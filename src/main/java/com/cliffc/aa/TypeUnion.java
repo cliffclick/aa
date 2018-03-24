@@ -196,4 +196,9 @@ public class TypeUnion extends Type {
     for( Type t : _ts._ts ) assert t.op_prec()==p; // answer is well-defined
     return p;
   }
+  @Override protected boolean is_pure() {
+    boolean pure = true;
+    for( Type t : _ts._ts ) pure &= t.is_pure();
+    return pure;
+  }
 }

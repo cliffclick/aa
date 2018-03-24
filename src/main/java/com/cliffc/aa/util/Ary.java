@@ -10,7 +10,7 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 
 // ArrayList with saner syntax
-public class Ary<E> {
+public class Ary<E> implements Iterable<E> {
   public E[] _es;
   public int _len;
   public Ary(E[] es) { this(es,es.length); }
@@ -42,6 +42,12 @@ public class Ary<E> {
     return this;
   }
 
+  public E set( int i, E e ) {
+    while( i>= _es.length ) _es = Arrays.copyOf(_es,_es.length<<1);
+    if( i >= _len ) _len = i+1;
+    return (_es[i] = e);
+  }
+  
   public Ary<E> set_as( E e ) { _es[0] = e; _len=1; return this; }
   
   /** @return compact array version, using the internal base array where possible. */
@@ -70,17 +76,18 @@ public class Ary<E> {
     return -1;
   }
   /** @return an iterator */
-  @NotNull public Iterator<E> iterator() { return new Iter(); }
+  @Override @NotNull public Iterator<E> iterator() { return new Iter(); }
   private class Iter implements Iterator<E> {
     int _i=0;
     @Override public boolean hasNext() { return _i<_len; }
     @Override public E next() { return _es[_i++]; }
   }
+  
   @Override public String toString() {
     SB sb = new SB().p('{');
     for( int i=0; i<_len; i++ ) {
       if( i>0 ) sb.p(',');
-      sb.p(_es[i].toString());
+      if( _es[i] != null ) sb.p(_es[i].toString());
     }
     return sb.p('}').toString();
   }

@@ -245,7 +245,7 @@ public class Type {
   }
   
   // Return any "return type" of the Meet of all function types
-  protected Type ret() { return _type==TANY ? ALL : ANY; } // Anything might be a function returning all things; other things return TOP/ANY
+  protected Type ret() { return null; }
   // Return a long   from a TypeInt constant; assert otherwise.
   protected long   getl() { throw AA.unimpl(); }
   // Return a double from a TypeFlt constant; assert otherwise.
@@ -275,7 +275,7 @@ public class Type {
     case TBASE: throw typerr(null);
     }
   }
-  protected boolean isCon() {
+  protected boolean is_con() {
     switch( _type ) {
     case TALL:
     case TSCALAR:

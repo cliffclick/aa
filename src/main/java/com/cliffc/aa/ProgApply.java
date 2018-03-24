@@ -31,7 +31,7 @@ public class ProgApply extends Prog {
       Prog arg = _args[i].resolve_types(x);
       progress |= arg != _args[i];
       Type t = ts[i] = (_args[i]=arg)._t; 
-      con &= t.isCon();
+      con &= t.is_con();
     }
     if( con && fun._t.is_pure() ) // All constants to a pure function; do the apply now
       return new ProgCon(((TypeFun)fun._t).apply(ts));

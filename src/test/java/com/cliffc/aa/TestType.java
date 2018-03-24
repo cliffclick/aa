@@ -5,29 +5,6 @@ import org.junit.Test;
 
 public class TestType {
   @Test public void testType0() {
-    // Trying to debug:
-    //    id(+)(1,2)
-    // ID needs to be a TypeFun, and have a real implementation - so that the
-    // type of the incoming arg carries across to the return result.  Currently
-    // return result is a SCALAR.  Needs to be "type inlined" at usages sites.
-    // Type analysis current defaults to:
-    //   SCALAR(1,2)
-    // which blows up.
-    
-    // Actually can do this with type-vars, where the input type of id is the
-    // same type-var as the output type.  Goes to having a Real Type-Annotation
-    // language.  "id(x::a) a" parses as "a function named 'id' with one input
-    // variable (named x) with a completely unconstrained type 'a', returning
-    // something of the same type.".
-
-    // So now need type-vars which U-F together.
-    
-
-    test("id(+)", Env.top().lookup("+",Type.ANY));
-    test("id(+)(1,pi)",TypeFlt.make(0,64,Math.PI+1));
-
-
-    
     // Simple int
     test("1",   TypeInt.TRUE);
     // Unary operator
@@ -67,6 +44,7 @@ public class TestType {
     // Parsed as +( (1+2*3) , (4*5+6) )
     test("+ 1 + 2 * 3 4 * 5 + 6 ", TypeInt.con(33));
 
+    // Ok, need serious type-prop for these
     test("id"   ,Prim.ID);
     test("id(1)",TypeInt.con(1));
     test("id(+)",Env.top().lookup("+",Type.ANY));

@@ -6,8 +6,8 @@ package com.cliffc.aa;
 public abstract class Exec {
   public static TypeEnv go( String src, String str ) { // Execute string
     Env env = Env.top();
-    Prog p = new Parse(src,env,str).go();
-    p = p.resolve();
-    return new TypeEnv(p.go(),env);
+    Parse p = new Parse(src,env,str);
+    Node n = p.go();
+    return new TypeEnv(p._gvn.type(n)/*pessimistic type*/,env);
   }
 }

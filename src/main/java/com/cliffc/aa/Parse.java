@@ -13,6 +13,7 @@ public class Parse {
   private final byte[] _buf;            // Bytes being parsed
   private int _x;                       // Parser index
   private int _line;                    // Zero-based line number
+  GVNGCP _gvn;                          // Pessimistic types
 
   // Fields strictly for Java number parsing
   private final NumberFormat _nf;
@@ -31,28 +32,21 @@ public class Parse {
     _nf.setGroupingUsed(false);
     _pp = new ParsePosition(0);
     _str = str;          // Keep a complete string copy for java number parsing
+    _gvn = new GVNGCP(false);   // Pessimistic during parsing
   }
   // Parse the string in the given lookup context, and return an executable program
-  Prog go( ) {
-    Prog res = top();
+  Node go( ) {
+    Node res = top();
     if( skipWS() != -1 ) throw err("Syntax error; trailing junk");
     return res;
   }
 
   /** Parse a top-level */
-  private Prog top() {
+  private Node top() {
     // Currently only supporting exprs
     return expr0();
   }
 
-  // -(3  ) ==> ok, e0:=e1;        e1:unary:-   e2:3
-  // -(3,1) ==> ok, e0:=e1(e0,e0); e1:binop:- ( e2:3 , e2:1 )
-  // - 3    ==> ok, e0:=e1;        e1:unary:-   e2:3
-  
-  // +(3  ) ==>err, e0:=e1;        e1:unary:+   e2:3
-  // +(3,1) ==> ok, e0:=e1(e0,e0); e1:binop:+ ( e2:3 , e2:1 )
-  // + 3    ==>err, e0:=e1;        e1:unary:+   e2:3
-  
   /** Parse an expression:
    * e0 := null
    * e0 := e1
@@ -73,12 +67,12 @@ public class Parse {
   // e0 := e1         // not a fcn call
   // e0 := e1(e0,...) // fcn call; zero-or-more args allowed
   // e0 := e1 e1...   // fcn call; one -or-more args allowed
-  private Prog expr0() {
-    Prog fun = expr1(), arg;
+  private Node expr0() {
+    Node fun = expr1(), arg;
     if( fun == null ) return null;   // No expression at all
     if( skipWS() == -1 ) return fun; // Just the original expression
     // Function application; parse out the argument list
-    ArrayList<Prog> args = new ArrayList<>();
+    ArrayList<Node> args = new ArrayList<>();
     if( peek('(') ) {               // Traditional fcn application
       if( (arg=expr1()) != null ) { // Check for a no-arg fcn call
         args.add(arg);              // Add first arg
@@ -93,23 +87,24 @@ public class Parse {
         args.add(arg);                 // Gather WS-separate args
       if( args.isEmpty() ) return fun; // Not a function call
     }
-    Prog[] pargs = args.toArray(new Prog[args.size()]);
+    Node[] pargs = args.toArray(new Node[args.size()]);
     
-    // Limit function choices to those matching arg count and type
-    Type[] ts = new Type[pargs.length];
-    for( int i=0; i<ts.length; i++ ) ts[i] = pargs[i]._t;
-    Type funt = TypeFun.make(fun._t.funame(),null,TypeTuple.make(ts),Type.SCALAR).meet(fun._t);
-    if( funt == Type.ALL || funt == Type.SCALAR )
-      throw err("Either "+fun+" is not a function, or is being called with "+ts.length+" args but expects a different number");
-    fun._t = funt; // Tighten allowed functions
-    return new ProgApply(fun,pargs);
+    //// Limit function choices to those matching arg count and type
+    //Type[] ts = new Type[pargs.length];
+    //for( int i=0; i<ts.length; i++ ) ts[i] = pargs[i]._t;
+    //Type funt = TypeFun.make(fun._t.funame(),null,TypeTuple.make(ts),Type.SCALAR).meet(fun._t);
+    //if( funt == Type.ALL || funt == Type.SCALAR )
+    //  throw err("Either "+fun+" is not a function, or is being called with "+ts.length+" args but expects a different number");
+    //fun._t = funt; // Tighten allowed functions
+    //return new ApplyNode(fun,pargs);
+    throw AA.unimpl();
   }
   
   // associates based on operator precedence across whole list of op-expr-op-expr...
   // e1 := [unop] e2 [binop e2]* 
-  private Prog expr1() {
+  private Node expr1() {
     ArrayList<Type> funs = new ArrayList<>();
-    ArrayList<Prog> args = new ArrayList<>();
+    ArrayList<Node> args = new ArrayList<>();
 
     // Parse an optional unary function
     int oldx = _x;
@@ -118,9 +113,9 @@ public class Parse {
     if( unfun==null ) { un=null; _x=oldx; } // Reset if no leading unary function
 
     // Parse first required e2 after option unary func
-    Prog e2 = expr2();
+    Node e2 = expr2();
     if( e2 == null )  // not a unary fcn application, so return the fcns if any
-      return unfun == null ? null : new ProgCon(unfun);
+      return unfun == null ? null : _gvn.ideal(new ConNode(unfun));
     // Collect 1st fcn/arg pair; if no unary then 1st fcn is null
     funs.add(unfun);   args.add(e2);
     
@@ -145,12 +140,12 @@ public class Parse {
       for( int i=0; i<funs.size(); i++ ) { // For all ops of this precedence level, left-to-right
         Type t = funs.get(i);
         if( t != null && t.op_prec()==max ) {
-          Prog pfun = new ProgCon(t);
+          Node pfun = _gvn.ideal(new ConNode(t));
           if( i==0 ) {          // Unary op?
-            args.set(i,new ProgApply(pfun,args.get(i))); // Apply unary op
+            args.set(i,_gvn.ideal(new ApplyNode(pfun,args.get(i)))); // Apply unary op
             funs.set(i,null);   // Clear unary slot
           } else {              // Binary: build tree node, reduce list length
-            args.set(i-1,new ProgApply(pfun,args.get(i-1),args.get(i)));
+            args.set(i-1,new ApplyNode(pfun,args.get(i-1),args.get(i)));
             funs.remove(i);  args.remove(i);  i--;
           }
         }
@@ -158,14 +153,14 @@ public class Parse {
       max--;
     }
     Type fun = funs.get(0);
-    Prog arg = args.get(0);
-    return fun==null ? arg : new ProgApply(new ProgCon(fun),arg); // Apply any left over unary op
+    Node arg = args.get(0);
+    return fun==null ? arg : _gvn.ideal(new ApplyNode(_gvn.ideal(new ConNode(fun)),arg)); // Apply any left over unary op
   }
 
   // optional lookup restricted to type/class of e3
   // e2 := e3 [. var] 
-  private Prog expr2() {
-    Prog e3 = expr3();
+  private Node expr2() {
+    Node e3 = expr3();
     if( peek('.') ) throw AA.unimpl();
     return e3;
   }
@@ -173,21 +168,22 @@ public class Parse {
   // e3 := var        // Basic vars pre-exist for primitives
   // e3 := num
   // e3 := (e0)       // grouping
-  private Prog expr3() {
+  private Node expr3() {
     int oldx = _x;
     if( skipWS() == -1 ) return null;
     if( peek('(') ) {
-      Prog e0 = expr0();
+      Node e0 = expr0();
       if( e0==null ) { _x = oldx; return null; } // A bare "()" pair is not an e3
       require(')'); return e0;
     }
     byte c = _buf[_x];
-    if( '0' <= c && c <= '9' ) return new ProgCon(number());
+    if( '0' <= c && c <= '9' ) return _gvn.ideal(new ConNode(number()));
     String tok = token();
     if( tok == null ) return null;
     Type var = _e.lookup(tok,Type.ANY);
     if( var == null ) { _x = oldx; return null; }
-    return var.canBeConst() ? new ProgCon(var) : new ProgVar(tok,var);
+    throw AA.unimpl();
+    //return var.canBeConst() ? new ConNode(var) : new NodeVar(tok,var);
   }
 
  

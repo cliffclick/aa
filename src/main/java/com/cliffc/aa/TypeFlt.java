@@ -32,7 +32,7 @@ public class TypeFlt extends Type {
   static final TypeFlt Pi     = make(0,64,Math.PI);
   static final TypeFlt[] TYPES = new TypeFlt[]{FLT64,FLT32,Pi};
   // Return a double from a TypeFlt constant; assert otherwise.
-  protected double getd() { assert isCon(); return _con; }
+  protected double getd() { assert is_con(); return _con; }
 
   @Override protected TypeFlt xdual() { return _x==0 ? this : new TypeFlt(-_x,_z,_con); }
   @Override protected Type xmeet( Type t ) {
@@ -65,5 +65,5 @@ public class TypeFlt extends Type {
   
   @Override protected boolean isBitShape(Type t) { return t._type == Type.TFLT && _z<=((TypeFlt)t)._z; }
   @Override public boolean canBeConst() { return _x>=0; }
-  @Override protected boolean isCon()   { return _x==0; }
+  @Override protected boolean is_con()   { return _x==0; }
 }

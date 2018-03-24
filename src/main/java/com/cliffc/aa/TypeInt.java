@@ -36,7 +36,7 @@ public class TypeInt extends Type {
   static final TypeInt[] TYPES = new TypeInt[]{INT64,INT32,INT16,BOOL,TRUE,FALSE};
   static TypeInt con(long con) { return make(0,log(con),con); }
   // Return a long from a TypeInt constant; assert otherwise.
-  protected long getl() { assert isCon(); return _con; }
+  protected long getl() { assert is_con(); return _con; }
 
   @Override protected TypeInt xdual() { return _x==0 ? this : new TypeInt(-_x,_z,_con); }
   @Override protected Type xmeet( Type t ) {
@@ -121,5 +121,5 @@ public class TypeInt extends Type {
     
   @Override protected boolean isBitShape(Type t) { return t._type == Type.TINT && _z<=((TypeInt)t)._z; }
   @Override public boolean canBeConst() { return _x>=0; }
-  @Override protected boolean isCon()   { return _x==0; }
+  @Override protected boolean is_con()   { return _x==0; }
 }

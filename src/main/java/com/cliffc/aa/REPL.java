@@ -12,10 +12,11 @@ public abstract class REPL {
     while( stdin.hasNextLine() ) {
       String line = stdin.nextLine();
       try { 
-        Prog p = new Parse("stdin",env,line).go();
-        p = p.resolve();
-        Type t = p.go();
-        System.out.println(t.toString());
+        Node p = new Parse("stdin",env,line).go();
+        throw AA.unimpl();
+        //p = p.resolve();
+        //Type t = p.go();
+        //System.out.println(t.toString());
       } catch( IllegalArgumentException iae ) {
         System.err.println(iae);
       }

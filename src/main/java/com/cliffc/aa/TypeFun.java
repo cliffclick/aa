@@ -7,7 +7,6 @@ public class TypeFun extends Type {
   String[] _args;               // Helpful arg names
   TypeTuple _ts;                // Arg types
   Type _ret;                    // return types
-  TypeVar[] _tvars;             // 
   protected TypeFun( String name, String[] args, TypeTuple ts, Type ret ) { super(TFUN); init(name,args,ts,ret); }
   private void init(String name, String[] args, TypeTuple ts, Type ret) {  _name = name; _args = args; _ts = ts; _ret = ret; }
   @Override public int hashCode( ) { return TFUN + _ts.hashCode() + _ret.hashCode() + _name.hashCode();  }
