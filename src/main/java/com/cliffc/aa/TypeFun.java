@@ -7,6 +7,7 @@ public class TypeFun extends Type {
   String[] _args;               // Helpful arg names
   TypeTuple _ts;                // Arg types
   Type _ret;                    // return types
+  TypeVar[] _tvars;             // 
   protected TypeFun( String name, String[] args, TypeTuple ts, Type ret ) { super(TFUN); init(name,args,ts,ret); }
   private void init(String name, String[] args, TypeTuple ts, Type ret) {  _name = name; _args = args; _ts = ts; _ret = ret; }
   @Override public int hashCode( ) { return TFUN + _ts.hashCode() + _ret.hashCode() + _name.hashCode();  }
@@ -55,7 +56,7 @@ public class TypeFun extends Type {
     default: throw typerr(t);   // All else should not happen
     }
     TypeFun tf = (TypeFun)t;
-    Type ret = _ret.join(tf._ret); // Notice JOIN, Functions are contrapositive
+    Type ret = _ret.join(tf._ret); // Notice JOIN, Functions are contravariant
     // If name or arglength are not compatible, then a union instead
     if( _name.equals(tf._name) && 
         _ts._ts.length == tf._ts._ts.length ) {
