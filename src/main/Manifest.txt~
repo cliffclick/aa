@@ -1,0 +1,2 @@
+Main-Class: com.cliffc.rocketrade.RocketTrade
+Class-Path: rocketrade.jar h2o.jar

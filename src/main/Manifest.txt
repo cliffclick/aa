@@ -1,0 +1,2 @@
+Main-Class: com.cliffc.aa.AA
+Class-Path: aa.jar
