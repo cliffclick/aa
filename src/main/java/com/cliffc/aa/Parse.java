@@ -48,6 +48,22 @@ public class Parse {
     return expr0();
   }
 
+  /** Wheee.... parse grammer round 2...
+   *  prog = expr END
+   *  expr = term [binop term]*   // gather all the binops and sort by prec
+   *  term = nfact                // No function call
+   *  term = nfact ( [expr,]* )+  // One or more function calls in a row, args are delimited
+   *  term = nfact nfact*         // One function call, all the args listed
+   *  nfact= unop* fact           // Zero or more unop calls over a fact
+   *  fact = id                   // variable lookup
+   *  fact = num                  // number
+   *  fact = (binop)              // Special syntactic form of binop; no spaces allowed; returns function constant
+   *  fact = (unop)               // Special syntactic form of  unop; no spaces allowed; returns function constant
+   *  fact = (expr)               // General expression called recursively
+   *  binop = +-*/%&|             // etc; primitive lookup; can determine infix binop at parse-time
+   *  unop  =  -!~                // etc; primitive lookup; can determine infix  unop at parse-time
+   */
+  
   /** Parse an expression:
    * e0 := null
    * e0 := e1
@@ -96,10 +112,10 @@ public class Parse {
     else if( t instanceof TypeUnion ) {
       tf = pick_fun((TypeUnion)t,args,1);
       if( tf == null ) throw AA.unimpl();
+      _gvn.setype(fun,tf);
     } else throw err("A function is being called, but "+fun+" is not a function");
     if( tf._ts._ts.length != args._len-1 )
       throw err(""+tf+" expects "+tf._ts._ts.length+" arguments but called with "+(args._len-1));
-    _gvn.setype(fun,tf);
     return _gvn.ideal(new ApplyNode(args.asAry()));
   }
   
