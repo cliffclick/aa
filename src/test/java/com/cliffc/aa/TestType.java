@@ -5,6 +5,8 @@ import org.junit.Test;
 
 public class TestType {
   @Test public void testType0() {
+    test("id(1)",Env.top().lookup("+",Type.ANY));
+
     // Simple int
     test("1",   TypeInt.TRUE);
     // Unary operator
@@ -30,22 +32,22 @@ public class TestType {
     test("!",  Env.top().lookup("!",Type.ANY));
     // Function application, lispy-style WS-delimited args
     test   ("+ 1 2", TypeInt.con( 3));
-    testerr("- 1 2", "\nargs:0:Either {any[-::Flt64, -::Int64]}([1]) is not a function, or is being called with 1 args but expects a different number\n- 1 2\n     ^\n");
+    testerr("- 1 2", "\nargs:0:A function is being called, but -1 is not a function\n- 1 2\n     ^\n");
     // Function application, traditional paren/comma args
     test   ("+(1,2)", TypeInt.con( 3));
     testerr("-(1,2)", "\nargs:0:Expected ')' but found ',' instead\n-(1,2)\n   ^\n"); // binary version
     test   ("-(1  )", TypeInt.con(-1)); // unary version
     // error; mismatch arg count
-    testerr("!()"     , "\nargs:0:Either !::Int1 is not a function, or is being called with 0 args but expects a different number\n!()\n   ^\n");
-    testerr("pi(1)"   , "\nargs:0:Either 3.141592653589793 is not a function, or is being called with 1 args but expects a different number\npi(1)\n     ^\n");
-    testerr("+(1,2,3)", "\nargs:0:Either {any[+::Flt64, +::Int64]} is not a function, or is being called with 3 args but expects a different number\n+(1,2,3)\n        ^\n");
+    testerr("!()"     , "\nargs:0:!::Int1 expects 1 arguments but called with 0\n!()\n   ^\n");
+    testerr("pi(1)"   , "\nargs:0:A function is being called, but 3.141592653589793 is not a function\npi(1)\n     ^\n");
+    testerr("+(1,2,3)", "\nargs:0:+::Int64 expects 2 arguments but called with 3\n+(1,2,3)\n        ^\n");
     // Parsed as +(1,(2*3))
     test("+ 1 2 * 3 ", TypeInt.con(7));
     // Parsed as +( (1+2*3) , (4*5+6) )
     test("+ 1 + 2 * 3 4 * 5 + 6 ", TypeInt.con(33));
 
     // Ok, need serious type-prop for these
-    test("id"   ,Prim.ID);
+    test("id"   ,Env.top().lookup("id",Type.ANY));
     test("id(1)",TypeInt.con(1));
     test("id(+)",Env.top().lookup("+",Type.ANY));
     test("id(+)(id(1),id(pi))",TypeFlt.make(0,64,Math.PI+1));

@@ -4,18 +4,18 @@ package com.cliffc.aa;
 public abstract class Prim {
   final static String[] ARGS1 = new String[]{"x"};
   final static String[] ARGS2 = new String[]{"x","y"};
-  static final TypeFun ID = (TypeFun)new ID().hashcons();
   private static final TypeFun convInt32Flt64 = (TypeFun)new  ConvertInt32Flt64().hashcons();
   //private static final ValPrim1 convUInt32Int64 = new ConvertUInt32Int64();
   //private static final ValPrim1 convUInt32Flt64 = new ConvertUInt32Flt64();
   //private static final ValPrim1  convInt64Flt64 = new  ConvertInt64Flt64();
   
   static final TypeFun[] TYPES = new TypeFun[]{
-    ID,
     convInt32Flt64,
 
     (TypeFun)new MinusFlt64().hashcons(),
+    (TypeFun)new    IDFlt64().hashcons(),
     (TypeFun)new MinusInt64().hashcons(),
+    (TypeFun)new    IDInt64().hashcons(),
     (TypeFun)new AddFlt64  ().hashcons(),
     (TypeFun)new SubFlt64  ().hashcons(),
     (TypeFun)new MulFlt64  ().hashcons(),
@@ -41,15 +41,9 @@ class PrimPure extends TypeFun {
   @Override public String toString() { return _name+"::"+_ret; }
 }
 
-class ID extends PrimPure {
-  ID() { super("id",Prim.ARGS1,TypeTuple.SCALAR,Type.SCALAR); }
-  Type apply( Type[] args ) { return args[0]; }
-  boolean is_lossy() { return false; }
-}  
-
 class ConvertInt32Flt64 extends PrimPure {
   ConvertInt32Flt64() { super("flt64",Prim.ARGS1,TypeTuple.INT32,TypeFlt.FLT64); }
-  TypeFlt apply( Type[] args ) { return TypeFlt.make(0,64,(double)args[0].getl()); }
+  TypeFlt apply( Type[] args ) { return TypeFlt.make(0,64,(double)args[1].getl()); }
   @Override int op_prec() { return 9; }
   boolean is_lossy() { return false; }
 }
@@ -72,7 +66,7 @@ class ConvertInt32Flt64 extends PrimPure {
 // 1Ops have uniform input/output types, so take a shortcut on name printing
 abstract class Prim1OpF64 extends PrimPure {
   Prim1OpF64( String name ) { super(name,Prim.ARGS1,TypeTuple.FLT64,TypeFlt.FLT64); }
-  TypeFlt apply( Type[] args ) { return TypeFlt.make(0,64,op(args[0].getd())); }
+  TypeFlt apply( Type[] args ) { return TypeFlt.make(0,64,op(args[1].getd())); }
   abstract double op( double d );
   @Override int op_prec() { return 9; }
 }
@@ -82,10 +76,15 @@ class MinusFlt64 extends Prim1OpF64 {
   double op( double d ) { return -d; }
 }
 
+class IDFlt64 extends Prim1OpF64 {
+  IDFlt64() { super("id"); }
+  double op( double d ) { return d; }
+}  
+
 // 1Ops have uniform input/output types, so take a shortcut on name printing
 abstract class Prim1OpI64 extends PrimPure {
   Prim1OpI64( String name ) { super(name,Prim.ARGS1,TypeTuple.INT64,TypeInt.INT64); }
-  TypeInt apply( Type[] args ) { return TypeInt.con(op(args[0].getl())); }
+  TypeInt apply( Type[] args ) { return TypeInt.con(op(args[1].getl())); }
   @Override int op_prec() { return 9; }
   abstract long op( long d );
 }
@@ -95,16 +94,21 @@ class MinusInt64 extends Prim1OpI64 {
   long op( long x ) { return -x; }
 }
 
+class IDInt64 extends Prim1OpI64 {
+  IDInt64() { super("id"); }
+  long op( long x ) { return x; }
+}  
+
 class NotInt64 extends PrimPure {
   NotInt64() { super("!",Prim.ARGS1,TypeTuple.INT64,TypeInt.BOOL); }
-  TypeInt apply( Type[] args ) { return args[0].getl()==0?TypeInt.TRUE:TypeInt.FALSE; }
+  TypeInt apply( Type[] args ) { return args[1].getl()==0?TypeInt.TRUE:TypeInt.FALSE; }
   @Override int op_prec() { return 9; }
 }
 
 // 2Ops have uniform input/output types, so take a shortcut on name printing
 abstract class Prim2OpF64 extends PrimPure {
   Prim2OpF64( String name ) { super(name,Prim.ARGS2,TypeTuple.FLT64_FLT64,TypeFlt.FLT64); }
-  TypeFlt apply( Type[] args ) { return TypeFlt.make(0,64,op(args[0].getd(),args[1].getd())); }
+  TypeFlt apply( Type[] args ) { return TypeFlt.make(0,64,op(args[1].getd(),args[2].getd())); }
   abstract double op( double x, double y );
 }
 
@@ -129,7 +133,7 @@ class MulFlt64 extends Prim2OpF64 {
 // 2Ops have uniform input/output types, so take a shortcut on name printing
 abstract class Prim2OpI64 extends PrimPure {
   Prim2OpI64( String name ) { super(name,Prim.ARGS2,TypeTuple.INT64_INT64,TypeInt.INT64); }
-  TypeInt apply( Type[] args ) { return TypeInt.con(op(args[0].getl(),args[1].getl())); }
+  TypeInt apply( Type[] args ) { return TypeInt.con(op(args[1].getl(),args[2].getl())); }
   abstract long op( long x, long y );
 }
 

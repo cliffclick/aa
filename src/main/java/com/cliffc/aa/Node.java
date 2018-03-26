@@ -39,6 +39,13 @@ public abstract class Node {
 
   // Compute the current best Type for this Node, based on the types of its inputs
   abstract Type value(GVNGCP gvn);
+
+  Type[] types( GVNGCP gvn ) {
+    Type[] ts = new Type[_defs._len];
+    for( int i=0; i<_defs._len; i++ )
+      ts[i] = gvn.type(_defs.at(i));
+    return ts;
+  }
   
   Node add_def(Node n) {
     throw AA.unimpl();
@@ -63,18 +70,20 @@ class ConNode extends Node {
 }
 
 class ApplyNode extends Node {
-  ApplyNode( Node fun, Node arg0 ) { super(fun,arg0); }
-  ApplyNode( Node fun, Node arg0, Node arg1 ) { super(fun,arg0,arg1); }
+  ApplyNode( Node... defs ) { super(defs); }
   @Override String str() { return "apply"; }
   @Override Node ideal() { return null; }
   @Override Type value(GVNGCP gvn) {
     Type fun = gvn.type(_defs.at(0));
     // if function is pure and all args are constant, eval immediately
     if( fun.is_pure() ) {
-      
-      throw AA.unimpl();
+      Type[] ts = types(gvn);
+      boolean con=true;
+      for( Type t : ts ) if( !t.is_con() ) { con=false; break; }
+      if( con ) 
+        return ((TypeFun)fun).apply(ts);
     }
-    
+    // Value is the function return type
     Type ret = fun.ret();
     if( ret==null ) throw AA.unimpl();
     return ret;

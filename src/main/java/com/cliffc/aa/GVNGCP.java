@@ -17,6 +17,7 @@ public class GVNGCP {
   GVNGCP( boolean opt ) { _opt = opt; }
 
   Type type( Node n ) { return _ts.at(n._uid); }
+  void setype( Node n, Type t ) { _ts.set(n._uid,t); }
 
   Node ideal( Node n ) {
     Type t = n.value(this);
@@ -25,7 +26,7 @@ public class GVNGCP {
       for( Node use : n._uses ) _work.add(use); // TODO: remove dups
     }
     if( t.is_con() && !(n instanceof ConNode) )
-      throw AA.unimpl();
+      return ideal(new ConNode(t));
     return n;
   }
 }

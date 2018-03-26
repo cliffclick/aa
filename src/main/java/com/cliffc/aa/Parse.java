@@ -1,8 +1,9 @@
 package com.cliffc.aa;
 
+import com.cliffc.aa.util.Ary;
+
 import java.text.NumberFormat;
 import java.text.ParsePosition;
-import java.util.ArrayList;
   
 /** an implementation of language AA
  */
@@ -72,7 +73,7 @@ public class Parse {
     if( fun == null ) return null;   // No expression at all
     if( skipWS() == -1 ) return fun; // Just the original expression
     // Function application; parse out the argument list
-    ArrayList<Node> args = new ArrayList<>();
+    Ary<Node> args = new Ary<>(new Node[]{fun});
     if( peek('(') ) {               // Traditional fcn application
       if( (arg=expr1()) != null ) { // Check for a no-arg fcn call
         args.add(arg);              // Add first arg
@@ -85,32 +86,34 @@ public class Parse {
     } else {                    // lispy-style fcn application
       while( (arg = expr1()) != null ) // While have args
         args.add(arg);                 // Gather WS-separate args
-      if( args.isEmpty() ) return fun; // Not a function call
+      if( args.len()==1 ) return fun;  // Not a function call
     }
-    Node[] pargs = args.toArray(new Node[args.size()]);
     
-    //// Limit function choices to those matching arg count and type
-    //Type[] ts = new Type[pargs.length];
-    //for( int i=0; i<ts.length; i++ ) ts[i] = pargs[i]._t;
-    //Type funt = TypeFun.make(fun._t.funame(),null,TypeTuple.make(ts),Type.SCALAR).meet(fun._t);
-    //if( funt == Type.ALL || funt == Type.SCALAR )
-    //  throw err("Either "+fun+" is not a function, or is being called with "+ts.length+" args but expects a different number");
-    //fun._t = funt; // Tighten allowed functions
-    //return new ApplyNode(fun,pargs);
-    throw AA.unimpl();
+    // Limit function choices to those matching arg count and type
+    Type t = _gvn.type(fun);
+    TypeFun tf;
+    if( t instanceof TypeFun ) tf = (TypeFun)t;
+    else if( t instanceof TypeUnion ) {
+      tf = pick_fun((TypeUnion)t,args,1);
+      if( tf == null ) throw AA.unimpl();
+    } else throw err("A function is being called, but "+fun+" is not a function");
+    if( tf._ts._ts.length != args._len-1 )
+      throw err(""+tf+" expects "+tf._ts._ts.length+" arguments but called with "+(args._len-1));
+    _gvn.setype(fun,tf);
+    return _gvn.ideal(new ApplyNode(args.asAry()));
   }
   
   // associates based on operator precedence across whole list of op-expr-op-expr...
   // e1 := [unop] e2 [binop e2]* 
   private Node expr1() {
-    ArrayList<Type> funs = new ArrayList<>();
-    ArrayList<Node> args = new ArrayList<>();
+    Ary<Type> funs = new Ary<>(new Type[1],0);
+    Ary<Node> args = new Ary<>(new Node[1],0);
 
     // Parse an optional unary function
     int oldx = _x;
     String un = token();
     Type unfun = un==null ? null : _e.lookup(un, TypeFun.any(un,1)); // Unary arg-count functions
-    if( unfun==null ) { un=null; _x=oldx; } // Reset if no leading unary function
+    if( unfun==null ) _x=oldx;  // Reset if no leading unary function
 
     // Parse first required e2 after option unary func
     Node e2 = expr2();
@@ -136,24 +139,28 @@ public class Parse {
     int max=-1;
     for( Type t : funs ) if( t != null ) max = Math.max(max,t.op_prec());
     // Now starting at max working down, group list by pairs into a tree
-    while( args.size() > 1 || funs.get(0) != null ) {
-      for( int i=0; i<funs.size(); i++ ) { // For all ops of this precedence level, left-to-right
-        Type t = funs.get(i);
+    while( args.len() > 1 || funs.at(0) != null ) {
+      for( int i=0; i<funs.len(); i++ ) { // For all ops of this precedence level, left-to-right
+        Type t = funs.at(i);
         if( t != null && t.op_prec()==max ) {
-          Node pfun = _gvn.ideal(new ConNode(t));
+          TypeFun tf = (t instanceof TypeFun) ? (TypeFun)t : pick_fun((TypeUnion)t,args,i==0?0:i-1);
+          Node pfun = _gvn.ideal(new ConNode(tf));
           if( i==0 ) {          // Unary op?
-            args.set(i,_gvn.ideal(new ApplyNode(pfun,args.get(i)))); // Apply unary op
+            args.set(i  ,_gvn.ideal(new ApplyNode(pfun, // Apply unary op
+                                                  convert(args.at(i),tf._ts._ts[0]))));
             funs.set(i,null);   // Clear unary slot
           } else {              // Binary: build tree node, reduce list length
-            args.set(i-1,new ApplyNode(pfun,args.get(i-1),args.get(i)));
+            args.set(i-1,_gvn.ideal(new ApplyNode(pfun,
+                                       convert(args.at(i-1),tf._ts._ts[0]),
+                                       convert(args.at(i  ),tf._ts._ts[1]))));
             funs.remove(i);  args.remove(i);  i--;
           }
         }
       }
       max--;
     }
-    Type fun = funs.get(0);
-    Node arg = args.get(0);
+    Type fun = funs.at(0);
+    Node arg = args.at(0);
     return fun==null ? arg : _gvn.ideal(new ApplyNode(_gvn.ideal(new ConNode(fun)),arg)); // Apply any left over unary op
   }
 
@@ -182,10 +189,43 @@ public class Parse {
     if( tok == null ) return null;
     Type var = _e.lookup(tok,Type.ANY);
     if( var == null ) { _x = oldx; return null; }
+    if( var.canBeConst() ) return _gvn.ideal(new ConNode(var));
+    // need to return the Node representing the var in the environment
     throw AA.unimpl();
-    //return var.canBeConst() ? new ConNode(var) : new NodeVar(tok,var);
   }
 
+  // Toss out choices where any args are not "isa" the call requirements,
+  // and error if there is not exactly 1 choice.
+  // i==0 is 1-arg, i==1 is 2-arg
+  private TypeFun pick_fun( TypeUnion tu, Ary<Node> args, int x ) {
+    Type[] funs = tu._ts._ts;
+    Type[] actuals = new Type[((TypeFun)funs[0])._args.length];
+    for( int i=0; i<actuals.length; i++ ) actuals[i] = _gvn.type(args.at(x+i));
+    TypeFun z=null;  int zcvts=999;
+    // for each function, see if the args isa.  If not, toss it out.
+    for( int i=0,j; i<funs.length; i++ ) {
+      TypeFun fun = (TypeFun)funs[i];
+      Type[] fargs = fun._ts._ts;
+      int cvts=0;
+      for( j=0; j<actuals.length; j++ )
+        if( !(actuals[j].isa(fargs[j])) ) break;
+        else if( !actuals[j].isBitShape(fargs[j]) ) cvts++;
+      if( j<actuals.length ) continue; // Some argument does not apply; drop this choice
+      if( z==null || cvts < zcvts ) { z=fun; zcvts = cvts; }
+      else throw err("Ambiguous function choices");
+    }
+    return z;
+  }
+
+  // Throw in a primitive format conversion as needed
+  private Node convert( Node actual, Type formal ) {
+    Type act = _gvn.type(actual);
+    if( act.isBitShape(formal) ) return actual;
+    TypeFun cvt = Prim.convert(act,formal);
+    if( cvt.is_lossy() ) throw new IllegalArgumentException("Requires lossy conversion");
+    return _gvn.ideal(new ApplyNode(_gvn.ideal(new ConNode(cvt)),actual));
+  }
+  
  
   // Lexical tokens.  Any alpha, followed by any alphanumerics is a alpha-
   // token; alpha-tokens end with WS or any operator character.  Any collection
