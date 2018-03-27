@@ -8,8 +8,11 @@ public class TestType {
     // Syntax for variable assignment
     test("x=1", TypeInt.TRUE);
     test("x=y=1", TypeInt.TRUE);
+    testerr("x=y=", "missing expr after assignment");
+    testerr("x=y","y not defined");
+    testerr("x=1+y","y not defined");
     test("x=2; y=x+1; x*y", TypeInt.con(6));
-    // Parses as: x=(2*3); 1+x+x*x
+    // Re-use ref immediately after def; parses as: x=(2*3); 1+x+x*x
     test("1+(x=2*3)+x*x", TypeInt.con(43));
     testerr("x=(1+(x=2)+x)", "cannot make the same ref twice");
 
@@ -37,7 +40,7 @@ public class TestType {
     // bare function lookup; returns a union of '+' functions
     testerr("+", "\nargs:0:Syntax error; trailing junk\n+\n^\n");
     test("(+)", Env.top().lookup("+",Type.ANY));
-    test("(!)",  Env.top().lookup("!",Type.ANY));
+    test("(!)", Env.top().lookup("!",Type.ANY));
     // Function application, traditional paren/comma args
     test("(+)(1,2)", TypeInt.con( 3));
     test("(-)(1,2)", TypeInt.con(-1)); // binary version
