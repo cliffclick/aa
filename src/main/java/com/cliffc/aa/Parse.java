@@ -39,7 +39,8 @@ public class Parse {
   Node go( ) { return prog(); }
 
   /** Wheee.... parse grammer round 2...
-   *  prog = expr END
+   *  prog = stmt END
+   *  stmt = [id = ] expr [; stmt]* // id must not exist, and is available in later statements
    *  expr = term [binop term]*   // gather all the binops and sort by prec
    *  term = nfact                // No function call
    *  term = nfact ( [expr,]* )+  // One or more function calls in a row, args are delimited
@@ -49,7 +50,7 @@ public class Parse {
    *  fact = num                  // number
    *  fact = (binop)              // Special syntactic form of binop; no spaces allowed; returns function constant
    *  fact = (uniop)              // Special syntactic form of uniop; no spaces allowed; returns function constant
-   *  fact = (expr)               // General expression called recursively
+   *  fact = (stmt)               // General statement called recursively
    *  binop = +-*%&|              // etc; primitive lookup; can determine infix binop at parse-time
    *  uniop  =  -!~               // etc; primitive lookup; can determine infix uniop at parse-time
    */
@@ -57,15 +58,39 @@ public class Parse {
    *  prog = expr END */
   private Node prog() {
     // Currently only supporting exprs
-    Node res = expr();
+    Node res = stmt();
     if( skipWS() != -1 ) throw err("Syntax error; trailing junk");
     return res;
   }
 
+  private Node stmt() {
+    // Scan for 'id ='.  Error if id pre-exists.  If either 'id' or '=' is not
+    // found, then no assignment.
+    int oldx = _x;
+    String token = token();
+    if( token != null ) {
+      Type t = _e.lookup(token,Type.ANY);
+      if( peek('=') ) {         // Assignment?
+        if( t != null ) throw err("Cannot re-assign ref "+token);
+      } else {                  // No assignment
+        _x = oldx;              // Unwind token parse
+        token = null;
+      }
+    }
+    Node expr = expr();
+    if( token != null ) {
+      // here need to expand _e to make token to expr.
+      // TODO: _e maps names to Nodes, not Types.
+      throw AA.unimpl();
+    }
+    return expr;
+  }
+  
   /** Parse an expression, a list of terms and infix operators
-   *  expr = term [binop term]*  */
+   *  expr = term [binop term]*
+   *  @return Node does NOT need gvn() */
   private Node expr() {
-    Node term = term();
+    Node term = gvn(term());
     if( term == null ) return null; // Term is required, so missing term implies not any expr
     // Collect 1st fcn/arg pair
     Ary<Type> funs = new Ary<>(new Type[1],0);
@@ -80,7 +105,7 @@ public class Parse {
       if( bin==null ) break;    // Valid parse, but no more Kleene star
       Type binfun = _e.lookup(bin,TypeFun.any(bin,2)); // BinOp, or null
       if( binfun==null ) { _x=oldx; break; } // Not a binop, no more Kleene star
-      term = term();
+      term = gvn(term());
       if( term == null ) throw err("missing expr after binary op "+bin);
       funs.add(binfun);  args.add(term);
     }
@@ -97,9 +122,9 @@ public class Parse {
         if( t.op_prec() < max ) continue; // Not yet
         // Either a function, or an overload-of-functions.  Resolve overloads.
         TypeFun tf = (t instanceof TypeFun) ? (TypeFun)t : pick_fun((TypeUnion)t,args,i-1,2);
-        args.set(i-1,_gvn.ideal(new ApplyNode(_gvn.ideal(new ConNode(tf)),
-                                              convert(args.at(i-1),tf._ts._ts[0]),
-                                              convert(args.at(i  ),tf._ts._ts[1]))));
+        args.set(i-1,gvn(new ApplyNode(gvn(new ConNode(tf)),
+                                       convert(args.at(i-1),tf._ts._ts[0]),
+                                       convert(args.at(i  ),tf._ts._ts[1]))));
         funs.remove(i);  args.remove(i);  i--;
       }
       max--;
@@ -110,18 +135,19 @@ public class Parse {
   /** Parse a function call, or not
    *  term = nfact                // No function call
    *  term = nfact ( [expr,]* )+  // One or more function calls in a row, each set of args are delimited
-   *  term = nfact nfact*         // One function call, all the args listed  */
+   *  term = nfact nfact*         // One function call, all the args listed
+   *  @return Node needs gvn() */
   private Node term() {
-    Node fun = nfact(), arg;         // nfactor
+    Node fun = nfact(), arg;    // nfactor
     if( fun == null ) return null;   // No term at all
     if( skipWS() == -1 ) return fun; // Just the original term
     // Function application; parse out the argument list
-    Ary<Node> args = new Ary<>(new Node[]{fun});
+    Ary<Node> args = new Ary<>(new Node[]{gvn(fun)});
     if( peek('(') ) {               // Traditional fcn application
-      if( (arg=expr()) != null ) {  // Check for a no-arg fcn call
+      if( (arg=stmt()) != null ) {  // Check for a no-arg fcn call
         args.add(arg);              // Add first arg
         while( peek(',') ) {        // Gather comma-separated args
-          if( (arg=expr()) == null ) throw err("Missing argument in function call");
+          if( (arg=stmt()) == null ) throw err("Missing argument in function call");
           args.add(arg);
         }
       }
@@ -134,7 +160,7 @@ public class Parse {
       // single arg "-(2)" - but "1" is not a function.
       return fun;              // No function call
       
-      //while( (arg = expr()) != null ) // While have args
+      //while( (arg = stmt()) != null ) // While have args
       //  args.add(arg);                // Gather WS-separate args
       //if( args.len()==1 ) return fun; // Not a function call
     }
@@ -145,11 +171,12 @@ public class Parse {
     if( tf._ts._ts.length != args._len-1 )
       throw err(""+tf+" expects "+tf._ts._ts.length+" arguments but called with "+(args._len-1));
     _gvn.setype(fun,tf);
-    return _gvn.ideal(new ApplyNode(args.asAry()));
+    return new ApplyNode(args.asAry());
   }
   
   /** Parse any leading unary ops before a factor
-   *  nfact = fact | uniop nfact */
+   *  nfact = fact | uniop nfact 
+   *  @return Node needs gvn() */
   private Node nfact() {
     int oldx = _x;
     skipWS();
@@ -157,10 +184,10 @@ public class Parse {
     if( uni!=null ) { // Valid parse
       Type unifun = _e.lookup(uni,TypeFun.any(uni,1));
       if( unifun != null && unifun.op_prec() > 0 )  {
-        Node arg = nfact();     // Recursive call
+        Node arg = gvn(nfact()); // Recursive call
         if( arg == null ) throw err("Call to unary function "+unifun+", but missing the one required argument");
         TypeFun tf = resolve_function_type(unifun,new Ary<>(new Node[]{null,arg}),1);
-        return _gvn.ideal(new ApplyNode(_gvn.ideal(new ConNode(tf)),arg));
+        return new ApplyNode(gvn(new ConNode(tf)),arg);
       } else {
         _x=oldx;                // Unwind token parse and try again for a factor
       }
@@ -173,18 +200,19 @@ public class Parse {
    *  fact = num       // number
    *  fact = (binop)   // Special syntactic form of binop; no spaces allowed; returns function constant
    *  fact = (uniop)   // Special syntactic form of uniop; no spaces allowed; returns function constant
-   *  fact = (expr)    // General expression called recursively */
+   *  fact = (expr)    // General expression called recursively
+   *  @return Node needs gvn() */
   private Node fact() {
     if( skipWS() == -1 ) return null;
     byte c = _buf[_x];
-    if( '0' <= c && c <= '9' ) return _gvn.ideal(new ConNode(number()));
+    if( '0' <= c && c <= '9' ) return new ConNode(number());
     int oldx = _x;
     if( peek('(') ) { // Either a special-syntax pre/infix op, or a nested expression
       Type op = look_token();
       if( peek(')') && op != null && op.op_prec() > 0 )
-        return _gvn.ideal(new ConNode(op)); // Return operator as a function constant
+        return new ConNode(op); // Return operator as a function constant
       _x = oldx+1;         // Back to the opening paren
-      Node ex = expr();
+      Node ex = stmt();
       if( ex==null ) { _x = oldx; return null; } // A bare "()" pair is not an expr
       require(')');
       return ex;
@@ -195,7 +223,7 @@ public class Parse {
     // Disallow uniop and binop functions as factors.
     if( var == null || var.op_prec() > 0 ) { _x = oldx; return null; }
     // TODO: Need to return the Node representing the var in the environment
-    if( var.canBeConst() ) return _gvn.ideal(new ConNode(var));
+    if( var.canBeConst() ) return new ConNode(var);
     throw AA.unimpl();
   }
 
@@ -248,7 +276,7 @@ public class Parse {
     if( act.isBitShape(formal) ) return actual;
     TypeFun cvt = Prim.convert(act,formal);
     if( cvt.is_lossy() ) throw new IllegalArgumentException("Requires lossy conversion");
-    return _gvn.ideal(new ApplyNode(_gvn.ideal(new ConNode(cvt)),actual));
+    return gvn(new ApplyNode(gvn(new ConNode(cvt)),actual));
   }
   
  
@@ -311,6 +339,9 @@ public class Parse {
   private static boolean isAlpha1(byte c) { return isAlpha0(c) || ('0'<=c && c <= '9'); }
   private static boolean isOp0   (byte c) { return "!#$%*+,-.;:=<>?@^[]{}~/".indexOf(c) != -1; }
   private static boolean isOp1   (byte c) { return isOp0(c); }
+
+  private Node gvn(Node n) { return n==null ? null : _gvn.ideal(n); }
+  
 
   // Handy for the debugger to print 
   @Override public String toString() { return new String(_buf,_x,_buf.length-_x); }

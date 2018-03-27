@@ -12,7 +12,6 @@ public abstract class Prim {
   static final TypeFun[] TYPES = new TypeFun[]{
     convInt32Flt64,
 
-    (TypeFun)new    IDFun  ().hashcons(),
     (TypeFun)new    IDFlt64().hashcons(),
     (TypeFun)new    IDInt64().hashcons(),
     (TypeFun)new MinusFlt64().hashcons(),
@@ -41,12 +40,6 @@ class PrimPure extends TypeFun {
   @Override protected boolean is_pure() { return true; }
   @Override public String toString() { return _name+"::"+_ret; }
 }
-
-class IDFun extends PrimPure {
-  IDFun() { super("id",Prim.ARGS1,TypeTuple.ANY_FUN,TypeFun.ANY_FUN); }
-  Type apply( Type[] args ) { return args[1]; }
-  @Override int op_prec() { return -1; } // not valid prefix op
-}  
 
 class ConvertInt32Flt64 extends PrimPure {
   ConvertInt32Flt64() { super("flt64",Prim.ARGS1,TypeTuple.INT32,TypeFlt.FLT64); }
