@@ -12,10 +12,11 @@ public abstract class Prim {
   static final TypeFun[] TYPES = new TypeFun[]{
     convInt32Flt64,
 
-    (TypeFun)new MinusFlt64().hashcons(),
+    (TypeFun)new    IDFun  ().hashcons(),
     (TypeFun)new    IDFlt64().hashcons(),
-    (TypeFun)new MinusInt64().hashcons(),
     (TypeFun)new    IDInt64().hashcons(),
+    (TypeFun)new MinusFlt64().hashcons(),
+    (TypeFun)new MinusInt64().hashcons(),
     (TypeFun)new AddFlt64  ().hashcons(),
     (TypeFun)new SubFlt64  ().hashcons(),
     (TypeFun)new MulFlt64  ().hashcons(),
@@ -40,6 +41,12 @@ class PrimPure extends TypeFun {
   @Override protected boolean is_pure() { return true; }
   @Override public String toString() { return _name+"::"+_ret; }
 }
+
+class IDFun extends PrimPure {
+  IDFun() { super("id",Prim.ARGS1,TypeTuple.ANY_FUN,TypeFun.ANY_FUN); }
+  Type apply( Type[] args ) { return args[1]; }
+  @Override int op_prec() { return -1; } // not valid prefix op
+}  
 
 class ConvertInt32Flt64 extends PrimPure {
   ConvertInt32Flt64() { super("flt64",Prim.ARGS1,TypeTuple.INT32,TypeFlt.FLT64); }
@@ -79,6 +86,7 @@ class MinusFlt64 extends Prim1OpF64 {
 class IDFlt64 extends Prim1OpF64 {
   IDFlt64() { super("id"); }
   double op( double d ) { return d; }
+  @Override int op_prec() { return -1; } // not valid prefix op
 }  
 
 // 1Ops have uniform input/output types, so take a shortcut on name printing
@@ -97,6 +105,7 @@ class MinusInt64 extends Prim1OpI64 {
 class IDInt64 extends Prim1OpI64 {
   IDInt64() { super("id"); }
   long op( long x ) { return x; }
+  @Override int op_prec() { return -1; } // not valid prefix op
 }  
 
 class NotInt64 extends PrimPure {

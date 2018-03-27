@@ -193,7 +193,8 @@ public class TypeUnion extends Type {
   @Override protected boolean canBeConst() { return _any && _ts.canBeConst(); }
   @Override protected int op_prec() {
     int p = _ts._ts[0].op_prec();
-    for( Type t : _ts._ts ) assert t.op_prec()==p; // answer is well-defined
+    // CNC Remove assert, allowed union of unary and binary '-'
+    //for( Type t : _ts._ts ) assert t.op_prec()==p; // answer is well-defined
     return p;
   }
   @Override protected boolean is_pure() {

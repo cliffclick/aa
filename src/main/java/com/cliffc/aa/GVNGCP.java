@@ -16,8 +16,8 @@ public class GVNGCP {
 
   GVNGCP( boolean opt ) { _opt = opt; }
 
-  Type type( Node n ) { return _ts.at(n._uid); }
-  void setype( Node n, Type t ) { _ts.set(n._uid,t); }
+  Type   type( Node n         ) { return _ts. at(n._uid  ); }
+  Type setype( Node n, Type t ) { return _ts.set(n._uid,t); }
 
   Node ideal( Node n ) {
     Type t = n.value(this);
