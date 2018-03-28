@@ -68,13 +68,11 @@ $(test_classes): $(CLZDIR)/test/%class: $(TST)/%java $(main_classes)
 	@[ -d $(CLZDIR)/test ] || mkdir -p $(CLZDIR)/test
 	@javac $(JAVAC_ARGS) -cp "$(CLZDIR)/test$(SEP)$(CLZDIR)/main$(SEP)$(jars)" -sourcepath $(TST) -d $(CLZDIR)/test $(test_javas)
 
-# Note the P4PORT info should be pulled directly from the p4config.txt file,
-# not inlined here.
 # Note the tabs - not spaces - in the grep and cut commands
-P4PORT = 73.170.241.187:34534
-BUILD_BRANCH=  p4 -p $(P4PORT) -u cliffc client -o | grep "Stream:	" | cut '-d	' -f2
-BUILD_HASH=    p4 -p $(P4PORT) -u cliffc changes -s submitted -m1 | cut '-d ' -f2
-BUILD_DESCRIBE=p4 -p $(P4PORT) -u cliffc changes -s submitted -m1 | cut '-d ' -f7-
+PROJECT_VERSION=99999
+BUILD_BRANCH=  git branch | grep '*' | sed 's/* //'
+BUILD_HASH=    git log -1 --format="%H"
+BUILD_DESCRIBE=git describe --always --dirty
 BUILD_ON=      (TZ=UCT date)
 BUILD_BY=      (whoami | cut -d\\ -f2-)
 
@@ -89,7 +87,7 @@ $(CLZDIR)/main/$(AA)/BuildVersion.class: $(main_classes) src/main/manifest.txt
 	@echo "    public String branchName()     { return \"$(shell $(BUILD_BRANCH))\"; }"   >> build/BuildVersion.java
 	@echo "    public String lastCommitHash() { return \"$(shell $(BUILD_HASH))\"; }"     >> build/BuildVersion.java
 	@echo "    public String describe()       { return \"$(shell $(BUILD_DESCRIBE))\"; }" >> build/BuildVersion.java
-	@echo "    public String projectVersion() { return \"none\"; }"                       >> build/BuildVersion.java
+	@echo "    public String projectVersion() { return \"$(PROJECT_VERSION)\"; }"         >> build/BuildVersion.java
 	@echo "    public String compiledOn()     { return \"$(shell $(BUILD_ON))\"; }"       >> build/BuildVersion.java
 	@echo "    public String compiledBy()     { return \"$(shell $(BUILD_BY))\"; }"       >> build/BuildVersion.java
 	@echo "}"                                                                             >> build/BuildVersion.java

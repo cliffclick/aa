@@ -14,7 +14,7 @@ public class Ary<E> implements Iterable<E> {
   public Ary(E[] es) { this(es,es.length); }
   public Ary(E[] es, int len) { _es=es; _len=len; }
   public Ary(Class<E> clazz) { this((E[]) Array.newInstance(clazz, 1),0); }
-  
+
   /** @return list is empty */
   public boolean isEmpty() { return _len==0; }
   /** @return active list length */
@@ -22,16 +22,18 @@ public class Ary<E> implements Iterable<E> {
   /** @param i element index
    *  @return element being returned */
   public E at( int i ) {
-    if( i>=_len ) throw new IllegalArgumentException(""+i+" OOB "+_len);
+    range_check(i);
     return _es[i];
   }
   /** @return last element */
   public E last( ) {
-    if( _len==0 ) throw new IllegalArgumentException(""+0+" OOB "+_len);
+    range_check(0);
     return _es[_len-1];
   }
   
-  
+  /** Add element in amortized constant time
+   *  @param e Element to add at end of list
+   *  @return 'this' for flow-coding */
   public Ary<E> add( E e ) {
     if( _len >= _es.length ) _es = Arrays.copyOf(_es,Math.max(1,_es.length<<1));
     _es[_len++] = e;
@@ -42,7 +44,7 @@ public class Ary<E> implements Iterable<E> {
    *  @param i element to be removed
    *  @return element removed */
   public E del( int i ) {
-    if( i>=_len ) throw new IllegalArgumentException(""+i+" OOB "+_len);
+    range_check(i);
     E tmp = _es[i];
     _es[i]=_es[--_len];
     return tmp;
@@ -51,7 +53,7 @@ public class Ary<E> implements Iterable<E> {
   /** Slow, linear-time, element removal.  Preserves order.
    *  @param i element to be removed */
   public void remove( int i ) {
-    if( i>=_len ) throw new IllegalArgumentException(""+i+" OOB "+_len);
+    range_check(i);
     System.arraycopy(_es,i+1,_es,i,(--_len)-i);
   }
   
@@ -104,4 +106,9 @@ public class Ary<E> implements Iterable<E> {
     }
     return sb.p('}').toString();
   }
+
+  private void range_check( int i ) {
+    if( i>=_len ) throw new ArrayIndexOutOfBoundsException(""+i+" >= "+_len);
+  }
+
 }

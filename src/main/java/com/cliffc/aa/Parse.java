@@ -22,7 +22,7 @@ public class Parse {
   private final ParsePosition _pp;
   private final String _str;
 
-  Parse( String src, Env env, String str ) {
+  Parse( String src, Env env, GVNGCP gvn, String str ) {
     _src = src;
     _line= 0;
     _e   = env;
@@ -34,7 +34,7 @@ public class Parse {
     _nf.setGroupingUsed(false);
     _pp = new ParsePosition(0);
     _str = str;          // Keep a complete string copy for java number parsing
-    _gvn = new GVNGCP(false);   // Pessimistic during parsing
+    _gvn = gvn;          // Pessimistic during parsing
   }
   // Parse the string in the given lookup context, and return an executable program
   Node go( ) { return prog(); }

@@ -16,7 +16,7 @@ public abstract class AA {
     ABV = abv;
   }
   public static void main( String[] args ) {
-    System.out.println("AA built: "+ABV.compiledOn());
+    System.out.println(ABV.toString());
     if( args.length > 0 ) System.out.println(Exec.go("args",String.join(" ",args))._t.toString());
     else REPL.go();
   }
