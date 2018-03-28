@@ -1,52 +1,39 @@
 package com.cliffc.aa;
 
-import com.cliffc.aa.util.SB;
-
 public class TypeFun extends Type {
-  String _name;                 // Unique identifier (i.e., ptr to the actual code bits)
-  String[] _args;               // Helpful arg names
-  TypeTuple _ts;                // Arg types
-  Type _ret;                    // return types
-  protected TypeFun( String name, String[] args, TypeTuple ts, Type ret ) { super(TFUN); init(name,args,ts,ret); }
-  private void init(String name, String[] args, TypeTuple ts, Type ret) {  _name = name; _args = args; _ts = ts; _ret = ret; }
-  @Override public int hashCode( ) { return TFUN + _ts.hashCode() + _ret.hashCode() + _name.hashCode();  }
+  public TypeTuple _ts;         // Arg types
+  public Type _ret;             // return types
+  protected TypeFun(TypeTuple ts, Type ret ) { super(TFUN); init(ts,ret); }
+  private void init(TypeTuple ts, Type ret ) { _ts = ts; _ret = ret; }
+  @Override public int hashCode( ) { return TFUN + _ts.hashCode() + _ret.hashCode();  }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeFun) ) return false;
     TypeFun tf = (TypeFun)o;
-    return _ts==tf._ts && _ret==tf._ret && _name.equals(tf._name);
+    return _ts==tf._ts && _ret==tf._ret;
   }
-  @Override public String toString() {
-    SB sb = new SB().p(_name).p("::(");
-    if( _args == null ) sb.p(_ts.toString());
-    else {
-      assert _args.length==_ts._ts.length;
-      for( int i=0; i<_args.length; i++ )
-        sb.p(i==0?"":",").p(_args[i]).p("::").p(_ts._ts[i].toString());
-    }
-    return sb.p("->").p(_ret).p(")").toString();
-  }
+  @Override public String toString() { return "{"+_ts+"->"+_ret+"}"; }
   private static TypeFun FREE=null;
   private TypeFun free( TypeFun f ) { FREE=f; return this; }
-  static TypeFun make( String name, String[] args, TypeTuple ts, Type ret ) {
+  public static TypeFun make( TypeTuple ts, Type ret ) {
     TypeFun t1 = FREE;
-    if( t1 == null ) t1 = new TypeFun(name,args,ts,ret);
-    else { FREE = null; t1.init(name,args,ts,ret); }
+    if( t1 == null ) t1 = new TypeFun(ts,ret);
+    else { FREE = null; t1.init(ts,ret); }
     TypeFun t2 = (TypeFun)t1.hashcons();
     return t1==t2 ? t1 : t2.free(t1);
   }
 
-  static TypeFun any( String name, int nargs ) {
-    return make(name,null,nargs==1?TypeTuple.XSCALAR1:TypeTuple.XSCALAR2,Type.SCALAR);
+  static TypeFun any( int nargs ) {
+    return make(nargs==1?TypeTuple.XSCALAR1:TypeTuple.XSCALAR2,Type.SCALAR);
   }
 
-  static final TypeFun[] TYPES = new TypeFun[]{};
+  static public final TypeFun FLT64 = make(TypeTuple.FLT64,TypeFlt.FLT64); // [flt]->flt
+  static public final TypeFun INT64 = make(TypeTuple.INT64,TypeInt.INT64); // [int]->int
+  static public final TypeFun FLT64_FLT64 = make(TypeTuple.FLT64_FLT64,TypeFlt.FLT64); // [flt,flt]->flt
+  static public final TypeFun INT64_INT64 = make(TypeTuple.INT64_INT64,TypeInt.INT64); // [int,int]->int
+  static final TypeFun[] TYPES = new TypeFun[]{FLT64,INT64,FLT64_FLT64,INT64_INT64};
   
-  // What is the dual of a function?  Like a constant '3.14' the name is
-  // unchanging and totally determined by the lookup rules (for prims) or their
-  // definition point.  Hence the name is a constant: it is its own dual.
-  // Other args flip structurally.
-  @Override protected TypeFun xdual() { return new TypeFun(_name,_args,(TypeTuple)_ts.dual(),_ret.dual()); }
+  @Override protected TypeFun xdual() { return new TypeFun((TypeTuple)_ts.dual(),_ret.dual()); }
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TTUPLE:           return ALL;
@@ -56,24 +43,20 @@ public class TypeFun extends Type {
     }
     TypeFun tf = (TypeFun)t;
     Type ret = _ret.join(tf._ret); // Notice JOIN, Functions are contravariant
-    // If name or arglength are not compatible, then a union instead
-    if( _name.equals(tf._name) && 
-        _ts._ts.length == tf._ts._ts.length ) {
-      // If the args are totally isa, then return the exact match
-      Type targs = _ts.meet(tf._ts);
-      if( targs==   _ts && ret==   _ret ) return this;
-      if( targs==tf._ts && ret==tf._ret ) return tf;
-    }
-    return Type.SCALAR;
+    // Bail out if arg lengths do not match.
+    if( _ts._ts.length != tf._ts._ts.length )
+      return Type.SCALAR;
+    // If the args are totally isa, then return the exact match to preserve
+    // name and args.
+    Type targs = _ts.meet(tf._ts);
+    if( targs==   _ts && ret==   _ret ) return this;
+    if( targs==tf._ts && ret==tf._ret ) return tf;
+    // Make a new signature
+    return make((TypeTuple)targs,ret);
   }
   
-  // The Main Excitement for functions is that they can be applied
-  Type apply( Type[] args ) { throw AA.unimpl(); } // Should not call this
-  
-  @Override protected Type ret() { return _ret; }
-  @Override protected String funame() { return _name; }
+  @Override public Type ret() { return _ret; }
 
-  @Override int op_prec() { return 0; }
   @Override protected boolean canBeConst() { return true; }
   boolean is_lossy() { return true; } // A few conversions are not lossy
 }

@@ -29,18 +29,19 @@ public class Ary<E> implements Iterable<E> {
    }
   
   public Ary<E> add( E e ) {
-    if( _len >= _es.length ) _es = Arrays.copyOf(_es,_es.length<<1);
+    if( _len >= _es.length ) _es = Arrays.copyOf(_es,Math.max(1,_es.length<<1));
     _es[_len++] = e;
     return this;
   }
 
   /** Fast, constant-time, element removal.  Does not preserve order
    *  @param i element to be removed
-   *  @return compressed version of self, order shuffled */
-  public Ary<E> del( int i ) {
+   *  @return element removed */
+  public E del( int i ) {
     if( i>=_len ) throw new IllegalArgumentException(""+i+" OOB "+_len);
+    E tmp = _es[i];
     _es[i]=_es[--_len];
-    return this;
+    return tmp;
   }
 
   /** Slow, linear-time, element removal.  Preserves order

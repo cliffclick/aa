@@ -21,7 +21,7 @@ public class TypeUnion extends Type {
   @Override public String toString() { return "{"+(_any?"any":"all")+_ts+"}"; }
   private static TypeUnion FREE=null;
   private TypeUnion free( TypeUnion f ) { FREE=f; return this; }
-  private static TypeUnion make( TypeTuple ts, boolean any ) {
+  public static TypeUnion make( TypeTuple ts, boolean any ) {
     TypeUnion t1 = FREE;
     if( t1 == null ) t1 = new TypeUnion(ts,any);
     else { FREE = null; t1.init(ts,any); }
@@ -155,51 +155,11 @@ public class TypeUnion extends Type {
     return ts;
   }
 
-  // Remove type choices from otherwise type-correct programs - anytime we
-  // could insert conversions, we now type to minimize conversions by doing
-  // locally cheap conversions.
-  @Override protected Type remove_choice( Prog[] args ) {
-    if( !_any ) return null;    // Has type choices?
-    Type[] tcs = _ts._ts;       // All the type choices
-    // Find a choice with maximal conversions required, or no "free"
-    // conversions (Flt->Int rounds, must be specified by user).
-    int idx=-1, max_cvts=-1;    // Find type choice requiring max conversions
-    boolean amb=false;
-    for( int i=0; i<tcs.length; i++ ) {         // For all type choices
-      Type[] fargs = ((TypeFun)tcs[i])._ts._ts; // Function args required
-      int cvts=0;               // Conversions needed for this one function
-      for( int j=0; j<args.length; j++ ) // Check each function arg
-        if( !args[j]._t.isBitShape(fargs[j]) )
-          cvts+=(args[j]._t._type==Type.TFLT && fargs[j]._type==Type.TINT)?1000:1 ;     // Count conversions needed
-      if( cvts > max_cvts ) { max_cvts=cvts; idx=i; amb=false;}
-      else if( cvts == max_cvts ) amb=true;
-    }
-    if( max_cvts < 1000 && amb ) throw AA.unimpl();   // Ambiguous choice
-    Ary<Type> ary = new Ary<>(_ts._ts.clone()).del(idx);
-    return make(_any,full_simplify(ary,_any));
-  }
-
-  @Override protected Type ret() {
+  @Override public Type ret() {
     Ary<Type> rets = new Ary<>(Type.class);
     for( int i=0; i<_ts._ts.length; i++ )
       rets.add(((TypeFun)_ts._ts[i])._ret);
     return make(_any,full_simplify(rets,_any));
   }
-  @Override protected String funame() {
-    String name = _ts._ts[0].funame();
-    assert name.equals(_ts._ts[1].funame());
-    return name;
-  }
   @Override protected boolean canBeConst() { return _any && _ts.canBeConst(); }
-  @Override protected int op_prec() {
-    int p = _ts._ts[0].op_prec();
-    // CNC Remove assert, allowed union of unary and binary '-'
-    //for( Type t : _ts._ts ) assert t.op_prec()==p; // answer is well-defined
-    return p;
-  }
-  @Override protected boolean is_pure() {
-    boolean pure = true;
-    for( Type t : _ts._ts ) pure &= t.is_pure();
-    return pure;
-  }
 }

@@ -1,5 +1,7 @@
 package com.cliffc.aa;
 
+import com.cliffc.aa.node.Node;
+
 import java.util.Scanner;
 
 /** an implementation of language AA

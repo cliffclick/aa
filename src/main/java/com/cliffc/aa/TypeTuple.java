@@ -3,7 +3,7 @@ package com.cliffc.aa;
 import java.util.Arrays;
 
 public class TypeTuple extends Type {
-  Type[] _ts;
+  public Type[] _ts;
   private int _hash;
   TypeTuple( Type[] ts ) { super(TTUPLE); init(ts);  }
   private void init(Type[] ts) {
@@ -28,7 +28,7 @@ public class TypeTuple extends Type {
   
   private static TypeTuple FREE=null;
   private TypeTuple free( TypeTuple f ) { FREE=f; return this; }
-  static TypeTuple make( Type... ts ) {
+  public static TypeTuple make( Type... ts ) {
     TypeTuple t1 = FREE;
     if( t1 == null ) t1 = new TypeTuple(ts);
     else { FREE = null; t1.init(ts); }
@@ -36,17 +36,17 @@ public class TypeTuple extends Type {
     return t1==t2 ? t1 : t2.free(t1);
   }
   
-  static final TypeTuple EMPTY   = make(new Type[0]);
-  static final TypeTuple  SCALAR = make(Type. SCALAR);
-  static final TypeTuple XSCALAR1= make(Type.XSCALAR);
-  static final TypeTuple XSCALAR2= make(Type.XSCALAR, Type.XSCALAR);
-  static final TypeTuple INT32   = make(TypeInt.INT32 );
-  static final TypeTuple INT64   = make(TypeInt.INT64 );
-  static final TypeTuple FLT64   = make(TypeFlt.FLT64 );
-  static final TypeTuple INT64_INT64 = make(TypeInt.INT64,TypeInt.INT64);
-  static final TypeTuple FLT64_FLT64 = make(TypeFlt.FLT64,TypeFlt.FLT64);
-  static final TypeTuple FLT64_INT64 = make(TypeFlt.FLT64,TypeInt.INT64);
-  static final TypeTuple[] TYPES = new TypeTuple[]{XSCALAR1,INT32,INT64,FLT64,INT64_INT64,FLT64_FLT64,FLT64_INT64};
+  static public final TypeTuple EMPTY   = make(new Type[0]);
+  static public final TypeTuple  SCALAR = make(Type.SCALAR);
+  static public final TypeTuple XSCALAR1= make(Type.XSCALAR);
+  static public final TypeTuple XSCALAR2= make(Type.XSCALAR, Type.XSCALAR);
+  static public final TypeTuple INT32   = make(TypeInt.INT32 );
+  static public final TypeTuple INT64   = make(TypeInt.INT64 );
+  static public final TypeTuple FLT64   = make(TypeFlt.FLT64 );
+  static public final TypeTuple INT64_INT64 = make(TypeInt.INT64,TypeInt.INT64);
+  static public final TypeTuple FLT64_FLT64 = make(TypeFlt.FLT64,TypeFlt.FLT64);
+  static public final TypeTuple FLT64_INT64 = make(TypeFlt.FLT64,TypeInt.INT64);
+  static public final TypeTuple[] TYPES = new TypeTuple[]{SCALAR,INT32,INT64,FLT64,INT64_INT64,FLT64_FLT64,FLT64_INT64};
   
   // The length of Tuples is a constant, and so is its own dual.  Otherwise
   // just dual each element.
@@ -91,7 +91,7 @@ public class TypeTuple extends Type {
     for( Type t : _ts ) if( t._type==Type.TTUPLE ) return true;
     return false;
   }
-  @Override protected TypeTuple ret() {
+  @Override public TypeTuple ret() {
     throw AA.unimpl();
     //Type[] ts = new Type[_ts.length];
     //for( int i=0; i<_ts.length; i++ )

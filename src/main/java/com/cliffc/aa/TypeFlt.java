@@ -19,7 +19,7 @@ public class TypeFlt extends Type {
   }
   private static TypeFlt FREE=null;
   private TypeFlt free( TypeFlt f ) { FREE=f; return this; }
-  static TypeFlt make( int x, int z, double con ) {
+  public static TypeFlt make( int x, int z, double con ) {
     TypeFlt t1 = FREE;
     if( t1 == null ) t1 = new TypeFlt(x,z,con);
     else { FREE = null; t1.init(x,z,con); }
@@ -27,12 +27,12 @@ public class TypeFlt extends Type {
     return t1==t2 ? t1 : t2.free(t1);
   }
   
-  static final TypeFlt  FLT64 = make(-1,64,0);
-  static final TypeFlt  FLT32 = make(-1,32,0);
-  static final TypeFlt Pi     = make(0,64,Math.PI);
+  static public final TypeFlt  FLT64 = make(-1,64,0);
+  static public final TypeFlt  FLT32 = make(-1,32,0);
+  static public final TypeFlt Pi     = make(0,64,Math.PI);
   static final TypeFlt[] TYPES = new TypeFlt[]{FLT64,FLT32,Pi};
   // Return a double from a TypeFlt constant; assert otherwise.
-  protected double getd() { assert is_con(); return _con; }
+  @Override public double getd() { assert is_con(); return _con; }
 
   @Override protected TypeFlt xdual() { return _x==0 ? this : new TypeFlt(-_x,_z,_con); }
   @Override protected Type xmeet( Type t ) {
@@ -63,7 +63,7 @@ public class TypeFlt extends Type {
   }
   static int log( double con ) { return ((double)(float)con)==con ? 32 : 64; }
   
-  @Override protected boolean isBitShape(Type t) { return t._type == Type.TFLT && _z<=((TypeFlt)t)._z; }
+  @Override public boolean isBitShape(Type t) { return t._type == Type.TFLT && _z<=((TypeFlt)t)._z; }
   @Override public boolean canBeConst() { return _x>=0; }
-  @Override protected boolean is_con()   { return _x==0; }
+  @Override public boolean is_con()   { return _x==0; }
 }

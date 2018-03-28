@@ -1,5 +1,7 @@
 package com.cliffc.aa;
 
+import com.cliffc.aa.node.Node;
+
 /** an implementation of language AA
  */
 

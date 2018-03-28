@@ -23,7 +23,7 @@ import java.util.HashMap;
 public class Type {
   static private int CNT=1;
   final int _uid=CNT++; // Unique ID, will have gaps, used to uniquely order Types in Unions
-  protected byte _type; // Simple types use a simple enum
+  public byte _type; // Simple types use a simple enum
   private Type _dual;   // All types support a dual notion, lazily computed and cached here
 
   protected Type(byte type) { _type=type; }
@@ -87,13 +87,13 @@ public class Type {
   static final byte TUNION  = 9; // Union types (finite collections of unrelated types Meet together); see TypeUnion
   static final byte TTUPLE  =10; // Tuples; finite collections of unrelated Types, kept in parallel
   static final byte TFUN    =11; // Functions; both domain and range are a Tuple; see TypeFun                            
-  static final byte TFLT    =12; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
+  static public final byte TFLT    =12; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
   static final byte TINT    =13; // All Integers, including signed/unsigned and various sizes; see TypeInt
   static final byte TLAST   =14; // Type check
   
-  static final Type ALL    = make(TALL    ); // Bottom
-  static final Type ANY    = make(TANY    ); // Top
-  static final Type  SCALAR= make( TSCALAR); // ptrs, ints, flts; things that fit in a machine register
+  static public final Type ALL    = make(TALL    ); // Bottom
+  static public final Type ANY    = make(TANY    ); // Top
+  static public final Type  SCALAR= make( TSCALAR); // ptrs, ints, flts; things that fit in a machine register
   static final Type XSCALAR= make(TXSCALAR); // ptrs, ints, flts; things that fit in a machine register
   static final Type  NUM   = make( TNUM   );
   static final Type XNUM   = make(TXNUM   );
@@ -203,7 +203,6 @@ public class Type {
     ts = concat(ts,TypeFlt  .TYPES);
     ts = concat(ts,TypeTuple.TYPES);
     ts = concat(ts,TypeFun  .TYPES);
-    ts = concat(ts,Prim     .TYPES);
     ts = concat(ts,TypeUnion.TYPES);
     
     // Confirm commutative & complete
@@ -237,21 +236,13 @@ public class Type {
     return ts;
   }
   
-  // True if 'this' isa/subtypes 't2'.  E.g. Int32-isa-Int64, but not vice-versa
-  boolean isa( Type t ) { return meet(t)==t; }
+  // True if 'this' isa/subtypes 't'.  E.g. Int32-isa-Int64, but not vice-versa
+  public boolean isa( Type t ) { return meet(t)==t; }
   // True if 'this' isa SCALAR, without the cost of a full 'meet()'
   final boolean isa_scalar() {
     return _type != TALL && _type != TANY && _type != TUNION && _type != TTUPLE;
   }
   
-  // Return any "return type" of the Meet of all function types
-  protected Type ret() { return null; }
-  // Return a long   from a TypeInt constant; assert otherwise.
-  protected long   getl() { throw AA.unimpl(); }
-  // Return a double from a TypeFlt constant; assert otherwise.
-  protected double getd() { throw AA.unimpl(); }
-  // Function name
-  protected String funame() { return ""; }
   // True if value is higher-equal to SOME constant.
   protected boolean canBeConst() {
     switch( _type ) {
@@ -275,7 +266,7 @@ public class Type {
     case TBASE: throw typerr(null);
     }
   }
-  protected boolean is_con() {
+  public boolean is_con() {
     switch( _type ) {
     case TALL:
     case TSCALAR:
@@ -285,10 +276,9 @@ public class Type {
     case TXNUM:
     case TXSCALAR:
     case TANY:
+    case TFUN:                  // Never a function
     case TUNION:                // Overridden in subclass
       return false;             // Not exactly a constant
-    case TFUN:                  // Always exactly 1 function choice
-      return true;
     case TTUPLE:                // Overridden in subclass
     case TFLT:                  // Overridden in subclass
     case TINT:                  // Overridden in subclass
@@ -296,11 +286,13 @@ public class Type {
     case TBASE: throw typerr(null);
     }
   }
-  // -1 for non-functions; 0 to 9; 9 binds more tightly than 0
-  int op_prec() { return -1; }
-  protected boolean is_pure() { return false; }
-  protected Type remove_choice( Prog[] args ) { return null; }
-  protected boolean isBitShape(Type t) { throw typerr(t); } // Overridden in subtypes
+  // Return any "return type" of the Meet of all function types
+  public Type ret() { return null; }
+  // Return a long   from a TypeInt constant; assert otherwise.
+  public long   getl() { throw AA.unimpl(); }
+  // Return a double from a TypeFlt constant; assert otherwise.
+  public double getd() { throw AA.unimpl(); }
+  public boolean isBitShape(Type t) { throw typerr(t); } // Overridden in subtypes
   // True if a base type
   private boolean isBaseType() { return getClass().getSimpleName().equals("Type"); }
   

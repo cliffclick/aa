@@ -19,7 +19,8 @@ public class TypeInt extends Type {
   }
   private static TypeInt FREE=null;
   private TypeInt free( TypeInt f ) { FREE=f; return this; }
-  static TypeInt make( int x, int z, long con ) {
+  public static TypeInt con(long con) { return make(0,log(con),con); }
+  public static TypeInt make( int x, int z, long con ) {
     TypeInt t1 = FREE;
     if( t1 == null ) t1 = new TypeInt(x,z,con);
     else { FREE = null; t1.init(x,z,con); }
@@ -27,16 +28,15 @@ public class TypeInt extends Type {
     return t1==t2 ? t1 : t2.free(t1);
   }
 
-  static final TypeInt  INT64 = make(-1,64,0);
-  static final TypeInt  INT32 = make(-1,32,0);
-  static final TypeInt  INT16 = make(-1,16,0);
-  static final TypeInt  BOOL  = make(-1, 1,0);
-  static final TypeInt TRUE   = make( 0, 1,1);
-  static final TypeInt FALSE  = make( 0, 1,0);
+  static public final TypeInt  INT64 = make(-1,64,0);
+  static public final TypeInt  INT32 = make(-1,32,0);
+  static public final TypeInt  INT16 = make(-1,16,0);
+  static public final TypeInt  BOOL  = make(-1, 1,0);
+  static public final TypeInt TRUE   = make( 0, 1,1);
+  static public final TypeInt FALSE  = make( 0, 1,0);
   static final TypeInt[] TYPES = new TypeInt[]{INT64,INT32,INT16,BOOL,TRUE,FALSE};
-  static TypeInt con(long con) { return make(0,log(con),con); }
   // Return a long from a TypeInt constant; assert otherwise.
-  protected long getl() { assert is_con(); return _con; }
+  @Override public long getl() { assert is_con(); return _con; }
 
   @Override protected TypeInt xdual() { return _x==0 ? this : new TypeInt(-_x,_z,_con); }
   @Override protected Type xmeet( Type t ) {
@@ -119,7 +119,7 @@ public class TypeInt extends Type {
     return TypeUnion.make(false,make(-1,isz,0),TypeFlt.make(-1,fsz,0));
   }
     
-  @Override protected boolean isBitShape(Type t) { return t._type == Type.TINT && _z<=((TypeInt)t)._z; }
+  @Override public boolean isBitShape(Type t) { return t._type == Type.TINT && _z<=((TypeInt)t)._z; }
   @Override public boolean canBeConst() { return _x>=0; }
-  @Override protected boolean is_con()   { return _x==0; }
+  @Override public boolean is_con()   { return _x==0; }
 }
