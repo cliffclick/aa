@@ -8,7 +8,7 @@ import java.util.concurrent.ConcurrentHashMap;
 class Env {
   final Env _par;
   final ConcurrentHashMap<String, UnresolvedNode> _refs;
-  private Env( Env par ) { _par=par; _refs = new ConcurrentHashMap<>(); }
+  Env( Env par ) { _par=par; _refs = new ConcurrentHashMap<>(); }
 
   private final static Env TOP = new Env(null);
   static {

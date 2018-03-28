@@ -57,6 +57,9 @@ public class Ary<E> implements Iterable<E> {
     System.arraycopy(_es,i+1,_es,i,(--_len)-i);
   }
   
+  /** Remove all elements */
+  public void clear( ) { _len=0; }
+  
   public E set( int i, E e ) {
     while( i>= _es.length ) _es = Arrays.copyOf(_es,_es.length<<1);
     if( i >= _len ) _len = i+1;
@@ -108,7 +111,8 @@ public class Ary<E> implements Iterable<E> {
   }
 
   private void range_check( int i ) {
-    if( i>=_len ) throw new ArrayIndexOutOfBoundsException(""+i+" >= "+_len);
+    if( i>=_len )
+      throw new ArrayIndexOutOfBoundsException(""+i+" >= "+_len);
   }
 
 }

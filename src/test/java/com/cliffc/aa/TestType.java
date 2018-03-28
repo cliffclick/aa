@@ -5,6 +5,13 @@ import org.junit.Test;
 
 public class TestType {
   @Test public void testType0() {
+    // Anonymous function definition
+    test("{x y -> x+y}", TypeInt.TRUE);
+    test("{5}()", TypeInt.con(5)); // No args nor -> required
+    test("x=3; fun={y -> x+y}; fun(2)", TypeInt.con(5)); // capture external variable
+    test("x=3; fun={x -> x+2}; fun(2)", TypeInt.con(4)); // shadow  external variable
+    testerr("fun={x -> x+2}; x", "Missing ref 'x'","                 "); // Scope exit ends lifetime
+    
     // Simple int
     test("1",   TypeInt.TRUE);
     // Unary operator
@@ -26,7 +33,7 @@ public class TestType {
     // Variable lookup
     test("pi", TypeFlt.Pi);
     // bare function lookup; returns a union of '+' functions
-    testerr("+", "\nargs:0:Syntax error; trailing junk\n+\n^\n");
+    testerr("+", "Syntax error; trailing junk","");
     test("(+)", Env.top().lookup("+").types());
     test("(!)", TypeFun.make(TypeTuple.INT64,TypeInt.BOOL));
     // Function application, traditional paren/comma args
@@ -34,9 +41,9 @@ public class TestType {
     test("(-)(1,2)", TypeInt.con(-1)); // binary version
     test("(-)(1  )", TypeInt.con(-1)); // unary version
     // error; mismatch arg count
-    testerr("!()"     , "\nargs:0:Call to unary function !::Int1, but missing the one required argument\n!()\n ^\n");
-    testerr("pi(1)"   , "\nargs:0:A function is being called, but 3.141592653589793 is not a function type\npi(1)\n   ^\n");
-    testerr("(+)(1,2,3)", "\nargs:0:Argument mismatch in call to ANY(+::Flt64,+::Int64)\n(+)(1,2,3)\n          ^\n");
+    testerr("!()"       , "Call to unary function !::Int1, but missing the one required argument"," ");
+    testerr("pi(1)"     , "A function is being called, but 3.141592653589793 is not a function type","   ");
+    testerr("(+)(1,2,3)", "Argument mismatch in call to ANY(+::Flt64,+::Int64)","          ");
     // Parsed as +(1,(2*3))
     test("(+)(1, 2 * 3) ", TypeInt.con(7));
     // Parsed as +( (1+2*3) , (4*5+6) )
@@ -45,13 +52,13 @@ public class TestType {
     // Syntax for variable assignment
     test("x=1", TypeInt.TRUE);
     test("x=y=1", TypeInt.TRUE);
-    testerr("x=y=", "\nargs:0:Missing expr after assignment of 'y'\nx=y=\n    ^\n");
-    testerr("x=y","\nargs:0:Unknown ref 'y'\nx=y\n   ^\n");
-    testerr("x=1+y","\nargs:0:Unknown ref 'y'\nx=1+y\n     ^\n");
+    testerr("x=y=", "Missing expr after assignment of 'y'","    ");
+    testerr("x=y" , "Unknown ref 'y'","   ");
+    testerr("x=1+y","Unknown ref 'y'","     ");
     test("x=2; y=x+1; x*y", TypeInt.con(6));
     // Re-use ref immediately after def; parses as: x=(2*3); 1+x+x*x
     test("1+(x=2*3)+x*x", TypeInt.con(43));
-    testerr("x=(1+(x=2)+x)", "\nargs:0:Cannot re-assign ref 'x'\nx=(1+(x=2)+x)\n             ^\n");
+    testerr("x=(1+(x=2)+x)", "Cannot re-assign ref 'x'","             ");
     
     // TODO: Need real TypeVars for these
     //test("id"   ,Env.top().lookup("id").types());
@@ -64,12 +71,13 @@ public class TestType {
   static private void test( String program, Type expected ) {
     Assert.assertEquals(expected,Exec.go("args",program)._t);
   }
-  static private void testerr( String program, String err ) {
+  static private void testerr( String program, String err, String cursor ) {
+    String err2 = "\nargs:0:"+err+"\n"+program+"\n"+cursor+"^\n";
     try {
       Exec.go("args",program);  // Expect to throw
       Assert.assertTrue(false); // Did not throw
     } catch( IllegalArgumentException iae ) {
-      Assert.assertEquals(err,iae.getMessage());
+      Assert.assertEquals(err2,iae.getMessage());
     }
   }
 

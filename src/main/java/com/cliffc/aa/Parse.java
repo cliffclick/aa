@@ -7,11 +7,29 @@ import java.text.NumberFormat;
 import java.text.ParsePosition;
   
 /** an implementation of language AA
+ *
+ *  GRAMMAR:
+ *  prog = stmt END
+ *  stmt = [id =]* expr [; stmt]* // ids must not exist, and are available in later statements
+ *  expr = term [binop term]*   // gather all the binops and sort by prec
+ *  term = nfact                // No function call
+ *  term = nfact ( [expr,]* )+  // One or more function calls in a row, args are delimited
+ // *  term = nfact nfact*         // One function call, all the args listed
+ *  nfact= uniop* fact          // Zero or more uniop calls over a fact
+ *  fact = id                   // variable lookup
+ *  fact = num                  // number
+ *  fact = (binop)              // Special syntactic form of binop; no spaces allowed; returns function constant
+ *  fact = (uniop)              // Special syntactic form of uniop; no spaces allowed; returns function constant
+ *  fact = (stmt)               // General statement called recursively
+ *  fact = {func}               // Anonymous function declaration
+ *  binop = +-*%&|              // etc; primitive lookup; can determine infix binop at parse-time
+ *  uniop  =  -!~               // etc; primitive lookup; can determine infix uniop at parse-time
+ *  func = { [[id]* ->]? stmt } // Anonymous function declaration
  */
 
 public class Parse {
   private final String _src;            // Source for error messages; usually a file name
-  private final Env _e;                 // Lookup context
+  private Env _e;                       // Lookup context; pushed and popped as scopes come and go
   private final byte[] _buf;            // Bytes being parsed
   private int _x;                       // Parser index
   private int _line;                    // Zero-based line number
@@ -39,24 +57,8 @@ public class Parse {
   // Parse the string in the given lookup context, and return an executable program
   Node go( ) { return prog(); }
 
-  /* Wheee.... parse grammer round 2...
-   *  prog = stmt END
-   *  stmt = [id =]* expr [; stmt]* // ids must not exist, and are available in later statements
-   *  expr = term [binop term]*   // gather all the binops and sort by prec
-   *  term = nfact                // No function call
-   *  term = nfact ( [expr,]* )+  // One or more function calls in a row, args are delimited
-   // *  term = nfact nfact*         // One function call, all the args listed
-   *  nfact= uniop* fact          // Zero or more uniop calls over a fact
-   *  fact = id                   // variable lookup
-   *  fact = num                  // number
-   *  fact = (binop)              // Special syntactic form of binop; no spaces allowed; returns function constant
-   *  fact = (uniop)              // Special syntactic form of uniop; no spaces allowed; returns function constant
-   *  fact = (stmt)               // General statement called recursively
-   *  binop = +-*%&|              // etc; primitive lookup; can determine infix binop at parse-time
-   *  uniop  =  -!~               // etc; primitive lookup; can determine infix uniop at parse-time
-   */
   /** Parse a top-level:
-   *  prog = expr END */
+   *  prog = stmt END */
   private Node prog() {
     // Currently only supporting exprs
     Node res = stmt();
@@ -196,6 +198,7 @@ public class Parse {
    *  fact = (binop)   // Special syntactic form of binop; no spaces allowed; returns function constant
    *  fact = (uniop)   // Special syntactic form of uniop; no spaces allowed; returns function constant
    *  fact = (expr)    // General expression called recursively
+   *  fact = {func}    // Anonymous function declaration
    *  @return Node needs gvn() */
   private Node fact() {
     if( skipWS() == -1 ) return null;
@@ -213,6 +216,8 @@ public class Parse {
       require(')');
       return ex;
     }
+    // Anonymous function
+    if( peek('{') ) return func();
     
     // Check for a valid 'id'
     String tok = token0();
@@ -224,6 +229,29 @@ public class Parse {
     return var;
   }
 
+  /** Parse an anonymous function; the opening '{' already parsed
+   *  func = { [[id]* ->]? stmt } // Anonymous function declaration
+   *  @return Node needs gvn() */
+  private Node func() {
+    int oldx = _x;
+    Ary<String> ids = new Ary<>(new String[1],0);
+    while( true ) {
+      String tok = token();
+      if( tok == null ) { ids.clear(); _x=oldx; break; } // not a "[id]* ->"
+      if( tok.equals("->") ) break;
+      ids.add(tok);
+    }
+    FunNode fun = (FunNode)gvn(new FunNode());
+    _e = new Env(_e);           // Nest an environment for the local vars
+    int cnt=0;                  // Add parameters to local environment
+    for( String id : ids )  _e.add(id,gvn(new ParmNode(fun,++cnt,id)));
+    Node ret = stmt();          // Parse function body
+    fun.add_def(ret);           // Close cycle over function, so can find the return later
+    _e = _e._par;               // Pop nested environment
+    require('}');
+    return fun;                 // Return function
+  }
+  
   private String token() { skipWS();  return token0(); }
   // Lexical tokens.  Any alpha, followed by any alphanumerics is a alpha-
   // token; alpha-tokens end with WS or any operator character.  Any collection
@@ -244,8 +272,8 @@ public class Parse {
     _pp.setIndex(_x);
     Number n = _nf.parse(_str,_pp);
     _x = _pp.getIndex();
-    if( n instanceof Long   ) return TypeInt.con(n.  longValue());
-    if( n instanceof Double ) return TypeFlt.make(0,64,(n.doubleValue()));
+    if( n instanceof Long   ) return TypeInt.con(      n.  longValue());
+    if( n instanceof Double ) return TypeFlt.make(0,64,n.doubleValue());
     throw new RuntimeException(n.getClass().toString()); // Should not happen
   }
   
@@ -281,7 +309,7 @@ public class Parse {
   private static boolean isWS    (byte c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r'; }
   private static boolean isAlpha0(byte c) { return ('a'<=c && c <= 'z') || ('A'<=c && c <= 'Z') || (c=='_'); }
   private static boolean isAlpha1(byte c) { return isAlpha0(c) || ('0'<=c && c <= '9'); }
-  private static boolean isOp0   (byte c) { return "!#$%*+,-.;:=<>?@^[]{}~/".indexOf(c) != -1; }
+  private static boolean isOp0   (byte c) { return "!#$%*+,-.;:=<>?@^[]~/".indexOf(c) != -1; }
   private static boolean isOp1   (byte c) { return isOp0(c); }
 
   private Node gvn(Node n) { return n==null ? null : _gvn.xform(n); }
