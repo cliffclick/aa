@@ -7,9 +7,9 @@ import java.util.Comparator;
 // Type union is a meet (or join) of unrelated SCALAR types.  Specifically it
 // simplifies out overlapping choices, such as {Flt64*Flt32} :=: Flt64.
 public class TypeUnion extends Type {
-  TypeTuple _ts;         // All of these are possible choices
-  boolean _any; // FALSE: meet; must support all; TRUE: join; can pick any one choice
-  TypeUnion( TypeTuple ts, boolean any ) { super(TUNION); init(ts,any); }
+  private TypeTuple _ts;         // All of these are possible choices
+  private boolean _any; // FALSE: meet; must support all; TRUE: join; can pick any one choice
+  private TypeUnion( TypeTuple ts, boolean any ) { super(TUNION); init(ts,any); }
   private void init( TypeTuple ts, boolean any ) { _ts = ts;  _any=any;  assert !ts.has_tuple(); }
   @Override public int hashCode( ) { return TANY+_ts.hashCode()+(_any?1:0);  }
   @Override public boolean equals( Object o ) {
@@ -30,7 +30,7 @@ public class TypeUnion extends Type {
   }
 
   static Type make( boolean any, Type... ts ) { return make(any,new Ary<>(ts)); }
-  static Type make( boolean any, Ary<Type> ts ) {
+  private static Type make( boolean any, Ary<Type> ts ) {
     if( ts._len == 0 ) throw AA.unimpl();   //return any ? Type.ANY : Type.ALL;
     // Special rules now apply to keep from growing out all combos of
     // e.g. float-constants.  All {float,int,function} types are meeted and
@@ -60,8 +60,8 @@ public class TypeUnion extends Type {
     return make(TypeTuple.make(ts.asAry()),any);
   }
 
-  static final TypeUnion ANY_NUM = (TypeUnion)make(true , TypeInt.INT64, TypeFlt.FLT64);
-  static final TypeUnion ALL_NUM = (TypeUnion)make(false, TypeInt.INT64, TypeFlt.FLT64);
+  private static final TypeUnion ANY_NUM = (TypeUnion)make(true , TypeInt.INT64, TypeFlt.FLT64);
+  private static final TypeUnion ALL_NUM = (TypeUnion)make(false, TypeInt.INT64, TypeFlt.FLT64);
   static final TypeUnion[] TYPES = new TypeUnion[]{ANY_NUM,ALL_NUM};
 
   @Override protected TypeUnion xdual() { return new TypeUnion((TypeTuple)_ts.dual(),!_any); }

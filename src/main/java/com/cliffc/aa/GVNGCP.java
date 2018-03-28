@@ -5,14 +5,14 @@ import com.cliffc.aa.util.Ary;
 
 // Global Value Numbering, Global Constant Propagation
 public class GVNGCP {
-  final boolean _opt; // Optimistic (types start at ANY and fall to ALL) or pessimistic (start ALL lifting to ANY)
+  private final boolean _opt; // Optimistic (types start at ANY and fall to ALL) or pessimistic (start ALL lifting to ANY)
   
   // Iterative worklist
-  Ary<Node> _work = new Ary<>(new Node[1],0);
+  private Ary<Node> _work = new Ary<>(new Node[1],0);
 
   // Array of types representing current node types.  Essentially a throw-away
   // temp extra field on Nodes.
-  Ary<Type> _ts = new Ary<>(new Type[1],0);
+  private Ary<Type> _ts = new Ary<>(new Type[1],0);
 
   GVNGCP( boolean opt ) {
     _opt = opt;
@@ -27,9 +27,9 @@ public class GVNGCP {
     assert t!=null;
     return t;
   }
-  public Type setype( Node n, Type t ) {
+  private void setype( Node n, Type t ) {
     assert t != null;
-    return _ts.set(n._uid,t);
+    _ts.set(n._uid,t);
   }
 
   // Apply graph-rewrite rules to Node n; if anything changes put all users of
@@ -69,7 +69,7 @@ public class GVNGCP {
     }
     
     if( t.is_con() && !(x instanceof ConNode) ) {
-      setype(x = new ConNode(t),t);
+      setype(x = new ConNode<>(t),t);
       cnt++;
     }
 

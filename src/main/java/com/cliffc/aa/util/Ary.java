@@ -1,7 +1,5 @@
 package com.cliffc.aa.util;
 
-import com.sun.istack.internal.NotNull;
-
 import java.lang.reflect.Array;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -23,10 +21,16 @@ public class Ary<E> implements Iterable<E> {
   public int len() { return _len; }
   /** @param i element index
    *  @return element being returned */
-   public E at( int i ) {
+  public E at( int i ) {
     if( i>=_len ) throw new IllegalArgumentException(""+i+" OOB "+_len);
     return _es[i];
-   }
+  }
+  /** @return last element */
+  public E last( ) {
+    if( _len==0 ) throw new IllegalArgumentException(""+0+" OOB "+_len);
+    return _es[_len-1];
+  }
+  
   
   public Ary<E> add( E e ) {
     if( _len >= _es.length ) _es = Arrays.copyOf(_es,Math.max(1,_es.length<<1));
@@ -44,13 +48,11 @@ public class Ary<E> implements Iterable<E> {
     return tmp;
   }
 
-  /** Slow, linear-time, element removal.  Preserves order
-   *  @param i element to be removed; 
-   *  @return compressed version of self, order preserved */
-  public Ary<E> remove( int i ) {
+  /** Slow, linear-time, element removal.  Preserves order.
+   *  @param i element to be removed */
+  public void remove( int i ) {
     if( i>=_len ) throw new IllegalArgumentException(""+i+" OOB "+_len);
     System.arraycopy(_es,i+1,_es,i,(--_len)-i);
-    return this;
   }
   
   public E set( int i, E e ) {
@@ -87,7 +89,7 @@ public class Ary<E> implements Iterable<E> {
     return -1;
   }
   /** @return an iterator */
-  @Override @NotNull public Iterator<E> iterator() { return new Iter(); }
+  @Override public Iterator<E> iterator() { return new Iter(); }
   private class Iter implements Iterator<E> {
     int _i=0;
     @Override public boolean hasNext() { return _i<_len; }

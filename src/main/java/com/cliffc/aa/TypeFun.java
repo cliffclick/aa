@@ -3,7 +3,7 @@ package com.cliffc.aa;
 public class TypeFun extends Type {
   public TypeTuple _ts;         // Arg types
   public Type _ret;             // return types
-  protected TypeFun(TypeTuple ts, Type ret ) { super(TFUN); init(ts,ret); }
+  private TypeFun( TypeTuple ts, Type ret ) { super(TFUN); init(ts,ret); }
   private void init(TypeTuple ts, Type ret ) { _ts = ts; _ret = ret; }
   @Override public int hashCode( ) { return TFUN + _ts.hashCode() + _ret.hashCode();  }
   @Override public boolean equals( Object o ) {

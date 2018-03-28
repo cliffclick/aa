@@ -39,9 +39,9 @@ public class Parse {
   // Parse the string in the given lookup context, and return an executable program
   Node go( ) { return prog(); }
 
-  /** Wheee.... parse grammer round 2...
+  /* Wheee.... parse grammer round 2...
    *  prog = stmt END
-   *  stmt = [id = ] stmt [; stmt]* // id must not exist, and is available in later statements
+   *  stmt = [id =]* expr [; stmt]* // ids must not exist, and are available in later statements
    *  expr = term [binop term]*   // gather all the binops and sort by prec
    *  term = nfact                // No function call
    *  term = nfact ( [expr,]* )+  // One or more function calls in a row, args are delimited
@@ -65,27 +65,28 @@ public class Parse {
   }
 
   /** Parse an expression, a list of terms and infix operators
-   *  stmt = [id = ] stmt [; stmt]* // id must not exist, and is available in later statements
+   *  stmt = [id =]* expr [; stmt]* // ids must not exist, and are available in later statements
    *  @return Node does NOT need gvn() */
   private Node stmt() {
-    // Scan for 'id ='.  Error if id pre-exists.  If either 'id' or '=' is not
-    // found, then no assignment.
-    int oldx = _x;
-    String token = token();
-    if( token != null ) {       // Got a variable token?
-      if( peek('=') ) {         // Assignment?
-        if( _e.lookup(token)!=null ) throw err("Cannot re-assign ref "+token);
-      } else {                  // No assignment
-        _x = oldx;              // Unwind token parse
-        token = null;
-      }
+    Ary<String> toks = new Ary<>(new String[1],0);
+    while( true ) {
+      int oldx = _x;
+      String tok = token();  // Scan for 'id = ...'
+      if( tok == null ) break;
+      if( !peek('=') ) { _x = oldx; break; } // Unwind token parse
+      if( _e.lookup(tok)!=null ) throw err("Cannot re-assign ref '"+tok+"'");
+      toks.add(tok);
     }
     Node expr = expr();
-    if( token != null ) {
-      // here need to expand _e to make token to expr.
-      // TODO: _e maps names to Nodes, not Types.
-      throw AA.unimpl();
+    if( expr == null ) {
+      if( toks._len > 0 ) throw err("Missing expr after assignment of '"+toks.last()+"'");
+      else return null;
     }
+    for( String tok : toks )
+      if( _e.lookup(tok)!=null ) throw err("Cannot re-assign ref '"+tok+"'");
+      else _e.add(tok,expr);
+    while( peek(';') )
+      expr = stmt();
     return expr;
   }
   
@@ -103,7 +104,6 @@ public class Parse {
     // Now loop for binop/term pairs: parse Kleene star of [binop term]
     while( true ) {
       int oldx = _x;
-      skipWS();
       String bin = token();
       if( bin==null ) break;    // Valid parse, but no more Kleene star
       Node binfun = _e.lookup_filter(bin,_gvn,TypeFun.any(2)); // BinOp, or null
@@ -164,7 +164,10 @@ public class Parse {
       //  args.add(arg);                // Gather WS-separate args
       //if( args.len()==1 ) return fun; // Not a function call
     }
-    return new ApplyNode(args.asAry());
+    Node rez = gvn(new ApplyNode(args.asAry()));
+    if( _gvn.type(rez)==Type.ANY )
+      throw err("Argument mismatch in call to "+fun);
+    return rez;
   }
   
   /** Parse any leading unary ops before a factor
@@ -172,7 +175,6 @@ public class Parse {
    *  @return Node needs gvn() */
   private Node nfact() {
     int oldx = _x;
-    skipWS();
     String uni = token();
     if( uni!=null ) { // Valid parse
       Node unifun = gvn(_e.lookup_filter(uni,_gvn,TypeFun.any(1)));
@@ -198,10 +200,11 @@ public class Parse {
   private Node fact() {
     if( skipWS() == -1 ) return null;
     byte c = _buf[_x];
-    if( '0' <= c && c <= '9' ) return new ConNode(number());
+    if( '0' <= c && c <= '9' ) return new ConNode<>(number());
     int oldx = _x;
     if( peek('(') ) { // Either a special-syntax pre/infix op, or a nested expression
-      Node op = look_token();
+      String tok = token0();
+      Node op = tok == null ? null : _e.lookup(tok);
       if( peek(')') && op != null && op.op_prec() > 0 )
         return op;              // Return operator as a function constant
       _x = oldx+1;              // Back to the opening paren
@@ -212,25 +215,21 @@ public class Parse {
     }
     
     // Check for a valid 'id'
-    Node var = look_token();
+    String tok = token0();
+    if( tok == null ) return null;
+    Node var = _e.lookup(tok);
+    if( var == null )  throw err("Unknown ref '"+tok+"'");
     // Disallow uniop and binop functions as factors.
-    if( var == null || var.op_prec() > 0 ) { _x = oldx; return null; }
+    if( var.op_prec() > 0 ) { _x = oldx; return null; }
     return var;
   }
 
-  // Lookup the immediate next token, withOUT advancing the cursor.
-  // Used to lookup special op forms, e.g. "(-)" or "(++)".
-  private Node look_token() {
-    String tok = token();
-    return tok == null ? null : _e.lookup(tok);
-  }
-  
- 
+  private String token() { skipWS();  return token0(); }
   // Lexical tokens.  Any alpha, followed by any alphanumerics is a alpha-
   // token; alpha-tokens end with WS or any operator character.  Any collection
   // of the classic operator characters are a token, except that they will break
   // un-ambiguously.
-  private String token() {
+  private String token0() {
     if( _x >= _buf.length ) return null;
     byte c=_buf[_x];  int x = _x;
     if(   isAlpha0(c) ) while( _x < _buf.length && isAlpha1(_buf[_x]) ) _x++;
@@ -238,8 +237,7 @@ public class Parse {
     else return null;           // Not a token; specifically excludes e.g. all bytes >= 128, or most bytes < 32
     return new String(_buf,x,_x-x);
   }
-  private boolean is_token(byte c ) { return isAlpha0(c) || isOp0(c); }
-  
+
   // Parse a number; WS already skipped and sitting at a digit.  Relies on
   // Javas number parsing.
   private Type number() {
@@ -314,10 +312,4 @@ public class Parse {
     return sb.toString();
   }
   private IllegalArgumentException err(String s) { return new IllegalArgumentException(errMsg(s)); }
-
-  private String err_hint(Type... ts) {
-    boolean allnum=true;
-    for( Type t : ts ) if( !t.isa(Type.NUM) ) allnum=false;
-    return allnum ? ", this can happen if there is no common (loss-free conversion) numeric format" : "";
-  }
 }

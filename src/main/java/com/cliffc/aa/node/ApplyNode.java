@@ -34,7 +34,8 @@ public class ApplyNode extends Node {
       if( z==null || cvts < zcvts ) { z=fun; zcvts = cvts; zn = unr._defs.at(i); }
       else throw AA.unimpl(); // TODO: Stall on ambiguous as long as possible
     }
-    if( z==null ) return null;
+    if( z==null ) // TODO: Return a new ErrNode() which preserves syntax line numbers
+      return new ConNode<>(Type.ANY); // Fail to top
 
     // insert actual conversions
     for( int i=1; i<_defs._len; i++ ) {

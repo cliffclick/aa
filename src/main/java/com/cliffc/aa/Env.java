@@ -12,12 +12,12 @@ class Env {
 
   private final static Env TOP = new Env(null);
   static {
-    TOP.add("pi",new ConNode(TypeFlt.Pi)); // TODO: Needs to be under Math.pi
+    TOP.add("pi",new ConNode<>(TypeFlt.Pi)); // TODO: Needs to be under Math.pi
     for( PrimNode prim : PrimNode.PRIMS ) TOP.add(prim._name,prim);
   }
   static Env top() { return new Env(TOP); }
 
-  private void add( String name, Node prim ) {
+  void add( String name, Node prim ) {
     _refs.computeIfAbsent(name, key -> new UnresolvedNode()).add_def(prim);
   }
   

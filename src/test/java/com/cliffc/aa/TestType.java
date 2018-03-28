@@ -5,18 +5,6 @@ import org.junit.Test;
 
 public class TestType {
   @Test public void testType0() {
-    //// Syntax for variable assignment
-    //test("x=1", TypeInt.TRUE);
-    //test("x=y=1", TypeInt.TRUE);
-    //testerr("x=y=", "missing expr after assignment");
-    //testerr("x=y","y not defined");
-    //testerr("x=1+y","y not defined");
-    //test("x=2; y=x+1; x*y", TypeInt.con(6));
-    //// Re-use ref immediately after def; parses as: x=(2*3); 1+x+x*x
-    //test("1+(x=2*3)+x*x", TypeInt.con(43));
-    //testerr("x=(1+(x=2)+x)", "cannot make the same ref twice");
-
-    
     // Simple int
     test("1",   TypeInt.TRUE);
     // Unary operator
@@ -48,15 +36,26 @@ public class TestType {
     // error; mismatch arg count
     testerr("!()"     , "\nargs:0:Call to unary function !::Int1, but missing the one required argument\n!()\n ^\n");
     testerr("pi(1)"   , "\nargs:0:A function is being called, but 3.141592653589793 is not a function type\npi(1)\n   ^\n");
-    testerr("(+)(1,2,3)", "\nargs:0:{any[+::Flt64, +::Int64]} does not have a 3-argument version or the argument types do not match\n(+)(1,2,3)\n          ^\n");
+    testerr("(+)(1,2,3)", "\nargs:0:Argument mismatch in call to ANY(+::Flt64,+::Int64)\n(+)(1,2,3)\n          ^\n");
     // Parsed as +(1,(2*3))
     test("(+)(1, 2 * 3) ", TypeInt.con(7));
     // Parsed as +( (1+2*3) , (4*5+6) )
     test("(+)(1 + 2 * 3, 4 * 5 + 6) ", TypeInt.con(33));
 
-    test("id"   ,Env.top().lookup("id").types());
-    test("id(1)",TypeInt.con(1));
+    // Syntax for variable assignment
+    test("x=1", TypeInt.TRUE);
+    test("x=y=1", TypeInt.TRUE);
+    testerr("x=y=", "\nargs:0:Missing expr after assignment of 'y'\nx=y=\n    ^\n");
+    testerr("x=y","\nargs:0:Unknown ref 'y'\nx=y\n   ^\n");
+    testerr("x=1+y","\nargs:0:Unknown ref 'y'\nx=1+y\n     ^\n");
+    test("x=2; y=x+1; x*y", TypeInt.con(6));
+    // Re-use ref immediately after def; parses as: x=(2*3); 1+x+x*x
+    test("1+(x=2*3)+x*x", TypeInt.con(43));
+    testerr("x=(1+(x=2)+x)", "\nargs:0:Cannot re-assign ref 'x'\nx=(1+(x=2)+x)\n             ^\n");
+    
     // TODO: Need real TypeVars for these
+    //test("id"   ,Env.top().lookup("id").types());
+    //test("id(1)",TypeInt.con(1));
     //test("id((+))",Env.top().lookup("+",Type.ANY));
     //test("id(+)(id(1),id(pi))",TypeFlt.make(0,64,Math.PI+1));
   

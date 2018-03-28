@@ -4,11 +4,11 @@ import com.cliffc.aa.*;
 
 public abstract class PrimNode extends ConNode<TypeFun> {
   public final String _name;    // Unique name (and program bits)
-  public final String[] _args;  // Handy
+  private final String[] _args;  // Handy
   PrimNode( String name, String[] args, TypeFun tf ) { super(tf); _name=name; _args=args; }
   
-  public final static String[] ARGS1 = new String[]{"x"};
-  public final static String[] ARGS2 = new String[]{"x","y"};
+  final static String[] ARGS1 = new String[]{"x"};
+  final static String[] ARGS2 = new String[]{"x","y"};
 
   public static PrimNode[] PRIMS = new PrimNode[] {
     new ConvertInt32Flt64(),

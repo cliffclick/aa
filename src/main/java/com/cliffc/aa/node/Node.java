@@ -29,6 +29,13 @@ public abstract class Node {
   abstract String str();
   private SB xstr(SB sb) { return sb.p(_uid).p("=").p(str()); }
   @Override public String toString() {
+    SB sb = new SB().p(str()).p("(");
+    boolean first=true;
+    for( Node n : _defs ) { sb.p(first?"":",").p(n.str()); first=false; }
+    return sb.p(")").toString();
+  }
+  public String toString( int d ) {
+    // TODO: Recursive d-depth printing
     SB sb = xstr(new SB()).p("(");
     boolean first=true;
     for( Node n : _defs ) { n.xstr(sb.p(first?"":",")); first=false; }
@@ -56,7 +63,7 @@ public abstract class Node {
     return ts;
   }
   
-  public Node add_def(Node n) { _defs.add(n); return this; }
+  public void add_def(Node n) { _defs.add(n); }
   // Strictly add uses (no defs)
   public void add_use(Node n) { _uses.add(n); }
 }
