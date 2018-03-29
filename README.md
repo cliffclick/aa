@@ -1,19 +1,58 @@
 # aa
 
 Cliff Click Language Hacking
+============================
 
 Not really a language, as much as a stream of consciousness puking of language desires.
 
+GRAMMAR
+-------
 
+*  prog = stmt END
+*  stmt = [id =]* expr [; stmt]* // ids must not exist, and are available in later statements
+*  expr = term [binop term]*   // gather all the binops and sort by prec
+*  term = nfact                // No function call
+*  term = nfact ( [expr,]* )+  // One or more function calls in a row, args are delimited
+*  term = nfact nfact*         // One function call, all the args listed
+*  nfact= uniop* fact          // Zero or more uniop calls over a fact
+*  fact = id                   // variable lookup
+*  fact = num                  // number
+*  fact = (binop)              // Special syntactic form of binop; no spaces allowed; returns function constant
+*  fact = (uniop)              // Special syntactic form of uniop; no spaces allowed; returns function constant
+*  fact = (stmt)               // General statement called recursively
+*  fact = {func}               // Anonymous function declaration
+*  binop= +-*%&|               // etc; primitive lookup; can determine infix binop at parse-time
+*  uniop=  -!~                 // etc; primitive lookup; can determine infix uniop at parse-time
+*  func = { [[id]* ->]? stmt } // Anonymous function declaratio
+
+
+Done Stuff
+----------
+
+* REPL
+* "eval"
+* Dynamic code-gen; no seperate compilation step.  Load Source & Go.
+* Primitive values; int overflow OK;
+* Static typing; types optional at every place.
+* H-M style typing.  Limited overloads.
+* Overloading ops.  No ambiguity / easy-to-read rules.
+* By default multi-arg ops are overloaded.
+* Direct SSA style code writing; no 'let' keyword.
+* default "x := 1" makes a "val" until scope runs out (cannot re-assign)
+* "ref" can be reassigned but requires type keyword: "x:ref := 1"
+* Sub-byte ranges?  Julia-like typing
+
+
+Ideas, Desirables
+-----------------
 
 Functional; 1st class functions.
-Dynamic code-gen; no seperate compilation step.  Load Source & Go.
-REPL
-"eval"
-JIT'ing.  {GC,Ref-Counting}: Ponder both vs requiring e.g. lifetime management (easy by just raising scope).
-No exceptions!!!   
+
+JIT'ing.
+{GC,Ref-Counting}: Ponder both vs requiring e.g. lifetime management (easy by just raising scope).
+No exceptions!!! 
 Lexical scope destructors.
-Primitive values; int overflow OK; can ask for Int for BigInteger; unboxed arrays.
+Can ask for Int for BigInteger; unboxed arrays.
 Pattern-matching too handy looking, need to have it
 Parallel (and distributed) but also deterministic
 
@@ -30,14 +69,10 @@ Transactions-for-shared-memory-always (Closure style)
 
 Monads?  i/o, side-effect monads.
 
-Static typing; types optional at every place.
-H-M style typing.  Limited overloads.
 Null-ptr distinguished; null/notnull types (e.g. Kotlin)
 OOP namespaces (distinguished "this"; classes; single-inheritence vs interfaces)
 Duck-typing?  Interfaces.  Single inheritance (or none; composition also works).
-Overloading ops.  No ambiguity / easy-to-read rules.  By default multi-arg ops are overloaded.
 physical-unit-types, esp for arrays; e.g. "fueltank_size:gallon", and "speed:mile/hour", with auto-conversions
-Sub-byte ranges?  Julia???
 
 Modules: independent shipping of code.
 
@@ -65,9 +100,6 @@ Rust-style memory lifetime management; linear logic owner; borrowing; guarenteed
 
 Tail-recursion optimization.
 
-Direct SSA style code writing; no 'let' keyword.
-default "x := 1" makes a "val" until scope runs out (cannot re-assign)
-"ref" can be reassigned but requires type keyword: "x:ref := 1"
 
 multi-value-returns OK, sugar over returning a temp-tuple
 Extra "," in static struct makers OK: "{'hello','world',}"
