@@ -64,7 +64,6 @@ public class GVNGCP {
     Type t = x.value(this);
     if( t != _ts.at(x._uid) ) { // Got a new type
       _ts.set(x._uid,t);        // Set it in
-      x.lift_type(t);           // Some nodes can cache a local type directly
       cnt++;
     }
     

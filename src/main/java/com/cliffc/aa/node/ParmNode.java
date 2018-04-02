@@ -11,5 +11,4 @@ public class ParmNode extends Node {
   @Override public Node ideal(GVNGCP gvn) { return null; }
   @Override public Type value(GVNGCP gvn) { return Type.SCALAR; }
   @Override public Type all_type() { return Type.SCALAR; }
-  @Override public void lift_type(Type t) { throw AA.unimpl(); }
 }

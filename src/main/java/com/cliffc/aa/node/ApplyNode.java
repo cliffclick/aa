@@ -32,7 +32,7 @@ public class ApplyNode extends Node {
         else if( !actuals[j].isBitShape(fargs[j]) ) cvts++;
       if( j<actuals.length ) continue; // Some argument does not apply; drop this choice
       if( z==null || cvts < zcvts ) { z=fun; zcvts = cvts; zn = unr._defs.at(i); }
-      else throw AA.unimpl(); // TODO: Stall on ambiguous as long as possible
+      else if( cvts == zcvts ) throw AA.unimpl(); // TODO: Stall on ambiguous as long as possible
     }
     if( z==null ) // TODO: Return a new ErrNode() which preserves syntax line numbers
       return new ConNode<>(Type.ANY); // Fail to top

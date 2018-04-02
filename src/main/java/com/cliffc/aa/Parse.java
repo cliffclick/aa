@@ -30,6 +30,7 @@ import java.text.ParsePosition;
 public class Parse {
   private final String _src;            // Source for error messages; usually a file name
   private Env _e;                       // Lookup context; pushed and popped as scopes come and go
+  private Node _ctrl;                   // Current control
   private final byte[] _buf;            // Bytes being parsed
   private int _x;                       // Parser index
   private int _line;                    // Zero-based line number
@@ -44,6 +45,7 @@ public class Parse {
     _src = src;
     _line= 0;
     _e   = env;
+    _ctrl= env.lookup_filter(" root ",gvn,Type.CONTROL);
     _buf = str.getBytes();
     _x   = 0;
 

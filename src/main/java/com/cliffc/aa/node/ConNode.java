@@ -9,7 +9,6 @@ public class ConNode<T extends Type> extends Node {
   @Override public Node ideal(GVNGCP gvn) { return null; }
   @Override public Type value(GVNGCP gvn) { return _t; }
   @Override public Type all_type() { return _t; }
-  @Override public void lift_type(Type t) { _t=(T)t; }
   @Override public String toString() { return str(); }
 }
 

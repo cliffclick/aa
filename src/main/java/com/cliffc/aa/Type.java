@@ -71,26 +71,28 @@ public class Type {
     return this;
   }
 
-  static final byte TBAD    =-1; // Type check
+  static final byte TBAD    = 0; // Type check
   // Implemented fully here
-  static final byte TALL    = 0; // Bottom; all possible types Meet together
-  static final byte TANY    = 1; // Top; dual of All
-  static final byte TSCALAR = 2; // Scalars; all possible finite types; includes pointers (functions, structs), ints, floats; excludes state of Memory.  
-  static final byte TXSCALAR= 3; // Invert scalars
-  static final byte TNUM    = 4; // Number and all derivitives (Complex, Rational, Int, Float, etc)
-  static final byte TXNUM   = 5; // Any Numbers; dual of NUM
-  static final byte TREAL   = 6; // All Real Numbers
-  static final byte TXREAL  = 7; // Any Real Numbers; dual of REAL
-  static final byte TBASE   = 8; // End of the Base Types; Not a Type
-  private static final String[] STRS = new String[]{"All","Any","Scalar","~Scalar","Number","~Number","Real","~Real"};
+  static final byte TCONTROL= 1; // Control flow bottom (mini-lattice of Top-Control)
+  static final byte TALL    = 2; // Bottom; all possible types Meet together
+  static final byte TANY    = 3; // Top; dual of All; choice of any type
+  static final byte TSCALAR = 4; // Scalars; all possible finite types; includes pointers (functions, structs), ints, floats; excludes state of Memory and Control.
+  static final byte TXSCALAR= 5; // Invert scalars
+  static final byte TNUM    = 6; // Number and all derivitives (Complex, Rational, Int, Float, etc)
+  static final byte TXNUM   = 7; // Any Numbers; dual of NUM
+  static final byte TREAL   = 8; // All Real Numbers
+  static final byte TXREAL  = 9; // Any Real Numbers; dual of REAL
+  static final byte TBASE   =10; // End of the Base Types; Not a Type
+  private static final String[] STRS = new String[]{"Bad","Control","All","Any","Scalar","~Scalar","Number","~Number","Real","~Real"};
   // Implemented in subclasses
-  static final byte TUNION  = 9; // Union types (finite collections of unrelated types Meet together); see TypeUnion
-  static final byte TTUPLE  =10; // Tuples; finite collections of unrelated Types, kept in parallel
-  static final byte TFUN    =11; // Functions; both domain and range are a Tuple; see TypeFun                            
-  static public final byte TFLT    =12; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
-  static final byte TINT    =13; // All Integers, including signed/unsigned and various sizes; see TypeInt
-  static final byte TLAST   =14; // Type check
+  static final byte TUNION  =11; // Union types (finite collections of unrelated types Meet together); see TypeUnion
+  static final byte TTUPLE  =12; // Tuples; finite collections of unrelated Types, kept in parallel
+  static final byte TFUN    =13; // Functions; both domain and range are a Tuple; see TypeFun                            
+  static public final byte TFLT    =14; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
+  static final byte TINT    =15; // All Integers, including signed/unsigned and various sizes; see TypeInt
+  static final byte TLAST   =16; // Type check
   
+  static public final Type CONTROL= make(TCONTROL); // Control
   static public final Type ALL    = make(TALL    ); // Bottom
   static public final Type ANY    = make(TANY    ); // Top
   static public final Type  SCALAR= make( TSCALAR); // ptrs, ints, flts; things that fit in a machine register
@@ -107,7 +109,7 @@ public class Type {
   byte base() { assert TBAD < _type && _type < TLAST; return _type; }
   
   // Return cached dual
-  public final Type dual() { return _dual; }
+  final Type dual() { return _dual; }
   
   // Compute dual right now.  Overridden in subclasses.
   protected Type xdual() {
@@ -116,7 +118,7 @@ public class Type {
     return new Type((byte)(_type^1));
   }
 
-  public final Type meet( Type t ) {
+  final Type meet( Type t ) {
     Type mt = xmeet0(t);
     //assert check_commute  (t,mt);
     //assert check_symmetric(t,mt);
@@ -142,6 +144,8 @@ public class Type {
     // Top meet anything is that thing
     if(   _type == TANY ) return t   ;
     if( t._type == TANY ) return this;
+    // Control can only meet Control or Top
+    if( _type == TCONTROL || t._type == TCONTROL ) { assert _type == t._type; return CONTROL; }
 
     // The rest of these choices are various scalars, which do not match well
     // with any tuple.

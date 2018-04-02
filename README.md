@@ -30,7 +30,6 @@ Done Stuff
 ----------
 
 * REPL
-* "eval"
 * Dynamic code-gen; no seperate compilation step.  Load Source & Go.
 * Primitive values; int overflow OK;
 * Static typing; types optional at every place.
@@ -55,6 +54,7 @@ Lexical scope destructors.
 Can ask for Int for BigInteger; unboxed arrays.
 Pattern-matching too handy looking, need to have it
 Parallel (and distributed) but also deterministic
+"eval"
 
 maps-over-collections; default to parallel
 parallel/distributed collections; deterministic

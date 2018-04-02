@@ -7,14 +7,20 @@ public class UnresolvedNode extends Node {
   // Returns a defensive copy if there remain many unresolved choices.
   // Returns null if all choices are removed.
   public Node filter( GVNGCP gvn, Type t0 ) {
-    UnresolvedNode rez=null;
+    Node rez=null;
     for( Node n : _defs ) {     // For each choice function
       if( t0.isa(gvn.type(n)) ) { // Want to know if each actual arg isa formal arg, or not.
-        if( rez==null ) rez = new UnresolvedNode();
-        rez.add_def(n);
+        if( rez==null ) rez = n;
+        else if( rez instanceof UnresolvedNode ) ((UnresolvedNode)rez).add_def(n);
+        else {
+          UnresolvedNode unr = new UnresolvedNode();
+          unr.add_def(n);
+          unr.add_def(rez);
+          rez = unr;
+        }
       }
     }
-    if( rez != null && rez._defs._len == _defs._len )
+    if( rez != null && rez instanceof UnresolvedNode && ((UnresolvedNode)rez)._defs._len == _defs._len )
       return this;              // No change
     return rez;                 // Hey progress; dropped some choices
   }

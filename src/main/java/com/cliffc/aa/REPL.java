@@ -1,6 +1,7 @@
 package com.cliffc.aa;
 
 import com.cliffc.aa.node.Node;
+import com.cliffc.aa.node.RootNode;
 
 import java.util.Scanner;
 
@@ -11,6 +12,9 @@ public abstract class REPL {
   private static final String prompt="> ";
   public static void go( ) {
     Env env = Env.top();
+    RootNode root = new RootNode();
+    env.add(" root ",root);
+    
     GVNGCP gvn = new GVNGCP(false);
     Scanner stdin = new Scanner(System.in);
     System.out.print(prompt);
