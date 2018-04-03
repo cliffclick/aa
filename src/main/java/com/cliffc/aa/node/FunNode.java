@@ -29,7 +29,9 @@ import com.cliffc.aa.*;
 // There is a JoinNode which points to the ReturnNode for actual value.  The
 // JoinNode is specific to each caller, and carries the return value for each
 // caller (ReturnNodes are only used by JoinNodes).  The JoinNode joins() its
-// input with the callers' known type, lifting the result per-call-site.
+// input with the callers' known type, lifting the result per-call-site.  This
+// sharpens the type analysis per-call-site, which I think is required for H-M
+// style typing, and leads to a O(n^2) graph (maybe?)
 //
 // The Parser will use the Env to point to the worse-case JoinNode to allow (or
 // create) more callers as parsing continues.  The JoinNode is what is passed

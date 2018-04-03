@@ -19,9 +19,9 @@ import java.text.ParsePosition;
  *  fact = id                   // variable lookup
  *  fact = num                  // number
  *  fact = (stmt)               // General statement called recursively
+ *  fact = {func}               // Anonymous function declaration
  *  fact = {binop}              // Special syntactic form of binop; no spaces allowed; returns function constant
  *  fact = {uniop}              // Special syntactic form of uniop; no spaces allowed; returns function constant
- *  fact = {func}               // Anonymous function declaration
  *  binop = +-*%&|              // etc; primitive lookup; can determine infix binop at parse-time
  *  uniop  =  -!~               // etc; primitive lookup; can determine infix uniop at parse-time
  *  func = { [[id]* ->]? stmt } // Anonymous function declaration

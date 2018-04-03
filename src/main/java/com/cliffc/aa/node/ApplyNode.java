@@ -2,6 +2,20 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.*;
 
+
+// See FunNode.
+
+// Slot 0 is not control, it is a function value.  Slots 1+ are for args.
+// Slot 0 is join'd with a correct-arg-cnt function type, and if that
+// type is TOP, then the ApplyNode is TOP.
+//
+// Slots 1+ are join'd with the slot 0 function type per-arg.  If any arg goes
+// to TOP, then the arg is not currently type-correct, and the call cannot be
+// made so result is TOP (if inlined, the undefined arg might also be dead, and
+// thus the call have a well-defined result).
+//
+// Return is just the function return (as type from slot 0).
+
 public class ApplyNode extends Node {
   public ApplyNode( Node... defs ) { super(defs); }
   @Override String str() { return "apply"; }
