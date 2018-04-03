@@ -8,9 +8,10 @@ import com.cliffc.aa.*;
 // CNC: Thinking about solve 1st-class function typing issues
 //
 // FunNode is a RegionNode; args point to all the known callers.  Zero slot is
-// empty, same as C2.  Arg1 points to the generic unknown worse-case caller.
-// This can be removed once no more callers can appear.  Carries a Type which
-// is a FunType, and has embedded TypeVars where structural sharing may occur.
+// empty, same as C2.  Arg1 points to the generic unknown worse-case caller;
+// maybe local control at assignment time.  This can be removed once no more
+// callers can appear.  Carries a Type which is a FunType, and has embedded
+// TypeVars where structural sharing may occur.
 //   
 // Pointing to the FunNode are ParmNodes which are also PhiNodes; one input
 // path for each known caller.  Zero slot points to the FunNode.  Arg1 points

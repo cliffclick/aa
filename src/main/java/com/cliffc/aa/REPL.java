@@ -13,7 +13,7 @@ public abstract class REPL {
   public static void go( ) {
     Env env = Env.top();
     RootNode root = new RootNode();
-    env.add(" root ",root);
+    env.add(" control ",root);
     
     GVNGCP gvn = new GVNGCP(false);
     Scanner stdin = new Scanner(System.in);

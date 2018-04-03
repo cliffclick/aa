@@ -27,20 +27,20 @@ public class TestType {
     test("pi", TypeFlt.Pi);
     // bare function lookup; returns a union of '+' functions
     testerr("+", "Syntax error; trailing junk","");
-    test("(+)", Env.top().lookup("+").types());
-    test("(!)", TypeFun.make(TypeTuple.INT64,TypeInt.BOOL));
+    test("{+}", Env.top().lookup("+").types());
+    test("{!}", TypeFun.make(TypeTuple.INT64,TypeInt.BOOL));
     // Function application, traditional paren/comma args
-    test("(+)(1,2)", TypeInt.con( 3));
-    test("(-)(1,2)", TypeInt.con(-1)); // binary version
-    test("(-)(1  )", TypeInt.con(-1)); // unary version
+    test("{+}(1,2)", TypeInt.con( 3));
+    test("{-}(1,2)", TypeInt.con(-1)); // binary version
+    test("{-}(1  )", TypeInt.con(-1)); // unary version
     // error; mismatch arg count
     testerr("!()"       , "Call to unary function !::Int1, but missing the one required argument"," ");
     testerr("pi(1)"     , "A function is being called, but 3.141592653589793 is not a function type","   ");
-    testerr("(+)(1,2,3)", "Argument mismatch in call to ANY(+::Flt64 +::Int64)","          ");
+    testerr("{+}(1,2,3)", "Argument mismatch in call to ANY(+::Flt64 +::Int64)","          ");
     // Parsed as +(1,(2*3))
-    test("(+)(1, 2 * 3) ", TypeInt.con(7));
+    test("{+}(1, 2 * 3) ", TypeInt.con(7));
     // Parsed as +( (1+2*3) , (4*5+6) )
-    test("(+)(1 + 2 * 3, 4 * 5 + 6) ", TypeInt.con(33));
+    test("{+}(1 + 2 * 3, 4 * 5 + 6) ", TypeInt.con(33));
 
     // Syntax for variable assignment
     test("x=1", TypeInt.TRUE);

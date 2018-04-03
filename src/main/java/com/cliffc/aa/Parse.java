@@ -18,9 +18,9 @@ import java.text.ParsePosition;
  *  nfact= uniop* fact          // Zero or more uniop calls over a fact
  *  fact = id                   // variable lookup
  *  fact = num                  // number
- *  fact = (binop)              // Special syntactic form of binop; no spaces allowed; returns function constant
- *  fact = (uniop)              // Special syntactic form of uniop; no spaces allowed; returns function constant
  *  fact = (stmt)               // General statement called recursively
+ *  fact = {binop}              // Special syntactic form of binop; no spaces allowed; returns function constant
+ *  fact = {uniop}              // Special syntactic form of uniop; no spaces allowed; returns function constant
  *  fact = {func}               // Anonymous function declaration
  *  binop = +-*%&|              // etc; primitive lookup; can determine infix binop at parse-time
  *  uniop  =  -!~               // etc; primitive lookup; can determine infix uniop at parse-time
@@ -45,7 +45,7 @@ public class Parse {
     _src = src;
     _line= 0;
     _e   = env;
-    _ctrl= env.lookup_filter(" root ",gvn,Type.CONTROL);
+    _ctrl= env.lookup_filter(" control ",gvn,Type.CONTROL);
     _buf = str.getBytes();
     _x   = 0;
 
@@ -195,12 +195,12 @@ public class Parse {
   }
 
   /** Parse a factor, a leaf grammar token
-   *  fact = id        // variable lookup, NOT a binop or uniop but might be e.g. function-valued, including un-/binops as values
    *  fact = num       // number
-   *  fact = (binop)   // Special syntactic form of binop; no spaces allowed; returns function constant
-   *  fact = (uniop)   // Special syntactic form of uniop; no spaces allowed; returns function constant
    *  fact = (expr)    // General expression called recursively
+   *  fact = {binop}   // Special syntactic form of binop; no spaces allowed; returns function constant
+   *  fact = {uniop}   // Special syntactic form of uniop; no spaces allowed; returns function constant
    *  fact = {func}    // Anonymous function declaration
+   *  fact = id        // variable lookup, NOT a binop or uniop but might be e.g. function-valued, including un-/binops as values
    *  @return Node needs gvn() */
   private Node fact() {
     if( skipWS() == -1 ) return null;
@@ -208,18 +208,20 @@ public class Parse {
     if( '0' <= c && c <= '9' ) return new ConNode<>(number());
     int oldx = _x;
     if( peek('(') ) { // Either a special-syntax pre/infix op, or a nested expression
-      String tok = token0();
-      Node op = tok == null ? null : _e.lookup(tok);
-      if( peek(')') && op != null && op.op_prec() > 0 )
-        return op;              // Return operator as a function constant
-      _x = oldx+1;              // Back to the opening paren
       Node ex = stmt();
       if( ex==null ) { _x = oldx; return null; } // A bare "()" pair is not an expr
       require(')');
       return ex;
     }
-    // Anonymous function
-    if( peek('{') ) return func();
+    // Anonymous function or operator
+    if( peek('{') ) {
+      String tok = token0();
+      Node op = tok == null ? null : _e.lookup(tok);
+      if( peek('}') && op != null && op.op_prec() > 0 )
+        return op;              // Return operator as a function constant
+      _x = oldx+1;              // Back to the opening paren
+      return func();            // Anonymous function
+    }
     
     // Check for a valid 'id'
     String tok = token0();
