@@ -25,7 +25,7 @@ import com.cliffc.aa.util.Ary;
 public class ApplyNode extends Node {
   static private int CNT=1;
   public final int _cidx;       // Call site index
-  public ApplyNode( Node... defs ) { super(defs); _cidx = CNT++; }
+  public ApplyNode( Node... defs ) { super(OP_APLY,defs); _cidx = CNT++; }
   @Override String str() { return "apply"; }
   @Override public Node ideal(GVNGCP gvn) {
 
@@ -74,7 +74,7 @@ public class ApplyNode extends Node {
       if( ns._len==unr._defs._len ) return null; // No improvement
       Node unr2 = new UnresolvedNode();          // Build and return a reduced Unr
       for( Node ret : ns ) unr2.add_def(ret);
-      return set_def(0,unr2);
+      return set_def(0,unr2,gvn);
     }
     
     // Single choice; insert actual conversions & replace
@@ -87,11 +87,11 @@ public class ApplyNode extends Node {
       if( !actual.isBitShape(formal) ) {
         PrimNode cvt = PrimNode.convert(_defs.at(i),actual,formal);
         if( cvt.is_lossy() ) throw new IllegalArgumentException("Requires lossy conversion");
-        _defs.set(i,gvn.xform(cvt));
+        set_def(i,gvn.xform(cvt),gvn);
       }
     }
     // upgrade function argument to a constant
-    return set_def(0,ret);
+    return set_def(0,ret,gvn);
   }
 
   @Override public Type value(GVNGCP gvn) {

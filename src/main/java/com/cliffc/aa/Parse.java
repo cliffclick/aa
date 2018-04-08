@@ -102,8 +102,8 @@ public class Parse {
     if( term == null ) return null; // Term is required, so missing term implies not any expr
     // Collect 1st fcn/arg pair
     Ary<Node> funs = new Ary<>(new Node[1],0);
-    Ary<Node> args = new Ary<>(new Node[1],0);
-    funs.add(null);   args.add(term);
+    TmpNode args = new TmpNode();
+    funs.add(null);   args.add_def(term);
     
     // Now loop for binop/term pairs: parse Kleene star of [binop term]
     while( true ) {
@@ -114,7 +114,7 @@ public class Parse {
       if( binfun==null ) { _x=oldx; break; } // Not a binop, no more Kleene star
       term = term();
       if( term == null ) throw err("missing expr after binary op "+bin);
-      funs.add(gvn(binfun));  args.add(gvn(term));
+      funs.add(gvn(binfun));  args.add_def(gvn(term));
     }
 
     // Have a list of interspersed operators and terms.
@@ -122,17 +122,17 @@ public class Parse {
     int max=-1;                 // First find max precedence.
     for( Node n : funs ) if( n != null ) max = Math.max(max,n.op_prec());
     // Now starting at max working down, group list by pairs into a tree
-    while( args.len() > 1 ) {
+    while( args._defs._len > 1 ) {
       for( int i=1; i<funs.len(); i++ ) { // For all ops of this precedence level, left-to-right
         Node fun = funs.at(i);
         assert fun.op_prec() <= max;
         if( fun.op_prec() < max ) continue; // Not yet
-        args.set(i-1,gvn(new ApplyNode(fun,args.at(i-1),args.at(i))));
+        args.set_def(i-1,gvn(new ApplyNode(fun,args.at(i-1),args.at(i))),_gvn);
         funs.remove(i);  args.remove(i);  i--;
       }
       max--;
     }
-    return args.at(0);
+    return args.last();         // Toss/unwind the tmp
   }
 
   /** Parse a function call, or not
@@ -169,8 +169,10 @@ public class Parse {
       //if( args.len()==1 ) return fun; // Not a function call
     }
     Node rez = gvn(new ApplyNode(args.asAry()));
-    if( _gvn.type(rez)==Type.ANY )
-      throw err("Argument mismatch in call to "+fun);
+    if( _gvn.type(rez)==Type.ANY ) {
+      if( rez._uses._len==0 ) _gvn.kill(rez);
+      throw err("Argument mismatch in call to " + fun);
+    }
     return rez;
   }
   
@@ -189,6 +191,8 @@ public class Parse {
         return new ApplyNode(unifun,arg);
       } else {
         _x=oldx;                // Unwind token parse and try again for a factor
+        if( unifun != null && unifun._uses._len==0 )
+          _gvn.kill(unifun);    // Might be made new by the lookup_filter, but then no-good
       }
     }
     return fact();
@@ -205,7 +209,7 @@ public class Parse {
   private Node fact() {
     if( skipWS() == -1 ) return null;
     byte c = _buf[_x];
-    if( '0' <= c && c <= '9' ) return new ConNode<>(number());
+    if( '0' <= c && c <= '9' ) return _gvn.con(number());
     int oldx = _x;
     if( peek('(') ) { // Either a special-syntax pre/infix op, or a nested expression
       Node ex = stmt();
@@ -246,15 +250,17 @@ public class Parse {
       ids.add(tok);
     }
     FunNode fun = (FunNode)init(new FunNode(TypeFun.any(ids._len)));
-    _e = new Env(_e);           // Nest an environment for the local vars
-    int cnt=0;                  // Add parameters to local environment
-    for( String id : ids )  _e.add(id,init(new ParmNode(++cnt,id,fun,_gvn.con(Type.XSCALAR))));
-    Node rpc = init(new ParmNode(ids._len,"$rpc",fun,_gvn.con(TypeInt.TRUE)));
-    Node rez = stmt();          // Parse function body
-    Node ret = _gvn.xform(new RetNode(fun,rez,rpc,1));
-    _e = _e._par;               // Pop nested environment
-    require('}');
-    return ret;                 // Return function
+    try( Env e = new Env(_e) ) { // Nest an environment for the local vars
+      _e = e;
+      int cnt=0;                // Add parameters to local environment
+      for( String id : ids )  _e.add(id,init(new ParmNode(++cnt,id,fun,_gvn.con(Type.XSCALAR))));
+      Node rpc = init(new ParmNode(ids._len,"$rpc",fun,_gvn.con(TypeInt.TRUE)));
+      Node rez = stmt();        // Parse function body
+      Node ret = _gvn.xform(new RetNode(fun,rez,rpc,1));
+      _e = _e._par;               // Pop nested environment
+      require('}');
+      return ret;                 // Return function
+    }
   }
   
   private String token() { skipWS();  return token0(); }

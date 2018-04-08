@@ -17,7 +17,7 @@ public class TestType {
     // Binary with precedence check
     test(" 1+2 * 3+4 *5", TypeInt.con( 27));
     test("(1+2)*(3+4)*5", TypeInt.con(105));
-    
+
     // Float
     test("1.2+3.4", TypeFlt.make(0,64,4.6));
     // Mixed int/float with conversion
@@ -27,7 +27,7 @@ public class TestType {
     test("pi", TypeFlt.Pi);
     // bare function lookup; returns a union of '+' functions
     testerr("+", "Syntax error; trailing junk","");
-    test("{+}", Env._gvn.type(Env.top().lookup("+")));
+    test("{+}", Env.lookup_type("+"));
     test("{!}", TypeFun.make(TypeTuple.INT64,TypeInt.BOOL));
     // Function application, traditional paren/comma args
     test("{+}(1,2)", TypeInt.con( 3));

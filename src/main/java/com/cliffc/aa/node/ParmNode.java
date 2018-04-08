@@ -7,7 +7,7 @@ import com.cliffc.aa.util.SB;
 public class ParmNode extends Node {
   final int _idx;               // Parameter index, 1-based
   final String _name;           // Parameter name
-  public ParmNode( int idx, String name, Node... funparms) { super(funparms); _idx=idx; _name=name; }
+  public ParmNode( int idx, String name, Node... funparms) { super(OP_PARM,funparms); _idx=idx; _name=name; }
   @Override String str() { return _name; }
   @Override public String toString() {
     SB sb = new SB().p(_name).p('{');

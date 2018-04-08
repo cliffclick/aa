@@ -5,7 +5,7 @@ import com.cliffc.aa.*;
 // See FunNode
 public class RetNode extends Node {
   final int _rpc;               // Which call site
-  public RetNode( Node ctrl, Node ret, Node rpcparm, int rpc ) { super(ctrl,ret,rpcparm); _rpc = rpc;}
+  public RetNode( Node ctrl, Node ret, Node rpcparm, int rpc ) { super(OP_RET,ctrl,ret,rpcparm); _rpc = rpc;}
   @Override String str() { return "ret$"+_rpc; }
   @Override public Node ideal(GVNGCP gvn) {
     if( _rpc==1 ) return null;  // Generic worse-case caller

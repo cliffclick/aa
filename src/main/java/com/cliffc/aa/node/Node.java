@@ -4,10 +4,22 @@ import com.cliffc.aa.*;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 
+import java.util.BitSet;
+
 // Sea-of-Nodes
 public abstract class Node {
-  static private int CNT=0;
-  public final int _uid=CNT++; // Unique ID, will have gaps, used to give a dense numbering to nodes
+  static final byte OP_ROOT= 1;
+  static final byte OP_CON = 2;
+  static final byte OP_PRIM= 3;
+  static final byte OP_UNR = 4;
+  static final byte OP_FUN = 5;
+  static final byte OP_PARM= 6;
+  static final byte OP_RET = 7;
+  static final byte OP_APLY= 8;
+  static final byte OP_TMP = 9;
+  
+  public final int _uid=Env._gvn.uid(); // Unique ID, will have gaps, used to give a dense numbering to nodes
+  public final byte _op;
 
   // Defs.  Generally fixed length, ordered, nulls allowed, no unused trailing space.  Zero is Control.
   public Ary<Node> _defs;
@@ -15,27 +27,28 @@ public abstract class Node {
   public void add_def(Node n) { _defs.add(n); if( n!=null ) n._uses.add(this); }
   public Node at(int i) { return _defs._es[i]; }
   // Replace def/use edge
-  public Node set_def( int idx, Node n ) {
-    Node old = _defs._es[idx];
+  public Node set_def( int idx, Node n, GVNGCP gvn ) {
+    Node old = _defs._es[idx];  // Get old value
+    // Add edge to new guy before deleting old, in case old goes dead and
+    // recursively makes new guy go dead also
+    if( (_defs._es[idx] = n) != null ) n._uses.add(this);
     if( old != null ) {
-      int i;
-      for( i=0; i<old._uses._len; i++ )
-        if( old._uses._es[i] == this )
-          { old._uses.del(i--); break; }
-      assert i < old._uses._len;  // Found the use to remove
+      old._uses.del(old._uses.find(a -> a==this));
+      if( old._uses._len==0 ) gvn.kill(old); // Recursively begin deleting
     }
-    _defs._es[idx] = n;
-    if( n != null ) n._uses.add(this);
     return this;
   }
   
   // Uses.  Generally variable length; unordered, no nulls, compressed, unused trailing space
   public Ary<Node> _uses = new Ary<>(new Node[1],0);  
   // Strictly add uses (no defs)
-  public void add_use(Node n) { _uses.add(n); }
+  public void add_use(Node n) {
+    assert _uses != null;
+    _uses.add(n); }
 
-  Node() { this(new Node[0]); }
-  Node( Node... defs ) {
+  Node( byte op ) { this(op,new Node[0]); }
+  Node( byte op, Node... defs ) {
+    _op = op;
     _defs = new Ary<>(defs);
     for( Node def : defs ) if( def != null ) def.add_use(this);
   }
@@ -58,7 +71,9 @@ public abstract class Node {
     return sb.p(")").toString();
   }
   
-  // graph rewriting
+  // Graph rewriting.  Change change defs, including making new nodes.
+  // Will not call ideal() recursively on old nodes.
+  // Returns null if no-progress, or better version of 'this'.
   abstract public Node ideal(GVNGCP gvn);
 
   // Compute the current best Type for this Node, based on the types of its inputs
@@ -70,22 +85,33 @@ public abstract class Node {
   // Operator precedence is only valid for ConNode of binary functions
   public int op_prec() { return -1; }
 
-  // Allocate array of GVN types
-  Type[] types( GVNGCP gvn ) {
-    Type[] ts = new Type[_defs._len];
-    for( int i=0; i<_defs._len; i++ )
-      ts[i] = gvn.type(_defs.at(i));
-    return ts;
-  }
-
+  // Hash is function+inputs, or opcode+input_uids, and is invariant over edge
+  // order (so we can swap edges without rehashing)
   @Override public int hashCode() {
-    throw AA.unimpl();
+    int sum = _op;
+    for( int i=0; i<_defs._len; i++ ) if( _defs._es[i] != null ) sum ^= _defs._es[i]._uid;
+    return sum;
   }
+  // Equals is function+inputs, or opcode+input_uids.  Uses pointer-equality
+  // checks for input equality checks.
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !(o instanceof Node) ) return false;
     Node n = (Node)o;
-    throw AA.unimpl();
+    if( _op != n._op ) return false;
+    if( _defs._len != n._defs._len ) return false;
+    // Note pointer-equality
+    for( int i=0; i<_defs._len; i++ ) if( _defs._es[i] != n._defs._es[i] ) return false;
+    return true;
   }
-  
+
+  public void walk( BitSet bs ) {
+    assert _defs != null;
+    if( !bs.get(_uid) ) {
+      bs.set(_uid);
+      for( Node def : _defs )
+        if( def != null )
+          def.walk(bs);
+    }
+  }
 }

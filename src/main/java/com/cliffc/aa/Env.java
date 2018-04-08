@@ -3,39 +3,39 @@ package com.cliffc.aa;
 import com.cliffc.aa.node.*;
 import com.cliffc.aa.node.UnresolvedNode;
 
+import java.lang.AutoCloseable;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.BitSet;
 
-public class Env {
+public class Env implements AutoCloseable {
   final Env _par;
-  final ConcurrentHashMap<String, Node> _refs;
+  private final ConcurrentHashMap<String, Node> _refs;
+  public final RootNode _root = new RootNode(); // Lexical anchor; goes when this environment leaves scope
   Env( Env par ) { _par=par; _refs = new ConcurrentHashMap<>(); }
 
   public final static GVNGCP _gvn = new GVNGCP(false); // Pessimistic GVN, defaults to ALL, lifts towards ANY
-  public final static Node ROOT = new RootNode();      // The permanent graph anchor
   private final static Env TOP = new Env(null);        // Top-most lexical Environment
-  static {
-    TOP.add0(" control ",_gvn.xform(ROOT));
-    TOP.add0("pi",_gvn.con(TypeFlt.Pi)); // TODO: Needs to be under Math.pi
-    for( PrimNode prim : PrimNode.PRIMS ) TOP.add0(prim._name,as_fun(prim));
+  public static RootNode top_root() { return TOP._root; }
+  static { TOP.init(); }
+  private final void init() {
+    _refs.put(" control ",_root);
+    _refs.put("pi",new ConNode<>(TypeFlt.Pi)); // TODO: Needs to be under Math.pi
+    for( PrimNode prim : PrimNode.PRIMS )
+      _refs.computeIfAbsent(prim._name, key -> new UnresolvedNode()).add_def(as_fun(prim));
     // Now that all the UnresolvedNodes have all possible hits for a name,
     // register them with GVN.
-    for( String k : TOP._refs.keySet() ) {
-      Node n = TOP._refs.get(k);
-      if( n instanceof UnresolvedNode )
-        TOP._refs.put(k,_gvn.xform(n));
+    for( String k : _refs.keySet() ) {
+      Node n = _refs.get(k);
+      if( n== _root ) continue;
+      _root.add_def(_gvn.init(n)); // Add to GVN; hook to lexical anchor so its not dead
+      _refs.put(k,_gvn.xform(n));  // xform after hooked
     }
   }
-  static Env top() { return new Env(TOP); }
 
-  private void add0( String name, Node prim ) { _refs.computeIfAbsent(name, key -> new UnresolvedNode()).add_def(prim); }
-  void add( String name, Node ref ) {
-    assert _refs.get(name)==null;
-    _refs.put(name, ref );
-  }
-
+  
   // Called during basic Env creation, this wraps a PrimNode as a full
   // 1st-class function to be passed about or assigned to variables.
-  static RetNode as_fun(PrimNode prim) {
+  private static RetNode as_fun( PrimNode prim ) {
     Type[] targs = prim._tf._ts._ts;
     String[] args = prim._args;
     FunNode fun = (FunNode)_gvn.init(new FunNode(prim._tf)); // Points to RootNode only
@@ -47,6 +47,41 @@ public class Env {
     Node rpc = _gvn.init(new ParmNode(args.length,"$rpc",fun,_gvn.con(TypeInt.TRUE)));
     return (RetNode)_gvn.init(new RetNode(fun,prim,rpc,1));
   }
+
+  // Extend the current Env with a new name.
+  void add( String name, Node ref ) {
+    assert _refs.get(name)==null;
+    _refs.put(name, ref );
+    _root.add_def(ref);
+  }
+
+  // A new top-level Env, above this is the basic public Env with all the primitives
+  static Env top() { return new Env(TOP); }
+
+  // Close the current Env, making its lexical scope dead (and making dead
+  // anything only pointed at by this scope).
+  @Override public void close() {
+    assert check_live(_gvn._live);
+    _gvn.kill0(_root);
+  }
+
+  private boolean check_live(BitSet live) {
+    BitSet rech = check_live0(new BitSet());
+    if( rech.equals(live) ) return true;
+    BitSet bs0 = (BitSet)live.clone();  bs0.andNot(rech);
+    BitSet bs1 = (BitSet)rech.clone();  bs1.andNot(live);
+    System.out.println("Reported live but not reachable: "+bs0);
+    System.out.println("Reachable but not reported live: "+bs1);
+    return false;
+  }
+    
+  private BitSet check_live0(BitSet bs) {
+    _root.walk(bs);
+    return _par == null ? bs : _par.check_live0(bs);
+  }
+
+  // Test support, return top-level token type
+  static Type lookup_type( String token ) { return _gvn.type(TOP.lookup(token)); }
   
   // Name lookup is the same for all variables, including function defs (which
   // are literally assigning a lambda to a ref).  Refs and Vars have a fixed

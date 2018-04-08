@@ -51,10 +51,13 @@ public class Ary<E> implements Iterable<E> {
   }
 
   /** Slow, linear-time, element removal.  Preserves order.
-   *  @param i element to be removed */
-  public void remove( int i ) {
+   *  @param i element to be removed 
+   *  @return element removed */
+  public E remove( int i ) {
     range_check(i);
+    E e = _es[i];
     System.arraycopy(_es,i+1,_es,i,(--_len)-i);
+    return e;
   }
   
   /** Remove all elements */

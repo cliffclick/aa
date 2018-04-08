@@ -15,7 +15,7 @@ public abstract class PrimNode extends Node {
   public final TypeFun _tf;
   public final String _name;    // Unique name (and program bits)
   public final String[] _args;  // Handy
-  PrimNode( String name, String[] args, TypeFun tf, Node... nodes ) { super(nodes); _name=name; _args=args; _tf = tf; }
+  PrimNode( String name, String[] args, TypeFun tf, Node... nodes ) { super(OP_PRIM,nodes); _name=name; _args=args; _tf = tf; }
   
   final static String[] ARGS1 = new String[]{"x"};
   final static String[] ARGS2 = new String[]{"x","y"};

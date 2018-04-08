@@ -42,7 +42,7 @@ import com.cliffc.aa.*;
 //
 public class FunNode extends Node {
   public final TypeFun _tf;     // Worse-case correct type
-  public FunNode(TypeFun tf) { super(Env.ROOT); _tf = tf; }
+  public FunNode(TypeFun tf) { super(OP_FUN,Env.top_root()); _tf = tf; }
   @Override String str() { return _tf.toString(); }
   @Override public Node ideal(GVNGCP gvn) { return null; }
   @Override public Type value(GVNGCP gvn) { return _tf; }
