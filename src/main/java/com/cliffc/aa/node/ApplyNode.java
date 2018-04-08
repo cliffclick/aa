@@ -1,23 +1,31 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.*;
+import com.cliffc.aa.util.Ary;
 
-
-// See FunNode.
-
-// Slot 0 is not control, it is a function value.  Slots 1+ are for args.
-// Slot 0 is join'd with a correct-arg-cnt function type, and if that
-// type is TOP, then the ApplyNode is TOP.
+// See FunNode.  Control is not required; Slot 0 is a function value - can be a
+// UnresolvedNode (both Any or All) or a RetNode.  Slots 1+ are for args.
 //
-// Slots 1+ are join'd with the slot 0 function type per-arg.  If any arg goes
-// to TOP, then the arg is not currently type-correct, and the call cannot be
-// made so result is TOP (if inlined, the undefined arg might also be dead, and
-// thus the call have a well-defined result).
+// When the UnresolvedNode simplifies to a single RetNode, the Apply can inline.
+// If the Unr is an 'all' then a bunch of function pointers are allowed here.
 //
-// Return is just the function return (as type from slot 0).
+// Apply-inlining can happen anytime we have a known function pointer, and
+// might be several known function pointers - we are inlining the type analysis
+// and not the execution code.  For this kind of inlining we replace the
+// ApplyNode with a call-site specific RetNode, move all the ApplyNode args to
+// the ParmNodes just like the Fun/Parm is a Region/Phi.  The call-site index
+// is just like a ReturnPC value on a real machine; it dictates which of
+// several possible returns apply... and can be merged like a PhiNode
+
+// At graph-construction time, assign a unique call-site index to the
+// ApplyNode.  Make a RetNode for each possible caller... which implies we have
+// the worse-case set of callers handy.... which we do not.  So need an approx
+// worse-case caller always.
 
 public class ApplyNode extends Node {
-  public ApplyNode( Node... defs ) { super(defs); }
+  static private int CNT=1;
+  public final int _cidx;       // Call site index
+  public ApplyNode( Node... defs ) { super(defs); _cidx = CNT++; }
   @Override String str() { return "apply"; }
   @Override public Node ideal(GVNGCP gvn) {
 
@@ -31,58 +39,79 @@ public class ApplyNode extends Node {
   // Toss out choices where any args are not "isa" the call requirements.
   // TODO: this tosses out choices too eagerly: no need to force conversions so quickly
   private Node resolve( GVNGCP gvn, UnresolvedNode unr ) {
-    Type[] funs = unr.types(gvn); // List of function types
+    // Actual argument types, in a convenient array format
     Type[] actuals = new Type[_defs._len-1];
     for( int i=1; i<_defs._len; i++ )  actuals[i-1] = gvn.type(_defs.at(i));
-    TypeFun z=null;  int zcvts=999;  Node zn=null;
+
+    // Set of possible choices with fewest conversions
+    Ary<Node> ns = new Ary<>(new Node[1],0);
+    int min_cvts = 999;         // Required conversions
+    
     // for each function, see if the actual args isa the formal args.  If not, toss it out.
-    for( int i=0,j; i<funs.length; i++ ) {
-      TypeFun fun = (TypeFun)funs[i];
-      Type[] fargs = fun._ts._ts;
-      if( fargs.length != actuals.length ) continue; // Argument count mismatch
-      int cvts=0;
-      for( j=0; j<actuals.length; j++ )
-        if( !(actuals[j].isa(fargs[j])) ) break;
-        else if( !actuals[j].isBitShape(fargs[j]) ) cvts++;
-      if( j<actuals.length ) continue; // Some argument does not apply; drop this choice
-      if( z==null || cvts < zcvts ) { z=fun; zcvts = cvts; zn = unr._defs.at(i); }
-      else if( cvts == zcvts ) throw AA.unimpl(); // TODO: Stall on ambiguous as long as possible
+    outerloop:
+    for( int i=0; i<unr._defs._len; i++ ) {
+      // Peek Ret->RPC->Fun and get the function type
+      Node ret = unr.at(i);
+      TypeFun fun = (TypeFun)gvn.type(ret.at(2).at(0));
+      Type[] fargs = fun._ts._ts;   // Type of each argument
+      if( fargs.length != _defs._len-1 ) continue; // Argument count mismatch
+      // Now check if the arguments are compatible at all
+      for( int j=0; j<actuals.length; j++ )
+        if( !actuals[j].isa(fargs[j]) ) continue outerloop;
+      int cvts=0;               // Count required conversions
+      for( int j=0; j<actuals.length; j++ )
+        if( !actuals[j].isBitShape(fargs[j]) ) cvts++;
+      // Save only choices with minimal conversions
+      if( cvts < min_cvts ) { min_cvts = cvts; ns.clear(); }
+      if( cvts == min_cvts)
+        ns.add(ret);            // This is an acceptable choice.
     }
-    if( z==null ) // TODO: Return a new ErrNode() which preserves syntax line numbers
+
+    if( ns.isEmpty() ) // TODO: Return a new ErrNode() which preserves syntax line numbers
       return new ConNode<>(Type.ANY); // Fail to top
 
-    // insert actual conversions
+    if( ns._len>1 ) {           // Multiple choices, but save the reduced Unr
+      if( ns._len==unr._defs._len ) return null; // No improvement
+      Node unr2 = new UnresolvedNode();          // Build and return a reduced Unr
+      for( Node ret : ns ) unr2.add_def(ret);
+      return set_def(0,unr2);
+    }
+    
+    // Single choice; insert actual conversions & replace
+    Node ret = ns.at(0);
+    Node fun = ret.at(2).at(0);
+    Type[] formals = ((TypeFun)gvn.type(fun))._ts._ts;
     for( int i=1; i<_defs._len; i++ ) {
-      Type formal = z._ts._ts[i-1];
-      Node actual = _defs.at(i);
-      Type act = gvn.type(actual);
-      if( !act.isBitShape(formal) ) {
-        PrimNode cvt = PrimNode.convert(act,formal);
+      Type formal = formals[i-1];
+      Type actual = actuals[i-1];
+      if( !actual.isBitShape(formal) ) {
+        PrimNode cvt = PrimNode.convert(_defs.at(i),actual,formal);
         if( cvt.is_lossy() ) throw new IllegalArgumentException("Requires lossy conversion");
-        _defs.set(i,gvn.xform(new ApplyNode(gvn.xform(cvt),actual)));
+        _defs.set(i,gvn.xform(cvt));
       }
     }
     // upgrade function argument to a constant
-    _defs.set(0,zn);
-    return this;
+    return set_def(0,ret);
   }
 
   @Override public Type value(GVNGCP gvn) {
-    Node nfun = _defs.at(0);
+    Node ret = _defs.at(0);
+    if( !(ret instanceof RetNode) ) return gvn.type(ret).ret();
     // Value is the function return type
-    Type fun = gvn.type(nfun);
-    Type ret = fun.ret();
-    if( ret == null )           // Not-a-function application
-      return Type.ANY;          // Yeah-Olde-Crash-N-Burn type
+    Type tret = gvn.type(ret.at(1));
+    if( tret.is_con() ) return tret; // Already determined function body is a constant
     
     // If all args are constant, eval immediately.  Note that the Memory edge
     // will define if a function is "pure" or not; no Memory means must be pure.
-    Type[] ts = types(gvn);
+    Type[] ts = new Type[_defs._len];
     boolean con=true;
-    for( int i=1; i<_defs._len; i++ ) if( !ts[i].is_con() ) { con=false; break; }
-    if( con && nfun instanceof PrimNode )
-      return ((PrimNode)nfun).apply(ts);
+    for( int i=1; i<_defs._len; i++ ) if( !(ts[i] = gvn.type(_defs.at(i))).is_con() ) { con=false; break; }
+    if( !con ) return tret;     // Non-constant args, no shortcuts
+    // Primitives directly apply
+    if( ret.at(1) instanceof PrimNode )
+      return ((PrimNode)ret.at(1)).apply(ts);
     
-    return ret;
+    // Need begin recursive execution - full partial evaluation
+    throw AA.unimpl();
   }
 }

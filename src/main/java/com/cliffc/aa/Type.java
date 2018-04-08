@@ -96,7 +96,7 @@ public class Type {
   static public final Type ALL    = make(TALL    ); // Bottom
   static public final Type ANY    = make(TANY    ); // Top
   static public final Type  SCALAR= make( TSCALAR); // ptrs, ints, flts; things that fit in a machine register
-  static final Type XSCALAR= make(TXSCALAR); // ptrs, ints, flts; things that fit in a machine register
+  static public final Type XSCALAR= make(TXSCALAR); // ptrs, ints, flts; things that fit in a machine register
   static final Type  NUM   = make( TNUM   );
   static final Type XNUM   = make(TXNUM   );
   static final Type  REAL  = make( TREAL  );
@@ -118,7 +118,7 @@ public class Type {
     return new Type((byte)(_type^1));
   }
 
-  final Type meet( Type t ) {
+  public final Type meet( Type t ) {
     Type mt = xmeet0(t);
     //assert check_commute  (t,mt);
     //assert check_symmetric(t,mt);
@@ -296,7 +296,10 @@ public class Type {
   public long   getl() { throw AA.unimpl(); }
   // Return a double from a TypeFlt constant; assert otherwise.
   public double getd() { throw AA.unimpl(); }
-  public boolean isBitShape(Type t) { throw typerr(t); } // Overridden in subtypes
+  public boolean isBitShape(Type t) {
+    if( _type==TXSCALAR ) return true ; // Optimistically  never  needs a conversion
+    if( _type== TSCALAR ) return false; // Pessimistically always needs a conversion
+    throw typerr(t); } // Overridden in subtypes
   // True if a base type
   private boolean isBaseType() { return getClass().getSimpleName().equals("Type"); }
   

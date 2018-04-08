@@ -35,17 +35,17 @@ public class Parse {
   private int _x;                       // Parser index
   private int _line;                    // Zero-based line number
   GVNGCP _gvn;                          // Pessimistic types
-
+  
   // Fields strictly for Java number parsing
   private final NumberFormat _nf;
   private final ParsePosition _pp;
   private final String _str;
 
-  Parse( String src, Env env, GVNGCP gvn, String str ) {
+  Parse( String src, Env env, String str ) {
     _src = src;
     _line= 0;
     _e   = env;
-    _ctrl= env.lookup_filter(" control ",gvn,Type.CONTROL);
+    _ctrl= null; // env.lookup(" control "); TODO: plus need to reach thru UNR
     _buf = str.getBytes();
     _x   = 0;
 
@@ -54,7 +54,7 @@ public class Parse {
     _nf.setGroupingUsed(false);
     _pp = new ParsePosition(0);
     _str = str;          // Keep a complete string copy for java number parsing
-    _gvn = gvn;          // Pessimistic during parsing
+    _gvn = Env._gvn;     // Pessimistic during parsing
   }
   // Parse the string in the given lookup context, and return an executable program
   Node go( ) { return prog(); }
@@ -110,7 +110,7 @@ public class Parse {
       int oldx = _x;
       String bin = token();
       if( bin==null ) break;    // Valid parse, but no more Kleene star
-      Node binfun = _e.lookup_filter(bin,_gvn,TypeFun.any(2)); // BinOp, or null
+      Node binfun = _e.lookup_filter(bin,2); // BinOp, or null
       if( binfun==null ) { _x=oldx; break; } // Not a binop, no more Kleene star
       term = term();
       if( term == null ) throw err("missing expr after binary op "+bin);
@@ -181,11 +181,11 @@ public class Parse {
     int oldx = _x;
     String uni = token();
     if( uni!=null ) { // Valid parse
-      Node unifun = gvn(_e.lookup_filter(uni,_gvn,TypeFun.any(1)));
+      Node unifun = gvn(_e.lookup_filter(uni,1));
       if( unifun != null && unifun.op_prec() > 0 )  {
         Node arg = gvn(nfact()); // Recursive call
         if( arg == null )
-          throw err("Call to unary function "+unifun+", but missing the one required argument");
+          throw err("Call to unary function '"+uni+"', but missing the one required argument");
         return new ApplyNode(unifun,arg);
       } else {
         _x=oldx;                // Unwind token parse and try again for a factor
@@ -245,15 +245,16 @@ public class Parse {
       if( tok.equals("->") ) break;
       ids.add(tok);
     }
-    FunNode fun = (FunNode)gvn(new FunNode());
+    FunNode fun = (FunNode)init(new FunNode(TypeFun.any(ids._len)));
     _e = new Env(_e);           // Nest an environment for the local vars
     int cnt=0;                  // Add parameters to local environment
-    for( String id : ids )  _e.add(id,gvn(new ParmNode(fun,++cnt,id)));
-    Node ret = stmt();          // Parse function body
-    fun.add_def(ret);           // Close cycle over function, so can find the return later
+    for( String id : ids )  _e.add(id,init(new ParmNode(++cnt,id,fun,_gvn.con(Type.XSCALAR))));
+    Node rpc = init(new ParmNode(ids._len,"$rpc",fun,_gvn.con(TypeInt.TRUE)));
+    Node rez = stmt();          // Parse function body
+    Node ret = _gvn.xform(new RetNode(fun,rez,rpc,1));
     _e = _e._par;               // Pop nested environment
     require('}');
-    return fun;                 // Return function
+    return ret;                 // Return function
   }
   
   private String token() { skipWS();  return token0(); }
@@ -316,7 +317,8 @@ public class Parse {
   private static boolean isOp0   (byte c) { return "!#$%*+,-.;:=<>?@^[]~/".indexOf(c) != -1; }
   private static boolean isOp1   (byte c) { return isOp0(c); }
 
-  private Node gvn(Node n) { return n==null ? null : _gvn.xform(n); }
+  private Node gvn (Node n) { return n==null ? null : _gvn.xform(n); }
+  private Node init(Node n) { return n==null ? null : _gvn.init (n); }
   
 
   // Handy for the debugger to print 

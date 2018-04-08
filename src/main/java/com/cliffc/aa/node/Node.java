@@ -11,14 +11,33 @@ public abstract class Node {
 
   // Defs.  Generally fixed length, ordered, nulls allowed, no unused trailing space.  Zero is Control.
   public Ary<Node> _defs;
+  // Add def/use edge
+  public void add_def(Node n) { _defs.add(n); if( n!=null ) n._uses.add(this); }
+  public Node at(int i) { return _defs._es[i]; }
+  // Replace def/use edge
+  public Node set_def( int idx, Node n ) {
+    Node old = _defs._es[idx];
+    if( old != null ) {
+      int i;
+      for( i=0; i<old._uses._len; i++ )
+        if( old._uses._es[i] == this )
+          { old._uses.del(i--); break; }
+      assert i < old._uses._len;  // Found the use to remove
+    }
+    _defs._es[idx] = n;
+    if( n != null ) n._uses.add(this);
+    return this;
+  }
   
   // Uses.  Generally variable length; unordered, no nulls, compressed, unused trailing space
-  public Ary<Node> _uses = new Ary<>(new Node[1],0);
+  public Ary<Node> _uses = new Ary<>(new Node[1],0);  
+  // Strictly add uses (no defs)
+  public void add_use(Node n) { _uses.add(n); }
 
   Node() { this(new Node[0]); }
   Node( Node... defs ) {
     _defs = new Ary<>(defs);
-    for( Node def : defs ) def.add_use(this);
+    for( Node def : defs ) if( def != null ) def.add_use(this);
   }
 
   
@@ -58,8 +77,15 @@ public abstract class Node {
       ts[i] = gvn.type(_defs.at(i));
     return ts;
   }
+
+  @Override public int hashCode() {
+    throw AA.unimpl();
+  }
+  @Override public boolean equals(Object o) {
+    if( this==o ) return true;
+    if( !(o instanceof Node) ) return false;
+    Node n = (Node)o;
+    throw AA.unimpl();
+  }
   
-  public void add_def(Node n) { _defs.add(n); }
-  // Strictly add uses (no defs)
-  public void add_use(Node n) { _uses.add(n); }
 }

@@ -27,14 +27,14 @@ public class TestType {
     test("pi", TypeFlt.Pi);
     // bare function lookup; returns a union of '+' functions
     testerr("+", "Syntax error; trailing junk","");
-    test("{+}", Env.top().lookup("+").types());
+    test("{+}", Env._gvn.type(Env.top().lookup("+")));
     test("{!}", TypeFun.make(TypeTuple.INT64,TypeInt.BOOL));
     // Function application, traditional paren/comma args
     test("{+}(1,2)", TypeInt.con( 3));
     test("{-}(1,2)", TypeInt.con(-1)); // binary version
     test("{-}(1  )", TypeInt.con(-1)); // unary version
     // error; mismatch arg count
-    testerr("!()"       , "Call to unary function !::Int1, but missing the one required argument"," ");
+    testerr("!()"       , "Call to unary function '!', but missing the one required argument"," ");
     testerr("pi(1)"     , "A function is being called, but 3.141592653589793 is not a function type","   ");
     testerr("{+}(1,2,3)", "Argument mismatch in call to ANY(+::Flt64 +::Int64)","          ");
     // Parsed as +(1,(2*3))
@@ -54,7 +54,7 @@ public class TestType {
     testerr("x=(1+(x=2)+x)", "Cannot re-assign ref 'x'","             ");
 
     // Anonymous function definition
-    test("{x y -> x+y}", TypeInt.TRUE);
+    test("{x y -> x+y}", TypeFun.any(2)); // actually {Flt,Int} x {FltxInt} -> {FltxInt} but currently types {SCALAR,SCALAR->SCALAR}
     test("{5}()", TypeInt.con(5)); // No args nor -> required
     test("x=3; fun={y -> x+y}; fun(2)", TypeInt.con(5)); // capture external variable
     test("x=3; fun={x -> x+2}; fun(2)", TypeInt.con(4)); // shadow  external variable
@@ -74,7 +74,7 @@ public class TestType {
   static private void testerr( String program, String err, String cursor ) {
     String err2 = "\nargs:0:"+err+"\n"+program+"\n"+cursor+"^\n";
     try {
-      Exec.go("args",program);  // Expect to throw
+      TypeEnv te = Exec.go("args",program);  // Expect to throw
       Assert.assertTrue(false); // Did not throw
     } catch( IllegalArgumentException iae ) {
       Assert.assertEquals(err2,iae.getMessage());

@@ -23,10 +23,18 @@ public class TypeFun extends Type {
     return t1==t2 ? t1 : t2.free(t1);
   }
 
-  static TypeFun any( int nargs ) {
-    return make(nargs==1?TypeTuple.XSCALAR1:TypeTuple.XSCALAR2,Type.SCALAR);
+  public static TypeFun any( int nargs ) {
+    switch( nargs ) {
+    case 0: return SCR0;
+    case 1: return SCR1;
+    case 2: return SCR2;
+    default: throw AA.unimpl();
+    }
   }
 
+  static public final TypeFun SCR0 = make(TypeTuple.EMPTY  ,Type.SCALAR);
+  static public final TypeFun SCR1 = make(TypeTuple.SCALAR ,Type.SCALAR);
+  static public final TypeFun SCR2 = make(TypeTuple.SCALAR2,Type.SCALAR);
   static public final TypeFun FLT64 = make(TypeTuple.FLT64,TypeFlt.FLT64); // [flt]->flt
   static public final TypeFun INT64 = make(TypeTuple.INT64,TypeInt.INT64); // [int]->int
   static public final TypeFun FLT64_FLT64 = make(TypeTuple.FLT64_FLT64,TypeFlt.FLT64); // [flt,flt]->flt

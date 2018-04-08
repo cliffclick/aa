@@ -35,8 +35,10 @@ public class TypeTuple extends Type {
     TypeTuple t2 = (TypeTuple)t1.hashcons();
     return t1==t2 ? t1 : t2.free(t1);
   }
-  
-  private static final TypeTuple  SCALAR = make(Type.SCALAR);
+
+          static final TypeTuple  EMPTY  = make();
+          static final TypeTuple  SCALAR = make(Type. SCALAR);
+          static final TypeTuple  SCALAR2= make(Type. SCALAR, Type. SCALAR);
           static final TypeTuple XSCALAR1= make(Type.XSCALAR);
           static final TypeTuple XSCALAR2= make(Type.XSCALAR, Type.XSCALAR);
   public  static final TypeTuple INT32   = make(TypeInt.INT32 );

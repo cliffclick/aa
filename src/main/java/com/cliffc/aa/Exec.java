@@ -8,9 +8,8 @@ import com.cliffc.aa.node.Node;
 public abstract class Exec {
   public static TypeEnv go( String src, String str ) { // Execute string
     Env env = Env.top();
-    GVNGCP gvn = new GVNGCP(false);
-    Parse p = new Parse(src,env,gvn,str);
+    Parse p = new Parse(src,env,str);
     Node n = p.go();
-    return new TypeEnv(p._gvn.type(n)/*pessimistic type*/,env);
+    return new TypeEnv(Env._gvn.type(n)/*pessimistic type*/,env);
   }
 }

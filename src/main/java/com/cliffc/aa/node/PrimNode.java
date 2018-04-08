@@ -2,10 +2,20 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.*;
 
-public abstract class PrimNode extends ConNode<TypeFun> {
+
+// Primitives can be used as an internal operator (their apply() call does the
+// primitive operation).  Primitives are wrapped as functions when returned
+// from Env lookup, although the immediate lookup+apply is optimized to just
+// make a new primitive.  See FunNode for function Node structure.
+//
+// Fun/Parm-per-arg/Prim/Ret
+//
+
+public abstract class PrimNode extends Node {
+  public final TypeFun _tf;
   public final String _name;    // Unique name (and program bits)
-  private final String[] _args;  // Handy
-  PrimNode( String name, String[] args, TypeFun tf ) { super(tf); _name=name; _args=args; }
+  public final String[] _args;  // Handy
+  PrimNode( String name, String[] args, TypeFun tf, Node... nodes ) { super(nodes); _name=name; _args=args; _tf = tf; }
   
   final static String[] ARGS1 = new String[]{"x"};
   final static String[] ARGS2 = new String[]{"x","y"};
@@ -27,8 +37,8 @@ public abstract class PrimNode extends ConNode<TypeFun> {
   };
 
   // Loss-less conversions only
-  static PrimNode convert( Type from, Type to ) {
-    if( from.isa(TypeInt.INT32) && to.isa(TypeFlt.FLT64) ) return new ConvertInt32Flt64();
+  static PrimNode convert( Node actual, Type from, Type to ) {
+    if( from.isa(TypeInt.INT32) && to.isa(TypeFlt.FLT64) ) return new ConvertInt32Flt64(null,actual);
     //if( from==Type.UInt32 && to==Type.Int64 ) return convUInt32Int64;
     //if( from==Type.UInt32 && to==Type.FLT64 ) return convUInt32Flt64;
     //if( from==Type. Int64 && to==Type.FLT64 ) return  convInt64Flt64;
@@ -37,11 +47,18 @@ public abstract class PrimNode extends ConNode<TypeFun> {
   
   public abstract Type apply( Type[] args ); // Execute primitive
   public boolean is_lossy() { return true; }
-  @Override public String str() { return _name+"::"+_t._ret; }
+  @Override public String str() { return _name+"::"+_tf._ret; }
+  @Override public Node ideal(GVNGCP gvn) { return null; }
+  @Override public Type value(GVNGCP gvn) {
+    Type[] ts = new Type[_defs._len];
+    boolean con=true;
+    for( int i=1; i<_defs._len; i++ ) if( !(ts[i] = gvn.type(_defs.at(i))).is_con() ) { con=false; break; }
+    return con ? apply(ts) : _tf._ret;
+  }
 }
 
 class ConvertInt32Flt64 extends PrimNode {
-  ConvertInt32Flt64() { super("flt64",PrimNode.ARGS1,TypeFun.make(TypeTuple.INT32,TypeFlt.FLT64)); }
+  ConvertInt32Flt64(Node... nodes) { super("flt64",PrimNode.ARGS1,TypeFun.make(TypeTuple.INT32,TypeFlt.FLT64),nodes); }
   @Override public TypeFlt apply( Type[] args ) { return TypeFlt.make(0,64,(double)args[1].getl()); }
   @Override public int op_prec() { return 9; }
   public boolean is_lossy() { return false; }
