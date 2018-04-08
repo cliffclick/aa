@@ -58,7 +58,7 @@ public class TestType {
     test("{5}()", TypeInt.con(5)); // No args nor -> required
     test("x=3; fun={y -> x+y}; fun(2)", TypeInt.con(5)); // capture external variable
     test("x=3; fun={x -> x+2}; fun(2)", TypeInt.con(4)); // shadow  external variable
-    testerr("fun={x -> x+2}; x", "Missing ref 'x'","                 "); // Scope exit ends lifetime
+    testerr("fun={x -> x+2}; x", "Unknown ref 'x'","                 "); // Scope exit ends lifetime
 
     // TODO: Need real TypeVars for these
     //test("id"   ,Env.top().lookup("id").types());
