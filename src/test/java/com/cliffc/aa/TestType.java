@@ -55,9 +55,9 @@ public class TestType {
 
     // Anonymous function definition
     test("{x y -> x+y}", TypeFun.any(2)); // actually {Flt,Int} x {FltxInt} -> {FltxInt} but currently types {SCALAR,SCALAR->SCALAR}
-    test("{5}()", TypeInt.con(5)); // No args nor -> required
+    test("{5}()", TypeInt.con(5)); // No args nor -> required; this is simply a function returning 5, being executed
     test("x=3; fun={y -> x+y}; fun(2)", TypeInt.con(5)); // capture external variable
-    test("x=3; fun={x -> x+2}; fun(2)", TypeInt.con(4)); // shadow  external variable
+    test("x=3; fun={x -> x*2}; fun(2)+fun(x)", TypeInt.con(2*2+3*2)); // shadow  external variable
     testerr("fun={x -> x+2}; x", "Unknown ref 'x'","                 "); // Scope exit ends lifetime
 
     // TODO: Need real TypeVars for these
@@ -65,7 +65,25 @@ public class TestType {
     //test("id(1)",TypeInt.con(1));
     //test("id((+))",Env.top().lookup("+",Type.ANY));
     //test("id(+)(id(1),id(pi))",TypeFlt.make(0,64,Math.PI+1));
-  
+
+    // Conditional:
+    //test("0?2:3",TestInt.con(3)); // false
+    //test("2?2:3",TestInt.con(2)); // true
+    //testerr("0?x=2:3;x","x only defined on other side, so not available after");
+    //test   ("  2    ?x=2:3;x",TestInt.con(2)); // off-side is constant-dead, so missing x-assign ignored
+    //testerr("math.rand(1)?x=2:3;x","off-side is NOT constant-dead, so x must be assigned both branches");
+    //testerr("math.rand(1)?x=2:3;4",TypeInt.con(4)); // x-defined on 1 side only, but not used thereafter
+    //testerr("2?x=2:y","off-side is dead, so missing y-ref ignored");
+    //test("2?x=2:x=3;x",TestInt.con(2)); // x defined on both arms, so available below
+    //testerr("x=1;2?x=2:x=3;x","re-assign x not allowed");
+    //test("x=1;2?2:x=3;x",TypeInt.con(1)); // Re-assigned allowed & ignored in dead branch
+    
+    // Recursive:
+    //test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)",TypeInt.con(5));
+
+    // Co-recursion will require parallel assignment & type inference across a lexical scope
+    //test("is_even = { n -> n ? is_odd(n-1) : true}; is_odd = {n -> n ? is_even(n-1) : false}; is_even(4)", TypeInt.TRUE );
+    //test("is_even = { n -> n ? is_odd(n-1) : true}; is_odd = {n -> n ? is_even(n-1) : false}; is_even(5)", TypeInt.FALSE);
   }
 
   static private void test( String program, Type expected ) {

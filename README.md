@@ -39,7 +39,7 @@ Done Stuff
 * Direct SSA style code writing; no 'let' keyword.
 * default "x := 1" makes a "val" until scope runs out (cannot re-assign)
 * "ref" can be reassigned but requires type keyword: "x:ref := 1"
-* Sub-byte ranges?  Julia-like typing
+* Sub-byte ranges?  Julia-like math typing
 
 
 Ideas, Desirables
@@ -60,6 +60,7 @@ maps-over-collections; default to parallel
 parallel/distributed collections; deterministic
 maps-with-folds require a associative fold op (and will run log-tree style)
 maps-without-assoc-folds are serial loops: code it as a loop
+user-spec'd iter types; for-loop syntax-suagar
 
 Pony-style concurrency management
 CAS built-in lang primitive: 'res := atomic(old,new)'; JMM
