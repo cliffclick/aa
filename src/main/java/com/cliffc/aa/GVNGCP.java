@@ -138,9 +138,11 @@ public class GVNGCP {
     assert n._uses._len==0;
     for( int i=0; i<n._defs._len; i++ )
       n.set_def(i,null,this);   // Recursively destroy dead nodes
-    n._defs = n._uses = null;   // Poor-mans indication of a dead node, probably needs to recycle these...
+    // n is officially dead now
+    n._defs = n._uses = null;   // TODO: Poor-mans indication of a dead node, probably needs to recycle these...
     _live.clear(n._uid);
-    if( n._uid==CNT )
-      throw AA.unimpl();
+    if( n._uid==CNT-1 ) {
+      while( !_live.get(CNT-1) ) CNT--;
+    }
   }
 }
