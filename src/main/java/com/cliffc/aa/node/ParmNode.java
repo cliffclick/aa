@@ -23,4 +23,12 @@ public class ParmNode extends Node {
     return t;
   }
   @Override public Type all_type() { return Type.SCALAR; }
+  @Override public int hashCode() { return super.hashCode()+_idx; }
+  @Override public boolean equals(Object o) {
+    if( this==o ) return true;
+    if( !super.equals(o) ) return false;
+    if( !(o instanceof ParmNode) ) return false;
+    ParmNode parm = (ParmNode)o;
+    return _idx==parm._idx;
+  }
 }

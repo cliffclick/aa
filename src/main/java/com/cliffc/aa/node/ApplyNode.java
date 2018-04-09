@@ -3,6 +3,8 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.*;
 import com.cliffc.aa.util.Ary;
 
+import java.lang.AutoCloseable;
+
 // See FunNode.  Control is not required; Slot 0 is a function value - can be a
 // UnresolvedNode (both Any or All) or a RetNode.  Slots 1+ are for args.
 //
@@ -22,7 +24,7 @@ import com.cliffc.aa.util.Ary;
 // the worse-case set of callers handy.... which we do not.  So need an approx
 // worse-case caller always.
 
-public class ApplyNode extends Node {
+public class ApplyNode extends Node implements AutoCloseable {
   static private int CNT=1;
   public final int _cidx;       // Call site index
   public ApplyNode( Node... defs ) { super(OP_APLY,defs); _cidx = CNT++; }
@@ -114,4 +116,14 @@ public class ApplyNode extends Node {
     // Need begin recursive execution - full partial evaluation
     throw AA.unimpl();
   }
+
+  // Parser support keeping args alive during parsing; if a syntax exception is
+  // thrown while the call args are being built, this will free them all.  Once
+  // this hits GVN, it will no longer auto-close.
+  @Override public void close() {
+    if( Env._gvn.touched(this) ) return;
+    if( _uses == null ) return; // Already deleted once
+    Env._gvn.kill0(this);
+  }
+
 }

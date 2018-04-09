@@ -38,6 +38,14 @@ public abstract class Node {
     }
     return this;
   }
+  // Return Node at idx, withOUT auto-deleting it, even if this is the last
+  // use.  Used by the parser to retrieve final Nodes from tmp holders.  Does
+  // NOT preserve order.
+  public Node del( int idx ) {
+    Node n = _defs.del(idx);
+    n._uses.del(n._uses.find(a -> a==this));
+    return n;
+  }
   
   // Uses.  Generally variable length; unordered, no nulls, compressed, unused trailing space
   public Ary<Node> _uses = new Ary<>(new Node[1],0);  

@@ -11,6 +11,7 @@ public class Env implements AutoCloseable {
   final Env _par;
   private final ConcurrentHashMap<String, Node> _refs;
   public final RootNode _root = new RootNode(); // Lexical anchor; goes when this environment leaves scope
+  public Node _ret;                             // Return value, just before the Env is popped
   Env( Env par ) { _par=par; _refs = new ConcurrentHashMap<>(); }
 
   public final static GVNGCP _gvn = new GVNGCP(false); // Pessimistic GVN, defaults to ALL, lifts towards ANY
@@ -49,10 +50,11 @@ public class Env implements AutoCloseable {
   }
 
   // Extend the current Env with a new name.
-  void add( String name, Node ref ) {
+  Node add( String name, Node ref ) {
     assert _refs.get(name)==null;
     _refs.put(name, ref );
     _root.add_def(ref);
+    return ref;
   }
 
   // A new top-level Env, above this is the basic public Env with all the primitives
@@ -77,6 +79,7 @@ public class Env implements AutoCloseable {
     
   private BitSet check_live0(BitSet bs) {
     _root.walk(bs);
+    if( _ret != null ) _ret.walk(bs); // Also walk return value
     return _par == null ? bs : _par.check_live0(bs);
   }
 

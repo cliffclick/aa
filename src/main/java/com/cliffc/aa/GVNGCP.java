@@ -40,6 +40,7 @@ public class GVNGCP {
     assert t != null;
     _ts.set(n._uid,t);
   }
+  public boolean touched( Node n ) { return n._uid < _ts._len && _ts._es[n._uid] != null; }
 
   // Make globally shared common ConNode for this type.
   Node con( Type t ) {
@@ -77,7 +78,9 @@ public class GVNGCP {
       u._defs.set(u._defs.find(a -> a==n),x); // was n now x
       x._uses.add(u);
     }
-    kill0(n);
+    x._uses.add(x);             // Self-hook, to prevent accidental deletion
+    kill0(n);                   // Delete the old n, and anything it uses
+    x._uses.del(x._uses.find(a -> a==x)); // Remove self-hook
     return x;
   }
   /** Look for a better version of 'n'.  Can change n's defs via the ideal()
@@ -103,10 +106,14 @@ public class GVNGCP {
       _ts.set(x._uid,t);        // Set it in
       cnt++;
     }
-    
+
+    // Replace with a constant
     if( t.is_con() && !(x instanceof ConNode) ) {
-      setype(x = new ConNode<>(t),t);
-      cnt++;
+      x = new ConNode<>(t);     // Make a new constant
+      Node y = _vals.get(x);    // See if redundant
+      if( y == null ) { setype(x,t); _vals.put(x,x); }
+      else { kill0(x); x=y; }
+      return x;
     }
 
     // GVN

@@ -87,7 +87,7 @@ public class Parse {
       else return null;
     }
     for( String tok : toks )
-      if( _e.lookup(tok)!=null ) throw err("Cannot re-assign ref '"+tok+"'");
+      if( _e.lookup(tok)!=null ) throw err(expr,"Cannot re-assign ref '"+tok+"'");
       else _e.add(tok,expr);
     while( peek(';') )
       expr = stmt();
@@ -102,37 +102,38 @@ public class Parse {
     if( term == null ) return null; // Term is required, so missing term implies not any expr
     // Collect 1st fcn/arg pair
     Ary<Node> funs = new Ary<>(new Node[1],0);
-    TmpNode args = new TmpNode();
-    funs.add(null);   args.add_def(term);
-    
-    // Now loop for binop/term pairs: parse Kleene star of [binop term]
-    while( true ) {
-      int oldx = _x;
-      String bin = token();
-      if( bin==null ) break;    // Valid parse, but no more Kleene star
-      Node binfun = _e.lookup_filter(bin,2); // BinOp, or null
-      if( binfun==null ) { _x=oldx; break; } // Not a binop, no more Kleene star
-      term = term();
-      if( term == null ) throw err("missing expr after binary op "+bin);
-      funs.add(gvn(binfun));  args.add_def(gvn(term));
-    }
-
-    // Have a list of interspersed operators and terms.
-    // Build a tree with precedence.
-    int max=-1;                 // First find max precedence.
-    for( Node n : funs ) if( n != null ) max = Math.max(max,n.op_prec());
-    // Now starting at max working down, group list by pairs into a tree
-    while( args._defs._len > 1 ) {
-      for( int i=1; i<funs.len(); i++ ) { // For all ops of this precedence level, left-to-right
-        Node fun = funs.at(i);
-        assert fun.op_prec() <= max;
-        if( fun.op_prec() < max ) continue; // Not yet
-        args.set_def(i-1,gvn(new ApplyNode(fun,args.at(i-1),args.at(i))),_gvn);
-        funs.remove(i);  args.remove(i);  i--;
+    try( TmpNode args = new TmpNode() ) {
+      funs.add(null);   args.add_def(term);
+      
+      // Now loop for binop/term pairs: parse Kleene star of [binop term]
+      while( true ) {
+        int oldx = _x;
+        String bin = token();
+        if( bin==null ) break;    // Valid parse, but no more Kleene star
+        Node binfun = _e.lookup_filter(bin,2); // BinOp, or null
+        if( binfun==null ) { _x=oldx; break; } // Not a binop, no more Kleene star
+        term = term();
+        if( term == null ) throw err("missing expr after binary op "+bin);
+        funs.add(gvn(binfun));  args.add_def(gvn(term));
       }
-      max--;
+  
+      // Have a list of interspersed operators and terms.
+      // Build a tree with precedence.
+      int max=-1;                 // First find max precedence.
+      for( Node n : funs ) if( n != null ) max = Math.max(max,n.op_prec());
+      // Now starting at max working down, group list by pairs into a tree
+      while( args._defs._len > 1 ) {
+        for( int i=1; i<funs.len(); i++ ) { // For all ops of this precedence level, left-to-right
+          Node fun = funs.at(i);
+          assert fun.op_prec() <= max;
+          if( fun.op_prec() < max ) continue; // Not yet
+          args.set_def(i-1,gvn(new ApplyNode(fun,args.at(i-1),args.at(i))),_gvn);
+          funs.remove(i);  args.remove(i);  i--;
+        }
+        max--;
+      }
+      return args.del(0);       // Return the remaining expression
     }
-    return args.last();         // Toss/unwind the tmp
   }
 
   /** Parse a function call, or not
@@ -145,35 +146,35 @@ public class Parse {
     if( fun == null ) return null;   // No term at all
     if( skipWS() == -1 ) return fun; // Just the original term
     // Function application; parse out the argument list
-    Ary<Node> args = new Ary<>(new Node[]{fun});
-    if( peek('(') ) {               // Traditional fcn application
-      if( _gvn.type(fun).ret() == null )
-        throw err("A function is being called, but "+_gvn.type(fun)+" is not a function type");
-      if( (arg=stmt()) != null ) {  // Check for a no-arg fcn call
-        args.add(arg);              // Add first arg
-        while( peek(',') ) {        // Gather comma-separated args
-          if( (arg=stmt()) == null ) throw err("Missing argument in function call");
-          args.add(arg);
+    try( ApplyNode args = new ApplyNode() ) {
+      args.add_def(fun);
+      if( peek('(') ) {               // Traditional fcn application
+        if( _gvn.type(fun).ret() == null )
+          throw err("A function is being called, but "+_gvn.type(fun)+" is not a function type");
+        if( (arg=stmt()) != null ) {  // Check for a no-arg fcn call
+          args.add_def(arg);          // Add first arg
+          while( peek(',') ) {        // Gather comma-separated args
+            if( (arg=stmt()) == null ) throw err("Missing argument in function call");
+            args.add_def(arg);
+          }
         }
+        require(')'); 
+      } else {                  // lispy-style fcn application
+        // TODO: Unable resolve ambiguity with mixing "(fun arg0 arg1)" and
+        // "fun(arg0,arg1)" argument calls.  Really having trouble with parsing
+        // "1-2", where "1" parses in the function position and "-2" is a uniop
+        // '-' applied to a 2: "-(2)".  This parses as the function "1" and its
+        // single arg "-(2)" - but "1" is not a function.
+        return args.del(0);     // No function call
+        //while( (arg = stmt()) != null ) // While have args
+        //  args.add_def(arg);            // Gather WS-separate args
+        //if( args.len()==1 ) return fun; // Not a function call
       }
-      require(')'); 
-    } else {                    // lispy-style fcn application
-      // TODO: Unable resolve ambiguity with mixing "(fun arg0 arg1)" and
-      // "fun(arg0,arg1)" argument calls.  Really having trouble with parsing
-      // "1-2", where "1" parses in the function position and "-2" is a uniop
-      // '-' applied to a 2: "-(2)".  This parses as the function "1" and its
-      // single arg "-(2)" - but "1" is not a function.
-      return fun;              // No function call
-      //while( (arg = stmt()) != null ) // While have args
-      //  args.add(arg);                // Gather WS-separate args
-      //if( args.len()==1 ) return fun; // Not a function call
+      Node call = gvn(args);    // No syntax errors; flag Apply not auto-close
+      if( _gvn.type(call)==Type.ANY ) 
+        throw err(call,"Argument mismatch in call to " + fun);
+      return call;
     }
-    Node rez = gvn(new ApplyNode(args.asAry()));
-    if( _gvn.type(rez)==Type.ANY ) {
-      if( rez._uses._len==0 ) _gvn.kill(rez);
-      throw err("Argument mismatch in call to " + fun);
-    }
-    return rez;
   }
   
   /** Parse any leading unary ops before a factor
@@ -187,7 +188,7 @@ public class Parse {
       if( unifun != null && unifun.op_prec() > 0 )  {
         Node arg = gvn(nfact()); // Recursive call
         if( arg == null )
-          throw err("Call to unary function '"+uni+"', but missing the one required argument");
+          throw err(unifun,"Call to unary function '"+uni+"', but missing the one required argument");
         return new ApplyNode(unifun,arg);
       } else {
         _x=oldx;                // Unwind token parse and try again for a factor
@@ -254,9 +255,9 @@ public class Parse {
       _e = e;
       int cnt=0;                // Add parameters to local environment
       for( String id : ids )  _e.add(id,init(new ParmNode(++cnt,id,fun,_gvn.con(Type.XSCALAR))));
-      Node rpc = init(new ParmNode(ids._len,"$rpc",fun,_gvn.con(TypeInt.TRUE)));
+      Node rpc = _e.add(" rpc ",init(new ParmNode(ids._len,"$rpc",fun,_gvn.con(TypeInt.TRUE))));
       Node rez = stmt();        // Parse function body
-      Node ret = _gvn.xform(new RetNode(fun,rez,rpc,1));
+      Node ret = _e._ret = _gvn.xform(new RetNode(fun,rez,rpc,1));
       _e = _e._par;               // Pop nested environment
       require('}');
       return ret;                 // Return function
@@ -350,6 +351,10 @@ public class Parse {
       sb.append(' ');
     sb.append('^').append('\n');
     return sb.toString();
+  }
+  private IllegalArgumentException err(Node n, String s) {
+    if( n._uses._len==0 ) _gvn.kill(n);
+    return err(s);
   }
   private IllegalArgumentException err(String s) { return new IllegalArgumentException(errMsg(s)); }
 }

@@ -2,8 +2,10 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.*;
 
+import java.lang.AutoCloseable;
+
 // Sea-of-Nodes
-public class TmpNode extends Node {
+public class TmpNode extends Node implements AutoCloseable {
   public TmpNode() { super(OP_TMP); }
   @Override String str() { return "tmp"; }
   @Override public String toString() { return "tmp"; } // TOoOoOo many use/defs, print none
@@ -21,14 +23,6 @@ public class TmpNode extends Node {
       Env._gvn.kill(n); // Recursively begin deleting
   }
   // Parser support of small lists of nodes to be kept alive during parsing.
-  // Nuke this node, but keep the last remaining def and return it alive and
-  // with no uses.
-  public Node last() {
-    assert _defs._len==1;
-    Node n = _defs.at(0);
-    n._uses.del(n._uses.find(a -> a==this));
-    _defs.clear();
-    Env._gvn.kill0(this);
-    return n;
-  }
+  // Nuke this node and anything it keeps alive
+  @Override public void close() { Env._gvn.kill0(this); }
 }
