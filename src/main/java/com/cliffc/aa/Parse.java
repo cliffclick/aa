@@ -98,7 +98,7 @@ public class Parse {
    *  expr = term [binop term]*
    *  @return Node does NOT need gvn() */
   private Node expr() {
-    Node term = gvn(term());
+    Node term = term();
     if( term == null ) return null; // Term is required, so missing term implies not any expr
     // Collect 1st fcn/arg pair
     Ary<Node> funs = new Ary<>(new Node[1],0);
@@ -114,7 +114,7 @@ public class Parse {
         if( binfun==null ) { _x=oldx; break; } // Not a binop, no more Kleene star
         term = term();
         if( term == null ) throw err("missing expr after binary op "+bin);
-        funs.add(gvn(binfun));  args.add_def(gvn(term));
+        funs.add(gvn(binfun));  args.add_def(term);
       }
   
       // Have a list of interspersed operators and terms.
@@ -140,7 +140,7 @@ public class Parse {
    *  term = nfact                // No function call
    *  term = nfact ( [expr,]* )+  // One or more function calls in a row, each set of args are delimited
    *  term = nfact nfact*         // One function call, all the args listed
-   *  @return Node needs gvn() */
+   *  @return Node does not need gvn() */
   private Node term() {
     Node fun = gvn(nfact()), arg;    // nfactor
     if( fun == null ) return null;   // No term at all
@@ -185,12 +185,12 @@ public class Parse {
     int oldx = _x;
     String uni = token();
     if( uni!=null ) { // Valid parse
-      Node unifun = gvn(_e.lookup_filter(uni,1));
+      Node unifun = _e.lookup_filter(uni,1);
       if( unifun != null && unifun.op_prec() > 0 )  {
-        Node arg = gvn(nfact()); // Recursive call
+        Node arg = nfact(); // Recursive call
         if( arg == null )
           throw err(unifun,"Call to unary function '"+uni+"', but missing the one required argument");
-        return new ApplyNode(_ctrl,unifun,arg);
+        return new ApplyNode(_ctrl,unifun,gvn(arg));
       } else {
         _x=oldx;                // Unwind token parse and try again for a factor
         if( unifun != null && unifun._uses._len==0 )
@@ -211,7 +211,7 @@ public class Parse {
   private Node fact() {
     if( skipWS() == -1 ) return null;
     byte c = _buf[_x];
-    if( '0' <= c && c <= '9' ) return _gvn.con(number());
+    if( '0' <= c && c <= '9' ) return new ConNode<>(number());
     int oldx = _x;
     if( peek('(') ) { // Either a special-syntax pre/infix op, or a nested expression
       Node ex = stmt();

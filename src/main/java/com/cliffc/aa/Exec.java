@@ -14,7 +14,7 @@ public abstract class Exec {
       Parse p = new Parse(src,env,str);
       Node n = p.go();            // Evaluated expression logic
       tmp.add_def(n);             // Hook, so not deleted
-      //Env._gvn.iter();            // Pessimistic optimizations; might improve
+      Env._gvn.iter();            // Pessimistic optimizations; might improve
       Node n2 = tmp.at(0);        // New and improved n
       t = Env._gvn.type(n2);      // pessimistic type
       par = env._par;             // Pop 

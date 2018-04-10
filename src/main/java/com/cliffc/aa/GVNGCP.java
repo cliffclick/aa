@@ -23,7 +23,7 @@ public class GVNGCP {
   private Ary<Node> _work = new Ary<>(new Node[1], 0);
   private BitSet _wrk_bits = new BitSet();
 
-  private Node add_work( Node n ) {
+  public Node add_work( Node n ) {
     return _wrk_bits.get(n._uid) ? n : add_work0(n);
   }
   private Node add_work0( Node n ) {
@@ -76,22 +76,33 @@ public class GVNGCP {
     return add_work0(n);
   }
 
-  // Node never seen by GVN
+  // Node new to GVN and unregistered, or old and registered
   boolean check_new( Node n ) {
-    if( n._uid < _ts._len && _ts._es[n._uid]!=null ) {
-      // need to hard-find in _vals on returning false
-      
-      //boolean found = false;
-      //for( Node x : _vals.keySet() ) if( x._uid == n._uid ) { found=true; break; }
-      //assert found;               // Expected in table but not there
-      //Node xn = _vals.remove(n);  // Remove from table
-      //assert xn == n : "Hash collided with an unrelated Node"; // Should have been in table to be removed
-      //return false;
-      throw AA.unimpl();
-    }
-    assert n._uses._len==0;
-    assert _vals.get(n)==null;
+    if( check_opt(n) ) return false; // Not new
+    assert n._uses._len==0;          // New, so no uses
     return true;
+  }
+  // Node is in the type table and GVN hash table
+  boolean check_opt( Node n ) {
+    // First & only test: in type table or not
+    if( n._uid < _ts._len && _ts._es[n._uid]!=null ) {
+      assert check_gvn(n,true);  // Check also in GVN table
+      return true;              // Yes in both type table and GVN table
+    }
+    assert !check_gvn(n,false); // Check also not in GVN table
+    return false;               // Node not in tables
+  }
+
+  private boolean check_gvn( Node n, boolean expect ) {
+    Node x = _vals.get(n);
+    if( x == n ) {              // Found in table
+      assert expect;            // Expected to be found
+      return true;              // Definitely in table
+    }
+    boolean found = false;
+    for( Node o : _vals.keySet() ) if( o._uid == n._uid ) { found=true; break; }
+    assert found == expect;     // Expected in table 
+    return false;               // Not in table
   }
 
   public Node xform( Node n ) {
@@ -107,11 +118,13 @@ public class GVNGCP {
     // Try generic graph reshaping, looping till no-progress.
     int cnt=0;  Node x;         // Progress bit
     while( (x = n.ideal(this)) != null ) {
-      x._uses.add(x);           // Hook X to prevent accidental deletion
-      kill_new(n);              // n was new, replaced so immediately recycle n and dead subgraph
-      n = x._uses.pop();        // Remove hook, keep better n
-      if( !check_new(n) ) break;// If the replacement is old, no need to re-ideal
-      assert cnt++ < 1000;      // Catch infinite ideal-loops
+      if( x != n ) {            // Different return, so delete original dead node
+        x._uses.add(x);         // Hook X to prevent accidental deletion
+        kill_new(n); // n was new, replaced so immediately recycle n and dead subgraph
+        n = x._uses.pop();      // Remove hook, keep better n
+      }
+      if( !check_new(n) ) return n; // If the replacement is old, no need to re-ideal
+      assert cnt++ < 1000;          // Catch infinite ideal-loops
     }
     // Compute a type for n
     Type t = n.value(this);              // Get best type
@@ -156,83 +169,68 @@ public class GVNGCP {
     }
   }
   
-  //// Apply graph-rewrite rules to Node n; if anything changes put all users of
-  //// n on the worklist for further eval.
-  //public Node xform( Node n ) {
-  //  Node x = xform0(n);
-  //  if( x == null ) return n;
-  //  // Change!  Add users of n to the worklist
-  //  assert n._uses != null;
-  //  for( Node u : n._uses )
-  //    if( !_wrk_bits.get(u._uid) ) { _wrk_bits.set(u._uid);  _work.add(u);  }
-  //  if( x == n ) return n;
-  //  // Complete replacement; point uses to x.
-  //  while( n._uses._len > 0 ) {
-  //    Node u = n._uses.del(0);
-  //    u._defs.set(u._defs.find(a -> a==n),x); // was n now x
-  //    x._uses.add(u);
-  //  }
-  //  x._uses.add(x);             // Self-hook, to prevent accidental deletion
-  //  kill(n);                    // Delete the old n, and anything it uses
-  //  x._uses.del(x._uses.find(a -> a==x)); // Remove self-hook
-  //  return x;
-  //}
-  ///** Look for a better version of 'n'.  Can change n's defs via the ideal()
-  // *  call, including making new nodes.  Can replace 'n' wholly, with n's uses
-  // *  now pointing at the replacement.
-  // *  @param n Node to be idealized
-  // *  @return null for no-change, or a better version of n */
-  //private Node xform0( Node n ) {
-  //  assert n!=null;
-  //  Node x=n,y;       // Rename, so can see original node for debugging
-  //  int cnt=0;        // Progress bit
-  //  // Try generic graph reshaping, looping till no-progress.
-  //  while( (y = x.ideal(this)) != null ) {
-  //    add_work(x); // Could be brand-new and already removed
-  //    x=y;
-  //    cnt++; assert cnt < 1000;
-  //  }
-  //  
-  //  // Make sure some type exists in the table... before calling
-  //  // Value which might recursively ask for its own type
-  //  if( x._uid >= _ts._len ) _ts.set(x._uid,x.all_type()); // Set it in
-  //  Type t = x.value(this);     // Get best type
-  //  if( t != _ts.at(x._uid) ) { // Got a new type
-  //    _ts.set(x._uid,t);        // Set it in
-  //    cnt++;
-  //  }
-  //
-  //  // Replace with a constant
-  //  if( t.is_con() && !(x instanceof ConNode) ) {
-  //    x = new ConNode<>(t);     // Make a new constant
-  //    y = _vals.get(x);         // See if redundant
-  //    if( y == null ) { setype(x,t); _vals.put(x,x); }
-  //    else { kill0(x); x=y; }
-  //    return x;
-  //  }
-  //
-  //  // GVN
-  //  y = _vals.get(x);
-  //  if( y != x ) {
-  //    if( y != null ) { x = y; cnt++; }
-  //    else _vals.put(x, x);
-  //  }
-  //  // If progress, return the new replacement
-  //  return cnt<=1 ? null : x;
-  //}
+  private void xform_old( Node old ) {
+    Node nnn = xform_old0(old);
+    if( nnn==null ) return;
+    assert !check_new(nnn);     // Replacement in system
+    if( nnn == old ) return;
+    // if old is being replaced, it got removed from GVN table and types table.
+    assert check_new(old);
+    subsume(old,nnn);
+  }
+  /** Look for a better version of 'n'.  Can change n's defs via the ideal()
+   *  call, including making new nodes.  Can replace 'n' wholly, with n's uses
+   *  now pointing at the replacement.
+   *  @param n Node to be idealized; already in GVN
+   *  @return null for no-change, or a better version of n, already in GVN */
+  private Node xform_old0( Node n ) {
+    assert !check_new(n);      // Node is in tables
+    _vals.remove(n);           // Remove before modifying edges (and thus hash)
+    Type oldt = type(n);       // Get old type
+    _ts._es[n._uid] = null;    // Remove from types
+    assert !check_opt(n);      // Not in system now
+    // Try generic graph reshaping
+    Node y = n.ideal(this);
+    if( y != null && y != n ) return y;  // Progress with some new node
+    // Either no-progress, or progress and need to re-insert n back into system
+    Type t = n.value(this);     // Get best type
+    assert t.isa(oldt);         // Types only improve
+    // Replace with a constant, if possible
+    if( t.is_con() && !(n instanceof ConNode) )
+      return con(t);            // Constant replacement
+    // Global Value Numbering
+    y = _vals.putIfAbsent(n,n);
+    if( y != null ) return y;
+    // Record type for n; n is "in the system" now
+    setype(n,t);                // Set it in
+    // TODO: If x is a TypeNode, capture any more-precise type permanently into Node
+    return oldt == t ? null : n; // Progress if types improved
+  }
 
+  // Complete replacement; point uses to x.
+  private void subsume( Node old, Node nnn ) {
+    while( old._uses._len > 0 ) {
+      Node u = old._uses.del(0);
+      u._defs.set(u._defs.find(a -> a==old),nnn); // was old now nnn
+      nnn._uses.add(u);
+      add_work(u);
+    }
+    nnn._uses.add(nnn);         // Self-hook, to prevent accidental deletion
+    kill_new(old);              // Delete the old n, and anything it uses
+    nnn._uses.pop();            // Remove self-hook
+  }
+  
   // Once the program is complete, any time anything is on the worklist we can
   // always conservatively iterate on it.
   public void iter() {
-    //while( _work._len > 0 ) {
-    //  Node n = _work.pop();
-    //  assert _wrk_bits.get(n._uid);
-    //  _wrk_bits.clear(n._uid);
-    //  if( n.is_dead() ) continue;
-    //  if( n._uses._len==0 ) { kill(n); continue; }
-    //  xform(n);
-    //}
-    throw AA.unimpl();
+    while( _work._len > 0 ) {
+      Node n = _work.pop();
+      assert _wrk_bits.get(n._uid);
+      _wrk_bits.clear(n._uid);
+      if( n.is_dead() ) continue;
+      if( n._uses._len==0 ) { kill(n); continue; }
+      xform_old(n);
+    }
   }
 
 }

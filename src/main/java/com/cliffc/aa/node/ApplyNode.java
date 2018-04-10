@@ -46,14 +46,15 @@ public class ApplyNode extends Node implements AutoCloseable {
         if( arg.at(0) == fun && arg instanceof ParmNode ) {
           int pidx = ((ParmNode)arg)._idx;
           if( pidx != _defs._len-2 ) {      // No update to the RPC Parm; it is done below
-            arg.add_def(_defs.at(pidx + 2));// 0-based on Parm is 2-based on Apply's args
+            gvn.add_work(arg).add_def(_defs.at(pidx + 2));// 0-based on Parm is 2-based on Apply's args
             pcnt++;                         // One more arg found
+            
           }
         }
       }
       assert pcnt == _defs._len-2; // All params found and updated at the function head
-      fun.add_def(ctrl);           // Add Control for this path
-      rpc.add_def(gvn.con(TypeInt.con(_cidx)));// The RPC for this call
+      gvn.add_work(fun).add_def(ctrl); // Add Control for this path
+      gvn.add_work(rpc).add_def(gvn.con(TypeInt.con(_cidx)));// The RPC for this call
       // A new private return path replaces the Apply.
       // TODO: Upgrade the function type for the known arguments.  THIS RetNode is a more strongly-typed function than the generic return
       return new RetNode( fun, rez, rpc, _cidx );
