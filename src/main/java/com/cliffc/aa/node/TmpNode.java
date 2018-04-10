@@ -24,5 +24,5 @@ public class TmpNode extends Node implements AutoCloseable {
   }
   // Parser support of small lists of nodes to be kept alive during parsing.
   // Nuke this node and anything it keeps alive
-  @Override public void close() { Env._gvn.kill0(this); }
+  @Override public void close() { Env._gvn.kill_new(this); }
 }

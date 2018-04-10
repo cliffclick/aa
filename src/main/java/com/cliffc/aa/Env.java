@@ -64,7 +64,7 @@ public class Env implements AutoCloseable {
   // anything only pointed at by this scope).
   @Override public void close() {
     assert check_live(_gvn._live);
-    _gvn.kill0(_root);
+    _gvn.kill_new(_root);
   }
 
   private boolean check_live(BitSet live) {

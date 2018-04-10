@@ -145,9 +145,10 @@ public class ApplyNode extends Node implements AutoCloseable {
   // thrown while the call args are being built, this will free them all.  Once
   // this hits GVN, it will no longer auto-close.
   @Override public void close() {
-    if( Env._gvn.touched(this) ) return;
-    if( _uses == null ) return; // Already deleted once
-    Env._gvn.kill0(this);
+    //if( Env._gvn.touched(this) ) return;
+    //if( is_dead() ) return; // Already deleted once
+    //Env._gvn.kill_new(this);
+    throw AA.unimpl(); // too many weirdo cases
   }
 
   @Override public int hashCode() { return super.hashCode()+_cidx; }
