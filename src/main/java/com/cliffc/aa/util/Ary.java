@@ -31,6 +31,12 @@ public class Ary<E> implements Iterable<E> {
     return _es[_len-1];
   }
   
+  /** @return remove and return last element */
+  public E pop( ) {
+    range_check(0);
+    return _es[--_len];
+  }
+  
   /** Add element in amortized constant time
    *  @param e Element to add at end of list
    *  @return 'this' for flow-coding */

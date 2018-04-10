@@ -79,8 +79,10 @@ public abstract class Node {
     return sb.p(")").toString();
   }
   
-  // Graph rewriting.  Change change defs, including making new nodes.
-  // Will not call ideal() recursively on old nodes.
+  // Graph rewriting.  Can change defs, including making new nodes - but if it
+  // does so, all new nodes will first call ideal().  If gvn._opt if false, not
+  // allowed to remove CFG edges (loop backedges and function-call entry points
+  // have not all appeared).
   // Returns null if no-progress, or better version of 'this'.
   abstract public Node ideal(GVNGCP gvn);
 
@@ -116,10 +118,14 @@ public abstract class Node {
   public void walk( BitSet bs ) {
     assert _defs != null;
     if( !bs.get(_uid) ) {
+      assert !is_dead();
       bs.set(_uid);
       for( Node def : _defs )
         if( def != null )
           def.walk(bs);
     }
   }
+
+  public boolean is_dead() { return _uses == null; }
+  public void set_dead( ) { _defs = _uses = null; }   // TODO: Poor-mans indication of a dead node, probably needs to recycle these...
 }

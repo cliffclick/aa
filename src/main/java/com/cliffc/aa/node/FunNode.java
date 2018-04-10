@@ -41,10 +41,20 @@ import com.cliffc.aa.*;
 // about for a "function pointer".
 //
 public class FunNode extends Node {
+  static private int CNT=2;     // Function index; 1 is reserved for unknown functions
+  public final int _fidx;       // Function index; 1 is reserved for unknown functions
   public final TypeFun _tf;     // Worse-case correct type
-  public FunNode(TypeFun tf) { super(OP_FUN,Env.top_root()); _tf = tf; }
+  public FunNode(TypeFun tf) { super(OP_FUN,Env.top_root()); _tf = tf; _fidx = CNT++; }
   @Override String str() { return _tf.toString(); }
   @Override public Node ideal(GVNGCP gvn) { return null; }
   @Override public Type value(GVNGCP gvn) { return _tf; }
   @Override public Type all_type() { return _tf; }
+  @Override public int hashCode() { return super.hashCode()+_tf.hashCode(); }
+  @Override public boolean equals(Object o) {
+    if( this==o ) return true;
+    if( !super.equals(o) ) return false;
+    if( !(o instanceof FunNode) ) return false;
+    FunNode fun = (FunNode)o;
+    return _fidx==fun._fidx;
+  }
 }

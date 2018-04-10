@@ -45,7 +45,7 @@ public class Parse {
     _src = src;
     _line= 0;
     _e   = env;
-    _ctrl= null; // env.lookup(" control "); TODO: plus need to reach thru UNR
+    _ctrl= env.lookup(" control ");
     _buf = str.getBytes();
     _x   = 0;
 
@@ -127,7 +127,7 @@ public class Parse {
           Node fun = funs.at(i);
           assert fun.op_prec() <= max;
           if( fun.op_prec() < max ) continue; // Not yet
-          args.set_def(i-1,gvn(new ApplyNode(fun,args.at(i-1),args.at(i))),_gvn);
+          args.set_def(i-1,gvn(new ApplyNode(_ctrl,fun,args.at(i-1),args.at(i))),_gvn);
           funs.remove(i);  args.remove(i);  i--;
         }
         max--;
@@ -147,6 +147,7 @@ public class Parse {
     if( skipWS() == -1 ) return fun; // Just the original term
     // Function application; parse out the argument list
     try( ApplyNode args = new ApplyNode() ) {
+      args.add_def(_ctrl);
       args.add_def(fun);
       if( peek('(') ) {               // Traditional fcn application
         if( _gvn.type(fun).ret() == null )
@@ -189,7 +190,7 @@ public class Parse {
         Node arg = gvn(nfact()); // Recursive call
         if( arg == null )
           throw err(unifun,"Call to unary function '"+uni+"', but missing the one required argument");
-        return new ApplyNode(unifun,arg);
+        return new ApplyNode(_ctrl,unifun,arg);
       } else {
         _x=oldx;                // Unwind token parse and try again for a factor
         if( unifun != null && unifun._uses._len==0 )
