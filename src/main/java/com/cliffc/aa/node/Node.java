@@ -7,7 +7,7 @@ import com.cliffc.aa.util.SB;
 import java.util.BitSet;
 
 // Sea-of-Nodes
-public abstract class Node {
+public abstract class Node implements Cloneable {
   static final byte OP_ROOT= 1;
   static final byte OP_CON = 2;
   static final byte OP_PRIM= 3;

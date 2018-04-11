@@ -53,8 +53,6 @@ public class GVNGCP {
     assert t != null;
     _ts.set(n._uid,t);
   }
-  public boolean touched( Node n ) { return n._uid < _ts._len && _ts._es[n._uid] != null; }
-
   // Make globally shared common ConNode for this type.
   public Node con( Type t ) {
     Node con = new ConNode<>(t);
@@ -77,13 +75,13 @@ public class GVNGCP {
   }
 
   // Node new to GVN and unregistered, or old and registered
-  boolean check_new( Node n ) {
+  private boolean check_new(Node n) {
     if( check_opt(n) ) return false; // Not new
     assert n._uses._len==0;          // New, so no uses
     return true;
   }
   // Node is in the type table and GVN hash table
-  boolean check_opt( Node n ) {
+  private boolean check_opt(Node n) {
     // First & only test: in type table or not
     if( n._uid < _ts._len && _ts._es[n._uid]!=null ) {
       assert check_gvn(n,true);  // Check also in GVN table
@@ -222,7 +220,7 @@ public class GVNGCP {
   
   // Once the program is complete, any time anything is on the worklist we can
   // always conservatively iterate on it.
-  public void iter() {
+  void iter() {
     while( _work._len > 0 ) {
       Node n = _work.pop();
       assert _wrk_bits.get(n._uid);

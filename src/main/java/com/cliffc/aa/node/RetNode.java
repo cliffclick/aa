@@ -8,6 +8,7 @@ public class RetNode extends Node {
   public RetNode( Node ctrl, Node ret, Node rpcparm, int rpc ) { super(OP_RET,ctrl,ret,rpcparm); _rpc = rpc;}
   @Override String str() { return "ret$"+_rpc; }
   @Override public Node ideal(GVNGCP gvn) {
+    if( _rpc==1 ) return null; // Do not muck with the unknown caller
     // special case: function body is a single node (e.g. a primitive).
     // Inline immediately.  Pattern is:
     // all  X  all  arg   1  rpc
@@ -34,8 +35,7 @@ public class RetNode extends Node {
       Node x = parm == null ? null : parm._defs.at(idx);
       nnn.add_def(x);
     }
-    
-    throw AA.unimpl();
+    return nnn;
   }
   // RetNodes *are* the function pointers, as opposed to FunNodes.  Thus their
   // type is that of a function, not of what is being returned.
