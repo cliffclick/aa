@@ -5,7 +5,7 @@ import com.cliffc.aa.util.SB;
 
 // Function parameter node; just a pass-thru
 public class ParmNode extends Node {
-  final int _idx;               // Parameter index, 0-based
+  final int _idx;               // Parameter index, 1-based
   final String _name;           // Parameter name
   public ParmNode( int idx, String name, Node... funparms) { super(OP_PARM,funparms); _idx=idx; _name=name; }
   @Override String str() { return _name; }
@@ -17,6 +17,7 @@ public class ParmNode extends Node {
   }
   @Override public Node ideal(GVNGCP gvn) { return null; }
   @Override public Type value(GVNGCP gvn) {
+    // TODO: only meet known-live incoming call-paths
     Type t = Type.XSCALAR;
     for( int i=1; i<_defs._len; i++ )
       t = t.meet(gvn.type(_defs._es[i]));

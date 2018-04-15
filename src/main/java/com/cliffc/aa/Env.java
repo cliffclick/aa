@@ -42,10 +42,10 @@ public class Env implements AutoCloseable {
     FunNode fun = (FunNode)_gvn.init(new FunNode(prim._tf)); // Points to RootNode only
     prim.add_def(null);         // Control for the primitive
     for( int i=0; i<args.length; i++ )
-      prim.add_def(_gvn.init(new ParmNode(i,args[i],fun,_gvn.con(targs[i]))));
+      prim.add_def(_gvn.init(new ParmNode(i+1,args[i],fun,_gvn.con(targs[i]))));
     Node x = _gvn.init(prim);
     assert x==prim;
-    Node rpc = _gvn.init(new ParmNode(args.length,"$rpc",fun,_gvn.con(TypeInt.TRUE)));
+    Node rpc = _gvn.init(new ParmNode(args.length+1,"$rpc",fun,_gvn.con(TypeInt.TRUE)));
     return (RetNode)_gvn.init(new RetNode(fun,prim,rpc,1));
   }
 

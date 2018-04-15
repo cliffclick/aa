@@ -114,7 +114,7 @@ public class Parse {
         if( binfun==null ) { _x=oldx; break; } // Not a binop, no more Kleene star
         term = term();
         if( term == null ) throw err("missing expr after binary op "+bin);
-        funs.add(gvn(binfun));  args.add_def(term);
+        funs.add(binfun);  args.add_def(term);
       }
   
       // Have a list of interspersed operators and terms.
@@ -142,7 +142,7 @@ public class Parse {
    *  term = nfact nfact*         // One function call, all the args listed
    *  @return Node does not need gvn() */
   private Node term() {
-    Node fun = gvn(nfact()), arg;    // nfactor
+    Node fun = nfact(), arg;         // nfactor
     if( fun == null ) return null;   // No term at all
     if( skipWS() == -1 ) return fun; // Just the original term
     // Function application; parse out the argument list
@@ -166,7 +166,7 @@ public class Parse {
         // "1-2", where "1" parses in the function position and "-2" is a uniop
         // '-' applied to a 2: "-(2)".  This parses as the function "1" and its
         // single arg "-(2)" - but "1" is not a function.
-        return args.del(0);     // No function call
+        return args.del(1);     // No function call
         //while( (arg = stmt()) != null ) // While have args
         //  args.add_def(arg);            // Gather WS-separate args
         //if( args.len()==1 ) return fun; // Not a function call
@@ -180,7 +180,7 @@ public class Parse {
   
   /** Parse any leading unary ops before a factor
    *  nfact = fact | uniop nfact 
-   *  @return Node needs gvn() */
+   *  @return Node does not needs gvn() */
   private Node nfact() {
     int oldx = _x;
     String uni = token();
@@ -190,7 +190,7 @@ public class Parse {
         Node arg = nfact(); // Recursive call
         if( arg == null )
           throw err(unifun,"Call to unary function '"+uni+"', but missing the one required argument");
-        return new ApplyNode(_ctrl,unifun,gvn(arg));
+        return gvn(new ApplyNode(_ctrl,unifun,arg));
       } else {
         _x=oldx;                // Unwind token parse and try again for a factor
         if( unifun != null && unifun._uses._len==0 )
@@ -202,22 +202,22 @@ public class Parse {
 
   /** Parse a factor, a leaf grammar token
    *  fact = num       // number
-   *  fact = (expr)    // General expression called recursively
+   *  fact = (stmt)    // General statement called recursively
    *  fact = {binop}   // Special syntactic form of binop; no spaces allowed; returns function constant
    *  fact = {uniop}   // Special syntactic form of uniop; no spaces allowed; returns function constant
    *  fact = {func}    // Anonymous function declaration
    *  fact = id        // variable lookup, NOT a binop or uniop but might be e.g. function-valued, including un-/binops as values
-   *  @return Node needs gvn() */
+   *  @return Node does not need gvn() */
   private Node fact() {
     if( skipWS() == -1 ) return null;
     byte c = _buf[_x];
-    if( '0' <= c && c <= '9' ) return new ConNode<>(number());
+    if( '0' <= c && c <= '9' ) return _gvn.con(number());
     int oldx = _x;
     if( peek('(') ) { // Either a special-syntax pre/infix op, or a nested expression
-      Node ex = stmt();
-      if( ex==null ) { _x = oldx; return null; } // A bare "()" pair is not an expr
+      Node s = stmt();
+      if( s==null ) { _x = oldx; return null; } // A bare "()" pair is not an expr
       require(')');
-      return ex;
+      return s;
     }
     // Anonymous function or operator
     if( peek('{') ) {
@@ -255,13 +255,13 @@ public class Parse {
     try( Env e = new Env(_e) ) { // Nest an environment for the local vars
       _e = e;
       int cnt=0;                // Add parameters to local environment
-      for( String id : ids )  _e.add(id,init(new ParmNode(++cnt,id,fun,_gvn.con(Type.XSCALAR))));
-      Node rpc = _e.add(" rpc ",init(new ParmNode(ids._len,"$rpc",fun,_gvn.con(TypeInt.TRUE))));
+      for( String id : ids )  _e.add(id,init(new ParmNode(++cnt,id,fun,_gvn.con(Type.SCALAR))));
+      Node rpc = _e.add(" rpc ",init(new ParmNode(ids._len+1,"$rpc",fun,_gvn.con(TypeInt.TRUE))));
       Node rez = stmt();        // Parse function body
-      Node ret = _e._ret = _gvn.xform(new RetNode(fun,rez,rpc,1));
-      _e = _e._par;               // Pop nested environment
+      Node ret = _e._ret = gvn(new RetNode(fun,rez,rpc,1));
+      _e = _e._par;             // Pop nested environment
       require('}');
-      return ret;                 // Return function
+      return ret;               // Return function
     }
   }
   

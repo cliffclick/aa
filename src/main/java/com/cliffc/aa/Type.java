@@ -199,7 +199,7 @@ public class Type {
     return false;
   }
   
-  Type join( Type t ) { return dual().meet(t.dual()).dual(); }
+  public Type join( Type t ) { return dual().meet(t.dual()).dual(); }
 
   static boolean check_startup() {
     Type[] ts =    Type     .TYPES ;
@@ -247,6 +247,29 @@ public class Type {
     return _type != TALL && _type != TANY && _type != TUNION && _type != TTUPLE;
   }
   
+  // True if value is above the centerline (no real value)
+  public boolean above_center() {
+    switch( _type ) {
+    case TALL:
+    case TSCALAR:
+    case TNUM:
+    case TREAL:
+      return false;             // These are all below center
+    case TXREAL:
+    case TXNUM:
+    case TXSCALAR:
+    case TANY:
+      return true;              // These are all above center
+      
+    case TFUN:                  // Overridden in subclass
+    case TUNION:                // Overridden in subclass
+    case TTUPLE:                // Overridden in subclass
+    case TFLT:                  // Overridden in subclass
+    case TINT:                  // Overridden in subclass
+    default: throw AA.unimpl();
+    case TBASE: throw typerr(null);
+    }
+  }
   // True if value is higher-equal to SOME constant.
   protected boolean canBeConst() {
     switch( _type ) {

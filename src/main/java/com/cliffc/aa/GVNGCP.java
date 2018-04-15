@@ -14,16 +14,13 @@ public class GVNGCP {
   private int CNT;
   BitSet _live = new BitSet();
 
-  public int uid() {
-    _live.set(CNT);
-    return CNT++;
-  }
+  public int uid() { _live.set(CNT);  return CNT++; }
 
   // Iterative worklist
   private Ary<Node> _work = new Ary<>(new Node[1], 0);
   private BitSet _wrk_bits = new BitSet();
 
-  public Node add_work( Node n ) {
+  private Node add_work(Node n) {
     return _wrk_bits.get(n._uid) ? n : add_work0(n);
   }
   private Node add_work0( Node n ) {
@@ -74,6 +71,28 @@ public class GVNGCP {
     return add_work0(n);
   }
 
+  // Add a new def to 'n', changing its hash - so rehash it
+  public Node add_def( Node n, Node def ) {
+    Node x = _vals.remove(n);
+    assert x == n;
+    n.add_def(def);
+    _vals.put(n,n);
+    add_work(n);
+    return n;
+  }
+
+  // True if in _ts and _vals, false otherwise
+  public boolean touched( Node n ) { return n._uid < _ts._len && _ts._es[n._uid]!=null; }
+  
+  // Remove from GVN structures
+  Node unreg( Node n ) {
+    assert !check_new(n);
+    _ts.set(n._uid,null);       // Remove from type system
+    _vals.remove(n);            // Remove from GVN
+    // TODO: Remove from worklist also
+    return n;
+  }
+  
   // Node new to GVN and unregistered, or old and registered
   private boolean check_new(Node n) {
     if( check_opt(n) ) return false; // Not new
@@ -82,9 +101,8 @@ public class GVNGCP {
   }
   // Node is in the type table and GVN hash table
   private boolean check_opt(Node n) {
-    // First & only test: in type table or not
-    if( n._uid < _ts._len && _ts._es[n._uid]!=null ) {
-      assert check_gvn(n,true);  // Check also in GVN table
+    if( touched(n) ) {          // First & only test: in type table or not
+      assert check_gvn(n,true); // Check also in GVN table
       return true;              // Yes in both type table and GVN table
     }
     assert !check_gvn(n,false); // Check also not in GVN table
@@ -141,19 +159,9 @@ public class GVNGCP {
   
   // Recursively kill off a new dead node, which might make lots of other nodes
   // go dead.  Since its new, no need to remove from GVN system.  
-  public void kill_new( Node n ) {
-    assert check_new(n);
-    kill0(n);
-  }
-  
+  public void kill_new( Node n ) { assert check_new(n);  kill0(n); }
   // Recursively kill off a dead node, which might make lots of other nodes go dead
-  public void kill( Node n ) {
-    assert !check_new(n);
-    _ts.set(n._uid,null);       // Remove from type system
-    _vals.remove(n);            // Remove from GVN
-    // TODO: Remove from worklist also
-    kill0(n);
-  }
+  public void kill( Node n ) {  unreg(n);  kill0(n); }
   // Version for never-GVN'd; common for e.g. constants to die early or
   // RootNode, and some other make-and-toss Nodes.
   private void kill0( Node n ) {

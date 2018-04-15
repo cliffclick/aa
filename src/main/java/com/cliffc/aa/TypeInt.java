@@ -120,6 +120,7 @@ public class TypeInt extends Type {
   }
     
   @Override public boolean isBitShape(Type t) { return t._type == Type.TINT && _z<=((TypeInt)t)._z; }
+  @Override public boolean above_center() { return _x>0; }
   @Override public boolean canBeConst() { return _x>=0; }
   @Override public boolean is_con()   { return _x==0; }
 }

@@ -64,6 +64,7 @@ public class TypeFlt extends Type {
   static int log( double con ) { return ((double)(float)con)==con ? 32 : 64; }
   
   @Override public boolean isBitShape(Type t) { return t._type == Type.TFLT && _z<=((TypeFlt)t)._z; }
+  @Override public boolean above_center() { return _x>0; }
   @Override public boolean canBeConst() { return _x>=0; }
   @Override public boolean is_con()   { return _x==0; }
 }

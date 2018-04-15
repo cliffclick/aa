@@ -56,6 +56,7 @@ public class TestType {
     // Anonymous function definition
     test("{x y -> x+y}", TypeFun.any(2)); // actually {Flt,Int} x {FltxInt} -> {FltxInt} but currently types {SCALAR,SCALAR->SCALAR}
     test("{5}()", TypeInt.con(5)); // No args nor -> required; this is simply a function returning 5, being executed
+
     test("x=3; fun={y -> x+y}; fun(2)", TypeInt.con(5)); // capture external variable
     test("x=3; fun={x -> x*2}; fun(2)+fun(x)", TypeInt.con(2*2+3*2)); // shadow  external variable
     testerr("fun={x -> x+2}; x", "Unknown ref 'x'","                 "); // Scope exit ends lifetime
@@ -99,6 +100,7 @@ public class TestType {
     }
   }
 
+  // TODO: Observation: value() calls need to be monotonic, can test this.
   @Test public void testCommuteSymmetricAssociative() {
     // Uncomment to insert a single test to focus on
     //Assert.assertEquals(Type.SCALAR,TypePrim.ID.meet(TypeUnion.ALL_NUM));

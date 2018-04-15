@@ -69,12 +69,17 @@ public class TypeTuple extends Type {
     case TFUN: return Type.ALL;
     default: throw typerr(t);
     }
+    // Length is longer of 2 tuples.
+    // Shorter elements take the meet; longer elements just copy.
     TypeTuple tt = (TypeTuple)t;
-    // The length of Tuples is a constant, and a mismatch on length is a
-    // complete miss: the result falls to Bottom.
-    if( _ts.length != tt._ts.length ) return Type.ALL;
-    Type[] ts = new Type[_ts.length];
-    for( int i=0; i<_ts.length; i++ ) ts[i] = _ts[i].meet(tt._ts[i]);
+    int min = Math.min(_ts.length,tt._ts.length);
+    int max = Math.max(_ts.length,tt._ts.length);
+    Type[] ts = new Type[max];
+    for( int i=0; i<min; i++ ) ts[i] = _ts[i].meet(tt._ts[i]);
+    if( min < max ) {
+      Type[] tx = max==_ts.length ? _ts : tt._ts;
+      for( int i=min; i<max; i++ )  ts[i] = tx[i];
+    }
     return make(ts);
   }
   boolean has_tuple() {

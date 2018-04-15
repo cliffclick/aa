@@ -50,15 +50,8 @@ public class TypeFun extends Type {
     default: throw typerr(t);   // All else should not happen
     }
     TypeFun tf = (TypeFun)t;
-    Type ret = _ret.join(tf._ret); // Notice JOIN, Functions are contravariant
-    // Bail out if arg lengths do not match.
-    if( _ts._ts.length != tf._ts._ts.length )
-      return Type.SCALAR;
-    // If the args are totally isa, then return the exact match to preserve
-    // name and args.
     Type targs = _ts.meet(tf._ts);
-    if( targs==   _ts && ret==   _ret ) return this;
-    if( targs==tf._ts && ret==tf._ret ) return tf;
+    Type ret = _ret.join(tf._ret); // Notice JOIN, Functions are contravariant
     // Make a new signature
     return make((TypeTuple)targs,ret);
   }
