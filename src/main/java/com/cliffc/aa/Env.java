@@ -14,7 +14,7 @@ public class Env implements AutoCloseable {
   public Node _ret;                             // Return value, just before the Env is popped
   Env( Env par ) { _par=par; _refs = new ConcurrentHashMap<>(); }
 
-  public final static GVNGCP _gvn = new GVNGCP(false); // Pessimistic GVN, defaults to ALL, lifts towards ANY
+  public final static GVNGCM _gvn = new GVNGCM(false); // Pessimistic GVN, defaults to ALL, lifts towards ANY
   private final static Env TOP = new Env(null);        // Top-most lexical Environment
   public static RootNode top_root() { return TOP._root; }
   static { TOP.init(); }

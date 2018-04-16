@@ -7,7 +7,7 @@ public class RetNode extends Node {
   final int _rpc;               // Which call site
   public RetNode( Node ctrl, Node ret, Node rpcparm, int rpc ) { super(OP_RET,ctrl,ret,rpcparm); _rpc = rpc;}
   @Override String str() { return "ret$"+_rpc; }
-  @Override public Node ideal(GVNGCP gvn) {
+  @Override public Node ideal(GVNGCM gvn) {
     if( _rpc==1 ) return null; // Do not muck with the unknown caller
     // special case: function body is a single node (e.g. a primitive).
     // Inline immediately.  Pattern is:
@@ -40,7 +40,7 @@ public class RetNode extends Node {
   }
   // RetNodes *are* the function pointers, as opposed to FunNodes.  Thus their
   // type is that of a function, not of what is being returned.
-  @Override public Type value(GVNGCP gvn) { return gvn.type(at(2).at(0)); }
+  @Override public Type value(GVNGCM gvn) { return gvn.type(at(2).at(0)); }
   @Override public Type all_type() { return at(2).at(0).all_type(); }
   // Return the op_prec of the returned value.  Not sensible except
   // when call on primitives.

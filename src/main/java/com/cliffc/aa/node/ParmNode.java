@@ -15,8 +15,8 @@ public class ParmNode extends Node {
     for( Node n : _defs ) { sb.p(first?"_":n.str()).p(' '); first=false; }
     return sb.p('}').toString();
   }
-  @Override public Node ideal(GVNGCP gvn) { return null; }
-  @Override public Type value(GVNGCP gvn) {
+  @Override public Node ideal(GVNGCM gvn) { return null; }
+  @Override public Type value(GVNGCM gvn) {
     // TODO: only meet known-live incoming call-paths
     Type t = Type.XSCALAR;
     for( int i=1; i<_defs._len; i++ )

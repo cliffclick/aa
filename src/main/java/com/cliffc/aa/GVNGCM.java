@@ -7,7 +7,7 @@ import java.util.BitSet;
 import java.util.concurrent.ConcurrentHashMap;
 
 // Global Value Numbering, Global Code Motion
-public class GVNGCP {
+public class GVNGCM {
   private final boolean _opt; // Optimistic (types start at ANY and fall to ALL) or pessimistic (start ALL lifting to ANY)
 
   // Unique dense node-numbering
@@ -37,7 +37,7 @@ public class GVNGCP {
   // Global expressions, to remove redundant Nodes
   private ConcurrentHashMap<Node,Node> _vals = new ConcurrentHashMap<>();
   
-  GVNGCP( boolean opt ) { _opt = opt; }
+  GVNGCM( boolean opt ) { _opt = opt; }
 
   public Type type( Node n ) {
     Type t = n._uid < _ts._len ? _ts._es[n._uid] : null;

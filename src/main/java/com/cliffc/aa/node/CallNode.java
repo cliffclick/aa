@@ -26,7 +26,7 @@ public class CallNode extends Node implements AutoCloseable {
   private final int _cidx;       // Call site index; 1 is reserved for unknown callers
   public CallNode( Node... defs ) { super(OP_APLY,defs); _cidx = CNT++; }
   @Override String str() { return "apply"; }
-  @Override public Node ideal(GVNGCP gvn) {
+  @Override public Node ideal(GVNGCM gvn) {
     Node ctrl = _defs.at(0);    // Control for apply/call-site
     Node retx = _defs.at(1);    // Possible RetNode or Unresolved
 
@@ -94,7 +94,7 @@ public class CallNode extends Node implements AutoCloseable {
       // result from a single function call, and not all possible return
       // results.
         
-      // TODO: Rename GVNGCP to GVNGCM
+      // TODO: Rename GVNGCM to GVNGCM
       // TODO: Combine RootNode and Env hash lookup... so can change what node
       // a name points too.
       
@@ -123,7 +123,7 @@ public class CallNode extends Node implements AutoCloseable {
     return null;
   }
 
-  @Override public Type value(GVNGCP gvn) {
+  @Override public Type value(GVNGCM gvn) {
     Node unr = _defs.at(1);
     if( unr instanceof UnresolvedNode )
       return ((UnresolvedNode)unr).retype(gvn,this);
@@ -152,7 +152,7 @@ public class CallNode extends Node implements AutoCloseable {
   // Number of actual arguments
   int nargs() { return _defs._len-2; }
   // Actual arguments
-  Type actual(GVNGCP gvn, int x) { return gvn.type(actual(x)); }
+  Type actual(GVNGCM gvn, int x) { return gvn.type(actual(x)); }
   Node actual(int x) { return _defs.at(x+2); }
   
   // Parser support keeping args alive during parsing; if a syntax exception is

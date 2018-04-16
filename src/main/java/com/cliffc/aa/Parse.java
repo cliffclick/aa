@@ -34,7 +34,7 @@ public class Parse {
   private final byte[] _buf;            // Bytes being parsed
   private int _x;                       // Parser index
   private int _line;                    // Zero-based line number
-  GVNGCP _gvn;                          // Pessimistic types
+  GVNGCM _gvn;                          // Pessimistic types
   
   // Fields strictly for Java number parsing
   private final NumberFormat _nf;

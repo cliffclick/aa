@@ -27,7 +27,7 @@ public abstract class Node implements Cloneable {
   public void add_def(Node n) { _defs.add(n); if( n!=null ) n._uses.add(this); }
   public Node at(int i) { return _defs._es[i]; }
   // Replace def/use edge
-  public Node set_def( int idx, Node n, GVNGCP gvn ) {
+  public Node set_def( int idx, Node n, GVNGCM gvn ) {
     Node old = _defs._es[idx];  // Get old value
     // Add edge to new guy before deleting old, in case old goes dead and
     // recursively makes new guy go dead also
@@ -96,10 +96,10 @@ public abstract class Node implements Cloneable {
   // allowed to remove CFG edges (loop backedges and function-call entry points
   // have not all appeared).
   // Returns null if no-progress, or better version of 'this'.
-  abstract public Node ideal(GVNGCP gvn);
+  abstract public Node ideal(GVNGCM gvn);
 
   // Compute the current best Type for this Node, based on the types of its inputs
-  abstract public Type value(GVNGCP gvn);
+  abstract public Type value(GVNGCM gvn);
 
   // Worse-case type for this Node
   public Type all_type() { return Type.ALL; }

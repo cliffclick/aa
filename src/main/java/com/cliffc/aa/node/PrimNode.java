@@ -48,8 +48,8 @@ public abstract class PrimNode extends Node {
   public abstract Type apply( Type[] args ); // Execute primitive
   public boolean is_lossy() { return true; }
   @Override public String str() { return _name+"::"+_tf._ret; }
-  @Override public Node ideal(GVNGCP gvn) { return null; }
-  @Override public Type value(GVNGCP gvn) {
+  @Override public Node ideal(GVNGCM gvn) { return null; }
+  @Override public Type value(GVNGCM gvn) {
     Type[] ts = new Type[_defs._len];
     boolean con=true;
     for( int i=1; i<_defs._len; i++ ) if( !(ts[i] = gvn.type(_defs.at(i))).is_con() ) { con=false; break; }
