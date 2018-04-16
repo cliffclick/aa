@@ -24,7 +24,7 @@ public class TestType {
     test("1+2.3",   TypeFlt.make(0,64,3.3));
   
     // Variable lookup
-    test("pi", TypeFlt.Pi);
+    test("math_pi", TypeFlt.Pi);
     // bare function lookup; returns a union of '+' functions
     testerr("+", "Syntax error; trailing junk","");
     test("{+}", Env.lookup_type("+"));
@@ -35,7 +35,7 @@ public class TestType {
     test("{-}(1  )", TypeInt.con(-1)); // unary version
     // error; mismatch arg count
     testerr("!()"       , "Call to unary function '!', but missing the one required argument"," ");
-    testerr("pi(1)"     , "A function is being called, but 3.141592653589793 is not a function type","   ");
+    testerr("math_pi(1)", "A function is being called, but 3.141592653589793 is not a function type","        ");
     testerr("{+}(1,2,3)", "Argument mismatch in call to ANY(+::Flt64 +::Int64)","          ");
     // Parsed as +(1,(2*3))
     test("{+}(1, 2 * 3) ", TypeInt.con(7));

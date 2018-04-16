@@ -25,7 +25,7 @@ public class CallNode extends Node implements AutoCloseable {
   static private int CNT=2;     // Call site index; 1 is reserved for unknown callers
   private final int _cidx;       // Call site index; 1 is reserved for unknown callers
   public CallNode( Node... defs ) { super(OP_CALL,defs); _cidx = CNT++; }
-  @Override String str() { return "apply"; }
+  @Override String str() { return "call"; }
   @Override public Node ideal(GVNGCM gvn) {
     Node ctrl = _defs.at(0);    // Control for apply/call-site
     Node retx = _defs.at(1);    // Possible RetNode or Unresolved

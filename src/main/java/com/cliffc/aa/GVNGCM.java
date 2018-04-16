@@ -63,8 +63,11 @@ public class GVNGCM {
   // Record a Node, but do not optimize it for value and ideal calls, as it is
   // mid-construction from the parser.  Any function call with yet-to-be-parsed
   // call sites, and any loop top with an unparsed backedge needs to use this.
-  Node init( Node n ) {
+  public Node init( Node n ) {
     assert n._uses._len==0;
+    return init0(n);
+  }
+  public Node init0( Node n ) {
     setype(n,n.all_type());
     _vals.put(n,n);
     assert!_wrk_bits.get(n._uid);
@@ -181,7 +184,7 @@ public class GVNGCM {
     assert !check_new(nnn);     // Replacement in system
     if( nnn == old ) return;
     // if old is being replaced, it got removed from GVN table and types table.
-    assert check_new(old);
+    assert !check_opt(old);
     subsume(old,nnn);
   }
   /** Look for a better version of 'n'.  Can change n's defs via the ideal()

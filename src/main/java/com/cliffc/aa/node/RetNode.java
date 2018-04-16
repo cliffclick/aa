@@ -22,7 +22,7 @@ public class RetNode extends Node {
     // All args to op come from function header
     for( Node parm : op._defs )
       if( parm!=null && parm._defs.at(0) != fun &&
-          !(parm instanceof RootNode) )
+          !(parm instanceof ScopeNode) )
         return null;
     // Find the call-site specific incoming path
     int idx;
@@ -33,7 +33,7 @@ public class RetNode extends Node {
     // Inline the function body (a single op)
     Node nnn = op.copy();       // A copy, no use/def
     for( Node parm : op._defs ) { // Copy edges
-      Node x = (parm == null || parm instanceof RootNode) ? parm : parm._defs.at(idx);
+      Node x = (parm == null || parm instanceof ScopeNode) ? parm : parm._defs.at(idx);
       nnn.add_def(x);
     }
     return nnn;

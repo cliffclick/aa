@@ -252,13 +252,13 @@ public class Parse {
       ids.add(tok);
     }
     FunNode fun = (FunNode)init(new FunNode(TypeFun.any(ids._len)));
-    try( Env e = new Env(_e) ) { // Nest an environment for the local vars
-      _e = e;
+    try( Env e = new Env(_e) ) {// Nest an environment for the local vars
+      _e = e;                   // Push nested environment
       int cnt=0;                // Add parameters to local environment
       for( String id : ids )  _e.add(id,init(new ParmNode(++cnt,id,fun,_gvn.con(Type.SCALAR))));
       Node rpc = _e.add(" rpc ",init(new ParmNode(ids._len+1,"$rpc",fun,_gvn.con(TypeInt.TRUE))));
       Node rez = stmt();        // Parse function body
-      Node ret = _e._ret = gvn(new RetNode(fun,rez,rpc,1));
+      Node ret = e._ret = gvn(new RetNode(fun,rez,rpc,1));
       _e = _e._par;             // Pop nested environment
       require('}');
       return ret;               // Return function

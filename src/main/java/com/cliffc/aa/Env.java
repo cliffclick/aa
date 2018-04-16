@@ -8,21 +8,22 @@ import java.util.BitSet;
 
 public class Env implements AutoCloseable {
   final Env _par;
-  public final ScopeNode _scope = new ScopeNode(); // Lexical anchor; goes when this environment leaves scope
+  private final ScopeNode _scope = new ScopeNode(); // Lexical anchor; goes when this environment leaves scope
+  Node _ret;   // Return result
   Env( Env par ) { _par=par; }
 
   public final static GVNGCM _gvn = new GVNGCM(false); // Pessimistic GVN, defaults to ALL, lifts towards ANY
   private final static Env TOP = new Env(null);        // Top-most lexical Environment
   public static ScopeNode top_scope() { return TOP._scope; }
   static { TOP.init(); }
-  private final void init() {
+  private void init() {
     _scope.add(" control ",_scope); // Self-add
-    _scope.add("math.pi",new ConNode<>(TypeFlt.Pi));
+    _scope.add("math_pi",new ConNode<>(TypeFlt.Pi));
     for( PrimNode prim : PrimNode.PRIMS )
       _scope.add_fun(prim._name,as_fun(prim));
     // Now that all the UnresolvedNodes have all possible hits for a name,
     // register them with GVN.
-    for( Node val : _scope._defs )  _gvn.xform(val);
+    for( Node val : _scope._defs )  _gvn.init0(val);
   }
   
   // Called during basic Env creation, this wraps a PrimNode as a full
@@ -39,6 +40,8 @@ public class Env implements AutoCloseable {
     Node rpc = _gvn.init(new ParmNode(args.length+1,"$rpc",fun,_gvn.con(TypeInt.TRUE)));
     return (RetNode)_gvn.init(new RetNode(fun,prim,rpc,1));
   }
+
+  public Node add( String name, Node val ) { return _scope.add(name,val); }
 
   // A new top-level Env, above this is the basic public Env with all the primitives
   static Env top() { return new Env(TOP); }
