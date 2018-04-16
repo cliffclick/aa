@@ -1,6 +1,9 @@
 # Compiled class file
 *.class
 
+# Built java file
+build/*java
+
 # Package Files #
 *.jar
 *.zip
@@ -12,7 +15,6 @@ hs_err_pid*
 #*#
 *~
 TAGS
-
 
 # IdeaJ
 .idea

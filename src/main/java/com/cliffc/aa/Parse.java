@@ -127,7 +127,7 @@ public class Parse {
           Node fun = funs.at(i);
           assert fun.op_prec() <= max;
           if( fun.op_prec() < max ) continue; // Not yet
-          args.set_def(i-1,gvn(new ApplyNode(_ctrl,fun,args.at(i-1),args.at(i))),_gvn);
+          args.set_def(i-1,gvn(new CallNode(_ctrl,fun,args.at(i-1),args.at(i))),_gvn);
           funs.remove(i);  args.remove(i);  i--;
         }
         max--;
@@ -146,7 +146,7 @@ public class Parse {
     if( fun == null ) return null;   // No term at all
     if( skipWS() == -1 ) return fun; // Just the original term
     // Function application; parse out the argument list
-    try( ApplyNode args = new ApplyNode() ) {
+    try( CallNode args = new CallNode() ) {
       args.add_def(_ctrl);
       args.add_def(fun);
       if( peek('(') ) {               // Traditional fcn application
@@ -171,7 +171,7 @@ public class Parse {
         //  args.add_def(arg);            // Gather WS-separate args
         //if( args.len()==1 ) return fun; // Not a function call
       }
-      Node call = gvn(args);    // No syntax errors; flag Apply not auto-close
+      Node call = gvn(args);    // No syntax errors; flag Call not auto-close
       if( _gvn.type(call)==Type.ANY ) 
         throw err(call,"Argument mismatch in call to " + fun);
       return call;
@@ -190,7 +190,7 @@ public class Parse {
         Node arg = nfact(); // Recursive call
         if( arg == null )
           throw err(unifun,"Call to unary function '"+uni+"', but missing the one required argument");
-        return gvn(new ApplyNode(_ctrl,unifun,arg));
+        return gvn(new CallNode(_ctrl,unifun,arg));
       } else {
         _x=oldx;                // Unwind token parse and try again for a factor
         if( unifun != null && unifun._uses._len==0 )

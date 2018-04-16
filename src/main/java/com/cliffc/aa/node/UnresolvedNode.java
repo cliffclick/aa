@@ -92,7 +92,7 @@ public class UnresolvedNode extends Node {
   // If more than one choice applies, then the choice with fewest costly
   // conversions are kept; if there is more than one then the join of them is
   // kept - and the program is not-yet type correct (ambiguous choices).
-  Ary<Node> resolve( GVNGCP gvn, ApplyNode apply ) {
+  Ary<Node> resolve( GVNGCP gvn, CallNode apply ) {
     // Set of possible choices with fewest conversions
     Ary<Node> ns = new Ary<>(new Node[1],0);
     int min_cvts = 999;         // Required conversions
@@ -131,7 +131,7 @@ public class UnresolvedNode extends Node {
   // Function return type for resolved functions.  Crash/ALL for no functions
   // allowed, join of possible returns otherwise - we get to choose the best
   // choice here.
-  Type retype( GVNGCP gvn, ApplyNode apply ) {
+  Type retype( GVNGCP gvn, CallNode apply ) {
     Type t = Type.ALL;
     outerloop:
     for( Node ret : _defs ) {

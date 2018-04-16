@@ -10,21 +10,21 @@ import java.lang.AutoCloseable;
 // can be a UnresolvedNode (choice/Any of functions) or a RetNode.  Slots 2+
 // are for args.
 //
-// When the UnresolvedNode simplifies to a single RetNode, the Apply can inline.
+// When the UnresolvedNode simplifies to a single RetNode, the Call can inline.
 // If the Unr is an 'any' then a bunch of function pointers are allowed here.
 //
-// Apply-inlining can happen anytime we have a known function pointer, and
+// Call-inlining can happen anytime we have a known function pointer, and
 // might be several known function pointers - we are inlining the type analysis
 // and not the execution code.  For this kind of inlining we replace the
-// ApplyNode with a call-site specific RetNode, move all the ApplyNode args to
+// CallNode with a call-site specific RetNode, move all the CallNode args to
 // the ParmNodes just like the Fun/Parm is a Region/Phi.  The call-site index
 // is just like a ReturnPC value on a real machine; it dictates which of
 // several possible returns apply... and can be merged like a PhiNode
 
-public class ApplyNode extends Node implements AutoCloseable {
+public class CallNode extends Node implements AutoCloseable {
   static private int CNT=2;     // Call site index; 1 is reserved for unknown callers
   private final int _cidx;       // Call site index; 1 is reserved for unknown callers
-  public ApplyNode( Node... defs ) { super(OP_APLY,defs); _cidx = CNT++; }
+  public CallNode( Node... defs ) { super(OP_APLY,defs); _cidx = CNT++; }
   @Override String str() { return "apply"; }
   @Override public Node ideal(GVNGCP gvn) {
     Node ctrl = _defs.at(0);    // Control for apply/call-site
@@ -43,7 +43,7 @@ public class ApplyNode extends Node implements AutoCloseable {
         throw AA.unimpl();
         //Node unr2 = new UnresolvedNode(); // Build and return a reduced Unr
         //for( Node ret : rets ) unr2.add_def(ret);
-        //return set_def(1,unr2,gvn); // Upgrade Apply with smaller choices
+        //return set_def(1,unr2,gvn); // Upgrade Call with smaller choices
       }
 
       // Single choice; insert actual conversions & replace
@@ -70,13 +70,13 @@ public class ApplyNode extends Node implements AutoCloseable {
       Node     rez =           retx.at(1);
       ParmNode rpc = (ParmNode)retx.at(2);
 
-      // Add an input path to all incoming arg ParmNodes from the Apply.
+      // Add an input path to all incoming arg ParmNodes from the Call.
       int pcnt=0;               // Assert all parameters found
       for( Node arg : fun._uses ) {
         if( arg.at(0) == fun && arg instanceof ParmNode ) {
           int pidx = ((ParmNode)arg)._idx;
           if( pidx != nargs()+1) {          // No update to the RPC Parm; it is done below
-            gvn.add_def(arg,actual(pidx-1));// 1-based on Parm is 2-based on Apply's args
+            gvn.add_def(arg,actual(pidx-1));// 1-based on Parm is 2-based on Call's args
             pcnt++;                         // One more arg found
           }
         }
@@ -84,7 +84,7 @@ public class ApplyNode extends Node implements AutoCloseable {
       assert pcnt == nargs(); // All params found and updated at the function head
       gvn.add_def(fun,ctrl); // Add Control for this path
       gvn.add_def(rpc,gvn.con(TypeInt.con(_cidx)));// The RPC for this call
-      // A new private return path replaces the Apply.
+      // A new private return path replaces the Call.
       // TODO: Upgrade the function type for the known arguments.  THIS RetNode
       // is a more strongly-typed function than the generic return.
 
@@ -94,7 +94,7 @@ public class ApplyNode extends Node implements AutoCloseable {
       // result from a single function call, and not all possible return
       // results.
         
-      // TODO: Rename ApplyNode to CallNode
+      // TODO: Rename CallNode to CallNode
       // TODO: Rename GVNGCP to GVNGCM
       // TODO: Combine RootNode and Env hash lookup... so can change what node
       // a name points too.
@@ -168,8 +168,8 @@ public class ApplyNode extends Node implements AutoCloseable {
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !super.equals(o) ) return false;
-    if( !(o instanceof ApplyNode) ) return false;
-    ApplyNode apply = (ApplyNode)o;
+    if( !(o instanceof CallNode) ) return false;
+    CallNode apply = (CallNode)o;
     return _cidx==apply._cidx;
   }
 }
