@@ -4,42 +4,33 @@ import com.cliffc.aa.node.*;
 import com.cliffc.aa.node.UnresolvedNode;
 
 import java.lang.AutoCloseable;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.BitSet;
 
 public class Env implements AutoCloseable {
   final Env _par;
-  private final ConcurrentHashMap<String, Node> _refs;
-  public final RootNode _root = new RootNode(); // Lexical anchor; goes when this environment leaves scope
-  public Node _ret;                             // Return value, just before the Env is popped
-  Env( Env par ) { _par=par; _refs = new ConcurrentHashMap<>(); }
+  public final ScopeNode _scope = new ScopeNode(); // Lexical anchor; goes when this environment leaves scope
+  Env( Env par ) { _par=par; }
 
   public final static GVNGCM _gvn = new GVNGCM(false); // Pessimistic GVN, defaults to ALL, lifts towards ANY
   private final static Env TOP = new Env(null);        // Top-most lexical Environment
-  public static RootNode top_root() { return TOP._root; }
+  public static ScopeNode top_scope() { return TOP._scope; }
   static { TOP.init(); }
   private final void init() {
-    _refs.put(" control ",_root);
-    _refs.put("pi",new ConNode<>(TypeFlt.Pi)); // TODO: Needs to be under Math.pi
+    _scope.add(" control ",_scope); // Self-add
+    _scope.add("math.pi",new ConNode<>(TypeFlt.Pi));
     for( PrimNode prim : PrimNode.PRIMS )
-      _refs.computeIfAbsent(prim._name, key -> new UnresolvedNode()).add_def(as_fun(prim));
+      _scope.add_fun(prim._name,as_fun(prim));
     // Now that all the UnresolvedNodes have all possible hits for a name,
     // register them with GVN.
-    for( String k : _refs.keySet() ) {
-      Node n = _refs.get(k);
-      if( n== _root ) continue;
-      _root.add_def(n=_gvn.xform(n)); // Add to GVN; hook to lexical anchor so its not dead
-      _refs.put(k,n);  // Record xformed node
-    }
+    for( Node val : _scope._defs )  _gvn.xform(val);
   }
-
   
   // Called during basic Env creation, this wraps a PrimNode as a full
   // 1st-class function to be passed about or assigned to variables.
   private static RetNode as_fun( PrimNode prim ) {
     Type[] targs = prim._tf._ts._ts;
     String[] args = prim._args;
-    FunNode fun = (FunNode)_gvn.init(new FunNode(prim._tf)); // Points to RootNode only
+    FunNode fun = (FunNode)_gvn.init(new FunNode(prim._tf)); // Points to ScopeNode only
     prim.add_def(null);         // Control for the primitive
     for( int i=0; i<args.length; i++ )
       prim.add_def(_gvn.init(new ParmNode(i+1,args[i],fun,_gvn.con(targs[i]))));
@@ -49,14 +40,6 @@ public class Env implements AutoCloseable {
     return (RetNode)_gvn.init(new RetNode(fun,prim,rpc,1));
   }
 
-  // Extend the current Env with a new name.
-  Node add( String name, Node ref ) {
-    assert _refs.get(name)==null;
-    _refs.put(name, ref );
-    _root.add_def(ref);
-    return ref;
-  }
-
   // A new top-level Env, above this is the basic public Env with all the primitives
   static Env top() { return new Env(TOP); }
 
@@ -64,9 +47,10 @@ public class Env implements AutoCloseable {
   // anything only pointed at by this scope).
   @Override public void close() {
     assert check_live(_gvn._live);
-    _gvn.kill_new(_root);
+    _gvn.kill_new(_scope);
   }
 
+  // Check all reachable via graph-walk equals recorded live bits
   private boolean check_live(BitSet live) {
     BitSet rech = check_live0(new BitSet());
     if( rech.equals(live) ) return true;
@@ -78,7 +62,7 @@ public class Env implements AutoCloseable {
   }
     
   private BitSet check_live0(BitSet bs) {
-    _root.walk(bs);
+    _scope.walk(bs);
     if( _ret != null ) _ret.walk(bs); // Also walk return value
     return _par == null ? bs : _par.check_live0(bs);
   }
@@ -95,7 +79,7 @@ public class Env implements AutoCloseable {
   Node lookup( String token ) {
     if( token == null ) return null; // Handle null here, easier on parser
     // Lookup
-    Node n = _refs.get(token);
+    Node n = _scope.get(token);
     // Lookups stop at 1st hit - because shadowing is rare, and so will be
     // handled when it happens and not on every lookup.  Shadowing is supported
     // at name-insertion time, where all shadowed Nodes are inserted into the

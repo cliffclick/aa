@@ -8,15 +8,15 @@ import java.util.BitSet;
 
 // Sea-of-Nodes
 public abstract class Node implements Cloneable {
-  static final byte OP_ROOT= 1;
-  static final byte OP_CON = 2;
-  static final byte OP_PRIM= 3;
-  static final byte OP_UNR = 4;
-  static final byte OP_FUN = 5;
-  static final byte OP_PARM= 6;
-  static final byte OP_RET = 7;
-  static final byte OP_APLY= 8;
-  static final byte OP_TMP = 9;
+  static final byte OP_CALL = 1;
+  static final byte OP_CON  = 2;
+  static final byte OP_FUN  = 3;
+  static final byte OP_PARM = 4;
+  static final byte OP_PRIM = 5;
+  static final byte OP_RET  = 6;
+  static final byte OP_SCOPE= 7;
+  static final byte OP_TMP  = 8;
+  static final byte OP_UNR  = 9;
   
   public int _uid=Env._gvn.uid(); // Unique ID, will have gaps, used to give a dense numbering to nodes
   public final byte _op;
