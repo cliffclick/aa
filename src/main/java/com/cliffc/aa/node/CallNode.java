@@ -94,7 +94,6 @@ public class CallNode extends Node implements AutoCloseable {
       // result from a single function call, and not all possible return
       // results.
         
-      // TODO: Rename CallNode to CallNode
       // TODO: Rename GVNGCP to GVNGCM
       // TODO: Combine RootNode and Env hash lookup... so can change what node
       // a name points too.
