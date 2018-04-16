@@ -96,20 +96,28 @@ public class ApplyNode extends Node implements AutoCloseable {
         
       // TODO: Rename ApplyNode to CallNode
       // TODO: Rename GVNGCP to GVNGCM
-
-      // TODO: Need a full execution engine, but can start with guided
-      // inlining.  As long as the inlining is complete, we have a full answer.
-      // Here, we want to inline a CallNode with Unresolved fcns across a
-      // ParmNode boundary.  We keep the original not-inlined CallNode, (so we
-      // can inline future unknown callers) and insert a new merge point
-      // just south...
-
-      // TODO: Really trying to solve the int/flt auto-conversions
-      // while trying to solve the generic function application problem.
-
-      // Can solve auto-converts later... or try to solve just the generic
-      // function application right now and blow off auto-converts.
+      // TODO: Combine RootNode and Env hash lookup... so can change what node
+      // a name points too.
       
+      // TODO: Graph rewrite of "x=3; foo={y->x+y}; foo(2)"
+      // 
+      // 2_Fun :=  _    0_Root       0_Root "foo"
+      // 6_Parm:= 2_Fun __Con_Scalar __Con_2 "y"
+      // 4_RPC := 2_Fun __Con_1      __Con_95
+      // 5_Unr := +:Flt  +:Int
+      // 3_Call:= 2_Fun 5_Unr __Con_3 6_Parm
+      // 1_Ret := 2_Fun 3_Call 4_RPC  #1
+      // foo->1_Ret
+      // 7_Call:= 0_Root 1_Ret __Con_2
+      // Parser: 7_Call
+      //
+      //
+      // 10_Fun :=  _    0_Root  "foo"
+      // 11_Parm:=10_Fun __Con_Int
+      // 12_Call:=10_Fun 5_Unr __Con_3 11_Parm
+      // 9_Ret := 10_Fun 12_Call X_RPC #95
+      // 8_Unr := 1_Ret 9_Ret
+      // foo->8_Unr
       return new RetNode( fun, rez, rpc, _cidx );
     }
 
