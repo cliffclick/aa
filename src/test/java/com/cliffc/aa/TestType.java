@@ -70,8 +70,8 @@ public class TestType {
     // Conditional:
     //test("0?2:3",TestInt.con(3)); // false
     //test("2?2:3",TestInt.con(2)); // true
-    //testerr("0?x=2:3;x","x only defined on other side, so not available after");
-    //test   ("  2    ?x=2:3;x",TestInt.con(2)); // off-side is constant-dead, so missing x-assign ignored
+    //testerr("0?x=2:3;x","x only defined on one side of conditional, so not available after");
+    //test   ("2?x=2:3;x",TestInt.con(2)); // off-side is constant-dead, so missing x-assign ignored
     //testerr("math.rand(1)?x=2:3;x","off-side is NOT constant-dead, so x must be assigned both branches");
     //testerr("math.rand(1)?x=2:3;4",TypeInt.con(4)); // x-defined on 1 side only, but not used thereafter
     //testerr("2?x=2:y","off-side is dead, so missing y-ref ignored");

@@ -97,25 +97,28 @@ public class CallNode extends Node implements AutoCloseable {
       // TODO: Combine RootNode and Env hash lookup... so can change what node
       // a name points too.
       
-      // TODO: Graph rewrite of "x=3; foo={y->x+y}; foo(2)"
+      // TODO: Graph rewrite of "x=3; foo={y->x+y}"
       // 
-      // 2_Fun :=  _    0_Root       0_Root "foo"
-      // 6_Parm:= 2_Fun __Con_Scalar __Con_2 "y"
-      // 4_RPC := 2_Fun __Con_1      __Con_95
+      // 2_Fun :=  _    0_Root
+      // 6_Parm:= 2_Fun __Con_Scalar
+      // 4_RPC := 2_Fun __Con_1     
       // 5_Unr := +:Flt  +:Int
-      // 3_Call:= 2_Fun 5_Unr __Con_3 6_Parm
+      // 3_Call:= 2_Fun 5_Unr __Con_3 6_Parm  // typerr if Scalar is e.g. String
       // 1_Ret := 2_Fun 3_Call 4_RPC  #1
       // foo->1_Ret
-      // 7_Call:= 0_Root 1_Ret __Con_2
-      // Parser: 7_Call
+      
+      // Call of Unr - resolves 3 fine, but type-var unify parm with either I or F.
+      // So instead, force inline which requires Fun get cloned:
       //
-      //
-      // 10_Fun :=  _    0_Root  "foo"
-      // 11_Parm:=10_Fun __Con_Int
-      // 12_Call:=10_Fun 5_Unr __Con_3 11_Parm
-      // 9_Ret := 10_Fun 12_Call X_RPC #95
-      // 8_Unr := 1_Ret 9_Ret
-      // foo->8_Unr
+      // Fun / Parm_Int64 / RPC / Call(+Int,3  ,Int64) / Ret:Int64
+      // Fun / Parm_Flt64 / RPC / Call(+Flt,3.0,Flt64) / Ret:Flt64
+      // foo-> { Fun_Int64, Fun_Flt64, Fun_Scalar\I\F }
+
+      // Want to allow all e.g. scalars minus int64 minus flt64
+      // Want to break foo into 3 functions, those taking int, those taking flt, and all-the-rest
+
+      // 
+      
       return new RetNode( fun, rez, rpc, _cidx );
     }
 
