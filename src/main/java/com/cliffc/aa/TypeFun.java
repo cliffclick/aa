@@ -44,6 +44,7 @@ public class TypeFun extends Type {
   @Override protected TypeFun xdual() { return new TypeFun((TypeTuple)_ts.dual(),_ret.dual()); }
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
+    case TCONTROL:
     case TTUPLE:           return ALL;
     case TFLT:  case TINT: return Type.SCALAR;
     case TFUN:             break;
@@ -51,6 +52,7 @@ public class TypeFun extends Type {
     }
     TypeFun tf = (TypeFun)t;
     Type targs = _ts.meet(tf._ts);
+    if( !(targs instanceof TypeTuple) ) return Type.SCALAR;
     Type ret = _ret.join(tf._ret); // Notice JOIN, Functions are contravariant
     // Make a new signature
     return make((TypeTuple)targs,ret);

@@ -30,6 +30,13 @@ public class ScopeNode extends Node {
     add_def(val);
     return val;
   }
+  
+  // Update the current Scope name
+  public Node update( String name, Node val, GVNGCM gvn ) {
+    int idx = _vals.get(name); // NPE if name does not exist
+    set_def(idx,val,gvn);
+    return val;
+  }
 
   @Override String str() { return "scope"; }
   @Override public String toString() { return "scope"; } // TODO: print with names

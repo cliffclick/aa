@@ -3,7 +3,8 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.*;
 import com.cliffc.aa.util.SB;
 
-// Function parameter node; just a pass-thru
+// Function parameter node; just a pass-thru.
+// TODO: Merge with PhiNode
 public class ParmNode extends Node {
   final int _idx;               // Parameter index, 1-based
   final String _name;           // Parameter name

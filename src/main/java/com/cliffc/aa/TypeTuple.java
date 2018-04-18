@@ -20,6 +20,7 @@ public class TypeTuple extends Type {
     TypeTuple t = (TypeTuple)o;
     if( _hash != t._hash ) return false;
     if( _ts == t._ts ) return true;
+    if( _ts.length != t._ts.length ) return false;
     for( int i=0; i<_ts.length; i++ )
       if( _ts[i]!=t._ts[i] ) return false;
     return true;
@@ -47,7 +48,8 @@ public class TypeTuple extends Type {
           static final TypeTuple INT64_INT64 = make(TypeInt.INT64,TypeInt.INT64);
           static final TypeTuple FLT64_FLT64 = make(TypeFlt.FLT64,TypeFlt.FLT64);
   private static final TypeTuple FLT64_INT64 = make(TypeFlt.FLT64,TypeInt.INT64);
-  static final TypeTuple[] TYPES = new TypeTuple[]{SCALAR,INT32,INT64,FLT64,INT64_INT64,FLT64_FLT64,FLT64_INT64};
+  public  static final TypeTuple IF_CTRL = make(Type.CONTROL,Type.CONTROL);
+  static final TypeTuple[] TYPES = new TypeTuple[]{SCALAR,INT32,INT64,FLT64,INT64_INT64,FLT64_FLT64,FLT64_INT64,IF_CTRL};
   
   // The length of Tuples is a constant, and so is its own dual.  Otherwise
   // just dual each element.
@@ -97,5 +99,10 @@ public class TypeTuple extends Type {
   @Override protected boolean canBeConst() {
     for( Type _t : _ts ) if( _t.canBeConst() ) return true;
     return false;
+  }
+  // True if all internals is_con
+  @Override public boolean is_con() {
+    for( Type _t : _ts ) if( !_t.is_con() ) return false;
+    return true;
   }
 }

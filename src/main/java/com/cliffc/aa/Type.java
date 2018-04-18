@@ -145,7 +145,7 @@ public class Type {
     if(   _type == TANY ) return t   ;
     if( t._type == TANY ) return this;
     // Control can only meet Control or Top
-    if( _type == TCONTROL || t._type == TCONTROL ) { assert _type == t._type; return CONTROL; }
+    if( _type == TCONTROL || t._type == TCONTROL ) { return _type == t._type ? CONTROL : ALL; }
 
     // The rest of these choices are various scalars, which do not match well
     // with any tuple.
@@ -296,6 +296,7 @@ public class Type {
   public boolean is_con() {
     switch( _type ) {
     case TALL:
+    case TCONTROL:
     case TSCALAR:
     case TNUM:
     case TREAL:

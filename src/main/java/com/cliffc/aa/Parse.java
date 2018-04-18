@@ -10,7 +10,8 @@ import java.text.ParsePosition;
  *
  *  GRAMMAR:
  *  prog = stmt END
- *  stmt = [id =]* expr [; stmt]* // ids must not exist, and are available in later statements
+ *  stmt = [id =]* ifex [; stmt]* // ids must not exist, and are available in later statements
+ *  ifex = expr ? expr : expr   // trinary logic
  *  expr = term [binop term]*   // gather all the binops and sort by prec
  *  term = nfact                // No function call
  *  term = nfact ( [expr,]* )+  // One or more function calls in a row, args are delimited
@@ -30,7 +31,6 @@ import java.text.ParsePosition;
 public class Parse {
   private final String _src;            // Source for error messages; usually a file name
   private Env _e;                       // Lookup context; pushed and popped as scopes come and go
-  private Node _ctrl;                   // Current control
   private final byte[] _buf;            // Bytes being parsed
   private int _x;                       // Parser index
   private int _line;                    // Zero-based line number
@@ -45,7 +45,6 @@ public class Parse {
     _src = src;
     _line= 0;
     _e   = env;
-    _ctrl= env.lookup(" control ");
     _buf = str.getBytes();
     _x   = 0;
 
@@ -81,17 +80,35 @@ public class Parse {
       if( _e.lookup(tok)!=null ) throw err("Cannot re-assign ref '"+tok+"'");
       toks.add(tok);
     }
-    Node expr = expr();
-    if( expr == null ) {
-      if( toks._len > 0 ) throw err("Missing expr after assignment of '"+toks.last()+"'");
+    Node ifex = ifex();
+    if( ifex == null ) {
+      if( toks._len > 0 ) throw err("Missing ifex after assignment of '"+toks.last()+"'");
       else return null;
     }
     for( String tok : toks )
-      if( _e.lookup(tok)!=null ) throw err(expr,"Cannot re-assign ref '"+tok+"'");
-      else _e.add(tok,expr);
+      if( _e.lookup(tok)!=null ) throw err(ifex,"Cannot re-assign ref '"+tok+"'");
+      else _e.add(tok,ifex);
     while( peek(';') )
-      expr = stmt();
-    return expr;
+      ifex = stmt();
+    return ifex;
+  }
+  
+  /** Parse an if-expression, with lazy eval on the branches.
+   *  ifex = expr ? expr : expr
+   *  @return Node does NOT need gvn() */
+  private Node ifex() {
+    Node expr = expr();
+    if( expr == null ) return null; // Expr is required, so missing expr implies not any ifex
+    if( !peek('?') ) return expr;   // No if-expression
+    Node ifex = gvn(new IfNode(ctrl(),expr));
+    Node tc = set_ctrl(gvn(new  TrueNode(ifex)));
+    Node t = expr();
+    if( t == null ) throw AA.unimpl();
+    Node fc = set_ctrl(gvn(new FalseNode(ifex)));
+    Node f = expr();
+    if( f == null ) throw AA.unimpl();
+    set_ctrl(init(new RegionNode(null,tc,fc)));
+    return gvn(new PhiNode(ctrl(),t,f));
   }
   
   /** Parse an expression, a list of terms and infix operators
@@ -127,7 +144,7 @@ public class Parse {
           Node fun = funs.at(i);
           assert fun.op_prec() <= max;
           if( fun.op_prec() < max ) continue; // Not yet
-          args.set_def(i-1,gvn(new CallNode(_ctrl,fun,args.at(i-1),args.at(i))),_gvn);
+          args.set_def(i-1,gvn(new CallNode(ctrl(),fun,args.at(i-1),args.at(i))),_gvn);
           funs.remove(i);  args.remove(i);  i--;
         }
         max--;
@@ -147,7 +164,7 @@ public class Parse {
     if( skipWS() == -1 ) return fun; // Just the original term
     // Function application; parse out the argument list
     try( CallNode args = new CallNode() ) {
-      args.add_def(_ctrl);
+      args.add_def(ctrl());
       args.add_def(fun);
       if( peek('(') ) {               // Traditional fcn application
         if( _gvn.type(fun).ret() == null )
@@ -190,7 +207,7 @@ public class Parse {
         Node arg = nfact(); // Recursive call
         if( arg == null )
           throw err(unifun,"Call to unary function '"+uni+"', but missing the one required argument");
-        return gvn(new CallNode(_ctrl,unifun,arg));
+        return gvn(new CallNode(ctrl(),unifun,arg));
       } else {
         _x=oldx;                // Unwind token parse and try again for a factor
         if( unifun != null && unifun._uses._len==0 )
@@ -252,6 +269,8 @@ public class Parse {
       ids.add(tok);
     }
     FunNode fun = (FunNode)init(new FunNode(TypeFun.any(ids._len)));
+    Node old_ctrl = ctrl();
+    set_ctrl(fun);
     try( Env e = new Env(_e) ) {// Nest an environment for the local vars
       _e = e;                   // Push nested environment
       int cnt=0;                // Add parameters to local environment
@@ -262,6 +281,8 @@ public class Parse {
       _e = _e._par;             // Pop nested environment
       require('}');
       return ret;               // Return function
+    } finally {
+      set_ctrl(old_ctrl);
     }
   }
   
@@ -327,7 +348,9 @@ public class Parse {
 
   private Node gvn (Node n) { return n==null ? null : _gvn.xform(n); }
   private Node init(Node n) { return n==null ? null : _gvn.init (n); }
-  
+  private Node ctrl() { return _e._scope.get(" control "); }
+  // Set a new control, return new
+  private Node set_ctrl(Node n) { return _e._scope.update(" control ",n,_gvn); }
 
   // Handy for the debugger to print 
   @Override public String toString() { return new String(_buf,_x,_buf.length-_x); }

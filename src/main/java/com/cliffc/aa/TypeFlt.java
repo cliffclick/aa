@@ -41,6 +41,7 @@ public class TypeFlt extends Type {
     case TFLT:   break;
     case TINT:   return ((TypeInt)t).xmeetf(this);
     case TFUN:   return Type.SCALAR;
+    case TCONTROL:
     case TTUPLE: return Type.ALL;
     default: throw typerr(t);
     }
