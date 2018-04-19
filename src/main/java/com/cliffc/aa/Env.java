@@ -8,7 +8,7 @@ import java.util.BitSet;
 
 public class Env implements AutoCloseable {
   final Env _par;
-  final ScopeNode _scope; // Lexical anchor; goes when this environment leaves scope
+  ScopeNode _scope; // Lexical anchor; goes when this environment leaves scope
   Node _ret;   // Return result
   Env( Env par ) {
     _par=par;

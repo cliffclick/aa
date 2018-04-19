@@ -17,10 +17,13 @@ public abstract class PrimNode extends Node {
   public final String[] _args;  // Handy
   PrimNode( String name, String[] args, TypeFun tf, Node... nodes ) { super(OP_PRIM,nodes); _name=name; _args=args; _tf = tf; }
   
+  final static String[] ARGS0 = new String[]{};
   final static String[] ARGS1 = new String[]{"x"};
   final static String[] ARGS2 = new String[]{"x","y"};
 
   public static PrimNode[] PRIMS = new PrimNode[] {
+    new    RandI64(),
+    
     new ConvertInt32Flt64(),
 
     new MinusFlt64(),
@@ -34,6 +37,7 @@ public abstract class PrimNode extends Node {
     new   AddInt64(),
     new   SubInt64(),
     new   MulInt64(),
+
   };
 
   // Loss-less conversions only
@@ -145,3 +149,11 @@ class MulInt64 extends Prim2OpI64 {
   long op( long l, long r ) { return l*r; }
   @Override public int op_prec() { return 6; }
 }
+
+class RandI64 extends PrimNode {
+  RandI64() { super("math_rand",PrimNode.ARGS0,TypeFun.make(TypeTuple.EMPTY,TypeInt.INT64)); }
+  @Override public TypeInt apply( Type[] args ) { return TypeInt.con(new java.util.Random().nextLong()); }
+  @Override public Type value(GVNGCM gvn) { return TypeInt.INT64; }
+  public boolean is_lossy() { return false; }
+}
+

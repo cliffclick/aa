@@ -31,6 +31,7 @@ public class TypeInt extends Type {
   static public final TypeInt  INT64 = make(-1,64,0);
   static public final TypeInt  INT32 = make(-1,32,0);
   static public final TypeInt  INT16 = make(-1,16,0);
+  static public final TypeInt  INT8  = make(-1, 8,0);
   static public final TypeInt  BOOL  = make(-1, 1,0);
   static public final TypeInt TRUE   = make( 0, 1,1);
   static public final TypeInt FALSE  = make( 0, 1,0);
@@ -78,7 +79,7 @@ public class TypeInt extends Type {
   private static TypeInt sz( int log ) {
     switch( log ) {
     case 1:
-    case 8:
+    case 8:  return TypeInt.INT8 ;
     case 16: return TypeInt.INT16;
     case 32: return TypeInt.INT32;
     case 64: return TypeInt.INT64;

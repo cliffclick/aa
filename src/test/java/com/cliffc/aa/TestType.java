@@ -45,7 +45,7 @@ public class TestType {
     // Syntax for variable assignment
     test("x=1", TypeInt.TRUE);
     test("x=y=1", TypeInt.TRUE);
-    testerr("x=y=", "Missing ifex after assignment of 'y'","    ");
+    testerr("x=y=", "Missing expr after assignment of 'y'","    ");
     testerr("x=y" , "Unknown ref 'y'","   ");
     testerr("x=1+y","Unknown ref 'y'","     ");
     test("x=2; y=x+1; x*y", TypeInt.con(6));
@@ -59,15 +59,16 @@ public class TestType {
 
     // Conditional:
     test("0 ? 2 : 3",TypeInt.con(3)); // false
-    //test("2?2:3",TestInt.con(2)); // true
-    //testerr("0?x=2:3;x","x only defined on one side of conditional, so not available after");
-    //test   ("2?x=2:3;x",TestInt.con(2)); // off-side is constant-dead, so missing x-assign ignored
-    //testerr("math.rand(1)?x=2:3;x","off-side is NOT constant-dead, so x must be assigned both branches");
-    //testerr("math.rand(1)?x=2:3;4",TypeInt.con(4)); // x-defined on 1 side only, but not used thereafter
-    //testerr("2?x=2:y","off-side is dead, so missing y-ref ignored");
-    //test("2?x=2:x=3;x",TestInt.con(2)); // x defined on both arms, so available below
-    //testerr("x=1;2?x=2:x=3;x","re-assign x not allowed");
-    //test("x=1;2?2:x=3;x",TypeInt.con(1)); // Re-assigned allowed & ignored in dead branch
+    test("2 ? 2 : 3",TypeInt.con(2)); // true
+    test("math_rand(1)?x=4:x=3;x",TypeInt.INT8); // x defined on both arms, so available after
+    test("math_rand(1)?x=2:3;4",TypeInt.con(4)); // x-defined on 1 side only, but not used thereafter
+    test("math_rand(1)?y=2;x=y*y:x=3;x",TypeInt.BOOL); // x defined on both arms, so available after, while y is not
+    testerr("math_rand(1)?x=2:3;x","off-side is NOT constant-dead, so x must be assigned both branches","");
+    testerr("0?x=2:3;x","x only defined on one side of conditional, so not available after","        ");
+    test   ("2?x=2:3;x",TypeInt.con(2)); // off-side is constant-dead, so missing x-assign ignored
+    testerr("2?x=2:y","off-side is dead, so missing y-ref ignored","");
+    testerr("x=1;2?x=2:x=3;x","re-assign x not allowed","");
+    test("x=1;2?2:x=3;x",TypeInt.con(1)); // Re-assigned allowed & ignored in dead branch
     
     // TODO: Needs overload cloning/inlining to resolve {+}
     //test("x=3; fun={y -> x+y}; fun(2)", TypeInt.con(5)); // capture external variable

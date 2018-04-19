@@ -37,7 +37,7 @@ public class TypeTuple extends Type {
     return t1==t2 ? t1 : t2.free(t1);
   }
 
-          static final TypeTuple  EMPTY  = make();
+  public  static final TypeTuple  EMPTY  = make();
           static final TypeTuple  SCALAR = make(Type. SCALAR);
           static final TypeTuple  SCALAR2= make(Type. SCALAR, Type. SCALAR);
           static final TypeTuple XSCALAR1= make(Type.XSCALAR);

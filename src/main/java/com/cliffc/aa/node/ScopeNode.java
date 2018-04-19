@@ -38,6 +38,40 @@ public class ScopeNode extends Node {
     return val;
   }
 
+  /** Return a ScopeNode with all the variable indices at or past the idx.
+   *  @param idx index to split on
+   *  @return a ScopeNode with the higher indices; 'this' has the lower indices.  null if no new vars
+   */
+  public ScopeNode split( int idx ) {
+    int oldlen = _defs._len;
+    if( idx == oldlen ) return null; // No vars, no return
+    ScopeNode s = new ScopeNode();
+    while( _defs._len > idx )
+      for( String name : _vals.keySet() )
+        if( _vals.get(name)==_defs._len-1 ) {
+          s.add(name,_defs.pop());
+          _vals.remove(name);
+          break;
+        }
+    assert _defs._len+s._defs._len==oldlen;
+    return s;
+  }
+
+  // Add PhiNodes and variable mappings for common definitions
+  public void common( Node ctrl, ScopeNode t, ScopeNode f, GVNGCM gvn ) {
+    if( t!=null && f!=null ) {  // Might have some variables in common
+      for( String name : t._vals.keySet() ) {
+        Integer fii =  f._vals.get(name);
+        if( fii==null ) continue;
+        Node tn = t.at(t._vals.get(name));
+        Node fn = f.at(fii);
+        add(name,gvn.xform(new PhiNode(ctrl,tn,fn)));
+      }
+    }
+    if( t!=null ) gvn.kill_new(t);
+    if( f!=null ) gvn.kill_new(f);
+  }
+  
   @Override String str() { return "scope"; }
   @Override public String toString() { return "scope"; } // TODO: print with names
   @Override public Node ideal(GVNGCM gvn) { return null; }

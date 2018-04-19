@@ -8,7 +8,8 @@ Not really a language, as much as a stream of consciousness puking of language d
 GRAMMAR
 -------
 
-*  prog = stmt END
+*  prog = ifex END
+*  ifex = stmt ? stmt : stmt   // trinary logic
 *  stmt = [id =]* expr [; stmt]* // ids must not exist, and are available in later statements
 *  expr = term [binop term]*   // gather all the binops and sort by prec
 *  term = nfact                // No function call

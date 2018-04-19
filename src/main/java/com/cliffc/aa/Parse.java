@@ -9,9 +9,9 @@ import java.text.ParsePosition;
 /** an implementation of language AA
  *
  *  GRAMMAR:
- *  prog = stmt END
- *  stmt = [id =]* ifex [; stmt]* // ids must not exist, and are available in later statements
- *  ifex = expr ? expr : expr   // trinary logic
+ *  prog = ifex END
+ *  ifex = stmt ? stmt : stmt   // trinary logic
+ *  stmt = [id =]* expr [; stmt]* // ids must not exist, and are available in later statements
  *  expr = term [binop term]*   // gather all the binops and sort by prec
  *  term = nfact                // No function call
  *  term = nfact ( [expr,]* )+  // One or more function calls in a row, args are delimited
@@ -59,14 +59,42 @@ public class Parse {
   Node go( ) { return prog(); }
 
   /** Parse a top-level:
-   *  prog = stmt END */
+   *  prog = ifex END */
   private Node prog() {
     // Currently only supporting exprs
-    Node res = stmt();
+    Node res = ifex();
     if( skipWS() != -1 ) throw err("Syntax error; trailing junk");
     return res;
   }
 
+  /** Parse an if-expression, with lazy eval on the branches.  Assignments to
+   *  new variables are allowed in either arm, and variables assigned on all
+   *  live arms are available afterwards.
+   *  ifex = stmt ? stmt : stmt
+   *  @return Node does NOT need gvn() */
+  private Node ifex() {
+    Node stmt = stmt();
+    if( stmt == null ) return null; // Stmt is required, so missing stmt implies not any ifex
+    if( !peek('?') ) return stmt;   // No if-expression
+    try( TmpNode ctrls = new TmpNode() ) {
+      int vidx = _e._scope._defs._len; // Set of live variables
+      Node ifex = gvn(new IfNode(ctrl(),stmt));
+      ctrls.add_def(ifex);      // Keep alive, even if 1st Proj kills last use, so 2nd Proj can hook
+      ctrls.add_def(set_ctrl(gvn(new ProjNode(ifex,1))));
+      Node t = stmt();
+      if( t == null ) throw AA.unimpl();
+      ScopeNode t_scope = _e._scope.split(vidx); // Split out the new vars on the true side
+      require(':');
+      ctrls.add_def(set_ctrl(gvn(new ProjNode(ifex,0))));
+      Node f = stmt();
+      if( f == null ) throw AA.unimpl();
+      ScopeNode f_scope = _e._scope.split(vidx); // Split out the new vars on the false side
+      set_ctrl(init(new RegionNode(null,ctrls.at(1),ctrls.at(2))));
+      _e._scope.common(ctrl(),t_scope,f_scope,_gvn); // Add a PhiNode for all commonly defined variables
+      return gvn(new PhiNode(ctrl(),t,f));      // Add a PhiNode for the result
+    }
+  }
+  
   /** Parse an expression, a list of terms and infix operators
    *  stmt = [id =]* expr [; stmt]* // ids must not exist, and are available in later statements
    *  @return Node does NOT need gvn() */
@@ -80,39 +108,17 @@ public class Parse {
       if( _e.lookup(tok)!=null ) throw err("Cannot re-assign ref '"+tok+"'");
       toks.add(tok);
     }
-    Node ifex = ifex();
-    if( ifex == null ) {
-      if( toks._len > 0 ) throw err("Missing ifex after assignment of '"+toks.last()+"'");
+    Node expr = expr();
+    if( expr == null ) {
+      if( toks._len > 0 ) throw err("Missing expr after assignment of '"+toks.last()+"'");
       else return null;
     }
     for( String tok : toks )
-      if( _e.lookup(tok)!=null ) throw err(ifex,"Cannot re-assign ref '"+tok+"'");
-      else _e.add(tok,ifex);
+      if( _e.lookup(tok)!=null ) throw err(expr,"Cannot re-assign ref '"+tok+"'");
+      else _e.add(tok,expr);
     while( peek(';') )
-      ifex = stmt();
-    return ifex;
-  }
-  
-  /** Parse an if-expression, with lazy eval on the branches.
-   *  ifex = expr ? expr : expr
-   *  @return Node does NOT need gvn() */
-  private Node ifex() {
-    Node expr = expr();
-    if( expr == null ) return null; // Expr is required, so missing expr implies not any ifex
-    if( !peek('?') ) return expr;   // No if-expression
-    try( TmpNode ctrls = new TmpNode() ) {
-      Node ifex = gvn(new IfNode(ctrl(),expr));
-      ctrls.add_def(ifex);      // Keep alive, even if 1st Proj kills last use, so 2nd Proj can hook
-      ctrls.add_def(set_ctrl(gvn(new ProjNode(ifex,1))));
-      Node t = expr();
-      if( t == null ) throw AA.unimpl();
-      require(':');
-      ctrls.add_def(set_ctrl(gvn(new ProjNode(ifex,0))));
-      Node f = expr();
-      if( f == null ) throw AA.unimpl();
-      set_ctrl(init(new RegionNode(null,ctrls.at(1),ctrls.at(2))));
-      return gvn(new PhiNode(ctrl(),t,f));
-    }
+      expr = stmt();
+    return expr;
   }
   
   /** Parse an expression, a list of terms and infix operators
