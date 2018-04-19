@@ -11,14 +11,27 @@ public class ProjNode extends Node {
       return _idx==0 ? "False" : "True";
     return "Proj_"+_idx;
   }
-  @Override public Node ideal(GVNGCM gvn) { return null; }
-  @Override public Type value(GVNGCM gvn) {
+  @Override public Node ideal(GVNGCM gvn) {
+    // If this value is ANY, then this is dead and becomes an ANY
+    if( value(gvn)==Type.ANY ) return gvn.con(Type.ANY);
+    // If the control type is a tuple with a single CONTROL and we are that
+    // CONTROL - we become the CONTROL's CONTROL.
     Type c = gvn.type(at(0));
-    if( c==Type.ANY ) return Type.ANY;
     if( !(c instanceof TypeTuple) )
       throw AA.unimpl();
     TypeTuple cs = (TypeTuple)c;
-    return cs._ts[_idx];
+    for( int i=0; i<cs._ts.length; i++ )
+      if( i!=_idx && cs._ts[i]!=Type.ANY ) // Some output (other than this) alive?
+        return null;            // Some other output is alive also
+    return at(0).at(0);         // We become the dominate control, and the parent test is dead
+  }
+  @Override public Type value(GVNGCM gvn) {
+    Type c = gvn.type(at(0));
+    if( c==Type.ANY ) return Type.ANY; // Handle totally dead input
+    if( !(c instanceof TypeTuple) )
+      throw AA.unimpl();
+    TypeTuple cs = (TypeTuple)c;
+    return cs._ts[_idx]; // Otherwise our type is just the matching tuple slice
   }
   @Override public Type all_type() { return Type.CONTROL; }
   @Override public int hashCode() { return super.hashCode()+_idx; }

@@ -41,7 +41,7 @@ public class ScopeNode extends Node {
   @Override String str() { return "scope"; }
   @Override public String toString() { return "scope"; } // TODO: print with names
   @Override public Node ideal(GVNGCM gvn) { return null; }
-  @Override public Type value(GVNGCM gvn) { return Type.ALL; }
+  @Override public Type value(GVNGCM gvn) { return Type.CONTROL; }
   // ScopeNodes are never equal
   @Override public boolean equals(Object o) { return this==o; }
   @Override public int hashCode() { return 123456789; }

@@ -102,6 +102,7 @@ public class Parse {
     if( !peek('?') ) return expr;   // No if-expression
     try( TmpNode ctrls = new TmpNode() ) {
       Node ifex = gvn(new IfNode(ctrl(),expr));
+      ctrls.add_def(ifex);      // Keep alive, even if 1st Proj kills last use, so 2nd Proj can hook
       ctrls.add_def(set_ctrl(gvn(new ProjNode(ifex,1))));
       Node t = expr();
       if( t == null ) throw AA.unimpl();
@@ -109,7 +110,7 @@ public class Parse {
       ctrls.add_def(set_ctrl(gvn(new ProjNode(ifex,0))));
       Node f = expr();
       if( f == null ) throw AA.unimpl();
-      set_ctrl(init(new RegionNode(null,ctrls.at(0),ctrls.at(1))));
+      set_ctrl(init(new RegionNode(null,ctrls.at(1),ctrls.at(2))));
       return gvn(new PhiNode(ctrl(),t,f));
     }
   }

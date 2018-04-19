@@ -1,7 +1,7 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.*;
-import com.cliffc.aa.util.SB;
+import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.Type;
 
 // Merge results
 public class RegionNode extends Node {

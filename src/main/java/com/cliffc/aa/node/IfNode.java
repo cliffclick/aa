@@ -7,7 +7,7 @@ public class IfNode extends Node {
   public IfNode( Node ctrl, Node pred ) { super(OP_IF,ctrl,pred); }
   @Override String str() { return "If"; }
   @Override public Node ideal(GVNGCM gvn) { return null; }
-  @Override public Type value(GVNGCM gvn) {
+  @Override public TypeTuple value(GVNGCM gvn) {
     // If the input is exactly  zero, we can return false: {ANY,CONTROL}
     // If the input is excludes zero, we can return true : {CONTROL,ANY}
     // If the input is excludes both, we can return ANY:   {ANY,ANY}
