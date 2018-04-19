@@ -18,10 +18,9 @@ public abstract class Node implements Cloneable {
   static final byte OP_TMP  = 8;
   static final byte OP_UNR  = 9;
   static final byte OP_IF   =10;
-  static final byte OP_TRUE =11;
-  static final byte OP_FALSE=12;
-  static final byte OP_REGION=13;
-  static final byte OP_PHI  =14;
+  static final byte OP_PROJ =11;
+  static final byte OP_REGION=12;
+  static final byte OP_PHI  =13;
   
   public int _uid=Env._gvn.uid(); // Unique ID, will have gaps, used to give a dense numbering to nodes
   public final byte _op;

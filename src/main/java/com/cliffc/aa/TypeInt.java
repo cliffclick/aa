@@ -34,7 +34,8 @@ public class TypeInt extends Type {
   static public final TypeInt  BOOL  = make(-1, 1,0);
   static public final TypeInt TRUE   = make( 0, 1,1);
   static public final TypeInt FALSE  = make( 0, 1,0);
-  static final TypeInt[] TYPES = new TypeInt[]{INT64,INT32,INT16,BOOL,TRUE,FALSE};
+  static public final TypeInt XINT1  = make( 1, 1,0);
+  static final TypeInt[] TYPES = new TypeInt[]{INT64,INT32,INT16,BOOL,TRUE,FALSE,XINT1};
   // Return a long from a TypeInt constant; assert otherwise.
   @Override public long getl() { assert is_con(); return _con; }
 

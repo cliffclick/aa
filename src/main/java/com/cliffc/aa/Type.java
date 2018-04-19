@@ -241,6 +241,7 @@ public class Type {
   }
   
   // True if 'this' isa/subtypes 't'.  E.g. Int32-isa-Int64, but not vice-versa
+  // E.g. ANY-isa-XSCALAR; XSCALAR-isa-XREAL; XREAL-isa-Int(Any); Int(Any)-isa-Int(3)
   public boolean isa( Type t ) { return meet(t)==t; }
   // True if 'this' isa SCALAR, without the cost of a full 'meet()'
   final boolean isa_scalar() {

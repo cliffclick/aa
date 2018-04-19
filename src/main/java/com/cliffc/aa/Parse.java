@@ -100,15 +100,18 @@ public class Parse {
     Node expr = expr();
     if( expr == null ) return null; // Expr is required, so missing expr implies not any ifex
     if( !peek('?') ) return expr;   // No if-expression
-    Node ifex = gvn(new IfNode(ctrl(),expr));
-    Node tc = set_ctrl(gvn(new  TrueNode(ifex)));
-    Node t = expr();
-    if( t == null ) throw AA.unimpl();
-    Node fc = set_ctrl(gvn(new FalseNode(ifex)));
-    Node f = expr();
-    if( f == null ) throw AA.unimpl();
-    set_ctrl(init(new RegionNode(null,tc,fc)));
-    return gvn(new PhiNode(ctrl(),t,f));
+    try( TmpNode ctrls = new TmpNode() ) {
+      Node ifex = gvn(new IfNode(ctrl(),expr));
+      ctrls.add_def(set_ctrl(gvn(new ProjNode(ifex,1))));
+      Node t = expr();
+      if( t == null ) throw AA.unimpl();
+      require(':');
+      ctrls.add_def(set_ctrl(gvn(new ProjNode(ifex,0))));
+      Node f = expr();
+      if( f == null ) throw AA.unimpl();
+      set_ctrl(init(new RegionNode(null,ctrls.at(0),ctrls.at(1))));
+      return gvn(new PhiNode(ctrl(),t,f));
+    }
   }
   
   /** Parse an expression, a list of terms and infix operators

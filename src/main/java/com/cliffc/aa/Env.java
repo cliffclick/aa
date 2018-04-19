@@ -8,9 +8,14 @@ import java.util.BitSet;
 
 public class Env implements AutoCloseable {
   final Env _par;
-  final ScopeNode _scope = new ScopeNode(); // Lexical anchor; goes when this environment leaves scope
+  final ScopeNode _scope; // Lexical anchor; goes when this environment leaves scope
   Node _ret;   // Return result
-  Env( Env par ) { _par=par; }//TODO: Add " control " to the new scopenode
+  Env( Env par ) {
+    _par=par;
+    _scope = new ScopeNode();
+    // Copy control thru from parent
+    if( par != null ) add(" control ",par._scope.get(" control "));
+  }
 
   public final static GVNGCM _gvn = new GVNGCM(false); // Pessimistic GVN, defaults to ALL, lifts towards ANY
   private final static Env TOP = new Env(null);        // Top-most lexical Environment
