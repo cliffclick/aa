@@ -2,6 +2,7 @@ package com.cliffc.aa;
 
 import com.cliffc.aa.node.*;
 import com.cliffc.aa.node.UnresolvedNode;
+import com.cliffc.aa.util.Ary;
 
 import java.lang.AutoCloseable;
 import java.util.BitSet;
@@ -55,7 +56,7 @@ public class Env implements AutoCloseable {
   // anything only pointed at by this scope).
   @Override public void close() {
     assert check_live(_gvn._live);
-    _gvn.kill_new(_scope);
+    _gvn.kill0(_scope);
   }
 
   // Check all reachable via graph-walk equals recorded live bits
@@ -75,6 +76,11 @@ public class Env implements AutoCloseable {
     return _par == null ? bs : _par.check_live0(bs);
   }
 
+  Ary<String> gather_errs(GVNGCM gvn) {
+    assert _par==null;          // Top-level only
+    return _scope.walkerr(null,new BitSet(),gvn);
+  }
+  
   // Test support, return top-level token type
   static Type lookup_type( String token ) { return _gvn.type(TOP.lookup(token)); }
   

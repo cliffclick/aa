@@ -56,17 +56,30 @@ public class Parse {
     _gvn = Env._gvn;     // Pessimistic during parsing
   }
   // Parse the string in the given lookup context, and return an executable program
-  Node go( ) { return prog(); }
+  TypeEnv go( ) { return prog(); }
 
   /** Parse a top-level:
    *  prog = ifex END */
-  private Node prog() {
+  private TypeEnv prog() {
     // Currently only supporting exprs
     Node res = stmt();
-    if( skipWS() != -1 ) throw err("Syntax error; trailing junk");
-    if( _gvn.type(res) instanceof TypeErr )
-      throw new IllegalArgumentException(((TypeErr)_gvn.type(res))._msg);
-    return res;
+    if( skipWS() != -1 ) res = err_ctrl("Syntax error; trailing junk", con(Type.ANY) );
+    _e._scope.add_def(res);     // Hook, so not deleted
+    _gvn.iter();    // Pessimistic optimizations; might improve error situation
+    res = _e._scope.pop(); // New and improved result
+
+    // TODO: Optimistic Pass Goes Here, to improve error situation
+
+    // Result type
+    Type tres = _gvn.type(res);
+    kill(res);
+
+    // Gather errors
+    Env par = _e._par;
+    Ary<String> errs = par.gather_errs(_gvn);
+    if( tres instanceof TypeErr ) // Result can be an error, even if no c-flow has an error
+      errs = add_err(errs,((TypeErr)tres)._msg); // One more error
+    return new TypeEnv(tres,_e,errs);
   }
 
   /** Parse a list of statements.  A statement is a list of variables to
@@ -85,16 +98,12 @@ public class Parse {
     }
     Node ifex = ifex();
     if( ifex == null ) {
-      if( toks._len > 0 ) throw err("Missing ifex after assignment of '"+toks.last()+"'");
+      if( toks._len > 0 ) return err_ctrl("Missing ifex after assignment of '"+toks.last()+"'", con(Type.ANY));
       else return null;
     }
     for( String tok : toks )
       if( _e.lookup(tok)==null ) _e.add(tok,ifex);
-      else {
-        kill(ifex);             // Kill old return value
-        ifex = _gvn.con(TypeErr.make(errMsg("Cannot re-assign ref '"+tok+"'")));
-        _e._scope.update(tok,ifex,_gvn); // Both var assigned and return value are error
-      }
+      else err_ctrl("Cannot re-assign ref '"+tok+"'",null);
     while( peek(';') ) {   // Another expression?
       kill(ifex);          // prior expression result no longer alive in parser
       ifex = stmt();
@@ -115,16 +124,18 @@ public class Parse {
       int vidx = _e._scope._defs._len; // Set of live variables
       Node ifex = gvn(new IfNode(ctrl(),expr));
       ctrls.add_def(ifex);      // Keep alive, even if 1st Proj kills last use, so 2nd Proj can hook
-      ctrls.add_def(set_ctrl(gvn(new ProjNode(ifex,1)))); // 1
-      if( ctrls.add_def(expr()) == null ) throw AA.unimpl(); // 2
+      set_ctrl(gvn(new ProjNode(ifex,1))); // Control for true branch
+      if( ctrls.add_def(expr()) == null ) throw AA.unimpl(); // 1
+      ctrls.add_def(ctrl()); // 2 - hook true-side control
       ScopeNode t_scope = _e._scope.split(vidx); // Split out the new vars on the true side
       require(':');
-      ctrls.add_def(set_ctrl(gvn(new ProjNode(ifex,0)))); // 3
-      if( ctrls.add_def(expr()) == null ) throw AA.unimpl(); // 4
+      set_ctrl(gvn(new ProjNode(ifex,0)));
+      if( ctrls.add_def(expr()) == null ) throw AA.unimpl(); // 3
+      ctrls.add_def(ctrl()); // 4 - hook false-side control
       ScopeNode f_scope = _e._scope.split(vidx); // Split out the new vars on the false side
-      set_ctrl(init(new RegionNode(null,ctrls.at(1),ctrls.at(3))));
+      set_ctrl(init(new RegionNode(null,ctrls.at(2),ctrls.at(4))));
       _e._scope.common(this,t_scope,f_scope); // Add a PhiNode for all commonly defined variables
-      _e._scope.add_def(gvn(new PhiNode(ctrl(),ctrls.at(2),ctrls.at(4)))); // Add a PhiNode for the result
+      _e._scope.add_def(gvn(new PhiNode(ctrl(),ctrls.at(1),ctrls.at(3)))); // Add a PhiNode for the result
     }
     return _e._scope.pop();
   }
@@ -149,7 +160,7 @@ public class Parse {
         Node binfun = _e.lookup_filter(bin,2); // BinOp, or null
         if( binfun==null ) { _x=oldx; break; } // Not a binop, no more Kleene star
         term = term();
-        if( term == null ) throw err("missing expr after binary op "+bin);
+        if( term == null ) term = err_ctrl("missing expr after binary op "+bin, con(Type.ANY));
         funs.add(binfun);  args.add_def(term);
       }
   
@@ -186,16 +197,16 @@ public class Parse {
       args.add_def(ctrl());
       args.add_def(fun);
       if( peek('(') ) {               // Traditional fcn application
-        if( _gvn.type(fun).ret() == null )
-          throw err("A function is being called, but "+_gvn.type(fun)+" is not a function type");
         if( (arg=stmt()) != null ) {  // Check for a no-arg fcn call
           args.add_def(arg);          // Add first arg
           while( peek(',') ) {        // Gather comma-separated args
-            if( (arg=stmt()) == null ) throw err("Missing argument in function call");
+            if( (arg=stmt()) == null ) arg = err_ctrl("Missing argument in function call", con(Type.ANY));
             args.add_def(arg);
           }
         }
         require(')'); 
+        if( _gvn.type(fun).ret() == null )
+          return err_ctrl("A function is being called, but "+_gvn.type(fun)+" is not a function type",con(Type.ANY));
       } else {                  // lispy-style fcn application
         // TODO: Unable resolve ambiguity with mixing "(fun arg0 arg1)" and
         // "fun(arg0,arg1)" argument calls.  Really having trouble with parsing
@@ -208,8 +219,10 @@ public class Parse {
         //if( args.len()==1 ) return fun; // Not a function call
       }
       Node call = gvn(args);    // No syntax errors; flag Call not auto-close
-      if( _gvn.type(call)==Type.ANY ) 
-        throw err(call,"Argument mismatch in call to " + fun);
+      if( _gvn.type(call)==Type.ANY ) {
+        kill(call);
+        return err_ctrl("Argument mismatch in call to " + fun,con(Type.ANY));
+      }
       return call;
     }
   }
@@ -224,9 +237,9 @@ public class Parse {
       Node unifun = _e.lookup_filter(uni,1);
       if( unifun != null && unifun.op_prec() > 0 )  {
         Node arg = nfact(); // Recursive call
-        if( arg == null )
-          throw err(unifun,"Call to unary function '"+uni+"', but missing the one required argument");
-        return gvn(new CallNode(ctrl(),unifun,arg));
+        return arg == null
+          ? err_ctrl("Call to unary function '"+uni+"', but missing the one required argument",null)
+          : gvn(new CallNode(ctrl(),unifun,arg));
       } else {
         _x=oldx;                // Unwind token parse and try again for a factor
         if( unifun != null ) kill(unifun); // Might be made new by the lookup_filter, but then no-good
@@ -246,7 +259,7 @@ public class Parse {
   private Node fact() {
     if( skipWS() == -1 ) return null;
     byte c = _buf[_x];
-    if( '0' <= c && c <= '9' ) return _gvn.con(number());
+    if( '0' <= c && c <= '9' ) return con(number());
     int oldx = _x;
     if( peek('(') ) {           // a nested statement
       Node s = stmt();
@@ -268,7 +281,8 @@ public class Parse {
     String tok = token0();
     if( tok == null ) return null;
     Node var = _e.lookup(tok);
-    if( var == null )  return _gvn.con(TypeErr.make(errMsg("Unknown ref '"+tok+"'")));
+    if( var == null )
+      return err_ctrl("Unknown ref '"+tok+"'",con(Type.ANY));
     // Disallow uniop and binop functions as factors.
     if( var.op_prec() > 0 ) { _x = oldx; return null; }
     return var;
@@ -293,8 +307,8 @@ public class Parse {
     try( Env e = new Env(_e) ) {// Nest an environment for the local vars
       _e = e;                   // Push nested environment
       int cnt=0;                // Add parameters to local environment
-      for( String id : ids )  _e.add(id,init(new ParmNode(++cnt,id,fun,_gvn.con(Type.SCALAR))));
-      Node rpc = _e.add(" rpc ",init(new ParmNode(ids._len+1,"$rpc",fun,_gvn.con(TypeInt.TRUE))));
+      for( String id : ids )  _e.add(id,init(new ParmNode(++cnt,id,fun,con(Type.SCALAR))));
+      Node rpc = _e.add(" rpc ",init(new ParmNode(ids._len+1,"$rpc",fun,con(TypeInt.TRUE))));
       Node rez = stmt();        // Parse function body
       Node ret = e._ret = gvn(new RetNode(fun,rez,rpc,1));
       _e = _e._par;             // Pop nested environment
@@ -333,7 +347,7 @@ public class Parse {
   // Require a specific character (after skipping WS) or polite error
   private void require( char c ) {
     if( peek(c) ) return;
-    throw err("Expected '"+c+"' but "+(_x>=_buf.length?"ran out of text":"found '"+(char)(_buf[_x])+"' instead"));
+    err_ctrl("Expected '"+c+"' but "+(_x>=_buf.length?"ran out of text":"found '"+(char)(_buf[_x])+"' instead"),null);
   }
 
   private boolean peek( char c ) {
@@ -369,11 +383,19 @@ public class Parse {
   public Node init(Node n) { return n==null ? null : _gvn.init (n); }
   public void kill(Node n) { if( n._uses._len==0 ) _gvn.kill(n); }
   public Node ctrl() { return _e._scope.get(" control "); }
-  // Set a new control, return new
+  // Set and return a new control
   private Node set_ctrl(Node n) { return _e._scope.update(" control ",n,_gvn); }
 
-  // Handy for the debugger to print 
-  @Override public String toString() { return new String(_buf,_x,_buf.length-_x); }
+  private Node con( Type t ) { return _gvn.con(t); }
+
+  // Whack current control with a syntax error
+  private Node err_ctrl(String s, Node n) { set_ctrl(gvn(new ErrNode(ctrl(),errMsg(s)))); return n; }
+
+  public static Ary<String> add_err( Ary<String> errs, String msg ) {
+    if( errs == null ) errs = new Ary<>(new String[1],0);
+    errs.add(msg);
+    return errs;
+  }
 
   // Build a string of the given message, the current line being parsed,
   // and line of the pointer to the current index.
@@ -396,9 +418,7 @@ public class Parse {
     sb.append('^').append('\n');
     return sb.toString();
   }
-  private IllegalArgumentException err(Node n, String s) {
-    kill(n);
-    return err(s);
-  }
-  private IllegalArgumentException err(String s) { return new IllegalArgumentException(errMsg(s)); }
+  // Handy for the debugger to print 
+  @Override public String toString() { return new String(_buf,_x,_buf.length-_x); }
+
 }

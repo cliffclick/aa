@@ -78,21 +78,22 @@ BUILD_BY=      (whoami | cut -d\\ -f2-)
 
 # Build the version file anytime anything would trigger the build/aa.jar
 # i.e., identical dependencies to aa.jar, except aa.jar also includes the build file
-$(CLZDIR)/main/$(AA)/BuildVersion.class: $(main_classes) src/main/manifest.txt
+$(CLZDIR)/main/$(AA)/BuildVersion.java: $(main_classes) src/main/manifest.txt
 	@echo "vrsioning " $@ " because " $?
-	@rm -f build/BuildVersion.java
+	@rm -f $@
 	@mkdir -p $(dir $@)
-	@echo "package com.cliffc.aa;"                                                        >  build/BuildVersion.java
-	@echo "public class BuildVersion extends AbstractBuildVersion {"                      >> build/BuildVersion.java
-	@echo "    public String branchName()     { return \"$(shell $(BUILD_BRANCH))\"; }"   >> build/BuildVersion.java
-	@echo "    public String lastCommitHash() { return \"$(shell $(BUILD_HASH))\"; }"     >> build/BuildVersion.java
-	@echo "    public String describe()       { return \"$(shell $(BUILD_DESCRIBE))\"; }" >> build/BuildVersion.java
-	@echo "    public String projectVersion() { return \"$(PROJECT_VERSION)\"; }"         >> build/BuildVersion.java
-	@echo "    public String compiledOn()     { return \"$(shell $(BUILD_ON))\"; }"       >> build/BuildVersion.java
-	@echo "    public String compiledBy()     { return \"$(shell $(BUILD_BY))\"; }"       >> build/BuildVersion.java
-	@echo "}"                                                                             >> build/BuildVersion.java
-	@javac $(JAVAC_ARGS) -cp "$(CLZDIR)/main$(SEP)$(jars)" -sourcepath $(SRC) -d $(CLZDIR)/main build/BuildVersion.java
-	@rm -f build/BuildVersion.java
+	@echo "package com.cliffc.aa;"                                                        >  $@
+	@echo "public class BuildVersion extends AbstractBuildVersion {"                      >> $@
+	@echo "    public String branchName()     { return \"$(shell $(BUILD_BRANCH))\"; }"   >> $@
+	@echo "    public String lastCommitHash() { return \"$(shell $(BUILD_HASH))\"; }"     >> $@
+	@echo "    public String describe()       { return \"$(shell $(BUILD_DESCRIBE))\"; }" >> $@
+	@echo "    public String projectVersion() { return \"$(PROJECT_VERSION)\"; }"         >> $@
+	@echo "    public String compiledOn()     { return \"$(shell $(BUILD_ON))\"; }"       >> $@
+	@echo "    public String compiledBy()     { return \"$(shell $(BUILD_BY))\"; }"       >> $@
+	@echo "}"                                                                             >> $@
+
+$(CLZDIR)/main/$(AA)/BuildVersion.class: $(CLZDIR)/main/$(AA)/BuildVersion.java
+	@javac $(JAVAC_ARGS) -cp "$(CLZDIR)/main$(SEP)$(jars)" -sourcepath $(SRC) -d $(CLZDIR)/main $(CLZDIR)/main/$(AA)/BuildVersion.java
 
 # Other Resources in aa.jar:
 JARBITS =

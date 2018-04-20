@@ -1,5 +1,6 @@
 package com.cliffc.aa;
+import com.cliffc.aa.util.Ary;
 public class TypeEnv {
-  final Type _t;  final Env _env;
-  TypeEnv( Type t, Env env ) { _t=t; _env=env; }
+  final Type _t;  final Env _env;  final Ary<String> _errs;
+  TypeEnv( Type t, Env env, Ary<String> errs ) { _t=t; _env=env; _errs = errs; }
 }

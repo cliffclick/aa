@@ -167,7 +167,7 @@ public class GVNGCM {
   public void kill( Node n ) {  unreg(n);  kill0(n); }
   // Version for never-GVN'd; common for e.g. constants to die early or
   // RootNode, and some other make-and-toss Nodes.
-  private void kill0( Node n ) {
+  void kill0( Node n ) {
     assert n._uses._len==0;
     for( int i=0; i<n._defs._len; i++ )
       n.set_def(i,null,this);   // Recursively destroy dead nodes

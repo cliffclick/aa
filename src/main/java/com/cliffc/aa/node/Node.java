@@ -133,8 +133,9 @@ public abstract class Node implements Cloneable {
     return true;
   }
 
+  // Liveness walk, all reachable defs
   public void walk( BitSet bs ) {
-    assert _defs != null;
+    assert !is_dead();
     if( !bs.get(_uid) ) {
       assert !is_dead();
       bs.set(_uid);
@@ -144,6 +145,20 @@ public abstract class Node implements Cloneable {
     }
   }
 
+  // Gather errors; reachable control uses only
+  public Ary<String> walkerr( Ary<String> errs, BitSet bs, GVNGCM gvn ) {
+    assert !is_dead();
+    if( bs.get(_uid) ) return errs; // Been there, done that
+    bs.set(_uid);                   // Only walk once
+    if( gvn.type(this) != Type.CONTROL )
+      return errs;                // Ignore non-control
+    if( this instanceof ErrNode ) // Gather errors
+      errs = Parse.add_err(errs,((ErrNode)this)._msg);
+    for( Node use : _uses )     // Walk control users for more errors
+      errs = use.walkerr(errs,bs,gvn);
+    return errs;
+  }
+  
   public boolean is_dead() { return _uses == null; }
   public void set_dead( ) { _defs = _uses = null; }   // TODO: Poor-mans indication of a dead node, probably needs to recycle these...
 }

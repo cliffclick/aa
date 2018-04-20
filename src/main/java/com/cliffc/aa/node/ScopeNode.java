@@ -80,12 +80,13 @@ public class ScopeNode extends Node {
     if( t!=null ) Env._gvn.kill_new(t);
     if( f!=null ) Env._gvn.kill_new(f);
   }
-  
+
   @Override String str() { return "scope"; }
   @Override public String toString() { return "scope"; } // TODO: print with names
   @Override public Node ideal(GVNGCM gvn) { return null; }
   @Override public Type value(GVNGCM gvn) { return Type.CONTROL; }
+  @Override public Type all_type() { return Type.CONTROL; }
+  @Override public int hashCode() { return 123456789; }
   // ScopeNodes are never equal
   @Override public boolean equals(Object o) { return this==o; }
-  @Override public int hashCode() { return 123456789; }
 }

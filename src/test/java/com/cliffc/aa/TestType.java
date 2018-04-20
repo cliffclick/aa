@@ -35,7 +35,7 @@ public class TestType {
     test("{-}(1  )", TypeInt.con(-1)); // unary version
     // error; mismatch arg count
     testerr("!()"       , "Call to unary function '!', but missing the one required argument"," ");
-    testerr("math_pi(1)", "A function is being called, but 3.141592653589793 is not a function type","        ");
+    testerr("math_pi(1)", "A function is being called, but 3.141592653589793 is not a function type","          ");
     testerr("{+}(1,2,3)", "Argument mismatch in call to ANY(+::Flt64 +::Int64)","          ");
     // Parsed as +(1,(2*3))
     test("{+}(1, 2 * 3) ", TypeInt.con(7));
@@ -63,11 +63,11 @@ public class TestType {
     test   ("math_rand(1)?(x=4):(x=3);x", TypeInt.INT8); // x defined on both arms, so available after
     test   ("math_rand(1)?(x=2):   3 ;4", TypeInt.con(4)); // x-defined on 1 side only, but not used thereafter
     test   ("math_rand(1)?(y=2;x=y*y):(x=3);x", TypeInt.INT8); // x defined on both arms, so available after, while y is not
-    testerr("math_rand(1)?(x=2):   3 ;x", "'x' not defined on false arm of trinary","                    ");
-    testerr("0 ? (x=2) : 3;x", "'x' not defined on false arm of trinary","         ");
+    testerr("math_rand(1)?(x=2):   3 ;x", "'x' not defined on false arm of trinary","                        ");
+    testerr("0 ? (x=2) : 3;x", "'x' not defined on false arm of trinary","             ");
     test   ("2 ? (x=2) : 3;x", TypeInt.con(2)); // off-side is constant-dead, so missing x-assign is ignored
     test   ("2 ? (x=2) : y  ", TypeInt.con(2)); // off-side is constant-dead, so missing 'y'      is ignored
-    testerr("x=1;2?(x=2):(x=3);x", "Cannot re-assign ref 'x'","                ");
+    testerr("x=1;2?(x=2):(x=3);x", "Cannot re-assign ref 'x'","          ");
     test   ("x=1;2?   2 :(x=3);x",TypeInt.con(1)); // Re-assigned allowed & ignored in dead branch
     
     // TODO: Needs overload cloning/inlining to resolve {+}
@@ -94,12 +94,9 @@ public class TestType {
   }
   static private void testerr( String program, String err, String cursor ) {
     String err2 = "\nargs:0:"+err+"\n"+program+"\n"+cursor+"^\n";
-    try {
-      TypeEnv te = Exec.go("args",program);  // Expect to throw
-      Assert.assertTrue(false); // Did not throw
-    } catch( IllegalArgumentException iae ) {
-      Assert.assertEquals(err2,iae.getMessage());
-    }
+    TypeEnv te = Exec.go("args",program);
+    Assert.assertTrue(te._errs != null && te._errs._len>=1);
+    Assert.assertEquals(err2,te._errs.at(0));
   }
 
   // TODO: Observation: value() calls need to be monotonic, can test this.
