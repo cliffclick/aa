@@ -32,13 +32,13 @@ public class TypeFun extends Type {
     }
   }
 
-  static public final TypeFun SCR0 = make(TypeTuple.EMPTY  ,Type.SCALAR);
-  static public final TypeFun SCR1 = make(TypeTuple.SCALAR ,Type.SCALAR);
-  static public final TypeFun SCR2 = make(TypeTuple.SCALAR2,Type.SCALAR);
-  static public final TypeFun FLT64 = make(TypeTuple.FLT64,TypeFlt.FLT64); // [flt]->flt
-  static public final TypeFun INT64 = make(TypeTuple.INT64,TypeInt.INT64); // [int]->int
-  static public final TypeFun FLT64_FLT64 = make(TypeTuple.FLT64_FLT64,TypeFlt.FLT64); // [flt,flt]->flt
-  static public final TypeFun INT64_INT64 = make(TypeTuple.INT64_INT64,TypeInt.INT64); // [int,int]->int
+  static private final TypeFun SCR0 = make(TypeTuple.EMPTY  ,Type.SCALAR);
+  static private final TypeFun SCR1 = make(TypeTuple.SCALAR ,Type.SCALAR);
+  static private final TypeFun SCR2 = make(TypeTuple.SCALAR2,Type.SCALAR);
+  static public  final TypeFun FLT64 = make(TypeTuple.FLT64,TypeFlt.FLT64); // [flt]->flt
+  static public  final TypeFun INT64 = make(TypeTuple.INT64,TypeInt.INT64); // [int]->int
+  static public  final TypeFun FLT64_FLT64 = make(TypeTuple.FLT64_FLT64,TypeFlt.FLT64); // [flt,flt]->flt
+  static public  final TypeFun INT64_INT64 = make(TypeTuple.INT64_INT64,TypeInt.INT64); // [int,int]->int
   static final TypeFun[] TYPES = new TypeFun[]{FLT64,INT64,FLT64_FLT64,INT64_INT64};
   
   @Override protected TypeFun xdual() { return new TypeFun((TypeTuple)_ts.dual(),_ret.dual()); }
@@ -62,5 +62,4 @@ public class TypeFun extends Type {
   @Override public Type ret() { return _ret; }
 
   @Override protected boolean canBeConst() { return true; }
-  boolean is_lossy() { return true; } // A few conversions are not lossy
 }

@@ -23,7 +23,7 @@ import java.util.HashMap;
 public class Type {
   static private int CNT=1;
   final int _uid=CNT++; // Unique ID, will have gaps, used to uniquely order Types in Unions
-  public byte _type; // Simple types use a simple enum
+  byte _type;           // Simple types use a simple enum
   private Type _dual;   // All types support a dual notion, lazily computed and cached here
 
   protected Type(byte type) { _type=type; }
@@ -51,7 +51,7 @@ public class Type {
   // check of a (possibly very large) Type is always a simple pointer-equality
   // check, except during construction and intern'ing.
   private static HashMap<Type,Type> INTERN = new HashMap<>();
-  protected Type hashcons() {
+  Type hashcons() {
     Type t2 = INTERN.get(this); // Lookup
     if( t2!=null ) {            // Found prior
       assert t2._dual != null;  // Prior is complete with dual
@@ -93,19 +93,19 @@ public class Type {
   static final byte TERROR  =16; // Type check
   static final byte TLAST   =17; // Type check
   
-  static public final Type CONTROL= make(TCONTROL); // Control
-  static public final Type ALL    = make(TALL    ); // Bottom
-  static public final Type ANY    = make(TANY    ); // Top
-  static public final Type  SCALAR= make( TSCALAR); // ptrs, ints, flts; things that fit in a machine register
-  static public final Type XSCALAR= make(TXSCALAR); // ptrs, ints, flts; things that fit in a machine register
-  static final Type  NUM   = make( TNUM   );
-  static final Type XNUM   = make(TXNUM   );
-  static final Type  REAL  = make( TREAL  );
-  static final Type XREAL  = make(TXREAL  );
+  public  static final Type CONTROL= make(TCONTROL); // Control
+  public  static final Type ALL    = make(TALL    ); // Bottom
+  public  static final Type ANY    = make(TANY    ); // Top
+  public  static final Type  SCALAR= make( TSCALAR); // ptrs, ints, flts; things that fit in a machine register
+  public  static final Type XSCALAR= make(TXSCALAR); // ptrs, ints, flts; things that fit in a machine register
+  private static final Type  NUM   = make( TNUM   );
+  private static final Type XNUM   = make(TXNUM   );
+  private static final Type  REAL  = make( TREAL  );
+  private static final Type XREAL  = make(TXREAL  );
 
   // Collection of sample types for checking type lattice properties.
   // Ordered so dual can be computed by flipping pairs.
-  static final Type[] TYPES = new Type[]{ALL,ANY,SCALAR,XSCALAR,NUM,XNUM,REAL,XREAL};
+  private static final Type[] TYPES = new Type[]{ALL,ANY,SCALAR,XSCALAR,NUM,XNUM,REAL,XREAL};
   
   byte base() { assert TBAD < _type && _type < TLAST; return _type; }
   

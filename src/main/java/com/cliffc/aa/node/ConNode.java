@@ -3,7 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.*;
 
 public final class ConNode<T extends Type> extends Node {
-  T _t;
+  private T _t;
   public ConNode( T t ) { super(OP_CON,Env.top_scope()); _t=t; }
   @Override String str() { return _t.toString(); }
   @Override public Node ideal(GVNGCM gvn) { return null; }

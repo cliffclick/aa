@@ -20,9 +20,7 @@ public class GVNGCM {
   private Ary<Node> _work = new Ary<>(new Node[1], 0);
   private BitSet _wrk_bits = new BitSet();
 
-  public Node add_work(Node n) {
-    return _wrk_bits.get(n._uid) ? n : add_work0(n);
-  }
+  public void add_work(Node n) { if( !_wrk_bits.get(n._uid) ) add_work0(n); }
   private Node add_work0( Node n ) {
     _work.add(n);               // These need to be visited later
     _wrk_bits.set(n._uid);
@@ -63,36 +61,34 @@ public class GVNGCM {
   // Record a Node, but do not optimize it for value and ideal calls, as it is
   // mid-construction from the parser.  Any function call with yet-to-be-parsed
   // call sites, and any loop top with an unparsed backedge needs to use this.
-  public Node init( Node n ) {
+  Node init( Node n ) {
     assert n._uses._len==0;
     return init0(n);
   }
-  public Node init0( Node n ) {
+  Node init0( Node n ) {
     setype(n,n.all_type());
     _vals.put(n,n);
     return add_work0(n);
   }
 
   // Add a new def to 'n', changing its hash - so rehash it
-  public Node add_def( Node n, Node def ) {
+  public void add_def( Node n, Node def ) {
     Node x = _vals.remove(n);
     assert x == n;
     n.add_def(def);
     _vals.put(n,n);
     add_work(n);
-    return n;
   }
 
   // True if in _ts and _vals, false otherwise
   public boolean touched( Node n ) { return n._uid < _ts._len && _ts._es[n._uid]!=null; }
   
   // Remove from GVN structures.  Used rarely for whole-merge changes
-  public Node unreg( Node n ) {
+  public void unreg( Node n ) {
     assert !check_new(n);
     _ts.set(n._uid,null);       // Remove from type system
     _vals.remove(n);            // Remove from GVN
     // TODO: Remove from worklist also
-    return n;
   }
   // Used rarely for whole-merge changes
   public void rereg( Node n ) {
@@ -147,7 +143,7 @@ public class GVNGCM {
         n = x._uses.pop();      // Remove hook, keep better n
       }
       if( !check_new(n) ) return n; // If the replacement is old, no need to re-ideal
-      assert cnt++ < 1000;          // Catch infinite ideal-loops
+      cnt++; assert cnt < 1000;     // Catch infinite ideal-loops
     }
     // Compute a type for n
     Type t = n.value(this);              // Get best type

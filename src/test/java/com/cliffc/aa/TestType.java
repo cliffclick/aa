@@ -58,17 +58,17 @@ public class TestType {
     test("{5}()", TypeInt.con(5)); // No args nor -> required; this is simply a function returning 5, being executed
 
     // Conditional:
-    test("0 ? 2 : 3",TypeInt.con(3)); // false
-    test("2 ? 2 : 3",TypeInt.con(2)); // true
-    test("math_rand(1)?(x=4):(x=3);x",TypeInt.INT8); // x defined on both arms, so available after
-    test("math_rand(1)?(x=2):   3 ;4",TypeInt.con(4)); // x-defined on 1 side only, but not used thereafter
-    test("math_rand(1)?(y=2;x=y*y):(x=3);x",TypeInt.INT8); // x defined on both arms, so available after, while y is not
-    testerr("math_rand(1)?(x=2):3;x","'x' not defined on false arm of trinary","                    ");
-    testerr("0?(x=2):3;x","'x' not defined on false arm of trinary","         ");
-    test   ("2?(x=2):3;x",TypeInt.con(2)); // off-side is constant-dead, so missing x-assign ignored
-    test   ("2?(x=2):y",TypeInt.con(2)); // off-side is constant-dead, so missing 'y' is ignored
-    testerr("x=1;2?(x=2):(x=3);x","Cannot re-assign ref 'x'","                ");
-    test("x=1;2?2:(x=3);x",TypeInt.con(1)); // Re-assigned allowed & ignored in dead branch
+    test   ("0 ?    2  : 3", TypeInt.con(3)); // false
+    test   ("2 ?    2  : 3", TypeInt.con(2)); // true
+    test   ("math_rand(1)?(x=4):(x=3);x", TypeInt.INT8); // x defined on both arms, so available after
+    test   ("math_rand(1)?(x=2):   3 ;4", TypeInt.con(4)); // x-defined on 1 side only, but not used thereafter
+    test   ("math_rand(1)?(y=2;x=y*y):(x=3);x", TypeInt.INT8); // x defined on both arms, so available after, while y is not
+    testerr("math_rand(1)?(x=2):   3 ;x", "'x' not defined on false arm of trinary","                    ");
+    testerr("0 ? (x=2) : 3;x", "'x' not defined on false arm of trinary","         ");
+    test   ("2 ? (x=2) : 3;x", TypeInt.con(2)); // off-side is constant-dead, so missing x-assign is ignored
+    test   ("2 ? (x=2) : y  ", TypeInt.con(2)); // off-side is constant-dead, so missing 'y'      is ignored
+    testerr("x=1;2?(x=2):(x=3);x", "Cannot re-assign ref 'x'","                ");
+    test   ("x=1;2?   2 :(x=3);x",TypeInt.con(1)); // Re-assigned allowed & ignored in dead branch
     
     // TODO: Needs overload cloning/inlining to resolve {+}
     //test("x=3; fun={y -> x+y}; fun(2)", TypeInt.con(5)); // capture external variable

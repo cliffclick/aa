@@ -69,9 +69,11 @@ public class Parse {
     return res;
   }
 
-  /** Parse an expression, a list of terms and infix operators
-   *  stmt = [id =]* ifex [; stmt]* // ids must not exist, and are available in later statements
-   *  @return Node does NOT need gvn() */
+  /** Parse a list of statements.  A statement is a list of variables to
+   *  let-assign, and an ifex for the value.  The variables must not already
+   *  exist, and are available in all later statements.
+   *  stmt = [id =]* ifex [; stmt]*
+   */
   private Node stmt() {
     Ary<String> toks = new Ary<>(new String[1],0);
     while( true ) {
@@ -101,10 +103,10 @@ public class Parse {
   }
   
   /** Parse an if-expression, with lazy eval on the branches.  Assignments to
-   *  new variables are allowed in either arm, and variables assigned on all
-   *  live arms are available afterwards.
-   *  ifex = stmt ? stmt : stmt
-   *  @return Node does NOT need gvn() */
+   *  new variables are allowed in either arm (as-if each arm is in a mini
+   *  scope), and variables assigned on all live arms are available afterwards.
+   *  ifex = expr ? expr : expr
+   */
   private Node ifex() {
     Node expr = expr();
     if( expr == null ) return null; // Expr is required, so missing expr implies not any ifex
@@ -127,9 +129,10 @@ public class Parse {
     return _e._scope.pop();
   }
   
-  /** Parse an expression, a list of terms and infix operators
+  /** Parse an expression, a list of terms and infix operators.  The whole list
+   *  is broken up into a tree based on operator precedence.
    *  expr = term [binop term]*
-   *  @return Node does NOT need gvn() */
+   */
   private Node expr() {
     Node term = term();
     if( term == null ) return null; // Term is required, so missing term implies not any expr
@@ -173,7 +176,7 @@ public class Parse {
    *  term = nfact                // No function call
    *  term = nfact ( [expr,]* )+  // One or more function calls in a row, each set of args are delimited
    *  term = nfact nfact*         // One function call, all the args listed
-   *  @return Node does not need gvn() */
+   */
   private Node term() {
     Node fun = nfact(), arg;         // nfactor
     if( fun == null ) return null;   // No term at all
@@ -213,7 +216,7 @@ public class Parse {
   
   /** Parse any leading unary ops before a factor
    *  nfact = fact | uniop nfact 
-   *  @return Node does not needs gvn() */
+   */
   private Node nfact() {
     int oldx = _x;
     String uni = token();
@@ -239,15 +242,15 @@ public class Parse {
    *  fact = {uniop}   // Special syntactic form of uniop; no spaces allowed; returns function constant
    *  fact = {func}    // Anonymous function declaration
    *  fact = id        // variable lookup, NOT a binop or uniop but might be e.g. function-valued, including un-/binops as values
-   *  @return Node does not need gvn() */
+   */
   private Node fact() {
     if( skipWS() == -1 ) return null;
     byte c = _buf[_x];
     if( '0' <= c && c <= '9' ) return _gvn.con(number());
     int oldx = _x;
-    if( peek('(') ) { // Either a special-syntax pre/infix op, or a nested expression
+    if( peek('(') ) {           // a nested statement
       Node s = stmt();
-      if( s==null ) { _x = oldx; return null; } // A bare "()" pair is not an expr
+      if( s==null ) { _x = oldx; return null; } // A bare "()" pair is not a statement
       require(')');
       return s;
     }
@@ -271,9 +274,10 @@ public class Parse {
     return var;
   }
 
-  /** Parse an anonymous function; the opening '{' already parsed
-   *  func = { [[id]* ->]? stmt } // Anonymous function declaration
-   *  @return Node needs gvn() */
+  /** Parse an anonymous function; the opening '{' already parsed.  After the
+   *  '{' comes an optional list of arguments and a '->' token.
+   *  func = { [[id]* ->]? stmt }
+   */
   private Node func() {
     int oldx = _x;
     Ary<String> ids = new Ary<>(new String[1],0);
