@@ -21,6 +21,7 @@ public abstract class Node implements Cloneable {
   static final byte OP_PROJ =11;
   static final byte OP_REGION=12;
   static final byte OP_PHI  =13;
+  static final byte OP_ERR  =14;
   
   public int _uid=Env._gvn.uid(); // Unique ID, will have gaps, used to give a dense numbering to nodes
   public final byte _op;
@@ -50,6 +51,7 @@ public abstract class Node implements Cloneable {
     n._uses.del(n._uses.find(a -> a==this));
     return n;
   }
+  public Node pop( ) { return del(_defs._len-1); }
   
   // Uses.  Generally variable length; unordered, no nulls, compressed, unused trailing space
   public Ary<Node> _uses = new Ary<>(new Node[1],0);
@@ -106,7 +108,7 @@ public abstract class Node implements Cloneable {
   abstract public Type value(GVNGCM gvn);
 
   // Worse-case type for this Node
-  public Type all_type() { return Type.ALL; }
+  public Type all_type() { return TypeErr.FAIL; }
   
   // Operator precedence is only valid for ConNode of binary functions
   public int op_prec() { return -1; }

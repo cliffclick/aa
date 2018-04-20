@@ -63,10 +63,10 @@ public class TestType {
     test("math_rand(1)?(x=4):(x=3);x",TypeInt.INT8); // x defined on both arms, so available after
     test("math_rand(1)?(x=2):   3 ;4",TypeInt.con(4)); // x-defined on 1 side only, but not used thereafter
     test("math_rand(1)?(y=2;x=y*y):(x=3);x",TypeInt.INT8); // x defined on both arms, so available after, while y is not
-    testerr("math_rand(1)?(x=2):3;x","off-side is NOT constant-dead, so x must be assigned both branches","");
-    testerr("0?x=2:3;x","x only defined on one side of conditional, so not available after","        ");
-    test   ("2?x=2:3;x",TypeInt.con(2)); // off-side is constant-dead, so missing x-assign ignored
-    testerr("2?x=2:y","off-side is dead, so missing y-ref ignored","");
+    testerr("math_rand(1)?(x=2):3;x","'x' not defined on false arm of trinary","                    ");
+    testerr("0?(x=2):3;x","'x' not defined on false arm of trinary","         ");
+    test   ("2?(x=2):3;x",TypeInt.con(2)); // off-side is constant-dead, so missing x-assign ignored
+    testerr("2?(x=2):y","off-side is dead, so missing y-ref ignored","");
     testerr("x=1;2?x=2:x=3;x","re-assign x not allowed","");
     test("x=1;2?2:x=3;x",TypeInt.con(1)); // Re-assigned allowed & ignored in dead branch
     

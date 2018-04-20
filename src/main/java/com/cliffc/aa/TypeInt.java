@@ -47,6 +47,7 @@ public class TypeInt extends Type {
     case TINT:   break;
     case TFLT:   return xmeetf((TypeFlt)t);
     case TFUN:   return Type.SCALAR;
+    case TERROR: return t;
     case TCONTROL:
     case TTUPLE: return Type.ALL;
     default: throw typerr(t);

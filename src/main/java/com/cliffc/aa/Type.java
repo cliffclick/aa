@@ -88,9 +88,10 @@ public class Type {
   static final byte TUNION  =11; // Union types (finite collections of unrelated types Meet together); see TypeUnion
   static final byte TTUPLE  =12; // Tuples; finite collections of unrelated Types, kept in parallel
   static final byte TFUN    =13; // Functions; both domain and range are a Tuple; see TypeFun                            
-  static public final byte TFLT    =14; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
+  static final byte TFLT    =14; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
   static final byte TINT    =15; // All Integers, including signed/unsigned and various sizes; see TypeInt
-  static final byte TLAST   =16; // Type check
+  static final byte TERROR  =16; // Type check
+  static final byte TLAST   =17; // Type check
   
   static public final Type CONTROL= make(TCONTROL); // Control
   static public final Type ALL    = make(TALL    ); // Bottom
@@ -126,9 +127,9 @@ public class Type {
   }
   private Type xmeet0( Type t ) {
     if( t == this ) return this;
-    if(_type != TUNION &&
+    if(_type != TUNION && _type != TERROR &&
        ( _type >  TBASE  && t._type <  TBASE || // Reverse; xmeet 2nd arg is never <TBASE
-         t._type == TUNION ))   // Reverse: always TypeUnion decides
+         t._type == TUNION || t._type == TERROR ))   // Reverse: always TypeUnion decides
       return t.xmeet(this);
     return xmeet(t);            // Do not reverse
   }
@@ -208,6 +209,7 @@ public class Type {
     ts = concat(ts,TypeTuple.TYPES);
     ts = concat(ts,TypeFun  .TYPES);
     ts = concat(ts,TypeUnion.TYPES);
+    ts = concat(ts,TypeErr  .TYPES);
     
     // Confirm commutative & complete
     for( Type t0 : ts )
@@ -297,6 +299,7 @@ public class Type {
   public boolean is_con() {
     switch( _type ) {
     case TALL:
+    case TERROR:
     case TCONTROL:
     case TSCALAR:
     case TNUM:

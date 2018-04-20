@@ -20,7 +20,7 @@ public class GVNGCM {
   private Ary<Node> _work = new Ary<>(new Node[1], 0);
   private BitSet _wrk_bits = new BitSet();
 
-  private Node add_work(Node n) {
+  public Node add_work(Node n) {
     return _wrk_bits.get(n._uid) ? n : add_work0(n);
   }
   private Node add_work0( Node n ) {
@@ -70,7 +70,6 @@ public class GVNGCM {
   public Node init0( Node n ) {
     setype(n,n.all_type());
     _vals.put(n,n);
-    assert!_wrk_bits.get(n._uid);
     return add_work0(n);
   }
 
@@ -87,13 +86,18 @@ public class GVNGCM {
   // True if in _ts and _vals, false otherwise
   public boolean touched( Node n ) { return n._uid < _ts._len && _ts._es[n._uid]!=null; }
   
-  // Remove from GVN structures
-  Node unreg( Node n ) {
+  // Remove from GVN structures.  Used rarely for whole-merge changes
+  public Node unreg( Node n ) {
     assert !check_new(n);
     _ts.set(n._uid,null);       // Remove from type system
     _vals.remove(n);            // Remove from GVN
     // TODO: Remove from worklist also
     return n;
+  }
+  // Used rarely for whole-merge changes
+  public void rereg( Node n ) {
+    assert !check_opt(n);
+    init0(n);
   }
   
   // Node new to GVN and unregistered, or old and registered
@@ -234,7 +238,6 @@ public class GVNGCM {
   void iter() {
     while( _work._len > 0 ) {
       Node n = _work.pop();
-      assert _wrk_bits.get(n._uid);
       _wrk_bits.clear(n._uid);
       if( n.is_dead() ) continue;
       if( n._uses._len==0 ) { kill(n); continue; }

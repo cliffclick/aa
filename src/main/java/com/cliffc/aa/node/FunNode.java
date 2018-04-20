@@ -2,6 +2,8 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.*;
 
+import java.util.BitSet;
+
 // FunNode is a RegionNode; args point to all the known callers.  Zero slot is
 // null, same as a C2 Region.  Args 1+ point to callers; Arg 1 points to Root
 // as the generic unknown worse-case caller; This can be removed once no more
@@ -27,7 +29,7 @@ import com.cliffc.aa.*;
 // RPC parm.  Root points to the Ret, as the worse-case unknown caller.  Other
 // Applys point to the the Ret have a constant RPC, and the RPC is used to
 // select which return path is taken.  While there is a single Ret for all
-// call-sites, the Applys can "peek through" to see the function body knowning
+// call-sites, the Applys can "peek through" to see the function body learning
 // the incoming args come from a known input path.
 // 
 // Example: FunNode "map" is called with type args A[] and A->B and returns
@@ -44,9 +46,39 @@ public class FunNode extends Node {
   static private int CNT=2;     // Function index; 1 is reserved for unknown functions
   public final int _fidx;       // Function index; 1 is reserved for unknown functions
   public final TypeFun _tf;     // Worse-case correct type
-  public FunNode(TypeFun tf) { super(OP_FUN,Env.top_scope()); _tf = tf; _fidx = CNT++; }
+  public FunNode(TypeFun tf) { super(OP_FUN,null,Env.top_scope()); _tf = tf; _fidx = CNT++; }
   @Override String str() { return _tf.toString(); }
-  @Override public Node ideal(GVNGCM gvn) { return null; }
+  @Override public Node ideal(GVNGCM gvn) {
+    // Remove dead/inlined call paths.
+    if( _defs._len==2 ) return null; // Only 1 caller, assume is unknown function
+    
+    // Look for all RetNode users, and collect used RPCs
+    ParmNode prpc=null;
+    BitSet rpcs=null;
+    for( Node use : _uses ) {
+      if( use instanceof RetNode ) {
+        int rpc = ((RetNode)use)._rpc;
+        if( rpc==1 ) continue;    // Ignore the unknown caller
+        throw AA.unimpl();
+      } else if( ((ParmNode)use)._name.equals("$rpc") )
+        prpc = (ParmNode)use;
+    }
+
+    // Toss all input paths not in bitset
+    if( rpcs != null ) throw AA.unimpl();
+    if( gvn.type(prpc.at(1)) != TypeInt.con(1) ) throw AA.unimpl();
+    while( _defs._len > 2 ) {
+      gvn.add_work(del(2));
+      for( Node use : _uses ) {
+        if( use instanceof ParmNode ) {
+          gvn.unreg(use);
+          gvn.add_work(use.del(2));
+          gvn.rereg(use);
+        }
+      }
+    }
+    return this;
+  }
   @Override public Type value(GVNGCM gvn) { return _tf; }
   @Override public Type all_type() { return _tf; }
   @Override public int hashCode() { return super.hashCode()+_tf.hashCode(); }

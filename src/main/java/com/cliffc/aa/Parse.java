@@ -64,6 +64,8 @@ public class Parse {
     // Currently only supporting exprs
     Node res = stmt();
     if( skipWS() != -1 ) throw err("Syntax error; trailing junk");
+    if( _gvn.type(res) instanceof TypeErr )
+      throw new IllegalArgumentException(((TypeErr)_gvn.type(res))._msg);
     return res;
   }
 
@@ -88,8 +90,8 @@ public class Parse {
     for( String tok : toks )
       if( _e.lookup(tok)!=null ) throw err(ifex,"Cannot re-assign ref '"+tok+"'");
       else _e.add(tok,ifex);
-    while( peek(';') ) {
-      if( ifex._uses._len==0 ) Env._gvn.kill(ifex); // prior expression result no longer alive in parser
+    while( peek(';') ) {   // Another expression?
+      kill(ifex);          // prior expression result no longer alive in parser
       ifex = stmt();
     }
     return ifex;
@@ -118,9 +120,10 @@ public class Parse {
       if( f == null ) throw AA.unimpl();
       ScopeNode f_scope = _e._scope.split(vidx); // Split out the new vars on the false side
       set_ctrl(init(new RegionNode(null,ctrls.at(1),ctrls.at(2))));
-      _e._scope.common(ctrl(),t_scope,f_scope,_gvn); // Add a PhiNode for all commonly defined variables
-      return gvn(new PhiNode(ctrl(),t,f));      // Add a PhiNode for the result
+      _e._scope.common(this,t_scope,f_scope); // Add a PhiNode for all commonly defined variables
+      _e._scope.add_def(gvn(new PhiNode(ctrl(),t,f))); // Add a PhiNode for the result
     }
+    return _e._scope.pop();
   }
   
   /** Parse an expression, a list of terms and infix operators
@@ -222,8 +225,7 @@ public class Parse {
         return gvn(new CallNode(ctrl(),unifun,arg));
       } else {
         _x=oldx;                // Unwind token parse and try again for a factor
-        if( unifun != null && unifun._uses._len==0 )
-          _gvn.kill(unifun);    // Might be made new by the lookup_filter, but then no-good
+        if( unifun != null ) kill(unifun); // Might be made new by the lookup_filter, but then no-good
       }
     }
     return fact();
@@ -262,7 +264,7 @@ public class Parse {
     String tok = token0();
     if( tok == null ) return null;
     Node var = _e.lookup(tok);
-    if( var == null )  throw err("Unknown ref '"+tok+"'");
+    if( var == null )  return _gvn.con(TypeErr.make(errMsg("Unknown ref '"+tok+"'")));
     // Disallow uniop and binop functions as factors.
     if( var.op_prec() > 0 ) { _x = oldx; return null; }
     return var;
@@ -358,9 +360,10 @@ public class Parse {
   private static boolean isOp0   (byte c) { return "!#$%*+,-.;:=<>?@^[]~/".indexOf(c) != -1; }
   private static boolean isOp1   (byte c) { return isOp0(c); }
 
-  private Node gvn (Node n) { return n==null ? null : _gvn.xform(n); }
-  private Node init(Node n) { return n==null ? null : _gvn.init (n); }
-  private Node ctrl() { return _e._scope.get(" control "); }
+  public Node gvn (Node n) { return n==null ? null : _gvn.xform(n); }
+  public Node init(Node n) { return n==null ? null : _gvn.init (n); }
+  public void kill(Node n) { if( n._uses._len==0 ) _gvn.kill(n); }
+  public Node ctrl() { return _e._scope.get(" control "); }
   // Set a new control, return new
   private Node set_ctrl(Node n) { return _e._scope.update(" control ",n,_gvn); }
 
@@ -369,7 +372,7 @@ public class Parse {
 
   // Build a string of the given message, the current line being parsed,
   // and line of the pointer to the current index.
-  private String errMsg(String s) {
+  public String errMsg(String s) {
     // find line start
     int a=_x;
     while( a > 0 && _buf[a-1] != '\n' ) --a;
@@ -389,7 +392,7 @@ public class Parse {
     return sb.toString();
   }
   private IllegalArgumentException err(Node n, String s) {
-    if( n._uses._len==0 ) _gvn.kill(n);
+    kill(n);
     return err(s);
   }
   private IllegalArgumentException err(String s) { return new IllegalArgumentException(errMsg(s)); }

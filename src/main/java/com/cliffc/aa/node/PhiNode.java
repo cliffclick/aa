@@ -30,5 +30,4 @@ public class PhiNode extends Node {
         t = t.meet(gvn.type(at(i)));
     return t;
   }
-  @Override public Type all_type() { return Type.SCALAR; }
 }

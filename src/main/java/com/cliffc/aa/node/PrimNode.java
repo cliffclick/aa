@@ -56,7 +56,11 @@ public abstract class PrimNode extends Node {
   @Override public Type value(GVNGCM gvn) {
     Type[] ts = new Type[_defs._len];
     boolean con=true;
-    for( int i=1; i<_defs._len; i++ ) if( !(ts[i] = gvn.type(_defs.at(i))).is_con() ) { con=false; break; }
+    for( int i=1; i<_defs._len; i++ ) {
+      ts[i] = gvn.type(_defs.at(i));
+      if( ts[i] instanceof TypeErr ) return ts[i]; // Errors poison
+      if( !ts[i].is_con() ) { con=false; break; }
+    }
     return con ? apply(ts) : _tf._ret;
   }
 }

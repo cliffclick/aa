@@ -44,6 +44,7 @@ public class TypeFun extends Type {
   @Override protected TypeFun xdual() { return new TypeFun((TypeTuple)_ts.dual(),_ret.dual()); }
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
+    case TERROR:           return t; 
     case TCONTROL:
     case TTUPLE:           return ALL;
     case TFLT:  case TINT: return Type.SCALAR;

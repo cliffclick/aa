@@ -58,18 +58,27 @@ public class ScopeNode extends Node {
   }
 
   // Add PhiNodes and variable mappings for common definitions
-  public void common( Node ctrl, ScopeNode t, ScopeNode f, GVNGCM gvn ) {
-    if( t!=null && f!=null ) {  // Might have some variables in common
+  public void common( Parse P, ScopeNode t, ScopeNode f ) {
+    if( t!=null ) {  // Might have some variables in common
       for( String name : t._vals.keySet() ) {
-        Integer fii =  f._vals.get(name);
-        if( fii==null ) continue;
         Node tn = t.at(t._vals.get(name));
-        Node fn = f.at(fii);
-        add(name,gvn.xform(new PhiNode(ctrl,tn,fn)));
+        Integer fii = f==null ? null : f._vals.get(name);
+        Node fn = fii==null ? Env._gvn.con(TypeErr.make(P.errMsg("'"+name+"' not defined on false arm of trinary"))) : f.at(fii);
+        add(name,P.gvn(new PhiNode(P.ctrl(),tn,fn)));
       }
     }
-    if( t!=null ) gvn.kill_new(t);
-    if( f!=null ) gvn.kill_new(f);
+    if( f!=null ) {  // Might have some variables in common
+      for( String name : f._vals.keySet() ) {
+        Node fn = f.at(f._vals.get(name));
+        Integer tii = t==null ? null : t._vals.get(name);
+        if( tii == null ) {
+          Node tn = Env._gvn.con(TypeErr.make(P.errMsg("'"+name+"' not defined on true arm of trinary")));
+          add(name,P.gvn(new PhiNode(P.ctrl(),tn,fn)));
+        }
+      }
+    }
+    if( t!=null ) Env._gvn.kill_new(t);
+    if( f!=null ) Env._gvn.kill_new(f);
   }
   
   @Override String str() { return "scope"; }

@@ -26,7 +26,6 @@ public class ParmNode extends Node {
       return TypeInt.INT32;     // RPC-of-1 is the unknown call-site, cannot collapse until known-no-more-callsites
     return t;
   }
-  @Override public Type all_type() { return Type.SCALAR; }
   @Override public int hashCode() { return super.hashCode()+_idx; }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
