@@ -66,9 +66,9 @@ public class TestType {
     testerr("math_rand(1)?(x=2):3;x","'x' not defined on false arm of trinary","                    ");
     testerr("0?(x=2):3;x","'x' not defined on false arm of trinary","         ");
     test   ("2?(x=2):3;x",TypeInt.con(2)); // off-side is constant-dead, so missing x-assign ignored
-    testerr("2?(x=2):y","off-side is dead, so missing y-ref ignored","");
-    testerr("x=1;2?x=2:x=3;x","re-assign x not allowed","");
-    test("x=1;2?2:x=3;x",TypeInt.con(1)); // Re-assigned allowed & ignored in dead branch
+    test   ("2?(x=2):y",TypeInt.con(2)); // off-side is constant-dead, so missing 'y' is ignored
+    testerr("x=1;2?(x=2):(x=3);x","Cannot re-assign ref 'x'","                ");
+    test("x=1;2?2:(x=3);x",TypeInt.con(1)); // Re-assigned allowed & ignored in dead branch
     
     // TODO: Needs overload cloning/inlining to resolve {+}
     //test("x=3; fun={y -> x+y}; fun(2)", TypeInt.con(5)); // capture external variable

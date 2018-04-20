@@ -29,7 +29,7 @@ public abstract class Node implements Cloneable {
   // Defs.  Generally fixed length, ordered, nulls allowed, no unused trailing space.  Zero is Control.
   public Ary<Node> _defs;
   // Add def/use edge
-  public void add_def(Node n) { _defs.add(n); if( n!=null ) n._uses.add(this); }
+  public Node add_def(Node n) { _defs.add(n); if( n!=null ) n._uses.add(this); return n; }
   public Node at(int i) { return _defs._es[i]; }
   // Replace def/use edge
   public Node set_def( int idx, Node n, GVNGCM gvn ) {

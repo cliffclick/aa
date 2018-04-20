@@ -79,7 +79,6 @@ public class Parse {
       String tok = token();  // Scan for 'id = ...'
       if( tok == null ) break;
       if( !peek('=') ) { _x = oldx; break; } // Unwind token parse
-      if( _e.lookup(tok)!=null ) throw err("Cannot re-assign ref '"+tok+"'");
       toks.add(tok);
     }
     Node ifex = ifex();
@@ -88,8 +87,12 @@ public class Parse {
       else return null;
     }
     for( String tok : toks )
-      if( _e.lookup(tok)!=null ) throw err(ifex,"Cannot re-assign ref '"+tok+"'");
-      else _e.add(tok,ifex);
+      if( _e.lookup(tok)==null ) _e.add(tok,ifex);
+      else {
+        kill(ifex);             // Kill old return value
+        ifex = _gvn.con(TypeErr.make(errMsg("Cannot re-assign ref '"+tok+"'")));
+        _e._scope.update(tok,ifex,_gvn); // Both var assigned and return value are error
+      }
     while( peek(';') ) {   // Another expression?
       kill(ifex);          // prior expression result no longer alive in parser
       ifex = stmt();
@@ -110,18 +113,16 @@ public class Parse {
       int vidx = _e._scope._defs._len; // Set of live variables
       Node ifex = gvn(new IfNode(ctrl(),expr));
       ctrls.add_def(ifex);      // Keep alive, even if 1st Proj kills last use, so 2nd Proj can hook
-      ctrls.add_def(set_ctrl(gvn(new ProjNode(ifex,1))));
-      Node t = expr();
-      if( t == null ) throw AA.unimpl();
+      ctrls.add_def(set_ctrl(gvn(new ProjNode(ifex,1)))); // 1
+      if( ctrls.add_def(expr()) == null ) throw AA.unimpl(); // 2
       ScopeNode t_scope = _e._scope.split(vidx); // Split out the new vars on the true side
       require(':');
-      ctrls.add_def(set_ctrl(gvn(new ProjNode(ifex,0))));
-      Node f = expr();
-      if( f == null ) throw AA.unimpl();
+      ctrls.add_def(set_ctrl(gvn(new ProjNode(ifex,0)))); // 3
+      if( ctrls.add_def(expr()) == null ) throw AA.unimpl(); // 4
       ScopeNode f_scope = _e._scope.split(vidx); // Split out the new vars on the false side
-      set_ctrl(init(new RegionNode(null,ctrls.at(1),ctrls.at(2))));
+      set_ctrl(init(new RegionNode(null,ctrls.at(1),ctrls.at(3))));
       _e._scope.common(this,t_scope,f_scope); // Add a PhiNode for all commonly defined variables
-      _e._scope.add_def(gvn(new PhiNode(ctrl(),t,f))); // Add a PhiNode for the result
+      _e._scope.add_def(gvn(new PhiNode(ctrl(),ctrls.at(2),ctrls.at(4)))); // Add a PhiNode for the result
     }
     return _e._scope.pop();
   }

@@ -49,7 +49,7 @@ public class ScopeNode extends Node {
     while( _defs._len > idx )
       for( String name : _vals.keySet() )
         if( _vals.get(name)==_defs._len-1 ) {
-          s.add(name,_defs.pop());
+          s.add(name,pop());
           _vals.remove(name);
           break;
         }
