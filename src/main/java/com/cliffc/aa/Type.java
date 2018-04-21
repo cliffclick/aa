@@ -199,7 +199,7 @@ public class Type {
     ts = concat(ts,TypeInt  .TYPES);
     ts = concat(ts,TypeFlt  .TYPES);
     ts = concat(ts,TypeTuple.TYPES);
-    //ts = concat(ts,TypeFun  .TYPES);
+    ts = concat(ts,TypeFun  .TYPES);
     //ts = concat(ts,TypeUnion.TYPES);
     
     // Confirm commutative & complete

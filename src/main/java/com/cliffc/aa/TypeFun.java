@@ -44,11 +44,12 @@ public class TypeFun extends Type {
   @Override protected TypeFun xdual() { return new TypeFun((TypeTuple)_ts.dual(),_ret.dual()); }
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
-    case TERROR:           return t; 
+    case TERROR: return ((TypeErr)t)._all ? t : this;
     case TCONTROL:
     case TTUPLE:           return TypeErr.ALL;
     case TFLT:  case TINT: return Type.SCALAR;
     case TFUN:             break;
+    case TUNION: return t.xmeet(this); // Let TypeUnion decide
     default: throw typerr(t);   // All else should not happen
     }
     TypeFun tf = (TypeFun)t;
