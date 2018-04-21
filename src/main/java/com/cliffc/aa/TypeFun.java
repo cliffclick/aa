@@ -32,7 +32,7 @@ public class TypeFun extends Type {
     }
   }
 
-  static private final TypeFun SCR0 = make(TypeTuple.EMPTY  ,Type.SCALAR);
+  static private final TypeFun SCR0 = make(TypeTuple.ANY    ,Type.SCALAR);
   static private final TypeFun SCR1 = make(TypeTuple.SCALAR ,Type.SCALAR);
   static private final TypeFun SCR2 = make(TypeTuple.SCALAR2,Type.SCALAR);
   static public  final TypeFun FLT64 = make(TypeTuple.FLT64,TypeFlt.FLT64); // [flt]->flt

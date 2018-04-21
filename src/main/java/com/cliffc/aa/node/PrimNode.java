@@ -155,7 +155,7 @@ class MulInt64 extends Prim2OpI64 {
 }
 
 class RandI64 extends PrimNode {
-  RandI64() { super("math_rand",PrimNode.ARGS0,TypeFun.make(TypeTuple.EMPTY,TypeInt.INT64)); }
+  RandI64() { super("math_rand",PrimNode.ARGS0,TypeFun.make(TypeTuple.ANY,TypeInt.INT64)); }
   @Override public TypeInt apply( Type[] args ) { return TypeInt.con(new java.util.Random().nextLong()); }
   @Override public Type value(GVNGCM gvn) { return TypeInt.INT64; }
   public boolean is_lossy() { return false; }

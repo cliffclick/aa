@@ -57,7 +57,7 @@ public class TypeUnion extends Type {
     
     if( ts._len == 1 ) return ts._es[0];
     ts.sort_update(Comparator.comparingInt(e -> e._uid));
-    return make(TypeTuple.make(ts.asAry()),any);
+    return make(TypeTuple.make(!any,ts.asAry()),any);
   }
 
   private static final TypeUnion ANY_NUM = (TypeUnion)make(true , TypeInt.INT64, TypeFlt.FLT64);

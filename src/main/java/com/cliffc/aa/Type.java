@@ -255,7 +255,7 @@ public class Type {
     case TUNION:
     case TTUPLE:
     case TFLT:
-    case TINT:                  
+    case TINT:
     default: throw AA.unimpl(); // Overridden in subclass
     case TSIMPLE: throw typerr(null);
     }
