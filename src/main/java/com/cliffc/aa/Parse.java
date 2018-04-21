@@ -63,7 +63,7 @@ public class Parse {
   private TypeEnv prog() {
     // Currently only supporting exprs
     Node res = stmt();
-    if( skipWS() != -1 ) res = err_ctrl("Syntax error; trailing junk", con(Type.ANY) );
+    if( skipWS() != -1 ) res = con(err_ctrl("Syntax error; trailing junk"));
     _e._scope.add_def(res);     // Hook, so not deleted
     _gvn.iter();    // Pessimistic optimizations; might improve error situation
     res = _e._scope.pop(); // New and improved result
@@ -98,12 +98,12 @@ public class Parse {
     }
     Node ifex = ifex();
     if( ifex == null ) {
-      if( toks._len > 0 ) return err_ctrl("Missing ifex after assignment of '"+toks.last()+"'", con(Type.ANY));
+      if( toks._len > 0 ) return con(err_ctrl("Missing ifex after assignment of '"+toks.last()+"'"));
       else return null;
     }
     for( String tok : toks )
       if( _e.lookup(tok)==null ) _e.add(tok,ifex);
-      else err_ctrl("Cannot re-assign ref '"+tok+"'",null);
+      else err_ctrl0("Cannot re-assign ref '"+tok+"'");
     while( peek(';') ) {   // Another expression?
       kill(ifex);          // prior expression result no longer alive in parser
       ifex = stmt();
@@ -160,7 +160,7 @@ public class Parse {
         Node binfun = _e.lookup_filter(bin,2); // BinOp, or null
         if( binfun==null ) { _x=oldx; break; } // Not a binop, no more Kleene star
         term = term();
-        if( term == null ) term = err_ctrl("missing expr after binary op "+bin, con(Type.ANY));
+        if( term == null ) term = con(err_ctrl("missing expr after binary op "+bin));
         funs.add(binfun);  args.add_def(term);
       }
   
@@ -200,13 +200,13 @@ public class Parse {
         if( (arg=stmt()) != null ) {  // Check for a no-arg fcn call
           args.add_def(arg);          // Add first arg
           while( peek(',') ) {        // Gather comma-separated args
-            if( (arg=stmt()) == null ) arg = err_ctrl("Missing argument in function call", con(Type.ANY));
+            if( (arg=stmt()) == null ) arg = con(err_ctrl("Missing argument in function call"));
             args.add_def(arg);
           }
         }
         require(')'); 
         if( _gvn.type(fun).ret() == null )
-          return err_ctrl("A function is being called, but "+_gvn.type(fun)+" is not a function type",con(Type.ANY));
+          return con(err_ctrl("A function is being called, but "+_gvn.type(fun)+" is not a function type"));
       } else {                  // lispy-style fcn application
         // TODO: Unable resolve ambiguity with mixing "(fun arg0 arg1)" and
         // "fun(arg0,arg1)" argument calls.  Really having trouble with parsing
@@ -219,9 +219,9 @@ public class Parse {
         //if( args.len()==1 ) return fun; // Not a function call
       }
       Node call = gvn(args);    // No syntax errors; flag Call not auto-close
-      if( _gvn.type(call)==Type.ANY ) {
+      if( _gvn.type(call)._type==Type.TERROR ) {
         kill(call);
-        return err_ctrl("Argument mismatch in call to " + fun,con(Type.ANY));
+        return con(err_ctrl("Argument mismatch in call to " + fun));
       }
       return call;
     }
@@ -237,9 +237,8 @@ public class Parse {
       Node unifun = _e.lookup_filter(uni,1);
       if( unifun != null && unifun.op_prec() > 0 )  {
         Node arg = nfact(); // Recursive call
-        return arg == null
-          ? err_ctrl("Call to unary function '"+uni+"', but missing the one required argument",null)
-          : gvn(new CallNode(ctrl(),unifun,arg));
+        if( arg == null ) { err_ctrl0("Call to unary function '"+uni+"', but missing the one required argument"); return null; }
+        return gvn(new CallNode(ctrl(),unifun,arg));
       } else {
         _x=oldx;                // Unwind token parse and try again for a factor
         if( unifun != null ) kill(unifun); // Might be made new by the lookup_filter, but then no-good
@@ -282,7 +281,7 @@ public class Parse {
     if( tok == null ) return null;
     Node var = _e.lookup(tok);
     if( var == null )
-      return err_ctrl("Unknown ref '"+tok+"'",con(Type.ANY));
+      return con(err_ctrl("Unknown ref '"+tok+"'"));
     // Disallow uniop and binop functions as factors.
     if( var.op_prec() > 0 ) { _x = oldx; return null; }
     return var;
@@ -347,7 +346,7 @@ public class Parse {
   // Require a specific character (after skipping WS) or polite error
   private void require( char c ) {
     if( peek(c) ) return;
-    err_ctrl("Expected '"+c+"' but "+(_x>=_buf.length?"ran out of text":"found '"+(char)(_buf[_x])+"' instead"),null);
+    err_ctrl0("Expected '"+c+"' but "+(_x>=_buf.length?"ran out of text":"found '"+(char)(_buf[_x])+"' instead"));
   }
 
   private boolean peek( char c ) {
@@ -389,7 +388,12 @@ public class Parse {
   private Node con( Type t ) { return _gvn.con(t); }
 
   // Whack current control with a syntax error
-  private Node err_ctrl(String s, Node n) { set_ctrl(gvn(new ErrNode(ctrl(),errMsg(s)))); return n; }
+  private TypeErr err_ctrl(String s) { return TypeErr.make(err_ctrl0(s)); }
+  private String err_ctrl0(String s) {
+    String msg = errMsg(s);
+    set_ctrl(gvn(new ErrNode(ctrl(),msg)));
+    return msg;
+  }
 
   public static Ary<String> add_err( Ary<String> errs, String msg ) {
     if( errs == null ) errs = new Ary<>(new String[1],0);

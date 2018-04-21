@@ -24,7 +24,7 @@ public class TestType {
     test("1+2.3",   TypeFlt.make(0,64,3.3));
   
     // Variable lookup
-    test("math_pi", TypeFlt.Pi);
+    test("math_pi", TypeFlt.PI);
     // bare function lookup; returns a union of '+' functions
     testerr("+", "Syntax error; trailing junk","");
     test("{+}", Env.lookup_type("+"));
@@ -102,7 +102,7 @@ public class TestType {
   // TODO: Observation: value() calls need to be monotonic, can test this.
   @Test public void testCommuteSymmetricAssociative() {
     // Uncomment to insert a single test to focus on
-    //Assert.assertEquals(Type.SCALAR,TypePrim.ID.meet(TypeUnion.ALL_NUM));
+    //Assert.assertEquals(TypeUnion.ALL_NUM,TypeInt.INT64.meet(TypeFlt.FLT64));
     Assert.assertTrue(Type.check_startup());
   }  
 }

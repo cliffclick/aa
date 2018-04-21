@@ -36,7 +36,7 @@ public class CallNode extends Node implements AutoCloseable {
       // List of function choices
 
       if( rets.isEmpty() ) // TODO: Return a new ErrNode() which preserves syntax line numbers
-        return new ConNode<>(Type.ANY); // Fail to top
+        return new ConNode<>(TypeErr.ANY); // Fail to top
 
       if( rets._len>1 ) {       // Multiple choices, but save the reduced Unr
         if( rets._len==retx._defs._len ) return null; // No improvement

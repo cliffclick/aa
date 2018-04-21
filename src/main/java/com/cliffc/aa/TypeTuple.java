@@ -48,10 +48,10 @@ public class TypeTuple extends Type {
           static final TypeTuple INT64_INT64 = make(TypeInt.INT64,TypeInt.INT64);
           static final TypeTuple FLT64_FLT64 = make(TypeFlt.FLT64,TypeFlt.FLT64);
   private static final TypeTuple FLT64_INT64 = make(TypeFlt.FLT64,TypeInt.INT64);
-  public  static final TypeTuple IF_ANY  = make(Type.ANY    ,Type.ANY    );
+  public  static final TypeTuple IF_ANY  = make(TypeErr.ANY ,TypeErr.ANY );
   public  static final TypeTuple IF_ALL  = make(Type.CONTROL,Type.CONTROL);
-  public  static final TypeTuple IF_TRUE = make(Type.ANY    ,Type.CONTROL);
-  public  static final TypeTuple IF_FALSE= make(Type.CONTROL,Type.ANY    );
+  public  static final TypeTuple IF_TRUE = make(TypeErr.ANY ,Type.CONTROL);
+  public  static final TypeTuple IF_FALSE= make(Type.CONTROL,TypeErr.ANY );
   static final TypeTuple[] TYPES = new TypeTuple[]{SCALAR,INT32,INT64,FLT64,INT64_INT64,FLT64_FLT64,FLT64_INT64,IF_ANY, IF_ALL, IF_TRUE, IF_FALSE};
   
   // The length of Tuples is a constant, and so is its own dual.  Otherwise
@@ -71,7 +71,8 @@ public class TypeTuple extends Type {
     case TTUPLE: break;
     case TFLT:
     case TINT:
-    case TFUN: return Type.ALL;
+    case TFUN: return TypeErr.ALL;
+    case TERROR: return ((TypeErr)t)._all ? t : this;
     default: throw typerr(t);
     }
     // Length is longer of 2 tuples.

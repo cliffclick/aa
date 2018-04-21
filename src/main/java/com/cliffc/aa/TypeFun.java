@@ -46,7 +46,7 @@ public class TypeFun extends Type {
     switch( t._type ) {
     case TERROR:           return t; 
     case TCONTROL:
-    case TTUPLE:           return ALL;
+    case TTUPLE:           return TypeErr.ALL;
     case TFLT:  case TINT: return Type.SCALAR;
     case TFUN:             break;
     default: throw typerr(t);   // All else should not happen

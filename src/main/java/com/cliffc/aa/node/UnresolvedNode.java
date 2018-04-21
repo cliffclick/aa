@@ -61,7 +61,7 @@ public class UnresolvedNode extends Node {
 
   // JOIN of all incoming (function) types
   @Override public Type value(GVNGCM gvn) {
-    Type t = Type.ALL;
+    Type t = TypeErr.ALL;
     for( Node def : _defs )
       t = t.join(gvn.type(def));
     return t;
@@ -132,7 +132,7 @@ public class UnresolvedNode extends Node {
   // allowed, join of possible returns otherwise - we get to choose the best
   // choice here.
   Type retype( GVNGCM gvn, CallNode apply ) {
-    Type t = Type.ALL;
+    Type t = TypeErr.ALL;
     outerloop:
     for( Node ret : _defs ) {
       // Peek Ret->RPC->Fun and get the function type

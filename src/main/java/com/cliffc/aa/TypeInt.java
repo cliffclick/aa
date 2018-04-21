@@ -19,7 +19,6 @@ public class TypeInt extends Type {
   }
   private static TypeInt FREE=null;
   private TypeInt free( TypeInt f ) { FREE=f; return this; }
-  public static TypeInt con(long con) { return make(0,log(con),con); }
   public static TypeInt make( int x, int z, long con ) {
     TypeInt t1 = FREE;
     if( t1 == null ) t1 = new TypeInt(x,z,con);
@@ -27,6 +26,7 @@ public class TypeInt extends Type {
     TypeInt t2 = (TypeInt)t1.hashcons();
     return t1==t2 ? t1 : t2.free(t1);
   }
+  public static TypeInt con(long con) { return make(0,log(con),con); }
 
   static public final TypeInt  INT64 = make(-1,64,0);
   static public final TypeInt  INT32 = make(-1,32,0);
@@ -47,9 +47,10 @@ public class TypeInt extends Type {
     case TINT:   break;
     case TFLT:   return xmeetf((TypeFlt)t);
     case TFUN:   return Type.SCALAR;
-    case TERROR: return t;
+    case TERROR: return ((TypeErr)t)._all ? t : this;
     case TCONTROL:
-    case TTUPLE: return Type.ALL;
+    case TTUPLE: return TypeErr.ALL;
+    case TUNION: return t.xmeet(this); // Let TypeUnion decide
     default: throw typerr(t);
     }
     TypeInt tt = (TypeInt)t;
@@ -104,8 +105,12 @@ public class TypeInt extends Type {
       int lg = log(_con);
       if( tf._x== -1 )          // Bottom float/double
         return widen(lg,tf._z); // Wider of (ints-wider-by-1) and floats
-      if( tf._x== 0 && _con==tf._con ) // Int constant vs Float constant
-        return this;                   // Matching int constant wins
+      if( tf._x== 0 ) {         // Int constant vs Float constant
+        if( _con==tf._con ) return this; // Matching int constant wins
+        if( ((long)tf._con) == tf._con ) // Float is a integer
+          return xmeet(TypeInt.con((long)tf._con)); // Return as-if meeting 2 integers
+        return tf.xmeet(TypeFlt.con(_con));         // Return as-if meeting 2 floats
+      }
     } // Fall into the bottom-int case
 
     // Bottom Int, size 1 to 64
@@ -114,7 +119,8 @@ public class TypeInt extends Type {
     long con = (long)tf._con;
     if( tf._x== 0 && con == tf._con )  
       return make(-1,Math.max(_z,log(con)),0);
-    if( tf._x==-1 && (_z<<1) <= tf._z ) return TypeFlt.make(-1,tf._z,0); // Fits in a float
+    if( tf._x<= 0 && (_z<<1) <= tf._z ) return TypeFlt.make(-1,tf._z,0); // Fits in a float
+    if( tf._x== 0 ) tf = TypeFlt.log(tf._con)==32 ? TypeFlt.FLT32 : TypeFlt.FLT64;
     return TypeUnion.make(false,this,tf);
   }
 

@@ -108,7 +108,7 @@ public abstract class Node implements Cloneable {
   abstract public Type value(GVNGCM gvn);
 
   // Worse-case type for this Node
-  public Type all_type() { return TypeErr.FAIL; }
+  public Type all_type() { return TypeErr.ALL; }
   
   // Operator precedence is only valid for ConNode of binary functions
   public int op_prec() { return -1; }

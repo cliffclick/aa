@@ -24,7 +24,7 @@ public class Env implements AutoCloseable {
   static { TOP.init(); }
   private void init() {
     _scope.add(" control ",_scope); // Self-add
-    _scope.add("math_pi",new ConNode<>(TypeFlt.Pi));
+    _scope.add("math_pi",new ConNode<>(TypeFlt.PI));
     for( PrimNode prim : PrimNode.PRIMS )
       _scope.add_fun(prim._name,as_fun(prim));
     // Now that all the UnresolvedNodes have all possible hits for a name,

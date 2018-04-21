@@ -10,7 +10,7 @@ public class TmpNode extends Node implements AutoCloseable {
   @Override String str() { return "tmp"; }
   @Override public String toString() { return "tmp"; } // TOoOoOo many use/defs, print none
   @Override public Node ideal(GVNGCM gvn) { return null; }
-  @Override public Type value(GVNGCM gvn) { return Type.ALL; }
+  @Override public Type value(GVNGCM gvn) { return TypeErr.ALL; }
   // TmpNodes are never equal
   @Override public boolean equals(Object o) { return this==o; }
   @Override public int hashCode() { return 123456789; }

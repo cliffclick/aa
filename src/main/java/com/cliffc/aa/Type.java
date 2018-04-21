@@ -30,9 +30,9 @@ public class Type {
   @Override public int hashCode( ) { return _type; }
   // Is anything equals to this?
   @Override public boolean equals( Object o ) {
-    assert isBaseType();      // Overridden in subclasses
+    assert is_simple();         // Overridden in subclasses
     if( this == o ) return true;
-    return (o instanceof Type) ? _type==((Type)o)._type : false;
+    return (o instanceof Type) && _type==((Type)o)._type;
   }
   @Override public String toString() { return STRS[_type]; }
 
@@ -72,30 +72,26 @@ public class Type {
   }
 
   static final byte TBAD    = 0; // Type check
-  // Implemented fully here
-  static final byte TCONTROL= 1; // Control flow bottom (mini-lattice of Top-Control)
-  static final byte TALL    = 2; // Bottom; all possible types Meet together
-  static final byte TANY    = 3; // Top; dual of All; choice of any type
-  static final byte TSCALAR = 4; // Scalars; all possible finite types; includes pointers (functions, structs), ints, floats; excludes state of Memory and Control.
-  static final byte TXSCALAR= 5; // Invert scalars
-  static final byte TNUM    = 6; // Number and all derivitives (Complex, Rational, Int, Float, etc)
-  static final byte TXNUM   = 7; // Any Numbers; dual of NUM
-  static final byte TREAL   = 8; // All Real Numbers
-  static final byte TXREAL  = 9; // Any Real Numbers; dual of REAL
-  static final byte TBASE   =10; // End of the Base Types; Not a Type
-  private static final String[] STRS = new String[]{"Bad","Control","All","Any","Scalar","~Scalar","Number","~Number","Real","~Real"};
+  // Simple types are implemented fully here
+  static final byte TCONTROL= 1; // Control flow bottom (mini-lattice of Any-Control-Err)
+  static final byte TSCALAR = 2; // Scalars; all possible finite types; includes pointers (functions, structs), ints, floats; excludes state of Memory and Control.
+  static final byte TXSCALAR= 3; // Invert scalars
+  static final byte TNUM    = 4; // Number and all derivitives (Complex, Rational, Int, Float, etc)
+  static final byte TXNUM   = 5; // Any Numbers; dual of NUM
+  static final byte TREAL   = 6; // All Real Numbers
+  static final byte TXREAL  = 7; // Any Real Numbers; dual of REAL
+  static final byte TSIMPLE = 8; // End of the Simple Types
+  private static final String[] STRS = new String[]{"Bad","Control","Scalar","~Scalar","Number","~Number","Real","~Real"};
   // Implemented in subclasses
-  static final byte TUNION  =11; // Union types (finite collections of unrelated types Meet together); see TypeUnion
-  static final byte TTUPLE  =12; // Tuples; finite collections of unrelated Types, kept in parallel
-  static final byte TFUN    =13; // Functions; both domain and range are a Tuple; see TypeFun                            
-  static final byte TFLT    =14; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
-  static final byte TINT    =15; // All Integers, including signed/unsigned and various sizes; see TypeInt
-  static final byte TERROR  =16; // Type check
-  static final byte TLAST   =17; // Type check
+  static final byte TERROR  = 9; // ALL/ANY TypeErr types
+  static final byte TUNION  =10; // Union types (finite collections of unrelated types Meet together); see TypeUnion
+  static final byte TTUPLE  =11; // Tuples; finite collections of unrelated Types, kept in parallel
+  static final byte TFUN    =12; // Functions; both domain and range are a Tuple; see TypeFun                            
+  static final byte TFLT    =13; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
+  static final byte TINT    =14; // All Integers, including signed/unsigned and various sizes; see TypeInt
+  static final byte TLAST   =15; // Type check
   
   public  static final Type CONTROL= make(TCONTROL); // Control
-  public  static final Type ALL    = make(TALL    ); // Bottom
-  public  static final Type ANY    = make(TANY    ); // Top
   public  static final Type  SCALAR= make( TSCALAR); // ptrs, ints, flts; things that fit in a machine register
   public  static final Type XSCALAR= make(TXSCALAR); // ptrs, ints, flts; things that fit in a machine register
   private static final Type  NUM   = make( TNUM   );
@@ -104,54 +100,50 @@ public class Type {
   private static final Type XREAL  = make(TXREAL  );
 
   // Collection of sample types for checking type lattice properties.
-  // Ordered so dual can be computed by flipping pairs.
-  private static final Type[] TYPES = new Type[]{ALL,ANY,SCALAR,XSCALAR,NUM,XNUM,REAL,XREAL};
+  private static final Type[] TYPES = new Type[]{CONTROL,SCALAR,XSCALAR,NUM,XNUM,REAL,XREAL};
   
   byte base() { assert TBAD < _type && _type < TLAST; return _type; }
+  private boolean is_simple() { return _type < TSIMPLE; }
   
   // Return cached dual
   final Type dual() { return _dual; }
   
   // Compute dual right now.  Overridden in subclasses.
   protected Type xdual() {
-    assert isBaseType(); // Should be overridden in subclass
-    assert TBAD < _type && _type < TBASE;
+    assert is_simple();
+    if( _type==TCONTROL ) return this; // Self-symmetric
     return new Type((byte)(_type^1));
   }
 
   public final Type meet( Type t ) {
     Type mt = xmeet0(t);
-    //assert check_commute  (t,mt);
-    //assert check_symmetric(t,mt);
+    // Expensive asserts in an common place, turn off when stable
+    assert check_commute  (t,mt);
+    assert check_symmetric(t,mt);
     return mt;
   }
   private Type xmeet0( Type t ) {
     if( t == this ) return this;
-    if(_type != TUNION && _type != TERROR &&
-       ( _type >  TBASE  && t._type <  TBASE || // Reverse; xmeet 2nd arg is never <TBASE
-         t._type == TUNION || t._type == TERROR ))   // Reverse: always TypeUnion decides
-      return t.xmeet(this);
-    return xmeet(t);            // Do not reverse
+    // Reverse; xmeet 2nd arg is never <TBASE
+    return !is_simple() && t.is_simple() ? t.xmeet(this) : xmeet(t);
   }
   
   // Compute meet right now.  Overridden in subclasses.
-  // Handles cases where 'this._type' < TBASE.
-  // Subclassed xmeet calls can assert that '!t.isBase()'.
+  // Handles cases where 'this.is_simple()'.
+  // Subclassed xmeet calls can assert that '!t.is_simple()'.
   protected Type xmeet(Type t) {
-    // 'this' is not Tuple, Union, Fun, Flt nor Int
-    assert isBaseType() && t._type != TUNION; // Should be overridden in subclass
-    // Bottom meet anything is Bottom
-    if( _type == TALL || t._type == TALL ) return ALL;
-    // Top meet anything is that thing
-    if(   _type == TANY ) return t   ;
-    if( t._type == TANY ) return this;
+    assert is_simple(); // Should be overridden in subclass
+    // ANY meet anything is thing; thing meet ALL is ALL
+    if( t==TypeErr.ANY ) return this;
+    if( t==TypeErr.ALL ) return    t;
+    
     // Control can only meet Control or Top
-    if( _type == TCONTROL || t._type == TCONTROL ) { return _type == t._type ? CONTROL : ALL; }
+    if( _type == TCONTROL || t._type == TCONTROL ) { return _type == t._type ? CONTROL : TypeErr.ALL; }
 
     // The rest of these choices are various scalars, which do not match well
     // with any tuple.
-    if( t._type == TTUPLE ) return ALL;
-
+    if( t._type == TTUPLE ) return TypeErr.ALL;
+    
     // Scalar is close to bottom: everything falls to SCALAR, except Bottom
     // (handled above) and multi-types like Tuples
     if( _type == TSCALAR || t._type == TSCALAR )  return SCALAR;
@@ -159,7 +151,7 @@ public class Type {
     // ~Scalar is close to Top: it falls to anything, except multi-types like Tuples.
     if(   _type == TXSCALAR ) return t   ;
     if( t._type == TXSCALAR ) return this;
-
+    
     // The rest of these choices are various numbers, which do not match well
     // with any function - but all are scalars, so make a union.
     if( t._type == TFUN ) return SCALAR; // return TypeUnion.make(false,this,t);
@@ -168,7 +160,7 @@ public class Type {
     if( _type == TNUM || t._type == TNUM ) return NUM;
     if(   _type == TXNUM ) return t   ;
     if( t._type == TXNUM ) return this;
-
+    
     // Real; same pattern as ANY/ALL, or SCALAR/XSCALAR
     if( _type == TREAL || t._type == TREAL ) return REAL;
     if(   _type == TXREAL ) return t   ;
@@ -182,8 +174,7 @@ public class Type {
   // still interesting for other orders.
   private boolean check_commute( Type t, Type mt ) {
     if( t==this ) return true;
-    if( _type <  TBASE  && t._type >  TBASE  ) return true; // By design, flipped the only allowed order
-    if( _type == TUNION && t._type != TUNION ) return true; // By design, flipped the only allowed order
+    if( is_simple() && !t.is_simple() ) return true; // By design, flipped the only allowed order
     Type mt2 = t.xmeet(this);   // Reverse args and try again
     if( mt==mt2 ) return true;
     System.out.println("Meet not commutative: "+this+".meet("+t+")="+mt+", but "+t+".meet("+this+")="+mt2);
@@ -204,12 +195,12 @@ public class Type {
 
   static boolean check_startup() {
     Type[] ts =    Type     .TYPES ;
+    ts = concat(ts,TypeErr  .TYPES);
     ts = concat(ts,TypeInt  .TYPES);
     ts = concat(ts,TypeFlt  .TYPES);
     ts = concat(ts,TypeTuple.TYPES);
-    ts = concat(ts,TypeFun  .TYPES);
-    ts = concat(ts,TypeUnion.TYPES);
-    ts = concat(ts,TypeErr  .TYPES);
+    //ts = concat(ts,TypeFun  .TYPES);
+    //ts = concat(ts,TypeUnion.TYPES);
     
     // Confirm commutative & complete
     for( Type t0 : ts )
@@ -246,14 +237,11 @@ public class Type {
   // E.g. ANY-isa-XSCALAR; XSCALAR-isa-XREAL; XREAL-isa-Int(Any); Int(Any)-isa-Int(3)
   public boolean isa( Type t ) { return meet(t)==t; }
   // True if 'this' isa SCALAR, without the cost of a full 'meet()'
-  final boolean isa_scalar() {
-    return _type != TALL && _type != TANY && _type != TUNION && _type != TTUPLE;
-  }
+  final boolean isa_scalar() { return _type != TERROR && _type != TUNION && _type != TTUPLE; }
   
   // True if value is above the centerline (no real value)
   public boolean above_center() {
     switch( _type ) {
-    case TALL:
     case TSCALAR:
     case TNUM:
     case TREAL:
@@ -261,22 +249,20 @@ public class Type {
     case TXREAL:
     case TXNUM:
     case TXSCALAR:
-    case TANY:
       return true;              // These are all above center
-      
-    case TFUN:                  // Overridden in subclass
-    case TUNION:                // Overridden in subclass
-    case TTUPLE:                // Overridden in subclass
-    case TFLT:                  // Overridden in subclass
-    case TINT:                  // Overridden in subclass
-    default: throw AA.unimpl();
-    case TBASE: throw typerr(null);
+    case TERROR:
+    case TFUN:
+    case TUNION:
+    case TTUPLE:
+    case TFLT:
+    case TINT:                  
+    default: throw AA.unimpl(); // Overridden in subclass
+    case TSIMPLE: throw typerr(null);
     }
   }
   // True if value is higher-equal to SOME constant.
   protected boolean canBeConst() {
     switch( _type ) {
-    case TALL:
     case TSCALAR:
     case TNUM:
     case TREAL:
@@ -284,21 +270,19 @@ public class Type {
     case TXREAL:
     case TXNUM:
     case TXSCALAR:
-    case TANY:
       return true;              // These all include some constants
-      
-    case TFUN:                  // Overridden in subclass
-    case TUNION:                // Overridden in subclass
-    case TTUPLE:                // Overridden in subclass
-    case TFLT:                  // Overridden in subclass
-    case TINT:                  // Overridden in subclass
+    case TERROR:
+    case TFUN:
+    case TUNION:
+    case TTUPLE:
+    case TFLT:
+    case TINT:
     default: throw AA.unimpl();
-    case TBASE: throw typerr(null);
+    case TSIMPLE: throw typerr(null);
     }
   }
   public boolean is_con() {
     switch( _type ) {
-    case TALL:
     case TERROR:
     case TCONTROL:
     case TSCALAR:
@@ -307,15 +291,14 @@ public class Type {
     case TXREAL:
     case TXNUM:
     case TXSCALAR:
-    case TANY:
     case TFUN:                  // Never a function
     case TUNION:                // Overridden in subclass
       return false;             // Not exactly a constant
-    case TTUPLE:                // Overridden in subclass
-    case TFLT:                  // Overridden in subclass
-    case TINT:                  // Overridden in subclass
+    case TTUPLE:
+    case TFLT:
+    case TINT:
     default: throw AA.unimpl();
-    case TBASE: throw typerr(null);
+    case TSIMPLE: throw typerr(null);
     }
   }
   // Return any "return type" of the Meet of all function types
@@ -327,10 +310,8 @@ public class Type {
   public boolean isBitShape(Type t) {
     if( _type==TXSCALAR ) return true ; // Optimistically  never  needs a conversion
     if( _type== TSCALAR ) return false; // Pessimistically always needs a conversion
-    throw typerr(t); } // Overridden in subtypes
-  // True if a base type
-  private boolean isBaseType() { return getClass().getSimpleName().equals("Type"); }
-  
+    throw typerr(t);                    // Overridden in subtypes
+  }
   public RuntimeException typerr(Type t) {
     throw new RuntimeException("Should not reach here: internal type system error with "+this+(t==null?"":(" and "+t)));
   }

@@ -26,11 +26,12 @@ public class TypeFlt extends Type {
     TypeFlt t2 = (TypeFlt)t1.hashcons();
     return t1==t2 ? t1 : t2.free(t1);
   }
+  public static TypeFlt con(double con) { return make(0,log(con),con); }
   
-  static public final TypeFlt  FLT64 = make(-1,64,0);
-  static public final TypeFlt  FLT32 = make(-1,32,0);
-  static public final TypeFlt Pi     = make(0,64,Math.PI);
-  static final TypeFlt[] TYPES = new TypeFlt[]{FLT64,FLT32,Pi};
+  static public final TypeFlt FLT64 = make(-1,64,0);
+  static public final TypeFlt FLT32 = make(-1,32,0);
+  static public final TypeFlt PI    = con(Math.PI);
+  static final TypeFlt[] TYPES = new TypeFlt[]{FLT64,FLT32,PI};
   // Return a double from a TypeFlt constant; assert otherwise.
   @Override public double getd() { assert is_con(); return _con; }
 
@@ -41,9 +42,10 @@ public class TypeFlt extends Type {
     case TFLT:   break;
     case TINT:   return ((TypeInt)t).xmeetf(this);
     case TFUN:   return Type.SCALAR;
-    case TERROR: return t;
+    case TERROR: return ((TypeErr)t)._all ? t : this;
     case TCONTROL:
-    case TTUPLE: return Type.ALL;
+    case TTUPLE: return TypeErr.ALL;
+    case TUNION: return t.xmeet(this); // Let TypeUnion decide
     default: throw typerr(t);
     }
     TypeFlt tf = (TypeFlt)t;

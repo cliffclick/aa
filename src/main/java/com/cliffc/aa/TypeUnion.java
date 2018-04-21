@@ -11,7 +11,7 @@ public class TypeUnion extends Type {
   private boolean _any; // FALSE: meet; must support all; TRUE: join; can pick any one choice
   private TypeUnion( TypeTuple ts, boolean any ) { super(TUNION); init(ts,any); }
   private void init( TypeTuple ts, boolean any ) { _ts = ts;  _any=any;  assert !ts.has_tuple(); }
-  @Override public int hashCode( ) { return TANY+_ts.hashCode()+(_any?1:0);  }
+  @Override public int hashCode( ) { return TUNION+_ts.hashCode()+(_any?1:0);  }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeUnion) ) return false;
@@ -61,7 +61,7 @@ public class TypeUnion extends Type {
   }
 
   private static final TypeUnion ANY_NUM = (TypeUnion)make(true , TypeInt.INT64, TypeFlt.FLT64);
-  private static final TypeUnion ALL_NUM = (TypeUnion)make(false, TypeInt.INT64, TypeFlt.FLT64);
+  public  static final TypeUnion ALL_NUM = (TypeUnion)make(false, TypeInt.INT64, TypeFlt.FLT64);
   static final TypeUnion[] TYPES = new TypeUnion[]{ANY_NUM,ALL_NUM};
 
   @Override protected TypeUnion xdual() { return new TypeUnion((TypeTuple)_ts.dual(),!_any); }
@@ -74,9 +74,8 @@ public class TypeUnion extends Type {
   // [AB]C, where C might be any type including e.g. a union of either [C+D] or [CD].
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
-    case TALL: return ALL;
-    case TANY: return this;
-    case TTUPLE: return ALL;    // Tuple-vs-scalar
+    case TERROR: return ((TypeErr)t)._all ? t : this;
+    case TTUPLE: return TypeErr.ALL; // Tuple-vs-scalar
     case TUNION: {
       // Handle the case where they are structurally equal
       TypeUnion tu = (TypeUnion)t;

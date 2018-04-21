@@ -3,7 +3,7 @@ package com.cliffc.aa;
 // Type Variables.  Supports type unification via Tarjan U-F
 public class TypeVar extends Type {
   TypeVar _unify;
-  TypeVar() { super(Type.TANY); }
+  TypeVar() { super(Type.TBAD); }
 
   // The "find" part of Tarjan U-F
   final TypeVar go() {

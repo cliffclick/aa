@@ -2,7 +2,7 @@
 *.class
 
 # Built java file
-build/*java
+build/classes/main/com/cliffc/aa/BuildVersion.java
 
 # Package Files #
 *.jar
