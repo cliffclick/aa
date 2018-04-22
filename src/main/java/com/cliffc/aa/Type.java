@@ -96,7 +96,7 @@ public class Type {
   public  static final Type XSCALAR= make(TXSCALAR); // ptrs, ints, flts; things that fit in a machine register
   private static final Type  NUM   = make( TNUM   );
   private static final Type XNUM   = make(TXNUM   );
-  private static final Type  REAL  = make( TREAL  );
+  public  static final Type  REAL  = make( TREAL  );
   private static final Type XREAL  = make(TXREAL  );
 
   // Collection of sample types for checking type lattice properties.
@@ -118,8 +118,8 @@ public class Type {
   public final Type meet( Type t ) {
     Type mt = xmeet0(t);
     // Expensive asserts in an common place, turn off when stable
-    assert check_commute  (t,mt);
-    assert check_symmetric(t,mt);
+    //assert check_commute  (t,mt);
+    //assert check_symmetric(t,mt);
     return mt;
   }
   private Type xmeet0( Type t ) {
@@ -185,9 +185,9 @@ public class Type {
     Type ta = mt._dual.xmeet0(t._dual);
     Type tb = mt._dual.xmeet0(  _dual);
     if( ta==t._dual && tb==_dual ) return true;
-    System.out.print("("+this+"&"+t+")="+mt+"; but ("+mt._dual+"&");
-    if( ta!=t._dual ) System.out.println(t._dual+")=="+ta+" which is not "+t._dual);
-    else              System.out.println(  _dual+")=="+tb+" which is not "+  _dual);
+    System.err.print("("+this+"&"+t+")="+mt+"; but ("+mt._dual+"&");
+    if( ta!=t._dual ) System.err.println(t._dual+")=="+ta+" which is not "+t._dual);
+    else              System.err.println(  _dual+")=="+tb+" which is not "+  _dual);
     return false;
   }
   
@@ -200,7 +200,7 @@ public class Type {
     ts = concat(ts,TypeFlt  .TYPES);
     ts = concat(ts,TypeTuple.TYPES);
     ts = concat(ts,TypeFun  .TYPES);
-    //ts = concat(ts,TypeUnion.TYPES);
+    ts = concat(ts,TypeUnion.TYPES);
     
     // Confirm commutative & complete
     for( Type t0 : ts )

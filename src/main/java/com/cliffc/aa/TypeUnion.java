@@ -29,6 +29,7 @@ public class TypeUnion extends Type {
     return t1==t2 ? t1 : t2.free(t1);
   }
 
+  // Common cleanup rules on making new unions
   static Type make( boolean any, Type... ts ) { return make(any,new Ary<>(ts)); }
   private static Type make( boolean any, Ary<Type> ts ) {
     if( ts._len == 0 ) throw AA.unimpl();   //return any ? Type.ANY : Type.ALL;
@@ -55,13 +56,13 @@ public class TypeUnion extends Type {
     if( ux != -1 && (fx!=-1 || ix!=-1) )
       return Type.SCALAR;
     
-    if( ts._len == 1 ) return ts._es[0];
-    ts.sort_update(Comparator.comparingInt(e -> e._uid));
+    if( ts._len == 1 ) return ts._es[0]; // A single result is always that result
+    ts.sort_update(Comparator.comparingInt(e -> e._uid)); // The set has to be ordered, to remove dups that vary only by order
     return make(TypeTuple.make(!any,ts.asAry()),any);
   }
 
-  private static final TypeUnion ANY_NUM = (TypeUnion)make(true , TypeInt.INT64, TypeFlt.FLT64);
-  public  static final TypeUnion ALL_NUM = (TypeUnion)make(false, TypeInt.INT64, TypeFlt.FLT64);
+  static final TypeUnion ANY_NUM = (TypeUnion)make(true , TypeInt.INT64, TypeFlt.FLT64);
+  static final TypeUnion ALL_NUM = (TypeUnion)make(false, TypeInt.INT64, TypeFlt.FLT64);
   static final TypeUnion[] TYPES = new TypeUnion[]{ANY_NUM,ALL_NUM};
 
   @Override protected TypeUnion xdual() { return new TypeUnion((TypeTuple)_ts.dual(),!_any); }
@@ -120,12 +121,21 @@ public class TypeUnion extends Type {
   private static Ary<Type> ymeet( Ary<Type> ts, boolean any, Type t ) {
     assert t.isa_scalar();
     if( any ) { // [A+B]C ==> [AC+BC]
-      // If C equals any of A or B, then we do not need to build the meet and
-      // simplify it; more than a speedup this prevents looping during meeting
-      // e.g. {Num+Fun} * Num - which turns into {Num*Num + Num*Fun} which
-      // simplifies to {Num + {Num,Fun}} which then recurses.  If C equals
-      // something, then we can choose that something and just return C.
-      return ts.find(e->e==t) == -1 ? full_simplify(ts.map_update(t::meet),true) : ts.set_as(t);
+      ts.map_update(t::meet);   // Update-in-place with the meet
+      // If any of AC or BC is itself a Union, we "lower" it to a simple type,
+      // to prevent nested any/all Unions.  This weakens the result - but
+      // prevents O(n^2) (exponential?) growth in the representation.
+      for( int i=0; i<ts._len; i++ )
+        if( ts.at(i)._type==TUNION ) {
+          TypeUnion tui = (TypeUnion)ts.at(i);
+          switch( tui._ts._ts[0]._type ) {
+          case Type.TINT:
+          case Type.TFLT:  ts.set(i,Type.REAL); break;
+          case Type.TFUN:  throw AA.unimpl(); // TODO: handle union of funs
+          default: throw AA.unimpl();         // How to get here?
+          }
+        }
+      return full_simplify(ts,any);
     } else {    // [A*B]C ==> [A*B*C]
       // If t isa any element, it is redundant and does not need to be added.
       // Otherwise, filter out elements that isa t, and append t.

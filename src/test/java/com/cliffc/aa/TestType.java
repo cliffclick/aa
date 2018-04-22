@@ -102,7 +102,7 @@ public class TestType {
   // TODO: Observation: value() calls need to be monotonic, can test this.
   @Test public void testCommuteSymmetricAssociative() {
     // Uncomment to insert a single test to focus on
-    //Assert.assertEquals(TypeUnion.ALL_NUM,TypeInt.INT64.meet(TypeFlt.FLT64));
+    //Assert.assertEquals(TypeFlt.FLT64,TypeFlt.FLT32.meet(TypeUnion.ANY_NUM));
     Assert.assertTrue(Type.check_startup());
   }  
 }
