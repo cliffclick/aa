@@ -121,21 +121,7 @@ public class TypeUnion extends Type {
   private static Ary<Type> ymeet( Ary<Type> ts, boolean any, Type t ) {
     assert t.isa_scalar();
     if( any ) { // [A+B]C ==> [AC+BC]
-      ts.map_update(t::meet);   // Update-in-place with the meet
-      // If any of AC or BC is itself a Union, we "lower" it to a simple type,
-      // to prevent nested any/all Unions.  This weakens the result - but
-      // prevents O(n^2) (exponential?) growth in the representation.
-      for( int i=0; i<ts._len; i++ )
-        if( ts.at(i)._type==TUNION ) {
-          TypeUnion tui = (TypeUnion)ts.at(i);
-          switch( tui._ts._ts[0]._type ) {
-          case Type.TINT:
-          case Type.TFLT:  ts.set(i,Type.REAL); break;
-          case Type.TFUN:  throw AA.unimpl(); // TODO: handle union of funs
-          default: throw AA.unimpl();         // How to get here?
-          }
-        }
-      return full_simplify(ts,any);
+      return full_simplify(ts.map_update(t::meet),any);
     } else {    // [A*B]C ==> [A*B*C]
       // If t isa any element, it is redundant and does not need to be added.
       // Otherwise, filter out elements that isa t, and append t.
