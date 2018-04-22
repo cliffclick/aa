@@ -120,7 +120,7 @@ public class GVNGCM {
     }
     boolean found = false;
     for( Node o : _vals.keySet() ) if( o._uid == n._uid ) { found=true; break; }
-    assert found == expect;     // Expected in table 
+    assert found == expect  || _wrk_bits.get(n._uid); // Expected in table or on worklist
     return false;               // Not in table
   }
 
@@ -193,7 +193,7 @@ public class GVNGCM {
    *  @param n Node to be idealized; already in GVN
    *  @return null for no-change, or a better version of n, already in GVN */
   private Node xform_old0( Node n ) {
-    assert !check_new(n);      // Node is in tables
+    assert touched(n);         // Node is in type tables, but might be already out of GVN
     _vals.remove(n);           // Remove before modifying edges (and thus hash)
     Type oldt = type(n);       // Get old type
     _ts._es[n._uid] = null;    // Remove from types
@@ -219,10 +219,11 @@ public class GVNGCM {
   // Complete replacement; point uses to x.
   private void subsume( Node old, Node nnn ) {
     while( old._uses._len > 0 ) {
-      Node u = old._uses.del(0);
+      Node u = old._uses.del(0); // Old use
+      _vals.remove(u);           // Use is about to change edges; remove from type table
       u._defs.set(u._defs.find(a -> a==old),nnn); // was old now nnn
       nnn._uses.add(u);
-      add_work(u);
+      add_work(u);              // And put on worklist, to get re-inserted
     }
     nnn._uses.add(nnn);         // Self-hook, to prevent accidental deletion
     kill_new(old);              // Delete the old n, and anything it uses

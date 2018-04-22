@@ -19,4 +19,3 @@ public final class ErrNode extends Node {
     return _msg.equals(err._msg);
   }
 }
-

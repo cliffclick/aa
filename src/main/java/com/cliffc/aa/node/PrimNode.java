@@ -23,6 +23,7 @@ public abstract class PrimNode extends Node {
 
   public static PrimNode[] PRIMS = new PrimNode[] {
     new    RandI64(),
+    new    Id(),
     
     new ConvertInt32Flt64(),
 
@@ -158,6 +159,12 @@ class RandI64 extends PrimNode {
   RandI64() { super("math_rand",PrimNode.ARGS0,TypeFun.make(TypeTuple.ANY,TypeInt.INT64)); }
   @Override public TypeInt apply( Type[] args ) { return TypeInt.con(new java.util.Random().nextLong()); }
   @Override public Type value(GVNGCM gvn) { return TypeInt.INT64; }
-  public boolean is_lossy() { return false; }
+}
+
+class Id extends PrimNode {
+  Id() { super("id",PrimNode.ARGS1,TypeFun.SCR1); }
+  @Override public Type apply( Type[] args ) { return args[1]; }
+  @Override public Node ideal(GVNGCM gvn) { return at(1); }
+  @Override public Type value(GVNGCM gvn) { return gvn.type(at(1)); }
 }
 

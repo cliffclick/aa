@@ -291,9 +291,10 @@ public class Type {
     case TXREAL:
     case TXNUM:
     case TXSCALAR:
-    case TFUN:                  // Never a function
     case TUNION:                // Overridden in subclass
       return false;             // Not exactly a constant
+    case TFUN:      // Functions can be constant (code not data)....
+      return false; // ...but this requires the type system break out signatures from implementations
     case TTUPLE:
     case TFLT:
     case TINT:
