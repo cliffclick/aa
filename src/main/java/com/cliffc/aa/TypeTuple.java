@@ -107,6 +107,8 @@ public class TypeTuple extends Type {
     if( len < ts.length ) ts = Arrays.copyOf(ts,len);
     return make(all, ts);
   }
+
+  public Type at( int idx ) { return idx < _ts.length ? _ts[idx] : (_all?TypeErr.ALL:TypeErr.ANY); }
   
   boolean has_tuple() {
     for( Type t : _ts ) if( t._type==Type.TTUPLE ) return true;

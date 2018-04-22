@@ -5,7 +5,6 @@ public class TypeErr extends Type {
   boolean _all;
   String _msg;
   private TypeErr( String msg, boolean all ) { super(TERROR); init(msg,all); }
-  private TypeErr( String msg ) { this(msg,true); }
   private void init(String msg, boolean all ) { _msg=msg; _all=all; }
   @Override public int hashCode( ) { return TERROR+_msg.hashCode()+(_all?1:0); }
   @Override public boolean equals( Object o ) {

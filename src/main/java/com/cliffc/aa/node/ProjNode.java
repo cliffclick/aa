@@ -4,7 +4,7 @@ import com.cliffc.aa.*;
 
 // Proj control
 public class ProjNode extends Node {
-  final int _idx;
+  private final int _idx;
   public ProjNode( Node ifn, int idx ) { super(OP_PROJ,ifn); _idx=idx; }
   @Override String str() {
     if( at(0) instanceof IfNode )
@@ -31,7 +31,7 @@ public class ProjNode extends Node {
     if( !(c instanceof TypeTuple) )
       throw AA.unimpl();
     TypeTuple cs = (TypeTuple)c;
-    return cs._ts[_idx]; // Otherwise our type is just the matching tuple slice
+    return cs.at(_idx); // Otherwise our type is just the matching tuple slice
   }
   @Override public Type all_type() { return Type.CONTROL; }
   @Override public int hashCode() { return super.hashCode()+_idx; }

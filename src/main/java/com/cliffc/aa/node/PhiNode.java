@@ -1,30 +1,23 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.Type;
-import com.cliffc.aa.TypeErr;
+import com.cliffc.aa.*;
 
 // Merge results
 public class PhiNode extends Node {
   public PhiNode( Node... vals) { super(OP_PHI,vals); }
   @Override String str() { return "Phi"; }
   @Override public Node ideal(GVNGCM gvn) {
-    Node r = at(0);
-    assert r instanceof RegionNode;
+    RegionNode r = (RegionNode)at(0);
     assert r._defs._len==_defs._len;
     if( gvn.type(r) == TypeErr.ANY ) return null; // All dead, c-prop will fold up
-    // If only 1 input path is alive, we become an identity on that path
-    int idx = -1;               // Index of the one alive path
-    for( int i=1; i<r._defs._len; i++ )
-      if( gvn.type(r.at(i))!=TypeErr.ANY ) // Found a live path
-        if( idx == -1 ) idx = i;        // Remember live path
-        else return null;               // Some other output is alive also
-    return idx== -1 ? null : at(idx);   // Return the 1 alive path
+    if( r._cidx != 0 )
+      throw AA.unimpl();// test
+    return r._cidx == 0 ? null : at(r._cidx); // Region has collapsed to a Copy, fold up
   }
   @Override public Type value(GVNGCM gvn) {
-    Node r = at(0);
-    assert r instanceof RegionNode;
+    RegionNode r = (RegionNode)at(0);
     assert r._defs._len==_defs._len;
+    if( r._cidx != 0 ) return gvn.type(at(r._cidx)); // Region has collapsed to a Copy, no need to run full merge
     Type t = Type.XSCALAR;
     for( int i=1; i<_defs._len; i++ )
       if( gvn.type(r.at(i))!=TypeErr.ANY ) // Only meet alive paths

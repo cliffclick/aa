@@ -24,7 +24,7 @@ public abstract class Node implements Cloneable {
   static final byte OP_ERR  =14;
   
   public int _uid=Env._gvn.uid(); // Unique ID, will have gaps, used to give a dense numbering to nodes
-  public final byte _op;
+  private final byte _op;
 
   // Defs.  Generally fixed length, ordered, nulls allowed, no unused trailing space.  Zero is Control.
   public Ary<Node> _defs;
@@ -56,7 +56,7 @@ public abstract class Node implements Cloneable {
   // Uses.  Generally variable length; unordered, no nulls, compressed, unused trailing space
   public Ary<Node> _uses = new Ary<>(new Node[1],0);
   // Strictly add uses (no defs)
-  public void add_use(Node n) {
+  private void add_use( Node n ) {
     assert _uses != null;
     _uses.add(n); }
 
@@ -68,7 +68,7 @@ public abstract class Node implements Cloneable {
   }
 
   // Make a copy of the base node, with no defs nor uses and a new UID.
-  public Node copy() {
+  Node copy() {
     try {
       Node n = (Node)clone();             // Preserve base java type
       n._uid = Env._gvn.uid();            // A new UID
