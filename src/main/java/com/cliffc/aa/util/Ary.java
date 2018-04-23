@@ -68,10 +68,16 @@ public class Ary<E> implements Iterable<E> {
   
   /** Remove all elements */
   public void clear( ) { _len=0; }
-  
-  public E set( int i, E e ) {
+
+  // Extend and set
+  public E setX( int i, E e ) {
     while( i>= _es.length ) _es = Arrays.copyOf(_es,_es.length<<1);
     if( i >= _len ) _len = i+1;
+    return (_es[i] = e);
+  }
+  
+  public E set( int i, E e ) {
+    range_check(i);
     return (_es[i] = e);
   }
   
@@ -120,7 +126,7 @@ public class Ary<E> implements Iterable<E> {
   }
 
   private void range_check( int i ) {
-    if( i>=_len )
+    if( i < 0 || i>=_len )
       throw new ArrayIndexOutOfBoundsException(""+i+" >= "+_len);
   }
 

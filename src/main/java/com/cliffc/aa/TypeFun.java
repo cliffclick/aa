@@ -1,5 +1,7 @@
 package com.cliffc.aa;
 
+import com.cliffc.aa.util.SB;
+
 public class TypeFun extends Type {
   public TypeTuple _ts;         // Arg types
   public Type _ret;             // return types
@@ -12,7 +14,12 @@ public class TypeFun extends Type {
     TypeFun tf = (TypeFun)o;
     return _ts==tf._ts && _ret==tf._ret;
   }
-  @Override public String toString() { return "{"+_ts+"->"+_ret+"}"; }
+  @Override public String toString() {
+    SB sb = new SB().p('{');
+    for( Type t : _ts._ts ) sb.p(t.toString()).p(' ');
+    return sb.p("-> ").p(_ret.toString()).p('}').toString();
+  }
+  
   private static TypeFun FREE=null;
   private TypeFun free( TypeFun f ) { FREE=f; return this; }
   public static TypeFun make( TypeTuple ts, Type ret ) {

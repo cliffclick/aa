@@ -9,19 +9,21 @@ import java.util.BitSet;
 // Sea-of-Nodes
 public abstract class Node implements Cloneable {
   static final byte OP_CALL = 1;
-  static final byte OP_CON  = 2;
-  static final byte OP_FUN  = 3;
-  static final byte OP_PARM = 4;
-  static final byte OP_PRIM = 5;
-  static final byte OP_RET  = 6;
-  static final byte OP_SCOPE= 7;
-  static final byte OP_TMP  = 8;
-  static final byte OP_UNR  = 9;
-  static final byte OP_IF   =10;
-  static final byte OP_PROJ =11;
-  static final byte OP_REGION=12;
-  static final byte OP_PHI  =13;
-  static final byte OP_ERR  =14;
+  static final byte OP_CAST = 2;
+  static final byte OP_CON  = 3;
+  static final byte OP_ERR  = 4;
+  static final byte OP_FUN  = 5;
+  static final byte OP_IF   = 6;
+  static final byte OP_PARM = 7;
+  static final byte OP_PHI  = 8;
+  static final byte OP_PRIM = 9;
+  static final byte OP_PROJ =10;
+  static final byte OP_REGION=11;
+  static final byte OP_RET  =12;
+  static final byte OP_SCOPE=13;
+  static final byte OP_TMP  =14;
+  static final byte OP_UNR  =15;
+  static final String[] STRS = new String[] { null, "Call", "Cast", "Con", "Err", "Fun", "If", "Parm", "Phi", "Prim", "Proj", "Region", "Ret", "Scope", "Tmp", "Unr" };
   
   public int _uid=Env._gvn.uid(); // Unique ID, will have gaps, used to give a dense numbering to nodes
   private final byte _op;
@@ -81,20 +83,20 @@ public abstract class Node implements Cloneable {
   }
   
   // Short string name
-  abstract String str();
-  private SB xstr(SB sb) { return sb.p(_uid).p("=").p(str()); }
-  @Override public String toString() {
-    SB sb = new SB().p(str()).p("(");
-    boolean first=true;
-    for( Node n : _defs ) { sb.p(first?"":" ").p(n==null?"_":n.str()); first=false; }
-    return sb.p(")").toString();
+  String str() { return STRS[_op]; }
+  @Override public String toString() { return toString(0,new SB()).toString(); }
+  public String toString( int max ) { return toString(0, new SB(),max,new BitSet()).toString();  }
+  private SB toString( int d, SB sb ) {
+    xstr(sb.i(d));
+    for( Node n : _defs ) (n == null ? sb.p('_') : n.xstr(sb)).p(' ');
+    return sb;
   }
-  public String toString( int d ) {
-    // TODO: Recursive d-depth printing
-    SB sb = xstr(new SB()).p("(");
-    boolean first=true;
-    for( Node n : _defs ) { sb.p(first?"":" "); if(n==null) sb.p("_"); else n.xstr(sb); first=false; }
-    return sb.p(")").toString();
+  private SB xstr(SB sb) { return sb.p(_uid).p(':').p(str()).p(' '); }
+  private SB toString( int d, SB sb, int max, BitSet bs ) {
+    if( bs.get(_uid) ) return sb;
+    bs.set(_uid);
+    if( d < max ) for( Node n : _defs ) if( n != null ) n.toString(d+1,sb,max,bs);
+    return toString(d,sb).nl();
   }
   
   // Graph rewriting.  Can change defs, including making new nodes - but if it

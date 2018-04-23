@@ -4,17 +4,16 @@ import com.cliffc.aa.util.SB;
 
 import java.util.Arrays;
 
-/** record/struct types; infinitely extended with either Any or All (so
- *  duck-like typing works); extra type fields are ignored.  */
+/** record/struct types; infinitely extended with an extra type (typically ANY or ALL) */
 public class TypeTuple extends Type {
-  public boolean _all;          // Infinite extension via All
-  public Type[] _ts;
+  public Type[] _ts;            // The fixed known types
+  public Type _inf;             // Infinite extension type
   private int _hash;
-  private TypeTuple( boolean all, Type[] ts ) { super(TTUPLE); init(all,ts);  }
-  private void init( boolean all, Type[] ts ) {
-    _all = all;
+  private TypeTuple( Type[] ts, Type inf ) { super(TTUPLE); init(ts,inf);  }
+  private void init( Type[] ts, Type inf ) {
     _ts = ts;
-    int sum=TTUPLE+(all?1:0);
+    _inf = inf;
+    int sum=TTUPLE+inf.hashCode();
     for( Type t : ts ) sum += t.hashCode();
     _hash=sum;
   }
@@ -26,7 +25,7 @@ public class TypeTuple extends Type {
     TypeTuple t = (TypeTuple)o;
     if( _hash != t._hash ) return false;
     if( _ts == t._ts ) return true;
-    if( _ts.length != t._ts.length || _all != t._all) return false;
+    if( _ts.length != t._ts.length || _inf != t._inf) return false;
     for( int i=0; i<_ts.length; i++ )
       if( _ts[i]!=t._ts[i] ) return false;
     return true;
@@ -34,16 +33,16 @@ public class TypeTuple extends Type {
   @Override public String toString() {
     SB sb = new SB().p("[");
     for( Type t : _ts ) sb.p(t.toString()).p(',');
-    return sb.p(_all?"All":"Any").p("...]").toString();
+    return sb.p(_inf.toString()).p("...]").toString();
   }
   
   private static TypeTuple FREE=null;
   private TypeTuple free( TypeTuple f ) { FREE=f; return this; }
-  public static TypeTuple make( Type... ts ) { return make(false,ts); }
-  public static TypeTuple make( boolean all, Type... ts ) {
+  public static TypeTuple make( Type... ts ) { return make(TypeErr.ANY,false,ts); }
+  public static TypeTuple make( Type inf, boolean ignore, Type... ts ) {
     TypeTuple t1 = FREE;
-    if( t1 == null ) t1 = new TypeTuple(all,ts);
-    else { FREE = null; t1.init(all,ts); }
+    if( t1 == null ) t1 = new TypeTuple(ts,inf);
+    else { FREE = null; t1.init(ts,inf); }
     TypeTuple t2 = (TypeTuple)t1.hashcons();
     return t1==t2 ? t1 : t2.free(t1);
   }
@@ -66,13 +65,12 @@ public class TypeTuple extends Type {
   static final TypeTuple[] TYPES = new TypeTuple[]{ANY,SCALAR,INT32,INT64,FLT64,INT64_INT64,FLT64_FLT64,FLT64_INT64, IF_ALL, IF_TRUE, IF_FALSE};
   
   // The length of Tuples is a constant, and so is its own dual.  Otherwise
-  // just dual each element.  Flipping the "_any" flag just flips the meaning
-  // of the infinitely extended tail types (and not any of the explicitly
-  // represented types).
+  // just dual each element.  Also flip the infinitely extended tail type.
   @Override protected TypeTuple xdual() {
+    if( _ts.length==0 && _inf.dual()==_inf ) return this; // Self-symmetric
     Type[] ts = new Type[_ts.length];
     for( int i=0; i<_ts.length; i++ ) ts[i] = _ts[i].dual();
-    return new TypeTuple(!_all,ts);
+    return new TypeTuple(ts,_inf.dual());
   }
   // Standard Meet.
   @Override protected Type xmeet( Type t ) {
@@ -98,17 +96,16 @@ public class TypeTuple extends Type {
     for( int i=0; i<_ts.length; i++ )  ts[i] = _ts[i].meet(tmax._ts[i]);
     // Meet of elements only in the longer tuple
     for( int i=_ts.length; i<tmax._ts.length; i++ )
-      ts[i] = (_all?TypeErr.ALL:TypeErr.ANY).meet(tmax._ts[i]);
+      ts[i] = _inf.meet(tmax._ts[i]);
     // Reduce common tail
-    boolean all = _all || tmax._all;
-    TypeErr tail = all?TypeErr.ALL:TypeErr.ANY;
+    Type tail = _inf.meet(tmax._inf);
     int len = ts.length;
     while( len > 0 && ts[len-1] == tail ) len--;
     if( len < ts.length ) ts = Arrays.copyOf(ts,len);
-    return make(all, ts);
+    return make(tail,false, ts);
   }
 
-  public Type at( int idx ) { return idx < _ts.length ? _ts[idx] : (_all?TypeErr.ALL:TypeErr.ANY); }
+  public Type at( int idx ) { return idx < _ts.length ? _ts[idx] : _inf; }
   
   boolean has_tuple() {
     for( Type t : _ts ) if( t._type==Type.TTUPLE ) return true;

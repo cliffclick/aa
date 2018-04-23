@@ -30,21 +30,21 @@ public class Env implements AutoCloseable {
     // Now that all the UnresolvedNodes have all possible hits for a name,
     // register them with GVN.
     for( Node val : _scope._defs )  _gvn.init0(val);
+    _gvn.iter();
   }
   
   // Called during basic Env creation, this wraps a PrimNode as a full
   // 1st-class function to be passed about or assigned to variables.
-  private static RetNode as_fun( PrimNode prim ) {
+  private ProjNode as_fun( PrimNode prim ) {
     Type[] targs = prim._tf._ts._ts;
     String[] args = prim._args;
-    FunNode fun = (FunNode)_gvn.init(new FunNode(prim._tf)); // Points to ScopeNode only
+    FunNode fun = _gvn.init(new FunNode(prim._tf,_scope)); // Points to ScopeNode only
     prim.add_def(null);         // Control for the primitive
     for( int i=0; i<args.length; i++ )
       prim.add_def(_gvn.init(new ParmNode(i+1,args[i],fun,_gvn.con(targs[i]))));
-    Node x = _gvn.init(prim);
+    PrimNode x = _gvn.init(prim);
     assert x==prim;
-    Node rpc = _gvn.init(new ParmNode(args.length+1,"$rpc",fun,_gvn.con(TypeInt.TRUE)));
-    return (RetNode)_gvn.init(new RetNode(fun,prim,rpc,1));
+    return _gvn.init(new ProjNode(_gvn.init(new RetNode(fun,prim,fun)),1));
   }
 
   public Node add( String name, Node val ) { return _scope.add(name,val); }

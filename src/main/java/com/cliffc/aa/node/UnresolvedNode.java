@@ -2,9 +2,8 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.*;
 import com.cliffc.aa.util.Ary;
-import com.cliffc.aa.util.SB;
 
-// This is a place-holder choice-of-functions for Apply.  The choice is limited
+// This is a place-holder choice-of-functions for Call.  The choice is limited
 // to those with a auto-convert option (e.g. int->flt) or (anything->str).
 // flt->int is NOT allowed except losslessly (e.g. 0.0 -> 0).  The semantics
 // are that of join (since this is a choice) of functions.
@@ -16,13 +15,13 @@ import com.cliffc.aa.util.SB;
 // and has support to toss out choices with incorrect args (known from the
 // parser).  The goal is to collapse the Unresolved away.
 //
-// Apply carries the actuals args, and unless inlined, is typically very
+// Call carries the actuals args, and unless inlined, is typically very
 // conservative args.  If some arg is not isa a formal, that function is not
-// used (reports ALL to the JOIN); if no function is used the Apply returns
+// used (reports ALL to the JOIN); if no function is used the Call returns
 // ALL.  This is common for non-inlined calls where the args are only known as
 // SCALAR.
 //
-// After Apply inlines a call-site and the args lift to e.g. int or flt, can
+// After Call inlines a call-site and the args lift to e.g. int or flt, can
 // some kind of real resolution take place.  The resolution logic is here, and
 // returns a join-of-functions type result.  As soon as some function returns
 // something other than ALL (because args apply), it supercedes other choices-
@@ -37,7 +36,7 @@ import com.cliffc.aa.util.SB;
 //            2(I) _Y(SCALAR)
 //  I+I  F+F  /   /
 //   UNR+    /   -
-//     APPLY----/
+//     CALL-----/
 //
 // End up with 2/I + SCALAR/I  vs  2/F + SCALAR/F
 //
@@ -57,26 +56,29 @@ import com.cliffc.aa.util.SB;
 
 
 public class UnresolvedNode extends Node {
-  public UnresolvedNode() { super(OP_UNR); }
+  final String _name;
+  UnresolvedNode(String name) { super(OP_UNR); _name=name; }
 
-  // JOIN of all incoming (function) types
-  @Override public Type value(GVNGCM gvn) {
-    Type t = TypeErr.ALL;
-    for( Node def : _defs )
-      t = t.join(gvn.type(def));
-    return t;
-  }
   // Fold away a single choice
   @Override public Node ideal(GVNGCM gvn) {
     return _defs._len==1 ? _defs.at(0) : null;
+  }
+  // JOIN of all incoming (function) types
+  @Override public Type value(GVNGCM gvn) {
+    Type t = TypeErr.ALL;
+    for( Node def : _defs ) {
+      FunNode fun = (FunNode) (def.at(0).at(2));
+      t = t.join(fun._tf);
+    }
+    return t;
   }
   
   // When a call-site and a function get together, we can filter out choices
   // based on argument count.
   public Node filter( int nargs ) {
-    UnresolvedNode rez= new UnresolvedNode();
+    UnresolvedNode rez= new UnresolvedNode(_name);
     for( Node n : _defs )       // For each choice function
-      if( ((FunNode)n.at(2).at(0))._tf._ts._ts.length == nargs ) // Correct argument count
+      if( ((FunNode)n.at(0).at(2))._tf._ts._ts.length == nargs ) // Correct argument count
         rez.add_def(n);
     return Env._gvn.xform(rez); // Cleanup; could be a single choice or identical to input
   }
@@ -99,9 +101,9 @@ public class UnresolvedNode extends Node {
     
     // for each function, see if the actual args isa the formal args.  If not, toss it out.
     outerloop:
-    for( Node ret : _defs ) {
-      // Peek Ret->RPC->Fun and get the function type
-      TypeFun fun = (TypeFun)gvn.type(ret.at(2).at(0));
+    for( Node proj : _defs ) {
+      // Peek Proj->Ret->Fun and get the function type
+      TypeFun fun = ((FunNode)(proj.at(0).at(2)))._tf;
       Type[] formals = fun._ts._ts;   // Type of each argument
       if( formals.length != apply.nargs() )
         continue; // Argument count mismatch
@@ -113,9 +115,9 @@ public class UnresolvedNode extends Node {
           continue outerloop;   // No, this function will never work
         if( apply.actual(gvn,j)==Type.SCALAR ) scalar=true;
       }
-      if( scalar ) { // Some unknown args from unknow callers
-        ns.add(ret); // Cannot insert conversions, nor toss out based on converts
-        continue;    // Must keep this choice
+      if( scalar ) {  // Some unknown args from unknow callers
+        ns.add(proj); // Cannot insert conversions, nor toss out based on converts
+        continue;     // Must keep this choice
       }
       int cvts=0;               // Count required conversions
       for( int j=0; j<formals.length; j++ )
@@ -123,7 +125,7 @@ public class UnresolvedNode extends Node {
       // Save only choices with minimal conversions
       if( cvts < min_cvts ) { min_cvts = cvts; ns.clear(); }
       if( cvts == min_cvts)
-        ns.add(ret);            // This is an acceptable choice.
+        ns.add(proj);           // This is an acceptable choice.
     }
     return ns;
   }
@@ -147,15 +149,14 @@ public class UnresolvedNode extends Node {
     }    
     return t;
   }
-  
 
-  @Override public String toString() {
-    SB sb = new SB().p("ANY(");
-    boolean first=true;
-    for( Node n : _defs ) { sb.p(first?"":" ").p(n==null?"_":n.at(1).str()); first=false; }
-    return sb.p(")").toString();
+  String errmsg() {
+    String s = _name+":[ ";
+    for( Node proj : _defs )
+      s += ((FunNode)(proj.at(0).at(2)))._tf+" ";
+    return s+"]";
   }
-  @Override String str() { return "ANY"; }
+  @Override String str() { return _name; }
   // Return a sample op_prec, but really could assert all are the same
-  @Override public int op_prec() { return _defs._len==0 ? -1 : _defs.at(0).op_prec(); }
+  @Override public int op_prec() { return _defs._len==0 ? -1 : _defs.at(0).at(0).op_prec(); }
 }

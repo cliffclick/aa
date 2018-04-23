@@ -4,7 +4,7 @@ import com.cliffc.aa.*;
 
 // Proj control
 public class ProjNode extends Node {
-  private final int _idx;
+  final int _idx;
   public ProjNode( Node ifn, int idx ) { super(OP_PROJ,ifn); _idx=idx; }
   @Override String str() {
     if( at(0) instanceof IfNode )
@@ -20,6 +20,7 @@ public class ProjNode extends Node {
     if( !(c instanceof TypeTuple) )
       throw AA.unimpl();
     TypeTuple cs = (TypeTuple)c;
+    if( cs._inf==TypeErr.CONTROL ) return null; // Other choices may yet appear
     for( int i=0; i<cs._ts.length; i++ )
       if( i!=_idx && cs._ts[i]!=TypeErr.ANY ) // Some output (other than this) alive?
         return null;            // Some other output is alive also
@@ -42,4 +43,7 @@ public class ProjNode extends Node {
     ProjNode proj = (ProjNode)o;
     return _idx==proj._idx;
   }
+  // Return the op_prec of the returned value.  Not sensible except
+  // when call on primitives.
+  @Override public int op_prec() { return _defs.at(0).op_prec(); }
 }

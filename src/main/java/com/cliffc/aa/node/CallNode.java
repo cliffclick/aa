@@ -32,24 +32,23 @@ public class CallNode extends Node implements AutoCloseable {
 
     // If the function is unresolved, see if we can resolve it now
     if( retx instanceof UnresolvedNode ) {
-      Ary<Node> rets = ((UnresolvedNode)retx).resolve(gvn,this);
-      // List of function choices
+      UnresolvedNode unr = (UnresolvedNode)retx;
+      Ary<Node> projs = unr.resolve(gvn,this); // List of function choices
+      if( projs.isEmpty() )                    // No choices possible
+        return new ConNode<>(TypeErr.make(unr.errmsg())); // Fail to top
 
-      if( rets.isEmpty() ) // TODO: Return a new ErrNode() which preserves syntax line numbers
-        return new ConNode<>(TypeErr.ANY); // Fail to top
-
-      if( rets._len>1 ) {       // Multiple choices, but save the reduced Unr
-        if( rets._len==retx._defs._len ) return null; // No improvement
+      if( projs._len>1 ) {       // Multiple choices, but save the reduced Unr
+        if( projs._len==retx._defs._len ) return null; // No improvement
         throw AA.unimpl();
         //Node unr2 = new UnresolvedNode(); // Build and return a reduced Unr
-        //for( Node ret : rets ) unr2.add_def(ret);
+        //for( Node ret : projs ) unr2.add_def(ret);
         //return set_def(1,unr2,gvn); // Upgrade Call with smaller choices
       }
 
       // Single choice; insert actual conversions & replace
-      Node ret = rets.at(0);
-      Node fun = ret.at(2).at(0);
-      Type[] formals = ((TypeFun)gvn.type(fun))._ts._ts;
+      Node proj = projs.at(0);
+      FunNode fun = (FunNode)(proj.at(0).at(2)); // Proj->Ret->Fun
+      Type[] formals = fun._tf._ts._ts;
       for( int i=0; i<nargs(); i++ ) {
         Type formal = formals[i];
         Type actual = actual(gvn,i);
@@ -60,66 +59,33 @@ public class CallNode extends Node implements AutoCloseable {
         }
       }
       // upgrade function argument to a constant
-      return set_def(1,ret,gvn);
+      return set_def(1,proj,gvn);
     }
 
     // If the function is fully resolved, inline the call site now.
     // This is NOT inlining the function body, just the call site.
     if( retx instanceof RetNode ) {
-      FunNode  fun = (FunNode) retx.at(0);
-      Node     rez =           retx.at(1);
-      ParmNode rpc = (ParmNode)retx.at(2);
-
-      // Add an input path to all incoming arg ParmNodes from the Call.
-      int pcnt=0;               // Assert all parameters found
-      for( Node arg : fun._uses ) {
-        if( arg.at(0) == fun && arg instanceof ParmNode ) {
-          int pidx = ((ParmNode)arg)._idx;
-          if( pidx != nargs()+1) {          // No update to the RPC Parm; it is done below
-            gvn.add_def(arg,actual(pidx-1));// 1-based on Parm is 2-based on Call's args
-            pcnt++;                         // One more arg found
-          }
-        }
-      }
-      assert pcnt == nargs(); // All params found and updated at the function head
-      gvn.add_def(fun,ctrl); // Add Control for this path
-      gvn.add_def(rpc,gvn.con(TypeInt.con(_cidx)));// The RPC for this call
-      // A new private return path replaces the Call.
-      // TODO: Upgrade the function type for the known arguments.  THIS RetNode
-      // is a more strongly-typed function than the generic return.
-
-      // TODO: Not a RetNode; I want the return result from an actual function
-      // call with actual args and NOT the generic return result from function
-      // def.  The RetNode being made here is intended to pull a single return
-      // result from a single function call, and not all possible return
-      // results.
-        
-      // TODO: Combine RootNode and Env hash lookup... so can change what node
-      // a name points too.
-      
-      // TODO: Graph rewrite of "x=3; foo={y->x+y}"
-      // 
-      // 2_Fun :=  _    0_Root
-      // 6_Parm:= 2_Fun __Con_Scalar
-      // 4_RPC := 2_Fun __Con_1     
-      // 5_Unr := +:Flt  +:Int
-      // 3_Call:= 2_Fun 5_Unr __Con_3 6_Parm  // typerr if Scalar is e.g. String
-      // 1_Ret := 2_Fun 3_Call 4_RPC  #1
-      // foo->1_Ret
-      
-      // Call of Unr - resolves 3 fine, but type-var unify parm with either I or F.
-      // So instead, force inline which requires Fun get cloned:
+      throw AA.unimpl();
+      //FunNode  fun = (FunNode) retx.at(0);
+      //Node     rez =           retx.at(1);
+      //ParmNode rpc = (ParmNode)retx.at(2);
       //
-      // Fun / Parm_Int64 / RPC / Call(+Int,3  ,Int64) / Ret:Int64
-      // Fun / Parm_Flt64 / RPC / Call(+Flt,3.0,Flt64) / Ret:Flt64
-      // foo-> { Fun_Int64, Fun_Flt64, Fun_Scalar\I\F }
-
-      // Want to allow all e.g. scalars minus int64 minus flt64
-      // Want to break foo into 3 functions, those taking int, those taking flt, and all-the-rest
-
-      // 
-      
-      return new RetNode( fun, rez, rpc, _cidx );
+      //// Add an input path to all incoming arg ParmNodes from the Call.
+      //int pcnt=0;               // Assert all parameters found
+      //for( Node arg : fun._uses ) {
+      //  if( arg.at(0) == fun && arg instanceof ParmNode ) {
+      //    int pidx = ((ParmNode)arg)._idx;
+      //    if( pidx != nargs()+1) {          // No update to the RPC Parm; it is done below
+      //      gvn.add_def(arg,actual(pidx-1));// 1-based on Parm is 2-based on Call's args
+      //      pcnt++;                         // One more arg found
+      //    }
+      //  }
+      //}
+      //assert pcnt == nargs(); // All params found and updated at the function head
+      //gvn.add_def(fun,ctrl); // Add Control for this path
+      //gvn.add_def(rpc,gvn.con(TypeInt.con(_cidx)));// The RPC for this call
+      //
+      //return new RetNode( fun, rez, rpc, _cidx );
     }
 
     return null;
@@ -129,10 +95,10 @@ public class CallNode extends Node implements AutoCloseable {
     Node unr = _defs.at(1);
     if( unr instanceof UnresolvedNode )
       return ((UnresolvedNode)unr).retype(gvn,this);
-    
-    assert unr instanceof RetNode;
+
+    assert unr instanceof ProjNode;
     // Value is the function return type
-    Node ret = unr;             // Must be a return
+    RetNode ret = (RetNode)(unr.at(0)); // Must be a return
     Type tret = gvn.type(ret.at(1));
     if( tret.is_con() ) return tret; // Already determined function body is a constant
     

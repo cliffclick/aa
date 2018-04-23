@@ -21,7 +21,7 @@ public class GVNGCM {
   private BitSet _wrk_bits = new BitSet();
 
   public void add_work(Node n) { if( !_wrk_bits.get(n._uid) ) add_work0(n); }
-  private Node add_work0( Node n ) {
+  private <N extends Node> N add_work0( N n ) {
     _work.add(n);               // These need to be visited later
     _wrk_bits.set(n._uid);
     return n;
@@ -42,11 +42,11 @@ public class GVNGCM {
     if( t != null ) return t;
     t = n.all_type();           // If no type yet, defaults to the pessimistic type
     if( _opt ) t = t.dual();
-    return _ts.set(n._uid,t);
+    return _ts.setX(n._uid,t);
   }
   private void setype( Node n, Type t ) {
     assert t != null;
-    _ts.set(n._uid,t);
+    _ts.setX(n._uid,t);
   }
   // Make globally shared common ConNode for this type.
   public Node con( Type t ) {
@@ -61,11 +61,11 @@ public class GVNGCM {
   // Record a Node, but do not optimize it for value and ideal calls, as it is
   // mid-construction from the parser.  Any function call with yet-to-be-parsed
   // call sites, and any loop top with an unparsed backedge needs to use this.
-  Node init( Node n ) {
+  <N extends Node> N init( N n ) {
     assert n._uses._len==0;
     return init0(n);
   }
-  Node init0( Node n ) {
+  <N extends Node> N init0( N n ) {
     setype(n,n.all_type());
     _vals.put(n,n);
     return add_work0(n);
@@ -227,7 +227,7 @@ public class GVNGCM {
     }
     nnn._uses.add(nnn);         // Self-hook, to prevent accidental deletion
     kill_new(old);              // Delete the old n, and anything it uses
-    nnn._uses.pop();            // Remove self-hook
+    nnn._uses.del(nnn._uses.find(a -> a==nnn)); // Remove self-hook
   }
   
   // Once the program is complete, any time anything is on the worklist we can

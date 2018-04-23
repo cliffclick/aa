@@ -72,6 +72,12 @@ public class Parse {
 
     // Result type
     Type tres = _gvn.type(res);
+    // Finding a function in a data-slot?  Returning a function type
+    if( tres == TypeErr.CONTROL ) { // Get function type when returning a function
+      if( res instanceof ProjNode ) {
+        tres = ((FunNode)(res.at(0).at(2)))._tf;
+      } else throw AA.unimpl();
+    }
     kill(res);
 
     // Gather errors
@@ -219,9 +225,10 @@ public class Parse {
         //if( args.len()==1 ) return fun; // Not a function call
       }
       Node call = gvn(args);    // No syntax errors; flag Call not auto-close
-      if( _gvn.type(call)._type==Type.TERROR ) {
+      Type tc = _gvn.type(call);
+      if( tc._type==Type.TERROR ) {
         kill(call);
-        return con(err_ctrl("Argument mismatch in call to " + fun));
+        return con(err_ctrl("Argument mismatch in call to " + tc));
       }
       return call;
     }
@@ -300,21 +307,19 @@ public class Parse {
       if( tok.equals("->") ) break;
       ids.add(tok);
     }
-    FunNode fun = (FunNode)init(new FunNode(TypeFun.any(ids._len)));
+    FunNode fun = init(new FunNode(TypeFun.any(ids._len),_e._scope));
     Node old_ctrl = ctrl();
-    set_ctrl(fun);
     try( Env e = new Env(_e) ) {// Nest an environment for the local vars
       _e = e;                   // Push nested environment
       int cnt=0;                // Add parameters to local environment
       for( String id : ids )  _e.add(id,init(new ParmNode(++cnt,id,fun,con(Type.SCALAR))));
       Node rpc = _e.add(" rpc ",init(new ParmNode(ids._len+1,"$rpc",fun,con(TypeInt.TRUE))));
       Node rez = stmt();        // Parse function body
-      Node ret = e._ret = gvn(new RetNode(fun,rez,rpc,1));
+      Node ret = e._ret = gvn(new RetNode(ctrl(),rez,fun));
+      require('}');             // 
       _e = _e._par;             // Pop nested environment
-      require('}');
-      return ret;               // Return function
-    } finally {
-      set_ctrl(old_ctrl);
+      set_ctrl(old_ctrl);       // Back to the pre-function-def control
+      return ret;               // Return function; close-out and DCE 'e'
     }
   }
   
@@ -379,7 +384,7 @@ public class Parse {
   private static boolean isOp1   (byte c) { return isOp0(c); }
 
   public Node gvn (Node n) { return n==null ? null : _gvn.xform(n); }
-  public Node init(Node n) { return n==null ? null : _gvn.init (n); }
+  public <N extends Node> N init(N n) { return n==null ? null : _gvn.init (n); }
   public void kill(Node n) { if( n._uses._len==0 ) _gvn.kill(n); }
   public Node ctrl() { return _e._scope.get(" control "); }
   // Set and return a new control

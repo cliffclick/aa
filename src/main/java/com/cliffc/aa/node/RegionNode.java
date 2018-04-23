@@ -8,12 +8,17 @@ import com.cliffc.aa.TypeErr;
 public class RegionNode extends Node {
   int _cidx; // Copy index; monotonic change from zero to Control input this Region is collapsing to
   public RegionNode( Node... ctrls) { super(OP_REGION,ctrls); }
+  protected RegionNode( byte op, ScopeNode sc ) { super(op,null,sc); } // For FunNodes
   @Override String str() { return "Region"; }
-  @Override public Node ideal(GVNGCM gvn) {
+  @Override public Node ideal(GVNGCM gvn) { return ideal(gvn,1); }
+  // Ideal call, but FunNodes keep index#1 for future parsed call sites
+  Node ideal(GVNGCM gvn, int sidx) {
+    // TODO: Check for dead-diamond merges
+    // TODO: Check for 2+but_less_than_all alive, and do a partial collapse
     if( _cidx !=0 ) return null; // Already found single control path
     // If only 1 input path is alive, we become a copy on that path
     int idx=0;
-    for( int i=1; i<_defs._len; i++ )
+    for( int i=sidx; i<_defs._len; i++ )
       if( gvn.type(at(i))!=TypeErr.ANY ) // Found a live path
         if( idx == 0 ) idx = i;          // Remember live path
         else return null;                // Some other output is alive also

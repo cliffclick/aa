@@ -2,14 +2,17 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.*;
 
-// Merge results
+// Merge results; extended by ParmNode
 public class PhiNode extends Node {
   public PhiNode( Node... vals) { super(OP_PHI,vals); }
+  protected PhiNode( byte op, Node fun, Node defalt ) { super(op,fun,defalt); } // For ParmNodes
   @Override String str() { return "Phi"; }
   @Override public Node ideal(GVNGCM gvn) {
     RegionNode r = (RegionNode)at(0);
     assert r._defs._len==_defs._len;
     if( gvn.type(r) == TypeErr.ANY ) return null; // All dead, c-prop will fold up
+    // TODO: can fold up all ANY control paths with ANY data; makes dead calcs
+    // go dead sooner.
     if( r._cidx != 0 )
       throw AA.unimpl();// test
     return r._cidx == 0 ? null : at(r._cidx); // Region has collapsed to a Copy, fold up

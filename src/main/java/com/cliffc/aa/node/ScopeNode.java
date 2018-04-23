@@ -17,10 +17,10 @@ public class ScopeNode extends Node {
   }
   
   // Add a Node to an UnresolvedNode.  Must be a function.
-  public void add_fun(String name, RetNode ret) {
+  public void add_fun(String name, ProjNode proj) {
     Integer ii = _vals.get(name);
-    Node unr = ii==null ? add(name,new UnresolvedNode()) : _defs.at(ii);
-    unr.add_def(ret);
+    Node unr = ii==null ? add(name,new UnresolvedNode(name)) : _defs.at(ii);
+    unr.add_def(proj);
   }
   
   // Extend the current Scope with a new name; cannot override existing name.
