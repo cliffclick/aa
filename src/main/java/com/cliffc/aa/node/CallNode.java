@@ -7,8 +7,8 @@ import java.lang.AutoCloseable;
 
 // See FunNode.  Control is not required for an apply but inlining the function
 // body will require it; slot 0 is for Control.  Slot 1 is a function value -
-// can be a UnresolvedNode (choice/Any of functions) or a RetNode.  Slots 2+
-// are for args.
+// can be a UnresolvedNode (choice/Any of functions) or a Proj to a RetNode.
+// Slots 2+ are for args.
 //
 // When the UnresolvedNode simplifies to a single RetNode, the Call can inline.
 // If the Unr is an 'any' then a bunch of function pointers are allowed here.
@@ -35,7 +35,7 @@ public class CallNode extends Node implements AutoCloseable {
       UnresolvedNode unr = (UnresolvedNode)p_u;
       Ary<Node> projs = unr.resolve(gvn,this); // List of function choices
       if( projs.isEmpty() )                    // No choices possible
-        return new ConNode<>(TypeErr.make(unr.errmsg())); // Fail to top
+        return new ConNode<>(TypeErr.make("Argument mismatch in call to "+unr.errmsg())); // Fail to top
 
       if( projs._len>1 ) {       // Multiple choices, but save the reduced Unr
         if( projs._len==unr._defs._len ) return null; // No improvement
@@ -68,6 +68,8 @@ public class CallNode extends Node implements AutoCloseable {
       RetNode ret = (RetNode)p_u.at(0);
       Node    rez = ret.at(1);
       FunNode fun = (FunNode)ret.at(2);
+      if( fun._tf._ts._ts.length != _defs._len-2 )
+        return null; // Incorrect argument count
       // Add an input path to all incoming arg ParmNodes from the Call.
       int pcnt=0;               // Assert all parameters found
       for( Node arg : fun._uses ) {
@@ -90,10 +92,13 @@ public class CallNode extends Node implements AutoCloseable {
     Node unr = _defs.at(1);
     if( unr instanceof UnresolvedNode )
       return ((UnresolvedNode)unr).retype(gvn,this);
-
     assert unr instanceof ProjNode;
-    // Value is the function return type
     RetNode ret = (RetNode)(unr.at(0)); // Must be a return
+    FunNode fun = (FunNode)ret.at(2);
+    if( fun._tf._ts._ts.length != _defs._len-2 )
+      return TypeErr.make("Function "+fun._tf+" expects "+fun._tf._ts._ts.length+" args but passed "+(_defs._len-2));
+    
+    // Value is the function return type
     Type tret = gvn.type(ret.at(1));
     if( tret.is_con() ) return tret; // Already determined function body is a constant
     

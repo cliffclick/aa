@@ -63,8 +63,8 @@ public class Parse {
   private TypeEnv prog() {
     // Currently only supporting exprs
     Node res = stmt();
-    if( skipWS() != -1 ) res = con(err_ctrl("Syntax error; trailing junk"));
-    _e._scope.add_def(res);     // Hook, so not deleted
+    if( res == null ) res = con(TypeErr.ALL);
+    _e._scope.add_def(res); // Hook, so not deleted
     _gvn.iter();    // Pessimistic optimizations; might improve error situation
     res = _e._scope.pop(); // New and improved result
 
@@ -72,13 +72,14 @@ public class Parse {
 
     // Result type
     Type tres = Env.lookup_type(res);
-    kill(res);
 
     // Gather errors
     Env par = _e._par;
     Ary<String> errs = par.gather_errs(_gvn);
-    if( tres instanceof TypeErr ) // Result can be an error, even if no c-flow has an error
+    if( tres instanceof TypeErr && tres != TypeErr.ALL ) // Result can be an error, even if no c-flow has an error
       errs = add_err(errs,((TypeErr)tres)._msg); // One more error
+    if( errs == null && skipWS() != -1 ) errs = add_err(null,errMsg("Syntax error; trailing junk"));
+    kill(res);
     return new TypeEnv(tres,_e,errs);
   }
 
@@ -190,43 +191,45 @@ public class Parse {
    */
   private Node term() {
     Node fun = nfact(), arg;         // nfactor
-    if( fun == null ) return null;   // No term at all
-    if( skipWS() == -1 ) return fun; // Just the original term
-    // Function application; parse out the argument list
-    try( CallNode args = new CallNode() ) {
-      args.add_def(ctrl());
-      args.add_def(fun);
-      if( peek('(') ) {               // Traditional fcn application
-        if( (arg=stmt()) != null ) {  // Check for a no-arg fcn call
-          args.add_def(arg);          // Add first arg
-          while( peek(',') ) {        // Gather comma-separated args
-            if( (arg=stmt()) == null ) arg = con(err_ctrl("Missing argument in function call"));
-            args.add_def(arg);
+    while( fun != null ) {           // Have nfact?
+      if( skipWS() == -1 ) return fun; // Just the original term
+      // Function application; parse out the argument list
+      try( CallNode args = new CallNode() ) {
+        args.add_def(ctrl());
+        args.add_def(fun);
+        if( peek('(') ) {               // Traditional fcn application
+          if( (arg=stmt()) != null ) {  // Check for a no-arg fcn call
+            args.add_def(arg);          // Add first arg
+            while( peek(',') ) {        // Gather comma-separated args
+              if( (arg=stmt()) == null ) arg = con(err_ctrl("Missing argument in function call"));
+              args.add_def(arg);
+            }
           }
+          require(')');
+          if( !(fun instanceof ProjNode && fun.at(0) instanceof RetNode) &&
+              !(fun instanceof UnresolvedNode) )
+            return con(err_ctrl("A function is being called, but "+_gvn.type(fun)+" is not a function type"));
+        } else {                  // lispy-style fcn application
+          // TODO: Unable resolve ambiguity with mixing "(fun arg0 arg1)" and
+          // "fun(arg0,arg1)" argument calls.  Really having trouble with parsing
+          // "1-2", where "1" parses in the function position and "-2" is a uniop
+          // '-' applied to a 2: "-(2)".  This parses as the function "1" and its
+          // single arg "-(2)" - but "1" is not a function.
+          return args.del(1);     // No function call
+          //while( (arg = stmt()) != null ) // While have args
+          //  args.add_def(arg);            // Gather WS-separate args
+          //if( args.len()==1 ) return fun; // Not a function call
         }
-        require(')');
-        if( !(fun instanceof ProjNode && fun.at(0) instanceof RetNode) &&
-            !(fun instanceof UnresolvedNode) )
-          return con(err_ctrl("A function is being called, but "+_gvn.type(fun)+" is not a function type"));
-      } else {                  // lispy-style fcn application
-        // TODO: Unable resolve ambiguity with mixing "(fun arg0 arg1)" and
-        // "fun(arg0,arg1)" argument calls.  Really having trouble with parsing
-        // "1-2", where "1" parses in the function position and "-2" is a uniop
-        // '-' applied to a 2: "-(2)".  This parses as the function "1" and its
-        // single arg "-(2)" - but "1" is not a function.
-        return args.del(1);     // No function call
-        //while( (arg = stmt()) != null ) // While have args
-        //  args.add_def(arg);            // Gather WS-separate args
-        //if( args.len()==1 ) return fun; // Not a function call
+        Node call = gvn(args);    // No syntax errors; flag Call not auto-close
+        Type tc = _gvn.type(call);
+        if( tc._type==Type.TERROR ) {
+          kill(call);
+          return con(err_ctrl(((TypeErr)tc)._msg));
+        }
+        fun = call;             // Result of call might be a function, getting called again
       }
-      Node call = gvn(args);    // No syntax errors; flag Call not auto-close
-      Type tc = _gvn.type(call);
-      if( tc._type==Type.TERROR ) {
-        kill(call);
-        return con(err_ctrl("Argument mismatch in call to " + tc));
-      }
-      return call;
     }
+    return null;
   }
   
   /** Parse any leading unary ops before a factor

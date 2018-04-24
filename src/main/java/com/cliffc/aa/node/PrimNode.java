@@ -156,7 +156,7 @@ class MulInt64 extends Prim2OpI64 {
 }
 
 class RandI64 extends PrimNode {
-  RandI64() { super("math_rand",PrimNode.ARGS1,TypeFun.INT64_INT64); }
+  RandI64() { super("math_rand",PrimNode.ARGS1,TypeFun.INT64); }
   @Override public TypeInt apply( Type[] args ) { return TypeInt.con(new java.util.Random().nextInt((int)args[1].getl())); }
   @Override public Type value(GVNGCM gvn) { return TypeInt.INT64; }
 }

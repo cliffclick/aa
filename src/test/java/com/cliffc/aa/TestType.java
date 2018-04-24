@@ -71,14 +71,15 @@ public class TestType {
     test("{x y -> x+y}", TypeFun.any(2)); // actually {Flt,Int} x {FltxInt} -> {FltxInt} but currently types {SCALAR,SCALAR->SCALAR}
     test("{5}()", TypeInt.con(5)); // No args nor -> required; this is simply a function returning 5, being executed
 
-    // ID in different contexts; require a new TypeVar per use
+    // ID in different contexts; in general requires a new TypeVar per use; for
+    // such a small function it is always inlined completely, has the same effect.
     test("id", Env.lookup_type("id"));
     test("id(1)",TypeInt.con(1));
     test("id(3.14)",TypeFlt.con(3.14));
     test("id({+})",Env.lookup_type("+")); // 
-    // TODO: Need real TypeVars for these
-    //test("id(+)(id(1),id(pi))",TypeFlt.make(0,64,Math.PI+1));
+    test("id({+})(id(1),id(math_pi))",TypeFlt.make(0,64,Math.PI+1));
 
+    // TODO: Need real TypeVars for these
     // TODO: Needs overload cloning/inlining to resolve {+}
     //test("x=3; fun={y -> x+y}; fun(2)", TypeInt.con(5)); // capture external variable
     //test("x=3; fun={x -> x*2}; fun(2.1)+fun(x)", TypeInt.con(2.1*2.0+3*2)); // shadow  external variable
@@ -93,7 +94,10 @@ public class TestType {
   }
 
   static private void test( String program, Type expected ) {
-    Assert.assertEquals(expected,Exec.go("args",program)._t);
+    TypeEnv te = Exec.go("args",program);
+    if( te._errs != null ) System.err.println(te._errs.toString());
+    Assert.assertNull(te._errs);
+    Assert.assertEquals(expected,te._t);
   }
   static private void testerr( String program, String err, String cursor ) {
     String err2 = "\nargs:0:"+err+"\n"+program+"\n"+cursor+"^\n";
