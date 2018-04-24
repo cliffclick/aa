@@ -43,7 +43,7 @@ public class TypeErr extends Type {
     throw AA.unimpl();
   }
 
-  @Override public byte isBitShape(Type t) { return 99; }
+  @Override public byte isBitShape(Type t) { return -1; }
   @Override public String toString() { return (_all ? "" : "~")+ _msg; }
   @Override public boolean above_center() { return !_all; }
   @Override public boolean canBeConst() { return !_all; }

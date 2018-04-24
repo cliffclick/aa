@@ -5,7 +5,7 @@ import org.junit.Test;
 
 public class TestType {
   @Test public void testType0() {
-    test("x=3; fun={y -> x+y}; fun(2)", TypeInt.con(5)); // must inline to resolve overload {+}:Int
+    test("x=3; fun={y -> x*x+y*y}; fun(2)", TypeInt.con(13)); // not inlined????
     // Simple int
     test("1",   TypeInt.TRUE);
     // Unary operator
@@ -84,7 +84,7 @@ public class TestType {
     test("x=3; fun={y -> x & y}; fun(2)", TypeInt.con(2)); // trivially inlined; capture external variable
     test("x=3; fun={x -> x & 2}; fun(2)", TypeInt.con(2)); // trivially inlined; shadow  external variable
     testerr("fun={x -> x+2}; x", "Unknown ref 'x'","                 "); // Scope exit ends lifetime
-    // TODO: Needs overload cloning/inlining to resolve {+}
+    // Needs overload cloning/inlining to resolve {+}
     test("x=3; fun={y -> x+y}; fun(2)", TypeInt.con(5)); // must inline to resolve overload {+}:Int
     test("x=3; fun={x -> x*2}; fun(2.1)", TypeFlt.con(2.1*2.0)); // must inline to resolve overload {+}:Flt with I->F conversion
     test("x=3; fun={y -> x*x+y*y}; fun(2)", TypeInt.con(13)); // not inlined????

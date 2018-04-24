@@ -26,13 +26,14 @@ public class CastNode extends Node {
       irez = rez.at(proj._idx);  // Identity function on some param
     } else { // Else check for 1-op body
       for( Node parm : rez._defs )
-        if( parm != null &&
+        if( parm != null && parm != fun &&
             !(parm instanceof ParmNode && parm.at(0) == fun) &&
+            !(parm instanceof UnresolvedNode) && // Unresolved is actually a funny constant
             !(parm instanceof ConNode) )
           return null;
       irez = rez.copy();     // Copy the entire function body
       for( Node parm : rez._defs )
-        irez.add_def((parm == null || parm instanceof ConNode) ? parm : parm.at(proj._idx));
+        irez.add_def((parm instanceof ParmNode && parm.at(0) == fun) ? parm.at(proj._idx) : parm);
     }
     // The ProjNode becomes the FunNode input control
     proj.set_as_ctrl(gvn,fun.at(proj._idx));
