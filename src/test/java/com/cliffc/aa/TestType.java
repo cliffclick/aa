@@ -52,7 +52,7 @@ public class TestType {
     testerr("x=1+y","Unknown ref 'y'","     ");
     test("x=2; y=x+1; x*y", TypeInt.con(6));
     // Re-use ref immediately after def; parses as: x=(2*3); 1+x+x*x
-    test("1+(x=2*3)+x*x", TypeInt.con(43));
+    test("1+(x=2*3)+x*x", TypeInt.con(1+6+6*6));
     testerr("x=(1+(x=2)+x)", "Cannot re-assign ref 'x'","             ");
 
     // Conditional:
