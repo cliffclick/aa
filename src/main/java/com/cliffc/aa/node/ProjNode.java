@@ -14,6 +14,9 @@ public class ProjNode extends Node {
   @Override public Node ideal(GVNGCM gvn) {
     // If this value is ANY, then this is dead and becomes an ANY
     if( value(gvn)==TypeErr.ANY ) return gvn.con(TypeErr.ANY);
+    // Support ProjNodes becoming some dominate (not immediate) control
+    if( _defs._len==2 ) return _defs.at(1);
+
     // If the control type is a tuple with a single CONTROL and we are that
     // CONTROL - we become the CONTROL's CONTROL.
     Type c = gvn.type(at(0));
@@ -34,6 +37,10 @@ public class ProjNode extends Node {
     TypeTuple cs = (TypeTuple)c;
     return cs.at(_idx); // Otherwise our type is just the matching tuple slice
   }
+
+  // Support ProjNodes becoming some dominate (not immediate) control.
+  // Lazily cleans out in ideal()
+  void set_as_ctrl( GVNGCM gvn, Node c ) { gvn.add_def(this,c); }
   @Override public Type all_type() { return Type.CONTROL; }
   @Override public int hashCode() { return super.hashCode()+_idx; }
   @Override public boolean equals(Object o) {

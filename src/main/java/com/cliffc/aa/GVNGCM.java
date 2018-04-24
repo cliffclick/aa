@@ -20,7 +20,7 @@ public class GVNGCM {
   private Ary<Node> _work = new Ary<>(new Node[1], 0);
   private BitSet _wrk_bits = new BitSet();
 
-  public void add_work(Node n) { if( !_wrk_bits.get(n._uid) ) add_work0(n); }
+  private void add_work( Node n ) { if( !_wrk_bits.get(n._uid) ) add_work0(n); }
   private <N extends Node> N add_work0( N n ) {
     _work.add(n);               // These need to be visited later
     _wrk_bits.set(n._uid);

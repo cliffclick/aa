@@ -1,8 +1,8 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.*;
-
-import java.util.BitSet;
+import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.TypeErr;
+import com.cliffc.aa.TypeFun;
 
 // FunNode is a RegionNode; args point to all the known callers.  Zero slot is
 // null, same as a C2 Region.  Args 1+ point to callers; Arg 1 points to Scope
@@ -72,9 +72,9 @@ import java.util.BitSet;
 //
 public class FunNode extends RegionNode {
   static private int CNT=2;     // Function index; 1 is reserved for unknown functions
-  public final int _fidx;       // Function index; 1 is reserved for unknown functions
+  private final int _fidx;       // Function index; 1 is reserved for unknown functions
   public final TypeFun _tf;     // Worse-case correct type
-  public FunNode(TypeFun tf, ScopeNode sc) { super(OP_FUN,sc); _tf = tf; _fidx = CNT++; }
+  public FunNode(TypeFun tf, Node sc) { super(OP_FUN,sc); _tf = tf; _fidx = CNT++; }
   @Override String str() { return "fun#"+_fidx+":"+_tf.toString(); }
   @Override public Node ideal(GVNGCM gvn) { return ideal(gvn,gvn.type(at(1))==TypeErr.ANY?1:2); }
   @Override public int hashCode() { return OP_FUN+_fidx; }

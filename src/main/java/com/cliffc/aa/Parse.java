@@ -71,13 +71,7 @@ public class Parse {
     // TODO: Optimistic Pass Goes Here, to improve error situation
 
     // Result type
-    Type tres = _gvn.type(res);
-    // Finding a function in a data-slot?  Returning a function type
-    if( tres == TypeErr.CONTROL ) { // Get function type when returning a function
-      if( res instanceof ProjNode ) {
-        tres = ((FunNode)(res.at(0).at(2)))._tf;
-      } else throw AA.unimpl();
-    }
+    Type tres = Env.lookup_type(res);
     kill(res);
 
     // Gather errors
@@ -210,8 +204,9 @@ public class Parse {
             args.add_def(arg);
           }
         }
-        require(')'); 
-        if( _gvn.type(fun).ret() == null )
+        require(')');
+        if( !(fun instanceof ProjNode && fun.at(0) instanceof RetNode) &&
+            !(fun instanceof UnresolvedNode) )
           return con(err_ctrl("A function is being called, but "+_gvn.type(fun)+" is not a function type"));
       } else {                  // lispy-style fcn application
         // TODO: Unable resolve ambiguity with mixing "(fun arg0 arg1)" and
@@ -307,15 +302,15 @@ public class Parse {
       if( tok.equals("->") ) break;
       ids.add(tok);
     }
-    FunNode fun = init(new FunNode(TypeFun.any(ids._len),_e._scope));
     Node old_ctrl = ctrl();
+    FunNode fun = init(new FunNode(TypeFun.any(ids._len),old_ctrl));
     try( Env e = new Env(_e) ) {// Nest an environment for the local vars
       _e = e;                   // Push nested environment
+      set_ctrl(fun);            // New control is function head
       int cnt=0;                // Add parameters to local environment
       for( String id : ids )  _e.add(id,init(new ParmNode(++cnt,id,fun,con(Type.SCALAR))));
-      Node rpc = _e.add(" rpc ",init(new ParmNode(ids._len+1,"$rpc",fun,con(TypeInt.TRUE))));
       Node rez = stmt();        // Parse function body
-      Node ret = e._ret = gvn(new RetNode(ctrl(),rez,fun));
+      Node ret = e._ret = init(new ProjNode(gvn(new RetNode(ctrl(),rez,fun)),1));
       require('}');             // 
       _e = _e._par;             // Pop nested environment
       set_ctrl(old_ctrl);       // Back to the pre-function-def control
@@ -384,8 +379,8 @@ public class Parse {
   private static boolean isOp1   (byte c) { return isOp0(c); }
 
   public Node gvn (Node n) { return n==null ? null : _gvn.xform(n); }
-  public <N extends Node> N init(N n) { return n==null ? null : _gvn.init (n); }
-  public void kill(Node n) { if( n._uses._len==0 ) _gvn.kill(n); }
+  private <N extends Node> N init( N n ) { return n==null ? null : _gvn.init (n); }
+  private void kill( Node n ) { if( n._uses._len==0 ) _gvn.kill(n); }
   public Node ctrl() { return _e._scope.get(" control "); }
   // Set and return a new control
   private Node set_ctrl(Node n) { return _e._scope.update(" control ",n,_gvn); }

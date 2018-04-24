@@ -95,7 +95,8 @@ public abstract class Node implements Cloneable {
   private SB toString( int d, SB sb, int max, BitSet bs ) {
     if( bs.get(_uid) ) return sb;
     bs.set(_uid);
-    if( d < max ) for( Node n : _defs ) if( n != null ) n.toString(d+1,sb,max,bs);
+    if( d < max && (d==0 || _uid != 0) ) // Limit at depth (and do not recurse thru root Scope)
+      for( Node n : _defs ) if( n != null ) n.toString(d+1,sb,max,bs);
     return toString(d,sb).nl();
   }
   

@@ -56,7 +56,7 @@ import com.cliffc.aa.util.Ary;
 
 
 public class UnresolvedNode extends Node {
-  final String _name;
+  private final String _name;
   UnresolvedNode(String name) { super(OP_UNR); _name=name; }
 
   // Fold away a single choice
@@ -136,9 +136,9 @@ public class UnresolvedNode extends Node {
   Type retype( GVNGCM gvn, CallNode apply ) {
     Type t = TypeErr.ALL;
     outerloop:
-    for( Node ret : _defs ) {
-      // Peek Ret->RPC->Fun and get the function type
-      TypeFun fun = (TypeFun)gvn.type(ret.at(2).at(0));
+    for( Node proj : _defs ) {
+      // Peek Proj->Ret->Fun and get the function type
+      TypeFun fun = ((FunNode)proj.at(0).at(2))._tf;
       Type[] formals = fun._ts._ts;   // Type of each argument
       if( formals.length != apply.nargs() ) continue; // Argument count mismatch; join of ALL
       // Now check if the arguments are compatible at all
@@ -156,7 +156,7 @@ public class UnresolvedNode extends Node {
       s += ((FunNode)(proj.at(0).at(2)))._tf+" ";
     return s+"]";
   }
-  @Override String str() { return _name; }
+  @Override String str() { return "Unr"+_name; }
   // Return a sample op_prec, but really could assert all are the same
   @Override public int op_prec() { return _defs._len==0 ? -1 : _defs.at(0).at(0).op_prec(); }
 }

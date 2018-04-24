@@ -82,7 +82,14 @@ public class Env implements AutoCloseable {
   }
   
   // Test support, return top-level token type
-  static Type lookup_type( String token ) { return _gvn.type(TOP.lookup(token)); }
+  static Type lookup_type( String token ) { return lookup_type(TOP.lookup(token)); }
+  static Type lookup_type( Node n ) {
+    Type t = _gvn.type(n);
+    if( t != TypeErr.CONTROL ) return t;
+    if( n instanceof ProjNode ) // Get function type when returning a function
+      return ((FunNode)(n.at(0).at(2)))._tf;
+    throw AA.unimpl();
+  }
   
   // Name lookup is the same for all variables, including function defs (which
   // are literally assigning a lambda to a ref).  Refs and Vars have a fixed

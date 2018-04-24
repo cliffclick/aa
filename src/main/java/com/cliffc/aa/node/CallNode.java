@@ -28,17 +28,17 @@ public class CallNode extends Node implements AutoCloseable {
   @Override String str() { return "call"; }
   @Override public Node ideal(GVNGCM gvn) {
     Node ctrl = _defs.at(0);    // Control for apply/call-site
-    Node retx = _defs.at(1);    // Possible RetNode or Unresolved
+    Node p_u = _defs.at(1);    // Possible ProjNode or Unresolved
 
     // If the function is unresolved, see if we can resolve it now
-    if( retx instanceof UnresolvedNode ) {
-      UnresolvedNode unr = (UnresolvedNode)retx;
+    if( p_u instanceof UnresolvedNode ) {
+      UnresolvedNode unr = (UnresolvedNode)p_u;
       Ary<Node> projs = unr.resolve(gvn,this); // List of function choices
       if( projs.isEmpty() )                    // No choices possible
         return new ConNode<>(TypeErr.make(unr.errmsg())); // Fail to top
 
       if( projs._len>1 ) {       // Multiple choices, but save the reduced Unr
-        if( projs._len==retx._defs._len ) return null; // No improvement
+        if( projs._len==unr._defs._len ) return null; // No improvement
         throw AA.unimpl();
         //Node unr2 = new UnresolvedNode(); // Build and return a reduced Unr
         //for( Node ret : projs ) unr2.add_def(ret);
@@ -64,28 +64,23 @@ public class CallNode extends Node implements AutoCloseable {
 
     // If the function is fully resolved, inline the call site now.
     // This is NOT inlining the function body, just the call site.
-    if( retx instanceof RetNode ) {
-      throw AA.unimpl();
-      //FunNode  fun = (FunNode) retx.at(0);
-      //Node     rez =           retx.at(1);
-      //ParmNode rpc = (ParmNode)retx.at(2);
-      //
-      //// Add an input path to all incoming arg ParmNodes from the Call.
-      //int pcnt=0;               // Assert all parameters found
-      //for( Node arg : fun._uses ) {
-      //  if( arg.at(0) == fun && arg instanceof ParmNode ) {
-      //    int pidx = ((ParmNode)arg)._idx;
-      //    if( pidx != nargs()+1) {          // No update to the RPC Parm; it is done below
-      //      gvn.add_def(arg,actual(pidx-1));// 1-based on Parm is 2-based on Call's args
-      //      pcnt++;                         // One more arg found
-      //    }
-      //  }
-      //}
-      //assert pcnt == nargs(); // All params found and updated at the function head
-      //gvn.add_def(fun,ctrl); // Add Control for this path
-      //gvn.add_def(rpc,gvn.con(TypeInt.con(_cidx)));// The RPC for this call
-      //
-      //return new RetNode( fun, rez, rpc, _cidx );
+    if( p_u instanceof ProjNode ) {
+      RetNode ret = (RetNode)p_u.at(0);
+      Node    rez = ret.at(1);
+      FunNode fun = (FunNode)ret.at(2);
+      // Add an input path to all incoming arg ParmNodes from the Call.
+      int pcnt=0;               // Assert all parameters found
+      for( Node arg : fun._uses ) {
+        if( arg.at(0) == fun && arg instanceof ParmNode ) {
+          int pidx = ((ParmNode)arg)._idx;
+          gvn.add_def(arg,actual(pidx-1));// 1-based on Parm is 2-based on Call's args
+          pcnt++;                         // One more arg found
+        }
+      }
+      assert pcnt == nargs(); // All params found and updated at the function head
+      gvn.add_def(fun,ctrl); // Add Control for this path
+      Node rctrl = gvn.xform(new ProjNode(ret,fun._defs._len-1));
+      return new CastNode( rctrl, rez, TypeErr.ANY );
     }
 
     return null;
@@ -102,16 +97,17 @@ public class CallNode extends Node implements AutoCloseable {
     Type tret = gvn.type(ret.at(1));
     if( tret.is_con() ) return tret; // Already determined function body is a constant
     
-    // Primitives with all constant args are applied immediately
-    if( ret.at(1) instanceof PrimNode ) {
-      // If all args are constant, eval immediately.  Note that the Memory edge
-      // will define if a function is "pure" or not; no Memory means must be pure.
-      Type[] ts = new Type[_defs._len-2+1];
-      boolean con=true;
-      for( int i=2; i<_defs._len; i++ ) if( !(ts[i-1] = gvn.type(_defs.at(i))).is_con() ) { con=false; break; }
-      if( con )     // Constant args, apply immediately
-        return ((PrimNode)ret.at(1)).apply(ts);
-    }
+    // Primitives with all constant args are applied immediately.
+    //if( ret.at(1) instanceof PrimNode &&
+    //    !(ret.at(1) instanceof RandI64) ) { // TODO: Model RandI64 as having an I/O effect so not pure
+    //  // If all args are constant, eval immediately.  Note that the Memory edge
+    //  // will define if a function is "pure" or not; no Memory means must be pure.
+    //  Type[] ts = new Type[_defs._len-2+1];
+    //  boolean con=true;
+    //  for( int i=2; i<_defs._len; i++ ) if( !(ts[i-1] = gvn.type(_defs.at(i))).is_con() ) { con=false; break; }
+    //  if( con )     // Constant args, apply immediately
+    //    return ((PrimNode)ret.at(1)).apply(ts);
+    //}
     // TODO: if apply args are all constant, do I partial-eval here or in Ideal?
     return tret;
   }
@@ -121,7 +117,7 @@ public class CallNode extends Node implements AutoCloseable {
   int nargs() { return _defs._len-2; }
   // Actual arguments
   Type actual(GVNGCM gvn, int x) { return gvn.type(actual(x)); }
-  Node actual(int x) { return _defs.at(x+2); }
+  private Node actual( int x ) { return _defs.at(x+2); }
   
   // Parser support keeping args alive during parsing; if a syntax exception is
   // thrown while the call args are being built, this will free them all.  Once
