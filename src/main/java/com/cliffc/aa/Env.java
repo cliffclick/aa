@@ -38,7 +38,7 @@ public class Env implements AutoCloseable {
   private ProjNode as_fun( PrimNode prim ) {
     Type[] targs = prim._tf._ts._ts;
     String[] args = prim._args;
-    FunNode fun = _gvn.init(new FunNode(prim._tf,_scope)); // Points to ScopeNode only
+    FunNode fun = _gvn.init(new FunNode(prim._tf,_scope, prim.op_prec())); // Points to ScopeNode only
     prim.add_def(null);         // Control for the primitive
     for( int i=0; i<args.length; i++ )
       prim.add_def(_gvn.init(new ParmNode(i+1,args[i],fun,_gvn.con(targs[i]))));

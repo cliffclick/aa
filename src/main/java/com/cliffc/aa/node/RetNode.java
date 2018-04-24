@@ -19,6 +19,6 @@ public class RetNode extends Node {
   }
   @Override public Type all_type() { return TypeTuple.make(TypeErr.CONTROL,false); }
   // Return the op_prec of the returned value.  Not sensible except
-  // when call on primitives.
-  @Override public int op_prec() { return _defs.at(1).op_prec(); }
+  // when call on primitives.  Queries the Fun, not the primitive.
+  @Override public byte op_prec() { return _defs.at(2).op_prec(); }
 }

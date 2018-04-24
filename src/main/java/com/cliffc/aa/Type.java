@@ -124,7 +124,7 @@ public class Type {
   }
   private Type xmeet0( Type t ) {
     if( t == this ) return this;
-    // Reverse; xmeet 2nd arg is never <TBASE
+    // Reverse; xmeet 2nd arg is never <TSIMPLE
     return !is_simple() && t.is_simple() ? t.xmeet(this) : xmeet(t);
   }
   
@@ -308,10 +308,17 @@ public class Type {
   public long   getl() { throw AA.unimpl(); }
   // Return a double from a TypeFlt constant; assert otherwise.
   public double getd() { throw AA.unimpl(); }
-  public boolean isBitShape(Type t) {
-    if( _type==TXSCALAR ) return true ; // Optimistically  never  needs a conversion
-    if( _type== TSCALAR ) return false; // Pessimistically always needs a conversion
-    throw typerr(t);                    // Overridden in subtypes
+
+  // Lattice of conversions:
+  // -1 unknown; top; might fail, might be free (Scalar->Int); Scalar might lift
+  //    to e.g. Float and require a user-provided rounding conversion from F64->Int.
+  //  0 requires no/free conversion (Int8->Int64, F32->F64)
+  // +1 requires a bit-changing conversion (Int->Flt)
+  // 99 Bottom; No free converts; e.g. Flt->Int requires explicit rounding
+  public byte isBitShape(Type t) {
+    if( above_center() && isa(t) ) return 0; // Can choose compatible format
+    if( _type == TSCALAR ) return -1;  // Dunno how it rides
+    throw typerr(t);  // Overridden in subtypes
   }
   public RuntimeException typerr(Type t) {
     throw new RuntimeException("Should not reach here: internal type system error with "+this+(t==null?"":(" and "+t)));

@@ -129,7 +129,18 @@ public class TypeInt extends Type {
     return TypeUnion.make(false,make(-1,isz,0),TypeFlt.make(-1,fsz,0));
   }
     
-  @Override public boolean isBitShape(Type t) { return t._type == Type.TINT && _z<=((TypeInt)t)._z; }
+  // Lattice of conversions:
+  // -1 unknown; top; might fail, might be free (Scalar->Int); Scalar might lift
+  //    to e.g. Float and require a user-provided rounding conversion from F64->Int.
+  //  0 requires no/free conversion (Int8->Int64, F32->F64)
+  // +1 requires a bit-changing conversion (Int->Flt)
+  // 99 Bottom; No free converts; e.g. Flt->Int requires explicit rounding
+  @Override public byte isBitShape(Type t) {
+    // TODO: Allow loss-less conversions (e.g. small float integer constants convert to ints just fine)
+    if( t._type == Type.TINT ) return (byte)(_z<=((TypeInt)t)._z ? 0 : 99);
+    if( t._type == Type.TFLT ) return 1; // Int->Flt ignores large int overflow issues
+    throw AA.unimpl();
+  }
   @Override public boolean above_center() { return _x>0; }
   @Override public boolean canBeConst() { return _x>=0; }
   @Override public boolean is_con()   { return _x==0; }

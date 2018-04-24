@@ -71,10 +71,12 @@ import com.cliffc.aa.TypeFun;
 // pointer".
 //
 public class FunNode extends RegionNode {
-  static private int CNT=2;     // Function index; 1 is reserved for unknown functions
-  private final int _fidx;       // Function index; 1 is reserved for unknown functions
-  public final TypeFun _tf;     // Worse-case correct type
-  public FunNode(TypeFun tf, Node sc) { super(OP_FUN,sc); _tf = tf; _fidx = CNT++; }
+  static private int CNT=2; // Function index; 1 is reserved for unknown functions
+  private final int _fidx;  // Function index; 1 is reserved for unknown functions
+  final byte _op_prec;      // Operator precedence; only set top-level primitive wrappers
+  public final TypeFun _tf; // Worse-case correct type
+  public FunNode(TypeFun tf, Node sc) { this(tf,sc,-1); }
+  public FunNode(TypeFun tf, Node sc, int op_prec) { super(OP_FUN,sc); _tf = tf; _fidx = CNT++; _op_prec = (byte)op_prec; }
   @Override String str() { return "fun#"+_fidx+":"+_tf.toString(); }
   @Override public Node ideal(GVNGCM gvn) { return ideal(gvn,gvn.type(at(1))==TypeErr.ANY?1:2); }
   @Override public int hashCode() { return OP_FUN+_fidx; }
@@ -85,4 +87,5 @@ public class FunNode extends RegionNode {
     FunNode fun = (FunNode)o;
     return _fidx==fun._fidx;
   }
+  @Override public byte op_prec() { return _op_prec; }
 }

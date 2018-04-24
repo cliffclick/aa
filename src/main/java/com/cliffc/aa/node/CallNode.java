@@ -51,8 +51,10 @@ public class CallNode extends Node implements AutoCloseable {
       Type[] formals = fun._tf._ts._ts;
       for( int i=0; i<nargs(); i++ ) {
         Type formal = formals[i];
-        Type actual = actual(gvn,i);
-        if( !actual.isBitShape(formal) ) {
+        Type actual = gvn.type(actual(i));
+        byte xcvt = actual.isBitShape(formal);
+        if( xcvt == 99 || xcvt == -1 ) throw AA.unimpl(); // Error cases should not reach here
+        if( xcvt == 1 ) {
           PrimNode cvt = PrimNode.convert(_defs.at(i+2),actual,formal);
           if( cvt.is_lossy() ) throw new IllegalArgumentException("Requires lossy conversion");
           set_def(i+2,gvn.xform(cvt),gvn);
@@ -82,7 +84,7 @@ public class CallNode extends Node implements AutoCloseable {
       assert pcnt == nargs(); // All params found and updated at the function head
       gvn.add_def(fun,ctrl); // Add Control for this path
       Node rctrl = gvn.xform(new ProjNode(ret,fun._defs._len-1));
-      return new CastNode( rctrl, rez, TypeErr.ANY );
+      return new CastNode( rctrl, rez, Type.SCALAR );
     }
 
     return null;
@@ -121,8 +123,7 @@ public class CallNode extends Node implements AutoCloseable {
   // Number of actual arguments
   int nargs() { return _defs._len-2; }
   // Actual arguments
-  Type actual(GVNGCM gvn, int x) { return gvn.type(actual(x)); }
-  private Node actual( int x ) { return _defs.at(x+2); }
+  Node actual( int x ) { return _defs.at(x+2); }
   
   // Parser support keeping args alive during parsing; if a syntax exception is
   // thrown while the call args are being built, this will free them all.  Once

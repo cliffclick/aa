@@ -114,7 +114,7 @@ public abstract class Node implements Cloneable {
   public Type all_type() { return TypeErr.ALL; }
   
   // Operator precedence is only valid for ConNode of binary functions
-  public int op_prec() { return -1; }
+  public byte op_prec() { return -1; }
 
   // Hash is function+inputs, or opcode+input_uids, and is invariant over edge
   // order (so we can swap edges without rehashing)

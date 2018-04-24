@@ -52,5 +52,5 @@ public class ProjNode extends Node {
   }
   // Return the op_prec of the returned value.  Not sensible except
   // when call on primitives.
-  @Override public int op_prec() { return _defs.at(0).op_prec(); }
+  @Override public byte op_prec() { return _defs.at(0).op_prec(); }
 }

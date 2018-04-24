@@ -311,7 +311,7 @@ public class Parse {
       _e = e;                   // Push nested environment
       set_ctrl(fun);            // New control is function head
       int cnt=0;                // Add parameters to local environment
-      for( String id : ids )  _e.add(id,init(new ParmNode(++cnt,id,fun,con(Type.SCALAR))));
+      for( String id : ids )  _e.add(id,gvn(new ParmNode(++cnt,id,fun,con(Type.SCALAR))));
       Node rez = stmt();        // Parse function body
       Node ret = e._ret = init(new ProjNode(gvn(new RetNode(ctrl(),rez,fun)),1));
       require('}');             // 
@@ -378,7 +378,7 @@ public class Parse {
   private static boolean isWS    (byte c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r'; }
   private static boolean isAlpha0(byte c) { return ('a'<=c && c <= 'z') || ('A'<=c && c <= 'Z') || (c=='_'); }
   private static boolean isAlpha1(byte c) { return isAlpha0(c) || ('0'<=c && c <= '9'); }
-  private static boolean isOp0   (byte c) { return "!#$%*+,-.;:=<>?@^[]~/".indexOf(c) != -1; }
+  private static boolean isOp0   (byte c) { return "!#$%*+,-.;:=<>?@^[]~/&".indexOf(c) != -1; }
   private static boolean isOp1   (byte c) { return isOp0(c); }
 
   public Node gvn (Node n) { return n==null ? null : _gvn.xform(n); }

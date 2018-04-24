@@ -94,56 +94,63 @@ public class UnresolvedNode extends Node {
   // If more than one choice applies, then the choice with fewest costly
   // conversions are kept; if there is more than one then the join of them is
   // kept - and the program is not-yet type correct (ambiguous choices).
-  Ary<Node> resolve( GVNGCM gvn, CallNode apply ) {
+  Ary<Node> resolve( GVNGCM gvn, CallNode call ) {
     // Set of possible choices with fewest conversions
     Ary<Node> ns = new Ary<>(new Node[1],0);
     int min_cvts = 999;         // Required conversions
-    
-    // for each function, see if the actual args isa the formal args.  If not, toss it out.
+    int cvts[] = new int[_defs._len];
+
+    // For each function, see if the actual args isa the formal args.  If not,
+    // toss it out.  Also count conversions, and keep the minimal conversion
+    // function with all arguments known.
     outerloop:
     for( Node proj : _defs ) {
       // Peek Proj->Ret->Fun and get the function type
       TypeFun fun = ((FunNode)(proj.at(0).at(2)))._tf;
       Type[] formals = fun._ts._ts;   // Type of each argument
-      if( formals.length != apply.nargs() )
-        continue; // Argument count mismatch
-      // Now check if the arguments are compatible at all
-      boolean scalar=false;
+      if( formals.length != call.nargs() )
+        continue; // Argument count mismatch, toss out this choice
+      // Now check if the arguments are compatible at all, keeping lowest cost
+      int xcvts = 0;             // Count of conversions required
+      boolean unk = false;       // Unknown arg might be incompatible or free to convert
       for( int j=0; j<formals.length; j++ ) {
-        Type tx = apply.actual(gvn,j).join(formals[j]);
+        Type actual = gvn.type(call.actual(j));
+        Type tx = actual.join(formals[j]);
         if( tx.above_center() ) // Actual and formal have values in common?
+          continue outerloop;   // No, this function will never work; e.g. cannot cast 1.2 as any integer
+        byte cvt = actual.isBitShape(formals[j]); // +1 needs convert, 0 no-cost convert, -1 unknown, 99 never
+        if( cvt == 99 )         // Happens if actual is e.g. TypeErr
           continue outerloop;   // No, this function will never work
-        if( apply.actual(gvn,j)==Type.SCALAR ) scalar=true;
+        if( cvt == -1 ) unk = true; // Unknown yet
+        else xcvts += cvt;          // Count conversions
       }
-      if( scalar ) {  // Some unknown args from unknow callers
-        ns.add(proj); // Cannot insert conversions, nor toss out based on converts
-        continue;     // Must keep this choice
-      }
-      int cvts=0;               // Count required conversions
-      for( int j=0; j<formals.length; j++ )
-        if( !apply.actual(gvn,j).isBitShape(formals[j]) ) cvts++;
-      // Save only choices with minimal conversions
-      if( cvts < min_cvts ) { min_cvts = cvts; ns.clear(); }
-      if( cvts == min_cvts)
-        ns.add(proj);           // This is an acceptable choice.
+      if( !unk && xcvts < min_cvts ) min_cvts = xcvts; // Keep minimal known conversion
+      cvts[ns._len] = xcvts;    // Keep count of conversions
+      ns.add(proj);             // This is an acceptable choice, so far (args can be made to work)
     }
+    // Toss out choices with strictly more conversions than the minimal
+    for( int i=0; i<ns._len; i++ )
+      if( cvts[i] > min_cvts ) {
+        cvts[i] = cvts[ns._len-1];
+        ns.del(i--);
+      }
     return ns;
   }
 
   // Function return type for resolved functions.  Crash/ALL for no functions
   // allowed, join of possible returns otherwise - we get to choose the best
   // choice here.
-  Type retype( GVNGCM gvn, CallNode apply ) {
+  Type retype( GVNGCM gvn, CallNode call ) {
     Type t = TypeErr.ALL;
     outerloop:
     for( Node proj : _defs ) {
       // Peek Proj->Ret->Fun and get the function type
       TypeFun fun = ((FunNode)proj.at(0).at(2))._tf;
       Type[] formals = fun._ts._ts;   // Type of each argument
-      if( formals.length != apply.nargs() ) continue; // Argument count mismatch; join of ALL
+      if( formals.length != call.nargs() ) continue; // Argument count mismatch; join of ALL
       // Now check if the arguments are compatible at all
       for( int j=0; j<formals.length; j++ )
-        if( !apply.actual(gvn,j).isa(formals[j]) )
+        if( !gvn.type(call.actual(j)).isa(formals[j]) )
           continue outerloop;   // Actual is not a formal; join of ALL
       t = t.join(fun.ret());
     }    
@@ -158,5 +165,5 @@ public class UnresolvedNode extends Node {
   }
   @Override String str() { return "Unr"+_name; }
   // Return a sample op_prec, but really could assert all are the same
-  @Override public int op_prec() { return _defs._len==0 ? -1 : _defs.at(0).at(0).op_prec(); }
+  @Override public byte op_prec() { return _defs._len==0 ? -1 : _defs.at(0).at(0).op_prec(); }
 }

@@ -39,6 +39,7 @@ public abstract class PrimNode extends Node {
     new   SubInt64(),
     new   MulInt64(),
 
+    new   AndInt64(),
   };
 
   // Loss-less conversions only
@@ -69,7 +70,7 @@ public abstract class PrimNode extends Node {
 class ConvertInt32Flt64 extends PrimNode {
   ConvertInt32Flt64(Node... nodes) { super("flt64",PrimNode.ARGS1,TypeFun.make(TypeTuple.INT32,TypeFlt.FLT64),nodes); }
   @Override public TypeFlt apply( Type[] args ) { return TypeFlt.make(0,64,(double)args[1].getl()); }
-  @Override public int op_prec() { return 9; }
+  @Override public byte op_prec() { return 9; }
   public boolean is_lossy() { return false; }
 }
 
@@ -78,7 +79,7 @@ abstract class Prim1OpF64 extends PrimNode {
   Prim1OpF64( String name ) { super(name,PrimNode.ARGS1,TypeFun.FLT64); }
   public TypeFlt apply( Type[] args ) { return TypeFlt.make(0,64,op(args[1].getd())); }
   abstract double op( double d );
-  @Override public int op_prec() { return 9; }
+  @Override public byte op_prec() { return 9; }
 }
 
 class MinusFlt64 extends Prim1OpF64 {
@@ -90,7 +91,7 @@ class MinusFlt64 extends Prim1OpF64 {
 abstract class Prim1OpI64 extends PrimNode {
   Prim1OpI64( String name ) { super(name,PrimNode.ARGS1,TypeFun.INT64); }
   public TypeInt apply( Type[] args ) { return TypeInt.con(op(args[1].getl())); }
-  @Override public int op_prec() { return 9; }
+  @Override public byte op_prec() { return 9; }
   abstract long op( long d );
 }
 
@@ -102,7 +103,7 @@ class MinusInt64 extends Prim1OpI64 {
 class NotInt64 extends PrimNode {
   NotInt64() { super("!",PrimNode.ARGS1,TypeFun.make(TypeTuple.INT64,TypeInt.BOOL)); }
   public TypeInt apply( Type[] args ) { return args[1].getl()==0?TypeInt.TRUE:TypeInt.FALSE; }
-  @Override public int op_prec() { return 9; }
+  @Override public byte op_prec() { return 9; }
 }
 
 // 2Ops have uniform input/output types, so take a shortcut on name printing
@@ -115,19 +116,19 @@ abstract class Prim2OpF64 extends PrimNode {
 class AddFlt64 extends Prim2OpF64 {
   AddFlt64() { super("+"); }
   double op( double l, double r ) { return l+r; }
-  @Override public int op_prec() { return 5; }
+  @Override public byte op_prec() { return 5; }
 }
 
 class SubFlt64 extends Prim2OpF64 {
   SubFlt64() { super("-"); }
   double op( double l, double r ) { return l-r; }
-  @Override public int op_prec() { return 5; }
+  @Override public byte op_prec() { return 5; }
 }
 
 class MulFlt64 extends Prim2OpF64 {
   MulFlt64() { super("*"); }
   double op( double l, double r ) { return l*r; }
-  @Override public int op_prec() { return 6; }
+  @Override public byte op_prec() { return 6; }
 }
 
 // 2Ops have uniform input/output types, so take a shortcut on name printing
@@ -140,19 +141,25 @@ abstract class Prim2OpI64 extends PrimNode {
 class AddInt64 extends Prim2OpI64 {
   AddInt64() { super("+"); }
   long op( long l, long r ) { return l+r; }
-  @Override public int op_prec() { return 5; }
+  @Override public byte op_prec() { return 5; }
 }
 
 class SubInt64 extends Prim2OpI64 {
   SubInt64() { super("-"); }
   long op( long l, long r ) { return l-r; }
-  @Override public int op_prec() { return 5; }
+  @Override public byte op_prec() { return 5; }
 }
 
 class MulInt64 extends Prim2OpI64 {
   MulInt64() { super("*"); }
   long op( long l, long r ) { return l*r; }
-  @Override public int op_prec() { return 6; }
+  @Override public byte op_prec() { return 6; }
+}
+
+class AndInt64 extends Prim2OpI64 {
+  AndInt64() { super("&"); }
+  long op( long l, long r ) { return l&r; }
+  @Override public byte op_prec() { return 7; }
 }
 
 class RandI64 extends PrimNode {

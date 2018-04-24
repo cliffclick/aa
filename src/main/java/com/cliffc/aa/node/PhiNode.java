@@ -5,7 +5,7 @@ import com.cliffc.aa.*;
 // Merge results; extended by ParmNode
 public class PhiNode extends Node {
   public PhiNode( Node... vals) { super(OP_PHI,vals); }
-  protected PhiNode( byte op, Node fun, Node defalt ) { super(op,fun,defalt); } // For ParmNodes
+  PhiNode( byte op, Node fun, Node defalt ) { super(op,fun,defalt); } // For ParmNodes
   @Override String str() { return "Phi"; }
   @Override public Node ideal(GVNGCM gvn) {
     RegionNode r = (RegionNode)at(0);

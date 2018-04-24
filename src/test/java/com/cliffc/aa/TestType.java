@@ -5,6 +5,7 @@ import org.junit.Test;
 
 public class TestType {
   @Test public void testType0() {
+    test("x=3; fun={y -> x+y}; fun(2)", TypeInt.con(5)); // must inline to resolve overload {+}:Int
     // Simple int
     test("1",   TypeInt.TRUE);
     // Unary operator
@@ -79,11 +80,16 @@ public class TestType {
     test("id({+})",Env.lookup_type("+")); // 
     test("id({+})(id(1),id(math_pi))",TypeFlt.make(0,64,Math.PI+1));
 
-    // TODO: Need real TypeVars for these
+    // Function execution and result typing
+    test("x=3; fun={y -> x & y}; fun(2)", TypeInt.con(2)); // trivially inlined; capture external variable
+    test("x=3; fun={x -> x & 2}; fun(2)", TypeInt.con(2)); // trivially inlined; shadow  external variable
+    testerr("fun={x -> x+2}; x", "Unknown ref 'x'","                 "); // Scope exit ends lifetime
     // TODO: Needs overload cloning/inlining to resolve {+}
-    test("x=3; fun={y -> x+y}; fun(2)", TypeInt.con(5)); // capture external variable
-    test("x=3; fun={x -> x*2}; fun(2.1)+fun(x)", TypeFlt.con(2.1*2.0+3*2)); // shadow  external variable
-    //testerr("fun={x -> x+2}; x", "Unknown ref 'x'","                 "); // Scope exit ends lifetime
+    test("x=3; fun={y -> x+y}; fun(2)", TypeInt.con(5)); // must inline to resolve overload {+}:Int
+    test("x=3; fun={x -> x*2}; fun(2.1)", TypeFlt.con(2.1*2.0)); // must inline to resolve overload {+}:Flt with I->F conversion
+    test("x=3; fun={y -> x*x+y*y}; fun(2)", TypeInt.con(13)); // not inlined????
+    test("x=3; fun={x -> x*2}; fun(2.1)+fun(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to fun()
+    // TODO: Need real TypeVars for these
 
     // Recursive:
     //test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)",TypeInt.con(5));
