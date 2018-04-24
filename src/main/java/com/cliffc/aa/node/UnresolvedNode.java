@@ -141,7 +141,7 @@ public class UnresolvedNode extends Node {
   // allowed, join of possible returns otherwise - we get to choose the best
   // choice here.
   Type retype( GVNGCM gvn, CallNode call ) {
-    Type t = TypeErr.ALL;
+    Type t = TypeErr.UNRESOLVED;
     outerloop:
     for( Node proj : _defs ) {
       // Peek Proj->Ret->Fun and get the function type
@@ -153,7 +153,7 @@ public class UnresolvedNode extends Node {
         if( !gvn.type(call.actual(j)).isa(formals[j]) )
           continue outerloop;   // Actual is not a formal; join of ALL
       t = t.join(fun.ret());
-    }    
+    }
     return t;
   }
 
