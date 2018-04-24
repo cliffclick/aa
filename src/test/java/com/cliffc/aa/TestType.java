@@ -81,8 +81,8 @@ public class TestType {
 
     // TODO: Need real TypeVars for these
     // TODO: Needs overload cloning/inlining to resolve {+}
-    //test("x=3; fun={y -> x+y}; fun(2)", TypeInt.con(5)); // capture external variable
-    //test("x=3; fun={x -> x*2}; fun(2.1)+fun(x)", TypeInt.con(2.1*2.0+3*2)); // shadow  external variable
+    test("x=3; fun={y -> x+y}; fun(2)", TypeInt.con(5)); // capture external variable
+    test("x=3; fun={x -> x*2}; fun(2.1)+fun(x)", TypeFlt.con(2.1*2.0+3*2)); // shadow  external variable
     //testerr("fun={x -> x+2}; x", "Unknown ref 'x'","                 "); // Scope exit ends lifetime
 
     // Recursive:
