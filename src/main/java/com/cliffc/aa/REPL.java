@@ -15,11 +15,7 @@ public abstract class REPL {
     while( stdin.hasNextLine() ) {
       String line = stdin.nextLine();
       TypeEnv te = new Parse("stdin",env,line).go();
-      if( te._errs == null ) {
-        System.out.println(te._t.toString());
-      } else {
-        System.err.println(te._errs.toString());
-      }
+      System.out.println( te._errs == null ? te._t.toString() : te._errs.toString());
       env._scope.set_def(0,env._par._scope,Env._gvn);
       System.out.print(prompt);
       System.out.flush();

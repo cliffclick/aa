@@ -49,7 +49,7 @@ libs = $(wildcard lib/*jar)
 jars = $(subst $(space),$(SEP),$(libs))
 
 # Just build the AA jar file
-default: build/aa.jar
+default: build/aa.jar tags
 
 # Just the classes, no jarring step
 classes: $(classes)

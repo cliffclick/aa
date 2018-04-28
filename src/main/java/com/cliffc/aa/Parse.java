@@ -19,11 +19,11 @@ import java.text.ParsePosition;
  *  nfact= uniop* fact          // Zero or more uniop calls over a fact
  *  fact = id                   // variable lookup
  *  fact = num                  // number
- *  fact = (stmt)               // General statement called recursively
+ *  fact = (stmt)               // General statement parsed recursively
  *  fact = {func}               // Anonymous function declaration
  *  fact = {binop}              // Special syntactic form of binop; no spaces allowed; returns function constant
  *  fact = {uniop}              // Special syntactic form of uniop; no spaces allowed; returns function constant
- *  binop = +-*%&|              // etc; primitive lookup; can determine infix binop at parse-time
+ *  binop = +-*%&|/             // etc; primitive lookup; can determine infix binop at parse-time
  *  uniop  =  -!~               // etc; primitive lookup; can determine infix uniop at parse-time
  *  func = { [[id]* ->]? stmt } // Anonymous function declaration
  */
@@ -254,7 +254,7 @@ public class Parse {
 
   /** Parse a factor, a leaf grammar token
    *  fact = num       // number
-   *  fact = (stmt)    // General statement called recursively
+   *  fact = (stmt)    // General statement parsed recursively
    *  fact = {binop}   // Special syntactic form of binop; no spaces allowed; returns function constant
    *  fact = {uniop}   // Special syntactic form of uniop; no spaces allowed; returns function constant
    *  fact = {func}    // Anonymous function declaration

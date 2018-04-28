@@ -149,9 +149,14 @@ public class UnresolvedNode extends Node {
       Type[] formals = fun._ts._ts;   // Type of each argument
       if( formals.length != call.nargs() ) continue; // Argument count mismatch; join of ALL
       // Now check if the arguments are compatible at all
-      for( int j=0; j<formals.length; j++ )
-        if( !gvn.type(call.actual(j)).isa(formals[j]) )
+      for( int j=0; j<formals.length; j++ ) {
+        Type actual = gvn.type(call.actual(j));
+        if( actual instanceof TypeErr && !t.above_center() )
+          // Actual is an error, so call result is the same error
+          return actual;        // TODO: Actually need to keep all such errors...
+        if( !actual.isa(formals[j]) )
           continue outerloop;   // Actual is not a formal; join of ALL
+      }
       t = t.join(fun.ret());
     }
     return t;

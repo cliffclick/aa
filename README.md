@@ -18,11 +18,11 @@ GRAMMAR
 *  nfact= uniop* fact          // Zero or more uniop calls over a fact
 *  fact = id                   // variable lookup
 *  fact = num                  // number
-*  fact = (stmt)               // General statement called recursively
+*  fact = (stmt)               // General statement parsed recursively
 *  fact = {func}               // Anonymous function declaration
 *  fact = {binop}              // Special syntactic form of binop; no spaces allowed; returns function constant
 *  fact = {uniop}              // Special syntactic form of uniop; no spaces allowed; returns function constant
-*  binop= +-*%&|               // etc; primitive lookup; can determine infix binop at parse-time
+*  binop= +-*%&|/              // etc; primitive lookup; can determine infix binop at parse-time
 *  uniop= -!~                  // etc; primitive lookup; can determine infix uniop at parse-time
 *  func = { [[id]* ->]? stmt } // Anonymous function declaration
 
@@ -34,20 +34,20 @@ Done Stuff
 * Dynamic code-gen; no seperate compilation step.  Load Source & Go.
 * Primitive values; int overflow OK;
 * Static typing; types optional at every place.
-* H-M style typing.  Limited overloads.
+* Limited overloads
 * Overloading ops.  No ambiguity / easy-to-read rules.
 * By default multi-arg ops are overloaded.
 * Direct SSA style code writing; no 'let' keyword.
-* default "x := 1" makes a "val" until scope runs out (cannot re-assign)
-* "ref" can be reassigned but requires type keyword: "x:ref := 1"
+* default "x=1" makes a "val" until scope runs out (cannot re-assign)
+* "var" can be reassigned but requires type keyword: "x:= 1"
 * Sub-byte ranges?  Julia-like math typing
+* Functional; 1st class functions.
 
 
 Ideas, Desirables
 -----------------
 
-Functional; 1st class functions.
-
+H-M style typing.
 JIT'ing.
 {GC,Ref-Counting}: Ponder both vs requiring e.g. lifetime management (easy by just raising scope).
 No exceptions!!! 
