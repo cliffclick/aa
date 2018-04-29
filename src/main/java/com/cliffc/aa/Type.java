@@ -320,6 +320,9 @@ public class Type {
     if( _type == TSCALAR ) return -1;  // Dunno how it rides
     throw typerr(t);  // Overridden in subtypes
   }
+  // "widen" a narrow type for type-specialization.
+  // e.g. "3" becomes "int64".
+  public Type widen() { throw AA.unimpl(); } // Overridden in subclasses
   public RuntimeException typerr(Type t) {
     throw new RuntimeException("Should not reach here: internal type system error with "+this+(t==null?"":(" and "+t)));
   }

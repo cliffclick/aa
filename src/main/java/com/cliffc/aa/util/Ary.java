@@ -1,12 +1,10 @@
 package com.cliffc.aa.util;
 
 import java.lang.reflect.Array;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.Iterator;
+import java.util.*;
 import java.util.function.Function;
 import java.util.function.Predicate;
-
+  
 // ArrayList with saner syntax
 public class Ary<E> implements Iterable<E> {
   public E[] _es;
@@ -82,6 +80,17 @@ public class Ary<E> implements Iterable<E> {
   }
   
   public Ary<E> set_as( E e ) { _es[0] = e; _len=1; return this; }
+  
+  /** @param c Collection to be added */
+  public void addAll( Collection<? extends E> c ) { for( E e : c ) add(e); }
+    
+  /** @param c Collection to be added */
+  public void addAll( Ary<? extends E> c ) {
+    if( c._len==0 ) return;
+    while( _len+c._len > _es.length ) _es = Arrays.copyOf(_es,_es.length<<1);
+    System.arraycopy(c._es,0,_es,_len,c._len);
+    _len += c._len;
+  }
   
   /** @return compact array version, using the internal base array where possible. */
   public E[] asAry() { return _len==_es.length ? _es : Arrays.copyOf(_es,_len); }

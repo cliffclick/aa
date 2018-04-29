@@ -13,6 +13,7 @@ public class RegionNode extends Node {
   @Override public Node ideal(GVNGCM gvn) { return ideal(gvn,1); }
   // Ideal call, but FunNodes keep index#1 for future parsed call sites
   Node ideal(GVNGCM gvn, int sidx) {
+    // TODO: The unzip xform, especially for funnodes doing type-specialization
     // TODO: Check for dead-diamond merges
     // TODO: Check for 2+but_less_than_all alive, and do a partial collapse
     if( _cidx !=0 ) return null; // Already found single control path
@@ -22,13 +23,14 @@ public class RegionNode extends Node {
     for( int i=sidx; i<_defs._len; i++ )
       if( gvn.type(at(i))!=TypeErr.ANY ) // Found a live path
         if( idx == 0 ) idx = i;          // Remember live path
-        else return null;                // Some other output is alive also
-    if( idx !=0 ) _cidx=idx;
+        else return null;                // Some other input is alive also
+    if( idx==0 ) return null;            // All dead?  Let value() handle it
     // Note: we do not return the 1 alive control path, as then trailing
     // PhiNodes will subsume that control - instead they each need to collapse
     // to their one alive input in their own ideal() calls - and they will be
     // using the _cidx to make their decisions.
-    return idx== 0 ? null : this; // Return the 1 alive path
+    _cidx=idx;                  // Flag the 1 live path
+    return this;                // Return self
   }
   @Override public Type value(GVNGCM gvn) {
     Type t = TypeErr.ANY;

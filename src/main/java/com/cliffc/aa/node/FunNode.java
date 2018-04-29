@@ -1,8 +1,9 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.TypeErr;
-import com.cliffc.aa.TypeFun;
+import com.cliffc.aa.*;
+import com.cliffc.aa.util.Ary;
+
+import java.util.HashMap;
 
 // FunNode is a RegionNode; args point to all the known callers.  Zero slot is
 // null, same as a C2 Region.  Args 1+ point to callers; Arg 1 points to Scope
@@ -78,7 +79,89 @@ public class FunNode extends RegionNode {
   public FunNode(TypeFun tf, Node sc) { this(tf,sc,-1); }
   public FunNode(TypeFun tf, Node sc, int op_prec) { super(OP_FUN,sc); _tf = tf; _fidx = CNT++; _op_prec = (byte)op_prec; }
   @Override String str() { return "fun#"+_fidx+":"+_tf.toString(); }
-  @Override public Node ideal(GVNGCM gvn) { return ideal(gvn,gvn.type(at(1))==TypeErr.ANY?1:2); }
+
+  @Override public Node ideal(GVNGCM gvn) {
+    // Clone function for type-specialization
+    Node n = type_special(gvn);
+    if( n != null ) return n;
+    // Else generic Region ideal
+    return ideal(gvn,gvn.type(at(1))==TypeErr.ANY?1:2);
+  }
+
+  // Look for type-specialization inlining.  If any ParmNode has an Unresolved
+  // Call, then we'd like to make a clone of the function body (at least up to
+  // getting all the UnresolvedNodes to clear out).  The specialized code uses
+  // generalized versions of the arguments, where we only specialize on
+  // arguments that help immediately.
+  private Node type_special( GVNGCM gvn ) {
+    // Bail if there are any dead pathes; RegionNode ideal will clean out
+    for( int i=1; i<_defs._len; i++ ) if( gvn.type(at(i))==TypeErr.ANY ) return null;
+    if( _defs._len <= 2 ) return null; // No need to specialize if only 1 caller
+    if( !(at(1) instanceof ScopeNode) ) throw AA.unimpl();
+    
+    // Gather the ParmNodes and the RetNode.  Ignore other (control) uses
+    int nargs = _tf._ts._ts.length+1;
+    ParmNode[] parms = new ParmNode[nargs];
+    RetNode ret = null;
+    for( Node use : _uses )
+      if( use instanceof ParmNode ) parms[((ParmNode)use)._idx] = (ParmNode)use;
+      else if( use instanceof RetNode ) { assert ret==null || ret==use; ret = (RetNode)use; }
+    
+    // Visit all ParmNodes, looking for unresolved call uses
+    boolean any_unr=false;
+    boolean[] has_unrs = new boolean[nargs];
+    for( int i=1; i<nargs; i++ )
+      for( Node use : parms[i]._uses )
+        if( use instanceof CallNode && use.at(1) instanceof UnresolvedNode ) {
+          has_unrs[i] = any_unr = true; break;
+        }
+    if( !any_unr ) return null; // No unresolved calls; no point in type-specialization
+
+    // If Parm has unresolved calls, we want to type-specialize on its arguments.
+    // Call-site #1 is the most generic call site for the parser.
+    // Peel out 2nd call-site args and generalize them.
+    Type[] sig = new Type[nargs-1];
+    for( int i=1; i<nargs; i++ )
+      sig[i-1] = gvn.type(parms[i].at(2)).widen();
+    FunNode fun2 = new FunNode(TypeFun.make(TypeTuple.make(sig),_tf._ret),at(1));
+
+    // Clone the function body, and hook with proper signature into ScopeNode
+    // under an Unresolved.  Future calls may resolve to either the old version
+    // or the new.
+    HashMap<Node,Node> map = new HashMap<>();
+    map.put(this,fun2);
+    Ary<Node> work = new Ary<>(new Node[1],0);
+    work.addAll(_uses);
+    while( work._len > 0 ) {    // While have work
+      Node n = work.pop();      // Get work
+      if( map.get(n) != null ) continue; // Already visited?
+      if( n != ret )            // Except for the Ret, which is the graph-sink for the function
+        work.addAll(n._uses);   // Visit all uses also
+      Node x = n.copy();        // Make a blank copy.  No edges
+      map.put(n,x);             // Map from old to new
+    }
+
+    if( _defs._len != 3 )
+      throw AA.unimpl(); // Actually doing signature-splitting...
+    
+    // Fill in edges.  New Nodes point to New, where they can.
+    for( Node n : map.keySet() ) {
+      Node c = map.get(n);
+      if( n==this || n instanceof ParmNode ) { // Leading edge nodes
+        c.add_def(n==this ? null : map.get(n.at(0)));
+        // Only keep defs matching signature, not all of them.
+        c.add_def(n.at(2));     // TODO: Handle all matching sigs
+      } else {                  // Interior nodes
+        for( Node i : n._defs ) {
+          Node ni = map.get(i);
+          c.add_def(ni==null ? i : ni);
+        }
+      }
+    }
+
+    throw AA.unimpl();
+  }
+  
   @Override public int hashCode() { return OP_FUN+_fidx; }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;

@@ -81,10 +81,10 @@ public class TypeInt extends Type {
   private static TypeInt sz( int log ) {
     switch( log ) {
     case 1:
-    case 8:  return TypeInt.INT8 ;
-    case 16: return TypeInt.INT16;
-    case 32: return TypeInt.INT32;
-    case 64: return TypeInt.INT64;
+    case 8:  return INT8 ;
+    case 16: return INT16;
+    case 32: return INT32;
+    case 64: return INT64;
     default: throw AA.unimpl();
     }
   }
@@ -140,6 +140,10 @@ public class TypeInt extends Type {
     if( t._type == Type.TINT ) return (byte)(_z<=((TypeInt)t)._z ? 0 : 99);
     if( t._type == Type.TFLT ) return 1; // Int->Flt ignores large int overflow issues
     throw AA.unimpl();
+  }
+  @Override public Type widen() {
+    assert _x <= 0;
+    return INT64;
   }
   @Override public boolean above_center() { return _x>0; }
   @Override public boolean canBeConst() { return _x>=0; }

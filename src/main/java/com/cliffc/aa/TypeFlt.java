@@ -79,6 +79,10 @@ public class TypeFlt extends Type {
     if( t._type == Type.TINT ) return 99; // Flt->Int always requires user intervention
     throw AA.unimpl();
   }
+  @Override public Type widen() {
+    assert _x <= 0;
+    return FLT64;
+  }
   @Override public boolean above_center() { return _x>0; }
   @Override public boolean canBeConst() { return _x>=0; }
   @Override public boolean is_con()   { return _x==0; }
