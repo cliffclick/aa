@@ -13,8 +13,6 @@ public class PhiNode extends Node {
     if( gvn.type(r) == TypeErr.ANY ) return null; // All dead, c-prop will fold up
     // TODO: can fold up all ANY control paths with ANY data; makes dead calcs
     // go dead sooner.
-    if( r._cidx != 0 )
-      throw AA.unimpl();// test
     return r._cidx == 0 ? null : at(r._cidx); // Region has collapsed to a Copy, fold up
   }
   @Override public Type value(GVNGCM gvn) {

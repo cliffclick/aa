@@ -58,7 +58,7 @@ public class TypeUnion extends Type {
     
     if( ts._len == 1 ) return ts._es[0]; // A single result is always that result
     ts.sort_update(Comparator.comparingInt(e -> e._uid)); // The set has to be ordered, to remove dups that vary only by order
-    return make(TypeTuple.make(any?TypeErr.ANY:TypeErr.ALL,false,ts.asAry()),any);
+    return make(TypeTuple.make(any?TypeErr.ANY:TypeErr.ALL,1.0,ts.asAry()),any);
   }
 
   static final TypeUnion ANY_NUM = (TypeUnion)make(true , TypeInt.INT64, TypeFlt.FLT64);

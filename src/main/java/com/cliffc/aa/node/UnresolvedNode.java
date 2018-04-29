@@ -141,7 +141,7 @@ public class UnresolvedNode extends Node {
   // allowed, join of possible returns otherwise - we get to choose the best
   // choice here.
   Type retype( GVNGCM gvn, CallNode call ) {
-    Type t = TypeErr.UNRESOLVED;
+    Type t = Type.SCALAR;
     outerloop:
     for( Node proj : _defs ) {
       // Peek Proj->Ret->Fun and get the function type

@@ -117,49 +117,80 @@ public class FunNode extends RegionNode {
         }
     if( !any_unr ) return null; // No unresolved calls; no point in type-specialization
 
-    // If Parm has unresolved calls, we want to type-specialize on its arguments.
-    // Call-site #1 is the most generic call site for the parser.
-    // Peel out 2nd call-site args and generalize them.
+    // Find the Proj matching the call to-be-cloned
+    ProjNode prj2 = null;
+    for( Node use : ret._uses )
+      if( use instanceof ProjNode && ((ProjNode)use)._idx == 2 )
+        { assert prj2==null; prj2 = (ProjNode)use; }
+    if( prj2 == null )          // Not found?  This path is dead
+      throw AA.unimpl();        // TODO: Should be eliminated by e.g. RetNode
+    
+    // Make a more-specific clone of the original function, and direct calls
+    // with the matching arguments to it.
+    
+    // If Parm has unresolved calls, we want to type-specialize on its
+    // arguments.  Call-site #1 is the most generic call site for the parser
+    // (all Scalar args).  Peel out 2nd call-site args and generalize them.
     Type[] sig = new Type[nargs-1];
     for( int i=1; i<nargs; i++ )
       sig[i-1] = gvn.type(parms[i].at(2)).widen();
-    FunNode fun2 = new FunNode(TypeFun.make(TypeTuple.make(sig),_tf._ret),at(1));
+    // Make a new function header with new signature
+    TypeFun tf = TypeFun.make(TypeTuple.make(sig),_tf._ret);
+    assert tf.isa(_tf);
+    if( tf == _tf ) return null; // No improvement for further splitting
+    FunNode fun2 = new FunNode(tf,at(1));
+    fun2.add_def(at(2));
 
-    // Clone the function body, and hook with proper signature into ScopeNode
-    // under an Unresolved.  Future calls may resolve to either the old version
-    // or the new.
+    // Clone the function body
     HashMap<Node,Node> map = new HashMap<>();
-    map.put(this,fun2);
     Ary<Node> work = new Ary<>(new Node[1],0);
-    work.addAll(_uses);
+    map.put(this,fun2);
+    work.addAll(_uses);         // Prime worklist
     while( work._len > 0 ) {    // While have work
       Node n = work.pop();      // Get work
       if( map.get(n) != null ) continue; // Already visited?
-      if( n != ret )            // Except for the Ret, which is the graph-sink for the function
-        work.addAll(n._uses);   // Visit all uses also
-      Node x = n.copy();        // Make a blank copy.  No edges
-      map.put(n,x);             // Map from old to new
+      if( n instanceof CastNode && n.at(0).at(0)==ret )
+        continue;              // Do not clone function data-exit 
+      if( n != ret )           // Except for the Ret, control-exit for function
+        work.addAll(n._uses);  // Visit all uses also
+      map.put(n,n.copy()); // Make a blank copy with no edges and map from old to new
     }
 
-    if( _defs._len != 3 )
-      throw AA.unimpl(); // Actually doing signature-splitting...
-    
-    // Fill in edges.  New Nodes point to New, where they can.
+    // Fill in edges.  New Nodes point to New instead of Old; everybody
+    // shares old nodes not in the function (and not cloned).  The
+    // FunNode & Parms only get the matching slice of args.
     for( Node n : map.keySet() ) {
       Node c = map.get(n);
-      if( n==this || n instanceof ParmNode ) { // Leading edge nodes
-        c.add_def(n==this ? null : map.get(n.at(0)));
+      if( n instanceof ParmNode ) {  // Leading edge ParmNodes
+        c.add_def(map.get(n.at(0))); // Control
+        c.add_def(gvn.con(sig[((ParmNode)n)._idx-1])); // Generic arg#1
         // Only keep defs matching signature, not all of them.
-        c.add_def(n.at(2));     // TODO: Handle all matching sigs
-      } else {                  // Interior nodes
-        for( Node i : n._defs ) {
-          Node ni = map.get(i);
-          c.add_def(ni==null ? i : ni);
+        if( _defs._len != 3 ) throw AA.unimpl(); // TODO: Actually doing signature-splitting...
+        c.add_def(n.at(2));     // Specific arg#2
+      } else if( !(n instanceof FunNode)) { // Interior nodes
+        for( Node def : n._defs ) {
+          Node newdef = map.get(def);
+          c.add_def(newdef==null ? def : newdef);
         }
       }
     }
+    if( prj2._uses._len != 1 )
+      throw AA.unimpl(); // Should be a control-use and a data/Cast use
+    Node data = (CastNode)prj2._uses.at(0);
+    gvn.unreg(prj2);
+    gvn.unreg(data);
+    prj2.set_def(0,map.get(ret),gvn); // Repoint proj as well
+    data.set_def(1,map.get(ret.at(1)),gvn);
+    // TODO: CAST repointed to new call as well
+    set_def(2,gvn.con(TypeErr.ANY),gvn); // Kill incoming path on old FunNode
 
-    throw AA.unimpl();
+    // Put all new nodes into the GVN tables and worklists
+    for( Node c : map.values() ) gvn.rereg(c);
+    gvn.rereg(prj2);
+    gvn.rereg(data);
+    // TODO: Hook with proper signature into ScopeNode under an Unresolved.
+    // Future calls may resolve to either the old version or the new.
+    return this;
   }
   
   @Override public int hashCode() { return OP_FUN+_fidx; }

@@ -313,7 +313,7 @@ public class Parse {
       int cnt=0;                // Add parameters to local environment
       for( String id : ids )  _e.add(id,gvn(new ParmNode(++cnt,id,fun,con(Type.SCALAR))));
       Node rez = stmt();        // Parse function body
-      Node ret = e._ret = init(new ProjNode(gvn(new RetNode(ctrl(),rez,fun)),1));
+      Node ret = e._ret = init(new ProjNode(init(new RetNode(ctrl(),rez,fun)),1));
       require('}');             // 
       _e = _e._par;             // Pop nested environment
       set_ctrl(old_ctrl);       // Back to the pre-function-def control

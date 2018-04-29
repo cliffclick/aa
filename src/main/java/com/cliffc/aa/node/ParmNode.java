@@ -8,6 +8,7 @@ public class ParmNode extends PhiNode {
   final String _name;           // Parameter name
   public ParmNode( int idx, String name, Node fun, Node defalt) { super(OP_PARM,fun,defalt); _idx=idx; _name=name; }
   @Override String str() { return _name; }
+  @Override public Type all_type() { return Type.SCALAR; }
   @Override public int hashCode() { return super.hashCode()+_idx; }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;

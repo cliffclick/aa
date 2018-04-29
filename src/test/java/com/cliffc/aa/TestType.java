@@ -116,7 +116,9 @@ public class TestType {
   // TODO: Observation: value() calls need to be monotonic, can test this.
   @Test public void testCommuteSymmetricAssociative() {
     // Uncomment to insert a single test to focus on
-    //Assert.assertEquals(TypeFlt.FLT32,TypeFlt.FLT32.meet(TypeUnion.ANY_NUM));
+    //Type t2 = TypeTuple.make(Type.CONTROL,1.0,TypeErr.ANY,Type.CONTROL,Type.CONTROL); // any,ctrl,ctrl,...
+    //Type t1 = TypeTuple.make(Type.CONTROL,1.0,TypeErr.ANY,Type.CONTROL,TypeErr.ANY ); // any,ctrl,any ,...
+    //Assert.assertEquals(t2,t1.meet(t2));
     Assert.assertTrue(Type.check_startup());
   }  
 }

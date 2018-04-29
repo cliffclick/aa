@@ -38,14 +38,20 @@ public class TypeTuple extends Type {
   
   private static TypeTuple FREE=null;
   private TypeTuple free( TypeTuple f ) { FREE=f; return this; }
-  public static TypeTuple make( Type... ts ) { return make(TypeErr.ANY,false,ts); }
-  public static TypeTuple make( Type inf, boolean ignore, Type... ts ) {
+  private static TypeTuple make( Type inf, boolean ignore, Type... ts ) {
     TypeTuple t1 = FREE;
     if( t1 == null ) t1 = new TypeTuple(ts,inf);
     else { FREE = null; t1.init(ts,inf); }
     TypeTuple t2 = (TypeTuple)t1.hashcons();
     return t1==t2 ? t1 : t2.free(t1);
   }
+  public static TypeTuple make( Type... ts ) { return make(TypeErr.ANY,1.0,ts); }
+  public static TypeTuple make( Type inf, double ignore, Type... ts ) {
+    int len = ts.length;
+    while( len > 0 && ts[len-1] == inf ) len--;
+    if( len < ts.length ) ts = Arrays.copyOf(ts,len);
+    return make(inf,false, ts);
+  }    
 
   public  static final TypeTuple  ANY    = make(); // Infinite list of Any
           static final TypeTuple  SCALAR = make(Type. SCALAR);

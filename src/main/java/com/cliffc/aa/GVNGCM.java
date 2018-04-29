@@ -20,7 +20,7 @@ public class GVNGCM {
   private Ary<Node> _work = new Ary<>(new Node[1], 0);
   private BitSet _wrk_bits = new BitSet();
 
-  private void add_work( Node n ) { if( !_wrk_bits.get(n._uid) ) add_work0(n); }
+  public <N extends Node> N add_work( N n ) { if( !_wrk_bits.get(n._uid) ) add_work0(n); return n; }
   private <N extends Node> N add_work0( N n ) {
     _work.add(n);               // These need to be visited later
     _wrk_bits.set(n._uid);
@@ -61,7 +61,7 @@ public class GVNGCM {
   // Record a Node, but do not optimize it for value and ideal calls, as it is
   // mid-construction from the parser.  Any function call with yet-to-be-parsed
   // call sites, and any loop top with an unparsed backedge needs to use this.
-  <N extends Node> N init( N n ) {
+  public <N extends Node> N init( N n ) {
     assert n._uses._len==0;
     return init0(n);
   }
@@ -181,8 +181,12 @@ public class GVNGCM {
   private void xform_old( Node old ) {
     Node nnn = xform_old0(old);
     if( nnn==null ) return;
-    assert !check_new(nnn);     // Replacement in system
-    if( nnn == old ) return;
+    if( nnn == old ) {          // Progress, but not replacement
+      for( Node use : old._uses ) add_work(use);
+      add_work(old);            // Re-run old, until no progress
+      return;
+    }
+    if( check_new(nnn) ) rereg(nnn); // Replacement in system
     // if old is being replaced, it got removed from GVN table and types table.
     assert !check_opt(old);
     subsume(old,nnn);
@@ -208,12 +212,12 @@ public class GVNGCM {
     if( t.is_con() && !(n instanceof ConNode) )
       return con(t);            // Constant replacement
     // Global Value Numbering
-    y = _vals.putIfAbsent(n,n);
-    if( y != null ) return y;
+    Node z = _vals.putIfAbsent(n,n);
+    if( z != null ) return z;
     // Record type for n; n is "in the system" now
     setype(n,t);                // Set it in
     // TODO: If x is a TypeNode, capture any more-precise type permanently into Node
-    return oldt == t ? null : n; // Progress if types improved
+    return oldt == t && y==null ? null : n; // Progress if types improved
   }
 
   // Complete replacement; point uses to x.
@@ -237,6 +241,7 @@ public class GVNGCM {
       Node n = _work.pop();
       _wrk_bits.clear(n._uid);
       if( n.is_dead() ) continue;
+      if( n instanceof ScopeNode ) continue; // These are killed when parsing exists lexical scope
       if( n._uses._len==0 ) { kill(n); continue; }
       xform_old(n);
     }

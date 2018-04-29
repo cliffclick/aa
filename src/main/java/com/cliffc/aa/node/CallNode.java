@@ -83,6 +83,18 @@ public class CallNode extends Node implements AutoCloseable {
       }
       assert pcnt == nargs(); // All params found and updated at the function head
       gvn.add_def(fun,ctrl); // Add Control for this path
+
+      // TODO: Big Decision: Calls, when inlined, pass control from the called
+      // function, OR from the dominator point: where the function was called.
+      // Doing it local from the function preserves a local CFG.
+      // Doing it global from the dominating point leads to data calcs with
+      // embedded control - but only a post-dominating data-use, no control-use.
+      // I.e., a non-CFG control structure.
+
+      // TODO: Currently stuck because cannot inline, because Call has
+      // dominating (non-local) control
+
+      
       Node rctrl = gvn.xform(new ProjNode(ret,fun._defs._len-1));
       return new CastNode( rctrl, rez, Type.SCALAR );
     }
@@ -133,6 +145,7 @@ public class CallNode extends Node implements AutoCloseable {
       Env._gvn.kill_new(this);  // Free state on 
   }
 
+  @Override public Type all_type() { return Type.SCALAR; }
   @Override public int hashCode() { return super.hashCode()+_cidx; }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
