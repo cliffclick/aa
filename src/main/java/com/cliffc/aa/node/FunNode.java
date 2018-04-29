@@ -181,7 +181,6 @@ public class FunNode extends RegionNode {
     gvn.unreg(data);
     prj2.set_def(0,map.get(ret),gvn); // Repoint proj as well
     data.set_def(1,map.get(ret.at(1)),gvn);
-    // TODO: CAST repointed to new call as well
     set_def(2,gvn.con(TypeErr.ANY),gvn); // Kill incoming path on old FunNode
 
     // Put all new nodes into the GVN tables and worklists

@@ -84,12 +84,14 @@ public class GVNGCM {
   public boolean touched( Node n ) { return n._uid < _ts._len && _ts._es[n._uid]!=null; }
   
   // Remove from GVN structures.  Used rarely for whole-merge changes
-  public void unreg( Node n ) {
-    assert !check_new(n);
+  public void unreg( Node n ) { assert !check_new(n); unreg0(n); }
+  private Node unreg0( Node n ) {
     _ts.set(n._uid,null);       // Remove from type system
     _vals.remove(n);            // Remove from GVN
     // TODO: Remove from worklist also
+    return n;
   }
+  
   // Used rarely for whole-merge changes
   public void rereg( Node n ) {
     assert !check_opt(n);
@@ -105,7 +107,7 @@ public class GVNGCM {
   // Node is in the type table and GVN hash table
   private boolean check_opt(Node n) {
     if( touched(n) ) {          // First & only test: in type table or not
-      assert check_gvn(n,true); // Check also in GVN table
+      assert (n instanceof ScopeNode) || check_gvn(n,true); // Check also in GVN table
       return true;              // Yes in both type table and GVN table
     }
     assert !check_gvn(n,false); // Check also not in GVN table
@@ -164,7 +166,7 @@ public class GVNGCM {
   // go dead.  Since its new, no need to remove from GVN system.  
   public void kill_new( Node n ) { assert check_new(n);  kill0(n); }
   // Recursively kill off a dead node, which might make lots of other nodes go dead
-  public void kill( Node n ) {  unreg(n);  kill0(n); }
+  public void kill( Node n ) {  kill0(unreg0(n)); }
   // Version for never-GVN'd; common for e.g. constants to die early or
   // RootNode, and some other make-and-toss Nodes.
   void kill0( Node n ) {

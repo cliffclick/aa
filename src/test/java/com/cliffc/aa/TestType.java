@@ -5,7 +5,6 @@ import org.junit.Test;
 
 public class TestType {
   @Test public void testType0() {
-    test("x=3; fun={y -> x*x+y*y}; fun(2)", TypeInt.con(13)); // not inlined????
     // Simple int
     test("1",   TypeInt.TRUE);
     // Unary operator
