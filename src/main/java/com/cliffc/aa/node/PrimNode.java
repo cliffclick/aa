@@ -26,6 +26,9 @@ public abstract class PrimNode extends Node {
     new    Id(),
     
     new ConvertInt32Flt64(),
+    new ConvertInt64Str(),
+    new ConvertFlt64Str(),
+    new ConvertStrStr(),
 
     new MinusFlt64(),
     new MinusInt64(),
@@ -48,6 +51,8 @@ public abstract class PrimNode extends Node {
     //if( from==Type.UInt32 && to==Type.Int64 ) return convUInt32Int64;
     //if( from==Type.UInt32 && to==Type.FLT64 ) return convUInt32Flt64;
     //if( from==Type. Int64 && to==Type.FLT64 ) return  convInt64Flt64;
+    if( from.isa(TypeInt.INT64) && to.isa(TypeStr.STR) ) return new ConvertInt64Str(null,actual);
+    if( from.isa(TypeFlt.FLT64) && to.isa(TypeStr.STR) ) return new ConvertFlt64Str(null,actual);
     throw AA.unimpl();
   }
   
@@ -72,6 +77,27 @@ class ConvertInt32Flt64 extends PrimNode {
   @Override public TypeFlt apply( Type[] args ) { return TypeFlt.make(0,64,(double)args[1].getl()); }
   @Override public byte op_prec() { return 9; }
   public boolean is_lossy() { return false; }
+}
+
+class ConvertInt64Str extends PrimNode {
+  ConvertInt64Str(Node... nodes) { super("str",PrimNode.ARGS1,TypeFun.make(TypeTuple.INT64,TypeStr.STR),nodes); }
+  @Override public TypeStr apply( Type[] args ) { return TypeStr.make(0,Long.toString(args[1].getl())); }
+  @Override public byte op_prec() { return 9; }
+  public boolean is_lossy() { return false; }
+}
+
+class ConvertFlt64Str extends PrimNode {
+  ConvertFlt64Str(Node... nodes) { super("str",PrimNode.ARGS1,TypeFun.make(TypeTuple.FLT64,TypeStr.STR),nodes); }
+  @Override public TypeStr apply( Type[] args ) { return TypeStr.make(0,Double.toString(args[1].getd())); }
+  @Override public byte op_prec() { return 9; }
+  public boolean is_lossy() { return false; }
+}
+
+class ConvertStrStr extends PrimNode {
+  ConvertStrStr(Node... nodes) { super("str",PrimNode.ARGS1,TypeFun.make(TypeTuple.STR,TypeStr.STR),nodes); }
+  @Override public Type apply( Type[] args ) { return args[1]; }
+  @Override public Node ideal(GVNGCM gvn) { return at(1); }
+  @Override public Type value(GVNGCM gvn) { return gvn.type(at(1)); }
 }
 
 // 1Ops have uniform input/output types, so take a shortcut on name printing

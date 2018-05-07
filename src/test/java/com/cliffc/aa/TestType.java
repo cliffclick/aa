@@ -5,6 +5,7 @@ import org.junit.Test;
 
 public class TestType {
   @Test public void testType0() {
+    test("str(\"abc\")", TypeStr.make(0,"abc"));
     // Simple int
     test("1",   TypeInt.TRUE);
     // Unary operator
@@ -23,6 +24,12 @@ public class TestType {
     // Mixed int/float with conversion
     test("1+2.3",   TypeFlt.make(0,64,3.3));
   
+    // Simple strings
+    test("\"Hello, world\"", TypeStr.make(0,"Hello, world"));
+    test("str(3.14)", TypeStr.make(0,"3.14"));
+    test("str(3)", TypeStr.make(0,"3"));
+    test("str(\"abc\")", TypeStr.make(0,"abc"));
+      
     // Variable lookup
     test("math_pi", TypeFlt.PI);
     // bare function lookup; returns a union of '+' functions

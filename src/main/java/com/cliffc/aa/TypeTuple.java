@@ -60,7 +60,8 @@ public class TypeTuple extends Type {
           static final TypeTuple XSCALAR2= make(Type.XSCALAR, Type.XSCALAR);
   public  static final TypeTuple INT32   = make(TypeInt.INT32 );
   public  static final TypeTuple INT64   = make(TypeInt.INT64 );
-          static final TypeTuple FLT64   = make(TypeFlt.FLT64 );
+  public  static final TypeTuple FLT64   = make(TypeFlt.FLT64 );
+  public  static final TypeTuple STR     = make(TypeStr.STR   );
           static final TypeTuple INT64_INT64 = make(TypeInt.INT64,TypeInt.INT64);
           static final TypeTuple FLT64_FLT64 = make(TypeFlt.FLT64,TypeFlt.FLT64);
   private static final TypeTuple FLT64_INT64 = make(TypeFlt.FLT64,TypeInt.INT64);
@@ -68,7 +69,7 @@ public class TypeTuple extends Type {
   public  static final TypeTuple IF_ALL  = make(Type.CONTROL,Type.CONTROL);
   public  static final TypeTuple IF_TRUE = make(TypeErr.ANY ,Type.CONTROL);
   public  static final TypeTuple IF_FALSE= make(Type.CONTROL             );
-  static final TypeTuple[] TYPES = new TypeTuple[]{ANY,SCALAR,INT32,INT64,FLT64,INT64_INT64,FLT64_FLT64,FLT64_INT64, IF_ALL, IF_TRUE, IF_FALSE};
+  static final TypeTuple[] TYPES = new TypeTuple[]{ANY,SCALAR,STR,INT32,INT64,FLT64,INT64_INT64,FLT64_FLT64,FLT64_INT64, IF_ALL, IF_TRUE, IF_FALSE};
   
   // The length of Tuples is a constant, and so is its own dual.  Otherwise
   // just dual each element.  Also flip the infinitely extended tail type.

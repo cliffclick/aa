@@ -89,7 +89,8 @@ public class Type {
   static final byte TFUN    =12; // Functions; both domain and range are a Tuple; see TypeFun                            
   static final byte TFLT    =13; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
   static final byte TINT    =14; // All Integers, including signed/unsigned and various sizes; see TypeInt
-  static final byte TLAST   =15; // Type check
+  static final byte TSTR    =15; // String type
+  static final byte TLAST   =16; // Type check
   
   public  static final Type CONTROL= make(TCONTROL); // Control
   public  static final Type  SCALAR= make( TSCALAR); // ptrs, ints, flts; things that fit in a machine register
@@ -308,6 +309,8 @@ public class Type {
   public long   getl() { throw AA.unimpl(); }
   // Return a double from a TypeFlt constant; assert otherwise.
   public double getd() { throw AA.unimpl(); }
+  // Return a String from a TypeStr constant; assert otherwise.
+  public String getstr() { throw AA.unimpl(); }
 
   // Lattice of conversions:
   // -1 unknown; top; might fail, might be free (Scalar->Int); Scalar might lift

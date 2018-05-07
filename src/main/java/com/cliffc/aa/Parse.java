@@ -19,13 +19,16 @@ import java.text.ParsePosition;
  *  nfact= uniop* fact          // Zero or more uniop calls over a fact
  *  fact = id                   // variable lookup
  *  fact = num                  // number
+ *  fact = "str"                // string
  *  fact = (stmt)               // General statement parsed recursively
  *  fact = {func}               // Anonymous function declaration
  *  fact = {binop}              // Special syntactic form of binop; no spaces allowed; returns function constant
  *  fact = {uniop}              // Special syntactic form of uniop; no spaces allowed; returns function constant
- *  binop = +-*%&|/             // etc; primitive lookup; can determine infix binop at parse-time
- *  uniop  =  -!~               // etc; primitive lookup; can determine infix uniop at parse-time
+ *  binop= +-*%&|/              // etc; primitive lookup; can determine infix binop at parse-time
+ *  uniop=  -!~                 // etc; primitive lookup; can determine infix uniop at parse-time
  *  func = { [[id]* ->]? stmt } // Anonymous function declaration
+ *  str  = [.\%]*               // String contents; \t\n\r\% standard escapes
+ *  str  = %[num]?[.num]?fact   // Percent escape embeds a 'fact' in a string; "name=%name\n"
  */
 
 public class Parse {
@@ -254,6 +257,7 @@ public class Parse {
 
   /** Parse a factor, a leaf grammar token
    *  fact = num       // number
+   *  fact = "string"  // string
    *  fact = (stmt)    // General statement parsed recursively
    *  fact = {binop}   // Special syntactic form of binop; no spaces allowed; returns function constant
    *  fact = {uniop}   // Special syntactic form of uniop; no spaces allowed; returns function constant
@@ -264,6 +268,7 @@ public class Parse {
     if( skipWS() == -1 ) return null;
     byte c = _buf[_x];
     if( '0' <= c && c <= '9' ) return con(number());
+    if( '"' == c ) return con(string());
     int oldx = _x;
     if( peek('(') ) {           // a nested statement
       Node s = stmt();
@@ -344,6 +349,21 @@ public class Parse {
     if( n instanceof Long   ) return TypeInt.con(      n.  longValue());
     if( n instanceof Double ) return TypeFlt.make(0,64,n.doubleValue());
     throw new RuntimeException(n.getClass().toString()); // Should not happen
+  }
+
+  /** Parse a String; _x is at '"'.
+   *  str  = [.\%]*               // String contents; \t\n\r\% standard escapes
+   *  str  = %[num]?[.num]?fact   // Percent escape embeds a 'fact' in a string; "name=%name\n"
+   */
+  private Type string() {
+    int oldx = ++_x;
+    byte c;
+    while( (c=_buf[_x++]) != '"' ) {
+      if( c=='%' ) throw AA.unimpl();
+      if( c=='\\' ) throw AA.unimpl();
+      if( _x == _buf.length ) return err_ctrl("Unterminated string");
+    }
+    return TypeStr.make(0,new String(_buf,oldx,_x-oldx-1));
   }
   
   // Require a specific character (after skipping WS) or polite error

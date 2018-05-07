@@ -18,6 +18,7 @@ GRAMMAR
 *  nfact= uniop* fact          // Zero or more uniop calls over a fact
 *  fact = id                   // variable lookup
 *  fact = num                  // number
+*  fact = "string"             // string
 *  fact = (stmt)               // General statement parsed recursively
 *  fact = {func}               // Anonymous function declaration
 *  fact = {binop}              // Special syntactic form of binop; no spaces allowed; returns function constant
@@ -25,6 +26,8 @@ GRAMMAR
 *  binop= +-*%&|/              // etc; primitive lookup; can determine infix binop at parse-time
 *  uniop= -!~                  // etc; primitive lookup; can determine infix uniop at parse-time
 *  func = { [[id]* ->]? stmt } // Anonymous function declaration
+*  string = [.\%]*             // String contents; \t\n\r\% standard escapes
+*  string = %[num]?[.num]?fact // Percent escape embeds a 'fact' in a string; "name=%name\n"
 
 
 Done Stuff
@@ -82,6 +85,9 @@ Elm-style union types
 
 No exceptions?!!?  Same as Elm: allow tagged union returns with an error return
 vs a non-error return.  Force user to handle errors up&down the stack.
+
+embed 'fact' in string: "milage=%(dist/gals) mph".  The expression (dist/gals) is
+a standard paren-wrapped 'fact' from the grammer.
 
 performance types: "no autoboxing, no big-int, no dynamic dispatch, no serial loops?"
 also: No GC allocations (only ref-counting & rust-style lifetime management).
