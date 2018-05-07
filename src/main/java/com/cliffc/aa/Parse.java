@@ -398,33 +398,30 @@ public class Parse {
     Type t = type0();
     return t==null ? err_ctrl("missing type") : t;
   }
+  // Type or null or TypeErr.ANY for '->' token
   private Type type0() {
-    if( !peek('{') ) {          // Primitive type
+    if( !peek('{') ) {          // Primitive type, not function type
       int oldx = _x;
       String tok = token();
       if( tok==null ) return null;
+      if( tok.equals("->") ) return TypeErr.ANY;
       Type t = _e.lookup_type(tok);
-      if( t==null ) _x = oldx;
+      if( t==null ) _x = oldx;  // Unwind if not a primitive type
       return t;
     }
-    Ary<Type> ts = new Ary<>(new Type[1],0);
-    while( true ) {
-      Type t = type0();
-      if( t==null ) break;
-      ts.add(t);
+    Ary<Type> ts = new Ary<>(new Type[1],0);  Type t;
+    while( (t=type0()) != null && t != TypeErr.ANY  )
+      ts.add(t);                // Collect arg types
+    Type ret=null;
+    if( t==TypeErr.ANY ) {      // Found ->, expect return type
+      ret = type0();
+      if( ret == null ) return null;
+    } else {                    // Allow no-args and simple return type
+      if( ts._len != 1 ) return null;
+      ret = ts.pop();
     }
-    if( peek('-') ) {
-      if( peek('>') ) {
-        Type res = type0();
-        if( res == null ) return null;
-        require('}');
-        return TypeFun.make(TypeTuple.make(ts.asAry()),res);
-      }
-      return null;
-    }
-    if( ts._len != 1 ) return null;
     require('}');
-    return TypeFun.make(TypeTuple.ANY,ts.at(0));
+    return TypeFun.make(TypeTuple.make(ts.asAry()),ret);
   }
 
   // Require a specific character (after skipping WS) or polite error
