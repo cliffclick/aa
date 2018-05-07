@@ -396,7 +396,7 @@ public class Parse {
    */
   private Type type() {
     Type t = type0();
-    return t==null ? err_ctrl("missing type") : t;
+    return (t==null || t==TypeErr.ANY) ? err_ctrl("missing type") : t;
   }
   // Type or null or TypeErr.ANY for '->' token
   private Type type0() {
@@ -418,7 +418,7 @@ public class Parse {
       if( ret == null ) return null;
     } else {                    // Allow no-args and simple return type
       if( ts._len != 1 ) return null;
-      ret = ts.pop();
+      ret = ts.pop();           // Get single return type
     }
     require('}');
     return TypeFun.make(TypeTuple.make(ts.asAry()),ret);

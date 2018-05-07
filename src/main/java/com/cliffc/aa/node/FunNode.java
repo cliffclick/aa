@@ -71,6 +71,11 @@ import java.util.HashMap;
 // as parsing continues.  The RetNode is what is passed about for a "function
 // pointer".
 //
+// Keep a global function table, indexed by _fidx.  Points to generic ProjNode
+// caller as currently does... but nothing else does.  Parser gets a function
+// constant with _fidx as a number and makes a ConNode.  Unresolved takes in
+// these ConNodes.  CallNode does the _fidx lookup when inlining the call.
+//
 public class FunNode extends RegionNode {
   static private int CNT=2; // Function index; 1 is reserved for unknown functions
   private final int _fidx;  // Function index; 1 is reserved for unknown functions
@@ -89,12 +94,12 @@ public class FunNode extends RegionNode {
   }
 
   // Look for type-specialization inlining.  If any ParmNode has an Unresolved
-  // Call, then we'd like to make a clone of the function body (at least up to
-  // getting all the UnresolvedNodes to clear out).  The specialized code uses
-  // generalized versions of the arguments, where we only specialize on
+  // Call user, then we'd like to make a clone of the function body (at least
+  // up to getting all the UnresolvedNodes to clear out).  The specialized code
+  // uses generalized versions of the arguments, where we only specialize on
   // arguments that help immediately.
   private Node type_special( GVNGCM gvn ) {
-    // Bail if there are any dead pathes; RegionNode ideal will clean out
+    // Bail if there are any dead paths; RegionNode ideal will clean out
     for( int i=1; i<_defs._len; i++ ) if( gvn.type(at(i))==TypeErr.ANY ) return null;
     if( _defs._len <= 2 ) return null; // No need to specialize if only 1 caller
     if( !(at(1) instanceof ScopeNode) ) throw AA.unimpl();
