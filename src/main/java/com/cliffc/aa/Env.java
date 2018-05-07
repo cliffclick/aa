@@ -6,14 +6,17 @@ import com.cliffc.aa.util.Ary;
 
 import java.lang.AutoCloseable;
 import java.util.BitSet;
+import java.util.HashMap;
 
 public class Env implements AutoCloseable {
   final Env _par;
   ScopeNode _scope; // Lexical anchor; goes when this environment leaves scope
+  final HashMap<String,Type> _types;
   Node _ret;   // Return result
   Env( Env par ) {
     _par=par;
     _scope = new ScopeNode();
+    _types = new HashMap<>();
     // Copy control thru from parent
     if( par != null ) add(" control ",par._scope.get(" control "));
   }
@@ -31,6 +34,7 @@ public class Env implements AutoCloseable {
     // register them with GVN.
     for( Node val : _scope._defs )  _gvn.init0(val);
     _gvn.iter();
+    Type.init0(_types);
   }
   
   // Called during basic Env creation, this wraps a PrimNode as a full
@@ -76,14 +80,9 @@ public class Env implements AutoCloseable {
     return _par == null ? bs : _par.check_live0(bs);
   }
 
-  Ary<String> gather_errs(GVNGCM gvn) {
-    assert _par==null;          // Top-level only
-    return _scope.walkerr(null,new BitSet(),gvn);
-  }
-  
   // Test support, return top-level token type
-  static Type lookup_type( String token ) { return lookup_type(TOP.lookup(token)); }
-  static Type lookup_type( Node n ) {
+  static Type lookup_valtype( String token ) { return lookup_valtype(TOP.lookup(token)); }
+  static Type lookup_valtype( Node n ) {
     Type t = _gvn.type(n);
     if( t != TypeErr.CONTROL ) return t;
     if( n instanceof ProjNode ) // Get function type when returning a function
@@ -117,5 +116,12 @@ public class Env implements AutoCloseable {
     if( unr == null ) return null;
     if( !(unr instanceof UnresolvedNode) ) return unr;
     return ((UnresolvedNode)unr).filter(nargs);
+  }
+
+  // Type lookup
+  Type lookup_type( String token ) {
+    Type t = _types.get(token);
+    if( t != null ) return t;
+    return _par == null ? null : _par.lookup_type(token);
   }
 }

@@ -5,17 +5,19 @@ import com.cliffc.aa.util.Ary;
 
 import java.text.NumberFormat;
 import java.text.ParsePosition;
-  
+import java.util.BitSet;
+
 /** an implementation of language AA
  *
  *  GRAMMAR:
  *  prog = stmt END
- *  stmt = [id =]* ifex [; stmt]* // ids must not exist, and are available in later statements
+ *  stmt = [id[@type]? =]* ifex [; stmt]* // ids must not exist, and are available in later statements
  *  ifex = expr ? expr : expr   // trinary logic
  *  expr = term [binop term]*   // gather all the binops and sort by prec
- *  term = nfact                // No function call
- *  term = nfact ( [stmt,]* )+  // One or more function calls in a row, args are delimited
- // *  term = nfact nfact*         // One function call, all the args listed
+ *  term = tfact                // No function call
+ *  term = tfact ( [stmt,]* )+  // One or more function calls in a row, args are delimited
+ // *  term = tfact tfact*         // One function call, all the args listed
+ *  tfact= nfact[@type]?        // Optional type after a nfact
  *  nfact= uniop* fact          // Zero or more uniop calls over a fact
  *  fact = id                   // variable lookup
  *  fact = num                  // number
@@ -29,6 +31,10 @@ import java.text.ParsePosition;
  *  func = { [[id]* ->]? stmt } // Anonymous function declaration
  *  str  = [.\%]*               // String contents; \t\n\r\% standard escapes
  *  str  = %[num]?[.num]?fact   // Percent escape embeds a 'fact' in a string; "name=%name\n"
+ *  type = tcon                 // Types are a tcon or a tfun
+ *  type = tfun
+ *  tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str
+ *  tfun = {[[type]* ->]? type }// Function types mirror func decls
  */
 
 public class Parse {
@@ -74,11 +80,13 @@ public class Parse {
     // TODO: Optimistic Pass Goes Here, to improve error situation
 
     // Result type
-    Type tres = Env.lookup_type(res);
+    Type tres = Env.lookup_valtype(res);
 
     // Gather errors
     Env par = _e._par;
-    Ary<String> errs = par.gather_errs(_gvn);
+    assert par._par==null;      // Top-level only
+    Ary<String> errs = par._scope.walkerr_use(null,new BitSet(),_gvn);
+    errs = res.walkerr_def(errs,new BitSet(),_gvn);
     if( tres instanceof TypeErr && tres != TypeErr.ALL ) // Result can be an error, even if no c-flow has an error
       errs = add_err(errs,((TypeErr)tres)._msg); // One more error
     if( errs == null && skipWS() != -1 ) errs = add_err(null,errMsg("Syntax error; trailing junk"));
@@ -89,22 +97,28 @@ public class Parse {
   /** Parse a list of statements.  A statement is a list of variables to
    *  let-assign, and an ifex for the value.  The variables must not already
    *  exist, and are available in all later statements.
-   *  stmt = [id =]* ifex [; stmt]*
+   *  stmt = [id[@type]? =]* ifex [; stmt]*
    */
   private Node stmt() {
     Ary<String> toks = new Ary<>(new String[1],0);
+    Ary<Type  > ts   = new Ary<>(new Type  [1],0);
     while( true ) {
       int oldx = _x;
       String tok = token();  // Scan for 'id = ...'
       if( tok == null ) break;
+      Type t = null;
+      if( peek('@') && (t=type())==null ) return con(err_ctrl("Missing type"));
       if( !peek('=') ) { _x = oldx; break; } // Unwind token parse
       toks.add(tok);
+      ts  .add(t  );
     }
     Node ifex = ifex();
     if( ifex == null ) {
       if( toks._len > 0 ) return con(err_ctrl("Missing ifex after assignment of '"+toks.last()+"'"));
       else return null;
     }
+    // Honor all type requests, all at once
+    for( Type t : ts ) if( t != null ) ifex = gvn(new TypeNode(t,ifex,errMsg("%s")));
     for( String tok : toks )
       if( _e.lookup(tok)==null ) _e.add(tok,ifex);
       else err_ctrl0("Cannot re-assign ref '"+tok+"'");
@@ -188,13 +202,13 @@ public class Parse {
   }
 
   /** Parse a function call, or not
-   *  term = nfact                // No function call
-   *  term = nfact ( [expr,]* )+  // One or more function calls in a row, each set of args are delimited
-   *  term = nfact nfact*         // One function call, all the args listed
+   *  term = tfact                // No function call
+   *  term = tfact ( [expr,]* )+  // One or more function calls in a row, each set of args are delimited
+   *  term = tfact tfact*         // One function call, all the args listed
    */
   private Node term() {
-    Node fun = nfact(), arg;         // nfactor
-    while( fun != null ) {           // Have nfact?
+    Node fun = tfact(), arg;         // tfactor
+    while( fun != null ) {           // Have tfact?
       if( skipWS() == -1 ) return fun; // Just the original term
       // Function application; parse out the argument list
       try( CallNode args = new CallNode() ) {
@@ -235,8 +249,16 @@ public class Parse {
     return null;
   }
   
+  /** Parse a type after a fact
+   *  tfact = nfact[@type]
+   */
+  private Node tfact() {
+    Node n = nfact();
+    return (n!=null && peek('@')) ? gvn(new TypeNode(type(),n,errMsg("%s"))) : n;
+  }
+  
   /** Parse any leading unary ops before a factor
-   *  nfact = fact | uniop nfact 
+   *  nfact = fact | uniop nfact
    */
   private Node nfact() {
     int oldx = _x;
@@ -365,7 +387,46 @@ public class Parse {
     }
     return TypeStr.make(0,new String(_buf,oldx,_x-oldx-1));
   }
-  
+
+  /** Parse a type
+   *  type = tcon                 // Types are a tcon or a tfun
+   *  type = tfun
+   *  tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str
+   *  tfun = {[[type]* ->]? type }// Function types mirror func decls
+   */
+  private Type type() {
+    Type t = type0();
+    return t==null ? err_ctrl("missing type") : t;
+  }
+  private Type type0() {
+    if( !peek('{') ) {          // Primitive type
+      int oldx = _x;
+      String tok = token();
+      if( tok==null ) return null;
+      Type t = _e.lookup_type(tok);
+      if( t==null ) _x = oldx;
+      return t;
+    }
+    Ary<Type> ts = new Ary<>(new Type[1],0);
+    while( true ) {
+      Type t = type0();
+      if( t==null ) break;
+      ts.add(t);
+    }
+    if( peek('-') ) {
+      if( peek('>') ) {
+        Type res = type0();
+        if( res == null ) return null;
+        require('}');
+        return TypeFun.make(TypeTuple.make(ts.asAry()),res);
+      }
+      return null;
+    }
+    if( ts._len != 1 ) return null;
+    require('}');
+    return TypeFun.make(TypeTuple.ANY,ts.at(0));
+  }
+
   // Require a specific character (after skipping WS) or polite error
   private void require( char c ) {
     if( peek(c) ) return;

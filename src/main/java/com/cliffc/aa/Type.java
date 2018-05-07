@@ -194,11 +194,19 @@ public class Type {
   
   public Type join( Type t ) { return dual().meet(t.dual()).dual(); }
 
+  static void init0( HashMap<String,Type> types ) {
+    types.put("real",REAL);
+    TypeInt.init0(types);
+    TypeFlt.init0(types);
+    TypeStr.init0(types);
+  }
+  
   static boolean check_startup() {
     Type[] ts =    Type     .TYPES ;
     ts = concat(ts,TypeErr  .TYPES);
     ts = concat(ts,TypeInt  .TYPES);
     ts = concat(ts,TypeFlt  .TYPES);
+    ts = concat(ts,TypeStr  .TYPES);
     ts = concat(ts,TypeTuple.TYPES);
     ts = concat(ts,TypeFun  .TYPES);
     ts = concat(ts,TypeUnion.TYPES);

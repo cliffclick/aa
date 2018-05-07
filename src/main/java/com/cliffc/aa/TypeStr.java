@@ -1,5 +1,7 @@
 package com.cliffc.aa;
 
+import java.util.HashMap;
+
 public class TypeStr extends Type {
   byte _x;                // -1 bot, 0 con, +1 top
   String _con;            // only if _x==0
@@ -13,8 +15,8 @@ public class TypeStr extends Type {
     return _x==t2._x && _con.equals(t2._con);
   }
   @Override public String toString() {
-    if( _x==0 ) return _con;
-    return (_x==1?"~":"")+"Str";
+    if( _x==0 ) return "\""+_con+"\"";
+    return (_x==1?"~":"")+"str";
   }
   private static TypeStr FREE=null;
   private TypeStr free( TypeStr f ) { FREE=f; return this; }
@@ -29,6 +31,9 @@ public class TypeStr extends Type {
 
   static public final TypeStr STR = make(-1,null);
   static final TypeStr[] TYPES = new TypeStr[]{STR};
+  static void init0( HashMap<String,Type> types ) {
+    types.put("str",STR);
+  }
   // Return a String from a TypeStr constant; assert otherwise.
   @Override public String getstr() { assert is_con(); return _con; }
 

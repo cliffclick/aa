@@ -7,7 +7,6 @@ import java.util.HashMap;
 public class ScopeNode extends Node {
   // Mapping from names to def indices
   private final HashMap<String, Integer> _vals;
-  
   public ScopeNode() { super(OP_SCOPE); _vals = new HashMap<>(); }
 
   // Name to node lookup, or null

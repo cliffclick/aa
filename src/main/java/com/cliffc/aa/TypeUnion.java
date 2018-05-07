@@ -57,7 +57,8 @@ public class TypeUnion extends Type {
       return Type.SCALAR;
     
     if( ts._len == 1 ) return ts._es[0]; // A single result is always that result
-    ts.sort_update(Comparator.comparingInt(e -> e._uid)); // The set has to be ordered, to remove dups that vary only by order
+    // The set has to be ordered, to remove dups that vary only by order
+    ts.sort_update(Comparator.comparingInt(e -> e._uid)); 
     return make(TypeTuple.make(any?TypeErr.ANY:TypeErr.ALL,1.0,ts.asAry()),any);
   }
 
@@ -157,4 +158,13 @@ public class TypeUnion extends Type {
     return make(_any,full_simplify(rets,_any));
   }
   @Override protected boolean canBeConst() { return _any && _ts.canBeConst(); }
+  @Override public boolean above_center() {
+    if( _any ) {
+      for( Type t : _ts._ts )
+        if( t.above_center() )
+          return true;
+      return false;
+    }
+    throw AA.unimpl();
+  }
 }

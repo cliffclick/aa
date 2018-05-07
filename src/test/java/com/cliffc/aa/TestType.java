@@ -5,7 +5,7 @@ import org.junit.Test;
 
 public class TestType {
   @Test public void testType0() {
-    test("str(\"abc\")", TypeStr.make(0,"abc"));
+    test("id@{int->int}", Env.lookup_valtype("id"));
     // Simple int
     test("1",   TypeInt.TRUE);
     // Unary operator
@@ -34,7 +34,7 @@ public class TestType {
     test("math_pi", TypeFlt.PI);
     // bare function lookup; returns a union of '+' functions
     testerr("+", "Syntax error; trailing junk","");
-    test("{+}", Env.lookup_type("+"));
+    test("{+}", Env.lookup_valtype("+"));
     test("{!}", TypeFun.make(TypeTuple.INT64,TypeInt.BOOL));
     // Function application, traditional paren/comma args
     test("{+}(1,2)", TypeInt.con( 3));
@@ -43,7 +43,7 @@ public class TestType {
     // error; mismatch arg count
     testerr("!()"       , "Call to unary function '!', but missing the one required argument"," ");
     testerr("math_pi(1)", "A function is being called, but 3.141592653589793 is not a function type","          ");
-    testerr("{+}(1,2,3)", "Argument mismatch in call to +:[ {Flt64 Flt64 -> Flt64} {Int64 Int64 -> Int64} ]","          ");
+    testerr("{+}(1,2,3)", "Argument mismatch in call to +:[ {flt64 flt64 -> flt64} {int64 int64 -> int64} ]","          ");
 
     // Parsed as +(1,(2*3))
     test("{+}(1, 2 * 3) ", TypeInt.con(7));
@@ -81,10 +81,10 @@ public class TestType {
 
     // ID in different contexts; in general requires a new TypeVar per use; for
     // such a small function it is always inlined completely, has the same effect.
-    test("id", Env.lookup_type("id"));
+    test("id", Env.lookup_valtype("id"));
     test("id(1)",TypeInt.con(1));
     test("id(3.14)",TypeFlt.con(3.14));
-    test("id({+})",Env.lookup_type("+")); // 
+    test("id({+})",Env.lookup_valtype("+")); // 
     test("id({+})(id(1),id(math_pi))",TypeFlt.make(0,64,Math.PI+1));
 
     // Function execution and result typing
@@ -94,8 +94,24 @@ public class TestType {
     // Needs overload cloning/inlining to resolve {+}
     test("x=3; fun={y -> x+y}; fun(2)", TypeInt.con(5)); // must inline to resolve overload {+}:Int
     test("x=3; fun={x -> x*2}; fun(2.1)", TypeFlt.con(2.1*2.0)); // must inline to resolve overload {+}:Flt with I->F conversion
-    test("x=3; fun={y -> x*x+y*y}; fun(2)", TypeInt.con(13)); // not inlined????
+    test("x=3; fun={y -> x*x+y*y}; fun(2)", TypeInt.con(13)); // 
     test("x=3; fun={x -> x*2}; fun(2.1)+fun(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to fun()
+
+    // Type annotations
+    test("-1@int", TypeInt.con( -1));
+    test("(1+2.3)@flt", TypeFlt.make(0,64,3.3));
+    test("x@int = 1", TypeInt.TRUE);
+    test("x@flt = 1", TypeInt.TRUE); // casts for free to a float
+    testerr("x@flt32 = 123456789", "123456789 is not a flt32","                   ");
+    
+    testerr("-1@int1", "-1 is not a int1","       ");
+    testerr("\"abc\"@int", "\"abc\" is not a int64","         ");
+    testerr("1@str", "1 is not a str","     ");
+    
+    test("id@{int->int}", Env.lookup_valtype("id"));
+    testerr("x=3; fun@{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int","  ");
+    test("x=3; fun@{real->real}={x -> x*2}; fun(2.1)+fun(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to fun()
+    
     // TODO: Need real TypeVars for these
 
     // Recursive:

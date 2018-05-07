@@ -9,12 +9,13 @@ GRAMMAR
 -------
 
 *  prog = stmt END
-*  stmt = [id =]* ifex [; stmt]* // ids must not exist, and are available in later statements
+*  stmt = [id[@type] =]* ifex [; stmt]* // ids must not exist, and are available in later statements
 *  ifex = expr ? expr : expr   // trinary logic
 *  expr = term [binop term]*   // gather all the binops and sort by prec
-*  term = nfact                // No function call
-*  term = nfact ( [expr,]* )+  // One or more function calls in a row, args are delimited
-*  term = nfact nfact*         // One function call, all the args listed
+*  term = tfact                // No function call
+*  term = tfact ( [stmt,]* )+  // One or more function calls in a row, args are delimited
+*  term = tfact tfact*         // One function call, all the args listed
+*  tfact= nfact[@type]         // Optional type after a nfact
 *  nfact= uniop* fact          // Zero or more uniop calls over a fact
 *  fact = id                   // variable lookup
 *  fact = num                  // number
@@ -26,8 +27,12 @@ GRAMMAR
 *  binop= +-*%&|/              // etc; primitive lookup; can determine infix binop at parse-time
 *  uniop= -!~                  // etc; primitive lookup; can determine infix uniop at parse-time
 *  func = { [[id]* ->]? stmt } // Anonymous function declaration
-*  string = [.\%]*             // String contents; \t\n\r\% standard escapes
-*  string = %[num]?[.num]?fact // Percent escape embeds a 'fact' in a string; "name=%name\n"
+*  str  = [.\%]*             // String contents; \t\n\r\% standard escapes
+*  str  = %[num]?[.num]?fact // Percent escape embeds a 'fact' in a string; "name=%name\n"
+*  type = tcon                 // Types are a tcon or a tfun
+*  type = tfun
+*  tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str
+*  tfun = {[[type]* ->]? type }// Function types mirror func decls
 
 
 Done Stuff

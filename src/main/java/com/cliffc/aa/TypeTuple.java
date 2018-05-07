@@ -86,6 +86,7 @@ public class TypeTuple extends Type {
     case TUNION:
     case TFLT:
     case TINT:
+    case TSTR:
     case TFUN: return TypeErr.ALL;
     case TERROR: return ((TypeErr)t)._all ? t : this;
     default: throw typerr(t);

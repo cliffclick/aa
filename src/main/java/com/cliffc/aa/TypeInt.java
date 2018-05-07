@@ -1,5 +1,7 @@
 package com.cliffc.aa;
 
+import java.util.HashMap;
+
 public class TypeInt extends Type {
   byte _x;                // -1 bot, 0 con, +1 top
   byte _z;                // bitsiZe, one of: 1,8,16,32,64
@@ -15,7 +17,7 @@ public class TypeInt extends Type {
   }
   @Override public String toString() {
     if( _x==0 ) return Long.toString(_con);
-    return (_x==1?"~":"")+"Int"+Integer.toString(_z);
+    return (_x==1?"~":"")+"int"+Integer.toString(_z);
   }
   private static TypeInt FREE=null;
   private TypeInt free( TypeInt f ) { FREE=f; return this; }
@@ -37,6 +39,15 @@ public class TypeInt extends Type {
   static public final TypeInt FALSE  = make( 0, 1,0);
   static public final TypeInt XINT1  = make( 1, 1,0);
   static final TypeInt[] TYPES = new TypeInt[]{INT64,INT32,INT16,BOOL,TRUE,FALSE,XINT1};
+  static void init0( HashMap<String,Type> types ) {
+    types.put("bool" ,BOOL);
+    types.put("int1" ,BOOL);
+    types.put("int8" ,INT8);
+    types.put("int16",INT16);
+    types.put("int32",INT32);
+    types.put("int64",INT64);
+    types.put("int"  ,INT64);
+  }
   // Return a long from a TypeInt constant; assert otherwise.
   @Override public long getl() { assert is_con(); return _con; }
 
@@ -99,7 +110,7 @@ public class TypeInt extends Type {
       long con = (long)tf._con;
       // Fits in the int choices, just keep float, but could return the int constant just as well
       if( con == tf._con && log(con) <= _z )  return tf; 
-      return TypeFlt.make(-1,TypeFlt.log(tf._con),0);      // Not an int constant or too large
+      return TypeUnion.make(false,this,tf);
     }
 
     if( _x == 0 ) {             // Constant int
@@ -110,18 +121,20 @@ public class TypeInt extends Type {
         if( _con==tf._con ) return this; // Matching int constant wins
         if( ((long)tf._con) == tf._con ) // Float is a integer
           return xmeet(TypeInt.con((long)tf._con)); // Return as-if meeting 2 integers
-        return tf.xmeet(TypeFlt.con(_con));         // Return as-if meeting 2 floats
+        return TypeUnion.make(false,this,tf);
+      }
+      if( tf._x == 1 ) {        // Can a high float fall to the int constant?
+        double dcon = tf._z==32 ? (float)_con : (double)_con;
+        if( (long)dcon == _con ) return this;
       }
     } // Fall into the bottom-int case
 
     // Bottom Int, size 1 to 64
-    if( tf._x== 1 ) return this; // ( Int | ~Flt) = Int, since can choose 0.0
+    if( tf._x== 1 ) return make(1,_z,0); // ( Int | ~Flt) = Int, since can choose 0.0
     // Float constant: cast "for free" to Int if possible, else fall to same as Flt-bottom
-    long con = (long)tf._con;
-    if( tf._x== 0 && con == tf._con )  
-      return make(-1,Math.max(_z,log(con)),0);
-    if( tf._x<= 0 && (_z<<1) <= tf._z ) return TypeFlt.make(-1,tf._z,0); // Fits in a float
-    if( tf._x== 0 ) tf = TypeFlt.log(tf._con)==32 ? TypeFlt.FLT32 : TypeFlt.FLT64;
+    long icon = (long)tf._con;
+    if( tf._x== 0 && icon == tf._con )  
+      return make(-1,Math.max(_z,log(icon)),0);
     return TypeUnion.make(false,this,tf);
   }
 

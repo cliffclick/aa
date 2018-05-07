@@ -22,8 +22,9 @@ public abstract class Node implements Cloneable {
   static final byte OP_RET  =12;
   static final byte OP_SCOPE=13;
   static final byte OP_TMP  =14;
-  static final byte OP_UNR  =15;
-  static final String[] STRS = new String[] { null, "Call", "Cast", "Con", "Err", "Fun", "If", "Parm", "Phi", "Prim", "Proj", "Region", "Ret", "Scope", "Tmp", "Unr" };
+  static final byte OP_TYPE =15;
+  static final byte OP_UNR  =16;
+  static final String[] STRS = new String[] { null, "Call", "Cast", "Con", "Err", "Fun", "If", "Parm", "Phi", "Prim", "Proj", "Region", "Ret", "Scope", "Tmp", "Type", "Unr" };
   
   public int _uid=Env._gvn.uid(); // Unique ID, will have gaps, used to give a dense numbering to nodes
   private final byte _op;
@@ -148,8 +149,8 @@ public abstract class Node implements Cloneable {
     }
   }
 
-  // Gather errors; reachable control uses only
-  public Ary<String> walkerr( Ary<String> errs, BitSet bs, GVNGCM gvn ) {
+  // Gather errors; backwards reachable control uses only
+  public Ary<String> walkerr_use( Ary<String> errs, BitSet bs, GVNGCM gvn ) {
     assert !is_dead();
     if( bs.get(_uid) ) return errs; // Been there, done that
     bs.set(_uid);                   // Only walk once
@@ -158,7 +159,21 @@ public abstract class Node implements Cloneable {
     if( this instanceof ErrNode ) // Gather errors
       errs = Parse.add_err(errs,((ErrNode)this)._msg);
     for( Node use : _uses )     // Walk control users for more errors
-      errs = use.walkerr(errs,bs,gvn);
+      errs = use.walkerr_use(errs,bs,gvn);
+    return errs;
+  }
+  
+  // Gather errors; forwards reachable data uses only
+  public Ary<String> walkerr_def( Ary<String> errs, BitSet bs, GVNGCM gvn ) {
+    assert !is_dead();
+    if( bs.get(_uid) ) return errs; // Been there, done that
+    bs.set(_uid);                   // Only walk once
+    if( at(0)!=null && gvn.type(at(0)) != Type.CONTROL )
+      return errs;                // Ignore dead control
+    if( this instanceof TypeNode ) // Gather errors
+      errs = Parse.add_err(errs,((TypeNode)this).err(gvn));
+    for( Node def : _defs )     // Walk data defs for more errors
+      if( def != null ) errs = def.walkerr_def(errs,bs,gvn);
     return errs;
   }
   

@@ -1,5 +1,7 @@
 package com.cliffc.aa;
 
+import java.util.HashMap;
+
 public class TypeFlt extends Type {
   byte _x;                // -1 bot, 0 con, +1 top
   byte _z;                // bitsiZe, one of: 32,64
@@ -15,7 +17,7 @@ public class TypeFlt extends Type {
   }
   @Override public String toString() {
     if( _x==0 ) return Double.toString(_con);
-    return (_x==1?"~":"")+"Flt"+Integer.toString(_z);
+    return (_x==1?"~":"")+"flt"+Integer.toString(_z);
   }
   private static TypeFlt FREE=null;
   private TypeFlt free( TypeFlt f ) { FREE=f; return this; }
@@ -32,6 +34,11 @@ public class TypeFlt extends Type {
   static public final TypeFlt FLT32 = make(-1,32,0);
   static public final TypeFlt PI    = con(Math.PI);
   static final TypeFlt[] TYPES = new TypeFlt[]{FLT64,FLT32,PI};
+  static void init0( HashMap<String,Type> types ) {
+    types.put("flt32",FLT32);
+    types.put("flt64",FLT64);
+    types.put("flt"  ,FLT64);
+  }
   // Return a double from a TypeFlt constant; assert otherwise.
   @Override public double getd() { assert is_con(); return _con; }
 

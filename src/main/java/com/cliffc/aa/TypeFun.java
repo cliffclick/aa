@@ -53,9 +53,11 @@ public class TypeFun extends Type {
     switch( t._type ) {
     case TERROR: return ((TypeErr)t)._all ? t : this;
     case TCONTROL:
-    case TTUPLE:           return TypeErr.ALL;
-    case TFLT:  case TINT: return Type.SCALAR;
-    case TFUN:             break;
+    case TTUPLE: return TypeErr.ALL;
+    case TFLT:
+    case TINT:
+    case TSTR:   return Type.SCALAR;
+    case TFUN:   break;
     case TUNION: return t.xmeet(this); // Let TypeUnion decide
     default: throw typerr(t);   // All else should not happen
     }
