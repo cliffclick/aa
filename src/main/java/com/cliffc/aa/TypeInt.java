@@ -3,9 +3,9 @@ package com.cliffc.aa;
 import java.util.HashMap;
 
 public class TypeInt extends Type {
-  byte _x;                // -1 bot, 0 con, +1 top
+  private byte _x;        // -1 bot, 0 con, +1 top
   byte _z;                // bitsiZe, one of: 1,8,16,32,64
-  long _con;              // only if _x==0
+  private long _con;      // only if _x==0
   private TypeInt( int x, int z, long con ) { super(TINT); init(x,z,con); }
   private void init(int x, int z, long con ) { _x=(byte)x; _z=(byte)z; _con = con; }
   @Override public int hashCode( ) { return TINT+_x+_z+(int)_con;  }
@@ -32,8 +32,8 @@ public class TypeInt extends Type {
 
   static public final TypeInt  INT64 = make(-1,64,0);
   static public final TypeInt  INT32 = make(-1,32,0);
-  static public final TypeInt  INT16 = make(-1,16,0);
-  static public final TypeInt  INT8  = make(-1, 8,0);
+  static private final TypeInt  INT16 = make(-1,16,0);
+  static        final TypeInt  INT8  = make(-1, 8,0);
   static public final TypeInt  BOOL  = make(-1, 1,0);
   static public final TypeInt TRUE   = make( 0, 1,1);
   static public final TypeInt FALSE  = make( 0, 1,0);
@@ -90,17 +90,7 @@ public class TypeInt extends Type {
     if(Integer.MIN_VALUE <= con && con <= Integer.MAX_VALUE ) return 32;
     return 64;
   }
-  private static TypeInt sz( int log ) {
-    switch( log ) {
-    case 1:
-    case 8:  return INT8 ;
-    case 16: return INT16;
-    case 32: return INT32;
-    case 64: return INT64;
-    default: throw AA.unimpl();
-    }
-  }
-  
+
   Type xmeetf( TypeFlt tf ) {
     if( _x == 1 ) {               // Top Int, size 1 to 64
       if( tf._x== -1 ) return tf; // (~Int | Flt) = Flt // choice includes 0 which is all flts
@@ -130,7 +120,7 @@ public class TypeInt extends Type {
     } // Fall into the bottom-int case
 
     // Bottom Int, size 1 to 64
-    if( tf._x== 1 ) return make(1,_z,0); // ( Int | ~Flt) = Int, since can choose 0.0
+    if( tf._x== 1 ) return make(-1,_z,0); // ( Int | ~Flt) = Int, since can choose 0.0
     // Float constant: cast "for free" to Int if possible, else fall to same as Flt-bottom
     long icon = (long)tf._con;
     if( tf._x== 0 && icon == tf._con )  
@@ -153,6 +143,7 @@ public class TypeInt extends Type {
     // TODO: Allow loss-less conversions (e.g. small float integer constants convert to ints just fine)
     if( t._type == Type.TINT ) return (byte)(_z<=((TypeInt)t)._z ? 0 : 99);
     if( t._type == Type.TFLT ) return 1; // Int->Flt ignores large int overflow issues
+    if( t._type == Type.TSCALAR ) return 0;
     throw AA.unimpl();
   }
   @Override public Type widen() {

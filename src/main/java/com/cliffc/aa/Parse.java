@@ -2,6 +2,7 @@ package com.cliffc.aa;
 
 import com.cliffc.aa.node.*;
 import com.cliffc.aa.util.Ary;
+import com.cliffc.aa.util.Bits;
 
 import java.text.NumberFormat;
 import java.text.ParsePosition;
@@ -175,11 +176,11 @@ public class Parse {
         int oldx = _x;
         String bin = token();
         if( bin==null ) break;    // Valid parse, but no more Kleene star
-        Node binfun = _e.lookup_filter(bin,2); // BinOp, or null
+        Type binfun = _e.lookup_filter(bin,_gvn,2); // BinOp, or null
         if( binfun==null ) { _x=oldx; break; } // Not a binop, no more Kleene star
         term = term();
         if( term == null ) term = con(err_ctrl("missing expr after binary op "+bin));
-        funs.add(binfun);  args.add_def(term);
+        funs.add(con(binfun));  args.add_def(term);
       }
   
       // Have a list of interspersed operators and terms.
@@ -223,8 +224,7 @@ public class Parse {
             }
           }
           require(')');
-          if( !(fun instanceof ProjNode && fun.at(0) instanceof RetNode) &&
-              !(fun instanceof UnresolvedNode) )
+          if( _gvn.type(fun).filter(args._defs._len-2)==null )
             return con(err_ctrl("A function is being called, but "+_gvn.type(fun)+" is not a function type"));
         } else {                  // lispy-style fcn application
           // TODO: Unable resolve ambiguity with mixing "(fun arg0 arg1)" and
@@ -264,14 +264,13 @@ public class Parse {
     int oldx = _x;
     String uni = token();
     if( uni!=null ) { // Valid parse
-      Node unifun = _e.lookup_filter(uni,1);
+      Type unifun = _e.lookup_filter(uni,_gvn,1);
       if( unifun != null && unifun.op_prec() > 0 )  {
         Node arg = nfact(); // Recursive call
         if( arg == null ) { err_ctrl0("Call to unary function '"+uni+"', but missing the one required argument"); return null; }
-        return gvn(new CallNode(ctrl(),unifun,arg));
+        return gvn(new CallNode(ctrl(),con(unifun),arg));
       } else {
         _x=oldx;                // Unwind token parse and try again for a factor
-        if( unifun != null ) kill(unifun); // Might be made new by the lookup_filter, but then no-good
       }
     }
     return fact();
@@ -333,18 +332,18 @@ public class Parse {
       ids.add(tok);
     }
     Node old_ctrl = ctrl();
-    FunNode fun = init(new FunNode(TypeFun.any(ids._len),old_ctrl));
+    FunNode fun = init(new FunNode(ids._len,old_ctrl));
     try( Env e = new Env(_e) ) {// Nest an environment for the local vars
       _e = e;                   // Push nested environment
       set_ctrl(fun);            // New control is function head
       int cnt=0;                // Add parameters to local environment
       for( String id : ids )  _e.add(id,gvn(new ParmNode(++cnt,id,fun,con(Type.SCALAR))));
       Node rez = stmt();        // Parse function body
-      Node ret = e._ret = init(new ProjNode(init(new RetNode(ctrl(),rez,fun)),1));
+      fun.init(init(new ProjNode(init(new RetNode(ctrl(),rez,fun)),1)));
       require('}');             // 
       _e = _e._par;             // Pop nested environment
       set_ctrl(old_ctrl);       // Back to the pre-function-def control
-      return ret;               // Return function; close-out and DCE 'e'
+      return (e._ret = con(fun._tf)); // Return function; close-out and DCE 'e'
     }
   }
   
@@ -421,7 +420,7 @@ public class Parse {
       ret = ts.pop();           // Get single return type
     }
     require('}');
-    return TypeFun.make(TypeTuple.make(ts.asAry()),ret);
+    return TypeFun.make(TypeTuple.make(ts.asAry()),ret,Bits.FULL);
   }
 
   // Require a specific character (after skipping WS) or polite error

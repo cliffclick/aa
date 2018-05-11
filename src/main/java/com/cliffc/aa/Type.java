@@ -95,7 +95,7 @@ public class Type {
   public  static final Type CONTROL= make(TCONTROL); // Control
   public  static final Type  SCALAR= make( TSCALAR); // ptrs, ints, flts; things that fit in a machine register
   public  static final Type XSCALAR= make(TXSCALAR); // ptrs, ints, flts; things that fit in a machine register
-  private static final Type  NUM   = make( TNUM   );
+  public  static final Type  NUM   = make( TNUM   );
   private static final Type XNUM   = make(TXNUM   );
   public  static final Type  REAL  = make( TREAL  );
   private static final Type XREAL  = make(TXREAL  );
@@ -154,8 +154,11 @@ public class Type {
     if( t._type == TXSCALAR ) return this;
     
     // The rest of these choices are various numbers, which do not match well
-    // with any function - but all are scalars, so make a union.
+    // with any function
     if( t._type == TFUN ) return SCALAR; // return TypeUnion.make(false,this,t);
+    // Union of functions, with a number
+    if( t._type == TUNION && ((TypeUnion)t)._ts.at(0)._type==TFUN )
+      return SCALAR;
     
     // Numeric; same pattern as ANY/ALL, or SCALAR/XSCALAR
     if( _type == TNUM || t._type == TNUM ) return NUM;
@@ -337,4 +340,8 @@ public class Type {
   public RuntimeException typerr(Type t) {
     throw new RuntimeException("Should not reach here: internal type system error with "+this+(t==null?"":(" and "+t)));
   }
+  // Filter out function types with incorrect arg counts
+  public Type filter(int nargs) { return null; } // Overridden in subclasses
+  // Operator precedence
+  public byte op_prec() { return -1; } // Overridden in subclasses
 }

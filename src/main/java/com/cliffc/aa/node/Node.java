@@ -63,7 +63,7 @@ public abstract class Node implements Cloneable {
     assert _uses != null;
     _uses.add(n); }
 
-  Node( byte op ) { this(op,new Node[0]); }
+  Node( byte op ) { _op = op; _defs = new Ary<>(new Node[1],0); }
   Node( byte op, Node... defs ) {
     _op = op;
     _defs = new Ary<>(defs);

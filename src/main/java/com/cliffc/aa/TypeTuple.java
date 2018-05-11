@@ -54,7 +54,7 @@ public class TypeTuple extends Type {
   }    
 
   public  static final TypeTuple  ANY    = make(); // Infinite list of Any
-          static final TypeTuple  SCALAR = make(Type. SCALAR);
+  public  static final TypeTuple  SCALAR = make(Type. SCALAR);
           static final TypeTuple  SCALAR2= make(Type. SCALAR, Type. SCALAR);
           static final TypeTuple XSCALAR1= make(Type.XSCALAR);
           static final TypeTuple XSCALAR2= make(Type.XSCALAR, Type.XSCALAR);
@@ -62,8 +62,8 @@ public class TypeTuple extends Type {
   public  static final TypeTuple INT64   = make(TypeInt.INT64 );
   public  static final TypeTuple FLT64   = make(TypeFlt.FLT64 );
   public  static final TypeTuple STR     = make(TypeStr.STR   );
-          static final TypeTuple INT64_INT64 = make(TypeInt.INT64,TypeInt.INT64);
-          static final TypeTuple FLT64_FLT64 = make(TypeFlt.FLT64,TypeFlt.FLT64);
+  public  static final TypeTuple INT64_INT64 = make(TypeInt.INT64,TypeInt.INT64);
+  public  static final TypeTuple FLT64_FLT64 = make(TypeFlt.FLT64,TypeFlt.FLT64);
   private static final TypeTuple FLT64_INT64 = make(TypeFlt.FLT64,TypeInt.INT64);
   public  static final TypeTuple IF_ANY  = ANY;
   public  static final TypeTuple IF_ALL  = make(Type.CONTROL,Type.CONTROL);

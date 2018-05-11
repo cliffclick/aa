@@ -1,8 +1,6 @@
 package com.cliffc.aa;
 
 import com.cliffc.aa.node.*;
-import com.cliffc.aa.node.UnresolvedNode;
-import com.cliffc.aa.util.Ary;
 
 import java.lang.AutoCloseable;
 import java.util.BitSet;
@@ -11,8 +9,8 @@ import java.util.HashMap;
 public class Env implements AutoCloseable {
   final Env _par;
   ScopeNode _scope; // Lexical anchor; goes when this environment leaves scope
-  final HashMap<String,Type> _types;
   Node _ret;   // Return result
+  private final HashMap<String,Type> _types;
   Env( Env par ) {
     _par=par;
     _scope = new ScopeNode();
@@ -39,16 +37,18 @@ public class Env implements AutoCloseable {
   
   // Called during basic Env creation, this wraps a PrimNode as a full
   // 1st-class function to be passed about or assigned to variables.
-  private ProjNode as_fun( PrimNode prim ) {
-    Type[] targs = prim._tf._ts._ts;
+  private TypeFun as_fun( PrimNode prim ) {
+    Type[] targs = prim._targs._ts;
     String[] args = prim._args;
-    FunNode fun = _gvn.init(new FunNode(prim._tf,_scope, prim.op_prec())); // Points to ScopeNode only
+    FunNode fun = _gvn.init(new FunNode(_scope, prim)); // Points to ScopeNode only
     prim.add_def(null);         // Control for the primitive
     for( int i=0; i<args.length; i++ )
       prim.add_def(_gvn.init(new ParmNode(i+1,args[i],fun,_gvn.con(targs[i]))));
     PrimNode x = _gvn.init(prim);
     assert x==prim;
-    return _gvn.init(new ProjNode(_gvn.init(new RetNode(fun,prim,fun)),1));
+    ProjNode proj = _gvn.init(new ProjNode(_gvn.init(new RetNode(fun,prim,fun)),1));
+    fun.init(proj);
+    return fun._tf;
   }
 
   public Node add( String name, Node val ) { return _scope.add(name,val); }
@@ -77,6 +77,7 @@ public class Env implements AutoCloseable {
   private BitSet check_live0(BitSet bs) {
     _scope.walk(bs);
     if( _ret != null ) _ret.walk(bs); // Also walk return value
+    FunNode.FUNS.walk(bs);
     return _par == null ? bs : _par.check_live0(bs);
   }
 
@@ -103,19 +104,17 @@ public class Env implements AutoCloseable {
     // Lookups stop at 1st hit - because shadowing is rare, and so will be
     // handled when it happens and not on every lookup.  Shadowing is supported
     // at name-insertion time, where all shadowed Nodes are inserted into the
-    // local UnresolvedNode first, and then new shadowing Nodes will replace
+    // local ScopeNode first, and then new shadowing Nodes will replace
     // shadowed nodes on a case-by-case basis.
     if( n != null ) return n;
     return _par == null ? null : _par.lookup(token);
   }
 
-  // Lookup the name.  If the result is an Unresolved, filter out all the
-  // wrong-arg-count functions.  Only returns nodes registered with GVN.
-  Node lookup_filter( String token, int nargs ) {
-    Node unr = lookup(token);
-    if( unr == null ) return null;
-    if( !(unr instanceof UnresolvedNode) ) return unr;
-    return ((UnresolvedNode)unr).filter(nargs);
+  // Lookup the name.  If the result is an ConNode of functions, filter out all
+  // the wrong-arg-count functions.  Only returns nodes registered with GVN.
+  Type lookup_filter( String token, GVNGCM gvn, int nargs ) {
+    Node n = lookup(token);
+    return n == null ? null : gvn.type(n).filter(nargs);
   }
 
   // Type lookup

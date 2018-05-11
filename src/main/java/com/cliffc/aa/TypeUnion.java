@@ -1,14 +1,15 @@
 package com.cliffc.aa;
 
 import com.cliffc.aa.util.Ary;
+import com.cliffc.aa.util.SB;
 
 import java.util.Comparator;
 
 // Type union is a meet (or join) of unrelated SCALAR types.  Specifically it
 // simplifies out overlapping choices, such as {Flt64*Flt32} :=: Flt64.
 public class TypeUnion extends Type {
-  private TypeTuple _ts;         // All of these are possible choices
-  private boolean _any; // FALSE: meet; must support all; TRUE: join; can pick any one choice
+  public TypeTuple _ts;         // All of these are possible choices
+  public boolean _any; // FALSE: meet; must support all; TRUE: join; can pick any one choice
   private TypeUnion( TypeTuple ts, boolean any ) { super(TUNION); init(ts,any); }
   private void init( TypeTuple ts, boolean any ) { _ts = ts;  _any=any;  assert !ts.has_tuple(); }
   @Override public int hashCode( ) { return TUNION+_ts.hashCode()+(_any?1:0);  }
@@ -34,9 +35,9 @@ public class TypeUnion extends Type {
   private static Type make( boolean any, Ary<Type> ts ) {
     if( ts._len == 0 ) throw AA.unimpl();   //return any ? Type.ANY : Type.ALL;
     // Special rules now apply to keep from growing out all combos of
-    // e.g. float-constants.  All {float,int,function} types are meeted and
+    // e.g. float-constants.  All {float,int,str} types are meeted and
     // their meet replaces them.
-    int fx=-1, ix=-1, ux=-1;
+    int fx=-1, ix=-1, sx=-1, ux=-1;
     for( int i=0; i<ts._len; i++ ) {
       Type t = ts._es[i];
       if( t._type == Type.TFLT ) {
@@ -47,13 +48,17 @@ public class TypeUnion extends Type {
         if( ix==-1 ) ix=i;
         else { ts._es[ix] = ts._es[ix].meet(t); ts.del(i--);  }
       }
+      if( t._type == Type.TSTR ) {
+        if( sx==-1 ) sx=i;
+        else { ts._es[sx] = ts._es[sx].meet(t); ts.del(i--);  }
+      }
       if( t._type == Type.TFUN ) ux = i;
     }
     // Also, if the remaining int fits in the remaining float, drop the int
     if( fx!=-1 && ix!=-1 && (((TypeInt)ts._es[ix])._z<<1) <= ((TypeFlt)ts._es[fx])._z && ((TypeFlt)ts._es[fx])._x==-1 )
       ts.del(ix);
     // Cannot mix functions and numbers
-    if( ux != -1 && (fx!=-1 || ix!=-1) )
+    if( ux != -1 && (fx!=-1 || ix!=-1 || sx!=-1) )
       return Type.SCALAR;
     
     if( ts._len == 1 ) return ts._es[0]; // A single result is always that result
@@ -71,7 +76,7 @@ public class TypeUnion extends Type {
   // TypeUnion can have any type on the right, including base types and another
   // TypeUnion.  Think of a TypeUnion as a list with either add/any/join/'+' or
   // mul/all/meet/'*' operations between elements; as is traditional, we use
-  // juxtipasition for mul/all/meet/'*'.  xmeet() is a mul/meet operation
+  // juxtaposition for mul/all/meet/'*'.  xmeet() is a mul/meet operation
   // itself.  "this" is either [A+B] or [AB], and xmeet(t) computes [A+B]C or
   // [AB]C, where C might be any type including e.g. a union of either [C+D] or [CD].
   @Override protected Type xmeet( Type t ) {
@@ -166,5 +171,39 @@ public class TypeUnion extends Type {
       return false;
     }
     throw AA.unimpl();
+  }
+  // Lattice of conversions:
+  // -1 unknown; top; might fail, might be free (Scalar->Int); Scalar might lift
+  //    to e.g. Float and require a user-provided rounding conversion from F64->Int.
+  //  0 requires no/free conversion (Int8->Int64, F32->F64)
+  // +1 requires a bit-changing conversion (Int->Flt)
+  // 99 Bottom; No free converts; e.g. Flt->Int requires explicit rounding
+  @Override public byte isBitShape(Type t) {
+    if( t._type == Type.TSCALAR ) return 0;
+    throw AA.unimpl();
+  }
+  // Filter out functions with the wrong args; error for non-functions
+  @Override public Type filter(int nargs) {
+    if( _any ) {
+      Type j = TypeErr.ALL;
+      for( Type t : _ts._ts )
+        if( t.filter(nargs)!=null )
+          j = j.join(t);
+      return j;
+    }
+    throw AA.unimpl();
+  }
+
+  // Return non-zero if allowed to be infix
+  @Override public byte op_prec() { return _ts.at(0).op_prec(); }
+  // Better error message
+  public String errMsg() {
+    assert _any;                // Expect only function choice here
+    TypeFun tf = (TypeFun)_ts.at(0);
+    String name = tf.funode()._name;
+    SB sb = new SB().p(name).p(':').p('[');
+    for( Type t : _ts._ts )
+      ((TypeFun)t).str(sb).p(',');
+    return sb.p(']').toString();
   }
 }

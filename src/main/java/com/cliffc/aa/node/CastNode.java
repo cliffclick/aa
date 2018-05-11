@@ -28,7 +28,6 @@ public class CastNode extends Node {
       for( Node parm : rez._defs )
         if( parm != null && parm != fun &&
             !(parm instanceof ParmNode && parm.at(0) == fun) &&
-            !(parm instanceof UnresolvedNode) && // Unresolved is actually a funny constant
             !(parm instanceof ConNode) )
           return null;
       irez = rez.copy();     // Copy the entire function body

@@ -6,12 +6,11 @@ import com.cliffc.aa.util.Ary;
 import java.lang.AutoCloseable;
 
 // See FunNode.  Control is not required for an apply but inlining the function
-// body will require it; slot 0 is for Control.  Slot 1 is a function value -
-// can be a UnresolvedNode (choice/Any of functions) or a Proj to a RetNode.
-// Slots 2+ are for args.
+// body will require it; slot 0 is for Control.  Slot 1 is a function value - a
+// ConNode with a TypeFun or a TypeUnion of TypeFuns.  Slots 2+ are for args.
 //
-// When the UnresolvedNode simplifies to a single RetNode, the Call can inline.
-// If the Unr is an 'any' then a bunch of function pointers are allowed here.
+// When the ConNode simplifies to a single TypeFun, the Call can inline.
+// Otherwise the TypeUnion lists a bunch of function pointers are allowed here.
 //
 // Call-inlining can happen anytime we have a known function pointer, and
 // might be several known function pointers - we are inlining the type analysis
@@ -28,107 +27,102 @@ public class CallNode extends Node implements AutoCloseable {
   @Override String str() { return "call"; }
   @Override public Node ideal(GVNGCM gvn) {
     Node ctrl = _defs.at(0);    // Control for apply/call-site
-    Node p_u = _defs.at(1);    // Possible ProjNode or Unresolved
+    Node funv = _defs.at(1);    // Function value
+    Type t = gvn.type(funv);    // 
 
     // If the function is unresolved, see if we can resolve it now
-    if( p_u instanceof UnresolvedNode ) {
-      UnresolvedNode unr = (UnresolvedNode)p_u;
-      Ary<Node> projs = unr.resolve(gvn,this); // List of function choices
-      if( projs.isEmpty() )                    // No choices possible
-        return new ConNode<>(TypeErr.make("Argument mismatch in call to "+unr.errmsg())); // Fail to top
-
-      if( projs._len>1 ) {       // Multiple choices, but save the reduced Unr
-        if( projs._len==unr._defs._len ) return null; // No improvement
+    if( t instanceof TypeUnion ) {
+      TypeUnion tu = (TypeUnion)t;
+      Ary<TypeFun> funs = resolve(tu,gvn); // List of function choices
+      if( funs.isEmpty() )                           // No choices possible
+        return new ConNode<>(TypeErr.make("Argument mismatch in call to "+tu.errMsg())); // Fail to top
+      if( funs._len>1 ) {       // Multiple choices, but save the reduced Unr
+        if( funs._len==tu._ts._ts.length ) return null; // No improvement
         throw AA.unimpl();
-        //Node unr2 = new UnresolvedNode(); // Build and return a reduced Unr
+        //Node unr2 = new ConNode(); // Build and return a reduced Con
         //for( Node ret : projs ) unr2.add_def(ret);
         //return set_def(1,unr2,gvn); // Upgrade Call with smaller choices
       }
-
-      // Single choice; insert actual conversions & replace
-      Node proj = projs.at(0);
-      FunNode fun = (FunNode)(proj.at(0).at(2)); // Proj->Ret->Fun
-      Type[] formals = fun._tf._ts._ts;
-      for( int i=0; i<nargs(); i++ ) {
-        Type formal = formals[i];
-        Type actual = gvn.type(actual(i));
-        byte xcvt = actual.isBitShape(formal);
-        if( xcvt == 99 || xcvt == -1 ) throw AA.unimpl(); // Error cases should not reach here
-        if( xcvt == 1 ) {
-          PrimNode cvt = PrimNode.convert(_defs.at(i+2),actual,formal);
-          if( cvt.is_lossy() ) throw new IllegalArgumentException("Requires lossy conversion");
-          set_def(i+2,gvn.xform(cvt),gvn);
-        }
-      }
-      // upgrade function argument to a constant
-      return set_def(1,proj,gvn);
+      t = funs.at(0);           // Single function choice
     }
 
-    // If the function is fully resolved, inline the call site now.
+    if( !(t instanceof TypeFun) ) {
+      throw AA.unimpl();        // untested?
+      //return null;
+    }
+
+    // Single choice; insert actual conversions & replace
+    ProjNode proj = (ProjNode)FunNode.FUNS.at(((TypeFun)t).fidx());
+    RetNode ret = (RetNode)proj.at(0);
+    FunNode fun = (FunNode)ret .at(2); // Proj->Ret->Fun
+    Type[] formals = fun._tf._ts._ts;
+    for( int i=0; i<nargs(); i++ ) {
+      Type formal = formals[i];
+      Type actual = gvn.type(actual(i));
+      byte xcvt = actual.isBitShape(formal);
+      if( xcvt == 99 ) throw AA.unimpl(); // Error cases should not reach here
+      if( xcvt == -1 ) return null;       // Wait for call args to resolve
+      if( xcvt == 1 ) {
+        PrimNode cvt = PrimNode.convert(_defs.at(i+2),actual,formal);
+        if( cvt.is_lossy() ) throw new IllegalArgumentException("Requires lossy conversion");
+        set_def(i+2,gvn.xform(cvt),gvn);
+      }
+    }
+
+    // Inline the call site now.
     // This is NOT inlining the function body, just the call site.
-    if( p_u instanceof ProjNode ) {
-      RetNode ret = (RetNode)p_u.at(0);
-      Node    rez = ret.at(1);
-      FunNode fun = (FunNode)ret.at(2);
-      if( fun._tf._ts._ts.length != _defs._len-2 )
-        return null; // Incorrect argument count
-      // Add an input path to all incoming arg ParmNodes from the Call.
-      int pcnt=0;               // Assert all parameters found
-      for( Node arg : fun._uses ) {
-        if( arg.at(0) == fun && arg instanceof ParmNode ) {
-          int pidx = ((ParmNode)arg)._idx;
-          gvn.add_def(arg,actual(pidx-1));// 1-based on Parm is 2-based on Call's args
-          pcnt++;                         // One more arg found
-        }
-      }
-      assert pcnt == nargs(); // All params found and updated at the function head
-      gvn.add_def(fun,ctrl); // Add Control for this path
-
-      // TODO: Big Decision: Calls, when inlined, pass control from the called
-      // function, OR from the dominator point: where the function was called.
-      // Doing it local from the function preserves a local CFG.
-      // Doing it global from the dominating point leads to data calcs with
-      // embedded control - but only a post-dominating data-use, no control-use.
-      // I.e., a non-CFG control structure.
-
-      // TODO: Currently stuck because cannot inline, because Call has
-      // dominating (non-local) control
-
-      
-      Node rctrl = gvn.xform(new ProjNode(ret,fun._defs._len-1));
-      return new CastNode( rctrl, rez, Type.SCALAR );
+    Node    rez = ret.at(1);
+    if( fun._tf._ts._ts.length != _defs._len-2 ) {
+      throw AA.unimpl(); // untested?
+      //return null; // Incorrect argument count
     }
-
-    return null;
+    // Add an input path to all incoming arg ParmNodes from the Call.
+    int pcnt=0;               // Assert all parameters found
+    for( Node arg : fun._uses ) {
+      if( arg.at(0) == fun && arg instanceof ParmNode ) {
+        int pidx = ((ParmNode)arg)._idx;
+        gvn.add_def(arg,actual(pidx-1));// 1-based on Parm is 2-based on Call's args
+        pcnt++;                         // One more arg found
+      }
+    }
+    assert pcnt == nargs(); // All params found and updated at the function head
+    gvn.add_def(fun,ctrl); // Add Control for this path
+    
+    // TODO: Big Decision: Calls, when inlined, pass control from the called
+    // function, OR from the dominating point: where the function was called.
+    // Doing it local from the function preserves a local CFG.
+    // Doing it global from the dominating point leads to data calcs with
+    // embedded control - but only a post-dominating data-use, no control-use.
+    // I.e., a non-CFG control structure.
+    
+    // TODO: Currently stuck because cannot inline, because Call has
+    // dominating (non-local) control
+    
+    Node rctrl = gvn.xform(new ProjNode(ret,fun._defs._len-1));
+    return new CastNode( rctrl, rez, Type.SCALAR );
   }
 
   @Override public Type value(GVNGCM gvn) {
-    Node unr = _defs.at(1);
-    if( unr instanceof UnresolvedNode )
-      return ((UnresolvedNode)unr).retype(gvn,this);
-    assert unr instanceof ProjNode;
-    RetNode ret = (RetNode)(unr.at(0)); // Must be a return
-    FunNode fun = (FunNode)ret.at(2);
-    if( fun._tf._ts._ts.length != _defs._len-2 )
-      return TypeErr.make("Function "+fun._tf+" expects "+fun._tf._ts._ts.length+" args but passed "+(_defs._len-2));
-    
-    // Value is the function return type
-    Type tret = gvn.type(ret.at(1));
-    if( tret.is_con() ) return tret; // Already determined function body is a constant
-    
-    // Primitives with all constant args are applied immediately.
-    //if( ret.at(1) instanceof PrimNode &&
-    //    !(ret.at(1) instanceof RandI64) ) { // TODO: Model RandI64 as having an I/O effect so not pure
-    //  // If all args are constant, eval immediately.  Note that the Memory edge
-    //  // will define if a function is "pure" or not; no Memory means must be pure.
-    //  Type[] ts = new Type[_defs._len-2+1];
-    //  boolean con=true;
-    //  for( int i=2; i<_defs._len; i++ ) if( !(ts[i-1] = gvn.type(_defs.at(i))).is_con() ) { con=false; break; }
-    //  if( con )     // Constant args, apply immediately
-    //    return ((PrimNode)ret.at(1)).apply(ts);
-    //}
-    // TODO: if apply args are all constant, do I partial-eval here or in Ideal?
-    return tret;
+    Node con = _defs.at(1);
+    Type t = gvn.type(con);
+    if( t instanceof TypeUnion )
+      // TODO: remove this, and just use TypeUnion.ret
+      return retype(gvn,(TypeUnion)t); // 
+    if( t instanceof TypeFun )
+      return ((TypeFun)t)._ret;
+    throw AA.unimpl();
+    //assert con instanceof ProjNode;
+    //RetNode ret = (RetNode)(unr.at(0)); // Must be a return
+    //FunNode fun = (FunNode)ret.at(2);
+    //if( fun._tf._ts._ts.length != _defs._len-2 )
+    //  return TypeErr.make("Function "+fun._tf+" expects "+fun._tf._ts._ts.length+" args but passed "+(_defs._len-2));
+    //
+    //// Value is the function return type
+    //Type tret = gvn.type(ret.at(1));
+    //if( tret.is_con() ) return tret; // Already determined function body is a constant
+    //
+    //// TODO: if apply args are all constant, do I partial-eval here or in Ideal?
+    //return tret;
   }
   
 
@@ -154,4 +148,84 @@ public class CallNode extends Node implements AutoCloseable {
     CallNode apply = (CallNode)o;
     return _cidx==apply._cidx;
   }
+
+  // Given a list of actuals, apply them to each function choice.  If any
+  // (!actual-isa-formal), then that function does not work and supplies an
+  // ALL to the JOIN.  This is common for non-inlined calls where the unknown
+  // arguments are approximated as SCALAR.  Lossless conversions are allowed as
+  // part of a valid isa test.  As soon as some function returns something
+  // other than ALL (because args apply), it supercedes other choices- which
+  // can be dropped.
+
+  // If more than one choice applies, then the choice with fewest costly
+  // conversions are kept; if there is more than one then the join of them is
+  // kept - and the program is not-yet type correct (ambiguous choices).
+  private Ary<TypeFun> resolve( TypeUnion tu, GVNGCM gvn ) {
+    // Set of possible choices with fewest conversions
+    Ary<TypeFun> ns = new Ary<>(new TypeFun[1],0);
+    int min_cvts = 999;         // Required conversions
+    int cvts[] = new int[_defs._len];
+
+    // For each function, see if the actual args isa the formal args.  If not,
+    // toss it out.  Also count conversions, and keep the minimal conversion
+    // function with all arguments known.
+    outerloop:
+    for( Type tft : tu._ts._ts ) {
+      TypeFun fun = (TypeFun)tft;
+      Type[] formals = fun._ts._ts;   // Type of each argument
+      if( formals.length != nargs() )
+        continue; // Argument count mismatch, toss out this choice
+      // Now check if the arguments are compatible at all, keeping lowest cost
+      int xcvts = 0;             // Count of conversions required
+      boolean unk = false;       // Unknown arg might be incompatible or free to convert
+      for( int j=0; j<formals.length; j++ ) {
+        Type actual = gvn.type(actual(j));
+        Type tx = actual.join(formals[j]);
+        if( tx.above_center() ) // Actual and formal have values in common?
+          continue outerloop;   // No, this function will never work; e.g. cannot cast 1.2 as any integer
+        byte cvt = actual.isBitShape(formals[j]); // +1 needs convert, 0 no-cost convert, -1 unknown, 99 never
+        if( cvt == 99 )         // Happens if actual is e.g. TypeErr
+          continue outerloop;   // No, this function will never work
+        if( cvt == -1 ) unk = true; // Unknown yet
+        else xcvts += cvt;          // Count conversions
+      }
+      if( !unk && xcvts < min_cvts ) min_cvts = xcvts; // Keep minimal known conversion
+      cvts[ns._len] = xcvts;    // Keep count of conversions
+      ns.add(fun);              // This is an acceptable choice, so far (args can be made to work)
+    }
+    // Toss out choices with strictly more conversions than the minimal
+    for( int i=0; i<ns._len; i++ )
+      if( cvts[i] > min_cvts ) {
+        cvts[i] = cvts[ns._len-1];
+        ns.del(i--);
+      }
+    return ns;
+  }
+
+
+  
+  // Function return type for resolved functions.  Crash/ALL for no functions
+  // allowed, join of possible returns otherwise - we get to choose the best
+  // choice here.
+  private Type retype( GVNGCM gvn, TypeUnion tu ) {
+    if( !tu._any ) throw AA.unimpl();
+    Type t = Type.SCALAR;
+    outerloop:
+    for( Type tft : tu._ts._ts ) {
+      TypeFun tf = (TypeFun)tft;
+      Type[] formals = tf._ts._ts;   // Type of each argument
+      if( formals.length != nargs() ) continue; // Argument count mismatch; join of ALL
+      // Now check if the arguments are compatible at all
+      for( int j=0; j<formals.length; j++ ) {
+        Type actual = gvn.type(actual(j));
+        if( actual instanceof TypeErr && !t.above_center() )
+          // Actual is an error, so call result is the same error
+          return actual;        // TODO: Actually need to keep all such errors...
+        if( !actual.isa(formals[j]) )
+          continue outerloop;   // Actual is not a formal; join of ALL
+      }
+      t = t.join(tf.ret());
+    }
+    return t;
+  }  
 }

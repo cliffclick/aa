@@ -5,7 +5,10 @@ import java.util.HashMap;
 
 // Lexical-Scope Node.  
 public class ScopeNode extends Node {
-  // Mapping from names to def indices
+  // Mapping from names to def indices.  Named defs are added upfront and some
+  // unnamed defs are added & removed as part of parsing.  Named function defs
+  // point to ConNodes with a TypeFun constant (a single function) or a
+  // TypeUnion of TypeFuns.
   private final HashMap<String, Integer> _vals;
   public ScopeNode() { super(OP_SCOPE); _vals = new HashMap<>(); }
 
@@ -16,10 +19,13 @@ public class ScopeNode extends Node {
   }
   
   // Add a Node to an UnresolvedNode.  Must be a function.
-  public void add_fun(String name, ProjNode proj) {
+  public void add_fun(String name, TypeFun tf) {
     Integer ii = _vals.get(name);
-    Node unr = ii==null ? add(name,new UnresolvedNode(name)) : _defs.at(ii);
-    unr.add_def(proj);
+    if( ii==null ) add(name,new ConNode<>(tf));
+    else {
+      ConNode con = (ConNode)_defs.at(ii);
+      con._t = con._t.join(tf);
+    }
   }
   
   // Extend the current Scope with a new name; cannot override existing name.
@@ -37,6 +43,12 @@ public class ScopeNode extends Node {
     return val;
   }
 
+  void set_def( int i, Node n ) {
+    assert i>= _defs._len || _defs._es[i]==null;
+    _defs.setX(i,n);
+    n._uses.add(this);
+  }
+  
   /** Return a ScopeNode with all the variable indices at or past the idx.
    *  @param idx index to split on
    *  @return a ScopeNode with the higher indices; 'this' has the lower indices.  null if no new vars

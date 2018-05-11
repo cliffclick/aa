@@ -35,7 +35,7 @@ public class TestType {
     // bare function lookup; returns a union of '+' functions
     testerr("+", "Syntax error; trailing junk","");
     test("{+}", Env.lookup_valtype("+"));
-    test("{!}", TypeFun.make(TypeTuple.INT64,TypeInt.BOOL));
+    test("{!}", Env.lookup_valtype("!"));
     // Function application, traditional paren/comma args
     test("{+}(1,2)", TypeInt.con( 3));
     test("{-}(1,2)", TypeInt.con(-1)); // binary version
@@ -43,7 +43,7 @@ public class TestType {
     // error; mismatch arg count
     testerr("!()"       , "Call to unary function '!', but missing the one required argument"," ");
     testerr("math_pi(1)", "A function is being called, but 3.141592653589793 is not a function type","          ");
-    testerr("{+}(1,2,3)", "Argument mismatch in call to +:[ {flt64 flt64 -> flt64} {int64 int64 -> int64} ]","          ");
+    testerr("{+}(1,2,3)", "Argument mismatch in call to +:[{flt64 flt64 -> flt64},{int64 int64 -> int64},]","          ");
 
     // Parsed as +(1,(2*3))
     test("{+}(1, 2 * 3) ", TypeInt.con(7));
@@ -76,7 +76,7 @@ public class TestType {
     test   ("x=1;2?   2 :(x=3);x",TypeInt.con(1)); // Re-assigned allowed & ignored in dead branch
     
     // Anonymous function definition
-    test("{x y -> x+y}", TypeFun.any(2)); // actually {Flt,Int} x {FltxInt} -> {FltxInt} but currently types {SCALAR,SCALAR->SCALAR}
+    test_isa("{x y -> x+y}", TypeFun.any(2,-1)); // actually {Flt,Int} x {FltxInt} -> {FltxInt} but currently types {SCALAR,SCALAR->SCALAR}
     test("{5}()", TypeInt.con(5)); // No args nor -> required; this is simply a function returning 5, being executed
 
     // ID in different contexts; in general requires a new TypeVar per use; for
@@ -128,6 +128,12 @@ public class TestType {
     Assert.assertNull(te._errs);
     Assert.assertEquals(expected,te._t);
   }
+  static private void test_isa( String program, Type expected ) {
+    TypeEnv te = Exec.go("args",program);
+    if( te._errs != null ) System.err.println(te._errs.toString());
+    Assert.assertNull(te._errs);
+    Assert.assertTrue(te._t.isa(expected));
+  }
   static private void testerr( String program, String err, String cursor ) {
     String err2 = "\nargs:0:"+err+"\n"+program+"\n"+cursor+"^\n";
     TypeEnv te = Exec.go("args",program);
@@ -138,9 +144,11 @@ public class TestType {
   // TODO: Observation: value() calls need to be monotonic, can test this.
   @Test public void testCommuteSymmetricAssociative() {
     // Uncomment to insert a single test to focus on
-    //Type t2 = TypeTuple.make(Type.CONTROL,1.0,TypeErr.ANY,Type.CONTROL,Type.CONTROL); // any,ctrl,ctrl,...
-    //Type t1 = TypeTuple.make(Type.CONTROL,1.0,TypeErr.ANY,Type.CONTROL,TypeErr.ANY ); // any,ctrl,any ,...
-    //Assert.assertEquals(t2,t1.meet(t2));
+    Type t0 = TypeFun.any(0,-1);
+    Type t1 = TypeFun.any(1,-1);
+    Type t2 = t0.meet(t1);
+    Type t3 = Type.NUM.meet(t2);
+    Assert.assertEquals(Type.SCALAR,t3);
     Assert.assertTrue(Type.check_startup());
   }  
 }

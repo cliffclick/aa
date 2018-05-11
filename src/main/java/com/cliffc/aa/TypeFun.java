@@ -1,54 +1,59 @@
 package com.cliffc.aa;
 
+import com.cliffc.aa.node.ProjNode;
+import com.cliffc.aa.node.FunNode;
+import com.cliffc.aa.util.Bits;
 import com.cliffc.aa.util.SB;
 
+// Function constants
 public class TypeFun extends Type {
   public TypeTuple _ts;         // Arg types
   public Type _ret;             // return types
-  private TypeFun( TypeTuple ts, Type ret ) { super(TFUN); init(ts,ret); }
-  private void init(TypeTuple ts, Type ret ) { _ts = ts; _ret = ret; }
-  @Override public int hashCode( ) { return TFUN + _ts.hashCode() + _ret.hashCode();  }
+  // List of known functions in set, or 'flip' for choice-of-functions
+  public Bits _fidxs;         // 
+
+  private TypeFun( TypeTuple ts, Type ret, Bits fidxs ) { super(TFUN); init(ts,ret,fidxs); }
+  private void init(TypeTuple ts, Type ret, Bits fidxs ) { _ts = ts; _ret = ret; _fidxs = fidxs; }
+  @Override public int hashCode( ) { return TFUN + _ts.hashCode() + _ret.hashCode()+ _fidxs.hashCode();  }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeFun) ) return false;
     TypeFun tf = (TypeFun)o;
-    return _ts==tf._ts && _ret==tf._ret;
+    return _ts==tf._ts && _ret==tf._ret && _fidxs==tf._fidxs;
   }
   @Override public String toString() {
-    SB sb = new SB().p('{');
+    return str(_fidxs.toString(new SB())).toString();
+  }
+  public SB str( SB sb ) {
+    sb.p('{');
     for( Type t : _ts._ts ) sb.p(t.toString()).p(' ');
-    return sb.p("-> ").p(_ret.toString()).p('}').toString();
+    return sb.p("-> ").p(_ret.toString()).p('}');
   }
   
   private static TypeFun FREE=null;
   private TypeFun free( TypeFun f ) { FREE=f; return this; }
-  public static TypeFun make( TypeTuple ts, Type ret ) {
+  public static TypeFun make( TypeTuple ts, Type ret, int fidx ) { return make(ts,ret,Bits.make(fidx)); }
+  public static TypeFun make( TypeTuple ts, Type ret, Bits fidxs ) {
     TypeFun t1 = FREE;
-    if( t1 == null ) t1 = new TypeFun(ts,ret);
-    else { FREE = null; t1.init(ts,ret); }
+    if( t1 == null ) t1 = new TypeFun(ts,ret,fidxs);
+    else { FREE = null; t1.init(ts,ret,fidxs); }
     TypeFun t2 = (TypeFun)t1.hashcons();
     return t1==t2 ? t1 : t2.free(t1);
   }
 
-  public static TypeFun any( int nargs ) {
+  public static TypeFun any( int nargs, int fidx ) {
+    Bits bs = fidx==-1 ? Bits.FULL : Bits.make(fidx);
     switch( nargs ) {
-    case 0: return SCR0;
-    case 1: return SCR1;
-    case 2: return SCR2;
+    case 0: return make(TypeTuple.ANY    ,Type.SCALAR, bs);
+    case 1: return make(TypeTuple.SCALAR ,Type.SCALAR, bs);
+    case 2: return make(TypeTuple.SCALAR2,Type.SCALAR, bs);
     default: throw AA.unimpl();
     }
   }
 
-  static private final TypeFun SCR0 = make(TypeTuple.ANY    ,Type.SCALAR);
-  static public  final TypeFun SCR1 = make(TypeTuple.SCALAR ,Type.SCALAR);
-  static private final TypeFun SCR2 = make(TypeTuple.SCALAR2,Type.SCALAR);
-  static public  final TypeFun FLT64 = make(TypeTuple.FLT64,TypeFlt.FLT64); // [flt]->flt
-  static public  final TypeFun INT64 = make(TypeTuple.INT64,TypeInt.INT64); // [int]->int
-  static public  final TypeFun FLT64_FLT64 = make(TypeTuple.FLT64_FLT64,TypeFlt.FLT64); // [flt,flt]->flt
-  static public  final TypeFun INT64_INT64 = make(TypeTuple.INT64_INT64,TypeInt.INT64); // [int,int]->int
-  static final TypeFun[] TYPES = new TypeFun[]{FLT64,INT64,FLT64_FLT64,INT64_INT64,SCR1};
+  static final TypeFun[] TYPES = new TypeFun[]{any(0,-1),any(1,-1),any(2,-1)};
   
-  @Override protected TypeFun xdual() { return new TypeFun((TypeTuple)_ts.dual(),_ret.dual()); }
+  @Override protected TypeFun xdual() { return new TypeFun((TypeTuple)_ts.dual(),_ret.dual(),_fidxs.flip()); }
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TERROR: return ((TypeErr)t)._all ? t : this;
@@ -62,14 +67,22 @@ public class TypeFun extends Type {
     default: throw typerr(t);   // All else should not happen
     }
     TypeFun tf = (TypeFun)t;
-    Type targs = _ts.meet(tf._ts);
-    if( !(targs instanceof TypeTuple) ) return Type.SCALAR;
-    Type ret = _ret.join(tf._ret); // Notice JOIN, Functions are contravariant
+    // If args are not identical, again go to TypeUnion
+    if( _ts != tf._ts || _ret != tf._ret )
+      return TypeUnion.make(false,this,tf);
     // Make a new signature
-    return make((TypeTuple)targs,ret);
+    return make(_ts,_ret,_fidxs.or( tf._fidxs ));
   }
   
   @Override public Type ret() { return _ret; }
 
-  @Override protected boolean canBeConst() { return true; }
+  @Override protected boolean canBeConst() { throw AA.unimpl(); }
+
+  public int fidx() { return _fidxs.getbit(); }
+  public FunNode funode() { return (FunNode)(FunNode.get(fidx()).at(0).at(2)); }
+  
+  // Filter out function types with incorrect arg counts
+  @Override public Type filter(int nargs) { return _ts._ts.length==nargs ? this : null; }
+  // Operator precedence
+  @Override public byte op_prec() { return funode().op_prec(); } 
 }

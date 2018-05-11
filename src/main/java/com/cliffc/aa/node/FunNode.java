@@ -77,13 +77,28 @@ import java.util.HashMap;
 // these ConNodes.  CallNode does the _fidx lookup when inlining the call.
 //
 public class FunNode extends RegionNode {
-  static private int CNT=2; // Function index; 1 is reserved for unknown functions
-  private final int _fidx;  // Function index; 1 is reserved for unknown functions
-  final byte _op_prec;      // Operator precedence; only set top-level primitive wrappers
+  private static int CNT=1; // Function index; -1 for 'all' and 0 for 'any'
   public final TypeFun _tf; // Worse-case correct type
-  public FunNode(TypeFun tf, Node sc) { this(tf,sc,-1); }
-  public FunNode(TypeFun tf, Node sc, int op_prec) { super(OP_FUN,sc); _tf = tf; _fidx = CNT++; _op_prec = (byte)op_prec; }
-  @Override String str() { return "fun#"+_fidx+":"+_tf.toString(); }
+  final byte _op_prec;      // Operator precedence; only set top-level primitive wrappers
+  public final String _name;// Optional function name
+  public FunNode(Node scope, PrimNode prim) {
+    this(scope,TypeFun.make(prim._targs,prim._ret,CNT++),prim.op_prec(),prim._name);
+  }
+  public FunNode(Node scope, TypeTuple ts, Type ret, String name) {
+    this(scope,TypeFun.make(ts,ret,CNT++),-1,name);
+  }
+  public FunNode(int nargs, Node scope) { this(scope,TypeFun.any(nargs,CNT++),-1,null); }
+  private FunNode(Node scope, TypeFun tf, int op_prec, String name) {
+    super(OP_FUN,scope);
+    _tf = tf;
+    _op_prec = (byte)op_prec;
+    _name = name;
+  }
+  public int fidx() { return _tf._fidxs.getbit(); }
+  public static ScopeNode FUNS = new ScopeNode();
+  public void init(ProjNode proj) { FUNS.set_def(fidx(),proj); }
+  public static ProjNode get(int fidx) { return (ProjNode)FUNS.at(fidx); }
+  @Override String str() { return "fun#"+fidx()+":"+_tf.toString(); }
 
   @Override public Node ideal(GVNGCM gvn) {
     // Clone function for type-specialization
@@ -114,11 +129,10 @@ public class FunNode extends RegionNode {
     
     // Visit all ParmNodes, looking for unresolved call uses
     boolean any_unr=false;
-    boolean[] has_unrs = new boolean[nargs];
     for( int i=1; i<nargs; i++ )
       for( Node use : parms[i]._uses )
-        if( use instanceof CallNode && use.at(1) instanceof UnresolvedNode ) {
-          has_unrs[i] = any_unr = true; break;
+        if( use instanceof CallNode && gvn.type(use.at(1)) instanceof TypeUnion ) {
+          any_unr = true; break;
         }
     if( !any_unr ) return null; // No unresolved calls; no point in type-specialization
 
@@ -140,10 +154,10 @@ public class FunNode extends RegionNode {
     for( int i=1; i<nargs; i++ )
       sig[i-1] = gvn.type(parms[i].at(2)).widen();
     // Make a new function header with new signature
-    TypeFun tf = TypeFun.make(TypeTuple.make(sig),_tf._ret);
-    assert tf.isa(_tf);
-    if( tf == _tf ) return null; // No improvement for further splitting
-    FunNode fun2 = new FunNode(tf,at(1));
+    TypeTuple ts = TypeTuple.make(sig);
+    assert ts.isa(_tf._ts);
+    if( ts == _tf._ts ) return null; // No improvement for further splitting
+    FunNode fun2 = new FunNode(at(1),ts,_tf._ret,_name);
     fun2.add_def(at(2));
 
     // Clone the function body
@@ -197,13 +211,13 @@ public class FunNode extends RegionNode {
     return this;
   }
   
-  @Override public int hashCode() { return OP_FUN+_fidx; }
+  @Override public int hashCode() { return OP_FUN+_tf.hashCode(); }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !super.equals(o) ) return false;
     if( !(o instanceof FunNode) ) return false;
     FunNode fun = (FunNode)o;
-    return _fidx==fun._fidx;
+    return _tf==fun._tf;
   }
   @Override public byte op_prec() { return _op_prec; }
 }
