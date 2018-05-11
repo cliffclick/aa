@@ -5,7 +5,7 @@ import org.junit.Test;
 
 public class TestType {
   @Test public void testType0() {
-    test("id@{int->int}", Env.lookup_valtype("id"));
+    testerr("x=3; fun@{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int","  ");
     // Simple int
     test("1",   TypeInt.TRUE);
     // Unary operator
@@ -108,11 +108,13 @@ public class TestType {
     testerr("\"abc\"@int", "\"abc\" is not a int64","         ");
     testerr("1@str", "1 is not a str","     ");
     
-    test("id@{int->int}", Env.lookup_valtype("id"));
     testerr("x=3; fun@{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int","  ");
-    test("x=3; fun@{real->real}={x -> x*2}; fun(2.1)+fun(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to fun()
+    test( "x=3; fun@{real->real}={x -> x*2}; fun(2.1)+fun(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to fun()
     
     // TODO: Need real TypeVars for these
+    //test("id@{A->A}"    , Env.lookup_valtype("id"));
+    //test("id@{A@int->A}", Env.lookup_valtype("id"));
+    //test("id@{int->int}", Env.lookup_valtype("id"));
 
     // Recursive:
     //test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)",TypeInt.con(5));

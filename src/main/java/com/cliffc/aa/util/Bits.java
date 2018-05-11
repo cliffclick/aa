@@ -18,7 +18,8 @@ public class Bits implements Iterable<Integer> {
       boolean z=true;
       for( int i=0; i<bits.length-1; i++ )
         z &= bits[i]==0;          // All leading words zero
-      _bit = z && ((last&-last)==last) ? Long.numberOfLeadingZeros(last) : 0;
+      _bit = z && ((last&-last)==last) ? 63-Long.numberOfLeadingZeros(last) : 0;
+      if( bits.length==0 ) _bit=0;
     } else _bit = -1;           // Flag as complement set
     _bits=bits;
     int sum=_bit;
@@ -52,7 +53,11 @@ public class Bits implements Iterable<Integer> {
     return make(false,new long[]{1L<<fidx});
   }
   public static Bits make( boolean not, long[] bits ) {
-    assert bits.length==0 || bits[bits.length-1] != (not?-1:0); // No trailing zeros
+    int len = bits.length-1;
+    while( len>=0 && bits[len] == (not?-1:0) ) len--;
+    if( len+1 < bits.length )   // Trim trailing zeros
+      bits = Arrays.copyOf(bits,len+1);
+        
     Bits t1 = FREE;
     if( t1 == null ) t1 = new Bits(not,bits);
     else { FREE = null; t1.init(not,bits); }
@@ -82,10 +87,12 @@ public class Bits implements Iterable<Integer> {
     if( this==bs ) return this;
     long[] maxs = _bits.length < bs._bits.length ? bs._bits : _bits;
     long[] mins = _bits.length < bs._bits.length ? _bits : bs._bits;
-    maxs = Arrays.copyOf(maxs,maxs.length);
+    long[] bits = Arrays.copyOf(mins,maxs.length);
+    if( (_bits.length < bs._bits.length ? _bit : bs._bit)==-1 )
+      for( int i=mins.length; i<bits.length; i++ ) bits[i] = -1;
+    for( int i=0; i<bits.length; i++ ) bits[i] |= maxs[i];
     boolean not = _bit == -1 | bs._bit == -1;
-    for( int i=0; i<mins.length; i++ ) maxs[i] |= mins[i];
-    return make(not,not ? mins : maxs);
+    return make(not,bits);
   }
   public Bits flip() {
     long bits[] = Arrays.copyOf(_bits,_bits.length);

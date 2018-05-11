@@ -79,12 +79,12 @@ import java.util.HashMap;
 public class FunNode extends RegionNode {
   private static int CNT=1; // Function index; -1 for 'all' and 0 for 'any'
   public final TypeFun _tf; // Worse-case correct type
-  final byte _op_prec;      // Operator precedence; only set top-level primitive wrappers
+  private final byte _op_prec;// Operator precedence; only set top-level primitive wrappers
   public final String _name;// Optional function name
   public FunNode(Node scope, PrimNode prim) {
     this(scope,TypeFun.make(prim._targs,prim._ret,CNT++),prim.op_prec(),prim._name);
   }
-  public FunNode(Node scope, TypeTuple ts, Type ret, String name) {
+  private FunNode(Node scope, TypeTuple ts, Type ret, String name) {
     this(scope,TypeFun.make(ts,ret,CNT++),-1,name);
   }
   public FunNode(int nargs, Node scope) { this(scope,TypeFun.any(nargs,CNT++),-1,null); }
@@ -94,7 +94,7 @@ public class FunNode extends RegionNode {
     _op_prec = (byte)op_prec;
     _name = name;
   }
-  public int fidx() { return _tf._fidxs.getbit(); }
+  private int fidx() { return _tf._fidxs.getbit(); }
   public static ScopeNode FUNS = new ScopeNode();
   public void init(ProjNode proj) { FUNS.set_def(fidx(),proj); }
   public static ProjNode get(int fidx) { return (ProjNode)FUNS.at(fidx); }
@@ -195,7 +195,7 @@ public class FunNode extends RegionNode {
     }
     if( prj2._uses._len != 1 )
       throw AA.unimpl(); // Should be a control-use and a data/Cast use
-    Node data = (CastNode)prj2._uses.at(0);
+    CastNode data = (CastNode)prj2._uses.at(0);
     gvn.unreg(prj2);
     gvn.unreg(data);
     prj2.set_def(0,map.get(ret),gvn); // Repoint proj as well

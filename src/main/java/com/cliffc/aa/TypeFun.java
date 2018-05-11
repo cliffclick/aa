@@ -1,6 +1,5 @@
 package com.cliffc.aa;
 
-import com.cliffc.aa.node.ProjNode;
 import com.cliffc.aa.node.FunNode;
 import com.cliffc.aa.util.Bits;
 import com.cliffc.aa.util.SB;
@@ -67,11 +66,14 @@ public class TypeFun extends Type {
     default: throw typerr(t);   // All else should not happen
     }
     TypeFun tf = (TypeFun)t;
-    // If args are not identical, again go to TypeUnion
-    if( _ts != tf._ts || _ret != tf._ret )
-      return TypeUnion.make(false,this,tf);
-    // Make a new signature
-    return make(_ts,_ret,_fidxs.or( tf._fidxs ));
+    // If either set includes the others functions, use the meet of args+ret.
+    // If the sets do not properly subset, go to a union.
+    Bits fidxs = _fidxs.or( tf._fidxs );
+    if( fidxs!=_fidxs && fidxs!=tf._fidxs )
+      return TypeUnion.make(false,this,tf); // Non-overlapping, go to a union
+    TypeTuple ts = (TypeTuple)_ts.meet(tf._ts);
+    Type ret = _ret.meet(tf._ret);
+    return make(ts,ret,fidxs);
   }
   
   @Override public Type ret() { return _ret; }
@@ -79,7 +81,7 @@ public class TypeFun extends Type {
   @Override protected boolean canBeConst() { throw AA.unimpl(); }
 
   public int fidx() { return _fidxs.getbit(); }
-  public FunNode funode() { return (FunNode)(FunNode.get(fidx()).at(0).at(2)); }
+  FunNode funode() { return (FunNode)(FunNode.get(fidx()).at(0).at(2)); }
   
   // Filter out function types with incorrect arg counts
   @Override public Type filter(int nargs) { return _ts._ts.length==nargs ? this : null; }
