@@ -58,7 +58,7 @@ Ideas, Desirables
 H-M style typing.
 JIT'ing.
 {GC,Ref-Counting}: Ponder both vs requiring e.g. lifetime management (easy by just raising scope).
-No exceptions!!! 
+No exceptions!!!
 Lexical scope destructors.
 Can ask for Int for BigInteger; unboxed arrays.
 Pattern-matching too handy looking, need to have it
@@ -123,8 +123,30 @@ For-loops with early-exit and Python else-clause
   else return DidNotFindItError()
 To detect never-ran vs ran-but-not-exited:
   if( foos.empty() ) return foos_was_empty
-  else 
+  else
     for( foo in foos )
       if( isAcceptable(foo) )
         break;
     else return no_acceptable_in_foos()
+
+Getting started
+---------------
+
+Download dependencies:
+
+    mkdir lib
+    cd lib
+    wget http://repo1.maven.org/maven2/junit/junit/4.12/junit-4.12.jar
+    wget http://repo1.maven.org/maven2/org/hamcrest/hamcrest-core/1.3/hamcrest-core-1.3.jar
+
+Build:
+
+    make
+
+Run checks:
+
+    make check
+
+Launch the REPL:
+
+    java -jar build/aa.jar
