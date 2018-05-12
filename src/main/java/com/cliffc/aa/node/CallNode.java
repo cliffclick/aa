@@ -95,8 +95,8 @@ public class CallNode extends Node implements AutoCloseable {
     // embedded control - but only a post-dominating data-use, no control-use.
     // I.e., a non-CFG control structure.
     
-    // TODO: Currently stuck because cannot inline, because Call has
-    // dominating (non-local) control
+    // TODO: Currently stuck because cannot inline, because Call has dominating
+    // (non-local) control
     
     Node rctrl = gvn.xform(new ProjNode(ret,fun._defs._len-1));
     return new CastNode( rctrl, rez, Type.SCALAR );
@@ -106,8 +106,9 @@ public class CallNode extends Node implements AutoCloseable {
     Node con = _defs.at(1);
     Type t = gvn.type(con);
     if( t instanceof TypeUnion )
-      // TODO: remove this, and just use TypeUnion.ret
-      return retype(gvn,(TypeUnion)t); // 
+      // Note that this is NOT the same as just a join-over-returns.
+      // Error arguments to calls poison the return results.
+      return retype(gvn,(TypeUnion)t);
     if( t instanceof TypeFun )
       return ((TypeFun)t)._ret;
     throw AA.unimpl();
@@ -127,9 +128,9 @@ public class CallNode extends Node implements AutoCloseable {
   
 
   // Number of actual arguments
-  int nargs() { return _defs._len-2; }
+  private int nargs() { return _defs._len-2; }
   // Actual arguments
-  Node actual( int x ) { return _defs.at(x+2); }
+  private Node actual( int x ) { return _defs.at(x+2); }
   
   // Parser support keeping args alive during parsing; if a syntax exception is
   // thrown while the call args are being built, this will free them all.  Once
@@ -206,7 +207,7 @@ public class CallNode extends Node implements AutoCloseable {
   
   // Function return type for resolved functions.  Crash/ALL for no functions
   // allowed, join of possible returns otherwise - we get to choose the best
-  // choice here.
+  // choice here.  Errors poison return results.
   private Type retype( GVNGCM gvn, TypeUnion tu ) {
     if( !tu._any ) throw AA.unimpl();
     Type t = Type.SCALAR;

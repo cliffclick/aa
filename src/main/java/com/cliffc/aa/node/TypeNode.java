@@ -14,8 +14,8 @@ public class TypeNode extends Node {
   }
   @Override public Type value(GVNGCM gvn) {
     Type t = gvn.type(at(1));
-    if( t instanceof TypeErr ) return t;
-    return t.join(_t);
+    // Return type is an error, until the assert can be proven and removed.  
+    return (t instanceof TypeErr || t.isa(_t)) ? t : TypeErr.make(err(gvn));
   }
   @Override public Type all_type() { return TypeErr.ALL; }
   String err(GVNGCM gvn) {
