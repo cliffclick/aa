@@ -3,6 +3,7 @@ package com.cliffc.aa;
 import com.cliffc.aa.node.*;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.Bits;
+import com.cliffc.aa.util.SB;
 
 import java.text.NumberFormat;
 import java.text.ParsePosition;
@@ -486,6 +487,7 @@ public class Parse {
   // Build a string of the given message, the current line being parsed,
   // and line of the pointer to the current index.
   public String errMsg(String s) {
+    if( s.charAt(0)=='\n' ) return s;
     // find line start
     int a=_x;
     while( a > 0 && _buf[a-1] != '\n' ) --a;
@@ -495,14 +497,12 @@ public class Parse {
     while( b < _buf.length && _buf[b] != '\n' ) b++;
     if( b < _buf.length ) b--; // do not include trailing \n or \n\r
     // error message
-    StringBuilder sb = new StringBuilder().append('\n');
-    sb.append(_src).append(':').append(_line).append(':').append(s).append('\n');
-    sb.append(new String(_buf,a,b-a)).append('\n');
+    SB sb = new SB().p('\n').p(_src).p(':').p(_line).p(':').p(s).p('\n');
+    sb.p(new String(_buf,a,b-a)).p('\n');
     int line_start = 0;
     for( int i=line_start; i<_x; i++ )
-      sb.append(' ');
-    sb.append('^').append('\n');
-    return sb.toString();
+      sb.p(' ');
+    return sb.p("^\n").toString();
   }
   // Handy for the debugger to print 
   @Override public String toString() { return new String(_buf,_x,_buf.length-_x); }

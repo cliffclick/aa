@@ -26,8 +26,7 @@ public class TypeErr extends Type {
 
   static public final TypeErr ALL = make("all");
   static public final TypeErr ANY = make("all",false);
-  static public final TypeErr UNRESOLVED = make("Unresolved overload");
-  
+
   static final TypeErr[] TYPES = new TypeErr[]{ANY,ALL};
   @Override protected TypeErr xdual() { return new TypeErr(_msg,!_all); }
   @Override protected Type xmeet( Type t ) {

@@ -5,7 +5,6 @@ import org.junit.Test;
 
 public class TestType {
   @Test public void testType0() {
-    testerr("x=3; fun@{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int64","  ");
     // Simple int
     test("1",   TypeInt.TRUE);
     // Unary operator
@@ -108,7 +107,7 @@ public class TestType {
     testerr("\"abc\"@int", "\"abc\" is not a int64","         ");
     testerr("1@str", "1 is not a str","     ");
     
-    testerr("x=3; fun@{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int","  ");
+    testerr("x=3; fun@{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int64","                              ");
     test( "x=3; fun@{real->real}={x -> x*2}; fun(2.1)+fun(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to fun()
     
     // TODO: Need real TypeVars for these
