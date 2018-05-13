@@ -222,18 +222,26 @@ public class GVNGCM {
     return oldt == t && y==null ? null : n; // Progress if types improved
   }
 
-  // Complete replacement; point uses to x.
-  private void subsume( Node old, Node nnn ) {
+  // Complete replacement; point uses to x.  If nnn points to 'old' the goal is
+  // to insert 'nnn' between 'old' and all uses; otherwise the goal is to
+  // completely replace 'old'.
+  public void subsume( Node old, Node nnn ) {
+    boolean replace=true;
     while( old._uses._len > 0 ) {
-      Node u = old._uses.del(0); // Old use
-      _vals.remove(u);           // Use is about to change edges; remove from type table
-      u._defs.set(u._defs.find(a -> a==old),nnn); // was old now nnn
-      nnn._uses.add(u);
-      add_work(u);              // And put on worklist, to get re-inserted
+      Node u = old._uses.del(0);  // Old use
+      if( u==nnn ) replace=false; // Goal is to insert, not replace
+      else {                      // Move use from 'old' over to 'nnn'
+        _vals.remove(u); // Use is about to change edges; remove from type table
+        u._defs.set(u._defs.find(a -> a==old),nnn); // was old now nnn
+        nnn._uses.add(u);
+        add_work(u);            // And put on worklist, to get re-inserted
+      }        
     }
-    nnn._uses.add(nnn);         // Self-hook, to prevent accidental deletion
-    kill_new(old);              // Delete the old n, and anything it uses
-    nnn._uses.del(nnn._uses.find(a -> a==nnn)); // Remove self-hook
+    if( replace ) {             // Completely removing 'old'
+      nnn._uses.add(nnn);       // Self-hook, to prevent accidental deletion
+      kill_new(old);            // Delete the old n, and anything it uses
+      nnn._uses.del(nnn._uses.find(a -> a==nnn)); // Remove self-hook
+    } else old._uses.add(nnn);  // Keeping 'old' but inserting 'nnn'
   }
   
   // Once the program is complete, any time anything is on the worklist we can

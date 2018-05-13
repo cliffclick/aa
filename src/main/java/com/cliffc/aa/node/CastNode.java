@@ -40,10 +40,6 @@ public class CastNode extends Node {
     fun.set_def(proj._idx,gvn.con(TypeErr.ANY),gvn);
     return irez;
   }
-  @Override public Type value(GVNGCM gvn) {
-    Type t = gvn.type(at(1));
-    if( t instanceof TypeErr ) return t;
-    return t.join(_t);
-  }
+  @Override public Type value(GVNGCM gvn) { return _t.join(gvn.type(at(1))); }
   @Override public Type all_type() { return Type.SCALAR; }
 }

@@ -74,9 +74,9 @@ public class Parse {
     // Currently only supporting exprs
     Node res = stmt();
     if( res == null ) res = con(TypeErr.ALL);
-    _e._scope.add_def(res); // Hook, so not deleted
+    _e._scope.add_def(res);     // Hook, so not deleted
     _gvn.iter();    // Pessimistic optimizations; might improve error situation
-    res = _e._scope.pop(); // New and improved result
+    res = _e._scope.pop();      // New and improved result
 
     // TODO: Optimistic Pass Goes Here, to improve error situation
 
@@ -114,10 +114,9 @@ public class Parse {
       ts  .add(t  );
     }
     Node ifex = ifex();
-    if( ifex == null ) {
-      if( toks._len > 0 ) return con(err_ctrl("Missing ifex after assignment of '"+toks.last()+"'"));
-      else return null;
-    }
+    if( ifex == null )
+      return toks._len == 0 ? null
+        : con(err_ctrl("Missing ifex after assignment of '"+toks.last()+"'"));
     // Honor all type requests, all at once
     for( Type t : ts ) if( t != null ) ifex = gvn(new TypeNode(t,ifex,errMsg("%s")));
     for( String tok : toks )
@@ -224,7 +223,10 @@ public class Parse {
             }
           }
           require(')');
-          if( _gvn.type(fun).filter(args._defs._len-2)==null )
+          Type t = _gvn.type(fun);
+          if( t instanceof TypeErr && fun instanceof TypeNode )
+            t = _gvn.type(fun.at(1)); // Assume eventually a TypeNode resolves
+          if( t.filter(args._defs._len-2)==null )
             return con(err_ctrl("A function is being called, but "+_gvn.type(fun)+" is not a function type"));
         } else {                  // lispy-style fcn application
           // TODO: Unable resolve ambiguity with mixing "(fun arg0 arg1)" and

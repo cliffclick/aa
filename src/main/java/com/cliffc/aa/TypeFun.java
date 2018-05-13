@@ -1,6 +1,8 @@
 package com.cliffc.aa;
 
 import com.cliffc.aa.node.FunNode;
+import com.cliffc.aa.node.ProjNode;
+import com.cliffc.aa.node.RetNode;
 import com.cliffc.aa.util.Bits;
 import com.cliffc.aa.util.SB;
 
@@ -81,10 +83,12 @@ public class TypeFun extends Type {
   @Override protected boolean canBeConst() { throw AA.unimpl(); }
 
   public int fidx() { return _fidxs.getbit(); }
-  FunNode funode() { return (FunNode)(FunNode.get(fidx()).at(0).at(2)); }
+  public ProjNode projnode() { return FunNode.get(fidx()); }
+  public  RetNode  retnode() { return (RetNode)(projnode().at(0)); }
+  public  FunNode  funnode() { return (FunNode)(retnode().at(2)); }
   
   // Filter out function types with incorrect arg counts
   @Override public Type filter(int nargs) { return _ts._ts.length==nargs ? this : null; }
   // Operator precedence
-  @Override public byte op_prec() { return funode().op_prec(); } 
+  @Override public byte op_prec() { return funnode().op_prec(); } 
 }

@@ -36,7 +36,7 @@ public class CallNode extends Node implements AutoCloseable {
       Ary<TypeFun> funs = resolve(tu,gvn); // List of function choices
       if( funs.isEmpty() )                           // No choices possible
         return new ConNode<>(TypeErr.make("Argument mismatch in call to "+tu.errMsg())); // Fail to top
-      if( funs._len>1 ) {       // Multiple choices, but save the reduced Unr
+      if( funs._len>1 ) {       // Multiple choices, but save the reduced choice list
         if( funs._len==tu._ts._ts.length ) return null; // No improvement
         throw AA.unimpl();
         //Node unr2 = new ConNode(); // Build and return a reduced Con
@@ -46,13 +46,27 @@ public class CallNode extends Node implements AutoCloseable {
       t = funs.at(0);           // Single function choice
     }
 
+    // Type-checking a function
+    if( t instanceof TypeErr && funv instanceof TypeNode ) {
+      TypeNode tn = (TypeNode)funv;
+      TypeFun tf_cast = (TypeFun)tn._t;
+      Node[] defs = new Node[_defs._len];
+      defs[0] = at(0);
+      defs[1] = tn.at(1);       // Bypass/delete the original TypeNode
+      for( int i=2; i<_defs._len; i++ ) // Insert casts for each parm
+        defs[i] = gvn.xform(new TypeNode(tf_cast._ts.at(i-2),at(i),tn._msg));;
+      Node call = gvn.xform(new CallNode(defs)); // New replacement Call
+      // And cast the return as well
+      return new TypeNode(tf_cast._ret,call,tn._msg);
+    }
+
     if( !(t instanceof TypeFun) ) {
       throw AA.unimpl();        // untested?
       //return null;
     }
 
     // Single choice; insert actual conversions & replace
-    ProjNode proj = (ProjNode)FunNode.FUNS.at(((TypeFun)t).fidx());
+    ProjNode proj = ((TypeFun)t).projnode();
     RetNode ret = (RetNode)proj.at(0);
     FunNode fun = (FunNode)ret .at(2); // Proj->Ret->Fun
     Type[] formals = fun._tf._ts._ts;
@@ -103,14 +117,17 @@ public class CallNode extends Node implements AutoCloseable {
   }
 
   @Override public Type value(GVNGCM gvn) {
-    Node con = _defs.at(1);
-    Type t = gvn.type(con);
+    Node fun = _defs.at(1);
+    Type t = gvn.type(fun);
     if( t instanceof TypeUnion )
       // Note that this is NOT the same as just a join-over-returns.
       // Error arguments to calls poison the return results.
       return retype(gvn,(TypeUnion)t);
-    if( t instanceof TypeFun )
-      return ((TypeFun)t)._ret;
+    if( t instanceof TypeFun ) {
+      Type res = retype(gvn,(TypeFun)t);
+      return res == null ? TypeErr.make("Arg mismatch in call") : res;
+    }
+    if( t instanceof TypeErr ) return t;
     throw AA.unimpl();
     //assert con instanceof ProjNode;
     //RetNode ret = (RetNode)(unr.at(0)); // Must be a return
@@ -203,30 +220,31 @@ public class CallNode extends Node implements AutoCloseable {
     return ns;
   }
 
-
-  
   // Function return type for resolved functions.  Crash/ALL for no functions
   // allowed, join of possible returns otherwise - we get to choose the best
   // choice here.  Errors poison return results.
   private Type retype( GVNGCM gvn, TypeUnion tu ) {
     if( !tu._any ) throw AA.unimpl();
     Type t = Type.SCALAR;
-    outerloop:
     for( Type tft : tu._ts._ts ) {
-      TypeFun tf = (TypeFun)tft;
-      Type[] formals = tf._ts._ts;   // Type of each argument
-      if( formals.length != nargs() ) continue; // Argument count mismatch; join of ALL
-      // Now check if the arguments are compatible at all
-      for( int j=0; j<formals.length; j++ ) {
-        Type actual = gvn.type(actual(j));
-        if( actual instanceof TypeErr && !t.above_center() )
-          // Actual is an error, so call result is the same error
-          return actual;        // TODO: Actually need to keep all such errors...
-        if( !actual.isa(formals[j]) )
-          continue outerloop;   // Actual is not a formal; join of ALL
-      }
-      t = t.join(tf.ret());
+      Type x = retype(gvn,(TypeFun)tft);
+      if( x!=null )             // Argument mismatch; join of ALL
+        t = t.join(x);          // Join of all
     }
     return t;
   }  
+  private Type retype( GVNGCM gvn, TypeFun tf ) {
+    Type[] formals = tf._ts._ts;   // Type of each argument
+    if( formals.length != nargs() ) return null; // Argument count mismatch; join of ALL
+    // Now check if the arguments are compatible at all
+    for( int j=0; j<formals.length; j++ ) {
+      Type actual = gvn.type(actual(j));
+      if( actual instanceof TypeErr )
+        // Actual is an error, so call result is the same error
+        return actual;        // TODO: Actually need to keep all such errors...
+      if( !actual.isa(formals[j]) )
+        return null;   // Actual is not a formal; join of ALL
+    }
+    return tf.ret();
+  }
 }
