@@ -24,11 +24,11 @@ GRAMMAR
 *  fact = {func}               // Anonymous function declaration
 *  fact = {binop}              // Special syntactic form of binop; no spaces allowed; returns function constant
 *  fact = {uniop}              // Special syntactic form of uniop; no spaces allowed; returns function constant
-*  binop= +-*%&|/              // etc; primitive lookup; can determine infix binop at parse-time
+*  binop= +-*%&|/<>!=          // etc; primitive lookup; can determine infix binop at parse-time
 *  uniop= -!~                  // etc; primitive lookup; can determine infix uniop at parse-time
 *  func = { [[id]* ->]? stmt } // Anonymous function declaration
-*  str  = [.\%]*             // String contents; \t\n\r\% standard escapes
-*  str  = %[num]?[.num]?fact // Percent escape embeds a 'fact' in a string; "name=%name\n"
+*  str  = [.\%]*               // String contents; \t\n\r\% standard escapes
+*  str  = %[num]?[.num]?fact   // Percent escape embeds a 'fact' in a string; "name=%name\n"
 *  type = tcon                 // Types are a tcon or a tfun
 *  type = tfun
 *  tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str

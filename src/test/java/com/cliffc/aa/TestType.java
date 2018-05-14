@@ -127,13 +127,14 @@ public class TestType {
     test("fun@{real->flt32}={x -> x}; fun(0.125)", TypeFlt.con(0.125));
     testerr("fun@{real->flt32}={x -> x}; fun(123456789)", "123456789 is not a flt32","                          ");
     
+    // Recursive:
+    //test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
+    //test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)",TypeInt.con(5));
+
     // TODO: Need real TypeVars for these
     //test("id@{A->A}"    , Env.lookup_valtype("id"));
     //test("id@{A@int->A}", Env.lookup_valtype("id"));
     //test("id@{int->int}", Env.lookup_valtype("id"));
-
-    // Recursive:
-    //test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)",TypeInt.con(5));
 
     // Co-recursion will require parallel assignment & type inference across a lexical scope
     //test("is_even = { n -> n ? is_odd(n-1) : true}; is_odd = {n -> n ? is_even(n-1) : false}; is_even(4)", TypeInt.TRUE );

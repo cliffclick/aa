@@ -28,7 +28,7 @@ import java.util.BitSet;
  *  fact = {func}               // Anonymous function declaration
  *  fact = {binop}              // Special syntactic form of binop; no spaces allowed; returns function constant
  *  fact = {uniop}              // Special syntactic form of uniop; no spaces allowed; returns function constant
- *  binop= +-*%&|/              // etc; primitive lookup; can determine infix binop at parse-time
+ *  binop= +-*%&|/<>!=          // etc; primitive lookup; can determine infix binop at parse-time
  *  uniop=  -!~                 // etc; primitive lookup; can determine infix uniop at parse-time
  *  func = { [[id]* ->]? stmt } // Anonymous function declaration
  *  str  = [.\%]*               // String contents; \t\n\r\% standard escapes
