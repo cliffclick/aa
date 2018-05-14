@@ -75,12 +75,18 @@ public class TestType {
     testerr("x=1;2?(x=2):(x=3);x", "Cannot re-assign ref 'x'","          ");
     test   ("x=1;2?   2 :(x=3);x",TypeInt.con(1)); // Re-assigned allowed & ignored in dead branch
     
-    test   ("1< 2", TypeInt.TRUE );
-    test   ("1<=2", TypeInt.TRUE );
-    test   ("1> 2", TypeInt.FALSE);
-    test   ("1>=2", TypeInt.FALSE);
-    test   ("1==2", TypeInt.FALSE);
-    test   ("1!=2", TypeInt.TRUE );
+    test   ("1  < 2", TypeInt.TRUE );
+    test   ("1  <=2", TypeInt.TRUE );
+    test   ("1  > 2", TypeInt.FALSE);
+    test   ("1  >=2", TypeInt.FALSE);
+    test   ("1  ==2", TypeInt.FALSE);
+    test   ("1  !=2", TypeInt.TRUE );
+    test   ("1.2< 2", TypeInt.TRUE );
+    test   ("1.2<=2", TypeInt.TRUE );
+    test   ("1.2> 2", TypeInt.FALSE);
+    test   ("1.2>=2", TypeInt.FALSE);
+    test   ("1.2==2", TypeInt.FALSE);
+    test   ("1.2!=2", TypeInt.TRUE );
     
     // Anonymous function definition
     test_isa("{x y -> x+y}", TypeFun.any(2,-1)); // actually {Flt,Int} x {FltxInt} -> {FltxInt} but currently types {SCALAR,SCALAR->SCALAR}

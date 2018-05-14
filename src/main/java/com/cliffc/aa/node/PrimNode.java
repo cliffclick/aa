@@ -39,6 +39,13 @@ public abstract class PrimNode extends Node {
     new   SubF64(),
     new   MulF64(),
           
+    new   LT_F64(),
+    new   LE_F64(),
+    new   GT_F64(),
+    new   GE_F64(),
+    new   EQ_F64(),
+    new   NE_F64(),
+    
     new   AddI64(),
     new   SubI64(),
     new   MulI64(),
@@ -166,6 +173,22 @@ class MulF64 extends Prim2OpF64 {
   double op( double l, double r ) { return l*r; }
   @Override public byte op_prec() { return 6; }
 }
+
+// 2RelOps have uniform input types, and bool output
+abstract class Prim2RelOpF64 extends PrimNode {
+  Prim2RelOpF64( String name ) { super(name,PrimNode.ARGS2,TypeTuple.FLT64_FLT64,TypeInt.BOOL); }
+  public TypeInt apply( Type[] args ) { return op(args[1].getd(),args[2].getd())?TypeInt.TRUE:TypeInt.FALSE; }
+  abstract boolean op( double x, double y );
+  @Override public byte op_prec() { return 4; }
+}
+
+class LT_F64 extends Prim2RelOpF64 { LT_F64() { super("<" ); } boolean op( double l, double r ) { return l< r; } }
+class LE_F64 extends Prim2RelOpF64 { LE_F64() { super("<="); } boolean op( double l, double r ) { return l<=r; } }
+class GT_F64 extends Prim2RelOpF64 { GT_F64() { super(">" ); } boolean op( double l, double r ) { return l> r; } }
+class GE_F64 extends Prim2RelOpF64 { GE_F64() { super(">="); } boolean op( double l, double r ) { return l>=r; } }
+class EQ_F64 extends Prim2RelOpF64 { EQ_F64() { super("=="); } boolean op( double l, double r ) { return l==r; } }
+class NE_F64 extends Prim2RelOpF64 { NE_F64() { super("!="); } boolean op( double l, double r ) { return l!=r; } }
+
 
 // 2Ops have uniform input/output types, so take a shortcut on name printing
 abstract class Prim2OpI64 extends PrimNode {
