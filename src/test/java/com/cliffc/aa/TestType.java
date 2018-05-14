@@ -108,7 +108,10 @@ public class TestType {
     testerr("1@str", "1 is not a str","     ");
     
     testerr("x=3; fun@{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int64","                              ");
-    test( "x=3; fun@{real->real}={x -> x*2}; fun(2.1)+fun(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to fun()
+    test("x=3; fun@{real->real}={x -> x*2}; fun(2.1)+fun(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to fun()
+    test("fun@{real->flt32}={x -> x}; fun(123 )", TypeInt.con(123 ));
+    test("fun@{real->flt32}={x -> x}; fun(0.125)", TypeFlt.con(0.125));
+    testerr("fun@{real->flt32}={x -> x}; fun(123456789)", "123456789 is not a flt32","                          ");
     
     // TODO: Need real TypeVars for these
     //test("id@{A->A}"    , Env.lookup_valtype("id"));

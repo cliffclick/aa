@@ -142,7 +142,8 @@ public class GVNGCM {
       if( x != n ) {            // Different return, so delete original dead node
         x._uses.add(x);         // Hook X to prevent accidental deletion
         kill_new(n); // n was new, replaced so immediately recycle n and dead subgraph
-        n = x._uses.pop();      // Remove hook, keep better n
+        final Node y=x;
+        n = x._uses.del(x._uses.find(a -> a==y)); // Remove hook, keep better n
       }
       if( !check_new(n) ) return n; // If the replacement is old, no need to re-ideal
       cnt++; assert cnt < 1000;     // Catch infinite ideal-loops
@@ -158,7 +159,6 @@ public class GVNGCM {
     // Record type for n; n is "in the system" now
     setype(n,t);                         // Set it in
     // TODO: If x is a TypeNode, capture any more-precise type permanently into Node
-
     return n;
   }
   
