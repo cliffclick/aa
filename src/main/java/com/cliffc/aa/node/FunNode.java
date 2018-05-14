@@ -100,6 +100,14 @@ public class FunNode extends RegionNode {
   private int fidx() { return _tf._fidxs.getbit(); }
   public static TmpNode FUNS = new TmpNode();
   public void init(ProjNode proj) { FUNS.set_def(fidx(),proj); }
+  public static void clear_forward_ref(Type t, GVNGCM gvn) {
+    assert t.forward_ref();
+    int fidx = ((TypeFun)t).fidx();
+    // The FunNode points to the current scope; when deleting the FunNode do
+    // NOT also delete the current scope, even if this is the last use.
+    FUNS.at(fidx).at(0).at(2).pop();
+    FUNS.set_def(fidx,null,gvn);
+  }
   public static ProjNode get(int fidx) { return (ProjNode)FUNS.at(fidx); }
   @Override String str() { return "fun#"+fidx()+":"+_tf.toString(); }
 

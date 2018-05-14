@@ -126,11 +126,14 @@ public class Parse {
     for( String tok : toks ) {
       Node n = _e.lookup(tok);
       if( n==null ) _e.add(tok,ifex);
-      else if( n instanceof ConNode && _gvn.type(n) instanceof TypeFun ) {
-        // Handle forward referenced function definitions
-        
-        throw AA.unimpl();
-      } else err_ctrl0("Cannot re-assign ref '"+tok+"'");
+      else { // Handle forward referenced function definitions
+        Type nt = _gvn.type(n);
+        if( n instanceof ConNode && nt instanceof TypeFun ) {
+          _gvn.subsume(n,ifex); // Subsume forward ref function constant
+          FunNode.clear_forward_ref(nt,_gvn);
+        } else
+          err_ctrl0("Cannot re-assign ref '"+tok+"'");
+      }
     }
     while( peek(';') ) {   // Another expression?
       kill(ifex);          // prior expression result no longer alive in parser
