@@ -88,7 +88,10 @@ public class TypeFun extends Type {
   public  FunNode  funnode() { return (FunNode)(retnode().at(2)); }
   
   // Filter out function types with incorrect arg counts
-  @Override public Type filter(int nargs) { return _ts._ts.length==nargs ? this : null; }
+  @Override public Type filter(int nargs) { return forward_ref() || _ts._ts.length==nargs ? this : null; }
+  // Is unspecified length (e.g. forward ref)
+  @Override public boolean forward_ref() { return _ret==Type.XSCALAR; }
+  public String forward_ref_err() { return "Unknown ref '"+funnode()._name+"'"; }  
   // Operator precedence
   @Override public byte op_prec() { return funnode().op_prec(); } 
 }

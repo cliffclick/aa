@@ -34,8 +34,17 @@ public class CallNode extends Node implements AutoCloseable {
     if( t instanceof TypeUnion ) {
       TypeUnion tu = (TypeUnion)t;
       Ary<TypeFun> funs = resolve(tu,gvn); // List of function choices
-      if( funs.isEmpty() )                           // No choices possible
-        return new ConNode<>(TypeErr.make("Argument mismatch in call to "+tu.errMsg())); // Fail to top
+      if( funs.isEmpty() ) {               // No choices possible
+        // Any arguments a forward-ref?  Blow out with more-specific
+        // forward-ref error.
+        TypeErr terr=TypeErr.make("Argument mismatch in call to "+tu.errMsg());
+        for( int i=0; i<nargs(); i++ ) {
+          Type ta = gvn.type(actual(i));
+          if( ta.forward_ref() )
+            terr = TypeErr.make(((TypeFun)ta).forward_ref_err());
+        }
+        return new ConNode<>(terr); // Fail to top
+      }
       if( funs._len>1 ) {       // Multiple choices, but save the reduced choice list
         if( funs._len==tu._ts._ts.length ) return null; // No improvement
         throw AA.unimpl();
@@ -83,10 +92,14 @@ public class CallNode extends Node implements AutoCloseable {
       }
     }
 
+    // If this is a forward-ref we have no body to inline
+    if( ret.at(1) == fun )
+      return null;
+    
     // Inline the call site now.
     // This is NOT inlining the function body, just the call site.
     Node    rez = ret.at(1);
-    if( fun._tf._ts._ts.length != _defs._len-2 ) {
+    if( fun._tf._ts._ts.length != nargs() ) {
       throw AA.unimpl(); // untested?
       //return null; // Incorrect argument count
     }
@@ -132,8 +145,8 @@ public class CallNode extends Node implements AutoCloseable {
     //assert con instanceof ProjNode;
     //RetNode ret = (RetNode)(unr.at(0)); // Must be a return
     //FunNode fun = (FunNode)ret.at(2);
-    //if( fun._tf._ts._ts.length != _defs._len-2 )
-    //  return TypeErr.make("Function "+fun._tf+" expects "+fun._tf._ts._ts.length+" args but passed "+(_defs._len-2));
+    //if( fun._tf._ts._ts.length != nargs() )
+    //  return TypeErr.make("Function "+fun._tf+" expects "+fun._tf._ts._ts.length+" args but passed "+nargs());
     //
     //// Value is the function return type
     //Type tret = gvn.type(ret.at(1));
@@ -246,5 +259,13 @@ public class CallNode extends Node implements AutoCloseable {
         return null;   // Actual is not a formal; join of ALL
     }
     return tf.ret();
+  }
+
+  // Type of arguments, as a tuple
+  public TypeTuple args(GVNGCM gvn) {
+    Type[] ts = new Type[nargs()];
+    for( int i=0; i<nargs(); i++ )
+      ts[i] = gvn.type(actual(i));
+    return TypeTuple.make(ts);
   }
 }

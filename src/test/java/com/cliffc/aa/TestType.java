@@ -5,7 +5,7 @@ import org.junit.Test;
 
 public class TestType {
   @Test public void testType0() {
-    test   ("1> 2", TypeInt.FALSE);
+    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
     // Simple int
     test("1",   TypeInt.TRUE);
     // Unary operator
@@ -128,7 +128,7 @@ public class TestType {
     testerr("fun@{real->flt32}={x -> x}; fun(123456789)", "123456789 is not a flt32","                          ");
     
     // Recursive:
-    //test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
+    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
     //test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)",TypeInt.con(5));
 
     // TODO: Need real TypeVars for these

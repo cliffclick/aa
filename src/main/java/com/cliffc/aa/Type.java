@@ -342,6 +342,8 @@ public class Type {
   }
   // Filter out function types with incorrect arg counts
   public Type filter(int nargs) { return null; } // Overridden in subclasses
+  // Is unspecified length (e.g. forward ref)
+  public boolean forward_ref() { return false; }
   // Operator precedence
   public byte op_prec() { return -1; } // Overridden in subclasses
 }

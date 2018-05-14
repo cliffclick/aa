@@ -15,6 +15,12 @@ public class TmpNode extends Node implements AutoCloseable {
   @Override public boolean equals(Object o) { return this==o; }
   @Override public int hashCode() { return 123456789; }
 
+  void set_def( int i, Node n ) {
+    assert i>= _defs._len || _defs._es[i]==null;
+    _defs.setX(i,n);
+    n._uses.add(this);
+  }
+  
   // Parser support of small lists of nodes to be kept alive during parsing
   public void remove( int i ) {
     Node n = _defs.remove(i);

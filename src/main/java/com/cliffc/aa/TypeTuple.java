@@ -54,6 +54,7 @@ public class TypeTuple extends Type {
   }    
 
   public  static final TypeTuple  ANY    = make(); // Infinite list of Any
+  public  static final TypeTuple  ALL    = (TypeTuple)make().dual(); // Infinite list of All
   public  static final TypeTuple  SCALAR = make(Type. SCALAR);
           static final TypeTuple  SCALAR2= make(Type. SCALAR, Type. SCALAR);
           static final TypeTuple XSCALAR1= make(Type.XSCALAR);

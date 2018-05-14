@@ -43,12 +43,6 @@ public class ScopeNode extends Node {
     return val;
   }
 
-  void set_def( int i, Node n ) {
-    assert i>= _defs._len || _defs._es[i]==null;
-    _defs.setX(i,n);
-    n._uses.add(this);
-  }
-  
   /** Return a ScopeNode with all the variable indices at or past the idx.
    *  @param idx index to split on
    *  @return a ScopeNode with the higher indices; 'this' has the lower indices.  null if no new vars

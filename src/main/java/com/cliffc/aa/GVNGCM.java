@@ -239,7 +239,7 @@ public class GVNGCM {
     }
     if( replace ) {             // Completely removing 'old'
       nnn._uses.add(nnn);       // Self-hook, to prevent accidental deletion
-      kill_new(old);            // Delete the old n, and anything it uses
+      kill(old);                // Delete the old n, and anything it uses
       nnn._uses.del(nnn._uses.find(a -> a==nnn)); // Remove self-hook
     } else old._uses.add(nnn);  // Keeping 'old' but inserting 'nnn'
   }

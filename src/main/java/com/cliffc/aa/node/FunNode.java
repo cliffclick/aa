@@ -87,15 +87,18 @@ public class FunNode extends RegionNode {
   private FunNode(Node scope, TypeTuple ts, Type ret, String name) {
     this(scope,TypeFun.make(ts,ret,CNT++),-1,name);
   }
+  public FunNode(Node scope, String name) { // Used to forward-decl anon functions
+    this(scope,TypeFun.make(TypeTuple.ALL,Type.XSCALAR,CNT++),-1,name);
+  }
   public FunNode(int nargs, Node scope) { this(scope,TypeFun.any(nargs,CNT++),-1,null); }
-  private FunNode(Node scope, TypeFun tf, int op_prec, String name) {
+  public FunNode(Node scope, TypeFun tf, int op_prec, String name) {
     super(OP_FUN,scope);
     _tf = tf;
     _op_prec = (byte)op_prec;
     _name = name;
   }
   private int fidx() { return _tf._fidxs.getbit(); }
-  public static ScopeNode FUNS = new ScopeNode();
+  public static TmpNode FUNS = new TmpNode();
   public void init(ProjNode proj) { FUNS.set_def(fidx(),proj); }
   public static ProjNode get(int fidx) { return (ProjNode)FUNS.at(fidx); }
   @Override String str() { return "fun#"+fidx()+":"+_tf.toString(); }

@@ -83,6 +83,9 @@ public class Parse {
 
     // Result type
     Type tres = Env.lookup_valtype(res);
+    // Disallow forward-refs as top-level results
+    if( tres.forward_ref() )
+      tres = TypeErr.make(errMsg(((TypeFun)tres).forward_ref_err()));
 
     // Gather errors
     Env par = _e._par;
@@ -120,9 +123,15 @@ public class Parse {
         : con(err_ctrl("Missing ifex after assignment of '"+toks.last()+"'"));
     // Honor all type requests, all at once
     for( Type t : ts ) if( t != null ) ifex = gvn(new TypeNode(t,ifex,errMsg("%s")));
-    for( String tok : toks )
-      if( _e.lookup(tok)==null ) _e.add(tok,ifex);
-      else err_ctrl0("Cannot re-assign ref '"+tok+"'");
+    for( String tok : toks ) {
+      Node n = _e.lookup(tok);
+      if( n==null ) _e.add(tok,ifex);
+      else if( n instanceof ConNode && _gvn.type(n) instanceof TypeFun ) {
+        // Handle forward referenced function definitions
+        
+        throw AA.unimpl();
+      } else err_ctrl0("Cannot re-assign ref '"+tok+"'");
+    }
     while( peek(';') ) {   // Another expression?
       kill(ifex);          // prior expression result no longer alive in parser
       ifex = stmt();
@@ -193,7 +202,10 @@ public class Parse {
           Node fun = funs.at(i);
           assert fun.op_prec() <= max;
           if( fun.op_prec() < max ) continue; // Not yet
-          args.set_def(i-1,gvn(new CallNode(ctrl(),fun,args.at(i-1),args.at(i))),_gvn);
+          Node call = gvn(new CallNode(ctrl(),fun,args.at(i-1),args.at(i)));
+          Node cerr = call_err(call);
+          if( cerr!=null ) call=cerr;
+          args.set_def(i-1,call,_gvn);
           funs.remove(i);  args.remove(i);  i--;
         }
         max--;
@@ -227,7 +239,16 @@ public class Parse {
           Type t = _gvn.type(fun);
           if( t instanceof TypeErr && fun instanceof TypeNode )
             t = _gvn.type(fun.at(1)); // Assume eventually a TypeNode resolves
-          if( t.filter(args._defs._len-2)==null )
+          if( t.forward_ref() ) {     // Forward ref; partial def
+            if( !(fun instanceof ConNode) ) throw AA.unimpl();       // Do not understand?
+            // Join with argument types & count.
+            TypeFun tf2 = TypeFun.make(args.args(_gvn),((TypeFun)t)._ret,((TypeFun)t)._fidxs);
+            // Replace here...
+            _gvn.subsume(fun,_gvn.con(tf2));
+            // And replace as the forward-ref function
+            FunNode fun2 = tf2.funnode();
+            _gvn.subsume(fun2,_gvn.init(new FunNode(fun2.at(1),tf2,-1,fun2._name)));
+          } else if( t.filter(args._defs._len-2)==null )
             return con(err_ctrl("A function is being called, but "+_gvn.type(fun)+" is not a function type"));
         } else {                  // lispy-style fcn application
           // TODO: Unable resolve ambiguity with mixing "(fun arg0 arg1)" and
@@ -241,11 +262,8 @@ public class Parse {
           //if( args.len()==1 ) return fun; // Not a function call
         }
         Node call = gvn(args);    // No syntax errors; flag Call not auto-close
-        Type tc = _gvn.type(call);
-        if( tc._type==Type.TERROR ) {
-          kill(call);
-          return con(err_ctrl(((TypeErr)tc)._msg));
-        }
+        Node cerr = call_err(call);
+        if( cerr!=null ) return cerr;
         fun = call;             // Result of call might be a function, getting called again
       }
     }
@@ -314,8 +332,13 @@ public class Parse {
     String tok = token0();
     if( tok == null ) return null;
     Node var = _e.lookup(tok);
-    if( var == null )
-      return con(err_ctrl("Unknown ref '"+tok+"'"));
+    if( var == null ) {
+      // TODO: Allow unknown refs in function position, to allow recursion
+      //return con(err_ctrl("Unknown ref '"+tok+"'"));
+      FunNode fun = init(new FunNode(_e._scope,tok));
+      fun.init(init(new ProjNode(init(new RetNode(fun,fun,fun)),1)));
+      return _e.add(tok,con(fun._tf));
+    }
     // Disallow uniop and binop functions as factors.
     if( var.op_prec() > 0 ) { _x = oldx; return null; }
     return var;
@@ -470,6 +493,18 @@ public class Parse {
 
   private Node con( Type t ) { return _gvn.con(t); }
 
+  private Node call_err( Node call ) {        
+    Type tc = _gvn.type(call);
+    if( tc._type==Type.TERROR ) {
+      String msg = ((TypeErr)tc)._msg;
+      if( msg.equals("Arg mismatch in call"))
+        return null; // Allow calls with unresolved args to live on
+      kill(call);
+      return con(err_ctrl(msg));
+    }
+    return null;
+  }
+  
   // Whack current control with a syntax error
   private TypeErr err_ctrl(String s) { return TypeErr.make(err_ctrl0(s)); }
   private String err_ctrl0(String s) {
