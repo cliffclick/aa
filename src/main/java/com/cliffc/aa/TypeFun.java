@@ -23,7 +23,9 @@ public class TypeFun extends Type {
     return _ts==tf._ts && _ret==tf._ret && _fidxs==tf._fidxs;
   }
   @Override public String toString() {
-    return str(_fidxs.toString(new SB())).toString();
+    SB sb = new SB();
+    String name = _fidxs.abit()>0 && projnode() != null ? funnode()._name : null;
+    return str(name==null ? _fidxs.toString(sb) : sb.p(name)).toString();
   }
   public SB str( SB sb ) {
     sb.p('{');
@@ -90,7 +92,7 @@ public class TypeFun extends Type {
   // Filter out function types with incorrect arg counts
   @Override public Type filter(int nargs) { return forward_ref() || _ts._ts.length==nargs ? this : null; }
   // Is unspecified length (e.g. forward ref)
-  @Override public boolean forward_ref() { return _ret==Type.XSCALAR; }
+  @Override public boolean forward_ref() { RetNode ret = retnode(); return ret.at(0)==ret.at(1); }
   public String forward_ref_err() { return "Unknown ref '"+funnode()._name+"'"; }  
   // Operator precedence
   @Override public byte op_prec() { return funnode().op_prec(); } 

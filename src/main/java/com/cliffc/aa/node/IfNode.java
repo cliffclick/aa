@@ -6,7 +6,11 @@ import com.cliffc.aa.*;
 public class IfNode extends Node {
   public IfNode( Node ctrl, Node pred ) { super(OP_IF,ctrl,pred); }
   @Override String str() { return "If"; }
-  @Override public Node ideal(GVNGCM gvn) { return null; }
+  @Override public Node ideal(GVNGCM gvn) {
+    Node x = at(0).skip_dead();
+    if( x!=null ) return set_def(0,x,gvn);
+    return null;
+  }
   @Override public TypeTuple value(GVNGCM gvn) {
     // If the input is exactly  zero, we can return false: {ANY,CONTROL}
     // If the input is excludes zero, we can return true : {CONTROL,ANY}

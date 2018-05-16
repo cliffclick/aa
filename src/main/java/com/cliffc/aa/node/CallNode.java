@@ -26,6 +26,8 @@ public class CallNode extends Node implements AutoCloseable {
   public CallNode( Node... defs ) { super(OP_CALL,defs); _cidx = CNT++; }
   @Override String str() { return "call"; }
   @Override public Node ideal(GVNGCM gvn) {
+    Node x = at(0).skip_dead();
+    if( x!=null ) return set_def(0,x,gvn);
     Node ctrl = _defs.at(0);    // Control for apply/call-site
     Node funv = _defs.at(1);    // Function value
     Type t = gvn.type(funv);    // 
@@ -93,12 +95,12 @@ public class CallNode extends Node implements AutoCloseable {
     }
 
     // If this is a forward-ref we have no body to inline
-    if( ret.at(1) == fun )
+    Node rez = ret.at(1);
+    if( rez == fun )
       return null;
-    
+
     // Inline the call site now.
     // This is NOT inlining the function body, just the call site.
-    Node    rez = ret.at(1);
     if( fun._tf._ts._ts.length != nargs() ) {
       throw AA.unimpl(); // untested?
       //return null; // Incorrect argument count
@@ -114,17 +116,17 @@ public class CallNode extends Node implements AutoCloseable {
     }
     assert pcnt == nargs(); // All params found and updated at the function head
     gvn.add_def(fun,ctrl); // Add Control for this path
-    
+
     // TODO: Big Decision: Calls, when inlined, pass control from the called
     // function, OR from the dominating point: where the function was called.
     // Doing it local from the function preserves a local CFG.
     // Doing it global from the dominating point leads to data calcs with
     // embedded control - but only a post-dominating data-use, no control-use.
     // I.e., a non-CFG control structure.
-    
+
     // TODO: Currently stuck because cannot inline, because Call has dominating
     // (non-local) control
-    
+
     Node rctrl = gvn.xform(new ProjNode(ret,fun._defs._len-1));
     return new CastNode( rctrl, rez, Type.SCALAR );
   }

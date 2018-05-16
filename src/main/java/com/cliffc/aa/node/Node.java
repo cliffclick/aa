@@ -179,4 +179,6 @@ public abstract class Node implements Cloneable {
   
   public boolean is_dead() { return _uses == null; }
   public void set_dead( ) { _defs = _uses = null; }   // TODO: Poor-mans indication of a dead node, probably needs to recycle these...
+
+  public Node skip_dead() { return null; }
 }

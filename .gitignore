@@ -1,8 +1,8 @@
 # Compiled class file
 *.class
 
-# Built java file
-build/classes/main/com/cliffc/aa/BuildVersion.java
+# Nothing in build
+build/*
 
 # Package Files #
 *.jar
@@ -11,6 +11,9 @@ build/classes/main/com/cliffc/aa/BuildVersion.java
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
 
+# Results of tests
+/sandbox
+
 # Emacs
 #*#
 *~
@@ -18,4 +21,3 @@ TAGS
 
 # IdeaJ
 .idea
-/sandbox

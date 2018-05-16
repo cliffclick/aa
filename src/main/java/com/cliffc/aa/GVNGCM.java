@@ -225,7 +225,7 @@ public class GVNGCM {
   // Complete replacement; point uses to x.  If nnn points to 'old' the goal is
   // to insert 'nnn' between 'old' and all uses; otherwise the goal is to
   // completely replace 'old'.
-  public void subsume( Node old, Node nnn ) {
+  void subsume( Node old, Node nnn ) {
     boolean replace=true;
     while( old._uses._len > 0 ) {
       Node u = old._uses.del(0);  // Old use
@@ -235,7 +235,7 @@ public class GVNGCM {
         u._defs.set(u._defs.find(a -> a==old),nnn); // was old now nnn
         nnn._uses.add(u);
         add_work(u);            // And put on worklist, to get re-inserted
-      }        
+      }
     }
     if( replace ) {             // Completely removing 'old'
       nnn._uses.add(nnn);       // Self-hook, to prevent accidental deletion

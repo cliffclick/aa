@@ -10,17 +10,17 @@ public class RegionNode extends Node {
   public RegionNode( Node... ctrls) { super(OP_REGION,ctrls); }
   RegionNode( byte op, Node sc ) { super(op,null,sc); } // For FunNodes
   @Override String str() { return "Region"; }
-  @Override public Node ideal(GVNGCM gvn) { return ideal(gvn,1); }
+  @Override public Node ideal(GVNGCM gvn) { return ideal(gvn,false); }
   // Ideal call, but FunNodes keep index#1 for future parsed call sites
-  Node ideal(GVNGCM gvn, int sidx) {
+  Node ideal(GVNGCM gvn, boolean more) {
     // TODO: The unzip xform, especially for funnodes doing type-specialization
     // TODO: Check for dead-diamond merges
-    // TODO: Check for 2+but_less_than_all alive, and do a partial collapse
+    // TODO: treat _cidx like U/F and skip_dead it also
     if( _cidx !=0 ) return null; // Already found single control path
-    if( sidx != 1 ) return null; // TODO: Do not call from FunNode if not complete
+    if( more ) return null;      // TODO: Check for 2+but_less_than_all alive, and do a partial collapse
     // If only 1 input path is alive, we become a copy on that path
     int idx=0;
-    for( int i=sidx; i<_defs._len; i++ )
+    for( int i=1; i<_defs._len; i++ )
       if( gvn.type(at(i))!=TypeErr.ANY ) // Found a live path
         if( idx == 0 ) idx = i;          // Remember live path
         else return null;                // Some other input is alive also
@@ -32,6 +32,8 @@ public class RegionNode extends Node {
     _cidx=idx;                  // Flag the 1 live path
     return this;                // Return self
   }
+  @Override public Node skip_dead() { return _cidx == 0 ? null : at(_cidx); }
+
   @Override public Type value(GVNGCM gvn) {
     Type t = TypeErr.ANY;
     for( int i=1; i<_defs._len; i++ )

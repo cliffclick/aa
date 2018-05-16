@@ -7,8 +7,9 @@ public class CastNode extends Node {
   private final Type _t;                // TypeVar???
   CastNode( Node ctrl, Node ret, Type t ) { super(OP_CAST,ctrl,ret); _t=t; }
   @Override String str() { return "("+_t+")"; }
-  // TODO: Can eliminate if the cast is useless
   @Override public Node ideal(GVNGCM gvn) {
+    Node x = at(0).skip_dead();
+    if( x!=null ) return set_def(0,x,gvn);
 
     // Heuristic to inline small functions.  Look for the pattern:
     //   Cast0->Proj->Ret2->Fun

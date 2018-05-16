@@ -12,8 +12,7 @@ import java.util.HashMap;
 // a new path to the FunNode.
 //
 // FunNodes are finite in count and can be unique densely numbered.
-// TODO: Use this numbering in TypeFun, to allow function constants.
-//   
+//
 // Pointing to the FunNode are ParmNodes which are also PhiNodes; one input
 // path for each known caller.  Zero slot points to the FunNode.  Arg1 points
 // to the generic unknown worse-case caller (a type-specific ConNode with
@@ -88,7 +87,7 @@ public class FunNode extends RegionNode {
     this(scope,TypeFun.make(ts,ret,CNT++),-1,name);
   }
   public FunNode(Node scope, String name) { // Used to forward-decl anon functions
-    this(scope,TypeFun.make(TypeTuple.ALL,Type.XSCALAR,CNT++),-1,name);
+    this(scope,TypeFun.make(TypeTuple.ALL,Type.SCALAR,CNT++),-1,name);
   }
   public FunNode(int nargs, Node scope) { this(scope,TypeFun.any(nargs,CNT++),-1,null); }
   public FunNode(Node scope, TypeFun tf, int op_prec, String name) {
@@ -116,7 +115,7 @@ public class FunNode extends RegionNode {
     Node n = type_special(gvn);
     if( n != null ) return n;
     // Else generic Region ideal
-    return ideal(gvn,gvn.type(at(1))==TypeErr.ANY?1:2);
+    return ideal(gvn,gvn.type(at(1))==Type.CONTROL);
   }
 
   // Look for type-specialization inlining.  If any ParmNode has an Unresolved

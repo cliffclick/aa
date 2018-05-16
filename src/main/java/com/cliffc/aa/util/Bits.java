@@ -77,10 +77,8 @@ public class Bits implements Iterable<Integer> {
     return idx < _bits.length ? (_bits[idx]&mask(i))!=0 : false;
   }
 
-  public int getbit() {
-    assert _bit > 0;
-    return _bit;
-  }
+  public int getbit() { assert _bit > 0; return _bit; }
+  public int   abit() {                  return _bit; }
   
   public Bits set(int idx) { throw AA.unimpl(); }
   public Bits or( Bits bs ) {

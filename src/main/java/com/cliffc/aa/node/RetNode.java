@@ -6,6 +6,8 @@ import com.cliffc.aa.*;
 public class RetNode extends Node {
   public RetNode( Node ctrl, Node ret, Node fun ) { super(OP_RET,ctrl,ret,fun); }
   @Override public Node ideal(GVNGCM gvn) {
+    Node x = at(0).skip_dead();
+    if( x!=null ) return set_def(0,x,gvn);
 
     // Look for missing ProjNodes, meaning a dead-path into the function
     long l=0;
@@ -17,6 +19,8 @@ public class RetNode extends Node {
       }
 
     Node fun = at(2);
+    if( (1L<<fun._defs._len)-2 == l ) return null; // All input paths have output projections
+
     for( int i=1; i<fun._defs._len; i++ ) {
       if( (l & (1L<<i))==0 ) {
         gvn.unreg(fun);
@@ -24,7 +28,7 @@ public class RetNode extends Node {
         gvn.rereg(fun);
       }
     }
-    
+
     return null;
   }
   // Builds a CONTROL tuple similar to IfNode

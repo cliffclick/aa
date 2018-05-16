@@ -182,7 +182,7 @@ public class Parse {
     Ary<Node> funs = new Ary<>(new Node[1],0);
     try( TmpNode args = new TmpNode() ) {
       funs.add(null);   args.add_def(term);
-      
+
       // Now loop for binop/term pairs: parse Kleene star of [binop term]
       while( true ) {
         int oldx = _x;
