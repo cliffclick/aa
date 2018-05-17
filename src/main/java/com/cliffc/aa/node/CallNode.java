@@ -99,13 +99,29 @@ public class CallNode extends Node implements AutoCloseable {
     if( rez == fun )
       return null;
 
-    // If this is a primitive, we never change the function header but we DO
-    // completely inline the body (which is always trivial).
-    if( fun.at(1)._uid==0 ) {
-      
-      throw AA.unimpl();
-    }
 
+    // Check for several trivial cases that can be fully inlined immediately.
+    // Check for zero-op body (id function)
+    if( rez instanceof ParmNode && rez.at(0) == fun ) return arg(0);
+
+    // Check for a 1-op body using only constants or parameters
+    boolean can_inline=true;
+    for( Node parm : rez._defs )
+      if( parm != null && parm != fun &&
+          !(parm instanceof ParmNode && parm.at(0) == fun) &&
+          !(parm instanceof ConNode) )
+        can_inline=false;       // Not trivial
+    if( can_inline ) {
+      Node irez = rez.copy();   // Copy the entire function body
+      for( Node parm : rez._defs )
+        irez.add_def((parm instanceof ParmNode && parm.at(0) == fun) ? arg(((ParmNode)parm)._idx) : parm);
+      return irez;
+    }
+      
+    // If this is a primitive, we never change the function header via inlining the call
+    if( fun.at(1)._uid==0 )
+      return null;
+  
     // Inline the call site now.
     // This is NOT inlining the function body, just the call site.
     if( fun._tf._ts._ts.length != nargs() ) {

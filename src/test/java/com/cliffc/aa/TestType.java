@@ -5,8 +5,7 @@ import org.junit.Test;
 
 public class TestType {
   @Test public void testType0() {
-    test("!1",  TypeInt.con(  0));
-    test("!1",  TypeInt.con(  0));
+    test   ("0 ?    2  : 3", TypeInt.con(3)); // false
     //test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
     // Simple int
     test("1",   TypeInt.TRUE);

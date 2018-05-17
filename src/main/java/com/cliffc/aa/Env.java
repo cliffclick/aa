@@ -58,8 +58,8 @@ public class Env implements AutoCloseable {
   // anything only pointed at by this scope).
   @Override public void close() {
     assert check_live(_gvn._live);
-    Node ctrl = _scope.del(0);
-    assert ctrl==_scope;
+    _scope.set_def(0,null,_gvn); // Kill control
+    if( _scope.is_dead() ) return;
     while( _scope._uses._len > 0 ) {
       Node fuse = _scope._uses.pop();
       // Allow only forward-ref func decls here

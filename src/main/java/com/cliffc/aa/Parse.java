@@ -91,7 +91,8 @@ public class Parse {
     Env par = _e._par;
     assert par._par==null;      // Top-level only
     Ary<String> errs = par._scope.walkerr_use(null,new BitSet(),_gvn);
-    errs = res.walkerr_def(errs,new BitSet(),_gvn);
+    errs = _e._scope.walkerr_use(errs,new BitSet(),_gvn);
+    errs = res      .walkerr_def(errs,new BitSet(),_gvn);
     if( tres instanceof TypeErr && tres != TypeErr.ALL ) // Result can be an error, even if no c-flow has an error
       errs = add_err(errs,((TypeErr)tres)._msg); // One more error
     if( errs == null && skipWS() != -1 ) errs = add_err(null,errMsg("Syntax error; trailing junk"));
@@ -502,6 +503,10 @@ public class Parse {
         return con(err_ctrl(msg));
       }
     }
+    // Primitives frequently inline immediately, and do not need following
+    // control/data projections.
+    if( !(call instanceof CallNode) ) return call;
+
     call.add_def(call);         // Hook, so not deleted after 1st use
     set_ctrl(gvn(new ProjNode(call,0)));
     Node ret = gvn(new ProjNode(call,1));
