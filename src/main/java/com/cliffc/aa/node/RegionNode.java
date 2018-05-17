@@ -16,8 +16,8 @@ public class RegionNode extends Node {
     // TODO: The unzip xform, especially for funnodes doing type-specialization
     // TODO: Check for dead-diamond merges
     // TODO: treat _cidx like U/F and skip_dead it also
-    if( _cidx !=0 ) return null; // Already found single control path
     if( more ) return null;      // TODO: Check for 2+but_less_than_all alive, and do a partial collapse
+    if( _cidx !=0 ) return null; // Already found single control path
     // If only 1 input path is alive, we become a copy on that path
     int idx=0;
     for( int i=1; i<_defs._len; i++ )
@@ -32,7 +32,7 @@ public class RegionNode extends Node {
     _cidx=idx;                  // Flag the 1 live path
     return this;                // Return self
   }
-  @Override public Node skip_dead() { return _cidx == 0 ? null : at(_cidx); }
+  @Override public Node is_copy(GVNGCM gvn, int idx) { assert idx==-1; return _cidx == 0 ? null : at(_cidx); }
 
   @Override public Type value(GVNGCM gvn) {
     Type t = TypeErr.ANY;

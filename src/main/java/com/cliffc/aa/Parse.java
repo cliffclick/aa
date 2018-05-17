@@ -205,9 +205,7 @@ public class Parse {
           Node fun = funs.at(i);
           assert fun.op_prec() <= max;
           if( fun.op_prec() < max ) continue; // Not yet
-          Node call = gvn(new CallNode(ctrl(),fun,args.at(i-1),args.at(i)));
-          Node cerr = call_err(call);
-          if( cerr!=null ) call=cerr;
+          Node call = do_call(new CallNode(ctrl(),fun,args.at(i-1),args.at(i)));
           args.set_def(i-1,call,_gvn);
           funs.remove(i);  args.remove(i);  i--;
         }
@@ -247,10 +245,11 @@ public class Parse {
             // Join with argument types & count.
             TypeFun tf2 = TypeFun.make(args.args(_gvn),((TypeFun)t)._ret,((TypeFun)t)._fidxs);
             // Replace here...
-            _gvn.subsume(fun,_gvn.con(tf2));
+            //_gvn.subsume(fun,_gvn.con(tf2));
             // And replace as the forward-ref function
             FunNode fun2 = tf2.funnode();
-            _gvn.subsume(fun2,_gvn.init(new FunNode(fun2.at(1),tf2,-1,fun2._name)));
+            //_gvn.subsume(fun2,_gvn.init(new FunNode(fun2.at(1),tf2,-1,fun2._name)));
+            throw AA.unimpl();
           } else if( t.filter(args._defs._len-2)==null )
             return con(err_ctrl("A function is being called, but "+_gvn.type(fun)+" is not a function type"));
         } else {                  // lispy-style fcn application
@@ -264,10 +263,7 @@ public class Parse {
           //  args.add_def(arg);            // Gather WS-separate args
           //if( args.len()==1 ) return fun; // Not a function call
         }
-        Node call = gvn(args);    // No syntax errors; flag Call not auto-close
-        Node cerr = call_err(call);
-        if( cerr!=null ) return cerr;
-        fun = call;             // Result of call might be a function, getting called again
+        fun = do_call(args); // No syntax errors; flag Call not auto-close, and go again
       }
     }
     return null;
@@ -292,7 +288,7 @@ public class Parse {
       if( unifun != null && unifun.op_prec() > 0 )  {
         Node arg = nfact(); // Recursive call
         if( arg == null ) { err_ctrl0("Call to unary function '"+uni+"', but missing the one required argument"); return null; }
-        return gvn(new CallNode(ctrl(),con(unifun),arg));
+        return do_call(new CallNode(ctrl(),con(unifun),arg));
       } else {
         _x=oldx;                // Unwind token parse and try again for a factor
       }
@@ -366,7 +362,7 @@ public class Parse {
       _e = e;                   // Push nested environment
       set_ctrl(fun);            // New control is function head
       int cnt=0;                // Add parameters to local environment
-      for( String id : ids )  _e.add(id,gvn(new ParmNode(++cnt,id,fun,con(Type.SCALAR))));
+      for( String id : ids )  _e.add(id,gvn(new ParmNode(cnt++,id,fun,con(Type.SCALAR))));
       Node rez = stmt();        // Parse function body
       fun.init(init(new ProjNode(init(new RetNode(ctrl(),rez,fun)),1)));
       require('}');             // 
@@ -496,18 +492,25 @@ public class Parse {
 
   private Node con( Type t ) { return _gvn.con(t); }
 
-  private Node call_err( Node call ) {        
+  private Node do_call( Node call ) {
+    call = gvn(call);
     Type tc = _gvn.type(call);
     if( tc._type==Type.TERROR ) {
       String msg = ((TypeErr)tc)._msg;
-      if( msg.equals("Arg mismatch in call"))
-        return null; // Allow calls with unresolved args to live on
-      kill(call);
-      return con(err_ctrl(msg));
+      if( !msg.equals("Arg mismatch in call") ) { // Allow calls with unresolved args to live on
+        kill(call);
+        return con(err_ctrl(msg));
+      }
     }
-    return null;
+    call.add_def(call);         // Hook, so not deleted after 1st use
+    set_ctrl(gvn(new ProjNode(call,0)));
+    Node ret = gvn(new ProjNode(call,1));
+    ret.add_def(ret);           // Hook, so not deleted when call goes
+    if( call.pop()._uses._len==0 )
+      _gvn.kill(call);
+    return ret.pop();
   }
-  
+
   // Whack current control with a syntax error
   private TypeErr err_ctrl(String s) { return TypeErr.make(err_ctrl0(s)); }
   private String err_ctrl0(String s) {

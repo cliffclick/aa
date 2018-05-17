@@ -21,13 +21,13 @@ import java.lang.AutoCloseable;
 // several possible returns apply... and can be merged like a PhiNode
 
 public class CallNode extends Node implements AutoCloseable {
-  static private int CNT=2;     // Call site index; 1 is reserved for unknown callers
-  private final int _cidx;       // Call site index; 1 is reserved for unknown callers
-  public CallNode( Node... defs ) { super(OP_CALL,defs); _cidx = CNT++; }
+  private boolean _inlined;
+  public CallNode( Node... defs ) { super(OP_CALL,defs); }
   @Override String str() { return "call"; }
   @Override public Node ideal(GVNGCM gvn) {
-    Node x = at(0).skip_dead();
-    if( x!=null ) return set_def(0,x,gvn);
+    if( skip_ctrl(gvn) ) return this;
+    if( _inlined ) return null;
+
     Node ctrl = _defs.at(0);    // Control for apply/call-site
     Node funv = _defs.at(1);    // Function value
     Type t = gvn.type(funv);    // 
@@ -41,7 +41,7 @@ public class CallNode extends Node implements AutoCloseable {
         // forward-ref error.
         TypeErr terr=TypeErr.make("Argument mismatch in call to "+tu.errMsg());
         for( int i=0; i<nargs(); i++ ) {
-          Type ta = gvn.type(actual(i));
+          Type ta = gvn.type(arg(i));
           if( ta.forward_ref() )
             terr = TypeErr.make(((TypeFun)ta).forward_ref_err());
         }
@@ -76,14 +76,14 @@ public class CallNode extends Node implements AutoCloseable {
       //return null;
     }
 
-    // Single choice; insert actual conversions & replace
+    // Single choice; insert actual conversions as needed
     ProjNode proj = ((TypeFun)t).projnode();
     RetNode ret = (RetNode)proj.at(0);
     FunNode fun = (FunNode)ret .at(2); // Proj->Ret->Fun
     Type[] formals = fun._tf._ts._ts;
     for( int i=0; i<nargs(); i++ ) {
       Type formal = formals[i];
-      Type actual = gvn.type(actual(i));
+      Type actual = gvn.type(arg(i));
       byte xcvt = actual.isBitShape(formal);
       if( xcvt == 99 ) throw AA.unimpl(); // Error cases should not reach here
       if( xcvt == -1 ) return null;       // Wait for call args to resolve
@@ -99,6 +99,13 @@ public class CallNode extends Node implements AutoCloseable {
     if( rez == fun )
       return null;
 
+    // If this is a primitive, we never change the function header but we DO
+    // completely inline the body (which is always trivial).
+    if( fun.at(1)._uid==0 ) {
+      
+      throw AA.unimpl();
+    }
+
     // Inline the call site now.
     // This is NOT inlining the function body, just the call site.
     if( fun._tf._ts._ts.length != nargs() ) {
@@ -109,31 +116,30 @@ public class CallNode extends Node implements AutoCloseable {
     int pcnt=0;               // Assert all parameters found
     for( Node arg : fun._uses ) {
       if( arg.at(0) == fun && arg instanceof ParmNode ) {
-        int pidx = ((ParmNode)arg)._idx;
-        gvn.add_def(arg,actual(pidx-1));// 1-based on Parm is 2-based on Call's args
-        pcnt++;                         // One more arg found
+        gvn.add_def(arg,arg(((ParmNode)arg)._idx));// 1-based on Parm
+        pcnt++;                      // One more arg found
       }
     }
     assert pcnt == nargs(); // All params found and updated at the function head
     gvn.add_def(fun,ctrl); // Add Control for this path
 
-    // TODO: Big Decision: Calls, when inlined, pass control from the called
-    // function, OR from the dominating point: where the function was called.
-    // Doing it local from the function preserves a local CFG.
-    // Doing it global from the dominating point leads to data calcs with
-    // embedded control - but only a post-dominating data-use, no control-use.
-    // I.e., a non-CFG control structure.
-
-    // TODO: Currently stuck because cannot inline, because Call has dominating
-    // (non-local) control
-
-    Node rctrl = gvn.xform(new ProjNode(ret,fun._defs._len-1));
-    return new CastNode( rctrl, rez, Type.SCALAR );
+    // Flag the Call as is_copy;
+    // Proj#0 is local control
+    // Proj#1 is a new CastNode on the tf._ret to regain precision
+    // Kill fun in slot 1 and all args.
+    // TODO: Use actual arg types to regain precision
+    set_def(0,gvn.xform(new ProjNode( ret ,fun._defs._len-1)),gvn);
+    set_def(1,gvn.xform(new CastNode(at(0),rez,fun._tf._ret)),gvn);
+    for( int i=2; i<_defs._len; i++ ) set_def(i,null,gvn);
+    _inlined = true;
+    return this;
   }
 
-  @Override public Type value(GVNGCM gvn) {
+  @Override public Type value(GVNGCM gvn) { return TypeTuple.make(gvn.type(at(0)),value0(gvn)); }
+  private Type value0(GVNGCM gvn) {
     Node fun = _defs.at(1);
     Type t = gvn.type(fun);
+    if( _inlined ) return t;
     if( t instanceof TypeUnion )
       // Note that this is NOT the same as just a join-over-returns.
       // Error arguments to calls poison the return results.
@@ -143,6 +149,7 @@ public class CallNode extends Node implements AutoCloseable {
       return res == null ? TypeErr.make("Arg mismatch in call") : res;
     }
     if( t instanceof TypeErr ) return t;
+    
     throw AA.unimpl();
     //assert con instanceof ProjNode;
     //RetNode ret = (RetNode)(unr.at(0)); // Must be a return
@@ -158,11 +165,13 @@ public class CallNode extends Node implements AutoCloseable {
     //return tret;
   }
   
+  @Override public Node is_copy(GVNGCM gvn, int idx) { return _inlined ? at(idx) : null; }
+  
 
   // Number of actual arguments
   private int nargs() { return _defs._len-2; }
   // Actual arguments
-  private Node actual( int x ) { return _defs.at(x+2); }
+  private Node arg( int x ) { return _defs.at(x+2); }
   
   // Parser support keeping args alive during parsing; if a syntax exception is
   // thrown while the call args are being built, this will free them all.  Once
@@ -173,13 +182,13 @@ public class CallNode extends Node implements AutoCloseable {
   }
 
   @Override public Type all_type() { return Type.SCALAR; }
-  @Override public int hashCode() { return super.hashCode()+_cidx; }
+  @Override public int hashCode() { return super.hashCode()+(_inlined?1:0); }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !super.equals(o) ) return false;
     if( !(o instanceof CallNode) ) return false;
-    CallNode apply = (CallNode)o;
-    return _cidx==apply._cidx;
+    CallNode call = (CallNode)o;
+    return _inlined==call._inlined;
   }
 
   // Given a list of actuals, apply them to each function choice.  If any
@@ -212,7 +221,7 @@ public class CallNode extends Node implements AutoCloseable {
       int xcvts = 0;             // Count of conversions required
       boolean unk = false;       // Unknown arg might be incompatible or free to convert
       for( int j=0; j<formals.length; j++ ) {
-        Type actual = gvn.type(actual(j));
+        Type actual = gvn.type(arg(j));
         Type tx = actual.join(formals[j]);
         if( tx.above_center() ) // Actual and formal have values in common?
           continue outerloop;   // No, this function will never work; e.g. cannot cast 1.2 as any integer
@@ -253,7 +262,7 @@ public class CallNode extends Node implements AutoCloseable {
     if( formals.length != nargs() ) return null; // Argument count mismatch; join of ALL
     // Now check if the arguments are compatible at all
     for( int j=0; j<formals.length; j++ ) {
-      Type actual = gvn.type(actual(j));
+      Type actual = gvn.type(arg(j));
       if( actual instanceof TypeErr )
         // Actual is an error, so call result is the same error
         return actual;        // TODO: Actually need to keep all such errors...
@@ -267,7 +276,7 @@ public class CallNode extends Node implements AutoCloseable {
   public TypeTuple args(GVNGCM gvn) {
     Type[] ts = new Type[nargs()];
     for( int i=0; i<nargs(); i++ )
-      ts[i] = gvn.type(actual(i));
+      ts[i] = gvn.type(arg(i));
     return TypeTuple.make(ts);
   }
 }

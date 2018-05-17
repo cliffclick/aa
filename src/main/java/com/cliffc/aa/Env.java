@@ -15,8 +15,7 @@ public class Env implements AutoCloseable {
     _par=par;
     _scope = new ScopeNode();
     _types = new HashMap<>();
-    // Copy control thru from parent
-    if( par != null ) add(" control ",par._scope.get(" control "));
+    add(" control ",_scope);
   }
 
   public final static GVNGCM _gvn = new GVNGCM(false); // Pessimistic GVN, defaults to ALL, lifts towards ANY
@@ -24,7 +23,6 @@ public class Env implements AutoCloseable {
   public static ScopeNode top_scope() { return TOP._scope; }
   static { TOP.init(); }
   private void init() {
-    _scope.add(" control ",_scope); // Self-add
     _scope.add("math_pi",new ConNode<>(TypeFlt.PI));
     for( PrimNode prim : PrimNode.PRIMS )
       _scope.add_fun(prim._name,as_fun(prim));
@@ -43,7 +41,7 @@ public class Env implements AutoCloseable {
     FunNode fun = _gvn.init(new FunNode(_scope, prim)); // Points to ScopeNode only
     prim.add_def(null);         // Control for the primitive
     for( int i=0; i<args.length; i++ )
-      prim.add_def(_gvn.init(new ParmNode(i+1,args[i],fun,_gvn.con(targs[i]))));
+      prim.add_def(_gvn.init(new ParmNode(i,args[i],fun,_gvn.con(targs[i]))));
     PrimNode x = _gvn.init(prim);
     assert x==prim;
     ProjNode proj = _gvn.init(new ProjNode(_gvn.init(new RetNode(fun,prim,fun)),1));
@@ -60,9 +58,11 @@ public class Env implements AutoCloseable {
   // anything only pointed at by this scope).
   @Override public void close() {
     assert check_live(_gvn._live);
+    Node ctrl = _scope.del(0);
+    assert ctrl==_scope;
     while( _scope._uses._len > 0 ) {
-      // Allow only forward-ref func decls here
       Node fuse = _scope._uses.pop();
+      // Allow only forward-ref func decls here
       if( !(fuse instanceof FunNode) ) throw AA.unimpl();
       FunNode fun = (FunNode)fuse;
       for( Node use : fun._uses ) assert use instanceof RetNode;

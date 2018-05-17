@@ -180,5 +180,17 @@ public abstract class Node implements Cloneable {
   public boolean is_dead() { return _uses == null; }
   public void set_dead( ) { _defs = _uses = null; }   // TODO: Poor-mans indication of a dead node, probably needs to recycle these...
 
-  public Node skip_dead() { return null; }
+  // Overridden in subclasses that return TypeTuple value types.  Such nodes
+  // are always followed by ProjNodes to break out the tuple slices.  If the
+  // node optimizes, each ProjNode becomes a copy of some other value... based
+  // on the ProjNode index
+  public Node is_copy(GVNGCM gvn, int idx) { return null; }
+
+  // Skip useless Region controls
+  boolean skip_ctrl(GVNGCM gvn) {
+    Node x = at(0).is_copy(gvn,-1);
+    if( x==null ) return false;
+    set_def(0,x,gvn);
+    return true;
+  }
 }

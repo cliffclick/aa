@@ -107,7 +107,7 @@ public class GVNGCM {
   // Node is in the type table and GVN hash table
   private boolean check_opt(Node n) {
     if( touched(n) ) {          // First & only test: in type table or not
-      assert (n instanceof ScopeNode) || check_gvn(n,true); // Check also in GVN table
+      assert (n instanceof ScopeNode) || _wrk_bits.get(n._uid)  || check_gvn(n,true); // Check also in GVN table
       return true;              // Yes in both type table and GVN table
     }
     assert !check_gvn(n,false); // Check also not in GVN table
@@ -222,10 +222,21 @@ public class GVNGCM {
     return oldt == t && y==null ? null : n; // Progress if types improved
   }
 
-  // Complete replacement; point uses to x.  If nnn points to 'old' the goal is
-  // to insert 'nnn' between 'old' and all uses; otherwise the goal is to
-  // completely replace 'old'.
+  // Complete replacement; point uses to x.  The goal is to completely replace
+  // 'old'.
   void subsume( Node old, Node nnn ) {
+    while( old._uses._len > 0 ) {
+      Node u = old._uses.del(0);  // Old use
+      _vals.remove(u); // Use is about to change edges; remove from type table
+      u._defs.set(u._defs.find(a -> a==old),nnn); // was old now nnn
+      nnn._uses.add(u);
+      add_work(u);            // And put on worklist, to get re-inserted
+    }
+    nnn._uses.add(nnn);       // Self-hook, to prevent accidental deletion
+    kill(old);                // Delete the old n, and anything it uses
+    nnn._uses.del(nnn._uses.find(a -> a==nnn)); // Remove self-hook
+  }
+  void insert( Node old, Node nnn ) {
     boolean replace=true;
     while( old._uses._len > 0 ) {
       Node u = old._uses.del(0);  // Old use
@@ -242,6 +253,7 @@ public class GVNGCM {
       kill(old);                // Delete the old n, and anything it uses
       nnn._uses.del(nnn._uses.find(a -> a==nnn)); // Remove self-hook
     } else old._uses.add(nnn);  // Keeping 'old' but inserting 'nnn'
+    throw AA.unimpl();
   }
   
   // Once the program is complete, any time anything is on the worklist we can

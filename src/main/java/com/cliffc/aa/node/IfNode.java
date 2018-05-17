@@ -7,8 +7,7 @@ public class IfNode extends Node {
   public IfNode( Node ctrl, Node pred ) { super(OP_IF,ctrl,pred); }
   @Override String str() { return "If"; }
   @Override public Node ideal(GVNGCM gvn) {
-    Node x = at(0).skip_dead();
-    if( x!=null ) return set_def(0,x,gvn);
+    if( skip_ctrl(gvn) ) return this;
     return null;
   }
   @Override public TypeTuple value(GVNGCM gvn) {
@@ -27,4 +26,11 @@ public class IfNode extends Node {
     return TypeTuple.IF_ANY;    // No more refinement than constant 0 vs constant non-zero
   }
   @Override public Type all_type() { return TypeTuple.IF_ALL; }
+  @Override public Node is_copy(GVNGCM gvn, int idx) {
+    TypeTuple tt = (TypeTuple)gvn.type(at(0));
+    assert tt._inf==TypeErr.ANY;
+    if( tt==TypeTuple.IF_TRUE  && idx==1 ) return at(0).at(0);
+    if( tt==TypeTuple.IF_FALSE && idx==0 ) return at(0).at(0);
+    return null;
+  }
 }

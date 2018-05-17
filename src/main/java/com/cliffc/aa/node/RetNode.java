@@ -6,8 +6,7 @@ import com.cliffc.aa.*;
 public class RetNode extends Node {
   public RetNode( Node ctrl, Node ret, Node fun ) { super(OP_RET,ctrl,ret,fun); }
   @Override public Node ideal(GVNGCM gvn) {
-    Node x = at(0).skip_dead();
-    if( x!=null ) return set_def(0,x,gvn);
+    if( skip_ctrl(gvn) ) return this;
 
     // Look for missing ProjNodes, meaning a dead-path into the function
     long l=0;
@@ -40,6 +39,13 @@ public class RetNode extends Node {
       ts[i] = gvn.type(fun.at(i));
     return TypeTuple.make(TypeErr.CONTROL,1.0,ts);
   }
+  @Override public Node is_copy(GVNGCM gvn, int idx) {
+    Node x = at(2).is_copy(gvn,-1); // Is controlling function is_copy?
+    if( x==null ) return null;      // Nope
+    assert at(2).at(idx)==x;        // Yes, only asked single alive ProjNode
+    return at(0);                   // Become pass-thru local control
+  }
+  
   @Override public Type all_type() { return TypeTuple.make(TypeErr.CONTROL,1.0); }
   // Return the op_prec of the returned value.  Not sensible except
   // when call on primitives.  Queries the Fun, not the primitive.
