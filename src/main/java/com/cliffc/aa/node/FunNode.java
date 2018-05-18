@@ -123,7 +123,7 @@ public class FunNode extends RegionNode {
     // Bail if there are any dead paths; RegionNode ideal will clean out
     for( int i=1; i<_defs._len; i++ ) if( gvn.type(at(i))==TypeErr.ANY ) return null;
     if( _defs._len <= 2 ) return null; // No need to split callers if only 1
-    
+
     // Gather the ParmNodes and the RetNode.  Ignore other (control) uses
     int nargs = _tf._ts._ts.length;
     ParmNode[] parms = new ParmNode[nargs];
@@ -138,8 +138,10 @@ public class FunNode extends RegionNode {
       if( use instanceof ProjNode )
         projs[((ProjNode)use)._idx] = (ProjNode)use;
     // Bail if there are any dead paths; RetNode ideal will clean out
-    for( int i=1; i<_defs._len; i++ ) if( projs[i] == null ) return null;
-    assert projs[2]._uses._len==2;
+    for( int i=2; i<_defs._len; i++ ) {
+      if( projs[i] == null ) return null;
+      assert projs[i]._uses._len==2;
+    }
 
     // Make a clone of the original function to split the callers.  Done for
     // e.g. primitive type-specialization or for tiny functions.
@@ -155,7 +157,7 @@ public class FunNode extends RegionNode {
     // Split for tiny body
     FunNode fun0 = split_size(gvn,parms,ret,projs);
     if( fun0 != null ) return fun0;
-    
+
     // Split for primitive type specialization
     FunNode fun1 = type_special(gvn,parms,ret,projs);
     if( fun1 != null ) return fun1;
@@ -171,7 +173,7 @@ public class FunNode extends RegionNode {
         if( parm != null && parm != this &&
             !(parm instanceof ParmNode && parm.at(0) == this) &&
             !(parm instanceof ConNode) )
-          return null;    
+          return null;
     }
     // Make a prototype new function header.  No generic unknown caller
     // in slot 1, only slot 2.
@@ -190,14 +192,14 @@ public class FunNode extends RegionNode {
     boolean any_unr=false;
     for( ParmNode parm : parms )
       for( Node use : parm._uses )
-        if( use instanceof CallNode && gvn.type(use.at(1)) instanceof TypeUnion ) {
+        if( use instanceof CallNode &&
+            gvn.type(use.at(1)) instanceof TypeUnion || // Call overload not resolved
+            (gvn.type(use) instanceof TypeTuple &&      // Call result is an error (arg mismatch)
+             ((TypeTuple)gvn.type(use)).at(1) instanceof TypeErr) ) {
           any_unr = true; break;
         }
     if( !any_unr ) return null; // No unresolved calls; no point in type-specialization
 
-    // TODO: Split with more paths
-    // Exactly split path 1 and path 2.
-    if( projs.length != 3 )  throw AA.unimpl();
     // TODO: Split with a known caller in slot 1
     if( !(at(1) instanceof ScopeNode) )  throw AA.unimpl(); // Untested: Slot 1 is not the generic unparsed caller
     
@@ -211,10 +213,15 @@ public class FunNode extends RegionNode {
     TypeTuple ts = TypeTuple.make(sig);
     assert ts.isa(_tf._ts);
     if( ts == _tf._ts ) return null; // No improvement for further splitting
-    // Make a prototype new function header.  Clone the generic unknown caller
-    // in slot 1.  Take the slot-2 type-specialized path.
+    // Make a prototype new function header.  Clone the generic unknown caller in slot 1.  
     FunNode fun = new FunNode(at(1),ts,_tf._ret,_name);
-    fun.add_def(at(2));
+    // Look at remaining paths and decide if they split or stay
+    for( int j=2; j<projs.length; j++ ) {
+      boolean split=true;
+      for( int i=0; i<parms.length; i++ )
+        split &= gvn.type(parms[i].at(j)).widen().isa(sig[i]);
+      fun.add_def(split ? at(j) : gvn.con(TypeErr.ANY));
+    }
     return fun;
   }
 
@@ -237,21 +244,20 @@ public class FunNode extends RegionNode {
       map.put(n,n.copy()); // Make a blank copy with no edges and map from old to new
     }
 
-    // TODO: Split with more paths
-    // Exactly split path 1 and path 2.
-    if( projs.length != 3 )  throw AA.unimpl();
     // TODO: Split with a known caller in slot 1
     if( !(at(1) instanceof ScopeNode) )  throw AA.unimpl(); // Untested: Slot 1 is not the generic unparsed caller
 
     // Fill in edges.  New Nodes point to New instead of Old; everybody
     // shares old nodes not in the function (and not cloned).  The
     // FunNode & Parms only get the matching slice of args.
+    Node any = gvn.con(TypeErr.ANY);
     for( Node n : map.keySet() ) {
       Node c = map.get(n);
       if( n instanceof ParmNode && n.at(0) == this ) {  // Leading edge ParmNodes
         c.add_def(map.get(n.at(0))); // Control
         c.add_def(gvn.con(fun._tf._ts._ts[((ParmNode)n)._idx])); // Generic arg#1
-        c.add_def(n.at(2));     // Specific arg#2
+        for( int j=2; j<projs.length; j++ ) // Get the new parm path or null according to split
+          c.add_def( fun.at(j)==any ? any : n.at(j) );
       } else if( n != this ) {  // Interior nodes
         for( Node def : n._defs ) {
           Node newdef = map.get(def);
@@ -259,26 +265,29 @@ public class FunNode extends RegionNode {
         }
       }
     }
-    // The final control-out on path 2 has exactly 2 uses: a control-use and the
-    // return result data-use.  The data-use needs repointing to the new body.
-    ProjNode prj2 = projs[2];
-    assert prj2._uses._len==2;
-    CastNode data = (CastNode) ((prj2._uses.at(0) instanceof CastNode) ? prj2._uses.at(0) : prj2._uses.at(1));
-    gvn.unreg(prj2);
-    gvn.unreg(data);
-    prj2.set_def(0,map.get(ret),gvn); // Repoint proj as well
-    data.set_def(1,map.get(ret.at(1)),gvn);
-    set_def(2,gvn.con(TypeErr.ANY),gvn); // Kill incoming path on old FunNode
+    // Kill split-out path-ins to the old code
+    for( int j=2; j<projs.length; j++ )
+      if( fun.at(j)!=any )  // Path split out?
+        set_def(j,any,gvn); // Kill incoming path on old FunNode
+    // The final control-out has exactly 2 uses: a control-use and the return
+    // result data-use.  The data-use needs repointing to the new body.
+    for( int j=2; j<projs.length; j++ ) {
+      ProjNode proj = projs[j];
+      assert proj._uses._len==2;
+      if( fun.at(j)!=any )  { // Path split out?
+        CastNode data = (CastNode) ((proj._uses.at(0) instanceof CastNode) ? proj._uses.at(0) : proj._uses.at(1));
+        gvn.set_def_reg(proj,0,map.get(ret)); // Repoint proj as well
+        gvn.set_def_reg(data,1,map.get(ret.at(1)));
+      }
+    }
 
     // Put all new nodes into the GVN tables and worklists
     for( Node c : map.values() ) gvn.rereg(c);
-    gvn.rereg(prj2);
-    gvn.rereg(data);
     // TODO: Hook with proper signature into ScopeNode under an Unresolved.
     // Future calls may resolve to either the old version or the new.
     return this;
   }
-  
+
   @Override public int hashCode() { return OP_FUN+_tf.hashCode(); }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;

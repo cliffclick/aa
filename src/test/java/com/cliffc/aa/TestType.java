@@ -5,7 +5,7 @@ import org.junit.Test;
 
 public class TestType {
   @Test public void testType0() {
-    test_isa("{x y -> x+y}", TypeFun.any(2,-1)); // actually {Flt,Int} x {FltxInt} -> {FltxInt} but currently types {SCALAR,SCALAR->SCALAR}
+    //test("x=3; fun={x -> x*2}; fun(2.1)+fun(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to fun()
     //test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
     // Simple int
     test("1",   TypeInt.TRUE);
@@ -127,7 +127,7 @@ public class TestType {
     test("fun@{real->flt32}={x -> x}; fun(123 )", TypeInt.con(123 ));
     test("fun@{real->flt32}={x -> x}; fun(0.125)", TypeFlt.con(0.125));
     testerr("fun@{real->flt32}={x -> x}; fun(123456789)", "123456789 is not a flt32","                          ");
-    
+
     // Recursive:
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
     //test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)",TypeInt.con(5));

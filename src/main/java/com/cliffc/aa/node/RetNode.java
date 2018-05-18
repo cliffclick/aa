@@ -20,13 +20,9 @@ public class RetNode extends Node {
     Node fun = at(2);
     if( (1L<<fun._defs._len)-2 == l ) return null; // All input paths have output projections
 
-    for( int i=1; i<fun._defs._len; i++ ) {
-      if( (l & (1L<<i))==0 ) {
-        gvn.unreg(fun);
-        fun.set_def(i,gvn.con(TypeErr.ANY),gvn);
-        gvn.rereg(fun);
-      }
-    }
+    for( int i=1; i<fun._defs._len; i++ )
+      if( (l & (1L<<i))==0 )
+        gvn.set_def_reg(fun,i,gvn.con(TypeErr.ANY));
 
     return null;
   }
@@ -42,8 +38,7 @@ public class RetNode extends Node {
   @Override public Node is_copy(GVNGCM gvn, int idx) {
     Node x = at(2).is_copy(gvn,-1); // Is controlling function is_copy?
     if( x==null ) return null;      // Nope
-    assert at(2).at(idx)==x;        // Yes, only asked single alive ProjNode
-    return at(0);                   // Become pass-thru local control
+    return at(2).at(idx)==x ? at(0) : null; // Yes, only asked single alive ProjNode
   }
   
   @Override public Type all_type() { return TypeTuple.make(TypeErr.CONTROL,1.0); }

@@ -70,7 +70,8 @@ public class TypeTuple extends Type {
   public  static final TypeTuple IF_ALL  = make(Type.CONTROL,Type.CONTROL);
   public  static final TypeTuple IF_TRUE = make(TypeErr.ANY ,Type.CONTROL);
   public  static final TypeTuple IF_FALSE= make(Type.CONTROL             );
-  static final TypeTuple[] TYPES = new TypeTuple[]{ANY,SCALAR,STR,INT32,INT64,FLT64,INT64_INT64,FLT64_FLT64,FLT64_INT64, IF_ALL, IF_TRUE, IF_FALSE};
+  public  static final TypeTuple CALL    = make(Type.CONTROL,Type.SCALAR );
+  static final TypeTuple[] TYPES = new TypeTuple[]{ANY,SCALAR,STR,INT32,INT64,FLT64,INT64_INT64,FLT64_FLT64,FLT64_INT64, IF_ALL, IF_TRUE, IF_FALSE, CALL};
   
   // The length of Tuples is a constant, and so is its own dual.  Otherwise
   // just dual each element.  Also flip the infinitely extended tail type.

@@ -20,7 +20,7 @@ public class ProjNode extends Node {
     return ((TypeTuple)c).at(_idx); // Otherwise our type is just the matching tuple slice
   }
 
-  @Override public Type all_type() { return Type.CONTROL; }
+  @Override public Type all_type() { return TypeErr.ALL; }
   @Override public int hashCode() { return super.hashCode()+_idx; }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;

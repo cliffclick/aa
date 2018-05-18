@@ -84,7 +84,6 @@ public class GVNGCM {
   public boolean touched( Node n ) { return n._uid < _ts._len && _ts._es[n._uid]!=null; }
   
   // Remove from GVN structures.  Used rarely for whole-merge changes
-  public void unreg( Node n ) { assert !check_new(n); unreg0(n); }
   private Node unreg0( Node n ) {
     _ts.set(n._uid,null);       // Remove from type system
     _vals.remove(n);            // Remove from GVN
@@ -96,6 +95,14 @@ public class GVNGCM {
   public void rereg( Node n ) {
     assert !check_opt(n);
     init0(n);
+  }
+
+  public void set_def_reg(Node n, int idx, Node def) {
+    _vals.remove(n);            // Remove from GVN
+    n.set_def(idx,def,this);    // Hack edge
+    assert !check_gvn(n,false); // Check not in GVN table after hack
+    _vals.put(n,n);             // Back in GVN table
+    add_work0(n);
   }
   
   // Node new to GVN and unregistered, or old and registered
@@ -263,7 +270,7 @@ public class GVNGCM {
       Node n = _work.pop();
       _wrk_bits.clear(n._uid);
       if( n.is_dead() ) continue;
-      if( n instanceof ScopeNode ) continue; // These are killed when parsing exists lexical scope
+      if( n instanceof ScopeNode || n instanceof TmpNode ) continue; // These are killed when parsing exists lexical scope
       if( n._uses._len==0 ) { kill(n); continue; }
       xform_old(n);
     }

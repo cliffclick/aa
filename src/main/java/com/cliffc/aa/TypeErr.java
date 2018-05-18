@@ -35,9 +35,8 @@ public class TypeErr extends Type {
     if( t._type != TERROR ) return this; // Anything-meet-ALL is ALL
     TypeErr te = (TypeErr)t;
     if( !te._all ) return this; // Anything-meet-ANY is that thing; dropping the 'any' error message
-    // Keep the more specific error message
-    if( t   ==ALL ) return this;
-    if( this==ALL ) return t   ;
+    // Keep the more generic error message (since this is meet not join)
+    if( t   ==ALL || this==ALL) return ALL;
     // Merge error messages?
     throw AA.unimpl();
   }

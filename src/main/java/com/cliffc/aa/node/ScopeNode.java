@@ -9,7 +9,7 @@ public class ScopeNode extends Node {
   // unnamed defs are added & removed as part of parsing.  Named function defs
   // point to ConNodes with a TypeFun constant (a single function) or a
   // TypeUnion of TypeFuns.
-  public final HashMap<String, Integer> _vals;
+  private final HashMap<String, Integer> _vals;
   public ScopeNode() { super(OP_SCOPE); _vals = new HashMap<>(); }
 
   // Name to node lookup, or null
@@ -43,6 +43,14 @@ public class ScopeNode extends Node {
     return val;
   }
 
+  // The current local scope ends; delete local var refs.
+  public void del_locals(GVNGCM gvn) {
+    for( Integer ii : _vals.values() ) {
+      set_def(ii, null, gvn);
+      if( is_dead() ) return;
+    }
+  }
+  
   /** Return a ScopeNode with all the variable indices at or past the idx.
    *  @param idx index to split on
    *  @return a ScopeNode with the higher indices; 'this' has the lower indices.  null if no new vars

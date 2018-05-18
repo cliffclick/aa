@@ -103,6 +103,8 @@ public class CallNode extends Node implements AutoCloseable {
     // Check for several trivial cases that can be fully inlined immediately.
     // Check for zero-op body (id function)
     if( rez instanceof ParmNode && rez.at(0) == fun ) return arg(0);
+    // Check for constant body
+    if( rez instanceof ConNode ) return rez;
 
     // Check for a 1-op body using only constants or parameters
     boolean can_inline=true;
@@ -115,7 +117,10 @@ public class CallNode extends Node implements AutoCloseable {
       Node irez = rez.copy();   // Copy the entire function body
       for( Node parm : rez._defs )
         irez.add_def((parm instanceof ParmNode && parm.at(0) == fun) ? arg(((ParmNode)parm)._idx) : parm);
-      return irez;
+      // Set new body as inline result
+      set_def(1,gvn.xform(irez),gvn);
+      _inlined = true;          // Allow data projection to find new body
+      return this;
     }
       
     // If this is a primitive, we never change the function header via inlining the call
@@ -197,7 +202,7 @@ public class CallNode extends Node implements AutoCloseable {
       Env._gvn.kill_new(this);  // Free state on 
   }
 
-  @Override public Type all_type() { return Type.SCALAR; }
+  @Override public Type all_type() { return TypeTuple.CALL; }
   @Override public int hashCode() { return super.hashCode()+(_inlined?1:0); }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;

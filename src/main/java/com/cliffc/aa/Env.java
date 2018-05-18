@@ -58,25 +58,16 @@ public class Env implements AutoCloseable {
   // anything only pointed at by this scope).
   @Override public void close() {
     assert check_live(_gvn._live);
-    // Delete all local variable refs
-    for( Integer ii : _scope._vals.values() ) {
-      _scope.set_def(ii, null, _gvn);
-      if( _scope.is_dead() ) return;
-    }
-    // Whats left is forward-refs; promote to next outer scope
+    _scope.del_locals(_gvn);
+    if( _scope.is_dead() ) return;
+    // Whats left is function-ref generic entry points; promote to next outer scope
     while( _scope._uses._len > 0 ) {
-      FunNode fun = (FunNode)_scope._uses.del(0);
-      Node ret = fun._uses.at(0);
-      assert ret instanceof RetNode;
-      assert ret.at(0)==ret.at(1) && ret.at(0)==ret.at(2);
-      // Push forward refs to the next outer scope
-      if( _par._par==null ) {   // Never defined at top level, so null out
-        fun._defs.set(1,null);
-      } else {                  // Push to outer scope
-        fun._defs.set(1, _par._scope);
-        _par._scope._uses.add(fun);
+      FunNode fun = (FunNode)_scope._uses.at(0);
+      int idx = fun._defs.find(a -> a==_scope);
+      // Never defined at top level, so null out else go upscope one
+      fun.set_def(idx, _par._par==null ? null: _par._scope, _gvn);
+      if( _par._par!=null )
         _par._scope.add(fun._name, _gvn.con(fun._tf));
-      }
     }
     _gvn.kill0(_scope);
   }
