@@ -29,8 +29,8 @@ public class IfNode extends Node {
   @Override public Node is_copy(GVNGCM gvn, int idx) {
     TypeTuple tt = (TypeTuple)gvn.type(this);
     assert tt._inf==TypeErr.ANY;
-    if( tt==TypeTuple.IF_TRUE  && idx==1 ) return at(0).at(0);
-    if( tt==TypeTuple.IF_FALSE && idx==0 ) return at(0).at(0);
+    if( tt==TypeTuple.IF_TRUE  && idx==1 ) return at(0);
+    if( tt==TypeTuple.IF_FALSE && idx==0 ) return at(0);
     return null;
   }
 }

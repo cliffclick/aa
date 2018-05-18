@@ -58,14 +58,17 @@ public class Env implements AutoCloseable {
   // anything only pointed at by this scope).
   @Override public void close() {
     assert check_live(_gvn._live);
-    _scope.set_def(0,null,_gvn); // Kill control
-    if( _scope.is_dead() ) return;
+    // Delete all local variable refs
+    for( Integer ii : _scope._vals.values() ) {
+      _scope.set_def(ii, null, _gvn);
+      if( _scope.is_dead() ) return;
+    }
+    // Whats left is forward-refs; promote to next outer scope
     while( _scope._uses._len > 0 ) {
-      Node fuse = _scope._uses.pop();
-      // Allow only forward-ref func decls here
-      if( !(fuse instanceof FunNode) ) throw AA.unimpl();
-      FunNode fun = (FunNode)fuse;
-      for( Node use : fun._uses ) assert use instanceof RetNode;
+      FunNode fun = (FunNode)_scope._uses.del(0);
+      Node ret = fun._uses.at(0);
+      assert ret instanceof RetNode;
+      assert ret.at(0)==ret.at(1) && ret.at(0)==ret.at(2);
       // Push forward refs to the next outer scope
       if( _par._par==null ) {   // Never defined at top level, so null out
         fun._defs.set(1,null);

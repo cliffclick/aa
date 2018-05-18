@@ -9,7 +9,7 @@ public class ScopeNode extends Node {
   // unnamed defs are added & removed as part of parsing.  Named function defs
   // point to ConNodes with a TypeFun constant (a single function) or a
   // TypeUnion of TypeFuns.
-  private final HashMap<String, Integer> _vals;
+  public final HashMap<String, Integer> _vals;
   public ScopeNode() { super(OP_SCOPE); _vals = new HashMap<>(); }
 
   // Name to node lookup, or null
