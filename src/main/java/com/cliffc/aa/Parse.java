@@ -156,12 +156,12 @@ public class Parse {
       int vidx = _e._scope._defs._len; // Set of live variables
       Node ifex = gvn(new IfNode(ctrl(),expr));
       ctrls.add_def(ifex);      // Keep alive, even if 1st Proj kills last use, so 2nd Proj can hook
-      set_ctrl(gvn(new ProjNode(ifex,1))); // Control for true branch
+      set_ctrl(gvn(new CProjNode(ifex,1))); // Control for true branch
       if( ctrls.add_def(expr()) == null ) throw AA.unimpl(); // 1
       ctrls.add_def(ctrl()); // 2 - hook true-side control
       ScopeNode t_scope = _e._scope.split(vidx); // Split out the new vars on the true side
       require(':');
-      set_ctrl(gvn(new ProjNode(ifex,0)));
+      set_ctrl(gvn(new CProjNode(ifex,0)));
       if( ctrls.add_def(expr()) == null ) throw AA.unimpl(); // 3
       ctrls.add_def(ctrl()); // 4 - hook false-side control
       ScopeNode f_scope = _e._scope.split(vidx); // Split out the new vars on the false side
@@ -336,7 +336,7 @@ public class Parse {
       // TODO: Allow unknown refs in function position, to allow recursion
       //return con(err_ctrl("Unknown ref '"+tok+"'"));
       FunNode fun = init(new FunNode(_e._scope,tok));
-      fun.init(init(new ProjNode(init(new RetNode(fun,fun,fun)),1)));
+      fun.init(init(new CProjNode(init(new RetNode(fun,fun,fun)),1)));
       return _e.add(tok,con(fun._tf));
     }
     // Disallow uniop and binop functions as factors.
@@ -365,7 +365,7 @@ public class Parse {
       int cnt=0;                // Add parameters to local environment
       for( String id : ids )  _e.add(id,gvn(new ParmNode(cnt++,id,fun,con(Type.SCALAR))));
       Node rez = stmt();        // Parse function body
-      fun.init(init(new ProjNode(init(new RetNode(ctrl(),rez,fun)),1)));
+      fun.init(init(new CProjNode(init(new RetNode(ctrl(),rez,fun)),1)));
       require('}');             // 
       _e = _e._par;             // Pop nested environment
       set_ctrl(old_ctrl);       // Back to the pre-function-def control
@@ -493,22 +493,25 @@ public class Parse {
 
   private Node con( Type t ) { return _gvn.con(t); }
 
-  private Node do_call( Node call ) {
-    call = gvn(call);
-    Type tc = _gvn.type(call);
-    if( tc._type==Type.TERROR ) {
-      String msg = ((TypeErr)tc)._msg;
-      if( !msg.equals("Arg mismatch in call") ) { // Allow calls with unresolved args to live on
-        kill(call);
+  private Node do_call( Node call0 ) {
+    Node call = gvn(call0);
+    // Some calls die instantly; wrap a line-number around the error and bail out
+    if( call instanceof ConNode ) {
+      Type tc = _gvn.type(call);
+      if( tc instanceof TypeErr ) {
+        String msg = ((TypeErr)tc)._msg;
+        assert !msg.equals("Arg mismatch in call");
+        kill(call);             // Call is definitely failing
         return con(err_ctrl(msg));
       }
     }
+    
     // Primitives frequently inline immediately, and do not need following
     // control/data projections.
-    if( !(call instanceof CallNode) ) return call;
+    if( !(call instanceof CallNode) && !(call instanceof TypeNode)) return call;
 
     call.add_def(call);         // Hook, so not deleted after 1st use
-    set_ctrl(gvn(new ProjNode(call,0)));
+    set_ctrl(gvn(new CProjNode(call,0)));
     Node ret = gvn(new ProjNode(call,1));
     ret.add_def(ret);           // Hook, so not deleted when call goes
     if( call.pop()._uses._len==0 )

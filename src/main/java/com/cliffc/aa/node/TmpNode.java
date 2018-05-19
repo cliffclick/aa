@@ -18,7 +18,7 @@ public class TmpNode extends Node implements AutoCloseable {
   void set_def( int i, Node n ) {
     assert i>= _defs._len || _defs._es[i]==null;
     _defs.setX(i,n);
-    n._uses.add(this);
+    if( n != null ) n._uses.add(this);
   }
   
   // Parser support of small lists of nodes to be kept alive during parsing

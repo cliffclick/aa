@@ -67,8 +67,8 @@ public class CallNode extends Node implements AutoCloseable {
       for( int i=2; i<_defs._len; i++ ) // Insert casts for each parm
         defs[i] = gvn.xform(new TypeNode(tf_cast._ts.at(i-2),at(i),tn._msg));;
       Node call = gvn.xform(new CallNode(defs)); // New replacement Call
-      // And cast the return as well
-      return new TypeNode(tf_cast._ret,call,tn._msg);
+      // And cast the return as well.
+      return new TypeNode(TypeTuple.make(Type.CONTROL,tf_cast._ret),call,tn._msg);
     }
 
     if( !(t instanceof TypeFun) ) {
@@ -149,7 +149,7 @@ public class CallNode extends Node implements AutoCloseable {
     // Proj#1 is a new CastNode on the tf._ret to regain precision
     // Kill fun in slot 1 and all args.
     // TODO: Use actual arg types to regain precision
-    set_def(0,gvn.xform(new ProjNode( ret ,fun._defs._len-1)),gvn);
+    set_def(0,gvn.xform(new CProjNode( ret ,fun._defs._len-1)),gvn);
     set_def(1,gvn.xform(new CastNode(at(0),rez,fun._tf._ret)),gvn);
     for( int i=2; i<_defs._len; i++ ) set_def(i,null,gvn);
     _inlined = true;

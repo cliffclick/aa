@@ -90,7 +90,7 @@ public class FunNode extends RegionNode {
     this(scope,TypeFun.make(TypeTuple.ALL,Type.SCALAR,CNT++),-1,name);
   }
   public FunNode(int nargs, Node scope) { this(scope,TypeFun.any(nargs,CNT++),-1,null); }
-  public FunNode(Node scope, TypeFun tf, int op_prec, String name) {
+  private FunNode(Node scope, TypeFun tf, int op_prec, String name) {
     super(OP_FUN,scope);
     _tf = tf;
     _op_prec = (byte)op_prec;
@@ -133,14 +133,15 @@ public class FunNode extends RegionNode {
       else if( use instanceof RetNode ) { assert ret==null || ret==use; ret = (RetNode)use; }
 
     // Find the Proj matching the call to-be-cloned
-    ProjNode[] projs = new ProjNode[_defs._len];
+    CProjNode[] projs = new CProjNode[_defs._len];
     for( Node use : ret._uses )
-      if( use instanceof ProjNode )
-        projs[((ProjNode)use)._idx] = (ProjNode)use;
+      if( use instanceof CProjNode )
+        projs[((CProjNode)use)._idx] = (CProjNode)use;
     // Bail if there are any dead paths; RetNode ideal will clean out
+    if( projs[1] == null ) return null;
     for( int i=2; i<_defs._len; i++ ) {
       if( projs[i] == null ) return null;
-      assert projs[i]._uses._len==2;
+      if( projs[i]._uses._len!=2 ) return null; // should be exactly a control-use and a cast-use
     }
 
     // Make a clone of the original function to split the callers.  Done for
@@ -276,8 +277,9 @@ public class FunNode extends RegionNode {
       assert proj._uses._len==2;
       if( fun.at(j)!=any )  { // Path split out?
         CastNode data = (CastNode) ((proj._uses.at(0) instanceof CastNode) ? proj._uses.at(0) : proj._uses.at(1));
+        Node newdata = map.get(ret.at(1));
         gvn.set_def_reg(proj,0,map.get(ret)); // Repoint proj as well
-        gvn.set_def_reg(data,1,map.get(ret.at(1)));
+        gvn.set_def_reg(data,1,newdata);
       }
     }
 
@@ -285,6 +287,7 @@ public class FunNode extends RegionNode {
     for( Node c : map.values() ) gvn.rereg(c);
     // TODO: Hook with proper signature into ScopeNode under an Unresolved.
     // Future calls may resolve to either the old version or the new.
+    fun.init(null); // TODO: hook a generic ProjNode for future calls to resolve against
     return this;
   }
 

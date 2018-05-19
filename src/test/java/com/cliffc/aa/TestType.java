@@ -5,7 +5,7 @@ import org.junit.Test;
 
 public class TestType {
   @Test public void testType0() {
-    //test("x=3; fun={x -> x*2}; fun(2.1)+fun(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to fun()
+    test("fun@{real->flt32}={x -> x}; fun(123 )", TypeInt.con(123 ));
     //test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
     // Simple int
     test("1",   TypeInt.TRUE);
@@ -121,7 +121,7 @@ public class TestType {
     testerr("-1@int1", "-1 is not a int1","       ");
     testerr("\"abc\"@int", "\"abc\" is not a int64","         ");
     testerr("1@str", "1 is not a str","     ");
-    
+
     testerr("x=3; fun@{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int64","                              ");
     test("x=3; fun@{real->real}={x -> x*2}; fun(2.1)+fun(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to fun()
     test("fun@{real->flt32}={x -> x}; fun(123 )", TypeInt.con(123 ));

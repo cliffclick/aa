@@ -44,7 +44,7 @@ public class GVNGCM {
     if( _opt ) t = t.dual();
     return _ts.setX(n._uid,t);
   }
-  private void setype( Node n, Type t ) {
+  public void setype( Node n, Type t ) {
     assert t != null;
     _ts.setX(n._uid,t);
   }
@@ -84,6 +84,7 @@ public class GVNGCM {
   public boolean touched( Node n ) { return n._uid < _ts._len && _ts._es[n._uid]!=null; }
   
   // Remove from GVN structures.  Used rarely for whole-merge changes
+  public void unreg( Node n ) { assert !check_new(n); unreg0(n); }
   private Node unreg0( Node n ) {
     _ts.set(n._uid,null);       // Remove from type system
     _vals.remove(n);            // Remove from GVN
@@ -231,7 +232,7 @@ public class GVNGCM {
 
   // Complete replacement; point uses to x.  The goal is to completely replace
   // 'old'.
-  void subsume( Node old, Node nnn ) {
+  public void subsume( Node old, Node nnn ) {
     while( old._uses._len > 0 ) {
       Node u = old._uses.del(0);  // Old use
       _vals.remove(u); // Use is about to change edges; remove from type table

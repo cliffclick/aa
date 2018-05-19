@@ -17,7 +17,6 @@ public class RegionNode extends Node {
     // TODO: The unzip xform, especially for funnodes doing type-specialization
     // TODO: Check for dead-diamond merges
     // TODO: treat _cidx like U/F and skip_dead it also
-    // TODO: Check for 2+but_less_than_all alive, and do a partial collapse
 
     // Find 0, 1 or many live paths
     int live=0, dead=0;
@@ -42,7 +41,39 @@ public class RegionNode extends Node {
     // Do a parallel bulk reshape: remove the dead edges from Phis and the
     // Region all at once (and for FunNodes renumber matching Projs).
 
-    throw com.cliffc.aa.AA.unimpl();
+    // TODO: REMOVE THIS GRUESOME HACK - and pass RPCs to function calls, merge
+    // at a Phi and the standard dead-path collapse code will Do The Right
+    // Thing.  Will require functions have extra types for the RPC (and they
+    // will eventually require extra types for IO & memory).
+    Node ret=null;
+    for( Node phi : _uses ) {
+      if( phi instanceof PhiNode && phi.at(0)==this ) {
+        for( int i=1,j=1; i<_defs._len; i++ )
+          if( gvn.type(at(i))==TypeErr.ANY ) { gvn.unreg(phi); phi.remove(j,gvn); gvn.rereg(phi); }
+          else j++;
+      } else if( phi instanceof RetNode && phi.at(2)==this ) ret=phi;
+    }
+    // GRUESOME HACK
+    if( this instanceof FunNode ) {
+      assert ret!=null;
+      CProjNode[] projs = new CProjNode[_defs._len];
+      for( Node use : ret._uses ) projs[((CProjNode)use)._idx] = (CProjNode)use;
+      for( int i=1,j=1; i<_defs._len; i++ )
+        if( gvn.type(at(i))!=TypeErr.ANY ) {
+          if( projs[i] != null && i!=j )
+            gvn.subsume(projs[i],gvn.init(new CProjNode(ret,j)));
+          j++;
+        }
+    }
+    
+    for( int i=1; i<_defs._len; i++ ) if( gvn.type(at(i))==TypeErr.ANY ) remove(i--,gvn);
+    if( this instanceof FunNode )
+      // Since projects slide over (in index), the RetNode tuple changed in a
+      // way that is not obviously monotonic.  Reset correct type to dodge the
+      // monotonic assert in gvn
+      gvn.setype(ret,ret.value(gvn));
+
+    return this;
   }
   @Override public Node is_copy(GVNGCM gvn, int idx) { assert idx==-1; return _cidx == 0 ? null : at(_cidx); }
 

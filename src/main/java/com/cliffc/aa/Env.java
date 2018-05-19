@@ -44,7 +44,7 @@ public class Env implements AutoCloseable {
       prim.add_def(_gvn.init(new ParmNode(i,args[i],fun,_gvn.con(targs[i]))));
     PrimNode x = _gvn.init(prim);
     assert x==prim;
-    ProjNode proj = _gvn.init(new ProjNode(_gvn.init(new RetNode(fun,prim,fun)),1));
+    ProjNode proj = _gvn.init(new CProjNode(_gvn.init(new RetNode(fun,prim,fun)),1));
     fun.init(proj);
     return fun._tf;
   }
@@ -62,12 +62,14 @@ public class Env implements AutoCloseable {
     if( _scope.is_dead() ) return;
     // Whats left is function-ref generic entry points; promote to next outer scope
     while( _scope._uses._len > 0 ) {
-      FunNode fun = (FunNode)_scope._uses.at(0);
-      int idx = fun._defs.find(a -> a==_scope);
+      Node use = _scope._uses.at(0);
+      int idx = use._defs.find(a -> a==_scope);
       // Never defined at top level, so null out else go upscope one
-      fun.set_def(idx, _par._par==null ? null: _par._scope, _gvn);
-      if( _par._par!=null )
+      use.set_def(idx, _par._par==null ? null: _par._scope, _gvn);
+      if( _par._par!=null && use instanceof FunNode ) {
+        FunNode fun = (FunNode)use;
         _par._scope.add(fun._name, _gvn.con(fun._tf));
+      }
     }
     _gvn.kill0(_scope);
   }

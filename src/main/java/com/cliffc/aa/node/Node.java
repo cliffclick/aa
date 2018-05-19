@@ -39,6 +39,9 @@ public abstract class Node implements Cloneable {
     // Add edge to new guy before deleting old, in case old goes dead and
     // recursively makes new guy go dead also
     if( (_defs._es[idx] = n) != null ) n._uses.add(this);
+    return unuse(old, gvn);
+  }
+  private Node unuse( Node old, GVNGCM gvn ) {
     if( old != null ) {
       old._uses.del(old._uses.find(a -> a==this));
       if( old._uses._len==0 && !(old instanceof ScopeNode) ) gvn.kill(old); // Recursively begin deleting
@@ -54,6 +57,8 @@ public abstract class Node implements Cloneable {
     return n;
   }
   public Node pop( ) { return del(_defs._len-1); }
+  // Remove Node at idx, auto-delete and preserve order.
+  public void remove(int idx, GVNGCM gvn) { unuse(_defs.remove(idx),gvn); }
 
   // Uses.  Generally variable length; unordered, no nulls, compressed, unused trailing space
   public Ary<Node> _uses = new Ary<>(new Node[1],0);
