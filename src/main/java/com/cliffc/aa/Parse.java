@@ -90,11 +90,12 @@ public class Parse {
     // Gather errors
     Env par = _e._par;
     assert par._par==null;      // Top-level only
-    Ary<String> errs = par._scope.walkerr_use(null,new BitSet(),_gvn);
-    errs = _e._scope.walkerr_use(errs,new BitSet(),_gvn);
-    errs = res      .walkerr_def(errs,new BitSet(),_gvn);
+    BitSet bs = new BitSet();
+    bs.set(_e._scope._uid);     // Do not walk top-level scope
+    Ary<String> errs = res.walkerr_def(null,bs,_gvn);
     if( tres instanceof TypeErr && tres != TypeErr.ALL ) // Result can be an error, even if no c-flow has an error
       errs = add_err(errs,((TypeErr)tres)._msg); // One more error
+    if( errs == null ) errs = _e._scope.walkerr_use(null,new BitSet(),_gvn);
     if( errs == null && skipWS() != -1 ) errs = add_err(null,errMsg("Syntax error; trailing junk"));
     kill(res);
     return new TypeEnv(tres,_e,errs);
@@ -496,14 +497,12 @@ public class Parse {
   private Node do_call( Node call0 ) {
     Node call = gvn(call0);
     // Some calls die instantly; wrap a line-number around the error and bail out
-    if( call instanceof ConNode ) {
-      Type tc = _gvn.type(call);
-      if( tc instanceof TypeErr ) {
-        String msg = ((TypeErr)tc)._msg;
-        assert !msg.equals("Arg mismatch in call");
-        kill(call);             // Call is definitely failing
-        return con(err_ctrl(msg));
-      }
+    Type tc = _gvn.type(call);
+    if( tc instanceof TypeErr ) {
+      String msg = ((TypeErr)tc)._msg;
+      assert !msg.equals("Arg mismatch in call");
+      kill(call);             // Call is definitely failing
+      return con(err_ctrl(msg));
     }
     
     // Primitives frequently inline immediately, and do not need following

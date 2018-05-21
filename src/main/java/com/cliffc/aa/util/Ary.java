@@ -80,6 +80,13 @@ public class Ary<E> implements Iterable<E> {
   }
   
   public Ary<E> set_as( E e ) { _es[0] = e; _len=1; return this; }
+  public Ary<E> set_len( int len ) {
+    if( len > _len ) throw new RuntimeException("unimpl");
+    _len = len;
+    while( _es.length > (len<<1) ) // Shrink if hugely too large
+      _es = Arrays.copyOf(_es,_es.length>>1);
+    return this;
+  }
   
   /** @param c Collection to be added */
   public void addAll( Collection<? extends E> c ) { for( E e : c ) add(e); }

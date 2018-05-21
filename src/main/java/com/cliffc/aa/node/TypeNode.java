@@ -19,11 +19,11 @@ public class TypeNode extends Node {
   }
   @Override public Type value(GVNGCM gvn) {
     Type t = gvn.type(at(1));
-    // Return type is an error, until the assert can be proven and removed.  
-    return (t instanceof TypeErr || t.isa(_t)) ? t : TypeErr.make(err(gvn));
+    //// Return type is an error, until the assert can be proven and removed.  
+    //return (t instanceof TypeErr || t.isa(_t)) ? t : TypeErr.make(err(gvn));
     // Cannot return a join, because the upcast type will propagate far and
     // wide and allow an upcast function type to inline.
-    //return _t.join(t);
+    return _t.join(t);
   }
   @Override public Type all_type() { return _t; }
   String err(GVNGCM gvn) {

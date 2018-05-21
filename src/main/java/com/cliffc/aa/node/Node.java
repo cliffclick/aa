@@ -172,12 +172,18 @@ public abstract class Node implements Cloneable {
     assert !is_dead();
     if( bs.get(_uid) ) return errs; // Been there, done that
     bs.set(_uid);                   // Only walk once
-    if( at(0)!=null && gvn.type(at(0)) != Type.CONTROL )
-      return errs;                // Ignore dead control
     if( this instanceof TypeNode ) // Gather errors
       errs = Parse.add_err(errs,((TypeNode)this).err(gvn));
-    for( Node def : _defs )     // Walk data defs for more errors
-      if( def != null ) errs = def.walkerr_def(errs,bs,gvn);
+    for( int i=0; i<_defs._len; i++ ) {
+      Node def = _defs.at(i);   // Walk data defs for more errors
+      if( def == null ) continue;
+      // Do not walk dead paths
+      Node r=null;
+      if( this instanceof    PhiNode ) r = at(0);
+      if( this instanceof RegionNode ) r = this;
+      if( r==null || i==0 || gvn.type(r.at(i)) == Type.CONTROL )
+        errs = def.walkerr_def(errs,bs,gvn);
+    }
     return errs;
   }
   

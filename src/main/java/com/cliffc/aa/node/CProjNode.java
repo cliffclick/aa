@@ -10,6 +10,7 @@ public class CProjNode extends ProjNode {
       return _idx==0 ? "False" : "True";
     return "CProj_"+_idx;
   }
+  @Override public Node ideal(GVNGCM gvn) { return at(0).is_copy(gvn,_idx); }
   @Override public Type all_type() { return Type.CONTROL; }
   // Return the op_prec of the returned value.  Not sensible except
   // when call on primitives.

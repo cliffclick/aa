@@ -8,14 +8,13 @@ public class ProjNode extends Node {
   public ProjNode( Node ifn, int idx ) { super(OP_PROJ,ifn); _idx=idx; }
   @Override String str() { return "Proj_"+_idx; }
   @Override public Node ideal(GVNGCM gvn) {
-    // If a CallNode 
     Node m = at(0);
-    if( m instanceof TypeNode ) {
-      TypeNode t = (TypeNode)m;
-      assert m.at(1) instanceof CallNode;
-      assert _idx==0 || _idx==1;
-      if( _idx==0 ) { set_def(0,m.at(1),gvn); return this; }
-      else return new TypeNode(((TypeTuple)t._t).at(1),gvn.xform(new ProjNode(m.at(1),1)),t._msg);
+    if( m instanceof CallNode ) {
+      // If a CallNode with an upcast on the data return?
+      CallNode call = (CallNode)m;
+      TypeNode callcast = call.upcast_return(gvn);
+      if( callcast != null )
+        return callcast.set_def(1,gvn.init(new ProjNode(call,_idx)),gvn);
     }
     return m.is_copy(gvn,_idx);
   }

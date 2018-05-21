@@ -12,15 +12,15 @@ public class GVNGCM {
 
   // Unique dense node-numbering
   private int CNT;
-  BitSet _live = new BitSet();
+  private BitSet _live = new BitSet();  // Conservative approximation of live; due to loops some things may be marked live, but are dead
 
-  public int uid() { _live.set(CNT);  return CNT++; }
+  public int uid() { assert CNT < 100000 : "infinite node create loop"; _live.set(CNT);  return CNT++; }
 
   // Iterative worklist
   private Ary<Node> _work = new Ary<>(new Node[1], 0);
   private BitSet _wrk_bits = new BitSet();
 
-  private <N extends Node> N add_work( N n ) { if( !_wrk_bits.get(n._uid) ) add_work0(n); return n; }
+  public <N extends Node> N add_work( N n ) { if( !_wrk_bits.get(n._uid) ) add_work0(n); return n; }
   private <N extends Node> N add_work0( N n ) {
     _work.add(n);               // These need to be visited later
     _wrk_bits.set(n._uid);
@@ -37,6 +37,29 @@ public class GVNGCM {
   
   GVNGCM( boolean opt ) { _opt = opt; }
 
+  // Initial state after loading e.g. primitives & boot libs.  Record state
+  // here, so can reset to here cheaply and parse again.
+  private static int _INIT0_CNT;
+  private static Node[] _INIT0_NODES;
+  void init0() {
+    assert _live.get(CNT-1) && !_live.get(CNT) && _work._len==0 && _wrk_bits.isEmpty() && _ts._len==CNT;
+    _INIT0_CNT=CNT;
+    _INIT0_NODES = _vals.keySet().toArray(new Node[0]);
+    for( Node n : _INIT0_NODES ) assert !n.is_dead();
+  }
+  // Reset is called after a top-level exec exits (e.g. junits) with no parse
+  // state left alive.  NOT called after a line in the REPL or a user-call to
+  // "eval" as user state carries on.
+  void reset_to_init0() {
+    assert _work._len==0 && _wrk_bits.isEmpty();
+    CNT = _INIT0_CNT;
+    _live.clear();  _live.set(0,_INIT0_CNT);
+    _ts.set_len(_INIT0_CNT);
+    _vals.clear();
+    for( Node n : _INIT0_NODES ) assert !n.is_dead();
+    for( Node n : _INIT0_NODES ) _vals.put(n,n);
+  }
+  
   public Type type( Node n ) {
     Type t = n._uid < _ts._len ? _ts._es[n._uid] : null;
     if( t != null ) return t;
@@ -130,7 +153,7 @@ public class GVNGCM {
     }
     boolean found = false;
     for( Node o : _vals.keySet() ) if( o._uid == n._uid ) { found=true; break; }
-    assert found == expect  || _wrk_bits.get(n._uid); // Expected in table or on worklist
+    assert found == expect || _wrk_bits.get(n._uid); // Expected in table or on worklist
     return false;               // Not in table
   }
 

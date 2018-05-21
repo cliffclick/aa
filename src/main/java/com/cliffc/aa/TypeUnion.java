@@ -60,7 +60,7 @@ public class TypeUnion extends Type {
     // Cannot mix functions and numbers
     if( ux != -1 && (fx!=-1 || ix!=-1 || sx!=-1) )
       return Type.SCALAR;
-    
+
     if( ts._len == 1 ) return ts._es[0]; // A single result is always that result
     // The set has to be ordered, to remove dups that vary only by order
     ts.sort_update(Comparator.comparingInt(e -> e._uid)); 
@@ -87,7 +87,7 @@ public class TypeUnion extends Type {
       // Handle the case where they are structurally equal
       TypeUnion tu = (TypeUnion)t;
       assert _any != tu._any || _ts!=tu._ts; // hashcons guarantees we are different here
-      
+
       // Mixed case, does not really simplify but go to canonical form so
       // nested versions can simplify.
       if( _any != tu._any ) {
@@ -98,7 +98,7 @@ public class TypeUnion extends Type {
         Ary<Type> ts = new Ary<>(new Type[anyts.length],0);
         for( Type anyt : anyts ) ts.add(tu.meet(anyt));
         return make(true, full_simplify(ts,true));
-        
+
       } else if( !_any ) {
         // [AB][CD] ==> [ABCD]
         Ary<Type> ts = new Ary<>(_ts._ts.clone());
@@ -169,8 +169,12 @@ public class TypeUnion extends Type {
         if( t.above_center() )
           return true;
       return false;
+    } else {
+      for( Type t : _ts._ts )
+        if( !t.above_center() )
+          return false;
+      return true;
     }
-    throw AA.unimpl();
   }
   // Lattice of conversions:
   // -1 unknown; top; might fail, might be free (Scalar->Int); Scalar might lift
@@ -180,7 +184,8 @@ public class TypeUnion extends Type {
   // 99 Bottom; No free converts; e.g. Flt->Int requires explicit rounding
   @Override public byte isBitShape(Type t) {
     if( t._type == Type.TSCALAR ) return 0;
-    throw AA.unimpl();
+    return 99;
+    //throw AA.unimpl();
   }
   // Filter out functions with the wrong args; error for non-functions
   @Override public Type filter(int nargs) {

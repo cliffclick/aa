@@ -2,15 +2,13 @@ package com.cliffc.aa;
 
 import com.cliffc.aa.node.*;
 
-import java.lang.AutoCloseable;
-import java.util.BitSet;
 import java.util.HashMap;
 
 public class Env implements AutoCloseable {
   final Env _par;
   ScopeNode _scope; // Lexical anchor; goes when this environment leaves scope
   Node _ret;   // Return result
-  private final HashMap<String,Type> _types;
+  private final HashMap<String,Type> _types; // user-typing type names
   Env( Env par ) {
     _par=par;
     _scope = new ScopeNode();
@@ -31,6 +29,8 @@ public class Env implements AutoCloseable {
     for( Node val : _scope._defs )  _gvn.init0(val);
     _gvn.iter();
     Type.init0(_types);
+    FunNode.init0();  // Done with adding primitives
+    _gvn   .init0();  // Done with adding primitives
   }
   
   // Called during basic Env creation, this wraps a PrimNode as a full
@@ -57,39 +57,22 @@ public class Env implements AutoCloseable {
   // Close the current Env, making its lexical scope dead (and making dead
   // anything only pointed at by this scope).
   @Override public void close() {
-    assert check_live(_gvn._live);
     _scope.del_locals(_gvn);
     if( _scope.is_dead() ) return;
+    if( _par._par == null ) {
+      FunNode.reset_to_init0(_gvn);
+      _gvn   .reset_to_init0();
+      return;
+    }
     // Whats left is function-ref generic entry points; promote to next outer scope
     while( _scope._uses._len > 0 ) {
       Node use = _scope._uses.at(0);
       int idx = use._defs.find(a -> a==_scope);
-      // Never defined at top level, so null out else go upscope one
-      use.set_def(idx, _par._par==null ? null: _par._scope, _gvn);
-      if( _par._par!=null && use instanceof FunNode ) {
-        FunNode fun = (FunNode)use;
-        _par._scope.add(fun._name, _gvn.con(fun._tf));
-      }
+      use.set_def(idx, _par._scope, _gvn); // Move it upscope
+      if( use instanceof FunNode )
+        _par._scope.add(((FunNode)use)._name, _gvn.con(((FunNode)use)._tf));
     }
     _gvn.kill0(_scope);
-  }
-
-  // Check all reachable via graph-walk equals recorded live bits
-  private boolean check_live(BitSet live) {
-    BitSet rech = check_live0(new BitSet());
-    if( rech.equals(live) ) return true;
-    BitSet bs0 = (BitSet)live.clone();  bs0.andNot(rech);
-    BitSet bs1 = (BitSet)rech.clone();  bs1.andNot(live);
-    System.out.println("Reported live but not reachable: "+bs0);
-    System.out.println("Reachable but not reported live: "+bs1);
-    return false;
-  }
-    
-  private BitSet check_live0(BitSet bs) {
-    _scope.walk(bs);
-    if( _ret != null ) _ret.walk(bs); // Also walk return value
-    FunNode.FUNS.walk(bs);
-    return _par == null ? bs : _par.check_live0(bs);
   }
 
   // Test support, return top-level token type

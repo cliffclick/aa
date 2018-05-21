@@ -22,6 +22,8 @@ import java.lang.AutoCloseable;
 
 public class CallNode extends Node implements AutoCloseable {
   private boolean _inlined;
+  private Type   _cast_ret;     // Return type has been up-casted
+  private String _cast_msg;     // Return type cast fail message
   public CallNode( Node... defs ) { super(OP_CALL,defs); }
   @Override String str() { return "call"; }
   @Override public Node ideal(GVNGCM gvn) {
@@ -36,17 +38,7 @@ public class CallNode extends Node implements AutoCloseable {
     if( t instanceof TypeUnion ) {
       TypeUnion tu = (TypeUnion)t;
       Ary<TypeFun> funs = resolve(tu,gvn); // List of function choices
-      if( funs.isEmpty() ) {               // No choices possible
-        // Any arguments a forward-ref?  Blow out with more-specific
-        // forward-ref error.
-        TypeErr terr=TypeErr.make("Argument mismatch in call to "+tu.errMsg());
-        for( int i=0; i<nargs(); i++ ) {
-          Type ta = gvn.type(arg(i));
-          if( ta.forward_ref() )
-            terr = TypeErr.make(((TypeFun)ta).forward_ref_err());
-        }
-        return new ConNode<>(terr); // Fail to top
-      }
+      if( funs.isEmpty() ) return null; // No choices possible; this is an error situation which might resolve later
       if( funs._len>1 ) {       // Multiple choices, but save the reduced choice list
         if( funs._len==tu._ts._ts.length ) return null; // No improvement
         throw AA.unimpl();
@@ -57,8 +49,12 @@ public class CallNode extends Node implements AutoCloseable {
       t = funs.at(0);           // Single function choice
     }
 
-    // Type-checking a function
-    if( t instanceof TypeErr && funv instanceof TypeNode ) {
+    // If an upcast is in-progress, no other opts until it finishes
+    if( _cast_ret !=null ) return null;
+    
+    // Type-checking a function; requires 2 steps, one now, one in the
+    // following data Proj from the worklist.
+    if( funv instanceof TypeNode ) {
       TypeNode tn = (TypeNode)funv;
       TypeFun tf_cast = (TypeFun)tn._t;
       Node[] defs = new Node[_defs._len];
@@ -66,9 +62,10 @@ public class CallNode extends Node implements AutoCloseable {
       defs[1] = tn.at(1);       // Bypass/delete the original TypeNode
       for( int i=2; i<_defs._len; i++ ) // Insert casts for each parm
         defs[i] = gvn.xform(new TypeNode(tf_cast._ts.at(i-2),at(i),tn._msg));;
-      Node call = gvn.xform(new CallNode(defs)); // New replacement Call
-      // And cast the return as well.
-      return new TypeNode(TypeTuple.make(Type.CONTROL,tf_cast._ret),call,tn._msg);
+      CallNode call = new CallNode(defs); // New replacement Call
+      call._cast_ret = tf_cast._ret;      // Upcast return results
+      call._cast_msg = tn._msg;           // Upcast failure message
+      return call;
     }
 
     if( !(t instanceof TypeFun) ) {
@@ -99,12 +96,11 @@ public class CallNode extends Node implements AutoCloseable {
     if( rez == fun )
       return null;
 
-
     // Check for several trivial cases that can be fully inlined immediately.
     // Check for zero-op body (id function)
-    if( rez instanceof ParmNode && rez.at(0) == fun ) return arg(0);
+    if( rez instanceof ParmNode && rez.at(0) == fun ) return inline(gvn,arg(0));
     // Check for constant body
-    if( rez instanceof ConNode ) return rez;
+    if( rez instanceof ConNode ) return inline(gvn,rez);
 
     // Check for a 1-op body using only constants or parameters
     boolean can_inline=true;
@@ -117,10 +113,7 @@ public class CallNode extends Node implements AutoCloseable {
       Node irez = rez.copy();   // Copy the entire function body
       for( Node parm : rez._defs )
         irez.add_def((parm instanceof ParmNode && parm.at(0) == fun) ? arg(((ParmNode)parm)._idx) : parm);
-      // Set new body as inline result
-      set_def(1,gvn.xform(irez),gvn);
-      _inlined = true;          // Allow data projection to find new body
-      return this;
+      return inline(gvn,gvn.xform(irez));  // New exciting replacement for inlined call
     }
       
     // If this is a primitive, we never change the function header via inlining the call
@@ -149,14 +142,16 @@ public class CallNode extends Node implements AutoCloseable {
     // Proj#1 is a new CastNode on the tf._ret to regain precision
     // Kill fun in slot 1 and all args.
     // TODO: Use actual arg types to regain precision
-    set_def(0,gvn.xform(new CProjNode( ret ,fun._defs._len-1)),gvn);
-    set_def(1,gvn.xform(new CastNode(at(0),rez,fun._tf._ret)),gvn);
     for( int i=2; i<_defs._len; i++ ) set_def(i,null,gvn);
-    _inlined = true;
-    return this;
+    set_def(0,gvn.xform(new CProjNode( ret ,fun._defs._len-1)),gvn);
+    return inline(gvn,gvn.xform(new CastNode(at(0),rez,fun._tf._ret)));
   }
 
-  @Override public Type value(GVNGCM gvn) { return TypeTuple.make(gvn.type(at(0)),value0(gvn)); }
+  @Override public Type value(GVNGCM gvn) {
+    Type t = value0(gvn);
+    if( t instanceof TypeErr ) return t; // Errors poison
+    return TypeTuple.make(gvn.type(at(0)),t);
+  }
   private Type value0(GVNGCM gvn) {
     Node fun = _defs.at(1);
     Type t = gvn.type(fun);
@@ -185,9 +180,24 @@ public class CallNode extends Node implements AutoCloseable {
     //// TODO: if apply args are all constant, do I partial-eval here or in Ideal?
     //return tret;
   }
+
+  // Called from the data proj.  Return a TypeNode with proper casting on return result.
+  TypeNode upcast_return(GVNGCM gvn) {
+    Type t = _cast_ret;
+    if( t==null ) return null;  // No cast-in-progress
+    _cast_ret = null;           // Gonna upcast the return result now
+    gvn.add_work(this);         // Revisit after the data-proj cleans out
+    return new TypeNode(t,null,_cast_msg);
+  }
+
+  // Inline to this Node.
+  private Node inline( GVNGCM gvn, Node rez ) {
+    set_def(1,rez,gvn);
+    _inlined = true;            // Allow data projection to find new body
+    return this;
+  }
   
   @Override public Node is_copy(GVNGCM gvn, int idx) { return _inlined ? at(idx) : null; }
-  
 
   // Number of actual arguments
   private int nargs() { return _defs._len-2; }
@@ -270,13 +280,13 @@ public class CallNode extends Node implements AutoCloseable {
   // choice here.  Errors poison return results.
   private Type retype( GVNGCM gvn, TypeUnion tu ) {
     if( !tu._any ) throw AA.unimpl();
-    Type t = Type.SCALAR;
+    Type t = TypeErr.ALL;
     for( Type tft : tu._ts._ts ) {
       Type x = retype(gvn,(TypeFun)tft);
       if( x!=null )             // Argument mismatch; join of ALL
         t = t.join(x);          // Join of all
     }
-    return t;
+    return t!=TypeErr.ALL ? t : TypeErr.make("Argument mismatch in call to "+tu.errMsg());
   }  
   private Type retype( GVNGCM gvn, TypeFun tf ) {
     Type[] formals = tf._ts._ts;   // Type of each argument
@@ -287,8 +297,9 @@ public class CallNode extends Node implements AutoCloseable {
       if( actual instanceof TypeErr )
         // Actual is an error, so call result is the same error
         return actual;        // TODO: Actually need to keep all such errors...
-      if( !actual.isa(formals[j]) )
-        return null;   // Actual is not a formal; join of ALL
+      if( !actual.isa(formals[j]) )  // Actual is not a formal; join of ALL
+        // Forward/unknown refs as args to a call report their own error
+        return actual.forward_ref() ? TypeErr.make(((TypeFun)actual).forward_ref_err()) : null;
     }
     return tf.ret();
   }

@@ -99,6 +99,13 @@ public class FunNode extends RegionNode {
   private int fidx() { return _tf._fidxs.getbit(); }
   public static TmpNode FUNS = new TmpNode();
   public void init(ProjNode proj) { FUNS.set_def(fidx(),proj); }
+  private static int PRIM_CNT;
+  public static void init0() { PRIM_CNT=CNT; }
+  public static void reset_to_init0(GVNGCM gvn) {
+    while( FUNS._defs._len > PRIM_CNT )
+      FUNS.remove(FUNS._defs._len-1,gvn);
+    CNT = PRIM_CNT;
+  }
   public static void clear_forward_ref(Type t, GVNGCM gvn) {
     assert t.forward_ref();
     int fidx = ((TypeFun)t).fidx();
@@ -202,8 +209,9 @@ public class FunNode extends RegionNode {
     if( !any_unr ) return null; // No unresolved calls; no point in type-specialization
 
     // TODO: Split with a known caller in slot 1
-    if( !(at(1) instanceof ScopeNode) )  throw AA.unimpl(); // Untested: Slot 1 is not the generic unparsed caller
-    
+    if( !(at(1) instanceof ScopeNode) )
+      return null; // Untested: Slot 1 is not the generic unparsed caller
+
     // If Parm has unresolved calls, we want to type-specialize on its
     // arguments.  Call-site #1 is the most generic call site for the parser
     // (all Scalar args).  Peel out 2nd call-site args and generalize them.

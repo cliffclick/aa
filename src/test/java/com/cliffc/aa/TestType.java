@@ -5,7 +5,6 @@ import org.junit.Test;
 
 public class TestType {
   @Test public void testType0() {
-    test("fun@{real->flt32}={x -> x}; fun(123 )", TypeInt.con(123 ));
     //test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
     // Simple int
     test("1",   TypeInt.TRUE);
@@ -30,7 +29,7 @@ public class TestType {
     test("str(3.14)", TypeStr.make(0,"3.14"));
     test("str(3)", TypeStr.make(0,"3"));
     test("str(\"abc\")", TypeStr.make(0,"abc"));
-      
+
     // Variable lookup
     test("math_pi", TypeFlt.PI);
     // bare function lookup; returns a union of '+' functions

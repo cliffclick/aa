@@ -336,8 +336,8 @@ public class Type {
   }
   // "widen" a narrow type for type-specialization.
   // e.g. "3" becomes "int64".
-  public Type widen() { throw AA.unimpl(); } // Overridden in subclasses
-  public RuntimeException typerr(Type t) {
+  public Type widen() { return this; } // Overridden in subclasses
+  RuntimeException typerr(Type t) {
     throw new RuntimeException("Should not reach here: internal type system error with "+this+(t==null?"":(" and "+t)));
   }
   // Filter out function types with incorrect arg counts
