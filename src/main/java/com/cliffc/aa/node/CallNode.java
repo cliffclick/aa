@@ -36,9 +36,9 @@ public class CallNode extends Node implements AutoCloseable {
   @Override public Node is_copy(GVNGCM gvn, int idx) { return _inlined ? at(idx) : null; }
 
   // Number of actual arguments
-  private int nargs() { return _defs._len-2; }
+  int nargs() { return _defs._len-2; }
   // Actual arguments
-  private Node arg( int x ) { return _defs.at(x+2); }
+  Node arg( int x ) { return _defs.at(x+2); }
   
   // Parser support keeping args alive during parsing; if a syntax exception is
   // thrown while the call args are being built, this will free them all.  Once
@@ -50,13 +50,13 @@ public class CallNode extends Node implements AutoCloseable {
 
   @Override public Node ideal(GVNGCM gvn) {
     if( skip_ctrl(gvn) ) return this;
-    //// If an inline is in-progress, no other opts and this node will go dead
-    //if( _inlined ) return null;
+    // If an inline is in-progress, no other opts and this node will go dead
+    if( _inlined ) return null;
     //// If an upcast is in-progress, no other opts until it finishes
     //if( _cast_ret !=null ) return null;
     //
     Node ctrl = _defs.at(0);    // Control for apply/call-site
-    Node epi  = _defs.at(1);    // Function epilog
+    Node unk  = _defs.at(1);    // Function epilog
     //
     //// Type-checking a function; requires 2 steps, one now, one in the
     //// following data Proj from the worklist.
@@ -73,9 +73,9 @@ public class CallNode extends Node implements AutoCloseable {
     //}
 
     // If the function is unresolved, see if we can resolve it now
-    if( epi instanceof UnresolvedNode ) {
-      Node epi2 = ((UnresolvedNode)epi).resolve(gvn,this);
-      if( epi2 != null ) { set_def(1,epi2,gvn); return this; }
+    if( unk instanceof UnresolvedNode ) {
+      Node fun = ((UnresolvedNode)unk).resolve(gvn,this);
+      if( fun != null ) { set_def(1,fun,gvn); return this; }
     }
 
     //// Similarly, if arguments do not match, push TypeNodes "uphill" to get
@@ -91,63 +91,57 @@ public class CallNode extends Node implements AutoCloseable {
     //  }
     //}
     //if( did_cast ) return this;
-    //
-    //// TypeUnion with zero resolvable choices and other error conditions
-    //if( !(t instanceof TypeFun) )
-    //  return null;
-    //TypeFun tf = (TypeFun)t;
-    //
-    //// Single choice; insert actual conversions as needed
-    //ProjNode proj = tf.projnode();
-    //RetNode ret = (RetNode)proj.at(0);
-    //FunNode fun = (FunNode)ret .at(2); // Proj->Ret->Fun
-    //assert fun._tf == tf;
-    //Type[] formals = tf._ts._ts;
-    //for( int i=0; i<nargs(); i++ ) {
-    //  Type formal = formals[i];
-    //  Type actual = gvn.type(arg(i));
-    //  byte xcvt = actual.isBitShape(formal);
-    //  if( xcvt == 99 ) throw AA.unimpl(); // Error cases should not reach here
-    //  if( xcvt == -1 ) return null;       // Wait for call args to resolve
-    //  if( xcvt == 1 ) {
-    //    PrimNode cvt = PrimNode.convert(_defs.at(i+2),actual,formal);
-    //    if( cvt.is_lossy() ) throw new IllegalArgumentException("Requires lossy conversion");
-    //    set_def(i+2,gvn.xform(cvt),gvn);
-    //  }
-    //}
-    //
-    //// If this is a forward-ref we have no body to inline
-    //Node rez = ret.at(1);
-    //if( rez == fun )
-    //  return null;
-    //// Return value is current error
-    //if( gvn.type(rez) instanceof TypeErr )
-    //  return null;
-    //
-    //// Check for several trivial cases that can be fully inlined immediately.
-    //// Check for zero-op body (id function)
-    //if( rez instanceof ParmNode && rez.at(0) == fun ) return inline(gvn,arg(0));
-    //// Check for constant body
-    //if( rez instanceof ConNode ) return inline(gvn,rez);
-    //
-    //// Check for a 1-op body using only constants or parameters
-    //boolean can_inline=true;
-    //for( Node parm : rez._defs )
-    //  if( parm != null && parm != fun &&
-    //      !(parm instanceof ParmNode && parm.at(0) == fun) &&
-    //      !(parm instanceof ConNode) )
-    //    can_inline=false;       // Not trivial
-    //if( can_inline ) {
-    //  Node irez = rez.copy();   // Copy the entire function body
-    //  for( Node parm : rez._defs )
-    //    irez.add_def((parm instanceof ParmNode && parm.at(0) == fun) ? arg(((ParmNode)parm)._idx) : parm);
-    //  return inline(gvn,gvn.xform(irez));  // New exciting replacement for inlined call
-    //}
-    //  
-    //// If this is a primitive, we never change the function header via inlining the call
-    //if( fun.at(1)._uid==0 )
-    //  return null;
-    //
+
+    // Unknown function(s) being called
+    if( !(unk instanceof EpilogNode) )
+      return null;
+    EpilogNode epi = (EpilogNode)unk;
+    Node    rez = epi.val ();
+    Node    rpc = epi.rpc ();
+    FunNode fun = epi.fun ();
+
+    // Single choice; insert actual conversions as needed
+    Type[] formals = fun._tf._ts._ts;
+    for( int i=0; i<nargs(); i++ ) {
+      Type formal = formals[i];
+      Type actual = gvn.type(arg(i));
+      byte xcvt = actual.isBitShape(formal);
+      if( xcvt == 99 ) throw AA.unimpl(); // Error cases should not reach here
+      if( xcvt == -1 ) return null;       // Wait for call args to resolve
+      if( xcvt == 1 ) {
+        PrimNode cvt = PrimNode.convert(_defs.at(i+2),actual,formal);
+        if( cvt.is_lossy() ) throw new IllegalArgumentException("Requires lossy conversion");
+        set_def(i+2,gvn.xform(cvt),gvn);
+      }
+    }
+
+    // If this is a forward-ref we have no body to inline
+    if( rez == fun ) // TODO: better forward-ref test
+      throw AA.unimpl(); // return null;
+
+    // Check for several trivial cases that can be fully inlined immediately.
+    // Check for zero-op body (id function)
+    if( rez instanceof ParmNode && rez.at(0) == fun ) return inline(gvn,arg(0));
+    // Check for constant body
+    if( rez instanceof ConNode ) return inline(gvn,rez);
+    
+    // Check for a 1-op body using only constants or parameters
+    boolean can_inline=true;
+    for( Node parm : rez._defs )
+      if( parm != null && parm != fun &&
+          !(parm instanceof ParmNode && parm.at(0) == fun) &&
+          !(parm instanceof ConNode) )
+        can_inline=false;       // Not trivial
+    if( can_inline ) {
+      Node irez = rez.copy();   // Copy the entire function body
+      for( Node parm : rez._defs )
+        irez.add_def((parm instanceof ParmNode && parm.at(0) == fun) ? arg(((ParmNode)parm)._idx) : parm);
+      return inline(gvn,gvn.xform(irez));  // New exciting replacement for inlined call
+    }
+    
+    // If this is a primitive, we never change the function header via inlining the call
+    assert fun.at(1)._uid!=0;
+    
     //// Inline the call site now.
     //// This is NOT inlining the function body, just the call site.
     //if( fun._tf._ts._ts.length != nargs() ) {
@@ -176,6 +170,13 @@ public class CallNode extends Node implements AutoCloseable {
     return null;
   }
 
+  // Inline to this Node.
+  private Node inline( GVNGCM gvn, Node rez ) {
+    set_def(1,rez,gvn);
+    _inlined = true;            // Allow data projection to find new body
+    return this;
+  }
+  
   @Override public Type value(GVNGCM gvn) {
     Type t = value0(gvn);
     if( t instanceof TypeErr ) return t; // Errors poison
@@ -185,12 +186,12 @@ public class CallNode extends Node implements AutoCloseable {
   private Type value0(GVNGCM gvn) {
     Node fun = _defs.at(1);
     Type t = gvn.type(fun);
-    if( _inlined ) throw AA.unimpl(); // return t;
+    if( _inlined ) return t;
     if( t instanceof TypeErr ) return t;
     TypeTuple tepi = (TypeTuple)t;
     assert tepi._ts.length==4;
-    Type    tctrl=        tepi.at(0);
-    Type    tval =        tepi.at(1);
+    Type    tctrl=         tepi.at(0);
+    Type    tval =         tepi.at(1);
     TypeRPC trpc =(TypeRPC)tepi.at(2);
     TypeFun tfun =(TypeFun)tepi.at(3);
     assert tctrl==Type.CONTROL;     // Function will never return?
@@ -222,13 +223,6 @@ public class CallNode extends Node implements AutoCloseable {
     return new TypeNode(t,null,_cast_P);
   }
 
-  // Inline to this Node.
-  private Node inline( GVNGCM gvn, Node rez ) {
-    set_def(1,rez,gvn);
-    _inlined = true;            // Allow data projection to find new body
-    return this;
-  }
-  
   // Function return type for resolved functions.  Crash/ALL for no functions
   // allowed, join of possible returns otherwise - we get to choose the best
   // choice here.  Errors poison return results.

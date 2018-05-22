@@ -155,8 +155,8 @@ public class FunNode extends RegionNode {
   // may-have-more-callers.  
   boolean has_unknown_callers(GVNGCM gvn) {
     Node funcon = gvn.con(_tf);
-    for( Node use : funcon._uses ) {
-      if( use instanceof ScopeNode ) return true;
+    for( Node def : funcon._defs ) {
+      if( def instanceof ScopeNode ) return true;
       throw AA.unimpl();
     }
     return false;

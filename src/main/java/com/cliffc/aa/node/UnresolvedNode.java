@@ -1,6 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.*;
+import com.cliffc.aa.util.Ary;
 
 public class UnresolvedNode extends Node {
   public UnresolvedNode( Node... funs ) { super(OP_UNR,funs); }
@@ -39,49 +40,50 @@ public class UnresolvedNode extends Node {
   // conversions are kept; if there is more than one then the join of them is
   // kept - and the program is not-yet type correct (ambiguous choices).
   public Node resolve( GVNGCM gvn, CallNode call ) {
-    throw AA.unimpl();
-//  private Ary<TypeFun> resolve( TypeUnion tu, GVNGCM gvn ) {
-//    // Set of possible choices with fewest conversions
-//    Ary<TypeFun> ns = new Ary<>(new TypeFun[1],0);
-//    int min_cvts = 999;         // Required conversions
-//    int cvts[] = new int[_defs._len];
-//
-//    // For each function, see if the actual args isa the formal args.  If not,
-//    // toss it out.  Also count conversions, and keep the minimal conversion
-//    // function with all arguments known.
-//    outerloop:
-//    for( Type tft : tu._ts._ts ) {
-//      TypeFun fun = (TypeFun)tft;
-//      Type[] formals = fun._ts._ts;   // Type of each argument
-//      if( formals.length != nargs() )
-//        continue; // Argument count mismatch, toss out this choice
-//      // Now check if the arguments are compatible at all, keeping lowest cost
-//      int xcvts = 0;             // Count of conversions required
-//      boolean unk = false;       // Unknown arg might be incompatible or free to convert
-//      for( int j=0; j<formals.length; j++ ) {
-//        Type actual = gvn.type(arg(j));
-//        Type tx = actual.join(formals[j]);
-//        if( tx.above_center() ) // Actual and formal have values in common?
-//          continue outerloop;   // No, this function will never work; e.g. cannot cast 1.2 as any integer
-//        byte cvt = actual.isBitShape(formals[j]); // +1 needs convert, 0 no-cost convert, -1 unknown, 99 never
-//        if( cvt == 99 )         // Happens if actual is e.g. TypeErr
-//          continue outerloop;   // No, this function will never work
-//        if( cvt == -1 ) unk = true; // Unknown yet
-//        else xcvts += cvt;          // Count conversions
-//      }
-//      if( !unk && xcvts < min_cvts ) min_cvts = xcvts; // Keep minimal known conversion
-//      cvts[ns._len] = xcvts;    // Keep count of conversions
-//      ns.add(fun);              // This is an acceptable choice, so far (args can be made to work)
-//    }
-//    // Toss out choices with strictly more conversions than the minimal
-//    for( int i=0; i<ns._len; i++ )
-//      if( cvts[i] > min_cvts ) {
-//        cvts[i] = cvts[ns._len-1];
-//        ns.del(i--);
-//      }
-//    return ns;
-//  }
+    Type t = TypeErr.ALL;
+    // Set of possible choices with fewest conversions
+    Ary<Node> ns = new Ary<>(new Node[1],0);
+    int min_cvts = 999;         // Required conversions
+    int cvts[] = new int[_defs._len];
 
+    // For each function, see if the actual args isa the formal args.  If not,
+    // toss it out.  Also count conversions, and keep the minimal conversion
+    // function with all arguments known.
+    outerloop:
+    for( Node epi : _defs ) {
+      TypeTuple tepi = (TypeTuple)gvn.type((EpilogNode)epi);
+      TypeFun fun = (TypeFun)tepi.at(3);
+      Type[] formals = fun._ts._ts;   // Type of each argument
+      assert formals.length == call.nargs(); // Should already be filtered for
+      // Now check if the arguments are compatible at all, keeping lowest cost
+      int xcvts = 0;             // Count of conversions required
+      boolean unk = false;       // Unknown arg might be incompatible or free to convert
+      for( int j=0; j<formals.length; j++ ) {
+        Type actual = gvn.type(call.arg(j));
+        Type tx = actual.join(formals[j]);
+        if( tx.above_center() ) // Actual and formal have values in common?
+          continue outerloop;   // No, this function will never work; e.g. cannot cast 1.2 as any integer
+        byte cvt = actual.isBitShape(formals[j]); // +1 needs convert, 0 no-cost convert, -1 unknown, 99 never
+        if( cvt == 99 )         // Happens if actual is e.g. TypeErr
+          continue outerloop;   // No, this function will never work
+        if( cvt == -1 ) unk = true; // Unknown yet
+        else xcvts += cvt;          // Count conversions
+      }
+      if( !unk && xcvts < min_cvts ) min_cvts = xcvts; // Keep minimal known conversion
+      cvts[ns._len] = xcvts;    // Keep count of conversions
+      ns.add(epi);              // This is an acceptable choice, so far (args can be made to work)
+    }
+    // Toss out choices with strictly more conversions than the minimal
+    for( int i=0; i<ns._len; i++ )
+      if( cvts[i] > min_cvts ) {
+        cvts[i] = cvts[ns._len-1];
+        ns.del(i--);
+      }
+
+    assert ns._len > 0;         // No choices apply?  Should die earlier?
+    if( ns._len==1 ) return ns.at(0);
+    if( ns._len==_defs._len ) return null; // No improvement
+    throw AA.unimpl();          // TODO: return shrunk choice list
   }
   
   // Return the op_prec of the returned value.  Not sensible except when call
