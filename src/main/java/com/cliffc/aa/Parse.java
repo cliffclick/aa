@@ -244,10 +244,8 @@ public class Parse {
           }
           require(')');
           Type t = _gvn.type(fun);
-          if( t instanceof TypeErr && fun instanceof TypeNode )
-            t = _gvn.type(fun.at(1)); // Assume eventually a TypeNode resolves
           if( t.forward_ref() ) {     // Forward ref; partial def
-            if( !(fun instanceof ConNode) ) throw AA.unimpl();       // Do not understand?
+            //if( !(fun instanceof ConNode) ) throw AA.unimpl();       // Do not understand?
             // Join with argument types & count.
             //TypeFun tf2 = TypeFun.make(args.args(_gvn),((TypeFun)t)._ret,((TypeFun)t)._fidxs);
             // Replace here...
@@ -256,8 +254,8 @@ public class Parse {
             //FunNode fun2 = tf2.funnode();
             //_gvn.subsume(fun2,_gvn.init(new FunNode(fun2.at(1),tf2,-1,fun2._name)));
             throw AA.unimpl();
-          } else if( t.filter(args._defs._len-2)==null )
-            return con(err_ctrl("A function is being called, but "+_gvn.type(fun)+" is not a function type"));
+          } else if( !t.is_fun_ptr() )
+            return con(err_ctrl("A function is being called, but "+t+" is not a function type"));
         } else {                  // lispy-style fcn application
           // TODO: Unable resolve ambiguity with mixing "(fun arg0 arg1)" and
           // "fun(arg0,arg1)" argument calls.  Really having trouble with parsing

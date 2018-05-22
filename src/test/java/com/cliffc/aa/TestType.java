@@ -5,6 +5,9 @@ import org.junit.Test;
 
 public class TestType {
   @Test public void testType0() {
+    testerr("x=y" , "Unknown ref 'y'","   ");
+    testerr("x=1+y","Unknown ref 'y'","     ");
+    test("x=2; y=x+1; x*y", TypeInt.con(6));
     //test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
     // Simple int
     test("1",   TypeInt.TRUE);
@@ -43,7 +46,7 @@ public class TestType {
     // error; mismatch arg count
     testerr("!()"       , "Call to unary function '!', but missing the one required argument"," ");
     testerr("math_pi(1)", "A function is being called, but 3.141592653589793 is not a function type","          ");
-    testerr("{+}(1,2,3)", "Argument mismatch in call to +:[{flt64 flt64 -> flt64},{int64 int64 -> int64},]","   ");
+    testerr("{+}(1,2,3)", "Passing 3 arguments to {}{int32 int32 -> Real} which takes 2 arguments","   ");
 
     // Parsed as +(1,(2*3))
     test("{+}(1, 2 * 3) ", TypeInt.con(7));

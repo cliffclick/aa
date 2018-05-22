@@ -54,7 +54,7 @@ public class UnresolvedNode extends Node {
       TypeTuple tepi = (TypeTuple)gvn.type((EpilogNode)epi);
       TypeFun fun = (TypeFun)tepi.at(3);
       Type[] formals = fun._ts._ts;   // Type of each argument
-      assert formals.length == call.nargs(); // Should already be filtered for
+      if( formals.length != call.nargs() ) continue;
       // Now check if the arguments are compatible at all, keeping lowest cost
       int xcvts = 0;             // Count of conversions required
       boolean unk = false;       // Unknown arg might be incompatible or free to convert
@@ -80,7 +80,7 @@ public class UnresolvedNode extends Node {
         ns.del(i--);
       }
 
-    assert ns._len > 0;         // No choices apply?  Should die earlier?
+    if( ns._len == 0 ) return null; // No choices apply?  No changes.
     if( ns._len==1 ) return ns.at(0);
     if( ns._len==_defs._len ) return null; // No improvement
     throw AA.unimpl();          // TODO: return shrunk choice list

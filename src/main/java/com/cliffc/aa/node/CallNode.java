@@ -188,15 +188,16 @@ public class CallNode extends Node implements AutoCloseable {
     Type t = gvn.type(fun);
     if( _inlined ) return t;
     if( t instanceof TypeErr ) return t;
+    assert t.is_fun_ptr();
     TypeTuple tepi = (TypeTuple)t;
-    assert tepi._ts.length==4;
     Type    tctrl=         tepi.at(0);
     Type    tval =         tepi.at(1);
     TypeRPC trpc =(TypeRPC)tepi.at(2);
     TypeFun tfun =(TypeFun)tepi.at(3);
     assert tctrl==Type.CONTROL;     // Function will never return?
     assert trpc._rpcs.test(_rpc);   // Function knows we are calling it
-    assert tfun.nargs() == nargs(); // Wrong-arg-count functions already filtered out
+    if( tfun.nargs() != nargs() )
+      return TypeErr.make(_badargs.errMsg("Passing "+nargs()+" arguments to "+tfun+" which takes "+tfun.nargs()+" arguments"));
     // TODO: optimize for Unresolved
     
     // Cannot return the functions return type, unless all args are compatible

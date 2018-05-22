@@ -11,10 +11,12 @@ public class EpilogNode extends Node {
   public EpilogNode( Node ctrl, Node val, Node rpc, Node fun ) { super(OP_EPI,ctrl,val,rpc,fun); }
   @Override public Node ideal(GVNGCM gvn) { return null; }
   @Override public Type value(GVNGCM gvn) {
-    return TypeTuple.make(gvn.type(ctrl()), // Function exits, or not
+    Type t=TypeTuple.make(gvn.type(ctrl()), // Function exits, or not
                           gvn.type(val ()), // Function return value
                           gvn.type(rpc ()), // Caller; the Continuation
                           fun()._tf);       // Function type plus "fidx"
+    assert t.is_fun_ptr();
+    return t;
   }
   public    Node ctrl() { return          at(0); } // internal function control
   public    Node val () { return          at(1); } // standard exit value

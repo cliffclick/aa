@@ -139,4 +139,15 @@ public class TypeTuple extends Type {
     for( Type _t : _ts ) if( !_t.is_con() ) return false;
     return true;
   }
+  // Return true if this is a function pointer (return type from EpilogNode)
+  // 0 - Control for the function
+  // 1 - Return type of the function as implemented
+  // 2 - RPC (set of callers)
+  // 3 - Classic TypeFun, includes declared return type
+  @Override public boolean is_fun_ptr() {
+    return _ts.length==4 &&
+      _ts[0]==Type.CONTROL &&
+      _ts[2] instanceof TypeRPC &&
+      _ts[3] instanceof TypeFun;
+  }
 }

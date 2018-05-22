@@ -311,6 +311,8 @@ public class Type {
   public Type arg(int idx) { throw AA.unimpl(); }
   // Return any "return type" of the Meet of all function types
   public Type ret() { return null; }
+  // Return true if this is a function pointer (return type from EpilogNode)
+  public boolean is_fun_ptr() { return false; }
   // Return a long   from a TypeInt constant; assert otherwise.
   public long   getl() { throw AA.unimpl(); }
   // Return a double from a TypeFlt constant; assert otherwise.
