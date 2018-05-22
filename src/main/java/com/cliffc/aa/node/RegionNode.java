@@ -9,7 +9,6 @@ public class RegionNode extends Node {
   int _cidx; // Copy index; monotonic change from zero to Control input this Region is collapsing to
   public RegionNode( Node... ctrls) { super(OP_REGION,ctrls); }
   RegionNode( byte op, Node sc ) { super(op,null,sc); } // For FunNodes
-  @Override String str() { return "Region"; }
   @Override public Node ideal(GVNGCM gvn) { return ideal(gvn,false); }
   // Ideal call, but FunNodes keep index#1 for future parsed call sites
   Node ideal(GVNGCM gvn, boolean more) {

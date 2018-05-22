@@ -80,6 +80,7 @@ public class TypeFun extends Type {
     return make(ts,ret,fidxs);
   }
   
+  @Override public Type arg(int idx) { return _ts._ts[idx]; }
   @Override public Type ret() { return _ret; }
 
   @Override protected boolean canBeConst() { throw AA.unimpl(); }
@@ -88,6 +89,11 @@ public class TypeFun extends Type {
   public ProjNode projnode() { return FunNode.get(fidx()); }
   public  RetNode  retnode() { return (RetNode)(projnode().at(0)); }
   public  FunNode  funnode() { return (FunNode)(retnode().at(2)); }
+  // Debug only: make an attempt to bind name to a function
+  void bind(String tok) {
+    int fidx = _fidxs.abit();
+    if( fidx > 0 ) FunNode.bind(tok,fidx);
+  }
   
   // Filter out function types with incorrect arg counts
   @Override public Type filter(int nargs) { return forward_ref() || _ts._ts.length==nargs ? this : null; }

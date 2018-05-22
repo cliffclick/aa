@@ -100,7 +100,8 @@ public class TypeInt extends Type {
       long con = (long)tf._con;
       // Fits in the int choices, just keep float, but could return the int constant just as well
       if( con == tf._con && log(con) <= _z )  return tf; 
-      return TypeUnion.make(false,this,tf);
+      return tf._z==32 ? TypeFlt.FLT32 : TypeFlt.FLT64;
+      //return TypeUnion.make(false,this,tf);
     }
 
     if( _x == 0 ) {             // Constant int
@@ -111,7 +112,8 @@ public class TypeInt extends Type {
         if( _con==tf._con ) return this; // Matching int constant wins
         if( ((long)tf._con) == tf._con ) // Float is a integer
           return xmeet(TypeInt.con((long)tf._con)); // Return as-if meeting 2 integers
-        return TypeUnion.make(false,this,tf);
+        return TypeFlt.con(_con).meet(tf);
+        //return TypeUnion.make(false,this,tf);
       }
       if( tf._x == 1 ) {        // Can a high float fall to the int constant?
         double dcon = tf._z==32 ? (float)_con : (double)_con;
@@ -125,7 +127,10 @@ public class TypeInt extends Type {
     long icon = (long)tf._con;
     if( tf._x== 0 && icon == tf._con )  
       return make(-1,Math.max(_z,log(icon)),0);
-    return TypeUnion.make(false,this,tf);
+    if( (_z<<1) <= tf._z ) return tf._z==32 ? TypeFlt.FLT32 : TypeFlt.FLT64;
+    if( (_z<<1) <= 64 ) return TypeFlt.FLT64; // Fits in the float
+    return Type.REAL;
+    //return TypeUnion.make(false,this,tf);
   }
 
   private static Type widen(int isz, int fsz) {

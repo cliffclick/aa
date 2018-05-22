@@ -55,21 +55,48 @@ public class TypeUnion extends Type {
       if( t._type == Type.TFUN ) ux = i;
     }
     // Also, if the remaining int fits in the remaining float, drop the int
-    if( fx!=-1 && ix!=-1 && (((TypeInt)ts._es[ix])._z<<1) <= ((TypeFlt)ts._es[fx])._z && ((TypeFlt)ts._es[fx])._x==-1 )
-      ts.del(ix);
+    if( fx!=-1 && ix!=-1 ) {
+      TypeInt ti = (TypeInt)ts._es[ix];
+      TypeFlt tf = (TypeFlt)ts._es[fx];
+      if( (ti._z<<1) <= tf._z && tf._x==-1 ) {
+        ts.del(ix);
+        throw AA.unimpl(); // Untested
+      }
+    }
+    if( ts._len == 1 ) return ts._es[0]; // A single result is always that result
     // Cannot mix functions and numbers
     if( ux != -1 && (fx!=-1 || ix!=-1 || sx!=-1) )
       return Type.SCALAR;
+    if( sx != -1 && (fx!=-1 || ix!=-1) )
+      return Type.SCALAR;
 
-    if( ts._len == 1 ) return ts._es[0]; // A single result is always that result
+    if( fx != -1 && ix != -1 ) {
+      TypeInt ti = (TypeInt)ts._es[ix];
+      TypeFlt tf = (TypeFlt)ts._es[fx];
+      if( ti==TypeInt.INT64 && tf==TypeFlt.FLT64 && !any )
+        return Type.REAL;
+      assert (ti==TypeInt.INT64 && tf==TypeFlt.FLT64 && any) ||
+        (ti==TypeInt.INT64.dual() && tf==TypeFlt.FLT64.dual() && !any);
+      
+      //if( !ts.at(fx).above_center() && !ts.at(ix).above_center() ) {
+      //  if( any ) ; // flt+int is OK; "ANY_NUM"
+      //  else
+      //    throw AA.unimpl(); // Falls to REAL
+      //} else { // one or other is above center???
+      //  if( ts.at(fx).above_center() && ts.at(ix).above_center() ) {
+      //    throw AA.unimpl(); // ???
+      //  } else 
+      //    throw AA.unimpl(); // Mixed, dunno
+      //}
+    }
+
     // The set has to be ordered, to remove dups that vary only by order
     ts.sort_update(Comparator.comparingInt(e -> e._uid)); 
     return make(TypeTuple.make(any?TypeErr.ANY:TypeErr.ALL,1.0,ts.asAry()),any);
   }
 
   static final TypeUnion ANY_NUM = (TypeUnion)make(true , TypeInt.INT64, TypeFlt.FLT64);
-  static final TypeUnion ALL_NUM = (TypeUnion)make(false, TypeInt.INT64, TypeFlt.FLT64);
-  static final TypeUnion[] TYPES = new TypeUnion[]{ANY_NUM,ALL_NUM};
+  static final TypeUnion[] TYPES = new TypeUnion[]{ANY_NUM};
 
   @Override protected TypeUnion xdual() { return new TypeUnion((TypeTuple)_ts.dual(),!_any); }
   
@@ -156,6 +183,14 @@ public class TypeUnion extends Type {
     return ts;
   }
 
+  // Union of the "idx"th argument.  Crash if the functions
+  // do not all have such an argument.
+  @Override public Type arg(int idx) {
+    Ary<Type> args = new Ary<>(Type.class);
+    for( int i=0; i<_ts._ts.length; i++ )
+      args.add(((TypeFun)_ts._ts[i])._ts.at(idx));
+    return make(false,full_simplify(args,_any));
+  }
   @Override public Type ret() {
     Ary<Type> rets = new Ary<>(Type.class);
     for( int i=0; i<_ts._ts.length; i++ )

@@ -23,61 +23,73 @@ import java.lang.AutoCloseable;
 public class CallNode extends Node implements AutoCloseable {
   private boolean _inlined;
   private Type   _cast_ret;     // Return type has been up-casted
-  private String _cast_msg;     // Return type cast fail message
-  public CallNode( Node... defs ) { super(OP_CALL,defs); }
-  @Override String str() { return "call"; }
+  private Parse  _cast_P;       // Return type cast fail message
+  private Parse  _badargs;      // Error for e.g. wrong arg counts or incompatible args
+  public CallNode( Parse badargs, Node... defs ) { super(OP_CALL,defs); _badargs = badargs; }
   @Override public Node ideal(GVNGCM gvn) {
     if( skip_ctrl(gvn) ) return this;
+    // If an inline is in-progress, no other opts and this node will go dead
     if( _inlined ) return null;
+    // If an upcast is in-progress, no other opts until it finishes
+    if( _cast_ret !=null ) return null;
 
     Node ctrl = _defs.at(0);    // Control for apply/call-site
     Node funv = _defs.at(1);    // Function value
-    Type t = gvn.type(funv);    // 
 
-    // If the function is unresolved, see if we can resolve it now
-    if( t instanceof TypeUnion ) {
-      TypeUnion tu = (TypeUnion)t;
-      Ary<TypeFun> funs = resolve(tu,gvn); // List of function choices
-      if( funs.isEmpty() ) return null; // No choices possible; this is an error situation which might resolve later
-      if( funs._len>1 ) {       // Multiple choices, but save the reduced choice list
-        if( funs._len==tu._ts._ts.length ) return null; // No improvement
-        throw AA.unimpl();
-        //Node unr2 = new ConNode(); // Build and return a reduced Con
-        //for( Node ret : projs ) unr2.add_def(ret);
-        //return set_def(1,unr2,gvn); // Upgrade Call with smaller choices
-      }
-      t = funs.at(0);           // Single function choice
-    }
-
-    // If an upcast is in-progress, no other opts until it finishes
-    if( _cast_ret !=null ) return null;
-    
     // Type-checking a function; requires 2 steps, one now, one in the
     // following data Proj from the worklist.
     if( funv instanceof TypeNode ) {
       TypeNode tn = (TypeNode)funv;
       TypeFun tf_cast = (TypeFun)tn._t;
-      Node[] defs = new Node[_defs._len];
-      defs[0] = at(0);
-      defs[1] = tn.at(1);       // Bypass/delete the original TypeNode
-      for( int i=2; i<_defs._len; i++ ) // Insert casts for each parm
-        defs[i] = gvn.xform(new TypeNode(tf_cast._ts.at(i-2),at(i),tn._msg));;
-      CallNode call = new CallNode(defs); // New replacement Call
-      call._cast_ret = tf_cast._ret;      // Upcast return results
-      call._cast_msg = tn._msg;           // Upcast failure message
-      return call;
+      set_def(1,tn.at(1),gvn);
+      for( int i=0; i<nargs(); i++ ) // Insert casts for each parm
+        set_def(i+2,gvn.xform(new TypeNode(tf_cast._ts.at(i),arg(i),tn._error_parse)),gvn);
+      _cast_ret = tf_cast._ret;      // Upcast return results
+      _cast_P = tn._error_parse;     // Upcast failure message
+      throw AA.unimpl(); // Untested, remove & retry
+      //return this;
     }
 
-    if( !(t instanceof TypeFun) ) {
-      throw AA.unimpl();        // untested?
-      //return null;
+    // If the function is unresolved, see if we can resolve it now
+    Type t = gvn.type(funv);    //
+    if( t instanceof TypeUnion ) {
+      TypeUnion tu = (TypeUnion)t;
+      Ary<TypeFun> funs = resolve(tu,gvn); // List of function choices
+      if( funs._len==1 )
+        t = funs.at(0);         // Single function choice
+      else if( funs._len > 0 && funs._len!=tu._ts._ts.length )
+        throw AA.unimpl(); // Multiple choices, but save the reduced choice list
+      else
+        for( Type tf : tu._ts._ts )
+          if( ((TypeFun)tf)._ts._ts.length != nargs() )
+            return null;     // Bail if remaining function choices have wrong nargs
     }
+
+    // Similarly, if arguments do not match, push TypeNodes "uphill" to get
+    // correct args to the function.  The TypeNodes will push the typing
+    // outward until we hit a direct conflict.
+    boolean did_cast = false;
+    for( int i=0; i<nargs(); i++ ) {
+      Type formal = t.arg(i);
+      Type actual = gvn.type(arg(i));
+      if( !actual.isa(formal) ) {
+        set_def(i+2,gvn.xform(new TypeNode(formal,arg(i),_badargs)),gvn);
+        did_cast = true;
+      }
+    }
+    if( did_cast ) return this;
+
+    // TypeUnion with zero resolvable choices and other error conditions
+    if( !(t instanceof TypeFun) )
+      return null;
+    TypeFun tf = (TypeFun)t;
 
     // Single choice; insert actual conversions as needed
-    ProjNode proj = ((TypeFun)t).projnode();
+    ProjNode proj = tf.projnode();
     RetNode ret = (RetNode)proj.at(0);
     FunNode fun = (FunNode)ret .at(2); // Proj->Ret->Fun
-    Type[] formals = fun._tf._ts._ts;
+    assert fun._tf == tf;
+    Type[] formals = tf._ts._ts;
     for( int i=0; i<nargs(); i++ ) {
       Type formal = formals[i];
       Type actual = gvn.type(arg(i));
@@ -95,7 +107,10 @@ public class CallNode extends Node implements AutoCloseable {
     Node rez = ret.at(1);
     if( rez == fun )
       return null;
-
+    // Return value is current error
+    if( gvn.type(rez) instanceof TypeErr )
+      return null;
+    
     // Check for several trivial cases that can be fully inlined immediately.
     // Check for zero-op body (id function)
     if( rez instanceof ParmNode && rez.at(0) == fun ) return inline(gvn,arg(0));
@@ -187,7 +202,7 @@ public class CallNode extends Node implements AutoCloseable {
     if( t==null ) return null;  // No cast-in-progress
     _cast_ret = null;           // Gonna upcast the return result now
     gvn.add_work(this);         // Revisit after the data-proj cleans out
-    return new TypeNode(t,null,_cast_msg);
+    return new TypeNode(t,null,_cast_P);
   }
 
   // Inline to this Node.
@@ -212,7 +227,6 @@ public class CallNode extends Node implements AutoCloseable {
       Env._gvn.kill_new(this);  // Free state on 
   }
 
-  @Override public Type all_type() { return TypeTuple.CALL; }
   @Override public int hashCode() { return super.hashCode()+(_inlined?1:0); }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
@@ -286,7 +300,7 @@ public class CallNode extends Node implements AutoCloseable {
       if( x!=null )             // Argument mismatch; join of ALL
         t = t.join(x);          // Join of all
     }
-    return t!=TypeErr.ALL ? t : TypeErr.make("Argument mismatch in call to "+tu.errMsg());
+    return t!=TypeErr.ALL ? t : TypeErr.make(_badargs.errMsg("Argument mismatch in call to "+tu.errMsg()));
   }  
   private Type retype( GVNGCM gvn, TypeFun tf ) {
     Type[] formals = tf._ts._ts;   // Type of each argument
@@ -299,7 +313,7 @@ public class CallNode extends Node implements AutoCloseable {
         return actual;        // TODO: Actually need to keep all such errors...
       if( !actual.isa(formals[j]) )  // Actual is not a formal; join of ALL
         // Forward/unknown refs as args to a call report their own error
-        return actual.forward_ref() ? TypeErr.make(((TypeFun)actual).forward_ref_err()) : null;
+        return actual.forward_ref() ? TypeErr.make(_badargs.errMsg(((TypeFun)actual).forward_ref_err())) : null;
     }
     return tf.ret();
   }

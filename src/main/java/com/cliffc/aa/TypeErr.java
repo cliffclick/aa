@@ -3,7 +3,7 @@ package com.cliffc.aa;
 /** Error data type.  If the program result is of this type, the program is not well formed. */
 public class TypeErr extends Type {
   boolean _all;
-  String _msg;
+  public String _msg;
   private TypeErr( String msg, boolean all ) { super(TERROR); init(msg,all); }
   private void init(String msg, boolean all ) { _msg=msg; _all=all; }
   @Override public int hashCode( ) { return TERROR+_msg.hashCode()+(_all?1:0); }
@@ -42,7 +42,7 @@ public class TypeErr extends Type {
   }
 
   @Override public byte isBitShape(Type t) { return -1; }
-  @Override public String toString() { return (_all ? "" : "~")+ _msg; }
+  @Override public String toString() { return this==ANY ? "any" : ((_all ? "" : "~")+ _msg); }
   @Override public boolean above_center() { return !_all; }
   @Override public boolean canBeConst() { return !_all; }
   @Override public boolean is_con()   { return false; }

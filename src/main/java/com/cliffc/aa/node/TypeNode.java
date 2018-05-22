@@ -10,23 +10,37 @@ import com.cliffc.aa.*;
 // locally obvious.
 public class TypeNode extends Node {
   final Type _t;                // TypeVar???
-  final String _msg;
-  public TypeNode( Type t, Node n, String msg ) { super(OP_TYPE,null,n); _t=t; _msg = msg; }
-  @Override String str() { return "@"+_t; }
+  final Parse _error_parse;     // Used for error messages
+  public TypeNode( Type t, Node n, Parse P ) { super(OP_TYPE,null,n); _t=t; _error_parse = P; }
+  @Override String xstr() { return "@"+_t; }
   @Override public Node ideal(GVNGCM gvn) {
-    Type t = gvn.type(at(1));
-    return t.isa(_t) ? at(1) : null;
+    Node arg=at(1);
+    Type t = gvn.type(arg);
+    if( t.isa(_t) ) return arg;
+    // Push TypeNodes 'up' to widen the space they apply to, and hopefully push
+    // the type check closer to the source of a conflict.
+    if( arg instanceof PhiNode ) {
+      Node region = arg.at(0);
+      assert region instanceof RegionNode;
+      // Cannot change the "shape" of function nodes with potential unknown
+      // callers, as the future callers need to see the same arguments.
+      if( !(region instanceof FunNode && ((FunNode)region).has_unknown_callers(gvn)) ) {
+        Node nphi = arg.copy();
+        nphi.add_def(region);
+        for( int i=1; i<arg._defs._len; i++ )
+          nphi.add_def(gvn.xform(new TypeNode(_t,arg.at(i),_error_parse)));
+        return nphi;
+      }
+    }
+    
+    return null;
   }
-  @Override public Type value(GVNGCM gvn) {
-    Type t = gvn.type(at(1));
-    //// Return type is an error, until the assert can be proven and removed.  
-    //return (t instanceof TypeErr || t.isa(_t)) ? t : TypeErr.make(err(gvn));
-    // Cannot return a join, because the upcast type will propagate far and
-    // wide and allow an upcast function type to inline.
-    return _t.join(t);
-  }
+  @Override public Type value(GVNGCM gvn) { return _t.join(gvn.type(at(1))); }
   @Override public Type all_type() { return _t; }
   String err(GVNGCM gvn) {
-    return String.format(_msg,gvn.type(at(1)).toString()+" is not a "+_t);
+    Type t = gvn.type(at(1));
+    if( t instanceof TypeErr ) return ((TypeErr)t)._msg;
+    String s = t.forward_ref() ? ((TypeFun)t).forward_ref_err() : t.toString()+" is not a "+_t;
+    return _error_parse.errMsg(s);
   }
 }

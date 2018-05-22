@@ -155,7 +155,8 @@ public class Type {
     
     // The rest of these choices are various numbers, which do not match well
     // with any function
-    if( t._type == TFUN ) return SCALAR; // return TypeUnion.make(false,this,t);
+    if( t._type == TSTR ) return SCALAR;
+    if( t._type == TFUN ) return SCALAR;
     // Union of functions, with a number
     if( t._type == TUNION && ((TypeUnion)t)._ts.at(0)._type==TFUN )
       return SCALAR;
@@ -314,6 +315,9 @@ public class Type {
     case TSIMPLE: throw typerr(null);
     }
   }
+  // Return the argument type of idxth argument.  Error for everybody except
+  // TypeFun and a TypeUnion of TypeFuns
+  public Type arg(int idx) { throw AA.unimpl(); }
   // Return any "return type" of the Meet of all function types
   public Type ret() { return null; }
   // Return a long   from a TypeInt constant; assert otherwise.
@@ -331,6 +335,8 @@ public class Type {
   // 99 Bottom; No free converts; e.g. Flt->Int requires explicit rounding
   public byte isBitShape(Type t) {
     if( above_center() && isa(t) ) return 0; // Can choose compatible format
+    if( t._type == TFLT ) return t.isBitShape(this);
+    if( t._type == TINT ) return t.isBitShape(this);
     if( _type == TSCALAR ) return -1;  // Dunno how it rides
     throw typerr(t);  // Overridden in subtypes
   }

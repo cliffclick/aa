@@ -6,7 +6,7 @@ import com.cliffc.aa.*;
 public class CastNode extends Node {
   private final Type _t;                // TypeVar???
   CastNode( Node ctrl, Node ret, Type t ) { super(OP_CAST,ctrl,ret); _t=t; }
-  @Override String str() { return "("+_t+")"; }
+  @Override String xstr() { return "("+_t+")"; }
   @Override public Node ideal(GVNGCM gvn) {
     // The control edge is only used to bound a function body when its being
     // inlined.  Once the function is no longer being treated function-like the

@@ -72,7 +72,7 @@ public abstract class PrimNode extends Node {
   
   public abstract Type apply( Type[] args ); // Execute primitive
   public boolean is_lossy() { return true; }
-  @Override public String str() { return _name+"::"+_ret; }
+  @Override public String xstr() { return _name+"::"+_ret; }
   @Override public Node ideal(GVNGCM gvn) { return null; }
   @Override public Type value(GVNGCM gvn) {
     Type[] ts = new Type[_defs._len];

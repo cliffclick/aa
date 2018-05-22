@@ -7,8 +7,6 @@ import java.lang.AutoCloseable;
 // Sea-of-Nodes
 public class TmpNode extends Node implements AutoCloseable {
   public TmpNode() { super(OP_TMP); }
-  @Override String str() { return "tmp"; }
-  @Override public String toString() { return "tmp"; } // TOoOoOo many use/defs, print none
   @Override public Node ideal(GVNGCM gvn) { return null; }
   @Override public Type value(GVNGCM gvn) { return TypeErr.ALL; }
   // TmpNodes are never equal

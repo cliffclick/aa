@@ -6,7 +6,6 @@ import com.cliffc.aa.*;
 public class PhiNode extends Node {
   public PhiNode( Node... vals) { super(OP_PHI,vals); }
   PhiNode( byte op, Node fun, Node defalt ) { super(op,fun,defalt); } // For ParmNodes
-  @Override String str() { return "Phi"; }
   @Override public Node ideal(GVNGCM gvn) {
     RegionNode r = (RegionNode)at(0);
     assert r._defs._len==_defs._len;

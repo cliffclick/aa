@@ -88,15 +88,18 @@ public abstract class Node implements Cloneable {
   }
   
   // Short string name
-  String str() { return STRS[_op]; }
+  String xstr() { return STRS[_op]; } // Self   short name
+  String  str() { return xstr(); }    // Inline short name
   @Override public String toString() { return toString(0,new SB()).toString(); }
   public String toString( int max ) { return toString(0, new SB(),max,new BitSet()).toString();  }
   private SB toString( int d, SB sb ) {
-    xstr(sb.i(d));
-    for( Node n : _defs ) (n == null ? sb.p('_') : n.xstr(sb)).p(' ');
-    return sb;
+    sb.i(d).p(_uid).p(':').p(xstr()).p(' ');
+    for( Node n : _defs ) (n == null ? sb.p('_') : n.str(sb)).p(' ');
+    sb.p(" [[");
+    for( Node n : _uses ) sb.p(n._uid).p(' ');
+    return sb.p("]]");
   }
-  private SB xstr(SB sb) { return sb.p(_uid).p(':').p(str()).p(' '); }
+  private SB str(SB sb) { return sb.p(_uid).p(':').p(str()).p(' '); }
   private SB toString( int d, SB sb, int max, BitSet bs ) {
     if( bs.get(_uid) ) return sb;
     bs.set(_uid);
@@ -172,7 +175,7 @@ public abstract class Node implements Cloneable {
     assert !is_dead();
     if( bs.get(_uid) ) return errs; // Been there, done that
     bs.set(_uid);                   // Only walk once
-    if( this instanceof TypeNode ) // Gather errors
+    if( this instanceof TypeNode )  // Gather errors
       errs = Parse.add_err(errs,((TypeNode)this).err(gvn));
     for( int i=0; i<_defs._len; i++ ) {
       Node def = _defs.at(i);   // Walk data defs for more errors

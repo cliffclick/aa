@@ -43,7 +43,7 @@ public class TestType {
     // error; mismatch arg count
     testerr("!()"       , "Call to unary function '!', but missing the one required argument"," ");
     testerr("math_pi(1)", "A function is being called, but 3.141592653589793 is not a function type","          ");
-    testerr("{+}(1,2,3)", "Argument mismatch in call to +:[{flt64 flt64 -> flt64},{int64 int64 -> int64},]","          ");
+    testerr("{+}(1,2,3)", "Argument mismatch in call to +:[{flt64 flt64 -> flt64},{int64 int64 -> int64},]","   ");
 
     // Parsed as +(1,(2*3))
     test("{+}(1, 2 * 3) ", TypeInt.con(7));
@@ -163,11 +163,20 @@ public class TestType {
   // TODO: Observation: value() calls need to be monotonic, can test this.
   @Test public void testCommuteSymmetricAssociative() {
     // Uncomment to insert a single test to focus on
-    Type t0 = TypeFun.any(0,-1);
-    Type t1 = TypeFun.any(1,-1);
-    Type t2 = t0.meet(t1);
-    Type t3 = Type.NUM.meet(t2);
-    Assert.assertEquals(Type.SCALAR,t3);
+
+    // {0   & Pi} & {flt+int}
+    // {0.0 & Pi} & {flt+int}
+    //   flt      & {flt+int}
+    //   flt
+    
+    Type mt0 = TypeInt.FALSE.meet(TypeFlt.PI); 
+    Type mt1 = mt0.meet(TypeUnion.ANY_NUM);
+    Assert.assertTrue(mt1==TypeFlt.FLT64);
+    
+    Type pi = TypeFlt.PI;
+    Type anum = TypeUnion.ANY_NUM;
+    Type mt = pi.meet(anum);
+    //Assert.assertTrue(anum==mt0);
     Assert.assertTrue(Type.check_startup());
   }  
 }

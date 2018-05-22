@@ -79,7 +79,7 @@ public class FunNode extends RegionNode {
   private static int CNT=1; // Function index; -1 for 'all' and 0 for 'any'
   public final TypeFun _tf; // Worse-case correct type
   private final byte _op_prec;// Operator precedence; only set top-level primitive wrappers
-  public final String _name;// Optional function name
+  public String _name;        // Optional function name
   public FunNode(Node scope, PrimNode prim) {
     this(scope,TypeFun.make(prim._targs,prim._ret,CNT++),prim.op_prec(),prim._name);
   }
@@ -115,15 +115,38 @@ public class FunNode extends RegionNode {
     FUNS.set_def(fidx,null,gvn);
   }
   public static ProjNode get(int fidx) { return (ProjNode)FUNS.at(fidx); }
-  @Override String str() { return "fun#"+fidx()+":"+_tf.toString(); }
+  @Override String xstr() { return _tf.toString(); }
+  @Override String str() { return _name==null ? _tf._fidxs.toString() : _name; }
+  // Debug only: make an attempt to bind name to a function
+  public static void bind(String tok, int fidx) {
+    FunNode fun = (FunNode)get(fidx).at(0).at(2);
+    if( fun._name == null ) fun._name = tok;
+  }
 
+  // FunNodes can "discover" callers if the function constant exists in the
+  // program anywhere (since, during execution (or optimizations) it may arrive
+  // at a CallNode and initiate a new call to the function).  Until all callers
+  // are accounted for, the FunNode keeps slot1 reserved with the most
+  // conservative allowed arguments, under the assumption a as-yet-detected
+  // caller will call with such arguments.  This is a quick check to detect
+  // may-have-more-callers.  
+  boolean has_unknown_callers(GVNGCM gvn) {
+    Node funcon = gvn.con(_tf);
+    for( Node use : funcon._uses ) {
+      if( use instanceof ScopeNode ) return true;
+      throw AA.unimpl();
+    }
+    return false;
+  }
+
+  
   // ----
   @Override public Node ideal(GVNGCM gvn) {
     Node n = split_callers(gvn);
     if( n != null ) return n;
     
     // Else generic Region ideal
-    return ideal(gvn,gvn.type(at(1))==Type.CONTROL);
+    return ideal(gvn,has_unknown_callers(gvn));
   }
 
   private Node split_callers( GVNGCM gvn ) {
@@ -199,11 +222,10 @@ public class FunNode extends RegionNode {
     // Visit all ParmNodes, looking for unresolved call uses
     boolean any_unr=false;
     for( ParmNode parm : parms )
-      for( Node use : parm._uses )
-        if( use instanceof CallNode &&
-            gvn.type(use.at(1)) instanceof TypeUnion || // Call overload not resolved
-            (gvn.type(use) instanceof TypeTuple &&      // Call result is an error (arg mismatch)
-             ((TypeTuple)gvn.type(use)).at(1) instanceof TypeErr) ) {
+      for( Node call : parm._uses )
+        if( call instanceof CallNode &&
+            (gvn.type(call.at(1)) instanceof TypeUnion || // Call overload not resolved
+             gvn.type(call      ) instanceof TypeErr ) ) {// Call result is an error (arg mismatch)
           any_unr = true; break;
         }
     if( !any_unr ) return null; // No unresolved calls; no point in type-specialization

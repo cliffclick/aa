@@ -7,7 +7,7 @@ import com.cliffc.aa.*;
 public final class ErrNode extends Node {
   final String _msg;
   public ErrNode( Node ctrl, String msg ) { super(OP_ERR,ctrl); _msg = msg; }
-  @Override String str() { return _msg; }
+  @Override String xstr() { return _msg; }
   @Override public Node ideal(GVNGCM gvn) { return null; }
   @Override public Type value(GVNGCM gvn) { return gvn.type(at(0)); } // Just pass control state thru
   @Override public Type all_type() { return Type.CONTROL; }

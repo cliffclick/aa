@@ -66,6 +66,7 @@ public class Parse {
     _str = str;          // Keep a complete string copy for java number parsing
     _gvn = Env._gvn;     // Pessimistic during parsing
   }
+  
   // Parse the string in the given lookup context, and return an executable program
   TypeEnv go( ) { return prog(); }
 
@@ -124,11 +125,14 @@ public class Parse {
       return toks._len == 0 ? null
         : con(err_ctrl("Missing ifex after assignment of '"+toks.last()+"'"));
     // Honor all type requests, all at once
-    for( Type t : ts ) if( t != null ) ifex = gvn(new TypeNode(t,ifex,errMsg("%s")));
+    for( Type t : ts ) if( t != null ) ifex = gvn(new TypeNode(t,ifex,errMsg()));
     for( String tok : toks ) {
       Node n = _e.lookup(tok);
-      if( n==null ) _e.add(tok,ifex);
-      else { // Handle forward referenced function definitions
+      if( n==null ) {           // Token not already bound to a value
+        _e.add(tok,ifex);       // Bind token to a value
+        Type tifex = _gvn.type(ifex); // Debug only: bind name to function if possible
+        if( tifex instanceof TypeFun ) ((TypeFun)tifex).bind(tok);
+      } else { // Handle forward referenced function definitions
         Type nt = _gvn.type(n);
         if( n instanceof ConNode && nt instanceof TypeFun ) {
           _gvn.subsume(n,ifex); // Subsume forward ref function constant
@@ -207,7 +211,7 @@ public class Parse {
           Node fun = funs.at(i);
           assert fun.op_prec() <= max;
           if( fun.op_prec() < max ) continue; // Not yet
-          Node call = do_call(new CallNode(ctrl(),fun,args.at(i-1),args.at(i)));
+          Node call = do_call(new CallNode(errMsg(),ctrl(),fun,args.at(i-1),args.at(i)));
           args.set_def(i-1,call,_gvn);
           funs.remove(i);  args.remove(i);  i--;
         }
@@ -227,7 +231,7 @@ public class Parse {
     while( fun != null ) {           // Have tfact?
       if( skipWS() == -1 ) return fun; // Just the original term
       // Function application; parse out the argument list
-      try( CallNode args = new CallNode() ) {
+      try( CallNode args = new CallNode(errMsg()) ) {
         args.add_def(ctrl());
         args.add_def(fun);
         if( peek('(') ) {               // Traditional fcn application
@@ -276,7 +280,7 @@ public class Parse {
    */
   private Node tfact() {
     Node n = nfact();
-    return (n!=null && peek('@')) ? gvn(new TypeNode(type(),n,errMsg("%s"))) : n;
+    return (n!=null && peek('@')) ? gvn(new TypeNode(type(),n,errMsg())) : n;
   }
   
   /** Parse any leading unary ops before a factor
@@ -290,7 +294,7 @@ public class Parse {
       if( unifun != null && unifun.op_prec() > 0 )  {
         Node arg = nfact(); // Recursive call
         if( arg == null ) { err_ctrl0("Call to unary function '"+uni+"', but missing the one required argument"); return null; }
-        return do_call(new CallNode(ctrl(),con(unifun),arg));
+        return do_call(new CallNode(errMsg(),ctrl(),con(unifun),arg));
       } else {
         _x=oldx;                // Unwind token parse and try again for a factor
       }
@@ -497,17 +501,17 @@ public class Parse {
   private Node do_call( Node call0 ) {
     Node call = gvn(call0);
     // Some calls die instantly; wrap a line-number around the error and bail out
-    Type tc = _gvn.type(call);
-    if( tc instanceof TypeErr ) {
-      String msg = ((TypeErr)tc)._msg;
-      assert !msg.equals("Arg mismatch in call");
-      kill(call);             // Call is definitely failing
-      return con(err_ctrl(msg));
-    }
+    //Type tc = _gvn.type(call);
+    //if( tc instanceof TypeErr ) {
+    //  String msg = ((TypeErr)tc)._msg;
+    //  assert !msg.equals("Arg mismatch in call");
+    //  kill(call);             // Call is definitely failing
+    //  return con(err_ctrl(msg));
+    //}
     
     // Primitives frequently inline immediately, and do not need following
     // control/data projections.
-    if( !(call instanceof CallNode) && !(call instanceof TypeNode)) return call;
+    if( !(call instanceof CallNode)) return call;
 
     call.add_def(call);         // Hook, so not deleted after 1st use
     set_ctrl(gvn(new CProjNode(call,0)));
@@ -531,6 +535,16 @@ public class Parse {
     errs.add(msg);
     return errs;
   }
+  // Make a private clone just for delayed error messages
+  private Parse( Parse P ) {
+    _src = P._src;  
+    _buf = P._buf;
+    _x   = P._x;
+    _line= P._line;
+    _e   = null;  _gvn = null;  _nf  = null;  _pp  = null;  _str = null;
+  }
+  // Delayed error message
+  public Parse errMsg() { return new Parse(this); }
 
   // Build a string of the given message, the current line being parsed,
   // and line of the pointer to the current index.
