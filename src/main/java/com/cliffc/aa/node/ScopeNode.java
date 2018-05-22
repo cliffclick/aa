@@ -19,12 +19,13 @@ public class ScopeNode extends Node {
   }
   
   // Add a Node to an UnresolvedNode.  Must be a function.
-  public void add_fun(String name, TypeFun tf) {
+  public void add_fun(String name, EpilogNode epi) {
     Integer ii = _vals.get(name);
-    if( ii==null ) add(name,new ConNode<>(tf));
+    if( ii==null ) add(name,epi);
     else {
-      ConNode con = (ConNode)_defs.at(ii);
-      con._t = con._t.join(tf);
+      Node n = _defs.at(ii);
+      if( n instanceof UnresolvedNode ) n.add_def(epi);
+      else set_def(ii,new UnresolvedNode(n,epi),null);
     }
   }
   

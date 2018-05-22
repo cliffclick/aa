@@ -35,18 +35,17 @@ public class Env implements AutoCloseable {
   
   // Called during basic Env creation, this wraps a PrimNode as a full
   // 1st-class function to be passed about or assigned to variables.
-  private TypeFun as_fun( PrimNode prim ) {
+  private EpilogNode as_fun( PrimNode prim ) {
     Type[] targs = prim._targs._ts;
     String[] args = prim._args;
-    FunNode fun = _gvn.init(new FunNode(_scope, prim)); // Points to ScopeNode only
+    FunNode  fun = _gvn.init(new  FunNode(_scope, prim)); // Points to ScopeNode only
+    ParmNode rpc = _gvn.init(new ParmNode(-1,"rpc",fun,_gvn.con(TypeRPC.ALL_CALL)));
     prim.add_def(null);         // Control for the primitive
     for( int i=0; i<args.length; i++ )
       prim.add_def(_gvn.init(new ParmNode(i,args[i],fun,_gvn.con(targs[i]))));
     PrimNode x = _gvn.init(prim);
     assert x==prim;
-    ProjNode proj = _gvn.init(new CProjNode(_gvn.init(new RetNode(fun,prim,fun)),1));
-    fun.init(proj);
-    return fun._tf;
+    return _gvn.init(new EpilogNode(fun,prim,rpc,fun));
   }
 
   public Node add( String name, Node val ) { return _scope.add(name,val); }
@@ -60,8 +59,9 @@ public class Env implements AutoCloseable {
     _scope.del_locals(_gvn);
     if( _scope.is_dead() ) return;
     if( _par._par == null ) {
-      FunNode.reset_to_init0(_gvn);
-      _gvn   .reset_to_init0();
+      CallNode.reset_to_init0(_gvn);
+      FunNode .reset_to_init0(_gvn);
+      _gvn    .reset_to_init0();
       return;
     }
     // Whats left is function-ref generic entry points; promote to next outer scope
@@ -70,7 +70,8 @@ public class Env implements AutoCloseable {
       int idx = use._defs.find(a -> a==_scope);
       use.set_def(idx, _par._scope, _gvn); // Move it upscope
       if( use instanceof FunNode )
-        _par._scope.add(((FunNode)use)._name, _gvn.con(((FunNode)use)._tf));
+        //_par._scope.add(((FunNode)use)._name, _gvn.con(((FunNode)use)._tf));
+        throw AA.unimpl();
     }
     _gvn.kill0(_scope);
   }
@@ -104,11 +105,11 @@ public class Env implements AutoCloseable {
     return _par == null ? null : _par.lookup(token);
   }
 
-  // Lookup the name.  If the result is an ConNode of functions, filter out all
+  // Lookup the name.  If the result is an UnresolvedNode of functions, filter out all
   // the wrong-arg-count functions.  Only returns nodes registered with GVN.
-  Type lookup_filter( String token, GVNGCM gvn, int nargs ) {
+  Node lookup_filter( String token, GVNGCM gvn, int nargs ) {
     Node n = lookup(token);
-    return n == null ? null : gvn.type(n).filter(nargs);
+    return n == null ? null : (n instanceof UnresolvedNode ? ((UnresolvedNode)n).filter(gvn,nargs) : n);
   }
 
   // Type lookup

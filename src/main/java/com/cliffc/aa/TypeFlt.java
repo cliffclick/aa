@@ -49,6 +49,7 @@ public class TypeFlt extends Type {
     case TFLT:   break;
     case TINT:   return ((TypeInt)t).xmeetf(this);
     case TSTR:   return TypeUnion.make(false,TypeStr.STR,this);
+    case TRPC:
     case TFUN:   return Type.SCALAR;
     case TERROR: return ((TypeErr)t)._all ? t : this;
     case TCONTROL:

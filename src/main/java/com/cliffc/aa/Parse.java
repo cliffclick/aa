@@ -194,11 +194,11 @@ public class Parse {
         int oldx = _x;
         String bin = token();
         if( bin==null ) break;    // Valid parse, but no more Kleene star
-        Type binfun = _e.lookup_filter(bin,_gvn,2); // BinOp, or null
+        Node binfun = _e.lookup_filter(bin,_gvn,2); // BinOp, or null
         if( binfun==null ) { _x=oldx; break; } // Not a binop, no more Kleene star
         term = term();
         if( term == null ) term = con(err_ctrl("missing expr after binary op "+bin));
-        funs.add(con(binfun));  args.add_def(term);
+        funs.add(binfun);  args.add_def(term);
       }
   
       // Have a list of interspersed operators and terms.
@@ -249,11 +249,11 @@ public class Parse {
           if( t.forward_ref() ) {     // Forward ref; partial def
             if( !(fun instanceof ConNode) ) throw AA.unimpl();       // Do not understand?
             // Join with argument types & count.
-            TypeFun tf2 = TypeFun.make(args.args(_gvn),((TypeFun)t)._ret,((TypeFun)t)._fidxs);
+            //TypeFun tf2 = TypeFun.make(args.args(_gvn),((TypeFun)t)._ret,((TypeFun)t)._fidxs);
             // Replace here...
             //_gvn.subsume(fun,_gvn.con(tf2));
             // And replace as the forward-ref function
-            FunNode fun2 = tf2.funnode();
+            //FunNode fun2 = tf2.funnode();
             //_gvn.subsume(fun2,_gvn.init(new FunNode(fun2.at(1),tf2,-1,fun2._name)));
             throw AA.unimpl();
           } else if( t.filter(args._defs._len-2)==null )
@@ -290,11 +290,11 @@ public class Parse {
     int oldx = _x;
     String uni = token();
     if( uni!=null ) { // Valid parse
-      Type unifun = _e.lookup_filter(uni,_gvn,1);
+      Node unifun = _e.lookup_filter(uni,_gvn,1);
       if( unifun != null && unifun.op_prec() > 0 )  {
         Node arg = nfact(); // Recursive call
         if( arg == null ) { err_ctrl0("Call to unary function '"+uni+"', but missing the one required argument"); return null; }
-        return do_call(new CallNode(errMsg(),ctrl(),con(unifun),arg));
+        return do_call(new CallNode(errMsg(),ctrl(),unifun,arg));
       } else {
         _x=oldx;                // Unwind token parse and try again for a factor
       }
@@ -340,9 +340,10 @@ public class Parse {
     if( var == null ) {
       // TODO: Allow unknown refs in function position, to allow recursion
       //return con(err_ctrl("Unknown ref '"+tok+"'"));
-      FunNode fun = init(new FunNode(_e._scope,tok));
-      fun.init(init(new CProjNode(init(new RetNode(fun,fun,fun)),1)));
-      return _e.add(tok,con(fun._tf));
+      //FunNode fun = init(new FunNode(_e._scope,tok));
+      //fun.init(init(new CProjNode(init(new RetNode(fun,fun,fun)),1)));
+      //return _e.add(tok,con(fun._tf));
+      throw AA.unimpl();
     }
     // Disallow uniop and binop functions as factors.
     if( var.op_prec() > 0 ) { _x = oldx; return null; }
@@ -363,19 +364,20 @@ public class Parse {
       ids.add(tok);
     }
     Node old_ctrl = ctrl();
-    FunNode fun = init(new FunNode(ids._len,old_ctrl));
-    try( Env e = new Env(_e) ) {// Nest an environment for the local vars
-      _e = e;                   // Push nested environment
-      set_ctrl(fun);            // New control is function head
-      int cnt=0;                // Add parameters to local environment
-      for( String id : ids )  _e.add(id,gvn(new ParmNode(cnt++,id,fun,con(Type.SCALAR))));
-      Node rez = stmt();        // Parse function body
-      fun.init(init(new CProjNode(init(new RetNode(ctrl(),rez,fun)),1)));
-      require('}');             // 
-      _e = _e._par;             // Pop nested environment
-      set_ctrl(old_ctrl);       // Back to the pre-function-def control
-      return (e._ret = con(fun._tf)); // Return function; close-out and DCE 'e'
-    }
+    throw AA.unimpl();
+    //FunNode fun = init(new FunNode(ids._len,old_ctrl));
+    //try( Env e = new Env(_e) ) {// Nest an environment for the local vars
+    //  _e = e;                   // Push nested environment
+    //  set_ctrl(fun);            // New control is function head
+    //  int cnt=0;                // Add parameters to local environment
+    //  for( String id : ids )  _e.add(id,gvn(new ParmNode(cnt++,id,fun,con(Type.SCALAR))));
+    //  Node rez = stmt();        // Parse function body
+    //  fun.init(init(new CProjNode(init(new RetNode(ctrl(),rez,fun)),1)));
+    //  require('}');             // 
+    //  _e = _e._par;             // Pop nested environment
+    //  set_ctrl(old_ctrl);       // Back to the pre-function-def control
+    //  return (e._ret = con(fun._tf)); // Return function; close-out and DCE 'e'
+    //}
   }
   
   private String token() { skipWS();  return token0(); }

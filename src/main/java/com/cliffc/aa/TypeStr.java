@@ -44,6 +44,7 @@ public class TypeStr extends Type {
     case TSTR:   break;
     case TINT:   return TypeUnion.make(false,STR,t);
     case TFLT:   return TypeUnion.make(false,STR,t);
+    case TRPC:
     case TFUN:   return Type.SCALAR;
     case TERROR: return ((TypeErr)t)._all ? t : this;
     case TCONTROL:

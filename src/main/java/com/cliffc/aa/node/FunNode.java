@@ -2,6 +2,8 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.*;
 import com.cliffc.aa.util.Ary;
+import com.cliffc.aa.util.Bits;
+import com.cliffc.aa.util.SB;
 
 import java.util.HashMap;
 
@@ -79,7 +81,6 @@ public class FunNode extends RegionNode {
   private static int CNT=1; // Function index; -1 for 'all' and 0 for 'any'
   public final TypeFun _tf; // Worse-case correct type
   private final byte _op_prec;// Operator precedence; only set top-level primitive wrappers
-  public String _name;        // Optional function name
   public FunNode(Node scope, PrimNode prim) {
     this(scope,TypeFun.make(prim._targs,prim._ret,CNT++),prim.op_prec(),prim._name);
   }
@@ -94,34 +95,56 @@ public class FunNode extends RegionNode {
     super(OP_FUN,scope);
     _tf = tf;
     _op_prec = (byte)op_prec;
-    _name = name;
+    bind(name,tf.fidx());
   }
   private int fidx() { return _tf._fidxs.getbit(); }
-  public static TmpNode FUNS = new TmpNode();
-  public void init(ProjNode proj) { FUNS.set_def(fidx(),proj); }
+  public void init(ProjNode proj) {
+    throw AA.unimpl();
+    //FUNS.set_def(fidx(),proj);
+  }
   private static int PRIM_CNT;
   public static void init0() { PRIM_CNT=CNT; }
-  public static void reset_to_init0(GVNGCM gvn) {
-    while( FUNS._defs._len > PRIM_CNT )
-      FUNS.remove(FUNS._defs._len-1,gvn);
-    CNT = PRIM_CNT;
-  }
+  public static void reset_to_init0(GVNGCM gvn) { CNT = PRIM_CNT; NAMES.set_len(PRIM_CNT); }
   public static void clear_forward_ref(Type t, GVNGCM gvn) {
     assert t.forward_ref();
     int fidx = ((TypeFun)t).fidx();
-    // The FunNode points to the current scope; when deleting the FunNode do
-    // NOT also delete the current scope, even if this is the last use.
-    FUNS.at(fidx).at(0).at(2).pop();
-    FUNS.set_def(fidx,null,gvn);
+    //// The FunNode points to the current scope; when deleting the FunNode do
+    //// NOT also delete the current scope, even if this is the last use.
+    //FUNS.at(fidx).at(0).at(2).pop();
+    //FUNS.set_def(fidx,null,gvn);
+    throw AA.unimpl();
   }
-  public static ProjNode get(int fidx) { return (ProjNode)FUNS.at(fidx); }
+  public static ProjNode get(int fidx) {
+    throw AA.unimpl();
+    //return (ProjNode)FUNS.at(fidx);
+  }
   @Override String xstr() { return _tf.toString(); }
-  @Override String str() { return _name==null ? _tf._fidxs.toString() : _name; }
+  @Override String str() { return names(_tf._fidxs,new SB()).toString(); }
   // Debug only: make an attempt to bind name to a function
+  private static Ary<String> NAMES = new Ary<>(new String[1],0);
   public static void bind(String tok, int fidx) {
-    FunNode fun = (FunNode)get(fidx).at(0).at(2);
-    if( fun._name == null ) fun._name = tok;
+    assert NAMES.atX(fidx)==null; // Attempt to double-bind
+    NAMES.setX(fidx,tok);
   }
+  // Can return nothing, or "name" or "{name0,name1,name2...}"
+  public static SB names(Bits fidxs, SB sb ) {
+    int fidx = fidxs.abit();
+    if( fidx > 0 ) return name(fidx,sb);
+    sb.p('{');
+    int cnt=0;
+    for( Integer ii : fidxs ) {
+      if( ++cnt==3 ) break;
+      name(ii,sb).p(',');
+    }
+    if( cnt>=3 || fidxs.abit() < 0 ) sb.p("...");
+    sb.p('}');
+    return sb;
+  }
+  private static SB name( int i, SB sb ) {
+    String name = NAMES.atX(i);
+    return sb.p(name==null?Integer.toString(i):name);
+  }
+  public String name() { return NAMES.at(_tf._fidxs.getbit()); }
 
   // FunNodes can "discover" callers if the function constant exists in the
   // program anywhere (since, during execution (or optimizations) it may arrive
@@ -208,9 +231,10 @@ public class FunNode extends RegionNode {
     }
     // Make a prototype new function header.  No generic unknown caller
     // in slot 1, only slot 2.
-    FunNode fun = new FunNode(gvn.con(TypeErr.ANY),_tf._ts,_tf._ret,_name);
-    fun.add_def(at(2));
-    return fun;
+    //FunNode fun = new FunNode(gvn.con(TypeErr.ANY),_tf._ts,_tf._ret,_name);
+    //fun.add_def(at(2));
+    //return fun;
+    throw AA.unimpl();
   }
 
   // Look for type-specialization inlining.  If any ParmNode has an unresolved
@@ -245,15 +269,16 @@ public class FunNode extends RegionNode {
     assert ts.isa(_tf._ts);
     if( ts == _tf._ts ) return null; // No improvement for further splitting
     // Make a prototype new function header.  Clone the generic unknown caller in slot 1.  
-    FunNode fun = new FunNode(at(1),ts,_tf._ret,_name);
-    // Look at remaining paths and decide if they split or stay
-    for( int j=2; j<projs.length; j++ ) {
-      boolean split=true;
-      for( int i=0; i<parms.length; i++ )
-        split &= gvn.type(parms[i].at(j)).widen().isa(sig[i]);
-      fun.add_def(split ? at(j) : gvn.con(TypeErr.ANY));
-    }
-    return fun;
+    //FunNode fun = new FunNode(at(1),ts,_tf._ret,_name);
+    //// Look at remaining paths and decide if they split or stay
+    //for( int j=2; j<projs.length; j++ ) {
+    //  boolean split=true;
+    //  for( int i=0; i<parms.length; i++ )
+    //    split &= gvn.type(parms[i].at(j)).widen().isa(sig[i]);
+    //  fun.add_def(split ? at(j) : gvn.con(TypeErr.ANY));
+    //}
+    //return fun;
+    throw AA.unimpl();
   }
 
   // Clone the function body, and split the callers of 'this' into 2 sets; one

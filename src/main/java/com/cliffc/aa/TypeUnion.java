@@ -240,7 +240,7 @@ public class TypeUnion extends Type {
   public String errMsg() {
     assert _any;                // Expect only function choice here
     TypeFun tf = (TypeFun)_ts.at(0);
-    String name = tf.funnode()._name;
+    String name = tf.funnode().name();
     SB sb = new SB().p(name).p(':').p('[');
     for( Type t : _ts._ts )
       ((TypeFun)t).str(sb).p(',');

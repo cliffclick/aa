@@ -74,7 +74,7 @@ public class Bits implements Iterable<Integer> {
   
   public boolean test(int i) {
     int idx = idx(i);
-    return idx < _bits.length ? (_bits[idx]&mask(i))!=0 : false;
+    return idx < _bits.length ? (_bits[idx]&mask(i))!=0 : (_bit<0);
   }
 
   public int getbit() { assert _bit > 0; return _bit; }

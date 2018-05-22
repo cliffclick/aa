@@ -86,6 +86,7 @@ public class TypeTuple extends Type {
     switch( t._type ) {
     case TTUPLE: break;
     case TUNION:
+    case TRPC:
     case TFLT:
     case TINT:
     case TSTR:

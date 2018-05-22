@@ -18,10 +18,15 @@ public class Ary<E> implements Iterable<E> {
   /** @return active list length */
   public int len() { return _len; }
   /** @param i element index
-   *  @return element being returned */
+   *  @return element being returned; throws if OOB */
   public E at( int i ) {
     range_check(i);
     return _es[i];
+  }
+  /** @param i element index
+   *  @return element being returned, or null if OOB */
+  public E atX( int i ) {
+    return i < _len ? _es[i] : null;
   }
   /** @return last element */
   public E last( ) {

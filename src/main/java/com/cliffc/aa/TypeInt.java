@@ -58,6 +58,7 @@ public class TypeInt extends Type {
     case TINT:   break;
     case TFLT:   return xmeetf((TypeFlt)t);
     case TSTR:   return TypeUnion.make(false,TypeStr.STR,this);
+    case TRPC:
     case TFUN:   return Type.SCALAR;
     case TERROR: return ((TypeErr)t)._all ? t : this;
     case TCONTROL:

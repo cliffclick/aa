@@ -23,7 +23,9 @@ public abstract class Node implements Cloneable {
   static final byte OP_SCOPE=13;
   static final byte OP_TMP  =14;
   static final byte OP_TYPE =15;
-  private static final String[] STRS = new String[] { null, "Call", "Cast", "Con", "Err", "Fun", "If", "Parm", "Phi", "Prim", "Proj", "Region", "Ret", "Scope", "Tmp", "Type" };
+  static final byte OP_EPI  =16;
+  static final byte OP_UNR  =17;
+  private static final String[] STRS = new String[] { null, "Call", "Cast", "Con", "Err", "Fun", "If", "Parm", "Phi", "Prim", "Proj", "Region", "Ret", "Scope", "Tmp", "Type", "Epilog", "Unresolved" };
 
   public int _uid=Env._gvn.uid(); // Unique ID, will have gaps, used to give a dense numbering to nodes
   private final byte _op;
@@ -62,16 +64,12 @@ public abstract class Node implements Cloneable {
 
   // Uses.  Generally variable length; unordered, no nulls, compressed, unused trailing space
   public Ary<Node> _uses = new Ary<>(new Node[1],0);
-  // Strictly add uses (no defs)
-  private void add_use( Node n ) {
-    assert _uses != null;
-    _uses.add(n); }
 
   Node( byte op ) { _op = op; _defs = new Ary<>(new Node[1],0); }
   Node( byte op, Node... defs ) {
     _op = op;
     _defs = new Ary<>(defs);
-    for( Node def : defs ) if( def != null ) def.add_use(this);
+    for( Node def : defs ) if( def != null ) def._uses.add(this);
   }
 
   // Make a copy of the base node, with no defs nor uses and a new UID.

@@ -87,10 +87,11 @@ public class Type {
   static final byte TUNION  =10; // Union types (finite collections of unrelated types Meet together); see TypeUnion
   static final byte TTUPLE  =11; // Tuples; finite collections of unrelated Types, kept in parallel
   static final byte TFUN    =12; // Functions; both domain and range are a Tuple; see TypeFun                            
-  static final byte TFLT    =13; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
-  static final byte TINT    =14; // All Integers, including signed/unsigned and various sizes; see TypeInt
-  static final byte TSTR    =15; // String type
-  static final byte TLAST   =16; // Type check
+  static final byte TRPC    =13; // Return PCs; Continuations; call-site return points; see TypeRPC
+  static final byte TFLT    =14; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
+  static final byte TINT    =15; // All Integers, including signed/unsigned and various sizes; see TypeInt
+  static final byte TSTR    =16; // String type
+  static final byte TLAST   =17; // Type check
   
   public  static final Type CONTROL= make(TCONTROL); // Control
   public  static final Type  SCALAR= make( TSCALAR); // ptrs, ints, flts; things that fit in a machine register
@@ -157,6 +158,7 @@ public class Type {
     // with any function
     if( t._type == TSTR ) return SCALAR;
     if( t._type == TFUN ) return SCALAR;
+    if( t._type == TRPC ) return SCALAR;
     // Union of functions, with a number
     if( t._type == TUNION && ((TypeUnion)t)._ts.at(0)._type==TFUN )
       return SCALAR;
@@ -213,6 +215,7 @@ public class Type {
     ts = concat(ts,TypeStr  .TYPES);
     ts = concat(ts,TypeTuple.TYPES);
     ts = concat(ts,TypeFun  .TYPES);
+    ts = concat(ts,TypeRPC  .TYPES);
     ts = concat(ts,TypeUnion.TYPES);
     
     // Confirm commutative & complete
@@ -265,6 +268,7 @@ public class Type {
       return true;              // These are all above center
     case TERROR:
     case TFUN:
+    case TRPC:
     case TUNION:
     case TTUPLE:
     case TFLT:
@@ -284,14 +288,7 @@ public class Type {
     case TXNUM:
     case TXSCALAR:
       return true;              // These all include some constants
-    case TERROR:
-    case TFUN:
-    case TUNION:
-    case TTUPLE:
-    case TFLT:
-    case TINT:
     default: throw AA.unimpl();
-    case TSIMPLE: throw typerr(null);
     }
   }
   public boolean is_con() {
@@ -306,13 +303,7 @@ public class Type {
     case TXSCALAR:
     case TUNION:                // Overridden in subclass
       return false;             // Not exactly a constant
-    case TFUN:      // Functions can be constant (code not data)....
-      return false; // ...but this requires the type system break out signatures from implementations
-    case TTUPLE:
-    case TFLT:
-    case TINT:
     default: throw AA.unimpl();
-    case TSIMPLE: throw typerr(null);
     }
   }
   // Return the argument type of idxth argument.  Error for everybody except

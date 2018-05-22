@@ -23,9 +23,7 @@ public class TypeFun extends Type {
     return _ts==tf._ts && _ret==tf._ret && _fidxs==tf._fidxs;
   }
   @Override public String toString() {
-    SB sb = new SB();
-    String name = _fidxs.abit()>0 && projnode() != null ? funnode()._name : null;
-    return str(name==null ? _fidxs.toString(sb) : sb.p(name)).toString();
+    return str(FunNode.names(_fidxs,new SB())).toString();
   }
   public SB str( SB sb ) {
     sb.p('{');
@@ -62,6 +60,7 @@ public class TypeFun extends Type {
     case TERROR: return ((TypeErr)t)._all ? t : this;
     case TCONTROL:
     case TTUPLE: return TypeErr.ALL;
+    case TRPC:
     case TFLT:
     case TINT:
     case TSTR:   return Type.SCALAR;
@@ -69,17 +68,17 @@ public class TypeFun extends Type {
     case TUNION: return t.xmeet(this); // Let TypeUnion decide
     default: throw typerr(t);   // All else should not happen
     }
+    // Meet of fidxs and args; join of ret
     TypeFun tf = (TypeFun)t;
-    // If either set includes the others functions, use the meet of args+ret.
-    // If the sets do not properly subset, go to a union.
     Bits fidxs = _fidxs.or( tf._fidxs );
-    if( fidxs!=_fidxs && fidxs!=tf._fidxs )
-      return TypeUnion.make(false,this,tf); // Non-overlapping, go to a union
+    //if( fidxs!=_fidxs && fidxs!=tf._fidxs )
+    //  return TypeUnion.make(false,this,tf); // Non-overlapping, go to a union
     TypeTuple ts = (TypeTuple)_ts.meet(tf._ts);
-    Type ret = _ret.meet(tf._ret);
+    Type ret = _ret.join(tf._ret);
     return make(ts,ret,fidxs);
   }
-  
+
+  public int nargs() { return _ts._ts.length; }
   @Override public Type arg(int idx) { return _ts._ts[idx]; }
   @Override public Type ret() { return _ret; }
 
@@ -96,10 +95,13 @@ public class TypeFun extends Type {
   }
   
   // Filter out function types with incorrect arg counts
-  @Override public Type filter(int nargs) { return forward_ref() || _ts._ts.length==nargs ? this : null; }
+  @Override public Type filter(int nargs) { return forward_ref() || nargs()==nargs ? this : null; }
   // Is unspecified length (e.g. forward ref)
   @Override public boolean forward_ref() { RetNode ret = retnode(); return ret.at(0)==ret.at(1); }
-  public String forward_ref_err() { return "Unknown ref '"+funnode()._name+"'"; }  
+  public String forward_ref_err() {
+    //return "Unknown ref '"+funnode()._name+"'";
+    throw AA.unimpl();
+  }
   // Operator precedence
   @Override public byte op_prec() { return funnode().op_prec(); } 
 }
