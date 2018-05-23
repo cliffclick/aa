@@ -9,7 +9,10 @@ import com.cliffc.aa.*;
 // - The FunNode function header (quickly maps to SESE region header)
 public class EpilogNode extends Node {
   public EpilogNode( Node ctrl, Node val, Node rpc, Node fun ) { super(OP_EPI,ctrl,val,rpc,fun); }
-  @Override public Node ideal(GVNGCM gvn) { return null; }
+  @Override public Node ideal(GVNGCM gvn) {
+    gvn.add_work(fun());
+    return null;
+  }
   @Override public Type value(GVNGCM gvn) {
     Type t=TypeTuple.make(gvn.type(ctrl()), // Function exits, or not
                           gvn.type(val ()), // Function return value

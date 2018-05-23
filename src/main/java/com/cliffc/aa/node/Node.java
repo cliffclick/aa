@@ -19,13 +19,13 @@ public abstract class Node implements Cloneable {
   static final byte OP_PRIM = 9;
   static final byte OP_PROJ =10;
   static final byte OP_REGION=11;
-  static final byte OP_RET  =12;
+  static final byte OP_RPC  =12;
   static final byte OP_SCOPE=13;
   static final byte OP_TMP  =14;
   static final byte OP_TYPE =15;
   static final byte OP_EPI  =16;
   static final byte OP_UNR  =17;
-  private static final String[] STRS = new String[] { null, "Call", "Cast", "Con", "Err", "Fun", "If", "Parm", "Phi", "Prim", "Proj", "Region", "Ret", "Scope", "Tmp", "Type", "Epilog", "Unresolved" };
+  private static final String[] STRS = new String[] { null, "Call", "Cast", "Con", "Err", "Fun", "If", "Parm", "Phi", "Prim", "Proj", "Region", "RPC", "Scope", "Tmp", "Type", "Epilog", "Unresolved" };
 
   public int _uid=Env._gvn.uid(); // Unique ID, will have gaps, used to give a dense numbering to nodes
   private final byte _op;

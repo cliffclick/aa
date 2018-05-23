@@ -139,8 +139,12 @@ public class Type {
     if( t==TypeErr.ANY ) return this;
     if( t==TypeErr.ALL ) return    t;
     
-    // Control can only meet Control or Top
-    if( _type == TCONTROL || t._type == TCONTROL ) { return _type == t._type ? CONTROL : TypeErr.ALL; }
+    // Control can only meet Control or Top or Errors
+    if( _type == TCONTROL || t._type == TCONTROL ) {
+      if(   _type == TERROR ) return this;
+      if( t._type == TERROR ) return t;
+      return _type == t._type ? CONTROL : TypeErr.ALL;
+    }
 
     // The rest of these choices are various scalars, which do not match well
     // with any tuple.

@@ -7,7 +7,6 @@ import java.util.HashMap;
 public class Env implements AutoCloseable {
   final Env _par;
   ScopeNode _scope; // Lexical anchor; goes when this environment leaves scope
-  Node _ret;   // Return result
   private final HashMap<String,Type> _types; // user-typing type names
   Env( Env par ) {
     _par=par;

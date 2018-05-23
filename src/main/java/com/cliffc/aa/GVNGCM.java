@@ -222,7 +222,7 @@ public class GVNGCM {
     if( check_new(nnn) ) rereg(nnn); // Replacement in system
     // if old is being replaced, it got removed from GVN table and types table.
     assert !check_opt(old);
-    subsume(old,nnn);
+    if( !old.is_dead() ) subsume(old,nnn);
   }
   /** Look for a better version of 'n'.  Can change n's defs via the ideal()
    *  call, including making new nodes.  Can replace 'n' wholly, with n's uses

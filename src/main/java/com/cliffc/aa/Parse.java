@@ -361,11 +361,11 @@ public class Parse {
       for( String id : ids )  _e.add(id,gvn(new ParmNode(cnt++,id,fun,con(Type.SCALAR))));
       Node rpc = gvn(new ParmNode(-1,"rpc",fun,_gvn.con(TypeRPC.ALL_CALL)));
       Node rez = stmt();        // Parse function body
+      Node epi = gvn(new EpilogNode(ctrl(),rez,rpc,fun));
       require('}');             // 
       _e = _e._par;             // Pop nested environment
-      e._ret = gvn(new EpilogNode(ctrl(),rez,rpc,fun));
       set_ctrl(old_ctrl);       // Back to the pre-function-def control
-      return e._ret;            // Return function; close-out and DCE 'e'
+      return epi;               // Return function; close-out and DCE 'e'
     }
   }
   

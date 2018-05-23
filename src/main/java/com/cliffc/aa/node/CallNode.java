@@ -12,7 +12,7 @@ import com.cliffc.aa.*;
 // Call-inlining can happen anytime we have a known function pointer, and
 // might be several known function pointers - we are inlining the type analysis
 // and not the execution code.  For this kind of inlining we replace the
-// CallNode with a call-site specific RetNode, move all the CallNode args to
+// CallNode with a call-site specific Epilog, move all the CallNode args to
 // the ParmNodes just like the Fun/Parm is a Region/Phi.  The call-site index
 // is just like a ReturnPC value on a real machine; it dictates which of
 // several possible returns apply... and can be merged like a PhiNode
@@ -37,7 +37,7 @@ public class CallNode extends Node implements AutoCloseable {
 
   // Number of actual arguments
   int nargs() { return _defs._len-2; }
-  // Actual arguments
+  // Actual arguments.
   Node arg( int x ) { return _defs.at(x+2); }
   
   // Parser support keeping args alive during parsing; if a syntax exception is
@@ -97,7 +97,6 @@ public class CallNode extends Node implements AutoCloseable {
       return null;
     EpilogNode epi = (EpilogNode)unk;
     Node    rez = epi.val ();
-    Node    rpc = epi.rpc ();
     FunNode fun = epi.fun ();
 
     // Single choice; insert actual conversions as needed
@@ -124,7 +123,7 @@ public class CallNode extends Node implements AutoCloseable {
     if( rez instanceof ParmNode && rez.at(0) == fun ) return inline(gvn,arg(0));
     // Check for constant body
     if( rez instanceof ConNode ) return inline(gvn,rez);
-    
+
     // Check for a 1-op body using only constants or parameters
     boolean can_inline=true;
     for( Node parm : rez._defs )
@@ -138,49 +137,48 @@ public class CallNode extends Node implements AutoCloseable {
         irez.add_def((parm instanceof ParmNode && parm.at(0) == fun) ? arg(((ParmNode)parm)._idx) : parm);
       return inline(gvn,gvn.xform(irez));  // New exciting replacement for inlined call
     }
-    
+
     // If this is a primitive, we never change the function header via inlining the call
     assert fun.at(1)._uid!=0;
-    
+
     // Inline the call site now.
     // This is NOT inlining the function body, just the call site.
-    //if( fun._tf._ts._ts.length != nargs() ) {
-    //  throw AA.unimpl(); // untested?
-    //  //return null; // Incorrect argument count
-    //}
-    //// Add an input path to all incoming arg ParmNodes from the Call.
-    //int pcnt=0;               // Assert all parameters found
-    //for( Node arg : fun._uses ) {
-    //  if( arg.at(0) == fun && arg instanceof ParmNode ) {
-    //    gvn.add_def(arg,arg(((ParmNode)arg)._idx));// 1-based on Parm
-    //    pcnt++;                      // One more arg found
-    //  }
-    //}
-    //assert pcnt == nargs(); // All params found and updated at the function head
-    //gvn.add_def(fun,ctrl); // Add Control for this path
-    //
-    //// Flag the Call as is_copy;
-    //// Proj#0 is local control
-    //// Proj#1 is a new CastNode on the tf._ret to regain precision
-    //// Kill fun in slot 1 and all args.
-    //// TODO: Use actual arg types to regain precision
-    //for( int i=2; i<_defs._len; i++ ) set_def(i,null,gvn);
-    //set_def(0,gvn.xform(new CProjNode( ret ,fun._defs._len-1)),gvn);
-    //return inline(gvn,gvn.xform(new CastNode(at(0),rez,fun._tf._ret)));
-    return null;
+    assert fun._tf._ts._ts.length == nargs();
+    // Add an input path to all incoming arg ParmNodes from the Call.
+    int pcnt=0;               // Assert all parameters found
+    for( Node arg : fun._uses ) {
+      if( arg.at(0) == fun && arg instanceof ParmNode ) {
+        int idx = ((ParmNode)arg)._idx; // Argument number, or -1 for rpc
+        Node actual = idx==-1 ? gvn.con(TypeRPC.make(_rpc)) : arg(idx);
+        gvn.add_def(arg,actual);
+        pcnt++;                      // One more arg found
+      }
+    }
+    assert pcnt == nargs()+1; // All params (and rpc) found and updated at the function head
+    gvn.add_def(fun,ctrl); // Add Control for this path
+
+    // Flag the Call as is_copy;
+    // Proj#0 is RPC to return from the function back to here.
+    // Proj#1 is a new CastNode on the tf._ret to regain precision
+    // All other slots are killed.
+    for( int i=2; i<_defs._len; i++ ) set_def(i,null,gvn);
+    Node rpc = gvn.xform(new RPCNode(epi,epi,_rpc));
+    set_def(0,rpc,gvn);
+    // TODO: Use actual arg types to regain precision
+    return inline(gvn,gvn.xform(new CastNode(rpc,epi,fun._tf._ret)));
   }
 
   // Inline to this Node.
   private Node inline( GVNGCM gvn, Node rez ) {
+    gvn.add_work(at(0));        // Major graph shrinkage; retry parent as well
     set_def(1,rez,gvn);
     _inlined = true;            // Allow data projection to find new body
     return this;
   }
-  
+
   @Override public Type value(GVNGCM gvn) {
     Type t = value0(gvn);
-    if( t instanceof TypeErr ) return t; // Errors poison
-    // Return {control,value} tuple
+    // Return {control,value} tuple.
     return TypeTuple.make(gvn.type(at(0)),t);
   }
   private Type value0(GVNGCM gvn) {

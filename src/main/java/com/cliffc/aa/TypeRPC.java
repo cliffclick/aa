@@ -54,6 +54,7 @@ public class TypeRPC extends Type {
   }
   
   public int rpc() { return _rpcs.getbit(); }
+  public boolean test(int rpc) { return _rpcs.test(rpc); }
   @Override public boolean above_center() { throw AA.unimpl(); }
   @Override public boolean canBeConst() { throw AA.unimpl(); }
   @Override public boolean is_con()   { return _rpcs.abit()>0; }

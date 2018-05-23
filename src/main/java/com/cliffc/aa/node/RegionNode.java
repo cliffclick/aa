@@ -1,8 +1,6 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.Type;
-import com.cliffc.aa.TypeErr;
+import com.cliffc.aa.*;
 
 // Merge results
 public class RegionNode extends Node {
@@ -38,40 +36,13 @@ public class RegionNode extends Node {
     if( dead==0 ) return null;  // No dead paths
 
     // Do a parallel bulk reshape: remove the dead edges from Phis and the
-    // Region all at once (and for FunNodes renumber matching Projs).
-
-    // TODO: REMOVE THIS GRUESOME HACK - and pass RPCs to function calls, merge
-    // at a Phi and the standard dead-path collapse code will Do The Right
-    // Thing.  Will require functions have extra types for the RPC (and they
-    // will eventually require extra types for IO & memory).
-    Node ret=null;
-    for( Node phi : _uses ) {
-      if( phi instanceof PhiNode && phi.at(0)==this ) {
+    // Region all at once
+    for( Node phi : _uses )
+      if( phi instanceof PhiNode )
         for( int i=1,j=1; i<_defs._len; i++ )
           if( gvn.type(at(i))==TypeErr.ANY ) { gvn.unreg(phi); phi.remove(j,gvn); gvn.rereg(phi); }
           else j++;
-      } else if( phi instanceof RetNode && phi.at(2)==this ) ret=phi;
-    }
-    // GRUESOME HACK
-    if( this instanceof FunNode ) {
-      assert ret!=null;
-      CProjNode[] projs = new CProjNode[_defs._len];
-      for( Node use : ret._uses ) projs[((CProjNode)use)._idx] = (CProjNode)use;
-      for( int i=1,j=1; i<_defs._len; i++ )
-        if( gvn.type(at(i))!=TypeErr.ANY ) {
-          if( projs[i] != null && i!=j )
-            gvn.subsume(projs[i],gvn.init(new CProjNode(ret,j)));
-          j++;
-        }
-    }
-    
     for( int i=1; i<_defs._len; i++ ) if( gvn.type(at(i))==TypeErr.ANY ) remove(i--,gvn);
-    if( this instanceof FunNode )
-      // Since projects slide over (in index), the RetNode tuple changed in a
-      // way that is not obviously monotonic.  Reset correct type to dodge the
-      // monotonic assert in gvn
-      gvn.setype(ret,ret.value(gvn));
-
     return this;
   }
   @Override public Node is_copy(GVNGCM gvn, int idx) { assert idx==-1; return _cidx == 0 ? null : at(_cidx); }

@@ -2,7 +2,6 @@ package com.cliffc.aa;
 
 import com.cliffc.aa.node.FunNode;
 import com.cliffc.aa.node.ProjNode;
-import com.cliffc.aa.node.RetNode;
 import com.cliffc.aa.util.Bits;
 import com.cliffc.aa.util.SB;
 

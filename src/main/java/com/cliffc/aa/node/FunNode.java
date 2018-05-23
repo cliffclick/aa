@@ -84,9 +84,9 @@ public class FunNode extends RegionNode {
   public FunNode(Node scope, PrimNode prim) {
     this(scope,TypeFun.make(prim._targs,prim._ret,CNT++),prim.op_prec(),prim._name);
   }
-  //private FunNode(Node scope, TypeTuple ts, Type ret, String name) {
-  //  this(scope,TypeFun.make(ts,ret,CNT++),-1,name);
-  //}
+  private FunNode(Node scope, TypeTuple ts, Type ret, String name) {
+    this(scope,TypeFun.make(ts,ret,CNT++),-1,name);
+  }
   public FunNode(Node scope, String name) { // Used to forward-decl anon functions
     this(scope,TypeFun.make(TypeTuple.ALL,Type.XSCALAR,CNT++),-1,name);
   }
@@ -131,7 +131,7 @@ public class FunNode extends RegionNode {
   }
   private static SB name( int i, SB sb ) {
     String name = NAMES.atX(i);
-    return sb.p(name==null?Integer.toString(i):name);
+    return sb.p(name==null ? "{"+Integer.toString(i)+"}" : name);
   }
   public String name() { return name(_tf._fidxs.getbit()); }
   public static String name(int fidx) { return NAMES.at(fidx); }
@@ -167,50 +167,42 @@ public class FunNode extends RegionNode {
     for( int i=1; i<_defs._len; i++ ) if( gvn.type(at(i))==TypeErr.ANY ) return null;
     if( _defs._len <= 2 ) return null; // No need to split callers if only 1
 
-    // Gather the ParmNodes and the RetNode.  Ignore other (control) uses
+    // Gather the ParmNodes and the EpilogNode.  Ignore other (control) uses
     int nargs = _tf._ts._ts.length;
     ParmNode[] parms = new ParmNode[nargs];
-    RetNode ret = null;
+    ParmNode rpc = null;
+    EpilogNode epi = null;
     for( Node use : _uses )
-      if( use instanceof ParmNode ) parms[((ParmNode)use)._idx] = (ParmNode)use;
-      else if( use instanceof RetNode ) { assert ret==null || ret==use; ret = (RetNode)use; }
-
-    // Find the Proj matching the call to-be-cloned
-    CProjNode[] projs = new CProjNode[_defs._len];
-    for( Node use : ret._uses )
-      if( use instanceof CProjNode )
-        projs[((CProjNode)use)._idx] = (CProjNode)use;
-    // Bail if there are any dead paths; RetNode ideal will clean out
-    if( projs[1] == null ) return null;
-    for( int i=2; i<_defs._len; i++ ) {
-      if( projs[i] == null ) return null;
-      if( projs[i]._uses._len!=2 ) return null; // should be exactly a control-use and a cast-use
-    }
+      if( use instanceof ParmNode ) {
+        ParmNode parm = (ParmNode)use;
+        if( parm._idx == -1 ) rpc = parm;
+        else parms[parm._idx] = parm;
+      } else if( use instanceof EpilogNode ) { assert epi==null || epi==use; epi = (EpilogNode)use; }
 
     // Make a clone of the original function to split the callers.  Done for
     // e.g. primitive type-specialization or for tiny functions.
-    FunNode fun =   split_callers_heuristic(gvn,parms,ret,projs);
-    return fun==null ? null : split_callers(gvn,parms,ret,projs,fun);
+    FunNode fun =   split_callers_heuristic(gvn,parms,epi);
+    return fun==null ? null : split_callers(gvn,rpc  ,epi,fun);
   }
   
   // General heuristic for splitting the many callers of this function into
   // groups with a private function body.  Can be split to refine types
   // (e.g. primitive int math vs primitive float math), or to allow
   // constant-prop for some args, or for tiny size.
-  private FunNode split_callers_heuristic( GVNGCM gvn, ParmNode[] parms, RetNode ret, ProjNode[] projs ) {
+  private FunNode split_callers_heuristic( GVNGCM gvn, ParmNode[] parms, EpilogNode epi ) {
     // Split for tiny body
-    FunNode fun0 = split_size(gvn,parms,ret,projs);
+    FunNode fun0 = split_size(gvn,epi);
     if( fun0 != null ) return fun0;
 
     // Split for primitive type specialization
-    FunNode fun1 = type_special(gvn,parms,ret,projs);
+    FunNode fun1 = type_special(gvn,parms);
     if( fun1 != null ) return fun1;
 
     return null;                // No splitting callers
   }
 
-  private FunNode split_size( GVNGCM gvn, ParmNode[] parms, RetNode ret, ProjNode[] projs ) {
-    Node rez = ret.at(1);
+  private FunNode split_size( GVNGCM gvn, EpilogNode epi ) {
+    Node rez = epi.val();
     if( !(rez instanceof ParmNode && rez.at(0) == this) ) { // Zero-op body
       // Else check for 1-op body
       for( Node parm : rez._defs )
@@ -221,10 +213,9 @@ public class FunNode extends RegionNode {
     }
     // Make a prototype new function header.  No generic unknown caller
     // in slot 1, only slot 2.
-    //FunNode fun = new FunNode(gvn.con(TypeErr.ANY),_tf._ts,_tf._ret,_name);
-    //fun.add_def(at(2));
-    //return fun;
-    throw AA.unimpl();
+    FunNode fun = new FunNode(gvn.con(TypeErr.ANY),_tf._ts,_tf._ret,name());
+    fun.add_def(at(2));
+    return fun;
   }
 
   // Look for type-specialization inlining.  If any ParmNode has an unresolved
@@ -232,14 +223,15 @@ public class FunNode extends RegionNode {
   // up to getting all the function TypeUnions to clear out).  The specialized
   // code uses generalized versions of the arguments, where we only specialize
   // on arguments that help immediately.
-  private FunNode type_special( GVNGCM gvn, ParmNode[] parms, RetNode ret, ProjNode[] projs ) {
+  private FunNode type_special( GVNGCM gvn, ParmNode[] parms ) {
     // Visit all ParmNodes, looking for unresolved call uses
     boolean any_unr=false;
     for( ParmNode parm : parms )
       for( Node call : parm._uses )
         if( call instanceof CallNode &&
             (gvn.type(call.at(1)) instanceof TypeUnion || // Call overload not resolved
-             gvn.type(call      ) instanceof TypeErr ) ) {// Call result is an error (arg mismatch)
+             gvn.type(call      ) instanceof TypeErr ||   // Call result is an error (arg mismatch)
+             ((TypeTuple)gvn.type(call)).at(1) instanceof TypeErr) ) { // Call result is an error (arg mismatch)
           any_unr = true; break;
         }
     if( !any_unr ) return null; // No unresolved calls; no point in type-specialization
@@ -259,22 +251,21 @@ public class FunNode extends RegionNode {
     assert ts.isa(_tf._ts);
     if( ts == _tf._ts ) return null; // No improvement for further splitting
     // Make a prototype new function header.  Clone the generic unknown caller in slot 1.  
-    //FunNode fun = new FunNode(at(1),ts,_tf._ret,_name);
-    //// Look at remaining paths and decide if they split or stay
-    //for( int j=2; j<projs.length; j++ ) {
-    //  boolean split=true;
-    //  for( int i=0; i<parms.length; i++ )
-    //    split &= gvn.type(parms[i].at(j)).widen().isa(sig[i]);
-    //  fun.add_def(split ? at(j) : gvn.con(TypeErr.ANY));
-    //}
-    //return fun;
-    throw AA.unimpl();
+    FunNode fun = new FunNode(at(1),ts,_tf._ret,name());
+    // Look at remaining paths and decide if they split or stay
+    for( int j=2; j<_defs._len; j++ ) {
+      boolean split=true;
+      for( int i=0; i<parms.length; i++ )
+        split &= gvn.type(parms[i].at(j)).widen().isa(sig[i]);
+      fun.add_def(split ? at(j) : gvn.con(TypeErr.ANY));
+    }
+    return fun;
   }
 
   // Clone the function body, and split the callers of 'this' into 2 sets; one
   // for the old and one for the new body.  The new function may have a more
   // refined signature, and perhaps no unknown callers.  
-  private Node split_callers(GVNGCM gvn, ParmNode[] parms, RetNode ret, ProjNode[] projs, FunNode fun) {
+  private Node split_callers(GVNGCM gvn, ParmNode rpc_parm, EpilogNode epi, FunNode fun) {
     // Clone the function body
     HashMap<Node,Node> map = new HashMap<>();
     Ary<Node> work = new Ary<>(new Node[1],0);
@@ -283,9 +274,8 @@ public class FunNode extends RegionNode {
     while( work._len > 0 ) {    // While have work
       Node n = work.pop();      // Get work
       if( map.get(n) != null ) continue; // Already visited?
-      if( n instanceof CastNode && n.at(0).at(0)==ret )
-        continue;              // Do not clone function data-exit 
-      if( n != ret )           // Except for the Ret, control-exit for function
+      assert n.at(0)!=epi && (n._defs._len<=1 || n.at(1)!= epi); // Do not walk past epilog
+      if( n != epi )           // Except for the Epilog; exit for thge function
         work.addAll(n._uses);  // Visit all uses also
       map.put(n,n.copy()); // Make a blank copy with no edges and map from old to new
     }
@@ -301,8 +291,9 @@ public class FunNode extends RegionNode {
       Node c = map.get(n);
       if( n instanceof ParmNode && n.at(0) == this ) {  // Leading edge ParmNodes
         c.add_def(map.get(n.at(0))); // Control
-        c.add_def(gvn.con(fun._tf._ts._ts[((ParmNode)n)._idx])); // Generic arg#1
-        for( int j=2; j<projs.length; j++ ) // Get the new parm path or null according to split
+        int idx = ((ParmNode)n)._idx;
+        c.add_def(gvn.con(idx==-1 ? TypeRPC.ALL_CALL : fun._tf._ts._ts[idx])); // Generic arg#1
+        for( int j=2; j<_defs._len; j++ ) // Get the new parm path or null according to split
           c.add_def( fun.at(j)==any ? any : n.at(j) );
       } else if( n != this ) {  // Interior nodes
         for( Node def : n._defs ) {
@@ -312,28 +303,42 @@ public class FunNode extends RegionNode {
       }
     }
     // Kill split-out path-ins to the old code
-    for( int j=2; j<projs.length; j++ )
+    for( int j=2; j<_defs._len; j++ )
       if( fun.at(j)!=any )  // Path split out?
         set_def(j,any,gvn); // Kill incoming path on old FunNode
-    // The final control-out has exactly 2 uses: a control-use and the return
-    // result data-use.  The data-use needs repointing to the new body.
-    for( int j=2; j<projs.length; j++ ) {
-      ProjNode proj = projs[j];
-      assert proj._uses._len==2;
-      if( fun.at(j)!=any )  { // Path split out?
-        CastNode data = (CastNode) ((proj._uses.at(0) instanceof CastNode) ? proj._uses.at(0) : proj._uses.at(1));
-        Node newdata = map.get(ret.at(1));
-        gvn.set_def_reg(proj,0,map.get(ret)); // Repoint proj as well
-        gvn.set_def_reg(data,1,newdata);
+
+    // The old Epilog has sets of result Casts and RPCs; these need to be
+    // split and half repointed to the new Epilog.  RPCs first.
+    Node newepi = map.get(epi);
+    for( int j=0; !epi.is_dead() && j<epi._uses._len; j++ ) {
+      Node use = epi._uses.at(j);
+      if( !(use instanceof RPCNode) ) continue;
+      int i, rpc_idx = ((RPCNode)use)._rpc;
+      for( i=2; i<_defs._len; i++ )
+        if( rpc_idx == ((TypeRPC)gvn.type(rpc_parm.at(i))).rpc() )
+          break;
+      assert i<_defs._len;      // Must find each RPC associated path
+      if( fun.at(i)!=any ) {
+        gvn.set_def_reg(use,0,newepi);
+        gvn.set_def_reg(use,1,newepi);
+        j--;            // Rerun loop since changed the set being iterated over
       }
     }
-
+    // Now repoint any Casts
+    for( int j=0; !epi.is_dead() && j<epi._uses._len; j++ ) {
+      Node use = epi._uses.at(j);
+      if( !(use instanceof CastNode) ) continue;
+      if( use.at(0) instanceof RPCNode && use.at(0).at(0)==newepi ) {
+        assert use.at(1)==epi;
+        gvn.set_def_reg(use,1,newepi);
+        j--;
+      }
+    }
     // Put all new nodes into the GVN tables and worklists
     for( Node c : map.values() ) gvn.rereg(c);
     // TODO: Hook with proper signature into ScopeNode under an Unresolved.
     // Future calls may resolve to either the old version or the new.
-    fun.init(null); // TODO: hook a generic ProjNode for future calls to resolve against
-    return this;
+    return is_dead() ? fun : this;
   }
 
   @Override public int hashCode() { return OP_FUN+_tf.hashCode(); }

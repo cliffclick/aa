@@ -149,7 +149,7 @@ public class TypeTuple extends Type {
   // 3 - Classic TypeFun, includes declared return type
   @Override public boolean is_fun_ptr() {
     return _ts.length==4 &&
-      _ts[0]==Type.CONTROL &&
+     (_ts[0]==Type.CONTROL || _ts[0] instanceof TypeErr) &&
       _ts[2] instanceof TypeRPC &&
       _ts[3] instanceof TypeFun;
   }
