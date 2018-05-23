@@ -90,7 +90,7 @@ public class FunNode extends RegionNode {
   public FunNode(Node scope, String name) { // Used to forward-decl anon functions
     this(scope,TypeFun.make(TypeTuple.ALL,Type.XSCALAR,CNT++),-1,name);
   }
-  //public FunNode(int nargs, Node scope) { this(scope,TypeFun.any(nargs,CNT++),-1,null); }
+  public FunNode(int nargs, Node scope) { this(scope,TypeFun.any(nargs,CNT++),-1,null); }
   private FunNode(Node scope, TypeFun tf, int op_prec, String name) {
     super(OP_FUN,scope);
     _tf = tf;

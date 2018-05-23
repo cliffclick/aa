@@ -57,8 +57,6 @@ public class TypeTuple extends Type {
   public  static final TypeTuple  ALL    = (TypeTuple)make().dual(); // Infinite list of All
   public  static final TypeTuple  SCALAR = make(Type. SCALAR);
           static final TypeTuple  SCALAR2= make(Type. SCALAR, Type. SCALAR);
-          static final TypeTuple XSCALAR1= make(Type.XSCALAR);
-          static final TypeTuple XSCALAR2= make(Type.XSCALAR, Type.XSCALAR);
   public  static final TypeTuple INT32   = make(TypeInt.INT32 );
   public  static final TypeTuple INT64   = make(TypeInt.INT64 );
   public  static final TypeTuple FLT64   = make(TypeFlt.FLT64 );
@@ -70,8 +68,8 @@ public class TypeTuple extends Type {
   public  static final TypeTuple IF_ALL  = make(Type.CONTROL,Type.CONTROL);
   public  static final TypeTuple IF_TRUE = make(TypeErr.ANY ,Type.CONTROL);
   public  static final TypeTuple IF_FALSE= make(Type.CONTROL             );
-  public  static final TypeTuple CALL    = make(Type.CONTROL,Type.SCALAR );
-  static final TypeTuple[] TYPES = new TypeTuple[]{ANY,SCALAR,STR,INT32,INT64,FLT64,INT64_INT64,FLT64_FLT64,FLT64_INT64, IF_ALL, IF_TRUE, IF_FALSE, CALL};
+  public  static final TypeTuple FUNPTR2 = make(Type.CONTROL,Type.SCALAR, TypeRPC.ALL_CALL, TypeFun.any(2,-1));
+  static final TypeTuple[] TYPES = new TypeTuple[]{ANY,SCALAR,STR,INT32,INT64,FLT64,INT64_INT64,FLT64_FLT64,FLT64_INT64, IF_ALL, IF_TRUE, IF_FALSE, FUNPTR2};
   
   // The length of Tuples is a constant, and so is its own dual.  Otherwise
   // just dual each element.  Also flip the infinitely extended tail type.
@@ -129,13 +127,18 @@ public class TypeTuple extends Type {
     //  ts[i] = ((TypeFun)_ts[i])._ret;
     //return new TypeTuple(ts);
   }
+  @Override public boolean above_center() {
+    return false;
+  }
   // True if any internals canBeConst
   @Override protected boolean canBeConst() {
+    if( _inf==TypeErr.ANY ) throw AA.unimpl();
     for( Type _t : _ts ) if( _t.canBeConst() ) return true;
     return false;
   }
   // True if all internals is_con
   @Override public boolean is_con() {
+    if( _inf==TypeErr.ALL ) throw AA.unimpl();
     for( Type _t : _ts ) if( !_t.is_con() ) return false;
     return true;
   }

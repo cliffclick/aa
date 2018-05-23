@@ -5,7 +5,9 @@ import org.junit.Test;
 
 public class TestType {
   @Test public void testType0() {
-    test_isa("{x y -> x+y}", TypeFun.any(2,-1)); // actually {Flt,Int} x {FltxInt} -> {FltxInt} but currently types {SCALAR,SCALAR->SCALAR}
+    test("x=3; fun={y -> x & y}; fun(2)", TypeInt.con(2)); // trivially inlined; capture external variable
+    test("x=3; fun={x -> x*2}; fun(2.1)", TypeFlt.con(2.1*2.0)); // must inline to resolve overload {+}:Flt with I->F conversion
+    test("id(1)",TypeInt.con(1));
     //test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
     // Simple int
     test("1",   TypeInt.TRUE);
@@ -90,7 +92,7 @@ public class TestType {
     test   ("1.2!=2", TypeInt.TRUE );
 
     // Anonymous function definition
-    test_isa("{x y -> x+y}", TypeFun.any(2,-1)); // actually {Flt,Int} x {FltxInt} -> {FltxInt} but currently types {SCALAR,SCALAR->SCALAR}
+    test_isa("{x y -> x+y}", TypeTuple.FUNPTR2); // actually {Flt,Int} x {FltxInt} -> {FltxInt} but currently types {SCALAR,SCALAR->SCALAR}
     test("{5}()", TypeInt.con(5)); // No args nor -> required; this is simply a function returning 5, being executed
 
     // ID in different contexts; in general requires a new TypeVar per use; for

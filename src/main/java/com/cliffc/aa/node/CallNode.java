@@ -142,8 +142,8 @@ public class CallNode extends Node implements AutoCloseable {
     // If this is a primitive, we never change the function header via inlining the call
     assert fun.at(1)._uid!=0;
     
-    //// Inline the call site now.
-    //// This is NOT inlining the function body, just the call site.
+    // Inline the call site now.
+    // This is NOT inlining the function body, just the call site.
     //if( fun._tf._ts._ts.length != nargs() ) {
     //  throw AA.unimpl(); // untested?
     //  //return null; // Incorrect argument count

@@ -39,8 +39,7 @@ public class UnresolvedNode extends Node {
   // If more than one choice applies, then the choice with fewest costly
   // conversions are kept; if there is more than one then the join of them is
   // kept - and the program is not-yet type correct (ambiguous choices).
-  public Node resolve( GVNGCM gvn, CallNode call ) {
-    Type t = TypeErr.ALL;
+  Node resolve( GVNGCM gvn, CallNode call ) {
     // Set of possible choices with fewest conversions
     Ary<Node> ns = new Ary<>(new Node[1],0);
     int min_cvts = 999;         // Required conversions
@@ -51,7 +50,8 @@ public class UnresolvedNode extends Node {
     // function with all arguments known.
     outerloop:
     for( Node epi : _defs ) {
-      TypeTuple tepi = (TypeTuple)gvn.type((EpilogNode)epi);
+      TypeTuple tepi = (TypeTuple)gvn.type(epi);
+      assert tepi.is_fun_ptr();
       TypeFun fun = (TypeFun)tepi.at(3);
       Type[] formals = fun._ts._ts;   // Type of each argument
       if( formals.length != call.nargs() ) continue;

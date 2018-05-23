@@ -90,6 +90,7 @@ public class Ary<E> implements Iterable<E> {
     _len = len;
     while( _es.length > (len<<1) ) // Shrink if hugely too large
       _es = Arrays.copyOf(_es,_es.length>>1);
+    Arrays.fill(_es,len,_es.length,null);
     return this;
   }
   

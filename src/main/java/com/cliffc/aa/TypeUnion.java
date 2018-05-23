@@ -220,7 +220,6 @@ public class TypeUnion extends Type {
   @Override public byte isBitShape(Type t) {
     if( t._type == Type.TSCALAR ) return 0;
     return 99;
-    //throw AA.unimpl();
   }
 
   // Return non-zero if allowed to be infix

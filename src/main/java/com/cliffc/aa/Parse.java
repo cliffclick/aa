@@ -66,7 +66,7 @@ public class Parse {
     _str = str;          // Keep a complete string copy for java number parsing
     _gvn = Env._gvn;     // Pessimistic during parsing
   }
-  
+
   // Parse the string in the given lookup context, and return an executable program
   TypeEnv go( ) { return prog(); }
 
@@ -82,18 +82,18 @@ public class Parse {
 
     // TODO: Optimistic Pass Goes Here, to improve error situation
 
-    // Disallow forward-refs as top-level results
+    // Gather errors
     Ary<String> errs = null;
+    Type tres = Env.lookup_valtype(res);    // Result type
+    if( tres instanceof TypeErr && tres != TypeErr.ALL )
+      errs = add_err(errs,((TypeErr)tres)._msg);
+    // Disallow forward-refs as top-level results
     if( res instanceof EpilogNode ) {
       EpilogNode epi = (EpilogNode)res;
       if( epi.forward_ref() )
         errs = add_err(errs,forward_ref_err(epi.fun().name()));
     }
-    Type tres = Env.lookup_valtype(res);    // Result type
-    if( tres instanceof TypeErr && tres != TypeErr.ALL )
-      errs = add_err(errs,((TypeErr)tres)._msg);
-
-    // Gather errors
+    // Hunt for typing errors in the alive code
     Env par = _e._par;
     assert par._par==null;      // Top-level only
     BitSet bs = new BitSet();
@@ -353,20 +353,20 @@ public class Parse {
       ids.add(tok);
     }
     Node old_ctrl = ctrl();
-    throw AA.unimpl();
-    //FunNode fun = init(new FunNode(ids._len,old_ctrl));
-    //try( Env e = new Env(_e) ) {// Nest an environment for the local vars
-    //  _e = e;                   // Push nested environment
-    //  set_ctrl(fun);            // New control is function head
-    //  int cnt=0;                // Add parameters to local environment
-    //  for( String id : ids )  _e.add(id,gvn(new ParmNode(cnt++,id,fun,con(Type.SCALAR))));
-    //  Node rez = stmt();        // Parse function body
-    //  fun.init(init(new CProjNode(init(new RetNode(ctrl(),rez,fun)),1)));
-    //  require('}');             // 
-    //  _e = _e._par;             // Pop nested environment
-    //  set_ctrl(old_ctrl);       // Back to the pre-function-def control
-    //  return (e._ret = con(fun._tf)); // Return function; close-out and DCE 'e'
-    //}
+    FunNode fun = init(new FunNode(ids._len,old_ctrl));
+    try( Env e = new Env(_e) ) {// Nest an environment for the local vars
+      _e = e;                   // Push nested environment
+      set_ctrl(fun);            // New control is function head
+      int cnt=0;                // Add parameters to local environment
+      for( String id : ids )  _e.add(id,gvn(new ParmNode(cnt++,id,fun,con(Type.SCALAR))));
+      Node rpc = gvn(new ParmNode(-1,"rpc",fun,_gvn.con(TypeRPC.ALL_CALL)));
+      Node rez = stmt();        // Parse function body
+      require('}');             // 
+      _e = _e._par;             // Pop nested environment
+      e._ret = gvn(new EpilogNode(ctrl(),rez,rpc,fun));
+      set_ctrl(old_ctrl);       // Back to the pre-function-def control
+      return e._ret;            // Return function; close-out and DCE 'e'
+    }
   }
   
   private String token() { skipWS();  return token0(); }
