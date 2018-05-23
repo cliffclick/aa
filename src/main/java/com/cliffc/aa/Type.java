@@ -334,15 +334,14 @@ public class Type {
   // 99 Bottom; No free converts; e.g. Flt->Int requires explicit rounding
   public byte isBitShape(Type t) {
     if( above_center() && isa(t) ) return 0; // Can choose compatible format
-    if( _type == TSCALAR ) {
-      if( t._type == TSCALAR ) return 0;
+    if( t._type==TSCALAR ) return 0; // Generic function arg never requires a conversion
+    if( _type == TSCALAR || _type == TREAL ) {
       if( t._type == TFLT ) return -1; // Scalar has to resolve
       if( t._type == TINT ) return -1; // Scalar has to resolve
       if( t._type == TSTR ) return -1; // Scalar has to resolve
       if( t.is_fun_ptr()  ) return -1; // Scalar has to resolve
     }
-    if( t==SCALAR ) return 0; // Generic function arg never requires a conversion
-    
+
     throw typerr(t);  // Overridden in subtypes
   }
   // "widen" a narrow type for type-specialization.

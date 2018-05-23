@@ -9,8 +9,8 @@ import com.cliffc.aa.*;
 // semantics, but the join is not-locally-obviously-correct.  The Cast makes it
 // locally obvious.
 public class TypeNode extends Node {
-  final Type _t;                // TypeVar???
-  final Parse _error_parse;     // Used for error messages
+  final Type _t;            // TypeVar???
+  final Parse _error_parse; // Used for error messages
   public TypeNode( Type t, Node n, Parse P ) { super(OP_TYPE,null,n); _t=t; _error_parse = P; }
   @Override String xstr() { return "@"+_t; }
   @Override public Node ideal(GVNGCM gvn) {
@@ -40,6 +40,6 @@ public class TypeNode extends Node {
   String err(GVNGCM gvn) {
     Type t = gvn.type(at(1));
     if( t instanceof TypeErr ) return ((TypeErr)t)._msg;
-    return _error_parse.typerr(t.toString()+" is not a "+_t,t);
+    return _error_parse.typerr(t,_t);
   }
 }

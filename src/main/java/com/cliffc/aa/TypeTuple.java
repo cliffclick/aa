@@ -51,7 +51,12 @@ public class TypeTuple extends Type {
     while( len > 0 && ts[len-1] == inf ) len--;
     if( len < ts.length ) ts = Arrays.copyOf(ts,len);
     return make(inf,false, ts);
-  }    
+  }
+  public static TypeTuple make_fun_ptr( TypeFun fun ) {
+    TypeTuple t = make(Type.CONTROL,Type.SCALAR, TypeRPC.ALL_CALL, fun);
+    assert t.is_fun_ptr();
+    return t;
+  }
 
   public  static final TypeTuple  ANY    = make(); // Infinite list of Any
   public  static final TypeTuple  ALL    = (TypeTuple)make().dual(); // Infinite list of All
@@ -68,7 +73,7 @@ public class TypeTuple extends Type {
   public  static final TypeTuple IF_ALL  = make(Type.CONTROL,Type.CONTROL);
   public  static final TypeTuple IF_TRUE = make(TypeErr.ANY ,Type.CONTROL);
   public  static final TypeTuple IF_FALSE= make(Type.CONTROL             );
-  public  static final TypeTuple FUNPTR2 = make(Type.CONTROL,Type.SCALAR, TypeRPC.ALL_CALL, TypeFun.any(2,-1));
+  public  static final TypeTuple FUNPTR2 = make_fun_ptr(TypeFun.any(2,-1));
   static final TypeTuple[] TYPES = new TypeTuple[]{ANY,SCALAR,STR,INT32,INT64,FLT64,INT64_INT64,FLT64_FLT64,FLT64_INT64, IF_ALL, IF_TRUE, IF_FALSE, FUNPTR2};
   
   // The length of Tuples is a constant, and so is its own dual.  Otherwise

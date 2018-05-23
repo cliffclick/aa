@@ -1,7 +1,6 @@
 package com.cliffc.aa;
 
 import com.cliffc.aa.node.FunNode;
-import com.cliffc.aa.node.ProjNode;
 import com.cliffc.aa.util.Bits;
 import com.cliffc.aa.util.SB;
 
@@ -10,7 +9,7 @@ public class TypeFun extends Type {
   public TypeTuple _ts;         // Arg types
   public Type _ret;             // return types
   // List of known functions in set, or 'flip' for choice-of-functions
-  public Bits _fidxs;         // 
+  public Bits _fidxs;           // 
 
   private TypeFun( TypeTuple ts, Type ret, Bits fidxs ) { super(TFUN); init(ts,ret,fidxs); }
   private void init(TypeTuple ts, Type ret, Bits fidxs ) { _ts = ts; _ret = ret; _fidxs = fidxs; }
@@ -70,8 +69,6 @@ public class TypeFun extends Type {
     // Meet of fidxs and args; join of ret
     TypeFun tf = (TypeFun)t;
     Bits fidxs = _fidxs.or( tf._fidxs );
-    //if( fidxs!=_fidxs && fidxs!=tf._fidxs )
-    //  return TypeUnion.make(false,this,tf); // Non-overlapping, go to a union
     TypeTuple ts = (TypeTuple)_ts.meet(tf._ts);
     Type ret = _ret.join(tf._ret);
     return make(ts,ret,fidxs);
@@ -82,17 +79,11 @@ public class TypeFun extends Type {
   @Override public Type ret() { return _ret; }
 
   @Override protected boolean canBeConst() { throw AA.unimpl(); }
-
   public int fidx() { return _fidxs.getbit(); }
-  //public ProjNode projnode() { return FunNode.get(fidx()); }
-  //public  RetNode  retnode() { return (RetNode)(projnode().at(0)); }
-  //public  FunNode  funnode() { return (FunNode)(retnode().at(2)); }
+  @Override public boolean is_con() { return _fidxs.abit() > 0; }
   // Debug only: make an attempt to bind name to a function
   void bind(String tok) {
     int fidx = _fidxs.abit();
     if( fidx > 0 ) FunNode.bind(tok,fidx);
   }
-  
-  // Operator precedence
-  //@Override public byte op_prec() { return funnode().op_prec(); } 
 }

@@ -255,7 +255,7 @@ public class GVNGCM {
 
   // Complete replacement; point uses to x.  The goal is to completely replace
   // 'old'.
-  public void subsume( Node old, Node nnn ) {
+  void subsume( Node old, Node nnn ) {
     while( old._uses._len > 0 ) {
       Node u = old._uses.del(0);  // Old use
       _vals.remove(u); // Use is about to change edges; remove from type table
@@ -267,26 +267,7 @@ public class GVNGCM {
     kill(old);                // Delete the old n, and anything it uses
     nnn._uses.del(nnn._uses.find(a -> a==nnn)); // Remove self-hook
   }
-  void insert( Node old, Node nnn ) {
-    boolean replace=true;
-    while( old._uses._len > 0 ) {
-      Node u = old._uses.del(0);  // Old use
-      if( u==nnn ) replace=false; // Goal is to insert, not replace
-      else {                      // Move use from 'old' over to 'nnn'
-        _vals.remove(u); // Use is about to change edges; remove from type table
-        u._defs.set(u._defs.find(a -> a==old),nnn); // was old now nnn
-        nnn._uses.add(u);
-        add_work(u);            // And put on worklist, to get re-inserted
-      }
-    }
-    if( replace ) {             // Completely removing 'old'
-      nnn._uses.add(nnn);       // Self-hook, to prevent accidental deletion
-      kill(old);                // Delete the old n, and anything it uses
-      nnn._uses.del(nnn._uses.find(a -> a==nnn)); // Remove self-hook
-    } else old._uses.add(nnn);  // Keeping 'old' but inserting 'nnn'
-    throw AA.unimpl();
-  }
-  
+
   // Once the program is complete, any time anything is on the worklist we can
   // always conservatively iterate on it.
   void iter() {

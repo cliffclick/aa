@@ -57,20 +57,21 @@ public class CallNode extends Node implements AutoCloseable {
     //
     Node ctrl = _defs.at(0);    // Control for apply/call-site
     Node unk  = _defs.at(1);    // Function epilog
-    //
-    //// Type-checking a function; requires 2 steps, one now, one in the
-    //// following data Proj from the worklist.
-    //if( funv instanceof TypeNode ) {
-    //  TypeNode tn = (TypeNode)funv;
-    //  TypeFun tf_cast = (TypeFun)tn._t;
-    //  set_def(1,tn.at(1),gvn);
-    //  for( int i=0; i<nargs(); i++ ) // Insert casts for each parm
-    //    set_def(i+2,gvn.xform(new TypeNode(tf_cast._ts.at(i),arg(i),tn._error_parse)),gvn);
-    //  _cast_ret = tf_cast._ret;      // Upcast return results
-    //  _cast_P = tn._error_parse;     // Upcast failure message
-    //  throw AA.unimpl(); // Untested, remove & retry
-    //  //return this;
-    //}
+
+    // Type-checking a function; requires 2 steps, one now, one in the
+    // following data Proj from the worklist.
+    if( unk instanceof TypeNode ) {
+      TypeNode tn = (TypeNode)unk;
+      TypeTuple t_funptr = (TypeTuple)tn._t;
+      assert t_funptr.is_fun_ptr();
+      TypeFun tf = t_funptr.get_fun();
+      set_def(1,tn.at(1),gvn);
+      for( int i=0; i<nargs(); i++ ) // Insert casts for each parm
+        set_def(i+2,gvn.xform(new TypeNode(tf._ts.at(i),arg(i),tn._error_parse)),gvn);
+      _cast_ret = tf._ret;       // Upcast return results
+      _cast_P = tn._error_parse; // Upcast failure message
+      return this;
+    }
 
     // If the function is unresolved, see if we can resolve it now
     if( unk instanceof UnresolvedNode ) {
@@ -207,7 +208,7 @@ public class CallNode extends Node implements AutoCloseable {
       if( actual instanceof TypeErr ) // Actual is an error, so call result is the same error
         return actual;        // TODO: Actually need to keep all such errors...
       if( !actual.isa(formals[j]) )   // Actual is not a formal; join of ALL
-        return TypeErr.make(_badargs.typerr("Argument mismatch",actual));
+        return TypeErr.make(_badargs.typerr(actual,formals[j]));
     }
     return tfun.ret();
   }
@@ -220,43 +221,6 @@ public class CallNode extends Node implements AutoCloseable {
     gvn.add_work(this);         // Revisit after the data-proj cleans out
     return new TypeNode(t,null,_cast_P);
   }
-
-  // Function return type for resolved functions.  Crash/ALL for no functions
-  // allowed, join of possible returns otherwise - we get to choose the best
-  // choice here.  Errors poison return results.
-  private Type retype( GVNGCM gvn, TypeUnion tu ) {
-    if( !tu._any ) throw AA.unimpl();
-    Type t = TypeErr.ALL;
-    for( Type tft : tu._ts._ts ) {
-      Type x = retype(gvn,(TypeFun)tft);
-      if( x!=null )             // Argument mismatch; join of ALL
-        t = t.join(x);          // Join of all
-    }
-    return t!=TypeErr.ALL ? t : TypeErr.make(_badargs.errMsg("Argument mismatch in call to "+tu.errMsg()));
-  }  
-  private Type retype( GVNGCM gvn, TypeFun tf ) {
-    Type[] formals = tf._ts._ts;   // Type of each argument
-    if( formals.length != nargs() ) return null; // Argument count mismatch; join of ALL
-    // Now check if the arguments are compatible at all
-    for( int j=0; j<formals.length; j++ ) {
-      Type actual = gvn.type(arg(j));
-      if( actual instanceof TypeErr )
-        // Actual is an error, so call result is the same error
-        return actual;        // TODO: Actually need to keep all such errors...
-      if( !actual.isa(formals[j]) )  // Actual is not a formal; join of ALL
-        //return actual.forward_ref() ? TypeErr.make(_badargs.errMsg(((TypeFun)actual).forward_ref_err())) : null;
-        throw AA.unimpl();
-    }
-    return tf.ret();
-  }
-
-  // Type of arguments, as a tuple
-  //public TypeTuple args(GVNGCM gvn) {
-  //  Type[] ts = new Type[nargs()];
-  //  for( int i=0; i<nargs(); i++ )
-  //    ts[i] = gvn.type(arg(i));
-  //  return TypeTuple.make(ts);
-  //}
 
   @Override public int hashCode() { return super.hashCode()+_rpc; }
   @Override public boolean equals(Object o) {
