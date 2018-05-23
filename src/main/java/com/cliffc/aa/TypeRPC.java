@@ -32,7 +32,7 @@ public class TypeRPC extends Type {
     return t1==t2 ? t1 : t2.free(t1);
   }
 
-  static final TypeRPC ALL_CALL = make(Bits.FULL);
+  public static final TypeRPC ALL_CALL = make(Bits.FULL);
   static final TypeRPC[] TYPES = new TypeRPC[]{make(0),ALL_CALL};
   
   @Override protected TypeRPC xdual() { return new TypeRPC(_rpcs.flip()); }

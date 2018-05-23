@@ -84,13 +84,13 @@ public class FunNode extends RegionNode {
   public FunNode(Node scope, PrimNode prim) {
     this(scope,TypeFun.make(prim._targs,prim._ret,CNT++),prim.op_prec(),prim._name);
   }
-  private FunNode(Node scope, TypeTuple ts, Type ret, String name) {
-    this(scope,TypeFun.make(ts,ret,CNT++),-1,name);
-  }
+  //private FunNode(Node scope, TypeTuple ts, Type ret, String name) {
+  //  this(scope,TypeFun.make(ts,ret,CNT++),-1,name);
+  //}
   public FunNode(Node scope, String name) { // Used to forward-decl anon functions
-    this(scope,TypeFun.make(TypeTuple.ALL,Type.SCALAR,CNT++),-1,name);
+    this(scope,TypeFun.make(TypeTuple.ALL,Type.XSCALAR,CNT++),-1,name);
   }
-  public FunNode(int nargs, Node scope) { this(scope,TypeFun.any(nargs,CNT++),-1,null); }
+  //public FunNode(int nargs, Node scope) { this(scope,TypeFun.any(nargs,CNT++),-1,null); }
   private FunNode(Node scope, TypeFun tf, int op_prec, String name) {
     super(OP_FUN,scope);
     _tf = tf;
@@ -105,19 +105,8 @@ public class FunNode extends RegionNode {
   private static int PRIM_CNT;
   public static void init0() { PRIM_CNT=CNT; }
   public static void reset_to_init0(GVNGCM gvn) { CNT = PRIM_CNT; NAMES.set_len(PRIM_CNT); }
-  public static void clear_forward_ref(Type t, GVNGCM gvn) {
-    assert t.forward_ref();
-    int fidx = ((TypeFun)t).fidx();
-    //// The FunNode points to the current scope; when deleting the FunNode do
-    //// NOT also delete the current scope, even if this is the last use.
-    //FUNS.at(fidx).at(0).at(2).pop();
-    //FUNS.set_def(fidx,null,gvn);
-    throw AA.unimpl();
-  }
-  public static ProjNode get(int fidx) {
-    throw AA.unimpl();
-    //return (ProjNode)FUNS.at(fidx);
-  }
+  public static void clear_forward_ref(Type t, GVNGCM gvn) {  throw AA.unimpl(); }
+  public static ProjNode get(int fidx) {  throw AA.unimpl(); }
   @Override String xstr() { return _tf.toString(); }
   @Override String str() { return names(_tf._fidxs,new SB()).toString(); }
   // Debug only: make an attempt to bind name to a function
@@ -144,7 +133,8 @@ public class FunNode extends RegionNode {
     String name = NAMES.atX(i);
     return sb.p(name==null?Integer.toString(i):name);
   }
-  public String name() { return NAMES.at(_tf._fidxs.getbit()); }
+  public String name() { return name(_tf._fidxs.getbit()); }
+  public static String name(int fidx) { return NAMES.at(fidx); }
 
   // FunNodes can "discover" callers if the function constant exists in the
   // program anywhere (since, during execution (or optimizations) it may arrive

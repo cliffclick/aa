@@ -85,23 +85,15 @@ public class TypeFun extends Type {
   @Override protected boolean canBeConst() { throw AA.unimpl(); }
 
   public int fidx() { return _fidxs.getbit(); }
-  public ProjNode projnode() { return FunNode.get(fidx()); }
-  public  RetNode  retnode() { return (RetNode)(projnode().at(0)); }
-  public  FunNode  funnode() { return (FunNode)(retnode().at(2)); }
+  //public ProjNode projnode() { return FunNode.get(fidx()); }
+  //public  RetNode  retnode() { return (RetNode)(projnode().at(0)); }
+  //public  FunNode  funnode() { return (FunNode)(retnode().at(2)); }
   // Debug only: make an attempt to bind name to a function
   void bind(String tok) {
     int fidx = _fidxs.abit();
     if( fidx > 0 ) FunNode.bind(tok,fidx);
   }
   
-  // Filter out function types with incorrect arg counts
-  @Override public Type filter(int nargs) { return forward_ref() || nargs()==nargs ? this : null; }
-  // Is unspecified length (e.g. forward ref)
-  @Override public boolean forward_ref() { RetNode ret = retnode(); return ret.at(0)==ret.at(1); }
-  public String forward_ref_err() {
-    //return "Unknown ref '"+funnode()._name+"'";
-    throw AA.unimpl();
-  }
   // Operator precedence
-  @Override public byte op_prec() { return funnode().op_prec(); } 
+  //@Override public byte op_prec() { return funnode().op_prec(); } 
 }

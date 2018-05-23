@@ -150,4 +150,9 @@ public class TypeTuple extends Type {
       _ts[2] instanceof TypeRPC &&
       _ts[3] instanceof TypeFun;
   }
+  // Return true if this is a forward-ref function pointer (return type from EpilogNode)
+  @Override public boolean is_forward_ref() {
+    return is_fun_ptr() && ((TypeFun)_ts[3])._ts==TypeTuple.ALL;
+  }
+  public TypeFun get_fun() { assert is_fun_ptr(); return (TypeFun)_ts[3]; }
 }

@@ -222,28 +222,18 @@ public class TypeUnion extends Type {
     return 99;
     //throw AA.unimpl();
   }
-  // Filter out functions with the wrong args; error for non-functions
-  @Override public Type filter(int nargs) {
-    if( _any ) {
-      Type j = TypeErr.ALL;
-      for( Type t : _ts._ts )
-        if( t.filter(nargs)!=null )
-          j = j.join(t);
-      return j;
-    }
-    throw AA.unimpl();
-  }
 
   // Return non-zero if allowed to be infix
   @Override public byte op_prec() { return _ts.at(0).op_prec(); }
   // Better error message
   public String errMsg() {
-    assert _any;                // Expect only function choice here
-    TypeFun tf = (TypeFun)_ts.at(0);
-    String name = tf.funnode().name();
-    SB sb = new SB().p(name).p(':').p('[');
-    for( Type t : _ts._ts )
-      ((TypeFun)t).str(sb).p(',');
-    return sb.p(']').toString();
+    //assert _any;                // Expect only function choice here
+    //TypeFun tf = (TypeFun)_ts.at(0);
+    //String name = tf.funnode().name();
+    //SB sb = new SB().p(name).p(':').p('[');
+    //for( Type t : _ts._ts )
+    //  ((TypeFun)t).str(sb).p(',');
+    //return sb.p(']').toString();
+    throw AA.unimpl();
   }
 }

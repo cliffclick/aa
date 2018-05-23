@@ -82,20 +82,23 @@ public class Parse {
 
     // TODO: Optimistic Pass Goes Here, to improve error situation
 
-    // Result type
-    Type tres = Env.lookup_valtype(res);
     // Disallow forward-refs as top-level results
-    if( tres.forward_ref() )
-      tres = TypeErr.make(errMsg(((TypeFun)tres).forward_ref_err()));
+    Ary<String> errs = null;
+    if( res instanceof EpilogNode ) {
+      EpilogNode epi = (EpilogNode)res;
+      if( epi.forward_ref() )
+        errs = add_err(errs,forward_ref_err(epi.fun().name()));
+    }
+    Type tres = Env.lookup_valtype(res);    // Result type
+    if( tres instanceof TypeErr && tres != TypeErr.ALL )
+      errs = add_err(errs,((TypeErr)tres)._msg);
 
     // Gather errors
     Env par = _e._par;
     assert par._par==null;      // Top-level only
     BitSet bs = new BitSet();
     bs.set(_e._scope._uid);     // Do not walk top-level scope
-    Ary<String> errs = res.walkerr_def(null,bs,_gvn);
-    if( tres instanceof TypeErr && tres != TypeErr.ALL ) // Result can be an error, even if no c-flow has an error
-      errs = add_err(errs,((TypeErr)tres)._msg); // One more error
+    if( errs == null ) errs = res.walkerr_def(errs,bs,_gvn);
     if( errs == null ) errs = _e._scope.walkerr_use(null,new BitSet(),_gvn);
     if( errs == null && skipWS() != -1 ) errs = add_err(null,errMsg("Syntax error; trailing junk"));
     kill(res);
@@ -243,19 +246,13 @@ public class Parse {
             }
           }
           require(')');
-          Type t = _gvn.type(fun);
-          if( t.forward_ref() ) {     // Forward ref; partial def
-            //if( !(fun instanceof ConNode) ) throw AA.unimpl();       // Do not understand?
-            // Join with argument types & count.
-            //TypeFun tf2 = TypeFun.make(args.args(_gvn),((TypeFun)t)._ret,((TypeFun)t)._fidxs);
-            // Replace here...
-            //_gvn.subsume(fun,_gvn.con(tf2));
-            // And replace as the forward-ref function
-            //FunNode fun2 = tf2.funnode();
-            //_gvn.subsume(fun2,_gvn.init(new FunNode(fun2.at(1),tf2,-1,fun2._name)));
+          if( fun instanceof EpilogNode && ((EpilogNode)fun).forward_ref() ) { // Forward ref; partial def
             throw AA.unimpl();
-          } else if( !t.is_fun_ptr() )
-            return con(err_ctrl("A function is being called, but "+t+" is not a function type"));
+          } else {
+            Type t = _gvn.type(fun);
+            if( !t.is_fun_ptr() )
+              return con(err_ctrl("A function is being called, but "+t+" is not a function type"));
+          }
         } else {                  // lispy-style fcn application
           // TODO: Unable resolve ambiguity with mixing "(fun arg0 arg1)" and
           // "fun(arg0,arg1)" argument calls.  Really having trouble with parsing
@@ -335,14 +332,8 @@ public class Parse {
     String tok = token0();
     if( tok == null ) return null;
     Node var = _e.lookup(tok);
-    if( var == null ) {
-      // TODO: Allow unknown refs in function position, to allow recursion
-      //return con(err_ctrl("Unknown ref '"+tok+"'"));
-      //FunNode fun = init(new FunNode(_e._scope,tok));
-      //fun.init(init(new CProjNode(init(new RetNode(fun,fun,fun)),1)));
-      //return _e.add(tok,con(fun._tf));
-      throw AA.unimpl();
-    }
+    if( var == null ) // Assume any unknown ref is a forward-ref of a recursive function
+      return _e.add(tok,gvn(EpilogNode.forward_ref(_gvn,ctrl(),tok)));
     // Disallow uniop and binop functions as factors.
     if( var.op_prec() > 0 ) { _x = oldx; return null; }
     return var;
@@ -545,6 +536,7 @@ public class Parse {
   }
   // Delayed error message
   public Parse errMsg() { return new Parse(this); }
+  public String forward_ref_err(String name) { return errMsg("Unknown ref '"+name+"'"); }
 
   // Build a string of the given message, the current line being parsed,
   // and line of the pointer to the current index.

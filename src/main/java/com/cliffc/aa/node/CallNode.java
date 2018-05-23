@@ -208,9 +208,12 @@ public class CallNode extends Node implements AutoCloseable {
       Type actual = gvn.type(arg(j));
       if( actual instanceof TypeErr ) // Actual is an error, so call result is the same error
         return actual;        // TODO: Actually need to keep all such errors...
-      if( !actual.isa(formals[j]) )  // Actual is not a formal; join of ALL
-        // Forward/unknown refs as args to a call report their own error
-        return actual.forward_ref() ? TypeErr.make(_badargs.errMsg(((TypeFun)actual).forward_ref_err())) : null;
+      if( !actual.isa(formals[j]) ) { // Actual is not a formal; join of ALL
+        String s = actual.is_forward_ref() // Forward/unknown refs as args to a call report their own error
+          ? _badargs.forward_ref_err(FunNode.name(((TypeTuple)actual).get_fun().fidx()))
+          : _badargs.errMsg("Argument mismatch");
+        return TypeErr.make(s);
+      }
     }
     return tfun.ret();
   }
@@ -247,8 +250,8 @@ public class CallNode extends Node implements AutoCloseable {
         // Actual is an error, so call result is the same error
         return actual;        // TODO: Actually need to keep all such errors...
       if( !actual.isa(formals[j]) )  // Actual is not a formal; join of ALL
-        // Forward/unknown refs as args to a call report their own error
-        return actual.forward_ref() ? TypeErr.make(_badargs.errMsg(((TypeFun)actual).forward_ref_err())) : null;
+        //return actual.forward_ref() ? TypeErr.make(_badargs.errMsg(((TypeFun)actual).forward_ref_err())) : null;
+        throw AA.unimpl();
     }
     return tf.ret();
   }

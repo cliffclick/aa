@@ -313,6 +313,8 @@ public class Type {
   public Type ret() { return null; }
   // Return true if this is a function pointer (return type from EpilogNode)
   public boolean is_fun_ptr() { return false; }
+  // Return true if this is a forward-ref function pointer (return type from EpilogNode)
+  public boolean is_forward_ref() { return false; }
   // Return a long   from a TypeInt constant; assert otherwise.
   public long   getl() { throw AA.unimpl(); }
   // Return a double from a TypeFlt constant; assert otherwise.
@@ -339,10 +341,6 @@ public class Type {
   RuntimeException typerr(Type t) {
     throw new RuntimeException("Should not reach here: internal type system error with "+this+(t==null?"":(" and "+t)));
   }
-  // Filter out function types with incorrect arg counts
-  public Type filter(int nargs) { return null; } // Overridden in subclasses
-  // Is unspecified length (e.g. forward ref)
-  public boolean forward_ref() { return false; }
   // Operator precedence
   public byte op_prec() { return -1; } // Overridden in subclasses
 }
