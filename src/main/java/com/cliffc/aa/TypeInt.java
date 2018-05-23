@@ -136,9 +136,10 @@ public class TypeInt extends Type {
 
   private static Type widen(int isz, int fsz) {
     if( (isz<<1) <= fsz ) return TypeFlt.make(-1,fsz,0); // Fits in a float
-    return TypeUnion.make(false,make(-1,isz,0),TypeFlt.make(-1,fsz,0));
+    //return TypeUnion.make(false,make(-1,isz,0),TypeFlt.make(-1,fsz,0));
+    return Type.REAL;
   }
-    
+
   // Lattice of conversions:
   // -1 unknown; top; might fail, might be free (Scalar->Int); Scalar might lift
   //    to e.g. Float and require a user-provided rounding conversion from F64->Int.

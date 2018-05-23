@@ -40,8 +40,6 @@ public class TypeNode extends Node {
   String err(GVNGCM gvn) {
     Type t = gvn.type(at(1));
     if( t instanceof TypeErr ) return ((TypeErr)t)._msg;
-    //String s = t.forward_ref() ? ((TypeFun)t).forward_ref_err() : t.toString()+" is not a "+_t;
-    //return _error_parse.errMsg(s);
-    throw AA.unimpl();
+    return _error_parse.typerr(t.toString()+" is not a "+_t,t);
   }
 }

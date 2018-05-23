@@ -5,6 +5,7 @@ import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.Bits;
 import com.cliffc.aa.util.SB;
 
+import java.util.BitSet;
 import java.util.HashMap;
 
 // FunNode is a RegionNode; args point to all the known callers.  Zero slot is
@@ -201,20 +202,39 @@ public class FunNode extends RegionNode {
     return null;                // No splitting callers
   }
 
+  // Split a single-use copy (e.g. fully inline) if the function is "small
+  // enough".  Include anything with just a handful of primitives, or a single
+  // call, possible with a single if.
   private FunNode split_size( GVNGCM gvn, EpilogNode epi ) {
-    Node rez = epi.val();
-    if( !(rez instanceof ParmNode && rez.at(0) == this) ) { // Zero-op body
-      // Else check for 1-op body
-      for( Node parm : rez._defs )
-        if( parm != null && parm != this &&
-            !(parm instanceof ParmNode && parm.at(0) == this) &&
-            !(parm instanceof ConNode) )
-          return null;
+    int[] cnts = new int[OP_MAX];
+    BitSet bs = new BitSet();
+    Ary<Node> work = new Ary<>(new Node[1],0);
+    work.add(this);             // Prime worklist
+    while( work._len > 0 ) {    // While have work
+      Node n = work.pop();      // Get work
+      if( bs.get(n._uid) ) continue; // Already visited?
+      if( n != epi )            // Except for the Epilog
+        work.addAll(n._uses);   // Visit all uses also
+      bs.set(n._uid);           // Flag as visited
+      cnts[n._op]++;            // Histogram ops
     }
+    assert cnts[OP_FUN]==1 && cnts[OP_EPI]==1;
+    assert cnts[OP_SCOPE]==0 && cnts[OP_TMP]==0;
+    assert cnts[OP_REGION] <= cnts[OP_IF];
+    // Specifically ignoring constants, errors, parms, phis, rpcs, types,
+    // unresolved, and casts.  These all track & control values, but actually
+    // do not generate any code.
+    if( cnts[OP_CALL] > 1 || // Careful inlining more calls; leads to exponential growth
+        cnts[OP_IF  ] > 1 || // Allow some trivial filtering to inline
+        cnts[OP_PRIM] > 3 )  // Allow small-ish primitive counts to inline
+      return null;
+    
     // Make a prototype new function header.  No generic unknown caller
     // in slot 1, only slot 2.
-    FunNode fun = new FunNode(gvn.con(TypeErr.ANY),_tf._ts,_tf._ret,name());
+    Node top = gvn.con(TypeErr.ANY);
+    FunNode fun = new FunNode(top,_tf._ts,_tf._ret,name());
     fun.add_def(at(2));
+    for( int i=3; i<_defs._len; i++ ) fun.add_def(top);
     return fun;
   }
 
@@ -275,7 +295,7 @@ public class FunNode extends RegionNode {
       Node n = work.pop();      // Get work
       if( map.get(n) != null ) continue; // Already visited?
       assert n.at(0)!=epi && (n._defs._len<=1 || n.at(1)!= epi); // Do not walk past epilog
-      if( n != epi )           // Except for the Epilog; exit for thge function
+      if( n != epi )           // Except for the Epilog
         work.addAll(n._uses);  // Visit all uses also
       map.put(n,n.copy()); // Make a blank copy with no edges and map from old to new
     }

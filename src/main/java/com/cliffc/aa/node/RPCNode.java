@@ -27,4 +27,12 @@ public class RPCNode extends Node {
     if( tctrl == TypeErr.ANY ) return TypeErr.ANY;
     return ((TypeRPC)trpc).test(_rpc) ? Type.CONTROL : TypeErr.ANY;
   }
+  @Override public int hashCode() { return super.hashCode()+_rpc; }
+  @Override public boolean equals(Object o) {
+    if( this==o ) return true;
+    if( !super.equals(o) ) return false;
+    if( !(o instanceof RPCNode) ) return false;
+    RPCNode rpc = (RPCNode)o;
+    return _rpc==rpc._rpc;
+  }
 }

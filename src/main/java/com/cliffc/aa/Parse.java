@@ -203,7 +203,7 @@ public class Parse {
         if( term == null ) term = con(err_ctrl("missing expr after binary op "+bin));
         funs.add(binfun);  args.add_def(term);
       }
-  
+
       // Have a list of interspersed operators and terms.
       // Build a tree with precedence.
       int max=-1;                 // First find max precedence.
@@ -536,8 +536,17 @@ public class Parse {
   }
   // Delayed error message
   public Parse errMsg() { return new Parse(this); }
-  public String forward_ref_err(String name) { return errMsg("Unknown ref '"+name+"'"); }
 
+  // Polite error message for a given type
+  public String typerr( String msg, Type t ) {
+    return t.is_forward_ref() // Forward/unknown refs as args to a call report their own error
+      ? forward_ref_err(FunNode.name(((TypeTuple)t).get_fun().fidx()))
+      : errMsg(msg);
+  }
+
+  // Standard mis-use of a forward-ref error (assumed to be a forward-decl of a
+  // recursive function; all other uses are treated as an unknown-ref error).
+  public String forward_ref_err(String name) { return errMsg("Unknown ref '"+name+"'"); }
   // Build a string of the given message, the current line being parsed,
   // and line of the pointer to the current index.
   public String errMsg(String s) {

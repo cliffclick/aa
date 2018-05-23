@@ -25,10 +25,11 @@ public abstract class Node implements Cloneable {
   static final byte OP_TYPE =15;
   static final byte OP_EPI  =16;
   static final byte OP_UNR  =17;
+  static final byte OP_MAX  =18;
   private static final String[] STRS = new String[] { null, "Call", "Cast", "Con", "Err", "Fun", "If", "Parm", "Phi", "Prim", "Proj", "Region", "RPC", "Scope", "Tmp", "Type", "Epilog", "Unresolved" };
 
   public int _uid=Env._gvn.uid(); // Unique ID, will have gaps, used to give a dense numbering to nodes
-  private final byte _op;
+  final byte _op;
 
   // Defs.  Generally fixed length, ordered, nulls allowed, no unused trailing space.  Zero is Control.
   public Ary<Node> _defs;
