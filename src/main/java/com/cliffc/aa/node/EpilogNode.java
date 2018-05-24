@@ -40,7 +40,7 @@ public class EpilogNode extends Node {
   }
 
   // True if this is a forward_ref
-  public boolean forward_ref() { return at(0)==at(3) && fun()._tf._ts==TypeTuple.ALL; }
+  public boolean is_forward_ref() { return at(0)==at(3) && fun()._tf.is_forward_ref(); }
 
   // Return the op_prec of the returned value.  Not sensible except when call
   // on primitives.

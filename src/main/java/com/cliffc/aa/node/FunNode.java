@@ -79,7 +79,7 @@ public class FunNode extends RegionNode {
   public FunNode(Node scope, PrimNode prim) { this(scope,TypeFun.make(prim._targs,prim._ret,CNT++),prim.op_prec(),prim._name); }
   private FunNode(Node scope, TypeTuple ts, Type ret, String name) { this(scope,TypeFun.make(ts,ret,CNT++),-1,name); }
   // Used to forward-decl anon functions
-  FunNode(Node scope, String name) { this(scope,TypeFun.make(TypeTuple.ALL,Type.XSCALAR,CNT++),-1,name); }
+  FunNode(Node scope, String name) { this(scope,TypeFun.make_forward_ref(CNT++),-1,name); }
   public FunNode(int nargs, Node scope) { this(scope,TypeFun.any(nargs,CNT++),-1,null); }
   private FunNode(Node scope, TypeFun tf, int op_prec, String name) {
     super(OP_FUN,scope);

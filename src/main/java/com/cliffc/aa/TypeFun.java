@@ -86,4 +86,9 @@ public class TypeFun extends Type {
     int fidx = _fidxs.abit();
     if( fidx > 0 ) FunNode.bind(tok,fidx);
   }
+
+  // Is a forward ref function?
+  public boolean is_forward_ref() { return _ts==TypeTuple.SCALARS && _ret==Type.XSCALAR; }
+  public static TypeFun make_forward_ref( int fidx ) { return make(TypeTuple.SCALARS,Type.XSCALAR,Bits.make(fidx)); }
+  
 }

@@ -62,6 +62,7 @@ public class TypeTuple extends Type {
   public  static final TypeTuple  ALL    = (TypeTuple)make().dual(); // Infinite list of All
   public  static final TypeTuple  SCALAR = make(Type. SCALAR);
           static final TypeTuple  SCALAR2= make(Type. SCALAR, Type. SCALAR);
+  public  static final TypeTuple  SCALARS= make(Type. SCALAR,1.0);
   public  static final TypeTuple INT32   = make(TypeInt.INT32 );
   public  static final TypeTuple INT64   = make(TypeInt.INT64 );
   public  static final TypeTuple FLT64   = make(TypeFlt.FLT64 );
@@ -160,7 +161,7 @@ public class TypeTuple extends Type {
   }
   // Return true if this is a forward-ref function pointer (return type from EpilogNode)
   @Override public boolean is_forward_ref() {
-    return is_fun_ptr() && ((TypeFun)_ts[3])._ts==TypeTuple.ALL;
+    return is_fun_ptr() && ((TypeFun)_ts[3]).is_forward_ref();
   }
   public TypeFun get_fun() { assert is_fun_ptr(); return (TypeFun)_ts[3]; }
 }

@@ -90,7 +90,7 @@ public class Parse {
     // Disallow forward-refs as top-level results
     if( res instanceof EpilogNode ) {
       EpilogNode epi = (EpilogNode)res;
-      if( epi.forward_ref() )
+      if( epi.is_forward_ref() )
         errs = add_err(errs,forward_ref_err(epi.fun().name()));
     }
     // Hunt for typing errors in the alive code
@@ -247,13 +247,6 @@ public class Parse {
             }
           }
           require(')');
-          if( fun instanceof EpilogNode && ((EpilogNode)fun).forward_ref() ) { // Forward ref; partial def
-            throw AA.unimpl();
-          } else {
-            Type t = _gvn.type(fun);
-            if( !t.is_fun_ptr() )
-              return con(err_ctrl("A function is being called, but "+t+" is not a function type"));
-          }
         } else {                  // lispy-style fcn application
           // TODO: Unable resolve ambiguity with mixing "(fun arg0 arg1)" and
           // "fun(arg0,arg1)" argument calls.  Really having trouble with parsing
@@ -264,6 +257,14 @@ public class Parse {
           //while( (arg = stmt()) != null ) // While have args
           //  args.add_def(arg);            // Gather WS-separate args
           //if( args.len()==1 ) return fun; // Not a function call
+        }
+        // Forward ref: what to do?
+        if( fun instanceof EpilogNode && ((EpilogNode)fun).is_forward_ref() ) { // Forward ref; partial def
+          System.out.println("for ref");
+        } else {
+          Type t = _gvn.type(fun);
+          if( !t.is_fun_ptr() )
+            return con(err_ctrl("A function is being called, but "+t+" is not a function type"));
         }
         fun = do_call(args); // No syntax errors; flag Call not auto-close, and go again
       }
