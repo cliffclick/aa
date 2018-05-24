@@ -20,7 +20,7 @@ public class GVNGCM {
   private Ary<Node> _work = new Ary<>(new Node[1], 0);
   private BitSet _wrk_bits = new BitSet();
 
-  public <N extends Node> N add_work( N n ) { if( !_wrk_bits.get(n._uid) ) add_work0(n); return n; }
+  public void add_work( Node n ) { if( !_wrk_bits.get(n._uid) ) add_work0(n); }
   private <N extends Node> N add_work0( N n ) {
     _work.add(n);               // These need to be visited later
     _wrk_bits.set(n._uid);
@@ -67,7 +67,7 @@ public class GVNGCM {
     if( _opt ) t = t.dual();
     return _ts.setX(n._uid,t);
   }
-  public void setype( Node n, Type t ) {
+  private void setype( Node n, Type t ) {
     assert t != null;
     _ts.setX(n._uid,t);
   }
@@ -173,8 +173,8 @@ public class GVNGCM {
       if( x != n ) {            // Different return, so delete original dead node
         x._uses.add(x);         // Hook X to prevent accidental deletion
         kill_new(n); // n was new, replaced so immediately recycle n and dead subgraph
-        final Node y=x;
-        n = x._uses.del(x._uses.find(a -> a==y)); // Remove hook, keep better n
+        final Node q=x;
+        n = x._uses.del(x._uses.find(a -> a==q)); // Remove hook, keep better n
       }
       if( !check_new(n) ) return n; // If the replacement is old, no need to re-ideal
       cnt++; assert cnt < 1000;     // Catch infinite ideal-loops
@@ -255,7 +255,7 @@ public class GVNGCM {
 
   // Complete replacement; point uses to x.  The goal is to completely replace
   // 'old'.
-  void subsume( Node old, Node nnn ) {
+  private void subsume( Node old, Node nnn ) {
     while( old._uses._len > 0 ) {
       Node u = old._uses.del(0);  // Old use
       _vals.remove(u); // Use is about to change edges; remove from type table

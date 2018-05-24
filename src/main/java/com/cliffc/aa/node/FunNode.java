@@ -26,13 +26,13 @@ import java.util.HashMap;
 //
 // The function body points to the FunNode and ParmNodes like C2.
 //
-// RetNode is different from C2, to support precise function type inference.
-// Rets point to the return control and the original FunNode; its type is a
-// control Tuple, similar to IfNodes.  Pointing to the RetNode are Projs with
-// call-site indices; they carry the control-out of the function for their
-// call-site.  While there is a single Ret for all call-sites, Calls can "peek
-// through" to see the function body learning the incoming args come from a
-// known input path.
+// EpilogNode is different from C2s RetNode, to support precise function type
+// inference.  Epilogs point to the return control, return value, RPC and the
+// original FunNode; its type is a control Tuple, similar to IfNodes.  Pointing
+// to the Epilog are RPCNodes with call-site indices; they carry the control-
+// out of the function for their call-site.  While there is a single Epilog for
+// all call-sites, Calls can "peek through" to see the function body learning
+// the incoming args come from a known input path.
 // 
 // Results come from CastNodes, which up-cast the merged function results back
 // to the call-site specific type - this is where the precision loss are
@@ -41,7 +41,7 @@ import java.util.HashMap;
 
 // Example: FunNode "map" is called with type args A[] and A->B and returns
 // type B[]; at one site its "int[]" and "int->str" and at another site its
-// "flt[]" and "flt->int" args.  The RetNode merges results to be "SCALAR[]".
+// "flt[]" and "flt->int" args.  The Epilog merges results to be "SCALAR[]".
 // The Cast#1 upcasts its value to "str[]", and Cast#2 upcasts its value to
 // "int[]".
 // 
@@ -61,7 +61,7 @@ import java.util.HashMap;
 // 12 function body control
 // 13 function body return value
 // -- function ends
-// 14 Ret 12 13 9 {A[] {A -> B} -> B[]}
+// 14 Epilog 12 13 9 {A[] {A -> B} -> B[]}
 // 15 Proj#1 14            -- Return path  for unknown caller in slot 1
 // 16 Cast#1 0 13#SCALAR[] -- Return value for unknown caller in slot 1
 // 16 Proj#2 14            -- Return path  for caller {int[] {int -> str} -> str[]}
@@ -72,25 +72,14 @@ import java.util.HashMap;
 // The Parser will use the Env to point to the RetNode to create more callers
 // as parsing continues.  The RetNode is what is passed about for a "function
 // pointer".
-//
-// Keep a global function table, indexed by _fidx.  Points to generic ProjNode
-// caller as currently does... but nothing else does.  Parser gets a function
-// constant with _fidx as a number and makes a ConNode.  Unresolved takes in
-// these ConNodes.  CallNode does the _fidx lookup when inlining the call.
-//
 public class FunNode extends RegionNode {
   private static int CNT=1; // Function index; -1 for 'all' and 0 for 'any'
   public final TypeFun _tf; // Worse-case correct type
   private final byte _op_prec;// Operator precedence; only set top-level primitive wrappers
-  public FunNode(Node scope, PrimNode prim) {
-    this(scope,TypeFun.make(prim._targs,prim._ret,CNT++),prim.op_prec(),prim._name);
-  }
-  private FunNode(Node scope, TypeTuple ts, Type ret, String name) {
-    this(scope,TypeFun.make(ts,ret,CNT++),-1,name);
-  }
-  public FunNode(Node scope, String name) { // Used to forward-decl anon functions
-    this(scope,TypeFun.make(TypeTuple.ALL,Type.XSCALAR,CNT++),-1,name);
-  }
+  public FunNode(Node scope, PrimNode prim) { this(scope,TypeFun.make(prim._targs,prim._ret,CNT++),prim.op_prec(),prim._name); }
+  private FunNode(Node scope, TypeTuple ts, Type ret, String name) { this(scope,TypeFun.make(ts,ret,CNT++),-1,name); }
+  // Used to forward-decl anon functions
+  FunNode(Node scope, String name) { this(scope,TypeFun.make(TypeTuple.ALL,Type.XSCALAR,CNT++),-1,name); }
   public FunNode(int nargs, Node scope) { this(scope,TypeFun.any(nargs,CNT++),-1,null); }
   private FunNode(Node scope, TypeFun tf, int op_prec, String name) {
     super(OP_FUN,scope);
@@ -98,16 +87,12 @@ public class FunNode extends RegionNode {
     _op_prec = (byte)op_prec;
     bind(name,tf.fidx());
   }
-  private int fidx() { return _tf._fidxs.getbit(); }
-  public void init(ProjNode proj) {
-    throw AA.unimpl();
-    //FUNS.set_def(fidx(),proj);
-  }
+
+  // Fast reset of parser state between calls to Exec
   private static int PRIM_CNT;
   public static void init0() { PRIM_CNT=CNT; }
-  public static void reset_to_init0(GVNGCM gvn) { CNT = PRIM_CNT; NAMES.set_len(PRIM_CNT); }
-  public static void clear_forward_ref(Type t, GVNGCM gvn) {  throw AA.unimpl(); }
-  public static ProjNode get(int fidx) {  throw AA.unimpl(); }
+  public static void reset_to_init0() { CNT = PRIM_CNT; NAMES.set_len(PRIM_CNT); }
+
   @Override String xstr() { return _tf.toString(); }
   @Override String str() { return names(_tf._fidxs,new SB()).toString(); }
   // Debug only: make an attempt to bind name to a function

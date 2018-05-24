@@ -28,7 +28,8 @@ public class CallNode extends Node implements AutoCloseable {
 
   String xstr() { return "Call#"+_rpc; } // Self short name
   String  str() { return xstr(); }       // Inline short name
-  
+
+  // Fast reset of parser state between calls to Exec
   private static int PRIM_RPC; // Primitives count of call-sites
   public static void init0() { PRIM_RPC=RPC; }
   public static void reset_to_init0(GVNGCM gvn) { RPC = PRIM_RPC; }

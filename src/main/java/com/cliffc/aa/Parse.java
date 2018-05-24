@@ -137,9 +137,10 @@ public class Parse {
         if( tifex instanceof TypeFun ) ((TypeFun)tifex).bind(tok);
       } else { // Handle forward referenced function definitions
         Type nt = _gvn.type(n);
-        if( n instanceof ConNode && nt instanceof TypeFun ) {
-          _gvn.subsume(n,ifex); // Subsume forward ref function constant
-          FunNode.clear_forward_ref(nt,_gvn);
+        if( nt.is_forward_ref() ) {
+          //_gvn.subsume(n,ifex); // Subsume forward ref function constant
+          //FunNode.clear_forward_ref(nt,_gvn);
+          throw AA.unimpl();
         } else
           err_ctrl0("Cannot re-assign ref '"+tok+"'");
       }

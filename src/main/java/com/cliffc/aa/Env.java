@@ -59,7 +59,7 @@ public class Env implements AutoCloseable {
     if( _scope.is_dead() ) return;
     if( _par._par == null ) {
       CallNode.reset_to_init0(_gvn);
-      FunNode .reset_to_init0(_gvn);
+      FunNode .reset_to_init0();
       _gvn    .reset_to_init0();
       return;
     }
