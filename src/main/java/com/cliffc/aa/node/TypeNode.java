@@ -35,7 +35,14 @@ public class TypeNode extends Node {
     
     return null;
   }
-  @Override public Type value(GVNGCM gvn) { return _t.join(gvn.type(at(1))); }
+  // If the input isa the expected value, we can return it.  Otherwise the
+  // TypeNode is "in error", and the program is not type-correct.  Return the
+  // asserted value for later code to assume "all is good", but this error here
+  // will eventually have to correct (or the program will be rejected).
+  @Override public Type value(GVNGCM gvn) {
+    Type t = gvn.type(at(1));
+    return t.isa(_t) ? t : _t;
+  }
   @Override public Type all_type() { return _t; }
   String err(GVNGCM gvn) {
     Type t = gvn.type(at(1));

@@ -434,7 +434,7 @@ public class Parse {
     Ary<Type> ts = new Ary<>(new Type[1],0);  Type t;
     while( (t=type0()) != null && t != TypeErr.ANY  )
       ts.add(t);                // Collect arg types
-    Type ret=null;
+    Type ret;
     if( t==TypeErr.ANY ) {      // Found ->, expect return type
       ret = type0();
       if( ret == null ) return null;
@@ -486,7 +486,7 @@ public class Parse {
   private void kill( Node n ) { if( n._uses._len==0 ) _gvn.kill(n); }
   public Node ctrl() { return _e._scope.get(" control "); }
   // Set and return a new control
-  private Node set_ctrl(Node n) { return _e._scope.update(" control ",n,_gvn); }
+  private void set_ctrl(Node n) { _e._scope.update(" control ",n,_gvn); }
 
   private Node con( Type t ) { return _gvn.con(t); }
 
@@ -527,7 +527,7 @@ public class Parse {
     _e   = null;  _gvn = null;  _nf  = null;  _pp  = null;  _str = null;
   }
   // Delayed error message
-  public Parse errMsg() { return new Parse(this); }
+  private Parse errMsg() { return new Parse(this); }
 
   // Polite error message for mismatched types
   public String typerr( Type t0, Type t1 ) {
@@ -538,7 +538,7 @@ public class Parse {
 
   // Standard mis-use of a forward-ref error (assumed to be a forward-decl of a
   // recursive function; all other uses are treated as an unknown-ref error).
-  public String forward_ref_err(String name) { return errMsg("Unknown ref '"+name+"'"); }
+  private String forward_ref_err(String name) { return errMsg("Unknown ref '"+name+"'"); }
   // Build a string of the given message, the current line being parsed,
   // and line of the pointer to the current index.
   public String errMsg(String s) {

@@ -130,6 +130,43 @@ public class Ary<E> implements Iterable<E> {
     for( int i=0; i<_len; i++ )  if( P.test(_es[i]) )  return i;
     return -1;
   }
+
+  /** Merge-Or.  Merge 2 sorted Arys, tossing out duplicates.  Return a new
+   *  sorted Ary with the merged list.  Undefined if the original arrays are
+   *  not sorted.  Error if they are not of the same type.  Elements must
+   *  implement Comparable.
+   *  @param a0 Sorted Ary to merge
+   *  @param a1 Sorted Ary to merge
+   *  @return A new sorted merged Ary
+   */
+  public static <X extends Comparable<X>> Ary<X> merge_or( Ary<X> a0, Ary<X> a1 ) {
+    int i=0, j=0;
+    Ary<X> res = new Ary<>(Arrays.copyOf(a0._es,a0._len+a1._len),0);
+
+    while( i<a0._len && j<a1._len ) {
+      X x = a0._es[i];
+      X y = a1._es[j];
+      int cmp = x.compareTo(y);
+      if( cmp<0 ) { res.add(x); i++; }
+      else if( cmp>0 ) { res.add(y); j++; }
+      else { res.add(x); i++; j++; }
+    }
+    while( i<a0._len ) res.add(a0._es[i++]);
+    while( j<a1._len ) res.add(a1._es[j++]);
+    return res;
+  }
+  /** Merge-And.  Merge 2 sorted Arys, keeping only duplicates.  Return a new
+   *  sorted Ary with the merged list.  Undefined if the original arrays are
+   *  not sorted.  Error if they are not of the same type.  Elements must
+   *  implement Comparable.
+   *  @param a0 Sorted Ary to merge
+   *  @param a1 Sorted Ary to merge
+   *  @return A new sorted merged Ary
+   */
+  public static <X extends Comparable<X>> Ary<X> merge_and( Ary<X> a0, Ary<X> a1 ) {
+    throw new RuntimeException("unimpl");
+  }
+  
   /** @return an iterator */
   @Override public Iterator<E> iterator() { return new Iter(); }
   private class Iter implements Iterator<E> {
@@ -152,4 +189,21 @@ public class Ary<E> implements Iterable<E> {
       throw new ArrayIndexOutOfBoundsException(""+i+" >= "+_len);
   }
 
+  @Override public boolean equals( Object o ) {
+    if( this==o ) return true;
+    if( !(o instanceof Ary) ) return false;
+    Ary ary = (Ary)o;
+    if( _len != ary._len ) return false;
+    if( _es == ary._es ) return true;
+    for( int i=0; i<_len; i++ )
+      if( !(_es[i]==null ? (ary._es[i] == null) : _es[i].equals(ary._es[i])) )
+        return false;
+    return true;
+  }
+  @Override public int hashCode( ) {
+    int sum=_len;
+    for( int i=0; i<_len; i++ )
+      sum += _es[i]==null ? 0 : _es[i].hashCode();
+    return sum;
+  }
 }

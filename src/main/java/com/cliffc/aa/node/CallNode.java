@@ -32,7 +32,7 @@ public class CallNode extends Node implements AutoCloseable {
   // Fast reset of parser state between calls to Exec
   private static int PRIM_RPC; // Primitives count of call-sites
   public static void init0() { PRIM_RPC=RPC; }
-  public static void reset_to_init0(GVNGCM gvn) { RPC = PRIM_RPC; }
+  public static void reset_to_init0() { RPC = PRIM_RPC; }
 
   @Override public Node is_copy(GVNGCM gvn, int idx) { return _inlined ? at(idx) : null; }
 
@@ -191,7 +191,6 @@ public class CallNode extends Node implements AutoCloseable {
     assert t.is_fun_ptr();
     TypeTuple tepi = (TypeTuple)t;
     Type    tctrl=         tepi.at(0);
-    Type    tval =         tepi.at(1);
     TypeRPC trpc =(TypeRPC)tepi.at(2);
     TypeFun tfun =(TypeFun)tepi.at(3);
     assert tctrl==Type.CONTROL;     // Function will never return?
@@ -209,7 +208,7 @@ public class CallNode extends Node implements AutoCloseable {
       if( actual instanceof TypeErr ) // Actual is an error, so call result is the same error
         return actual;        // TODO: Actually need to keep all such errors...
       if( !actual.isa(formals[j]) )   // Actual is not a formal; join of ALL
-        return TypeErr.make(_badargs.typerr(actual,formals[j]),actual);
+        return TypeErr.make(_badargs.typerr(actual,formals[j]),actual,formals[j]);
     }
     return tfun.ret();
   }

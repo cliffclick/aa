@@ -28,8 +28,9 @@ public class Env implements AutoCloseable {
     for( Node val : _scope._defs )  _gvn.init0(val);
     _gvn.iter();
     Type.init0(_types);
-    FunNode.init0();  // Done with adding primitives
-    _gvn   .init0();  // Done with adding primitives
+    CallNode.init0(); // Done with adding primitives
+    FunNode .init0(); // Done with adding primitives
+    _gvn    .init0(); // Done with adding primitives
   }
   
   // Called during basic Env creation, this wraps a PrimNode as a full
@@ -58,7 +59,7 @@ public class Env implements AutoCloseable {
     _scope.del_locals(_gvn);
     if( _scope.is_dead() ) return;
     if( _par._par == null ) {
-      CallNode.reset_to_init0(_gvn);
+      CallNode.reset_to_init0();
       FunNode .reset_to_init0();
       _gvn    .reset_to_init0();
       return;

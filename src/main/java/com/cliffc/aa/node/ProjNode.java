@@ -6,7 +6,7 @@ import com.cliffc.aa.*;
 public class ProjNode extends Node {
   final int _idx;
   public ProjNode( Node ifn, int idx ) { super(OP_PROJ,ifn); _idx=idx; }
-  @Override String xstr() { return "Proj_"+_idx; }
+  @Override String xstr() { return "DProj_"+_idx; }
   @Override public Node ideal(GVNGCM gvn) {
     Node m = at(0);
     if( m instanceof CallNode ) {

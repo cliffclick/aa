@@ -31,8 +31,8 @@ public class TypeFlt extends Type {
   public static TypeFlt con(double con) { return make(0,log(con),con); }
   
   static public final TypeFlt FLT64 = make(-1,64,0);
-  static public final TypeFlt FLT32 = make(-1,32,0);
-  static public final TypeFlt PI    = con(Math.PI);
+  static        final TypeFlt FLT32 = make(-1,32,0);
+  static        final TypeFlt PI    = con(Math.PI);
   static final TypeFlt[] TYPES = new TypeFlt[]{FLT64,FLT32,PI};
   static void init0( HashMap<String,Type> types ) {
     types.put("flt32",FLT32);
@@ -74,7 +74,7 @@ public class TypeFlt extends Type {
     if( log(tcon._con) <= ttop._z ) return tcon;
     return make(-1,maxz,0);
   }
-  static int log( double con ) { return ((double)(float)con)==con ? 32 : 64; }
+  private static int log( double con ) { return ((double)(float)con)==con ? 32 : 64; }
   
   // Lattice of conversions:
   // -1 unknown; top; might fail, might be free (Scalar->Int); Scalar might lift

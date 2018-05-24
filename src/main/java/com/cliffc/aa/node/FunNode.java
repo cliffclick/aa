@@ -138,7 +138,7 @@ public class FunNode extends RegionNode {
     return false;
   }
 
-  
+
   // ----
   @Override public Node ideal(GVNGCM gvn) {
     Node n = split_callers(gvn);
@@ -211,7 +211,7 @@ public class FunNode extends RegionNode {
     // do not generate any code.
     if( cnts[OP_CALL] > 1 || // Careful inlining more calls; leads to exponential growth
         cnts[OP_IF  ] > 1 || // Allow some trivial filtering to inline
-        cnts[OP_PRIM] > 3 )  // Allow small-ish primitive counts to inline
+        cnts[OP_PRIM] > 10)  // Allow small-ish primitive counts to inline
       return null;
     
     // Make a prototype new function header.  No generic unknown caller

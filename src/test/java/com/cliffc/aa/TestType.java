@@ -5,14 +5,6 @@ import org.junit.Test;
 
 public class TestType {
   @Test public void testType0() {
-    testerr("fun@{int ->int }={x -> x*2}; fun(2.1)", "2.1 is not a int64","                                   ");
-    testerr("x=3; fun@{int ->int }={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int64","                                   ");
-    test   ("x=3; fun@{real->real}={x -> x*2}; fun(2.1)+fun(x)", TypeFlt.con(2.1*2+3*2)); // Mix of types to fun()
-    test   ("fun={x -> x*2+x*2.1}; fun(1)+fun(1.2)", TypeFlt.con((1*2+1*2.1)+(1.2*2+1.2*2.1))); // Cloning fun leads to 2 different funs
-
-    // This is an interesting case; at the top-level a function is returned
-    // which may be applied to e.g. String args.  It type-errors on Strings.
-    test_isa("{x y -> x+y}", TypeTuple.FUNPTR2); // actually {Real,Real->Real} but types as {Scalar,Scalar->Scalar}
     //test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
     // Simple int
     test("1",   TypeInt.TRUE);
@@ -129,7 +121,7 @@ public class TestType {
     testerr("\"abc\"@int", "\"abc\" is not a int64","         ");
     testerr("1@str", "1 is not a str","     ");
 
-    testerr("x=3; fun@{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int64","                                   ");
+    testerr("x=3; fun@{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int64","                              ");
     test("x=3; fun@{real->real}={x -> x*2}; fun(2.1)+fun(x)", TypeFlt.con(2.1*2+3*2)); // Mix of types to fun()
     test("fun@{real->flt32}={x -> x}; fun(123 )", TypeInt.con(123 ));
     test("fun@{real->flt32}={x -> x}; fun(0.125)", TypeFlt.con(0.125));

@@ -25,7 +25,7 @@ public abstract class PrimNode extends Node {
     new    RandI64(),
     new    Id(),
     
-    new ConvertInt32F64(),
+    new ConvertInt64F64(),
     new ConvertI64Str(),
     new ConvertF64Str(),
     new ConvertStrStr(),
@@ -59,9 +59,9 @@ public abstract class PrimNode extends Node {
     new   NE_I64(),
   };
 
-  // Loss-less conversions only
+  // Loss-less conversions only, plus int64->flt64 (standard lossy conversion)
   static PrimNode convert( Node actual, Type from, Type to ) {
-    if( from.isa(TypeInt.INT32) && to.isa(TypeFlt.FLT64) ) return new ConvertInt32F64(null,actual);
+    if( from.isa(TypeInt.INT64) && to.isa(TypeFlt.FLT64) ) return new ConvertInt64F64(null,actual);
     //if( from==Type.UInt32 && to==Type.I64 ) return convUInt32I64;
     //if( from==Type.UInt32 && to==Type.FLT64 ) return convUInt32F64;
     //if( from==Type. I64 && to==Type.FLT64 ) return  convI64F64;
@@ -88,8 +88,8 @@ public abstract class PrimNode extends Node {
   @Override public Type all_type() { return _ret; }
 }
 
-class ConvertInt32F64 extends PrimNode {
-  ConvertInt32F64(Node... nodes) { super("flt64",PrimNode.ARGS1,TypeTuple.INT32,TypeFlt.FLT64,nodes); }
+class ConvertInt64F64 extends PrimNode {
+  ConvertInt64F64(Node... nodes) { super("flt64",PrimNode.ARGS1,TypeTuple.INT64,TypeFlt.FLT64,nodes); }
   @Override public TypeFlt apply( Type[] args ) { return TypeFlt.make(0,64,(double)args[1].getl()); }
   @Override public byte op_prec() { return 9; }
   public boolean is_lossy() { return false; }

@@ -52,7 +52,7 @@ public class TypeTuple extends Type {
     if( len < ts.length ) ts = Arrays.copyOf(ts,len);
     return make(inf,false, ts);
   }
-  public static TypeTuple make_fun_ptr( TypeFun fun ) {
+  static TypeTuple make_fun_ptr( TypeFun fun ) {
     TypeTuple t = make(Type.CONTROL,TypeErr.ALL, TypeRPC.ALL_CALL, fun);
     assert t.is_fun_ptr();
     return t;
@@ -104,7 +104,7 @@ public class TypeTuple extends Type {
   }
 
   // Meet 2 tuples, shorter is 'this'
-  TypeTuple xmeet1(TypeTuple tmax) {
+  private TypeTuple xmeet1(TypeTuple tmax) {
     Type[] ts = new Type[tmax._ts.length];
     // Meet of common elements
     for( int i=0; i<_ts.length; i++ )  ts[i] = _ts[i].meet(tmax._ts[i]);
