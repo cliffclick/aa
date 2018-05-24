@@ -138,26 +138,24 @@ public class Type {
     // ANY meet anything is thing; thing meet ALL is ALL
     if( t==TypeErr.ANY ) return this;
     if( t==TypeErr.ALL ) return    t;
-    
-    // Control can only meet Control or Top or Errors
-    if( _type == TCONTROL || t._type == TCONTROL ) {
-      if(   _type == TERROR ) return this;
-      if( t._type == TERROR ) return t;
-      return _type == t._type ? CONTROL : TypeErr.ALL;
-    }
+    // Errors "win" over everything else
+    if( t instanceof TypeErr ) return t.above_center() ? this : t;
+
+    // Control can only meet Control or Top
+    if( _type == TCONTROL || t._type == TCONTROL ) return _type == t._type ? CONTROL : TypeErr.ALL;
 
     // The rest of these choices are various scalars, which do not match well
     // with any tuple.
     if( t._type == TTUPLE ) return TypeErr.ALL;
-    
+
     // Scalar is close to bottom: everything falls to SCALAR, except Bottom
     // (handled above) and multi-types like Tuples
     if( _type == TSCALAR || t._type == TSCALAR )  return SCALAR;
-    
+
     // ~Scalar is close to Top: it falls to anything, except multi-types like Tuples.
     if(   _type == TXSCALAR ) return t   ;
     if( t._type == TXSCALAR ) return this;
-    
+
     // The rest of these choices are various numbers, which do not match well
     // with any function
     if( t._type == TSTR ) return SCALAR;
@@ -166,12 +164,12 @@ public class Type {
     // Union of functions, with a number
     if( t._type == TUNION && ((TypeUnion)t)._ts.at(0)._type==TFUN )
       return SCALAR;
-    
+
     // Numeric; same pattern as ANY/ALL, or SCALAR/XSCALAR
     if( _type == TNUM || t._type == TNUM ) return NUM;
     if(   _type == TXNUM ) return t   ;
     if( t._type == TXNUM ) return this;
-    
+
     // Real; same pattern as ANY/ALL, or SCALAR/XSCALAR
     if( _type == TREAL || t._type == TREAL ) return REAL;
     if(   _type == TXREAL ) return t   ;

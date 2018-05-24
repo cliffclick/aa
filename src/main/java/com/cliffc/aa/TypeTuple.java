@@ -53,7 +53,7 @@ public class TypeTuple extends Type {
     return make(inf,false, ts);
   }
   public static TypeTuple make_fun_ptr( TypeFun fun ) {
-    TypeTuple t = make(Type.CONTROL,Type.SCALAR, TypeRPC.ALL_CALL, fun);
+    TypeTuple t = make(Type.CONTROL,fun._ret, TypeRPC.ALL_CALL, fun);
     assert t.is_fun_ptr();
     return t;
   }
