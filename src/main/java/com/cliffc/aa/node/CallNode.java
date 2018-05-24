@@ -52,7 +52,7 @@ public class CallNode extends Node implements AutoCloseable {
     if( skip_ctrl(gvn) ) return this;
     // If an inline is in-progress, no other opts and this node will go dead
     if( _inlined ) return null;
-    //// If an upcast is in-progress, no other opts until it finishes
+    // If an upcast is in-progress, no other opts until it finishes
     if( _cast_ret !=null ) return null;
     //
     Node ctrl = _defs.at(0);    // Control for apply/call-site
@@ -64,8 +64,6 @@ public class CallNode extends Node implements AutoCloseable {
       TypeNode tn = (TypeNode)unk;
       TypeTuple t_funptr = (TypeTuple)tn._t;
       assert t_funptr.is_fun_ptr();
-      if( ((TypeTuple)gvn.type(tn)).at(1) instanceof TypeErr )
-        return null; // The TypeNode is currently in-error, do not expose downstream to the error
       TypeFun tf = t_funptr.get_fun();
       set_def(1,tn.at(1),gvn);
       for( int i=0; i<nargs(); i++ ) // Insert casts for each parm
