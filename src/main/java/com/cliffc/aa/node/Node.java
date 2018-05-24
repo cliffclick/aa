@@ -35,10 +35,10 @@ public abstract class Node implements Cloneable {
   public Ary<Node> _defs;
   // Add def/use edge
   public Node add_def(Node n) { _defs.add(n); if( n!=null ) n._uses.add(this); return n; }
-  public Node at(int i) { return _defs._es[i]; }
+  public Node at(int i) { return _defs.at(i); }
   // Replace def/use edge
   public Node set_def( int idx, Node n, GVNGCM gvn ) {
-    Node old = _defs._es[idx];  // Get old value
+    Node old = _defs.at(idx);  // Get old value
     // Add edge to new guy before deleting old, in case old goes dead and
     // recursively makes new guy go dead also
     if( (_defs._es[idx] = n) != null ) n._uses.add(this);

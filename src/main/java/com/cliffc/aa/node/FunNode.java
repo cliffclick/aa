@@ -143,7 +143,7 @@ public class FunNode extends RegionNode {
   @Override public Node ideal(GVNGCM gvn) {
     Node n = split_callers(gvn);
     if( n != null ) return n;
-    
+
     // Else generic Region ideal
     return ideal(gvn,has_unknown_callers(gvn));
   }
