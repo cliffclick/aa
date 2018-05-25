@@ -353,7 +353,7 @@ public class FunNode extends RegionNode {
     return is_dead() ? fun : this;
   }
 
-  @Override public int hashCode() { return OP_FUN+_tf.hashCode(); }
+  @Override public int hashCode() { return super.hashCode()+_tf.hashCode(); }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !super.equals(o) ) return false;

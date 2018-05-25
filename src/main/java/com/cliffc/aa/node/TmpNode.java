@@ -10,8 +10,8 @@ public class TmpNode extends Node implements AutoCloseable {
   @Override public Node ideal(GVNGCM gvn) { return null; }
   @Override public Type value(GVNGCM gvn) { return TypeErr.ALL; }
   // TmpNodes are never equal
-  @Override public boolean equals(Object o) { return this==o; }
   @Override public int hashCode() { return 123456789; }
+  @Override public boolean equals(Object o) { return this==o; }
 
   void set_def( int i, Node n ) {
     assert i>= _defs._len || _defs._es[i]==null;

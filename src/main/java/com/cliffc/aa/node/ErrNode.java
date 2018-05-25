@@ -11,9 +11,10 @@ public final class ErrNode extends Node {
   @Override public Node ideal(GVNGCM gvn) { return null; }
   @Override public Type value(GVNGCM gvn) { return gvn.type(at(0)); } // Just pass control state thru
   @Override public Type all_type() { return Type.CONTROL; }
-  @Override public int hashCode() { return _msg.hashCode(); }
+  @Override public int hashCode() { return super.hashCode()+_msg.hashCode(); }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
+    if( !super.equals(o) ) return false;
     if( !(o instanceof ErrNode) ) return false;
     ErrNode err = (ErrNode)o;
     return _msg.equals(err._msg);

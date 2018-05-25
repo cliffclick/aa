@@ -86,6 +86,17 @@ public abstract class PrimNode extends Node {
   }
   // Worse-case type for this Node
   @Override public Type all_type() { return _ret; }
+  // Prims are equal for same-name-same-signature (and same inputs).
+  // E.g. float-minus of x and y is NOT the same as int-minus of x and y
+  // despite both names being '-'.
+  @Override public int hashCode() { return super.hashCode()+_name.hashCode()+_targs.hashCode(); }
+  @Override public boolean equals(Object o) {
+    if( this==o ) return true;
+    if( !super.equals(o) ) return false;
+    if( !(o instanceof PrimNode) ) return false;
+    PrimNode p = (PrimNode)o;
+    return _name.equals(p._name) && _targs==p._targs;
+  }
 }
 
 class ConvertInt64F64 extends PrimNode {

@@ -85,6 +85,6 @@ public class TypeFun extends Type {
   // Is a forward ref function?
   public boolean is_forward_ref() { return _ts==TypeTuple.SCALARS && _ret==TypeErr.ALL; }
   public static TypeFun make_forward_ref( int fidx ) { return make(TypeTuple.SCALARS,TypeErr.ALL,Bits.make(fidx)); }
-  public static TypeFun make_generic( ) { return make(TypeTuple.SCALARS,TypeErr.ALL,Bits.FULL); }
+  public static TypeFun make_generic( ) { return make(TypeTuple.SCALARS,TypeErr.ANY,Bits.FULL); }
   
 }
