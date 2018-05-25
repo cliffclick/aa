@@ -258,14 +258,9 @@ public class Parse {
           //  args.add_def(arg);            // Gather WS-separate args
           //if( args.len()==1 ) return fun; // Not a function call
         }
-        // Forward ref: what to do?
-        if( fun instanceof EpilogNode && ((EpilogNode)fun).is_forward_ref() ) { // Forward ref; partial def
-          System.out.println("for ref");
-        } else {
-          Type t = _gvn.type(fun);
-          if( !t.is_fun_ptr() )
-            return con(err_ctrl("A function is being called, but "+t+" is not a function type"));
-        }
+        Type t = _gvn.type(fun);
+        if( !t.is_fun_ptr() )
+          return con(err_ctrl("A function is being called, but "+t+" is not a function type"));
         fun = do_call(args); // No syntax errors; flag Call not auto-close, and go again
       }
     }

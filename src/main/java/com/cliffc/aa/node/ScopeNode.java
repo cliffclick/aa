@@ -38,16 +38,21 @@ public class ScopeNode extends Node {
   }
   
   // Update the current Scope name
-  public Node update( String name, Node val, GVNGCM gvn ) {
+  public void update( String name, Node val, GVNGCM gvn ) {
     int idx = _vals.get(name); // NPE if name does not exist
     set_def(idx,val,gvn);
-    return val;
   }
 
-  // The current local scope ends; delete local var refs.
-  public void del_locals(GVNGCM gvn) {
-    for( Integer ii : _vals.values() ) {
-      set_def(ii, null, gvn);
+  // The current local scope ends; delete local var refs.  Forward refs first
+  // found in this scope are assumed to be defined in some outer scope and get
+  // promoted.
+  public void promote_forward_del_locals(GVNGCM gvn, ScopeNode parent) {
+    for( String name : _vals.keySet() ) {
+      int idx = _vals.get(name);
+      Node n = at(idx);
+      if( parent != null && (n instanceof EpilogNode) && ((EpilogNode)n).is_forward_ref() )
+        parent.add(name,n);
+      set_def(idx, null, gvn);
       if( is_dead() ) return;
     }
   }
@@ -77,24 +82,32 @@ public class ScopeNode extends Node {
       for( String name : t._vals.keySet() ) {
         Node tn = t.at(t._vals.get(name));
         Integer fii = f==null ? null : f._vals.get(name);
-        Node fn = fii==null ? Env._gvn.con(TypeErr.make(P.errMsg("'"+name+"' not defined on false arm of trinary"))) : f.at(fii);
-        add(name,P.gvn(new PhiNode(P.ctrl(),tn,fn)));
+        Node fn = fii==null ? undef(P,tn,name,false) : f.at(fii); // Grab false-side var
+        add_phi(P,name,tn,fn);
       }
     }
     if( f!=null ) {  // Might have some variables in common
       for( String name : f._vals.keySet() ) {
         Node fn = f.at(f._vals.get(name));
         Integer tii = t==null ? null : t._vals.get(name);
-        if( tii == null ) {
-          Node tn = Env._gvn.con(TypeErr.make(P.errMsg("'"+name+"' not defined on true arm of trinary")));
-          add(name,P.gvn(new PhiNode(P.ctrl(),tn,fn)));
-        }
+        if( tii == null ) {     // Only defined on one branch
+          Node tn = undef(P,fn,name,true); // True-side var
+          add_phi(P,name,tn,fn);
+        } // Else values defined on both branches already handled
       }
     }
     if( t!=null ) Env._gvn.kill_new(t);
     if( f!=null ) Env._gvn.kill_new(f);
   }
 
+  private Node undef(Parse P, Node xn, String name, boolean arm ) {
+    return xn instanceof EpilogNode && ((EpilogNode)xn).is_forward_ref() ? xn
+      : Env._gvn.con(TypeErr.make(P.errMsg("'"+name+"' not defined on "+arm+" arm of trinary")));
+  }
+  private void add_phi(Parse P, String name, Node tn, Node fn) {
+    add(name,tn==fn ? fn : P.gvn(new PhiNode(P.ctrl(),tn,fn)));
+  }
+  
   @Override public Node ideal(GVNGCM gvn) { return null; }
   @Override public Type value(GVNGCM gvn) { return Type.CONTROL; }
   @Override public Type all_type() { return Type.CONTROL; }

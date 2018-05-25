@@ -56,7 +56,7 @@ public class Env implements AutoCloseable {
   // Close the current Env, making its lexical scope dead (and making dead
   // anything only pointed at by this scope).
   @Override public void close() {
-    _scope.del_locals(_gvn);
+    _scope.promote_forward_del_locals(_gvn,_par._par == null ? null : _par._scope);
     if( _scope.is_dead() ) return;
     if( _par._par == null ) {
       CallNode.reset_to_init0();

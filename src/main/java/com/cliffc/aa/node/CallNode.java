@@ -102,9 +102,9 @@ public class CallNode extends Node implements AutoCloseable {
     FunNode fun = epi.fun ();
 
     // Single choice; insert actual conversions as needed
-    Type[] formals = fun._tf._ts._ts;
+    TypeTuple formals = fun._tf._ts;
     for( int i=0; i<nargs(); i++ ) {
-      Type formal = formals[i];
+      Type formal = formals.at(i);
       Type actual = gvn.type(arg(i));
       byte xcvt = actual.isBitShape(formal);
       if( xcvt == 99 ) throw AA.unimpl(); // Error cases should not reach here
@@ -201,14 +201,15 @@ public class CallNode extends Node implements AutoCloseable {
     
     // Cannot return the functions return type, unless all args are compatible
     // with the function(s).  Arg-check.
-    Type[] formals = tfun._ts._ts;   // Type of each argument
+    TypeTuple formals = tfun._ts;   // Type of each argument
     // Now check if the arguments are compatible at all
-    for( int j=0; j<formals.length; j++ ) {
+    for( int j=0; j<nargs(); j++ ) {
       Type actual = gvn.type(arg(j));
+      Type formal = formals.at(j);
       if( actual instanceof TypeErr ) // Actual is an error, so call result is the same error
         return actual;        // TODO: Actually need to keep all such errors...
-      if( !actual.isa(formals[j]) )   // Actual is not a formal; join of ALL
-        return TypeErr.make(_badargs.typerr(actual,formals[j]),actual,formals[j]);
+      if( !actual.isa(formal) )   // Actual is not a formal; join of ALL
+        return TypeErr.make(_badargs.typerr(actual,formal),actual,formal);
     }
     return tfun.ret();
   }
