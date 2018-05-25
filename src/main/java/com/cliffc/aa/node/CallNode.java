@@ -223,6 +223,7 @@ public class CallNode extends Node implements AutoCloseable {
     return new TypeNode(t,null,_cast_P);
   }
 
+  @Override public Type all_type() { return TypeTuple.make(Type.CONTROL,TypeErr.ALL); }
   @Override public int hashCode() { return super.hashCode()+_rpc; }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;

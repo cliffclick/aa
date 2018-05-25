@@ -35,10 +35,10 @@ public class TypeTuple extends Type {
     for( Type t : _ts ) sb.p(t.toString()).p(',');
     return sb.p(_inf.toString()).p("...]").toString();
   }
-  
+
   private static TypeTuple FREE=null;
   private TypeTuple free( TypeTuple f ) { FREE=f; return this; }
-  private static TypeTuple make( Type inf, boolean ignore, Type... ts ) {
+  private static TypeTuple make0( Type inf, Type... ts ) {
     TypeTuple t1 = FREE;
     if( t1 == null ) t1 = new TypeTuple(ts,inf);
     else { FREE = null; t1.init(ts,inf); }
@@ -50,7 +50,7 @@ public class TypeTuple extends Type {
     int len = ts.length;
     while( len > 0 && ts[len-1] == inf ) len--;
     if( len < ts.length ) ts = Arrays.copyOf(ts,len);
-    return make(inf,false, ts);
+    return make0(inf, ts);
   }
   static TypeTuple make_fun_ptr( TypeFun fun ) {
     TypeTuple t = make(Type.CONTROL,TypeErr.ALL, TypeRPC.ALL_CALL, fun);
@@ -75,6 +75,7 @@ public class TypeTuple extends Type {
   public  static final TypeTuple IF_TRUE = make(TypeErr.ANY ,Type.CONTROL);
   public  static final TypeTuple IF_FALSE= make(Type.CONTROL             );
   public  static final TypeTuple FUNPTR2 = make_fun_ptr(TypeFun.any(2,-1));
+  public  static final TypeTuple GENERIC_FUN = make_fun_ptr(TypeFun.make_generic());
   static final TypeTuple[] TYPES = new TypeTuple[]{ANY,SCALAR,STR,INT32,INT64,FLT64,INT64_INT64,FLT64_FLT64,FLT64_INT64, IF_ALL, IF_TRUE, IF_FALSE, FUNPTR2};
   
   // The length of Tuples is a constant, and so is its own dual.  Otherwise
@@ -117,7 +118,7 @@ public class TypeTuple extends Type {
     int len = ts.length;
     while( len > 0 && ts[len-1] == tail ) len--;
     if( len < ts.length ) ts = Arrays.copyOf(ts,len);
-    return make(tail,false, ts);
+    return make0(tail, ts);
   }
 
   public Type at( int idx ) { return idx < _ts.length ? _ts[idx] : _inf; }

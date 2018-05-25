@@ -56,6 +56,8 @@ public class EpilogNode extends Node {
     dfun.bind(tok);
   }
 
+  @Override public Type all_type() { return TypeTuple.GENERIC_FUN; }
+  
   // Return the op_prec of the returned value.  Not sensible except when call
   // on primitives.
   @Override public byte op_prec() { return val().op_prec(); }
