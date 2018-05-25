@@ -34,13 +34,27 @@ public class EpilogNode extends Node {
   // declared.  Hence we want a callable function pointer, but have no defined
   // body (yet).  Make a function pointer that takes/ignores all args, and
   // returns any/top.
-  public static Node forward_ref( GVNGCM gvn, Node ctrl, String name ) {
-    FunNode fun = gvn.init(new FunNode(ctrl,name));
+  public static Node forward_ref( GVNGCM gvn, String name ) {
+    FunNode fun = gvn.init(new FunNode(name));
     return new EpilogNode(fun,gvn.con(TypeErr.ANY),gvn.con(TypeRPC.ALL_CALL),fun);
   }
 
   // True if this is a forward_ref
-  public boolean is_forward_ref() { return at(0)==at(3) && fun()._tf.is_forward_ref(); }
+  @Override public boolean is_forward_ref() { return at(0)==at(3) && fun()._tf.is_forward_ref(); }
+
+  // 'this' is a forward reference, probably with multiple uses (and no inlined
+  // callers).  Passed in the matching function definition, which is brand new
+  // and has no uses.  Merge the two.
+  public void merge_ref_def( GVNGCM gvn, String tok, EpilogNode def ) {
+    FunNode rfun = fun();
+    FunNode dfun = def.fun();
+    assert rfun._defs._len==1 && rfun.at(0)==null; // Forward ref has no callers
+    assert dfun._defs._len==2 && dfun.at(0)==null && dfun.at(1) instanceof ScopeNode;
+    assert def._uses._len==0;                      // Def is brand new, no uses
+
+    gvn.subsume(this,def);
+    dfun.bind(tok);
+  }
 
   // Return the op_prec of the returned value.  Not sensible except when call
   // on primitives.

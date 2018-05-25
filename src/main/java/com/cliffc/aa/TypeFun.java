@@ -81,14 +81,9 @@ public class TypeFun extends Type {
   @Override protected boolean canBeConst() { throw AA.unimpl(); }
   public int fidx() { return _fidxs.getbit(); }
   @Override public boolean is_con() { return _fidxs.abit() > 0; }
-  // Debug only: make an attempt to bind name to a function
-  void bind(String tok) {
-    int fidx = _fidxs.abit();
-    if( fidx > 0 ) FunNode.bind(tok,fidx);
-  }
 
   // Is a forward ref function?
-  public boolean is_forward_ref() { return _ts==TypeTuple.SCALARS && _ret==Type.XSCALAR; }
-  public static TypeFun make_forward_ref( int fidx ) { return make(TypeTuple.SCALARS,Type.XSCALAR,Bits.make(fidx)); }
+  public boolean is_forward_ref() { return _ts==TypeTuple.SCALARS && _ret==TypeErr.ALL; }
+  public static TypeFun make_forward_ref( int fidx ) { return make(TypeTuple.SCALARS,TypeErr.ALL,Bits.make(fidx)); }
   
 }

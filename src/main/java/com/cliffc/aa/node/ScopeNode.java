@@ -50,7 +50,7 @@ public class ScopeNode extends Node {
     for( String name : _vals.keySet() ) {
       int idx = _vals.get(name);
       Node n = at(idx);
-      if( parent != null && (n instanceof EpilogNode) && ((EpilogNode)n).is_forward_ref() )
+      if( parent != null && n.is_forward_ref() )
         parent.add(name,n);
       set_def(idx, null, gvn);
       if( is_dead() ) return;
@@ -101,7 +101,7 @@ public class ScopeNode extends Node {
   }
 
   private Node undef(Parse P, Node xn, String name, boolean arm ) {
-    return xn instanceof EpilogNode && ((EpilogNode)xn).is_forward_ref() ? xn
+    return xn.is_forward_ref() ? xn
       : Env._gvn.con(TypeErr.make(P.errMsg("'"+name+"' not defined on "+arm+" arm of trinary")));
   }
   private void add_phi(Parse P, String name, Node tn, Node fn) {

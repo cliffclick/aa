@@ -99,19 +99,49 @@ public abstract class Node implements Cloneable {
     return sb.p("]]");
   }
   private SB str(SB sb) { return sb.p(_uid).p(':').p(str()).p(' '); }
+  // Recursively print, up to depth
   private SB toString( int d, SB sb, int max, BitSet bs ) {
     if( bs.get(_uid) ) return sb;
     bs.set(_uid);
-    if( d < max && (d==0 || _uid != 0) ) // Limit at depth (and do not recurse thru root Scope)
+    if( d < max ) {    // Limit at depth
+      // Print parser scopes first (deepest)
+      for( Node n : _defs ) if( n instanceof ScopeNode && n._uid != 0 ) n.toString(d+1,sb,max,bs);
+      // Print constants early
+      for( Node n : _defs ) if( n instanceof ConNode ) n.toString(d+1,sb,max,bs);
+      // Do not recursively print root Scope, nor Unresolved of primitives.
+      // These are too common, and uninteresting.
+      for( Node n : _defs ) if( n != null && n._uid < GVNGCM._INIT0_CNT ) bs.set(n._uid);
+      // Recursively print most of the rest, just not the multi-node combos
+      for( Node n : _defs ) if( n != null && !n.is_multi_head() && !n.is_multi_tail() ) n.toString(d+1,sb,max,bs);
+      // Print anything not yet printed, including multi-node combos
       for( Node n : _defs ) if( n != null ) n.toString(d+1,sb,max,bs);
+    }
+    // Print multi-node combos all-at-once
+    Node x = is_multi_tail() ? at(0) : this;
+    if( x.is_multi_head() ) {
+      bs.clear(_uid);           // Reset for self, so prints in the mix
+      int dx = d+(x==this?0:1);
+      x.toString(dx,sb,bs); // Conditionally print head of combo
+      // Print all combo tails, if not already printed
+      for( Node n : x._uses ) if( n.is_multi_tail() ) n.toString(dx-1,sb,bs);
+      return sb;
+    } else { // Neither combo head nor tail, just print
+      return toString(d,sb).nl();
+    }
+  }
+  private SB toString(int d, SB sb, BitSet bs) {
+    if( bs.get(_uid) ) return sb;
+    bs.set(_uid);
     return toString(d,sb).nl();
   }
-  
+  private boolean is_multi_head() { return _op==OP_FUN  || _op==OP_REGION || _op==OP_CALL || _op==OP_IF; }
+  private boolean is_multi_tail() { return _op==OP_PARM || _op==OP_PHI    || _op==OP_PROJ              ; }
+
   // Graph rewriting.  Can change defs, including making new nodes - but if it
   // does so, all new nodes will first call ideal().  If gvn._opt if false, not
   // allowed to remove CFG edges (loop backedges and function-call entry points
   // have not all appeared).
-  // Returns null if no-progress, or better version of 'this'.
+  // Returns null if no-progress, or a better version of 'this'.
   abstract public Node ideal(GVNGCM gvn);
 
   // Compute the current best Type for this Node, based on the types of its inputs
@@ -198,6 +228,9 @@ public abstract class Node implements Cloneable {
   // on the ProjNode index
   public Node is_copy(GVNGCM gvn, int idx) { return null; }
 
+  // Only true for some EpilogNodes
+  public boolean is_forward_ref() { return false; }
+  
   // Skip useless Region controls
   boolean skip_ctrl(GVNGCM gvn) {
     Node x = at(0).is_copy(gvn,-1);

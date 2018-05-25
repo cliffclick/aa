@@ -57,7 +57,7 @@ public class CallNode extends Node implements AutoCloseable {
     if( _cast_ret !=null ) return null;
     //
     Node ctrl = _defs.at(0);    // Control for apply/call-site
-    Node unk  = _defs.at(1);    // Function epilog
+    Node unk  = _defs.at(1);    // Function epilog/function pointer
 
     // Type-checking a function; requires 2 steps, one now, one in the
     // following data Proj from the worklist.
@@ -117,7 +117,7 @@ public class CallNode extends Node implements AutoCloseable {
     }
 
     // If this is a forward-ref we have no body to inline
-    if( rez == fun ) // TODO: better forward-ref test
+    if( epi.is_forward_ref() )
       throw AA.unimpl(); // return null;
 
     // Check for several trivial cases that can be fully inlined immediately.
@@ -195,10 +195,10 @@ public class CallNode extends Node implements AutoCloseable {
     TypeFun tfun =(TypeFun)tepi.at(3);
     assert tctrl==Type.CONTROL;     // Function will never return?
     assert trpc._rpcs.test(_rpc);   // Function knows we are calling it
+    if( t.is_forward_ref() ) return tfun.ret(); // Forward refs do no argument checking
     if( tfun.nargs() != nargs() )
       return TypeErr.make(_badargs.errMsg("Passing "+nargs()+" arguments to "+tfun+" which takes "+tfun.nargs()+" arguments"));
     // TODO: optimize for Unresolved
-    
     // Cannot return the functions return type, unless all args are compatible
     // with the function(s).  Arg-check.
     TypeTuple formals = tfun._ts;   // Type of each argument

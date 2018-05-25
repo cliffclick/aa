@@ -88,11 +88,8 @@ public class Parse {
     if( tres instanceof TypeErr && tres != TypeErr.ALL )
       errs = add_err(errs,((TypeErr)tres)._msg);
     // Disallow forward-refs as top-level results
-    if( res instanceof EpilogNode ) {
-      EpilogNode epi = (EpilogNode)res;
-      if( epi.is_forward_ref() )
-        errs = add_err(errs,forward_ref_err(epi.fun().name()));
-    }
+    if( res.is_forward_ref() )
+      errs = add_err(errs,forward_ref_err(((EpilogNode)res).fun().name()));
     // Hunt for typing errors in the alive code
     Env par = _e._par;
     assert par._par==null;      // Top-level only
@@ -133,16 +130,9 @@ public class Parse {
       Node n = _e.lookup(tok);
       if( n==null ) {           // Token not already bound to a value
         _e.add(tok,ifex);       // Bind token to a value
-        Type tifex = _gvn.type(ifex); // Debug only: bind name to function if possible
-        if( tifex instanceof TypeFun ) ((TypeFun)tifex).bind(tok);
       } else { // Handle forward referenced function definitions
-        Type nt = _gvn.type(n);
-        if( nt.is_forward_ref() ) {
-          //_gvn.subsume(n,ifex); // Subsume forward ref function constant
-          //FunNode.clear_forward_ref(nt,_gvn);
-          throw AA.unimpl();
-        } else
-          err_ctrl0("Cannot re-assign ref '"+tok+"'");
+        if( n.is_forward_ref() ) ((EpilogNode)n).merge_ref_def(_gvn,tok,(EpilogNode)ifex);
+        else err_ctrl0("Cannot re-assign ref '"+tok+"'");
       }
     }
     while( peek(';') ) {   // Another expression?
@@ -330,7 +320,7 @@ public class Parse {
     if( tok == null ) return null;
     Node var = _e.lookup(tok);
     if( var == null ) // Assume any unknown ref is a forward-ref of a recursive function
-      return _e.add(tok,gvn(EpilogNode.forward_ref(_gvn,ctrl(),tok)));
+      return _e.add(tok,gvn(EpilogNode.forward_ref(_gvn,tok)));
     // Disallow uniop and binop functions as factors.
     if( var.op_prec() > 0 ) { _x = oldx; return null; }
     return var;

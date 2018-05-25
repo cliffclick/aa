@@ -76,16 +76,21 @@ public class FunNode extends RegionNode {
   private static int CNT=1; // Function index; -1 for 'all' and 0 for 'any'
   public final TypeFun _tf; // Worse-case correct type
   private final byte _op_prec;// Operator precedence; only set top-level primitive wrappers
+  // Used to make the primitives at boot time
   public FunNode(Node scope, PrimNode prim) { this(scope,TypeFun.make(prim._targs,prim._ret,CNT++),prim.op_prec(),prim._name); }
+  // Used to make copies when inlining/cloning function bodies
   private FunNode(Node scope, TypeTuple ts, Type ret, String name) { this(scope,TypeFun.make(ts,ret,CNT++),-1,name); }
-  // Used to forward-decl anon functions
-  FunNode(Node scope, String name) { this(scope,TypeFun.make_forward_ref(CNT++),-1,name); }
+  // Used start an anonymous function in the Parser
   public FunNode(int nargs, Node scope) { this(scope,TypeFun.any(nargs,CNT++),-1,null); }
+  // Used to forward-decl anon functions
+  FunNode(String name) { this(null,TypeFun.make_forward_ref(CNT),-1,name); }
+  // Shared common constructor
   private FunNode(Node scope, TypeFun tf, int op_prec, String name) {
-    super(OP_FUN,scope);
+    super(OP_FUN);
+    if( scope != null ) add_def(scope);
     _tf = tf;
     _op_prec = (byte)op_prec;
-    bind(name,tf.fidx());
+    if( name != null ) bind(name);
   }
 
   // Fast reset of parser state between calls to Exec
@@ -97,8 +102,10 @@ public class FunNode extends RegionNode {
   @Override String str() { return names(_tf._fidxs,new SB()).toString(); }
   // Debug only: make an attempt to bind name to a function
   private static Ary<String> NAMES = new Ary<>(new String[1],0);
-  public static void bind(String tok, int fidx) {
-    assert NAMES.atX(fidx)==null; // Attempt to double-bind
+  public void bind(String tok) {
+    int fidx = _tf.fidx();
+    String name = NAMES.atX(fidx);
+    assert name==null || name.equals(tok); // Attempt to double-bind
     NAMES.setX(fidx,tok);
   }
   // Can return nothing, or "name" or "{name0,name1,name2...}"
@@ -119,8 +126,8 @@ public class FunNode extends RegionNode {
     String name = NAMES.atX(i);
     return sb.p(name==null ? "{"+Integer.toString(i)+"}" : name);
   }
-  public String name() { return name(_tf._fidxs.getbit()); }
-  public static String name(int fidx) { return NAMES.at(fidx); }
+  public String name() { return name(_tf.fidx()); }
+  public static String name(int fidx) { return NAMES.atX(fidx); }
 
   // FunNodes can "discover" callers if the function constant exists in the
   // program anywhere (since, during execution (or optimizations) it may arrive
@@ -279,7 +286,7 @@ public class FunNode extends RegionNode {
     while( work._len > 0 ) {    // While have work
       Node n = work.pop();      // Get work
       if( map.get(n) != null ) continue; // Already visited?
-      assert n.at(0)!=epi && (n._defs._len<=1 || n.at(1)!= epi); // Do not walk past epilog
+      assert n.at(0)!=epi && (n._defs._len<=1 || n.at(1)!= epi || n instanceof CallNode); // Do not walk past epilog
       if( n != epi )           // Except for the Epilog
         work.addAll(n._uses);  // Visit all uses also
       map.put(n,n.copy()); // Make a blank copy with no edges and map from old to new

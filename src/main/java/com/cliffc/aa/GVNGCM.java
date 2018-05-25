@@ -39,7 +39,7 @@ public class GVNGCM {
 
   // Initial state after loading e.g. primitives & boot libs.  Record state
   // here, so can reset to here cheaply and parse again.
-  private static int _INIT0_CNT;
+  public static int _INIT0_CNT;
   private static Node[] _INIT0_NODES;
   void init0() {
     assert _live.get(CNT-1) && !_live.get(CNT) && _work._len==0 && _wrk_bits.isEmpty() && _ts._len==CNT;
@@ -255,7 +255,7 @@ public class GVNGCM {
 
   // Complete replacement; point uses to x.  The goal is to completely replace
   // 'old'.
-  private void subsume( Node old, Node nnn ) {
+  public void subsume( Node old, Node nnn ) {
     while( old._uses._len > 0 ) {
       Node u = old._uses.del(0);  // Old use
       _vals.remove(u); // Use is about to change edges; remove from type table
