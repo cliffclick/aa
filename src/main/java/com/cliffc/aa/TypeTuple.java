@@ -137,17 +137,15 @@ public class TypeTuple extends Type {
   @Override public boolean above_center() {
     return false;
   }
-  // True if any internals canBeConst
+  // True if all internals canBeConst
   @Override protected boolean canBeConst() {
-    if( _inf==TypeErr.ANY ) throw AA.unimpl();
-    for( Type _t : _ts ) if( _t.canBeConst() ) return true;
-    return false;
+    for( Type _t : _ts ) if( !_t.canBeConst() ) return false;
+    return _inf.canBeConst();
   }
   // True if all internals is_con
   @Override public boolean is_con() {
-    if( _inf==TypeErr.ALL ) throw AA.unimpl();
     for( Type _t : _ts ) if( !_t.is_con() ) return false;
-    return true;
+    return _inf.is_con();
   }
   // Return true if this is a function pointer (return type from EpilogNode)
   // 0 - Control for the function

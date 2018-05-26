@@ -57,5 +57,5 @@ public class TypeErr extends Type {
   @Override public String toString() { return this==ANY ? "any" : ((_all ? "" : "~")+ _msg); }
   @Override public boolean above_center() { return !_all; }
   @Override public boolean canBeConst() { return !_all; }
-  @Override public boolean is_con()   { return false; }
+  @Override public boolean is_con()   { return !_all; }
 }

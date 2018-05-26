@@ -182,7 +182,7 @@ public class GVNGCM {
     // Compute a type for n
     Type t = n.value(this);              // Get best type
     // Replace with a constant, if possible
-    if( t.is_con() && !(n instanceof ConNode) )
+    if( t.canBeConst() && !(n instanceof ConNode) )
       { kill_new(n); return con(t); }
     // Global Value Numbering
     x = _vals.putIfAbsent(n,n);
@@ -242,7 +242,7 @@ public class GVNGCM {
     Type t = n.value(this);     // Get best type
     assert t.isa(oldt);         // Types only improve
     // Replace with a constant, if possible
-    if( t.is_con() && !(n instanceof ConNode) )
+    if( t.canBeConst() && !(n instanceof ConNode) )
       return con(t);            // Constant replacement
     // Global Value Numbering
     Node z = _vals.putIfAbsent(n,n);
@@ -271,14 +271,25 @@ public class GVNGCM {
   // Once the program is complete, any time anything is on the worklist we can
   // always conservatively iterate on it.
   void iter() {
-    while( _work._len > 0 ) {
-      Node n = _work.pop();
-      _wrk_bits.clear(n._uid);
+    // As a modest debugging convenience, avoid inlining (which blows up the
+    // graph) until other optimizations are done.  Gather the possible inline
+    // requests and set them aside until the main list is empty, then work down
+    // the inline list.
+    Ary<Node> funs = new Ary<>(new Node[1], 0);
+    BitSet fun_bits = new BitSet();
+    boolean work;
+    while( (work=_work._len > 0) || funs._len > 0 ) {
+      Node n = (work ? _work : funs).pop(); // Pull from main worklist before functions
+      (work ? _wrk_bits : fun_bits).clear(n._uid);
       if( n.is_dead() ) continue;
       if( n instanceof ScopeNode || n instanceof TmpNode ) continue; // These are killed when parsing exists lexical scope
       if( n._uses._len==0 ) { kill(n); continue; }
-      xform_old(n);
+      if( _work._len > 0 && n instanceof FunNode && n.is_copy(this,-1) == null ) {
+        // Stall FunNodes, which may inline, until the main list goes empty
+        if( !fun_bits.get(n._uid ) ) { funs.add(n); fun_bits.set(n._uid); }
+      } else {
+        xform_old(n);
+      }
     }
   }
-
 }

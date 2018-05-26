@@ -5,7 +5,7 @@ import com.cliffc.aa.*;
 // Tail end of functions.  Gathers:
 // - exit control; function may never exit or may be more than one
 // - exit value;
-// - RPC - where to jump-to next; the Contiuation
+// - RPC - where to jump-to next; the Continuation
 // - The FunNode function header (quickly maps to SESE region header)
 public class EpilogNode extends Node {
   public EpilogNode( Node ctrl, Node val, Node rpc, Node fun ) { super(OP_EPI,ctrl,val,rpc,fun); }

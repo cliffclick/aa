@@ -45,7 +45,6 @@ public class RegionNode extends Node {
     for( int i=1; i<_defs._len; i++ ) if( gvn.type(at(i))==TypeErr.ANY ) remove(i--,gvn);
     return this;
   }
-  @Override public Node is_copy(GVNGCM gvn, int idx) { assert idx==-1; return _cidx == 0 ? null : at(_cidx); }
 
   @Override public Type value(GVNGCM gvn) {
     Type t = TypeErr.ANY;
@@ -53,5 +52,6 @@ public class RegionNode extends Node {
       t = t.meet(gvn.type(_defs._es[i]));
     return t;
   }
+  @Override public Node is_copy(GVNGCM gvn, int idx) { assert idx==-1; return _cidx == 0 ? null : at(_cidx); }
   @Override public Type all_type() { return Type.CONTROL; }
 }

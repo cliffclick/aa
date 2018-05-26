@@ -285,6 +285,7 @@ public class Type {
     case TSCALAR:
     case TNUM:
     case TREAL:
+    case TCONTROL:
       return false;             // These all include not-constant things
     case TXREAL:
     case TXNUM:
