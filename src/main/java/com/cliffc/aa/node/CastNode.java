@@ -8,16 +8,26 @@ public class CastNode extends Node {
   CastNode( Node ctrl, Node ret, Type t ) { super(OP_CAST,ctrl,ret); _t=t; }
   @Override String xstr() { return "("+_t+")"; }
   @Override public Node ideal(GVNGCM gvn) {
-    Node x = at(0).is_copy(gvn,0);
-    if( x!=null ) return set_def(0,x,gvn);
     // Must keep a cast, even if it useless, if it points to an Epilog.  The
     // Epilog may split (the function may be split) and the callers seperated.
     // The cast funnels the data-uses along one CFG path to this single node,
     // so on a split we can move all these data uses to the old or the new
-    // Epilog by just moving the cast.  Once an Epilog can no longer split the
-    // cast will lose its control edge, and useless casts can then be removed.
-    if( at(0) instanceof RPCNode && at(0).at(0) instanceof EpilogNode ) return null;
-    return gvn.type(at(1)).isa(_t) ? at(1) : null;
+    // Epilog by just moving the cast.  Once an Epilog can no longer split, we
+    // can remove useless casts.
+    Node ctrl = at(0);
+    Node data = at(1);
+    if( ctrl instanceof RPCNode && data instanceof EpilogNode && ctrl.at(0) == data ) {
+      // Note that the control-edge cannot go away (since its an up-cast) but
+      // the data edge can refine.
+      Node x = data.is_copy(gvn,1); // If the Epilog collapses
+      return x == null ? null : set_def(1,x,gvn);
+    }
+    // If the Epilog is collapsed, the data edge will have moved past the
+    // Epilog, allowing the code to reach here.  However, we are still
+    // up-casting and so cannot go away unless useless - any up-cast has to
+    // remain control-guarded.  However, the control may no longer be an
+    // e.g. RPCNode, but whatever test gated the RPC in the first place.
+    return gvn.type(data).isa(_t) ? data : null;
   }
   @Override public Type value(GVNGCM gvn) {
     Type t0 = gvn.type(at(1));

@@ -24,7 +24,7 @@ public class TypeNode extends Node {
       assert region instanceof RegionNode;
       // Cannot change the "shape" of function nodes with potential unknown
       // callers, as the future callers need to see the same arguments.
-      if( !(region instanceof FunNode && ((FunNode)region).has_unknown_callers(gvn)) ) {
+      if( !(region instanceof FunNode && !((FunNode)region).callers_known(gvn)) ) {
         Node nphi = arg.copy();
         nphi.add_def(region);
         for( int i=1; i<arg._defs._len; i++ )

@@ -19,7 +19,7 @@ import com.cliffc.aa.*;
 
 public class CallNode extends Node implements AutoCloseable {
   private static int RPC=1; // Call-site return PC
-  private final int _rpc;   // Call-site return PC
+  private int _rpc;         // Call-site return PC
   private boolean _inlined;
   private Type   _cast_ret;     // Return type has been up-casted
   private Parse  _cast_P;       // Return type cast fail message
@@ -49,6 +49,13 @@ public class CallNode extends Node implements AutoCloseable {
       Env._gvn.kill_new(this);  // Free state on 
   }
 
+  // Clones during inlining all become unique new call sites
+  @Override Node copy() {
+    CallNode call = super.copy();
+    call._rpc = RPC++;
+    return call;
+  }
+  
   @Override public Node ideal(GVNGCM gvn) {
     if( skip_ctrl(gvn) ) return this;
     // If an inline is in-progress, no other opts and this node will go dead
@@ -142,10 +149,19 @@ public class CallNode extends Node implements AutoCloseable {
 
     // If this is a primitive, we never change the function header via inlining the call
     assert fun.at(1)._uid!=0;
+    assert fun._tf._ts._ts.length == nargs();
 
+
+    // Not legal to inline recursive calls; makes a tight loop (yay!) but does
+    // not stack live values across the call (including the RPC) so does not
+    // honor the semantics.  Basically need to merge this code with the FunNode
+    // inlining.
+    if( !(ctrl instanceof ScopeNode) )
+      return null;    // TODO: CAN INLINE THE WHOLE FUNCTION HERE
+    
     // Inline the call site now.
     // This is NOT inlining the function body, just the call site.
-    assert fun._tf._ts._ts.length == nargs();
+
     // Add an input path to all incoming arg ParmNodes from the Call.
     int pcnt=0;               // Assert all parameters found
     for( Node arg : fun._uses ) {
@@ -202,16 +218,16 @@ public class CallNode extends Node implements AutoCloseable {
     // Cannot return the functions return type, unless all args are compatible
     // with the function(s).  Arg-check.
     TypeTuple formals = tfun._ts;   // Type of each argument
-    // Now check if the arguments are compatible at all
+    Type terr = TypeErr.ANY;    // No errors (yet)
     for( int j=0; j<nargs(); j++ ) {
       Type actual = gvn.type(arg(j));
       Type formal = formals.at(j);
       if( actual instanceof TypeErr ) // Actual is an error, so call result is the same error
-        return actual;        // TODO: Actually need to keep all such errors...
-      if( !actual.isa(formal) )   // Actual is not a formal; join of ALL
-        return TypeErr.make(_badargs.typerr(actual,formal),actual,formal);
+        terr = terr.meet(actual);
+      else if( !actual.isa(formal) ) // Actual is not a formal; join of ALL
+        terr = terr.meet( TypeErr.make(_badargs.typerr(actual,formal),actual,formal));
     }
-    return tfun.ret();
+    return terr == TypeErr.ANY ? tfun.ret() : terr;
   }
 
   // Called from the data proj.  Return a TypeNode with proper casting on return result.

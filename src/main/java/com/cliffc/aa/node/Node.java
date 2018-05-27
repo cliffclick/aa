@@ -74,9 +74,9 @@ public abstract class Node implements Cloneable {
   }
 
   // Make a copy of the base node, with no defs nor uses and a new UID.
-  Node copy() {
+  <N extends Node> N copy() {
     try {
-      Node n = (Node)clone();             // Preserve base java type
+      N n = (N)clone();                   // Preserve base java type
       n._uid = Env._gvn.uid();            // A new UID
       n._defs = new Ary<>(new Node[1],0); // New empty defs
       n._uses = new Ary<>(new Node[1],0); // New empty uses

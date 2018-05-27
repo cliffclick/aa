@@ -129,20 +129,23 @@ public class FunNode extends RegionNode {
   public String name() { return name(_tf.fidx()); }
   public static String name(int fidx) { return NAMES.atX(fidx); }
 
+  @Override Node copy() {
+    throw AA.unimpl();          // Gotta make a new FIDX
+  }
+  
   // FunNodes can "discover" callers if the function constant exists in the
   // program anywhere (since, during execution (or optimizations) it may arrive
   // at a CallNode and initiate a new call to the function).  Until all callers
   // are accounted for, the FunNode keeps slot1 reserved with the most
   // conservative allowed arguments, under the assumption a as-yet-detected
   // caller will call with such arguments.  This is a quick check to detect
-  // may-have-more-callers.  
-  boolean has_unknown_callers(GVNGCM gvn) {
-    Node funcon = gvn.con(_tf);
-    for( Node def : funcon._defs ) {
-      if( def instanceof ScopeNode ) return true;
-      throw AA.unimpl();
-    }
-    return false;
+  // may-have-more-callers.
+  private boolean _all_callers_known;
+  boolean callers_known(GVNGCM gvn) {
+    if( _all_callers_known ) return _all_callers_known; // Once true, always true
+    if( _tf.is_forward_ref() || (at(1) instanceof ScopeNode) ) return false;
+    System.out.println("flipping to no unknown callers");
+    return (_all_callers_known=true);
   }
 
 
@@ -152,7 +155,7 @@ public class FunNode extends RegionNode {
     if( n != null ) return n;
 
     // Else generic Region ideal
-    return ideal(gvn,has_unknown_callers(gvn));
+    return ideal(gvn,!callers_known(gvn));
   }
 
   private Node split_callers( GVNGCM gvn ) {
@@ -225,6 +228,7 @@ public class FunNode extends RegionNode {
     // in slot 1, only slot 2.
     Node top = gvn.con(TypeErr.ANY);
     FunNode fun = new FunNode(top,_tf._ts,_tf._ret,name());
+    fun._all_callers_known=true; // private split always
     fun.add_def(at(2));
     for( int i=3; i<_defs._len; i++ ) fun.add_def(top);
     return fun;
@@ -271,6 +275,8 @@ public class FunNode extends RegionNode {
         split &= gvn.type(parms[i].at(j)).widen().isa(sig[i]);
       fun.add_def(split ? at(j) : gvn.con(TypeErr.ANY));
     }
+    // TODO: Install in ScopeNode for future finding
+    fun._all_callers_known=true; // currently not exposing to further calls
     return fun;
   }
 
@@ -286,6 +292,7 @@ public class FunNode extends RegionNode {
     while( work._len > 0 ) {    // While have work
       Node n = work.pop();      // Get work
       if( map.get(n) != null ) continue; // Already visited?
+      assert n._uid < fun._uid; // Recursive calls will call 'fun' directly
       assert n.at(0)!=epi && (n._defs._len<=1 || n.at(1)!= epi || n instanceof CallNode); // Do not walk past epilog
       if( n != epi )           // Except for the Epilog
         work.addAll(n._uses);  // Visit all uses also
@@ -354,7 +361,7 @@ public class FunNode extends RegionNode {
   }
 
   @Override public Type value(GVNGCM gvn) {
-    return _tf.is_forward_ref() || has_unknown_callers(gvn) ? Type.CONTROL : super.value(gvn);
+    return _tf.is_forward_ref() || !callers_known(gvn) ? Type.CONTROL : super.value(gvn);
   }
   
   @Override public int hashCode() { return super.hashCode()+_tf.hashCode(); }

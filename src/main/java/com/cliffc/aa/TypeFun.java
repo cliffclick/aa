@@ -70,7 +70,7 @@ public class TypeFun extends Type {
     TypeFun tf = (TypeFun)t;
     Bits fidxs = _fidxs.or( tf._fidxs );
     TypeTuple ts = (TypeTuple)_ts.meet(tf._ts);
-    Type ret = _ret.join(tf._ret);
+    Type ret = _ret.meet(tf._ret);
     return make(ts,ret,fidxs);
   }
 
@@ -82,9 +82,10 @@ public class TypeFun extends Type {
   public int fidx() { return _fidxs.getbit(); }
   @Override public boolean is_con() { return _fidxs.abit() > 0; }
 
-  // Is a forward ref function?
-  public boolean is_forward_ref() { return _ts==TypeTuple.SCALARS && _ret==TypeErr.ALL; }
-  public static TypeFun make_forward_ref( int fidx ) { return make(TypeTuple.SCALARS,TypeErr.ALL,Bits.make(fidx)); }
-  public static TypeFun make_generic( ) { return make(TypeTuple.SCALARS,TypeErr.ANY,Bits.FULL); }
-  
+  // Generic functions
+  private static final TypeTuple GENERIC_ARGS=TypeTuple.SCALARS;
+  private static final Type      GENERIC_RET =TypeErr.ALL;
+  public boolean is_forward_ref()                    { return _ts==GENERIC_ARGS&&GENERIC_RET ==_ret; }
+  public static TypeFun make_forward_ref( int fidx ) { return make(GENERIC_ARGS, GENERIC_RET,Bits.make(fidx)); }
+  public static TypeFun make_generic( )              { return make(GENERIC_ARGS, GENERIC_RET,Bits.FULL); }
 }

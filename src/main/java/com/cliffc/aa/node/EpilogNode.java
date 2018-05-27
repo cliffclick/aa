@@ -10,6 +10,7 @@ import com.cliffc.aa.*;
 public class EpilogNode extends Node {
   public EpilogNode( Node ctrl, Node val, Node rpc, Node fun ) { super(OP_EPI,ctrl,val,rpc,fun); }
   @Override public Node ideal(GVNGCM gvn) {
+    if( skip_ctrl(gvn) ) return this;
     gvn.add_work(fun());
     return null;
   }
@@ -21,6 +22,14 @@ public class EpilogNode extends Node {
     assert t.is_fun_ptr();
     return t;
   }
+  // If the return PC is a constant, this is a single-target function and is
+  // effectively being inlined on the spot, removing the function head and tail.
+  @Override public Node is_copy(GVNGCM gvn, int idx) {
+    assert idx==0 || idx==1;
+    assert !gvn.type(rpc()).is_con() || fun().callers_known(gvn);
+    return gvn.type(rpc()).is_con() ? at(idx) : null;
+  }
+  
   public    Node ctrl() { return          at(0); } // internal function control
   public    Node val () { return          at(1); } // standard exit value
   public    Node rpc () { return          at(2); } // Almost surely a PhiNode merging RPCs

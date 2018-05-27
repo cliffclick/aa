@@ -8,7 +8,7 @@ public class RPCNode extends Node {
   RPCNode( Node ctrl, Node epi, int rpc ) { super(OP_RPC,ctrl,epi); _rpc=rpc; }
   String xstr() { return "RPC#"+_rpc; } // Self short name
   String  str() { return xstr(); }      // Inline short name
-  @Override public Node ideal(GVNGCM gvn) { return null; }
+  @Override public Node ideal(GVNGCM gvn) { return at(0).is_copy(gvn,0); }
   @Override public Type value(GVNGCM gvn) {
     Node  ctrl = at(0),  rpc = at(1);
     Type tctrl,         trpc;
