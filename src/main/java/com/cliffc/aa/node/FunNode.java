@@ -144,7 +144,6 @@ public class FunNode extends RegionNode {
   boolean callers_known(GVNGCM gvn) {
     if( _all_callers_known ) return _all_callers_known; // Once true, always true
     if( _tf.is_forward_ref() || (at(1) instanceof ScopeNode) ) return false;
-    System.out.println("flipping to no unknown callers");
     return (_all_callers_known=true);
   }
 
@@ -211,7 +210,13 @@ public class FunNode extends RegionNode {
       if( n != epi )            // Except for the Epilog
         work.addAll(n._uses);   // Visit all uses also
       bs.set(n._uid);           // Flag as visited
-      cnts[n._op]++;            // Histogram ops
+      int op = n._op;           // opcode
+      if( op==OP_CALL ) {       // Call-of-primitive?
+        EpilogNode x = (EpilogNode)(n.at(1) instanceof UnresolvedNode ? n.at(1).at(0) : n.at(1));
+        if( x.val() instanceof PrimNode )
+          op = OP_PRIM;         // Treat as primitive for inlining purposes
+      }
+      cnts[op]++;               // Histogram ops
     }
     assert cnts[OP_FUN]==1 && cnts[OP_EPI]==1;
     assert cnts[OP_SCOPE]==0 && cnts[OP_TMP]==0;
@@ -221,7 +226,7 @@ public class FunNode extends RegionNode {
     // do not generate any code.
     if( cnts[OP_CALL] > 1 || // Careful inlining more calls; leads to exponential growth
         cnts[OP_IF  ] > 1 || // Allow some trivial filtering to inline
-        cnts[OP_PRIM] > 10)  // Allow small-ish primitive counts to inline
+        cnts[OP_PRIM] > 6 )  // Allow small-ish primitive counts to inline
       return null;
     
     // Make a prototype new function header.  No generic unknown caller
@@ -317,6 +322,8 @@ public class FunNode extends RegionNode {
       } else if( n != this ) {  // Interior nodes
         for( Node def : n._defs ) {
           Node newdef = map.get(def);
+          if( def==epi )  // If using the old epilog in a recursive,
+            newdef = def; // need to keep using the old general-purpose version
           c.add_def(newdef==null ? def : newdef);
         }
       }
