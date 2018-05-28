@@ -5,7 +5,7 @@ import com.cliffc.aa.*;
 // Function parameter node; just a Phi with a name
 public class ParmNode extends PhiNode {
   final int _idx;               // Parameter index, zero-based; -1 reserved for RPC
-  private final String _name;   // Parameter name
+  final String _name;   // Parameter name
   public ParmNode( int idx, String name, FunNode fun, Node defalt) { super(OP_PARM,fun,defalt); _idx=idx; _name=name; }
   @Override String xstr() { return "Parm:"+_name; }
   @Override public Type value(GVNGCM gvn) {

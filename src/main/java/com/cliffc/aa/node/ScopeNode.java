@@ -52,6 +52,7 @@ public class ScopeNode extends Node {
       Node n = at(idx);
       if( parent != null && n.is_forward_ref() )
         parent.add(name,n);
+      if( n != null ) gvn.add_work(n);
       set_def(idx, null, gvn);
       if( is_dead() ) return;
     }

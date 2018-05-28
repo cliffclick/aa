@@ -121,12 +121,13 @@ public class GVNGCM {
     init0(n);
   }
 
+  // Hack an edge, updating GVN as needed
   public void set_def_reg(Node n, int idx, Node def) {
     _vals.remove(n);            // Remove from GVN
     n.set_def(idx,def,this);    // Hack edge
     assert !check_gvn(n,false); // Check not in GVN table after hack
     _vals.put(n,n);             // Back in GVN table
-    add_work0(n);
+    add_work(n);
   }
   
   // Node new to GVN and unregistered, or old and registered

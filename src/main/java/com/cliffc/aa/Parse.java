@@ -76,7 +76,10 @@ public class Parse {
     // Currently only supporting exprs
     Node res = stmt();
     if( res == null ) res = con(TypeErr.ALL);
+    _e._scope.add_def(ctrl());  // Hook, so not deleted
     _e._scope.add_def(res);     // Hook, so not deleted
+    // Delete names at the top scope before final optimization.
+    _e._scope.promote_forward_del_locals(_gvn,null);
     _gvn.iter();    // Pessimistic optimizations; might improve error situation
     res = _e._scope.pop();      // New and improved result
 

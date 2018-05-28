@@ -1,6 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.*;
+import java.util.BitSet;
 
 // Tail end of functions.  Gathers:
 // - exit control; function may never exit or may be more than one
@@ -11,8 +12,62 @@ public class EpilogNode extends Node {
   public EpilogNode( Node ctrl, Node val, Node rpc, Node fun ) { super(OP_EPI,ctrl,val,rpc,fun); }
   @Override public Node ideal(GVNGCM gvn) {
     if( skip_ctrl(gvn) ) return this;
-    gvn.add_work(fun());
-    return null;
+
+    // Look at the set of uses post-Parse; at parse time there will be no uses.
+    if( _uses._len == 0 ) return null; // Dead, or during-parse
+
+    FunNode fun = fun();
+    if( fun.callers_known(gvn) ) return null;
+    
+    // After parse, we have the complete set of uses.  If there are any uses as
+    // a function-pointer, then "all is lost" we have to assume the F-P is
+    // called later.  If all uses are RPCs or not-inlined Calls, we can union
+    // them all - and cut out any incoming paths to the FunNode that have no
+    // matching RPC.  Once a top-level Parse exits the "unknown callers" often
+    // go away.
+    BitSet bs = new BitSet();   // Union of RPCs
+    for( Node use : _uses ) {
+      int rpc;
+      if( use instanceof RPCNode ) rpc = ((RPCNode)use)._rpc;
+      else if( use instanceof CallNode ) { // Un-inlined call site
+        CallNode call = (CallNode)use;
+        // If any use is as an argument, all is lost.
+        for( int i=0; i<call.nargs(); i++ ) if( call.arg(i)==this ) return null;
+        assert call.at(1) == this;
+        rpc = call._rpc;
+      } else if( use instanceof CastNode ) continue; // Casts of RPC results are OK
+      else return null;         // Else unknown function-pointer user
+      bs.set(rpc);
+    }
+
+    // Not sure how we can have callers with no returns, so assert we found
+    // them all.... but fairly sure there's a path involving late-appearing
+    // dead paths that clean out quicker on the RPCs vs the FunNode inputs.
+    boolean progress = false;
+    ParmNode rpc=null;
+    for( Node parm : fun._uses )
+      if( parm instanceof ParmNode && ((ParmNode)parm)._name.equals("rpc") )
+        { assert rpc==null; rpc = ((ParmNode)parm); }
+    assert rpc != null;
+    // Skip the unknown caller in slot 1
+    assert gvn.type(rpc.at(1)) == TypeRPC.ALL_CALL;
+    for( int i=2; i<rpc._defs._len; i++ ) {
+      if( gvn.type( fun.at(i) ) == TypeErr.ANY ) continue; // Path is dead
+      TypeRPC t = (TypeRPC)gvn.type(rpc.at(i));
+      if( !t.is_con() ) throw AA.unimpl(); // merged multi-callers path
+      int irpc = t.rpc();
+      if( bs.get(irpc) ) bs.clear(irpc); // Found matching input path; clear from BS
+      else { gvn.set_def_reg(fun,i,gvn.con(TypeErr.ANY)); progress=true; }// No RPC for this input path, clear path
+    }
+
+    // If all RPCs are accounted for, then kill the unknown caller.
+    if( bs.isEmpty() ) {
+      gvn.set_def_reg(fun,1,gvn.con(TypeErr.ANY));
+      fun.callers_known(gvn);
+      progress=true;
+    }
+
+    return progress ? this : null;
   }
   @Override public Type value(GVNGCM gvn) {
     Type t=TypeTuple.make(gvn.type(ctrl()), // Function exits, or not

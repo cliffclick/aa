@@ -19,7 +19,7 @@ import com.cliffc.aa.*;
 
 public class CallNode extends Node implements AutoCloseable {
   private static int RPC=1; // Call-site return PC
-  private int _rpc;         // Call-site return PC
+  int _rpc;         // Call-site return PC
   private boolean _inlined;
   private Type   _cast_ret;     // Return type has been up-casted
   private Parse  _cast_P;       // Return type cast fail message
@@ -157,7 +157,7 @@ public class CallNode extends Node implements AutoCloseable {
     // honor the semantics.  Basically need to merge this code with the FunNode
     // inlining.
     if( !(ctrl instanceof ScopeNode) )
-      return null;    // TODO: CAN INLINE THE WHOLE FUNCTION HERE
+      return null; //System.out.print(""); //   // TODO: CAN INLINE THE WHOLE FUNCTION HERE
     
     // Inline the call site now.
     // This is NOT inlining the function body, just the call site.
