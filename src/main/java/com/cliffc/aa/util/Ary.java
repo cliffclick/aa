@@ -122,6 +122,14 @@ public class Ary<E> implements Iterable<E> {
   /** Sorts in-place 
    *  @param c Comparator to sort by */
   public void sort_update(Comparator<? super E> c ) { Arrays.sort(_es, 0, _len, c);  }
+  /** Find the first matching element using ==, or -1 if none.  Note that
+   *  most del calls shuffle the list, so the first element might be random.
+   *  @param e Element to find
+   *  @return index of first matching element, or -1 if none */
+  public int find( E e ) {
+    for( int i=0; i<_len; i++ )  if( _es[i]==e )  return i;
+    return -1;
+  }
   /** Find the first element matching predicate P, or -1 if none.  Note that
    *  most del calls shuffle the list, so the first element might be random.
    *  @param P Predicate to match

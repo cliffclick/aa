@@ -174,8 +174,7 @@ public class GVNGCM {
       if( x != n ) {            // Different return, so delete original dead node
         x._uses.add(x);         // Hook X to prevent accidental deletion
         kill_new(n); // n was new, replaced so immediately recycle n and dead subgraph
-        final Node q=x;
-        n = x._uses.del(x._uses.find(a -> a==q)); // Remove hook, keep better n
+        n = x._uses.del(x._uses.find(x)); // Remove hook, keep better n
       }
       if( !check_new(n) ) return n; // If the replacement is old, no need to re-ideal
       cnt++; assert cnt < 1000;     // Catch infinite ideal-loops
@@ -260,13 +259,13 @@ public class GVNGCM {
     while( old._uses._len > 0 ) {
       Node u = old._uses.del(0);  // Old use
       _vals.remove(u); // Use is about to change edges; remove from type table
-      u._defs.set(u._defs.find(a -> a==old),nnn); // was old now nnn
+      u._defs.set(u._defs.find(old),nnn); // was old now nnn
       nnn._uses.add(u);
       add_work(u);            // And put on worklist, to get re-inserted
     }
     nnn._uses.add(nnn);       // Self-hook, to prevent accidental deletion
     kill(old);                // Delete the old n, and anything it uses
-    nnn._uses.del(nnn._uses.find(a -> a==nnn)); // Remove self-hook
+    nnn._uses.del(nnn._uses.find(nnn)); // Remove self-hook
   }
 
   // Once the program is complete, any time anything is on the worklist we can
