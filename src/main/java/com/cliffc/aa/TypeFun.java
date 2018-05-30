@@ -4,7 +4,7 @@ import com.cliffc.aa.node.FunNode;
 import com.cliffc.aa.util.Bits;
 import com.cliffc.aa.util.SB;
 
-// Function constants
+// Function constants.  Contrast this to 'TypeTuple.make_fun_ptr'.
 public class TypeFun extends Type {
   public TypeTuple _ts;         // Arg types
   public Type _ret;             // return types

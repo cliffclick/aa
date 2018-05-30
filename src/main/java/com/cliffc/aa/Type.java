@@ -104,6 +104,15 @@ public class Type {
   // Collection of sample types for checking type lattice properties.
   private static final Type[] TYPES = new Type[]{CONTROL,SCALAR,XSCALAR,NUM,XNUM,REAL,XREAL};
   
+  // The complete list of primitive types that are disjoint and also is-a
+  // SCALAR; nothing else is a SCALAR except what is on this list (or
+  // subtypes).  Useful when type-specializing functions to break SCALAR args
+  // into a concrete list of specific types.  Specifically excludes e.g.
+  // TypeTuple - these may be passed as a scalar reference type in the future
+  // but for now Tuples explicitly refer to multiple values, and a SCALAR is
+  // exactly 1 value.  
+  static /*final*/ Type[] SCALAR_PRIMS;
+  
   byte base() { assert TBAD < _type && _type < TLAST; return _type; }
   private boolean is_simple() { return _type < TSIMPLE; }
   
@@ -243,6 +252,14 @@ public class Type {
                                t01_2                  +" == "+t0_12);
         }
     assert errs==0 : "Found "+errs+" non-associative-type errors";
+
+    // Check scalar primitives; all are SCALARS and none sub-type each other.
+    SCALAR_PRIMS = new Type[] { TypeInt.INT64, TypeFlt.FLT64, TypeStr.STR, TypeFun.make_generic() };
+    for( Type t : SCALAR_PRIMS ) assert t.isa(SCALAR);
+    for( int i=0; i<SCALAR_PRIMS.length; i++ ) 
+      for( int j=i+1; j<SCALAR_PRIMS.length; j++ )
+        assert !SCALAR_PRIMS[i].isa(SCALAR_PRIMS[j]);
+    
     return true;
   }
   private static Type[] concat( Type[] ts0, Type[] ts1 ) {
@@ -256,7 +273,7 @@ public class Type {
   public boolean isa( Type t ) { return meet(t)==t; }
   // True if 'this' isa SCALAR, without the cost of a full 'meet()'
   final boolean isa_scalar() { return _type != TERROR && _type != TUNION && _type != TTUPLE; }
-  
+
   // True if value is above the centerline (no real value)
   public boolean above_center() {
     switch( _type ) {
