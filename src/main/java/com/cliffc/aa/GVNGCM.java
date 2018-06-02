@@ -8,8 +8,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 // Global Value Numbering, Global Code Motion
 public class GVNGCM {
-  private final boolean _opt; // Optimistic (types start at ANY and fall to ALL) or pessimistic (start ALL lifting to ANY)
-
   // Unique dense node-numbering
   private int CNT;
   private BitSet _live = new BitSet();  // Conservative approximation of live; due to loops some things may be marked live, but are dead
@@ -35,8 +33,6 @@ public class GVNGCM {
   // Global expressions, to remove redundant Nodes
   private ConcurrentHashMap<Node,Node> _vals = new ConcurrentHashMap<>();
   
-  GVNGCM( boolean opt ) { _opt = opt; }
-
   // Initial state after loading e.g. primitives & boot libs.  Record state
   // here, so can reset to here cheaply and parse again.
   public static int _INIT0_CNT;
@@ -62,10 +58,8 @@ public class GVNGCM {
   
   public Type type( Node n ) {
     Type t = n._uid < _ts._len ? _ts._es[n._uid] : null;
-    if( t != null ) return t;
-    t = n.all_type();           // If no type yet, defaults to the pessimistic type
-    if( _opt ) t = t.dual();
-    return _ts.setX(n._uid,t);
+    // If no type yet, defaults to the pessimistic type
+    return t==null ? _ts.setX(n._uid,n.all_type()) : t;
   }
   private void setype( Node n, Type t ) {
     assert t != null;
@@ -158,14 +152,10 @@ public class GVNGCM {
     return false;               // Not in table
   }
 
-  public Node xform( Node n ) {
-    if( _opt ) throw AA.unimpl();
-    return xform_new(n);
-  }
   // Apply graph-rewrite rules on new nodes (those with no users and kept alive
   // for the parser).  Return a node registered with GVN that is possibly "more
   // ideal" than what was before.
-  private Node xform_new( Node n ) {
+  public Node xform( Node n ) {
     assert check_new(n);
 
     // Try generic graph reshaping, looping till no-progress.

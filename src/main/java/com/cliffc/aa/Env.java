@@ -15,7 +15,7 @@ public class Env implements AutoCloseable {
     add(" control ",_scope);
   }
 
-  public final static GVNGCM _gvn = new GVNGCM(false); // Pessimistic GVN, defaults to ALL, lifts towards ANY
+  public final static GVNGCM _gvn = new GVNGCM(); // Pessimistic GVN, defaults to ALL, lifts towards ANY
   private final static Env TOP = new Env(null);        // Top-most lexical Environment
   public static ScopeNode top_scope() { return TOP._scope; }
   static { TOP.init(); }

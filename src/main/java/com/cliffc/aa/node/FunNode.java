@@ -308,19 +308,25 @@ public class FunNode extends RegionNode {
     if( !(at(1) instanceof ScopeNode) )  throw AA.unimpl(); // Untested: Slot 1 is not the generic unparsed caller
     if( ((ScopeNode)at(1)).get(name()) !=null )
       throw AA.unimpl(); // need to repoint the scope
+    Node any = gvn.con(TypeErr.ANY);
     Node newepi = map.get(epi);
-    EpilogNode xxxepi = epi.copy();
-    for( Node def : epi._defs ) xxxepi.add_def(def);
-    gvn.init(xxxepi);
-    UnresolvedNode new_unr = new UnresolvedNode();
-    new_unr.add_def(xxxepi);
-    new_unr.add_def(newepi);
-    gvn.init(new_unr);
+    Node new_unr = epi;
+    // Are we making a type-specialized copy, that can/should be found by same-typed users?
+    // Or are we cloning a private copy just for this call-site?
+    if( fun.at(1) != any ) {
+      // All uses now get to select either the old or new (type-specific) copy.
+      EpilogNode xxxepi = epi.copy();
+      for( Node def : epi._defs ) xxxepi.add_def(def);
+      gvn.init(xxxepi);
+      new_unr = new UnresolvedNode();
+      new_unr.add_def(xxxepi);
+      new_unr.add_def(newepi);
+      gvn.init(new_unr);
+    }
 
     // Fill in edges.  New Nodes point to New instead of Old; everybody
     // shares old nodes not in the function (and not cloned).  The
     // FunNode & Parms only get the matching slice of args.
-    Node any = gvn.con(TypeErr.ANY);
     for( Node n : map.keySet() ) {
       Node c = map.get(n);
       if( n instanceof ParmNode && n.at(0) == this ) {  // Leading edge ParmNodes
@@ -370,7 +376,7 @@ public class FunNode extends RegionNode {
       }
     }
     // Repoint all other uses to an Unresolved choice of the old and new functions
-    gvn.subsume(epi,new_unr);
+    if( fun.at(1) != any ) gvn.subsume(epi,new_unr);
     
     // Put all new nodes into the GVN tables and worklists
     for( Node c : map.values() ) gvn.rereg(c);
