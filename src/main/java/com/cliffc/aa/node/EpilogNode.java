@@ -98,8 +98,8 @@ public class EpilogNode extends Node {
   // declared.  Hence we want a callable function pointer, but have no defined
   // body (yet).  Make a function pointer that takes/ignores all args, and
   // returns any/top.
-  public static Node forward_ref( GVNGCM gvn, String name ) {
-    FunNode fun = gvn.init(new FunNode(name));
+  public static Node forward_ref( GVNGCM gvn, Node scope, String name ) {
+    FunNode fun = gvn.init(new FunNode(scope,name));
     return new EpilogNode(fun,gvn.con(TypeErr.ANY),gvn.con(TypeRPC.ALL_CALL),fun);
   }
 

@@ -253,7 +253,7 @@ class RandI64 extends PrimNode {
 }
 
 class Id extends PrimNode {
-  Id() { super("id",PrimNode.ARGS1,TypeTuple.SCALAR,Type.SCALAR); }
+  Id() { super("id",PrimNode.ARGS1,TypeTuple.SCALAR1,Type.SCALAR); }
   @Override public Type apply( Type[] args ) { return args[1]; }
   @Override public Node ideal(GVNGCM gvn) { return at(1); }
   @Override public Type value(GVNGCM gvn) { return gvn.type(at(1)); }

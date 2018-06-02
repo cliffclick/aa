@@ -45,7 +45,8 @@ public class TypeTuple extends Type {
     TypeTuple t2 = (TypeTuple)t1.hashcons();
     return t1==t2 ? t1 : t2.free(t1);
   }
-  public static TypeTuple make( Type... ts ) { return make(TypeErr.ANY,1.0,ts); }
+  public static TypeTuple make    ( Type... ts ) { return make(TypeErr.ANY,1.0,ts); }
+  public static TypeTuple make_all( Type... ts ) { return make(TypeErr.ALL,1.0,ts); }
   public static TypeTuple make( Type inf, double ignore, Type... ts ) {
     int len = ts.length;
     while( len > 0 && ts[len-1] == inf ) len--;
@@ -53,15 +54,16 @@ public class TypeTuple extends Type {
     return make0(inf, ts);
   }
   static TypeTuple make_fun_ptr( TypeFun fun ) {
-    TypeTuple t = make(Type.CONTROL,TypeErr.ALL, TypeRPC.ALL_CALL, fun);
+    TypeTuple t = make_all(Type.CONTROL,TypeErr.ALL, TypeRPC.ALL_CALL, fun);
     assert t.is_fun_ptr();
     return t;
   }
 
   public  static final TypeTuple  ANY    = make(); // Infinite list of Any
   public  static final TypeTuple  ALL    = (TypeTuple)make().dual(); // Infinite list of All
-  public  static final TypeTuple  SCALAR = make(Type. SCALAR);
-          static final TypeTuple  SCALAR2= make(Type. SCALAR, Type. SCALAR);
+  public  static final TypeTuple  SCALAR0= make(Type.XSCALAR,1.0);
+  public  static final TypeTuple  SCALAR1= make(Type.XSCALAR,1.0,Type. SCALAR);
+          static final TypeTuple  SCALAR2= make(Type.XSCALAR,1.0,Type. SCALAR, Type. SCALAR);
   public  static final TypeTuple  SCALARS= make(Type. SCALAR,1.0);
   public  static final TypeTuple INT32   = make(TypeInt.INT32 );
   public  static final TypeTuple INT64   = make(TypeInt.INT64 );
@@ -70,13 +72,13 @@ public class TypeTuple extends Type {
   public  static final TypeTuple INT64_INT64 = make(TypeInt.INT64,TypeInt.INT64);
   public  static final TypeTuple FLT64_FLT64 = make(TypeFlt.FLT64,TypeFlt.FLT64);
   private static final TypeTuple FLT64_INT64 = make(TypeFlt.FLT64,TypeInt.INT64);
-  public  static final TypeTuple IF_ANY  = ANY;
-  public  static final TypeTuple IF_ALL  = make(Type.CONTROL,Type.CONTROL);
-  public  static final TypeTuple IF_TRUE = make(TypeErr.ANY ,Type.CONTROL);
-  public  static final TypeTuple IF_FALSE= make(Type.CONTROL             );
+  public  static final TypeTuple IF_ANY  = make_all(TypeErr.ANY,TypeErr.ANY  );
+  public  static final TypeTuple IF_ALL  = make_all(Type.CONTROL,Type.CONTROL);
+  public  static final TypeTuple IF_TRUE = make_all(TypeErr.ANY ,Type.CONTROL);
+  public  static final TypeTuple IF_FALSE= make_all(Type.CONTROL,TypeErr.ANY );
   public  static final TypeTuple FUNPTR2 = make_fun_ptr(TypeFun.any(2,-1));
   public  static final TypeTuple GENERIC_FUN = make_fun_ptr(TypeFun.make_generic());
-  static final TypeTuple[] TYPES = new TypeTuple[]{ANY,SCALAR,STR,INT32,INT64,FLT64,INT64_INT64,FLT64_FLT64,FLT64_INT64, IF_ALL, IF_TRUE, IF_FALSE, FUNPTR2};
+  static final TypeTuple[] TYPES = new TypeTuple[]{ANY,SCALAR1,STR,INT32,INT64,FLT64,INT64_INT64,FLT64_FLT64,FLT64_INT64, IF_ALL, IF_TRUE, IF_FALSE, FUNPTR2};
   
   // The length of Tuples is a constant, and so is its own dual.  Otherwise
   // just dual each element.  Also flip the infinitely extended tail type.
@@ -147,6 +149,7 @@ public class TypeTuple extends Type {
     for( Type _t : _ts ) if( !_t.is_con() ) return false;
     return _inf.is_con();
   }
+
   // Return true if this is a function pointer (return type from EpilogNode)
   // 0 - Control for the function
   // 1 - Return type of the function as implemented

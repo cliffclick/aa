@@ -3,6 +3,7 @@ package com.cliffc.aa;
 import com.cliffc.aa.node.*;
 import com.cliffc.aa.util.Ary;
 
+import java.util.Arrays;
 import java.util.BitSet;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -55,11 +56,14 @@ public class GVNGCM {
     for( Node n : _INIT0_NODES ) assert !n.is_dead();
     for( Node n : _INIT0_NODES ) _vals.put(n,n);
   }
-  
+
+  private boolean _opt=false;
   public Type type( Node n ) {
     Type t = n._uid < _ts._len ? _ts._es[n._uid] : null;
-    // If no type yet, defaults to the pessimistic type
-    return t==null ? _ts.setX(n._uid,n.all_type()) : t;
+    if( t != null ) return t;
+    t = n.all_type();           // If no type yet, defaults to the pessimistic type
+    if( _opt ) t = t.dual();    // If running optimistic GCP, want the dual instead
+    return _ts.setX(n._uid,t);
   }
   private void setype( Node n, Type t ) {
     assert t != null;
@@ -282,5 +286,34 @@ public class GVNGCM {
         xform_old(n);
       }
     }
+  }
+
+  // Global Optimimistic Constant Propagation.
+  void gcp(Node start) {
+    assert _work._len==0;
+    assert _wrk_bits.isEmpty();
+    // Set all types to null, indicating no value/never visited.
+    Arrays.fill(_ts._es,_INIT0_CNT,_ts._len,null);
+    _opt = true;                // Lazily fill with best value
+    // Prime the worklist
+    _ts.setX(start._uid,start.all_type().dual());
+    for( Node use : start._uses ) add_work(use); // Users use progress
+    // Work down list until all reachable nodes types quit falling
+    while( _work._len > 0 ) {
+      Node n = _work.pop();
+      _wrk_bits.clear(n._uid);
+      assert !n.is_dead();
+      boolean never_seen = _ts._es[n._uid]==null;
+      Type ot = type(n);        // Old type
+      Type nt = n.value(this);  // New type
+      assert ot.isa(nt);        // Types only fall monotonically
+      if( ot != nt || never_seen ) { // Progress
+        _ts.setX(n._uid,nt);    // Record progress
+        for( Node use : n._uses ) add_work(use); // Users use progress
+      }
+    }
+
+    // Record in any improved types; replace with constants if possible.
+    //throw AA.unimpl();
   }
 }

@@ -82,13 +82,14 @@ public class Parse {
     _e._scope.promote_forward_del_locals(_gvn,null);
     _gvn.iter();    // Pessimistic optimizations; might improve error situation
     res = _e._scope.pop();      // New and improved result
+    Node ctrl = _e._scope.pop();
 
-    // TODO: Optimistic Pass Goes Here, to improve error situation
+    //_gvn.gcp(_e._scope);             // Global Constant Propagation
 
     // Gather errors
     Ary<String> errs = null;
     Type tres = Env.lookup_valtype(res);    // Result type
-    if( tres instanceof TypeErr && tres != TypeErr.ALL )
+    if( tres instanceof TypeErr && tres != TypeErr.ALL && tres != TypeErr.ANY )
       errs = add_err(errs,((TypeErr)tres)._msg);
     // Disallow forward-refs as top-level results
     if( res.is_forward_ref() )
@@ -323,7 +324,7 @@ public class Parse {
     if( tok == null ) return null;
     Node var = _e.lookup(tok);
     if( var == null ) // Assume any unknown ref is a forward-ref of a recursive function
-      return _e.add(tok,gvn(EpilogNode.forward_ref(_gvn,tok)));
+      return _e.add(tok,gvn(EpilogNode.forward_ref(_gvn,_e._scope,tok)));
     // Disallow uniop and binop functions as factors.
     if( var.op_prec() > 0 ) { _x = oldx; return null; }
     return var;

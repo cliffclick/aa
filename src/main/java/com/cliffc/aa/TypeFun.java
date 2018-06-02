@@ -43,8 +43,8 @@ public class TypeFun extends Type {
   public static TypeFun any( int nargs, int fidx ) {
     Bits bs = fidx==-1 ? Bits.FULL : Bits.make(fidx);
     switch( nargs ) {
-    case 0: return make(TypeTuple.ANY    ,Type.SCALAR, bs);
-    case 1: return make(TypeTuple.SCALAR ,Type.SCALAR, bs);
+    case 0: return make(TypeTuple.SCALAR0,Type.SCALAR, bs);
+    case 1: return make(TypeTuple.SCALAR1,Type.SCALAR, bs);
     case 2: return make(TypeTuple.SCALAR2,Type.SCALAR, bs);
     default: throw AA.unimpl();
     }
