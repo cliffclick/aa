@@ -34,5 +34,4 @@ public class CastNode extends Node {
     Type t1 = at(1) instanceof EpilogNode ? ((TypeTuple)t0)._ts[1] : t0;
     return _t.join(t1);
   }
-  @Override public Type all_type() { return Type.SCALAR; }
 }

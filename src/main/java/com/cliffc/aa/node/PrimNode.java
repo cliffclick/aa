@@ -249,7 +249,7 @@ class NE_I64 extends Prim2RelOpI64 { NE_I64() { super("!="); } boolean op( long 
 class RandI64 extends PrimNode {
   RandI64() { super("math_rand",PrimNode.ARGS1,TypeTuple.INT64,TypeInt.INT64); }
   @Override public TypeInt apply( Type[] args ) { return TypeInt.con(new java.util.Random().nextInt((int)args[1].getl())); }
-  @Override public Type value(GVNGCM gvn) { return TypeInt.INT64; }
+  @Override public Type value(GVNGCM gvn) { return gvn.type(at(1)).meet(TypeInt.FALSE); }
 }
 
 class Id extends PrimNode {

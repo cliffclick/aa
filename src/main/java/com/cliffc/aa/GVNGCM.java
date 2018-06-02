@@ -53,8 +53,13 @@ public class GVNGCM {
     _live.clear();  _live.set(0,_INIT0_CNT);
     _ts.set_len(_INIT0_CNT);
     _vals.clear();
-    for( Node n : _INIT0_NODES ) assert !n.is_dead();
-    for( Node n : _INIT0_NODES ) _vals.put(n,n);
+    for( Node n : _INIT0_NODES ) {
+      assert !n.is_dead();
+      _vals.put(n,n);
+      for( int i=0; i<n._uses._len; i++ )
+        if( n._uses.at(i)._uid >= CNT )
+          n._uses.del(i--);
+    }
   }
 
   private boolean _opt=false;
@@ -288,8 +293,8 @@ public class GVNGCM {
     }
   }
 
-  // Global Optimimistic Constant Propagation.
-  void gcp(Node start) {
+  // Global Optimistic Constant Propagation.
+  void gcp(ScopeNode start) {
     assert _work._len==0;
     assert _wrk_bits.isEmpty();
     // Set all types to null, indicating no value/never visited.
@@ -309,7 +314,14 @@ public class GVNGCM {
       assert ot.isa(nt);        // Types only fall monotonically
       if( ot != nt || never_seen ) { // Progress
         _ts.setX(n._uid,nt);    // Record progress
-        for( Node use : n._uses ) add_work(use); // Users use progress
+        for( Node use : n._uses ) {
+          if( use.all_type() != type(use) ) // If not already at bottom
+            add_work(use);      // Re-run users to check for progress
+          // When new control paths appear on Regions, the Region stays the
+          // same type (Ctrl) but the Phis must merge new values.
+          if( use instanceof RegionNode )
+            for( Node phi : use._uses ) add_work(phi);
+        }
       }
     }
     _opt = false;               // Back to pessimistic behavior on new nodes

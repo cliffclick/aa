@@ -209,6 +209,7 @@ public class CallNode extends Node implements AutoCloseable {
     Type    tctrl=         tepi.at(0);
     TypeRPC trpc =(TypeRPC)tepi.at(2);
     TypeFun tfun =(TypeFun)tepi.at(3);
+    if( tctrl == Type.XCTRL ) return TypeErr.ANY; // Function will never return
     assert tctrl==Type.CTRL;      // Function will never return?
     assert trpc._rpcs.test(_rpc); // Function knows we are calling it
     if( t.is_forward_ref() ) return tfun.ret(); // Forward refs do no argument checking

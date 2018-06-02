@@ -83,8 +83,14 @@ public class Parse {
     _gvn.iter();    // Pessimistic optimizations; might improve error situation
     res = _e._scope.pop();      // New and improved result
     Node ctrl = _e._scope.pop();
+    // Run GCP from the global top, so we also get all the initial constants
+    // and all users of those constants.  
+    Env par = _e._par;
+    _e._scope.add_def(par._scope); // Hook start control into all the constants
 
-    //_gvn.gcp(_e._scope);             // Global Constant Propagation
+    _gvn.gcp(par._scope); // Global Constant Propagation
+
+    _e._scope.pop(); // Remove start hook
 
     // Gather errors
     Ary<String> errs = null;
@@ -95,7 +101,6 @@ public class Parse {
     if( res.is_forward_ref() )
       errs = add_err(errs,forward_ref_err(((EpilogNode)res).fun().name()));
     // Hunt for typing errors in the alive code
-    Env par = _e._par;
     assert par._par==null;      // Top-level only
     BitSet bs = new BitSet();
     bs.set(_e._scope._uid);     // Do not walk top-level scope
