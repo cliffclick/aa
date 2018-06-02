@@ -306,6 +306,16 @@ public class FunNode extends RegionNode {
 
     // TODO: Split with a known caller in slot 1
     if( !(at(1) instanceof ScopeNode) )  throw AA.unimpl(); // Untested: Slot 1 is not the generic unparsed caller
+    if( ((ScopeNode)at(1)).get(name()) !=null )
+      throw AA.unimpl(); // need to repoint the scope
+    Node newepi = map.get(epi);
+    EpilogNode xxxepi = epi.copy();
+    for( Node def : epi._defs ) xxxepi.add_def(def);
+    gvn.init(xxxepi);
+    UnresolvedNode new_unr = new UnresolvedNode();
+    new_unr.add_def(xxxepi);
+    new_unr.add_def(newepi);
+    gvn.init(new_unr);
 
     // Fill in edges.  New Nodes point to New instead of Old; everybody
     // shares old nodes not in the function (and not cloned).  The
@@ -322,8 +332,8 @@ public class FunNode extends RegionNode {
       } else if( n != this ) {  // Interior nodes
         for( Node def : n._defs ) {
           Node newdef = map.get(def);
-          if( def==epi )  // If using the old epilog in a recursive,
-            newdef = def; // need to keep using the old general-purpose version
+          if( def==epi )  // If using the old epilog in a recursive fcn,
+            newdef = new_unr; // need to point to the function-choice which includes the old fcn
           c.add_def(newdef==null ? def : newdef);
         }
       }
@@ -335,7 +345,6 @@ public class FunNode extends RegionNode {
 
     // The old Epilog has sets of result Casts and RPCs; these need to be
     // split and half repointed to the new Epilog.  RPCs first.
-    Node newepi = map.get(epi);
     for( int j=0; !epi.is_dead() && j<epi._uses._len; j++ ) {
       Node use = epi._uses.at(j);
       if( !(use instanceof RPCNode) ) continue;
@@ -360,6 +369,9 @@ public class FunNode extends RegionNode {
         j--;
       }
     }
+    // Repoint all other uses to an Unresolved choice of the old and new functions
+    gvn.subsume(epi,new_unr);
+    
     // Put all new nodes into the GVN tables and worklists
     for( Node c : map.values() ) gvn.rereg(c);
     // TODO: Hook with proper signature into ScopeNode under an Unresolved.

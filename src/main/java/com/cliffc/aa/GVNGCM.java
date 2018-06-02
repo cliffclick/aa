@@ -238,6 +238,7 @@ public class GVNGCM {
     // Try generic graph reshaping
     Node y = n.ideal(this);
     if( y != null && y != n ) return y;  // Progress with some new node
+    if( y != null && y.is_dead() ) return null;
     // Either no-progress, or progress and need to re-insert n back into system
     Type t = n.value(this);     // Get best type
     assert t.isa(oldt);         // Types only improve
