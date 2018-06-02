@@ -159,7 +159,7 @@ public class FunNode extends RegionNode {
 
   private Node split_callers( GVNGCM gvn ) {
     // Bail if there are any dead paths; RegionNode ideal will clean out
-    for( int i=1; i<_defs._len; i++ ) if( gvn.type(at(i))==TypeErr.ANY ) return null;
+    for( int i=1; i<_defs._len; i++ ) if( gvn.type(at(i))==Type.XCTRL ) return null;
     if( _defs._len <= 2 ) return null; // No need to split callers if only 1
 
     // Gather the ParmNodes and the EpilogNode.  Ignore other (control) uses
@@ -231,7 +231,7 @@ public class FunNode extends RegionNode {
     
     // Make a prototype new function header.  No generic unknown caller
     // in slot 1, only slot 2.
-    Node top = gvn.con(TypeErr.ANY);
+    Node top = gvn.con(Type.XCTRL);
     FunNode fun = new FunNode(top,_tf._ts,_tf._ret,name());
     fun._all_callers_known=true; // private split always
     fun.add_def(at(2));
@@ -278,7 +278,7 @@ public class FunNode extends RegionNode {
       boolean split=true;
       for( int i=0; i<parms.length; i++ )
         split &= gvn.type(parms[i].at(j)).widen().isa(sig[i]);
-      fun.add_def(split ? at(j) : gvn.con(TypeErr.ANY));
+      fun.add_def(split ? at(j) : gvn.con(Type.XCTRL));
     }
     // TODO: Install in ScopeNode for future finding
     fun._all_callers_known=true; // currently not exposing to further calls
@@ -308,7 +308,7 @@ public class FunNode extends RegionNode {
     if( !(at(1) instanceof ScopeNode) )  throw AA.unimpl(); // Untested: Slot 1 is not the generic unparsed caller
     if( ((ScopeNode)at(1)).get(name()) !=null )
       throw AA.unimpl(); // need to repoint the scope
-    Node any = gvn.con(TypeErr.ANY);
+    Node any = gvn.con(Type.XCTRL);
     Node newepi = map.get(epi);
     Node new_unr = epi;
     // Are we making a type-specialized copy, that can/should be found by same-typed users?
@@ -386,7 +386,7 @@ public class FunNode extends RegionNode {
   }
 
   @Override public Type value(GVNGCM gvn) {
-    return _tf.is_forward_ref() || !callers_known(gvn) ? Type.CONTROL : super.value(gvn);
+    return _tf.is_forward_ref() || !callers_known(gvn) ? Type.CTRL : super.value(gvn);
   }
   
   @Override public int hashCode() { return super.hashCode()+_tf.hashCode(); }

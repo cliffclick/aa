@@ -209,8 +209,8 @@ public class CallNode extends Node implements AutoCloseable {
     Type    tctrl=         tepi.at(0);
     TypeRPC trpc =(TypeRPC)tepi.at(2);
     TypeFun tfun =(TypeFun)tepi.at(3);
-    assert tctrl==Type.CONTROL;     // Function will never return?
-    assert trpc._rpcs.test(_rpc);   // Function knows we are calling it
+    assert tctrl==Type.CTRL;      // Function will never return?
+    assert trpc._rpcs.test(_rpc); // Function knows we are calling it
     if( t.is_forward_ref() ) return tfun.ret(); // Forward refs do no argument checking
     if( tfun.nargs() != nargs() )
       return TypeErr.make(_badargs.errMsg("Passing "+nargs()+" arguments to "+tfun+" which takes "+tfun.nargs()+" arguments"));
@@ -239,7 +239,7 @@ public class CallNode extends Node implements AutoCloseable {
     return new TypeNode(t,null,_cast_P);
   }
 
-  @Override public Type all_type() { return TypeTuple.make_all(Type.CONTROL,TypeErr.ALL); }
+  @Override public Type all_type() { return TypeTuple.make_all(Type.CTRL,TypeErr.ALL); }
   @Override public int hashCode() { return super.hashCode()+_rpc; }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;

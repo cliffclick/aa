@@ -52,17 +52,17 @@ public class EpilogNode extends Node {
     // Skip the unknown caller in slot 1
     assert gvn.type(rpc.at(1)) == TypeRPC.ALL_CALL;
     for( int i=2; i<rpc._defs._len; i++ ) {
-      if( gvn.type( fun.at(i) ) == TypeErr.ANY ) continue; // Path is dead
+      if( gvn.type( fun.at(i) ) == Type.XCTRL ) continue; // Path is dead
       TypeRPC t = (TypeRPC)gvn.type(rpc.at(i));
       if( !t.is_con() ) throw AA.unimpl(); // merged multi-callers path
       int irpc = t.rpc();
       if( bs.get(irpc) ) bs.clear(irpc); // Found matching input path; clear from BS
-      else { gvn.set_def_reg(fun,i,gvn.con(TypeErr.ANY)); progress=true; }// No RPC for this input path, clear path
+      else { gvn.set_def_reg(fun,i,gvn.con(Type.XCTRL)); progress=true; }// No RPC for this input path, clear path
     }
 
     // If all RPCs are accounted for, then kill the unknown caller.
     if( bs.isEmpty() ) {
-      gvn.set_def_reg(fun,1,gvn.con(TypeErr.ANY));
+      gvn.set_def_reg(fun,1,gvn.con(Type.XCTRL));
       fun.callers_known(gvn);
       progress=true;
     }
@@ -112,7 +112,7 @@ public class EpilogNode extends Node {
   public void merge_ref_def( GVNGCM gvn, String tok, EpilogNode def ) {
     FunNode rfun = fun();
     FunNode dfun = def.fun();
-    assert rfun._defs._len==1 && rfun.at(0)==null; // Forward ref has no callers
+    assert rfun._defs._len==2 && rfun.at(0)==null && dfun.at(1) instanceof ScopeNode; // Forward ref has no callers
     assert dfun._defs._len==2 && dfun.at(0)==null && dfun.at(1) instanceof ScopeNode;
     assert def._uses._len==0;                      // Def is brand new, no uses
 

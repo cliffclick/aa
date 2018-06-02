@@ -71,17 +71,17 @@ public class Type {
     return this;
   }
 
-  static final byte TBAD    = 0; // Type check
   // Simple types are implemented fully here
-  static final byte TCONTROL= 1; // Control flow bottom (mini-lattice of Any-Control-Err)
-  static final byte TSCALAR = 2; // Scalars; all possible finite types; includes pointers (functions, structs), ints, floats; excludes state of Memory and Control.
+  static final byte TCTRL   = 0; // Ctrl flow bottom
+  static final byte TXCTRL  = 1; // Ctrl flow top (mini-lattice: any-xctrl-ctrl-all)
+  static final byte TSCALAR = 2; // Scalars; all possible finite types; includes pointers (functions, structs), ints, floats; excludes state of Memory and Ctrl.
   static final byte TXSCALAR= 3; // Invert scalars
   static final byte TNUM    = 4; // Number and all derivitives (Complex, Rational, Int, Float, etc)
   static final byte TXNUM   = 5; // Any Numbers; dual of NUM
   static final byte TREAL   = 6; // All Real Numbers
   static final byte TXREAL  = 7; // Any Real Numbers; dual of REAL
   static final byte TSIMPLE = 8; // End of the Simple Types
-  private static final String[] STRS = new String[]{"Bad","Control","Scalar","~Scalar","Number","~Number","Real","~Real"};
+  private static final String[] STRS = new String[]{"Ctrl","~Ctrl","Scalar","~Scalar","Number","~Number","Real","~Real"};
   // Implemented in subclasses
   static final byte TERROR  = 9; // ALL/ANY TypeErr types
   static final byte TUNION  =10; // Union types (finite collections of unrelated types Meet together); see TypeUnion
@@ -93,7 +93,8 @@ public class Type {
   static final byte TSTR    =16; // String type
   static final byte TLAST   =17; // Type check
   
-  public  static final Type CONTROL= make(TCONTROL); // Control
+  public  static final Type CTRL   = make( TCTRL  ); // Ctrl
+  public  static final Type XCTRL  = make(TXCTRL  ); // Ctrl
   public  static final Type  SCALAR= make( TSCALAR); // ptrs, ints, flts; things that fit in a machine register
   public  static final Type XSCALAR= make(TXSCALAR); // ptrs, ints, flts; things that fit in a machine register
   public  static final Type  NUM   = make( TNUM   );
@@ -102,7 +103,7 @@ public class Type {
   private static final Type XREAL  = make(TXREAL  );
 
   // Collection of sample types for checking type lattice properties.
-  private static final Type[] TYPES = new Type[]{CONTROL,SCALAR,XSCALAR,NUM,XNUM,REAL,XREAL};
+  private static final Type[] TYPES = new Type[]{CTRL,XCTRL,SCALAR,XSCALAR,NUM,XNUM,REAL,XREAL};
   
   // The complete list of primitive types that are disjoint and also is-a
   // SCALAR; nothing else is a SCALAR except what is on this list (or
@@ -113,7 +114,6 @@ public class Type {
   // exactly 1 value.  
   static /*final*/ Type[] SCALAR_PRIMS;
   
-  byte base() { assert TBAD < _type && _type < TLAST; return _type; }
   private boolean is_simple() { return _type < TSIMPLE; }
   
   // Return cached dual
@@ -122,7 +122,6 @@ public class Type {
   // Compute dual right now.  Overridden in subclasses.
   protected Type xdual() {
     assert is_simple();
-    if( _type==TCONTROL ) return this; // Self-symmetric
     return new Type((byte)(_type^1));
   }
 
@@ -150,8 +149,10 @@ public class Type {
     // Errors "win" over everything else
     if( t instanceof TypeErr ) return t.above_center() ? this : t;
 
-    // Control can only meet Control or Top
-    if( _type == TCONTROL || t._type == TCONTROL ) return _type == t._type ? CONTROL : TypeErr.ALL;
+    // Ctrl can only meet Ctrl, XCtrl or Top
+    byte type = (byte)(_type|t._type); // the OR is low if both are low
+    if(  type <= TXCTRL ) return _type==TXCTRL && t._type==TXCTRL ? XCTRL : CTRL;
+    if( _type <= TXCTRL || t._type <= TXCTRL ) return TypeErr.ALL;
 
     // The rest of these choices are various scalars, which do not match well
     // with any tuple.
@@ -302,11 +303,12 @@ public class Type {
     case TSCALAR:
     case TNUM:
     case TREAL:
-    case TCONTROL:
+    case TCTRL:
       return false;             // These all include not-constant things
     case TXREAL:
     case TXNUM:
     case TXSCALAR:
+    case TXCTRL:
       return true;              // These all include some constants
     default: throw AA.unimpl();
     }
@@ -314,10 +316,11 @@ public class Type {
   public boolean is_con() {
     switch( _type ) {
     case TERROR:
-    case TCONTROL:
+    case TCTRL:
     case TSCALAR:
     case TNUM:
     case TREAL:
+    case TXCTRL:
     case TXREAL:
     case TXNUM:
     case TXSCALAR:

@@ -14,7 +14,7 @@ public class IfNode extends Node {
     // If the input is excludes zero, we can return true : {CONTROL,ANY}
     // If the input is excludes both, we can return ANY:   {ANY,ANY}
     // If the input is includes both, we can return both:  {CONTROL,CONTROL}
-    if( gvn.type(at(0))==TypeErr.ANY ) return TypeTuple.IF_ANY;
+    if( gvn.type(at(0))==Type.XCTRL ) return TypeTuple.IF_ANY;
     Type pred = gvn.type(at(1));
     if( pred.isa(TypeInt.XINT1) ) return TypeTuple.IF_ANY;
     if( TypeInt.BOOL.isa(pred)  ) return TypeTuple.IF_ALL;

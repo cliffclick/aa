@@ -10,7 +10,7 @@ public final class ErrNode extends Node {
   @Override String xstr() { return _msg; }
   @Override public Node ideal(GVNGCM gvn) { return null; }
   @Override public Type value(GVNGCM gvn) { return gvn.type(at(0)); } // Just pass control state thru
-  @Override public Type all_type() { return Type.CONTROL; }
+  @Override public Type all_type() { return Type.CTRL; }
   @Override public int hashCode() { return super.hashCode()+_msg.hashCode(); }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;

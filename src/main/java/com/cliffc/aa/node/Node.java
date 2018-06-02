@@ -190,7 +190,7 @@ public abstract class Node implements Cloneable {
     assert !is_dead();
     if( bs.get(_uid) ) return errs; // Been there, done that
     bs.set(_uid);                   // Only walk once
-    if( gvn.type(this) != Type.CONTROL )
+    if( gvn.type(this) != Type.CTRL )
       return errs;                // Ignore non-control
     if( this instanceof ErrNode ) // Gather errors
       errs = Parse.add_err(errs,((ErrNode)this)._msg);
@@ -213,7 +213,7 @@ public abstract class Node implements Cloneable {
       Node r=null;
       if( this instanceof    PhiNode ) r = at(0);
       if( this instanceof RegionNode ) r = this;
-      if( r==null || i==0 || gvn.type(r.at(i)) == Type.CONTROL )
+      if( r==null || i==0 || gvn.type(r.at(i)) == Type.CTRL )
         errs = def.walkerr_def(errs,bs,gvn);
     }
     return errs;

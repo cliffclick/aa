@@ -39,7 +39,8 @@ public class TypeRPC extends Type {
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TERROR: return ((TypeErr)t)._all ? t : this;
-    case TCONTROL:
+    case TCTRL:
+    case TXCTRL:
     case TTUPLE: return TypeErr.ALL;
     case TFUN:
     case TFLT:

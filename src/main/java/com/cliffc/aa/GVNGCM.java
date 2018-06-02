@@ -296,7 +296,7 @@ public class GVNGCM {
     Arrays.fill(_ts._es,_INIT0_CNT,_ts._len,null);
     _opt = true;                // Lazily fill with best value
     // Prime the worklist
-    _ts.setX(start._uid,start.all_type().dual());
+    _ts.setX(start._uid,start.all_type());
     for( Node use : start._uses ) add_work(use); // Users use progress
     // Work down list until all reachable nodes types quit falling
     while( _work._len > 0 ) {
@@ -312,6 +312,7 @@ public class GVNGCM {
         for( Node use : n._uses ) add_work(use); // Users use progress
       }
     }
+    _opt = false;               // Back to pessimistic behavior on new nodes
 
     // Record in any improved types; replace with constants if possible.
     //throw AA.unimpl();

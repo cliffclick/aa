@@ -61,7 +61,8 @@ public class TypeInt extends Type {
     case TRPC:
     case TFUN:   return Type.SCALAR;
     case TERROR: return ((TypeErr)t)._all ? t : this;
-    case TCONTROL:
+    case TCTRL:
+    case TXCTRL:
     case TTUPLE: return TypeErr.ALL;
     case TUNION: return t.xmeet(this); // Let TypeUnion decide
     default: throw typerr(t);

@@ -110,8 +110,8 @@ public class ScopeNode extends Node {
   }
   
   @Override public Node ideal(GVNGCM gvn) { return null; }
-  @Override public Type value(GVNGCM gvn) { return Type.CONTROL; }
-  @Override public Type all_type() { return Type.CONTROL; }
+  @Override public Type value(GVNGCM gvn) { return Type.CTRL; }
+  @Override public Type all_type() { return Type.CTRL; }
   @Override public int hashCode() { return 123456789; }
   // ScopeNodes are never equal
   @Override public boolean equals(Object o) { return this==o; }

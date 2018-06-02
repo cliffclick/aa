@@ -18,7 +18,7 @@ public class RegionNode extends Node {
     // Find 0, 1 or many live paths
     int live=0, dead=0;
     for( int i=1; i<_defs._len; i++ )
-      if( gvn.type(at(i))==TypeErr.ANY )
+      if( gvn.type(at(i))==Type.XCTRL )
         dead++;                  // Count dead paths
       else                       // Found a live path
         if( live == 0 ) live = i;// Remember live path
@@ -40,18 +40,18 @@ public class RegionNode extends Node {
     for( Node phi : _uses )
       if( phi instanceof PhiNode )
         for( int i=1,j=1; i<_defs._len; i++ )
-          if( gvn.type(at(i))==TypeErr.ANY ) { gvn.unreg(phi); phi.remove(j,gvn); gvn.rereg(phi); }
+          if( gvn.type(at(i))==Type.XCTRL ) { gvn.unreg(phi); phi.remove(j,gvn); gvn.rereg(phi); }
           else j++;
-    for( int i=1; i<_defs._len; i++ ) if( gvn.type(at(i))==TypeErr.ANY ) remove(i--,gvn);
+    for( int i=1; i<_defs._len; i++ ) if( gvn.type(at(i))==Type.XCTRL ) remove(i--,gvn);
     return this;
   }
 
   @Override public Type value(GVNGCM gvn) {
-    Type t = TypeErr.ANY;
+    Type t = Type.XCTRL;
     for( int i=1; i<_defs._len; i++ )
       t = t.meet(gvn.type(_defs._es[i]));
     return t;
   }
   @Override public Node is_copy(GVNGCM gvn, int idx) { assert idx==-1; return _cidx == 0 ? null : at(_cidx); }
-  @Override public Type all_type() { return Type.CONTROL; }
+  @Override public Type all_type() { return Type.CTRL; }
 }

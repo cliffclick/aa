@@ -54,7 +54,7 @@ public class TypeTuple extends Type {
     return make0(inf, ts);
   }
   static TypeTuple make_fun_ptr( TypeFun fun ) {
-    TypeTuple t = make_all(Type.CONTROL,TypeErr.ALL, TypeRPC.ALL_CALL, fun);
+    TypeTuple t = make_all(Type.CTRL,TypeErr.ALL, TypeRPC.ALL_CALL, fun);
     assert t.is_fun_ptr();
     return t;
   }
@@ -72,10 +72,10 @@ public class TypeTuple extends Type {
   public  static final TypeTuple INT64_INT64 = make(TypeInt.INT64,TypeInt.INT64);
   public  static final TypeTuple FLT64_FLT64 = make(TypeFlt.FLT64,TypeFlt.FLT64);
   private static final TypeTuple FLT64_INT64 = make(TypeFlt.FLT64,TypeInt.INT64);
-  public  static final TypeTuple IF_ANY  = make_all(TypeErr.ANY,TypeErr.ANY  );
-  public  static final TypeTuple IF_ALL  = make_all(Type.CONTROL,Type.CONTROL);
-  public  static final TypeTuple IF_TRUE = make_all(TypeErr.ANY ,Type.CONTROL);
-  public  static final TypeTuple IF_FALSE= make_all(Type.CONTROL,TypeErr.ANY );
+  public  static final TypeTuple IF_ANY  = make_all(Type.XCTRL,Type.XCTRL);
+  public  static final TypeTuple IF_ALL  = make_all(Type.CTRL ,Type.CTRL );
+  public  static final TypeTuple IF_TRUE = make_all(Type.XCTRL,Type.CTRL );
+  public  static final TypeTuple IF_FALSE= make_all(Type.CTRL ,Type.XCTRL);
   public  static final TypeTuple FUNPTR2 = make_fun_ptr(TypeFun.any(2,-1));
   public  static final TypeTuple GENERIC_FUN = make_fun_ptr(TypeFun.make_generic());
   static final TypeTuple[] TYPES = new TypeTuple[]{ANY,SCALAR1,STR,INT32,INT64,FLT64,INT64_INT64,FLT64_FLT64,FLT64_INT64, IF_ALL, IF_TRUE, IF_FALSE, FUNPTR2};
@@ -157,7 +157,7 @@ public class TypeTuple extends Type {
   // 3 - Classic TypeFun, includes declared return type
   @Override public boolean is_fun_ptr() {
     return _ts.length==4 &&
-     (_ts[0]==Type.CONTROL || _ts[0] instanceof TypeErr) &&
+     (_ts[0]==Type.CTRL || _ts[0] instanceof TypeErr) &&
       _ts[2] instanceof TypeRPC &&
       _ts[3] instanceof TypeFun;
   }
