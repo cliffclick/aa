@@ -297,17 +297,21 @@ public class GVNGCM {
   void gcp(ScopeNode start) {
     assert _work._len==0;
     assert _wrk_bits.isEmpty();
+    Node[] nodes = new Node[Math.max(CNT,_ts._len)];
     // Set all types to null, indicating no value/never visited.
     Arrays.fill(_ts._es,_INIT0_CNT,_ts._len,null);
     _opt = true;                // Lazily fill with best value
     // Prime the worklist
+    nodes[start._uid] = start;
     _ts.setX(start._uid,start.all_type());
     for( Node use : start._uses ) add_work(use); // Users use progress
+    // Analysis phase.
     // Work down list until all reachable nodes types quit falling
     while( _work._len > 0 ) {
       Node n = _work.pop();
       _wrk_bits.clear(n._uid);
       assert !n.is_dead();
+      nodes[n._uid]=n;          // Record back-ptr to Node
       boolean never_seen = _ts._es[n._uid]==null;
       Type ot = type(n);        // Old type
       Type nt = n.value(this);  // New type
@@ -326,7 +330,21 @@ public class GVNGCM {
     }
     _opt = false;               // Back to pessimistic behavior on new nodes
 
+    // Optimization phase.
     // Record in any improved types; replace with constants if possible.
-    //throw AA.unimpl();
+    for( int i=_INIT0_CNT; i<_ts._len; i++ ) {
+      Type t = _ts._es[i];
+      if( t==null ) {           // Never typed?
+        assert nodes[i]==null;  // Never reached
+        continue;
+      }
+      Node n = nodes[i];
+      if( n != null && t.canBeConst() && !(n instanceof ConNode) )
+        throw AA.unimpl();
+      //if( n instanceof CallNode && n.at(1) instanceof UnresolvedNode ) 
+      //  throw AA.unimpl();
+      //if( n instanceof FunNode ) 
+      //  throw AA.unimpl();
+    }
   }
 }

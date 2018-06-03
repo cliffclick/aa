@@ -27,6 +27,7 @@ public class RPCNode extends Node {
     if( tctrl == Type.XCTRL ) return Type.XCTRL;
     return ((TypeRPC)trpc).test(_rpc) ? Type.CTRL : Type.XCTRL;
   }
+  @Override public Type all_type() { return Type.CTRL; }
   @Override public int hashCode() { return super.hashCode()+_rpc; }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;

@@ -195,18 +195,35 @@ public class CallNode extends Node implements AutoCloseable {
   }
 
   @Override public Type value(GVNGCM gvn) {
-    Type t = value0(gvn);
+    Node fun = _defs.at(1);
+    Type t = gvn.type(fun), tx;
+    if( !_inlined ) {           // Inlined functions just pass thru & disappear
+      if( fun instanceof UnresolvedNode ) {
+        // For unresolved, we can take the BEST choice; i.e. the JOIN of every
+        // choice.  Typically one choice works and the others report type
+        // errors on arguments.
+        t = TypeErr.ALL;
+        for( Node epi : fun._defs ) {
+          Type t_unr = value1(gvn,gvn.type(epi));
+          t = t.join(t_unr);    // JOIN of choices
+        }
+      } else {                  // Single resolved target
+        t = value1(gvn,t);      // Check args
+      }
+    }
+
     // Return {control,value} tuple.
     return TypeTuple.make(gvn.type(at(0)),t);
   }
-  private Type value0(GVNGCM gvn) {
-    Node fun = _defs.at(1);
-    Type t = gvn.type(fun);
-    if( _inlined ) return t;
+
+  // Cannot return the functions return type, unless all args are compatible
+  // with the function(s).  Arg-check.
+  private Type value1( GVNGCM gvn, Type t ) {
     if( t instanceof TypeErr ) return t;
     assert t.is_fun_ptr();
     TypeTuple tepi = (TypeTuple)t;
     Type    tctrl=         tepi.at(0);
+    Type    tval =         tepi.at(1);
     TypeRPC trpc =(TypeRPC)tepi.at(2);
     TypeFun tfun =(TypeFun)tepi.at(3);
     if( tctrl == Type.XCTRL ) return TypeErr.ANY; // Function will never return
@@ -215,22 +232,23 @@ public class CallNode extends Node implements AutoCloseable {
     if( t.is_forward_ref() ) return tfun.ret(); // Forward refs do no argument checking
     if( tfun.nargs() != nargs() )
       return TypeErr.make(_badargs.errMsg("Passing "+nargs()+" arguments to "+tfun+" which takes "+tfun.nargs()+" arguments"));
-    // TODO: optimize for Unresolved
-    // Cannot return the functions return type, unless all args are compatible
-    // with the function(s).  Arg-check.
+    // Now do an arg-check
     TypeTuple formals = tfun._ts;   // Type of each argument
-    Type terr = TypeErr.ANY;    // No errors (yet)
+    Type terr = TypeErr.ANY;        // No errors (yet)
     for( int j=0; j<nargs(); j++ ) {
       Type actual = gvn.type(arg(j));
       Type formal = formals.at(j);
-      if( actual instanceof TypeErr ) // Actual is an error, so call result is the same error
+      if( actual instanceof TypeErr && !actual.above_center() ) { // Actual is an error, so call result is the same error
         terr = terr.meet(actual);
-      else if( !actual.isa(formal) ) // Actual is not a formal; join of ALL
-        terr = terr.meet( TypeErr.make(_badargs.typerr(actual,formal),actual,formal));
+        actual = Type.SCALAR;   // Lift actual to worse-case valid argument type
+      }
+      if( !actual.isa(formal) ) // Actual is not a formal; accumulate type errors
+        terr = terr.meet(TypeErr.make(_badargs.typerr(actual, formal), actual, formal, false));
     }
-    return terr == TypeErr.ANY ? tfun.ret() : terr;
+    return terr.meet(tval);  // Return any errors, or the Epilog return type
   }
 
+  
   // Called from the data proj.  Return a TypeNode with proper casting on return result.
   TypeNode upcast_return(GVNGCM gvn) {
     Type t = _cast_ret;

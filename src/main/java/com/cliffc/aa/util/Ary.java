@@ -155,9 +155,9 @@ public class Ary<E> implements Iterable<E> {
       X x = a0._es[i];
       X y = a1._es[j];
       int cmp = x.compareTo(y);
-      if( cmp<0 ) { res.add(x); i++; }
-      else if( cmp>0 ) { res.add(y); j++; }
-      else { res.add(x); i++; j++; }
+      if( cmp<0 )      { res.add(x); i++;      }
+      else if( cmp>0 ) { res.add(y);      j++; }
+      else             { res.add(x); i++; j++; }
     }
     while( i<a0._len ) res.add(a0._es[i++]);
     while( j<a1._len ) res.add(a1._es[j++]);
@@ -172,7 +172,17 @@ public class Ary<E> implements Iterable<E> {
    *  @return A new sorted merged Ary
    */
   public static <X extends Comparable<X>> Ary<X> merge_and( Ary<X> a0, Ary<X> a1 ) {
-    throw new RuntimeException("unimpl");
+    int i=0, j=0;
+    Ary<X> res = new Ary<>(Arrays.copyOf(a0._es,Math.min(a0._len,a1._len)),0);
+    while( i<a0._len && j<a1._len ) {
+      X x = a0._es[i];
+      X y = a1._es[j];
+      int cmp = x.compareTo(y);
+      if( cmp<0 )      { i++;      }
+      else if( cmp>0 ) {      j++; }
+      else { res.add(x); i++; j++; }
+    }
+    return res;
   }
   
   /** @return an iterator */
