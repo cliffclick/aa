@@ -119,9 +119,9 @@ public class GVNGCM {
   }
   
   // Used rarely for whole-merge changes
-  public void rereg( Node n ) {
+  public Node rereg( Node n ) {
     assert !check_opt(n);
-    init0(n);
+    return init0(n);
   }
 
   // Hack an edge, updating GVN as needed
@@ -297,54 +297,79 @@ public class GVNGCM {
   void gcp(ScopeNode start) {
     assert _work._len==0;
     assert _wrk_bits.isEmpty();
-    Node[] nodes = new Node[Math.max(CNT,_ts._len)];
+    Ary<Node> nodes = new Ary<>(new Node[1],0);
     // Set all types to null, indicating no value/never visited.
     Arrays.fill(_ts._es,_INIT0_CNT,_ts._len,null);
     _opt = true;                // Lazily fill with best value
     // Prime the worklist
-    nodes[start._uid] = start;
+    nodes.setX(start._uid,start);
     _ts.setX(start._uid,start.all_type());
     for( Node use : start._uses ) add_work(use); // Users use progress
-    // Analysis phase.
-    // Work down list until all reachable nodes types quit falling
+    // Repeat, if we remove some ambiguous choices, and keep falling until the
+    // graph stabilizes without ambiguity.
     while( _work._len > 0 ) {
-      Node n = _work.pop();
-      _wrk_bits.clear(n._uid);
-      assert !n.is_dead();
-      nodes[n._uid]=n;          // Record back-ptr to Node
-      boolean never_seen = _ts._es[n._uid]==null;
-      Type ot = type(n);        // Old type
-      Type nt = n.value(this);  // New type
-      assert ot.isa(nt);        // Types only fall monotonically
-      if( ot != nt || never_seen ) { // Progress
-        _ts.setX(n._uid,nt);    // Record progress
-        for( Node use : n._uses ) {
-          if( use.all_type() != type(use) ) // If not already at bottom
-            add_work(use);      // Re-run users to check for progress
-          // When new control paths appear on Regions, the Region stays the
-          // same type (Ctrl) but the Phis must merge new values.
-          if( use instanceof RegionNode )
-            for( Node phi : use._uses ) add_work(phi);
+      // Analysis phase.
+      // Work down list until all reachable nodes types quit falling
+      while( _work._len > 0 ) {
+        Node n = _work.pop();
+        _wrk_bits.clear(n._uid);
+        assert !n.is_dead();
+        nodes.setX(n._uid,n);     // Record back-ptr to Node
+        boolean never_seen = _ts._es[n._uid]==null;
+        Type ot = type(n);        // Old type
+        Type nt = n.value(this);  // New type
+        assert ot.isa(nt);        // Types only fall monotonically
+        if( ot != nt || never_seen ) { // Progress
+          _ts.setX(n._uid,nt);    // Record progress
+          for( Node use : n._uses ) {
+            if( use.all_type() != type(use) ) // If not already at bottom
+              add_work(use);      // Re-run users to check for progress
+            // When new control paths appear on Regions, the Region stays the
+            // same type (Ctrl) but the Phis must merge new values.
+            if( use instanceof RegionNode )
+              for( Node phi : use._uses ) add_work(phi);
+          }
+        }
+      }
+      _opt = false;               // Back to pessimistic behavior on new nodes
+  
+      // Optimization phase 1: Remove ambiguity
+      for( int i=_INIT0_CNT; i<_ts._len; i++ ) {
+        Node n = nodes.atX(i);
+        if( n instanceof CallNode && n.at(1) instanceof UnresolvedNode ) {
+          Node fun = ((UnresolvedNode)n.at(1)).resolve(this,(CallNode)n);
+          if( fun != null ) {
+            set_def_reg(n, 1, fun);
+            add_work(n); // Go again- values will continue to fall in the lattice
+          }
         }
       }
     }
-    _opt = false;               // Back to pessimistic behavior on new nodes
-
-    // Optimization phase.
+    
+    // Optimization phase 2.
     // Record in any improved types; replace with constants if possible.
     for( int i=_INIT0_CNT; i<_ts._len; i++ ) {
       Type t = _ts._es[i];
-      if( t==null ) {           // Never typed?
-        assert nodes[i]==null;  // Never reached
-        continue;
-      }
-      Node n = nodes[i];
+      if( t==null ) continue;   // Never reached?
+      Node n = nodes.atX(i);
       if( n != null && t.canBeConst() && !(n instanceof ConNode) )
         throw AA.unimpl();
-      //if( n instanceof CallNode && n.at(1) instanceof UnresolvedNode ) 
-      //  throw AA.unimpl();
+      if( n instanceof CastNode ) { // TODO: Fold into CastNode.ideal
+        assert t.isa(((CastNode)n)._t);
+        if( t != (((CastNode)n)._t)) {
+          unreg(n);
+          Node cast = xform_old0(rereg(new CastNode(n.at(0), n.at(1), t)));
+          subsume(n, nodes.setX(cast._uid, cast));
+        }
+      }
       //if( n instanceof FunNode ) 
       //  throw AA.unimpl();
     }
+
+    // Re-check all ideal calls now that types have been maximally lifted
+    for( int i=_INIT0_CNT; i<_ts._len; i++ )
+      if( nodes.atX(i) != null )
+        add_work(nodes.at(i));
+    iter();
   }
 }

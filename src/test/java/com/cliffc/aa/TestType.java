@@ -5,7 +5,6 @@ import org.junit.Test;
 
 public class TestType {
   @Test public void testType0() {
-    //test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)",TypeInt.con(5));
     // Simple int
     test("1",   TypeInt.TRUE);
     // Unary operator
@@ -128,16 +127,16 @@ public class TestType {
 
     // Recursive:
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
-    //test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)",TypeInt.con(5));
+    test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)",TypeInt.INT64);
+
+    // Co-recursion requires parallel assignment & type inference across a lexical scope
+    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.TRUE );
+    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(5)", TypeInt.FALSE );
 
     // TODO: Need real TypeVars for these
     //test("id@{A->A}"    , Env.lookup_valtype("id"));
     //test("id@{A@int->A}", Env.lookup_valtype("id"));
     //test("id@{int->int}", Env.lookup_valtype("id"));
-
-    // Co-recursion will require parallel assignment & type inference across a lexical scope
-    //test("is_even = { n -> n ? is_odd(n-1) : true}; is_odd = {n -> n ? is_even(n-1) : false}; is_even(4)", TypeInt.TRUE );
-    //test("is_even = { n -> n ? is_odd(n-1) : true}; is_odd = {n -> n ? is_even(n-1) : false}; is_even(5)", TypeInt.FALSE);
   }
 
   static private void test( String program, Type expected ) {

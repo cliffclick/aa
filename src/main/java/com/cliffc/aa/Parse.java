@@ -81,16 +81,14 @@ public class Parse {
     // Delete names at the top scope before final optimization.
     _e._scope.promote_forward_del_locals(_gvn,null);
     _gvn.iter();    // Pessimistic optimizations; might improve error situation
-    res = _e._scope.pop();      // New and improved result
-    Node ctrl = _e._scope.pop();
     // Run GCP from the global top, so we also get all the initial constants
     // and all users of those constants.  
     Env par = _e._par;
     _e._scope.add_def(par._scope); // Hook start control into all the constants
-
-    _gvn.gcp(par._scope); // Global Constant Propagation
-
-    _e._scope.pop(); // Remove start hook
+    _gvn.gcp(par._scope);          // Global Constant Propagation
+    _e._scope.pop();               // Remove start hook
+    res = _e._scope.pop();         // New and improved result
+    Node ctrl = _e._scope.pop();   // Exit control
 
     // Gather errors
     Ary<String> errs = null;

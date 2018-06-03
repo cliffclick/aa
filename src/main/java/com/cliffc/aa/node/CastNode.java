@@ -4,8 +4,8 @@ import com.cliffc.aa.*;
 
 // Regain precision after a call
 public class CastNode extends Node {
-  private final Type _t;                // TypeVar???
-  CastNode( Node ctrl, Node ret, Type t ) { super(OP_CAST,ctrl,ret); _t=t; }
+  public final Type _t;                // TypeVar???
+  public CastNode( Node ctrl, Node ret, Type t ) { super(OP_CAST,ctrl,ret); _t=t; }
   @Override String xstr() { return "("+_t+")"; }
   @Override public Node ideal(GVNGCM gvn) {
     // Must keep a cast, even if it useless, if it points to an Epilog.  The

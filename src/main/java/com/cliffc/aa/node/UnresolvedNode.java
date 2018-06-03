@@ -40,7 +40,7 @@ public class UnresolvedNode extends Node {
   // If more than one choice applies, then the choice with fewest costly
   // conversions are kept; if there is more than one then the join of them is
   // kept - and the program is not-yet type correct (ambiguous choices).
-  Node resolve( GVNGCM gvn, CallNode call ) {
+  public Node resolve( GVNGCM gvn, CallNode call ) {
     // Set of possible choices with fewest conversions
     Ary<Node> ns = new Ary<>(new Node[1],0);
     int min_cvts = 999;         // Required conversions
