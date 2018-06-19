@@ -63,7 +63,7 @@ Ideas, Desirables
 * Can ask for Int for BigInteger; unboxed arrays.
 * Pattern-matching too handy looking, need to have it
 * Parallel (and distributed) but also deterministic
-* "eval"
+* "eval"  
 
 * maps-over-collections; default to parallel
 * parallel/distributed collections; deterministic
@@ -99,14 +99,15 @@ Ideas, Desirables
 * Runs in "O(1) time"?  Runs in "O(N) time"?
 * associated affine-value types: "this int is equal to that int, plus or minus a constant".
 
-    fun copyInt2Dbl( src:[]int32, dst:[src.len+0]d64 )...
+    `fun copyInt2Dbl( src:[]int32, dst:[src.len+0]d64 )...`
 
 OR
 
-    fun copyInt2Dbl( len:int32, src:[len]int32, dst:[len]d64 )...
+    `fun copyInt2Dbl( len:int32, src:[len]int32, dst:[len]d64 )...`
 
 OR
-    fun slide( len:int32, off:int32, src:[>=len]a, dst[>=len+off]a )...
+
+    `fun slide( len:int32, off:int32, src:[>=len]a, dst[>=len+off]a )...`
 
 * Distributed ref-cnting?  (or Dist-GC?)
 * Ref-Counting does NOT given "immediate" destructor execution, but "soon".
@@ -118,7 +119,7 @@ OR
 * Tail-recursion optimization.
 
 * multi-value-returns OK, sugar over returning a temp-tuple
-* Extra "," in static struct makers OK: "{'hello','world',}"
+* Extra "," in static struct makers OK: `"{'hello','world',}"`
 * For-loops with early-exit and Python else-clause
 
 ```python
