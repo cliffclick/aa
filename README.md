@@ -99,11 +99,14 @@ Ideas, Desirables
 * Runs in "O(1) time"?  Runs in "O(N) time"?
 * associated affine-value types: "this int is equal to that int, plus or minus a constant".
 
-      'fun copyInt2Dbl( src:[]int32, dst:[src.len+0]d64 )...'
-    OR
-      'fun copyInt2Dbl( len:int32, src:[len]int32, dst:[len]d64 )...'
-    OR
-      'fun slide( len:int32, off:int32, src:[>=len]a, dst[>=len+off]a )...'
+    fun copyInt2Dbl( src:[]int32, dst:[src.len+0]d64 )...
+
+OR
+
+    fun copyInt2Dbl( len:int32, src:[len]int32, dst:[len]d64 )...
+
+OR
+    fun slide( len:int32, off:int32, src:[>=len]a, dst[>=len+off]a )...
 
 * Distributed ref-cnting?  (or Dist-GC?)
 * Ref-Counting does NOT given "immediate" destructor execution, but "soon".
@@ -118,19 +121,23 @@ Ideas, Desirables
 * Extra "," in static struct makers OK: "{'hello','world',}"
 * For-loops with early-exit and Python else-clause
 
-    for( foo in foos )
-      if( isAcceptable(foo) )
-        break;
-        else return DidNotFindItError()
-          
+```python
+for( foo in foos )
+  if( isAcceptable(foo) )
+    break;
+    else return DidNotFindItError()
+```
+        
 * To detect never-ran vs ran-but-not-exited:
           
+```python
     if( foos.empty() ) return foos_was_empty
     else
       for( foo in foos )
         if( isAcceptable(foo) )
           break;
       else return no_acceptable_in_foos()
+```
 
 Getting started
 ---------------
