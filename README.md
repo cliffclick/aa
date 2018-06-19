@@ -33,7 +33,7 @@ BNF                           | Comment
 `str  = %[num]?[.num]?fact`   | Percent escape embeds a 'fact' in a string; "name=%name\n"
 `type = tcon`                 | Types are a tcon or a tfun
 `type = tfun`                 |
-`tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str` |
+`tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str` | Primitive types
 `tfun = {[[type]* ->]? type }` | Function types mirror func decls
 
 
@@ -49,7 +49,6 @@ Done Stuff
 * By default multi-arg ops are overloaded.
 * Direct SSA style code writing; no 'let' keyword.
 * default "x=1" makes a "val" until scope runs out (cannot re-assign)
-* "var" can be reassigned but requires type keyword: "x:= 1"
 * Sub-byte ranges?  Julia-like math typing
 * Functional; 1st class functions.
 
@@ -149,6 +148,7 @@ a standard paren-wrapped 'fact' from the grammar.
 * multi-value-returns OK, sugar over returning a temp-tuple
 * Extra "," in static struct makers OK: `"{'hello','world',}"`
 * Tail-recursion optimization.
+* "var" can be reassigned but requires type keyword: "x:= 1"
 
 Getting started
 ---------------
