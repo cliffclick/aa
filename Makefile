@@ -99,7 +99,7 @@ $(CLZDIR)/main/$(AA)/BuildVersion.class: $(CLZDIR)/main/$(AA)/BuildVersion.java
 JARBITS =
 JARBITS += -C $(CLZDIR)/main .    # The java class files
 
-build/aa.jar: $(main_classes) $(test_classes) $(CLZDIR)/main/$(AA)/BuildVersion.class src/main/manifest.txt
+build/aa.jar: $(main_classes) $(test_classes) $(CLZDIR)/main/$(AA)/BuildVersion.class src/main/manifest.txt lib
 	@echo "  jarring " $@ " because " $?
 	@[ -d build ] || mkdir -p build
 # Build the aa.jar file.  All included jars are unpacked into a flat
@@ -152,6 +152,19 @@ conf:
 	@echo $(CURDIR) requires java, jar
 	java -version
 	which jar
+
+# Download libs from maven
+lib:	lib/junit-4.12.jar lib/hamcrest-core-1.3.jar lib/annotations-16.0.2.jar
+
+# Unit testing
+lib/junit-4.12.jar lib/hamcrest-core-1.3.jar:
+	@[ -d lib ] || mkdir -p lib
+	@(cd lib; wget http://repo1.maven.org/maven2/junit/junit/4.12/junit-4.12.jar)
+	@(cd lib; wget http://repo1.maven.org/maven2/org/hamcrest/hamcrest-core/1.3/hamcrest-core-1.3.jar)
+# @NotNull annotations
+lib/annotations-16.0.2.jar:
+	@[ -d lib ] || mkdir -p lib
+	@(cd lib; wget http://repo1.maven.org/maven2/org/jetbrains/annotations/16.0.2/annotations-16.0.2.jar)
 
 # Build emacs tags (part of a tasty emacs ide experience)
 tags:	$(main_javas) $(test_javas)
