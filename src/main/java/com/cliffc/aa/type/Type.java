@@ -1,5 +1,6 @@
-package com.cliffc.aa;
+package com.cliffc.aa.type;
 
+import com.cliffc.aa.AA;
 import java.util.Arrays;
 import java.util.HashMap;
 
@@ -117,7 +118,7 @@ public class Type {
   private boolean is_simple() { return _type < TSIMPLE; }
   
   // Return cached dual
-  final Type dual() { return _dual; }
+  public final Type dual() { return _dual; }
   
   // Compute dual right now.  Overridden in subclasses.
   protected Type xdual() {
@@ -212,14 +213,14 @@ public class Type {
   
   public Type join( Type t ) { return dual().meet(t.dual()).dual(); }
 
-  static void init0( HashMap<String,Type> types ) {
+  public static void init0( HashMap<String,Type> types ) {
     types.put("real",REAL);
-    TypeInt.init0(types);
-    TypeFlt.init0(types);
-    TypeStr.init0(types);
+    TypeInt.init1(types);
+    TypeFlt.init1(types);
+    TypeStr.init1(types);
   }
   
-  static boolean check_startup() {
+  public static boolean check_startup() {
     Type[] ts =    Type     .TYPES ;
     ts = concat(ts,TypeErr  .TYPES);
     ts = concat(ts,TypeInt  .TYPES);
@@ -298,7 +299,7 @@ public class Type {
     }
   }
   // True if value is higher-equal to SOME constant.
-  protected boolean canBeConst() {
+  public boolean canBeConst() {
     switch( _type ) {
     case TSCALAR:
     case TNUM:

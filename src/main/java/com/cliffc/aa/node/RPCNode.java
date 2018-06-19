@@ -1,6 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.*;
+import com.cliffc.aa.type.*;
 
 // Jump-to a specific RPC
 public class RPCNode extends Node {

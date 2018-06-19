@@ -1,4 +1,4 @@
-package com.cliffc.aa;
+package com.cliffc.aa.type;
 
 import java.util.HashMap;
 
@@ -33,13 +33,13 @@ public class TypeInt extends Type {
   static public final TypeInt  INT64 = make(-1,64,0);
   static public final TypeInt  INT32 = make(-1,32,0);
   static private final TypeInt  INT16 = make(-1,16,0);
-  static        final TypeInt  INT8  = make(-1, 8,0);
+  static public final TypeInt  INT8  = make(-1, 8,0);
   static public final TypeInt  BOOL  = make(-1, 1,0);
   static public final TypeInt TRUE   = make( 0, 1,1);
   static public final TypeInt FALSE  = make( 0, 1,0);
   static public final TypeInt XINT1  = make( 1, 1,0);
   static final TypeInt[] TYPES = new TypeInt[]{INT64,INT32,INT16,BOOL,TRUE,FALSE,XINT1};
-  static void init0( HashMap<String,Type> types ) {
+  static void init1( HashMap<String,Type> types ) {
     types.put("bool" ,BOOL);
     types.put("int1" ,BOOL);
     types.put("int8" ,INT8);
@@ -152,7 +152,7 @@ public class TypeInt extends Type {
     if( t._type == Type.TINT ) return (byte)(_z<=((TypeInt)t)._z ? 0 : 99);
     if( t._type == Type.TFLT ) return 1; // Int->Flt ignores large int overflow issues
     if( t._type == Type.TSCALAR ) return 0;
-    throw AA.unimpl();
+    throw com.cliffc.aa.AA.unimpl();
   }
   @Override public Type widen() {
     assert _x <= 0;

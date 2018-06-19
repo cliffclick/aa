@@ -1,6 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.*;
+import com.cliffc.aa.type.Type;
 
 public final class ConNode<T extends Type> extends Node {
   T _t;

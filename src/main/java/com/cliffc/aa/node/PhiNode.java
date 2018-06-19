@@ -1,6 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.*;
+import com.cliffc.aa.type.Type;
 
 // Merge results; extended by ParmNode
 public class PhiNode extends Node {

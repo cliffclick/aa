@@ -1,4 +1,4 @@
-package com.cliffc.aa;
+package com.cliffc.aa.type;
 
 import com.cliffc.aa.util.SB;
 
@@ -53,7 +53,7 @@ public class TypeTuple extends Type {
     if( len < ts.length ) ts = Arrays.copyOf(ts,len);
     return make0(inf, ts);
   }
-  static TypeTuple make_fun_ptr( TypeFun fun ) {
+  public static TypeTuple make_fun_ptr( TypeFun fun ) {
     TypeTuple t = make_all(Type.CTRL,TypeErr.ALL, TypeRPC.ALL_CALL, fun);
     assert t.is_fun_ptr();
     return t;
@@ -130,7 +130,7 @@ public class TypeTuple extends Type {
     return false;
   }
   @Override public TypeTuple ret() {
-    throw AA.unimpl();
+    throw com.cliffc.aa.AA.unimpl();
     //Type[] ts = new Type[_ts.length];
     //for( int i=0; i<_ts.length; i++ )
     //  ts[i] = ((TypeFun)_ts[i])._ret;
@@ -140,7 +140,7 @@ public class TypeTuple extends Type {
     return false;
   }
   // True if all internals canBeConst
-  @Override protected boolean canBeConst() {
+  @Override public boolean canBeConst() {
     for( Type _t : _ts ) if( !_t.canBeConst() ) return false;
     return _inf.canBeConst();
   }

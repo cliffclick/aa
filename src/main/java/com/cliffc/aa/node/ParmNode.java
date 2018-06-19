@@ -1,6 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.*;
+import com.cliffc.aa.type.Type;
 
 // Function parameter node; just a Phi with a name
 public class ParmNode extends PhiNode {

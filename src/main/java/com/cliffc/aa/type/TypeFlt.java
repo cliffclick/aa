@@ -1,4 +1,4 @@
-package com.cliffc.aa;
+package com.cliffc.aa.type;
 
 import java.util.HashMap;
 
@@ -30,11 +30,11 @@ public class TypeFlt extends Type {
   }
   public static TypeFlt con(double con) { return make(0,log(con),con); }
   
-  static public final TypeFlt FLT64 = make(-1,64,0);
-  static        final TypeFlt FLT32 = make(-1,32,0);
-  static        final TypeFlt PI    = con(Math.PI);
-  static final TypeFlt[] TYPES = new TypeFlt[]{FLT64,FLT32,PI};
-  static void init0( HashMap<String,Type> types ) {
+  public static final TypeFlt FLT64 = make(-1,64,0);
+  public static        final TypeFlt FLT32 = make(-1,32,0);
+  public static        final TypeFlt PI    = con(Math.PI);
+  public static final TypeFlt[] TYPES = new TypeFlt[]{FLT64,FLT32,PI};
+  static void init1( HashMap<String,Type> types ) {
     types.put("flt32",FLT32);
     types.put("flt64",FLT64);
     types.put("flt"  ,FLT64);
@@ -88,7 +88,7 @@ public class TypeFlt extends Type {
     if( t._type == Type.TFLT ) return (byte)(_z<=((TypeFlt)t)._z ? 0 : 99);
     if( t._type == Type.TINT ) return 99; // Flt->Int always requires user intervention
     if( t._type == Type.TSCALAR ) return 0;
-    throw AA.unimpl();
+    throw com.cliffc.aa.AA.unimpl();
   }
   @Override public Type widen() {
     assert _x <= 0;

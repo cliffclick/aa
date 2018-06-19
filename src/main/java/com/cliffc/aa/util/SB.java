@@ -1,6 +1,6 @@
 package com.cliffc.aa.util;
 
-import com.cliffc.aa.Type;
+import com.cliffc.aa.type.Type;
 
 /** Tight/tiny StringBuilder wrapper.
  *  Short short names on purpose; so they don't obscure the printing.

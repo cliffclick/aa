@@ -1,6 +1,7 @@
 package com.cliffc.aa;
 
 import com.cliffc.aa.node.*;
+import com.cliffc.aa.type.*;
 
 import java.util.HashMap;
 

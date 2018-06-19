@@ -1,6 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.*;
+import com.cliffc.aa.type.Type;
 
 /** Control flow error nodes.  If any remain in the program after optimization,
  *  the program is not well-typed. */

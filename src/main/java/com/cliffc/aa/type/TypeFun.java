@@ -1,4 +1,4 @@
-package com.cliffc.aa;
+package com.cliffc.aa.type;
 
 import com.cliffc.aa.node.FunNode;
 import com.cliffc.aa.util.Bits;
@@ -46,7 +46,7 @@ public class TypeFun extends Type {
     case 0: return make(TypeTuple.SCALAR0,Type.SCALAR, bs);
     case 1: return make(TypeTuple.SCALAR1,Type.SCALAR, bs);
     case 2: return make(TypeTuple.SCALAR2,Type.SCALAR, bs);
-    default: throw AA.unimpl();
+    default: throw com.cliffc.aa.AA.unimpl();
     }
   }
 
@@ -79,7 +79,7 @@ public class TypeFun extends Type {
   @Override public Type arg(int idx) { return _ts._ts[idx]; }
   @Override public Type ret() { return _ret; }
 
-  @Override protected boolean canBeConst() { throw AA.unimpl(); }
+  @Override public boolean canBeConst() { throw com.cliffc.aa.AA.unimpl(); }
   public int fidx() { return _fidxs.getbit(); }
   @Override public boolean is_con() { return _fidxs.abit() > 0; }
 

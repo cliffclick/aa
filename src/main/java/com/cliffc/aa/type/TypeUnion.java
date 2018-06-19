@@ -1,4 +1,4 @@
-package com.cliffc.aa;
+package com.cliffc.aa.type;
 
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
@@ -33,7 +33,7 @@ public class TypeUnion extends Type {
   // Common cleanup rules on making new unions
   static Type make( boolean any, Type... ts ) { return make(any,new Ary<>(ts)); }
   private static Type make( boolean any, Ary<Type> ts ) {
-    if( ts._len == 0 ) throw AA.unimpl();   //return any ? Type.ANY : Type.ALL;
+    if( ts._len == 0 ) throw com.cliffc.aa.AA.unimpl();   //return any ? Type.ANY : Type.ALL;
     // Special rules now apply to keep from growing out all combos of
     // e.g. float-constants.  All {float,int,str} types are meeted and
     // their meet replaces them.
@@ -60,7 +60,7 @@ public class TypeUnion extends Type {
       TypeFlt tf = (TypeFlt)ts._es[fx];
       if( (ti._z<<1) <= tf._z && tf._x==-1 ) {
         ts.del(ix);
-        throw AA.unimpl(); // Untested
+        throw com.cliffc.aa.AA.unimpl(); // Untested
       }
     }
     if( ts._len == 1 ) return ts._es[0]; // A single result is always that result
@@ -197,7 +197,7 @@ public class TypeUnion extends Type {
       rets.add(((TypeFun)_ts._ts[i])._ret);
     return make(_any,full_simplify(rets,_any));
   }
-  @Override protected boolean canBeConst() { return _any && _ts.canBeConst(); }
+  @Override public boolean canBeConst() { return _any && _ts.canBeConst(); }
   @Override public boolean above_center() {
     if( _any ) {
       for( Type t : _ts._ts )
@@ -233,6 +233,6 @@ public class TypeUnion extends Type {
     //for( Type t : _ts._ts )
     //  ((TypeFun)t).str(sb).p(',');
     //return sb.p(']').toString();
-    throw AA.unimpl();
+    throw com.cliffc.aa.AA.unimpl();
   }
 }

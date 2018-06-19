@@ -1,6 +1,9 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.*;
+import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeErr;
+import com.cliffc.aa.type.TypeTuple;
 
 // Proj data
 public class ProjNode extends Node {

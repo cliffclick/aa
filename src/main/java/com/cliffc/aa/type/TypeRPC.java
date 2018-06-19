@@ -1,4 +1,4 @@
-package com.cliffc.aa;
+package com.cliffc.aa.type;
 
 import com.cliffc.aa.util.Bits;
 import com.cliffc.aa.util.SB;
@@ -56,7 +56,7 @@ public class TypeRPC extends Type {
   
   public int rpc() { return _rpcs.getbit(); }
   public boolean test(int rpc) { return _rpcs.test(rpc); }
-  @Override public boolean above_center() { throw AA.unimpl(); }
+  @Override public boolean above_center() { throw com.cliffc.aa.AA.unimpl(); }
   @Override public boolean canBeConst() { return _rpcs.abit()>0; }
   @Override public boolean is_con()     { return _rpcs.abit()>0; }
 }

@@ -1,5 +1,6 @@
 package com.cliffc.aa;
 
+import com.cliffc.aa.type.*;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -164,7 +165,7 @@ public class TestType {
     Type prim = TypeFun.make(TypeTuple.INT64_INT64,TypeInt.INT64,17);
     Type gen = TypeFun.make_generic();
     Type mt = gen.meet(prim);
-    Assert.assertTrue(mt==gen);
+    Assert.assertSame(mt, gen);
     Assert.assertTrue(prim.isa(gen));
     Assert.assertTrue(Type.check_startup());
   }  

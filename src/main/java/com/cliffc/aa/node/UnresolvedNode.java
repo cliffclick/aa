@@ -1,10 +1,11 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.*;
+import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 
 public class UnresolvedNode extends Node {
-  public UnresolvedNode( Node... funs ) { super(OP_UNR,funs); }
+  UnresolvedNode( Node... funs ) { super(OP_UNR,funs); }
   @Override String xstr() { return "Unr:"+((EpilogNode)at(0)).fun().name(); }
   @Override public Node ideal(GVNGCM gvn) {
     if( _defs._len < 2 ) throw AA.unimpl(); // Should collapse

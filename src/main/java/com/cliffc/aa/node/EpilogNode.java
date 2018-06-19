@@ -1,6 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.*;
+import com.cliffc.aa.type.*;
 import java.util.BitSet;
 
 // Tail end of functions.  Gathers:
@@ -86,7 +87,7 @@ public class EpilogNode extends Node {
   }
   
   public    Node ctrl() { return          at(0); } // internal function control
-  public    Node val () { return          at(1); } // standard exit value
+            Node val () { return          at(1); } // standard exit value
   public    Node rpc () { return          at(2); } // Almost surely a PhiNode merging RPCs
   public FunNode fun () { return (FunNode)at(3); } // Function header
   @Override String xstr() {                        // Self short name

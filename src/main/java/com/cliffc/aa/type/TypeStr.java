@@ -1,4 +1,4 @@
-package com.cliffc.aa;
+package com.cliffc.aa.type;
 
 import java.util.HashMap;
 
@@ -31,7 +31,7 @@ public class TypeStr extends Type {
 
   static public final TypeStr STR = make(-1,null);
   static final TypeStr[] TYPES = new TypeStr[]{STR};
-  static void init0( HashMap<String,Type> types ) {
+  static void init1( HashMap<String,Type> types ) {
     types.put("str",STR);
   }
   // Return a String from a TypeStr constant; assert otherwise.

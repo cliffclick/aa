@@ -1,4 +1,4 @@
-package com.cliffc.aa;
+package com.cliffc.aa.type;
 
 /** Error data type.  If the program result is of this type, the program is not well formed. */
 public class TypeErr extends Type {
@@ -39,7 +39,7 @@ public class TypeErr extends Type {
     TypeErr te = (TypeErr)t;
     if( _msg.equals(te._msg) && _a==te._a && _b==te._b && _multi==te._multi)
       return _all ? this : t;
-    if( _all != te._all ) throw AA.unimpl(); // mixed-mode?
+    if( _all != te._all ) throw com.cliffc.aa.AA.unimpl(); // mixed-mode?
     // Merge isa complaints
     Type a=null, b=null;
     if( _a != null ) {

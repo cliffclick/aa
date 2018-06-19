@@ -1,6 +1,8 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.*;
+import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeTuple;
 
 // Regain precision after a call
 public class CastNode extends Node {

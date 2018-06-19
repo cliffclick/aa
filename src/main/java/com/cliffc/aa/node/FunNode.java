@@ -4,6 +4,7 @@ import com.cliffc.aa.*;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.Bits;
 import com.cliffc.aa.util.SB;
+import com.cliffc.aa.type.*;
 
 import java.util.BitSet;
 import java.util.HashMap;
@@ -102,7 +103,7 @@ public class FunNode extends RegionNode {
   @Override String str() { return names(_tf._fidxs,new SB()).toString(); }
   // Debug only: make an attempt to bind name to a function
   private static Ary<String> NAMES = new Ary<>(new String[1],0);
-  public void bind(String tok) {
+  void bind( String tok ) {
     int fidx = _tf.fidx();
     String name = NAMES.atX(fidx);
     assert name==null || name.equals(tok); // Attempt to double-bind
@@ -141,8 +142,8 @@ public class FunNode extends RegionNode {
   // caller will call with such arguments.  This is a quick check to detect
   // may-have-more-callers.
   private boolean _all_callers_known;
-  boolean callers_known(GVNGCM gvn) {
-    if( _all_callers_known ) return _all_callers_known; // Once true, always true
+  boolean callers_known(GVNGCM ignore) {
+    if( _all_callers_known ) return true; // Once true, always true
     if( _tf.is_forward_ref() || (at(1) instanceof ScopeNode) ) return false;
     return (_all_callers_known=true);
   }

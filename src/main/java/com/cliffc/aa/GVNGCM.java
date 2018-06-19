@@ -1,6 +1,7 @@
 package com.cliffc.aa;
 
 import com.cliffc.aa.node.*;
+import com.cliffc.aa.type.Type;
 import com.cliffc.aa.util.Ary;
 
 import java.util.Arrays;

@@ -1,4 +1,4 @@
-package com.cliffc.aa;
+package com.cliffc.aa.type;
 
 // Type Variables.  Supports type unification via Tarjan U-F
 public class TypeVar extends Type {
