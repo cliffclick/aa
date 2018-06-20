@@ -74,7 +74,11 @@ public class TestType {
     test   ("2 ? (x=2) : y  ", TypeInt.con(2)); // off-side is constant-dead, so missing 'y'      is ignored
     testerr("x=1;2?(x=2):(x=3);x", "Cannot re-assign ref 'x'","          ");
     test   ("x=1;2?   2 :(x=3);x",TypeInt.con(1)); // Re-assigned allowed & ignored in dead branch
-    
+    testerr("1:","Syntax error; trailing junk"," "); // missing type
+    test   ("math_rand(1)?1:int:2:int",TypeInt.INT8); // no ambiguity between conditionals and type annotations
+    testerr("math_rand(1)?1: :2:int","missing expr after ':'","                "); // missing type
+    testerr("math_rand(1)?1::2:int","missing expr after ':'","               "); // missing type
+
     test   ("1  < 2", TypeInt.TRUE );
     test   ("1  <=2", TypeInt.TRUE );
     test   ("1  > 2", TypeInt.FALSE);
@@ -110,21 +114,21 @@ public class TestType {
     test("x=3; fun={x -> x*2}; fun(2.1)+fun(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to fun()
 
     // Type annotations
-    test("-1@int", TypeInt.con( -1));
-    test("(1+2.3)@flt", TypeFlt.make(0,64,3.3));
-    test("x@int = 1", TypeInt.TRUE);
-    test("x@flt = 1", TypeInt.TRUE); // casts for free to a float
-    testerr("x@flt32 = 123456789", "123456789 is not a flt32","                   ");
+    test("-1:int", TypeInt.con( -1));
+    test("(1+2.3):flt", TypeFlt.make(0,64,3.3));
+    test("x:int = 1", TypeInt.TRUE);
+    test("x:flt = 1", TypeInt.TRUE); // casts for free to a float
+    testerr("x:flt32 = 123456789", "123456789 is not a flt32","                   ");
 
-    testerr("-1@int1", "-1 is not a int1","       ");
-    testerr("\"abc\"@int", "\"abc\" is not a int64","         ");
-    testerr("1@str", "1 is not a str","     ");
+    testerr("-1:int1", "-1 is not a int1","       ");
+    testerr("\"abc\":int", "\"abc\" is not a int64","         ");
+    testerr("1:str", "1 is not a str","     ");
 
-    testerr("x=3; fun@{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int64","                              ");
-    test("x=3; fun@{real->real}={x -> x*2}; fun(2.1)+fun(x)", TypeFlt.con(2.1*2+3*2)); // Mix of types to fun()
-    test("fun@{real->flt32}={x -> x}; fun(123 )", TypeInt.con(123 ));
-    test("fun@{real->flt32}={x -> x}; fun(0.125)", TypeFlt.con(0.125));
-    testerr("fun@{real->flt32}={x -> x}; fun(123456789)", "123456789 is not a flt32","                          ");
+    testerr("x=3; fun:{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int64","                              ");
+    test("x=3; fun:{real->real}={x -> x*2}; fun(2.1)+fun(x)", TypeFlt.con(2.1*2+3*2)); // Mix of types to fun()
+    test("fun:{real->flt32}={x -> x}; fun(123 )", TypeInt.con(123 ));
+    test("fun:{real->flt32}={x -> x}; fun(0.125)", TypeFlt.con(0.125));
+    testerr("fun:{real->flt32}={x -> x}; fun(123456789)", "123456789 is not a flt32","                          ");
 
     // Recursive:
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
@@ -135,45 +139,25 @@ public class TestType {
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(5)", TypeInt.FALSE );
 
     // TODO: Need real TypeVars for these
-    //test("id@{A->A}"    , Env.lookup_valtype("id"));
-    //test("id@{A@int->A}", Env.lookup_valtype("id"));
-    //test("id@{int->int}", Env.lookup_valtype("id"));
+    //test("id:{A->A}"    , Env.lookup_valtype("id"));
+    //test("id:{A:int->A}", Env.lookup_valtype("id"));
+    //test("id:{int->int}", Env.lookup_valtype("id"));
   }
 
   /*
+// Swap [] for {} in struct-value & struct-type defs
+// user type-vars
+// re-assignment
 
-struct MyStruct {
-  int cnt;
-  flt wid;
-}
-MyStruct x;
-
-MyStruct === { cnt@int wid@flt }
-
-MyStruct === { cnt wid }
-
-// X is a MyStruct, assigned null, re-assignable
-x@MyStruct := _
-
-// Call a type constructor
-x = MyStruct(17,1.2)
-
-// Function do_it, only takes a MyStruct
-do_it = { mys@MyStruct -> mys.cnt++; mys.wid*mys.wid }
-
-// A version which takes anything with a modable-cnt & wid field
-do_it = { mys          -> mys.cnt++; mys.wid*mys.wid }
-
-==================
 
 // Adding named types to primitives, because its the natural extension 
 // when adding them to tuples.
 
 // 'gal' is a type name for a flt.  'gal' is a type, never a concrete value.
-gal = @flt
+gal = :flt
 
 // tank is being assigned a concrete value, not a type, so tank is not a type.
-tank@gal := 5@gal // tank has 5 gallons, and can be reassigned
+tank:gal := 5:gal // tank has 5 gallons, and can be reassigned
 
 tank := 10 // free cast for bare constants
 
@@ -187,23 +171,23 @@ tank := gal(x) // OK : called 'gal' constructor
 list_of_hello = { _, "hello", }
 
 // No ambiguity:
- { x  } // no-arg-function returning external variable x
+ { x  } // no-arg-function returning external variable x; same as { -> x }
  { x, } // 1-elem struct   returning external variable x
-@{ x  } // 1-elem struct type with field named x
+:{ x  } // 1-elem struct type with field named x
 
 // Adding named types to structs
 
 // Point is a struct with 2 untyped named variables
-Point = @{ x, y, }
-Point = @{ x@flt, y@flt, } // Same Point, vars forced to flt
+Point = :{ x, y, }
+Point = :{ x:flt, y:flt, } // Same Point, vars forced to flt
 
 here = Point(1,2) // Point constructor
 // "." field name lookup
 print(here.x)
 
 // Null
-x@str   := "hello" // x takes a not-null str
-x@_|str := _       // x takes a null or str
+x:str   := "hello" // x takes a not-null str
+x:_|str := _       // x takes a null or str
 
 x := _       // x is untyped; assigned null right now
 x := "hello" // x is re-assigned and has type _|str
@@ -212,37 +196,37 @@ x := "hello" // x is re-assigned and has type _|str
 // 'dist2' takes any record with fields x,y
 dist2 = { p -> p.x*p.x+p.y*p.y }
 // Restrict argument to just Points
-dist2 = { p@Point -> p.x*p.x+p.y*p.y }
+dist2 = { p:Point -> p.x*p.x+p.y*p.y }
 
 
 
 
 
-// type variables are free in @ type expressions
+// type variables are free in : type expressions
 
 // Define a pair as 2 fields "a" and "b" both with the same type T.
 // Note that 'a' and 'b' and 'T' are all free, but the comma parses this as a
 // collection, so 'a' and 'b' become field names and 'T' becomes a type-var.
-Pair = @{ a@T, b@T }
+Pair = :{ a:T, b:T }
 
 // Since no comma, its a function type not a struct type.
 // Since 'A' and 'B' are free and not field names, they become type-vars.
-MapType = @{ {A->B} List(A) -> List(B) }
+MapType = :{ {A->B} List(A) -> List(B) }
 
-// map: no leading '@' so a function definition, not a type def
-map@{ {A->B} List(A) -> List(B) }  = { f list -> ... }
+// map: no leading ':' so a function definition, not a type def
+map:{ {A->B} List(A) -> List(B) }  = { f list -> ... }
 
-// A List type.  Named types are not 'null', so not valid to use "List = @_|...".
+// A List type.  Named types are not 'null', so not valid to use "List = :_|...".
 // Type List takes a type-variable 'A' (which is free in the type expr).
 // List is a self-recursive type.
 // Field 'next' can be null or List(A).
 // Field 'val' is type A.
-List = @{ next@_|List(A) val@A }
+List = :{ next:_|List(A) val:A }
 
 // Type A can allow nulls, or not
-strs@List(_)     = ... // List of nulls
-strs@List(str)   = ... // List of not-null strings
-strs@List(_|str) = ... // List of null-or-strings
+strs:List(_)     = ... // List of nulls
+strs:List(str)   = ... // List of not-null strings
+strs:List(_|str) = ... // List of null-or-strings
 
 
 

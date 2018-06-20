@@ -14,13 +14,13 @@ import java.util.BitSet;
  *
  *  GRAMMAR:
  *  prog = stmt END
- *  stmt = [id[@type]? =]* ifex [; stmt]* // ids must not exist, and are available in later statements
+ *  stmt = [id[:type]? =]* ifex [; stmt]* // ids must not exist, and are available in later statements
  *  ifex = expr ? expr : expr   // trinary logic
  *  expr = term [binop term]*   // gather all the binops and sort by prec
  *  term = tfact                // No function call
  *  term = tfact ( [stmt,]* )+  // One or more function calls in a row, args are delimited
  // *  term = tfact tfact*         // One function call, all the args listed
- *  tfact= nfact[@type]?        // Optional type after a nfact
+ *  tfact= nfact[:type]?        // Optional type after a nfact
  *  nfact= uniop* fact          // Zero or more uniop calls over a fact
  *  fact = id                   // variable lookup
  *  fact = num                  // number
@@ -113,7 +113,7 @@ public class Parse {
   /** Parse a list of statements.  A statement is a list of variables to
    *  let-assign, and an ifex for the value.  The variables must not already
    *  exist, and are available in all later statements.
-   *  stmt = [id[@type]? =]* ifex [; stmt]*
+   *  stmt = [id[:type]? =]* ifex [; stmt]*
    */
   private Node stmt() {
     Ary<String> toks = new Ary<>(new String[1],0);
@@ -123,8 +123,8 @@ public class Parse {
       String tok = token();  // Scan for 'id = ...'
       if( tok == null ) break;
       Type t = null;
-      if( peek('@') && (t=type())==null ) return con(err_ctrl("Missing type"));
-      if( !peek('=') ) { _x = oldx; break; } // Unwind token parse
+      if( peek(':') && (t=type())==null ) _x = oldx; // attempt type parse
+      if( !peek('=') ) { _x = oldx; break; } // Unwind token parse, and not assignment
       toks.add(tok);
       ts  .add(t  );
     }
@@ -164,12 +164,14 @@ public class Parse {
       Node ifex = gvn(new IfNode(ctrl(),expr));
       ctrls.add_def(ifex);      // Keep alive, even if 1st Proj kills last use, so 2nd Proj can hook
       set_ctrl(gvn(new CProjNode(ifex,1))); // Control for true branch
-      if( ctrls.add_def(expr()) == null ) throw AA.unimpl(); // 1
+      Node tex = expr();
+      ctrls.add_def(tex==null ? con(err_ctrl("missing expr after '?'")) : tex);
       ctrls.add_def(ctrl()); // 2 - hook true-side control
       ScopeNode t_scope = _e._scope.split(vidx); // Split out the new vars on the true side
       require(':');
       set_ctrl(gvn(new CProjNode(ifex,0)));
-      if( ctrls.add_def(expr()) == null ) throw AA.unimpl(); // 3
+      Node fex = expr();
+      ctrls.add_def(fex==null ? con(err_ctrl("missing expr after ':'")) : fex);
       ctrls.add_def(ctrl()); // 4 - hook false-side control
       ScopeNode f_scope = _e._scope.split(vidx); // Split out the new vars on the false side
       set_ctrl(init(new RegionNode(null,ctrls.at(2),ctrls.at(4))));
@@ -266,11 +268,15 @@ public class Parse {
   }
   
   /** Parse a type after a fact
-   *  tfact = nfact[@type]
+   *  tfact = nfact[:type]
    */
   private Node tfact() {
     Node n = nfact();
-    return (n!=null && peek('@')) ? gvn(new TypeNode(type(),n,errMsg())) : n;
+    int oldx = _x;
+    if( n==null || !peek(':') ) return n;
+    Type t = type();
+    if( t==null ) { _x = oldx; return n; }
+    return gvn(new TypeNode(t,n,errMsg()));
   }
   
   /** Parse any leading unary ops before a factor
@@ -374,7 +380,9 @@ public class Parse {
     byte c=_buf[_x];  int x = _x;
     if(   isAlpha0(c) ) while( _x < _buf.length && isAlpha1(_buf[_x]) ) _x++;
     else if( isOp0(c) ) while( _x < _buf.length && isOp1   (_buf[_x]) ) _x++;
-    else return null;           // Not a token; specifically excludes e.g. all bytes >= 128, or most bytes < 32
+    else return null; // Not a token; specifically excludes e.g. all bytes >= 128, or most bytes < 32
+    if( _buf[x]==':' && _x-x==1 ) // Disallow bare ':' as a token; ambiguous with ?: and type annotations
+      { _x=x; return null; } // Unwind, not a token
     return new String(_buf,x,_x-x);
   }
 
@@ -404,7 +412,7 @@ public class Parse {
     return TypeStr.make(0,new String(_buf,oldx,_x-oldx-1));
   }
 
-  /** Parse a type
+  /** Parse a type or return null
    *  type = tcon                 // Types are a tcon or a tfun
    *  type = tfun
    *  tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str
@@ -412,7 +420,7 @@ public class Parse {
    */
   private Type type() {
     Type t = type0();
-    return (t==null || t==TypeErr.ANY) ? err_ctrl("missing type") : t;
+    return (t==null || t==TypeErr.ANY) ? null : t;
   }
   // Type or null or TypeErr.ANY for '->' token
   private Type type0() {
@@ -420,9 +428,9 @@ public class Parse {
       int oldx = _x;
       String tok = token();
       if( tok==null ) return null;
-      if( tok.equals("->") ) return TypeErr.ANY;
+      if( tok.equals("->") ) return TypeErr.ANY; // Found ->
       Type t = _e.lookup_type(tok);
-      if( t==null ) _x = oldx;  // Unwind if not a primitive type
+      if( t==null ) _x = oldx;  // Unwind if not a known type
       return t;
     }
     Ary<Type> ts = new Ary<>(new Type[1],0);  Type t;
