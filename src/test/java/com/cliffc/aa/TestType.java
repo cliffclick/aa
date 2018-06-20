@@ -49,6 +49,11 @@ public class TestType {
     test("{+}(1, 2 * 3) ", TypeInt.con(7));
     // Parsed as +( (1+2*3) , (4*5+6) )
     test("{+}(1 + 2 * 3, 4 * 5 + 6) ", TypeInt.con(33));
+    // Statements
+    test("(1;2 )", TypeInt.con(2));
+    test("(1;2;)", TypeInt.con(2)); // final semicolon is optional
+    test("{+}(1;2 ,3)", TypeInt.con(5)); // statements in arguments
+    test("{+}(1;2;,3)", TypeInt.con(5)); // statements in arguments
 
     // Syntax for variable assignment
     test("x=1", TypeInt.TRUE);
@@ -145,7 +150,6 @@ public class TestType {
   }
 
   /*
-// Swap [] for {} in struct-value & struct-type defs
 // user type-vars
 
 

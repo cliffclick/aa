@@ -13,25 +13,27 @@ import java.util.BitSet;
 /** an implementation of language AA
  *
  *  GRAMMAR:
- *  prog = stmt END
- *  stmt = [id[:type]? =]* ifex [; stmt]* // ids must not exist, and are available in later statements
+ *  prog = stmts END
+ *  stmts= stmt [; stmt]*[;]?   // multiple statments; final ';' is optional
+ *  stmt = [id[:type]? =]* ifex // ids must not exist, and are available in later statements
  *  ifex = expr ? expr : expr   // trinary logic
  *  expr = term [binop term]*   // gather all the binops and sort by prec
  *  term = tfact                // No function call
- *  term = tfact ( [stmt,]* )+  // One or more function calls in a row, args are delimited
+ *  term = tfact ( [stmts,]* )+ // One or more function calls in a row, args (full stmts) are delimited
  // *  term = tfact tfact*         // One function call, all the args listed
  *  tfact= nfact[:type]?        // Optional type after a nfact
  *  nfact= uniop* fact          // Zero or more uniop calls over a fact
  *  fact = id                   // variable lookup
  *  fact = num                  // number
  *  fact = "str"                // string
- *  fact = (stmt)               // General statement parsed recursively
+ *  fact = (stmts)              // General statements parsed recursively
  *  fact = {func}               // Anonymous function declaration
+ *  fact = { [stmt,]* }         // Anonymous struct   declaration
  *  fact = {binop}              // Special syntactic form of binop; no spaces allowed; returns function constant
  *  fact = {uniop}              // Special syntactic form of uniop; no spaces allowed; returns function constant
  *  binop= +-*%&|/<>!=          // etc; primitive lookup; can determine infix binop at parse-time
  *  uniop=  -!~                 // etc; primitive lookup; can determine infix uniop at parse-time
- *  func = { [[id]* ->]? stmt } // Anonymous function declaration
+ *  func = { [[id]* ->]? stmts} // Anonymous function declaration
  *  str  = [.\%]*               // String contents; \t\n\r\% standard escapes
  *  str  = %[num]?[.num]?fact   // Percent escape embeds a 'fact' in a string; "name=%name\n"
  *  type = tcon                 // Types are a tcon or a tfun
@@ -75,7 +77,7 @@ public class Parse {
    *  prog = ifex END */
   private TypeEnv prog() {
     // Currently only supporting exprs
-    Node res = stmt();
+    Node res = stmts();
     if( res == null ) res = con(TypeErr.ALL);
     _e._scope.add_def(ctrl());  // Hook, so not deleted
     _e._scope.add_def(res);     // Hook, so not deleted
@@ -110,10 +112,24 @@ public class Parse {
     return new TypeEnv(tres,_e,errs);
   }
 
-  /** Parse a list of statements.  A statement is a list of variables to
-   *  let-assign, and an ifex for the value.  The variables must not already
-   *  exist, and are available in all later statements.
-   *  stmt = [id[:type]? =]* ifex [; stmt]*
+  /** Parse a list of statements; final semi-colon is optional.
+   *  stmts= stmt [; stmt]*[;]? 
+   */
+  private Node stmts() {
+    Node stmt = stmt(), last = null;
+    while( stmt != null ) {
+      if( !peek(';') ) return stmt;
+      last = stmt;
+      stmt = stmt();
+      if( stmt!=null && last!=null ) kill(last); // prior expression result no longer alive in parser
+    }
+    return last;
+  }
+    
+  /** A statement is a list of variables to let-assign, and an ifex for the
+   *  value.  The variables must not already exist, and are available in all
+   *  later statements.
+   *  stmt = [id[:type]? =]* ifex
    */
   private Node stmt() {
     Ary<String> toks = new Ary<>(new String[1],0);
@@ -142,10 +158,6 @@ public class Parse {
         if( n.is_forward_ref() ) ((EpilogNode)n).merge_ref_def(_gvn,tok,(EpilogNode)ifex);
         else err_ctrl0("Cannot re-assign ref '"+tok+"'");
       }
-    }
-    while( peek(';') ) {   // Another expression?
-      kill(ifex);          // prior expression result no longer alive in parser
-      ifex = stmt();
     }
     return ifex;
   }
@@ -227,7 +239,7 @@ public class Parse {
 
   /** Parse a function call, or not
    *  term = tfact                // No function call
-   *  term = tfact ( [expr,]* )+  // One or more function calls in a row, each set of args are delimited
+   *  term = tfact ([stmts,]* )+  // One or more function calls in a row, each set of args are delimited
    *  term = tfact tfact*         // One function call, all the args listed
    */
   private Node term() {
@@ -239,10 +251,10 @@ public class Parse {
         args.add_def(ctrl());
         args.add_def(fun);
         if( peek('(') ) {               // Traditional fcn application
-          if( (arg=stmt()) != null ) {  // Check for a no-arg fcn call
+          if( (arg=stmts()) != null ) { // Check for a no-arg fcn call
             args.add_def(arg);          // Add first arg
             while( peek(',') ) {        // Gather comma-separated args
-              if( (arg=stmt()) == null ) arg = con(err_ctrl("Missing argument in function call"));
+              if( (arg=stmts()) == null ) arg = con(err_ctrl("Missing argument in function call"));
               args.add_def(arg);
             }
           }
@@ -254,7 +266,7 @@ public class Parse {
           // '-' applied to a 2: "-(2)".  This parses as the function "1" and its
           // single arg "-(2)" - but "1" is not a function.
           return args.del(1);     // No function call
-          //while( (arg = stmt()) != null ) // While have args
+          //while( (arg = stmts()) != null ) // While have args
           //  args.add_def(arg);            // Gather WS-separate args
           //if( args.len()==1 ) return fun; // Not a function call
         }
@@ -314,7 +326,7 @@ public class Parse {
     if( '"' == c ) return con(string());
     int oldx = _x;
     if( peek('(') ) {           // a nested statement
-      Node s = stmt();
+      Node s = stmts();
       if( s==null ) { _x = oldx; return null; } // A bare "()" pair is not a statement
       require(')');
       return s;
@@ -361,7 +373,7 @@ public class Parse {
       int cnt=0;                // Add parameters to local environment
       for( String id : ids )  _e.add(id,gvn(new ParmNode(cnt++,id,fun,con(Type.SCALAR))));
       Node rpc = gvn(new ParmNode(-1,"rpc",fun,_gvn.con(TypeRPC.ALL_CALL)));
-      Node rez = stmt();        // Parse function body
+      Node rez = stmts();       // Parse function body
       Node epi = gvn(new EpilogNode(ctrl(),rez,rpc,fun));
       require('}');             // 
       _e = _e._par;             // Pop nested environment
@@ -381,7 +393,7 @@ public class Parse {
     if(   isAlpha0(c) ) while( _x < _buf.length && isAlpha1(_buf[_x]) ) _x++;
     else if( isOp0(c) ) while( _x < _buf.length && isOp1   (_buf[_x]) ) _x++;
     else return null; // Not a token; specifically excludes e.g. all bytes >= 128, or most bytes < 32
-    if( _buf[x]==':' && _x-x==1 ) // Disallow bare ':' as a token; ambiguous with ?: and type annotations
+    if( (c==':' || c==',') && _x-x==1 ) // Disallow bare ':' as a token; ambiguous with ?: and type annotations; same for ','
       { _x=x; return null; } // Unwind, not a token
     return new String(_buf,x,_x-x);
   }

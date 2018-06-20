@@ -11,24 +11,26 @@ GRAMMAR
 BNF                           | Comment
 ---                           | -------
 `prog = stmt END`             |
-`stmt = [id[:type] =]* ifex [; stmt]*` | ids must not exist, and are available in later statements
+`stmts= stmt [; stmt]*[;]?`   | multiple statments; final ';' is optional
+`stmt = [id[:type]? =]* ifex` | ids must not exist, and are available in later statements
 `ifex = expr ? expr : expr`   | trinary logic
 `expr = term [binop term]*`   | gather all the binops and sort by prec
 `term = tfact`                | No function call
-`term = tfact ( [stmt,]* )+`  | One or more function calls in a row, args are delimited
+`term = tfact ( [stmts,]* )+` | One or more function calls in a row, args (full stmts) are delimited
 `term = tfact tfact*`         | One function call, all the args listed
 `tfact= nfact[:type]`         | Optional type after a nfact
 `nfact= uniop* fact`          | Zero or more uniop calls over a fact
 `fact = id`                   | variable lookup
 `fact = num`                  | number
 `fact = "string"`             | string
-`fact = (stmt)`               | General statement parsed recursively
+`fact = (stmts)`              | General statements parsed recursively
 `fact = {func}`               | Anonymous function declaration
+`fact = { [stmt,]* }`         | Anonymous struct   declaration
 `fact = {binop}`              | Special syntactic form of binop; no spaces allowed; returns function constant
 `fact = {uniop}`              | Special syntactic form of uniop; no spaces allowed; returns function constant
 `binop= +-*%&|/<>!=`          | etc; primitive lookup; can determine infix binop at parse-time
 `uniop= -!~`                  | etc; primitive lookup; can determine infix uniop at parse-time
-`func = { [[id]* ->]? stmt }` | Anonymous function declaration
+`func = { [[id]* ->]? stmts}` | Anonymous function declaration
 `str  = [.\%]*`               | String contents; \t\n\r\% standard escapes
 `str  = %[num]?[.num]?fact`   | Percent escape embeds a 'fact' in a string; "name=%name\n"
 `type = tcon`                 | Types are a tcon or a tfun
@@ -80,6 +82,9 @@ Errors; mismatch arg count | ---
 Arguments separated by commas and are full statements | ---
 `{+}(1, 2 * 3)` | `7:int`
 `{+}(1 + 2 * 3, 4 * 5 + 6)` | `33:int`
+`(1;2 )`        | `2:int`
+`(1;2;)`        | `2:int` final semicolon is optional
+`{+}(1;2 ,3)`   | `5:int` full statements in arguments
 Syntax for variable assignment | ---
 `x=1`           | `1:int` assignments have values
 `x=y=1`         | `1:int` stacked assignments ok
