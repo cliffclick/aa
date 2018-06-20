@@ -147,7 +147,6 @@ public class TestType {
   /*
 // Swap [] for {} in struct-value & struct-type defs
 // user type-vars
-// re-assignment
 
 
 // Adding named types to primitives, because its the natural extension 
@@ -157,13 +156,13 @@ public class TestType {
 gal = :flt
 
 // tank is being assigned a concrete value, not a type, so tank is not a type.
-tank:gal := 5:gal // tank has 5 gallons, and can be reassigned
+tank:gal = 5:gal // tank has 5 gallons
 
-tank := 10 // free cast for bare constants
+tank:gal = 10 // free cast for bare constants
 
-x = 1.23       // x has type flt 1.23
-tank := x      // ERR: x is not gallons
-tank := gal(x) // OK : called 'gal' constructor
+x = 1.23          // x has type flt 1.23
+tank:gal =     x  // ERR: x is not gallons; no free cast
+tank:gal = gal(x) // OK : called 'gal' constructor
 
 // Since comma, its a struct not a function type.
 // Trailing comma is optional.
@@ -178,7 +177,7 @@ list_of_hello = { _, "hello", }
 // Adding named types to structs
 
 // Point is a struct with 2 untyped named variables
-Point = :{ x, y, }
+Point = :{ x,     y, }
 Point = :{ x:flt, y:flt, } // Same Point, vars forced to flt
 
 here = Point(1,2) // Point constructor
@@ -186,8 +185,8 @@ here = Point(1,2) // Point constructor
 print(here.x)
 
 // Null
-x:str   := "hello" // x takes a not-null str
-x:_|str := _       // x takes a null or str
+x:str   = "hello" // x takes a not-null str
+x:_|str = _       // x takes a null or str
 
 x := _       // x is untyped; assigned null right now
 x := "hello" // x is re-assigned and has type _|str
@@ -228,8 +227,14 @@ strs:List(_)     = ... // List of nulls
 strs:List(str)   = ... // List of not-null strings
 strs:List(_|str) = ... // List of null-or-strings
 
-
-
+// TODO: Re-assignment; ':=' allows more ':=' or exactly 1 final assignment '='
+x := 1; x:= 2; x = 3; x // 3
+x  = 1; x = 2; // cannot reassign
+x  = 1; x:= 2; // cannot reassign
+x := 1; rand ? x =2 :  3; x; // cannot partially final-assign
+x := 1; rand ? x:=2 :  3; x; // 2; x is still assignable
+x := 1; rand ? x =2 :x=3; x; // 2or3; x is final
+x := 1; x = x; // 1; make x final
    */
   
   static private void test( String program, Type expected ) {
