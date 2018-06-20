@@ -11,13 +11,13 @@ GRAMMAR
 BNF                           | Comment
 ---                           | -------
 `prog = stmt END`             |
-`stmt = [id[@type] =]* ifex [; stmt]*` | ids must not exist, and are available in later statements
+`stmt = [id[:type] =]* ifex [; stmt]*` | ids must not exist, and are available in later statements
 `ifex = expr ? expr : expr`   | trinary logic
 `expr = term [binop term]*`   | gather all the binops and sort by prec
 `term = tfact`                | No function call
 `term = tfact ( [stmt,]* )+`  | One or more function calls in a row, args are delimited
 `term = tfact tfact*`         | One function call, all the args listed
-`tfact= nfact[@type]`         | Optional type after a nfact
+`tfact= nfact[:type]`         | Optional type after a nfact
 `nfact= uniop* fact`          | Zero or more uniop calls over a fact
 `fact = id`                   | variable lookup
 `fact = num`                  | number
@@ -41,99 +41,101 @@ EXAMPLES
 
 Code            | Comment
 ----            | -------
-`1`             | ` 1@int`
+`1`             | ` 1:int`
 Prefix unary operator | ---
-`-1`            | ` -1@int` application of unary minus to a positive 1
-`!1`            | `  0@int` convert 'truthy' to false
+`-1`            | ` -1:int` application of unary minus to a positive 1
+`!1`            | `  0:int` convert 'truthy' to false
 Infix binary operator | ---
-`1+2`           | `  3@int`
-`1-2`           | ` -1@int`
-`1<=2`          | `1@int` Truth === 1
-`1>=2`          | `0@int` False === 0
+`1+2`           | `  3:int`
+`1-2`           | ` -1:int`
+`1<=2`          | `1:int` Truth === 1
+`1>=2`          | `0:int` False === 0
 Binary operators have precedence | ---
-`1+2*3`         | `  7@int` standard precedence
-` 1+2 * 3+4 *5` | ` 27@int`
-`(1+2)*(3+4)*5` | `105@int` parens overrides precedence
+`1+2*3`         | `  7:int` standard precedence
+` 1+2 * 3+4 *5` | ` 27:int`
+`(1+2)*(3+4)*5` | `105:int` parens overrides precedence
 Float           | ---
-`1.2+3.4`       | `4.6@flt`
-`1+2.3`         | `3.3@flt` standard auto-widening of int to flt
-`1.0==1`        | `1@int` True; int widened to float
+`1.2+3.4`       | `4.6:flt`
+`1+2.3`         | `3.3:flt` standard auto-widening of int to flt
+`1.0==1`        | `1:int` True; int widened to float
 Simple strings  | ---
-`\"Hello, world\"` | `"Hello, world"@str`
-`str(3.14)`     | `"3.14"@str` Overloaded `str(@flt)`
-`str(3)`        | `"3"@str`    Overloaded `str(@int)`
-`str(\"abc\")`  | `"abc"@str`  Overloaded `str(@str)`
+`\"Hello, world\"` | `"Hello, world":str`
+`str(3.14)`     | `"3.14":str` Overloaded `str(:flt)`
+`str(3)`        | `"3":str`    Overloaded `str(:int)`
+`str(\"abc\")`  | `"abc":str`  Overloaded `str(:str)`
 Variable lookup | ---
-`math_pi`       | `3.141592653589793@flt` Should be `math.pi` but name spaces not implemented
+`math_pi`       | `3.141592653589793:flt` Should be `math.pi` but name spaces not implemented
 primitive function lookup | ---
 `+`             | `"Syntax error; trailing junk"` unadorned primitive not allowed
-`{+}`           | `{{+@{int int -> int}, +@{flt flt -> flt}}` returns a union of '+' functions
-`{!}`           | `!@{int -> int1}` function taking an `int` and returning a `bool`
+`{+}`           | `{{+:{int int -> int}, +:{flt flt -> flt}}` returns a union of '+' functions
+`{!}`           | `!:{int -> int1}` function taking an `int` and returning a `bool`
 Function application, traditional paren/comma args | ---
-`{+}(1,2)`      | `3@int`
-`{-}(1,2)`      | `-1@int` binary version
-`{-}(1)`        | `-1@int` unary version
+`{+}(1,2)`      | `3:int`
+`{-}(1,2)`      | `-1:int` binary version
+`{-}(1)`        | `-1:int` unary version
 Errors; mismatch arg count | ---
 `!()`           | `Call to unary function '!', but missing the one required argument`
 `math_pi(1)`    | `A function is being called, but 3.141592653589793 is not a function type`
 `{+}(1,2,3)`    | `Passing 3 arguments to +{flt64 flt64 -> flt64} which takes 2 arguments`
 Arguments separated by commas and are full statements | ---
-`{+}(1, 2 * 3)` | `7@int`
-`{+}(1 + 2 * 3, 4 * 5 + 6)` | `33@int`
+`{+}(1, 2 * 3)` | `7:int`
+`{+}(1 + 2 * 3, 4 * 5 + 6)` | `33:int`
 Syntax for variable assignment | ---
-`x=1`           | `1@int` assignments have values
-`x=y=1`         | `1@int` stacked assignments ok
+`x=1`           | `1:int` assignments have values
+`x=y=1`         | `1:int` stacked assignments ok
 `x=y=`          | `Missing ifex after assignment of 'y'`
 `x=1+y`         | `Unknown ref 'y'`
-`x=2; y=x+1; x*y` | `6@int`
-`1+(x=2*3)+x*x` | `43@int` Re-use ref immediately after def; parses as: `x=(2*3); 1+x+x*x`
+`x=2; y=x+1; x*y` | `6:int`
+`1+(x=2*3)+x*x` | `43:int` Re-use ref immediately after def; parses as: `x=(2*3); 1+x+x*x`
 `x=(1+(x=2)+x)` | `Cannot re-assign ref 'x'`
 Conditionals    | ---
-`0 ?    2  : 3` | `3@int` Zero is false
-`2 ?    2  : 3` | `2@int` Any non-zero is true; "truthy"
-`math_rand(1)?(x=4):(x=3);x` | `@int8` x defined on both arms, so available after but range bound
-`math_rand(1)?(x=2):   3 ;4` | `4@int` x-defined on 1 side only, but not used thereafter
-`math_rand(1)?(y=2;x=y*y):(x=3);x` | `@int8` x defined on both arms, so available after, while y is not
+`0 ?    2  : 3` | `3:int` Zero is false
+`2 ?    2  : 3` | `2:int` Any non-zero is true; "truthy"
+`math_rand(1)?(x=4):(x=3);x` | `:int8` x defined on both arms, so available after but range bound
+`math_rand(1)?(x=2):   3 ;4` | `4:int` x-defined on 1 side only, but not used thereafter
+`math_rand(1)?(y=2;x=y*y):(x=3);x` | `:int8` x defined on both arms, so available after, while y is not
 `math_rand(1)?(x=2):   3 ;x` | `'x' not defined on false arm of trinary` No partial-defs
 `math_rand(1)?(x=2):   3 ;y=x+2;y` | `'x' not defined on false arm of trinary` More complicated partial-def
 `0 ? (x=2) : 3;x` | `'x' not defined on false arm of trinary`
-`2 ? (x=2) : 3;x` | `2@int` Off-side is constant-dead, so missing x-assign is ignored
-`2 ? (x=2) : y  ` | `2@int` Off-side is constant-dead, so `"Unknown ref 'y'"` is ignored
+`2 ? (x=2) : 3;x` | `2:int` Off-side is constant-dead, so missing x-assign is ignored
+`2 ? (x=2) : y  ` | `2:int` Off-side is constant-dead, so `"Unknown ref 'y'"` is ignored
 `x=1;2?(x=2):(x=3);x` | `Cannot re-assign ref 'x'` Re-assignment not allowed
-`x=1;2?   2 :(x=3);x` | `1@int` Re-assign allowed & ignored in dead branch
+`x=1;2?   2 :(x=3);x` | `1:int` Re-assign allowed & ignored in dead branch
+`math_rand(1)?1:int:2:int` | `:int8` no ambiguity between conditionals and type annotations
+`math_rand(1)?1::2:int` | `missing expr after ':'`
 Anonymous function definition | ---
 `{x y -> x+y}`    | Types as a 2-arg function { int int -> int } or { flt flt -> flt }
-`{5}()`           | `5@int` No args nor `->` required; this is simply a no-arg function returning 5, being executed
+`{5}()`           | `5:int` No args nor `->` required; this is simply a no-arg function returning 5, being executed
 Identity mimics having type-vars via inlining during typing | ---
 `id`              | `{A->A}` No type-vars yet
-`id(1)`           | `1@int`
-`id(3.14)`        | `3.14@flt`
-`id({+})`         | `{{+@{int int -> int}, +@{flt flt -> flt}}`
-`id({+})(id(1),id(math_pi))` | `4.141592653589793@flt`
+`id(1)`           | `1:int`
+`id(3.14)`        | `3.14:flt`
+`id({+})`         | `{{+:{int int -> int}, +:{flt flt -> flt}}`
+`id({+})(id(1),id(math_pi))` | `4.141592653589793:flt`
 Function execution and result typing | ---
-`x=3; fun={y -> x & y}; fun(2)` | `2@int` capture external variable
-`x=3; fun={x -> x & 2}; fun(2)` | `2@int` shadow  external variable
+`x=3; fun={y -> x & y}; fun(2)` | `2:int` capture external variable
+`x=3; fun={x -> x & 2}; fun(2)` | `2:int` shadow  external variable
 `fun={x -> x+2}; x` | `Unknown ref 'x'` Scope exit ends lifetime
-`x=3; fun={y -> x+y}; fun(2)` | `5@int` Overloaded `+` resolves to `@int`
-`x=3; fun={x -> x*2}; fun(2.1)` | `4.2@flt` Overloaded `{+}:flt` resolves with I->F conversion
-`x=3; fun={x -> x*2}; fun(2.1)+fun(x)` | `10.2@flt` Overloaded `fun` specialized into int and flt variants
+`x=3; fun={y -> x+y}; fun(2)` | `5:int` Overloaded `+` resolves to `:int`
+`x=3; fun={x -> x*2}; fun(2.1)` | `4.2:flt` Overloaded `{+}:flt` resolves with I->F conversion
+`x=3; fun={x -> x*2}; fun(2.1)+fun(x)` | `10.2:flt` Overloaded `fun` specialized into int and flt variants
 Recursive functions | ---
-`fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)` | `6@int` fully evaluates at typing time
-`fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)` | `@int` does not collapse at typing time
-`is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)` | `1@int`
-`is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(5)` | `0@int`
+`fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)` | `6:int` fully evaluates at typing time
+`fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)` | `:int` does not collapse at typing time
+`is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)` | `1:int`
+`is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(5)` | `0:int`
 Type annotations  | ---
-`-1@int`          | `-1@int`
-`(1+2.3)@flt`     | `3.3@flt`  Any expression can have a type annotation
-`x@int = 1`       | `1@int`  Variable assignment can also have one
-`x@flt = 1`       | `1@int` Casts for free to a float
-`x@flt32 = 123456789` | `123456789 is not a flt32` Failed to convert int64 to a flt32
-`-1@int1`         | `-1 is not a int1` int1 is only {0,1}
-`"abc"@int`       | `"abc" is not a int64`
-`x=3; fun@{int ->int }={x -> x*2}; fun(2.1)+fun(x)` | `2.1 is not a int64`
-`x=3; fun@{real->real}={x -> x*2}; fun(2.1)+fun(x)` | `10.4@flt` real covers both int and flt
-`fun@{real->flt32}={x -> x}; fun(123 )` | `123@int` Casts for free to real and flt32
-`fun@{real->flt32}={x -> x}; fun(123456789)` | `123456789 is not a flt32`
+`-1:int`          | `-1:int`
+`(1+2.3):flt`     | `3.3:flt`  Any expression can have a type annotation
+`x:int = 1`       | `1:int`  Variable assignment can also have one
+`x:flt = 1`       | `1:int` Casts for free to a float
+`x:flt32 = 123456789` | `123456789 is not a flt32` Failed to convert int64 to a flt32
+`-1:int1`         | `-1 is not a int1` int1 is only {0,1}
+`"abc":int`       | `"abc" is not a int64`
+`x=3; fun:{int ->int }={x -> x*2}; fun(2.1)+fun(x)` | `2.1 is not a int64`
+`x=3; fun:{real->real}={x -> x*2}; fun(2.1)+fun(x)` | `10.4:flt` real covers both int and flt
+`fun:{real->flt32}={x -> x}; fun(123 )` | `123:int` Casts for free to real and flt32
+`fun:{real->flt32}={x -> x}; fun(123456789)` | `123456789 is not a flt32`
 
 
 
