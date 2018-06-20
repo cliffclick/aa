@@ -121,7 +121,7 @@ public class Parse {
       if( !peek(';') ) return stmt;
       last = stmt;
       stmt = stmt();
-      if( stmt!=null && last!=null ) kill(last); // prior expression result no longer alive in parser
+      if( stmt!=null ) kill(last); // prior expression result no longer alive in parser
     }
     return last;
   }
@@ -374,8 +374,8 @@ public class Parse {
       for( String id : ids )  _e.add(id,gvn(new ParmNode(cnt++,id,fun,con(Type.SCALAR))));
       Node rpc = gvn(new ParmNode(-1,"rpc",fun,_gvn.con(TypeRPC.ALL_CALL)));
       Node rez = stmts();       // Parse function body
+      require('}');             //
       Node epi = gvn(new EpilogNode(ctrl(),rez,rpc,fun));
-      require('}');             // 
       _e = _e._par;             // Pop nested environment
       set_ctrl(old_ctrl);       // Back to the pre-function-def control
       return epi;               // Return function; close-out and DCE 'e'

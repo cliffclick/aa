@@ -69,7 +69,7 @@ public class Env implements AutoCloseable {
     while( _scope._uses._len > 0 ) {
       Node use = _scope._uses.at(0);
       int idx = use._defs.find(_scope);
-      use.set_def(idx, _par._scope, _gvn); // Move it upscope
+      _gvn.set_def_reg(use,idx, _par._scope); // Move it upscope
     }
     _gvn.kill0(_scope);
   }

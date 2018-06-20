@@ -6,6 +6,16 @@ import org.junit.Test;
 
 public class TestType {
   @Test public void testType0() {
+    // simple anon struct tests
+    //test   ("{x,y}", TypeTuple.make(TypeInt.FALSE,TypeInt.FALSE)); // simple anon struct decl
+    //test   ("a={x=1.2,y}; a.x", TypeFlt.con(1.2)); // standard "." field naming
+    //testerr("a = {x,y}; a.x=1","Cannot re-assign _.x","");
+    //test   ("a={x=0,y=1}; b={x=2}; c=rand?a:b; c.x", TypeInt.INT8); // either 0 or 2
+    //testerr("a={x=0,y=1}; b={x=2}; c=rand?a:b; c.y",  "Unknown ref _.y","");
+    //testerr("dist={p->p.x*p.x+p.y+p.y}; dist({x=1})", "Unknown ref _.y","");   // missing field
+    //test   ("dist={p->p.x*p.x+p.y+p.y}; dist({x=1,y=2})", TypeInt.con(5));     // passed in to func
+    //test   ("dist={p->p.x*p.x+p.y+p.y}; dist({x=1,y=2,z=3})", TypeInt.con(5)); // extra fields OK
+
     // Simple int
     test("1",   TypeInt.TRUE);
     // Unary operator
@@ -150,7 +160,47 @@ public class TestType {
   }
 
   /*
-// user type-vars
+
+// 0:int is the uniform initial value, counts as null; free cast to null
+
+// anon struct decls
+// no un-init values; always take a default init
+// no re-assignment YET, so default is also final
+{ x, y } // no initial value and no reassignment semantics yet; "feels like" C
+{ x=1.1, y=2.2, } // with initial values
+a = {x,y}; a.x=1; // Cannot re-assign, so x,y are stuck at zero
+// a.x is a LHS value; makes it a parser-aware thing
+a={x=0  ,y=2.2}
+b={x=1.2,y=2.3}
+c=rand?a:b; 
+c.x=1; // cannot re-assign
+c.x;   // return either 0 or 1.2 or flt
+dist={p->p.x*p.x+p.y*p.y}; dist(a); // valid
+
+b={x="hello", y=2.2}
+c=rand?a:b; 
+c.x; // either 0/null or "hello"
+
+x=0; y=1.2; z="abc"; c=rand?x:y; d=rand?x:z; str(c)+d; // "0 or 1.2"+"null or hello"
+
+
+
+// With re-assignment, more excitement around LHS!
+// So fields in a tuple type have a init-value, a final-value, an
+// un-init-value, a mixed-init-value, and a name
+make_point={{x,y}} // returns {x,y} with both un-init
+a=make_point(); a.x=1; // a.x init; a.y uninit
+b=make_point(); b.y=2; // a.x uninit; b.y init
+c = rand ? a : b;      // c: worse-case x & y mixed init & uninit
+c.x = 1; // Error; might be    init
+c.x;     // Error; might be un-init
+// reflection read/write of fields.
+// '[' binary operator returns a LHS value (really a 2-tuple).
+// ']' postfix operator takes a LHS, returns value
+// ']=' binary operator takes a LHS and a value, and returns same value... and SIDE-EFFECTS
+c[x];
+c[x]=1;
+
 
 
 // Adding named types to primitives, because its the natural extension 
@@ -171,7 +221,7 @@ tank:gal = gal(x) // OK : called 'gal' constructor
 // Since comma, its a struct not a function type.
 // Trailing comma is optional.
 // A tuple of null and a string
-list_of_hello = { _, "hello", }
+list_of_hello = { 0, "hello", }
 
 // No ambiguity:
  { x  } // no-arg-function returning external variable x; same as { -> x }
@@ -190,10 +240,10 @@ print(here.x)
 
 // Null
 x:str   = "hello" // x takes a not-null str
-x:_|str = _       // x takes a null or str
+x:0|str = 0       // x takes a null or str
 
-x := _       // x is untyped; assigned null right now
-x := "hello" // x is re-assigned and has type _|str
+x := 0       // x is untyped; assigned null right now
+x := "hello" // x is re-assigned and has type 0|str
 
 // Unnamed types use Duck typing; Named types are restricted (nomative)
 // 'dist2' takes any record with fields x,y
@@ -219,17 +269,17 @@ MapType = :{ {A->B} List(A) -> List(B) }
 // map: no leading ':' so a function definition, not a type def
 map:{ {A->B} List(A) -> List(B) }  = { f list -> ... }
 
-// A List type.  Named types are not 'null', so not valid to use "List = :_|...".
+// A List type.  Named types are not 'null', so not valid to use "List = :0|...".
 // Type List takes a type-variable 'A' (which is free in the type expr).
 // List is a self-recursive type.
 // Field 'next' can be null or List(A).
 // Field 'val' is type A.
-List = :{ next:_|List(A) val:A }
+List = :{ next:0|List(A) val:A }
 
 // Type A can allow nulls, or not
-strs:List(_)     = ... // List of nulls
+strs:List(0)     = ... // List of nulls
 strs:List(str)   = ... // List of not-null strings
-strs:List(_|str) = ... // List of null-or-strings
+strs:List(0|str) = ... // List of null-or-strings
 
 // TODO: Re-assignment; ':=' allows more ':=' or exactly 1 final assignment '='
 x := 1; x:= 2; x = 3; x // 3

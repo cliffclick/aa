@@ -151,14 +151,14 @@ public class GVNGCM {
   }
 
   private boolean check_gvn( Node n, boolean expect ) {
-    Node x = _vals.get(n);
+    Node x = _vals.get(n), old=null;
     if( x == n ) {              // Found in table
       assert expect;            // Expected to be found
       return true;              // Definitely in table
     }
     boolean found = false;
-    for( Node o : _vals.keySet() ) if( o._uid == n._uid ) { found=true; break; }
-    assert found == expect || _wrk_bits.get(n._uid); // Expected in table or on worklist
+    for( Node o : _vals.keySet() ) if( (old=o)._uid == n._uid ) { found=true; break; }
+    assert found == expect || _wrk_bits.get(n._uid) : "Found but not expected: "+old.toString(); // Expected in table or on worklist
     return false;               // Not in table
   }
 
