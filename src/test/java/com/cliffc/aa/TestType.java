@@ -166,7 +166,8 @@ do_it = { mys          -> mys.cnt++; mys.wid*mys.wid }
 
 ==================
 
-// Adding named types to primitives
+// Adding named types to primitives, because its the natural extension 
+// when adding them to tuples.
 
 // 'gal' is a type name for a flt.  'gal' is a type, never a concrete value.
 gal = @flt
@@ -180,35 +181,51 @@ x = 1.23       // x has type flt 1.23
 tank := x      // ERR: x is not gallons
 tank := gal(x) // OK : called 'gal' constructor
 
-// Adding named types to collections
+// Since comma, its a struct not a function type.
+// Trailing comma is optional.
+// A tuple of null and a string
+list_of_hello = { _, "hello", }
+
+// No ambiguity:
+ { x  } // no-arg-function returning external variable x
+ { x, } // 1-elem struct   returning external variable x
+@{ x  } // 1-elem struct type with field named x
+
+// Adding named types to structs
 
 // Point is a struct with 2 untyped named variables
 Point = @{ x, y, }
-Point = @{ x@flt, y@flt, } // Same point, vars forced to flt
+Point = @{ x@flt, y@flt, } // Same Point, vars forced to flt
 
 here = Point(1,2) // Point constructor
 // "." field name lookup
 print(here.x)
 
 // Null
-
 x@str   := "hello" // x takes a not-null str
 x@_|str := _       // x takes a null or str
 
-x := _ // x is untyped; assigned null right now
-x := "hello" // x has type _|str
+x := _       // x is untyped; assigned null right now
+x := "hello" // x is re-assigned and has type _|str
 
-// a tuple of null and a string
-list_of_hello = { _, "hello", }
+// Unnamed types use Duck typing; Named types are restricted (nomative)
+// 'dist2' takes any record with fields x,y
+dist2 = { p -> p.x*p.x+p.y*p.y }
+// Restrict argument to just Points
+dist2 = { p@Point -> p.x*p.x+p.y*p.y }
+
+
+
+
 
 // type variables are free in @ type expressions
 
 // Define a pair as 2 fields "a" and "b" both with the same type T.
 // Note that 'a' and 'b' and 'T' are all free, but the comma parses this as a
 // collection, so 'a' and 'b' become field names and 'T' becomes a type-var.
-Pair = @{ a@T, b@T, }
+Pair = @{ a@T, b@T }
 
-// Since no comma, its a function type not a collection type.
+// Since no comma, its a function type not a struct type.
 // Since 'A' and 'B' are free and not field names, they become type-vars.
 MapType = @{ {A->B} List(A) -> List(B) }
 
@@ -216,10 +233,11 @@ MapType = @{ {A->B} List(A) -> List(B) }
 map@{ {A->B} List(A) -> List(B) }  = { f list -> ... }
 
 // A List type.  Named types are not 'null', so not valid to use "List = @_|...".
-// Type List takes a type-variable 'A'.
+// Type List takes a type-variable 'A' (which is free in the type expr).
+// List is a self-recursive type.
 // Field 'next' can be null or List(A).
 // Field 'val' is type A.
-List = @{ A => next@_|List(A) val@A }
+List = @{ next@_|List(A) val@A }
 
 // Type A can allow nulls, or not
 strs@List(_)     = ... // List of nulls
