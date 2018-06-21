@@ -25,7 +25,7 @@ BNF                           | Comment
 `fact = "string"`             | string
 `fact = (stmts)`              | General statements parsed recursively
 `fact = {func}`               | Anonymous function declaration
-`fact = { [stmt,]* }`         | Anonymous struct   declaration
+`fact = .{ [stmt,]* }`        | Anonymous struct   declaration
 `fact = {binop}`              | Special syntactic form of binop; no spaces allowed; returns function constant
 `fact = {uniop}`              | Special syntactic form of uniop; no spaces allowed; returns function constant
 `binop= +-*%&|/<>!=`          | etc; primitive lookup; can determine infix binop at parse-time

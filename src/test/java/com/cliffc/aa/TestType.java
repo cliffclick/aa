@@ -7,14 +7,14 @@ import org.junit.Test;
 public class TestType {
   @Test public void testType0() {
     // simple anon struct tests
-    //test   ("{x,y}", TypeTuple.make(TypeInt.FALSE,TypeInt.FALSE)); // simple anon struct decl
-    //test   ("a={x=1.2,y}; a.x", TypeFlt.con(1.2)); // standard "." field naming
-    //testerr("a = {x,y}; a.x=1","Cannot re-assign _.x","");
-    //test   ("a={x=0,y=1}; b={x=2}; c=rand?a:b; c.x", TypeInt.INT8); // either 0 or 2
-    //testerr("a={x=0,y=1}; b={x=2}; c=rand?a:b; c.y",  "Unknown ref _.y","");
-    //testerr("dist={p->p.x*p.x+p.y+p.y}; dist({x=1})", "Unknown ref _.y","");   // missing field
-    //test   ("dist={p->p.x*p.x+p.y+p.y}; dist({x=1,y=2})", TypeInt.con(5));     // passed in to func
-    //test   ("dist={p->p.x*p.x+p.y+p.y}; dist({x=1,y=2,z=3})", TypeInt.con(5)); // extra fields OK
+    //test   ("  .{x,y}", TypeTuple.make(TypeInt.FALSE,TypeInt.FALSE)); // simple anon struct decl
+    //test   ("a=.{x=1.2,y}; a.x", TypeFlt.con(1.2)); // standard "." field naming
+    //testerr("a=.{x,y}; a.x=1","Cannot re-assign _.x","");
+    //test   ("a=.{x=0,y=1}; b=.{x=2}; c=math_rand(1)?a:b; c.x", TypeInt.INT8); // either 0 or 2
+    //testerr("a=.{x=0,y=1}; b=.{x=2}; c=math_rand(1)?a:b; c.y",  "Unknown ref _.y","");
+    //testerr("dist={p->p.x*p.x+p.y+p.y}; dist(.{x=1})", "Unknown ref _.y","");   // missing field
+    //test   ("dist={p->p.x*p.x+p.y+p.y}; dist(.{x=1,y=2})", TypeInt.con(5));     // passed in to func
+    //test   ("dist={p->p.x*p.x+p.y+p.y}; dist(.{x=1,y=2,z=3})", TypeInt.con(5)); // extra fields OK
 
     // Simple int
     test("1",   TypeInt.TRUE);
@@ -123,6 +123,7 @@ public class TestType {
     test("x=3; fun={y -> x & y}; fun(2)", TypeInt.con(2)); // trivially inlined; capture external variable
     test("x=3; fun={x -> x & 2}; fun(2)", TypeInt.con(2)); // trivially inlined; shadow  external variable
     testerr("fun={x -> x+2}; x", "Unknown ref 'x'","                 "); // Scope exit ends lifetime
+    test("fun={x -> y=3; x*y}; fun(2)", TypeInt.con(6)); // multi statements in func body
     // Needs overload cloning/inlining to resolve {+}
     test("x=3; fun={y -> x+y}; fun(2)", TypeInt.con(5)); // must inline to resolve overload {+}:Int
     test("x=3; fun={x -> x*2}; fun(2.1)", TypeFlt.con(2.1*2.0)); // must inline to resolve overload {+}:Flt with I->F conversion
@@ -166,12 +167,12 @@ public class TestType {
 // anon struct decls
 // no un-init values; always take a default init
 // no re-assignment YET, so default is also final
-{ x, y } // no initial value and no reassignment semantics yet; "feels like" C
-{ x=1.1, y=2.2, } // with initial values
+.{ x, y } // no initial value and no reassignment semantics yet; "feels like" C
+.{ x=1.1, y=2.2, } // with initial values
 a = {x,y}; a.x=1; // Cannot re-assign, so x,y are stuck at zero
 // a.x is a LHS value; makes it a parser-aware thing
-a={x=0  ,y=2.2}
-b={x=1.2,y=2.3}
+a=.{x=0  ,y=2.2}
+b=.{x=1.2,y=2.3}
 c=rand?a:b; 
 c.x=1; // cannot re-assign
 c.x;   // return either 0 or 1.2 or flt

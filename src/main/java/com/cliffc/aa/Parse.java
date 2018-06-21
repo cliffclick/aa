@@ -28,7 +28,7 @@ import java.util.BitSet;
  *  fact = "str"                // string
  *  fact = (stmts)              // General statements parsed recursively
  *  fact = {func}               // Anonymous function declaration
- *  fact = { [stmt,]* }         // Anonymous struct   declaration
+ *  fact = .{ [stmt,]* }        // Anonymous struct   declaration
  *  fact = {binop}              // Special syntactic form of binop; no spaces allowed; returns function constant
  *  fact = {uniop}              // Special syntactic form of uniop; no spaces allowed; returns function constant
  *  binop= +-*%&|/<>!=          // etc; primitive lookup; can determine infix binop at parse-time
@@ -313,7 +313,7 @@ public class Parse {
   /** Parse a factor, a leaf grammar token
    *  fact = num       // number
    *  fact = "string"  // string
-   *  fact = (stmt)    // General statement parsed recursively
+   *  fact = (stmts)   // General statements parsed recursively
    *  fact = {binop}   // Special syntactic form of binop; no spaces allowed; returns function constant
    *  fact = {uniop}   // Special syntactic form of uniop; no spaces allowed; returns function constant
    *  fact = {func}    // Anonymous function declaration
@@ -353,8 +353,9 @@ public class Parse {
   }
 
   /** Parse an anonymous function; the opening '{' already parsed.  After the
-   *  '{' comes an optional list of arguments and a '->' token.
-   *  func = { [[id]* ->]? stmt }
+   *  '{' comes an optional list of arguments and a '->' token, and then any
+   *  number of statements separated by ';'.
+   *  func = { [[id]* ->]? stmts }
    */
   private Node func() {
     int oldx = _x;
