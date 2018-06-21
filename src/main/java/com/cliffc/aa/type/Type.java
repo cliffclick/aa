@@ -87,12 +87,13 @@ public class Type {
   static final byte TERROR  = 9; // ALL/ANY TypeErr types
   static final byte TUNION  =10; // Union types (finite collections of unrelated types Meet together); see TypeUnion
   static final byte TTUPLE  =11; // Tuples; finite collections of unrelated Types, kept in parallel
-  static final byte TFUN    =12; // Functions; both domain and range are a Tuple; see TypeFun                            
-  static final byte TRPC    =13; // Return PCs; Continuations; call-site return points; see TypeRPC
-  static final byte TFLT    =14; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
-  static final byte TINT    =15; // All Integers, including signed/unsigned and various sizes; see TypeInt
-  static final byte TSTR    =16; // String type
-  static final byte TLAST   =17; // Type check
+  static final byte TSTRUCT =12; // Structs; tuples with named fields
+  static final byte TFUN    =13; // Functions; both domain and range are a Tuple; see TypeFun                            
+  static final byte TRPC    =14; // Return PCs; Continuations; call-site return points; see TypeRPC
+  static final byte TFLT    =15; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
+  static final byte TINT    =16; // All Integers, including signed/unsigned and various sizes; see TypeInt
+  static final byte TSTR    =17; // String type
+  static final byte TLAST   =18; // Type check
   
   public  static final Type CTRL   = make( TCTRL  ); // Ctrl
   public  static final Type XCTRL  = make(TXCTRL  ); // Ctrl
@@ -158,6 +159,7 @@ public class Type {
     // The rest of these choices are various scalars, which do not match well
     // with any tuple.
     if( t._type == TTUPLE ) return TypeErr.ALL;
+    if( t._type == TSTRUCT) return TypeErr.ALL;
 
     // Scalar is close to bottom: everything falls to SCALAR, except Bottom
     // (handled above) and multi-types like Tuples
@@ -221,15 +223,16 @@ public class Type {
   }
   
   public static boolean check_startup() {
-    Type[] ts =    Type     .TYPES ;
-    ts = concat(ts,TypeErr  .TYPES);
-    ts = concat(ts,TypeInt  .TYPES);
-    ts = concat(ts,TypeFlt  .TYPES);
-    ts = concat(ts,TypeStr  .TYPES);
-    ts = concat(ts,TypeTuple.TYPES);
-    ts = concat(ts,TypeFun  .TYPES);
-    ts = concat(ts,TypeRPC  .TYPES);
-    ts = concat(ts,TypeUnion.TYPES);
+    Type[] ts =    Type      .TYPES ;
+    ts = concat(ts,TypeErr   .TYPES);
+    ts = concat(ts,TypeInt   .TYPES);
+    ts = concat(ts,TypeFlt   .TYPES);
+    ts = concat(ts,TypeStr   .TYPES);
+    ts = concat(ts,TypeTuple .TYPES);
+    ts = concat(ts,TypeStruct.TYPES);
+    ts = concat(ts,TypeFun   .TYPES);
+    ts = concat(ts,TypeRPC   .TYPES);
+    ts = concat(ts,TypeUnion .TYPES);
     
     // Confirm commutative & complete
     for( Type t0 : ts )
@@ -274,7 +277,7 @@ public class Type {
   // E.g. ANY-isa-XSCALAR; XSCALAR-isa-XREAL; XREAL-isa-Int(Any); Int(Any)-isa-Int(3)
   public boolean isa( Type t ) { return meet(t)==t; }
   // True if 'this' isa SCALAR, without the cost of a full 'meet()'
-  final boolean isa_scalar() { return _type != TERROR && _type != TUNION && _type != TTUPLE; }
+  final boolean isa_scalar() { return _type != TERROR && _type != TUNION && _type != TTUPLE && _type != TSTRUCT; }
 
   // True if value is above the centerline (no real value)
   public boolean above_center() {
@@ -292,6 +295,7 @@ public class Type {
     case TRPC:
     case TUNION:
     case TTUPLE:
+    case TSTRUCT:
     case TFLT:
     case TINT:
     default: throw AA.unimpl(); // Overridden in subclass

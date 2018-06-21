@@ -54,6 +54,7 @@ public class TypeFlt extends Type {
     case TERROR: return ((TypeErr)t)._all ? t : this;
     case TCTRL:
     case TXCTRL:
+    case TSTRUCT:
     case TTUPLE: return TypeErr.ALL;
     case TUNION: return t.xmeet(this); // Let TypeUnion decide
     default: throw typerr(t);

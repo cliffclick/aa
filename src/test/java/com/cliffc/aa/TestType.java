@@ -7,7 +7,8 @@ import org.junit.Test;
 public class TestType {
   @Test public void testType0() {
     // simple anon struct tests
-    //test   ("  .{x,y}", TypeTuple.make(TypeInt.FALSE,TypeInt.FALSE)); // simple anon struct decl
+    test   ("  .{x,y}", TypeTuple.make(TypeInt.FALSE,TypeInt.FALSE)); // simple anon struct decl
+    //testerr("a=.{x=1.2,y}; x", "bare field name does not escape","");
     //test   ("a=.{x=1.2,y}; a.x", TypeFlt.con(1.2)); // standard "." field naming
     //testerr("a=.{x,y}; a.x=1","Cannot re-assign _.x","");
     //test   ("a=.{x=0,y=1}; b=.{x=2}; c=math_rand(1)?a:b; c.x", TypeInt.INT8); // either 0 or 2
@@ -15,6 +16,10 @@ public class TestType {
     //testerr("dist={p->p.x*p.x+p.y+p.y}; dist(.{x=1})", "Unknown ref _.y","");   // missing field
     //test   ("dist={p->p.x*p.x+p.y+p.y}; dist(.{x=1,y=2})", TypeInt.con(5));     // passed in to func
     //test   ("dist={p->p.x*p.x+p.y+p.y}; dist(.{x=1,y=2,z=3})", TypeInt.con(5)); // extra fields OK
+    //testerr("a=.{x=1,x=2}", "cannot redefine .x","");
+    //testerr("a=.{x=(b=1.2)*b,y=b}; b", "temp name does not escape","");
+    //test   ("a=.{x=(b=1.2)*b,y=b}; a.y", TypeFlt.con(1.2)); // ok to use temp defs
+    //test   ("a=.{x=(b=1.2)*b,y=x}; a.y", TypeFlt.con(1.44)); // ok to use early fields in later defs
 
     // Simple int
     test("1",   TypeInt.TRUE);
@@ -135,6 +140,8 @@ public class TestType {
     test("x:int = 1", TypeInt.TRUE);
     test("x:flt = 1", TypeInt.TRUE); // casts for free to a float
     testerr("x:flt32 = 123456789", "123456789 is not a flt32","                   ");
+    testerr("2:x", "Syntax error; trailing junk", " ");
+    testerr("(2:)", "Expected ')' but found ':' instead", "  ");
 
     testerr("-1:int1", "-1 is not a int1","       ");
     testerr("\"abc\":int", "\"abc\" is not a int64","         ");

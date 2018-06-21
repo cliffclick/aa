@@ -88,7 +88,6 @@ public class Env implements AutoCloseable {
   // are literally assigning a lambda to a ref).  Refs and Vars have a fixed
   // type (so can, for instance, assign a new function to a var as long as the
   // type signatures match).  Cannot re-assign to a ref, only var; vars only
-
   // available in loops.  Only returns nodes registered with GVN.
   Node lookup( String token ) {
     if( token == null ) return null; // Handle null here, easier on parser

@@ -287,7 +287,7 @@ public class Parse {
     int oldx = _x;
     if( n==null || !peek(':') ) return n;
     Type t = type();
-    if( t==null ) { _x = oldx; return n; }
+    if( t==null ) { _x = oldx; return n; } // No error for missing type, because can be ?: instead
     return gvn(new TypeNode(t,n,errMsg()));
   }
   
@@ -325,14 +325,14 @@ public class Parse {
     if( '0' <= c && c <= '9' ) return con(number());
     if( '"' == c ) return con(string());
     int oldx = _x;
-    if( peek('(') ) {           // a nested statement
+    if( peek1(c,'(') ) {           // a nested statement
       Node s = stmts();
       if( s==null ) { _x = oldx; return null; } // A bare "()" pair is not a statement
       require(')');
       return s;
     }
     // Anonymous function or operator
-    if( peek('{') ) {
+    if( peek1(c,'{') ) {
       String tok = token0();
       Node op = tok == null ? null : _e.lookup(tok);
       if( peek('}') && op != null && op.op_prec() > 0 )
@@ -340,6 +340,8 @@ public class Parse {
       _x = oldx+1;              // Back to the opening paren
       return func();            // Anonymous function
     }
+    // Anonymous struct
+    if( peek2(c,".{") ) return struct();
     
     // Check for a valid 'id'
     String tok = token0();
@@ -380,6 +382,41 @@ public class Parse {
       _e = _e._par;             // Pop nested environment
       set_ctrl(old_ctrl);       // Back to the pre-function-def control
       return epi;               // Return function; close-out and DCE 'e'
+    }
+  }
+
+  /** Parse anonymous struct; the opening ".{" already parsed.  Next comes
+   *  statements, with each assigned value becoming a struct member.  A lexical
+   *  scope is made (non top-level assignments are removed at the end).
+   * .{ [id[:type]?[=stmt]?,]* }
+   */
+  private Node struct() {
+    try( Env e = new Env(_e) ) {// Nest an environment for the local vars
+      _e = e;                   // Push nested environment
+      Ary<String> toks = new Ary<>(new String[1],0);
+      Ary<Type  > ts   = new Ary<>(new Type  [1],0);
+      while( true ) {
+        String tok = token();    // Scan for 'id'
+        if( tok == null ) break; // end-of-struct-def
+        Type t = TypeErr.ANY;    // Untyped, most generic type
+        if( peek(':') )          // Has type annotation?
+          if( (t=type())==null ) throw AA.unimpl(); // return an error here
+        Node stmt = con(TypeErr.ANY);
+        if( peek('=') )
+          if( (stmt=stmt())==null ) throw AA.unimpl(); // return an error here
+        stmt = gvn(new TypeNode(t,stmt,errMsg()));
+        Node n = e._scope.get(tok);
+        if( n!=null ) return con(err_ctrl("Cannot define field '"+tok+"' twice"));
+        e._scope.add(tok,stmt); // Field now available 'bare' inside rest of scope
+        toks.add(tok);          // Gather for final type
+        ts  .add(t  );
+        if( !peek(',') ) break;
+      }
+      require('}');
+      _e = _e._par;             // Pop nested environment
+      throw AA.unimpl();
+      //TypeStruct tstr = TypeStruct.make(toks, TypeTuple.make(ts.asAry()));
+      //return gvn(new NewNode(ctrl(),tstr,e._scope);
     }
   }
   
@@ -467,9 +504,22 @@ public class Parse {
     err_ctrl0("Expected '"+c+"' but "+(_x>=_buf.length?"ran out of text":"found '"+(char)(_buf[_x])+"' instead"));
   }
 
-  private boolean peek( char c ) {
-    if( skipWS()!=c ) return false;
+  // Skip WS, return true&skip if match, false&noskip if miss.
+  private boolean peek( char c ) { return peek1(skipWS(),c); }
+  // Already skipped WS & have character;
+  // return true&skip if match, false&noskip if miss.
+  private boolean peek1( byte c0, char c ) {
+    assert (c0==-1 || c0== _buf[_x]) && !isWS(c0);
+    if( c0!=c ) return false;
     _x++;                       // Skip peeked character
+    return true;
+  }
+  // Already skipped WS & have character;
+  // return true&skip if match, false&noskip if miss.
+  private boolean peek2( byte c0, String s2 ) {
+    if( c0 != s2.charAt(0) ) return false;
+    if( _x+1 >= _buf.length || _buf[_x+1] != s2.charAt(1) ) return false;
+    _x+=2;                      // Skip peeked characters
     return true;
   }
   
