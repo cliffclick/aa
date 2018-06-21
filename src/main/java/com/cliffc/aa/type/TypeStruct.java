@@ -5,8 +5,8 @@ import java.util.Arrays;
 
 /** A Tuple with named fields */
 public class TypeStruct extends Type {
-  public String[] _args;        // The field names
-  public TypeTuple _tt;         // The field types
+  private String[] _args;        // The field names
+  private TypeTuple _tt;         // The field types
   private TypeStruct( String[] args, TypeTuple tt ) { super(TSTRUCT); init(args,tt); }
   private void init( String[] args, TypeTuple tt ) {
     assert args.length<=tt._ts.length;
@@ -19,12 +19,7 @@ public class TypeStruct extends Type {
     if( this==o ) return true;
     if( !(o instanceof TypeStruct) ) return false;
     TypeStruct t = (TypeStruct)o;
-    if( _tt!=t._tt ) return false; //
-    if( _args==t._args ) return true;
-    if( _args.length != t._args.length ) return false;
-    for( int i=0; i<_args.length; i++ )
-      if( _args[i]!=t._args[i] ) return false;
-    return true;
+    return _tt==t._tt && Arrays.equals(_args,t._args);
   }
   @Override public String toString() {
     SB sb = new SB().p("[");
@@ -56,8 +51,8 @@ public class TypeStruct extends Type {
 
   // Standard Meet.
   @Override protected Type xmeet( Type t ) {
-    String[] args= null;
-    TypeTuple tt = null;
+    String[] args;
+    TypeTuple tt ;
     switch( t._type ) {
     case TSTRUCT: tt = ((TypeStruct)t)._tt; args = ((TypeStruct)t)._args; break;
     case TTUPLE : tt =  (TypeTuple )t     ; args = new String[0]        ; break;
@@ -72,24 +67,25 @@ public class TypeStruct extends Type {
     }
     TypeTuple mtt = (TypeTuple)_tt.meet(tt); // Tuples just meet
     // Keep shorter (longer) set of matching arg names
-    return _args.length < args.length
-      ? xmeet1(_args,_tt._inf, args,mtt)
-      : xmeet1( args, tt._inf,_args,mtt);
+    return _args.length < args.length ? xmeet1(_args, args,mtt) : xmeet1( args,_args,mtt);
   }
   
-  private Type xmeet1(String[] amin, Type infmin, String[] amax, TypeTuple mtt ) {
+  private Type xmeet1(String[] amin, String[] amax, TypeTuple mtt ) {
     int i=0;
     for( ; i<amin.length; i++ )
       if( !amin[i].equals(amax[i]) )
         break;                  // Common prefix
-    if( i==amin.length && infmin.above_center() )
-      i = amax.length;          // Prefix equal, and shorter is "high", then keep longer
+    if( i==amin.length )        // Prefix was equal?  See if we can keep more names
+      while( i<amax.length && mtt.at(i).above_center() )
+        i++;             // Meet is "high", then keep longer
     if( i==0 ) return mtt;      // No names in common, fall to tuple
     if( i==amin.length ) return make(amin,mtt);
     if( i==amax.length ) return make(amax,mtt);
     return make( Arrays.copyOf(amax,i),mtt);
   }
   
+  @Override public TypeTuple ret() { throw com.cliffc.aa.AA.unimpl(); }
+  @Override public boolean above_center() { return false; }
   // True if all internals canBeConst
   @Override public boolean canBeConst() { return _tt.canBeConst(); }
   // True if all internals is_con

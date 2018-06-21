@@ -130,16 +130,8 @@ public class TypeTuple extends Type {
     for( Type t : _ts ) if( t._type==Type.TTUPLE ) return true;
     return false;
   }
-  @Override public TypeTuple ret() {
-    throw com.cliffc.aa.AA.unimpl();
-    //Type[] ts = new Type[_ts.length];
-    //for( int i=0; i<_ts.length; i++ )
-    //  ts[i] = ((TypeFun)_ts[i])._ret;
-    //return new TypeTuple(ts);
-  }
-  @Override public boolean above_center() {
-    return false;
-  }
+  @Override public TypeTuple ret() { throw com.cliffc.aa.AA.unimpl(); }
+  @Override public boolean above_center() { return false; }
   // True if all internals canBeConst
   @Override public boolean canBeConst() {
     for( Type _t : _ts ) if( !_t.canBeConst() ) return false;

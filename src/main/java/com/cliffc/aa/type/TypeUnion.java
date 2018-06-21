@@ -1,7 +1,6 @@
 package com.cliffc.aa.type;
 
 import com.cliffc.aa.util.Ary;
-import com.cliffc.aa.util.SB;
 
 import java.util.Comparator;
 
@@ -109,6 +108,7 @@ public class TypeUnion extends Type {
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TERROR: return ((TypeErr)t)._all ? t : this;
+    case TSTRUCT:
     case TTUPLE: return TypeErr.ALL; // Tuple-vs-scalar
     case TUNION: {
       // Handle the case where they are structurally equal
