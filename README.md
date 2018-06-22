@@ -10,33 +10,34 @@ GRAMMAR
 
 BNF                           | Comment
 ---                           | -------
-`prog = stmt END`             |
+`prog = stmts END`            |
 `stmts= stmt [; stmt]*[;]?`   | multiple statments; final ';' is optional
 `stmt = [id[:type]? =]* ifex` | ids must not exist, and are available in later statements
 `ifex = expr ? expr : expr`   | trinary logic
 `expr = term [binop term]*`   | gather all the binops and sort by prec
-`term = tfact`                | No function call
-`term = tfact ( [stmts,]* )+` | One or more function calls in a row, args (full stmts) are delimited
-`term = tfact tfact*`         | One function call, all the args listed
-`tfact= nfact[:type]`         | Optional type after a nfact
+`term = nfact [          `    | Any number of optional nfact modifiers
+` =         ([stmts,]*)  OR`  | A function call, args (full stmts) are comma-delimited
+` =         .field       OR`  | Field lookup; `.` is not quite a binary operator because 'field' is not a `str`
+` =         :type`            | Type annotation
+` ]*`                         | Any number of optional nfact modifiers
 `nfact= uniop* fact`          | Zero or more uniop calls over a fact
 `fact = id`                   | variable lookup
 `fact = num`                  | number
 `fact = "string"`             | string
 `fact = (stmts)`              | General statements parsed recursively
 `fact = {func}`               | Anonymous function declaration
-`fact = .{ [stmt,]* }`        | Anonymous struct   declaration
+`fact = .{ [id[:type]?[=stmt]?,]* }` | Anonymous struct declaration; optional type, optional initial value, optional final comma
 `fact = {binop}`              | Special syntactic form of binop; no spaces allowed; returns function constant
 `fact = {uniop}`              | Special syntactic form of uniop; no spaces allowed; returns function constant
 `binop= +-*%&|/<>!=`          | etc; primitive lookup; can determine infix binop at parse-time
 `uniop= -!~`                  | etc; primitive lookup; can determine infix uniop at parse-time
-`func = { [[id]* ->]? stmts}` | Anonymous function declaration
+`func = { [[id[:type]*]* ->]? stmts}` | Anonymous function declaration
 `str  = [.\%]*`               | String contents; \t\n\r\% standard escapes
 `str  = %[num]?[.num]?fact`   | Percent escape embeds a 'fact' in a string; "name=%name\n"
-`type = tcon`                 | Types are a tcon or a tfun
-`type = tfun`                 |
+`type = tcon | tfun | tstruct` | Types are a tcon or a tfun or a tstruct
 `tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str` | Primitive types
 `tfun = {[[type]* ->]? type }` | Function types mirror func decls
+`tstruct = .{ [id[:type],]*}` | Struct types are field names with optional types
 
 EXAMPLES
 --------
@@ -141,7 +142,22 @@ Type annotations  | ---
 `x=3; fun:{real->real}={x -> x*2}; fun(2.1)+fun(x)` | `10.4:flt` real covers both int and flt
 `fun:{real->flt32}={x -> x}; fun(123 )` | `123:int` Casts for free to real and flt32
 `fun:{real->flt32}={x -> x}; fun(123456789)` | `123456789 is not a flt32`
-
+Simple anonymous structure tests | ---
+`  .{x,y}`        | `.{x,y}` Simple anon struct decl
+`a=.{x=1.2,y}; x` | `Unknown ref 'x'`
+`a=.{x=1,x=2}`    | `Cannot define field '.x' twice`
+`a=.{x=1.2,y}; a.x` | `1.2:flt` Standard "." field naming
+`(a=.{x,y}; a.)`  | `Missing field name after '.'`
+`a=.{x,y}; a.x=1` | `Cannot re-assign field '.x'` No reassignment yet
+`a=.{x=0,y=1}; b=.{x=2}; c=math_rand(1)?a:b; c.x` | `:int8` Either 0 or 2; structs can be partially merged and used
+`a=.{x=0,y=1}; b=.{x=2}; c=math_rand(1)?a:b; c.y` | `Unknown field '.y'` Use fields must be fully available
+`dist={p->p.x*p.x+p.y*p.y}; dist(.{x=1})` | `Unknown field '.y'`  Field not available inside of function
+`dist={p->p.x*p.x+p.y*p.y}; dist(.{x=1,y=2})` | `5:int` Passing an anonymous struct
+`dist={p->p.x*p.x+p.y*p.y}; dist(.{x=1,y=2,z=3})` | `5:int` Extra fields OK
+`dist={p:.{x,y} -> p.x*p.x+p.y*p.y}; dist(.{x=1,y=2})` | `5:int` Structure typing on function args
+`a=.{x=(b=1.2)*b,y=b}; a.y` | `1.2:flt`  // Ok to re-use temp defs
+`a=.{x=(b=1.2)*b,y=x}; a.y` | `1.44:flt` // Ok to use early fields in later defs
+`a=.{x=(b=1.2)*b,y=b}; b` | `Unknown ref 'b'`  Structure def has a lexical scope
 
 
 Done Stuff

@@ -18,28 +18,29 @@ import java.util.BitSet;
  *  stmt = [id[:type]? =]* ifex // ids must not exist, and are available in later statements
  *  ifex = expr ? expr : expr   // trinary logic
  *  expr = term [binop term]*   // gather all the binops and sort by prec
- *  term = tfact                // No function call
- *  term = tfact ( [stmts,]* )+ // One or more function calls in a row, args (full stmts) are delimited
- // *  term = tfact tfact*         // One function call, all the args listed
- *  tfact= nfact[:type]?        // Optional type after a nfact
+ *  term = nfact [              // Any number of optional nfact modifiers
+ *       =   ([stmts,]*) OR     // A function call, args (full stmts) are comma-delimited
+ *       =   .field      OR     // Field lookup; not quite a binary operator because 'field' is not a Value
+ *       =   :type              // Type annotation
+ *       ]*                     // Any number of optional nfact modifiers
  *  nfact= uniop* fact          // Zero or more uniop calls over a fact
  *  fact = id                   // variable lookup
  *  fact = num                  // number
  *  fact = "str"                // string
  *  fact = (stmts)              // General statements parsed recursively
  *  fact = {func}               // Anonymous function declaration
- *  fact = .{ [stmt,]* }        // Anonymous struct   declaration
+ *  fact = .{ [id[:type]?[=stmt]?,]* } // Anonymous struct declaration; optional type, optional initial value, optional final comma
  *  fact = {binop}              // Special syntactic form of binop; no spaces allowed; returns function constant
  *  fact = {uniop}              // Special syntactic form of uniop; no spaces allowed; returns function constant
  *  binop= +-*%&|/<>!=          // etc; primitive lookup; can determine infix binop at parse-time
  *  uniop=  -!~                 // etc; primitive lookup; can determine infix uniop at parse-time
- *  func = { [[id]* ->]? stmts} // Anonymous function declaration
+ *  func = { [[id[:type]?]* ->]? stmts} // Anonymous function declaration
  *  str  = [.\%]*               // String contents; \t\n\r\% standard escapes
  *  str  = %[num]?[.num]?fact   // Percent escape embeds a 'fact' in a string; "name=%name\n"
- *  type = tcon                 // Types are a tcon or a tfun
- *  type = tfun
+ *  type = tcon | tfun | tstruct // Types are a tcon or a tfun or a tstruct
  *  tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str
  *  tfun = {[[type]* ->]? type }// Function types mirror func decls
+ *  tstruct = .{ [id[:type],]*} // Struct types are field names with optional types
  */
 
 public class Parse {
@@ -96,8 +97,8 @@ public class Parse {
     // Gather errors
     Ary<String> errs = null;
     Type tres = Env.lookup_valtype(res);    // Result type
-    if( tres instanceof TypeErr && tres != TypeErr.ALL && tres != TypeErr.ANY )
-      errs = add_err(errs,((TypeErr)tres)._msg);
+    String emsg = tres.errMsg();            // Error embedded in some subtype
+    if( emsg != null ) errs = add_err(errs,emsg);
     // Disallow forward-refs as top-level results
     if( res.is_forward_ref() )
       errs = add_err(errs,forward_ref_err(((EpilogNode)res).fun().name()));
@@ -156,7 +157,7 @@ public class Parse {
         _e.add(tok,ifex);       // Bind token to a value
       } else { // Handle forward referenced function definitions
         if( n.is_forward_ref() ) ((EpilogNode)n).merge_ref_def(_gvn,tok,(EpilogNode)ifex);
-        else err_ctrl0("Cannot re-assign ref '"+tok+"'");
+        else err_ctrl0("Cannot re-assign val '"+tok+"'");
       }
     }
     return ifex;
@@ -237,21 +238,28 @@ public class Parse {
     }
   }
 
-  /** Parse a function call, or not
-   *  term = tfact                // No function call
-   *  term = tfact ([stmts,]* )+  // One or more function calls in a row, each set of args are delimited
-   *  term = tfact tfact*         // One function call, all the args listed
+  /** Parse any number of optional function calls, field lookups and types
+   *  annotations.
+   *  term = nfact [
+   *           ([stmts,]*) |      // A function call, args (full stmts) are delimited
+   *           .field      |      // Field lookup; not quite a binary operator because 'field' is not a Value
+   *           :type              // Typed
+   *               ]*             // Any number of the above, in any order
    */
   private Node term() {
-    Node fun = tfact(), arg;         // tfactor
-    while( fun != null ) {           // Have tfact?
-      if( skipWS() == -1 ) return fun; // Just the original term
-      // Function application; parse out the argument list
-      try( CallNode args = new CallNode(errMsg()) ) {
-        args.add_def(ctrl());
-        args.add_def(fun);
-        if( peek('(') ) {               // Traditional fcn application
-          if( (arg=stmts()) != null ) { // Check for a no-arg fcn call
+    Node n = nfact();    // Start with an nfact
+    if( n == null ) return null;
+    while( true ) {        // Any number of calls, field loads, and type annotations
+      int oldx = _x;
+      switch( skipWS() ) {
+      case -1: return n;   // Just the original nfact
+      case '(':            // Function application; parse out the argument list
+        _x++;              // Skip paren
+        try( CallNode args = new CallNode(errMsg()) ) {
+          args.add_def(ctrl());
+          args.add_def(n);              // Function pointer
+          Node arg=stmts();             // First argument
+          if( arg != null ) {           // Check for a no-arg fcn call
             args.add_def(arg);          // Add first arg
             while( peek(',') ) {        // Gather comma-separated args
               if( (arg=stmts()) == null ) arg = con(err_ctrl("Missing argument in function call"));
@@ -259,37 +267,38 @@ public class Parse {
             }
           }
           require(')');
-        } else {                  // lispy-style fcn application
-          // TODO: Unable resolve ambiguity with mixing "(fun arg0 arg1)" and
-          // "fun(arg0,arg1)" argument calls.  Really having trouble with parsing
-          // "1-2", where "1" parses in the function position and "-2" is a uniop
-          // '-' applied to a 2: "-(2)".  This parses as the function "1" and its
-          // single arg "-(2)" - but "1" is not a function.
-          return args.del(1);     // No function call
-          //while( (arg = stmts()) != null ) // While have args
-          //  args.add_def(arg);            // Gather WS-separate args
-          //if( args.len()==1 ) return fun; // Not a function call
+          Type t = _gvn.type(n);
+          n = t.is_fun_ptr() // Require being able to tell n is a function ptr at parse-time
+            ? do_call(args)  // No syntax errors; flag Call not auto-close, and go again
+            // Syntax error; auto-close reclaim args; but go again
+            : con(err_ctrl("A function is being called, but "+t+" is not a function type"));
         }
-        Type t = _gvn.type(fun);
-        if( !t.is_fun_ptr() )
-          return con(err_ctrl("A function is being called, but "+t+" is not a function type"));
-        fun = do_call(args); // No syntax errors; flag Call not auto-close, and go again
+        break;
+
+      case '.':                 // Field parse
+        _x++;                   // Skip dot
+        String fld = token();   // Field name
+        n = fld == null         // Missing field?
+          ? con(err_ctrl("Missing field name after '.'"))
+          :  gvn(new LoadNode(n,fld,errMsg()));
+        if( peek('=') ) {       // Right now, field re-assigns of any type
+          Node stmt = stmt();
+          if( stmt == null ) n = con(err_ctrl("Missing stmt after assigning field '."+fld+"'"));
+          else { kill(stmt); n = con(err_ctrl("Cannot re-assign field '."+fld+"'")); }
+        }
+        break;
+
+      case ':':                 // Type parse
+        _x++;                   // Skip colon
+        Type t = type();
+        if( t==null ) { _x = oldx; return n; } // No error for missing type, because can be ?: instead
+        n = gvn(new TypeNode(t,n,errMsg()));
+        break;
+      default: return n;
       }
     }
-    return null;
   }
   
-  /** Parse a type after a fact
-   *  tfact = nfact[:type]
-   */
-  private Node tfact() {
-    Node n = nfact();
-    int oldx = _x;
-    if( n==null || !peek(':') ) return n;
-    Type t = type();
-    if( t==null ) { _x = oldx; return n; } // No error for missing type, because can be ?: instead
-    return gvn(new TypeNode(t,n,errMsg()));
-  }
   
   /** Parse any leading unary ops before a factor
    *  nfact = fact | uniop nfact
@@ -362,11 +371,19 @@ public class Parse {
   private Node func() {
     int oldx = _x;
     Ary<String> ids = new Ary<>(new String[1],0);
+    Ary<Type  > ts  = new Ary<>(new Type  [1],0);
+    Ary<Parse > bads= new Ary<>(new Parse [1],0);
     while( true ) {
       String tok = token();
       if( tok == null ) { ids.clear(); _x=oldx; break; } // not a "[id]* ->"
       if( tok.equals("->") ) break;
-      ids.add(tok);
+      Type t = TypeErr.ALL;    // Untyped, most generic type
+      Parse bad = errMsg();    // Capture location in case of type error
+      if( peek(':') )          // Has type annotation?
+        if( (t=type())==null ) throw AA.unimpl(); // return an error here
+      ids .add(tok);
+      ts  .add(t  );
+      bads.add(bad);
     }
     Node old_ctrl = ctrl();
     FunNode fun = init(new FunNode(ids._len,old_ctrl));
@@ -374,7 +391,8 @@ public class Parse {
       _e = e;                   // Push nested environment
       set_ctrl(fun);            // New control is function head
       int cnt=0;                // Add parameters to local environment
-      for( String id : ids )  _e.add(id,gvn(new ParmNode(cnt++,id,fun,con(Type.SCALAR))));
+      for( int i=0; i<ids._len; i++ )
+        _e.add(ids.at(i),gvn(new TypeNode(ts.at(i),gvn(new ParmNode(cnt++,ids.at(i),fun,con(TypeErr.ALL))),bads.at(i))));
       Node rpc = gvn(new ParmNode(-1,"rpc",fun,_gvn.con(TypeRPC.ALL_CALL)));
       Node rez = stmts();       // Parse function body
       require('}');             //
@@ -398,25 +416,30 @@ public class Parse {
       while( true ) {
         String tok = token();    // Scan for 'id'
         if( tok == null ) break; // end-of-struct-def
-        Type t = TypeErr.ANY;    // Untyped, most generic type
+        Type t = TypeErr.ALL;    // Untyped, most generic type
         if( peek(':') )          // Has type annotation?
           if( (t=type())==null ) throw AA.unimpl(); // return an error here
         Node stmt = con(TypeErr.ANY);
         if( peek('=') )
           if( (stmt=stmt())==null ) throw AA.unimpl(); // return an error here
         stmt = gvn(new TypeNode(t,stmt,errMsg()));
-        Node n = e._scope.get(tok);
-        if( n!=null ) return con(err_ctrl("Cannot define field '"+tok+"' twice"));
-        e._scope.add(tok,stmt); // Field now available 'bare' inside rest of scope
-        toks.add(tok);          // Gather for final type
-        ts  .add(t  );
-        if( !peek(',') ) break;
+        if( e._scope.get(tok)!=null ) {
+          kill(stmt);
+          t = err_ctrl("Cannot define field '." + tok + "' twice");
+          e._scope.update(tok,con(t),_gvn);
+          ts.set(toks.find(fld -> fld.equals(tok)),t);
+        } else {
+          e._scope.add(tok,stmt); // Field now available 'bare' inside rest of scope
+          toks.add(tok);          // Gather for final type
+          ts  .add(_gvn.type(stmt));
+        }
+        if( !peek(',') ) break; // Final comma is optional
       }
       require('}');
       _e = _e._par;             // Pop nested environment
       TypeStruct tstr = TypeStruct.make(toks.asAry(), TypeTuple.make(ts.asAry()));
-      throw AA.unimpl();
-      //return gvn(new NewNode(ctrl(),tstr,e._scope);
+      Node[] flds = e._scope.get(toks);
+      return gvn(new NewNode(tstr,flds));
     }
   }
   
@@ -463,10 +486,10 @@ public class Parse {
   }
 
   /** Parse a type or return null
-   *  type = tcon                 // Types are a tcon or a tfun
-   *  type = tfun
+   *  type = tcon | tfun | tstruct   // Types are a tcon or a tfun or a tstruct
    *  tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str
    *  tfun = {[[type]* ->]? type }// Function types mirror func decls
+   *  tstruct = .{ [id[:type],]*} // Struct types are field names with optional types
    */
   private Type type() {
     Type t = type0();
@@ -474,28 +497,49 @@ public class Parse {
   }
   // Type or null or TypeErr.ANY for '->' token
   private Type type0() {
-    if( !peek('{') ) {          // Primitive type, not function type
-      int oldx = _x;
-      String tok = token();
-      if( tok==null ) return null;
-      if( tok.equals("->") ) return TypeErr.ANY; // Found ->
-      Type t = _e.lookup_type(tok);
-      if( t==null ) _x = oldx;  // Unwind if not a known type
-      return t;
+    byte c = skipWS();
+    if( peek1(c,'{') ) { // Function type
+      Ary<Type> ts = new Ary<>(new Type[1],0);  Type t;
+      while( (t=type0()) != null && t != TypeErr.ANY  )
+        ts.add(t);              // Collect arg types
+      Type ret;
+      if( t==TypeErr.ANY ) {    // Found ->, expect return type
+        ret = type0();
+        if( ret == null ) throw AA.unimpl(); // should return TypeErr missing type after ->
+      } else {                  // Allow no-args and simple return type
+        if( ts._len != 1 ) throw AA.unimpl(); // should return TypeErr missing -> in tfun
+        ret = ts.pop();         // Get single return type
+      }
+      require('}');
+      return TypeTuple.make_fun_ptr(TypeFun.make(TypeTuple.make(ts.asAry()),ret,Bits.FULL));
     }
-    Ary<Type> ts = new Ary<>(new Type[1],0);  Type t;
-    while( (t=type0()) != null && t != TypeErr.ANY  )
-      ts.add(t);                // Collect arg types
-    Type ret;
-    if( t==TypeErr.ANY ) {      // Found ->, expect return type
-      ret = type0();
-      if( ret == null ) return null;
-    } else {                    // Allow no-args and simple return type
-      if( ts._len != 1 ) return null;
-      ret = ts.pop();           // Get single return type
+
+    if( peek2(c,".{") ) { // Struct type
+      Ary<String> flds = new Ary<>(new String[1],0);
+      Ary<Type  > ts   = new Ary<>(new Type  [1],0);
+      while( true ) {
+        String tok = token();    // Scan for 'id'
+        if( tok == null ) break; // end-of-struct-def
+        Type t = TypeErr.ALL;    // Untyped, most generic type
+        if( peek(':') )          // Has type annotation?
+          if( (t=type())==null ) throw AA.unimpl(); // return an error here, missing type
+        if( flds.find(tok) != -1 ) throw AA.unimpl(); // cannot use same field name twice
+        flds.add(tok);          // Gather for final type
+        ts  .add(t  );
+        if( !peek(',') ) break; // Final comma is optional
+      }
+      require('}');
+      return TypeStruct.make(flds.asAry(), TypeTuple.make(ts.asAry()));
     }
-    require('}');
-    return TypeTuple.make_fun_ptr(TypeFun.make(TypeTuple.make(ts.asAry()),ret,Bits.FULL));
+
+    // Primitive type
+    int oldx = _x;
+    String tok = token();
+    if( tok==null ) return null;
+    if( tok.equals("->") ) return TypeErr.ANY; // Found -> return sentinal
+    Type t = _e.lookup_type(tok);
+    if( t==null ) _x = oldx;  // Unwind if not a known type
+    return t;
   }
 
   // Require a specific character (after skipping WS) or polite error

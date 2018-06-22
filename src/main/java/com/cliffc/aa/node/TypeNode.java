@@ -14,7 +14,7 @@ public class TypeNode extends Node {
   final Type _t;            // TypeVar???
   final Parse _error_parse; // Used for error messages
   public TypeNode( Type t, Node n, Parse P ) { super(OP_TYPE,null,n); _t=t; _error_parse = P; }
-  @Override String xstr() { return "@"+_t; }
+  @Override String xstr() { return ":"+_t; }
   @Override public Node ideal(GVNGCM gvn) {
     Node arg=at(1);
     Type t = gvn.type(arg);

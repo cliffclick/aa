@@ -6,21 +6,6 @@ import org.junit.Test;
 
 public class TestType {
   @Test public void testType0() {
-    // simple anon struct tests
-    test   ("  .{x,y}", TypeTuple.make(TypeInt.FALSE,TypeInt.FALSE)); // simple anon struct decl
-    //testerr("a=.{x=1.2,y}; x", "bare field name does not escape","");
-    //test   ("a=.{x=1.2,y}; a.x", TypeFlt.con(1.2)); // standard "." field naming
-    //testerr("a=.{x,y}; a.x=1","Cannot re-assign _.x","");
-    //test   ("a=.{x=0,y=1}; b=.{x=2}; c=math_rand(1)?a:b; c.x", TypeInt.INT8); // either 0 or 2
-    //testerr("a=.{x=0,y=1}; b=.{x=2}; c=math_rand(1)?a:b; c.y",  "Unknown ref _.y","");
-    //testerr("dist={p->p.x*p.x+p.y+p.y}; dist(.{x=1})", "Unknown ref _.y","");   // missing field
-    //test   ("dist={p->p.x*p.x+p.y+p.y}; dist(.{x=1,y=2})", TypeInt.con(5));     // passed in to func
-    //test   ("dist={p->p.x*p.x+p.y+p.y}; dist(.{x=1,y=2,z=3})", TypeInt.con(5)); // extra fields OK
-    //testerr("a=.{x=1,x=2}", "cannot redefine .x","");
-    //testerr("a=.{x=(b=1.2)*b,y=b}; b", "temp name does not escape","");
-    //test   ("a=.{x=(b=1.2)*b,y=b}; a.y", TypeFlt.con(1.2)); // ok to use temp defs
-    //test   ("a=.{x=(b=1.2)*b,y=x}; a.y", TypeFlt.con(1.44)); // ok to use early fields in later defs
-
     // Simple int
     test("1",   TypeInt.TRUE);
     // Unary operator
@@ -58,7 +43,7 @@ public class TestType {
     // error; mismatch arg count
     testerr("!()"       , "Call to unary function '!', but missing the one required argument"," ");
     testerr("math_pi(1)", "A function is being called, but 3.141592653589793 is not a function type","          ");
-    testerr("{+}(1,2,3)", "Passing 3 arguments to +{flt64 flt64 -> flt64} which takes 2 arguments","   ");
+    testerr("{+}(1,2,3)", "Passing 3 arguments to +{flt64 flt64 -> flt64} which takes 2 arguments","    ");
 
     // Parsed as +(1,(2*3))
     test("{+}(1, 2 * 3) ", TypeInt.con(7));
@@ -79,7 +64,7 @@ public class TestType {
     test("x=2; y=x+1; x*y", TypeInt.con(6));
     // Re-use ref immediately after def; parses as: x=(2*3); 1+x+x*x
     test("1+(x=2*3)+x*x", TypeInt.con(1+6+6*6));
-    testerr("x=(1+(x=2)+x)", "Cannot re-assign ref 'x'","             ");
+    testerr("x=(1+(x=2)+x)", "Cannot re-assign val 'x'","             ");
 
     // Conditional:
     test   ("0 ?    2  : 3", TypeInt.con(3)); // false
@@ -92,7 +77,7 @@ public class TestType {
     testerr("0 ? (x=2) : 3;x", "'x' not defined on false arm of trinary","             ");
     test   ("2 ? (x=2) : 3;x", TypeInt.con(2)); // off-side is constant-dead, so missing x-assign is ignored
     test   ("2 ? (x=2) : y  ", TypeInt.con(2)); // off-side is constant-dead, so missing 'y'      is ignored
-    testerr("x=1;2?(x=2):(x=3);x", "Cannot re-assign ref 'x'","          ");
+    testerr("x=1;2?(x=2):(x=3);x", "Cannot re-assign val 'x'","          ");
     test   ("x=1;2?   2 :(x=3);x",TypeInt.con(1)); // Re-assigned allowed & ignored in dead branch
     testerr("1:","Syntax error; trailing junk"," "); // missing type
     test   ("math_rand(1)?1:int:2:int",TypeInt.INT8); // no ambiguity between conditionals and type annotations
@@ -153,6 +138,9 @@ public class TestType {
     test("fun:{real->flt32}={x -> x}; fun(0.125)", TypeFlt.con(0.125));
     testerr("fun:{real->flt32}={x -> x}; fun(123456789)", "123456789 is not a flt32","                          ");
 
+    test   ("{x:int -> x*2}(1)", TypeInt.con(2)); // Types on parms
+    testerr("{x:str -> x}(1)", "1 is not a str", "  ");
+
     // Recursive:
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
     test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)",TypeInt.INT64);
@@ -160,6 +148,23 @@ public class TestType {
     // Co-recursion requires parallel assignment & type inference across a lexical scope
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.TRUE );
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(5)", TypeInt.FALSE );
+
+    // simple anon struct tests
+    test   ("  .{x,y}", TypeStruct.make(new String[]{"x","y"},TypeTuple.ANY)); // simple anon struct decl
+    testerr("a=.{x=1.2,y}; x", "Unknown ref 'x'","               ");
+    test   ("a=.{x=1.2,y}; a.x", TypeFlt.con(1.2)); // standard "." field naming
+    testerr("a=.{x,y}; a.x=1","Cannot re-assign field '.x'","               ");
+    test   ("a=.{x=0,y=1}; b=.{x=2}; c=math_rand(1)?a:b; c.x", TypeInt.INT8); // either 0 or 2
+    testerr("a=.{x=0,y=1}; b=.{x=2}; c=math_rand(1)?a:b; c.y",  "Unknown field '.y'","                                               ");
+    testerr("dist={p->p.x*p.x+p.y*p.y}; dist(.{x=1})", "Unknown field '.y'","                    ");
+    test   ("dist={p->p.x*p.x+p.y*p.y}; dist(.{x=1,y=2})", TypeInt.con(5));     // passed in to func
+    test   ("dist={p->p.x*p.x+p.y*p.y}; dist(.{x=1,y=2,z=3})", TypeInt.con(5)); // extra fields OK
+    test   ("dist={p:.{x,y} -> p.x*p.x+p.y*p.y}; dist(.{x=1,y=2})", TypeInt.con(5)); // Typed func arg
+    testerr("a=.{x=1,x=2}", "Cannot define field '.x' twice","           ");
+    testerr("a=.{x=(b=1.2)*b,y=b}; b", "Unknown ref 'b'","                       ");
+    testerr("(a=.{x,y}; a.)", "Missing field name after '.'","             ");
+    test   ("a=.{x=(b=1.2)*b,y=b}; a.y", TypeFlt.con(1.2 )); // ok to use temp defs
+    test   ("a=.{x=(b=1.2)*b,y=x}; a.y", TypeFlt.con(1.44)); // ok to use early fields in later defs
 
     // TODO: Need real TypeVars for these
     //test("id:{A->A}"    , Env.lookup_valtype("id"));
@@ -170,27 +175,6 @@ public class TestType {
   /*
 
 // 0:int is the uniform initial value, counts as null; free cast to null
-
-// anon struct decls
-// no un-init values; always take a default init
-// no re-assignment YET, so default is also final
-.{ x, y } // no initial value and no reassignment semantics yet; "feels like" C
-.{ x=1.1, y=2.2, } // with initial values
-a = {x,y}; a.x=1; // Cannot re-assign, so x,y are stuck at zero
-// a.x is a LHS value; makes it a parser-aware thing
-a=.{x=0  ,y=2.2}
-b=.{x=1.2,y=2.3}
-c=rand?a:b; 
-c.x=1; // cannot re-assign
-c.x;   // return either 0 or 1.2 or flt
-dist={p->p.x*p.x+p.y*p.y}; dist(a); // valid
-
-b={x="hello", y=2.2}
-c=rand?a:b; 
-c.x; // either 0/null or "hello"
-
-x=0; y=1.2; z="abc"; c=rand?x:y; d=rand?x:z; str(c)+d; // "0 or 1.2"+"null or hello"
-
 
 
 // With re-assignment, more excitement around LHS!
@@ -321,11 +305,6 @@ x := 1; x = x; // 1; make x final
   // TODO: Observation: value() calls need to be monotonic, can test this.
   @Test public void testCommuteSymmetricAssociative() {
     // Uncomment to insert a single test to focus on
-    Type prim = TypeFun.make(TypeTuple.INT64_INT64,TypeInt.INT64,17);
-    Type gen = TypeFun.make_generic();
-    Type mt = gen.meet(prim);
-    Assert.assertSame(mt, gen);
-    Assert.assertTrue(prim.isa(gen));
     Assert.assertTrue(Type.check_startup());
   }  
 }

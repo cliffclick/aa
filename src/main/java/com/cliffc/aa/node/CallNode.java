@@ -115,7 +115,7 @@ public class CallNode extends Node implements AutoCloseable {
       Type formal = formals.at(i);
       Type actual = gvn.type(arg(i));
       byte xcvt = actual.isBitShape(formal);
-      if( xcvt == 99 ) throw AA.unimpl(); // Error cases should not reach here
+      if( xcvt == 99 ) return null;
       if( xcvt == -1 ) return null;       // Wait for call args to resolve
       if( xcvt == 1 ) {
         PrimNode cvt = PrimNode.convert(_defs.at(i+2),actual,formal);
@@ -241,7 +241,7 @@ public class CallNode extends Node implements AutoCloseable {
       Type formal = formals.at(j);
       if( actual instanceof TypeErr && !actual.above_center() ) { // Actual is an error, so call result is the same error
         terr = terr.meet(actual);
-        actual = Type.SCALAR;   // Lift actual to worse-case valid argument type
+        actual = formal;   // Lift actual to worse-case valid argument type
       }
       if( !actual.isa(formal) ) // Actual is not a formal; accumulate type errors
         terr = terr.meet(TypeErr.make(_badargs.typerr(actual, formal), actual, formal, false));

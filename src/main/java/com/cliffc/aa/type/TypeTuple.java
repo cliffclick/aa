@@ -159,4 +159,12 @@ public class TypeTuple extends Type {
     return is_fun_ptr() && ((TypeFun)_ts[3]).is_forward_ref();
   }
   public TypeFun get_fun() { assert is_fun_ptr(); return (TypeFun)_ts[3]; }
+  // Return an error message, if any exists
+  @Override public String errMsg() {
+    String s;
+    for( Type t : _ts )
+      if( (s=t.errMsg()) != null )
+        return s;
+    return null;
+  }
 }

@@ -2,6 +2,7 @@ package com.cliffc.aa;
 
 import com.cliffc.aa.node.*;
 import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeErr;
 import com.cliffc.aa.util.Ary;
 
 import java.util.Arrays;
@@ -219,10 +220,15 @@ public class GVNGCM {
       add_work(old);            // Re-run old, until no progress
       return;
     }
-    if( check_new(nnn) ) rereg(nnn); // Replacement in system
-    // if old is being replaced, it got removed from GVN table and types table.
-    assert !check_opt(old);
-    if( !old.is_dead() ) subsume(old,nnn);
+    if( check_new(nnn) ) {      // If new, replace back in GVN
+      setype(nnn,nnn.value(this));// Can compute a better value
+      _vals.put(nnn,nnn);
+      add_work0(nnn);
+    }
+    if( !old.is_dead() ) { // if old is being replaced, it got removed from GVN table and types table.
+      assert !check_opt(old);
+      subsume(old,nnn);
+    }
   }
   /** Look for a better version of 'n'.  Can change n's defs via the ideal()
    *  call, including making new nodes.  Can replace 'n' wholly, with n's uses
@@ -355,7 +361,7 @@ public class GVNGCM {
       Node n = nodes.atX(i);
       if( n != null && t.canBeConst() && !(n instanceof ConNode) )
         throw AA.unimpl();
-      if( n instanceof CastNode ) { // TODO: Fold into CastNode.ideal
+      if( !(t instanceof TypeErr) && n instanceof CastNode ) { // TODO: Fold into CastNode.ideal
         assert t.isa(((CastNode)n)._t);
         if( t != (((CastNode)n)._t)) {
           unreg(n);

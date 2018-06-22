@@ -1,10 +1,14 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.*;
+import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeErr;
 import com.cliffc.aa.type.TypeTuple;
 
-// Regain precision after a call
+// Regain precision after a call.  Calls return some intended value which
+// varies by call-site; e.g. map({A->B}, A[]) returns B[] - but the B type
+// varies by call-site.  This Cast is used to "up-lift" call return values.
+// Calls can ALSO return e.g. some TypeErr.
 public class CastNode extends Node {
   public final Type _t;                // TypeVar???
   public CastNode( Node ctrl, Node ret, Type t ) { super(OP_CAST,ctrl,ret); _t=t; }
@@ -34,6 +38,8 @@ public class CastNode extends Node {
   @Override public Type value(GVNGCM gvn) {
     Type t0 = gvn.type(at(1));
     Type t1 = at(1) instanceof EpilogNode ? ((TypeTuple)t0)._ts[1] : t0;
+    if( t1 instanceof TypeErr && !t1.above_center() )
+      return t1; // Preserve error returns
     return _t.join(t1);
   }
 }

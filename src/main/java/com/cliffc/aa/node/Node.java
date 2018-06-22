@@ -10,25 +10,27 @@ import java.util.BitSet;
 
 // Sea-of-Nodes
 public abstract class Node implements Cloneable {
-  static final byte OP_CALL = 1;
-  static final byte OP_CAST = 2;
-  static final byte OP_CON  = 3;
-  static final byte OP_ERR  = 4;
-  static final byte OP_FUN  = 5;
-  static final byte OP_IF   = 6;
-  static final byte OP_PARM = 7;
-  static final byte OP_PHI  = 8;
-  static final byte OP_PRIM = 9;
-  static final byte OP_PROJ =10;
-  static final byte OP_REGION=11;
-  static final byte OP_RPC  =12;
-  static final byte OP_SCOPE=13;
-  static final byte OP_TMP  =14;
-  static final byte OP_TYPE =15;
-  static final byte OP_EPI  =16;
-  static final byte OP_UNR  =17;
-  static final byte OP_MAX  =18;
-  private static final String[] STRS = new String[] { null, "Call", "Cast", "Con", "Err", "Fun", "If", "Parm", "Phi", "Prim", "Proj", "Region", "RPC", "Scope", "Tmp", "Type", "Epilog", "Unresolved" };
+  static final byte OP_CALL  = 1;
+  static final byte OP_CAST  = 2;
+  static final byte OP_CON   = 3;
+  static final byte OP_EPI   = 4;
+  static final byte OP_ERR   = 5;
+  static final byte OP_FUN   = 6;
+  static final byte OP_IF    = 7;
+  static final byte OP_LOAD  = 8;
+  static final byte OP_NEW   = 9;
+  static final byte OP_PARM  =10;
+  static final byte OP_PHI   =11;
+  static final byte OP_PRIM  =12;
+  static final byte OP_PROJ  =13;
+  static final byte OP_REGION=14;
+  static final byte OP_RPC   =15;
+  static final byte OP_SCOPE =16;
+  static final byte OP_TMP   =17;
+  static final byte OP_TYPE  =18;
+  static final byte OP_UNR   =19;
+  static final byte OP_MAX   =20;
+  private static final String[] STRS = new String[] { null, "Call", "Cast", "Con", "Epi", "Err", "Fun", "If", "Load", "New", "Parm", "Phi", "Prim", "Proj", "Region", "RPC", "Scope", "Tmp", "Type", "Unresolved" };
 
   public int _uid=Env._gvn.uid(); // Unique ID, will have gaps, used to give a dense numbering to nodes
   final byte _op;

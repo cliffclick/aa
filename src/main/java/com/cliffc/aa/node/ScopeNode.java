@@ -1,6 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.*;
+import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeErr;
 import java.util.HashMap;
@@ -18,6 +19,13 @@ public class ScopeNode extends Node {
   public Node get(String name) {
     Integer ii = _vals.get(name);
     return ii==null ? null : _defs.at(ii);
+  }
+  // Get a set of names into an array.  Skip zero, which is control.
+  public Node[] get( Ary<String> names ) {
+    Node[] ns = new Node[names._len+1];
+    for( int i=0; i<names._len; i++ )
+      ns[i+1] = get(names.at(i));
+    return ns;
   }
   
   // Add a Node to an UnresolvedNode.  Must be a function.

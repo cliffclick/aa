@@ -5,8 +5,8 @@ import java.util.Arrays;
 
 /** A Tuple with named fields */
 public class TypeStruct extends Type {
-  private String[] _args;        // The field names
-  private TypeTuple _tt;         // The field types
+  public String[] _args;        // The field names
+  public TypeTuple _tt;         // The field types
   private TypeStruct( String[] args, TypeTuple tt ) { super(TSTRUCT); init(args,tt); }
   private void init( String[] args, TypeTuple tt ) {
     _args = args;
@@ -82,6 +82,14 @@ public class TypeStruct extends Type {
     if( i==amax.length ) return make(amax,mtt);
     return make( Arrays.copyOf(amax,i),mtt);
   }
+
+  // Return the index of the matching field, or -1 if not found
+  public int find( String fld ) {
+    for( int i=0; i<_args.length; i++ )
+      if( fld.equals(_args[i]) )
+        return i;
+    return -1;
+  }
   
   @Override public TypeTuple ret() { throw com.cliffc.aa.AA.unimpl(); }
   @Override public boolean above_center() { return false; }
@@ -89,4 +97,5 @@ public class TypeStruct extends Type {
   @Override public boolean canBeConst() { return _tt.canBeConst(); }
   // True if all internals is_con
   @Override public boolean is_con() { return _tt.is_con(); }
+  @Override public String errMsg() { return _tt.errMsg(); }
 }

@@ -368,12 +368,15 @@ public class Type {
 
     throw typerr(t);  // Overridden in subtypes
   }
-  // "widen" a narrow type for type-specialization.
+  // "widen" a narrow type for primitive type-specialization.
   // e.g. "3" becomes "int64".
   public Type widen() { return this; } // Overridden in subclasses
+  // Operator precedence
+  public byte op_prec() { return -1; } // Overridden in subclasses
+  // Contains an error type string, perhaps embedded in some subtype
+  public String errMsg() { return null; }
+  
   RuntimeException typerr(Type t) {
     throw new RuntimeException("Should not reach here: internal type system error with "+this+(t==null?"":(" and "+t)));
   }
-  // Operator precedence
-  public byte op_prec() { return -1; } // Overridden in subclasses
 }

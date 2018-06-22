@@ -1,7 +1,8 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.*;
+import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeErr;
 
 // Merge results; extended by ParmNode
 public class PhiNode extends Node {
@@ -19,7 +20,7 @@ public class PhiNode extends Node {
     RegionNode r = (RegionNode)at(0);
     assert r._defs._len==_defs._len;
     if( r._cidx != 0 ) return gvn.type(at(r._cidx)); // Region has collapsed to a Copy, no need to run full merge
-    Type t = Type.XSCALAR;
+    Type t = TypeErr.ANY;
     for( int i=1; i<_defs._len; i++ )
       if( gvn.type(r.at(i))!=Type.XCTRL ) // Only meet alive paths
         t = t.meet(gvn.type(at(i)));

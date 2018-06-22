@@ -35,7 +35,7 @@ public class UnresolvedNode extends Node {
   // ALL to the JOIN.  This is common for non-inlined calls where the unknown
   // arguments are approximated as SCALAR.  Lossless conversions are allowed as
   // part of a valid isa test.  As soon as some function returns something
-  // other than ALL (because args apply), it supercedes other choices- which
+  // other than ALL (because args apply), it supersedes other choices- which
   // can be dropped.
 
   // If more than one choice applies, then the choice with fewest costly
