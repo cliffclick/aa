@@ -29,12 +29,12 @@ BNF                           | Comment
 `fact = .{ [id[:type]?[=stmt]?,]* }` | Anonymous struct declaration; optional type, optional initial value, optional final comma
 `fact = {binop}`              | Special syntactic form of binop; no spaces allowed; returns function constant
 `fact = {uniop}`              | Special syntactic form of uniop; no spaces allowed; returns function constant
-`binop= +-*%&|/<>!=`          | etc; primitive lookup; can determine infix binop at parse-time
+`binop= +-*%&/<>!=`           | etc; primitive lookup; can determine infix binop at parse-time, also pipe but GFM screws up
 `uniop= -!~`                  | etc; primitive lookup; can determine infix uniop at parse-time
 `func = { [[id[:type]*]* ->]? stmts}` | Anonymous function declaration
 `str  = [.\%]*`               | String contents; \t\n\r\% standard escapes
 `str  = %[num]?[.num]?fact`   | Percent escape embeds a 'fact' in a string; "name=%name\n"
-`type = tcon | tfun | tstruct` | Types are a tcon or a tfun or a tstruct
+`type = tcon OR tfun OR tstruct` | Types are a tcon or a tfun or a tstruct
 `tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str` | Primitive types
 `tfun = {[[type]* ->]? type }` | Function types mirror func decls
 `tstruct = .{ [id[:type],]*}` | Struct types are field names with optional types
