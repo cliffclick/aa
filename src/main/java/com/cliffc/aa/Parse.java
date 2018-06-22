@@ -414,8 +414,8 @@ public class Parse {
       }
       require('}');
       _e = _e._par;             // Pop nested environment
+      TypeStruct tstr = TypeStruct.make(toks.asAry(), TypeTuple.make(ts.asAry()));
       throw AA.unimpl();
-      //TypeStruct tstr = TypeStruct.make(toks, TypeTuple.make(ts.asAry()));
       //return gvn(new NewNode(ctrl(),tstr,e._scope);
     }
   }

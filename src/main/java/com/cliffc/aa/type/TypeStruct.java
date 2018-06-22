@@ -9,7 +9,6 @@ public class TypeStruct extends Type {
   private TypeTuple _tt;         // The field types
   private TypeStruct( String[] args, TypeTuple tt ) { super(TSTRUCT); init(args,tt); }
   private void init( String[] args, TypeTuple tt ) {
-    assert args.length<=tt._ts.length;
     _args = args;
     _tt = tt;
   }
@@ -24,7 +23,7 @@ public class TypeStruct extends Type {
   @Override public String toString() {
     SB sb = new SB().p("[");
     for( int i=0; i<_args.length; i++ )
-      sb.p(_args[i]).p(':').p(_tt._ts[i].toString()).p(',');
+      sb.p(_args[i]).p(':').p(_tt.at(i).toString()).p(',');
     return sb.p(_tt._inf.toString()).p("...]").toString();
   }
 
