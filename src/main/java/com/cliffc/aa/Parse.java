@@ -79,7 +79,7 @@ public class Parse {
   private TypeEnv prog() {
     // Currently only supporting exprs
     Node res = stmts();
-    if( res == null ) res = con(TypeErr.ALL);
+    if( res == null ) res = con(TypeErr.ANY);
     _e._scope.add_def(ctrl());  // Hook, so not deleted
     _e._scope.add_def(res);     // Hook, so not deleted
     // Delete names at the top scope before final optimization.
@@ -105,10 +105,17 @@ public class Parse {
     // Hunt for typing errors in the alive code
     assert par._par==null;      // Top-level only
     BitSet bs = new BitSet();
+    bs.set(0);                  // Do not walk initial scope (primitives and constants only)
     bs.set(_e._scope._uid);     // Do not walk top-level scope
     if( errs == null ) errs = res.walkerr_def(errs,bs,_gvn);
     if( errs == null ) errs = _e._scope.walkerr_use(null,new BitSet(),_gvn);
     if( errs == null && skipWS() != -1 ) errs = add_err(null,errMsg("Syntax error; trailing junk"));
+    if( errs == null ) {        // Final check for bad GC
+      bs.clear();
+      bs.set(0);   // Do not walk initial scope (primitives and constants only)
+      bs.set(_e._scope._uid);   // Do not walk top-level scope
+      res.walkerr_gc(bs,_gvn);
+    }
     kill(res);
     return new TypeEnv(tres,_e,errs);
   }
@@ -188,8 +195,9 @@ public class Parse {
       ctrls.add_def(ctrl()); // 4 - hook false-side control
       ScopeNode f_scope = _e._scope.split(vidx); // Split out the new vars on the false side
       set_ctrl(init(new RegionNode(null,ctrls.at(2),ctrls.at(4))));
-      _e._scope.common(this,t_scope,f_scope); // Add a PhiNode for all commonly defined variables
-      _e._scope.add_def(gvn(new PhiNode(ctrl(),ctrls.at(1),ctrls.at(3)))); // Add a PhiNode for the result
+      String errmsg = errMsg("Cannot mix GC and non-GC types");
+      _e._scope.common(this,errmsg,t_scope,f_scope); // Add a PhiNode for all commonly defined variables
+      _e._scope.add_def(gvn(new PhiNode(errmsg,ctrl(),ctrls.at(1),ctrls.at(3)))); // Add a PhiNode for the result
     }
     return _e._scope.pop();
   }
@@ -390,11 +398,13 @@ public class Parse {
     try( Env e = new Env(_e) ) {// Nest an environment for the local vars
       _e = e;                   // Push nested environment
       set_ctrl(fun);            // New control is function head
+      String errmsg = errMsg("Cannot mix GC and non-GC types");      
       int cnt=0;                // Add parameters to local environment
       for( int i=0; i<ids._len; i++ )
-        _e.add(ids.at(i),gvn(new TypeNode(ts.at(i),gvn(new ParmNode(cnt++,ids.at(i),fun,con(TypeErr.ALL))),bads.at(i))));
-      Node rpc = gvn(new ParmNode(-1,"rpc",fun,_gvn.con(TypeRPC.ALL_CALL)));
+        _e.add(ids.at(i),gvn(new TypeNode(ts.at(i),gvn(new ParmNode(cnt++,ids.at(i),fun,con(TypeErr.ALL),errmsg)),bads.at(i))));
+      Node rpc = gvn(new ParmNode(-1,"rpc",fun,_gvn.con(TypeRPC.ALL_CALL),null));
       Node rez = stmts();       // Parse function body
+      if( rez == null ) rez = con(err_ctrl("Missing function body"));
       require('}');             //
       Node epi = gvn(new EpilogNode(ctrl(),rez,rpc,fun));
       _e = _e._par;             // Pop nested environment

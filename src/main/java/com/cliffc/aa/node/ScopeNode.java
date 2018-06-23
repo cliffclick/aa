@@ -88,13 +88,13 @@ public class ScopeNode extends Node {
   }
 
   // Add PhiNodes and variable mappings for common definitions
-  public void common( Parse P, ScopeNode t, ScopeNode f ) {
+  public void common( Parse P, String errmsg, ScopeNode t, ScopeNode f ) {
     if( t!=null ) {  // Might have some variables in common
       for( String name : t._vals.keySet() ) {
         Node tn = t.at(t._vals.get(name));
         Integer fii = f==null ? null : f._vals.get(name);
         Node fn = fii==null ? undef(P,tn,name,false) : f.at(fii); // Grab false-side var
-        add_phi(P,name,tn,fn);
+        add_phi(P,errmsg,name,tn,fn);
       }
     }
     if( f!=null ) {  // Might have some variables in common
@@ -103,7 +103,7 @@ public class ScopeNode extends Node {
         Integer tii = t==null ? null : t._vals.get(name);
         if( tii == null ) {     // Only defined on one branch
           Node tn = undef(P,fn,name,true); // True-side var
-          add_phi(P,name,tn,fn);
+          add_phi(P,errmsg,name,tn,fn);
         } // Else values defined on both branches already handled
       }
     }
@@ -115,8 +115,8 @@ public class ScopeNode extends Node {
     return xn.is_forward_ref() ? xn
       : Env._gvn.con(TypeErr.make(P.errMsg("'"+name+"' not defined on "+arm+" arm of trinary")));
   }
-  private void add_phi(Parse P, String name, Node tn, Node fn) {
-    add(name,tn==fn ? fn : P.gvn(new PhiNode(P.ctrl(),tn,fn)));
+  private void add_phi(Parse P, String errmsg, String name, Node tn, Node fn) {
+    add(name,tn==fn ? fn : P.gvn(new PhiNode(errmsg, P.ctrl(),tn,fn)));
   }
   
   @Override public Node ideal(GVNGCM gvn) { return null; }

@@ -44,13 +44,13 @@ public class TypeStr extends Type {
     case TSTR:   break;
     case TINT:   return TypeUnion.make(false,STR,t);
     case TFLT:   return TypeUnion.make(false,STR,t);
+    case TSTRUCT:
+    case TTUPLE: return Type.OOP;
     case TRPC:
     case TFUN:   return Type.SCALAR;
     case TERROR: return ((TypeErr)t)._all ? t : this;
     case TCTRL:
-    case TXCTRL:
-    case TSTRUCT:
-    case TTUPLE: return TypeErr.ALL;
+    case TXCTRL: return TypeErr.ALL;
     case TUNION: return t.xmeet(this); // Let TypeUnion decide
     default: throw typerr(t);
     }

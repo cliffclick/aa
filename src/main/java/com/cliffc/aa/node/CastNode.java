@@ -20,9 +20,8 @@ public class CastNode extends Node {
     // so on a split we can move all these data uses to the old or the new
     // Epilog by just moving the cast.  Once an Epilog can no longer split, we
     // can remove useless casts.
-    Node ctrl = at(0);
     Node data = at(1);
-    if( ctrl instanceof RPCNode && data instanceof EpilogNode && ctrl.at(0) == data ) {
+    if( data instanceof EpilogNode ) {
       // Note that the control-edge cannot go away (since its an up-cast) but
       // the data edge can refine.
       Node x = data.is_copy(gvn,1); // If the Epilog collapses

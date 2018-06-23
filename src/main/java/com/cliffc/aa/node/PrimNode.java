@@ -23,8 +23,9 @@ public abstract class PrimNode extends Node {
   final static String[] ARGS2 = new String[]{"x","y"};
 
   public static PrimNode[] PRIMS = new PrimNode[] {
-    new    RandI64(),
-    new    Id(),
+    new RandI64(),
+    new Id(Type.OOP ), // Pre-split OOP from non-OOP
+    new Id(Type.REAL),
     
     new ConvertInt64F64(),
     new ConvertI64Str(),
@@ -254,7 +255,8 @@ class RandI64 extends PrimNode {
 }
 
 class Id extends PrimNode {
-  Id() { super("id",PrimNode.ARGS1,TypeTuple.SCALAR1,Type.SCALAR); }
+
+  Id(Type arg) { super("id",PrimNode.ARGS1,TypeTuple.make(Type.XSCALAR,1.0,arg),arg); }
   @Override public Type apply( Type[] args ) { return args[1]; }
   @Override public Node ideal(GVNGCM gvn) { return at(1); }
   @Override public Type value(GVNGCM gvn) { return gvn.type(at(1)); }

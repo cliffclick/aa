@@ -40,10 +40,10 @@ public class Env implements AutoCloseable {
     Type[] targs = prim._targs._ts;
     String[] args = prim._args;
     FunNode  fun = _gvn.init(new  FunNode(_scope, prim)); // Points to ScopeNode only
-    ParmNode rpc = _gvn.init(new ParmNode(-1,"rpc",fun,_gvn.con(TypeRPC.ALL_CALL)));
+    ParmNode rpc = _gvn.init(new ParmNode(-1,"rpc",fun,_gvn.con(TypeRPC.ALL_CALL),null));
     prim.add_def(null);         // Control for the primitive
     for( int i=0; i<args.length; i++ )
-      prim.add_def(_gvn.init(new ParmNode(i,args[i],fun,_gvn.con(targs[i]))));
+      prim.add_def(_gvn.init(new ParmNode(i,args[i],fun,_gvn.con(targs[i]),null)));
     PrimNode x = _gvn.init(prim);
     assert x==prim;
     return _gvn.init(new EpilogNode(fun,prim,rpc,fun));

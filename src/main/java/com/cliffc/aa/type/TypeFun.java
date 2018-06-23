@@ -57,10 +57,10 @@ public class TypeFun extends Type {
     switch( t._type ) {
     case TERROR: return ((TypeErr)t)._all ? t : this;
     case TCTRL:
-    case TXCTRL:
-    case TSTRUCT:
-    case TTUPLE: return TypeErr.ALL;
+    case TXCTRL: return TypeErr.ALL;
     case TRPC:
+    case TSTRUCT:
+    case TTUPLE: 
     case TFLT:
     case TINT:
     case TSTR:   return Type.SCALAR;

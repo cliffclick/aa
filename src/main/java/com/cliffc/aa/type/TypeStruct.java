@@ -55,12 +55,12 @@ public class TypeStruct extends Type {
     switch( t._type ) {
     case TSTRUCT: tt = ((TypeStruct)t)._tt; args = ((TypeStruct)t)._args; break;
     case TTUPLE : tt =  (TypeTuple )t     ; args = new String[0]        ; break;
-    case TUNION:
-    case TRPC:
+    case TUNION: return t.xmeet(this); // Let TypeUnion decide
+    case TSTR: return Type.OOP;
     case TFLT:
     case TINT:
-    case TSTR:
-    case TFUN: return TypeErr.ALL;
+    case TRPC: 
+    case TFUN: return TypeErr.SCALAR;
     case TERROR: return ((TypeErr)t)._all ? t : this;
     default: throw typerr(t);   // All else should not happen
     }

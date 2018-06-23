@@ -8,7 +8,7 @@ import com.cliffc.aa.type.TypeErr;
 public class ParmNode extends PhiNode {
   final int _idx;               // Parameter index, zero-based; -1 reserved for RPC
   final String _name;   // Parameter name
-  public ParmNode( int idx, String name, FunNode fun, Node defalt) { super(OP_PARM,fun,defalt); _idx=idx; _name=name; }
+  public ParmNode( int idx, String name, FunNode fun, Node defalt, String badgc) { super(OP_PARM,fun,defalt,badgc); _idx=idx; _name=name; }
   @Override String xstr() { return "Parm:"+_name; }
   @Override public Type value(GVNGCM gvn) {
     if( at(0) instanceof FunNode && !((FunNode)at(0)).callers_known(gvn) ) { // Slot zero allows unknown callers

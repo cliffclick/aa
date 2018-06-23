@@ -40,9 +40,9 @@ public class TypeRPC extends Type {
     switch( t._type ) {
     case TERROR: return ((TypeErr)t)._all ? t : this;
     case TCTRL:
-    case TXCTRL:
+    case TXCTRL: return TypeErr.ALL;
+    case TTUPLE: 
     case TSTRUCT:
-    case TTUPLE: return TypeErr.ALL;
     case TFUN:
     case TFLT:
     case TINT:

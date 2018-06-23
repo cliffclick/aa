@@ -213,14 +213,28 @@ public abstract class Node implements Cloneable {
     for( int i=0; i<_defs._len; i++ ) {
       Node def = _defs.at(i);   // Walk data defs for more errors
       if( def == null ) continue;
-      // Do not walk dead paths
-      Node r=null;
-      if( this instanceof    PhiNode ) r = at(0);
-      if( this instanceof RegionNode ) r = this;
-      if( r==null || i==0 || gvn.type(r.at(i)) == Type.CTRL )
-        errs = def.walkerr_def(errs,bs,gvn);
+      // All dead paths been cleaned out
+      assert !(this instanceof RegionNode) || gvn.type(def)== Type.CTRL;
+      errs = def.walkerr_def(errs,bs,gvn);
     }
     return errs;
+  }
+  // Gather errors; forwards reachable data uses only
+  public void walkerr_gc( BitSet bs, GVNGCM gvn ) {
+    if( bs.get(_uid) ) return;     // Been there, done that
+    bs.set(_uid);                  // Only walk once
+    if( this instanceof UnresolvedNode ) return; // Only remaining Unresolved are never-called functions
+    if( this instanceof EpilogNode ) { // Function ptr?
+      FunNode fun = ((EpilogNode)this).fun();
+      if( fun._defs._len <= (fun.callers_known(gvn) ? 1 : 2) )
+        return;                 // No callers?
+    }
+    if( Type.SCALAR.isa(gvn.type(this)) ) // Cannot have code that deals with unknown-GC-state
+      throw AA.unimpl(); // Not allowed; either user-error or missing opt
+    for( int i=0; i<_defs._len; i++ ) {
+      Node def=at(i);
+      if( def != null ) def.walkerr_gc(bs,gvn);
+    }
   }
   
   public boolean is_dead() { return _uses == null; }

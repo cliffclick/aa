@@ -6,8 +6,9 @@ import com.cliffc.aa.type.TypeErr;
 
 // Merge results; extended by ParmNode
 public class PhiNode extends Node {
-  public PhiNode( Node... vals) { super(OP_PHI,vals); }
-  PhiNode( byte op, Node fun, Node defalt ) { super(op,fun,defalt); } // For ParmNodes
+  private String _badgc;
+  public PhiNode( String badgc, Node... vals) { super(OP_PHI,vals); _badgc = badgc; }
+  PhiNode( byte op, Node fun, Node defalt, String badgc ) { super(op,fun,defalt); _badgc = badgc; } // For ParmNodes
   @Override public Node ideal(GVNGCM gvn) {
     RegionNode r = (RegionNode)at(0);
     assert r._defs._len==_defs._len;
@@ -24,6 +25,8 @@ public class PhiNode extends Node {
     for( int i=1; i<_defs._len; i++ )
       if( gvn.type(r.at(i))!=Type.XCTRL ) // Only meet alive paths
         t = t.meet(gvn.type(at(i)));
+    if( t==Type.SCALAR )        // Cannot mix GC and non-GC types
+      t = TypeErr.make(_badgc);
     return t;
   }
 }

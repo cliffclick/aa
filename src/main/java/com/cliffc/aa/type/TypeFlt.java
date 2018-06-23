@@ -49,13 +49,13 @@ public class TypeFlt extends Type {
     case TFLT:   break;
     case TINT:   return ((TypeInt)t).xmeetf(this);
     case TSTR:   return TypeUnion.make(false,TypeStr.STR,this);
+    case TSTRUCT:
+    case TTUPLE: 
     case TRPC:
     case TFUN:   return Type.SCALAR;
     case TERROR: return ((TypeErr)t)._all ? t : this;
     case TCTRL:
-    case TXCTRL:
-    case TSTRUCT:
-    case TTUPLE: return TypeErr.ALL;
+    case TXCTRL: return TypeErr.ALL;
     case TUNION: return t.xmeet(this); // Let TypeUnion decide
     default: throw typerr(t);
     }
@@ -88,6 +88,7 @@ public class TypeFlt extends Type {
     // TODO: Allow loss-less conversions (e.g. small float integer constants convert to ints just fine)
     if( t._type == Type.TFLT ) return (byte)(_z<=((TypeFlt)t)._z ? 0 : 99);
     if( t._type == Type.TINT ) return 99; // Flt->Int always requires user intervention
+    if( t._type == Type.TREAL ) return 0;
     if( t._type == Type.TSCALAR ) return 0;
     throw com.cliffc.aa.AA.unimpl();
   }

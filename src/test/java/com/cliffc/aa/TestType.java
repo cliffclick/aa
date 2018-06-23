@@ -83,6 +83,7 @@ public class TestType {
     test   ("math_rand(1)?1:int:2:int",TypeInt.INT8); // no ambiguity between conditionals and type annotations
     testerr("math_rand(1)?1: :2:int","missing expr after ':'","                "); // missing type
     testerr("math_rand(1)?1::2:int","missing expr after ':'","               "); // missing type
+    testerr("math_rand(1)?1:\"a\"", "Cannot mix GC and non-GC types", "                  " );
 
     test   ("1  < 2", TypeInt.TRUE );
     test   ("1  <=2", TypeInt.TRUE );
@@ -113,6 +114,7 @@ public class TestType {
     test("x=3; fun={y -> x & y}; fun(2)", TypeInt.con(2)); // trivially inlined; capture external variable
     test("x=3; fun={x -> x & 2}; fun(2)", TypeInt.con(2)); // trivially inlined; shadow  external variable
     testerr("fun={x -> x+2}; x", "Unknown ref 'x'","                 "); // Scope exit ends lifetime
+    testerr("fun={x -> }", "Missing function body","          ");
     test("fun={x -> y=3; x*y}; fun(2)", TypeInt.con(6)); // multi statements in func body
     // Needs overload cloning/inlining to resolve {+}
     test("x=3; fun={y -> x+y}; fun(2)", TypeInt.con(5)); // must inline to resolve overload {+}:Int
@@ -154,7 +156,7 @@ public class TestType {
     testerr("a=.{x=1.2,y}; x", "Unknown ref 'x'","               ");
     test   ("a=.{x=1.2,y}; a.x", TypeFlt.con(1.2)); // standard "." field naming
     testerr("a=.{x,y}; a.x=1","Cannot re-assign field '.x'","               ");
-    test   ("a=.{x=0,y=1}; b=.{x=2}; c=math_rand(1)?a:b; c.x", TypeInt.INT8); // either 0 or 2
+    test   ("a=.{x=0,y=1}; b=.{x=2}  ; c=math_rand(1)?a:b; c.x", TypeInt.INT8); // either 0 or 2
     testerr("a=.{x=0,y=1}; b=.{x=2}; c=math_rand(1)?a:b; c.y",  "Unknown field '.y'","                                               ");
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(.{x=1})", "Unknown field '.y'","                    ");
     test   ("dist={p->p.x*p.x+p.y*p.y}; dist(.{x=1,y=2})", TypeInt.con(5));     // passed in to func

@@ -108,8 +108,6 @@ public class TypeUnion extends Type {
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TERROR: return ((TypeErr)t)._all ? t : this;
-    case TSTRUCT:
-    case TTUPLE: return TypeErr.ALL; // Tuple-vs-scalar
     case TUNION: {
       // Handle the case where they are structurally equal
       TypeUnion tu = (TypeUnion)t;

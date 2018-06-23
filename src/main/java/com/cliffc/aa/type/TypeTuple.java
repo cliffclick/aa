@@ -92,13 +92,13 @@ public class TypeTuple extends Type {
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TTUPLE: break;
+    case TUNION:  
     case TSTRUCT: return t.xmeet(this); // Let TypeStruct decide
-    case TUNION:
-    case TRPC:
+    case TSTR:   return Type.OOP;
     case TFLT:
     case TINT:
-    case TSTR:
-    case TFUN: return TypeErr.ALL;
+    case TRPC:   
+    case TFUN:   return Type.SCALAR;
     case TERROR: return ((TypeErr)t)._all ? t : this;
     default: throw typerr(t);
     }

@@ -77,35 +77,39 @@ public class Type {
   static final byte TXCTRL  = 1; // Ctrl flow top (mini-lattice: any-xctrl-ctrl-all)
   static final byte TSCALAR = 2; // Scalars; all possible finite types; includes pointers (functions, structs), ints, floats; excludes state of Memory and Ctrl.
   static final byte TXSCALAR= 3; // Invert scalars
-  static final byte TNUM    = 4; // Number and all derivitives (Complex, Rational, Int, Float, etc)
-  static final byte TXNUM   = 5; // Any Numbers; dual of NUM
-  static final byte TREAL   = 6; // All Real Numbers
-  static final byte TXREAL  = 7; // Any Real Numbers; dual of REAL
-  static final byte TSIMPLE = 8; // End of the Simple Types
-  private static final String[] STRS = new String[]{"Ctrl","~Ctrl","Scalar","~Scalar","Number","~Number","Real","~Real"};
+  static final byte TOOP    = 4; // Includes all GC ptrs; structs, arrays, strings.  Excludes functions, ints, floats
+  static final byte TXOOP   = 5; // Invert oops
+  static final byte TNUM    = 6; // Number and all derivitives (Complex, Rational, Int, Float, etc)
+  static final byte TXNUM   = 7; // Any Numbers; dual of NUM
+  static final byte TREAL   = 8; // All Real Numbers
+  static final byte TXREAL  = 9; // Any Real Numbers; dual of REAL
+  static final byte TSIMPLE =10; // End of the Simple Types
+  private static final String[] STRS = new String[]{"Ctrl","~Ctrl","Scalar","~Scalar","OOP","~OOP","Number","~Number","Real","~Real"};
   // Implemented in subclasses
-  static final byte TERROR  = 9; // ALL/ANY TypeErr types
-  static final byte TUNION  =10; // Union types (finite collections of unrelated types Meet together); see TypeUnion
-  static final byte TTUPLE  =11; // Tuples; finite collections of unrelated Types, kept in parallel
-  static final byte TSTRUCT =12; // Structs; tuples with named fields
-  static final byte TFUN    =13; // Functions; both domain and range are a Tuple; see TypeFun                            
-  static final byte TRPC    =14; // Return PCs; Continuations; call-site return points; see TypeRPC
-  static final byte TFLT    =15; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
-  static final byte TINT    =16; // All Integers, including signed/unsigned and various sizes; see TypeInt
-  static final byte TSTR    =17; // String type
-  static final byte TLAST   =18; // Type check
+  static final byte TERROR  =11; // ALL/ANY TypeErr types
+  static final byte TUNION  =12; // Union types (finite collections of unrelated types Meet together); see TypeUnion
+  static final byte TTUPLE  =13; // Tuples; finite collections of unrelated Types, kept in parallel
+  static final byte TSTRUCT =14; // Structs; tuples with named fields
+  static final byte TFUN    =15; // Functions; both domain and range are a Tuple; see TypeFun                            
+  static final byte TRPC    =16; // Return PCs; Continuations; call-site return points; see TypeRPC
+  static final byte TFLT    =17; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
+  static final byte TINT    =18; // All Integers, including signed/unsigned and various sizes; see TypeInt
+  static final byte TSTR    =19; // String type
+  static final byte TLAST   =20; // Type check
   
   public  static final Type CTRL   = make( TCTRL  ); // Ctrl
   public  static final Type XCTRL  = make(TXCTRL  ); // Ctrl
   public  static final Type  SCALAR= make( TSCALAR); // ptrs, ints, flts; things that fit in a machine register
   public  static final Type XSCALAR= make(TXSCALAR); // ptrs, ints, flts; things that fit in a machine register
+  public  static final Type  OOP   = make( TOOP   ); // ptrs subject to GC (excludes e.g. function pointers)
+  public  static final Type XOOP   = make(TXOOP   ); // ptrs subject to GC
   public  static final Type  NUM   = make( TNUM   );
   private static final Type XNUM   = make(TXNUM   );
   public  static final Type  REAL  = make( TREAL  );
   private static final Type XREAL  = make(TXREAL  );
 
   // Collection of sample types for checking type lattice properties.
-  private static final Type[] TYPES = new Type[]{CTRL,XCTRL,SCALAR,XSCALAR,NUM,XNUM,REAL,XREAL};
+  private static final Type[] TYPES = new Type[]{CTRL,XCTRL,SCALAR,XSCALAR,OOP,XOOP,NUM,XNUM,REAL,XREAL};
   
   // The complete list of primitive types that are disjoint and also is-a
   // SCALAR; nothing else is a SCALAR except what is on this list (or
@@ -117,6 +121,10 @@ public class Type {
   static /*final*/ Type[] SCALAR_PRIMS;
   
   private boolean is_simple() { return _type < TSIMPLE; }
+  private boolean is_oop() { return _type == TOOP || _type == TXOOP || _type == TSTR || _type == TSTRUCT || _type == TTUPLE; }
+  private boolean is_num() { return _type == TNUM || _type == TXNUM || _type == TREAL || _type == TXREAL || _type == TINT || _type == TFLT; }
+  // True if 'this' isa SCALAR, without the cost of a full 'meet()'
+  final boolean isa_scalar() { return _type != TERROR && _type != TCTRL && _type != TXCTRL; }
   
   // Return cached dual
   public final Type dual() { return _dual; }
@@ -141,7 +149,7 @@ public class Type {
   }
   
   // Compute meet right now.  Overridden in subclasses.
-  // Handles cases where 'this.is_simple()'.
+  // Handles cases where 'this.is_simple()' and unequal to 't'.
   // Subclassed xmeet calls can assert that '!t.is_simple()'.
   protected Type xmeet(Type t) {
     assert is_simple(); // Should be overridden in subclass
@@ -156,38 +164,45 @@ public class Type {
     if(  type <= TXCTRL ) return _type==TXCTRL && t._type==TXCTRL ? XCTRL : CTRL;
     if( _type <= TXCTRL || t._type <= TXCTRL ) return TypeErr.ALL;
 
-    // The rest of these choices are various scalars, which do not match well
-    // with any tuple.
-    if( t._type == TTUPLE ) return TypeErr.ALL;
-    if( t._type == TSTRUCT) return TypeErr.ALL;
+    // Scalar is close to bottom: nearly everything falls to SCALAR, except
+    // Bottom (already handled) and Control (error; already handled).
+    if( _type == TSCALAR || t._type == TSCALAR ) return SCALAR;
 
-    // Scalar is close to bottom: everything falls to SCALAR, except Bottom
-    // (handled above) and multi-types like Tuples
-    if( _type == TSCALAR || t._type == TSCALAR )  return SCALAR;
-
-    // ~Scalar is close to Top: it falls to anything, except multi-types like Tuples.
+    // ~Scalar is close to Top: it falls to nearly anything.
     if(   _type == TXSCALAR ) return t   ;
     if( t._type == TXSCALAR ) return this;
 
-    // The rest of these choices are various numbers, which do not match well
-    // with any function
-    if( t._type == TSTR ) return SCALAR;
-    if( t._type == TFUN ) return SCALAR;
-    if( t._type == TRPC ) return SCALAR;
-    // Union of functions, with a number
-    if( t._type == TUNION && ((TypeUnion)t)._ts.at(0)._type==TFUN )
-      return SCALAR;
+    // Scalar values break out into: nums(reals (int,flt)), GC-ptrs (structs(tuples), arrays(strings)), fun-ptrs, RPC
 
-    // Numeric; same pattern as ANY/ALL, or SCALAR/XSCALAR
-    if( _type == TNUM || t._type == TNUM ) return NUM;
-    if(   _type == TXNUM ) return t   ;
-    if( t._type == TXNUM ) return this;
+    if( t._type == TFUN ) return SCALAR; // If 't' is a FUN and 'this' is not a FUN (because not equal to 't')
+    if( t._type == TRPC ) return SCALAR; // If 't' is a RPC and 'this' is not a RPC (because not equal to 't')
+    // Union of functions or numbers or whatever: let Union sort it out
+    if( t._type == TUNION ) return t.xmeet(this);
 
-    // Real; same pattern as ANY/ALL, or SCALAR/XSCALAR
-    if( _type == TREAL || t._type == TREAL ) return REAL;
-    if(   _type == TXREAL ) return t   ;
-    if( t._type == TXREAL ) return this;
+    boolean that_oop = t.is_oop();
+    boolean that_num = t.is_num();
+    assert !(that_oop&&that_num);
+    
+    if( is_oop() ) { // Only simple OOPish type
+      if( !that_oop ) return SCALAR;
+      return _type == TOOP ? OOP : t;
+    }
 
+    if( is_num() ) {
+      if( that_oop ) return SCALAR;
+      if( !that_num ) throw AA.unimpl();
+      
+      // Numeric; same pattern as ANY/ALL, or SCALAR/XSCALAR
+      if( _type == TNUM || t._type == TNUM ) return NUM;
+      if(   _type == TXNUM ) return t   ;
+      if( t._type == TXNUM ) return this;
+      
+      // Real; same pattern as ANY/ALL, or SCALAR/XSCALAR
+      if( _type == TREAL || t._type == TREAL ) return REAL;
+      if(   _type == TXREAL ) return t   ;
+      if( t._type == TXREAL ) return this;
+      throw AA.unimpl();          // Need nice printout
+    }
     throw AA.unimpl();          // Need nice printout
   }
 
@@ -259,7 +274,7 @@ public class Type {
     assert errs==0 : "Found "+errs+" non-associative-type errors";
 
     // Check scalar primitives; all are SCALARS and none sub-type each other.
-    SCALAR_PRIMS = new Type[] { TypeInt.INT64, TypeFlt.FLT64, TypeStr.STR, TypeFun.make_generic() };
+    SCALAR_PRIMS = new Type[] { TypeInt.INT64, TypeFlt.FLT64, Type.OOP, TypeFun.make_generic() };
     for( Type t : SCALAR_PRIMS ) assert t.isa(SCALAR);
     for( int i=0; i<SCALAR_PRIMS.length; i++ ) 
       for( int j=i+1; j<SCALAR_PRIMS.length; j++ )
@@ -276,8 +291,6 @@ public class Type {
   // True if 'this' isa/subtypes 't'.  E.g. Int32-isa-Int64, but not vice-versa
   // E.g. ANY-isa-XSCALAR; XSCALAR-isa-XREAL; XREAL-isa-Int(Any); Int(Any)-isa-Int(3)
   public boolean isa( Type t ) { return meet(t)==t; }
-  // True if 'this' isa SCALAR, without the cost of a full 'meet()'
-  final boolean isa_scalar() { return _type != TERROR && _type != TUNION && _type != TTUPLE && _type != TSTRUCT; }
 
   // True if value is above the centerline (no real value)
   public boolean above_center() {
@@ -306,12 +319,14 @@ public class Type {
   public boolean canBeConst() {
     switch( _type ) {
     case TSCALAR:
+    case TOOP:
     case TNUM:
     case TREAL:
     case TCTRL:
       return false;             // These all include not-constant things
     case TXREAL:
     case TXNUM:
+    case TXOOP:
     case TXSCALAR:
     case TXCTRL:
       return true;              // These all include some constants
@@ -358,13 +373,11 @@ public class Type {
   // 99 Bottom; No free converts; e.g. Flt->Int requires explicit rounding
   public byte isBitShape(Type t) {
     if( above_center() && isa(t) ) return 0; // Can choose compatible format
+    if( _type == t._type ) return 0; // Same type is OK
     if( t._type==TSCALAR ) return 0; // Generic function arg never requires a conversion
-    if( _type == TSCALAR || _type == TREAL ) {
-      if( t._type == TFLT ) return -1; // Scalar has to resolve
-      if( t._type == TINT ) return -1; // Scalar has to resolve
-      if( t._type == TSTR ) return -1; // Scalar has to resolve
-      if( t.is_fun_ptr()  ) return -1; // Scalar has to resolve
-    }
+    if( _type == TSCALAR ) return -1; // Scalar has to resolve
+    if( _type == TREAL && t.is_num() ) return -1; // Real->Int/Flt has to resolve
+    if( is_fun_ptr() && t == OOP ) return 0;
 
     throw typerr(t);  // Overridden in subtypes
   }
