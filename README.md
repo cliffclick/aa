@@ -62,10 +62,10 @@ Float           | ---
 `1+2.3`         | `3.3:flt` standard auto-widening of int to flt
 `1.0==1`        | `1:int` True; int widened to float
 Simple strings  | ---
-`\"Hello, world\"` | `"Hello, world":str`
+`"Hello, world"`| `"Hello, world":str`
 `str(3.14)`     | `"3.14":str` Overloaded `str(:flt)`
 `str(3)`        | `"3":str`    Overloaded `str(:int)`
-`str(\"abc\")`  | `"abc":str`  Overloaded `str(:str)`
+`str("abc")`    | `"abc":str`  Overloaded `str(:str)`
 Variable lookup | ---
 `math_pi`       | `3.141592653589793:flt` Should be `math.pi` but name spaces not implemented
 primitive function lookup | ---
@@ -83,7 +83,7 @@ Errors; mismatch arg count | ---
 Arguments separated by commas and are full statements | ---
 `{+}(1, 2 * 3)` | `7:int`
 `{+}(1 + 2 * 3, 4 * 5 + 6)` | `33:int`
-`(1;2 )`        | `2:int`
+`(1;2 )`        | `2:int` just parens around two statements
 `(1;2;)`        | `2:int` final semicolon is optional
 `{+}(1;2 ,3)`   | `5:int` full statements in arguments
 Syntax for variable assignment | ---
@@ -146,17 +146,17 @@ Simple anonymous structure tests | ---
 `  .{x,y}`        | `.{x,y}` Simple anon struct decl
 `a=.{x=1.2,y}; x` | `Unknown ref 'x'`
 `a=.{x=1,x=2}`    | `Cannot define field '.x' twice`
-`a=.{x=1.2,y}; a.x` | `1.2:flt` Standard "." field naming
+`a=.{x=1.2,y}; a.x` | `1.2:flt` Standard "." field name lookups
 `(a=.{x,y}; a.)`  | `Missing field name after '.'`
 `a=.{x,y}; a.x=1` | `Cannot re-assign field '.x'` No reassignment yet
 `a=.{x=0,y=1}; b=.{x=2}; c=math_rand(1)?a:b; c.x` | `:int8` Either 0 or 2; structs can be partially merged and used
-`a=.{x=0,y=1}; b=.{x=2}; c=math_rand(1)?a:b; c.y` | `Unknown field '.y'` Use fields must be fully available
+`a=.{x=0,y=1}; b=.{x=2}; c=math_rand(1)?a:b; c.y` | `Unknown field '.y'` Used fields must be fully available
 `dist={p->p.x*p.x+p.y*p.y}; dist(.{x=1})` | `Unknown field '.y'`  Field not available inside of function
 `dist={p->p.x*p.x+p.y*p.y}; dist(.{x=1,y=2})` | `5:int` Passing an anonymous struct
 `dist={p->p.x*p.x+p.y*p.y}; dist(.{x=1,y=2,z=3})` | `5:int` Extra fields OK
-`dist={p:.{x,y} -> p.x*p.x+p.y*p.y}; dist(.{x=1,y=2})` | `5:int` Structure typing on function args
-`a=.{x=(b=1.2)*b,y=b}; a.y` | `1.2:flt`  // Ok to re-use temp defs
-`a=.{x=(b=1.2)*b,y=x}; a.y` | `1.44:flt` // Ok to use early fields in later defs
+`dist={p:.{x,y} -> p.x*p.x+p.y*p.y}; dist(.{x=1,y=2})` | `5:int` Structure type annotations on function args
+`a=.{x=(b=1.2)*b,y=b}; a.y` | `1.2:flt`  Temps allowed in struct def
+`a=.{x=(b=1.2)*b,y=x}; a.y` | `1.44:flt` Ok to use early fields in later defs
 `a=.{x=(b=1.2)*b,y=b}; b` | `Unknown ref 'b'`  Structure def has a lexical scope
 
 

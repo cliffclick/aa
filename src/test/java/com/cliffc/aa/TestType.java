@@ -177,24 +177,6 @@ public class TestType {
 // 0:int is the uniform initial value, counts as null; free cast to null
 
 
-// With re-assignment, more excitement around LHS!
-// So fields in a tuple type have a init-value, a final-value, an
-// un-init-value, a mixed-init-value, and a name
-make_point={{x,y}} // returns {x,y} with both un-init
-a=make_point(); a.x=1; // a.x init; a.y uninit
-b=make_point(); b.y=2; // a.x uninit; b.y init
-c = rand ? a : b;      // c: worse-case x & y mixed init & uninit
-c.x = 1; // Error; might be    init
-c.x;     // Error; might be un-init
-// reflection read/write of fields.
-// '[' binary operator returns a LHS value (really a 2-tuple).
-// ']' postfix operator takes a LHS, returns value
-// ']=' binary operator takes a LHS and a value, and returns same value... and SIDE-EFFECTS
-c[x];
-c[x]=1;
-
-
-
 // Adding named types to primitives, because its the natural extension 
 // when adding them to tuples.
 
@@ -244,9 +226,6 @@ dist2 = { p -> p.x*p.x+p.y*p.y }
 dist2 = { p:Point -> p.x*p.x+p.y*p.y }
 
 
-
-
-
 // type variables are free in : type expressions
 
 // Define a pair as 2 fields "a" and "b" both with the same type T.
@@ -281,6 +260,23 @@ x := 1; rand ? x =2 :  3; x; // cannot partially final-assign
 x := 1; rand ? x:=2 :  3; x; // 2; x is still assignable
 x := 1; rand ? x =2 :x=3; x; // 2or3; x is final
 x := 1; x = x; // 1; make x final
+
+// With re-assignment, more excitement around LHS!
+// So fields in a tuple type have a init-value, a final-value, an
+// un-init-value, a mixed-init-value, and a name
+make_point={{x,y}} // returns {x,y} with both un-init
+a=make_point(); a.x=1; // a.x init; a.y uninit
+b=make_point(); b.y=2; // a.x uninit; b.y init
+c = rand ? a : b;      // c: worse-case x & y mixed init & uninit
+c.x = 1; // Error; might be    init
+c.x;     // Error; might be un-init
+// reflection read/write of fields.
+// '[' binary operator returns a LHS value (really a 2-tuple).
+// ']' postfix operator takes a LHS, returns value
+// ']=' binary operator takes a LHS and a value, and returns same value... and SIDE-EFFECTS
+c[x];
+c[x]=1;
+
    */
   
   static private void test( String program, Type expected ) {
