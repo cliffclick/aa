@@ -26,7 +26,7 @@ BNF                           | Comment
 `fact = "string"`             | string
 `fact = (stmts)`              | General statements parsed recursively
 `fact = {func}`               | Anonymous function declaration
-`fact = .{ [id[:type]?[=stmt]?,]* }` | Anonymous struct declaration; optional type, optional initial value, optional final comma
+`fact = @{ [id[:type]?[=stmt]?,]* }` | Anonymous struct declaration; optional type, optional initial value, optional final comma
 `fact = {binop}`              | Special syntactic form of binop; no spaces allowed; returns function constant
 `fact = {uniop}`              | Special syntactic form of uniop; no spaces allowed; returns function constant
 `binop= +-*%&/<>!=`           | etc; primitive lookup; can determine infix binop at parse-time, also pipe but GFM screws up
@@ -37,7 +37,7 @@ BNF                           | Comment
 `type = tcon OR tfun OR tstruct` | Types are a tcon or a tfun or a tstruct
 `tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str` | Primitive types
 `tfun = {[[type]* ->]? type }` | Function types mirror func decls
-`tstruct = .{ [id[:type],]*}` | Struct types are field names with optional types
+`tstruct = @{ [id[:type],]*}` | Struct types are field names with optional types
 
 EXAMPLES
 --------
@@ -138,26 +138,26 @@ Type annotations  | ---
 `x:flt32 = 123456789` | `123456789 is not a flt32` Failed to convert int64 to a flt32
 `-1:int1`         | `-1 is not a int1` int1 is only {0,1}
 `"abc":int`       | `"abc" is not a int64`
-`x=3; fun:{int ->int }={x -> x*2}; fun(2.1)+fun(x)` | `2.1 is not a int64`
-`x=3; fun:{real->real}={x -> x*2}; fun(2.1)+fun(x)` | `10.4:flt` real covers both int and flt
-`fun:{real->flt32}={x -> x}; fun(123 )` | `123:int` Casts for free to real and flt32
-`fun:{real->flt32}={x -> x}; fun(123456789)` | `123456789 is not a flt32`
+`x=3; fun:{int -> int} = {x -> x*2}; fun(2.1)+fun(x)` | `2.1 is not a int64`
+`x=3; fun:{real -> real} = {x -> x*2}; fun(2.1)+fun(x)` | `10.4:flt` real covers both int and flt
+`fun:{real->flt32} = {x -> x}; fun(123 )` | `123:int` Casts for free to real and flt32
+`fun:{real->flt32} = {x -> x}; fun(123456789)` | `123456789 is not a flt32`
 Simple anonymous structure tests | ---
-`  .{x,y}`        | `.{x,y}` Simple anon struct decl
-`a=.{x=1.2,y}; x` | `Unknown ref 'x'`
-`a=.{x=1,x=2}`    | `Cannot define field '.x' twice`
-`a=.{x=1.2,y}; a.x` | `1.2:flt` Standard "." field name lookups
-`(a=.{x,y}; a.)`  | `Missing field name after '.'`
-`a=.{x,y}; a.x=1` | `Cannot re-assign field '.x'` No reassignment yet
-`a=.{x=0,y=1}; b=.{x=2}; c=math_rand(1)?a:b; c.x` | `:int8` Either 0 or 2; structs can be partially merged and used
-`a=.{x=0,y=1}; b=.{x=2}; c=math_rand(1)?a:b; c.y` | `Unknown field '.y'` Used fields must be fully available
-`dist={p->p.x*p.x+p.y*p.y}; dist(.{x=1})` | `Unknown field '.y'`  Field not available inside of function
-`dist={p->p.x*p.x+p.y*p.y}; dist(.{x=1,y=2})` | `5:int` Passing an anonymous struct
-`dist={p->p.x*p.x+p.y*p.y}; dist(.{x=1,y=2,z=3})` | `5:int` Extra fields OK
-`dist={p:.{x,y} -> p.x*p.x+p.y*p.y}; dist(.{x=1,y=2})` | `5:int` Structure type annotations on function args
-`a=.{x=(b=1.2)*b,y=b}; a.y` | `1.2:flt`  Temps allowed in struct def
-`a=.{x=(b=1.2)*b,y=x}; a.y` | `1.44:flt` Ok to use early fields in later defs
-`a=.{x=(b=1.2)*b,y=b}; b` | `Unknown ref 'b'`  Structure def has a lexical scope
+`  @{x,y}`        | `@{x,y}` Simple anon struct decl
+`a=@{x=1.2,y}; x` | `Unknown ref 'x'`
+`a=@{x=1,x=2}`    | `Cannot define field '.x' twice`
+`a=@{x=1.2,y}; a.x` | `1.2:flt` Standard "." field name lookups
+`(a=@{x,y}; a.)`  | `Missing field name after '.'`
+`a=@{x,y}; a.x=1` | `Cannot re-assign field '.x'` No reassignment yet
+`a=@{x=0,y=1}; b=@{x=2}; c=math_rand(1)?a:b; c.x` | `:int8` Either 0 or 2; structs can be partially merged and used
+`a=@{x=0,y=1}; b=@{x=2}; c=math_rand(1)?a:b; c.y` | `Unknown field '.y'` Used fields must be fully available
+`dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})` | `Unknown field '.y'`  Field not available inside of function
+`dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1,y=2})` | `5:int` Passing an anonymous struct
+`dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1,y=2,z=3})` | `5:int` Extra fields OK
+`dist={p:@{x,y} -> p.x*p.x+p.y*p.y}; dist(@{x=1,y=2})` | `5:int` Structure type annotations on function args
+`a=@{x=(b=1.2)*b,y=b}; a.y` | `1.2:flt`  Temps allowed in struct def
+`a=@{x=(b=1.2)*b,y=x}; a.y` | `1.44:flt` Ok to use early fields in later defs
+`a=@{x=(b=1.2)*b,y=b}; b` | `Unknown ref 'b'`  Structure def has a lexical scope
 
 
 Done Stuff

@@ -29,7 +29,7 @@ import java.util.BitSet;
  *  fact = "str"                // string
  *  fact = (stmts)              // General statements parsed recursively
  *  fact = {func}               // Anonymous function declaration
- *  fact = .{ [id[:type]?[=stmt]?,]* } // Anonymous struct declaration; optional type, optional initial value, optional final comma
+ *  fact = @{ [id[:type]?[=stmt]?,]* } // Anonymous struct declaration; optional type, optional initial value, optional final comma
  *  fact = {binop}              // Special syntactic form of binop; no spaces allowed; returns function constant
  *  fact = {uniop}              // Special syntactic form of uniop; no spaces allowed; returns function constant
  *  binop= +-*%&|/<>!=          // etc; primitive lookup; can determine infix binop at parse-time
@@ -40,7 +40,7 @@ import java.util.BitSet;
  *  type = tcon | tfun | tstruct // Types are a tcon or a tfun or a tstruct
  *  tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str
  *  tfun = {[[type]* ->]? type }// Function types mirror func decls
- *  tstruct = .{ [id[:type],]*} // Struct types are field names with optional types
+ *  tstruct = @{ [id[:type],]*} // Struct types are field names with optional types
  */
 
 public class Parse {
@@ -358,7 +358,7 @@ public class Parse {
       return func();            // Anonymous function
     }
     // Anonymous struct
-    if( peek2(c,".{") ) return struct();
+    if( peek2(c,"@{") ) return struct();
     
     // Check for a valid 'id'
     String tok = token0();
@@ -413,10 +413,10 @@ public class Parse {
     }
   }
 
-  /** Parse anonymous struct; the opening ".{" already parsed.  Next comes
+  /** Parse anonymous struct; the opening "@{" already parsed.  Next comes
    *  statements, with each assigned value becoming a struct member.  A lexical
    *  scope is made (non top-level assignments are removed at the end).
-   * .{ [id[:type]?[=stmt]?,]* }
+   *  @{ [id[:type]?[=stmt]?,]* }
    */
   private Node struct() {
     try( Env e = new Env(_e) ) {// Nest an environment for the local vars
@@ -499,7 +499,7 @@ public class Parse {
    *  type = tcon | tfun | tstruct   // Types are a tcon or a tfun or a tstruct
    *  tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str
    *  tfun = {[[type]* ->]? type }// Function types mirror func decls
-   *  tstruct = .{ [id[:type],]*} // Struct types are field names with optional types
+   *  tstruct = @{ [id[:type],]*} // Struct types are field names with optional types
    */
   private Type type() {
     Type t = type0();
@@ -524,7 +524,7 @@ public class Parse {
       return TypeTuple.make_fun_ptr(TypeFun.make(TypeTuple.make(ts.asAry()),ret,Bits.FULL));
     }
 
-    if( peek2(c,".{") ) { // Struct type
+    if( peek2(c,"@{") ) { // Struct type
       Ary<String> flds = new Ary<>(new String[1],0);
       Ary<Type  > ts   = new Ary<>(new Type  [1],0);
       while( true ) {

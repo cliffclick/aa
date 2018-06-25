@@ -152,21 +152,21 @@ public class TestType {
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(5)", TypeInt.FALSE );
 
     // simple anon struct tests
-    test   ("  .{x,y}", TypeStruct.make(new String[]{"x","y"},TypeTuple.ANY)); // simple anon struct decl
-    testerr("a=.{x=1.2,y}; x", "Unknown ref 'x'","               ");
-    test   ("a=.{x=1.2,y}; a.x", TypeFlt.con(1.2)); // standard "." field naming
-    testerr("a=.{x,y}; a.x=1","Cannot re-assign field '.x'","               ");
-    test   ("a=.{x=0,y=1}; b=.{x=2}  ; c=math_rand(1)?a:b; c.x", TypeInt.INT8); // either 0 or 2
-    testerr("a=.{x=0,y=1}; b=.{x=2}; c=math_rand(1)?a:b; c.y",  "Unknown field '.y'","                                               ");
-    testerr("dist={p->p.x*p.x+p.y*p.y}; dist(.{x=1})", "Unknown field '.y'","                    ");
-    test   ("dist={p->p.x*p.x+p.y*p.y}; dist(.{x=1,y=2})", TypeInt.con(5));     // passed in to func
-    test   ("dist={p->p.x*p.x+p.y*p.y}; dist(.{x=1,y=2,z=3})", TypeInt.con(5)); // extra fields OK
-    test   ("dist={p:.{x,y} -> p.x*p.x+p.y*p.y}; dist(.{x=1,y=2})", TypeInt.con(5)); // Typed func arg
-    testerr("a=.{x=1,x=2}", "Cannot define field '.x' twice","           ");
-    testerr("a=.{x=(b=1.2)*b,y=b}; b", "Unknown ref 'b'","                       ");
-    testerr("(a=.{x,y}; a.)", "Missing field name after '.'","             ");
-    test   ("a=.{x=(b=1.2)*b,y=b}; a.y", TypeFlt.con(1.2 )); // ok to use temp defs
-    test   ("a=.{x=(b=1.2)*b,y=x}; a.y", TypeFlt.con(1.44)); // ok to use early fields in later defs
+    test   ("  @{x,y}", TypeStruct.make(new String[]{"x","y"},TypeTuple.ANY)); // simple anon struct decl
+    testerr("a=@{x=1.2,y}; x", "Unknown ref 'x'","               ");
+    test   ("a=@{x=1.2,y}; a.x", TypeFlt.con(1.2)); // standard "." field naming
+    testerr("a=@{x,y}; a.x=1","Cannot re-assign field '.x'","               ");
+    test   ("a=@{x=0,y=1}; b=@{x=2}  ; c=math_rand(1)?a:b; c.x", TypeInt.INT8); // either 0 or 2
+    testerr("a=@{x=0,y=1}; b=@{x=2}; c=math_rand(1)?a:b; c.y",  "Unknown field '.y'","                                               ");
+    testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'","                    ");
+    test   ("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1,y=2})", TypeInt.con(5));     // passed in to func
+    test   ("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1,y=2,z=3})", TypeInt.con(5)); // extra fields OK
+    test   ("dist={p:@{x,y} -> p.x*p.x+p.y*p.y}; dist(@{x=1,y=2})", TypeInt.con(5)); // Typed func arg
+    testerr("a=@{x=1,x=2}", "Cannot define field '.x' twice","           ");
+    testerr("a=@{x=(b=1.2)*b,y=b}; b", "Unknown ref 'b'","                       ");
+    testerr("(a=@{x,y}; a.)", "Missing field name after '.'","             ");
+    test   ("a=@{x=(b=1.2)*b,y=b}; a.y", TypeFlt.con(1.2 )); // ok to use temp defs
+    test   ("a=@{x=(b=1.2)*b,y=x}; a.y", TypeFlt.con(1.44)); // ok to use early fields in later defs
 
     // TODO: Need real TypeVars for these
     //test("id:{A->A}"    , Env.lookup_valtype("id"));

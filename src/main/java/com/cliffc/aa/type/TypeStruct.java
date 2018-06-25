@@ -21,10 +21,10 @@ public class TypeStruct extends Type {
     return _tt==t._tt && Arrays.equals(_args,t._args);
   }
   @Override public String toString() {
-    SB sb = new SB().p("[");
+    SB sb = new SB().p("@{");
     for( int i=0; i<_args.length; i++ )
       sb.p(_args[i]).p(':').p(_tt.at(i).toString()).p(',');
-    return sb.p(_tt._inf.toString()).p("...]").toString();
+    return sb.p(_tt._inf.toString()).p("...}").toString();
   }
 
   private static TypeStruct FREE=null;
