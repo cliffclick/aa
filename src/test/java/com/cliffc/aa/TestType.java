@@ -112,7 +112,7 @@ public class TestType {
 
     // Function execution and result typing
     test("x=3; andx={y -> x & y}; andx(2)", TypeInt.con(2)); // trivially inlined; capture external variable
-    test("x=3; and2={x -> x & 2}; and2(2)", TypeInt.con(2)); // trivially inlined; shadow  external variable
+    test("x=3; and2={x -> x & 2}; and2(x)", TypeInt.con(2)); // trivially inlined; shadow  external variable
     testerr("plus2={x -> x+2}; x", "Unknown ref 'x'","                   "); // Scope exit ends lifetime
     testerr("fun={x -> }", "Missing function body","          ");
     testerr("fun(2)", "Unknown ref 'fun'", "   "); // multi statements in func body

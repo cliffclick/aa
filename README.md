@@ -120,7 +120,7 @@ Identity mimics having type-vars via inlining during typing | ---
 `id({+})(id(1),id(math_pi))` | `4.141592653589793:flt`
 Function execution and result typing | ---
 `x=3; andx={y -> x & y}; andx(2)` | `2:int` capture external variable
-`x=3; and2={x -> x & 2}; and2(2)` | `2:int` shadow  external variable
+`x=3; and2={x -> x & 2}; and2(x)` | `2:int` shadow  external variable
 `plus2={x -> x+2}; x` | `Unknown ref 'x'` Scope exit ends lifetime
 `x=3; addx={y -> x+y}; addx(2)` | `5:int` Overloaded `+` resolves to `:int`
 `x=3; mul2={x -> x*2}; mul2(2.1)` | `4.2:flt` Overloaded `{+}:flt` resolves with I->F conversion
