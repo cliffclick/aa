@@ -587,7 +587,7 @@ public class Parse {
     }
     return -1;
   }
-  private void skipEOL  () { throw AA.unimpl(); }
+  private void skipEOL  () { while( _x < _buf.length && _buf[_x] != '\n' ) _x++; }
   private void skipBlock() { throw AA.unimpl(); }
 
   /** Return true if `c` passes a test */

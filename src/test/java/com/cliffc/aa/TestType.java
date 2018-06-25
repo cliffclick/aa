@@ -169,6 +169,9 @@ public class TestType {
     test   ("a=@{x=(b=1.2)*b,y=b}; a.y", TypeFlt.con(1.2 )); // ok to use temp defs
     test   ("a=@{x=(b=1.2)*b,y=x}; a.y", TypeFlt.con(1.44)); // ok to use early fields in later defs
 
+    test("1// some comment\n+2", TypeInt.con(3));
+    test   ("dist={p->p//qqq\n.//qqq\nx*p.x+p.y*p.y}; dist(//qqq\n@{x//qqq\n=1,y=2})", TypeInt.con(5));     // passed in to func
+    
     // TODO: Need real TypeVars for these
     //test("id:{A->A}"    , Env.lookup_valtype("id"));
     //test("id:{A:int->A}", Env.lookup_valtype("id"));
