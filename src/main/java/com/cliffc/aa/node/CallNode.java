@@ -126,7 +126,7 @@ public class CallNode extends Node implements AutoCloseable {
 
     // If this is a forward-ref we have no body to inline
     if( epi.is_forward_ref() )
-      throw AA.unimpl(); // return null;
+      return null;
 
     // Check for several trivial cases that can be fully inlined immediately.
     // Check for zero-op body (id function)

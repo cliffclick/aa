@@ -46,7 +46,7 @@ public class Env implements AutoCloseable {
       prim.add_def(_gvn.init(new ParmNode(i,args[i],fun,_gvn.con(targs[i]),null)));
     PrimNode x = _gvn.init(prim);
     assert x==prim;
-    return _gvn.init(new EpilogNode(fun,prim,rpc,fun));
+    return _gvn.init(new EpilogNode(fun,prim,rpc,fun,null));
   }
 
   public Node add( String name, Node val ) { return _scope.add(name,val); }

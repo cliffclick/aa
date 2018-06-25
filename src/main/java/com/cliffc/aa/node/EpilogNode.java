@@ -10,7 +10,8 @@ import java.util.BitSet;
 // - RPC - where to jump-to next; the Continuation
 // - The FunNode function header (quickly maps to SESE region header)
 public class EpilogNode extends Node {
-  public EpilogNode( Node ctrl, Node val, Node rpc, Node fun ) { super(OP_EPI,ctrl,val,rpc,fun); }
+  public final String _unkref_err; // Unknown ref error (not really a forward ref)
+  public EpilogNode( Node ctrl, Node val, Node rpc, Node fun, String unkref_err ) { super(OP_EPI,ctrl,val,rpc,fun); _unkref_err=unkref_err; }
   @Override public Node ideal(GVNGCM gvn) {
     if( skip_ctrl(gvn) ) return this;
 
@@ -49,7 +50,7 @@ public class EpilogNode extends Node {
     for( Node parm : fun._uses )
       if( parm instanceof ParmNode && ((ParmNode)parm)._name.equals("rpc") )
         { assert rpc==null; rpc = ((ParmNode)parm); }
-    assert rpc != null;
+    if( rpc == null ) return null;
     // Skip the unknown caller in slot 1
     assert gvn.type(rpc.at(1)) == TypeRPC.ALL_CALL;
     for( int i=2; i<rpc._defs._len; i++ ) {
@@ -99,9 +100,10 @@ public class EpilogNode extends Node {
   // declared.  Hence we want a callable function pointer, but have no defined
   // body (yet).  Make a function pointer that takes/ignores all args, and
   // returns any/top.
-  public static Node forward_ref( GVNGCM gvn, Node scope, String name ) {
+  public static Node forward_ref( GVNGCM gvn, Node scope, String name, Parse unkref ) {
     FunNode fun = gvn.init(new FunNode(scope,name));
-    return new EpilogNode(fun,gvn.con(TypeErr.ANY),gvn.con(TypeRPC.ALL_CALL),fun);
+    String referr = unkref.errMsg("Unknown ref '"+name+"'");
+    return new EpilogNode(fun,gvn.con(TypeErr.ANY),gvn.con(TypeRPC.ALL_CALL),fun, referr);
   }
 
   // True if this is a forward_ref

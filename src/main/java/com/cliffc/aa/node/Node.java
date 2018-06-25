@@ -210,6 +210,8 @@ public abstract class Node implements Cloneable {
     bs.set(_uid);                   // Only walk once
     if( this instanceof TypeNode )  // Gather errors
       errs = Parse.add_err(errs,((TypeNode)this).err(gvn));
+    if( is_forward_ref() )      // Forward refs not allowed in the result either
+      errs = Parse.add_err(errs,((EpilogNode)this)._unkref_err);
     for( int i=0; i<_defs._len; i++ ) {
       Node def = _defs.at(i);   // Walk data defs for more errors
       if( def == null ) continue;

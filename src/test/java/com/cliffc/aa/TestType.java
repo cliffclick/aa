@@ -111,15 +111,16 @@ public class TestType {
     test("id({+})(id(1),id(math_pi))",TypeFlt.make(0,64,Math.PI+1));
 
     // Function execution and result typing
-    test("x=3; fun={y -> x & y}; fun(2)", TypeInt.con(2)); // trivially inlined; capture external variable
-    test("x=3; fun={x -> x & 2}; fun(2)", TypeInt.con(2)); // trivially inlined; shadow  external variable
-    testerr("fun={x -> x+2}; x", "Unknown ref 'x'","                 "); // Scope exit ends lifetime
+    test("x=3; andx={y -> x & y}; andx(2)", TypeInt.con(2)); // trivially inlined; capture external variable
+    test("x=3; and2={x -> x & 2}; and2(2)", TypeInt.con(2)); // trivially inlined; shadow  external variable
+    testerr("plus2={x -> x+2}; x", "Unknown ref 'x'","                   "); // Scope exit ends lifetime
     testerr("fun={x -> }", "Missing function body","          ");
-    test("fun={x -> y=3; x*y}; fun(2)", TypeInt.con(6)); // multi statements in func body
+    testerr("fun(2)", "Unknown ref 'fun'", "   "); // multi statements in func body
+    test("mul3={x -> y=3; x*y}; mul3(2)", TypeInt.con(6)); // multi statements in func body
     // Needs overload cloning/inlining to resolve {+}
-    test("x=3; fun={y -> x+y}; fun(2)", TypeInt.con(5)); // must inline to resolve overload {+}:Int
-    test("x=3; fun={x -> x*2}; fun(2.1)", TypeFlt.con(2.1*2.0)); // must inline to resolve overload {+}:Flt with I->F conversion
-    test("x=3; fun={x -> x*2}; fun(2.1)+fun(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to fun()
+    test("x=3; addx={y -> x+y}; addx(2)", TypeInt.con(5)); // must inline to resolve overload {+}:Int
+    test("x=3; mul2={x -> x*2}; mul2(2.1)", TypeFlt.con(2.1*2.0)); // must inline to resolve overload {+}:Flt with I->F conversion
+    test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to fun()
 
     // Type annotations
     test("-1:int", TypeInt.con( -1));

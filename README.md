@@ -119,12 +119,12 @@ Identity mimics having type-vars via inlining during typing | ---
 `id({+})`         | `{{+:{int int -> int}, +:{flt flt -> flt}}`
 `id({+})(id(1),id(math_pi))` | `4.141592653589793:flt`
 Function execution and result typing | ---
-`x=3; fun={y -> x & y}; fun(2)` | `2:int` capture external variable
-`x=3; fun={x -> x & 2}; fun(2)` | `2:int` shadow  external variable
-`fun={x -> x+2}; x` | `Unknown ref 'x'` Scope exit ends lifetime
-`x=3; fun={y -> x+y}; fun(2)` | `5:int` Overloaded `+` resolves to `:int`
-`x=3; fun={x -> x*2}; fun(2.1)` | `4.2:flt` Overloaded `{+}:flt` resolves with I->F conversion
-`x=3; fun={x -> x*2}; fun(2.1)+fun(x)` | `10.2:flt` Overloaded `fun` specialized into int and flt variants
+`x=3; andx={y -> x & y}; andx(2)` | `2:int` capture external variable
+`x=3; and2={x -> x & 2}; and2(2)` | `2:int` shadow  external variable
+`plus2={x -> x+2}; x` | `Unknown ref 'x'` Scope exit ends lifetime
+`x=3; addx={y -> x+y}; addx(2)` | `5:int` Overloaded `+` resolves to `:int`
+`x=3; mul2={x -> x*2}; mul2(2.1)` | `4.2:flt` Overloaded `{+}:flt` resolves with I->F conversion
+`x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)` | `10.2:flt` Overloaded `mul2` specialized into int and flt variants
 Recursive functions | ---
 `fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)` | `6:int` fully evaluates at typing time
 `fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)` | `:int` does not collapse at typing time

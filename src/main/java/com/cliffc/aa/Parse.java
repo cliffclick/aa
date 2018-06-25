@@ -99,9 +99,6 @@ public class Parse {
     Type tres = Env.lookup_valtype(res);    // Result type
     String emsg = tres.errMsg();            // Error embedded in some subtype
     if( emsg != null ) errs = add_err(errs,emsg);
-    // Disallow forward-refs as top-level results
-    if( res.is_forward_ref() )
-      errs = add_err(errs,forward_ref_err(((EpilogNode)res).fun().name()));
     // Hunt for typing errors in the alive code
     assert par._par==null;      // Top-level only
     BitSet bs = new BitSet();
@@ -365,7 +362,7 @@ public class Parse {
     if( tok == null ) return null;
     Node var = _e.lookup(tok);
     if( var == null ) // Assume any unknown ref is a forward-ref of a recursive function
-      return _e.add(tok,gvn(EpilogNode.forward_ref(_gvn,_e._scope,tok)));
+      return _e.add(tok,gvn(EpilogNode.forward_ref(_gvn,_e._scope,tok,this)));
     // Disallow uniop and binop functions as factors.
     if( var.op_prec() > 0 ) { _x = oldx; return null; }
     return var;
@@ -406,7 +403,7 @@ public class Parse {
       Node rez = stmts();       // Parse function body
       if( rez == null ) rez = con(err_ctrl("Missing function body"));
       require('}');             //
-      Node epi = gvn(new EpilogNode(ctrl(),rez,rpc,fun));
+      Node epi = gvn(new EpilogNode(ctrl(),rez,rpc,fun,null));
       _e = _e._par;             // Pop nested environment
       set_ctrl(old_ctrl);       // Back to the pre-function-def control
       return epi;               // Return function; close-out and DCE 'e'
