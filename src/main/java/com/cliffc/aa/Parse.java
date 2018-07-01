@@ -16,6 +16,7 @@ import java.util.BitSet;
  *  prog = stmts END
  *  stmts= stmt [; stmt]*[;]?   // multiple statments; final ';' is optional
  *  stmt = [id[:type]? =]* ifex // ids must not exist, and are available in later statements
+ *  tasgn= id := type           // type variable assignment
  *  ifex = expr ? expr : expr   // trinary logic
  *  expr = term [binop term]*   // gather all the binops and sort by prec
  *  term = nfact [              // Any number of optional nfact modifiers

@@ -251,7 +251,9 @@ map:{ {A->B} List(A) -> List(B) }  = { f list -> ... }
 // List is a self-recursive type.
 // Field 'next' can be null or List(A).
 // Field 'val' is type A.
-List = :{ next:0|List(A) val:A }
+List = :@{ _+List(A) A }
+
+list = @{ next:0|list val:A }
 
 // Type A can allow nulls, or not
 strs:List(0)     = ... // List of nulls
