@@ -8,11 +8,9 @@ import java.util.HashMap;
 public class Env implements AutoCloseable {
   final Env _par;
   ScopeNode _scope; // Lexical anchor; goes when this environment leaves scope
-  private final HashMap<String,Type> _types; // user-typing type names
   Env( Env par ) {
     _par=par;
     _scope = new ScopeNode();
-    _types = new HashMap<>();
     add(" control ",_scope);
   }
 
@@ -28,7 +26,7 @@ public class Env implements AutoCloseable {
     // register them with GVN.
     for( Node val : _scope._defs )  _gvn.init0(val);
     _gvn.iter();
-    Type.init0(_types);
+    _scope  .init0(); // Add base types
     CallNode.init0(); // Done with adding primitives
     FunNode .init0(); // Done with adding primitives
     _gvn    .init0(); // Done with adding primitives
@@ -51,6 +49,8 @@ public class Env implements AutoCloseable {
 
   public Node add( String name, Node val ) { return _scope.add(name,val); }
 
+  public void add_type( String name, Type t ) { _scope.add_type(name,t); }
+  
   // A new top-level Env, above this is the basic public Env with all the primitives
   static Env top() { return new Env(TOP); }
 
@@ -111,7 +111,7 @@ public class Env implements AutoCloseable {
 
   // Type lookup
   Type lookup_type( String token ) {
-    Type t = _types.get(token);
+    Type t = _scope.get_type(token);
     if( t != null ) return t;
     return _par == null ? null : _par.lookup_type(token);
   }

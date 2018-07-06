@@ -6,6 +6,8 @@ import org.junit.Test;
 
 public class TestType {
   @Test public void testType0() {
+    test("gal = :flt", TypeFlt.FLT64); // Simple type-var assignment; returns type constructor
+    
     // Simple int
     test("1",   TypeInt.TRUE);
     // Unary operator

@@ -16,7 +16,7 @@ import java.util.BitSet;
  *  prog = stmts END
  *  stmts= stmt [; stmt]*[;]?   // multiple statments; final ';' is optional
  *  stmt = [id[:type]? =]* ifex // ids must not exist, and are available in later statements
- *  tasgn= id := type           // type variable assignment
+ *  stmt = tvar = :type         // type variable assignment
  *  ifex = expr ? expr : expr   // trinary logic
  *  expr = term [binop term]*   // gather all the binops and sort by prec
  *  term = nfact [              // Any number of optional nfact modifiers
@@ -38,7 +38,7 @@ import java.util.BitSet;
  *  func = { [[id[:type]?]* ->]? stmts} // Anonymous function declaration
  *  str  = [.\%]*               // String contents; \t\n\r\% standard escapes
  *  str  = %[num]?[.num]?fact   // Percent escape embeds a 'fact' in a string; "name=%name\n"
- *  type = tcon | tfun | tstruct // Types are a tcon or a tfun or a tstruct
+ *  type = tcon | tfun | tstruct | tvar // Types are a tcon or a tfun or a tstruct or a type variable
  *  tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str
  *  tfun = {[[type]* ->]? type }// Function types mirror func decls
  *  tstruct = @{ [id[:type],]*} // Struct types are field names with optional types
@@ -133,9 +133,10 @@ public class Parse {
   }
     
   /** A statement is a list of variables to let-assign, and an ifex for the
-   *  value.  The variables must not already exist, and are available in all
-   *  later statements.
+   *  value.  The variables must not already exist (or be a forward ref), and
+   *  are available in all later statements.
    *  stmt = [id[:type]? =]* ifex
+   *  stmt = tvar = :type
    */
   private Node stmt() {
     Ary<String> toks = new Ary<>(new String[1],0);
@@ -150,8 +151,23 @@ public class Parse {
       toks.add(tok);
       ts  .add(t  );
     }
-    Node ifex = ifex();
-    if( ifex == null )
+    // tvar assignment only allows 1 id
+    if( toks._len == 1 && ts.at(0)==null && peek(':') ) {
+      Type t = type();
+      if( t==null ) return con(err_ctrl("Missing type after ':'"));
+      String tvar = toks.at(0);
+      Type ot = _e.lookup_type(toks.at(0));
+      if( ot != null || _e.lookup(tvar) != null )
+        return con(err_ctrl("Cannot re-assign val '"+tok+"'"));
+      _e.add_type(toks.at(0),t); // Assign type-var
+      throw AA.unimpl();
+      //Node cfun = ...; // Type constructor
+      //return _e.(tok,cfun); // Return constructor
+    }
+
+    // Normal statement value parse
+    Node ifex = ifex();         // Parse an expression for the statement value
+    if( ifex == null )          // No statement?
       return toks._len == 0 ? null
         : con(err_ctrl("Missing ifex after assignment of '"+toks.last()+"'"));
     // Honor all type requests, all at once

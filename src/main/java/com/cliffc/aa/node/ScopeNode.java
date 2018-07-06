@@ -13,7 +13,9 @@ public class ScopeNode extends Node {
   // point to ConNodes with a TypeFun constant (a single function) or a
   // TypeUnion of TypeFuns.
   private final HashMap<String, Integer> _vals;
-  public ScopeNode() { super(OP_SCOPE); _vals = new HashMap<>(); }
+  // Mapping from type-variables to Types.  Types have a scope lifetime like values.
+  private final HashMap<String,Type> _types; // user-typing type names
+  public ScopeNode() { super(OP_SCOPE); _vals = new HashMap<>(); _types = new HashMap<>(); }
 
   // Name to node lookup, or null
   public Node get(String name) {
@@ -66,6 +68,18 @@ public class ScopeNode extends Node {
       set_def(idx, null, gvn);
       if( is_dead() ) return;
     }
+  }
+  
+  // Add base types on startup
+  public void init0() { Type.init0(_types); }
+  
+  // Name to type lookup, or null
+  public Type get_type(String name) { return _types.get(name);  }
+  
+  // Extend the current Scope with a new type; cannot override existing name.
+  public void add_type( String name, Type t ) {
+    assert _types.get(name)==null;
+    _types.put( name, t );
   }
   
   /** Return a ScopeNode with all the variable indices at or past the idx.
