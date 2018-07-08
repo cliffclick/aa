@@ -65,13 +65,13 @@ public class TypeTuple extends Type {
   public  static final TypeTuple  SCALAR1= make(Type.XSCALAR,1.0,Type. SCALAR);
           static final TypeTuple  SCALAR2= make(Type.XSCALAR,1.0,Type. SCALAR, Type. SCALAR);
   public  static final TypeTuple  SCALARS= make(Type. SCALAR,1.0);
-  public  static final TypeTuple INT32   = make(TypeInt.INT32 );
-  public  static final TypeTuple INT64   = make(TypeInt.INT64 );
-  public  static final TypeTuple FLT64   = make(TypeFlt.FLT64 );
-  public  static final TypeTuple STR     = make(TypeStr.STR   );
-  public  static final TypeTuple INT64_INT64 = make(TypeInt.INT64,TypeInt.INT64);
-  public  static final TypeTuple FLT64_FLT64 = make(TypeFlt.FLT64,TypeFlt.FLT64);
-  private static final TypeTuple FLT64_INT64 = make(TypeFlt.FLT64,TypeInt.INT64);
+  public  static final TypeTuple INT32   = make(Type.XSCALAR,1.0,TypeInt.INT32 );
+  public  static final TypeTuple INT64   = make(Type.XSCALAR,1.0,TypeInt.INT64 );
+  public  static final TypeTuple FLT64   = make(Type.XSCALAR,1.0,TypeFlt.FLT64 );
+  public  static final TypeTuple STR     = make(Type.XSCALAR,1.0,TypeStr.STR   );
+  public  static final TypeTuple INT64_INT64 = make(Type.XSCALAR,1.0,TypeInt.INT64,TypeInt.INT64);
+  public  static final TypeTuple FLT64_FLT64 = make(Type.XSCALAR,1.0,TypeFlt.FLT64,TypeFlt.FLT64);
+  private static final TypeTuple FLT64_INT64 = make(Type.XSCALAR,1.0,TypeFlt.FLT64,TypeInt.INT64);
   public  static final TypeTuple IF_ANY  = make_all(Type.XCTRL,Type.XCTRL);
   public  static final TypeTuple IF_ALL  = make_all(Type.CTRL ,Type.CTRL );
   public  static final TypeTuple IF_TRUE = make_all(Type.XCTRL,Type.CTRL );
@@ -83,21 +83,26 @@ public class TypeTuple extends Type {
   // The length of Tuples is a constant, and so is its own dual.  Otherwise
   // just dual each element.  Also flip the infinitely extended tail type.
   @Override protected TypeTuple xdual() {
-    if( _ts.length==0 && _inf.dual()==_inf ) return this; // Self-symmetric
+    boolean sym = _inf.dual()==_inf;
+    if( _ts.length==0 && sym ) return this; // Self-symmetric
     Type[] ts = new Type[_ts.length];
-    for( int i=0; i<_ts.length; i++ ) ts[i] = _ts[i].dual();
-    return new TypeTuple(ts,_inf.dual());
+    for( int i=0; i<_ts.length; i++ ) {
+      ts[i] = _ts[i].dual();
+      sym &= ts[i]==_ts[i];     // All elements self-symetric?
+    }
+    return sym ? this : new TypeTuple(ts,_inf.dual());
   }
   // Standard Meet.
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TTUPLE: break;
-    case TUNION:  
+    case TNAME:
+    case TUNION:
     case TSTRUCT: return t.xmeet(this); // Let TypeStruct decide
     case TSTR:   return Type.OOP;
     case TFLT:
     case TINT:
-    case TRPC:   
+    case TRPC:
     case TFUN:   return Type.SCALAR;
     case TERROR: return ((TypeErr)t)._all ? t : this;
     default: throw typerr(t);

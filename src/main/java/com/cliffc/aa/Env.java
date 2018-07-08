@@ -3,8 +3,6 @@ package com.cliffc.aa;
 import com.cliffc.aa.node.*;
 import com.cliffc.aa.type.*;
 
-import java.util.HashMap;
-
 public class Env implements AutoCloseable {
   final Env _par;
   ScopeNode _scope; // Lexical anchor; goes when this environment leaves scope
@@ -32,16 +30,17 @@ public class Env implements AutoCloseable {
     _gvn    .init0(); // Done with adding primitives
   }
   
-  // Called during basic Env creation, this wraps a PrimNode as a full
-  // 1st-class function to be passed about or assigned to variables.
-  private EpilogNode as_fun( PrimNode prim ) {
-    Type[] targs = prim._targs._ts;
+  // Called during basic Env creation and making of type constructors, this
+  // wraps a PrimNode as a full 1st-class function to be passed about or
+  // assigned to variables.
+  EpilogNode as_fun( PrimNode prim ) {
+    TypeTuple targs = prim._targs;
     String[] args = prim._args;
     FunNode  fun = _gvn.init(new  FunNode(_scope, prim)); // Points to ScopeNode only
     ParmNode rpc = _gvn.init(new ParmNode(-1,"rpc",fun,_gvn.con(TypeRPC.ALL_CALL),null));
     prim.add_def(null);         // Control for the primitive
     for( int i=0; i<args.length; i++ )
-      prim.add_def(_gvn.init(new ParmNode(i,args[i],fun,_gvn.con(targs[i]),null)));
+      prim.add_def(_gvn.init(new ParmNode(i,args[i],fun,_gvn.con(targs.at(i)),null)));
     PrimNode x = _gvn.init(prim);
     assert x==prim;
     return _gvn.init(new EpilogNode(fun,prim,rpc,fun,null));

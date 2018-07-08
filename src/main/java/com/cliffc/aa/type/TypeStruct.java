@@ -55,6 +55,7 @@ public class TypeStruct extends Type {
     switch( t._type ) {
     case TSTRUCT: tt = ((TypeStruct)t)._tt; args = ((TypeStruct)t)._args; break;
     case TTUPLE : tt =  (TypeTuple )t     ; args = new String[0]        ; break;
+    case TNAME:
     case TUNION: return t.xmeet(this); // Let TypeUnion decide
     case TSTR: return Type.OOP;
     case TFLT:

@@ -30,14 +30,14 @@ public class TypeInt extends Type {
   }
   public static TypeInt con(long con) { return make(0,log(con),con); }
 
-  static public final TypeInt  INT64 = make(-1,64,0);
-  static public final TypeInt  INT32 = make(-1,32,0);
+  static public  final TypeInt  INT64 = make(-1,64,0);
+  static public  final TypeInt  INT32 = make(-1,32,0);
   static private final TypeInt  INT16 = make(-1,16,0);
-  static public final TypeInt  INT8  = make(-1, 8,0);
-  static public final TypeInt  BOOL  = make(-1, 1,0);
-  static public final TypeInt TRUE   = make( 0, 1,1);
-  static public final TypeInt FALSE  = make( 0, 1,0);
-  static public final TypeInt XINT1  = make( 1, 1,0);
+  static public  final TypeInt  INT8  = make(-1, 8,0);
+  static public  final TypeInt  BOOL  = make(-1, 1,0);
+  static public  final TypeInt TRUE   = make( 0, 1,1);
+  static public  final TypeInt FALSE  = make( 0, 1,0);
+  static public  final TypeInt XINT1  = make( 1, 1,0);
   static final TypeInt[] TYPES = new TypeInt[]{INT64,INT32,INT16,BOOL,TRUE,FALSE,XINT1};
   static void init1( HashMap<String,Type> types ) {
     types.put("bool" ,BOOL);
@@ -65,6 +65,7 @@ public class TypeInt extends Type {
     case TERROR: return ((TypeErr)t)._all ? t : this;
     case TCTRL:
     case TXCTRL: return TypeErr.ALL;
+    case TNAME:
     case TUNION: return t.xmeet(this); // Let TypeUnion decide
     default: throw typerr(t);
     }

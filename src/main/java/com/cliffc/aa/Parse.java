@@ -154,22 +154,23 @@ public class Parse {
     // tvar assignment only allows 1 id
     if( toks._len == 1 && ts.at(0)==null && peek(':') ) {
       Type t = type();
-      if( t==null ) return con(err_ctrl("Missing type after ':'"));
+      if( t==null ) return err_ctrl2("Missing type after ':'");
       String tvar = toks.at(0);
-      Type ot = _e.lookup_type(toks.at(0));
-      if( ot != null || _e.lookup(tvar) != null )
-        return con(err_ctrl("Cannot re-assign val '"+tok+"'"));
-      _e.add_type(toks.at(0),t); // Assign type-var
-      throw AA.unimpl();
-      //Node cfun = ...; // Type constructor
-      //return _e.(tok,cfun); // Return constructor
+      Type ot = _e.lookup_type(tvar);
+      if( ot              != null ) return err_ctrl2("Cannot re-assign type '"+tvar+"'");
+      if( _e.lookup(tvar) != null ) return err_ctrl2("Cannot re-assign val '"+tvar+"' as a type");
+      TypeName tn = TypeName.make(tvar,t);
+      _e.add_type(tvar,tn); // Assign type-name
+      // TODO: Add reverse cast-away
+      PrimNode cvt = PrimNode.convert(null,t,tn);
+      return _e.add(tvar,_e.as_fun(cvt)); // Return type-name constructor
     }
 
     // Normal statement value parse
     Node ifex = ifex();         // Parse an expression for the statement value
     if( ifex == null )          // No statement?
       return toks._len == 0 ? null
-        : con(err_ctrl("Missing ifex after assignment of '"+toks.last()+"'"));
+        : err_ctrl2("Missing ifex after assignment of '"+toks.last()+"'");
     // Honor all type requests, all at once
     for( Type t : ts ) if( t != null ) ifex = gvn(new TypeNode(t,ifex,errMsg()));
     for( String tok : toks ) {
@@ -199,13 +200,13 @@ public class Parse {
       ctrls.add_def(ifex);      // Keep alive, even if 1st Proj kills last use, so 2nd Proj can hook
       set_ctrl(gvn(new CProjNode(ifex,1))); // Control for true branch
       Node tex = expr();
-      ctrls.add_def(tex==null ? con(err_ctrl("missing expr after '?'")) : tex);
+      ctrls.add_def(tex==null ? err_ctrl2("missing expr after '?'") : tex);
       ctrls.add_def(ctrl()); // 2 - hook true-side control
       ScopeNode t_scope = _e._scope.split(vidx); // Split out the new vars on the true side
       require(':');
       set_ctrl(gvn(new CProjNode(ifex,0)));
       Node fex = expr();
-      ctrls.add_def(fex==null ? con(err_ctrl("missing expr after ':'")) : fex);
+      ctrls.add_def(fex==null ? err_ctrl2("missing expr after ':'") : fex);
       ctrls.add_def(ctrl()); // 4 - hook false-side control
       ScopeNode f_scope = _e._scope.split(vidx); // Split out the new vars on the false side
       set_ctrl(init(new RegionNode(null,ctrls.at(2),ctrls.at(4))));
@@ -236,7 +237,7 @@ public class Parse {
         Node binfun = _e.lookup_filter(bin,_gvn,2); // BinOp, or null
         if( binfun==null ) { _x=oldx; break; } // Not a binop, no more Kleene star
         term = term();
-        if( term == null ) term = con(err_ctrl("missing expr after binary op "+bin));
+        if( term == null ) term = err_ctrl2("missing expr after binary op "+bin);
         funs.add(binfun);  args.add_def(term);
       }
 
@@ -284,7 +285,7 @@ public class Parse {
           if( arg != null ) {           // Check for a no-arg fcn call
             args.add_def(arg);          // Add first arg
             while( peek(',') ) {        // Gather comma-separated args
-              if( (arg=stmts()) == null ) arg = con(err_ctrl("Missing argument in function call"));
+              if( (arg=stmts()) == null ) arg = err_ctrl2("Missing argument in function call");
               args.add_def(arg);
             }
           }
@@ -293,7 +294,7 @@ public class Parse {
           n = t.is_fun_ptr() // Require being able to tell n is a function ptr at parse-time
             ? do_call(args)  // No syntax errors; flag Call not auto-close, and go again
             // Syntax error; auto-close reclaim args; but go again
-            : con(err_ctrl("A function is being called, but "+t+" is not a function type"));
+            : err_ctrl2("A function is being called, but "+t+" is not a function type");
         }
         break;
 
@@ -301,12 +302,12 @@ public class Parse {
         _x++;                   // Skip dot
         String fld = token();   // Field name
         n = fld == null         // Missing field?
-          ? con(err_ctrl("Missing field name after '.'"))
+          ? err_ctrl2("Missing field name after '.'")
           :  gvn(new LoadNode(n,fld,errMsg()));
         if( peek('=') ) {       // Right now, field re-assigns of any type
           Node stmt = stmt();
-          if( stmt == null ) n = con(err_ctrl("Missing stmt after assigning field '."+fld+"'"));
-          else { kill(stmt); n = con(err_ctrl("Cannot re-assign field '."+fld+"'")); }
+          if( stmt == null ) n = err_ctrl2("Missing stmt after assigning field '."+fld+"'");
+          else { kill(stmt); n = err_ctrl2("Cannot re-assign field '."+fld+"'"); }
         }
         break;
 
@@ -418,7 +419,7 @@ public class Parse {
         _e.add(ids.at(i),gvn(new TypeNode(ts.at(i),gvn(new ParmNode(cnt++,ids.at(i),fun,con(TypeErr.ALL),errmsg)),bads.at(i))));
       Node rpc = gvn(new ParmNode(-1,"rpc",fun,_gvn.con(TypeRPC.ALL_CALL),null));
       Node rez = stmts();       // Parse function body
-      if( rez == null ) rez = con(err_ctrl("Missing function body"));
+      if( rez == null ) rez = err_ctrl2("Missing function body");
       require('}');             //
       Node epi = gvn(new EpilogNode(ctrl(),rez,rpc,fun,null));
       _e = _e._par;             // Pop nested environment
@@ -449,7 +450,7 @@ public class Parse {
         stmt = gvn(new TypeNode(t,stmt,errMsg()));
         if( e._scope.get(tok)!=null ) {
           kill(stmt);
-          t = err_ctrl("Cannot define field '." + tok + "' twice");
+          t = err_ctrl1("Cannot define field '." + tok + "' twice");
           e._scope.update(tok,con(t),_gvn);
           ts.set(toks.find(fld -> fld.equals(tok)),t);
         } else {
@@ -461,7 +462,7 @@ public class Parse {
       }
       require('}');
       _e = _e._par;             // Pop nested environment
-      TypeStruct tstr = TypeStruct.make(toks.asAry(), TypeTuple.make(ts.asAry()));
+      TypeStruct tstr = TypeStruct.make(toks.asAry(), TypeTuple.make_all(ts.asAry()));
       Node[] flds = e._scope.get(toks);
       return gvn(new NewNode(tstr,flds));
     }
@@ -504,7 +505,7 @@ public class Parse {
     while( (c=_buf[_x++]) != '"' ) {
       if( c=='%' ) throw AA.unimpl();
       if( c=='\\' ) throw AA.unimpl();
-      if( _x == _buf.length ) return err_ctrl("Unterminated string");
+      if( _x == _buf.length ) return err_ctrl1("Unterminated string");
     }
     return TypeStr.make(0,new String(_buf,oldx,_x-oldx-1));
   }
@@ -553,7 +554,7 @@ public class Parse {
         if( !peek(',') ) break; // Final comma is optional
       }
       require('}');
-      return TypeStruct.make(flds.asAry(), TypeTuple.make(ts.asAry()));
+      return TypeStruct.make(flds.asAry(), TypeTuple.make_all(ts.asAry()));
     }
 
     // Primitive type
@@ -639,8 +640,9 @@ public class Parse {
   }
 
   // Whack current control with a syntax error
-  private TypeErr err_ctrl(String s) { return TypeErr.make(err_ctrl0(s)); }
-  private String err_ctrl0(String s) {
+  private Node    err_ctrl2(String s) { return con(err_ctrl1(s)); }
+  private TypeErr err_ctrl1(String s) { return TypeErr.make(err_ctrl0(s)); }
+  private String  err_ctrl0(String s) {
     String msg = errMsg(s);
     set_ctrl(gvn(new ErrNode(ctrl(),msg)));
     return msg;

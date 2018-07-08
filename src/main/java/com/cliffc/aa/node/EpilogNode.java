@@ -72,10 +72,10 @@ public class EpilogNode extends Node {
     return progress ? this : null;
   }
   @Override public Type value(GVNGCM gvn) {
-    Type t=TypeTuple.make(gvn.type(ctrl()), // Function exits, or not
-                          gvn.type(val ()), // Function return value
-                          gvn.type(rpc ()), // Caller; the Continuation
-                          fun()._tf);       // Function type plus "fidx"
+    Type t=TypeTuple.make_all(gvn.type(ctrl()), // Function exits, or not
+                              gvn.type(val ()), // Function return value
+                              gvn.type(rpc ()), // Caller; the Continuation
+                              fun()._tf);       // Function type plus "fidx"
     assert t.is_fun_ptr();
     return t;
   }

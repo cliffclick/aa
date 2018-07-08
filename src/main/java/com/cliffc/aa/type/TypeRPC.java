@@ -48,6 +48,7 @@ public class TypeRPC extends Type {
     case TINT:
     case TSTR:   return Type.SCALAR;
     case TRPC:   break;
+    case TNAME:
     case TUNION: return t.xmeet(this); // Let TypeUnion decide
     default: throw typerr(t);   // All else should not happen
     }
@@ -57,7 +58,7 @@ public class TypeRPC extends Type {
   
   public int rpc() { return _rpcs.getbit(); }
   public boolean test(int rpc) { return _rpcs.test(rpc); }
-  @Override public boolean above_center() { throw com.cliffc.aa.AA.unimpl(); }
-  @Override public boolean canBeConst() { return _rpcs.abit()>0; }
-  @Override public boolean is_con()     { return _rpcs.abit()>0; }
+  @Override public boolean above_center() { return _rpcs.abit()<0; }
+  @Override public boolean canBeConst()   { return _rpcs.abit()>0; }
+  @Override public boolean is_con()       { return _rpcs.abit()>0; }
 }

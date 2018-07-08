@@ -65,6 +65,7 @@ public class TypeFun extends Type {
     case TINT:
     case TSTR:   return Type.SCALAR;
     case TFUN:   break;
+    case TNAME:
     case TUNION: return t.xmeet(this); // Let TypeUnion decide
     default: throw typerr(t);   // All else should not happen
     }
@@ -80,9 +81,10 @@ public class TypeFun extends Type {
   @Override public Type arg(int idx) { return _ts._ts[idx]; }
   @Override public Type ret() { return _ret; }
 
-  @Override public boolean canBeConst() { throw com.cliffc.aa.AA.unimpl(); }
+  @Override public boolean above_center() { return _ret.above_center(); }
+  @Override public boolean canBeConst()   { return _fidxs.abit() > 0; }
+  @Override public boolean is_con()       { return _fidxs.abit() > 0; }
   public int fidx() { return _fidxs.getbit(); }
-  @Override public boolean is_con() { return _fidxs.abit() > 0; }
 
   // Generic functions
   private static final TypeTuple GENERIC_ARGS=TypeTuple.SCALARS;

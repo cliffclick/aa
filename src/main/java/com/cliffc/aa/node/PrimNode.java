@@ -62,13 +62,15 @@ public abstract class PrimNode extends Node {
   };
 
   // Loss-less conversions only, plus int64->flt64 (standard lossy conversion)
-  static PrimNode convert( Node actual, Type from, Type to ) {
+  public static PrimNode convert( Node actual, Type from, Type to ) {
     if( from.isa(TypeInt.INT64) && to.isa(TypeFlt.FLT64) ) return new ConvertInt64F64(null,actual);
     //if( from==Type.UInt32 && to==Type.I64 ) return convUInt32I64;
     //if( from==Type.UInt32 && to==Type.FLT64 ) return convUInt32F64;
     //if( from==Type. I64 && to==Type.FLT64 ) return  convI64F64;
     if( from.isa(TypeInt.INT64) && to.isa(TypeStr.STR) ) return new ConvertI64Str(null,actual);
     if( from.isa(TypeFlt.FLT64) && to.isa(TypeStr.STR) ) return new ConvertF64Str(null,actual);
+
+    if( to instanceof TypeName ) return new Convert(from,((TypeName)to));
     throw AA.unimpl();
   }
   
@@ -101,9 +103,24 @@ public abstract class PrimNode extends Node {
   }
 }
 
+class Convert extends PrimNode {
+  Convert(Type from, TypeName to) { super(to._name,PrimNode.ARGS1,TypeTuple.make(Type.XSCALAR,1.0,from),to); }
+  @Override public Type value(GVNGCM gvn) {
+    Type[] ts = new Type[_defs._len];
+    for( int i=1; i<_defs._len; i++ ) {
+      ts[i] = gvn.type(_defs.at(i));
+      if( ts[i] instanceof TypeErr ) return ts[i]; // Errors poison
+    }
+    return apply(ts);
+  }
+  @Override public TypeName apply( Type[] args ) { return TypeName.make(_name,args[1]); }
+  @Override public byte op_prec() { return 9; }
+  public boolean is_lossy() { return false; }
+}
+
 class ConvertInt64F64 extends PrimNode {
   ConvertInt64F64(Node... nodes) { super("flt64",PrimNode.ARGS1,TypeTuple.INT64,TypeFlt.FLT64,nodes); }
-  @Override public TypeFlt apply( Type[] args ) { return TypeFlt.make(0,64,(double)args[1].getl()); }
+  @Override public TypeFlt apply( Type[] args ) { return TypeFlt.con((double)args[1].getl()); }
   @Override public byte op_prec() { return 9; }
   public boolean is_lossy() { return false; }
 }
@@ -127,6 +144,7 @@ class ConvertStrStr extends PrimNode {
   @Override public Type apply( Type[] args ) { return args[1]; }
   @Override public Node ideal(GVNGCM gvn) { return at(1); }
   @Override public Type value(GVNGCM gvn) { return gvn.type(at(1)); }
+  public boolean is_lossy() { return false; }
 }
 
 // 1Ops have uniform input/output types, so take a shortcut on name printing

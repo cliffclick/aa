@@ -1,13 +1,12 @@
 package com.cliffc.aa;
 
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.Bits;
 import org.junit.Assert;
 import org.junit.Test;
 
 public class TestType {
   @Test public void testType0() {
-    test("gal = :flt", TypeFlt.FLT64); // Simple type-var assignment; returns type constructor
-    
     // Simple int
     test("1",   TypeInt.TRUE);
     // Unary operator
@@ -20,6 +19,7 @@ public class TestType {
     // Binary with precedence check
     test(" 1+2 * 3+4 *5", TypeInt.con( 27));
     test("(1+2)*(3+4)*5", TypeInt.con(105));
+    test("1// some comment\n+2", TypeInt.con(3)); // With bad comment
 
     // Float
     test("1.2+3.4", TypeFlt.make(0,64,4.6));
@@ -155,9 +155,9 @@ public class TestType {
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(5)", TypeInt.FALSE );
 
     // simple anon struct tests
-    test   ("  @{x,y}", TypeStruct.make(new String[]{"x","y"},TypeTuple.ANY)); // simple anon struct decl
+    test   ("  @{x,y} ", TypeStruct.make(new String[]{"x","y"},TypeTuple.make_all(TypeErr.ANY,TypeErr.ANY))); // simple anon struct decl
     testerr("a=@{x=1.2,y}; x", "Unknown ref 'x'","               ");
-    test   ("a=@{x=1.2,y}; a.x", TypeFlt.con(1.2)); // standard "." field naming
+    test   ("a=@{x=1.2,y,}; a.x", TypeFlt.con(1.2)); // standard "." field naming; trailing comma optional
     testerr("a=@{x,y}; a.x=1","Cannot re-assign field '.x'","               ");
     test   ("a=@{x=0,y=1}; b=@{x=2}  ; c=math_rand(1)?a:b; c.x", TypeInt.INT8); // either 0 or 2
     testerr("a=@{x=0,y=1}; b=@{x=2}; c=math_rand(1)?a:b; c.y",  "Unknown field '.y'","                                               ");
@@ -171,8 +171,18 @@ public class TestType {
     test   ("a=@{x=(b=1.2)*b,y=b}; a.y", TypeFlt.con(1.2 )); // ok to use temp defs
     test   ("a=@{x=(b=1.2)*b,y=x}; a.y", TypeFlt.con(1.44)); // ok to use early fields in later defs
 
-    test("1// some comment\n+2", TypeInt.con(3));
-    test   ("dist={p->p//qqq\n.//qqq\nx*p.x+p.y*p.y}; dist(//qqq\n@{x//qqq\n=1,y=2})", TypeInt.con(5));     // passed in to func
+    test   ("dist={p->p//qqq\n.//qqq\nx*p.x+p.y*p.y}; dist(//qqq\n@{x//qqq\n=1,y=2})", TypeInt.con(5));
+
+    // Named type variables
+    test_isa("gal=:flt"       , TypeTuple.make_fun_ptr(TypeFun.make(TypeTuple.FLT64,TypeName.make("gal",TypeFlt.FLT64),Bits.FULL)));
+    test_isa("gal=:flt; {gal}", TypeTuple.make_fun_ptr(TypeFun.make(TypeTuple.FLT64,TypeName.make("gal",TypeFlt.FLT64),Bits.FULL)));
+    test    ("gal=:flt; 3==gal(2)+1", TypeInt.TRUE);
+    test    ("gal=:flt; tank:gal = gal(2)", TypeName.make("gal",TypeFlt.con(2)));
+    // test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: free cast for bare constants
+    testerr ("gal=:flt; tank:gal = gal(2)+1", "3.0 is not a gal:flt64","                             ");
+    test    ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(@{x=1,y=2}))", TypeInt.con(5));
+    test    ("Point=:@{x,y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(@{x=1,y=2}))", TypeInt.con(5));
+    testerr ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(     (@{x=1,y=2}))", "@{x:1,y:2,all...} is not a Point:@{x:all,y:all,all...}","                      ");
     
     // TODO: Need real TypeVars for these
     //test("id:{A->A}"    , Env.lookup_valtype("id"));
@@ -184,41 +194,13 @@ public class TestType {
 
 // 0:int is the uniform initial value, counts as null; free cast to null
 
-
-// Adding named types to primitives, because its the natural extension 
-// when adding them to tuples.
-
-// 'gal' is a type name for a flt.  'gal' is a type, never a concrete value.
-gal = :flt
-
-// tank is being assigned a concrete value, not a type, so tank is not a type.
-tank:gal = 5:gal // tank has 5 gallons
-
-tank:gal = 10 // free cast for bare constants
-
-x = 1.23          // x has type flt 1.23
-tank:gal =     x  // ERR: x is not gallons; no free cast
-tank:gal = gal(x) // OK : called 'gal' constructor
-
-// Since comma, its a struct not a function type.
-// Trailing comma is optional.
 // A tuple of null and a string
-list_of_hello = { 0, "hello", }
+list_of_hello = @{ 0, "hello", }
 
 // No ambiguity:
  { x  } // no-arg-function returning external variable x; same as { -> x }
- { x, } // 1-elem struct   returning external variable x
-:{ x  } // 1-elem struct type with field named x
-
-// Adding named types to structs
-
-// Point is a struct with 2 untyped named variables
-Point = :{ x,     y, }
-Point = :{ x:flt, y:flt, } // Same Point, vars forced to flt
-
-here = Point(1,2) // Point constructor
-// "." field name lookup
-print(here.x)
+ { x, } // 1-elem tuple     wrapping external variable x
+@{ x  } // 1-elem struct type with field named x
 
 // Null
 x:str   = "hello" // x takes a not-null str
@@ -227,19 +209,12 @@ x:0|str = 0       // x takes a null or str
 x := 0       // x is untyped; assigned null right now
 x := "hello" // x is re-assigned and has type 0|str
 
-// Unnamed types use Duck typing; Named types are restricted (nomative)
-// 'dist2' takes any record with fields x,y
-dist2 = { p -> p.x*p.x+p.y*p.y }
-// Restrict argument to just Points
-dist2 = { p:Point -> p.x*p.x+p.y*p.y }
-
-
 // type variables are free in : type expressions
 
-// Define a pair as 2 fields "a" and "b" both with the same type T.
-// Note that 'a' and 'b' and 'T' are all free, but the comma parses this as a
-// collection, so 'a' and 'b' become field names and 'T' becomes a type-var.
-Pair = :{ a:T, b:T }
+// Define a pair as 2 fields "a" and "b" both with the same type T.  Note that
+// 'a' and 'b' and 'T' are all free, but the @ parses this as a struct, so 'a'
+// and 'b' become field names and 'T' becomes a free type-var.
+Pair = :@{ a:T, b:T }
 
 // Since no comma, its a function type not a struct type.
 // Since 'A' and 'B' are free and not field names, they become type-vars.

@@ -19,6 +19,7 @@ public class LoadNode extends Node {
   @Override public Node ideal(GVNGCM gvn) { return null; }
   @Override public Type value(GVNGCM gvn) {
     Type t = gvn.type(at(1));
+    while( t instanceof TypeName ) t = ((TypeName)t)._t;
     if( t instanceof TypeStruct ) {
       TypeStruct ts = (TypeStruct)t;
       int idx = ts.find(_fld);

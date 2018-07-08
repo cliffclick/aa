@@ -88,14 +88,15 @@ public class Type {
   // Implemented in subclasses
   static final byte TERROR  =11; // ALL/ANY TypeErr types
   static final byte TUNION  =12; // Union types (finite collections of unrelated types Meet together); see TypeUnion
-  static final byte TTUPLE  =13; // Tuples; finite collections of unrelated Types, kept in parallel
-  static final byte TSTRUCT =14; // Structs; tuples with named fields
-  static final byte TFUN    =15; // Functions; both domain and range are a Tuple; see TypeFun                            
-  static final byte TRPC    =16; // Return PCs; Continuations; call-site return points; see TypeRPC
-  static final byte TFLT    =17; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
-  static final byte TINT    =18; // All Integers, including signed/unsigned and various sizes; see TypeInt
-  static final byte TSTR    =19; // String type
-  static final byte TLAST   =20; // Type check
+  static final byte TNAME   =13; // Union types (finite collections of unrelated types Meet together); see TypeUnion
+  static final byte TTUPLE  =14; // Tuples; finite collections of unrelated Types, kept in parallel
+  static final byte TSTRUCT =15; // Structs; tuples with named fields
+  static final byte TFUN    =16; // Functions; both domain and range are a Tuple; see TypeFun                            
+  static final byte TRPC    =17; // Return PCs; Continuations; call-site return points; see TypeRPC
+  static final byte TFLT    =18; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
+  static final byte TINT    =19; // All Integers, including signed/unsigned and various sizes; see TypeInt
+  static final byte TSTR    =20; // String type
+  static final byte TLAST   =21; // Type check
   
   public  static final Type CTRL   = make( TCTRL  ); // Ctrl
   public  static final Type XCTRL  = make(TXCTRL  ); // Ctrl
@@ -121,8 +122,14 @@ public class Type {
   static /*final*/ Type[] SCALAR_PRIMS;
   
   private boolean is_simple() { return _type < TSIMPLE; }
-  private boolean is_oop() { return _type == TOOP || _type == TXOOP || _type == TSTR || _type == TSTRUCT || _type == TTUPLE; }
-  private boolean is_num() { return _type == TNUM || _type == TXNUM || _type == TREAL || _type == TXREAL || _type == TINT || _type == TFLT; }
+  // Strip off any subclassing just for names
+  private byte simple_type() {
+    Type t = this;
+    while( t._type == TNAME ) t = ((TypeName)t)._t;
+    return t._type;
+  }
+  private boolean is_oop() { byte t = simple_type();  return t == TOOP || t == TXOOP || t == TSTR || t == TSTRUCT || t == TTUPLE;  }
+  private boolean is_num() { byte t = simple_type();  return t == TNUM || t == TXNUM || t == TREAL || t == TXREAL || t == TINT || t == TFLT; }
   // True if 'this' isa SCALAR, without the cost of a full 'meet()'
   final boolean isa_scalar() { return _type != TERROR && _type != TCTRL && _type != TXCTRL; }
   
@@ -201,7 +208,7 @@ public class Type {
       if( _type == TREAL || t._type == TREAL ) return REAL;
       if(   _type == TXREAL ) return t   ;
       if( t._type == TXREAL ) return this;
-      throw AA.unimpl();          // Need nice printout
+      throw AA.unimpl();        // Need nice printout
     }
     throw AA.unimpl();          // Need nice printout
   }
@@ -248,6 +255,7 @@ public class Type {
     ts = concat(ts,TypeFun   .TYPES);
     ts = concat(ts,TypeRPC   .TYPES);
     ts = concat(ts,TypeUnion .TYPES);
+    ts = concat(ts,TypeName  .TYPES);
     
     // Confirm commutative & complete
     for( Type t0 : ts )

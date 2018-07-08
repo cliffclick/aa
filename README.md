@@ -13,6 +13,7 @@ BNF                           | Comment
 `prog = stmts END`            |
 `stmts= stmt [; stmt]*[;]?`   | multiple statments; final ';' is optional
 `stmt = [id[:type]? =]* ifex` | ids must not exist, and are available in later statements
+`stmt = tvar = :type`         | type variable assignment
 `ifex = expr ? expr : expr`   | trinary logic
 `expr = term [binop term]*`   | gather all the binops and sort by prec
 `term = nfact [          `    | Any number of optional nfact modifiers
@@ -34,7 +35,7 @@ BNF                           | Comment
 `func = { [[id[:type]*]* ->]? stmts}` | Anonymous function declaration
 `str  = [.\%]*`               | String contents; \t\n\r\% standard escapes
 `str  = %[num]?[.num]?fact`   | Percent escape embeds a 'fact' in a string; "name=%name\n"
-`type = tcon OR tfun OR tstruct` | Types are a tcon or a tfun or a tstruct
+`type = tcon OR tfun OR tstruct OR tvar` | Types are a tcon or a tfun or a tstruct or a type variable
 `tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str` | Primitive types
 `tfun = {[[type]* ->]? type }` | Function types mirror func decls
 `tstruct = @{ [id[:type],]*}` | Struct types are field names with optional types
