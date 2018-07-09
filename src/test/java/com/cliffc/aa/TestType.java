@@ -12,7 +12,7 @@ public class TestType {
     testerr("x:str  = 0", "null is not a str", "          ");
     test   ("math_rand(1)?0:\"abc\"", TypeUnion.make_null(TypeStr.con("abc")));
     testerr("(math_rand(1)?0 : @{x=1}).x", "Struct might be null when reading field '.x'", "                           ");
-    test   ("p=math_rand(1)?0:@{x=1}; p ? p.x : 0", TypeInt.BOOL);
+    //test   ("p=math_rand(1)?0:@{x=1}; p ? p.x : 0", TypeInt.BOOL);
     test   ("x:int = y:str? = z:flt = 0", TypeInt.NULL);
     
     // Simple int
@@ -24,6 +24,19 @@ public class TestType {
     test("1+2", TypeInt.con(  3));
     test("1-2", TypeInt.con( -1));
     test("1+2*3", TypeInt.con(  7));
+    test("1  < 2", TypeInt.TRUE );
+    test("1  <=2", TypeInt.TRUE );
+    test("1  > 2", TypeInt.FALSE);
+    test("1  >=2", TypeInt.FALSE);
+    test("1  ==2", TypeInt.FALSE);
+    test("1  !=2", TypeInt.TRUE );
+    test("1.2< 2", TypeInt.TRUE );
+    test("1.2<=2", TypeInt.TRUE );
+    test("1.2> 2", TypeInt.FALSE);
+    test("1.2>=2", TypeInt.FALSE);
+    test("1.2==2", TypeInt.FALSE);
+    test("1.2!=2", TypeInt.TRUE );
+
     // Binary with precedence check
     test(" 1+2 * 3+4 *5", TypeInt.con( 27));
     test("(1+2)*(3+4)*5", TypeInt.con(105));
@@ -89,24 +102,10 @@ public class TestType {
     test   ("2 ? (x=2) : y  ", TypeInt.con(2)); // off-side is constant-dead, so missing 'y'      is ignored
     testerr("x=1;2?(x=2):(x=3);x", "Cannot re-assign val 'x'","          ");
     test   ("x=1;2?   2 :(x=3);x",TypeInt.con(1)); // Re-assigned allowed & ignored in dead branch
-    testerr("1:","Syntax error; trailing junk"," "); // missing type
     test   ("math_rand(1)?1:int:2:int",TypeInt.INT8); // no ambiguity between conditionals and type annotations
     testerr("math_rand(1)?1: :2:int","missing expr after ':'","                "); // missing type
     testerr("math_rand(1)?1::2:int","missing expr after ':'","               "); // missing type
     testerr("math_rand(1)?1:\"a\"", "Cannot mix GC and non-GC types", "                  " );
-
-    test   ("1  < 2", TypeInt.TRUE );
-    test   ("1  <=2", TypeInt.TRUE );
-    test   ("1  > 2", TypeInt.FALSE);
-    test   ("1  >=2", TypeInt.FALSE);
-    test   ("1  ==2", TypeInt.FALSE);
-    test   ("1  !=2", TypeInt.TRUE );
-    test   ("1.2< 2", TypeInt.TRUE );
-    test   ("1.2<=2", TypeInt.TRUE );
-    test   ("1.2> 2", TypeInt.FALSE);
-    test   ("1.2>=2", TypeInt.FALSE);
-    test   ("1.2==2", TypeInt.FALSE);
-    test   ("1.2!=2", TypeInt.TRUE );
 
     // Anonymous function definition
     test_isa("{x y -> x+y}", TypeTuple.FUNPTR2); // actually {Flt,Int} x {FltxInt} -> {FltxInt} but currently types {SCALAR,SCALAR->SCALAR}
@@ -125,12 +124,12 @@ public class TestType {
     test("x=3; and2={x -> x & 2}; and2(x)", TypeInt.con(2)); // trivially inlined; shadow  external variable
     testerr("plus2={x -> x+2}; x", "Unknown ref 'x'","                   "); // Scope exit ends lifetime
     testerr("fun={x -> }", "Missing function body","          ");
-    testerr("fun(2)", "Unknown ref 'fun'", "   "); // multi statements in func body
-    test("mul3={x -> y=3; x*y}; mul3(2)", TypeInt.con(6)); // multi statements in func body
+    testerr("fun(2)", "Unknown ref 'fun'", "   ");
+    test("mul3={x -> y=3; x*y}; mul3(2)", TypeInt.con(6)); // multiple statements in func body
     // Needs overload cloning/inlining to resolve {+}
     test("x=3; addx={y -> x+y}; addx(2)", TypeInt.con(5)); // must inline to resolve overload {+}:Int
-    test("x=3; mul2={x -> x*2}; mul2(2.1)", TypeFlt.con(2.1*2.0)); // must inline to resolve overload {+}:Flt with I->F conversion
-    test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to fun()
+    test("x=3; mul2={x -> x*2}; mul2(2.1)", TypeFlt.con(2.1*2.0)); // must inline to resolve overload {*}:Flt with I->F conversion
+    test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
 
     // Type annotations
     test("-1:int", TypeInt.con( -1));
@@ -138,6 +137,7 @@ public class TestType {
     test("x:int = 1", TypeInt.TRUE);
     test("x:flt = 1", TypeInt.TRUE); // casts for free to a float
     testerr("x:flt32 = 123456789", "123456789 is not a flt32","                   ");
+    testerr("1:","Syntax error; trailing junk"," "); // missing type
     testerr("2:x", "Syntax error; trailing junk", " ");
     testerr("(2:)", "Expected ')' but found ':' instead", "  ");
 
@@ -165,19 +165,19 @@ public class TestType {
     // simple anon struct tests
     test   ("  @{x,y} ", TypeStruct.make(new String[]{"x","y"},TypeTuple.make_all(TypeErr.ANY,TypeErr.ANY))); // simple anon struct decl
     testerr("a=@{x=1.2,y}; x", "Unknown ref 'x'","               ");
+    testerr("a=@{x=1,x=2}", "Cannot define field '.x' twice","           ");
     test   ("a=@{x=1.2,y,}; a.x", TypeFlt.con(1.2)); // standard "." field naming; trailing comma optional
+    testerr("(a=@{x,y}; a.)", "Missing field name after '.'","             ");
     testerr("a=@{x,y}; a.x=1","Cannot re-assign field '.x'","               ");
-    test   ("a=@{x=0,y=1}; b=@{x=2}  ; c=math_rand(1)?a:b; c.x", TypeInt.INT8); // either 0 or 2
+    test   ("a=@{x=0,y=1}; b=@{x=2}  ; c=math_rand(1)?a:b; c.x", TypeInt.INT8); // either 0 or 2; structs can be partially merged
     testerr("a=@{x=0,y=1}; b=@{x=2}; c=math_rand(1)?a:b; c.y",  "Unknown field '.y'","                                               ");
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'","                    ");
     test   ("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1,y=2})", TypeInt.con(5));     // passed in to func
     test   ("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1,y=2,z=3})", TypeInt.con(5)); // extra fields OK
     test   ("dist={p:@{x,y} -> p.x*p.x+p.y*p.y}; dist(@{x=1,y=2})", TypeInt.con(5)); // Typed func arg
-    testerr("a=@{x=1,x=2}", "Cannot define field '.x' twice","           ");
-    testerr("a=@{x=(b=1.2)*b,y=b}; b", "Unknown ref 'b'","                       ");
-    testerr("(a=@{x,y}; a.)", "Missing field name after '.'","             ");
     test   ("a=@{x=(b=1.2)*b,y=b}; a.y", TypeFlt.con(1.2 )); // ok to use temp defs
     test   ("a=@{x=(b=1.2)*b,y=x}; a.y", TypeFlt.con(1.44)); // ok to use early fields in later defs
+    testerr("a=@{x=(b=1.2)*b,y=b}; b", "Unknown ref 'b'","                       ");
 
     test   ("dist={p->p//qqq\n.//qqq\nx*p.x+p.y*p.y}; dist(//qqq\n@{x//qqq\n=1,y=2})", TypeInt.con(5));
 

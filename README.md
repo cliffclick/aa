@@ -58,6 +58,9 @@ Binary operators have precedence | ---
 `1+2*3`         | `  7:int` standard precedence
 ` 1+2 * 3+4 *5` | ` 27:int`
 `(1+2)*(3+4)*5` | `105:int` parens overrides precedence
+`1// some comment\n+2` | `3:int` with bad comment
+`1 < 2`         | `1:int` true  is 1, 1 is true
+`1 > 2`         | `0:int` false is 0, 0 is false
 Float           | ---
 `1.2+3.4`       | `4.6:flt`
 `1+2.3`         | `3.3:flt` standard auto-widening of int to flt
@@ -110,6 +113,7 @@ Conditionals    | ---
 `x=1;2?   2 :(x=3);x` | `1:int` Re-assign allowed & ignored in dead branch
 `math_rand(1)?1:int:2:int` | `:int8` no ambiguity between conditionals and type annotations
 `math_rand(1)?1::2:int` | `missing expr after ':'`
+`math_rand(1)?1:\"a\""` | `Cannot mix GC and non-GC types`
 Anonymous function definition | ---
 `{x y -> x+y}`    | Types as a 2-arg function { int int -> int } or { flt flt -> flt }
 `{5}()`           | `5:int` No args nor `->` required; this is simply a no-arg function returning 5, being executed
@@ -123,42 +127,58 @@ Function execution and result typing | ---
 `x=3; andx={y -> x & y}; andx(2)` | `2:int` capture external variable
 `x=3; and2={x -> x & 2}; and2(x)` | `2:int` shadow  external variable
 `plus2={x -> x+2}; x` | `Unknown ref 'x'` Scope exit ends lifetime
+`fun={x -> }`     | `Missing function body`
+`mul3={x -> y=3; x*y}; mul3(2)` | `6:int` // multiple statements in func body
 `x=3; addx={y -> x+y}; addx(2)` | `5:int` Overloaded `+` resolves to `:int`
 `x=3; mul2={x -> x*2}; mul2(2.1)` | `4.2:flt` Overloaded `{+}:flt` resolves with I->F conversion
 `x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)` | `10.2:flt` Overloaded `mul2` specialized into int and flt variants
-Recursive functions | ---
-`fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)` | `6:int` fully evaluates at typing time
-`fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)` | `:int` does not collapse at typing time
-`is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)` | `1:int`
-`is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(5)` | `0:int`
 Type annotations  | ---
 `-1:int`          | `-1:int`
 `(1+2.3):flt`     | `3.3:flt`  Any expression can have a type annotation
 `x:int = 1`       | `1:int`  Variable assignment can also have one
 `x:flt = 1`       | `1:int` Casts for free to a float
 `x:flt32 = 123456789` | `123456789 is not a flt32` Failed to convert int64 to a flt32
+`1:`              | `Syntax error; trailing junk` Missing type
 `-1:int1`         | `-1 is not a int1` int1 is only {0,1}
 `"abc":int`       | `"abc" is not a int64`
 `x=3; fun:{int -> int} = {x -> x*2}; fun(2.1)+fun(x)` | `2.1 is not a int64`
 `x=3; fun:{real -> real} = {x -> x*2}; fun(2.1)+fun(x)` | `10.4:flt` real covers both int and flt
 `fun:{real->flt32} = {x -> x}; fun(123 )` | `123:int` Casts for free to real and flt32
 `fun:{real->flt32} = {x -> x}; fun(123456789)` | `123456789 is not a flt32`
+`{x:int -> x*2}(1)` | `2:int` types on parmeters too
+`{x:str -> x}(1)`   | `1 is not a str`
+Recursive and co-recursive functions | ---
+`fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)` | `6:int` fully evaluates at typing time
+`fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)` | `:int` does not collapse at typing time
+`is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)` | `1:int`
+`is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(5)` | `0:int`
 Simple anonymous structure tests | ---
 `  @{x,y}`        | `@{x,y}` Simple anon struct decl
-`a=@{x=1.2,y}; x` | `Unknown ref 'x'`
+`a=@{x=1.2,y}; x` | `Unknown ref 'x'` Field name does not escape structure
 `a=@{x=1,x=2}`    | `Cannot define field '.x' twice`
-`a=@{x=1.2,y}; a.x` | `1.2:flt` Standard "." field name lookups
+`a=@{x=1.2,y,}; a.x` | `1.2:flt` Standard "." field name lookups; trailing comma optional
 `(a=@{x,y}; a.)`  | `Missing field name after '.'`
 `a=@{x,y}; a.x=1` | `Cannot re-assign field '.x'` No reassignment yet
 `a=@{x=0,y=1}; b=@{x=2}; c=math_rand(1)?a:b; c.x` | `:int8` Either 0 or 2; structs can be partially merged and used
 `a=@{x=0,y=1}; b=@{x=2}; c=math_rand(1)?a:b; c.y` | `Unknown field '.y'` Used fields must be fully available
 `dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})` | `Unknown field '.y'`  Field not available inside of function
-`dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1,y=2})` | `5:int` Passing an anonymous struct
+`dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1,y=2})` | `5:int` Passing an anonymous struct OK
 `dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1,y=2,z=3})` | `5:int` Extra fields OK
 `dist={p:@{x,y} -> p.x*p.x+p.y*p.y}; dist(@{x=1,y=2})` | `5:int` Structure type annotations on function args
 `a=@{x=(b=1.2)*b,y=b}; a.y` | `1.2:flt`  Temps allowed in struct def
 `a=@{x=(b=1.2)*b,y=x}; a.y` | `1.44:flt` Ok to use early fields in later defs
 `a=@{x=(b=1.2)*b,y=b}; b` | `Unknown ref 'b'`  Structure def has a lexical scope
+`dist={p->p//qqq\n.//qqq\nx*p.x+p.y*p.y}; dist(//qqq\n@{x//qqq\n=1,y=2})` | `5:int`  Some rather horrible comments
+Named type variables | Named types are simple subtypes
+`gal=:flt`        | `gal{flt -> gal:flt}` Returns a simple type constructor function
+`gal=:flt; {gal}` | `gal{flt -> gal:flt}` Operator syntax for the function
+`gal=:flt; 3==gal(2)+1` | `1:int` Auto-cast-away `gal` to get a `flt`
+`gal=:flt; tank:gal = gal(2)` | `2:gal` 
+`gal=:flt; tank:gal = gal(2)+1` | `3.0 is not a gal:flt` No-auto-cast into a `gal`
+`Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(@{x=1,y=2}))` | `5:int` type variables can be used anywhere a type can, including function arguments
+`Point=:@{x,y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(@{x=1,y=2}))` | `5:int` this `dist` takes any argument with fields `@{x,y}`, `Point` included
+`Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(     (@{x=1,y=2}))` | `@{x:1,y:2} is not a Point:@{x,y}` this `dist` only takes a `Point` argument
+
 
 
 Done Stuff
