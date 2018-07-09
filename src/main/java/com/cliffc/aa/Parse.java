@@ -194,21 +194,21 @@ public class Parse {
     Node expr = expr();
     if( expr == null ) return null; // Expr is required, so missing expr implies not any ifex
     if( !peek('?') ) return expr;   // No if-expression
-    try( TmpNode ctrls = new TmpNode() ) {
+    try( TmpNode ctrls = new TmpNode(); TmpNode ttmp = new TmpNode(); TmpNode ftmp = new TmpNode() ) {
       int vidx = _e._scope._defs._len; // Set of live variables
       Node ifex = gvn(new IfNode(ctrl(),expr));
-      ctrls.add_def(ifex);      // Keep alive, even if 1st Proj kills last use, so 2nd Proj can hook
-      set_ctrl(gvn(new CProjNode(ifex,1))); // Control for true branch
+      ctrls.add_def(ifex); // Keep alive, even if 1st Proj kills last use, so 2nd Proj can hook
+      set_ctrl(gvn(new CProjNode(ifex,1)).sharpen(_gvn,_e._scope,ttmp)); // Control for true branch, and sharpen tested value
       Node tex = expr();
       ctrls.add_def(tex==null ? err_ctrl2("missing expr after '?'") : tex);
       ctrls.add_def(ctrl()); // 2 - hook true-side control
-      ScopeNode t_scope = _e._scope.split(vidx); // Split out the new vars on the true side
+      ScopeNode t_scope = _e._scope.split(vidx,ttmp,_gvn); // Split out the new vars on the true side
       require(':');
-      set_ctrl(gvn(new CProjNode(ifex,0)));
+      set_ctrl(gvn(new CProjNode(ifex,0)).sharpen(_gvn,_e._scope,ftmp)); // Control for false branch, and sharpen tested vale
       Node fex = expr();
       ctrls.add_def(fex==null ? err_ctrl2("missing expr after ':'") : fex);
       ctrls.add_def(ctrl()); // 4 - hook false-side control
-      ScopeNode f_scope = _e._scope.split(vidx); // Split out the new vars on the false side
+      ScopeNode f_scope = _e._scope.split(vidx,ftmp,_gvn); // Split out the new vars on the false side
       set_ctrl(init(new RegionNode(null,ctrls.at(2),ctrls.at(4))));
       String errmsg = errMsg("Cannot mix GC and non-GC types");
       _e._scope.common(this,errmsg,t_scope,f_scope); // Add a PhiNode for all commonly defined variables

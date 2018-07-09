@@ -22,9 +22,14 @@ public class TypeStruct extends Type {
   }
   @Override public String toString() {
     SB sb = new SB().p("@{");
-    for( int i=0; i<_args.length; i++ )
-      sb.p(_args[i]).p(':').p(_tt.at(i).toString()).p(',');
-    return sb.p(_tt._inf.toString()).p("...}").toString();
+    for( int i=0; i<_args.length; i++ ) {
+      sb.p(_args[i]);
+      if( _tt.at(i) != TypeErr.ALL ) sb.p(':').p(_tt.at(i).toString());
+      if( i<_args.length-1 ) sb.p(',');
+    }
+    if( _tt._inf!=TypeErr.ALL && _tt._inf!=TypeErr.ANY )
+      sb.p(_tt._inf.toString()).p("...");
+    return sb.p("}").toString();
   }
 
   private static TypeStruct FREE=null;

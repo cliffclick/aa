@@ -5,16 +5,10 @@ import com.cliffc.aa.util.Bits;
 import org.junit.Assert;
 import org.junit.Test;
 
+import java.util.HashMap;
+
 public class TestType {
   @Test public void testType0() {
-    test   ("x:str? = 0", TypeInt.NULL); // question-type allows null or not; zero digit is null
-    test   ("x:str? = \"abc\"", TypeStr.con("abc")); // question-type allows null or not
-    testerr("x:str  = 0", "null is not a str", "          ");
-    test   ("math_rand(1)?0:\"abc\"", TypeUnion.make_null(TypeStr.con("abc")));
-    testerr("(math_rand(1)?0 : @{x=1}).x", "Struct might be null when reading field '.x'", "                           ");
-    //test   ("p=math_rand(1)?0:@{x=1}; p ? p.x : 0", TypeInt.BOOL);
-    test   ("x:int = y:str? = z:flt = 0", TypeInt.NULL);
-    
     // Simple int
     test("1",   TypeInt.TRUE);
     // Unary operator
@@ -190,7 +184,19 @@ public class TestType {
     testerr ("gal=:flt; tank:gal = gal(2)+1", "3.0 is not a gal:flt64","                             ");
     test    ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(@{x=1,y=2}))", TypeInt.con(5));
     test    ("Point=:@{x,y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(@{x=1,y=2}))", TypeInt.con(5));
-    testerr ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(     (@{x=1,y=2}))", "@{x:1,y:2,all...} is not a Point:@{x:all,y:all,all...}","                      ");
+    testerr ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(     (@{x=1,y=2}))", "@{x:1,y:2} is not a Point:@{x,y}","                      ");
+
+    // nullable and not-null pointers
+    test   ("x:str? = 0", TypeInt.NULL); // question-type allows null or not; zero digit is null
+    test   ("x:str? = \"abc\"", TypeStr.con("abc")); // question-type allows null or not
+    testerr("x:str  = 0", "null is not a str", "          ");
+    test   ("math_rand(1)?0:\"abc\"", TypeUnion.make_null(TypeStr.con("abc")));
+    testerr("(math_rand(1)?0 : @{x=1}).x", "Struct might be null when reading field '.x'", "                           ");
+    test   ("p=math_rand(1)?0:@{x=1}; p ? p.x : 0", TypeInt.BOOL); // not-null-ness after a null-check
+    test   ("x:int = y:str? = z:flt = 0", TypeInt.NULL); // null/0 freely recasts
+    test   ("\"abc\"==0", TypeInt.FALSE ); // No type error, just not null
+    test   ("\"abc\"!=0", TypeInt.TRUE  ); // No type error, just not null
+    test   ("nil=0; \"abc\"!=nil", TypeInt.TRUE); // Another way to name null
     
     // TODO: Need real TypeVars for these
     //test("id:{A->A}"    , Env.lookup_valtype("id"));
@@ -209,13 +215,6 @@ list_of_hello = @{ 0, "hello", }
  { x  } // no-arg-function returning external variable x; same as { -> x }
  { x, } // 1-elem tuple     wrapping external variable x
 @{ x  } // 1-elem struct type with field named x
-
-// Null
-x:str  = "hello" // x takes a not-null str
-x:str? =  0      // x takes a null or str
-
-x := 0       // x is untyped; assigned null right now
-x := "hello" // x is re-assigned and has type str?
 
 // type variables are free in : type expressions
 
@@ -293,6 +292,7 @@ c[x]=1;
 
   // TODO: Observation: value() calls need to be monotonic, can test this.
   @Test public void testCommuteSymmetricAssociative() {
+    Type.init0(new HashMap<>());
     // Uncomment to insert a single test to focus on
     Type t1 = (TypeInt.INT64.join(TypeFlt.FLT64)).join(TypeStr.STR) ;
     Type t2 =  TypeInt.INT64.join(TypeFlt.FLT64  .join(TypeStr.STR));

@@ -113,7 +113,7 @@ Conditionals    | ---
 `x=1;2?   2 :(x=3);x` | `1:int` Re-assign allowed & ignored in dead branch
 `math_rand(1)?1:int:2:int` | `:int8` no ambiguity between conditionals and type annotations
 `math_rand(1)?1::2:int` | `missing expr after ':'`
-`math_rand(1)?1:\"a\""` | `Cannot mix GC and non-GC types`
+`math_rand(1)?1:"a"` | `Cannot mix GC and non-GC types`
 Anonymous function definition | ---
 `{x y -> x+y}`    | Types as a 2-arg function { int int -> int } or { flt flt -> flt }
 `{5}()`           | `5:int` No args nor `->` required; this is simply a no-arg function returning 5, being executed
@@ -152,7 +152,7 @@ Recursive and co-recursive functions | ---
 `fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)` | `:int` does not collapse at typing time
 `is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)` | `1:int`
 `is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(5)` | `0:int`
-Simple anonymous structure tests | ---
+Simple anonymous structures | ---
 `  @{x,y}`        | `@{x,y}` Simple anon struct decl
 `a=@{x=1.2,y}; x` | `Unknown ref 'x'` Field name does not escape structure
 `a=@{x=1,x=2}`    | `Cannot define field '.x' twice`
@@ -178,7 +178,17 @@ Named type variables | Named types are simple subtypes
 `Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(@{x=1,y=2}))` | `5:int` type variables can be used anywhere a type can, including function arguments
 `Point=:@{x,y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(@{x=1,y=2}))` | `5:int` this `dist` takes any argument with fields `@{x,y}`, `Point` included
 `Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(     (@{x=1,y=2}))` | `@{x:1,y:2} is not a Point:@{x,y}` this `dist` only takes a `Point` argument
-
+Nullable and not-null modeled after Kotlin | ---
+`x:str? = 0`      | `null`  question-type allows null or not; zero digit is null
+`x:str? = "abc"`| `"abc":str` question-type allows null or not
+`x:str  = 0`      | `"null is not a str"`
+`math_rand(1)?0:"abc"` | `"abc"?` Null-or-string "abc"
+`(math_rand(1)?0 : @{x=1}).x` | `Struct might be null when reading field '.x'` Must be probable not-null
+`p=math_rand(1)?0:@{x=1}; p ? p.x : 0` | `:int1` not-null-ness after a null-check, so field de-ref is OK
+`x:int = y:str? = z:flt = 0` | `0:int` null/0 freely recasts
+`"abc"==0`        | `0:int` Compare vs null
+`"abc"!=0`        | `1:int` Compare vs null
+`nil=0; "abc"!=nil` | `1:int` Another name for 0/null
 
 
 Done Stuff
@@ -195,6 +205,9 @@ Done Stuff
 * default "x=1" makes a "val" until scope runs out (cannot re-assign)
 * Sub-byte ranges?  Julia-like math typing
 * Functional; 1st class functions.
+* Null-ptr distinguished; null/notnull types (e.g. Kotlin)
+* Duck-typing.  Interfaces.
+* Can type-name primitives, but no e.g. physical-unit-type math
 
 
 Ideas, Desirables
@@ -231,12 +244,11 @@ concurrency:
 
 types and name spaces and nulls:
 
-* Null-ptr distinguished; null/notnull types (e.g. Kotlin)
 * OOP namespaces (distinguished "this"; classes; single-inheritance vs interfaces)
-* Duck-typing?  Interfaces.  Single inheritance (or none; composition also works).
-* physical-unit-types, esp for arrays; e.g. "fueltank_size:gallon", and "speed:mile/hour", with auto-conversions
 * Modules: independent shipping of code.
 * Elm-style union types
+* Single inheritance (or none; composition also works).
+* physical-unit-types, esp for arrays; e.g. "fueltank_size:gallon", and "speed:mile/hour", with auto-conversions
 
 performance types:
 

@@ -153,6 +153,7 @@ public class TypeInt extends Type {
     if( t._type == Type.TFLT ) return 1; // Int->Flt ignores large int overflow issues
     if( t._type == Type.TREAL ) return 0;
     if( t._type == Type.TSCALAR ) return 0;
+    if( t._type == Type.TUNION && ((TypeUnion)t).has_null() && this==NULL ) return 0;
     throw com.cliffc.aa.AA.unimpl();
   }
   @Override public Type widen() {

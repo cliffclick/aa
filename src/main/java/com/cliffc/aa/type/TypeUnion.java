@@ -7,8 +7,8 @@ import java.util.Comparator;
 // Type union is a meet (or join) of unrelated SCALAR types.  Specifically it
 // simplifies out overlapping choices, such as {Flt64*Flt32} :=: Flt64.
 public class TypeUnion extends Type {
-  public TypeTuple _ts;         // All of these are possible choices
-  public boolean _any; // FALSE: meet; must support all; TRUE: join; can pick any one choice
+  private TypeTuple _ts;         // All of these are possible choices
+  private boolean _any; // FALSE: meet; must support all; TRUE: join; can pick any one choice
   private TypeUnion( TypeTuple ts, boolean any ) { super(TUNION); init(ts,any); }
   private void init( TypeTuple ts, boolean any ) { _ts = ts;  _any=any;  assert !ts.has_union(); }
   @Override public int hashCode( ) { return TUNION+_ts.hashCode()+(_any?1:0);  }
@@ -18,7 +18,13 @@ public class TypeUnion extends Type {
     TypeUnion t = (TypeUnion)o;
     return _any==t._any && _ts==t._ts;
   }
-  @Override public String toString() { return "{"+(_any?"any":"all")+_ts+"}"; }
+  @Override public String toString() {
+    if( _ts._ts.length==2 ) {
+      if( _ts.at(0)==TypeInt.NULL && _ts.at(1).is_oop() )  return _ts.at(1)+"?";
+      if( _ts.at(1)==TypeInt.NULL && _ts.at(0).is_oop() )  return _ts.at(0)+"?";
+    }
+    return "{"+(_any?"any":"all")+_ts+"}";
+  }
   private static TypeUnion FREE=null;
   private TypeUnion free( TypeUnion f ) { FREE=f; return this; }
   public static TypeUnion make( TypeTuple ts, boolean any ) {
@@ -106,14 +112,22 @@ public class TypeUnion extends Type {
 
   // Mix null with another
   public static Type make_null( Type t ) { assert t.is_oop(); return make(false,TypeInt.NULL,t); }
-  
+
+  // True if has a null
   public boolean has_null( ) {
     for( Type t : _ts._ts ) if( t==TypeInt.NULL ) return true;
     return false;
   }
+  // Same union, minus the null
+  public Type remove_null() {
+    Ary<Type> ts = new Ary<>(new Type[1],0);
+    for( Type t : _ts._ts ) if( t!=TypeInt.NULL ) ts.add(t);
+    return make(_any,ts);
+  }
   
   static final TypeUnion ANY_NUM = (TypeUnion)make(true , TypeInt.INT64, TypeFlt.FLT64);
-  static final TypeUnion[] TYPES = new TypeUnion[]{ANY_NUM};
+  static final TypeUnion OOP     = (TypeUnion)make(false, TypeInt.NULL , Type.OOP);
+  static final TypeUnion[] TYPES = new TypeUnion[]{ANY_NUM, OOP};
 
   @Override protected TypeUnion xdual() { return new TypeUnion((TypeTuple)_ts.dual(),!_any); }
   

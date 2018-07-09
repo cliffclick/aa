@@ -238,6 +238,7 @@ public class Type {
   public Type join( Type t ) { return dual().meet(t.dual()).dual(); }
 
   public static void init0( HashMap<String,Type> types ) {
+    TypeTuple.init1();
     types.put("real",REAL);
     TypeInt.init1(types);
     TypeFlt.init1(types);

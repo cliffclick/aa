@@ -11,21 +11,21 @@ public class IfNode extends Node {
     return null;
   }
   @Override public TypeTuple value(GVNGCM gvn) {
-    // If the input is exactly  zero, we can return false: {ANY,CONTROL}
-    // If the input is excludes zero, we can return true : {CONTROL,ANY}
-    // If the input is excludes both, we can return ANY:   {ANY,ANY}
-    // If the input is includes both, we can return both:  {CONTROL,CONTROL}
-    if( gvn.type(at(0))==Type.XCTRL ) return TypeTuple.IF_ANY;
+    // If the input is exactly zero, we can return false: {ANY,CONTROL}
+    // If the input excludes   zero, we can return true : {CONTROL,ANY}
+    // If the input excludes   both, we can return ANY:   {ANY,ANY}
+    // If the input includes   both, we can return both:  {CONTROL,CONTROL}
+    if( gvn.type(at(0))==Type.XCTRL ) return TypeTuple.IF_ANY; // Test is dead
     Type pred = gvn.type(at(1));
     if( pred instanceof TypeUnion ) // Pointers with and without null
       pred = ((TypeUnion)pred).has_null() ? TypeInt.BOOL : TypeInt.TRUE;
-    if( pred.isa(TypeInt.XINT1) ) return TypeTuple.IF_ANY;
-    if( TypeInt.BOOL.isa(pred)  ) return TypeTuple.IF_ALL;
-    if( pred==TypeInt.FALSE     ) return TypeTuple.IF_FALSE;
+    if( pred.isa(TypeInt.XINT1) ) return TypeTuple.IF_ANY;  // Choice of {0,1}
+    if( TypeInt.BOOL.isa(pred)  ) return TypeTuple.IF_ALL;  // Can be either
+    if( pred==TypeInt.FALSE     ) return TypeTuple.IF_FALSE;// False only
     if( !(pred instanceof TypeInt) )
-      throw AA.unimpl();
-    if( pred.is_con() ) { assert pred.getl() != 0; return TypeTuple.IF_TRUE; }
-    return TypeTuple.IF_ANY;    // No more refinement than constant 0 vs constant non-zero
+      throw AA.unimpl(); // Dunno what this test is?
+    if( pred.is_con() ) { assert pred.getl() != 0; return TypeTuple.IF_TRUE; } // True only
+    throw AA.unimpl(); // Dunno what this test is?
   }
   @Override public Type all_type() { return TypeTuple.IF_ALL; }
   @Override public Node is_copy(GVNGCM gvn, int idx) {

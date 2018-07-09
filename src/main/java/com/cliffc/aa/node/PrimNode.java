@@ -59,6 +59,9 @@ public abstract class PrimNode extends Node {
     new   GE_I64(),
     new   EQ_I64(),
     new   NE_I64(),
+
+    new   EQ_OOP(),
+    new   NE_OOP(),
   };
 
   // Loss-less conversions only, plus int64->flt64 (standard lossy conversion)
@@ -266,6 +269,20 @@ class GE_I64 extends Prim2RelOpI64 { GE_I64() { super(">="); } boolean op( long 
 class EQ_I64 extends Prim2RelOpI64 { EQ_I64() { super("=="); } boolean op( long l, long r ) { return l==r; } }
 class NE_I64 extends Prim2RelOpI64 { NE_I64() { super("!="); } boolean op( long l, long r ) { return l!=r; } }
 
+
+class EQ_OOP extends PrimNode {
+  EQ_OOP() { super("==",PrimNode.ARGS2,TypeTuple.OOP_OOP,TypeInt.BOOL); }
+  public TypeInt apply( Type[] args ) { return args[1] == args[2] ? TypeInt.TRUE : TypeInt.FALSE; }
+  @Override public byte op_prec() { return 4; }
+}
+
+class NE_OOP extends PrimNode {
+  NE_OOP() { super("!=",PrimNode.ARGS2,TypeTuple.OOP_OOP,TypeInt.BOOL); }
+  public TypeInt apply( Type[] args ) { return args[1] != args[2] ? TypeInt.TRUE : TypeInt.FALSE; }
+  @Override public byte op_prec() { return 4; }
+}
+
+
 class RandI64 extends PrimNode {
   RandI64() { super("math_rand",PrimNode.ARGS1,TypeTuple.INT64,TypeInt.INT64); }
   @Override public TypeInt apply( Type[] args ) { return TypeInt.con(new java.util.Random().nextInt((int)args[1].getl())); }
@@ -273,7 +290,6 @@ class RandI64 extends PrimNode {
 }
 
 class Id extends PrimNode {
-
   Id(Type arg) { super("id",PrimNode.ARGS1,TypeTuple.make(Type.XSCALAR,1.0,arg),arg); }
   @Override public Type apply( Type[] args ) { return args[1]; }
   @Override public Node ideal(GVNGCM gvn) { return at(1); }

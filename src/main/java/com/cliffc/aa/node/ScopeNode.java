@@ -82,11 +82,21 @@ public class ScopeNode extends Node {
     _types.put( name, t );
   }
   
-  /** Return a ScopeNode with all the variable indices at or past the idx.
+  /** Return a ScopeNode with all the variable indices at or past the idx;
+   *  remove them from 'this' ScopeNode.
    *  @param idx index to split on
+   *  @param tmp A list of dull nodes, used to reverse sharpening after the if arm closes
    *  @return a ScopeNode with the higher indices; 'this' has the lower indices.  null if no new vars
    */
-  public ScopeNode split( int idx ) {
+  public ScopeNode split( int idx, TmpNode tmp, GVNGCM gvn ) {
+    // Recover old 'dull' values after a sharpening if-test ends.
+    for( int i=0; i<tmp._defs._len; i++ ) {
+      if( tmp.at(i) != null ) {
+        assert at(i) != tmp.at(i) && at(i) != null;
+        set_def(i,tmp.at(i),gvn);
+      }
+    }
+    
     int oldlen = _defs._len;
     if( idx == oldlen ) return null; // No vars, no return
     ScopeNode s = new ScopeNode();
@@ -131,6 +141,15 @@ public class ScopeNode extends Node {
   }
   private void add_phi(Parse P, String errmsg, String name, Node tn, Node fn) {
     add(name,tn==fn ? fn : P.gvn(new PhiNode(errmsg, P.ctrl(),tn,fn)));
+  }
+
+  // Replace uses of dull with sharp, used after an IfNode test
+  void sharpen( Node dull, Node sharp, TmpNode tmp ) {
+    for( int i=0; i<_defs._len; i++ )
+      if( at(i)==dull ) {
+        tmp.set_def(i,dull);    // Save dull for recovery after If arm passes
+        set_def(i,sharp,null);  // ok for gvn to be passed null, because 'dull' never deleted
+      }
   }
   
   @Override public Node ideal(GVNGCM gvn) { return null; }

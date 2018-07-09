@@ -1,7 +1,11 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.*;
+import com.cliffc.aa.AA;
+import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeErr;
+import com.cliffc.aa.type.TypeInt;
+import com.cliffc.aa.type.TypeUnion;
 
 // Proj control
 public class CProjNode extends ProjNode {
@@ -16,4 +20,32 @@ public class CProjNode extends ProjNode {
   // Return the op_prec of the returned value.  Not sensible except
   // when call on primitives.
   @Override public byte op_prec() { return _defs.at(0).op_prec(); }
+  
+  // Used in Parser just after an if-test to sharpen the tested variables.
+  // Main use is to remove null-ness from a nullable after a null-check.  If
+  // the IfNode collapses during parsing, some other node will call here (a
+  // default true or false), and the sharpening will not be needed.
+  @Override public CProjNode sharpen( GVNGCM gvn, ScopeNode scope, TmpNode tmp ) {
+    Node iff = at(0);
+    if( !(iff instanceof IfNode) ) return this; // Already collapsed IfNode, no sharpen
+    Node test = iff.at(1);
+    Type pred = gvn.type(test);
+    if( pred instanceof TypeErr ) return this;
+    if( pred==TypeInt.BOOL ) {  // The bool test itself is either 0 or 1
+      // Find and replace uses of the pred in the scope with the con
+      scope.sharpen(test,gvn.con(TypeInt.con(_idx)),tmp);
+      return this;
+    }
+    if( pred instanceof TypeUnion ) {  // Check for null & oop
+      assert ((TypeUnion)pred).has_null(); // Else the IfNode already sharpened
+      Node sharp = _idx==1
+        ? gvn.xform(new CastNode(this,test,((TypeUnion)pred).remove_null()))
+        : gvn.con(TypeInt.NULL);
+      scope.sharpen(test,sharp,tmp);
+      return this;
+    }
+
+    throw AA.unimpl();
+  }
+
 }

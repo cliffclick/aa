@@ -17,6 +17,7 @@ public class Env implements AutoCloseable {
   public static ScopeNode top_scope() { return TOP._scope; }
   static { TOP.init(); }
   private void init() {
+    _scope  .init0(); // Add base types
     _scope.add("math_pi",new ConNode<>(TypeFlt.PI));
     for( PrimNode prim : PrimNode.PRIMS )
       _scope.add_fun(prim._name,as_fun(prim));
@@ -24,7 +25,6 @@ public class Env implements AutoCloseable {
     // register them with GVN.
     for( Node val : _scope._defs )  _gvn.init0(val);
     _gvn.iter();
-    _scope  .init0(); // Add base types
     CallNode.init0(); // Done with adding primitives
     FunNode .init0(); // Done with adding primitives
     _gvn    .init0(); // Done with adding primitives

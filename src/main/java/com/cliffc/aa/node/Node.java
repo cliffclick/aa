@@ -177,6 +177,12 @@ public abstract class Node implements Cloneable {
     return true;
   }
 
+  // Used in Parser just after an if-test to sharpen the tested variables.
+  // Main use is to remove null-ness from a nullable after a null-check.  If
+  // the IfNode collapses during parsing, some other node will call here (a
+  // default true or false), and the sharpening will not be needed.
+  public Node sharpen( GVNGCM gvn, ScopeNode scope, TmpNode tmp ) { return this; }
+    
   // Liveness walk, all reachable defs
   public void walk( BitSet bs ) {
     assert !is_dead();

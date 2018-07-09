@@ -78,7 +78,15 @@ public class TypeTuple extends Type {
   public  static final TypeTuple IF_FALSE= make_all(Type.CTRL ,Type.XCTRL);
   public  static final TypeTuple FUNPTR2 = make_fun_ptr(TypeFun.any(2,-1));
   public  static final TypeTuple GENERIC_FUN = make_fun_ptr(TypeFun.make_generic());
-  static final TypeTuple[] TYPES = new TypeTuple[]{ANY,SCALAR1,STR,INT32,INT64,FLT64,INT64_INT64,FLT64_FLT64,FLT64_INT64, IF_ALL, IF_TRUE, IF_FALSE, FUNPTR2};
+  static final TypeTuple[] TYPES = new TypeTuple[]{ANY,SCALAR1,STR,INT32,INT64,FLT64,INT64_INT64,FLT64_FLT64,FLT64_INT64, IF_ALL, IF_TRUE, IF_FALSE, FUNPTR2, null};
+  public  static       TypeTuple OOP_OOP;
+  // Break a cyclic class-init loop
+  static void init1() {
+    // OOP_OOP requires a TypeUnion; TypeUnion requires TypeTuple.  Break the cycle.
+    OOP_OOP = make(Type.XSCALAR,1.0,TypeUnion.OOP,TypeUnion.OOP);
+    assert TYPES[TYPES.length-1]==null;
+    TYPES[TYPES.length-1]=OOP_OOP;
+  }
   
   // The length of Tuples is a constant, and so is its own dual.  Otherwise
   // just dual each element.  Also flip the infinitely extended tail type.
