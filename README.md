@@ -58,7 +58,7 @@ Binary operators have precedence | ---
 `1+2*3`         | `  7:int` standard precedence
 ` 1+2 * 3+4 *5` | ` 27:int`
 `(1+2)*(3+4)*5` | `105:int` parens overrides precedence
-`1// some comment<br>+2`  | `3:int` with bad comment
+`1// some comment`<br>`+2`  | `3:int` with bad comment
 `1 < 2`         | `1:int` true  is 1, 1 is true
 `1 > 2`         | `0:int` false is 0, 0 is false
 Float           | ---
