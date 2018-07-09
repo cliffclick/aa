@@ -180,7 +180,7 @@ Named type variables | Named types are simple subtypes
 `Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(     (@{x=1,y=2}))` | `@{x:1,y:2} is not a Point:@{x,y}` this `dist` only takes a `Point` argument
 Nullable and not-null modeled after Kotlin | ---
 `x:str? = 0`      | `null`  question-type allows null or not; zero digit is null
-`x:str? = "abc"`| `"abc":str` question-type allows null or not
+`x:str? = "abc"`  | `"abc":str` question-type allows null or not
 `x:str  = 0`      | `"null is not a str"`
 `math_rand(1)?0:"abc"` | `"abc"?` Null-or-string "abc"
 `(math_rand(1)?0 : @{x=1}).x` | `Struct might be null when reading field '.x'` Must be probable not-null
@@ -196,17 +196,17 @@ Done Stuff
 
 * REPL
 * Dynamic code-gen; no seperate compilation step.  Load Source & Go.
-* Primitive values; int overflow OK;
-* Static typing; types optional at every place.
+* Functional; 1st class functions.
+* Static typing; types optional & fully inferred at every place.
+* Null-ptr distinguished; null/notnull types (e.g. Kotlin)
+* Duck-typing.  Interfaces.
 * Limited overloads
 * Overloading ops.  No ambiguity / easy-to-read rules.
 * By default multi-arg ops are overloaded.
 * Direct SSA style code writing; no 'let' keyword.
 * default "x=1" makes a "val" until scope runs out (cannot re-assign)
+* Primitive values; int overflow OK;
 * Sub-byte ranges?  Julia-like math typing
-* Functional; 1st class functions.
-* Null-ptr distinguished; null/notnull types (e.g. Kotlin)
-* Duck-typing.  Interfaces.
 * Can type-name primitives, but no e.g. physical-unit-type math
 
 
