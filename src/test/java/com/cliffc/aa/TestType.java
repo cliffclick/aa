@@ -9,6 +9,9 @@ import java.util.HashMap;
 
 public class TestType {
   @Test public void testType0() {
+    test   ("a = math_rand(1) ? 0 : @{x=1}; // a is null or a struct\n"+
+            "b = math_rand(1) ? 0 : @{c=a}; // b is null or a struct\n"+
+            "b ? (b.c ? b.c.x : 0) : 0  // Needs a safe-field", TypeInt.BOOL); // Needs a safe-field
     // Simple int
     test("1",   TypeInt.TRUE);
     // Unary operator
@@ -197,6 +200,11 @@ public class TestType {
     test   ("\"abc\"==0", TypeInt.FALSE ); // No type error, just not null
     test   ("\"abc\"!=0", TypeInt.TRUE  ); // No type error, just not null
     test   ("nil=0; \"abc\"!=nil", TypeInt.TRUE); // Another way to name null
+
+    test   ("a = math_rand(1)?0:@{x=1}; // a is null or a struct"+
+            "b = math_rand(1)?0:@{a=a}; // b is null or a struct"+
+            "b ? (b.a ? b.a.x : 0) : 0  // Needs a safe-field", TypeInt.BOOL); // Needs a safe-field
+
     
     // TODO: Need real TypeVars for these
     //test("id:{A->A}"    , Env.lookup_valtype("id"));

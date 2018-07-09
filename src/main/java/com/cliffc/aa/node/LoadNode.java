@@ -34,6 +34,8 @@ public class LoadNode extends Node {
       return TypeErr.make(_badfld);
     } else if( t==TypeErr.ANY ) { // t is 'above' any struct with fld name, then ANY type
       return TypeErr.ANY;
+    } else if( t instanceof TypeErr ) {
+      return t;
     } else if( t==TypeInt.NULL || (t instanceof TypeUnion && ((TypeUnion)t).has_null()) ) {
       return TypeErr.make(_badnul);
     }
