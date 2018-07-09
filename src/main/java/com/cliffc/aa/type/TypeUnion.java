@@ -107,6 +107,11 @@ public class TypeUnion extends Type {
   // Mix null with another
   public static Type make_null( Type t ) { assert t.is_oop(); return make(false,TypeInt.NULL,t); }
   
+  public boolean has_null( ) {
+    for( Type t : _ts._ts ) if( t==TypeInt.NULL ) return true;
+    return false;
+  }
+  
   static final TypeUnion ANY_NUM = (TypeUnion)make(true , TypeInt.INT64, TypeFlt.FLT64);
   static final TypeUnion[] TYPES = new TypeUnion[]{ANY_NUM};
 

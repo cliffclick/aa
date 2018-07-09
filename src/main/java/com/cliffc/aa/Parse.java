@@ -533,13 +533,12 @@ public class Parse {
       Type ret;
       if( t==TypeErr.ANY ) {    // Found ->, expect return type
         ret = type0();
-        if( ret == null ) throw AA.unimpl(); // should return TypeErr missing type after ->
+        if( ret == null ) return null; // should return TypeErr missing type after ->
       } else {                  // Allow no-args and simple return type
-        if( ts._len != 1 ) throw AA.unimpl(); // should return TypeErr missing -> in tfun
+        if( ts._len != 1 ) return null; // should return TypeErr missing -> in tfun
         ret = ts.pop();         // Get single return type
       }
-      require('}');
-      return typeq(TypeTuple.make_fun_ptr(TypeFun.make(TypeTuple.make(ts.asAry()),ret,Bits.FULL)));
+      return peek('}') ? typeq(TypeTuple.make_fun_ptr(TypeFun.make(TypeTuple.make(ts.asAry()),ret,Bits.FULL))) : null;
     }
 
     if( peek2(c,"@{") ) { // Struct type
@@ -556,8 +555,7 @@ public class Parse {
         ts  .add(t  );
         if( !peek(',') ) break; // Final comma is optional
       }
-      require('}');
-      return typeq(TypeStruct.make(flds.asAry(), TypeTuple.make_all(ts.asAry())));
+      return peek('}') ? typeq(TypeStruct.make(flds.asAry(), TypeTuple.make_all(ts.asAry()))) : null;
     }
 
     // Primitive type

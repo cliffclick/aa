@@ -7,14 +7,13 @@ import org.junit.Test;
 
 public class TestType {
   @Test public void testType0() {
-    testerr("(math_rand(1)?0 : @{x=1}).x", "might be null", "");
     test   ("x:str? = 0", TypeInt.NULL); // question-type allows null or not; zero digit is null
     test   ("x:str? = \"abc\"", TypeStr.con("abc")); // question-type allows null or not
     testerr("x:str  = 0", "null is not a str", "          ");
     test   ("math_rand(1)?0:\"abc\"", TypeUnion.make_null(TypeStr.con("abc")));
-    testerr("(math_rand(1)?0:@{x=1}).x", "might be null", "");
-    //test   ("p=math_rand(1)?0:@{x=1}; p ? p.x : 0", TypeInt.BOOL);
-    //test   ("x:int = y:str? = z:flt = 0", TypeInt.NULL);
+    testerr("(math_rand(1)?0 : @{x=1}).x", "Struct might be null when reading field '.x'", "                           ");
+    test   ("p=math_rand(1)?0:@{x=1}; p ? p.x : 0", TypeInt.BOOL);
+    test   ("x:int = y:str? = z:flt = 0", TypeInt.NULL);
     
     // Simple int
     test("1",   TypeInt.TRUE);

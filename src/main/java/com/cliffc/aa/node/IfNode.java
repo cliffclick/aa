@@ -17,6 +17,8 @@ public class IfNode extends Node {
     // If the input is includes both, we can return both:  {CONTROL,CONTROL}
     if( gvn.type(at(0))==Type.XCTRL ) return TypeTuple.IF_ANY;
     Type pred = gvn.type(at(1));
+    if( pred instanceof TypeUnion ) // Pointers with and without null
+      pred = ((TypeUnion)pred).has_null() ? TypeInt.BOOL : TypeInt.TRUE;
     if( pred.isa(TypeInt.XINT1) ) return TypeTuple.IF_ANY;
     if( TypeInt.BOOL.isa(pred)  ) return TypeTuple.IF_ALL;
     if( pred==TypeInt.FALSE     ) return TypeTuple.IF_FALSE;
