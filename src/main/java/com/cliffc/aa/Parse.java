@@ -38,8 +38,8 @@ import java.util.BitSet;
  *  func = { [[id[:type]?]* ->]? stmts} // Anonymous function declaration
  *  str  = [.\%]*               // String contents; \t\n\r\% standard escapes
  *  str  = %[num]?[.num]?fact   // Percent escape embeds a 'fact' in a string; "name=%name\n"
- *  type = tcon | tfun | tstruct | tvar // Types are a tcon or a tfun or a tstruct or a type variable
- *  tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str
+ *  type = tcon | tvar | tfun[?] | tstruct[?] // Types are a tcon or a tfun or a tstruct or a type variable.  A trailing ? means 'nullable'
+ *  tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str[?]
  *  tfun = {[[type]* ->]? type }// Function types mirror func decls
  *  tstruct = @{ [id[:type],]*} // Struct types are field names with optional types
  */
@@ -511,8 +511,8 @@ public class Parse {
   }
 
   /** Parse a type or return null
-   *  type = tcon | tfun | tstruct   // Types are a tcon or a tfun or a tstruct
-   *  tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str
+   *  type = tcon | tvar | tfun[?] | tstruct[?]   // Types are a tcon or a tfun or a tstruct
+   *  tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str[?]
    *  tfun = {[[type]* ->]? type }// Function types mirror func decls
    *  tstruct = @{ [id[:type],]*} // Struct types are field names with optional types
    */
@@ -520,6 +520,9 @@ public class Parse {
     Type t = type0();
     return (t==null || t==TypeErr.ANY) ? null : t;
   }
+  // Wrap in a nullable if there is a trailing '?'
+  private Type typeq(Type t) { return peek('?') ? TypeUnion.make_null(t) : t; }
+  
   // Type or null or TypeErr.ANY for '->' token
   private Type type0() {
     byte c = skipWS();
@@ -536,7 +539,7 @@ public class Parse {
         ret = ts.pop();         // Get single return type
       }
       require('}');
-      return TypeTuple.make_fun_ptr(TypeFun.make(TypeTuple.make(ts.asAry()),ret,Bits.FULL));
+      return typeq(TypeTuple.make_fun_ptr(TypeFun.make(TypeTuple.make(ts.asAry()),ret,Bits.FULL)));
     }
 
     if( peek2(c,"@{") ) { // Struct type
@@ -554,7 +557,7 @@ public class Parse {
         if( !peek(',') ) break; // Final comma is optional
       }
       require('}');
-      return TypeStruct.make(flds.asAry(), TypeTuple.make_all(ts.asAry()));
+      return typeq(TypeStruct.make(flds.asAry(), TypeTuple.make_all(ts.asAry())));
     }
 
     // Primitive type
@@ -564,7 +567,7 @@ public class Parse {
     if( tok.equals("->") ) return TypeErr.ANY; // Found -> return sentinal
     Type t = _e.lookup_type(tok);
     if( t==null ) _x = oldx;  // Unwind if not a known type
-    return t;
+    return t==TypeStr.STR ? typeq(t) : t;
   }
 
   // Require a specific character (after skipping WS) or polite error
@@ -668,7 +671,7 @@ public class Parse {
   public String typerr( Type t0, Type t1 ) {
     return t0.is_forward_ref() // Forward/unknown refs as args to a call report their own error
       ? forward_ref_err(FunNode.name(((TypeTuple)t0).get_fun().fidx()))
-      : errMsg(t0+" is not a "+t1);
+      : errMsg((t0==TypeInt.FALSE && t1.is_oop() ? "null" : t0.toString())+" is not a "+t1);
   }
 
   // Standard mis-use of a forward-ref error (assumed to be a forward-decl of a

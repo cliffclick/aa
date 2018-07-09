@@ -10,7 +10,7 @@ public class TypeUnion extends Type {
   public TypeTuple _ts;         // All of these are possible choices
   public boolean _any; // FALSE: meet; must support all; TRUE: join; can pick any one choice
   private TypeUnion( TypeTuple ts, boolean any ) { super(TUNION); init(ts,any); }
-  private void init( TypeTuple ts, boolean any ) { _ts = ts;  _any=any;  assert !ts.has_tuple(); }
+  private void init( TypeTuple ts, boolean any ) { _ts = ts;  _any=any;  assert !ts.has_union(); }
   @Override public int hashCode( ) { return TUNION+_ts.hashCode()+(_any?1:0);  }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
@@ -30,28 +30,31 @@ public class TypeUnion extends Type {
   }
 
   // Common cleanup rules on making new unions
-  static Type make( boolean any, Type... ts ) { return make(any,new Ary<>(ts)); }
+  public  static Type make( boolean any, Type... ts ) { return make(any,new Ary<>(ts)); }
   private static Type make( boolean any, Ary<Type> ts ) {
     if( ts._len == 0 ) throw com.cliffc.aa.AA.unimpl();   //return any ? Type.ANY : Type.ALL;
     // Special rules now apply to keep from growing out all combos of
     // e.g. float-constants.  All {float,int,str} types are meeted and
     // their meet replaces them.
-    int fx=-1, ix=-1, sx=-1, ux=-1;
+    int fx=-1, ix=-1, ox=-1, ux=-1;
     for( int i=0; i<ts._len; i++ ) {
       Type t = ts._es[i];
-      if( t._type == Type.TFLT ) {
+      switch( t._type ) {
+      case Type.TFLT:
         if( fx==-1 ) fx=i;
         else { ts._es[fx] = ts._es[fx].meet(t); ts.del(i--);  }
-      }
-      if( t._type == Type.TINT ) {
+        break;
+      case Type.TINT:
         if( ix==-1 ) ix=i;
         else { ts._es[ix] = ts._es[ix].meet(t); ts.del(i--);  }
+        break;
+      case Type.TFUN:
+        if( t._type == Type.TFUN ) ux = i;
+        break;
+      default: // All Oops, plus Scalar, Number, other weirdnesses
+        if( ox==-1 ) ox=i;
+        else { ts._es[ox] = ts._es[ox].meet(t); ts.del(i--);  }
       }
-      if( t._type == Type.TSTR ) {
-        if( sx==-1 ) sx=i;
-        else { ts._es[sx] = ts._es[sx].meet(t); ts.del(i--);  }
-      }
-      if( t._type == Type.TFUN ) ux = i;
     }
     // Also, if the remaining int fits in the remaining float, drop the int
     if( fx!=-1 && ix!=-1 ) {
@@ -63,30 +66,37 @@ public class TypeUnion extends Type {
       }
     }
     if( ts._len == 1 ) return ts._es[0]; // A single result is always that result
-    // Cannot mix functions and numbers
-    if( ux != -1 && (fx!=-1 || ix!=-1 || sx!=-1) )
-      return Type.SCALAR;
-    if( sx != -1 && (fx!=-1 || ix!=-1) )
-      return Type.SCALAR;
 
-    if( fx != -1 && ix != -1 ) {
+    // Allow null & oop (no floats, exactly 0 integer, the rest are oops).
+    // Tuples are OK, and Tuples can also be function pointers.
+    if( ox!= -1 ) {
+      if( ix!=-1 && ts._es[ix].isa(TypeInt.NULL) ) {
+        ts.set(ix,TypeInt.NULL);  // Set to null (incase e.g. ~Number)
+        ix = -1;                  // Ignore null in the union
+      }
+      if( fx!=-1 && ts._es[fx].isa(TypeInt.NULL) ) {
+        ts.set(fx,TypeInt.NULL);  // Set to null (incase e.g. ~flt32)
+        fx = -1;                  // Ignore null in the union
+      }
+    }
+
+    // Cannot mix functions and anything else, including null.
+    // Function pointers (which are internally TypeTuples), are
+    // just fine with nulls.
+    if( ux != -1 && (fx!=-1 || ix!=-1 || ox!=-1) )
+      return Type.SCALAR;
+    if( ox != -1 && (fx!=-1 || ix!=-1) )
+      return Type.SCALAR;       // Cannot mix oops and floats/ints
+    if( ox != -1 && Type.SCALAR.isa(ts._es[ox]) )
+      return ts._es[ox];
+
+    if( fx != -1 && ix != -1 ) {// Fall to REAL if possible
       TypeInt ti = (TypeInt)ts._es[ix];
       TypeFlt tf = (TypeFlt)ts._es[fx];
       if( ti==TypeInt.INT64 && tf==TypeFlt.FLT64 && !any )
         return Type.REAL;
       assert (ti==TypeInt.INT64 && tf==TypeFlt.FLT64 && any) ||
         (ti==TypeInt.INT64.dual() && tf==TypeFlt.FLT64.dual() && !any);
-      
-      //if( !ts.at(fx).above_center() && !ts.at(ix).above_center() ) {
-      //  if( any ) ; // flt+int is OK; "ANY_NUM"
-      //  else
-      //    throw AA.unimpl(); // Falls to REAL
-      //} else { // one or other is above center???
-      //  if( ts.at(fx).above_center() && ts.at(ix).above_center() ) {
-      //    throw AA.unimpl(); // ???
-      //  } else 
-      //    throw AA.unimpl(); // Mixed, dunno
-      //}
     }
 
     // The set has to be ordered, to remove dups that vary only by order
@@ -94,6 +104,9 @@ public class TypeUnion extends Type {
     return make(TypeTuple.make(any?TypeErr.ANY:TypeErr.ALL,1.0,ts.asAry()),any);
   }
 
+  // Mix null with another
+  public static Type make_null( Type t ) { assert t.is_oop(); return make(false,TypeInt.NULL,t); }
+  
   static final TypeUnion ANY_NUM = (TypeUnion)make(true , TypeInt.INT64, TypeFlt.FLT64);
   static final TypeUnion[] TYPES = new TypeUnion[]{ANY_NUM};
 
@@ -222,15 +235,4 @@ public class TypeUnion extends Type {
 
   // Return non-zero if allowed to be infix
   @Override public byte op_prec() { return _ts.at(0).op_prec(); }
-  // Better error message
-  public String errMsg() {
-    //assert _any;                // Expect only function choice here
-    //TypeFun tf = (TypeFun)_ts.at(0);
-    //String name = tf.funnode().name();
-    //SB sb = new SB().p(name).p(':').p('[');
-    //for( Type t : _ts._ts )
-    //  ((TypeFun)t).str(sb).p(',');
-    //return sb.p(']').toString();
-    throw com.cliffc.aa.AA.unimpl();
-  }
 }

@@ -100,10 +100,10 @@ public class TypeTuple extends Type {
     case TUNION:
     case TSTRUCT: return t.xmeet(this); // Let TypeStruct decide
     case TSTR:   return Type.OOP;
-    case TFLT:
-    case TINT:
     case TRPC:
     case TFUN:   return Type.SCALAR;
+    case TFLT:
+    case TINT:   return t.isa(TypeInt.NULL) ? TypeUnion.make_null(this) : Type.SCALAR;
     case TERROR: return ((TypeErr)t)._all ? t : this;
     default: throw typerr(t);
     }
@@ -131,8 +131,8 @@ public class TypeTuple extends Type {
 
   public Type at( int idx ) { return idx < _ts.length ? _ts[idx] : _inf; }
   
-  boolean has_tuple() {
-    for( Type t : _ts ) if( t._type==Type.TTUPLE ) return true;
+  boolean has_union() {
+    for( Type t : _ts ) if( t._type==Type.TUNION ) return true;
     return false;
   }
   @Override public TypeTuple ret() { throw com.cliffc.aa.AA.unimpl(); }

@@ -7,6 +7,15 @@ import org.junit.Test;
 
 public class TestType {
   @Test public void testType0() {
+    testerr("(math_rand(1)?0 : @{x=1}).x", "might be null", "");
+    test   ("x:str? = 0", TypeInt.NULL); // question-type allows null or not; zero digit is null
+    test   ("x:str? = \"abc\"", TypeStr.con("abc")); // question-type allows null or not
+    testerr("x:str  = 0", "null is not a str", "          ");
+    test   ("math_rand(1)?0:\"abc\"", TypeUnion.make_null(TypeStr.con("abc")));
+    testerr("(math_rand(1)?0:@{x=1}).x", "might be null", "");
+    //test   ("p=math_rand(1)?0:@{x=1}; p ? p.x : 0", TypeInt.BOOL);
+    //test   ("x:int = y:str? = z:flt = 0", TypeInt.NULL);
+    
     // Simple int
     test("1",   TypeInt.TRUE);
     // Unary operator
@@ -27,10 +36,10 @@ public class TestType {
     test("1+2.3",   TypeFlt.make(0,64,3.3));
   
     // Simple strings
-    test("\"Hello, world\"", TypeStr.make(0,"Hello, world"));
-    test("str(3.14)", TypeStr.make(0,"3.14"));
-    test("str(3)", TypeStr.make(0,"3"));
-    test("str(\"abc\")", TypeStr.make(0,"abc"));
+    test("\"Hello, world\"", TypeStr.con("Hello, world"));
+    test("str(3.14)", TypeStr.con("3.14"));
+    test("str(3)", TypeStr.con("3"));
+    test("str(\"abc\")", TypeStr.con("abc"));
 
     // Variable lookup
     test("math_pi", TypeFlt.PI);
@@ -178,7 +187,7 @@ public class TestType {
     test_isa("gal=:flt; {gal}", TypeTuple.make_fun_ptr(TypeFun.make(TypeTuple.FLT64,TypeName.make("gal",TypeFlt.FLT64),Bits.FULL)));
     test    ("gal=:flt; 3==gal(2)+1", TypeInt.TRUE);
     test    ("gal=:flt; tank:gal = gal(2)", TypeName.make("gal",TypeFlt.con(2)));
-    // test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: free cast for bare constants
+    // test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: figure out if free cast for bare constants?
     testerr ("gal=:flt; tank:gal = gal(2)+1", "3.0 is not a gal:flt64","                             ");
     test    ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(@{x=1,y=2}))", TypeInt.con(5));
     test    ("Point=:@{x,y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(@{x=1,y=2}))", TypeInt.con(5));
@@ -203,11 +212,11 @@ list_of_hello = @{ 0, "hello", }
 @{ x  } // 1-elem struct type with field named x
 
 // Null
-x:str   = "hello" // x takes a not-null str
-x:0|str = 0       // x takes a null or str
+x:str  = "hello" // x takes a not-null str
+x:str? =  0      // x takes a null or str
 
 x := 0       // x is untyped; assigned null right now
-x := "hello" // x is re-assigned and has type 0|str
+x := "hello" // x is re-assigned and has type str?
 
 // type variables are free in : type expressions
 
@@ -228,14 +237,14 @@ map:{ {A->B} List(A) -> List(B) }  = { f list -> ... }
 // List is a self-recursive type.
 // Field 'next' can be null or List(A).
 // Field 'val' is type A.
-List = :@{ _+List(A) A }
+List = :@{ List(A)? A }
 
-list = @{ next:0|list val:A }
+list = @{ next:List(A)? val:A }
 
 // Type A can allow nulls, or not
-strs:List(0)     = ... // List of nulls
-strs:List(str)   = ... // List of not-null strings
-strs:List(0|str) = ... // List of null-or-strings
+strs:List(0)    = ... // List of nulls
+strs:List(str)  = ... // List of not-null strings
+strs:List(str?) = ... // List of null-or-strings
 
 // TODO: Re-assignment; ':=' allows more ':=' or exactly 1 final assignment '='
 x := 1; x:= 2; x = 3; x // 3
@@ -286,6 +295,9 @@ c[x]=1;
   // TODO: Observation: value() calls need to be monotonic, can test this.
   @Test public void testCommuteSymmetricAssociative() {
     // Uncomment to insert a single test to focus on
+    Type t1 = (TypeInt.INT64.join(TypeFlt.FLT64)).join(TypeStr.STR) ;
+    Type t2 =  TypeInt.INT64.join(TypeFlt.FLT64  .join(TypeStr.STR));
+    Assert.assertEquals(t1,t2);
     Assert.assertTrue(Type.check_startup());
   }  
 }

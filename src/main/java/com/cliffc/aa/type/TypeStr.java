@@ -42,8 +42,8 @@ public class TypeStr extends Type {
     if( t == this ) return this;
     switch( t._type ) {
     case TSTR:   break;
-    case TINT:   return TypeUnion.make(false,STR,t);
-    case TFLT:   return TypeUnion.make(false,STR,t);
+    case TFLT:
+    case TINT:   return TypeUnion.make(false,this,t);
     case TSTRUCT:
     case TTUPLE: return Type.OOP;
     case TRPC:

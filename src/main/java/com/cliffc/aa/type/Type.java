@@ -105,7 +105,7 @@ public class Type {
   public  static final Type  OOP   = make( TOOP   ); // ptrs subject to GC (excludes e.g. function pointers)
   public  static final Type XOOP   = make(TXOOP   ); // ptrs subject to GC
   public  static final Type  NUM   = make( TNUM   );
-  private static final Type XNUM   = make(TXNUM   );
+  public  static final Type XNUM   = make(TXNUM   );
   public  static final Type  REAL  = make( TREAL  );
   private static final Type XREAL  = make(TXREAL  );
 
@@ -128,7 +128,7 @@ public class Type {
     while( t._type == TNAME ) t = ((TypeName)t)._t;
     return t._type;
   }
-  private boolean is_oop() { byte t = simple_type();  return t == TOOP || t == TXOOP || t == TSTR || t == TSTRUCT || t == TTUPLE;  }
+  public  boolean is_oop() { byte t = simple_type();  return t == TOOP || t == TXOOP || t == TSTR || t == TSTRUCT || t == TTUPLE; }
   private boolean is_num() { byte t = simple_type();  return t == TNUM || t == TXNUM || t == TREAL || t == TXREAL || t == TINT || t == TFLT; }
   // True if 'this' isa SCALAR, without the cost of a full 'meet()'
   final boolean isa_scalar() { return _type != TERROR && _type != TCTRL && _type != TXCTRL; }
@@ -191,12 +191,12 @@ public class Type {
     assert !(that_oop&&that_num);
     
     if( is_oop() ) { // Only simple OOPish type
-      if( !that_oop ) return SCALAR;
+      if( !that_oop ) return t.isa(TypeInt.NULL) ? TypeUnion.make_null(this) : SCALAR;
       return _type == TOOP ? OOP : t;
     }
 
     if( is_num() ) {
-      if( that_oop ) return SCALAR;
+      if( that_oop ) return isa(TypeInt.NULL) ? TypeUnion.make_null(t) : SCALAR;
       if( !that_num ) throw AA.unimpl();
       
       // Numeric; same pattern as ANY/ALL, or SCALAR/XSCALAR
@@ -385,7 +385,7 @@ public class Type {
     if( t._type==TSCALAR ) return 0; // Generic function arg never requires a conversion
     if( _type == TSCALAR ) return -1; // Scalar has to resolve
     if( _type == TREAL && t.is_num() ) return -1; // Real->Int/Flt has to resolve
-    if( is_fun_ptr() && t == OOP ) return 0;
+    if( is_fun_ptr() ) return (byte)(t == OOP ? 0 : 99);
 
     throw typerr(t);  // Overridden in subtypes
   }

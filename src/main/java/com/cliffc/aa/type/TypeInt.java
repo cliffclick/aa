@@ -38,6 +38,7 @@ public class TypeInt extends Type {
   static public  final TypeInt TRUE   = make( 0, 1,1);
   static public  final TypeInt FALSE  = make( 0, 1,0);
   static public  final TypeInt XINT1  = make( 1, 1,0);
+  static public  final TypeInt NULL   = make( 0, 1,0);
   static final TypeInt[] TYPES = new TypeInt[]{INT64,INT32,INT16,BOOL,TRUE,FALSE,XINT1};
   static void init1( HashMap<String,Type> types ) {
     types.put("bool" ,BOOL);
@@ -57,11 +58,12 @@ public class TypeInt extends Type {
     switch( t._type ) {
     case TINT:   break;
     case TFLT:   return xmeetf((TypeFlt)t);
-    case TSTR:   return TypeUnion.make(false,TypeStr.STR,this);
+    case TSTR:   return TypeUnion.make(false,t,this);
     case TSTRUCT:
     case TTUPLE: 
-    case TRPC:
-    case TFUN:   return Type.SCALAR;
+      return isa(NULL) ? TypeUnion.make_null(t) : Type.SCALAR;
+    case TFUN:
+    case TRPC:   return Type.SCALAR;
     case TERROR: return ((TypeErr)t)._all ? t : this;
     case TCTRL:
     case TXCTRL: return TypeErr.ALL;
@@ -105,7 +107,6 @@ public class TypeInt extends Type {
       // Fits in the int choices, just keep float, but could return the int constant just as well
       if( con == tf._con && log(con) <= _z )  return tf; 
       return tf._z==32 ? TypeFlt.FLT32 : TypeFlt.FLT64;
-      //return TypeUnion.make(false,this,tf);
     }
 
     if( _x == 0 ) {             // Constant int
@@ -117,7 +118,6 @@ public class TypeInt extends Type {
         if( ((long)tf._con) == tf._con ) // Float is a integer
           return xmeet(TypeInt.con((long)tf._con)); // Return as-if meeting 2 integers
         return TypeFlt.con(_con).meet(tf);
-        //return TypeUnion.make(false,this,tf);
       }
       if( tf._x == 1 ) {        // Can a high float fall to the int constant?
         double dcon = tf._z==32 ? (float)_con : (double)_con;
@@ -134,12 +134,10 @@ public class TypeInt extends Type {
     if( (_z<<1) <= tf._z ) return tf._z==32 ? TypeFlt.FLT32 : TypeFlt.FLT64;
     if( (_z<<1) <= 64 ) return TypeFlt.FLT64; // Fits in the float
     return Type.REAL;
-    //return TypeUnion.make(false,this,tf);
   }
 
   private static Type widen(int isz, int fsz) {
     if( (isz<<1) <= fsz ) return TypeFlt.make(-1,fsz,0); // Fits in a float
-    //return TypeUnion.make(false,make(-1,isz,0),TypeFlt.make(-1,fsz,0));
     return Type.REAL;
   }
 
