@@ -168,7 +168,7 @@ Simple anonymous structures | ---
 `a=@{x=(b=1.2)*b,y=b}; a.y` | `1.2:flt`  Temps allowed in struct def
 `a=@{x=(b=1.2)*b,y=x}; a.y` | `1.44:flt` Ok to use early fields in later defs
 `a=@{x=(b=1.2)*b,y=b}; b` | `Unknown ref 'b'`  Structure def has a lexical scope
-`dist={p->p//qqq\n.//qqq\nx*p.x+p.y*p.y}; dist(//qqq\n@{x//qqq\n=1,y=2})` | `5:int`  Some rather horrible comments
+`dist={p->p//qqq`<br>`.//qqq`<br>`x*p.x+p.y*p.y}; dist(//qqq`<br>`@{x//qqq`<br>`=1,y=2})` | `5:int`  Some rather horrible comments
 Named type variables | Named types are simple subtypes
 `gal=:flt`        | `gal{flt -> gal:flt}` Returns a simple type constructor function
 `gal=:flt; {gal}` | `gal{flt -> gal:flt}` Operator syntax for the function
