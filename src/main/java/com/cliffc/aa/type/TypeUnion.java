@@ -118,14 +118,8 @@ public class TypeUnion extends Type {
 
   // Return true if this type MAY be a null.
   @Override public boolean may_be_null() {
-    if( _any ) {
-      throw AA.unimpl(); // any element is a null, can pick the null
-      //for( Type t : _ts._ts ) if( t==TypeInt.NULL ) return true;
-      //return false;
-    } else { // if any element is a null, it might get picked
-      for( Type t : _ts._ts ) if( t==TypeInt.NULL ) return true;
-      return false;
-    }
+    for( Type t : _ts._ts ) if( t==TypeInt.NULL ) return true;
+    return false;
   }
   // Same union, minus the null
   public Type remove_null() {
