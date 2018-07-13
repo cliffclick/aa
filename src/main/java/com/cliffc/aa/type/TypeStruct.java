@@ -56,10 +56,12 @@ public class TypeStruct extends Type {
     return make1(Arrays.copyOf(args,i+1),tt);
   }
 
-  public static final TypeStruct POINT = make1(new String[]{"x","y"},TypeTuple.FLT64_FLT64);
-  public static final TypeStruct X     = make1(new String[]{"x"},TypeTuple.FLT64);
+  private static final TypeStruct POINT = make1(new String[]{"x","y"},TypeTuple.FLT64_FLT64);
+  public  static final TypeStruct X     = make1(new String[]{"x"},TypeTuple.FLT64);
   private static final TypeStruct A     = make1(new String[]{"a"},TypeTuple.FLT64);
-  static final TypeStruct[] TYPES = new TypeStruct[]{POINT,X,A};
+  static         final TypeStruct C0    = make1(new String[]{"c"},TypeTuple.make_all(TypeInt.NULL)); // @{c:0}
+  static         final TypeStruct D1    = make1(new String[]{"d"},TypeTuple.make_all(TypeInt.TRUE)); // @{d:1}
+  static final TypeStruct[] TYPES = new TypeStruct[]{POINT,X,A,C0,D1};
 
   // Dual the args, dual the tuple
   @Override protected TypeStruct xdual() {

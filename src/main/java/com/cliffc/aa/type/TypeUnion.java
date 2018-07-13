@@ -1,6 +1,5 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.AA;
 import com.cliffc.aa.util.Ary;
 
 import java.util.Arrays;
@@ -107,8 +106,9 @@ public class TypeUnion extends Type {
   }
 
   private static int meet_dup( boolean any, Ary<Type> ts, int idx, int i ) {
-    if( any ) throw AA.unimpl(); // join choices, not meet
-    ts._es[idx] = ts._es[idx].meet(ts._es[i]);
+    Type tx = ts._es[idx], ti = ts._es[i];
+    Type tr = any ? tx.join(ti) : tx.meet(ti);
+    ts._es[idx] = tr;
     ts.del(i);
     return i-1;
   }
@@ -128,8 +128,10 @@ public class TypeUnion extends Type {
     return make(_any,ts);
   }
   
-  static public final TypeUnion OOP     = (TypeUnion)make(false, TypeInt.NULL , Type.OOP);
-  static final TypeUnion[] TYPES = new TypeUnion[]{OOP};
+  static public final TypeUnion OOP = (TypeUnion)make(false, TypeInt.NULL , Type.OOP);
+  static public final TypeUnion NC0 = (TypeUnion)make(false, TypeInt.NULL , TypeStruct.C0);
+  static public final TypeUnion ND1 = (TypeUnion)make(false, TypeInt.NULL , TypeStruct.D1);
+  static final TypeUnion[] TYPES = new TypeUnion[]{OOP,NC0,ND1};
 
   @Override protected TypeUnion xdual() {
     // The obvious thing is to just ask _ts for it's dual(), but Tuples are not
@@ -184,8 +186,16 @@ public class TypeUnion extends Type {
       }
     }
     default:                    // Unions can handle all non-union internal types
-      Ary<Type> ts = ymeet( new Ary<>(_ts._ts.clone()), _any, t );
-      return make(_any, ts);
+      // Look for: "OOPa+? meet OOPb"; the standard ymeet will convert this to
+      // "OOPa JOIN OOPb?" basically moving the null around and making no
+      // progress.  Pick up this pattern and handle it separately
+      Ary<Type> ts = new Ary<>(_ts._ts.clone()); // Defensive clone
+      if( _any && t.is_oop() )                   // X+Y meet OOP?
+        for( int i=0; i<ts._len; i++ )
+          if( ts.at(i)==TypeInt.NULL ) { // Find the null?
+            ts.del(i);  break;           // Remove it: compute X meet OOP instead
+          }
+      return make(_any, ymeet( ts, _any, t ));
     }
   }
 

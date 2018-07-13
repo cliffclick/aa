@@ -12,9 +12,9 @@ import static org.junit.Assert.assertTrue;
 
 public class TestType {
   @Test public void testType0() {
-    //test   ("a = math_rand(1) ? 0 : @{x=1}; // a is null or a struct\n"+
-    //        "b = math_rand(1) ? 0 : @{c=a}; // b is null or a struct\n"+
-    //        "b ? (b.c ? b.c.x : 0) : 0  // Needs a safe-field", TypeInt.BOOL); // Needs a safe-field
+    test   ("a = math_rand(1) ? 0 : @{x=1}; // a is null or a struct\n"+
+            "b = math_rand(1) ? 0 : @{c=a}; // b is null or a struct\n"+
+            "b ? (b.c ? b.c.x : 0) : 0  // Needs a safe-field", TypeInt.BOOL); // Needs a safe-field
     // Simple int
     test("1",   TypeInt.TRUE);
     // Unary operator
@@ -399,8 +399,45 @@ c[x]=1;
     Type      ts0= TypeStruct.make(new String[]{"x"},t0);         //@{x:0,~Scalar...}
     Type tss = ts0.meet(t0);
     assertEquals(t0,tss);      // ts0.isa(t0)
+
+    // Union meets & joins same-class types
+    Type uany = TypeUnion.make(true ,TypeInt.con(2),TypeInt.INT8);
+    Type uall = TypeUnion.make(false,TypeInt.con(2),TypeInt.INT8);
+    assertEquals(uany,TypeInt.con(2));
+    assertEquals(uall,TypeInt.INT8  );
+    
+    // meet @{c:0,}? and @{c:@{x:1,}?,}
+    Type c0  = TypeStruct.make(new String[]{"c"},TypeTuple.make_all(TypeInt.NULL)); // @{c:0}
+    Type nc0 = TypeUnion.make_null(c0); // @{c:0}?
+    Type x1  = TypeStruct.make(new String[]{"x"},TypeTuple.make_all(TypeInt.TRUE)); // @{x:1}
+    Type nx1 = TypeUnion.make_null(x1); // @{x:1}?
+    Type cx  = TypeStruct.make(new String[]{"c"},TypeTuple.make_all(nx1)); // @{c:@{x:1}?}
+    // join turns into dual of meet of duals
+    //   @{c:0,any...}+? MEET @{c:@{x:1,any...}+?,any...}
+    // ymeet does type-by-type MEETs, shoving the null around and making no progess.
+    // after ymeet and fed into meet_dup:
+    //   @{c:0,any...}   JOIN @{c:@{x:1,any...}+?,any...}?
+    // after next round of dual:
+    //   @{c:0,}         JOIN @{c:@{x:1,}?,}+?
+    // after ymeet and fed into meet_dup:
+    //   @{c:0,}?        JOIN @{c:@{x:1,}?,}
+    // which is the starting point and we're cyclic
+
+    // Hand-done:
+    //   @{c:0,any...}+? MEET @{c:@{x:1,any...}+?,any...}
+    // Struct+null MEET Struct, toss the null choice since it does not appear on both sides:
+    //   @{c:0,any...} MEET @{c:@{x:1,any...}+?,any...}
+    // Trailing fields all same, so its:
+    //   @{c:[0 MEET @{x:1,any...}+?],any...}
+    // null MEET choice of null is always a null
+    //   @{c:0,any...}
+    
+    
+    Type cj  = nc0.join(cx);
+    // JOIN tosses the top-level null choice, and the inside struct choice
+    assertEquals(c0,cj);
   }
-  
+
   // TODO: Observation: value() calls need to be monotonic, can test this.
   @Test public void testCommuteSymmetricAssociative() {
     Type.init0(new HashMap<>());
