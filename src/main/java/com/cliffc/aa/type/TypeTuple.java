@@ -85,7 +85,7 @@ public class TypeTuple extends Type {
   static void init1() {
     // OOP_OOP requires a TypeUnion; TypeUnion requires TypeTuple.  Break the cycle.
     OOP_OOP = make(Type.XSCALAR,1.0,TypeUnion.OOP,TypeUnion.OOP);
-    assert TYPES[TYPES.length-1]==null;
+    assert TYPES[TYPES.length-1]==null || TYPES[TYPES.length-1]==OOP_OOP;
     TYPES[TYPES.length-1]=OOP_OOP;
   }
   

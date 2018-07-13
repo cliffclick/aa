@@ -301,8 +301,7 @@ c[x]=1;
     assertEquals(err2,te._errs.at(0));
   }
 
-  // TODO: Observation: value() calls need to be monotonic, can test this.
-  @Test public void testCommuteSymmetricAssociative() {
+  @Test public void testNamesInts() {
     Type.init0(new HashMap<>());
 
     // No named-zero, ever
@@ -343,7 +342,10 @@ c[x]=1;
     assertEquals(  z , z  .meet(xni8));// N:~i8 -> 0
     assertEquals( ni8, ni8.meet(   z));//     0 -> N:i8
     assertEquals(  i8,  i8.meet( ni8));// N: i8 ->   i8
-
+  }
+  
+  @Test public void testOOPsNulls() {
+    Type.init0(new HashMap<>());
     // Confirm lattice: {~OOP+? -> ~OOP ->  OOP  -> OOP?}
     // Also:            {~OOP+? -> OOP+? -> OOP }           // Drop choice ~OOP keep choice 0
     // Also:                      {~OOP -> ~OOP? -> OOP? }  // Drop no-null keep choice ~OOP
@@ -362,6 +364,7 @@ c[x]=1;
     assertEquals(xoop_,xoop_.meet(xoop )); // ~OOP   -> ~OOP?
     assertEquals( oop0, oop0.meet(xoop_)); //  OOP+? ->  OOP?
     // Thru 0
+    Type z  = TypeInt.NULL;
     assertEquals(  z  ,  z  .meet( oop_)); // OOP+? -> 0
     assertEquals(xoop_,xoop_.meet( z   )); // 0 -> ~OOP?
     
@@ -370,6 +373,10 @@ c[x]=1;
     assertEquals(xoop_, oop_.meet(xoop_)); // ~OOP? & OOP+? -> ~OOP? ; no other edges
 
     // Crossing named:ints or named:null and OOP
+    Type  i8 = TypeInt.INT8;
+    Type xi8 = i8.dual();
+    Type ni8 = TypeName.TEST_ENUM;
+    Type xni8= ni8.dual(); // dual name:int8
     assertEquals(  z  , xi8.meet(xoop0)); // ~OOP+0 &   ~i8 -> 0
     assertEquals(  z  ,xni8.meet(xoop0)); // ~OOP+0 & N:~i8 -> int8
     assertEquals(xoop_, xi8.meet(xoop )); // ~OOP   &   ~i8 -> ~OOP?
@@ -379,7 +386,10 @@ c[x]=1;
     Type str8 = str.join(ni8);
     Type str_ = TypeUnion.make(true,TypeInt.NULL,str); // str+?
     assertEquals(str_,str8);
-    
+  }
+  
+  @Test public void testStructTuple() {
+    Type.init0(new HashMap<>());
     // Tuple is more general that Struct
     Type tf = TypeTuple.FLT64; //  [  flt64,~Scalar...]
     Type tsx= TypeStruct.X;    // @{x:flt64,~Scalar...}
@@ -389,7 +399,11 @@ c[x]=1;
     Type      ts0= TypeStruct.make(new String[]{"x"},t0);         //@{x:0,~Scalar...}
     Type tss = ts0.meet(t0);
     assertEquals(t0,tss);      // ts0.isa(t0)
-    
+  }
+  
+  // TODO: Observation: value() calls need to be monotonic, can test this.
+  @Test public void testCommuteSymmetricAssociative() {
+    Type.init0(new HashMap<>());
     assertTrue(Type.check_startup());
   }  
 }

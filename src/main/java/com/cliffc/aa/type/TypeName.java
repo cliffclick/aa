@@ -28,7 +28,7 @@ public class TypeName extends Type {
     TypeName t2 = (TypeName)t1.hashcons();
     return t1==t2 ? t1 : t2.free(t1);
   }
-  public static Type make0( string name, Type t ) {
+  public static Type make0( String name, Type t ) {
     if( t==TypeInt.NULL ) return t; // No named null
     String dname = TypeStruct.defarg(t);
     if( t.is_simple() || name==dname || (name!=null && name.equals(dname)) )
