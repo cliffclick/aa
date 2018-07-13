@@ -17,10 +17,28 @@ import java.util.HashMap;
 // this program still types as 'Any' then the program is ambiguious.  'All'
 // represents a type conflict.
 //
-// During parsing, we come to places where conversions *may* be added - to
-// allow for matching primitives.  We add all possible overloaded function
-// combinations to get the "loosest" program (i.e., both +:Flt and +:Int).
-
+// ASCII-Grams of Type Lattices
+//
+// Ints:   ~int64 -> ~int32 -> ~int16 -> ~int8 -> ~int1 -> {...-3,-2,-1,0,1,2,3,...} -> int1 -> int8 -> int16 -> int32 -> int64
+//                /---^     /--^                                                                          \------v     \---v
+// Floats: ~flt64 -> ~flt32 ----------------------------> {... -pi,-0.1,0,0.1,pi, ... } ----------------------> flt32 -> flt64
+// int{1,8,16} all inject in flt32; int32 injects in flt64.  Small integer
+// constants as floats inject into the integers.
+//
+// Named ints and flts "subtype", except for 0 which is canonically the same
+// everywhere.  Example assuming a name "gal:flt32"
+// ~flt64 -> ~flt32 -> gal:~flt32 -> {... gal:-pi, gal:-0.1, 0, gal:0.1, gal:pi, ... } -> gal:flt32 -> flt32 -> flt64
+//
+// Simple OOP Lattice, where "+0" means "OR 0" and "?" means "AND 0"
+// ~OOP+0 -> ~OOP   --\-/-->  OOP  --> OOP?
+//        ->  OOP+0 --/-\--> ~OOP? -/
+//                \--> 0 ----/
+// Here's a list of edges for the above chart:
+// {~OOP+0 -> ~OOP -> OOP -> OOP? ; ~OOP+0 -> OOP+0 -> ~OOP? -> OOP? ; OOP+0 -> 0 -> ~OOP? }
+//
+// Subtyping OOP are e.g. {str, tuple} and subtyping tuple is struct.  
+// Subtypes are always "inside" what they subtype, so { ~OOP -> ~str } and { str -> OOP }
+// 
 public class Type {
   static private int CNT=1;
   final int _uid=CNT++; // Unique ID, will have gaps, used to uniquely order Types in Unions
