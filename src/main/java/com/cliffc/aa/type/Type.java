@@ -104,8 +104,8 @@ public class Type {
   public  static final Type XSCALAR= make(TXSCALAR); // ptrs, ints, flts; things that fit in a machine register
   public  static final Type  OOP   = make( TOOP   ); // ptrs subject to GC (excludes e.g. function pointers)
   public  static final Type XOOP   = make(TXOOP   ); // ptrs subject to GC
-  public  static final Type  NUM   = make( TNUM   );
-  public  static final Type XNUM   = make(TXNUM   );
+  private static final Type  NUM   = make( TNUM   );
+  private static final Type XNUM   = make(TXNUM   );
   public  static final Type  REAL  = make( TREAL  );
   private static final Type XREAL  = make(TXREAL  );
 
@@ -121,13 +121,11 @@ public class Type {
   // exactly 1 value.  
   static /*final*/ Type[] SCALAR_PRIMS;
   
-  private boolean is_simple() { return _type < TSIMPLE; }
+  boolean is_simple() { return _type < TSIMPLE; }
+  // Return base type of named types
+  Type base() { Type t = this; while( t._type == TNAME ) t = ((TypeName)t)._t; return t; }
   // Strip off any subclassing just for names
-  private byte simple_type() {
-    Type t = this;
-    while( t._type == TNAME ) t = ((TypeName)t)._t;
-    return t._type;
-  }
+  byte simple_type() { return base()._type; }
   public  boolean is_oop() { byte t = simple_type();  return t == TOOP || t == TXOOP || t == TSTR || t == TSTRUCT || t == TTUPLE; }
   private boolean is_num() { byte t = simple_type();  return t == TNUM || t == TXNUM || t == TREAL || t == TXREAL || t == TINT || t == TFLT; }
   // True if 'this' isa SCALAR, without the cost of a full 'meet()'
@@ -191,12 +189,14 @@ public class Type {
     assert !(that_oop&&that_num);
     
     if( is_oop() ) { // Only simple OOPish type
-      if( !that_oop ) return t.isa(TypeInt.NULL) ? TypeUnion.make_null(this) : SCALAR;
+      assert this==OOP || this==XOOP;         // Only simple OOP right now
+      if(  that_num ) return t.may_be_null()  ? TypeUnion.make_null(this) : SCALAR;
+      if( !that_oop ) throw AA.unimpl();
       return _type == TOOP ? OOP : t;
     }
 
     if( is_num() ) {
-      if( that_oop ) return isa(TypeInt.NULL) ? TypeUnion.make_null(t) : SCALAR;
+      if(  that_oop ) return may_be_null() ? t.meet(get_null()) : SCALAR;
       if( !that_num ) throw AA.unimpl();
       
       // Numeric; same pattern as ANY/ALL, or SCALAR/XSCALAR
@@ -229,9 +229,9 @@ public class Type {
     Type ta = mt._dual.xmeet0(t._dual);
     Type tb = mt._dual.xmeet0(  _dual);
     if( ta==t._dual && tb==_dual ) return true;
-    System.err.print("("+this+"&"+t+")="+mt+"; but ("+mt._dual+"&");
-    if( ta!=t._dual ) System.err.println(t._dual+")=="+ta+" which is not "+t._dual);
-    else              System.err.println(  _dual+")=="+tb+" which is not "+  _dual);
+    System.err.print("("+this+"&"+t+")=="+mt+"; but \n("+mt._dual+"&");
+    if( ta!=t._dual ) System.err.println(t._dual+")=="+ta+" \nwhich is not "+t._dual);
+    else              System.err.println(  _dual+")=="+tb+" \nwhich is not "+  _dual);
     return false;
   }
   
@@ -280,7 +280,26 @@ public class Type {
                                "("+t01      +") & "+t2+" == "+t0+" & ("+t12        +"); "+
                                t01_2                  +" == "+t0_12);
         }
-    assert errs==0 : "Found "+errs+" non-associative-type errors";
+    assert errs==0 : "Found "+errs+" associative errors";
+
+
+    // Confirm C-R, I guess.  If A isa B, then A.join(C) isa B.join(C)
+    for( Type t0 : ts )
+      for( Type t1 : ts ) {
+        if( t0.isa(t1) ) {
+          for( Type t2 : ts ) {
+            Type t02 = t0.join(t2);
+            Type t12 = t1.join(t2);
+            Type mt  = t02.meet(t12);
+            if( mt != t12 && errs++ < 10 ) {
+              System.err.println("("+t0+" ^ "+t2+") = "+t02+"; "+
+                                 "("+t1+" ^ "+t2+") = "+t12+"; "+
+                                 "their meet = "+mt+" which is not "+t12);
+            }
+          }
+        }
+      }    
+    assert errs==0 : "Found "+errs+" non-join-type errors";
 
     // Check scalar primitives; all are SCALARS and none sub-type each other.
     SCALAR_PRIMS = new Type[] { TypeInt.INT64, TypeFlt.FLT64, Type.OOP, TypeFun.make_generic() };
@@ -307,10 +326,14 @@ public class Type {
     case TSCALAR:
     case TNUM:
     case TREAL:
+    case TCTRL:
+    case TOOP:
       return false;             // These are all below center
     case TXREAL:
     case TXNUM:
     case TXSCALAR:
+    case TXCTRL:
+    case TXOOP:
       return true;              // These are all above center
     case TERROR:
     case TFUN:
@@ -361,8 +384,9 @@ public class Type {
   // Return the argument type of idxth argument.  Error for everybody except
   // TypeFun and a TypeUnion of TypeFuns
   public Type arg(int idx) { throw AA.unimpl(); }
-  // Return any "return type" of the Meet of all function types
-  public Type ret() { return null; }
+  // Return any "return type" of the Meet of all function types.  Error for
+  // everybody except TypeFun and a TypeUnion of TypeFuns
+  public Type ret() { throw AA.unimpl(); }
   // Return true if this is a function pointer (return type from EpilogNode)
   public boolean is_fun_ptr() { return false; }
   // Return true if this is a forward-ref function pointer (return type from EpilogNode)
@@ -373,6 +397,12 @@ public class Type {
   public double getd() { throw AA.unimpl(); }
   // Return a String from a TypeStr constant; assert otherwise.
   public String getstr() { throw AA.unimpl(); }
+  // Return true if this type may BE a null: includes Int:NULL plus numbers
+  // above the center line; numbers may be named.  When true, a call to to
+  // get_null will return this type "fallen" to a NULL.
+  public boolean may_be_null() {  assert is_simple();  return _type == TXSCALAR || _type == TXNUM || _type == TXREAL; }
+  // Return a (named) null
+  public Type get_null() { assert is_simple(); return TypeInt.NULL; }
 
   // Lattice of conversions:
   // -1 unknown; top; might fail, might be free (Scalar->Int); Scalar might lift

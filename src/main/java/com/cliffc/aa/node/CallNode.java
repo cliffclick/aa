@@ -35,7 +35,7 @@ public class CallNode extends Node implements AutoCloseable {
   public static void init0() { PRIM_RPC=RPC; }
   public static void reset_to_init0() { RPC = PRIM_RPC; }
 
-  @Override public Node is_copy(GVNGCM gvn, int idx) { return _inlined ? at(idx) : null; }
+  @Override public Node is_copy(GVNGCM gvn, int idx) { return _inlined ? in(idx) : null; }
 
   // Number of actual arguments
   int nargs() { return _defs._len-2; }
@@ -74,7 +74,7 @@ public class CallNode extends Node implements AutoCloseable {
       TypeTuple t_funptr = (TypeTuple)tn._t;
       assert t_funptr.is_fun_ptr();
       TypeFun tf = t_funptr.get_fun();
-      set_def(1,tn.at(1),gvn);
+      set_def(1,tn.in(1),gvn);
       for( int i=0; i<nargs(); i++ ) // Insert casts for each parm
         set_def(i+2,gvn.xform(new TypeNode(tf._ts.at(i),arg(i),tn._error_parse)),gvn);
       _cast_ret = tf._ret;       // Upcast return results
@@ -130,7 +130,7 @@ public class CallNode extends Node implements AutoCloseable {
 
     // Check for several trivial cases that can be fully inlined immediately.
     // Check for zero-op body (id function)
-    if( rez instanceof ParmNode && rez.at(0) == fun ) return inline(gvn,arg(0));
+    if( rez instanceof ParmNode && rez.in(0) == fun ) return inline(gvn,arg(0));
     // Check for constant body
     if( rez instanceof ConNode ) return inline(gvn,rez);
 
@@ -138,18 +138,18 @@ public class CallNode extends Node implements AutoCloseable {
     boolean can_inline=true;
     for( Node parm : rez._defs )
       if( parm != null && parm != fun &&
-          !(parm instanceof ParmNode && parm.at(0) == fun) &&
+          !(parm instanceof ParmNode && parm.in(0) == fun) &&
           !(parm instanceof ConNode) )
         can_inline=false;       // Not trivial
     if( can_inline ) {
       Node irez = rez.copy();   // Copy the entire function body
       for( Node parm : rez._defs )
-        irez.add_def((parm instanceof ParmNode && parm.at(0) == fun) ? arg(((ParmNode)parm)._idx) : parm);
+        irez.add_def((parm instanceof ParmNode && parm.in(0) == fun) ? arg(((ParmNode)parm)._idx) : parm);
       return inline(gvn,gvn.xform(irez));  // New exciting replacement for inlined call
     }
 
     // If this is a primitive, we never change the function header via inlining the call
-    assert fun.at(1)._uid!=0;
+    assert fun.in(1)._uid!=0;
     assert fun._tf._ts._ts.length == nargs();
 
 
@@ -166,7 +166,7 @@ public class CallNode extends Node implements AutoCloseable {
     // Add an input path to all incoming arg ParmNodes from the Call.
     int pcnt=0;               // Assert all parameters found
     for( Node arg : fun._uses ) {
-      if( arg.at(0) == fun && arg instanceof ParmNode ) {
+      if( arg.in(0) == fun && arg instanceof ParmNode ) {
         int idx = ((ParmNode)arg)._idx; // Argument number, or -1 for rpc
         Node actual = idx==-1 ? gvn.con(TypeRPC.make(_rpc)) : arg(idx);
         gvn.add_def(arg,actual);
@@ -189,7 +189,7 @@ public class CallNode extends Node implements AutoCloseable {
 
   // Inline to this Node.
   private Node inline( GVNGCM gvn, Node rez ) {
-    gvn.add_work(at(0));        // Major graph shrinkage; retry parent as well
+    gvn.add_work(in(0));        // Major graph shrinkage; retry parent as well
     set_def(1,rez,gvn);
     _inlined = true;            // Allow data projection to find new body
     return this;
@@ -214,7 +214,7 @@ public class CallNode extends Node implements AutoCloseable {
     }
 
     // Return {control,value} tuple.
-    return TypeTuple.make(gvn.type(at(0)),t);
+    return TypeTuple.make(gvn.type(in(0)),t);
   }
 
   // Cannot return the functions return type, unless all args are compatible

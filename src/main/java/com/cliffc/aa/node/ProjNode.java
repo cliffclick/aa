@@ -11,7 +11,7 @@ public class ProjNode extends Node {
   public ProjNode( Node ifn, int idx ) { super(OP_PROJ,ifn); _idx=idx; }
   @Override String xstr() { return "DProj_"+_idx; }
   @Override public Node ideal(GVNGCM gvn) {
-    Node m = at(0);
+    Node m = in(0);
     if( m instanceof CallNode ) {
       // If a CallNode with an upcast on the data return?
       CallNode call = (CallNode)m;
@@ -22,7 +22,7 @@ public class ProjNode extends Node {
     return m.is_copy(gvn,_idx);
   }
   @Override public Type value(GVNGCM gvn) {
-    Type c = gvn.type(at(0));
+    Type c = gvn.type(in(0));
     if( c instanceof TypeErr ) return c; // Handle error input
     if( !(c instanceof TypeTuple) )
       throw AA.unimpl();

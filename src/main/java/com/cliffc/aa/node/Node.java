@@ -7,6 +7,7 @@ import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeErr;
 
 import java.util.BitSet;
+import java.util.function.Predicate;
 
 // Sea-of-Nodes
 public abstract class Node implements Cloneable {
@@ -39,7 +40,7 @@ public abstract class Node implements Cloneable {
   public Ary<Node> _defs;
   // Add def/use edge
   public Node add_def(Node n) { _defs.add(n); if( n!=null ) n._uses.add(this); return n; }
-  public Node at(int i) { return _defs.at(i); }
+  public Node in( int i) { return _defs.at(i); }
   // Replace def/use edge
   public Node set_def( int idx, Node n, GVNGCM gvn ) {
     Node old = _defs.at(idx);  // Get old value
@@ -121,7 +122,7 @@ public abstract class Node implements Cloneable {
       for( Node n : _defs ) if( n != null ) n.toString(d+1,sb,max,bs);
     }
     // Print multi-node combos all-at-once
-    Node x = is_multi_tail() ? at(0) : this;
+    Node x = is_multi_tail() ? in(0) : this;
     if( x.is_multi_head() ) {
       bs.clear(_uid);           // Reset for self, so prints in the mix
       int dx = d+(x==this?0:1);
@@ -178,9 +179,9 @@ public abstract class Node implements Cloneable {
   }
 
   // Used in Parser just after an if-test to sharpen the tested variables.
-  // Main use is to remove null-ness from a nullable after a null-check.  If
-  // the IfNode collapses during parsing, some other node will call here (a
-  // default true or false), and the sharpening will not be needed.
+  // This is a mild optimization, since e.g. follow-on Loads which require a
+  // non-null check will hash to the pre-test Load, and so bypass this
+  // sharpening.
   public Node sharpen( GVNGCM gvn, ScopeNode scope, TmpNode tmp ) { return this; }
     
   // Liveness walk, all reachable defs
@@ -240,7 +241,7 @@ public abstract class Node implements Cloneable {
     if( Type.SCALAR.isa(gvn.type(this)) ) // Cannot have code that deals with unknown-GC-state
       throw AA.unimpl(); // Not allowed; either user-error or missing opt
     for( int i=0; i<_defs._len; i++ ) {
-      Node def=at(i);
+      Node def= in(i);
       if( def != null ) def.walkerr_gc(bs,gvn);
     }
   }
@@ -259,9 +260,19 @@ public abstract class Node implements Cloneable {
   
   // Skip useless Region controls
   boolean skip_ctrl(GVNGCM gvn) {
-    Node x = at(0).is_copy(gvn,-1);
+    Node x = in(0).is_copy(gvn,-1);
     if( x==null ) return false;
     set_def(0,x,gvn);
     return true;
   }
+
+  // Walk a subset of the dominator tree, looking for the last place (highest
+  // in tree) this predicate passes, or null if it never does.  
+  Node walk_dom_last(Predicate<Node> P) {
+    assert in(0) != null;       // All default control nodes pass ctrl in slot 0
+    Node n = in(0).walk_dom_last(P);
+    if( n != null ) return n;   // Take last answer first
+    return P.test(this) ? this : null;
+  }
+  
 }

@@ -116,7 +116,7 @@ class Convert extends PrimNode {
     }
     return apply(ts);
   }
-  @Override public TypeName apply( Type[] args ) { return TypeName.make(_name,args[1]); }
+  @Override public Type apply( Type[] args ) { return TypeName.make0(_name,args[1]); }
   @Override public byte op_prec() { return 9; }
   public boolean is_lossy() { return false; }
 }
@@ -145,8 +145,8 @@ class ConvertF64Str extends PrimNode {
 class ConvertStrStr extends PrimNode {
   ConvertStrStr(Node... nodes) { super("str",PrimNode.ARGS1,TypeTuple.STR,TypeStr.STR,nodes); }
   @Override public Type apply( Type[] args ) { return args[1]; }
-  @Override public Node ideal(GVNGCM gvn) { return at(1); }
-  @Override public Type value(GVNGCM gvn) { return gvn.type(at(1)); }
+  @Override public Node ideal(GVNGCM gvn) { return in(1); }
+  @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)); }
   public boolean is_lossy() { return false; }
 }
 
@@ -286,12 +286,14 @@ class NE_OOP extends PrimNode {
 class RandI64 extends PrimNode {
   RandI64() { super("math_rand",PrimNode.ARGS1,TypeTuple.INT64,TypeInt.INT64); }
   @Override public TypeInt apply( Type[] args ) { return TypeInt.con(new java.util.Random().nextInt((int)args[1].getl())); }
-  @Override public Type value(GVNGCM gvn) { return gvn.type(at(1)).meet(TypeInt.FALSE); }
+  @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)).meet(TypeInt.FALSE); }
+  // Rands have hidden internal state; 2 Rands are never equal
+  @Override public boolean equals(Object o) { return this==o; }
 }
 
 class Id extends PrimNode {
   Id(Type arg) { super("id",PrimNode.ARGS1,TypeTuple.make(Type.XSCALAR,1.0,arg),arg); }
   @Override public Type apply( Type[] args ) { return args[1]; }
-  @Override public Node ideal(GVNGCM gvn) { return at(1); }
-  @Override public Type value(GVNGCM gvn) { return gvn.type(at(1)); }
+  @Override public Node ideal(GVNGCM gvn) { return in(1); }
+  @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)); }
 }

@@ -16,13 +16,13 @@ public class TypeNode extends Node {
   public TypeNode( Type t, Node n, Parse P ) { super(OP_TYPE,null,n); _t=t; _error_parse = P; }
   @Override String xstr() { return ":"+_t; }
   @Override public Node ideal(GVNGCM gvn) {
-    Node arg=at(1);
+    Node arg= in(1);
     Type t = gvn.type(arg);
     if( t.isa(_t) ) return arg;
     // Push TypeNodes 'up' to widen the space they apply to, and hopefully push
     // the type check closer to the source of a conflict.
     if( arg instanceof PhiNode ) {
-      Node region = arg.at(0);
+      Node region = arg.in(0);
       assert region instanceof RegionNode;
       // Cannot change the "shape" of function nodes with potential unknown
       // callers, as the future callers need to see the same arguments.
@@ -30,7 +30,7 @@ public class TypeNode extends Node {
         Node nphi = arg.copy();
         nphi.add_def(region);
         for( int i=1; i<arg._defs._len; i++ )
-          nphi.add_def(gvn.xform(new TypeNode(_t,arg.at(i),_error_parse)));
+          nphi.add_def(gvn.xform(new TypeNode(_t,arg.in(i),_error_parse)));
         return nphi;
       }
     }
@@ -42,12 +42,12 @@ public class TypeNode extends Node {
   // asserted value for later code to assume "all is good", but this error here
   // will eventually have to correct (or the program will be rejected).
   @Override public Type value(GVNGCM gvn) {
-    Type t = gvn.type(at(1));
+    Type t = gvn.type(in(1));
     return t.isa(_t) ? t : _t;
   }
   @Override public Type all_type() { return _t; }
   String err(GVNGCM gvn) {
-    Type t = gvn.type(at(1));
+    Type t = gvn.type(in(1));
     if( t instanceof TypeErr ) return ((TypeErr)t)._msg;
     return _error_parse.typerr(t,_t);
   }

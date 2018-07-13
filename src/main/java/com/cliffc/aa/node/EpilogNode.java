@@ -35,7 +35,7 @@ public class EpilogNode extends Node {
         CallNode call = (CallNode)use;
         // If any use is as an argument, all is lost.
         for( int i=0; i<call.nargs(); i++ ) if( call.arg(i)==this ) return null;
-        assert call.at(1) == this;
+        assert call.in(1) == this;
         rpc = call._rpc;
       } else if( use instanceof CastNode ) continue; // Casts of RPC results are OK
       else return null;         // Else unknown function-pointer user
@@ -52,10 +52,10 @@ public class EpilogNode extends Node {
         { assert rpc==null; rpc = ((ParmNode)parm); }
     if( rpc == null ) return null;
     // Skip the unknown caller in slot 1
-    assert gvn.type(rpc.at(1)) == TypeRPC.ALL_CALL;
+    assert gvn.type(rpc.in(1)) == TypeRPC.ALL_CALL;
     for( int i=2; i<rpc._defs._len; i++ ) {
-      if( gvn.type( fun.at(i) ) == Type.XCTRL ) continue; // Path is dead
-      TypeRPC t = (TypeRPC)gvn.type(rpc.at(i));
+      if( gvn.type( fun.in(i) ) == Type.XCTRL ) continue; // Path is dead
+      TypeRPC t = (TypeRPC)gvn.type(rpc.in(i));
       if( !t.is_con() ) throw AA.unimpl(); // merged multi-callers path
       int irpc = t.rpc();
       if( bs.get(irpc) ) bs.clear(irpc); // Found matching input path; clear from BS
@@ -84,13 +84,13 @@ public class EpilogNode extends Node {
   @Override public Node is_copy(GVNGCM gvn, int idx) {
     assert idx==0 || idx==1;
     assert !gvn.type(rpc()).is_con() || fun().callers_known(gvn);
-    return gvn.type(rpc()).is_con() ? at(idx) : null;
+    return gvn.type(rpc()).is_con() ? in(idx) : null;
   }
   
-  public    Node ctrl() { return          at(0); } // internal function control
-            Node val () { return          at(1); } // standard exit value
-  public    Node rpc () { return          at(2); } // Almost surely a PhiNode merging RPCs
-  public FunNode fun () { return (FunNode)at(3); } // Function header
+  public    Node ctrl() { return          in(0); } // internal function control
+            Node val () { return          in(1); } // standard exit value
+  public    Node rpc () { return          in(2); } // Almost surely a PhiNode merging RPCs
+  public FunNode fun () { return (FunNode) in(3); } // Function header
   @Override String xstr() {                        // Self short name
     String name = fun().name();
     return name==null ? "Epilog" : "Epi#"+name;
@@ -107,7 +107,7 @@ public class EpilogNode extends Node {
   }
 
   // True if this is a forward_ref
-  @Override public boolean is_forward_ref() { return at(0)==at(3) && fun()._tf.is_forward_ref(); }
+  @Override public boolean is_forward_ref() { return in(0)== in(3) && fun()._tf.is_forward_ref(); }
 
   // 'this' is a forward reference, probably with multiple uses (and no inlined
   // callers).  Passed in the matching function definition, which is brand new
@@ -115,8 +115,8 @@ public class EpilogNode extends Node {
   public void merge_ref_def( GVNGCM gvn, String tok, EpilogNode def ) {
     FunNode rfun = fun();
     FunNode dfun = def.fun();
-    assert rfun._defs._len==2 && rfun.at(0)==null && dfun.at(1) instanceof ScopeNode; // Forward ref has no callers
-    assert dfun._defs._len==2 && dfun.at(0)==null && dfun.at(1) instanceof ScopeNode;
+    assert rfun._defs._len==2 && rfun.in(0)==null && dfun.in(1) instanceof ScopeNode; // Forward ref has no callers
+    assert dfun._defs._len==2 && dfun.in(0)==null && dfun.in(1) instanceof ScopeNode;
     assert def._uses._len==0;                      // Def is brand new, no uses
 
     gvn.subsume(this,def);

@@ -144,7 +144,7 @@ public class FunNode extends RegionNode {
   private boolean _all_callers_known;
   boolean callers_known(GVNGCM ignore) {
     if( _all_callers_known ) return true; // Once true, always true
-    if( _tf.is_forward_ref() || (at(1) instanceof ScopeNode) ) return false;
+    if( _tf.is_forward_ref() || (in(1) instanceof ScopeNode) ) return false;
     return (_all_callers_known=true);
   }
 
@@ -160,7 +160,7 @@ public class FunNode extends RegionNode {
 
   private Node split_callers( GVNGCM gvn ) {
     // Bail if there are any dead paths; RegionNode ideal will clean out
-    for( int i=1; i<_defs._len; i++ ) if( gvn.type(at(i))==Type.XCTRL ) return null;
+    for( int i=1; i<_defs._len; i++ ) if( gvn.type(in(i))==Type.XCTRL ) return null;
     if( _defs._len <= 2 ) return null; // No need to split callers if only 1
 
     // Gather the ParmNodes and the EpilogNode.  Ignore other (control) uses
@@ -213,7 +213,7 @@ public class FunNode extends RegionNode {
       bs.set(n._uid);           // Flag as visited
       int op = n._op;           // opcode
       if( op==OP_CALL ) {       // Call-of-primitive?
-        EpilogNode x = (EpilogNode)(n.at(1) instanceof UnresolvedNode ? n.at(1).at(0) : n.at(1));
+        EpilogNode x = (EpilogNode)(n.in(1) instanceof UnresolvedNode ? n.in(1).in(0) : n.in(1));
         if( x.val() instanceof PrimNode )
           op = OP_PRIM;         // Treat as primitive for inlining purposes
       }
@@ -235,13 +235,13 @@ public class FunNode extends RegionNode {
     Node top = gvn.con(Type.XCTRL);
     FunNode fun = new FunNode(top,_tf._ts,_tf._ret,name());
     fun._all_callers_known=true; // private split always
-    fun.add_def(at(2));
+    fun.add_def(in(2));
     for( int i=3; i<_defs._len; i++ ) fun.add_def(top);
     return fun;
   }
 
   // Look for type-specialization inlining.  If any ParmNode has an unresolved
-  // Call user, then we'd like to make a clone of the function body (at least
+  // Call user, then we'd like to make a clone of the function body (in least
   // up to getting all the function TypeUnions to clear out).  The specialized
   // code uses generalized versions of the arguments, where we only specialize
   // on arguments that help immediately.
@@ -251,7 +251,7 @@ public class FunNode extends RegionNode {
     for( ParmNode parm : parms )
       for( Node call : parm._uses )
         if( call instanceof CallNode &&
-            (gvn.type(call.at(1)) instanceof TypeUnion || // Call overload not resolved
+            (gvn.type(call.in(1)) instanceof TypeUnion || // Call overload not resolved
              gvn.type(call      ) instanceof TypeErr ||   // Call result is an error (arg mismatch)
              ((TypeTuple)gvn.type(call)).at(1) instanceof TypeErr) ) { // Call result is an error (arg mismatch)
           any_unr = true; break;
@@ -259,7 +259,7 @@ public class FunNode extends RegionNode {
     if( !any_unr ) return null; // No unresolved calls; no point in type-specialization
 
     // TODO: Split with a known caller in slot 1
-    if( !(at(1) instanceof ScopeNode) )
+    if( !(in(1) instanceof ScopeNode) )
       return null; // Untested: Slot 1 is not the generic unparsed caller
 
     // If Parm has unresolved calls, we want to type-specialize on its
@@ -267,19 +267,19 @@ public class FunNode extends RegionNode {
     // (all Scalar args).  Peel out 2nd call-site args and generalize them.
     Type[] sig = new Type[parms.length];
     for( int i=0; i<parms.length; i++ )
-      sig[i] = gvn.type(parms[i].at(2)).widen();
+      sig[i] = gvn.type(parms[i].in(2)).widen();
     // Make a new function header with new signature
     TypeTuple ts = TypeTuple.make(Type.XSCALAR,1.0,sig);
     assert ts.isa(_tf._ts);
     if( ts == _tf._ts ) return null; // No improvement for further splitting
     // Make a prototype new function header.  Clone the generic unknown caller in slot 1.  
-    FunNode fun = new FunNode(at(1),ts,_tf._ret,name());
-    // Look at remaining paths and decide if they split or stay
+    FunNode fun = new FunNode(in(1),ts,_tf._ret,name());
+    // Look in remaining paths and decide if they split or stay
     for( int j=2; j<_defs._len; j++ ) {
       boolean split=true;
       for( int i=0; i<parms.length; i++ )
-        split &= gvn.type(parms[i].at(j)).widen().isa(sig[i]);
-      fun.add_def(split ? at(j) : gvn.con(Type.XCTRL));
+        split &= gvn.type(parms[i].in(j)).widen().isa(sig[i]);
+      fun.add_def(split ? in(j) : gvn.con(Type.XCTRL));
     }
     // TODO: Install in ScopeNode for future finding
     fun._all_callers_known=true; // currently not exposing to further calls
@@ -299,22 +299,22 @@ public class FunNode extends RegionNode {
       Node n = work.pop();      // Get work
       if( map.get(n) != null ) continue; // Already visited?
       assert n._uid < fun._uid; // Recursive calls will call 'fun' directly
-      assert n.at(0)!=epi && (n._defs._len<=1 || n.at(1)!= epi || n instanceof CallNode); // Do not walk past epilog
+      assert n.in(0)!=epi && (n._defs._len<=1 || n.in(1)!= epi || n instanceof CallNode); // Do not walk past epilog
       if( n != epi )           // Except for the Epilog
         work.addAll(n._uses);  // Visit all uses also
       map.put(n,n.copy()); // Make a blank copy with no edges and map from old to new
     }
 
     // TODO: Split with a known caller in slot 1
-    if( !(at(1) instanceof ScopeNode) )  throw AA.unimpl(); // Untested: Slot 1 is not the generic unparsed caller
-    if( ((ScopeNode)at(1)).get(name()) !=null )
+    if( !(in(1) instanceof ScopeNode) )  throw AA.unimpl(); // Untested: Slot 1 is not the generic unparsed caller
+    if( ((ScopeNode) in(1)).get(name()) !=null )
       throw AA.unimpl(); // need to repoint the scope
     Node any = gvn.con(Type.XCTRL);
     Node newepi = map.get(epi);
     Node new_unr = epi;
     // Are we making a type-specialized copy, that can/should be found by same-typed users?
     // Or are we cloning a private copy just for this call-site?
-    if( fun.at(1) != any ) {
+    if( fun.in(1) != any ) {
       // All uses now get to select either the old or new (type-specific) copy.
       EpilogNode xxxepi = epi.copy();
       for( Node def : epi._defs ) xxxepi.add_def(def);
@@ -330,12 +330,12 @@ public class FunNode extends RegionNode {
     // FunNode & Parms only get the matching slice of args.
     for( Node n : map.keySet() ) {
       Node c = map.get(n);
-      if( n instanceof ParmNode && n.at(0) == this ) {  // Leading edge ParmNodes
-        c.add_def(map.get(n.at(0))); // Control
+      if( n instanceof ParmNode && n.in(0) == this ) {  // Leading edge ParmNodes
+        c.add_def(map.get(n.in(0))); // Control
         int idx = ((ParmNode)n)._idx;
         c.add_def(gvn.con(idx==-1 ? TypeRPC.ALL_CALL : fun._tf._ts._ts[idx])); // Generic arg#1
         for( int j=2; j<_defs._len; j++ ) // Get the new parm path or null according to split
-          c.add_def( fun.at(j)==any ? any : n.at(j) );
+          c.add_def( fun.in(j)==any ? any : n.in(j) );
       } else if( n != this ) {  // Interior nodes
         for( Node def : n._defs ) {
           Node newdef = map.get(def);
@@ -347,7 +347,7 @@ public class FunNode extends RegionNode {
     }
     // Kill split-out path-ins to the old code
     for( int j=2; j<_defs._len; j++ )
-      if( fun.at(j)!=any )  // Path split out?
+      if( fun.in(j)!=any )  // Path split out?
         set_def(j,any,gvn); // Kill incoming path on old FunNode
 
     // The old Epilog has sets of result Casts and RPCs; these need to be
@@ -357,10 +357,10 @@ public class FunNode extends RegionNode {
       if( !(use instanceof RPCNode) ) continue;
       int i, rpc_idx = ((RPCNode)use)._rpc;
       for( i=2; i<_defs._len; i++ )
-        if( rpc_idx == ((TypeRPC)gvn.type(rpc_parm.at(i))).rpc() )
+        if( rpc_idx == ((TypeRPC)gvn.type(rpc_parm.in(i))).rpc() )
           break;
       assert i<_defs._len;      // Must find each RPC associated path
-      if( fun.at(i)!=any ) {
+      if( fun.in(i)!=any ) {
         gvn.set_def_reg(use,0,newepi);
         gvn.set_def_reg(use,1,newepi);
         j--;            // Rerun loop since changed the set being iterated over
@@ -370,14 +370,14 @@ public class FunNode extends RegionNode {
     for( int j=0; !epi.is_dead() && j<epi._uses._len; j++ ) {
       Node use = epi._uses.at(j);
       if( !(use instanceof CastNode) ) continue;
-      if( use.at(0) instanceof RPCNode && use.at(0).at(0)==newepi ) {
-        assert use.at(1)==epi;
+      if( use.in(0) instanceof RPCNode && use.in(0).in(0)==newepi ) {
+        assert use.in(1)==epi;
         gvn.set_def_reg(use,1,newepi);
         j--;
       }
     }
     // Repoint all other uses to an Unresolved choice of the old and new functions
-    if( fun.at(1) != any ) gvn.subsume(epi,new_unr);
+    if( fun.in(1) != any ) gvn.subsume(epi,new_unr);
     
     // Put all new nodes into the GVN tables and worklists
     for( Node c : map.values() ) gvn.rereg(c);

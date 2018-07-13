@@ -33,7 +33,8 @@ public class TypeTuple extends Type {
   @Override public String toString() {
     SB sb = new SB().p("[");
     for( Type t : _ts ) sb.p(t.toString()).p(',');
-    return sb.p(_inf.toString()).p("...]").toString();
+    if( _inf!=TypeErr.ALL ) sb.p(_inf.toString()).p("...");
+    return sb.p("]").toString();
   }
 
   private static TypeTuple FREE=null;
@@ -111,7 +112,7 @@ public class TypeTuple extends Type {
     case TRPC:
     case TFUN:   return Type.SCALAR;
     case TFLT:
-    case TINT:   return t.isa(TypeInt.NULL) ? TypeUnion.make_null(this) : Type.SCALAR;
+    case TINT:   return t.may_be_null() && !(t instanceof TypeName) ? TypeUnion.make_null(this) : SCALAR;
     case TERROR: return ((TypeErr)t)._all ? t : this;
     default: throw typerr(t);
     }
@@ -143,7 +144,6 @@ public class TypeTuple extends Type {
     for( Type t : _ts ) if( t._type==Type.TUNION ) return true;
     return false;
   }
-  @Override public TypeTuple ret() { throw com.cliffc.aa.AA.unimpl(); }
   @Override public boolean above_center() { return false; }
   // True if all internals canBeConst
   @Override public boolean canBeConst() {
@@ -180,4 +180,5 @@ public class TypeTuple extends Type {
         return s;
     return null;
   }
+  @Override public boolean may_be_null() { return false; }
 }

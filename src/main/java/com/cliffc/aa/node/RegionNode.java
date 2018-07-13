@@ -1,7 +1,10 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.*;
+import com.cliffc.aa.AA;
+import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
+
+import java.util.function.Predicate;
 
 // Merge results
 public class RegionNode extends Node {
@@ -19,7 +22,7 @@ public class RegionNode extends Node {
     // Find 0, 1 or many live paths
     int live=0, dead=0;
     for( int i=1; i<_defs._len; i++ )
-      if( gvn.type(at(i))==Type.XCTRL )
+      if( gvn.type(in(i))==Type.XCTRL )
         dead++;                  // Count dead paths
       else                       // Found a live path
         if( live == 0 ) live = i;// Remember live path
@@ -37,13 +40,13 @@ public class RegionNode extends Node {
     if( dead==0 ) return null;  // No dead paths
 
     // Do a parallel bulk reshape: remove the dead edges from Phis and the
-    // Region all at once
+    // Region all in once
     for( Node phi : _uses )
       if( phi instanceof PhiNode )
         for( int i=1,j=1; i<_defs._len; i++ )
-          if( gvn.type(at(i))==Type.XCTRL ) { gvn.unreg(phi); phi.remove(j,gvn); gvn.rereg(phi); }
+          if( gvn.type(in(i))==Type.XCTRL ) { gvn.unreg(phi); phi.remove(j,gvn); gvn.rereg(phi); }
           else j++;
-    for( int i=1; i<_defs._len; i++ ) if( gvn.type(at(i))==Type.XCTRL ) remove(i--,gvn);
+    for( int i=1; i<_defs._len; i++ ) if( gvn.type(in(i))==Type.XCTRL ) remove(i--,gvn);
     return this;
   }
 
@@ -53,6 +56,16 @@ public class RegionNode extends Node {
       t = t.meet(gvn.type(_defs._es[i]));
     return t;
   }
-  @Override public Node is_copy(GVNGCM gvn, int idx) { assert idx==-1; return _cidx == 0 ? null : at(_cidx); }
+  @Override public Node is_copy(GVNGCM gvn, int idx) { assert idx==-1; return _cidx == 0 ? null : in(_cidx); }
   @Override public Type all_type() { return Type.CTRL; }
+  // Complex dominator tree.  Ok to subset, attempt the easy walk
+  @Override Node walk_dom_last(Predicate<Node> P) {
+    // Allow moving up simple diamonds
+    if( _defs._len==3 && in(1) instanceof ProjNode && in(1).in(0) instanceof IfNode &&
+        in(1).in(0) == in(2).in(0) ) {
+      Node n = in(1).in(0).walk_dom_last(P);
+      if( n != null ) return n;
+    }
+    return P.test(this) ? this : null;
+  }
 }

@@ -55,10 +55,11 @@ public class TypeErr extends Type {
     }
     return make(msg, _all|te._all, a, b, multi);
   }
-  @Override public byte isBitShape(Type t) { return _all && this!=ALL ? (byte)99 : -1; }
-  @Override public String toString() { return this==ANY ? "any" : ((_all ? "" : "~")+ _msg + (_multi ? "+++" : "")); }
   @Override public boolean above_center() { return !_all; }
   @Override public boolean canBeConst() { return !_all; }
   @Override public boolean is_con()   { return !_all; }
+  @Override public boolean may_be_null() { return !_all; }
+  @Override public byte isBitShape(Type t) { return _all && this!=ALL ? (byte)99 : -1; }
+  @Override public String toString() { return this==ANY ? "any" : ((_all ? "" : "~")+ _msg + (_multi ? "+++" : "")); }
   @Override public String errMsg() { return above_center() || this==ALL ? null : _msg; }
 }

@@ -343,8 +343,8 @@ public class GVNGCM {
       // Optimization phase 1: Remove ambiguity
       for( int i=_INIT0_CNT; i<_ts._len; i++ ) {
         Node n = nodes.atX(i);
-        if( n instanceof CallNode && n.at(1) instanceof UnresolvedNode ) {
-          Node fun = ((UnresolvedNode)n.at(1)).resolve(this,(CallNode)n);
+        if( n instanceof CallNode && n.in(1) instanceof UnresolvedNode ) {
+          Node fun = ((UnresolvedNode)n.in(1)).resolve(this,(CallNode)n);
           if( fun != null ) {
             set_def_reg(n, 1, fun);
             add_work(n); // Go again- values will continue to fall in the lattice
@@ -365,7 +365,7 @@ public class GVNGCM {
         assert t.isa(((CastNode)n)._t);
         if( t != (((CastNode)n)._t)) {
           unreg(n);
-          Node cast = xform_old0(rereg(new CastNode(n.at(0), n.at(1), t)));
+          Node cast = xform_old0(rereg(new CastNode(n.in(0), n.in(1), t)));
           subsume(n, nodes.setX(cast._uid, cast));
         }
       }

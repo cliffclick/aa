@@ -7,11 +7,14 @@ import org.junit.Test;
 
 import java.util.HashMap;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
 public class TestType {
   @Test public void testType0() {
-    test   ("a = math_rand(1) ? 0 : @{x=1}; // a is null or a struct\n"+
-            "b = math_rand(1) ? 0 : @{c=a}; // b is null or a struct\n"+
-            "b ? (b.c ? b.c.x : 0) : 0  // Needs a safe-field", TypeInt.BOOL); // Needs a safe-field
+    //test   ("a = math_rand(1) ? 0 : @{x=1}; // a is null or a struct\n"+
+    //        "b = math_rand(1) ? 0 : @{c=a}; // b is null or a struct\n"+
+    //        "b ? (b.c ? b.c.x : 0) : 0  // Needs a safe-field", TypeInt.BOOL); // Needs a safe-field
     // Simple int
     test("1",   TypeInt.TRUE);
     // Unary operator
@@ -179,15 +182,15 @@ public class TestType {
     test   ("dist={p->p//qqq\n.//qqq\nx*p.x+p.y*p.y}; dist(//qqq\n@{x//qqq\n=1,y=2})", TypeInt.con(5));
 
     // Named type variables
-    test_isa("gal=:flt"       , TypeTuple.make_fun_ptr(TypeFun.make(TypeTuple.FLT64,TypeName.make("gal",TypeFlt.FLT64),Bits.FULL)));
-    test_isa("gal=:flt; {gal}", TypeTuple.make_fun_ptr(TypeFun.make(TypeTuple.FLT64,TypeName.make("gal",TypeFlt.FLT64),Bits.FULL)));
+    test_isa("gal=:flt"       , TypeTuple.make_fun_ptr(TypeFun.make(TypeTuple.FLT64,TypeName.make0("gal",TypeFlt.FLT64),Bits.FULL)));
+    test_isa("gal=:flt; {gal}", TypeTuple.make_fun_ptr(TypeFun.make(TypeTuple.FLT64,TypeName.make0("gal",TypeFlt.FLT64),Bits.FULL)));
     test    ("gal=:flt; 3==gal(2)+1", TypeInt.TRUE);
-    test    ("gal=:flt; tank:gal = gal(2)", TypeName.make("gal",TypeFlt.con(2)));
+    test    ("gal=:flt; tank:gal = gal(2)", TypeName.make0("gal",TypeFlt.con(2)));
     // test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: figure out if free cast for bare constants?
     testerr ("gal=:flt; tank:gal = gal(2)+1", "3.0 is not a gal:flt64","                             ");
     test    ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(@{x=1,y=2}))", TypeInt.con(5));
     test    ("Point=:@{x,y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(@{x=1,y=2}))", TypeInt.con(5));
-    testerr ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(     (@{x=1,y=2}))", "@{x:1,y:2} is not a Point:@{x,y}","                      ");
+    testerr ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(     (@{x=1,y=2}))", "@{x:1,y:2,} is not a Point:@{x,y,}","                      ");
 
     // nullable and not-null pointers
     test   ("x:str? = 0", TypeInt.NULL); // question-type allows null or not; zero digit is null
@@ -200,10 +203,10 @@ public class TestType {
     test   ("\"abc\"==0", TypeInt.FALSE ); // No type error, just not null
     test   ("\"abc\"!=0", TypeInt.TRUE  ); // No type error, just not null
     test   ("nil=0; \"abc\"!=nil", TypeInt.TRUE); // Another way to name null
-
-    test   ("a = math_rand(1)?0:@{x=1}; // a is null or a struct"+
-            "b = math_rand(1)?0:@{a=a}; // b is null or a struct"+
-            "b ? (b.a ? b.a.x : 0) : 0  // Needs a safe-field", TypeInt.BOOL); // Needs a safe-field
+    
+    //test   ("a = math_rand(1)?0:@{x=1}; // a is null or a struct"+
+    //        "b = math_rand(1)?0:@{a=a}; // b is null or a struct"+
+    //        "b ? (b.a ? b.a.x : 0) : 0  // Needs a safe-field", TypeInt.BOOL); // Needs a safe-field
 
     
     // TODO: Need real TypeVars for these
@@ -283,28 +286,110 @@ c[x]=1;
     TypeEnv te = Exec.go("args",program);
     if( te._errs != null ) System.err.println(te._errs.toString());
     Assert.assertNull(te._errs);
-    Assert.assertEquals(expected,te._t);
+    assertEquals(expected,te._t);
   }
   static private void test_isa( String program, Type expected ) {
     TypeEnv te = Exec.go("args",program);
     if( te._errs != null ) System.err.println(te._errs.toString());
     Assert.assertNull(te._errs);
-    Assert.assertTrue(te._t.isa(expected));
+    assertTrue(te._t.isa(expected));
   }
   static private void testerr( String program, String err, String cursor ) {
     String err2 = "\nargs:0:"+err+"\n"+program+"\n"+cursor+"^\n";
     TypeEnv te = Exec.go("args",program);
-    Assert.assertTrue(te._errs != null && te._errs._len>=1);
-    Assert.assertEquals(err2,te._errs.at(0));
+    assertTrue(te._errs != null && te._errs._len>=1);
+    assertEquals(err2,te._errs.at(0));
   }
 
   // TODO: Observation: value() calls need to be monotonic, can test this.
   @Test public void testCommuteSymmetricAssociative() {
     Type.init0(new HashMap<>());
-    // Uncomment to insert a single test to focus on
-    Type t1 = (TypeInt.INT64.join(TypeFlt.FLT64)).join(TypeStr.STR) ;
-    Type t2 =  TypeInt.INT64.join(TypeFlt.FLT64  .join(TypeStr.STR));
-    Assert.assertEquals(t1,t2);
-    Assert.assertTrue(Type.check_startup());
+
+    // No named-zero, ever
+    Type z  = TypeInt.NULL;
+    Type nz = TypeName.make0("__test_enum",z);
+    assertEquals(z,nz);
+    // Lattice around int8 and 0 is well formed; exactly 3 edges, 3 nodes
+    // Confirm lattice: {~i16 -> ~i8 -> 0 -> i8 -> i16 }
+    // Confirm lattice: {        ~i8 -> 1 -> i8        }
+    Type  i16= TypeInt.INT16;
+    Type  i8 = TypeInt.INT8;
+    Type xi8 = i8.dual();
+    Type xi16= i16.dual();
+    Type o   = TypeInt.TRUE;
+    assertEquals(xi8,xi8.meet(xi16)); // ~i16-> ~i8
+    assertEquals( z ,z  .meet(xi8 )); // ~i8 ->  0
+    assertEquals(i8 ,i8 .meet(z   )); //  0  -> i8
+    assertEquals(i16,i16.meet(xi8 )); //  i8 -> i16
+    assertEquals( o ,o  .meet(xi8 )); // ~i8 ->  1
+    assertEquals(i8 ,i8 .meet(o   )); //  1  -> i8
+
+    // Lattice around n:int8 and n:0 is well formed; exactly 2 edges, 3 nodes
+    // Confirm lattice: {N:~i8 -> N:1 -> N:i8}
+    // Confirm lattice: {N:~i8 ->   0 -> N:i8}
+    Type ni8 = TypeName.TEST_ENUM;
+    Type xni8= ni8.dual(); // dual name:int8
+    Type no  = TypeName.make0("__test_enum",o);
+    assertEquals(no ,no .meet(xni8)); // N:~i8 -> N: 1
+    assertEquals(ni8,ni8.meet( no )); // N:  1 -> N:i8
+    assertEquals( z , z .meet(xni8)); // N:~i8 ->    0
+    assertEquals(ni8,ni8.meet( z  )); //     0 -> N:i8
+    assertEquals(TypeInt.BOOL,o.meet(xni8)); // 1 & n:~i8 -> mixing 0 and 1
+
+    // Crossing lattice between named and unnamed ints
+    //      Confirm lattice: {~i8 -> N:~i8 -> 0 -> N:i8 -> i8; N:0 -> 0 }
+    // NOT: Confirm lattice: {N:~i8 -> ~i8; N:i8 -> i8 }
+    assertEquals(xni8,xni8.meet( xi8));//   ~i8 -> N:~i8
+    assertEquals(  z , z  .meet(xni8));// N:~i8 -> 0
+    assertEquals( ni8, ni8.meet(   z));//     0 -> N:i8
+    assertEquals(  i8,  i8.meet( ni8));// N: i8 ->   i8
+
+    // Confirm lattice: {~OOP+? -> ~OOP ->  OOP  -> OOP?}
+    // Also:            {~OOP+? -> OOP+? -> OOP }           // Drop choice ~OOP keep choice 0
+    // Also:                      {~OOP -> ~OOP? -> OOP? }  // Drop no-null keep choice ~OOP
+    // Also:                      {OOP+? -> 0 -> ~OOP? }    // Thru 0
+    Type  oop0= TypeUnion.OOP; //  OOP and 0
+    Type xoop0= oop0.dual();   // ~OOP or  0
+    Type  oop = Type.OOP;      //  OOP
+    Type xoop = Type.XOOP;     // ~OOP
+    assertEquals(xoop ,xoop .meet(xoop0)); // ~OOP+? -> ~OOP
+    assertEquals( oop , oop .meet(xoop )); // ~OOP   ->  OOP
+    assertEquals( oop0, oop0.meet( oop )); //  OOP   ->  OOP?
+    Type oop_ = TypeUnion.make(true,TypeInt.NULL,oop); // OOP+?
+    assertEquals( oop_, oop_.meet(xoop0)); // ~OOP+? ->  OOP+?
+    assertEquals( oop , oop .meet( oop_)); //  OOP+? ->  OOP
+    Type xoop_= TypeUnion.make_null(xoop); // ~OOP?
+    assertEquals(xoop_,xoop_.meet(xoop )); // ~OOP   -> ~OOP?
+    assertEquals( oop0, oop0.meet(xoop_)); //  OOP+? ->  OOP?
+    // Thru 0
+    assertEquals(  z  ,  z  .meet( oop_)); // OOP+? -> 0
+    assertEquals(xoop_,xoop_.meet( z   )); // 0 -> ~OOP?
+    
+    assertEquals(xoop_,xoop .meet( z   )); // ~OOP & 0 -> ~OOP?
+    assertEquals( oop0, oop .meet( z   )); //  OOP & 0 -> OOP? ; no other edges
+    assertEquals(xoop_, oop_.meet(xoop_)); // ~OOP? & OOP+? -> ~OOP? ; no other edges
+
+    // Crossing named:ints or named:null and OOP
+    assertEquals(  z  , xi8.meet(xoop0)); // ~OOP+0 &   ~i8 -> 0
+    assertEquals(  z  ,xni8.meet(xoop0)); // ~OOP+0 & N:~i8 -> int8
+    assertEquals(xoop_, xi8.meet(xoop )); // ~OOP   &   ~i8 -> ~OOP?
+    assertEquals(xoop_,xni8.meet(xoop )); // ~OOP   & N:~i8 -> ~OOP?
+    
+    Type str = TypeStr.STR;     // String can mix with null like OOP
+    Type str8 = str.join(ni8);
+    Type str_ = TypeUnion.make(true,TypeInt.NULL,str); // str+?
+    assertEquals(str_,str8);
+    
+    // Tuple is more general that Struct
+    Type tf = TypeTuple.FLT64; //  [  flt64,~Scalar...]
+    Type tsx= TypeStruct.X;    // @{x:flt64,~Scalar...}
+    Type tff = tsx.meet(tf);
+    assertEquals(tf,tff);      // tsx.isa(tf)
+    TypeTuple t0 = TypeTuple.make(Type.XSCALAR,1.0,TypeInt.NULL); // [  0,~Scalar...]
+    Type      ts0= TypeStruct.make(new String[]{"x"},t0);         //@{x:0,~Scalar...}
+    Type tss = ts0.meet(t0);
+    assertEquals(t0,tss);      // ts0.isa(t0)
+    
+    assertTrue(Type.check_startup());
   }  
 }

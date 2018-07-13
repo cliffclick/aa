@@ -20,7 +20,7 @@ public class CastNode extends Node {
     // so on a split we can move all these data uses to the old or the new
     // Epilog by just moving the cast.  Once an Epilog can no longer split, we
     // can remove useless casts.
-    Node data = at(1);
+    Node data = in(1);
     if( data instanceof EpilogNode ) {
       // Note that the control-edge cannot go away (since its an up-cast) but
       // the data edge can refine.
@@ -35,8 +35,8 @@ public class CastNode extends Node {
     return gvn.type(data).isa(_t) ? data : null;
   }
   @Override public Type value(GVNGCM gvn) {
-    Type t0 = gvn.type(at(1));
-    Type t1 = at(1) instanceof EpilogNode ? ((TypeTuple)t0)._ts[1] : t0;
+    Type t0 = gvn.type(in(1));
+    Type t1 = in(1) instanceof EpilogNode ? ((TypeTuple)t0)._ts[1] : t0;
     if( t1 instanceof TypeErr && !t1.above_center() )
       return t1; // Preserve error returns
     return _t.join(t1);

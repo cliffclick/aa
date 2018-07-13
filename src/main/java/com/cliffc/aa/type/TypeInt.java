@@ -31,8 +31,8 @@ public class TypeInt extends Type {
   public static TypeInt con(long con) { return make(0,log(con),con); }
 
   static public  final TypeInt  INT64 = make(-1,64,0);
-  static public  final TypeInt  INT32 = make(-1,32,0);
-  static private final TypeInt  INT16 = make(-1,16,0);
+  static         final TypeInt  INT32 = make(-1,32,0);
+  static public  final TypeInt  INT16 = make(-1,16,0);
   static public  final TypeInt  INT8  = make(-1, 8,0);
   static public  final TypeInt  BOOL  = make(-1, 1,0);
   static public  final TypeInt TRUE   = make( 0, 1,1);
@@ -153,7 +153,7 @@ public class TypeInt extends Type {
     if( t._type == Type.TFLT ) return 1; // Int->Flt ignores large int overflow issues
     if( t._type == Type.TREAL ) return 0;
     if( t._type == Type.TSCALAR ) return 0;
-    if( t._type == Type.TUNION && ((TypeUnion)t).has_null() && this==NULL ) return 0;
+    if( t._type == Type.TUNION && t.may_be_null() && this==NULL ) return 0;
     throw com.cliffc.aa.AA.unimpl();
   }
   @Override public Type widen() {
@@ -163,4 +163,6 @@ public class TypeInt extends Type {
   @Override public boolean above_center() { return _x>0; }
   @Override public boolean canBeConst() { return _x>=0; }
   @Override public boolean is_con()   { return _x==0; }
+  @Override public boolean may_be_null() { return _x > 0 || (_x==0 && _con==0); }
+  @Override public Type get_null() { return NULL; }
 }

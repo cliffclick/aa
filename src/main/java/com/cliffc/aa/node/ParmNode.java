@@ -11,13 +11,13 @@ public class ParmNode extends PhiNode {
   public ParmNode( int idx, String name, FunNode fun, Node defalt, String badgc) { super(OP_PARM,fun,defalt,badgc); _idx=idx; _name=name; }
   @Override String xstr() { return "Parm:"+_name; }
   @Override public Type value(GVNGCM gvn) {
-    if( at(0) instanceof FunNode && !((FunNode)at(0)).callers_known(gvn) ) { // Slot zero allows unknown callers
-      assert at(0).at(1) instanceof ScopeNode; // Function is visible in current scope, to be looked up
-      return gvn.type(at(1));   // More unknown callers, assume worst-case input type
+    if( in(0) instanceof FunNode && !((FunNode) in(0)).callers_known(gvn) ) { // Slot zero allows unknown callers
+      assert in(0).in(1) instanceof ScopeNode; // Function is visible in current scope, to be looked up
+      return gvn.type(in(1));   // More unknown callers, assume worst-case input type
     }
     return super.value(gvn);
   }
-  @Override public Type all_type() { return at(1) instanceof ConNode ? ((ConNode)at(1))._t : TypeErr.ALL ; }
+  @Override public Type all_type() { return in(1) instanceof ConNode ? ((ConNode) in(1))._t : TypeErr.ALL ; }
   @Override public int hashCode() { return super.hashCode()+_idx; }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;

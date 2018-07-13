@@ -11,24 +11,24 @@ import com.cliffc.aa.type.TypeUnion;
 public class CProjNode extends ProjNode {
   public CProjNode( Node ifn, int idx ) { super(ifn,idx); }
   @Override String xstr() {
-    if( at(0) instanceof IfNode )
+    if( in(0) instanceof IfNode )
       return _idx==0 ? "False" : "True";
     return "CProj_"+_idx;
   }
-  @Override public Node ideal(GVNGCM gvn) { return at(0).is_copy(gvn,_idx); }
+  @Override public Node ideal(GVNGCM gvn) { return in(0).is_copy(gvn,_idx); }
   @Override public Type all_type() { return Type.CTRL; }
   // Return the op_prec of the returned value.  Not sensible except
   // when call on primitives.
   @Override public byte op_prec() { return _defs.at(0).op_prec(); }
   
   // Used in Parser just after an if-test to sharpen the tested variables.
-  // Main use is to remove null-ness from a nullable after a null-check.  If
-  // the IfNode collapses during parsing, some other node will call here (a
-  // default true or false), and the sharpening will not be needed.
+  // This is a mild optimization, since e.g. follow-on Loads which require a
+  // non-null check will hash to the pre-test Load, and so bypass this
+  // sharpening.  
   @Override public CProjNode sharpen( GVNGCM gvn, ScopeNode scope, TmpNode tmp ) {
-    Node iff = at(0);
+    Node iff = in(0);
     if( !(iff instanceof IfNode) ) return this; // Already collapsed IfNode, no sharpen
-    Node test = iff.at(1);
+    Node test = iff.in(1);
     Type pred = gvn.type(test);
     if( pred instanceof TypeErr ) return this;
     if( pred==TypeInt.BOOL ) {  // The bool test itself is either 0 or 1
@@ -37,7 +37,7 @@ public class CProjNode extends ProjNode {
       return this;
     }
     if( pred instanceof TypeUnion ) {  // Check for null & oop
-      assert ((TypeUnion)pred).has_null(); // Else the IfNode already sharpened
+      assert pred.may_be_null(); // Else the IfNode already sharpened
       Node sharp = _idx==1
         ? gvn.xform(new CastNode(this,test,((TypeUnion)pred).remove_null()))
         : gvn.con(TypeInt.NULL);
@@ -47,5 +47,4 @@ public class CProjNode extends ProjNode {
 
     throw AA.unimpl();
   }
-
 }

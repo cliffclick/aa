@@ -1,7 +1,9 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.AA;
 import com.cliffc.aa.util.Ary;
 
+import java.util.Arrays;
 import java.util.Comparator;
 
 // Type union is a meet (or join) of unrelated SCALAR types.  Specifically it
@@ -20,8 +22,9 @@ public class TypeUnion extends Type {
   }
   @Override public String toString() {
     if( _ts._ts.length==2 ) {
-      if( _ts.at(0)==TypeInt.NULL && _ts.at(1).is_oop() )  return _ts.at(1)+"?";
-      if( _ts.at(1)==TypeInt.NULL && _ts.at(0).is_oop() )  return _ts.at(0)+"?";
+      String s = _any?"+":"";
+      if( _ts.at(0)==TypeInt.NULL && _ts.at(1).is_oop() )  return _ts.at(1)+s+"?";
+      if( _ts.at(1)==TypeInt.NULL && _ts.at(0).is_oop() )  return _ts.at(0)+s+"?";
     }
     return "{"+(_any?"any":"all")+_ts+"}";
   }
@@ -42,81 +45,87 @@ public class TypeUnion extends Type {
     // Special rules now apply to keep from growing out all combos of
     // e.g. float-constants.  All {float,int,str} types are meeted and
     // their meet replaces them.
-    int fx=-1, ix=-1, ox=-1, ux=-1;
+    int fx=-1, ix=-1, ox=-1, ux=-1, rx=-1;
+    Type[] es = ts._es;
     for( int i=0; i<ts._len; i++ ) {
-      Type t = ts._es[i];
-      switch( t._type ) {
-      case Type.TFLT:
-        if( fx==-1 ) fx=i;
-        else { ts._es[fx] = ts._es[fx].meet(t); ts.del(i--);  }
-        break;
-      case Type.TINT:
-        if( ix==-1 ) ix=i;
-        else { ts._es[ix] = ts._es[ix].meet(t); ts.del(i--);  }
-        break;
-      case Type.TFUN:
-        if( t._type == Type.TFUN ) ux = i;
-        break;
-      default: // All Oops, plus Scalar, Number, other weirdnesses
-        if( ox==-1 ) ox=i;
-        else { ts._es[ox] = ts._es[ox].meet(t); ts.del(i--);  }
+      Type t = es[i];
+      switch( t.simple_type() ) {
+      case Type.TFUN:   ux = i;   break;
+      case Type.TRPC:   rx = i;   break;
+      case Type.TINT:   if( ix==-1 ) ix=i;  else  i = meet_dup(any,ts,ix,i);  break;
+      case Type.TFLT:   if( fx==-1 ) fx=i;  else  i = meet_dup(any,ts,fx,i);  break;
+        // All Oops, plus Scalar, Number, other weirdnesses
+      default:          if( ox==-1 ) ox=i;  else  i = meet_dup(any,ts,ox,i);  break;
       }
     }
     // Also, if the remaining int fits in the remaining float, drop the int
     if( fx!=-1 && ix!=-1 ) {
-      TypeInt ti = (TypeInt)ts._es[ix];
-      TypeFlt tf = (TypeFlt)ts._es[fx];
-      if( (ti._z<<1) <= tf._z && tf._x==-1 ) {
-        ts.del(ix);
-        throw com.cliffc.aa.AA.unimpl(); // Untested
-      }
+      TypeInt ti = (TypeInt)es[ix].base();
+      TypeFlt tf = (TypeFlt)es[fx].base();
+      if( (ti._z<<1) <= tf._z && tf._x==-1 ) ts.del(ix);
     }
-    if( ts._len == 1 ) return ts._es[0]; // A single result is always that result
+    if( ts._len == 1 ) return es[0]; // A single result is always that result
 
     // Allow null & oop (no floats, exactly 0 integer, the rest are oops).
     // Tuples are OK, and Tuples can also be function pointers.
+    int ifx = -1; // index of a null, if both fx and ix are null
     if( ox!= -1 ) {
-      if( ix!=-1 && ts._es[ix].isa(TypeInt.NULL) ) {
-        ts.set(ix,TypeInt.NULL);  // Set to null (incase e.g. ~Number)
+      if( ix!=-1 && es[ix].may_be_null() ) {
+        ts.set(ix,  es[ix].get_null()); // Set to null (incase e.g. ~Number)
+        ifx = ix;                 // Record index of null
         ix = -1;                  // Ignore null in the union
       }
-      if( fx!=-1 && ts._es[fx].isa(TypeInt.NULL) ) {
-        ts.set(fx,TypeInt.NULL);  // Set to null (incase e.g. ~flt32)
+      if( fx!=-1 && es[fx].may_be_null() ) {
+        ts.set(fx,  es[fx].get_null());  // Set to null (incase e.g. ~flt32)
         fx = -1;                  // Ignore null in the union
-      }
+      } else ifx = -1;            // No float index
     }
 
     // Cannot mix functions and anything else, including null.
     // Function pointers (which are internally TypeTuples), are
     // just fine with nulls.
-    if( ux != -1 && (fx!=-1 || ix!=-1 || ox!=-1) )
+    if( (ux != -1 || rx != -1) && (fx!=-1 || ix!=-1 || ox!=-1) )
       return Type.SCALAR;
     if( ox != -1 && (fx!=-1 || ix!=-1) )
       return Type.SCALAR;       // Cannot mix oops and floats/ints
-    if( ox != -1 && Type.SCALAR.isa(ts._es[ox]) )
-      return ts._es[ox];
+    if( ox != -1 && Type.SCALAR.isa(es[ox]) )
+      return es[ox];
 
     if( fx != -1 && ix != -1 ) {// Fall to REAL if possible
-      TypeInt ti = (TypeInt)ts._es[ix];
-      TypeFlt tf = (TypeFlt)ts._es[fx];
-      if( ti==TypeInt.INT64 && tf==TypeFlt.FLT64 && !any )
+      TypeInt ti = (TypeInt)es[ix].base();
+      TypeFlt tf = (TypeFlt)es[fx].base();
+      if( ti==TypeInt.INT64 && tf==TypeFlt.FLT64 )
         return Type.REAL;
-      assert (ti==TypeInt.INT64 && tf==TypeFlt.FLT64 && any) ||
-        (ti==TypeInt.INT64.dual() && tf==TypeFlt.FLT64.dual() && !any);
+      //assert (ti==TypeInt.INT64 && tf==TypeFlt.FLT64 && any) ||
+      //  (ti==TypeInt.INT64.dual() && tf==TypeFlt.FLT64.dual() && !any);
     }
+    if( ifx >= 0 ) ts.del(ifx); // Delete extra null
 
     // The set has to be ordered, to remove dups that vary only by order
     ts.sort_update(Comparator.comparingInt(e -> e._uid)); 
     return make(TypeTuple.make(any?TypeErr.ANY:TypeErr.ALL,1.0,ts.asAry()),any);
   }
 
+  private static int meet_dup( boolean any, Ary<Type> ts, int idx, int i ) {
+    if( any ) throw AA.unimpl(); // join choices, not meet
+    ts._es[idx] = ts._es[idx].meet(ts._es[i]);
+    ts.del(i);
+    return i-1;
+  }
+
   // Mix null with another
   public static Type make_null( Type t ) { assert t.is_oop(); return make(false,TypeInt.NULL,t); }
 
-  // True if has a null
-  public boolean has_null( ) {
-    for( Type t : _ts._ts ) if( t==TypeInt.NULL ) return true;
-    return false;
+  // Return true if this type MAY be a null.
+  @Override public boolean may_be_null() {
+    if( _any ) {
+      throw AA.unimpl(); // any element is a null, can pick the null
+      //for( Type t : _ts._ts ) if( t==TypeInt.NULL ) return true;
+      //return false;
+    } else { // if any element is a null, it might get picked
+      for( Type t : _ts._ts ) if( t==TypeInt.NULL ) return true;
+      return false;
+    }
   }
   // Same union, minus the null
   public Type remove_null() {
@@ -125,11 +134,20 @@ public class TypeUnion extends Type {
     return make(_any,ts);
   }
   
-  static final TypeUnion ANY_NUM = (TypeUnion)make(true , TypeInt.INT64, TypeFlt.FLT64);
-  static final TypeUnion OOP     = (TypeUnion)make(false, TypeInt.NULL , Type.OOP);
-  static final TypeUnion[] TYPES = new TypeUnion[]{ANY_NUM, OOP};
+  static public final TypeUnion OOP     = (TypeUnion)make(false, TypeInt.NULL , Type.OOP);
+  static final TypeUnion[] TYPES = new TypeUnion[]{OOP};
 
-  @Override protected TypeUnion xdual() { return new TypeUnion((TypeTuple)_ts.dual(),!_any); }
+  @Override protected TypeUnion xdual() {
+    // The obvious thing is to just ask _ts for it's dual(), but Tuples are not
+    // sorted and Unions are.  The dual of the current _ts may not match the sort
+    // criteria, and this will lead to equal Unions with 2 different layouts.
+    // Re-sort after dual'ing the members.
+    Type[] ts = ((TypeTuple)_ts.dual())._ts; // Dual-tuple array
+    ts = Arrays.copyOf(ts,ts.length);        // Defensive copy
+    Arrays.sort(ts, 0, ts.length, Comparator.comparingInt(e -> e._uid));
+    TypeTuple stt = TypeTuple.make(!_any?TypeErr.ANY:TypeErr.ALL,1.0,ts);
+    return new TypeUnion(stt,!_any);
+  }
   
   // TypeUnion can have any type on the right, including base types and another
   // TypeUnion.  Think of a TypeUnion as a list with either add/any/join/'+' or

@@ -31,8 +31,8 @@ public class TypeFlt extends Type {
   public static TypeFlt con(double con) { return make(0,log(con),con); }
   
   public static final TypeFlt FLT64 = make(-1,64,0);
-  public static        final TypeFlt FLT32 = make(-1,32,0);
-  public static        final TypeFlt PI    = con(Math.PI);
+  static        final TypeFlt FLT32 = make(-1,32,0);
+  public static final TypeFlt PI    = con(Math.PI);
   public static final TypeFlt[] TYPES = new TypeFlt[]{FLT64,FLT32,PI};
   static void init1( HashMap<String,Type> types ) {
     types.put("flt32",FLT32);
@@ -101,4 +101,6 @@ public class TypeFlt extends Type {
   @Override public boolean above_center() { return _x>0; }
   @Override public boolean canBeConst() { return _x>=0; }
   @Override public boolean is_con()   { return _x==0; }
+  @Override public boolean may_be_null() { return _x > 0 || (_x==0 && _con==0); }
+  @Override public Type get_null() { return TypeInt.NULL; }
 }

@@ -6,7 +6,7 @@ import com.cliffc.aa.util.Ary;
 
 public class UnresolvedNode extends Node {
   UnresolvedNode( Node... funs ) { super(OP_UNR,funs); }
-  @Override String xstr() { return "Unr:"+((EpilogNode)at(0)).fun().name(); }
+  @Override String xstr() { return "Unr:"+((EpilogNode) in(0)).fun().name(); }
   @Override public Node ideal(GVNGCM gvn) {
     if( _defs._len < 2 ) throw AA.unimpl(); // Should collapse
     return null;
@@ -57,7 +57,7 @@ public class UnresolvedNode extends Node {
       TypeFun fun = (TypeFun)tepi.at(3);
       Type[] formals = fun._ts._ts;   // Type of each argument
       if( formals.length != call.nargs() ) continue;
-      // Now check if the arguments are compatible at all, keeping lowest cost
+      // Now check if the arguments are compatible in all, keeping lowest cost
       int xcvts = 0;             // Count of conversions required
       boolean unk = false;       // Unknown arg might be incompatible or free to convert
       for( int j=0; j<formals.length; j++ ) {

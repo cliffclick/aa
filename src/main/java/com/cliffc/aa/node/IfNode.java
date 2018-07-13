@@ -15,10 +15,10 @@ public class IfNode extends Node {
     // If the input excludes   zero, we can return true : {CONTROL,ANY}
     // If the input excludes   both, we can return ANY:   {ANY,ANY}
     // If the input includes   both, we can return both:  {CONTROL,CONTROL}
-    if( gvn.type(at(0))==Type.XCTRL ) return TypeTuple.IF_ANY; // Test is dead
-    Type pred = gvn.type(at(1));
+    if( gvn.type(in(0))==Type.XCTRL ) return TypeTuple.IF_ANY; // Test is dead
+    Type pred = gvn.type(in(1));
     if( pred instanceof TypeUnion ) // Pointers with and without null
-      pred = ((TypeUnion)pred).has_null() ? TypeInt.BOOL : TypeInt.TRUE;
+      pred = pred.may_be_null() ? TypeInt.BOOL : TypeInt.TRUE;
     if( pred.isa(TypeInt.XINT1) ) return TypeTuple.IF_ANY;  // Choice of {0,1}
     if( TypeInt.BOOL.isa(pred)  ) return TypeTuple.IF_ALL;  // Can be either
     if( pred==TypeInt.FALSE     ) return TypeTuple.IF_FALSE;// False only
@@ -31,8 +31,8 @@ public class IfNode extends Node {
   @Override public Node is_copy(GVNGCM gvn, int idx) {
     TypeTuple tt = (TypeTuple)gvn.type(this);
     assert tt._inf==TypeErr.ALL;
-    if( tt==TypeTuple.IF_TRUE  && idx==1 ) return at(0);
-    if( tt==TypeTuple.IF_FALSE && idx==0 ) return at(0);
+    if( tt==TypeTuple.IF_TRUE  && idx==1 ) return in(0);
+    if( tt==TypeTuple.IF_FALSE && idx==0 ) return in(0);
     return null;
   }
 }

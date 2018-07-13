@@ -159,7 +159,8 @@ public class Parse {
       Type ot = _e.lookup_type(tvar);
       if( ot              != null ) return err_ctrl2("Cannot re-assign type '"+tvar+"'");
       if( _e.lookup(tvar) != null ) return err_ctrl2("Cannot re-assign val '"+tvar+"' as a type");
-      TypeName tn = TypeName.make(tvar,t);
+      Type tn = TypeName.make0(tvar,t);
+      assert tn instanceof TypeName; // Can fail out for weird mixes
       _e.add_type(tvar,tn); // Assign type-name
       // TODO: Add reverse cast-away
       PrimNode cvt = PrimNode.convert(null,t,tn);
@@ -209,10 +210,10 @@ public class Parse {
       ctrls.add_def(fex==null ? err_ctrl2("missing expr after ':'") : fex);
       ctrls.add_def(ctrl()); // 4 - hook false-side control
       ScopeNode f_scope = _e._scope.split(vidx,ftmp,_gvn); // Split out the new vars on the false side
-      set_ctrl(init(new RegionNode(null,ctrls.at(2),ctrls.at(4))));
+      set_ctrl(init(new RegionNode(null,ctrls.in(2),ctrls.in(4))));
       String errmsg = errMsg("Cannot mix GC and non-GC types");
       _e._scope.common(this,errmsg,t_scope,f_scope); // Add a PhiNode for all commonly defined variables
-      _e._scope.add_def(gvn(new PhiNode(errmsg,ctrl(),ctrls.at(1),ctrls.at(3)))); // Add a PhiNode for the result
+      _e._scope.add_def(gvn(new PhiNode(errmsg,ctrl(),ctrls.in(1),ctrls.in(3)))); // Add a PhiNode for the result
     }
     return _e._scope.pop();
   }
@@ -251,7 +252,7 @@ public class Parse {
           Node fun = funs.at(i);
           assert fun.op_prec() <= max;
           if( fun.op_prec() < max ) continue; // Not yet
-          Node call = do_call(new CallNode(errMsg(),ctrl(),fun,args.at(i-1),args.at(i)));
+          Node call = do_call(new CallNode(errMsg(),ctrl(),fun,args.in(i-1),args.in(i)));
           args.set_def(i-1,call,_gvn);
           funs.remove(i);  args.remove(i);  i--;
         }
@@ -303,7 +304,7 @@ public class Parse {
         String fld = token();   // Field name
         n = fld == null         // Missing field?
           ? err_ctrl2("Missing field name after '.'")
-          :  gvn(new LoadNode(n,fld,errMsg()));
+          :  gvn(new LoadNode(ctrl(),n,fld,errMsg()));
         if( peek('=') ) {       // Right now, field re-assigns of any type
           Node stmt = stmt();
           if( stmt == null ) n = err_ctrl2("Missing stmt after assigning field '."+fld+"'");
@@ -462,7 +463,7 @@ public class Parse {
       }
       require('}');
       _e = _e._par;             // Pop nested environment
-      TypeStruct tstr = TypeStruct.make(toks.asAry(), TypeTuple.make_all(ts.asAry()));
+      TypeStruct tstr = (TypeStruct)TypeStruct.make(toks.asAry(), TypeTuple.make_all(ts.asAry()));
       Node[] flds = e._scope.get(toks);
       return gvn(new NewNode(tstr,flds));
     }

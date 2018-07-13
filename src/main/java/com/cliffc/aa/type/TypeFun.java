@@ -84,6 +84,7 @@ public class TypeFun extends Type {
   @Override public boolean above_center() { return _ret.above_center(); }
   @Override public boolean canBeConst()   { return _fidxs.abit() > 0; }
   @Override public boolean is_con()       { return _fidxs.abit() > 0; }
+  @Override public boolean may_be_null() { return false; }
   public int fidx() { return _fidxs.getbit(); }
 
   // Generic functions

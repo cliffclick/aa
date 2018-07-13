@@ -48,7 +48,7 @@ public class Env implements AutoCloseable {
 
   public Node add( String name, Node val ) { return _scope.add(name,val); }
 
-  public void add_type( String name, Type t ) { _scope.add_type(name,t); }
+  void add_type( String name, Type t ) { _scope.add_type(name,t); }
   
   // A new top-level Env, above this is the basic public Env with all the primitives
   static Env top() { return new Env(TOP); }
@@ -79,7 +79,7 @@ public class Env implements AutoCloseable {
     Type t = _gvn.type(n);
     if( t != TypeErr.CTRL ) return t;
     if( n instanceof ProjNode ) // Get function type when returning a function
-      return ((FunNode)(n.at(0).at(2)))._tf;
+      return ((FunNode)(n.in(0).in(2)))._tf;
     throw AA.unimpl();
   }
   

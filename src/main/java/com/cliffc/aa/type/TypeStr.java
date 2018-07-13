@@ -43,7 +43,7 @@ public class TypeStr extends Type {
     switch( t._type ) {
     case TSTR:   break;
     case TFLT:
-    case TINT:   return TypeUnion.make(false,this,t);
+    case TINT:   return t.may_be_null() && !(t instanceof TypeName) ? TypeUnion.make_null(this) : SCALAR;
     case TSTRUCT:
     case TTUPLE: return Type.OOP;
     case TRPC:
@@ -81,4 +81,5 @@ public class TypeStr extends Type {
   @Override public boolean above_center() { return _x>0; }
   @Override public boolean canBeConst() { return _x>=0; }
   @Override public boolean is_con()   { return _x==0; }
+  @Override public boolean may_be_null() { return false; }
 }
