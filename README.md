@@ -3,7 +3,32 @@
 Cliff Click Language Hacking
 ============================
 
-Not really a language, as much as a stream of consciousness puking of language desires.
+**Too-the-metal performance:** every abstraction used can be peeled away,
+yielding code that you would expect from a tightly written low-level program.
+This is a primary driver for me, the guy who's been writing compilers for high
+performance computing (including Java) all my life.
+
+**Modern:** Statically typed.  Functional programming with full H-M strength type
+inference.  Minimal syntax.  REPL (i.e. incremental static typing) and seperate
+compilation.  Typed C-style macros: most syntax errors in dead code are typed.
+
+My intent is a modern language that can be used where C or C++ is used: low-level
+high-performance work and a systems implementation language (e.g. OS's, device
+drivers, GC's), but bring in all the goodness of the last 20 years of language
+improvements.
+
+I specifically intend to look at real-time constraints and the notion of Time
+in a language.
+
+Part of modern coding is the use Garbage Collection and the structured use of
+malloc/free - so I intend to add Rust-style memory management.
+
+Part of modern coding is the use of multiple cores, so I intend to explore a
+couple of different concurrency models.
+
+And of course, this is a Work-In-Progress!!!!
+
+
 
 GRAMMAR
 -------
@@ -194,19 +219,19 @@ Nullable and not-null modeled after Kotlin | ---
 Done Stuff
 ----------
 
-* REPL
-* Dynamic code-gen; no seperate compilation step.  Load Source & Go.
-* Functional; 1st class functions.
 * Static typing; types optional & fully inferred at every place.
 * Null-ptr distinguished; null/notnull types (e.g. Kotlin)
 * Duck-typing.  Interfaces.
-* Limited overloads
+* Functional; 1st class functions.
+* REPL
+* Dynamic code-gen; no seperate compilation step.  Load Source & Go.
+* Limited overloads.
 * Overloading ops.  No ambiguity / easy-to-read rules.
 * By default multi-arg ops are overloaded.
 * Direct SSA style code writing; no 'let' keyword.
 * default "x=1" makes a "val" until scope runs out (cannot re-assign)
 * Primitive values; int overflow OK;
-* Sub-byte ranges?  Julia-like math typing
+* Sub-byte ranges.  Julia-like math typing.
 * Can type-name primitives, but no e.g. physical-unit-type math
 
 
