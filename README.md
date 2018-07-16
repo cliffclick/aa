@@ -208,7 +208,7 @@ Nullable and not-null modeled after Kotlin | ---
 `x:str? = "abc"`  | `"abc":str` question-type allows null or not
 `x:str  = 0`      | `"null is not a str"`
 `math_rand(1)?0:"abc"` | `"abc"?` Null-or-string "abc"
-`(math_rand(1)?0 : @{x=1}).x` | `Struct might be null when reading field '.x'` Must be probable not-null
+`(math_rand(1)?0 : @{x=1}).x` | `Struct might be null when reading field '.x'` Must be provable not-null
 `p=math_rand(1)?0:@{x=1}; p ? p.x : 0` | `:int1` not-null-ness after a null-check, so field de-ref is OK
 `x:int = y:str? = z:flt = 0` | `0:int` null/0 freely recasts
 `"abc"==0`        | `0:int` Compare vs null
