@@ -102,7 +102,7 @@ public class Type {
   static final byte TREAL   = 8; // All Real Numbers
   static final byte TXREAL  = 9; // Any Real Numbers; dual of REAL
   static final byte TSIMPLE =10; // End of the Simple Types
-  private static final String[] STRS = new String[]{"Ctrl","~Ctrl","Scalar","~Scalar","OOP","~OOP","Number","~Number","Real","~Real"};
+  private static final String[] STRS = new String[]{"Ctrl","~Ctrl","Scalar","~Scalar","OOP?","~OOP+?","Number","~Number","Real","~Real"};
   // Implemented in subclasses
   static final byte TERROR  =11; // ALL/ANY TypeErr types
   static final byte TUNION  =12; // Union types (finite collections of unrelated types Meet together); see TypeUnion
@@ -120,15 +120,15 @@ public class Type {
   public  static final Type XCTRL  = make(TXCTRL  ); // Ctrl
   public  static final Type  SCALAR= make( TSCALAR); // ptrs, ints, flts; things that fit in a machine register
   public  static final Type XSCALAR= make(TXSCALAR); // ptrs, ints, flts; things that fit in a machine register
-  public  static final Type  OOP   = make( TOOP   ); // ptrs subject to GC (excludes e.g. function pointers)
-  public  static final Type XOOP   = make(TXOOP   ); // ptrs subject to GC
+  public  static final Type  OOP0  = make( TOOP   ); // ptrs subject to GC (excludes e.g. function pointers) & null
+  public  static final Type XOOP0  = make(TXOOP   ); // ptrs subject to GC
   private static final Type  NUM   = make( TNUM   );
   private static final Type XNUM   = make(TXNUM   );
   public  static final Type  REAL  = make( TREAL  );
   private static final Type XREAL  = make(TXREAL  );
 
   // Collection of sample types for checking type lattice properties.
-  private static final Type[] TYPES = new Type[]{CTRL,XCTRL,SCALAR,XSCALAR,OOP,XOOP,NUM,XNUM,REAL,XREAL};
+  private static final Type[] TYPES = new Type[]{CTRL,XCTRL,SCALAR,XSCALAR,OOP0,XOOP0,NUM,XNUM,REAL,XREAL};
   
   // The complete list of primitive types that are disjoint and also is-a
   // SCALAR; nothing else is a SCALAR except what is on this list (or
@@ -207,10 +207,10 @@ public class Type {
     assert !(that_oop&&that_num);
     
     if( is_oop() ) { // Only simple OOPish type
-      assert this==OOP || this==XOOP;         // Only simple OOP right now
+      assert this==OOP0 || this==XOOP0; // Only simple OOP right now
       if(  that_num ) return t.may_be_null()  ? TypeUnion.make_null(this) : SCALAR;
       if( !that_oop ) throw AA.unimpl();
-      return _type == TOOP ? OOP : t;
+      return _type == TOOP ? OOP0 : t;
     }
 
     if( is_num() ) {
@@ -256,7 +256,6 @@ public class Type {
   public Type join( Type t ) { return dual().meet(t.dual()).dual(); }
 
   public static void init0( HashMap<String,Type> types ) {
-    TypeTuple.init1();
     types.put("real",REAL);
     TypeInt.init1(types);
     TypeFlt.init1(types);
@@ -320,7 +319,7 @@ public class Type {
     assert errs==0 : "Found "+errs+" non-join-type errors";
 
     // Check scalar primitives; all are SCALARS and none sub-type each other.
-    SCALAR_PRIMS = new Type[] { TypeInt.INT64, TypeFlt.FLT64, Type.OOP, TypeFun.make_generic() };
+    SCALAR_PRIMS = new Type[] { TypeInt.INT64, TypeFlt.FLT64, Type.OOP0, TypeFun.make_generic() };
     for( Type t : SCALAR_PRIMS ) assert t.isa(SCALAR);
     for( int i=0; i<SCALAR_PRIMS.length; i++ ) 
       for( int j=i+1; j<SCALAR_PRIMS.length; j++ )
@@ -434,7 +433,7 @@ public class Type {
     if( t._type==TSCALAR ) return 0; // Generic function arg never requires a conversion
     if( _type == TSCALAR ) return -1; // Scalar has to resolve
     if( _type == TREAL && t.is_num() ) return -1; // Real->Int/Flt has to resolve
-    if( is_fun_ptr() ) return (byte)(t == OOP ? 0 : 99);
+    if( is_fun_ptr() ) return (byte)(t == OOP0 ? 0 : 99);
 
     throw typerr(t);  // Overridden in subtypes
   }

@@ -344,58 +344,69 @@ c[x]=1;
     assertEquals(  i8,  i8.meet( ni8));// N: i8 ->   i8
   }
   
+  // oop? -> {str?,tup?} -> { null, string constants, tuple constants } -> {~str+?,~tup+?} -> ~oop+?
+
+  // Notice NO {oop,~oop} as this makes the non-lattice issue; meet of
+  // {oop,null} is not well-defined, as it tops out as either {~str+?,~tup+?}
+  // instead of being unique.
   @Test public void testOOPsNulls() {
     Type.init0(new HashMap<>());
-    // Confirm lattice: {~OOP+? -> ~OOP ->  OOP  -> OOP?}
-    // Also:            {~OOP+? -> OOP+? -> OOP }           // Drop choice ~OOP keep choice 0
-    // Also:                      {~OOP -> ~OOP? -> OOP? }  // Drop no-null keep choice ~OOP
-    // Also:                      {OOP+? -> 0 -> ~OOP? }    // Thru 0
-    Type  oop0= TypeUnion.OOP; //  OOP and 0
-    Type xoop0= oop0.dual();   // ~OOP or  0
-    Type  oop = Type.OOP;      //  OOP
-    Type xoop = Type.XOOP;     // ~OOP
-    assertEquals(xoop ,xoop .meet(xoop0)); // ~OOP+? -> ~OOP
-    assertEquals( oop , oop .meet(xoop )); // ~OOP   ->  OOP
-    assertEquals( oop0, oop0.meet( oop )); //  OOP   ->  OOP?
-    Type oop_ = TypeUnion.make(true,TypeInt.NULL,oop); // OOP+?
-    assertEquals( oop_, oop_.meet(xoop0)); // ~OOP+? ->  OOP+?
-    assertEquals( oop , oop .meet( oop_)); //  OOP+? ->  OOP
-    Type xoop_= TypeUnion.make_null(xoop); // ~OOP?
-    assertEquals(xoop_,xoop_.meet(xoop )); // ~OOP   -> ~OOP?
-    assertEquals( oop0, oop0.meet(xoop_)); //  OOP+? ->  OOP?
-    // Thru 0
-    Type z  = TypeInt.NULL;
-    assertEquals(  z  ,  z  .meet( oop_)); // OOP+? -> 0
-    assertEquals(xoop_,xoop_.meet( z   )); // 0 -> ~OOP?
-    
-    assertEquals(xoop_,xoop .meet( z   )); // ~OOP & 0 -> ~OOP?
-    assertEquals( oop0, oop .meet( z   )); //  OOP & 0 -> OOP? ; no other edges
-    assertEquals(xoop_, oop_.meet(xoop_)); // ~OOP? & OOP+? -> ~OOP? ; no other edges
+    Type bot  = TypeErr.ALL;
+    Type oop0 = Type.OOP0;     // OOP? (OOP and null)
+    Type str0 = TypeUnion.make_null(TypeStr.STR); // str? (str AND null)
+    Type str  = TypeStr.STR;   // str no NULL
+    Type tup  = TypeTuple.ALL;
+    Type tup0 = TypeUnion.make_null(tup); // tup? (tup AND null)
+    Type nil  = TypeInt.NULL;
+    Type abc  = TypeStr.con("abc");
+    Type fld  = TypeStruct.X;
+    Type tupx = tup .dual(); // ~tup   (choice tup, no NULL)
+    Type tup_ = tup0.dual(); // ~tup+? (choice tup  OR NULL)
+    Type strx = str .dual(); // ~str   (choice str, no NULL)
+    Type str_ = str0.dual(); // ~str+? (choice str  OR NULL)
+    Type oop_ = Type.OOP0.dual();     // ~OOP+? (choice OOP AND null)
+    Type top  = TypeErr.ANY;
 
+    assertTrue(top .isa(oop_));
+
+    assertTrue(oop_.isa(strx));
+    assertTrue(oop_.isa(tupx));
+
+    assertTrue(str_.isa(strx));
+    assertTrue(tup_.isa(tupx));
+
+    assertTrue(strx.isa(abc ));
+    assertTrue(tupx.isa(fld ));
+    
+    assertTrue(abc .isa(str ));
+    assertTrue(fld .isa(tup ));
+
+    assertTrue(str .isa(str0));
+    assertTrue(tup .isa(tup0));
+
+    assertTrue(str0.isa(oop0));
+    assertTrue(tup0.isa(oop0));
+    
+    assertTrue(oop0.isa(bot ));
+    
     // Crossing named:ints or named:null and OOP
     Type  i8 = TypeInt.INT8;
     Type xi8 = i8.dual();
     Type ni8 = TypeName.TEST_ENUM;
     Type xni8= ni8.dual(); // dual name:int8
-    assertEquals(  z  , xi8.meet(xoop0)); // ~OOP+0 &   ~i8 -> 0
-    assertEquals(  z  ,xni8.meet(xoop0)); // ~OOP+0 & N:~i8 -> int8
-    assertEquals(xoop_, xi8.meet(xoop )); // ~OOP   &   ~i8 -> ~OOP?
-    assertEquals(xoop_,xni8.meet(xoop )); // ~OOP   & N:~i8 -> ~OOP?
-    
-    Type str = TypeStr.STR;     // String can mix with null like OOP
-    Type str8 = str.join(ni8);
-    Type str_ = TypeUnion.make(true,TypeInt.NULL,str); // str+?
-    assertEquals(str_,str8);
+    assertEquals( nil     , xi8.meet(oop_)); // ~OOP+0 &   ~i8 -> 0
+    assertEquals( nil     ,xni8.meet(oop_)); // ~OOP+0 & N:~i8 -> 0
   }
   
   @Test public void testStructTuple() {
     Type.init0(new HashMap<>());
+    Type nil  = TypeInt.NULL;
     // Tuple is more general that Struct
     Type tf = TypeTuple.FLT64; //  [  flt64,~Scalar...]
     Type tsx= TypeStruct.X;    // @{x:flt64,~Scalar...}
     Type tff = tsx.meet(tf);
     assertEquals(tf,tff);      // tsx.isa(tf)
-    TypeTuple t0 = TypeTuple.make(Type.XSCALAR,1.0,TypeInt.NULL); // [  0,~Scalar...]
+    TypeTuple t0 = TypeTuple.make(Type.XSCALAR,1.0,nil); // [  0,~Scalar...]
     Type      ts0= TypeStruct.make(new String[]{"x"},t0);         //@{x:0,~Scalar...}
     Type tss = ts0.meet(t0);
     assertEquals(t0,tss);      // ts0.isa(t0)
@@ -407,7 +418,7 @@ c[x]=1;
     assertEquals(uall,TypeInt.INT8  );
     
     // meet @{c:0,}? and @{c:@{x:1,}?,}
-    Type c0  = TypeStruct.make(new String[]{"c"},TypeTuple.make_all(TypeInt.NULL)); // @{c:0}
+    Type c0  = TypeStruct.make(new String[]{"c"},TypeTuple.make_all(nil)); // @{c:0}
     Type nc0 = TypeUnion.make_null(c0); // @{c:0}?
     Type x1  = TypeStruct.make(new String[]{"x"},TypeTuple.make_all(TypeInt.TRUE)); // @{x:1}
     Type nx1 = TypeUnion.make_null(x1); // @{x:1}?
@@ -431,11 +442,20 @@ c[x]=1;
     //   @{c:[0 MEET @{x:1,any...}+?],any...}
     // null MEET choice of null is always a null
     //   @{c:0,any...}
-    
-    
     Type cj  = nc0.join(cx);
     // JOIN tosses the top-level null choice, and the inside struct choice
     assertEquals(c0,cj);
+
+    // 0 is tuple?; 0 JOIN OOP is OOP+?; tuple? JOIN OOP is tuple; OOP+? isa tuple
+    Type  oop = Type.OOP0;     //  OOP
+    Type oop_ = TypeUnion.make(true,nil,oop); // OOP+?
+    assertTrue(nil.isa(nc0));
+    assertEquals(oop_,nil.join(oop));
+    // (tuple? JOIN OOP) can go to either tuple or OOP+?
+    // is ambiguous in lattice
+    // lattice is not well formed
+    assertEquals( c0 ,nc0.join(oop));
+    assertTrue(oop_.isa(c0));
   }
 
   // TODO: Observation: value() calls need to be monotonic, can test this.

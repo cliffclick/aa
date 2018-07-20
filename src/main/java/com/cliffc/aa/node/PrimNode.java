@@ -24,7 +24,7 @@ public abstract class PrimNode extends Node {
 
   public static PrimNode[] PRIMS = new PrimNode[] {
     new RandI64(),
-    new Id(Type.OOP ), // Pre-split OOP from non-OOP
+    new Id(Type.OOP0), // Pre-split OOP from non-OOP
     new Id(Type.REAL),
     
     new ConvertInt64F64(),

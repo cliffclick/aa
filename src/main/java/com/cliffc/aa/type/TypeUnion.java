@@ -1,5 +1,6 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.AA;
 import com.cliffc.aa.util.Ary;
 
 import java.util.Arrays;
@@ -128,10 +129,9 @@ public class TypeUnion extends Type {
     return make(_any,ts);
   }
   
-  static public final TypeUnion OOP = (TypeUnion)make(false, TypeInt.NULL , Type.OOP);
   static public final TypeUnion NC0 = (TypeUnion)make(false, TypeInt.NULL , TypeStruct.C0);
   static public final TypeUnion ND1 = (TypeUnion)make(false, TypeInt.NULL , TypeStruct.D1);
-  static final TypeUnion[] TYPES = new TypeUnion[]{OOP,NC0,ND1};
+  static final TypeUnion[] TYPES = new TypeUnion[]{NC0,ND1};
 
   @Override protected TypeUnion xdual() {
     // The obvious thing is to just ask _ts for it's dual(), but Tuples are not
@@ -154,6 +154,14 @@ public class TypeUnion extends Type {
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TERROR: return ((TypeErr)t)._all ? t : this;
+    case TOOP:                  // Really {OOP and null}
+      // 
+      if( has_null() && _ts._ts.length==2 ) {
+        // meet or join OOP0 and thingy, and then join NULL
+      }
+      throw AA.unimpl();
+    case TXOOP:                 // Really {~XOOP or NULL}
+      throw AA.unimpl();
     case TUNION: {
       // Handle the case where they are structurally equal
       TypeUnion tu = (TypeUnion)t;

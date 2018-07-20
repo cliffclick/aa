@@ -90,7 +90,7 @@ public class TypeStruct extends Type {
     }
     case TNAME:
     case TUNION: return t.xmeet(this); // Let TypeUnion decide
-    case TSTR:   return Type.OOP;
+    case TSTR:   return Type.OOP0;
     case TFLT:
     case TINT:   return t.may_be_null() && !(t instanceof TypeName) ? TypeUnion.make_null(this) : SCALAR;
     case TRPC: 

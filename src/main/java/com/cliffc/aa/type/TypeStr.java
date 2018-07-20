@@ -45,7 +45,7 @@ public class TypeStr extends Type {
     case TFLT:
     case TINT:   return t.may_be_null() && !(t instanceof TypeName) ? TypeUnion.make_null(this) : SCALAR;
     case TSTRUCT:
-    case TTUPLE: return Type.OOP;
+    case TTUPLE: return Type.OOP0;
     case TRPC:
     case TFUN:   return Type.SCALAR;
     case TERROR: return ((TypeErr)t)._all ? t : this;
