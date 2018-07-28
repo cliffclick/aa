@@ -30,7 +30,7 @@ public class TypeName extends Type {
   }
   public static Type make0( String name, Type t ) {
     if( t==TypeInt.NULL ) return t; // No named null
-    String dname = TypeStruct.defarg(t);
+    String dname = defarg(t);
     if( t.is_simple() || name==dname || (name!=null && name.equals(dname)) )
       return t;
     return make(name,t);
@@ -43,7 +43,7 @@ public class TypeName extends Type {
   static final TypeName[] TYPES = new TypeName[]{TEST_ENUM,TEST_FLT,TEST_E2};
 
   @Override protected TypeName xdual() {
-    String dname = TypeStruct.sdual(_name);
+    String dname = sdual(_name);
     return dname==_name && _t==_t.dual() ? this : new TypeName(dname,_t.dual());
   }
   @Override protected Type xmeet( Type t ) {
@@ -53,7 +53,7 @@ public class TypeName extends Type {
       TypeName tn = (TypeName)t;
       if( tn._depth > _depth ) return tn.xmeet(this); // Deeper on 'this'
       if( tn._depth== _depth )
-        return make0( TypeStruct.smeet(_name,tn._name), _t.meet(tn._t));
+        return make0( smeet(_name,tn._name), _t.meet(tn._t));
       break;
     case TUNION: return t.xmeet(this); // Let TypeUnion decide
     case TERROR: return ((TypeErr)t)._all ? t : this;
@@ -65,7 +65,23 @@ public class TypeName extends Type {
     Type mt = _t.meet(t);       // Peel and meet; keep name if RHS is above-or-null
     return t.may_be_null() ? make0(_name,mt) : mt;
   }
-
+  static String sdual( String s ) {
+    if( s==null ) return "";
+    if( s.isEmpty() ) return null;
+    return s;
+  }
+  // Default arg (top or bottom) if no arg is available
+  static String defarg( Type t ) { return ((t.above_center() && t!=Type.XCTRL)) ? null : ""; }
+  // String meet; empty string is bottom; null is top
+  static String smeet( String s0, String s1 ) {
+    if( s0==s1 ) return s0;
+    if( s0==null ) return s1;
+    if( s1==null ) return s0;
+    if( s0.isEmpty() ) return s0;
+    if( s1.isEmpty() ) return s1;
+    if( s0.equals(s1) ) return s0;
+    return "";
+  }
 
   @Override public boolean above_center() { return _t.above_center(); }
   @Override public boolean canBeConst() { return _t.canBeConst(); }

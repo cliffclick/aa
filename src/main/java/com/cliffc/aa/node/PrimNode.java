@@ -107,7 +107,7 @@ public abstract class PrimNode extends Node {
 }
 
 class Convert extends PrimNode {
-  Convert(Type from, TypeName to) { super(to._name,PrimNode.ARGS1,TypeTuple.make(Type.XSCALAR,1.0,from),to); }
+  Convert(Type from, TypeName to) { super(to._name,PrimNode.ARGS1,TypeTuple.make(Type.XSCALAR,false,from),to); }
   @Override public Type value(GVNGCM gvn) {
     Type[] ts = new Type[_defs._len];
     for( int i=1; i<_defs._len; i++ ) {
@@ -292,7 +292,7 @@ class RandI64 extends PrimNode {
 }
 
 class Id extends PrimNode {
-  Id(Type arg) { super("id",PrimNode.ARGS1,TypeTuple.make(Type.XSCALAR,1.0,arg),arg); }
+  Id(Type arg) { super("id",PrimNode.ARGS1,TypeTuple.make(Type.XSCALAR,false,arg),arg); }
   @Override public Type apply( Type[] args ) { return args[1]; }
   @Override public Node ideal(GVNGCM gvn) { return in(1); }
   @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)); }

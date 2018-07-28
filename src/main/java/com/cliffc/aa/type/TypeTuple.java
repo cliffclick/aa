@@ -1,19 +1,22 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.AA;
 import com.cliffc.aa.util.SB;
 
 import java.util.Arrays;
 
 /** record/struct types; infinitely extended with an extra type (typically ANY or ALL) */
 public class TypeTuple extends Type {
-  public Type[] _ts;            // The fixed known types
-  public Type _inf;             // Infinite extension type
+  public Type[] _ts;      // The fixed known types
+  public Type _inf;       // Infinite extension type
+  boolean _nil;           // Tuple itself can be null (unrelated to the fields)
   private int _hash;
-  private TypeTuple( Type[] ts, Type inf ) { super(TTUPLE); init(ts,inf);  }
-  private void init( Type[] ts, Type inf ) {
+  private TypeTuple( Type[] ts, Type inf, boolean nil ) { super(TTUPLE); init(ts,inf,nil);  }
+  private void init( Type[] ts, Type inf, boolean nil ) {
     _ts = ts;
     _inf = inf;
-    int sum=TTUPLE+inf.hashCode();
+    _nil = nil;
+    int sum=TTUPLE+inf.hashCode()+(_nil?0:1);
     for( Type t : ts ) sum += t.hashCode();
     _hash=sum;
   }
@@ -24,35 +27,38 @@ public class TypeTuple extends Type {
     if( !(o instanceof TypeTuple) ) return false;
     TypeTuple t = (TypeTuple)o;
     if( _hash != t._hash ) return false;
+    if( _ts.length != t._ts.length || _inf != t._inf || _nil != t._nil )
+      return false;
     if( _ts == t._ts ) return true;
-    if( _ts.length != t._ts.length || _inf != t._inf) return false;
     for( int i=0; i<_ts.length; i++ )
       if( _ts[i]!=t._ts[i] ) return false;
     return true;
   }
   @Override public String toString() {
-    SB sb = new SB().p("[");
+    SB sb = new SB().p('[');
     for( Type t : _ts ) sb.p(t.toString()).p(',');
     if( _inf!=TypeErr.ALL ) sb.p(_inf.toString()).p("...");
-    return sb.p("]").toString();
+    sb.p(']');
+    if( _nil ) sb.p(above_center() ? "+?" : "?");
+    return sb.toString();
   }
 
   private static TypeTuple FREE=null;
   private TypeTuple free( TypeTuple f ) { FREE=f; return this; }
-  private static TypeTuple make0( Type inf, Type... ts ) {
+  private static TypeTuple make0( Type inf, boolean nil, Type... ts ) {
     TypeTuple t1 = FREE;
-    if( t1 == null ) t1 = new TypeTuple(ts,inf);
-    else { FREE = null; t1.init(ts,inf); }
+    if( t1 == null ) t1 = new TypeTuple(ts,inf,nil);
+    else { FREE = null; t1.init(ts,inf,nil); }
     TypeTuple t2 = (TypeTuple)t1.hashcons();
     return t1==t2 ? t1 : t2.free(t1);
   }
-  public static TypeTuple make    ( Type... ts ) { return make(TypeErr.ANY,1.0,ts); }
-  public static TypeTuple make_all( Type... ts ) { return make(TypeErr.ALL,1.0,ts); }
-  public static TypeTuple make( Type inf, double ignore, Type... ts ) {
+  public static TypeTuple make    ( Type... ts ) { return make(TypeErr.ANY,false,ts); }
+  public static TypeTuple make_all( Type... ts ) { return make(TypeErr.ALL,false,ts); }
+  public static TypeTuple make( Type inf, boolean nil, Type... ts ) {
     int len = ts.length;
     while( len > 0 && ts[len-1] == inf ) len--;
     if( len < ts.length ) ts = Arrays.copyOf(ts,len);
-    return make0(inf, ts);
+    return make0(inf, nil, ts);
   }
   public static TypeTuple make_fun_ptr( TypeFun fun ) {
     TypeTuple t = make_all(Type.CTRL,TypeErr.ALL, TypeRPC.ALL_CALL, fun);
@@ -62,24 +68,25 @@ public class TypeTuple extends Type {
 
   public  static final TypeTuple  ANY    = make(); // Infinite list of Any
   public  static final TypeTuple  ALL    = (TypeTuple)make().dual(); // Infinite list of All
-  public  static final TypeTuple  SCALAR0= make(Type.XSCALAR,1.0);
-  public  static final TypeTuple  SCALAR1= make(Type.XSCALAR,1.0,Type. SCALAR);
-          static final TypeTuple  SCALAR2= make(Type.XSCALAR,1.0,Type. SCALAR, Type. SCALAR);
-  public  static final TypeTuple  SCALARS= make(Type. SCALAR,1.0);
-  public  static final TypeTuple INT32   = make(Type.XSCALAR,1.0,TypeInt.INT32 );
-  public  static final TypeTuple INT64   = make(Type.XSCALAR,1.0,TypeInt.INT64 );
-  public  static final TypeTuple FLT64   = make(Type.XSCALAR,1.0,TypeFlt.FLT64 );
-  public  static final TypeTuple STR     = make(Type.XSCALAR,1.0,TypeStr.STR   );
-  public  static final TypeTuple INT64_INT64 = make(Type.XSCALAR,1.0,TypeInt.INT64,TypeInt.INT64);
-  public  static final TypeTuple FLT64_FLT64 = make(Type.XSCALAR,1.0,TypeFlt.FLT64,TypeFlt.FLT64);
-  private static final TypeTuple FLT64_INT64 = make(Type.XSCALAR,1.0,TypeFlt.FLT64,TypeInt.INT64);
+  public  static final TypeTuple  ALL0   = make(TypeErr.ALL,true);
+  public  static final TypeTuple  SCALAR0= make(Type.XSCALAR,false);
+  public  static final TypeTuple  SCALAR1= make(Type.XSCALAR,false,Type. SCALAR);
+          static final TypeTuple  SCALAR2= make(Type.XSCALAR,false,Type. SCALAR, Type. SCALAR);
+  public  static final TypeTuple  SCALARS= make(Type. SCALAR,false);
+  public  static final TypeTuple INT32   = make(Type.XSCALAR,false,TypeInt.INT32 );
+  public  static final TypeTuple INT64   = make(Type.XSCALAR,false,TypeInt.INT64 );
+  public  static final TypeTuple FLT64   = make(Type.XSCALAR,false,TypeFlt.FLT64 );
+  public  static final TypeTuple STR     = make(Type.XSCALAR,false,TypeStr.STR   );
+  public  static final TypeTuple INT64_INT64 = make(Type.XSCALAR,false,TypeInt.INT64,TypeInt.INT64);
+  public  static final TypeTuple FLT64_FLT64 = make(Type.XSCALAR,false,TypeFlt.FLT64,TypeFlt.FLT64);
+  private static final TypeTuple FLT64_INT64 = make(Type.XSCALAR,false,TypeFlt.FLT64,TypeInt.INT64);
   public  static final TypeTuple IF_ANY  = make_all(Type.XCTRL,Type.XCTRL);
   public  static final TypeTuple IF_ALL  = make_all(Type.CTRL ,Type.CTRL );
   public  static final TypeTuple IF_TRUE = make_all(Type.XCTRL,Type.CTRL );
   public  static final TypeTuple IF_FALSE= make_all(Type.CTRL ,Type.XCTRL);
   public  static final TypeTuple FUNPTR2 = make_fun_ptr(TypeFun.any(2,-1));
   public  static final TypeTuple GENERIC_FUN = make_fun_ptr(TypeFun.make_generic());
-  public  static final TypeTuple OOP_OOP = make(Type.XSCALAR,1.0,Type.OOP0,Type.OOP0);
+  public  static final TypeTuple OOP_OOP = make(Type.XSCALAR,false,Type.OOP0,Type.OOP0);
   static final TypeTuple[] TYPES = new TypeTuple[]{ANY,SCALAR1,STR,INT32,INT64,FLT64,INT64_INT64,FLT64_FLT64,FLT64_INT64, IF_ALL, IF_TRUE, IF_FALSE, FUNPTR2, OOP_OOP};
   
   // The length of Tuples is a constant, and so is its own dual.  Otherwise
@@ -92,7 +99,7 @@ public class TypeTuple extends Type {
       ts[i] = _ts[i].dual();
       sym &= ts[i]==_ts[i];     // All elements self-symetric?
     }
-    return sym ? this : new TypeTuple(ts,_inf.dual());
+    return sym ? this : new TypeTuple(ts,_inf.dual(),_nil);
   }
   // Standard Meet.
   @Override protected Type xmeet( Type t ) {
@@ -101,11 +108,14 @@ public class TypeTuple extends Type {
     case TNAME:
     case TUNION:
     case TSTRUCT: return t.xmeet(this); // Let TypeStruct decide
-    case TSTR:   return Type.OOP0;
     case TRPC:
     case TFUN:   return Type.SCALAR;
+    case TSTR:
     case TFLT:
-    case TINT:   return t.may_be_null() && !(t instanceof TypeName) ? TypeUnion.make_null(this) : SCALAR;
+    case TINT:
+      if(   may_be_null() ) return t.meet(TypeInt.NULL);
+      if( t.may_be_null() ) return   meet_null();
+      return t._type==TFLT||t._type==TINT ? SCALAR : OOP0;
     case TERROR: return ((TypeErr)t)._all ? t : this;
     default: throw typerr(t);
     }
@@ -128,25 +138,33 @@ public class TypeTuple extends Type {
     int len = ts.length;
     while( len > 0 && ts[len-1] == tail ) len--;
     if( len < ts.length ) ts = Arrays.copyOf(ts,len);
-    return make0(tail, ts);
+    // If both are high and have nil choice, then nil choice.
+    // If either is low and requires nil, then require nil.
+    boolean nil = (above_center() && _nil && tmax._nil) ||
+      (!     above_center() &&      _nil) ||
+      (!tmax.above_center() && tmax._nil);
+    return make0(tail,nil, ts);
   }
 
   public Type at( int idx ) { return idx < _ts.length ? _ts[idx] : _inf; }
+
+  Type meet_null() { return above_center() && _nil ? TypeInt.NULL : ALL0; }
   
-  boolean has_union() {
-    for( Type t : _ts ) if( t._type==Type.TUNION ) return true;
+  boolean has_union_or_tuple() {
+    for( Type t : _ts ) if( t._type==Type.TUNION || t._type==Type.TTUPLE || t._type==Type.TSTRUCT ) return true;
     return false;
   }
-  @Override public boolean above_center() { return false; }
+  @Override public boolean above_center() { return _inf.above_center(); }
   // True if all internals canBeConst
   @Override public boolean canBeConst() {
+    if( above_center() && _nil ) return true; // can be nil
     for( Type _t : _ts ) if( !_t.canBeConst() ) return false;
     return _inf.canBeConst();
   }
   // True if all internals is_con
   @Override public boolean is_con() {
     for( Type _t : _ts ) if( !_t.is_con() ) return false;
-    return _inf.is_con();
+    return _inf.is_con() && !_nil;
   }
 
   // Return true if this is a function pointer (return type from EpilogNode)
@@ -173,5 +191,5 @@ public class TypeTuple extends Type {
         return s;
     return null;
   }
-  @Override public boolean may_be_null() { return false; }
+  @Override public boolean may_be_null() { return above_center() && _nil; }
 }

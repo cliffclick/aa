@@ -58,10 +58,9 @@ public class TypeInt extends Type {
     switch( t._type ) {
     case TINT:   break;
     case TFLT:   return xmeetf((TypeFlt)t);
-    case TSTR:   return TypeUnion.make(false,t,this);
+    case TSTR:   
     case TSTRUCT:
-    case TTUPLE: 
-      return isa(NULL) ? TypeUnion.make_null(t) : Type.SCALAR;
+    case TTUPLE: return may_be_null() ? t.xmeet(this) : Type.SCALAR;
     case TFUN:
     case TRPC:   return Type.SCALAR;
     case TERROR: return ((TypeErr)t)._all ? t : this;

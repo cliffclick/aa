@@ -12,7 +12,7 @@ public class TypeUnion extends Type {
   private TypeTuple _ts;         // All of these are possible choices
   private boolean _any; // FALSE: meet; must support all; TRUE: join; can pick any one choice
   private TypeUnion( TypeTuple ts, boolean any ) { super(TUNION); init(ts,any); }
-  private void init( TypeTuple ts, boolean any ) { _ts = ts;  _any=any;  assert !ts.has_union(); }
+  private void init( TypeTuple ts, boolean any ) { _ts = ts;  _any=any;  assert !ts.has_union_or_tuple(); }
   @Override public int hashCode( ) { return TUNION+_ts.hashCode()+(_any?1:0);  }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
@@ -103,7 +103,7 @@ public class TypeUnion extends Type {
 
     // The set has to be ordered, to remove dups that vary only by order
     ts.sort_update(Comparator.comparingInt(e -> e._uid)); 
-    return make(TypeTuple.make(any?TypeErr.ANY:TypeErr.ALL,1.0,ts.asAry()),any);
+    return make(TypeTuple.make(any?TypeErr.ANY:TypeErr.ALL,false,ts.asAry()),any);
   }
 
   private static int meet_dup( boolean any, Ary<Type> ts, int idx, int i ) {
@@ -119,8 +119,13 @@ public class TypeUnion extends Type {
 
   // Return true if this type MAY be a null.
   @Override public boolean may_be_null() {
-    for( Type t : _ts._ts ) if( t==TypeInt.NULL ) return true;
-    return false;
+    if( _any ) {                // Any null works
+      for( Type t : _ts._ts ) if( t.may_be_null() ) return true;
+      return false;
+    } else {                    // All must be null
+      for( Type t : _ts._ts ) if( !t.may_be_null() ) return false;
+      return true;
+    }
   }
   // Same union, minus the null
   public Type remove_null() {
@@ -129,9 +134,8 @@ public class TypeUnion extends Type {
     return make(_any,ts);
   }
   
-  static public final TypeUnion NC0 = (TypeUnion)make(false, TypeInt.NULL , TypeStruct.C0);
-  static public final TypeUnion ND1 = (TypeUnion)make(false, TypeInt.NULL , TypeStruct.D1);
-  static final TypeUnion[] TYPES = new TypeUnion[]{NC0,ND1};
+  //static public final TypeUnion NC0 = (TypeUnion)make(false, TypeFlt.PI, TypeInt.NULL);
+  static final TypeUnion[] TYPES = new TypeUnion[]{};
 
   @Override protected TypeUnion xdual() {
     // The obvious thing is to just ask _ts for it's dual(), but Tuples are not
@@ -141,7 +145,7 @@ public class TypeUnion extends Type {
     Type[] ts = ((TypeTuple)_ts.dual())._ts; // Dual-tuple array
     ts = Arrays.copyOf(ts,ts.length);        // Defensive copy
     Arrays.sort(ts, 0, ts.length, Comparator.comparingInt(e -> e._uid));
-    TypeTuple stt = TypeTuple.make(!_any?TypeErr.ANY:TypeErr.ALL,1.0,ts);
+    TypeTuple stt = TypeTuple.make(!_any?TypeErr.ANY:TypeErr.ALL,false,ts);
     return new TypeUnion(stt,!_any);
   }
   
@@ -154,14 +158,12 @@ public class TypeUnion extends Type {
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TERROR: return ((TypeErr)t)._all ? t : this;
-    case TOOP:                  // Really {OOP and null}
-      // 
-      if( has_null() && _ts._ts.length==2 ) {
-        // meet or join OOP0 and thingy, and then join NULL
-      }
-      throw AA.unimpl();
-    case TXOOP:                 // Really {~XOOP or NULL}
-      throw AA.unimpl();
+    case TOOP:   return may_be_null() ? OOP0 : SCALAR;
+    case TXOOP:
+    case TSTR:
+    case TSTRUCT:
+    case TTUPLE:
+      return t.may_be_null() ? meet(TypeInt.NULL) : SCALAR; // Mixing of int/flt or functions
     case TUNION: {
       // Handle the case where they are structurally equal
       TypeUnion tu = (TypeUnion)t;

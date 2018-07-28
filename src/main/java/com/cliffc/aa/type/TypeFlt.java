@@ -50,8 +50,7 @@ public class TypeFlt extends Type {
     case TINT:   return ((TypeInt)t).xmeetf(this);
     case TSTR:
     case TSTRUCT:
-    case TTUPLE: 
-      return isa(TypeInt.NULL) ? TypeUnion.make_null(t) : Type.SCALAR;
+    case TTUPLE: return may_be_null() ? t.xmeet(this) : Type.SCALAR;
     case TRPC:
     case TFUN:   return Type.SCALAR;
     case TERROR: return ((TypeErr)t)._all ? t : this;

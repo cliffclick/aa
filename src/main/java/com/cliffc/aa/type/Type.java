@@ -29,16 +29,13 @@ import java.util.HashMap;
 // everywhere.  Example assuming a name "gal:flt32"
 // ~flt64 -> ~flt32 -> gal:~flt32 -> {... gal:-pi, gal:-0.1, 0, gal:0.1, gal:pi, ... } -> gal:flt32 -> flt32 -> flt64
 //
-// Simple OOP Lattice, where "+0" means "OR 0" and "?" means "AND 0"
-// ~OOP+0 -> ~OOP   --\-/-->  OOP  --> OOP?
-//        ->  OOP+0 --/-\--> ~OOP? -/
-//                \--> 0 ----/
-// Here's a list of edges for the above chart:
-// {~OOP+0 -> ~OOP -> OOP -> OOP? ; ~OOP+0 -> OOP+0 -> ~OOP? -> OOP? ; OOP+0 -> 0 -> ~OOP? }
-//
-// Subtyping OOP are e.g. {str, tuple} and subtyping tuple is struct.  
-// Subtypes are always "inside" what they subtype, so { ~OOP -> ~str } and { str -> OOP }
-// 
+// OOPs are everywhere nullable; they always support a {oop+null, oop, null,
+// oop&null} set of choices, where oop+null and oop&null are duals.
+// Tuples are OOPS with an infinite list of values; the values are dualed
+// structurally.
+// Structs are tuples with a set of named fields; the fields can be top, a
+// field name, or bottom.
+// Strings are OOPs which again can be top, a constant, or bottom.
 public class Type {
   static private int CNT=1;
   final int _uid=CNT++; // Unique ID, will have gaps, used to uniquely order Types in Unions
@@ -95,40 +92,37 @@ public class Type {
   static final byte TXCTRL  = 1; // Ctrl flow top (mini-lattice: any-xctrl-ctrl-all)
   static final byte TSCALAR = 2; // Scalars; all possible finite types; includes pointers (functions, structs), ints, floats; excludes state of Memory and Ctrl.
   static final byte TXSCALAR= 3; // Invert scalars
-  static final byte TOOP    = 4; // Includes all GC ptrs; structs, arrays, strings.  Excludes functions, ints, floats
-  static final byte TXOOP   = 5; // Invert oops
-  static final byte TNUM    = 6; // Number and all derivitives (Complex, Rational, Int, Float, etc)
-  static final byte TXNUM   = 7; // Any Numbers; dual of NUM
-  static final byte TREAL   = 8; // All Real Numbers
-  static final byte TXREAL  = 9; // Any Real Numbers; dual of REAL
-  static final byte TSIMPLE =10; // End of the Simple Types
-  private static final String[] STRS = new String[]{"Ctrl","~Ctrl","Scalar","~Scalar","OOP?","~OOP+?","Number","~Number","Real","~Real"};
+  static final byte TNUM    = 4; // Number and all derivitives (Complex, Rational, Int, Float, etc)
+  static final byte TXNUM   = 5; // Any Numbers; dual of NUM
+  static final byte TREAL   = 6; // All Real Numbers
+  static final byte TXREAL  = 7; // Any Real Numbers; dual of REAL
+  static final byte TSIMPLE = 8; // End of the Simple Types
+  private static final String[] STRS = new String[]{"Ctrl","~Ctrl","Scalar","~Scalar","Number","~Number","Real","~Real"};
   // Implemented in subclasses
-  static final byte TERROR  =11; // ALL/ANY TypeErr types
-  static final byte TUNION  =12; // Union types (finite collections of unrelated types Meet together); see TypeUnion
-  static final byte TNAME   =13; // Union types (finite collections of unrelated types Meet together); see TypeUnion
-  static final byte TTUPLE  =14; // Tuples; finite collections of unrelated Types, kept in parallel
-  static final byte TSTRUCT =15; // Structs; tuples with named fields
-  static final byte TFUN    =16; // Functions; both domain and range are a Tuple; see TypeFun                            
-  static final byte TRPC    =17; // Return PCs; Continuations; call-site return points; see TypeRPC
-  static final byte TFLT    =18; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
-  static final byte TINT    =19; // All Integers, including signed/unsigned and various sizes; see TypeInt
-  static final byte TSTR    =20; // String type
-  static final byte TLAST   =21; // Type check
+  static final byte TERROR  = 9; // ALL/ANY TypeErr types
+  static final byte TUNION  =10; // Union types (finite collections of unrelated types Meet together); see TypeUnion
+  static final byte TNAME   =11; // Named types; always a subtype of some other type
+  static final byte TOOP    =12; // Includes all GC ptrs & null; structs, strings.  Excludes functions, ints, floats
+  static final byte TTUPLE  =13; // Tuples; finite collections of unrelated Types, kept in parallel
+  static final byte TSTRUCT =14; // Structs; tuples with named fields
+  static final byte TFUN    =15; // Functions; both domain and range are a Tuple; see TypeFun
+  static final byte TRPC    =16; // Return PCs; Continuations; call-site return points; see TypeRPC
+  static final byte TFLT    =17; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
+  static final byte TINT    =18; // All Integers, including signed/unsigned and various sizes; see TypeInt
+  static final byte TSTR    =19; // String type
+  static final byte TLAST   =20; // Type check
   
   public  static final Type CTRL   = make( TCTRL  ); // Ctrl
   public  static final Type XCTRL  = make(TXCTRL  ); // Ctrl
   public  static final Type  SCALAR= make( TSCALAR); // ptrs, ints, flts; things that fit in a machine register
   public  static final Type XSCALAR= make(TXSCALAR); // ptrs, ints, flts; things that fit in a machine register
-  public  static final Type  OOP0  = make( TOOP   ); // ptrs subject to GC (excludes e.g. function pointers) & null
-  public  static final Type XOOP0  = make(TXOOP   ); // ptrs subject to GC
-  private static final Type  NUM   = make( TNUM   );
-  private static final Type XNUM   = make(TXNUM   );
+  public  static final Type  NUM   = make( TNUM   );
+  public  static final Type XNUM   = make(TXNUM   );
   public  static final Type  REAL  = make( TREAL  );
   private static final Type XREAL  = make(TXREAL  );
 
   // Collection of sample types for checking type lattice properties.
-  private static final Type[] TYPES = new Type[]{CTRL,XCTRL,SCALAR,XSCALAR,OOP0,XOOP0,NUM,XNUM,REAL,XREAL};
+  private static final Type[] TYPES = new Type[]{CTRL,XCTRL,SCALAR,XSCALAR,NUM,XNUM,REAL,XREAL};
   
   // The complete list of primitive types that are disjoint and also is-a
   // SCALAR; nothing else is a SCALAR except what is on this list (or
@@ -144,7 +138,7 @@ public class Type {
   Type base() { Type t = this; while( t._type == TNAME ) t = ((TypeName)t)._t; return t; }
   // Strip off any subclassing just for names
   byte simple_type() { return base()._type; }
-  public  boolean is_oop() { byte t = simple_type();  return t == TOOP || t == TXOOP || t == TSTR || t == TSTRUCT || t == TTUPLE; }
+  public  boolean is_oop() { byte t = simple_type();  return t == TOOP || t == TSTR || t == TSTRUCT || t == TTUPLE; }
   private boolean is_num() { byte t = simple_type();  return t == TNUM || t == TXNUM || t == TREAL || t == TXREAL || t == TINT || t == TFLT; }
   // True if 'this' isa SCALAR, without the cost of a full 'meet()'
   final boolean isa_scalar() { return _type != TERROR && _type != TCTRL && _type != TXCTRL; }
@@ -207,25 +201,28 @@ public class Type {
     assert !(that_oop&&that_num);
     
     if( is_oop() ) { // Only simple OOPish type
-      assert this==OOP0 || this==XOOP0; // Only simple OOP right now
-      if(  that_num ) return t.may_be_null()  ? TypeUnion.make_null(this) : SCALAR;
-      if( !that_oop ) throw AA.unimpl();
-      return _type == TOOP ? OOP0 : t;
+      //assert this==OOP0 || this==XOOP0; // Only simple OOP right now
+      //if( that_num ) // OOP and NULL, OR ~OOP choice NULL
+      //  return _type == TOOP ? (t.may_be_null() ? OOP0 : SCALAR) : t.meet(TypeInt.NULL);
+      //if( !that_oop ) throw AA.unimpl();
+      //return _type == TOOP ? OOP0 : t;
     }
 
     if( is_num() ) {
-      if(  that_oop ) return may_be_null() ? t.meet(get_null()) : SCALAR;
-      if( !that_num ) throw AA.unimpl();
-      
-      // Numeric; same pattern as ANY/ALL, or SCALAR/XSCALAR
-      if( _type == TNUM || t._type == TNUM ) return NUM;
-      if(   _type == TXNUM ) return t   ;
-      if( t._type == TXNUM ) return this;
-      
-      // Real; same pattern as ANY/ALL, or SCALAR/XSCALAR
-      if( _type == TREAL || t._type == TREAL ) return REAL;
-      if(   _type == TXREAL ) return t   ;
-      if( t._type == TXREAL ) return this;
+      //if( that_oop ) // May be OOP0 or STR or STRUCT or TUPLE
+      //  return t.may_be_null() ? meet(TypeInt.NULL)
+      //    : (may_be_null() ? t.meet(TypeInt.NULL) : SCALAR);
+      //if( !that_num ) throw AA.unimpl();
+      //
+      //// Numeric; same pattern as ANY/ALL, or SCALAR/XSCALAR
+      //if( _type == TNUM || t._type == TNUM ) return NUM;
+      //if(   _type == TXNUM ) return t   ;
+      //if( t._type == TXNUM ) return this;
+      //
+      //// Real; same pattern as ANY/ALL, or SCALAR/XSCALAR
+      //if( _type == TREAL || t._type == TREAL ) return REAL;
+      //if(   _type == TXREAL ) return t   ;
+      //if( t._type == TXREAL ) return this;
       throw AA.unimpl();        // Need nice printout
     }
     throw AA.unimpl();          // Need nice printout
@@ -319,7 +316,7 @@ public class Type {
     assert errs==0 : "Found "+errs+" non-join-type errors";
 
     // Check scalar primitives; all are SCALARS and none sub-type each other.
-    SCALAR_PRIMS = new Type[] { TypeInt.INT64, TypeFlt.FLT64, Type.OOP0, TypeFun.make_generic() };
+    SCALAR_PRIMS = new Type[] { TypeInt.INT64, TypeFlt.FLT64, TypeOop.OOP0, TypeFun.make_generic() };
     for( Type t : SCALAR_PRIMS ) assert t.isa(SCALAR);
     for( int i=0; i<SCALAR_PRIMS.length; i++ ) 
       for( int j=i+1; j<SCALAR_PRIMS.length; j++ )
@@ -414,12 +411,6 @@ public class Type {
   public double getd() { throw AA.unimpl(); }
   // Return a String from a TypeStr constant; assert otherwise.
   public String getstr() { throw AA.unimpl(); }
-  // Return true if this type may BE a null: includes Int:NULL plus numbers
-  // above the center line; numbers may be named.  When true, a call to to
-  // get_null will return this type "fallen" to a NULL.
-  public boolean may_be_null() {  assert is_simple();  return _type == TXSCALAR || _type == TXNUM || _type == TXREAL; }
-  // Return a (named) null
-  public Type get_null() { assert is_simple(); return TypeInt.NULL; }
 
   // Lattice of conversions:
   // -1 unknown; top; might fail, might be free (Scalar->Int); Scalar might lift

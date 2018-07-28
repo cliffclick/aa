@@ -196,7 +196,7 @@ public class TestType {
     test   ("x:str? = 0", TypeInt.NULL); // question-type allows null or not; zero digit is null
     test   ("x:str? = \"abc\"", TypeStr.con("abc")); // question-type allows null or not
     testerr("x:str  = 0", "null is not a str", "          ");
-    test   ("math_rand(1)?0:\"abc\"", TypeUnion.make_null(TypeStr.con("abc")));
+    test   ("math_rand(1)?0:\"abc\"", TypeStr.con("abc").make_null());
     testerr("(math_rand(1)?0 : @{x=1}).x", "Struct might be null when reading field '.x'", "                           ");
     test   ("p=math_rand(1)?0:@{x=1}; p ? p.x : 0", TypeInt.BOOL); // not-null-ness after a null-check
     test   ("x:int = y:str? = z:flt = 0", TypeInt.NULL); // null/0 freely recasts
@@ -347,39 +347,43 @@ c[x]=1;
   // oop? -> {str?,tup?} -> { null, string constants, tuple constants } -> {~str+?,~tup+?} -> ~oop+?
 
   // Notice NO {oop,~oop} as this makes the non-lattice issue; meet of
-  // {oop,null} is not well-defined, as it tops out as either {~str+?,~tup+?}
+  // {oop,null} is not well-defined, as it tops out as either ~str+? OR ~tup+?
   // instead of being unique.
   @Test public void testOOPsNulls() {
     Type.init0(new HashMap<>());
     Type bot  = TypeErr.ALL;
-    Type oop0 = Type.OOP0;     // OOP? (OOP and null)
-    Type str0 = TypeUnion.make_null(TypeStr.STR); // str? (str AND null)
-    Type str  = TypeStr.STR;   // str no NULL
-    Type tup  = TypeTuple.ALL;
-    Type tup0 = TypeUnion.make_null(tup); // tup? (tup AND null)
+    Type oop0 = Type.OOP0;      // OOP? (OOP and null)
+    Type str0 = TypeStr.STR0;   // str? (str AND null)
+    Type str  = TypeStr.STR;    // str no null
+    Type tup0 = TypeTuple.ALL0; // tup? (tup AND null); infinite repeat of ALL fields
+    Type tup  = TypeTuple.ALL;  // tup       no  null ; infinite repeat of ALL fields
     Type nil  = TypeInt.NULL;
     Type abc  = TypeStr.con("abc");
-    Type fld  = TypeStruct.X;
-    Type tupx = tup .dual(); // ~tup   (choice tup, no NULL)
-    Type tup_ = tup0.dual(); // ~tup+? (choice tup  OR NULL)
-    Type strx = str .dual(); // ~str   (choice str, no NULL)
-    Type str_ = str0.dual(); // ~str+? (choice str  OR NULL)
-    Type oop_ = Type.OOP0.dual();     // ~OOP+? (choice OOP AND null)
+    Type fld  = TypeTuple.INT64;  // 1 field of int64 
+    Type tupx = tup .dual();      // ~tup   (choice tup, no NULL)
+    Type tup_ = tup0.dual();      // ~tup+? (choice tup  OR NULL)
+    Type strx = str .dual();      // ~str   (choice str, no NULL)
+    Type str_ = str0.dual();      // ~str+? (choice str  OR NULL)
+    Type oop_ = Type.OOP0.dual(); // ~OOP+? (choice OOP AND null)
     Type top  = TypeErr.ANY;
 
     assertTrue(top .isa(oop_));
 
-    assertTrue(oop_.isa(strx));
-    assertTrue(oop_.isa(tupx));
+    assertTrue(oop_.isa(str_));
+    assertTrue(oop_.isa(tup_));
 
     assertTrue(str_.isa(strx));
     assertTrue(tup_.isa(tupx));
+    assertTrue(str_.isa(nil ));
+    assertTrue(tup_.isa(nil ));
 
     assertTrue(strx.isa(abc ));
     assertTrue(tupx.isa(fld ));
     
     assertTrue(abc .isa(str ));
     assertTrue(fld .isa(tup ));
+    assertTrue(nil .isa(str0));
+    assertTrue(nil .isa(tup0));
 
     assertTrue(str .isa(str0));
     assertTrue(tup .isa(tup0));
@@ -402,14 +406,14 @@ c[x]=1;
     Type.init0(new HashMap<>());
     Type nil  = TypeInt.NULL;
     // Tuple is more general that Struct
-    Type tf = TypeTuple.FLT64; //  [  flt64,~Scalar...]
-    Type tsx= TypeStruct.X;    // @{x:flt64,~Scalar...}
-    Type tff = tsx.meet(tf);
-    assertEquals(tf,tff);      // tsx.isa(tf)
-    TypeTuple t0 = TypeTuple.make(Type.XSCALAR,1.0,nil); // [  0,~Scalar...]
-    Type      ts0= TypeStruct.make(new String[]{"x"},t0);         //@{x:0,~Scalar...}
+    Type tf = TypeTuple.FLT64; //  [  flt64,~Scalar...]; choice leading field name
+    Type tsx= TypeStruct.X;    // @{x:flt64,~Scalar...}; fixed  leading field name
+    Type tff = tsx.meet(tf);   //
+    assertEquals(tsx,tff);     // tf.isa(tsx)
+    TypeTuple t0 = TypeTuple.make(Type.XSCALAR,false,nil); //  [  0,~Scalar...]
+    Type      ts0= TypeStruct.make(new String[]{"x"},t0);  // @{x:0,~Scalar...}
     Type tss = ts0.meet(t0);
-    assertEquals(t0,tss);      // ts0.isa(t0)
+    assertEquals(ts0,tss);      // t0.isa(ts0)
 
     // Union meets & joins same-class types
     Type uany = TypeUnion.make(true ,TypeInt.con(2),TypeInt.INT8);
@@ -417,50 +421,20 @@ c[x]=1;
     assertEquals(uany,TypeInt.con(2));
     assertEquals(uall,TypeInt.INT8  );
     
-    // meet @{c:0,}? and @{c:@{x:1,}?,}
-    Type c0  = TypeStruct.make(new String[]{"c"},TypeTuple.make_all(nil)); // @{c:0}
-    Type nc0 = TypeUnion.make_null(c0); // @{c:0}?
-    Type x1  = TypeStruct.make(new String[]{"x"},TypeTuple.make_all(TypeInt.TRUE)); // @{x:1}
-    Type nx1 = TypeUnion.make_null(x1); // @{x:1}?
+    // meet @{c:0}? and @{c:@{x:1}?,}
+    Type nc0 = TypeStruct.make(new String[]{"c"},TypeTuple.make(TypeErr.ALL,true,nil)); // @{c:0}?
+    Type nx1 = TypeStruct.make(new String[]{"x"},TypeTuple.make(TypeErr.ALL,true,TypeInt.TRUE)); // @{x:1}?
     Type cx  = TypeStruct.make(new String[]{"c"},TypeTuple.make_all(nx1)); // @{c:@{x:1}?}
-    // join turns into dual of meet of duals
-    //   @{c:0,any...}+? MEET @{c:@{x:1,any...}+?,any...}
-    // ymeet does type-by-type MEETs, shoving the null around and making no progess.
-    // after ymeet and fed into meet_dup:
-    //   @{c:0,any...}   JOIN @{c:@{x:1,any...}+?,any...}?
-    // after next round of dual:
-    //   @{c:0,}         JOIN @{c:@{x:1,}?,}+?
-    // after ymeet and fed into meet_dup:
-    //   @{c:0,}?        JOIN @{c:@{x:1,}?,}
-    // which is the starting point and we're cyclic
-
-    // Hand-done:
-    //   @{c:0,any...}+? MEET @{c:@{x:1,any...}+?,any...}
-    // Struct+null MEET Struct, toss the null choice since it does not appear on both sides:
-    //   @{c:0,any...} MEET @{c:@{x:1,any...}+?,any...}
-    // Trailing fields all same, so its:
-    //   @{c:[0 MEET @{x:1,any...}+?],any...}
-    // null MEET choice of null is always a null
-    //   @{c:0,any...}
-    Type cj  = nc0.join(cx);
     // JOIN tosses the top-level null choice, and the inside struct choice
+    Type cj  = nc0.join(cx);
+    Type c0  = TypeStruct.make(new String[]{"c"},TypeTuple.make_all(nil)); // @{c:0}
     assertEquals(c0,cj);
-
-    // 0 is tuple?; 0 JOIN OOP is OOP+?; tuple? JOIN OOP is tuple; OOP+? isa tuple
-    Type  oop = Type.OOP0;     //  OOP
-    Type oop_ = TypeUnion.make(true,nil,oop); // OOP+?
-    assertTrue(nil.isa(nc0));
-    assertEquals(oop_,nil.join(oop));
-    // (tuple? JOIN OOP) can go to either tuple or OOP+?
-    // is ambiguous in lattice
-    // lattice is not well formed
-    assertEquals( c0 ,nc0.join(oop));
-    assertTrue(oop_.isa(c0));
   }
 
   // TODO: Observation: value() calls need to be monotonic, can test this.
   @Test public void testCommuteSymmetricAssociative() {
     Type.init0(new HashMap<>());
+    //assertEquals(TypeUnion.NC0,Type.XOOP0.meet(TypeFlt.PI));
     assertTrue(Type.check_startup());
   }  
 }
