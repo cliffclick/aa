@@ -13,6 +13,7 @@ public class TestLattice {
   private static class N {
     private static int ID=0;
     static Ary<N> NS=new Ary<>(new N[1],0);
+    static void reset() { NS.clear(); ID=0; }
     final int _id;
     final String _t;
     final Ary<N> _subs;
@@ -145,6 +146,7 @@ public class TestLattice {
   // instead of being unique.  Similarly meet of {~oop,null} is not well
   // defined, and bottoms out as either {str?} OR {tup?}.
   @Test public void testLattice0() {
+    N.reset();
     N scal= new N( "scalar");
     N num = new N("num" ,scal);
     N int8= new N("int8",num );
@@ -198,6 +200,7 @@ public class TestLattice {
   // Fails to be a valid lattice; same fail: MEET of 0 and ~[]+?  falls to
   // either [x]? or [b]? and "invents" fields as it falls.
   @Ignore @Test public void testLattice1() {
+    N.reset();
     N  ta0 = new N("[]?"   );
     N  tx0 = new N("[x]?"  ,ta0);
     N  tb0 = new N("[b]?"  ,ta0);
@@ -239,6 +242,7 @@ public class TestLattice {
   // nil and a highest nil.  Struct nil is different from int 0, and seeing a 0
   // probably means producing a union{0[_,_]0,0:int}
   @Test public void testLattice2() {
+    N.reset();
     N tb0 = new N("[_,_]0"  );
     N tx0 = new N("[x,_]0" ,tb0);
     N ty0 = new N("[y,_]0" ,tb0);

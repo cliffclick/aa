@@ -508,7 +508,7 @@ public class Parse {
       if( c=='\\' ) throw AA.unimpl();
       if( _x == _buf.length ) return err_ctrl1("Unterminated string");
     }
-    return TypeStr.make(0,new String(_buf,oldx,_x-oldx-1));
+    return TypeStr.con(new String(_buf,oldx,_x-oldx-1));
   }
 
   /** Parse a type or return null

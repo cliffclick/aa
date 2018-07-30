@@ -86,7 +86,7 @@ public class TypeTuple extends Type {
   public  static final TypeTuple IF_FALSE= make_all(Type.CTRL ,Type.XCTRL);
   public  static final TypeTuple FUNPTR2 = make_fun_ptr(TypeFun.any(2,-1));
   public  static final TypeTuple GENERIC_FUN = make_fun_ptr(TypeFun.make_generic());
-  public  static final TypeTuple OOP_OOP = make(Type.XSCALAR,false,Type.OOP0,Type.OOP0);
+  public  static final TypeTuple OOP_OOP = make(Type.XSCALAR,false,TypeOop.OOP0,TypeOop.OOP0);
   static final TypeTuple[] TYPES = new TypeTuple[]{ANY,SCALAR1,STR,INT32,INT64,FLT64,INT64_INT64,FLT64_FLT64,FLT64_INT64, IF_ALL, IF_TRUE, IF_FALSE, FUNPTR2, OOP_OOP};
   
   // The length of Tuples is a constant, and so is its own dual.  Otherwise
@@ -113,9 +113,10 @@ public class TypeTuple extends Type {
     case TSTR:
     case TFLT:
     case TINT:
-      if(   may_be_null() ) return t.meet(TypeInt.NULL);
-      if( t.may_be_null() ) return   meet_null();
-      return t._type==TFLT||t._type==TINT ? SCALAR : OOP0;
+      //if(   may_be_null() ) return t.meet(TypeInt.NULL);
+      //if( t.may_be_null() ) return   meet_null();
+      //return t._type==TFLT||t._type==TINT ? SCALAR : OOP0;
+      throw AA.unimpl();
     case TERROR: return ((TypeErr)t)._all ? t : this;
     default: throw typerr(t);
     }
@@ -191,5 +192,4 @@ public class TypeTuple extends Type {
         return s;
     return null;
   }
-  @Override public boolean may_be_null() { return above_center() && _nil; }
 }

@@ -18,7 +18,7 @@ public class IfNode extends Node {
     if( gvn.type(in(0))==Type.XCTRL ) return TypeTuple.IF_ANY; // Test is dead
     Type pred = gvn.type(in(1));
     if( pred instanceof TypeUnion ) // Pointers with and without null
-      pred = pred.may_be_null() ? TypeInt.BOOL : TypeInt.TRUE;
+      pred = pred.may_be_nil() ? TypeInt.BOOL : TypeInt.TRUE;
     if( pred.isa(TypeInt.XINT1) ) return TypeTuple.IF_ANY;  // Choice of {0,1}
     if( TypeInt.BOOL.isa(pred)  ) return TypeTuple.IF_ALL;  // Can be either
     if( pred==TypeInt.FALSE     ) return TypeTuple.IF_FALSE;// False only

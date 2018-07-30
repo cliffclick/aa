@@ -1,5 +1,6 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.AA;
 import java.util.HashMap;
 
 public class TypeFlt extends Type {
@@ -50,7 +51,9 @@ public class TypeFlt extends Type {
     case TINT:   return ((TypeInt)t).xmeetf(this);
     case TSTR:
     case TSTRUCT:
-    case TTUPLE: return may_be_null() ? t.xmeet(this) : Type.SCALAR;
+    case TTUPLE:
+      //return may_be_null() ? t.xmeet(this) : Type.SCALAR;
+      throw AA.unimpl();
     case TRPC:
     case TFUN:   return Type.SCALAR;
     case TERROR: return ((TypeErr)t)._all ? t : this;
@@ -100,6 +103,5 @@ public class TypeFlt extends Type {
   @Override public boolean above_center() { return _x>0; }
   @Override public boolean canBeConst() { return _x>=0; }
   @Override public boolean is_con()   { return _x==0; }
-  @Override public boolean may_be_null() { return _x > 0 || (_x==0 && _con==0); }
-  @Override public Type get_null() { return TypeInt.NULL; }
+  @Override public boolean may_be_nil() { return _x > 0 || (_x==0 && _con==0); }
 }

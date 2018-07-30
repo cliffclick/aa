@@ -1,5 +1,6 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.AA;
 import com.cliffc.aa.util.SB;
 import java.util.Arrays;
 
@@ -102,9 +103,10 @@ public class TypeStruct extends Type {
     case TSTR:
     case TFLT:
     case TINT:
-      if(   may_be_null() ) return t.meet(TypeInt.NULL);
-      if( t.may_be_null() ) return   meet_null();
-      return t._type==TFLT||t._type==TINT ? SCALAR : OOP0;
+      //if(   may_be_null() ) return t.meet(TypeInt.NULL);
+      //if( t.may_be_null() ) return   meet_null();
+      //return t._type==TFLT||t._type==TINT ? SCALAR : OOP0;
+      throw AA.unimpl();
     case TNAME:
     case TUNION: return t.xmeet(this); // Let TypeUnion decide
     case TRPC: 
@@ -159,6 +161,5 @@ public class TypeStruct extends Type {
   @Override public boolean canBeConst() { return _tt.canBeConst(); }
   // True if all internals is_con
   @Override public boolean is_con() { return _tt.is_con(); }
-  @Override public boolean may_be_null() { return _tt.may_be_null(); }
   @Override public String errMsg() { return _tt.errMsg(); }
 }

@@ -70,15 +70,16 @@ public class TypeUnion extends Type {
     // Tuples are OK, and Tuples can also be function pointers.
     int ifx = -1; // index of a null, if both fx and ix are null
     if( ox!= -1 ) {
-      if( ix!=-1 && es[ix].may_be_null() ) {
-        ts.set(ix,  es[ix].get_null()); // Set to null (incase e.g. ~Number)
-        ifx = ix;                 // Record index of null
-        ix = -1;                  // Ignore null in the union
-      }
-      if( fx!=-1 && es[fx].may_be_null() ) {
-        ts.set(fx,  es[fx].get_null());  // Set to null (incase e.g. ~flt32)
-        fx = -1;                  // Ignore null in the union
-      } else ifx = -1;            // No float index
+      //if( ix!=-1 && es[ix].may_be_null() ) {
+      //  ts.set(ix,  es[ix].get_null()); // Set to null (incase e.g. ~Number)
+      //  ifx = ix;                 // Record index of null
+      //  ix = -1;                  // Ignore null in the union
+      //}
+      //if( fx!=-1 && es[fx].may_be_null() ) {
+      //  ts.set(fx,  es[fx].get_null());  // Set to null (incase e.g. ~flt32)
+      //  fx = -1;                  // Ignore null in the union
+      //} else ifx = -1;            // No float index
+      throw AA.unimpl();
     }
 
     // Cannot mix functions and anything else, including null.
@@ -117,13 +118,13 @@ public class TypeUnion extends Type {
   // Mix null with another
   public static Type make_null( Type t ) { assert t.is_oop(); return make(false,TypeInt.NULL,t); }
 
-  // Return true if this type MAY be a null.
-  @Override public boolean may_be_null() {
+  // Return true if this type MAY be a nil.
+  @Override public boolean may_be_nil() {
     if( _any ) {                // Any null works
-      for( Type t : _ts._ts ) if( t.may_be_null() ) return true;
+      for( Type t : _ts._ts ) if(  t.may_be_nil() ) return true;
       return false;
     } else {                    // All must be null
-      for( Type t : _ts._ts ) if( !t.may_be_null() ) return false;
+      for( Type t : _ts._ts ) if( !t.may_be_nil() ) return false;
       return true;
     }
   }
@@ -158,12 +159,14 @@ public class TypeUnion extends Type {
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TERROR: return ((TypeErr)t)._all ? t : this;
-    case TOOP:   return may_be_null() ? OOP0 : SCALAR;
-    case TXOOP:
+    case TOOP:
+      //return may_be_null() ? OOP0 : SCALAR;
+      throw AA.unimpl();
     case TSTR:
     case TSTRUCT:
     case TTUPLE:
-      return t.may_be_null() ? meet(TypeInt.NULL) : SCALAR; // Mixing of int/flt or functions
+      //return t.may_be_null() ? meet(TypeInt.NULL) : SCALAR; // Mixing of int/flt or functions
+      throw AA.unimpl();
     case TUNION: {
       // Handle the case where they are structurally equal
       TypeUnion tu = (TypeUnion)t;

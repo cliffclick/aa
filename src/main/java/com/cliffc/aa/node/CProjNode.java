@@ -37,7 +37,7 @@ public class CProjNode extends ProjNode {
       return this;
     }
     if( pred instanceof TypeUnion ) {  // Check for null & oop
-      assert pred.may_be_null(); // Else the IfNode already sharpened
+      assert pred.may_be_nil();        // Else the IfNode already sharpened
       Node sharp = _idx==1
         ? gvn.xform(new CastNode(this,test,((TypeUnion)pred).remove_null()))
         : gvn.con(TypeInt.NULL);

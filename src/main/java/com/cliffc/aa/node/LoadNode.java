@@ -29,7 +29,7 @@ public class LoadNode extends Node {
 
     // Lift control on Loads as high as possible... and move them over
     // to a CastNode (to remove null-ness) and remove the control.
-    if( !t.may_be_null() )    // No null, no need for ctrl
+    if( !t.may_be_nil() )       // No null, no need for ctrl
       // remove ctrl; address already casts-away-null
       return set_def(0,null,gvn);
 
@@ -60,7 +60,7 @@ public class LoadNode extends Node {
       return TypeErr.make(_badfld);
     } else if( t instanceof TypeErr ) {
       return t;                 // Errors poison
-    } else if( t.may_be_null() ) {
+    } else if( t.may_be_nil() ) {
       return TypeErr.make(_badnul); // Null compile-time error
     } else if( t instanceof TypeStruct ) {
       TypeStruct ts = (TypeStruct)t;

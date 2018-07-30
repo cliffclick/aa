@@ -1,5 +1,6 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.AA;
 import java.util.HashMap;
 
 public class TypeInt extends Type {
@@ -60,7 +61,9 @@ public class TypeInt extends Type {
     case TFLT:   return xmeetf((TypeFlt)t);
     case TSTR:   
     case TSTRUCT:
-    case TTUPLE: return may_be_null() ? t.xmeet(this) : Type.SCALAR;
+    case TTUPLE:
+      throw AA.unimpl();
+      //return may_be_null() ? t.xmeet(this) : Type.SCALAR;
     case TFUN:
     case TRPC:   return Type.SCALAR;
     case TERROR: return ((TypeErr)t)._all ? t : this;
@@ -152,7 +155,7 @@ public class TypeInt extends Type {
     if( t._type == Type.TFLT ) return 1; // Int->Flt ignores large int overflow issues
     if( t._type == Type.TREAL ) return 0;
     if( t._type == Type.TSCALAR ) return 0;
-    if( t._type == Type.TUNION && t.may_be_null() && this==NULL ) return 0;
+    //if( t._type == Type.TUNION && t.may_be_null() && this==NULL ) return 0;
     throw com.cliffc.aa.AA.unimpl();
   }
   @Override public Type widen() {
@@ -162,6 +165,5 @@ public class TypeInt extends Type {
   @Override public boolean above_center() { return _x>0; }
   @Override public boolean canBeConst() { return _x>=0; }
   @Override public boolean is_con()   { return _x==0; }
-  @Override public boolean may_be_null() { return _x > 0 || (_x==0 && _con==0); }
-  @Override public Type get_null() { return NULL; }
+  @Override public boolean may_be_nil() { return _x > 0 || (_x==0 && _con==0); }
 }

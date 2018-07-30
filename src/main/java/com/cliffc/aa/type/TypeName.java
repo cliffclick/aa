@@ -60,10 +60,10 @@ public class TypeName extends Type {
     default: break;
     }
     // LHS is named, RHS is unnamed.
-    if( _t.may_be_null() && !t.may_be_null() )
+    if( _t.may_be_nil() && !t.may_be_nil() )
       return TypeInt.NULL.meet(t); // Degrade LHS to a null and drop the _name
     Type mt = _t.meet(t);       // Peel and meet; keep name if RHS is above-or-null
-    return t.may_be_null() ? make0(_name,mt) : mt;
+    return t.may_be_nil() ? make0(_name,mt) : mt;
   }
   static String sdual( String s ) {
     if( s==null ) return "";
@@ -89,7 +89,5 @@ public class TypeName extends Type {
   @Override public double getd  () { return _t.getd  (); }
   @Override public long   getl  () { return _t.getl  (); }
   @Override public String getstr() { return _t.getstr(); }
-  @Override public boolean may_be_null() { return _t.may_be_null(); }
-  @Override public Type get_null() { return make0(_name,_t.get_null()); }
   @Override public byte isBitShape(Type t) { return _t.isBitShape(t); }
 }

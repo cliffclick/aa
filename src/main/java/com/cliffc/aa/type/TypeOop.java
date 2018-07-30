@@ -1,45 +1,35 @@
 package com.cliffc.aa.type;
 
-import java.util.HashMap;
+import com.cliffc.aa.AA;
 
-public class TypeOop extends Type {
-  byte _o; // 0=OOP&nil, 1=OOP, 2=nil, 3=OOP+nil
-  private TypeOop ( byte type, byte o ) { super(o); init(type,o); }
-  private void init(byte type, byte o ) { _type=type;  _o=o; }
-  @Override public int hashCode( ) { return (_type<<8)+_o; }
+// All Generic Nullable Oops, including Strings, Structs, Tuples, Arrays
+public class TypeOop extends TypeNullable {
+  boolean _any;                 // True=choice/join; False=all/meet
+  protected TypeOop ( byte nil, boolean any) { super(TOOP,nil); init(nil,any); }
+  protected void init(byte nil, boolean any) { super.init(nil); _any=any; assert _type==TOOP; }
+  @Override public int hashCode( ) { return super.hashCode()+(_any?1:0); }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
-    if( !(o instanceof TypeOop) ) return false;
-    TypeOop t2 = (TypeOop)o;
-    return _type==t2._type && _o==t2._o;
+    return o instanceof TypeOop && eq((TypeOop)o) && _any==((TypeOop)o)._any;
   }
-  private static final String[] TSTRS=new String[]{"oop?","oop","0","oop!"};
-  @Override public String toString() { return TSTRS[_o]; }
-  private static TypeOop FREE=nil;
-  private TypeOop free( TypeOop f ) { FREE=f; return this; }
-  public static TypeOop make( byte type, byte o ) {
+  @Override public String toString() { return (_any?"~":"")+String.format(TSTRS[_nil],"oop"); }
+  private static TypeOop FREE=null;
+  private TypeOop free( TypeOop f ) { assert f._type==TOOP; FREE=f; return this; }
+  public static TypeOop make( byte nil, boolean any ) {
     TypeOop t1 = FREE;
-    if( t1 == nil ) t1 = new TypeOop(type,o);
-    else { FREE = nil; t1.init(type,o); }
+    if( t1 == null ) t1 = new TypeOop(nil,any);
+    else { FREE = null; t1.init(nil,any); }
     TypeOop t2 = (TypeOop)t1.hashcons();
     return t1==t2 ? t1 : t2.free(t1);
   }
 
-  private static TypeOop make( byte o ) { return make(TOOP,o); }
-  static public final TypeOop OOP0 = make(0); // OOP&nil
-  static public final TypeOop OOP  = make(1); // OOP
-  static public final TypeOop NIL  = make(2); // nil
-  static public final TypeOop OOP_ = make(3); // OOP+nil
+  static public final TypeOop OOP0 = make(AND_NIL,false); // OOP&nil
+  static public final TypeOop OOP  = make(NOT_NIL,false); // OOP
+  static public final TypeOop NIL  = make( IS_NIL,false); // nil
+  static public final TypeOop OOP_ = make( OR_NIL, true); // ~OOP+nil
   static final TypeOop[] TYPES = new TypeOop[]{OOP0,OOP,NIL,OOP_};
 
-  @Override protected TypeOop xdual() {
-    switch( _o ) {
-    case 0: return new TypeOop(TOOP,3);
-    case 1: case 2: return this;
-    case 3: return new TypeOop(TOOP,0);
-    default: throw typerr(this);
-    }
-  }
+  @Override protected TypeOop xdual() { return new TypeOop(xdualnil(),!_any); }
       
   @Override protected Type xmeet( Type t ) {
     if( t == this ) return this;
@@ -62,7 +52,7 @@ public class TypeOop extends Type {
     case TUNION: return t.xmeet(this); // Let other side decide
     default: throw typerr(t);
     }
-    throw com.cliffc.aa.AA.unimpl();
+    return _any ? t.meet(this) : make(nmeet((TypeNullable)t),false);
   }
 
   // Lattice of conversions:
@@ -71,18 +61,10 @@ public class TypeOop extends Type {
   //  0 requires no/free conversion (Str->Str)
   // +1 requires a bit-changing conversion; no auto-unboxing
   // 99 Bottom; No free converts; e.g. Flt->Str requires explicit rounding
-  @Override public byte isBitShape(Type t) {
-    if( t._type==Type.TSTR ) return 0;
-    if( t instanceof TypeUnion && this.isa(t) )
-      return 0;
-    return 99;
-  }
-  @Override public Type widen() {
-    assert _x != 0;
-    return _con==nil ? STR : STR0;
-  }
-  @Override public boolean above_center() { return _x==0; }
-  @Override public boolean canBeConst() { return _x>=0; }
-  @Override public boolean is_con()   { return _x==1; }
-  @Override public boolean may_be_nil() { return _x==0 && _con==nil; }
+  @Override public byte isBitShape(Type t) { throw AA.unimpl();  }
+  @Override public boolean above_center() { throw AA.unimpl(); }
+  @Override public boolean canBeConst() { throw AA.unimpl(); }
+  @Override public boolean is_con()   { throw AA.unimpl(); }
+  // True if this OOP may BE a nil (as opposed to: may have a nil)
+  public boolean may_be_nil() { throw AA.unimpl(); }
 }

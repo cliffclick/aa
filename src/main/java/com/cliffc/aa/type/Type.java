@@ -79,7 +79,7 @@ public class Type {
     INTERN.put(this,this);       // Put in table without dual
     Type d = _dual = xdual();    // Compute dual without requiring table lookup
     if( this==d ) return d;      // Self-symmetric?  Dual is self
-    assert !equals(d);           // If self symmetric then returned self
+    if( equals(d) ) { free(d); _dual=this; return this; } // If self symmetric then use self
     assert d._dual==null;        // Else dual-dual not computed yet
     assert INTERN.get(d)==null;
     d._dual = this;
@@ -206,6 +206,7 @@ public class Type {
       //  return _type == TOOP ? (t.may_be_null() ? OOP0 : SCALAR) : t.meet(TypeInt.NULL);
       //if( !that_oop ) throw AA.unimpl();
       //return _type == TOOP ? OOP0 : t;
+      throw AA.unimpl();        // Need nice printout
     }
 
     if( is_num() ) {
@@ -337,26 +338,25 @@ public class Type {
   // True if value is above the centerline (no real value)
   public boolean above_center() {
     switch( _type ) {
-    case TSCALAR:
+    case TCTRL:
     case TNUM:
     case TREAL:
-    case TCTRL:
-    case TOOP:
+    case TSCALAR:
       return false;             // These are all below center
-    case TXREAL:
-    case TXNUM:
-    case TXSCALAR:
     case TXCTRL:
-    case TXOOP:
+    case TXNUM:
+    case TXREAL:
+    case TXSCALAR:
       return true;              // These are all above center
     case TERROR:
-    case TFUN:
-    case TRPC:
-    case TUNION:
-    case TTUPLE:
-    case TSTRUCT:
     case TFLT:
+    case TFUN:
     case TINT:
+    case TOOP:
+    case TRPC:
+    case TSTRUCT:
+    case TTUPLE:
+    case TUNION:
     default: throw AA.unimpl(); // Overridden in subclass
     case TSIMPLE: throw typerr(null);
     }
@@ -365,32 +365,31 @@ public class Type {
   public boolean canBeConst() {
     switch( _type ) {
     case TSCALAR:
-    case TOOP:
     case TNUM:
     case TREAL:
     case TCTRL:
       return false;             // These all include not-constant things
     case TXREAL:
     case TXNUM:
-    case TXOOP:
     case TXSCALAR:
     case TXCTRL:
       return true;              // These all include some constants
     default: throw AA.unimpl();
     }
   }
+  // True if exactly a constant (not higher, not lower)
   public boolean is_con() {
     switch( _type ) {
-    case TERROR:
     case TCTRL:
-    case TSCALAR:
+    case TERROR:
     case TNUM:
     case TREAL:
-    case TXCTRL:
-    case TXREAL:
-    case TXNUM:
-    case TXSCALAR:
+    case TSCALAR:
     case TUNION:                // Overridden in subclass
+    case TXCTRL:
+    case TXNUM:
+    case TXREAL:
+    case TXSCALAR:
       return false;             // Not exactly a constant
     default: throw AA.unimpl();
     }
@@ -411,7 +410,11 @@ public class Type {
   public double getd() { throw AA.unimpl(); }
   // Return a String from a TypeStr constant; assert otherwise.
   public String getstr() { throw AA.unimpl(); }
-
+  // Return true if this type may BE a null: includes Int:NULL plus numbers
+  // above the center line; numbers may be named.  When true, a call to to
+  // get_null will return this type "fallen" to a NULL.
+  public boolean may_be_nil() { assert is_simple();  return _type == TXSCALAR || _type == TXNUM || _type == TXREAL; }
+  
   // Lattice of conversions:
   // -1 unknown; top; might fail, might be free (Scalar->Int); Scalar might lift
   //    to e.g. Float and require a user-provided rounding conversion from F64->Int.
@@ -424,7 +427,7 @@ public class Type {
     if( t._type==TSCALAR ) return 0; // Generic function arg never requires a conversion
     if( _type == TSCALAR ) return -1; // Scalar has to resolve
     if( _type == TREAL && t.is_num() ) return -1; // Real->Int/Flt has to resolve
-    if( is_fun_ptr() ) return (byte)(t == OOP0 ? 0 : 99);
+    //if( is_fun_ptr() ) return (byte)(t == OOP0 ? 0 : 99);
 
     throw typerr(t);  // Overridden in subtypes
   }

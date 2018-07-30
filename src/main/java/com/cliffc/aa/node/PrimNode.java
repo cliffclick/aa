@@ -24,7 +24,7 @@ public abstract class PrimNode extends Node {
 
   public static PrimNode[] PRIMS = new PrimNode[] {
     new RandI64(),
-    new Id(Type.OOP0), // Pre-split OOP from non-OOP
+    new Id(TypeOop.OOP0), // Pre-split OOP from non-OOP
     new Id(Type.REAL),
     
     new ConvertInt64F64(),
@@ -130,14 +130,14 @@ class ConvertInt64F64 extends PrimNode {
 
 class ConvertI64Str extends PrimNode {
   ConvertI64Str(Node... nodes) { super("str",PrimNode.ARGS1,TypeTuple.INT64,TypeStr.STR,nodes); }
-  @Override public TypeStr apply( Type[] args ) { return TypeStr.make(0,Long.toString(args[1].getl())); }
+  @Override public TypeStr apply( Type[] args ) { return TypeStr.con(Long.toString(args[1].getl())); }
   @Override public byte op_prec() { return 9; }
   public boolean is_lossy() { return false; }
 }
 
 class ConvertF64Str extends PrimNode {
   ConvertF64Str(Node... nodes) { super("str",PrimNode.ARGS1,TypeTuple.FLT64,TypeStr.STR,nodes); }
-  @Override public TypeStr apply( Type[] args ) { return TypeStr.make(0,Double.toString(args[1].getd())); }
+  @Override public TypeStr apply( Type[] args ) { return TypeStr.con(Double.toString(args[1].getd())); }
   @Override public byte op_prec() { return 9; }
   public boolean is_lossy() { return false; }
 }

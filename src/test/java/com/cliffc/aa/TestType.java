@@ -196,7 +196,7 @@ public class TestType {
     test   ("x:str? = 0", TypeInt.NULL); // question-type allows null or not; zero digit is null
     test   ("x:str? = \"abc\"", TypeStr.con("abc")); // question-type allows null or not
     testerr("x:str  = 0", "null is not a str", "          ");
-    test   ("math_rand(1)?0:\"abc\"", TypeStr.con("abc").make_null());
+    test   ("math_rand(1)?0:\"abc\"", TypeStr.make(TypeStr.AND_NIL,1,"abc"));
     testerr("(math_rand(1)?0 : @{x=1}).x", "Struct might be null when reading field '.x'", "                           ");
     test   ("p=math_rand(1)?0:@{x=1}; p ? p.x : 0", TypeInt.BOOL); // not-null-ness after a null-check
     test   ("x:int = y:str? = z:flt = 0", TypeInt.NULL); // null/0 freely recasts
@@ -352,19 +352,20 @@ c[x]=1;
   @Test public void testOOPsNulls() {
     Type.init0(new HashMap<>());
     Type bot  = TypeErr.ALL;
-    Type oop0 = Type.OOP0;      // OOP? (OOP and null)
+    Type oop0 = TypeOop.OOP0;   // OOP? (OOP and null)
     Type str0 = TypeStr.STR0;   // str? (str AND null)
     Type str  = TypeStr.STR;    // str no null
     Type tup0 = TypeTuple.ALL0; // tup? (tup AND null); infinite repeat of ALL fields
     Type tup  = TypeTuple.ALL;  // tup       no  null ; infinite repeat of ALL fields
-    Type nil  = TypeInt.NULL;
+    Type nil  = TypeOop.NIL;
     Type abc  = TypeStr.con("abc");
-    Type fld  = TypeTuple.INT64;  // 1 field of int64 
+    Type fld  = TypeTuple.INT64;  // 1 field of int64
+    
     Type tupx = tup .dual();      // ~tup   (choice tup, no NULL)
     Type tup_ = tup0.dual();      // ~tup+? (choice tup  OR NULL)
     Type strx = str .dual();      // ~str   (choice str, no NULL)
     Type str_ = str0.dual();      // ~str+? (choice str  OR NULL)
-    Type oop_ = Type.OOP0.dual(); // ~OOP+? (choice OOP AND null)
+    Type oop_ = oop0.dual();      // ~OOP+? (choice OOP  OR null)
     Type top  = TypeErr.ANY;
 
     assertTrue(top .isa(oop_));
