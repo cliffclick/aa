@@ -20,14 +20,15 @@ public class TypeUnion extends Type {
     TypeUnion t = (TypeUnion)o;
     return _any==t._any && _ts==t._ts;
   }
-  @Override public String toString() {
-    if( _ts._ts.length==2 ) {
-      String s = _any?"+":"";
-      if( _ts.at(0)==TypeInt.NULL && _ts.at(1).is_oop() )  return _ts.at(1)+s+"?";
-      if( _ts.at(1)==TypeInt.NULL && _ts.at(0).is_oop() )  return _ts.at(0)+s+"?";
-    }
-    return "{"+(_any?"any":"all")+_ts+"}";
-  }
+  //@Override public String toString() {
+  //  if( _ts._ts.length==2 ) {
+  //    //String s = _any?"+":"";
+  //    //if( _ts.at(0)==TypeInt.NULL && _ts.at(1).is_oop() )  return _ts.at(1)+s+"?";
+  //    //if( _ts.at(1)==TypeInt.NULL && _ts.at(0).is_oop() )  return _ts.at(0)+s+"?";
+  //    throw AA.unimpl();
+  //  }
+  //  return "{"+(_any?"any":"all")+_ts+"}";
+  //}
   private static TypeUnion FREE=null;
   private TypeUnion free( TypeUnion f ) { FREE=f; return this; }
   public static TypeUnion make( TypeTuple ts, boolean any ) {
@@ -104,7 +105,7 @@ public class TypeUnion extends Type {
 
     // The set has to be ordered, to remove dups that vary only by order
     ts.sort_update(Comparator.comparingInt(e -> e._uid)); 
-    return make(TypeTuple.make(any?TypeErr.ANY:TypeErr.ALL,false,ts.asAry()),any);
+    return make(TypeTuple.make(any?TypeErr.ANY:TypeErr.ALL,TypeTuple.NOT_NIL,ts.asAry()),any);
   }
 
   private static int meet_dup( boolean any, Ary<Type> ts, int idx, int i ) {
@@ -114,9 +115,6 @@ public class TypeUnion extends Type {
     ts.del(i);
     return i-1;
   }
-
-  // Mix null with another
-  public static Type make_null( Type t ) { assert t.is_oop(); return make(false,TypeInt.NULL,t); }
 
   // Return true if this type MAY be a nil.
   @Override public boolean may_be_nil() {
@@ -130,9 +128,10 @@ public class TypeUnion extends Type {
   }
   // Same union, minus the null
   public Type remove_null() {
-    Ary<Type> ts = new Ary<>(new Type[1],0);
-    for( Type t : _ts._ts ) if( t!=TypeInt.NULL ) ts.add(t);
-    return make(_any,ts);
+    //Ary<Type> ts = new Ary<>(new Type[1],0);
+    //for( Type t : _ts._ts ) if( t!=TypeInt.NULL ) ts.add(t);
+    //return make(_any,ts);
+    throw AA.unimpl();
   }
   
   //static public final TypeUnion NC0 = (TypeUnion)make(false, TypeFlt.PI, TypeInt.NULL);
@@ -146,7 +145,7 @@ public class TypeUnion extends Type {
     Type[] ts = ((TypeTuple)_ts.dual())._ts; // Dual-tuple array
     ts = Arrays.copyOf(ts,ts.length);        // Defensive copy
     Arrays.sort(ts, 0, ts.length, Comparator.comparingInt(e -> e._uid));
-    TypeTuple stt = TypeTuple.make(!_any?TypeErr.ANY:TypeErr.ALL,false,ts);
+    TypeTuple stt = TypeTuple.make(!_any?TypeErr.ANY:TypeErr.ALL,TypeTuple.NOT_NIL,ts);
     return new TypeUnion(stt,!_any);
   }
   
@@ -203,11 +202,11 @@ public class TypeUnion extends Type {
       // "OOPa JOIN OOPb?" basically moving the null around and making no
       // progress.  Pick up this pattern and handle it separately
       Ary<Type> ts = new Ary<>(_ts._ts.clone()); // Defensive clone
-      if( _any && t.is_oop() )                   // X+Y meet OOP?
-        for( int i=0; i<ts._len; i++ )
-          if( ts.at(i)==TypeInt.NULL ) { // Find the null?
-            ts.del(i);  break;           // Remove it: compute X meet OOP instead
-          }
+      //if( _any && t.is_oop() )                   // X+Y meet OOP?
+      //  for( int i=0; i<ts._len; i++ )
+      //    if( ts.at(i)==TypeInt.NULL ) { // Find the null?
+      //      ts.del(i);  break;           // Remove it: compute X meet OOP instead
+      //    }
       return make(_any, ymeet( ts, _any, t ));
     }
   }

@@ -133,10 +133,10 @@ public class TestLattice {
 
   //      ~scalar
   //    ~num    ~oop+?
-  //  ~int        { ~str+?, ~tup+? }
-  //                { ~str, ~tup }
-  //  3       0      { "abc", "def", @{x:1}, @{x:1,y:1} }
-  //                { str, tup }
+  //  ~int        { ~str+?,     ~tup+? }
+  //                { ~str,           ~tup }
+  //  42      0       { "abc", "def", @{x}, @{x,y} }
+  //                { str,       tup }
   //   int        { str?, tup? }
   //     num    oop?
   //        scalar
@@ -169,7 +169,7 @@ public class TestLattice {
     N tup_= new N("~tup+0",tupx,nil);
     N oop_= new N("~oop+0",str_,tup_);
 
-    N i3  = new N("3",int8 );
+    N i3  = new N("42",int8 );
     N xint= new N("~int8",i3,nil );
     N xnum= new N("~num",xint);
     
@@ -235,6 +235,9 @@ public class TestLattice {
     test(xta0);
   }
 
+  // Lattice!
+  // This structure is tested to be a lattice:
+  
   // back to field-by-field for structs; each tuple/struct has a {choice-null,
   // not-null, support-null, is-null}.  Each field is Top, field, Bot,
   // replicated for all fields separately.  Also, the nil choice is available
@@ -308,4 +311,52 @@ public class TestLattice {
     
     test(btp);
   }
+
+
+  // Lattice!
+  // This structure is tested to be a lattice:
+  
+  //          ~int
+  //    M:~int    N:~int
+  //          ~int8
+  //  M:~int8       N:~int8
+  //M:0  M:8  0  8    N:0  N:8
+  //  M:int8        N:int8
+  //           int8
+  //    M:int     N:int
+  //           int
+  @Test public void testLattice3() {
+    N.reset();
+    N num = new N(  "num" );
+    N nnum= new N("N:num",num);
+    N mnum= new N("M:num",num);
+    N  i64= new N(  "int",num );
+    N ni64= new N("N:int",i64,nnum );
+    N mi64= new N("M:int",i64,mnum );
+
+    N i0  = new N(  "0", i64);
+    N i7  = new N(  "7", i64);
+    N ni0 = new N("N:0", ni64);
+    N ni7 = new N("N:7", ni64);
+    N mi0 = new N("M:0", mi64);
+    N mi7 = new N("M:7", mi64);
+
+    N nx64= new N("N:~int",ni0,ni7 );
+    N mx64= new N("M:~int",mi0,mi7 );
+    N  x64= new N(  "~int",nx64,mx64, i0, i7 );
+    N nxum= new N("N:~num",nx64 );
+    N mxum= new N("M:~num",mx64 );
+    N  xum= new N(  "~num",nxum,mxum,x64 );
+   
+    // Mark the non-centerline duals
+     num.set_dual( xum);
+    nnum.set_dual(nxum);
+    mnum.set_dual(mxum);
+     i64.set_dual( x64);
+    ni64.set_dual(nx64);
+    mi64.set_dual(mx64);
+
+    test(xum);
+  }
+
 }

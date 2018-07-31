@@ -49,11 +49,10 @@ public class TypeFlt extends Type {
     switch( t._type ) {
     case TFLT:   break;
     case TINT:   return ((TypeInt)t).xmeetf(this);
+    case TOOP:
     case TSTR:
     case TSTRUCT:
     case TTUPLE:
-      //return may_be_null() ? t.xmeet(this) : Type.SCALAR;
-      throw AA.unimpl();
     case TRPC:
     case TFUN:   return Type.SCALAR;
     case TERROR: return ((TypeErr)t)._all ? t : this;
@@ -82,6 +81,8 @@ public class TypeFlt extends Type {
   }
   private static int log( double con ) { return ((double)(float)con)==con ? 32 : 64; }
   
+  // Meet in a nil
+  @Override public Type meet_nil() { return xmeet(TypeInt.FALSE); }
   // Lattice of conversions:
   // -1 unknown; top; might fail, might be free (Scalar->Int); Scalar might lift
   //    to e.g. Float and require a user-provided rounding conversion from F64->Int.

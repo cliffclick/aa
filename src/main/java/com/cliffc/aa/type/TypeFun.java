@@ -58,6 +58,7 @@ public class TypeFun extends Type {
     case TERROR: return ((TypeErr)t)._all ? t : this;
     case TCTRL:
     case TXCTRL: return TypeErr.ALL;
+    case TOOP:
     case TRPC:
     case TSTRUCT:
     case TTUPLE: 

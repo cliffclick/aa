@@ -195,6 +195,7 @@ public class Type {
     if( t._type == TRPC ) return SCALAR; // If 't' is a RPC and 'this' is not a RPC (because not equal to 't')
     // Union of functions or numbers or whatever: let Union sort it out
     if( t._type == TUNION ) return t.xmeet(this);
+    if( t._type == TNAME  ) return t.xmeet(this);
 
     boolean that_oop = t.is_oop();
     boolean that_num = t.is_num();
@@ -210,20 +211,18 @@ public class Type {
     }
 
     if( is_num() ) {
-      //if( that_oop ) // May be OOP0 or STR or STRUCT or TUPLE
-      //  return t.may_be_null() ? meet(TypeInt.NULL)
-      //    : (may_be_null() ? t.meet(TypeInt.NULL) : SCALAR);
-      //if( !that_num ) throw AA.unimpl();
-      //
-      //// Numeric; same pattern as ANY/ALL, or SCALAR/XSCALAR
-      //if( _type == TNUM || t._type == TNUM ) return NUM;
-      //if(   _type == TXNUM ) return t   ;
-      //if( t._type == TXNUM ) return this;
-      //
-      //// Real; same pattern as ANY/ALL, or SCALAR/XSCALAR
-      //if( _type == TREAL || t._type == TREAL ) return REAL;
-      //if(   _type == TXREAL ) return t   ;
-      //if( t._type == TXREAL ) return this;
+      // May be OOP0 or STR or STRUCT or TUPLE
+      if( that_oop ) return SCALAR;
+      if( !that_num ) throw AA.unimpl();
+      // Numeric; same pattern as ANY/ALL, or SCALAR/XSCALAR
+      if( _type == TNUM || t._type == TNUM ) return NUM;
+      if(   _type == TXNUM ) return t   ;
+      if( t._type == TXNUM ) return this;
+
+      // Real; same pattern as ANY/ALL, or SCALAR/XSCALAR
+      if( _type == TREAL || t._type == TREAL ) return REAL;
+      if(   _type == TXREAL ) return t   ;
+      if( t._type == TXREAL ) return this;
       throw AA.unimpl();        // Need nice printout
     }
     throw AA.unimpl();          // Need nice printout
@@ -306,7 +305,7 @@ public class Type {
             Type t02 = t0.join(t2);
             Type t12 = t1.join(t2);
             Type mt  = t02.meet(t12);
-            if( mt != t12 && errs++ < 10 ) {
+            if( mt != t12 && errs++ < 100 ) {
               System.err.println("("+t0+" ^ "+t2+") = "+t02+"; "+
                                  "("+t1+" ^ "+t2+") = "+t12+"; "+
                                  "their meet = "+mt+" which is not "+t12);
@@ -317,6 +316,7 @@ public class Type {
     assert errs==0 : "Found "+errs+" non-join-type errors";
 
     // Check scalar primitives; all are SCALARS and none sub-type each other.
+    Type ignore = TypeTuple.NIL; // Break class-loader cycle; load Tuple before Fun.
     SCALAR_PRIMS = new Type[] { TypeInt.INT64, TypeFlt.FLT64, TypeOop.OOP0, TypeFun.make_generic() };
     for( Type t : SCALAR_PRIMS ) assert t.isa(SCALAR);
     for( int i=0; i<SCALAR_PRIMS.length; i++ ) 
@@ -410,6 +410,11 @@ public class Type {
   public double getd() { throw AA.unimpl(); }
   // Return a String from a TypeStr constant; assert otherwise.
   public String getstr() { throw AA.unimpl(); }
+  // Meet in a nil
+  public Type meet_nil() {
+    if( above_center() ) throw AA.unimpl();
+    return this;
+  }
   // Return true if this type may BE a null: includes Int:NULL plus numbers
   // above the center line; numbers may be named.  When true, a call to to
   // get_null will return this type "fallen" to a NULL.

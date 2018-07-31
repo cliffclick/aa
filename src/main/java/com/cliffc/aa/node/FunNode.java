@@ -269,7 +269,7 @@ public class FunNode extends RegionNode {
     for( int i=0; i<parms.length; i++ )
       sig[i] = gvn.type(parms[i].in(2)).widen();
     // Make a new function header with new signature
-    TypeTuple ts = TypeTuple.make(Type.XSCALAR,false,sig);
+    TypeTuple ts = TypeTuple.make_args(sig);
     assert ts.isa(_tf._ts);
     if( ts == _tf._ts ) return null; // No improvement for further splitting
     // Make a prototype new function header.  Clone the generic unknown caller in slot 1.  

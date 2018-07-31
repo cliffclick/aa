@@ -159,7 +159,7 @@ public class Parse {
       Type ot = _e.lookup_type(tvar);
       if( ot              != null ) return err_ctrl2("Cannot re-assign type '"+tvar+"'");
       if( _e.lookup(tvar) != null ) return err_ctrl2("Cannot re-assign val '"+tvar+"' as a type");
-      Type tn = TypeName.make0(tvar,t);
+      Type tn = TypeName.make(tvar,t);
       assert tn instanceof TypeName; // Can fail out for weird mixes
       _e.add_type(tvar,tn); // Assign type-name
       // TODO: Add reverse cast-away
@@ -522,7 +522,7 @@ public class Parse {
     return (t==null || t==TypeErr.ANY) ? null : t;
   }
   // Wrap in a nullable if there is a trailing '?'
-  private Type typeq(Type t) { return peek('?') ? TypeUnion.make_null(t) : t; }
+  private Type typeq(Type t) { return peek('?') ? ((TypeNullable)t).meet_nil() : t; }
   
   // Type or null or TypeErr.ANY for '->' token
   private Type type0() {

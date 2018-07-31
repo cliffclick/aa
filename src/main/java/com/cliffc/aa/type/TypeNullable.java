@@ -1,7 +1,5 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.AA;
-
 // Base class for Types which can be nil
 public abstract class TypeNullable extends Type {
   // There are 4 combos:
@@ -12,8 +10,8 @@ public abstract class TypeNullable extends Type {
   protected static final String[] TSTRS=new String[]{"0","%s","%s+0","%s&0"};
   // map 0->0, 1->1, 2->3; 3->2;
   byte xdualnil() { return (byte)(_nil<=1 ? _nil : 5-_nil); }
-
   byte _nil;
+  
   protected TypeNullable(byte type, byte nil ) { super(type); init(nil); }
   protected void init(byte nil) { _nil=nil; }
   @Override public int hashCode( ) { return (_type<<8)+_nil; }
@@ -23,12 +21,18 @@ public abstract class TypeNullable extends Type {
   }
   public boolean eq( TypeNullable to ) { return _type==to._type && _nil==to._nil; }
 
+  // Meet in a nil
+  @Override public Type meet_nil() { return make_nil(nmeet(IS_NIL)); }
+  
+  // Make a subtype with a given nil choice
+  abstract Type make_nil(byte nil);
+
   // Meet "nullable" notions
-  byte nmeet(TypeNullable n) {
-    if(   _nil==OR_NIL ) return n._nil; // OR loses to the other side
-    if( n._nil==OR_NIL ) return   _nil; // OR loses to the other side
-    if(   _nil==n._nil ) return   _nil; // Equals returns either
-    return AND_NIL;                     // Everything else has a nil
+  byte nmeet(byte nil) {
+    if( _nil==OR_NIL ) return  nil; // OR loses to the other side
+    if(  nil==OR_NIL ) return _nil; // OR loses to the other side
+    if( _nil==   nil ) return _nil; // Equals returns either
+    return AND_NIL;                 // Everything else has a nil
   }
   
   // True if this OOP may BE a nil (as opposed to: may have a nil)

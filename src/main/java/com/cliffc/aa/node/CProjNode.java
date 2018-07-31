@@ -2,10 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.AA;
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeErr;
-import com.cliffc.aa.type.TypeInt;
-import com.cliffc.aa.type.TypeUnion;
+import com.cliffc.aa.type.*;
 
 // Proj control
 public class CProjNode extends ProjNode {
@@ -40,7 +37,7 @@ public class CProjNode extends ProjNode {
       assert pred.may_be_nil();        // Else the IfNode already sharpened
       Node sharp = _idx==1
         ? gvn.xform(new CastNode(this,test,((TypeUnion)pred).remove_null()))
-        : gvn.con(TypeInt.NULL);
+        : gvn.con(TypeOop.NIL);
       scope.sharpen(test,sharp,tmp);
       return this;
     }

@@ -10,7 +10,7 @@ public class TypeStr extends TypeNullable {
   private void init(byte nil, int x, String con ) {
     super.init(nil);
     assert con != null;
-    assert (nil==IS_NIL && _x==1)||(nil!=IS_NIL);
+    assert (nil==IS_NIL && x==1)||(nil!=IS_NIL);
     _x=(byte)x;
     _con = con;
     assert _type==TSTR;
@@ -23,7 +23,7 @@ public class TypeStr extends TypeNullable {
     return super.eq(t2) && _x==t2._x && _con.equals(t2._con);
   }
   @Override public String toString() {
-    return String.format(TSTRS[_nil],(_x==0?"~":"")+_con);
+    return String.format(TSTRS[_nil],(_x==0?"~":"")+'"'+_con+'"');
   }
   private static TypeStr FREE=null;
   private TypeStr free( TypeStr f ) { assert f._type==TSTR; FREE=f; return this; }
@@ -36,10 +36,11 @@ public class TypeStr extends TypeNullable {
   }
   public static TypeStr con(String con) { return make(NOT_NIL,1,con); }
 
-  static public final TypeStr STR0 = make(AND_NIL,-1,"str"); // yes null
-  static public final TypeStr STR  = make(NOT_NIL,-1,"str"); // no  null
+  static public final TypeStr NIL  = make( IS_NIL, 1,"str"); // is  null; string con ignored
+  static public final TypeStr STR0 = make(AND_NIL,-1,"str"); // and null
+  static public final TypeStr STR  = make(NOT_NIL,-1,"str"); // not null
   static public final TypeStr STR_ = make( OR_NIL, 0,"str"); // choice string, choice nil
-  static final TypeStr[] TYPES = new TypeStr[]{STR,STR0};
+  static final TypeStr[] TYPES = new TypeStr[]{NIL,STR,STR0};
   static void init1( HashMap<String,Type> types ) {
     types.put("str",STR);
   }
@@ -47,48 +48,39 @@ public class TypeStr extends TypeNullable {
   @Override public String getstr() { assert is_con(); return _con; }
 
   @Override protected TypeStr xdual() {
-    switch(_nil) {
-    case  IS_NIL:
-      return this;
-    case NOT_NIL:
-      if( _x==1 ) return this;
-      // fallthru
-    case AND_NIL:
-    case OR_NIL:
-      return new TypeStr(xdualnil(),~_x,"str");
-    }
-    throw typerr(this);
+    byte x = (byte)(_x==0?-1:(_x==1?1:0));
+    return new TypeStr(xdualnil(),x,_con);
   }
   @Override protected Type xmeet( Type t ) {
     if( t == this ) return this;
     switch( t._type ) {
     case TSTR:   break;
-    case TOOP: {
-      TypeOop to = (TypeOop)t;
-      byte nil = nmeet(to);
-      return to._any ? make(nil,_x,_con) : TypeOop.make(nil);
-    }
     case TSTRUCT:
-    case TTUPLE:
+    case TTUPLE: return TypeOop.make(nmeet(((TypeNullable)t)._nil),false);
     case TFLT:
     case TINT:
-      //if(   may_be_null() ) return t.meet(TypeInt.NULL);
-      //if( t.may_be_null() ) return   make_null();
-      //return t._type==TFLT||t._type==TINT ? SCALAR : OOP0;
-      throw AA.unimpl();
-      
     case TRPC:
     case TFUN:   return SCALAR;
     case TERROR: return ((TypeErr)t)._all ? t : this;
-    case TNAME:  
+    case TOOP:
+    case TNAME:
     case TUNION: return t.xmeet(this); // Let other side decide
     default: throw typerr(t);
     }
     TypeStr ts = (TypeStr)t;
-    //if( _con == ts._con ) return this;
-    throw AA.unimpl();
+    byte nil = nmeet(ts._nil);
+    byte x = (byte)(_x|ts._x);
+    String con = _x==0 ? ts._con : _con;
+    if( _x==1 && ts._x==1 && !_con.equals(ts._con) ) x=-1;
+    if( x!=1 ) con="str";
+    return make(nil,x,con);
   }
 
+  // Make a subtype with a given nil choice
+  @Override TypeStr make_nil(byte nil) { return make(nil,_x,_con); }
+  
+  @Override public boolean above_center() { return _x==0; }
+  @Override public boolean is_con() { return _x==1; }
   // Lattice of conversions:
   // -1 unknown; top; might fail, might be free (Scalar->Str); Scalar might lift
   //    to e.g. Float and require a user-provided rounding conversion from F64->Str.

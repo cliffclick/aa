@@ -41,6 +41,7 @@ public class TypeRPC extends Type {
     case TERROR: return ((TypeErr)t)._all ? t : this;
     case TCTRL:
     case TXCTRL: return TypeErr.ALL;
+    case TOOP:
     case TTUPLE: 
     case TSTRUCT:
     case TFUN:

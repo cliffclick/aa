@@ -182,10 +182,10 @@ public class TestType {
     test   ("dist={p->p//qqq\n.//qqq\nx*p.x+p.y*p.y}; dist(//qqq\n@{x//qqq\n=1,y=2})", TypeInt.con(5));
 
     // Named type variables
-    test_isa("gal=:flt"       , TypeTuple.make_fun_ptr(TypeFun.make(TypeTuple.FLT64,TypeName.make0("gal",TypeFlt.FLT64),Bits.FULL)));
-    test_isa("gal=:flt; {gal}", TypeTuple.make_fun_ptr(TypeFun.make(TypeTuple.FLT64,TypeName.make0("gal",TypeFlt.FLT64),Bits.FULL)));
+    test_isa("gal=:flt"       , TypeTuple.make_fun_ptr(TypeFun.make(TypeTuple.FLT64,TypeName.make("gal",TypeFlt.FLT64),Bits.FULL)));
+    test_isa("gal=:flt; {gal}", TypeTuple.make_fun_ptr(TypeFun.make(TypeTuple.FLT64,TypeName.make("gal",TypeFlt.FLT64),Bits.FULL)));
     test    ("gal=:flt; 3==gal(2)+1", TypeInt.TRUE);
-    test    ("gal=:flt; tank:gal = gal(2)", TypeName.make0("gal",TypeFlt.con(2)));
+    test    ("gal=:flt; tank:gal = gal(2)", TypeName.make("gal",TypeFlt.con(2)));
     // test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: figure out if free cast for bare constants?
     testerr ("gal=:flt; tank:gal = gal(2)+1", "3.0 is not a gal:flt64","                             ");
     test    ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(@{x=1,y=2}))", TypeInt.con(5));
@@ -193,13 +193,13 @@ public class TestType {
     testerr ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(     (@{x=1,y=2}))", "@{x:1,y:2,} is not a Point:@{x,y,}","                      ");
 
     // nullable and not-null pointers
-    test   ("x:str? = 0", TypeInt.NULL); // question-type allows null or not; zero digit is null
+    test   ("x:str? = 0", TypeStr.NIL); // question-type allows null or not; zero digit is null
     test   ("x:str? = \"abc\"", TypeStr.con("abc")); // question-type allows null or not
     testerr("x:str  = 0", "null is not a str", "          ");
     test   ("math_rand(1)?0:\"abc\"", TypeStr.make(TypeStr.AND_NIL,1,"abc"));
     testerr("(math_rand(1)?0 : @{x=1}).x", "Struct might be null when reading field '.x'", "                           ");
     test   ("p=math_rand(1)?0:@{x=1}; p ? p.x : 0", TypeInt.BOOL); // not-null-ness after a null-check
-    test   ("x:int = y:str? = z:flt = 0", TypeInt.NULL); // null/0 freely recasts
+    test   ("x:int = y:str? = z:flt = 0", TypeStr.NIL); // null/0 freely recasts
     test   ("\"abc\"==0", TypeInt.FALSE ); // No type error, just not null
     test   ("\"abc\"!=0", TypeInt.TRUE  ); // No type error, just not null
     test   ("nil=0; \"abc\"!=nil", TypeInt.TRUE); // Another way to name null
@@ -304,10 +304,6 @@ c[x]=1;
   @Test public void testNamesInts() {
     Type.init0(new HashMap<>());
 
-    // No named-zero, ever
-    Type z  = TypeInt.NULL;
-    Type nz = TypeName.make0("__test_enum",z);
-    assertEquals(z,nz);
     // Lattice around int8 and 0 is well formed; exactly 3 edges, 3 nodes
     // Confirm lattice: {~i16 -> ~i8 -> 0 -> i8 -> i16 }
     // Confirm lattice: {        ~i8 -> 1 -> i8        }
@@ -315,6 +311,7 @@ c[x]=1;
     Type  i8 = TypeInt.INT8;
     Type xi8 = i8.dual();
     Type xi16= i16.dual();
+    Type z   = TypeInt.FALSE;
     Type o   = TypeInt.TRUE;
     assertEquals(xi8,xi8.meet(xi16)); // ~i16-> ~i8
     assertEquals( z ,z  .meet(xi8 )); // ~i8 ->  0
@@ -328,36 +325,39 @@ c[x]=1;
     // Confirm lattice: {N:~i8 ->   0 -> N:i8}
     Type ni8 = TypeName.TEST_ENUM;
     Type xni8= ni8.dual(); // dual name:int8
-    Type no  = TypeName.make0("__test_enum",o);
+    Type no  = TypeName.make("__test_enum",o);
+    Type nz  = TypeName.make("__test_enum",z);
     assertEquals(no ,no .meet(xni8)); // N:~i8 -> N: 1
-    assertEquals(ni8,ni8.meet( no )); // N:  1 -> N:i8
-    assertEquals( z , z .meet(xni8)); // N:~i8 ->    0
-    assertEquals(ni8,ni8.meet( z  )); //     0 -> N:i8
-    assertEquals(TypeInt.BOOL,o.meet(xni8)); // 1 & n:~i8 -> mixing 0 and 1
+    assertEquals(ni8,ni8.meet(no  )); // N:  1 -> N:i8
+    assertEquals(ni8,ni8.meet(nz  )); //   N:0 -> N:i8
+    assertEquals(nz ,nz .meet(xni8)); // N:~i8 -> N:0
+    assertEquals(no ,no .meet(xni8)); // 1 & n:~i8 -> mixing 0 and 1
 
     // Crossing lattice between named and unnamed ints
     //      Confirm lattice: {~i8 -> N:~i8 -> 0 -> N:i8 -> i8; N:0 -> 0 }
     // NOT: Confirm lattice: {N:~i8 -> ~i8; N:i8 -> i8 }
     assertEquals(xni8,xni8.meet( xi8));//   ~i8 -> N:~i8
     assertEquals(  z , z  .meet(xni8));// N:~i8 -> 0
-    assertEquals( ni8, ni8.meet(   z));//     0 -> N:i8
+    assertEquals(  i8, ni8.meet(   z));//     0 -> N:i8
     assertEquals(  i8,  i8.meet( ni8));// N: i8 ->   i8
+
+    assertEquals(xni8,xi8.meet(xni8));
+    assertEquals(  o , o .meet(xni8));
   }
   
   // oop? -> {str?,tup?} -> { null, string constants, tuple constants } -> {~str+?,~tup+?} -> ~oop+?
-
-  // Notice NO {oop,~oop} as this makes the non-lattice issue; meet of
-  // {oop,null} is not well-defined, as it tops out as either ~str+? OR ~tup+?
-  // instead of being unique.
+  // Notice multiple NILs; can be many for each type.
   @Test public void testOOPsNulls() {
     Type.init0(new HashMap<>());
-    Type bot  = TypeErr.ALL;
-    Type oop0 = TypeOop.OOP0;   // OOP? (OOP and null)
-    Type str0 = TypeStr.STR0;   // str? (str AND null)
-    Type str  = TypeStr.STR;    // str no null
+    Type bot  = TypeErr  .ALL;
+    Type oop0 = TypeOop  .OOP0; // OOP? (OOP and null)
+    Type str0 = TypeStr  .STR0; // str? (str AND null)
+    Type str  = TypeStr  .STR;  // str no null
     Type tup0 = TypeTuple.ALL0; // tup? (tup AND null); infinite repeat of ALL fields
     Type tup  = TypeTuple.ALL;  // tup       no  null ; infinite repeat of ALL fields
-    Type nil  = TypeOop.NIL;
+    Type nilo = TypeOop  .NIL;
+    Type nils = TypeStr  .NIL;
+    Type nilt = TypeTuple.NIL;
     Type abc  = TypeStr.con("abc");
     Type fld  = TypeTuple.INT64;  // 1 field of int64
     
@@ -375,16 +375,18 @@ c[x]=1;
 
     assertTrue(str_.isa(strx));
     assertTrue(tup_.isa(tupx));
-    assertTrue(str_.isa(nil ));
-    assertTrue(tup_.isa(nil ));
+    assertTrue(str_.isa(nilo));
+    assertTrue(str_.isa(nils));
+    assertTrue(tup_.isa(nilo));
+    assertTrue(tup_.isa(nilt));
 
     assertTrue(strx.isa(abc ));
     assertTrue(tupx.isa(fld ));
     
     assertTrue(abc .isa(str ));
     assertTrue(fld .isa(tup ));
-    assertTrue(nil .isa(str0));
-    assertTrue(nil .isa(tup0));
+    assertTrue(nils.isa(str0));
+    assertTrue(nilt.isa(tup0));
 
     assertTrue(str .isa(str0));
     assertTrue(tup .isa(tup0));
@@ -397,21 +399,18 @@ c[x]=1;
     // Crossing named:ints or named:null and OOP
     Type  i8 = TypeInt.INT8;
     Type xi8 = i8.dual();
-    Type ni8 = TypeName.TEST_ENUM;
-    Type xni8= ni8.dual(); // dual name:int8
-    assertEquals( nil     , xi8.meet(oop_)); // ~OOP+0 &   ~i8 -> 0
-    assertEquals( nil     ,xni8.meet(oop_)); // ~OOP+0 & N:~i8 -> 0
+    assertEquals( Type.SCALAR, xi8.meet(oop_)); // ~OOP+0 &   ~i8 -> 0
   }
   
   @Test public void testStructTuple() {
     Type.init0(new HashMap<>());
-    Type nil  = TypeInt.NULL;
+    Type nil  = TypeOop.NIL;
     // Tuple is more general that Struct
     Type tf = TypeTuple.FLT64; //  [  flt64,~Scalar...]; choice leading field name
     Type tsx= TypeStruct.X;    // @{x:flt64,~Scalar...}; fixed  leading field name
     Type tff = tsx.meet(tf);   //
     assertEquals(tsx,tff);     // tf.isa(tsx)
-    TypeTuple t0 = TypeTuple.make(Type.XSCALAR,false,nil); //  [  0,~Scalar...]
+    TypeTuple t0 = TypeTuple.make_args(nil); //  [  0,~Scalar...]
     Type      ts0= TypeStruct.make(new String[]{"x"},t0);  // @{x:0,~Scalar...}
     Type tss = ts0.meet(t0);
     assertEquals(ts0,tss);      // t0.isa(ts0)
@@ -423,8 +422,8 @@ c[x]=1;
     assertEquals(uall,TypeInt.INT8  );
     
     // meet @{c:0}? and @{c:@{x:1}?,}
-    Type nc0 = TypeStruct.make(new String[]{"c"},TypeTuple.make(TypeErr.ALL,true,nil)); // @{c:0}?
-    Type nx1 = TypeStruct.make(new String[]{"x"},TypeTuple.make(TypeErr.ALL,true,TypeInt.TRUE)); // @{x:1}?
+    Type nc0 = TypeStruct.make(new String[]{"c"},TypeTuple.make(TypeErr.ALL,TypeTuple.AND_NIL,nil)); // @{c:0}?
+    Type nx1 = TypeStruct.make(new String[]{"x"},TypeTuple.make(TypeErr.ALL,TypeTuple.AND_NIL,TypeInt.TRUE)); // @{x:1}?
     Type cx  = TypeStruct.make(new String[]{"c"},TypeTuple.make_all(nx1)); // @{c:@{x:1}?}
     // JOIN tosses the top-level null choice, and the inside struct choice
     Type cj  = nc0.join(cx);
@@ -435,7 +434,14 @@ c[x]=1;
   // TODO: Observation: value() calls need to be monotonic, can test this.
   @Test public void testCommuteSymmetricAssociative() {
     Type.init0(new HashMap<>());
-    //assertEquals(TypeUnion.NC0,Type.XOOP0.meet(TypeFlt.PI));
+    Type ni8 = TypeName.TEST_ENUM;
+    Type nf  = TypeName.TEST_FLT;
+    Type dni8= ni8.dual();
+    Type dnf = nf.dual();
+    Type dmt = dni8.meet(dnf);
+    Type  mt = dmt.dual();
+    assertEquals(TypeInt.BOOL.dual(),mt);
+
     assertTrue(Type.check_startup());
   }  
 }

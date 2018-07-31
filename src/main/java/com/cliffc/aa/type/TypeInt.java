@@ -1,6 +1,5 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.AA;
 import java.util.HashMap;
 
 public class TypeInt extends Type {
@@ -39,7 +38,6 @@ public class TypeInt extends Type {
   static public  final TypeInt TRUE   = make( 0, 1,1);
   static public  final TypeInt FALSE  = make( 0, 1,0);
   static public  final TypeInt XINT1  = make( 1, 1,0);
-  static public  final TypeInt NULL   = make( 0, 1,0);
   static final TypeInt[] TYPES = new TypeInt[]{INT64,INT32,INT16,BOOL,TRUE,FALSE,XINT1};
   static void init1( HashMap<String,Type> types ) {
     types.put("bool" ,BOOL);
@@ -59,11 +57,10 @@ public class TypeInt extends Type {
     switch( t._type ) {
     case TINT:   break;
     case TFLT:   return xmeetf((TypeFlt)t);
-    case TSTR:   
+    case TOOP:
+    case TSTR:
     case TSTRUCT:
     case TTUPLE:
-      throw AA.unimpl();
-      //return may_be_null() ? t.xmeet(this) : Type.SCALAR;
     case TFUN:
     case TRPC:   return Type.SCALAR;
     case TERROR: return ((TypeErr)t)._all ? t : this;
@@ -143,6 +140,8 @@ public class TypeInt extends Type {
     return Type.REAL;
   }
 
+  // Meet in a nil
+  @Override public Type meet_nil() { return xmeet(TypeInt.FALSE); }
   // Lattice of conversions:
   // -1 unknown; top; might fail, might be free (Scalar->Int); Scalar might lift
   //    to e.g. Float and require a user-provided rounding conversion from F64->Int.

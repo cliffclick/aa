@@ -22,9 +22,7 @@ public class TypeStruct extends Type {
     return _tt==t._tt && Arrays.equals(_args,t._args);
   }
   @Override public String toString() {
-    SB sb = new SB();
-    if( above_center() ) sb.p('~');
-    sb.p('@').p('{');
+    SB sb = new SB().p('@').p('{');
     for( int i=0; i<_args.length; i++ ) {
       sb.p(argTop(_args[i]) ? "^" : (argBot(_args[i]) ? "_" : _args[i]) );
       if( _tt.at(i) != TypeErr.ALL ) sb.p(':').p(_tt.at(i).toString());
@@ -32,8 +30,7 @@ public class TypeStruct extends Type {
     }
     if( _tt._inf!=TypeErr.ALL ) sb.p(_tt._inf.toString()).p("...");
     sb.p('}');
-    if( _tt._nil ) sb.p(_tt._inf.above_center() ? "+?" : "?");
-    return sb.toString();
+    return String.format(TypeTuple.TSTRS[_tt._nil],sb.toString());
   }
 
   private static TypeStruct FREE=null;
@@ -63,17 +60,10 @@ public class TypeStruct extends Type {
   private static final TypeStruct POINT = make1(new String[]{"x","y"},TypeTuple.FLT64_FLT64);
   public  static final TypeStruct X     = make1(new String[]{"x"},TypeTuple.FLT64);
   private static final TypeStruct A     = make1(new String[]{"a"},TypeTuple.FLT64);
-  static         final TypeStruct C0    = make1(new String[]{"c"},TypeTuple.make_all(TypeInt.NULL)); // @{c:0}
+  static         final TypeStruct C0    = make1(new String[]{"c"},TypeTuple.make_all(TypeInt.FALSE)); // @{c:0}
   static         final TypeStruct D1    = make1(new String[]{"d"},TypeTuple.make_all(TypeInt.TRUE)); // @{d:1}
   static final TypeStruct[] TYPES = new TypeStruct[]{POINT,X,A,C0,D1};
 
-  public Type meet_null( ) {
-    Type tt = _tt.meet_null();
-    if( tt instanceof TypeTuple ) return make(_args,(TypeTuple)tt);
-    assert tt==TypeInt.NULL;
-    return tt;
-  }
-  
   // Dual the args, dual the tuple
   @Override protected TypeStruct xdual() {
     String[] as = Arrays.copyOf(_args,_args.length);
@@ -131,7 +121,7 @@ public class TypeStruct extends Type {
   static private boolean argTop( String s ) { return s==null; }
   static private boolean argBot( String s ) { return s!=null && s.isEmpty(); }
   // Default arg (top or bottom) if no arg is available
-  static String sarg( TypeTuple t ) { return ((t.above_center() && t!=Type.XCTRL)) ? null : ""; }
+  static String sarg( Type t ) { return ((t.above_center() && t!=Type.XCTRL)) ? null : ""; }
   // String meet; empty string is bottom; null is top
   static String smeet( String s0, String s1 ) {
     if( s0==s1 ) return s0;
