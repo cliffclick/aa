@@ -4,8 +4,8 @@ import com.cliffc.aa.AA;
 import java.util.HashMap;
 
 public class TypeStr extends TypeNullable {
-  byte _x;                // -1 bot, 1 con, 0 top
-  String _con;            // 
+  private byte _x;              // -1 bot, 1 con, 0 top
+  private String _con;          //
   private TypeStr ( byte nil, int x, String con ) { super(TSTR,nil); init(nil,x,con); }
   private void init(byte nil, int x, String con ) {
     super.init(nil);
@@ -35,14 +35,12 @@ public class TypeStr extends TypeNullable {
   }
   public static TypeStr con(String con) { return make(NOT_NIL,1,con); }
 
-  static public final TypeStr NIL  = make( IS_NIL, 1,"str"); // is  null; string con ignored
-  static public final TypeStr STR0 = make(AND_NIL,-1,"str"); // and null
-  static public final TypeStr STR  = make(NOT_NIL,-1,"str"); // not null
-  static public final TypeStr STR_ = make( OR_NIL, 0,"str"); // choice string, choice nil
-  static final TypeStr[] TYPES = new TypeStr[]{NIL,STR,STR0};
-  static void init1( HashMap<String,Type> types ) {
-    types.put("str",STR);
-  }
+  public  static final TypeStr NIL  = make( IS_NIL, 1,"str"); // is  null; string con ignored
+  public  static final TypeStr STR0 = make(AND_NIL,-1,"str"); // and null
+  public  static final TypeStr STR  = make(NOT_NIL,-1,"str"); // not null
+  private static final TypeStr STR_ = make( OR_NIL, 0,"str"); // choice string, choice nil
+  static final TypeStr[] TYPES = new TypeStr[]{NIL,STR,STR0,STR_};
+  static void init1( HashMap<String,Type> types ) { types.put("str",STR); }
   // Return a String from a TypeStr constant; assert otherwise.
   @Override public String getstr() { assert is_con(); return _con; }
 

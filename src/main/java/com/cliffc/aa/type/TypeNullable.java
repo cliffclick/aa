@@ -3,23 +3,23 @@ package com.cliffc.aa.type;
 // Base class for Types which can be nil
 public abstract class TypeNullable extends Type {
   // There are 4 combos:
-  static public final byte  IS_NIL=0; //      nil;
-  static public final byte NOT_NIL=1; //  OOP    ; all the OOPs, never nil
-  static public final byte  OR_NIL=2; //  OOP+nil; or choice of nil
+  static final byte  IS_NIL=0; //      nil;
+  static final byte NOT_NIL=1; //  OOP    ; all the OOPs, never nil
+  static final byte  OR_NIL=2; //  OOP+nil; or choice of nil
   static public final byte AND_NIL=3; //  OOP&nil; and also nil
-  protected static final String[] TSTRS=new String[]{"0","%s","%s+0","%s&0"};
+  static final String[] TSTRS=new String[]{"0","%s","%s+0","%s&0"};
   // map 0->0, 1->1, 2->3; 3->2;
   byte xdualnil() { return (byte)(_nil<=1 ? _nil : 5-_nil); }
   byte _nil;
   
-  protected TypeNullable(byte type, byte nil ) { super(type); init(nil); }
+  TypeNullable( byte type, byte nil ) { super(type); init(nil); }
   protected void init(byte nil) { _nil=nil; }
   @Override public int hashCode( ) { return (_type<<8)+_nil; }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     return o instanceof TypeNullable && eq((TypeNullable)o);
   }
-  public boolean eq( TypeNullable to ) { return _type==to._type && _nil==to._nil; }
+  boolean eq( TypeNullable to ) { return _type==to._type && _nil==to._nil; }
 
   // Meet in a nil
   @Override public Type meet_nil() { return make_nil(nmeet(IS_NIL)); }

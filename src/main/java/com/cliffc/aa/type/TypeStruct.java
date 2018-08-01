@@ -68,8 +68,8 @@ public class TypeStruct extends TypeTuple {
   private static final TypeStruct POINT = makeA(flds("x","y"),TypeFlt.FLT64,TypeFlt.FLT64);
   public  static final TypeStruct X     = makeX(flds("x"),TypeFlt.FLT64); // @{x:flt,~Scalar...}
   private static final TypeStruct A     = makeX(flds("a"),TypeFlt.FLT64);
-  static         final TypeStruct C0    = makeA(flds("c"),TypeInt.FALSE); // @{c:0}
-  static         final TypeStruct D1    = makeA(flds("d"),TypeInt.TRUE ); // @{d:1}
+  private static final TypeStruct C0    = makeA(flds("c"),TypeInt.FALSE); // @{c:0}
+  private static final TypeStruct D1    = makeA(flds("d"),TypeInt.TRUE ); // @{d:1}
   static final TypeStruct[] TYPES = new TypeStruct[]{POINT,X,A,C0,D1};
 
   // Dual the args, dual the tuple
@@ -120,14 +120,13 @@ public class TypeStruct extends TypeTuple {
   static private boolean argBot( String s ) { return s.charAt(0)=='.'; }
   // Return field name, using the default from the field type if no field name
   // is available.
-  static String sat( String[] args, int i, TypeTuple tt ) {
+  private static String sat( String[] args, int i, TypeTuple tt ) {
     return i < args.length ? args[i] : sarg(tt._inf);
   }
   // Default arg (top or bottom) if no arg is available
-  static String sarg( Type t ) { return ((t.above_center() && t!=Type.XCTRL)) ? "^" : "."; }
+  private static String sarg( Type t ) { return ((t.above_center() && t!=Type.XCTRL)) ? "^" : "."; }
   // String meet
-  static String smeet( String s0, String s1 ) {
-    if( s0==s1 ) return s0;
+  private static String smeet( String s0, String s1 ) {
     if( argTop(s0) ) return s1;
     if( argTop(s1) ) return s0;
     if( argBot(s0) ) return s0;
@@ -135,7 +134,7 @@ public class TypeStruct extends TypeTuple {
     if( s0.equals(s1) ) return s0;
     return "."; // argBot
   }
-  static String sdual( String s ) {
+  private static String sdual( String s ) {
     if( argTop(s) ) return ".";
     if( argBot(s) ) return "^";
     return s;

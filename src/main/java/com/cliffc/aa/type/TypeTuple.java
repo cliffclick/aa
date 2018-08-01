@@ -27,7 +27,7 @@ public class TypeTuple extends TypeNullable {
     if( this==o ) return true;
     return o instanceof TypeTuple && eq((TypeTuple)o);
   }    
-  public boolean eq( TypeTuple t ) {
+  boolean eq( TypeTuple t ) {
     if( _hash != t._hash ) return false;
     if( !super.eq(t) || _ts.length != t._ts.length || _inf != t._inf )
       return false;
@@ -72,11 +72,11 @@ public class TypeTuple extends TypeNullable {
   public  static final TypeTuple ANY     = make(); // Infinite list of Any
   public  static final TypeTuple ALL     = (TypeTuple)make().dual(); // Infinite list of All
   public  static final TypeTuple ALL0    = make(TypeErr.ALL,AND_NIL);
-  public  static final TypeTuple SCALARS = make(Type.SCALAR,NOT_NIL);
-  public  static final TypeTuple SCALAR0 = make_args();
-  public  static final TypeTuple SCALAR1 = make_args(Type.SCALAR);
+          static final TypeTuple SCALARS = make(Type.SCALAR,NOT_NIL);
+          static final TypeTuple SCALAR0 = make_args();
+          static final TypeTuple SCALAR1 = make_args(Type.SCALAR);
           static final TypeTuple SCALAR2 = make_args(Type.SCALAR, Type. SCALAR);
-  public  static final TypeTuple INT32   = make_args(TypeInt.INT32 );
+  private static final TypeTuple INT32   = make_args(TypeInt.INT32 );
   public  static final TypeTuple INT64   = make_args(TypeInt.INT64 );
   public  static final TypeTuple FLT64   = make_args(TypeFlt.FLT64 );
   public  static final TypeTuple STR     = make_args(TypeStr.STR   );
@@ -173,9 +173,7 @@ public class TypeTuple extends TypeNullable {
       _ts[3] instanceof TypeFun;
   }
   // Return true if this is a forward-ref function pointer (return type from EpilogNode)
-  @Override public boolean is_forward_ref() {
-    return is_fun_ptr() && ((TypeFun)_ts[3]).is_forward_ref();
-  }
+  @Override public boolean is_forward_ref() { return is_fun_ptr() && _ts[3].is_forward_ref(); }
   public TypeFun get_fun() { assert is_fun_ptr(); return (TypeFun)_ts[3]; }
   // Return an error message, if any exists
   @Override public String errMsg() {

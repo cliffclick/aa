@@ -2,23 +2,21 @@ package com.cliffc.aa.type;
 
 import com.cliffc.aa.AA;
 
+// Named types are essentially a subclass of the named type.
 public class TypeName extends Type {
   public  String _name;
   public  Type _t;
   private short _depth;
   private TypeName ( String name, Type t ) { super(TNAME); init(name,t); }
-  private void init( String name, Type t ) { _name=name; _t=t; _depth = (short)(t instanceof TypeName ? ((TypeName)t)._depth+1 : 0); }
+  private void init( String name, Type t ) { assert name!=null; _name=name; _t=t; _depth = (short)(t instanceof TypeName ? ((TypeName)t)._depth+1 : 0); }
   @Override public int hashCode( ) { return TNAME+(_name==null?0:_name.hashCode())+_t.hashCode()+_depth;  }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeName) ) return false;
     TypeName t2 = (TypeName)o;
-    return _t==t2._t && _depth==t2._depth && (_name==t2._name || (_name!=null && _name.equals(t2._name)));
+    return _t==t2._t && _depth==t2._depth && _name.equals(t2._name);
   }
-  @Override public String toString() {
-    String n = _name==null ? "^" : (_name.isEmpty() ? "_" : _name);
-    return n+":"+_t;
-  }
+  @Override public String toString() { return _name+":"+_t; }
   private static TypeName FREE=null;
   private TypeName free( TypeName f ) { FREE=f; return this; }
   private static TypeName make0( String name, Type t) {
@@ -31,9 +29,9 @@ public class TypeName extends Type {
   }
   public static Type make( String name, Type t) { return t.is_simple() ? t : make0(name,t); }
 
-  static public  final TypeName TEST_ENUM = make0("__test_enum",TypeInt.INT8);
-  static public  final TypeName TEST_FLT  = make0("__test_flt" ,TypeFlt.FLT32);
-  static private final TypeName TEST_E2   = make0("__test_e2"  ,TEST_ENUM);
+  public  static final TypeName TEST_ENUM = make0("__test_enum",TypeInt.INT8);
+  private static final TypeName TEST_FLT  = make0("__test_flt" ,TypeFlt.FLT32);
+  private static final TypeName TEST_E2   = make0("__test_e2"  ,TEST_ENUM);
   
   static final TypeName[] TYPES = new TypeName[]{TEST_ENUM,TEST_FLT,TEST_E2};
 

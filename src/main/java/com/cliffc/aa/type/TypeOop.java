@@ -23,10 +23,10 @@ public class TypeOop extends TypeNullable {
     return t1==t2 ? t1 : t2.free(t1);
   }
 
-  static public final TypeOop OOP0 = make(AND_NIL,false); // OOP&nil
-  static public final TypeOop OOP  = make(NOT_NIL,false); // OOP
-  static public final TypeOop NIL  = make( IS_NIL,false); // nil
-  static public final TypeOop OOP_ = make( OR_NIL, true); // ~OOP+nil
+  public  static final TypeOop OOP0 = make(AND_NIL,false); // OOP&nil
+  private static final TypeOop OOP  = make(NOT_NIL,false); // OOP
+  public  static final TypeOop NIL  = make( IS_NIL,false); // nil
+  private static final TypeOop OOP_ = make( OR_NIL, true); // ~OOP+nil
   static final TypeOop[] TYPES = new TypeOop[]{OOP0,OOP,NIL,OOP_};
 
   @Override protected TypeOop xdual() { return new TypeOop(xdualnil(),!_any); }

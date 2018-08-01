@@ -92,5 +92,5 @@ public class TypeFun extends Type {
   private static final Type      GENERIC_RET =TypeErr.ALL;
   public boolean is_forward_ref()                    { return _ts==GENERIC_ARGS&&GENERIC_RET ==_ret; }
   public static TypeFun make_forward_ref( int fidx ) { return make(GENERIC_ARGS, GENERIC_RET,Bits.make(fidx)); }
-  public static TypeFun make_generic( )              { return make(GENERIC_ARGS, GENERIC_RET,Bits.FULL); }
+         static TypeFun make_generic()               { return make(GENERIC_ARGS, GENERIC_RET,Bits.FULL); }
 }
