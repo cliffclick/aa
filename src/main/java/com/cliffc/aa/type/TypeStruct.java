@@ -57,21 +57,20 @@ public class TypeStruct extends TypeTuple {
     for( i=args.length-1; i>=0; i-- )
       if( !args[i].equals(ttarg) )
         break;
-    if( i==args.length-1 ) return make1(nil,ts,inf,args);
     if( i== -1 ) return TypeTuple.make(inf,nil,ts); // No args other than the default, so drop to a tuple
+    if( i==args.length-1 ) return make1(nil,ts,inf,args);
     return make1(nil,ts,inf,Arrays.copyOf(args,i+1));
   }
   private static String[] flds(String... fs) { return fs; }
   public  static TypeStruct makeX(String[] flds, Type... ts ) { return make1(NOT_NIL,ts,Type.XSCALAR,flds); }
   public  static TypeStruct makeA(String[] flds, Type... ts ) { return make1(NOT_NIL,ts,TypeErr.ALL ,flds); }
 
-  public  static final TypeStruct NIL   = make1(IS_NIL,new Type[0],TypeErr.ALL,new String[0]);
   private static final TypeStruct POINT = makeA(flds("x","y"),TypeFlt.FLT64,TypeFlt.FLT64);
   public  static final TypeStruct X     = makeX(flds("x"),TypeFlt.FLT64); // @{x:flt,~Scalar...}
   private static final TypeStruct A     = makeX(flds("a"),TypeFlt.FLT64);
   static         final TypeStruct C0    = makeA(flds("c"),TypeInt.FALSE); // @{c:0}
   static         final TypeStruct D1    = makeA(flds("d"),TypeInt.TRUE ); // @{d:1}
-  static final TypeStruct[] TYPES = new TypeStruct[]{NIL,POINT,X,A,C0,D1};
+  static final TypeStruct[] TYPES = new TypeStruct[]{POINT,X,A,C0,D1};
 
   // Dual the args, dual the tuple
   @Override protected TypeStruct xdual() {

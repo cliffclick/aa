@@ -267,7 +267,7 @@ public class Type {
     ts = concat(ts,TypeOop   .TYPES);
     ts = concat(ts,TypeStr   .TYPES);
     ts = concat(ts,TypeTuple .TYPES);
-    //ts = concat(ts,TypeStruct.TYPES);
+    ts = concat(ts,TypeStruct.TYPES);
     ts = concat(ts,TypeFun   .TYPES);
     ts = concat(ts,TypeRPC   .TYPES);
     ts = concat(ts,TypeUnion .TYPES);
