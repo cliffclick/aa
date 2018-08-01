@@ -34,7 +34,11 @@ public abstract class TypeNullable extends Type {
     if( _nil==   nil ) return _nil; // Equals returns either
     return AND_NIL;                 // Everything else has a nil
   }
-  
+
+  // True if value is higher-equal to SOME constant.
+  @Override public boolean may_be_con() { return may_be_nil(); }
+  // True if this OOP is a nil (the only constant)
+  @Override public boolean is_con() { return _nil==IS_NIL; }
   // True if this OOP may BE a nil (as opposed to: may have a nil)
   public boolean may_be_nil() { return _nil==IS_NIL || _nil==OR_NIL; }
 }

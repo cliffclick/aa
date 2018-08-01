@@ -22,7 +22,8 @@ public class TypeStr extends TypeNullable {
     return super.eq(t2) && _x==t2._x && _con.equals(t2._con);
   }
   @Override public String toString() {
-    return String.format(TSTRS[_nil],(_x==0?"~":"")+'"'+_con+'"');
+    return String.format(TSTRS[_nil],(_x==0?"~":"") +
+                         (_x==1 ? '"'+_con+'"' : "str"));
   }
   private static TypeStr FREE=null;
   private TypeStr free( TypeStr f ) { assert f._type==TSTR; FREE=f; return this; }
@@ -77,7 +78,8 @@ public class TypeStr extends TypeNullable {
   @Override public TypeStr make_nil(byte nil) { return make(nil,_x,_con); }
 
   @Override public boolean above_center() { return _x==0; }
-  @Override public boolean is_con() { return _x==1; }
+  @Override public boolean may_be_con() { return super.may_be_con() || _x>=0; }
+  @Override public boolean is_con() { return super.is_con() || _x==1; }
   // Lattice of conversions:
   // -1 unknown; top; might fail, might be free (Scalar->Str); Scalar might lift
   //    to e.g. Float and require a user-provided rounding conversion from F64->Str.
@@ -85,7 +87,9 @@ public class TypeStr extends TypeNullable {
   // +1 requires a bit-changing conversion; no auto-unboxing
   // 99 Bottom; No free converts; e.g. Flt->Str requires explicit rounding
   @Override public byte isBitShape(Type t) {
-    throw AA.unimpl();
+    if( t._type==Type.TSTR ) return 0;
+    if( t instanceof TypeUnion && this.isa(t) ) return 0;
+    return 99;
   }
   @Override public Type widen() {
     throw AA.unimpl();

@@ -147,12 +147,11 @@ public class TypeTuple extends TypeNullable {
     return false;
   }
   @Override public boolean above_center() { return _inf.above_center(); }
-  // True if all internals canBeConst
-  @Override public boolean canBeConst() {
-    //if( above_center() && _nil ) return true; // can be nil
-    //for( Type _t : _ts ) if( !_t.canBeConst() ) return false;
-    //return _inf.canBeConst();
-    throw AA.unimpl();
+  // True if all internals may_be_con
+  @Override public boolean may_be_con() {
+    if( may_be_nil() ) return true;
+    for( Type _t : _ts ) if( !_t.may_be_con() ) return false;
+    return _inf.may_be_con();
   }
   // True if all internals is_con
   @Override public boolean is_con() {

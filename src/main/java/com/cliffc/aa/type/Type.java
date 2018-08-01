@@ -4,6 +4,8 @@ import com.cliffc.aa.AA;
 import java.util.Arrays;
 import java.util.HashMap;
 
+import static com.cliffc.aa.type.TypeOop.OOP0;
+
 /** an implementation of language AA
  */
 
@@ -115,9 +117,9 @@ public class Type {
   public  static final Type CTRL   = make( TCTRL  ); // Ctrl
   public  static final Type XCTRL  = make(TXCTRL  ); // Ctrl
   public  static final Type  SCALAR= make( TSCALAR); // ptrs, ints, flts; things that fit in a machine register
-  public  static final Type XSCALAR= make(TXSCALAR); // ptrs, ints, flts; things that fit in a machine register
-  public  static final Type  NUM   = make( TNUM   );
-  public  static final Type XNUM   = make(TXNUM   );
+          static final Type XSCALAR= make(TXSCALAR); // ptrs, ints, flts; things that fit in a machine register
+          static final Type  NUM   = make( TNUM   );
+  private static final Type XNUM   = make(TXNUM   );
   public  static final Type  REAL  = make( TREAL  );
   private static final Type XREAL  = make(TXREAL  );
 
@@ -131,7 +133,7 @@ public class Type {
   // TypeTuple - these may be passed as a scalar reference type in the future
   // but for now Tuples explicitly refer to multiple values, and a SCALAR is
   // exactly 1 value.  
-  static /*final*/ Type[] SCALAR_PRIMS;
+  private static /*final*/ Type[] SCALAR_PRIMS;
   
   boolean is_simple() { return _type < TSIMPLE; }
   // Return base type of named types
@@ -318,7 +320,7 @@ public class Type {
 
     // Check scalar primitives; all are SCALARS and none sub-type each other.
     Type ignore = TypeTuple.NIL; // Break class-loader cycle; load Tuple before Fun.
-    SCALAR_PRIMS = new Type[] { TypeInt.INT64, TypeFlt.FLT64, TypeOop.OOP0, TypeFun.make_generic() };
+    SCALAR_PRIMS = new Type[] { TypeInt.INT64, TypeFlt.FLT64, OOP0, TypeFun.make_generic() };
     for( Type t : SCALAR_PRIMS ) assert t.isa(SCALAR);
     for( int i=0; i<SCALAR_PRIMS.length; i++ ) 
       for( int j=i+1; j<SCALAR_PRIMS.length; j++ )
@@ -363,7 +365,7 @@ public class Type {
     }
   }
   // True if value is higher-equal to SOME constant.
-  public boolean canBeConst() {
+  public boolean may_be_con() {
     switch( _type ) {
     case TSCALAR:
     case TNUM:
@@ -433,7 +435,7 @@ public class Type {
     if( t._type==TSCALAR ) return 0; // Generic function arg never requires a conversion
     if( _type == TSCALAR ) return -1; // Scalar has to resolve
     if( _type == TREAL && t.is_num() ) return -1; // Real->Int/Flt has to resolve
-    //if( is_fun_ptr() ) return (byte)(t == OOP0 ? 0 : 99);
+    if( is_fun_ptr() ) return (byte)(t == OOP0 ? 0 : 99);
 
     throw typerr(t);  // Overridden in subtypes
   }

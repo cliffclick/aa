@@ -64,6 +64,5 @@ public class TypeOop extends TypeNullable {
   // 99 Bottom; No free converts; e.g. Flt->Str requires explicit rounding
   @Override public byte isBitShape(Type t) { throw AA.unimpl();  }
   @Override public boolean above_center() { return _any; }
-  @Override public boolean canBeConst() { return may_be_nil() || _any; }
-  @Override public boolean is_con()   { throw AA.unimpl(); }
+  @Override public boolean may_be_con() { return may_be_nil() || _any; }
 }

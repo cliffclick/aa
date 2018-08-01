@@ -261,7 +261,7 @@ public class TypeUnion extends Type {
       rets.add(((TypeFun)_ts._ts[i])._ret);
     return make(_any,full_simplify(rets,_any));
   }
-  @Override public boolean canBeConst() { return _any && _ts.canBeConst(); }
+  @Override public boolean may_be_con() { return _any && _ts.may_be_con(); }
   @Override public boolean above_center() {
     if( _any ) {
       for( Type t : _ts._ts )

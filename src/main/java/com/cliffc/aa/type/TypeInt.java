@@ -162,7 +162,7 @@ public class TypeInt extends Type {
     return INT64;
   }
   @Override public boolean above_center() { return _x>0; }
-  @Override public boolean canBeConst() { return _x>=0; }
+  @Override public boolean may_be_con() { return _x>=0; }
   @Override public boolean is_con()   { return _x==0; }
   @Override public boolean may_be_nil() { return _x > 0 || (_x==0 && _con==0); }
 }

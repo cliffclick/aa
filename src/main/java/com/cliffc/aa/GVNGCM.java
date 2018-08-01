@@ -183,7 +183,7 @@ public class GVNGCM {
     // Compute a type for n
     Type t = n.value(this);              // Get best type
     // Replace with a constant, if possible
-    if( t.canBeConst() && !(n instanceof ConNode) )
+    if( t.may_be_con() && !(n instanceof ConNode) )
       { kill_new(n); return con(t); }
     // Global Value Numbering
     x = _vals.putIfAbsent(n,n);
@@ -249,7 +249,7 @@ public class GVNGCM {
     Type t = n.value(this);     // Get best type
     assert t.isa(oldt);         // Types only improve
     // Replace with a constant, if possible
-    if( t.canBeConst() && !(n instanceof ConNode) )
+    if( t.may_be_con() && !(n instanceof ConNode) )
       return con(t);            // Constant replacement
     // Global Value Numbering
     Node z = _vals.putIfAbsent(n,n);
@@ -359,7 +359,7 @@ public class GVNGCM {
       Type t = _ts._es[i];
       if( t==null ) continue;   // Never reached?
       Node n = nodes.atX(i);
-      if( n != null && t.canBeConst() && !(n instanceof ConNode) )
+      if( n != null && t.may_be_con() && !(n instanceof ConNode) )
         throw AA.unimpl();
       if( !(t instanceof TypeErr) && n instanceof CastNode ) { // TODO: Fold into CastNode.ideal
         assert t.isa(((CastNode)n)._t);
