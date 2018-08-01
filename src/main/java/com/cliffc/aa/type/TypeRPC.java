@@ -62,4 +62,7 @@ public class TypeRPC extends Type {
   @Override public boolean above_center() { return _rpcs.abit()<0; }
   @Override public boolean may_be_con()   { return _rpcs.abit()>0; }
   @Override public boolean is_con()       { return _rpcs.abit()>0; }
+  // Return true if this type may BE a null.  RPC are not GC'd, are not OOP's,
+  // and are never nil.
+  public boolean may_be_nil() { return false; }
 }

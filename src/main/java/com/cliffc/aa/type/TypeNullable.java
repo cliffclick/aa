@@ -3,14 +3,14 @@ package com.cliffc.aa.type;
 // Base class for Types which can be nil
 public abstract class TypeNullable extends Type {
   // There are 4 combos:
-  static final byte  IS_NIL=0; //      nil;
-  static final byte NOT_NIL=1; //  OOP    ; all the OOPs, never nil
-  static final byte  OR_NIL=2; //  OOP+nil; or choice of nil
-  static public final byte AND_NIL=3; //  OOP&nil; and also nil
+  public static final byte  IS_NIL=0; //      nil;
+  public static final byte NOT_NIL=1; //  OOP    ; all the OOPs, never nil
+  public static final byte  OR_NIL=2; //  OOP+nil; or choice of nil
+  public static final byte AND_NIL=3; //  OOP&nil; and also nil
   static final String[] TSTRS=new String[]{"0","%s","%s+0","%s?"};
   // map 0->0, 1->1, 2->3; 3->2;
   byte xdualnil() { return (byte)(_nil<=1 ? _nil : 5-_nil); }
-  byte _nil;
+  public byte _nil;
   
   TypeNullable( byte type, byte nil ) { super(type); init(nil); }
   protected void init(byte nil) { _nil=nil; }
@@ -40,5 +40,8 @@ public abstract class TypeNullable extends Type {
   // True if this OOP is a nil (the only constant)
   @Override public boolean is_con() { return _nil==IS_NIL; }
   // True if this OOP may BE a nil (as opposed to: may have a nil)
-  public boolean may_be_nil() { return _nil==IS_NIL || _nil==OR_NIL; }
+  @Override public boolean may_be_nil() { return _nil==IS_NIL || _nil==OR_NIL; }
+  // Return true if this type may HAVE a null: includes any nullable type with
+  // "AND_NIL" or "IS_NIL", or int types at or below the constant 0.
+  @Override public boolean may_have_nil() { return _nil==IS_NIL || _nil==AND_NIL; }
 }

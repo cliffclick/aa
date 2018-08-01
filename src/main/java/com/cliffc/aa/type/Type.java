@@ -118,7 +118,7 @@ public class Type {
   public  static final Type XCTRL  = make(TXCTRL  ); // Ctrl
   public  static final Type  SCALAR= make( TSCALAR); // ptrs, ints, flts; things that fit in a machine register
           static final Type XSCALAR= make(TXSCALAR); // ptrs, ints, flts; things that fit in a machine register
-          static final Type  NUM   = make( TNUM   );
+  public  static final Type  NUM   = make( TNUM   );
   private static final Type XNUM   = make(TXNUM   );
   public  static final Type  REAL  = make( TREAL  );
   private static final Type XREAL  = make(TXREAL  );
@@ -204,11 +204,6 @@ public class Type {
     assert !(that_oop&&that_num);
     
     if( is_oop() ) { // Only simple OOPish type
-      //assert this==OOP0 || this==XOOP0; // Only simple OOP right now
-      //if( that_num ) // OOP and NULL, OR ~OOP choice NULL
-      //  return _type == TOOP ? (t.may_be_null() ? OOP0 : SCALAR) : t.meet(TypeInt.NULL);
-      //if( !that_oop ) throw AA.unimpl();
-      //return _type == TOOP ? OOP0 : t;
       throw AA.unimpl();        // Need nice printout
     }
 
@@ -419,9 +414,11 @@ public class Type {
     return this;
   }
   // Return true if this type may BE a null: includes Int:NULL plus numbers
-  // above the center line; numbers may be named.  When true, a call to to
-  // get_null will return this type "fallen" to a NULL.
+  // above the center line; numbers may be named.
   public boolean may_be_nil() { assert is_simple();  return _type == TXSCALAR || _type == TXNUM || _type == TXREAL; }
+  // Return true if this type may HAVE a null: includes any nullable type with
+  // "AND_NIL" or "IS_NIL", or int types at or below the constant 0.
+  public boolean may_have_nil() { assert is_simple();  return _type == TSCALAR || _type == TNUM || _type == TREAL; }
   
   // Lattice of conversions:
   // -1 unknown; top; might fail, might be free (Scalar->Int); Scalar might lift

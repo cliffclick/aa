@@ -4,7 +4,7 @@ import java.util.HashMap;
 
 public class TypeInt extends Type {
   private byte _x;        // -1 bot, 0 con, +1 top
-  byte _z;                // bitsiZe, one of: 1,8,16,32,64
+  private byte _z;        // bitsiZe, one of: 1,8,16,32,64
   private long _con;      // only if _x==0
   private TypeInt( int x, int z, long con ) { super(TINT); init(x,z,con); }
   private void init(int x, int z, long con ) { _x=(byte)x; _z=(byte)z; _con = con; }
@@ -164,5 +164,6 @@ public class TypeInt extends Type {
   @Override public boolean above_center() { return _x>0; }
   @Override public boolean may_be_con() { return _x>=0; }
   @Override public boolean is_con()   { return _x==0; }
-  @Override public boolean may_be_nil() { return _x > 0 || (_x==0 && _con==0); }
+  @Override public boolean may_be_nil  () { return _x > 0 || (_x==0 && _con==0); }
+  @Override public boolean may_have_nil() { return _x < 0 || (_x==0 && _con==0); }
 }

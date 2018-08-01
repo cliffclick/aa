@@ -2,17 +2,23 @@ package com.cliffc.aa.type;
 
 import com.cliffc.aa.AA;
 import com.cliffc.aa.util.Ary;
+import com.cliffc.aa.util.SB;
 
 import java.util.Arrays;
 import java.util.Comparator;
 
 // Type union is a meet (or join) of unrelated SCALAR types.  Specifically it
-// simplifies out overlapping choices, such as {Flt64*Flt32} :=: Flt64.
+// simplifies out overlapping choices, such as {Flt64 & Flt32} :=: Flt64.
 public class TypeUnion extends Type {
   private TypeTuple _ts;         // All of these are possible choices
   private boolean _any; // FALSE: meet; must support all; TRUE: join; can pick any one choice
   private TypeUnion( TypeTuple ts, boolean any ) { super(TUNION); init(ts,any); }
-  private void init( TypeTuple ts, boolean any ) { _ts = ts;  _any=any;  assert !ts.has_union_or_tuple(); }
+  private void init( TypeTuple ts, boolean any ) {
+    assert !ts.has_union_or_tuple();
+    assert ts._nil==TypeTuple.NOT_NIL;
+    _ts = ts;
+    _any=any;
+  }
   @Override public int hashCode( ) { return TUNION+_ts.hashCode()+(_any?1:0);  }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
@@ -20,15 +26,13 @@ public class TypeUnion extends Type {
     TypeUnion t = (TypeUnion)o;
     return _any==t._any && _ts==t._ts;
   }
-  //@Override public String toString() {
-  //  if( _ts._ts.length==2 ) {
-  //    //String s = _any?"+":"";
-  //    //if( _ts.at(0)==TypeInt.NULL && _ts.at(1).is_oop() )  return _ts.at(1)+s+"?";
-  //    //if( _ts.at(1)==TypeInt.NULL && _ts.at(0).is_oop() )  return _ts.at(0)+s+"?";
-  //    throw AA.unimpl();
-  //  }
-  //  return "{"+(_any?"any":"all")+_ts+"}";
-  //}
+  @Override public String toString() {
+    if( this==NIL ) return "nil";
+    SB sb = new SB().p('{');
+    for( Type t : _ts._ts )
+      sb.p(t.toString()).p(_any?" | ":" & ");
+    return sb.p('}').toString();
+  }
   private static TypeUnion FREE=null;
   private TypeUnion free( TypeUnion f ) { FREE=f; return this; }
   public static TypeUnion make( TypeTuple ts, boolean any ) {
@@ -43,89 +47,35 @@ public class TypeUnion extends Type {
   public  static Type make( boolean any, Type... ts ) { return make(any,new Ary<>(ts)); }
   private static Type make( boolean any, Ary<Type> ts ) {
     if( ts._len == 0 ) throw com.cliffc.aa.AA.unimpl();   //return any ? Type.ANY : Type.ALL;
-    // Special rules now apply to keep from growing out all combos of
-    // e.g. float-constants.  All {float,int,str} types are meeted and
-    // their meet replaces them.
-    int fx=-1, ix=-1, ox=-1, ux=-1, rx=-1;
-    Type[] es = ts._es;
-    for( int i=0; i<ts._len; i++ ) {
-      Type t = es[i];
-      switch( t.simple_type() ) {
-      case Type.TFUN:   ux = i;   break;
-      case Type.TRPC:   rx = i;   break;
-      case Type.TINT:   if( ix==-1 ) ix=i;  else  i = meet_dup(any,ts,ix,i);  break;
-      case Type.TFLT:   if( fx==-1 ) fx=i;  else  i = meet_dup(any,ts,fx,i);  break;
-        // All Oops, plus Scalar, Number, other weirdnesses
-      default:          if( ox==-1 ) ox=i;  else  i = meet_dup(any,ts,ox,i);  break;
-      }
-    }
-    // Also, if the remaining int fits in the remaining float, drop the int
-    if( fx!=-1 && ix!=-1 ) {
-      TypeInt ti = (TypeInt)es[ix].base();
-      TypeFlt tf = (TypeFlt)es[fx].base();
-      if( (ti._z<<1) <= tf._z && tf._x==-1 ) ts.del(ix);
-    }
-    if( ts._len == 1 ) return es[0]; // A single result is always that result
+    // Special rules now apply to keep from growing out all combos.
+    //
+    // Meet all ints together; meet all floats together; if there is a Number
+    // or Real, then blend the ints and floats with all the isa Number types.
+    // Meet all strings together.
+    //
+    // Keep all unique functions.
+    // Keep all unique nulls.
+    //
+    // Disallow all other combos.  Will loosen this later.
 
-    // Allow null & oop (no floats, exactly 0 integer, the rest are oops).
-    // Tuples are OK, and Tuples can also be function pointers.
-    int ifx = -1; // index of a null, if both fx and ix are null
-    if( ox!= -1 ) {
-      //if( ix!=-1 && es[ix].may_be_null() ) {
-      //  ts.set(ix,  es[ix].get_null()); // Set to null (incase e.g. ~Number)
-      //  ifx = ix;                 // Record index of null
-      //  ix = -1;                  // Ignore null in the union
-      //}
-      //if( fx!=-1 && es[fx].may_be_null() ) {
-      //  ts.set(fx,  es[fx].get_null());  // Set to null (incase e.g. ~flt32)
-      //  fx = -1;                  // Ignore null in the union
-      //} else ifx = -1;            // No float index
-      throw AA.unimpl();
+    boolean all_fun=true, all_nil=true;
+    for( Type t : ts ) {
+      if( t.simple_type() != TFUN ) all_fun=false;
+      if( !t.may_be_nil() ) all_nil=false;
+    }
+    if( !all_fun && !all_nil ) { // Collapse all the parts
+      Type x = any ? TypeErr.ALL : TypeErr.ANY;
+      for( Type t : ts ) x = any ? x.join(t) : x.meet(t);
+      return x;
     }
 
-    // Cannot mix functions and anything else, including null.
-    // Function pointers (which are internally TypeTuples), are
-    // just fine with nulls.
-    if( (ux != -1 || rx != -1) && (fx!=-1 || ix!=-1 || ox!=-1) )
-      return Type.SCALAR;
-    if( ox != -1 && (fx!=-1 || ix!=-1) )
-      return Type.SCALAR;       // Cannot mix oops and floats/ints
-    if( ox != -1 && Type.SCALAR.isa(es[ox]) )
-      return es[ox];
-
-    if( fx != -1 && ix != -1 ) {// Fall to REAL if possible
-      TypeInt ti = (TypeInt)es[ix].base();
-      TypeFlt tf = (TypeFlt)es[fx].base();
-      if( ti==TypeInt.INT64 && tf==TypeFlt.FLT64 )
-        return Type.REAL;
-      //assert (ti==TypeInt.INT64 && tf==TypeFlt.FLT64 && any) ||
-      //  (ti==TypeInt.INT64.dual() && tf==TypeFlt.FLT64.dual() && !any);
-    }
-    if( ifx >= 0 ) ts.del(ifx); // Delete extra null
+    if( ts._len == 1 ) return ts.at(0); // A single result is always that result
 
     // The set has to be ordered, to remove dups that vary only by order
     ts.sort_update(Comparator.comparingInt(e -> e._uid)); 
     return make(TypeTuple.make(any?TypeErr.ANY:TypeErr.ALL,TypeTuple.NOT_NIL,ts.asAry()),any);
   }
 
-  private static int meet_dup( boolean any, Ary<Type> ts, int idx, int i ) {
-    Type tx = ts._es[idx], ti = ts._es[i];
-    Type tr = any ? tx.join(ti) : tx.meet(ti);
-    ts._es[idx] = tr;
-    ts.del(i);
-    return i-1;
-  }
-
-  // Return true if this type MAY be a nil.
-  @Override public boolean may_be_nil() {
-    if( _any ) {                // Any null works
-      for( Type t : _ts._ts ) if(  t.may_be_nil() ) return true;
-      return false;
-    } else {                    // All must be null
-      for( Type t : _ts._ts ) if( !t.may_be_nil() ) return false;
-      return true;
-    }
-  }
   // Same union, minus the null
   public Type remove_null() {
     //Ary<Type> ts = new Ary<>(new Type[1],0);
@@ -134,8 +84,9 @@ public class TypeUnion extends Type {
     throw AA.unimpl();
   }
   
-  //static public final TypeUnion NC0 = (TypeUnion)make(false, TypeFlt.PI, TypeInt.NULL);
-  static final TypeUnion[] TYPES = new TypeUnion[]{};
+  public  static final TypeUnion NIL  = (TypeUnion)make(true, TypeOop.NIL, TypeStr.NIL, TypeTuple.NIL, TypeInt.FALSE);
+  private static final TypeUnion FUNS = (TypeUnion)make(true, TypeFun.any(0,-1), TypeFun.any(1,-1));
+  static final TypeUnion[] TYPES = new TypeUnion[]{FUNS};
 
   @Override protected TypeUnion xdual() {
     // The obvious thing is to just ask _ts for it's dual(), but Tuples are not
@@ -158,14 +109,6 @@ public class TypeUnion extends Type {
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TERROR: return ((TypeErr)t)._all ? t : this;
-    case TOOP:
-      //return may_be_null() ? OOP0 : SCALAR;
-      throw AA.unimpl();
-    case TSTR:
-    case TSTRUCT:
-    case TTUPLE:
-      //return t.may_be_null() ? meet(TypeInt.NULL) : SCALAR; // Mixing of int/flt or functions
-      throw AA.unimpl();
     case TUNION: {
       // Handle the case where they are structurally equal
       TypeUnion tu = (TypeUnion)t;
@@ -198,15 +141,7 @@ public class TypeUnion extends Type {
       }
     }
     default:                    // Unions can handle all non-union internal types
-      // Look for: "OOPa+? meet OOPb"; the standard ymeet will convert this to
-      // "OOPa JOIN OOPb?" basically moving the null around and making no
-      // progress.  Pick up this pattern and handle it separately
       Ary<Type> ts = new Ary<>(_ts._ts.clone()); // Defensive clone
-      //if( _any && t.is_oop() )                   // X+Y meet OOP?
-      //  for( int i=0; i<ts._len; i++ )
-      //    if( ts.at(i)==TypeInt.NULL ) { // Find the null?
-      //      ts.del(i);  break;           // Remove it: compute X meet OOP instead
-      //    }
       return make(_any, ymeet( ts, _any, t ));
     }
   }
@@ -261,18 +196,44 @@ public class TypeUnion extends Type {
       rets.add(((TypeFun)_ts._ts[i])._ret);
     return make(_any,full_simplify(rets,_any));
   }
-  @Override public boolean may_be_con() { return _any && _ts.may_be_con(); }
+
   @Override public boolean above_center() {
     if( _any ) {
-      for( Type t : _ts._ts )
-        if( t.above_center() )
-          return true;
+      for( Type t : _ts._ts )  if(  t.above_center() ) return true;
       return false;
     } else {
-      for( Type t : _ts._ts )
-        if( !t.above_center() )
-          return false;
+      for( Type t : _ts._ts )  if( !t.above_center() ) return false;
       return true;
+    }
+  }
+  @Override public boolean may_be_con() { return _any && _ts.may_be_con(); }
+  @Override public boolean is_con() {
+    if( _any ) {                // Any con works
+      for( Type t : _ts._ts ) if(  t.is_con() ) return true;
+      return false;
+    } else {                    // All must be con
+      for( Type t : _ts._ts ) if( !t.is_con() ) return false;
+      return true;
+    }
+  }
+  // Return true if this type MAY be a nil.
+  @Override public boolean may_be_nil() {
+    if( _any ) {                // Any null works
+      for( Type t : _ts._ts ) if(  t.may_be_nil() ) return true;
+      return false;
+    } else {                    // All must be null
+      for( Type t : _ts._ts ) if( !t.may_be_nil() ) return false;
+      return true;
+    }
+  }
+  // True if any choice can have a nul
+  @Override public boolean may_have_nil() {
+    if( _any ) {                // Any non-nil can be picked for a no-nil answer
+      for( Type t : _ts._ts ) if(  !t.may_have_nil() ) return false;
+      return true;
+    } else {                    // Any have-nil means the union have-nil
+      for( Type t : _ts._ts ) if(  t.may_be_nil() ) return true;
+      return false;
     }
   }
   // Lattice of conversions:
@@ -282,8 +243,7 @@ public class TypeUnion extends Type {
   // +1 requires a bit-changing conversion (Int->Flt)
   // 99 Bottom; No free converts; e.g. Flt->Int requires explicit rounding
   @Override public byte isBitShape(Type t) {
-    if( t._type == Type.TSCALAR ) return 0;
-    return 99;
+    return 0;
   }
 
   // Return non-zero if allowed to be infix

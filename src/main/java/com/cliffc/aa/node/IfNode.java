@@ -17,11 +17,17 @@ public class IfNode extends Node {
     // If the input includes   both, we can return both:  {CONTROL,CONTROL}
     if( gvn.type(in(0))==Type.XCTRL ) return TypeTuple.IF_ANY; // Test is dead
     Type pred = gvn.type(in(1));
-    if( pred instanceof TypeUnion ) // Pointers with and without null
-      pred = pred.may_be_nil() ? TypeInt.BOOL : TypeInt.TRUE;
     if( pred.isa(TypeInt.XINT1) ) return TypeTuple.IF_ANY;  // Choice of {0,1}
     if( TypeInt.BOOL.isa(pred)  ) return TypeTuple.IF_ALL;  // Can be either
-    if( pred==TypeInt.FALSE     ) return TypeTuple.IF_FALSE;// False only
+    if( pred.isa(TypeInt.FALSE) ) return TypeTuple.IF_FALSE;// False only
+    if( pred instanceof TypeNullable ) {
+      switch( ((TypeNullable)pred)._nil ) {
+      case TypeNullable. IS_NIL: return TypeTuple.IF_FALSE;
+      case TypeNullable.NOT_NIL: return TypeTuple.IF_TRUE;
+      case TypeNullable.AND_NIL: return TypeTuple.IF_ALL;   // Might be nil or the oop
+      case TypeNullable. OR_NIL: return TypeTuple.IF_FALSE; // Take nil choice
+      }
+    }
     if( !(pred instanceof TypeInt) )
       throw AA.unimpl(); // Dunno what this test is?
     if( pred.is_con() ) { assert pred.getl() != 0; return TypeTuple.IF_TRUE; } // True only

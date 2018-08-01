@@ -33,10 +33,10 @@ public class CProjNode extends ProjNode {
       scope.sharpen(test,gvn.con(TypeInt.con(_idx)),tmp);
       return this;
     }
-    if( pred instanceof TypeUnion ) {  // Check for null & oop
-      assert pred.may_be_nil();        // Else the IfNode already sharpened
+    if( pred instanceof TypeNullable ) {// Check for null & oop
+      assert pred.may_have_nil();         // Else the IfNode already sharpened
       Node sharp = _idx==1
-        ? gvn.xform(new CastNode(this,test,((TypeUnion)pred).remove_null()))
+        ? gvn.xform(new CastNode(this,test,((TypeNullable)pred).make_nil(TypeNullable.NOT_NIL)))
         : gvn.con(TypeOop.NIL);
       scope.sharpen(test,sharp,tmp);
       return this;

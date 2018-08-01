@@ -160,7 +160,7 @@ public class TestType {
 
     // Co-recursion requires parallel assignment & type inference across a lexical scope
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.TRUE );
-    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(5)", TypeInt.FALSE );
+    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(5)", TypeUnion.NIL);
 
     // simple anon struct tests
     test   ("  @{x,y} ", TypeStruct.makeA(new String[]{"x","y"},TypeErr.ANY,TypeErr.ANY)); // simple anon struct decl
@@ -193,13 +193,13 @@ public class TestType {
     testerr ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(     (@{x=1,y=2}))", "@{x:1,y:2,} is not a Point:@{x,y,}","                      ");
 
     // nullable and not-null pointers
-    test   ("x:str? = 0", TypeStr.NIL); // question-type allows null or not; zero digit is null
+    test   ("x:str? = 0", TypeUnion.NIL); // question-type allows null or not; zero digit is null
     test   ("x:str? = \"abc\"", TypeStr.con("abc")); // question-type allows null or not
-    testerr("x:str  = 0", "null is not a str", "          ");
-    test   ("math_rand(1)?0:\"abc\"", TypeStr.make(TypeStr.AND_NIL,1,"abc"));
-    testerr("(math_rand(1)?0 : @{x=1}).x", "Struct might be null when reading field '.x'", "                           ");
+    testerr("x:str  = 0", "nil is not a str", "          ");
+    test   ("math_rand(1)?0:\"abc\"", TypeStr.STR0);
+    testerr("(math_rand(1)?0 : @{x=1}).x", "Struct might be nil when reading field '.x'", "                           ");
     test   ("p=math_rand(1)?0:@{x=1}; p ? p.x : 0", TypeInt.BOOL); // not-null-ness after a null-check
-    test   ("x:int = y:str? = z:flt = 0", TypeStr.NIL); // null/0 freely recasts
+    test   ("x:int = y:str? = z:flt = 0", TypeUnion.NIL); // null/0 freely recasts
     test   ("\"abc\"==0", TypeInt.FALSE ); // No type error, just not null
     test   ("\"abc\"!=0", TypeInt.TRUE  ); // No type error, just not null
     test   ("nil=0; \"abc\"!=nil", TypeInt.TRUE); // Another way to name null
@@ -337,12 +337,12 @@ c[x]=1;
     //      Confirm lattice: {~i8 -> N:~i8 -> 0 -> N:i8 -> i8; N:0 -> 0 }
     // NOT: Confirm lattice: {N:~i8 -> ~i8; N:i8 -> i8 }
     assertEquals(xni8,xni8.meet( xi8));//   ~i8 -> N:~i8
-    assertEquals(  z , z  .meet(xni8));// N:~i8 -> 0
+    assertEquals(TypeInt.BOOL, z  .meet(xni8));// N:~i8 -> {0,1}??? When falling off from a Named Int, must fall below ANY constant to keep a true lattice
     assertEquals(  i8, ni8.meet(   z));//     0 -> N:i8
     assertEquals(  i8,  i8.meet( ni8));// N: i8 ->   i8
 
     assertEquals(xni8,xi8.meet(xni8));
-    assertEquals(  o , o .meet(xni8));
+    assertEquals(TypeInt.BOOL, o .meet(xni8));
   }
   
   // oop? -> {str?,tup?} -> { null, string constants, tuple constants } -> {~str+?,~tup+?} -> ~oop+?
@@ -431,11 +431,42 @@ c[x]=1;
     assertEquals(c0,cj);
   }
 
+  @Test public void testUnion() {
+    Type.init0(new HashMap<>());
+
+    Type a = TypeUnion.make(false,TypeInt.FALSE,TypeFlt.FLT32);
+    assertEquals(TypeFlt.FLT32,a); // 0 isa FLT32, so collapses
+    Type b = TypeUnion.make(false,TypeInt.con(123456789),TypeFlt.FLT32);
+    assertEquals(Type.REAL,b); // Does not collapse
+    Type c = TypeUnion.make(false,TypeInt.FALSE,TypeInt.TRUE);
+    assertEquals(TypeInt.BOOL,c); // {0*1} combines to bool
+    Type d = TypeUnion.make(false,TypeInt.FALSE,TypeOop.NIL);
+    assertTrue(d instanceof TypeUnion); // Does not collapse
+
+    Type nil = TypeUnion.NIL;
+    Type e = TypeOop.NIL.meet(TypeUnion.NIL);
+    assertEquals(TypeOop.NIL,e);
+  }
+
   // TODO: Observation: value() calls need to be monotonic, can test this.
   @Test public void testCommuteSymmetricAssociative() {
     Type.init0(new HashMap<>());
 
+    Type  n  = Type.NUM;
+    Type xn  = Type.NUM.dual();
+    Type onil= TypeOop.NIL;
+    Type oop_= TypeOop.OOP_;
+    Type  nil= TypeUnion.NIL;
+    Type dnil= nil.dual();
 
+    Type hi0 = xn.meet(dnil);
+    assertEquals(dnil,hi0);
+    Type mt2 = oop_.meet(n);
+    assertEquals(Type.SCALAR,mt2);
+    Type mt0 = xn.meet(onil);
+    //assertEquals(nil,mt0);
+    Type mt1 = onil.meet(nil);
+    assertEquals(onil,mt1);
     
     assertTrue(Type.check_startup());
   }  

@@ -491,7 +491,7 @@ public class Parse {
     _pp.setIndex(_x);
     Number n = _nf.parse(_str,_pp);
     _x = _pp.getIndex();
-    if( n instanceof Long   ) return TypeInt.con(n.  longValue());
+    if( n instanceof Long   ) return n.longValue()==0 ? TypeUnion.NIL : TypeInt.con(n.  longValue());
     if( n instanceof Double ) return TypeFlt.con(n.doubleValue());
     throw new RuntimeException(n.getClass().toString()); // Should not happen
   }
@@ -670,7 +670,7 @@ public class Parse {
   public String typerr( Type t0, Type t1 ) {
     return t0.is_forward_ref() // Forward/unknown refs as args to a call report their own error
       ? forward_ref_err(FunNode.name(((TypeTuple)t0).get_fun().fidx()))
-      : errMsg((t0==TypeInt.FALSE && t1.is_oop() ? "null" : t0.toString())+" is not a "+t1);
+      : errMsg((t0==TypeInt.FALSE && t1.is_oop() ? "nil" : t0.toString())+" is not a "+t1);
   }
 
   // Standard mis-use of a forward-ref error (assumed to be a forward-decl of a

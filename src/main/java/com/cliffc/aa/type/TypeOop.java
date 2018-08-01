@@ -26,7 +26,7 @@ public class TypeOop extends TypeNullable {
   public  static final TypeOop OOP0 = make(AND_NIL,false); // OOP&nil
   private static final TypeOop OOP  = make(NOT_NIL,false); // OOP
   public  static final TypeOop NIL  = make( IS_NIL,false); // nil
-  private static final TypeOop OOP_ = make( OR_NIL, true); // ~OOP+nil
+  public  static final TypeOop OOP_ = make( OR_NIL, true); // ~OOP+nil
   static final TypeOop[] TYPES = new TypeOop[]{OOP0,OOP,NIL,OOP_};
 
   @Override protected TypeOop xdual() { return new TypeOop(xdualnil(),!_any); }

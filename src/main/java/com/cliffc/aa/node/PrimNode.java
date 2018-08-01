@@ -86,7 +86,7 @@ public abstract class PrimNode extends Node {
     boolean con=true;
     for( int i=1; i<_defs._len; i++ ) {
       ts[i] = gvn.type(_defs.at(i));
-      if( ts[i] instanceof TypeErr ) return ts[i]; // Errors poison
+      if( ts[i] instanceof TypeErr && !ts[i].above_center() ) return ts[i]; // Errors poison
       if( !ts[i].is_con() ) { con=false; break; }
     }
     return con ? apply(ts) : _ret;

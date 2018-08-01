@@ -10,12 +10,12 @@ import com.cliffc.aa.type.*;
 public class LoadNode extends Node {
   private final String _fld;
   private final String _badfld;
-  private final String _badnul;
+  private final String _badnil;
   public LoadNode( Node ctrl, Node st, String fld, Parse bad ) {
     super(OP_LOAD,ctrl,st);
     _fld = fld;
     _badfld = bad.errMsg("Unknown field '."+fld+"'");
-    _badnul = bad.errMsg("Struct might be null when reading field '."+fld+"'");
+    _badnil = bad.errMsg("Struct might be nil when reading field '."+fld+"'");
   }
   String xstr() { return "."+_fld; }    // Self short name
   String  str() { return xstr(); }      // Inline short name
@@ -60,8 +60,8 @@ public class LoadNode extends Node {
       return TypeErr.make(_badfld);
     } else if( t instanceof TypeErr ) {
       return t;                 // Errors poison
-    } else if( t.may_be_nil() ) {
-      return TypeErr.make(_badnul); // Null compile-time error
+    } else if( t.may_have_nil() ) {
+      return TypeErr.make(_badnil); // Null compile-time error
     } else if( t instanceof TypeStruct ) {
       TypeStruct ts = (TypeStruct)t;
       int idx = ts.find(_fld);  // Find the named field

@@ -67,7 +67,7 @@ public class TypeTuple extends TypeNullable {
     return t;
   }
 
-  public  static final TypeTuple NIL     = make(TypeErr.ALL,IS_NIL); // is null; tuple guts ignored
+  public  static final TypeTuple NIL     = make(TypeErr.ANY,IS_NIL); // is null; tuple guts ignored
   public  static final TypeTuple ANY     = make(); // Infinite list of Any
   public  static final TypeTuple ALL     = (TypeTuple)make().dual(); // Infinite list of All
   public  static final TypeTuple ALL0    = make(TypeErr.ALL,AND_NIL);
@@ -142,10 +142,12 @@ public class TypeTuple extends TypeNullable {
   public Type at( int idx ) { return idx < _ts.length ? _ts[idx] : _inf; }
 
   boolean has_union_or_tuple() {
-    for( Type t : _ts ) if( t._type==Type.TUNION || t._type==Type.TTUPLE || t._type==Type.TSTRUCT ) return true;
+    for( Type t : _ts ) if( t._type==Type.TUNION ) return true;
     return false;
   }
-  @Override public boolean above_center() { return _inf.above_center(); }
+  @Override public boolean above_center() {
+    return (_nil==NOT_NIL || _nil==OR_NIL) && _inf.above_center();
+  }
   // True if all internals may_be_con
   @Override public boolean may_be_con() {
     if( may_be_nil() ) return true;
