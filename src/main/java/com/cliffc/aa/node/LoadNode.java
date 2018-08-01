@@ -65,7 +65,7 @@ public class LoadNode extends Node {
     } else if( t instanceof TypeStruct ) {
       TypeStruct ts = (TypeStruct)t;
       int idx = ts.find(_fld);  // Find the named field
-      return idx == -1 ? TypeErr.make(_badfld) : ts._tt.at(idx); // Field type
+      return idx == -1 ? TypeErr.make(_badfld) : ts.at(idx); // Field type
     }
 
     throw AA.unimpl();

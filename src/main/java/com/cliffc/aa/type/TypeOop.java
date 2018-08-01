@@ -54,7 +54,7 @@ public class TypeOop extends TypeNullable {
   }
 
   // Make a subtype with a given nil choice
-  @Override Type make_nil(byte nil) { return make(nil,_any); }
+  @Override public Type make_nil(byte nil) { return make(nil,_any); }
   
   // Lattice of conversions:
   // -1 unknown; top; might fail, might be free (Scalar->Str); Scalar might lift

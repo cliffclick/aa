@@ -163,7 +163,7 @@ public class TestType {
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(5)", TypeInt.FALSE );
 
     // simple anon struct tests
-    test   ("  @{x,y} ", TypeStruct.make(new String[]{"x","y"},TypeTuple.make_all(TypeErr.ANY,TypeErr.ANY))); // simple anon struct decl
+    test   ("  @{x,y} ", TypeStruct.makeA(new String[]{"x","y"},TypeErr.ANY,TypeErr.ANY)); // simple anon struct decl
     testerr("a=@{x=1.2,y}; x", "Unknown ref 'x'","               ");
     testerr("a=@{x=1,x=2}", "Cannot define field '.x' twice","           ");
     test   ("a=@{x=1.2,y,}; a.x", TypeFlt.con(1.2)); // standard "." field naming; trailing comma optional
@@ -411,7 +411,7 @@ c[x]=1;
     Type tff = tsx.meet(tf);   //
     assertEquals(tsx,tff);     // tf.isa(tsx)
     TypeTuple t0 = TypeTuple.make_args(nil); //  [  0,~Scalar...]
-    Type      ts0= TypeStruct.make(new String[]{"x"},t0);  // @{x:0,~Scalar...}
+    Type      ts0= TypeStruct.makeX(new String[]{"x"},nil);  // @{x:0,~Scalar...}
     Type tss = ts0.meet(t0);
     assertEquals(ts0,tss);      // t0.isa(ts0)
 
@@ -422,12 +422,12 @@ c[x]=1;
     assertEquals(uall,TypeInt.INT8  );
     
     // meet @{c:0}? and @{c:@{x:1}?,}
-    Type nc0 = TypeStruct.make(new String[]{"c"},TypeTuple.make(TypeErr.ALL,TypeTuple.AND_NIL,nil)); // @{c:0}?
-    Type nx1 = TypeStruct.make(new String[]{"x"},TypeTuple.make(TypeErr.ALL,TypeTuple.AND_NIL,TypeInt.TRUE)); // @{x:1}?
-    Type cx  = TypeStruct.make(new String[]{"c"},TypeTuple.make_all(nx1)); // @{c:@{x:1}?}
+    Type nc0 = TypeStruct.make(TypeStruct.AND_NIL,new Type[]{nil},TypeErr.ALL,new String[]{"c"}); // @{c:0}?
+    Type nx1 = TypeStruct.make(TypeStruct.AND_NIL,new Type[]{TypeInt.TRUE},TypeErr.ALL,new String[]{"x"}); // @{x:1}?
+    Type cx  = TypeStruct.makeA(new String[]{"c"},nx1); // @{c:@{x:1}?}
     // JOIN tosses the top-level null choice, and the inside struct choice
     Type cj  = nc0.join(cx);
-    Type c0  = TypeStruct.make(new String[]{"c"},TypeTuple.make_all(nil)); // @{c:0}
+    Type c0  = TypeStruct.makeA(new String[]{"c"},((TypeNullable) nx1).make_nil((byte)0)); // @{c:0}
     assertEquals(c0,cj);
   }
 

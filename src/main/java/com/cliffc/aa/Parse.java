@@ -463,7 +463,7 @@ public class Parse {
       }
       require('}');
       _e = _e._par;             // Pop nested environment
-      TypeStruct tstr = (TypeStruct)TypeStruct.make(toks.asAry(), TypeTuple.make_all(ts.asAry()));
+      TypeStruct tstr = TypeStruct.makeA(toks.asAry(), ts.asAry());
       Node[] flds = e._scope.get(toks);
       return gvn(new NewNode(tstr,flds));
     }
@@ -556,7 +556,7 @@ public class Parse {
         ts  .add(t  );
         if( !peek(',') ) break; // Final comma is optional
       }
-      return peek('}') ? typeq(TypeStruct.make(flds.asAry(), TypeTuple.make_all(ts.asAry()))) : null;
+      return peek('}') ? typeq(TypeStruct.makeA(flds.asAry(), ts.asAry())) : null;
     }
 
     // Primitive type

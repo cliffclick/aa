@@ -19,14 +19,14 @@ public class NewNode extends Node {
   @Override public Type value(GVNGCM gvn) {
     boolean eq=true;
     for( int i=0; i<_ts._args.length; i++ )
-      eq &= _ts._tt.at(i) == gvn.type(in(i+1));
+      eq &= _ts.at(i) == gvn.type(in(i+1));
     if( eq ) return _ts;
     Type[] ts = new Type[_ts._args.length];
     for( int i=0; i<_ts._args.length; i++ ) {
       ts[i] = gvn.type(in(i+1));
-      assert ts[i].isa(_ts._tt.at(i)); // Type correct
+      assert ts[i].isa(_ts.at(i)); // Type correct
     }
-    return TypeStruct.make(_ts._args,TypeTuple.make_all(ts));
+    return TypeStruct.makeA(_ts._args,ts);
   }
   @Override public int hashCode() { return super.hashCode()+_ts.hashCode(); }
   @Override public boolean equals(Object o) {

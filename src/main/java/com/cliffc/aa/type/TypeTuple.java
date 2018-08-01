@@ -10,22 +10,24 @@ public class TypeTuple extends TypeNullable {
   public Type[] _ts;      // The fixed known types
   public Type _inf;       // Infinite extension type
   private int _hash;
-  private TypeTuple( byte nil, Type[] ts, Type inf ) { super(TTUPLE,nil); init(nil,ts,inf);  }
-  private void init( byte nil, Type[] ts, Type inf ) {
+  protected TypeTuple( byte nil, Type[] ts, Type inf, byte type ) { super(type,nil); init(nil,ts,inf,type);  }
+  private   TypeTuple( byte nil, Type[] ts, Type inf ) { this(nil,ts,inf,TTUPLE); }
+  protected void init( byte nil, Type[] ts, Type inf, byte type ) {
     super.init(nil);
     _ts = ts;
     _inf = inf;
     int sum=super.hashCode()+inf.hashCode();
     for( Type t : ts ) sum += t.hashCode();
     _hash=sum;
-    assert _type==TTUPLE;
+    assert _type==type;
   }
   
   @Override public int hashCode( ) { return _hash;  }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
-    if( !(o instanceof TypeTuple) ) return false;
-    TypeTuple t = (TypeTuple)o;
+    return o instanceof TypeTuple && eq((TypeTuple)o);
+  }    
+  public boolean eq( TypeTuple t ) {
     if( _hash != t._hash ) return false;
     if( !super.eq(t) || _ts.length != t._ts.length || _inf != t._inf )
       return false;
@@ -43,11 +45,11 @@ public class TypeTuple extends TypeNullable {
   }
 
   private static TypeTuple FREE=null;
-  private TypeTuple free( TypeTuple f ) { FREE=f; return this; }
+  private TypeTuple free( TypeTuple f ) { assert f._type==TTUPLE; FREE=f; return this; }
   private static TypeTuple make0( Type inf, byte nil, Type... ts ) {
     TypeTuple t1 = FREE;
     if( t1 == null ) t1 = new TypeTuple(nil,ts,inf);
-    else { FREE = null; t1.init(nil,ts,inf); }
+    else { FREE = null; t1.init(nil,ts,inf,TTUPLE); }
     TypeTuple t2 = (TypeTuple)t1.hashcons();
     return t1==t2 ? t1 : t2.free(t1);
   }
@@ -88,7 +90,7 @@ public class TypeTuple extends TypeNullable {
   public  static final TypeTuple IF_FALSE= make_all(Type.CTRL ,Type.XCTRL);
   public  static final TypeTuple FUNPTR2 = make_fun_ptr(TypeFun.any(2,-1));
   public  static final TypeTuple GENERIC_FUN = make_fun_ptr(TypeFun.make_generic());
-  static final TypeTuple[] TYPES = new TypeTuple[]{ANY,SCALAR1,STR,INT32,INT64,FLT64,INT64_INT64,FLT64_FLT64,FLT64_INT64, IF_ALL, IF_TRUE, IF_FALSE, FUNPTR2, OOP_OOP};
+  static final TypeTuple[] TYPES = new TypeTuple[]{NIL,ANY,SCALAR1,STR,INT32,INT64,FLT64,INT64_INT64,FLT64_FLT64,FLT64_INT64, IF_ALL, IF_TRUE, IF_FALSE, FUNPTR2, OOP_OOP};
   
   // The length of Tuples is a constant, and so is its own dual.  Otherwise
   // just dual each element.  Also flip the infinitely extended tail type.
@@ -136,7 +138,7 @@ public class TypeTuple extends TypeNullable {
   }
 
   // Make a subtype with a given nil choice
-  @Override Type make_nil(byte nil) { return make0(_inf,nil,_ts); }
+  @Override public Type make_nil(byte nil) { return make0(_inf,nil,_ts); }
   
   public Type at( int idx ) { return idx < _ts.length ? _ts[idx] : _inf; }
 

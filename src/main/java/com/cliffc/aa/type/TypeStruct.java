@@ -1,44 +1,44 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.AA;
 import com.cliffc.aa.util.SB;
+
 import java.util.Arrays;
 
 /** A Tuple with named fields */
-public class TypeStruct extends Type {
+public class TypeStruct extends TypeTuple {
+  // Fields are named in-order and aligned with the Tuple values.  Field names
+  // are never null, and never zero-length.  If the 1st char is a '^' the field
+  // is Top; a '.' is Bot; all other values are valid field names.
   public String[] _args;        // The field names
-  public TypeTuple _tt;         // The field types
-  private TypeStruct( String[] args, TypeTuple tt ) { super(TSTRUCT); init(args,tt); }
-  private void init ( String[] args, TypeTuple tt ) {
-    _args = args;
-    _tt = tt;
+  private TypeStruct( byte nil, Type[] ts, Type inf, String[] args ) { super(nil,ts,inf,TSTRUCT); init(nil,ts,inf,args); }
+  private void init ( byte nil, Type[] ts, Type inf, String[] args ) {
+    super.init(nil,ts,inf,TSTRUCT);
+    _args=args;
   }
   
-  @Override public int hashCode( ) { return _tt.hashCode();  }
+  @Override public int hashCode( ) { return super.hashCode();  }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
-    if( !(o instanceof TypeStruct) ) return false;
-    TypeStruct t = (TypeStruct)o;
-    return _tt==t._tt && Arrays.equals(_args,t._args);
+    return o instanceof TypeStruct && eq((TypeStruct)o) && Arrays.equals(_args,((TypeStruct)o)._args);
   }
   @Override public String toString() {
     SB sb = new SB().p('@').p('{');
     for( int i=0; i<_args.length; i++ ) {
-      sb.p(argTop(_args[i]) ? "^" : (argBot(_args[i]) ? "_" : _args[i]) );
-      if( _tt.at(i) != TypeErr.ALL ) sb.p(':').p(_tt.at(i).toString());
+      sb.p(_args[i]);
+      if( at(i) != TypeErr.ALL ) sb.p(':').p(at(i).toString());
       sb.p(',');
     }
-    if( _tt._inf!=TypeErr.ALL ) sb.p(_tt._inf.toString()).p("...");
+    if( _inf!=TypeErr.ALL ) sb.p(_inf.toString()).p("...");
     sb.p('}');
-    return String.format(TypeTuple.TSTRS[_tt._nil],sb.toString());
+    return String.format(TypeTuple.TSTRS[_nil],sb.toString());
   }
 
   private static TypeStruct FREE=null;
-  private TypeStruct free( TypeStruct f ) { FREE=f; return this; }
-  private static TypeStruct make1( String[] args, TypeTuple tt ) {
+  private TypeStruct free( TypeStruct f ) { assert f._type==TSTRUCT; FREE=f; return this; }
+  private static TypeStruct make1( byte nil, Type[] ts, Type inf, String[] args ) {
     TypeStruct t1 = FREE;
-    if( t1 == null ) t1 = new TypeStruct(args,tt);
-    else { FREE = null; t1.init(args,tt); }
+    if( t1 == null ) t1 = new TypeStruct(nil,ts,inf,args);
+    else { FREE = null; t1.init(nil,ts,inf,args); }
     TypeStruct t2 = (TypeStruct)t1.hashcons();
     return t1==t2 ? t1 : t2.free(t1);
   }
@@ -46,83 +46,87 @@ public class TypeStruct extends Type {
   // Canonicalize.  Tuple will clean out trailing fields that match the _inf.
   // Similarly, clean out trailing args that match the tuple default.  If no
   // args remain, drop to a tuple.
-  public static Type make( String[] args, TypeTuple tt ) {
-    String ttarg = sarg(tt);    // default arg from tuple is either top or bottom
+  public static Type make( byte nil, Type[] ts, Type inf, String[] args ) {
+    // Remove trailing duplicates of inf
+    int len = ts.length;
+    while( len > 0 && ts[len-1] == inf ) len--;
+    if( len < ts.length ) ts = Arrays.copyOf(ts,len);
+    // Remove trailing default args
+    String ttarg = sarg(inf);    // default arg from tuple is either top or bottom
     int i;
     for( i=args.length-1; i>=0; i-- )
-      if( args[i]!=ttarg && (args[i]==null || !args[i].equals(ttarg)) )
+      if( !args[i].equals(ttarg) )
         break;
-    if( i==args.length-1 ) return make1(args,tt);
-    if( i== -1 ) return tt; // No args other than the default, so drop to a tuple
-    return make1(Arrays.copyOf(args,i+1),tt);
+    if( i==args.length-1 ) return make1(nil,ts,inf,args);
+    if( i== -1 ) return TypeTuple.make(inf,nil,ts); // No args other than the default, so drop to a tuple
+    return make1(nil,ts,inf,Arrays.copyOf(args,i+1));
   }
+  private static String[] flds(String... fs) { return fs; }
+  public  static TypeStruct makeX(String[] flds, Type... ts ) { return make1(NOT_NIL,ts,Type.XSCALAR,flds); }
+  public  static TypeStruct makeA(String[] flds, Type... ts ) { return make1(NOT_NIL,ts,TypeErr.ALL ,flds); }
 
-  private static final TypeStruct POINT = make1(new String[]{"x","y"},TypeTuple.FLT64_FLT64);
-  public  static final TypeStruct X     = make1(new String[]{"x"},TypeTuple.FLT64);
-  private static final TypeStruct A     = make1(new String[]{"a"},TypeTuple.FLT64);
-  static         final TypeStruct C0    = make1(new String[]{"c"},TypeTuple.make_all(TypeInt.FALSE)); // @{c:0}
-  static         final TypeStruct D1    = make1(new String[]{"d"},TypeTuple.make_all(TypeInt.TRUE)); // @{d:1}
-  static final TypeStruct[] TYPES = new TypeStruct[]{POINT,X,A,C0,D1};
+  public  static final TypeStruct NIL   = make1(IS_NIL,new Type[0],TypeErr.ALL,new String[0]);
+  private static final TypeStruct POINT = makeA(flds("x","y"),TypeFlt.FLT64,TypeFlt.FLT64);
+  public  static final TypeStruct X     = makeX(flds("x"),TypeFlt.FLT64); // @{x:flt,~Scalar...}
+  private static final TypeStruct A     = makeX(flds("a"),TypeFlt.FLT64);
+  static         final TypeStruct C0    = makeA(flds("c"),TypeInt.FALSE); // @{c:0}
+  static         final TypeStruct D1    = makeA(flds("d"),TypeInt.TRUE ); // @{d:1}
+  static final TypeStruct[] TYPES = new TypeStruct[]{NIL,POINT,X,A,C0,D1};
 
   // Dual the args, dual the tuple
   @Override protected TypeStruct xdual() {
-    String[] as = Arrays.copyOf(_args,_args.length);
-    for( int i=0; i<as.length; i++ ) as[i]=sdual(as[i]);
-    TypeTuple xt = (TypeTuple)_tt.dual();
-    return xt==_tt && Arrays.equals(as,_args) ? this : new TypeStruct(as,xt);
+    String[] as = new String[_args.length];
+    for( int i=0; i<as.length; i++ ) as[i]=sdual(_args[i]);
+    Type  [] ts = new Type  [_ts  .length];
+    for( int i=0; i<ts.length; i++ ) ts[i] = _ts[i].dual();
+    return new TypeStruct(xdualnil(),ts,_inf.dual(),as);
   }
 
   // Standard Meet.  Tuple-meet-Tuple and arg-meet-arg.  Empty arg string
   // counts as bottom; null arg string counts as top.
   @Override protected Type xmeet( Type t ) {
-    TypeTuple tt;  String[] args;
+    TypeTuple tt;   String[] args;
     switch( t._type ) {
-    case TSTRUCT: {
-      tt  = ((TypeStruct)t)._tt;
-      args= ((TypeStruct)t)._args;
-      break;
-    }
-    case TTUPLE : {
-      // values above_center get a top-string; those below get a bottom-string
-      tt = (TypeTuple)t;
-      args = new String[tt._ts.length];
-      String s = sarg(tt);
-      for( int i=0; i<tt._ts.length; i++ ) args[i]=s;
-      break;
-    }
-    case TSTR:
-    case TFLT:
-    case TINT:
-      //if(   may_be_null() ) return t.meet(TypeInt.NULL);
-      //if( t.may_be_null() ) return   meet_null();
-      //return t._type==TFLT||t._type==TINT ? SCALAR : OOP0;
-      throw AA.unimpl();
+    case TSTRUCT:  args= ((TypeStruct)t)._args;  tt=(TypeTuple)t;  break;
+    case TTUPLE :  args= new String[0];          tt=(TypeTuple)t;  break;
+    case TSTR:   return TypeOop.make(nmeet(((TypeNullable)t)._nil),false);
+    case TOOP:
     case TNAME:
     case TUNION: return t.xmeet(this); // Let TypeUnion decide
+    case TFLT:
+    case TINT:
     case TRPC: 
     case TFUN:   return TypeErr.SCALAR;
     case TERROR: return ((TypeErr)t)._all ? t : this;
     default: throw typerr(t);   // All else should not happen
     }
-    TypeTuple mtt = (TypeTuple)_tt.meet(tt); // Tuples just meet
-    return _args.length < args.length
-      ? xmeet1(_args, _tt, args, mtt)
-      : xmeet1( args,  tt,_args, mtt);
+
+    byte nil = nmeet(tt._nil);
+    Type inf = _inf.meet(tt._inf);
+    int max = Math.max(Math.max(_args.length,args.length),Math.max(_ts.length,tt._ts.length));
+    String[] as = new String[max];
+    Type  [] ts = new Type  [max];
+    for( int i=0; i<max; i++ ) {
+      ts[i] = at(i).meet(tt.at(i));
+      as[i] = smeet(sat(_args,i,this),sat(args,i,tt));
+    }
+    return make(nil,ts,inf,as);
   }
   
-  private Type xmeet1(String[] amin, TypeTuple ttmin, String[] amax, TypeTuple mtt ) {
-    String argmin = sarg(ttmin);
-    String[] as = Arrays.copyOf(amax,amax.length);
-    int i=0;
-    for( ; i<amin.length; i++ ) as[i] = smeet(amax[i],amin[i]);
-    for( ; i<amax.length; i++ ) as[i] = smeet(amax[i],argmin);
-    return make(as, mtt);
+  // Make a subtype with a given nil choice
+  @Override public Type make_nil(byte nil) { return make(nil,_ts,_inf,_args); }
+
+  
+  static private boolean argTop( String s ) { return s.charAt(0)=='^'; }
+  static private boolean argBot( String s ) { return s.charAt(0)=='.'; }
+  // Return field name, using the default from the field type if no field name
+  // is available.
+  static String sat( String[] args, int i, TypeTuple tt ) {
+    return i < args.length ? args[i] : sarg(tt._inf);
   }
-  static private boolean argTop( String s ) { return s==null; }
-  static private boolean argBot( String s ) { return s!=null && s.isEmpty(); }
   // Default arg (top or bottom) if no arg is available
-  static String sarg( Type t ) { return ((t.above_center() && t!=Type.XCTRL)) ? null : ""; }
-  // String meet; empty string is bottom; null is top
+  static String sarg( Type t ) { return ((t.above_center() && t!=Type.XCTRL)) ? "^" : "."; }
+  // String meet
   static String smeet( String s0, String s1 ) {
     if( s0==s1 ) return s0;
     if( argTop(s0) ) return s1;
@@ -130,11 +134,11 @@ public class TypeStruct extends Type {
     if( argBot(s0) ) return s0;
     if( argBot(s1) ) return s1;
     if( s0.equals(s1) ) return s0;
-    return ""; // argBot
+    return "."; // argBot
   }
   static String sdual( String s ) {
-    if( s==null ) return "";
-    if( s.isEmpty() ) return null;
+    if( argTop(s) ) return ".";
+    if( argBot(s) ) return "^";
     return s;
   }
 
@@ -145,11 +149,4 @@ public class TypeStruct extends Type {
         return i;
     return -1;
   }
-  
-  @Override public boolean above_center() { return _tt.above_center(); }
-  // True if all internals canBeConst
-  @Override public boolean canBeConst() { return _tt.canBeConst(); }
-  // True if all internals is_con
-  @Override public boolean is_con() { return _tt.is_con(); }
-  @Override public String errMsg() { return _tt.errMsg(); }
 }

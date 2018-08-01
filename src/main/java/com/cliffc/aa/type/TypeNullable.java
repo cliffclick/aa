@@ -17,7 +17,7 @@ public abstract class TypeNullable extends Type {
   @Override public int hashCode( ) { return (_type<<8)+_nil; }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
-    return o instanceof TypeOop && eq((TypeOop)o);
+    return o instanceof TypeNullable && eq((TypeNullable)o);
   }
   public boolean eq( TypeNullable to ) { return _type==to._type && _nil==to._nil; }
 
@@ -25,7 +25,7 @@ public abstract class TypeNullable extends Type {
   @Override public Type meet_nil() { return make_nil(nmeet(IS_NIL)); }
   
   // Make a subtype with a given nil choice
-  abstract Type make_nil(byte nil);
+  abstract public Type make_nil(byte nil);
 
   // Meet "nullable" notions
   byte nmeet(byte nil) {

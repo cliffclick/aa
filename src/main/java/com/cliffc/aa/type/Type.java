@@ -264,14 +264,15 @@ public class Type {
     ts = concat(ts,TypeErr   .TYPES);
     ts = concat(ts,TypeInt   .TYPES);
     ts = concat(ts,TypeFlt   .TYPES);
+    ts = concat(ts,TypeOop   .TYPES);
     ts = concat(ts,TypeStr   .TYPES);
     ts = concat(ts,TypeTuple .TYPES);
-    ts = concat(ts,TypeStruct.TYPES);
+    //ts = concat(ts,TypeStruct.TYPES);
     ts = concat(ts,TypeFun   .TYPES);
     ts = concat(ts,TypeRPC   .TYPES);
     ts = concat(ts,TypeUnion .TYPES);
     ts = concat(ts,TypeName  .TYPES);
-    
+
     // Confirm commutative & complete
     for( Type t0 : ts )
       for( Type t1 : ts ) {
@@ -279,7 +280,7 @@ public class Type {
         assert t0.check_commute  (t1,mt);
         assert t0.check_symmetric(t1,mt);
       }
-    
+
     // Confirm associative
     int errs=0;
     for( Type t0 : ts )
@@ -305,7 +306,7 @@ public class Type {
             Type t02 = t0.join(t2);
             Type t12 = t1.join(t2);
             Type mt  = t02.meet(t12);
-            if( mt != t12 && errs++ < 100 ) {
+            if( mt != t12 && errs++ < 10 ) {
               System.err.println("("+t0+" ^ "+t2+") = "+t02+"; "+
                                  "("+t1+" ^ "+t2+") = "+t12+"; "+
                                  "their meet = "+mt+" which is not "+t12);

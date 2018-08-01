@@ -10,7 +10,6 @@ public class TypeStr extends TypeNullable {
   private void init(byte nil, int x, String con ) {
     super.init(nil);
     assert con != null;
-    assert (nil==IS_NIL && x==1)||(nil!=IS_NIL);
     _x=(byte)x;
     _con = con;
     assert _type==TSTR;
@@ -77,8 +76,8 @@ public class TypeStr extends TypeNullable {
   }
 
   // Make a subtype with a given nil choice
-  @Override TypeStr make_nil(byte nil) { return make(nil,_x,_con); }
-  
+  @Override public TypeStr make_nil(byte nil) { return make(nil,_x,_con); }
+
   @Override public boolean above_center() { return _x==0; }
   @Override public boolean is_con() { return _x==1; }
   // Lattice of conversions:
