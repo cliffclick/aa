@@ -66,7 +66,8 @@ public class LoadNode extends Node {
       TypeStruct ts = (TypeStruct)t;
       int idx = ts.find(_fld);  // Find the named field
       return idx == -1 ? TypeErr.make(_badfld) : ts.at(idx); // Field type
-    }
+    } if( t.isa(TypeTuple.ANY) )
+      return Type.XSCALAR; // Very high address; might fall to any valid value
 
     throw AA.unimpl();
   }
