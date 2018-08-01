@@ -434,6 +434,9 @@ c[x]=1;
   // TODO: Observation: value() calls need to be monotonic, can test this.
   @Test public void testCommuteSymmetricAssociative() {
     Type.init0(new HashMap<>());
+
+
+    
     assertTrue(Type.check_startup());
   }  
 }

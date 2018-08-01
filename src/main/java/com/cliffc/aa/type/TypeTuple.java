@@ -1,6 +1,5 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.AA;
 import com.cliffc.aa.util.SB;
 
 import java.util.Arrays;
@@ -155,9 +154,9 @@ public class TypeTuple extends TypeNullable {
   }
   // True if all internals is_con
   @Override public boolean is_con() {
-    //for( Type _t : _ts ) if( !_t.is_con() ) return false;
-    //return _inf.is_con() && !_nil;
-    throw AA.unimpl();
+    if( super.is_con() ) return true;
+    for( Type _t : _ts ) if( !_t.may_be_con() ) return false;
+    return _inf.may_be_con();
   }
 
   // Return true if this is a function pointer (return type from EpilogNode)

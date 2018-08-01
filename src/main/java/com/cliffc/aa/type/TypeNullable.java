@@ -7,7 +7,7 @@ public abstract class TypeNullable extends Type {
   static final byte NOT_NIL=1; //  OOP    ; all the OOPs, never nil
   static final byte  OR_NIL=2; //  OOP+nil; or choice of nil
   static public final byte AND_NIL=3; //  OOP&nil; and also nil
-  static final String[] TSTRS=new String[]{"0","%s","%s+0","%s&0"};
+  static final String[] TSTRS=new String[]{"0","%s","%s+0","%s?"};
   // map 0->0, 1->1, 2->3; 3->2;
   byte xdualnil() { return (byte)(_nil<=1 ? _nil : 5-_nil); }
   byte _nil;

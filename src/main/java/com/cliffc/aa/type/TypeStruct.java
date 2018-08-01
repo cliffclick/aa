@@ -46,7 +46,7 @@ public class TypeStruct extends TypeTuple {
   // Canonicalize.  Tuple will clean out trailing fields that match the _inf.
   // Similarly, clean out trailing args that match the tuple default.  If no
   // args remain, drop to a tuple.
-  public static Type make( byte nil, Type[] ts, Type inf, String[] args ) {
+  public static TypeTuple make( byte nil, Type[] ts, Type inf, String[] args ) {
     // Remove trailing duplicates of inf
     int len = ts.length;
     while( len > 0 && ts[len-1] == inf ) len--;
@@ -62,8 +62,8 @@ public class TypeStruct extends TypeTuple {
     return make1(nil,ts,inf,Arrays.copyOf(args,i+1));
   }
   private static String[] flds(String... fs) { return fs; }
-  public  static TypeStruct makeX(String[] flds, Type... ts ) { return make1(NOT_NIL,ts,Type.XSCALAR,flds); }
-  public  static TypeStruct makeA(String[] flds, Type... ts ) { return make1(NOT_NIL,ts,TypeErr.ALL ,flds); }
+  public  static TypeStruct makeX(String[] flds, Type... ts ) { return (TypeStruct)make(NOT_NIL,ts,Type.XSCALAR,flds); }
+  public  static TypeStruct makeA(String[] flds, Type... ts ) { return (TypeStruct)make(NOT_NIL,ts,TypeErr.ALL ,flds); }
 
   private static final TypeStruct POINT = makeA(flds("x","y"),TypeFlt.FLT64,TypeFlt.FLT64);
   public  static final TypeStruct X     = makeX(flds("x"),TypeFlt.FLT64); // @{x:flt,~Scalar...}
