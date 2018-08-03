@@ -117,7 +117,7 @@ class Convert extends PrimNode {
     return apply(ts);
   }
   @Override public Type apply( Type[] args ) { return TypeName.make(_name,args[1]); }
-  @Override public byte op_prec() { return 9; }
+  @Override public byte op_prec() { return 0; }
   public boolean is_lossy() { return false; }
 }
 

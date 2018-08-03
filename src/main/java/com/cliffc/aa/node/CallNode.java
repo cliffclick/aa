@@ -64,8 +64,8 @@ public class CallNode extends Node implements AutoCloseable {
     // If an upcast is in-progress, no other opts until it finishes
     if( _cast_ret !=null ) return null;
     //
-    Node ctrl = _defs.at(0);    // Control for apply/call-site
-    Node unk  = _defs.at(1);    // Function epilog/function pointer
+    Node ctrl = in(0);          // Control for apply/call-site
+    Node unk  = in(1);          // Function epilog/function pointer
 
     // Type-checking a function; requires 2 steps, one now, one in the
     // following data Proj from the worklist.
@@ -118,9 +118,9 @@ public class CallNode extends Node implements AutoCloseable {
       if( xcvt == 99 ) return null;
       if( xcvt == -1 ) return null;       // Wait for call args to resolve
       if( xcvt == 1 ) {
-        PrimNode cvt = PrimNode.convert(_defs.at(i+2),actual,formal);
+        PrimNode cvt = PrimNode.convert(arg(i),actual,formal);
         if( cvt.is_lossy() ) throw new IllegalArgumentException("Requires lossy conversion");
-        set_def(i+2,gvn.xform(cvt),gvn);
+        set_def(i+2,gvn.xform(cvt),gvn); // set the converted arg
       }
     }
 
@@ -196,8 +196,8 @@ public class CallNode extends Node implements AutoCloseable {
   }
 
   @Override public Type value(GVNGCM gvn) {
-    Node fun = _defs.at(1);
-    Type t = gvn.type(fun), tx;
+    Node fun = in(1);
+    Type t = gvn.type(fun);
     if( !_inlined ) {           // Inlined functions just pass thru & disappear
       if( fun instanceof UnresolvedNode ) {
         // For unresolved, we can take the BEST choice; i.e. the JOIN of every

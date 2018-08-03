@@ -12,6 +12,11 @@ import static org.junit.Assert.assertTrue;
 
 public class TestType {
   @Test public void testType0() {
+    // User-defined linked-list
+    test("List = :@{ next, val }; x=List(@{next=0,val=\"abc\"}); x.val", TypeStr.ABC);
+    //test("List = :@{ next, val }; x=List(       0,    \"abc\"}); x.val", TypeStr.ABC);
+    //test("@{0,\"abc\"}", TypeTuple.make_all(TypeUnion.NIL,TypeStr.ABC));
+
     // Simple int
     test("1",   TypeInt.TRUE);
     // Unary operator
@@ -48,7 +53,7 @@ public class TestType {
     test("\"Hello, world\"", TypeStr.con("Hello, world"));
     test("str(3.14)", TypeStr.con("3.14"));
     test("str(3)", TypeStr.con("3"));
-    test("str(\"abc\")", TypeStr.con("abc"));
+    test("str(\"abc\")", TypeStr.ABC);
 
     // Variable lookup
     test("math_pi", TypeFlt.PI);
@@ -180,7 +185,7 @@ public class TestType {
 
     // Named type variables
     test_isa("gal=:flt"       , TypeTuple.make_fun_ptr(TypeFun.make(TypeTuple.FLT64,TypeName.make("gal",TypeFlt.FLT64),Bits.FULL)));
-    test_isa("gal=:flt; {gal}", TypeTuple.make_fun_ptr(TypeFun.make(TypeTuple.FLT64,TypeName.make("gal",TypeFlt.FLT64),Bits.FULL)));
+    test_isa("gal=:flt; gal"  , TypeTuple.make_fun_ptr(TypeFun.make(TypeTuple.FLT64,TypeName.make("gal",TypeFlt.FLT64),Bits.FULL)));
     test    ("gal=:flt; 3==gal(2)+1", TypeInt.TRUE);
     test    ("gal=:flt; tank:gal = gal(2)", TypeName.make("gal",TypeFlt.con(2)));
     // test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: figure out if free cast for bare constants?
@@ -191,7 +196,7 @@ public class TestType {
 
     // nullable and not-null pointers
     test   ("x:str? = 0", TypeUnion.NIL); // question-type allows null or not; zero digit is null
-    test   ("x:str? = \"abc\"", TypeStr.con("abc")); // question-type allows null or not
+    test   ("x:str? = \"abc\"", TypeStr.ABC); // question-type allows null or not
     testerr("x:str  = 0", "nil is not a str", "          ");
     test   ("math_rand(1)?0:\"abc\"", TypeStr.STR0);
     testerr("(math_rand(1)?0 : @{x=1}).x", "Struct might be nil when reading field '.x'", "                           ");
@@ -216,9 +221,9 @@ public class TestType {
 list_of_hello = @{ 0, "hello", }
 
 // No ambiguity:
- { x  } // no-arg-function returning external variable x; same as { -> x }
- { x, } // 1-elem tuple     wrapping external variable x
-@{ x  } // 1-elem struct type with field named x
+ { x } // no-arg-function returning external variable x; same as { -> x }
+ { x } // 1-elem tuple     wrapping external variable x
+@{ x } // 1-elem struct type with field named x
 
 // type variables are free in : type expressions
 
@@ -227,7 +232,6 @@ list_of_hello = @{ 0, "hello", }
 // and 'b' become field names and 'T' becomes a free type-var.
 Pair = :@{ a:T, b:T }
 
-// Since no comma, its a function type not a struct type.
 // Since 'A' and 'B' are free and not field names, they become type-vars.
 MapType = :{ {A->B} List(A) -> List(B) }
 
@@ -239,9 +243,15 @@ map:{ {A->B} List(A) -> List(B) }  = { f list -> ... }
 // List is a self-recursive type.
 // Field 'next' can be null or List(A).
 // Field 'val' is type A.
-List = :@{ List(A)? A }
+List = :@{ next:List(A)?, val:A }
 
-list = @{ next:List(A)? val:A }
+list = @{ next:List(A)?, val:A }
+
+List = :@{ next, val }
+head = { list -> list.val  } // fails to compile if list is nil
+tail = { list -> list.next } // fails to compile if list is nil
+
+map = { f list -> list ? List(@{map(f,list.next),f(list.val)}) : 0 }
 
 // Type A can allow nulls, or not
 strs:List(0)    = ... // List of nulls
@@ -351,7 +361,7 @@ c[x]=1;
     Type nilo = TypeOop  .NIL;
     Type nils = TypeStr  .NIL;
     Type nilt = TypeTuple.NIL;
-    Type abc  = TypeStr.con("abc");
+    Type abc  = TypeStr  .ABC;
     Type fld  = TypeTuple.INT64;  // 1 field of int64
     
     Type tupx = tup .dual();      // ~tup   (choice tup, no NULL)
