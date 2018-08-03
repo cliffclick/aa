@@ -214,9 +214,7 @@ Nullable and not-null modeled after Kotlin | ---
 `"abc"==0`        | `0:int` Compare vs null
 `"abc"!=0`        | `1:int` Compare vs null
 `nil=0; "abc"!=nil` | `1:int` Another name for 0/null
-`a = math_rand(1) ? 0 : @{x=1}; // a is null or a struct
-b = math_rand(1) ? 0 : @{c=a}; // b is null or a struct
-b ? (b.c ? b.c.x : 0) : 0      // Null-safe field load` | `int1` Nested nullable structs
+`a = math_rand(1) ? 0 : @{x=1}; b = math_rand(1) ? 0 : @{c=a}; b ? (b.c ? b.c.x : 0) : 0` | `int1` Nested nullable structs
 
 
 Done Stuff
