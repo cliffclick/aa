@@ -29,7 +29,7 @@ public class LoadNode extends Node {
 
     // Lift control on Loads as high as possible... and move them over
     // to a CastNode (to remove null-ness) and remove the control.
-    if( !t.may_be_nil() )       // No null, no need for ctrl
+    if( !t.may_have_nil() )     // No null, no need for ctrl
       // remove ctrl; address already casts-away-null
       return set_def(0,null,gvn);
 
@@ -50,7 +50,7 @@ public class LoadNode extends Node {
                                   n.in(0).in(1) == fbaseaddr );
     if( tru==null ) return null;
     assert !(tru==ctrl && addr != baseaddr) : "not the immediate location or we would be not-null already";
-    set_def(1,gvn.xform(new CastNode(tru,baseaddr,((TypeUnion)t).remove_null())),gvn);
+    set_def(1,gvn.xform(new CastNode(tru,baseaddr,((TypeStruct)t).make_nil(TypeStruct.NOT_NIL))),gvn);
     return set_def(0,null,gvn);
   }
   @Override public Type value(GVNGCM gvn) {

@@ -35,6 +35,8 @@ public class GVNGCM {
 
   // Global expressions, to remove redundant Nodes
   private ConcurrentHashMap<Node,Node> _vals = new ConcurrentHashMap<>();
+
+  public String dump( Node n, int max ) { return n.dump(max,this); }
   
   // Initial state after loading e.g. primitives & boot libs.  Record state
   // here, so can reset to here cheaply and parse again.

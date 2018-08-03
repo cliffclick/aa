@@ -94,50 +94,53 @@ public abstract class Node implements Cloneable {
   // Short string name
   String xstr() { return STRS[_op]; } // Self   short name
   String  str() { return xstr(); }    // Inline short name
-  @Override public String toString() { return toString(0,new SB()).toString(); }
-  public String toString( int max ) { return toString(0, new SB(),max,new BitSet()).toString();  }
-  private SB toString( int d, SB sb ) {
+  @Override public String toString() { return dump(0,new SB(),null).toString(); }
+  public String dump( int max ) { return dump(max,null); }
+  public String dump( int max, GVNGCM gvn ) { return dump(0, new SB(),max,new BitSet(),gvn).toString();  }
+  private SB dump( int d, SB sb, GVNGCM gvn ) {
     sb.i(d).p(_uid).p(':').p(xstr()).p(' ');
     for( Node n : _defs ) (n == null ? sb.p('_') : n.str(sb)).p(' ');
     sb.p(" [[");
     for( Node n : _uses ) sb.p(n._uid).p(' ');
-    return sb.p("]]");
+    sb.p("]]  ");
+    if( gvn != null ) sb.p(gvn.type(this).toString());
+    return sb;
   }
   private SB str(SB sb) { return sb.p(_uid).p(':').p(str()).p(' '); }
   // Recursively print, up to depth
-  private SB toString( int d, SB sb, int max, BitSet bs ) {
+  private SB dump( int d, SB sb, int max, BitSet bs, GVNGCM gvn ) {
     if( bs.get(_uid) ) return sb;
     bs.set(_uid);
     if( d < max ) {    // Limit at depth
       // Print parser scopes first (deepest)
-      for( Node n : _defs ) if( n instanceof ScopeNode && n._uid != 0 ) n.toString(d+1,sb,max,bs);
+      for( Node n : _defs ) if( n instanceof ScopeNode && n._uid != 0 ) n.dump(d+1,sb,max,bs,gvn);
       // Print constants early
-      for( Node n : _defs ) if( n instanceof ConNode ) n.toString(d+1,sb,max,bs);
+      for( Node n : _defs ) if( n instanceof ConNode ) n.dump(d+1,sb,max,bs,gvn);
       // Do not recursively print root Scope, nor Unresolved of primitives.
       // These are too common, and uninteresting.
       for( Node n : _defs ) if( n != null && n._uid < GVNGCM._INIT0_CNT ) bs.set(n._uid);
       // Recursively print most of the rest, just not the multi-node combos
-      for( Node n : _defs ) if( n != null && !n.is_multi_head() && !n.is_multi_tail() ) n.toString(d+1,sb,max,bs);
+      for( Node n : _defs ) if( n != null && !n.is_multi_head() && !n.is_multi_tail() ) n.dump(d+1,sb,max,bs,gvn);
       // Print anything not yet printed, including multi-node combos
-      for( Node n : _defs ) if( n != null ) n.toString(d+1,sb,max,bs);
+      for( Node n : _defs ) if( n != null ) n.dump(d+1,sb,max,bs,gvn);
     }
     // Print multi-node combos all-at-once
     Node x = is_multi_tail() ? in(0) : this;
     if( x.is_multi_head() ) {
       bs.clear(_uid);           // Reset for self, so prints in the mix
       int dx = d+(x==this?0:1);
-      x.toString(dx,sb,bs); // Conditionally print head of combo
+      x.dump(dx,sb,bs,gvn); // Conditionally print head of combo
       // Print all combo tails, if not already printed
-      for( Node n : x._uses ) if( n.is_multi_tail() ) n.toString(dx-1,sb,bs);
+      for( Node n : x._uses ) if( n.is_multi_tail() ) n.dump(dx-1,sb,bs,gvn);
       return sb;
     } else { // Neither combo head nor tail, just print
-      return toString(d,sb).nl();
+      return dump(d,sb,gvn).nl();
     }
   }
-  private SB toString(int d, SB sb, BitSet bs) {
+  private SB dump(int d, SB sb, BitSet bs, GVNGCM gvn) {
     if( bs.get(_uid) ) return sb;
     bs.set(_uid);
-    return toString(d,sb).nl();
+    return dump(d,sb,gvn).nl();
   }
   private boolean is_multi_head() { return _op==OP_FUN  || _op==OP_REGION || _op==OP_CALL || _op==OP_IF; }
   private boolean is_multi_tail() { return _op==OP_PARM || _op==OP_PHI    || _op==OP_PROJ              ; }

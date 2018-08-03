@@ -70,6 +70,7 @@ public class TypeName extends Type {
   @Override public boolean may_be_con() { return _t.may_be_con(); }
   @Override public boolean is_con()   { return _t.is_con(); }
   @Override public boolean may_be_nil() { return _t.may_be_nil(); }
+  @Override public boolean may_have_nil() { return _t.may_have_nil(); }
   @Override public double getd  () { return _t.getd  (); }
   @Override public long   getl  () { return _t.getl  (); }
   @Override public String getstr() { return _t.getstr(); }

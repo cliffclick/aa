@@ -12,9 +12,6 @@ import static org.junit.Assert.assertTrue;
 
 public class TestType {
   @Test public void testType0() {
-    //test   ("a = math_rand(1) ? 0 : @{x=1}; // a is null or a struct\n"+
-    //        "b = math_rand(1) ? 0 : @{c=a}; // b is null or a struct\n"+
-    //        "b ? (b.c ? b.c.x : 0) : 0  // Needs a safe-field", TypeInt.BOOL); // Needs a safe-field
     // Simple int
     test("1",   TypeInt.TRUE);
     // Unary operator
@@ -203,12 +200,10 @@ public class TestType {
     test   ("\"abc\"==0", TypeInt.FALSE ); // No type error, just not null
     test   ("\"abc\"!=0", TypeInt.TRUE  ); // No type error, just not null
     test   ("nil=0; \"abc\"!=nil", TypeInt.TRUE); // Another way to name null
-    
-    //test   ("a = math_rand(1)?0:@{x=1}; // a is null or a struct"+
-    //        "b = math_rand(1)?0:@{a=a}; // b is null or a struct"+
-    //        "b ? (b.a ? b.a.x : 0) : 0  // Needs a safe-field", TypeInt.BOOL); // Needs a safe-field
+    test   ("a = math_rand(1) ? 0 : @{x=1}; // a is null or a struct\n"+
+            "b = math_rand(1) ? 0 : @{c=a}; // b is null or a struct\n"+
+            "b ? (b.c ? b.c.x : 0) : 0      // Null-safe field load", TypeInt.BOOL); // Nested null-safe field load
 
-    
     // TODO: Need real TypeVars for these
     //test("id:{A->A}"    , Env.lookup_valtype("id"));
     //test("id:{A:int->A}", Env.lookup_valtype("id"));
@@ -216,8 +211,6 @@ public class TestType {
   }
 
   /*
-
-// 0:int is the uniform initial value, counts as null; free cast to null
 
 // A tuple of null and a string
 list_of_hello = @{ 0, "hello", }
