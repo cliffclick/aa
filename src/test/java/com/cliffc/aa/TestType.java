@@ -13,9 +13,7 @@ import static org.junit.Assert.assertTrue;
 public class TestType {
   @Test public void testType0() {
     // User-defined linked-list
-    test("List = :@{ next, val }; x=List(@{next=0,val=\"abc\"}); x.val", TypeStr.ABC);
-    //test("List = :@{ next, val }; x=List(       0,    \"abc\"}); x.val", TypeStr.ABC);
-    //test("@{0,\"abc\"}", TypeTuple.make_all(TypeUnion.NIL,TypeStr.ABC));
+    //test("List=:@{next,val}; x=List(0,\"abc\"); x.val", TypeStr.ABC);
 
     // Simple int
     test("1",   TypeInt.TRUE);
@@ -209,6 +207,13 @@ public class TestType {
             "b = math_rand(1) ? 0 : @{c=a}; // b is null or a struct\n"+
             "b ? (b.c ? b.c.x : 0) : 0      // Null-safe field load", TypeInt.BOOL); // Nested null-safe field load
 
+    // User-defined linked list
+    test("List=:@{next,val}; x=List(@{next=0,val=\"abc\"}); x.val", TypeStr.ABC);
+
+    // Potential tuple syntax
+    //test("@{0,\"abc\"}", TypeTuple.make_all(TypeUnion.NIL,TypeStr.ABC));
+    //test(" (0,\"abc\")", TypeTuple.make_all(TypeUnion.NIL,TypeStr.ABC));
+    
     // TODO: Need real TypeVars for these
     //test("id:{A->A}"    , Env.lookup_valtype("id"));
     //test("id:{A:int->A}", Env.lookup_valtype("id"));
@@ -219,6 +224,17 @@ public class TestType {
 
 // A tuple of null and a string
 list_of_hello = @{ 0, "hello", }
+list_of_hello =  ( 0, "hello", )
+
+TODO: Decide if calls only ever take 1 arg, and also args auto-gather into
+tuples which is the one arg passed into a call.  Eg: dist(x,y) parses into a
+function 'dist' and a 2-element tuple '(x,y)' and then a function call of the
+one tuple arg.  Meanwhile dist is declared as 'dist = { x y -> ...}  which is
+syntax sugar for naming the elements of the 1 tuple arg passed in.
+
+The difference shows up in any sort of varargs-like syntax, where multiple
+different arguments get passed in.
+
 
 // No ambiguity:
  { x } // no-arg-function returning external variable x; same as { -> x }

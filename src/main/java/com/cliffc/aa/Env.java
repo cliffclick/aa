@@ -20,7 +20,7 @@ public class Env implements AutoCloseable {
     _scope  .init0(); // Add base types
     _scope.add("math_pi",new ConNode<>(TypeFlt.PI));
     for( PrimNode prim : PrimNode.PRIMS )
-      _scope.add_fun(prim._name,as_fun(prim));
+      _scope.add_fun(prim._name,_gvn.init(as_fun(prim)));
     // Now that all the UnresolvedNodes have all possible hits for a name,
     // register them with GVN.
     for( Node val : _scope._defs )  _gvn.init0(val);
@@ -43,7 +43,7 @@ public class Env implements AutoCloseable {
       prim.add_def(_gvn.init(new ParmNode(i,args[i],fun,_gvn.con(targs.at(i)),null)));
     PrimNode x = _gvn.init(prim);
     assert x==prim;
-    return _gvn.init(new EpilogNode(fun,prim,rpc,fun,null));
+    return new EpilogNode(fun,prim,rpc,fun,null);
   }
 
   public Node add( String name, Node val ) { return _scope.add(name,val); }

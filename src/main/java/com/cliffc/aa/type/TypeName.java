@@ -20,7 +20,7 @@ public class TypeName extends Type {
   private static TypeName FREE=null;
   private TypeName free( TypeName f ) { FREE=f; return this; }
   private static TypeName make0( String name, Type t) {
-    assert !(t instanceof TypeUnion); // No named unions
+    assert !(t instanceof TypeUnion) || t==TypeUnion.NIL; // No named unions (except nil)
     TypeName t1 = FREE;
     if( t1 == null ) t1 = new TypeName(name,t);
     else { FREE = null; t1.init(name,t); }

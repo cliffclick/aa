@@ -10,7 +10,7 @@ import java.util.BitSet;
 // - RPC - where to jump-to next; the Continuation
 // - The FunNode function header (quickly maps to SESE region header)
 public class EpilogNode extends Node {
-  public final String _unkref_err; // Unknown ref error (not really a forward ref)
+  final String _unkref_err; // Unknown ref error (not really a forward ref)
   public EpilogNode( Node ctrl, Node val, Node rpc, Node fun, String unkref_err ) { super(OP_EPI,ctrl,val,rpc,fun); _unkref_err=unkref_err; }
   @Override public Node ideal(GVNGCM gvn) {
     if( skip_ctrl(gvn) ) return this;

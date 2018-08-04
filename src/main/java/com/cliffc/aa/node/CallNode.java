@@ -109,6 +109,10 @@ public class CallNode extends Node implements AutoCloseable {
     Node    rez = epi.val ();
     FunNode fun = epi.fun ();
 
+    // Arg counts must be compatible
+    if( fun._tf.nargs() != nargs() )
+      return null;
+
     // Single choice; insert actual conversions as needed
     TypeTuple formals = fun._tf._ts;
     for( int i=0; i<nargs(); i++ ) {

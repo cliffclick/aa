@@ -164,7 +164,7 @@ public class Parse {
       _e.add_type(tvar,tn); // Assign type-name
       // TODO: Add reverse cast-away
       PrimNode cvt = PrimNode.convert(null,t,tn);
-      return _e.add(tvar,_e.as_fun(cvt)); // Return type-name constructor
+      return _e.add(tvar,gvn(_e.as_fun(cvt))); // Return type-name constructor
     }
 
     // Normal statement value parse

@@ -88,7 +88,7 @@ public class TypeStr extends TypeNullable {
   // +1 requires a bit-changing conversion; no auto-unboxing
   // 99 Bottom; No free converts; e.g. Flt->Str requires explicit rounding
   @Override public byte isBitShape(Type t) {
-    if( t._type==Type.TSTR || t._type==Type.TOOP ) return 0;
+    if( t._type==Type.TSTR || t._type==Type.TOOP || t._type==Type.TSCALAR || t._type==Type.TXSCALAR) return 0;
     if( t instanceof TypeUnion && this.isa(t) ) return 0;
     return 99;
   }
