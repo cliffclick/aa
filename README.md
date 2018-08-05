@@ -155,6 +155,7 @@ Function execution and result typing | ---
 `x=3; addx={y -> x+y}; addx(2)` | `5:int` Overloaded `+` resolves to `:int`
 `x=3; mul2={x -> x*2}; mul2(2.1)` | `4.2:flt` Overloaded `{+}:flt` resolves with I->F conversion
 `x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)` | `10.2:flt` Overloaded `mul2` specialized into int and flt variants
+`sq={x -> x*x}; sq 2.1` | `4.41:flt` No `()` required for single args
 Type annotations  | ---
 `-1:int`          | `-1:int`
 `(1+2.3):flt`     | `3.3:flt`  Any expression can have a type annotation
