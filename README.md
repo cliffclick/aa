@@ -41,20 +41,18 @@ BNF                           | Comment
 `stmt = tvar = :type`         | type variable assignment
 `ifex = expr ? expr : expr`   | trinary logic
 `expr = term [binop term]*`   | gather all the binops and sort by prec
-`term = nfact [          `    | Any number of optional nfact modifiers
-` =         ([stmts,]*)  OR`  | A function call, args (full stmts) are comma-delimited
-` =         .field       OR`  | Field lookup; `.` is not quite a binary operator because 'field' is not a `str`
-` =         :type`            | Type annotation
-` ]*`                         | Any number of optional nfact modifiers
-`nfact= uniop* fact`          | Zero or more uniop calls over a fact
+`term = tfact [tuple | fact | .field]*` | function application (includes uniop) or field lookup
+`tfact= fact[:type]`          | Optionally typed fact
 `fact = id`                   | variable lookup
 `fact = num`                  | number
 `fact = "string"`             | string
 `fact = (stmts)`              | General statements parsed recursively
+`fact = tuple`                | Tuple builder
 `fact = {func}`               | Anonymous function declaration
 `fact = @{ [id[:type]?[=stmt]?,]* }` | Anonymous struct declaration; optional type, optional initial value, optional final comma
 `fact = {binop}`              | Special syntactic form of binop; no spaces allowed; returns function constant
 `fact = {uniop}`              | Special syntactic form of uniop; no spaces allowed; returns function constant
+`tuple= (stmts,[stmts,])`     | Tuple; final comma is optional
 `binop= +-*%&/<>!=`           | etc; primitive lookup; can determine infix binop at parse-time, also pipe but GFM screws up
 `uniop= -!~`                  | etc; primitive lookup; can determine infix uniop at parse-time
 `func = { [[id[:type]*]* ->]? stmts}` | Anonymous function declaration

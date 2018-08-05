@@ -58,15 +58,15 @@ public class TestType {
     // bare function lookup; returns a union of '+' functions
     testerr("+", "Syntax error; trailing junk","");
     test("{+}", Env.lookup_valtype("+"));
-    test("{!}", Env.lookup_valtype("!"));
+    test("!", Env.lookup_valtype("!")); // uniops are just like normal functions
     // Function application, traditional paren/comma args
     test("{+}(1,2)", TypeInt.con( 3));
     test("{-}(1,2)", TypeInt.con(-1)); // binary version
-    test("{-}(1  )", TypeInt.con(-1)); // unary version
+    test(" - (1  )", TypeInt.con(-1)); // unary version
     // error; mismatch arg count
-    testerr("!()"       , "Call to unary function '!', but missing the one required argument"," ");
+    testerr("!()       ", "Passing 0 arguments to !{int64 -> int1} which takes 1 arguments","   ");
     testerr("math_pi(1)", "A function is being called, but 3.141592653589793 is not a function type","          ");
-    testerr("{+}(1,2,3)", "Passing 3 arguments to +{flt64 flt64 -> flt64} which takes 2 arguments","    ");
+    testerr("{+}(1,2,3)", "Passing 3 arguments to +{flt64 flt64 -> flt64} which takes 2 arguments","          ");
 
     // Parsed as +(1,(2*3))
     test("{+}(1, 2 * 3) ", TypeInt.con(7));
@@ -139,9 +139,10 @@ public class TestType {
     testerr("x:flt32 = 123456789", "123456789 is not a flt32","                   ");
     testerr("1:","Syntax error; trailing junk"," "); // missing type
     testerr("2:x", "Syntax error; trailing junk", " ");
-    testerr("(2:)", "Expected ')' but found ':' instead", "  ");
+    testerr("(2:)", "Syntax error; trailing junk", "  ");
 
-    testerr("-1:int1", "-1 is not a int1","       ");
+    test   (" -1 :int1", TypeInt.con(-1));
+    testerr("(-1):int1", "-1 is not a int1","         ");
     testerr("\"abc\":int", "\"abc\" is not a int64","         ");
     testerr("1:str", "1 is not a str","     ");
 

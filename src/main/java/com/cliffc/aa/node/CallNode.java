@@ -5,9 +5,9 @@ import com.cliffc.aa.type.*;
 
 // See FunNode.  Control is not required for an apply but inlining the function
 // body will require it; slot 0 is for Control.  Slot 1 is a function value - a
-// ConNode with a TypeFun or a TypeUnion of TypeFuns.  Slots 2+ are for args.
+// Node with a TypeFun or a TypeUnion of TypeFuns.  Slots 2+ are for args.
 //
-// When the ConNode simplifies to a single TypeFun, the Call can inline.
+// When the function simplifies to a single TypeFun, the Call can inline.
 // Otherwise the TypeUnion lists a bunch of function pointers are allowed here.
 //
 // Call-inlining can happen anytime we have a known function pointer, and
@@ -18,14 +18,15 @@ import com.cliffc.aa.type.*;
 // is just like a ReturnPC value on a real machine; it dictates which of
 // several possible returns apply... and can be merged like a PhiNode
 
-public class CallNode extends Node implements AutoCloseable {
+public class CallNode extends Node {
   private static int RPC=1; // Call-site return PC
   int _rpc;         // Call-site return PC
-  private boolean _inlined;
+  private boolean _unpacked;    // Call site allows unpacking a tuple (once)
+  private boolean _inlined;     // Inlining a call-site is a 2-stage process
   private Type   _cast_ret;     // Return type has been up-casted
   private Parse  _cast_P;       // Return type cast fail message
   private Parse  _badargs;      // Error for e.g. wrong arg counts or incompatible args
-  public CallNode( Parse badargs, Node... defs ) { super(OP_CALL,defs); _rpc=RPC++; _badargs = badargs; }
+  public CallNode( boolean unpacked, Parse badargs, Node... defs ) { super(OP_CALL,defs); _rpc=RPC++; _unpacked=unpacked; _badargs = badargs; }
 
   String xstr() { return "Call#"+_rpc; } // Self short name
   String  str() { return xstr(); }       // Inline short name
@@ -42,14 +43,6 @@ public class CallNode extends Node implements AutoCloseable {
   // Actual arguments.
   Node arg( int x ) { return _defs.at(x+2); }
   
-  // Parser support keeping args alive during parsing; if a syntax exception is
-  // thrown while the call args are being built, this will free them all.  Once
-  // this hits GVN, it will no longer auto-close.
-  @Override public void close() {
-    if( !is_dead() && !Env._gvn.touched(this) )
-      Env._gvn.kill_new(this);  // Free state on 
-  }
-
   // Clones during inlining all become unique new call sites
   @Override Node copy() {
     CallNode call = super.copy();
@@ -66,6 +59,21 @@ public class CallNode extends Node implements AutoCloseable {
     //
     Node ctrl = in(0);          // Control for apply/call-site
     Node unk  = in(1);          // Function epilog/function pointer
+
+    // When do i do 'pattern matching'?  For the moment, right here: if not
+    // already unpacked a tuple, and can see the NewNode, unpack it right now.
+    if( !_unpacked ) { // Not yet unpacked a tuple
+      assert nargs()==1;
+      Node nn = arg(0);
+      if( nn instanceof NewNode || gvn.type(nn) == TypeTuple.ALL ) {
+        pop();                  // Pop off the NewNode/empty tuple
+        if( nn instanceof NewNode )
+          for( int i=1; i<nn._defs._len; i++ )
+            add_def(nn.in(i));  // Push the args; unpacks the tuple
+        _unpacked = true;       // Only do it once
+        return this;
+      }
+    }
 
     // Type-checking a function; requires 2 steps, one now, one in the
     // following data Proj from the worklist.
@@ -87,20 +95,6 @@ public class CallNode extends Node implements AutoCloseable {
       Node fun = ((UnresolvedNode)unk).resolve(gvn,this);
       if( fun != null ) { set_def(1,fun,gvn); return this; }
     }
-
-    //// Similarly, if arguments do not match, push TypeNodes "uphill" to get
-    //// correct args to the function.  The TypeNodes will push the typing
-    //// outward until we hit a direct conflict.
-    //boolean did_cast = false;
-    //for( int i=0; i<nargs(); i++ ) {
-    //  Type formal = t.arg(i);
-    //  Type actual = gvn.type(arg(i));
-    //  if( !actual.isa(formal) ) {
-    //    set_def(i+2,gvn.xform(new TypeNode(formal,arg(i),_badargs)),gvn);
-    //    did_cast = true;
-    //  }
-    //}
-    //if( did_cast ) return this;
 
     // Unknown function(s) being called
     if( !(unk instanceof EpilogNode) )

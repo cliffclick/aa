@@ -117,28 +117,24 @@ class Convert extends PrimNode {
     return apply(ts);
   }
   @Override public Type apply( Type[] args ) { return TypeName.make(_name,args[1]); }
-  @Override public byte op_prec() { return 0; }
   public boolean is_lossy() { return false; }
 }
 
 class ConvertInt64F64 extends PrimNode {
   ConvertInt64F64(Node... nodes) { super("flt64",PrimNode.ARGS1,TypeTuple.INT64,TypeFlt.FLT64,nodes); }
   @Override public TypeFlt apply( Type[] args ) { return TypeFlt.con((double)args[1].getl()); }
-  @Override public byte op_prec() { return 9; }
   public boolean is_lossy() { return false; }
 }
 
 class ConvertI64Str extends PrimNode {
   ConvertI64Str(Node... nodes) { super("str",PrimNode.ARGS1,TypeTuple.INT64,TypeStr.STR,nodes); }
   @Override public TypeStr apply( Type[] args ) { return TypeStr.con(Long.toString(args[1].getl())); }
-  @Override public byte op_prec() { return 9; }
   public boolean is_lossy() { return false; }
 }
 
 class ConvertF64Str extends PrimNode {
   ConvertF64Str(Node... nodes) { super("str",PrimNode.ARGS1,TypeTuple.FLT64,TypeStr.STR,nodes); }
   @Override public TypeStr apply( Type[] args ) { return TypeStr.con(Double.toString(args[1].getd())); }
-  @Override public byte op_prec() { return 9; }
   public boolean is_lossy() { return false; }
 }
 
@@ -155,7 +151,6 @@ abstract class Prim1OpF64 extends PrimNode {
   Prim1OpF64( String name ) { super(name,PrimNode.ARGS1,TypeTuple.FLT64,TypeFlt.FLT64); }
   public TypeFlt apply( Type[] args ) { return TypeFlt.make(0,64,op(args[1].getd())); }
   abstract double op( double d );
-  @Override public byte op_prec() { return 9; }
 }
 
 class MinusF64 extends Prim1OpF64 {
@@ -167,7 +162,6 @@ class MinusF64 extends Prim1OpF64 {
 abstract class Prim1OpI64 extends PrimNode {
   Prim1OpI64( String name ) { super(name,PrimNode.ARGS1,TypeTuple.INT64,TypeInt.INT64); }
   public TypeInt apply( Type[] args ) { return TypeInt.con(op(args[1].getl())); }
-  @Override public byte op_prec() { return 9; }
   abstract long op( long d );
 }
 
@@ -179,7 +173,6 @@ class MinusI64 extends Prim1OpI64 {
 class NotI64 extends PrimNode {
   NotI64() { super("!",PrimNode.ARGS1,TypeTuple.INT64,TypeInt.BOOL); }
   public TypeInt apply( Type[] args ) { return args[1].getl()==0?TypeInt.TRUE:TypeInt.FALSE; }
-  @Override public byte op_prec() { return 9; }
 }
 
 // 2Ops have uniform input/output types, so take a shortcut on name printing

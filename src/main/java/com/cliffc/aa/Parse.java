@@ -19,23 +19,22 @@ import java.util.BitSet;
  *  stmt = tvar = :type         // type variable assignment
  *  ifex = expr ? expr : expr   // trinary logic
  *  expr = term [binop term]*   // gather all the binops and sort by prec
- *  term = nfact [              // Any number of optional nfact modifiers
- *       =   ([stmts,]*) OR     // A function call, args (full stmts) are comma-delimited
- *       =   .field      OR     // Field lookup; not quite a binary operator because 'field' is not a Value
- *       =   :type              // Type annotation
- *       ]*                     // Any number of optional nfact modifiers
- *  nfact= uniop* fact          // Zero or more uniop calls over a fact
+ *  term = tfact [tuple | fact | .field]* // application (includes uniop) or field lookup
+ *  tfact= fact[:type]          // Typed fact
  *  fact = id                   // variable lookup
  *  fact = num                  // number
  *  fact = "str"                // string
  *  fact = (stmts)              // General statements parsed recursively
+ *  fact = tuple                // Tuple builder
  *  fact = {func}               // Anonymous function declaration
  *  fact = @{ [id[:type]?[=stmt]?,]* } // Anonymous struct declaration; optional type, optional initial value, optional final comma
  *  fact = {binop}              // Special syntactic form of binop; no spaces allowed; returns function constant
  *  fact = {uniop}              // Special syntactic form of uniop; no spaces allowed; returns function constant
+ *  tuple= (stmts,[stmts,])     // Tuple; final comma is optional
  *  binop= +-*%&|/<>!=          // etc; primitive lookup; can determine infix binop at parse-time
  *  uniop=  -!~                 // etc; primitive lookup; can determine infix uniop at parse-time
  *  func = { [[id[:type]?]* ->]? stmts} // Anonymous function declaration
+ *                              // Pattern matching: 1 arg is the arg; 2+ args break down a (required) tuple
  *  str  = [.\%]*               // String contents; \t\n\r\% standard escapes
  *  str  = %[num]?[.num]?fact   // Percent escape embeds a 'fact' in a string; "name=%name\n"
  *  type = tcon | tvar | tfun[?] | tstruct[?] // Types are a tcon or a tfun or a tstruct or a type variable.  A trailing ? means 'nullable'
@@ -252,7 +251,7 @@ public class Parse {
           Node fun = funs.at(i);
           assert fun.op_prec() <= max;
           if( fun.op_prec() < max ) continue; // Not yet
-          Node call = do_call(new CallNode(errMsg(),ctrl(),fun,args.in(i-1),args.in(i)));
+          Node call = do_call(new CallNode(true,errMsg(),ctrl(),fun,args.in(i-1),args.in(i)));
           args.set_def(i-1,call,_gvn);
           funs.remove(i);  args.remove(i);  i--;
         }
@@ -262,91 +261,62 @@ public class Parse {
     }
   }
 
-  /** Parse any number of optional function calls, field lookups and types
-   *  annotations.
-   *  term = nfact [
-   *           ([stmts,]*) |      // A function call, args (full stmts) are delimited
-   *           .field      |      // Field lookup; not quite a binary operator because 'field' is not a Value
-   *           :type              // Typed
-   *               ]*             // Any number of the above, in any order
+  /** Parse a term, either an optional application or a field lookup
+   *  term = tfact [tuple | fact | .field]* // application (includes uniop) or field lookup
    */
   private Node term() {
-    Node n = nfact();    // Start with an nfact
+    Node n = tfact();
     if( n == null ) return null;
-    while( true ) {        // Any number of calls, field loads, and type annotations
-      int oldx = _x;
-      switch( skipWS() ) {
-      case -1: return n;   // Just the original nfact
-      case '(':            // Function application; parse out the argument list
-        _x++;              // Skip paren
-        try( CallNode args = new CallNode(errMsg()) ) {
-          args.add_def(ctrl());
-          args.add_def(n);              // Function pointer
-          Node arg=stmts();             // First argument
-          if( arg != null ) {           // Check for a no-arg fcn call
-            args.add_def(arg);          // Add first arg
-            while( peek(',') ) {        // Gather comma-separated args
-              if( (arg=stmts()) == null ) arg = err_ctrl2("Missing argument in function call");
-              args.add_def(arg);
-            }
-          }
-          require(')');
-          Type t = _gvn.type(n);
-          n = t.is_fun_ptr() // Require being able to tell n is a function ptr at parse-time
-            ? do_call(args)  // No syntax errors; flag Call not auto-close, and go again
-            // Syntax error; auto-close reclaim args; but go again
-            : err_ctrl2("A function is being called, but "+t+" is not a function type");
-        }
-        break;
-
-      case '.':                 // Field parse
-        _x++;                   // Skip dot
+    while( true ) {             // Repeated application or field lookup is fine
+      if( peek('.') ) {         // Field?
         String fld = token();   // Field name
         n = fld == null         // Missing field?
           ? err_ctrl2("Missing field name after '.'")
           :  gvn(new LoadNode(ctrl(),n,fld,errMsg()));
-        if( peek('=') ) {       // Right now, field re-assigns of any type
+        if( peek('=') ) {       // Right now, no field re-assigns of any type
           Node stmt = stmt();
           if( stmt == null ) n = err_ctrl2("Missing stmt after assigning field '."+fld+"'");
           else { kill(stmt); n = err_ctrl2("Cannot re-assign field '."+fld+"'"); }
         }
-        break;
 
-      case ':':                 // Type parse
-        _x++;                   // Skip colon
-        Type t = type();
-        if( t==null ) { _x = oldx; return n; } // No error for missing type, because can be ?: instead
-        n = gvn(new TypeNode(t,n,errMsg()));
+      } else if( _gvn.type(n).is_fun_ptr() ) { // Require being able to tell n is a function ptr at parse-time
+        boolean arglist = peek('(');
+        Node arg = arglist ? tuple(stmts()) : tfact(); // Start of an argument list?
+        if( arg == null ) break; // Function but no arg is just the function
+        n = do_call(new CallNode(!arglist,errMsg(),ctrl(),n,arg)); // Pass the 1 arg
+
+      } else                    // Not a function application nor field lookup
         break;
-      default: return n;
-      }
     }
+    
+    if( skipWS() == '(' ) { // Check for function application, but no function
+      Node arg = tfact();   // Following (arg) ?
+      if( arg != null ) {   // Non-function being applied
+        kill(arg);
+        n = err_ctrl2("A function is being called, but "+_gvn.type(n)+" is not a function type");
+      }
+    } // Else no trailing arg, just return value
+    return n;                   // No more terms
   }
   
-  
-  /** Parse any leading unary ops before a factor
-   *  nfact = fact | uniop nfact
+  /** Parse an optional type
+   *  tfact = fact[:type]
    */
-  private Node nfact() {
+  private Node tfact() {
+    Node fact = fact();
+    if( fact==null ) return null;
     int oldx = _x;
-    String uni = token();
-    if( uni!=null ) { // Valid parse
-      Node unifun = _e.lookup_filter(uni,_gvn,1);
-      if( unifun != null && unifun.op_prec() > 0 )  {
-        Node arg = nfact(); // Recursive call
-        if( arg == null ) { err_ctrl0("Call to unary function '"+uni+"', but missing the one required argument"); return null; }
-        return do_call(new CallNode(errMsg(),ctrl(),unifun,arg));
-      } else {
-        _x=oldx;                // Unwind token parse and try again for a factor
-      }
-    }
-    return fact();
+    if( !peek(':') ) { _x = oldx; return fact; }
+    Type t = type();
+    if( t==null ) { _x = oldx; return fact; } // No error for missing type, because can be ?: instead
+    return gvn(new TypeNode(t,fact,errMsg()));
   }
-
+  
   /** Parse a factor, a leaf grammar token
    *  fact = num       // number
    *  fact = "string"  // string
    *  fact = (stmts)   // General statements parsed recursively
+   *  fact = (tuple,*) // tuple; first comma required, trailing comma not required
    *  fact = {binop}   // Special syntactic form of binop; no spaces allowed; returns function constant
    *  fact = {uniop}   // Special syntactic form of uniop; no spaces allowed; returns function constant
    *  fact = {func}    // Anonymous function declaration
@@ -358,16 +328,16 @@ public class Parse {
     if( '0' <= c && c <= '9' ) return con(number());
     if( '"' == c ) return con(string());
     int oldx = _x;
-    if( peek1(c,'(') ) {           // a nested statement
+    if( peek1(c,'(') ) {        // a nested statement or a tuple
       Node s = stmts();
       if( s==null ) { _x = oldx; return null; } // A bare "()" pair is not a statement
-      require(')');
-      return s;
+      if( peek(')') ) return s;                 // A (grouped) statement
+      return peek(',') ? tuple(s) : s;
     }
     // Anonymous function or operator
     if( peek1(c,'{') ) {
       String tok = token0();
-      Node op = tok == null ? null : _e.lookup(tok);
+      Node op = tok == null ? null : _e.lookup_filter(tok,_gvn,2); // TODO: filter by >1 not ==2
       if( peek('}') && op != null && op.op_prec() > 0 )
         return op;              // Return operator as a function constant
       _x = oldx+1;              // Back to the opening paren
@@ -385,6 +355,24 @@ public class Parse {
     // Disallow uniop and binop functions as factors.
     if( var.op_prec() > 0 ) { _x = oldx; return null; }
     return var;
+  }
+
+  /** Parse a tuple
+   *  tuple= (stmts,[stmts,])     // Tuple; final comma is optional
+   */
+  private Node tuple(Node s) {
+    // Construct a tuple
+    Ary<Node> ns = new Ary<>(new Node[]{null});
+    Ary<Type> ts = new Ary<>(new Type[]{});
+    while( s!=null ) {
+      ns.add(s);
+      ts.add(_gvn.type(s));
+      if( !peek(',') ) break; // Final comma is optional
+      s=stmt();
+    }
+    require(')');
+    TypeTuple tt = TypeTuple.make_all(ts.asAry());
+    return gvn(new NewNode(tt,ns.asAry()));
   }
 
   /** Parse an anonymous function; the opening '{' already parsed.  After the
@@ -614,8 +602,8 @@ public class Parse {
   private static boolean isWS    (byte c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r'; }
   private static boolean isAlpha0(byte c) { return ('a'<=c && c <= 'z') || ('A'<=c && c <= 'Z') || (c=='_'); }
   private static boolean isAlpha1(byte c) { return isAlpha0(c) || ('0'<=c && c <= '9'); }
-  private static boolean isOp0   (byte c) { return "!#$%*+,-.;:=<>?@^[]~/&".indexOf(c) != -1; }
-  private static boolean isOp1   (byte c) { return isOp0(c); }
+  private static boolean isOp0   (byte c) { return "!#$%*+,-.=<>?@^[]~/&".indexOf(c) != -1; }
+  private static boolean isOp1   (byte c) { return isOp0(c) || ":".indexOf(c) != -1; }
 
   public Node gvn (Node n) { return n==null ? null : _gvn.xform(n); }
   private <N extends Node> N init( N n ) { return n==null ? null : _gvn.init (n); }
@@ -633,8 +621,8 @@ public class Parse {
     if( !(call instanceof CallNode)) return call;
 
     call.add_def(call);         // Hook, so not deleted after 1st use
-    set_ctrl(gvn(new CProjNode(call,0)));
-    Node ret = gvn(new ProjNode(call,1));
+    set_ctrl(  gvn(new CProjNode(call,0)));
+    Node ret = gvn(new  ProjNode(call,1));
     ret.add_def(ret);           // Hook, so not deleted when call goes
     if( call.pop()._uses._len==0 )
       _gvn.kill(call);
