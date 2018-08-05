@@ -14,6 +14,8 @@ public class TestType {
   @Test public void testType0() {
     // User-defined linked-list
     //test("List=:@{next,val}; x=List(0,\"abc\"); x.val", TypeStr.ABC);
+    //test("List=:@{next,val}; map = { f list -> list ? List(@{next=map(f,list.next),val=f(list.val)}) : 0 }",TypeInt.TRUE);
+
 
     // Simple int
     test("1",   TypeInt.TRUE);
@@ -183,6 +185,9 @@ public class TestType {
 
     test   ("dist={p->p//qqq\n.//qqq\nx*p.x+p.y*p.y}; dist(//qqq\n@{x//qqq\n=1,y=2})", TypeInt.con(5));
 
+    // Tuple
+    test("(0,\"abc\")", TypeTuple.make_all(TypeUnion.NIL,TypeStr.ABC));
+    
     // Named type variables
     test_isa("gal=:flt"       , TypeTuple.make_fun_ptr(TypeFun.make(TypeTuple.FLT64,TypeName.make("gal",TypeFlt.FLT64),Bits.FULL)));
     test_isa("gal=:flt; gal"  , TypeTuple.make_fun_ptr(TypeFun.make(TypeTuple.FLT64,TypeName.make("gal",TypeFlt.FLT64),Bits.FULL)));
@@ -212,10 +217,6 @@ public class TestType {
     // User-defined linked list
     test("List=:@{next,val}; x=List(@{next=0,val=\"abc\"}); x.val", TypeStr.ABC);
 
-    // Potential tuple syntax
-    //test("@{0,\"abc\"}", TypeTuple.make_all(TypeUnion.NIL,TypeStr.ABC));
-    //test(" (0,\"abc\")", TypeTuple.make_all(TypeUnion.NIL,TypeStr.ABC));
-    
     // TODO: Need real TypeVars for these
     //test("id:{A->A}"    , Env.lookup_valtype("id"));
     //test("id:{A:int->A}", Env.lookup_valtype("id"));
