@@ -130,6 +130,7 @@ public class TestType {
     test("x=3; addx={y -> x+y}; addx(2)", TypeInt.con(5)); // must inline to resolve overload {+}:Int
     test("x=3; mul2={x -> x*2}; mul2(2.1)", TypeFlt.con(2.1*2.0)); // must inline to resolve overload {*}:Flt with I->F conversion
     test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
+    test("sq={x -> x*x}; sq 2.1", TypeFlt.con(4.41)); // No () required for single args
 
     // Type annotations
     test("-1:int", TypeInt.con( -1));
