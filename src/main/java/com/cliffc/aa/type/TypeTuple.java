@@ -1,5 +1,6 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.AA;
 import com.cliffc.aa.util.SB;
 
 import java.util.Arrays;
@@ -36,10 +37,10 @@ public class TypeTuple extends TypeNullable {
     return true;
   }
   @Override public String toString() {
-    SB sb = new SB().p('[');
+    SB sb = new SB().p('(');
     for( Type t : _ts ) sb.p(t.toString()).p(',');
     if( _inf!=TypeErr.ALL ) sb.p(_inf.toString()).p("...");
-    sb.p(']');
+    sb.p(')');
     return String.format(TSTRS[_nil],sb.toString());
   }
 
@@ -175,6 +176,15 @@ public class TypeTuple extends TypeNullable {
   // Return true if this is a forward-ref function pointer (return type from EpilogNode)
   @Override public boolean is_forward_ref() { return is_fun_ptr() && _ts[3].is_forward_ref(); }
   public TypeFun get_fun() { assert is_fun_ptr(); return (TypeFun)_ts[3]; }
+
+  // True if isBitShape on all bits
+  @Override public byte isBitShape(Type t) {
+    if( isa(t) ) return 0; // Can choose compatible format
+    if( t instanceof TypeStruct ) return 99; // Not allowed to upcast a tuple to a struct
+    
+    throw AA.unimpl();
+  }
+  
   // Return an error message, if any exists
   @Override public String errMsg() {
     String s;

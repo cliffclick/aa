@@ -242,7 +242,7 @@ public class CallNode extends Node {
         actual = formal;   // Lift actual to worse-case valid argument type
       }
       if( !actual.isa(formal) ) // Actual is not a formal; accumulate type errors
-        terr = terr.meet(TypeErr.make(_badargs.typerr(actual, formal), actual, formal, false));
+        terr = terr.meet(TypeErr.make(_badargs.errMsg("%s is not a %s"), actual, formal, false));
     }
     return terr.meet(tval);  // Return any errors, or the Epilog return type
   }

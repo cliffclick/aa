@@ -13,7 +13,6 @@ import static org.junit.Assert.assertTrue;
 public class TestType {
   @Test public void testType0() {
     // User-defined linked-list
-    //test("List=:@{next,val}; x=List(0,\"abc\"); x.val", TypeStr.ABC);
     //test("List=:@{next,val}; map = { f list -> list ? List(@{next=map(f,list.next),val=f(list.val)}) : 0 }",TypeInt.TRUE);
 
 
@@ -198,6 +197,7 @@ public class TestType {
     test    ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(@{x=1,y=2}))", TypeInt.con(5));
     test    ("Point=:@{x,y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(@{x=1,y=2}))", TypeInt.con(5));
     testerr ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(     (@{x=1,y=2}))", "@{x:1,y:2,} is not a Point:@{x,y,}","                      ");
+    testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1,) is not a @{x,y,}","                           ");
 
     // nullable and not-null pointers
     test   ("x:str? = 0", TypeUnion.NIL); // question-type allows null or not; zero digit is null
@@ -216,6 +216,7 @@ public class TestType {
 
     // User-defined linked list
     test("List=:@{next,val}; x=List(@{next=0,val=\"abc\"}); x.val", TypeStr.ABC);
+    test("List=:@{next,val}; List0={n v -> List(@{next=n,val=v})}; x=List0(0,\"abc\"); x.val", TypeStr.ABC);
 
     // TODO: Need real TypeVars for these
     //test("id:{A->A}"    , Env.lookup_valtype("id"));

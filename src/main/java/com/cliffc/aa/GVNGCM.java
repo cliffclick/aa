@@ -328,16 +328,16 @@ public class GVNGCM {
         Type ot = type(n);        // Old type
         Type nt = n.value(this);  // New type
         assert ot.isa(nt);        // Types only fall monotonically
-        if( ot != nt || never_seen ) { // Progress
+        if( ot != nt || never_seen ) // Progress
           _ts.setX(n._uid,nt);    // Record progress
-          for( Node use : n._uses ) {
-            if( use.all_type() != type(use) ) // If not already at bottom
-              add_work(use);      // Re-run users to check for progress
-            // When new control paths appear on Regions, the Region stays the
-            // same type (Ctrl) but the Phis must merge new values.
-            if( use instanceof RegionNode )
-              for( Node phi : use._uses ) add_work(phi);
-          }
+        for( Node use : n._uses ) {
+          if( _ts._es[use._uid]==null || // Never typed
+              (ot != nt && use.all_type() != type(use))) // If not already at bottom
+            if( use != n ) add_work(use); // Re-run users to check for progress
+          // When new control paths appear on Regions, the Region stays the
+          // same type (Ctrl) but the Phis must merge new values.
+          if( use instanceof RegionNode )
+            for( Node phi : use._uses ) if( phi != n ) add_work(phi);
         }
       }
       _opt = false;               // Back to pessimistic behavior on new nodes

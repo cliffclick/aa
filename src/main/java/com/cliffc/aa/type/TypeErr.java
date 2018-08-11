@@ -1,5 +1,7 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.node.FunNode;
+
 /** Error data type.  If the program result is of this type, the program is not well formed. */
 public class TypeErr extends Type {
   boolean _all, _multi;         // Above or below centerline/dual; multiple errors (of which _msg is one)
@@ -58,7 +60,16 @@ public class TypeErr extends Type {
   }
   @Override public boolean above_center() { return !_all; }
   @Override public boolean may_be_con() { return !_all; }
-  @Override public boolean is_con()   { return !_all; }
   @Override public byte isBitShape(Type t) { return _all && this!=ALL ? (byte)99 : -1; }
-  @Override public String errMsg() { return above_center() || this==ALL ? null : _msg; }
+  @Override public String errMsg() {
+    if( above_center() || this==ALL ) return null;
+    if( _a == null ) return _msg;
+    if( _a.is_forward_ref() ) { // Forward/unknown refs as args to a call report their own error
+      // If _a, then expect "file:line:%s is not a %s\nsource_text\n    ^"
+      // Replace "%s is not a %s" with "Unknown ref 'xxx'"
+      String[] msgs = _msg.split("%s"); 
+      return msgs[0]+"Unknown ref '"+ FunNode.name(((TypeTuple)_a).get_fun().fidx())+"'"+msgs[2];
+    }
+    return String.format(_msg,_a,_b);
+  }
 }

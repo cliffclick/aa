@@ -79,7 +79,7 @@ public class Parse {
   private TypeEnv prog() {
     // Currently only supporting exprs
     Node res = stmts();
-    if( res == null ) res = con(TypeErr.ANY);
+    if( res == null ) res = con(TypeErr.ALL);
     _e._scope.add_def(ctrl());  // Hook, so not deleted
     _e._scope.add_def(res);     // Hook, so not deleted
     // Delete names at the top scope before final optimization.
@@ -332,7 +332,10 @@ public class Parse {
       Node s = stmts();
       if( s==null ) { _x = oldx; return null; } // A bare "()" pair is not a statement
       if( peek(')') ) return s;                 // A (grouped) statement
-      return peek(',') ? tuple(s) : s;
+      oldx = _x;
+      if( !peek(',') ) return s;                // Not a tuple, probably a syntax error
+      _x = oldx;                                // Reparse the ',' in tuple
+      return tuple(s);                          // Parse a tuple
     }
     // Anonymous function or operator
     if( peek1(c,'{') ) {
@@ -357,7 +360,7 @@ public class Parse {
     return var;
   }
 
-  /** Parse a tuple
+  /** Parse a tuple; first stmt but not the ',' parsed.
    *  tuple= (stmts,[stmts,])     // Tuple; final comma is optional
    */
   private Node tuple(Node s) {
@@ -367,8 +370,8 @@ public class Parse {
     while( s!=null ) {
       ns.add(s);
       ts.add(_gvn.type(s));
-      if( !peek(',') ) break; // Final comma is optional
-      s=stmt();
+      if( !peek(',') ) break;   // Final comma is optional
+      s=stmts();
     }
     require(')');
     TypeTuple tt = TypeTuple.make_all(ts.asAry());

@@ -1,5 +1,6 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.AA;
 import com.cliffc.aa.util.SB;
 
 import java.util.Arrays;
@@ -146,5 +147,12 @@ public class TypeStruct extends TypeTuple {
       if( fld.equals(_args[i]) )
         return i;
     return -1;
+  }
+
+  // True if isBitShape on all bits
+  @Override public byte isBitShape(Type t) {
+    if( isa(t) ) return 0; // Can choose compatible format
+    
+    throw AA.unimpl();
   }
 }

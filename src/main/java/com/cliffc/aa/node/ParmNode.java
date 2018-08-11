@@ -13,7 +13,7 @@ public class ParmNode extends PhiNode {
   @Override public Type value(GVNGCM gvn) {
     if( in(0) instanceof FunNode && !((FunNode) in(0)).callers_known(gvn) ) { // Slot zero allows unknown callers
       assert in(0).in(1) instanceof ScopeNode; // Function is visible in current scope, to be looked up
-      return gvn.type(in(1));   // More unknown callers, assume worst-case input type
+      return gvn.type(in(1)).meet(((ConNode)in(1))._t);   // More unknown callers, assume worst-case input type
     }
     return super.value(gvn);
   }
