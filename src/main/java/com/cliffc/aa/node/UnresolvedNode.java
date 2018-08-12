@@ -95,4 +95,11 @@ public class UnresolvedNode extends Node {
     assert _defs._len < 2 || _defs.at(1).op_prec() == prec;
     return prec;
   }
+  // Return the op_prec of the returned value.  Not sensible except when call
+  // on primitives.  Should be the same across all defs.
+  @Override public byte may_prec() {
+    byte prec = -1;
+    for( Node f : _defs ) if( (prec=f.op_prec()) >= 0 ) return prec;
+    return prec;
+  }
 }

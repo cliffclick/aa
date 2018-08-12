@@ -226,6 +226,8 @@ public class TypeUnion extends Type {
       return true;
     }
   }
+  @Override public long getl() { if(may_have_nil()) return 0; throw AA.unimpl(); }
+  
   // True if any choice can have a nul
   @Override public boolean may_have_nil() {
     if( _any ) {                // Any non-nil can be picked for a no-nil answer

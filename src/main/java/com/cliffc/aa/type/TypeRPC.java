@@ -35,7 +35,7 @@ public class TypeRPC extends Type {
   public static final TypeRPC ALL_CALL = make(Bits.FULL);
   static final TypeRPC[] TYPES = new TypeRPC[]{make(0),ALL_CALL};
   
-  @Override protected TypeRPC xdual() { return is_con() ? this : new TypeRPC(_rpcs.flip()); }
+  @Override protected TypeRPC xdual() { return new TypeRPC(_rpcs.dual()); }
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TERROR: return ((TypeErr)t)._all ? t : this;
@@ -54,7 +54,7 @@ public class TypeRPC extends Type {
     default: throw typerr(t);   // All else should not happen
     }
     TypeRPC tf = (TypeRPC)t;
-    return make(_rpcs.or( tf._rpcs ));
+    return make(_rpcs.meet( tf._rpcs ));
   }
   
   public int rpc() { return _rpcs.getbit(); }

@@ -90,7 +90,7 @@ public class EpilogNode extends Node {
   public    Node ctrl() { return          in(0); } // internal function control
             Node val () { return          in(1); } // standard exit value
   public    Node rpc () { return          in(2); } // Almost surely a PhiNode merging RPCs
-  public FunNode fun () { return (FunNode) in(3); } // Function header
+  public FunNode fun () { return (FunNode)in(3); } // Function header
   @Override String xstr() {                        // Self short name
     String name = fun().name();
     return name==null ? "Epilog" : "Epi#"+name;
@@ -115,7 +115,7 @@ public class EpilogNode extends Node {
   public void merge_ref_def( GVNGCM gvn, String tok, EpilogNode def ) {
     FunNode rfun = fun();
     FunNode dfun = def.fun();
-    assert rfun._defs._len==2 && rfun.in(0)==null && dfun.in(1) instanceof ScopeNode; // Forward ref has no callers
+    assert rfun._defs._len==2 && rfun.in(0)==null && rfun.in(1) instanceof ScopeNode; // Forward ref has no callers
     assert dfun._defs._len==2 && dfun.in(0)==null && dfun.in(1) instanceof ScopeNode;
     assert def._uses._len==0;                      // Def is brand new, no uses
 

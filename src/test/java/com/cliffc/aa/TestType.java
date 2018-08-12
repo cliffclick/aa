@@ -13,7 +13,15 @@ import static org.junit.Assert.assertTrue;
 public class TestType {
   @Test public void testType0() {
     // User-defined linked-list
-    //test("List=:@{next,val}; map = { f list -> list ? List(@{next=map(f,list.next),val=f(list.val)}) : 0 }",TypeInt.TRUE);
+    //test("f1={x y -> x&y}; f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0(f1,2)", TypeInt.FALSE);
+    //test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({+},2)", TypeInt.con(2));
+    //test("List=:@{next,val};\n"+
+    //     "List0={n v -> List(@{next=n,val=v})};\n"+
+    //     "x=List0(List0(0,1.2),2.3);\n"+
+    //     "f={x->x*x};\n"+
+    //     "map = { f list -> list ? List0(map(f,list.next),f(list.val)) : 0 };\n"+
+    //     "map(f,x)"
+    //     , TypeStr.ABC);
 
 
     // Simple int
@@ -132,6 +140,7 @@ public class TestType {
     test("x=3; mul2={x -> x*2}; mul2(2.1)", TypeFlt.con(2.1*2.0)); // must inline to resolve overload {*}:Flt with I->F conversion
     test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
     test("sq={x -> x*x}; sq 2.1", TypeFlt.con(4.41)); // No () required for single args
+    testerr("f0 = { f x -> f0(x-1) }; f0({+},2)", "Passing 1 arguments to f0{Scalar Scalar -> Scalar} which takes 2 arguments","                     ");
 
     // Type annotations
     test("-1:int", TypeInt.con( -1));
@@ -160,6 +169,7 @@ public class TestType {
     // Recursive:
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
     test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)",TypeInt.INT64);
+    test("f0 = { x -> x ? {+}(f0(x-1),1) : 0 }; f0(2)", TypeInt.con(2));
 
     // Co-recursion requires parallel assignment & type inference across a lexical scope
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.TRUE );
@@ -242,7 +252,7 @@ different arguments get passed in.
 
 // No ambiguity:
  { x } // no-arg-function returning external variable x; same as { -> x }
- { x } // 1-elem tuple     wrapping external variable x
+ { x,} // 1-elem tuple     wrapping external variable x
 @{ x } // 1-elem struct type with field named x
 
 // type variables are free in : type expressions
@@ -256,7 +266,7 @@ Pair = :@{ a:T, b:T }
 MapType = :{ {A->B} List(A) -> List(B) }
 
 // map: no leading ':' so a function definition, not a type def
-map:{ {A->B} List(A) -> List(B) }  = { f list -> ... }
+map:MapType  = { f list -> ... }
 
 // A List type.  Named types are not 'null', so not valid to use "List = :0|...".
 // Type List takes a type-variable 'A' (which is free in the type expr).

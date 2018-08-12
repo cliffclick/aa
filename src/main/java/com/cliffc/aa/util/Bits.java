@@ -3,7 +3,7 @@ package com.cliffc.aa.util;
 import com.cliffc.aa.AA;
 import java.util.*;
 
-// Bits supporting complement; immutable; hash-cons'd.
+// Bits supporting a lattice; immutable; hash-cons'd.
 public class Bits implements Iterable<Integer> {
   private long[] _bits;         // 
   private int _hash;            // Pre-computed hashcode
@@ -96,6 +96,16 @@ public class Bits implements Iterable<Integer> {
     long bits[] = Arrays.copyOf(_bits,_bits.length);
     for( int i=0; i<bits.length; i++ ) bits[i] ^= -1;
     return Bits.make(_bit!=-1,bits);
+  }
+  
+  public Bits meet( Bits bs ) {
+    if( this==bs ) return this;
+    //if( _bit==-1 || bs._bit== -1 )
+    //  throw AA.unimpl();
+    return or(bs);
+  }
+  public Bits dual() {
+    return flip();
   }
 
   /** @return an iterator */

@@ -279,21 +279,31 @@ public class Parse {
           else { kill(stmt); n = err_ctrl2("Cannot re-assign field '."+fld+"'"); }
         }
 
-      } else if( _gvn.type(n).is_fun_ptr() ) { // Require being able to tell n is a function ptr at parse-time
+      } else {                  // Attempt a function-call
         boolean arglist = peek('(');
+        int oldx = _x;
         Node arg = arglist ? tuple(stmts()) : tfact(); // Start of an argument list?
-        if( arg == null ) break; // Function but no arg is just the function
-        n = do_call(new CallNode(!arglist,errMsg(),ctrl(),n,arg)); // Pass the 1 arg
-
-      } else                    // Not a function application nor field lookup
-        break;
-    }
-    
-    if( skipWS() == '(' ) { // Check for function application, but no function
-      Node arg = tfact();   // Following (arg) ?
-      if( arg != null ) {   // Non-function being applied
-        kill(arg);
-        n = err_ctrl2("A function is being called, but "+_gvn.type(n)+" is not a function type");
+        if( arg == null )       // Function but no arg is just the function
+          break;
+        Type tn = _gvn.type(n);
+        if( !tn.is_fun_ptr() && arg.may_prec() >= 0 ) {
+          _x=oldx;
+          break;
+        }
+        if( !tn.is_fun_ptr() &&
+            // Notice the backwards condition: n was already tested for !is_fun_ptr().
+            // Now we test the other way: the generic function can never be an 'n'.
+            // Only if we cannot 'isa' in either direction do we bail out early
+            // here.  Otherwise, e.g. 'n' might be an unknown function argument
+            // and during GCP be 'lifted' to a function; if we bail out now we
+            // may disallow a legal program with function arguments.  However,
+            // if 'n' is a e.g. Float there's no way it can 'lift' to a function.
+            !TypeFun.make_generic().isa(tn) ) { 
+          kill(arg);
+          n = err_ctrl2("A function is being called, but "+tn+" is not a function type");
+        } else {
+          n = do_call(new CallNode(!arglist,errMsg(),ctrl(),n,arg)); // Pass the 1 arg
+        }
       }
     } // Else no trailing arg, just return value
     return n;                   // No more terms
@@ -605,7 +615,7 @@ public class Parse {
   private static boolean isWS    (byte c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r'; }
   private static boolean isAlpha0(byte c) { return ('a'<=c && c <= 'z') || ('A'<=c && c <= 'Z') || (c=='_'); }
   private static boolean isAlpha1(byte c) { return isAlpha0(c) || ('0'<=c && c <= '9'); }
-  private static boolean isOp0   (byte c) { return "!#$%*+,-.=<>?@^[]~/&".indexOf(c) != -1; }
+  private static boolean isOp0   (byte c) { return "!#$%*+,-.=<>@^[]~/&".indexOf(c) != -1; }
   private static boolean isOp1   (byte c) { return isOp0(c) || ":".indexOf(c) != -1; }
 
   public Node gvn (Node n) { return n==null ? null : _gvn.xform(n); }

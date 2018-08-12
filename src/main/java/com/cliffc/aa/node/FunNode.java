@@ -213,8 +213,10 @@ public class FunNode extends RegionNode {
       bs.set(n._uid);           // Flag as visited
       int op = n._op;           // opcode
       if( op==OP_CALL ) {       // Call-of-primitive?
-        EpilogNode x = (EpilogNode)(n.in(1) instanceof UnresolvedNode ? n.in(1).in(0) : n.in(1));
-        if( x.val() instanceof PrimNode )
+        Node n1 = n.in(1);
+        Node n2 = n1 instanceof UnresolvedNode ? n1.in(0) : n1;
+        if( n2 instanceof EpilogNode &&
+            ((EpilogNode)n2).val() instanceof PrimNode )
           op = OP_PRIM;         // Treat as primitive for inlining purposes
       }
       cnts[op]++;               // Histogram ops
@@ -282,7 +284,7 @@ public class FunNode extends RegionNode {
       fun.add_def(split ? in(j) : gvn.con(Type.XCTRL));
     }
     // TODO: Install in ScopeNode for future finding
-    fun._all_callers_known=true; // currently not exposing to further calls
+    fun._all_callers_known=false; // currently not exposing to further calls
     return fun;
   }
 

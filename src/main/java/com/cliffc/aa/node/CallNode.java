@@ -161,17 +161,16 @@ public class CallNode extends Node {
     // Inline the call site now.
     // This is NOT inlining the function body, just the call site.
 
-    // Add an input path to all incoming arg ParmNodes from the Call.
-    int pcnt=0;               // Assert all parameters found
+    // Add an input path to all incoming arg ParmNodes from the Call.  Cannot
+    // assert finding all args, because dead args may already be removed - and
+    // so there's no Parm/Phi to attach the incoming arg to.
     for( Node arg : fun._uses ) {
       if( arg.in(0) == fun && arg instanceof ParmNode ) {
         int idx = ((ParmNode)arg)._idx; // Argument number, or -1 for rpc
         Node actual = idx==-1 ? gvn.con(TypeRPC.make(_rpc)) : arg(idx);
         gvn.add_def(arg,actual);
-        pcnt++;                      // One more arg found
       }
     }
-    assert pcnt == nargs()+1; // All params (and rpc) found and updated at the function head
     gvn.add_def(fun,ctrl); // Add Control for this path
 
     // Flag the Call as is_copy;

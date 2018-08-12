@@ -52,7 +52,7 @@ public class TypeFun extends Type {
 
   static final TypeFun[] TYPES = new TypeFun[]{any(0,-1),any(1,-1),any(2,-1)};
   
-  @Override protected TypeFun xdual() { return new TypeFun((TypeTuple)_ts.dual(),_ret.dual(),_fidxs.flip()); }
+  @Override protected TypeFun xdual() { return new TypeFun((TypeTuple)_ts.dual(),_ret.dual(),_fidxs.dual()); }
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TERROR: return ((TypeErr)t)._all ? t : this;
@@ -72,7 +72,7 @@ public class TypeFun extends Type {
     }
     // Meet of fidxs and args; join of ret
     TypeFun tf = (TypeFun)t;
-    Bits fidxs = _fidxs.or( tf._fidxs );
+    Bits fidxs = _fidxs.meet( tf._fidxs );
     TypeTuple ts = (TypeTuple)_ts.meet(tf._ts);
     Type ret = _ret.meet(tf._ret);
     return make(ts,ret,fidxs);
@@ -95,5 +95,5 @@ public class TypeFun extends Type {
   private static final Type      GENERIC_RET =TypeErr.ALL;
   public boolean is_forward_ref()                    { return _ts==GENERIC_ARGS&&GENERIC_RET ==_ret; }
   public static TypeFun make_forward_ref( int fidx ) { return make(GENERIC_ARGS, GENERIC_RET,Bits.make(fidx)); }
-         static TypeFun make_generic()               { return make(GENERIC_ARGS, GENERIC_RET,Bits.FULL); }
+  public static TypeFun make_generic()               { return make(GENERIC_ARGS, GENERIC_RET,Bits.FULL); }
 }

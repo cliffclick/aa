@@ -127,8 +127,10 @@ public abstract class Node implements Cloneable {
     // Print multi-node combos all-at-once
     Node x = is_multi_tail() ? in(0) : this;
     if( x.is_multi_head() ) {
-      bs.clear(_uid);           // Reset for self, so prints in the mix
       int dx = d+(x==this?0:1);
+      for( Node n : x._uses ) if( n.is_multi_tail() )
+        for( Node m : n._defs ) m.dump(dx,sb,max,bs,gvn);
+      bs.clear(_uid);           // Reset for self, so prints in the mix
       x.dump(dx,sb,bs,gvn); // Conditionally print head of combo
       // Print all combo tails, if not already printed
       for( Node n : x._uses ) if( n.is_multi_tail() ) n.dump(dx-1,sb,bs,gvn);
@@ -144,6 +146,16 @@ public abstract class Node implements Cloneable {
   }
   private boolean is_multi_head() { return _op==OP_FUN  || _op==OP_REGION || _op==OP_CALL || _op==OP_IF; }
   private boolean is_multi_tail() { return _op==OP_PARM || _op==OP_PHI    || _op==OP_PROJ              ; }
+  
+  public  Node find( int uid ) { return find(uid,new BitSet()); }
+  private Node find( int uid, BitSet bs ) {
+    if( _uid==uid ) return this;
+    if( bs.get(_uid) ) return null;
+    bs.set(_uid);
+    Node m;
+    for( Node n : _defs ) if( n!=null && (m=n.find(uid,bs)) !=null ) return m;
+    return null;
+  }
 
   // Graph rewriting.  Can change defs, including making new nodes - but if it
   // does so, all new nodes will first call ideal().  If gvn._opt if false, not
@@ -159,7 +171,8 @@ public abstract class Node implements Cloneable {
   public Type all_type() { return TypeErr.ALL; }
   
   // Operator precedence is only valid for ConNode of binary functions
-  public byte op_prec() { return -1; }
+  public byte  op_prec() { return -1; }
+  public byte may_prec() { return -1; }
 
   // Hash is function+inputs, or opcode+input_uids, and is invariant over edge
   // order (so we can swap edges without rehashing)
