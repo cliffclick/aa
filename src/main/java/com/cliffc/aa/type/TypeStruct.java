@@ -63,7 +63,7 @@ public class TypeStruct extends TypeTuple {
     return make1(nil,ts,inf,Arrays.copyOf(args,i+1));
   }
   private static String[] flds(String... fs) { return fs; }
-  public  static TypeStruct makeX(String[] flds, Type... ts ) { return (TypeStruct)make(NOT_NIL,ts,Type.XSCALAR,flds); }
+  public  static TypeStruct makeX(String[] flds, Type... ts ) { return (TypeStruct)make(NOT_NIL,ts,Type.SCALAR,flds); }
   public  static TypeStruct makeA(String[] flds, Type... ts ) { return (TypeStruct)make(NOT_NIL,ts,TypeErr.ALL ,flds); }
 
   private static final TypeStruct POINT = makeA(flds("x","y"),TypeFlt.FLT64,TypeFlt.FLT64);

@@ -78,9 +78,9 @@ public class FunNode extends RegionNode {
   public final TypeFun _tf; // Worse-case correct type
   private final byte _op_prec;// Operator precedence; only set top-level primitive wrappers
   // Used to make the primitives at boot time
-  public FunNode(Node scope, PrimNode prim) { this(scope,TypeFun.make(prim._targs,prim._ret,CNT++),prim.op_prec(),prim._name); }
+  public FunNode(Node scope, PrimNode prim) { this(scope,TypeFun.make(prim._targs,prim._ret,CNT++,prim._targs._ts.length),prim.op_prec(),prim._name); }
   // Used to make copies when inlining/cloning function bodies
-  private FunNode(Node scope, TypeTuple ts, Type ret, String name) { this(scope,TypeFun.make(ts,ret,CNT++),-1,name); }
+  private FunNode(Node scope, TypeTuple ts, Type ret, String name, int nargs) { this(scope,TypeFun.make(ts,ret,CNT++,nargs),-1,name); }
   // Used to start an anonymous function in the Parser
   public FunNode(int nargs, Node scope) { this(scope,TypeFun.any(nargs,CNT++),-1,null); }
   // Used to forward-decl anon functions
@@ -164,7 +164,7 @@ public class FunNode extends RegionNode {
     if( _defs._len <= 2 ) return null; // No need to split callers if only 1
 
     // Gather the ParmNodes and the EpilogNode.  Ignore other (control) uses
-    int nargs = _tf._ts._ts.length;
+    int nargs = _tf.nargs();
     ParmNode[] parms = new ParmNode[nargs];
     ParmNode rpc = null;
     EpilogNode epi = null;
@@ -235,7 +235,7 @@ public class FunNode extends RegionNode {
     // Make a prototype new function header.  No generic unknown caller
     // in slot 1, only slot 2.
     Node top = gvn.con(Type.XCTRL);
-    FunNode fun = new FunNode(top,_tf._ts,_tf._ret,name());
+    FunNode fun = new FunNode(top,_tf._ts,_tf._ret,name(),_tf._nargs);
     fun._all_callers_known=true; // private split always
     fun.add_def(in(2));
     for( int i=3; i<_defs._len; i++ ) fun.add_def(top);
@@ -275,7 +275,7 @@ public class FunNode extends RegionNode {
     assert ts.isa(_tf._ts);
     if( ts == _tf._ts ) return null; // No improvement for further splitting
     // Make a prototype new function header.  Clone the generic unknown caller in slot 1.  
-    FunNode fun = new FunNode(in(1),ts,_tf._ret,name());
+    FunNode fun = new FunNode(in(1),ts,_tf._ret,name(),_tf._nargs);
     // Look in remaining paths and decide if they split or stay
     for( int j=2; j<_defs._len; j++ ) {
       boolean split=true;
@@ -335,7 +335,7 @@ public class FunNode extends RegionNode {
       if( n instanceof ParmNode && n.in(0) == this ) {  // Leading edge ParmNodes
         c.add_def(map.get(n.in(0))); // Control
         int idx = ((ParmNode)n)._idx;
-        c.add_def(gvn.con(idx==-1 ? TypeRPC.ALL_CALL : fun._tf._ts._ts[idx])); // Generic arg#1
+        c.add_def(gvn.con(idx==-1 ? TypeRPC.ALL_CALL : fun._tf.arg(idx))); // Generic arg#1
         for( int j=2; j<_defs._len; j++ ) // Get the new parm path or null according to split
           c.add_def( fun.in(j)==any ? any : n.in(j) );
       } else if( n != this ) {  // Interior nodes

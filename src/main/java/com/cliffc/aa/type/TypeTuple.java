@@ -61,7 +61,7 @@ public class TypeTuple extends TypeNullable {
     if( len < ts.length ) ts = Arrays.copyOf(ts,len);
     return make0(inf, nil, ts);
   }
-  public static TypeTuple make_args( Type... ts ) { return make(Type.XSCALAR,NOT_NIL,ts); }
+  public static TypeTuple make_args( Type... ts ) { return make(Type.SCALAR,NOT_NIL,ts); }
   public static TypeTuple make_fun_ptr( TypeFun fun ) {
     TypeTuple t = make_all(Type.CTRL,TypeErr.ALL, TypeRPC.ALL_CALL, fun);
     assert t.is_fun_ptr();

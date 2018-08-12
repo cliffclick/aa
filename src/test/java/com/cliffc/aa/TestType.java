@@ -9,6 +9,12 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 public class TestType {
+  // temp/junk holder for "instant" junits, when debugged moved into other tests
+  @Test public void testType() {
+    Type.init0(new HashMap<>());
+    Type ignore = TypeTuple.NIL; // Break class-loader cycle; load Tuple before Fun.
+  }
+  
   @Test public void testNamesInts() {
     Type.init0(new HashMap<>());
 
@@ -117,11 +123,11 @@ public class TestType {
     Type tf = TypeTuple.FLT64; //  [  flt64,~Scalar...]; choice leading field name
     Type tsx= TypeStruct.X;    // @{x:flt64,~Scalar...}; fixed  leading field name
     Type tff = tsx.meet(tf);   //
-    assertEquals(tsx,tff);     // tf.isa(tsx)
+    assertEquals(tf,tff);      // tsx.isa(tf)
     TypeTuple t0 = TypeTuple.make_args(nil); //  [  0,~Scalar...]
     Type      ts0= TypeStruct.makeX(new String[]{"x"},nil);  // @{x:0,~Scalar...}
     Type tss = ts0.meet(t0);
-    assertEquals(ts0,tss);      // t0.isa(ts0)
+    assertEquals(t0,tss);      // t0.isa(ts0)
 
     // Union meets & joins same-class types
     Type uany = TypeUnion.make(true ,TypeInt.con(2),TypeInt.INT8);
@@ -137,6 +143,10 @@ public class TestType {
     Type cj  = nc0.join(cx);
     Type c0  = TypeStruct.makeA(new String[]{"c"},nx1.make_nil((byte)0)); // @{c:0}
     assertEquals(c0,cj);
+
+    TypeFun gf = TypeFun.make_generic();
+    TypeFun f2 = TypeFun.any(2,23); // Some generic function (happens to be #23, '&')
+    assertTrue(f2.isa(gf));
   }
 
   @Test public void testUnion() {

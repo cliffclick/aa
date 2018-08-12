@@ -148,7 +148,7 @@ public class CallNode extends Node {
 
     // If this is a primitive, we never change the function header via inlining the call
     assert fun.in(1)._uid!=0;
-    assert fun._tf._ts._ts.length == nargs();
+    assert fun._tf.nargs() == nargs();
 
 
     // Not legal to inline recursive calls; makes a tight loop (yay!) but does

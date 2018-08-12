@@ -5,14 +5,12 @@ import com.cliffc.aa.util.Bits;
 import org.junit.Assert;
 import org.junit.Test;
 
-import java.util.HashMap;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
-  @Test public void testType() {
+  @Test public void testParse() {
     // User-defined linked-list
     //test("f1={x y -> x&y}; f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0(f1,2)", TypeInt.FALSE);
     //test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({+},2)", TypeInt.con(2));
@@ -25,7 +23,7 @@ public class TestParse {
     //     , TypeStr.ABC);
   }
   
-  @Test public void testType0() {
+  @Test public void testParse0() {
     // Simple int
     test("1",   TypeInt.TRUE);
     // Unary operator
@@ -90,7 +88,7 @@ public class TestParse {
     test("{+}(1;2;,3)", TypeInt.con(5)); // statements in arguments
   }
   
-  @Test public void testType1() {
+  @Test public void testParse1() {
     // Syntax for variable assignment
     test("x=1", TypeInt.TRUE);
     test("x=y=1", TypeInt.TRUE);
@@ -121,7 +119,7 @@ public class TestParse {
     testerr("math_rand(1)?1:\"a\"", "Cannot mix GC and non-GC types", "                  " );
   }
 
-  @Test public void testType2() {
+  @Test public void testParse2() {
     // Anonymous function definition
     test_isa("{x y -> x+y}", TypeTuple.FUNPTR2); // actually {Flt,Int} x {FltxInt} -> {FltxInt} but currently types {SCALAR,SCALAR->SCALAR}
     test("{5}()", TypeInt.con(5)); // No args nor -> required; this is simply a function returning 5, being executed
@@ -149,7 +147,7 @@ public class TestParse {
     testerr("f0 = { f x -> f0(x-1) }; f0({+},2)", "Passing 1 arguments to f0{Scalar Scalar -> Scalar} which takes 2 arguments","                     ");
   }
 
-  @Test public void testType3() {
+  @Test public void testParse3() {
     // Type annotations
     test("-1:int", TypeInt.con( -1));
     test("(1+2.3):flt", TypeFlt.make(0,64,3.3));
@@ -184,7 +182,7 @@ public class TestParse {
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(5)", TypeUnion.NIL);
   }
 
-  @Test public void testType4() {
+  @Test public void testParse4() {
 
     // simple anon struct tests
     test   ("  @{x,y} ", TypeStruct.makeA(new String[]{"x","y"},TypeErr.ANY,TypeErr.ANY)); // simple anon struct decl
@@ -209,8 +207,8 @@ public class TestParse {
     test("(0,\"abc\")", TypeTuple.make_all(TypeUnion.NIL,TypeStr.ABC));
     
     // Named type variables
-    test_isa("gal=:flt"       , TypeTuple.make_fun_ptr(TypeFun.make(TypeTuple.FLT64,TypeName.make("gal",TypeFlt.FLT64),Bits.FULL)));
-    test_isa("gal=:flt; gal"  , TypeTuple.make_fun_ptr(TypeFun.make(TypeTuple.FLT64,TypeName.make("gal",TypeFlt.FLT64),Bits.FULL)));
+    test_isa("gal=:flt"       , TypeTuple.make_fun_ptr(TypeFun.make(TypeTuple.FLT64,TypeName.make("gal",TypeFlt.FLT64),Bits.FULL,1)));
+    test_isa("gal=:flt; gal"  , TypeTuple.make_fun_ptr(TypeFun.make(TypeTuple.FLT64,TypeName.make("gal",TypeFlt.FLT64),Bits.FULL,1)));
     test    ("gal=:flt; 3==gal(2)+1", TypeInt.TRUE);
     test    ("gal=:flt; tank:gal = gal(2)", TypeName.make("gal",TypeFlt.con(2)));
     // test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: figure out if free cast for bare constants?
@@ -221,7 +219,7 @@ public class TestParse {
     testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1,) is not a @{x,y,}","                           ");
   }
 
-  @Test public void testType5() {
+  @Test public void testParse5() {
 
     // nullable and not-null pointers
     test   ("x:str? = 0", TypeUnion.NIL); // question-type allows null or not; zero digit is null
@@ -240,7 +238,7 @@ public class TestParse {
 
   }
 
-  @Test public void testType6() {
+  @Test public void testParse6() {
     // User-defined linked list
     test("List=:@{next,val}; x=List(@{next=0,val=\"abc\"}); x.val", TypeStr.ABC);
     test("List=:@{next,val}; List0={n v -> List(@{next=n,val=v})}; x=List0(0,\"abc\"); x.val", TypeStr.ABC);

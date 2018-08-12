@@ -540,7 +540,7 @@ public class Parse {
         if( ts._len != 1 ) return null; // should return TypeErr missing -> in tfun
         ret = ts.pop();         // Get single return type
       }
-      return peek('}') ? typeq(TypeTuple.make_fun_ptr(TypeFun.make(TypeTuple.make(ts.asAry()),ret,Bits.FULL))) : null;
+      return peek('}') ? typeq(TypeTuple.make_fun_ptr(TypeFun.make(TypeTuple.make(ts.asAry()),ret,Bits.FULL,ts._len))) : null;
     }
 
     if( peek2(c,"@{") ) { // Struct type

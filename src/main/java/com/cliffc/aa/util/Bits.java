@@ -42,9 +42,13 @@ public class Bits implements Iterable<Integer> {
   }
   @Override public String toString() { return toString(new SB()).toString(); }
   public SB toString(SB sb) {
+    if( this==FULL ) return sb.p("[ALL]");
+    else if( _con==-1 && _bits.length==1 && _bits[0]==-1 ) return sb.p("[~ALL]");
     sb.p('[');
     if( _bits==null ) sb.p(_con);
-    else for( Integer idx : this ) sb.p(idx).p(above_center()?'+':',');
+    else {
+      for( Integer idx : this ) sb.p(idx).p(above_center()?'+':',');
+    }
     if( inf() ) sb.p("...");
     return sb.p(']');
   }
