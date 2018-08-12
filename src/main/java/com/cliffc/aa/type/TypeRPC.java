@@ -33,7 +33,7 @@ public class TypeRPC extends Type {
   }
 
   public static final TypeRPC ALL_CALL = make(Bits.FULL);
-  static final TypeRPC[] TYPES = new TypeRPC[]{make(0),ALL_CALL};
+  static final TypeRPC[] TYPES = new TypeRPC[]{make(1),ALL_CALL};
   
   @Override protected TypeRPC xdual() { return new TypeRPC(_rpcs.dual()); }
   @Override protected Type xmeet( Type t ) {

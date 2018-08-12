@@ -1,38 +1,40 @@
 package com.cliffc.aa.util;
 
 import com.cliffc.aa.AA;
+import org.jetbrains.annotations.NotNull;
+
 import java.util.*;
 
 // Bits supporting a lattice; immutable; hash-cons'd.
 public class Bits implements Iterable<Integer> {
-  private long[] _bits;         // 
+  // Holds a set of bits meet'd together, or join'd together, along
+  // with an infinite extent or a single bit choice as a constant.
+  //
+  // If _bits is NULL, then _con holds the single set bit (including 0).
+  // If _bits is not-null, then _con is 0 for meet, and -1 for join.
+  // The last bit of _bits is the "sign" bit, and extends infinitely.
+  private long[] _bits;         // Bits set or null for a single bit
+  private int _con;             // value of single bit, or 0 for meet or -1 for join
   private int _hash;            // Pre-computed hashcode
-  private int _bit;             // value of single bit, or 0 for many or -1 for complement
-  private Bits(boolean not, long[] bits ) { init(not,bits); }
-  private void init(boolean not, long[] bits ) {
-    // No trailing zeros allowed; not canonical
-    long last = bits.length==0 ? 0 : bits[bits.length-1];
-    assert bits.length==0 || last != 0;
-    // Scan for a single-bit set
-    if( !not ) {
-      boolean z=true;
-      for( int i=0; i<bits.length-1; i++ )
-        z &= bits[i]==0;          // All leading words zero
-      _bit = z && ((last&-last)==last) ? 63-Long.numberOfLeadingZeros(last) : 0;
-      if( bits.length==0 ) _bit=0;
-    } else _bit = -1;           // Flag as complement set
-    _bits=bits;
-    int sum=_bit;
-    for( long bit : bits ) sum += bit;
+  private      Bits(int con, long[] bits ) { init(con,bits); }
+  private void init(int con, long[] bits ) {
+    if( bits==null ) assert con >= 0;
+    else             assert con==0 || con==-1;
+
+    int sum=con;
+    if( bits != null ) for( long bit : bits ) sum += bit;
     _hash=sum;
+    _con = con;
+    _bits=bits;
   }
   @Override public int hashCode( ) { return _hash; }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof Bits) ) return false;
     Bits bs = (Bits)o;
-    if( _bit != bs._bit || _hash != bs._hash ) return false;
+    if( _con != bs._con || _hash != bs._hash ) return false;
     if( _bits == bs._bits ) return true;
+    if( _bits ==null || bs._bits==null ) return false;
     if( _bits.length != bs._bits.length ) return false;
     for( int i=0; i<_bits.length; i++ )
       if( _bits[i]!=bs._bits[i] ) return false;
@@ -41,75 +43,115 @@ public class Bits implements Iterable<Integer> {
   @Override public String toString() { return toString(new SB()).toString(); }
   public SB toString(SB sb) {
     sb.p('[');
-    for( Integer idx : this ) sb.p(idx).p(',');
-    if( _bit==-1 ) sb.p("...");
+    if( _bits==null ) sb.p(_con);
+    else for( Integer idx : this ) sb.p(idx).p(above_center()?'+':',');
+    if( inf() ) sb.p("...");
     return sb.p(']');
   }
 
   private static HashMap<Bits,Bits> INTERN = new HashMap<>();
   private static Bits FREE=null;
-  public static Bits make( int fidx ) {
-    if( fidx >= 64 ) throw AA.unimpl();
-    return make(false,new long[]{1L<<fidx});
-  }
-  public static Bits make( boolean not, long[] bits ) {
-    int len = bits.length-1;
-    while( len>=0 && bits[len] == (not?-1:0) ) len--;
-    if( len+1 < bits.length )   // Trim trailing zeros
-      bits = Arrays.copyOf(bits,len+1);
-        
+  private static Bits make( int con, long[] bits ) {
     Bits t1 = FREE;
-    if( t1 == null ) t1 = new Bits(not,bits);
-    else { FREE = null; t1.init(not,bits); }
+    if( t1 == null ) t1 = new Bits(con,bits);
+    else { FREE = null; t1.init(con,bits); }
     Bits t2 = INTERN.get(t1);
     if( t2 == null ) INTERN.put(t1,t1);
     else { FREE=t1; t1=t2; }
     return t1;
   }
 
-  public static Bits FULL = Bits.make(true,new long[0]);
+  private static Bits make0( int con, long[] bits ) {
+    assert con==0 || con==-1;
+    // TODO: convert to single-bit-form if only 1 bit set
+    // TODO: remove trailing sign-extend words
+    throw AA.unimpl();
+  }        
+  public static Bits make( int bit ) {
+    if( bit < 0 ) throw new IllegalArgumentException("bit must be positive");
+    if( bit >= 63 ) throw AA.unimpl();
+    return make(bit,null);
+  }
   
-  private int  idx (int i) { return i>>6; }
-  private long mask(int i) { return 1L<<(i&63); }
+  public static Bits FULL = make(0,new long[]{-1});
+  
+  private static int  idx (int i) { return i>>6; }
+  private static long mask(int i) { return 1L<<(i&63); }
+  public  boolean inf() { return _bits !=null && (_bits[_bits.length-1]>>63)==-1; }
+  
+  public int getbit() { assert _bits==null; return _con; }
+  public int   abit() { return _bits==null ? _con : -1; }
+  public boolean above_center() { return _con==-1; }
   
   public boolean test(int i) {
+    if( _bits==null ) return i==_con;
     int idx = idx(i);
-    return idx < _bits.length ? (_bits[idx]&mask(i))!=0 : (_bit<0);
+    return idx < _bits.length ? (_bits[idx]&mask(i))!=0 : inf();
   }
 
-  public int getbit() { assert _bit > 0; return _bit; }
-  public int   abit() {                  return _bit; }
-  
-  public Bits set(int idx) { throw AA.unimpl(); }
-  public Bits or( Bits bs ) {
-    if( this==bs ) return this;
-    long[] maxs = _bits.length < bs._bits.length ? bs._bits : _bits;
-    long[] mins = _bits.length < bs._bits.length ? _bits : bs._bits;
-    long[] bits = Arrays.copyOf(mins,maxs.length);
-    if( (_bits.length < bs._bits.length ? _bit : bs._bit)==-1 )
-      for( int i=mins.length; i<bits.length; i++ ) bits[i] = -1;
-    for( int i=0; i<bits.length; i++ ) bits[i] |= maxs[i];
-    boolean not = _bit == -1 | bs._bit == -1;
-    return make(not,bits);
-  }
-  public Bits flip() {
-    long bits[] = Arrays.copyOf(_bits,_bits.length);
-    for( int i=0; i<bits.length; i++ ) bits[i] ^= -1;
-    return Bits.make(_bit!=-1,bits);
-  }
+  private int max() { return (_bits.length<<6)-1; }
+  private static void or( long[] bits, int con ) { bits[idx(con)] |= mask(con); }
+  private static long[] bits( int a, int b ) { return new long[idx(Math.max(a,b))+1]; }
   
   public Bits meet( Bits bs ) {
     if( this==bs ) return this;
-    //if( _bit==-1 || bs._bit== -1 )
-    //  throw AA.unimpl();
-    return or(bs);
+    if( this==FULL || bs==FULL ) return FULL;
+    if( _bits==null || bs._bits==null ) { // One or both are constants
+      Bits conbs = this, bigbs = bs;
+      if( bs._bits==null ) { conbs = bs;  bigbs = this; }
+      if( bigbs._bits==null ) { // both constants
+        // two constants; make a big enough bits array for both
+        long[] bits = bits(conbs._con,bigbs._con);
+        or( bits,conbs._con);
+        or( bits,bigbs._con);
+        Bits bs0 = make(0,bits);
+        assert !bs0.inf(); // didn't set sign bit by accident (need bigger array if so)
+        return bs0;
+      }
+      
+      if( bigbs._con==0 ) {     // Meet of constant and set
+        if( bigbs.test(conbs._con) ) return bigbs; // already a member
+        // Grow set to hold constant and OR it it
+        long[] bits = bits(bigbs.max(),conbs._con);
+        System.arraycopy(bigbs._bits,0,bits,0,bigbs._bits.length);
+        or( bits,conbs._con);
+        Bits bs0 = make(0,bits);
+        assert bs0.inf()==bigbs.inf();
+        return bs0;
+      }
+      // Join of constant and set
+      if( bigbs.test(conbs._con) ) return conbs; // Already a member
+      throw AA.unimpl();    // join constant and any bit from big set
+
+    }
+
+    if( _con==0 ) {             // Meet
+      throw AA.unimpl();        // 2 big sets
+    }
+    if( bs._con==0 ) {           // Meet
+      throw AA.unimpl();        // 2 big sets
+    }
+
+    // join of 2 sets; return intersection
+    Bits bs0 = this, bs1 = bs;  // Shorter set in bs0
+    if( _bits.length > bs._bits.length ) { bs0=bs; bs1=this; }
+    boolean eqs=true;
+    for( int i=0; i<bs0._bits.length; i++ )
+      if( (bs0._bits[i]&bs1._bits[i]) != bs0._bits[i] )
+        { eqs=false; break; }
+    if( eqs ) return bs0;       // All short bits in long set, return intersection
+    throw AA.unimpl();          // 2 big sets
+    
   }
   public Bits dual() {
-    return flip();
+    if( _bits==null ) return this; // Dual of a constant is itself
+    // Otherwise just flip _con
+    assert _con==0 || _con==-1;
+    return make(~_con,_bits);
   }
 
   /** @return an iterator */
-  @Override public Iterator<Integer> iterator() { return new Iter(); }
+  @NotNull @Override public Iterator<Integer> iterator() { return new Iter(); }
   private class Iter implements Iterator<Integer> {
     int _i=-1;
     @Override public boolean hasNext() {

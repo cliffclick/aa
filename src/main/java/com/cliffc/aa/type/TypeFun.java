@@ -83,8 +83,8 @@ public class TypeFun extends Type {
   @Override public Type ret() { return _ret; }
 
   @Override public boolean above_center() { return _ret.above_center(); }
-  @Override public boolean may_be_con()   { return _fidxs.abit() > 0; }
-  @Override public boolean is_con()       { return _fidxs.abit() > 0; }
+  @Override public boolean may_be_con()   { return _fidxs.abit() >= 0 || _fidxs.above_center(); }
+  @Override public boolean is_con()       { return _fidxs.abit() >= 0; }
   // Return true if this type may BE a null.  Functions are not GC'd, are not
   // OOP's, and are never nil.
   public boolean may_be_nil() { return false; }

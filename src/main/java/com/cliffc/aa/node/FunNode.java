@@ -112,14 +112,14 @@ public class FunNode extends RegionNode {
   // Can return nothing, or "name" or "{name0,name1,name2...}"
   public static SB names(Bits fidxs, SB sb ) {
     int fidx = fidxs.abit();
-    if( fidx > 0 ) return name(fidx,sb);
+    if( fidx >= 0 ) return name(fidx,sb);
     sb.p('{');
     int cnt=0;
     for( Integer ii : fidxs ) {
       if( ++cnt==3 ) break;
-      name(ii,sb).p(',');
+      name(ii,sb).p(fidxs.above_center()?'+':',');
     }
-    if( cnt>=3 || fidxs.abit() < 0 ) sb.p("...");
+    if( cnt>=3 || fidxs.inf() ) sb.p("...");
     sb.p('}');
     return sb;
   }
