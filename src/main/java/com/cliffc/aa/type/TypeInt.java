@@ -49,7 +49,8 @@ public class TypeInt extends Type {
     types.put("int"  ,INT64);
   }
   // Return a long from a TypeInt constant; assert otherwise.
-  @Override public long getl() { assert is_con(); return _con; }
+  @Override public long   getl() { assert is_con(); return _con; }
+  @Override public double getd() { assert is_con() && (long)((double)_con)==_con; return _con; }
 
   @Override protected TypeInt xdual() { return _x==0 ? this : new TypeInt(-_x,_z,_con); }
   @Override protected Type xmeet( Type t ) {

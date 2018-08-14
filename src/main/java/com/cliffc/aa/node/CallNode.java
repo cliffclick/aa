@@ -150,38 +150,40 @@ public class CallNode extends Node {
     assert fun.in(1)._uid!=0;
     assert fun._tf.nargs() == nargs();
 
+    // Calls no longer "partially" inline to single-targets.  This leads to
+    // various strange CFGs when the same function is partially-inlined
+    // multiple times, and truely broken CFGs for recursion.  The root problem
+    // is not honoring a stack of RPCs in the CFG.
+    // TODO: INLINE for all the reasons FunNode inlines (size, primitive-type-split)
+    return null;
 
-    // Not legal to inline recursive calls; makes a tight loop (yay!) but does
-    // not stack live values across the call (including the RPC) so does not
-    // honor the semantics.  Basically need to merge this code with the FunNode
-    // inlining.
-    if( !(ctrl instanceof ScopeNode) )
-      return null; //System.out.print(""); //   // TODO: CAN INLINE THE WHOLE FUNCTION HERE
-    
-    // Inline the call site now.
-    // This is NOT inlining the function body, just the call site.
-
-    // Add an input path to all incoming arg ParmNodes from the Call.  Cannot
-    // assert finding all args, because dead args may already be removed - and
-    // so there's no Parm/Phi to attach the incoming arg to.
-    for( Node arg : fun._uses ) {
-      if( arg.in(0) == fun && arg instanceof ParmNode ) {
-        int idx = ((ParmNode)arg)._idx; // Argument number, or -1 for rpc
-        Node actual = idx==-1 ? gvn.con(TypeRPC.make(_rpc)) : arg(idx);
-        gvn.add_def(arg,actual);
-      }
-    }
-    gvn.add_def(fun,ctrl); // Add Control for this path
-
-    // Flag the Call as is_copy;
-    // Proj#0 is RPC to return from the function back to here.
-    // Proj#1 is a new CastNode on the tf._ret to regain precision
-    // All other slots are killed.
-    for( int i=2; i<_defs._len; i++ ) set_def(i,null,gvn);
-    Node rpc = gvn.xform(new RPCNode(epi,epi,_rpc));
-    set_def(0,rpc,gvn);
-    // TODO: Use actual arg types to regain precision
-    return inline(gvn,gvn.xform(new CastNode(rpc,epi,fun._tf._ret)));
+    //if( !(ctrl instanceof ScopeNode) )
+    //  return null; //System.out.print(""); // TODO: INLINE was failing on recursion, but this test is too conservative
+    //
+    //// Inline the call site now.
+    //// This is NOT inlining the function body, just the call site.
+    //
+    //// Add an input path to all incoming arg ParmNodes from the Call.  Cannot
+    //// assert finding all args, because dead args may already be removed - and
+    //// so there's no Parm/Phi to attach the incoming arg to.
+    //for( Node arg : fun._uses ) {
+    //  if( arg.in(0) == fun && arg instanceof ParmNode ) {
+    //    int idx = ((ParmNode)arg)._idx; // Argument number, or -1 for rpc
+    //    Node actual = idx==-1 ? gvn.con(TypeRPC.make(_rpc)) : arg(idx);
+    //    gvn.add_def(arg,actual);
+    //  }
+    //}
+    //gvn.add_def(fun,ctrl); // Add Control for this path
+    //
+    //// Flag the Call as is_copy;
+    //// Proj#0 is RPC to return from the function back to here.
+    //// Proj#1 is a new CastNode on the tf._ret to regain precision
+    //// All other slots are killed.
+    //for( int i=2; i<_defs._len; i++ ) set_def(i,null,gvn);
+    //Node rpc = gvn.xform(new RPCNode(epi,epi,_rpc));
+    //set_def(0,rpc,gvn);
+    //// TODO: Use actual arg types to regain precision
+    //return inline(gvn,gvn.xform(new CastNode(rpc,epi,fun._tf._ret)));
   }
 
   // Inline to this Node.
@@ -226,10 +228,10 @@ public class CallNode extends Node {
     TypeFun tfun =(TypeFun)tepi.at(3);
     if( tctrl == Type.XCTRL ) return TypeErr.ANY; // Function will never return
     assert tctrl==Type.CTRL;      // Function will never return?
-    assert trpc._rpcs.test(_rpc); // Function knows we are calling it
     if( t.is_forward_ref() ) return tfun.ret(); // Forward refs do no argument checking
     if( tfun.nargs() != nargs() )
-      return TypeErr.make(_badargs.errMsg("Passing "+nargs()+" arguments to "+tfun+" which takes "+tfun.nargs()+" arguments"));
+      return nargerr(tfun);
+    assert trpc._rpcs.test(_rpc); // Function knows we are calling it
     // Now do an arg-check
     TypeTuple formals = tfun._ts;   // Type of each argument
     Type terr = TypeErr.ANY;        // No errors (yet)
@@ -245,7 +247,9 @@ public class CallNode extends Node {
     }
     return terr.meet(tval);  // Return any errors, or the Epilog return type
   }
-
+  Type nargerr(TypeFun tfun) {
+    return TypeErr.make(_badargs.errMsg("Passing "+nargs()+" arguments to "+tfun+" which takes "+tfun.nargs()+" arguments"));
+  }
   
   // Called from the data proj.  Return a TypeNode with proper casting on return result.
   TypeNode upcast_return(GVNGCM gvn) {

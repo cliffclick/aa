@@ -79,10 +79,10 @@ public class GVNGCM {
     _ts.setX(n._uid,t);
   }
   // Make globally shared common ConNode for this type.
-  public Node con( Type t ) {
-    Node con = new ConNode<>(t);
+  public ConNode con( Type t ) {
+    ConNode con = new ConNode<>(t);
     Node con2 = _vals.get(con);
-    if( con2 != null ) { kill0(con); return con2; } // TODO: con goes dead, should be recycled
+    if( con2 != null ) { kill0(con); return (ConNode)con2; } // TODO: con goes dead, should be recycled
     setype(con,t);
     _vals.put(con,con);
     return con;
@@ -123,9 +123,11 @@ public class GVNGCM {
   }
   
   // Used rarely for whole-merge changes
-  public Node rereg( Node n ) {
+  public Node rereg( Node n, Type oldt ) {
     assert !check_opt(n);
-    return init0(n);
+    setype(n,oldt);
+    _vals.put(n,n);
+    return add_work0(n);
   }
 
   // Hack an edge, updating GVN as needed
@@ -367,7 +369,7 @@ public class GVNGCM {
         assert t.isa(((CastNode)n)._t);
         if( t != (((CastNode)n)._t)) {
           unreg(n);
-          Node cast = xform_old0(rereg(new CastNode(n.in(0), n.in(1), t)));
+          Node cast = xform_old0(rereg(new CastNode(n.in(0), n.in(1), t),t));
           subsume(n, nodes.setX(cast._uid, cast));
         }
       }

@@ -133,7 +133,7 @@ public class FunNode extends RegionNode {
   @Override Node copy() {
     throw AA.unimpl();          // Gotta make a new FIDX
   }
-  
+
   // FunNodes can "discover" callers if the function constant exists in the
   // program anywhere (since, during execution (or optimizations) it may arrive
   // at a CallNode and initiate a new call to the function).  Until all callers
@@ -141,21 +141,15 @@ public class FunNode extends RegionNode {
   // conservative allowed arguments, under the assumption a as-yet-detected
   // caller will call with such arguments.  This is a quick check to detect
   // may-have-more-callers.
-  private boolean _all_callers_known;
-  boolean callers_known(GVNGCM ignore) {
-    if( _all_callers_known ) return true; // Once true, always true
-    if( _tf.is_forward_ref() || (in(1) instanceof ScopeNode) ) return false;
-    return (_all_callers_known=true);
-  }
-
-
+  public boolean _callers_known;
+  
   // ----
   @Override public Node ideal(GVNGCM gvn) {
     Node n = split_callers(gvn);
     if( n != null ) return n;
 
     // Else generic Region ideal
-    return ideal(gvn,!callers_known(gvn));
+    return ideal(gvn,false);
   }
 
   private Node split_callers( GVNGCM gvn ) {
@@ -171,6 +165,8 @@ public class FunNode extends RegionNode {
     for( Node use : _uses )
       if( use instanceof ParmNode ) {
         ParmNode parm = (ParmNode)use;
+        Type pt = gvn.type(parm);
+        if( pt instanceof TypeErr && !pt.above_center() ) return null;
         if( parm._idx == -1 ) rpc = parm;
         else parms[parm._idx] = parm;
       } else if( use instanceof EpilogNode ) { assert epi==null || epi==use; epi = (EpilogNode)use; }
@@ -236,7 +232,7 @@ public class FunNode extends RegionNode {
     // in slot 1, only slot 2.
     Node top = gvn.con(Type.XCTRL);
     FunNode fun = new FunNode(top,_tf._ts,_tf._ret,name(),_tf._nargs);
-    fun._all_callers_known=true; // private split always
+    fun._callers_known=true; // private split always
     fun.add_def(in(2));
     for( int i=3; i<_defs._len; i++ ) fun.add_def(top);
     return fun;
@@ -284,7 +280,7 @@ public class FunNode extends RegionNode {
       fun.add_def(split ? in(j) : gvn.con(Type.XCTRL));
     }
     // TODO: Install in ScopeNode for future finding
-    fun._all_callers_known=false; // currently not exposing to further calls
+    fun._callers_known=false; // currently not exposing to further calls
     return fun;
   }
 
@@ -382,14 +378,14 @@ public class FunNode extends RegionNode {
     if( fun.in(1) != any ) gvn.subsume(epi,new_unr);
     
     // Put all new nodes into the GVN tables and worklists
-    for( Node c : map.values() ) gvn.rereg(c);
+    for( Node c : map.values() ) gvn.rereg(c,c.all_type());
     // TODO: Hook with proper signature into ScopeNode under an Unresolved.
     // Future calls may resolve to either the old version or the new.
     return is_dead() ? fun : this;
   }
 
   @Override public Type value(GVNGCM gvn) {
-    return _tf.is_forward_ref() || !callers_known(gvn) ? Type.CTRL : super.value(gvn);
+    return _tf.is_forward_ref() || !_callers_known ? Type.CTRL : super.value(gvn);
   }
   
   @Override public int hashCode() { return super.hashCode()+_tf.hashCode(); }

@@ -11,6 +11,41 @@ import static org.junit.Assert.assertTrue;
 public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
+
+    // FunNodes -
+    // - Slot#1, worse-case unknown callers
+    // - conservative: if in lex scope OR has Epilog-data-use, then #[all]
+    // - conservative: if lost lex scope AND no Epilog-data-use, then call-list-known
+    // - call-list-known: replace slot#1 with MEET of callers, this can lift
+    //   as callers remove
+    // - Optimistic: (lex-scope gone, but might be epilog-data-use)
+    // - Set to no-callers, and fall as expected
+    //
+    // Caller
+    // - as discover FunNodes on optimistic  , must "push"
+    // - conversative: if lose a FunNode target can ask FunNode to re-compute (if Fun is list-known)
+
+
+    
+    // Making a trivial function which needs H-M or full inlining to type.
+    // Adding syntax to prevent inlining, which means needs H-M
+    //test("fun={# s->s.x}; (fun(@{x=@{z=3.14}}),fun(@{x=\"abc\"}))",
+    //     TypeTuple.make_all(TypeFlt.con(3.14),TypeStr.ABC)); // result is a tuple of (3.14,"abc")
+
+    
+    // TODO: Split out top-level known calls from cmd-line vs "unknown calls"
+    // control, and special "unknown arg" Nodes - not ConNodes, and not shared.
+    //
+    // Until more is parsed, can/should more strongly type.  Since the parser
+    // ends with each example, fair to say "no more top-level calls" and remove
+    // them.... except what we discover from CallNodes
+    //
+    // TODO: CallNodes pass all their args to all the named functions' args as
+    // part of type call.  This is a "push forward" from the call into the
+    // FunNode/Parm types - the Call#RPC into the "unknown RPC", and the call
+    // args into the matching FunNode "unknown args" - for all listed functions
+    // appearing at the CallNodes' optimistic input list.
+    
     // User-defined linked-list
     //test("f1={x y -> x&y}; f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0(f1,2)", TypeInt.FALSE);
     //test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({+},2)", TypeInt.con(2));

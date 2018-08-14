@@ -1,6 +1,5 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.AA;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
 
@@ -11,9 +10,9 @@ public class RegionNode extends Node {
   int _cidx; // Copy index; monotonic change from zero to Control input this Region is collapsing to
   public RegionNode( Node... ctrls) { super(OP_REGION,ctrls); }
   RegionNode( byte op ) { super(op); add_def(null); } // For FunNodes
-  @Override public Node ideal(GVNGCM gvn) { return ideal(gvn,false); }
+  @Override public Node ideal(GVNGCM gvn) { return ideal(gvn,true); }
   // Ideal call, but FunNodes keep index#1 for future parsed call sites
-  Node ideal(GVNGCM gvn, boolean more) {
+  Node ideal(GVNGCM gvn, boolean can_copy) {
     if( _cidx !=0 ) return null; // Already found single control path
     // TODO: The unzip xform, especially for funnodes doing type-specialization
     // TODO: Check for dead-diamond merges
@@ -29,7 +28,7 @@ public class RegionNode extends Node {
         else live = -1;          // Found many live paths
     if( live==0 ) return null;   // Nothing live?  Let value() handle it
 
-    if( !more && live > 0 ) {   // Exactly one and no more?
+    if( can_copy && live > 0 ) {   // Exactly one and no more?
       // Note: we do not return the 1 alive control path, as then trailing
       // PhiNodes will subsume that control - instead they each need to
       // collapse to their one alive input in their own ideal() calls - and
@@ -44,7 +43,7 @@ public class RegionNode extends Node {
     for( Node phi : _uses )
       if( phi instanceof PhiNode )
         for( int i=1,j=1; i<_defs._len; i++ )
-          if( gvn.type(in(i))==Type.XCTRL ) { gvn.unreg(phi); phi.remove(j,gvn); gvn.rereg(phi); }
+          if( gvn.type(in(i))==Type.XCTRL ) { Type ot = gvn.type(phi); gvn.unreg(phi); phi.remove(j,gvn); gvn.rereg(phi,ot); }
           else j++;
     for( int i=1; i<_defs._len; i++ ) if( gvn.type(in(i))==Type.XCTRL ) remove(i--,gvn);
     return this;

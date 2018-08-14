@@ -13,13 +13,14 @@ public class EpilogNode extends Node {
   final String _unkref_err; // Unknown ref error (not really a forward ref)
   public EpilogNode( Node ctrl, Node val, Node rpc, Node fun, String unkref_err ) { super(OP_EPI,ctrl,val,rpc,fun); _unkref_err=unkref_err; }
   @Override public Node ideal(GVNGCM gvn) {
-    if( skip_ctrl(gvn) ) return this;
+    if( !is_forward_ref() && skip_ctrl(gvn) ) return this; // Collapsing exit control
 
     // Look at the set of uses post-Parse; at parse time there will be no uses.
     if( _uses._len == 0 ) return null; // Dead, or during-parse
 
+    // Optimization: if we already know all callers are known, quit now.
     FunNode fun = fun();
-    if( fun.callers_known(gvn) ) return null;
+    if( fun._callers_known ) return null;
     
     // After parse, we have the complete set of uses.  If there are any uses as
     // a function-pointer, then "all is lost" we have to assume the F-P is
@@ -30,47 +31,58 @@ public class EpilogNode extends Node {
     BitSet bs = new BitSet();   // Union of RPCs
     for( Node use : _uses ) {
       int rpc;
-      if( use instanceof RPCNode ) rpc = ((RPCNode)use)._rpc;
-      else if( use instanceof CallNode ) { // Un-inlined call site
+      if( use instanceof RPCNode ) {
+        rpc = ((RPCNode)use)._rpc;
+        throw AA.unimpl();                   // TODO: no partially inlined Funs
+      } else if( use instanceof CastNode ) {
+        //continue; // Casts of RPC results are OK
+        throw AA.unimpl();                   // TODO: no partially inlined Funs
+      } else if( use instanceof CallNode ) { // Un-inlined call site
         CallNode call = (CallNode)use;
         // If any use is as an argument, all is lost.
         for( int i=0; i<call.nargs(); i++ ) if( call.arg(i)==this ) return null;
         assert call.in(1) == this;
         rpc = call._rpc;
-      } else if( use instanceof CastNode ) continue; // Casts of RPC results are OK
-      else return null;         // Else unknown function-pointer user
+      }
+      else return null; // Else unknown function-pointer user (e.g. store-to-memory)
       bs.set(rpc);
     }
 
-    // Not sure how we can have callers with no returns, so assert we found
-    // them all.... but fairly sure there's a path involving late-appearing
-    // dead paths that clean out quicker on the RPCs vs the FunNode inputs.
-    boolean progress = false;
-    ParmNode rpc=null;
+    // If we got here, then no function-as-data uses.  All callers are known.
+    fun._callers_known = true;
+
+    // Expand out the n callers with the m args.  This is a bulk parallel
+    // rename of the FunNode and all Parms.  Note the recursive calls being
+    // expanded this way will (on purpose) lead to loops, with the CallNode
+    // embedded in the loop.
+    Type[] ts = new Type[fun._tf.nargs()+1];
     for( Node parm : fun._uses )
-      if( parm instanceof ParmNode && ((ParmNode)parm)._name.equals("rpc") )
-        { assert rpc==null; rpc = ((ParmNode)parm); }
-    if( rpc == null ) return null;
-    // Skip the unknown caller in slot 1
-    assert gvn.type(rpc.in(1)) == TypeRPC.ALL_CALL;
-    for( int i=2; i<rpc._defs._len; i++ ) {
-      if( gvn.type( fun.in(i) ) == Type.XCTRL ) continue; // Path is dead
-      TypeRPC t = (TypeRPC)gvn.type(rpc.in(i));
-      if( !t.is_con() ) throw AA.unimpl(); // merged multi-callers path
-      int irpc = t.rpc();
-      if( bs.get(irpc) ) bs.clear(irpc); // Found matching input path; clear from BS
-      else { gvn.set_def_reg(fun,i,gvn.con(Type.XCTRL)); progress=true; }// No RPC for this input path, clear path
+      if( parm instanceof ParmNode )
+        {  ts[((ParmNode)parm)._idx+1] = gvn.type(parm); gvn.unreg(parm); }
+    gvn.unreg(fun);
+    for( Node use : _uses ) {
+      CallNode call = (CallNode)use; // Just tested for in above prior loop
+      for( Node parm : fun._uses )
+        if( parm instanceof ParmNode ) {
+          int idx = ((ParmNode)parm)._idx;
+          parm.add_def(idx == -1
+                       ? gvn.con(TypeRPC.make(call._rpc))
+                       : (idx < call.nargs()
+                          ? call.arg(idx)
+                          : gvn.con(call.nargerr(fun._tf))));
+        }
+      fun.add_def(call.in(0));
     }
+    for( Node parm : fun._uses )
+      if( parm instanceof ParmNode )
+        gvn.rereg(parm,ts[((ParmNode)parm)._idx+1]);
+    gvn.rereg(fun,Type.CTRL);   // Bulk rename over
+    // Kill the unknown-caller path
+    gvn.set_def_reg(fun,1,gvn.con(Type.XCTRL));
 
-    // If all RPCs are accounted for, then kill the unknown caller.
-    if( bs.isEmpty() ) {
-      gvn.set_def_reg(fun,1,gvn.con(Type.XCTRL));
-      fun.callers_known(gvn);
-      progress=true;
-    }
-
-    return progress ? this : null;
+    return this;
   }
+
   @Override public Type value(GVNGCM gvn) {
     Type t=TypeTuple.make_all(gvn.type(ctrl()), // Function exits, or not
                               gvn.type(val ()), // Function return value
@@ -83,7 +95,7 @@ public class EpilogNode extends Node {
   // effectively being inlined on the spot, removing the function head and tail.
   @Override public Node is_copy(GVNGCM gvn, int idx) {
     assert idx==0 || idx==1;
-    assert !gvn.type(rpc()).is_con() || fun().callers_known(gvn);
+    assert !gvn.type(rpc()).is_con() || fun()._callers_known;
     return gvn.type(rpc()).is_con() ? in(idx) : null;
   }
   

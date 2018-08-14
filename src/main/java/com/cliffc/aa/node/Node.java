@@ -251,7 +251,7 @@ public abstract class Node implements Cloneable {
     if( this instanceof UnresolvedNode ) return; // Only remaining Unresolved are never-called functions
     if( this instanceof EpilogNode ) { // Function ptr?
       FunNode fun = ((EpilogNode)this).fun();
-      if( fun._defs._len <= (fun.callers_known(gvn) ? 1 : 2) )
+      if( fun._defs._len <= (fun._callers_known ? 1 : 2) )
         return;                 // No callers?
     }
     if( Type.SCALAR.isa(gvn.type(this)) ) // Cannot have code that deals with unknown-GC-state

@@ -616,7 +616,7 @@ public class Parse {
   private static boolean isAlpha0(byte c) { return ('a'<=c && c <= 'z') || ('A'<=c && c <= 'Z') || (c=='_'); }
   private static boolean isAlpha1(byte c) { return isAlpha0(c) || ('0'<=c && c <= '9'); }
   private static boolean isOp0   (byte c) { return "!#$%*+,-.=<>@^[]~/&".indexOf(c) != -1; }
-  private static boolean isOp1   (byte c) { return isOp0(c) || ":".indexOf(c) != -1; }
+  private static boolean isOp1   (byte c) { return isOp0(c) || ":?".indexOf(c) != -1; }
 
   public Node gvn (Node n) { return n==null ? null : _gvn.xform(n); }
   private <N extends Node> N init( N n ) { return n==null ? null : _gvn.init (n); }
@@ -625,7 +625,7 @@ public class Parse {
   // Set and return a new control
   private void set_ctrl(Node n) { _e._scope.update(" control ",n,_gvn); }
 
-  private Node con( Type t ) { return _gvn.con(t); }
+  private ConNode con( Type t ) { return _gvn.con(t); }
 
   private Node do_call( Node call0 ) {
     Node call = gvn(call0);
