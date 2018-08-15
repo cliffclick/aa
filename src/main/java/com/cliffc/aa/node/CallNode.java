@@ -22,7 +22,8 @@ public class CallNode extends Node {
   private static int RPC=1; // Call-site return PC
   int _rpc;         // Call-site return PC
   private boolean _unpacked;    // Call site allows unpacking a tuple (once)
-  private boolean _inlined;     // Inlining a call-site is a 2-stage process
+  boolean _wired;       // Args wired to the single unique function
+  private boolean _inlined;     // Inlining a call-site is a 2-stage process; function return wired to the call return
   private Type   _cast_ret;     // Return type has been up-casted
   private Parse  _cast_P;       // Return type cast fail message
   private Parse  _badargs;      // Error for e.g. wrong arg counts or incompatible args
@@ -149,32 +150,14 @@ public class CallNode extends Node {
     // If this is a primitive, we never change the function header via inlining the call
     assert fun.in(1)._uid!=0;
     assert fun._tf.nargs() == nargs();
-
-    // Calls no longer "partially" inline to single-targets.  This leads to
-    // various strange CFGs when the same function is partially-inlined
-    // multiple times, and truely broken CFGs for recursion.  The root problem
-    // is not honoring a stack of RPCs in the CFG.
-    // TODO: INLINE for all the reasons FunNode inlines (size, primitive-type-split)
-    return null;
-
-    //if( !(ctrl instanceof ScopeNode) )
-    //  return null; //System.out.print(""); // TODO: INLINE was failing on recursion, but this test is too conservative
-    //
-    //// Inline the call site now.
-    //// This is NOT inlining the function body, just the call site.
-    //
-    //// Add an input path to all incoming arg ParmNodes from the Call.  Cannot
-    //// assert finding all args, because dead args may already be removed - and
-    //// so there's no Parm/Phi to attach the incoming arg to.
-    //for( Node arg : fun._uses ) {
-    //  if( arg.in(0) == fun && arg instanceof ParmNode ) {
-    //    int idx = ((ParmNode)arg)._idx; // Argument number, or -1 for rpc
-    //    Node actual = idx==-1 ? gvn.con(TypeRPC.make(_rpc)) : arg(idx);
-    //    gvn.add_def(arg,actual);
-    //  }
-    //}
-    //gvn.add_def(fun,ctrl); // Add Control for this path
-    //
+    // If the single function callers are known, then we are already wired up.
+    // Happens at the transition (!known -> known) or anytime a wired CallNode
+    // is cloned.
+    assert !fun._callers_known || _wired;
+    
+    // TODO: if the function has this as the sole caller, can "inline"
+    // by wiring the call's return up now.
+    
     //// Flag the Call as is_copy;
     //// Proj#0 is RPC to return from the function back to here.
     //// Proj#1 is a new CastNode on the tf._ret to regain precision
@@ -184,8 +167,36 @@ public class CallNode extends Node {
     //set_def(0,rpc,gvn);
     //// TODO: Use actual arg types to regain precision
     //return inline(gvn,gvn.xform(new CastNode(rpc,epi,fun._tf._ret)));
+    return null;
   }
 
+  // Wire the call args to a known function, letting the function have precise
+  // knowledge of its callers and arguments.
+  
+  // Leave the Call in the graph - making the graph "a little odd" - double
+  // CTRL users - once for the call, and once for the function being called.
+  void wire(GVNGCM gvn, FunNode fun) {
+    // Inline the call site now.
+    // This is NOT inlining the function body, just the call site.
+    _wired = true;
+    
+    // Add an input path to all incoming arg ParmNodes from the Call.  Cannot
+    // assert finding all args, because dead args may already be removed - and
+    // so there's no Parm/Phi to attach the incoming arg to.
+    for( Node arg : fun._uses ) {
+      if( arg.in(0) == fun && arg instanceof ParmNode ) {
+        int idx = ((ParmNode)arg)._idx; // Argument number, or -1 for rpc
+        Node actual = idx==-1 ? gvn.con(TypeRPC.make(_rpc)) : arg(idx);
+        gvn.add_def(arg,actual);
+      }
+    }
+    // Add Control for this path.  Sometimes called from fun.Ideal() (because
+    // inlining), sometimes called by Epilog when it discovers all callers
+    // known.
+    if( gvn.touched(fun) ) gvn.add_def(fun,in(0)); 
+    else                   fun.add_def(in(0));
+  }
+  
   // Inline to this Node.
   private Node inline( GVNGCM gvn, Node rez ) {
     gvn.add_work(in(0));        // Major graph shrinkage; retry parent as well
@@ -231,7 +242,6 @@ public class CallNode extends Node {
     if( t.is_forward_ref() ) return tfun.ret(); // Forward refs do no argument checking
     if( tfun.nargs() != nargs() )
       return nargerr(tfun);
-    assert trpc._rpcs.test(_rpc); // Function knows we are calling it
     // Now do an arg-check
     TypeTuple formals = tfun._ts;   // Type of each argument
     Type terr = TypeErr.ANY;        // No errors (yet)

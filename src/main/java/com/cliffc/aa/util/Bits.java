@@ -130,10 +130,19 @@ public class Bits implements Iterable<Integer> {
     }
 
     if( _con==0 ) {             // Meet
-      throw AA.unimpl();        // 2 big sets
+      if( bs._con==0 ) {
+        Bits smlbs = this, bigbs = bs;
+        if( smlbs._bits.length > bigbs._bits.length ) { smlbs=bs; bigbs=this; }
+        long[] bits = bigbs._bits.clone();
+        for( int i=0; i<smlbs._bits.length; i++ ) bits[i]|=smlbs._bits[i];
+        return make(0,bits);
+
+      } else {                  // Meet of a high set and low set
+        throw AA.unimpl();
+      }
     }
-    if( bs._con==0 ) {           // Meet
-      throw AA.unimpl();        // 2 big sets
+    if( bs._con==0 ) {          // Meet of a low set and high set
+      throw AA.unimpl();
     }
 
     // join of 2 sets; return intersection
@@ -159,6 +168,8 @@ public class Bits implements Iterable<Integer> {
   private class Iter implements Iterator<Integer> {
     int _i=-1;
     @Override public boolean hasNext() {
+      if( _bits==null )
+        if( _i==-1 ) { _i=0; return true; } else return false;
       int idx;
       while( (idx=idx(++_i)) < _bits.length )
         if( (_bits[idx]&mask(_i)) != 0 )
@@ -166,6 +177,7 @@ public class Bits implements Iterable<Integer> {
       return false;
     }
     @Override public Integer next() {
+      if( _bits==null ) return _con;
       if( idx(_i) < _bits.length ) return _i;
       throw new NoSuchElementException();
     }

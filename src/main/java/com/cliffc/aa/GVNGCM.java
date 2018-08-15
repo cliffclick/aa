@@ -1,8 +1,7 @@
 package com.cliffc.aa;
 
 import com.cliffc.aa.node.*;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeErr;
+import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 
 import java.util.Arrays;
@@ -19,7 +18,7 @@ public class GVNGCM {
 
   // Iterative worklist
   private Ary<Node> _work = new Ary<>(new Node[1], 0);
-  private BitSet _wrk_bits = new BitSet();
+  private BitSet _wrk_bits = new BitSet(), _fun_bits;
 
   public void add_work( Node n ) { if( !_wrk_bits.get(n._uid) ) add_work0(n); }
   private <N extends Node> N add_work0( N n ) {
@@ -148,7 +147,7 @@ public class GVNGCM {
   // Node is in the type table and GVN hash table
   private boolean check_opt(Node n) {
     if( touched(n) ) {          // First & only test: in type table or not
-      assert (n instanceof ScopeNode) || _wrk_bits.get(n._uid)  || check_gvn(n,true); // Check also in GVN table
+      assert (n instanceof ScopeNode) || _wrk_bits.get(n._uid)  || check_gvn(n,true) || _fun_bits.get(n._uid); // Check also in GVN table
       return true;              // Yes in both type table and GVN table
     }
     assert !check_gvn(n,false); // Check also not in GVN table
@@ -163,7 +162,7 @@ public class GVNGCM {
     }
     boolean found = false;
     for( Node o : _vals.keySet() ) if( (old=o)._uid == n._uid ) { found=true; break; }
-    assert found == expect || _wrk_bits.get(n._uid) : "Found but not expected: "+old.toString(); // Expected in table or on worklist
+    assert found == expect || _wrk_bits.get(n._uid) || _fun_bits.get(n._uid): "Found but not expected: "+old.toString(); // Expected in table or on worklist
     return false;               // Not in table
   }
 
@@ -287,21 +286,22 @@ public class GVNGCM {
     // requests and set them aside until the main list is empty, then work down
     // the inline list.
     Ary<Node> funs = new Ary<>(new Node[1], 0);
-    BitSet fun_bits = new BitSet();
+    _fun_bits = new BitSet();   // Wimpy priorities: FunNodes last because inlining, and global for asserts
     boolean work;
     while( (work=_work._len > 0) || funs._len > 0 ) {
       Node n = (work ? _work : funs).pop(); // Pull from main worklist before functions
-      (work ? _wrk_bits : fun_bits).clear(n._uid);
+      (work ? _wrk_bits : _fun_bits).clear(n._uid);
       if( n.is_dead() ) continue;
       if( n instanceof ScopeNode || n instanceof TmpNode ) continue; // These are killed when parsing exists lexical scope
       if( n._uses._len==0 ) { kill(n); continue; }
       if( _work._len > 0 && n instanceof FunNode && n.is_copy(this,-1) == null ) {
         // Stall FunNodes, which may inline, until the main list goes empty
-        if( !fun_bits.get(n._uid ) ) { funs.add(n); fun_bits.set(n._uid); }
+        if( !_fun_bits.get(n._uid ) ) { funs.add(n); _fun_bits.set(n._uid); }
       } else {
         xform_old(n);
       }
     }
+    _fun_bits = null;           // Clear global (and turn off asserting)
   }
 
   // Global Optimistic Constant Propagation.
@@ -326,14 +326,15 @@ public class GVNGCM {
         _wrk_bits.clear(n._uid);
         assert !n.is_dead();
         nodes.setX(n._uid,n);     // Record back-ptr to Node
-        boolean never_seen = _ts._es[n._uid]==null;
+        boolean never_seen = !touched(n);
         Type ot = type(n);        // Old type
         Type nt = n.value(this);  // New type
         assert ot.isa(nt);        // Types only fall monotonically
-        if( ot != nt || never_seen ) // Progress
+        if( ot != nt )            // Progress
           _ts.setX(n._uid,nt);    // Record progress
         for( Node use : n._uses ) {
-          if( _ts._es[use._uid]==null || // Never typed
+          if( !touched(use) ||  // Never typed
+              never_seen ||     // Or was all_typed without this input
               (ot != nt && use.all_type() != type(use))) // If not already at bottom
             if( use != n ) add_work(use); // Re-run users to check for progress
           // When new control paths appear on Regions, the Region stays the

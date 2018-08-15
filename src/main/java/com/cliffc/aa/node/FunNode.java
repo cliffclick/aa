@@ -78,11 +78,11 @@ public class FunNode extends RegionNode {
   public final TypeFun _tf; // Worse-case correct type
   private final byte _op_prec;// Operator precedence; only set top-level primitive wrappers
   // Used to make the primitives at boot time
-  public FunNode(Node scope, PrimNode prim) { this(scope,TypeFun.make(prim._targs,prim._ret,CNT++,prim._targs._ts.length),prim.op_prec(),prim._name); }
+  public FunNode(Node scope, PrimNode prim) { this(scope,TypeFun.make(prim._targs,prim._ret,CNT,prim._targs._ts.length),prim.op_prec(),prim._name); }
   // Used to make copies when inlining/cloning function bodies
-  private FunNode(Node scope, TypeTuple ts, Type ret, String name, int nargs) { this(scope,TypeFun.make(ts,ret,CNT++,nargs),-1,name); }
+  private FunNode(Node scope, TypeTuple ts, Type ret, String name, int nargs) { this(scope,TypeFun.make(ts,ret,CNT,nargs),-1,name); }
   // Used to start an anonymous function in the Parser
-  public FunNode(int nargs, Node scope) { this(scope,TypeFun.any(nargs,CNT++),-1,null); }
+  public FunNode(int nargs, Node scope) { this(scope,TypeFun.any(nargs,CNT),-1,null); }
   // Used to forward-decl anon functions
   FunNode(Node scope, String name) { this(scope,TypeFun.make_forward_ref(CNT),-1,name); }
   // Shared common constructor
@@ -92,12 +92,16 @@ public class FunNode extends RegionNode {
     _tf = tf;
     _op_prec = (byte)op_prec;
     if( name != null ) bind(name);
+    FUNS.add(this);             // Track FunNode by fidx
+    CNT++;                      // Bump global unique fidx number
   }
+  private static Ary<FunNode> FUNS = new Ary<>(new FunNode[]{null,});
+  public static FunNode find_fidx(int fidx) { return FUNS.at(fidx); }
 
   // Fast reset of parser state between calls to Exec
   private static int PRIM_CNT;
   public static void init0() { PRIM_CNT=CNT; }
-  public static void reset_to_init0() { CNT = PRIM_CNT; NAMES.set_len(PRIM_CNT); }
+  public static void reset_to_init0() { CNT = PRIM_CNT; NAMES.set_len(PRIM_CNT); FUNS.set_len(PRIM_CNT); }
 
   @Override String xstr() { return _tf.toString(); }
   @Override String str() { return names(_tf._fidxs,new SB()).toString(); }
@@ -166,7 +170,7 @@ public class FunNode extends RegionNode {
       if( use instanceof ParmNode ) {
         ParmNode parm = (ParmNode)use;
         Type pt = gvn.type(parm);
-        if( pt instanceof TypeErr && !pt.above_center() ) return null;
+        if( pt instanceof TypeErr && !pt.above_center() && pt != TypeErr.ALL ) return null;
         if( parm._idx == -1 ) rpc = parm;
         else parms[parm._idx] = parm;
       } else if( use instanceof EpilogNode ) { assert epi==null || epi==use; epi = (EpilogNode)use; }
@@ -280,7 +284,7 @@ public class FunNode extends RegionNode {
       fun.add_def(split ? in(j) : gvn.con(Type.XCTRL));
     }
     // TODO: Install in ScopeNode for future finding
-    fun._callers_known=false; // currently not exposing to further calls
+    fun._callers_known=true; // currently not exposing to further calls
     return fun;
   }
 
@@ -288,6 +292,11 @@ public class FunNode extends RegionNode {
   // for the old and one for the new body.  The new function may have a more
   // refined signature, and perhaps no unknown callers.  
   private Node split_callers(GVNGCM gvn, ParmNode rpc_parm, EpilogNode epi, FunNode fun) {
+    // TODO: Split with a known caller in slot 1
+    if( (in(1) instanceof ScopeNode) &&
+        ((ScopeNode) in(1)).get(name()) !=null )
+        throw AA.unimpl(); // need to repoint the scope
+
     // Clone the function body
     HashMap<Node,Node> map = new HashMap<>();
     Ary<Node> work = new Ary<>(new Node[1],0);
@@ -303,10 +312,6 @@ public class FunNode extends RegionNode {
       map.put(n,n.copy()); // Make a blank copy with no edges and map from old to new
     }
 
-    // TODO: Split with a known caller in slot 1
-    if( !(in(1) instanceof ScopeNode) )  throw AA.unimpl(); // Untested: Slot 1 is not the generic unparsed caller
-    if( ((ScopeNode) in(1)).get(name()) !=null )
-      throw AA.unimpl(); // need to repoint the scope
     Node any = gvn.con(Type.XCTRL);
     Node newepi = map.get(epi);
     Node new_unr = epi;
@@ -348,34 +353,38 @@ public class FunNode extends RegionNode {
       if( fun.in(j)!=any )  // Path split out?
         set_def(j,any,gvn); // Kill incoming path on old FunNode
 
-    // The old Epilog has sets of result Casts and RPCs; these need to be
-    // split and half repointed to the new Epilog.  RPCs first.
-    for( int j=0; !epi.is_dead() && j<epi._uses._len; j++ ) {
-      Node use = epi._uses.at(j);
-      if( !(use instanceof RPCNode) ) continue;
-      int i, rpc_idx = ((RPCNode)use)._rpc;
-      for( i=2; i<_defs._len; i++ )
-        if( rpc_idx == ((TypeRPC)gvn.type(rpc_parm.in(i))).rpc() )
+    // Repoint all Calls uses to an Unresolved choice of the old and new
+    // functions and let the Calls resolve individually.
+    if( fun.in(1) != any )
+      gvn.subsume(epi,new_unr);
+    else {
+      // The old Epilog has a set of CallNodes, but only the one in slot#2 is
+      // being split-for-size.  Repoint the one Call._rpc matching rpc_parm
+      // in(2) to new_epi.
+      int rpc = ((TypeRPC)gvn.type(rpc_parm.in(2))).rpc();
+      for( int j=0; !epi.is_dead() && j<epi._uses._len; j++ ) {
+        Node use = epi._uses.at(j);
+        if( use instanceof CallNode && 
+            ((CallNode)use)._rpc == rpc ) {
+          gvn.set_def_reg(use,1,newepi);
           break;
-      assert i<_defs._len;      // Must find each RPC associated path
-      if( fun.in(i)!=any ) {
-        gvn.set_def_reg(use,0,newepi);
-        gvn.set_def_reg(use,1,newepi);
-        j--;            // Rerun loop since changed the set being iterated over
+        }
       }
     }
-    // Now repoint any Casts
-    for( int j=0; !epi.is_dead() && j<epi._uses._len; j++ ) {
-      Node use = epi._uses.at(j);
-      if( !(use instanceof CastNode) ) continue;
-      if( use.in(0) instanceof RPCNode && use.in(0).in(0)==newepi ) {
-        assert use.in(1)==epi;
-        gvn.set_def_reg(use,1,newepi);
-        j--;
+
+    // Cloned CallNodes that are labeled wired, are not actually wired up.
+    // Basically we made a bunch of new callers in the function body and
+    // anybody they called needs to be informed.
+    for( Node c : map.values() )
+      if( c instanceof CallNode && ((CallNode)c)._wired ) {
+        CallNode call = (CallNode)c;
+        Node epic = call.in(1);
+        if( epic instanceof EpilogNode ) {
+          FunNode func = ((EpilogNode)epic).fun();
+          assert func._callers_known;
+          call.wire(gvn,func);
+        }
       }
-    }
-    // Repoint all other uses to an Unresolved choice of the old and new functions
-    if( fun.in(1) != any ) gvn.subsume(epi,new_unr);
     
     // Put all new nodes into the GVN tables and worklists
     for( Node c : map.values() ) gvn.rereg(c,c.all_type());

@@ -55,28 +55,10 @@ public class EpilogNode extends Node {
     // rename of the FunNode and all Parms.  Note the recursive calls being
     // expanded this way will (on purpose) lead to loops, with the CallNode
     // embedded in the loop.
-    Type[] ts = new Type[fun._tf.nargs()+1];
-    for( Node parm : fun._uses )
-      if( parm instanceof ParmNode )
-        {  ts[((ParmNode)parm)._idx+1] = gvn.type(parm); gvn.unreg(parm); }
-    gvn.unreg(fun);
     for( Node use : _uses ) {
       CallNode call = (CallNode)use; // Just tested for in above prior loop
-      for( Node parm : fun._uses )
-        if( parm instanceof ParmNode ) {
-          int idx = ((ParmNode)parm)._idx;
-          parm.add_def(idx == -1
-                       ? gvn.con(TypeRPC.make(call._rpc))
-                       : (idx < call.nargs()
-                          ? call.arg(idx)
-                          : gvn.con(call.nargerr(fun._tf))));
-        }
-      fun.add_def(call.in(0));
+      if( !call._wired ) call.wire(gvn,fun);
     }
-    for( Node parm : fun._uses )
-      if( parm instanceof ParmNode )
-        gvn.rereg(parm,ts[((ParmNode)parm)._idx+1]);
-    gvn.rereg(fun,Type.CTRL);   // Bulk rename over
     // Kill the unknown-caller path
     gvn.set_def_reg(fun,1,gvn.con(Type.XCTRL));
 
