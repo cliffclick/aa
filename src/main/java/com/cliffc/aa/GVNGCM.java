@@ -69,8 +69,13 @@ public class GVNGCM {
   public Type type( Node n ) {
     Type t = n._uid < _ts._len ? _ts._es[n._uid] : null;
     if( t != null ) return t;
-    t = n.all_type();           // If no type yet, defaults to the pessimistic type
-    if( _opt ) t = t.dual();    // If running optimistic GCP, want the dual instead
+    t = n.all_type();       // If no type yet, defaults to the pessimistic type
+    if( _opt ) {
+      t = t.dual();         // If running optimistic GCP, want the dual instead
+      // Setting types that will not fall further (t._dual==t) will not trigger
+      // a change-based revisit of children.  Mark the children now.
+      for( Node use : n._uses ) add_work(use);
+    }
     return _ts.setX(n._uid,t);
   }
   private void setype( Node n, Type t ) {

@@ -28,6 +28,7 @@ public class CProjNode extends ProjNode {
     Node test = iff.in(1);
     Type pred = gvn.type(test);
     if( pred instanceof TypeErr ) return this;
+    if( pred== Type.SCALAR ) return this;
     if( pred==TypeInt.BOOL ) {  // The bool test itself is either 0 or 1
       // Find and replace uses of the pred in the scope with the con
       scope.sharpen(test,gvn.con(TypeInt.con(_idx)),tmp);

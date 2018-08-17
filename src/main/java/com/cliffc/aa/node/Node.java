@@ -245,21 +245,23 @@ public abstract class Node implements Cloneable {
     return errs;
   }
   // Gather errors; forwards reachable data uses only
-  public void walkerr_gc( BitSet bs, GVNGCM gvn ) {
-    if( bs.get(_uid) ) return;     // Been there, done that
+  public Ary<String> walkerr_gc( Ary<String> errs, BitSet bs, GVNGCM gvn ) {
+    if( bs.get(_uid) ) return errs;// Been there, done that
     bs.set(_uid);                  // Only walk once
-    if( this instanceof UnresolvedNode ) return; // Only remaining Unresolved are never-called functions
+    if( this instanceof UnresolvedNode ) return errs; // Only remaining Unresolved are never-called functions
     if( this instanceof EpilogNode ) { // Function ptr?
       FunNode fun = ((EpilogNode)this).fun();
       if( fun._defs._len <= (fun._callers_known ? 1 : 2) )
-        return;                 // No callers?
+        return errs;                 // No callers?
     }
     if( Type.SCALAR.isa(gvn.type(this)) ) // Cannot have code that deals with unknown-GC-state
-      throw AA.unimpl(); // Not allowed; either user-error or missing opt
+      if( this instanceof PhiNode ) errs = Parse.add_err(errs,((PhiNode)this)._badgc);
+      else throw AA.unimpl(); // Not allowed; either user-error or missing opt
     for( int i=0; i<_defs._len; i++ ) {
       Node def= in(i);
-      if( def != null ) def.walkerr_gc(bs,gvn);
+      if( def != null ) def.walkerr_gc(errs,bs,gvn);
     }
+    return errs;
   }
   
   public boolean is_dead() { return _uses == null; }

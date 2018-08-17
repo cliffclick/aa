@@ -11,7 +11,12 @@ public final class ConNode<T extends Type> extends Node {
   @Override String xstr() { return _t.toString(); }
   @Override public Node ideal(GVNGCM gvn) { return null; }
   @Override public Type value(GVNGCM gvn) { return _t; }
-  @Override public Type all_type() { return _t.is_con() ? _t : TypeErr.ALL; }
+  @Override public Type all_type() {
+    if( _t==_t.dual() ) return _t;
+    if( _t.isa(_t.dual()) ) return _t.dual();
+    assert _t.dual().isa(_t);
+    return _t;
+  }
   @Override public String toString() { return str(); }
   @Override public int hashCode() { return _t.hashCode(); }// In theory also slot 0, but slot 0 is always Root
   @Override public boolean equals(Object o) {

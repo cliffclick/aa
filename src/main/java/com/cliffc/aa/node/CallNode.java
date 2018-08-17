@@ -57,20 +57,22 @@ public class CallNode extends Node {
     if( _inlined ) return null;
     // If an upcast is in-progress, no other opts until it finishes
     if( _cast_ret !=null ) return null;
-    //
-    Node ctrl = in(0);          // Control for apply/call-site
-    Node unk  = in(1);          // Function epilog/function pointer
 
     // When do i do 'pattern matching'?  For the moment, right here: if not
     // already unpacked a tuple, and can see the NewNode, unpack it right now.
     if( !_unpacked ) { // Not yet unpacked a tuple
       assert nargs()==1;
       Node nn = arg(0);
-      if( nn instanceof NewNode || gvn.type(nn) == TypeTuple.ALL ) {
-        pop();                  // Pop off the NewNode/empty tuple
-        if( nn instanceof NewNode )
-          for( int i=1; i<nn._defs._len; i++ )
-            add_def(nn.in(i));  // Push the args; unpacks the tuple
+      Type tn = gvn.type(nn);
+      if( tn instanceof TypeTuple ) {
+        TypeTuple tt = (TypeTuple)tn;
+        // Either all the edges from a NewNode (for non-constants), or all the
+        // constants types from a constant Tuple from a ConNode
+        assert nn instanceof NewNode || tt.is_con();
+        int len = nn instanceof NewNode ? nn._defs._len-1 : tt._ts.length;
+        pop();                  // Pop off the NewNode/ConNode tuple
+        for( int i=0; i<len; i++ ) // Push the args; unpacks the tuple
+          add_def( nn instanceof NewNode ? nn.in(i+1) : gvn.con(tt.at(i)) );
         _unpacked = true;       // Only do it once
         return this;
       }
@@ -78,6 +80,7 @@ public class CallNode extends Node {
 
     // Type-checking a function; requires 2 steps, one now, one in the
     // following data Proj from the worklist.
+    Node unk  = in(1);          // Function epilog/function pointer
     if( unk instanceof TypeNode ) {
       TypeNode tn = (TypeNode)unk;
       TypeTuple t_funptr = (TypeTuple)tn._t;
@@ -152,9 +155,11 @@ public class CallNode extends Node {
     assert fun._tf.nargs() == nargs();
     // If the single function callers are known, then we are already wired up.
     // Happens at the transition (!known -> known) or anytime a wired CallNode
-    // is cloned.
-    assert !fun._callers_known || _wired;
-    
+    // is cloned.  If we clone an unwired Call into a split/inline with
+    // a single known caller, we can inline.
+    if( !_wired && fun._callers_known &&
+        wire(gvn,fun) ) return this;
+
     // TODO: if the function has this as the sole caller, can "inline"
     // by wiring the call's return up now.
     
@@ -175,7 +180,16 @@ public class CallNode extends Node {
   
   // Leave the Call in the graph - making the graph "a little odd" - double
   // CTRL users - once for the call, and once for the function being called.
-  void wire(GVNGCM gvn, FunNode fun) {
+  boolean wire(GVNGCM gvn, FunNode fun) {
+    for( Node arg : fun._uses ) {
+      if( arg.in(0) == fun && arg instanceof ParmNode ) {
+        int idx = ((ParmNode)arg)._idx; // Argument number, or -1 for rpc
+        if( idx != -1 &&
+            (idx >= nargs() || !gvn.type(arg(idx)).isa(fun._tf.arg(idx))) )
+          return false;         // Illegal args?
+      }
+    }
+    
     // Inline the call site now.
     // This is NOT inlining the function body, just the call site.
     _wired = true;
@@ -186,6 +200,7 @@ public class CallNode extends Node {
     for( Node arg : fun._uses ) {
       if( arg.in(0) == fun && arg instanceof ParmNode ) {
         int idx = ((ParmNode)arg)._idx; // Argument number, or -1 for rpc
+        assert idx<nargs();
         Node actual = idx==-1 ? gvn.con(TypeRPC.make(_rpc)) : arg(idx);
         gvn.add_def(arg,actual);
       }
@@ -195,6 +210,7 @@ public class CallNode extends Node {
     // known.
     if( gvn.touched(fun) ) gvn.add_def(fun,in(0)); 
     else                   fun.add_def(in(0));
+    return true;
   }
   
   // Inline to this Node.
@@ -252,8 +268,8 @@ public class CallNode extends Node {
         terr = terr.meet(actual);
         actual = formal;   // Lift actual to worse-case valid argument type
       }
-      if( !actual.isa(formal) ) // Actual is not a formal; accumulate type errors
-        terr = terr.meet(TypeErr.make(_badargs.errMsg("%s is not a %s"), actual, formal, false));
+      //if( !actual.isa(formal) ) // Actual is not a formal; accumulate type errors
+      //  terr = terr.meet(TypeErr.make(_badargs.errMsg("%s is not a %s"), actual, formal, false));
     }
     return terr.meet(tval);  // Return any errors, or the Epilog return type
   }

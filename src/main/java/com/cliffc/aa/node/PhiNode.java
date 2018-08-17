@@ -6,7 +6,7 @@ import com.cliffc.aa.type.TypeErr;
 
 // Merge results; extended by ParmNode
 public class PhiNode extends Node {
-  private String _badgc;
+  public final String _badgc;
   final Type _default_type; //
   public PhiNode( String badgc, Node... vals) { super(OP_PHI,vals); _default_type = TypeErr.ALL; _badgc = badgc; }
   PhiNode( byte op, Node fun, ConNode defalt, String badgc ) { super(op,fun,defalt); _badgc = badgc; _default_type = defalt._t; } // For ParmNodes
@@ -26,8 +26,8 @@ public class PhiNode extends Node {
     for( int i=1; i<_defs._len; i++ )
       if( gvn.type(r.in(i))!=Type.XCTRL ) // Only meet alive paths
         t = t.meet(gvn.type(in(i)));
-    if( t==Type.SCALAR )        // Cannot mix GC and non-GC types
-      t = TypeErr.make(_badgc);
+    //if( t==Type.SCALAR )        // Cannot mix GC and non-GC types
+    //  t = TypeErr.make(_badgc);
     return t;
   }
   @Override public Type all_type() { return _default_type; }

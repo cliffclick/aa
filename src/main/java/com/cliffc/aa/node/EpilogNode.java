@@ -44,25 +44,30 @@ public class EpilogNode extends Node {
         assert call.in(1) == this;
         rpc = call._rpc;
       }
-      else return null; // Else unknown function-pointer user (e.g. store-to-memory)
+      else
+        return null; // Else unknown function-pointer user (e.g. store-to-memory)
       bs.set(rpc);
     }
 
     // If we got here, then no function-as-data uses.  All callers are known.
-    fun._callers_known = true;
 
     // Expand out the n callers with the m args.  This is a bulk parallel
     // rename of the FunNode and all Parms.  Note the recursive calls being
     // expanded this way will (on purpose) lead to loops, with the CallNode
     // embedded in the loop.
+    boolean ok=true, progress=false;
     for( Node use : _uses ) {
       CallNode call = (CallNode)use; // Just tested for in above prior loop
-      if( !call._wired ) call.wire(gvn,fun);
+      if( !call._wired )
+        if( call.wire(gvn,fun) ) progress=true;
+        else ok=false;          // Call cannot inline for illegal args
     }
-    // Kill the unknown-caller path
-    gvn.set_def_reg(fun,1,gvn.con(Type.XCTRL));
-
-    return this;
+    if( ok ) {
+      fun._callers_known = true;
+      // Kill the unknown-caller path
+      gvn.set_def_reg(fun,1,gvn.con(Type.XCTRL));
+    }
+    return progress ? this : null;
   }
 
   @Override public Type value(GVNGCM gvn) {

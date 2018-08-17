@@ -158,8 +158,8 @@ public class TypeTuple extends TypeNullable {
   // True if all internals is_con
   @Override public boolean is_con() {
     if( super.is_con() ) return true;
-    for( Type _t : _ts ) if( !_t.may_be_con() ) return false;
-    return _inf.may_be_con();
+    for( Type _t : _ts ) if( !_t.is_con() ) return false;
+    return true;
   }
 
   // Return true if this is a function pointer (return type from EpilogNode)

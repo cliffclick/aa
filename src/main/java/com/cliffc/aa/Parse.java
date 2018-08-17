@@ -111,7 +111,7 @@ public class Parse {
       bs.clear();
       bs.set(0);   // Do not walk initial scope (primitives and constants only)
       bs.set(_e._scope._uid);   // Do not walk top-level scope
-      res.walkerr_gc(bs,_gvn);
+      errs=res.walkerr_gc(errs,bs,_gvn);
     }
     kill(res);
     return new TypeEnv(tres,_e,errs);
@@ -418,7 +418,7 @@ public class Parse {
       String errmsg = errMsg("Cannot mix GC and non-GC types");      
       int cnt=0;                // Add parameters to local environment
       for( int i=0; i<ids._len; i++ )
-        _e.add(ids.at(i),gvn(new TypeNode(ts.at(i),gvn(new ParmNode(cnt++,ids.at(i),fun,con(TypeErr.ALL),errmsg)),bads.at(i))));
+        _e.add(ids.at(i),gvn(new TypeNode(ts.at(i),gvn(new ParmNode(cnt++,ids.at(i),fun,con(Type.SCALAR),errmsg)),bads.at(i))));
       Node rpc = gvn(new ParmNode(-1,"rpc",fun,_gvn.con(TypeRPC.ALL_CALL),null));
       Node rez = stmts();       // Parse function body
       if( rez == null ) rez = err_ctrl2("Missing function body");
