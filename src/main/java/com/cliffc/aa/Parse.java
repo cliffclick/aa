@@ -177,6 +177,7 @@ public class Parse {
       Node n = _e.lookup(tok);
       if( n==null ) {           // Token not already bound to a value
         _e.add(tok,ifex);       // Bind token to a value
+        if( ifex instanceof EpilogNode && !ifex.is_forward_ref() ) ((EpilogNode)ifex).fun().bind(tok); // Debug only: give name to function
       } else { // Handle forward referenced function definitions
         if( n.is_forward_ref() ) ((EpilogNode)n).merge_ref_def(_gvn,tok,(EpilogNode)ifex);
         else err_ctrl0("Cannot re-assign val '"+tok+"'");

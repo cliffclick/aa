@@ -128,7 +128,7 @@ public class TestParse {
     test("x=1", TypeInt.TRUE);
     test("x=y=1", TypeInt.TRUE);
     testerr("x=y=", "Missing ifex after assignment of 'y'","    ");
-    testerr("x=y" , "Unknown ref 'y'","   ");
+    testerr("x=z" , "Unknown ref 'z'","   ");
     testerr("x=1+y","Unknown ref 'y'","     ");
     test("x=2; y=x+1; x*y", TypeInt.con(6));
     // Re-use ref immediately after def; parses as: x=(2*3); 1+x+x*x
@@ -219,7 +219,6 @@ public class TestParse {
   }
 
   @Test public void testParse4() {
-    testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1,) is not a @{x,y,}","                           ");
     // simple anon struct tests
     test   ("  @{x,y} ", TypeStruct.makeA(new String[]{"x","y"},TypeErr.ANY,TypeErr.ANY)); // simple anon struct decl
     testerr("a=@{x=1.2,y}; x", "Unknown ref 'x'","               ");

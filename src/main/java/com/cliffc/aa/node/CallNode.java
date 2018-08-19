@@ -70,7 +70,7 @@ public class CallNode extends Node {
         // constants types from a constant Tuple from a ConNode
         assert nn instanceof NewNode || tt.is_con();
         int len = nn instanceof NewNode ? nn._defs._len-1 : tt._ts.length;
-        pop();                  // Pop off the NewNode/ConNode tuple
+        pop();  gvn.add_work(nn);  // Pop off the NewNode/ConNode tuple
         for( int i=0; i<len; i++ ) // Push the args; unpacks the tuple
           add_def( nn instanceof NewNode ? nn.in(i+1) : gvn.con(tt.at(i)) );
         _unpacked = true;       // Only do it once
@@ -226,13 +226,12 @@ public class CallNode extends Node {
     Type t = gvn.type(fun);
     if( !_inlined ) {           // Inlined functions just pass thru & disappear
       if( fun instanceof UnresolvedNode ) {
-        // For unresolved, we can take the BEST choice; i.e. the JOIN of every
-        // choice.  Typically one choice works and the others report type
-        // errors on arguments.
-        t = TypeErr.ALL;
+        // Might be forced to take the worst choice, based on args.  Until the
+        // args settle out must be conservative.
+        t = TypeErr.ANY;
         for( Node epi : fun._defs ) {
           Type t_unr = value1(gvn,gvn.type(epi));
-          t = t.join(t_unr);    // JOIN of choices
+          t = t.meet(t_unr);    // JOIN of choices
         }
       } else {                  // Single resolved target
         t = value1(gvn,t);      // Check args

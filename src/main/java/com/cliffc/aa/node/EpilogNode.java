@@ -44,8 +44,7 @@ public class EpilogNode extends Node {
         assert call.in(1) == this;
         rpc = call._rpc;
       }
-      else
-        return null; // Else unknown function-pointer user (e.g. store-to-memory)
+      else return null; // Else unknown function-pointer user (e.g. store-to-memory)
       bs.set(rpc);
     }
 

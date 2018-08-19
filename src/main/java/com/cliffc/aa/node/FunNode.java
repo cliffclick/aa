@@ -1,13 +1,15 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.*;
+import com.cliffc.aa.AA;
+import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.Bits;
 import com.cliffc.aa.util.SB;
-import com.cliffc.aa.type.*;
 
 import java.util.BitSet;
 import java.util.HashMap;
+import java.util.Map;
 
 // FunNode is a RegionNode; args point to all the known callers.  Zero slot is
 // null, same as a C2 Region.  Args 1+ point to callers; Arg 1 points to Scope
@@ -107,7 +109,7 @@ public class FunNode extends RegionNode {
   @Override String str() { return names(_tf._fidxs,new SB()).toString(); }
   // Debug only: make an attempt to bind name to a function
   private static Ary<String> NAMES = new Ary<>(new String[1],0);
-  void bind( String tok ) {
+  public void bind( String tok ) {
     int fidx = _tf.fidx();
     String name = NAMES.atX(fidx);
     assert name==null || name.equals(tok); // Attempt to double-bind
@@ -208,10 +210,12 @@ public class FunNode extends RegionNode {
     while( work._len > 0 ) {    // While have work
       Node n = work.pop();      // Get work
       if( bs.get(n._uid) ) continue; // Already visited?
-      if( n != epi )            // Except for the Epilog
-        work.addAll(n._uses);   // Visit all uses also
       bs.set(n._uid);           // Flag as visited
       int op = n._op;           // opcode
+      if( op == OP_FUN  && n       != this ) continue; // Call to other function, not part of inlining
+      if( op == OP_PARM && n.in(0) != this ) continue; // Arg  to other function, not part of inlining
+      if( n != epi )            // Except for the Epilog
+        work.addAll(n._uses);   // Visit all uses also
       if( op==OP_CALL ) {       // Call-of-primitive?
         Node n1 = n.in(1);
         Node n2 = n1 instanceof UnresolvedNode ? n1.in(0) : n1;
@@ -305,6 +309,9 @@ public class FunNode extends RegionNode {
     while( work._len > 0 ) {    // While have work
       Node n = work.pop();      // Get work
       if( map.get(n) != null ) continue; // Already visited?
+      int op = n._op;           // opcode
+      if( op == OP_FUN  && n       != this ) continue; // Call to other function, not part of inlining
+      if( op == OP_PARM && n.in(0) != this ) continue; // Arg  to other function, not part of inlining
       assert n._uid < fun._uid; // Recursive calls will call 'fun' directly
       assert n.in(0)!=epi && (n._defs._len<=1 || n.in(1)!= epi || n instanceof CallNode); // Do not walk past epilog
       if( n != epi )           // Except for the Epilog
@@ -348,6 +355,7 @@ public class FunNode extends RegionNode {
         }
       }
     }
+
     // Kill split-out path-ins to the old code
     for( int j=2; j<_defs._len; j++ )
       if( fun.in(j)!=any )  // Path split out?
@@ -355,7 +363,7 @@ public class FunNode extends RegionNode {
 
     // Repoint all Calls uses to an Unresolved choice of the old and new
     // functions and let the Calls resolve individually.
-    if( fun.in(1) != any )
+    if( fun.in(1) != any )      // Split-for-type, possible many future callers
       gvn.subsume(epi,new_unr);
     else {
       // The old Epilog has a set of CallNodes, but only the one in slot#2 is
@@ -372,6 +380,19 @@ public class FunNode extends RegionNode {
       }
     }
 
+    // Put all new nodes into the GVN tables and worklists
+    for( Map.Entry<Node,Node> e : map.entrySet() ) {
+      Node nn = e.getValue();         // New node
+      Type ot = gvn.type(e.getKey()); // Generally just copy type from original nodes
+      if( nn instanceof ParmNode && ((ParmNode)nn)._idx==-1 )
+        ot = nn.all_type();     // Except the RPC, which has new callers
+      else if( nn instanceof EpilogNode ) {
+        TypeTuple tt = (TypeTuple)ot; // And the epilog, which has a new funnode and RPCs
+        ot = TypeTuple.make_all(tt.at(0),tt.at(1),TypeRPC.ALL_CALL,fun._tf);
+      }
+      gvn.rereg(nn,ot);
+    }
+
     // Cloned CallNodes that are labeled wired, are not actually wired up.
     // Basically we made a bunch of new callers in the function body and
     // anybody they called needs to be informed.
@@ -385,9 +406,7 @@ public class FunNode extends RegionNode {
           call.wire(gvn,func);
         }
       }
-    
-    // Put all new nodes into the GVN tables and worklists
-    for( Node c : map.values() ) gvn.rereg(c,c.all_type());
+
     // TODO: Hook with proper signature into ScopeNode under an Unresolved.
     // Future calls may resolve to either the old version or the new.
     return is_dead() ? fun : this;

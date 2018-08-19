@@ -268,8 +268,7 @@ public class GVNGCM {
     return oldt == t && y==null ? null : n; // Progress if types improved
   }
 
-  // Complete replacement; point uses to x.  The goal is to completely replace
-  // 'old'.
+  // Complete replacement; point uses to 'nnn'.  The goal is to completely replace 'old'.
   public void subsume( Node old, Node nnn ) {
     while( old._uses._len > 0 ) {
       Node u = old._uses.del(0);  // Old use

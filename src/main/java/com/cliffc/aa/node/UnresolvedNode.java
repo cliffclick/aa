@@ -12,9 +12,9 @@ public class UnresolvedNode extends Node {
     return null;
   }
   @Override public Type value(GVNGCM gvn) {
-    Type t = TypeErr.ALL;
+    Type t = TypeErr.ANY;
     for( Node def : _defs )
-      t = t.join(gvn.type(def)); // Join of incoming functions
+      t = t.meet(gvn.type(def)); // Meet of incoming functions
     return t;
   }
   // Filter out all the wrong-arg-count functions
@@ -56,7 +56,7 @@ public class UnresolvedNode extends Node {
       assert tepi.is_fun_ptr();
       TypeFun fun = (TypeFun)tepi.at(3);
       Type[] formals = fun._ts._ts;   // Type of each argument
-      if( formals.length != call.nargs() ) continue;
+      if( formals.length != call.nargs() ) continue; // Wrong arg count, toss out
       // Now check if the arguments are compatible in all, keeping lowest cost
       int xcvts = 0;             // Count of conversions required
       boolean unk = false;       // Unknown arg might be incompatible or free to convert
@@ -82,10 +82,10 @@ public class UnresolvedNode extends Node {
         ns.del(i--);
       }
 
-    if( ns._len == 0 ) return null; // No choices apply?  No changes.
-    if( ns._len==1 ) return ns.at(0);
+    if( ns._len==0 ) return null;          // No choices apply?  No changes.
+    if( ns._len==1 ) return ns.at(0);      // Return the one choice
     if( ns._len==_defs._len ) return null; // No improvement
-    throw AA.unimpl();          // TODO: return shrunk choice list
+    throw AA.unimpl();                     // TODO: return shrunk choice list
   }
   
   // Return the op_prec of the returned value.  Not sensible except when call
