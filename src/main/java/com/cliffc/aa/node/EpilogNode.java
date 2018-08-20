@@ -1,8 +1,11 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.*;
-import com.cliffc.aa.type.*;
-import java.util.BitSet;
+import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.Parse;
+import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeErr;
+import com.cliffc.aa.type.TypeRPC;
+import com.cliffc.aa.type.TypeTuple;
 
 // Tail end of functions.  Gathers:
 // - exit control; function may never exit or may be more than one
@@ -14,59 +17,10 @@ public class EpilogNode extends Node {
   public EpilogNode( Node ctrl, Node val, Node rpc, Node fun, String unkref_err ) { super(OP_EPI,ctrl,val,rpc,fun); _unkref_err=unkref_err; }
   @Override public Node ideal(GVNGCM gvn) {
     if( !is_forward_ref() && skip_ctrl(gvn) ) return this; // Collapsing exit control
-
-    // Look at the set of uses post-Parse; at parse time there will be no uses.
-    if( _uses._len == 0 ) return null; // Dead, or during-parse
-
-    // Optimization: if we already know all callers are known, quit now.
-    FunNode fun = fun();
-    if( fun._callers_known ) return null;
-    
-    // After parse, we have the complete set of uses.  If there are any uses as
-    // a function-pointer, then "all is lost" we have to assume the F-P is
-    // called later.  If all uses are RPCs or not-inlined Calls, we can union
-    // them all - and cut out any incoming paths to the FunNode that have no
-    // matching RPC.  Once a top-level Parse exits the "unknown callers" often
-    // go away.
-    BitSet bs = new BitSet();   // Union of RPCs
-    for( Node use : _uses ) {
-      int rpc;
-      if( use instanceof RPCNode ) {
-        rpc = ((RPCNode)use)._rpc;
-        throw AA.unimpl();                   // TODO: no partially inlined Funs
-      } else if( use instanceof CastNode ) {
-        //continue; // Casts of RPC results are OK
-        throw AA.unimpl();                   // TODO: no partially inlined Funs
-      } else if( use instanceof CallNode ) { // Un-inlined call site
-        CallNode call = (CallNode)use;
-        // If any use is as an argument, all is lost.
-        for( int i=0; i<call.nargs(); i++ ) if( call.arg(i)==this ) return null;
-        assert call.in(1) == this;
-        rpc = call._rpc;
-      }
-      else return null; // Else unknown function-pointer user (e.g. store-to-memory)
-      bs.set(rpc);
-    }
-
-    // If we got here, then no function-as-data uses.  All callers are known.
-
-    // Expand out the n callers with the m args.  This is a bulk parallel
-    // rename of the FunNode and all Parms.  Note the recursive calls being
-    // expanded this way will (on purpose) lead to loops, with the CallNode
-    // embedded in the loop.
-    boolean ok=true, progress=false;
-    for( Node use : _uses ) {
-      CallNode call = (CallNode)use; // Just tested for in above prior loop
-      if( !call._wired )
-        if( call.wire(gvn,fun) ) progress=true;
-        else ok=false;          // Call cannot inline for illegal args
-    }
-    if( ok ) {
-      fun._callers_known = true;
-      // Kill the unknown-caller path
-      gvn.set_def_reg(fun,1,gvn.con(Type.XCTRL));
-    }
-    return progress ? this : null;
+    if( fun()._cidx != 0 )  // Collapsing function, call sites need to optimize
+      for( Node use : _uses )
+        gvn.add_work(use);
+    return null;
   }
 
   @Override public Type value(GVNGCM gvn) {
@@ -81,8 +35,8 @@ public class EpilogNode extends Node {
   // effectively being inlined on the spot, removing the function head and tail.
   @Override public Node is_copy(GVNGCM gvn, int idx) {
     assert idx==0 || idx==1;
-    assert !gvn.type(rpc()).is_con() || fun()._callers_known;
-    return gvn.type(rpc()).is_con() ? in(idx) : null;
+    assert gvn.type(rpc()).is_con() && !fun()._fun_as_data;
+    return in(idx);
   }
   
   public    Node ctrl() { return          in(0); } // internal function control

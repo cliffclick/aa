@@ -135,6 +135,9 @@ public class CallNode extends Node {
     if( rez instanceof ParmNode && rez.in(0) == fun ) return inline(gvn,arg(0));
     // Check for constant body
     if( rez instanceof ConNode ) return inline(gvn,rez);
+    // Function is single-caller (me) and collapsing
+    if( fun._cidx != 0 )
+      return inline(gvn,rez);
 
     // Check for a 1-op body using only constants or parameters
     boolean can_inline=true;
@@ -153,32 +156,16 @@ public class CallNode extends Node {
     // If this is a primitive, we never change the function header via inlining the call
     assert fun.in(1)._uid!=0;
     assert fun._tf.nargs() == nargs();
-    // If the single function callers are known, then we are already wired up.
-    // Happens at the transition (!known -> known) or anytime a wired CallNode
-    // is cloned.  If we clone an unwired Call into a split/inline with
-    // a single known caller, we can inline.
-    if( !_wired && fun._callers_known &&
-        wire(gvn,fun) ) return this;
 
-    // TODO: if the function has this as the sole caller, can "inline"
-    // by wiring the call's return up now.
-    
-    //// Flag the Call as is_copy;
-    //// Proj#0 is RPC to return from the function back to here.
-    //// Proj#1 is a new CastNode on the tf._ret to regain precision
-    //// All other slots are killed.
-    //for( int i=2; i<_defs._len; i++ ) set_def(i,null,gvn);
-    //Node rpc = gvn.xform(new RPCNode(epi,epi,_rpc));
-    //set_def(0,rpc,gvn);
-    //// TODO: Use actual arg types to regain precision
-    //return inline(gvn,gvn.xform(new CastNode(rpc,epi,fun._tf._ret)));
+    // Always wire caller args into known functions
+    if( !_wired && wire(gvn,fun) ) return this;
+
     return null;
   }
 
   // Wire the call args to a known function, letting the function have precise
   // knowledge of its callers and arguments.
-  
-  // Leave the Call in the graph - making the graph "a little odd" - double
+  // Leaves the Call in the graph - making the graph "a little odd" - double
   // CTRL users - once for the call, and once for the function being called.
   boolean wire(GVNGCM gvn, FunNode fun) {
     for( Node arg : fun._uses ) {

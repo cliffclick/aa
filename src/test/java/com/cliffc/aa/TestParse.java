@@ -12,18 +12,39 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
 
-    // FunNodes -
-    // - Slot#1, worse-case unknown callers
-    // - conservative: if in lex scope OR has Epilog-data-use, then #[all]
-    // - conservative: if lost lex scope AND no Epilog-data-use, then call-list-known
-    // - call-list-known: replace slot#1 with MEET of callers, this can lift
-    //   as callers remove
-    // - Optimistic: (lex-scope gone, but might be epilog-data-use)
-    // - Set to no-callers, and fall as expected
+    // Cannot inline/clone a function which calls another function and that
+    // other function has already optimized it's entry point - because cloning
+    // makes a new Call to the already-optimized FunNode.
     //
-    // Caller
-    // - as discover FunNodes on optimistic  , must "push"
-    // - conversative: if lose a FunNode target can ask FunNode to re-compute (if Fun is list-known)
+    // Even post-parser, call functions retain a "new calls go here" in slot#1.
+    //
+    // FunNodes can back to Epilog's can back to Call users; if any non-call
+    // users, then the Fun "has unknown users" until all Calls are wired, which
+    // typically means GCP to propagate the FunPtr around.  If all callers are
+    // known, they can wire and then indeed "all callers known".  However,
+    // removing the unknown-caller-entry prevents other inlining.  Do not
+    // remove the unknown-entry, even if all-callers-known.
+    // Move Epilog's "all-callers-known" to FunNode?
+    //
+    // If all-callers-known can uplift to Meet of inputs.  The RPC meet denies
+    // other callers, fix by tagging the RPC as "plus more" but specifically do
+    // not list any known RPCs.
+    //
+    // If FunNode is "all callers known" and single-entry, can inline the
+    // single call & remove the function header.  This is independent of
+    // function size.
+    //
+    // Size-splits indeed can set the one known caller and so must/should
+    // optimize completely away.  Should turn into a single-caller function
+    // which will completely inline.
+    //
+    // Type-splits upgrade their unknown-callers slot#1 to be the Meet of just
+    // their new post-split inputs.  The splits are NOT all-callers-known.  The
+    // FunNode does not need to be "all callers known".
+    //
+
+    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
+    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.TRUE );
 
 
     
@@ -183,7 +204,6 @@ public class TestParse {
   }
 
   @Test public void testParse3() {
-    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.TRUE );
     // Type annotations
     test("-1:int", TypeInt.con( -1));
     test("(1+2.3):flt", TypeFlt.make(0,64,3.3));

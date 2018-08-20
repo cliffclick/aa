@@ -147,17 +147,31 @@ public class FunNode extends RegionNode {
   // conservative allowed arguments, under the assumption a as-yet-detected
   // caller will call with such arguments.  This is a quick check to detect
   // may-have-more-callers.
-  public boolean _callers_known;
-  
+  public boolean _fun_as_data = true;
+
   // ----
   @Override public Node ideal(GVNGCM gvn) {
     Node n = split_callers(gvn);
     if( n != null ) return n;
 
     // Else generic Region ideal
-    return ideal(gvn,false);
+    return ideal(gvn,true);
   }
 
+  // Look for this function pointer as data.  If found it means this function
+  // might be called from an unknown call site.
+  private boolean funptr_as_data(EpilogNode epi) {
+    if( in(0) instanceof ScopeNode ) { assert _fun_as_data; return true; }
+    for( Node use : epi._uses ) {
+      if( !(use instanceof CallNode) ) return true; // Unknown F-P usage
+      CallNode call = (CallNode)use;
+      // If any use is as an argument, all is lost.
+      for( int i=0; i<call.nargs(); i++ ) if( call.arg(i)==this ) return true;
+      assert call.in(1) == epi;
+    }
+    return false;
+  }
+  
   private Node split_callers( GVNGCM gvn ) {
     // Bail if there are any dead paths; RegionNode ideal will clean out
     for( int i=1; i<_defs._len; i++ ) if( gvn.type(in(i))==Type.XCTRL ) return null;
@@ -176,6 +190,10 @@ public class FunNode extends RegionNode {
         if( parm._idx == -1 ) rpc = parm;
         else parms[parm._idx] = parm;
       } else if( use instanceof EpilogNode ) { assert epi==null || epi==use; epi = (EpilogNode)use; }
+
+    // See if all callers are known
+    if( _fun_as_data && !funptr_as_data(epi) ) _fun_as_data = false;
+    else assert !funptr_as_data(epi);
 
     // Make a clone of the original function to split the callers.  Done for
     // e.g. primitive type-specialization or for tiny functions.
@@ -240,7 +258,7 @@ public class FunNode extends RegionNode {
     // in slot 1, only slot 2.
     Node top = gvn.con(Type.XCTRL);
     FunNode fun = new FunNode(top,_tf._ts,_tf._ret,name(),_tf._nargs);
-    fun._callers_known=true; // private split always
+    fun._fun_as_data=false;     // Never as a function pointer
     fun.add_def(in(2));
     for( int i=3; i<_defs._len; i++ ) fun.add_def(top);
     return fun;
@@ -288,7 +306,7 @@ public class FunNode extends RegionNode {
       fun.add_def(split ? in(j) : gvn.con(Type.XCTRL));
     }
     // TODO: Install in ScopeNode for future finding
-    fun._callers_known=true; // currently not exposing to further calls
+    fun._fun_as_data=_fun_as_data;
     return fun;
   }
 
@@ -397,23 +415,24 @@ public class FunNode extends RegionNode {
     // Basically we made a bunch of new callers in the function body and
     // anybody they called needs to be informed.
     for( Node c : map.values() )
-      if( c instanceof CallNode && ((CallNode)c)._wired ) {
-        CallNode call = (CallNode)c;
-        Node epic = call.in(1);
-        if( epic instanceof EpilogNode ) {
-          FunNode func = ((EpilogNode)epic).fun();
-          assert func._callers_known;
-          call.wire(gvn,func);
-        }
-      }
-
+      if( c instanceof CallNode )
+        ((CallNode)c)._wired = false;
     // TODO: Hook with proper signature into ScopeNode under an Unresolved.
     // Future calls may resolve to either the old version or the new.
     return is_dead() ? fun : this;
   }
 
+  // Compute value from inputs.  Slot#1 is always the unknown caller.  If
+  // Slot#1 is not a ScopeNode, then it is a constant CTRL just in case we make
+  // a new caller (e.g. via inlining).  If there are no other inputs and no
+  // data uses, then the function is dead.  If there are data uses, they might
+  // hit a new CallNode - and this requires GCP to discover the full set of
+  // possible callers.
   @Override public Type value(GVNGCM gvn) {
-    return _tf.is_forward_ref() || !_callers_known ? Type.CTRL : super.value(gvn);
+    return _fun_as_data ||          // Might be called thru the F-P
+      in(1) instanceof ScopeNode || // Might parse a new call site
+      _defs._len>2                  // Existing callers
+      ? Type.CTRL : Type.XCTRL;     // No callers and no chance for future callers
   }
   
   @Override public int hashCode() { return super.hashCode()+_tf.hashCode(); }

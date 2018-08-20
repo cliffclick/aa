@@ -10,13 +10,20 @@ public class RegionNode extends Node {
   int _cidx; // Copy index; monotonic change from zero to Control input this Region is collapsing to
   public RegionNode( Node... ctrls) { super(OP_REGION,ctrls); }
   RegionNode( byte op ) { super(op); add_def(null); } // For FunNodes
-  @Override public Node ideal(GVNGCM gvn) { return ideal(gvn,true); }
+  @Override public Node ideal(GVNGCM gvn) { return ideal(gvn,false); }
   // Ideal call, but FunNodes keep index#1 for future parsed call sites
-  Node ideal(GVNGCM gvn, boolean can_copy) {
+  Node ideal(GVNGCM gvn, boolean keepslot1) {
     if( _cidx !=0 ) return null; // Already found single control path
     // TODO: The unzip xform, especially for funnodes doing type-specialization
     // TODO: Check for dead-diamond merges
     // TODO: treat _cidx like U/F and skip_dead it also
+    boolean progress=false;
+    for( int i=1; i<_defs._len; i++ ) {
+      Node x = in(i).is_copy(gvn,-1);
+      if( x != null ) {
+        set_def(i,x,gvn); progress = true; }
+    }
+    if( progress ) return this;
 
     // Find 0, 1 or many live paths
     int live=0, dead=0;
@@ -28,7 +35,7 @@ public class RegionNode extends Node {
         else live = -1;          // Found many live paths
     if( live==0 ) return null;   // Nothing live?  Let value() handle it
 
-    if( can_copy && live > 0 ) {   // Exactly one and no more?
+    if( live > 1 || (live==1 && !keepslot1) ) { // Exactly one and no more?
       // Note: we do not return the 1 alive control path, as then trailing
       // PhiNodes will subsume that control - instead they each need to
       // collapse to their one alive input in their own ideal() calls - and
@@ -40,12 +47,13 @@ public class RegionNode extends Node {
 
     // Do a parallel bulk reshape: remove the dead edges from Phis and the
     // Region all in once
+    int s = keepslot1 ? 2 : 1;
     for( Node phi : _uses )
       if( phi instanceof PhiNode )
-        for( int i=1,j=1; i<_defs._len; i++ )
+        for( int i=s,j=s; i<_defs._len; i++ )
           if( gvn.type(in(i))==Type.XCTRL ) { Type ot = gvn.type(phi); gvn.unreg(phi); phi.remove(j,gvn); gvn.rereg(phi,ot); }
           else j++;
-    for( int i=1; i<_defs._len; i++ ) if( gvn.type(in(i))==Type.XCTRL ) remove(i--,gvn);
+    for( int i=s; i<_defs._len; i++ ) if( gvn.type(in(i))==Type.XCTRL ) remove(i--,gvn);
     return this;
   }
 
@@ -55,6 +63,7 @@ public class RegionNode extends Node {
       t = t.meet(gvn.type(_defs._es[i]));
     return t;
   }
+  
   @Override public Node is_copy(GVNGCM gvn, int idx) { assert idx==-1; return _cidx == 0 ? null : in(_cidx); }
   @Override public Type all_type() { return Type.CTRL; }
   // Complex dominator tree.  Ok to subset, attempt the easy walk
