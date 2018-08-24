@@ -41,14 +41,14 @@ BNF                           | Comment
 `stmt = tvar = :type`         | type variable assignment
 `ifex = expr ? expr : expr`   | trinary logic
 `expr = term [binop term]*`   | gather all the binops and sort by prec
-`term = tfact [tuple | fact | .field]*` | function application (includes uniop) or field lookup
+`term = tfact [tuple or fact or .field]*` | function application (includes uniop) or field lookup
 `tfact= fact[:type]`          | Optionally typed fact
 `fact = id`                   | variable lookup
 `fact = num`                  | number
 `fact = "string"`             | string
 `fact = (stmts)`              | General statements parsed recursively
 `fact = tuple`                | Tuple builder
-`fact = {func}`               | Anonymous function declaration
+`fact = func`                 | Anonymous function declaration
 `fact = @{ [id[:type]?[=stmt]?,]* }` | Anonymous struct declaration; optional type, optional initial value, optional final comma
 `fact = {binop}`              | Special syntactic form of binop; no spaces allowed; returns function constant
 `fact = {uniop}`              | Special syntactic form of uniop; no spaces allowed; returns function constant
