@@ -213,12 +213,13 @@ public class CallNode extends Node {
     Type t = gvn.type(fun);
     if( !_inlined ) {           // Inlined functions just pass thru & disappear
       if( fun instanceof UnresolvedNode ) {
-        // Might be forced to take the worst choice, based on args.  Until the
-        // args settle out must be conservative.
-        t = TypeErr.ANY;
+        // For unresolved, we can take the BEST choice; i.e. the JOIN of every
+        // choice.  Typically one choice works and the others report type
+        // errors on arguments.
+        t = TypeErr.ALL;
         for( Node epi : fun._defs ) {
           Type t_unr = value1(gvn,gvn.type(epi));
-          t = t.meet(t_unr);    // JOIN of choices
+          t = t.join(t_unr); // JOIN of choices
         }
       } else {                  // Single resolved target
         t = value1(gvn,t);      // Check args
@@ -254,8 +255,8 @@ public class CallNode extends Node {
         terr = terr.meet(actual);
         actual = formal;   // Lift actual to worse-case valid argument type
       }
-      //if( !actual.isa(formal) ) // Actual is not a formal; accumulate type errors
-      //  terr = terr.meet(TypeErr.make(_badargs.errMsg("%s is not a %s"), actual, formal, false));
+      if( !actual.isa(formal) ) // Actual is not a formal; accumulate type errors
+        terr = terr.meet(TypeErr.make(_badargs.errMsg("%s is not a %s"), actual, formal, false));
     }
     return terr.meet(tval);  // Return any errors, or the Epilog return type
   }

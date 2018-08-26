@@ -187,6 +187,8 @@ public class TypeTuple extends TypeNullable {
   
   // Return an error message, if any exists
   @Override public String errMsg() {
+    // Ok to have a function which cannot be executed
+    if( is_fun_ptr() ) return null;
     String s;
     for( Type t : _ts )
       if( (s=t.errMsg()) != null )

@@ -8,7 +8,9 @@ public class TypeErr extends Type {
   public String _msg;
   private Type _a,_b;           // Error !(a isa b)
   private TypeErr ( String msg, boolean all, Type a, Type b, boolean multi ) { super(TERROR); init(msg,all,a,b,multi); }
-  private void init(String msg, boolean all, Type a, Type b, boolean multi ) { _msg=msg; _all=all; _a=a; _b=b; _multi=multi;}
+  private void init(String msg, boolean all, Type a, Type b, boolean multi ) {
+    assert !msg.contains("is not a") || a!=null;
+    _msg=msg; _all=all; _a=a; _b=b; _multi=multi;}
   @Override public int hashCode( ) { return TERROR+_msg.hashCode()+(_all?1:0)+(_a==null?0:_a.hashCode()+_b.hashCode())+(_multi?2:0); }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
@@ -30,10 +32,13 @@ public class TypeErr extends Type {
   }
 
   static public final TypeErr ALL = make("all");
-  static public final TypeErr ANY = make("all",false,null,null,false);
+  static public final TypeErr ANY = (TypeErr)ALL.dual();
+  static public final TypeErr E0 = make("err",false,null,null,false);
+  static public final TypeErr E1 = make("%s is not a %s",false,Type.SCALAR,TypeInt.TRUE,false);
+  static public final TypeErr E2 = make("%s is not a %s",true ,Type.SCALAR,TypeFlt.PI,true);
 
-  static final TypeErr[] TYPES = new TypeErr[]{ANY,ALL};
-  @Override protected TypeErr xdual() { return new TypeErr(_msg,!_all,_a==null?null:_a.dual(),_b==null?null:_b.dual(),_multi); }
+  static final TypeErr[] TYPES = new TypeErr[]{ANY,ALL,E0,E1,E2};
+  @Override protected TypeErr xdual() { return new TypeErr(_msg,!_all,_a==null?null:_a.dual(),_b==null?null:_b.dual(),!_multi); }
   @Override protected Type xmeet( Type t ) {
     if( t == this ) return this;
     if( t._type != TERROR ) return _all ? this : t; // Errors win over non-errors
@@ -42,21 +47,29 @@ public class TypeErr extends Type {
     TypeErr te = (TypeErr)t;
     if( _msg.equals(te._msg) && _a==te._a && _b==te._b && _multi==te._multi)
       return _all ? this : t;
-    if( _all != te._all ) throw com.cliffc.aa.AA.unimpl(); // mixed-mode?
+    //if( _all != te._all ) throw com.cliffc.aa.AA.unimpl(); // mixed-mode?
     // Merge isa complaints
     Type a=null, b=null;
-    if( _a != null ) {
-      a = _all ? _a.meet(te._a) : _a.join(te._a);
-      b = _all ? _b.join(te._b) : _b.meet(te._b);
+    if( _a == null ) {
+      if( te._a == null ) ;
+      else { a=te._a; b=te._b; }
+    } else {
+      if( te._a == null ) { a=_a; b=_b; }
+      else {
+        a = _all ? _a.meet(te._a) : _a.join(te._a);
+        b = _all ? _b.join(te._b) : _b.meet(te._b);
+      }
     }
+    
     // Merge errors
+    boolean all   = _all   | te._all  ;
     boolean multi = _multi | te._multi; // If either is a multi, so is the result
     String msg = _msg;
     if( !_msg.equals(te._msg) ) {
-      multi = true;             // If strings are unequal, result is a multi
+      all = multi = true;       // If strings are unequal, result is a multi and falls
       if( msg.compareTo(te._msg) > 0 ) msg = te._msg; // And take alpha-sort string only
     }
-    return make(msg, _all|te._all, a, b, multi);
+    return make(msg, all, a, b, multi);
   }
   @Override public boolean above_center() { return !_all; }
   @Override public boolean may_be_con() { return !_all; }

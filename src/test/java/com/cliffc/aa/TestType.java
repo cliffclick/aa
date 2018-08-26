@@ -13,6 +13,15 @@ public class TestType {
   @Test public void testType() {
     Type.init0(new HashMap<>());
     Type ignore = TypeTuple.NIL; // Break class-loader cycle; load Tuple before Fun.
+
+    // broken doing check_symmetric of errors.
+    // plan C:
+    // - TypeErr.ALL / ANY moves back to plain Type.
+    // - TypeErr collects Strings (but not other types) & supports a dual notion.
+    // - "above" is choice, "below" is "all strings", and meet
+    // intersects or unions as appropriate.
+
+    
   }
   
   @Test public void testNamesInts() {

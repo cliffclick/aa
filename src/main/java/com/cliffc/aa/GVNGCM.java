@@ -65,7 +65,7 @@ public class GVNGCM {
     }
   }
 
-  private boolean _opt=false;
+  public boolean _opt=false;
   public Type type( Node n ) {
     Type t = n._uid < _ts._len ? _ts._es[n._uid] : null;
     if( t != null ) return t;
@@ -369,7 +369,7 @@ public class GVNGCM {
       if( t==null ) continue;   // Never reached?
       Node n = nodes.atX(i);
       if( n != null && t.may_be_con() && !(n instanceof ConNode) )
-        throw AA.unimpl();
+        subsume(n,con(t));
       if( !(t instanceof TypeErr) && n instanceof CastNode ) { // TODO: Fold into CastNode.ideal
         assert t.isa(((CastNode)n)._t);
         if( t != (((CastNode)n)._t)) {

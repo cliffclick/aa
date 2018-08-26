@@ -190,6 +190,7 @@ public class FunNode extends RegionNode {
         if( parm._idx == -1 ) rpc = parm;
         else parms[parm._idx] = parm;
       } else if( use instanceof EpilogNode ) { assert epi==null || epi==use; epi = (EpilogNode)use; }
+    if( epi == null ) return null; // No epilog is a dead function
 
     // See if all callers are known
     if( _fun_as_data && !funptr_as_data(epi) ) _fun_as_data = false;

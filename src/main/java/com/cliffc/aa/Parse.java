@@ -672,7 +672,7 @@ public class Parse {
   public String typerr( Type t0, Type t1 ) {
     return t0.is_forward_ref() // Forward/unknown refs as args to a call report their own error
       ? forward_ref_err(FunNode.name(((TypeTuple)t0).get_fun().fidx()))
-      : errMsg((t0==TypeInt.FALSE && t1.is_oop() ? "nil" : t0.toString())+" is not a "+t1);
+      : errMsg((t0==TypeInt.FALSE && t1.is_oop() ? "nil" : t0.toString())+" is notQ a "+t1);
   }
 
   // Standard mis-use of a forward-ref error (assumed to be a forward-decl of a
