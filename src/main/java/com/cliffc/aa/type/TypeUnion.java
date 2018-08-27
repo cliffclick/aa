@@ -9,7 +9,7 @@ import java.util.Comparator;
 
 // Type union is a meet (or join) of unrelated SCALAR types.  Specifically it
 // simplifies out overlapping choices, such as {Flt64 & Flt32} :=: Flt64.
-public class TypeUnion extends Type {
+public class TypeUnion extends Type<TypeUnion> {
   private TypeTuple _ts;         // All of these are possible choices
   private boolean _any; // FALSE: meet; must support all; TRUE: join; can pick any one choice
   private TypeUnion( TypeTuple ts, boolean any ) { super(TUNION); init(ts,any); }
@@ -34,7 +34,7 @@ public class TypeUnion extends Type {
     return sb.p('}').toString();
   }
   private static TypeUnion FREE=null;
-  private TypeUnion free( TypeUnion f ) { FREE=f; return this; }
+  @Override protected TypeUnion free( TypeUnion f ) { FREE=f; return this; }
   public static TypeUnion make( TypeTuple ts, boolean any ) {
     TypeUnion t1 = FREE;
     if( t1 == null ) t1 = new TypeUnion(ts,any);
@@ -108,7 +108,6 @@ public class TypeUnion extends Type {
   // [AB]C, where C might be any type including e.g. a union of either [C+D] or [CD].
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
-    case TERROR: return ((TypeErr)t)._all ? t : this;
     case TUNION: {
       // Handle the case where they are structurally equal
       TypeUnion tu = (TypeUnion)t;
@@ -140,6 +139,7 @@ public class TypeUnion extends Type {
         return make(_any, full_simplify(ts,_any));
       }
     }
+    case TERROR: return t.meet(this); // Let other side handle
     default:                    // Unions can handle all non-union internal types
       Ary<Type> ts = new Ary<>(_ts._ts.clone()); // Defensive clone
       return make(_any, ymeet( ts, _any, t ));

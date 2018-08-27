@@ -2,7 +2,7 @@ package com.cliffc.aa.type;
 
 import java.util.HashMap;
 
-public class TypeInt extends Type {
+public class TypeInt extends Type<TypeInt> {
   private byte _x;        // -1 bot, 0 con, +1 top
   private byte _z;        // bitsiZe, one of: 1,8,16,32,64
   private long _con;      // only if _x==0
@@ -20,7 +20,7 @@ public class TypeInt extends Type {
     return (_x==1?"~":"")+"int"+Integer.toString(_z);
   }
   private static TypeInt FREE=null;
-  private TypeInt free( TypeInt f ) { FREE=f; return this; }
+  @Override protected TypeInt free( TypeInt f ) { FREE=f; return this; }
   public static TypeInt make( int x, int z, long con ) {
     TypeInt t1 = FREE;
     if( t1 == null ) t1 = new TypeInt(x,z,con);
@@ -64,11 +64,11 @@ public class TypeInt extends Type {
     case TTUPLE:
     case TFUN:
     case TRPC:   return Type.SCALAR;
-    case TERROR: return ((TypeErr)t)._all ? t : this;
     case TCTRL:
     case TXCTRL: return TypeErr.ALL;
+    case TERROR:
     case TNAME:
-    case TUNION: return t.xmeet(this); // Let TypeUnion decide
+    case TUNION: return t.xmeet(this); // Let other side decide
     default: throw typerr(t);
     }
     TypeInt tt = (TypeInt)t;

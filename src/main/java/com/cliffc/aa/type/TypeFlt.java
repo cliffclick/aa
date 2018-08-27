@@ -2,7 +2,7 @@ package com.cliffc.aa.type;
 
 import java.util.HashMap;
 
-public class TypeFlt extends Type {
+public class TypeFlt extends Type<TypeFlt> {
   byte _x;                // -1 bot, 0 con, +1 top
   byte _z;                // bitsiZe, one of: 32,64
   double _con;
@@ -20,7 +20,7 @@ public class TypeFlt extends Type {
     return (_x==1?"~":"")+"flt"+Integer.toString(_z);
   }
   private static TypeFlt FREE=null;
-  private TypeFlt free( TypeFlt f ) { FREE=f; return this; }
+  @Override protected TypeFlt free( TypeFlt f ) { FREE=f; return this; }
   public static TypeFlt make( int x, int z, double con ) {
     TypeFlt t1 = FREE;
     if( t1 == null ) t1 = new TypeFlt(x,z,con);
@@ -55,11 +55,11 @@ public class TypeFlt extends Type {
     case TTUPLE:
     case TRPC:
     case TFUN:   return Type.SCALAR;
-    case TERROR: return ((TypeErr)t)._all ? t : this;
     case TCTRL:
     case TXCTRL: return TypeErr.ALL;
+    case TERROR:
     case TNAME:
-    case TUNION: return t.xmeet(this); // Let TypeUnion decide
+    case TUNION: return t.xmeet(this); // Let other side decide
     default: throw typerr(t);
     }
     TypeFlt tf = (TypeFlt)t;

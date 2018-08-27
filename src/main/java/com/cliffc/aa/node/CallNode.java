@@ -256,11 +256,11 @@ public class CallNode extends Node {
         actual = formal;   // Lift actual to worse-case valid argument type
       }
       if( !actual.isa(formal) ) // Actual is not a formal; accumulate type errors
-        terr = terr.meet(TypeErr.make(_badargs.errMsg("%s is not a %s"), actual, formal, false));
+        terr = terr.meet(TypeErr.make(_badargs.errMsg("%s is not a %s"), actual, formal));
     }
-    return terr.meet(tval);  // Return any errors, or the Epilog return type
+    return terr instanceof TypeErr ? terr : terr.meet(tval);  // Return any errors, or the Epilog return type
   }
-  Type nargerr(TypeFun tfun) {
+  private Type nargerr( TypeFun tfun ) {
     return TypeErr.make(_badargs.errMsg("Passing "+nargs()+" arguments to "+tfun+" which takes "+tfun.nargs()+" arguments"));
   }
   

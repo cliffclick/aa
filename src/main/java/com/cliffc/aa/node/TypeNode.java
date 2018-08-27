@@ -48,7 +48,7 @@ public class TypeNode extends Node {
   @Override public Type all_type() { return _t; }
   String err(GVNGCM gvn) {
     Type t = gvn.type(in(1));
-    if( t instanceof TypeErr ) return ((TypeErr)t)._msg;
+    if( t instanceof TypeErr ) return t.errMsg();
     return _error_parse.typerr(t,_t);
   }
 }

@@ -4,7 +4,7 @@ import com.cliffc.aa.util.Bits;
 import com.cliffc.aa.util.SB;
 
 // Return-Program-Counters, or Continuation constants
-public class TypeRPC extends Type {
+public class TypeRPC extends Type<TypeRPC> {
   public Bits _rpcs;            // 
 
   private TypeRPC( Bits rpcs ) { super(TRPC); init(rpcs); }
@@ -22,7 +22,7 @@ public class TypeRPC extends Type {
   }
   
   private static TypeRPC FREE=null;
-  private TypeRPC free( TypeRPC f ) { FREE=f; return this; }
+  @Override protected TypeRPC free( TypeRPC f ) { FREE=f; return this; }
   public static TypeRPC make( int rpc ) { return make(Bits.make(rpc)); }
   public static TypeRPC make( Bits rpcs ) {
     TypeRPC t1 = FREE;
@@ -38,7 +38,6 @@ public class TypeRPC extends Type {
   @Override protected TypeRPC xdual() { return new TypeRPC(_rpcs.dual()); }
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
-    case TERROR: return ((TypeErr)t)._all ? t : this;
     case TCTRL:
     case TXCTRL: return TypeErr.ALL;
     case TOOP:
@@ -49,8 +48,9 @@ public class TypeRPC extends Type {
     case TINT:
     case TSTR:   return Type.SCALAR;
     case TRPC:   break;
+    case TERROR:
     case TNAME:
-    case TUNION: return t.xmeet(this); // Let TypeUnion decide
+    case TUNION: return t.xmeet(this); // Let other side decide
     default: throw typerr(t);   // All else should not happen
     }
     TypeRPC tf = (TypeRPC)t;

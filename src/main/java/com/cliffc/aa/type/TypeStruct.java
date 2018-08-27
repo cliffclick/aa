@@ -6,7 +6,7 @@ import com.cliffc.aa.util.SB;
 import java.util.Arrays;
 
 /** A Tuple with named fields */
-public class TypeStruct extends TypeTuple {
+public class TypeStruct extends TypeTuple<TypeStruct> {
   // Fields are named in-order and aligned with the Tuple values.  Field names
   // are never null, and never zero-length.  If the 1st char is a '^' the field
   // is Top; a '.' is Bot; all other values are valid field names.
@@ -26,16 +26,16 @@ public class TypeStruct extends TypeTuple {
     SB sb = new SB().p('@').p('{');
     for( int i=0; i<_args.length; i++ ) {
       sb.p(_args[i]);
-      if( at(i) != TypeErr.ALL ) sb.p(':').p(at(i).toString());
+      if( at(i) != Type.ALL ) sb.p(':').p(at(i).toString());
       sb.p(',');
     }
-    if( _inf!=TypeErr.ALL ) sb.p(_inf.toString()).p("...");
+    if( _inf!=Type.ALL ) sb.p(_inf.toString()).p("...");
     sb.p('}');
     return String.format(TypeTuple.TSTRS[_nil],sb.toString());
   }
 
   private static TypeStruct FREE=null;
-  private TypeStruct free( TypeStruct f ) { assert f._type==TSTRUCT; FREE=f; return this; }
+  @Override protected TypeStruct free( TypeStruct f ) { assert f._type==TSTRUCT; FREE=f; return this; }
   private static TypeStruct make1( byte nil, Type[] ts, Type inf, String[] args ) {
     TypeStruct t1 = FREE;
     if( t1 == null ) t1 = new TypeStruct(nil,ts,inf,args);
@@ -64,7 +64,7 @@ public class TypeStruct extends TypeTuple {
   }
   private static String[] flds(String... fs) { return fs; }
   public  static TypeStruct makeX(String[] flds, Type... ts ) { return (TypeStruct)make(NOT_NIL,ts,Type.SCALAR,flds); }
-  public  static TypeStruct makeA(String[] flds, Type... ts ) { return (TypeStruct)make(NOT_NIL,ts,TypeErr.ALL ,flds); }
+  public  static TypeStruct makeA(String[] flds, Type... ts ) { return (TypeStruct)make(NOT_NIL,ts,Type.ALL   ,flds); }
 
   private static final TypeStruct POINT = makeA(flds("x","y"),TypeFlt.FLT64,TypeFlt.FLT64);
   public  static final TypeStruct X     = makeX(flds("x"),TypeFlt.FLT64); // @{x:flt,~Scalar...}
@@ -90,14 +90,14 @@ public class TypeStruct extends TypeTuple {
     case TSTRUCT:  args= ((TypeStruct)t)._args;  tt=(TypeTuple)t;  break;
     case TTUPLE :  args= new String[0];          tt=(TypeTuple)t;  break;
     case TSTR:   return TypeOop.make(nmeet(((TypeNullable)t)._nil),false);
-    case TOOP:
-    case TNAME:
-    case TUNION: return t.xmeet(this); // Let TypeUnion decide
     case TFLT:
     case TINT:
     case TRPC: 
     case TFUN:   return TypeErr.SCALAR;
-    case TERROR: return ((TypeErr)t)._all ? t : this;
+    case TOOP:
+    case TERROR:
+    case TNAME:
+    case TUNION: return t.xmeet(this); // Let other side decide
     default: throw typerr(t);   // All else should not happen
     }
 

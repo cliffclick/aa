@@ -320,7 +320,7 @@ public class TestLattice {
   //    M:~int    N:~int
   //          ~int8
   //  M:~int8       N:~int8
-  //M:0  M:8  0  8    N:0  N:8
+  //M:0  M:7  0  7    N:0  N:7
   //  M:int8        N:int8
   //           int8
   //    M:int     N:int

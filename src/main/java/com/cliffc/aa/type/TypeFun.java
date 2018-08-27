@@ -5,7 +5,7 @@ import com.cliffc.aa.util.Bits;
 import com.cliffc.aa.util.SB;
 
 // Function constants.  Contrast this to 'TypeTuple.make_fun_ptr'.
-public class TypeFun extends Type {
+public class TypeFun extends Type<TypeFun> {
   public TypeTuple _ts;         // Arg types
   public Type _ret;             // return types
   // List of known functions in set, or 'flip' for choice-of-functions
@@ -31,7 +31,7 @@ public class TypeFun extends Type {
   }
   
   private static TypeFun FREE=null;
-  private TypeFun free( TypeFun f ) { FREE=f; return this; }
+  @Override protected TypeFun free( TypeFun f ) { FREE=f; return this; }
   public static TypeFun make( TypeTuple ts, Type ret, int  fidx , int nargs ) { return make(ts,ret,Bits.make(fidx),nargs); }
   public static TypeFun make( TypeTuple ts, Type ret, Bits fidxs, int nargs ) {
     TypeFun t1 = FREE;
@@ -56,7 +56,6 @@ public class TypeFun extends Type {
   @Override protected TypeFun xdual() { return new TypeFun((TypeTuple)_ts.dual(),_ret.dual(),_fidxs.dual(),_nargs); }
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
-    case TERROR: return ((TypeErr)t)._all ? t : this;
     case TCTRL:
     case TXCTRL: return TypeErr.ALL;
     case TOOP:
@@ -67,8 +66,9 @@ public class TypeFun extends Type {
     case TINT:
     case TSTR:   return Type.SCALAR;
     case TFUN:   break;
+    case TERROR:
     case TNAME:
-    case TUNION: return t.xmeet(this); // Let TypeUnion decide
+    case TUNION: return t.xmeet(this); // Let other side decide
     default: throw typerr(t);   // All else should not happen
     }
     // Meet of fidxs and args; join of ret

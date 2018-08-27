@@ -14,14 +14,6 @@ public class TestType {
     Type.init0(new HashMap<>());
     Type ignore = TypeTuple.NIL; // Break class-loader cycle; load Tuple before Fun.
 
-    // broken doing check_symmetric of errors.
-    // plan C:
-    // - TypeErr.ALL / ANY moves back to plain Type.
-    // - TypeErr collects Strings (but not other types) & supports a dual notion.
-    // - "above" is choice, "below" is "all strings", and meet
-    // intersects or unions as appropriate.
-
-    
   }
   
   @Test public void testNamesInts() {
@@ -89,7 +81,7 @@ public class TestType {
     Type strx = str .dual();      // ~str   (choice str, no NULL)
     Type str_ = str0.dual();      // ~str+? (choice str  OR NULL)
     Type oop_ = oop0.dual();      // ~OOP+? (choice OOP  OR null)
-    Type top  = TypeErr.ANY;
+    Type top  = Type.ANY;
 
     assertTrue(top .isa(oop_));
 
@@ -145,8 +137,8 @@ public class TestType {
     assertEquals(uall,TypeInt.INT8  );
     
     // meet @{c:0}? and @{c:@{x:1}?,}
-    TypeNullable nc0 = TypeStruct.make(TypeStruct.AND_NIL,new Type[]{nil},TypeErr.ALL,new String[]{"c"}); // @{c:0}?
-    TypeNullable nx1 = TypeStruct.make(TypeStruct.AND_NIL,new Type[]{TypeInt.TRUE},TypeErr.ALL,new String[]{"x"}); // @{x:1}?
+    TypeNullable nc0 = TypeStruct.make(TypeStruct.AND_NIL,new Type[]{nil},Type.ALL,new String[]{"c"}); // @{c:0}?
+    TypeNullable nx1 = TypeStruct.make(TypeStruct.AND_NIL,new Type[]{TypeInt.TRUE},Type.ALL,new String[]{"x"}); // @{x:1}?
     TypeNullable cx  = TypeStruct.makeA(new String[]{"c"},nx1); // @{c:@{x:1}?}
     // JOIN tosses the top-level null choice, and the inside struct choice
     Type cj  = nc0.join(cx);

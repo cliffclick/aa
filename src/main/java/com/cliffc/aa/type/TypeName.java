@@ -3,7 +3,7 @@ package com.cliffc.aa.type;
 import com.cliffc.aa.AA;
 
 // Named types are essentially a subclass of the named type.
-public class TypeName extends Type {
+public class TypeName extends Type<TypeName> {
   public  String _name;
   public  Type _t;
   private short _depth;
@@ -18,7 +18,7 @@ public class TypeName extends Type {
   }
   @Override public String toString() { return _name+":"+_t; }
   private static TypeName FREE=null;
-  private TypeName free( TypeName f ) { FREE=f; return this; }
+  @Override protected TypeName free( TypeName f ) { FREE=f; return this; }
   private static TypeName make0( String name, Type t) {
     assert !(t instanceof TypeUnion) || t==TypeUnion.NIL; // No named unions (except nil)
     TypeName t1 = FREE;
@@ -40,8 +40,8 @@ public class TypeName extends Type {
     assert t != this;
     Type mt;
     switch( t._type ) {
-    case TUNION: return t.xmeet(this); // Let TypeUnion decide
-    case TERROR: return ((TypeErr)t)._all ? t : this;
+    case TERROR:
+    case TUNION: return t.xmeet(this); // Let other side decide
     case TNAME:
       TypeName tn = (TypeName)t;
       if( tn._depth > _depth ) return tn.xmeet(this); // Deeper on 'this'

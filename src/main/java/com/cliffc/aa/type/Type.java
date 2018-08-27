@@ -38,11 +38,11 @@ import static com.cliffc.aa.type.TypeOop.OOP0;
 // Structs are tuples with a set of named fields; the fields can be top, a
 // field name, or bottom.
 // Strings are OOPs which again can be top, a constant, or bottom.
-public class Type {
+public class Type<T extends Type> {
   static private int CNT=1;
   final int _uid=CNT++; // Unique ID, will have gaps, used to uniquely order Types in Unions
   byte _type;           // Simple types use a simple enum
-  private Type _dual;   // All types support a dual notion, lazily computed and cached here
+  protected Type _dual; // All types support a dual notion, lazily computed and cached here
 
   protected Type(byte type) { _type=type; }
   @Override public int hashCode( ) { return _type; }
@@ -57,7 +57,7 @@ public class Type {
   // Object Pooling to handle frequent (re)construction of temp objects being
   // interned.  One-entry pool for now.
   private static Type FREE=null;
-  private Type free( Type f ) { FREE=f; return this; }
+  protected Type free( T f ) { assert !(f instanceof TypeRPC); FREE=f; return this; }
   static Type make( byte type ) {
     Type t1 = FREE;
     if( t1 == null ) t1 = new Type(type);
@@ -79,7 +79,8 @@ public class Type {
     // Not in type table
     _dual = null;                // No dual yet
     INTERN.put(this,this);       // Put in table without dual
-    Type d = _dual = xdual();    // Compute dual without requiring table lookup
+    T d = xdual();               // Compute dual without requiring table lookup
+    _dual = d;
     if( this==d ) return d;      // Self-symmetric?  Dual is self
     if( equals(d) ) { free(d); _dual=this; return this; } // If self symmetric then use self
     assert d._dual==null;        // Else dual-dual not computed yet
@@ -90,30 +91,34 @@ public class Type {
   }
 
   // Simple types are implemented fully here
-  static final byte TCTRL   = 0; // Ctrl flow bottom
-  static final byte TXCTRL  = 1; // Ctrl flow top (mini-lattice: any-xctrl-ctrl-all)
-  static final byte TSCALAR = 2; // Scalars; all possible finite types; includes pointers (functions, structs), ints, floats; excludes state of Memory and Ctrl.
-  static final byte TXSCALAR= 3; // Invert scalars
-  static final byte TNUM    = 4; // Number and all derivitives (Complex, Rational, Int, Float, etc)
-  static final byte TXNUM   = 5; // Any Numbers; dual of NUM
-  static final byte TREAL   = 6; // All Real Numbers
-  static final byte TXREAL  = 7; // Any Real Numbers; dual of REAL
-  static final byte TSIMPLE = 8; // End of the Simple Types
-  private static final String[] STRS = new String[]{"Ctrl","~Ctrl","Scalar","~Scalar","Number","~Number","Real","~Real"};
+  static final byte TALL    = 0; // Bottom
+  static final byte TANY    = 1; // Top
+  static final byte TCTRL   = 2; // Ctrl flow bottom
+  static final byte TXCTRL  = 3; // Ctrl flow top (mini-lattice: any-xctrl-ctrl-all)
+  static final byte TSCALAR = 4; // Scalars; all possible finite types; includes pointers (functions, structs), ints, floats; excludes state of Memory and Ctrl.
+  static final byte TXSCALAR= 5; // Invert scalars
+  static final byte TNUM    = 6; // Number and all derivatives (Complex, Rational, Int, Float, etc)
+  static final byte TXNUM   = 7; // Any Numbers; dual of NUM
+  static final byte TREAL   = 8; // All Real Numbers
+  static final byte TXREAL  = 9; // Any Real Numbers; dual of REAL
+  static final byte TSIMPLE =10; // End of the Simple Types
+  private static final String[] STRS = new String[]{"all","any","Ctrl","~Ctrl","Scalar","~Scalar","Number","~Number","Real","~Real"};
   // Implemented in subclasses
-  static final byte TERROR  = 9; // ALL/ANY TypeErr types
-  static final byte TUNION  =10; // Union types (finite collections of unrelated types Meet together); see TypeUnion
-  static final byte TNAME   =11; // Named types; always a subtype of some other type
-  static final byte TOOP    =12; // Includes all GC ptrs & null; structs, strings.  Excludes functions, ints, floats
-  static final byte TTUPLE  =13; // Tuples; finite collections of unrelated Types, kept in parallel
-  static final byte TSTRUCT =14; // Structs; tuples with named fields
-  static final byte TFUN    =15; // Functions; both domain and range are a Tuple; see TypeFun
-  static final byte TRPC    =16; // Return PCs; Continuations; call-site return points; see TypeRPC
-  static final byte TFLT    =17; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
-  static final byte TINT    =18; // All Integers, including signed/unsigned and various sizes; see TypeInt
-  static final byte TSTR    =19; // String type
-  static final byte TLAST   =20; // Type check
+  static final byte TERROR  =11; // ALL/ANY TypeErr types
+  static final byte TUNION  =12; // Union types (finite collections of unrelated types Meet together); see TypeUnion
+  static final byte TNAME   =13; // Named types; always a subtype of some other type
+  static final byte TOOP    =14; // Includes all GC ptrs & null; structs, strings.  Excludes functions, ints, floats
+  static final byte TTUPLE  =15; // Tuples; finite collections of unrelated Types, kept in parallel
+  static final byte TSTRUCT =16; // Structs; tuples with named fields
+  static final byte TFUN    =17; // Functions; both domain and range are a Tuple; see TypeFun
+  static final byte TRPC    =18; // Return PCs; Continuations; call-site return points; see TypeRPC
+  static final byte TFLT    =19; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
+  static final byte TINT    =20; // All Integers, including signed/unsigned and various sizes; see TypeInt
+  static final byte TSTR    =21; // String type
+  static final byte TLAST   =22; // Type check
   
+  public  static final Type ALL    = make( TALL   ); // Bottom
+  public  static final Type ANY    = make( TANY   ); // Top
   public  static final Type CTRL   = make( TCTRL  ); // Ctrl
   public  static final Type XCTRL  = make(TXCTRL  ); // Ctrl
   public  static final Type  SCALAR= make( TSCALAR); // ptrs, ints, flts; things that fit in a machine register
@@ -121,10 +126,10 @@ public class Type {
   public  static final Type  NUM   = make( TNUM   );
   private static final Type XNUM   = make(TXNUM   );
   public  static final Type  REAL  = make( TREAL  );
-  private static final Type XREAL  = make(TXREAL  );
+  public  static final Type XREAL  = make(TXREAL  );
 
   // Collection of sample types for checking type lattice properties.
-  private static final Type[] TYPES = new Type[]{CTRL,XCTRL,SCALAR,XSCALAR,NUM,XNUM,REAL,XREAL};
+  private static final Type[] TYPES = new Type[]{ALL,ANY,CTRL,XCTRL,SCALAR,XSCALAR,NUM,XNUM,REAL,XREAL};
   
   // The complete list of primitive types that are disjoint and also is-a
   // SCALAR; nothing else is a SCALAR except what is on this list (or
@@ -149,9 +154,9 @@ public class Type {
   public final Type dual() { return _dual; }
   
   // Compute dual right now.  Overridden in subclasses.
-  protected Type xdual() {
+  protected T xdual() {
     assert is_simple();
-    return new Type((byte)(_type^1));
+    return (T)new Type((byte)(_type^1));
   }
 
   public final Type meet( Type t ) {
@@ -173,15 +178,15 @@ public class Type {
   protected Type xmeet(Type t) {
     assert is_simple(); // Should be overridden in subclass
     // ANY meet anything is thing; thing meet ALL is ALL
-    if( t==TypeErr.ANY ) return this;
-    if( t==TypeErr.ALL ) return    t;
+    if( this==ALL || t==ANY ) return this;
+    if( this==ANY || t==ALL ) return    t;
     // Errors "win" over everything else
-    if( t instanceof TypeErr ) return t.above_center() ? this : t;
+    if( t instanceof TypeErr ) return t.above_center() ? xmeet(((TypeErr)t)._t) : t.xmeet(this);
 
     // Ctrl can only meet Ctrl, XCtrl or Top
     byte type = (byte)(_type|t._type); // the OR is low if both are low
     if(  type <= TXCTRL ) return _type==TXCTRL && t._type==TXCTRL ? XCTRL : CTRL;
-    if( _type <= TXCTRL || t._type <= TXCTRL ) return TypeErr.ALL;
+    if( _type <= TXCTRL || t._type <= TXCTRL ) return ALL;
 
     // Scalar is close to bottom: nearly everything falls to SCALAR, except
     // Bottom (already handled) and Control (error; already handled).
@@ -336,11 +341,13 @@ public class Type {
   // True if value is above the centerline (no real value)
   public boolean above_center() {
     switch( _type ) {
+    case TALL:
     case TCTRL:
     case TNUM:
     case TREAL:
     case TSCALAR:
       return false;             // These are all below center
+    case TANY:
     case TXCTRL:
     case TXNUM:
     case TXREAL:
@@ -362,11 +369,13 @@ public class Type {
   // True if value is higher-equal to SOME constant.
   public boolean may_be_con() {
     switch( _type ) {
+    case TALL:
     case TSCALAR:
     case TNUM:
     case TREAL:
     case TCTRL:
       return false;             // These all include not-constant things
+    case TANY:
     case TXREAL:
     case TXNUM:
     case TXSCALAR:
@@ -378,6 +387,7 @@ public class Type {
   // True if exactly a constant (not higher, not lower)
   public boolean is_con() {
     switch( _type ) {
+    case TALL:
     case TCTRL:
     case TERROR:
     case TNUM:
@@ -430,7 +440,7 @@ public class Type {
     if( above_center() && isa(t) ) return 0; // Can choose compatible format
     if( _type == t._type ) return 0; // Same type is OK
     if( t._type==TSCALAR ) return 0; // Generic function arg never requires a conversion
-    if( _type == TSCALAR ) return -1; // Scalar has to resolve
+    if( _type == TALL || _type == TSCALAR ) return -1; // Scalar has to resolve
     if( _type == TREAL && t.is_num() ) return -1; // Real->Int/Flt has to resolve
     if( is_fun_ptr() ) return (byte)(t == OOP0 ? 0 : 99);
 

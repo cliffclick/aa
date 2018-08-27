@@ -2,7 +2,7 @@ package com.cliffc.aa.type;
 
 import java.util.HashMap;
 
-public class TypeStr extends TypeNullable {
+public class TypeStr extends TypeNullable<TypeStr> {
   private byte _x;              // -1 bot, 1 con, 0 top
   private String _con;          //
   private TypeStr ( byte nil, int x, String con ) { super(TSTR,nil); init(nil,x,con); }
@@ -25,7 +25,7 @@ public class TypeStr extends TypeNullable {
                          (_x==1 ? '"'+_con+'"' : "str"));
   }
   private static TypeStr FREE=null;
-  private TypeStr free( TypeStr f ) { assert f._type==TSTR; FREE=f; return this; }
+  @Override protected TypeStr free( TypeStr f ) { assert f._type==TSTR; FREE=f; return this; }
   public static TypeStr make( byte nil, int x, String con ) {
     TypeStr t1 = FREE;
     if( t1 == null ) t1 = new TypeStr(nil,x,con);
@@ -59,8 +59,8 @@ public class TypeStr extends TypeNullable {
     case TINT:
     case TRPC:
     case TFUN:   return SCALAR;
-    case TERROR: return ((TypeErr)t)._all ? t : this;
     case TOOP:
+    case TERROR:
     case TNAME:
     case TUNION: return t.xmeet(this); // Let other side decide
     default: throw typerr(t);

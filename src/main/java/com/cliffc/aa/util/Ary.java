@@ -97,6 +97,15 @@ public class Ary<E> implements Iterable<E> {
   /** @param c Collection to be added */
   public void addAll( Collection<? extends E> c ) { for( E e : c ) add(e); }
     
+  /** @param es Array to be added */
+  public <F extends E> Ary<E> addAll( F[] es ) {
+    if( es.length==0 ) return this;
+    while( _len+es.length > _es.length ) _es = Arrays.copyOf(_es,_es.length<<1);
+    System.arraycopy(es,0,_es,_len,es.length);
+    _len += es.length;
+    return this;
+  }
+    
   /** @param c Collection to be added */
   public void addAll( Ary<? extends E> c ) {
     if( c._len==0 ) return;

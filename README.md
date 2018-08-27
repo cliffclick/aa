@@ -3,7 +3,7 @@
 Cliff Click Language Hacking
 ============================
 
-**Too-the-metal performance:** every abstraction used can be peeled away,
+**To-the-metal performance:** every abstraction used can be peeled away,
 yielding code that you would expect from a tightly written low-level program.
 This is a primary driver for me, the guy who's been writing compilers for high
 performance computing (including Java) all my life.

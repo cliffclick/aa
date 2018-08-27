@@ -3,7 +3,7 @@ package com.cliffc.aa.type;
 import com.cliffc.aa.AA;
 
 // All Generic Nullable Oops, including Strings, Structs, Tuples, Arrays
-public class TypeOop extends TypeNullable {
+public class TypeOop extends TypeNullable<TypeOop> {
   private boolean _any;                 // True=choice/join; False=all/meet
   private TypeOop    (byte nil, boolean any) { super(TOOP,nil); init(nil,any); }
   protected void init(byte nil, boolean any) { super.init(nil); _any=any; assert _type==TOOP; }
@@ -14,7 +14,7 @@ public class TypeOop extends TypeNullable {
   }
   @Override public String toString() { return (_any?"~":"")+String.format(TSTRS[_nil],"oop"); }
   private static TypeOop FREE=null;
-  private TypeOop free( TypeOop f ) { assert f._type==TOOP; FREE=f; return this; }
+  @Override protected TypeOop free( TypeOop f ) { assert f._type==TOOP; FREE=f; return this; }
   public static TypeOop make( byte nil, boolean any ) {
     TypeOop t1 = FREE;
     if( t1 == null ) t1 = new TypeOop(nil,any);
@@ -32,7 +32,7 @@ public class TypeOop extends TypeNullable {
   @Override protected TypeOop xdual() { return new TypeOop(xdualnil(),!_any); }
       
   @Override protected Type xmeet( Type t ) {
-    if( t == this ) return this;
+    assert t != this;
     switch( t._type ) {
     case TOOP:
     case TSTRUCT:
@@ -43,7 +43,7 @@ public class TypeOop extends TypeNullable {
     case TINT:
     case TRPC:
     case TFUN:   return SCALAR;
-    case TERROR: return ((TypeErr)t)._all ? t : this;
+    case TERROR:
     case TNAME:  
     case TUNION: return t.xmeet(this); // Let other side decide
     default: throw typerr(t);

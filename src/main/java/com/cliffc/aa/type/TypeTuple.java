@@ -6,7 +6,7 @@ import com.cliffc.aa.util.SB;
 import java.util.Arrays;
 
 /** record/struct types; infinitely extended with an extra type (typically ANY or ALL) */
-public class TypeTuple extends TypeNullable {
+public class TypeTuple<T extends TypeTuple> extends TypeNullable<T> {
   public Type[] _ts;      // The fixed known types
   public Type _inf;       // Infinite extension type
   private int _hash;
@@ -45,7 +45,7 @@ public class TypeTuple extends TypeNullable {
   }
 
   private static TypeTuple FREE=null;
-  private TypeTuple free( TypeTuple f ) { assert f._type==TTUPLE; FREE=f; return this; }
+  @Override protected TypeTuple free( TypeTuple f ) { assert f._type==TTUPLE; FREE=f; return this; }
   private static TypeTuple make0( Type inf, byte nil, Type... ts ) {
     TypeTuple t1 = FREE;
     if( t1 == null ) t1 = new TypeTuple(nil,ts,inf);
@@ -94,25 +94,25 @@ public class TypeTuple extends TypeNullable {
   
   // The length of Tuples is a constant, and so is its own dual.  Otherwise
   // just dual each element.  Also flip the infinitely extended tail type.
-  @Override protected TypeTuple xdual() {
+  @Override protected T xdual() {
     Type[] ts = new Type[_ts.length];
     for( int i=0; i<_ts.length; i++ ) ts[i] = _ts[i].dual();
-    return new TypeTuple(xdualnil(),ts,_inf.dual());
+    return (T)new TypeTuple(xdualnil(),ts,_inf.dual());
   }
   // Standard Meet.
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TTUPLE: break;
     case TSTR:   return TypeOop.make(nmeet(((TypeNullable)t)._nil),false);
-    case TOOP:
-    case TSTRUCT: 
-    case TNAME:
-    case TUNION: return t.xmeet(this); // Let other side decide
     case TFLT:
     case TINT:
     case TRPC:
     case TFUN:   return Type.SCALAR;
-    case TERROR: return ((TypeErr)t)._all ? t : this;
+    case TOOP:
+    case TSTRUCT: 
+    case TERROR:
+    case TNAME:
+    case TUNION: return t.xmeet(this); // Let other side decide
     default: throw typerr(t);
     }
     // Length is longer of 2 tuples.  Shorter elements take the meet; longer
@@ -159,7 +159,8 @@ public class TypeTuple extends TypeNullable {
   @Override public boolean is_con() {
     if( super.is_con() ) return true;
     for( Type _t : _ts ) if( !_t.is_con() ) return false;
-    return true;
+    //return true;
+    return false;
   }
 
   // Return true if this is a function pointer (return type from EpilogNode)

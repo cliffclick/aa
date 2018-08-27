@@ -1,7 +1,7 @@
 package com.cliffc.aa.type;
 
 // Base class for Types which can be nil
-public abstract class TypeNullable extends Type {
+public abstract class TypeNullable<T extends TypeNullable> extends Type<T> {
   // There are 4 combos:
   public static final byte  IS_NIL=0; //      nil;
   public static final byte NOT_NIL=1; //  OOP    ; all the OOPs, never nil
@@ -20,7 +20,7 @@ public abstract class TypeNullable extends Type {
     return o instanceof TypeNullable && eq((TypeNullable)o);
   }
   boolean eq( TypeNullable to ) { return _type==to._type && _nil==to._nil; }
-
+  
   // Meet in a nil
   @Override public Type meet_nil() { return make_nil(nmeet(IS_NIL)); }
   
