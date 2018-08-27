@@ -12,12 +12,27 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
 
-    // Cannot inline/clone a function which calls another function and that
-    // other function has already optimized it's entry point - because cloning
-    // makes a new Call to the already-optimized FunNode.
+    // Ok progress towards propagating unknown callers in GCP.
     //
-    // Even post-parser, call functions retain a "new calls go here" in slot#1.
+    // Decision: do not inflate O(n^2) graph connecting all calls with unknown
+    // functions to all possible functions - means making the graph "virtually"
+    // at GCP time.
     //
+    // FunNode slot#1 is the "unknown callers".  For GCP it is ignored, and the
+    // FunNode only gets control from other inputs - or if it has any unknown
+    // callers.  FunNodes have an optimistic (empty) list of unknown callers,
+    // and if the list is non-empty then it counts as Ctrl.  For the RPC
+    // ParmNode it folds in the normal edges with the RPCs from the FunNode.
+    // CallNodes which get a new FunPtr/fidx push it to the FunNode, which
+    // pushes it to the RPC Parm.
+    //
+    // During CallNode.value(), get type of function input, get set of
+    // fidxes(), visit all FunNodes, add call RPC to them all, if any set grows
+    // then push FunNode AND RPC on worklist.  During FunNode.value(), if the
+    // RPC set is non-empty then it counts as Ctrl.  During RPCNode.value(),
+    // fold in the FunNode extra RPC set, which may lower RPCNode's type.
+
+    
     // FunNodes can back to Epilog's can back to Call users; if any non-call
     // users, then the Fun "has unknown users" until all Calls are wired, which
     // typically means GCP to propagate the FunPtr around.  If all callers are
@@ -43,19 +58,19 @@ public class TestParse {
     // FunNode does not need to be "all callers known".
     //
 
+    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
+    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.TRUE );
     testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1,) is not a @{x,y,}","                           ");
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'","                    ");
     testerr("{+}(1,2,3)", "Passing 3 arguments to +{flt64 flt64 -> flt64} which takes 2 arguments","          ");
     test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
     test_isa("{x y -> x+y}", TypeTuple.FUNPTR2); // actually {Flt,Int} x {FltxInt} -> {FltxInt} but currently types {SCALAR,SCALAR->SCALAR}
     testerr("x=1+y","Unknown ref 'y'","     ");
-    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
-    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.TRUE );
 
     
     // Making a trivial function which needs H-M or full inlining to type.
     // Adding syntax to prevent inlining, which means needs H-M
-    //test("fun={# s->s.x}; (fun(@{x=@{z=3.14}}),fun(@{x=\"abc\"}))",
+    //test("fun={# s->s.x}; (fun(@{x=3.14}),fun(@{x=\"abc\"}))",
     //     TypeTuple.make_all(TypeFlt.con(3.14),TypeStr.ABC)); // result is a tuple of (3.14,"abc")
 
     
