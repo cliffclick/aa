@@ -425,6 +425,14 @@ public class FunNode extends RegionNode {
     return is_dead() ? fun : this;
   }
 
+  // Utility to find RPC parm
+  ParmNode find_rpc() {
+    for( Node use : _uses )
+      if( use instanceof ParmNode && ((ParmNode)use)._idx == -1 )
+        return (ParmNode)use;
+    return null;
+  }
+  
   // A bit of optimistic GCP-only state: the list of known call-sites which
   // call this function through a function-pointer, as opposed to a direct
   // call.  Null if there are no fun-ptr callers.

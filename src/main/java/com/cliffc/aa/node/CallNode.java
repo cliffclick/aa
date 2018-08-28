@@ -1,6 +1,5 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.AA;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
@@ -215,18 +214,10 @@ public class CallNode extends Node {
     Node fp = in(1);
     Type t = gvn.type(fp);
     if( !_inlined ) {           // Inlined functions just pass thru & disappear
-      if( gvn._opt ) {
-        // TODO: pass this calls RPCs to the FIDX functions
-        assert t.is_fun_ptr();
-        TypeFun tf = (TypeFun)(((TypeTuple)t).at(3));
-        Bits fidxs = tf._fidxs;
-        for( int fidx : fidxs ) {
-          FunNode fun = FunNode.find_fidx(fidx);
-          // if the fun._rpcs changes, toss fun on the worklist & his parm RPC
-          Type rpcs = fun._rpcs.meet(TypeRPC.make(_rpc));
-          throw AA.unimpl();
-        }
-      }
+
+      if( gvn._opt ) // Following optimistic virtual edges between caller and callee
+        add_rpc(gvn,t,_rpc); // Add this call site to all callee functions
+
       if( fp instanceof UnresolvedNode ) {
         // For unresolved, we can take the BEST choice; i.e. the JOIN of every
         // choice.  Typically one choice works and the others report type
@@ -239,12 +230,33 @@ public class CallNode extends Node {
       } else {                  // Single resolved target
         t = value1(gvn,t);      // Check args
       }
-    }
+    } // Else inlined
 
     // Return {control,value} tuple.
     return TypeTuple.make(gvn.type(in(0)),t);
   }
 
+  // Add given caller RPC to all called functions
+  static void add_rpc(GVNGCM gvn, Type funptr, int rpc) {
+    TypeRPC trpc = null;                        // Lazy init
+    TypeFun tf = ((TypeTuple)funptr).get_fun(); // Get type-propagated function list
+    Bits fidxs = tf._fidxs;     // Get all the propagated reaching functions
+    if( fidxs.above_center() ) return;
+    for( int fidx : fidxs ) {   // For all functions
+      FunNode fun = FunNode.find_fidx(fidx);
+      TypeRPC oldrpc = fun._rpcs; // Get the list of callers
+      if( oldrpc == null || !oldrpc.test(rpc) ) {  // This call not on the list
+        if( trpc==null ) trpc = TypeRPC.make(rpc); // Lazy init
+        fun._rpcs = oldrpc==null ? trpc : (TypeRPC)oldrpc.meet(trpc);
+        gvn.add_work(fun); // Revisit with new path available
+        gvn.add_work(fun.find_rpc()); // Revisit with new path available
+        // Need to add all arguments to all functions along default edges
+        throw AA.unimpl();
+      }
+    }
+  }
+  
+  
   // Cannot return the functions return type, unless all args are compatible
   // with the function(s).  Arg-check.
   private Type value1( GVNGCM gvn, Type t ) {

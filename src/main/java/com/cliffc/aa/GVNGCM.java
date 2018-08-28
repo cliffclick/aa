@@ -332,7 +332,7 @@ public class GVNGCM {
         nodes.setX(n._uid,n);     // Record back-ptr to Node
         boolean never_seen = !touched(n);
         Type ot = type(n);        // Old type
-        Type nt = n._uid <_INIT0_CNT ? ot : n.value(this);  // New type
+        Type nt = n._uid <_INIT0_CNT ? ot : n.value(this);  // New type (except never reset the initial nodes)
         assert ot.isa(nt);        // Types only fall monotonically
         if( ot != nt )            // Progress
           _ts.setX(n._uid,nt);    // Record progress
@@ -358,6 +358,14 @@ public class GVNGCM {
             set_def_reg(n, 1, fun);
             add_work(n); // Go again- values will continue to fall in the lattice
           }
+        }
+        // ParmRPCs take their default unknown caller to be the result of the
+        // virtual edges discovered by GCP.  This will trigger hard-inlining of
+        // these edges.
+        if( n instanceof ParmNode && ((ParmNode)n)._idx== -1 ) {
+          FunNode fun = (FunNode)n.in(0);
+          TypeRPC rpc = fun._rpc;
+          throw AA.unimpl();
         }
       }
     }
