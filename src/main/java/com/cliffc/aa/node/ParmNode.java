@@ -1,7 +1,8 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeErr;
+import com.cliffc.aa.type.TypeRPC;
 
 // Function parameter node; just a Phi with a name
 public class ParmNode extends PhiNode {
@@ -13,13 +14,23 @@ public class ParmNode extends PhiNode {
     _name=name;
   }
   @Override String xstr() { return "Parm:"+_name; }
-  //@Override public Type value(GVNGCM gvn) {
-  //  if( in(0) instanceof FunNode && !((FunNode) in(0)).callers_known(gvn) ) { // Slot zero allows unknown callers
-  //    assert in(0).in(1) instanceof ScopeNode; // Function is visible in current scope, to be looked up
-  //    return gvn.type(in(1)).meet(((ConNode)in(1))._t);   // More unknown callers, assume worst-case input type
-  //  }
-  //  return super.value(gvn);
-  //}
+  @Override public Type value(GVNGCM gvn) {
+    if( _idx==-1 && gvn._opt ) { // If running optimistic, extra RPCs can be found in the FunNode
+      Node fun = in(0);
+      assert fun._defs._len==_defs._len;
+      Type t = TypeRPC.ALL_CALL.dual();
+      if( gvn.type(fun.in(1))==Type.CTRL ) { // If slot#1 is alive, count all discovered fun-ptr callers
+        TypeRPC trpcs = ((FunNode)in(0))._rpcs;
+        if( trpcs != null ) t = trpcs; // Keep fun-ptr callers
+      }
+      for( int i=2; i<_defs._len; i++ )
+        if( gvn.type(fun.in(i))==Type.CTRL ) // Only meet alive paths
+          t = t.meet(gvn.type(in(i)));     // Merge in fixed callers
+      return t;
+    }
+    // Otherwise just like a Phi
+    return super.value(gvn);
+  }
   @Override public int hashCode() { return super.hashCode()+_idx; }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;

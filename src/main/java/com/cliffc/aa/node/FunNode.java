@@ -97,13 +97,15 @@ public class FunNode extends RegionNode {
     FUNS.add(this);             // Track FunNode by fidx
     CNT++;                      // Bump global unique fidx number
   }
-  private static Ary<FunNode> FUNS = new Ary<>(new FunNode[]{null,});
-  public static FunNode find_fidx(int fidx) { return FUNS.at(fidx); }
-
+  
   // Fast reset of parser state between calls to Exec
   private static int PRIM_CNT;
   public static void init0() { PRIM_CNT=CNT; }
   public static void reset_to_init0() { CNT = PRIM_CNT; NAMES.set_len(PRIM_CNT); FUNS.set_len(PRIM_CNT); }
+
+  // Find FunNodes by fidx
+  private static Ary<FunNode> FUNS = new Ary<>(new FunNode[]{null,});
+  public static FunNode find_fidx(int fidx) { return FUNS.at(fidx); }
 
   @Override String xstr() { return _tf.toString(); }
   @Override String str() { return names(_tf._fidxs,new SB()).toString(); }
@@ -423,6 +425,11 @@ public class FunNode extends RegionNode {
     return is_dead() ? fun : this;
   }
 
+  // A bit of optimistic GCP-only state: the list of known call-sites which
+  // call this function through a function-pointer, as opposed to a direct
+  // call.  Null if there are no fun-ptr callers.
+  TypeRPC _rpcs;
+  
   // Compute value from inputs.  Slot#1 is always the unknown caller.  If
   // Slot#1 is not a ScopeNode, then it is a constant CTRL just in case we make
   // a new caller (e.g. via inlining).  If there are no other inputs and no
@@ -430,10 +437,17 @@ public class FunNode extends RegionNode {
   // hit a new CallNode - and this requires GCP to discover the full set of
   // possible callers.
   @Override public Type value(GVNGCM gvn) {
-    return _fun_as_data ||          // Might be called thru the F-P
-      in(1) instanceof ScopeNode || // Might parse a new call site
-      _defs._len>2                  // Existing callers
-      ? Type.CTRL : Type.XCTRL;     // No callers and no chance for future callers
+    if( gvn._opt ) {                        // Optimistic types?
+      if( _rpcs != null ) return Type.CTRL; // Have some fun_ptr callers
+    } else {                                // Pessimistic types?
+      if( _fun_as_data ||                   // Might be called thru the F-P
+          in(1) instanceof ScopeNode )      // Might parse a new call site
+        return Type.CTRL;
+    }
+    Type t = Type.XCTRL;        // Remaining edges behave like RegionNode.value
+    for( int i=2; i<_defs._len; i++ )
+      t = t.meet(gvn.type(_defs._es[i]));
+    return t;
   }
   
   @Override public int hashCode() { return super.hashCode()+_tf.hashCode(); }

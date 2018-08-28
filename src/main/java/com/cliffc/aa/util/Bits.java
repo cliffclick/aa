@@ -142,7 +142,9 @@ public class Bits implements Iterable<Integer> {
       }
     }
     if( bs._con==0 ) {          // Meet of a low set and high set
-      throw AA.unimpl();
+      // Probably require 1 bit from high set in the low set.
+      // For now, just return low set
+      return bs;
     }
 
     // join of 2 sets; return intersection

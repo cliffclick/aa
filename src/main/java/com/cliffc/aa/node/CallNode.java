@@ -1,7 +1,10 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.*;
+import com.cliffc.aa.AA;
+import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.Bits;
 
 // See FunNode.  Control is not required for an apply but inlining the function
 // body will require it; slot 0 is for Control.  Slot 1 is a function value - a
@@ -209,15 +212,27 @@ public class CallNode extends Node {
   }
 
   @Override public Type value(GVNGCM gvn) {
-    Node fun = in(1);
-    Type t = gvn.type(fun);
+    Node fp = in(1);
+    Type t = gvn.type(fp);
     if( !_inlined ) {           // Inlined functions just pass thru & disappear
-      if( fun instanceof UnresolvedNode ) {
+      if( gvn._opt ) {
+        // TODO: pass this calls RPCs to the FIDX functions
+        assert t.is_fun_ptr();
+        TypeFun tf = (TypeFun)(((TypeTuple)t).at(3));
+        Bits fidxs = tf._fidxs;
+        for( int fidx : fidxs ) {
+          FunNode fun = FunNode.find_fidx(fidx);
+          // if the fun._rpcs changes, toss fun on the worklist & his parm RPC
+          Type rpcs = fun._rpcs.meet(TypeRPC.make(_rpc));
+          throw AA.unimpl();
+        }
+      }
+      if( fp instanceof UnresolvedNode ) {
         // For unresolved, we can take the BEST choice; i.e. the JOIN of every
         // choice.  Typically one choice works and the others report type
         // errors on arguments.
-        t = TypeErr.ALL;
-        for( Node epi : fun._defs ) {
+        t = Type.ALL;
+        for( Node epi : fp._defs ) {
           Type t_unr = value1(gvn,gvn.type(epi));
           t = t.join(t_unr); // JOIN of choices
         }
@@ -240,14 +255,14 @@ public class CallNode extends Node {
     Type    tval =         tepi.at(1);
     TypeRPC trpc =(TypeRPC)tepi.at(2);
     TypeFun tfun =(TypeFun)tepi.at(3);
-    if( tctrl == Type.XCTRL ) return TypeErr.ANY; // Function will never return
+    if( tctrl == Type.XCTRL ) return Type.ANY; // Function will never return
     assert tctrl==Type.CTRL;      // Function will never return?
     if( t.is_forward_ref() ) return tfun.ret(); // Forward refs do no argument checking
     if( tfun.nargs() != nargs() )
       return nargerr(tfun);
     // Now do an arg-check
     TypeTuple formals = tfun._ts;   // Type of each argument
-    Type terr = TypeErr.ANY;        // No errors (yet)
+    Type terr = Type.ANY;        // No errors (yet)
     for( int j=0; j<nargs(); j++ ) {
       Type actual = gvn.type(arg(j));
       Type formal = formals.at(j);
@@ -273,7 +288,7 @@ public class CallNode extends Node {
     return new TypeNode(t,null,_cast_P);
   }
 
-  @Override public Type all_type() { return TypeTuple.make_all(Type.CTRL,TypeErr.ALL); }
+  @Override public Type all_type() { return TypeTuple.make_all(Type.CTRL,Type.ALL); }
   @Override public int hashCode() { return super.hashCode()+_rpc; }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;

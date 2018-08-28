@@ -332,7 +332,7 @@ public class GVNGCM {
         nodes.setX(n._uid,n);     // Record back-ptr to Node
         boolean never_seen = !touched(n);
         Type ot = type(n);        // Old type
-        Type nt = n.value(this);  // New type
+        Type nt = n._uid <_INIT0_CNT ? ot : n.value(this);  // New type
         assert ot.isa(nt);        // Types only fall monotonically
         if( ot != nt )            // Progress
           _ts.setX(n._uid,nt);    // Record progress
