@@ -78,7 +78,7 @@ public class GVNGCM {
     }
     return _ts.setX(n._uid,t);
   }
-  private void setype( Node n, Type t ) {
+  public void setype( Node n, Type t ) {
     assert t != null;
     _ts.setX(n._uid,t);
   }
@@ -108,7 +108,7 @@ public class GVNGCM {
   // Add a new def to 'n', changing its hash - so rehash it
   public void add_def( Node n, Node def ) {
     Node x = _vals.remove(n);
-    assert x == n;
+    assert x == n || (x==null && _wrk_bits.get(n._uid));
     n.add_def(def);
     _vals.put(n,n);
     add_work(n);
@@ -309,7 +309,7 @@ public class GVNGCM {
   }
 
   // Global Optimistic Constant Propagation.
-  void gcp(ScopeNode start) {
+  void gcp(ScopeNode start, ScopeNode end) {
     assert _work._len==0;
     assert _wrk_bits.isEmpty();
     Ary<Node> nodes = new Ary<>(new Node[1],0);
@@ -348,7 +348,7 @@ public class GVNGCM {
         }
       }
       _opt = false;               // Back to pessimistic behavior on new nodes
-  
+
       // Optimization phase 1: Remove ambiguity
       for( int i=_INIT0_CNT; i<_ts._len; i++ ) {
         Node n = nodes.atX(i);
@@ -359,41 +359,73 @@ public class GVNGCM {
             add_work(n); // Go again- values will continue to fall in the lattice
           }
         }
-        // ParmRPCs take their default unknown caller to be the result of the
-        // virtual edges discovered by GCP.  This will trigger hard-inlining of
-        // these edges.
-        if( n instanceof ParmNode && ((ParmNode)n)._idx== -1 ) {
-          FunNode fun = (FunNode)n.in(0);
-          TypeRPC rpc = fun._rpc;
-          throw AA.unimpl();
-        }
+      }
+    }
+
+    // Revisit the entire reachable program, as ideal calls may do something
+    // with the maximally lifted types.
+    Node rez = end.in(end._defs._len-2);
+    walk_opt(rez,start);
+      
+    //// Optimization phase 2.
+    //// Record in any improved types; replace with constants if possible.
+    //for( int i=_INIT0_CNT; i<_ts._len; i++ ) {
+    //  Type t = _ts._es[i];
+    //  if( t==null ) continue;   // Never reached?
+    //  Node n = nodes.atX(i);
+    //  if( n != null && t.may_be_con() && !(n instanceof ConNode) )
+    //    subsume(n,con(t));
+    //  if( !(t instanceof TypeErr) && n instanceof CastNode ) { // TODO: Fold into CastNode.ideal
+    //    assert t.isa(((CastNode)n)._t);
+    //    if( t != (((CastNode)n)._t)) {
+    //      unreg(n);
+    //      Node cast = xform_old0(rereg(new CastNode(n.in(0), n.in(1), t),t));
+    //      subsume(n, nodes.setX(cast._uid, cast));
+    //    }
+    //  }
+    //}
+    //
+    //// Re-check all ideal calls now that types have been maximally lifted
+    //for( int i=_INIT0_CNT; i<_ts._len; i++ )
+    //  if( nodes.atX(i) != null )
+    //    add_work(nodes.at(i));
+  }
+
+  // GCP optimizations on the live subgraph
+  private void walk_opt( Node n, Node start ) {
+    assert !n.is_dead();
+    if( _wrk_bits.get(n._uid) ) return; // Been there, done that
+    if( n==start ) return;              // Top-level scope
+    add_work(n);                        // Only walk once
+    // Remove any ambiguity
+    if( n instanceof CallNode && n.in(1) instanceof UnresolvedNode ) {
+      Node fun = ((UnresolvedNode)n.in(1)).resolve(this,(CallNode)n);
+      if( fun != null )
+        set_def_reg(n, 1, fun);
+    }
+    // Look for constants
+    Type t = _ts._es[n._uid];
+    if( t.may_be_con() && !(n instanceof ConNode) ) {
+      subsume(n, con(t));
+      return;
+    }
+
+    // Upgrade any casts with sharper type info
+    // TODO: Fold into CastNode.ideal
+    if( !(t instanceof TypeErr) && n instanceof CastNode ) { 
+      assert t.isa(((CastNode)n)._t);
+      if( t != (((CastNode)n)._t)) {
+        unreg(n);
+        Node cast = xform_old0(rereg(new CastNode(n.in(0), n.in(1), t),t));
+        subsume(n, cast);
       }
     }
     
-    // Optimization phase 2.
-    // Record in any improved types; replace with constants if possible.
-    for( int i=_INIT0_CNT; i<_ts._len; i++ ) {
-      Type t = _ts._es[i];
-      if( t==null ) continue;   // Never reached?
-      Node n = nodes.atX(i);
-      if( n != null && t.may_be_con() && !(n instanceof ConNode) )
-        subsume(n,con(t));
-      if( !(t instanceof TypeErr) && n instanceof CastNode ) { // TODO: Fold into CastNode.ideal
-        assert t.isa(((CastNode)n)._t);
-        if( t != (((CastNode)n)._t)) {
-          unreg(n);
-          Node cast = xform_old0(rereg(new CastNode(n.in(0), n.in(1), t),t));
-          subsume(n, nodes.setX(cast._uid, cast));
-        }
-      }
-      //if( n instanceof FunNode ) 
-      //  throw AA.unimpl();
-    }
-
-    // Re-check all ideal calls now that types have been maximally lifted
-    for( int i=_INIT0_CNT; i<_ts._len; i++ )
-      if( nodes.atX(i) != null )
-        add_work(nodes.at(i));
-    iter();
+    // Walk reachable graph
+    for( Node def : n._defs )
+      if( def != null &&
+          !(n instanceof RegionNode && type(def)== Type.XCTRL) )
+        walk_opt(def,start);
   }
+
 }

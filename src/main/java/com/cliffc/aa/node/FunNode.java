@@ -99,7 +99,7 @@ public class FunNode extends RegionNode {
   }
   
   // Fast reset of parser state between calls to Exec
-  private static int PRIM_CNT;
+  static int PRIM_CNT;
   public static void init0() { PRIM_CNT=CNT; }
   public static void reset_to_init0() { CNT = PRIM_CNT; NAMES.set_len(PRIM_CNT); FUNS.set_len(PRIM_CNT); }
 
@@ -150,6 +150,9 @@ public class FunNode extends RegionNode {
   // caller will call with such arguments.  This is a quick check to detect
   // may-have-more-callers.
   public boolean _fun_as_data = true;
+  // If the function is being returned from the top-level Parse, then it is
+  // alive with no callers.
+  public boolean _returned_at_top = false;
 
   // ----
   @Override public Node ideal(GVNGCM gvn) {
@@ -414,12 +417,6 @@ public class FunNode extends RegionNode {
       gvn.rereg(nn,ot);
     }
 
-    // Cloned CallNodes that are labeled wired, are not actually wired up.
-    // Basically we made a bunch of new callers in the function body and
-    // anybody they called needs to be informed.
-    for( Node c : map.values() )
-      if( c instanceof CallNode )
-        ((CallNode)c)._wired = false;
     // TODO: Hook with proper signature into ScopeNode under an Unresolved.
     // Future calls may resolve to either the old version or the new.
     return is_dead() ? fun : this;
@@ -433,11 +430,6 @@ public class FunNode extends RegionNode {
     return null;
   }
   
-  // A bit of optimistic GCP-only state: the list of known call-sites which
-  // call this function through a function-pointer, as opposed to a direct
-  // call.  Null if there are no fun-ptr callers.
-  TypeRPC _rpcs;
-  
   // Compute value from inputs.  Slot#1 is always the unknown caller.  If
   // Slot#1 is not a ScopeNode, then it is a constant CTRL just in case we make
   // a new caller (e.g. via inlining).  If there are no other inputs and no
@@ -445,11 +437,10 @@ public class FunNode extends RegionNode {
   // hit a new CallNode - and this requires GCP to discover the full set of
   // possible callers.
   @Override public Type value(GVNGCM gvn) {
-    if( gvn._opt ) {                        // Optimistic types?
-      if( _rpcs != null ) return Type.CTRL; // Have some fun_ptr callers
-    } else {                                // Pessimistic types?
-      if( _fun_as_data ||                   // Might be called thru the F-P
-          in(1) instanceof ScopeNode )      // Might parse a new call site
+    if( _returned_at_top ) return Type.CTRL;
+    if( !gvn._opt ) {                  // Pessimistic types?
+      if( _fun_as_data ||              // Might be called thru the F-P
+          in(1) instanceof ScopeNode ) // Might parse a new call site
         return Type.CTRL;
     }
     Type t = Type.XCTRL;        // Remaining edges behave like RegionNode.value

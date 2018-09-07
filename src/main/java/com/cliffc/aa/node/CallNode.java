@@ -24,12 +24,16 @@ public class CallNode extends Node {
   private static int RPC=1; // Call-site return PC
   int _rpc;         // Call-site return PC
   private boolean _unpacked;    // Call site allows unpacking a tuple (once)
-  boolean _wired;       // Args wired to the single unique function
   private boolean _inlined;     // Inlining a call-site is a 2-stage process; function return wired to the call return
   private Type   _cast_ret;     // Return type has been up-casted
   private Parse  _cast_P;       // Return type cast fail message
   private Parse  _badargs;      // Error for e.g. wrong arg counts or incompatible args
-  public CallNode( boolean unpacked, Parse badargs, Node... defs ) { super(OP_CALL,defs); _rpc=RPC++; _unpacked=unpacked; _badargs = badargs; }
+  public CallNode( boolean unpacked, Parse badargs, Node... defs ) {
+    super(OP_CALL,defs);
+    _rpc = RPC++;               // Unique call-site index
+    _unpacked=unpacked;         // Arguments are typically packed into a tuple and need unpacking, but not always
+    _badargs = badargs;
+  }
 
   String xstr() { return "Call#"+_rpc; } // Self short name
   String  str() { return xstr(); }       // Inline short name
@@ -105,9 +109,10 @@ public class CallNode extends Node {
     // Unknown function(s) being called
     if( !(unk instanceof EpilogNode) )
       return null;
+    // From here on down we know the exact function being called
     EpilogNode epi = (EpilogNode)unk;
-    Node    rez = epi.val ();
-    FunNode fun = epi.fun ();
+    Node    rez = epi.val();
+    FunNode fun = epi.fun();
 
     // Arg counts must be compatible
     if( fun._tf.nargs() != nargs() )
@@ -155,33 +160,33 @@ public class CallNode extends Node {
       return inline(gvn,gvn.xform(irez));  // New exciting replacement for inlined call
     }
 
-    // If this is a primitive, we never change the function header via inlining the call
-    assert fun.in(1)._uid!=0;
+    assert fun.in(1)._uid!=0; // Never wire into a primitive, just clone/inline it instead (done just above)
     assert fun._tf.nargs() == nargs();
 
     // Always wire caller args into known functions
-    if( !_wired && wire(gvn,fun) ) return this;
-
-    return null;
+    return wire(gvn,fun);
   }
 
   // Wire the call args to a known function, letting the function have precise
   // knowledge of its callers and arguments.
   // Leaves the Call in the graph - making the graph "a little odd" - double
   // CTRL users - once for the call, and once for the function being called.
-  boolean wire(GVNGCM gvn, FunNode fun) {
+  Node wire(GVNGCM gvn, FunNode fun) {
+    Node ctrl = in(0);
+    for( int i=2; i<fun._defs.len(); i++ ) // Skip default control (for top-level calls vs top-level fun-defs)
+      if( fun._defs.at(i)==ctrl ) // Look for same control
+        return null;              // Already wired up
+    
+    // Do an arg check before wiring up; cannot wire busted args (do not
+    // propagate type errors past function call boundaries).
     for( Node arg : fun._uses ) {
       if( arg.in(0) == fun && arg instanceof ParmNode ) {
         int idx = ((ParmNode)arg)._idx; // Argument number, or -1 for rpc
         if( idx != -1 &&
             (idx >= nargs() || !gvn.type(arg(idx)).isa(fun._tf.arg(idx))) )
-          return false;         // Illegal args?
+          return null;          // Illegal args?
       }
     }
-    
-    // Inline the call site now.
-    // This is NOT inlining the function body, just the call site.
-    _wired = true;
     
     // Add an input path to all incoming arg ParmNodes from the Call.  Cannot
     // assert finding all args, because dead args may already be removed - and
@@ -197,9 +202,9 @@ public class CallNode extends Node {
     // Add Control for this path.  Sometimes called from fun.Ideal() (because
     // inlining), sometimes called by Epilog when it discovers all callers
     // known.
-    if( gvn.touched(fun) ) gvn.add_def(fun,in(0)); 
-    else                   fun.add_def(in(0));
-    return true;
+    if( gvn.touched(fun) || gvn._opt ) gvn.add_def(fun,in(0));
+    else                               fun.add_def(    in(0));
+    return this;
   }
   
   // Inline to this Node.
@@ -215,8 +220,8 @@ public class CallNode extends Node {
     Type t = gvn.type(fp);
     if( !_inlined ) {           // Inlined functions just pass thru & disappear
 
-      if( gvn._opt ) // Following optimistic virtual edges between caller and callee
-        add_rpc(gvn,t,_rpc); // Add this call site to all callee functions
+      if( gvn._opt ) // Manifesting optimistic virtual edges between caller and callee
+        wire(gvn,t); // Make real edges from virtual edges
 
       if( fp instanceof UnresolvedNode ) {
         // For unresolved, we can take the BEST choice; i.e. the JOIN of every
@@ -236,23 +241,17 @@ public class CallNode extends Node {
     return TypeTuple.make(gvn.type(in(0)),t);
   }
 
-  // Add given caller RPC to all called functions
-  static void add_rpc(GVNGCM gvn, Type funptr, int rpc) {
-    TypeRPC trpc = null;                        // Lazy init
-    TypeFun tf = ((TypeTuple)funptr).get_fun(); // Get type-propagated function list
+  // Make real call edges from virtual call edges
+  private void wire(GVNGCM gvn, Type funptr) {
+    assert funptr.isa(TypeTuple.GENERIC_FUN);
+    if( !(funptr instanceof TypeTuple) ) return; // Not fallen to a funptr yet
+    TypeTuple tfunptr = (TypeTuple)funptr;
+    TypeFun tf = tfunptr.get_fun(); // Get type-propagated function list
     Bits fidxs = tf._fidxs;     // Get all the propagated reaching functions
     if( fidxs.above_center() ) return;
     for( int fidx : fidxs ) {   // For all functions
-      FunNode fun = FunNode.find_fidx(fidx);
-      TypeRPC oldrpc = fun._rpcs; // Get the list of callers
-      if( oldrpc == null || !oldrpc.test(rpc) ) {  // This call not on the list
-        if( trpc==null ) trpc = TypeRPC.make(rpc); // Lazy init
-        fun._rpcs = oldrpc==null ? trpc : (TypeRPC)oldrpc.meet(trpc);
-        gvn.add_work(fun); // Revisit with new path available
-        gvn.add_work(fun.find_rpc()); // Revisit with new path available
-        // Need to add all arguments to all functions along default edges
-        throw AA.unimpl();
-      }
+      if( fidx >= FunNode.PRIM_CNT ) // Do not wire up primitives, but forever take their default inputs and outputs
+        wire(gvn,FunNode.find_fidx(fidx));
     }
   }
   
@@ -283,9 +282,10 @@ public class CallNode extends Node {
         actual = formal;   // Lift actual to worse-case valid argument type
       }
       if( !actual.isa(formal) ) // Actual is not a formal; accumulate type errors
-        terr = terr.meet(TypeErr.make(_badargs.errMsg("%s is not a %s"), actual, formal));
+        terr = terr.meet(TypeErr.make(_badargs.typerr(actual, formal)));
     }
     return terr instanceof TypeErr ? terr : terr.meet(tval);  // Return any errors, or the Epilog return type
+    //return terr.meet(tval);  // Return any errors and the Epilog return type
   }
   private Type nargerr( TypeFun tfun ) {
     return TypeErr.make(_badargs.errMsg("Passing "+nargs()+" arguments to "+tfun+" which takes "+tfun.nargs()+" arguments"));

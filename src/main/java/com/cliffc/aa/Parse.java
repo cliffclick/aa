@@ -84,12 +84,15 @@ public class Parse {
     _e._scope.add_def(res);     // Hook, so not deleted
     // Delete names at the top scope before final optimization.
     _e._scope.promote_forward_del_locals(_gvn,null);
+    if( res instanceof EpilogNode )
+      ((EpilogNode)res).fun()._returned_at_top = true;
     _gvn.iter();    // Pessimistic optimizations; might improve error situation
     // Run GCP from the global top, so we also get all the initial constants
     // and all users of those constants.  
     Env par = _e._par;
     _e._scope.add_def(par._scope); // Hook start control into all the constants
-    _gvn.gcp(par._scope);          // Global Constant Propagation
+    _gvn.gcp(par._scope,_e._scope);// Global Constant Propagation
+    _gvn.iter();                   // Re-check all ideal calls now that types have been maximally lifted
     _e._scope.pop();               // Remove start hook
     res = _e._scope.pop();         // New and improved result
     Node ctrl = _e._scope.pop();   // Exit control

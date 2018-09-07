@@ -157,19 +157,7 @@ public class ScopeNode extends Node {
   }
   
   @Override public Node ideal(GVNGCM gvn) { return null; }
-  @Override public Type value(GVNGCM gvn) {
-    // Similar to CallNode, if the top-level scope uses a function pointer then
-    // the function is being returned from a top-level scope.  It's never
-    // executed (the fun-ptr itself is result of execution) so otherwise would
-    // appear dead after optimistic call-path analysis.  Force it live here,
-    // same as a CallNode does.
-    if( gvn._opt ) {
-      Node rez = in(_defs._len-2);
-      if( rez instanceof EpilogNode )
-        CallNode.add_rpc(gvn,gvn.type(rez),0);
-    }
-    return Type.CTRL;
-  }
+  @Override public Type value(GVNGCM gvn) { return Type.CTRL; }
   @Override public Type all_type() { return Type.CTRL; }
   @Override public int hashCode() { return 123456789; }
   // ScopeNodes are never equal

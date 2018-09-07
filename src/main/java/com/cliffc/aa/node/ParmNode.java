@@ -2,11 +2,10 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeRPC;
 
 // Function parameter node; just a Phi with a name
 public class ParmNode extends PhiNode {
-  final int _idx;           // Parameter index, zero-based; -1 reserved for RPC
+  public final int _idx;    // Parameter index, zero-based; -1 reserved for RPC
   final String _name;       // Parameter name
   public ParmNode( int idx, String name, FunNode fun, ConNode defalt, String badgc) {
     super(OP_PARM,fun,defalt,badgc);
@@ -14,23 +13,6 @@ public class ParmNode extends PhiNode {
     _name=name;
   }
   @Override String xstr() { return "Parm:"+_name; }
-  @Override public Type value(GVNGCM gvn) {
-    if( _idx==-1 && gvn._opt ) { // If running optimistic, extra RPCs can be found in the FunNode
-      Node fun = in(0);
-      assert fun._defs._len==_defs._len;
-      Type t = TypeRPC.ALL_CALL.dual();
-      if( gvn.type(fun.in(1))==Type.CTRL ) { // If slot#1 is alive, count all discovered fun-ptr callers
-        TypeRPC trpcs = ((FunNode)in(0))._rpcs;
-        if( trpcs != null ) t = trpcs; // Keep fun-ptr callers
-      }
-      for( int i=2; i<_defs._len; i++ )
-        if( gvn.type(fun.in(i))==Type.CTRL ) // Only meet alive paths
-          t = t.meet(gvn.type(in(i)));     // Merge in fixed callers
-      return t;
-    }
-    // Otherwise just like a Phi
-    return super.value(gvn);
-  }
   @Override public int hashCode() { return super.hashCode()+_idx; }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
@@ -38,5 +20,18 @@ public class ParmNode extends PhiNode {
     if( !(o instanceof ParmNode) ) return false;
     ParmNode parm = (ParmNode)o;
     return _idx==parm._idx;
+  }
+  @Override public Type value( GVNGCM gvn ) {
+    FunNode fun = (FunNode) in(0);
+    assert fun._defs._len==_defs._len;
+    if( fun._cidx != 0 ) return gvn.type(in(fun._cidx)); // Region has collapsed to a Copy, no need to run full merge
+    Type t = _default_type.dual();
+    for( int i=1; i<_defs._len; i++ )
+      if( gvn.type(fun.in(i))!=Type.XCTRL ) { // Only meet alive paths
+        Type argt = gvn.type(in(i));   // Arg type for this incoming path
+        if( _idx < 0 || argt.isa(fun._tf.arg(_idx)) ) // Argument is legal?  Illegal args are not merged, and error-reported in CallNode
+          t = t.meet(argt);
+      }
+    return t;
   }
 }
