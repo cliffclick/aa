@@ -157,16 +157,31 @@ public abstract class Node implements Cloneable {
     return null;
   }
 
-  // Graph rewriting.  Can change defs, including making new nodes - but if it
-  // does so, all new nodes will first call ideal().  If gvn._opt if false, not
-  // allowed to remove CFG edges (loop backedges and function-call entry points
-  // have not all appeared).
+  // Graph rewriting.  Can assume all inputs are non-error.  Can change defs,
+  // including making new nodes - but if it does so, all new nodes will first
+  // call gvn.xform().  If gvn._opt if false, not allowed to remove CFG edges
+  // (loop backedges and function-call entry points have not all appeared).
   // Returns null if no-progress, or a better version of 'this'.
   abstract public Node ideal(GVNGCM gvn);
 
-  // Compute the current best Type for this Node, based on the types of its inputs
-  abstract public Type value(GVNGCM gvn);
+  // Compute the current best Type for this Node, based on the types of its inputs.
+  // Ignores error inputs, and may return an error output.
+  abstract public Type value_ne(GVNGCM gvn);
 
+  // Compute the current best Type for this Node, based on the types of its inputs.
+  // Handles input errors.
+  public Type value( GVNGCM gvn ) {
+    Type t = value_ne(gvn);
+    Type base = t instanceof TypeErr ? ((TypeErr)t)._t : t;
+    for( Node def : _defs ) {
+      if( def == null ) continue; // 
+      Type t0 = gvn.type(def);    // Type with errors
+      if( t0 instanceof TypeErr ) // Accumulate errors across all inputs
+        t = t.meet(TypeErr.make(base,((TypeErr)t0)._msgs));
+    }
+    return t;
+  }
+  
   // Worse-case type for this Node
   public Type all_type() { return TypeErr.ALL; }
   
@@ -276,14 +291,6 @@ public abstract class Node implements Cloneable {
   // Only true for some EpilogNodes
   public boolean is_forward_ref() { return false; }
   
-  // Skip useless Region controls
-  boolean skip_ctrl(GVNGCM gvn) {
-    Node x = in(0).is_copy(gvn,-1);
-    if( x==null ) return false;
-    set_def(0,x,gvn);
-    return true;
-  }
-
   // Walk a subset of the dominator tree, looking for the last place (highest
   // in tree) this predicate passes, or null if it never does.  
   Node walk_dom_last(Predicate<Node> P) {

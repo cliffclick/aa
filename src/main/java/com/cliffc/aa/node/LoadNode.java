@@ -53,10 +53,9 @@ public class LoadNode extends Node {
     set_def(1,gvn.xform(new CastNode(tru,baseaddr,((TypeStruct)t).make_nil(TypeStruct.NOT_NIL))),gvn);
     return set_def(0,null,gvn);
   }
-  @Override public Type value(GVNGCM gvn) {
-    Type t = gvn.type(in(1));
+  @Override public Type value_ne(GVNGCM gvn) {
+    Type t = gvn.type_ne(in(1));
     while( t instanceof TypeName ) t = ((TypeName)t)._t;
-    if( t instanceof TypeErr ) return t; // Errors poison
     if( t.isa(TypeOop.OOP_) ) return Type.XSCALAR; // Very high address; might fall to any valid value
     Type tnil = t.may_have_nil() ? TypeErr.make(_badnil) : Type.ANY; // Null compile-time error
     if( TypeOop.OOP0.isa(t) )            // Too low, might not have any fields

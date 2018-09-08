@@ -41,8 +41,9 @@ public class TypeNode extends Node {
   // TypeNode is "in error", and the program is not type-correct.  Return the
   // asserted value for later code to assume "all is good", but this error here
   // will eventually have to correct (or the program will be rejected).
-  @Override public Type value(GVNGCM gvn) {
-    Type t = gvn.type(in(1));
+  @Override public Type value_ne(GVNGCM gvn) {
+    Type t = gvn.type_ne(in(1));
+    // Return my input type "pinched" between _t and _t.dual()
     return t.isa(_t) ? (t.isa(_t.dual()) ? _t.dual() : t) : _t;
   }
   @Override public Type all_type() { return _t; }

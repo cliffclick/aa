@@ -7,8 +7,8 @@ import java.util.Arrays;
 
 /** Error data type.  If the program result is of this type, the program is not well formed. */
 public class TypeErr extends Type<TypeErr> {
-  Type _t;                      // Above or below centerline/dual
-  private String[] _msgs;       // Collection of errors
+  public Type _t;               // Above or below centerline/dual
+  public String[] _msgs;        // Collection of errors
   private TypeErr ( Type t, String[] msgs ) { super(TERROR); init(t,msgs); }
   private void init(Type t, String[] msgs ) { _t=t; _msgs=msgs; }
   @Override public int hashCode( ) { return TERROR+_t.hashCode()+Arrays.hashCode(_msgs); }
@@ -21,12 +21,13 @@ public class TypeErr extends Type<TypeErr> {
   @Override public String toString() { return _t+Arrays.toString(_msgs); }
   private static TypeErr FREE=null;
   @Override protected TypeErr free( TypeErr f ) { FREE=f; return this; }
-  public  static Type    make( String msg, Type a, Type b ) { return a==Type.ALL ? a : make(a,String.format(msg,a.toString(),b.toString())); }
+  public  static Type    make( String msg, Type a, Type b ) { return a==Type.ALL ? a : make(a,String.format(msg,a.toString(),b.toString()).intern()); }
   public  static TypeErr make( String msg) { return make(Type.SCALAR,new String[]{msg.intern()}); }
   public  static TypeErr make( Type t, String msg) { return make(t,new String[]{msg.intern()}); }
-  private static TypeErr make( Type t, String[] msgs ) {
+  public  static TypeErr make( Type t, String[] msgs ) {
     assert sorted(msgs);
     assert t!= Type.ALL && t!=Type.ANY; // The limits just fall to the limits
+    assert !(t instanceof TypeErr);     // No nested errors
     TypeErr t1 = FREE;
     if( t1 == null ) t1 = new TypeErr(t,msgs);
     else { FREE = null; t1.init(t,msgs); }

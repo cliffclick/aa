@@ -43,6 +43,13 @@ public class CallNode extends Node {
   public static void init0() { PRIM_RPC=RPC; }
   public static void reset_to_init0() { RPC = PRIM_RPC; }
 
+  // Inline the CallNode
+  private Node inline( GVNGCM gvn, Node rez ) {
+    set_def(1,rez ,gvn);        // New result is function epilog result
+    _inlined = true;
+    return this;
+  }
+  // Called by projections when folding away the call
   @Override public Node is_copy(GVNGCM gvn, int idx) { return _inlined ? in(idx) : null; }
 
   // Number of actual arguments
@@ -58,7 +65,6 @@ public class CallNode extends Node {
   }
   
   @Override public Node ideal(GVNGCM gvn) {
-    if( skip_ctrl(gvn) ) return this;
     // If an inline is in-progress, no other opts and this node will go dead
     if( _inlined ) return null;
     // If an upcast is in-progress, no other opts until it finishes
@@ -111,10 +117,14 @@ public class CallNode extends Node {
       return null;
     // From here on down we know the exact function being called
     EpilogNode epi = (EpilogNode)unk;
-    Node    rez = epi.val();
-    FunNode fun = epi.fun();
-
+    Node rez = epi.val();
+    // Function is single-caller (me) and collapsing
+    if( epi.is_copy(gvn,3) != null )
+      return inline(gvn,rez);
+    // Function is well-formed
+    
     // Arg counts must be compatible
+    FunNode fun = epi.fun();
     if( fun._tf.nargs() != nargs() )
       return null;
 
@@ -139,12 +149,9 @@ public class CallNode extends Node {
 
     // Check for several trivial cases that can be fully inlined immediately.
     // Check for zero-op body (id function)
-    if( rez instanceof ParmNode && rez.in(0) == fun ) return inline(gvn,arg(0));
+    if( rez instanceof ParmNode && rez.in(0) == fun ) return inline(gvn,arg(((ParmNode)rez)._idx));
     // Check for constant body
     if( rez instanceof ConNode ) return inline(gvn,rez);
-    // Function is single-caller (me) and collapsing
-    if( fun._cidx != 0 )
-      return inline(gvn,rez);
 
     // Check for a 1-op body using only constants or parameters
     boolean can_inline=true;
@@ -157,7 +164,7 @@ public class CallNode extends Node {
       Node irez = rez.copy();   // Copy the entire function body
       for( Node parm : rez._defs )
         irez.add_def((parm instanceof ParmNode && parm.in(0) == fun) ? arg(((ParmNode)parm)._idx) : parm);
-      return inline(gvn,gvn.xform(irez));  // New exciting replacement for inlined call
+      return inline(gvn,gvn.xform(irez)); // New exciting replacement for inlined call
     }
 
     assert fun.in(1)._uid!=0; // Never wire into a primitive, just clone/inline it instead (done just above)
@@ -206,40 +213,6 @@ public class CallNode extends Node {
     else                               fun.add_def(    in(0));
     return this;
   }
-  
-  // Inline to this Node.
-  private Node inline( GVNGCM gvn, Node rez ) {
-    gvn.add_work(in(0));        // Major graph shrinkage; retry parent as well
-    set_def(1,rez,gvn);
-    _inlined = true;            // Allow data projection to find new body
-    return this;
-  }
-
-  @Override public Type value(GVNGCM gvn) {
-    Node fp = in(1);
-    Type t = gvn.type(fp);
-    if( !_inlined ) {           // Inlined functions just pass thru & disappear
-
-      if( gvn._opt ) // Manifesting optimistic virtual edges between caller and callee
-        wire(gvn,t); // Make real edges from virtual edges
-
-      if( fp instanceof UnresolvedNode ) {
-        // For unresolved, we can take the BEST choice; i.e. the JOIN of every
-        // choice.  Typically one choice works and the others report type
-        // errors on arguments.
-        t = Type.ALL;
-        for( Node epi : fp._defs ) {
-          Type t_unr = value1(gvn,gvn.type(epi));
-          t = t.join(t_unr); // JOIN of choices
-        }
-      } else {                  // Single resolved target
-        t = value1(gvn,t);      // Check args
-      }
-    } // Else inlined
-
-    // Return {control,value} tuple.
-    return TypeTuple.make(gvn.type(in(0)),t);
-  }
 
   // Make real call edges from virtual call edges
   private void wire(GVNGCM gvn, Type funptr) {
@@ -255,16 +228,65 @@ public class CallNode extends Node {
     }
   }
   
-  
+  @Override public Type value_ne(GVNGCM gvn) {
+    Type t0 = gvn.type_ne(in(0));
+    Node fp = in(1);
+    Type t = gvn.type_ne(fp);
+    if( _inlined )              // Inlined functions just pass thru & disappear
+      return TypeTuple.make_all(t0,t);
+    
+    if( gvn._opt ) // Manifesting optimistic virtual edges between caller and callee
+      wire(gvn,t); // Make real edges from virtual edges
+
+    // If any incoming args are error, simply return the function return (or
+    // meet of functions returns).  Otherwise check args, and report first
+    // broken arg.
+
+    // implies: if any input is error1, output is error1; once the input lifts
+    // to non-error, output switches to error2.  If inputs keep lifting, output
+    // might switch to non-error (e.g. funptr resolves to a single function).
+
+    // want to stack error2 above error1 (so isa test works, and the value()
+    // call is monotonic).
+
+    // could nest errors?  outer error is error1: errors from inputs.  Inner
+    // error is error only looking at the non-error from inputs.  meet is ugly:
+    // expect oldt to be error1 with 'any', and newt to be error2 with argument
+    // errors.  Meet matches on _msgs, which fails, so it looks at oldt._t vs
+    // newt?  Probably better to have a incoming/outgoing flag.
+
+    
+    Type trez;
+    if( fp instanceof UnresolvedNode ) {
+      // For unresolved, we can take the BEST choice; i.e. the JOIN of every
+      // choice.  Typically one choice works and the others report type
+      // errors on arguments.
+      trez = Type.ANY;
+      for( Node epi : fp._defs ) {
+        Type t_unr = value1(gvn,gvn.type_ne(epi));
+        if( !t_unr instanceof TypeErr )
+          trez = t.meet(t_unr);
+        //trez = t.join(t_unr); // JOIN of choices
+      }
+      // If any choice is non-error, take it.
+      // If all choices are error, return the errors.
+    } else {                  // Single resolved target
+      trez = value1(gvn,t);   // Check args
+    }
+
+    // Return {control,value} tuple.
+    if( trez instanceof TypeErr )
+      return TypeErr.make(TypeTuple.make_all(t0,((TypeErr)t)._t), ((TypeErr)trez)._msgs);
+    return                TypeTuple.make_all(t0,trez);
+  }
+
   // Cannot return the functions return type, unless all args are compatible
   // with the function(s).  Arg-check.
   private Type value1( GVNGCM gvn, Type t ) {
-    if( t instanceof TypeErr ) return t;
     assert t.is_fun_ptr();
     TypeTuple tepi = (TypeTuple)t;
     Type    tctrl=         tepi.at(0);
     Type    tval =         tepi.at(1);
-    TypeRPC trpc =(TypeRPC)tepi.at(2);
     TypeFun tfun =(TypeFun)tepi.at(3);
     if( tctrl == Type.XCTRL ) return Type.ANY; // Function will never return
     assert tctrl==Type.CTRL;      // Function will never return?
@@ -272,20 +294,15 @@ public class CallNode extends Node {
     if( tfun.nargs() != nargs() )
       return nargerr(tfun);
     // Now do an arg-check
-    TypeTuple formals = tfun._ts;   // Type of each argument
-    Type terr = Type.ANY;        // No errors (yet)
+    TypeTuple formals = tfun._ts; // Type of each argument
+    Type terr = tval;
     for( int j=0; j<nargs(); j++ ) {
-      Type actual = gvn.type(arg(j));
+      Type actual = gvn.type_ne(arg(j));
       Type formal = formals.at(j);
-      if( actual instanceof TypeErr && !actual.above_center() ) { // Actual is an error, so call result is the same error
-        terr = terr.meet(actual);
-        actual = formal;   // Lift actual to worse-case valid argument type
-      }
       if( !actual.isa(formal) ) // Actual is not a formal; accumulate type errors
-        terr = terr.meet(TypeErr.make(_badargs.typerr(actual, formal)));
+        terr = terr.meet(TypeErr.make(tval,_badargs.typerr(actual, formal)));
     }
-    return terr instanceof TypeErr ? terr : terr.meet(tval);  // Return any errors, or the Epilog return type
-    //return terr.meet(tval);  // Return any errors and the Epilog return type
+    return terr; // Return Epilog data return value, plus any formal/actual errors
   }
   private Type nargerr( TypeFun tfun ) {
     return TypeErr.make(_badargs.errMsg("Passing "+nargs()+" arguments to "+tfun+" which takes "+tfun.nargs()+" arguments"));

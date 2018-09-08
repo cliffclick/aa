@@ -84,7 +84,10 @@ public class Parse {
     _e._scope.add_def(res);     // Hook, so not deleted
     // Delete names at the top scope before final optimization.
     _e._scope.promote_forward_del_locals(_gvn,null);
-    if( res instanceof EpilogNode )
+    // Returning a top-level function (not a primitive) appears "as if" the
+    // returned function is being called to keep it from being declared as
+    // having no callers and optimized away.
+    if( res instanceof EpilogNode && res._uid >= GVNGCM._INIT0_CNT )
       ((EpilogNode)res).fun()._returned_at_top = true;
     _gvn.iter();    // Pessimistic optimizations; might improve error situation
     // Run GCP from the global top, so we also get all the initial constants
@@ -99,9 +102,12 @@ public class Parse {
 
     // Gather errors
     Ary<String> errs = null;
-    Type tres = Env.lookup_valtype(res);    // Result type
-    String emsg = tres.errMsg();            // Error embedded in some subtype
+    Type tres = _gvn.type(res);  // Result type
+    String emsg = tres.errMsg(); // Error embedded in some subtype
     if( emsg != null ) errs = add_err(errs,emsg);
+    if( ctrl instanceof ErrNode )
+      errs = add_err(errs,((ErrNode)ctrl)._msg);
+    
     // Hunt for typing errors in the alive code
     assert par._par==null;      // Top-level only
     BitSet bs = new BitSet();
@@ -289,7 +295,7 @@ public class Parse {
         Node arg = arglist ? tuple(stmts()) : tfact(); // Start of an argument list?
         if( arg == null )       // Function but no arg is just the function
           break;
-        Type tn = _gvn.type(n);
+        Type tn = _gvn.type_ne(n);
         if( !tn.is_fun_ptr() && arg.may_prec() >= 0 ) {
           _x=oldx;
           break;

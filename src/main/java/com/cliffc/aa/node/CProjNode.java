@@ -13,6 +13,10 @@ public class CProjNode extends ProjNode {
     return "CProj_"+_idx;
   }
   @Override public Node ideal(GVNGCM gvn) { return in(0).is_copy(gvn,_idx); }
+  @Override public Type value(GVNGCM gvn) {
+    Type c = gvn.type_ne(in(0));
+    return ((TypeTuple)c).at(_idx); // Otherwise our type is just the matching tuple slice
+  }
   @Override public Type all_type() { return Type.CTRL; }
   // Return the op_prec of the returned value.  Not sensible except
   // when call on primitives.

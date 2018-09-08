@@ -2,10 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeErr;
-import com.cliffc.aa.type.TypeRPC;
-import com.cliffc.aa.type.TypeTuple;
+import com.cliffc.aa.type.*;
 
 // Tail end of functions.  Gathers:
 // - exit control; function may never exit or may be more than one
@@ -13,30 +10,27 @@ import com.cliffc.aa.type.TypeTuple;
 // - RPC - where to jump-to next; the Continuation
 // - The FunNode function header (quickly maps to SESE region header)
 public class EpilogNode extends Node {
+  private final int _fidx;
   final String _unkref_err; // Unknown ref error (not really a forward ref)
-  public EpilogNode( Node ctrl, Node val, Node rpc, Node fun, String unkref_err ) { super(OP_EPI,ctrl,val,rpc,fun); _unkref_err=unkref_err; }
-  @Override public Node ideal(GVNGCM gvn) {
-    if( !is_forward_ref() && skip_ctrl(gvn) ) return this; // Collapsing exit control
-    if( fun()._cidx != 0 )  // Collapsing function, call sites need to optimize
-      for( Node use : _uses )
-        gvn.add_work(use);
-    return null;
+  public EpilogNode( Node ctrl, Node val, Node rpc, FunNode fun, String unkref_err ) {
+    super(OP_EPI,ctrl,val,rpc,fun);
+    _unkref_err = unkref_err;
+    _fidx = fun._tf.fidx();     // Record function index, so can tell it exactly
   }
+  @Override public Node ideal(GVNGCM gvn) { return null; }
 
   @Override public Type value(GVNGCM gvn) {
     Type t=TypeTuple.make_all(gvn.type(ctrl()), // Function exits, or not
                               gvn.type(val ()), // Function return value
                               gvn.type(rpc ()), // Caller; the Continuation
-                              fun()._tf);       // Function type plus "fidx"
+                              FunNode.find_fidx(_fidx)._tf);
     assert t.is_fun_ptr();
     return t;
   }
-  // If the return PC is a constant, this is a single-target function and is
-  // effectively being inlined on the spot, removing the function head and tail.
+  @Override public Type value_ne(GVNGCM gvn) { throw com.cliffc.aa.AA.unimpl(); } // Never called
+  
   @Override public Node is_copy(GVNGCM gvn, int idx) {
-    assert idx==0 || idx==1;
-    assert gvn.type(rpc()).is_con() && !fun()._fun_as_data;
-    return in(idx);
+    return (in(3) instanceof FunNode && ((FunNode)in(3))._tf.fidx()==_fidx) ? null : in(idx);
   }
   
   public    Node ctrl() { return          in(0); } // internal function control
@@ -44,7 +38,7 @@ public class EpilogNode extends Node {
   public    Node rpc () { return          in(2); } // Almost surely a PhiNode merging RPCs
   public FunNode fun () { return (FunNode)in(3); } // Function header
   @Override String xstr() {                        // Self short name
-    String name = fun().name();
+    String name = FunNode.name(_fidx);
     return name==null ? "Epilog" : "Epi#"+name;
   }
 

@@ -70,13 +70,18 @@ public class GVNGCM {
     Type t = n._uid < _ts._len ? _ts._es[n._uid] : null;
     if( t != null ) return t;
     t = n.all_type();       // If no type yet, defaults to the pessimistic type
-    if( _opt ) {
+    if( _opt ) {            // TODO: Remove this (requires a Node-walk in GCP prior to running GCP)
       t = t.dual();         // If running optimistic GCP, want the dual instead
       // Setting types that will not fall further (t._dual==t) will not trigger
       // a change-based revisit of children.  Mark the children now.
       for( Node use : n._uses ) add_work(use);
     }
     return _ts.setX(n._uid,t);
+  }
+  // Read thru errors
+  public Type type_ne( Node n ) {
+    Type t = type(n);
+    return t instanceof TypeErr ? ((TypeErr)t)._t : t;
   }
   public void setype( Node n, Type t ) {
     assert t != null;
@@ -178,15 +183,17 @@ public class GVNGCM {
     assert check_new(n);
 
     // Try generic graph reshaping, looping till no-progress.
-    int cnt=0;  Node x;         // Progress bit
-    while( (x = n.ideal(this)) != null ) {
-      if( x != n ) {            // Different return, so delete original dead node
-        x._uses.add(x);         // Hook X to prevent accidental deletion
-        kill_new(n); // n was new, replaced so immediately recycle n and dead subgraph
-        n = x._uses.del(x._uses.find(x)); // Remove hook, keep better n
+    if( !has_error_inputs(n) ) { // No 'ideal' calls with error inputs.
+      int cnt=0;  Node x;        // Progress bit
+      while( (x = n.ideal(this)) != null ) {
+        if( x != n ) {            // Different return, so delete original dead node
+          x._uses.add(x);         // Hook X to prevent accidental deletion
+          kill_new(n); // n was new, replaced so immediately recycle n and dead subgraph
+          n = x._uses.del(x._uses.find(x)); // Remove hook, keep better n
+        }
+        if( !check_new(n) ) return n; // If the replacement is old, no need to re-ideal
+        cnt++; assert cnt < 1000;     // Catch infinite ideal-loops
       }
-      if( !check_new(n) ) return n; // If the replacement is old, no need to re-ideal
-      cnt++; assert cnt < 1000;     // Catch infinite ideal-loops
     }
     // Compute a type for n
     Type t = n.value(this);              // Get best type
@@ -194,13 +201,22 @@ public class GVNGCM {
     if( t.may_be_con() && !(n instanceof ConNode) )
       { kill_new(n); return con(t); }
     // Global Value Numbering
-    x = _vals.putIfAbsent(n,n);
+    Node x = _vals.putIfAbsent(n,n);
     if( x != null ) { kill_new(n); return x; }
     // Record type for n; n is "in the system" now
     setype(n,t);                         // Set it in
     // TODO: If x is a TypeNode, capture any more-precise type permanently into Node
     return n;
   }
+
+  // Utility reports true if any input is in error
+  private boolean has_error_inputs( Node n ) {
+    for( Node def : n._defs )
+      if( def != null && type(def) instanceof TypeErr )
+        return true;
+    return false;
+  }
+
   
   // Recursively kill off a new dead node, which might make lots of other nodes
   // go dead.  Since its new, no need to remove from GVN system.  
@@ -229,7 +245,8 @@ public class GVNGCM {
       return;
     }
     if( check_new(nnn) ) {      // If new, replace back in GVN
-      setype(nnn,nnn.value(this));// Can compute a better value
+      assert _ts.at(nnn._uid)==nnn.value(this);
+      //setype(nnn,nnn.value(this));// Can compute a better value
       _vals.put(nnn,nnn);
       add_work0(nnn);
     }
@@ -249,8 +266,8 @@ public class GVNGCM {
     Type oldt = type(n);       // Get old type
     _ts._es[n._uid] = null;    // Remove from types
     assert !check_opt(n);      // Not in system now
-    // Try generic graph reshaping
-    Node y = n.ideal(this);
+    // Try generic graph reshaping (as long as no errors)
+    Node y = has_error_inputs(n) ? null : n.ideal(this);
     if( y != null && y != n ) return y;  // Progress with some new node
     if( y != null && y.is_dead() ) return null;
     // Either no-progress, or progress and need to re-insert n back into system
@@ -330,9 +347,10 @@ public class GVNGCM {
         _wrk_bits.clear(n._uid);
         assert !n.is_dead();
         nodes.setX(n._uid,n);     // Record back-ptr to Node
+        if( n._uid < _INIT0_CNT ) continue; // Ignore primitives (type is unchanged and conservative)
         boolean never_seen = !touched(n);
         Type ot = type(n);        // Old type
-        Type nt = n._uid <_INIT0_CNT ? ot : n.value(this);  // New type (except never reset the initial nodes)
+        Type nt = n.value(this);  // New type
         assert ot.isa(nt);        // Types only fall monotonically
         if( ot != nt )            // Progress
           _ts.setX(n._uid,nt);    // Record progress

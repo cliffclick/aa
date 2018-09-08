@@ -196,6 +196,7 @@ public class FunNode extends RegionNode {
         else parms[parm._idx] = parm;
       } else if( use instanceof EpilogNode ) { assert epi==null || epi==use; epi = (EpilogNode)use; }
     if( epi == null ) return null; // No epilog is a dead function
+    if( rpc == null ) return null; // No RPC is a forward ref
 
     // See if all callers are known
     if( _fun_as_data && !funptr_as_data(epi) ) _fun_as_data = false;
@@ -385,6 +386,19 @@ public class FunNode extends RegionNode {
       if( fun.in(j)!=any )  // Path split out?
         set_def(j,any,gvn); // Kill incoming path on old FunNode
 
+    // Put all new nodes into the GVN tables and worklists
+    for( Map.Entry<Node,Node> e : map.entrySet() ) {
+      Node nn = e.getValue();         // New node
+      Type ot = gvn.type(e.getKey()); // Generally just copy type from original nodes
+      if( nn instanceof ParmNode && ((ParmNode)nn)._idx==-1 )
+        ot = nn.all_type();     // Except the RPC, which has new callers
+      else if( nn instanceof EpilogNode ) {
+        TypeTuple tt = (TypeTuple)ot; // And the epilog, which has a new funnode and RPCs
+        ot = TypeTuple.make_all(tt.at(0),tt.at(1),TypeRPC.ALL_CALL,fun._tf);
+      }
+      gvn.rereg(nn,ot);
+    }
+
     // Repoint all Calls uses to an Unresolved choice of the old and new
     // functions and let the Calls resolve individually.
     if( fun.in(1) != any )      // Split-for-type, possible many future callers
@@ -402,19 +416,6 @@ public class FunNode extends RegionNode {
           break;
         }
       }
-    }
-
-    // Put all new nodes into the GVN tables and worklists
-    for( Map.Entry<Node,Node> e : map.entrySet() ) {
-      Node nn = e.getValue();         // New node
-      Type ot = gvn.type(e.getKey()); // Generally just copy type from original nodes
-      if( nn instanceof ParmNode && ((ParmNode)nn)._idx==-1 )
-        ot = nn.all_type();     // Except the RPC, which has new callers
-      else if( nn instanceof EpilogNode ) {
-        TypeTuple tt = (TypeTuple)ot; // And the epilog, which has a new funnode and RPCs
-        ot = TypeTuple.make_all(tt.at(0),tt.at(1),TypeRPC.ALL_CALL,fun._tf);
-      }
-      gvn.rereg(nn,ot);
     }
 
     // TODO: Hook with proper signature into ScopeNode under an Unresolved.
@@ -436,8 +437,9 @@ public class FunNode extends RegionNode {
   // data uses, then the function is dead.  If there are data uses, they might
   // hit a new CallNode - and this requires GCP to discover the full set of
   // possible callers.
-  @Override public Type value(GVNGCM gvn) {
-    if( _returned_at_top ) return Type.CTRL;
+  @Override public Type value_ne(GVNGCM gvn) {
+    if( _returned_at_top )
+      return Type.CTRL;
     if( !gvn._opt ) {                  // Pessimistic types?
       if( _fun_as_data ||              // Might be called thru the F-P
           in(1) instanceof ScopeNode ) // Might parse a new call site
@@ -445,7 +447,7 @@ public class FunNode extends RegionNode {
     }
     Type t = Type.XCTRL;        // Remaining edges behave like RegionNode.value
     for( int i=2; i<_defs._len; i++ )
-      t = t.meet(gvn.type(_defs._es[i]));
+      t = t.meet(gvn.type(in(i)));
     return t;
   }
   

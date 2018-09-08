@@ -34,11 +34,13 @@ public class CastNode extends Node {
     // e.g. RPCNode, but whatever test gated the RPC in the first place.
     return gvn.type(data).isa(_t) ? data : null;
   }
-  @Override public Type value(GVNGCM gvn) {
-    Type t0 = gvn.type(in(1));
-    Type t1 = in(1) instanceof EpilogNode ? ((TypeTuple)t0)._ts[1] : t0;
-    if( t1 instanceof TypeErr && !t1.above_center() )
-      return t1; // Preserve error returns
-    return _t.join(t1);
+  @Override public Type value_ne(GVNGCM gvn) {
+    Type t0 = gvn.type_ne(in(1));
+    assert !(in(1) instanceof EpilogNode);
+    //Type t1 = in(1) instanceof EpilogNode ? ((TypeTuple)t0)._ts[1] : t0;
+    //if( t1 instanceof TypeErr && !t1.above_center() )
+    //  return t1; // Preserve error returns
+    //return _t.join(t1);
+    return _t.join(t0);
   }
 }
