@@ -165,7 +165,6 @@ public class TestParse {
   }
   
   @Test public void testParse1() {
-    testerr("math_rand(1)?1: :2:int","missing expr after ':'","                "); // missing type
     // Syntax for variable assignment
     test("x=1", TypeInt.TRUE);
     test("x=y=1", TypeInt.TRUE);
@@ -197,7 +196,6 @@ public class TestParse {
   }
 
   @Test public void testParse2() {
-    testerr("f0 = { f x -> f0(x-1) }; f0({+},2)", "Passing 1 arguments to f0{Scalar Scalar -> Scalar} which takes 2 arguments","                     ");
     // Anonymous function definition
     test_isa("{x y -> x+y}", TypeTuple.FUNPTR2); // actually {Flt,Int} x {FltxInt} -> {FltxInt} but currently types {SCALAR,SCALAR->SCALAR}
     test("{5}()", TypeInt.con(5)); // No args nor -> required; this is simply a function returning 5, being executed

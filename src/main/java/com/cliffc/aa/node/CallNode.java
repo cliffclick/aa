@@ -44,8 +44,9 @@ public class CallNode extends Node {
   public static void reset_to_init0() { RPC = PRIM_RPC; }
 
   // Inline the CallNode
-  private Node inline( GVNGCM gvn, Node rez ) {
-    set_def(1,rez ,gvn);        // New result is function epilog result
+  private Node inline( GVNGCM gvn, Node ctrl, Node rez ) {
+    set_def(0,ctrl,gvn);        // New control is function epilog control
+    set_def(1,rez ,gvn);        // New result  is function epilog result 
     _inlined = true;
     return this;
   }
@@ -117,10 +118,11 @@ public class CallNode extends Node {
       return null;
     // From here on down we know the exact function being called
     EpilogNode epi = (EpilogNode)unk;
-    Node rez = epi.val();
+    Node ctrl = epi.ctrl();
+    Node rez  = epi.val();
     // Function is single-caller (me) and collapsing
     if( epi.is_copy(gvn,3) != null )
-      return inline(gvn,rez);
+      return inline(gvn,ctrl,rez);
     // Function is well-formed
     
     // Arg counts must be compatible
@@ -149,9 +151,9 @@ public class CallNode extends Node {
 
     // Check for several trivial cases that can be fully inlined immediately.
     // Check for zero-op body (id function)
-    if( rez instanceof ParmNode && rez.in(0) == fun ) return inline(gvn,arg(((ParmNode)rez)._idx));
+    if( rez instanceof ParmNode && rez.in(0) == fun ) return inline(gvn,ctrl,arg(((ParmNode)rez)._idx));
     // Check for constant body
-    if( rez instanceof ConNode ) return inline(gvn,rez);
+    if( rez instanceof ConNode ) return inline(gvn,ctrl,rez);
 
     // Check for a 1-op body using only constants or parameters
     boolean can_inline=true;
@@ -164,7 +166,7 @@ public class CallNode extends Node {
       Node irez = rez.copy();   // Copy the entire function body
       for( Node parm : rez._defs )
         irez.add_def((parm instanceof ParmNode && parm.in(0) == fun) ? arg(((ParmNode)parm)._idx) : parm);
-      return inline(gvn,gvn.xform(irez)); // New exciting replacement for inlined call
+      return inline(gvn,in(0),gvn.xform(irez)); // New exciting replacement for inlined call
     }
 
     assert fun.in(1)._uid!=0; // Never wire into a primitive, just clone/inline it instead (done just above)

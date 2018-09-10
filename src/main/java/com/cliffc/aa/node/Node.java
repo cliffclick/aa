@@ -53,6 +53,8 @@ public abstract class Node implements Cloneable {
     if( old != null ) {
       old._uses.del(old._uses.find(this));
       if( old._uses._len==0 && !(old instanceof ScopeNode) ) gvn.kill(old); // Recursively begin deleting
+      if( !old.is_dead() && old instanceof RegionNode && this instanceof PhiNode )
+        gvn.add_work(old);
     }
     return this;
   }

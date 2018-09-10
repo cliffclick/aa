@@ -51,7 +51,11 @@ public class GVNGCM {
   // state left alive.  NOT called after a line in the REPL or a user-call to
   // "eval" as user state carries on.
   void reset_to_init0() {
-    assert _work._len==0 && _wrk_bits.isEmpty();
+    while( _work._len > 0 ) {   // Can be a few leftover dead bits...
+      Node n = _work.pop();     // from top-level parse killing result...
+      _wrk_bits.clear(n._uid);  // after getting type to return
+      assert n.is_dead();
+    }
     CNT = _INIT0_CNT;
     _live.clear();  _live.set(0,_INIT0_CNT);
     _ts.set_len(_INIT0_CNT);
@@ -72,7 +76,7 @@ public class GVNGCM {
     t = n.all_type();       // If no type yet, defaults to the pessimistic type
     return _ts.setX(n._uid,t);
   }
-  public void setype( Node n, Type t ) {
+  private void setype( Node n, Type t ) {
     assert t != null;
     _ts.setX(n._uid,t);
   }

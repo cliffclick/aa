@@ -45,11 +45,11 @@ public class EpilogNode extends Node {
   // A forward-ref is an assumed unknown-function being used before being
   // declared.  Hence we want a callable function pointer, but have no defined
   // body (yet).  Make a function pointer that takes/ignores all args, and
-  // returns any/top.
+  // returns a scalar.
   public static Node forward_ref( GVNGCM gvn, Node scope, String name, Parse unkref ) {
     FunNode fun = gvn.init(new FunNode(scope,name));
     String referr = unkref.errMsg("Unknown ref '"+name+"'");
-    return new EpilogNode(fun,gvn.con(TypeErr.XSCALAR),gvn.con(TypeRPC.ALL_CALL),fun, referr);
+    return new EpilogNode(fun,gvn.con(TypeErr.SCALAR),gvn.con(TypeRPC.ALL_CALL),fun, referr);
   }
 
   // True if this is a forward_ref

@@ -160,7 +160,7 @@ public class FunNode extends RegionNode {
     if( n != null ) return n;
 
     // Else generic Region ideal
-    return ideal(gvn,true);
+    return ideal(gvn,_fun_as_data);
   }
 
   // Look for this function pointer as data.  If found it means this function
@@ -181,6 +181,7 @@ public class FunNode extends RegionNode {
     // Bail if there are any dead paths; RegionNode ideal will clean out
     for( int i=1; i<_defs._len; i++ ) if( gvn.type(in(i))==Type.XCTRL ) return null;
     if( _defs._len <= 2 ) return null; // No need to split callers if only 1
+    if( _tf.is_forward_ref() ) return null;
 
     // Gather the ParmNodes and the EpilogNode.  Ignore other (control) uses
     int nargs = _tf.nargs();
@@ -438,7 +439,7 @@ public class FunNode extends RegionNode {
         return Type.CTRL;
     }
     Type t = Type.XCTRL;        // Remaining edges behave like RegionNode.value
-    for( int i=2; i<_defs._len; i++ )
+    for( int i=1; i<_defs._len; i++ )
       t = t.meet(gvn.type(in(i)));
     return t;
   }
