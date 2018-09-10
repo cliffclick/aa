@@ -84,11 +84,6 @@ public class Parse {
     _e._scope.add_def(res);     // Hook, so not deleted
     // Delete names at the top scope before final optimization.
     _e._scope.promote_forward_del_locals(_gvn,null);
-    // Returning a top-level function (not a primitive) appears "as if" the
-    // returned function is being called to keep it from being declared as
-    // having no callers and optimized away.
-    if( res instanceof EpilogNode && res._uid >= GVNGCM._INIT0_CNT )
-      ((EpilogNode)res).fun()._returned_at_top = true;
     _gvn.iter();    // Pessimistic optimizations; might improve error situation
     // Run GCP from the global top, so we also get all the initial constants
     // and all users of those constants.  

@@ -224,6 +224,7 @@ public class TestParse {
   }
 
   @Test public void testParse3() {
+    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
     // Type annotations
     test("-1:int", TypeInt.con( -1));
     test("(1+2.3):flt", TypeFlt.make(0,64,3.3));

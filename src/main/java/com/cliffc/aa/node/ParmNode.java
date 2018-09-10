@@ -25,7 +25,7 @@ public class ParmNode extends PhiNode {
     FunNode fun = (FunNode) in(0);
     assert fun._defs._len==_defs._len;
     if( gvn.type(fun) == Type.XCTRL ) return null; // All dead, c-prop will fold up
-    return fun._defs.len() == 2 && gvn.type(fun)==Type.XCTRL ? in(1) : null; // Fun has collapsed to a Copy, fold up
+    return fun._defs.len() == 2 && fun._all_callers_known ? in(1) : null; // Fun has collapsed to a Copy, fold up
   }
 
   @Override public String err( GVNGCM gvn ) {
@@ -33,8 +33,8 @@ public class ParmNode extends PhiNode {
     assert fun._defs._len==_defs._len;
     // For the function being returned-at-top, and thus NOT called on this path
     // - ignore the argument check.  Function is not being called.
-    if( _defs._len==2 && fun._returned_at_top ) return null; // Never called, so no argument fails
-    if( _idx < 0 ) return null;                              // No arg check on RPC
+    if( _defs._len==2 && !fun._all_callers_known ) return null; // Never called, so no argument fails
+    if( _idx < 0 ) return null;                                 // No arg check on RPC
     Type formal = fun._tf.arg(_idx);
     for( int i=1; i<_defs._len; i++ ) {
       Type argt = gvn.type(in(i));    // Arg type for this incoming path

@@ -37,48 +37,20 @@ import java.util.Map;
 // all call-sites, Calls can "peek through" to see the function body learning
 // the incoming args come from a known input path.
 // 
-// Results come from CastNodes, which up-cast the merged function results back
-// to the call-site specific type - this is where the precision loss are
-// ParmNodes is regained.  CastNodes point to the original call-site control
-// path and the function result.
-
-// Example: FunNode "map" is called with type args A[] and A->B and returns
-// type B[]; at one site its "int[]" and "int->str" and at another site its
-// "flt[]" and "flt->int" args.  The Epilog merges results to be "SCALAR[]".
-// The Cast#1 upcasts its value to "str[]", and Cast#2 upcasts its value to
-// "int[]".
-// 
-//  0 Scope...               -- Call site#1 control
-//  1 Con_TV#C (really A[] ) -- Call site#1 arg#1
-//  2 Con_TV#D (really A->B) -- Call site#1 arg#2
-//  3 Ctrl callsite 2        -- Call site#2 control
-//  4 arg#int[]              -- Call site#2 arg#1  
-//  5 arg#int->str           -- Call site#2 arg#2  
-//  6 Ctrl callsite 3        -- Call site#3 control
-//  7 arg#flt[]              -- Call site#3 arg#1  
-//  8 arg#flt->int           -- Call site#3 arg#2  
-//  9 Fun _ 0 3 6
-// 10 ParmX 9 1 4 7  -- meet of A[] , int[]   , flt[]
-// 11 ParmX 9 2 5 8  -- meet of A->B, int->str, flt->int
-// -- function body, uses 9 10 11
-// 12 function body control
-// 13 function body return value
-// -- function ends
-// 14 Epilog 12 13 9 {A[] {A -> B} -> B[]}
-// 15 Proj#1 14            -- Return path  for unknown caller in slot 1
-// 16 Cast#1 0 13#SCALAR[] -- Return value for unknown caller in slot 1
-// 16 Proj#2 14            -- Return path  for caller {int[] {int -> str} -> str[]}
-// 17 Cast#2 3 13#flt[]    -- Return value for caller {int[] {int -> str} -> str[]}
-// 18 Proj#3 14            -- Return path  for caller {flt[] {flt -> int} -> int[]}
-// 19 Cast#3 6 13#int[]    -- Return value for caller {flt[] {flt -> int} -> int[]}
-//
-// The Parser will use the Env to point to the RetNode to create more callers
-// as parsing continues.  The RetNode is what is passed about for a "function
-// pointer".
 public class FunNode extends RegionNode {
   private static int CNT=1; // Function index; -1 for 'all' and 0 for 'any'
   public final TypeFun _tf; // Worse-case correct type
   private final byte _op_prec;// Operator precedence; only set top-level primitive wrappers
+
+  // FunNodes can "discover" callers if the function constant exists in the
+  // program anywhere (since, during execution (or optimizations) it may arrive
+  // at a CallNode and initiate a new call to the function).  Until all callers
+  // are accounted for, the FunNode keeps slot1 reserved with the most
+  // conservative allowed arguments, under the assumption a as-yet-detected
+  // caller will call with such arguments.  This is a quick check to detect
+  // may-have-more-callers.
+  public boolean _all_callers_known = false;
+  
   // Used to make the primitives at boot time
   public FunNode(Node scope, PrimNode prim) { this(scope,TypeFun.make(prim._targs,prim._ret,CNT,prim._targs._ts.length),prim.op_prec(),prim._name); }
   // Used to make copies when inlining/cloning function bodies
@@ -142,39 +114,21 @@ public class FunNode extends RegionNode {
     throw AA.unimpl();          // Gotta make a new FIDX
   }
 
-  // FunNodes can "discover" callers if the function constant exists in the
-  // program anywhere (since, during execution (or optimizations) it may arrive
-  // at a CallNode and initiate a new call to the function).  Until all callers
-  // are accounted for, the FunNode keeps slot1 reserved with the most
-  // conservative allowed arguments, under the assumption a as-yet-detected
-  // caller will call with such arguments.  This is a quick check to detect
-  // may-have-more-callers.
-  public boolean _fun_as_data = true;
-  // If the function is being returned from the top-level Parse, then it is
-  // alive with no callers.
-  public boolean _returned_at_top = false;
-
   // ----
   @Override public Node ideal(GVNGCM gvn) {
     Node n = split_callers(gvn);
     if( n != null ) return n;
 
     // Else generic Region ideal
-    return ideal(gvn,_fun_as_data);
+    return ideal(gvn,!_all_callers_known);
   }
 
-  // Look for this function pointer as data.  If found it means this function
-  // might be called from an unknown call site.
-  private boolean funptr_as_data(EpilogNode epi) {
-    if( in(0) instanceof ScopeNode ) { assert _fun_as_data; return true; }
-    for( Node use : epi._uses ) {
-      if( !(use instanceof CallNode) ) return true; // Unknown F-P usage
-      CallNode call = (CallNode)use;
-      // If any use is as an argument, all is lost.
-      for( int i=0; i<call.nargs(); i++ ) if( call.arg(i)==this ) return true;
-      assert call.in(1) == epi;
-    }
-    return false;
+  // Declare as all-callers-known.  Done by GCP after flowing function-pointers
+  // to all call sites, and by inlining when making private copies.
+  private void all_callers_known( GVNGCM gvn ) {
+    assert !_all_callers_known;
+    _all_callers_known = true;
+    set_def(0,gvn.con(Type.XCTRL),gvn);
   }
   
   private Node split_callers( GVNGCM gvn ) {
@@ -198,10 +152,6 @@ public class FunNode extends RegionNode {
       } else if( use instanceof EpilogNode ) { assert epi==null || epi==use; epi = (EpilogNode)use; }
     if( epi == null ) return null; // No epilog is a dead function
     if( rpc == null ) return null; // No RPC is a forward ref
-
-    // See if all callers are known
-    if( _fun_as_data && !funptr_as_data(epi) ) _fun_as_data = false;
-    else assert !funptr_as_data(epi);
 
     // Make a clone of the original function to split the callers.  Done for
     // e.g. primitive type-specialization or for tiny functions.
@@ -266,9 +216,9 @@ public class FunNode extends RegionNode {
     // in slot 1, only slot 2.
     Node top = gvn.con(Type.XCTRL);
     FunNode fun = new FunNode(top,_tf._ts,_tf._ret,name(),_tf._nargs);
-    fun._fun_as_data=false;     // Never as a function pointer
     fun.add_def(in(2));
     for( int i=3; i<_defs._len; i++ ) fun.add_def(top);
+    fun.all_callers_known(gvn);     // Only 1 caller
     return fun;
   }
 
@@ -314,7 +264,7 @@ public class FunNode extends RegionNode {
       fun.add_def(split ? in(j) : gvn.con(Type.XCTRL));
     }
     // TODO: Install in ScopeNode for future finding
-    fun._fun_as_data=_fun_as_data;
+    fun._all_callers_known = false;
     return fun;
   }
 
@@ -345,7 +295,8 @@ public class FunNode extends RegionNode {
       map.put(n,n.copy()); // Make a blank copy with no edges and map from old to new
     }
 
-    Node any = gvn.con(Type.XCTRL);
+    Node  any = gvn.con(Type.XCTRL);
+    Node dany = gvn.con(Type.XSCALAR);
     Node newepi = map.get(epi);
     Node new_unr = epi;
     // Are we making a type-specialized copy, that can/should be found by same-typed users?
@@ -371,7 +322,7 @@ public class FunNode extends RegionNode {
         int idx = ((ParmNode)n)._idx;
         c.add_def(gvn.con(idx==-1 ? TypeRPC.ALL_CALL : fun._tf.arg(idx))); // Generic arg#1
         for( int j=2; j<_defs._len; j++ ) // Get the new parm path or null according to split
-          c.add_def( fun.in(j)==any ? any : n.in(j) );
+          c.add_def( fun.in(j)==any ? dany : n.in(j) );
       } else if( n != this ) {  // Interior nodes
         for( Node def : n._defs ) {
           Node newdef = map.get(def);
@@ -431,17 +382,9 @@ public class FunNode extends RegionNode {
   // hit a new CallNode - and this requires GCP to discover the full set of
   // possible callers.
   @Override public Type value(GVNGCM gvn) {
-    if( _returned_at_top ) return Type.CTRL; // Not really executed, but the function constant is being returned
-    if( _tf.is_forward_ref() ) return Type.CTRL; // Will be an error eventually, but act like its executed so the trailing EpilogNode gets visited during GCP
-    if( !gvn._opt ) {                  // Pessimistic types?
-      if( _fun_as_data ||              // Might be called thru the F-P
-          in(1) instanceof ScopeNode ) // Might parse a new call site
-        return Type.CTRL;
-    }
-    Type t = Type.XCTRL;        // Remaining edges behave like RegionNode.value
-    for( int i=1; i<_defs._len; i++ )
-      t = t.meet(gvn.type(in(i)));
-    return t;
+    // Will be an error eventually, but act like its executed so the trailing EpilogNode gets visited during GCP
+    if( _tf.is_forward_ref() ) return Type.CTRL; 
+    return super.value(gvn);
   }
   
   @Override public int hashCode() { return super.hashCode()+_tf.hashCode(); }
