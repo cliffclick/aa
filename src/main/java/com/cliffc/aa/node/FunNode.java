@@ -125,10 +125,9 @@ public class FunNode extends RegionNode {
 
   // Declare as all-callers-known.  Done by GCP after flowing function-pointers
   // to all call sites, and by inlining when making private copies.
-  private void all_callers_known( GVNGCM gvn ) {
+  public void all_callers_known( ) {
     assert !_all_callers_known;
     _all_callers_known = true;
-    set_def(0,gvn.con(Type.XCTRL),gvn);
   }
   
   private Node split_callers( GVNGCM gvn ) {
@@ -218,7 +217,7 @@ public class FunNode extends RegionNode {
     FunNode fun = new FunNode(top,_tf._ts,_tf._ret,name(),_tf._nargs);
     fun.add_def(in(2));
     for( int i=3; i<_defs._len; i++ ) fun.add_def(top);
-    fun.all_callers_known(gvn);     // Only 1 caller
+    fun.all_callers_known();    // Only 1 caller
     return fun;
   }
 

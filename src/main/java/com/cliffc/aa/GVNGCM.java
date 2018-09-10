@@ -365,7 +365,8 @@ public class GVNGCM {
     // Revisit the entire reachable program, as ideal calls may do something
     // with the maximally lifted types.
     Node rez = end.in(end._defs._len-2);
-    walk_opt(rez,start);
+    FunNode frez = rez instanceof EpilogNode ? ((EpilogNode)rez).fun() : null;
+    walk_opt(rez,start,frez);
   }
 
   // Forward reachable walk, setting all_type.dual (except Start) and priming
@@ -383,40 +384,25 @@ public class GVNGCM {
   }
   
   // GCP optimizations on the live subgraph
-  private void walk_opt( Node n, Node start ) {
+  private void walk_opt( Node n, Node start, FunNode frez ) {
     assert !n.is_dead();
     if( _wrk_bits.get(n._uid) ) return; // Been there, done that
     if( n==start ) return;              // Top-level scope
     add_work(n);                        // Only walk once
-    //// Remove any ambiguity
-    //if( n instanceof CallNode && n.in(1) instanceof UnresolvedNode ) {
-    //  Node fun = ((UnresolvedNode)n.in(1)).resolve(this,(CallNode)n);
-    //  if( fun != null )
-    //    set_def_reg(n, 1, fun);
-    //}
-    //// Look for constants
-    //Type t = _ts._es[n._uid];
-    //if( !(n instanceof ErrNode) && t.may_be_con() && !(n instanceof ConNode) ) {
-    //  subsume(n, con(t));
-    //  return;
-    //}
-    //
-    //// Upgrade any casts with sharper type info
-    //// TODO: Fold into CastNode.ideal
-    //if( n instanceof CastNode ) {
-    //  assert t.isa(((CastNode)n)._t);
-    //  if( t != (((CastNode)n)._t)) {
-    //    unreg(n);
-    //    Node cast = xform_old0(rereg(new CastNode(n.in(0), n.in(1), t),t));
-    //    subsume(n, cast);
-    //  }
-    //}
+    // Functions have no more unknown callers
+    if( n instanceof FunNode && n._uid >= _INIT0_CNT ) {
+      FunNode fun = (FunNode)n;
+      if( !fun._tf.is_forward_ref() && !fun._all_callers_known && fun != frez) {
+        fun.all_callers_known();
+        set_def_reg(fun,1,con(Type.XCTRL));
+      }
+    }
     
     // Walk reachable graph
     for( Node def : n._defs )
       if( def != null &&
           !(n instanceof RegionNode && type(def)== Type.XCTRL) )
-        walk_opt(def,start);
+        walk_opt(def,start,frez);
   }
 
 }
