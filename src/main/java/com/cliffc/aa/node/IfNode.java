@@ -7,13 +7,13 @@ import com.cliffc.aa.type.*;
 public class IfNode extends Node {
   public IfNode( Node ctrl, Node pred ) { super(OP_IF,ctrl,pred); }
   @Override public Node ideal(GVNGCM gvn) { return null; }
-  @Override public TypeTuple value_ne(GVNGCM gvn) {
+  @Override public TypeTuple value(GVNGCM gvn) {
     // If the input is exactly zero, we can return false: {ANY,CONTROL}
     // If the input excludes   zero, we can return true : {CONTROL,ANY}
     // If the input excludes   both, we can return ANY:   {ANY,ANY}
     // If the input includes   both, we can return both:  {CONTROL,CONTROL}
-    if( gvn.type_ne(in(0))==Type.XCTRL ) return TypeTuple.IF_ANY; // Test is dead
-    Type pred = gvn.type_ne(in(1));
+    if( gvn.type(in(0))==Type.XCTRL ) return TypeTuple.IF_ANY; // Test is dead
+    Type pred = gvn.type(in(1));
     if( pred.isa(TypeInt.XINT1) ) return TypeTuple.IF_ANY;  // Choice of {0,1}
     if( TypeInt.BOOL.isa(pred)  ) return TypeTuple.IF_ALL;  // Can be either
     if( pred.isa(TypeInt.FALSE) ) return TypeTuple.IF_FALSE;// False only

@@ -11,10 +11,10 @@ public class UnresolvedNode extends Node {
     if( _defs._len < 2 ) throw AA.unimpl(); // Should collapse
     return null;
   }
-  @Override public Type value_ne(GVNGCM gvn) {
+  @Override public Type value(GVNGCM gvn) {
     Type t = TypeErr.ANY;
     for( Node def : _defs )
-      t = t.meet(gvn.type_ne(def)); // Meet of incoming functions
+      t = t.meet(gvn.type(def)); // Meet of incoming functions
     return t;
   }
   // Filter out all the wrong-arg-count functions

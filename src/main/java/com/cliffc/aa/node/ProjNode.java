@@ -21,8 +21,8 @@ public class ProjNode extends Node {
     }
     return m.is_copy(gvn,_idx);
   }
-  @Override public Type value_ne(GVNGCM gvn) {
-    Type c = gvn.type_ne(in(0));
+  @Override public Type value(GVNGCM gvn) {
+    Type c = gvn.type(in(0));
     return ((TypeTuple)c).at(_idx); // Otherwise our type is just the matching tuple slice
   }
 

@@ -70,18 +70,7 @@ public class GVNGCM {
     Type t = n._uid < _ts._len ? _ts._es[n._uid] : null;
     if( t != null ) return t;
     t = n.all_type();       // If no type yet, defaults to the pessimistic type
-    if( _opt ) {            // TODO: Remove this (requires a Node-walk in GCP prior to running GCP)
-      t = t.dual();         // If running optimistic GCP, want the dual instead
-      // Setting types that will not fall further (t._dual==t) will not trigger
-      // a change-based revisit of children.  Mark the children now.
-      for( Node use : n._uses ) add_work(use);
-    }
     return _ts.setX(n._uid,t);
-  }
-  // Read thru errors
-  public Type type_ne( Node n ) {
-    Type t = type(n);
-    return t instanceof TypeErr ? ((TypeErr)t)._t : t;
   }
   public void setype( Node n, Type t ) {
     assert t != null;
@@ -183,17 +172,15 @@ public class GVNGCM {
     assert check_new(n);
 
     // Try generic graph reshaping, looping till no-progress.
-    if( !has_error_inputs(n) ) { // No 'ideal' calls with error inputs.
-      int cnt=0;  Node x;        // Progress bit
-      while( (x = n.ideal(this)) != null ) {
-        if( x != n ) {            // Different return, so delete original dead node
-          x._uses.add(x);         // Hook X to prevent accidental deletion
-          kill_new(n); // n was new, replaced so immediately recycle n and dead subgraph
-          n = x._uses.del(x._uses.find(x)); // Remove hook, keep better n
-        }
-        if( !check_new(n) ) return n; // If the replacement is old, no need to re-ideal
-        cnt++; assert cnt < 1000;     // Catch infinite ideal-loops
+    int cnt=0;  Node x;        // Progress bit
+    while( (x = n.ideal(this)) != null ) {
+      if( x != n ) {            // Different return, so delete original dead node
+        x._uses.add(x);         // Hook X to prevent accidental deletion
+        kill_new(n); // n was new, replaced so immediately recycle n and dead subgraph
+        n = x._uses.del(x._uses.find(x)); // Remove hook, keep better n
       }
+      if( !check_new(n) ) return n; // If the replacement is old, no need to re-ideal
+      cnt++; assert cnt < 1000;     // Catch infinite ideal-loops
     }
     // Compute a type for n
     Type t = n.value(this);              // Get best type
@@ -201,7 +188,7 @@ public class GVNGCM {
     if( t.may_be_con() && !(n instanceof ConNode) )
       { kill_new(n); return con(t); }
     // Global Value Numbering
-    Node x = _vals.putIfAbsent(n,n);
+    x = _vals.putIfAbsent(n,n);
     if( x != null ) { kill_new(n); return x; }
     // Record type for n; n is "in the system" now
     setype(n,t);                         // Set it in
@@ -209,15 +196,6 @@ public class GVNGCM {
     return n;
   }
 
-  // Utility reports true if any input is in error
-  private boolean has_error_inputs( Node n ) {
-    for( Node def : n._defs )
-      if( def != null && type(def) instanceof TypeErr )
-        return true;
-    return false;
-  }
-
-  
   // Recursively kill off a new dead node, which might make lots of other nodes
   // go dead.  Since its new, no need to remove from GVN system.  
   public void kill_new( Node n ) { assert check_new(n);  kill0(n); }
@@ -266,15 +244,15 @@ public class GVNGCM {
     Type oldt = type(n);       // Get old type
     _ts._es[n._uid] = null;    // Remove from types
     assert !check_opt(n);      // Not in system now
-    // Try generic graph reshaping (as long as no errors)
-    Node y = has_error_inputs(n) ? null : n.ideal(this);
+    // Try generic graph reshaping
+    Node y = n.ideal(this);
     if( y != null && y != n ) return y;  // Progress with some new node
     if( y != null && y.is_dead() ) return null;
     // Either no-progress, or progress and need to re-insert n back into system
     Type t = n.value(this);     // Get best type
     assert t.isa(oldt);         // Types only improve
     // Replace with a constant, if possible
-    if( t.may_be_con() && !(n instanceof ConNode) )
+    if( t.may_be_con() && !(n instanceof ConNode) && !(n instanceof ErrNode) )
       return con(t);            // Constant replacement
     // Global Value Numbering
     Node z = _vals.putIfAbsent(n,n);
@@ -329,14 +307,15 @@ public class GVNGCM {
   void gcp(ScopeNode start, ScopeNode end) {
     assert _work._len==0;
     assert _wrk_bits.isEmpty();
-    Ary<Node> nodes = new Ary<>(new Node[1],0);
-    // Set all types to null, indicating no value/never visited.
+    Ary<Node> calls = new Ary<>(new Node[1],0);
+    // Set all types to all_type().dual()
     Arrays.fill(_ts._es,_INIT0_CNT,_ts._len,null);
+    walk_initype( end );
+    for( Node use : start._uses ) walk_initype( use ); // Grab all constants
+    // Prime worklist
+    add_work(end);
+    
     _opt = true;                // Lazily fill with best value
-    // Prime the worklist
-    nodes.setX(start._uid,start);
-    _ts.setX(start._uid,start.all_type());
-    for( Node use : start._uses ) add_work(use); // Users use progress
     // Repeat, if we remove some ambiguous choices, and keep falling until the
     // graph stabilizes without ambiguity.
     while( _work._len > 0 ) {
@@ -346,17 +325,16 @@ public class GVNGCM {
         Node n = _work.pop();
         _wrk_bits.clear(n._uid);
         assert !n.is_dead();
-        nodes.setX(n._uid,n);     // Record back-ptr to Node
         if( n._uid < _INIT0_CNT ) continue; // Ignore primitives (type is unchanged and conservative)
-        boolean never_seen = !touched(n);
-        Type ot = type(n);        // Old type
-        Type nt = n.value(this);  // New type
-        assert ot.isa(nt);        // Types only fall monotonically
-        if( ot != nt )            // Progress
-          _ts.setX(n._uid,nt);    // Record progress
+        if( n instanceof CallNode && n.in(1) instanceof UnresolvedNode && calls.find(n)== -1 )
+          calls.add(n);          // Track ambiguous calls
+        Type ot = type(n);       // Old type
+        Type nt = n.value(this); // New type
+        assert ot.isa(nt);       // Types only fall monotonically
+        if( ot != nt )           // Progress
+          _ts.setX(n._uid,nt);   // Record progress
         for( Node use : n._uses ) {
-          if( !touched(use) ||  // Never typed
-              never_seen ||     // Or was all_typed without this input
+          if( type(use) == Type.ANY || // Not yet typed
               (ot != nt && use.all_type() != type(use))) // If not already at bottom
             if( use != n ) add_work(use); // Re-run users to check for progress
           // When new control paths appear on Regions, the Region stays the
@@ -365,79 +343,70 @@ public class GVNGCM {
             for( Node phi : use._uses ) if( phi != n ) add_work(phi);
         }
       }
-      _opt = false;               // Back to pessimistic behavior on new nodes
 
-      // Optimization phase 1: Remove ambiguity
-      for( int i=_INIT0_CNT; i<_ts._len; i++ ) {
-        Node n = nodes.atX(i);
-        if( n instanceof CallNode && n.in(1) instanceof UnresolvedNode ) {
-          Node fun = ((UnresolvedNode)n.in(1)).resolve(this,(CallNode)n);
-          if( fun != null ) {
-            set_def_reg(n, 1, fun);
-            add_work(n); // Go again- values will continue to fall in the lattice
-          }
+      // Remove ambiguity after worklist runs dry
+      for( int i=0; i<calls.len(); i++ ) {
+        Node call = calls.at(i);
+        Node fun = ((UnresolvedNode)call.in(1)).resolve(this,(CallNode)call);
+        if( fun != null ) {
+          set_def_reg(call, 1, fun);
+          add_work(call); // Go again- values will continue to fall in the lattice
+          calls.del(i--); // Remove from worklist
         }
       }
     }
+
+    _opt = false;               // Back to pessimistic behavior on new nodes
 
     // Revisit the entire reachable program, as ideal calls may do something
     // with the maximally lifted types.
     Node rez = end.in(end._defs._len-2);
     walk_opt(rez,start);
-      
-    //// Optimization phase 2.
-    //// Record in any improved types; replace with constants if possible.
-    //for( int i=_INIT0_CNT; i<_ts._len; i++ ) {
-    //  Type t = _ts._es[i];
-    //  if( t==null ) continue;   // Never reached?
-    //  Node n = nodes.atX(i);
-    //  if( n != null && t.may_be_con() && !(n instanceof ConNode) )
-    //    subsume(n,con(t));
-    //  if( !(t instanceof TypeErr) && n instanceof CastNode ) { // TODO: Fold into CastNode.ideal
-    //    assert t.isa(((CastNode)n)._t);
-    //    if( t != (((CastNode)n)._t)) {
-    //      unreg(n);
-    //      Node cast = xform_old0(rereg(new CastNode(n.in(0), n.in(1), t),t));
-    //      subsume(n, nodes.setX(cast._uid, cast));
-    //    }
-    //  }
-    //}
-    //
-    //// Re-check all ideal calls now that types have been maximally lifted
-    //for( int i=_INIT0_CNT; i<_ts._len; i++ )
-    //  if( nodes.atX(i) != null )
-    //    add_work(nodes.at(i));
   }
 
+  // Forward reachable walk, setting all_type.dual (except Start) and priming
+  // the worklist for nodes that are not above centerline.
+  private void walk_initype( Node n ) {
+    if( _ts.atX(n._uid) != null ) return; // Been there, done that
+    Type t = n.all_type();
+    if( !t.above_center() && !(n instanceof ErrNode) && !(n instanceof ConNode) )
+      t = t.dual();             // Start above-center and fall
+    if( !t.above_center() )     // Constants and errors act as-if they started high and fell to the constant value ...
+      for( Node use : n._uses ) add_work(use); // ...by adding users
+    setype(n,t);
+    // Walk forward reachable graph
+    for( Node use : n._uses ) walk_initype(use);
+  }
+  
   // GCP optimizations on the live subgraph
   private void walk_opt( Node n, Node start ) {
     assert !n.is_dead();
     if( _wrk_bits.get(n._uid) ) return; // Been there, done that
     if( n==start ) return;              // Top-level scope
     add_work(n);                        // Only walk once
-    // Remove any ambiguity
-    if( n instanceof CallNode && n.in(1) instanceof UnresolvedNode ) {
-      Node fun = ((UnresolvedNode)n.in(1)).resolve(this,(CallNode)n);
-      if( fun != null )
-        set_def_reg(n, 1, fun);
-    }
-    // Look for constants
-    Type t = _ts._es[n._uid];
-    if( t.may_be_con() && !(n instanceof ConNode) ) {
-      subsume(n, con(t));
-      return;
-    }
-
-    // Upgrade any casts with sharper type info
-    // TODO: Fold into CastNode.ideal
-    if( !(t instanceof TypeErr) && n instanceof CastNode ) { 
-      assert t.isa(((CastNode)n)._t);
-      if( t != (((CastNode)n)._t)) {
-        unreg(n);
-        Node cast = xform_old0(rereg(new CastNode(n.in(0), n.in(1), t),t));
-        subsume(n, cast);
-      }
-    }
+    //// Remove any ambiguity
+    //if( n instanceof CallNode && n.in(1) instanceof UnresolvedNode ) {
+    //  Node fun = ((UnresolvedNode)n.in(1)).resolve(this,(CallNode)n);
+    //  if( fun != null )
+    //    set_def_reg(n, 1, fun);
+    //}
+    //// Look for constants
+    //Type t = _ts._es[n._uid];
+    //if( !(n instanceof ErrNode) && t.may_be_con() && !(n instanceof ConNode) ) {
+    //  subsume(n, con(t));
+    //  return;
+    //}
+    //
+    //// Upgrade any casts with sharper type info
+    //// TODO: Fold into CastNode.ideal
+    //if( n instanceof CastNode ) {
+    //  assert t.isa(((CastNode)n)._t);
+    //  if( t != (((CastNode)n)._t)) {
+    //    unreg(n);
+    //    Node cast = xform_old0(rereg(new CastNode(n.in(0), n.in(1), t),t));
+    //    subsume(n, cast);
+    //  }
+    //}
     
     // Walk reachable graph
     for( Node def : n._defs )

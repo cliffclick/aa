@@ -216,8 +216,8 @@ public class CallNode extends Node {
 
   // Make real call edges from virtual call edges
   private void wire(GVNGCM gvn, Type funptr) {
-    assert funptr.isa(TypeTuple.GENERIC_FUN);
     if( !(funptr instanceof TypeTuple) ) return; // Not fallen to a funptr yet
+    assert funptr.isa(TypeTuple.GENERIC_FUN);
     TypeTuple tfunptr = (TypeTuple)funptr;
     TypeFun tf = tfunptr.get_fun(); // Get type-propagated function list
     Bits fidxs = tf._fidxs;     // Get all the propagated reaching functions
@@ -228,84 +228,69 @@ public class CallNode extends Node {
     }
   }
   
-  @Override public Type value_ne(GVNGCM gvn) {
-    Type t0 = gvn.type_ne(in(0));
-    Node fp = in(1);
-    Type t = gvn.type_ne(fp);
+  @Override public Type value(GVNGCM gvn) {
+    Type tc = gvn.type(in(0));  // Control type
+    Node fp = in(1);            // If inlined, its the result, if not inlined, its the function being called
+    Type t = gvn.type(fp);      // If inlined, its the result, if not inlined, its the function being called
     if( _inlined )              // Inlined functions just pass thru & disappear
-      return TypeTuple.make_all(t0,t);
+      return TypeTuple.make_all(tc,t);
     
     if( gvn._opt ) // Manifesting optimistic virtual edges between caller and callee
       wire(gvn,t); // Make real edges from virtual edges
 
-    // If any incoming args are error, simply return the function return (or
-    // meet of functions returns).  Otherwise check args, and report first
-    // broken arg.
-
-    // implies: if any input is error1, output is error1; once the input lifts
-    // to non-error, output switches to error2.  If inputs keep lifting, output
-    // might switch to non-error (e.g. funptr resolves to a single function).
-
-    // want to stack error2 above error1 (so isa test works, and the value()
-    // call is monotonic).
-
-    // could nest errors?  outer error is error1: errors from inputs.  Inner
-    // error is error only looking at the non-error from inputs.  meet is ugly:
-    // expect oldt to be error1 with 'any', and newt to be error2 with argument
-    // errors.  Meet matches on _msgs, which fails, so it looks at oldt._t vs
-    // newt?  Probably better to have a incoming/outgoing flag.
-
-    
-    Type trez;
+    Type trez = Type.ANY;
     if( fp instanceof UnresolvedNode ) {
       // For unresolved, we can take the BEST choice; i.e. the JOIN of every
       // choice.  Typically one choice works and the others report type
       // errors on arguments.
-      trez = Type.ANY;
-      for( Node epi : fp._defs ) {
-        Type t_unr = value1(gvn,gvn.type_ne(epi));
-        if( !t_unr instanceof TypeErr )
-          trez = t.meet(t_unr);
-        //trez = t.join(t_unr); // JOIN of choices
-      }
-      // If any choice is non-error, take it.
-      // If all choices are error, return the errors.
-    } else {                  // Single resolved target
-      trez = value1(gvn,t);   // Check args
+      for( Node epi : fp._defs )
+        trez = trez.meet(value1(gvn.type(epi))); // JOIN of choices
+    } else {                                  // Single resolved target
+      trez = value1(t);
     }
 
     // Return {control,value} tuple.
-    if( trez instanceof TypeErr )
-      return TypeErr.make(TypeTuple.make_all(t0,((TypeErr)t)._t), ((TypeErr)trez)._msgs);
-    return                TypeTuple.make_all(t0,trez);
+    return TypeTuple.make_all(tc,trez);
   }
 
-  // Cannot return the functions return type, unless all args are compatible
-  // with the function(s).  Arg-check.
-  private Type value1( GVNGCM gvn, Type t ) {
+  private Type value1( Type t ) {
     assert t.is_fun_ptr();
     TypeTuple tepi = (TypeTuple)t;
-    Type    tctrl=         tepi.at(0);
-    Type    tval =         tepi.at(1);
-    TypeFun tfun =(TypeFun)tepi.at(3);
-    if( tctrl == Type.XCTRL ) return Type.ANY; // Function will never return
-    assert tctrl==Type.CTRL;      // Function will never return?
-    if( t.is_forward_ref() ) return tfun.ret(); // Forward refs do no argument checking
-    if( tfun.nargs() != nargs() )
-      return nargerr(tfun);
-    // Now do an arg-check
-    TypeTuple formals = tfun._ts; // Type of each argument
-    Type terr = tval;
-    for( int j=0; j<nargs(); j++ ) {
-      Type actual = gvn.type_ne(arg(j));
-      Type formal = formals.at(j);
-      if( !actual.isa(formal) ) // Actual is not a formal; accumulate type errors
-        terr = terr.meet(TypeErr.make(tval,_badargs.typerr(actual, formal)));
-    }
-    return terr; // Return Epilog data return value, plus any formal/actual errors
+    return tepi.at(0) == Type.XCTRL ? Type.XSCALAR : tepi.at(1);
   }
-  private Type nargerr( TypeFun tfun ) {
-    return TypeErr.make(_badargs.errMsg("Passing "+nargs()+" arguments to "+tfun+" which takes "+tfun.nargs()+" arguments"));
+  
+  @Override public String err(GVNGCM gvn) {
+    assert !_inlined;           // Should have already cleaned out
+    
+    // Error#1: fail for passed-in unknown references
+    for( int j=0; j<nargs(); j++ ) 
+      if( arg(j).is_forward_ref() )
+        return _badargs.forward_ref_err(gvn.type(arg(j)));
+    
+    Node fp = in(1);      // Either function pointer, or unresolve list of them
+    Node xfp = fp instanceof UnresolvedNode ? fp.in(0) : fp;
+    TypeFun txfun = ((TypeTuple)gvn.type(xfp)).get_fun();
+    if( txfun.is_forward_ref() ) // Forward ref on incoming function
+      return _badargs.forward_ref_err(txfun);
+
+    // Error#2: bad-arg-count
+    if( txfun.nargs() != nargs() )
+      return _badargs.errMsg("Passing "+nargs()+" arguments to "+txfun+" which takes "+txfun.nargs()+" arguments");
+
+    // Error#3: ambiguous
+    if( fp instanceof UnresolvedNode )
+      //return _badargs.errMsg("Ambiguous call");
+      return null;              // If unresolved, must also be uncalled so allow arg badness
+
+    // Error#4: Now do an arg-check
+    TypeTuple formals = txfun._ts; // Type of each argument
+    for( int j=0; j<nargs(); j++ ) {
+      Type actual = gvn.type(arg(j));
+      Type formal = formals.at(j);
+      if( !actual.isa(formal) ) // Actual is not a formal
+        return _badargs.typerr(actual,formal);
+    }
+    return null;
   }
   
   // Called from the data proj.  Return a TypeNode with proper casting on return result.
@@ -317,7 +302,7 @@ public class CallNode extends Node {
     return new TypeNode(t,null,_cast_P);
   }
 
-  @Override public Type all_type() { return TypeTuple.make_all(Type.CTRL,Type.ALL); }
+  @Override public Type all_type() { return TypeTuple.make_all(Type.CTRL,Type.SCALAR); }
   @Override public int hashCode() { return super.hashCode()+_rpc; }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;

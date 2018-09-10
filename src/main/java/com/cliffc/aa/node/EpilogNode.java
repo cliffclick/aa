@@ -27,7 +27,7 @@ public class EpilogNode extends Node {
     assert t.is_fun_ptr();
     return t;
   }
-  @Override public Type value_ne(GVNGCM gvn) { throw com.cliffc.aa.AA.unimpl(); } // Never called
+  @Override public String err(GVNGCM gvn) { return is_forward_ref() ? _unkref_err : null; }
   
   @Override public Node is_copy(GVNGCM gvn, int idx) {
     return (in(3) instanceof FunNode && ((FunNode)in(3))._tf.fidx()==_fidx) ? null : in(idx);
@@ -49,7 +49,7 @@ public class EpilogNode extends Node {
   public static Node forward_ref( GVNGCM gvn, Node scope, String name, Parse unkref ) {
     FunNode fun = gvn.init(new FunNode(scope,name));
     String referr = unkref.errMsg("Unknown ref '"+name+"'");
-    return new EpilogNode(fun,gvn.con(TypeErr.ANY),gvn.con(TypeRPC.ALL_CALL),fun, referr);
+    return new EpilogNode(fun,gvn.con(TypeErr.XSCALAR),gvn.con(TypeRPC.ALL_CALL),fun, referr);
   }
 
   // True if this is a forward_ref

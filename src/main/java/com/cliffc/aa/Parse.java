@@ -79,7 +79,7 @@ public class Parse {
   private TypeEnv prog() {
     // Currently only supporting exprs
     Node res = stmts();
-    if( res == null ) res = con(TypeErr.ALL);
+    if( res == null ) res = con(TypeErr.ANY);
     _e._scope.add_def(ctrl());  // Hook, so not deleted
     _e._scope.add_def(res);     // Hook, so not deleted
     // Delete names at the top scope before final optimization.
@@ -100,28 +100,19 @@ public class Parse {
     res = _e._scope.pop();         // New and improved result
     Node ctrl = _e._scope.pop();   // Exit control
 
-    // Gather errors
-    Ary<String> errs = null;
-    Type tres = _gvn.type(res);  // Result type
-    String emsg = tres.errMsg(); // Error embedded in some subtype
-    if( emsg != null ) errs = add_err(errs,emsg);
-    if( ctrl instanceof ErrNode )
-      errs = add_err(errs,((ErrNode)ctrl)._msg);
-    
     // Hunt for typing errors in the alive code
     assert par._par==null;      // Top-level only
+    Ary<String> errs = null;
     BitSet bs = new BitSet();
     bs.set(0);                  // Do not walk initial scope (primitives and constants only)
     bs.set(_e._scope._uid);     // Do not walk top-level scope
-    if( errs == null ) errs = res.walkerr_def(errs,bs,_gvn);
-    if( errs == null ) errs = _e._scope.walkerr_use(null,new BitSet(),_gvn);
+    if( errs == null ) errs = res .walkerr_def(errs,bs,_gvn);
+    if( errs == null ) errs = ctrl.walkerr_def(errs,bs,_gvn);
+    if( errs == null ) errs = _e._scope.walkerr_use(errs,new BitSet(),_gvn);
     if( errs == null && skipWS() != -1 ) errs = add_err(null,errMsg("Syntax error; trailing junk"));
-    if( errs == null ) {        // Final check for bad GC
-      bs.clear();
-      bs.set(0);   // Do not walk initial scope (primitives and constants only)
-      bs.set(_e._scope._uid);   // Do not walk top-level scope
-      errs=res.walkerr_gc(errs,bs,_gvn);
-    }
+    if( errs == null ) errs = res      .walkerr_gc (errs,new BitSet(),_gvn);
+
+    Type tres = _gvn.type(res);
     kill(res);
     return new TypeEnv(tres,_e,errs);
   }
@@ -187,7 +178,7 @@ public class Parse {
       if( n==null ) {           // Token not already bound to a value
         _e.add(tok,ifex);       // Bind token to a value
         if( ifex instanceof EpilogNode && !ifex.is_forward_ref() ) ((EpilogNode)ifex).fun().bind(tok); // Debug only: give name to function
-      } else { // Handle forward referenced function definitions
+      } else { // Handle re-assignments and forward referenced function definitions
         if( n.is_forward_ref() ) ((EpilogNode)n).merge_ref_def(_gvn,tok,(EpilogNode)ifex);
         else err_ctrl0("Cannot re-assign val '"+tok+"'");
       }
@@ -210,18 +201,18 @@ public class Parse {
       ctrls.add_def(ifex); // Keep alive, even if 1st Proj kills last use, so 2nd Proj can hook
       set_ctrl(gvn(new CProjNode(ifex,1)).sharpen(_gvn,_e._scope,ttmp)); // Control for true branch, and sharpen tested value
       Node tex = expr();
-      ctrls.add_def(tex==null ? err_ctrl2("missing expr after '?'") : tex);
+      ctrls.add_def(tex==null ? err_ctrl1("missing expr after '?'",Type.SCALAR) : tex);
       ctrls.add_def(ctrl()); // 2 - hook true-side control
       ScopeNode t_scope = _e._scope.split(vidx,ttmp,_gvn); // Split out the new vars on the true side
       require(':');
       set_ctrl(gvn(new CProjNode(ifex,0)).sharpen(_gvn,_e._scope,ftmp)); // Control for false branch, and sharpen tested vale
       Node fex = expr();
-      ctrls.add_def(fex==null ? err_ctrl2("missing expr after ':'") : fex);
+      ctrls.add_def(fex==null ? err_ctrl1("missing expr after ':'",Type.SCALAR) : fex);
       ctrls.add_def(ctrl()); // 4 - hook false-side control
       ScopeNode f_scope = _e._scope.split(vidx,ftmp,_gvn); // Split out the new vars on the false side
       set_ctrl(init(new RegionNode(null,ctrls.in(2),ctrls.in(4))));
       String errmsg = errMsg("Cannot mix GC and non-GC types");
-      _e._scope.common(this,errmsg,t_scope,f_scope); // Add a PhiNode for all commonly defined variables
+      _e._scope.common(this,_gvn,errmsg,t_scope,f_scope); // Add a PhiNode for all commonly defined variables
       _e._scope.add_def(gvn(new PhiNode(errmsg,ctrl(),ctrls.in(1),ctrls.in(3)))); // Add a PhiNode for the result
     }
     return _e._scope.pop();
@@ -295,11 +286,8 @@ public class Parse {
         Node arg = arglist ? tuple(stmts()) : tfact(); // Start of an argument list?
         if( arg == null )       // Function but no arg is just the function
           break;
-        Type tn = _gvn.type_ne(n);
-        if( !tn.is_fun_ptr() && arg.may_prec() >= 0 ) {
-          _x=oldx;
-          break;
-        }
+        Type tn = _gvn.type(n);
+        if( !tn.is_fun_ptr() && arg.may_prec() >= 0 ) { _x=oldx; break; }
         if( !tn.is_fun_ptr() &&
             // Notice the backwards condition: n was already tested for !is_fun_ptr().
             // Now we test the other way: the generic function can never be an 'n'.
@@ -346,7 +334,10 @@ public class Parse {
     if( skipWS() == -1 ) return null;
     byte c = _buf[_x];
     if( '0' <= c && c <= '9' ) return con(number());
-    if( '"' == c ) return con(string());
+    if( '"' == c ) {
+      Type ts = string();
+      return ts==null ? err_ctrl1("Unterminated string",TypeStr.STR_) : con(ts);
+    }
     int oldx = _x;
     if( peek1(c,'(') ) {        // a nested statement or a tuple
       Node s = stmts();
@@ -431,7 +422,7 @@ public class Parse {
         _e.add(ids.at(i),gvn(new TypeNode(ts.at(i),gvn(new ParmNode(cnt++,ids.at(i),fun,con(Type.SCALAR),errmsg)),bads.at(i))));
       Node rpc = gvn(new ParmNode(-1,"rpc",fun,_gvn.con(TypeRPC.ALL_CALL),null));
       Node rez = stmts();       // Parse function body
-      if( rez == null ) rez = err_ctrl2("Missing function body");
+      if( rez == null ) rez = err_ctrl1("Missing function body", Type.SCALAR);
       require('}');             //
       Node epi = gvn(new EpilogNode(ctrl(),rez,rpc,fun,null));
       _e = _e._par;             // Pop nested environment
@@ -462,9 +453,9 @@ public class Parse {
         stmt = gvn(new TypeNode(t,stmt,errMsg()));
         if( e._scope.get(tok)!=null ) {
           kill(stmt);
-          t = err_ctrl1("Cannot define field '." + tok + "' twice");
-          e._scope.update(tok,con(t),_gvn);
-          ts.set(toks.find(fld -> fld.equals(tok)),t);
+          ErrNode err = err_ctrl2("Cannot define field '." + tok + "' twice");
+          e._scope.update(tok,err,_gvn);
+          ts.set(toks.find(fld -> fld.equals(tok)),err._t);
         } else {
           e._scope.add(tok,stmt); // Field now available 'bare' inside rest of scope
           toks.add(tok);          // Gather for final type
@@ -517,7 +508,7 @@ public class Parse {
     while( (c=_buf[_x++]) != '"' ) {
       if( c=='%' ) throw AA.unimpl();
       if( c=='\\' ) throw AA.unimpl();
-      if( _x == _buf.length ) return err_ctrl1("Unterminated string");
+      if( _x == _buf.length ) return null;
     }
     return TypeStr.con(new String(_buf,oldx,_x-oldx-1));
   }
@@ -653,12 +644,10 @@ public class Parse {
   }
 
   // Whack current control with a syntax error
-  private Node    err_ctrl2(String s) { return con(err_ctrl1(s)); }
-  private TypeErr err_ctrl1(String s) { return TypeErr.make(err_ctrl0(s)); }
-  private String  err_ctrl0(String s) {
-    String msg = errMsg(s);
-    set_ctrl(gvn(new ErrNode(ctrl(),msg)));
-    return msg;
+  private ErrNode err_ctrl2( String s ) { return err_ctrl1(s,Type.ANY); }
+  public  ErrNode err_ctrl1(String s, Type t) { return init(new ErrNode(Env.top_scope(),errMsg(s),t)); }
+  private void err_ctrl0(String s) {
+    set_ctrl(gvn(new ErrNode(ctrl(),errMsg(s),Type.CTRL)));
   }
 
   public static Ary<String> add_err( Ary<String> errs, String msg ) {
@@ -674,19 +663,24 @@ public class Parse {
     _line= P._line;
     _e   = null;  _gvn = null;  _nf  = null;  _pp  = null;  _str = null;
   }
-  // Delayed error message
+  // Delayed error message, just record line/char index and share code buffer
   private Parse errMsg() { return new Parse(this); }
 
   // Polite error message for mismatched types
   public String typerr( Type t0, Type t1 ) {
     return t0.is_forward_ref() // Forward/unknown refs as args to a call report their own error
-      ? forward_ref_err(FunNode.name(((TypeTuple)t0).get_fun().fidx()))
+      ? forward_ref_err(t0)
       : errMsg((t0==TypeInt.FALSE && t1.is_oop() ? "nil" : t0.toString())+" is not a "+t1);
   }
 
   // Standard mis-use of a forward-ref error (assumed to be a forward-decl of a
   // recursive function; all other uses are treated as an unknown-ref error).
-  private String forward_ref_err(String name) { return errMsg("Unknown ref '"+name+"'"); }
+  public String forward_ref_err(Type t0) { return forward_ref_err(((TypeTuple)t0).get_fun()); }
+  public String forward_ref_err(TypeFun tfun) {
+    String name = FunNode.name(tfun.fidx());
+    return errMsg("Unknown ref '"+name+"'");
+  }
+  
   // Build a string of the given message, the current line being parsed,
   // and line of the pointer to the current index.
   public String errMsg(String s) {

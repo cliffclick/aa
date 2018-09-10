@@ -81,10 +81,10 @@ public abstract class PrimNode extends Node {
   public boolean is_lossy() { return true; }
   @Override public String xstr() { return _name+"::"+_ret; }
   @Override public Node ideal(GVNGCM gvn) { return null; }
-  @Override public Type value_ne(GVNGCM gvn) {
+  @Override public Type value(GVNGCM gvn) {
     Type[] ts = new Type[_defs._len];
     for( int i=1; i<_defs._len; i++ )
-      if( !(ts[i] = gvn.type_ne(in(i))).is_con() )
+      if( !(ts[i] = gvn.type(in(i))).is_con() )
         return _ret;            // Some non-constant input
     return apply(ts);           // All constant inputs; constant-fold result
   }
@@ -105,10 +105,10 @@ public abstract class PrimNode extends Node {
 
 class Convert extends PrimNode {
   Convert(Type from, TypeName to) { super(to._name,PrimNode.ARGS1,TypeTuple.make_args(from),to); }
-  @Override public Type value_ne(GVNGCM gvn) {
+  @Override public Type value(GVNGCM gvn) {
     Type[] ts = new Type[_defs._len];
     for( int i=1; i<_defs._len; i++ )
-      ts[i] = gvn.type_ne(_defs.at(i));
+      ts[i] = gvn.type(_defs.at(i));
     return apply(ts);     // Apply (convert) even if some args are not constant
   }
   @Override public Type apply( Type[] args ) { return TypeName.make(_name,args[1]); }
@@ -137,7 +137,7 @@ class ConvertStrStr extends PrimNode {
   ConvertStrStr(Node... nodes) { super("str",PrimNode.ARGS1,TypeTuple.STR,TypeStr.STR,nodes); }
   @Override public Type apply( Type[] args ) { return args[1]; }
   @Override public Node ideal(GVNGCM gvn) { return in(1); }
-  @Override public Type value_ne(GVNGCM gvn) { return gvn.type_ne(in(1)); }
+  @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)); }
   public boolean is_lossy() { return false; }
 }
 
@@ -274,7 +274,7 @@ class NE_OOP extends PrimNode {
 class RandI64 extends PrimNode {
   RandI64() { super("math_rand",PrimNode.ARGS1,TypeTuple.INT64,TypeInt.INT64); }
   @Override public TypeInt apply( Type[] args ) { return TypeInt.con(new java.util.Random().nextInt((int)args[1].getl())); }
-  @Override public Type value_ne(GVNGCM gvn) { return gvn.type_ne(in(1)).meet(TypeInt.FALSE); }
+  @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)).meet(TypeInt.FALSE); }
   // Rands have hidden internal state; 2 Rands are never equal
   @Override public boolean equals(Object o) { return this==o; }
 }
@@ -283,5 +283,5 @@ class Id extends PrimNode {
   Id(Type arg) { super("id",PrimNode.ARGS1,TypeTuple.make_args(arg),arg); }
   @Override public Type apply( Type[] args ) { return args[1]; }
   @Override public Node ideal(GVNGCM gvn) { return in(1); }
-  @Override public Type value_ne(GVNGCM gvn) { return gvn.type_ne(in(1)); }
+  @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)); }
 }

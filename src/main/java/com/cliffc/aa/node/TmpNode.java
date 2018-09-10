@@ -10,7 +10,7 @@ import java.lang.AutoCloseable;
 public class TmpNode extends Node implements AutoCloseable {
   public TmpNode() { super(OP_TMP); }
   @Override public Node ideal(GVNGCM gvn) { return null; }
-  @Override public Type value_ne(GVNGCM gvn) { return all_type(); }
+  @Override public Type value(GVNGCM gvn) { return all_type(); }
   // TmpNodes are never equal
   @Override public int hashCode() { return 123456789; }
   @Override public boolean equals(Object o) { return this==o; }

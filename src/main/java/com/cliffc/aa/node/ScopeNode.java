@@ -4,7 +4,6 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeErr;
 import com.cliffc.aa.util.Ary;
 
 import java.util.HashMap;
@@ -116,12 +115,12 @@ public class ScopeNode extends Node {
   }
 
   // Add PhiNodes and variable mappings for common definitions
-  public void common( Parse P, String errmsg, ScopeNode t, ScopeNode f ) {
+  public void common( Parse P, GVNGCM gvn, String errmsg, ScopeNode t, ScopeNode f ) {
     if( t!=null ) {  // Might have some variables in common
       for( String name : t._vals.keySet() ) {
         Node tn = t.in(t._vals.get(name));
         Integer fii = f==null ? null : f._vals.get(name);
-        Node fn = fii==null ? undef(P,tn,name,false) : f.in(fii); // Grab false-side var
+        Node fn = fii==null ? undef(P,gvn,tn,name,false) : f.in(fii); // Grab false-side var
         add_phi(P,errmsg,name,tn,fn);
       }
     }
@@ -130,7 +129,7 @@ public class ScopeNode extends Node {
         Node fn = f.in(f._vals.get(name));
         Integer tii = t==null ? null : t._vals.get(name);
         if( tii == null ) {     // Only defined on one branch
-          Node tn = undef(P,fn,name,true); // True-side var
+          Node tn = undef(P,gvn,fn,name,true); // True-side var
           add_phi(P,errmsg,name,tn,fn);
         } // Else values defined on both branches already handled
       }
@@ -139,9 +138,9 @@ public class ScopeNode extends Node {
     if( f!=null ) Env._gvn.kill_new(f);
   }
 
-  private Node undef(Parse P, Node xn, String name, boolean arm ) {
-    return xn.is_forward_ref() ? xn
-      : Env._gvn.con(TypeErr.make(P.errMsg("'"+name+"' not defined on "+arm+" arm of trinary")));
+  private Node undef(Parse P, GVNGCM gvn, Node xn, String name, boolean arm ) {
+    return xn.is_forward_ref() ? xn :
+      P.err_ctrl1("'"+name+"' not defined on "+arm+" arm of trinary",gvn.type(xn).widen());
   }
   private void add_phi(Parse P, String errmsg, String name, Node tn, Node fn) {
     add(name,tn==fn ? fn : P.gvn(new PhiNode(errmsg, P.ctrl(),tn,fn)));
@@ -158,7 +157,6 @@ public class ScopeNode extends Node {
   
   @Override public Node ideal(GVNGCM gvn) { return null; }
   @Override public Type value(GVNGCM gvn) { return all_type(); }
-  @Override public Type value_ne(GVNGCM gvn) { throw com.cliffc.aa.AA.unimpl(); } // Never called
   @Override public Type all_type() { return Type.CTRL; }
   @Override public int hashCode() { return 123456789; }
   // ScopeNodes are never equal

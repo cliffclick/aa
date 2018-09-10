@@ -165,6 +165,7 @@ public class TestParse {
   }
   
   @Test public void testParse1() {
+    testerr("math_rand(1)?1: :2:int","missing expr after ':'","                "); // missing type
     // Syntax for variable assignment
     test("x=1", TypeInt.TRUE);
     test("x=y=1", TypeInt.TRUE);
@@ -196,7 +197,7 @@ public class TestParse {
   }
 
   @Test public void testParse2() {
-    test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
+    testerr("f0 = { f x -> f0(x-1) }; f0({+},2)", "Passing 1 arguments to f0{Scalar Scalar -> Scalar} which takes 2 arguments","                     ");
     // Anonymous function definition
     test_isa("{x y -> x+y}", TypeTuple.FUNPTR2); // actually {Flt,Int} x {FltxInt} -> {FltxInt} but currently types {SCALAR,SCALAR->SCALAR}
     test("{5}()", TypeInt.con(5)); // No args nor -> required; this is simply a function returning 5, being executed
@@ -214,7 +215,7 @@ public class TestParse {
     test("x=3; and2={x -> x & 2}; and2(x)", TypeInt.con(2)); // trivially inlined; shadow  external variable
     testerr("plus2={x -> x+2}; x", "Unknown ref 'x'","                   "); // Scope exit ends lifetime
     testerr("fun={x -> }", "Missing function body","          ");
-    testerr("fun(2)", "Unknown ref 'fun'", "   ");
+    testerr("fun(2)", "Unknown ref 'fun'", "      ");
     test("mul3={x -> y=3; x*y}; mul3(2)", TypeInt.con(6)); // multiple statements in func body
     // Needs overload cloning/inlining to resolve {+}
     test("x=3; addx={y -> x+y}; addx(2)", TypeInt.con(5)); // must inline to resolve overload {+}:Int

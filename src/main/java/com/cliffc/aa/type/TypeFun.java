@@ -10,7 +10,7 @@ public class TypeFun extends Type<TypeFun> {
   public Type _ret;             // return types
   // List of known functions in set, or 'flip' for choice-of-functions
   public Bits _fidxs;           //
-  public int _nargs;            // Count of args
+  public int _nargs;            // Count of args or -1 for forward_ref
 
   private   TypeFun(TypeTuple ts, Type ret, Bits fidxs, int nargs ) { super(TFUN); init(ts,ret,fidxs,nargs); }
   private void init(TypeTuple ts, Type ret, Bits fidxs, int nargs ) { _ts = ts; _ret = ret; _fidxs = fidxs; _nargs=nargs; }
@@ -25,6 +25,7 @@ public class TypeFun extends Type<TypeFun> {
     return str(FunNode.names(_fidxs,new SB())).toString();
   }
   public SB str( SB sb ) {
+    if( _nargs==-1 ) return sb.p("{forward_ref}");
     sb.p('{');
     for( int i=0; i<_nargs; i++ ) sb.p(arg(i).toString()).p(' ');
     return sb.p("-> ").p(_ret.toString()).p('}');
@@ -96,8 +97,8 @@ public class TypeFun extends Type<TypeFun> {
 
   // Generic functions
   private static final TypeTuple GENERIC_ARGS=TypeTuple.SCALARS;
-  private static final Type      GENERIC_RET =TypeErr.ALL; // Cannot be, e.g. SCALAR because might return an error
-  public boolean is_forward_ref()                    { return _ts==GENERIC_ARGS&&GENERIC_RET ==_ret; }
-  public static TypeFun make_forward_ref( int fidx ) { return make(GENERIC_ARGS, GENERIC_RET,Bits.make(fidx),0); }
+  private static final Type      GENERIC_RET =Type.SCALAR; // Can return almost anything
+  public boolean is_forward_ref()                    { return _nargs == -1; }
+  public static TypeFun make_forward_ref( int fidx ) { return make(GENERIC_ARGS, GENERIC_RET,Bits.make(fidx),-1); }
   public static TypeFun make_generic()               { return make(GENERIC_ARGS, GENERIC_RET,Bits.FULL,99); }
 }

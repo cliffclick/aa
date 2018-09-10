@@ -35,10 +35,10 @@ public class RegionNode extends Node {
     return in(1);
   }
 
-  @Override public Type value_ne(GVNGCM gvn) {
+  @Override public Type value(GVNGCM gvn) {
     Type t = Type.XCTRL;
     for( int i=1; i<_defs._len; i++ )
-      t = t.meet(gvn.type_ne(in(i)));
+      t = t.meet(gvn.type(in(i)));
     return t;
   }
   

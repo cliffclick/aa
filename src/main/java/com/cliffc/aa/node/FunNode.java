@@ -423,23 +423,15 @@ public class FunNode extends RegionNode {
     return is_dead() ? fun : this;
   }
 
-  // Utility to find RPC parm
-  ParmNode find_rpc() {
-    for( Node use : _uses )
-      if( use instanceof ParmNode && ((ParmNode)use)._idx == -1 )
-        return (ParmNode)use;
-    return null;
-  }
-  
   // Compute value from inputs.  Slot#1 is always the unknown caller.  If
   // Slot#1 is not a ScopeNode, then it is a constant CTRL just in case we make
   // a new caller (e.g. via inlining).  If there are no other inputs and no
   // data uses, then the function is dead.  If there are data uses, they might
   // hit a new CallNode - and this requires GCP to discover the full set of
   // possible callers.
-  @Override public Type value_ne(GVNGCM gvn) {
-    if( _returned_at_top )
-      return Type.CTRL;
+  @Override public Type value(GVNGCM gvn) {
+    if( _returned_at_top ) return Type.CTRL; // Not really executed, but the function constant is being returned
+    if( _tf.is_forward_ref() ) return Type.CTRL; // Will be an error eventually, but act like its executed so the trailing EpilogNode gets visited during GCP
     if( !gvn._opt ) {                  // Pessimistic types?
       if( _fun_as_data ||              // Might be called thru the F-P
           in(1) instanceof ScopeNode ) // Might parse a new call site

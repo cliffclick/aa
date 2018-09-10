@@ -38,7 +38,7 @@ public class TypeStr extends TypeNullable<TypeStr> {
   public  static final TypeStr NIL  = make( IS_NIL, 1,"str"); // is  null; string con ignored
   public  static final TypeStr STR0 = make(AND_NIL,-1,"str"); // and null
   public  static final TypeStr STR  = make(NOT_NIL,-1,"str"); // not null
-  private static final TypeStr STR_ = make( OR_NIL, 0,"str"); // choice string, choice nil
+  public  static final TypeStr STR_ = make( OR_NIL, 0,"str"); // choice string, choice nil
   public  static final TypeStr ABC  = make(NOT_NIL, 1,"abc"); // a string constant
   static final TypeStr[] TYPES = new TypeStr[]{NIL,STR,STR0,STR_,ABC};
   static void init1( HashMap<String,Type> types ) { types.put("str",STR); }

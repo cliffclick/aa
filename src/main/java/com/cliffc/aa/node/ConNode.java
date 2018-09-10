@@ -10,7 +10,7 @@ public final class ConNode<T extends Type> extends Node {
   public ConNode( T t ) { super(OP_CON,Env.top_scope()); _t=t; }
   @Override String xstr() { return _t.toString(); }
   @Override public Node ideal(GVNGCM gvn) { return null; }
-  @Override public Type value_ne(GVNGCM gvn) { return _t; }
+  @Override public Type value(GVNGCM gvn) { return _t; }
   @Override public Type all_type() {
     if( _t==_t.dual() ) return _t;
     if( _t.isa(_t.dual()) ) return _t.dual();

@@ -157,30 +157,19 @@ public abstract class Node implements Cloneable {
     return null;
   }
 
-  // Graph rewriting.  Can assume all inputs are non-error.  Can change defs,
-  // including making new nodes - but if it does so, all new nodes will first
-  // call gvn.xform().  If gvn._opt if false, not allowed to remove CFG edges
-  // (loop backedges and function-call entry points have not all appeared).
-  // Returns null if no-progress, or a better version of 'this'.
+  // Graph rewriting.  Can change defs, including making new nodes - but if it
+  // does so, all new nodes will first call gvn.xform().  If gvn._opt if false,
+  // not allowed to remove CFG edges (loop backedges and function-call entry
+  // points have not all appeared).  Returns null if no-progress, or a better
+  // version of 'this'.
   abstract public Node ideal(GVNGCM gvn);
 
   // Compute the current best Type for this Node, based on the types of its inputs.
-  // Ignores error inputs, and may return an error output.
-  abstract public Type value_ne(GVNGCM gvn);
+  // May return the local "all_type()", especially if its inputs are in error.
+  abstract public Type value(GVNGCM gvn);
 
-  // Compute the current best Type for this Node, based on the types of its inputs.
-  // Handles input errors.
-  public Type value( GVNGCM gvn ) {
-    Type t = value_ne(gvn);
-    Type base = t instanceof TypeErr ? ((TypeErr)t)._t : t;
-    for( Node def : _defs ) {
-      if( def == null ) continue; // 
-      Type t0 = gvn.type(def);    // Type with errors
-      if( t0 instanceof TypeErr ) // Accumulate errors across all inputs
-        t = t.meet(TypeErr.make(base,((TypeErr)t0)._msgs));
-    }
-    return t;
-  }
+  // Return any type error message, or null if no error
+  public String err(GVNGCM gvn) { return null; }
   
   // Worse-case type for this Node
   public Type all_type() { return TypeErr.ALL; }
@@ -215,18 +204,6 @@ public abstract class Node implements Cloneable {
   // sharpening.
   public Node sharpen( GVNGCM gvn, ScopeNode scope, TmpNode tmp ) { return this; }
     
-  // Liveness walk, all reachable defs
-  public void walk( BitSet bs ) {
-    assert !is_dead();
-    if( !bs.get(_uid) ) {
-      assert !is_dead();
-      bs.set(_uid);
-      for( Node def : _defs )
-        if( def != null )
-          def.walk(bs);
-    }
-  }
-
   // Gather errors; backwards reachable control uses only
   public Ary<String> walkerr_use( Ary<String> errs, BitSet bs, GVNGCM gvn ) {
     assert !is_dead();
@@ -246,10 +223,9 @@ public abstract class Node implements Cloneable {
     assert !is_dead();
     if( bs.get(_uid) ) return errs; // Been there, done that
     bs.set(_uid);                   // Only walk once
-    if( this instanceof TypeNode )  // Gather errors
-      errs = Parse.add_err(errs,((TypeNode)this).err(gvn));
-    if( is_forward_ref() )      // Forward refs not allowed in the result either
-      errs = Parse.add_err(errs,((EpilogNode)this)._unkref_err);
+    String msg = err(gvn);          // Get any error
+    if( msg != null )  errs = Parse.add_err(errs,msg); // Gather errors
+    
     for( int i=0; i<_defs._len; i++ ) {
       Node def = _defs.at(i);   // Walk data defs for more errors
       if( def == null ) continue;
@@ -259,26 +235,18 @@ public abstract class Node implements Cloneable {
     }
     return errs;
   }
+  
   // Gather errors; forwards reachable data uses only
   public Ary<String> walkerr_gc( Ary<String> errs, BitSet bs, GVNGCM gvn ) {
     if( bs.get(_uid) ) return errs;// Been there, done that
     bs.set(_uid);                  // Only walk once
-    if( this instanceof UnresolvedNode ) return errs; // Only remaining Unresolved are never-called functions
-    if( this instanceof EpilogNode ) { // Function ptr?
-      FunNode fun = ((EpilogNode)this).fun();
-      if( fun._defs._len <= 2 )
-        return errs;                 // No callers?
-    }
-    if( Type.SCALAR.isa(gvn.type(this)) ) // Cannot have code that deals with unknown-GC-state
-      if( this instanceof PhiNode ) errs = Parse.add_err(errs,((PhiNode)this)._badgc);
-      else throw AA.unimpl(); // Not allowed; either user-error or missing opt
-    for( int i=0; i<_defs._len; i++ ) {
-      Node def= in(i);
-      if( def != null ) def.walkerr_gc(errs,bs,gvn);
-    }
+    if( this instanceof PhiNode &&
+        Type.SCALAR.isa(gvn.type(this)) ) // Cannot have code that deals with unknown-GC-state
+      errs = Parse.add_err(errs,((PhiNode)this)._badgc);
+    for( int i=0; i<_defs._len; i++ )
+      if( in(i) != null ) in(i).walkerr_gc(errs,bs,gvn);
     return errs;
   }
-  
   public boolean is_dead() { return _uses == null; }
   public void set_dead( ) { _defs = _uses = null; }   // TODO: Poor-mans indication of a dead node, probably needs to recycle these...
 

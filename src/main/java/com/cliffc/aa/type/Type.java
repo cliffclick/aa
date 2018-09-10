@@ -42,7 +42,7 @@ public class Type<T extends Type> {
   static private int CNT=1;
   final int _uid=CNT++; // Unique ID, will have gaps, used to uniquely order Types in Unions
   byte _type;           // Simple types use a simple enum
-  protected Type _dual; // All types support a dual notion, lazily computed and cached here
+  Type _dual; // All types support a dual notion, lazily computed and cached here
 
   protected Type(byte type) { _type=type; }
   @Override public int hashCode( ) { return _type; }

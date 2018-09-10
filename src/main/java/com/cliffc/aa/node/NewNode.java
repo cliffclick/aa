@@ -16,16 +16,16 @@ public class NewNode extends Node {
   String xstr() { return "New#"+_ts; }  // Self short name
   String  str() { return xstr(); }      // Inline short name
   @Override public Node ideal(GVNGCM gvn) { return null; }
-  @Override public Type value_ne(GVNGCM gvn) {
+  @Override public Type value(GVNGCM gvn) {
     TypeStruct tstr = _ts instanceof TypeStruct ? (TypeStruct)_ts : null;
     assert tstr==null || tstr._args.length+1 == _defs._len;
     boolean eq=true;
     for( int i=1; i<_defs._len; i++ )
-      eq &= _ts.at(i-1) == gvn.type_ne(in(i));
+      eq &= _ts.at(i-1) == gvn.type(in(i));
     if( eq ) return _ts;
     Type[] ts = new Type[_defs._len-1];
     for( int i=0; i<ts.length; i++ ) {
-      ts[i] = gvn.type_ne(in(i+1));
+      ts[i] = gvn.type(in(i+1));
       assert ts[i].isa(_ts.at(i)); // Type correct
     }
     return tstr==null ? TypeTuple.make_all(ts) : TypeStruct.makeA(tstr._args,ts);

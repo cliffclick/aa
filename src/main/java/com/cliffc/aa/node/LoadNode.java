@@ -53,23 +53,40 @@ public class LoadNode extends Node {
     set_def(1,gvn.xform(new CastNode(tru,baseaddr,((TypeStruct)t).make_nil(TypeStruct.NOT_NIL))),gvn);
     return set_def(0,null,gvn);
   }
-  @Override public Type value_ne(GVNGCM gvn) {
-    Type t = gvn.type_ne(in(1));
+  @Override public Type value(GVNGCM gvn) {
+    Type t = gvn.type(in(1));
     while( t instanceof TypeName ) t = ((TypeName)t)._t;
     if( t.isa(TypeOop.OOP_) ) return Type.XSCALAR; // Very high address; might fall to any valid value
-    Type tnil = t.may_have_nil() ? TypeErr.make(_badnil) : Type.ANY; // Null compile-time error
-    if( TypeOop.OOP0.isa(t) )            // Too low, might not have any fields
-      return tnil.meet(TypeErr.make(_badfld));
+    if( t.may_have_nil() ) return Type.XSCALAR; // Might fail before loading
+    if( TypeOop.OOP0.isa(t) ) return Type.SCALAR; // Too low, might not have any fields
+    
     if( t instanceof TypeStruct ) {
       TypeStruct ts = (TypeStruct)t;
       int idx = ts.find(_fld);  // Find the named field
-      Type tfld = idx == -1 ? TypeErr.make(_badfld) : ts.at(idx); // Field type
-      return tnil.meet(tfld);
+      if( idx == -1 ) return Type.SCALAR;
+      return ts.at(idx);        // Field type
     }
-    if( tnil != Type.ANY ) return tnil;
     
     throw AA.unimpl();
   }
+  @Override public String err(GVNGCM gvn) {
+    Type t = gvn.type(in(1));
+    while( t instanceof TypeName ) t = ((TypeName)t)._t;
+    //if( t.isa(TypeOop.OOP_) ) return Type.XSCALAR; // Very high address; might fall to any valid value
+    //Type tnil = t.may_have_nil() ? TypeErr.make(_badnil) : Type.ANY; // Null compile-time error
+    //if( TypeOop.OOP0.isa(t) )            // Too low, might not have any fields
+    //  return tnil.meet(TypeErr.make(_badfld));
+    //if( t instanceof TypeStruct ) {
+    //  TypeStruct ts = (TypeStruct)t;
+    //  int idx = ts.find(_fld);  // Find the named field
+    //  Type tfld = idx == -1 ? TypeErr.make(_badfld) : ts.at(idx); // Field type
+    //  return tnil.meet(tfld);
+    //}
+    //if( tnil != Type.ANY ) return tnil;
+    
+    throw AA.unimpl();
+  }
+  @Override public Type all_type() { return Type.SCALAR; }
   @Override public int hashCode() { return super.hashCode()+_fld.hashCode(); }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
