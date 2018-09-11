@@ -376,6 +376,28 @@ public class FunNode extends RegionNode {
     return is_dead() ? fun : this;
   }
 
+  // TODO: During GCP, slot#1 is the "default" input and assumed never
+  // called.  As callers appear, they wire up and become actual input edges.
+  // Leaving slot#1 alive here makes every call appear to be called by the
+  // default caller.  Fix is to have the default (undiscovered) caller
+  // control be different from the top-level REPL caller, and set the
+  // undiscovered control to XCTRL.
+  boolean slot1(GVNGCM gvn) {
+    if( _all_callers_known ) return true;
+    if( _busted_call ) return true;
+    if( !gvn._opt ) return true;
+    // TODO: Also check to see if this is a function being returned as a
+    // top-level result.  This is only a partial fix, and only to make the body
+    // executable - in case the only use is to return from the parser.
+    Node s = in(1);
+    if( !(s instanceof ScopeNode) ) return false;
+    if( s._defs._len < 3 ) return false;
+    Node e = s.in(s._defs._len-2); // EPilog
+    if( !(e instanceof EpilogNode) ) return false;
+    if( ((EpilogNode)e).fun() != this ) return false;
+    return true;
+  }
+  
   // Compute value from inputs.  Slot#1 is always the unknown caller.  If
   // Slot#1 is not a ScopeNode, then it is a constant CTRL just in case we make
   // a new caller (e.g. via inlining).  If there are no other inputs and no
@@ -384,8 +406,18 @@ public class FunNode extends RegionNode {
   // possible callers.
   @Override public Type value(GVNGCM gvn) {
     // Will be an error eventually, but act like its executed so the trailing EpilogNode gets visited during GCP
-    if( _tf.is_forward_ref() ) return Type.CTRL; 
-    return super.value(gvn);
+    if( _tf.is_forward_ref() ) return Type.CTRL;
+    // TODO: During GCP, slot#1 is the "default" input and assumed never
+    // called.  As callers appear, they wire up and become actual input edges.
+    // Leaving slot#1 alive here makes every call appear to be called by the
+    // default caller.  Fix is to have the default (undiscovered) caller
+    // control be different from the top-level REPL caller, and set the
+    // undiscovered control to XCTRL.
+    int s = slot1(gvn) ? 1 : 2;
+    Type t = Type.XCTRL;
+    for( int i=s; i<_defs._len; i++ )
+      t = t.meet(gvn.type(in(i)));
+    return t;
   }
   
   @Override public int hashCode() { return super.hashCode()+_tf.hashCode(); }

@@ -366,6 +366,15 @@ public class GVNGCM {
     // with the maximally lifted types.
     Node rez = end.in(end._defs._len-2);
     FunNode frez = rez instanceof EpilogNode ? ((EpilogNode)rez).fun() : null;
+    /* TODO: Cliff Notes; see ParmNode & FunNode value calls for slot#1.  If
+       some Epilog is being kept as a plain F-P and not called then the FunNode
+       needs to be kept live - even without callers.  How do i detect a F-P
+       usage where the F-P is stored in a data structure, and called later?
+       All such usages should be matchable to call sites.  But in any case, F-P
+       taken implies some unknown callers...  currently returning a F-P that is
+       not otherwise called, looks like the RPC stays at the "never called"
+       stage.  Once in iter(), again acts like "being called".
+     */
     walk_opt(rez,start,frez);
   }
 

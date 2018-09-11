@@ -246,25 +246,55 @@ public class CallNode extends Node {
     if( gvn._opt ) // Manifesting optimistic virtual edges between caller and callee
       wire(gvn,t); // Make real edges from virtual edges
 
-    Type trez = Type.ANY;
+    Type trez = Type.ALL; // Base for JOIN
     if( fp instanceof UnresolvedNode ) {
       // For unresolved, we can take the BEST choice; i.e. the JOIN of every
       // choice.  Typically one choice works and the others report type
       // errors on arguments.
       for( Node epi : fp._defs )
-        trez = trez.meet(value1(gvn.type(epi))); // JOIN of choices
+        trez = trez.join(value1(gvn,gvn.type(epi))); // JOIN of choices
+/* Cliff notes:
+   Have call with multiple options.  Taking JOIN of choices only works for
+   primitives?  Does it work for random user calls... still being resolved?
+
+   Join: of {~flt,~int} is ~real.  
+   PES: only lifting inputs.  Some start invalid.  Output is JOIN of valid,
+   and ignore the invalid outputs.  More become valid over time, so more
+   outputs join the JOIN, which keeps lifting.
+   OPT: only lowering inputs.  All start valid.  Output is JOIN of valid.
+   Fewer become valid over time; so fewer outputs join the JOIN, which 
+   keeps falling.  During GCP, also drop more-expensive but valid choices.
+ */
     } else {                                  // Single resolved target
-      trez = value1(t);
+      trez = value1(gvn,t);                   // Return type or SCALAR if invalid args
     }
 
     // Return {control,value} tuple.
     return TypeTuple.make_all(tc,trez);
   }
 
-  private Type value1( Type t ) {
+  // See if the arguments are valid.  If valid, return the function's return
+  // type.  If not valid return SCALAR - as an indicator that the function
+  // cannot be called, so the JOIN of valid returns is not lowered.
+  private Type value1( GVNGCM gvn, Type t ) {
     assert t.is_fun_ptr();
     TypeTuple tepi = (TypeTuple)t;
-    return tepi.at(0) == Type.XCTRL ? Type.XSCALAR : tepi.at(1);
+    Type    tctrl=         tepi.at(0);
+    Type    tval =         tepi.at(1);
+    TypeFun tfun =(TypeFun)tepi.at(3);
+    if( tctrl == Type.XCTRL ) return Type.XSCALAR; // Function will never return
+    assert tctrl==Type.CTRL;      // Function will never return?
+    if( t.is_forward_ref() ) return tfun.ret(); // Forward refs do no argument checking
+    if( tfun.nargs() != nargs() ) return Type.SCALAR; // Function not called, nothing to JOIN
+    // Now do an arg-check
+    TypeTuple formals = tfun._ts; // Type of each argument
+    for( int j=0; j<nargs(); j++ ) {
+      Type actual = gvn.type(arg(j));
+      Type formal = formals.at(j);
+      if( !actual.isa(formal) ) // Actual is not a formal; accumulate type errors
+        return Type.SCALAR;     // Argument not valid, nothing to JOIN
+    }
+    return tval;
   }
   
   @Override public String err(GVNGCM gvn) {
