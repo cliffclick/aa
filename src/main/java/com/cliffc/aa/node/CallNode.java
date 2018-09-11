@@ -187,13 +187,19 @@ public class CallNode extends Node {
         return null;              // Already wired up
     
     // Do an arg check before wiring up; cannot wire busted args (do not
-    // propagate type errors past function call boundaries).
+    // propagate type errors past function call boundaries).  Wiring happens
+    // twice: once during pessimistic iter() when given a constant function
+    // with correct arg counts - but possibly invald (yet) arguments, and
+    // during optimistic gcp().  During gcp() the call MUST happen and
+    // incorrect args are definitely a type-error.
     for( Node arg : fun._uses ) {
       if( arg.in(0) == fun && arg instanceof ParmNode ) {
         int idx = ((ParmNode)arg)._idx; // Argument number, or -1 for rpc
         if( idx != -1 &&
-            (idx >= nargs() || !gvn.type(arg(idx)).isa(fun._tf.arg(idx))) )
+            (idx >= nargs() || !gvn.type(arg(idx)).isa(fun._tf.arg(idx))) ) {
+          if( gvn._opt ) fun._busted_call = true;
           return null;          // Illegal args?
+        }
       }
     }
     
