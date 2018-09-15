@@ -295,7 +295,6 @@ public class GVNGCM {
       Node n = (work ? _work : funs).pop(); // Pull from main worklist before functions
       (work ? _wrk_bits : _fun_bits).clear(n._uid);
       if( n.is_dead() ) continue;
-      if( n instanceof ScopeNode || n instanceof TmpNode ) continue; // These are killed when parsing exists lexical scope
       if( n._uses._len==0 ) { kill(n); continue; }
       if( _work._len > 0 && n instanceof FunNode && n.is_copy(this,-1) == null ) {
         // Stall FunNodes, which may inline, until the main list goes empty

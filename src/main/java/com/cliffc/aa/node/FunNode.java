@@ -118,11 +118,11 @@ public class FunNode extends RegionNode {
 
   // ----
   @Override public Node ideal(GVNGCM gvn) {
-    Node n = split_callers(gvn);
-    if( n != null ) return n;
-
-    // Else generic Region ideal
-    return ideal(gvn,!_all_callers_known);
+    // Generic Region ideal
+    Node n = ideal(gvn,!_all_callers_known);
+    if( n!=null ) return n;
+    
+    return split_callers(gvn);
   }
 
   // Declare as all-callers-known.  Done by GCP after flowing function-pointers
@@ -165,13 +165,13 @@ public class FunNode extends RegionNode {
   // (e.g. primitive int math vs primitive float math), or to allow
   // constant-prop for some args, or for tiny size.
   private FunNode split_callers_heuristic( GVNGCM gvn, ParmNode[] parms, EpilogNode epi ) {
-    // Split for tiny body
-    FunNode fun0 = split_size(gvn,epi);
-    if( fun0 != null ) return fun0;
-
     // Split for primitive type specialization
     FunNode fun1 = type_special(gvn,parms);
     if( fun1 != null ) return fun1;
+
+    // Split for tiny body
+    FunNode fun0 = split_size(gvn,epi);
+    if( fun0 != null ) return fun0;
 
     return null;                // No splitting callers
   }
@@ -234,9 +234,7 @@ public class FunNode extends RegionNode {
     for( ParmNode parm : parms )
       for( Node call : parm._uses )
         if( call instanceof CallNode &&
-            (gvn.type(call.in(1)) instanceof TypeUnion || // Call overload not resolved
-             gvn.type(call      ) instanceof TypeErr ||   // Call result is an error (arg mismatch)
-             ((TypeTuple)gvn.type(call)).at(1) instanceof TypeErr) ) { // Call result is an error (arg mismatch)
+            (call.in(1) instanceof UnresolvedNode) ) { // Call overload not resolved
           any_unr = true; break;
         }
     if( !any_unr ) return null; // No unresolved calls; no point in type-specialization
@@ -298,13 +296,14 @@ public class FunNode extends RegionNode {
 
     Node  any = gvn.con(Type.XCTRL);
     Node dany = gvn.con(Type.XSCALAR);
-    Node newepi = map.get(epi);
+    EpilogNode newepi = (EpilogNode)map.get(epi);
+    newepi._fidx = fun._tf.fidx();
     Node new_unr = epi;
     // Are we making a type-specialized copy, that can/should be found by same-typed users?
     // Or are we cloning a private copy just for this call-site?
     if( fun.in(1) != any ) {
       // All uses now get to select either the old or new (type-specific) copy.
-      EpilogNode xxxepi = epi.copy();
+      EpilogNode xxxepi = epi.copy(); // this one will replace 'epi' in a bit
       for( Node def : epi._defs ) xxxepi.add_def(def);
       gvn.init(xxxepi);
       new_unr = new UnresolvedNode();
@@ -418,6 +417,13 @@ public class FunNode extends RegionNode {
     for( int i=s; i<_defs._len; i++ )
       t = t.meet(gvn.type(in(i)));
     return t;
+  }
+
+  public Node rpc() {
+    for( Node use : _uses )
+      if( use instanceof ParmNode && ((ParmNode)use)._idx==-1 )
+        return use;
+    return null;
   }
   
   @Override public int hashCode() { return super.hashCode()+_tf.hashCode(); }

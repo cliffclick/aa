@@ -10,14 +10,19 @@ import com.cliffc.aa.type.*;
 // - RPC - where to jump-to next; the Continuation
 // - The FunNode function header (quickly maps to SESE region header)
 public class EpilogNode extends Node {
-  private final int _fidx;
+  int _fidx;
   final String _unkref_err; // Unknown ref error (not really a forward ref)
   public EpilogNode( Node ctrl, Node val, Node rpc, FunNode fun, String unkref_err ) {
     super(OP_EPI,ctrl,val,rpc,fun);
     _unkref_err = unkref_err;
     _fidx = fun._tf.fidx();     // Record function index, so can tell it exactly
   }
-  @Override public Node ideal(GVNGCM gvn) { return null; }
+  @Override public Node ideal(GVNGCM gvn) {
+    // If is_copy is true, CallNodes uses need to fold away as well
+    if( is_copy(gvn,3) != null )
+      for( Node use : _uses ) gvn.add_work(use);
+    return null;
+  }
 
   @Override public Type value(GVNGCM gvn) {
     Type t=TypeTuple.make_all(gvn.type(ctrl()), // Function exits, or not
@@ -28,9 +33,10 @@ public class EpilogNode extends Node {
     return t;
   }
   @Override public String err(GVNGCM gvn) { return is_forward_ref() ? _unkref_err : null; }
-  
+
   @Override public Node is_copy(GVNGCM gvn, int idx) {
-    return (in(3) instanceof FunNode && ((FunNode)in(3))._tf.fidx()==_fidx) ? null : in(idx);
+    // FunNode has disappeared/optimized away, so should this Epilog
+    return (in(3) instanceof FunNode && fun()._tf.fidx()==_fidx) ? null : in(idx);
   }
   
   public    Node ctrl() { return          in(0); } // internal function control
