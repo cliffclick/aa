@@ -151,9 +151,9 @@ public class CallNode extends Node {
 
     // Check for several trivial cases that can be fully inlined immediately.
     // Check for zero-op body (id function)
-    if( rez instanceof ParmNode && rez.in(0) == fun ) return inline(gvn,ctrl,arg(((ParmNode)rez)._idx));
+    if( rez instanceof ParmNode && rez.in(0) == fun ) return inline(gvn,in(0),arg(((ParmNode)rez)._idx));
     // Check for constant body
-    if( rez instanceof ConNode ) return inline(gvn,ctrl,rez);
+    if( rez instanceof ConNode ) return inline(gvn,in(0),rez);
 
     // Check for a 1-op body using only constants or parameters
     boolean can_inline=true;

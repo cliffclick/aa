@@ -232,35 +232,39 @@ public class FunNode extends RegionNode {
     // Visit all ParmNodes, looking for unresolved call uses
     boolean any_unr=false;
     for( ParmNode parm : parms )
-      for( Node call : parm._uses )
-        if( call instanceof CallNode &&
-            (call.in(1) instanceof UnresolvedNode) ) { // Call overload not resolved
-          any_unr = true; break;
-        }
+      if( parm != null ) 
+        for( Node call : parm._uses )
+          if( call instanceof CallNode &&
+              (call.in(1) instanceof UnresolvedNode) ) { // Call overload not resolved
+            any_unr = true; break;
+          }
     if( !any_unr ) return null; // No unresolved calls; no point in type-specialization
 
     // TODO: Split with a known caller in slot 1
     if( !(in(1) instanceof ScopeNode) )
-      return null; // Untested: Slot 1 is not the generic unparsed caller
+      return null;
+    assert !_all_callers_known;
 
     // If Parm has unresolved calls, we want to type-specialize on its
     // arguments.  Call-site #1 is the most generic call site for the parser
     // (all Scalar args).  Peel out 2nd call-site args and generalize them.
     Type[] sig = new Type[parms.length];
     for( int i=0; i<parms.length; i++ )
-      sig[i] = gvn.type(parms[i].in(2)).widen();
+      sig[i] = parms[i]==null ? Type.SCALAR : gvn.type(parms[i].in(2)).widen();
     // Make a new function header with new signature
     TypeTuple ts = TypeTuple.make_args(sig);
     assert ts.isa(_tf._ts);
     if( ts == _tf._ts ) return null; // No improvement for further splitting
     // Make a prototype new function header.  Clone the generic unknown caller in slot 1.  
-    FunNode fun = new FunNode(in(1),ts,_tf._ret,name(),_tf._nargs);
+    Node xctrl = gvn.con(Type.XCTRL);
+    FunNode fun = new FunNode(null,ts,_tf._ret,name(),_tf._nargs);
+    fun.add_def(xctrl); // Keeping the generic path on the original FunNode
     // Look in remaining paths and decide if they split or stay
     for( int j=2; j<_defs._len; j++ ) {
       boolean split=true;
       for( int i=0; i<parms.length; i++ )
-        split &= gvn.type(parms[i].in(j)).widen().isa(sig[i]);
-      fun.add_def(split ? in(j) : gvn.con(Type.XCTRL));
+        if( parms[i]!=null ) split &= gvn.type(parms[i].in(j)).widen().isa(sig[i]);
+      fun.add_def(split ? in(j) : xctrl);
     }
     // TODO: Install in ScopeNode for future finding
     fun._all_callers_known = false;
@@ -271,11 +275,6 @@ public class FunNode extends RegionNode {
   // for the old and one for the new body.  The new function may have a more
   // refined signature, and perhaps no unknown callers.  
   private Node split_callers(GVNGCM gvn, ParmNode rpc_parm, EpilogNode epi, FunNode fun) {
-    // TODO: Split with a known caller in slot 1
-    if( (in(1) instanceof ScopeNode) &&
-        ((ScopeNode) in(1)).get(name()) !=null )
-        throw AA.unimpl(); // need to repoint the scope
-
     // Clone the function body
     HashMap<Node,Node> map = new HashMap<>();
     Ary<Node> work = new Ary<>(new Node[1],0);
@@ -301,7 +300,7 @@ public class FunNode extends RegionNode {
     Node new_unr = epi;
     // Are we making a type-specialized copy, that can/should be found by same-typed users?
     // Or are we cloning a private copy just for this call-site?
-    if( fun.in(1) != any ) {
+    if( !fun._all_callers_known ) {
       // All uses now get to select either the old or new (type-specific) copy.
       EpilogNode xxxepi = epi.copy(); // this one will replace 'epi' in a bit
       for( Node def : epi._defs ) xxxepi.add_def(def);
@@ -319,9 +318,7 @@ public class FunNode extends RegionNode {
       Node c = map.get(n);
       if( n instanceof ParmNode && n.in(0) == this ) {  // Leading edge ParmNodes
         c.add_def(map.get(n.in(0))); // Control
-        int idx = ((ParmNode)n)._idx;
-        c.add_def(gvn.con(idx==-1 ? TypeRPC.ALL_CALL : fun._tf.arg(idx))); // Generic arg#1
-        for( int j=2; j<_defs._len; j++ ) // Get the new parm path or null according to split
+        for( int j=1; j<_defs._len; j++ ) // Get the new parm path or null according to split
           c.add_def( fun.in(j)==any ? dany : n.in(j) );
       } else if( n != this ) {  // Interior nodes
         for( Node def : n._defs ) {
@@ -333,8 +330,10 @@ public class FunNode extends RegionNode {
       }
     }
 
-    // Kill split-out path-ins to the old code
-    for( int j=2; j<_defs._len; j++ )
+    // Kill split-out path-ins to the old code.  If !_all_callers_known then
+    // always keep slot#1, otherwise kill slots being taken over by the new
+    // function.
+    for( int j=_all_callers_known ? 1 : 2; j<_defs._len; j++ )
       if( fun.in(j)!=any )  // Path split out?
         set_def(j,any,gvn); // Kill incoming path on old FunNode
 
@@ -353,13 +352,19 @@ public class FunNode extends RegionNode {
 
     // Repoint all Calls uses to an Unresolved choice of the old and new
     // functions and let the Calls resolve individually.
-    if( fun.in(1) != any )      // Split-for-type, possible many future callers
+    if( !fun._all_callers_known ) // Split-for-type, possible many future callers
       gvn.subsume(epi,new_unr);
     else {
-      // The old Epilog has a set of CallNodes, but only the one in slot#2 is
+      // Single path being inlined, if any
+      int path_being_inlined=-1;
+      for( int j=1; j<_defs._len; j++ )
+        if( fun.in(j)!=any )
+          path_being_inlined = j;
+
+      // The old Epilog has a set of CallNodes, but only the one in #path_being_inlined is
       // being split-for-size.  Repoint the one Call._rpc matching rpc_parm
-      // in(2) to new_epi.
-      int rpc = ((TypeRPC)gvn.type(rpc_parm.in(2))).rpc();
+      // in(path_being_inlined) to new_epi.
+      int rpc = ((TypeRPC)gvn.type(rpc_parm.in(path_being_inlined))).rpc();
       for( int j=0; !epi.is_dead() && j<epi._uses._len; j++ ) {
         Node use = epi._uses.at(j);
         if( use instanceof CallNode && 

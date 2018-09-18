@@ -8,7 +8,7 @@ public class Env implements AutoCloseable {
   ScopeNode _scope; // Lexical anchor; goes when this environment leaves scope
   Env( Env par ) {
     _par=par;
-    _scope = new ScopeNode();
+    _scope = _gvn.init(new ScopeNode());
     add(" control ",_scope);
   }
 
