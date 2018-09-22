@@ -136,25 +136,20 @@ public class FunNode extends RegionNode {
     if( epi == null ) return null;
     // Look for appropriate type-specialize callers
     FunNode fun = type_special(gvn,parms);
-    if( fun == null ) return null;
+    if( fun == null ) { // No type-specilization to do 
+      if( gvn._small_work ) { // Only doing small-work now
+        // Maybe want to inline later
+        gvn.add_work2(this);
+        return null;
+      }
+      // Large code-expansion allowed; can inline for other reasons
+      fun = split_size(gvn,epi,parms);
+      if( fun == null ) return null;
+    }
     // Split the callers according to the new 'fun'.
     return split_callers(gvn,rpc(),epi,fun);
   }
 
-  // Called to inline-for-size
-  public Node inline_size( GVNGCM gvn ) {
-    if( _tf.is_forward_ref() ) return null;
-    ParmNode[] parms = new ParmNode[_tf.nargs()];
-    EpilogNode epi = split_callers_gather(gvn,parms);
-    if( epi == null ) return null;
-    // Look for appropriate type-specialize callers
-    FunNode fun = split_size(gvn,epi);
-    if( fun == null ) return null;
-    // Split the callers according to the new 'fun'.
-    return split_callers(gvn,rpc(),epi,fun);
-  }
-
-  
   private EpilogNode split_callers_gather( GVNGCM gvn, ParmNode[] parms ) {
     if( _tf.is_forward_ref() ) return null;
     for( int i=1; i<_defs._len; i++ ) if( gvn.type(in(i))==Type.XCTRL ) return null;
@@ -224,7 +219,7 @@ public class FunNode extends RegionNode {
   // Split a single-use copy (e.g. fully inline) if the function is "small
   // enough".  Include anything with just a handful of primitives, or a single
   // call, possible with a single if.
-  private FunNode split_size( GVNGCM gvn, EpilogNode epi ) {
+  private FunNode split_size( GVNGCM gvn, EpilogNode epi, ParmNode[] parms ) {
     int[] cnts = new int[OP_MAX];
     BitSet bs = new BitSet();
     Ary<Node> work = new Ary<>(new Node[1],0);
@@ -257,13 +252,27 @@ public class FunNode extends RegionNode {
         cnts[OP_IF  ] > 1 || // Allow some trivial filtering to inline
         cnts[OP_PRIM] > 6 )  // Allow small-ish primitive counts to inline
       return null;
+
+    // Pick which input to inline.  Only based on having some constant inputs
+    // right now.
+    int m=-1, mncons = -1;
+    for( int i=2; i<_defs._len; i++ ) {
+      int ncon=0;
+      for( ParmNode parm : parms ) {
+        if( parm != null &&
+            gvn.type(parm.in(i)).is_con() )
+          ncon++;
+      }
+      if( ncon > mncons ) { mncons = ncon; m = i; }
+    }
+
     
     // Make a prototype new function header.  No generic unknown caller
-    // in slot 1, only slot 2.
+    // in slot 1.  The one inlined call in slot 'm'.
     Node top = gvn.con(Type.XCTRL);
     FunNode fun = new FunNode(top,_tf._ts,_tf._ret,name(),_tf._nargs);
-    fun.add_def(in(2));
-    for( int i=3; i<_defs._len; i++ ) fun.add_def(top);
+    for( int i=2; i<_defs._len; i++ )
+      fun.add_def(i==m ? in(i) : top);
     fun.all_callers_known();    // Only 1 caller
     return fun;
   }

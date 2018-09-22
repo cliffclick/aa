@@ -18,7 +18,7 @@ public class GVNGCM {
 
   // Iterative worklist
   private Ary<Node> _work = new Ary<>(new Node[1], 0);
-  private BitSet _wrk_bits = new BitSet(), _fun_bits;
+  private BitSet _wrk_bits = new BitSet();
 
   public void add_work( Node n ) { if( !_wrk_bits.get(n._uid) ) add_work0(n); }
   private <N extends Node> N add_work0( N n ) {
@@ -27,6 +27,16 @@ public class GVNGCM {
     return n;
   }
 
+  // Code-expanding worklist, lower priority work
+  private Ary<Node> _work2 = new Ary<>(new Node[1], 0);
+  private BitSet _wrk2_bits = new BitSet();
+  public void add_work2( Node n ) {
+    if( !_wrk2_bits.get(n._uid) ) {
+      _work2.add(n);
+      _wrk2_bits.set(n._uid);
+    }
+  }
+  
   // Array of types representing current node types.  Essentially a throw-away
   // temp extra field on Nodes.  It is either bottom-up, conservatively correct
   // or top-down and optimistic.
@@ -150,7 +160,7 @@ public class GVNGCM {
   // Node is in the type table and GVN hash table
   private boolean check_opt(Node n) {
     if( touched(n) ) {          // First & only test: in type table or not
-      assert (n instanceof ScopeNode) || _wrk_bits.get(n._uid)  || check_gvn(n,true) || _fun_bits.get(n._uid); // Check also in GVN table
+      assert (n instanceof ScopeNode) || _wrk_bits.get(n._uid)  || check_gvn(n,true); // Check also in GVN table
       return true;              // Yes in both type table and GVN table
     }
     assert !check_gvn(n,false); // Check also not in GVN table
@@ -165,7 +175,7 @@ public class GVNGCM {
     }
     boolean found = false;
     for( Node o : _vals.keySet() ) if( (old=o)._uid == n._uid ) { found=true; break; }
-    assert found == expect || _wrk_bits.get(n._uid) || _fun_bits.get(n._uid): "Found but not expected: "+old.toString(); // Expected in table or on worklist
+    assert found == expect || _wrk_bits.get(n._uid) : "Found but not expected: "+old.toString(); // Expected in table or on worklist
     return false;               // Not in table
   }
 
@@ -283,27 +293,19 @@ public class GVNGCM {
 
   // Once the program is complete, any time anything is on the worklist we can
   // always conservatively iterate on it.
+  public boolean _small_work;
   void iter() {
     // As a modest debugging convenience, avoid inlining (which blows up the
     // graph) until other optimizations are done.  Gather the possible inline
     // requests and set them aside until the main list is empty, then work down
     // the inline list.
-    Ary<Node> funs = new Ary<>(new Node[1], 0);
-    _fun_bits = new BitSet();   // Wimpy priorities: FunNodes last because inlining, and global for asserts
-    boolean work;
-    while( (work=_work._len > 0) || funs._len > 0 ) {
-      Node n = (work ? _work : funs).pop(); // Pull from main worklist before functions
-      (work ? _wrk_bits : _fun_bits).clear(n._uid);
+    while( (_small_work=_work._len > 0) || _work2._len > 0 ) {
+      Node n = (_small_work ? _work : _work2).pop(); // Pull from main worklist before functions
+      (_small_work ? _wrk_bits : _wrk2_bits).clear(n._uid);
       if( n.is_dead() ) continue;
-      if( n._uses._len==0 ) { kill(n); continue; }
-      if( _work._len > 0 && n instanceof FunNode && n.is_copy(this,-1) == null ) {
-        // Stall FunNodes, which may inline, until the main list goes empty
-        if( !_fun_bits.get(n._uid ) ) { funs.add(n); _fun_bits.set(n._uid); }
-      } else {
-        xform_old(n);
-      }
+      if( n._uses._len==0 ) kill(n);
+      else xform_old(n);
     }
-    _fun_bits = null;           // Clear global (and turn off asserting)
   }
 
   // Global Optimistic Constant Propagation.
