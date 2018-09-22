@@ -208,7 +208,7 @@ public class FunNode extends RegionNode {
     for( int j=2; j<_defs._len; j++ ) {
       boolean split=true;
       for( int i=0; i<parms.length; i++ )
-        if( parms[i]!=null ) split &= gvn.type(parms[i].in(j)).widen().isa(sig[i]);
+        split &= parms[i] == null || gvn.type(parms[i].in(j)).widen().isa(sig[i]);
       fun.add_def(split ? in(j) : xctrl);
     }
     // TODO: Install in ScopeNode for future finding
