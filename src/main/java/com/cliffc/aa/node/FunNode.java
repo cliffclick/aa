@@ -116,15 +116,6 @@ public class FunNode extends RegionNode {
     throw AA.unimpl();          // Gotta make a new FIDX
   }
 
-  // ----
-  @Override public Node ideal(GVNGCM gvn) {
-    // Generic Region ideal
-    Node n = ideal(gvn,!_all_callers_known);
-    if( n!=null ) return n;
-    
-    return split_callers(gvn);
-  }
-
   // Declare as all-callers-known.  Done by GCP after flowing function-pointers
   // to all call sites, and by inlining when making private copies.
   public void all_callers_known( ) {
@@ -132,48 +123,102 @@ public class FunNode extends RegionNode {
     _all_callers_known = true;
   }
   
-  private Node split_callers( GVNGCM gvn ) {
-    // Bail if there are any dead paths; RegionNode ideal will clean out
+  // ----
+  @Override public Node ideal(GVNGCM gvn) {
+    // Generic Region ideal
+    Node n = ideal(gvn,!_all_callers_known);
+    if( n!=null ) return n;
+
+    // Type-specialize as-needed
+    if( _tf.is_forward_ref() ) return null;
+    ParmNode[] parms = new ParmNode[_tf.nargs()];
+    EpilogNode epi = split_callers_gather(gvn,parms);
+    if( epi == null ) return null;
+    // Look for appropriate type-specialize callers
+    FunNode fun = type_special(gvn,parms);
+    if( fun == null ) return null;
+    // Split the callers according to the new 'fun'.
+    return split_callers(gvn,rpc(),epi,fun);
+  }
+
+  // Called to inline-for-size
+  public Node inline_size( GVNGCM gvn ) {
+    if( _tf.is_forward_ref() ) return null;
+    ParmNode[] parms = new ParmNode[_tf.nargs()];
+    EpilogNode epi = split_callers_gather(gvn,parms);
+    if( epi == null ) return null;
+    // Look for appropriate type-specialize callers
+    FunNode fun = split_size(gvn,epi);
+    if( fun == null ) return null;
+    // Split the callers according to the new 'fun'.
+    return split_callers(gvn,rpc(),epi,fun);
+  }
+
+  
+  private EpilogNode split_callers_gather( GVNGCM gvn, ParmNode[] parms ) {
+    if( _tf.is_forward_ref() ) return null;
     for( int i=1; i<_defs._len; i++ ) if( gvn.type(in(i))==Type.XCTRL ) return null;
     if( _defs._len <= 2 ) return null; // No need to split callers if only 1
-    if( _tf.is_forward_ref() ) return null;
 
     // Gather the ParmNodes and the EpilogNode.  Ignore other (control) uses
-    int nargs = _tf.nargs();
-    ParmNode[] parms = new ParmNode[nargs];
-    ParmNode rpc = null;
     EpilogNode epi = null;
     for( Node use : _uses )
       if( use instanceof ParmNode ) {
         ParmNode parm = (ParmNode)use;
-        Type pt = gvn.type(parm);
-        if( pt instanceof TypeErr && !pt.above_center() && pt != TypeErr.ALL ) return null;
-        if( parm._idx == -1 ) rpc = parm;
-        else parms[parm._idx] = parm;
+        assert !(gvn.type(use) instanceof TypeErr);
+        //Type pt = gvn.type(parm);
+        //if( pt instanceof TypeErr && !pt.above_center() && pt != TypeErr.ALL ) return null;
+        if( parm._idx != -1 ) parms[parm._idx] = parm;
       } else if( use instanceof EpilogNode ) { assert epi==null || epi==use; epi = (EpilogNode)use; }
-    if( epi == null ) return null; // No epilog is a dead function
-    if( rpc == null ) return null; // No RPC is a forward ref
-
-    // Make a clone of the original function to split the callers.  Done for
-    // e.g. primitive type-specialization or for tiny functions.
-    FunNode fun =   split_callers_heuristic(gvn,parms,epi);
-    return fun==null ? null : split_callers(gvn,rpc  ,epi,fun);
+    return epi;                 // Epilog (or null if dead)
   }
   
-  // General heuristic for splitting the many callers of this function into
-  // groups with a private function body.  Can be split to refine types
-  // (e.g. primitive int math vs primitive float math), or to allow
-  // constant-prop for some args, or for tiny size.
-  private FunNode split_callers_heuristic( GVNGCM gvn, ParmNode[] parms, EpilogNode epi ) {
-    // Split for primitive type specialization
-    FunNode fun1 = type_special(gvn,parms);
-    if( fun1 != null ) return fun1;
+  // Look for type-specialization inlining.  If any ParmNode has an unresolved
+  // Call user, then we'd like to make a clone of the function body (in least
+  // up to getting all the function TypeUnions to clear out).  The specialized
+  // code uses generalized versions of the arguments, where we only specialize
+  // on arguments that help immediately.
+  private FunNode type_special( GVNGCM gvn, ParmNode[] parms ) {
+    // Visit all ParmNodes, looking for unresolved call uses
+    boolean any_unr=false;
+    for( ParmNode parm : parms )
+      if( parm != null ) 
+        for( Node call : parm._uses )
+          if( call instanceof CallNode &&
+              (call.in(1) instanceof UnresolvedNode) ) { // Call overload not resolved
+            any_unr = true; break;
+          }
+    if( !any_unr ) return null; // No unresolved calls; no point in type-specialization
 
-    // Split for tiny body
-    FunNode fun0 = split_size(gvn,epi);
-    if( fun0 != null ) return fun0;
+    // TODO: Split with a known caller in slot 1
+    if( !(in(1) instanceof ScopeNode) )
+      return null;
+    assert !_all_callers_known;
 
-    return null;                // No splitting callers
+    // If Parm has unresolved calls, we want to type-specialize on its
+    // arguments.  Call-site #1 is the most generic call site for the parser
+    // (all Scalar args).  Peel out 2nd call-site args and generalize them.
+    Type[] sig = new Type[parms.length];
+    for( int i=0; i<parms.length; i++ )
+      sig[i] = parms[i]==null ? Type.SCALAR : gvn.type(parms[i].in(2)).widen();
+    // Make a new function header with new signature
+    TypeTuple ts = TypeTuple.make_args(sig);
+    assert ts.isa(_tf._ts);
+    if( ts == _tf._ts ) return null; // No improvement for further splitting
+    // Make a prototype new function header.  Clone the generic unknown caller in slot 1.  
+    FunNode fun = new FunNode(in(1),ts,_tf._ret,name(),_tf._nargs);
+    //fun.add_def(xctrl); // Keeping the generic path on the original FunNode
+    // Look in remaining paths and decide if they split or stay
+    Node xctrl = gvn.con(Type.XCTRL);
+    for( int j=2; j<_defs._len; j++ ) {
+      boolean split=true;
+      for( int i=0; i<parms.length; i++ )
+        if( parms[i]!=null ) split &= gvn.type(parms[i].in(j)).widen().isa(sig[i]);
+      fun.add_def(split ? in(j) : xctrl);
+    }
+    // TODO: Install in ScopeNode for future finding
+    fun._all_callers_known = false;
+    return fun;
   }
 
   // Split a single-use copy (e.g. fully inline) if the function is "small
@@ -220,54 +265,6 @@ public class FunNode extends RegionNode {
     fun.add_def(in(2));
     for( int i=3; i<_defs._len; i++ ) fun.add_def(top);
     fun.all_callers_known();    // Only 1 caller
-    return fun;
-  }
-
-  // Look for type-specialization inlining.  If any ParmNode has an unresolved
-  // Call user, then we'd like to make a clone of the function body (in least
-  // up to getting all the function TypeUnions to clear out).  The specialized
-  // code uses generalized versions of the arguments, where we only specialize
-  // on arguments that help immediately.
-  private FunNode type_special( GVNGCM gvn, ParmNode[] parms ) {
-    // Visit all ParmNodes, looking for unresolved call uses
-    boolean any_unr=false;
-    for( ParmNode parm : parms )
-      if( parm != null ) 
-        for( Node call : parm._uses )
-          if( call instanceof CallNode &&
-              (call.in(1) instanceof UnresolvedNode) ) { // Call overload not resolved
-            any_unr = true; break;
-          }
-    if( !any_unr ) return null; // No unresolved calls; no point in type-specialization
-
-    // TODO: Split with a known caller in slot 1
-    if( !(in(1) instanceof ScopeNode) )
-      return null;
-    assert !_all_callers_known;
-
-    // If Parm has unresolved calls, we want to type-specialize on its
-    // arguments.  Call-site #1 is the most generic call site for the parser
-    // (all Scalar args).  Peel out 2nd call-site args and generalize them.
-    Type[] sig = new Type[parms.length];
-    for( int i=0; i<parms.length; i++ )
-      sig[i] = parms[i]==null ? Type.SCALAR : gvn.type(parms[i].in(2)).widen();
-    // Make a new function header with new signature
-    TypeTuple ts = TypeTuple.make_args(sig);
-    assert ts.isa(_tf._ts);
-    if( ts == _tf._ts ) return null; // No improvement for further splitting
-    // Make a prototype new function header.  Clone the generic unknown caller in slot 1.  
-    Node xctrl = gvn.con(Type.XCTRL);
-    FunNode fun = new FunNode(null,ts,_tf._ret,name(),_tf._nargs);
-    fun.add_def(xctrl); // Keeping the generic path on the original FunNode
-    // Look in remaining paths and decide if they split or stay
-    for( int j=2; j<_defs._len; j++ ) {
-      boolean split=true;
-      for( int i=0; i<parms.length; i++ )
-        if( parms[i]!=null ) split &= gvn.type(parms[i].in(j)).widen().isa(sig[i]);
-      fun.add_def(split ? in(j) : xctrl);
-    }
-    // TODO: Install in ScopeNode for future finding
-    fun._all_callers_known = false;
     return fun;
   }
 
@@ -318,7 +315,11 @@ public class FunNode extends RegionNode {
       Node c = map.get(n);
       if( n instanceof ParmNode && n.in(0) == this ) {  // Leading edge ParmNodes
         c.add_def(map.get(n.in(0))); // Control
-        for( int j=1; j<_defs._len; j++ ) // Get the new parm path or null according to split
+        // Slot#1 for a type-split gets the new generic type from the new signature.
+        // Slot#1 for other live splits gets from the old parm inputs.
+        int idx = ((ParmNode)n)._idx;
+        c.add_def(gvn.con(idx==-1 ? TypeRPC.ALL_CALL : fun._tf.arg(idx))); // Generic arg#1
+        for( int j=2; j<_defs._len; j++ ) // Get the new parm path or null according to split
           c.add_def( fun.in(j)==any ? dany : n.in(j) );
       } else if( n != this ) {  // Interior nodes
         for( Node def : n._defs ) {
@@ -424,10 +425,10 @@ public class FunNode extends RegionNode {
     return t;
   }
 
-  public Node rpc() {
+  public ParmNode rpc() {
     for( Node use : _uses )
       if( use instanceof ParmNode && ((ParmNode)use)._idx==-1 )
-        return use;
+        return (ParmNode)use;
     return null;
   }
   

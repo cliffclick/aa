@@ -384,7 +384,7 @@ public class GVNGCM {
     Type t = n.all_type();
     if( !t.above_center() && !(n instanceof ErrNode) && !(n instanceof ConNode) )
       t = t.dual();             // Start above-center and fall
-    if( !t.above_center() )     // Constants and errors act as-if they started high and fell to the constant value ...
+    if( !t.above_center() || n instanceof ConNode ) // Constants and errors act as-if they started high and fell to the constant value ...
       for( Node use : n._uses ) add_work(use); // ...by adding users
     setype(n,t);
     // Walk forward reachable graph

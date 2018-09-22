@@ -25,6 +25,7 @@ public class ProjNode extends Node {
     Type c = gvn.type(in(0));
     return ((TypeTuple)c).at(_idx); // Otherwise our type is just the matching tuple slice
   }
+  @Override public Type all_type() { return Type.SCALAR; }
 
   @Override public int hashCode() { return super.hashCode()+_idx; }
   @Override public boolean equals(Object o) {
