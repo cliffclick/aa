@@ -57,7 +57,7 @@ public class LoadNode extends Node {
     Type t = gvn.type(in(1));
     while( t instanceof TypeName ) t = ((TypeName)t)._t;
     if( t.isa(TypeOop.OOP_) ) return Type.XSCALAR; // Very high address; might fall to any valid value
-    if( t.may_have_nil() ) return Type.XSCALAR; // Might fail before loading
+    if( t.may_have_nil() ) return Type.SCALAR; // Might fail before loading
     if( TypeOop.OOP0.isa(t) ) return Type.SCALAR; // Too low, might not have any fields
     
     if( t instanceof TypeStruct ) {
@@ -72,17 +72,12 @@ public class LoadNode extends Node {
   @Override public String err(GVNGCM gvn) {
     Type t = gvn.type(in(1));
     while( t instanceof TypeName ) t = ((TypeName)t)._t;
-    //if( t.isa(TypeOop.OOP_) ) return Type.XSCALAR; // Very high address; might fall to any valid value
-    //Type tnil = t.may_have_nil() ? TypeErr.make(_badnil) : Type.ANY; // Null compile-time error
-    //if( TypeOop.OOP0.isa(t) )            // Too low, might not have any fields
-    //  return tnil.meet(TypeErr.make(_badfld));
-    //if( t instanceof TypeStruct ) {
-    //  TypeStruct ts = (TypeStruct)t;
-    //  int idx = ts.find(_fld);  // Find the named field
-    //  Type tfld = idx == -1 ? TypeErr.make(_badfld) : ts.at(idx); // Field type
-    //  return tnil.meet(tfld);
-    //}
-    //if( tnil != Type.ANY ) return tnil;
+    if( t.may_have_nil() ) return _badnil;
+
+    if( TypeOop.OOP0.isa(t) ) return _badfld; // Too low, might not have any fields
+    if( t instanceof TypeStruct &&
+        ((TypeStruct)t).find(_fld) == -1 )
+      return _badfld;
     
     throw AA.unimpl();
   }

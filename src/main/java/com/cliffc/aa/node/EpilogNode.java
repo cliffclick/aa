@@ -77,7 +77,9 @@ public class EpilogNode extends Node {
 
   @Override public Type all_type() { return TypeTuple.GENERIC_FUN; }
   
-  // Return the op_prec of the returned value.  Not sensible except when call
+  // Return the op_prec of the returned value.  Not sensible except when called
   // on primitives.
-  @Override public byte op_prec() { return val().op_prec(); }
+  @Override public byte op_prec() {
+    return val()._uid < GVNGCM._INIT0_CNT ? val().op_prec() : -1;
+  }
 }
