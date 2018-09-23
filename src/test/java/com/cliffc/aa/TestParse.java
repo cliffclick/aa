@@ -11,7 +11,26 @@ import static org.junit.Assert.assertTrue;
 public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
+    // Count-down self-recursive loop, passing in a AND function
+    //test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({&},2)", TypeInt.FALSE);
+    //test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({+},2)", TypeInt.con(2));
+    // User-defined linked-list
+    //test("List=:@{next,val};\n"+
+    //     "List0={n v -> List(@{next=n,val=v})};\n"+
+    //     "x=List0(List0(0,1.2),2.3);\n"+
+    //     "f={x->x*x};\n"+
+    //     "map = { f list -> list ? List0(map(f,list.next),f(list.val)) : 0 };\n"+
+    //     "map(f,x)"
+    //     , TypeStr.ABC);
 
+    
+    // Making a trivial function which needs H-M or full inlining to type.
+    // Adding syntax to prevent inlining, which means needs H-M
+    //test("fun={# s->s.x}; (fun(@{x=3.14}),fun(@{x=\"abc\"}))",
+    //     TypeTuple.make_all(TypeFlt.con(3.14),TypeStr.ABC)); // result is a tuple of (3.14,"abc")
+
+    
+    // A collection of tests which like to fail easily
     testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1,) is not a @{x,y,}","                           ");
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'","                    ");
     testerr("{+}(1,2,3)", "Passing 3 arguments to +{flt64 flt64 -> flt64} which takes 2 arguments","          ");
@@ -21,23 +40,6 @@ public class TestParse {
     test_isa("{x y -> x+y}", TypeTuple.FUNPTR2); // actually {Flt,Int} x {FltxInt} -> {FltxInt} but currently types {SCALAR,SCALAR->SCALAR}
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.BOOL );
 
-    
-    // Making a trivial function which needs H-M or full inlining to type.
-    // Adding syntax to prevent inlining, which means needs H-M
-    //test("fun={# s->s.x}; (fun(@{x=3.14}),fun(@{x=\"abc\"}))",
-    //     TypeTuple.make_all(TypeFlt.con(3.14),TypeStr.ABC)); // result is a tuple of (3.14,"abc")
-
-    
-    // User-defined linked-list
-    //test("f1={x y -> x&y}; f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0(f1,2)", TypeInt.FALSE);
-    //test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({+},2)", TypeInt.con(2));
-    //test("List=:@{next,val};\n"+
-    //     "List0={n v -> List(@{next=n,val=v})};\n"+
-    //     "x=List0(List0(0,1.2),2.3);\n"+
-    //     "f={x->x*x};\n"+
-    //     "map = { f list -> list ? List0(map(f,list.next),f(list.val)) : 0 };\n"+
-    //     "map(f,x)"
-    //     , TypeStr.ABC);
   }
   
   @Test public void testParse0() {

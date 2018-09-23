@@ -237,6 +237,8 @@ public class CallNode extends Node {
     Type t = gvn.type(fp);      // If inlined, its the result, if not inlined, its the function being called
     if( _inlined )              // Inlined functions just pass thru & disappear
       return TypeTuple.make_all(tc,t);
+    if( t == Type.SCALAR ) // Calling something that MIGHT be a function, no idea what the result is
+      return TypeTuple.make_all(Type.CTRL,Type.SCALAR);
     
     if( gvn._opt ) // Manifesting optimistic virtual edges between caller and callee
       wire(gvn,t); // Make real edges from virtual edges
@@ -248,18 +250,6 @@ public class CallNode extends Node {
       // errors on arguments.
       for( Node epi : fp._defs )
         trez = trez.join(value1(gvn,gvn.type(epi))); // JOIN of choices
-/* Cliff notes:
-   Have call with multiple options.  Taking JOIN of choices only works for
-   primitives?  Does it work for random user calls... still being resolved?
-
-   Join: of {~flt,~int} is ~real.  
-   PES: only lifting inputs.  Some start invalid.  Output is JOIN of valid,
-   and ignore the invalid outputs.  More become valid over time, so more
-   outputs join the JOIN, which keeps lifting.
-   OPT: only lowering inputs.  All start valid.  Output is JOIN of valid.
-   Fewer become valid over time; so fewer outputs join the JOIN, which 
-   keeps falling.  During GCP, also drop more-expensive but valid choices.
- */
     } else {                                  // Single resolved target
       trez = value1(gvn,t);                   // Return type or SCALAR if invalid args
     }
