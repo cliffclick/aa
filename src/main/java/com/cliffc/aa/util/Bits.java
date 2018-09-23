@@ -138,7 +138,9 @@ public class Bits implements Iterable<Integer> {
         return make(0,bits);
 
       } else {                  // Meet of a high set and low set
-        throw AA.unimpl();
+        // Probably require 1 bit from high set in the low set.
+        // For now, just return low set
+        return this;
       }
     }
     if( bs._con==0 ) {          // Meet of a low set and high set

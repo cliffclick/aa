@@ -146,6 +146,7 @@ public class GVNGCM {
   public void set_def_reg(Node n, int idx, Node def) {
     _vals.remove(n);            // Remove from GVN
     n.set_def(idx,def,this);    // Hack edge
+    if( n.is_dead() ) return;
     assert !check_gvn(n,false); // Check not in GVN table after hack
     _vals.put(n,n);             // Back in GVN table
     add_work(n);
@@ -352,11 +353,12 @@ public class GVNGCM {
       // Remove ambiguity after worklist runs dry
       for( int i=0; i<calls.len(); i++ ) {
         Node call = calls.at(i);
-        Node fun = ((UnresolvedNode)call.in(1)).resolve(this,(CallNode)call);
-        if( fun != null ) {
-          set_def_reg(call, 1, fun);
-          add_work(call); // Go again- values will continue to fall in the lattice
-          calls.del(i--); // Remove from worklist
+        if( !call.is_dead() ) {
+          Node fun = ((UnresolvedNode)call.in(1)).resolve(this,(CallNode)call);
+          if( fun != null ) {
+            set_def_reg(call, 1, fun);
+            calls.del(i--); // Remove from worklist
+          }
         }
       }
     }

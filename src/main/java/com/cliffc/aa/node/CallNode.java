@@ -136,9 +136,11 @@ public class CallNode extends Node {
       Type formal = formals.at(i);
       Type actual = gvn.type(arg(i));
       byte xcvt = actual.isBitShape(formal);
-      if( xcvt == 99 ) return null;
+      if( xcvt == 99 ) return null;       // Requires user-specified conversion
       if( xcvt == -1 ) return null;       // Wait for call args to resolve
-      if( xcvt == 1 ) {
+      // xcvt of 0 is correct shape; xcvt of 1 is acceptable but not as precise
+      // xcvt of 2 requires built-in conversion (e.g. int->flt)
+      if( xcvt == 2 ) {
         PrimNode cvt = PrimNode.convert(arg(i),actual,formal);
         if( cvt.is_lossy() ) throw new IllegalArgumentException("Requires lossy conversion");
         set_def(i+2,gvn.xform(cvt),gvn); // set the converted arg
@@ -182,7 +184,7 @@ public class CallNode extends Node {
   // CTRL users - once for the call, and once for the function being called.
   private Node wire(GVNGCM gvn, FunNode fun) {
     Node ctrl = in(0);
-    for( int i=2; i<fun._defs.len(); i++ ) // Skip default control (for top-level calls vs top-level fun-defs)
+    for( int i=fun._all_callers_known?1:2; i<fun._defs.len(); i++ ) // Skip default control (for top-level calls vs top-level fun-defs)
       if( fun._defs.at(i)==ctrl ) // Look for same control
         return null;              // Already wired up
     
@@ -318,7 +320,7 @@ public class CallNode extends Node {
     // Error#3: ambiguous
     if( fp instanceof UnresolvedNode )
       //return _badargs.errMsg("Ambiguous call");
-      return null;              // If unresolved, must also be uncalled so allow arg badness
+      return null; // If unresolved, must also be uncalled so allow arg badness
 
     // Error#4: Now do an arg-check
     TypeTuple formals = txfun._ts; // Type of each argument

@@ -27,7 +27,7 @@ public class TypeName extends Type<TypeName> {
     TypeName t2 = (TypeName)t1.hashcons();
     return t1==t2 ? t1 : t2.free(t1);
   }
-  public static Type make( String name, Type t) { return t.is_simple() ? t : make0(name,t); }
+  public static TypeName make( String name, Type t) { return make0(name,t); }
 
   public  static final TypeName TEST_ENUM = make0("__test_enum",TypeInt.INT8);
   private static final TypeName TEST_FLT  = make0("__test_flt" ,TypeFlt.FLT32);

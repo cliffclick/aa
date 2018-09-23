@@ -152,9 +152,9 @@ public class TypeInt extends Type<TypeInt> {
   @Override public byte isBitShape(Type t) {
     // TODO: Allow loss-less conversions (e.g. small float integer constants convert to ints just fine)
     if( t._type == Type.TINT ) return (byte)(_z<=((TypeInt)t)._z ? 0 : 99);
-    if( t._type == Type.TFLT ) return 1; // Int->Flt ignores large int overflow issues
-    if( t._type == Type.TREAL ) return 0;
-    if( t._type == Type.TSCALAR ) return 0;
+    if( t._type == Type.TFLT ) return 2; // Int->Flt ignores large int overflow issues
+    if( t._type == Type.TREAL ) return 1;
+    if( t._type == Type.TSCALAR ) return 1;
     //if( t._type == Type.TUNION && t.may_be_null() && this==NULL ) return 0;
     throw com.cliffc.aa.AA.unimpl();
   }

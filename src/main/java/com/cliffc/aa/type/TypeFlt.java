@@ -93,8 +93,8 @@ public class TypeFlt extends Type<TypeFlt> {
     // TODO: Allow loss-less conversions (e.g. small float integer constants convert to ints just fine)
     if( t._type == Type.TFLT ) return (byte)(_z<=((TypeFlt)t)._z ? 0 : 99);
     if( t._type == Type.TINT ) return 99; // Flt->Int always requires user intervention
-    if( t._type == Type.TREAL ) return 0;
-    if( t._type == Type.TSCALAR ) return 0;
+    if( t._type == Type.TREAL ) return 1;
+    if( t._type == Type.TSCALAR ) return 1;
     throw com.cliffc.aa.AA.unimpl();
   }
   @Override public Type widen() {

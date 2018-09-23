@@ -153,11 +153,10 @@ public class Parse {
       Type ot = _e.lookup_type(tvar);
       if( ot              != null ) return err_ctrl2("Cannot re-assign type '"+tvar+"'");
       if( _e.lookup(tvar) != null ) return err_ctrl2("Cannot re-assign val '"+tvar+"' as a type");
-      Type tn = TypeName.make(tvar,t);
-      assert tn instanceof TypeName; // Can fail out for weird mixes
+      TypeName tn = TypeName.make(tvar,t);
       _e.add_type(tvar,tn); // Assign type-name
       // TODO: Add reverse cast-away
-      PrimNode cvt = PrimNode.convert(null,t,tn);
+      PrimNode cvt = PrimNode.convertTypeName(t,tn,errMsg());
       return _e.add(tvar,gvn(_e.as_fun(cvt))); // Return type-name constructor
     }
 

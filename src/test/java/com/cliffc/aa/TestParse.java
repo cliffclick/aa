@@ -12,14 +12,14 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
 
+    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.TRUE );
+    testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1,) is not a @{x,y,}","                           ");
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'","                    ");
     testerr("{+}(1,2,3)", "Passing 3 arguments to +{flt64 flt64 -> flt64} which takes 2 arguments","          ");
     test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
     testerr("x=1+y","Unknown ref 'y'","     ");
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
-    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.TRUE );
     test_isa("{x y -> x+y}", TypeTuple.FUNPTR2); // actually {Flt,Int} x {FltxInt} -> {FltxInt} but currently types {SCALAR,SCALAR->SCALAR}
-    testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1,) is not a @{x,y,}","                           ");
 
     
     // Making a trivial function which needs H-M or full inlining to type.
@@ -27,19 +27,6 @@ public class TestParse {
     //test("fun={# s->s.x}; (fun(@{x=3.14}),fun(@{x=\"abc\"}))",
     //     TypeTuple.make_all(TypeFlt.con(3.14),TypeStr.ABC)); // result is a tuple of (3.14,"abc")
 
-    
-    // TODO: Split out top-level known calls from cmd-line vs "unknown calls"
-    // control, and special "unknown arg" Nodes - not ConNodes, and not shared.
-    //
-    // Until more is parsed, can/should more strongly type.  Since the parser
-    // ends with each example, fair to say "no more top-level calls" and remove
-    // them.... except what we discover from CallNodes
-    //
-    // TODO: CallNodes pass all their args to all the named functions' args as
-    // part of type call.  This is a "push forward" from the call into the
-    // FunNode/Parm types - the Call#RPC into the "unknown RPC", and the call
-    // args into the matching FunNode "unknown args" - for all listed functions
-    // appearing at the CallNodes' optimistic input list.
     
     // User-defined linked-list
     //test("f1={x y -> x&y}; f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0(f1,2)", TypeInt.FALSE);
@@ -150,6 +137,7 @@ public class TestParse {
   }
 
   @Test public void testParse2() {
+    test("mul3={x -> y=3; x*y}; mul3(2)", TypeInt.con(6)); // multiple statements in func body
     // Anonymous function definition
     test_isa("{x y -> x+y}", TypeTuple.FUNPTR2); // actually {Flt,Int} x {FltxInt} -> {FltxInt} but currently types {SCALAR,SCALAR->SCALAR}
     test("{5}()", TypeInt.con(5)); // No args nor -> required; this is simply a function returning 5, being executed
@@ -178,7 +166,6 @@ public class TestParse {
   }
 
   @Test public void testParse3() {
-    test("x=3; fun:{real->real}={x -> x*2}; fun(2.1)+fun(x)", TypeFlt.con(2.1*2+3*2)); // Mix of types to fun()
     // Type annotations
     test("-1:int", TypeInt.con( -1));
     test("(1+2.3):flt", TypeFlt.make(0,64,3.3));

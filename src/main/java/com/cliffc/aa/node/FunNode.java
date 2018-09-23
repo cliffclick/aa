@@ -98,16 +98,16 @@ public class FunNode extends RegionNode {
     sb.p('{');
     int cnt=0;
     for( Integer ii : fidxs ) {
-      if( ++cnt==3 ) break;
+      if( ++cnt==4 ) break;
       name(ii,sb).p(fidxs.above_center()?'+':',');
     }
-    if( cnt>=3 || fidxs.inf() ) sb.p("...");
+    if( cnt>=4 || fidxs.inf() ) sb.p("...");
     sb.p('}');
     return sb;
   }
   private static SB name( int i, SB sb ) {
     String name = NAMES.atX(i);
-    return sb.p(name==null ? "{"+Integer.toString(i)+"}" : name);
+    return sb.p(name==null ? Integer.toString(i) : name);
   }
   public String name() { return name(_tf.fidx()); }
   public static String name(int fidx) { return NAMES.atX(fidx); }
@@ -129,6 +129,11 @@ public class FunNode extends RegionNode {
     Node n = ideal(gvn,!_all_callers_known);
     if( n!=null ) return n;
 
+    if( gvn._small_work ) { // Only doing small-work now
+      gvn.add_work2(this);  // Maybe want to inline later
+      return null;
+    }
+      
     // Type-specialize as-needed
     if( _tf.is_forward_ref() ) return null;
     ParmNode[] parms = new ParmNode[_tf.nargs()];
@@ -136,12 +141,7 @@ public class FunNode extends RegionNode {
     if( epi == null ) return null;
     // Look for appropriate type-specialize callers
     FunNode fun = type_special(gvn,parms);
-    if( fun == null ) { // No type-specilization to do 
-      if( gvn._small_work ) { // Only doing small-work now
-        // Maybe want to inline later
-        gvn.add_work2(this);
-        return null;
-      }
+    if( fun == null ) { // No type-specialization to do
       // Large code-expansion allowed; can inline for other reasons
       fun = split_size(gvn,epi,parms);
       if( fun == null ) return null;
@@ -151,7 +151,6 @@ public class FunNode extends RegionNode {
   }
 
   private EpilogNode split_callers_gather( GVNGCM gvn, ParmNode[] parms ) {
-    if( _tf.is_forward_ref() ) return null;
     for( int i=1; i<_defs._len; i++ ) if( gvn.type(in(i))==Type.XCTRL ) return null;
     if( _defs._len <= 2 ) return null; // No need to split callers if only 1
 
@@ -180,7 +179,8 @@ public class FunNode extends RegionNode {
       if( parm != null ) 
         for( Node call : parm._uses )
           if( call instanceof CallNode &&
-              (call.in(1) instanceof UnresolvedNode) ) { // Call overload not resolved
+              call.in(1) instanceof UnresolvedNode ) { // Call overload not resolved
+            // TODO: Figure out which parm slot improves here, and type-split on that slot
             any_unr = true; break;
           }
     if( !any_unr ) return null; // No unresolved calls; no point in type-specialization
@@ -202,7 +202,6 @@ public class FunNode extends RegionNode {
     if( ts == _tf._ts ) return null; // No improvement for further splitting
     // Make a prototype new function header.  Clone the generic unknown caller in slot 1.  
     FunNode fun = new FunNode(in(1),ts,_tf._ret,name(),_tf._nargs);
-    //fun.add_def(xctrl); // Keeping the generic path on the original FunNode
     // Look in remaining paths and decide if they split or stay
     Node xctrl = gvn.con(Type.XCTRL);
     for( int j=2; j<_defs._len; j++ ) {
@@ -298,28 +297,15 @@ public class FunNode extends RegionNode {
         work.addAll(n._uses);  // Visit all uses also
       map.put(n,n.copy()); // Make a blank copy with no edges and map from old to new
     }
-
-    Node  any = gvn.con(Type.XCTRL);
-    Node dany = gvn.con(Type.XSCALAR);
+    // Correct new function index
     EpilogNode newepi = (EpilogNode)map.get(epi);
     newepi._fidx = fun._tf.fidx();
-    Node new_unr = epi;
-    // Are we making a type-specialized copy, that can/should be found by same-typed users?
-    // Or are we cloning a private copy just for this call-site?
-    if( !fun._all_callers_known ) {
-      // All uses now get to select either the old or new (type-specific) copy.
-      EpilogNode xxxepi = epi.copy(); // this one will replace 'epi' in a bit
-      for( Node def : epi._defs ) xxxepi.add_def(def);
-      gvn.init(xxxepi);
-      new_unr = new UnresolvedNode();
-      new_unr.add_def(xxxepi);
-      new_unr.add_def(newepi);
-      gvn.init(new_unr);
-    }
 
     // Fill in edges.  New Nodes point to New instead of Old; everybody
     // shares old nodes not in the function (and not cloned).  The
     // FunNode & Parms only get the matching slice of args.
+    Node  any = gvn.con(Type.XCTRL);
+    Node dany = gvn.con(Type.XSCALAR);
     for( Node n : map.keySet() ) {
       Node c = map.get(n);
       if( n instanceof ParmNode && n.in(0) == this ) {  // Leading edge ParmNodes
@@ -332,9 +318,10 @@ public class FunNode extends RegionNode {
           c.add_def( fun.in(j)==any ? dany : n.in(j) );
       } else if( n != this ) {  // Interior nodes
         for( Node def : n._defs ) {
-          Node newdef = map.get(def);
-          if( def==epi )  // If using the old epilog in a recursive fcn,
-            newdef = new_unr; // need to point to the function-choice which includes the old fcn
+          // Map old to new, except if using the old epilog in a recursive fcn,
+          // need to stay pointing to the old fcn.  The epilog choices will be
+          // updated further below.
+          Node newdef = def==epi ? def : map.get(def);
           c.add_def(newdef==null ? def : newdef);
         }
       }
@@ -359,13 +346,33 @@ public class FunNode extends RegionNode {
       }
       gvn.rereg(nn,ot);
     }
+    assert !epi.is_dead();      // Not expecting this to be dead already
 
     // Repoint all Calls uses to an Unresolved choice of the old and new
     // functions and let the Calls resolve individually.
-    if( !fun._all_callers_known ) // Split-for-type, possible many future callers
-      gvn.subsume(epi,new_unr);
-    else {
-      // Single path being inlined, if any
+    if( !fun._all_callers_known ) { // Split-for-type, possible many future callers
+      UnresolvedNode new_unr = new UnresolvedNode();
+      new_unr.add_def(epi);
+      gvn.init(new_unr);
+
+      // Direct all Call uses to the new Unresolved
+      for( int i=0; i<epi._uses._len; i++ ) {
+        Node call = epi._uses.at(i);
+        if( call instanceof CallNode && call.in(1)==epi ) {
+          gvn.set_def_reg(call,1,new_unr);// As part of removing call->epi edge, compress epi uses
+          i--;             // Rerun set point in epi use list after compression
+        }
+      }
+      // Include the new Epilog in all Unresolved
+      for( int i=0; i<epi._uses._len; i++ ) {
+        Node unr = epi._uses.at(i);
+        assert !(unr instanceof CallNode);
+        if( unr instanceof UnresolvedNode )
+          gvn.add_def(unr,newepi);
+      }      
+
+    } else {                    // All-callers-known, so actually only 1
+      // Single path being inlined
       int path_being_inlined=-1;
       for( int j=1; j<_defs._len; j++ )
         if( fun.in(j)!=any )
@@ -375,8 +382,7 @@ public class FunNode extends RegionNode {
       // being split-for-size.  Repoint the one Call._rpc matching rpc_parm
       // in(path_being_inlined) to new_epi.
       int rpc = ((TypeRPC)gvn.type(rpc_parm.in(path_being_inlined))).rpc();
-      for( int j=0; !epi.is_dead() && j<epi._uses._len; j++ ) {
-        Node use = epi._uses.at(j);
+      for( Node use : epi._uses ) {
         if( use instanceof CallNode && 
             ((CallNode)use)._rpc == rpc ) {
           gvn.set_def_reg(use,1,newepi);

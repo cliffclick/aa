@@ -55,17 +55,17 @@ public class UnresolvedNode extends Node {
       TypeTuple tepi = (TypeTuple)gvn.type(epi);
       assert tepi.is_fun_ptr();
       TypeFun fun = (TypeFun)tepi.at(3);
-      Type[] formals = fun._ts._ts;   // Type of each argument
-      if( formals.length != call.nargs() ) continue; // Wrong arg count, toss out
+      if( fun.nargs() != call.nargs() ) continue; // Wrong arg count, toss out
+      TypeTuple formals = fun._ts;   // Type of each argument
       // Now check if the arguments are compatible in all, keeping lowest cost
       int xcvts = 0;             // Count of conversions required
       boolean unk = false;       // Unknown arg might be incompatible or free to convert
-      for( int j=0; j<formals.length; j++ ) {
+      for( int j=0; j<call.nargs(); j++ ) {
         Type actual = gvn.type(call.arg(j));
-        Type tx = actual.join(formals[j]);
+        Type tx = actual.join(formals.at(j));
         if( tx.above_center() ) // Actual and formal have values in common?
           continue outerloop;   // No, this function will never work; e.g. cannot cast 1.2 as any integer
-        byte cvt = actual.isBitShape(formals[j]); // +1 needs convert, 0 no-cost convert, -1 unknown, 99 never
+        byte cvt = actual.isBitShape(formals.at(j)); // +1 needs convert, 0 no-cost convert, -1 unknown, 99 never
         if( cvt == 99 )         // Happens if actual is e.g. TypeErr
           continue outerloop;   // No, this function will never work
         if( cvt == -1 ) unk = true; // Unknown yet

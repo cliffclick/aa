@@ -11,7 +11,7 @@ import com.cliffc.aa.type.*;
 // - The FunNode function header (quickly maps to SESE region header)
 public class EpilogNode extends Node {
   int _fidx;
-  final String _unkref_err; // Unknown ref error (not really a forward ref)
+  private final String _unkref_err; // Unknown ref error (not really a forward ref)
   public EpilogNode( Node ctrl, Node val, Node rpc, FunNode fun, String unkref_err ) {
     super(OP_EPI,ctrl,val,rpc,fun);
     _unkref_err = unkref_err;
