@@ -27,7 +27,7 @@ public class CallNode extends Node {
   private boolean _inlined;     // Inlining a call-site is a 2-stage process; function return wired to the call return
   private Type   _cast_ret;     // Return type has been up-casted
   private Parse  _cast_P;       // Return type cast fail message
-  private Parse  _badargs;      // Error for e.g. wrong arg counts or incompatible args
+  public  Parse  _badargs;      // Error for e.g. wrong arg counts or incompatible args
   public CallNode( boolean unpacked, Parse badargs, Node... defs ) {
     super(OP_CALL,defs);
     _rpc = RPC++;               // Unique call-site index

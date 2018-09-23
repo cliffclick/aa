@@ -26,7 +26,11 @@ public class ParmNode extends PhiNode {
     FunNode fun = (FunNode) in(0);
     assert fun._defs._len==_defs._len;
     if( gvn.type(fun) == Type.XCTRL ) return null; // All dead, c-prop will fold up
-    return fun._defs.len() == 2 && fun._all_callers_known ? in(1) : null; // Fun has collapsed to a Copy, fold up
+    if( fun._defs.len() > 2 || !fun._all_callers_known ) return null;
+    // Down to a single input; arg-check before folding up
+    if( _idx != -1 && !gvn.type(in(1)).isa(fun._tf._ts.at(_idx)) )
+      return null;              // Not correct arg-type; refuse to collapse
+    return in(1);
   }
 
   @Override public Type value(GVNGCM gvn) {
@@ -56,9 +60,24 @@ public class ParmNode extends PhiNode {
     if( _idx < 0 ) return null;                                 // No arg check on RPC
     Type formal = fun._tf.arg(_idx);
     for( int i=1; i<_defs._len; i++ ) {
-      Type argt = gvn.type(in(i));    // Arg type for this incoming path
-      if( !argt.isa(formal) )         // Argument is legal?
-        throw com.cliffc.aa.AA.unimpl();
+      Type argt = gvn.type(in(i)); // Arg type for this incoming path
+      if( !argt.isa(formal) ) {    // Argument is legal?
+        // The merge of all incoming calls for this argument is not legal.
+        // Find the call bringing the broken args, and use it for error
+        // reporting - it MUST exist, or we have a really weird situation
+        EpilogNode epi=null;       // Only 1 epilog per fun
+        for( Node use : fun._uses ) if( use instanceof EpilogNode ) { epi=(EpilogNode)use; break; }
+        for( Node use : epi._uses ) {
+          if( use instanceof CallNode ) {
+            CallNode call = (CallNode)use;
+            Type argc = gvn.type(call.arg(_idx)); // Call arg type
+            if( !argc.isa(formal) )
+              return call._badargs.typerr(argc,formal);
+            // Must be a different call that is in-error
+          }
+        }
+        throw com.cliffc.aa.AA.unimpl(); // meet of args is not the formal, but no single arg is not the formal?
+      }
     }
     return null;
   }
