@@ -166,41 +166,48 @@ public class FunNode extends RegionNode {
       } else if( use instanceof EpilogNode ) { assert epi==null || epi==use; epi = (EpilogNode)use; }
     return epi;                 // Epilog (or null if dead)
   }
-  
+
+
+  // Visit all ParmNodes, looking for unresolved call uses that can be improved
+  // by type-splitting
+  private int find_type_split_index( GVNGCM gvn, ParmNode[] parms ) {
+    for( ParmNode parm : parms )// For all parms
+      if( parm != null )        //   (some can be dead)
+        for( Node call : parm._uses ) // See if a parm-user needs a type-specialization split
+          if( call instanceof CallNode &&
+              call.in(1) instanceof UnresolvedNode ) { // Call overload not resolved
+            Type t0 = gvn.type(parm.in(1));            // Generic type in slot#1
+            for( int i=2; i<parm._defs._len; i++ ) {   // For all other inputs
+              Type ti = gvn.type(parm.in(i)).widen();  // Get the widen'd type
+              assert ti.isa(t0);                       // Must be isa-generic type, or else type-error
+              if( ti != t0 ) return i; // Sharpens?  Then splitting here should help
+            }
+            // Else no split will help this call, look for other calls to help
+          }
+    return -1; // No unresolved calls; no point in type-specialization
+  }
+
   // Look for type-specialization inlining.  If any ParmNode has an unresolved
   // Call user, then we'd like to make a clone of the function body (in least
   // up to getting all the function TypeUnions to clear out).  The specialized
   // code uses generalized versions of the arguments, where we only specialize
   // on arguments that help immediately.
   private FunNode type_special( GVNGCM gvn, ParmNode[] parms ) {
-    // Visit all ParmNodes, looking for unresolved call uses
-    boolean any_unr=false;
-    for( ParmNode parm : parms )
-      if( parm != null ) 
-        for( Node call : parm._uses )
-          if( call instanceof CallNode &&
-              call.in(1) instanceof UnresolvedNode ) { // Call overload not resolved
-            // TODO: Figure out which parm slot improves here, and type-split on that slot
-            any_unr = true; break;
-          }
-    if( !any_unr ) return null; // No unresolved calls; no point in type-specialization
-
-    // TODO: Split with a known caller in slot 1
-    if( !(in(1) instanceof ScopeNode) )
-      return null;
-    assert !_all_callers_known;
+    int idx = find_type_split_index(gvn,parms);
+    if( idx == -1 ) return null; // No unresolved calls; no point in type-specialization
 
     // If Parm has unresolved calls, we want to type-specialize on its
     // arguments.  Call-site #1 is the most generic call site for the parser
     // (all Scalar args).  Peel out 2nd call-site args and generalize them.
     Type[] sig = new Type[parms.length];
     for( int i=0; i<parms.length; i++ )
-      sig[i] = parms[i]==null ? Type.SCALAR : gvn.type(parms[i].in(2)).widen();
+      sig[i] = parms[i]==null ? Type.SCALAR : gvn.type(parms[i].in(idx)).widen();
     // Make a new function header with new signature
     TypeTuple ts = TypeTuple.make_args(sig);
     assert ts.isa(_tf._ts);
-    if( ts == _tf._ts ) return null; // No improvement for further splitting
+    assert ts != _tf._ts;            // Must see improvement
     // Make a prototype new function header.  Clone the generic unknown caller in slot 1.  
+    assert !_all_callers_known;
     FunNode fun = new FunNode(in(1),ts,_tf._ret,name(),_tf._nargs);
     // Look in remaining paths and decide if they split or stay
     Node xctrl = gvn.con(Type.XCTRL);

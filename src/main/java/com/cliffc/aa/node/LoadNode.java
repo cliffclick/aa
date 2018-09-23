@@ -78,8 +78,7 @@ public class LoadNode extends Node {
     if( t instanceof TypeStruct &&
         ((TypeStruct)t).find(_fld) == -1 )
       return _badfld;
-    
-    throw AA.unimpl();
+    return null;
   }
   @Override public Type all_type() { return Type.SCALAR; }
   @Override public int hashCode() { return super.hashCode()+_fld.hashCode(); }

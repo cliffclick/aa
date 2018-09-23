@@ -22,6 +22,7 @@ public class ParmNode extends PhiNode {
     return _idx==parm._idx;
   }
   @Override public Node ideal(GVNGCM gvn) {
+    if( !(in(0) instanceof FunNode) ) return null; // Dying
     FunNode fun = (FunNode) in(0);
     assert fun._defs._len==_defs._len;
     if( gvn.type(fun) == Type.XCTRL ) return null; // All dead, c-prop will fold up
@@ -29,9 +30,10 @@ public class ParmNode extends PhiNode {
   }
 
   @Override public Type value(GVNGCM gvn) {
+    Type t = _default_type.dual();
+    if( !(in(0) instanceof FunNode) ) return t; // Dying
     FunNode r = (FunNode) in(0);
     assert r._defs._len==_defs._len;
-    Type t = _default_type.dual();
     // TODO: During GCP, slot#1 is the "default" input and assumed never
     // called.  As callers appear, they wire up and become actual input edges.
     // Leaving slot#1 alive here makes every call appear to be called by the
