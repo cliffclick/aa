@@ -47,6 +47,7 @@ public class ParmNode extends PhiNode {
     return t;
   }
   @Override public String err( GVNGCM gvn ) {
+    if( !(in(0) instanceof FunNode) ) return null; // Dead, report elsewhere
     FunNode fun = (FunNode) in(0);
     assert fun._defs._len==_defs._len;
     // For the function being returned-at-top, and thus NOT called on this path

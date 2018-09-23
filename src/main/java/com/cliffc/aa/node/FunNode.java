@@ -50,8 +50,6 @@ public class FunNode extends RegionNode {
   // caller will call with such arguments.  This is a quick check to detect
   // may-have-more-callers.
   public boolean _all_callers_known = false;
-  // Discovered in gcp() a call with broken arguments.
-  public boolean _busted_call = false;
   
   // Used to make the primitives at boot time
   public FunNode(Node scope, PrimNode prim) { this(scope,TypeFun.make(prim._targs,prim._ret,CNT,prim._targs._ts.length),prim.op_prec(),prim._name); }
@@ -119,7 +117,7 @@ public class FunNode extends RegionNode {
   // Declare as all-callers-known.  Done by GCP after flowing function-pointers
   // to all call sites, and by inlining when making private copies.
   public void all_callers_known( ) {
-    assert !_all_callers_known && !_busted_call;
+    assert !_all_callers_known;
     _all_callers_known = true;
   }
   
@@ -411,7 +409,6 @@ public class FunNode extends RegionNode {
   // undiscovered control to XCTRL.
   boolean slot1(GVNGCM gvn) {
     if( _all_callers_known ) return true;
-    if( _busted_call ) return true;
     if( !gvn._opt ) return true;
     // TODO: Also check to see if this is a function being returned as a
     // top-level result.  This is only a partial fix, and only to make the body

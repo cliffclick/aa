@@ -405,7 +405,6 @@ public class GVNGCM {
     if( n instanceof FunNode && n._uid >= _INIT0_CNT ) {
       FunNode fun = (FunNode)n;
       if( !fun._tf.is_forward_ref() && // No forward ref (error at this point)
-          !fun._busted_call &&         // No broken calls (error at this point)
           !fun._all_callers_known &&   // Not already flagged as all-calls-known
           fun != frez) {               // Not being returned as top-level result
         fun.all_callers_known();

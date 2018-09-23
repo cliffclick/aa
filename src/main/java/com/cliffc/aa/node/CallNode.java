@@ -187,23 +187,16 @@ public class CallNode extends Node {
     for( int i=fun._all_callers_known?1:2; i<fun._defs.len(); i++ ) // Skip default control (for top-level calls vs top-level fun-defs)
       if( fun._defs.at(i)==ctrl ) // Look for same control
         return null;              // Already wired up
-    
-    // Do an arg check before wiring up; cannot wire busted args (do not
-    // propagate type errors past function call boundaries).  Wiring happens
-    // twice: once during pessimistic iter() when given a constant function
-    // with correct arg counts - but possibly invald (yet) arguments, and
-    // during optimistic gcp().  During gcp() the call MUST happen and
-    // incorrect args are definitely a type-error.
-    for( Node arg : fun._uses ) {
-      if( arg.in(0) == fun && arg instanceof ParmNode ) {
-        int idx = ((ParmNode)arg)._idx; // Argument number, or -1 for rpc
-        if( idx != -1 &&
-            (idx >= nargs() || !gvn.type(arg(idx)).isa(fun._tf.arg(idx))) ) {
-          if( gvn._opt ) fun._busted_call = true;
-          return null;          // Illegal args?
-        }
-      }
-    }
+
+    // Make sure we have enough args before wiring up (makes later life easier
+    // to assume correct arg counts).  Note that we cannot, in general,
+    // type-check the args during GCP, as they will start out too-high and pass
+    // any isa-check.  Later, after wiring up in GCP they might fall to an
+    // error state - so we have to support having error args coming in.
+    for( Node arg : fun._uses )
+      if( arg.in(0) == fun && arg instanceof ParmNode &&
+          ((ParmNode)arg)._idx >= nargs() )
+        return null;          // Wrong arg-count
     
     // Add an input path to all incoming arg ParmNodes from the Call.  Cannot
     // assert finding all args, because dead args may already be removed - and

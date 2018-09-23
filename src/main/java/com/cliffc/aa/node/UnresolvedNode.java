@@ -6,7 +6,14 @@ import com.cliffc.aa.util.Ary;
 
 public class UnresolvedNode extends Node {
   UnresolvedNode( Node... funs ) { super(OP_UNR,funs); }
-  @Override String xstr() { return "Unr:"+((EpilogNode) in(0)).fun().name(); }
+  @Override String xstr() {
+    if( in(0) instanceof EpilogNode ) {
+      EpilogNode epi = (EpilogNode)in(0);
+      if( epi.in(3) instanceof FunNode )
+        return "Unr:"+epi.fun().name();
+    }
+    return "Unr???";
+  }
   @Override public Node ideal(GVNGCM gvn) {
     if( _defs._len < 2 ) throw AA.unimpl(); // Should collapse
     return null;
