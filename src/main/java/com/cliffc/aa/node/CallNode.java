@@ -262,6 +262,7 @@ public class CallNode extends Node {
   // type.  If not valid return SCALAR - as an indicator that the function
   // cannot be called, so the JOIN of valid returns is not lowered.
   private Type value1( GVNGCM gvn, Type t ) {
+    if( t==Type.XSCALAR ) return Type.XSCALAR; // Might be any function, returning anything
     assert t.is_fun_ptr();
     TypeTuple tepi = (TypeTuple)t;
     Type    tctrl=         tepi.at(0);

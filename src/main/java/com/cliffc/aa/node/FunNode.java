@@ -39,7 +39,7 @@ import java.util.Map;
 // 
 public class FunNode extends RegionNode {
   private static int CNT=1; // Function index; -1 for 'all' and 0 for 'any'
-  public final TypeFun _tf; // Worse-case correct type
+  public TypeFun _tf;       // Worse-case correct type, updated by GCP
   private final byte _op_prec;// Operator precedence; only set top-level primitive wrappers
 
   // FunNodes can "discover" callers if the function constant exists in the
@@ -448,6 +448,12 @@ public class FunNode extends RegionNode {
     for( Node use : _uses )
       if( use instanceof ParmNode && ((ParmNode)use)._idx==-1 )
         return (ParmNode)use;
+    return null;
+  }
+  public EpilogNode epi() {
+    for( Node use : _uses )
+      if( use instanceof EpilogNode )
+        return (EpilogNode)use;
     return null;
   }
   

@@ -257,14 +257,16 @@ public class GVNGCM {
     assert touched(n);         // Node is in type tables, but might be already out of GVN
     _vals.remove(n);           // Remove before modifying edges (and thus hash)
     Type oldt = type(n);       // Get old type
-    _ts._es[n._uid] = null;    // Remove from types
+    _ts._es[n._uid] = null;    // Remove from types, mostly for asserts
     assert !check_opt(n);      // Not in system now
     // Try generic graph reshaping
     Node y = n.ideal(this);
     if( y != null && y != n ) return y;  // Progress with some new node
     if( y != null && y.is_dead() ) return null;
     // Either no-progress, or progress and need to re-insert n back into system
+    _ts._es[n._uid] = oldt;     // Restore old type, in case we recursively ask for it
     Type t = n.value(this);     // Get best type
+    _ts._es[n._uid] = null;     // Remove in case we replace it
     assert t.isa(oldt);         // Types only improve
     // Replace with a constant, if possible
     if( t.may_be_con() && !(n instanceof ConNode) && !(n instanceof ErrNode) )
@@ -369,15 +371,6 @@ public class GVNGCM {
     // with the maximally lifted types.
     Node rez = end.in(end._defs._len-2);
     FunNode frez = rez instanceof EpilogNode ? ((EpilogNode)rez).fun() : null;
-    /* TODO: Cliff Notes; see ParmNode & FunNode value calls for slot#1.  If
-       some Epilog is being kept as a plain F-P and not called then the FunNode
-       needs to be kept live - even without callers.  How do i detect a F-P
-       usage where the F-P is stored in a data structure, and called later?
-       All such usages should be matchable to call sites.  But in any case, F-P
-       taken implies some unknown callers...  currently returning a F-P that is
-       not otherwise called, looks like the RPC stays at the "never called"
-       stage.  Once in iter(), again acts like "being called".
-     */
     walk_opt(rez,start,frez);
   }
 
@@ -409,6 +402,21 @@ public class GVNGCM {
           fun != frez) {               // Not being returned as top-level result
         fun.all_callers_known();
         set_def_reg(fun,1,con(Type.XCTRL));
+      }
+      // Functions can sharpen return value
+      if( type(fun)==Type.CTRL ) {
+        EpilogNode epi = fun.epi();
+        TypeTuple tt = (TypeTuple)type(epi);
+        Type    tctl =          tt.at(0);
+        Type    tret =          tt.at(1);
+        TypeFun tfun = (TypeFun)tt.at(3);
+        if( tctl != Type.CTRL ) throw AA.unimpl(); // never-return function (maybe never called?)
+        if( tret != tfun._ret &&    // can sharpen function return
+            tret.isa(tfun._ret) ) { // Only if sharpened (might not be true for errors)
+          unreg(fun);
+          fun._tf = TypeFun.make(tfun._ts,tret,tfun._fidxs,tfun._nargs);
+          rereg(fun,Type.CTRL);
+        }
       }
     }
     
