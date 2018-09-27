@@ -26,11 +26,18 @@ public class ParmNode extends PhiNode {
     FunNode fun = (FunNode) in(0);
     assert fun._defs._len==_defs._len;
     if( gvn.type(fun) == Type.XCTRL ) return null; // All dead, c-prop will fold up
-    if( fun._defs.len() > 2 || !fun._all_callers_known ) return null;
-    // Down to a single input; arg-check before folding up
-    if( _idx != -1 && !gvn.type(in(1)).isa(fun._tf._ts.at(_idx)) )
-      return null;              // Not correct arg-type; refuse to collapse
-    return in(1);
+    if( !fun._all_callers_known ) return null;     // More callers to come, no change yet
+    // Arg-check before folding up
+    if( _idx != -1 ) {
+      Type formal = fun._tf._ts.at(_idx); // Formal argument type
+      for( int i=1; i<_defs._len; i++  )  // For all arguments
+        if( gvn.type(fun.in(i))==Type.CTRL && // Path is alive
+            in(i)!=this &&                    // Can ignore self- only other inputs will determine arg-check
+            !gvn.type(in(i)).isa(formal) )    // Arg is NOT correct type
+          return null;          // Not correct arg-type; refuse to collapse
+    }
+    // Let PhiNode collapse
+    return super.ideal(gvn);
   }
 
   @Override public Type value(GVNGCM gvn) {

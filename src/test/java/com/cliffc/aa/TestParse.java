@@ -11,8 +11,6 @@ import static org.junit.Assert.assertTrue;
 public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
-    // Count-down self-recursive loop, passing in a AND function
-    test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({&},2)", TypeInt.FALSE);
     //test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({+},2)", TypeInt.con(2));
     // User-defined linked-list
     //test("List=:@{next,val};\n"+
@@ -31,6 +29,7 @@ public class TestParse {
 
     
     // A collection of tests which like to fail easily
+    test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({&},2)", TypeInt.FALSE);
     testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1,) is not a @{x,y,}","                           ");
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'","                    ");
     testerr("{+}(1,2,3)", "Passing 3 arguments to +{flt64 flt64 -> flt64} which takes 2 arguments","          ");
@@ -260,6 +259,9 @@ public class TestParse {
   }
 
   @Test public void testParse6() {
+    // Passing a function recursively
+    test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({&},2)", TypeInt.FALSE);
+    
     // User-defined linked list
     test("List=:@{next,val}; x=List(@{next=0,val=\"abc\"}); x.val", TypeStr.ABC);
     test("List=:@{next,val}; List0={n v -> List(@{next=n,val=v})}; x=List0(0,\"abc\"); x.val", TypeStr.ABC);
@@ -275,16 +277,6 @@ public class TestParse {
 // A tuple of null and a string
 list_of_hello = @{ 0, "hello", }
 list_of_hello =  ( 0, "hello", )
-
-TODO: Decide if calls only ever take 1 arg, and also args auto-gather into
-tuples which is the one arg passed into a call.  Eg: dist(x,y) parses into a
-function 'dist' and a 2-element tuple '(x,y)' and then a function call of the
-one tuple arg.  Meanwhile dist is declared as 'dist = { x y -> ...}  which is
-syntax sugar for naming the elements of the 1 tuple arg passed in.
-
-The difference shows up in any sort of varargs-like syntax, where multiple
-different arguments get passed in.
-
 
 // No ambiguity:
  { x } // no-arg-function returning external variable x; same as { -> x }

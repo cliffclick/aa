@@ -271,6 +271,18 @@ public class GVNGCM {
     // Replace with a constant, if possible
     if( t.may_be_con() && !(n instanceof ConNode) && !(n instanceof ErrNode) )
       return con(t);            // Constant replacement
+    // Function-pointer tuples are not considered constants, but can refer to a
+    // constant function and show up any place a Scalar is allowed; e.g. as
+    // arguments to functions or loaded from fields.  Replace with the constant
+    // function's EpilogNode.
+    if( t.is_fun_ptr() ) {
+      Type tc = ((TypeTuple)t).at(0);
+      Type tf = ((TypeTuple)t).at(3);
+      if( tf.is_con() && tc == Type.CTRL && n.is_copy(this,0)==null ) {
+        EpilogNode epi = FunNode.find_fidx(((TypeFun)tf).fidx()).epi();
+        if( n != epi ) return epi;
+      }
+    }
     // Global Value Numbering
     Node z = _vals.putIfAbsent(n,n);
     if( z != null ) return z;
@@ -419,7 +431,7 @@ public class GVNGCM {
         }
       }
     }
-    
+
     // Walk reachable graph
     for( Node def : n._defs )
       if( def != null &&
