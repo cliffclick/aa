@@ -237,17 +237,21 @@ public class CallNode extends Node {
     Type t = gvn.type(fp);      // If inlined, its the result, if not inlined, its the function being called
     if( _inlined )              // Inlined functions just pass thru & disappear
       return TypeTuple.make_all(tc,t);
-    if( t == Type.SCALAR ) // Calling something that MIGHT be a function, no idea what the result is
+    if( Type.SCALAR.isa(t) ) // Calling something that MIGHT be a function, no idea what the result is
       return TypeTuple.make_all(Type.CTRL,Type.SCALAR);
     
     if( gvn._opt ) // Manifesting optimistic virtual edges between caller and callee
       wire(gvn,t); // Make real edges from virtual edges
 
     Type trez = Type.ALL; // Base for JOIN
+    //if( t.is_fun_ptr() ) {
     if( fp instanceof UnresolvedNode ) {
       // For unresolved, we can take the BEST choice; i.e. the JOIN of every
       // choice.  Typically one choice works and the others report type
       // errors on arguments.
+      //Bits fidxs = ((TypeFun)((TypeTuple)t).at(3))._fidxs;
+      //for( int fidx : fidxs )
+      //  trez = trez.join(value1(gvn,gvn.type(FunNode.find_fidx(fidx).epi()))); // JOIN of choices
       for( Node epi : fp._defs )
         trez = trez.join(value1(gvn,gvn.type(epi))); // JOIN of choices
     } else {                                  // Single resolved target

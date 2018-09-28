@@ -86,7 +86,7 @@ public class Parse {
     _e._scope.promote_forward_del_locals(_gvn,null);
     _gvn.iter();    // Pessimistic optimizations; might improve error situation
     // Run GCP from the global top, so we also get all the initial constants
-    // and all users of those constants.  
+    // and all users of those constants.
     Env par = _e._par;
     _e._scope.add_def(par._scope); // Hook start control into all the constants
     _gvn.gcp(par._scope,_e._scope);// Global Constant Propagation
