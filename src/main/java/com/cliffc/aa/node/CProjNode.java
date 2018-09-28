@@ -31,7 +31,6 @@ public class CProjNode extends ProjNode {
     if( !(iff instanceof IfNode) ) return this; // Already collapsed IfNode, no sharpen
     Node test = iff.in(1);
     Type pred = gvn.type(test);
-    if( pred instanceof TypeErr ) return this;
     if( pred== Type.SCALAR ) return this;
     if( pred==TypeInt.BOOL ) {  // The bool test itself is either 0 or 1
       // Find and replace uses of the pred in the scope with the con

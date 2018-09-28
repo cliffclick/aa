@@ -157,9 +157,6 @@ public class FunNode extends RegionNode {
     for( Node use : _uses )
       if( use instanceof ParmNode ) {
         ParmNode parm = (ParmNode)use;
-        assert !(gvn.type(use) instanceof TypeErr);
-        //Type pt = gvn.type(parm);
-        //if( pt instanceof TypeErr && !pt.above_center() && pt != TypeErr.ALL ) return null;
         if( parm._idx != -1 ) parms[parm._idx] = parm;
       } else if( use instanceof EpilogNode ) { assert epi==null || epi==use; epi = (EpilogNode)use; }
     return epi;                 // Epilog (or null if dead)

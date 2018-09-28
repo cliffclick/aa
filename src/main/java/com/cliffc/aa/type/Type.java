@@ -180,8 +180,6 @@ public class Type<T extends Type> {
     // ANY meet anything is thing; thing meet ALL is ALL
     if( this==ALL || t==ANY ) return this;
     if( this==ANY || t==ALL ) return    t;
-    // Errors "win" over everything else
-    if( t instanceof TypeErr ) return t.above_center() ? xmeet(((TypeErr)t)._t) : t.xmeet(this);
 
     // Ctrl can only meet Ctrl, XCtrl or Top
     byte type = (byte)(_type|t._type); // the OR is low if both are low
@@ -263,7 +261,6 @@ public class Type<T extends Type> {
   
   public static boolean check_startup() {
     Type[] ts =    Type      .TYPES ;
-    ts = concat(ts,TypeErr   .TYPES);
     ts = concat(ts,TypeInt   .TYPES);
     ts = concat(ts,TypeFlt   .TYPES);
     ts = concat(ts,TypeOop   .TYPES);

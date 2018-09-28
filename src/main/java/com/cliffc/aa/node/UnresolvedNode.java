@@ -19,7 +19,7 @@ public class UnresolvedNode extends Node {
     return null;
   }
   @Override public Type value(GVNGCM gvn) {
-    Type t = TypeErr.ANY;
+    Type t = Type.ANY;
     for( Node def : _defs )
       t = t.meet(gvn.type(def)); // Meet of incoming functions
     return t;

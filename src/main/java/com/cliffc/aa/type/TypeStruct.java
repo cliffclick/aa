@@ -93,7 +93,7 @@ public class TypeStruct extends TypeTuple<TypeStruct> {
     case TFLT:
     case TINT:
     case TRPC: 
-    case TFUN:   return TypeErr.SCALAR;
+    case TFUN:   return Type.SCALAR;
     case TOOP:
     case TERROR:
     case TNAME:

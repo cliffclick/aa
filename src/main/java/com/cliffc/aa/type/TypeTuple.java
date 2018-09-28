@@ -39,7 +39,7 @@ public class TypeTuple<T extends TypeTuple> extends TypeNullable<T> {
   @Override public String toString() {
     SB sb = new SB().p('(');
     for( Type t : _ts ) sb.p(t.toString()).p(',');
-    if( _inf!=TypeErr.ALL ) sb.p(_inf.toString()).p("...");
+    if( _inf!=Type.ALL ) sb.p(_inf.toString()).p("...");
     sb.p(')');
     return String.format(TSTRS[_nil],sb.toString());
   }
@@ -53,8 +53,8 @@ public class TypeTuple<T extends TypeTuple> extends TypeNullable<T> {
     TypeTuple t2 = (TypeTuple)t1.hashcons();
     return t1==t2 ? t1 : t2.free(t1);
   }
-  public static TypeTuple make    ( Type... ts ) { return make(TypeErr.ANY,NOT_NIL,ts); }
-  public static TypeTuple make_all( Type... ts ) { return make(TypeErr.ALL,NOT_NIL,ts); }
+  public static TypeTuple make    ( Type... ts ) { return make(Type.ANY,NOT_NIL,ts); }
+  public static TypeTuple make_all( Type... ts ) { return make(Type.ALL,NOT_NIL,ts); }
   public static TypeTuple make( Type inf, byte nil, Type... ts ) {
     int len = ts.length;
     while( len > 0 && ts[len-1] == inf ) len--;
@@ -63,15 +63,15 @@ public class TypeTuple<T extends TypeTuple> extends TypeNullable<T> {
   }
   public static TypeTuple make_args( Type... ts ) { return make(Type.SCALAR,NOT_NIL,ts); }
   public static TypeTuple make_fun_ptr( TypeFun fun ) {
-    TypeTuple t = make_all(Type.CTRL,TypeErr.ALL, TypeRPC.ALL_CALL, fun);
+    TypeTuple t = make_all(Type.CTRL,Type.ALL, TypeRPC.ALL_CALL, fun);
     assert t.is_fun_ptr();
     return t;
   }
 
-  public  static final TypeTuple NIL     = make(TypeErr.ANY,IS_NIL); // is null; tuple guts ignored
+  public  static final TypeTuple NIL     = make(Type.ANY,IS_NIL); // is null; tuple guts ignored
   public  static final TypeTuple ANY     = make(); // Infinite list of Any
   public  static final TypeTuple ALL     = (TypeTuple)make().dual(); // Infinite list of All
-  public  static final TypeTuple ALL0    = make(TypeErr.ALL,AND_NIL);
+  public  static final TypeTuple ALL0    = make(Type.ALL,AND_NIL);
           static final TypeTuple SCALARS = make(Type.SCALAR,NOT_NIL);
           static final TypeTuple SCALAR0 = make_args();
           static final TypeTuple SCALAR1 = make_args(Type.SCALAR);
@@ -170,7 +170,7 @@ public class TypeTuple<T extends TypeTuple> extends TypeNullable<T> {
   // 3 - Classic TypeFun, includes declared return type
   @Override public boolean is_fun_ptr() {
     return _ts.length==4 &&
-     (_ts[0]==Type.CTRL || _ts[0]==Type.XCTRL|| _ts[0] instanceof TypeErr) &&
+     (_ts[0]==Type.CTRL || _ts[0]==Type.XCTRL) &&
       _ts[2] instanceof TypeRPC &&
       _ts[3] instanceof TypeFun;
   }

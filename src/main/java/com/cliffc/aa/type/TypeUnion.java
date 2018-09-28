@@ -64,7 +64,7 @@ public class TypeUnion extends Type<TypeUnion> {
       if( !t.may_be_nil() ) all_nil=false;
     }
     if( !all_fun && !all_nil ) { // Collapse all the parts
-      Type x = any ? TypeErr.ALL : TypeErr.ANY;
+      Type x = any ? Type.ALL : Type.ANY;
       for( Type t : ts ) x = any ? x.join(t) : x.meet(t);
       return x;
     }
@@ -73,7 +73,7 @@ public class TypeUnion extends Type<TypeUnion> {
 
     // The set has to be ordered, to remove dups that vary only by order
     ts.sort_update(Comparator.comparingInt(e -> e._uid)); 
-    return make(TypeTuple.make(any?TypeErr.ANY:TypeErr.ALL,TypeTuple.NOT_NIL,ts.asAry()),any);
+    return make(TypeTuple.make(any?Type.ANY:Type.ALL,TypeTuple.NOT_NIL,ts.asAry()),any);
   }
 
   // Same union, minus the null
@@ -96,7 +96,7 @@ public class TypeUnion extends Type<TypeUnion> {
     Type[] ts = ((TypeTuple)_ts.dual())._ts; // Dual-tuple array
     ts = Arrays.copyOf(ts,ts.length);        // Defensive copy
     Arrays.sort(ts, 0, ts.length, Comparator.comparingInt(e -> e._uid));
-    TypeTuple stt = TypeTuple.make(!_any?TypeErr.ANY:TypeErr.ALL,TypeTuple.NOT_NIL,ts);
+    TypeTuple stt = TypeTuple.make(!_any?Type.ANY:Type.ALL,TypeTuple.NOT_NIL,ts);
     return new TypeUnion(stt,!_any);
   }
   

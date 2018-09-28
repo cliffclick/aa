@@ -168,6 +168,7 @@ public class TestParse {
   }
 
   @Test public void testParse3() {
+    test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)",TypeInt.INT64);
     // Type annotations
     test("-1:int", TypeInt.con( -1));
     test("(1+2.3):flt", TypeFlt.make(0,64,3.3));
@@ -205,7 +206,7 @@ public class TestParse {
   @Test public void testParse4() {
     test   ("a=@{x=0,y=1}; b=@{x=2}  ; c=math_rand(1)?a:b; c.x", TypeInt.INT8); // either 0 or 2; structs can be partially merged
     // simple anon struct tests
-    test   ("  @{x,y} ", TypeStruct.makeA(new String[]{"x","y"},TypeErr.ANY,TypeErr.ANY)); // simple anon struct decl
+    test   ("  @{x,y} ", TypeStruct.makeA(new String[]{"x","y"},Type.ANY,Type.ANY)); // simple anon struct decl
     testerr("a=@{x=1.2,y}; x", "Unknown ref 'x'","               ");
     testerr("a=@{x=1,x=2}", "Cannot define field '.x' twice","           ");
     test   ("a=@{x=1.2,y,}; a.x", TypeFlt.con(1.2)); // standard "." field naming; trailing comma optional

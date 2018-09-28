@@ -55,7 +55,7 @@ public class EpilogNode extends Node {
   public static Node forward_ref( GVNGCM gvn, Node scope, String name, Parse unkref ) {
     FunNode fun = gvn.init(new FunNode(scope,name));
     String referr = unkref.errMsg("Unknown ref '"+name+"'");
-    return new EpilogNode(fun,gvn.con(TypeErr.SCALAR),gvn.con(TypeRPC.ALL_CALL),fun, referr);
+    return new EpilogNode(fun,gvn.con(Type.SCALAR),gvn.con(TypeRPC.ALL_CALL),fun, referr);
   }
 
   // True if this is a forward_ref

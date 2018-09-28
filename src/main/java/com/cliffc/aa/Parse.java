@@ -79,7 +79,7 @@ public class Parse {
   private TypeEnv prog() {
     // Currently only supporting exprs
     Node res = stmts();
-    if( res == null ) res = con(TypeErr.ANY);
+    if( res == null ) res = con(Type.ANY);
     _e._scope.add_def(ctrl());  // Hook, so not deleted
     _e._scope.add_def(res);     // Hook, so not deleted
     // Delete names at the top scope before final optimization.
@@ -397,7 +397,7 @@ public class Parse {
       String tok = token();
       if( tok == null ) { ids.clear(); _x=oldx; break; } // not a "[id]* ->"
       if( tok.equals("->") ) break;
-      Type t = TypeErr.ALL;    // Untyped, most generic type
+      Type t = Type.ALL;       // Untyped, most generic type
       Parse bad = errMsg();    // Capture location in case of type error
       if( peek(':') )          // Has type annotation?
         if( (t=type())==null ) throw AA.unimpl(); // return an error here
@@ -438,10 +438,10 @@ public class Parse {
       while( true ) {
         String tok = token();    // Scan for 'id'
         if( tok == null ) break; // end-of-struct-def
-        Type t = TypeErr.ALL;    // Untyped, most generic type
+        Type t = Type.ALL;       // Untyped, most generic type
         if( peek(':') )          // Has type annotation?
           if( (t=type())==null ) throw AA.unimpl(); // return an error here
-        Node stmt = con(TypeErr.ANY);
+        Node stmt = con(Type.ANY);
         if( peek('=') )
           if( (stmt=stmt())==null ) throw AA.unimpl(); // return an error here
         stmt = gvn(new TypeNode(t,stmt,errMsg()));
@@ -515,7 +515,7 @@ public class Parse {
    */
   private Type type() {
     Type t = type0();
-    return (t==null || t==TypeErr.ANY) ? null : t;
+    return (t==null || t==Type.ANY) ? null : t;
   }
   // Wrap in a nullable if there is a trailing '?'
   private Type typeq(Type t) { return peek('?') ? ((TypeNullable)t).meet_nil() : t; }
@@ -525,10 +525,10 @@ public class Parse {
     byte c = skipWS();
     if( peek1(c,'{') ) { // Function type
       Ary<Type> ts = new Ary<>(new Type[1],0);  Type t;
-      while( (t=type0()) != null && t != TypeErr.ANY  )
+      while( (t=type0()) != null && t != Type.ANY  )
         ts.add(t);              // Collect arg types
       Type ret;
-      if( t==TypeErr.ANY ) {    // Found ->, expect return type
+      if( t==Type.ANY ) {       // Found ->, expect return type
         ret = type0();
         if( ret == null ) return null; // should return TypeErr missing type after ->
       } else {                  // Allow no-args and simple return type
@@ -544,7 +544,7 @@ public class Parse {
       while( true ) {
         String tok = token();    // Scan for 'id'
         if( tok == null ) break; // end-of-struct-def
-        Type t = TypeErr.ALL;    // Untyped, most generic type
+        Type t = Type.ALL;       // Untyped, most generic type
         if( peek(':') )          // Has type annotation?
           if( (t=type())==null ) throw AA.unimpl(); // return an error here, missing type
         if( flds.find(tok) != -1 ) throw AA.unimpl(); // cannot use same field name twice
@@ -559,7 +559,7 @@ public class Parse {
     int oldx = _x;
     String tok = token();
     if( tok==null ) return null;
-    if( tok.equals("->") ) return TypeErr.ANY; // Found -> return sentinal
+    if( tok.equals("->") ) return Type.ANY; // Found -> return sentinal
     Type t = _e.lookup_type(tok);
     if( t==null ) _x = oldx;  // Unwind if not a known type
     return t==TypeStr.STR ? typeq(t) : t;

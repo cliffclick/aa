@@ -39,7 +39,7 @@ public class TypeRPC extends Type<TypeRPC> {
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TCTRL:
-    case TXCTRL: return TypeErr.ALL;
+    case TXCTRL: return Type.ALL;
     case TOOP:
     case TTUPLE: 
     case TSTRUCT:

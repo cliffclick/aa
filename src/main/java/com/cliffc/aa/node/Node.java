@@ -4,7 +4,6 @@ import com.cliffc.aa.*;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeErr;
 
 import java.util.BitSet;
 import java.util.function.Predicate;

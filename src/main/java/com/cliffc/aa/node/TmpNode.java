@@ -2,7 +2,6 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.*;
 import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeErr;
 
 import java.lang.AutoCloseable;
 

@@ -25,7 +25,6 @@ public class LoadNode extends Node {
     if( ctrl==null || gvn.type(ctrl)!=Type.CTRL )
       return null; // Dead load, or a no-control-no-fail load
     Type t = gvn.type(addr);    // Address type
-    if( t instanceof TypeErr ) return null;
 
     // Lift control on Loads as high as possible... and move them over
     // to a CastNode (to remove null-ness) and remove the control.

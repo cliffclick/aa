@@ -58,7 +58,7 @@ public class TypeFun extends Type<TypeFun> {
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TCTRL:
-    case TXCTRL: return TypeErr.ALL;
+    case TXCTRL: return Type.ALL;
     case TOOP:
     case TRPC:
     case TSTRUCT:

@@ -78,7 +78,7 @@ public class Env implements AutoCloseable {
   // Top-level exit type lookup
   static Type lookup_valtype( Node n ) {
     Type t = _gvn.type(n);
-    if( t != TypeErr.CTRL ) return t;
+    if( t != Type.CTRL ) return t;
   //  if( n instanceof ProjNode ) // Get function type when returning a function
   //    return ((FunNode)(n.in(0).in(2)))._tf;
     throw AA.unimpl();

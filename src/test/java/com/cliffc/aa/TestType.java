@@ -64,7 +64,7 @@ public class TestType {
   // Notice multiple NILs; can be many for each type.
   @Test public void testOOPsNulls() {
     Type.init0(new HashMap<>());
-    Type bot  = TypeErr  .ALL;
+    Type bot  = Type     .ALL;
     Type oop0 = TypeOop  .OOP0; // OOP? (OOP and null)
     Type str0 = TypeStr  .STR0; // str? (str AND null)
     Type str  = TypeStr  .STR;  // str no null
