@@ -1,6 +1,7 @@
 package com.cliffc.aa;
 
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.Bits;
 import org.junit.Test;
 
 import java.util.HashMap;
@@ -144,10 +145,6 @@ public class TestType {
     Type cj  = nc0.join(cx);
     Type c0  = TypeStruct.makeA(new String[]{"c"},nx1.make_nil((byte)0)); // @{c:0}
     assertEquals(c0,cj);
-
-    TypeFun gf = TypeFun.make_generic();
-    TypeFun f2 = TypeFun.any(2,23); // Some generic function (happens to be #23, '&')
-    assertTrue(f2.isa(gf));
   }
 
   @Test public void testUnion() {
@@ -162,11 +159,35 @@ public class TestType {
     Type d = TypeUnion.make(false,TypeInt.FALSE,TypeOop.NIL);
     assertTrue(d instanceof TypeUnion); // Does not collapse
 
-    Type nil = TypeUnion.NIL;
     Type e = TypeOop.NIL.meet(TypeUnion.NIL);
     assertEquals(TypeOop.NIL,e);
   }
 
+
+  // meet of functions: arguments *join*, fidxes union (meet), and return types
+  // meet.  Inverse of all of this for functions join'ing, and UnresolvedNode
+  // is a function join.
+  @Test public void testFunction() {
+    Type.init0(new HashMap<>());
+    Type ignore = TypeTuple.NIL; // Break class-loader cycle; load Tuple before Fun.
+
+    TypeFun gf = TypeFun.make_generic();
+
+    TypeFun f1i2i = TypeFun.make(TypeTuple.INT64,TypeInt.INT64,1/*fidx*/,1/*nargs*/);
+    assertTrue(f1i2i.isa(gf));
+    TypeFun f1f2f = TypeFun.make(TypeTuple.FLT64,TypeFlt.FLT64,2/*fidx*/,1/*nargs*/);
+    assertTrue(f1f2f.isa(gf));
+    TypeFun mt = (TypeFun)f1i2i.meet(f1f2f);
+    TypeFun f3i2r = TypeFun.make(TypeTuple.INT32,Type.REAL    ,Bits.make0(0,new long[]{(1<<1)|(1<<2)}),1/*nargs*/);
+    assertEquals(f3i2r,mt);
+    assertTrue(f3i2r.isa(gf));
+    assertTrue(f1i2i.isa(f3i2r));
+    assertTrue(f1f2f.isa(f3i2r));
+    
+    TypeFun f2 = TypeFun.any(2,23); // Some generic function (happens to be #23, '&')
+    assertTrue(f2.isa(gf));
+  }
+  
   // TODO: Observation: value() calls need to be monotonic, can test this.
   @Test public void testCommuteSymmetricAssociative() {
     Type.init0(new HashMap<>());

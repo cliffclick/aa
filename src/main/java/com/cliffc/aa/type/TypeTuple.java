@@ -63,7 +63,7 @@ public class TypeTuple<T extends TypeTuple> extends TypeNullable<T> {
   }
   public static TypeTuple make_args( Type... ts ) { return make(Type.SCALAR,NOT_NIL,ts); }
   public static TypeTuple make_fun_ptr( TypeFun fun ) {
-    TypeTuple t = make_all(Type.CTRL,Type.ALL, TypeRPC.ALL_CALL, fun);
+    TypeTuple t = make_all(Type.CTRL,fun._ret, TypeRPC.ALL_CALL, fun);
     assert t.is_fun_ptr();
     return t;
   }
@@ -72,11 +72,11 @@ public class TypeTuple<T extends TypeTuple> extends TypeNullable<T> {
   public  static final TypeTuple ANY     = make(); // Infinite list of Any
   public  static final TypeTuple ALL     = (TypeTuple)make().dual(); // Infinite list of All
   public  static final TypeTuple ALL0    = make(Type.ALL,AND_NIL);
-          static final TypeTuple SCALARS = make(Type.SCALAR,NOT_NIL);
+          static final TypeTuple XSCALARS= make(Type.XSCALAR,NOT_NIL);
           static final TypeTuple SCALAR0 = make_args();
           static final TypeTuple SCALAR1 = make_args(Type.SCALAR);
           static final TypeTuple SCALAR2 = make_args(Type.SCALAR, Type. SCALAR);
-  private static final TypeTuple INT32   = make_args(TypeInt.INT32 );
+  public  static final TypeTuple INT32   = make_args(TypeInt.INT32 );
   public  static final TypeTuple INT64   = make_args(TypeInt.INT64 );
   public  static final TypeTuple FLT64   = make_args(TypeFlt.FLT64 );
   public  static final TypeTuple STR     = make_args(TypeStr.STR   );

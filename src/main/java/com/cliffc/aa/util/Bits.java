@@ -65,11 +65,11 @@ public class Bits implements Iterable<Integer> {
     return t1;
   }
 
-  private static Bits make0( int con, long[] bits ) {
+  public static Bits make0( int con, long[] bits ) {
     assert con==0 || con==-1;
     // TODO: convert to single-bit-form if only 1 bit set
     // TODO: remove trailing sign-extend words
-    throw AA.unimpl();
+    return make(con,bits);
   }        
   public static Bits make( int bit ) {
     if( bit < 0 ) throw new IllegalArgumentException("bit must be positive");

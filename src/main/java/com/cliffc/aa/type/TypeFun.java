@@ -72,10 +72,10 @@ public class TypeFun extends Type<TypeFun> {
     case TUNION: return t.xmeet(this); // Let other side decide
     default: throw typerr(t);   // All else should not happen
     }
-    // Meet of fidxs and args; join of ret
+    // Join of args; meet of ret & fidxes
     TypeFun tf = (TypeFun)t;
     Bits fidxs = _fidxs.meet( tf._fidxs );
-    TypeTuple ts = (TypeTuple)_ts.meet(tf._ts);
+    TypeTuple ts = (TypeTuple)_ts.join(tf._ts);
     Type ret = _ret.meet(tf._ret);
     int nargs = tf._ret.above_center()
       ? (_ret.above_center() ? Math.min(_nargs,tf._nargs) :   _nargs )
@@ -96,7 +96,7 @@ public class TypeFun extends Type<TypeFun> {
   public int fidx() { return _fidxs.getbit(); }
 
   // Generic functions
-  private static final TypeTuple GENERIC_ARGS=TypeTuple.SCALARS;
+  private static final TypeTuple GENERIC_ARGS=TypeTuple.XSCALARS;
   private static final Type      GENERIC_RET =Type.SCALAR; // Can return almost anything
   public boolean is_forward_ref()                    { return _nargs == -1; }
   public static TypeFun make_forward_ref( int fidx ) { return make(GENERIC_ARGS, GENERIC_RET,Bits.make(fidx),-1); }
