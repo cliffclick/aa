@@ -182,7 +182,7 @@ public class CallNode extends Node {
   // knowledge of its callers and arguments.
   // Leaves the Call in the graph - making the graph "a little odd" - double
   // CTRL users - once for the call, and once for the function being called.
-  private Node wire(GVNGCM gvn, FunNode fun) {
+  Node wire(GVNGCM gvn, FunNode fun) {
     Node ctrl = in(0);
     for( int i=fun._all_callers_known?1:2; i<fun._defs.len(); i++ ) // Skip default control (for top-level calls vs top-level fun-defs)
       if( fun._defs.at(i)==ctrl ) // Look for same control

@@ -86,7 +86,7 @@ public class GVNGCM {
     t = n.all_type();       // If no type yet, defaults to the pessimistic type
     return _ts.setX(n._uid,t);
   }
-  private void setype( Node n, Type t ) {
+  public void setype( Node n, Type t ) {
     assert t != null;
     _ts.setX(n._uid,t);
   }

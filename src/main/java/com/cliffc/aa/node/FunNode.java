@@ -236,10 +236,6 @@ public class FunNode extends RegionNode {
         work.addAll(n._uses);   // Visit all uses also
       if( op==OP_CALL ) {       // Call-of-primitive?
         Node n1 = n.in(1);
-        Type tfunptr = gvn.type(n1);
-        if( tfunptr.is_fun_ptr() &&
-            ((TypeFun)(((TypeTuple)tfunptr).at(3)))._fidxs.test(_tf.fidx()) )
-          return null;          // Recursive: do not inline
         Node n2 = n1 instanceof UnresolvedNode ? n1.in(0) : n1;
         if( n2 instanceof EpilogNode &&
             ((EpilogNode)n2).val() instanceof PrimNode )
@@ -354,8 +350,8 @@ public class FunNode extends RegionNode {
     }
     assert !epi.is_dead();      // Not expecting this to be dead already
 
-    // Repoint all Calls uses to an Unresolved choice of the old and new
-    // functions and let the Calls resolve individually.
+    // Repoint all Calls uses of the original Epilog to an Unresolved choice of
+    // the old and new functions and let the Calls resolve individually.
     if( !fun._all_callers_known ) { // Split-for-type, possible many future callers
       UnresolvedNode new_unr = new UnresolvedNode();
       new_unr.add_def(epi);
@@ -397,6 +393,38 @@ public class FunNode extends RegionNode {
       }
     }
 
+    // There are new some cloned new Calls; these point to some old functions
+    // which might belive "_all_calls_known" - which excludes these new Calls.
+    // The situation is still theoretically correct: the original Calls all
+    // split into 2 non-overlapping sets: calls from the new Calls and those
+    // left behind coming from the old Calls.  Update the old functions with
+    // the se new Calls as-needed.  If _all_calls_known is false, the old
+    // function is prepared to handle unexpected new Calls already.  If its
+    // true, then immediately wire up the new Call, add the new RPC input and
+    // correct all types.
+    if( _all_callers_known )
+      for( Node c : map.values() ) {
+        if( c instanceof CallNode ) { // For all cloned Calls
+          Type tfunptr = gvn.type(c.in(1));
+          assert tfunptr.is_fun_ptr();
+          TypeFun tfun = (TypeFun)((TypeTuple)tfunptr).at(3);
+          for( int fidx : tfun._fidxs ) { // For all possible targets of the Call
+            FunNode oldfun = FunNode.find_fidx(fidx);
+            assert !oldfun.is_dead();
+            if( oldfun._all_callers_known ) {
+              gvn.add_work(oldfun);
+              Node x = ((CallNode)c).wire(gvn,oldfun);
+              assert x != null;
+              ParmNode rpc = oldfun.rpc();
+              gvn.setype(rpc,rpc.value(gvn));
+              assert rpc._uses._len==1;
+              Node oldepi = rpc._uses.at(0);
+              gvn.setype(oldepi,oldepi.value(gvn));
+            }
+          }
+        }
+      }
+    
     // TODO: Hook with proper signature into ScopeNode under an Unresolved.
     // Future calls may resolve to either the old version or the new.
     return is_dead() ? fun : this;
