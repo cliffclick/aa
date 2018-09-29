@@ -52,7 +52,7 @@ public class TypeName extends Type<TypeName> {
     default:
       // LHS is named, RHS is unnamed.  If the RHS is high, can keep the name.
       mt = _t.meet(t);
-      if( t.above_center() ) return make(_name,mt);
+      if( t.above_center() && !Type.SCALAR.isa(mt) ) return make(_name,mt);
       if( !mt.is_con() ) return mt;
       break;
     }

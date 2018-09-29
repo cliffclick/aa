@@ -166,6 +166,8 @@ public class Bits implements Iterable<Integer> {
     assert _con==0 || _con==-1;
     return make(~_con,_bits);
   }
+  // join is defined in terms of meet and dual
+  public Bits join(Bits bs) { return dual().meet(bs.dual()).dual(); }
 
   /** @return an iterator */
   @NotNull @Override public Iterator<Integer> iterator() { return new Iter(); }
