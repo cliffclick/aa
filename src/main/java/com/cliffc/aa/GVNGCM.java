@@ -259,6 +259,8 @@ public class GVNGCM {
     Type oldt = type(n);       // Get old type
     _ts._es[n._uid] = null;    // Remove from types, mostly for asserts
     assert !check_opt(n);      // Not in system now
+    if( oldt.may_be_con() && !(n instanceof ConNode) && !(n instanceof ErrNode) )
+      return con(oldt);        // Dead-on-Entry, common when called from GCP
     // Try generic graph reshaping
     Node y = n.ideal(this);
     if( y != null && y != n ) return y;  // Progress with some new node
@@ -406,6 +408,12 @@ public class GVNGCM {
     if( _wrk_bits.get(n._uid) ) return; // Been there, done that
     if( n==start ) return;              // Top-level scope
     add_work(n);                        // Only walk once
+    // Replace with a constant, if possible
+    Type t = type(n);
+    if( t.may_be_con() && !(n instanceof ConNode) && !(n instanceof ErrNode) ) {
+      subsume(n,con(t));        // Constant replacement
+      return;
+    }
     // Functions have no more unknown callers
     if( n instanceof FunNode && n._uid >= _INIT0_CNT ) {
       FunNode fun = (FunNode)n;
@@ -434,8 +442,7 @@ public class GVNGCM {
 
     // Walk reachable graph
     for( Node def : n._defs )
-      if( def != null &&
-          !(n instanceof RegionNode && type(def)== Type.XCTRL) )
+      if( def != null )
         walk_opt(def,start,frez);
   }
 

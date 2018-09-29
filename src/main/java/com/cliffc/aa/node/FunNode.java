@@ -236,6 +236,10 @@ public class FunNode extends RegionNode {
         work.addAll(n._uses);   // Visit all uses also
       if( op==OP_CALL ) {       // Call-of-primitive?
         Node n1 = n.in(1);
+        Type tfunptr = gvn.type(n1);
+        if( tfunptr.is_fun_ptr() &&
+            ((TypeFun)(((TypeTuple)tfunptr).at(3)))._fidxs.test(_tf.fidx()) )
+          return null;          // Recursive: do not inline
         Node n2 = n1 instanceof UnresolvedNode ? n1.in(0) : n1;
         if( n2 instanceof EpilogNode &&
             ((EpilogNode)n2).val() instanceof PrimNode )
