@@ -20,7 +20,7 @@ public class Env implements AutoCloseable {
     _scope  .init0(); // Add base types
     _scope.add("math_pi",new ConNode<>(TypeFlt.PI));
     for( PrimNode prim : PrimNode.PRIMS )
-      _scope.add_fun(prim._name,_gvn.init(as_fun(prim)));
+      _scope.add_fun(prim._name,(EpilogNode)_gvn.xform(as_fun(prim)));
     // Now that all the UnresolvedNodes have all possible hits for a name,
     // register them with GVN.
     for( Node val : _scope._defs )  _gvn.init0(val);
@@ -36,11 +36,11 @@ public class Env implements AutoCloseable {
   EpilogNode as_fun( PrimNode prim ) {
     TypeTuple targs = prim._targs;
     String[] args = prim._args;
-    FunNode  fun = _gvn.init(new  FunNode(_scope, prim)); // Points to ScopeNode only
-    ParmNode rpc = _gvn.init(new ParmNode(-1,"rpc",fun,_gvn.con(TypeRPC.ALL_CALL),null));
+    FunNode  fun = ( FunNode)_gvn.xform(new  FunNode(_scope, prim)); // Points to ScopeNode only
+    ParmNode rpc = (ParmNode)_gvn.xform(new ParmNode(-1,"rpc",fun,_gvn.con(TypeRPC.ALL_CALL),null));
     prim.add_def(null);         // Control for the primitive
     for( int i=0; i<args.length; i++ )
-      prim.add_def(_gvn.init(new ParmNode(i,args[i],fun,_gvn.con(targs.at(i)),null)));
+      prim.add_def(_gvn.xform(new ParmNode(i,args[i],fun,_gvn.con(targs.at(i)),null)));
     PrimNode x = _gvn.init(prim);
     assert x==prim;
     return new EpilogNode(fun,prim,rpc,fun,null);

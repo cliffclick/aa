@@ -19,9 +19,9 @@ public class UnresolvedNode extends Node {
     return null;
   }
   @Override public Type value(GVNGCM gvn) {
-    Type t = Type.ANY;
+    Type t = Type.ALL;
     for( Node def : _defs )
-      t = t.meet(gvn.type(def)); // Meet of incoming functions
+      t = t.join(gvn.type(def)); // Join of incoming functions
     return t;
   }
   // Filter out all the wrong-arg-count functions
