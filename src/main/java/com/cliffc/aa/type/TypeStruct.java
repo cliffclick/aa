@@ -31,7 +31,7 @@ public class TypeStruct extends TypeTuple<TypeStruct> {
     }
     if( _inf!=Type.ALL ) sb.p(_inf.toString()).p("...");
     sb.p('}');
-    return String.format(TypeTuple.TSTRS[_nil],sb.toString());
+    return String.format(TSTRS[_nil],sb.toString());
   }
 
   private static TypeStruct FREE=null;
@@ -88,6 +88,7 @@ public class TypeStruct extends TypeTuple<TypeStruct> {
     TypeTuple tt;   String[] args;
     switch( t._type ) {
     case TSTRUCT:  args= ((TypeStruct)t)._args;  tt=(TypeTuple)t;  break;
+    case TFUNPTR:
     case TTUPLE :  args= new String[0];          tt=(TypeTuple)t;  break;
     case TSTR:   return TypeOop.make(nmeet(((TypeNullable)t)._nil),false);
     case TFLT:

@@ -59,9 +59,8 @@ public class UnresolvedNode extends Node {
     // function with all arguments known.
     outerloop:
     for( Node epi : _defs ) {
-      TypeTuple tepi = (TypeTuple)gvn.type(epi);
-      assert tepi.is_fun_ptr();
-      TypeFun fun = (TypeFun)tepi.at(3);
+      TypeFunPtr tepi = (TypeFunPtr)gvn.type(epi);
+      TypeFun fun = tepi.fun();
       if( fun.nargs() != call.nargs() ) continue; // Wrong arg count, toss out
       TypeTuple formals = fun._ts;   // Type of each argument
       // Now check if the arguments are compatible in all, keeping lowest cost

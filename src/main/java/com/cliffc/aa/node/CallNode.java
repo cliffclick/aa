@@ -96,9 +96,8 @@ public class CallNode extends Node {
     Node unk  = in(1);          // Function epilog/function pointer
     if( unk instanceof TypeNode ) {
       TypeNode tn = (TypeNode)unk;
-      TypeTuple t_funptr = (TypeTuple)tn._t;
-      assert t_funptr.is_fun_ptr();
-      TypeFun tf = t_funptr.get_fun();
+      TypeFunPtr t_funptr = (TypeFunPtr)tn._t;
+      TypeFun tf = t_funptr.fun();
       set_def(1,tn.in(1),gvn);
       for( int i=0; i<nargs(); i++ ) // Insert casts for each parm
         set_def(i+2,gvn.xform(new TypeNode(tf._ts.at(i),arg(i),tn._error_parse)),gvn);
@@ -219,10 +218,9 @@ public class CallNode extends Node {
 
   // Make real call edges from virtual call edges
   private void wire(GVNGCM gvn, Type funptr) {
-    if( !(funptr instanceof TypeTuple) ) return; // Not fallen to a funptr yet
-    assert funptr.isa(TypeTuple.GENERIC_FUN);
-    TypeTuple tfunptr = (TypeTuple)funptr;
-    TypeFun tf = tfunptr.get_fun(); // Get type-propagated function list
+    if( !(funptr instanceof TypeFunPtr) ) return; // Not fallen to a funptr yet
+    TypeFunPtr tfunptr = (TypeFunPtr)funptr;
+    TypeFun tf = tfunptr.fun(); // Get type-propagated function list
     Bits fidxs = tf._fidxs;     // Get all the propagated reaching functions
     if( fidxs.above_center() ) return;
     for( int fidx : fidxs ) {   // For all functions
@@ -269,11 +267,10 @@ public class CallNode extends Node {
   // cannot be called, so the JOIN of valid returns is not lowered.
   private Type value1( GVNGCM gvn, Type t ) {
     if( t==Type.XSCALAR ) return Type.XSCALAR; // Might be any function, returning anything
-    assert t.is_fun_ptr();
-    TypeTuple tepi = (TypeTuple)t;
-    Type    tctrl=         tepi.at(0);
-    Type    tval =         tepi.at(1);
-    TypeFun tfun =(TypeFun)tepi.at(3);
+    TypeFunPtr tepi = (TypeFunPtr)t;
+    Type    tctrl=tepi.ctl();
+    Type    tval =tepi.val();
+    TypeFun tfun =tepi.fun();
     if( tctrl == Type.XCTRL ) return Type.XSCALAR; // Function will never return
     assert tctrl==Type.CTRL;      // Function will never return?
     if( t.is_forward_ref() ) return tfun.ret(); // Forward refs do no argument checking
@@ -299,7 +296,7 @@ public class CallNode extends Node {
     
     Node fp = in(1);      // Either function pointer, or unresolve list of them
     Node xfp = fp instanceof UnresolvedNode ? fp.in(0) : fp;
-    TypeFun txfun = ((TypeTuple)gvn.type(xfp)).get_fun();
+    TypeFun txfun = ((TypeFunPtr)gvn.type(xfp)).fun();
     if( txfun.is_forward_ref() ) // Forward ref on incoming function
       return _badargs.forward_ref_err(txfun);
 

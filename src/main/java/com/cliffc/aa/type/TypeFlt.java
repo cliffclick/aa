@@ -53,6 +53,7 @@ public class TypeFlt extends Type<TypeFlt> {
     case TSTR:
     case TSTRUCT:
     case TTUPLE:
+    case TFUNPTR:
     case TRPC:
     case TFUN:   return Type.SCALAR;
     case TCTRL:

@@ -62,7 +62,8 @@ public class TypeFun extends Type<TypeFun> {
     case TOOP:
     case TRPC:
     case TSTRUCT:
-    case TTUPLE: 
+    case TTUPLE:
+    case TFUNPTR:
     case TFLT:
     case TINT:
     case TSTR:   return Type.SCALAR;
@@ -92,7 +93,9 @@ public class TypeFun extends Type<TypeFun> {
   @Override public boolean is_con()       { return _fidxs.abit() >= 0; }
   // Return true if this type may BE a null.  Functions are not GC'd, are not
   // OOP's, and are never nil.
-  public boolean may_be_nil() { return false; }
+  @Override public boolean may_be_nil() { return false; }
+  // Return true if this is an ambiguous function pointer
+  @Override public boolean is_ambiguous_fun() { return _fidxs.above_center(); }
   public int fidx() { return _fidxs.getbit(); }
 
   // Generic functions

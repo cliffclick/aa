@@ -37,6 +37,7 @@ public class TypeOop extends TypeNullable<TypeOop> {
     case TOOP:
     case TSTRUCT:
     case TTUPLE:
+    case TFUNPTR:
     case TSTR:
       break;
     case TFLT:

@@ -281,9 +281,9 @@ public class Parse {
         if( arg == null )       // Function but no arg is just the function
           break;
         Type tn = _gvn.type(n);
-        if( !tn.is_fun_ptr() && arg.may_prec() >= 0 ) { _x=oldx; break; }
-        if( !tn.is_fun_ptr() &&
-            // Notice the backwards condition: n was already tested for !is_fun_ptr().
+        if( !(tn instanceof TypeFunPtr) && arg.may_prec() >= 0 ) { _x=oldx; break; }
+        if( !(tn instanceof TypeFunPtr) &&
+            // Notice the backwards condition: n was already tested for !(tn instanceof TypeFunPtr).
             // Now we test the other way: the generic function can never be an 'n'.
             // Only if we cannot 'isa' in either direction do we bail out early
             // here.  Otherwise, e.g. 'n' might be an unknown function argument
@@ -535,7 +535,7 @@ public class Parse {
         if( ts._len != 1 ) return null; // should return TypeErr missing -> in tfun
         ret = ts.pop();         // Get single return type
       }
-      return peek('}') ? typeq(TypeTuple.make_fun_ptr(TypeFun.make(TypeTuple.make(ts.asAry()),ret,Bits.FULL,ts._len))) : null;
+      return peek('}') ? typeq(TypeFunPtr.make(TypeFun.make(TypeTuple.make(ts.asAry()),ret,Bits.FULL,ts._len))) : null;
     }
 
     if( peek2(c,"@{") ) { // Struct type
@@ -669,7 +669,7 @@ public class Parse {
 
   // Standard mis-use of a forward-ref error (assumed to be a forward-decl of a
   // recursive function; all other uses are treated as an unknown-ref error).
-  public String forward_ref_err(Type t0) { return forward_ref_err(((TypeTuple)t0).get_fun()); }
+  public String forward_ref_err(Type t0) { return forward_ref_err(((TypeFunPtr)t0).fun()); }
   public String forward_ref_err(TypeFun tfun) {
     String name = FunNode.name(tfun.fidx());
     return errMsg("Unknown ref '"+name+"'");

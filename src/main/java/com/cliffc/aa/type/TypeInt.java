@@ -62,6 +62,7 @@ public class TypeInt extends Type<TypeInt> {
     case TSTR:
     case TSTRUCT:
     case TTUPLE:
+    case TFUNPTR:
     case TFUN:
     case TRPC:   return Type.SCALAR;
     case TCTRL:
@@ -151,6 +152,7 @@ public class TypeInt extends Type<TypeInt> {
   // 99 Bottom; No free converts; e.g. Flt->Int requires explicit rounding
   @Override public byte isBitShape(Type t) {
     // TODO: Allow loss-less conversions (e.g. small float integer constants convert to ints just fine)
+    if( t._type == Type.TXSCALAR ) return 0;
     if( t._type == Type.TINT ) return (byte)(_z<=((TypeInt)t)._z ? 0 : 99);
     if( t._type == Type.TFLT ) return 2; // Int->Flt ignores large int overflow issues
     if( t._type == Type.TREAL ) return 1;

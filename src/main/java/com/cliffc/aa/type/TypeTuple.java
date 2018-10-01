@@ -59,14 +59,10 @@ public class TypeTuple<T extends TypeTuple> extends TypeNullable<T> {
     int len = ts.length;
     while( len > 0 && ts[len-1] == inf ) len--;
     if( len < ts.length ) ts = Arrays.copyOf(ts,len);
-    return make0(inf, nil, ts);
+    TypeTuple tt = make0(inf, nil, ts);
+    return tt.is_fun_ptr() ? TypeFunPtr.make(tt) : tt;
   }
   public static TypeTuple make_args( Type... ts ) { return make(Type.SCALAR,NOT_NIL,ts); }
-  public static TypeTuple make_fun_ptr( TypeFun fun ) {
-    TypeTuple t = make_all(Type.CTRL,fun._ret, TypeRPC.ALL_CALL, fun);
-    assert t.is_fun_ptr();
-    return t;
-  }
 
   public  static final TypeTuple NIL     = make(Type.ANY,IS_NIL); // is null; tuple guts ignored
   public  static final TypeTuple ANY     = make(); // Infinite list of Any
@@ -75,7 +71,7 @@ public class TypeTuple<T extends TypeTuple> extends TypeNullable<T> {
           static final TypeTuple XSCALARS= make(Type.XSCALAR,NOT_NIL);
           static final TypeTuple SCALAR0 = make_args();
           static final TypeTuple SCALAR1 = make_args(Type.SCALAR);
-          static final TypeTuple SCALAR2 = make_args(Type.SCALAR, Type. SCALAR);
+          static final TypeTuple SCALAR2 = make_args(Type.SCALAR, Type.SCALAR);
   public  static final TypeTuple INT32   = make_args(TypeInt.INT32 );
   public  static final TypeTuple INT64   = make_args(TypeInt.INT64 );
   public  static final TypeTuple FLT64   = make_args(TypeFlt.FLT64 );
@@ -88,9 +84,7 @@ public class TypeTuple<T extends TypeTuple> extends TypeNullable<T> {
   public  static final TypeTuple IF_ALL  = make_all(Type.CTRL ,Type.CTRL );
   public  static final TypeTuple IF_TRUE = make_all(Type.XCTRL,Type.CTRL );
   public  static final TypeTuple IF_FALSE= make_all(Type.CTRL ,Type.XCTRL);
-  public  static final TypeTuple FUNPTR2 = make_fun_ptr(TypeFun.any(2,-1));
-  public  static final TypeTuple GENERIC_FUN = make_fun_ptr(TypeFun.make_generic());
-  static final TypeTuple[] TYPES = new TypeTuple[]{NIL,ANY,SCALAR1,STR,INT32,INT64,FLT64,INT64_INT64,FLT64_FLT64,FLT64_INT64, IF_ALL, IF_TRUE, IF_FALSE, FUNPTR2, OOP_OOP};
+  static final TypeTuple[] TYPES = new TypeTuple[]{NIL,ANY,SCALAR1,STR,INT32,INT64,FLT64,INT64_INT64,FLT64_FLT64,FLT64_INT64, IF_ALL, IF_TRUE, IF_FALSE, OOP_OOP};
   
   // The length of Tuples is a constant, and so is its own dual.  Otherwise
   // just dual each element.  Also flip the infinitely extended tail type.
@@ -109,6 +103,7 @@ public class TypeTuple<T extends TypeTuple> extends TypeNullable<T> {
     case TRPC:
     case TFUN:   return Type.SCALAR;
     case TOOP:
+    case TFUNPTR:
     case TSTRUCT: 
     case TERROR:
     case TNAME:
@@ -122,7 +117,7 @@ public class TypeTuple<T extends TypeTuple> extends TypeNullable<T> {
   }
 
   // Meet 2 tuples, shorter is 'this'
-  private TypeTuple xmeet1(TypeTuple tmax) {
+  TypeTuple xmeet1( TypeTuple tmax ) {
     Type[] ts = new Type[tmax._ts.length];
     // Meet of common elements
     for( int i=0; i<_ts.length; i++ )  ts[i] = _ts[i].meet(tmax._ts[i]);
@@ -168,15 +163,13 @@ public class TypeTuple<T extends TypeTuple> extends TypeNullable<T> {
   // 1 - Return type of the function as implemented
   // 2 - RPC (set of callers)
   // 3 - Classic TypeFun, includes declared return type
-  @Override public boolean is_fun_ptr() {
+  final boolean is_fun_ptr() {
     return _ts.length==4 &&
      (_ts[0]==Type.CTRL || _ts[0]==Type.XCTRL) &&
       _ts[2] instanceof TypeRPC &&
+      //assert ts[3].is_con(); // Not always a constant F-P, e.g. Unresolved doing joins of F-P's
       _ts[3] instanceof TypeFun;
   }
-  // Return true if this is a forward-ref function pointer (return type from EpilogNode)
-  @Override public boolean is_forward_ref() { return is_fun_ptr() && _ts[3].is_forward_ref(); }
-  public TypeFun get_fun() { assert is_fun_ptr(); return (TypeFun)_ts[3]; }
 
   // True if isBitShape on all bits
   @Override public byte isBitShape(Type t) {
@@ -188,8 +181,6 @@ public class TypeTuple<T extends TypeTuple> extends TypeNullable<T> {
   
   // Return an error message, if any exists
   @Override public String errMsg() {
-    // Ok to have a function which cannot be executed
-    if( is_fun_ptr() ) return null;
     String s;
     for( Type t : _ts )
       if( (s=t.errMsg()) != null )

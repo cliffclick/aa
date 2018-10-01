@@ -343,8 +343,8 @@ public class FunNode extends RegionNode {
       if( nn instanceof ParmNode && ((ParmNode)nn)._idx==-1 )
         ot = nn.all_type();     // Except the RPC, which has new callers
       else if( nn instanceof EpilogNode ) {
-        TypeTuple tt = (TypeTuple)ot; // And the epilog, which has a new funnode and RPCs
-        ot = TypeTuple.make_all(tt.at(0),tt.at(1),TypeRPC.ALL_CALL,fun._tf);
+        TypeFunPtr tt = (TypeFunPtr)ot; // And the epilog, which has a new funnode and RPCs
+        ot = TypeFunPtr.make0(tt.ctl(),tt.val(),TypeRPC.ALL_CALL,fun._tf);
       }
       gvn.rereg(nn,ot);
     }
@@ -406,8 +406,7 @@ public class FunNode extends RegionNode {
       for( Node c : map.values() ) {
         if( c instanceof CallNode ) { // For all cloned Calls
           Type tfunptr = gvn.type(c.in(1));
-          assert tfunptr.is_fun_ptr();
-          TypeFun tfun = (TypeFun)((TypeTuple)tfunptr).at(3);
+          TypeFun tfun = ((TypeFunPtr)tfunptr).fun();
           for( int fidx : tfun._fidxs ) { // For all possible targets of the Call
             FunNode oldfun = FunNode.find_fidx(fidx);
             assert !oldfun.is_dead();

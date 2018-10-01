@@ -42,6 +42,7 @@ public class TypeRPC extends Type<TypeRPC> {
     case TXCTRL: return Type.ALL;
     case TOOP:
     case TTUPLE: 
+    case TFUNPTR:
     case TSTRUCT:
     case TFUN:
     case TFLT:

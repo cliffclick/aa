@@ -25,12 +25,10 @@ public class EpilogNode extends Node {
   }
 
   @Override public Type value(GVNGCM gvn) {
-    Type t=TypeTuple.make_all(gvn.type(ctrl()), // Function exits, or not
-                              gvn.type(val ()), // Function return value
-                              gvn.type(rpc ()), // Caller; the Continuation
-                              FunNode.find_fidx(_fidx)._tf);
-    assert t.is_fun_ptr();
-    return t;
+    return TypeFunPtr.make0(gvn.type(ctrl()), // Function exits, or not
+                            gvn.type(val ()), // Function return value
+                            (TypeRPC)gvn.type(rpc ()), // Caller; the Continuation
+                            FunNode.find_fidx(_fidx)._tf);
   }
   @Override public String err(GVNGCM gvn) { return is_forward_ref() ? _unkref_err : null; }
 
@@ -75,7 +73,7 @@ public class EpilogNode extends Node {
     dfun.bind(tok);
   }
 
-  @Override public Type all_type() { return TypeTuple.GENERIC_FUN; }
+  @Override public Type all_type() { return TypeFunPtr.GENERIC_FUN; }
   
   // Return the op_prec of the returned value.  Not sensible except when called
   // on primitives.

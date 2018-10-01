@@ -54,6 +54,7 @@ public class TypeStr extends TypeNullable<TypeStr> {
     switch( t._type ) {
     case TSTR:   break;
     case TSTRUCT:
+    case TFUNPTR:
     case TTUPLE: return TypeOop.make(nmeet(((TypeNullable)t)._nil),false);
     case TFLT:
     case TINT:

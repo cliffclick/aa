@@ -110,12 +110,13 @@ public class Type<T extends Type> {
   static final byte TOOP    =14; // Includes all GC ptrs & null; structs, strings.  Excludes functions, ints, floats
   static final byte TTUPLE  =15; // Tuples; finite collections of unrelated Types, kept in parallel
   static final byte TSTRUCT =16; // Structs; tuples with named fields
-  static final byte TFUN    =17; // Functions; both domain and range are a Tuple; see TypeFun
-  static final byte TRPC    =18; // Return PCs; Continuations; call-site return points; see TypeRPC
-  static final byte TFLT    =19; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
-  static final byte TINT    =20; // All Integers, including signed/unsigned and various sizes; see TypeInt
-  static final byte TSTR    =21; // String type
-  static final byte TLAST   =22; // Type check
+  static final byte TFUNPTR =17; // Function *pointer*, a "fat" pointer refering to a single block of code
+  static final byte TFUN    =18; // Function signature; both domain and range are a Tuple; see TypeFun; many functions share the same signature
+  static final byte TRPC    =19; // Return PCs; Continuations; call-site return points; see TypeRPC
+  static final byte TFLT    =20; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
+  static final byte TINT    =21; // All Integers, including signed/unsigned and various sizes; see TypeInt
+  static final byte TSTR    =22; // String type
+  static final byte TLAST   =23; // Type check
   
   public  static final Type ALL    = make( TALL   ); // Bottom
   public  static final Type ANY    = make( TANY   ); // Top
@@ -145,7 +146,7 @@ public class Type<T extends Type> {
   Type base() { Type t = this; while( t._type == TNAME ) t = ((TypeName)t)._t; return t; }
   // Strip off any subclassing just for names
   byte simple_type() { return base()._type; }
-  public  boolean is_oop() { byte t = simple_type();  return t == TOOP || t == TSTR || t == TSTRUCT || t == TTUPLE; }
+  public  boolean is_oop() { byte t = simple_type();  return t == TOOP || t == TSTR || t == TSTRUCT || t == TTUPLE || t == TFUNPTR; }
   private boolean is_num() { byte t = simple_type();  return t == TNUM || t == TXNUM || t == TREAL || t == TXREAL || t == TINT || t == TFLT; }
   // True if 'this' isa SCALAR, without the cost of a full 'meet()'
   final boolean isa_scalar() { return _type != TERROR && _type != TCTRL && _type != TXCTRL; }
@@ -267,6 +268,7 @@ public class Type<T extends Type> {
     ts = concat(ts,TypeStr   .TYPES);
     ts = concat(ts,TypeTuple .TYPES);
     ts = concat(ts,TypeStruct.TYPES);
+    ts = concat(ts,TypeFunPtr.TYPES);
     ts = concat(ts,TypeFun   .TYPES);
     ts = concat(ts,TypeRPC   .TYPES);
     ts = concat(ts,TypeUnion .TYPES);
@@ -405,10 +407,11 @@ public class Type<T extends Type> {
   // Return any "return type" of the Meet of all function types.  Error for
   // everybody except TypeFun and a TypeUnion of TypeFuns
   public Type ret() { throw AA.unimpl(); }
-  // Return true if this is a function pointer (return type from EpilogNode)
-  public boolean is_fun_ptr() { return false; }
   // Return true if this is a forward-ref function pointer (return type from EpilogNode)
   public boolean is_forward_ref() { return false; }
+  // Return true if this is an ambiguous function pointer
+  public boolean is_ambiguous_fun() { throw AA.unimpl(); }
+  
   // Return a long   from a TypeInt constant; assert otherwise.
   public long   getl() { throw AA.unimpl(); }
   // Return a double from a TypeFlt constant; assert otherwise.
@@ -439,7 +442,7 @@ public class Type<T extends Type> {
     if( t._type==TSCALAR ) return 0; // Generic function arg never requires a conversion
     if( _type == TALL || _type == TSCALAR ) return -1; // Scalar has to resolve
     if( _type == TREAL && t.is_num() ) return -1; // Real->Int/Flt has to resolve
-    if( is_fun_ptr() ) return (byte)(t == OOP0 ? 0 : 99);
+    if( _type == TFUNPTR ) return (byte)(t == OOP0 ? 0 : 99);
 
     throw typerr(t);  // Overridden in subtypes
   }

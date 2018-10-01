@@ -238,6 +238,12 @@ public class TypeUnion extends Type<TypeUnion> {
       return false;
     }
   }
+  // Return true if this is an ambiguous function pointer.  Only valid for meet
+  // of functions, and can be true for a meet of ambiguous functions.  Example:
+  // "(rand?{+}:{*})(2,3)" - either {*} or {+} is being called on (2,3) with
+  // either floats or ints.  The result is either 6 or 5 according.
+  @Override public boolean is_ambiguous_fun() { throw AA.unimpl(); }
+  
   // Lattice of conversions:
   // -1 unknown; top; might fail, might be free (Scalar->Int); Scalar might lift
   //    to e.g. Float and require a user-provided rounding conversion from F64->Int.
