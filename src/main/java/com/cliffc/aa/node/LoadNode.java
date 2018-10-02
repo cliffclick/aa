@@ -49,7 +49,8 @@ public class LoadNode extends Node {
                                   n.in(0).in(1) == fbaseaddr );
     if( tru==null ) return null;
     assert !(tru==ctrl && addr != baseaddr) : "not the immediate location or we would be not-null already";
-    set_def(1,gvn.xform(new CastNode(tru,baseaddr,((TypeStruct)t).make_nil(TypeStruct.NOT_NIL))),gvn);
+    if( !(t instanceof TypeNullable) ) return null; // Not yet typed as a Nullable
+    set_def(1,gvn.xform(new CastNode(tru,baseaddr,((TypeNullable)t).make_nil(TypeNullable.NOT_NIL))),gvn);
     return set_def(0,null,gvn);
   }
   @Override public Type value(GVNGCM gvn) {

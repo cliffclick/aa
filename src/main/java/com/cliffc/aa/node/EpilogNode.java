@@ -66,7 +66,7 @@ public class EpilogNode extends Node {
     FunNode rfun = fun();
     FunNode dfun = def.fun();
     assert rfun._defs._len==2 && rfun.in(0)==null && rfun.in(1) instanceof ScopeNode; // Forward ref has no callers
-    assert dfun._defs._len==2 && dfun.in(0)==null && dfun.in(1) instanceof ScopeNode;
+    assert dfun._defs._len==2 && dfun.in(0)==null;
     assert def._uses._len==0;                      // Def is brand new, no uses
 
     gvn.subsume(this,def);
