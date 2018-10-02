@@ -1,8 +1,10 @@
 package com.cliffc.aa.type;
 
 import com.cliffc.aa.AA;
+
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 
 import static com.cliffc.aa.type.TypeOop.OOP0;
 
@@ -52,7 +54,8 @@ public class Type<T extends Type> {
     if( this == o ) return true;
     return (o instanceof Type) && _type==((Type)o)._type;
   }
-  @Override public String toString() { return STRS[_type]; }
+  @Override public String toString() { return str(null); }
+  String str( HashSet<Type> dups) { return STRS[_type]; }
 
   // Object Pooling to handle frequent (re)construction of temp objects being
   // interned.  One-entry pool for now.
@@ -88,6 +91,12 @@ public class Type<T extends Type> {
     d._dual = this;
     INTERN.put(d,d);
     return this;
+  }
+  // Remove a forward-ref type from the interning dictionary, prior to
+  // interning it again - as a self-recursive type
+  void untern( ) {
+    Type rez  = INTERN.remove(this);
+    assert rez != null;
   }
 
   // Simple types are implemented fully here
@@ -169,6 +178,7 @@ public class Type<T extends Type> {
   }
   private Type xmeet0( Type t ) {
     if( t == this ) return this;
+    if( t._dual==this ) return above_center() ? t : this;
     // Reverse; xmeet 2nd arg is never <TSIMPLE
     return !is_simple() && t.is_simple() ? t.xmeet(this) : xmeet(t);
   }
@@ -409,6 +419,8 @@ public class Type<T extends Type> {
   public Type ret() { throw AA.unimpl(); }
   // Return true if this is a forward-ref function pointer (return type from EpilogNode)
   public boolean is_forward_ref() { return false; }
+  // Return the recursive type if this is a forward-ref type def, and null otherwise
+  public TypeName merge_recursive_type( Type t ) { return null; }
   
   // Return a long   from a TypeInt constant; assert otherwise.
   public long   getl() { throw AA.unimpl(); }

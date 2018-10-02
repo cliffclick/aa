@@ -1,6 +1,7 @@
 package com.cliffc.aa.type;
 
 import java.util.HashMap;
+import java.util.HashSet;
 
 public class TypeFlt extends Type<TypeFlt> {
   byte _x;                // -1 bot, 0 con, +1 top
@@ -15,7 +16,7 @@ public class TypeFlt extends Type<TypeFlt> {
     TypeFlt t2 = (TypeFlt)o;
     return _x==t2._x && _z==t2._z && _con==t2._con;
   }
-  @Override public String toString() {
+  @Override String str( HashSet<Type> dups) {
     if( _x==0 ) return Double.toString(_con);
     return (_x==1?"~":"")+"flt"+Integer.toString(_z);
   }

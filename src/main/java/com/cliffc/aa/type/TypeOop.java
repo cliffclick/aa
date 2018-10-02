@@ -2,6 +2,8 @@ package com.cliffc.aa.type;
 
 import com.cliffc.aa.AA;
 
+import java.util.HashSet;
+
 // All Generic Nullable Oops, including Strings, Structs, Tuples, Arrays
 public class TypeOop extends TypeNullable<TypeOop> {
   private boolean _any;                 // True=choice/join; False=all/meet
@@ -12,7 +14,7 @@ public class TypeOop extends TypeNullable<TypeOop> {
     if( this==o ) return true;
     return o instanceof TypeOop && eq((TypeOop)o) && _any==((TypeOop)o)._any;
   }
-  @Override public String toString() { return (_any?"~":"")+String.format(TSTRS[_nil],"oop"); }
+  @Override String str( HashSet<Type> dups) { return (_any?"~":"")+String.format(TSTRS[_nil],"oop"); }
   private static TypeOop FREE=null;
   @Override protected TypeOop free( TypeOop f ) { assert f._type==TOOP; FREE=f; return this; }
   public static TypeOop make( byte nil, boolean any ) {

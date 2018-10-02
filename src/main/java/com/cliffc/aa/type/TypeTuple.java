@@ -4,6 +4,7 @@ import com.cliffc.aa.AA;
 import com.cliffc.aa.util.SB;
 
 import java.util.Arrays;
+import java.util.HashSet;
 
 /** record/struct types; infinitely extended with an extra type (typically ANY or ALL) */
 public class TypeTuple<T extends TypeTuple> extends TypeNullable<T> {
@@ -36,10 +37,13 @@ public class TypeTuple<T extends TypeTuple> extends TypeNullable<T> {
       if( _ts[i]!=t._ts[i] ) return false;
     return true;
   }
-  @Override public String toString() {
+  @Override String str(HashSet<Type> dups) {
+    if( dups == null ) dups = new HashSet<>();
+    if( dups.contains(this) ) return "*";
+    dups.add(this);
     SB sb = new SB().p('(');
-    for( Type t : _ts ) sb.p(t.toString()).p(',');
-    if( _inf!=Type.ALL ) sb.p(_inf.toString()).p("...");
+    for( Type t : _ts ) sb.p(t.str(dups)).p(',');
+    if( _inf!=Type.ALL ) sb.p(_inf.str(dups)).p("...");
     sb.p(')');
     return String.format(TSTRS[_nil],sb.toString());
   }

@@ -2,13 +2,19 @@ package com.cliffc.aa.type;
 
 import com.cliffc.aa.AA;
 
+import java.util.HashSet;
+
 // Named types are essentially a subclass of the named type.
 public class TypeName extends Type<TypeName> {
   public  String _name;
   public  Type _t;
-  private short _depth;
-  private TypeName ( String name, Type t ) { super(TNAME); init(name,t); }
-  private void init( String name, Type t ) { assert name!=null; _name=name; _t=t; _depth = (short)(t instanceof TypeName ? ((TypeName)t)._depth+1 : 0); }
+  private short _depth;         // Nested depth of TypeNames, or -1 for a forward-ref type-var
+  // Forward-ref type-variable; changes after the def appears.
+  public TypeName ( String name ) { super(TNAME); init(name,Type.SCALAR,(short)-1); }
+  // Named type variable
+  private TypeName ( String name, Type t, short depth ) { super(TNAME); init(name,t,depth); }
+  private void init( String name, Type t, short depth ) { assert name!=null; _name=name; _t=t; _depth = depth; }
+  private static short depth( Type t ) { return(short)(t instanceof TypeName ? ((TypeName)t)._depth+1 : 0); }
   @Override public int hashCode( ) { return TNAME+(_name==null?0:_name.hashCode())+_t.hashCode()+_depth;  }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
@@ -16,26 +22,27 @@ public class TypeName extends Type<TypeName> {
     TypeName t2 = (TypeName)o;
     return _t==t2._t && _depth==t2._depth && _name.equals(t2._name);
   }
-  @Override public String toString() { return _name+":"+_t; }
+  @Override String str( HashSet<Type> dups) { return _name+":"+_t.str(dups); }
   private static TypeName FREE=null;
   @Override protected TypeName free( TypeName f ) { FREE=f; return this; }
-  private static TypeName make0( String name, Type t) {
+  private static TypeName make0( String name, Type t, short depth) {
     assert !(t instanceof TypeUnion) || t==TypeUnion.NIL; // No named unions (except nil)
     TypeName t1 = FREE;
-    if( t1 == null ) t1 = new TypeName(name,t);
-    else { FREE = null; t1.init(name,t); }
+    if( t1 == null ) t1 = new TypeName(name,t,depth);
+    else { FREE = null; t1.init(name,t,depth); }
     TypeName t2 = (TypeName)t1.hashcons();
     return t1==t2 ? t1 : t2.free(t1);
   }
-  public static TypeName make( String name, Type t) { return make0(name,t); }
+  public static TypeName make( String name, Type t) { return make0(name,t,depth(t)); }
+  public static TypeName make_forward_def_type( String name ) { return make0(name,Type.SCALAR,(short)-1); }
 
-  public  static final TypeName TEST_ENUM = make0("__test_enum",TypeInt.INT8);
-  private static final TypeName TEST_FLT  = make0("__test_flt" ,TypeFlt.FLT32);
-  private static final TypeName TEST_E2   = make0("__test_e2"  ,TEST_ENUM);
+  public  static final TypeName TEST_ENUM = make("__test_enum",TypeInt.INT8);
+  private static final TypeName TEST_FLT  = make("__test_flt" ,TypeFlt.FLT32);
+  private static final TypeName TEST_E2   = make("__test_e2"  ,TEST_ENUM);
   
   static final TypeName[] TYPES = new TypeName[]{TEST_ENUM,TEST_FLT,TEST_E2};
 
-  @Override protected TypeName xdual() { return new TypeName(_name,_t.dual()); }
+  @Override protected TypeName xdual() { return new TypeName(_name,_t.dual(),depth(_t)); }
   @Override protected Type xmeet( Type t ) {
     assert t != this;
     Type mt;
@@ -66,6 +73,25 @@ public class TypeName extends Type<TypeName> {
     return mt.meet_nil();
   }
 
+  // 'this' is a forward ref type definition; the actual type-def is 't' which
+  // may include embedded references to 'this'
+  @Override public TypeName merge_recursive_type( Type t ) {
+    if( _depth != -1 ) return null; // Not a recursive type-def
+    assert _t==Type.SCALAR;
+    // Remove from INTERN table, since hacking type will not match hash
+    untern();
+    _dual.untern();
+    // Hack type and it's dual.  Type is now recursive.
+    _t = t;
+    ((TypeName)_dual)._t = t._dual;
+    // DO not install recursive-type back into the INTERN table.  The
+    // hashCode() and equals() calls are not prepared to handle the recursive
+    // structure and will stack-overflow instead of returning sensible results.
+    // But the types are still pointer-unique and can be compared with normal
+    // pointer-equality checks.
+    return this;
+  }
+  
   @Override public boolean above_center() { return _t.above_center(); }
   @Override public boolean may_be_con() { return _t.may_be_con(); }
   @Override public boolean is_con()   { return _t.is_con(); }

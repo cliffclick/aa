@@ -147,15 +147,22 @@ public class Parse {
     }
     // tvar assignment only allows 1 id
     if( toks._len == 1 && ts.at(0)==null && peek(':') ) {
-      Type t = type();
+      Type t = type(true);
       if( t==null ) return err_ctrl2("Missing type after ':'");
       String tvar = toks.at(0);
-      Type ot = _e.lookup_type(tvar);
-      if( ot              != null ) return err_ctrl2("Cannot re-assign type '"+tvar+"'");
       if( _e.lookup(tvar) != null ) return err_ctrl2("Cannot re-assign val '"+tvar+"' as a type");
-      TypeName tn = TypeName.make(tvar,t);
-      _e.add_type(tvar,tn); // Assign type-name
+      Type ot = _e.lookup_type(tvar);
+      TypeName tn;
+      if( ot == null ) {
+        tn = TypeName.make(tvar,t);
+        _e.add_type(tvar,tn); // Assign type-name
+      } else {
+        tn = ot.merge_recursive_type(t);
+        if( tn == null ) return err_ctrl2("Cannot re-assign type '"+tvar+"'");
+      }
+      // Add a constructor function
       // TODO: Add reverse cast-away
+      // TODO: Add struct types with expanded arg lists
       PrimNode cvt = PrimNode.convertTypeName(t,tn,errMsg());
       return _e.add(tvar,gvn(_e.as_fun(cvt))); // Return type-name constructor
     }
@@ -508,28 +515,32 @@ public class Parse {
   }
 
   /** Parse a type or return null
-   *  type = tcon | tvar | tfun[?] | tstruct[?]   // Types are a tcon or a tfun or a tstruct
+   *  type = tcon | tfun[?] | tstruct[?] | tvar  // Types are a tcon or a tfun or a tstruct
    *  tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str[?]
    *  tfun = {[[type]* ->]? type }// Function types mirror func decls
    *  tstruct = @{ [id[:type],]*} // Struct types are field names with optional types
+   *
+   *  Unknown tokens when type_var is false are treated as not-a-type.  When
+   *  true, unknown tokens are treated as a forward-ref new type.
    */
-  private Type type() {
-    Type t = type0();
+  private Type type() { return type(false); }
+  private Type type(boolean type_var) {
+    Type t = type0(type_var);
     return (t==null || t==Type.ANY) ? null : t;
   }
   // Wrap in a nullable if there is a trailing '?'
-  private Type typeq(Type t) { return peek('?') ? ((TypeNullable)t).meet_nil() : t; }
+  private Type typeq(Type t) { return peek('?') ? t.meet_nil() : t; }
   
   // Type or null or TypeErr.ANY for '->' token
-  private Type type0() {
+  private Type type0(boolean type_var) {
     byte c = skipWS();
     if( peek1(c,'{') ) { // Function type
       Ary<Type> ts = new Ary<>(new Type[1],0);  Type t;
-      while( (t=type0()) != null && t != Type.ANY  )
+      while( (t=type0(type_var)) != null && t != Type.ANY  )
         ts.add(t);              // Collect arg types
       Type ret;
       if( t==Type.ANY ) {       // Found ->, expect return type
-        ret = type0();
+        ret = type0(type_var);
         if( ret == null ) return null; // should return TypeErr missing type after ->
       } else {                  // Allow no-args and simple return type
         if( ts._len != 1 ) return null; // should return TypeErr missing -> in tfun
@@ -546,7 +557,7 @@ public class Parse {
         if( tok == null ) break; // end-of-struct-def
         Type t = Type.SCALAR;    // Untyped, most generic field type
         if( peek(':') )          // Has type annotation?
-          if( (t=type())==null ) throw AA.unimpl(); // return an error here, missing type
+          if( (t=type(type_var))==null ) throw AA.unimpl(); // return an error here, missing type
         if( flds.find(tok) != -1 ) throw AA.unimpl(); // cannot use same field name twice
         flds.add(tok);          // Gather for final type
         ts  .add(t  );
@@ -559,10 +570,17 @@ public class Parse {
     int oldx = _x;
     String tok = token();
     if( tok==null ) return null;
-    if( tok.equals("->") ) return Type.ANY; // Found -> return sentinal
+    if( tok.equals("->") ) return Type.ANY; // Found -> return sentinel
     Type t = _e.lookup_type(tok);
-    if( t==null ) _x = oldx;  // Unwind if not a known type
-    return t==TypeStr.STR ? typeq(t) : t;
+    if( t==null ) {                // Not a known type var
+      if( _e.lookup(tok) != null ||// Yes a known normal var; resolve as a normal var
+          !type_var ) {            // Or not inside a type-var assignment
+        _x = oldx;                 // Unwind if not a known type var
+        return null;               // Not a type
+      }
+      _e.add_type(tok,t=TypeName.make_forward_def_type(tok));
+    }
+    return t instanceof TypeNullable ? typeq(t) : t;
   }
 
   // Require a specific character (after skipping WS) or polite error

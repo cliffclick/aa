@@ -11,8 +11,14 @@ import static org.junit.Assert.assertTrue;
 public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
-    // User-defined linked-list
 
+    // Named recursive types
+    //test_isa("A= :@{n:A, v:int}", Type.SCALAR);
+    //testerr ("A= :@{n:B, v:int}", "Missing type decl B", "");
+    //test_isa("A= :@{n:B, v:int}; B= :@{n:A, v:flt}", Env.lookup_valtype("B"));
+    //
+    //test_isa("A= :@{n:A?, v:int}; f={x:A? -> x ? A(@{n=f(x.n),v=x.v*x.v}) : 0}", TypeFunPtr.FUNPTR1);
+    
     // Fails because there is an infinite type-expansion (which in turn points
     // out that I'm missing the optimistic-all-equals type algo which can find
     // optimal closed type cycles).  The expansion loop is:
@@ -20,10 +26,7 @@ public class TestParse {
     // Each loop around nests another @{n:???,v:int} wrapper.
     //test_isa("f={x:@{n,v:int}? -> x ? @{n=f(x.n),v=x.v*x.v} : 0}", TypeFunPtr.FUNPTR1); // Recursive (looping) struct meets
 
-    // Named recursive type
-    //test_isa("A= :@{n:A, v:int}; f={x:A? -> x ? A(@{n=f(x.n),v=x.v*x.v}) : 0}", TypeFunPtr.FUNPTR1);
-    
-    
+    // User-defined linked-list
     //test("List=:@{next,val};\n"+
     //     "List0={n v -> List(@{next=n,val=v})};\n"+
     //     "x=List0(List0(0,1.2),2.3);\n"+
@@ -269,6 +272,11 @@ public class TestParse {
   }
 
   @Test public void testParse6() {
+    // Building recursive types
+    test_isa("A= :int; A(1)", TypeName.make("A",TypeInt.INT64));
+
+  }
+  @Test public void testParse7() {
     // Passing a function recursively
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({&},2)", TypeInt.FALSE);
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({+},2)", TypeInt.con(2));

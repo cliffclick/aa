@@ -1,6 +1,7 @@
 package com.cliffc.aa.type;
 
 import java.util.HashMap;
+import java.util.HashSet;
 
 public class TypeStr extends TypeNullable<TypeStr> {
   private byte _x;              // -1 bot, 1 con, 0 top
@@ -20,7 +21,7 @@ public class TypeStr extends TypeNullable<TypeStr> {
     TypeStr t2 = (TypeStr)o;
     return super.eq(t2) && _x==t2._x && _con.equals(t2._con);
   }
-  @Override public String toString() {
+  @Override String str( HashSet<Type> dups) {
     return String.format(TSTRS[_nil],(_x==0?"~":"") +
                          (_x==1 ? '"'+_con+'"' : "str"));
   }

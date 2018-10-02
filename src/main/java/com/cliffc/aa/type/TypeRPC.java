@@ -3,6 +3,8 @@ package com.cliffc.aa.type;
 import com.cliffc.aa.util.Bits;
 import com.cliffc.aa.util.SB;
 
+import java.util.HashSet;
+
 // Return-Program-Counters, or Continuation constants
 public class TypeRPC extends Type<TypeRPC> {
   public Bits _rpcs;            // 
@@ -16,7 +18,7 @@ public class TypeRPC extends Type<TypeRPC> {
     TypeRPC tf = (TypeRPC)o;
     return _rpcs==tf._rpcs;
   }
-  @Override public String toString() {
+  @Override String str( HashSet<Type> dups) {
     SB sb = new SB().p("#");
     return _rpcs.toString(sb).toString();
   }
