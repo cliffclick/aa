@@ -29,8 +29,8 @@ public class ParmNode extends PhiNode {
     if( !fun._all_callers_known ) return null;     // More callers to come, no change yet
     // Arg-check before folding up
     if( _idx != -1 ) {
-      Type formal = fun._tf._ts.at(_idx); // Formal argument type
-      for( int i=1; i<_defs._len; i++  )  // For all arguments
+      Type formal = fun._tf.arg(_idx);        // Formal argument type
+      for( int i=1; i<_defs._len; i++  )      // For all arguments
         if( gvn.type(fun.in(i))==Type.CTRL && // Path is alive
             in(i)!=this &&                    // Can ignore self- only other inputs will determine arg-check
             !gvn.type(in(i)).isa(formal) )    // Arg is NOT correct type
@@ -43,18 +43,20 @@ public class ParmNode extends PhiNode {
   @Override public Type value(GVNGCM gvn) {
     Type t = _default_type.dual();
     if( !(in(0) instanceof FunNode) ) return t; // Dying
-    FunNode r = (FunNode) in(0);
-    assert r._defs._len==_defs._len;
+    FunNode fun = (FunNode) in(0);
+    assert fun._defs._len==_defs._len;
     // TODO: During GCP, slot#1 is the "default" input and assumed never
     // called.  As callers appear, they wire up and become actual input edges.
     // Leaving slot#1 alive here makes every call appear to be called by the
     // default caller.  Fix is to have the default (undiscovered) caller
     // control be different from the top-level REPL caller, and set the
     // undiscovered control to XCTRL.
-    int s = r.slot1(gvn) ? 1 : 2;
+    int s = fun.slot1(gvn) ? 1 : 2;
     for( int i=s; i<_defs._len; i++ )
-      if( gvn.type(r.in(i))!=Type.XCTRL ) // Only meet alive paths
-        t = t.meet(gvn.type(in(i)));
+      if( gvn.type(fun.in(i))!=Type.XCTRL ) { // Only meet alive paths
+        Type pt = gvn.type(in(i));
+        t = t.meet(pt.isa(_default_type) ? pt : _default_type);
+      }
     return t;
   }
   @Override public String err( GVNGCM gvn ) {

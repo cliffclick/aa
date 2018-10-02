@@ -413,7 +413,7 @@ public class Parse {
       String errmsg = errMsg("Cannot mix GC and non-GC types");      
       int cnt=0;                // Add parameters to local environment
       for( int i=0; i<ids._len; i++ )
-        _e.add(ids.at(i),gvn(new TypeNode(ts.at(i),gvn(new ParmNode(cnt++,ids.at(i),fun,con(Type.SCALAR),errmsg)),bads.at(i))));
+        _e.add(ids.at(i),gvn(new ParmNode(cnt++,ids.at(i),fun,con(ts.at(i)),errmsg)));
       Node rpc = gvn(new ParmNode(-1,"rpc",fun,_gvn.con(TypeRPC.ALL_CALL),null));
       Node rez = stmts();       // Parse function body
       if( rez == null ) rez = err_ctrl1("Missing function body", Type.SCALAR);

@@ -13,7 +13,7 @@ public class TestParse {
   @Test public void testParse() {
     // User-defined linked-list
 
-    //test_isa("f={x:@{n,v:int} -> x.n ? @{n=f(x.n),v=x.v*x.v} : 0}", TypeFunPtr.FUNPTR1); // Recursive (looping) struct meets
+    //test_isa("f={x:@{n,v:int}? -> x ? @{n=f(x.n),v=x.v*x.v} : 0}", TypeFunPtr.FUNPTR1); // Recursive (looping) struct meets
     
     //test("List=:@{next,val};\n"+
     //     "List0={n v -> List(@{next=n,val=v})};\n"+
@@ -168,7 +168,6 @@ public class TestParse {
   }
 
   @Test public void testParse3() {
-    test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)",TypeInt.INT64);
     // Type annotations
     test("-1:int", TypeInt.con( -1));
     test("(1+2.3):flt", TypeFlt.make(0,64,3.3));
@@ -191,7 +190,7 @@ public class TestParse {
     testerr("fun:{real->flt32}={x -> x}; fun(123456789)", "123456789 is not a flt32","                          ");
 
     test   ("{x:int -> x*2}(1)", TypeInt.con(2)); // Types on parms
-    testerr("{x:str -> x}(1)", "1 is not a str", "  ");
+    testerr("{x:str -> x}(1)", "1 is not a str", "               ");
 
     // Recursive:
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
@@ -204,6 +203,7 @@ public class TestParse {
   }
 
   @Test public void testParse4() {
+    testerr ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(     (@{x=1,y=2}))", "@{x:1,y:2,} is not a Point:@{x:Scalar,y:Scalar,}","                                                                         ");
     // simple anon struct tests
     test   ("  @{x,y} ", TypeStruct.makeA(new String[]{"x","y"},Type.ANY,Type.ANY)); // simple anon struct decl
     testerr("a=@{x=1.2,y}; x", "Unknown ref 'x'","               ");
