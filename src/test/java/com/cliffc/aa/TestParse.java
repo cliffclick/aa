@@ -12,6 +12,9 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
     // User-defined linked-list
+
+    //test_isa("f={x:@{n,v:int} -> x.n ? @{n=f(x.n),v=x.v*x.v} : 0}", TypeFunPtr.FUNPTR1); // Recursive (looping) struct meets
+    
     //test("List=:@{next,val};\n"+
     //     "List0={n v -> List(@{next=n,val=v})};\n"+
     //     "x=List0(List0(0,1.2),2.3);\n"+
@@ -29,7 +32,7 @@ public class TestParse {
     
     // A collection of tests which like to fail easily
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({&},2)", TypeInt.FALSE);
-    testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1,) is not a @{x,y,}","                           ");
+    testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1,) is not a @{x:Scalar,y:Scalar,}","                           ");
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'","                    ");
     testerr("{+}(1,2,3)", "Passing 3 arguments to +{flt64 flt64 -> flt64} which takes 2 arguments","          ");
     test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
@@ -217,6 +220,7 @@ public class TestParse {
     test   ("a=@{x=(b=1.2)*b,y=b}; a.y", TypeFlt.con(1.2 )); // ok to use temp defs
     test   ("a=@{x=(b=1.2)*b,y=x}; a.y", TypeFlt.con(1.44)); // ok to use early fields in later defs
     testerr("a=@{x=(b=1.2)*b,y=b}; b", "Unknown ref 'b'","                       ");
+    test   ("t=@{n=0,val=1.2}; u=math_rand(1) ? t : @{n=t,val=2.3}; u.val", TypeFlt.FLT64); // structs merge field-by-field
     // Comments in the middle of a struct decl
     test   ("dist={p->p//qqq\n.//qqq\nx*p.x+p.y*p.y}; dist(//qqq\n@{x//qqq\n=1,y=2})", TypeInt.con(5));
 
@@ -232,8 +236,8 @@ public class TestParse {
     testerr ("gal=:flt; tank:gal = gal(2)+1", "3.0 is not a gal:flt64","                             ");
     test    ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(@{x=1,y=2}))", TypeInt.con(5));
     test    ("Point=:@{x,y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(@{x=1,y=2}))", TypeInt.con(5));
-    testerr ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(     (@{x=1,y=2}))", "@{x:1,y:2,} is not a Point:@{x,y,}","                      ");
-    testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1,) is not a @{x,y,}","                           ");
+    testerr ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(     (@{x=1,y=2}))", "@{x:1,y:2,} is not a Point:@{x:Scalar,y:Scalar,}","                                                                         ");
+    testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1,) is not a @{x:Scalar,y:Scalar,}","                           ");
   }
 
   @Test public void testParse5() {

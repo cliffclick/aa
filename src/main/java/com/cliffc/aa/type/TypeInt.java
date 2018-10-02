@@ -157,6 +157,7 @@ public class TypeInt extends Type<TypeInt> {
     if( t._type == Type.TFLT ) return 2; // Int->Flt ignores large int overflow issues
     if( t._type == Type.TREAL ) return 1;
     if( t._type == Type.TSCALAR ) return 1;
+    if( t._type == Type.TSTR ) return 99;
     //if( t._type == Type.TUNION && t.may_be_null() && this==NULL ) return 0;
     throw com.cliffc.aa.AA.unimpl();
   }

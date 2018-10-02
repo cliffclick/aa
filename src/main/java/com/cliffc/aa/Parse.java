@@ -397,7 +397,7 @@ public class Parse {
       String tok = token();
       if( tok == null ) { ids.clear(); _x=oldx; break; } // not a "[id]* ->"
       if( tok.equals("->") ) break;
-      Type t = Type.ALL;       // Untyped, most generic type
+      Type t = Type.SCALAR;    // Untyped, most generic type
       Parse bad = errMsg();    // Capture location in case of type error
       if( peek(':') )          // Has type annotation?
         if( (t=type())==null ) throw AA.unimpl(); // return an error here
@@ -406,7 +406,7 @@ public class Parse {
       bads.add(bad);
     }
     Node old_ctrl = ctrl();
-    FunNode fun = init(new FunNode(ids._len,old_ctrl));
+    FunNode fun = init(new FunNode(ts.asAry(),old_ctrl));
     try( Env e = new Env(_e) ) {// Nest an environment for the local vars
       _e = e;                   // Push nested environment
       set_ctrl(fun);            // New control is function head
@@ -544,7 +544,7 @@ public class Parse {
       while( true ) {
         String tok = token();    // Scan for 'id'
         if( tok == null ) break; // end-of-struct-def
-        Type t = Type.ALL;       // Untyped, most generic type
+        Type t = Type.SCALAR;    // Untyped, most generic field type
         if( peek(':') )          // Has type annotation?
           if( (t=type())==null ) throw AA.unimpl(); // return an error here, missing type
         if( flds.find(tok) != -1 ) throw AA.unimpl(); // cannot use same field name twice

@@ -56,7 +56,7 @@ public class FunNode extends RegionNode {
   // Used to make copies when inlining/cloning function bodies
   private FunNode(Node scope, TypeTuple ts, Type ret, String name, int nargs) { this(scope,TypeFun.make(ts,ret,CNT,nargs),-1,name); }
   // Used to start an anonymous function in the Parser
-  public FunNode(int nargs, Node scope) { this(scope,TypeFun.any(nargs,CNT),-1,null); }
+  public FunNode(Type[] ts, Node scope) { this(scope,TypeFun.make(TypeTuple.make_args(ts),Type.SCALAR,CNT,ts.length),-1,null); }
   // Used to forward-decl anon functions
   FunNode(Node scope, String name) { this(scope,TypeFun.make_forward_ref(CNT),-1,name); }
   // Shared common constructor

@@ -45,6 +45,7 @@ public class TypeFunPtr extends TypeTuple<TypeFunPtr> {
   public static TypeFunPtr make( int fidx ) { return make(FunNode.find_fidx(fidx)._tf); }
   public static TypeFunPtr make( TypeTuple tt ) { return make0(tt._nil,tt._ts,tt._inf); }
 
+  public static final TypeFunPtr FUNPTR1     = make(TypeFun.any(1,-1));
   public static final TypeFunPtr FUNPTR2     = make(TypeFun.any(2,-1));
   public static final TypeFunPtr GENERIC_FUN = make(TypeFun.make_generic());
   static final TypeFunPtr[] TYPES = new TypeFunPtr[]{FUNPTR2,GENERIC_FUN};

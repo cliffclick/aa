@@ -56,7 +56,8 @@ public class Env implements AutoCloseable {
   // Close the current Env, making its lexical scope dead (and making dead
   // anything only pointed at by this scope).
   @Override public void close() {
-    _scope.promote_forward_del_locals(_gvn,_par._par == null ? null : _par._scope);
+    ScopeNode pscope = _par._scope;
+    _scope.promote_forward_del_locals(_gvn,_par._par == null ? null : pscope);
     if( _scope.is_dead() ) return;
     if( _par._par == null ) {
       CallNode.reset_to_init0();
@@ -64,11 +65,12 @@ public class Env implements AutoCloseable {
       _gvn    .reset_to_init0();
       return;
     }
-    // Whats left is function-ref generic entry points; promote to next outer scope
+    // Whats left is function-ref generic entry points which promote to next
+    // outer scope, and control-users which promote to the Scope's control.
     while( _scope._uses._len > 0 ) {
       Node use = _scope._uses.at(0);
       int idx = use._defs.find(_scope);
-      _gvn.set_def_reg(use,idx, _par._scope); // Move it upscope
+      _gvn.set_def_reg(use,idx, idx==0 ? pscope.get(" control ") : pscope);
     }
     _gvn.kill0(_scope);
   }
@@ -76,7 +78,7 @@ public class Env implements AutoCloseable {
   // Test support, return top-level token type
   static Type lookup_valtype( String token ) { return lookup_valtype(TOP.lookup(token)); }
   // Top-level exit type lookup
-  static Type lookup_valtype( Node n ) {
+  private static Type lookup_valtype( Node n ) {
     Type t = _gvn.type(n);
     if( t != Type.CTRL ) return t;
   //  if( n instanceof ProjNode ) // Get function type when returning a function

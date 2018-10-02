@@ -74,5 +74,11 @@ public class TypeName extends Type<TypeName> {
   @Override public double getd  () { return _t.getd  (); }
   @Override public long   getl  () { return _t.getl  (); }
   @Override public String getstr() { return _t.getstr(); }
-  @Override public byte isBitShape(Type t) { return _t.isBitShape(t); }
+  @Override public byte isBitShape(Type t) {
+    if( t instanceof TypeName ) {
+      if( ((TypeName)t)._name.equals(_name) ) return _t.isBitShape(((TypeName)t)._t);
+      return 99; // Incompatible names do not mix
+    }
+    return _t.isBitShape(t);
+  }
 }
