@@ -13,7 +13,16 @@ public class TestParse {
   @Test public void testParse() {
     // User-defined linked-list
 
+    // Fails because there is an infinite type-expansion (which in turn points
+    // out that I'm missing the optimistic-all-equals type algo which can find
+    // optimal closed type cycles).  The expansion loop is:
+    //    Call(arg)->DProj->New(adds a layer)->Phi(of nil)->Epilog->Call
+    // Each loop around nests another @{n:???,v:int} wrapper.
     //test_isa("f={x:@{n,v:int}? -> x ? @{n=f(x.n),v=x.v*x.v} : 0}", TypeFunPtr.FUNPTR1); // Recursive (looping) struct meets
+
+    // Named recursive type
+    //test_isa("A= :@{n:A, v:int}; f={x:A? -> x ? A(@{n=f(x.n),v=x.v*x.v}) : 0}", TypeFunPtr.FUNPTR1);
+    
     
     //test("List=:@{next,val};\n"+
     //     "List0={n v -> List(@{next=n,val=v})};\n"+
