@@ -13,6 +13,8 @@ public class IfNode extends Node {
     // If the input excludes   both, we can return ANY:   {ANY,ANY}
     // If the input includes   both, we can return both:  {CONTROL,CONTROL}
     if( gvn.type(in(0))==Type.XCTRL ) return TypeTuple.IF_ANY; // Test is dead
+    if( in(0) instanceof ProjNode && in(0).in(0)==this )
+      return TypeTuple.IF_ANY; // Test is dead cycle of self (during collapse of dead loops)
     Type pred = gvn.type(in(1));
     if( pred.isa(TypeInt.XINT1) ) return TypeTuple.IF_ANY;  // Choice of {0,1}
     if( TypeInt.BOOL.isa(pred)  ) return TypeTuple.IF_ALL;  // Can be either

@@ -11,7 +11,6 @@ import static org.junit.Assert.assertTrue;
 public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
-    //test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({+},2)", TypeInt.con(2));
     // User-defined linked-list
     //test("List=:@{next,val};\n"+
     //     "List0={n v -> List(@{next=n,val=v})};\n"+
@@ -260,7 +259,8 @@ public class TestParse {
   @Test public void testParse6() {
     // Passing a function recursively
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({&},2)", TypeInt.FALSE);
-    
+    test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({+},2)", TypeInt.con(2));
+
     // User-defined linked list
     test("List=:@{next,val}; x=List(@{next=0,val=\"abc\"}); x.val", TypeStr.ABC);
     test("List=:@{next,val}; List0={n v -> List(@{next=n,val=v})}; x=List0(0,\"abc\"); x.val", TypeStr.ABC);

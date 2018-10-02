@@ -409,8 +409,6 @@ public class Type<T extends Type> {
   public Type ret() { throw AA.unimpl(); }
   // Return true if this is a forward-ref function pointer (return type from EpilogNode)
   public boolean is_forward_ref() { return false; }
-  // Return true if this is an ambiguous function pointer
-  public boolean is_ambiguous_fun() { throw AA.unimpl(); }
   
   // Return a long   from a TypeInt constant; assert otherwise.
   public long   getl() { throw AA.unimpl(); }

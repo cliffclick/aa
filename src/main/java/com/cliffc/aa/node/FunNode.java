@@ -257,7 +257,7 @@ public class FunNode extends RegionNode {
     // Pick which input to inline.  Only based on having some constant inputs
     // right now.
     int m=-1, mncons = -1;
-    for( int i=2; i<_defs._len; i++ ) {
+    for( int i=_all_callers_known ? 1 : 2; i<_defs._len; i++ ) {
       int ncon=0;
       for( ParmNode parm : parms ) {
         if( parm != null &&
@@ -271,8 +271,8 @@ public class FunNode extends RegionNode {
     // Make a prototype new function header.  No generic unknown caller
     // in slot 1.  The one inlined call in slot 'm'.
     Node top = gvn.con(Type.XCTRL);
-    FunNode fun = new FunNode(top,_tf._ts,_tf._ret,name(),_tf._nargs);
-    for( int i=2; i<_defs._len; i++ )
+    FunNode fun = new FunNode(null,_tf._ts,_tf._ret,name(),_tf._nargs);
+    for( int i=1; i<_defs._len; i++ )
       fun.add_def(i==m ? in(i) : top);
     fun.all_callers_known();    // Only 1 caller
     return fun;
@@ -315,7 +315,11 @@ public class FunNode extends RegionNode {
         // Slot#1 for a type-split gets the new generic type from the new signature.
         // Slot#1 for other live splits gets from the old parm inputs.
         int idx = ((ParmNode)n)._idx;
-        c.add_def(gvn.con(idx==-1 ? TypeRPC.ALL_CALL : fun._tf.arg(idx))); // Generic arg#1
+        Node x = _all_callers_known             // Post-GCP not a type-split
+          ? (fun.in(1)==any ? dany : n.in(1))   // Just another argument
+          // Else type-split; maybe more unknown callers... so slot#1 remains generic
+          : gvn.con(idx==-1 ? TypeRPC.ALL_CALL : fun._tf.arg(idx)); // Generic arg#1
+        c.add_def(x); 
         for( int j=2; j<_defs._len; j++ ) // Get the new parm path or null according to split
           c.add_def( fun.in(j)==any ? dany : n.in(j) );
       } else if( n != this ) {  // Interior nodes

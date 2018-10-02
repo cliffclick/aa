@@ -329,7 +329,7 @@ public class GVNGCM {
   void gcp(ScopeNode start, ScopeNode end) {
     assert _work._len==0;
     assert _wrk_bits.isEmpty();
-    Ary<Node> calls = new Ary<>(new Node[1],0);
+    Ary<CallNode> calls = new Ary<>(new CallNode[1],0);
     // Set all types to all_type().dual()
     Arrays.fill(_ts._es,_INIT0_CNT,_ts._len,null);
     walk_initype( end );
@@ -348,8 +348,12 @@ public class GVNGCM {
         _wrk_bits.clear(n._uid);
         assert !n.is_dead();
         if( n._uid < _INIT0_CNT ) continue; // Ignore primitives (type is unchanged and conservative)
-        if( n instanceof CallNode && n.in(1) instanceof UnresolvedNode && calls.find(n)== -1 )
-          calls.add(n);          // Track ambiguous calls
+        if( n instanceof CallNode && calls.find((CallNode)n)== -1 ) {
+          Type tf = type(n.in(1));
+          if( tf instanceof TypeFunPtr && // Might be e.g. ~Scalar
+              ((TypeFunPtr)tf).fun().is_ambiguous_fun() )
+            calls.add((CallNode)n); // Track ambiguous calls
+        }
         Type ot = type(n);       // Old type
         Type nt = n.value(this); // New type
         assert ot.isa(nt);       // Types only fall monotonically
@@ -366,13 +370,14 @@ public class GVNGCM {
         }
       }
 
-      // Remove ambiguity after worklist runs dry
+      // Remove CallNode ambiguity after worklist runs dry
       for( int i=0; i<calls.len(); i++ ) {
-        Node call = calls.at(i);
-        if( !call.is_dead() ) {
-          Node fun = ((UnresolvedNode)call.in(1)).resolve(this,(CallNode)call);
-          if( fun != null ) {
-            set_def_reg(call, 1, fun);
+        CallNode call = calls.at(i);
+        if( call.is_dead() ) calls.del(i--); // Remove from worklist
+        else {
+          Node fun = call.resolve(this);
+          if( fun != null ) {   // Unresolved gets left on worklist
+            set_def_reg(call, 1, fun); // Set resolved edge
             calls.del(i--); // Remove from worklist
           }
         }

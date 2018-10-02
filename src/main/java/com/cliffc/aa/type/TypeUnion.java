@@ -242,7 +242,7 @@ public class TypeUnion extends Type<TypeUnion> {
   // of functions, and can be true for a meet of ambiguous functions.  Example:
   // "(rand?{+}:{*})(2,3)" - either {*} or {+} is being called on (2,3) with
   // either floats or ints.  The result is either 6 or 5 according.
-  @Override public boolean is_ambiguous_fun() { throw AA.unimpl(); }
+  //@Override public boolean is_ambiguous_fun() { throw AA.unimpl(); }
   
   // Lattice of conversions:
   // -1 unknown; top; might fail, might be free (Scalar->Int); Scalar might lift

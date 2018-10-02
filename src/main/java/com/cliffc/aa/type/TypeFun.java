@@ -95,7 +95,7 @@ public class TypeFun extends Type<TypeFun> {
   // OOP's, and are never nil.
   @Override public boolean may_be_nil() { return false; }
   // Return true if this is an ambiguous function pointer
-  @Override public boolean is_ambiguous_fun() { return _fidxs.above_center(); }
+  public boolean is_ambiguous_fun() { return _fidxs.above_center(); }
   public int fidx() { return _fidxs.getbit(); }
 
   // Generic functions

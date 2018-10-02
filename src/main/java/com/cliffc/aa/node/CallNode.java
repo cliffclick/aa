@@ -285,6 +285,73 @@ public class CallNode extends Node {
     }
     return tval;
   }
+
+  
+  // Given a list of actuals, apply them to each function choice.  If any
+  // (!actual-isa-formal), then that function does not work and supplies an
+  // ALL to the JOIN.  This is common for non-inlined calls where the unknown
+  // arguments are approximated as SCALAR.  Lossless conversions are allowed as
+  // part of a valid isa test.  As soon as some function returns something
+  // other than ALL (because args apply), it supersedes other choices- which
+  // can be dropped.
+
+  // If more than one choice applies, then the choice with fewest costly
+  // conversions are kept; if there is more than one then the join of them is
+  // kept - and the program is not-yet type correct (ambiguous choices).
+  public Node resolve( GVNGCM gvn ) {
+    Type t = gvn.type(in(1));
+    if( !(t instanceof TypeFunPtr) ) return null; // Might be e.g. ~Scalar
+    TypeFunPtr tfp = (TypeFunPtr)t;
+    if( !tfp.fun().is_ambiguous_fun() ) return in(1); // Sane as-is
+    Bits fidxs = tfp.fun()._fidxs;
+
+    // Set of possible choices with fewest conversions
+    int min_cvts = 999;         // Required conversions
+    int cvts[] = new int[64];
+    int fxs [] = new int[64];
+    int len=0;
+
+    // For each function, see if the actual args isa the formal args.  If not,
+    // toss it out.  Also count conversions, and keep the minimal conversion
+    // function with all arguments known.
+    outerloop:
+    for( int fidx : fidxs ) {
+      TypeFun fun = FunNode.find_fidx(fidx)._tf;
+      if( fun.nargs() != nargs() ) continue; // Wrong arg count, toss out
+      TypeTuple formals = fun._ts;   // Type of each argument
+      // Now check if the arguments are compatible in all, keeping lowest cost
+      int xcvts = 0;             // Count of conversions required
+      boolean unk = false;       // Unknown arg might be incompatible or free to convert
+      for( int j=0; j<nargs(); j++ ) {
+        Type actual = gvn.type(arg(j));
+        Type tx = actual.join(formals.at(j));
+        if( tx.above_center() ) // Actual and formal have values in common?
+          continue outerloop;   // No, this function will never work; e.g. cannot cast 1.2 as any integer
+        byte cvt = actual.isBitShape(formals.at(j)); // +1 needs convert, 0 no-cost convert, -1 unknown, 99 never
+        if( cvt == 99 )         // Happens if actual is e.g. TypeErr
+          continue outerloop;   // No, this function will never work
+        if( cvt == -1 ) unk = true; // Unknown yet
+        else xcvts += cvt;          // Count conversions
+      }
+      if( !unk && xcvts < min_cvts ) min_cvts = xcvts; // Keep minimal known conversion
+      cvts[len] = xcvts;        // Keep count of conversions
+      fxs [len] = fidx; // This is an acceptable choice, so far (args can be made to work)
+      len++;
+    }
+    // Toss out choices with strictly more conversions than the minimal
+    for( int i=0; i<len; i++ )
+      if( cvts[i] > min_cvts ) {
+        cvts[i] = cvts[len-1];
+        fxs [i] = fxs [len-1];
+        len--;
+      }
+
+    if( len==0 ) return null;   // No choices apply?  No changes.
+    if( len==1 )                // Return the one choice
+      return FunNode.find_fidx(fxs[0]).epi();
+    // TODO: return shrunk list
+    return null;  // No improvement
+  }
   
   @Override public String err(GVNGCM gvn) {
     assert !_inlined;           // Should have already cleaned out

@@ -32,10 +32,11 @@ public class RegionNode extends Node {
     // If only 1 live path and no Phis then return 1 live path.
     if( dlen>2 || keepslot1 ) return null; // Multiple live paths
     for( Node phi : _uses ) if( phi instanceof PhiNode ) return null;
-    return in(1);
+    return in(1)==this ? null : in(1);
   }
 
   @Override public Type value(GVNGCM gvn) {
+    if( _defs._len==2 && in(1)==this ) return Type.XCTRL; // Dead self-loop
     Type t = Type.XCTRL;
     for( int i=1; i<_defs._len; i++ )
       t = t.meet(gvn.type(in(i)));
