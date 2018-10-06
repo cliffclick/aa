@@ -51,7 +51,6 @@ public class TypeRPC extends Type<TypeRPC> {
     case TINT:
     case TSTR:   return Type.SCALAR;
     case TRPC:   break;
-    case TERROR:
     case TNAME:
     case TUNION: return t.xmeet(this); // Let other side decide
     default: throw typerr(t);   // All else should not happen

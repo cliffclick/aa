@@ -113,19 +113,18 @@ public class Type<T extends Type> {
   static final byte TSIMPLE =10; // End of the Simple Types
   private static final String[] STRS = new String[]{"all","any","Ctrl","~Ctrl","Scalar","~Scalar","Number","~Number","Real","~Real"};
   // Implemented in subclasses
-  static final byte TERROR  =11; // ALL/ANY TypeErr types
-  static final byte TUNION  =12; // Union types (finite collections of unrelated types Meet together); see TypeUnion
-  static final byte TNAME   =13; // Named types; always a subtype of some other type
-  static final byte TOOP    =14; // Includes all GC ptrs & null; structs, strings.  Excludes functions, ints, floats
-  static final byte TTUPLE  =15; // Tuples; finite collections of unrelated Types, kept in parallel
-  static final byte TSTRUCT =16; // Structs; tuples with named fields
-  static final byte TFUNPTR =17; // Function *pointer*, a "fat" pointer refering to a single block of code
-  static final byte TFUN    =18; // Function signature; both domain and range are a Tuple; see TypeFun; many functions share the same signature
-  static final byte TRPC    =19; // Return PCs; Continuations; call-site return points; see TypeRPC
-  static final byte TFLT    =20; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
-  static final byte TINT    =21; // All Integers, including signed/unsigned and various sizes; see TypeInt
-  static final byte TSTR    =22; // String type
-  static final byte TLAST   =23; // Type check
+  static final byte TUNION  =11; // Union types (finite collections of unrelated types Meet together); see TypeUnion
+  static final byte TNAME   =12; // Named types; always a subtype of some other type
+  static final byte TOOP    =13; // Includes all GC ptrs & null; structs, strings.  Excludes functions, ints, floats
+  static final byte TTUPLE  =14; // Tuples; finite collections of unrelated Types, kept in parallel
+  static final byte TSTRUCT =15; // Structs; tuples with named fields
+  static final byte TFUNPTR =16; // Function *pointer*, a "fat" pointer refering to a single block of code
+  static final byte TFUN    =17; // Function signature; both domain and range are a Tuple; see TypeFun; many functions share the same signature
+  static final byte TRPC    =18; // Return PCs; Continuations; call-site return points; see TypeRPC
+  static final byte TFLT    =19; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
+  static final byte TINT    =20; // All Integers, including signed/unsigned and various sizes; see TypeInt
+  static final byte TSTR    =21; // String type
+  static final byte TLAST   =22; // Type check
   
   public  static final Type ALL    = make( TALL   ); // Bottom
   public  static final Type ANY    = make( TANY   ); // Top
@@ -158,7 +157,7 @@ public class Type<T extends Type> {
   public  boolean is_oop() { byte t = simple_type();  return t == TOOP || t == TSTR || t == TSTRUCT || t == TTUPLE || t == TFUNPTR; }
   private boolean is_num() { byte t = simple_type();  return t == TNUM || t == TXNUM || t == TREAL || t == TXREAL || t == TINT || t == TFLT; }
   // True if 'this' isa SCALAR, without the cost of a full 'meet()'
-  final boolean isa_scalar() { return _type != TERROR && _type != TCTRL && _type != TXCTRL; }
+  final boolean isa_scalar() { return _type != TCTRL && _type != TXCTRL; }
   
   // Return cached dual
   public final Type dual() { return _dual; }
@@ -362,7 +361,6 @@ public class Type<T extends Type> {
     case TXREAL:
     case TXSCALAR:
       return true;              // These are all above center
-    case TERROR:
     case TFLT:
     case TFUN:
     case TINT:
@@ -398,7 +396,6 @@ public class Type<T extends Type> {
     switch( _type ) {
     case TALL:
     case TCTRL:
-    case TERROR:
     case TNUM:
     case TREAL:
     case TSCALAR:

@@ -59,7 +59,6 @@ public class TypeFlt extends Type<TypeFlt> {
     case TFUN:   return Type.SCALAR;
     case TCTRL:
     case TXCTRL: return Type.ALL;
-    case TERROR:
     case TNAME:
     case TUNION: return t.xmeet(this); // Let other side decide
     default: throw typerr(t);

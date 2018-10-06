@@ -62,7 +62,6 @@ public class TypeStr extends TypeNullable<TypeStr> {
     case TRPC:
     case TFUN:   return SCALAR;
     case TOOP:
-    case TERROR:
     case TNAME:
     case TUNION: return t.xmeet(this); // Let other side decide
     default: throw typerr(t);

@@ -101,7 +101,6 @@ public class TypeStruct extends TypeTuple<TypeStruct> {
     case TRPC: 
     case TFUN:   return Type.SCALAR;
     case TOOP:
-    case TERROR:
     case TNAME:
     case TUNION: return t.xmeet(this); // Let other side decide
     default: throw typerr(t);   // All else should not happen

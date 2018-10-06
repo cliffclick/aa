@@ -109,7 +109,6 @@ public class TypeTuple<T extends TypeTuple> extends TypeNullable<T> {
     case TOOP:
     case TFUNPTR:
     case TSTRUCT: 
-    case TERROR:
     case TNAME:
     case TUNION: return t.xmeet(this); // Let other side decide
     default: throw typerr(t);

@@ -70,7 +70,6 @@ public class TypeFun extends Type<TypeFun> {
     case TINT:
     case TSTR:   return Type.SCALAR;
     case TFUN:   break;
-    case TERROR:
     case TNAME:
     case TUNION: return t.xmeet(this); // Let other side decide
     default: throw typerr(t);   // All else should not happen

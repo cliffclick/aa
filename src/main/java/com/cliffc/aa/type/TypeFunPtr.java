@@ -69,7 +69,6 @@ public class TypeFunPtr extends TypeTuple<TypeFunPtr> {
     case TFUN:   return Type.SCALAR;
     case TOOP:
     case TSTRUCT: 
-    case TERROR:
     case TNAME:
     case TUNION: return t.xmeet(this); // Let other side decide
     default: throw typerr(t);

@@ -140,7 +140,6 @@ public class TypeUnion extends Type<TypeUnion> {
         return make(_any, full_simplify(ts,_any));
       }
     }
-    case TERROR: return t.meet(this); // Let other side handle
     default:                    // Unions can handle all non-union internal types
       Ary<Type> ts = new Ary<>(_ts._ts.clone()); // Defensive clone
       return make(_any, ymeet( ts, _any, t ));

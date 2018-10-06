@@ -47,7 +47,6 @@ public class TypeName extends Type<TypeName> {
     assert t != this;
     Type mt;
     switch( t._type ) {
-    case TERROR:
     case TUNION: return t.xmeet(this); // Let other side decide
     case TNAME:
       TypeName tn = (TypeName)t;
