@@ -557,8 +557,8 @@ public class Parse {
         String tok = token();    // Scan for 'id'
         if( tok == null ) break; // end-of-struct-def
         Type t = Type.SCALAR;    // Untyped, most generic field type
-        if( peek(':') )          // Has type annotation?
-          if( (t=type(type_var))==null ) throw AA.unimpl(); // return an error here, missing type
+        if( peek(':') &&         // Has type annotation?
+            (t=type(type_var))==null ) throw AA.unimpl(); // return an error here, missing type
         if( flds.find(tok) != -1 ) throw AA.unimpl(); // cannot use same field name twice
         flds.add(tok);          // Gather for final type
         ts  .add(typeq(t));
@@ -567,12 +567,18 @@ public class Parse {
       return peek('}') ? typeq(TypeStruct.makeA(flds.asAry(), ts.asAry())) : null;
     }
 
+    // "()" is the zero-entry tuple
+    // "(   ,)" is a 1-entry tuple
+    // "(int )" is a 1-entry tuple (optional trailing comma)
+    // "(int,)" is a 1-entry tuple (optional trailing comma)
+    // "(,int)" is a 2-entry tuple
+    // "(, , )" is a 2-entry tuple
     if( peek1(c,'(') ) { // Tuple type
       Ary<Type> ts = new Ary<>(new Type[1],0);
-      while( true ) {
+      while( skipWS() != ')' ) { // No more types...
         Type t = Type.SCALAR;    // Untyped, most generic field type
-        if( peek(':') )          // Has type annotation?
-          if( (t=type(type_var))==null ) throw AA.unimpl(); // return an error here, missing type
+        if( peek(':') &&         // Has type annotation?
+            (t=type(type_var))==null ) throw AA.unimpl(); // return an error here, missing type
         ts.add(typeq(t));
         if( !peek(',') ) break; // Final comma is optional
       }

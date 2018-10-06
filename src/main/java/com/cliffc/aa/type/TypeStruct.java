@@ -23,11 +23,7 @@ public class TypeStruct extends TypeTuple<TypeStruct> {
     if( this==o ) return true;
     return o instanceof TypeStruct && eq((TypeStruct)o) && Arrays.equals(_args,((TypeStruct)o)._args);
   }
-  @Override public String toString() { return str(new HashSet<>()); }
   String str(HashSet<Type> dups) {
-    if( dups == null ) dups = new HashSet<>();
-    if( dups.contains(this) ) return "*";
-    dups.add(this);
     SB sb = new SB().p('@').p('{');
     for( int i=0; i<_args.length; i++ ) {
       sb.p(_args[i]);

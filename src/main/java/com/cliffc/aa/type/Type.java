@@ -54,8 +54,13 @@ public class Type<T extends Type> {
     if( this == o ) return true;
     return (o instanceof Type) && _type==((Type)o)._type;
   }
-  @Override public String toString() { return str(null); }
-  String str( HashSet<Type> dups) { return STRS[_type]; }
+  // In order to handle recursive printing, this is the only toString call in
+  // the Type heirarchy.  Instead, subtypes override 'str(HashSet)' where the
+  // HashSet is only installed by the head of a type-cycle (always and only
+  // TypeName) and is used (again only by TypeName) to end cyclic printing.
+  // All other 'str()' callers just pass along.
+  @Override public final String toString() { return str(null); }
+  String str( HashSet<Type> dups ) { return STRS[_type]; }
 
   // Object Pooling to handle frequent (re)construction of temp objects being
   // interned.  One-entry pool for now.
@@ -399,13 +404,12 @@ public class Type<T extends Type> {
     case TNUM:
     case TREAL:
     case TSCALAR:
-    case TUNION:                // Overridden in subclass
     case TXCTRL:
     case TXNUM:
     case TXREAL:
     case TXSCALAR:
       return false;             // Not exactly a constant
-    default: throw AA.unimpl();
+    default: throw AA.unimpl(); // Overridden in subclass
     }
   }
   // Return the argument type of idxth argument.  Error for everybody except

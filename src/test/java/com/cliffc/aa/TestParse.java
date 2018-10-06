@@ -13,6 +13,7 @@ public class TestParse {
   @Test public void testParse() {
 
     // Named recursive types
+    //test_isa("A= :(:A, :int)?", Type.SCALAR);
     //test_isa("A= :@{n:A, v:int}", Type.SCALAR);
     //testerr ("A= :@{n:B, v:int}", "Missing type decl B", "");
     //test_isa("A= :@{n:B, v:int}; B= :@{n:A, v:flt}", Env.lookup_valtype("B"));
@@ -44,7 +45,7 @@ public class TestParse {
     
     // A collection of tests which like to fail easily
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({&},2)", TypeInt.FALSE);
-    testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1,) is not a @{x:Scalar,y:Scalar,}","                           ");
+    testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1) is not a @{x:Scalar,y:Scalar,}","                           ");
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'","                    ");
     testerr("{+}(1,2,3)", "Passing 3 arguments to +{flt64 flt64 -> flt64} which takes 2 arguments","          ");
     test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
@@ -213,13 +214,15 @@ public class TestParse {
     testerr("{x:str -> x}(1)", "1 is not a str", "               ");
 
     // Tuple types
-    test_isa("A= :(    ,    )", name_tuple_constructor(Type.SCALAR  ,Type.SCALAR  ));
-    test_isa("A= :(:flt,    )", name_tuple_constructor(TypeFlt.FLT64,Type.SCALAR  ));
+    test_isa("A= :(         )", name_tuple_constructor()); // Zero-length tuple
+    test_isa("A= :(    ,    )", name_tuple_constructor(Type.SCALAR)); // One-length tuple
+    test_isa("A= :(    ,   ,)", name_tuple_constructor(Type.SCALAR  ,Type.SCALAR  ));
+    test_isa("A= :(:flt,    )", name_tuple_constructor(TypeFlt.FLT64 ));
     test_isa("A= :(:flt,:int)", name_tuple_constructor(TypeFlt.FLT64,TypeInt.INT64));
     test_isa("A= :(    ,:int)", name_tuple_constructor(Type.SCALAR  ,TypeInt.INT64));
   }
-  static private TypeFunPtr name_tuple_constructor(Type t0, Type t1) {
-    TypeTuple tt = TypeTuple.make_all(t0,t1);
+  static private TypeFunPtr name_tuple_constructor(Type... ts) {
+    TypeTuple tt = TypeTuple.make_all(ts);
     return TypeFunPtr.make(TypeFun.make(TypeTuple.make_args(tt),TypeName.make("A",tt),Bits.FULL,1));
   }
 
@@ -258,7 +261,7 @@ public class TestParse {
     test    ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(@{x=1,y=2}))", TypeInt.con(5));
     test    ("Point=:@{x,y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(@{x=1,y=2}))", TypeInt.con(5));
     testerr ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(     (@{x=1,y=2}))", "@{x:1,y:2,} is not a Point:@{x:Scalar,y:Scalar,}","                                                                         ");
-    testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1,) is not a @{x:Scalar,y:Scalar,}","                           ");
+    testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1) is not a @{x:Scalar,y:Scalar,}","                           ");
   }
 
   @Test public void testParse5() {

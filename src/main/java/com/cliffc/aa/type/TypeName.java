@@ -9,8 +9,6 @@ public class TypeName extends Type<TypeName> {
   public  String _name;
   public  Type _t;
   private short _depth;         // Nested depth of TypeNames, or -1 for a forward-ref type-var
-  // Forward-ref type-variable; changes after the def appears.
-  public TypeName ( String name ) { super(TNAME); init(name,Type.SCALAR,(short)-1); }
   // Named type variable
   private TypeName ( String name, Type t, short depth ) { super(TNAME); init(name,t,depth); }
   private void init( String name, Type t, short depth ) { assert name!=null; _name=name; _t=t; _depth = depth; }
@@ -22,7 +20,15 @@ public class TypeName extends Type<TypeName> {
     TypeName t2 = (TypeName)o;
     return _t==t2._t && _depth==t2._depth && _name.equals(t2._name);
   }
-  @Override String str( HashSet<Type> dups) { return _name+":"+_t.str(dups); }
+  @Override String str(HashSet<Type> dups) {
+    if( _depth == -1 ) {        // Only for recursive-type-heads
+      if( dups == null ) dups = new HashSet<>();
+      else if( dups.contains(this) ) return _name; // Break recursive cycle
+      dups.add(this);
+    }
+    return _name+":"+_t.str(dups);
+  }
+  
   private static TypeName FREE=null;
   @Override protected TypeName free( TypeName f ) { FREE=f; return this; }
   private static TypeName make0( String name, Type t, short depth) {
@@ -92,8 +98,8 @@ public class TypeName extends Type<TypeName> {
   }
   
   @Override public boolean above_center() { return _t.above_center(); }
-  @Override public boolean may_be_con() { return _t.may_be_con(); }
-  @Override public boolean is_con()   { return _t.is_con(); }
+  @Override public boolean may_be_con() { return _depth != -1 && _t.may_be_con(); }
+  @Override public boolean is_con()   { return _depth != -1 && _t.is_con(); } // No recursive structure is a constant
   @Override public boolean may_be_nil() { return _t.may_be_nil(); }
   @Override public boolean may_have_nil() { return _t.may_have_nil(); }
   @Override public double getd  () { return _t.getd  (); }

@@ -38,12 +38,13 @@ public class TypeTuple<T extends TypeTuple> extends TypeNullable<T> {
     return true;
   }
   @Override String str(HashSet<Type> dups) {
-    if( dups == null ) dups = new HashSet<>();
-    if( dups.contains(this) ) return "*";
-    dups.add(this);
     SB sb = new SB().p('(');
-    for( Type t : _ts ) sb.p(t.str(dups)).p(',');
-    if( _inf!=Type.ALL ) sb.p(_inf.str(dups)).p("...");
+    if( _ts.length>0 ) {        // No commas for zero-length
+      sb.p(_ts[0].str(dups));
+      for( int i=1; i<_ts.length; i++ )
+        sb.p(',').p(_ts[i].str(dups));
+    }
+    if( _inf!=Type.ALL ) sb.p(',').p(_inf.str(dups)).p("...");
     sb.p(')');
     return String.format(TSTRS[_nil],sb.toString());
   }
@@ -155,10 +156,9 @@ public class TypeTuple<T extends TypeTuple> extends TypeNullable<T> {
   }
   // True if all internals is_con
   @Override public boolean is_con() {
-    if( super.is_con() ) return true;
+    if( super.is_con() ) return true; // True-if-nil
     for( Type _t : _ts ) if( !_t.is_con() ) return false;
-    //return true;
-    return false;
+    return true;
   }
 
   // Return true if this is a function pointer (return type from EpilogNode)
