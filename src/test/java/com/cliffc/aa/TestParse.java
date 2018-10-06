@@ -177,6 +177,14 @@ public class TestParse {
     test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
     test("sq={x -> x*x}; sq 2.1", TypeFlt.con(4.41)); // No () required for single args
     testerr("f0 = { f x -> f0(x-1) }; f0({+},2)", "Passing 1 arguments to f0{Scalar Scalar -> Scalar} which takes 2 arguments","                     ");
+    // Recursive:
+    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
+    test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)",TypeInt.INT64);
+    test("f0 = { x -> x ? {+}(f0(x-1),1) : 0 }; f0(2)", TypeInt.con(2));
+
+    // Co-recursion requires parallel assignment & type inference across a lexical scope
+    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.BOOL );
+    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(5)", TypeInt.BOOL);
   }
 
   @Test public void testParse3() {
@@ -204,14 +212,15 @@ public class TestParse {
     test   ("{x:int -> x*2}(1)", TypeInt.con(2)); // Types on parms
     testerr("{x:str -> x}(1)", "1 is not a str", "               ");
 
-    // Recursive:
-    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
-    test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)",TypeInt.INT64);
-    test("f0 = { x -> x ? {+}(f0(x-1),1) : 0 }; f0(2)", TypeInt.con(2));
-
-    // Co-recursion requires parallel assignment & type inference across a lexical scope
-    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.BOOL );
-    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(5)", TypeInt.BOOL);
+    // Tuple types
+    test_isa("A= :(    ,    )", name_tuple_constructor(Type.SCALAR  ,Type.SCALAR  ));
+    test_isa("A= :(:flt,    )", name_tuple_constructor(TypeFlt.FLT64,Type.SCALAR  ));
+    test_isa("A= :(:flt,:int)", name_tuple_constructor(TypeFlt.FLT64,TypeInt.INT64));
+    test_isa("A= :(    ,:int)", name_tuple_constructor(Type.SCALAR  ,TypeInt.INT64));
+  }
+  static private TypeFunPtr name_tuple_constructor(Type t0, Type t1) {
+    TypeTuple tt = TypeTuple.make_all(t0,t1);
+    return TypeFunPtr.make(TypeFun.make(TypeTuple.make_args(tt),TypeName.make("A",tt),Bits.FULL,1));
   }
 
   @Test public void testParse4() {

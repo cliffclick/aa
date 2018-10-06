@@ -65,7 +65,7 @@ public abstract class PrimNode extends Node {
   };
 
   // Loss-less conversions only, plus int64->flt64 (standard lossy conversion)
-  public static PrimNode convert( Node actual, Type from, Type to ) {
+  static PrimNode convert( Node actual, Type from, Type to ) {
     if( from.isa(TypeInt.INT64) && to.isa(TypeFlt.FLT64) ) return new ConvertInt64F64(null,actual);
     //if( from==Type.UInt32 && to==Type.I64 ) return convUInt32I64;
     //if( from==Type.UInt32 && to==Type.FLT64 ) return convUInt32F64;

@@ -37,9 +37,10 @@ import java.util.BitSet;
  *                              // Pattern matching: 1 arg is the arg; 2+ args break down a (required) tuple
  *  str  = [.\%]*               // String contents; \t\n\r\% standard escapes
  *  str  = %[num]?[.num]?fact   // Percent escape embeds a 'fact' in a string; "name=%name\n"
- *  type = tcon | tvar | tfun[?] | tstruct[?] // Types are a tcon or a tfun or a tstruct or a type variable.  A trailing ? means 'nullable'
+ *  type = tcon | tvar | tfun[?] | tstruct[?] | ttuple[?] // Types are a tcon or a tfun or a tstruct or a type variable.  A trailing ? means 'nullable'
  *  tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str[?]
  *  tfun = {[[type]* ->]? type }// Function types mirror func decls
+ *  ttuple = @( [:type]?,* )    // Tuple types are just a list of optional types; the count of commas dictates the length
  *  tstruct = @{ [id[:type],]*} // Struct types are field names with optional types
  */
 
@@ -564,6 +565,18 @@ public class Parse {
         if( !peek(',') ) break; // Final comma is optional
       }
       return peek('}') ? typeq(TypeStruct.makeA(flds.asAry(), ts.asAry())) : null;
+    }
+
+    if( peek1(c,'(') ) { // Tuple type
+      Ary<Type> ts = new Ary<>(new Type[1],0);
+      while( true ) {
+        Type t = Type.SCALAR;    // Untyped, most generic field type
+        if( peek(':') )          // Has type annotation?
+          if( (t=type(type_var))==null ) throw AA.unimpl(); // return an error here, missing type
+        ts.add(t);
+        if( !peek(',') ) break; // Final comma is optional
+      }
+      return peek(')') ? typeq(TypeTuple.make_all(ts.asAry())) : null;
     }
 
     // Primitive type
