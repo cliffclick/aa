@@ -3,8 +3,8 @@ package com.cliffc.aa.type;
 import com.cliffc.aa.AA;
 
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.HashMap;
-import java.util.HashSet;
 
 import static com.cliffc.aa.type.TypeOop.OOP0;
 
@@ -60,7 +60,7 @@ public class Type<T extends Type> {
   // TypeName) and is used (again only by TypeName) to end cyclic printing.
   // All other 'str()' callers just pass along.
   @Override public final String toString() { return str(null); }
-  String str( HashSet<Type> dups ) { return STRS[_type]; }
+  String str( BitSet dups ) { return STRS[_type]; }
 
   // Object Pooling to handle frequent (re)construction of temp objects being
   // interned.  One-entry pool for now.
@@ -102,6 +102,10 @@ public class Type<T extends Type> {
   void untern( ) {
     Type rez  = INTERN.remove(this);
     assert rez != null;
+  }
+  void retern( ) {
+    INTERN.put(this,this);
+    assert INTERN.get(this)==this;
   }
 
   // Simple types are implemented fully here

@@ -1,7 +1,7 @@
 package com.cliffc.aa.type;
 
+import java.util.BitSet;
 import java.util.HashMap;
-import java.util.HashSet;
 
 public class TypeInt extends Type<TypeInt> {
   private byte _x;        // -1 bot, 0 con, +1 top
@@ -16,7 +16,7 @@ public class TypeInt extends Type<TypeInt> {
     TypeInt t2 = (TypeInt)o;
     return _x==t2._x && _z==t2._z && _con==t2._con;
   }
-  @Override String str( HashSet<Type> dups) {
+  @Override String str( BitSet dups) {
     if( _x==0 ) return Long.toString(_con);
     return (_x==1?"~":"")+"int"+Integer.toString(_z);
   }

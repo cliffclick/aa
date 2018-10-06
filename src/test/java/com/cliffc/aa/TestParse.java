@@ -12,8 +12,13 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
 
+    // Currently fails because ~A.isa(A:(0,2)) fails because
+    // (~str+0,~int64) meet (nil,2) is (str:nil,2) which is != (nil,2)
+    //test("A= :(:str?, :int); A((0,2))",TypeName.make("A",TypeTuple.make_all(TypeUnion.NIL,TypeInt.con(2))));
+    
     // Named recursive types
     //test_isa("A= :(:A, :int)?", Type.SCALAR);
+    //test_isa("A= :(:A, :int)?; A((0,2))",Type.SCALAR);//TypeName.make("A",TypeTuple.make(TypeTuple.NIL,TypeInt.con(2))));
     //test_isa("A= :@{n:A, v:int}", Type.SCALAR);
     //testerr ("A= :@{n:B, v:int}", "Missing type decl B", "");
     //test_isa("A= :@{n:B, v:int}; B= :@{n:A, v:flt}", Env.lookup_valtype("B"));
@@ -220,6 +225,8 @@ public class TestParse {
     test_isa("A= :(:flt,    )", name_tuple_constructor(TypeFlt.FLT64 ));
     test_isa("A= :(:flt,:int)", name_tuple_constructor(TypeFlt.FLT64,TypeInt.INT64));
     test_isa("A= :(    ,:int)", name_tuple_constructor(Type.SCALAR  ,TypeInt.INT64));
+
+    test("A= :(:str?, :int); A((\"abc\",2))",TypeName.make("A",TypeTuple.make_all(TypeStr.ABC,TypeInt.con(2))));
   }
   static private TypeFunPtr name_tuple_constructor(Type... ts) {
     TypeTuple tt = TypeTuple.make_all(ts);
@@ -265,7 +272,6 @@ public class TestParse {
   }
 
   @Test public void testParse5() {
-
     // nullable and not-null pointers
     test   ("x:str? = 0", TypeUnion.NIL); // question-type allows null or not; zero digit is null
     test   ("x:str? = \"abc\"", TypeStr.ABC); // question-type allows null or not
@@ -280,7 +286,6 @@ public class TestParse {
     test   ("a = math_rand(1) ? 0 : @{x=1}; // a is null or a struct\n"+
             "b = math_rand(1) ? 0 : @{c=a}; // b is null or a struct\n"+
             "b ? (b.c ? b.c.x : 0) : 0      // Null-safe field load", TypeInt.BOOL); // Nested null-safe field load
-
   }
 
   @Test public void testParse6() {

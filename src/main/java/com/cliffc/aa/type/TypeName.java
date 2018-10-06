@@ -2,9 +2,10 @@ package com.cliffc.aa.type;
 
 import com.cliffc.aa.AA;
 
-import java.util.HashSet;
+import java.util.BitSet;
 
 // Named types are essentially a subclass of the named type.
+// They also must be used to make recursive types.
 public class TypeName extends Type<TypeName> {
   public  String _name;
   public  Type _t;
@@ -13,18 +14,23 @@ public class TypeName extends Type<TypeName> {
   private TypeName ( String name, Type t, short depth ) { super(TNAME); init(name,t,depth); }
   private void init( String name, Type t, short depth ) { assert name!=null; _name=name; _t=t; _depth = depth; }
   private static short depth( Type t ) { return(short)(t instanceof TypeName ? ((TypeName)t)._depth+1 : 0); }
-  @Override public int hashCode( ) { return TNAME+(_name==null?0:_name.hashCode())+_t.hashCode()+_depth;  }
+  @Override public int hashCode( ) { return 23+_name.hashCode();  } // No recursion on _t to break type cycles
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeName) ) return false;
     TypeName t2 = (TypeName)o;
-    return _t==t2._t && _depth==t2._depth && _name.equals(t2._name);
+    if( !_name.equals(t2._name) || _t!=t2._t ) return false;
+    if( _depth==t2._depth ) return true;
+    // Also return true for comparing TypeName(name,type) where the types
+    // match, but the 'this' TypeName is depth 0 vs depth -1 - this detects
+    // simple cycles and lets the interning close the loop.
+    return t2._depth == -1 && _depth == 0;
   }
-  @Override String str(HashSet<Type> dups) {
+  @Override String str( BitSet dups) {
     if( _depth == -1 ) {        // Only for recursive-type-heads
-      if( dups == null ) dups = new HashSet<>();
-      else if( dups.contains(this) ) return _name; // Break recursive cycle
-      dups.add(this);
+      if( dups == null ) dups = new BitSet();
+      else if( dups.get(_uid) ) return _name; // Break recursive cycle
+      dups.set(_uid);
     }
     return _name+":"+_t.str(dups);
   }
@@ -89,11 +95,10 @@ public class TypeName extends Type<TypeName> {
     // Hack type and it's dual.  Type is now recursive.
     _t = t;
     ((TypeName)_dual)._t = t._dual;
-    // DO not install recursive-type back into the INTERN table.  The
-    // hashCode() and equals() calls are not prepared to handle the recursive
-    // structure and will stack-overflow instead of returning sensible results.
-    // But the types are still pointer-unique and can be compared with normal
-    // pointer-equality checks.
+    ((TypeName)_dual)._depth = -1;
+    // Back into the INTERN table
+    retern();
+    _dual.retern();
     return this;
   }
   
@@ -110,6 +115,6 @@ public class TypeName extends Type<TypeName> {
       if( ((TypeName)t)._name.equals(_name) ) return _t.isBitShape(((TypeName)t)._t);
       return 99; // Incompatible names do not mix
     }
-    return _t.isBitShape(t);
+    return _t.isBitShape(t); // Strip name and try again
   }
 }

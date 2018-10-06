@@ -4,7 +4,7 @@ import com.cliffc.aa.AA;
 import com.cliffc.aa.util.SB;
 
 import java.util.Arrays;
-import java.util.HashSet;
+import java.util.BitSet;
 
 /** A Tuple with named fields */
 public class TypeStruct extends TypeTuple<TypeStruct> {
@@ -23,7 +23,7 @@ public class TypeStruct extends TypeTuple<TypeStruct> {
     if( this==o ) return true;
     return o instanceof TypeStruct && eq((TypeStruct)o) && Arrays.equals(_args,((TypeStruct)o)._args);
   }
-  String str(HashSet<Type> dups) {
+  String str( BitSet dups) {
     SB sb = new SB().p('@').p('{');
     for( int i=0; i<_args.length; i++ ) {
       sb.p(_args[i]);

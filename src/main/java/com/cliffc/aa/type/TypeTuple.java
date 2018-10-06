@@ -4,7 +4,7 @@ import com.cliffc.aa.AA;
 import com.cliffc.aa.util.SB;
 
 import java.util.Arrays;
-import java.util.HashSet;
+import java.util.BitSet;
 
 /** record/struct types; infinitely extended with an extra type (typically ANY or ALL) */
 public class TypeTuple<T extends TypeTuple> extends TypeNullable<T> {
@@ -37,7 +37,7 @@ public class TypeTuple<T extends TypeTuple> extends TypeNullable<T> {
       if( _ts[i]!=t._ts[i] ) return false;
     return true;
   }
-  @Override String str(HashSet<Type> dups) {
+  @Override String str( BitSet dups) {
     SB sb = new SB().p('(');
     if( _ts.length>0 ) {        // No commas for zero-length
       sb.p(_ts[0].str(dups));
@@ -177,7 +177,16 @@ public class TypeTuple<T extends TypeTuple> extends TypeNullable<T> {
   // True if isBitShape on all bits
   @Override public byte isBitShape(Type t) {
     if( isa(t) ) return 0; // Can choose compatible format
+    if( t instanceof TypeName ) return t.isBitShape(this);
     if( t instanceof TypeStruct ) return 99; // Not allowed to upcast a tuple to a struct
+    if( t instanceof TypeTuple ) {
+      TypeTuple tt = (TypeTuple)t;
+      if( tt._ts.length != _ts.length ) return 99;
+      byte x;
+      for( int i=0; i<_ts.length; i++ )
+        if( (x=_ts[i].isBitShape(tt._ts[i])) != 0 )
+          return x;
+    }
     
     throw AA.unimpl();
   }

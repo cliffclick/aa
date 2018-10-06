@@ -5,8 +5,8 @@ import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.Comparator;
-import java.util.HashSet;
 
 // Type union is a meet (or join) of unrelated SCALAR types.  Specifically it
 // simplifies out overlapping choices, such as {Flt64 & Flt32} :=: Flt64.
@@ -27,7 +27,7 @@ public class TypeUnion extends Type<TypeUnion> {
     TypeUnion t = (TypeUnion)o;
     return _any==t._any && _ts==t._ts;
   }
-  @Override String str( HashSet<Type> dups) {
+  @Override String str( BitSet dups) {
     if( this==NIL ) return "nil";
     SB sb = new SB().p('{');
     for( Type t : _ts._ts )

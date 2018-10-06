@@ -4,7 +4,7 @@ import com.cliffc.aa.node.FunNode;
 import com.cliffc.aa.util.Bits;
 import com.cliffc.aa.util.SB;
 
-import java.util.HashSet;
+import java.util.BitSet;
 
 // Function constants.  Contrast this to 'TypeTuple.make_fun_ptr'.
 public class TypeFun extends Type<TypeFun> {
@@ -23,16 +23,14 @@ public class TypeFun extends Type<TypeFun> {
     TypeFun tf = (TypeFun)o;
     return _ts==tf._ts && _ret==tf._ret && _fidxs==tf._fidxs && _nargs==tf._nargs;
   }
-  @Override String str(HashSet<Type> dups) {
-    return str(dups,FunNode.names(_fidxs,new SB())).toString();
-  }
-  public SB str( HashSet<Type> dups, SB sb ) {
-    if( _nargs==-1 ) return sb.p("{forward_ref}");
+  @Override String str( BitSet dups) {
+    SB sb = FunNode.names(_fidxs,new SB());
+    if( _nargs==-1 ) return sb.p("{forward_ref}").toString();
     sb.p('{');
     for( int i=0; i<_nargs; i++ ) sb.p(arg(i).str(dups)).p(' ');
-    return sb.p("-> ").p(_ret.str(dups)).p('}');
+    return sb.p("-> ").p(_ret.str(dups)).p('}').toString();
   }
-  
+
   private static TypeFun FREE=null;
   @Override protected TypeFun free( TypeFun f ) { FREE=f; return this; }
   public static TypeFun make( TypeTuple ts, Type ret, int  fidx , int nargs ) { return make(ts,ret,Bits.make(fidx),nargs); }
