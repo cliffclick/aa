@@ -561,7 +561,7 @@ public class Parse {
           if( (t=type(type_var))==null ) throw AA.unimpl(); // return an error here, missing type
         if( flds.find(tok) != -1 ) throw AA.unimpl(); // cannot use same field name twice
         flds.add(tok);          // Gather for final type
-        ts  .add(t  );
+        ts  .add(typeq(t));
         if( !peek(',') ) break; // Final comma is optional
       }
       return peek('}') ? typeq(TypeStruct.makeA(flds.asAry(), ts.asAry())) : null;
@@ -573,7 +573,7 @@ public class Parse {
         Type t = Type.SCALAR;    // Untyped, most generic field type
         if( peek(':') )          // Has type annotation?
           if( (t=type(type_var))==null ) throw AA.unimpl(); // return an error here, missing type
-        ts.add(t);
+        ts.add(typeq(t));
         if( !peek(',') ) break; // Final comma is optional
       }
       return peek(')') ? typeq(TypeTuple.make_all(ts.asAry())) : null;
