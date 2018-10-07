@@ -40,7 +40,7 @@ import java.util.BitSet;
  *  type = tcon | tvar | tfun[?] | tstruct[?] | ttuple[?] // Types are a tcon or a tfun or a tstruct or a type variable.  A trailing ? means 'nullable'
  *  tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str[?]
  *  tfun = {[[type]* ->]? type }// Function types mirror func decls
- *  ttuple = @( [:type]?,* )    // Tuple types are just a list of optional types; the count of commas dictates the length
+ *  ttuple = ( [:type]?,* )     // Tuple types are just a list of optional types; the count of commas dictates the length, zero commas is zero length
  *  tstruct = @{ [id[:type],]*} // Struct types are field names with optional types
  */
 
