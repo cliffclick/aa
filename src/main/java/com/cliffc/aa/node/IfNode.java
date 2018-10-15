@@ -15,14 +15,12 @@ public class IfNode extends Node {
     if( gvn.type(in(0))==Type.XCTRL ) return TypeTuple.IF_ANY; // Test is dead
     if( in(0) instanceof ProjNode && in(0).in(0)==this )
       return TypeTuple.IF_ANY; // Test is dead cycle of self (during collapse of dead loops)
-    Type pred = gvn.type(in(1));
+    Type pred = gvn.type(in(1)).base();
     if( pred.isa(TypeInt.XINT1) ) return TypeTuple.IF_ANY;  // Choice of {0,1}
     if( TypeInt.BOOL.isa(pred)  ) return TypeTuple.IF_ALL;  // Can be either
     if( pred == TypeInt.FALSE ||
         pred == TypeNil.NIL ) return TypeTuple.IF_FALSE; // False only
-    if( pred instanceof TypeOop ) {
-      throw AA.unimpl();
-    }
+    if( pred instanceof TypeOop ) return TypeTuple.IF_TRUE;
     if( pred instanceof TypeNil ) // Check for nil-or- vs nil-and-
       return pred.above_center() ? TypeTuple.IF_ANY : TypeTuple.IF_ALL;
     if( pred.is_con() ) { assert pred.getl() != 0; return TypeTuple.IF_TRUE; } // True only

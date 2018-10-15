@@ -149,6 +149,7 @@ public class TypeStruct extends TypeTuple<TypeStruct> {
   // True if isBitShape on all bits
   @Override public byte isBitShape(Type t) {
     if( isa(t) ) return 0; // Can choose compatible format
+    if( t.isa(this) ) return 0; // TODO: really: test same args, each arg isBitShape
     if( t instanceof TypeName ) return 99; // Cannot pick up a name, requires user converts
     throw AA.unimpl();
   }

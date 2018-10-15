@@ -54,10 +54,10 @@ public class LoadNode extends Node {
     return set_def(0,null,gvn);
   }
   @Override public Type value(GVNGCM gvn) {
-    Type t = gvn.type(in(1));
-    while( t instanceof TypeName ) t = ((TypeName)t)._t;
+    Type t = gvn.type(in(1)).base();
     if( t.isa(TypeNil.XOOP) ) return Type.XSCALAR; // Very high address; might fall to any valid value
     if( TypeOop.OOP.isa(t) ) return Type.SCALAR; // Too low, might not have any fields
+    if( t.is_forward_ref() ) return Type.SCALAR; // Not yet defined, might fail
     if( t instanceof TypeNil ) {
       if( t.above_center() ) t = ((TypeNil)t)._t; // hi-nil, assume not a nil
       else return Type.SCALAR;  // Might fail before loading
