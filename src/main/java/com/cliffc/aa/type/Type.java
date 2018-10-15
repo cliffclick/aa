@@ -158,7 +158,7 @@ public class Type<T extends Type<T>> {
   
   private boolean is_simple() { return _type < TSIMPLE; }
   // Return base type of named types
-  private Type base() { Type t = this; while( t._type == TNAME ) t = ((TypeName)t)._t; return t; }
+  Type base() { Type t = this; while( t._type == TNAME ) t = ((TypeName)t)._t; return t; }
   // Strip off any subclassing just for names
   byte simple_type() { return base()._type; }
   private boolean is_ptr() { byte t = simple_type();  return t == TOOP || t == TSTR || t == TSTRUCT || t == TTUPLE || t == TFUNPTR; }

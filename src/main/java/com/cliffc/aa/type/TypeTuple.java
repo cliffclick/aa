@@ -164,6 +164,7 @@ public class TypeTuple<P extends TypeTuple<P>> extends TypeOop<P> {
   @Override public byte isBitShape(Type t) {
     if( isa(t) ) return 0; // Can choose compatible format
     if( t instanceof TypeName ) return t.isBitShape(this);
+    if( t instanceof TypeNil ) return isBitShape(((TypeNil)t)._t);
     if( t instanceof TypeStruct ) return 99; // Not allowed to upcast a tuple to a struct
     if( t instanceof TypeTuple ) {
       TypeTuple tt = (TypeTuple)t;

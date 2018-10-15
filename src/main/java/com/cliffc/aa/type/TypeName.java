@@ -12,7 +12,7 @@ public class TypeName extends Type<TypeName> {
   private short _depth;         // Nested depth of TypeNames, or -1 for a forward-ref type-var
   // Named type variable
   private TypeName ( String name, Type t, short depth ) { super(TNAME); init(name,t,depth); }
-  private void init( String name, Type t, short depth ) { assert name!=null && t != Type.SCALAR; _name=name; _t=t; _depth = depth; }
+  private void init( String name, Type t, short depth ) { assert name!=null; _name=name; _t=t; _depth = depth; }
   private static short depth( Type t ) { return(short)(t instanceof TypeName ? ((TypeName)t)._depth+1 : 0); }
   @Override public int hashCode( ) { return 23+_name.hashCode();  } // No recursion on _t to break type cycles
   @Override public boolean equals( Object o ) {
@@ -58,13 +58,15 @@ public class TypeName extends Type<TypeName> {
     switch( t._type ) {
     case TNAME:
       TypeName tn = (TypeName)t;
-      if( tn._depth > _depth ) return tn.xmeet(this); // Deeper on 'this'
-      if( tn._depth== _depth && _name.equals(tn._name) )
+      int thisd =    _depth==-1 ? 0 :   _depth;
+      int thatd = tn._depth==-1 ? 0 : tn._depth;
+      if( thatd > thisd ) return tn.xmeet(this); // Deeper on 'this'
+      if( thatd== thisd && _name.equals(tn._name) )
         return make(_name,_t.meet(tn._t)); // Peel name and meet
       t = tn.drop_name();       // Names or depth unequal; treat as unnamed
       break;
     default:
-      if( t.above_center() ) { // 't' can fall to a matching name
+      if( t.above_center() || t==TypeNil.NIL ) { // 't' can fall to a matching name
         if( t.isa(_t) ) return make(_name,_t.meet(t));
       }
     }
@@ -85,6 +87,7 @@ public class TypeName extends Type<TypeName> {
       return TypeInt.BOOL;      // Least number below the centerline
     // Recursively drop multiple names
     case TNAME: return ((TypeName)t).drop_name();
+    case TXSCALAR: return TypeNil.NIL;
     default: throw AA.unimpl();
     }
   }

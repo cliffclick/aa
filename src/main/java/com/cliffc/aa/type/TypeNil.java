@@ -15,7 +15,7 @@ public class TypeNil extends Type<TypeNil> {
     TypeNil t2 = (TypeNil)o;
     return _t==t2._t;
   }
-  @Override String str( BitSet dups) { return _t==null ? "nil" : _t+(_t.above_center() ? "+0" : "?"); }
+  @Override String str( BitSet dups) { return _t==null ? "nil" : _t.str(dups)+(_t.above_center() ? "+0" : "?"); }
   
   private static TypeNil FREE=null;
   @Override protected TypeNil free( TypeNil ret ) { FREE=this; return ret; }
@@ -29,9 +29,13 @@ public class TypeNil extends Type<TypeNil> {
   }
   public static Type make( Type t ) {
     assert !t.isa(NUM); // Numbers fold in zero directly
+    if( t instanceof TypeName ) return make_name_nil((TypeName)t);
     return t == SCALAR || t == XSCALAR || t instanceof TypeNil ? t : make0(t);
   }
-
+  private static Type make_name_nil( TypeName t ) {
+    return TypeName.make(t._name, t._t instanceof TypeName ? make_name_nil((TypeName)(t._t)) : make(t._t));
+  }
+  
   // This is the Parser's canonical NIL, suitable for initializing all data
   // types.  It is not in the lattice, and is not returned from any meet
   // (except when meet'ing itself).
@@ -58,7 +62,7 @@ public class TypeNil extends Type<TypeNil> {
     } else {                    // must-nil
       if( _t == null ) {        // Exactly the flexible nil
         if( t.isa(NUM) ) return t.meet(TypeInt.FALSE); // Fall away from NIL to ZERO
-        if( t instanceof TypeNil ) return t.above_center() ? this : t;
+        if( t.base() instanceof TypeNil ) return t.above_center() ? this : t;
         if( !t.above_center() ) return make(t); // NIL-wrap the other guy
         return make(t.dual());
       }
@@ -72,5 +76,5 @@ public class TypeNil extends Type<TypeNil> {
   @Override public boolean above_center() { return _t != null && _t.above_center(); }
   @Override public boolean may_be_con() { return _t==null || _t.may_be_con(); }
   @Override public boolean is_con()   { return _t == null; } // Constant nil
-  @Override public byte isBitShape(Type t) { return 0; }
+  @Override public byte isBitShape(Type t) { return _t==null ? 0 : _t.isBitShape(t); }
 }
