@@ -56,7 +56,7 @@ public class TestParse {
     test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
     testerr("x=1+y","Unknown ref 'y'","     ");
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
-    test_isa("{x y -> x+y}", TypeFunPtr.FUNPTR2); // actually {Flt,Int} x {FltxInt} -> {FltxInt} but currently types {SCALAR,SCALAR->SCALAR}
+    test_isa("{x y -> x+y}", TypeFun.FUN2); // {Flt,Int} x {FltxInt} -> {FltxInt}
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.BOOL );
 
   }
@@ -159,7 +159,7 @@ public class TestParse {
 
   @Test public void testParse2() {
     // Anonymous function definition
-    test_isa("{x y -> x+y}", TypeFunPtr.FUNPTR2); // actually {Flt,Int} x {FltxInt} -> {FltxInt} but currently types {SCALAR,SCALAR->SCALAR}
+    test_isa("{x y -> x+y}", TypeFun.FUN2); // {SCALAR,SCALAR->SCALAR}
     test("{5}()", TypeInt.con(5)); // No args nor -> required; this is simply a function returning 5, being executed
 
     // ID in different contexts; in general requires a new TypeVar per use; for
@@ -228,13 +228,12 @@ public class TestParse {
 
     test("A= :(:str?, :int); A((\"abc\",2))",TypeName.make("A",TypeTuple.make_all(TypeStr.ABC,TypeInt.con(2))));
   }
-  static private TypeFunPtr name_tuple_constructor(Type... ts) {
+  static private TypeFun name_tuple_constructor(Type... ts) {
     TypeTuple tt = TypeTuple.make_all(ts);
-    return TypeFunPtr.make(TypeFun.make(TypeTuple.make_args(tt),TypeName.make("A",tt),Bits.FULL,1));
+    return TypeFun.make(TypeFunPtr.make(TypeTuple.make_args(tt),TypeName.make("A",tt),Bits.FULL,1));
   }
 
   @Test public void testParse4() {
-    testerr ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(     (@{x=1,y=2}))", "@{x:1,y:2,} is not a Point:@{x:Scalar,y:Scalar,}","                                                                         ");
     // simple anon struct tests
     test   ("  @{x,y} ", TypeStruct.makeA(new String[]{"x","y"},Type.ANY,Type.ANY)); // simple anon struct decl
     testerr("a=@{x=1.2,y}; x", "Unknown ref 'x'","               ");
@@ -256,11 +255,11 @@ public class TestParse {
     test   ("dist={p->p//qqq\n.//qqq\nx*p.x+p.y*p.y}; dist(//qqq\n@{x//qqq\n=1,y=2})", TypeInt.con(5));
 
     // Tuple
-    test("(0,\"abc\")", TypeTuple.make_all(TypeUnion.NIL,TypeStr.ABC));
+    test("(0,\"abc\")", TypeTuple.make_all(TypeNil.NIL,TypeStr.ABC));
     
     // Named type variables
-    test_isa("gal=:flt"       , TypeFunPtr.make(TypeFun.make(TypeTuple.FLT64,TypeName.make("gal",TypeFlt.FLT64),Bits.FULL,1)));
-    test_isa("gal=:flt; gal"  , TypeFunPtr.make(TypeFun.make(TypeTuple.FLT64,TypeName.make("gal",TypeFlt.FLT64),Bits.FULL,1)));
+    test_isa("gal=:flt"       , TypeFun.make(TypeFunPtr.make(TypeTuple.FLT64,TypeName.make("gal",TypeFlt.FLT64),Bits.FULL,1)));
+    test_isa("gal=:flt; gal"  , TypeFun.make(TypeFunPtr.make(TypeTuple.FLT64,TypeName.make("gal",TypeFlt.FLT64),Bits.FULL,1)));
     test    ("gal=:flt; 3==gal(2)+1", TypeInt.TRUE);
     test    ("gal=:flt; tank:gal = gal(2)", TypeName.make("gal",TypeFlt.con(2)));
     // test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: figure out if free cast for bare constants?
@@ -273,13 +272,13 @@ public class TestParse {
 
   @Test public void testParse5() {
     // nullable and not-null pointers
-    test   ("x:str? = 0", TypeUnion.NIL); // question-type allows null or not; zero digit is null
+    test   ("x:str? = 0", TypeNil.NIL); // question-type allows null or not; zero digit is null
     test   ("x:str? = \"abc\"", TypeStr.ABC); // question-type allows null or not
     testerr("x:str  = 0", "nil is not a str", "          ");
-    test   ("math_rand(1)?0:\"abc\"", TypeStr.STR0);
+    test   ("math_rand(1)?0:\"abc\"", TypeNil.ABC);
     testerr("(math_rand(1)?0 : @{x=1}).x", "Struct might be nil when reading field '.x'", "                           ");
     test   ("p=math_rand(1)?0:@{x=1}; p ? p.x : 0", TypeInt.BOOL); // not-null-ness after a null-check
-    test   ("x:int = y:str? = z:flt = 0", TypeUnion.NIL); // null/0 freely recasts
+    test   ("x:int = y:str? = z:flt = 0", TypeNil.NIL); // null/0 freely recasts
     test   ("\"abc\"==0", TypeInt.FALSE ); // No type error, just not null
     test   ("\"abc\"!=0", TypeInt.TRUE  ); // No type error, just not null
     test   ("nil=0; \"abc\"!=nil", TypeInt.TRUE); // Another way to name null

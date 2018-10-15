@@ -289,16 +289,16 @@ public class Parse {
         if( arg == null )       // Function but no arg is just the function
           break;
         Type tn = _gvn.type(n);
-        if( !(tn instanceof TypeFunPtr) && arg.may_prec() >= 0 ) { _x=oldx; break; }
-        if( !(tn instanceof TypeFunPtr) &&
-            // Notice the backwards condition: n was already tested for !(tn instanceof TypeFunPtr).
+        if( !(tn instanceof TypeFun) && arg.may_prec() >= 0 ) { _x=oldx; break; }
+        if( !(tn instanceof TypeFun) &&
+            // Notice the backwards condition: n was already tested for !(tn instanceof TypeFun).
             // Now we test the other way: the generic function can never be an 'n'.
             // Only if we cannot 'isa' in either direction do we bail out early
             // here.  Otherwise, e.g. 'n' might be an unknown function argument
             // and during GCP be 'lifted' to a function; if we bail out now we
             // may disallow a legal program with function arguments.  However,
             // if 'n' is a e.g. Float there's no way it can 'lift' to a function.
-            !TypeFun.make_generic().isa(tn) ) { 
+            !TypeFun.GENERIC_FUN.isa(tn) ) {
           kill(arg);
           n = err_ctrl2("A function is being called, but "+tn+" is not a function type");
         } else {
@@ -338,7 +338,7 @@ public class Parse {
     if( '0' <= c && c <= '9' ) return con(number());
     if( '"' == c ) {
       Type ts = string();
-      return ts==null ? err_ctrl1("Unterminated string",TypeStr.STR_) : con(ts);
+      return ts==null ? err_ctrl1("Unterminated string",TypeStr.XSTR) : con(ts);
     }
     int oldx = _x;
     if( peek1(c,'(') ) {        // a nested statement or a tuple
@@ -435,8 +435,8 @@ public class Parse {
 
   /** Parse anonymous struct; the opening "@{" already parsed.  Next comes
    *  statements, with each assigned value becoming a struct member.  A lexical
-   *  scope is made (non top-level assignments are removed at the end).
-   *  @{ [id[:type]?[=stmt]?,]* }
+   *  scope is made (non top-level assignments are removed at the end), then the closing "}".
+   *  \@{ [id[:type]?[=stmt]?,]* }
    */
   private Node struct() {
     try( Env e = new Env(_e) ) {// Nest an environment for the local vars
@@ -495,7 +495,7 @@ public class Parse {
     _pp.setIndex(_x);
     Number n = _nf.parse(_str,_pp);
     _x = _pp.getIndex();
-    if( n instanceof Long   ) return n.longValue()==0 ? TypeUnion.NIL : TypeInt.con(n.  longValue());
+    if( n instanceof Long   ) return n.longValue()==0 ? TypeNil.NIL : TypeInt.con(n.  longValue());
     if( n instanceof Double ) return TypeFlt.con(n.doubleValue());
     throw new RuntimeException(n.getClass().toString()); // Should not happen
   }
@@ -530,7 +530,7 @@ public class Parse {
     return (t==null || t==Type.ANY) ? null : t;
   }
   // Wrap in a nullable if there is a trailing '?'
-  private Type typeq(Type t) { return peek('?') ? t.meet_nil() : t; }
+  private Type typeq(Type t) { return peek('?') ? TypeNil.make(t) : t; }
   
   // Type or null or TypeErr.ANY for '->' token
   private Type type0(boolean type_var) {
@@ -547,7 +547,8 @@ public class Parse {
         if( ts._len != 1 ) return null; // should return TypeErr missing -> in tfun
         ret = ts.pop();         // Get single return type
       }
-      return peek('}') ? typeq(TypeFunPtr.make(TypeFun.make(TypeTuple.make(ts.asAry()),ret,Bits.FULL,ts._len))) : null;
+      TypeTuple targs = TypeTuple.make_args(ts.asAry());
+      return peek('}') ? typeq(TypeFun.make(TypeFunPtr.make(targs,ret,Bits.FULL,ts._len))) : null;
     }
 
     if( peek2(c,"@{") ) { // Struct type
@@ -599,7 +600,7 @@ public class Parse {
       }
       _e.add_type(tok,t=TypeName.make_forward_def_type(tok));
     }
-    return t instanceof TypeNullable ? typeq(t) : t;
+    return t instanceof TypeOop ? typeq(t) : t;
   }
 
   // Require a specific character (after skipping WS) or polite error
@@ -700,15 +701,14 @@ public class Parse {
   // Polite error message for mismatched types
   public String typerr( Type t0, Type t1 ) {
     return t0.is_forward_ref() // Forward/unknown refs as args to a call report their own error
-      ? forward_ref_err(t0)
-      : errMsg((t0==TypeInt.FALSE && t1.is_oop() ? "nil" : t0.toString())+" is not a "+t1);
+      ? forward_ref_err((TypeFun)t0)
+      : errMsg(t0.toString()+" is not a "+t1);
   }
 
   // Standard mis-use of a forward-ref error (assumed to be a forward-decl of a
   // recursive function; all other uses are treated as an unknown-ref error).
-  public String forward_ref_err(Type t0) { return forward_ref_err(((TypeFunPtr)t0).fun()); }
   public String forward_ref_err(TypeFun tfun) {
-    String name = FunNode.name(tfun.fidx());
+    String name = FunNode.name(tfun.fun().fidx());
     return errMsg("Unknown ref '"+name+"'");
   }
   

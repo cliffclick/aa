@@ -6,8 +6,6 @@ import java.util.Arrays;
 import java.util.BitSet;
 import java.util.HashMap;
 
-import static com.cliffc.aa.type.TypeOop.OOP0;
-
 /** an implementation of language AA
  */
 
@@ -40,11 +38,11 @@ import static com.cliffc.aa.type.TypeOop.OOP0;
 // Structs are tuples with a set of named fields; the fields can be top, a
 // field name, or bottom.
 // Strings are OOPs which again can be top, a constant, or bottom.
-public class Type<T extends Type> {
+public class Type<T extends Type<T>> {
   static private int CNT=1;
   final int _uid=CNT++; // Unique ID, will have gaps, used to uniquely order Types in Unions
   byte _type;           // Simple types use a simple enum
-  Type _dual; // All types support a dual notion, lazily computed and cached here
+  T _dual; // All types support a dual notion, lazily computed and cached here
 
   protected Type(byte type) { _type=type; }
   @Override public int hashCode( ) { return _type; }
@@ -65,19 +63,19 @@ public class Type<T extends Type> {
   // Object Pooling to handle frequent (re)construction of temp objects being
   // interned.  One-entry pool for now.
   private static Type FREE=null;
-  protected Type free( T f ) { assert !(f instanceof TypeRPC); FREE=f; return this; }
+  protected T free( T ret ) { assert getClass()==Type.class; FREE=this; return ret; }
   static Type make( byte type ) {
     Type t1 = FREE;
     if( t1 == null ) t1 = new Type(type);
     else { FREE = null; t1._type = type; }
     Type t2 = t1.hashcons();
-    return t1==t2 ? t1 : t2.free(t1);
+    return t1==t2 ? t1 : t1.free(t2);
   }
   // Hash-Cons - all Types are interned in this hash table.  Thus an equality
   // check of a (possibly very large) Type is always a simple pointer-equality
   // check, except during construction and intern'ing.
   private static HashMap<Type,Type> INTERN = new HashMap<>();
-  Type hashcons() {
+  final Type hashcons() {
     Type t2 = INTERN.get(this); // Lookup
     if( t2!=null ) {            // Found prior
       assert t2._dual != null;  // Prior is complete with dual
@@ -90,10 +88,10 @@ public class Type<T extends Type> {
     T d = xdual();               // Compute dual without requiring table lookup
     _dual = d;
     if( this==d ) return d;      // Self-symmetric?  Dual is self
-    if( equals(d) ) { free(d); _dual=this; return this; } // If self symmetric then use self
+    if( equals(d) ) { d.free(null); _dual=(T)this; return this; } // If self symmetric then use self
     assert d._dual==null;        // Else dual-dual not computed yet
     assert INTERN.get(d)==null;
-    d._dual = this;
+    d._dual = (T)this;
     INTERN.put(d,d);
     return this;
   }
@@ -113,7 +111,7 @@ public class Type<T extends Type> {
   static final byte TANY    = 1; // Top
   static final byte TCTRL   = 2; // Ctrl flow bottom
   static final byte TXCTRL  = 3; // Ctrl flow top (mini-lattice: any-xctrl-ctrl-all)
-  static final byte TSCALAR = 4; // Scalars; all possible finite types; includes pointers (functions, structs), ints, floats; excludes state of Memory and Ctrl.
+  static final byte TSCALAR = 4; // Scalars; all possible finite types that fit in a machine register; includes pointers (functions, structs), ints, floats; excludes state of Memory and Ctrl.
   static final byte TXSCALAR= 5; // Invert scalars
   static final byte TNUM    = 6; // Number and all derivatives (Complex, Rational, Int, Float, etc)
   static final byte TXNUM   = 7; // Any Numbers; dual of NUM
@@ -122,7 +120,7 @@ public class Type<T extends Type> {
   static final byte TSIMPLE =10; // End of the Simple Types
   private static final String[] STRS = new String[]{"all","any","Ctrl","~Ctrl","Scalar","~Scalar","Number","~Number","Real","~Real"};
   // Implemented in subclasses
-  static final byte TUNION  =11; // Union types (finite collections of unrelated types Meet together); see TypeUnion
+  static final byte TNIL    =11; // Nil-types
   static final byte TNAME   =12; // Named types; always a subtype of some other type
   static final byte TOOP    =13; // Includes all GC ptrs & null; structs, strings.  Excludes functions, ints, floats
   static final byte TTUPLE  =14; // Tuples; finite collections of unrelated Types, kept in parallel
@@ -134,17 +132,17 @@ public class Type<T extends Type> {
   static final byte TINT    =20; // All Integers, including signed/unsigned and various sizes; see TypeInt
   static final byte TSTR    =21; // String type
   static final byte TLAST   =22; // Type check
-  
+
   public  static final Type ALL    = make( TALL   ); // Bottom
   public  static final Type ANY    = make( TANY   ); // Top
   public  static final Type CTRL   = make( TCTRL  ); // Ctrl
   public  static final Type XCTRL  = make(TXCTRL  ); // Ctrl
   public  static final Type  SCALAR= make( TSCALAR); // ptrs, ints, flts; things that fit in a machine register
   public  static final Type XSCALAR= make(TXSCALAR); // ptrs, ints, flts; things that fit in a machine register
-  public  static final Type  NUM   = make( TNUM   );
+          static final Type  NUM   = make( TNUM   );
   private static final Type XNUM   = make(TXNUM   );
   public  static final Type  REAL  = make( TREAL  );
-  public  static final Type XREAL  = make(TXREAL  );
+  private static final Type XREAL  = make(TXREAL  );
 
   // Collection of sample types for checking type lattice properties.
   private static final Type[] TYPES = new Type[]{ALL,ANY,CTRL,XCTRL,SCALAR,XSCALAR,NUM,XNUM,REAL,XREAL};
@@ -158,18 +156,18 @@ public class Type<T extends Type> {
   // exactly 1 value.  
   private static /*final*/ Type[] SCALAR_PRIMS;
   
-  boolean is_simple() { return _type < TSIMPLE; }
+  private boolean is_simple() { return _type < TSIMPLE; }
   // Return base type of named types
-  Type base() { Type t = this; while( t._type == TNAME ) t = ((TypeName)t)._t; return t; }
+  private Type base() { Type t = this; while( t._type == TNAME ) t = ((TypeName)t)._t; return t; }
   // Strip off any subclassing just for names
   byte simple_type() { return base()._type; }
-  public  boolean is_oop() { byte t = simple_type();  return t == TOOP || t == TSTR || t == TSTRUCT || t == TTUPLE || t == TFUNPTR; }
+  private boolean is_ptr() { byte t = simple_type();  return t == TOOP || t == TSTR || t == TSTRUCT || t == TTUPLE || t == TFUNPTR; }
   private boolean is_num() { byte t = simple_type();  return t == TNUM || t == TXNUM || t == TREAL || t == TXREAL || t == TINT || t == TFLT; }
   // True if 'this' isa SCALAR, without the cost of a full 'meet()'
   final boolean isa_scalar() { return _type != TCTRL && _type != TXCTRL; }
   
   // Return cached dual
-  public final Type dual() { return _dual; }
+  public final T dual() { return _dual; }
   
   // Compute dual right now.  Overridden in subclasses.
   protected T xdual() {
@@ -185,9 +183,11 @@ public class Type<T extends Type> {
     return mt;
   }
   private Type xmeet0( Type t ) {
+    // Short cut for the self case
     if( t == this ) return this;
-    if( t._dual==this ) return above_center() ? t : this;
-    // Reverse; xmeet 2nd arg is never <TSIMPLE
+    // Short cut for the exactly dual case
+    if( t._dual==this ) return above_center() ? t : this;    
+    // Reverse; xmeet 2nd arg is never "is_simple" and never equal to "this"
     return !is_simple() && t.is_simple() ? t.xmeet(this) : xmeet(t);
   }
   
@@ -214,21 +214,17 @@ public class Type<T extends Type> {
     if( t._type == TXSCALAR ) return this;
 
     // Scalar values break out into: nums(reals (int,flt)), GC-ptrs (structs(tuples), arrays(strings)), fun-ptrs, RPC
-
-    if( t._type == TFUN ) return SCALAR; // If 't' is a FUN and 'this' is not a FUN (because not equal to 't')
-    if( t._type == TRPC ) return SCALAR; // If 't' is a RPC and 'this' is not a RPC (because not equal to 't')
-    // Union of functions or numbers or whatever: let Union sort it out
-    if( t._type == TUNION ) return t.xmeet(this);
+    if( t._type == TFUN   ) return SCALAR; // If 't' is a FUN and 'this' is not a FUN (because not equal to 't')
+    if( t._type == TRPC   ) return SCALAR; // If 't' is a RPC and 'this' is not a RPC (because not equal to 't')
+    // Named numbers or whatever: let name sort it out
     if( t._type == TNAME  ) return t.xmeet(this);
+    if( t._type == TNIL   ) return t.xmeet(this);
 
-    boolean that_oop = t.is_oop();
+    // Down to just nums and GC-ptrs
+    boolean that_oop = t.is_ptr();
     boolean that_num = t.is_num();
     assert !(that_oop&&that_num);
     
-    if( is_oop() ) { // Only simple OOPish type
-      throw AA.unimpl();        // Need nice printout
-    }
-
     if( is_num() ) {
       // May be OOP0 or STR or STRUCT or TUPLE
       if( that_oop ) return SCALAR;
@@ -263,7 +259,7 @@ public class Type<T extends Type> {
     Type ta = mt._dual.xmeet0(t._dual);
     Type tb = mt._dual.xmeet0(  _dual);
     if( ta==t._dual && tb==_dual ) return true;
-    System.err.print("("+this+"&"+t+")=="+mt+"; but \n("+mt._dual+"&");
+    System.err.print("("+this+"&"+t+")=="+mt+" but \n("+mt._dual+"&");
     if( ta!=t._dual ) System.err.println(t._dual+")=="+ta+" \nwhich is not "+t._dual);
     else              System.err.println(  _dual+")=="+tb+" \nwhich is not "+  _dual);
     return false;
@@ -283,13 +279,13 @@ public class Type<T extends Type> {
     ts = concat(ts,TypeInt   .TYPES);
     ts = concat(ts,TypeFlt   .TYPES);
     ts = concat(ts,TypeOop   .TYPES);
+    ts = concat(ts,TypeNil   .TYPES);
     ts = concat(ts,TypeStr   .TYPES);
     ts = concat(ts,TypeTuple .TYPES);
     ts = concat(ts,TypeStruct.TYPES);
     ts = concat(ts,TypeFunPtr.TYPES);
     ts = concat(ts,TypeFun   .TYPES);
     ts = concat(ts,TypeRPC   .TYPES);
-    ts = concat(ts,TypeUnion .TYPES);
     ts = concat(ts,TypeName  .TYPES);
 
     // Confirm commutative & complete
@@ -336,8 +332,7 @@ public class Type<T extends Type> {
     assert errs==0 : "Found "+errs+" non-join-type errors";
 
     // Check scalar primitives; all are SCALARS and none sub-type each other.
-    Type ignore = TypeTuple.NIL; // Break class-loader cycle; load Tuple before Fun.
-    SCALAR_PRIMS = new Type[] { TypeInt.INT64, TypeFlt.FLT64, OOP0, TypeFun.make_generic() };
+    SCALAR_PRIMS = new Type[] { TypeInt.INT64, TypeFlt.FLT64, TypeOop.OOP, TypeFunPtr.GENERIC_FUNPTR, TypeRPC.ALL_CALL };
     for( Type t : SCALAR_PRIMS ) assert t.isa(SCALAR);
     for( int i=0; i<SCALAR_PRIMS.length; i++ ) 
       for( int j=i+1; j<SCALAR_PRIMS.length; j++ )
@@ -363,23 +358,14 @@ public class Type<T extends Type> {
     case TNUM:
     case TREAL:
     case TSCALAR:
-      return false;             // These are all below center
+      return false;             // These are all at or below center
     case TANY:
     case TXCTRL:
     case TXNUM:
     case TXREAL:
     case TXSCALAR:
       return true;              // These are all above center
-    case TFLT:
-    case TFUN:
-    case TINT:
-    case TOOP:
-    case TRPC:
-    case TSTRUCT:
-    case TTUPLE:
-    case TUNION:
     default: throw AA.unimpl(); // Overridden in subclass
-    case TSIMPLE: throw typerr(null);
     }
   }
   // True if value is higher-equal to SOME constant.
@@ -408,6 +394,7 @@ public class Type<T extends Type> {
     case TNUM:
     case TREAL:
     case TSCALAR:
+    case TANY:
     case TXCTRL:
     case TXNUM:
     case TXREAL:
@@ -416,11 +403,10 @@ public class Type<T extends Type> {
     default: throw AA.unimpl(); // Overridden in subclass
     }
   }
-  // Return the argument type of idxth argument.  Error for everybody except
-  // TypeFun and a TypeUnion of TypeFuns
+  // Return the argument type of idxth argument.  Error for everybody except TypeFun
   public Type arg(int idx) { throw AA.unimpl(); }
   // Return any "return type" of the Meet of all function types.  Error for
-  // everybody except TypeFun and a TypeUnion of TypeFuns
+  // everybody except TypeFun
   public Type ret() { throw AA.unimpl(); }
   // Return true if this is a forward-ref function pointer (return type from EpilogNode)
   public boolean is_forward_ref() { return false; }
@@ -433,17 +419,6 @@ public class Type<T extends Type> {
   public double getd() { throw AA.unimpl(); }
   // Return a String from a TypeStr constant; assert otherwise.
   public String getstr() { throw AA.unimpl(); }
-  // Meet in a nil
-  public Type meet_nil() {
-    if( above_center() ) throw AA.unimpl();
-    return this;
-  }
-  // Return true if this type may BE a null: includes Int:NULL plus numbers
-  // above the center line; numbers may be named.
-  public boolean may_be_nil() { assert is_simple();  return _type == TXSCALAR || _type == TXNUM || _type == TXREAL; }
-  // Return true if this type may HAVE a null: includes any nullable type with
-  // "AND_NIL" or "IS_NIL", or int types at or below the constant 0.
-  public boolean may_have_nil() { assert is_simple();  return _type == TSCALAR || _type == TNUM || _type == TREAL; }
   
   // Lattice of conversions:
   // -1 unknown; top; might fail, might be free (Scalar->Int); Scalar might lift
@@ -457,7 +432,6 @@ public class Type<T extends Type> {
     if( t._type==TSCALAR ) return 0; // Generic function arg never requires a conversion
     if( _type == TALL || _type == TSCALAR ) return -1; // Scalar has to resolve
     if( _type == TREAL && t.is_num() ) return -1; // Real->Int/Flt has to resolve
-    if( _type == TFUNPTR ) return (byte)(t == OOP0 ? 0 : 99);
 
     throw typerr(t);  // Overridden in subtypes
   }

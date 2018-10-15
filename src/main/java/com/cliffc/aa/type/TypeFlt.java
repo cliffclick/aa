@@ -21,13 +21,13 @@ public class TypeFlt extends Type<TypeFlt> {
     return (_x==1?"~":"")+"flt"+Integer.toString(_z);
   }
   private static TypeFlt FREE=null;
-  @Override protected TypeFlt free( TypeFlt f ) { FREE=f; return this; }
+  @Override protected TypeFlt free( TypeFlt ret ) { FREE=this; return ret; }
   public static TypeFlt make( int x, int z, double con ) {
     TypeFlt t1 = FREE;
     if( t1 == null ) t1 = new TypeFlt(x,z,con);
     else { FREE = null; t1.init(x,z,con); }
     TypeFlt t2 = (TypeFlt)t1.hashcons();
-    return t1==t2 ? t1 : t2.free(t1);
+    return t1==t2 ? t1 : t1.free(t2);
   }
   public static TypeFlt con(double con) { return make(0,log(con),con); }
   
@@ -46,7 +46,7 @@ public class TypeFlt extends Type<TypeFlt> {
 
   @Override protected TypeFlt xdual() { return _x==0 ? this : new TypeFlt(-_x,_z,_con); }
   @Override protected Type xmeet( Type t ) {
-    if( t == this ) return this;
+    assert t != this;
     switch( t._type ) {
     case TFLT:   break;
     case TINT:   return ((TypeInt)t).xmeetf(this);
@@ -55,12 +55,10 @@ public class TypeFlt extends Type<TypeFlt> {
     case TSTRUCT:
     case TTUPLE:
     case TFUNPTR:
-    case TRPC:
-    case TFUN:   return Type.SCALAR;
-    case TCTRL:
-    case TXCTRL: return Type.ALL;
-    case TNAME:
-    case TUNION: return t.xmeet(this); // Let other side decide
+    case TFUN:
+    case TRPC:   return Type.SCALAR;
+    case TNIL:
+    case TNAME:  return t.xmeet(this); // Let other side decide
     default: throw typerr(t);
     }
     TypeFlt tf = (TypeFlt)t;
@@ -82,8 +80,10 @@ public class TypeFlt extends Type<TypeFlt> {
   }
   private static int log( double con ) { return ((double)(float)con)==con ? 32 : 64; }
   
-  // Meet in a nil
-  @Override public Type meet_nil() { return xmeet(TypeInt.FALSE); }
+  @Override public boolean above_center() { return _x>0; }
+  @Override public boolean may_be_con() { return _x>=0; }
+  @Override public boolean is_con()   { return _x==0; }
+  
   // Lattice of conversions:
   // -1 unknown; top; might fail, might be free (Scalar->Int); Scalar might lift
   //    to e.g. Float and require a user-provided rounding conversion from F64->Int.
@@ -102,8 +102,4 @@ public class TypeFlt extends Type<TypeFlt> {
     assert _x <= 0;
     return FLT64;
   }
-  @Override public boolean above_center() { return _x>0; }
-  @Override public boolean may_be_con() { return _x>=0; }
-  @Override public boolean is_con()   { return _x==0; }
-  @Override public boolean may_be_nil() { return _x > 0 || (_x==0 && _con==0); }
 }

@@ -24,14 +24,14 @@ public class TypeRPC extends Type<TypeRPC> {
   }
   
   private static TypeRPC FREE=null;
-  @Override protected TypeRPC free( TypeRPC f ) { FREE=f; return this; }
+  @Override protected TypeRPC free( TypeRPC ret ) { FREE=this; return ret; }
   public static TypeRPC make( int rpc ) { return make(Bits.make(rpc)); }
   public static TypeRPC make( Bits rpcs ) {
     TypeRPC t1 = FREE;
     if( t1 == null ) t1 = new TypeRPC(rpcs);
     else { FREE = null; t1.init(rpcs); }
     TypeRPC t2 = (TypeRPC)t1.hashcons();
-    return t1==t2 ? t1 : t2.free(t1);
+    return t1==t2 ? t1 : t1.free(t2);
   }
 
   public static final TypeRPC ALL_CALL = make(Bits.FULL);
@@ -40,8 +40,6 @@ public class TypeRPC extends Type<TypeRPC> {
   @Override protected TypeRPC xdual() { return new TypeRPC(_rpcs.dual()); }
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
-    case TCTRL:
-    case TXCTRL: return Type.ALL;
     case TOOP:
     case TTUPLE: 
     case TFUNPTR:
@@ -51,8 +49,8 @@ public class TypeRPC extends Type<TypeRPC> {
     case TINT:
     case TSTR:   return Type.SCALAR;
     case TRPC:   break;
-    case TNAME:
-    case TUNION: return t.xmeet(this); // Let other side decide
+    case TNIL:
+    case TNAME:  return t.xmeet(this); // Let other side decide
     default: throw typerr(t);   // All else should not happen
     }
     TypeRPC tf = (TypeRPC)t;
@@ -64,7 +62,4 @@ public class TypeRPC extends Type<TypeRPC> {
   @Override public boolean above_center() { return _rpcs.above_center(); }
   @Override public boolean may_be_con()   { return _rpcs.abit()>0; }
   @Override public boolean is_con()       { return _rpcs.abit()>0; }
-  // Return true if this type may BE a null.  RPC are not GC'd, are not OOP's,
-  // and are never nil.
-  public boolean may_be_nil() { return false; }
 }

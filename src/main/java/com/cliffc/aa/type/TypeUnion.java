@@ -13,14 +13,12 @@ import java.util.Comparator;
 public class TypeUnion extends Type<TypeUnion> {
   private TypeTuple _ts;         // All of these are possible choices
   private boolean _any; // FALSE: meet; must support all; TRUE: join; can pick any one choice
-  private TypeUnion( TypeTuple ts, boolean any ) { super(TUNION); init(ts,any); }
+  private TypeUnion( TypeTuple ts, boolean any ) { super(/*TUNION*/(byte)-1); init(ts,any); }
   private void init( TypeTuple ts, boolean any ) {
-    assert !ts.has_union_or_tuple();
-    assert ts._nil==TypeTuple.NOT_NIL;
     _ts = ts;
     _any=any;
   }
-  @Override public int hashCode( ) { return TUNION+_ts.hashCode()+(_any?1:0);  }
+  @Override public int hashCode( ) { return _ts.hashCode()+(_any?1:0);  }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeUnion) ) return false;
@@ -28,20 +26,20 @@ public class TypeUnion extends Type<TypeUnion> {
     return _any==t._any && _ts==t._ts;
   }
   @Override String str( BitSet dups) {
-    if( this==NIL ) return "nil";
+    //if( this==NIL ) return "nil";
     SB sb = new SB().p('{');
     for( Type t : _ts._ts )
       sb.p(t.str(dups)).p(_any?" | ":" & ");
     return sb.p('}').toString();
   }
   private static TypeUnion FREE=null;
-  @Override protected TypeUnion free( TypeUnion f ) { FREE=f; return this; }
+  @Override protected TypeUnion free( TypeUnion ret ) { FREE=this; return ret; }
   public static TypeUnion make( TypeTuple ts, boolean any ) {
     TypeUnion t1 = FREE;
     if( t1 == null ) t1 = new TypeUnion(ts,any);
     else { FREE = null; t1.init(ts,any); }
     TypeUnion t2 = (TypeUnion)t1.hashcons();
-    return t1==t2 ? t1 : t2.free(t1);
+    return t1==t2 ? t1 : t1.free(t2);
   }
 
   // Common cleanup rules on making new unions
@@ -62,7 +60,8 @@ public class TypeUnion extends Type<TypeUnion> {
     boolean all_fun=true, all_nil=true;
     for( Type t : ts ) {
       if( t.simple_type() != TFUN ) all_fun=false;
-      if( !t.may_be_nil() ) all_nil=false;
+      //if( !t.may_be_nil() ) all_nil=false;
+      throw AA.unimpl();
     }
     if( !all_fun && !all_nil ) { // Collapse all the parts
       Type x = any ? Type.ALL : Type.ANY;
@@ -74,19 +73,11 @@ public class TypeUnion extends Type<TypeUnion> {
 
     // The set has to be ordered, to remove dups that vary only by order
     ts.sort_update(Comparator.comparingInt(e -> e._uid)); 
-    return make(TypeTuple.make(any?Type.ANY:Type.ALL,TypeTuple.NOT_NIL,ts.asAry()),any);
+    return make(TypeTuple.make(any?Type.ANY:Type.ALL,1.0f,ts.asAry()),any);
   }
 
-  // Same union, minus the null
-  public Type remove_null() {
-    //Ary<Type> ts = new Ary<>(new Type[1],0);
-    //for( Type t : _ts._ts ) if( t!=TypeInt.NULL ) ts.add(t);
-    //return make(_any,ts);
-    throw AA.unimpl();
-  }
-  
-  public  static final TypeUnion NIL  = (TypeUnion)make(true, TypeOop.NIL, TypeStr.NIL, TypeTuple.NIL, TypeInt.FALSE);
-  private static final TypeUnion FUNS = (TypeUnion)make(true, TypeFun.any(0,-1), TypeFun.any(1,-1));
+  //public  static final TypeUnion NIL  = (TypeUnion)make(true, Type.NIL, TypeStr.NIL, TypeTuple.NIL, TypeInt.FALSE);
+  private static final TypeUnion FUNS = (TypeUnion)make(true, TypeFunPtr.any(0,-1), TypeFunPtr.any(1,-1));
   static final TypeUnion[] TYPES = new TypeUnion[]{FUNS};
 
   @Override protected TypeUnion xdual() {
@@ -97,7 +88,7 @@ public class TypeUnion extends Type<TypeUnion> {
     Type[] ts = ((TypeTuple)_ts.dual())._ts; // Dual-tuple array
     ts = Arrays.copyOf(ts,ts.length);        // Defensive copy
     Arrays.sort(ts, 0, ts.length, Comparator.comparingInt(e -> e._uid));
-    TypeTuple stt = TypeTuple.make(!_any?Type.ANY:Type.ALL,TypeTuple.NOT_NIL,ts);
+    TypeTuple stt = TypeTuple.make(!_any?Type.ANY:Type.ALL,1.0f,ts);
     return new TypeUnion(stt,!_any);
   }
   
@@ -109,7 +100,7 @@ public class TypeUnion extends Type<TypeUnion> {
   // [AB]C, where C might be any type including e.g. a union of either [C+D] or [CD].
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
-    case TUNION: {
+    case -1/*TUNION*/: {
       // Handle the case where they are structurally equal
       TypeUnion tu = (TypeUnion)t;
       assert _any != tu._any || _ts!=tu._ts; // hashcons guarantees we are different here
@@ -187,13 +178,13 @@ public class TypeUnion extends Type<TypeUnion> {
   @Override public Type arg(int idx) {
     Ary<Type> args = new Ary<>(Type.class);
     for( int i=0; i<_ts._ts.length; i++ )
-      args.add(((TypeFun)_ts._ts[i])._ts.at(idx));
+      args.add(((TypeFunPtr)_ts._ts[i])._ts.at(idx));
     return make(false,full_simplify(args,_any));
   }
   @Override public Type ret() {
     Ary<Type> rets = new Ary<>(Type.class);
     for( int i=0; i<_ts._ts.length; i++ )
-      rets.add(((TypeFun)_ts._ts[i])._ret);
+      rets.add(((TypeFunPtr)_ts._ts[i])._ret);
     return make(_any,full_simplify(rets,_any));
   }
 
@@ -216,33 +207,6 @@ public class TypeUnion extends Type<TypeUnion> {
       return true;
     }
   }
-  // Return true if this type MAY be a nil.
-  @Override public boolean may_be_nil() {
-    if( _any ) {                // Any null works
-      for( Type t : _ts._ts ) if(  t.may_be_nil() ) return true;
-      return false;
-    } else {                    // All must be null
-      for( Type t : _ts._ts ) if( !t.may_be_nil() ) return false;
-      return true;
-    }
-  }
-  @Override public long getl() { if(may_have_nil()) return 0; throw AA.unimpl(); }
-  
-  // True if any choice can have a nul
-  @Override public boolean may_have_nil() {
-    if( _any ) {                // Any non-nil can be picked for a no-nil answer
-      for( Type t : _ts._ts ) if(  !t.may_have_nil() ) return false;
-      return true;
-    } else {                    // Any have-nil means the union have-nil
-      for( Type t : _ts._ts ) if(  t.may_be_nil() ) return true;
-      return false;
-    }
-  }
-  // Return true if this is an ambiguous function pointer.  Only valid for meet
-  // of functions, and can be true for a meet of ambiguous functions.  Example:
-  // "(rand?{+}:{*})(2,3)" - either {*} or {+} is being called on (2,3) with
-  // either floats or ints.  The result is either 6 or 5 according.
-  //@Override public boolean is_ambiguous_fun() { throw AA.unimpl(); }
   
   // Lattice of conversions:
   // -1 unknown; top; might fail, might be free (Scalar->Int); Scalar might lift

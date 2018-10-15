@@ -11,7 +11,7 @@ public class Bits implements Iterable<Integer> {
   // with an infinite extent or a single bit choice as a constant.
   //
   // If _bits is NULL, then _con holds the single set bit (including 0).
-  // If _bits is not-null, then _con is 0 for meet, and -1 for join.
+  // If _bits is not-null, then _con is -2 for meet, and -1 for join.
   // The last bit of _bits is the "sign" bit, and extends infinitely.
   private long[] _bits;         // Bits set or null for a single bit
   private int _con;             // value of single bit, or 0 for meet or -1 for join
@@ -19,7 +19,7 @@ public class Bits implements Iterable<Integer> {
   private      Bits(int con, long[] bits ) { init(con,bits); }
   private void init(int con, long[] bits ) {
     if( bits==null ) assert con >= 0;
-    else             assert con==0 || con==-1;
+    else             assert con==-2 || con==-1;
 
     int sum=con;
     if( bits != null ) for( long bit : bits ) sum += bit;
@@ -66,7 +66,7 @@ public class Bits implements Iterable<Integer> {
   }
 
   public static Bits make0( int con, long[] bits ) {
-    assert con==0 || con==-1;
+    assert con==-2 || con==-1;
     // TODO: convert to single-bit-form if only 1 bit set
     // TODO: remove trailing sign-extend words
     return make(con,bits);
@@ -77,7 +77,8 @@ public class Bits implements Iterable<Integer> {
     return make(bit,null);
   }
   
-  public static Bits FULL = make(0,new long[]{-1});
+  public static Bits FULL = make(-2,new long[]{-1});
+  public static Bits ANY  = FULL.dual();
   
   private static int  idx (int i) { return i>>6; }
   private static long mask(int i) { return 1L<<(i&63); }
@@ -85,6 +86,7 @@ public class Bits implements Iterable<Integer> {
   
   public int getbit() { assert _bits==null; return _con; }
   public int   abit() { return _bits==null ? _con : -1; }
+  public boolean is_con() { return _bits==null; }
   public boolean above_center() { return _con==-1; }
   
   public boolean test(int i) {
@@ -100,6 +102,8 @@ public class Bits implements Iterable<Integer> {
   public Bits meet( Bits bs ) {
     if( this==bs ) return this;
     if( this==FULL || bs==FULL ) return FULL;
+    if( this==ANY ) return bs;
+    if( bs  ==ANY ) return this;
     if( _bits==null || bs._bits==null ) { // One or both are constants
       Bits conbs = this, bigbs = bs;
       if( bs._bits==null ) { conbs = bs;  bigbs = this; }
@@ -108,18 +112,18 @@ public class Bits implements Iterable<Integer> {
         long[] bits = bits(conbs._con,bigbs._con);
         or( bits,conbs._con);
         or( bits,bigbs._con);
-        Bits bs0 = make(0,bits);
+        Bits bs0 = make(-2,bits);
         assert !bs0.inf(); // didn't set sign bit by accident (need bigger array if so)
         return bs0;
       }
       
-      if( bigbs._con==0 ) {     // Meet of constant and set
+      if( bigbs._con==-2 ) {     // Meet of constant and set
         if( bigbs.test(conbs._con) ) return bigbs; // already a member
         // Grow set to hold constant and OR it it
         long[] bits = bits(bigbs.max(),conbs._con);
         System.arraycopy(bigbs._bits,0,bits,0,bigbs._bits.length);
         or( bits,conbs._con);
-        Bits bs0 = make(0,bits);
+        Bits bs0 = make(-2,bits);
         assert bs0.inf()==bigbs.inf();
         return bs0;
       }
@@ -129,13 +133,13 @@ public class Bits implements Iterable<Integer> {
 
     }
 
-    if( _con==0 ) {             // Meet
-      if( bs._con==0 ) {
+    if( _con==-2 ) {            // Meet
+      if( bs._con==-2 ) {
         Bits smlbs = this, bigbs = bs;
         if( smlbs._bits.length > bigbs._bits.length ) { smlbs=bs; bigbs=this; }
         long[] bits = bigbs._bits.clone();
         for( int i=0; i<smlbs._bits.length; i++ ) bits[i]|=smlbs._bits[i];
-        return make(0,bits);
+        return make(-2,bits);
 
       } else {                  // Meet of a high set and low set
         // Probably require 1 bit from high set in the low set.
@@ -143,7 +147,7 @@ public class Bits implements Iterable<Integer> {
         return this;
       }
     }
-    if( bs._con==0 ) {          // Meet of a low set and high set
+    if( bs._con==-2 ) { // Meet of a low set and high set
       // Probably require 1 bit from high set in the low set.
       // For now, just return low set
       return bs;
@@ -163,8 +167,8 @@ public class Bits implements Iterable<Integer> {
   public Bits dual() {
     if( _bits==null ) return this; // Dual of a constant is itself
     // Otherwise just flip _con
-    assert _con==0 || _con==-1;
-    return make(~_con,_bits);
+    assert _con==-2 || _con==-1;
+    return make(-3-_con,_bits);
   }
   // join is defined in terms of meet and dual
   public Bits join(Bits bs) { return dual().meet(bs.dual()).dual(); }

@@ -38,9 +38,9 @@ import java.util.Map;
 // the incoming args come from a known input path.
 // 
 public class FunNode extends RegionNode {
-  private static int CNT=1; // Function index; -1 for 'all' and 0 for 'any'
-  public TypeFun _tf;       // Worse-case correct type, updated by GCP
-  private final byte _op_prec;// Operator precedence; only set top-level primitive wrappers
+  private static int CNT=1;     // Function index; 0 reserved (for nil in TypeFunPtr)
+  public TypeFunPtr _tf;        // Worse-case correct type, updated by GCP
+  private final byte _op_prec;  // Operator precedence; only set top-level primitive wrappers
 
   // FunNodes can "discover" callers if the function constant exists in the
   // program anywhere (since, during execution (or optimizations) it may arrive
@@ -52,15 +52,15 @@ public class FunNode extends RegionNode {
   public boolean _all_callers_known = false;
   
   // Used to make the primitives at boot time
-  public FunNode(Node scope, PrimNode prim) { this(scope,TypeFun.make(prim._targs,prim._ret,CNT,prim._targs._ts.length),prim.op_prec(),prim._name); }
+  public FunNode(Node scope, PrimNode prim) { this(scope,TypeFunPtr.make(prim._targs,prim._ret,CNT,prim._targs._ts.length),prim.op_prec(),prim._name); }
   // Used to make copies when inlining/cloning function bodies
-  private FunNode(Node scope, TypeTuple ts, Type ret, String name, int nargs) { this(scope,TypeFun.make(ts,ret,CNT,nargs),-1,name); }
+  private FunNode(Node scope, TypeTuple ts, Type ret, String name, int nargs) { this(scope,TypeFunPtr.make(ts,ret,CNT,nargs),-1,name); }
   // Used to start an anonymous function in the Parser
-  public FunNode(Type[] ts, Node scope) { this(scope,TypeFun.make(TypeTuple.make_args(ts),Type.SCALAR,CNT,ts.length),-1,null); }
+  public FunNode(Type[] ts, Node scope) { this(scope,TypeFunPtr.make(TypeTuple.make_args(ts),Type.SCALAR,CNT,ts.length),-1,null); }
   // Used to forward-decl anon functions
-  FunNode(Node scope, String name) { this(scope,TypeFun.make_forward_ref(CNT),-1,name); }
+  FunNode(Node scope, String name) { this(scope,TypeFunPtr.make_forward_ref(CNT),-1,name); }
   // Shared common constructor
-  private FunNode(Node scope, TypeFun tf, int op_prec, String name) {
+  private FunNode(Node scope, TypeFunPtr tf, int op_prec, String name) {
     super(OP_FUN);
     if( scope != null ) add_def(scope);
     _tf = tf;
@@ -184,7 +184,7 @@ public class FunNode extends RegionNode {
 
   // Look for type-specialization inlining.  If any ParmNode has an unresolved
   // Call user, then we'd like to make a clone of the function body (in least
-  // up to getting all the function TypeUnions to clear out).  The specialized
+  // up to getting all the Unresolved functions to clear out).  The specialized
   // code uses generalized versions of the arguments, where we only specialize
   // on arguments that help immediately.
   private FunNode type_special( GVNGCM gvn, ParmNode[] parms ) {
@@ -347,8 +347,8 @@ public class FunNode extends RegionNode {
       if( nn instanceof ParmNode && ((ParmNode)nn)._idx==-1 )
         ot = nn.all_type();     // Except the RPC, which has new callers
       else if( nn instanceof EpilogNode ) {
-        TypeFunPtr tt = (TypeFunPtr)ot; // And the epilog, which has a new funnode and RPCs
-        ot = TypeFunPtr.make0(tt.ctl(),tt.val(),TypeRPC.ALL_CALL,fun._tf);
+        TypeFun tt = (TypeFun)ot; // And the epilog, which has a new funnode and RPCs
+        ot = TypeFun.make(tt.ctl(),tt.val(),TypeRPC.ALL_CALL,fun._tf);
       }
       gvn.rereg(nn,ot);
     }
@@ -410,7 +410,7 @@ public class FunNode extends RegionNode {
       for( Node c : map.values() ) {
         if( c instanceof CallNode ) { // For all cloned Calls
           Type tfunptr = gvn.type(c.in(1));
-          TypeFun tfun = ((TypeFunPtr)tfunptr).fun();
+          TypeFunPtr tfun = ((TypeFun)tfunptr).fun();
           for( int fidx : tfun._fidxs ) { // For all possible targets of the Call
             FunNode oldfun = FunNode.find_fidx(fidx);
             assert !oldfun.is_dead();

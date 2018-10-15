@@ -18,17 +18,13 @@ public class IfNode extends Node {
     Type pred = gvn.type(in(1));
     if( pred.isa(TypeInt.XINT1) ) return TypeTuple.IF_ANY;  // Choice of {0,1}
     if( TypeInt.BOOL.isa(pred)  ) return TypeTuple.IF_ALL;  // Can be either
-    if( pred.isa(TypeInt.FALSE) ) return TypeTuple.IF_FALSE;// False only
-    if( pred instanceof TypeNullable ) {
-      switch( ((TypeNullable)pred)._nil ) {
-      case TypeNullable. IS_NIL: return TypeTuple.IF_FALSE;
-      case TypeNullable.NOT_NIL: return TypeTuple.IF_TRUE;
-      case TypeNullable.AND_NIL: return TypeTuple.IF_ALL;   // Might be nil or the oop
-      case TypeNullable. OR_NIL: return TypeTuple.IF_FALSE; // Take nil choice
-      }
+    if( pred == TypeInt.FALSE ||
+        pred == TypeNil.NIL ) return TypeTuple.IF_FALSE; // False only
+    if( pred instanceof TypeOop ) {
+      throw AA.unimpl();
     }
-    if( !(pred instanceof TypeInt) )
-      throw AA.unimpl(); // Dunno what this test is?
+    if( pred instanceof TypeNil ) // Check for nil-or- vs nil-and-
+      return pred.above_center() ? TypeTuple.IF_ANY : TypeTuple.IF_ALL;
     if( pred.is_con() ) { assert pred.getl() != 0; return TypeTuple.IF_TRUE; } // True only
     throw AA.unimpl(); // Dunno what this test is?
   }

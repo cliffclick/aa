@@ -1,96 +1,106 @@
 package com.cliffc.aa.type;
 
 import com.cliffc.aa.node.FunNode;
+import com.cliffc.aa.util.Bits;
+import com.cliffc.aa.util.SB;
 
-/** A Tuple with exactly 4 fields:
- *  0 - Function exit control
- *  1 - Function exit value type
- *  2 - Function RPC type (set of callers) - Short cut available type, to avoid
- *      going to the FunNode and reversing to the RPC.
- *  3 - Function signature, with a single FIDX 
- * 
- *  This is the type of EpilogNodes, except they also have a _fidx to map to
- *  the FunNode (used when the FunNode is collapsing) AND a pointer to the
- *  FunNode.
-*/
-public class TypeFunPtr extends TypeTuple<TypeFunPtr> {
-  private TypeFunPtr( byte nil, Type[] ts, Type inf ) {
-    super(nil,ts,inf,TFUNPTR);
-    init(nil,ts,inf);
-  }
-  protected void init( byte nil, Type[] ts, Type inf ) {
-    super.init(nil,ts,inf,TFUNPTR);
-    assert is_fun_ptr();
-  }
-  
+import java.util.BitSet;
+
+// Function constants and signatures.  Contrast this to 'TypeFun'.
+public class TypeFunPtr extends Type<TypeFunPtr> {
+  public TypeTuple _ts;         // Arg types
+  public Type _ret;             // return types
+  // List of known functions in set, or 'flip' for choice-of-functions.
+  // Zero bit reserved for null.
+  public Bits _fidxs;           //
+  public int _nargs;            // Count of args or -1 for forward_ref
+
+  private   TypeFunPtr(TypeTuple ts, Type ret, Bits fidxs, int nargs ) { super(TFUNPTR); init(ts,ret,fidxs,nargs); }
+  private void init(TypeTuple ts, Type ret, Bits fidxs, int nargs ) { _ts = ts; _ret = ret; _fidxs = fidxs; _nargs=nargs; }
+  @Override public int hashCode( ) { return TFUNPTR + _ts.hashCode() + _ret.hashCode()+ _fidxs.hashCode() + _nargs;  }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
-    return o instanceof TypeFunPtr && eq((TypeFunPtr)o);
-  }    
-  
-  private static TypeFunPtr FREE=null;
-  @Override protected TypeFunPtr free( TypeFunPtr f ) { assert f._type==TFUNPTR; FREE=f; return this; }
-  private static TypeFunPtr make0( byte nil, Type[] ts, Type inf ) {
-    TypeFunPtr t1 = FREE;
-    if( t1 == null ) t1 = new TypeFunPtr(nil,ts,inf);
-    else { FREE = null; t1.init(nil,ts,inf); }
-    TypeFunPtr t2 = (TypeFunPtr)t1.hashcons();
-    return t1==t2 ? t1 : t2.free(t1);
+    if( !(o instanceof TypeFunPtr) ) return false;
+    TypeFunPtr tf = (TypeFunPtr)o;
+    return _ts==tf._ts && _ret==tf._ret && _fidxs==tf._fidxs && _nargs==tf._nargs;
   }
-  
-  public static TypeFunPtr make0( Type ctrl, Type ret, TypeRPC rpc, TypeFun fun ) {
-    return make0(NOT_NIL, new Type[] {ctrl,ret,rpc,fun}, Type.ALL);
+  @Override String str( BitSet dups) {
+    SB sb = FunNode.names(_fidxs,new SB());
+    if( _nargs==-1 ) return sb.p("{forward_ref}").toString();
+    sb.p('{');
+    for( int i=0; i<_nargs; i++ ) sb.p(arg(i).str(dups)).p(' ');
+    sb.p("-> ").p(_ret.str(dups)).p('}');
+    if( _fidxs.test(0) ) sb.p(_fidxs.above_center()?"+0":"?");
+    return sb.toString();
   }
-  public static TypeFunPtr make( TypeFun fun ) { return make0(Type.CTRL,fun._ret,TypeRPC.ALL_CALL, fun); }
-  public static TypeFunPtr make( int fidx ) { return make(FunNode.find_fidx(fidx)._tf); }
-  public static TypeFunPtr make( TypeTuple tt ) { return make0(tt._nil,tt._ts,tt._inf); }
 
-  public static final TypeFunPtr FUNPTR1     = make(TypeFun.any(1,-1));
-  public static final TypeFunPtr FUNPTR2     = make(TypeFun.any(2,-1));
-  public static final TypeFunPtr GENERIC_FUN = make(TypeFun.make_generic());
-  static final TypeFunPtr[] TYPES = new TypeFunPtr[]{FUNPTR2,GENERIC_FUN};
-  
-  // The length of Tuples is a constant, and so is its own dual.  Otherwise
-  // just dual each element.  Also flip the infinitely extended tail type.
-  @Override protected TypeFunPtr xdual() {
-    Type[] ts = new Type[_ts.length];
-    for( int i=0; i<_ts.length; i++ ) ts[i] = _ts[i].dual();
-    return new TypeFunPtr(xdualnil(),ts,_inf.dual());
+  private static TypeFunPtr FREE=null;
+  @Override protected TypeFunPtr free( TypeFunPtr ret ) { FREE=this; return ret; }
+  public static TypeFunPtr make( TypeTuple ts, Type ret, int  fidx , int nargs ) { return make(ts,ret,Bits.make(fidx),nargs); }
+  public static TypeFunPtr make( TypeTuple ts, Type ret, Bits fidxs, int nargs ) {
+    TypeFunPtr t1 = FREE;
+    if( t1 == null ) t1 = new TypeFunPtr(ts,ret,fidxs,nargs);
+    else {   FREE = null;     t1.init(ts,ret,fidxs,nargs); }
+    TypeFunPtr t2 = (TypeFunPtr)t1.hashcons();
+    return t1==t2 ? t1 : t1.free(t2);
   }
-  // Standard Meet.
+
+  public static TypeFunPtr any( int nargs, int fidx ) {
+    Bits bs = fidx==-1 ? Bits.FULL : Bits.make(fidx);
+    switch( nargs ) {
+    case 0: return make(TypeTuple.SCALAR0,Type.SCALAR, bs,nargs);
+    case 1: return make(TypeTuple.SCALAR1,Type.SCALAR, bs,nargs);
+    case 2: return make(TypeTuple.SCALAR2,Type.SCALAR, bs,nargs);
+    default: throw com.cliffc.aa.AA.unimpl();
+    }
+  }
+
+  public  static final TypeTuple GENERIC_ARGS=TypeTuple.XSCALARS;
+  public  static final Type      GENERIC_RET =Type.SCALAR; // Can return almost anything
+  public  static final TypeFunPtr GENERIC_FUNPTR = make_generic();
+  public  static final TypeFunPtr FUNPTR1 = any(1,1);
+  static final TypeFunPtr[] TYPES = new TypeFunPtr[]{FUNPTR1,GENERIC_FUNPTR};
+  
+  @Override protected TypeFunPtr xdual() { return new TypeFunPtr((TypeTuple)_ts.dual(),_ret.dual(),_fidxs.dual(),_nargs); }
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
-    case TTUPLE: 
-    case TFUNPTR: break;
-    case TSTR:   return TypeOop.make(nmeet(((TypeNullable)t)._nil),false);
+    case TFUNPTR:break;
+    case TOOP:
+    case TSTRUCT:
+    case TTUPLE:
     case TFLT:
     case TINT:
-    case TRPC:
-    case TFUN:   return Type.SCALAR;
-    case TOOP:
-    case TSTRUCT: 
-    case TNAME:
-    case TUNION: return t.xmeet(this); // Let other side decide
-    default: throw typerr(t);
+    case TSTR:
+    case TFUN:
+    case TRPC:   return Type.SCALAR;
+    case TNIL:
+    case TNAME:  return t.xmeet(this); // Let other side decide
+    default: throw typerr(t);   // All else should not happen
     }
-    // Length is longer of 2 tuples.  Shorter elements take the meet; longer
-    // elements meet the shorter extension.
-    TypeTuple tt = (TypeTuple)t;
-    TypeTuple rez = _ts.length < tt._ts.length ? xmeet1(tt) : tt.xmeet1(this);
-    return rez.is_fun_ptr() ? make(rez) : rez; // Copy back up to a TypeFunPtr
+    // Join of args; meet of ret & fidxs
+    TypeFunPtr tf = (TypeFunPtr)t;
+    Bits fidxs = _fidxs.meet( tf._fidxs );
+    TypeTuple ts = (TypeTuple)_ts.join(tf._ts);
+    Type ret = _ret.meet(tf._ret);
+    int nargs = tf._ret.above_center()
+      ? (_ret.above_center() ? Math.min(_nargs,tf._nargs) :   _nargs )
+      : (_ret.above_center() ? tf._nargs : Math.max(_nargs,tf._nargs));
+    return make(ts,ret,fidxs,nargs);
   }
-  // Make a subtype with a given nil choice
-  @Override public Type make_nil(byte nil) { return make0(nil,_ts,_inf); }
 
-  // Return true if this is a forward-ref function pointer (return type from EpilogNode)
-  @Override public boolean is_forward_ref() { return fun().is_forward_ref(); }
+  public int nargs() { return _nargs; }
+  @Override public Type arg(int idx) { return _ts.at(idx); }
+  @Override public Type ret() { return _ret; }
 
-  public Type    ctl() { return          _ts[0]; }
-  public Type    val() { return          _ts[1]; }
-  public TypeFun fun() { return (TypeFun)_ts[3]; }
-  // Return an error message, if any exists
-  @Override public String errMsg() {
-    // Ok to have a function which cannot be executed
-    return null;
-  }
+  @Override public boolean above_center() { return _fidxs.above_center(); }
+  @Override public boolean may_be_con()   { return _fidxs.is_con() || _fidxs.above_center(); }
+  @Override public boolean is_con()       { return _fidxs.is_con(); }
+  // Return true if this is an ambiguous function pointer
+  public boolean is_ambiguous_fun() { return _fidxs.above_center(); }
+  public int fidx() { return _fidxs.getbit(); }
+
+  // Generic functions
+  public boolean is_forward_ref()                    { return _nargs == -1; }
+  public static TypeFunPtr make_forward_ref( int fidx ) { return make(GENERIC_ARGS, GENERIC_RET,Bits.make(fidx),-1); }
+  private static TypeFunPtr make_generic()              { return make(GENERIC_ARGS, GENERIC_RET,Bits.FULL,99); }
 }

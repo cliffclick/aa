@@ -2,7 +2,6 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeTuple;
 
 // Regain precision after a call.  Calls return some intended value which
 // varies by call-site; e.g. map({A->B}, A[]) returns B[] - but the B type
@@ -10,7 +9,7 @@ import com.cliffc.aa.type.TypeTuple;
 // Calls can ALSO return e.g. some TypeErr.
 public class CastNode extends Node {
   public final Type _t;                // TypeVar???
-  public CastNode( Node ctrl, Node ret, Type t ) { super(OP_CAST,ctrl,ret); _t=t; }
+  CastNode( Node ctrl, Node ret, Type t ) { super(OP_CAST,ctrl,ret); _t=t; }
   @Override String xstr() { return "("+_t+")"; }
   @Override public Node ideal(GVNGCM gvn) {
     // Must keep a cast, even if it useless, if it points to an Epilog.  The

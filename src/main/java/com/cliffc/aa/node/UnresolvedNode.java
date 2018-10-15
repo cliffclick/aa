@@ -28,7 +28,7 @@ public class UnresolvedNode extends Node {
   public Node filter( GVNGCM gvn, int nargs ) {
     Node x = null;
     for( Node epi : _defs ) {
-      TypeFun tf = ((EpilogNode)epi).fun()._tf;
+      TypeFunPtr tf = ((EpilogNode)epi).fun()._tf;
       if( tf.nargs() != nargs ) continue;
       if( x == null ) x = epi;
       else if( x instanceof UnresolvedNode ) x.add_def(epi);
@@ -48,7 +48,7 @@ public class UnresolvedNode extends Node {
   // If more than one choice applies, then the choice with fewest costly
   // conversions are kept; if there is more than one then the join of them is
   // kept - and the program is not-yet type correct (ambiguous choices).
-  public Node resolve( GVNGCM gvn, CallNode call ) {
+  Node resolve( GVNGCM gvn, CallNode call ) {
     // Set of possible choices with fewest conversions
     Ary<Node> ns = new Ary<>(new Node[1],0);
     int min_cvts = 999;         // Required conversions
@@ -59,8 +59,8 @@ public class UnresolvedNode extends Node {
     // function with all arguments known.
     outerloop:
     for( Node epi : _defs ) {
-      TypeFunPtr tepi = (TypeFunPtr)gvn.type(epi);
-      TypeFun fun = tepi.fun();
+      TypeFun tepi = (TypeFun)gvn.type(epi);
+      TypeFunPtr fun = tepi.fun();
       if( fun.nargs() != call.nargs() ) continue; // Wrong arg count, toss out
       TypeTuple formals = fun._ts;   // Type of each argument
       // Now check if the arguments are compatible in all, keeping lowest cost

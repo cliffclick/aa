@@ -28,7 +28,7 @@ public class LoadNode extends Node {
 
     // Lift control on Loads as high as possible... and move them over
     // to a CastNode (to remove null-ness) and remove the control.
-    if( !t.may_have_nil() )     // No null, no need for ctrl
+    if( !(t instanceof TypeNil) ) // No null, no need for ctrl
       // remove ctrl; address already casts-away-null
       return set_def(0,null,gvn);
 
@@ -49,17 +49,20 @@ public class LoadNode extends Node {
                                   n.in(0).in(1) == fbaseaddr );
     if( tru==null ) return null;
     assert !(tru==ctrl && addr != baseaddr) : "not the immediate location or we would be not-null already";
-    if( !(t instanceof TypeNullable) ) return null; // Not yet typed as a Nullable
-    set_def(1,gvn.xform(new CastNode(tru,baseaddr,((TypeNullable)t).make_nil(TypeNullable.NOT_NIL))),gvn);
+
+    set_def(1,gvn.xform(new CastNode(tru,baseaddr,((TypeNil)t)._t)),gvn);
     return set_def(0,null,gvn);
   }
   @Override public Type value(GVNGCM gvn) {
     Type t = gvn.type(in(1));
     while( t instanceof TypeName ) t = ((TypeName)t)._t;
-    if( t.isa(TypeOop.OOP_) ) return Type.XSCALAR; // Very high address; might fall to any valid value
-    if( t.may_have_nil() ) return Type.SCALAR; // Might fail before loading
-    if( TypeOop.OOP0.isa(t) ) return Type.SCALAR; // Too low, might not have any fields
-    
+    if( t.isa(TypeNil.XOOP) ) return Type.XSCALAR; // Very high address; might fall to any valid value
+    if( TypeOop.OOP.isa(t) ) return Type.SCALAR; // Too low, might not have any fields
+    if( t instanceof TypeNil ) {
+      if( t.above_center() ) t = ((TypeNil)t)._t; // hi-nil, assume not a nil
+      else return Type.SCALAR;  // Might fail before loading
+    }
+
     if( t instanceof TypeStruct ) {
       TypeStruct ts = (TypeStruct)t;
       int idx = ts.find(_fld);  // Find the named field
@@ -72,9 +75,8 @@ public class LoadNode extends Node {
   @Override public String err(GVNGCM gvn) {
     Type t = gvn.type(in(1));
     while( t instanceof TypeName ) t = ((TypeName)t)._t;
-    if( t.may_have_nil() ) return _badnil;
-
-    if( TypeOop.OOP0.isa(t) ) return _badfld; // Too low, might not have any fields
+    if( t instanceof TypeNil && !t.above_center() ) return _badnil;
+    if( TypeOop.OOP.isa(t) ) return _badfld; // Too low, might not have any fields
     if( t instanceof TypeStruct &&
         ((TypeStruct)t).find(_fld) == -1 )
       return _badfld;

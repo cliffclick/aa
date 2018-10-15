@@ -7,10 +7,9 @@ import com.cliffc.aa.util.Bits;
 
 // See FunNode.  Control is not required for an apply but inlining the function
 // body will require it; slot 0 is for Control.  Slot 1 is a function value - a
-// Node with a TypeFun or a TypeUnion of TypeFuns.  Slots 2+ are for args.
+// Node with a TypeFunPtr.  Slots 2+ are for args.
 //
-// When the function simplifies to a single TypeFun, the Call can inline.
-// Otherwise the TypeUnion lists a bunch of function pointers are allowed here.
+// When the function simplifies to a single TypeFunPtr, the Call can inline.
 //
 // Call-inlining can happen anytime we have a known function pointer, and
 // might be several known function pointers - we are inlining the type analysis
@@ -27,7 +26,7 @@ public class CallNode extends Node {
   private boolean _inlined;     // Inlining a call-site is a 2-stage process; function return wired to the call return
   private Type   _cast_ret;     // Return type has been up-casted
   private Parse  _cast_P;       // Return type cast fail message
-  public  Parse  _badargs;      // Error for e.g. wrong arg counts or incompatible args
+          Parse  _badargs;      // Error for e.g. wrong arg counts or incompatible args
   public CallNode( boolean unpacked, Parse badargs, Node... defs ) {
     super(OP_CALL,defs);
     _rpc = RPC++;               // Unique call-site index
@@ -96,8 +95,8 @@ public class CallNode extends Node {
     Node unk  = in(1);          // Function epilog/function pointer
     if( unk instanceof TypeNode ) {
       TypeNode tn = (TypeNode)unk;
-      TypeFunPtr t_funptr = (TypeFunPtr)tn._t;
-      TypeFun tf = t_funptr.fun();
+      TypeFun t_funptr = (TypeFun)tn._t;
+      TypeFunPtr tf = t_funptr.fun();
       set_def(1,tn.in(1),gvn);
       for( int i=0; i<nargs(); i++ ) // Insert casts for each parm
         set_def(i+2,gvn.xform(new TypeNode(tf._ts.at(i),arg(i),tn._error_parse)),gvn);
@@ -218,9 +217,9 @@ public class CallNode extends Node {
 
   // Make real call edges from virtual call edges
   private void wire(GVNGCM gvn, Type funptr) {
-    if( !(funptr instanceof TypeFunPtr) ) return; // Not fallen to a funptr yet
-    TypeFunPtr tfunptr = (TypeFunPtr)funptr;
-    TypeFun tf = tfunptr.fun(); // Get type-propagated function list
+    if( !(funptr instanceof TypeFun) ) return; // Not fallen to a funptr yet
+    TypeFun tfunptr = (TypeFun)funptr;
+    TypeFunPtr tf = tfunptr.fun(); // Get type-propagated function list
     Bits fidxs = tf._fidxs;     // Get all the propagated reaching functions
     if( fidxs.above_center() ) return;
     for( int fidx : fidxs ) {   // For all functions
@@ -249,7 +248,7 @@ public class CallNode extends Node {
       // For unresolved, we can take the BEST choice; i.e. the JOIN of every
       // choice.  Typically one choice works and the others report type
       // errors on arguments.
-      //Bits fidxs = ((TypeFun)((TypeTuple)t).at(3))._fidxs;
+      //Bits fidxs = ((TypeFunPtr)((TypeTuple)t).at(3))._fidxs;
       //for( int fidx : fidxs )
       //  trez = trez.join(value1(gvn,gvn.type(FunNode.find_fidx(fidx).epi()))); // JOIN of choices
       for( Node epi : fp._defs )
@@ -267,10 +266,10 @@ public class CallNode extends Node {
   // cannot be called, so the JOIN of valid returns is not lowered.
   private Type value1( GVNGCM gvn, Type t ) {
     if( t==Type.XSCALAR ) return Type.XSCALAR; // Might be any function, returning anything
-    TypeFunPtr tepi = (TypeFunPtr)t;
+    TypeFun tepi = (TypeFun)t;
     Type    tctrl=tepi.ctl();
     Type    tval =tepi.val();
-    TypeFun tfun =tepi.fun();
+    TypeFunPtr tfun =tepi.fun();
     if( tctrl == Type.XCTRL ) return Type.XSCALAR; // Function will never return
     assert tctrl==Type.CTRL;      // Function will never return?
     if( t.is_forward_ref() ) return tfun.ret(); // Forward refs do no argument checking
@@ -300,8 +299,8 @@ public class CallNode extends Node {
   // kept - and the program is not-yet type correct (ambiguous choices).
   public Node resolve( GVNGCM gvn ) {
     Type t = gvn.type(in(1));
-    if( !(t instanceof TypeFunPtr) ) return null; // Might be e.g. ~Scalar
-    TypeFunPtr tfp = (TypeFunPtr)t;
+    if( !(t instanceof TypeFun) ) return null; // Might be e.g. ~Scalar
+    TypeFun tfp = (TypeFun)t;
     if( !tfp.fun().is_ambiguous_fun() ) return in(1); // Sane as-is
     Bits fidxs = tfp.fun()._fidxs;
 
@@ -316,7 +315,7 @@ public class CallNode extends Node {
     // function with all arguments known.
     outerloop:
     for( int fidx : fidxs ) {
-      TypeFun fun = FunNode.find_fidx(fidx)._tf;
+      TypeFunPtr fun = FunNode.find_fidx(fidx)._tf;
       if( fun.nargs() != nargs() ) continue; // Wrong arg count, toss out
       TypeTuple formals = fun._ts;   // Type of each argument
       // Now check if the arguments are compatible in all, keeping lowest cost
@@ -359,17 +358,18 @@ public class CallNode extends Node {
     // Error#1: fail for passed-in unknown references
     for( int j=0; j<nargs(); j++ ) 
       if( arg(j).is_forward_ref() )
-        return _badargs.forward_ref_err(gvn.type(arg(j)));
+        return _badargs.forward_ref_err((TypeFun)gvn.type(arg(j)));
     
     Node fp = in(1);      // Either function pointer, or unresolve list of them
     Node xfp = fp instanceof UnresolvedNode ? fp.in(0) : fp;
-    TypeFun txfun = ((TypeFunPtr)gvn.type(xfp)).fun();
-    if( txfun.is_forward_ref() ) // Forward ref on incoming function
-      return _badargs.forward_ref_err(txfun);
+    TypeFun tfun = (TypeFun)gvn.type(xfp);
+    if( tfun.is_forward_ref() ) // Forward ref on incoming function
+      return _badargs.forward_ref_err(tfun);
 
     // Error#2: bad-arg-count
-    if( txfun.nargs() != nargs() )
-      return _badargs.errMsg("Passing "+nargs()+" arguments to "+txfun+" which takes "+txfun.nargs()+" arguments");
+    TypeFunPtr tfp = tfun.fun();
+    if( tfp.nargs() != nargs() )
+      return _badargs.errMsg("Passing "+nargs()+" arguments to "+tfp+" which takes "+tfp.nargs()+" arguments");
 
     // Error#3: ambiguous
     if( fp instanceof UnresolvedNode )
@@ -377,7 +377,7 @@ public class CallNode extends Node {
       return null; // If unresolved, must also be uncalled so allow arg badness
 
     // Error#4: Now do an arg-check
-    TypeTuple formals = txfun._ts; // Type of each argument
+    TypeTuple formals = tfp._ts; // Type of each argument
     for( int j=0; j<nargs(); j++ ) {
       Type actual = gvn.type(arg(j));
       Type formal = formals.at(j);

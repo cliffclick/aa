@@ -277,9 +277,9 @@ public class GVNGCM {
     // constant function and show up any place a Scalar is allowed; e.g. as
     // arguments to functions or loaded from fields.  Replace with the constant
     // function's EpilogNode.
-    if( t instanceof TypeFunPtr ) {
-      Type    tc = ((TypeFunPtr)t).ctl();
-      TypeFun tf = ((TypeFunPtr)t).fun();
+    if( t instanceof TypeFun ) {
+      Type       tc = ((TypeFun)t).ctl();
+      TypeFunPtr tf = ((TypeFun)t).fun();
       if( tf.is_con() && tc == Type.CTRL && n.is_copy(this,0)==null ) {
         EpilogNode epi = FunNode.find_fidx(tf.fidx()).epi();
         if( n != epi ) return epi;
@@ -350,8 +350,8 @@ public class GVNGCM {
         if( n._uid < _INIT0_CNT ) continue; // Ignore primitives (type is unchanged and conservative)
         if( n instanceof CallNode && calls.find((CallNode)n)== -1 ) {
           Type tf = type(n.in(1));
-          if( tf instanceof TypeFunPtr && // Might be e.g. ~Scalar
-              ((TypeFunPtr)tf).fun().is_ambiguous_fun() )
+          if( tf instanceof TypeFun && // Might be e.g. ~Scalar
+              ((TypeFun)tf).fun().is_ambiguous_fun() )
             calls.add((CallNode)n); // Track ambiguous calls
         }
         Type ot = type(n);       // Old type
@@ -431,15 +431,15 @@ public class GVNGCM {
       // Functions can sharpen return value
       if( type(fun)==Type.CTRL ) {
         EpilogNode epi = fun.epi();
-        TypeTuple tt = (TypeTuple)type(epi);
-        Type    tctl =          tt.at(0);
-        Type    tret =          tt.at(1);
-        TypeFun tfun = (TypeFun)tt.at(3);
+        TypeTuple  tt = (TypeTuple)   type(epi);
+        Type       tctl =             tt.at(0);
+        Type       tret =             tt.at(1);
+        TypeFunPtr tfun = (TypeFunPtr)tt.at(3);
         if( tctl != Type.CTRL ) throw AA.unimpl(); // never-return function (maybe never called?)
         if( tret != tfun._ret &&    // can sharpen function return
             tret.isa(tfun._ret) ) { // Only if sharpened (might not be true for errors)
           unreg(fun);
-          fun._tf = TypeFun.make(tfun._ts,tret,tfun._fidxs,tfun._nargs);
+          fun._tf = TypeFunPtr.make(tfun._ts,tret,tfun._fidxs,tfun._nargs);
           rereg(fun,Type.CTRL);
         }
       }

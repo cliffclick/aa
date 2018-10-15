@@ -13,8 +13,8 @@ import java.util.function.Predicate;
 public class ScopeNode extends Node {
   // Mapping from names to def indices.  Named defs are added upfront and some
   // unnamed defs are added & removed as part of parsing.  Named function defs
-  // point to ConNodes with a TypeFun constant (a single function) or a
-  // TypeUnion of TypeFuns.
+  // point to ConNodes with a TypeFun constant (a single function), or maybe
+  // an Unresolved collection of overloaded functions.
   private final HashMap<String, Integer> _vals;
   // Mapping from type-variables to Types.  Types have a scope lifetime like values.
   private final HashMap<String,Type> _types; // user-typing type names

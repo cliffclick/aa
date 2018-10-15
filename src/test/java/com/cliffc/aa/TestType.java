@@ -2,6 +2,7 @@ package com.cliffc.aa;
 
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Bits;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.HashMap;
@@ -13,8 +14,20 @@ public class TestType {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testType() {
     Type.init0(new HashMap<>());
-    Type ignore = TypeTuple.NIL; // Break class-loader cycle; load Tuple before Fun.
+    Type ignore = TypeTuple.ALL; // Break class-loader cycle; load Tuple before Fun.
 
+    Type def = TypeStr.con("def");
+    Type mto5 = def.meet(TypeStr.ABC);
+    assertEquals(TypeStr.STR,mto5);
+    Type mto4 = TypeOop.XOOP.meet(TypeNil.ABC);
+    assertEquals(TypeNil.ABC,mto4);
+    Type mto3 = TypeOop.XOOP.meet(TypeNil.STR);
+    assertEquals(TypeNil.STR,mto3);
+    Type mto2 = TypeNil.XOOP.meet(TypeNil.make(TypeStr.XSTR));
+    assertEquals(TypeNil.make(TypeStr.XSTR),mto2);
+    Type mto1 = TypeOop.XOOP.meet(TypeStr.XSTR);
+    assertEquals(TypeStr.XSTR,mto1);
+    
   }
   
   @Test public void testNamesInts() {
@@ -38,16 +51,16 @@ public class TestType {
 
     // Lattice around n:int8 and n:0 is well formed; exactly 2 edges, 3 nodes
     // Confirm lattice: {N:~i8 -> N:1 -> N:i8}
-    // Confirm lattice: {N:~i8 ->   0 -> N:i8}
+    // Confirm lattice: {N:~i8 -> N:0 -> N:i8}
     Type ni8 = TypeName.TEST_ENUM;
     Type xni8= ni8.dual(); // dual name:int8
     Type no  = TypeName.make("__test_enum",o);
     Type nz  = TypeName.make("__test_enum",z);
     assertEquals(no ,no .meet(xni8)); // N:~i8 -> N: 1
     assertEquals(ni8,ni8.meet(no  )); // N:  1 -> N:i8
-    assertEquals(ni8,ni8.meet(nz  )); //   N:0 -> N:i8
     assertEquals(nz ,nz .meet(xni8)); // N:~i8 -> N:0
-    assertEquals(no ,no .meet(xni8)); // 1 & n:~i8 -> mixing 0 and 1
+    assertEquals(ni8,ni8.meet(nz  )); //   N:0 -> N:i8
+    assertEquals(no ,no .meet(xni8)); // n:1 & n:~i8 -> mixing 0 and 1
 
     // Crossing lattice between named and unnamed ints
     //      Confirm lattice: {~i8 -> N:~i8 -> 0 -> N:i8 -> i8; N:0 -> 0 }
@@ -66,14 +79,12 @@ public class TestType {
   @Test public void testOOPsNulls() {
     Type.init0(new HashMap<>());
     Type bot  = Type     .ALL;
-    Type oop0 = TypeOop  .OOP0; // OOP? (OOP and null)
-    Type str0 = TypeStr  .STR0; // str? (str AND null)
+    Type oop0 = TypeNil  .OOP;  // OOP? (OOP and null)
+    Type str0 = TypeNil  .STR;  // str? (str AND null)
     Type str  = TypeStr  .STR;  // str no null
-    Type tup0 = TypeTuple.ALL0; // tup? (tup AND null); infinite repeat of ALL fields
-    Type tup  = TypeTuple.ALL;  // tup       no  null ; infinite repeat of ALL fields
-    Type nilo = TypeOop  .NIL;
-    Type nils = TypeStr  .NIL;
-    Type nilt = TypeTuple.NIL;
+    Type tup0 = TypeNil.make(TypeTuple.SCALAR0); // tup? (tup AND null); infinite repeat of SCALAR fields
+    Type tup  = TypeTuple.SCALAR0; // tup no null ; infinite repeat of SCALAR fields
+    Type i0   = TypeInt.FALSE;
     Type abc  = TypeStr  .ABC;
     Type fld  = TypeTuple.INT64;  // 1 field of int64
     
@@ -91,18 +102,17 @@ public class TestType {
 
     assertTrue(str_.isa(strx));
     assertTrue(tup_.isa(tupx));
-    assertTrue(str_.isa(nilo));
-    assertTrue(str_.isa(nils));
-    assertTrue(tup_.isa(nilo));
-    assertTrue(tup_.isa(nilt));
+    assertTrue(!str_.isa(i0 ));
+    assertTrue(!tup_.isa(i0 ));
+    assertTrue(str_.isa(TypeNil.ABC));
 
     assertTrue(strx.isa(abc ));
     assertTrue(tupx.isa(fld ));
     
     assertTrue(abc .isa(str ));
     assertTrue(fld .isa(tup ));
-    assertTrue(nils.isa(str0));
-    assertTrue(nilt.isa(tup0));
+    assertTrue(!i0 .isa(str0));
+    assertTrue(!i0 .isa(tup0));
 
     assertTrue(str .isa(str0));
     assertTrue(tup .isa(tup0));
@@ -112,7 +122,7 @@ public class TestType {
     
     assertTrue(oop0.isa(bot ));
     
-    // Crossing named:ints or named:null and OOP
+    // Crossing ints and OOP+null
     Type  i8 = TypeInt.INT8;
     Type xi8 = i8.dual();
     assertEquals( Type.SCALAR, xi8.meet(oop_)); // ~OOP+0 &   ~i8 -> 0
@@ -120,34 +130,28 @@ public class TestType {
   
   @Test public void testStructTuple() {
     Type.init0(new HashMap<>());
-    Type nil  = TypeOop.NIL;
+    Type nil  = TypeNil.NIL;
     // Tuple is more general that Struct
     Type tf = TypeTuple.FLT64; //  [  flt64,~Scalar...]; choice leading field name
     Type tsx= TypeStruct.X;    // @{x:flt64,~Scalar...}; fixed  leading field name
     Type tff = tsx.meet(tf);   //
     assertEquals(tf,tff);      // tsx.isa(tf)
-    TypeTuple t0 = TypeTuple.make_args(nil); //  [  0,~Scalar...]
-    Type      ts0= TypeStruct.makeX(new String[]{"x"},nil);  // @{x:0,~Scalar...}
+    TypeTuple t0 = TypeTuple.make_args(nil); //  [  0,Scalar...]
+    Type      ts0= TypeStruct.makeX(new String[]{"x"},nil);  // @{x:0,Scalar...}
     Type tss = ts0.meet(t0);
     assertEquals(t0,tss);      // t0.isa(ts0)
 
-    // Union meets & joins same-class types
-    Type uany = TypeUnion.make(true ,TypeInt.con(2),TypeInt.INT8);
-    Type uall = TypeUnion.make(false,TypeInt.con(2),TypeInt.INT8);
-    assertEquals(uany,TypeInt.con(2));
-    assertEquals(uall,TypeInt.INT8  );
-    
     // meet @{c:0}? and @{c:@{x:1}?,}
-    TypeNullable nc0 = TypeStruct.make(TypeStruct.AND_NIL,new Type[]{nil},Type.ALL,new String[]{"c"}); // @{c:0}?
-    TypeNullable nx1 = TypeStruct.make(TypeStruct.AND_NIL,new Type[]{TypeInt.TRUE},Type.ALL,new String[]{"x"}); // @{x:1}?
-    TypeNullable cx  = TypeStruct.makeA(new String[]{"c"},nx1); // @{c:@{x:1}?}
+    Type    nc0 = TypeNil.make(TypeStruct.makeX(new String[]{"c"},TypeNil.NIL )); // @{c:nil}?
+    Type    nx1 = TypeNil.make(TypeStruct.makeX(new String[]{"x"},TypeInt.TRUE)); // @{x:1}?
+    TypeOop cx  = TypeStruct.makeX(new String[]{"c"},nx1); // @{c:@{x:1}?}
     // JOIN tosses the top-level null choice, and the inside struct choice
     Type cj  = nc0.join(cx);
-    Type c0  = TypeStruct.makeA(new String[]{"c"},nx1.make_nil((byte)0)); // @{c:0}
+    Type c0  = TypeStruct.makeX(new String[]{"c"},TypeNil.NIL); // @{c:0}
     assertEquals(c0,cj);
   }
 
-  @Test public void testUnion() {
+  @Ignore @Test public void testUnion() {
     Type.init0(new HashMap<>());
 
     Type a = TypeUnion.make(false,TypeInt.FALSE,TypeFlt.FLT32);
@@ -156,11 +160,11 @@ public class TestType {
     assertEquals(Type.REAL,b); // Does not collapse
     Type c = TypeUnion.make(false,TypeInt.FALSE,TypeInt.TRUE);
     assertEquals(TypeInt.BOOL,c); // {0*1} combines to bool
-    Type d = TypeUnion.make(false,TypeInt.FALSE,TypeOop.NIL);
+    Type d = TypeUnion.make(false,TypeInt.FALSE,TypeInt.FALSE);
     assertTrue(d instanceof TypeUnion); // Does not collapse
 
-    Type e = TypeOop.NIL.meet(TypeUnion.NIL);
-    assertEquals(TypeOop.NIL,e);
+    //Type e = TypeInt.FALSE.meet(TypeUnion.NIL);
+    //assertEquals(TypeInt.FALSE,e);
   }
 
 
@@ -169,22 +173,22 @@ public class TestType {
   // is a function join.
   @Test public void testFunction() {
     Type.init0(new HashMap<>());
-    Type ignore = TypeTuple.NIL; // Break class-loader cycle; load Tuple before Fun.
+    Type ignore = TypeTuple.ANY; // Break class-loader cycle; load Tuple before Fun.
 
-    TypeFun gf = TypeFun.make_generic();
+    TypeFunPtr gf = TypeFunPtr.GENERIC_FUNPTR;
 
-    TypeFun f1i2i = TypeFun.make(TypeTuple.INT64,TypeInt.INT64,1/*fidx*/,1/*nargs*/);
+    TypeFunPtr f1i2i = TypeFunPtr.make(TypeTuple.INT64,TypeInt.INT64,1/*fidx*/,1/*nargs*/);
     assertTrue(f1i2i.isa(gf));
-    TypeFun f1f2f = TypeFun.make(TypeTuple.FLT64,TypeFlt.FLT64,2/*fidx*/,1/*nargs*/);
+    TypeFunPtr f1f2f = TypeFunPtr.make(TypeTuple.FLT64,TypeFlt.FLT64,2/*fidx*/,1/*nargs*/);
     assertTrue(f1f2f.isa(gf));
-    TypeFun mt = (TypeFun)f1i2i.meet(f1f2f);
-    TypeFun f3i2r = TypeFun.make(TypeTuple.INT32,Type.REAL    ,Bits.make0(0,new long[]{(1<<1)|(1<<2)}),1/*nargs*/);
+    TypeFunPtr mt = (TypeFunPtr)f1i2i.meet(f1f2f);
+    TypeFunPtr f3i2r = TypeFunPtr.make(TypeTuple.INT32,Type.REAL    ,Bits.make0(-2,new long[]{(1<<1)|(1<<2)}),1/*nargs*/);
     assertEquals(f3i2r,mt);
     assertTrue(f3i2r.isa(gf));
     assertTrue(f1i2i.isa(f3i2r));
     assertTrue(f1f2f.isa(f3i2r));
     
-    TypeFun f2 = TypeFun.any(2,23); // Some generic function (happens to be #23, '&')
+    TypeFunPtr f2 = TypeFunPtr.any(2,23); // Some generic function (happens to be #23, '&')
     assertTrue(f2.isa(gf));
   }
   
@@ -192,22 +196,6 @@ public class TestType {
   @Test public void testCommuteSymmetricAssociative() {
     Type.init0(new HashMap<>());
 
-    Type  n  = Type.NUM;
-    Type xn  = Type.NUM.dual();
-    Type onil= TypeOop.NIL;
-    Type oop_= TypeOop.OOP_;
-    Type  nil= TypeUnion.NIL;
-    Type dnil= nil.dual();
-
-    Type hi0 = xn.meet(dnil);
-    assertEquals(dnil,hi0);
-    Type mt2 = oop_.meet(n);
-    assertEquals(Type.SCALAR,mt2);
-    Type mt0 = xn.meet(onil);
-    //assertEquals(nil,mt0);
-    Type mt1 = onil.meet(nil);
-    assertEquals(onil,mt1);
-    
     assertTrue(Type.check_startup());
   }  
 }

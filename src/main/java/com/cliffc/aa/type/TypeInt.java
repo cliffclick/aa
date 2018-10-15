@@ -21,13 +21,13 @@ public class TypeInt extends Type<TypeInt> {
     return (_x==1?"~":"")+"int"+Integer.toString(_z);
   }
   private static TypeInt FREE=null;
-  @Override protected TypeInt free( TypeInt f ) { FREE=f; return this; }
+  @Override protected TypeInt free( TypeInt ret ) { FREE=this; return ret; }
   public static TypeInt make( int x, int z, long con ) {
     TypeInt t1 = FREE;
     if( t1 == null ) t1 = new TypeInt(x,z,con);
     else { FREE = null; t1.init(x,z,con); }
     TypeInt t2 = (TypeInt)t1.hashcons();
-    return t1==t2 ? t1 : t2.free(t1);
+    return t1==t2 ? t1 : t1.free(t2);
   }
   public static TypeInt con(long con) { return make(0,log(con),con); }
 
@@ -55,7 +55,7 @@ public class TypeInt extends Type<TypeInt> {
 
   @Override protected TypeInt xdual() { return _x==0 ? this : new TypeInt(-_x,_z,_con); }
   @Override protected Type xmeet( Type t ) {
-    if( t == this ) return this;
+    assert t != this;
     switch( t._type ) {
     case TINT:   break;
     case TFLT:   return xmeetf((TypeFlt)t);
@@ -66,10 +66,8 @@ public class TypeInt extends Type<TypeInt> {
     case TFUNPTR:
     case TFUN:
     case TRPC:   return Type.SCALAR;
-    case TCTRL:
-    case TXCTRL: return Type.ALL;
-    case TNAME:
-    case TUNION: return t.xmeet(this); // Let other side decide
+    case TNIL:
+    case TNAME:  return t.xmeet(this); // Let other side decide
     default: throw typerr(t);
     }
     TypeInt tt = (TypeInt)t;
@@ -142,8 +140,6 @@ public class TypeInt extends Type<TypeInt> {
     return Type.REAL;
   }
 
-  // Meet in a nil
-  @Override public Type meet_nil() { return xmeet(TypeInt.FALSE); }
   // Lattice of conversions:
   // -1 unknown; top; might fail, might be free (Scalar->Int); Scalar might lift
   //    to e.g. Float and require a user-provided rounding conversion from F64->Int.
@@ -168,6 +164,5 @@ public class TypeInt extends Type<TypeInt> {
   @Override public boolean above_center() { return _x>0; }
   @Override public boolean may_be_con() { return _x>=0; }
   @Override public boolean is_con()   { return _x==0; }
-  @Override public boolean may_be_nil  () { return _x > 0 || (_x==0 && _con==0); }
-  @Override public boolean may_have_nil() { return _x < 0 || (_x==0 && _con==0); }
+
 }
