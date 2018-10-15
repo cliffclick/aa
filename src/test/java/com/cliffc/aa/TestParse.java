@@ -11,8 +11,6 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
     
-    //test_isa("A= :@{n:B, v:int}; B= :@{n:A, v:flt}", Env.lookup_valtype("B"));
-    //
     //test_isa("A= :@{n:A?, v:int}; f={x:A? -> x ? A(@{n=f(x.n),v=x.v*x.v}) : 0}", TypeFunPtr.FUNPTR1);
     
     // Fails because there is an infinite type-expansion (which in turn points
@@ -314,7 +312,8 @@ public class TestParse {
     test_isa("A= :@{n:B, v:int}", Type.SCALAR);
     test_isa("A= :@{n:B, v:int}; a = A(@{n=0,v=2})", Type.SCALAR);
     test_isa("A= :@{n:B, v:int}; a = A(@{n=0,v=2}); a.n", TypeNil.NIL);
-    
+    // Mutually recursive type
+    test_isa("A= :@{n:B, v:int}; B= :@{n:A, v:flt}", Type.SCALAR);
   }
   @Test public void testParse7() {
     // Passing a function recursively
