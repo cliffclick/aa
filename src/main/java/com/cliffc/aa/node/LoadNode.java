@@ -59,7 +59,7 @@ public class LoadNode extends Node {
     if( TypeOop.OOP.isa(t) ) return Type.SCALAR; // Too low, might not have any fields
     if( t.is_forward_ref() ) return Type.SCALAR; // Not yet defined, might fail
     if( t instanceof TypeNil ) {
-      if( t.above_center() ) t = ((TypeNil)t)._t; // hi-nil, assume not a nil
+      if( t.above_center() ) t = ((TypeNil)t)._t.base(); // hi-nil, assume not a nil
       else return Type.SCALAR;  // Might fail before loading
     }
 

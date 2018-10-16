@@ -115,7 +115,11 @@ class ConvertTypeName extends PrimNode {
       ts[i] = gvn.type(_defs.at(i));
     return apply(ts);     // Apply (convert) even if some args are not constant
   }
-  @Override public Type apply( Type[] args ) { return TypeName.make(_name,args[1]); }
+  @Override public Type apply( Type[] args ) {
+    // If args are illegal, the output is still no worse than _ret in either direction
+    TypeName tn = TypeName.make(_name,args[1]);
+    return _ret.dual().isa(tn) ? (tn.isa(_ret) ? tn : _ret) : _ret.dual();
+  }
   @Override public boolean is_lossy() { return false; }
   @Override public String err(GVNGCM gvn) {
     Type actual = gvn.type(in(1));

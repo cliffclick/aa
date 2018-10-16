@@ -48,10 +48,9 @@ public class TypeNil extends Type<TypeNil> {
 
   @Override protected TypeNil xdual() { return _t==null ? this : new TypeNil(_t.dual()); }
   @Override protected Type xmeet( Type t ) {
-    if( this != NIL && t == NIL ) return t.xmeet(this); // Swap NIL to left
+    if( t == NIL ) return t.xmeet(this); // Swap NIL to left
     if( above_center() ) {         // choice-nil
       if( t instanceof TypeNil ) { // aways keep nil (choice or not)
-        if( t==NIL ) return NIL.meet(this);
         return make(_t.meet(((TypeNil)t)._t));
       } else {
         return _t.meet(t);      // toss away nil choice
@@ -63,6 +62,8 @@ public class TypeNil extends Type<TypeNil> {
         if( !t.above_center() ) return make(t); // NIL-wrap the other guy
         return make(t.dual());
       }
+      if( t instanceof TypeNil )
+        return make(_t.meet(((TypeNil)t)._t));
       Type mt = _t.meet(t);
       assert !mt.above_center(); // this is below_center, so the meet is also
       assert !mt.isa(NUM);
@@ -73,5 +74,5 @@ public class TypeNil extends Type<TypeNil> {
   @Override public boolean above_center() { return _t != null && _t.above_center(); }
   @Override public boolean may_be_con() { return _t==null || _t.may_be_con(); }
   @Override public boolean is_con()   { return _t == null; } // Constant nil
-  @Override public byte isBitShape(Type t) { return _t==null ? 0 : _t.isBitShape(t); }
+  @Override public byte isBitShape(Type t) { return _t==null || this==t ? 0 : _t.isBitShape(t); }
 }
