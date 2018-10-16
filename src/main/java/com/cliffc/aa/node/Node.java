@@ -225,7 +225,7 @@ public abstract class Node implements Cloneable {
     bs.set(_uid);                   // Only walk once
     String msg = err(gvn);          // Get any error
     if( msg != null )  errs = Parse.add_err(errs,msg); // Gather errors
-    
+
     for( int i=0; i<_defs._len; i++ ) {
       Node def = _defs.at(i);   // Walk data defs for more errors
       if( def == null ) continue;

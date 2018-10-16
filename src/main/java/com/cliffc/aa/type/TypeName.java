@@ -69,9 +69,13 @@ public class TypeName extends Type<TypeName> {
       t = tn.drop_name();       // Names or depth unequal; treat as unnamed
       break;
     default:
-      if( t.above_center() || t==TypeNil.NIL ) { // 't' can fall to a matching name
+      if( t.above_center() ) { // 't' can fall to a matching name
         if( t.isa(_t) ) return make(_name,_t.meet(t));
       }
+      if( t==TypeNil.NIL ) return TypeNil.make(this);
+      // Special case: close the recursive type loop, instead of falling
+      if( _t==t && _depth == -2 )
+        return this;
     }
     Type t0 = drop_name();
     return t0.meet(t);
