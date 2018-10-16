@@ -150,6 +150,7 @@ public class Parse {
     if( toks._len == 1 && ts.at(0)==null && peek(':') ) {
       Type t = type(true);
       if( t==null ) return err_ctrl2("Missing type after ':'");
+      if( t instanceof TypeNil ) return err_ctrl2("Top level types are never nil");
       String tvar = toks.at(0);
       if( _e.lookup(tvar) != null ) return err_ctrl2("Cannot re-assign val '"+tvar+"' as a type");
       Type ot = _e.lookup_type(tvar);
@@ -529,8 +530,8 @@ public class Parse {
     Type t = type0(type_var);
     return (t==null || t==Type.ANY) ? null : t;
   }
-  // Wrap in a nullable if there is a trailing '?'
-  private Type typeq(Type t) { return peek('?') ? TypeNil.make(t) : t; }
+  // Wrap in a nullable if there is a trailing '?'.  No spaces allowed
+  private Type typeq(Type t) { return peek_noWS('?') ? TypeNil.make(t) : t; }
   
   // Type or null or TypeErr.ANY for '->' token
   private Type type0(boolean type_var) {
@@ -600,7 +601,8 @@ public class Parse {
       }
       _e.add_type(tok,t=TypeName.make_forward_def_type(tok));
     }
-    return t instanceof TypeOop ? typeq(t) : t;
+    Type tb = t.base();
+    return tb instanceof TypeOop || tb==Type.SCALAR ? typeq(t) : t;
   }
 
   // Require a specific character (after skipping WS) or polite error
@@ -611,10 +613,11 @@ public class Parse {
 
   // Skip WS, return true&skip if match, false&noskip if miss.
   private boolean peek( char c ) { return peek1(skipWS(),c); }
+  private boolean peek_noWS( char c ) { return peek1(_x >= _buf.length ? -1 : _buf[_x],c); }
   // Already skipped WS & have character;
   // return true&skip if match, false&noskip if miss.
   private boolean peek1( byte c0, char c ) {
-    assert (c0==-1 || c0== _buf[_x]) && !isWS(c0);
+    assert c0==-1 || c0== _buf[_x];
     if( c0!=c ) return false;
     _x++;                       // Skip peeked character
     return true;

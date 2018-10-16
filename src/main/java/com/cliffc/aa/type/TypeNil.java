@@ -29,11 +29,7 @@ public class TypeNil extends Type<TypeNil> {
   }
   public static Type make( Type t ) {
     assert !t.isa(NUM); // Numbers fold in zero directly
-    if( t instanceof TypeName ) return make_name_nil((TypeName)t);
     return t == SCALAR || t == XSCALAR || t instanceof TypeNil ? t : make0(t);
-  }
-  private static Type make_name_nil( TypeName t ) {
-    return TypeName.make(t._name, t._t instanceof TypeName ? make_name_nil((TypeName)(t._t)) : make(t._t));
   }
   
   // This is the Parser's canonical NIL, suitable for initializing all data
@@ -52,6 +48,7 @@ public class TypeNil extends Type<TypeNil> {
 
   @Override protected TypeNil xdual() { return _t==null ? this : new TypeNil(_t.dual()); }
   @Override protected Type xmeet( Type t ) {
+    if( this != NIL && t == NIL ) return t.xmeet(this); // Swap NIL to left
     if( above_center() ) {         // choice-nil
       if( t instanceof TypeNil ) { // aways keep nil (choice or not)
         if( t==NIL ) return NIL.meet(this);
@@ -60,8 +57,8 @@ public class TypeNil extends Type<TypeNil> {
         return _t.meet(t);      // toss away nil choice
       }
     } else {                    // must-nil
-      if( _t == null ) {        // Exactly the flexible nil
-        if( t.isa(NUM) ) return t.meet(TypeInt.FALSE); // Fall away from NIL to ZERO
+      if( this == NIL ) {       // Exactly the flexible nil
+        if( t.isa(NUM) ) return t.above_center() ? this : t.meet(TypeInt.FALSE); // Fall away from NIL to ZERO
         if( t.base() instanceof TypeNil ) return t.above_center() ? this : t;
         if( !t.above_center() ) return make(t); // NIL-wrap the other guy
         return make(t.dual());

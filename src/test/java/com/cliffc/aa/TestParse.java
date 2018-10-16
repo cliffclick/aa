@@ -10,7 +10,7 @@ import static org.junit.Assert.*;
 public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
-    
+
     //test_isa("A= :@{n:A?, v:int}; f={x:A? -> x ? A(@{n=f(x.n),v=x.v*x.v}) : 0}", TypeFunPtr.FUNPTR1);
     
     // Fails because there is an infinite type-expansion (which in turn points
@@ -214,7 +214,8 @@ public class TestParse {
     test_isa("A= :(:flt,:int)", name_tuple_constructor(TypeFlt.FLT64,TypeInt.INT64));
     test_isa("A= :(    ,:int)", name_tuple_constructor(Type.SCALAR  ,TypeInt.INT64));
 
-    test("A= :(:str?, :int); A((\"abc\",2))",TypeName.make("A",TypeTuple.make_all(TypeStr.ABC,TypeInt.con(2))));
+    test   ("A= :(:str?, :int); A((\"abc\",2))",TypeName.make("A",TypeTuple.make_all(TypeStr.ABC,TypeInt.con(2))));
+    testerr("A= :(:str?, :int)?","Top level types are never nil","                  ");
   }
   static private TypeFun name_tuple_constructor(Type... ts) {
     TypeTuple tt = TypeTuple.make_all(ts);
@@ -276,42 +277,30 @@ public class TestParse {
   }
 
   @Test public void testParse6() {
+    test_isa("A= :(:A?, :int); A((0,2))",Type.SCALAR);// No error casting (0,2) to an A
     // Building recursive types
     test_isa("A= :int; A(1)", TypeName.make("A",TypeInt.INT64));
     test("A= :(:str?, :int); A((0,2))",TypeName.make("A",TypeTuple.make_all(TypeNil.NIL,TypeInt.con(2))));
-    // TODO: Needs a way to easily test simple recursive types
-    TypeEnv te = Exec.go("args","A= :(:A, :int)?");
-    if( te._errs != null ) System.err.println(te._errs.toString());
-    Assert.assertNull(te._errs);
-    TypeName tname = (TypeName)((TypeFun)te._t).val();
-    assertEquals("A", tname._name);
-    TypeNil tnil = (TypeNil)tname._t;
-    TypeTuple tt = (TypeTuple)tnil._t;
-    assertSame(tt.at(0), tname);
-    assertSame(tt.at(1), TypeInt.INT64);
-    TypeTuple tt02 = TypeTuple.make_all(TypeNil.NIL,TypeInt.con(2));
-    assertTrue(tt02.isa(tt));
-    TypeName tname02 = TypeName.make("A",tt02);
-    assertTrue(tname.dual().isa(tname02));
     // Named recursive types
-    test_isa("A= :(:A, :int)?; A((0,2))",Type.SCALAR);// No error casting (0,2) to an A
+    test_isa("A= :(:A?, :int); A((0,2))",Type.SCALAR);// No error casting (0,2) to an A
 
-    TypeEnv te2 = Exec.go("args","A= :@{n:A, v:int}?");
-    if( te2._errs != null ) System.err.println(te2._errs.toString());
-    Assert.assertNull(te2._errs);
-    TypeName tname2 = (TypeName)((TypeFun)te2._t).val();
-    assertEquals("A", tname2._name);
-    TypeNil tnil2 = (TypeNil)tname2._t;
-    TypeStruct tt2 = (TypeStruct)tnil2._t;
-    assertSame(tt2.at(0), tname2);
-    assertSame(tt2.at(1), TypeInt.INT64);
-    assertEquals("n",tt2._args[0]);
-    assertEquals("v",tt2._args[1]);
+    // TODO: Needs a way to easily test simple recursive types
+    TypeEnv te3 = Exec.go("args","A= :@{n:A?, v:int}");
+    if( te3._errs != null ) System.err.println(te3._errs.toString());
+    Assert.assertNull(te3._errs);
+    TypeName tname3 = (TypeName)((TypeFun)te3._t).val();
+    assertEquals("A", tname3._name);
+    TypeStruct tt3 = (TypeStruct)tname3._t;
+    TypeNil tnil3 = (TypeNil)tt3.at(0);
+    assertSame(tnil3._t , tname3);
+    assertSame(tt3.at(1), TypeInt.INT64);
+    assertEquals("n",tt3._args[0]);
+    assertEquals("v",tt3._args[1]);
 
     // Missing type B is also never worked on.
-    test_isa("A= :@{n:B, v:int}", Type.SCALAR);
-    test_isa("A= :@{n:B, v:int}; a = A(@{n=0,v=2})", Type.SCALAR);
-    test_isa("A= :@{n:B, v:int}; a = A(@{n=0,v=2}); a.n", TypeNil.NIL);
+    test_isa("A= :@{n:B?, v:int}", Type.SCALAR);
+    test_isa("A= :@{n:B?, v:int}; a = A(@{n=0,v=2})", Type.SCALAR);
+    test_isa("A= :@{n:B?, v:int}; a = A(@{n=0,v=2}); a.n", TypeNil.NIL);
     // Mutually recursive type
     test_isa("A= :@{n:B, v:int}; B= :@{n:A, v:flt}", Type.SCALAR);
   }
