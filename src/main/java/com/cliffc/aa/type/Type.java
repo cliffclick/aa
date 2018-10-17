@@ -442,10 +442,11 @@ public class Type<T extends Type<T>> {
   public byte op_prec() { return -1; } // Overridden in subclasses
   // Contains an error type string, perhaps embedded in some subtype
   public String errMsg() { return null; }
-  Type make_recur(TypeName tn, int d, BitSet bs ) {
-    assert is_simple();
-    return this;
-  }
+  // Make a (posssibly cyclic & infinite) named type.  Prevent the infinite
+  // unrolling of names by not allowing a named-type with depth >= D from
+  // holding (recursively) the head of a named-type cycle.  We need to cap the
+  // unroll, to prevent loops/recursion from infinitely unrolling.
+  Type make_recur(TypeName tn, int d, BitSet bs ) { assert is_simple(); return this; }
   
   RuntimeException typerr(Type t) {
     throw new RuntimeException("Should not reach here: internal type system error with "+this+(t==null?"":(" and "+t)));

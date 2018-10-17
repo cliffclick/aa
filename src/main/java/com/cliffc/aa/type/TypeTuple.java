@@ -178,6 +178,18 @@ public class TypeTuple<P extends TypeTuple<P>> extends TypeOop<P> {
     throw AA.unimpl();
   }
   
+  // Make a (posssibly cyclic & infinite) named type.  Prevent the infinite
+  // unrolling of names by not allowing a named-type with depth >= D from
+  // holding (recursively) the head of a named-type cycle.  We need to cap the
+  // unroll, to prevent loops/recursion from infinitely unrolling.
+  @Override TypeTuple<P> make_recur(TypeName tn, int d, BitSet bs ) {
+    boolean eq = _inf.make_recur(tn,d,bs)==_inf;
+    for( Type t : _ts )
+      eq = eq && t.make_recur(tn,d,bs)==t;
+    if( eq ) return this;
+    // Build a depth-limited version of the same struct
+    throw AA.unimpl();
+  }
   // Return an error message, if any exists
   @Override public String errMsg() {
     String s;

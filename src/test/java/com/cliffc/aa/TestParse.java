@@ -13,8 +13,6 @@ import static org.junit.Assert.*;
 public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
-
-    test_isa("A= :@{n:A?, v:int}; f={x:A? -> x ? A(@{n=f(x.n),v=x.v*x.v}) : 0}", TypeFun.GENERIC_FUN);
     
     // Fails because there is an infinite type-expansion (which in turn points
     // out that I'm missing the optimistic-all-equals type algo which can find
@@ -23,6 +21,9 @@ public class TestParse {
     // Each loop around nests another @{n:???,v:int} wrapper.
     //test_isa("f={x:@{n,v:int}? -> x ? @{n=f(x.n),v=x.v*x.v} : 0}", TypeFunPtr.FUNPTR1); // Recursive (looping) struct meets
 
+    // Tuple syntax, not yet supported
+    //test_isa("f={x -> x ? (f(x[0]),x[1]*x[1]) : 0}; f(((0,1.2),2.3));", TypeFunPtr.FUNPTR1); // Recursive (looping) struct meets
+    
     // User-defined linked-list
     //test("List=:@{next,val};\n"+
     //     "List0={n v -> List(@{next=n,val=v})};\n"+
@@ -286,6 +287,7 @@ public class TestParse {
     test("A= :(:str?, :int); A((0,2))",(scope -> TypeName.make("A",scope,TypeTuple.make_all(TypeNil.NIL,TypeInt.con(2)))));
     // Named recursive types
     test_isa("A= :(:A?, :int); A((0,2))",Type.SCALAR);// No error casting (0,2) to an A
+    test_isa("A= :@{n:A?, v:flt}; A(@{n=0,v=1.2}).v;", TypeFlt.con(1.2));
 
     // TODO: Needs a way to easily test simple recursive types
     TypeEnv te3 = Exec.go("args","A= :@{n:A?, v:int}");
@@ -311,6 +313,8 @@ public class TestParse {
     // Passing a function recursively
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({&},2)", TypeInt.FALSE);
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({+},2)", TypeInt.con(2));
+    test_isa("A= :@{n:A?, v:int}; f={x:A? -> x ? A(@{n=f(x.n),v=x.v*x.v}) : 0}", TypeFun.GENERIC_FUN);
+    test_isa("A= :@{n:A?, v:flt}; f={x:A? -> x ? A(@{n=f(x.n),v=x.v*x.v}) : 0}; f(A(@{n=0,v=1.2})).v;", TypeFlt.con(1.2*1.2));
 
     // User-defined linked list
     test("List=:@{next,val}; x=List(@{next=0,val=\"abc\"}); x.val", TypeStr.ABC);

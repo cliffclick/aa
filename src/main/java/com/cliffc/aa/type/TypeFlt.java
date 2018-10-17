@@ -102,4 +102,5 @@ public class TypeFlt extends Type<TypeFlt> {
     assert _x <= 0;
     return FLT64;
   }
+  @Override Type make_recur(TypeName tn, int d, BitSet bs ) { return this; }
 }

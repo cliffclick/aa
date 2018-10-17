@@ -54,7 +54,7 @@ public class TypeName extends Type<TypeName> {
   // unrolling of names by not allowing a named-type with depth >= D from
   // holding (recursively) the head of a named-type cycle.  We need to cap the
   // unroll, to prevent loops/recursion from infinitely unrolling.
-  private static int D=0;
+  private static int D=1;
   public static TypeName make( String name, ScopeNode lex, Type t) {
     TypeName tn0 = make0(name,lex,t,depth(t));
     TypeName tn1 = (TypeName)lex.get_type(name);
@@ -82,6 +82,7 @@ public class TypeName extends Type<TypeName> {
   @Override protected TypeName xdual() { return new TypeName(_name,_lex,_t.dual(),_depth); }
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
+    case TNIL: return t.xmeet(this);
     case TNAME:
       TypeName tn = (TypeName)t;
       int thisd =    _depth<0 ? 0 :   _depth;

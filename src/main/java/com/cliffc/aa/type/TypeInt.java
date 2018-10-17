@@ -164,5 +164,5 @@ public class TypeInt extends Type<TypeInt> {
   @Override public boolean above_center() { return _x>0; }
   @Override public boolean may_be_con() { return _x>=0; }
   @Override public boolean is_con()   { return _x==0; }
-
+  @Override Type make_recur(TypeName tn, int d, BitSet bs ) { return this; }
 }

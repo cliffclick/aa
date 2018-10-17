@@ -1,6 +1,5 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.AA;
 import com.cliffc.aa.util.SB;
 
 import java.util.Arrays;
@@ -151,6 +150,6 @@ public class TypeStruct extends TypeTuple<TypeStruct> {
     if( isa(t) ) return 0; // Can choose compatible format
     if( t.isa(this) ) return 0; // TODO: really: test same args, each arg isBitShape
     if( t instanceof TypeName ) return 99; // Cannot pick up a name, requires user converts
-    throw AA.unimpl();
+    return 99;
   }
 }
