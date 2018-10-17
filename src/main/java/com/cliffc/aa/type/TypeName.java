@@ -1,6 +1,7 @@
 package com.cliffc.aa.type;
 
 import com.cliffc.aa.AA;
+import com.cliffc.aa.node.ScopeNode;
 
 import java.util.BitSet;
 
@@ -8,18 +9,19 @@ import java.util.BitSet;
 // They also must be used to make recursive types.
 public class TypeName extends Type<TypeName> {
   public  String _name;
-  public  Type _t;
-  private short _depth;         // Nested depth of TypeNames, or -1/ for a forward-ref type-var, -2 for type-cycle head
+  public  ScopeNode _lex;         // Lexical scope of this named type
+  public  Type _t;                // Named type
+  private short _depth; // Nested depth of TypeNames, or -1/ for a forward-ref type-var, -2 for type-cycle head
   // Named type variable
-  private TypeName ( String name, Type t, short depth ) { super(TNAME); init(name,t,depth); }
-  private void init( String name, Type t, short depth ) { assert name!=null; _name=name; _t=t; _depth = depth; }
+  private TypeName ( String name, ScopeNode lex, Type t, short depth ) { super(TNAME); init(name,lex,t,depth); }
+  private void init( String name, ScopeNode lex, Type t, short depth ) { assert name!=null && lex !=null; _name=name; _lex=lex; _t=t; _depth = depth; }
   private static short depth( Type t ) { return(short)(t instanceof TypeName ? ((TypeName)t)._depth+1 : 0); }
-  @Override public int hashCode( ) { return 23+_name.hashCode();  } // No recursion on _t to break type cycles
+  @Override public int hashCode( ) { return TNAME+_name.hashCode();  } // No recursion on _t to break type cycles
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeName) ) return false;
     TypeName t2 = (TypeName)o;
-    if( !_name.equals(t2._name) || _t!=t2._t ) return false;
+    if( _lex != t2._lex  || !_name.equals(t2._name) || _t!=t2._t ) return false;
     if( _depth==t2._depth ) return true;
     // Also return true for comparing TypeName(name,type) where the types
     // match, but the 'this' TypeName is depth 0 vs depth -1 - this detects
@@ -37,26 +39,39 @@ public class TypeName extends Type<TypeName> {
   
   private static TypeName FREE=null;
   @Override protected TypeName free( TypeName ret ) { FREE=this; return ret; }
-  private static TypeName make0( String name, Type t, short depth) {
+  private static TypeName make0( String name, ScopeNode lex, Type t, short depth) {
+    assert !(t instanceof TypeNil); // No named nils (but ok to nil a named type)
     TypeName t1 = FREE;
-    if( t1 == null ) t1 = new TypeName(name,t,depth);
-    else { FREE = null; t1.init(name,t,depth); }
+    if( t1 == null ) t1 = new TypeName(name,lex,t,depth);
+    else { FREE = null; t1.init(name,lex,t,depth); }
     TypeName t2 = (TypeName)t1.hashcons();
+    // Close some recursions: keep -2 and -1 depths vs 0
     if( t1!=t2 && t1._depth < t2._depth )
       t2._depth = t1._depth;    // If equals() on depth, then keep deeper depth
     return t1==t2 ? t1 : t1.free(t2);
   }
-  public static TypeName make( String name, Type t) { return make0(name,t,depth(t)); }
-  public static TypeName make_forward_def_type( String name ) { return make0(name,Type.SCALAR,(short)-1); }
+  // Make a (posssibly cyclic & infinite) named type.  Prevent the infinite
+  // unrolling of names by not allowing a named-type with depth >= 0 from
+  // holding (recursively) the head of a named-type cycle.  We actually can
+  // allow some finite depth of unrolled structures... but need to cap the
+  // unroll, to prevent loops/recursion from infinitely unrolling.
+  public static TypeName make( String name, ScopeNode lex, Type t) {
+    TypeName tn = (TypeName)lex.get_type(name);
+    if( tn==null || tn._depth!= -2 ) return make0(name,lex,t,depth(t));
+    
+    return make0(name,lex,t,depth(t));
+  }
+  public static TypeName make_forward_def_type( String name, ScopeNode lex ) { return make0(name,lex,Type.SCALAR,(short)-1); }
   public        boolean is_forward_def_type( ) { return _depth==-1; }
 
-  public  static final TypeName TEST_ENUM = make("__test_enum",TypeInt.INT8);
-  private static final TypeName TEST_FLT  = make("__test_flt" ,TypeFlt.FLT32);
-  public  static final TypeName TEST_E2   = make("__test_e2"  ,TEST_ENUM);
+  public  static final ScopeNode TEST_SCOPE = new ScopeNode();
+  public  static final TypeName TEST_ENUM = make("__test_enum",TEST_SCOPE,TypeInt.INT8);
+  private static final TypeName TEST_FLT  = make("__test_flt" ,TEST_SCOPE,TypeFlt.FLT32);
+  private static final TypeName TEST_E2   = make("__test_e2"  ,TEST_SCOPE,TEST_ENUM);
   
   static final TypeName[] TYPES = new TypeName[]{TEST_ENUM,TEST_FLT,TEST_E2};
 
-  @Override protected TypeName xdual() { return new TypeName(_name,_t.dual(),depth(_t)); }
+  @Override protected TypeName xdual() { return new TypeName(_name,_lex,_t.dual(),_depth); }
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TNAME:
@@ -65,12 +80,12 @@ public class TypeName extends Type<TypeName> {
       int thatd = tn._depth<0 ? 0 : tn._depth;
       if( thatd > thisd ) return tn.xmeet(this); // Deeper on 'this'
       if( thatd== thisd && _name.equals(tn._name) )
-        return make(_name,_t.meet(tn._t)); // Peel name and meet
+        return make(_name,_lex,_t.meet(tn._t)); // Peel name and meet
       t = tn.drop_name();       // Names or depth unequal; treat as unnamed
       break;
     default:
       if( t.above_center() ) { // 't' can fall to a matching name
-        if( t.isa(_t) ) return make(_name,_t.meet(t));
+        if( t.isa(_t) ) return make(_name,_lex,_t.meet(t));
       }
       if( t==TypeNil.NIL ) return TypeNil.make(this);
       // Special case: close the recursive type loop, instead of falling

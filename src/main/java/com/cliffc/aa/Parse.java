@@ -148,15 +148,15 @@ public class Parse {
     }
     // tvar assignment only allows 1 id
     if( toks._len == 1 && ts.at(0)==null && peek(':') ) {
-      Type t = type(true);
+      Type t = type(true); // Get the type, allowing forward refs
       if( t==null ) return err_ctrl2("Missing type after ':'");
-      if( t instanceof TypeNil ) return err_ctrl2("Top level types are never nil");
+      if( t instanceof TypeNil ) return err_ctrl2("Named types are never nil");
       String tvar = toks.at(0);
       if( _e.lookup(tvar) != null ) return err_ctrl2("Cannot re-assign val '"+tvar+"' as a type");
       Type ot = _e.lookup_type(tvar);
       TypeName tn;
-      if( ot == null ) {
-        tn = TypeName.make(tvar,t);
+      if( ot == null ) {        // Name does not pre-exist
+        tn = TypeName.make(tvar,_e._scope,t);
         _e.add_type(tvar,tn); // Assign type-name
       } else {
         tn = ot.merge_recursive_type(t);
@@ -599,7 +599,7 @@ public class Parse {
         _x = oldx;                 // Unwind if not a known type var
         return null;               // Not a type
       }
-      _e.add_type(tok,t=TypeName.make_forward_def_type(tok));
+      _e.add_type(tok,t=TypeName.make_forward_def_type(tok,_e._scope));
     }
     Type tb = t.base();
     return tb instanceof TypeOop || tb==Type.SCALAR ? typeq(t) : t;

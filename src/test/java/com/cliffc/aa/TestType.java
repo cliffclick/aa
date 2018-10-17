@@ -54,8 +54,8 @@ public class TestType {
     // Confirm lattice: {N:~i8 -> N:0 -> N:i8}
     Type ni8 = TypeName.TEST_ENUM;
     Type xni8= ni8.dual(); // dual name:int8
-    Type no  = TypeName.make("__test_enum",o);
-    Type nz  = TypeName.make("__test_enum",z);
+    Type no  = TypeName.make("__test_enum",TypeName.TEST_SCOPE,o);
+    Type nz  = TypeName.make("__test_enum",TypeName.TEST_SCOPE,z);
     assertEquals(no ,no .meet(xni8)); // N:~i8 -> N: 1
     assertEquals(ni8,ni8.meet(no  )); // N:  1 -> N:i8
     assertEquals(nz ,nz .meet(xni8)); // N:~i8 -> N:0

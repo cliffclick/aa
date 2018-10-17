@@ -108,7 +108,8 @@ public abstract class PrimNode extends Node {
 
 class ConvertTypeName extends PrimNode {
   private final Parse _badargs; // Only for converts
-  ConvertTypeName(Type from, TypeName to, Parse badargs) { super(to._name,PrimNode.ARGS1,TypeTuple.make_args(from),to); _badargs=badargs; }
+  private final ScopeNode _lex; // Unique lexical scope
+  ConvertTypeName(Type from, TypeName to, Parse badargs) { super(to._name,PrimNode.ARGS1,TypeTuple.make_args(from),to); _lex=to._lex; _badargs=badargs; }
   @Override public Type value(GVNGCM gvn) {
     Type[] ts = new Type[_defs._len];
     for( int i=1; i<_defs._len; i++ )
@@ -117,7 +118,7 @@ class ConvertTypeName extends PrimNode {
   }
   @Override public Type apply( Type[] args ) {
     // If args are illegal, the output is still no worse than _ret in either direction
-    TypeName tn = TypeName.make(_name,args[1]);
+    TypeName tn = TypeName.make(_name,_lex,args[1]);
     return _ret.dual().isa(tn) ? (tn.isa(_ret) ? tn : _ret) : _ret.dual();
   }
   @Override public boolean is_lossy() { return false; }

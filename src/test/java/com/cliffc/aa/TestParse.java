@@ -1,9 +1,12 @@
 package com.cliffc.aa;
 
+import com.cliffc.aa.node.ScopeNode;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Bits;
 import org.junit.Assert;
 import org.junit.Test;
+
+import java.util.function.Function;
 
 import static org.junit.Assert.*;
 
@@ -214,12 +217,12 @@ public class TestParse {
     test_isa("A= :(:flt,:int)", name_tuple_constructor(TypeFlt.FLT64,TypeInt.INT64));
     test_isa("A= :(    ,:int)", name_tuple_constructor(Type.SCALAR  ,TypeInt.INT64));
 
-    test   ("A= :(:str?, :int); A((\"abc\",2))",TypeName.make("A",TypeTuple.make_all(TypeStr.ABC,TypeInt.con(2))));
-    testerr("A= :(:str?, :int)?","Top level types are never nil","                  ");
+    test   ("A= :(:str?, :int); A((\"abc\",2))",(scope -> TypeName.make("A",scope,TypeTuple.make_all(TypeStr.ABC,TypeInt.con(2)))));
+    testerr("A= :(:str?, :int)?","Named types are never nil","                  ");
   }
-  static private TypeFun name_tuple_constructor(Type... ts) {
+  static private Function<ScopeNode,Type> name_tuple_constructor(Type... ts) {
     TypeTuple tt = TypeTuple.make_all(ts);
-    return TypeFun.make(TypeFunPtr.make(TypeTuple.make_args(tt),TypeName.make("A",tt),Bits.FULL,1));
+    return (scope -> TypeFun.make(TypeFunPtr.make(TypeTuple.make_args(tt),TypeName.make("A",scope,tt),Bits.FULL,1)));
   }
 
   @Test public void testParse4() {
@@ -247,10 +250,10 @@ public class TestParse {
     test("(0,\"abc\")", TypeTuple.make_all(TypeNil.NIL,TypeStr.ABC));
     
     // Named type variables
-    test_isa("gal=:flt"       , TypeFun.make(TypeFunPtr.make(TypeTuple.FLT64,TypeName.make("gal",TypeFlt.FLT64),Bits.FULL,1)));
-    test_isa("gal=:flt; gal"  , TypeFun.make(TypeFunPtr.make(TypeTuple.FLT64,TypeName.make("gal",TypeFlt.FLT64),Bits.FULL,1)));
+    test_isa("gal=:flt"       , (scope -> TypeFun.make(TypeFunPtr.make(TypeTuple.FLT64,TypeName.make("gal",scope,TypeFlt.FLT64),Bits.FULL,1))));
+    test_isa("gal=:flt; gal"  , (scope -> TypeFun.make(TypeFunPtr.make(TypeTuple.FLT64,TypeName.make("gal",scope,TypeFlt.FLT64),Bits.FULL,1))));
     test    ("gal=:flt; 3==gal(2)+1", TypeInt.TRUE);
-    test    ("gal=:flt; tank:gal = gal(2)", TypeName.make("gal",TypeFlt.con(2)));
+    test    ("gal=:flt; tank:gal = gal(2)", (scope -> TypeName.make("gal",scope,TypeFlt.con(2))));
     // test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: figure out if free cast for bare constants?
     testerr ("gal=:flt; tank:gal = gal(2)+1", "3.0 is not a gal:flt64","                             ");
     test    ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(@{x=1,y=2}))", TypeInt.con(5));
@@ -279,8 +282,8 @@ public class TestParse {
   @Test public void testParse6() {
     test_isa("A= :(:A?, :int); A((0,2))",Type.SCALAR);// No error casting (0,2) to an A
     // Building recursive types
-    test_isa("A= :int; A(1)", TypeName.make("A",TypeInt.INT64));
-    test("A= :(:str?, :int); A((0,2))",TypeName.make("A",TypeTuple.make_all(TypeNil.NIL,TypeInt.con(2))));
+    test_isa("A= :int; A(1)", (scope -> TypeName.make("A",scope,TypeInt.INT64)));
+    test("A= :(:str?, :int); A((0,2))",(scope -> TypeName.make("A",scope,TypeTuple.make_all(TypeNil.NIL,TypeInt.con(2)))));
     // Named recursive types
     test_isa("A= :(:A?, :int); A((0,2))",Type.SCALAR);// No error casting (0,2) to an A
 
@@ -390,17 +393,24 @@ c[x]=1;
 
    */
   
-  static private void test( String program, Type expected ) {
+  static private TypeEnv run( String program ) {
     TypeEnv te = Exec.go("args",program);
     if( te._errs != null ) System.err.println(te._errs.toString());
     Assert.assertNull(te._errs);
-    assertEquals(expected,te._t);
+    return te;
   }
-  static private void test_isa( String program, Type expected ) {
-    TypeEnv te = Exec.go("args",program);
-    if( te._errs != null ) System.err.println(te._errs.toString());
-    Assert.assertNull(te._errs);
-    assertTrue(te._t.isa(expected));
+  
+  static private void test( String program, Type expected ) { assertEquals(expected,run(program)._t); }
+  static private void test( String program, Function<ScopeNode,Type> expected ) {
+    TypeEnv te = run(program);
+    Type t_expected = expected.apply(te._env._scope);
+    assertEquals(t_expected,te._t);
+  }
+  static private void test_isa( String program, Type expected ) { assertTrue(run(program)._t.isa(expected)); }
+  static private void test_isa( String program, Function<ScopeNode,Type> expected ) {
+    TypeEnv te = run(program);
+    Type t_expected = expected.apply(te._env._scope);
+    assertTrue(te._t.isa(t_expected));
   }
   static private void testerr( String program, String err, String cursor ) {
     String err2 = "\nargs:0:"+err+"\n"+program+"\n"+cursor+"^\n";
