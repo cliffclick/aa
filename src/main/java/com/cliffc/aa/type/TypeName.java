@@ -51,15 +51,23 @@ public class TypeName extends Type<TypeName> {
     return t1==t2 ? t1 : t1.free(t2);
   }
   // Make a (posssibly cyclic & infinite) named type.  Prevent the infinite
-  // unrolling of names by not allowing a named-type with depth >= 0 from
-  // holding (recursively) the head of a named-type cycle.  We actually can
-  // allow some finite depth of unrolled structures... but need to cap the
+  // unrolling of names by not allowing a named-type with depth >= D from
+  // holding (recursively) the head of a named-type cycle.  We need to cap the
   // unroll, to prevent loops/recursion from infinitely unrolling.
+  private static int D=0;
   public static TypeName make( String name, ScopeNode lex, Type t) {
-    TypeName tn = (TypeName)lex.get_type(name);
-    if( tn==null || tn._depth!= -2 ) return make0(name,lex,t,depth(t));
-    
-    return make0(name,lex,t,depth(t));
+    TypeName tn0 = make0(name,lex,t,depth(t));
+    TypeName tn1 = (TypeName)lex.get_type(name);
+    if( tn1==null || tn1._depth!= -2 ) return tn0;
+    return tn0.make_recur(tn1,0,new BitSet());
+  }
+  @Override TypeName make_recur(TypeName tn, int d, BitSet bs ) {
+    if( bs.get(_uid) ) return this; // Looping on some other recursive type
+    bs.set(_uid);
+    if( _lex==tn._lex && _name.equals(tn._name) )
+      if( d++ == D ) return above_center() ? tn.dual() : tn;
+    Type t2 = _t.make_recur(tn,d,bs);
+    return t2==_t ? this : make0(_name,_lex,t2,_depth);
   }
   public static TypeName make_forward_def_type( String name, ScopeNode lex ) { return make0(name,lex,Type.SCALAR,(short)-1); }
   public        boolean is_forward_def_type( ) { return _depth==-1; }

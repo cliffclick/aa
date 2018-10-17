@@ -14,7 +14,7 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
 
-    //test_isa("A= :@{n:A?, v:int}; f={x:A? -> x ? A(@{n=f(x.n),v=x.v*x.v}) : 0}", TypeFunPtr.FUNPTR1);
+    test_isa("A= :@{n:A?, v:int}; f={x:A? -> x ? A(@{n=f(x.n),v=x.v*x.v}) : 0}", TypeFun.GENERIC_FUN);
     
     // Fails because there is an infinite type-expansion (which in turn points
     // out that I'm missing the optimistic-all-equals type algo which can find
@@ -406,7 +406,10 @@ c[x]=1;
     Type t_expected = expected.apply(te._env._scope);
     assertEquals(t_expected,te._t);
   }
-  static private void test_isa( String program, Type expected ) { assertTrue(run(program)._t.isa(expected)); }
+  static private void test_isa( String program, Type expected ) {
+    TypeEnv te = run(program);
+    assertTrue(te._t.isa(expected));
+  }
   static private void test_isa( String program, Function<ScopeNode,Type> expected ) {
     TypeEnv te = run(program);
     Type t_expected = expected.apply(te._env._scope);
