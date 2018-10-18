@@ -223,7 +223,6 @@ Recursive types | ---
 `A= :@{n:B, v:int}; B= :@{n:A, v:flt}` | `B(@{n:A:@{n:B, v:int},v:flt} -> B)`  Types A and B are mutually recursive
 `List=:@{next:List?,val}; LL={n v -> List(@{next=n,val=v})` | `LL` Linked-list type with sample shortcut factory
 `LL(LL(0,1.2),2.3)` | `List:@{next:List:@{next:nil,val:1.2},val:2.3}` Sample linked-list, with all types shown
-`map = {fun list -> list ? LL(map(fun,list.next),fun(list.val)) : 0}` | `map{{x -> x} @{next,val} -> LinkedList}` Sample higher-order linked-list mapping function
 
 Done Stuff
 ----------
