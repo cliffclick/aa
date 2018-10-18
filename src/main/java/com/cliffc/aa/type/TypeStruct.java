@@ -1,5 +1,6 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.AA;
 import com.cliffc.aa.util.SB;
 
 import java.util.Arrays;
@@ -151,5 +152,13 @@ public class TypeStruct extends TypeTuple<TypeStruct> {
     if( t.isa(this) ) return 0; // TODO: really: test same args, each arg isBitShape
     if( t instanceof TypeName ) return 99; // Cannot pick up a name, requires user converts
     return 99;
+  }
+  @Override TypeStruct make_recur(TypeName tn, int d, BitSet bs ) {
+    boolean eq = _inf.make_recur(tn,d,bs)==_inf;
+    for( Type t : _ts )
+      eq = eq && t.make_recur(tn,d,bs)==t;
+    if( eq ) return this;
+    // Build a depth-limited version of the same struct
+    throw AA.unimpl();
   }
 }

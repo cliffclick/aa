@@ -1,7 +1,5 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.AA;
-
 import java.util.BitSet;
 
 // Nil types are just a nil, but along a particular type domain.  Used so the
@@ -81,11 +79,11 @@ public class TypeNil extends Type<TypeNil> {
   // unrolling of names by not allowing a named-type with depth >= D from
   // holding (recursively) the head of a named-type cycle.  We need to cap the
   // unroll, to prevent loops/recursion from infinitely unrolling.
-  @Override TypeNil make_recur(TypeName tn, int d, BitSet bs ) {
+  @Override Type make_recur(TypeName tn, int d, BitSet bs ) {
     if( _t==null ) return this; // No recursion on NIL
     Type t2 = _t.make_recur(tn,d,bs);
     if( t2==_t ) return this;
     // Build a depth-limited version of the same TypeNil
-    throw AA.unimpl();
+    return make(t2);
   }
 }

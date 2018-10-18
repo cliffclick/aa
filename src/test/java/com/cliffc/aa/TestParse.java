@@ -19,10 +19,11 @@ public class TestParse {
     // optimal closed type cycles).  The expansion loop is:
     //    Call(arg)->DProj->New(adds a layer)->Phi(of nil)->Epilog->Call
     // Each loop around nests another @{n:???,v:int} wrapper.
-    //test_isa("f={x:@{n,v:int}? -> x ? @{n=f(x.n),v=x.v*x.v} : 0}", TypeFunPtr.FUNPTR1); // Recursive (looping) struct meets
+    //test_isa("map={x:@{n,v:int}? -> x ? @{n=map(x.n),v=x.v*x.v} : 0}", TypeFunPtr.FUNPTR1); // Recursive (looping) struct meets
+    //test_isa("map={x -> x ? @{n=map(x.n),v=x.v*x.v} : 0}", TypeFunPtr.FUNPTR1); // Recursive (looping) struct meets
 
     // Tuple syntax, not yet supported
-    //test_isa("f={x -> x ? (f(x[0]),x[1]*x[1]) : 0}; f(((0,1.2),2.3));", TypeFunPtr.FUNPTR1); // Recursive (looping) struct meets
+    //test_isa("map={x -> x ? (map(x[0]),x[1]*x[1]) : 0}; map(((0,1.2),2.3));", TypeFunPtr.FUNPTR1); // Recursive (looping) struct meets
     
     // User-defined linked-list
     //test("List=:@{next,val};\n"+
@@ -281,7 +282,10 @@ public class TestParse {
   }
 
   @Test public void testParse6() {
-    test_isa("A= :(:A?, :int); A((0,2))",Type.SCALAR);// No error casting (0,2) to an A
+    test_isa("A= :(:A?, :int); A((0,2))",(scope -> TypeName.make("A",scope,TypeTuple.make_all(TypeNil.NIL,TypeInt.con(2)))));
+    test_isa("A= :(:A?, :int); A((A((0,2)),3))",(scope -> TypeName.make("A",scope,TypeTuple.make_all(TypeName.make("A",scope,TypeTuple.make_all(TypeNil.NIL,TypeInt.con(2))),TypeInt.con(3)))));
+    
+    
     // Building recursive types
     test_isa("A= :int; A(1)", (scope -> TypeName.make("A",scope,TypeInt.INT64)));
     test("A= :(:str?, :int); A((0,2))",(scope -> TypeName.make("A",scope,TypeTuple.make_all(TypeNil.NIL,TypeInt.con(2)))));
@@ -317,8 +321,14 @@ public class TestParse {
     test_isa("A= :@{n:A?, v:flt}; f={x:A? -> x ? A(@{n=f(x.n),v=x.v*x.v}) : 0}; f(A(@{n=0,v=1.2})).v;", TypeFlt.con(1.2*1.2));
 
     // User-defined linked list
-    test("List=:@{next,val}; x=List(@{next=0,val=\"abc\"}); x.val", TypeStr.ABC);
-    test("List=:@{next,val}; List0={n v -> List(@{next=n,val=v})}; x=List0(0,\"abc\"); x.val", TypeStr.ABC);
+    String ll_def = "List=:@{next,val}; LL={n v -> List(@{next=n,val=v})};";
+    String ll_con = "tmp=LL(LL(0,1.2),2.3);";
+    //String ll_map = "map = {fun list -> list ? LL(map(fun,list.next),fun(list.val)) : 0};";
+    
+    test_isa(ll_def, TypeFun.GENERIC_FUN);
+    test(ll_def+ll_con+"; tmp.next.val", TypeFlt.con(1.2));
+    //test(ll_def+ll_con+ll_map, TypeFlt.con(1.2));
+    
 
     // TODO: Need real TypeVars for these
     //test("id:{A->A}"    , Env.lookup_valtype("id"));

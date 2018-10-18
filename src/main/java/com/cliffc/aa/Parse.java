@@ -122,7 +122,9 @@ public class Parse {
       if( !peek(';') ) return stmt;
       last = stmt;
       stmt = stmt();
-      if( stmt!=null ) kill(last); // prior expression result no longer alive in parser
+      if( stmt==null ) {
+        if( peek(';') ) { _x--; stmt=last; } // Ignore empty statement
+      } else kill(last); // prior expression result no longer alive in parser
     }
     return last;
   }
