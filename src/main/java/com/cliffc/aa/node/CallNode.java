@@ -76,8 +76,8 @@ public class CallNode extends Node {
       assert nargs()==1;
       Node nn = arg(0);
       Type tn = gvn.type(nn);
-      if( tn instanceof TypeTuple ) {
-        TypeTuple tt = (TypeTuple)tn;
+      if( tn instanceof TypeStruct ) {
+        TypeStruct tt = (TypeStruct)tn;
         // Either all the edges from a NewNode (for non-constants), or all the
         // constants types from a constant Tuple from a ConNode
         assert nn instanceof NewNode || tt.is_con();
@@ -233,11 +233,11 @@ public class CallNode extends Node {
     Node fp = in(1);            // If inlined, its the result, if not inlined, its the function being called
     Type t = gvn.type(fp);      // If inlined, its the result, if not inlined, its the function being called
     if( _inlined )              // Inlined functions just pass thru & disappear
-      return TypeTuple.make_all(tc,t);
+      return TypeTuple.make(tc,t);
     if( tc == Type.XCTRL )      // Call is dead?  Just return exact same return type, only deader
       return TypeTuple.make(tc,((TypeTuple)gvn.type(this)).at(1));
     if( Type.SCALAR.isa(t) ) // Calling something that MIGHT be a function, no idea what the result is
-      return TypeTuple.make_all(tc,Type.SCALAR);
+      return TypeTuple.make(tc,Type.SCALAR);
 
     if( gvn._opt ) // Manifesting optimistic virtual edges between caller and callee
       wire(gvn,t); // Make real edges from virtual edges
@@ -258,7 +258,7 @@ public class CallNode extends Node {
     }
 
     // Return {control,value} tuple.
-    return TypeTuple.make_all(tc,trez);
+    return TypeTuple.make(tc,trez);
   }
 
   // See if the arguments are valid.  If valid, return the function's return
@@ -396,7 +396,7 @@ public class CallNode extends Node {
     return new TypeNode(t,null,_cast_P);
   }
 
-  @Override public Type all_type() { return TypeTuple.make_all(Type.CTRL,Type.SCALAR); }
+  @Override public Type all_type() { return TypeTuple.make(Type.CTRL,Type.SCALAR); }
   @Override public int hashCode() { return super.hashCode()+_rpc; }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;

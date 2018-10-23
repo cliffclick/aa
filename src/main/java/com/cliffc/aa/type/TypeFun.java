@@ -14,32 +14,31 @@ import com.cliffc.aa.node.FunNode;
  *  FunNode.
 */
 public class TypeFun extends TypeTuple<TypeFun> {
-  private TypeFun( Type[] ts, Type inf ) {
-    super(TFUN, inf.above_center(), ts,inf);
-    init(ts,inf);
+  private TypeFun( boolean any, Type[] ts ) {
+    super(TFUN, any, ts);
+    init(any,ts);
   }
-  protected void init( Type[] ts, Type inf ) {
-    super.init(TFUN, inf.above_center(), ts,inf);
+  protected void init( boolean any, Type[] ts ) {
+    super.init(TFUN, any, ts);
     assert is_fun();
   }
   
   @Override public boolean equals( Object o ) {
-    if( this==o ) return true;
-    return o instanceof TypeFun && eq((TypeFun)o);
+    return o instanceof TypeFun && super.equals(o);
   }    
   
   private static TypeFun FREE=null;
   @Override protected TypeFun free( TypeFun ret ) { FREE=this; return ret; }
-  private static TypeFun make( Type[] ts, Type inf ) {
+  private static TypeFun make( boolean any, Type[] ts ) {
     TypeFun t1 = FREE;
-    if( t1 == null ) t1 = new TypeFun(ts,inf);
-    else { FREE = null; t1.init(ts,inf); }
+    if( t1 == null ) t1 = new TypeFun(any,ts);
+    else { FREE = null; t1.init(any,ts); }
     TypeFun t2 = (TypeFun)t1.hashcons();
     return t1==t2 ? t1 : t1.free(t2);
   }
   
   public static TypeFun make( Type ctrl, Type ret, TypeRPC rpc, TypeFunPtr fun ) {
-    return make(new Type[]{ctrl,ret,rpc,fun}, Type.ALL);
+    return make(false,new Type[]{ctrl,ret,rpc,fun});
   }
   public static TypeFun make( TypeFunPtr fun ) { return make(Type.CTRL,fun._ret,TypeRPC.ALL_CALL, fun); }
   public static TypeFun make( int fidx ) { return make(FunNode.find_fidx(fidx)._tf); }
@@ -54,7 +53,7 @@ public class TypeFun extends TypeTuple<TypeFun> {
   @Override protected TypeFun xdual() {
     Type[] ts = new Type[_ts.length];
     for( int i=0; i<_ts.length; i++ ) ts[i] = _ts[i].dual();
-    return new TypeFun(ts,_inf.dual());
+    return new TypeFun(!_any,ts);
   }
   // Standard Meet.
   @Override protected Type xmeet( Type t ) {
@@ -72,14 +71,11 @@ public class TypeFun extends TypeTuple<TypeFun> {
     case TNAME:  return t.xmeet(this); // Let other side decide
     default: throw typerr(t);
     }
-    // Length is longer of 2 tuples.  Shorter elements take the meet; longer
-    // elements meet the shorter extension.
     TypeFun tt = (TypeFun)t;
     assert _ts.length==tt._ts.length;
     Type[] ts = new Type[4];
     for( int i=0; i<_ts.length; i++ )  ts[i] = _ts[i].meet(tt._ts[i]);
-    Type inf = _inf.meet(tt._inf);
-    return make(ts,inf);
+    return make(_any&tt._any,ts);
   }
 
   // Return true if this is a forward-ref function pointer (return type from EpilogNode)

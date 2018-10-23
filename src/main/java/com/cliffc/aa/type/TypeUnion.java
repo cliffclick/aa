@@ -73,7 +73,7 @@ public class TypeUnion extends Type<TypeUnion> {
 
     // The set has to be ordered, to remove dups that vary only by order
     ts.sort_update(Comparator.comparingInt(e -> e._uid)); 
-    return make(TypeTuple.make(any?Type.ANY:Type.ALL,1.0f,ts.asAry()),any);
+    return make(TypeTuple.make0(any,ts.asAry()),any);
   }
 
   //public  static final TypeUnion NIL  = (TypeUnion)make(true, Type.NIL, TypeStr.NIL, TypeTuple.NIL, TypeInt.FALSE);
@@ -88,7 +88,7 @@ public class TypeUnion extends Type<TypeUnion> {
     Type[] ts = ((TypeTuple)_ts.dual())._ts; // Dual-tuple array
     ts = Arrays.copyOf(ts,ts.length);        // Defensive copy
     Arrays.sort(ts, 0, ts.length, Comparator.comparingInt(e -> e._uid));
-    TypeTuple stt = TypeTuple.make(!_any?Type.ANY:Type.ALL,1.0f,ts);
+    TypeTuple stt = TypeTuple.make0(_any,ts);
     return new TypeUnion(stt,!_any);
   }
   

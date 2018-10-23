@@ -158,7 +158,7 @@ public class Parse {
       Type ot = _e.lookup_type(tvar);
       TypeName tn;
       if( ot == null ) {        // Name does not pre-exist
-        tn = TypeName.make(tvar,_e._scope,t);
+        tn = TypeName.make(tvar,_e._scope.types(),t);
         _e.add_type(tvar,tn); // Assign type-name
       } else {
         tn = ot.merge_recursive_type(t);
@@ -382,16 +382,13 @@ public class Parse {
   private Node tuple(Node s) {
     // Construct a tuple
     Ary<Node> ns = new Ary<>(new Node[]{null});
-    Ary<Type> ts = new Ary<>(new Type[]{});
     while( s!=null ) {
       ns.add(s);
-      ts.add(_gvn.type(s));
       if( !peek(',') ) break;   // Final comma is optional
       s=stmts();
     }
     require(')');
-    TypeTuple tt = TypeTuple.make_all(ts.asAry());
-    return gvn(new NewNode(tt,ns.asAry()));
+    return gvn(new NewNode(TypeStruct.FLDS(ns._len-1),ns.asAry()));
   }
 
   /** Parse an anonymous function; the opening '{' already parsed.  After the
@@ -452,7 +449,7 @@ public class Parse {
         Type t = Type.ALL;       // Untyped, most generic type
         if( peek(':') )          // Has type annotation?
           if( (t=type())==null ) throw AA.unimpl(); // return an error here
-        Node stmt = con(Type.ANY);
+        Node stmt = con(Type.SCALAR);
         if( peek('=') )
           if( (stmt=stmt())==null ) throw AA.unimpl(); // return an error here
         stmt = gvn(new TypeNode(t,stmt,errMsg()));
@@ -470,10 +467,9 @@ public class Parse {
       }
       require('}');
       _e = _e._par;             // Pop nested environment
-      TypeStruct tstr = TypeStruct.makeA(toks.asAry(), ts.asAry());
       Node[] flds = e._scope.get(toks);
-      return gvn(new NewNode(tstr,flds));
-    }
+      return gvn(new NewNode(toks.asAry(),flds));
+    } // Pop lexical scope around struct
   }
   
   private String token() { skipWS();  return token0(); }
@@ -550,7 +546,7 @@ public class Parse {
         if( ts._len != 1 ) return null; // should return TypeErr missing -> in tfun
         ret = ts.pop();         // Get single return type
       }
-      TypeTuple targs = TypeTuple.make_args(ts.asAry());
+      TypeTuple targs = TypeTuple.make(ts.asAry());
       return peek('}') ? typeq(TypeFun.make(TypeFunPtr.make(targs,ret,Bits.FULL,ts._len))) : null;
     }
 
@@ -568,7 +564,7 @@ public class Parse {
         ts  .add(typeq(t));
         if( !peek(',') ) break; // Final comma is optional
       }
-      return peek('}') ? typeq(TypeStruct.makeA(flds.asAry(), ts.asAry())) : null;
+      return peek('}') ? typeq(TypeStruct.make(0,flds.asAry(),ts.asAry())) : null;
     }
 
     // "()" is the zero-entry tuple
@@ -586,7 +582,7 @@ public class Parse {
         ts.add(typeq(t));
         if( !peek(',') ) break; // Final comma is optional
       }
-      return peek(')') ? typeq(TypeTuple.make_all(ts.asAry())) : null;
+      return peek(')') ? typeq(TypeStruct.make(0,ts.asAry())) : null;
     }
 
     // Primitive type
@@ -601,7 +597,7 @@ public class Parse {
         _x = oldx;                 // Unwind if not a known type var
         return null;               // Not a type
       }
-      _e.add_type(tok,t=TypeName.make_forward_def_type(tok,_e._scope));
+      _e.add_type(tok,t=TypeName.make_forward_def_type(tok,_e._scope.types()));
     }
     Type tb = t.base();
     return tb instanceof TypeOop || tb==Type.SCALAR ? typeq(t) : t;

@@ -3,6 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.*;
 import com.cliffc.aa.type.*;
 
+import java.util.HashMap;
 
 // Primitives can be used as an internal operator (their apply() call does the
 // primitive operation).  Primitives are wrapped as functions when returned
@@ -108,8 +109,8 @@ public abstract class PrimNode extends Node {
 
 class ConvertTypeName extends PrimNode {
   private final Parse _badargs; // Only for converts
-  private final ScopeNode _lex; // Unique lexical scope
-  ConvertTypeName(Type from, TypeName to, Parse badargs) { super(to._name,PrimNode.ARGS1,TypeTuple.make_args(from),to); _lex=to._lex; _badargs=badargs; }
+  private final HashMap<String,Type> _lex; // Unique lexical scope
+  ConvertTypeName(Type from, TypeName to, Parse badargs) { super(to._name,PrimNode.ARGS1,TypeTuple.make(from),to); _lex=to._lex; _badargs=badargs; }
   @Override public Type value(GVNGCM gvn) {
     Type[] ts = new Type[_defs._len];
     for( int i=1; i<_defs._len; i++ )
@@ -296,7 +297,7 @@ class RandI64 extends PrimNode {
 }
 
 class Id extends PrimNode {
-  Id(Type arg) { super("id",PrimNode.ARGS1,TypeTuple.make_args(arg),arg); }
+  Id(Type arg) { super("id",PrimNode.ARGS1,TypeTuple.make(arg),arg); }
   @Override public Type apply( Type[] args ) { return args[1]; }
   @Override public Node ideal(GVNGCM gvn) { return in(1); }
   @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)); }

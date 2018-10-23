@@ -12,9 +12,8 @@ public class TypeOop<O extends TypeOop<O>> extends Type<O> {
   @Override public int hashCode( ) { return super.hashCode()+(_any?1:0); }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
-    return o instanceof TypeOop && eq((TypeOop)o);
+    return o instanceof TypeOop && _any==((TypeOop)o)._any;
   }
-  boolean eq( TypeOop toop ) { return _any==toop._any; }
   @Override String str( BitSet dups) { return _any ? "~oop" : "oop"; }
   private static TypeOop FREE=null;
   @Override protected TypeOop free( TypeOop ret ) { FREE=this; return ret; }
@@ -63,4 +62,9 @@ public class TypeOop<O extends TypeOop<O>> extends Type<O> {
   // +1 requires a bit-changing conversion; no auto-unboxing
   // 99 Bottom; No free converts; e.g. Flt->Str requires explicit rounding
   @Override public byte isBitShape(Type t) { throw AA.unimpl();  }
+  // Make a (posssibly cyclic & infinite) named type.  Prevent the infinite
+  // unrolling of names by not allowing a named-type with depth >= D from
+  // holding (recursively) the head of a named-type cycle.  We need to cap the
+  // unroll, to prevent loops/recursion from infinitely unrolling.
+  @Override Type make_recur(TypeName tn, int d, BitSet bs ) { return this; }
 }

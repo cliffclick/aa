@@ -17,7 +17,7 @@ public class TypeStr extends TypeOop<TypeStr> {
     if( this==o ) return true;
     if( !(o instanceof TypeStr) ) return false;
     TypeStr t2 = (TypeStr)o;
-    return super.eq(t2) && (_con==t2._con || (_con != null && _con.equals(t2._con)));
+    return _any == t2._any && (_con==t2._con || (_con != null && _con.equals(t2._con)));
   }
   @Override String str( BitSet dups) {
     SB sb = new SB();

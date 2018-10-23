@@ -5,6 +5,7 @@ import com.cliffc.aa.util.Bits;
 import com.cliffc.aa.util.SB;
 
 import java.util.BitSet;
+import java.util.function.Consumer;
 
 // Function constants and signatures.  Contrast this to 'TypeFun'.
 public class TypeFunPtr extends Type<TypeFunPtr> {
@@ -103,4 +104,6 @@ public class TypeFunPtr extends Type<TypeFunPtr> {
   public boolean is_forward_ref()                    { return _nargs == -1; }
   public static TypeFunPtr make_forward_ref( int fidx ) { return make(GENERIC_ARGS, GENERIC_RET,Bits.make(fidx),-1); }
   private static TypeFunPtr make_generic()              { return make(GENERIC_ARGS, GENERIC_RET,Bits.FULL,99); }
+  // Iterate over any nested child types
+  @Override public void iter( Consumer<Type> c ) { _ts.iter(c); c.accept(_ret); }
 }

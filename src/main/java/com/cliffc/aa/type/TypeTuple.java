@@ -3,20 +3,19 @@ package com.cliffc.aa.type;
 import com.cliffc.aa.AA;
 import com.cliffc.aa.util.SB;
 
-import java.util.Arrays;
 import java.util.BitSet;
+import java.util.function.Consumer;
 
-/** record/struct types; infinitely extended with an extra type (typically ANY or ALL) */
+/** Internal fixed-length non-recursive tuples.  Used for function arguments,
+ *  and multi-arg results like IfNode and CallNode. */
 public class TypeTuple<P extends TypeTuple<P>> extends TypeOop<P> {
-  public Type[] _ts;      // The fixed known types
-  public Type _inf;       // Infinite extension type
-  private int _hash;
-  protected TypeTuple( byte type, boolean any, Type[] ts, Type inf ) { super(type,any); init(type, any, ts,inf);  }
-  protected void init( byte type, boolean any, Type[] ts, Type inf ) {
+  public Type[] _ts;     // The fixed known types
+  private int _hash;     // Hash pre-computed to avoid large computes duing interning
+  protected TypeTuple( byte type, boolean any, Type[] ts ) { super(type,any); init(type, any, ts);  }
+  protected void init( byte type, boolean any, Type[] ts ) {
     super.init(type,any);
     _ts = ts;
-    _inf = inf;
-    int sum=super.hashCode()+inf.hashCode();
+    int sum=super.hashCode();
     for( Type t : ts ) sum += t.hashCode();
     _hash=sum;
   }
@@ -24,11 +23,9 @@ public class TypeTuple<P extends TypeTuple<P>> extends TypeOop<P> {
   @Override public int hashCode( ) { return _hash;  }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
-    return o instanceof TypeTuple && eq((TypeTuple)o);
-  }    
-  boolean eq( TypeTuple t ) {
-    if( _hash != t._hash ) return false;
-    if( !super.eq(t) || _ts.length != t._ts.length || _inf != t._inf )
+    if( !(o instanceof TypeTuple) ) return false;
+    TypeTuple t = (TypeTuple)o;
+    if( _any!=t._any || _hash != t._hash || _ts.length != t._ts.length )
       return false;
     if( _ts == t._ts ) return true;
     for( int i=0; i<_ts.length; i++ )
@@ -44,49 +41,42 @@ public class TypeTuple<P extends TypeTuple<P>> extends TypeOop<P> {
       for( int i=1; i<_ts.length; i++ )
         sb.p(',').p(_ts[i].str(dups));
     }
-    if( _inf!=ALL ) sb.p(',').p(_inf.str(dups)).p("...");
     sb.p(')');
     return sb.toString();
   }
 
   private static TypeTuple FREE=null;
   @Override protected TypeTuple free( TypeTuple ret ) { FREE=this; return ret; }
-  private static TypeTuple make0( Type inf, boolean any, Type... ts ) {
+  static TypeTuple make0( boolean any, Type... ts ) {
     TypeTuple t1 = FREE;
-    if( t1 == null ) t1 = new TypeTuple(TTUPLE, any, ts,inf);
-    else { FREE = null; t1.init(TTUPLE, any, ts,inf); }
+    if( t1 == null ) t1 = new TypeTuple(TTUPLE, any, ts);
+    else { FREE = null; t1.init(TTUPLE, any, ts); }
     TypeTuple t2 = (TypeTuple)t1.hashcons();
     return t1==t2 ? t1 : t1.free(t2);
   }
-  public static TypeTuple make( Type inf, float ignore, Type... ts ) {
-    assert !inf.is_con();
-    int len = ts.length;
-    while( len > 0 && ts[len-1] == inf ) len--;
-    if( len < ts.length ) ts = Arrays.copyOf(ts,len);
-    TypeTuple tt = make0(inf, inf.above_center(), ts);
-    assert !tt.is_fun();    // Use funptr class for this
+  public static TypeTuple make( Type... ts ) {
+    TypeTuple tt = make0(false,ts);
+    assert !tt.is_fun();
     return tt;
   }
-  public static TypeTuple make     ( Type... ts ) { return make(ANY,1.0f,ts); }
-  public static TypeTuple make_all ( Type... ts ) { return make(ALL,1.0f,ts); }
-  public static TypeTuple make_args( Type... ts ) { return make(SCALAR,1.0f,ts); }
 
-          static final TypeTuple XSCALARS= make(XSCALAR,1.0f);
-  public  static final TypeTuple SCALAR0 = make_args();
-          static final TypeTuple SCALAR1 = make_args(SCALAR);
-          static final TypeTuple SCALAR2 = make_args(SCALAR, SCALAR);
-  public  static final TypeTuple INT32   = make_args(TypeInt.INT32 );
-  public  static final TypeTuple INT64   = make_args(TypeInt.INT64 );
-  public  static final TypeTuple FLT64   = make_args(TypeFlt.FLT64 );
-  public  static final TypeTuple STR     = make_args(TypeStr.STR   );
-  public  static final TypeTuple OOP_OOP = make_args(TypeNil.OOP,TypeNil.OOP);
-  public  static final TypeTuple INT64_INT64 = make_args(TypeInt.INT64,TypeInt.INT64);
-  public  static final TypeTuple FLT64_FLT64 = make_args(TypeFlt.FLT64,TypeFlt.FLT64);
-  private static final TypeTuple FLT64_INT64 = make_args(TypeFlt.FLT64,TypeInt.INT64);
-  public  static final TypeTuple IF_ANY  = make_all(XCTRL,XCTRL);
-  public  static final TypeTuple IF_ALL  = make_all(CTRL ,CTRL );
-  public  static final TypeTuple IF_TRUE = make_all(XCTRL,CTRL );
-  public  static final TypeTuple IF_FALSE= make_all(CTRL ,XCTRL);
+          static final TypeTuple XSCALARS= make0(true);
+  public  static final TypeTuple SCALAR0 = make();
+          static final TypeTuple SCALAR1 = make(SCALAR);
+          static final TypeTuple SCALAR2 = make(SCALAR, SCALAR);
+  public  static final TypeTuple INT32   = make(TypeInt.INT32 );
+  public  static final TypeTuple INT64   = make(TypeInt.INT64 );
+  public  static final TypeTuple FLT64   = make(TypeFlt.FLT64 );
+  public  static final TypeTuple STR     = make(TypeStr.STR   );
+  public  static final TypeTuple OOP_OOP = make(TypeNil.OOP,TypeNil.OOP);
+  public  static final TypeTuple INT64_INT64 = make(TypeInt.INT64,TypeInt.INT64);
+  public  static final TypeTuple FLT64_FLT64 = make(TypeFlt.FLT64,TypeFlt.FLT64);
+  private static final TypeTuple FLT64_INT64 = make(TypeFlt.FLT64,TypeInt.INT64);
+  
+  public  static final TypeTuple IF_ANY  = make(XCTRL,XCTRL);
+  public  static final TypeTuple IF_ALL  = make(CTRL ,CTRL );
+  public  static final TypeTuple IF_TRUE = make(XCTRL,CTRL );
+  public  static final TypeTuple IF_FALSE= make(CTRL ,XCTRL);
   static final TypeTuple[] TYPES = new TypeTuple[]{XSCALARS,SCALAR0,SCALAR1,STR,INT32,INT64,FLT64,INT64_INT64,FLT64_FLT64,FLT64_INT64, IF_ALL, IF_TRUE, IF_FALSE, OOP_OOP};
   
   // The length of Tuples is a constant, and so is its own dual.  Otherwise
@@ -94,7 +84,7 @@ public class TypeTuple<P extends TypeTuple<P>> extends TypeOop<P> {
   @Override protected P xdual() {
     Type[] ts = new Type[_ts.length];
     for( int i=0; i<_ts.length; i++ ) ts[i] = _ts[i].dual();
-    return (P)new TypeTuple(TTUPLE, !_any, ts,_inf.dual());
+    return (P)new TypeTuple(TTUPLE, !_any, ts);
   }
   // Standard Meet.
   @Override protected Type xmeet( Type t ) {
@@ -112,34 +102,33 @@ public class TypeTuple<P extends TypeTuple<P>> extends TypeOop<P> {
     case TNAME:  return t.xmeet(this); // Let other side decide
     default: throw typerr(t);
     }
-    // Length is longer of 2 tuples.  Shorter elements take the meet; longer
-    // elements meet the shorter extension.
+    // If unequal length; then if short is low it "wins" (result is short) else
+    // short is high and it "loses" (result is long).
     TypeTuple tt = (TypeTuple)t;
     return _ts.length < tt._ts.length ? xmeet1(tt) : tt.xmeet1(this);
   }
 
   // Meet 2 tuples, shorter is 'this'
   private TypeTuple xmeet1( TypeTuple tmax ) {
-    Type[] ts = new Type[tmax._ts.length];
+    int len = _any ? tmax._ts.length : _ts.length;
     // Meet of common elements
+    Type[] ts = new Type[len];
     for( int i=0; i<_ts.length; i++ )  ts[i] = _ts[i].meet(tmax._ts[i]);
-    // Meet of elements only in the longer tuple
-    for( int i=_ts.length; i<tmax._ts.length; i++ )
-      ts[i] = _inf.meet(tmax._ts[i]);
-    // Reduce common tail
-    Type tail = _inf.meet(tmax._inf);
-    int len = ts.length;
-    while( len > 0 && ts[len-1] == tail ) len--;
-    if( len < ts.length ) ts = Arrays.copyOf(ts,len);
-    return make0(tail,_any && tmax._any,ts);
+    // Elements only in the longer tuple
+    for( int i=_ts.length; i<len; i++ )
+      ts[i] = tmax._ts[i];
+    return make0(_any&tmax._any,ts);
   }
 
-  public Type at( int idx ) { return idx < _ts.length ? _ts[idx] : _inf; }
+  public Type at( int idx ) {
+    //return idx < _ts.length ? _ts[idx] : _inf;
+    return _ts[idx];            // Must be in-size
+  }
 
   // True if all internals may_be_con
   @Override public boolean may_be_con() {
     for( Type _t : _ts ) if( !_t.may_be_con() ) return false;
-    return _inf.may_be_con();
+    return true;
   }
   // True if all internals is_con
   @Override public boolean is_con() {
@@ -183,17 +172,11 @@ public class TypeTuple<P extends TypeTuple<P>> extends TypeOop<P> {
   // holding (recursively) the head of a named-type cycle.  We need to cap the
   // unroll, to prevent loops/recursion from infinitely unrolling.
   @Override TypeTuple<P> make_recur(TypeName tn, int d, BitSet bs ) {
-    boolean eq = _inf.make_recur(tn,d,bs)==_inf;
-    for( Type t : _ts )
-      eq = eq && t.make_recur(tn,d,bs)==t;
-    if( eq ) return this;
-    // Build a depth-limited version of the same struct
-    Type inf = _inf.make_recur(tn,d,bs);
-    Type[] ts = new Type[_ts.length];
-    for( int i=0; i<_ts.length; i++ )
-      ts[i] = _ts[i].make_recur(tn,d,bs);
-    return make(inf,1.0f,ts);
+    throw AA.unimpl();
   }
+  
+  // Iterate over any nested child types
+  @Override public void iter( Consumer<Type> c ) { for( Type t : _ts) c.accept(t); }
   // Return an error message, if any exists
   @Override public String errMsg() {
     String s;

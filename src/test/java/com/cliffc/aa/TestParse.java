@@ -1,11 +1,11 @@
 package com.cliffc.aa;
 
-import com.cliffc.aa.node.ScopeNode;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Bits;
 import org.junit.Assert;
 import org.junit.Test;
 
+import java.util.HashMap;
 import java.util.function.Function;
 
 import static org.junit.Assert.*;
@@ -13,7 +13,7 @@ import static org.junit.Assert.*;
 public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
-    
+
     // Fails because there is an infinite type-expansion (which in turn points
     // out that I'm missing the optimistic-all-equals type algo which can find
     // optimal closed type cycles).  The expansion loop is:
@@ -38,12 +38,12 @@ public class TestParse {
     // Making a trivial function which needs H-M or full inlining to type.
     // Adding syntax to prevent inlining, which means needs H-M
     //test("fun={# s->s.x}; (fun(@{x=3.14}),fun(@{x=\"abc\"}))",
-    //     TypeTuple.make_all(TypeFlt.con(3.14),TypeStr.ABC)); // result is a tuple of (3.14,"abc")
+    //     TypeTuple.make(TypeFlt.con(3.14),TypeStr.ABC)); // result is a tuple of (3.14,"abc")
 
     
     // A collection of tests which like to fail easily
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({&},2)", TypeInt.FALSE);
-    testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1) is not a @{x:Scalar,y:Scalar,}","                           ");
+    testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1) is not a @{x,y}","                           ");
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'","                    ");
     testerr("{+}(1,2,3)", "Passing 3 arguments to +{flt64 flt64 -> flt64} which takes 2 arguments","          ");
     test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
@@ -219,17 +219,17 @@ public class TestParse {
     test_isa("A= :(:flt,:int)", name_tuple_constructor(TypeFlt.FLT64,TypeInt.INT64));
     test_isa("A= :(    ,:int)", name_tuple_constructor(Type.SCALAR  ,TypeInt.INT64));
 
-    test   ("A= :(:str?, :int); A((\"abc\",2))",(scope -> TypeName.make("A",scope,TypeTuple.make_all(TypeStr.ABC,TypeInt.con(2)))));
+    test   ("A= :(:str?, :int); A((\"abc\",2))",(tmap -> TypeName.make("A",tmap,TypeStruct.make(211,TypeStr.ABC,TypeInt.con(2)))));
     testerr("A= :(:str?, :int)?","Named types are never nil","                  ");
   }
-  static private Function<ScopeNode,Type> name_tuple_constructor(Type... ts) {
-    TypeTuple tt = TypeTuple.make_all(ts);
-    return (scope -> TypeFun.make(TypeFunPtr.make(TypeTuple.make_args(tt),TypeName.make("A",scope,tt),Bits.FULL,1)));
+  static private Function<HashMap<String,Type>,Type> name_tuple_constructor(Type... ts) {
+    TypeStruct tt = TypeStruct.make(0,ts);
+    return (tmap -> TypeFun.make(TypeFunPtr.make(TypeTuple.make(tt),TypeName.make("A",tmap,tt),Bits.FULL,1)));
   }
 
   @Test public void testParse4() {
     // simple anon struct tests
-    test   ("  @{x,y} ", TypeStruct.makeA(new String[]{"x","y"},Type.ANY,Type.ANY)); // simple anon struct decl
+    test   ("  @{x,y} ", TypeStruct.make(205,new String[]{"x","y"},Type.SCALAR,Type.SCALAR)); // simple anon struct decl
     testerr("a=@{x=1.2,y}; x", "Unknown ref 'x'","               ");
     testerr("a=@{x=1,x=2}", "Cannot define field '.x' twice","           ");
     test   ("a=@{x=1.2,y,}; a.x", TypeFlt.con(1.2)); // standard "." field naming; trailing comma optional
@@ -249,19 +249,19 @@ public class TestParse {
     test   ("dist={p->p//qqq\n.//qqq\nx*p.x+p.y*p.y}; dist(//qqq\n@{x//qqq\n=1,y=2})", TypeInt.con(5));
 
     // Tuple
-    test("(0,\"abc\")", TypeTuple.make_all(TypeNil.NIL,TypeStr.ABC));
+    test("(0,\"abc\")", TypeStruct.make(205,TypeNil.NIL,TypeStr.ABC));
     
     // Named type variables
-    test_isa("gal=:flt"       , (scope -> TypeFun.make(TypeFunPtr.make(TypeTuple.FLT64,TypeName.make("gal",scope,TypeFlt.FLT64),Bits.FULL,1))));
-    test_isa("gal=:flt; gal"  , (scope -> TypeFun.make(TypeFunPtr.make(TypeTuple.FLT64,TypeName.make("gal",scope,TypeFlt.FLT64),Bits.FULL,1))));
+    test_isa("gal=:flt"       , (tmap -> TypeFun.make(TypeFunPtr.make(TypeTuple.FLT64,TypeName.make("gal",tmap,TypeFlt.FLT64),Bits.FULL,1))));
+    test_isa("gal=:flt; gal"  , (tmap -> TypeFun.make(TypeFunPtr.make(TypeTuple.FLT64,TypeName.make("gal",tmap,TypeFlt.FLT64),Bits.FULL,1))));
     test    ("gal=:flt; 3==gal(2)+1", TypeInt.TRUE);
-    test    ("gal=:flt; tank:gal = gal(2)", (scope -> TypeName.make("gal",scope,TypeFlt.con(2))));
+    test    ("gal=:flt; tank:gal = gal(2)", (tmap -> TypeName.make("gal",tmap,TypeFlt.con(2))));
     // test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: figure out if free cast for bare constants?
     testerr ("gal=:flt; tank:gal = gal(2)+1", "3.0 is not a gal:flt64","                             ");
     test    ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(@{x=1,y=2}))", TypeInt.con(5));
     test    ("Point=:@{x,y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(@{x=1,y=2}))", TypeInt.con(5));
-    testerr ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(     (@{x=1,y=2}))", "@{x:1,y:2,} is not a Point:@{x:Scalar,y:Scalar,}","                                                                         ");
-    testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1) is not a @{x:Scalar,y:Scalar,}","                           ");
+    testerr ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(     (@{x=1,y=2}))", "@{x:1,y:2} is not a Point:@{x,y}","                                                                         ");
+    testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1) is not a @{x,y}","                           ");
   }
 
   @Test public void testParse5() {
@@ -282,13 +282,13 @@ public class TestParse {
   }
 
   @Test public void testParse6() {
-    test_isa("A= :(:A?, :int); A((0,2))",(scope -> TypeName.make("A",scope,TypeTuple.make_all(TypeNil.NIL,TypeInt.con(2)))));
-    test_isa("A= :(:A?, :int); A((A((0,2)),3))",(scope -> TypeName.make("A",scope,TypeTuple.make_all(TypeName.make("A",scope,TypeTuple.make_all(TypeNil.NIL,TypeInt.con(2))),TypeInt.con(3)))));
+    test_isa("A= :(:A?, :int); A((0,2))",(tmap -> TypeName.make("A",tmap,TypeStruct.make(0,TypeNil.NIL,TypeInt.con(2)))));
+    test_isa("A= :(:A?, :int); A((A((0,2)),3))",(tmap -> TypeName.make("A",tmap,TypeStruct.make(0,TypeName.make("A",tmap,TypeStruct.make(0,TypeNil.NIL,TypeInt.con(2))),TypeInt.con(3)))));
     
     
     // Building recursive types
-    test_isa("A= :int; A(1)", (scope -> TypeName.make("A",scope,TypeInt.INT64)));
-    test("A= :(:str?, :int); A((0,2))",(scope -> TypeName.make("A",scope,TypeTuple.make_all(TypeNil.NIL,TypeInt.con(2)))));
+    test_isa("A= :int; A(1)", (tmap -> TypeName.make("A",tmap,TypeInt.INT64)));
+    test("A= :(:str?, :int); A((0,2))",(tmap -> TypeName.make("A",tmap,TypeStruct.make(211,TypeNil.NIL,TypeInt.con(2)))));
     // Named recursive types
     test_isa("A= :(:A?, :int); A((0,2))",Type.SCALAR);// No error casting (0,2) to an A
     test_isa("A= :@{n:A?, v:flt}; A(@{n=0,v=1.2}).v;", TypeFlt.con(1.2));
@@ -414,26 +414,33 @@ c[x]=1;
     return te;
   }
   
-  static private void test( String program, Type expected ) { assertEquals(expected,run(program)._t); }
-  static private void test( String program, Function<ScopeNode,Type> expected ) {
+  static private void test( String program, Type expected ) {
+    assertEquals(expected,run(program)._t);
+    Type.reset_to_init0();      // Reset after type looking and testing
+  }
+  static private void test( String program, Function<HashMap<String,Type>,Type> expected ) {
     TypeEnv te = run(program);
-    Type t_expected = expected.apply(te._env._scope);
+    Type t_expected = expected.apply(te._env._scope.types());
     assertEquals(t_expected,te._t);
+    Type.reset_to_init0();      // Reset after type looking and testing
   }
   static private void test_isa( String program, Type expected ) {
     TypeEnv te = run(program);
     assertTrue(te._t.isa(expected));
+    Type.reset_to_init0();      // Reset after type looking and testing
   }
-  static private void test_isa( String program, Function<ScopeNode,Type> expected ) {
+  static private void test_isa( String program, Function<HashMap<String,Type>,Type> expected ) {
     TypeEnv te = run(program);
-    Type t_expected = expected.apply(te._env._scope);
+    Type t_expected = expected.apply(te._env._scope.types());
     assertTrue(te._t.isa(t_expected));
+    Type.reset_to_init0();      // Reset after type looking and testing
   }
   static private void testerr( String program, String err, String cursor ) {
     String err2 = "\nargs:0:"+err+"\n"+program+"\n"+cursor+"^\n";
     TypeEnv te = Exec.go("args",program);
     assertTrue(te._errs != null && te._errs._len>=1);
     assertEquals(err2,te._errs.at(0));
+    Type.reset_to_init0();      // Reset after type looking and testing
   }
 
 }

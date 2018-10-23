@@ -49,6 +49,15 @@ public class Ary<E> implements Iterable<E> {
     return this;
   }
 
+  /** Add element in amortized constant time
+   *  @param e Element to add at end of list
+   *  @return e for flow-coding */
+  public E push( E e ) {
+    if( _len >= _es.length ) _es = Arrays.copyOf(_es,Math.max(1,_es.length<<1));
+    _es[_len++] = e;
+    return e;
+  }
+
   /** Fast, constant-time, element removal.  Does not preserve order
    *  @param i element to be removed
    *  @return element removed */

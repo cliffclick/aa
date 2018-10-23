@@ -1,11 +1,13 @@
 package com.cliffc.aa;
 
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.Bits;
 import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.HashMap;
+import java.util.function.Consumer;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -132,22 +134,22 @@ public class TestType {
     Type.init0(new HashMap<>());
     Type nil  = TypeNil.NIL;
     // Tuple is more general that Struct
-    Type tf = TypeTuple.FLT64; //  [  flt64,~Scalar...]; choice leading field name
-    Type tsx= TypeStruct.X;    // @{x:flt64,~Scalar...}; fixed  leading field name
-    Type tff = tsx.meet(tf);   //
-    assertEquals(tf,tff);      // tsx.isa(tf)
-    TypeTuple t0 = TypeTuple.make_args(nil); //  [  0,Scalar...]
-    Type      ts0= TypeStruct.makeX(new String[]{"x"},nil);  // @{x:0,Scalar...}
+    Type tf = TypeStruct.TFLT64; //  (  flt64); choice leading field name
+    Type tsx= TypeStruct.X;      // @{x:flt64}; fixed  leading field name
+    Type tff = tsx.meet(tf);     //
+    assertEquals(tf,tff);        // tsx.isa(tf)
+    TypeStruct t0 = TypeStruct.make(0,nil); //  (nil)
+    TypeStruct ts0= TypeStruct.make(0,new String[]{"x"},nil);  // @{x:nil}
     Type tss = ts0.meet(t0);
     assertEquals(t0,tss);      // t0.isa(ts0)
 
     // meet @{c:0}? and @{c:@{x:1}?,}
-    Type    nc0 = TypeNil.make(TypeStruct.makeX(new String[]{"c"},TypeNil.NIL )); // @{c:nil}?
-    Type    nx1 = TypeNil.make(TypeStruct.makeX(new String[]{"x"},TypeInt.TRUE)); // @{x:1}?
-    TypeOop cx  = TypeStruct.makeX(new String[]{"c"},nx1); // @{c:@{x:1}?}
+    Type    nc0 = TypeNil.make(TypeStruct.make(0,new String[]{"c"},TypeNil.NIL )); // @{c:nil}?
+    Type    nx1 = TypeNil.make(TypeStruct.make(0,new String[]{"x"},TypeInt.TRUE)); // @{x:1}?
+    TypeOop cx  = TypeStruct.make(0,new String[]{"c"},nx1); // @{c:@{x:1}?}
     // JOIN tosses the top-level null choice, and the inside struct choice
     Type cj  = nc0.join(cx);
-    Type c0  = TypeStruct.makeX(new String[]{"c"},TypeNil.NIL); // @{c:0}
+    Type c0  = TypeStruct.make(0,new String[]{"c"},TypeNil.NIL); // @{c:0}
     assertEquals(c0,cj);
   }
 
@@ -191,6 +193,43 @@ public class TestType {
     TypeFunPtr f2 = TypeFunPtr.any(2,23); // Some generic function (happens to be #23, '&')
     assertTrue(f2.isa(gf));
   }
+
+  // Test limits on recursive type structures; recursively building nested
+  // structures caps out in the type system at some reasonable limit.
+  @Ignore @Test public void testRecursive() {
+    Type.init0(new HashMap<>());
+
+    // Nest a linked-list style tuple 10 deep; verify actual depth is capped at
+    // less than 5.
+    int nuid = 123;             // Sample NewNode nuid
+    Type t0 = TypeNil.NIL;
+    for( int i=0; i<10; i++ ) {
+      TypeStruct ts = TypeStruct.make_recursive(nuid,TypeStruct.FLDS(2),t0,TypeInt.con(i));
+      t0 = ts.meet(t0);    // Must be a phi-meet in any data loop
+    }
+    int max_depth = type_depth(t0,new HashMap<>());
+    assertTrue(max_depth<5);
+  }
+
+  // Classic breadth-first-search algo
+  private int type_depth( Type init, HashMap<Type,Integer> ds ) {
+    int d = 0;
+    Ary<Type> work0 = new Ary<>(new Type[0]);
+    Ary<Type> work1 = new Ary<>(new Type[0]);
+    ds.put(work0.push(init),d);
+    
+    while( !work0.isEmpty() ) {
+      final int fd = ++d;
+      assert work1.isEmpty();
+      final Ary<Type> fwork1 = work1;
+      for( Type t : work0 )
+        t.iter((Consumer<Type>) tc ->
+               { if( tc !=null && ds.get(tc)==null ) ds.put(fwork1.push(tc),fd); }  );
+      work0.clear();  work1 = work0;  work0 = fwork1; // Swap worklists
+    }
+    return d;                   // Max depth
+  }
+  
   
   // TODO: Observation: value() calls need to be monotonic, can test this.
   @Test public void testCommuteSymmetricAssociative() {

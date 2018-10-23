@@ -5,6 +5,7 @@ import com.cliffc.aa.AA;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.HashMap;
+import java.util.function.Consumer;
 
 /** an implementation of language AA
  */
@@ -273,6 +274,11 @@ public class Type<T extends Type<T>> {
     TypeFlt.init1(types);
     TypeStr.init1(types);
   }
+  public static void reset_to_init0( ) {
+    // Remove all mutable types... which are all the recursive types.  They
+    // need to be re-mutated from the start every Parse.
+    INTERN.entrySet().removeIf(entry ->  entry.getValue() instanceof TypeStruct && ((TypeStruct)entry.getValue())._nuid != 0 );
+  }
   
   public static boolean check_startup() {
     Type[] ts =    Type      .TYPES ;
@@ -447,6 +453,9 @@ public class Type<T extends Type<T>> {
   // holding (recursively) the head of a named-type cycle.  We need to cap the
   // unroll, to prevent loops/recursion from infinitely unrolling.
   Type make_recur(TypeName tn, int d, BitSet bs ) { assert is_simple(); return this; }
+
+  // Iterate over any nested child types
+  public void iter( Consumer<Type> c ) { /*None in the base class*/ }
   
   RuntimeException typerr(Type t) {
     throw new RuntimeException("Should not reach here: internal type system error with "+this+(t==null?"":(" and "+t)));

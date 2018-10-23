@@ -1,6 +1,7 @@
 package com.cliffc.aa.type;
 
 import java.util.BitSet;
+import java.util.function.Consumer;
 
 // Nil types are just a nil, but along a particular type domain.  Used so the
 // parser can just parse a '0' as the same nil for all other types.
@@ -86,4 +87,6 @@ public class TypeNil extends Type<TypeNil> {
     // Build a depth-limited version of the same TypeNil
     return make(t2);
   }
+  // Iterate over any nested child types
+  @Override public void iter( Consumer<Type> c ) { c.accept(_t); }
 }

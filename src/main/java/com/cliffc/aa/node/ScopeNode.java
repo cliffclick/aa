@@ -78,6 +78,7 @@ public class ScopeNode extends Node {
   
   // Name to type lookup, or null
   public Type get_type(String name) { return _types.get(name);  }
+  public HashMap<String,Type> types() { return _types; }
   
   // Extend the current Scope with a new type; cannot override existing name.
   public void add_type( String name, Type t ) {

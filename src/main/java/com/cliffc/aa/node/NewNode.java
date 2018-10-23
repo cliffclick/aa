@@ -3,39 +3,33 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeStruct;
-import com.cliffc.aa.type.TypeTuple;
+
+import java.util.Arrays;
 
 // Make a new object of given type
 public class NewNode extends Node {
-  private final TypeTuple _ts;
-  public NewNode( TypeTuple ts, Node[] flds ) {
+  private final String[] _names; // Field names
+  public NewNode( String[] names, Node[] flds ) {
     super(OP_NEW,flds);
-    assert flds[0]==null;       // no ctrl field
-    _ts=ts;
+    assert flds [0]==null;      // no ctrl field
+    assert names.length==flds.length-1;
+    _names=names;
   }
-  String xstr() { return "New#"+_ts; }  // Self short name
-  String  str() { return xstr(); }      // Inline short name
+  String xstr() { return "New#"; } // Self short name
+  String  str() { return xstr(); } // Inline short name
   @Override public Node ideal(GVNGCM gvn) { return null; }
   @Override public Type value(GVNGCM gvn) {
-    TypeStruct tstr = _ts instanceof TypeStruct ? (TypeStruct)_ts : null;
-    assert tstr==null || tstr._args.length+1 == _defs._len;
-    boolean eq=true;
-    for( int i=1; i<_defs._len; i++ )
-      eq &= _ts.at(i-1) == gvn.type(in(i));
-    if( eq ) return _ts;
     Type[] ts = new Type[_defs._len-1];
-    for( int i=0; i<ts.length; i++ ) {
+    for( int i=0; i<ts.length; i++ )
       ts[i] = gvn.type(in(i+1));
-      assert ts[i].isa(_ts.at(i)); // Type correct
-    }
-    return tstr==null ? TypeTuple.make_all(ts) : TypeStruct.makeA(tstr._args,ts);
+    return TypeStruct.make_recursive(_uid,_names,ts);
   }
-  @Override public int hashCode() { return super.hashCode()+_ts.hashCode(); }
+  @Override public int hashCode() { return super.hashCode()+ Arrays.hashCode(_names); }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !super.equals(o) ) return false;
     if( !(o instanceof NewNode) ) return false;
     NewNode nnn = (NewNode)o;
-    return _ts==nnn._ts;
+    return Arrays.equals(_names,nnn._names);
   }
 }
