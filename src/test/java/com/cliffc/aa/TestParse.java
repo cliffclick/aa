@@ -14,12 +14,7 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
 
-    // Fails because there is an infinite type-expansion (which in turn points
-    // out that I'm missing the optimistic-all-equals type algo which can find
-    // optimal closed type cycles).  The expansion loop is:
-    //    Call(arg)->DProj->New(adds a layer)->Phi(of nil)->Epilog->Call
-    // Each loop around nests another @{n:???,v:int} wrapper.
-    //test_isa("map={x:@{n,v:int}? -> x ? @{n=map(x.n),v=x.v*x.v} : 0}", TypeFunPtr.FUNPTR1); // Recursive (looping) struct meets
+    test_isa("map={x:@{n,v:int}? -> x ? @{n=map(x.n),v=x.v*x.v} : 0}", TypeFunPtr.FUNPTR1); // Recursive (looping) struct meets
     //test_isa("map={x -> x ? @{n=map(x.n),v=x.v*x.v} : 0}", TypeFunPtr.FUNPTR1); // Recursive (looping) struct meets
 
     // Tuple syntax, not yet supported
@@ -322,7 +317,7 @@ public class TestParse {
     // User-defined linked list
     String ll_def = "List=:@{next,val}; LL={n v -> List(@{next=n,val=v})};";
     String ll_con = "tmp=LL(LL(0,1.2),2.3);";
-    //String ll_map = "map = {fun list -> list ? LL(map(fun,list.next),fun(list.val)) : 0};";
+    String ll_map = "map = {fun list -> list ? LL(map(fun,list.next),fun(list.val)) : 0};";
     
     test_isa(ll_def, TypeFun.GENERIC_FUN);
     test(ll_def+ll_con+"; tmp.next.val", TypeFlt.con(1.2));

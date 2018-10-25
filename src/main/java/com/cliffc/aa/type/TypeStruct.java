@@ -204,13 +204,14 @@ public class TypeStruct extends TypeOop<TypeStruct> {
     TypeStruct drez= malloc(!rez._any     ,das,dts);
     rez._dual=drez;             // Pre-compute the dual, since its needed recursively
     drez._dual=rez;
-    tmax._recursive = _recursive = rez;
+    tmax._recursive = _recursive = rez; // If either this or tmax, instead use rez
     for( int i=0; i<_ts.length; i++ ) 
       dts[i] = (ts[i] = _ts[i].meet(tmax._ts[i])).dual();
     tmax._recursive = _recursive = null;
-    _recursive = drez;     // If interning, take the computed dual directly.  See xdual
+    rez._recursive = drez; // If interning, take the computed dual directly.  See xdual
+    drez._dual= null;      // Pass interning asserts
     TypeStruct tstr = rez.hashcons_free();
-    _recursive = null;
+    rez._recursive = _recursive = null;
     return tstr;
   }
 

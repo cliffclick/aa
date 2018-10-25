@@ -20,8 +20,27 @@ public class TestType {
 
     Type foo = TypeStruct.POINT.meet(TypeStruct.C0);
     assertTrue(foo!=foo.dual());
+    //test_isa("map={x:@{n,v:int}? -> x ? @{n=map(x.n),v=x.v*x.v} : 0}", TypeFunPtr.FUNPTR1); // Recursive (looping) struct meets
 
+    // NewNode infinitely wraps self in recursive function.  Returns from
+    // recursive function only Phi-meet infinitely-wrapping self with nil.  So
+    // need 'meet' calls except with nil, and type can get very large.  Some
+    // random isa test does a meet, which triggers a recursive meet and returns
+    // a cyclic type, instead of an unrolled type - which then fails the isa.
+
+    // But the wrapped type with same NewNode grows the type without bound,
+    // unless we trigger a recursive-meet.  What is the minimal type of
+    // this:
+    //     "@{n:@{n:~Scalar,v:int64},v:int64}";
+    // Need n's type to always support an 'n'.
+    // So we see a recursive n: (which supports 'n');
+    // So we see a ~Scalar, which supports 'n'.
+    //     "@{n:~*+?,v:int64}"
     
+    //"@{n:@{n:~Scalar,v:int64},v:int64}";
+    //"@{n:@{n:@{n:~Scalar,v:int64},v:int64},v:int64}";
+    //meet: "@{n:*,v:int64}";
+      
     Type def = TypeStr.con("def");
     Type mto5 = def.meet(TypeStr.ABC);
     assertEquals(TypeStr.STR,mto5);
