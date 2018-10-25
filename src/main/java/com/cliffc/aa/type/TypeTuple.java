@@ -32,6 +32,17 @@ public class TypeTuple<P extends TypeTuple<P>> extends TypeOop<P> {
       if( _ts[i]!=t._ts[i] ) return false;
     return true;
   }
+  @Override public boolean cycle_equals( Type o ) {
+    if( this==o ) return true;
+    if( !(o instanceof TypeTuple) ) return false;
+    TypeTuple t = (TypeTuple)o;
+    if( _any!=t._any || _hash != t._hash || _ts.length != t._ts.length )
+      return false;
+    if( _ts == t._ts ) return true;
+    for( int i=0; i<_ts.length; i++ )
+      if( _ts[i]!=t._ts[i] && !_ts[i].cycle_equals(t._ts[i]) ) return false;
+    return true;
+  }
   @Override String str( BitSet dups) {
     SB sb = new SB();
     if( _any ) sb.p('~');

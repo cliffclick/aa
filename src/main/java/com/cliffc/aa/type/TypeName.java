@@ -29,6 +29,18 @@ public class TypeName extends Type<TypeName> {
     // simple cycles and lets the interning close the loop.
     return (t2._depth<0 ? 0 : t2._depth) == (_depth<0 ? 0 :_depth);
   }
+  @Override public boolean cycle_equals( Type o ) {
+    if( this==o ) return true;
+    if( !(o instanceof TypeName) ) return false;
+    TypeName t2 = (TypeName)o;
+    if( _lex != t2._lex  || !_name.equals(t2._name) ) return false;
+    if( _t!=t2._t && !_t.cycle_equals(t2._t) ) return false;
+    if( _depth==t2._depth ) return true;
+    // Also return true for comparing TypeName(name,type) where the types
+    // match, but the 'this' TypeName is depth 0 vs depth -1 - this detects
+    // simple cycles and lets the interning close the loop.
+    return (t2._depth<0 ? 0 : t2._depth) == (_depth<0 ? 0 :_depth);
+  }
   @Override String str( BitSet dups) {
     if( _depth < 0 ) {          // Only for recursive-type-heads
       if( dups == null ) dups = new BitSet();

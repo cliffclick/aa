@@ -219,17 +219,17 @@ public class TestParse {
     test_isa("A= :(:flt,:int)", name_tuple_constructor(TypeFlt.FLT64,TypeInt.INT64));
     test_isa("A= :(    ,:int)", name_tuple_constructor(Type.SCALAR  ,TypeInt.INT64));
 
-    test   ("A= :(:str?, :int); A((\"abc\",2))",(tmap -> TypeName.make("A",tmap,TypeStruct.make(211,TypeStr.ABC,TypeInt.con(2)))));
+    test   ("A= :(:str?, :int); A((\"abc\",2))",(tmap -> TypeName.make("A",tmap,TypeStruct.make(TypeStr.ABC,TypeInt.con(2)))));
     testerr("A= :(:str?, :int)?","Named types are never nil","                  ");
   }
   static private Function<HashMap<String,Type>,Type> name_tuple_constructor(Type... ts) {
-    TypeStruct tt = TypeStruct.make(0,ts);
+    TypeStruct tt = TypeStruct.make(ts);
     return (tmap -> TypeFun.make(TypeFunPtr.make(TypeTuple.make(tt),TypeName.make("A",tmap,tt),Bits.FULL,1)));
   }
 
   @Test public void testParse4() {
     // simple anon struct tests
-    test   ("  @{x,y} ", TypeStruct.make(205,new String[]{"x","y"},Type.SCALAR,Type.SCALAR)); // simple anon struct decl
+    test   ("  @{x,y} ", TypeStruct.make(new String[]{"x","y"},Type.SCALAR,Type.SCALAR)); // simple anon struct decl
     testerr("a=@{x=1.2,y}; x", "Unknown ref 'x'","               ");
     testerr("a=@{x=1,x=2}", "Cannot define field '.x' twice","           ");
     test   ("a=@{x=1.2,y,}; a.x", TypeFlt.con(1.2)); // standard "." field naming; trailing comma optional
@@ -249,7 +249,7 @@ public class TestParse {
     test   ("dist={p->p//qqq\n.//qqq\nx*p.x+p.y*p.y}; dist(//qqq\n@{x//qqq\n=1,y=2})", TypeInt.con(5));
 
     // Tuple
-    test("(0,\"abc\")", TypeStruct.make(205,TypeNil.NIL,TypeStr.ABC));
+    test("(0,\"abc\")", TypeStruct.make(TypeNil.NIL,TypeStr.ABC));
     
     // Named type variables
     test_isa("gal=:flt"       , (tmap -> TypeFun.make(TypeFunPtr.make(TypeTuple.FLT64,TypeName.make("gal",tmap,TypeFlt.FLT64),Bits.FULL,1))));
@@ -282,13 +282,12 @@ public class TestParse {
   }
 
   @Test public void testParse6() {
-    test_isa("A= :(:A?, :int); A((0,2))",(tmap -> TypeName.make("A",tmap,TypeStruct.make(0,TypeNil.NIL,TypeInt.con(2)))));
-    test_isa("A= :(:A?, :int); A((A((0,2)),3))",(tmap -> TypeName.make("A",tmap,TypeStruct.make(0,TypeName.make("A",tmap,TypeStruct.make(0,TypeNil.NIL,TypeInt.con(2))),TypeInt.con(3)))));
-    
+    test_isa("A= :(:A?, :int); A((0,2))",(tmap -> TypeName.make("A",tmap,TypeStruct.make(TypeNil.NIL,TypeInt.con(2)))));
+    test_isa("A= :(:A?, :int); A((A((0,2)),3))",(tmap -> TypeName.make("A",tmap,TypeStruct.make(TypeName.make("A",tmap,TypeStruct.make(TypeNil.NIL,TypeInt.con(2))),TypeInt.con(3)))));
     
     // Building recursive types
     test_isa("A= :int; A(1)", (tmap -> TypeName.make("A",tmap,TypeInt.INT64)));
-    test("A= :(:str?, :int); A((0,2))",(tmap -> TypeName.make("A",tmap,TypeStruct.make(211,TypeNil.NIL,TypeInt.con(2)))));
+    test("A= :(:str?, :int); A((0,2))",(tmap -> TypeName.make("A",tmap,TypeStruct.make(TypeNil.NIL,TypeInt.con(2)))));
     // Named recursive types
     test_isa("A= :(:A?, :int); A((0,2))",Type.SCALAR);// No error casting (0,2) to an A
     test_isa("A= :@{n:A?, v:flt}; A(@{n=0,v=1.2}).v;", TypeFlt.con(1.2));
@@ -416,31 +415,26 @@ c[x]=1;
   
   static private void test( String program, Type expected ) {
     assertEquals(expected,run(program)._t);
-    Type.reset_to_init0();      // Reset after type looking and testing
   }
   static private void test( String program, Function<HashMap<String,Type>,Type> expected ) {
     TypeEnv te = run(program);
     Type t_expected = expected.apply(te._env._scope.types());
     assertEquals(t_expected,te._t);
-    Type.reset_to_init0();      // Reset after type looking and testing
   }
   static private void test_isa( String program, Type expected ) {
     TypeEnv te = run(program);
     assertTrue(te._t.isa(expected));
-    Type.reset_to_init0();      // Reset after type looking and testing
   }
   static private void test_isa( String program, Function<HashMap<String,Type>,Type> expected ) {
     TypeEnv te = run(program);
     Type t_expected = expected.apply(te._env._scope.types());
     assertTrue(te._t.isa(t_expected));
-    Type.reset_to_init0();      // Reset after type looking and testing
   }
   static private void testerr( String program, String err, String cursor ) {
     String err2 = "\nargs:0:"+err+"\n"+program+"\n"+cursor+"^\n";
     TypeEnv te = Exec.go("args",program);
     assertTrue(te._errs != null && te._errs._len>=1);
     assertEquals(err2,te._errs.at(0));
-    Type.reset_to_init0();      // Reset after type looking and testing
   }
 
 }

@@ -18,6 +18,10 @@ public class TestType {
     Type.init0(new HashMap<>());
     Type ignore = TypeTuple.ALL; // Break class-loader cycle; load Tuple before Fun.
 
+    Type foo = TypeStruct.POINT.meet(TypeStruct.C0);
+    assertTrue(foo!=foo.dual());
+
+    
     Type def = TypeStr.con("def");
     Type mto5 = def.meet(TypeStr.ABC);
     assertEquals(TypeStr.STR,mto5);
@@ -138,18 +142,18 @@ public class TestType {
     Type tsx= TypeStruct.X;      // @{x:flt64}; fixed  leading field name
     Type tff = tsx.meet(tf);     //
     assertEquals(tf,tff);        // tsx.isa(tf)
-    TypeStruct t0 = TypeStruct.make(0,nil); //  (nil)
-    TypeStruct ts0= TypeStruct.make(0,new String[]{"x"},nil);  // @{x:nil}
+    TypeStruct t0 = TypeStruct.make(nil); //  (nil)
+    TypeStruct ts0= TypeStruct.make(new String[]{"x"},nil);  // @{x:nil}
     Type tss = ts0.meet(t0);
     assertEquals(t0,tss);      // t0.isa(ts0)
 
     // meet @{c:0}? and @{c:@{x:1}?,}
-    Type    nc0 = TypeNil.make(TypeStruct.make(0,new String[]{"c"},TypeNil.NIL )); // @{c:nil}?
-    Type    nx1 = TypeNil.make(TypeStruct.make(0,new String[]{"x"},TypeInt.TRUE)); // @{x:1}?
-    TypeOop cx  = TypeStruct.make(0,new String[]{"c"},nx1); // @{c:@{x:1}?}
+    Type    nc0 = TypeNil.make(TypeStruct.make(new String[]{"c"},TypeNil.NIL )); // @{c:nil}?
+    Type    nx1 = TypeNil.make(TypeStruct.make(new String[]{"x"},TypeInt.TRUE)); // @{x:1}?
+    TypeOop cx  = TypeStruct.make(new String[]{"c"},nx1); // @{c:@{x:1}?}
     // JOIN tosses the top-level null choice, and the inside struct choice
     Type cj  = nc0.join(cx);
-    Type c0  = TypeStruct.make(0,new String[]{"c"},TypeNil.NIL); // @{c:0}
+    Type c0  = TypeStruct.make(new String[]{"c"},TypeNil.NIL); // @{c:0}
     assertEquals(c0,cj);
   }
 
@@ -196,16 +200,16 @@ public class TestType {
 
   // Test limits on recursive type structures; recursively building nested
   // structures caps out in the type system at some reasonable limit.
-  @Ignore @Test public void testRecursive() {
+  @Test public void testRecursive() {
     Type.init0(new HashMap<>());
 
     // Nest a linked-list style tuple 10 deep; verify actual depth is capped at
     // less than 5.
-    int nuid = 123;             // Sample NewNode nuid
+    Type told = Type.SCALAR;
     Type t0 = TypeNil.NIL;
     for( int i=0; i<10; i++ ) {
-      TypeStruct ts = TypeStruct.make_recursive(nuid,TypeStruct.FLDS(2),t0,TypeInt.con(i));
-      t0 = ts.meet(t0);    // Must be a phi-meet in any data loop
+      told = TypeStruct.make(TypeStruct.FLDS(2),t0,TypeInt.con(i));
+      t0 = told.meet(t0);    // Must be a phi-meet in any data loop
     }
     int max_depth = type_depth(t0,new HashMap<>());
     assertTrue(max_depth<5);

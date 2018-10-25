@@ -19,6 +19,7 @@ public class TypeStr extends TypeOop<TypeStr> {
     TypeStr t2 = (TypeStr)o;
     return _any == t2._any && (_con==t2._con || (_con != null && _con.equals(t2._con)));
   }
+  @Override public boolean cycle_equals( Type o ) { return equals(o); }
   @Override String str( BitSet dups) {
     SB sb = new SB();
     if( _any ) sb.p('~');

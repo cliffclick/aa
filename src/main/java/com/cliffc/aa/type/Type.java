@@ -53,6 +53,10 @@ public class Type<T extends Type<T>> {
     if( this == o ) return true;
     return (o instanceof Type) && _type==((Type)o)._type;
   }
+  public boolean cycle_equals( Type o ) {
+    assert is_simple();         // Overridden in subclasses
+    return _type==o._type;
+  }
   // In order to handle recursive printing, this is the only toString call in
   // the Type heirarchy.  Instead, subtypes override 'str(HashSet)' where the
   // HashSet is only installed by the head of a type-cycle (always and only
@@ -274,11 +278,6 @@ public class Type<T extends Type<T>> {
     TypeFlt.init1(types);
     TypeStr.init1(types);
   }
-  public static void reset_to_init0( ) {
-    // Remove all mutable types... which are all the recursive types.  They
-    // need to be re-mutated from the start every Parse.
-    INTERN.entrySet().removeIf(entry ->  entry.getValue() instanceof TypeStruct && ((TypeStruct)entry.getValue())._nuid != 0 );
-  }
   
   public static boolean check_startup() {
     Type[] ts =    Type      .TYPES ;
@@ -453,7 +452,7 @@ public class Type<T extends Type<T>> {
   // holding (recursively) the head of a named-type cycle.  We need to cap the
   // unroll, to prevent loops/recursion from infinitely unrolling.
   Type make_recur(TypeName tn, int d, BitSet bs ) { assert is_simple(); return this; }
-
+  
   // Iterate over any nested child types
   public void iter( Consumer<Type> c ) { /*None in the base class*/ }
   

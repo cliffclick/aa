@@ -16,6 +16,7 @@ public class TypeInt extends Type<TypeInt> {
     TypeInt t2 = (TypeInt)o;
     return _x==t2._x && _z==t2._z && _con==t2._con;
   }
+  @Override public boolean cycle_equals( Type o ) { return equals(o); }
   @Override String str( BitSet dups) {
     if( _x==0 ) return Long.toString(_con);
     return (_x==1?"~":"")+"int"+Integer.toString(_z);

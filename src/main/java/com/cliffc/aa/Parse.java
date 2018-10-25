@@ -564,7 +564,7 @@ public class Parse {
         ts  .add(typeq(t));
         if( !peek(',') ) break; // Final comma is optional
       }
-      return peek('}') ? typeq(TypeStruct.make(0,flds.asAry(),ts.asAry())) : null;
+      return peek('}') ? typeq(TypeStruct.make(flds.asAry(),ts.asAry())) : null;
     }
 
     // "()" is the zero-entry tuple
@@ -582,7 +582,7 @@ public class Parse {
         ts.add(typeq(t));
         if( !peek(',') ) break; // Final comma is optional
       }
-      return peek(')') ? typeq(TypeStruct.make(0,ts.asAry())) : null;
+      return peek(')') ? typeq(TypeStruct.make(ts.asAry())) : null;
     }
 
     // Primitive type

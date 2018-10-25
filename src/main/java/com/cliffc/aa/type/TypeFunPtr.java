@@ -29,7 +29,8 @@ public class TypeFunPtr extends Type<TypeFunPtr> {
     SB sb = FunNode.names(_fidxs,new SB());
     if( _nargs==-1 ) return sb.p("{forward_ref}").toString();
     sb.p('{');
-    for( int i=0; i<_nargs; i++ ) sb.p(arg(i).str(dups)).p(' ');
+    for( int i=0; i<_ts._ts.length; i++ ) sb.p(arg(i).str(dups)).p(' ');
+    if( _nargs==99 ) sb.p("... ");
     sb.p("-> ").p(_ret.str(dups)).p('}');
     if( _fidxs.test(0) ) sb.p(_fidxs.above_center()?"+0":"?");
     return sb.toString();

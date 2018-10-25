@@ -16,6 +16,12 @@ public class TypeNil extends Type<TypeNil> {
     TypeNil t2 = (TypeNil)o;
     return _t==t2._t;
   }
+  @Override public boolean cycle_equals( Type o ) {
+    if( this==o ) return true;
+    if( !(o instanceof TypeNil) ) return false;
+    TypeNil t2 = (TypeNil)o;
+    return _t==t2._t || (_t!=null && t2._t != null && _t.cycle_equals(t2._t));
+  }
   @Override String str( BitSet dups) { return _t==null ? "nil" : _t.str(dups)+(_t.above_center() ? "+0" : "?"); }
   
   private static TypeNil FREE=null;
@@ -83,9 +89,8 @@ public class TypeNil extends Type<TypeNil> {
   @Override Type make_recur(TypeName tn, int d, BitSet bs ) {
     if( _t==null ) return this; // No recursion on NIL
     Type t2 = _t.make_recur(tn,d,bs);
-    if( t2==_t ) return this;
     // Build a depth-limited version of the same TypeNil
-    return make(t2);
+    return t2==_t ? this : make(t2);
   }
   // Iterate over any nested child types
   @Override public void iter( Consumer<Type> c ) { c.accept(_t); }

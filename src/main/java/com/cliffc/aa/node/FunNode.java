@@ -402,7 +402,7 @@ public class FunNode extends RegionNode {
     // The situation is still theoretically correct: the original Calls all
     // split into 2 non-overlapping sets: calls from the new Calls and those
     // left behind coming from the old Calls.  Update the old functions with
-    // the se new Calls as-needed.  If _all_calls_known is false, the old
+    // these new Calls as-needed.  If _all_calls_known is false, the old
     // function is prepared to handle unexpected new Calls already.  If its
     // true, then immediately wire up the new Call, add the new RPC input and
     // correct all types.

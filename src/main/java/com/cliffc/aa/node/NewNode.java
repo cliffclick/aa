@@ -22,7 +22,7 @@ public class NewNode extends Node {
     Type[] ts = new Type[_defs._len-1];
     for( int i=0; i<ts.length; i++ )
       ts[i] = gvn.type(in(i+1));
-    return TypeStruct.make_recursive(_uid,_names,ts);
+    return TypeStruct.make(_names,ts);
   }
   @Override public int hashCode() { return super.hashCode()+ Arrays.hashCode(_names); }
   @Override public boolean equals(Object o) {
