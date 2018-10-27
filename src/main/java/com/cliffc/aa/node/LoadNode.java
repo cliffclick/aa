@@ -28,9 +28,11 @@ public class LoadNode extends Node {
 
     // Lift control on Loads as high as possible... and move them over
     // to a CastNode (to remove null-ness) and remove the control.
-    if( !(t instanceof TypeNil) ) // No null, no need for ctrl
+    if( !TypeNil.NIL.isa(t) ) // No null, no need for ctrl
       // remove ctrl; address already casts-away-null
       return set_def(0,null,gvn);
+    if( !(t instanceof TypeNil) )
+      return null; // below a nil (e.g. Scalar), do nothing yet
 
     // Looking for a null-check pattern:
     //   this.0->dom*->True->If->addr
@@ -60,7 +62,8 @@ public class LoadNode extends Node {
     if( t.is_forward_ref() ) return Type.SCALAR; // Not yet defined, might fail
     if( t instanceof TypeNil ) {
       if( t.above_center() ) t = ((TypeNil)t)._t.base(); // hi-nil, assume not a nil
-      else return Type.SCALAR;  // Might fail before loading
+      else if( t==TypeNil.NIL ) return Type.SCALAR;      // Must fail
+      else return gvn.self_type(this); // Might nil-fail, might be null-checked recursively, leave type alone
     }
 
     if( t instanceof TypeStruct ) {

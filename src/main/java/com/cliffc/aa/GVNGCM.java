@@ -90,6 +90,11 @@ public class GVNGCM {
     assert t != null;
     _ts.setX(n._uid,t);
   }
+  // Return the prior self_type during the value() call, without installing a
+  // new type.
+  public Type self_type( Node n ) {
+    return n._uid < _ts._len ? _ts._es[n._uid] : n.all_type();
+  }
   // Make globally shared common ConNode for this type.
   public ConNode con( Type t ) {
     ConNode con = new ConNode<>(t);

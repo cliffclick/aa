@@ -200,18 +200,33 @@ public class TypeStruct extends TypeOop<TypeStruct> {
     // recursively we'll return the rez result which will form a loop in the
     // type structures.  Notice that the recursive dual has to be computed in
     // parallel, since it will also be used in the dual internal structures.
-    TypeStruct  rez= malloc(_any&tmax._any, as, ts);
-    TypeStruct drez= malloc(!rez._any     ,das,dts);
-    rez._dual=drez;             // Pre-compute the dual, since its needed recursively
-    drez._dual=rez;
+    TypeStruct rez = malloc(_any&tmax._any, as, ts);
+    TypeStruct rezd= malloc(!rez._any     ,das,dts);
+    rez._dual=rezd;       // Pre-compute the dual, since its needed recursively
+    rezd._dual=rez;
+    // Set in the recursive answer: this is how the result will have self-loops
+    // (instead of pointers back into the this/tmax loops).
     tmax._recursive = _recursive = rez; // If either this or tmax, instead use rez
     for( int i=0; i<_ts.length; i++ ) 
       dts[i] = (ts[i] = _ts[i].meet(tmax._ts[i])).dual();
     tmax._recursive = _recursive = null;
-    rez._recursive = drez; // If interning, take the computed dual directly.  See xdual
-    drez._dual= null;      // Pass interning asserts
-    TypeStruct tstr = rez.hashcons_free();
-    rez._recursive = _recursive = null;
+    
+    rezd._dual= null;      // Pass interning asserts
+    // Already computed a (recursive) dual; use it instead of top-down
+    // constructed dual - which cannot have self-loops.
+    rez._recursive = rezd; // If interning, take the computed dual directly.  See xdual
+    TypeStruct tstr = (TypeStruct)rez.hashcons();
+    rez._recursive = null;
+    // If interning returns a prior answer, need to nuke the entire self-loop
+    if( tstr != rez ) {         // Intern'ing gave a pre-existing answer
+      rez ._dual=null;
+      rezd._dual=null;
+      BitSet bs = new BitSet();
+      for( Type t : rez ._ts) t.free_recursively(bs);
+      for( Type t : rezd._ts) t.free_recursively(bs);
+      rez .free(null);
+      rezd.free(null);
+    }
     return tstr;
   }
 
@@ -262,6 +277,26 @@ public class TypeStruct extends TypeOop<TypeStruct> {
 
   // Iterate over any nested child types
   @Override public void iter( Consumer<Type> c ) { for( Type t : _ts) c.accept(t); }
+  // If any substructure is being freed, then this type is being freed also.
+  @Override boolean free_recursively(BitSet bs) {
+    if( _dual==null ) return true;
+    if( bs.get(_uid) ) return false;
+    bs.set(_uid);
+    boolean free=false;
+    for( Type t : _ts) if( t.free_recursively(bs) ) { free=true; break; }
+    if( !free ) return false;
+    untern();
+    free(null);
+    _dual=null;
+    return true;
+  }
+  @Override boolean contains( Type t, BitSet bs ) {
+    if( bs==null ) bs=new BitSet();
+    if( bs.get(_uid) ) return false;
+    bs.set(_uid);
+    for( Type t2 : _ts) if( t2==t || t2.contains(t,bs) ) return true;
+    return false;
+  }
 
 
   // Recursive-cyclic meet: given 2 (potentially) cyclic structures do a

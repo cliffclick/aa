@@ -22,7 +22,12 @@ public class NewNode extends Node {
     Type[] ts = new Type[_defs._len-1];
     for( int i=0; i<ts.length; i++ )
       ts[i] = gvn.type(in(i+1));
-    return TypeStruct.make(_names,ts);
+    Type newt = TypeStruct.make(_names,ts);
+    // Get the existing type, without installing if missing because blows the
+    // "new newnode" assert if this node gets replaced during parsing.
+    Type oldt = gvn.self_type(this);
+    Type rez = newt.contains(oldt) ? newt.meet(oldt) : newt;
+    return rez;
   }
   @Override public int hashCode() { return super.hashCode()+ Arrays.hashCode(_names); }
   @Override public boolean equals(Object o) {

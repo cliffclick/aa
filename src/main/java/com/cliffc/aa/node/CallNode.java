@@ -223,8 +223,12 @@ public class CallNode extends Node {
     Bits fidxs = tf._fidxs;     // Get all the propagated reaching functions
     if( fidxs.above_center() ) return;
     for( int fidx : fidxs ) {   // For all functions
-      if( fidx >= FunNode.PRIM_CNT ) // Do not wire up primitives, but forever take their default inputs and outputs
-        wire(gvn,FunNode.find_fidx(fidx));
+      if( fidx >= FunNode.PRIM_CNT ) { // Do not wire up primitives, but forever take their default inputs and outputs
+        // Can be wiring up the '#[ALL]' list.  Stop after seeing all existing functions
+        if( fidx >= FunNode.FUNS._len ) return;
+        FunNode fun = FunNode.find_fidx(fidx);
+        if( !fun.is_dead() ) wire(gvn,fun);
+      }
     }
   }
   
@@ -362,7 +366,11 @@ public class CallNode extends Node {
     
     Node fp = in(1);      // Either function pointer, or unresolve list of them
     Node xfp = fp instanceof UnresolvedNode ? fp.in(0) : fp;
-    TypeFun tfun = (TypeFun)gvn.type(xfp);
+    Type txfp = gvn.type(xfp);
+    if( !(txfp instanceof TypeFun) )
+      return _badargs.errMsg("A function is being called, but "+txfp+" is not a function type");
+
+    TypeFun tfun = (TypeFun)txfp;
     if( tfun.is_forward_ref() ) // Forward ref on incoming function
       return _badargs.forward_ref_err(tfun);
 

@@ -76,7 +76,7 @@ public class FunNode extends RegionNode {
   public static void reset_to_init0() { CNT = PRIM_CNT; NAMES.set_len(PRIM_CNT); FUNS.set_len(PRIM_CNT); }
 
   // Find FunNodes by fidx
-  private static Ary<FunNode> FUNS = new Ary<>(new FunNode[]{null,});
+  static Ary<FunNode> FUNS = new Ary<>(new FunNode[]{null,});
   public static FunNode find_fidx(int fidx) { return FUNS.at(fidx); }
 
   @Override String xstr() { return _tf.toString(); }
@@ -448,7 +448,7 @@ public class FunNode extends RegionNode {
     Node s = in(1);
     if( !(s instanceof ScopeNode) ) return false;
     if( s._defs._len < 3 ) return false;
-    Node e = s.in(s._defs._len-2); // EPilog
+    Node e = s.in(s._defs._len-2); // Epilog
     if( !(e instanceof EpilogNode) ) return false;
     if( ((EpilogNode)e).fun() != this ) return false;
     return true;

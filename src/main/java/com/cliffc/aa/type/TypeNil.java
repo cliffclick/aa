@@ -94,4 +94,13 @@ public class TypeNil extends Type<TypeNil> {
   }
   // Iterate over any nested child types
   @Override public void iter( Consumer<Type> c ) { c.accept(_t); }
+  // If any substructure is being freed, then this type is being freed also.
+  @Override boolean free_recursively(BitSet bs) {
+    if( _t==null || !_t.free_recursively(bs) ) return false;
+    untern();
+    free(null);
+    return true;
+  }
+
+  @Override boolean contains( Type t, BitSet bs ) { return _t == t || (_t != null && _t.contains(t, bs)); }
 }

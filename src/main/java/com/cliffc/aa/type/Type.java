@@ -58,7 +58,7 @@ public class Type<T extends Type<T>> {
     return _type==o._type;
   }
   // In order to handle recursive printing, this is the only toString call in
-  // the Type heirarchy.  Instead, subtypes override 'str(HashSet)' where the
+  // the Type hierarchy.  Instead, subtypes override 'str(HashSet)' where the
   // HashSet is only installed by the head of a type-cycle (always and only
   // TypeName) and is used (again only by TypeName) to end cyclic printing.
   // All other 'str()' callers just pass along.
@@ -274,6 +274,7 @@ public class Type<T extends Type<T>> {
 
   public static void init0( HashMap<String,Type> types ) {
     types.put("real",REAL);
+    types.put("scalar",SCALAR);
     TypeInt.init1(types);
     TypeFlt.init1(types);
     TypeStr.init1(types);
@@ -447,15 +448,24 @@ public class Type<T extends Type<T>> {
   public byte op_prec() { return -1; } // Overridden in subclasses
   // Contains an error type string, perhaps embedded in some subtype
   public String errMsg() { return null; }
-  // Make a (posssibly cyclic & infinite) named type.  Prevent the infinite
+
+  // Make a (possibly cyclic & infinite) named type.  Prevent the infinite
   // unrolling of names by not allowing a named-type with depth >= D from
   // holding (recursively) the head of a named-type cycle.  We need to cap the
   // unroll, to prevent loops/recursion from infinitely unrolling.
   Type make_recur(TypeName tn, int d, BitSet bs ) { assert is_simple(); return this; }
+
+  // If any substructure is being freed, then this type is being freed also.
+  boolean free_recursively(BitSet bs) { return false; }
+
   
-  // Iterate over any nested child types
+  // Is t type contained within this?  Short-circuits on a true
+  public boolean contains( Type t ) { return contains(t,null); }
+  boolean contains( Type t, BitSet bs ) { return false; }
+  
+  // Iterate over any nested child types.  Only side-effect results.
   public void iter( Consumer<Type> c ) { /*None in the base class*/ }
-  
+
   RuntimeException typerr(Type t) {
     throw new RuntimeException("Should not reach here: internal type system error with "+this+(t==null?"":(" and "+t)));
   }

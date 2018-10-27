@@ -18,10 +18,17 @@ public class TestType {
     Type.init0(new HashMap<>());
     Type ignore = TypeTuple.ALL; // Break class-loader cycle; load Tuple before Fun.
 
-    Type foo = TypeStruct.POINT.meet(TypeStruct.C0);
-    assertTrue(foo!=foo.dual());
     //test_isa("map={x:@{n,v:int}? -> x ? @{n=map(x.n),v=x.v*x.v} : 0}", TypeFunPtr.FUNPTR1); // Recursive (looping) struct meets
+    String[] FLDS = new String[]{"n","v"};
+    Type s0 = TypeStruct.make(FLDS,Type.XSCALAR,TypeInt.INT64);
+    Type s1 = TypeStruct.make(FLDS,s0,TypeInt.INT64);
+    Type m1 = s1.meet(s0);
+    Type s2 = TypeStruct.make(FLDS,m1,TypeInt.INT64);
+    Type m2 = s2.meet(s1);
+    //assertEquals(m1,m2);
 
+
+    
     // NewNode infinitely wraps self in recursive function.  Returns from
     // recursive function only Phi-meet infinitely-wrapping self with nil.  So
     // need 'meet' calls except with nil, and type can get very large.  Some

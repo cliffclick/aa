@@ -14,7 +14,25 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
 
-    test_isa("map={x:@{n,v:int}? -> x ? @{n=map(x.n),v=x.v*x.v} : 0}", TypeFunPtr.FUNPTR1); // Recursive (looping) struct meets
+    // User-defined linked list
+    String ll_def = "List=:@{next,val}; LL={n v -> List(@{next=n,val=v})};";
+    String ll_con = "tmp=LL(LL(0,1.2),2.3);";
+    String ll_map = "map = {fun list -> list ? LL(map(fun,list.next),fun(list.val)) : 0};";
+    String ll_fun = "sq = {x -> x*x};";
+    String ll_apl = "map(sq,tmp);";
+
+    //test_isa(ll_def, TypeFun.GENERIC_FUN);
+    //test(ll_def+ll_con+"; tmp.next.val", TypeFlt.con(1.2));
+    //test(ll_def+ll_con+ll_map, TypeFun.GENERIC_FUN);
+    //test_isa(ll_def+ll_con+ll_map+ll_fun, TypeFun.GENERIC_FUN);
+    //test_isa(ll_def+ll_con+ll_map+ll_fun+ll_apl, TypeFlt.con(1.2));
+
+    // Returning this function dies because since it's being returned, it's
+    // acting "as if" it is being called with a @{n:scalar,v:int} argument
+    // which then passes via x.n a scalar to the map call again: map(scalar),
+    // and this does not type.
+    //test_isa("map={x:@{n,v:int}? -> x ? @{n=map(x.n),v=x.v*x.v} : 0}", TypeFunPtr.FUNPTR1); // Recursive (looping) struct meets
+    
     //test_isa("map={x -> x ? @{n=map(x.n),v=x.v*x.v} : 0}", TypeFunPtr.FUNPTR1); // Recursive (looping) struct meets
 
     // Tuple syntax, not yet supported

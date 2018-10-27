@@ -188,6 +188,20 @@ public class TypeTuple<P extends TypeTuple<P>> extends TypeOop<P> {
   
   // Iterate over any nested child types
   @Override public void iter( Consumer<Type> c ) { for( Type t : _ts) c.accept(t); }
+  // If any substructure is being freed, then this type is being freed also.
+  @Override boolean free_recursively(BitSet bs) {
+    boolean free=false;
+    for( Type t : _ts) if( t.free_recursively(bs) ) { free=true; break; }
+    if( !free ) return false;
+    untern();
+    free(null);
+    return true;
+  }
+  @Override boolean contains( Type t, BitSet bs ) {
+    if( bs==null ) bs=new BitSet();
+    for( Type t2 : _ts) if( t2==t || t2.contains(t,bs) ) return true;
+    return false;
+  }
   // Return an error message, if any exists
   @Override public String errMsg() {
     String s;
