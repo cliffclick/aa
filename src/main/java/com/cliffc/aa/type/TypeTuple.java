@@ -105,7 +105,7 @@ public class TypeTuple<P extends TypeTuple<P>> extends TypeOop<P> {
     case TINT:
     case TFUNPTR:
     case TFUN:
-    case TRPC:   return SCALAR;
+    case TRPC:   return t.must_nil() ? SCALAR : NSCALR;
     case TSTR:   return OOP;
     case TOOP:
     case TSTRUCT:

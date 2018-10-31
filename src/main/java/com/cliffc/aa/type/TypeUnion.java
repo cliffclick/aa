@@ -173,21 +173,6 @@ public class TypeUnion extends Type<TypeUnion> {
     return ts;
   }
 
-  // Union of the "idx"th argument.  Crash if the functions
-  // do not all have such an argument.
-  @Override public Type arg(int idx) {
-    Ary<Type> args = new Ary<>(Type.class);
-    for( int i=0; i<_ts._ts.length; i++ )
-      args.add(((TypeFunPtr)_ts._ts[i])._ts.at(idx));
-    return make(false,full_simplify(args,_any));
-  }
-  @Override public Type ret() {
-    Ary<Type> rets = new Ary<>(Type.class);
-    for( int i=0; i<_ts._ts.length; i++ )
-      rets.add(((TypeFunPtr)_ts._ts[i])._ret);
-    return make(_any,full_simplify(rets,_any));
-  }
-
   @Override public boolean above_center() {
     if( _any ) {
       for( Type t : _ts._ts )  if(  t.above_center() ) return true;

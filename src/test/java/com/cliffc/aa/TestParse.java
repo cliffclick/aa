@@ -14,19 +14,7 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
 
-    // User-defined linked list
-    String ll_def = "List=:@{next,val}; LL={n v -> List(@{next=n,val=v})};";
-    String ll_con = "tmp=LL(LL(0,1.2),2.3);";
-    String ll_map = "map = {fun list -> list ? LL(map(fun,list.next),fun(list.val)) : 0};";
-    String ll_fun = "sq = {x -> x*x};";
-    String ll_apl = "map(sq,tmp);";
-
-    //test_isa(ll_def, TypeFun.GENERIC_FUN);
-    //test(ll_def+ll_con+"; tmp.next.val", TypeFlt.con(1.2));
-    //test(ll_def+ll_con+ll_map, TypeFun.GENERIC_FUN);
-    //test_isa(ll_def+ll_con+ll_map+ll_fun, TypeFun.GENERIC_FUN);
-    //test_isa(ll_def+ll_con+ll_map+ll_fun+ll_apl, TypeFlt.con(1.2));
-
+    testerr("(math_rand(1)?0 : @{x=1}).x", "Struct might be nil when reading field '.x'", "                           ");
     // Returning this function dies because since it's being returned, it's
     // acting "as if" it is being called with a @{n:scalar,v:int} argument
     // which then passes via x.n a scalar to the map call again: map(scalar),
@@ -37,17 +25,7 @@ public class TestParse {
 
     // Tuple syntax, not yet supported
     //test_isa("map={x -> x ? (map(x[0]),x[1]*x[1]) : 0}; map(((0,1.2),2.3));", TypeFunPtr.FUNPTR1); // Recursive (looping) struct meets
-    
-    // User-defined linked-list
-    //test("List=:@{next,val};\n"+
-    //     "List0={n v -> List(@{next=n,val=v})};\n"+
-    //     "x=List0(List0(0,1.2),2.3);\n"+
-    //     "f={x->x*x};\n"+
-    //     "map = { f list -> list ? List0(map(f,list.next),f(list.val)) : 0 };\n"+
-    //     "map(f,x)"
-    //     , TypeStr.ABC);
 
-    
     // Making a trivial function which needs H-M or full inlining to type.
     // Adding syntax to prevent inlining, which means needs H-M
     //test("fun={# s->s.x}; (fun(@{x=3.14}),fun(@{x=\"abc\"}))",
@@ -147,9 +125,9 @@ public class TestParse {
     // Conditional:
     test   ("0 ?    2  : 3", TypeInt.con(3)); // false
     test   ("2 ?    2  : 3", TypeInt.con(2)); // true
-    test   ("math_rand(1)?(x=4):(x=3);x", TypeInt.INT8); // x defined on both arms, so available after
+    test   ("math_rand(1)?(x=4):(x=3);x", TypeInt.NINT8); // x defined on both arms, so available after
     test   ("math_rand(1)?(x=2):   3 ;4", TypeInt.con(4)); // x-defined on 1 side only, but not used thereafter
-    test   ("math_rand(1)?(y=2;x=y*y):(x=3);x", TypeInt.INT8); // x defined on both arms, so available after, while y is not
+    test   ("math_rand(1)?(y=2;x=y*y):(x=3);x", TypeInt.NINT8); // x defined on both arms, so available after, while y is not
     testerr("math_rand(1)?(x=2):   3 ;x", "'x' not defined on false arm of trinary","                        ");
     testerr("math_rand(1)?(x=2):   3 ;y=x+2;y", "'x' not defined on false arm of trinary","                        ");
     testerr("0 ? (x=2) : 3;x", "'x' not defined on false arm of trinary","             ");
@@ -157,7 +135,7 @@ public class TestParse {
     test   ("2 ? (x=2) : y  ", TypeInt.con(2)); // off-side is constant-dead, so missing 'y'      is ignored
     testerr("x=1;2?(x=2):(x=3);x", "Cannot re-assign val 'x'","          ");
     test   ("x=1;2?   2 :(x=3);x",TypeInt.con(1)); // Re-assigned allowed & ignored in dead branch
-    test   ("math_rand(1)?1:int:2:int",TypeInt.INT8); // no ambiguity between conditionals and type annotations
+    test   ("math_rand(1)?1:int:2:int",TypeInt.NINT8); // no ambiguity between conditionals and type annotations
     testerr("math_rand(1)?1: :2:int","missing expr after ':'","                "); // missing type
     testerr("math_rand(1)?1::2:int","missing expr after ':'","               "); // missing type
     testerr("math_rand(1)?1:\"a\"", "Cannot mix GC and non-GC types", "                  " );
@@ -257,7 +235,7 @@ public class TestParse {
     test   ("a=@{x=(b=1.2)*b,y=b}; a.y", TypeFlt.con(1.2 )); // ok to use temp defs
     test   ("a=@{x=(b=1.2)*b,y=x}; a.y", TypeFlt.con(1.44)); // ok to use early fields in later defs
     testerr("a=@{x=(b=1.2)*b,y=b}; b", "Unknown ref 'b'","                       ");
-    test   ("t=@{n=0,val=1.2}; u=math_rand(1) ? t : @{n=t,val=2.3}; u.val", TypeFlt.FLT64); // structs merge field-by-field
+    test   ("t=@{n=0,val=1.2}; u=math_rand(1) ? t : @{n=t,val=2.3}; u.val", TypeFlt.NFLT64); // structs merge field-by-field
     // Comments in the middle of a struct decl
     test   ("dist={p->p//qqq\n.//qqq\nx*p.x+p.y*p.y}; dist(//qqq\n@{x//qqq\n=1,y=2})", TypeInt.con(5));
 
@@ -325,6 +303,7 @@ public class TestParse {
     // Mutually recursive type
     test_isa("A= :@{n:B, v:int}; B= :@{n:A, v:flt}", Type.SCALAR);
   }
+
   @Test public void testParse7() {
     // Passing a function recursively
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({&},2)", TypeInt.FALSE);
@@ -336,12 +315,27 @@ public class TestParse {
     String ll_def = "List=:@{next,val}; LL={n v -> List(@{next=n,val=v})};";
     String ll_con = "tmp=LL(LL(0,1.2),2.3);";
     String ll_map = "map = {fun list -> list ? LL(map(fun,list.next),fun(list.val)) : 0};";
-    
+    String ll_fun = "sq = {x -> x*x};";
+    String ll_apl = "map(sq,tmp);";
+
     test_isa(ll_def, TypeFun.GENERIC_FUN);
     test(ll_def+ll_con+"; tmp.next.val", TypeFlt.con(1.2));
-    //test(ll_def+ll_con+ll_map, TypeFlt.con(1.2));
-    
+    //test(ll_def+ll_con+ll_map, TypeFun.GENERIC_FUN);
+    test_isa(ll_def+ll_con+ll_map+ll_fun, TypeFun.GENERIC_FUN);
 
+    // TODO: Needs a way to easily test simple recursive types
+    TypeEnv te4 = Exec.go("args",ll_def+ll_con+ll_map+ll_fun+ll_apl);
+    if( te4._errs != null ) System.err.println(te4._errs.toString());
+    Assert.assertNull(te4._errs);
+    TypeName tname4 = (TypeName)te4._t;
+    assertEquals("List", tname4._name);
+    TypeStruct tt4 = (TypeStruct)tname4._t;
+    TypeNil tnil4 = (TypeNil)tt4.at(0);
+    assertSame(tnil4._t , tname4);
+    //assertSame(tt4.at(1), TypeFlt.FLT64);
+    assertEquals("next",tt4._args[0]);
+    assertEquals("val",tt4._args[1]);
+    
     // TODO: Need real TypeVars for these
     //test("id:{A->A}"    , Env.lookup_valtype("id"));
     //test("id:{A:int->A}", Env.lookup_valtype("id"));

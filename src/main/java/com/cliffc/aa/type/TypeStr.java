@@ -58,7 +58,7 @@ public class TypeStr extends TypeOop<TypeStr> {
     case TFLT:
     case TINT:
     case TFUN:
-    case TRPC:   return SCALAR;
+    case TRPC:   return t.must_nil() ? SCALAR : NSCALR;
     case TOOP:
     case TNIL:
     case TNAME:  return t.xmeet(this); // Let other side decide

@@ -9,9 +9,9 @@ import com.cliffc.aa.node.FunNode;
  *      going to the FunNode and reversing to the RPC.
  *  3 - Function signature, with a single FIDX 
  * 
- *  This is the type of EpilogNodes, except they also have a _fidx to map to
- *  the FunNode (used when the FunNode is collapsing) AND a pointer to the
- *  FunNode.
+ *  This is the type of EpilogNodes, and is somewhat redundant because they
+ *  also have a _fidx to map to the FunNode (used when the FunNode is
+ *  collapsing) AND a pointer to the FunNode.
 */
 public class TypeFun extends TypeTuple<TypeFun> {
   private TypeFun( boolean any, Type[] ts ) {
@@ -30,6 +30,7 @@ public class TypeFun extends TypeTuple<TypeFun> {
   private static TypeFun FREE=null;
   @Override protected TypeFun free( TypeFun ret ) { FREE=this; return ret; }
   private static TypeFun make( boolean any, Type[] ts ) {
+    // TODO: assert fun().is_con() or _ts[3]._fidxes.is_con()
     TypeFun t1 = FREE;
     if( t1 == null ) t1 = new TypeFun(any,ts);
     else { FREE = null; t1.init(any,ts); }
@@ -66,7 +67,7 @@ public class TypeFun extends TypeTuple<TypeFun> {
     case TOOP:
     case TSTRUCT:
     case TTUPLE: 
-    case TRPC:   return Type.SCALAR;
+    case TRPC:   return t.must_nil() ? SCALAR : NSCALR;
     case TNIL:
     case TNAME:  return t.xmeet(this); // Let other side decide
     default: throw typerr(t);
@@ -83,7 +84,10 @@ public class TypeFun extends TypeTuple<TypeFun> {
 
   public Type ctl() { return _ts[0]; }
   public Type val() { return _ts[1]; }
+  public Type rpc() { return _ts[2]; }
   public TypeFunPtr fun() { return (TypeFunPtr)_ts[3]; }
+  @Override boolean must_nil() { return false; }
+  @Override Type not_nil(Type ignore) { return this; }
   // Return an error message, if any exists
   @Override public String errMsg() {
     // Ok to have a function which cannot be executed

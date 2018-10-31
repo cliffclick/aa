@@ -126,11 +126,11 @@ public class TypeStruct extends TypeOop<TypeStruct> {
   public  static TypeStruct make(Type... ts               ) { return malloc(false,FLDS[ts.length],ts).hashcons_free(); }
   public  static TypeStruct make(String[] flds, Type... ts) { return malloc(false,flds,ts).hashcons_free(); }
 
-  public  static final TypeStruct POINT = make(flds("x","y"),ts(TypeFlt.FLT64,TypeFlt.FLT64));
+  private static final TypeStruct POINT = make(flds("x","y"),ts(TypeFlt.FLT64,TypeFlt.FLT64));
   public  static final TypeStruct X     = make(flds("x"),ts(TypeFlt.FLT64 )); // @{x:flt}
   public  static final TypeStruct TFLT64= make(          ts(TypeFlt.FLT64 )); //  (  flt)
   private static final TypeStruct A     = make(flds("a"),ts(TypeFlt.FLT64 ));
-  public  static final TypeStruct C0    = make(flds("c"),ts(TypeNil.SCALAR)); // @{c:0}
+  private static final TypeStruct C0    = make(flds("c"),ts(TypeNil.SCALAR)); // @{c:0}
   private static final TypeStruct D1    = make(flds("d"),ts(TypeInt.TRUE  )); // @{d:1}
   static final TypeStruct[] TYPES = new TypeStruct[]{POINT,X,A,C0,D1};
 
@@ -155,7 +155,7 @@ public class TypeStruct extends TypeOop<TypeStruct> {
     case TINT:
     case TFUNPTR:
     case TFUN:
-    case TRPC:   return SCALAR;
+    case TRPC:   return t.must_nil() ? SCALAR : NSCALR;
     case TOOP:
     case TNIL:
     case TNAME:  return t.xmeet(this); // Let other side decide

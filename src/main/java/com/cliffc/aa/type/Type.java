@@ -1,7 +1,5 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.AA;
-
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.HashMap;
@@ -116,27 +114,41 @@ public class Type<T extends Type<T>> {
   static final byte TANY    = 1; // Top
   static final byte TCTRL   = 2; // Ctrl flow bottom
   static final byte TXCTRL  = 3; // Ctrl flow top (mini-lattice: any-xctrl-ctrl-all)
-  static final byte TSCALAR = 4; // Scalars; all possible finite types that fit in a machine register; includes pointers (functions, structs), ints, floats; excludes state of Memory and Ctrl.
+  // Scalars; all possible finite types that fit in a machine register;
+  // includes pointers (functions, structs), ints, floats; excludes state of
+  // Memory and Ctrl.
+  static final byte TSCALAR = 4; // Scalars
   static final byte TXSCALAR= 5; // Invert scalars
-  static final byte TNUM    = 6; // Number and all derivatives (Complex, Rational, Int, Float, etc)
-  static final byte TXNUM   = 7; // Any Numbers; dual of NUM
-  static final byte TREAL   = 8; // All Real Numbers
-  static final byte TXREAL  = 9; // Any Real Numbers; dual of REAL
-  static final byte TSIMPLE =10; // End of the Simple Types
-  private static final String[] STRS = new String[]{"all","any","Ctrl","~Ctrl","Scalar","~Scalar","Number","~Number","Real","~Real"};
+  // Not-nil Scalars.  Same as Scalars above but excludes nil/0.  Note that I
+  // have a doubly represented type: TypeNil.make(SCALAR) would add a nil to a
+  // SCALAR except SCALAR already has a nil.  This means if I define SCALAR as
+  // not having a nil, I could drop TNSCALR and TXNSCALR... but that makes
+  // TypeNil.make(SCALAR) below SCALAR in the lattice, which gets ugly.
+  static final byte TNSCALR = 6; // Scalars-not-nil
+  static final byte TXNSCALR= 7; // Invert Scalars-not-nil
+  static final byte TNUM    = 8; // Number and all derivatives (Complex, Rational, Int, Float, etc)
+  static final byte TXNUM   = 9; // Any Numbers; dual of NUM
+  static final byte TNNUM   =10; // Numbers-not-nil
+  static final byte TXNNUM  =11; // Invert Numbers-not-nil
+  static final byte TREAL   =12; // All Real Numbers
+  static final byte TXREAL  =13; // Any Real Numbers; dual of REAL
+  static final byte TNREAL  =14; // Numbers-not-nil
+  static final byte TXNREAL =15; // Invert Numbers-not-nil
+  static final byte TSIMPLE =16; // End of the Simple Types
+  private static final String[] STRS = new String[]{"all","any","Ctrl","~Ctrl","Scalar","~Scalar","nScalar","~nScalar","Number","~Number","nNumber","~nNumber","Real","~Real","nReal","~nReal"};
   // Implemented in subclasses
-  static final byte TNIL    =11; // Nil-types
-  static final byte TNAME   =12; // Named types; always a subtype of some other type
-  static final byte TOOP    =13; // Includes all GC ptrs & null; structs, strings.  Excludes functions, ints, floats
-  static final byte TTUPLE  =14; // Tuples; finite collections of unrelated Types, kept in parallel
-  static final byte TSTRUCT =15; // Structs; tuples with named fields
-  static final byte TFUNPTR =16; // Function *pointer*, a "fat" pointer refering to a single block of code
-  static final byte TFUN    =17; // Function signature; both domain and range are a Tuple; see TypeFun; many functions share the same signature
-  static final byte TRPC    =18; // Return PCs; Continuations; call-site return points; see TypeRPC
-  static final byte TFLT    =19; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
-  static final byte TINT    =20; // All Integers, including signed/unsigned and various sizes; see TypeInt
-  static final byte TSTR    =21; // String type
-  static final byte TLAST   =22; // Type check
+  static final byte TNIL    =17; // Nil-types
+  static final byte TNAME   =18; // Named types; always a subtype of some other type
+  static final byte TOOP    =19; // Includes all GC ptrs & null; structs, strings.  Excludes functions, ints, floats
+  static final byte TTUPLE  =20; // Tuples; finite collections of unrelated Types, kept in parallel
+  static final byte TSTRUCT =21; // Structs; tuples with named fields
+  static final byte TFUNPTR =22; // Function signature; both domain and range are a Tuple; see TypeFun; many functions share the same signature
+  static final byte TFUN    =23; // Function *pointer*, a "fat" pointer refering to a single block of code
+  static final byte TRPC    =24; // Return PCs; Continuations; call-site return points; see TypeRPC
+  static final byte TFLT    =25; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
+  static final byte TINT    =26; // All Integers, including signed/unsigned and various sizes; see TypeInt
+  static final byte TSTR    =27; // String type
+  static final byte TLAST   =28; // Type check
 
   public  static final Type ALL    = make( TALL   ); // Bottom
   public  static final Type ANY    = make( TANY   ); // Top
@@ -144,13 +156,19 @@ public class Type<T extends Type<T>> {
   public  static final Type XCTRL  = make(TXCTRL  ); // Ctrl
   public  static final Type  SCALAR= make( TSCALAR); // ptrs, ints, flts; things that fit in a machine register
   public  static final Type XSCALAR= make(TXSCALAR); // ptrs, ints, flts; things that fit in a machine register
-          static final Type  NUM   = make( TNUM   );
-  private static final Type XNUM   = make(TXNUM   );
-  public  static final Type  REAL  = make( TREAL  );
-  private static final Type XREAL  = make(TXREAL  );
+  public  static final Type  NSCALR= make( TNSCALR); // Scalars-not-nil
+  public  static final Type XNSCALR= make(TXNSCALR); // Scalars-not-nil
+  public  static final Type   NUM  = make( TNUM   );
+  public  static final Type  XNUM  = make(TXNUM   );
+  public  static final Type  NNUM  = make( TNNUM  );
+  public  static final Type XNNUM  = make(TXNNUM  );
+  public  static final Type   REAL = make( TREAL  );
+  private static final Type  XREAL = make(TXREAL  );
+          static final Type  NREAL = make( TNREAL );
+  private static final Type XNREAL = make(TXNREAL );
 
   // Collection of sample types for checking type lattice properties.
-  private static final Type[] TYPES = new Type[]{ALL,ANY,CTRL,XCTRL,SCALAR,XSCALAR,NUM,XNUM,REAL,XREAL};
+  private static final Type[] TYPES = new Type[]{ALL,ANY,CTRL,XCTRL,SCALAR,XSCALAR,NSCALR,XNSCALR,NUM,XNUM,NNUM,XNNUM,REAL,XREAL,NREAL,XNREAL};
   
   // The complete list of primitive types that are disjoint and also is-a
   // SCALAR; nothing else is a SCALAR except what is on this list (or
@@ -166,8 +184,8 @@ public class Type<T extends Type<T>> {
   public Type base() { Type t = this; while( t._type == TNAME ) t = ((TypeName)t)._t; return t; }
   // Strip off any subclassing just for names
   byte simple_type() { return base()._type; }
-  private boolean is_ptr() { byte t = simple_type();  return t == TOOP || t == TSTR || t == TSTRUCT || t == TTUPLE || t == TFUNPTR; }
-  private boolean is_num() { byte t = simple_type();  return t == TNUM || t == TXNUM || t == TREAL || t == TXREAL || t == TINT || t == TFLT; }
+  private boolean is_ptr() { byte t = simple_type();  return t == TOOP || t == TSTR || t == TSTRUCT || t == TTUPLE || t == TFUN || t == TFUNPTR; }
+  private boolean is_num() { byte t = simple_type();  return t == TNUM || t == TXNUM || t == TNNUM || t == TXNNUM || t == TREAL || t == TXREAL || t == TNREAL || t == TXNREAL || t == TINT || t == TFLT; }
   // True if 'this' isa SCALAR, without the cost of a full 'meet()'
   final boolean isa_scalar() { return _type != TCTRL && _type != TXCTRL; }
   
@@ -218,34 +236,53 @@ public class Type<T extends Type<T>> {
     if(   _type == TXSCALAR ) return t   ;
     if( t._type == TXSCALAR ) return this;
 
+    // Not-nil variants
+    if(   _type == TNSCALR ) return t.must_nil() ? SCALAR : NSCALR;
+    if( t._type == TNSCALR ) return   must_nil() ? SCALAR : NSCALR;
+    if(   _type == TXNSCALR) return t.not_nil(this);
+    if( t._type == TXNSCALR) return   not_nil(t   );
+
     // Scalar values break out into: nums(reals (int,flt)), GC-ptrs (structs(tuples), arrays(strings)), fun-ptrs, RPC
-    if( t._type == TFUN   ) return SCALAR; // If 't' is a FUN and 'this' is not a FUN (because not equal to 't')
-    if( t._type == TRPC   ) return SCALAR; // If 't' is a RPC and 'this' is not a RPC (because not equal to 't')
-    // Named numbers or whatever: let name sort it out
-    if( t._type == TNAME  ) return t.xmeet(this);
+    if( t._type == TFUN   ) return must_nil() ? SCALAR : NSCALR; // If 't' is a FUN and 'this' is not a FUN (because not equal to 't')
+    if( t._type == TRPC   ) return must_nil() ? SCALAR : NSCALR; // If 't' is a RPC and 'this' is not a RPC (because not equal to 't')
+
     if( t._type == TNIL   ) return t.xmeet(this);
 
-    // Down to just nums and GC-ptrs
     boolean that_oop = t.is_ptr();
     boolean that_num = t.is_num();
     assert !(that_oop&&that_num);
     
+    // Down to just nums and GC-ptrs
     if( is_num() ) {
       // May be OOP0 or STR or STRUCT or TUPLE
-      if( that_oop ) return SCALAR;
-      if( !that_num ) throw AA.unimpl();
-      // Numeric; same pattern as ANY/ALL, or SCALAR/XSCALAR
-      if( _type == TNUM || t._type == TNUM ) return NUM;
-      if(   _type == TXNUM ) return t   ;
-      if( t._type == TXNUM ) return this;
+      if( that_oop ) return (must_nil() || t.must_nil()) ? SCALAR : NSCALR;
+      if( that_num ) {
+        // Numeric; same pattern as ANY/ALL, or SCALAR/XSCALAR
+        if( _type == TNUM || t._type == TNUM ) return NUM;
+        if(   _type == TXNUM ) return t   ;
+        if( t._type == TXNUM ) return this;
 
-      // Real; same pattern as ANY/ALL, or SCALAR/XSCALAR
-      if( _type == TREAL || t._type == TREAL ) return REAL;
-      if(   _type == TXREAL ) return t   ;
-      if( t._type == TXREAL ) return this;
-      throw AA.unimpl();        // Need nice printout
+        // Not-nil variants
+        if(   _type == TNNUM ) return t.must_nil() ? NUM : NNUM;
+        if( t._type == TNNUM ) return   must_nil() ? NUM : NNUM;
+        if(   _type == TXNNUM) return t.not_nil(this);
+        if( t._type == TXNNUM) return   not_nil(t   );
+
+        // Real; same pattern as ANY/ALL, or SCALAR/XSCALAR
+        if( _type == TREAL || t._type == TREAL ) return REAL;
+        if(   _type == TXREAL ) return t   ;
+        if( t._type == TXREAL ) return this;
+
+        // Not-nil variants
+        if(   _type == TNREAL ) return t.must_nil() ? REAL : NREAL;
+        if( t._type == TNREAL ) return   must_nil() ? REAL : NREAL;
+        if(   _type == TXNREAL) return t.not_nil(this);
+        if( t._type == TXNREAL) return   not_nil(t   );
+      }
     }
-    throw AA.unimpl();          // Need nice printout
+    // Named numbers or whatever: let name sort it out
+    if( t._type == TNAME  ) return t.xmeet(this);
+    throw typerr(t);
   }
 
   // By design in meet, args are already flipped to order _type, which forces
@@ -356,40 +393,40 @@ public class Type<T extends Type<T>> {
   // E.g. ANY-isa-XSCALAR; XSCALAR-isa-XREAL; XREAL-isa-Int(Any); Int(Any)-isa-Int(3)
   public boolean isa( Type t ) { return meet(t)==t; }
 
-  // True if value is above the centerline (no real value)
+  // True if value is above the centerline (no definite value, ambiguous)
   public boolean above_center() {
     switch( _type ) {
     case TALL:
     case TCTRL:
-    case TNUM:
-    case TREAL:
-    case TSCALAR:
-      return false;             // These are all at or below center
+    case TNUM:    case TNNUM:
+    case TREAL:   case TNREAL:
+    case TSCALAR: case TNSCALR:
+      return false;             // These are all below center, no simple class is on the center
     case TANY:
     case TXCTRL:
-    case TXNUM:
-    case TXREAL:
-    case TXSCALAR:
+    case TXNUM:    case TXNNUM:
+    case TXREAL:   case TXNREAL:
+    case TXSCALAR: case TXNSCALR:
       return true;              // These are all above center
-    default: throw AA.unimpl(); // Overridden in subclass
+    default: throw typerr(null);// Overridden in subclass
     }
   }
   // True if value is higher-equal to SOME constant.
   public boolean may_be_con() {
     switch( _type ) {
     case TALL:
-    case TSCALAR:
-    case TNUM:
-    case TREAL:
+    case TSCALAR:  case TNSCALR:
+    case TNUM:     case TNNUM:
+    case TREAL:    case TNREAL:
     case TCTRL:
       return false;             // These all include not-constant things
     case TANY:
-    case TXREAL:
-    case TXNUM:
-    case TXSCALAR:
+    case TXREAL:   case TXNREAL:
+    case TXNUM:    case TXNNUM:
+    case TXSCALAR: case TXNSCALR:
     case TXCTRL:
       return true;              // These all include some constants
-    default: throw AA.unimpl();
+    default: throw typerr(null);
     }
   }
   // True if exactly a constant (not higher, not lower)
@@ -406,25 +443,20 @@ public class Type<T extends Type<T>> {
     case TXREAL:
     case TXSCALAR:
       return false;             // Not exactly a constant
-    default: throw AA.unimpl(); // Overridden in subclass
+    default: throw typerr(null);// Overridden in subclass
     }
   }
-  // Return the argument type of idxth argument.  Error for everybody except TypeFun
-  public Type arg(int idx) { throw AA.unimpl(); }
-  // Return any "return type" of the Meet of all function types.  Error for
-  // everybody except TypeFun
-  public Type ret() { throw AA.unimpl(); }
   // Return true if this is a forward-ref function pointer (return type from EpilogNode)
   public boolean is_forward_ref() { return false; }
   // Return the recursive type if this is a forward-ref type def, and null otherwise
   public TypeName merge_recursive_type( Type t ) { return null; }
   
   // Return a long   from a TypeInt constant; assert otherwise.
-  public long   getl() { throw AA.unimpl(); }
+  public long   getl() { throw typerr(null); }
   // Return a double from a TypeFlt constant; assert otherwise.
-  public double getd() { throw AA.unimpl(); }
+  public double getd() { throw typerr(null); }
   // Return a String from a TypeStr constant; assert otherwise.
-  public String getstr() { throw AA.unimpl(); }
+  public String getstr() { throw typerr(null); }
   
   // Lattice of conversions:
   // -1 unknown; top; might fail, might be free (Scalar->Int); Scalar might lift
@@ -449,6 +481,42 @@ public class Type<T extends Type<T>> {
   // Contains an error type string, perhaps embedded in some subtype
   public String errMsg() { return null; }
 
+  // True if type must include a nil (as opposed to may-nil, which means the
+  // type can choose something other than nil).
+  boolean must_nil() {
+    switch( _type ) {
+    case TALL:
+    case TNUM:
+    case TREAL:
+    case TSCALAR:
+      return true;              // These all must include a nil
+    case TANY:
+    case TXNUM:
+    case TXREAL:
+    case TXSCALAR:
+    case TXNSCALR: case TNSCALR: 
+    case TXNNUM:   case TNNUM:   
+    case TXNREAL:  case TNREAL:  
+      return false;             // These all may be non-nil
+    default: throw typerr(null); // Overridden in subclass
+    }
+  }
+  // Return the type without a nil-choice.  Only applies to above_center types,
+  // as these are the only types with a nil-choice.  Only called during meets
+  // with above-center types.
+  Type not_nil(Type ignore) {
+    switch( _type ) {
+    case TXSCALAR:  return XNSCALR;
+    case TXNUM   :  return XNNUM  ;
+    case TXREAL  :  return XNREAL ;
+    case TSCALAR:   case TNSCALR:   case TXNSCALR:
+    case TNUM:      case TNNUM:     case TXNNUM:
+    case TREAL:     case TNREAL:    case TXNREAL:
+      return this;
+    default: throw typerr(null); // Overridden in subclass
+    }
+  }
+    
   // Make a (possibly cyclic & infinite) named type.  Prevent the infinite
   // unrolling of names by not allowing a named-type with depth >= D from
   // holding (recursively) the head of a named-type cycle.  We need to cap the
@@ -457,7 +525,6 @@ public class Type<T extends Type<T>> {
 
   // If any substructure is being freed, then this type is being freed also.
   boolean free_recursively(BitSet bs) { return false; }
-
   
   // Is t type contained within this?  Short-circuits on a true
   public boolean contains( Type t ) { return contains(t,null); }

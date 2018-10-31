@@ -4,7 +4,8 @@ import com.cliffc.aa.AA;
 
 import java.util.BitSet;
 
-// All Generic Nullable Oops, including Strings, Structs, Tuples, Arrays
+// All Generic Nullable Oops, including Strings, Structs, Tuples, Arrays.
+// Excludes nil; to add a nil wrap with TypeNil.
 public class TypeOop<O extends TypeOop<O>> extends Type<O> {
   boolean _any;                 // True=choice/join; False=all/meet
   protected   TypeOop(byte type, boolean any) { super(type); init(type,any); }
@@ -43,7 +44,7 @@ public class TypeOop<O extends TypeOop<O>> extends Type<O> {
     case TINT:
     case TFUNPTR:
     case TFUN:
-    case TRPC:   return SCALAR;
+    case TRPC:   return t.must_nil() ? SCALAR : NSCALR;
     case TNIL:
     case TNAME:  return t.xmeet(this); // Let other side decide
     default: throw typerr(t);
@@ -55,6 +56,8 @@ public class TypeOop<O extends TypeOop<O>> extends Type<O> {
   @Override public boolean above_center() { return _any; }
   @Override public boolean may_be_con() { return _any; }
   @Override public boolean is_con() { return false; }
+  @Override boolean must_nil() { return false; }
+  @Override Type not_nil(Type ignore) { return this; }
   // Lattice of conversions:
   // -1 unknown; top; might fail, might be free (Scalar->Str); Scalar might lift
   //    to e.g. Float and require a user-provided rounding conversion from F64->Str.

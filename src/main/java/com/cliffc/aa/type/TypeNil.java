@@ -36,6 +36,8 @@ public class TypeNil extends Type<TypeNil> {
   }
   public static Type make( Type t ) {
     assert !t.isa(NUM); // Numbers fold in zero directly
+    if( t==NSCALR ) return SCALAR;
+    if( t==XNSCALR ) return XSCALAR;
     return t == SCALAR || t == XSCALAR || t instanceof TypeNil ? t : make0(t);
   }
   
@@ -82,6 +84,8 @@ public class TypeNil extends Type<TypeNil> {
   @Override public boolean may_be_con() { return _t==null || _t.may_be_con(); }
   @Override public boolean is_con()   { return _t == null; } // Constant nil
   @Override public byte isBitShape(Type t) { return _t==null || this==t ? 0 : _t.isBitShape(t); }
+  @Override boolean must_nil() { return _t==null || !_t.above_center(); }
+  @Override Type not_nil(Type ignore) { return _t!=null && _t.above_center() ? _t : this; }
   // Make a (posssibly cyclic & infinite) named type.  Prevent the infinite
   // unrolling of names by not allowing a named-type with depth >= D from
   // holding (recursively) the head of a named-type cycle.  We need to cap the

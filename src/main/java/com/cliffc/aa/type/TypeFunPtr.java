@@ -12,7 +12,6 @@ public class TypeFunPtr extends Type<TypeFunPtr> {
   public TypeTuple _ts;         // Arg types
   public Type _ret;             // return types
   // List of known functions in set, or 'flip' for choice-of-functions.
-  // Zero bit reserved for null.
   public Bits _fidxs;           //
   public int _nargs;            // Count of args or -1 for forward_ref
 
@@ -32,7 +31,6 @@ public class TypeFunPtr extends Type<TypeFunPtr> {
     for( int i=0; i<_ts._ts.length; i++ ) sb.p(arg(i).str(dups)).p(' ');
     if( _nargs==99 ) sb.p("... ");
     sb.p("-> ").p(_ret.str(dups)).p('}');
-    if( _fidxs.test(0) ) sb.p(_fidxs.above_center()?"+0":"?");
     return sb.toString();
   }
 
@@ -74,7 +72,7 @@ public class TypeFunPtr extends Type<TypeFunPtr> {
     case TINT:
     case TSTR:
     case TFUN:
-    case TRPC:   return Type.SCALAR;
+    case TRPC:   return t.must_nil() ? SCALAR : NSCALR;
     case TNIL:
     case TNAME:  return t.xmeet(this); // Let other side decide
     default: throw typerr(t);   // All else should not happen
@@ -90,13 +88,16 @@ public class TypeFunPtr extends Type<TypeFunPtr> {
     return make(ts,ret,fidxs,nargs);
   }
 
-  public int nargs() { return _nargs; }
-  @Override public Type arg(int idx) { return _ts.at(idx); }
-  @Override public Type ret() { return _ret; }
+  public final int nargs() { return _nargs; }
+  public final Type arg(int idx) { return _ts.at(idx); }
+  public final Type ret() { return _ret; }
 
   @Override public boolean above_center() { return _fidxs.above_center(); }
   @Override public boolean may_be_con()   { return _fidxs.is_con() || _fidxs.above_center(); }
   @Override public boolean is_con()       { return _fidxs.is_con(); }
+  @Override boolean must_nil() { return false; }
+  @Override Type not_nil(Type ignore) { return this; }
+      
   // Return true if this is an ambiguous function pointer
   public boolean is_ambiguous_fun() { return _fidxs.above_center(); }
   public int fidx() { return _fidxs.getbit(); }

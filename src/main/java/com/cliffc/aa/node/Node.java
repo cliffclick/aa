@@ -241,7 +241,7 @@ public abstract class Node implements Cloneable {
     if( bs.get(_uid) ) return errs;// Been there, done that
     bs.set(_uid);                  // Only walk once
     if( this instanceof PhiNode &&
-        Type.SCALAR.isa(gvn.type(this)) ) // Cannot have code that deals with unknown-GC-state
+        Type.NSCALR.isa(gvn.type(this)) ) // Cannot have code that deals with unknown-GC-state
       errs = Parse.add_err(errs,((PhiNode)this)._badgc);
     for( int i=0; i<_defs._len; i++ )
       if( in(i) != null ) in(i).walkerr_gc(errs,bs,gvn);

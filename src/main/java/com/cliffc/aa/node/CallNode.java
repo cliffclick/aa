@@ -125,12 +125,17 @@ public class CallNode extends Node {
     
     // Arg counts must be compatible
     FunNode fun = epi.fun();
-    if( fun._tf.nargs() != nargs() )
+    TypeFunPtr tfun = fun._tf;
+    if( tfun.nargs() != nargs() )
       return null;
 
     // Single choice; insert actual conversions as needed
-    TypeTuple formals = fun._tf._ts;
+    TypeTuple formals = tfun._ts;
     for( int i=0; i<nargs(); i++ ) {
+      if( fun.parm(i)==null ) { // Argument is dead and can be dropped?
+        set_def(i+2,gvn.con(Type.XSCALAR),gvn); // Replace with some generic placeholder
+        continue;
+      }
       Type formal = formals.at(i);
       Type actual = gvn.type(arg(i));
       byte xcvt = actual.isBitShape(formal);
@@ -170,7 +175,7 @@ public class CallNode extends Node {
     }
 
     assert fun.in(1)._uid!=0; // Never wire into a primitive, just clone/inline it instead (done just above)
-    assert fun._tf.nargs() == nargs();
+    assert tfun.nargs() == nargs();
 
     // Always wire caller args into known functions
     return wire(gvn,fun);

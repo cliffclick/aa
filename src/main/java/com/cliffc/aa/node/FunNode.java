@@ -476,12 +476,13 @@ public class FunNode extends RegionNode {
     return t;
   }
 
-  public ParmNode rpc() {
+  public ParmNode parm(int idx) {
     for( Node use : _uses )
-      if( use instanceof ParmNode && ((ParmNode)use)._idx==-1 )
+      if( use instanceof ParmNode && ((ParmNode)use)._idx==idx )
         return (ParmNode)use;
     return null;
   }
+  public ParmNode rpc() { return parm(-1); }
   public EpilogNode epi() {
     for( Node use : _uses )
       if( use instanceof EpilogNode )

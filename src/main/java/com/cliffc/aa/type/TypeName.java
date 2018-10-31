@@ -79,7 +79,7 @@ public class TypeName extends Type<TypeName> {
   public  static final HashMap<String,Type> TEST_SCOPE = new HashMap<>();
   public  static final TypeName TEST_ENUM = make("__test_enum",TEST_SCOPE,TypeInt.INT8);
   private static final TypeName TEST_FLT  = make("__test_flt" ,TEST_SCOPE,TypeFlt.FLT32);
-  private static final TypeName TEST_E2   = make("__test_e2"  ,TEST_SCOPE,TEST_ENUM);
+  public  static final TypeName TEST_E2   = make("__test_e2"  ,TEST_SCOPE,TEST_ENUM);
   
   static final TypeName[] TYPES = new TypeName[]{TEST_ENUM,TEST_FLT,TEST_E2};
 
@@ -94,36 +94,42 @@ public class TypeName extends Type<TypeName> {
       if( thatd > thisd ) return tn.xmeet(this); // Deeper on 'this'
       if( thatd== thisd && _name.equals(tn._name) )
         return make(_name,_lex,_t.meet(tn._t)); // Peel name and meet
-      t = tn.drop_name();       // Names or depth unequal; treat as unnamed
+      t = tn.drop_name(t);      // Names or depth unequal; treat as unnamed
       break;
     default:
-      if( t.above_center() ) { // 't' can fall to a matching name
-        if( t.isa(_t) ) return make(_name,_lex,_t.meet(t));
+      if( t.above_center() ) { // t is high
+        Type mt = _t.meet(t);  // If meet fails to be anything, drop the name
+        if( mt==SCALAR || mt==NSCALR ) return SCALAR;
+        return make(_name,_lex,mt);
       }
       if( t==TypeNil.NIL ) return TypeNil.make(this);
       // Special case: close the recursive type loop, instead of falling
       if( _t==t && _depth == -2 )
         return this;
     }
-    Type t0 = drop_name();
+    Type t0 = drop_name(t);
     return t0.meet(t);
   }
 
   // Drop in lattice, until we can drop the name.  Generally means we must drop
   // from above_center to exactly 1 step below center.  Types already below
   // center can just drop the name, which drops them 1 step in the lattice.
-  private Type drop_name() {
-    Type t = _t;
-    if( !t.may_be_con() ) return t; // Already below centerline; can just drop the name
+  private Type drop_name(Type t) {
+    Type tx = _t;
+    if( !tx.may_be_con() ) return tx; // Already below centerline; can just drop the name
     // If at or above the centerline, just dropping the name amounts to a
     // lift/join of the type - not allowed, can only fall.
-    switch( t._type ) {
-    case TXNUM: case TXREAL: case TINT: case TFLT:
-      return TypeInt.BOOL;      // Least number below the centerline
+    switch( tx._type ) {
+    case TXNUM: case TXNNUM: case TXREAL: case TXNREAL: case TINT: case TFLT: {
+      // Return a number that is not-null (to preserve any not-null-number
+      // property) but forces a move off the centerline.
+      return must_nil() ? TypeInt.BOOL : TypeInt.TRUE;
+    }
     // Recursively drop multiple names
-    case TNAME: return ((TypeName)t).drop_name();
-    case TXSCALAR: return TypeNil.NIL;
-    case TSTRUCT: return t.dual();
+    case TNAME:    return ((TypeName)tx).drop_name(t);
+    case TXSCALAR: return t;
+    case TXNSCALR: return t;
+    case TSTRUCT:  return tx.dual();
     default: throw AA.unimpl();
     }
   }
@@ -152,6 +158,14 @@ public class TypeName extends Type<TypeName> {
   @Override public double getd  () { return _t.getd  (); }
   @Override public long   getl  () { return _t.getl  (); }
   @Override public String getstr() { return _t.getstr(); }
+  @Override boolean must_nil() { return _t.above_center() || _t.must_nil(); }
+  @Override Type not_nil(Type t) {
+    Type nn = _t.not_nil(t);
+    if( base().must_nil() ) return nn; // Cannot remove all nils and keep the name, so lose the name
+    //return _t.above_center() || t.isa(_t.dual()) ? make(_name,_lex,nn) : nn;
+    return make(_name,_lex,nn);
+  }
+  
   @Override public byte isBitShape(Type t) {
     if( t instanceof TypeName ) {
       if( ((TypeName)t)._name.equals(_name) ) return _t.isBitShape(((TypeName)t)._t);
@@ -177,5 +191,5 @@ public class TypeName extends Type<TypeName> {
     free(null);
     return true;
   }
-  @Override boolean contains( Type t, BitSet bs ) { return _t==t ? true : _t.contains(t,bs); }
+  @Override boolean contains( Type t, BitSet bs ) { return _t == t || _t.contains(t, bs); }
 }

@@ -18,36 +18,83 @@ public class TestType {
     Type.init0(new HashMap<>());
     Type ignore = TypeTuple.ALL; // Break class-loader cycle; load Tuple before Fun.
 
-    //test_isa("map={x:@{n,v:int}? -> x ? @{n=map(x.n),v=x.v*x.v} : 0}", TypeFunPtr.FUNPTR1); // Recursive (looping) struct meets
-    String[] FLDS = new String[]{"n","v"};
-    Type s0 = TypeStruct.make(FLDS,Type.XSCALAR,TypeInt.INT64);
-    Type s1 = TypeStruct.make(FLDS,s0,TypeInt.INT64);
-    Type m1 = s1.meet(s0);
-    Type s2 = TypeStruct.make(FLDS,m1,TypeInt.INT64);
-    Type m2 = s2.meet(s1);
-    //assertEquals(m1,m2);
+    Type rbq = Type.NSCALR.join(TypeName.TEST_E2);
+    Type rbz = Type.NSCALR.join(TypeName.TEST_ENUM);
+    assertEquals(TypeName.make("__test_enum",TypeName.TEST_SCOPE,TypeInt.make(-1,8,0)),rbz);
+    Type rbp = TypeOop.OOP.join(TypeName.TEST_ENUM);
+    assertEquals(Type.XSCALAR,rbp);
+    Type rby = Type.NNUM  .join(TypeName.TEST_ENUM);
+    assertEquals(TypeName.make("__test_enum",TypeName.TEST_SCOPE,TypeInt.make(-1,8,0)),rby);
+    Type ra = Type.XNSCALR.join(TypeName.TEST_ENUM);
+    assertEquals(Type.XSCALAR,ra);
+    Type xo1 = TypeOop.XOOP.join(TypeName.TEST_ENUM);
+    assertEquals(Type.XSCALAR,xo1);
+    Type rx = Type.NNUM.meet(TypeName.TEST_ENUM.dual()).dual();
+    assertEquals(Type.XNUM,rx);
+    Type tb4 = Type.NNUM.meet(TypeName.TEST_ENUM.dual());
+    assertEquals(Type.NUM,tb4);
+    Type rb = Type.XNNUM.join(TypeName.TEST_ENUM);
+    assertEquals(Type.XNUM,rb);
 
-
+    Type r32 = Type.XSCALAR.join(TypeName.TEST_ENUM);
+    assertEquals(Type.XSCALAR,r32);
+    Type r02 = Type.XNUM.join(TypeName.TEST_ENUM);
+    assertEquals(Type.XNUM,r02);
+    Type rmt = r02.meet(TypeName.TEST_ENUM);
+    assertEquals(TypeName.TEST_ENUM,rmt);
     
-    // NewNode infinitely wraps self in recursive function.  Returns from
-    // recursive function only Phi-meet infinitely-wrapping self with nil.  So
-    // need 'meet' calls except with nil, and type can get very large.  Some
-    // random isa test does a meet, which triggers a recursive meet and returns
-    // a cyclic type, instead of an unrolled type - which then fails the isa.
+    assertEquals(TypeFlt.FLT32,Type.XNSCALR.meet(TypeFlt.FLT32)); // ~nScalar isa flt32
+    Type tf02 = Type.XNSCALR .join(TypeFlt.PI); // Type.XNSCALR; PI is a member directly of ~nScalar
+    Type tf12 = TypeFlt.FLT32.join(TypeFlt.PI); // TypeFlt.XFLT64; ugly lift
+    Type tfmt = tf02.meet(tf12); // Drops nil?  TypeFlt.XNFLT64
+    assertEquals(tf12,tfmt); // Expect A.join(C) isa B.join(C)
+    Type nflt64 = TypeFlt.make(-1,64,0);
+    Type nint32 = TypeInt.make(-1,32,0);
+    Type tfx = nint32.meet(nflt64);
+    assertEquals(nflt64,tfx);
+    // int64 isa all
+    // int64.join(__test_flt:flt32) isa all.join(__test_flt:flt32)
+    // ~int64.meet(__test_flt:~flt32).~ isa __test_flt:flt32
+    // ==>> ~int64 .meet(__test_flt:~flt32).~
+    // ==>> __test_flt:~int64 .meet(__test_flt:~flt32).~
+    // ==>> __test_flt:~int16 .meet(__test_flt:~flt32).~
+    // ==>> __test_flt:meet(~int16,~flt32).~
+    // ==>> __test_flt:~int16.~
+    // ==>> __test_flt:int16
+    Type xint64 = TypeInt.make(2,64,0);
+    Type xflt32 = TypeFlt.make(2,32,0);
+    Type nxflt32 = TypeName.make("__test_enum",TypeName.TEST_SCOPE,xflt32);
+    Type nxint16 = TypeName.make("__test_enum",TypeName.TEST_SCOPE,TypeInt.INT16);
+    Type xfimt = xint64.meet(nxflt32).dual();
+    assertEquals(nxint16,xfimt);
+    Type nxx = TypeInt.FALSE.join(nflt64);
+    assertEquals(TypeInt.BOOL.dual(),nxx);
 
-    // But the wrapped type with same NewNode grows the type without bound,
-    // unless we trigger a recursive-meet.  What is the minimal type of
-    // this:
-    //     "@{n:@{n:~Scalar,v:int64},v:int64}";
-    // Need n's type to always support an 'n'.
-    // So we see a recursive n: (which supports 'n');
-    // So we see a ~Scalar, which supports 'n'.
-    //     "@{n:~*+?,v:int64}"
+    Type q02 = Type.XNSCALR.meet(TypeName.TEST_ENUM);
+    assertEquals(TypeInt.INT8,q02);
+    Type q02j= Type.XNSCALR.join(TypeName.TEST_ENUM);
+    assertEquals(Type.XSCALAR,q02j);
+    Type q12 = Type.XNNUM  .meet(TypeName.TEST_ENUM);
+    assertEquals(TypeInt.INT8,q12);
+    Type q12j= Type.XNNUM  .join(TypeName.TEST_ENUM);
+    assertEquals(Type.XNUM,q12j);
+
+    Type tb5 = Type.XNSCALR.meet(TypeFun.FUN1.dual());
+    assertEquals(TypeFun.FUN1.dual(),tb5);
+    Type tb3 = Type.XNSCALR.meet(TypeInt.FALSE);
+    assertEquals(TypeInt.BOOL,tb3);
+    Type tb2 = Type.XNSCALR.meet(Type.XNUM);
+    assertEquals(Type.XNNUM,tb2);
+    Type tb1 = TypeNil.XOOP.meet(Type.NSCALR);
+    assertEquals(Type.NSCALR,tb1);
     
-    //"@{n:@{n:~Scalar,v:int64},v:int64}";
-    //"@{n:@{n:@{n:~Scalar,v:int64},v:int64},v:int64}";
-    //meet: "@{n:*,v:int64}";
-      
+    Type that= Type.XNSCALR;
+    Type dual= Type. NSCALR;
+    Type t   = TypeNil.OOP;
+    Type mt  = t.meet(that);
+    Type tb  = mt.dual().meet(dual);
+    assertEquals(dual,tb);
+    
     Type def = TypeStr.con("def");
     Type mto5 = def.meet(TypeStr.ABC);
     assertEquals(TypeStr.STR,mto5);
@@ -157,7 +204,7 @@ public class TestType {
     // Crossing ints and OOP+null
     Type  i8 = TypeInt.INT8;
     Type xi8 = i8.dual();
-    assertEquals( Type.SCALAR, xi8.meet(oop_)); // ~OOP+0 &   ~i8 -> 0
+    assertEquals( Type.NSCALR, xi8.meet(oop_)); // ~OOP+0 &   ~i8 -> 0
   }
   
   @Test public void testStructTuple() {
@@ -231,8 +278,7 @@ public class TestType {
 
     // Nest a linked-list style tuple 10 deep; verify actual depth is capped at
     // less than 5.
-    Type told = Type.SCALAR;
-    Type t0 = TypeNil.NIL;
+    Type told, t0 = TypeNil.NIL;
     for( int i=0; i<10; i++ ) {
       told = TypeStruct.make(TypeStruct.FLDS(2),t0,TypeInt.con(i));
       t0 = told.meet(t0);    // Must be a phi-meet in any data loop

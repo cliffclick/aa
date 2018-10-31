@@ -47,7 +47,7 @@ public class TypeRPC extends Type<TypeRPC> {
     case TFUN:
     case TFLT:
     case TINT:
-    case TSTR:   return Type.SCALAR;
+    case TSTR:   return t.must_nil() ? SCALAR : NSCALR;
     case TRPC:   break;
     case TNIL:
     case TNAME:  return t.xmeet(this); // Let other side decide
@@ -62,4 +62,6 @@ public class TypeRPC extends Type<TypeRPC> {
   @Override public boolean above_center() { return _rpcs.above_center(); }
   @Override public boolean may_be_con()   { return _rpcs.abit()>0; }
   @Override public boolean is_con()       { return _rpcs.abit()>0; }
+  @Override boolean must_nil() { return false; } // never a nil
+  @Override Type not_nil(Type ignore) { return this; }
 }

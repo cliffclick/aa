@@ -493,15 +493,15 @@ public class TestLattice {
   // This structure is tested to be a lattice:
   
   //         ~scalar
-  //       ~i64          ~oop+?
-  //   N:~i64  M:~i64
-  //       ~i8
-  //   N:~i8   M:~i8
+  //          ~i64         ~oop+?
+  //   N:~i64        M:~i64
+  //          ~i8
+  //   N:~i8          M:~i8
   // N:7 N:0  7 nil  M:7 M:0   "abc"
-  //   N:i8    M:i8
-  //        i8
-  //   N:i64   M:i64
-  //        i64           oop?
+  //   N:i8           M:i8
+  //           i8
+  //   N:i64          M:i64
+  //           i64          oop?
   //          scalar
   @Test public void testLattice6() {
     N.reset();
@@ -541,6 +541,87 @@ public class TestLattice {
     n64 .set_dual(xn64 );
     m64 .set_dual(xm64 );
     i8  .set_dual(xi8  );
+    n8  .set_dual(xn8  );
+    m8  .set_dual(xm8  );
+
+    test(xscal);
+  }
+
+  // Lattice!
+  // This structure is tested to be a lattice:
+  
+  // Same as Lattice6 but includes a not-nil notion, and i8 becomes i1.
+  // not-nil of ~i1 is not-nil-choice{0,1} is just {1}.  Notice not allowed to
+  // have edges ~nzi64 -> N:~nzi64 or else we lose the lattice property.  This
+  // implies we can only pick up named-numbers once: at the i64 outermost level.
+  // 
+  //         ~scalar
+  //           ~nzscalar
+  //          ~i64         ~oop+?
+  //            ~nzi64         
+  //   N:~i64        M:~i64
+  //     N:~nzi64      M:~nzi64
+  //          ~i1
+  //   N:~i1          M:~i1
+  // N:1 N:0  1 nil  M:1 M:0   "abc"
+  //   N:i1           M:i1
+  //           i1
+  //     N:nzi64        M:nzi64
+  //   N:i64          M:i64
+  //             nzi64
+  //           i64          oop?
+  //           nzscalar
+  //          scalar
+  @Test public void testLattice6_1() {
+    N.reset();
+    N scal= new N("scalar");
+    N nzscal= new N("nzscalar",scal);
+    N oop0= new N("oop?"    ,scal);
+    N i64 = new N("i64"     ,scal);
+    N nzi64 = new N("nzi64"     ,i64,nzscal);
+    N n64 = new N("N:i64"   ,i64);
+    N m64 = new N("M:i64"   ,i64);
+    N nzn64 = new N("N:nzi64"   ,n64);
+    N nzm64 = new N("M:nzi64"   ,m64);
+    
+    N i1  = new N("i1"      ,i64);
+    N n8  = new N("N:i1"    ,n64,i1);
+    N m8  = new N("M:i1"    ,m64,i1);
+    
+    N nil = new N("nil"     ,i1);
+    N c1  = new N("1"       ,i1,nzi64);
+    N m0  = new N("M:0"     ,m8);
+    N m1  = new N("M:1"     ,m8,nzm64);
+    N n0  = new N("N:0"     ,n8);
+    N n1  = new N("N:1"     ,n8,nzn64);
+    N abc = new N("abc"     ,oop0);
+
+    N xn8 = new N("N:~i1"   ,n0,n1);
+    N xm8 = new N("M:~i1"   ,m0,m1);
+    N xi1 = new N("~i1"     ,xn8,xm8,c1,nil);
+    
+    N xnzm64= new N("M:~nzi64"  ,m1);
+    N xnzn64= new N("N:~nzi64"  ,n1);
+    N xm64= new N("M:~i64"  ,xm8,xnzm64);
+    N xn64= new N("N:~i64"  ,xn8,xnzn64);
+    N xnzi64= new N("~nzi64"    ,c1);
+    N xi64= new N("~i64"    ,xn64,xm64,xi1,xnzi64);
+    N xoop= new N("~oop+?"  ,abc);
+    
+    N xnzscal=new N("~nzscalar" ,xnzi64);
+    N xscal=new N("~scalar" ,xoop,xi64,xnzscal);
+    
+    // Mark the non-centerline duals
+    scal.set_dual(xscal);
+    nzscal.set_dual(xnzscal);
+    oop0.set_dual(xoop );
+    i64 .set_dual(xi64 );
+    nzi64 .set_dual(xnzi64 );
+    n64 .set_dual(xn64 );
+    m64 .set_dual(xm64 );
+    nzn64 .set_dual(xnzn64 );
+    nzm64 .set_dual(xnzm64 );
+    i1  .set_dual(xi1  );
     n8  .set_dual(xn8  );
     m8  .set_dual(xm8  );
 

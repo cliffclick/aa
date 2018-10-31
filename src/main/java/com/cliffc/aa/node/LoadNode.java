@@ -23,7 +23,7 @@ public class LoadNode extends Node {
     Node ctrl = in(0);
     Node addr = in(1);
     if( ctrl==null || gvn.type(ctrl)!=Type.CTRL )
-      return null; // Dead load, or a no-control-no-fail load
+      return null;              // Dead load, or a no-control-no-fail load
     Type t = gvn.type(addr);    // Address type
 
     // Lift control on Loads as high as possible... and move them over
@@ -31,8 +31,6 @@ public class LoadNode extends Node {
     if( !TypeNil.NIL.isa(t) ) // No null, no need for ctrl
       // remove ctrl; address already casts-away-null
       return set_def(0,null,gvn);
-    if( !(t instanceof TypeNil) )
-      return null; // below a nil (e.g. Scalar), do nothing yet
 
     // Looking for a null-check pattern:
     //   this.0->dom*->True->If->addr
@@ -52,24 +50,30 @@ public class LoadNode extends Node {
     if( tru==null ) return null;
     assert !(tru==ctrl && addr != baseaddr) : "not the immediate location or we would be not-null already";
 
+    if( !(t instanceof TypeNil) )
+      return null; // below a nil (e.g. Scalar), do nothing yet
     set_def(1,gvn.xform(new CastNode(tru,baseaddr,((TypeNil)t)._t)),gvn);
     return set_def(0,null,gvn);
   }
   @Override public Type value(GVNGCM gvn) {
     Type t = gvn.type(in(1)).base();
     if( t.isa(TypeNil.XOOP) ) return Type.XSCALAR; // Very high address; might fall to any valid value
-    if( TypeOop.OOP.isa(t) ) return Type.SCALAR; // Too low, might not have any fields
-    if( t.is_forward_ref() ) return Type.SCALAR; // Not yet defined, might fail
+    if( TypeOop.OOP.isa(t) ) return Type.SCALAR;   // Too low, might not have any fields
+    if( t.is_forward_ref() ) return Type.SCALAR;   // Not yet defined, might fail
+    boolean needs_nil_check=false;
     if( t instanceof TypeNil ) {
-      if( t.above_center() ) t = ((TypeNil)t)._t.base(); // hi-nil, assume not a nil
-      else if( t==TypeNil.NIL ) return Type.SCALAR;      // Must fail
-      else return gvn.self_type(this); // Might nil-fail, might be null-checked recursively, leave type alone
+      if( t==TypeNil.NIL ) return Type.SCALAR;     // Must fail
+      if( !t.above_center() ) needs_nil_check=true;// Above_center might fall to no-nil
+      t = ((TypeNil)t)._t.base();                  // Assume guarded by test
     }
 
     if( t instanceof TypeStruct ) {
       TypeStruct ts = (TypeStruct)t;
       int idx = ts.find(_fld);  // Find the named field
       if( idx == -1 ) return Type.SCALAR;
+      if( needs_nil_check )
+        return gvn.self_type(this);
+      //  throw AA.unimpl();
       return ts.at(idx);        // Field type
     }
     
