@@ -58,6 +58,15 @@ public class ScopeNode extends Node {
     set_def(idx,val,gvn);
   }
 
+  // Set value to null and return it, without deleting node
+  public Node remove( String name ) {
+    int idx = _vals.get(name); // NPE if name does not exist
+    Node n = in(idx);          // Get existing value
+    _defs.set(idx,null);       // Set to null, without deleting old
+    n._uses.del(n._uses.find(this));
+    return n;
+  }
+  
   // The current local scope ends; delete local var refs.  Forward refs first
   // found in this scope are assumed to be defined in some outer scope and get
   // promoted.
@@ -65,7 +74,7 @@ public class ScopeNode extends Node {
     for( String name : _vals.keySet() ) {
       int idx = _vals.get(name);
       Node n = in(idx);
-      if( parent != null && n.is_forward_ref() )
+      if( n != null && parent != null && n.is_forward_ref() )
         parent.add(name,n);
       if( n != null ) gvn.add_work(n);
       set_def(idx, null, gvn);

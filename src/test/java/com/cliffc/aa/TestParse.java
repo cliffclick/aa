@@ -18,7 +18,7 @@ public class TestParse {
     // acting "as if" it is being called with a @{n:scalar,v:int} argument
     // which then passes via x.n a scalar to the map call again: map(scalar),
     // and this does not type.
-    //test_isa("map={x:@{n,v:int}? -> x ? @{n=map(x.n),v=x.v*x.v} : 0}", TypeFunPtr.FUNPTR1); // Recursive (looping) struct meets
+    //test_isa("map={x:@{n,v:int}? -> x ? @{n=map(x.n),v=x.v*x.v} : 0}; map(@{n=0,v=1.2})", TypeFunPtr.FUNPTR1); // Recursive (looping) struct meets
     
     //test_isa("map={x -> x ? @{n=map(x.n),v=x.v*x.v} : 0}", TypeFunPtr.FUNPTR1); // Recursive (looping) struct meets
 
@@ -304,6 +304,7 @@ public class TestParse {
   }
 
   @Test public void testParse7() {
+    test_isa("A= :@{n:A?, v:int}; f={x:A? -> x ? A(@{n=f(x.n),v=x.v*x.v}) : 0}", TypeFun.GENERIC_FUN);
     // Passing a function recursively
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({&},2)", TypeInt.FALSE);
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({+},2)", TypeInt.con(2));

@@ -440,7 +440,9 @@ public class Parse {
    */
   private Node struct() {
     try( Env e = new Env(_e) ) {// Nest an environment for the local vars
+      Node ctrl = ctrl();
       _e = e;                   // Push nested environment
+      set_ctrl(ctrl);           // Carry control thru
       Ary<String> toks = new Ary<>(new String[1],0);
       Ary<Type  > ts   = new Ary<>(new Type  [1],0);
       while( true ) {
@@ -466,7 +468,9 @@ public class Parse {
         if( !peek(',') ) break; // Final comma is optional
       }
       require('}');
+      Node c = _e._scope.remove(" control ");
       _e = _e._par;             // Pop nested environment
+      if( e._scope != c ) set_ctrl(c);
       Node[] flds = e._scope.get(toks);
       return gvn(new NewNode(toks.asAry(),flds));
     } // Pop lexical scope around struct

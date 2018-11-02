@@ -276,6 +276,29 @@ public class TestType {
   @Test public void testRecursive() {
     Type.init0(new HashMap<>());
 
+    // Cyclic named struct: "A:@{n:A?,v:int64}"
+    // If we unrolled this (and used S for Struct and 0 for Nil) we'd get:
+    // AS0AS0AS0AS0AS0AS0...
+    TypeName tfd = TypeName.make_forward_def_type("A",TypeName.TEST_SCOPE);
+    Type tna = TypeNil.make(tfd);
+    TypeStruct tsna = TypeStruct.make(new String[]{"n","v"},tna,TypeInt.INT64);
+    TypeName ta = tfd.merge_recursive_type(tsna);
+    // Peel A once without a nil: "A:@{n:A:@{n:A?,v:int64},v:int64}"
+    // ASAS0AS0AS0AS0AS0AS0...
+    TypeStruct taa = TypeStruct.make(new String[]{"n","v"},ta,TypeInt.INT64);
+    TypeName tan = TypeName.make("A",TypeName.TEST_SCOPE,taa);
+    // Peel A twice without a nil: "A:@{n:A:@{n:A:@{n:A?,v:int64},v:int64},v:int64}"
+    // ASASAS0AS0AS0AS0AS0AS0...
+    TypeStruct taaa = TypeStruct.make(new String[]{"n","v"},tan,TypeInt.INT64);
+    // Starting with the Struct not the A we get:
+    // Once:  SAS0AS0AS0AS0AS0AS0...
+    // Twice: SAS AS0AS0AS0AS0AS0...
+    // Meet:  SAS0AS0AS0AS0AS0AS0...
+    // which is the Once yet again
+    Type mt = taaa.meet(taa);
+    assertEquals(taa,mt);
+    
+
     // Nest a linked-list style tuple 10 deep; verify actual depth is capped at
     // less than 5.
     Type told, t0 = TypeNil.NIL;

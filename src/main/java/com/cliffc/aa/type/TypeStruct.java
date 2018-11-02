@@ -173,7 +173,7 @@ public class TypeStruct extends TypeOop<TypeStruct> {
     
     // If unequal length; then if short is low it "wins" (result is short) else
     // short is high and it "loses" (result is long).
-    return _ts.length < tt._ts.length ? xmeet1(tt) : tt.xmeet1(this);
+    return _ts.length <= tt._ts.length ? xmeet1(tt) : tt.xmeet1(this);
   }
   
   // Meet 2 structs, shorter is 'this'.  Can be recursive.  Flag each of the 2
