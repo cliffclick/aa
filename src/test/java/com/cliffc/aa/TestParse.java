@@ -14,7 +14,6 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
 
-    testerr("(math_rand(1)?0 : @{x=1}).x", "Struct might be nil when reading field '.x'", "                           ");
     // Returning this function dies because since it's being returned, it's
     // acting "as if" it is being called with a @{n:scalar,v:int} argument
     // which then passes via x.n a scalar to the map call again: map(scalar),
@@ -330,11 +329,15 @@ public class TestParse {
     TypeName tname4 = (TypeName)te4._t;
     assertEquals("List", tname4._name);
     TypeStruct tt4 = (TypeStruct)tname4._t;
-    TypeNil tnil4 = (TypeNil)tt4.at(0);
-    assertSame(tnil4._t , tname4);
-    //assertSame(tt4.at(1), TypeFlt.FLT64);
+    TypeName tname5 = (TypeName)tt4.at(0);
+    assertEquals(2.3*2.3,tt4.at(1).getd(),1e-6);
     assertEquals("next",tt4._args[0]);
     assertEquals("val",tt4._args[1]);
+    
+    assertEquals("List", tname5._name);
+    TypeStruct tt5 = (TypeStruct)tname5._t;
+    assertEquals(TypeNil.NIL,tt5.at(0));
+    assertEquals(1.2*1.2,tt5.at(1).getd(),1e-6);
     
     // TODO: Need real TypeVars for these
     //test("id:{A->A}"    , Env.lookup_valtype("id"));

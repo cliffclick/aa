@@ -290,6 +290,8 @@ public class TypeStruct extends TypeOop<TypeStruct> {
     _dual=null;
     return true;
   }
+  @Override Type meet_nil() { return TypeNil.make(above_center() ? make(_args,_ts) : this); }
+  
   @Override boolean contains( Type t, BitSet bs ) {
     if( bs==null ) bs=new BitSet();
     if( bs.get(_uid) ) return false;
@@ -297,7 +299,6 @@ public class TypeStruct extends TypeOop<TypeStruct> {
     for( Type t2 : _ts) if( t2==t || t2.contains(t,bs) ) return true;
     return false;
   }
-
 
   // Recursive-cyclic meet: given 2 (potentially) cyclic structures do a
   // general-purpose meet preserving the largest cycles possible.  This is NOT

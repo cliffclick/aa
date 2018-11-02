@@ -131,10 +131,7 @@ public class TypeTuple<P extends TypeTuple<P>> extends TypeOop<P> {
     return make0(_any&tmax._any,ts);
   }
 
-  public Type at( int idx ) {
-    //return idx < _ts.length ? _ts[idx] : _inf;
-    return _ts[idx];            // Must be in-size
-  }
+  public Type at( int idx ) { return _ts[idx]; } // Must be in-size
 
   // True if all internals may_be_con
   @Override public boolean may_be_con() {

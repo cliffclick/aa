@@ -2,6 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeNil;
 
 // Regain precision after a call.  Calls return some intended value which
 // varies by call-site; e.g. map({A->B}, A[]) returns B[] - but the B type
@@ -33,6 +34,8 @@ public class CastNode extends Node {
     return gvn.type(data).isa(_t) ? data : null;
   }
   @Override public Type value(GVNGCM gvn) {
+    Type t = gvn.type(in(1));
+    if( t == TypeNil.NIL && _t==Type.NSCALR ) return gvn.self_type(this);
     return _t.join(gvn.type(in(1)));
   }
 }

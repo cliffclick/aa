@@ -94,14 +94,16 @@ public class UnresolvedNode extends Node {
     throw AA.unimpl();                     // TODO: return shrunk choice list
   }
   
-  // Return the op_prec of the returned value.  Not sensible except when call
+  @Override public Type all_type() { return TypeFun.GENERIC_FUN; }
+  
+  // Return the op_prec of the returned value.  Not sensible except when called
   // on primitives.  Should be the same across all defs.
   @Override public byte op_prec() {
     byte prec = _defs.at(0).op_prec();
     assert _defs._len < 2 || _defs.at(1).op_prec() == prec;
     return prec;
   }
-  // Return the op_prec of the returned value.  Not sensible except when call
+  // Return the op_prec of the returned value.  Not sensible except when called
   // on primitives.  Should be the same across all defs.
   @Override public byte may_prec() {
     byte prec = -1;

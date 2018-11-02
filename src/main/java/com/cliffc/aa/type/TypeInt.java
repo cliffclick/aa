@@ -180,5 +180,6 @@ public class TypeInt extends Type<TypeInt> {
     // Never had a nil choice
     return this;
   }
+  @Override Type meet_nil() { return meet(FALSE); }
   @Override Type make_recur(TypeName tn, int d, BitSet bs ) { return this; }
 }

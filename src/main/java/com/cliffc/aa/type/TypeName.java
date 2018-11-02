@@ -165,7 +165,11 @@ public class TypeName extends Type<TypeName> {
     //return _t.above_center() || t.isa(_t.dual()) ? make(_name,_lex,nn) : nn;
     return make(_name,_lex,nn);
   }
-  
+  @Override Type meet_nil() {
+    Type x = _t.meet_nil();     // Compute meet-nil without the name
+    if( x instanceof TypeNil ) return TypeNil.make(TypeName.make(_name,_lex,((TypeNil)x)._t));
+    else                       return              TypeName.make(_name,_lex,          x); // Just name-wrap
+  }
   @Override public byte isBitShape(Type t) {
     if( t instanceof TypeName ) {
       if( ((TypeName)t)._name.equals(_name) ) return _t.isBitShape(((TypeName)t)._t);

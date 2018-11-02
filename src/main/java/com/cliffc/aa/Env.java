@@ -12,8 +12,8 @@ public class Env implements AutoCloseable {
     add(" control ",_scope);
   }
 
-  public final static GVNGCM _gvn = new GVNGCM(); // Pessimistic GVN, defaults to ALL, lifts towards ANY
-  private final static Env TOP = new Env(null);        // Top-most lexical Environment
+  public final static GVNGCM _gvn = new GVNGCM(); // Initial GVN, defaults to ALL, lifts towards ANY
+  private final static Env TOP = new Env(null);   // Top-most lexical Environment
   public static ScopeNode top_scope() { return TOP._scope; }
   static { TOP.init(); }
   private void init() {
@@ -69,6 +69,7 @@ public class Env implements AutoCloseable {
     // outer scope, and control-users which promote to the Scope's control.
     while( _scope._uses._len > 0 ) {
       Node use = _scope._uses.at(0);
+      assert use != pscope;
       int idx = use._defs.find(_scope);
       _gvn.set_def_reg(use,idx, idx==0 ? pscope.get(" control ") : pscope);
     }

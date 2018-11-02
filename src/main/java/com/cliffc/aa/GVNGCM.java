@@ -27,7 +27,8 @@ public class GVNGCM {
     return n;
   }
 
-  // Code-expanding worklist, lower priority work
+  // A second worklist, for code-expanding and thus lower priority work.
+  // Inlining happens off this worklist, once the main worklist runs dry.
   private Ary<Node> _work2 = new Ary<>(new Node[1], 0);
   private BitSet _wrk2_bits = new BitSet();
   public void add_work2( Node n ) {
@@ -128,7 +129,7 @@ public class GVNGCM {
   }
 
   // True if in _ts and _vals, false otherwise
-  public boolean touched( Node n ) { return n._uid < _ts._len && _ts._es[n._uid]!=null; }
+  public boolean touched( Node n ) { return _ts.atX(n._uid)!=null; }
   
   // Remove from GVN structures.  Used rarely for whole-merge changes
   public void unreg( Node n ) { assert !check_new(n); unreg0(n); }
@@ -401,15 +402,14 @@ public class GVNGCM {
   // Forward reachable walk, setting all_type.dual (except Start) and priming
   // the worklist for nodes that are not above centerline.
   private void walk_initype( Node n ) {
-    if( _ts.atX(n._uid) != null ) return; // Been there, done that
+    if( n==null || touched(n) ) return; // Been there, done that
     Type t = n.all_type();
-    if( !t.above_center() && !(n instanceof ErrNode) && !(n instanceof ConNode) )
-      t = t.dual();             // Start above-center and fall
-    if( !t.above_center() || n instanceof ConNode || n instanceof ErrNode ) // Constants and errors act as-if they started high and fell to the constant value ...
-      for( Node use : n._uses ) add_work(use); // ...by adding users
+    if( !t.above_center() ) t = t.dual(); // Start above-center and fall
     setype(n,t);
-    // Walk forward reachable graph
+    add_work(n);
+    // Walk reachable graph
     for( Node use : n._uses ) walk_initype(use);
+    for( Node def : n._defs ) walk_initype(def);
   }
   
   // GCP optimizations on the live subgraph

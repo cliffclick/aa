@@ -69,6 +69,8 @@ public class CallNode extends Node {
     if( _inlined ) return null;
     // If an upcast is in-progress, no other opts until it finishes
     if( _cast_ret !=null ) return null;
+    // Dead, do nothing
+    if( gvn.type(in(0))==Type.XCTRL ) return null;
 
     // When do i do 'pattern matching'?  For the moment, right here: if not
     // already unpacked a tuple, and can see the NewNode, unpack it right now.

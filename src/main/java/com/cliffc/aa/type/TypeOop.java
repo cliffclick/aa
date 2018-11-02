@@ -58,6 +58,10 @@ public class TypeOop<O extends TypeOop<O>> extends Type<O> {
   @Override public boolean is_con() { return false; }
   @Override boolean must_nil() { return false; }
   @Override Type not_nil(Type ignore) { return this; }
+  @Override Type meet_nil() {
+    if( above_center() ) throw com.cliffc.aa.AA.unimpl();
+    return TypeNil.make(this);
+  }
   // Lattice of conversions:
   // -1 unknown; top; might fail, might be free (Scalar->Str); Scalar might lift
   //    to e.g. Float and require a user-provided rounding conversion from F64->Str.

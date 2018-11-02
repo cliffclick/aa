@@ -185,7 +185,7 @@ public class Type<T extends Type<T>> {
   // Strip off any subclassing just for names
   byte simple_type() { return base()._type; }
   private boolean is_ptr() { byte t = simple_type();  return t == TOOP || t == TSTR || t == TSTRUCT || t == TTUPLE || t == TFUN || t == TFUNPTR; }
-  private boolean is_num() { byte t = simple_type();  return t == TNUM || t == TXNUM || t == TNNUM || t == TXNNUM || t == TREAL || t == TXREAL || t == TNREAL || t == TXNREAL || t == TINT || t == TFLT; }
+          boolean is_num() { byte t = simple_type();  return t == TNUM || t == TXNUM || t == TNNUM || t == TXNNUM || t == TREAL || t == TXREAL || t == TNREAL || t == TXNREAL || t == TINT || t == TFLT; }
   // True if 'this' isa SCALAR, without the cost of a full 'meet()'
   final boolean isa_scalar() { return _type != TCTRL && _type != TXCTRL; }
   
@@ -468,7 +468,7 @@ public class Type<T extends Type<T>> {
     if( above_center() && isa(t) ) return 0; // Can choose compatible format
     if( _type == t._type ) return 0; // Same type is OK
     if( t._type==TSCALAR ) return 0; // Generic function arg never requires a conversion
-    if( _type == TALL || _type == TSCALAR ) return -1; // Scalar has to resolve
+    if( _type == TALL || _type == TSCALAR || _type == TNSCALR ) return -1; // Scalar has to resolve
     if( _type == TREAL && t.is_num() ) return -1; // Real->Int/Flt has to resolve
 
     throw typerr(t);  // Overridden in subtypes
@@ -496,7 +496,7 @@ public class Type<T extends Type<T>> {
     case TXSCALAR:
     case TXNSCALR: case TNSCALR: 
     case TXNNUM:   case TNNUM:   
-    case TXNREAL:  case TNREAL:  
+    case TXNREAL:  case TNREAL:
       return false;             // These all may be non-nil
     default: throw typerr(null); // Overridden in subclass
     }
@@ -516,6 +516,7 @@ public class Type<T extends Type<T>> {
     default: throw typerr(null); // Overridden in subclass
     }
   }
+  Type meet_nil() { throw typerr(null); } // Overridden in subclass
     
   // Make a (possibly cyclic & infinite) named type.  Prevent the infinite
   // unrolling of names by not allowing a named-type with depth >= D from

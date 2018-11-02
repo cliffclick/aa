@@ -73,6 +73,10 @@ public class TypeStr extends TypeOop<TypeStr> {
 
   @Override public boolean may_be_con() { return super.may_be_con() || _con != null; }
   @Override public boolean is_con() { return _con!=null; }
+  @Override Type meet_nil() {
+    if( above_center() ) throw com.cliffc.aa.AA.unimpl();
+    return TypeNil.make(this);
+  }
   
   // Lattice of conversions:
   // -1 unknown; top; might fail, might be free (Scalar->Str); Scalar might lift

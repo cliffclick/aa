@@ -89,6 +89,7 @@ public class TypeFlt extends Type<TypeFlt> {
   @Override public boolean is_con()   { return _x==0; }
   @Override boolean must_nil() { assert _x!=0||_con!=0; return _x==-2; }
   @Override Type not_nil(Type ignore) { return _x==2 ? make(1,_z,_con) : this; }
+  @Override Type meet_nil() { return meet(TypeInt.FALSE); }
   
   // Lattice of conversions:
   // -1 unknown; top; might fail, might be free (Scalar->Int); Scalar might lift

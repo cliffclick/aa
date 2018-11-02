@@ -27,7 +27,7 @@ public class TypeNil extends Type<TypeNil> {
   private static TypeNil FREE=null;
   @Override protected TypeNil free( TypeNil ret ) { FREE=this; return ret; }
   private static TypeNil make0( Type t ) {
-    assert !(t instanceof TypeNil);
+    assert !(t instanceof TypeNil) && !(t instanceof TypeTuple);
     TypeNil t1 = FREE;
     if( t1 == null ) t1 = new TypeNil(t);
     else { FREE = null; t1.init(t); }
@@ -35,7 +35,7 @@ public class TypeNil extends Type<TypeNil> {
     return t1==t2 ? t1 : t1.free(t2);
   }
   public static Type make( Type t ) {
-    assert !t.isa(NUM); // Numbers fold in zero directly
+    assert !t.is_num(); // Numbers fold in zero directly
     if( t==NSCALR ) return SCALAR;
     if( t==XNSCALR ) return XSCALAR;
     return t == SCALAR || t == XSCALAR || t instanceof TypeNil ? t : make0(t);
@@ -57,27 +57,16 @@ public class TypeNil extends Type<TypeNil> {
 
   @Override protected TypeNil xdual() { return _t==null ? this : new TypeNil(_t.dual()); }
   @Override protected Type xmeet( Type t ) {
-    if( t == NIL ) return t.xmeet(this); // Swap NIL to left
-    if( above_center() ) {         // choice-nil
-      if( t instanceof TypeNil ) { // aways keep nil (choice or not)
-        return make(_t.meet(((TypeNil)t)._t));
-      } else {
-        return _t.meet(t);      // toss away nil choice
-      }
-    } else {                    // must-nil
-      if( this == NIL ) {       // Exactly the flexible nil
-        if( t.isa(NUM) ) return t.above_center() ? this : t.meet(TypeInt.FALSE); // Fall away from NIL to ZERO
-        if( t.base() instanceof TypeNil ) return t.above_center() ? this : t;
-        if( !t.above_center() ) return make(t); // NIL-wrap the other guy
-        return make(t.dual());
-      }
-      if( t instanceof TypeNil )
-        return make(_t.meet(((TypeNil)t)._t));
-      Type mt = _t.meet(t);
-      assert !mt.above_center(); // this is below_center, so the meet is also
-      assert !mt.isa(NUM);
-      return make(mt);
-    }
+    assert t.base()==t || !(t.base() instanceof TypeNil); // No name-wrapping-nils
+    if( this == NIL ) return t   .meet_nil();
+    if( t    == NIL ) return this.meet_nil();
+    if( above_center() )           // choice-nil
+      return t instanceof TypeNil  // aways keep nil (choice or not)
+        ? make(_t.meet(((TypeNil)t)._t))
+        :      _t.meet(t);      // toss away nil choice
+    else                        // must-nil
+      // Keep the nil (and remove any double-nil)
+      return make(_t.meet(t instanceof TypeNil ? ((TypeNil)t)._t : t));
   }
 
   @Override public boolean above_center() { return _t != null && _t.above_center(); }
@@ -86,7 +75,8 @@ public class TypeNil extends Type<TypeNil> {
   @Override public byte isBitShape(Type t) { return _t==null || this==t ? 0 : _t.isBitShape(t); }
   @Override boolean must_nil() { return _t==null || !_t.above_center(); }
   @Override Type not_nil(Type ignore) { return _t!=null && _t.above_center() ? _t : this; }
-  // Make a (posssibly cyclic & infinite) named type.  Prevent the infinite
+  @Override Type meet_nil() { return _t.above_center() ? NIL : this; }
+  // Make a (possibly cyclic & infinite) named type.  Prevent the infinite
   // unrolling of names by not allowing a named-type with depth >= D from
   // holding (recursively) the head of a named-type cycle.  We need to cap the
   // unroll, to prevent loops/recursion from infinitely unrolling.

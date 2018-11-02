@@ -38,7 +38,7 @@ import java.util.Map;
 // the incoming args come from a known input path.
 // 
 public class FunNode extends RegionNode {
-  private static int CNT=1;     // Function index; 0 reserved (for nil in TypeFunPtr)
+  private static int CNT=1;     // Function index; 0 reserved
   public TypeFunPtr _tf;        // Worse-case correct type, updated by GCP
   private final byte _op_prec;  // Operator precedence; only set top-level primitive wrappers
 

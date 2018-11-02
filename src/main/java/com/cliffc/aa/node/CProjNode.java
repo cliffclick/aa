@@ -1,8 +1,9 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.AA;
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.type.*;
+import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeNil;
+import com.cliffc.aa.type.TypeTuple;
 
 // Proj control
 public class CProjNode extends ProjNode {
@@ -30,23 +31,12 @@ public class CProjNode extends ProjNode {
     Node iff = in(0);
     if( !(iff instanceof IfNode) ) return this; // Already collapsed IfNode, no sharpen
     Node test = iff.in(1);
-    Type pred = gvn.type(test).base();
-    if( pred== Type.SCALAR ) return this;
-    if( pred==TypeInt.BOOL ) {  // The bool test itself is either 0 or 1
-      // Find and replace uses of the pred in the scope with the con
-      scope.sharpen(test,gvn.con(TypeInt.con(_idx)),tmp);
-      return this;
-    }
-    if( pred instanceof TypeNil ) { // Check for null & oop
-      Type remove_nil = ((TypeNil)pred)._t;
-      if( remove_nil == null && _idx==1 ) return this; // Do not sharpen nil on the false path
-      Node sharp = _idx==1
-        ? gvn.xform(new CastNode(this,test,remove_nil))
-        : gvn.con(TypeNil.NIL);
-      scope.sharpen(test,sharp,tmp);
-      return this;
-    }
-
-    throw AA.unimpl();
+    add_def(this);              // Self-hook to prevent accidental deletion
+    Node sharp = _idx==1
+      ? gvn.xform(new CastNode(this,test,Type.NSCALR))
+      : gvn.con(TypeNil.NIL);
+    scope.sharpen(test,sharp,tmp);
+    pop();                      // Remove self-hook
+    return this;
   }
 }

@@ -161,11 +161,11 @@ public class TestType {
     Type oop0 = TypeNil  .OOP;  // OOP? (OOP and null)
     Type str0 = TypeNil  .STR;  // str? (str AND null)
     Type str  = TypeStr  .STR;  // str no null
-    Type tup0 = TypeNil.make(TypeTuple.SCALAR0); // tup? (tup AND null); infinite repeat of SCALAR fields
-    Type tup  = TypeTuple.SCALAR0; // tup no null ; infinite repeat of SCALAR fields
+    Type tup  = TypeStruct.make(); // tup no null ; infinite repeat of SCALAR fields
+    Type tup0 = TypeNil.make(tup); // tup? (tup AND null); infinite repeat of SCALAR fields
     Type i0   = TypeInt.FALSE;
     Type abc  = TypeStr  .ABC;
-    Type fld  = TypeTuple.INT64;  // 1 field of int64
+    Type fld  = TypeStruct.make(TypeInt.INT64);  // 1 field of int64
     
     Type tupx = tup .dual();      // ~tup   (choice tup, no NULL)
     Type tup_ = tup0.dual();      // ~tup+? (choice tup  OR NULL)
