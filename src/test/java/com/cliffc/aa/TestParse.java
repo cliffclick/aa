@@ -292,8 +292,8 @@ public class TestParse {
     TypeNil tnil3 = (TypeNil)tt3.at(0);
     assertSame(tnil3._t , tname3);
     assertSame(tt3.at(1), TypeInt.INT64);
-    assertEquals("n",tt3._args[0]);
-    assertEquals("v",tt3._args[1]);
+    assertEquals("n",tt3._flds[0]);
+    assertEquals("v",tt3._flds[1]);
 
     // Missing type B is also never worked on.
     test_isa("A= :@{n:B?, v:int}", Type.SCALAR);
@@ -332,8 +332,8 @@ public class TestParse {
     TypeStruct tt4 = (TypeStruct)tname4._t;
     TypeName tname5 = (TypeName)tt4.at(0);
     assertEquals(2.3*2.3,tt4.at(1).getd(),1e-6);
-    assertEquals("next",tt4._args[0]);
-    assertEquals("val",tt4._args[1]);
+    assertEquals("next",tt4._flds[0]);
+    assertEquals("val",tt4._flds[1]);
     
     assertEquals("List", tname5._name);
     TypeStruct tt5 = (TypeStruct)tname5._t;

@@ -8,22 +8,39 @@ import java.util.function.Consumer;
 
 /** A memory-based Tuple with optionally named fields.  This is a recursive
  *  type, only produced by NewNode and structure or tuple constants.  
+ *
+ *  The recursive type poses some interesting challenges.  It is represented as
+ *  literally a cycle of pointers which must include a TypeStruct (and not a
+ *  TypeTuple which only roots Types).  Type inference involves finding the
+ *  Meet of two cyclic structures.  The cycles will not generally be of the
+ *  same length.  However, each field Meets independently (and fields in one
+ *  structure but not the other are not in the final Meet).  This means we are
+ *  NOT trying to solve the general problem of graph-equivalence (a known hard
+ *  problem).  Instead we can solve each field independently and also intersect
+ *  across common fields.
+ * 
+ *  When solving across a single field, we will find some prefix and then
+ *  possibly a cycle - conceptually the type unrolls forever.  When doing the
+ *  Meet we conceptually unroll both types forever, compute the Meet element by
+ *  element... but when both types have looped, we can stop and the discovered
+ *  cycle is the Meet's cycle.
+ *  
  */
 public class TypeStruct extends TypeOop<TypeStruct> {
   // Fields are named in-order and aligned with the Tuple values.  Field names
   // are never null, and never zero-length.  If the 1st char is a '^' the field
   // is Top; a '.' is Bot; all other values are valid field names.
-  public String[] _args;        // The field names
+  public String[] _flds;        // The field names
   public Type[] _ts;            // Matching field types
   private int _hash; // Hash pre-computed to avoid large computes duing interning
   private TypeStruct _recursive;        // Only set during recursive-meets
-  private TypeStruct     ( boolean any, String[] args, Type[] ts ) { super(TSTRUCT, any); init(any,args,ts); }
-  private TypeStruct init( boolean any, String[] args, Type[] ts ) {
+  private TypeStruct     ( boolean any, String[] flds, Type[] ts ) { super(TSTRUCT, any); init(any,flds,ts); }
+  private TypeStruct init( boolean any, String[] flds, Type[] ts ) {
     super.init(TSTRUCT, any);
-    _args=args;
+    _flds=flds;
     _ts=ts;
     int sum=super.hashCode();
-    for( String fld : _args ) sum += fld.hashCode();
+    for( String fld : _flds ) sum += fld.hashCode();
     _hash= sum;
     return this;
   }
@@ -41,9 +58,9 @@ public class TypeStruct extends TypeOop<TypeStruct> {
     TypeStruct t = (TypeStruct)o;
     if( _any!=t._any || _hash != t._hash || _ts.length != t._ts.length )
       return false;
-    if( _ts == t._ts && _args == t._args ) return true;
+    if( _ts == t._ts && _flds == t._flds ) return true;
     for( int i=0; i<_ts.length; i++ )
-      if( !_args[i].equals(t._args[i]) )
+      if( !_flds[i].equals(t._flds[i]) )
         return false;
 
     // Unlike all other non-cyclic structures which are built bottom-up, cyclic
@@ -56,14 +73,14 @@ public class TypeStruct extends TypeOop<TypeStruct> {
     if( !(o instanceof TypeStruct) ) return false;
     TypeStruct t = (TypeStruct)o;
     TypeStruct t2 = find_other();
-    if( t2 !=null ) return t2==t; // Already in cycle report equals or not
+    if( t2 !=null ) return t2==t   ; // Already in cycle report equals or not
     TypeStruct t3 = t.find_other();
     if( t3 !=null ) return t3==this;// Already in cycle report equals or not
     if( _any!=t._any || _hash != t._hash || _ts.length != t._ts.length )
       return false;
-    if( _ts == t._ts && _args == t._args ) return true;
+    if( _ts == t._ts && _flds == t._flds ) return true;
     for( int i=0; i<_ts.length; i++ )
-      if( !_args[i].equals(t._args[i]) )
+      if( !_flds[i].equals(t._flds[i]) )
         return false;
     
     int len = CYCLES._len;
@@ -89,15 +106,15 @@ public class TypeStruct extends TypeOop<TypeStruct> {
 
     SB sb = new SB();
     if( _any ) sb.p('~');
-    boolean is_tup = _args.length==0 || argTop(_args[0]) || argBot(_args[0]);
+    boolean is_tup = _flds.length==0 || fldTop(_flds[0]) || fldBot(_flds[0]);
     if( !is_tup ) sb.p('@');
     sb.p(is_tup ? '(' : '{');
-    for( int i=0; i<_args.length; i++ ) {
-      if( !is_tup ) sb.p(_args[i]);
+    for( int i=0; i<_flds.length; i++ ) {
+      if( !is_tup ) sb.p(_flds[i]);
       Type t = at(i);
       if( !is_tup && t != SCALAR ) sb.p(':');
       if( t != SCALAR ) sb.p(t==null ? "!" : t.str(dups));
-      if( i<_args.length-1 ) sb.p(',');
+      if( i<_flds.length-1 ) sb.p(',');
     }
     sb.p(!is_tup ? '}' : ')');
     return sb.toString();
@@ -107,10 +124,10 @@ public class TypeStruct extends TypeOop<TypeStruct> {
   // cyclic types for which a DAG-like bottom-up-remove-dups approach cannot work.
   private static TypeStruct FREE=null;
   @Override protected TypeStruct free( TypeStruct ret ) { FREE=this; return ret; }
-  private static TypeStruct malloc( boolean any, String[] args, Type[] ts ) {
-    if( FREE == null ) return new TypeStruct(any,args,ts);
+  private static TypeStruct malloc( boolean any, String[] flds, Type[] ts ) {
+    if( FREE == null ) return new TypeStruct(any,flds,ts);
     TypeStruct t1 = FREE;  FREE = null;
-    return t1.init(any,args,ts);
+    return t1.init(any,flds,ts);
   }
   private TypeStruct hashcons_free() { TypeStruct t2 = (TypeStruct)hashcons();  return this==t2 ? this : free(t2);  }
 
@@ -134,17 +151,17 @@ public class TypeStruct extends TypeOop<TypeStruct> {
   private static final TypeStruct D1    = make(flds("d"),ts(TypeInt.TRUE  )); // @{d:1}
   static final TypeStruct[] TYPES = new TypeStruct[]{POINT,X,A,C0,D1};
 
-  // Dual the args, dual the tuple
+  // Dual the flds, dual the tuple
   @Override protected TypeStruct xdual() {
     if( _recursive!=null ) return _recursive; // Recursive meets pre-computed the xdual
-    String[] as = new String[_args.length];
-    for( int i=0; i<as.length; i++ ) as[i]=sdual(_args[i]);
+    String[] as = new String[_flds.length];
+    for( int i=0; i<as.length; i++ ) as[i]=sdual(_flds[i]);
     Type  [] ts = new Type  [_ts  .length];
     for( int i=0; i<ts.length; i++ ) ts[i] = _ts[i].dual();
     return new TypeStruct(!_any,as,ts);
   }
 
-  // Standard Meet.  Types-meet-Types and arg-meet-arg.  Arg strings can be
+  // Standard Meet.  Types-meet-Types and fld-meet-fld.  Fld strings can be
   // top/bottom (for tuples).
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
@@ -185,13 +202,13 @@ public class TypeStruct extends TypeOop<TypeStruct> {
     String[] as = new String[len], das = new String[len];
     Type  [] ts = new Type  [len], dts = new Type  [len];
     for( int i=0; i<_ts.length; i++ ) {
-      das[i] = sdual( as[i] = smeet(_args[i],tmax._args[i]) );
+      das[i] = sdual( as[i] = smeet(_flds[i],tmax._flds[i]) );
       // No recursive meet... yet
       //dts[i] = ( ts[i] = _ts[i].meet(tmax._ts[i]) ).dual();
     }
     // Elements only in the longer tuple
     for( int i=_ts.length; i<len; i++ ) {
-      das[i] = sdual( as[i] = tmax._args[i] );
+      das[i] = sdual( as[i] = tmax._flds[i] );
       dts[i] = ( ts[i] = tmax._ts[i] ).dual();
     }
 
@@ -230,27 +247,27 @@ public class TypeStruct extends TypeOop<TypeStruct> {
     return tstr;
   }
 
-  static private boolean argTop( String s ) { return s.charAt(0)=='^'; }
-  static private boolean argBot( String s ) { return s.charAt(0)=='.'; }
+  static private boolean fldTop( String s ) { return s.charAt(0)=='^'; }
+  static private boolean fldBot( String s ) { return s.charAt(0)=='.'; }
   // String meet
   private static String smeet( String s0, String s1 ) {
-    if( argTop(s0) ) return s1;
-    if( argTop(s1) ) return s0;
-    if( argBot(s0) ) return s0;
-    if( argBot(s1) ) return s1;
+    if( fldTop(s0) ) return s1;
+    if( fldTop(s1) ) return s0;
+    if( fldBot(s0) ) return s0;
+    if( fldBot(s1) ) return s1;
     if( s0.equals(s1) ) return s0;
-    return "."; // argBot
+    return "."; // fldBot
   }
   private static String sdual( String s ) {
-    if( argTop(s) ) return ".";
-    if( argBot(s) ) return "^";
+    if( fldTop(s) ) return ".";
+    if( fldBot(s) ) return "^";
     return s;
   }
 
   // Return the index of the matching field, or -1 if not found
   public int find( String fld ) {
-    for( int i=0; i<_args.length; i++ )
-      if( fld.equals(_args[i]) )
+    for( int i=0; i<_flds.length; i++ )
+      if( fld.equals(_flds[i]) )
         return i;
     return -1;
   }
@@ -260,7 +277,7 @@ public class TypeStruct extends TypeOop<TypeStruct> {
   // True if isBitShape on all bits
   @Override public byte isBitShape(Type t) {
     if( isa(t) ) return 0; // Can choose compatible format
-    if( t.isa(this) ) return 0; // TODO: really: test same args, each arg isBitShape
+    if( t.isa(this) ) return 0; // TODO: really: test same flds, each fld isBitShape
     if( t instanceof TypeName ) return 99; // Cannot pick up a name, requires user converts
     return 99;
   }
@@ -272,7 +289,7 @@ public class TypeStruct extends TypeOop<TypeStruct> {
     Type[] ts = new Type[_ts.length];
     for( int i=0; i<_ts.length; i++ )
       eq &= (ts[i] = _ts[i].make_recur(tn,d,bs))==_ts[i];
-    return eq ? this : make(_args,ts);
+    return eq ? this : make(_flds,ts);
   }
 
   // Iterate over any nested child types
@@ -290,7 +307,7 @@ public class TypeStruct extends TypeOop<TypeStruct> {
     _dual=null;
     return true;
   }
-  @Override Type meet_nil() { return TypeNil.make(above_center() ? make(_args,_ts) : this); }
+  @Override Type meet_nil() { return TypeNil.make(above_center() ? make(_flds,_ts) : this); }
   
   @Override boolean contains( Type t, BitSet bs ) {
     if( bs==null ) bs=new BitSet();
@@ -299,41 +316,4 @@ public class TypeStruct extends TypeOop<TypeStruct> {
     for( Type t2 : _ts) if( t2==t || t2.contains(t,bs) ) return true;
     return false;
   }
-
-  // Recursive-cyclic meet: given 2 (potentially) cyclic structures do a
-  // general-purpose meet preserving the largest cycles possible.  This is NOT
-  // the general case of looking for equality amongst general graphs as the
-  // out-edges are ordered.  Instead the problem devolves to looking at cycles
-  // involving a single edge-number, counting the depth and taking e.g. the GCD
-  // or LCM as the new cycle depth.  Taking the LCM allows the structure to
-  // grow much more, while keeping more precision.  The cycles along each edge
-  // are independent.  Non-cyclic edges use the usual MEET.
-  //
-  // Example:  edge0, a 1-cycle meets a 1-cycle:
-  //    A->A->
-  //    B->B->...
-  // GCD, LCM is 1 {AB}->...
-  // 
-  // Example:  edge0, a 2-cycle meets a 1-cycle:
-  //    A->B->A->B->...
-  //    C->C->C->C->...
-  // GCD is 1 {ABC}->...
-  // LCM is 2 {AC}->{BC}->...
-  // 
-  // Example:  edge0, a 3-cycle meets a 2-cycle:
-  //    A->B->C->A->B->C->
-  //    D->E->D->E->D->E->
-  // GCD is 1 {ABCDE}->...
-  // LCM is 6 {AD}->{BE}->{CD}->{AE}->{BD}->{CE}->
-  // 
-  // Example:  edge0, a 4-cycle meets a 2-cycle:
-  //    A->B->C->D->A->B->C->D->...
-  //    E->F->E->F->...
-  // GCD is 2 {ACE}->{BDF}->...
-  // LCM is 4 {AE}->{BF}->{CE}->{DF}->
-  //
-  // NOTE: Most data structures the limit is depth 1 or at most 2.  No need to
-  // solve the general case.
-
-  
 }
