@@ -4,6 +4,7 @@ import java.util.Arrays;
 import java.util.BitSet;
 import java.util.HashMap;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 /** an implementation of language AA
  */
@@ -41,9 +42,10 @@ public class Type<T extends Type<T>> {
   static private int CNT=1;
   final int _uid=CNT++; // Unique ID, will have gaps, used to uniquely order Types in Unions
   byte _type;           // Simple types use a simple enum
+  boolean _cyclic;      // Part of a type cycle
   T _dual; // All types support a dual notion, lazily computed and cached here
 
-  protected Type(byte type) { _type=type; }
+  protected Type(byte type) { _type=type; _cyclic=false; }
   @Override public int hashCode( ) { return _type; }
   // Is anything equals to this?
   @Override public boolean equals( Object o ) {
@@ -78,6 +80,7 @@ public class Type<T extends Type<T>> {
   // check of a (possibly very large) Type is always a simple pointer-equality
   // check, except during construction and intern'ing.
   private static HashMap<Type,Type> INTERN = new HashMap<>();
+  static int RECURSIVE_MEET;
   final Type hashcons() {
     Type t2 = INTERN.get(this); // Lookup
     if( t2!=null ) {            // Found prior
@@ -85,6 +88,8 @@ public class Type<T extends Type<T>> {
       assert t2 != this;        // Not hash-consing twice
       return t2;                // Return prior
     }
+    if( RECURSIVE_MEET > 0 )    // Mid-building recursive types; do not intern
+      return this;
     // Not in type table
     _dual = null;                // No dual yet
     INTERN.put(this,this);       // Put in table without dual
@@ -104,10 +109,16 @@ public class Type<T extends Type<T>> {
     Type rez  = INTERN.remove(this);
     assert rez != null;
   }
-  void retern( ) {
+  T retern( ) {
+    assert _cyclic;
+    assert _dual._dual == this;
     INTERN.put(this,this);
     assert INTERN.get(this)==this;
+    return (T)this;
   }
+  boolean interned() { return INTERN.get(this)==this; }
+  Type intern_lookup() { return INTERN.get(this); }
+  static int intern_size() { return INTERN.size(); }
 
   // Simple types are implemented fully here
   static final byte TALL    = 0; // Bottom
@@ -193,13 +204,18 @@ public class Type<T extends Type<T>> {
   public final T dual() { return _dual; }
   
   // Compute dual right now.  Overridden in subclasses.
-  protected T xdual() {
+  T xdual() {
     assert is_simple();
     return (T)new Type((byte)(_type^1));
   }
+  T rdual() { assert _dual!=null; return _dual; }
 
   public final Type meet( Type t ) {
     Type mt = xmeet0(t);
+    if( _cyclic && t._cyclic && !mt._cyclic ) {
+      assert !mt.interned();
+      mt._cyclic = true;
+    }
     // Expensive asserts in an common place, turn off when stable
     //assert check_commute  (t,mt);
     //assert check_symmetric(t,mt);
@@ -524,15 +540,25 @@ public class Type<T extends Type<T>> {
   // unroll, to prevent loops/recursion from infinitely unrolling.
   Type make_recur(TypeName tn, int d, BitSet bs ) { assert is_simple(); return this; }
 
-  // If any substructure is being freed, then this type is being freed also.
-  boolean free_recursively(BitSet bs) { return false; }
-  
   // Is t type contained within this?  Short-circuits on a true
-  public boolean contains( Type t ) { return contains(t,null); }
+  public final boolean contains( Type t ) { return contains(t,null); }
   boolean contains( Type t, BitSet bs ) { return false; }
+  // Depth of nested types
+  public final int depth( ) { return depth(null); }
+  int depth( BitSet bs ) { return 1; }
+  // Mark if part of a cycle
+  void mark_cycle( Type t, BitSet visit, BitSet cycle ) { }
+  // Replace old with nnn in a clone
+  Type replace( Type old, Type nnn, HashMap<TypeStruct,TypeStruct> ignore ) { return this; }
   
   // Iterate over any nested child types.  Only side-effect results.
   public void iter( Consumer<Type> c ) { /*None in the base class*/ }
+
+  // Apply the test(); if it returns true iterate over all nested child types.
+  // If the test returns false, short-circuit the walk.  No attempt to guard
+  // against recursive structure walks, so the 'test' must return false when
+  // visiting the same Type again.
+  void walk( Predicate<Type> p ) { assert is_simple(); p.test(this); }
 
   RuntimeException typerr(Type t) {
     throw new RuntimeException("Should not reach here: internal type system error with "+this+(t==null?"":(" and "+t)));

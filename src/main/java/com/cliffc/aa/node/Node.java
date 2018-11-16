@@ -139,10 +139,10 @@ public abstract class Node implements Cloneable {
       return dump(d,sb,gvn).nl();
     }
   }
-  private SB dump(int d, SB sb, BitSet bs, GVNGCM gvn) {
-    if( bs.get(_uid) ) return sb;
+  private void dump(int d, SB sb, BitSet bs, GVNGCM gvn) {
+    if( bs.get(_uid) ) return;
     bs.set(_uid);
-    return dump(d,sb,gvn).nl();
+    dump(d,sb,gvn).nl();
   }
   private boolean is_multi_head() { return _op==OP_FUN  || _op==OP_REGION || _op==OP_CALL || _op==OP_IF; }
   private boolean is_multi_tail() { return _op==OP_PARM || _op==OP_PHI    || _op==OP_PROJ              ; }

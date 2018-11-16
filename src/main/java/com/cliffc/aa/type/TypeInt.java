@@ -2,6 +2,7 @@ package com.cliffc.aa.type;
 
 import java.util.BitSet;
 import java.util.HashMap;
+import java.util.function.Predicate;
 
 public class TypeInt extends Type<TypeInt> {
   private byte _x;        // -2 bot, -1 not-null, 0 con, +1 not-null-top +2 top
@@ -75,6 +76,7 @@ public class TypeInt extends Type<TypeInt> {
     default: throw typerr(t);
     }
     TypeInt tt = (TypeInt)t;
+    assert !equals(tt);         // Already covered by interning
     if( _x==tt._x && _z==tt._z && _con==tt._con ) return this;
     int maxz = Math.max(_z,tt._z);
     int minz = Math.min(_z,tt._z);
@@ -182,4 +184,5 @@ public class TypeInt extends Type<TypeInt> {
   }
   @Override Type meet_nil() { return meet(FALSE); }
   @Override Type make_recur(TypeName tn, int d, BitSet bs ) { return this; }
+  @Override void walk( Predicate<Type> p ) { p.test(this); }
 }

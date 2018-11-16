@@ -141,11 +141,11 @@ public class GVNGCM {
   }
   
   // Used rarely for whole-merge changes
-  public Node rereg( Node n, Type oldt ) {
+  public void rereg( Node n, Type oldt ) {
     assert !check_opt(n);
     setype(n,oldt);
     _vals.put(n,n);
-    return add_work0(n);
+    add_work0(n);
   }
 
   // Hack an edge, updating GVN as needed

@@ -1,13 +1,11 @@
 package com.cliffc.aa;
 
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.Bits;
 import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.HashMap;
-import java.util.function.Consumer;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -17,6 +15,8 @@ public class TestType {
   @Test public void testType() {
     Type.init0(new HashMap<>());
     Type ignore = TypeTuple.ALL; // Break class-loader cycle; load Tuple before Fun.
+
+    Type rez = TypeStruct.POINT.join(TypeStruct.A);
 
     Type rbq = Type.NSCALR.join(TypeName.TEST_E2);
     Type rbz = Type.NSCALR.join(TypeName.TEST_ENUM);
@@ -61,11 +61,11 @@ public class TestType {
     // ==>> __test_flt:meet(~int16,~flt32).~
     // ==>> __test_flt:~int16.~
     // ==>> __test_flt:int16
-    Type xint64 = TypeInt.make(2,64,0);
-    Type xflt32 = TypeFlt.make(2,32,0);
+    Type  xint64 = TypeInt.make(2,64,0);
+    Type  xflt32 = TypeFlt.make(2,32,0);
     Type nxflt32 = TypeName.make("__test_enum",TypeName.TEST_SCOPE,xflt32);
     Type nxint16 = TypeName.make("__test_enum",TypeName.TEST_SCOPE,TypeInt.INT16);
-    Type xfimt = xint64.meet(nxflt32).dual();
+    Type  xfimt  = xint64.meet(nxflt32).dual();
     assertEquals(nxint16,xfimt);
     Type nxx = TypeInt.FALSE.join(nflt64);
     assertEquals(TypeInt.BOOL.dual(),nxx);
@@ -279,10 +279,10 @@ public class TestType {
     // Cyclic named struct: "A:@{n:A?,v:int64}"
     // If we unrolled this (and used S for Struct and 0 for Nil) we'd get:
     // AS0AS0AS0AS0AS0AS0...
-    TypeName tfd = TypeName.make_forward_def_type("A",TypeName.TEST_SCOPE);
-    Type tna = TypeNil.make(tfd);
+    TypeName tfa = TypeName.make_forward_def_type("A",TypeName.TEST_SCOPE);
+    Type tna = TypeNil.make(tfa);
     TypeStruct tsna = TypeStruct.make(new String[]{"n","v"},tna,TypeInt.INT64);
-    TypeName ta = tfd.merge_recursive_type(tsna);
+    TypeName ta = tfa.merge_recursive_type(tsna);
     // Peel A once without a nil: "A:@{n:A:@{n:A?,v:int64},v:int64}"
     // ASAS0AS0AS0AS0AS0AS0...
     TypeStruct taa = TypeStruct.make(new String[]{"n","v"},ta,TypeInt.INT64);
@@ -295,41 +295,35 @@ public class TestType {
     // Twice: SAS AS0AS0AS0AS0AS0...
     // Meet:  SAS0AS0AS0AS0AS0AS0...
     // which is the Once yet again
-    Type mt = taaa.meet(taa);
-    assertEquals(taa,mt);
+    Type mta = taaa.meet(taa);
+    assertEquals(taa,mta);
+
+    // Mismatched Names in a cycle; force a new cyclic type to appear
+    TypeName tfb = TypeName.make_forward_def_type("B",TypeName.TEST_SCOPE);
+    Type tnb = TypeNil.make(tfb);
+    TypeStruct tsnb = TypeStruct.make(new String[]{"n","v"},tnb,TypeFlt.FLT64);
+    TypeName tb = tfb.merge_recursive_type(tsnb);
+    
+    Type mtab = tfa.meet(tfb);
+    // TODO: Needs a way to easily test simple recursive types
+    TypeStruct mtab0 = (TypeStruct)mtab;
+    assertEquals("n",mtab0._flds[0]);
+    assertEquals("v",mtab0._flds[1]);
+    TypeNil mtab1 = (TypeNil)mtab0.at(0);
+    assertEquals(mtab,mtab1._t);
+    assertEquals(Type.REAL,mtab0.at(1));
     
 
     // Nest a linked-list style tuple 10 deep; verify actual depth is capped at
     // less than 5.
     Type told, t0 = TypeNil.NIL;
-    for( int i=0; i<10; i++ ) {
+    for( int i=0; i<20; i++ ) {
       told = TypeStruct.make(TypeStruct.FLDS(2),t0,TypeInt.con(i));
       t0 = told.meet(t0);    // Must be a phi-meet in any data loop
     }
-    int max_depth = type_depth(t0,new HashMap<>());
-    assertTrue(max_depth<5);
+    assertTrue(t0.depth()<10);
   }
 
-  // Classic breadth-first-search algo
-  private int type_depth( Type init, HashMap<Type,Integer> ds ) {
-    int d = 0;
-    Ary<Type> work0 = new Ary<>(new Type[0]);
-    Ary<Type> work1 = new Ary<>(new Type[0]);
-    ds.put(work0.push(init),d);
-    
-    while( !work0.isEmpty() ) {
-      final int fd = ++d;
-      assert work1.isEmpty();
-      final Ary<Type> fwork1 = work1;
-      for( Type t : work0 )
-        t.iter((Consumer<Type>) tc ->
-               { if( tc !=null && ds.get(tc)==null ) ds.put(fwork1.push(tc),fd); }  );
-      work0.clear();  work1 = work0;  work0 = fwork1; // Swap worklists
-    }
-    return d;                   // Max depth
-  }
-  
-  
   // TODO: Observation: value() calls need to be monotonic, can test this.
   @Test public void testCommuteSymmetricAssociative() {
     Type.init0(new HashMap<>());

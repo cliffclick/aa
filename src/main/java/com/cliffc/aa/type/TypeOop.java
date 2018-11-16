@@ -17,7 +17,7 @@ public class TypeOop<O extends TypeOop<O>> extends Type<O> {
   }
   @Override String str( BitSet dups) { return _any ? "~oop" : "oop"; }
   private static TypeOop FREE=null;
-  @Override protected TypeOop free( TypeOop ret ) { FREE=this; return ret; }
+  @Override protected O free( O ret ) { FREE=this; return ret; }
   public static TypeOop make( boolean any ) {
     TypeOop t1 = FREE;
     if( t1 == null ) t1 = new TypeOop(TOOP,any);
@@ -30,7 +30,7 @@ public class TypeOop<O extends TypeOop<O>> extends Type<O> {
   public  static final TypeOop XOOP = make(true ); // ~OOP
   static final TypeOop[] TYPES = new TypeOop[]{OOP,XOOP};
 
-  @Override protected O xdual() { assert _type==TOOP; return (O)new TypeOop(TOOP,!_any); }
+  @Override O xdual() { assert _type==TOOP; return (O)new TypeOop(TOOP,!_any); }
       
   @Override protected Type xmeet( Type t ) {
     assert t != this;

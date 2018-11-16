@@ -4,6 +4,7 @@ import com.cliffc.aa.util.SB;
 
 import java.util.BitSet;
 import java.util.HashMap;
+import java.util.function.Predicate;
 
 public class TypeStr extends TypeOop<TypeStr> {
   private String _con;          // 
@@ -89,4 +90,5 @@ public class TypeStr extends TypeOop<TypeStr> {
     return 99;
   }
   @Override public Type widen() { return STR; }
+  @Override void walk( Predicate<Type> p ) { p.test(this); }
 }

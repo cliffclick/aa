@@ -98,11 +98,10 @@ public class Parse {
 
     // Hunt for typing errors in the alive code
     assert par._par==null;      // Top-level only
-    Ary<String> errs = null;
     BitSet bs = new BitSet();
     bs.set(0);                  // Do not walk initial scope (primitives and constants only)
     bs.set(_e._scope._uid);     // Do not walk top-level scope
-    if( errs == null ) errs = res .walkerr_def(errs,bs,_gvn);
+    Ary<String> errs = res.walkerr_def(null,bs,_gvn);
     if( errs == null ) errs = ctrl.walkerr_def(errs,bs,_gvn);
     if( errs == null ) errs = _e._scope.walkerr_use(errs,new BitSet(),_gvn);
     if( errs == null && skipWS() != -1 ) errs = add_err(null,errMsg("Syntax error; trailing junk"));

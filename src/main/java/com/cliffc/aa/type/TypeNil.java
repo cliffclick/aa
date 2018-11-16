@@ -1,7 +1,9 @@
 package com.cliffc.aa.type;
 
 import java.util.BitSet;
+import java.util.HashMap;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 // Nil types are just a nil, but along a particular type domain.  Used so the
 // parser can just parse a '0' as the same nil for all other types.
@@ -22,7 +24,10 @@ public class TypeNil extends Type<TypeNil> {
     TypeNil t2 = (TypeNil)o;
     return _t==t2._t || (_t!=null && t2._t != null && _t.cycle_equals(t2._t));
   }
-  @Override String str( BitSet dups) { return _t==null ? "nil" : _t.str(dups)+(_t.above_center() ? "+0" : "?"); }
+  @Override String str( BitSet dups) {
+    if( _t==null ) return "nil";
+    return _t.str(dups)+(_t.above_center() ? "+0" : "?");
+  }
   
   private static TypeNil FREE=null;
   @Override protected TypeNil free( TypeNil ret ) { FREE=this; return ret; }
@@ -55,7 +60,15 @@ public class TypeNil extends Type<TypeNil> {
   @Override public long   getl() { assert is_con(); return 0; }
   @Override public double getd() { assert is_con(); return 0; }
 
-  @Override protected TypeNil xdual() { return _t==null ? this : new TypeNil(_t.dual()); }
+  @Override TypeNil xdual() { return _t==null ? this : new TypeNil(_t. dual()); }
+  @Override TypeNil rdual() {
+    if( _dual != null ) return _dual;
+    assert _t!=null; // NIL has no out-edges and cannot be part of a cycle
+    TypeNil dual = _dual= new TypeNil(_t.rdual());
+    dual._dual = this;
+    dual._cyclic = true;
+    return dual;
+  }
   @Override protected Type xmeet( Type t ) {
     assert t.base()==t || !(t.base() instanceof TypeNil); // No name-wrapping-nils
     if( this == NIL ) return t   .meet_nil();
@@ -86,15 +99,29 @@ public class TypeNil extends Type<TypeNil> {
     // Build a depth-limited version of the same TypeNil
     return t2==_t ? this : make(t2);
   }
+  // Mark if part of a cycle
+  @Override void mark_cycle( Type head, BitSet visit, BitSet cycle ) {
+    if( visit.get(_uid) ) return;
+    visit.set(_uid);
+    if( this==head ) { cycle.set(_uid); _cyclic=_dual._cyclic=true; }
+    if( _t != null ) {
+      _t.mark_cycle(head,visit,cycle);
+      if( cycle.get(_t._uid) )
+        { cycle.set(_uid); _cyclic=_dual._cyclic=true; }
+    }
+  }
+  
   // Iterate over any nested child types
   @Override public void iter( Consumer<Type> c ) { c.accept(_t); }
-  // If any substructure is being freed, then this type is being freed also.
-  @Override boolean free_recursively(BitSet bs) {
-    if( _t==null || !_t.free_recursively(bs) ) return false;
-    untern();
-    free(null);
-    return true;
-  }
-
   @Override boolean contains( Type t, BitSet bs ) { return _t == t || (_t != null && _t.contains(t, bs)); }
+  @Override int depth( BitSet bs ) { return 1+(_t==null ? 0 : _t.depth(bs)); }
+  @Override Type replace( Type old, Type nnn, HashMap<TypeStruct,TypeStruct> MEETS ) {
+    if( _t==null ) return this;
+    Type x = _t.replace(old,nnn,MEETS);
+    if( x==_t ) return this;
+    Type rez = make(x);
+    rez._cyclic=true;
+    return rez;
+  }
+  @Override void walk( Predicate<Type> p ) { if( p.test(this) && _t!=null ) _t.walk(p); }
 }

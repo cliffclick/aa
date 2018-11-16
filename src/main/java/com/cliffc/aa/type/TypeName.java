@@ -5,6 +5,7 @@ import com.cliffc.aa.AA;
 import java.util.BitSet;
 import java.util.HashMap;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 // Named types are essentially a subclass of the named type.
 // They also must be used to make recursive types.
@@ -83,10 +84,25 @@ public class TypeName extends Type<TypeName> {
   
   static final TypeName[] TYPES = new TypeName[]{TEST_ENUM,TEST_FLT,TEST_E2};
 
-  @Override protected TypeName xdual() { return new TypeName(_name,_lex,_t.dual(),_depth); }
+  @Override TypeName xdual() { return new TypeName(_name,_lex,_t. dual(),_depth); }
+  @Override TypeName rdual() {
+    if( _dual != null ) return _dual;
+    TypeName dual = _dual = new TypeName(_name,_lex,_t.rdual(),_depth);
+    dual._dual = this;
+    dual._cyclic = true;
+    return dual;
+  }
   @Override protected Type xmeet( Type t ) {
+    assert !(base() instanceof TypeNil); // No name-wrapping-nils
     switch( t._type ) {
-    case TNIL: return t.xmeet(this);
+    case TNIL:
+      // Cannot swap args and go again, because it screws up the cyclic_meet.
+      // This means we handle name-meet-nil right here.
+      //return t.xmeet(this);
+      if( t == TypeNil.NIL ) return meet_nil();
+      Type nmt = meet(((TypeNil)t)._t);
+      return t.above_center() ? nmt : TypeNil.make(nmt);
+
     case TNAME:
       TypeName tn = (TypeName)t;
       int thisd =    _depth<0 ? 0 :   _depth;
@@ -146,12 +162,14 @@ public class TypeName extends Type<TypeName> {
     _t = t;
     _dual._t = t._dual;
     _depth = _dual._depth = -2;
+    // Flag all as cyclic
+    t.mark_cycle(this,new BitSet(),new BitSet());
     // Back into the INTERN table
-    retern();
-    _dual.retern();
+    retern()._dual.retern();
+
     return this;
   }
-  
+
   @Override public boolean above_center() { return _t.above_center(); }
   @Override public boolean may_be_con() { return _depth >= 0 && _t.may_be_con(); }
   @Override public boolean is_con()   { return _depth >= 0 && _t.is_con(); } // No recursive structure is a constant
@@ -162,7 +180,6 @@ public class TypeName extends Type<TypeName> {
   @Override Type not_nil(Type t) {
     Type nn = _t.not_nil(t);
     if( base().must_nil() ) return nn; // Cannot remove all nils and keep the name, so lose the name
-    //return _t.above_center() || t.isa(_t.dual()) ? make(_name,_lex,nn) : nn;
     return make(_name,_lex,nn);
   }
   @Override Type meet_nil() {
@@ -185,15 +202,27 @@ public class TypeName extends Type<TypeName> {
     Type t2 = _t.make_recur(tn,d,bs);
     return t2==_t ? this : make0(_name,_lex,t2,_depth);
   }
+  // Mark if part of a cycle
+  @Override void mark_cycle( Type head, BitSet visit, BitSet cycle ) {
+    if( visit.get(_uid) ) return;
+    visit.set(_uid);
+    if( this==head ) { cycle.set(_uid); _cyclic=_dual._cyclic=true; }
+    _t.mark_cycle(head,visit,cycle);
+    if( cycle.get(_t._uid) )
+      { cycle.set(_uid); _cyclic=_dual._cyclic=true; }
+  }
 
   // Iterate over any nested child types
   @Override public void iter( Consumer<Type> c ) { c.accept(_t); }
-  // If any substructure is being freed, then this type is being freed also.
-  @Override boolean free_recursively(BitSet bs) {
-    if( !_t.free_recursively(bs) ) return false;
-    untern();
-    free(null);
-    return true;
-  }
   @Override boolean contains( Type t, BitSet bs ) { return _t == t || _t.contains(t, bs); }
+  @Override int depth( BitSet bs ) { return 1+_t.depth(bs); }
+  @Override Type replace( Type old, Type nnn, HashMap<TypeStruct,TypeStruct> MEETS  ) {
+    Type x = _t.replace(old,nnn,MEETS);
+    if( x==_t ) return this;
+    Type rez = make(_name,_lex,x);
+    rez._cyclic=true;
+    return rez;
+  }
+
+  @Override void walk( Predicate<Type> p ) { if( p.test(this) ) _t.walk(p); }
 }

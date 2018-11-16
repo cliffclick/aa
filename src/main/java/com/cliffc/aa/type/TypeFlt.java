@@ -2,6 +2,7 @@ package com.cliffc.aa.type;
 
 import java.util.BitSet;
 import java.util.HashMap;
+import java.util.function.Predicate;
 
 public class TypeFlt extends Type<TypeFlt> {
   byte _x;                // -2 bot, -1 not-null, 0 con, +1 not-null-top +2 top
@@ -110,4 +111,5 @@ public class TypeFlt extends Type<TypeFlt> {
     return FLT64;
   }
   @Override Type make_recur(TypeName tn, int d, BitSet bs ) { return this; }
+  @Override void walk( Predicate<Type> p ) { p.test(this); }
 }

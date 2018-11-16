@@ -4,6 +4,7 @@ import com.cliffc.aa.AA;
 import com.cliffc.aa.util.SB;
 
 import java.util.BitSet;
+import java.util.HashMap;
 import java.util.function.Consumer;
 
 /** Internal fixed-length non-recursive tuples.  Used for function arguments,
@@ -182,23 +183,24 @@ public class TypeTuple<P extends TypeTuple<P>> extends TypeOop<P> {
   @Override TypeTuple<P> make_recur(TypeName tn, int d, BitSet bs ) {
     throw AA.unimpl();
   }
-  
+
   // Iterate over any nested child types
   @Override public void iter( Consumer<Type> c ) { for( Type t : _ts) c.accept(t); }
-  // If any substructure is being freed, then this type is being freed also.
-  @Override boolean free_recursively(BitSet bs) {
-    boolean free=false;
-    for( Type t : _ts) if( t.free_recursively(bs) ) { free=true; break; }
-    if( !free ) return false;
-    untern();
-    free(null);
-    return true;
-  }
   @Override boolean contains( Type t, BitSet bs ) {
     if( bs==null ) bs=new BitSet();
     for( Type t2 : _ts) if( t2==t || t2.contains(t,bs) ) return true;
     return false;
   }
+  @Override int depth( BitSet bs ) {
+    if( bs==null ) bs=new BitSet();
+    int max=0;
+    for( Type t : _ts) max = Math.max(max,t.depth(bs));
+    return max+1;
+  }
+  @Override Type replace( Type old, Type nnn, HashMap<TypeStruct,TypeStruct> MEETS ) {
+    throw AA.unimpl();
+  }
+  
   // Return an error message, if any exists
   @Override public String errMsg() {
     String s;

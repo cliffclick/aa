@@ -450,8 +450,7 @@ public class FunNode extends RegionNode {
     if( s._defs._len < 3 ) return false;
     Node e = s.in(s._defs._len-2); // Epilog
     if( !(e instanceof EpilogNode) ) return false;
-    if( ((EpilogNode)e).fun() != this ) return false;
-    return true;
+    return ((EpilogNode) e).fun() == this;
   }
   
   // Compute value from inputs.  Slot#1 is always the unknown caller.  If
@@ -476,7 +475,7 @@ public class FunNode extends RegionNode {
     return t;
   }
 
-  public ParmNode parm(int idx) {
+  ParmNode parm( int idx ) {
     for( Node use : _uses )
       if( use instanceof ParmNode && ((ParmNode)use)._idx==idx )
         return (ParmNode)use;
