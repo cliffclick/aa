@@ -132,12 +132,12 @@ public class TypeStruct extends TypeOop<TypeStruct> {
   // cyclic types for which a DAG-like bottom-up-remove-dups approach cannot work.
   private static TypeStruct FREE=null;
   @Override protected TypeStruct free( TypeStruct ret ) { FREE=this; return ret; }
-  private static TypeStruct malloc( boolean any, String[] flds, Type[] ts ) {
+  public static TypeStruct malloc( boolean any, String[] flds, Type[] ts ) {
     if( FREE == null ) return new TypeStruct(any,flds,ts);
     TypeStruct t1 = FREE;  FREE = null;
     return t1.init(any,flds,ts);
   }
-  private TypeStruct hashcons_free() { TypeStruct t2 = (TypeStruct)hashcons();  return this==t2 ? this : free(t2);  }
+  TypeStruct hashcons_free() { TypeStruct t2 = (TypeStruct)hashcons();  return this==t2 ? this : free(t2);  }
 
   // Default tuple field names - all bottom-field names
   private static final String[] FLD0={};
@@ -204,8 +204,15 @@ public class TypeStruct extends TypeOop<TypeStruct> {
     case TFUNPTR:
     case TFUN:
     case TRPC:   return t.must_nil() ? SCALAR : NSCALR;
-    case TOOP:
+      
     case TNIL:
+      // Cannot swap args and go again, because it screws up the cyclic_meet.
+      // This means we handle struct-meet-nil right here.
+      if( t == TypeNil.NIL ) return meet_nil();
+      Type smt = meet(((TypeNil)t)._t);
+      return t.above_center() ? smt : TypeNil.make(smt);
+      
+    case TOOP:
     case TNAME:  return t.xmeet(this); // Let other side decide
     default: throw typerr(t);   // All else should not happen
     }
@@ -326,7 +333,7 @@ public class TypeStruct extends TypeOop<TypeStruct> {
   }
 
   // Install, cleanup and return
-  private TypeStruct install_cyclic() {
+  public TypeStruct install_cyclic() {
     // Check for dups.  If found, delete entire cycle, and return dup.
     // Assert nothing in the cycle is a dup either.
     TypeStruct old = (TypeStruct)intern_lookup();

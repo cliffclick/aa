@@ -10,6 +10,7 @@ import java.util.HashMap;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+
 public class TestType {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testType() {
@@ -275,21 +276,39 @@ public class TestType {
   // structures caps out in the type system at some reasonable limit.
   @Test public void testRecursive() {
     Type.init0(new HashMap<>());
+    String[] flds = new String[]{"n","v"};
 
+    // Anonymous recursive structs
+    TypeStruct ts0 = TypeStruct.malloc(false,flds,new Type[2]);
+    ts0._ts[0] = ts0;    ts0._cyclic = true;
+    ts0._ts[1] = TypeInt.INT64;
+    ts0 = ts0.install_cyclic();
+
+    TypeStruct ts1 = TypeStruct.malloc(false,flds,new Type[2]);
+    Type.RECURSIVE_MEET++;
+    Type tsn = TypeNil.make(ts1);  tsn._cyclic = true;
+    ts1._ts[0] = tsn;    ts1._cyclic = true;
+    ts1._ts[1] = TypeInt.INT64;
+    Type.RECURSIVE_MEET--;
+    ts1 = ts1.install_cyclic();
+
+    Type tsmt = ts0.meet(ts1);
+    assertEquals(ts1,tsmt);
+    
     // Cyclic named struct: "A:@{n:A?,v:int64}"
     // If we unrolled this (and used S for Struct and 0 for Nil) we'd get:
     // AS0AS0AS0AS0AS0AS0...
     TypeName tfa = TypeName.make_forward_def_type("A",TypeName.TEST_SCOPE);
     Type tna = TypeNil.make(tfa);
-    TypeStruct tsna = TypeStruct.make(new String[]{"n","v"},tna,TypeInt.INT64);
+    TypeStruct tsna = TypeStruct.make(flds,tna,TypeInt.INT64);
     TypeName ta = tfa.merge_recursive_type(tsna);
     // Peel A once without a nil: "A:@{n:A:@{n:A?,v:int64},v:int64}"
     // ASAS0AS0AS0AS0AS0AS0...
-    TypeStruct taa = TypeStruct.make(new String[]{"n","v"},ta,TypeInt.INT64);
+    TypeStruct taa = TypeStruct.make(flds,ta,TypeInt.INT64);
     TypeName tan = TypeName.make("A",TypeName.TEST_SCOPE,taa);
     // Peel A twice without a nil: "A:@{n:A:@{n:A:@{n:A?,v:int64},v:int64},v:int64}"
     // ASASAS0AS0AS0AS0AS0AS0...
-    TypeStruct taaa = TypeStruct.make(new String[]{"n","v"},tan,TypeInt.INT64);
+    TypeStruct taaa = TypeStruct.make(flds,tan,TypeInt.INT64);
     // Starting with the Struct not the A we get:
     // Once:  SAS0AS0AS0AS0AS0AS0...
     // Twice: SAS AS0AS0AS0AS0AS0...
@@ -301,7 +320,7 @@ public class TestType {
     // Mismatched Names in a cycle; force a new cyclic type to appear
     TypeName tfb = TypeName.make_forward_def_type("B",TypeName.TEST_SCOPE);
     Type tnb = TypeNil.make(tfb);
-    TypeStruct tsnb = TypeStruct.make(new String[]{"n","v"},tnb,TypeFlt.FLT64);
+    TypeStruct tsnb = TypeStruct.make(flds,tnb,TypeFlt.FLT64);
     TypeName tb = tfb.merge_recursive_type(tsnb);
     
     Type mtab = tfa.meet(tfb);
@@ -322,6 +341,7 @@ public class TestType {
       t0 = told.meet(t0);    // Must be a phi-meet in any data loop
     }
     assertTrue(t0.depth()<10);
+
   }
 
   // TODO: Observation: value() calls need to be monotonic, can test this.

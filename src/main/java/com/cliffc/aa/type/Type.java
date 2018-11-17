@@ -40,9 +40,9 @@ import java.util.function.Predicate;
 // Strings are OOPs which again can be top, a constant, or bottom.
 public class Type<T extends Type<T>> {
   static private int CNT=1;
-  final int _uid=CNT++; // Unique ID, will have gaps, used to uniquely order Types in Unions
-  byte _type;           // Simple types use a simple enum
-  boolean _cyclic;      // Part of a type cycle
+  final int _uid=CNT++;  // Unique ID, will have gaps, used to uniquely order Types in Unions
+  byte _type;            // Simple types use a simple enum
+  public boolean _cyclic;// Part of a type cycle
   T _dual; // All types support a dual notion, lazily computed and cached here
 
   protected Type(byte type) { _type=type; _cyclic=false; }
@@ -80,7 +80,7 @@ public class Type<T extends Type<T>> {
   // check of a (possibly very large) Type is always a simple pointer-equality
   // check, except during construction and intern'ing.
   private static HashMap<Type,Type> INTERN = new HashMap<>();
-  static int RECURSIVE_MEET;
+  public static int RECURSIVE_MEET;
   final Type hashcons() {
     Type t2 = INTERN.get(this); // Lookup
     if( t2!=null ) {            // Found prior
