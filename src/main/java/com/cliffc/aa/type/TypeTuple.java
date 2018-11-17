@@ -58,7 +58,7 @@ public class TypeTuple<P extends TypeTuple<P>> extends TypeOop<P> {
   }
 
   private static TypeTuple FREE=null;
-  @Override protected TypeTuple free( TypeTuple ret ) { FREE=this; return ret; }
+  @Override protected P free( P ret ) { FREE=this; return ret; }
   static TypeTuple make0( boolean any, Type... ts ) {
     TypeTuple t1 = FREE;
     if( t1 == null ) t1 = new TypeTuple(TTUPLE, any, ts);
@@ -73,10 +73,10 @@ public class TypeTuple<P extends TypeTuple<P>> extends TypeOop<P> {
   }
 
           static final TypeTuple XSCALARS= make0(true);
-  public  static final TypeTuple SCALAR0 = make();
+          static final TypeTuple SCALAR0 = make();
           static final TypeTuple SCALAR1 = make(SCALAR);
           static final TypeTuple SCALAR2 = make(SCALAR, SCALAR);
-  public  static final TypeTuple INT32   = make(TypeInt.INT32 );
+          static final TypeTuple INT32   = make(TypeInt.INT32 );
   public  static final TypeTuple INT64   = make(TypeInt.INT64 );
   public  static final TypeTuple FLT64   = make(TypeFlt.FLT64 );
   public  static final TypeTuple STR     = make(TypeStr.STR   );

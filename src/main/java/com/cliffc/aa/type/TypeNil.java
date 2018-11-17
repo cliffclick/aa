@@ -52,7 +52,7 @@ public class TypeNil extends Type<TypeNil> {
   public  static final TypeNil NIL  = make0(null);
   public  static final TypeNil OOP  = make0(TypeOop.OOP);
   public  static final TypeNil XOOP = make0(TypeOop.XOOP);
-  public  static final TypeNil STR  = make0(TypeStr.STR);
+          static final TypeNil STR  = make0(TypeStr.STR);
   public  static final TypeNil ABC  = make0(TypeStr.ABC);
 
   static final TypeNil[] TYPES = new TypeNil[]{OOP,STR,ABC};

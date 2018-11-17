@@ -132,12 +132,12 @@ public class TypeStruct extends TypeOop<TypeStruct> {
   // cyclic types for which a DAG-like bottom-up-remove-dups approach cannot work.
   private static TypeStruct FREE=null;
   @Override protected TypeStruct free( TypeStruct ret ) { FREE=this; return ret; }
-  public static TypeStruct malloc( boolean any, String[] flds, Type[] ts ) {
+  static TypeStruct malloc( boolean any, String[] flds, Type[] ts ) {
     if( FREE == null ) return new TypeStruct(any,flds,ts);
     TypeStruct t1 = FREE;  FREE = null;
     return t1.init(any,flds,ts);
   }
-  TypeStruct hashcons_free() { TypeStruct t2 = (TypeStruct)hashcons();  return this==t2 ? this : free(t2);  }
+  private TypeStruct hashcons_free() { TypeStruct t2 = (TypeStruct)hashcons();  return this==t2 ? this : free(t2);  }
 
   // Default tuple field names - all bottom-field names
   private static final String[] FLD0={};
@@ -151,9 +151,9 @@ public class TypeStruct extends TypeOop<TypeStruct> {
   public  static TypeStruct make(Type... ts               ) { return malloc(false,FLDS[ts.length],ts).hashcons_free(); }
   public  static TypeStruct make(String[] flds, Type... ts) { return malloc(false,flds,ts).hashcons_free(); }
 
-  public  static final TypeStruct POINT = make(flds("x","y"),ts(TypeFlt.FLT64,TypeFlt.FLT64));
-  public  static final TypeStruct X     = make(flds("x"),ts(TypeFlt.FLT64 )); // @{x:flt}
-  public  static final TypeStruct TFLT64= make(          ts(TypeFlt.FLT64 )); //  (  flt)
+  private static final TypeStruct POINT = make(flds("x","y"),ts(TypeFlt.FLT64,TypeFlt.FLT64));
+          static final TypeStruct X     = make(flds("x"),ts(TypeFlt.FLT64 )); // @{x:flt}
+          static final TypeStruct TFLT64= make(          ts(TypeFlt.FLT64 )); //  (  flt)
   public  static final TypeStruct A     = make(flds("a"),ts(TypeFlt.FLT64 ));
   private static final TypeStruct C0    = make(flds("c"),ts(TypeNil.SCALAR)); // @{c:0}
   private static final TypeStruct D1    = make(flds("d"),ts(TypeInt.TRUE  )); // @{d:1}
@@ -333,7 +333,7 @@ public class TypeStruct extends TypeOop<TypeStruct> {
   }
 
   // Install, cleanup and return
-  public TypeStruct install_cyclic() {
+  TypeStruct install_cyclic() {
     // Check for dups.  If found, delete entire cycle, and return dup.
     // Assert nothing in the cycle is a dup either.
     TypeStruct old = (TypeStruct)intern_lookup();

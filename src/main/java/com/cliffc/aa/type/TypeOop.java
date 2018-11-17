@@ -26,8 +26,8 @@ public class TypeOop<O extends TypeOop<O>> extends Type<O> {
     return t1==t2 ? t1 : t1.free(t2);
   }
 
-  public  static final TypeOop  OOP = make(false); //  OOP
-  public  static final TypeOop XOOP = make(true ); // ~OOP
+  public static final TypeOop  OOP = make(false); //  OOP
+  static final TypeOop XOOP = make(true ); // ~OOP
   static final TypeOop[] TYPES = new TypeOop[]{OOP,XOOP};
 
   @Override O xdual() { assert _type==TOOP; return (O)new TypeOop(TOOP,!_any); }

@@ -1,6 +1,5 @@
-package com.cliffc.aa;
+package com.cliffc.aa.type;
 
-import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Bits;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -17,9 +16,6 @@ public class TestType {
     Type.init0(new HashMap<>());
     Type ignore = TypeTuple.ALL; // Break class-loader cycle; load Tuple before Fun.
 
-    Type rez = TypeStruct.POINT.join(TypeStruct.A);
-
-    Type rbq = Type.NSCALR.join(TypeName.TEST_E2);
     Type rbz = Type.NSCALR.join(TypeName.TEST_ENUM);
     assertEquals(TypeName.make("__test_enum",TypeName.TEST_SCOPE,TypeInt.make(-1,8,0)),rbz);
     Type rbp = TypeOop.OOP.join(TypeName.TEST_ENUM);
@@ -321,7 +317,7 @@ public class TestType {
     TypeName tfb = TypeName.make_forward_def_type("B",TypeName.TEST_SCOPE);
     Type tnb = TypeNil.make(tfb);
     TypeStruct tsnb = TypeStruct.make(flds,tnb,TypeFlt.FLT64);
-    TypeName tb = tfb.merge_recursive_type(tsnb);
+    tfb.merge_recursive_type(tsnb);
     
     Type mtab = tfa.meet(tfb);
     // TODO: Needs a way to easily test simple recursive types
@@ -344,7 +340,6 @@ public class TestType {
 
   }
 
-  // TODO: Observation: value() calls need to be monotonic, can test this.
   @Test public void testCommuteSymmetricAssociative() {
     Type.init0(new HashMap<>());
 

@@ -55,10 +55,10 @@ public class TypeFunPtr extends Type<TypeFunPtr> {
     }
   }
 
-  public  static final TypeTuple GENERIC_ARGS=TypeTuple.XSCALARS;
-  public  static final Type      GENERIC_RET =Type.SCALAR; // Can return almost anything
-  public  static final TypeFunPtr GENERIC_FUNPTR = make_generic();
-  public  static final TypeFunPtr FUNPTR1 = any(1,1);
+  private static final TypeTuple GENERIC_ARGS=TypeTuple.XSCALARS;
+  private static final Type      GENERIC_RET =Type.SCALAR; // Can return almost anything
+          static final TypeFunPtr GENERIC_FUNPTR = make_generic();
+  private static final TypeFunPtr FUNPTR1 = any(1,1);
   static final TypeFunPtr[] TYPES = new TypeFunPtr[]{FUNPTR1,GENERIC_FUNPTR};
   
   @Override protected TypeFunPtr xdual() { return new TypeFunPtr((TypeTuple)_ts.dual(),_ret.dual(),_fidxs.dual(),_nargs); }

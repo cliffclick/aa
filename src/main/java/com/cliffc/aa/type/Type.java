@@ -42,7 +42,7 @@ public class Type<T extends Type<T>> {
   static private int CNT=1;
   final int _uid=CNT++;  // Unique ID, will have gaps, used to uniquely order Types in Unions
   byte _type;            // Simple types use a simple enum
-  public boolean _cyclic;// Part of a type cycle
+  boolean _cyclic;       // Part of a type cycle
   T _dual; // All types support a dual notion, lazily computed and cached here
 
   protected Type(byte type) { _type=type; _cyclic=false; }
@@ -80,7 +80,7 @@ public class Type<T extends Type<T>> {
   // check of a (possibly very large) Type is always a simple pointer-equality
   // check, except during construction and intern'ing.
   private static HashMap<Type,Type> INTERN = new HashMap<>();
-  public static int RECURSIVE_MEET;
+  static int RECURSIVE_MEET;    // Count of recursive meet depth
   final Type hashcons() {
     Type t2 = INTERN.get(this); // Lookup
     if( t2!=null ) {            // Found prior
@@ -105,11 +105,11 @@ public class Type<T extends Type<T>> {
   }
   // Remove a forward-ref type from the interning dictionary, prior to
   // interning it again - as a self-recursive type
-  void untern( ) {
+  final void untern( ) {
     Type rez  = INTERN.remove(this);
     assert rez != null;
   }
-  T retern( ) {
+  final T retern( ) {
     assert _cyclic;
     assert _dual._dual == this;
     INTERN.put(this,this);
@@ -168,11 +168,11 @@ public class Type<T extends Type<T>> {
   public  static final Type  SCALAR= make( TSCALAR); // ptrs, ints, flts; things that fit in a machine register
   public  static final Type XSCALAR= make(TXSCALAR); // ptrs, ints, flts; things that fit in a machine register
   public  static final Type  NSCALR= make( TNSCALR); // Scalars-not-nil
-  public  static final Type XNSCALR= make(TXNSCALR); // Scalars-not-nil
-  public  static final Type   NUM  = make( TNUM   );
-  public  static final Type  XNUM  = make(TXNUM   );
-  public  static final Type  NNUM  = make( TNNUM  );
-  public  static final Type XNNUM  = make(TXNNUM  );
+          static final Type XNSCALR= make(TXNSCALR); // Scalars-not-nil
+          static final Type   NUM  = make( TNUM   );
+          static final Type  XNUM  = make(TXNUM   );
+          static final Type  NNUM  = make( TNNUM  );
+          static final Type XNNUM  = make(TXNNUM  );
   public  static final Type   REAL = make( TREAL  );
   private static final Type  XREAL = make(TXREAL  );
           static final Type  NREAL = make( TNREAL );
@@ -333,7 +333,7 @@ public class Type<T extends Type<T>> {
     TypeStr.init1(types);
   }
   
-  public static boolean check_startup() {
+  static boolean check_startup() {
     Type[] ts =    Type      .TYPES ;
     ts = concat(ts,TypeInt   .TYPES);
     ts = concat(ts,TypeFlt   .TYPES);
@@ -544,7 +544,7 @@ public class Type<T extends Type<T>> {
   public final boolean contains( Type t ) { return contains(t,null); }
   boolean contains( Type t, BitSet bs ) { return false; }
   // Depth of nested types
-  public final int depth( ) { return depth(null); }
+  final int depth() { return depth(null); }
   int depth( BitSet bs ) { return 1; }
   // Mark if part of a cycle
   void mark_cycle( Type t, BitSet visit, BitSet cycle ) { }

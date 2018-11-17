@@ -11,6 +11,8 @@ import java.util.function.Function;
 import static org.junit.Assert.*;
 
 public class TestParse {
+  // TODO: Observation: value() calls need to be monotonic, can test this.
+
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
 

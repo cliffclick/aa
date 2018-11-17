@@ -64,11 +64,7 @@ public class TypeName extends Type<TypeName> {
       t2._depth = t1._depth;    // If equals() on depth, then keep deeper depth
     return t1==t2 ? t1 : t1.free(t2);
   }
-  // Make a (possibly cyclic & infinite) named type.  Prevent the infinite
-  // unrolling of names by not allowing a named-type with depth >= D from
-  // holding (recursively) the head of a named-type cycle.  We need to cap the
-  // unroll, to prevent loops/recursion from infinitely unrolling.
-  private static int D=1;
+
   public static TypeName make( String name, HashMap<String,Type> lex, Type t) {
     TypeName tn0 = make0(name,lex,t,depth(t));
     TypeName tn1 = (TypeName)lex.get(name);
@@ -77,10 +73,10 @@ public class TypeName extends Type<TypeName> {
   }
   public static TypeName make_forward_def_type( String name, HashMap<String,Type> lex ) { return make0(name,lex,Type.SCALAR,(short)-1); }
 
-  public  static final HashMap<String,Type> TEST_SCOPE = new HashMap<>();
-  public  static final TypeName TEST_ENUM = make("__test_enum",TEST_SCOPE,TypeInt.INT8);
+          static final HashMap<String,Type> TEST_SCOPE = new HashMap<>();
+          static final TypeName TEST_ENUM = make("__test_enum",TEST_SCOPE,TypeInt.INT8);
   private static final TypeName TEST_FLT  = make("__test_flt" ,TEST_SCOPE,TypeFlt.FLT32);
-  public  static final TypeName TEST_E2   = make("__test_e2"  ,TEST_SCOPE,TEST_ENUM);
+  private static final TypeName TEST_E2   = make("__test_e2"  ,TEST_SCOPE,TEST_ENUM);
   
   static final TypeName[] TYPES = new TypeName[]{TEST_ENUM,TEST_FLT,TEST_E2};
 
@@ -197,8 +193,13 @@ public class TypeName extends Type<TypeName> {
   @Override TypeName make_recur(TypeName tn, int d, BitSet bs ) {
     if( bs.get(_uid) ) return this; // Looping on some other recursive type
     bs.set(_uid);
-    if( _lex==tn._lex && _name.equals(tn._name) )
-      if( d++ == D ) return above_center() ? tn.dual() : tn;
+    // Make a (possibly cyclic & infinite) named type.  Prevent the infinite
+    // unrolling of names by not allowing a named-type with depth >= D from
+    // holding (recursively) the head of a named-type cycle.  We need to cap the
+    // unroll, to prevent loops/recursion from infinitely unrolling.
+    int D = 1;
+    if( _lex==tn._lex && _name.equals(tn._name) && d++ == D )
+      return above_center() ? tn.dual() : tn;
     Type t2 = _t.make_recur(tn,d,bs);
     return t2==_t ? this : make0(_name,_lex,t2,_depth);
   }
