@@ -188,10 +188,18 @@ public class TypeStruct extends TypeOop<TypeStruct> {
     ts1._ts[0] = tsn;    ts1._cyclic = true;
     ts1._ts[1] = TypeFlt.FLT64;
     RECURSIVE_MEET--;
-    ts1 = ts1.install_cyclic();
-    RECURS_NIL_FLT = ts1;
+    RECURS_NIL_FLT = ts1.install_cyclic();
+
+    ts1 = malloc(false,FLD2,new Type[2]);
+    RECURSIVE_MEET++;
+    tsn = TypeNil.make(ts1);  tsn._cyclic = true;
+    ts1._ts[0] = tsn;    ts1._cyclic = true;
+    ts1._ts[1] = TypeFlt.FLT64;
+    RECURSIVE_MEET--;
+    RECURT_NIL_FLT = ts1.install_cyclic();
+    
   }
-  public static TypeStruct RECURS_NIL_FLT;
+  public static TypeStruct RECURS_NIL_FLT, RECURT_NIL_FLT;
   
   static final TypeStruct[] TYPES = new TypeStruct[]{POINT,X,A,C0,D1};
 

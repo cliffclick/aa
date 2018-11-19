@@ -19,7 +19,7 @@ import java.util.BitSet;
  *  stmt = tvar = :type         // type variable assignment
  *  ifex = expr ? expr : expr   // trinary logic
  *  expr = term [binop term]*   // gather all the binops and sort by prec
- *  term = tfact [tuple or fact or .field]* // application (includes uniop) or field lookup
+ *  term = tfact [tuple or fact or .field]* // application (includes uniop) or field (and tuple) lookup
  *  tfact= fact[:type]          // Typed fact
  *  fact = id                   // variable lookup
  *  fact = num                  // number
@@ -267,7 +267,7 @@ public class Parse {
   }
 
   /** Parse a term, either an optional application or a field lookup
-   *  term = tfact [tuple | fact | .field]* // application (includes uniop) or field lookup
+   *  term = tfact [tuple | fact | .field]* // application (includes uniop) or field (and tuple) lookup
    */
   private Node term() {
     Node n = tfact();
@@ -275,9 +275,14 @@ public class Parse {
     while( true ) {             // Repeated application or field lookup is fine
       if( peek('.') ) {         // Field?
         String fld = token();   // Field name
-        n = fld == null         // Missing field?
+        LoadNode ld = null;
+        if( fld == null ) {     // No field name, look for field number
+          int fnum = field_number();
+          if( fnum != -1 ) ld = new LoadNode(ctrl(),n,fnum,errMsg());
+        } else             ld = new LoadNode(ctrl(),n,fld ,errMsg());
+        n = ld == null          // Missing field?
           ? err_ctrl2("Missing field name after '.'")
-          :  gvn(new LoadNode(ctrl(),n,fld,errMsg()));
+          :  gvn(ld);
         if( peek('=') ) {       // Right now, no field re-assigns of any type
           Node stmt = stmt();
           if( stmt == null ) n = err_ctrl2("Missing stmt after assigning field '."+fld+"'");
@@ -337,7 +342,7 @@ public class Parse {
   private Node fact() {
     if( skipWS() == -1 ) return null;
     byte c = _buf[_x];
-    if( '0' <= c && c <= '9' ) return con(number());
+    if( isDigit(c) ) return con(number());
     if( '"' == c ) {
       Type ts = string();
       return ts==null ? err_ctrl1("Unterminated string",TypeStr.XSTR) : con(ts);
@@ -501,6 +506,18 @@ public class Parse {
     if( n instanceof Double ) return TypeFlt.con(n.doubleValue());
     throw new RuntimeException(n.getClass().toString()); // Should not happen
   }
+  // Parse a small positive integer; WS already skipped and sitting at a digit.
+  private int field_number() {
+    byte c = _buf[_x];
+    if( !isDigit(c) ) return -1;
+    _x++;
+    int sum = c-'0';  
+    while( _x < _buf.length && isDigit(c=_buf[_x]) ) {
+      _x++;
+      sum = sum*10+c-'0';
+    }
+    return sum;
+  }
 
   /** Parse a String; _x is at '"'.
    *  str  = [.\%]*               // String contents; \t\n\r\% standard escapes
@@ -654,6 +671,7 @@ public class Parse {
   private static boolean isAlpha1(byte c) { return isAlpha0(c) || ('0'<=c && c <= '9'); }
   private static boolean isOp0   (byte c) { return "!#$%*+,-.=<>@^[]~/&".indexOf(c) != -1; }
   private static boolean isOp1   (byte c) { return isOp0(c) || ":?".indexOf(c) != -1; }
+  private static boolean isDigit (byte c) { return '0' <= c && c <= '9'; }
 
   public Node gvn (Node n) { return n==null ? null : _gvn.xform(n); }
   private <N extends Node> N init( N n ) { return n==null ? null : _gvn.init (n); }

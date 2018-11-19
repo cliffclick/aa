@@ -41,7 +41,7 @@ BNF                           | Comment
 `stmt = tvar = :type`         | type variable assignment
 `ifex = expr ? expr : expr`   | trinary logic
 `expr = term [binop term]*`   | gather all the binops and sort by prec
-`term = tfact [tuple or fact or .field]*` | function application (includes uniop) or field lookup
+`term = tfact [tuple or fact or .field]*` | function application (includes uniop) or field (and tuple) lookup
 `tfact= fact[:type]`          | Optionally typed fact
 `fact = id`                   | variable lookup
 `fact = num`                  | number
@@ -177,6 +177,9 @@ Recursive and co-recursive functions | ---
 `fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)` | `:int` does not collapse at typing time
 `is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)` | `1:int`
 `is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(5)` | `0:int`
+Simple anonymous tuples | ---
+`(1,\"abc\").0` | `1:int`  .n loads from the nth field; only parse-time constants are supported
+`(1,\"abc\").1` | `"abc"`
 Simple anonymous structures | ---
 `  @{x,y}`        | `@{x,y}` Simple anon struct decl
 `a=@{x=1.2,y}; x` | `Unknown ref 'x'` Field name does not escape structure

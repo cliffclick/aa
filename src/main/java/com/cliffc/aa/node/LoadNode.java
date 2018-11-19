@@ -9,15 +9,19 @@ import com.cliffc.aa.type.*;
 // value depends on the struct typing.
 public class LoadNode extends Node {
   private final String _fld;
+  private final int _fld_num;
   private final String _badfld;
   private final String _badnil;
-  public LoadNode( Node ctrl, Node st, String fld, Parse bad ) {
+  private LoadNode( Node ctrl, Node st, String fld, int fld_num, Parse bad ) {
     super(OP_LOAD,ctrl,st);
     _fld = fld;
+    _fld_num = fld_num;
     _badfld = bad.errMsg("Unknown field '."+fld+"'");
     _badnil = bad.errMsg("Struct might be nil when reading field '."+fld+"'");
   }
-  String xstr() { return "."+_fld; }    // Self short name
+  public LoadNode( Node ctrl, Node st, String fld , Parse bad ) { this(ctrl,st,fld,-1,bad); }
+  public LoadNode( Node ctrl, Node st, int fld_num, Parse bad ) { this(ctrl,st,null,fld_num,bad); }
+  String xstr() { return "."+(_fld==null ? ""+_fld_num : _fld); } // Self short name
   String  str() { return xstr(); }      // Inline short name
   @Override public Node ideal(GVNGCM gvn) {
     Node ctrl = in(0);
@@ -69,15 +73,22 @@ public class LoadNode extends Node {
 
     if( t instanceof TypeStruct ) {
       TypeStruct ts = (TypeStruct)t;
-      int idx = ts.find(_fld);  // Find the named field
+      int idx = find(ts);       // Find the named field
       if( idx == -1 ) return Type.SCALAR;
       if( needs_nil_check )
         return gvn.self_type(this);
-      //  throw AA.unimpl();
       return ts.at(idx);        // Field type
     }
     
     throw AA.unimpl();
+  }
+  private int find(TypeStruct ts) {
+    if( _fld == null ) {
+      if( _fld_num < ts._ts.length )
+        return _fld_num;
+      else
+        throw AA.unimpl();
+    } else return ts.find(_fld);  // Find the named field
   }
   @Override public String err(GVNGCM gvn) {
     Type t = gvn.type(in(1));
@@ -85,17 +96,17 @@ public class LoadNode extends Node {
     if( t instanceof TypeNil && !t.above_center() ) return _badnil;
     if( TypeOop.OOP.isa(t) ) return _badfld; // Too low, might not have any fields
     if( t instanceof TypeStruct &&
-        ((TypeStruct)t).find(_fld) == -1 )
+        find((TypeStruct)t) == -1 )
       return _badfld;
     return null;
   }
   @Override public Type all_type() { return Type.SCALAR; }
-  @Override public int hashCode() { return super.hashCode()+_fld.hashCode(); }
+  @Override public int hashCode() { return super.hashCode()+(_fld==null ? _fld_num : _fld.hashCode()); }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !super.equals(o) ) return false;
     if( !(o instanceof LoadNode) ) return false;
     LoadNode ld = (LoadNode)o;
-    return _fld.equals(ld._fld);
+    return _fld_num == ld._fld_num && (_fld==null ? ld._fld==null : _fld.equals(ld._fld));
   }
 }

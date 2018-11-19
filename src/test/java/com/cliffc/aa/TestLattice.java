@@ -641,7 +641,7 @@ public class TestLattice {
   //             @{x:i64}?     @{y:i64}?     oop
   //    num             oop?
   //          scalar
-  @Test public void testLattice7() {
+  @Ignore @Test public void testLattice7() {
     N.reset();
     N scal= new N("scalar");
     N num = new N("num"      ,scal);

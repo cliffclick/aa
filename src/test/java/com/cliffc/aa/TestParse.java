@@ -242,8 +242,8 @@ public class TestParse {
 
     // Tuple
     test("(0,\"abc\")", TypeStruct.make(TypeNil.NIL,TypeStr.ABC));
-    //test("(1,\"abc\").0", TypeInt.TRUE);
-    //test("(1,\"abc\").1", TypeStr.ABC);
+    test("(1,\"abc\").0", TypeInt.TRUE);
+    test("(1,\"abc\").1", TypeStr.ABC);
     
     // Named type variables
     test_isa("gal=:flt"       , (tmap -> TypeFun.make(TypeFunPtr.make(TypeTuple.FLT64,TypeName.make("gal",tmap,TypeFlt.FLT64),Bits.FULL,1))));
@@ -308,7 +308,6 @@ public class TestParse {
   }
 
   @Test public void testParse7() {
-    test_isa("A= :@{n:A?, v:int}; f={x:A? -> x ? A(@{n=f(x.n),v=x.v*x.v}) : 0}", TypeFun.GENERIC_FUN);
     // Passing a function recursively
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({&},2)", TypeInt.FALSE);
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({+},2)", TypeInt.con(2));
@@ -362,9 +361,13 @@ public class TestParse {
     
     // Test inferring a recursive tuple type, with less help.  This one
     // inlines so doesn't actually test inferring a recursive type.
-    //test("map={x -> x ? (map(x.0),x.1*x.1) : 0}; map((0,1.2))",
-    //     TypeStruct.make(TypeNil.NIL,TypeFlt.con(1.2*1.2)));
+    test("map={x -> x ? (map(x.0),x.1*x.1) : 0}; map((0,1.2))",
+         TypeStruct.make(TypeNil.NIL,TypeFlt.con(1.2*1.2)));
 
+    test("map={x -> x ? (map(x.0),x.1*x.1) : 0};"+
+         "map((math_rand(1)?0: (math_rand(1)?0: (math_rand(1)?0: (0,1.2), 2.3), 3.4), 4.5))",
+         TypeStruct.make(TypeNil.make(TypeStruct.RECURT_NIL_FLT),TypeFlt.con(4.5*4.5)));
+    
     // TODO: Need real TypeVars for these
     //test("id:{A->A}"    , Env.lookup_valtype("id"));
     //test("id:{A:int->A}", Env.lookup_valtype("id"));
