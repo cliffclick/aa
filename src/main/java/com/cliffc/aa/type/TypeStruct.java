@@ -105,6 +105,22 @@ public class TypeStruct extends TypeOop<TypeStruct> {
     return true;
   }
 
+  // Test if this is a cyclic value (and should not be interned) with internal
+  // repeats.  i.e., not a minimal cycle.
+  private TypeStruct repeats_in_cycles() {
+    assert _cyclic;
+    return repeats_in_cycles(this,new BitSet());
+  }
+  @Override TypeStruct repeats_in_cycles(TypeStruct head, BitSet bs) {
+    if( bs.get(_uid) ) return null;
+    bs.set(_uid);
+    if( this!=head && equals(head) ) return this;
+    for( Type t : _ts ) {
+      TypeStruct ts = t.repeats_in_cycles(head,bs);
+      if( ts!=null ) return ts;
+    }
+    return null;
+  }
   
   String str( BitSet dups) {
     if( dups == null ) dups = new BitSet();
@@ -157,12 +173,29 @@ public class TypeStruct extends TypeOop<TypeStruct> {
   public  static final TypeStruct A     = make(flds("a"),ts(TypeFlt.FLT64 ));
   private static final TypeStruct C0    = make(flds("c"),ts(TypeNil.SCALAR)); // @{c:0}
   private static final TypeStruct D1    = make(flds("d"),ts(TypeInt.TRUE  )); // @{d:1}
-  static final TypeStruct[] TYPES = new TypeStruct[]{POINT,X,A,C0,D1};
-
+  public  static final TypeStruct GENERIC = malloc(true,FLD0,new Type[0]).hashcons_free();
 
   // Recursive meet in progress
   private static final HashMap<TypeStruct,TypeStruct> MEETS1 = new HashMap<>(), MEETS2 = new HashMap<>();
   
+  // Build a recursive struct type for tests: @{n=*?,v=flt}
+  public static void init1() {
+    Type dummy0 = TypeStr.STR; // Force TypeStr <clinit>
+    Type dummy1 = TypeNil.NIL; // Force TypeNil <clinit>
+    TypeStruct ts1 = malloc(false,new String[]{"n","v"},new Type[2]);
+    RECURSIVE_MEET++;
+    Type tsn = TypeNil.make(ts1);  tsn._cyclic = true;
+    ts1._ts[0] = tsn;    ts1._cyclic = true;
+    ts1._ts[1] = TypeFlt.FLT64;
+    RECURSIVE_MEET--;
+    ts1 = ts1.install_cyclic();
+    RECURS_NIL_FLT = ts1;
+  }
+  public static TypeStruct RECURS_NIL_FLT;
+  
+  static final TypeStruct[] TYPES = new TypeStruct[]{POINT,X,A,C0,D1};
+
+
   // Dual the flds, dual the tuple.
   @Override TypeStruct xdual() {
     String[] as = new String[_flds.length];
@@ -290,23 +323,26 @@ public class TypeStruct extends TypeOop<TypeStruct> {
     assert lf_mt._cyclic && rt_mt._cyclic;
     assert !lf_mt.interned() && !rt_mt.interned();
     if( lf_mt==rt_mt ) return lf_mt; // Cycle been closed
+    // Union together
+    boolean flip = lf == null && rt != null;
+    TypeStruct mt = flip ? rt_mt : lf_mt;
+    TypeStruct mx = flip ? lf_mt : rt_mt;
+    mx.union(mt);
     // Map to MEETS1 & MEETS2.
-    TypeStruct mt = lf_mt;
-    rt_mt.union(mt);
     MEETS1.put(this,mt);
     MEETS2.put(that,mt);
 
     // Do a shallow MEET: meet of field names and _any and _ts sizes - all
     // things that can be computed without the cycle.  _ts not filled in yet.
-    int len = mt.len(rt_mt); // Length depends on all the Structs Meet'ing here
+    int len = mt.len(mx); // Length depends on all the Structs Meet'ing here
     if( len != mt._ts.length ) {
       mt._flds= Arrays.copyOf(mt._flds, len);
       mt._ts  = Arrays.copyOf(mt._ts  , len);
     }
-    if( mt._any && !rt_mt._any ) mt._any=false;
-    len = Math.min(len,rt_mt._ts.length);
+    if( mt._any && !mx._any ) mt._any=false;
+    len = Math.min(len,mx._ts.length);
     for( int i=0; i<len; i++ )
-      mt._flds[i] = smeet(lf_mt._flds[i],rt_mt._flds[i]); // Set the Meet of field names
+      mt._flds[i] = smeet(mt._flds[i],mx._flds[i]); // Set the Meet of field names
 
     // Since the result is cyclic, we cannot test the cyclic parts for
     // pre-existence until the entire cycle is built.  We can't intern the
@@ -320,7 +356,10 @@ public class TypeStruct extends TypeOop<TypeStruct> {
     for( int i=0; i<len; i++ ) {
       Type lfi = lf_mt._ts[i];
       Type rti = rt_mt._ts[i];
-      mt._ts[i] = lfi.meet(rti);
+      Type mti = lfi.meet(rti);
+      assert mt._uf==null; // wrote results but value is ignored
+      if( mt._ts[i] == (flip ? rti : lfi) )
+        mt._ts[i] = mti;
     }
 
     // Lower recursive-meet flag.  At this point the Meet 'mt' is still
@@ -340,6 +379,7 @@ public class TypeStruct extends TypeOop<TypeStruct> {
     // If the cycle already exists, just drop the new Type on the floor and let
     // GC get it and return the old Type.
     if( old == null ) {         // Not a dup
+      assert repeats_in_cycles()==null;
       rdual();               // Complete cyclic dual
       // Insert all members of the cycle into the hashcons.  If self-symmetric,
       // also replace entire cycle with self at each point.
@@ -387,6 +427,11 @@ public class TypeStruct extends TypeOop<TypeStruct> {
     // Do not install until the cycle is complete.
     RECURSIVE_MEET++;
     TypeStruct mt = (TypeStruct)replace(that,null,MEETS1);
+    // The result might not be minimal.  Look for a smaller cycle.
+    TypeStruct mt2 = mt.repeats_in_cycles(); // Returns first dup instance
+    if( mt2 != null ) // Shrink again
+      mt = (TypeStruct)mt.replace(mt2,null,MEETS1);
+    assert mt.repeats_in_cycles()==null; // TODO: Need to do this once-per-field?
     if( --RECURSIVE_MEET > 0 )
       return mt;                // And, if not yet done, just exit with it
     // Install the cycle

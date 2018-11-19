@@ -254,6 +254,17 @@ public class GVNGCM {
       subsume(old,nnn);
     }
   }
+
+  // Replace with a ConNode iff
+  // - Not already a ConNode AND
+  // - Not an ErrNode AND
+  // - Type is above-or-a-con AND
+  // - Not a ParmNode unless also is_con
+  private static boolean replace_con(Type t, Node n) {
+    return t.may_be_con() && !(n instanceof ConNode) && !(n instanceof ErrNode) &&
+            (!(n instanceof ParmNode) || t.is_con());
+  };
+
   /** Look for a better version of 'n'.  Can change n's defs via the ideal()
    *  call, including making new nodes.  Can replace 'n' wholly, with n's uses
    *  now pointing at the replacement.
@@ -265,7 +276,7 @@ public class GVNGCM {
     Type oldt = type(n);       // Get old type
     _ts._es[n._uid] = null;    // Remove from types, mostly for asserts
     assert !check_opt(n);      // Not in system now
-    if( oldt.may_be_con() && !(n instanceof ConNode) && !(n instanceof ErrNode) )
+    if( replace_con(oldt,n) )
       return con(oldt);        // Dead-on-Entry, common when called from GCP
     // Try generic graph reshaping
     Node y = n.ideal(this);
@@ -277,7 +288,7 @@ public class GVNGCM {
     _ts._es[n._uid] = null;     // Remove in case we replace it
     assert t.isa(oldt);         // Types only improve
     // Replace with a constant, if possible
-    if( t.may_be_con() && !(n instanceof ConNode) && !(n instanceof ErrNode) )
+    if( replace_con(t,n) )
       return con(t);            // Constant replacement
     // Function-pointer tuples are not considered constants, but can refer to a
     // constant function and show up any place a Scalar is allowed; e.g. as
@@ -420,7 +431,7 @@ public class GVNGCM {
     add_work(n);                        // Only walk once
     // Replace with a constant, if possible
     Type t = type(n);
-    if( t.may_be_con() && !(n instanceof ConNode) && !(n instanceof ErrNode) ) {
+    if( replace_con(t,n) ) {
       subsume(n,con(t));        // Constant replacement
       return;
     }

@@ -161,7 +161,7 @@ class ConvertStrStr extends PrimNode {
 // 1Ops have uniform input/output types, so take a shortcut on name printing
 abstract class Prim1OpF64 extends PrimNode {
   Prim1OpF64( String name ) { super(name,PrimNode.ARGS1,TypeTuple.FLT64,TypeFlt.FLT64); }
-  public TypeFlt apply( Type[] args ) { return TypeFlt.make(0,64,op(args[1].getd())); }
+  public TypeFlt apply( Type[] args ) { return TypeFlt.con(op(args[1].getd())); }
   abstract double op( double d );
 }
 
@@ -190,7 +190,7 @@ class NotI64 extends PrimNode {
 // 2Ops have uniform input/output types, so take a shortcut on name printing
 abstract class Prim2OpF64 extends PrimNode {
   Prim2OpF64( String name ) { super(name,PrimNode.ARGS2,TypeTuple.FLT64_FLT64,TypeFlt.FLT64); }
-  public TypeFlt apply( Type[] args ) { return TypeFlt.make(0,64,op(args[1].getd(),args[2].getd())); }
+  public TypeFlt apply( Type[] args ) { return TypeFlt.con(op(args[1].getd(),args[2].getd())); }
   abstract double op( double x, double y );
 }
 

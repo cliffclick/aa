@@ -124,4 +124,8 @@ public class TypeNil extends Type<TypeNil> {
     return rez;
   }
   @Override void walk( Predicate<Type> p ) { if( p.test(this) && _t!=null ) _t.walk(p); }
+  @Override TypeStruct repeats_in_cycles(TypeStruct head, BitSet bs) {
+    if( !_cyclic || _t==null ) return null;
+    return _t.repeats_in_cycles(head,bs);
+  }
 }

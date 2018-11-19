@@ -5,8 +5,8 @@ import com.cliffc.aa.type.Type;
 
 // Function parameter node; just a Phi with a name
 public class ParmNode extends PhiNode {
-  final int _idx;    // Parameter index, zero-based; -1 reserved for RPC
-  private final String _name;       // Parameter name
+  public final int _idx;    // Parameter index, zero-based; -1 reserved for RPC
+  private final String _name;   // Parameter name
   public ParmNode( int idx, String name, FunNode fun, ConNode defalt, String badgc) {
     super(OP_PARM,fun,defalt,badgc);
     _idx=idx;

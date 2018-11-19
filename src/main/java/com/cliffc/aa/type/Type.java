@@ -560,6 +560,8 @@ public class Type<T extends Type<T>> {
   // visiting the same Type again.
   void walk( Predicate<Type> p ) { assert is_simple(); p.test(this); }
 
+  TypeStruct repeats_in_cycles(TypeStruct head, BitSet bs) { return null; }
+  
   RuntimeException typerr(Type t) {
     throw new RuntimeException("Should not reach here: internal type system error with "+this+(t==null?"":(" and "+t)));
   }

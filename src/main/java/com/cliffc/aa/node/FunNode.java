@@ -148,6 +148,9 @@ public class FunNode extends RegionNode {
     return split_callers(gvn,rpc(),epi,fun);
   }
 
+  // Gather the ParmNodes into an array.  Return null if any input path is dead
+  // (would rather fold away dead paths before inlining).  Return null if there
+  // is only 1 path.  Return null if any actuals are not formals.
   private EpilogNode split_callers_gather( GVNGCM gvn, ParmNode[] parms ) {
     for( int i=1; i<_defs._len; i++ ) if( gvn.type(in(i))==Type.XCTRL ) return null;
     if( _defs._len <= 2 ) return null; // No need to split callers if only 1
@@ -157,11 +160,17 @@ public class FunNode extends RegionNode {
     for( Node use : _uses )
       if( use instanceof ParmNode ) {
         ParmNode parm = (ParmNode)use;
-        if( parm._idx != -1 ) parms[parm._idx] = parm;
+        if( parm._idx != -1 ) {
+          parms[parm._idx] = parm;
+          // Check that all actuals are isa all formals.  This is a little
+          // conservative, as we could inline on non-error paths.
+          for( int i=_all_callers_known ? 1 : 2; i<_defs._len; i++ )
+            if( !gvn.type(parm.in(i)).isa(_tf.arg(parm._idx)) )
+              return null; // Actual !isa formal; do not inline while in-error
+        }
       } else if( use instanceof EpilogNode ) { assert epi==null || epi==use; epi = (EpilogNode)use; }
     return epi;                 // Epilog (or null if dead)
   }
-
 
   // Visit all ParmNodes, looking for unresolved call uses that can be improved
   // by type-splitting
@@ -181,22 +190,61 @@ public class FunNode extends RegionNode {
           }
     return -1; // No unresolved calls; no point in type-specialization
   }
+    
+  private Type[] find_type_split( GVNGCM gvn, ParmNode[] parms ) {
+    // Look for splitting to help an Unresolved Call.
+    int idx = find_type_split_index(gvn,parms);
+    if( idx != -1 ) {           // Found; split along a specific input path using widened types
+      Type[] sig = new Type[parms.length];
+      for( int i=0; i<parms.length; i++ )
+        sig[i] = parms[i]==null ? Type.SCALAR : gvn.type(parms[i].in(idx)).widen();
+      return sig;
+    }
 
+    // Look for splitting to help a field Load from an unspecialized type.
+    // Split ~Scalar,~nScalar,~Oop,~nOop, ~Struct,~nStruct into ~Struct and add
+    // fields discovered.
+    boolean progress=false;
+    Type[] sig = new Type[parms.length];
+    for( int i=0; i<parms.length; i++ ) { // For all parms
+      Node parm = parms[i];
+      if( parm == null ) { sig[i]=Type.SCALAR; continue; } // (some can be dead)
+      Type tp = gvn.type(parm);
+      for( Node puse : parm._uses ) { // See if a parm-user needs a load specialization
+        Type rez = find_load_use(puse,tp);
+        if( rez != tp ) { progress = true; tp = rez; }
+      }
+      sig[i] = tp;
+    }
+    if( !progress ) return null;
+    throw AA.unimpl();
+  }
+
+  private static Type find_load_use(Node puse, Type tp) {
+    if( !tp.isa(TypeStruct.GENERIC) ) return tp;
+    if( puse instanceof CastNode ) 
+      throw AA.unimpl();
+    if( puse instanceof LoadNode ) 
+      throw AA.unimpl();
+    return tp;                  // Unknown use, can ignore
+  }
+
+  
   // Look for type-specialization inlining.  If any ParmNode has an unresolved
   // Call user, then we'd like to make a clone of the function body (in least
   // up to getting all the Unresolved functions to clear out).  The specialized
   // code uses generalized versions of the arguments, where we only specialize
   // on arguments that help immediately.
+  //
+  // Same argument for field Loads from unspecialized values.
   private FunNode type_special( GVNGCM gvn, ParmNode[] parms ) {
-    int idx = find_type_split_index(gvn,parms);
-    if( idx == -1 ) return null; // No unresolved calls; no point in type-specialization
+    Type[] sig = find_type_split(gvn,parms);
+    if( sig == null ) return null; // No unresolved calls; no point in type-specialization
 
     // If Parm has unresolved calls, we want to type-specialize on its
     // arguments.  Call-site #1 is the most generic call site for the parser
     // (all Scalar args).  Peel out 2nd call-site args and generalize them.
-    Type[] sig = new Type[parms.length];
-    for( int i=0; i<parms.length; i++ )
-      sig[i] = parms[i]==null ? Type.SCALAR : gvn.type(parms[i].in(idx)).widen();
+    
     // Make a new function header with new signature
     TypeTuple ts = TypeTuple.make(sig);
     assert ts.isa(_tf._ts);
@@ -221,6 +269,7 @@ public class FunNode extends RegionNode {
   // enough".  Include anything with just a handful of primitives, or a single
   // call, possible with a single if.
   private FunNode split_size( GVNGCM gvn, EpilogNode epi, ParmNode[] parms ) {
+    if( _defs._len <= 1 ) return null; // No need to split callers if only 2
     int[] cnts = new int[OP_MAX];
     BitSet bs = new BitSet();
     Ary<Node> work = new Ary<>(new Node[1],0);
@@ -259,11 +308,10 @@ public class FunNode extends RegionNode {
     int m=-1, mncons = -1;
     for( int i=_all_callers_known ? 1 : 2; i<_defs._len; i++ ) {
       int ncon=0;
-      for( ParmNode parm : parms ) {
-        if( parm != null &&
+      for( ParmNode parm : parms )
+        if( parm != null &&     // Some can be dead
             gvn.type(parm.in(i)).is_con() )
           ncon++;
-      }
       if( ncon > mncons ) { mncons = ncon; m = i; }
     }
 
@@ -447,6 +495,9 @@ public class FunNode extends RegionNode {
     // executable - in case the only use is to return from the parser.
     Node s = in(1);
     if( !(s instanceof ScopeNode) ) return false;
+    // TODO: broken hack to see if this is the top-level return from the
+    // top-level Scope - which means its never actually called, but we're going
+    // to act like there is a generic top-level caller.
     if( s._defs._len < 3 ) return false;
     Node e = s.in(s._defs._len-2); // Epilog
     if( !(e instanceof EpilogNode) ) return false;

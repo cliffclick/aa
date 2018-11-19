@@ -20,8 +20,12 @@ public class NewNode extends Node {
   @Override public Node ideal(GVNGCM gvn) { return null; }
   @Override public Type value(GVNGCM gvn) {
     Type[] ts = new Type[_defs._len-1];
-    for( int i=0; i<ts.length; i++ )
+    for( int i=0; i<ts.length; i++ ) {
       ts[i] = gvn.type(in(i+1));
+      // Limit to Scalar results
+      if( ts[i]==Type.ANY ) ts[i] = Type.XSCALAR;
+      if( ts[i]==Type.ALL ) ts[i] = Type. SCALAR;
+    }
     Type newt = TypeStruct.make(_names,ts);
     // Get the existing type, without installing if missing because blows the
     // "new newnode" assert if this node gets replaced during parsing.
@@ -29,6 +33,13 @@ public class NewNode extends Node {
     Type rez = newt.contains(oldt) ? newt.meet(oldt) : newt;
     return rez;
   }
+  // Worse-case type for this Node
+  @Override public Type all_type() {
+    Type[] ts = new Type[_names.length];
+    Arrays.fill(ts,Type.SCALAR);
+    return TypeStruct.make(_names,ts);
+  }
+  
   @Override public int hashCode() { return super.hashCode()+ Arrays.hashCode(_names); }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;

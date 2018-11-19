@@ -12,27 +12,19 @@ import static org.junit.Assert.*;
 
 public class TestParse {
   // TODO: Observation: value() calls need to be monotonic, can test this.
-
+  private static String[] FLDS = new String[]{"n","v"};
+  
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
 
-    // Returning this function dies because since it's being returned, it's
-    // acting "as if" it is being called with a @{n:scalar,v:int} argument
-    // which then passes via x.n a scalar to the map call again: map(scalar),
-    // and this does not type.
-    //test_isa("map={x:@{n,v:int}? -> x ? @{n=map(x.n),v=x.v*x.v} : 0}; map(@{n=0,v=1.2})", TypeFunPtr.FUNPTR1); // Recursive (looping) struct meets
-    
-    //test_isa("map={x -> x ? @{n=map(x.n),v=x.v*x.v} : 0}", TypeFunPtr.FUNPTR1); // Recursive (looping) struct meets
+    // Not currently inferring top-level function return very well.  Acting
+    // "as-if" called by Scalar, which pretty much guarantees a fail result.
+    // Note that this is correct scenario: the returned value is reporting that
+    // it might type-err on some future unknown call with Scalar args.  Would
+    // like to lift the type to (i64,i64->i64) and move that future maybe-error
+    // to the function args and away from the primitive call.
+    //test("{x y -> x & y}", TypeFun.make(TypeFunPtr.make(TypeTuple.INT64_INT64,TypeInt.INT64,Bits.FULL,2)));
 
-    // Tuple syntax, not yet supported
-    //test_isa("map={x -> x ? (map(x[0]),x[1]*x[1]) : 0}; map(((0,1.2),2.3));", TypeFunPtr.FUNPTR1); // Recursive (looping) struct meets
-
-    // Making a trivial function which needs H-M or full inlining to type.
-    // Adding syntax to prevent inlining, which means needs H-M
-    //test("fun={# s->s.x}; (fun(@{x=3.14}),fun(@{x=\"abc\"}))",
-    //     TypeTuple.make(TypeFlt.con(3.14),TypeStr.ABC)); // result is a tuple of (3.14,"abc")
-
-    
     // A collection of tests which like to fail easily
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({&},2)", TypeInt.FALSE);
     testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1) is not a @{x,y}","                           ");
@@ -41,7 +33,7 @@ public class TestParse {
     test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
     testerr("x=1+y","Unknown ref 'y'","     ");
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
-    test_isa("{x y -> x+y}", TypeFun.FUN2); // {Flt,Int} x {FltxInt} -> {FltxInt}
+    test_isa("{x y -> x+y}", TypeFun.FUN2); // {Flt,Int} x {Flt,Int} -> {Flt,Int}
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.BOOL );
 
   }
@@ -176,6 +168,14 @@ public class TestParse {
     // Co-recursion requires parallel assignment & type inference across a lexical scope
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.BOOL );
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(5)", TypeInt.BOOL);
+
+    // Not currently inferring top-level function return very well.  Acting
+    // "as-if" called by Scalar, which pretty much guarantees a fail result.
+    // Note that this is correct scenario: the returned value is reporting that
+    // it might type-err on some future unknown call with Scalar args.  Would
+    // like to lift the type to (i64,i64->i64) and move that future maybe-error
+    // to the function args and away from the primitive call.
+    //test("{x y -> x & y}", TypeFun.make(TypeFunPtr.make(TypeTuple.INT64_INT64,TypeInt.INT64,Bits.FULL,2)));
   }
 
   @Test public void testParse3() {
@@ -242,6 +242,8 @@ public class TestParse {
 
     // Tuple
     test("(0,\"abc\")", TypeStruct.make(TypeNil.NIL,TypeStr.ABC));
+    //test("(1,\"abc\").0", TypeInt.TRUE);
+    //test("(1,\"abc\").1", TypeStr.ABC);
     
     // Named type variables
     test_isa("gal=:flt"       , (tmap -> TypeFun.make(TypeFunPtr.make(TypeTuple.FLT64,TypeName.make("gal",tmap,TypeFlt.FLT64),Bits.FULL,1))));
@@ -342,6 +344,27 @@ public class TestParse {
     assertEquals(TypeNil.NIL,tt5.at(0));
     assertEquals(1.2*1.2,tt5.at(1).getd(),1e-6);
     
+    // Test inferring a recursive struct type, with a little help
+    test("map={x:@{n,v:flt}? -> x ? @{n=map(x.n),v=x.v*x.v} : 0}; map(@{n=0,v=1.2})",
+         TypeStruct.make(FLDS,TypeNil.NIL,TypeFlt.con(1.2*1.2)));
+
+    // Test inferring a recursive struct type, with less help.  This one
+    // inlines so doesn't actually test inferring a recursive type.
+    test("map={x -> x ? @{n=map(x.n),v=x.v*x.v} : 0}; map(@{n=0,v=1.2})",
+         TypeStruct.make(FLDS,TypeNil.NIL,TypeFlt.con(1.2*1.2)));
+
+    // Test inferring a recursive struct type, with less help. Too complex to
+    // inline, so actual inference happens
+    TypeStruct.init1();
+    test("map={x -> x ? @{n=map(x.n),v=x.v*x.v} : 0};"+
+         "map(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0,v=1.2},v=2.3},v=3.4},v=4.5})",
+         TypeStruct.make(FLDS,TypeNil.make(TypeStruct.RECURS_NIL_FLT),TypeFlt.con(4.5*4.5)));
+    
+    // Test inferring a recursive tuple type, with less help.  This one
+    // inlines so doesn't actually test inferring a recursive type.
+    //test("map={x -> x ? (map(x.0),x.1*x.1) : 0}; map((0,1.2))",
+    //     TypeStruct.make(TypeNil.NIL,TypeFlt.con(1.2*1.2)));
+
     // TODO: Need real TypeVars for these
     //test("id:{A->A}"    , Env.lookup_valtype("id"));
     //test("id:{A:int->A}", Env.lookup_valtype("id"));

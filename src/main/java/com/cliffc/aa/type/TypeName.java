@@ -226,4 +226,5 @@ public class TypeName extends Type<TypeName> {
   }
 
   @Override void walk( Predicate<Type> p ) { if( p.test(this) ) _t.walk(p); }
+  @Override TypeStruct repeats_in_cycles(TypeStruct head, BitSet bs) { return _cyclic ? _t.repeats_in_cycles(head,bs) : null; }
 }
