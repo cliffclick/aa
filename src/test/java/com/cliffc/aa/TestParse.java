@@ -398,12 +398,12 @@ MapType = :{ {A->B} List(A) -> List(B) }
 // map: no leading ':' so a function definition, not a type def
 map:MapType  = { f list -> ... }
 
-// A List type.  Named types are not 'null', so not valid to use "List = :0|...".
+// A List type.  Named types are not 'null', so not valid to use "List = :...?".
 // Type List takes a type-variable 'A' (which is free in the type expr).
 // List is a self-recursive type.
 // Field 'next' can be null or List(A).
 // Field 'val' is type A.
-List = :@{ next:List(A)?, val:A }
+List(A) = :@{ next:List?, val:A }
 
 list = @{ next:List(A)?, val:A }
 
