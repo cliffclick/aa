@@ -539,7 +539,7 @@ public class FunNode extends RegionNode {
         return (EpilogNode)use;
     return null;
   }
-  
+
   @Override public int hashCode() { return super.hashCode()+_tf.hashCode(); }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;

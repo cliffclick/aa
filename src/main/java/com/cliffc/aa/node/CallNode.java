@@ -386,12 +386,7 @@ public class CallNode extends Node {
     if( tfp.nargs() != nargs() )
       return _badargs.errMsg("Passing "+nargs()+" arguments to "+tfp+" which takes "+tfp.nargs()+" arguments");
 
-    // Error#3: ambiguous
-    if( fp instanceof UnresolvedNode )
-      //return _badargs.errMsg("Ambiguous call");
-      return null; // If unresolved, must also be uncalled so allow arg badness
-
-    // Error#4: Now do an arg-check
+    // Error#3: Now do an arg-check
     TypeTuple formals = tfp._ts; // Type of each argument
     for( int j=0; j<nargs(); j++ ) {
       Type actual = gvn.type(arg(j));
@@ -399,6 +394,7 @@ public class CallNode extends Node {
       if( !actual.isa(formal) ) // Actual is not a formal
         return _badargs.typerr(actual,formal);
     }
+    
     return null;
   }
   

@@ -205,47 +205,44 @@ public abstract class Node implements Cloneable {
   public Node sharpen( GVNGCM gvn, ScopeNode scope, TmpNode tmp ) { return this; }
     
   // Gather errors; backwards reachable control uses only
-  public Ary<String> walkerr_use( Ary<String> errs, BitSet bs, GVNGCM gvn ) {
+  public void walkerr_use( Ary<String> errs, BitSet bs, GVNGCM gvn ) {
     assert !is_dead();
-    if( bs.get(_uid) ) return errs; // Been there, done that
-    bs.set(_uid);                   // Only walk once
-    if( gvn.type(this) != Type.CTRL )
-      return errs;                // Ignore non-control
-    if( this instanceof ErrNode ) // Gather errors
-      errs = Parse.add_err(errs,((ErrNode)this)._msg);
+    if( bs.get(_uid) ) return;  // Been there, done that
+    bs.set(_uid);               // Only walk once
+    if( gvn.type(this) != Type.CTRL ) return; // Ignore non-control
+    if( this instanceof ErrNode ) errs.add(((ErrNode)this)._msg); // Gather errors
     for( Node use : _uses )     // Walk control users for more errors
-      errs = use.walkerr_use(errs,bs,gvn);
-    return errs;
+      use.walkerr_use(errs,bs,gvn);
   }
   
   // Gather errors; forwards reachable data uses only
-  public Ary<String> walkerr_def( Ary<String> errs, BitSet bs, GVNGCM gvn ) {
+  public void walkerr_def( Ary<String> errs, Ary<String> errs2, BitSet bs, GVNGCM gvn ) {
     assert !is_dead();
-    if( bs.get(_uid) ) return errs; // Been there, done that
-    bs.set(_uid);                   // Only walk once
-    String msg = err(gvn);          // Get any error
-    if( msg != null )  errs = Parse.add_err(errs,msg); // Gather errors
-
+    if( bs.get(_uid) ) return;  // Been there, done that
+    bs.set(_uid);               // Only walk once
+    if( is_uncalled(gvn) ) return; // Function is a constant, but never executed, do not check for errors
+    String msg = err(gvn);      // Get any error
+    if( msg != null )           // Gather errors
+      (this instanceof CallNode && in(1) instanceof UnresolvedNode ? errs2 : errs).add(msg);
     for( int i=0; i<_defs._len; i++ ) {
       Node def = _defs.at(i);   // Walk data defs for more errors
       if( def == null ) continue;
       // All dead paths been cleaned out
       assert !(this instanceof RegionNode) || gvn.type(def)== Type.CTRL;
-      errs = def.walkerr_def(errs,bs,gvn);
+      def.walkerr_def(errs,errs2,bs,gvn);
     }
-    return errs;
   }
   
   // Gather errors; forwards reachable data uses only
-  public Ary<String> walkerr_gc( Ary<String> errs, BitSet bs, GVNGCM gvn ) {
-    if( bs.get(_uid) ) return errs;// Been there, done that
-    bs.set(_uid);                  // Only walk once
+  public void walkerr_gc( Ary<String> errs, BitSet bs, GVNGCM gvn ) {
+    if( bs.get(_uid) ) return;  // Been there, done that
+    bs.set(_uid);               // Only walk once
+    if( is_uncalled(gvn) ) return; // Function is a constant, but never executed, do not check for errors
     if( this instanceof PhiNode &&
         Type.NSCALR.isa(gvn.type(this)) ) // Cannot have code that deals with unknown-GC-state
-      errs = Parse.add_err(errs,((PhiNode)this)._badgc);
+      errs.add(((PhiNode)this)._badgc);
     for( int i=0; i<_defs._len; i++ )
       if( in(i) != null ) in(i).walkerr_gc(errs,bs,gvn);
-    return errs;
   }
   public boolean is_dead() { return _uses == null; }
   public void set_dead( ) { _defs = _uses = null; }   // TODO: Poor-mans indication of a dead node, probably needs to recycle these...
@@ -256,6 +253,10 @@ public abstract class Node implements Cloneable {
   // on the ProjNode index
   public Node is_copy(GVNGCM gvn, int idx) { return null; }
 
+  // True if epilog or function is uncalled (but possibly returned or stored as
+  // a constant).  Such code is not searched for errors.
+  boolean is_uncalled(GVNGCM gvn) { return false; }
+  
   // Only true for some EpilogNodes
   public boolean is_forward_ref() { return false; }
   

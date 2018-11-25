@@ -68,7 +68,7 @@ public class TypeName extends Type<TypeName> {
   public static TypeName make( String name, HashMap<String,Type> lex, Type t) {
     TypeName tn0 = make0(name,lex,t,depth(t));
     TypeName tn1 = (TypeName)lex.get(name);
-    if( tn1==null || tn1._depth!= -2 ) return tn0;
+    if( tn1==null || tn1._depth!= -2 || RECURSIVE_MEET>0 ) return tn0;
     return tn0.make_recur(tn1,0,new BitSet());
   }
   public static TypeName make_forward_def_type( String name, HashMap<String,Type> lex ) { return make0(name,lex,Type.SCALAR,(short)-1); }
@@ -184,6 +184,7 @@ public class TypeName extends Type<TypeName> {
     else                       return              TypeName.make(_name,_lex,          x); // Just name-wrap
   }
   @Override public byte isBitShape(Type t) {
+    if( t instanceof TypeNil ) t = ((TypeNil)t)._t; // Strip nil and go again
     if( t instanceof TypeName ) {
       if( ((TypeName)t)._name.equals(_name) ) return _t.isBitShape(((TypeName)t)._t);
       return 99; // Incompatible names do not mix

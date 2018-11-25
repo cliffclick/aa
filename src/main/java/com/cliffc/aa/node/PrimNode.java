@@ -1,6 +1,8 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.*;
+import com.cliffc.aa.AA;
+import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
 
 import java.util.HashMap;
@@ -80,6 +82,9 @@ public abstract class PrimNode extends Node {
   public static PrimNode convertTypeName( Type from, TypeName to, Parse badargs ) {
     return new ConvertTypeName(from,to,badargs);
   }
+  public static PrimNode convertTypeNameStruct( TypeStruct from_ts, TypeName to, Parse badargs ) {
+    return new ConvertTypeNameStruct(from_ts,to,badargs);
+  }
   
   public abstract Type apply( Type[] args ); // Execute primitive
   public boolean is_lossy() { return true; }
@@ -107,6 +112,7 @@ public abstract class PrimNode extends Node {
   }
 }
 
+// Default name constructor using a single tuple type
 class ConvertTypeName extends PrimNode {
   private final Parse _badargs; // Only for converts
   private final HashMap<String,Type> _lex; // Unique lexical scope
@@ -118,8 +124,8 @@ class ConvertTypeName extends PrimNode {
     return apply(ts);     // Apply (convert) even if some args are not constant
   }
   @Override public Type apply( Type[] args ) {
-    // If args are illegal, the output is still no worse than _ret in either direction
     TypeName tn = TypeName.make(_name,_lex,args[1]);
+    // If args are illegal, the output is still no worse than _ret in either direction
     return _ret.dual().isa(tn) ? (tn.isa(_ret) ? tn : _ret) : _ret.dual();
   }
   @Override public boolean is_lossy() { return false; }
@@ -129,6 +135,33 @@ class ConvertTypeName extends PrimNode {
     if( !actual.isa(formal) ) // Actual is not a formal
       return _badargs.typerr(actual,formal);
     return null;
+  }
+}
+
+// Default name constructor using expanded args list
+class ConvertTypeNameStruct extends PrimNode {
+  private final Parse _badargs; // Only for converts
+  private final HashMap<String,Type> _lex; // Unique lexical scope
+  ConvertTypeNameStruct(TypeStruct from, TypeName to, Parse badargs) {
+    super(to._name,from._flds,TypeTuple.make(from._ts),to);
+    _lex=to._lex;
+    _badargs=badargs;
+  }
+  @Override public Node ideal(GVNGCM gvn) {
+    Node nn = gvn.xform(new NewNode(_args,_defs.asAry()));
+    TypeStruct ts = TypeStruct.make(_args,_targs._ts);
+    TypeName tn = TypeName.make(_name,_lex,ts);
+    Node cvt = new ConvertTypeName(ts,tn,_badargs);
+    cvt.add_def(null); // Control
+    cvt.add_def(nn);
+    return gvn.xform(cvt);
+  }
+  
+  @Override public Type value(GVNGCM gvn) {
+    throw AA.unimpl();
+  }
+  @Override public Type apply( Type[] args ) {
+    throw AA.unimpl();
   }
 }
 

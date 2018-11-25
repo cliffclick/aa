@@ -18,7 +18,7 @@ public class TestParse {
   @Test public void testParse() {
 
     // Not currently inferring top-level function return very well.  Acting
-    // "as-if" called by Scalar, which pretty much guarantees a fail result.
+    // "as-if" called by Scalar args, which pretty much guarantees a fail result.
     // Note that this is correct scenario: the returned value is reporting that
     // it might type-err on some future unknown call with Scalar args.  Would
     // like to lift the type to (i64,i64->i64) and move that future maybe-error
@@ -151,7 +151,7 @@ public class TestParse {
     test("x=3; andx={y -> x & y}; andx(2)", TypeInt.con(2)); // trivially inlined; capture external variable
     test("x=3; and2={x -> x & 2}; and2(x)", TypeInt.con(2)); // trivially inlined; shadow  external variable
     testerr("plus2={x -> x+2}; x", "Unknown ref 'x'","                   "); // Scope exit ends lifetime
-    testerr("fun={x -> }", "Missing function body","          ");
+    testerr("fun={x -> }; fun(0)", "Missing function body","          ");
     testerr("fun(2)", "Unknown ref 'fun'", "      ");
     test("mul3={x -> y=3; x*y}; mul3(2)", TypeInt.con(6)); // multiple statements in func body
     // Needs overload cloning/inlining to resolve {+}
@@ -212,6 +212,7 @@ public class TestParse {
     test_isa("A= :(    ,:int)", name_tuple_constructor(Type.SCALAR  ,TypeInt.INT64));
 
     test   ("A= :(:str?, :int); A((\"abc\",2))",(tmap -> TypeName.make("A",tmap,TypeStruct.make(TypeStr.ABC,TypeInt.con(2)))));
+    test   ("A= :(:str?, :int); A( \"abc\",2 )",(tmap -> TypeName.make("A",tmap,TypeStruct.make(TypeStr.ABC,TypeInt.con(2)))));
     testerr("A= :(:str?, :int)?","Named types are never nil","                  ");
   }
   static private Function<HashMap<String,Type>,Type> name_tuple_constructor(Type... ts) {
@@ -252,9 +253,11 @@ public class TestParse {
     test    ("gal=:flt; tank:gal = gal(2)", (tmap -> TypeName.make("gal",tmap,TypeFlt.con(2))));
     // test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: figure out if free cast for bare constants?
     testerr ("gal=:flt; tank:gal = gal(2)+1", "3.0 is not a gal:flt64","                             ");
-    test    ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(@{x=1,y=2}))", TypeInt.con(5));
-    test    ("Point=:@{x,y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(@{x=1,y=2}))", TypeInt.con(5));
-    testerr ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(     (@{x=1,y=2}))", "@{x:1,y:2} is not a Point:@{x,y}","                                                                         ");
+    
+    test    ("A= :(:str?, :int); A( \"abc\",2 )",(tmap -> TypeName.make("A",tmap,TypeStruct.make(TypeStr.ABC,TypeInt.con(2)))));
+    test    ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
+    test    ("Point=:@{x,y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
+    testerr ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1,y=2}))", "@{x:1,y:2} is not a Point:@{x,y}","                                                                    ");
     testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1) is not a @{x,y}","                           ");
   }
 
@@ -276,14 +279,14 @@ public class TestParse {
   }
 
   @Test public void testParse6() {
-    test_isa("A= :(:A?, :int); A((0,2))",(tmap -> TypeName.make("A",tmap,TypeStruct.make(TypeNil.NIL,TypeInt.con(2)))));
-    test_isa("A= :(:A?, :int); A((A((0,2)),3))",(tmap -> TypeName.make("A",tmap,TypeStruct.make(TypeName.make("A",tmap,TypeStruct.make(TypeNil.NIL,TypeInt.con(2))),TypeInt.con(3)))));
+    test_isa("A= :(:A?, :int); A(0,2)",(tmap -> TypeName.make("A",tmap,TypeStruct.make(TypeNil.NIL,TypeInt.con(2)))));
+    test_isa("A= :(:A?, :int); A(A(0,2),3)",(tmap -> TypeName.make("A",tmap,TypeStruct.make(TypeName.make("A",tmap,TypeStruct.make(TypeNil.NIL,TypeInt.con(2))),TypeInt.con(3)))));
     
     // Building recursive types
     test_isa("A= :int; A(1)", (tmap -> TypeName.make("A",tmap,TypeInt.INT64)));
-    test("A= :(:str?, :int); A((0,2))",(tmap -> TypeName.make("A",tmap,TypeStruct.make(TypeNil.NIL,TypeInt.con(2)))));
+    test("A= :(:str?, :int); A(0,2)",(tmap -> TypeName.make("A",tmap,TypeStruct.make(TypeNil.NIL,TypeInt.con(2)))));
     // Named recursive types
-    test_isa("A= :(:A?, :int); A((0,2))",Type.SCALAR);// No error casting (0,2) to an A
+    test_isa("A= :(:A?, :int); A(0,2)",Type.SCALAR);// No error casting (0,2) to an A
     test_isa("A= :@{n:A?, v:flt}; A(@{n=0,v=1.2}).v;", TypeFlt.con(1.2));
 
     // TODO: Needs a way to easily test simple recursive types
@@ -301,8 +304,8 @@ public class TestParse {
 
     // Missing type B is also never worked on.
     test_isa("A= :@{n:B?, v:int}", Type.SCALAR);
-    test_isa("A= :@{n:B?, v:int}; a = A(@{n=0,v=2})", Type.SCALAR);
-    test_isa("A= :@{n:B?, v:int}; a = A(@{n=0,v=2}); a.n", TypeNil.NIL);
+    test_isa("A= :@{n:B?, v:int}; a = A(0,2)", Type.SCALAR);
+    test_isa("A= :@{n:B?, v:int}; a = A(0,2); a.n", TypeNil.NIL);
     // Mutually recursive type
     test_isa("A= :@{n:B, v:int}; B= :@{n:A, v:flt}", Type.SCALAR);
   }
@@ -311,13 +314,13 @@ public class TestParse {
     // Passing a function recursively
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({&},2)", TypeInt.FALSE);
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({+},2)", TypeInt.con(2));
-    test_isa("A= :@{n:A?, v:int}; f={x:A? -> x ? A(@{n=f(x.n),v=x.v*x.v}) : 0}", TypeFun.GENERIC_FUN);
-    test_isa("A= :@{n:A?, v:flt}; f={x:A? -> x ? A(@{n=f(x.n),v=x.v*x.v}) : 0}; f(A(@{n=0,v=1.2})).v;", TypeFlt.con(1.2*1.2));
+    test_isa("A= :@{n:A?, v:int}; f={x:A? -> x ? A(f(x.n),x.v*x.v) : 0}", TypeFun.GENERIC_FUN);
+    test_isa("A= :@{n:A?, v:flt}; f={x:A? -> x ? A(f(x.n),x.v*x.v) : 0}; f(A(0,1.2)).v;", TypeFlt.con(1.2*1.2));
 
     // User-defined linked list
-    String ll_def = "List=:@{next,val}; LL={n v -> List(@{next=n,val=v})};";
-    String ll_con = "tmp=LL(LL(0,1.2),2.3);";
-    String ll_map = "map = {fun list -> list ? LL(map(fun,list.next),fun(list.val)) : 0};";
+    String ll_def = "List=:@{next,val};";
+    String ll_con = "tmp=List(List(0,1.2),2.3);";
+    String ll_map = "map = {fun list -> list ? List(map(fun,list.next),fun(list.val)) : 0};";
     String ll_fun = "sq = {x -> x*x};";
     String ll_apl = "map(sq,tmp);";
 
@@ -393,7 +396,7 @@ list_of_hello =  ( 0, "hello", )
 Pair = :@{ a:T, b:T }
 
 // Since 'A' and 'B' are free and not field names, they become type-vars.
-MapType = :{ {A->B} List(A) -> List(B) }
+MapType = :{ {A->B} List[A] -> List[B] }
 
 // map: no leading ':' so a function definition, not a type def
 map:MapType  = { f list -> ... }
@@ -403,9 +406,9 @@ map:MapType  = { f list -> ... }
 // List is a self-recursive type.
 // Field 'next' can be null or List(A).
 // Field 'val' is type A.
-List(A) = :@{ next:List?, val:A }
+List = :@{ next:List?, val:A }
 
-list = @{ next:List(A)?, val:A }
+list = @{ next:nil, val:1.2 }
 
 List = :@{ next, val }
 head = { list -> list.val  } // fails to compile if list is nil

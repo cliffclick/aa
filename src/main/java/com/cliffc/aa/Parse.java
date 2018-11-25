@@ -101,15 +101,20 @@ public class Parse {
     BitSet bs = new BitSet();
     bs.set(0);                  // Do not walk initial scope (primitives and constants only)
     bs.set(_e._scope._uid);     // Do not walk top-level scope
-    Ary<String> errs = res.walkerr_def(null,bs,_gvn);
-    if( errs == null ) errs = ctrl.walkerr_def(errs,bs,_gvn);
-    if( errs == null ) errs = _e._scope.walkerr_use(errs,new BitSet(),_gvn);
-    if( errs == null && skipWS() != -1 ) errs = add_err(null,errMsg("Syntax error; trailing junk"));
-    if( errs == null ) errs = res      .walkerr_gc (errs,new BitSet(),_gvn);
+    Ary<String> errs  = new Ary<>(new String[1],0);
+    Ary<String> errs2 = new Ary<>(new String[1],0);
+    res .walkerr_def(errs,errs2,bs,_gvn);
+    ctrl.walkerr_def(errs,errs2,bs,_gvn);
+    if( errs.isEmpty() ) _e._scope.walkerr_use(errs,new BitSet(),_gvn);
+    if( errs.isEmpty() && skipWS() != -1 ) errs.add(errMsg("Syntax error; trailing junk"));
+    if( errs.isEmpty() ) res.walkerr_gc(errs,new BitSet(),_gvn);
+    // If the ONLY error is from unresolved calls, report them last.  Most
+    // other errors result in unresolved calls, so report others first.
+    if( errs.isEmpty() ) errs.addAll(errs2);
 
     Type tres = _gvn.type(res);
     kill(res);
-    return new TypeEnv(tres,_e,errs);
+    return new TypeEnv(tres,_e,errs.isEmpty() ? null : errs);
   }
 
   /** Parse a list of statements; final semi-colon is optional.
@@ -147,6 +152,7 @@ public class Parse {
       toks.add(tok);
       ts  .add(t  );
     }
+    
     // tvar assignment only allows 1 id
     if( toks._len == 1 && ts.at(0)==null && peek(':') ) {
       Type t = type(true); // Get the type, allowing forward refs
@@ -165,9 +171,15 @@ public class Parse {
       }
       // Add a constructor function
       // TODO: Add reverse cast-away
-      // TODO: Add struct types with expanded arg lists
       PrimNode cvt = PrimNode.convertTypeName(t,tn,errMsg());
-      return _e.add(tvar,gvn(_e.as_fun(cvt))); // Return type-name constructor
+      Node rez = _e.add_fun(tvar,gvn(_e.as_fun(cvt))); // Return type-name constructor
+      if( t instanceof TypeStruct ) { // Add struct types with expanded arg lists
+        PrimNode cvts = PrimNode.convertTypeNameStruct((TypeStruct)t,tn,errMsg());
+        Node rez2 = _e.add_fun(tvar,gvn(_e.as_fun(cvts))); // type-name constructor with expanded arg list
+        // UnresolvedNode needs touching once all constructors are done
+        _gvn.init0(rez2._uses.at(0));
+      }
+      return rez;
     }
 
     // Normal statement value parse
@@ -703,12 +715,7 @@ public class Parse {
   private void err_ctrl0(String s) {
     set_ctrl(gvn(new ErrNode(ctrl(),errMsg(s),Type.CTRL)));
   }
-
-  public static Ary<String> add_err( Ary<String> errs, String msg ) {
-    if( errs == null ) errs = new Ary<>(new String[1],0);
-    errs.add(msg);
-    return errs;
-  }
+  
   // Make a private clone just for delayed error messages
   private Parse( Parse P ) {
     _src = P._src;  

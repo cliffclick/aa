@@ -46,7 +46,8 @@ public class Env implements AutoCloseable {
     return new EpilogNode(fun,prim,rpc,fun,null);
   }
 
-  public Node add( String name, Node val ) { return _scope.add(name,val); }
+  public Node add    ( String name, Node val ) { return _scope.add    (name,            val); }
+  public Node add_fun( String name, Node val ) { return _scope.add_fun(name,(EpilogNode)val); }
 
   void add_type( String name, Type t ) { _scope.add_type(name,t); }
   

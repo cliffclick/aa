@@ -34,7 +34,7 @@ public class ScopeNode extends Node {
   }
   
   // Add a Node to an UnresolvedNode.  Must be a function.
-  public void add_fun(String name, EpilogNode epi) {
+  public EpilogNode add_fun(String name, EpilogNode epi) {
     Integer ii = _vals.get(name);
     if( ii==null ) add(name,epi);
     else {
@@ -42,6 +42,7 @@ public class ScopeNode extends Node {
       if( n instanceof UnresolvedNode ) n.add_def(epi);
       else set_def(ii,new UnresolvedNode(n,epi),null);
     }
+    return epi;
   }
   
   // Extend the current Scope with a new name; cannot override existing name.

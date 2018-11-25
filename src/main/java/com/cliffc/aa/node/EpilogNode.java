@@ -2,7 +2,9 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.type.*;
+import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeFun;
+import com.cliffc.aa.type.TypeRPC;
 
 // Tail end of functions.  Gathers:
 // - exit control; function may never exit or may be more than one
@@ -74,6 +76,10 @@ public class EpilogNode extends Node {
   }
 
   @Override public Type all_type() { return TypeFun.GENERIC_FUN; }
+  
+  // True if epilog or function is uncalled (but possibly returned or stored as
+  // a constant).  Such code is not searched for errors.
+  @Override boolean is_uncalled(GVNGCM gvn) { return !is_forward_ref() && gvn.type(rpc())== TypeRPC.ALL_CALL; }
   
   // Return the op_prec of the returned value.  Not sensible except when called
   // on primitives.
