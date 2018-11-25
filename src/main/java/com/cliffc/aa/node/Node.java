@@ -103,7 +103,10 @@ public abstract class Node implements Cloneable {
     sb.p(" [[");
     for( Node n : _uses ) sb.p(n._uid).p(' ');
     sb.p("]]  ");
-    if( gvn != null ) sb.p(gvn.type(this).toString());
+    if( gvn != null ) {
+      Type t = gvn.type(this);
+      sb.p(t==null ? "null" : t.toString());
+    }
     return sb;
   }
   private SB str(SB sb) { return sb.p(_uid).p(':').p(str()).p(' '); }
@@ -239,7 +242,8 @@ public abstract class Node implements Cloneable {
     bs.set(_uid);               // Only walk once
     if( is_uncalled(gvn) ) return; // Function is a constant, but never executed, do not check for errors
     if( this instanceof PhiNode &&
-        Type.NSCALR.isa(gvn.type(this)) ) // Cannot have code that deals with unknown-GC-state
+        (gvn.type(this).contains(Type.SCALAR) ||
+         gvn.type(this).contains(Type.NSCALR)) ) // Cannot have code that deals with unknown-GC-state
       errs.add(((PhiNode)this)._badgc);
     for( int i=0; i<_defs._len; i++ )
       if( in(i) != null ) in(i).walkerr_gc(errs,bs,gvn);

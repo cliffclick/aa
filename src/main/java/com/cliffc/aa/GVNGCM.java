@@ -318,7 +318,8 @@ public class GVNGCM {
       _vals.remove(u); // Use is about to change edges; remove from type table
       u._defs.set(u._defs.find(old),nnn); // was old now nnn
       nnn._uses.add(u);
-      add_work(u);            // And put on worklist, to get re-inserted
+      _vals.put(u,u);         // Back in the table, since its still in the graph
+      add_work(u);            // And put on worklist, to get re-visited
     }
     nnn._uses.add(nnn);       // Self-hook, to prevent accidental deletion
     kill(old);                // Delete the old n, and anything it uses

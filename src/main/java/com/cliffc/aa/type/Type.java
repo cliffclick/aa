@@ -542,7 +542,7 @@ public class Type<T extends Type<T>> {
 
   // Is t type contained within this?  Short-circuits on a true
   public final boolean contains( Type t ) { return contains(t,null); }
-  boolean contains( Type t, BitSet bs ) { return false; }
+  boolean contains( Type t, BitSet bs ) { return this==t; }
   // Depth of nested types
   public final int depth() { return depth(null); }
   int depth( BitSet bs ) { return 1; }

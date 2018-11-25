@@ -17,16 +17,6 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
 
-    // User-defined linked list
-    String ll_con = "tmp=((((0,2),99),1),98);"; // intermix strings and ints
-    String ll_map = "map = {fun list -> list ? (map(fun,list.0),fun(list.1)) : 0};";
-    String ll_fun = "plus = {x -> x+x};";
-    String ll_apl = "map(plus,tmp);";
-
-    // TODO: Needs a way to easily test simple recursive types
-    TypeEnv te4 = Exec.go("args",ll_con+ll_map+ll_fun+ll_apl);
-    
-
     
     // Not currently inferring top-level function return very well.  Acting
     // "as-if" called by Scalar args, which pretty much guarantees a fail result.
@@ -339,7 +329,7 @@ public class TestParse {
     test(ll_def+ll_con+"; tmp.next.val", TypeFlt.con(1.2));
     //test(ll_def+ll_con+ll_map, TypeFun.GENERIC_FUN);
     test_isa(ll_def+ll_con+ll_map+ll_fun, TypeFun.GENERIC_FUN);
-
+    
     // TODO: Needs a way to easily test simple recursive types
     TypeEnv te4 = Exec.go("args",ll_def+ll_con+ll_map+ll_fun+ll_apl);
     if( te4._errs != null ) System.err.println(te4._errs.toString());
@@ -382,12 +372,48 @@ public class TestParse {
          "map((math_rand(1)?0: (math_rand(1)?0: (math_rand(1)?0: (0,1.2), 2.3), 3.4), 4.5))",
          TypeStruct.make(TypeNil.make(TypeStruct.RECURT_NIL_FLT),TypeFlt.con(4.5*4.5)));
     
+
     // TODO: Need real TypeVars for these
     //test("id:{A->A}"    , Env.lookup_valtype("id"));
     //test("id:{A:int->A}", Env.lookup_valtype("id"));
     //test("id:{int->int}", Env.lookup_valtype("id"));
   }
 
+  
+  @Test public void testParse8() {
+    // A linked-list mixing ints and strings, always in pairs
+    String ll_cona = "a=0; ";
+    String ll_conb = "b=math_rand(1) ? ((a,1),\"abc\") : a; ";
+    String ll_conc = "c=math_rand(1) ? ((b,2),\"def\") : b; ";
+    String ll_cond = "d=math_rand(1) ? ((c,3),\"ghi\") : c; ";
+    String ll_cone = "e=math_rand(1) ? ((d,4),\"jkl\") : d; ";
+    String ll_cont = "tmp=e; ";
+    // Standard pair-UN-aware map call
+    String ll_map2 = "map = {fun list -> list ? (map(fun,list.0),fun(list.1)) : 0};";
+    String ll_fun2 = "plus = {x -> x+x};";
+    String ll_apl2 = "map(plus,tmp);";
+    // End type: ((((*?,scalar)?,str)?,int64),str)?
+
+    // This expression results in an embedded Scalar (caused by the map mixing
+    // ints and strs).
+    testerr(ll_cona+ll_conb+ll_conc+ll_cond+ll_cone+ll_cont+ll_map2+ll_fun2+ll_apl2,
+            "Cannot mix GC and non-GC types", "                                                                                                                                                                                                                       " );
+    
+    // TODO: Needs a way to easily test simple recursive types
+    //if( te5._errs != null ) System.err.println(te5._errs.toString());
+    //Assert.assertNull(te5._errs);
+    //TypeStruct tt50 = (TypeStruct)((TypeNil)te5._t)._t;
+    //assertEquals(TypeStr.STR,tt50.at(1));
+    //TypeStruct tt51 = (TypeStruct)tt50.at(0);
+    //assertEquals(TypeInt.INT64,tt51.at(1));
+    //TypeStruct tt52 = (TypeStruct)((TypeNil)tt51.at(0))._t;
+    //assertEquals(TypeStr.STR,tt52.at(1));
+    //TypeStruct tt53 = (TypeStruct)((TypeNil)tt52.at(0))._t;
+    //assertEquals(Type.SCALAR,tt53.at(1));
+    //assertEquals(tt52.at(0),tt53.at(0));
+    
+  }
+  
   /*
 
 // No ambiguity:

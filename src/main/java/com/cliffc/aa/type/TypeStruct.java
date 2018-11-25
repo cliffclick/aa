@@ -299,30 +299,36 @@ public class TypeStruct extends TypeOop<TypeStruct> {
   private TypeStruct cyclic_meet( TypeStruct that ) {
     // Walk 'this' and 'that' and map them both (via MEETS1 and MEETS2) to a
     // shared common Meet result.  Only walk the cyclic parts... cyclically.
-    // When visiting a finite-sized part use the normal recursive meet.  When
-    // doing the cyclic part, we use the normal meet except when we hit cyclic
-    // types we need to use the mapped Meet types.  As part of these Meet
-    // operations we can end up Meeting Meet types with each other more than
-    // once, or more than once from each side - which means already visited
-    // Types might need to Meet again, even as they are embedded in other Types
-    // - which leads to the need to use Tarjan U-F to union Types on the fly.
+    // When visiting a finite-sized part we use the normal recursive Meet.
+    // When doing the cyclic part, we use the normal Meet except we need to use
+    // the mapped Meet types.  As part of these Meet operations we can end up
+    // Meeting Meet types with each other more than once, or more than once
+    // from each side - which means already visited Types might need to Meet
+    // again, even as they are embedded in other Types - which leads to the
+    // need to use Tarjan U-F to union Types on the fly.
 
-    // There are 3 choices here: this, that and the existing MEET.  U-F all 3
-    // choices together.  Some or all may be missing and can be assumed equal
-    // to the final MEET.
+    // There are 4 choices here: this, that the existing MEETs from either
+    // side.  U-F all choices together.  Some or all may be missing and can
+    // be assumed equal to the final MEET.
     TypeStruct lf = MEETS1.get(this);
     TypeStruct rt = MEETS2.get(that);
-    TypeStruct lf_mt = lf == null ? this.shallow_clone() : lf.ufind();
-    TypeStruct rt_mt = rt == null ? that.shallow_clone() : rt.ufind();
-    assert lf_mt._cyclic && rt_mt._cyclic;
-    assert !lf_mt.interned() && !rt_mt.interned();
-    if( lf_mt==rt_mt ) return lf_mt; // Cycle been closed
-    // Union together
-    boolean flip = lf == null && rt != null;
-    TypeStruct mt = flip ? rt_mt : lf_mt;
-    TypeStruct mx = flip ? lf_mt : rt_mt;
-    mx.union(mt);
-    // Map to MEETS1 & MEETS2.
+    if( lf != null ) { lf = lf.ufind(); assert lf._cyclic && !lf.interned(); }
+    if( rt != null ) { rt = rt.ufind(); assert rt._cyclic && !rt.interned(); }
+    if( lf == rt && lf != null ) return lf; // Cycle has been closed
+
+    // Take for the starting point MEET either already-mapped type.  If neither
+    // is mapped, clone one (to make a new space to put new types into) and
+    // simply point at the other - it will only be used for the len() and _any
+    // fields.  If both are mapped, union together and pick one arbitrarily
+    // (here always picked left).
+    TypeStruct mt, mx;
+    if( lf == null ) {
+      if( rt == null ) { mt = this.shallow_clone(); mx = that; }
+      else             { mt = rt;                   mx = this; }
+    } else {
+      if( rt == null ) { mt = lf;                   mx = that; }
+      else             { mt = lf;  rt.union(lf);    mx = rt  ; }
+    }
     MEETS1.put(this,mt);
     MEETS2.put(that,mt);
 
@@ -348,12 +354,13 @@ public class TypeStruct extends TypeOop<TypeStruct> {
     // For-all _ts edges do the Meet.  Some are not-recursive and mapped, some
     // are part of the cycle and mapped, some 
     for( int i=0; i<len; i++ ) {
-      Type lfi = lf_mt._ts[i];
-      Type rti = rt_mt._ts[i];
-      Type mti = lfi.meet(rti);
-      assert mt._uf==null; // wrote results but value is ignored
-      if( mt._ts[i] == (flip ? rti : lfi) )
-        mt._ts[i] = mti;
+      Type lfi = this._ts[i];
+      Type rti = that._ts[i];
+      Type mti = lfi.meet(rti); // Recursively meet, can update 'mt'
+      Type mtx = mt._ts[i];     // Prior value, perhaps updated recursively
+      Type mts = mtx.meet(mti); // Meet again
+      assert mt._uf==null;      // writing results but value is ignored
+      mt._ts[i] = mts;          // Finally update
     }
 
     // Lower recursive-meet flag.  At this point the Meet 'mt' is still
@@ -367,8 +374,7 @@ public class TypeStruct extends TypeOop<TypeStruct> {
 
   // Install, cleanup and return
   TypeStruct install_cyclic() {
-    // Check for dups.  If found, delete entire cycle, and return dup.
-    // Assert nothing in the cycle is a dup either.
+    // Check for dups.  If found, delete entire cycle, and return original.
     TypeStruct old = (TypeStruct)intern_lookup();
     // If the cycle already exists, just drop the new Type on the floor and let
     // GC get it and return the old Type.
@@ -392,9 +398,11 @@ public class TypeStruct extends TypeOop<TypeStruct> {
   // Make a clone of this TypeStruct that is not interned.
   private TypeStruct shallow_clone() {
     assert _cyclic;
-    TypeStruct ts = malloc(_any,_flds.clone(),_ts.clone());
-    ts._cyclic = true;
-    return ts;
+    Type[] ts = new Type[_ts.length];
+    Arrays.fill(ts,Type.XSCALAR);
+    TypeStruct tstr = malloc(_any,_flds.clone(),ts);
+    tstr._cyclic = true;
+    return tstr;
   }
 
   // Tarjan Union-Find to help build cyclic structures
