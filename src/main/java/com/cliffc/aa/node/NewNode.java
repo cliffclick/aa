@@ -26,13 +26,26 @@ public class NewNode extends Node {
       if( ts[i]==Type.ANY ) ts[i] = Type.XSCALAR;
       if( ts[i]==Type.ALL ) ts[i] = Type. SCALAR;
     }
-    Type newt = TypeStruct.make(_names,ts);
+    TypeStruct newt = TypeStruct.make(_names,ts);
     // Get the existing type, without installing if missing because blows the
     // "new newnode" assert if this node gets replaced during parsing.
     Type oldt = gvn.self_type(this);
-    Type rez = newt.contains(oldt) ? newt.meet(oldt) : newt;
-    return rez;
+    return approx(newt,oldt);
   }
+  
+  // NewNodes can particpate in cycles, where the same structure is appended
+  // too in a loop until the size grows without bound.  If we detect this we
+  // need to approximate a new cyclic type.
+  private final static int CUTOFF=5; // Depth of types before we start forcing approximations
+  public static Type approx(TypeStruct newt, Type oldt) {
+    if( !(oldt instanceof TypeStruct) ) return newt;
+    assert oldt==newt || !oldt.contains(newt);
+    if( !newt.contains(oldt) ) return newt;
+    if( oldt.depth() <= CUTOFF ) return newt;
+    TypeStruct tsa = newt.approx((TypeStruct)oldt);
+    return tsa.meet(oldt);
+  }
+
   // Worse-case type for this Node
   @Override public Type all_type() {
     Type[] ts = new Type[_names.length];

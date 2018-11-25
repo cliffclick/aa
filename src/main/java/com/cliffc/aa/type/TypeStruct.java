@@ -30,7 +30,6 @@ import java.util.function.Predicate;
  *  cycle is the Meet's cycle.
  */
 public class TypeStruct extends TypeOop<TypeStruct> {
-  private final static int CUTOFF=5; // Depth of types before we start forcing approximations
   // Fields are named in-order and aligned with the Tuple values.  Field names
   // are never null, and never zero-length.  If the 1st char is a '^' the field
   // is Top; a '.' is Bot; all other values are valid field names.
@@ -270,20 +269,7 @@ public class TypeStruct extends TypeOop<TypeStruct> {
       return cyclic_meet(that);
     // Recursive but not cyclic; since at least one of these types is
     // non-cyclic normal recursion will bottom-out.
-      
-    // See if the structure is being built by repeated applications of,
-    // e.g. New, and thus will grow without bound.  At some point cut it off
-    // and make a cyclic structure.  Look for, e.g. 'this' containing a
-    // reference to 'that' (or vice-versa), where 'that' is "too big".  If
-    // found, replace the pointer to 'that' with a pointer to 'this' before
-    // doing the meet.
-    thsi = thsi.approx(that);
-    that = that.approx(thsi);
-    // Repeat the cycle-aware check, since might have made a cycle
-    if( thsi._cyclic && that._cyclic )
-      //return thsi.cyclic_meet(that);
-      throw AA.unimpl(); // untested
-    
+
     // If unequal length; then if short is low it "wins" (result is short) else
     // short is high and it "loses" (result is long).
     return thsi._ts.length <= that._ts.length ? thsi.xmeet1(that) : that.xmeet1(thsi);
@@ -428,9 +414,8 @@ public class TypeStruct extends TypeOop<TypeStruct> {
 
   // THIS contains THAT, and THAT is too deep.  Make a new cyclic type for THIS
   // where THAT is replaced by THIS, before doing the Meet.
-  private TypeStruct approx( final TypeStruct that ) {
-    if( !this.contains(that)  )  return this;
-    if( that.depth() <= CUTOFF ) return this;
+  public TypeStruct approx( final TypeStruct that ) {
+    assert this.contains(that);
     // Recursively clone THIS, replacing the reference to THAT with the THIS clone.
     // Do not install until the cycle is complete.
     RECURSIVE_MEET++;

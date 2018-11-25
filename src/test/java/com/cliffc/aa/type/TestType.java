@@ -330,13 +330,14 @@ public class TestType {
     
 
     // Nest a linked-list style tuple 10 deep; verify actual depth is capped at
-    // less than 5.
-    Type told, t0 = TypeNil.NIL;
+    // less than 5.  Any data loop must contain a Phi; if structures are
+    // nesting infinitely deep, then it must contain a NewNode also.
+    Type phi = TypeNil.NIL;
     for( int i=0; i<20; i++ ) {
-      told = TypeStruct.make(TypeStruct.FLDS(2),t0,TypeInt.con(i));
-      t0 = told.meet(t0);    // Must be a phi-meet in any data loop
+      TypeStruct newt = TypeStruct.make(TypeStruct.FLDS(2),phi,TypeInt.con(i));
+      phi=com.cliffc.aa.node.NewNode.approx(newt,phi);
     }
-    assertTrue(t0.depth()<10);
+    assertTrue(phi.depth()<10);
 
   }
 

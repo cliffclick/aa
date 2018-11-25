@@ -17,6 +17,17 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
 
+    // User-defined linked list
+    String ll_con = "tmp=((((0,2),99),1),98);"; // intermix strings and ints
+    String ll_map = "map = {fun list -> list ? (map(fun,list.0),fun(list.1)) : 0};";
+    String ll_fun = "plus = {x -> x+x};";
+    String ll_apl = "map(plus,tmp);";
+
+    // TODO: Needs a way to easily test simple recursive types
+    TypeEnv te4 = Exec.go("args",ll_con+ll_map+ll_fun+ll_apl);
+    
+
+    
     // Not currently inferring top-level function return very well.  Acting
     // "as-if" called by Scalar args, which pretty much guarantees a fail result.
     // Note that this is correct scenario: the returned value is reporting that
@@ -358,7 +369,7 @@ public class TestParse {
     // Test inferring a recursive struct type, with less help. Too complex to
     // inline, so actual inference happens
     TypeStruct.init1();
-    test("map={x -> x ? @{n=map(x.n),v=x.v*x.v} : 0};"+
+    test_isa("map={x -> x ? @{n=map(x.n),v=x.v*x.v} : 0};"+
          "map(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0,v=1.2},v=2.3},v=3.4},v=4.5})",
          TypeStruct.make(FLDS,TypeNil.make(TypeStruct.RECURS_NIL_FLT),TypeFlt.con(4.5*4.5)));
     
@@ -367,7 +378,7 @@ public class TestParse {
     test("map={x -> x ? (map(x.0),x.1*x.1) : 0}; map((0,1.2))",
          TypeStruct.make(TypeNil.NIL,TypeFlt.con(1.2*1.2)));
 
-    test("map={x -> x ? (map(x.0),x.1*x.1) : 0};"+
+    test_isa("map={x -> x ? (map(x.0),x.1*x.1) : 0};"+
          "map((math_rand(1)?0: (math_rand(1)?0: (math_rand(1)?0: (0,1.2), 2.3), 3.4), 4.5))",
          TypeStruct.make(TypeNil.make(TypeStruct.RECURT_NIL_FLT),TypeFlt.con(4.5*4.5)));
     
@@ -378,10 +389,6 @@ public class TestParse {
   }
 
   /*
-
-// A tuple of null and a string
-list_of_hello = @{ 0, "hello", }
-list_of_hello =  ( 0, "hello", )
 
 // No ambiguity:
  { x } // no-arg-function returning external variable x; same as { -> x }

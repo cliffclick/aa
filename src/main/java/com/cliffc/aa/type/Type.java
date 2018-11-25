@@ -544,7 +544,7 @@ public class Type<T extends Type<T>> {
   public final boolean contains( Type t ) { return contains(t,null); }
   boolean contains( Type t, BitSet bs ) { return false; }
   // Depth of nested types
-  final int depth() { return depth(null); }
+  public final int depth() { return depth(null); }
   int depth( BitSet bs ) { return 1; }
   // Mark if part of a cycle
   void mark_cycle( Type t, BitSet visit, BitSet cycle ) { }
