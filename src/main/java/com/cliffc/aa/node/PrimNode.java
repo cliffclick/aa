@@ -66,6 +66,7 @@ public abstract class PrimNode extends Node {
 
     new   EQ_OOP(),
     new   NE_OOP(),
+    new AddStrStr(),
   };
 
   // Loss-less conversions only, plus int64->flt64 (standard lossy conversion)
@@ -334,4 +335,9 @@ class Id extends PrimNode {
   @Override public Type apply( Type[] args ) { return args[1]; }
   @Override public Node ideal(GVNGCM gvn) { return in(1); }
   @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)); }
+}
+
+class AddStrStr extends PrimNode {
+  AddStrStr( ) { super("+",PrimNode.ARGS2,TypeTuple.STR_STR,TypeStr.STR); }
+  public TypeStr apply( Type[] args ) { return TypeStr.con(args[1].getstr()+args[2].getstr()); }
 }

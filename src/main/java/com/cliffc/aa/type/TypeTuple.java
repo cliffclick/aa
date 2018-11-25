@@ -84,6 +84,7 @@ public class TypeTuple<P extends TypeTuple<P>> extends TypeOop<P> {
   public  static final TypeTuple INT64_INT64 = make(TypeInt.INT64,TypeInt.INT64);
   public  static final TypeTuple FLT64_FLT64 = make(TypeFlt.FLT64,TypeFlt.FLT64);
   private static final TypeTuple FLT64_INT64 = make(TypeFlt.FLT64,TypeInt.INT64);
+  public  static final TypeTuple STR_STR     = make(TypeStr.STR  ,TypeStr.STR  );
   
   public  static final TypeTuple IF_ANY  = make(XCTRL,XCTRL);
   public  static final TypeTuple IF_ALL  = make(CTRL ,CTRL );

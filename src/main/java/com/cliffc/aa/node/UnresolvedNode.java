@@ -91,7 +91,7 @@ public class UnresolvedNode extends Node {
     if( ns._len==0 ) return null;          // No choices apply?  No changes.
     if( ns._len==1 ) return ns.at(0);      // Return the one choice
     if( ns._len==_defs._len ) return null; // No improvement
-    throw AA.unimpl();                     // TODO: return shrunk choice list
+    return gvn.xform(new UnresolvedNode(ns.asAry())); // return shrunk choice list
   }
   
   @Override public Type all_type() { return TypeFun.GENERIC_FUN; }
