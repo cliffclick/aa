@@ -34,7 +34,7 @@ public class TestParse {
     testerr("x=1+y","Unknown ref 'y'","     ");
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
     test_isa("{x y -> x+y}", TypeFun.FUN2); // {Flt,Int} x {Flt,Int} -> {Flt,Int}
-    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.BOOL );
+    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.TRUE );
 
   }
   
@@ -110,6 +110,7 @@ public class TestParse {
     testerr("x=y=", "Missing ifex after assignment of 'y'","    ");
     testerr("x=z" , "Unknown ref 'z'","   ");
     testerr("x=1+y","Unknown ref 'y'","     ");
+    testerr("x=y; x=y","Unknown ref 'y'","   ");
     test("x=2; y=x+1; x*y", TypeInt.con(6));
     // Re-use ref immediately after def; parses as: x=(2*3); 1+x+x*x
     test("1+(x=2*3)+x*x", TypeInt.con(1+6+6*6));
@@ -169,8 +170,8 @@ public class TestParse {
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(0),fact(1),fact(2))",TypeStruct.make(TypeNil.NIL,TypeInt.con(1),TypeInt.con(2)));
 
     // Co-recursion requires parallel assignment & type inference across a lexical scope
-    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.BOOL );
-    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(5)", TypeInt.BOOL);
+    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.TRUE );
+    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(5)", TypeNil.NIL  );
 
     // Not currently inferring top-level function return very well.  Acting
     // "as-if" called by Scalar, which pretty much guarantees a fail result.

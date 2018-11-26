@@ -98,6 +98,7 @@ public class Parse {
     Node res2 = _e._scope.pop();
     assert res==res2;
     set_ctrl(_e._scope.pop());
+    _gvn._whole_program = true;
   }
   
   private TypeEnv opto_type(Node res) {
@@ -133,6 +134,7 @@ public class Parse {
     Type tres = _gvn.type(res);
     kill(res);       // Kill Node for returned Type result
     set_ctrl(null);  // Kill control also
+    _gvn._post_gcp = false;
     return new TypeEnv(tres,_e,errs.isEmpty() ? null : errs);
   }
 
@@ -218,7 +220,8 @@ public class Parse {
     for( String tok : toks ) {
       Node n = _e.lookup(tok);
       if( n==null ) {           // Token not already bound to a value
-        _e.add(tok,ifex);       // Bind token to a value
+        if( !ifex.is_forward_ref() ) // Do not assign unknown refs to another name
+          _e.add(tok,ifex);     // Bind token to a value
         if( ifex instanceof EpilogNode && !ifex.is_forward_ref() ) ((EpilogNode)ifex).fun().bind(tok); // Debug only: give name to function
       } else { // Handle re-assignments and forward referenced function definitions
         if( n.is_forward_ref() ) ((EpilogNode)n).merge_ref_def(_gvn,tok,(EpilogNode)ifex);

@@ -295,13 +295,6 @@ public class FunNode extends RegionNode {
     assert cnts[OP_FUN]==1 && cnts[OP_EPI]==1;
     assert cnts[OP_SCOPE]==0 && cnts[OP_TMP]==0;
     assert cnts[OP_REGION] <= cnts[OP_IF];
-    // Specifically ignoring constants, errors, parms, phis, rpcs, types,
-    // unresolved, and casts.  These all track & control values, but actually
-    // do not generate any code.
-    if( cnts[OP_CALL] > 1 || // Careful inlining more calls; leads to exponential growth
-        cnts[OP_IF  ] > 1 || // Allow some trivial filtering to inline
-        cnts[OP_PRIM] > 6 )  // Allow small-ish primitive counts to inline
-      return null;
 
     // Pick which input to inline.  Only based on having some constant inputs
     // right now.
@@ -315,7 +308,14 @@ public class FunNode extends RegionNode {
       if( ncon > mncons ) { mncons = ncon; m = i; }
     }
 
-    
+    // Specifically ignoring constants, parms, phis, rpcs, types,
+    // unresolved, and casts.  These all track & control values, but actually
+    // do not generate any code.
+    if( cnts[OP_CALL] > 1 || // Careful inlining more calls; leads to exponential growth
+            cnts[OP_IF  ] > 1+mncons || // Allow some trivial filtering to inline
+            cnts[OP_PRIM] > 6 )  // Allow small-ish primitive counts to inline
+      return null;
+
     // Make a prototype new function header.  No generic unknown caller
     // in slot 1.  The one inlined call in slot 'm'.
     Node top = gvn.con(Type.XCTRL);
@@ -488,8 +488,19 @@ public class FunNode extends RegionNode {
   // control be different from the top-level REPL caller, and set the
   // undiscovered control to XCTRL.
   boolean slot1(GVNGCM gvn) {
+    // If all-callers-known, then slot#1 is not special anymore.
+    // All callers are explicitly represented in the graph.
     if( _all_callers_known ) return true;
-    if( !gvn._opt ) return true;
+    // Primitives forever assume a default caller
+    if( _uid < GVNGCM._INIT0_CNT ) return true; // Not a primitive
+    // Not all callers are known until GCP constant-props the RPCs about.
+    // GCP makes all callers explicit.
+    if( !gvn._post_gcp ) return true;
+    // Post GCP, all callers are known for whole-world programs.
+    // The REPL might bring in more callers.
+    if( !gvn._whole_program ) return true;
+    // In an iter() pre-GCP or from the REPL.
+
     // TODO: Also check to see if this is a function being returned as a
     // top-level result.  This is only a partial fix, and only to make the body
     // executable - in case the only use is to return from the parser.
@@ -503,7 +514,7 @@ public class FunNode extends RegionNode {
     if( !(e instanceof EpilogNode) ) return false;
     return ((EpilogNode) e).fun() == this;
   }
-  
+
   // Compute value from inputs.  Slot#1 is always the unknown caller.  If
   // Slot#1 is not a ScopeNode, then it is a constant CTRL just in case we make
   // a new caller (e.g. via inlining).  If there are no other inputs and no

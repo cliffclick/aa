@@ -78,9 +78,9 @@ public class GVNGCM {
         if( n._uses.at(i)._uid >= CNT )
           n._uses.del(i--);
     }
+    _post_gcp = false;
   }
 
-  public boolean _opt=false;
   public Type type( Node n ) {
     Type t = n._uid < _ts._len ? _ts._es[n._uid] : null;
     if( t != null ) return t;
@@ -344,9 +344,14 @@ public class GVNGCM {
   }
 
   // Global Optimistic Constant Propagation.
+  public boolean _whole_program;// If false, then REPL may provide more program
+  public boolean _post_gcp;     // During and after GCP (all callers are known)
+  public boolean _opt;          // GCP in-progress
   void gcp(ScopeNode start, ScopeNode end) {
     assert _work._len==0;
     assert _wrk_bits.isEmpty();
+    assert !_post_gcp;
+    _post_gcp = true;
     Ary<CallNode> calls = new Ary<>(new CallNode[1],0);
     // Set all types to all_type().dual()
     Arrays.fill(_ts._es,_INIT0_CNT,_ts._len,null);
@@ -441,6 +446,7 @@ public class GVNGCM {
       FunNode fun = (FunNode)n;
       if( !fun._tf.is_forward_ref() && // No forward ref (error at this point)
           !fun._all_callers_known &&   // Not already flagged as all-calls-known
+           _whole_program &&           // No more callers from the REPL
           fun != frez) {               // Not being returned as top-level result
         fun.all_callers_known();
         set_def_reg(fun,1,con(Type.XCTRL));
