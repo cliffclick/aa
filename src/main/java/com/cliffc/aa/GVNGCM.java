@@ -446,8 +446,8 @@ public class GVNGCM {
         set_def_reg(fun,1,con(Type.XCTRL));
       }
       // Functions can sharpen return value
-      if( type(fun)==Type.CTRL ) {
-        EpilogNode epi = fun.epi();
+      EpilogNode epi = fun.epi();
+      if( type(fun)==Type.CTRL && epi != null ) {
         TypeTuple  tt = (TypeTuple)   type(epi);
         Type       tctl =             tt.at(0);
         Type       tret =             tt.at(1);

@@ -10,6 +10,9 @@ import java.util.BitSet;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+// The core Type system is a distributive complete bounded lattice.
+// See: https://en.wikipedia.org/wiki/Lattice_(order)
+
 public class TestLattice {
   private static class N {
     private static int ID=0;

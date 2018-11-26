@@ -9,11 +9,14 @@ import java.util.function.Predicate;
 /** an implementation of language AA
  */
 
-// C2-style type system, with Meet & Dual.  Symmetric around the centerline of
-// constants.  Fixed height, so a finite count of Meet stablizes; a unique All
-// (Bottom; no known value) and due to symmetry a unique Any (Top, all values
-// simultaneously).  Support function types, various kinds of numeric ranges,
-// null and a Object Oriented single-inheritance hierarchy.
+// C2-style type system, with Meet & Dual.  This is a distributed complete
+// bounded lattice.  See https://en.wikipedia.org/wiki/Complete_lattice.
+
+// Symmetric around the centerline of constants.  Fixed height, so a finite
+// count of Meet stablizes; a unique All (Bottom; no known value) and due to
+// symmetry a unique Any (Top, all values simultaneously).  Support function
+// types, various kinds of numeric ranges, nil, tuples and structs, and named
+// subtypes of the above.
 //
 // During program typing, always keeping the "loosest" possible program and if
 // this program still types as 'Any' then the program is ambiguious.  'All'
@@ -372,7 +375,7 @@ public class Type<T extends Type<T>> {
     assert errs==0 : "Found "+errs+" associative errors";
 
 
-    // Confirm C-R, I guess.  If A isa B, then A.join(C) isa B.join(C)
+    // Confirm distributivity.  If A isa B, then A.join(C) isa B.join(C)
     for( Type t0 : ts )
       for( Type t1 : ts ) {
         if( t0.isa(t1) ) {

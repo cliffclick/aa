@@ -229,9 +229,7 @@ public abstract class Node implements Cloneable {
       (this instanceof CallNode && in(1) instanceof UnresolvedNode ? errs2 : errs).add(msg);
     for( int i=0; i<_defs._len; i++ ) {
       Node def = _defs.at(i);   // Walk data defs for more errors
-      if( def == null ) continue;
-      // All dead paths been cleaned out
-      assert !(this instanceof RegionNode) || gvn.type(def)== Type.CTRL;
+      if( def == null || gvn.type(def) == Type.XCTRL ) continue;
       def.walkerr_def(errs,errs2,bs,gvn);
     }
   }

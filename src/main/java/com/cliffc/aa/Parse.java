@@ -72,29 +72,47 @@ public class Parse {
     _gvn = Env._gvn;     // Pessimistic during parsing
   }
 
-  // Parse the string in the given lookup context, and return an executable program
-  TypeEnv go( ) { return prog(); }
-
-  /** Parse a top-level:
-   *  prog = ifex END */
-  private TypeEnv prog() {
-    // Currently only supporting exprs
-    Node res = stmts();
-    if( res == null ) res = con(Type.ANY);
+  // Parse the string in the given lookup context, and return an executable
+  // program.  Called in a partial-program context; passed in an existing
+  // ScopeNode with existing variables which survive to the next call.  Used by
+  // the REPL to do incremental typing.
+  TypeEnv go_partial( ) {
+    Node res = prog();
+    return opto_type(res);
+  }
+  // Parse the string in the given lookup context, and return an executable
+  // program.  Called in a whole-program context; passed in an empty ScopeNode
+  // and nothing survives since there is no next call.  Used by the Exec to do
+  // whole-compilation-unit typing.
+  TypeEnv go_whole( ) {
+    Node res = prog();
+    clean_top_level_scope(res);
+    return opto_type(res);
+  }
+  
+  private void clean_top_level_scope(Node res) {
     _e._scope.add_def(ctrl());  // Hook, so not deleted
     _e._scope.add_def(res);     // Hook, so not deleted
     // Delete names at the top scope before final optimization.
     _e._scope.promote_forward_del_locals(_gvn,null);
+    Node res2 = _e._scope.pop();
+    assert res==res2;
+    set_ctrl(_e._scope.pop());
+  }
+  
+  private TypeEnv opto_type(Node res) {
+    Env par = _e._par;
+    _e._scope.add_def(res);     // Hook, so not deleted
+    _e._scope.add_def(par._scope); // Hook start control into all the constants
+
     _gvn.iter();    // Pessimistic optimizations; might improve error situation
     // Run GCP from the global top, so we also get all the initial constants
     // and all users of those constants.
-    Env par = _e._par;
-    _e._scope.add_def(par._scope); // Hook start control into all the constants
     _gvn.gcp(par._scope,_e._scope);// Global Constant Propagation
     _gvn.iter();                   // Re-check all ideal calls now that types have been maximally lifted
+
     _e._scope.pop();               // Remove start hook
     res = _e._scope.pop();         // New and improved result
-    Node ctrl = _e._scope.pop();   // Exit control
 
     // Hunt for typing errors in the alive code
     assert par._par==null;      // Top-level only
@@ -103,8 +121,8 @@ public class Parse {
     bs.set(_e._scope._uid);     // Do not walk top-level scope
     Ary<String> errs  = new Ary<>(new String[1],0);
     Ary<String> errs2 = new Ary<>(new String[1],0);
-    res .walkerr_def(errs,errs2,bs,_gvn);
-    ctrl.walkerr_def(errs,errs2,bs,_gvn);
+    res   .walkerr_def(errs,errs2,bs,_gvn);
+    ctrl().walkerr_def(errs,errs2,bs,_gvn);
     if( errs.isEmpty() ) _e._scope.walkerr_use(errs,new BitSet(),_gvn);
     if( errs.isEmpty() && skipWS() != -1 ) errs.add(errMsg("Syntax error; trailing junk"));
     if( errs.isEmpty() ) res.walkerr_gc(errs,new BitSet(),_gvn);
@@ -113,10 +131,18 @@ public class Parse {
     if( errs.isEmpty() ) errs.addAll(errs2);
 
     Type tres = _gvn.type(res);
-    kill(res);
+    kill(res);       // Kill Node for returned Type result
+    set_ctrl(null);  // Kill control also
     return new TypeEnv(tres,_e,errs.isEmpty() ? null : errs);
   }
 
+  /** Parse a top-level:
+   *  prog = ifex END */
+  private Node prog() {
+    Node res = stmts();
+    return res == null ? con(Type.ANY) : res;
+  }
+    
   /** Parse a list of statements; final semi-colon is optional.
    *  stmts= stmt [; stmt]*[;]? 
    */

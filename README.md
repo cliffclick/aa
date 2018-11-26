@@ -220,12 +220,22 @@ Nullable and not-null modeled after Kotlin | ---
 `a = math_rand(1) ? 0 : @{x=1}; b = math_rand(1) ? 0 : @{c=a}; b ? (b.c ? b.c.x : 0) : 0` | `int1` Nested nullable structs
 Recursive types | ---
 `A= :(:A?, :int); A((0,2))`|`A:(nil,2)` Simple recursive tuple
+`A= :(:A?, :int); A(0,2)`|`A:(nil,2)` Same thing using explicit args
 `A= :(:A?, :int); A(A(0,2),3)`|`A:(A:(nil,2),3)` Simple recursive tuple
 `A= :@{n:A?, v:flt}; A(@{n=0,v=1.2}).v` | `1.2:flt` Named recursive structure
-`A= :@{n:B?, v:int}; a = A(@{n=0,v=2}); a.n` | `nil` Unknown type B is never assigned, so no type error
+`A= :@{n:A?, v:flt}; A(0,1.2).v` | `1.2:flt` Same thing using explicit args
+`A= :@{n:B?, v:int}; a = A(0,2); a.n` | `nil` Unknown type B is never assigned, so no type error
 `A= :@{n:B, v:int}; B= :@{n:A, v:flt}` | `B(@{n:A:@{n:B, v:int},v:flt} -> B)`  Types A and B are mutually recursive
-`List=:@{next:List?,val}; LL={n v -> List(@{next=n,val=v})` | `LL` Linked-list type with sample shortcut factory
-`LL(LL(0,1.2),2.3)` | `List:@{next:List:@{next:nil,val:1.2},val:2.3}` Sample linked-list, with all types shown
+`List=:@{next:List?,val}` | `List` Linked-list type
+`List(List(0,1.2),2.3)` | `List:@{next:List:@{next:nil,val:1.2},val:2.3}` Sample linked-list, with all types shown
+`map_sq={x -> x ? (map_sq(x.0),x.1*x.1) : 0}; map_sq((0,1.2))` | `(nil,1.44)` Strongly typed `map_sq` with a simple tuple
+
+Examples:
+---------
+
+
+
+
 
 Done Stuff
 ----------

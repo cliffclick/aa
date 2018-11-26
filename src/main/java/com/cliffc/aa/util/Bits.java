@@ -154,16 +154,20 @@ public class Bits implements Iterable<Integer> {
     }
 
     // join of 2 sets; return intersection
-    Bits bs0 = this, bs1 = bs;  // Shorter set in bs0
-    if( _bits.length > bs._bits.length ) { bs0=bs; bs1=this; }
-    boolean eqs=true;
-    for( int i=0; i<bs0._bits.length; i++ )
-      if( (bs0._bits[i]&bs1._bits[i]) != bs0._bits[i] )
-        { eqs=false; break; }
-    if( eqs ) return bs0;       // All short bits in long set, return intersection
-    throw AA.unimpl();          // 2 big sets
+    if(    subset(bs  ) ) return this;
+    if( bs.subset(this) ) return bs  ;
     
+    throw AA.unimpl();          // 2 big sets
   }
+  
+  private boolean subset(Bits bs) {
+    if( _bits.length > bs._bits.length ) return false;
+    for( int i=0; i<_bits.length; i++ )
+      if( (_bits[i]&bs._bits[i]) != _bits[i] )
+        return false;
+    return true;
+  }
+  
   public Bits dual() {
     if( _bits==null ) return this; // Dual of a constant is itself
     // Otherwise just flip _con

@@ -29,6 +29,7 @@ public class LoadNode extends Node {
     if( ctrl==null || gvn.type(ctrl)!=Type.CTRL )
       return null;              // Dead load, or a no-control-no-fail load
     Type t = gvn.type(addr);    // Address type
+    if( t.is_forward_ref() ) return null;
 
     // Lift control on Loads as high as possible... and move them over
     // to a CastNode (to remove null-ness) and remove the control.
@@ -95,8 +96,8 @@ public class LoadNode extends Node {
     while( t instanceof TypeName ) t = ((TypeName)t)._t;
     if( t instanceof TypeNil && !t.above_center() ) return _badnil;
     if( TypeOop.OOP.isa(t) ) return _badfld; // Too low, might not have any fields
-    if( t instanceof TypeStruct &&
-        find((TypeStruct)t) == -1 )
+    if( !(t instanceof TypeStruct) ) return _badfld;
+    if( find((TypeStruct)t) == -1 )
       return _badfld;
     return null;
   }

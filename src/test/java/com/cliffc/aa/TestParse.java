@@ -17,7 +17,6 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
 
-    
     // Not currently inferring top-level function return very well.  Acting
     // "as-if" called by Scalar args, which pretty much guarantees a fail result.
     // Note that this is correct scenario: the returned value is reporting that
@@ -133,6 +132,7 @@ public class TestParse {
     testerr("math_rand(1)?1: :2:int","missing expr after ':'","                "); // missing type
     testerr("math_rand(1)?1::2:int","missing expr after ':'","               "); // missing type
     testerr("math_rand(1)?1:\"a\"", "Cannot mix GC and non-GC types", "                  " );
+    testerr("a.b.c();","Unknown ref 'a'"," ");
   }
 
   @Test public void testParse2() {
@@ -153,7 +153,7 @@ public class TestParse {
     test("x=3; and2={x -> x & 2}; and2(x)", TypeInt.con(2)); // trivially inlined; shadow  external variable
     testerr("plus2={x -> x+2}; x", "Unknown ref 'x'","                   "); // Scope exit ends lifetime
     testerr("fun={x -> }; fun(0)", "Missing function body","          ");
-    testerr("fun(2)", "Unknown ref 'fun'", "      ");
+    testerr("fun(2)", "Unknown ref 'fun'", "   ");
     test("mul3={x -> y=3; x*y}; mul3(2)", TypeInt.con(6)); // multiple statements in func body
     // Needs overload cloning/inlining to resolve {+}
     test("x=3; addx={y -> x+y}; addx(2)", TypeInt.con(5)); // must inline to resolve overload {+}:Int
@@ -165,6 +165,8 @@ public class TestParse {
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
     test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)",TypeInt.INT64);
     test("f0 = { x -> x ? {+}(f0(x-1),1) : 0 }; f0(2)", TypeInt.con(2));
+    testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact()","Passing 0 arguments to fact{Scalar -> Scalar} which takes 1 arguments","                                                ");
+    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(0),fact(1),fact(2))",TypeStruct.make(TypeNil.NIL,TypeInt.con(1),TypeInt.con(2)));
 
     // Co-recursion requires parallel assignment & type inference across a lexical scope
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.BOOL );
@@ -509,7 +511,7 @@ c[x]=1;
     String err2 = "\nargs:0:"+err+"\n"+program+"\n"+cursor+"^\n";
     TypeEnv te = Exec.go("args",program);
     assertTrue(te._errs != null && te._errs._len>=1);
-    assertEquals(err2,te._errs.at(0));
+    assertEquals(err2,te._errs.last());
   }
 
 }

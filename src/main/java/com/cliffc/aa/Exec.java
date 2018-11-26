@@ -5,6 +5,6 @@ package com.cliffc.aa;
 
 public abstract class Exec {
   public static TypeEnv go( String src, String str ) { // Execute string
-    try( TypeEnv te = new Parse(src,Env.top(),str).go(); ) { return te; }
+    try( TypeEnv te = new Parse(src,Env.top(),str).go_whole() ) { return te; }
   }
 }
