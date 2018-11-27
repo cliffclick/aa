@@ -33,7 +33,7 @@ public class NewNode extends Node {
     return approx(newt,oldt);
   }
   
-  // NewNodes can particpate in cycles, where the same structure is appended
+  // NewNodes can participate in cycles, where the same structure is appended
   // too in a loop until the size grows without bound.  If we detect this we
   // need to approximate a new cyclic type.
   private final static int CUTOFF=5; // Depth of types before we start forcing approximations
