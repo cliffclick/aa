@@ -14,96 +14,6 @@ public class TestType {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testType() {
     Type.init0(new HashMap<>());
-    Type ignore = TypeTuple.ALL; // Break class-loader cycle; load Tuple before Fun.
-
-    Type rbz = Type.NSCALR.join(TypeName.TEST_ENUM);
-    assertEquals(TypeName.make("__test_enum",TypeName.TEST_SCOPE,TypeInt.make(-1,8,0)),rbz);
-    Type rbp = TypeOop.OOP.join(TypeName.TEST_ENUM);
-    assertEquals(Type.XSCALAR,rbp);
-    Type rby = Type.NNUM  .join(TypeName.TEST_ENUM);
-    assertEquals(TypeName.make("__test_enum",TypeName.TEST_SCOPE,TypeInt.make(-1,8,0)),rby);
-    Type ra = Type.XNSCALR.join(TypeName.TEST_ENUM);
-    assertEquals(Type.XSCALAR,ra);
-    Type xo1 = TypeOop.XOOP.join(TypeName.TEST_ENUM);
-    assertEquals(Type.XSCALAR,xo1);
-    Type rx = Type.NNUM.meet(TypeName.TEST_ENUM.dual()).dual();
-    assertEquals(Type.XNUM,rx);
-    Type tb4 = Type.NNUM.meet(TypeName.TEST_ENUM.dual());
-    assertEquals(Type.NUM,tb4);
-    Type rb = Type.XNNUM.join(TypeName.TEST_ENUM);
-    assertEquals(Type.XNUM,rb);
-
-    Type r32 = Type.XSCALAR.join(TypeName.TEST_ENUM);
-    assertEquals(Type.XSCALAR,r32);
-    Type r02 = Type.XNUM.join(TypeName.TEST_ENUM);
-    assertEquals(Type.XNUM,r02);
-    Type rmt = r02.meet(TypeName.TEST_ENUM);
-    assertEquals(TypeName.TEST_ENUM,rmt);
-    
-    assertEquals(TypeFlt.FLT32,Type.XNSCALR.meet(TypeFlt.FLT32)); // ~nScalar isa flt32
-    Type tf02 = Type.XNSCALR .join(TypeFlt.PI); // Type.XNSCALR; PI is a member directly of ~nScalar
-    Type tf12 = TypeFlt.FLT32.join(TypeFlt.PI); // TypeFlt.XFLT64; ugly lift
-    Type tfmt = tf02.meet(tf12); // Drops nil?  TypeFlt.XNFLT64
-    assertEquals(tf12,tfmt); // Expect A.join(C) isa B.join(C)
-    Type nflt64 = TypeFlt.make(-1,64,0);
-    Type nint32 = TypeInt.make(-1,32,0);
-    Type tfx = nint32.meet(nflt64);
-    assertEquals(nflt64,tfx);
-    // int64 isa all
-    // int64.join(__test_flt:flt32) isa all.join(__test_flt:flt32)
-    // ~int64.meet(__test_flt:~flt32).~ isa __test_flt:flt32
-    // ==>> ~int64 .meet(__test_flt:~flt32).~
-    // ==>> __test_flt:~int64 .meet(__test_flt:~flt32).~
-    // ==>> __test_flt:~int16 .meet(__test_flt:~flt32).~
-    // ==>> __test_flt:meet(~int16,~flt32).~
-    // ==>> __test_flt:~int16.~
-    // ==>> __test_flt:int16
-    Type  xint64 = TypeInt.make(2,64,0);
-    Type  xflt32 = TypeFlt.make(2,32,0);
-    Type nxflt32 = TypeName.make("__test_enum",TypeName.TEST_SCOPE,xflt32);
-    Type nxint16 = TypeName.make("__test_enum",TypeName.TEST_SCOPE,TypeInt.INT16);
-    Type  xfimt  = xint64.meet(nxflt32).dual();
-    assertEquals(nxint16,xfimt);
-    Type nxx = TypeInt.FALSE.join(nflt64);
-    assertEquals(TypeInt.BOOL.dual(),nxx);
-
-    Type q02 = Type.XNSCALR.meet(TypeName.TEST_ENUM);
-    assertEquals(TypeInt.INT8,q02);
-    Type q02j= Type.XNSCALR.join(TypeName.TEST_ENUM);
-    assertEquals(Type.XSCALAR,q02j);
-    Type q12 = Type.XNNUM  .meet(TypeName.TEST_ENUM);
-    assertEquals(TypeInt.INT8,q12);
-    Type q12j= Type.XNNUM  .join(TypeName.TEST_ENUM);
-    assertEquals(Type.XNUM,q12j);
-
-    Type tb5 = Type.XNSCALR.meet(TypeFun.FUN1.dual());
-    assertEquals(TypeFun.FUN1.dual(),tb5);
-    Type tb3 = Type.XNSCALR.meet(TypeInt.FALSE);
-    assertEquals(TypeInt.BOOL,tb3);
-    Type tb2 = Type.XNSCALR.meet(Type.XNUM);
-    assertEquals(Type.XNNUM,tb2);
-    Type tb1 = TypeNil.XOOP.meet(Type.NSCALR);
-    assertEquals(Type.NSCALR,tb1);
-    
-    Type that= Type.XNSCALR;
-    Type dual= Type. NSCALR;
-    Type t   = TypeNil.OOP;
-    Type mt  = t.meet(that);
-    Type tb  = mt.dual().meet(dual);
-    assertEquals(dual,tb);
-    
-    Type def = TypeStr.con("def");
-    Type mto5 = def.meet(TypeStr.ABC);
-    assertEquals(TypeStr.STR,mto5);
-    Type mto4 = TypeOop.XOOP.meet(TypeNil.ABC);
-    assertEquals(TypeNil.ABC,mto4);
-    Type mto3 = TypeOop.XOOP.meet(TypeNil.STR);
-    assertEquals(TypeNil.STR,mto3);
-    Type mto2 = TypeNil.XOOP.meet(TypeNil.make(TypeStr.XSTR));
-    assertEquals(TypeNil.make(TypeStr.XSTR),mto2);
-    Type mto1 = TypeOop.XOOP.meet(TypeStr.XSTR);
-    assertEquals(TypeStr.XSTR,mto1);
-    
   }
   
   @Test public void testNamesInts() {
@@ -337,10 +247,90 @@ public class TestType {
       TypeStruct newt = TypeStruct.make(TypeStruct.FLDS(2),phi,TypeInt.con(i));
       phi=com.cliffc.aa.node.NewNode.approx(newt,phi);
     }
-    assertTrue(phi.depth()<10);
+    int d = phi.depth()-9999; // added +9999 for cycle
+    assertTrue(0 <= d && d <10);
 
   }
 
+
+  // For any cyclic type with the cycle larger than 1, the other members of the
+  // cycle can be produced by appropriate meets... but all are equivalent.
+  // Example: T = :(T?,Scalar).  A simple linked-list-or-nil situation.
+  // Unrolled:   TypeStruct ==> TypeNil ==> ...
+  // Unrolled:  S?S?S?S?S?S?....
+  //
+  // Adding a nil to T gives T back, except rotated around the cycle:
+  // Unrolled:   TypeNil ==> TypeStruct ==> TypeNil ==> ...
+  // Unrolled:  ?S?S?S?S?S?S?....
+  // 
+  @Test public void testCycles() {
+    Type.init0(new HashMap<>());
+    Type ignore0 = TypeTuple.ALL; // Break class-loader cycle; load Tuple before Fun.
+    Type ignore1 = TypeNil.OOP; // Break class-loader cycle; load Tuple before Fun.
+    String[] flds = TypeStruct.FLDS(2);
+
+    // T = :(T?,i64)
+    TypeStruct T = TypeStruct.malloc(false,flds,new Type[2]);
+    Type.RECURSIVE_MEET++;
+    Type TN = TypeNil.make(T);  TN._cyclic = true;
+    T._ts[0] = TN;    T._cyclic = true;
+    T._ts[1] = TypeInt.INT64;
+    Type.RECURSIVE_MEET--;
+    T = T.install_cyclic();
+
+    // Adding a Nil to T brings to another spot in the cycle
+    Type tn2 = TypeNil.make(T);
+    assertEquals(TN,tn2);
+
+    // Meet of 2 elements of the cycle yields the cycle back.
+    Type mt = T.meet(TN);
+    assertTrue(mt==T || mt==TN);
+
+    // Test from an unrolled map() call, during GCP one of the guarding IF tests
+    // is still showing false, so we alternate having NILs or not.
+
+    // ((T,i64)?,i64) .isa( ((((T,i64)?,i64),i64)?,i64) ) ==>
+    //  (T,i64)       .isa(  (((T,i64)?,i64),i64)       ) ==>
+    //   T            .isa(   ((T,i64)?,i64)            ) ==>
+    //   T      .meet(((T,i64)?,i64)) == ((T,i64)?,i64) ==>
+    //  (T?,i64).meet(((T,i64)?,i64)) == ((T,i64)?,i64) ==>
+    //  (T?.meet((T,i64)?),i64) == ((T,i64)?,i64) ==>
+    //   T?.meet((T,i64)?)      ==  (T,i64)?      ==>
+    //   T.meet((T,i64))?       ==  (T,i64)?      ==>
+    //   T.meet((T,i64))        ==  (T,i64)       ==>
+    //  (T?,i64).meet((T,i64)) ==   (T,i64)       ==>
+    //   T?     .meet( T     ) ==    T            ==>
+    // T? is a T that is rotated around the cycle 1 nil notch.
+    // So T?==T
+    //   T         .meet( T        ) ==   T
+    // T == T.  QED
+
+    Type Ts      = TypeStruct.make(T     ,TypeInt.INT64); //    (T,i64)
+
+    // Ugh: backwards from QED above; in fact Ts isa T since adding a Nil to a
+    // Ts is strictly lower in the lattice... and immediately makes it a T.
+    Type mt3 = T.meet(Ts);
+    assertEquals(T,mt3);
+
+    Type Ts0     = TypeNil   .make(Ts);                   //    (T,i64)?
+    Type Ts0s    = TypeStruct.make(Ts0   ,TypeInt.INT64); //   ((T,i64)?,i64)
+
+    // Ugh: backwards from QED above, same as above: adding any counts of
+    // TypeNil clearly makes an unrolled T which rolls back up to a T.
+    Type mt2 = T.meet(Ts0s);
+    assertEquals(T,mt2);
+
+    Type Ts0ss   = TypeStruct.make(Ts0s  ,TypeInt.INT64); //  (((T,i64)?,i64),i64)
+    Type Ts0ss0  = TypeNil   .make(Ts0ss);                //  (((T,i64)?,i64),i64)?
+    Type Ts0ss0s = TypeStruct.make(Ts0ss0,TypeInt.INT64); // ((((T,i64)?,i64),i64)?,i64)
+
+    Type mt1 = Ts0s.meet(Ts0ss0s); // Ts0s.isa(Ts0ss0s) ==> Ts0s.meet(Ts0ss0s) == Ts0ss0s
+    assertEquals(Ts0s,mt1);
+
+    Type mt0 = T.meet(Ts0ss0s); // Ts0s.isa(Ts0ss0s) ==> Ts0s.meet(Ts0ss0s) == Ts0ss0s
+    assertEquals(T,mt0);
+  }
+  
   @Test public void testCommuteSymmetricAssociative() {
     Type.init0(new HashMap<>());
 

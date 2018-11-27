@@ -39,7 +39,7 @@ public class NewNode extends Node {
   private final static int CUTOFF=5; // Depth of types before we start forcing approximations
   public static Type approx(TypeStruct newt, Type oldt) {
     if( !(oldt instanceof TypeStruct) ) return newt;
-    assert oldt==newt || !oldt.contains(newt);
+    if( newt == oldt ) return newt;
     if( !newt.contains(oldt) ) return newt;
     if( oldt.depth() <= CUTOFF ) return newt;
     TypeStruct tsa = newt.approx((TypeStruct)oldt);

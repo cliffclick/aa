@@ -515,6 +515,7 @@ public class TypeStruct extends TypeOop<TypeStruct> {
     return false;
   }
   @Override int depth( BitSet bs ) {
+    if( _cyclic ) return 9999;
     if( bs==null ) bs=new BitSet();
     if( bs.get(_uid) ) return 0;
     bs.set(_uid);
