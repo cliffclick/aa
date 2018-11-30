@@ -5,7 +5,7 @@ import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
 
-// Load a named field from a struct.  Does it's own null-check testing.  Loaded
+// Load a named field from a struct.  Does it's own nil-check testing.  Loaded
 // value depends on the struct typing.
 public class LoadNode extends Node {
   private final String _fld;
@@ -32,18 +32,18 @@ public class LoadNode extends Node {
     if( t.is_forward_ref() ) return null;
 
     // Lift control on Loads as high as possible... and move them over
-    // to a CastNode (to remove null-ness) and remove the control.
-    if( !TypeNil.NIL.isa(t) ) // No null, no need for ctrl
-      // remove ctrl; address already casts-away-null
+    // to a CastNode (to remove nil-ness) and remove the control.
+    if( !TypeNil.NIL.isa(t) ) // No nil, no need for ctrl
+      // remove ctrl; address already casts-away-nil
       return set_def(0,null,gvn);
 
-    // Looking for a null-check pattern:
+    // Looking for a nil-check pattern:
     //   this.0->dom*->True->If->addr
     //   this.1->[Cast]*-------/   Cast(s) are optional
     // If found, convert to this pattern:
     //   this.0      ->True->If->addr
     //   this.1->Cast/---------/
-    // Where the cast-away-null is local and explicit
+    // Where the cast-away-nil is local and explicit
     Node baseaddr = addr;
     while( baseaddr instanceof CastNode ) baseaddr = baseaddr.in(1);
     final Node fbaseaddr = baseaddr;
@@ -53,7 +53,7 @@ public class LoadNode extends Node {
                                   n.in(0) instanceof IfNode &&
                                   n.in(0).in(1) == fbaseaddr );
     if( tru==null ) return null;
-    assert !(tru==ctrl && addr != baseaddr) : "not the immediate location or we would be not-null already";
+    assert !(tru==ctrl && addr != baseaddr) : "not the immediate location or we would be not-nil already";
 
     if( !(t instanceof TypeNil) )
       return null; // below a nil (e.g. Scalar), do nothing yet

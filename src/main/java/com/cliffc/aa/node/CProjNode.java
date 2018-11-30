@@ -25,7 +25,7 @@ public class CProjNode extends ProjNode {
   
   // Used in Parser just after an if-test to sharpen the tested variables.
   // This is a mild optimization, since e.g. follow-on Loads which require a
-  // non-null check will hash to the pre-test Load, and so bypass this
+  // non-nil check will hash to the pre-test Load, and so bypass this
   // sharpening.  
   @Override public CProjNode sharpen( GVNGCM gvn, ScopeNode scope, TmpNode tmp ) {
     Node iff = in(0);

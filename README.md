@@ -206,18 +206,18 @@ Named type variables | Named types are simple subtypes
 `Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(@{x=1,y=2}))` | `5:int` type variables can be used anywhere a type can, including function arguments
 `Point=:@{x,y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(@{x=1,y=2}))` | `5:int` this `dist` takes any argument with fields `@{x,y}`, `Point` included
 `Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(     (@{x=1,y=2}))` | `@{x:1,y:2} is not a Point:@{x,y}` this `dist` only takes a `Point` argument
-Nullable and not-null modeled after Kotlin | ---
-`x:str? = 0`      | `null`  question-type allows null or not; zero digit is null
-`x:str? = "abc"`  | `"abc":str` question-type allows null or not
-`x:str  = 0`      | `"null is not a str"`
-`math_rand(1)?0:"abc"` | `"abc"?` Null-or-string "abc"
-`(math_rand(1)?0 : @{x=1}).x` | `Struct might be null when reading field '.x'` Must be provable not-null
-`p=math_rand(1)?0:@{x=1}; p ? p.x : 0` | `:int1` not-null-ness after a null-check, so field de-ref is OK
-`x:int = y:str? = z:flt = 0` | `0:int` null/0 freely recasts
-`"abc"==0`        | `0:int` Compare vs null
-`"abc"!=0`        | `1:int` Compare vs null
-`nil=0; "abc"!=nil` | `1:int` Another name for 0/null
-`a = math_rand(1) ? 0 : @{x=1}; b = math_rand(1) ? 0 : @{c=a}; b ? (b.c ? b.c.x : 0) : 0` | `int1` Nested nullable structs
+Nilable and not-nil modeled after Kotlin | ---
+`x:str? = 0`      | `nil`  question-type allows nil or not; zero digit is nil
+`x:str? = "abc"`  | `"abc":str` question-type allows nil or not
+`x:str  = 0`      | `"nil is not a str"`
+`math_rand(1)?0:"abc"` | `"abc"?` Nil-or-string "abc"
+`(math_rand(1)?0 : @{x=1}).x` | `Struct might be nil when reading field '.x'` Must be provable not-nil
+`p=math_rand(1)?0:@{x=1}; p ? p.x : 0` | `:int1` not-nil-ness after a nil-check, so field de-ref is OK
+`x:int = y:str? = z:flt = 0` | `0:int` nil/0 freely recasts
+`"abc"==0`        | `0:int` Compare vs nil
+`"abc"!=0`        | `1:int` Compare vs nil
+`nil=0; "abc"!=nil` | `1:int` Another name for 0/nil
+`a = math_rand(1) ? 0 : @{x=1}; b = math_rand(1) ? 0 : @{c=a}; b ? (b.c ? b.c.x : 0) : 0` | `int1` Nested nilable structs
 Recursive types | ---
 `A= :(:A?, :int); A((0,2))`|`A:(nil,2)` Simple recursive tuple
 `A= :(:A?, :int); A(0,2)`|`A:(nil,2)` Same thing using explicit args
@@ -241,7 +241,7 @@ Done Stuff
 ----------
 
 * Static typing; types optional & fully inferred at every place.
-* Null-ptr distinguished; null/notnull types (e.g. Kotlin)
+* Nil-ptr distinguished; nil/notnil types (e.g. Kotlin)
 * Duck-typing.  Interfaces.
 * Functional; 1st class functions.
 * REPL
@@ -288,7 +288,7 @@ concurrency:
 * not really actors but spawn/fork worker threads, run until they 'join' with parent.
 * Transactions-for-shared-memory-always (Closure style)
 
-types and name spaces and nulls:
+types and name spaces and nils:
 
 * OOP namespaces (distinguished "this"; classes; single-inheritance vs interfaces)
 * Modules: independent shipping of code.

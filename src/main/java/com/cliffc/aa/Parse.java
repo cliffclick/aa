@@ -37,7 +37,7 @@ import java.util.BitSet;
  *                              // Pattern matching: 1 arg is the arg; 2+ args break down a (required) tuple
  *  str  = [.\%]*               // String contents; \t\n\r\% standard escapes
  *  str  = %[num]?[.num]?fact   // Percent escape embeds a 'fact' in a string; "name=%name\n"
- *  type = tcon | tvar | tfun[?] | tstruct[?] | ttuple[?] // Types are a tcon or a tfun or a tstruct or a type variable.  A trailing ? means 'nullable'
+ *  type = tcon | tvar | tfun[?] | tstruct[?] | ttuple[?] // Types are a tcon or a tfun or a tstruct or a type variable.  A trailing ? means 'nilable'
  *  tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str[?]
  *  tfun = {[[type]* ->]? type }// Function types mirror func decls
  *  ttuple = ( [:type]?,* )     // Tuple types are just a list of optional types; the count of commas dictates the length, zero commas is zero length
