@@ -6,8 +6,7 @@ import org.junit.Test;
 
 import java.util.HashMap;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 
 public class TestType {
@@ -257,11 +256,12 @@ public class TestType {
   // cycle can be produced by appropriate meets... but all are equivalent.
   // Example: T = :(T?,Scalar).  A simple linked-list-or-nil situation.
   // Unrolled:   TypeStruct ==> TypeNil ==> ...
-  // Unrolled:  S?S?S?S?S?S?....
+  // Unrolled:   S?S?S?S?S?S?....
   //
   // Adding a nil to T gives T back, except rotated around the cycle:
   // Unrolled:   TypeNil ==> TypeStruct ==> TypeNil ==> ...
   // Unrolled:  ?S?S?S?S?S?S?....
+  // Note: Leading '?' but otherwise infinitely equal to the prior unroll
   // 
   @Test public void testCycles() {
     Type.init0(new HashMap<>());
@@ -277,10 +277,11 @@ public class TestType {
     T._ts[1] = TypeInt.INT64;
     Type.RECURSIVE_MEET--;
     T = T.install_cyclic();
+    TN = T._ts[0];
 
     // Adding a Nil to T brings to another spot in the cycle
     Type tn2 = TypeNil.make(T);
-    assertEquals(TN,tn2);
+    assertSame(TN, tn2);
 
     // Meet of 2 elements of the cycle yields the cycle back.
     Type mt = T.meet(TN);
