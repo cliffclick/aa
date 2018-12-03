@@ -1,11 +1,13 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.AA;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.util.Ary;
 
+import java.util.BitSet;
 import java.util.HashMap;
 import java.util.function.Predicate;
 
@@ -16,9 +18,10 @@ public class ScopeNode extends Node {
   // point to ConNodes with a TypeFun constant (a single function), or maybe
   // an Unresolved collection of overloaded functions.
   private final HashMap<String, Integer> _vals;
+  private final BitSet _ms;     // True if mutable, indexed with input#
   // Mapping from type-variables to Types.  Types have a scope lifetime like values.
   private final HashMap<String,Type> _types; // user-typing type names
-  public ScopeNode() { super(OP_SCOPE); _vals = new HashMap<>(); _types = new HashMap<>(); }
+  public ScopeNode() { super(OP_SCOPE); _vals = new HashMap<>(); _types = new HashMap<>(); _ms = new BitSet(); }
 
   // Name to node lookup, or null
   public Node get(String name) {
@@ -36,8 +39,9 @@ public class ScopeNode extends Node {
   // Add a Node to an UnresolvedNode.  Must be a function.
   public EpilogNode add_fun(String name, EpilogNode epi) {
     Integer ii = _vals.get(name);
-    if( ii==null ) add(name,epi);
-    else {
+    if( ii==null ) {
+      update(name,epi,null,false);
+    } else {
       Node n = _defs.at(ii);
       if( n instanceof UnresolvedNode ) n.add_def(epi);
       else set_def(ii,new UnresolvedNode(n,epi),null);
@@ -45,18 +49,21 @@ public class ScopeNode extends Node {
     return epi;
   }
   
-  // Extend the current Scope with a new name; cannot override existing name.
-  public Node add( String name, Node val ) {
-    assert _vals.get(name)==null;
-    _vals.put( name, _defs._len );
-    add_def(val);
+  // Add or update the scope with a name
+  public Node update( String name, Node val, GVNGCM gvn, boolean mutable ) {
+    Integer ii = _vals.get(name);
+    if( ii==null ) {
+      int i=_defs._len;
+      _vals.put( name, i );
+      add_def(val);
+      if( mutable ) _ms.set(i);
+    } else {
+      int i=ii;
+      assert _ms.get(i);
+      set_def(i,val,gvn);
+      if( !mutable ) _ms.clear(i);
+    }
     return val;
-  }
-  
-  // Update the current Scope name
-  public void update( String name, Node val, GVNGCM gvn ) {
-    int idx = _vals.get(name); // NPE if name does not exist
-    set_def(idx,val,gvn);
   }
 
   // Set value to null and return it, without deleting node
@@ -67,7 +74,12 @@ public class ScopeNode extends Node {
     n._uses.del(n._uses.find(this));
     return n;
   }
-  
+
+  // Name must exist
+  public boolean is_mutable( String name ) {
+    return _ms.get(_vals.get(name));
+  }
+
   // The current local scope ends; delete local var refs.  Forward refs first
   // found in this scope are assumed to be defined in some outer scope and get
   // promoted.
@@ -76,7 +88,7 @@ public class ScopeNode extends Node {
       int idx = _vals.get(name);
       Node n = in(idx);
       if( n != null && parent != null && n.is_forward_ref() )
-        parent.add(name,n);
+        parent.update(name,n,null,false);
       if( n != null ) gvn.add_work(n);
       set_def(idx, null, gvn);
       if( is_dead() ) return;
@@ -114,47 +126,116 @@ public class ScopeNode extends Node {
     int oldlen = _defs._len;
     if( idx == oldlen ) return null; // No vars, no return
     ScopeNode s = new ScopeNode();
-    while( _defs._len > idx )
+    while( _defs._len > idx ) {
+      int lidx = _defs._len-1;
       for( String name : _vals.keySet() )
-        if( _vals.get(name)==_defs._len-1 ) {
-          s.add(name,pop());
+        if( _vals.get(name)==lidx ) {
+          s.update(name,pop(),null,_ms.get(lidx));
           _vals.remove(name);
+          _ms.clear(lidx);
           break;
         }
+    }
     assert _defs._len+s._defs._len==oldlen;
     return s;
   }
 
-  // Add PhiNodes and variable mappings for common definitions
-  public void common( Parse P, GVNGCM gvn, String errmsg, ScopeNode t, ScopeNode f ) {
-    if( t!=null ) {  // Might have some variables in common
-      for( String name : t._vals.keySet() ) {
-        Node tn = t.in(t._vals.get(name));
-        Integer fii = f==null ? null : f._vals.get(name);
-        Node fn = fii==null ? undef(P,gvn,tn,name,false) : f.in(fii); // Grab false-side var
-        add_phi(P,errmsg,name,tn,fn);
-      }
-    }
-    if( f!=null ) {  // Might have some variables in common
-      for( String name : f._vals.keySet() ) {
-        Node fn = f.in(f._vals.get(name));
-        Integer tii = t==null ? null : t._vals.get(name);
-        if( tii == null ) {     // Only defined on one branch
-          Node tn = undef(P,gvn,fn,name,true); // True-side var
-          add_phi(P,errmsg,name,tn,fn);
-        } // Else values defined on both branches already handled
-      }
-    }
+  // Add PhiNodes and variable mappings for common definitions merging at the
+  // end of an IfNode split.
+  // - Errors are ignored for dead vars (ErrNode inserted into graph as instead
+  //   of a syntax error)
+  // - Unknown forward refs must be unknown on both branches and be immutable
+  //   and will promote to the next outer scope.
+  // - First-time defs on either branch must be defined on both branches.
+  // - Both branches must agree on mutability
+  // - Ok to be mutably updated on only one arm
+  public void common( Parse P, GVNGCM gvn, String phi_errmsg, ScopeNode t, ScopeNode f ) {
+    if( t!=null )               // Might have some variables in common
+      for( String name : t._vals.keySet() )
+        if( f==null || f._vals.get(name) == null )// If not on false side
+          do_one_side(name,P,gvn,phi_errmsg,t,true);
+        else
+          do_both_sides(name,P,gvn,phi_errmsg,t,f);
+
+    if( f!=null )               // Might have some variables in common
+      for( String name : f._vals.keySet() )
+        if( t==null || t._vals.get(name) == null )// If not on true side
+          do_one_side(name,P,gvn,phi_errmsg,f,false);
+    
     if( t!=null ) Env._gvn.kill_new(t);
     if( f!=null ) Env._gvn.kill_new(f);
   }
 
+
+  // Called per name defined on only one arm of a trinary.
+  // Produces the merge result.
+  private void do_one_side(String name, Parse P, GVNGCM gvn, String phi_errmsg, ScopeNode x, boolean arm) {
+    int xii = x._vals.get(name);
+    boolean x_is_mutable = x._ms.get(xii);
+    Node xn = x.in(xii);
+
+    // Forward refs are not really a def, but produce a trackable definition
+    // that must be immutable, and will eventually get promoted until it
+    // reaches a scope where it gets defined.
+    if( xn.is_forward_ref() ) { assert !x_is_mutable; update(name,xn,gvn,false); return; }
+        
+    // Check for mixed-mode updates.  'name' must be either fully mutable or
+    // fully immutable at the merge point (or dead afterwards).  Since x was
+    // updated on this branch, the variable was mutable beforehand.  Since it
+    // was mutable and not changed on the other side, it remains mutable.
+    if( !x_is_mutable ) {       // x-side is final but y-side is mutable.
+      update(name,P.err_ctrl1(" is only partially mutable",gvn.type(xn).widen()),gvn,false);
+      return;
+    }
+
+    // Must be mutable.  Find the prior definition.
+    Node yn = P.lookup(name);
+    if( yn == null ) {
+      update(name,P.err_ctrl1("'"+name+"' not defined on "+!arm+" arm of trinary",gvn.type(xn).widen()),gvn,false);
+      return;
+    } 
+    // Mutably updated on one side, and remains mutable.
+    update(name,xn==yn ? xn : P.gvn(new PhiNode(phi_errmsg, P.ctrl(),xn,yn)),gvn,true);
+  }
+  
+  private void do_both_sides(String name, Parse P, GVNGCM gvn, String phi_errmsg, ScopeNode t, ScopeNode f) {
+    int tii = t._vals.get(name);
+    int fii = f._vals.get(name);
+    boolean t_is_mutable = t._ms.get(tii);
+    boolean f_is_mutable = f._ms.get(fii);
+    Node tn = t.in(tii);
+    Node fn = f.in(fii);
+    
+    if( tn.is_forward_ref() ) {
+      assert !t_is_mutable;
+      if( fn.is_forward_ref() ) {
+        assert !f_is_mutable;
+        throw AA.unimpl(); // Merge/U-F two forward refs
+      }
+      update(name,P.err_ctrl1("'"+name+"' not defined on "+true+" arm of trinary",gvn.type(fn).widen()),gvn,false);
+      return;
+    }
+    if( fn.is_forward_ref() ) {
+      update(name,P.err_ctrl1("'"+name+"' not defined on "+false+" arm of trinary",gvn.type(tn).widen()),gvn,false);
+      return;
+    }
+
+    // Check for mixed-mode updates.  'name' must be either fully mutable
+    // or fully immutable at the merge point (or dead afterwards).
+    if( t_is_mutable != f_is_mutable ) {
+      update(name,P.err_ctrl1(" is only partially mutable",gvn.type(tn).widen()),gvn,false);
+      return;
+    }
+
+    update(name,tn==fn ? fn : P.gvn(new PhiNode(phi_errmsg, P.ctrl(),tn,fn)),gvn,t_is_mutable);
+  }
+  
   private Node undef(Parse P, GVNGCM gvn, Node xn, String name, boolean arm ) {
     return xn.is_forward_ref() ? xn :
       P.err_ctrl1("'"+name+"' not defined on "+arm+" arm of trinary",gvn.type(xn).widen());
   }
-  private void add_phi(Parse P, String errmsg, String name, Node tn, Node fn) {
-    add(name,tn==fn ? fn : P.gvn(new PhiNode(errmsg, P.ctrl(),tn,fn)));
+  private void add_phi(Parse P, String errmsg, String name, Node tn, Node fn, boolean mutable) {
+    update(name,tn==fn ? fn : P.gvn(new PhiNode(errmsg, P.ctrl(),tn,fn)),null,mutable);
   }
 
   // Replace uses of dull with sharp, used after an IfNode test

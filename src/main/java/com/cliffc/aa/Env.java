@@ -9,7 +9,7 @@ public class Env implements AutoCloseable {
   Env( Env par ) {
     _par=par;
     _scope = _gvn.init(new ScopeNode());
-    add(" control ",_scope);
+    update(" control ",_scope,null,true);
   }
 
   public final static GVNGCM _gvn = new GVNGCM(); // Initial GVN, defaults to ALL, lifts towards ANY
@@ -18,7 +18,7 @@ public class Env implements AutoCloseable {
   static { TOP.init(); }
   private void init() {
     _scope  .init0(); // Add base types
-    _scope.add("math_pi",new ConNode<>(TypeFlt.PI));
+    _scope.update("math_pi",new ConNode<>(TypeFlt.PI),null,false);
     for( PrimNode prim : PrimNode.PRIMS )
       _scope.add_fun(prim._name,(EpilogNode)_gvn.xform(as_fun(prim)));
     // Now that all the UnresolvedNodes have all possible hits for a name,
@@ -46,8 +46,9 @@ public class Env implements AutoCloseable {
     return new EpilogNode(fun,prim,rpc,fun,null);
   }
 
-  public Node add    ( String name, Node val ) { return _scope.add    (name,            val); }
+  public Node update( String name, Node val, GVNGCM gvn, boolean mutable ) { return _scope.update(name,val,gvn,mutable); }
   public Node add_fun( String name, Node val ) { return _scope.add_fun(name,(EpilogNode)val); }
+  public boolean is_mutable( String name ) { return _scope.is_mutable(name); }
 
   void add_type( String name, Type t ) { _scope.add_type(name,t); }
   

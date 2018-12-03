@@ -277,7 +277,7 @@ public class TestType {
     T._ts[1] = TypeInt.INT64;
     Type.RECURSIVE_MEET--;
     T = T.install_cyclic();
-    TN = T._ts[0];
+    TN = T._ts[0]; // Reload after interning
 
     // Adding a Nil to T brings to another spot in the cycle
     Type tn2 = TypeNil.make(T);

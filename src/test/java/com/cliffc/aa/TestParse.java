@@ -417,6 +417,27 @@ public class TestParse {
     
   }
   
+  @Test public void testParse9() {
+    // Test re-assignment
+    test("x=1", TypeInt.TRUE);
+    test("x=y=1", TypeInt.TRUE);
+    testerr("x=y=", "Missing ifex after assignment of 'y'","    ");
+    testerr("x=z" , "Unknown ref 'z'","   ");
+    testerr("x=1+y","Unknown ref 'y'","     ");
+    
+    test("x:=1", TypeInt.TRUE);
+    test("x:=0; a=x; x:=1; b=x; x:=2; (a,b,x)", TypeStruct.make(TypeNil.NIL,TypeInt.con(1),TypeInt.con(2)));
+    
+    testerr("x=1; x:=2", "Cannot re-assign val 'x'", "         ");
+    
+    test("math_rand(1)?(x=4):(x=3);x", TypeInt.NINT8); // x defined on both arms, so available after
+    test("math_rand(1)?(x:=4):(x:=3);x", TypeInt.NINT8); // x defined on both arms, so available after
+    test("math_rand(1)?(x:=4):(x:=3);x:=x+1", TypeInt.NINT8); // x mutable on both arms, so mutable after
+    test   ("x:=0; 1 ? (x:=4):; x:=x+1", TypeInt.con(5)); // x mutable ahead; ok to mutate on 1 arm and later
+    test   ("x:=0; 1 ? (x =4):; x", TypeInt.con(4)); // x final on 1 arm, dead on other arm
+    testerr("x:=0; 1 ? (x =4):; x", "'x' not final on false arm of trinary","                        "); // x mutable ahead; ok to mutate on 1 arm and later
+  }
+  
   /*
 
 // No ambiguity:

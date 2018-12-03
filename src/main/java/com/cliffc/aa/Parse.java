@@ -14,34 +14,34 @@ import java.util.BitSet;
  *
  *  GRAMMAR:
  *  prog = stmts END
- *  stmts= stmt [; stmt]*[;]?   // multiple statments; final ';' is optional
- *  stmt = [id[:type]? =]* ifex // ids must not exist, and are available in later statements
- *  stmt = tvar = :type         // type variable assignment
- *  ifex = expr ? expr : expr   // trinary logic
- *  expr = term [binop term]*   // gather all the binops and sort by prec
+ *  stmts= stmt [; stmt]*[;]?      // multiple statments; final ';' is optional
+ *  stmt = [id[:type]? [:]=]* ifex // ids are (re-)assigned, and are available in later statements
+ *  stmt = tvar = :type            // type variable assignment
+ *  ifex = expr ? expr : expr      // trinary logic
+ *  expr = term [binop term]*      // gather all the binops and sort by prec
  *  term = tfact [tuple or fact or .field]* // application (includes uniop) or field (and tuple) lookup
- *  tfact= fact[:type]          // Typed fact
- *  fact = id                   // variable lookup
- *  fact = num                  // number
- *  fact = "str"                // string
- *  fact = (stmts)              // General statements parsed recursively
- *  fact = tuple                // Tuple builder
- *  fact = func                 // Anonymous function declaration
+ *  tfact= fact[:type]             // Typed fact
+ *  fact = id                      // variable lookup
+ *  fact = num                     // number
+ *  fact = "str"                   // string
+ *  fact = (stmts)                 // General statements parsed recursively
+ *  fact = tuple                   // Tuple builder
+ *  fact = func                    // Anonymous function declaration
  *  fact = @{ [id[:type]?[=stmt]?,]* } // Anonymous struct declaration; optional type, optional initial value, optional final comma
- *  fact = {binop}              // Special syntactic form of binop; no spaces allowed; returns function constant
- *  fact = {uniop}              // Special syntactic form of uniop; no spaces allowed; returns function constant
- *  tuple= (stmts,[stmts,])     // Tuple; final comma is optional
- *  binop= +-*%&|/<>!=          // etc; primitive lookup; can determine infix binop at parse-time
- *  uniop=  -!~                 // etc; primitive lookup; can determine infix uniop at parse-time
+ *  fact = {binop}                 // Special syntactic form of binop; no spaces allowed; returns function constant
+ *  fact = {uniop}                 // Special syntactic form of uniop; no spaces allowed; returns function constant
+ *  tuple= (stmts,[stmts,])        // Tuple; final comma is optional
+ *  binop= +-*%&|/<>!=             // etc; primitive lookup; can determine infix binop at parse-time
+ *  uniop=  -!~                    // etc; primitive lookup; can determine infix uniop at parse-time
  *  func = { [[id[:type]?]* ->]? stmts} // Anonymous function declaration
- *                              // Pattern matching: 1 arg is the arg; 2+ args break down a (required) tuple
- *  str  = [.\%]*               // String contents; \t\n\r\% standard escapes
- *  str  = %[num]?[.num]?fact   // Percent escape embeds a 'fact' in a string; "name=%name\n"
+ *                                 // Pattern matching: 1 arg is the arg; 2+ args break down a (required) tuple
+ *  str  = [.\%]*                  // String contents; \t\n\r\% standard escapes
+ *  str  = %[num]?[.num]?fact      // Percent escape embeds a 'fact' in a string; "name=%name\n"
  *  type = tcon | tvar | tfun[?] | tstruct[?] | ttuple[?] // Types are a tcon or a tfun or a tstruct or a type variable.  A trailing ? means 'nilable'
  *  tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str[?]
- *  tfun = {[[type]* ->]? type }// Function types mirror func decls
- *  ttuple = ( [:type]?,* )     // Tuple types are just a list of optional types; the count of commas dictates the length, zero commas is zero length
- *  tstruct = @{ [id[:type],]*} // Struct types are field names with optional types
+ *  tfun = {[[type]* ->]? type }   // Function types mirror func decls
+ *  ttuple = ( [:type]?,* )        // Tuple types are just a list of optional types; the count of commas dictates the length, zero commas is zero length
+ *  tstruct = @{ [id[:type],]*}    // Struct types are field names with optional types
  */
 
 public class Parse {
@@ -161,22 +161,39 @@ public class Parse {
     return last;
   }
     
-  /** A statement is a list of variables to let-assign, and an ifex for the
-   *  value.  The variables must not already exist (or be a forward ref), and
-   *  are available in all later statements.
-   *  stmt = [id[:type]? =]* ifex
+  /** A statement is a list of variables to final-assign or re-assign, and an
+   *  ifex for the value.  The variables must not be forward refs and are
+   *  available in all later statements.  Final-assigned variables can never be
+   *  assigned again.  Type variable assignments are always final, and can not
+   *  exist before assignment (hence a variable cannot have a normal value and
+   *  be re-assigned as a type variable).  All type annotations on a variable
+   *  always apply to all assignments (final or not); a variable cannot be
+   *  "loosened" during a reassignment.
+   *
+   *  stmt = [id[:type]? [:]=]* ifex
    *  stmt = tvar = :type
+   *
+   *  Note the syntax difference between:
+   *    stmt = id := val  // re-assignment
+   *    stmt = id =:type  // type variable decl, type assignment
+   *
+   *  The ':=' is the re-assignment token, no spaces allowed.
+   *  The ':type' is the type being assigned; a space is allowed between '= :type'.
+   *  Variable re-assignment does not involve Memory; no State is changed.
    */
   private Node stmt() {
     Ary<String> toks = new Ary<>(new String[1],0);
     Ary<Type  > ts   = new Ary<>(new Type  [1],0);
+    BitSet rs = new BitSet();
     while( true ) {
       int oldx = _x;
       String tok = token();  // Scan for 'id = ...'
       if( tok == null ) break;
+      int oldx2 = _x;
       Type t = null;
-      if( peek(':') && (t=type())==null ) _x = oldx; // attempt type parse
-      if( !peek('=') ) { _x = oldx; break; } // Unwind token parse, and not assignment
+      if( peek(':') && (t=type())==null ) _x = oldx2; // attempt type parse
+      if( peek(":=") ) rs.set(toks._len);             // Re-assignment parse
+      else if( !peek('=') ) { _x = oldx; break; } // Unwind token parse, and not assignment
       toks.add(tok);
       ts  .add(t  );
     }
@@ -187,18 +204,17 @@ public class Parse {
       if( t==null ) return err_ctrl2("Missing type after ':'");
       if( t instanceof TypeNil ) return err_ctrl2("Named types are never nil");
       String tvar = toks.at(0);
-      if( _e.lookup(tvar) != null ) return err_ctrl2("Cannot re-assign val '"+tvar+"' as a type");
+      if( lookup(tvar) != null ) return err_ctrl2("Cannot re-assign val '"+tvar+"' as a type");
       Type ot = _e.lookup_type(tvar);
       TypeName tn;
       if( ot == null ) {        // Name does not pre-exist
         tn = TypeName.make(tvar,_e._scope.types(),t);
-        _e.add_type(tvar,tn); // Assign type-name
+        _e.add_type(tvar,tn);   // Assign type-name
       } else {
         tn = ot.merge_recursive_type(t);
         if( tn == null ) return err_ctrl2("Cannot re-assign type '"+tvar+"'");
       }
       // Add a constructor function
-      // TODO: Add reverse cast-away
       PrimNode cvt = PrimNode.convertTypeName(t,tn,errMsg());
       Node rez = _e.add_fun(tvar,gvn(_e.as_fun(cvt))); // Return type-name constructor
       if( t instanceof TypeStruct ) { // Add struct types with expanded arg lists
@@ -207,6 +223,7 @@ public class Parse {
         // UnresolvedNode needs touching once all constructors are done
         _gvn.init0(rez2._uses.at(0));
       }
+      // TODO: Add reverse cast-away
       return rez;
     }
 
@@ -217,15 +234,24 @@ public class Parse {
         : err_ctrl2("Missing ifex after assignment of '"+toks.last()+"'");
     // Honor all type requests, all at once
     for( Type t : ts ) if( t != null ) ifex = gvn(new TypeNode(t,ifex,errMsg()));
-    for( String tok : toks ) {
-      Node n = _e.lookup(tok);
-      if( n==null ) {           // Token not already bound to a value
-        if( !ifex.is_forward_ref() ) // Do not assign unknown refs to another name
-          _e.add(tok,ifex);     // Bind token to a value
-        if( ifex instanceof EpilogNode && !ifex.is_forward_ref() ) ((EpilogNode)ifex).fun().bind(tok); // Debug only: give name to function
+    // Assign tokens to value
+    for( int i=0; i<toks._len; i++ ) {
+      String tok = toks.at(i);
+      boolean mutable = rs.get(i);
+      Node n = lookup(tok);
+      if( n==null ) {                 // Token not already bound to a value
+        if( !ifex.is_forward_ref() ) { // Do not assign unknown refs to another name
+          _e.update(tok,ifex,null,mutable); // Bind token to a value
+          if( ifex instanceof EpilogNode ) ((EpilogNode)ifex).fun().bind(tok); // Debug only: give name to function
+        }
       } else { // Handle re-assignments and forward referenced function definitions
-        if( n.is_forward_ref() ) ((EpilogNode)n).merge_ref_def(_gvn,tok,(EpilogNode)ifex);
-        else err_ctrl0("Cannot re-assign val '"+tok+"'");
+        if( n.is_forward_ref() ) {
+          assert !_e.is_mutable(tok);
+          ((EpilogNode)n).merge_ref_def(_gvn,tok,(EpilogNode)ifex);
+        } else if( _e.is_mutable(tok) )
+          _e.update(tok,ifex,_gvn,mutable);
+        else
+          err_ctrl0("Cannot re-assign val '"+tok+"'");
       }
     }
     return ifex;
@@ -256,9 +282,9 @@ public class Parse {
       ctrls.add_def(ctrl()); // 4 - hook false-side control
       ScopeNode f_scope = _e._scope.split(vidx,ftmp,_gvn); // Split out the new vars on the false side
       set_ctrl(init(new RegionNode(null,ctrls.in(2),ctrls.in(4))));
-      String errmsg = errMsg("Cannot mix GC and non-GC types");
-      _e._scope.common(this,_gvn,errmsg,t_scope,f_scope); // Add a PhiNode for all commonly defined variables
-      _e._scope.add_def(gvn(new PhiNode(errmsg,ctrl(),ctrls.in(1),ctrls.in(3)))); // Add a PhiNode for the result
+      String phi_errmsg = errMsg("Cannot mix GC and non-GC types");
+      _e._scope.common(this,_gvn,phi_errmsg,t_scope,f_scope); // Add a PhiNode for all commonly defined variables
+      _e._scope.add_def(gvn(new PhiNode(phi_errmsg,ctrl(),ctrls.in(1),ctrls.in(3)))); // Add a PhiNode for the result
     }
     return _e._scope.pop();
   }
@@ -413,9 +439,9 @@ public class Parse {
     // Check for a valid 'id'
     String tok = token0();
     if( tok == null ) return null;
-    Node var = _e.lookup(tok);
+    Node var = lookup(tok);
     if( var == null ) // Assume any unknown ref is a forward-ref of a recursive function
-      return _e.add(tok,gvn(EpilogNode.forward_ref(_gvn,_e._scope,tok,this)));
+      return _e.update(tok,gvn(EpilogNode.forward_ref(_gvn,_e._scope,tok,this)),null,false);
     // Disallow uniop and binop functions as factors.
     if( var.op_prec() > 0 ) { _x = oldx; return null; }
     return var;
@@ -441,6 +467,7 @@ public class Parse {
    *  number of statements separated by ';'.
    *  func = { [[id]* ->]? stmts }
    */
+  private static final boolean args_are_mutable=false;
   private Node func() {
     int oldx = _x;
     Ary<String> ids = new Ary<>(new String[1],0);
@@ -466,7 +493,7 @@ public class Parse {
       String errmsg = errMsg("Cannot mix GC and non-GC types");      
       int cnt=0;                // Add parameters to local environment
       for( int i=0; i<ids._len; i++ )
-        _e.add(ids.at(i),gvn(new ParmNode(cnt++,ids.at(i),fun,con(ts.at(i)),errmsg)));
+        _e.update(ids.at(i),gvn(new ParmNode(cnt++,ids.at(i),fun,con(ts.at(i)),errmsg)),null,args_are_mutable);
       Node rpc = gvn(new ParmNode(-1,"rpc",fun,_gvn.con(TypeRPC.ALL_CALL),null));
       Node rez = stmts();       // Parse function body
       if( rez == null ) rez = err_ctrl1("Missing function body", Type.SCALAR);
@@ -503,10 +530,10 @@ public class Parse {
         if( e._scope.get(tok)!=null ) {
           kill(stmt);
           ErrNode err = err_ctrl2("Cannot define field '." + tok + "' twice");
-          e._scope.update(tok,err,_gvn);
+          e._scope.update(tok,err,_gvn,false);
           ts.set(toks.find(fld -> fld.equals(tok)),err._t);
         } else {
-          e._scope.add(tok,stmt); // Field now available 'bare' inside rest of scope
+          e.update(tok,stmt,null,false); // Field now available 'bare' inside rest of scope
           toks.add(tok);          // Gather for final type
           ts  .add(_gvn.type(stmt));
         }
@@ -653,7 +680,7 @@ public class Parse {
     if( tok.equals("->") ) return Type.ANY; // Found -> return sentinel
     Type t = _e.lookup_type(tok);
     if( t==null ) {                // Not a known type var
-      if( _e.lookup(tok) != null ||// Yes a known normal var; resolve as a normal var
+      if( lookup(tok) != null ||// Yes a known normal var; resolve as a normal var
           !type_var ) {            // Or not inside a type-var assignment
         _x = oldx;                 // Unwind if not a known type var
         return null;               // Not a type
@@ -689,6 +716,12 @@ public class Parse {
     _x+=2;                      // Skip peeked characters
     return true;
   }
+  private boolean peek( String s ) {
+    if( !peek(s.charAt(0)) ) return false;
+    if( peek(s.charAt(1)) ) return true;
+    _x--;
+    return false;
+  }
   
   /** Advance parse pointer to the first non-whitespace character, and return
    *  that character, -1 otherwise.  */
@@ -719,10 +752,12 @@ public class Parse {
   private void kill( Node n ) { if( n._uses._len==0 ) _gvn.kill(n); }
   public Node ctrl() { return _e._scope.get(" control "); }
   // Set and return a new control
-  private void set_ctrl(Node n) { _e._scope.update(" control ",n,_gvn); }
+  private void set_ctrl(Node n) { _e._scope.update(" control ",n,_gvn,true); }
 
   private ConNode con( Type t ) { return _gvn.con(t); }
 
+  public Node lookup( String tok ) { return _e.lookup(tok); }
+  
   private Node do_call( Node call0 ) {
     Node call = gvn(call0);
     // Primitives frequently inline immediately, and do not need following
