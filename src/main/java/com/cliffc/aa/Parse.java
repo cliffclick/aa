@@ -155,8 +155,8 @@ public class Parse {
       last = stmt;
       stmt = stmt();
       if( stmt==null ) {
-        if( peek(';') ) { _x--; stmt=last; } // Ignore empty statement
-      } else kill(last); // prior expression result no longer alive in parser
+        if( peek(';') ) { _x--; stmt=last; }   // Ignore empty statement
+      } else if( !last.is_dead() ) kill(last); // prior expression result no longer alive in parser
     }
     return last;
   }

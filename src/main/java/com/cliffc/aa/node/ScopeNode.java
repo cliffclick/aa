@@ -59,7 +59,7 @@ public class ScopeNode extends Node {
       if( mutable ) _ms.set(i);
     } else {
       int i=ii;
-      assert _ms.get(i);
+      assert _ms.get(i) || val instanceof ErrNode;
       set_def(i,val,gvn);
       if( !mutable ) _ms.clear(i);
     }
@@ -172,7 +172,7 @@ public class ScopeNode extends Node {
   private void do_one_side(String name, Parse P, GVNGCM gvn, String phi_errmsg, ScopeNode x, boolean arm) {
     int xii = x._vals.get(name);
     boolean x_is_mutable = x._ms.get(xii);
-    Node xn = x.in(xii);
+    Node xn = x.in(xii), yn;
 
     // Forward refs are not really a def, but produce a trackable definition
     // that must be immutable, and will eventually get promoted until it
@@ -183,17 +183,10 @@ public class ScopeNode extends Node {
     // fully immutable at the merge point (or dead afterwards).  Since x was
     // updated on this branch, the variable was mutable beforehand.  Since it
     // was mutable and not changed on the other side, it remains mutable.
-    if( !x_is_mutable ) {       // x-side is final but y-side is mutable.
-      update(name,P.err_ctrl1(" is only partially mutable",gvn.type(xn).widen()),gvn,false);
-      return;
-    }
-
-    // Must be mutable.  Find the prior definition.
-    Node yn = P.lookup(name);
-    if( yn == null ) {
-      update(name,P.err_ctrl1("'"+name+"' not defined on "+!arm+" arm of trinary",gvn.type(xn).widen()),gvn,false);
-      return;
-    } 
+    if( !x_is_mutable ||        // x-side is final but y-side is mutable.
+        (yn = P.lookup(name)) == null ) // Must be mutable.  Find the prior definition.
+      yn = P.err_ctrl1("'"+name+"' not defined on "+!arm+" arm of trinary",gvn.type(xn).widen());
+    
     // Mutably updated on one side, and remains mutable.
     update(name,xn==yn ? xn : P.gvn(new PhiNode(phi_errmsg, P.ctrl(),xn,yn)),gvn,true);
   }

@@ -16,6 +16,7 @@ public class TestParse {
   
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
+    testerr("x:=0; math_rand(1) ? (x =4):; x", "'x' not final on false arm of trinary","                        "); // x mutable ahead; ok to mutate on 1 arm and later
 
     // Not currently inferring top-level function return very well.  Acting
     // "as-if" called by Scalar args, which pretty much guarantees a fail result.
@@ -432,10 +433,10 @@ public class TestParse {
     
     test("math_rand(1)?(x=4):(x=3);x", TypeInt.NINT8); // x defined on both arms, so available after
     test("math_rand(1)?(x:=4):(x:=3);x", TypeInt.NINT8); // x defined on both arms, so available after
-    test("math_rand(1)?(x:=4):(x:=3);x:=x+1", TypeInt.NINT8); // x mutable on both arms, so mutable after
+    test("math_rand(1)?(x:=4):(x:=3);x:=x+1", TypeInt.INT64); // x mutable on both arms, so mutable after
     test   ("x:=0; 1 ? (x:=4):; x:=x+1", TypeInt.con(5)); // x mutable ahead; ok to mutate on 1 arm and later
     test   ("x:=0; 1 ? (x =4):; x", TypeInt.con(4)); // x final on 1 arm, dead on other arm
-    testerr("x:=0; 1 ? (x =4):; x", "'x' not final on false arm of trinary","                        "); // x mutable ahead; ok to mutate on 1 arm and later
+    testerr("x:=0; math_rand(1) ? (x =4):; x", "'x' not final on false arm of trinary","                        "); // x mutable ahead; ok to mutate on 1 arm and later
   }
   
   /*
