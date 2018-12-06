@@ -102,6 +102,7 @@ public class Parse {
   }
   
   private TypeEnv opto_type(Node res) {
+    try {
     Env par = _e._par;
     _e._scope.add_def(res);     // Hook, so not deleted
     _e._scope.add_def(par._scope); // Hook start control into all the constants
@@ -134,8 +135,10 @@ public class Parse {
     Type tres = _gvn.type(res);
     kill(res);       // Kill Node for returned Type result
     set_ctrl(null);  // Kill control also
-    _gvn._post_gcp = false;
     return new TypeEnv(tres,_e,errs.isEmpty() ? null : errs);
+    } finally {
+      _gvn._post_gcp = false;
+    }
   }
 
   /** Parse a top-level:
@@ -236,16 +239,16 @@ public class Parse {
     for( Type t : ts ) if( t != null ) ifex = gvn(new TypeNode(t,ifex,errMsg()));
     // Assign tokens to value
     for( int i=0; i<toks._len; i++ ) {
-      String tok = toks.at(i);
-      boolean mutable = rs.get(i);
-      Node n = lookup(tok);
-      if( n==null ) {                 // Token not already bound to a value
+      String tok = toks.at(i);     // Token being assigned
+      boolean mutable = rs.get(i); // Assignment is mutable or final
+      Node n = lookup(tok);        // Prior value of token
+      if( n==null ) {              // Token not already bound to a value
         if( !ifex.is_forward_ref() ) { // Do not assign unknown refs to another name
           _e.update(tok,ifex,null,mutable); // Bind token to a value
           if( ifex instanceof EpilogNode ) ((EpilogNode)ifex).fun().bind(tok); // Debug only: give name to function
         }
       } else { // Handle re-assignments and forward referenced function definitions
-        if( n.is_forward_ref() ) {
+        if( n.is_forward_ref() ) { // Prior is actually a forward-ref, so this is the def
           assert !_e.is_mutable(tok);
           ((EpilogNode)n).merge_ref_def(_gvn,tok,(EpilogNode)ifex);
         } else if( _e.is_mutable(tok) )
@@ -266,25 +269,29 @@ public class Parse {
     Node expr = expr();
     if( expr == null ) return null; // Expr is required, so missing expr implies not any ifex
     if( !peek('?') ) return expr;   // No if-expression
-    try( TmpNode ctrls = new TmpNode(); TmpNode ttmp = new TmpNode(); TmpNode ftmp = new TmpNode() ) {
-      int vidx = _e._scope._defs._len; // Set of live variables
+    try( TmpNode ctrls = new TmpNode() ) {
       Node ifex = gvn(new IfNode(ctrl(),expr));
       ctrls.add_def(ifex); // Keep alive, even if 1st Proj kills last use, so 2nd Proj can hook
-      set_ctrl(gvn(new CProjNode(ifex,1)).sharpen(_gvn,_e._scope,ttmp)); // Control for true branch, and sharpen tested value
+      Env e_if = _e;       // Environment for 'if'
+      ScopeNode if_scope = e_if._scope;
+      ScopeNode t_scope = (_e = new Env(e_if))._scope; // Push new scope for true arm
+      set_ctrl(gvn(new CProjNode(ifex,1)).sharpen(_gvn,if_scope,t_scope)); // Control for true branch, and sharpen tested value
       Node tex = expr();
       ctrls.add_def(tex==null ? err_ctrl1("missing expr after '?'",Type.SCALAR) : tex);
       ctrls.add_def(ctrl()); // 2 - hook true-side control
-      ScopeNode t_scope = _e._scope.split(vidx,ttmp,_gvn); // Split out the new vars on the true side
       require(':');
-      set_ctrl(gvn(new CProjNode(ifex,0)).sharpen(_gvn,_e._scope,ftmp)); // Control for false branch, and sharpen tested vale
+      ScopeNode f_scope = (_e = new Env(e_if))._scope; // Push new scope for false arm
+      set_ctrl(gvn(new CProjNode(ifex,0)).sharpen(_gvn,if_scope,f_scope)); // Control for false branch, and sharpen tested vale
       Node fex = expr();
       ctrls.add_def(fex==null ? err_ctrl1("missing expr after ':'",Type.SCALAR) : fex);
       ctrls.add_def(ctrl()); // 4 - hook false-side control
-      ScopeNode f_scope = _e._scope.split(vidx,ftmp,_gvn); // Split out the new vars on the false side
+      _e = e_if;             // Pop the arms scope
       set_ctrl(init(new RegionNode(null,ctrls.in(2),ctrls.in(4))));
       String phi_errmsg = errMsg("Cannot mix GC and non-GC types");
-      _e._scope.common(this,_gvn,phi_errmsg,t_scope,f_scope); // Add a PhiNode for all commonly defined variables
-      _e._scope.add_def(gvn(new PhiNode(phi_errmsg,ctrl(),ctrls.in(1),ctrls.in(3)))); // Add a PhiNode for the result
+      if_scope.common(this,_gvn,phi_errmsg,t_scope,f_scope); // Add a PhiNode for all commonly defined variables
+      if_scope.add_def(gvn(new PhiNode(phi_errmsg,ctrl(),ctrls.in(1),ctrls.in(3)))); // Add a PhiNode for the result, hook to prevent deletion
+      kill(t_scope);
+      kill(f_scope);
     }
     return _e._scope.pop();
   }

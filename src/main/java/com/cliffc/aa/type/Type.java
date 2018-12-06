@@ -535,7 +535,20 @@ public class Type<T extends Type<T>> {
     default: throw typerr(null); // Overridden in subclass
     }
   }
-  Type meet_nil() { throw typerr(null); } // Overridden in subclass
+  Type meet_nil() {
+    switch( _type ) {
+    case TXNUM:
+    case TXREAL:
+    case TXSCALAR:  return TypeNil.NIL;
+    case TXNNUM:    return TypeInt.BOOL;
+    case TXNREAL:   return TypeInt.BOOL;
+    case TXNSCALR:  return TypeInt.BOOL;
+    case TNNUM:     return NUM;
+    case TNREAL:    return REAL;
+    case TNSCALR:   return SCALAR;
+    default:        return this;
+    }
+  }
     
   // Make a (possibly cyclic & infinite) named type.  Prevent the infinite
   // unrolling of names by not allowing a named-type with depth >= D from

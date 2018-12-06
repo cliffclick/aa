@@ -60,8 +60,8 @@ public class TypeName extends Type<TypeName> {
     else { FREE = null; t1.init(name,lex,t,depth); }
     TypeName t2 = (TypeName)t1.hashcons();
     // Close some recursions: keep -2 and -1 depths vs 0
-    if( t1!=t2 && t1._depth < t2._depth )
-      t2._depth = t1._depth;    // If equals() on depth, then keep deeper depth
+    if( t1._depth < t2._depth )
+      t2._depth = t1._depth;    // keep deeper depth
     return t1==t2 ? t1 : t1.free(t2);
   }
 
@@ -198,7 +198,7 @@ public class TypeName extends Type<TypeName> {
     // unrolling of names by not allowing a named-type with depth >= D from
     // holding (recursively) the head of a named-type cycle.  We need to cap the
     // unroll, to prevent loops/recursion from infinitely unrolling.
-    int D = 1;
+    int D = 5;
     if( _lex==tn._lex && _name.equals(tn._name) && d++ == D )
       return above_center() ? tn.dual() : tn;
     Type t2 = _t.make_recur(tn,d,bs);

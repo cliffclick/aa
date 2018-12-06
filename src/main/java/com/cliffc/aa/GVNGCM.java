@@ -244,8 +244,8 @@ public class GVNGCM {
       return;
     }
     if( check_new(nnn) ) {      // If new, replace back in GVN
-      assert _ts.at(nnn._uid)==nnn.value(this);
-      //setype(nnn,nnn.value(this));// Can compute a better value
+      //assert _ts.at(nnn._uid)==nnn.value(this);
+      setype(nnn,nnn.value(this));// Can compute a better value
       _vals.put(nnn,nnn);
       add_work0(nnn);
     }

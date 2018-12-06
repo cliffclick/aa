@@ -66,7 +66,7 @@ public abstract class PrimNode extends Node {
 
     new   EQ_OOP(),
     new   NE_OOP(),
-    new AddStrStr(),
+    //new AddStrStr(),
   };
 
   // Loss-less conversions only, plus int64->flt64 (standard lossy conversion)
@@ -155,7 +155,7 @@ class ConvertTypeNameStruct extends PrimNode {
     Node cvt = new ConvertTypeName(ts,tn,_badargs);
     cvt.add_def(null); // Control
     cvt.add_def(nn);
-    return gvn.xform(cvt);
+    return cvt;
   }
   
   @Override public Type value(GVNGCM gvn) {

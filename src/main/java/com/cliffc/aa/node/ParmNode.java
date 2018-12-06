@@ -76,6 +76,8 @@ public class ParmNode extends PhiNode {
         // reporting - it MUST exist, or we have a really weird situation
         EpilogNode epi=fun.epi();  // Only 1 epilog per fun
         for( Node use : epi._uses ) {
+          if( use instanceof UnresolvedNode )
+            use = use._uses.at(0); // TODO: Need to loop over the tree of uses
           if( use instanceof CallNode ) {
             CallNode call = (CallNode)use;
             Type argc = gvn.type(call.arg(_idx)); // Call arg type

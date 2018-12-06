@@ -1,7 +1,6 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.AA;
-import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.Type;
@@ -28,6 +27,8 @@ public class ScopeNode extends Node {
     Integer ii = _vals.get(name);
     return ii==null ? null : _defs.at(ii);
   }
+  public Integer get_idx(String name) { return _vals.get(name); }
+  
   // Get a set of names into an array.  Skip zero, which is control.
   public Node[] get( Ary<String> names ) {
     Node[] ns = new Node[names._len+1];
@@ -76,10 +77,9 @@ public class ScopeNode extends Node {
   }
 
   // Name must exist
-  public boolean is_mutable( String name ) {
-    return _ms.get(_vals.get(name));
-  }
-
+  public boolean is_mutable( String name ) { return is_mutable(_vals.get(name)); }
+  public boolean is_mutable( Integer ii ) { return _ms.get(ii); }
+  
   // The current local scope ends; delete local var refs.  Forward refs first
   // found in this scope are assumed to be defined in some outer scope and get
   // promoted.
@@ -150,20 +150,15 @@ public class ScopeNode extends Node {
   // - Both branches must agree on mutability
   // - Ok to be mutably updated on only one arm
   public void common( Parse P, GVNGCM gvn, String phi_errmsg, ScopeNode t, ScopeNode f ) {
-    if( t!=null )               // Might have some variables in common
-      for( String name : t._vals.keySet() )
-        if( f==null || f._vals.get(name) == null )// If not on false side
-          do_one_side(name,P,gvn,phi_errmsg,t,true);
-        else
-          do_both_sides(name,P,gvn,phi_errmsg,t,f);
+    for( String name : t._vals.keySet() )
+      if( f._vals.get(name) == null ) // If not on false side
+        do_one_side(name,P,gvn,phi_errmsg,t,true);
+      else
+        do_both_sides(name,P,gvn,phi_errmsg,t,f);
 
-    if( f!=null )               // Might have some variables in common
-      for( String name : f._vals.keySet() )
-        if( t==null || t._vals.get(name) == null )// If not on true side
-          do_one_side(name,P,gvn,phi_errmsg,f,false);
-    
-    if( t!=null ) Env._gvn.kill_new(t);
-    if( f!=null ) Env._gvn.kill_new(f);
+    for( String name : f._vals.keySet() )
+      if( t._vals.get(name) == null ) // If not on true side
+        do_one_side(name,P,gvn,phi_errmsg,f,false);
   }
 
 
@@ -191,9 +186,12 @@ public class ScopeNode extends Node {
     update(name,xn==yn ? xn : P.gvn(new PhiNode(phi_errmsg, P.ctrl(),xn,yn)),gvn,true);
   }
   
+  // Called per name defined on both arms of a trinary.
+  // Produces the merge result.
   private void do_both_sides(String name, Parse P, GVNGCM gvn, String phi_errmsg, ScopeNode t, ScopeNode f) {
     int tii = t._vals.get(name);
     int fii = f._vals.get(name);
+    if( tii==0 && fii==0 ) return; // Control handled differently
     boolean t_is_mutable = t._ms.get(tii);
     boolean f_is_mutable = f._ms.get(fii);
     Node tn = t.in(tii);
@@ -232,12 +230,9 @@ public class ScopeNode extends Node {
   }
 
   // Replace uses of dull with sharp, used after an IfNode test
-  void sharpen( Node dull, Node sharp, TmpNode tmp ) {
+  void sharpen( Node dull, Node sharp, ScopeNode arm ) {
     for( int i=0; i<_defs._len; i++ )
-      if( in(i)==dull ) {
-        tmp.set_def(i,dull);    // Save dull for recovery after If arm passes
-        set_def(i,sharp,null);  // ok for gvn to be passed null, because 'dull' never deleted
-      }
+      arm.add_def(in(i)==dull ? sharp : in(i));
   }
   
   @Override public Node ideal(GVNGCM gvn) { return null; }

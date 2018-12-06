@@ -48,7 +48,6 @@ public class Env implements AutoCloseable {
 
   public Node update( String name, Node val, GVNGCM gvn, boolean mutable ) { return _scope.update(name,val,gvn,mutable); }
   public Node add_fun( String name, Node val ) { return _scope.add_fun(name,(EpilogNode)val); }
-  public boolean is_mutable( String name ) { return _scope.is_mutable(name); }
 
   void add_type( String name, Type t ) { _scope.add_type(name,t); }
   
@@ -120,4 +119,9 @@ public class Env implements AutoCloseable {
     if( t != null ) return t;
     return _par == null ? null : _par.lookup_type(token);
   }
+  public boolean is_mutable( String name ) {
+    Integer ii = _scope.get_idx(name);
+    return ii == null ? _par.is_mutable(name) : _scope.is_mutable(ii);
+  }
+
 }

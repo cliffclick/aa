@@ -134,6 +134,8 @@ public class FunNode extends RegionNode {
       
     // Type-specialize as-needed
     if( _tf.is_forward_ref() ) return null;
+    ParmNode rpc_parm = rpc();
+    if( rpc_parm == null ) return null; // Single caller const-folds the RPC, but also inlines in CallNode
     ParmNode[] parms = new ParmNode[_tf.nargs()];
     EpilogNode epi = split_callers_gather(gvn,parms);
     if( epi == null ) return null;
@@ -145,7 +147,7 @@ public class FunNode extends RegionNode {
       if( fun == null ) return null;
     }
     // Split the callers according to the new 'fun'.
-    return split_callers(gvn,rpc(),epi,fun);
+    return split_callers(gvn,rpc_parm,epi,fun);
   }
 
   // Gather the ParmNodes into an array.  Return null if any input path is dead
@@ -467,9 +469,9 @@ public class FunNode extends RegionNode {
               Node x = ((CallNode)c).wire(gvn,oldfun);
               assert x != null;
               ParmNode rpc = oldfun.rpc();
-              gvn.setype(rpc,rpc.value(gvn));
-              assert rpc._uses._len==1;
-              Node oldepi = rpc._uses.at(0);
+              if( rpc != null ) // Can be null there is a single return point, which got constant-folded
+                gvn.setype(rpc,rpc.value(gvn));
+              EpilogNode oldepi = oldfun.epi();
               gvn.setype(oldepi,oldepi.value(gvn));
             }
           }

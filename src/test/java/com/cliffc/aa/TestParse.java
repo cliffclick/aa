@@ -16,7 +16,29 @@ public class TestParse {
   
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
-    testerr("x:=0; math_rand(1) ? (x =4):; x", "'x' not final on false arm of trinary","                        "); // x mutable ahead; ok to mutate on 1 arm and later
+    // User-defined linked list
+    String ll_def = "List=:@{next:List?,val:flt};";
+    String ll_con = "tmp=List(List(0,1.2),2.3);";
+    String ll_map = "map = {list -> list ? List(map(list.next),id(list.val)) : 0};";
+    String ll_apl = "map(tmp);";
+
+    // TODO: Needs a way to easily test simple recursive types
+    TypeEnv te4 = Exec.go("args",ll_def+ll_con+ll_map+ll_apl);
+    if( te4._errs != null ) System.err.println(te4._errs.toString());
+    Assert.assertNull(te4._errs);
+    TypeName tname4 = (TypeName)te4._t;
+    assertEquals("List", tname4._name);
+    TypeStruct tt4 = (TypeStruct)tname4._t;
+    TypeName tname5 = (TypeName)tt4.at(0);
+    assertEquals(2.3*2.3,tt4.at(1).getd(),1e-6);
+    assertEquals("next",tt4._flds[0]);
+    assertEquals("val",tt4._flds[1]);
+    
+    assertEquals("List", tname5._name);
+    TypeStruct tt5 = (TypeStruct)tname5._t;
+    assertEquals(TypeNil.NIL,tt5.at(0));
+    assertEquals(1.2*1.2,tt5.at(1).getd(),1e-6);
+    
 
     // Not currently inferring top-level function return very well.  Acting
     // "as-if" called by Scalar args, which pretty much guarantees a fail result.
@@ -314,7 +336,7 @@ public class TestParse {
     // Mutually recursive type
     test_isa("A= :@{n:B, v:int}; B= :@{n:A, v:flt}", Type.SCALAR);
   }
-
+  
   @Test public void testParse7() {
     // Passing a function recursively
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({&},2)", TypeInt.FALSE);
@@ -436,7 +458,7 @@ public class TestParse {
     test("math_rand(1)?(x:=4):(x:=3);x:=x+1", TypeInt.INT64); // x mutable on both arms, so mutable after
     test   ("x:=0; 1 ? (x:=4):; x:=x+1", TypeInt.con(5)); // x mutable ahead; ok to mutate on 1 arm and later
     test   ("x:=0; 1 ? (x =4):; x", TypeInt.con(4)); // x final on 1 arm, dead on other arm
-    testerr("x:=0; math_rand(1) ? (x =4):; x", "'x' not final on false arm of trinary","                        "); // x mutable ahead; ok to mutate on 1 arm and later
+    testerr("x:=0; math_rand(1) ? (x =4):; x", "'x' not final on false arm of trinary","                            "); // x mutable ahead; ok to mutate on 1 arm and later
   }
   
   /*

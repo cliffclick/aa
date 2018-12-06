@@ -205,7 +205,7 @@ public abstract class Node implements Cloneable {
   // This is a mild optimization, since e.g. follow-on Loads which require a
   // non-null check will hash to the pre-test Load, and so bypass this
   // sharpening.
-  public Node sharpen( GVNGCM gvn, ScopeNode scope, TmpNode tmp ) { return this; }
+  public Node sharpen( GVNGCM gvn, ScopeNode scope, ScopeNode arm ) { return this; }
     
   // Gather errors; backwards reachable control uses only
   public void walkerr_use( Ary<String> errs, BitSet bs, GVNGCM gvn ) {
