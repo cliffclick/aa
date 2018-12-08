@@ -178,12 +178,17 @@ public class ScopeNode extends Node {
     // fully immutable at the merge point (or dead afterwards).  Since x was
     // updated on this branch, the variable was mutable beforehand.  Since it
     // was mutable and not changed on the other side, it remains mutable.
-    if( !x_is_mutable ||        // x-side is final but y-side is mutable.
-        (yn = P.lookup(name)) == null ) // Must be mutable.  Find the prior definition.
-      yn = P.err_ctrl1("'"+name+"' not defined on "+!arm+" arm of trinary",gvn.type(xn).widen());
+    if( (yn = P.lookup(name)) == null ) // Find the prior definition.
+      yn = fail(name,P,gvn,arm,xn,"defined");
+    else if( !x_is_mutable )        // x-side is final but y-side is mutable.
+      yn = fail(name,P,gvn,arm,xn,"final");
     
     // Mutably updated on one side, and remains mutable.
     update(name,xn==yn ? xn : P.gvn(new PhiNode(phi_errmsg, P.ctrl(),xn,yn)),gvn,true);
+  }
+
+  private Node fail(String name, Parse P, GVNGCM gvn, boolean arm, Node xn, String msg) {
+    return P.err_ctrl1("'"+name+"' not "+msg+" on "+!arm+" arm of trinary",gvn.type(xn).widen());
   }
   
   // Called per name defined on both arms of a trinary.
