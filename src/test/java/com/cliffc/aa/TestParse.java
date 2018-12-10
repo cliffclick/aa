@@ -16,29 +16,6 @@ public class TestParse {
   
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
-    // User-defined linked list
-    String ll_def = "List=:@{next:List?,val:flt};";
-    String ll_con = "tmp=List(List(0,1.2),2.3);";
-    String ll_map = "map = {list -> list ? List(map(list.next),id(list.val)) : 0};";
-    String ll_apl = "map(tmp);";
-
-    // TODO: Needs a way to easily test simple recursive types
-    TypeEnv te4 = Exec.go("args",ll_def+ll_con+ll_map+ll_apl);
-    if( te4._errs != null ) System.err.println(te4._errs.toString());
-    Assert.assertNull(te4._errs);
-    TypeName tname4 = (TypeName)te4._t;
-    assertEquals("List", tname4._name);
-    TypeStruct tt4 = (TypeStruct)tname4._t;
-    TypeName tname5 = (TypeName)tt4.at(0);
-    assertEquals(2.3*2.3,tt4.at(1).getd(),1e-6);
-    assertEquals("next",tt4._flds[0]);
-    assertEquals("val",tt4._flds[1]);
-    
-    assertEquals("List", tname5._name);
-    TypeStruct tt5 = (TypeStruct)tname5._t;
-    assertEquals(TypeNil.NIL,tt5.at(0));
-    assertEquals(1.2*1.2,tt5.at(1).getd(),1e-6);
-    
 
     // Not currently inferring top-level function return very well.  Acting
     // "as-if" called by Scalar args, which pretty much guarantees a fail result.
@@ -277,9 +254,9 @@ public class TestParse {
     test_isa("gal=:flt"       , (tmap -> TypeFun.make(TypeFunPtr.make(TypeTuple.FLT64,TypeName.make("gal",tmap,TypeFlt.FLT64),Bits.FULL,1))));
     test_isa("gal=:flt; gal"  , (tmap -> TypeFun.make(TypeFunPtr.make(TypeTuple.FLT64,TypeName.make("gal",tmap,TypeFlt.FLT64),Bits.FULL,1))));
     test    ("gal=:flt; 3==gal(2)+1", TypeInt.TRUE);
-    test    ("gal=:flt; tank:gal = gal(2)", (tmap -> TypeName.make("gal",tmap,TypeFlt.con(2))));
+    test    ("gal=:flt; tank:gal = gal(2)", (tmap -> TypeName.make("gal",tmap,TypeInt.con(2))));
     // test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: figure out if free cast for bare constants?
-    testerr ("gal=:flt; tank:gal = gal(2)+1", "3.0 is not a gal:flt64","                             ");
+    testerr ("gal=:flt; tank:gal = gal(2)+1", "3 is not a gal:flt64","                             ");
     
     test    ("A= :(:str?, :int); A( \"abc\",2 )",(tmap -> TypeName.make("A",tmap,TypeStruct.make(TypeStr.ABC,TypeInt.con(2)))));
     test    ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
@@ -452,7 +429,8 @@ public class TestParse {
     test("x:=0; a=x; x:=1; b=x; x:=2; (a,b,x)", TypeStruct.make(TypeNil.NIL,TypeInt.con(1),TypeInt.con(2)));
     
     testerr("x=1; x:=2", "Cannot re-assign val 'x'", "         ");
-    
+    testerr("x=1; x=2", "Cannot re-assign val 'x'", "        ");
+
     test("math_rand(1)?(x=4):(x=3);x", TypeInt.NINT8); // x defined on both arms, so available after
     test("math_rand(1)?(x:=4):(x:=3);x", TypeInt.NINT8); // x defined on both arms, so available after
     test("math_rand(1)?(x:=4):(x:=3);x:=x+1", TypeInt.INT64); // x mutable on both arms, so mutable after
@@ -501,19 +479,10 @@ strs:List(0)    = ... // List of nulls
 strs:List(str)  = ... // List of not-null strings
 strs:List(str?) = ... // List of null-or-strings
 
-// TODO: Re-assignment; ':=' allows more ':=' or exactly 1 final assignment '='
-x := 1; x:= 2; x = 3; x // 3
-x  = 1; x = 2; // cannot reassign
-x  = 1; x:= 2; // cannot reassign
-x := 1; rand ? x =2 :  3; x; // cannot partially final-assign
-x := 1; rand ? x:=2 :  3; x; // 2; x is still assignable
-x := 1; rand ? x =2 :x=3; x; // 2or3; x is final
-x := 1; x = x; // 1; make x final
-
 // With re-assignment, more excitement around LHS!
 // So fields in a tuple type have a init-value, a final-value, an
 // un-init-value, a mixed-init-value, and a name
-make_point={{x,y}} // returns {x,y} with both un-init
+make_point={@{x,y}} // returns {x,y} with both un-init
 a=make_point(); a.x=1; // a.x init; a.y uninit
 b=make_point(); b.y=2; // a.x uninit; b.y init
 c = rand ? a : b;      // c: worse-case x & y mixed init & uninit

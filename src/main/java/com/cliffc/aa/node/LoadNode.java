@@ -60,37 +60,36 @@ public class LoadNode extends Node {
     set_def(1,gvn.xform(new CastNode(tru,baseaddr,((TypeNil)t)._t)),gvn);
     return set_def(0,null,gvn);
   }
+
   @Override public Type value(GVNGCM gvn) {
     Type t = gvn.type(in(1)).base();
     if( t.isa(TypeNil.XOOP) ) return Type.XSCALAR; // Very high address; might fall to any valid value
     if( TypeOop.OOP.isa(t) ) return Type.SCALAR;   // Too low, might not have any fields
     if( t.is_forward_ref() ) return Type.SCALAR;   // Not yet defined, might fail
-    boolean needs_nil_check=false;
     if( t instanceof TypeNil ) {
-      if( t==TypeNil.NIL ) return Type.SCALAR;     // Must fail
-      if( !t.above_center() ) needs_nil_check=true;// Above_center might fall to no-nil
-      t = ((TypeNil)t)._t.base();                  // Assume guarded by test
+      if( !t.above_center() )     // NIL or below?
+        return Type.SCALAR;       // Fails - might be nil at runtime
+      t = ((TypeNil)t)._t.base(); // Assume guarded by test
     }
 
     if( t instanceof TypeStruct ) {
       TypeStruct ts = (TypeStruct)t;
       int idx = find(ts);       // Find the named field
-      if( idx == -1 ) return Type.SCALAR;
-      if( needs_nil_check )
-        return gvn.self_type(this);
-      return ts.at(idx);        // Field type
+      return idx == -1 ? Type.SCALAR : ts.at(idx); // Field type
     }
     
     throw AA.unimpl();
   }
+
   private int find(TypeStruct ts) {
-    if( _fld == null ) {
-      if( _fld_num < ts._ts.length )
-        return _fld_num;
+    if( _fld == null ) { // No fields, i.e. a tuple?
+      if( _fld_num < ts._ts.length ) // Range-check tuple
+        return _fld_num; // Return nth tuple field
       else
         throw AA.unimpl();
     } else return ts.find(_fld);  // Find the named field
   }
+
   @Override public String err(GVNGCM gvn) {
     Type t = gvn.type(in(1));
     while( t instanceof TypeName ) t = ((TypeName)t)._t;

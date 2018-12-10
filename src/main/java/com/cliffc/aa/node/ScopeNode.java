@@ -149,13 +149,23 @@ public class ScopeNode extends Node {
   // - First-time defs on either branch must be defined on both branches.
   // - Both branches must agree on mutability
   // - Ok to be mutably updated on only one arm
-  public void common( Parse P, GVNGCM gvn, String phi_errmsg, ScopeNode t, ScopeNode f ) {
+  public void common( Parse P, GVNGCM gvn, String phi_errmsg, ScopeNode t, ScopeNode f, Node dull, Node t_sharp, Node f_sharp ) {
+    // Unwind the sharpening
+    for( String name : _vals.keySet() ) {
+      int idx = _vals.get(name);
+      if( in(idx)==dull && t.in(idx)==t_sharp ) t._vals.remove(name);
+      if( in(idx)==dull && f.in(idx)==f_sharp ) f._vals.remove(name);
+    }
+    for( int i=1; i<_defs._len; i++ ) {
+      if( in(i)==dull && t.in(i)==t_sharp ) t.set_def(i,null,gvn);
+      if( in(i)==dull && f.in(i)==f_sharp ) f.set_def(i,null,gvn);
+    }
+    // Look for updates on either arm
     for( String name : t._vals.keySet() )
       if( f._vals.get(name) == null ) // If not on false side
         do_one_side(name,P,gvn,phi_errmsg,t,true);
       else
         do_both_sides(name,P,gvn,phi_errmsg,t,f);
-
     for( String name : f._vals.keySet() )
       if( t._vals.get(name) == null ) // If not on true side
         do_one_side(name,P,gvn,phi_errmsg,f,false);
@@ -236,8 +246,17 @@ public class ScopeNode extends Node {
 
   // Replace uses of dull with sharp, used after an IfNode test
   void sharpen( Node dull, Node sharp, ScopeNode arm ) {
-    for( int i=0; i<_defs._len; i++ )
-      arm.add_def(in(i)==dull ? sharp : in(i));
+    assert dull != sharp;
+    for( int i=1; i<_defs._len; i++ ) // Fill in all fields
+      arm.add_def(in(i)==dull ? sharp : null);
+    // Update sharpen value lookup
+    for( String name : _vals.keySet() ) {
+      int idx = _vals.get(name);
+      if( in(idx)==dull ) {
+        arm._vals.put(name,idx);
+        if( _ms.get(idx) ) arm._ms.set(idx);
+      }
+    }
   }
   
   @Override public Node ideal(GVNGCM gvn) { return null; }

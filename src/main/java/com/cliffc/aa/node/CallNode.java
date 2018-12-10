@@ -134,21 +134,12 @@ public class CallNode extends Node {
     // Single choice; insert actual conversions as needed
     TypeTuple formals = tfun._ts;
     for( int i=0; i<nargs(); i++ ) {
-      if( fun.parm(i)==null ) { // Argument is dead and can be dropped?
+      if( fun.parm(i)==null )   // Argument is dead and can be dropped?
         set_def(i+2,gvn.con(Type.XSCALAR),gvn); // Replace with some generic placeholder
-        continue;
-      }
-      Type formal = formals.at(i);
-      Type actual = gvn.type(arg(i));
-      byte xcvt = actual.isBitShape(formal);
-      if( xcvt == 99 ) return null;       // Requires user-specified conversion
-      if( xcvt == -1 ) return null;       // Wait for call args to resolve
-      // xcvt of 0 is correct shape; xcvt of 1 is acceptable but not as precise
-      // xcvt of 2 requires built-in conversion (e.g. int->flt)
-      if( xcvt == 2 ) {
-        PrimNode cvt = PrimNode.convert(arg(i),actual,formal);
-        if( cvt.is_lossy() ) throw new IllegalArgumentException("Requires lossy conversion");
-        set_def(i+2,gvn.xform(cvt),gvn); // set the converted arg
+      else {
+        Type formal = formals.at(i);
+        Type actual = gvn.type(arg(i));
+        if( actual.isBitShape(formal) == 99 ) return null; // Requires user-specified conversion
       }
     }
 

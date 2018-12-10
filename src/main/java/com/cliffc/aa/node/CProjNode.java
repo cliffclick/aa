@@ -27,7 +27,7 @@ public class CProjNode extends ProjNode {
   // This is a mild optimization, since e.g. follow-on Loads which require a
   // non-nil check will hash to the pre-test Load, and so bypass this
   // sharpening.  
-  @Override public CProjNode sharpen( GVNGCM gvn, ScopeNode scope, ScopeNode arm ) {
+  @Override public Node sharpen( GVNGCM gvn, ScopeNode scope, ScopeNode arm ) {
     Node iff = in(0);
     if( !(iff instanceof IfNode) ) return this; // Already collapsed IfNode, no sharpen
     Node test = iff.in(1);
@@ -37,6 +37,6 @@ public class CProjNode extends ProjNode {
       : gvn.con(TypeNil.NIL);
     scope.sharpen(test,sharp,arm);
     pop();                      // Remove self-hook
-    return this;
+    return sharp;
   }
 }

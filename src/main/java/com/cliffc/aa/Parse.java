@@ -275,20 +275,22 @@ public class Parse {
       Env e_if = _e;       // Environment for 'if'
       ScopeNode if_scope = e_if._scope;
       ScopeNode t_scope = (_e = new Env(e_if))._scope; // Push new scope for true arm
-      set_ctrl(gvn(new CProjNode(ifex,1)).sharpen(_gvn,if_scope,t_scope)); // Control for true branch, and sharpen tested value
+      set_ctrl(gvn(new CProjNode(ifex,1))); // Control for true branch, and sharpen tested value
+      Node t_sharp = ctrl().sharpen(_gvn,if_scope,t_scope);
       Node tex = expr();
       ctrls.add_def(tex==null ? err_ctrl1("missing expr after '?'",Type.SCALAR) : tex);
       ctrls.add_def(ctrl()); // 2 - hook true-side control
       require(':');
       ScopeNode f_scope = (_e = new Env(e_if))._scope; // Push new scope for false arm
-      set_ctrl(gvn(new CProjNode(ifex,0)).sharpen(_gvn,if_scope,f_scope)); // Control for false branch, and sharpen tested vale
+      set_ctrl(gvn(new CProjNode(ifex,0))); // Control for true branch, and sharpen tested value
+      Node f_sharp = ctrl().sharpen(_gvn,if_scope,f_scope);
       Node fex = expr();
       ctrls.add_def(fex==null ? err_ctrl1("missing expr after ':'",Type.SCALAR) : fex);
       ctrls.add_def(ctrl()); // 4 - hook false-side control
       _e = e_if;             // Pop the arms scope
       set_ctrl(init(new RegionNode(null,ctrls.in(2),ctrls.in(4))));
       String phi_errmsg = errMsg("Cannot mix GC and non-GC types");
-      if_scope.common(this,_gvn,phi_errmsg,t_scope,f_scope); // Add a PhiNode for all commonly defined variables
+      if_scope.common(this,_gvn,phi_errmsg,t_scope,f_scope,expr,t_sharp,f_sharp); // Add a PhiNode for all commonly defined variables
       if_scope.add_def(gvn(new PhiNode(phi_errmsg,ctrl(),ctrls.in(1),ctrls.in(3)))); // Add a PhiNode for the result, hook to prevent deletion
       kill(t_scope);
       kill(f_scope);

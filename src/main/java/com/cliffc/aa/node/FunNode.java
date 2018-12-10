@@ -314,8 +314,8 @@ public class FunNode extends RegionNode {
     // unresolved, and casts.  These all track & control values, but actually
     // do not generate any code.
     if( cnts[OP_CALL] > 1 || // Careful inlining more calls; leads to exponential growth
-            cnts[OP_IF  ] > 1+mncons || // Allow some trivial filtering to inline
-            cnts[OP_PRIM] > 6 )  // Allow small-ish primitive counts to inline
+        cnts[OP_IF  ] > 1+mncons || // Allow some trivial filtering to inline
+        cnts[OP_PRIM] > 6 )  // Allow small-ish primitive counts to inline
       return null;
 
     // Make a prototype new function header.  No generic unknown caller
