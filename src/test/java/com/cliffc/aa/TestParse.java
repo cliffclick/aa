@@ -16,6 +16,8 @@ public class TestParse {
   
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
+    testerr("x=(1+(x=2)+x)", "Cannot re-assign val 'x'","             ");
+    test("x=(1+(x:=2)+x)", TypeInt.con(5));
 
     // Not currently inferring top-level function return very well.  Acting
     // "as-if" called by Scalar args, which pretty much guarantees a fail result.

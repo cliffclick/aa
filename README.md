@@ -37,7 +37,7 @@ BNF                           | Comment
 ---                           | -------
 `prog = stmts END`            |
 `stmts= stmt [; stmt]*[;]?`   | multiple statments; final ';' is optional
-`stmt = [id[:type]? =]* ifex` | ids must not exist, and are available in later statements
+`stmt = [id[:type]? [:]=]* ifex` | ids must not exist, and are available in later statements
 `stmt = tvar = :type`         | type variable assignment
 `ifex = expr ? expr : expr`   | trinary logic
 `expr = term [binop term]*`   | gather all the binops and sort by prec
@@ -116,12 +116,14 @@ Arguments separated by commas and are full statements | ---
 `{+}(1;2 ,3)`   | `5:int` full statements in arguments
 Syntax for variable assignment | ---
 `x=1`           | `1:int` assignments have values
+`x:=1`          | `1:int` Same thing, not final
 `x=y=1`         | `1:int` stacked assignments ok
 `x=y=`          | `Missing ifex after assignment of 'y'`
 `x=1+y`         | `Unknown ref 'y'`
 `x=2; y=x+1; x*y` | `6:int`
 `1+(x=2*3)+x*x` | `43:int` Re-use ref immediately after def; parses as: `x=(2*3); 1+x+x*x`
 `x=(1+(x=2)+x)` | `Cannot re-assign ref 'x'`
+`x=(1+(x:=2)+x)` | `5:int` RHS executes first, so parses as: `x:=2; x=1+x+x`
 Conditionals    | ---
 `0 ?    2  : 3` | `3:int` Zero is false
 `2 ?    2  : 3` | `2:int` Any non-zero is true; "truthy"
@@ -138,6 +140,11 @@ Conditionals    | ---
 `math_rand(1)?1:int:2:int` | `:int8` no ambiguity between conditionals and type annotations
 `math_rand(1)?1::2:int` | `missing expr after ':'`
 `math_rand(1)?1:"a"` | `Cannot mix GC and non-GC types`
+`math_rand(1)?(x:=4):(x:=3);x` | `:int8` x mutably defined on both arms, so available after
+`math_rand(1)?(x:=4):(x:=3);x:=x+1`| `:int64` x mutably defined on both arms, so mutable after
+`x:=0; math_rand(1) ? (x:=4):3; x:=x+1` | `:int8`  x partially updated, remains mutable after
+`x:=0; 1 ? (x =4):; x` | `4:int8` x final on 1 arm, dead on other arm, so final after
+`x:=0; math_rand(1) ? (x =4):3; x` | `'x' not final on false arm of trinary` Must be fully final after trinary
 Anonymous function definition | ---
 `{x y -> x+y}`    | Types as a 2-arg function { int int -> int } or { flt flt -> flt }
 `{5}()`           | `5:int` No args nor `->` required; this is simply a no-arg function returning 5, being executed
