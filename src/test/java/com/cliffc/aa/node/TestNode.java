@@ -116,6 +116,9 @@ public class TestNode {
     // more efficient in testing all Types which subtype another Type.
     _min_subtypes = make_minimal_graph(Type.ALL_TYPES());
 
+    // Per-node-type cached value() results
+    _values = new NonBlockingHashMapLong<>();
+
     // Setup to compute a value() call: we need a tiny chunk of Node graph with
     // known inputs.
     _gvn = new GVNGCM();
@@ -137,6 +140,7 @@ public class TestNode {
     n.add_def(_ins[1]);
     n.add_def(_ins[2]);
     _values.clear();
+    set_value_type(n,0,0,0,0,xx(0,0,0,0));
     test1monotonic(n,0,0,0,0);
   }
   
@@ -147,25 +151,35 @@ public class TestNode {
     if( n._defs.at(0)!=null ) {
       int[] at0s = _min_subtypes[i0];
       for( int i=0; i<at0s.length; i++ ) {
+        // Check for this type combo from the cache
         long xx = xx(i ,i1,i2,i3);
         Type vm = _values.get(xx);
-        if( vm == null ) {
-          vm = set_value_type(n,at0s[i],i1,i2,i3,xx);
-          throw AA.unimpl(); // Recurse
-        }
+        boolean old = vm == null;
+        if( vm == null ) vm = set_value_type(n,at0s[i],i1,i2,i3,xx);
+        // The major monotonicity assert
         assert vn.isa(vm);
+        if( !old ) 
+          throw AA.unimpl(); // Recurse
       }
     }
+
+    // CNC - not afraid of O(65^2), all combos of 2 types to e.g. AddF64Node.
+    // But yes getting afraid of O(64^4), all combos to e.g. CallNode; needs a
+    // control, a function, and some args.  But the control is limited to 2,
+    // and the function is not evaled.  So have a value_pre_check call which
+    // checks all args for sanity.  Here, we cut off the search.  During normal
+    // GVN operations we flag an assert for insane args.
     
     int[] at1s = _min_subtypes[i1];
     for( int i=0; i<at1s.length; i++ ) {
-      long xx = xx(i0,i ,i2,i3);
+      long xx = xx(i0,at1s[i] ,i2,i3);
       Type vm = _values.get(xx);
-      if( vm == null ) {
-        vm = set_value_type(n,i0,at1s[i],i2,i3,xx);
-        throw AA.unimpl(); // Recurse
-      }
+      boolean old = vm == null;
+      if( vm == null ) vm = set_value_type(n,at1s[i],i1,i2,i3,xx);
+      // The major monotonicity assert
       assert vn.isa(vm);
+      if( !old ) 
+        throw AA.unimpl(); // Recurse
     }
       
     throw AA.unimpl(); // Repeat for i2,i3
