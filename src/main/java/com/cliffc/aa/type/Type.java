@@ -335,8 +335,10 @@ public class Type<T extends Type<T>> {
     TypeFlt.init1(types);
     TypeStr.init1(types);
   }
-  
-  static boolean check_startup() {
+
+  private static Type[] ALL_TYPES; // Used for tests
+  public static Type[] ALL_TYPES() {
+    if( ALL_TYPES != null ) return ALL_TYPES;
     Type[] ts =    Type      .TYPES ;
     ts = concat(ts,TypeInt   .TYPES);
     ts = concat(ts,TypeFlt   .TYPES);
@@ -349,6 +351,17 @@ public class Type<T extends Type<T>> {
     ts = concat(ts,TypeFun   .TYPES);
     ts = concat(ts,TypeRPC   .TYPES);
     ts = concat(ts,TypeName  .TYPES);
+    // Partial order Sort, makes for easier tests later.  Arrays.sort requires
+    // a total order (i.e., the obvious Comparator breaks the sort contract),
+    // so we hand-roll a simple bubble sort.
+    for( int i=0; i<ts.length; i++ )
+      for( int j=i+1; j<ts.length; j++ )
+        if( ts[j].isa(ts[i]) ) { Type tmp = ts[i]; ts[i] = ts[j]; ts[j] = tmp; }
+    return (ALL_TYPES = ts); // Preserve for tests
+  }
+
+  static boolean check_startup() {
+    Type[] ts = ALL_TYPES();
 
     // Confirm commutative & complete
     for( Type t0 : ts )
@@ -453,13 +466,19 @@ public class Type<T extends Type<T>> {
     switch( _type ) {
     case TALL:
     case TCTRL:
+    case TNNUM:
     case TNUM:
+    case TNREAL:
     case TREAL:
+    case TNSCALR:
     case TSCALAR:
     case TANY:
     case TXCTRL:
+    case TXNNUM:
     case TXNUM:
+    case TXNREAL:
     case TXREAL:
+    case TXNSCALR:
     case TXSCALAR:
       return false;             // Not exactly a constant
     default: throw typerr(null);// Overridden in subclass
