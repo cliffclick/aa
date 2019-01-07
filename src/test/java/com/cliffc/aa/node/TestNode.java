@@ -1,6 +1,5 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.AA;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.util.NonBlockingHashMapLong;
@@ -140,66 +139,60 @@ public class TestNode {
     n.add_def(_ins[1]);
     n.add_def(_ins[2]);
     _values.clear();
-    set_value_type(n,0,0,0,0,xx(0,0,0,0));
-    test1monotonic(n,0,0,0,0);
+    set_value_type(n,0);
+    test1monotonic(n,0);
   }
   
   // Recursively walk all combos of types, compute values and verifying
   // monotonicity
-  private void test1monotonic(final Node n, final int i0, final int i1, final int i2, final int i3 ) {
-    Type vn = get_value_type(i0,i1,i2,i3);
-    if( n._defs.at(0)!=null ) {
-      int[] at0s = _min_subtypes[i0];
-      for( int i=0; i<at0s.length; i++ ) {
-        // Check for this type combo from the cache
-        long xx = xx(i ,i1,i2,i3);
-        Type vm = _values.get(xx);
-        boolean old = vm == null;
-        if( vm == null ) vm = set_value_type(n,at0s[i],i1,i2,i3,xx);
-        // The major monotonicity assert
-        assert vn.isa(vm);
-        if( !old ) 
-          throw AA.unimpl(); // Recurse
-      }
-    }
+  private void test1monotonic(final Node n, final long xx) {
+    Type[] all = Type.ALL_TYPES();
+    Type vn = get_value_type(xx);
+    // Subtypes in 4 node input directions
+    int[] stx0 = stx(n,xx,0);
+    int[] stx1 = stx(n,xx,1);
+    int[] stx2 = stx(n,xx,2);
+    int[] stx3 = stx(n,xx,3);
 
-    // CNC - not afraid of O(65^2), all combos of 2 types to e.g. AddF64Node.
-    // But yes getting afraid of O(64^4), all combos to e.g. CallNode; needs a
-    // control, a function, and some args.  But the control is limited to 2,
-    // and the function is not evaled.  So have a value_pre_check call which
-    // checks all args for sanity.  Here, we cut off the search.  During normal
-    // GVN operations we flag an assert for insane args.
-    
-    int[] at1s = _min_subtypes[i1];
-    for( int i=0; i<at1s.length; i++ ) {
-      long xx = xx(i0,at1s[i] ,i2,i3);
-      Type vm = _values.get(xx);
-      boolean old = vm == null;
-      if( vm == null ) vm = set_value_type(n,at1s[i],i1,i2,i3,xx);
-      // The major monotonicity assert
-      assert vn.isa(vm);
-      if( !old ) 
-        throw AA.unimpl(); // Recurse
-    }
-      
-    throw AA.unimpl(); // Repeat for i2,i3
-    
+    for( int x0 : stx0 )
+      for( int x1 : stx1 )
+        for( int x2 : stx2 )
+          for( int x3 : stx3 ) {
+            // Check for this type combo from the cache
+            long xxx = xx(x0,x1,x2,x3);
+            Type vm = _values.get(xxx);
+            boolean visited = vm != null;
+            if( !visited ) vm = set_value_type(n,xxx);
+            // The major monotonicity assert
+            if( !vn.isa(vm) ) {
+              System.out.println(n.xstr()+"("+all[xx(xx,0)]+","+all[xx(xx,1)]+","+all[xx(xx,2)]+","+all[xx(xx,3)]+") = "+vn);
+              System.out.println(n.xstr()+"("+all[     x0 ]+","+all[     x1 ]+","+all[     x2 ]+","+all[     x3 ]+") = "+vm);
+              assert vn.isa(vm) : "Not monotonic!";
+            }
+            if( !visited ) test1monotonic(n,xxx); // Recurse
+          }
   }
 
+  private static int[] stx_any = new int[]{0};
+  private int[] stx(final Node n, long xx, int i) {
+    if( i >= n._defs._len || n.in(i) == null ) return stx_any;
+    return _min_subtypes[xx(xx,i)];
+  }
+  
+  
   // Get the value Type for 4 input types.  Must exist.
-  private Type get_value_type(int i0, int i1, int i2, int i3) {
-    long xx = xx(i0,i1,i2,i3);
+  private Type get_value_type(long xx) {
     Type vt = _values.get(xx);
     assert vt!=null;
     return vt;
   }
   // Set the value Type for 4 input types.  Must not exist.
-  private Type set_value_type(Node n, int i0, int i1, int i2, int i3, long xx ) {
+  private Type set_value_type(Node n, long xx ) {
     Type[] alltypes = Type.ALL_TYPES();
-    _gvn.setype(_ins[0],_ins[0]._t = alltypes[i0]);
-    _gvn.setype(_ins[1],_ins[1]._t = alltypes[i1]);
-    _gvn.setype(_ins[2],_ins[2]._t = alltypes[i2]);
-    _gvn.setype(_ins[3],_ins[3]._t = alltypes[i3]);
+    _gvn.setype(_ins[0],_ins[0]._t = alltypes[xx(xx,0)]);
+    _gvn.setype(_ins[1],_ins[1]._t = alltypes[xx(xx,1)]);
+    _gvn.setype(_ins[2],_ins[2]._t = alltypes[xx(xx,2)]);
+    _gvn.setype(_ins[3],_ins[3]._t = alltypes[xx(xx,3)]);
     Type vt = n.value(_gvn);
     Type old = _values.put(xx,vt);
     assert old==null;
@@ -209,4 +202,5 @@ public class TestNode {
   private static long xx( int i0, int i1, int i2, int i3 ) {
     return i0+(i1<<8)+(i2<<16)+(i3<<24);
   }
+  private static int xx(long xx, int i) { return (int)((xx>>(i<<3)) & 0xffL); }
 }

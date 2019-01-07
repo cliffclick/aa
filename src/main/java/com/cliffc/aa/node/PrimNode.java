@@ -93,9 +93,36 @@ public abstract class PrimNode extends Node {
   @Override public Node ideal(GVNGCM gvn) { return null; }
   @Override public Type value(GVNGCM gvn) {
     Type[] ts = new Type[_defs._len];
+    for( int i=1; i<_defs._len; i++ ) ts[i] = gvn.type(in(i));
+    
+    // If any type is below the lowest allowed for this primitive, only return
+    // ALL as this is a type error and the program will not type.  E.g. passing
+    // Scalar to a float operation.
     for( int i=1; i<_defs._len; i++ )
-      if( !(ts[i] = gvn.type(in(i))).is_con() )
+      if( _targs.at(i-1)!=ts[i] && _targs.at(i-1).isa(ts[i]) )
+        return Type.ALL;        // Input is below any valid input
+    
+    // If any type is above the highest allowed, only return ANY until values fall.
+    for( int i=1; i<_defs._len; i++ )
+      if( _targs.at(i-1)!=ts[i] && ts[i].isa(_targs.at(i-1).dual()) )
+        return Type.ANY;        // Input is above any valid input
+    
+    // If any type is an unrelated type, e.g. passing a string to a float
+    // operation, then again a type error.
+    for( int i=1; i<_defs._len; i++ )
+      if( !_targs.at(i-1).dual().isa(ts[i]) || !ts[i].isa(_targs.at(i-1)) )
+        return Type.ALL;
+   
+    // If any type is above a constant, assume the result fall to any valid value
+    for( int i=1; i<_defs._len; i++ )
+      if( ts[i].above_center() )
+        return _ret.dual();     // Any valid value
+    
+    // If any type is below a constant, fall to the lowest valid value
+    for( int i=1; i<_defs._len; i++ )
+      if( !ts[i].is_con() )
         return _ret;            // Some non-constant input
+    
     return apply(ts);           // All constant inputs; constant-fold result
   }
   // Worse-case type for this Node
