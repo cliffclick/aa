@@ -103,7 +103,7 @@ public class TestNode {
   // Node.  However, all legal inputs should produce an output with the
   // monotonicity invariant.
 
-  @Test @Ignore public void testMonotonic() {
+  @Test public void testMonotonic() {
     // All The Types we care to reason about.  There's an infinite number of
     // Types, but mostly are extremely similar - so we limit ourselves to a
     // subset which has at least one of unique (Java) subtype, plus some
@@ -124,8 +124,9 @@ public class TestNode {
     _ins = new ConNode[4];
     for( int i=0; i<_ins.length; i++ )
       _ins[i] = new ConNode<Type>(Type.SCALAR);
-    
-    test1monotonic_NXX(new PrimNode.AddF64());
+
+    for( PrimNode prim : PrimNode.PRIMS )
+      test1monotonic_prim(prim);
     //test1monotonicType(0,new ConNode(Type.SCALAR));
     //test1monotonicType(2,new CastNode(_ins[0],_ins[1],Type.SCALAR));
 
@@ -133,11 +134,12 @@ public class TestNode {
   }
 
   // Fill a Node with {null,edge,edge} and start the search
-  private void test1monotonic_NXX(Node n) {
+  private void test1monotonic_prim(PrimNode prim) {
+    PrimNode n = (PrimNode)prim.copy();
     assert n._defs._len==0;
     n.add_def( null  );
     n.add_def(_ins[1]);
-    n.add_def(_ins[2]);
+    if( n._targs._ts.length >= 2 ) n.add_def(_ins[2]);
     _values.clear();
     set_value_type(n,0);
     test1monotonic(n,0);
