@@ -4,7 +4,6 @@ import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.util.NonBlockingHashMapLong;
 import com.cliffc.aa.util.Util;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.Arrays;
@@ -12,7 +11,7 @@ import java.util.Arrays;
 public class TestNode {
   // A private set of input nodes to feed into each tested Node - a hand-rolled
   // sub-graph.
-  private ConNode[] _ins;
+  private Node[] _ins;
   // A private GVN for computing value() calls.
   private GVNGCM _gvn;
 
@@ -121,12 +120,14 @@ public class TestNode {
     // Setup to compute a value() call: we need a tiny chunk of Node graph with
     // known inputs.
     _gvn = new GVNGCM();
-    _ins = new ConNode[4];
-    for( int i=0; i<_ins.length; i++ )
+    _ins = new Node[4];
+    _ins[0] = new RegionNode(null,new ConNode(Type.CTRL),new ConNode(Type.CTRL));
+    for( int i=1; i<_ins.length; i++ )
       _ins[i] = new ConNode<Type>(Type.SCALAR);
 
     for( PrimNode prim : PrimNode.PRIMS )
       test1monotonic_prim(prim);
+    test1monotonic_XXX(new PhiNode("badgc"));
     //test1monotonicType(0,new ConNode(Type.SCALAR));
     //test1monotonicType(2,new CastNode(_ins[0],_ins[1],Type.SCALAR));
 
@@ -134,8 +135,19 @@ public class TestNode {
   }
 
   // Fill a Node with {null,edge,edge} and start the search
+  private void test1monotonic_XXX(Node n) {
+    assert n._defs._len==0;
+    n.add_def(_ins[0]);
+    n.add_def(_ins[1]);
+    n.add_def(_ins[2]);
+    _values.clear();
+    set_value_type(n,0);
+    test1monotonic(n,0);
+  }
+
+  // Fill a Node with {null,edge,edge} and start the search
   private void test1monotonic_prim(PrimNode prim) {
-    PrimNode n = (PrimNode)prim.copy();
+    PrimNode n = prim.copy();
     assert n._defs._len==0;
     n.add_def( null  );
     n.add_def(_ins[1]);
@@ -180,8 +192,7 @@ public class TestNode {
     if( i >= n._defs._len || n.in(i) == null ) return stx_any;
     return _min_subtypes[xx(xx,i)];
   }
-  
-  
+
   // Get the value Type for 4 input types.  Must exist.
   private Type get_value_type(long xx) {
     Type vt = _values.get(xx);
@@ -191,10 +202,10 @@ public class TestNode {
   // Set the value Type for 4 input types.  Must not exist.
   private Type set_value_type(Node n, long xx ) {
     Type[] alltypes = Type.ALL_TYPES();
-    _gvn.setype(_ins[0],_ins[0]._t = alltypes[xx(xx,0)]);
-    _gvn.setype(_ins[1],_ins[1]._t = alltypes[xx(xx,1)]);
-    _gvn.setype(_ins[2],_ins[2]._t = alltypes[xx(xx,2)]);
-    _gvn.setype(_ins[3],_ins[3]._t = alltypes[xx(xx,3)]);
+    _gvn.setype(_ins[0],                        alltypes[xx(xx,0)]);
+    _gvn.setype(_ins[1],((ConNode)_ins[1])._t = alltypes[xx(xx,1)]);
+    _gvn.setype(_ins[2],((ConNode)_ins[2])._t = alltypes[xx(xx,2)]);
+    _gvn.setype(_ins[3],((ConNode)_ins[3])._t = alltypes[xx(xx,3)]);
     Type vt = n.value(_gvn);
     Type old = _values.put(xx,vt);
     assert old==null;
