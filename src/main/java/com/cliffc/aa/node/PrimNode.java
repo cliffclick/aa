@@ -210,30 +210,30 @@ abstract static class Prim1OpF64 extends PrimNode {
 
 static class MinusF64 extends Prim1OpF64 {
   MinusF64() { super("-"); }
-  double op( double d ) { return -d; }
+  @Override double op( double d ) { return -d; }
 }
 
 // 1Ops have uniform input/output types, so take a shortcut on name printing
 abstract static class Prim1OpI64 extends PrimNode {
   Prim1OpI64( String name ) { super(name,PrimNode.ARGS1,TypeTuple.INT64,TypeInt.INT64); }
-  public TypeInt apply( Type[] args ) { return TypeInt.con(op(args[1].getl())); }
+  @Override public TypeInt apply( Type[] args ) { return TypeInt.con(op(args[1].getl())); }
   abstract long op( long d );
 }
 
 static class MinusI64 extends Prim1OpI64 {
   MinusI64() { super("-"); }
-  long op( long x ) { return -x; }
+  @Override long op( long x ) { return -x; }
 }
 
 static class NotI64 extends PrimNode {
   NotI64() { super("!",PrimNode.ARGS1,TypeTuple.INT64,TypeInt.BOOL); }
-  public TypeInt apply( Type[] args ) { return args[1].getl()==0?TypeInt.TRUE:TypeInt.FALSE; }
+  @Override public TypeInt apply( Type[] args ) { return args[1].getl()==0?TypeInt.TRUE:TypeInt.FALSE; }
 }
 
 // 2Ops have uniform input/output types, so take a shortcut on name printing
 abstract static class Prim2OpF64 extends PrimNode {
   Prim2OpF64( String name ) { super(name,PrimNode.ARGS2,TypeTuple.FLT64_FLT64,TypeFlt.FLT64); }
-  public TypeFlt apply( Type[] args ) { return TypeFlt.con(op(args[1].getd(),args[2].getd())); }
+  @Override public TypeFlt apply( Type[] args ) { return TypeFlt.con(op(args[1].getd(),args[2].getd())); }
   abstract double op( double x, double y );
 }
 
@@ -251,14 +251,14 @@ static class SubF64 extends Prim2OpF64 {
 
 static class MulF64 extends Prim2OpF64 {
   MulF64() { super("*"); }
-  double op( double l, double r ) { return l*r; }
+  @Override double op( double l, double r ) { return l*r; }
   @Override public byte op_prec() { return 6; }
 }
 
 // 2RelOps have uniform input types, and bool output
 abstract static class Prim2RelOpF64 extends PrimNode {
   Prim2RelOpF64( String name ) { super(name,PrimNode.ARGS2,TypeTuple.FLT64_FLT64,TypeInt.BOOL); }
-  public TypeInt apply( Type[] args ) { return op(args[1].getd(),args[2].getd())?TypeInt.TRUE:TypeInt.FALSE; }
+  @Override public TypeInt apply( Type[] args ) { return op(args[1].getd(),args[2].getd())?TypeInt.TRUE:TypeInt.FALSE; }
   abstract boolean op( double x, double y );
   @Override public byte op_prec() { return 4; }
 }
@@ -274,38 +274,38 @@ static class NE_F64 extends Prim2RelOpF64 { NE_F64() { super("!="); } boolean op
 // 2Ops have uniform input/output types, so take a shortcut on name printing
 abstract static class Prim2OpI64 extends PrimNode {
   Prim2OpI64( String name ) { super(name,PrimNode.ARGS2,TypeTuple.INT64_INT64,TypeInt.INT64); }
-  public TypeInt apply( Type[] args ) { return TypeInt.con(op(args[1].getl(),args[2].getl())); }
+  @Override public TypeInt apply( Type[] args ) { return TypeInt.con(op(args[1].getl(),args[2].getl())); }
   abstract long op( long x, long y );
 }
 
 static class AddI64 extends Prim2OpI64 {
   AddI64() { super("+"); }
-  long op( long l, long r ) { return l+r; }
+  @Override long op( long l, long r ) { return l+r; }
   @Override public byte op_prec() { return 5; }
 }
 
 static class SubI64 extends Prim2OpI64 {
   SubI64() { super("-"); }
-  long op( long l, long r ) { return l-r; }
+  @Override long op( long l, long r ) { return l-r; }
   @Override public byte op_prec() { return 5; }
 }
 
 static class MulI64 extends Prim2OpI64 {
   MulI64() { super("*"); }
-  long op( long l, long r ) { return l*r; }
+  @Override long op( long l, long r ) { return l*r; }
   @Override public byte op_prec() { return 6; }
 }
 
 static class AndI64 extends Prim2OpI64 {
   AndI64() { super("&"); }
-  long op( long l, long r ) { return l&r; }
+  @Override long op( long l, long r ) { return l&r; }
   @Override public byte op_prec() { return 7; }
 }
 
 // 2RelOps have uniform input types, and bool output
 abstract static class Prim2RelOpI64 extends PrimNode {
   Prim2RelOpI64( String name ) { super(name,PrimNode.ARGS2,TypeTuple.INT64_INT64,TypeInt.BOOL); }
-  public TypeInt apply( Type[] args ) { return op(args[1].getl(),args[2].getl())?TypeInt.TRUE:TypeInt.FALSE; }
+  @Override public TypeInt apply( Type[] args ) { return op(args[1].getl(),args[2].getl())?TypeInt.TRUE:TypeInt.FALSE; }
   abstract boolean op( long x, long y );
   @Override public byte op_prec() { return 4; }
 }
@@ -320,13 +320,37 @@ static class NE_I64 extends Prim2RelOpI64 { NE_I64() { super("!="); } boolean op
 
 static class EQ_OOP extends PrimNode {
   EQ_OOP() { super("==",PrimNode.ARGS2,TypeTuple.OOP_OOP,TypeInt.BOOL); }
-  public TypeInt apply( Type[] args ) { return args[1] == args[2] ? TypeInt.TRUE : TypeInt.FALSE; }
+  @Override public Type value(GVNGCM gvn) {
+    // Oop-equivalence is based on pointer-equivalence NOT on a "deep equals".
+    // Probably need a java-like "===" vs "==" to mean deep-equals.  You are
+    // equals if your inputs are the same node, and you are unequals if your
+    // input is 2 different NewNodes (or casts of NewNodes).  Otherwise you
+    // have to do the runtime test.
+    if( in(1)==in(2) ) return TypeInt.TRUE;
+    if( in(1) instanceof NewNode &&
+        in(2) instanceof NewNode &&
+        in(1) != in(2) ) return TypeInt.FALSE;
+    return TypeInt.BOOL;
+  }
+  @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
   @Override public byte op_prec() { return 4; }
 }
 
 static class NE_OOP extends PrimNode {
   NE_OOP() { super("!=",PrimNode.ARGS2,TypeTuple.OOP_OOP,TypeInt.BOOL); }
-  public TypeInt apply( Type[] args ) { return args[1] != args[2] ? TypeInt.TRUE : TypeInt.FALSE; }
+  @Override public Type value(GVNGCM gvn) {
+    // Oop-equivalence is based on pointer-equivalence NOT on a "deep equals".
+    // Probably need a java-like "===" vs "==" to mean deep-equals.  You are
+    // equals if your inputs are the same node, and you are unequals if your
+    // input is 2 different NewNodes (or casts of NewNodes).  Otherwise you
+    // have to do the runtime test.
+    if( in(1)==in(2) ) return TypeInt.FALSE;
+    if( in(1) instanceof NewNode &&
+        in(2) instanceof NewNode &&
+        in(1) != in(2) ) return TypeInt.TRUE;
+    return TypeInt.BOOL;
+  }
+  @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
   @Override public byte op_prec() { return 4; }
 }
 
