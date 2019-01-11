@@ -2,6 +2,9 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeFlt;
+import com.cliffc.aa.type.TypeInt;
+import com.cliffc.aa.type.TypeStr;
 import com.cliffc.aa.util.NonBlockingHashMapLong;
 import com.cliffc.aa.util.Util;
 import org.junit.Test;
@@ -127,22 +130,30 @@ public class TestNode {
 
     for( PrimNode prim : PrimNode.PRIMS )
       test1monotonic_prim(prim);
+    
+    test1monotonic    (new  ConNode<Type>(          TypeInt.FALSE));
+    test1monotonic    (new  ConNode<Type>(          TypeStr.ABC  ));
+    test1monotonic    (new  ConNode<Type>(          TypeFlt.FLT64));
+    test1monotonic    (new CastNode(_ins[0],_ins[1],TypeInt.FALSE));
+    test1monotonic    (new CastNode(_ins[0],_ins[1],TypeStr.ABC  ));
+    test1monotonic    (new CastNode(_ins[0],_ins[1],TypeFlt.FLT64));
     test1monotonic_XXX(new PhiNode("badgc"));
-    //test1monotonicType(0,new ConNode(Type.SCALAR));
-    //test1monotonicType(2,new CastNode(_ins[0],_ins[1],Type.SCALAR));
 
     
   }
 
+  private void test1monotonic(Node n) {
+    assert n._defs._len>0;
+    test1monotonic_init(n,0);
+  }
+  
   // Fill a Node with {null,edge,edge} and start the search
   private void test1monotonic_XXX(Node n) {
     assert n._defs._len==0;
     n.add_def(_ins[0]);
     n.add_def(_ins[1]);
     n.add_def(_ins[2]);
-    _values.clear();
-    set_value_type(n,0);
-    test1monotonic(n,0);
+    test1monotonic_init(n,0);
   }
 
   // Fill a Node with {null,edge,edge} and start the search
@@ -152,6 +163,10 @@ public class TestNode {
     n.add_def( null  );
     n.add_def(_ins[1]);
     if( n._targs._ts.length >= 2 ) n.add_def(_ins[2]);
+    test1monotonic_init(n,0);
+  }
+  
+  private void test1monotonic_init(final Node n, final long xx) {
     _values.clear();
     set_value_type(n,0);
     test1monotonic(n,0);
