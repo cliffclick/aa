@@ -56,7 +56,7 @@ public class TestNode {
   // efficient in testing all Types which subtype another Type.  The outer
   // array is the index into Type.ALL_TYPES(), and the inner array is the set
   // of immediate sub-Types (again as indices into ALL_TYPES).
-  private int[][] make_minimal_graph(Type[] alltypes) {
+  private int[][] make_minimal_graph() {
 
     int[][] subs = new int[_subtypes.length][];
     for( int i=0; i<subs.length; i++ )
@@ -108,11 +108,11 @@ public class TestNode {
     // subset which has at least one of unique (Java) subtype, plus some
     // variations inside the more complete (Java) Types.
     _subtypes = make_subtypes(Type.ALL_TYPES());
-    
+
     // Build a minimal spanning sub-Type tree from the set of sample types.
     // We'll use this to know which other types sub-Type this type... and thus be
     // more efficient in testing all Types which subtype another Type.
-    _min_subtypes = make_minimal_graph(Type.ALL_TYPES());
+    _min_subtypes = make_minimal_graph();
 
     // Per-node-type cached value() results
     _values = new NonBlockingHashMapLong<>();
@@ -121,7 +121,7 @@ public class TestNode {
     // known inputs.
     _gvn = new GVNGCM();
     _ins = new Node[4];
-    _ins[0] = new RegionNode(null,new ConNode(Type.CTRL),new ConNode(Type.CTRL));
+    _ins[0] = new RegionNode(null,new ConNode<Type>(Type.CTRL),new ConNode<Type>(Type.CTRL));
     for( int i=1; i<_ins.length; i++ )
       _ins[i] = new ConNode<Type>(Type.SCALAR);
 
