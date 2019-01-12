@@ -74,7 +74,7 @@ public class TypeStr extends TypeOop<TypeStr> {
 
   @Override public boolean may_be_con() { return super.may_be_con() || _con != null; }
   @Override public boolean is_con() { return _con!=null; }
-  @Override Type meet_nil() {
+  @Override public Type meet_nil() {
     return above_center() ? TypeNil.STR : TypeNil.make(this);
   }
   

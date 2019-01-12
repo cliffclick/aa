@@ -178,7 +178,7 @@ public class TypeName extends Type<TypeName> {
     if( base().must_nil() ) return nn; // Cannot remove all nils and keep the name, so lose the name
     return make(_name,_lex,nn);
   }
-  @Override Type meet_nil() {
+  @Override public Type meet_nil() {
     Type x = _t.meet_nil();     // Compute meet-nil without the name
     if( x instanceof TypeNil ) return TypeNil.make(TypeName.make(_name,_lex,((TypeNil)x)._t));
     else                       return              TypeName.make(_name,_lex,          x); // Just name-wrap

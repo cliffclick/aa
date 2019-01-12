@@ -554,7 +554,7 @@ public class Type<T extends Type<T>> {
     default: throw typerr(null); // Overridden in subclass
     }
   }
-  Type meet_nil() {
+  public Type meet_nil() {
     switch( _type ) {
     case TXNUM:
     case TXREAL:

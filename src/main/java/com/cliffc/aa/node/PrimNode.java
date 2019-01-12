@@ -329,6 +329,13 @@ static class EQ_OOP extends PrimNode {
     if( in(1) instanceof NewNode &&
         in(2) instanceof NewNode &&
         in(1) != in(2) ) return TypeInt.FALSE;
+    // Constants can only do nil-vs-not-nil, since e.g. two strings "abc" and
+    // "abc" are equal constants in the type system but can be two different
+    // string pointers.
+    Type t1 = gvn.type(in(1));
+    Type t2 = gvn.type(in(2));
+    if( t2==TypeNil.NIL && t1.may_be_con() && t1.meet_nil() != t1 ) return TypeInt.FALSE;
+    if( t1==TypeNil.NIL && t2.may_be_con() && t2.meet_nil() != t2 ) return TypeInt.FALSE;
     return TypeInt.BOOL;
   }
   @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
@@ -347,6 +354,13 @@ static class NE_OOP extends PrimNode {
     if( in(1) instanceof NewNode &&
         in(2) instanceof NewNode &&
         in(1) != in(2) ) return TypeInt.TRUE;
+    // Constants can only do nil-vs-not-nil, since e.g. two strings "abc" and
+    // "abc" are equal constants in the type system but can be two different
+    // string pointers.
+    Type t1 = gvn.type(in(1));
+    Type t2 = gvn.type(in(2));
+    if( t2==TypeNil.NIL && t1.may_be_con() && t1.meet_nil() != t1 ) return TypeInt.TRUE;
+    if( t1==TypeNil.NIL && t2.may_be_con() && t2.meet_nil() != t2 ) return TypeInt.TRUE;
     return TypeInt.BOOL;
   }
   @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }

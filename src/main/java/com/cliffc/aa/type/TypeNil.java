@@ -88,7 +88,7 @@ public class TypeNil extends Type<TypeNil> {
   @Override public byte isBitShape(Type t) { return _t==null || this==t ? 0 : _t.isBitShape(t); }
   @Override boolean must_nil() { return _t==null || !_t.above_center(); }
   @Override Type not_nil(Type ignore) { return _t!=null && _t.above_center() ? _t : this; }
-  @Override Type meet_nil() { return _t.above_center() ? NIL : this; }
+  @Override public Type meet_nil() { return _t.above_center() ? NIL : this; }
   // Make a (possibly cyclic & infinite) named type.  Prevent the infinite
   // unrolling of names by not allowing a named-type with depth >= D from
   // holding (recursively) the head of a named-type cycle.  We need to cap the
