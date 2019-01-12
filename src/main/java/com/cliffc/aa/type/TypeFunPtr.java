@@ -97,6 +97,7 @@ public class TypeFunPtr extends Type<TypeFunPtr> {
   @Override public boolean is_con()       { return _fidxs.is_con(); }
   @Override boolean must_nil() { return false; }
   @Override Type not_nil(Type ignore) { return this; }
+  @Override public Type meet_nil() { return TypeNil.make(this); }
       
   // Return true if this is an ambiguous function pointer
   public boolean is_ambiguous_fun() { return _fidxs.above_center(); }

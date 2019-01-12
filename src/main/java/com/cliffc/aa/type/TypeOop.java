@@ -59,8 +59,7 @@ public class TypeOop<O extends TypeOop<O>> extends Type<O> {
   @Override boolean must_nil() { return false; }
   @Override Type not_nil(Type ignore) { return this; }
   @Override public Type meet_nil() {
-    if( above_center() ) throw com.cliffc.aa.AA.unimpl();
-    return TypeNil.make(this);
+    return above_center() ? TypeNil.OOP : TypeNil.make(this);
   }
   // Lattice of conversions:
   // -1 unknown; top; might fail, might be free (Scalar->Str); Scalar might lift
@@ -69,7 +68,7 @@ public class TypeOop<O extends TypeOop<O>> extends Type<O> {
   // +1 requires a bit-changing conversion; no auto-unboxing
   // 99 Bottom; No free converts; e.g. Flt->Str requires explicit rounding
   @Override public byte isBitShape(Type t) { throw AA.unimpl();  }
-  // Make a (posssibly cyclic & infinite) named type.  Prevent the infinite
+  // Make a (possibly cyclic & infinite) named type.  Prevent the infinite
   // unrolling of names by not allowing a named-type with depth >= D from
   // holding (recursively) the head of a named-type cycle.  We need to cap the
   // unroll, to prevent loops/recursion from infinitely unrolling.

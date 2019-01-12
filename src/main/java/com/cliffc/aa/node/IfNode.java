@@ -16,15 +16,21 @@ public class IfNode extends Node {
     if( in(0) instanceof ProjNode && in(0).in(0)==this )
       return TypeTuple.IF_ANY; // Test is dead cycle of self (during collapse of dead loops)
     Type pred = gvn.type(in(1)).base();
-    if( pred.isa(TypeInt.XINT1) ) return TypeTuple.IF_ANY;  // Choice of {0,1}
-    if( TypeInt.BOOL.isa(pred)  ) return TypeTuple.IF_ALL;  // Can be either
-    if( pred == TypeInt.FALSE ||
-        pred == TypeNil.NIL ) return TypeTuple.IF_FALSE; // False only
-    if( pred instanceof TypeOop ) return TypeTuple.IF_TRUE;
-    if( pred instanceof TypeNil ) // Check for nil-or- vs nil-and-
+    if( pred.isa(TypeInt.XINT1) ) return TypeTuple.IF_ANY; // Choice of {0,1}
+    if( TypeInt.BOOL.isa(pred)  ) return TypeTuple.IF_ALL; // Can be either
+    if( pred instanceof TypeTuple)return TypeTuple.IF_TRUE;// Nonsense, and never nil
+    if( pred instanceof TypeRPC ) return TypeTuple.IF_TRUE;// Nonsense, and never nil
+    if( pred == TypeInt.FALSE || pred == TypeNil.NIL )
+      return TypeTuple.IF_FALSE;   // False only
+    assert pred != TypeFlt.con(0); // Only expect int numeric constants?
+    if( pred instanceof TypeNil )  // Check for nil-or- vs nil-and-
       return pred.above_center() ? TypeTuple.IF_ANY : TypeTuple.IF_ALL;
+    if( pred.meet_nil() != pred ) return TypeTuple.IF_TRUE;// Has no nil
+    
+    if( pred instanceof TypeOop ) return TypeTuple.IF_TRUE;
     if( pred.is_con() ) { assert pred.getl() != 0; return TypeTuple.IF_TRUE; } // True only
-    throw AA.unimpl(); // Dunno what this test is?
+    System.out.println("if takes default "+pred); // Dunno what test this is?
+    return TypeTuple.IF_ALL;
   }
   @Override public Type all_type() { return TypeTuple.IF_ALL; }
   @Override public Node is_copy(GVNGCM gvn, int idx) {

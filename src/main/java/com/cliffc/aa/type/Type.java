@@ -175,7 +175,7 @@ public class Type<T extends Type<T>> {
           static final Type   NUM  = make( TNUM   );
           static final Type  XNUM  = make(TXNUM   );
           static final Type  NNUM  = make( TNNUM  );
-          static final Type XNNUM  = make(TXNNUM  );
+  private static final Type XNNUM  = make(TXNNUM  );
   public  static final Type   REAL = make( TREAL  );
   private static final Type  XREAL = make(TXREAL  );
           static final Type  NREAL = make( TNREAL );
@@ -565,7 +565,8 @@ public class Type<T extends Type<T>> {
     case TNNUM:     return NUM;
     case TNREAL:    return REAL;
     case TNSCALR:   return SCALAR;
-    default:        return this;
+    case TCTRL: case TXCTRL: return ALL;
+    default:        throw typerr(null); // Overridden in subclass
     }
   }
     
