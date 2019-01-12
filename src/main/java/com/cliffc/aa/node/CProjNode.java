@@ -15,8 +15,8 @@ public class CProjNode extends ProjNode {
   }
   @Override public Node ideal(GVNGCM gvn) { return in(0).is_copy(gvn,_idx); }
   @Override public Type value(GVNGCM gvn) {
-    Type c = gvn.type(in(0));
-    return ((TypeTuple)c).at(_idx); // Otherwise our type is just the matching tuple slice
+    Type c = gvn.type(in(0));  // our type is just the matching tuple slice
+    return c instanceof TypeTuple && ((TypeTuple)c)._ts.length < _idx ? ((TypeTuple)c).at(_idx) : Type.ALL;
   }
   @Override public Type all_type() { return Type.CTRL; }
   // Return the op_prec of the returned value.  Not sensible except
