@@ -14,10 +14,10 @@ import com.cliffc.aa.type.TypeRPC;
 public class EpilogNode extends Node {
   int _fidx;
   private final String _unkref_err; // Unknown ref error (not really a forward ref)
-  public EpilogNode( Node ctrl, Node val, Node rpc, FunNode fun, String unkref_err ) {
+  public EpilogNode( Node ctrl, Node val, Node rpc, Node fun, int fidx, String unkref_err ) {
     super(OP_EPI,ctrl,val,rpc,fun);
     _unkref_err = unkref_err;
-    _fidx = fun._tf.fidx();     // Record function index, so can tell it exactly
+    _fidx = fidx;              // Record function index, so can tell it exactly
   }
   @Override public Node ideal(GVNGCM gvn) {
     // If is_copy is true, CallNodes uses need to fold away as well
@@ -27,10 +27,12 @@ public class EpilogNode extends Node {
   }
 
   @Override public Type value(GVNGCM gvn) {
-    return TypeFun.make(gvn.type(ctrl()), // Function exits, or not
-                        gvn.type(val ()), // Function return value
-                        (TypeRPC)gvn.type(rpc ()), // Caller; the Continuation
-                        FunNode.find_fidx(_fidx)._tf);
+    Type c = gvn.type(ctrl()); // Function exits, or not
+    Type v = gvn.type(val ()); // Function return value
+    Type r = gvn.type(rpc ()); // Caller; the Continuation
+    if( c==Type.ANY  || r==Type.ANY  ) return all_type().dual();
+    if( c!=Type.CTRL || c!=Type.XCTRL || !(r instanceof TypeRPC) ) return all_type();
+    return TypeFun.make(c, v, r, FunNode.find_fidx(_fidx)._tf);
   }
   @Override public String err(GVNGCM gvn) { return is_forward_ref() ? _unkref_err : null; }
 
@@ -55,7 +57,7 @@ public class EpilogNode extends Node {
   public static Node forward_ref( GVNGCM gvn, Node scope, String name, Parse unkref ) {
     FunNode fun = gvn.init(new FunNode(scope,name));
     String referr = unkref.errMsg("Unknown ref '"+name+"'");
-    return new EpilogNode(fun,gvn.con(Type.SCALAR),gvn.con(TypeRPC.ALL_CALL),fun, referr);
+    return new EpilogNode(fun,gvn.con(Type.SCALAR),gvn.con(TypeRPC.ALL_CALL),fun,fun._tf.fidx(), referr);
   }
 
   // True if this is a forward_ref

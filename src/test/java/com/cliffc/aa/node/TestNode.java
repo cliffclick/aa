@@ -131,14 +131,15 @@ public class TestNode {
     for( PrimNode prim : PrimNode.PRIMS )
       test1monotonic_prim(prim);
     
-    test1monotonic    (new   ConNode<Type>(          TypeInt.FALSE));
-    test1monotonic    (new   ConNode<Type>(          TypeStr.ABC  ));
-    test1monotonic    (new   ConNode<Type>(          TypeFlt.FLT64));
-    test1monotonic    (new  CastNode(_ins[0],_ins[1],TypeInt.FALSE));
-    test1monotonic    (new  CastNode(_ins[0],_ins[1],TypeStr.ABC  ));
-    test1monotonic    (new  CastNode(_ins[0],_ins[1],TypeFlt.FLT64));
-    test1monotonic    (new CProjNode(_ins[0],0));
-    test1monotonic_XXX(new   PhiNode("badgc"));
+    test1monotonic    (new    ConNode<Type>(          TypeInt.FALSE));
+    test1monotonic    (new    ConNode<Type>(          TypeStr.ABC  ));
+    test1monotonic    (new    ConNode<Type>(          TypeFlt.FLT64));
+    test1monotonic    (new   CastNode(_ins[0],_ins[1],TypeInt.FALSE));
+    test1monotonic    (new   CastNode(_ins[0],_ins[1],TypeStr.ABC  ));
+    test1monotonic    (new   CastNode(_ins[0],_ins[1],TypeFlt.FLT64));
+    test1monotonic    (new  CProjNode(_ins[0],0));
+    test1monotonic    (new EpilogNode(_ins[0],_ins[1],_ins[2],_ins[3],1,"unknown_ref"));
+    test1monotonic_XXX(new    PhiNode("badgc"));
 
     
   }

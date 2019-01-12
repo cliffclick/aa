@@ -23,9 +23,7 @@ public class TypeFun extends TypeTuple<TypeFun> {
     assert is_fun();
   }
   
-  @Override public boolean equals( Object o ) {
-    return o instanceof TypeFun && super.equals(o);
-  }    
+  @Override public boolean equals( Object o ) { return o instanceof TypeFun && super.equals(o); }    
   
   private static TypeFun FREE=null;
   @Override protected TypeFun free( TypeFun ret ) { FREE=this; return ret; }
@@ -38,7 +36,7 @@ public class TypeFun extends TypeTuple<TypeFun> {
     return t1==t2 ? t1 : t1.free(t2);
   }
   
-  public static TypeFun make( Type ctrl, Type ret, TypeRPC rpc, TypeFunPtr fun ) {
+  public static TypeFun make( Type ctrl, Type ret, Type rpc, TypeFunPtr fun ) {
     return make(false,new Type[]{ctrl,ret,rpc,fun});
   }
   public static TypeFun make( TypeFunPtr fun ) { return make(Type.CTRL,fun._ret,TypeRPC.ALL_CALL, fun); }

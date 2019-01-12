@@ -43,7 +43,7 @@ public class Env implements AutoCloseable {
       prim.add_def(_gvn.xform(new ParmNode(i,args[i],fun,_gvn.con(targs.at(i)),null)));
     PrimNode x = _gvn.init(prim);
     assert x==prim;
-    return new EpilogNode(fun,prim,rpc,fun,null);
+    return new EpilogNode(fun,prim,rpc,fun,fun._tf.fidx(),null);
   }
 
   public Node update( String name, Node val, GVNGCM gvn, boolean mutable ) { return _scope.update(name,val,gvn,mutable); }
