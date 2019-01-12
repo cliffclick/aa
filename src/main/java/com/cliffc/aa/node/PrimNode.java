@@ -97,14 +97,13 @@ public abstract class PrimNode extends Node {
     // return _ret.dual, the highest allowed result; if all inputs are
     // constants we constant fold; else some input is low so we return _ret,
     // the lowest possible result.
-    boolean above=true;
+    boolean is_con = true;
     for( int i=1; i<_defs._len; i++ ) {
       Type t = _targs.at(i-1).dual().meet(ts[i] = gvn.type(in(i)));
-      if( t.above_center() ) /*nothing, above is the default*/;
-      else if( t.is_con() ) above=false; // Not above, but maybe everything is constant
-      else return _ret;                  // Some input is too low
+      if( t.above_center() ) is_con = false; // Not a constant
+      else if( !t.is_con() ) return _ret;    // Some input is too low
     }
-    return above ? _ret.dual() : apply(ts);
+    return is_con ? apply(ts) : _ret.dual();
   }
   // Worse-case type for this Node
   @Override public Type all_type() { return _ret; }
