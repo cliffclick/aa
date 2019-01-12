@@ -144,7 +144,7 @@ public class TestNode {
 
   private void test1monotonic(Node n) {
     assert n._defs._len>0;
-    test1monotonic_init(n,0);
+    test1monotonic_init(n);
   }
   
   // Fill a Node with {null,edge,edge} and start the search
@@ -153,7 +153,7 @@ public class TestNode {
     n.add_def(_ins[0]);
     n.add_def(_ins[1]);
     n.add_def(_ins[2]);
-    test1monotonic_init(n,0);
+    test1monotonic_init(n);
   }
 
   // Fill a Node with {null,edge,edge} and start the search
@@ -163,13 +163,13 @@ public class TestNode {
     n.add_def( null  );
     n.add_def(_ins[1]);
     if( n._targs._ts.length >= 2 ) n.add_def(_ins[2]);
-    test1monotonic_init(n,0);
+    test1monotonic_init(n);
   }
   
-  private void test1monotonic_init(final Node n, final long xx) {
+  private void test1monotonic_init(final Node n) {
     _values.clear();
     set_value_type(n,0);
-    test1monotonic(n,0);
+    test1monotonic(n);
   }
   
   // Recursively walk all combos of types, compute values and verifying
