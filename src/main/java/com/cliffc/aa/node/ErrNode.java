@@ -14,7 +14,7 @@ public final class ErrNode extends Node {
   @Override public Type value(GVNGCM gvn) {
     Type t = gvn.type(in(0));
     if( _t == Type.CTRL ) return t; // For control errors, pass through incoming control
-    return t == Type.CTRL ? _t : Type.ANY; // For dead data errors return ANY (no error)
+    return t == Type.ANY || t == Type.XCTRL ? Type.ANY : _t; // For dead data errors return ANY (no error)
   }
   @Override public String err(GVNGCM gvn) { return _msg; }
   @Override public Type all_type() { return _t; }

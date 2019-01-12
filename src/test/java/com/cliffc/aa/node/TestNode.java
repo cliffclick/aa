@@ -131,17 +131,19 @@ public class TestNode {
     for( PrimNode prim : PrimNode.PRIMS )
       test1monotonic_prim(prim);
     
-    test1monotonic    (new    ConNode<Type>(          TypeInt.FALSE));
-    test1monotonic    (new    ConNode<Type>(          TypeStr.ABC  ));
-    test1monotonic    (new    ConNode<Type>(          TypeFlt.FLT64));
-    test1monotonic    (new   CastNode(_ins[0],_ins[1],TypeInt.FALSE));
-    test1monotonic    (new   CastNode(_ins[0],_ins[1],TypeStr.ABC  ));
-    test1monotonic    (new   CastNode(_ins[0],_ins[1],TypeFlt.FLT64));
-    test1monotonic    (new  CProjNode(_ins[0],0));
-    test1monotonic    (new EpilogNode(_ins[0],_ins[1],_ins[2],_ins[3],1,"unknown_ref"));
-    test1monotonic_XXX(new    PhiNode("badgc"));
-
-    
+    test1monotonic(new    ConNode<Type>(          TypeInt.FALSE));
+    test1monotonic(new    ConNode<Type>(          TypeStr.ABC  ));
+    test1monotonic(new    ConNode<Type>(          TypeFlt.FLT64));
+    test1monotonic(new   CastNode(_ins[0],_ins[1],TypeInt.FALSE));
+    test1monotonic(new   CastNode(_ins[0],_ins[1],TypeStr.ABC  ));
+    test1monotonic(new   CastNode(_ins[0],_ins[1],TypeFlt.FLT64));
+    test1monotonic(new  CProjNode(_ins[0],0));
+    test1monotonic(new EpilogNode(_ins[0],_ins[1],_ins[2],_ins[3],1,"unknown_ref"));
+    test1monotonic(new    ErrNode(_ins[0],"err",  TypeInt.FALSE));
+    test1monotonic(new    ErrNode(_ins[0],"err",  TypeStr.ABC  ));
+    test1monotonic(new    ErrNode(_ins[0],"err",  TypeFlt.FLT64));
+    test1monotonic(new    ErrNode(_ins[0],"err",  Type.CTRL ));
+    test1monotonic(new    PhiNode("badgc",_ins[0],_ins[1],_ins[2]));
   }
 
   private void test1monotonic(Node n) {
@@ -149,15 +151,6 @@ public class TestNode {
     test1monotonic_init(n);
   }
   
-  // Fill a Node with {null,edge,edge} and start the search
-  private void test1monotonic_XXX(Node n) {
-    assert n._defs._len==0;
-    n.add_def(_ins[0]);
-    n.add_def(_ins[1]);
-    n.add_def(_ins[2]);
-    test1monotonic_init(n);
-  }
-
   // Fill a Node with {null,edge,edge} and start the search
   private void test1monotonic_prim(PrimNode prim) {
     PrimNode n = prim.copy();
