@@ -21,10 +21,11 @@ public class NewNode extends Node {
   @Override public Type value(GVNGCM gvn) {
     Type[] ts = new Type[_defs._len-1];
     for( int i=0; i<ts.length; i++ ) {
-      ts[i] = gvn.type(in(i+1));
+      Type t = gvn.type(in(i+1));
       // Limit to Scalar results
-      if( ts[i]==Type.ANY ) ts[i] = Type.XSCALAR;
-      if( ts[i]==Type.ALL ) ts[i] = Type. SCALAR;
+      if(  t.isa(Type.XSCALAR) ) t = Type.XSCALAR;
+      if( !t.isa(Type. SCALAR) ) t = Type. SCALAR;
+      ts[i] = t;
     }
     TypeStruct newt = TypeStruct.make(_names,ts);
     // Get the existing type, without installing if missing because blows the
@@ -34,7 +35,7 @@ public class NewNode extends Node {
   }
   
   // NewNodes can participate in cycles, where the same structure is appended
-  // too in a loop until the size grows without bound.  If we detect this we
+  // to in a loop until the size grows without bound.  If we detect this we
   // need to approximate a new cyclic type.
   private final static int CUTOFF=5; // Depth of types before we start forcing approximations
   public static Type approx(TypeStruct newt, Type oldt) {

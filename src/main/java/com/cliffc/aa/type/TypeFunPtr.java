@@ -24,6 +24,8 @@ public class TypeFunPtr extends Type<TypeFunPtr> {
     TypeFunPtr tf = (TypeFunPtr)o;
     return _ts==tf._ts && _ret==tf._ret && _fidxs==tf._fidxs && _nargs==tf._nargs;
   }
+  // Never part of a cycle, so the normal check works
+  @Override public boolean cycle_equals( Type o ) { return equals(o); }
   @Override String str( BitSet dups) {
     SB sb = FunNode.names(_fidxs,new SB());
     if( _nargs==-1 ) return sb.p("{forward_ref}").toString();

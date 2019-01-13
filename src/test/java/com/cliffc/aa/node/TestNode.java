@@ -5,6 +5,7 @@ import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeFlt;
 import com.cliffc.aa.type.TypeInt;
 import com.cliffc.aa.type.TypeStr;
+import com.cliffc.aa.type.TypeStruct;
 import com.cliffc.aa.util.NonBlockingHashMapLong;
 import com.cliffc.aa.util.Util;
 import org.junit.Test;
@@ -128,6 +129,7 @@ public class TestNode {
     for( int i=1; i<_ins.length; i++ )
       _ins[i] = new ConNode<Type>(Type.SCALAR);
 
+    test1monotonic(new    NewNode(TypeStruct.FLDS(2),new Node[]{null,_ins[1],_ins[2]}));
     // CallNode
     test1monotonic(new    ConNode<Type>(          TypeInt.FALSE));
     test1monotonic(new    ConNode<Type>(          TypeStr.ABC  ));
@@ -144,7 +146,7 @@ public class TestNode {
     // FunNode
     test1monotonic(new     IfNode(_ins[0],_ins[1]));
     test1monotonic(new   LoadNode(_ins[0],_ins[1],0,null));
-    // NewNode.java
+    test1monotonic(new    NewNode(TypeStruct.FLDS(2),new Node[]{null,_ins[1],_ins[2]}));
     // ParmNode.java
     test1monotonic(new    PhiNode("badgc",_ins[0],_ins[1],_ins[2]));
     for( PrimNode prim : PrimNode.PRIMS )

@@ -18,6 +18,8 @@ public class TypeRPC extends Type<TypeRPC> {
     TypeRPC tf = (TypeRPC)o;
     return _rpcs==tf._rpcs;
   }
+  // Never part of a cycle, so the normal check works
+  @Override public boolean cycle_equals( Type o ) { return equals(o); }
   @Override String str( BitSet dups) {
     SB sb = new SB().p("#");
     return _rpcs.toString(sb).toString();

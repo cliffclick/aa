@@ -15,6 +15,8 @@ public class TypeOop<O extends TypeOop<O>> extends Type<O> {
     if( this==o ) return true;
     return o instanceof TypeOop && _any==((TypeOop)o)._any;
   }
+  // Never part of a cycle, so the normal check works
+  @Override public boolean cycle_equals( Type o ) { return equals(o); }
   @Override String str( BitSet dups) { return _any ? "~oop" : "oop"; }
   private static TypeOop FREE=null;
   @Override protected O free( O ret ) { FREE=this; return ret; }
