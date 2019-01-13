@@ -128,9 +128,7 @@ public class TestNode {
     for( int i=1; i<_ins.length; i++ )
       _ins[i] = new ConNode<Type>(Type.SCALAR);
 
-    for( PrimNode prim : PrimNode.PRIMS )
-      test1monotonic_prim(prim);
-    
+    // CallNode
     test1monotonic(new    ConNode<Type>(          TypeInt.FALSE));
     test1monotonic(new    ConNode<Type>(          TypeStr.ABC  ));
     test1monotonic(new    ConNode<Type>(          TypeFlt.FLT64));
@@ -143,8 +141,20 @@ public class TestNode {
     test1monotonic(new    ErrNode(_ins[0],"err",  TypeStr.ABC  ));
     test1monotonic(new    ErrNode(_ins[0],"err",  TypeFlt.FLT64));
     test1monotonic(new    ErrNode(_ins[0],"err",  Type   .CTRL ));
+    // FunNode
     test1monotonic(new     IfNode(_ins[0],_ins[1]));
+    test1monotonic(new   LoadNode(_ins[0],_ins[1],0,null));
+    // NewNode.java
+    // ParmNode.java
     test1monotonic(new    PhiNode("badgc",_ins[0],_ins[1],_ins[2]));
+    for( PrimNode prim : PrimNode.PRIMS )
+      test1monotonic_prim(prim);
+    // ProjNode.java
+    // RegionNode.java
+    // ScopeNode.java
+    // TmpNode.java
+    // TypeNode.java
+    // UnresolvedNode.java    
   }
 
   private void test1monotonic(Node n) {

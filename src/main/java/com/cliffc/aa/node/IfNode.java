@@ -29,8 +29,8 @@ public class IfNode extends Node {
     
     if( pred instanceof TypeOop ) return TypeTuple.IF_TRUE;
     if( pred.is_con() ) { assert pred.getl() != 0; return TypeTuple.IF_TRUE; } // True only
-    System.out.println("if takes default "+pred); // Dunno what test this is?
-    return TypeTuple.IF_ALL;
+    
+    throw AA.unimpl(); // Dunno what test this is?
   }
   @Override public Type all_type() { return TypeTuple.IF_ALL; }
   @Override public Node is_copy(GVNGCM gvn, int idx) {

@@ -16,8 +16,9 @@ public class LoadNode extends Node {
     super(OP_LOAD,ctrl,st);
     _fld = fld;
     _fld_num = fld_num;
-    _badfld = bad.errMsg("Unknown field '."+fld+"'");
-    _badnil = bad.errMsg("Struct might be nil when reading field '."+fld+"'");
+    // Tests can pass a null, but nobody else does
+    _badfld = bad==null ? null : bad.errMsg("Unknown field '."+fld+"'");
+    _badnil = bad==null ? null : bad.errMsg("Struct might be nil when reading field '."+fld+"'");
   }
   public LoadNode( Node ctrl, Node st, String fld , Parse bad ) { this(ctrl,st,fld,-1,bad); }
   public LoadNode( Node ctrl, Node st, int fld_num, Parse bad ) { this(ctrl,st,null,fld_num,bad); }
@@ -64,8 +65,7 @@ public class LoadNode extends Node {
   @Override public Type value(GVNGCM gvn) {
     Type t = gvn.type(in(1)).base();
     if( t.isa(TypeNil.XOOP) ) return Type.XSCALAR; // Very high address; might fall to any valid value
-    if( TypeOop.OOP.isa(t) ) return Type.SCALAR;   // Too low, might not have any fields
-    if( t.is_forward_ref() ) return Type.SCALAR;   // Not yet defined, might fail
+    if( t.isa(TypeOop.XOOP) ) return Type.XSCALAR; // Very high address; might fall to any valid value
     if( t instanceof TypeNil ) {
       if( !t.above_center() )     // NIL or below?
         return Type.SCALAR;       // Fails - might be nil at runtime
@@ -75,10 +75,10 @@ public class LoadNode extends Node {
     if( t instanceof TypeStruct ) {
       TypeStruct ts = (TypeStruct)t;
       int idx = find(ts);       // Find the named field
-      return idx == -1 ? Type.SCALAR : ts.at(idx); // Field type
+      if( idx != -1 ) return ts.at(idx); // Field type
     }
-    
-    throw AA.unimpl();
+
+    return Type.SCALAR;
   }
 
   private int find(TypeStruct ts) {
