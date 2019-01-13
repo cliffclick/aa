@@ -259,11 +259,6 @@ public class TypeStruct extends TypeOop<TypeStruct> {
     TypeStruct thsi = this;
     TypeStruct that = (TypeStruct)t;
     // INVARIANT: Both this and that are prior existing & interned.
-    if( RECURSIVE_MEET==0 && !that.interned() ) {
-      Type res = Type.INTERN.get(that);
-      System.out.println(res);
-      assert res==that : "broken hash table";
-    }
     assert RECURSIVE_MEET > 0 || (thsi.interned() && that.interned());
     // INVARIANT: Both MEETS are empty at the start.  Nothing involved in a
     // potential cycle is interned until the Meet completes.

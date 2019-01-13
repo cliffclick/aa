@@ -63,6 +63,7 @@ public class TypeTuple<P extends TypeTuple<P>> extends TypeOop<P> {
     TypeTuple t1 = FREE;
     if( t1 == null ) t1 = new TypeTuple(TTUPLE, any, ts);
     else { FREE = null; t1.init(TTUPLE, any, ts); }
+    assert t1._type==TTUPLE;
     TypeTuple t2 = (TypeTuple)t1.hashcons();
     return t1==t2 ? t1 : t1.free(t2);
   }

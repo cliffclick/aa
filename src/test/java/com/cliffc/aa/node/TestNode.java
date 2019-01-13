@@ -129,7 +129,6 @@ public class TestNode {
     for( int i=1; i<_ins.length; i++ )
       _ins[i] = new ConNode<Type>(Type.SCALAR);
 
-    test1monotonic(new    NewNode(TypeStruct.FLDS(2),new Node[]{null,_ins[1],_ins[2]}));
     // CallNode
     test1monotonic(new    ConNode<Type>(          TypeInt.FALSE));
     test1monotonic(new    ConNode<Type>(          TypeStr.ABC  ));

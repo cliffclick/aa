@@ -32,6 +32,7 @@ public class TypeFun extends TypeTuple<TypeFun> {
     TypeFun t1 = FREE;
     if( t1 == null ) t1 = new TypeFun(any,ts);
     else { FREE = null; t1.init(any,ts); }
+    assert t1._type==TFUN;
     TypeFun t2 = (TypeFun)t1.hashcons();
     return t1==t2 ? t1 : t1.free(t2);
   }

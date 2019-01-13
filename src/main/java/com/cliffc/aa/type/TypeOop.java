@@ -13,10 +13,13 @@ public class TypeOop<O extends TypeOop<O>> extends Type<O> {
   @Override public int hashCode( ) { return super.hashCode()+(_any?1:0); }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
-    return o instanceof TypeOop && _any==((TypeOop)o)._any;
+    return o instanceof TypeOop && _any==((TypeOop)o)._any && _type==((TypeOop)o)._type;
   }
   // Never part of a cycle, so the normal check works
-  @Override public boolean cycle_equals( Type o ) { return equals(o); }
+  @Override public boolean cycle_equals( Type o ) {
+    assert _type==TOOP;
+    return equals(o);
+  }
   @Override String str( BitSet dups) { return _any ? "~oop" : "oop"; }
   private static TypeOop FREE=null;
   @Override protected O free( O ret ) { FREE=this; return ret; }

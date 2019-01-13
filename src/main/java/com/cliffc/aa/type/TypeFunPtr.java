@@ -8,7 +8,7 @@ import java.util.BitSet;
 import java.util.function.Consumer;
 
 // Function constants and signatures.  Contrast this to 'TypeFun'.
-public class TypeFunPtr extends Type<TypeFunPtr> {
+public final class TypeFunPtr extends Type<TypeFunPtr> {
   public TypeTuple _ts;         // Arg types
   public Type _ret;             // return types
   // List of known functions in set, or 'flip' for choice-of-functions.
