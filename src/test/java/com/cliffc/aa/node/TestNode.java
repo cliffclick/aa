@@ -142,7 +142,7 @@ public class TestNode {
     test1monotonic(new    ErrNode(_ins[0],"err",  TypeStr.ABC  ));
     test1monotonic(new    ErrNode(_ins[0],"err",  TypeFlt.FLT64));
     test1monotonic(new    ErrNode(_ins[0],"err",  Type   .CTRL ));
-    // FunNode
+    test1monotonic(new    FunNode(new Type[]{TypeInt.INT64},_ins[0]));
     test1monotonic(new     IfNode(_ins[0],_ins[1]));
     test1monotonic(new   LoadNode(_ins[0],_ins[1],0,null));
     test1monotonic(new    NewNode(TypeStruct.FLDS(2),new Node[]{null,_ins[1],_ins[2]}));
