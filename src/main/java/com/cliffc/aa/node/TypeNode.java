@@ -43,9 +43,8 @@ public class TypeNode extends Node {
   @Override public Type value(GVNGCM gvn) {
     Type t = gvn.type(in(1));
     // Return my input type "pinched" between _t and _t.dual()
-    return t.isa(_t) ? (t.isa(_t.dual()) ? _t.dual() : t) : _t;
-    //if( _t.dual().isa(t) && t.isa(_t) ) return t;
-    //return _t.dual().meet(_t.join(t));
+    if( _t.dual().isa(t) && t.isa(_t) ) return t;
+    return t.above_center() ? _t.dual() : _t;
   }
   @Override public Type all_type() { return _t; }
   @Override public String err(GVNGCM gvn) {
