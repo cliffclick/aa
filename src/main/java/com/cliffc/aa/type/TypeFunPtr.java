@@ -77,6 +77,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     case TRPC:   return t.must_nil() ? SCALAR : NSCALR;
     case TNIL:
     case TNAME:  return t.xmeet(this); // Let other side decide
+    case TMEM:   return ALL;
     default: throw typerr(t);   // All else should not happen
     }
     // Join of args; meet of ret & fidxs

@@ -162,7 +162,8 @@ public class Type<T extends Type<T>> {
   static final byte TFLT    =25; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
   static final byte TINT    =26; // All Integers, including signed/unsigned and various sizes; see TypeInt
   static final byte TSTR    =27; // String type
-  static final byte TLAST   =28; // Type check
+  static final byte TMEM    =28; // String type
+  static final byte TLAST   =29; // Type check
 
   public  static final Type ALL    = make( TALL   ); // Bottom
   public  static final Type ANY    = make( TANY   ); // Top
@@ -247,6 +248,9 @@ public class Type<T extends Type<T>> {
     if(  type <= TXCTRL ) return _type==TXCTRL && t._type==TXCTRL ? XCTRL : CTRL;
     if( _type <= TXCTRL || t._type <= TXCTRL ) return ALL;
 
+    // Memory does something complex with memory
+    if( t._type==TMEM ) return t.xmeet(this);
+    
     // Scalar is close to bottom: nearly everything falls to SCALAR, except
     // Bottom (already handled) and Control (error; already handled).
     if( _type == TSCALAR || t._type == TSCALAR ) return SCALAR;
@@ -351,6 +355,7 @@ public class Type<T extends Type<T>> {
     ts = concat(ts,TypeFun   .TYPES);
     ts = concat(ts,TypeRPC   .TYPES);
     ts = concat(ts,TypeName  .TYPES);
+    ts = concat(ts,TypeMem   .TYPES);
     // Partial order Sort, makes for easier tests later.  Arrays.sort requires
     // a total order (i.e., the obvious Comparator breaks the sort contract),
     // so we hand-roll a simple bubble sort.
@@ -566,6 +571,7 @@ public class Type<T extends Type<T>> {
     case TNREAL:    return REAL;
     case TNSCALR:   return SCALAR;
     case TCTRL: case TXCTRL: return ALL;
+    case TMEM:      return ALL;
     default:        throw typerr(null); // Overridden in subclass
     }
   }

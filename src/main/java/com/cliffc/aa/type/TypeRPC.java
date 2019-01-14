@@ -53,6 +53,7 @@ public class TypeRPC extends Type<TypeRPC> {
     case TRPC:   break;
     case TNIL:
     case TNAME:  return t.xmeet(this); // Let other side decide
+    case TMEM:   return ALL;
     default: throw typerr(t);   // All else should not happen
     }
     TypeRPC tf = (TypeRPC)t;

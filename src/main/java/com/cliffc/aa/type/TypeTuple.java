@@ -114,6 +114,7 @@ public class TypeTuple<P extends TypeTuple<P>> extends TypeOop<P> {
     case TSTRUCT:
     case TNIL:
     case TNAME:  return t.xmeet(this); // Let other side decide
+    case TMEM:   return ALL;
     default: throw typerr(t);
     }
     // If unequal length; then if short is low it "wins" (result is short) else

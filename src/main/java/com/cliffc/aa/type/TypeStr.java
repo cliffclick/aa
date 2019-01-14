@@ -63,6 +63,7 @@ public class TypeStr extends TypeOop<TypeStr> {
     case TOOP:
     case TNIL:
     case TNAME:  return t.xmeet(this); // Let other side decide
+    case TMEM:   return ALL;
     default: throw typerr(t);
     }
     if( this== STR || t == STR ) return STR;

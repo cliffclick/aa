@@ -254,6 +254,7 @@ public class TypeStruct extends TypeOop<TypeStruct> {
       
     case TOOP:
     case TNAME:  return t.xmeet(this); // Let other side decide
+    case TMEM:   return ALL;
     default: throw typerr(t);   // All else should not happen
     }
     TypeStruct thsi = this;

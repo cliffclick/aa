@@ -62,6 +62,7 @@ public class TypeFlt extends Type<TypeFlt> {
     case TRPC:   return must_nil() ? SCALAR : NSCALR;
     case TNIL:
     case TNAME:  return t.xmeet(this); // Let other side decide
+    case TMEM:   return ALL;
     default: throw typerr(t);
     }
     TypeFlt tf = (TypeFlt)t;

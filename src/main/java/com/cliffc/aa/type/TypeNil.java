@@ -77,9 +77,11 @@ public class TypeNil extends Type<TypeNil> {
       return t instanceof TypeNil  // aways keep nil (choice or not)
         ? make(_t.meet(((TypeNil)t)._t))
         :      _t.meet(t);      // toss away nil choice
-    else                        // must-nil
+    else {                      // must-nil
       // Keep the nil (and remove any double-nil)
-      return make(_t.meet(t instanceof TypeNil ? ((TypeNil)t)._t : t));
+      Type tm = _t.meet(t instanceof TypeNil ? ((TypeNil)t)._t : t);
+      return tm.isa(SCALAR) ? make(tm) : ALL;
+    }
   }
 
   @Override public boolean above_center() { return _t != null && _t.above_center(); }

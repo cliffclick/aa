@@ -73,6 +73,7 @@ public class TypeInt extends Type<TypeInt> {
     case TRPC:   return must_nil() ? SCALAR : NSCALR;
     case TNIL:
     case TNAME:  return t.xmeet(this); // Let other side decide
+    case TMEM:   return ALL;
     default: throw typerr(t);
     }
     TypeInt tt = (TypeInt)t;

@@ -69,6 +69,7 @@ public class TypeFun extends TypeTuple<TypeFun> {
     case TRPC:   return t.must_nil() ? SCALAR : NSCALR;
     case TNIL:
     case TNAME:  return t.xmeet(this); // Let other side decide
+    case TMEM:   return ALL;
     default: throw typerr(t);
     }
     TypeFun tt = (TypeFun)t;
