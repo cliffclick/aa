@@ -1,11 +1,8 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeFlt;
-import com.cliffc.aa.type.TypeInt;
-import com.cliffc.aa.type.TypeStr;
-import com.cliffc.aa.type.TypeStruct;
+import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.NonBlockingHashMapLong;
 import com.cliffc.aa.util.Util;
 import org.junit.Test;
@@ -129,6 +126,8 @@ public class TestNode {
     for( int i=1; i<_ins.length; i++ )
       _ins[i] = new ConNode<Type>(Type.SCALAR);
 
+    Node unr = Env.top().lookup("+"); // All the "+" functions
+    test1monotonic(new   CallNode(false,null,_ins[0],  unr  ,_ins[2],_ins[3]));
     test1monotonic(new   CallNode(false,null,_ins[0],_ins[1],_ins[2],_ins[3]));
     test1monotonic(new    ConNode<Type>(          TypeInt.FALSE));
     test1monotonic(new    ConNode<Type>(          TypeStr.ABC  ));
@@ -205,7 +204,6 @@ public class TestNode {
             if( !vn.isa(vm) ) {
               System.out.println(n.xstr()+"("+all[xx(xx,0)]+","+all[xx(xx,1)]+","+all[xx(xx,2)]+","+all[xx(xx,3)]+") = "+vn);
               System.out.println(n.xstr()+"("+all[     x0 ]+","+all[     x1 ]+","+all[     x2 ]+","+all[     x3 ]+") = "+vm);
-              assert vn.isa(vm) : "Not monotonic!";
             }
             if( !visited ) test1monotonic(n,xxx); // Recurse
           }

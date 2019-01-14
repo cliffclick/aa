@@ -52,7 +52,7 @@ public class Env implements AutoCloseable {
   void add_type( String name, Type t ) { _scope.add_type(name,t); }
   
   // A new top-level Env, above this is the basic public Env with all the primitives
-  static Env top() { return new Env(TOP); }
+  public static Env top() { return new Env(TOP); }
 
   // Close the current Env, making its lexical scope dead (and making dead
   // anything only pointed at by this scope).
@@ -93,7 +93,7 @@ public class Env implements AutoCloseable {
   // type (so can, for instance, assign a new function to a var as long as the
   // type signatures match).  Cannot re-assign to a ref, only var; vars only
   // available in loops.  Only returns nodes registered with GVN.
-  Node lookup( String token ) {
+  public Node lookup( String token ) {
     if( token == null ) return null; // Handle null here, easier on parser
     // Lookup
     Node n = _scope.get(token);

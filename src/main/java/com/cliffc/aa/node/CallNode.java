@@ -236,10 +236,10 @@ public class CallNode extends Node {
     Type t = gvn.type(fp);      // If inlined, its the result, if not inlined, its the function being called
     if( _inlined )              // Inlined functions just pass thru & disappear
       return TypeTuple.make(tc,t);
-    if( tc == Type.XCTRL )      // Call is dead?
+    if( tc == Type.XCTRL || tc == Type.ANY ) // Call is dead?
       return TypeTuple.make(Type.XCTRL,Type.XSCALAR);
     if( Type.SCALAR.isa(t) ) // Calling something that MIGHT be a function, no idea what the result is
-      return TypeTuple.make(tc,Type.SCALAR);
+      return TypeTuple.make(Type.CTRL,Type.SCALAR);
 
     if( gvn._opt ) // Manifesting optimistic virtual edges between caller and callee
       wire(gvn,t); // Make real edges from virtual edges
@@ -256,7 +256,7 @@ public class CallNode extends Node {
     }
 
     // Return {control,value} tuple.
-    return TypeTuple.make(tc,trez);
+    return TypeTuple.make(Type.CTRL,trez);
   }
 
   // See if the arguments are valid.  If valid, return the function's return
