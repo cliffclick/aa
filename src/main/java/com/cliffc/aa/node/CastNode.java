@@ -36,6 +36,7 @@ public class CastNode extends Node {
   @Override public Type value(GVNGCM gvn) {
     Type t = gvn.type(in(1));
     if( t == TypeNil.NIL && _t==Type.NSCALR ) return gvn.self_type(this);
-    return _t.join(gvn.type(in(1)));
+    return _t.join(t);
+    //return _t.dual().meet(_t.join(t));
   }
 }
