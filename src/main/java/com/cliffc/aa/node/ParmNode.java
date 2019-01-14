@@ -7,7 +7,7 @@ import com.cliffc.aa.type.Type;
 public class ParmNode extends PhiNode {
   public final int _idx;    // Parameter index, zero-based; -1 reserved for RPC
   private final String _name;   // Parameter name
-  public ParmNode( int idx, String name, FunNode fun, ConNode defalt, String badgc) {
+  public ParmNode( int idx, String name, Node fun, ConNode defalt, String badgc) {
     super(OP_PARM,fun,defalt,badgc);
     _idx=idx;
     _name=name;

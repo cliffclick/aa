@@ -22,7 +22,12 @@ public class ProjNode extends Node {
   }
   @Override public Type value(GVNGCM gvn) {
     Type c = gvn.type(in(0));
-    return ((TypeTuple)c).at(_idx); // Otherwise our type is just the matching tuple slice
+    if( c instanceof TypeTuple ) {
+      TypeTuple ct = (TypeTuple)c;
+      if( _idx < ct._ts.length )
+        return ct._ts[_idx];
+    }
+    return c.above_center() ? Type.ANY : Type.ALL;
   }
   @Override public Type all_type() { return Type.SCALAR; }
 

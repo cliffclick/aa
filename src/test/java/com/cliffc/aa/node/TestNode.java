@@ -147,10 +147,11 @@ public class TestNode {
     test1monotonic(new   LoadNode(_ins[0],_ins[1],0,null));
     test1monotonic(new    NewNode(TypeStruct.FLDS(2),new Node[]{null,_ins[1],_ins[2]}));
     // ParmNode.java
+    test1monotonic(new   ParmNode( 1, "x",_ins[0],(ConNode)_ins[1],"badgc"));
     test1monotonic(new    PhiNode("badgc",_ins[0],_ins[1],_ins[2]));
     for( PrimNode prim : PrimNode.PRIMS )
       test1monotonic_prim(prim);
-    // ProjNode.java
+    test1monotonic(new   ProjNode(_ins[0],1));
     // RegionNode.java
     // ScopeNode.java
     // TmpNode.java
