@@ -236,8 +236,8 @@ public class CallNode extends Node {
     Type t = gvn.type(fp);      // If inlined, its the result, if not inlined, its the function being called
     if( _inlined )              // Inlined functions just pass thru & disappear
       return TypeTuple.make(tc,t);
-    if( tc == Type.XCTRL )      // Call is dead?  Just return exact same return type, only deader
-      return TypeTuple.make(tc,((TypeTuple)gvn.type(this)).at(1));
+    if( tc == Type.XCTRL )      // Call is dead?
+      return TypeTuple.make(Type.XCTRL,Type.XSCALAR);
     if( Type.SCALAR.isa(t) ) // Calling something that MIGHT be a function, no idea what the result is
       return TypeTuple.make(tc,Type.SCALAR);
 
@@ -245,14 +245,10 @@ public class CallNode extends Node {
       wire(gvn,t); // Make real edges from virtual edges
 
     Type trez = Type.ALL; // Base for JOIN
-    //if( t.is_fun_ptr() ) {
     if( fp instanceof UnresolvedNode ) {
       // For unresolved, we can take the BEST choice; i.e. the JOIN of every
       // choice.  Typically one choice works and the others report type
       // errors on arguments.
-      //Bits fidxs = ((TypeFunPtr)((TypeTuple)t).at(3))._fidxs;
-      //for( int fidx : fidxs )
-      //  trez = trez.join(value1(gvn,gvn.type(FunNode.find_fidx(fidx).epi()))); // JOIN of choices
       for( Node epi : fp._defs )
         trez = trez.join(value1(gvn,gvn.type(epi))); // JOIN of choices
     } else {                                  // Single resolved target
@@ -267,7 +263,8 @@ public class CallNode extends Node {
   // type.  If not valid return SCALAR - as an indicator that the function
   // cannot be called, so the JOIN of valid returns is not lowered.
   private Type value1( GVNGCM gvn, Type t ) {
-    if( t==Type.XSCALAR ) return Type.XSCALAR; // Might be any function, returning anything
+    if( !(t instanceof TypeFun) ) // Might be any function, returning anything
+      return t.above_center() ? Type.XSCALAR : Type.SCALAR;
     TypeFun tepi = (TypeFun)t;
     Type    tctrl=tepi.ctl();
     Type    tval =tepi.val();
