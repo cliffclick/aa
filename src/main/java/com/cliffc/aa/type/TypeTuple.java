@@ -76,7 +76,7 @@ public class TypeTuple<P extends TypeTuple<P>> extends TypeOop<P> {
           static final TypeTuple XSCALARS= make0(true);
           static final TypeTuple SCALAR0 = make();
           static final TypeTuple SCALAR1 = make(SCALAR);
-          static final TypeTuple SCALAR2 = make(SCALAR, SCALAR);
+  public  static final TypeTuple SCALAR2 = make(SCALAR, SCALAR);
           static final TypeTuple INT32   = make(TypeInt.INT32 );
   public  static final TypeTuple INT64   = make(TypeInt.INT64 );
   public  static final TypeTuple FLT64   = make(TypeFlt.FLT64 );

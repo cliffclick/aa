@@ -164,6 +164,7 @@ public class CallNode extends Node {
       Node irez = rez.copy();   // Copy the entire function body
       for( Node parm : rez._defs )
         irez.add_def((parm instanceof ParmNode && parm.in(0) == fun) ? arg(((ParmNode)parm)._idx) : parm);
+      if( irez instanceof PrimNode ) ((PrimNode)irez)._badargs = _badargs;
       return inline(gvn,in(0),gvn.xform(irez)); // New exciting replacement for inlined call
     }
 

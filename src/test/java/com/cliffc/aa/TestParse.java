@@ -15,16 +15,6 @@ public class TestParse {
   
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
-    testerr("x=(1+(x=2)+x)", "Cannot re-assign val 'x'","             ");
-    test("x=(1+(x:=2)+x)", TypeInt.con(5));
-
-    // Not currently inferring top-level function return very well.  Acting
-    // "as-if" called by Scalar args, which pretty much guarantees a fail result.
-    // Note that this is correct scenario: the returned value is reporting that
-    // it might type-err on some future unknown call with Scalar args.  Would
-    // like to lift the type to (i64,i64->i64) and move that future maybe-error
-    // to the function args and away from the primitive call.
-    //test("{x y -> x & y}", TypeFun.make(TypeFunPtr.make(TypeTuple.INT64_INT64,TypeInt.INT64,Bits.FULL,2)));
 
     // A collection of tests which like to fail easily
     testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1) is not a @{x,y}","                           ");
@@ -162,6 +152,7 @@ public class TestParse {
     test("x=3; mul2={x -> x*2}; mul2(2.1)", TypeFlt.con(2.1*2.0)); // must inline to resolve overload {*}:Flt with I->F conversion
     test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
     test("sq={x -> x*x}; sq 2.1", TypeFlt.con(4.41)); // No () required for single args
+    testerr("sq={x -> x&x}; sq(\"abc\")", "\"abc\" is not a int64","                        ");
     testerr("f0 = { f x -> f0(x-1) }; f0({+},2)", "Passing 1 arguments to f0{Scalar Scalar -> Scalar} which takes 2 arguments","                     ");
     // Recursive:
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));

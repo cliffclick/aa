@@ -20,7 +20,8 @@ public abstract class PrimNode extends Node {
   final Type _ret;
   public final String _name;    // Unique name (and program bits)
   public final String[] _args;  // Handy
-  PrimNode( String name, String[] args, TypeTuple targs, Type ret, Node... nodes ) { super(OP_PRIM,nodes); _name=name; _args=args; _targs = targs; _ret = ret; }
+  public Parse _badargs;
+  PrimNode( String name, String[] args, TypeTuple targs, Type ret, Node... nodes ) { super(OP_PRIM,nodes); _name=name; _args=args; _targs = targs; _ret = ret; _badargs=null; }
   
   final static String[] ARGS1 = new String[]{"x"};
   final static String[] ARGS2 = new String[]{"x","y"};
@@ -104,6 +105,15 @@ public abstract class PrimNode extends Node {
       else if( !t.is_con() ) return _ret;    // Some input is too low
     }
     return is_con ? apply(ts) : _ret.dual();
+  }
+  @Override public String err(GVNGCM gvn) {
+    for( int i=0; i<_targs._ts.length; i++ ) {
+      Type tactual = gvn.type(in(i+1));
+      Type tformal = _targs._ts[i];
+      if( !tactual.isa(tformal) )
+        return _badargs==null ? "bad arguments" : _badargs.typerr(tactual,tformal);
+    }
+    return null;
   }
   // Worse-case type for this Node
   @Override public Type all_type() { return _ret; }
