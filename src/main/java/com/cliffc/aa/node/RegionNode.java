@@ -31,6 +31,7 @@ public class RegionNode extends Node {
 
     // If only 1 live path and no Phis then return 1 live path.
     if( dlen>2 || keepslot1 ) return null; // Multiple live paths
+    if( dlen == 1 ) return null; // No live inputs
     for( Node phi : _uses ) if( phi instanceof PhiNode ) return null;
     return in(1)==this ? null : in(1);
   }

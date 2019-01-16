@@ -372,6 +372,8 @@ public class FunNode extends RegionNode {
         c.add_def(x); 
         for( int j=2; j<_defs._len; j++ ) // Get the new parm path or null according to split
           c.add_def( fun.in(j)==any ? dany : n.in(j) );
+        // Update default type to match signature
+        if( idx != -1 ) ((ParmNode)c)._default_type = fun._tf.arg(idx);
       } else if( n != this ) {  // Interior nodes
         for( Node def : n._defs ) {
           // Map old to new, except if using the old epilog in a recursive fcn,

@@ -258,11 +258,11 @@ public class GVNGCM {
   // Replace with a ConNode iff
   // - Not already a ConNode AND
   // - Not an ErrNode AND
-  // - Type is above-or-a-con AND
-  // - Not a ParmNode unless also is_con
+  // - Type isa Con
   private static boolean replace_con(Type t, Node n) {
-    return t.may_be_con() && !(n instanceof ConNode) && !(n instanceof ErrNode) &&
-            (!(n instanceof ParmNode) || t.is_con());
+    if( n instanceof ConNode || n instanceof ErrNode )
+      return false; // Already a constant, or never touch an ErrNode
+    return t.is_con(); // Replace with a ConNode
   };
 
   /** Look for a better version of 'n'.  Can change n's defs via the ideal()

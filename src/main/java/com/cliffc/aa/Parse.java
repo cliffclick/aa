@@ -292,6 +292,8 @@ public class Parse {
       String phi_errmsg = errMsg("Cannot mix GC and non-GC types");
       if_scope.common(this,_gvn,phi_errmsg,t_scope,f_scope,expr,t_sharp,f_sharp); // Add a PhiNode for all commonly defined variables
       if_scope.add_def(gvn(new PhiNode(phi_errmsg,ctrl(),ctrls.in(1),ctrls.in(3)))); // Add a PhiNode for the result, hook to prevent deletion
+      if( !t_sharp.is_dead() && t_sharp._uses._len == 0 ) kill(t_sharp);
+      if( !f_sharp.is_dead() && f_sharp._uses._len == 0 ) kill(f_sharp);
       kill(t_scope);
       kill(f_scope);
     }
