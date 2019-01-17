@@ -210,9 +210,9 @@ Named type variables | Named types are simple subtypes
 `gal=:flt; 3==gal(2)+1` | `1:int` Auto-cast-away `gal` to get a `flt`
 `gal=:flt; tank:gal = gal(2)` | `2:gal` 
 `gal=:flt; tank:gal = gal(2)+1` | `3.0 is not a gal:flt` No-auto-cast into a `gal`
-`Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(@{x=1,y=2}))` | `5:int` type variables can be used anywhere a type can, including function arguments
-`Point=:@{x,y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(@{x=1,y=2}))` | `5:int` this `dist` takes any argument with fields `@{x,y}`, `Point` included
-`Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(     (@{x=1,y=2}))` | `@{x:1,y:2} is not a Point:@{x,y}` this `dist` only takes a `Point` argument
+`Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(1,2))` | `5:int` type variables can be used anywhere a type can, including function arguments
+`Point=:@{x,y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(1,2))` | `5:int` this `dist` takes any argument with fields `@{x,y}`, `Point` included
+`Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(@{x=1,y=2})` | `@{x:1,y:2} is not a Point:@{x,y}` this `dist` only takes a `Point` argument
 Nilable and not-nil modeled after Kotlin | ---
 `x:str? = 0`      | `nil`  question-type allows nil or not; zero digit is nil
 `x:str? = "abc"`  | `"abc":str` question-type allows nil or not
