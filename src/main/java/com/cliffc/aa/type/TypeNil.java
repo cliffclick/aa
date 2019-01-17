@@ -79,7 +79,14 @@ public class TypeNil extends Type<TypeNil> {
         :      _t.meet(t);      // toss away nil choice
     else {                      // must-nil
       // Keep the nil (and remove any double-nil)
-      Type tm = _t.meet(t instanceof TypeNil ? ((TypeNil)t)._t : t);
+      Type tm;
+      if( t instanceof TypeNil ) {
+        TypeNil tn = (TypeNil)t;
+        tm = _t.meet(tn._t);
+        if( tm == tn._t ) return tn;
+      } else {
+        tm = _t.meet(t);
+      }
       return tm.isa(SCALAR) ? make(tm) : ALL;
     }
   }
@@ -117,13 +124,16 @@ public class TypeNil extends Type<TypeNil> {
   @Override public void iter( Consumer<Type> c ) { c.accept(_t); }
   @Override boolean contains( Type t, BitSet bs ) { return _t == t || (_t != null && _t.contains(t, bs)); }
   @Override int depth( BitSet bs ) { return 1+(_t==null ? 0 : _t.depth(bs)); }
-  @Override Type replace( Type old, Type nnn, HashMap<TypeStruct,TypeStruct> MEETS ) {
+  @Override Type replace( Type old, Type nnn, HashMap<Type,Type> HASHCONS ) {
     if( _t==null ) return this;
-    Type x = _t.replace(old,nnn,MEETS);
+    Type x = _t.replace(old,nnn,HASHCONS);
     if( x==_t ) return this;
-    Type rez = make(x);
+    TypeNil rez = make0(x);
     rez._cyclic=true;
-    return rez;
+    Type hc = HASHCONS.get(rez);
+    if( hc == null ) { HASHCONS.put(rez,rez); return rez; }
+    free(rez);
+    return hc;
   }
   @Override void walk( Predicate<Type> p ) { if( p.test(this) && _t!=null ) _t.walk(p); }
   @Override TypeStruct repeats_in_cycles(TypeStruct head, BitSet bs) {

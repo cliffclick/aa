@@ -88,7 +88,6 @@ public class Type<T extends Type<T>> {
     Type t2 = INTERN.get(this); // Lookup
     if( t2!=null ) {            // Found prior
       assert t2._dual != null;  // Prior is complete with dual
-      assert t2 != this;        // Not hash-consing twice
       return t2;                // Return prior
     }
     if( RECURSIVE_MEET > 0 )    // Mid-building recursive types; do not intern
@@ -591,7 +590,7 @@ public class Type<T extends Type<T>> {
   // Mark if part of a cycle
   void mark_cycle( Type t, BitSet visit, BitSet cycle ) { }
   // Replace old with nnn in a clone
-  Type replace( Type old, Type nnn, HashMap<TypeStruct,TypeStruct> ignore ) { return this; }
+  Type replace( Type old, Type nnn, HashMap<Type,Type> ignore ) { return this; }
   
   // Iterate over any nested child types.  Only side-effect results.
   public void iter( Consumer<Type> c ) { /*None in the base class*/ }

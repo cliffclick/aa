@@ -218,7 +218,7 @@ public class TypeName extends Type<TypeName> {
   @Override public void iter( Consumer<Type> c ) { c.accept(_t); }
   @Override boolean contains( Type t, BitSet bs ) { return _t == t || _t.contains(t, bs); }
   @Override int depth( BitSet bs ) { return 1+_t.depth(bs); }
-  @Override Type replace( Type old, Type nnn, HashMap<TypeStruct,TypeStruct> MEETS  ) {
+  @Override Type replace( Type old, Type nnn, HashMap<Type,Type> MEETS  ) {
     Type x = _t.replace(old,nnn,MEETS);
     if( x==_t ) return this;
     Type rez = make(_name,_lex,x);

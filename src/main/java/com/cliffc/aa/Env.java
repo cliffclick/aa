@@ -74,7 +74,7 @@ public class Env implements AutoCloseable {
       int idx = use._defs.find(_scope);
       _gvn.set_def_reg(use,idx, idx==0 ? pscope.get(" control ") : pscope);
     }
-    _gvn.kill0(_scope);
+    _gvn.kill(_scope);
   }
 
   // Test support, return top-level token type

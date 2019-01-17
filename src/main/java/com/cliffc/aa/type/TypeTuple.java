@@ -200,7 +200,7 @@ public class TypeTuple<P extends TypeTuple<P>> extends TypeOop<P> {
     for( Type t : _ts) max = Math.max(max,t.depth(bs));
     return max+1;
   }
-  @Override Type replace( Type old, Type nnn, HashMap<TypeStruct,TypeStruct> MEETS ) {
+  @Override Type replace( Type old, Type nnn, HashMap<Type,Type> HASHCONS ) {
     throw AA.unimpl();
   }
   

@@ -423,19 +423,22 @@ public class TypeStruct extends TypeOop<TypeStruct> {
 
   // THIS contains THAT, and THAT is too deep.  Make a new cyclic type for THIS
   // where THAT is replaced by THIS, before doing the Meet.
+  private static final HashMap<Type,Type> MEET = new HashMap<>();
   public TypeStruct approx( final TypeStruct that ) {
     assert this.contains(that);
     // Recursively clone THIS, replacing the reference to THAT with the THIS clone.
     // Do not install until the cycle is complete.
+    assert RECURSIVE_MEET == 0 && MEET.isEmpty();
     RECURSIVE_MEET++;
-    TypeStruct mt = (TypeStruct)replace(that,null,MEETS1);
+    TypeStruct mt = (TypeStruct)replace(that,null,MEET);
     // The result might not be minimal.  Look for a smaller cycle.
     TypeStruct mt2 = mt.repeats_in_cycles(); // Returns first dup instance
     if( mt2 != null ) // Shrink again
-      mt = (TypeStruct)mt.replace(mt2,null,MEETS1);
+      mt = (TypeStruct)mt.replace(mt2,null,MEET);
     assert mt.repeats_in_cycles()==null; // TODO: Need to do this once-per-field?
-    if( --RECURSIVE_MEET > 0 )
-      return mt;                // And, if not yet done, just exit with it
+    --RECURSIVE_MEET;
+    assert RECURSIVE_MEET==0;
+    MEET.clear();
     // Install the cycle
     return mt.install_cyclic();
   }
@@ -524,14 +527,14 @@ public class TypeStruct extends TypeOop<TypeStruct> {
     for( Type t : _ts) max = Math.max(max,t.depth(bs));
     return max+1;
   }
-  @Override Type replace( Type old, Type nnn, HashMap<TypeStruct,TypeStruct> MEETS ) {
+  @Override Type replace( Type old, Type nnn, HashMap<Type,Type> HASHCONS ) {
     if( this==old ) return nnn;
     Type[] ts = new Type[_ts.length];
     TypeStruct rez = malloc(_any,_flds,ts);
     rez._cyclic=true;
     if( nnn==null ) nnn = rez;
     for( int i=0; i<_ts.length; i++ )
-      ts[i] = _ts[i].replace(old,nnn,MEETS);
+      ts[i] = _ts[i].replace(old,nnn,HASHCONS);
     return rez.hashcons_free();
   }
   @Override void walk( Predicate<Type> p ) {

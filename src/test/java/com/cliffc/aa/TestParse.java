@@ -16,6 +16,25 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
 
+    //test("tmp=@{"+
+    //     "  l=@{"+
+    //     "    l=@{ l=0, r=0, v=3 },"+
+    //     "    l=@{ l=0, r=0, v=7 },"+
+    //     "    v=5"+
+    //     "  },"+
+    //     "  r=@{"+
+    //     "    l=@{ l=0, r=0, v=15 },"+
+    //     "    l=@{ l=0, r=0, v=22 },"+
+    //     "    v=20"+
+    //     "  },"+
+    //     "  v=12 "+
+    //     "};"+
+    //     "map={tree fun -> tree"+
+    //     "     ? @{l=map(tree.l,fun),r=map(tree.r,fun),v=fun(tree.v)}"+
+    //     "     : 0};"+
+    //     "map(tmp,{x->x+x})",Type.SCALAR);
+    
+    
     // A collection of tests which like to fail easily
     testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1) is not a @{x,y}","                           ");
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'","                    ");
@@ -394,7 +413,7 @@ public class TestParse {
     // ints and strs).
     testerr(ll_cona+ll_conb+ll_conc+ll_cond+ll_cone+ll_cont+ll_map2+ll_fun2+ll_apl2,
             "Cannot mix GC and non-GC types", "                                                                                                                                                                                                                       " );
-    
+
     // TODO: Needs a way to easily test simple recursive types
     //if( te5._errs != null ) System.err.println(te5._errs.toString());
     //Assert.assertNull(te5._errs);
