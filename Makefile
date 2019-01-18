@@ -26,6 +26,13 @@ else
 		SEP = :
 	endif
 endif
+# Find a reasonable ctags.
+CTAGS = $(shell which ctags)
+# Hack for MacOS: /usr/bin/ctags is unfriendly, so look for ctags from
+# brew
+ifeq ($(UNAME),Darwin)
+	CTAGS = $(shell brew list ctags 2> /dev/null | grep bin/ctags)
+endif
 
 # Fun Args to javac.  Mostly limit to java8 source definitions, and fairly
 # agressive lint warnings.
@@ -48,8 +55,14 @@ javas = $(main_javas)
 libs = $(wildcard lib/*jar)
 jars = $(subst $(space),$(SEP),$(libs))
 
-# Just build the AA jar file
-default: build/aa.jar tags
+# Optionally add ctags to the default target if a reasonable one was
+# found.
+default_targets := build/aa.jar
+ifneq ($(CTAGS),)
+default_targets += tags
+endif
+
+default: $(default_targets)
 
 # Just the classes, no jarring step
 classes: $(classes)
@@ -169,4 +182,4 @@ lib/annotations-16.0.2.jar:
 # Build emacs tags (part of a tasty emacs ide experience)
 tags:	$(main_javas) $(test_javas)
 	@rm -f TAGS
-	@ctags -e --recurse=yes --extra=+q --fields=+fksaiS $(SRC) $(TST)
+	@$(CTAGS) -e --recurse=yes --extra=+q --fields=+fksaiS $(SRC) $(TST)
