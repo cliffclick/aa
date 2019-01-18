@@ -28,14 +28,13 @@ else
 endif
 # Find a reasonable ctags.
 CTAGS = $(shell which ctags)
-# Hack for MacOS: /usr/bin/ctags is unfriendly, so look for ctags from
-# brew
+# Hack for MacOS: /usr/bin/ctags is unfriendly, so look for ctags from brew
 ifeq ($(UNAME),Darwin)
 	CTAGS = $(shell brew list ctags 2> /dev/null | grep bin/ctags)
 endif
 
 # Fun Args to javac.  Mostly limit to java8 source definitions, and fairly
-# agressive lint warnings.
+# aggressive lint warnings.
 JAVAC_ARGS = -g -source 1.8 -target 1.8 -XDignore.symbol.file -Xlint:all -Xlint:-deprecation -Xlint:-serial -Xlint:-rawtypes -Xlint:-unchecked
 
 # Source code
@@ -55,9 +54,8 @@ javas = $(main_javas)
 libs = $(wildcard lib/*jar)
 jars = $(subst $(space),$(SEP),$(libs))
 
-# Optionally add ctags to the default target if a reasonable one was
-# found.
 default_targets := build/aa.jar
+# Optionally add ctags to the default target if a reasonable one was found.
 ifneq ($(CTAGS),)
 default_targets += tags
 endif
@@ -89,9 +87,10 @@ BUILD_DESCRIBE=git describe --always --dirty
 BUILD_ON=      (TZ=UCT date)
 BUILD_BY=      (whoami | cut -d\\ -f2-)
 
-# Build the version file anytime anything would trigger the build/aa.jar
-# i.e., identical dependencies to aa.jar, except aa.jar also includes the build file
-$(CLZDIR)/main/$(AA)/BuildVersion.java: $(main_classes) src/main/manifest.txt
+# Build the version file anytime anything would trigger the build/aa.jar.
+# i.e., identical dependencies to aa.jar, except aa.jar also includes the test
+# files and the BuildVersion file.
+$(CLZDIR)/main/$(AA)/BuildVersion.java: $(main_classes) src/main/manifest.txt lib
 	@echo "vrsioning " $@ " because " $?
 	@rm -f $@
 	@mkdir -p $(dir $@)
@@ -115,19 +114,17 @@ JARBITS += -C $(CLZDIR)/main .    # The java class files
 build/aa.jar: $(main_classes) $(test_classes) $(CLZDIR)/main/$(AA)/BuildVersion.class src/main/manifest.txt lib
 	@echo "  jarring " $@ " because " $?
 	@[ -d build ] || mkdir -p build
-# Build the aa.jar file.  All included jars are unpacked into a flat
-# structure, then repacked into One Jar Name collisions amongst packages are
-# quietly ignored.  aa names win over all other names.
+# Build the aa.jar file.  All included jars are unpacked into a flat structure,
+# then repacked into One Jar.  Name collisions amongst packages are quietly
+# ignored.  aa names win over all other names.
 	@jar -cfm build/aa.jar src/main/manifest.txt $(JARBITS)
 
 # find all java in the src/test directory
 # Cut the "./water/MRThrow.java" down to "water/MRThrow.java"
 # Cut the   "water/MRThrow.java" down to "water/MRThrow"
 # Slash/dot "water/MRThrow"      becomes "water.MRThrow"
-# add 'sort' to get determinism on order of tests on different machines
-# methods within a class can still reorder due to junit?
-# '/usr/bin/sort' needed to avoid windows native sort when run in cygwin
-# Build the AA-test jar and run the junit tests
+# add 'sort' to get determinism on order of tests on different machines.
+# '/usr/bin/sort' needed to avoid windows native sort when run in cygwin.
 sandbox/tests.txt:	$(test_classes)
 	@echo "  finding " $@ " because " $?
 	@[ -d sandbox ] || mkdir -p sandbox
@@ -136,6 +133,7 @@ sandbox/tests.txt:	$(test_classes)
 # Base launch line for JVM tests
 JVM=nice java -Xms1g -Xms1g -XX:+PrintGC -ea -cp "build/aa.jar${SEP}${jars}${SEP}$(CLZDIR)/test"
 
+# Build the AA-test jar and run the junit tests.
 # Actually makes jvm_cmd.txt and status.0 along with out.0
 sandbox/out.0:	sandbox/tests.txt $(test_classes) build/aa.jar 
 	@echo "  testing " $@ " because " $?
