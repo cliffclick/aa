@@ -220,18 +220,25 @@ public abstract class Node implements Cloneable {
   }
   
   // Gather errors; forwards reachable data uses only
-  public void walkerr_def( Ary<String> errs, Ary<String> errs2, BitSet bs, GVNGCM gvn ) {
+  public void walkerr_def( Ary<String> errs0, Ary<String> errs1, Ary<String> errs2, BitSet bs, GVNGCM gvn ) {
     assert !is_dead();
     if( bs.get(_uid) ) return;  // Been there, done that
     bs.set(_uid);               // Only walk once
     if( is_uncalled(gvn) ) return; // Function is a constant, but never executed, do not check for errors
     String msg = err(gvn);      // Get any error
-    if( msg != null )           // Gather errors
-      (this instanceof CallNode && in(1) instanceof UnresolvedNode ? errs2 : errs).add(msg);
+    if( msg != null ) {         // Gather errors
+      Ary<String> errs;
+      if( this instanceof ErrNode ) errs=errs0; // Report ErrNodes first
+      // Report bad parms/unresolved calls last, as some other error generally
+      // triggered this one.
+      else if( this instanceof CallNode && in(1) instanceof UnresolvedNode ) errs=errs2;
+      else errs=errs1;          // Other errors (e.g. bad fields for Loads)
+      errs.add(msg);
+    }
     for( int i=0; i<_defs._len; i++ ) {
       Node def = _defs.at(i);   // Walk data defs for more errors
       if( def == null || gvn.type(def) == Type.XCTRL ) continue;
-      def.walkerr_def(errs,errs2,bs,gvn);
+      def.walkerr_def(errs0,errs1,errs2,bs,gvn);
     }
   }
   

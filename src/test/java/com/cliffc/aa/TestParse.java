@@ -15,23 +15,25 @@ public class TestParse {
   
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
-    //test("tmp=@{"+
-    //     "  l=@{"+
-    //     "    l=@{ l=0, r=0, v=3 },"+
-    //     "    l=@{ l=0, r=0, v=7 },"+
-    //     "    v=5"+
-    //     "  },"+
-    //     "  r=@{"+
-    //     "    l=@{ l=0, r=0, v=15 },"+
-    //     "    l=@{ l=0, r=0, v=22 },"+
-    //     "    v=20"+
-    //     "  },"+
-    //     "  v=12 "+
-    //     "};"+
-    //     "map={tree fun -> tree"+
-    //     "     ? @{l=map(tree.l,fun),r=map(tree.r,fun),v=fun(tree.v)}"+
-    //     "     : 0};"+
-    //     "map(tmp,{x->x+x})",Type.SCALAR);
+    testerr("tmp=@{"+
+         "  l=@{"+
+         "    l=@{ l=0, r=0, v=3 },"+
+         "    l=@{ l=0, r=0, v=7 },"+
+         "    v=5"+
+         "  },"+
+         "  r=@{"+
+         "    l=@{ l=0, r=0, v=15 },"+
+         "    l=@{ l=0, r=0, v=22 },"+
+         "    v=20"+
+         "  },"+
+         "  v=12 "+
+         "};"+
+         "map={tree fun -> tree"+
+         "     ? @{l=map(tree.l,fun),r=map(tree.r,fun),v=fun(tree.v)}"+
+         "     : 0};"+
+         "map(tmp,{x->x+x})",
+            "Cannot define field '.l' twice",
+            "                                                             ");
 
 
     // A collection of tests which like to fail easily

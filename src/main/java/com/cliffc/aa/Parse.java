@@ -121,21 +121,24 @@ public class Parse {
     BitSet bs = new BitSet();
     bs.set(0);                  // Do not walk initial scope (primitives and constants only)
     bs.set(_e._scope._uid);     // Do not walk top-level scope
-    Ary<String> errs  = new Ary<>(new String[1],0);
+    Ary<String> errs0 = new Ary<>(new String[1],0);
+    Ary<String> errs1 = new Ary<>(new String[1],0);
     Ary<String> errs2 = new Ary<>(new String[1],0);
-    res   .walkerr_def(errs,errs2,bs,_gvn);
-    ctrl().walkerr_def(errs,errs2,bs,_gvn);
-    if( errs.isEmpty() ) _e._scope.walkerr_use(errs,new BitSet(),_gvn);
-    if( errs.isEmpty() && skipWS() != -1 ) errs.add(errMsg("Syntax error; trailing junk"));
-    if( errs.isEmpty() ) res.walkerr_gc(errs,new BitSet(),_gvn);
+    res   .walkerr_def(errs0,errs1,errs2,bs,_gvn);
+    ctrl().walkerr_def(errs0,errs1,errs2,bs,_gvn);
+    if( errs0.isEmpty() ) errs0.addAll(errs1);
+    if( errs0.isEmpty() ) _e._scope.walkerr_use(errs0,new BitSet(),_gvn);
+    if( errs0.isEmpty() && skipWS() != -1 ) errs0.add(errMsg("Syntax error; trailing junk"));
+    if( errs0.isEmpty() ) res.walkerr_gc(errs0,new BitSet(),_gvn);
     // If the ONLY error is from unresolved calls, report them last.  Most
     // other errors result in unresolved calls, so report others first.
-    if( errs.isEmpty() ) errs.addAll(errs2);
+    if( errs0.isEmpty() ) errs0.addAll(errs2);
+    errs0.sort_update(String::compareTo);
 
     Type tres = _gvn.type(res);
     kill(res);       // Kill Node for returned Type result
     set_ctrl(null);  // Kill control also
-    return new TypeEnv(tres,_e,errs.isEmpty() ? null : errs);
+    return new TypeEnv(tres,_e,errs0.isEmpty() ? null : errs0);
     } finally {
       _gvn._post_gcp = false;
     }

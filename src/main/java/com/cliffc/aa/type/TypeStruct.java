@@ -532,6 +532,8 @@ public class TypeStruct extends TypeOop<TypeStruct> {
   // Type... which means the whole structure is cyclic when we are done.
   @Override Type replace( Type old, Type nnn, HashMap<Type,Type> HASHCONS ) {
     if( this==old ) return nnn; // Found a copy of 'old', so replace with 'nnn'
+    if( _cyclic && !contains(old) ) // Not related, no need to update/clone
+      return this;              // Just use as-is
     // Need to clone 'this'
     Type[] ts = new Type[_ts.length];
     TypeStruct rez = malloc(_any,_flds,ts);
