@@ -6,16 +6,27 @@ Cliff Click Language Hacking
 **To-the-metal performance:** every abstraction used can be peeled away,
 yielding code that you would expect from a tightly written low-level program.
 This is a primary driver for me, the guy who's been writing compilers for high
-performance computing (including Java) all my life.
+performance computing (including Java) all my life.  Ease-of-programming is a
+close second, but only after you've declared that performance is not your main
+goal.  Hence I support syntactic sugar on expensive operations (e.g.
+accidental auto-boxing in a hot loop can cost you 10x in speed) but only if the
+type-system cannot remove it and you've not declared that you are programming
+for speed.
 
-**Modern:** Statically typed.  Functional programming with full H-M strength type
-inference.  Minimal syntax.  REPL (i.e. incremental static typing) and seperate
-compilation.  Typed C-style macros: most syntax errors in dead code are typed.
+**Modern:** Statically typed.  Functional programming with full-strength type
+inference - types are everywhere optional.  Minimal syntax.  REPL
+(i.e. incremental static typing) and seperate compilation.  Typed C-style
+macros: most syntax errors in dead code are typed.
 
 My intent is a modern language that can be used where C or C++ is used: low-level
 high-performance work and a systems implementation language (e.g. OS's, device
 drivers, GC's), but bring in all the goodness of the last 20 years of language
 improvements.
+
+The language is intended to "look like" C or Java, but with all types optional
+and all keywords removed.  The whole no-keywords thing is an experiment I may
+back away from; a primary goal is to be *readable* - sometimes keywords feel
+like clutter and sometimes they are an code-anchor for your scanning eye.
 
 I specifically intend to look at real-time constraints and the notion of Time
 in a language.
@@ -64,8 +75,8 @@ BNF                           | Comment
 `ttuple = ( [:type]?,* )` | Tuple types are just a list of optional types; the count of commas dictates the length, zero commas is zero length
 `tstruct = @{ [id[:type],]*}` | Struct types are field names with optional types
 
-EXAMPLES
---------
+SIMPLE EXAMPLES
+---------------
 
 Code            | Comment
 ----            | -------
