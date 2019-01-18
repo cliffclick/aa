@@ -48,7 +48,8 @@ public class Type<T extends Type<T>> {
   boolean _cyclic;       // Part of a type cycle
   T _dual; // All types support a dual notion, lazily computed and cached here
 
-  protected Type(byte type) { _type=type; _cyclic=false; }
+  protected Type(byte type) { init(type); }
+  protected void init(byte type) { _type=type; _cyclic=false; }
   @Override public int hashCode( ) { return _type; }
   // Is anything equals to this?
   @Override public boolean equals( Object o ) {
@@ -75,7 +76,7 @@ public class Type<T extends Type<T>> {
   static Type make( byte type ) {
     Type t1 = FREE;
     if( t1 == null ) t1 = new Type(type);
-    else { FREE = null; t1._type = type; }
+    else { FREE = null; t1.init(type); }
     Type t2 = t1.hashcons();
     return t1==t2 ? t1 : t1.free(t2);
   }
@@ -92,7 +93,6 @@ public class Type<T extends Type<T>> {
     }
     if( RECURSIVE_MEET > 0 )    // Mid-building recursive types; do not intern
       return this;
-    assert intern_check();
     // Not in type table
     _dual = null;                // No dual yet
     INTERN.put(this,this);       // Put in table without dual
@@ -104,7 +104,6 @@ public class Type<T extends Type<T>> {
     assert INTERN.get(d)==null;
     d._dual = (T)this;
     INTERN.put(d,d);
-    assert intern_check();
     return this;
   }
   // Remove a forward-ref type from the interning dictionary, prior to

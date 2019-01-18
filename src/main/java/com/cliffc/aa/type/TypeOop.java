@@ -9,7 +9,7 @@ import java.util.BitSet;
 public class TypeOop<O extends TypeOop<O>> extends Type<O> {
   boolean _any;                 // True=choice/join; False=all/meet
   protected   TypeOop(byte type, boolean any) { super(type); init(type,any); }
-  protected void init(byte type, boolean any) { assert _type==type; _any=any; }
+  protected void init(byte type, boolean any) { super.init(type); _any=any; }
   @Override public int hashCode( ) { return super.hashCode()+(_any?1:0); }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
