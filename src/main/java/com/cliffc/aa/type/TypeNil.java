@@ -30,7 +30,11 @@ public class TypeNil extends Type<TypeNil> {
   }
   
   private static TypeNil FREE=null;
-  @Override protected TypeNil free( TypeNil ret ) { FREE=this; return ret; }
+  @Override protected TypeNil free( TypeNil ret ) {
+    assert intern_lookup()!=this;
+    FREE=this; this._dual=null; this._t=Type.ANY;
+    return ret;
+  }
   private static TypeNil make0( Type t ) {
     assert !(t instanceof TypeNil) && !(t instanceof TypeTuple);
     TypeNil t1 = FREE;
@@ -130,10 +134,9 @@ public class TypeNil extends Type<TypeNil> {
     if( x==_t ) return this;
     TypeNil rez = make0(x);
     rez._cyclic=true;
-    Type hc = HASHCONS.get(rez);
+    TypeNil hc = (TypeNil)HASHCONS.get(rez);
     if( hc == null ) { HASHCONS.put(rez,rez); return rez; }
-    free(rez);
-    return hc;
+    return rez.free(hc);
   }
   @Override void walk( Predicate<Type> p ) { if( p.test(this) && _t!=null ) _t.walk(p); }
   @Override TypeStruct repeats_in_cycles(TypeStruct head, BitSet bs) {

@@ -92,6 +92,7 @@ public class Type<T extends Type<T>> {
     }
     if( RECURSIVE_MEET > 0 )    // Mid-building recursive types; do not intern
       return this;
+    assert intern_check();
     // Not in type table
     _dual = null;                // No dual yet
     INTERN.put(this,this);       // Put in table without dual
@@ -103,13 +104,15 @@ public class Type<T extends Type<T>> {
     assert INTERN.get(d)==null;
     d._dual = (T)this;
     INTERN.put(d,d);
+    assert intern_check();
     return this;
   }
   // Remove a forward-ref type from the interning dictionary, prior to
   // interning it again - as a self-recursive type
-  final void untern( ) {
-    Type rez  = INTERN.remove(this);
+  final T untern( ) {
+    Type rez = INTERN.remove(this);
     assert rez != null;
+    return (T)this;
   }
   final T retern( ) {
     assert _cyclic;
@@ -121,6 +124,22 @@ public class Type<T extends Type<T>> {
   boolean interned() { return INTERN.get(this)==this; }
   Type intern_lookup() { return INTERN.get(this); }
   static int intern_size() { return INTERN.size(); }
+  static boolean intern_check() {
+    for( Type k : INTERN.keySet() ) {
+      if( k.intern_check0() ) return false;
+      if( k instanceof TypeNil &&
+          ((TypeNil)k)._t != null &&
+          ((TypeNil)k)._t.intern_check0() )
+        return false;
+    }
+    return true;
+  }
+  private boolean intern_check0() {
+    Type v = INTERN.get(this);
+    if( this == v ) return false;
+    System.out.println("INTERN_CHECK FAIL: "+_uid+":"+this+" vs "+v._uid+":"+v);
+    return true;
+  }
 
   // Simple types are implemented fully here
   static final byte TALL    = 0; // Bottom

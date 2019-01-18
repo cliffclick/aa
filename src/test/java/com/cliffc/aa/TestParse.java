@@ -15,26 +15,28 @@ public class TestParse {
   
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
+    test("map={x -> x ? @{n=map(x.n),v=x.v*x.v} : 0}; map(@{n=0,v=1.2})",
+         TypeStruct.make(FLDS,TypeNil.NIL,TypeFlt.con(1.2*1.2)));
 
-    //test("tmp=@{"+
-    //     "  l=@{"+
-    //     "    l=@{ l=0, r=0, v=3 },"+
-    //     "    l=@{ l=0, r=0, v=7 },"+
-    //     "    v=5"+
-    //     "  },"+
-    //     "  r=@{"+
-    //     "    l=@{ l=0, r=0, v=15 },"+
-    //     "    l=@{ l=0, r=0, v=22 },"+
-    //     "    v=20"+
-    //     "  },"+
-    //     "  v=12 "+
-    //     "};"+
-    //     "map={tree fun -> tree"+
-    //     "     ? @{l=map(tree.l,fun),r=map(tree.r,fun),v=fun(tree.v)}"+
-    //     "     : 0};"+
-    //     "map(tmp,{x->x+x})",Type.SCALAR);
-    
-    
+    test("tmp=@{"+
+         "  l=@{"+
+         "    l=@{ l=0, r=0, v=3 },"+
+         "    l=@{ l=0, r=0, v=7 },"+
+         "    v=5"+
+         "  },"+
+         "  r=@{"+
+         "    l=@{ l=0, r=0, v=15 },"+
+         "    l=@{ l=0, r=0, v=22 },"+
+         "    v=20"+
+         "  },"+
+         "  v=12 "+
+         "};"+
+         "map={tree fun -> tree"+
+         "     ? @{l=map(tree.l,fun),r=map(tree.r,fun),v=fun(tree.v)}"+
+         "     : 0};"+
+         "map(tmp,{x->x+x})",Type.SCALAR);
+
+
     // A collection of tests which like to fail easily
     testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1) is not a @{x,y}","                           ");
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'","                    ");

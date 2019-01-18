@@ -264,6 +264,7 @@ public class TypeStruct extends TypeOop<TypeStruct> {
     // INVARIANT: Both MEETS are empty at the start.  Nothing involved in a
     // potential cycle is interned until the Meet completes.
     assert RECURSIVE_MEET > 0 || (MEETS1.isEmpty() && MEETS2.isEmpty());
+    assert RECURSIVE_MEET > 0 || intern_check();
 
     // If both are cyclic, we have to do the complicated cyclic-aware meet
     if( _cyclic && that._cyclic )
@@ -370,6 +371,7 @@ public class TypeStruct extends TypeOop<TypeStruct> {
       return mt;                // And, if not yet done, just exit with it
     
     // This completes 'mt' as the Meet structure.
+    assert intern_check();
     return mt.install_cyclic();
   }
 
@@ -527,11 +529,19 @@ public class TypeStruct extends TypeOop<TypeStruct> {
     for( Type t : _ts) max = Math.max(max,t.depth(bs));
     return max+1;
   }
+  // Replace old with nnn in a 'this' clone.  We are initially called with
+  // 'this==old', so in the clone there is a pointer to the initial
+  // Type... which means the whole structure is cyclic when we are done.
   @Override Type replace( Type old, Type nnn, HashMap<Type,Type> HASHCONS ) {
-    if( this==old ) return nnn;
+    if( this==old ) return nnn; // Found a copy of 'old', so replace with 'nnn'
+    if( _cyclic ) {             // If already cyclic, it must be part of an unrelated cycle
+      assert !contains(old);    // Not related, no need to update/clone
+      return this;              // Just use as-is
+    }
+    // Need to clone 'this'
     Type[] ts = new Type[_ts.length];
     TypeStruct rez = malloc(_any,_flds,ts);
-    rez._cyclic=true;
+    rez._cyclic=true;           // Whole structure is cyclic
     if( nnn==null ) nnn = rez;
     for( int i=0; i<_ts.length; i++ )
       ts[i] = _ts[i].replace(old,nnn,HASHCONS);

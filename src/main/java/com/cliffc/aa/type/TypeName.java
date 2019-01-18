@@ -152,8 +152,7 @@ public class TypeName extends Type<TypeName> {
     if( _depth >= 0 ) return null; // Not a recursive type-def
     assert _t==Type.SCALAR;
     // Remove from INTERN table, since hacking type will not match hash
-    untern();
-    _dual.untern();
+    untern()._dual.untern();
     // Hack type and it's dual.  Type is now recursive.
     _t = t;
     _dual._t = t._dual;
