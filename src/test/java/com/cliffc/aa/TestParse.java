@@ -15,27 +15,6 @@ public class TestParse {
   
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
-    testerr("tmp=@{"+
-         "  l=@{"+
-         "    l=@{ l=0, r=0, v=3 },"+
-         "    l=@{ l=0, r=0, v=7 },"+
-         "    v=5"+
-         "  },"+
-         "  r=@{"+
-         "    l=@{ l=0, r=0, v=15 },"+
-         "    l=@{ l=0, r=0, v=22 },"+
-         "    v=20"+
-         "  },"+
-         "  v=12 "+
-         "};"+
-         "map={tree fun -> tree"+
-         "     ? @{l=map(tree.l,fun),r=map(tree.r,fun),v=fun(tree.v)}"+
-         "     : 0};"+
-         "map(tmp,{x->x+x})",
-            "Cannot define field '.l' twice",
-            "                                                             ");
-
-
     // A collection of tests which like to fail easily
     testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1) is not a @{x,y}","                           ");
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'","                    ");
@@ -427,7 +406,47 @@ public class TestParse {
     //TypeStruct tt53 = (TypeStruct)((TypeNil)tt52.at(0))._t;
     //assertEquals(Type.SCALAR,tt53.at(1));
     //assertEquals(tt52.at(0),tt53.at(0));
+
+    // Failed attempt at a Tree-structure inference test.  Triggered all sorts
+    // of bugs and error reporting issues, so keeping it as a regression test.
+    testerr("tmp=@{"+
+         "  l=@{"+
+         "    l=@{ l=0, r=0, v=3 },"+
+         "    l=@{ l=0, r=0, v=7 },"+
+         "    v=5"+
+         "  },"+
+         "  r=@{"+
+         "    l=@{ l=0, r=0, v=15 },"+
+         "    l=@{ l=0, r=0, v=22 },"+
+         "    v=20"+
+         "  },"+
+         "  v=12 "+
+         "};"+
+         "map={tree fun -> tree"+
+         "     ? @{l=map(tree.l,fun),r=map(tree.r,fun),v=fun(tree.v)}"+
+         "     : 0};"+
+         "map(tmp,{x->x+x})",
+            "Cannot define field '.l' twice",
+            "                                                             ");
     
+    test("tmp=@{"+
+         "  l=@{"+
+         "    l=@{ l=0, r=0, v=3 },"+
+         "    r=@{ l=0, r=0, v=7 },"+
+         "    v=5"+
+         "  },"+
+         "  r=@{"+
+         "    l=@{ l=0, r=0, v=15 },"+
+         "    r=@{ l=0, r=0, v=22 },"+
+         "    v=20"+
+         "  },"+
+         "  v=12 "+
+         "};"+
+         "map={tree fun -> tree"+
+         "     ? @{l=map(tree.l,fun),r=map(tree.r,fun),v=fun(tree.v)}"+
+         "     : 0};"+
+         "map(tmp,{x->x+x})",
+         TypeNil.make(TypeStruct.RECURS_TREE));
   }
   
   @Test public void testParse9() {
