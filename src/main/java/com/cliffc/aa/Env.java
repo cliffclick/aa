@@ -7,29 +7,49 @@ public class Env implements AutoCloseable {
   final Env _par;
   ScopeNode _scope; // Lexical anchor; goes when this environment leaves scope
   Env( Env par ) {
-    _par=par;
-    _scope = _gvn.init(new ScopeNode());
+    _par = par;
+    ScopeNode scope = new ScopeNode();
+    if( par != null ) {
+      scope.update(" control ",par._scope.get(" control "),_gvn,true);
+      scope.update(" memory " ,par._scope.get(" memory " ),_gvn,true);
+    }
+    _scope = _gvn.init(scope);
   }
 
-  public final static GVNGCM _gvn = new GVNGCM(); // Initial GVN, defaults to ALL, lifts towards ANY
-  private final static Env TOP = new Env(null);   // Top-most lexical Environment
-  // A new top-level Env, above this is the basic public Env with all the primitives
-  public static Env top() { return new Env(TOP); }
-  public static ScopeNode top_scope() { return TOP._scope; }
-  static { TOP.init(); }
-  private void init() {
+  public final static GVNGCM _gvn; // Initial GVN, defaults to ALL, lifts towards ANY
+  public final static StartNode _start; // Program start values (control, empty memory, cmd-line args)
+  private final static Env TOP; // Top-most lexical Environment, has all primitives, unable to be removed
+  static {
+    _gvn   = new GVNGCM();     // Initial GVN, defaults to ALL, lifts towards ANY
+    _start = new StartNode();
+    TOP    = new Env(null);        // Top-most lexical Environment
+    TOP.install_primitives();
+  }
+  private void install_primitives() {
     _scope  .init0(); // Add base types
-    _scope.update("math_pi",new ConNode<>(TypeFlt.PI),null,false);
+    // Initial control, memory, args, program state
+    Node ctl0 = _gvn.init(new CProjNode(_start,0));
+    Node mem0 = _gvn.init(new MProjNode(_start,1));
+    _scope.update(" control ",ctl0,_gvn,true);
+    _scope.update(" memory " ,mem0,_gvn,true);
     for( PrimNode prim : PrimNode.PRIMS )
       _scope.add_fun(prim._name,(EpilogNode)_gvn.xform(as_fun(prim)));
     // Now that all the UnresolvedNodes have all possible hits for a name,
     // register them with GVN.
     for( Node val : _scope._defs )  _gvn.init0(val);
+    // Top-level constants
+    _scope.update("math_pi",_gvn.con(TypeFlt.PI),null,false);
+    // Run the worklist dry
+    _scope.add_def(_scope); // Self-hook to prevent deletion
     _gvn.iter();
+    _scope.pop();
     CallNode.init0(); // Done with adding primitives
     FunNode .init0(); // Done with adding primitives
     _gvn    .init0(); // Done with adding primitives
   }
+  
+  // A new top-level Env, above this is the basic public Env with all the primitives
+  public static Env top() { return new Env(TOP); }
   
   // Called during basic Env creation and making of type constructors, this
   // wraps a PrimNode as a full 1st-class function to be passed about or
@@ -37,7 +57,7 @@ public class Env implements AutoCloseable {
   EpilogNode as_fun( PrimNode prim ) {
     TypeTuple targs = prim._targs;
     String[] args = prim._args;
-    FunNode  fun = ( FunNode)_gvn.xform(new  FunNode(_scope, prim)); // Points to ScopeNode only
+    FunNode  fun = ( FunNode)_gvn.xform(new  FunNode(_start, prim)); // Points to ScopeNode only
     ParmNode rpc = (ParmNode)_gvn.xform(new ParmNode(-1,"rpc",fun,_gvn.con(TypeRPC.ALL_CALL),null));
     prim.add_def(null);         // Control for the primitive
     for( int i=0; i<args.length; i++ )

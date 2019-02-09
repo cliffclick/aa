@@ -103,42 +103,42 @@ public class Parse {
   
   private TypeEnv opto_type(Node res) {
     try {
-    Env par = _e._par;
-    _e._scope.add_def(res);     // Hook, so not deleted
-    _e._scope.add_def(par._scope); // Hook start control into all the constants
+      Env par = _e._par;
+      _e._scope.add_def(res);     // Hook, so not deleted
+      _e._scope.add_def(_e._scope); // Self hook, so not deleted
+      
+      _gvn.iter(); // Pessimistic optimizations; might improve error situation
+      // Run GCP from the global top, so we also get all the initial constants
+      // and all users of those constants.
+      _gvn.gcp(_e._scope);      // Global Constant Propagation
+      _gvn.iter(); // Re-check all ideal calls now that types have been maximally lifted
 
-    _gvn.iter();    // Pessimistic optimizations; might improve error situation
-    // Run GCP from the global top, so we also get all the initial constants
-    // and all users of those constants.
-    _gvn.gcp(par._scope,_e._scope);// Global Constant Propagation
-    _gvn.iter();                   // Re-check all ideal calls now that types have been maximally lifted
+      _e._scope.pop();          // Remove self-hook
+      res = _e._scope.pop();    // New and improved result
 
-    _e._scope.pop();               // Remove start hook
-    res = _e._scope.pop();         // New and improved result
+      // Hunt for typing errors in the alive code
+      assert par._par==null;      // Top-level only
+      BitSet bs = new BitSet();
+      bs.set(0);                  // Do not walk initial scope (primitives and constants only)
+      bs.set(_e._scope._uid);     // Do not walk top-level scope
+      Ary<String> errs0 = new Ary<>(new String[1],0);
+      Ary<String> errs1 = new Ary<>(new String[1],0);
+      Ary<String> errs2 = new Ary<>(new String[1],0);
+      res   .walkerr_def(errs0,errs1,errs2,bs,_gvn);
+      ctrl().walkerr_def(errs0,errs1,errs2,bs,_gvn);
+      if( errs0.isEmpty() ) errs0.addAll(errs1);
+      if( errs0.isEmpty() ) _e._scope.walkerr_use(errs0,new BitSet(),_gvn);
+      if( errs0.isEmpty() && skipWS() != -1 ) errs0.add(errMsg("Syntax error; trailing junk"));
+      if( errs0.isEmpty() ) res.walkerr_gc(errs0,new BitSet(),_gvn);
+      // If the ONLY error is from unresolved calls, report them last.  Most
+      // other errors result in unresolved calls, so report others first.
+      if( errs0.isEmpty() ) errs0.addAll(errs2);
+      errs0.sort_update(String::compareTo);
 
-    // Hunt for typing errors in the alive code
-    assert par._par==null;      // Top-level only
-    BitSet bs = new BitSet();
-    bs.set(0);                  // Do not walk initial scope (primitives and constants only)
-    bs.set(_e._scope._uid);     // Do not walk top-level scope
-    Ary<String> errs0 = new Ary<>(new String[1],0);
-    Ary<String> errs1 = new Ary<>(new String[1],0);
-    Ary<String> errs2 = new Ary<>(new String[1],0);
-    res   .walkerr_def(errs0,errs1,errs2,bs,_gvn);
-    ctrl().walkerr_def(errs0,errs1,errs2,bs,_gvn);
-    if( errs0.isEmpty() ) errs0.addAll(errs1);
-    if( errs0.isEmpty() ) _e._scope.walkerr_use(errs0,new BitSet(),_gvn);
-    if( errs0.isEmpty() && skipWS() != -1 ) errs0.add(errMsg("Syntax error; trailing junk"));
-    if( errs0.isEmpty() ) res.walkerr_gc(errs0,new BitSet(),_gvn);
-    // If the ONLY error is from unresolved calls, report them last.  Most
-    // other errors result in unresolved calls, so report others first.
-    if( errs0.isEmpty() ) errs0.addAll(errs2);
-    errs0.sort_update(String::compareTo);
-
-    Type tres = _gvn.type(res);
-    kill(res);       // Kill Node for returned Type result
-    set_ctrl(null);  // Kill control also
-    return new TypeEnv(tres,_e,errs0.isEmpty() ? null : errs0);
+      Type tres = _gvn.type(res);
+      kill(res);       // Kill Node for returned Type result
+      set_ctrl(null);  // Kill control also
+      return new TypeEnv(tres,_e,errs0.isEmpty() ? null : errs0);
     } finally {
       _gvn._post_gcp = false;
     }
@@ -789,7 +789,7 @@ public class Parse {
 
   // Whack current control with a syntax error
   private ErrNode err_ctrl2( String s ) { return err_ctrl1(s,Type.ANY); }
-  public  ErrNode err_ctrl1(String s, Type t) { return init(new ErrNode(Env.top_scope(),errMsg(s),t)); }
+  public  ErrNode err_ctrl1(String s, Type t) { return init(new ErrNode(Env._start,errMsg(s),t)); }
   private void err_ctrl0(String s) {
     set_ctrl(gvn(new ErrNode(ctrl(),errMsg(s),Type.CTRL)));
   }

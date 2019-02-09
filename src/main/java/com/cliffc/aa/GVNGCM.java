@@ -347,7 +347,7 @@ public class GVNGCM {
   public boolean _whole_program;// If false, then REPL may provide more program
   public boolean _post_gcp;     // During and after GCP (all callers are known)
   public boolean _opt;          // GCP in-progress
-  void gcp(ScopeNode start, ScopeNode end) {
+  void gcp(ScopeNode end) {
     assert _work._len==0;
     assert _wrk_bits.isEmpty();
     assert !_post_gcp;
@@ -356,7 +356,7 @@ public class GVNGCM {
     // Set all types to all_type().dual()
     Arrays.fill(_ts._es,_INIT0_CNT,_ts._len,null);
     walk_initype( end );
-    for( Node use : start._uses ) walk_initype( use ); // Grab all constants
+    for( Node use : Env._start._uses ) walk_initype( use ); // Grab all constants
     // Prime worklist
     add_work(end);
     
@@ -413,7 +413,7 @@ public class GVNGCM {
     // with the maximally lifted types.
     Node rez = end.in(end._defs._len-2);
     FunNode frez = rez instanceof EpilogNode ? ((EpilogNode)rez).fun() : null;
-    walk_opt(rez,start,frez);
+    walk_opt(rez,Env._start,frez);
   }
 
   // Forward reachable walk, setting all_type.dual (except Start) and priming

@@ -6,7 +6,7 @@ import com.cliffc.aa.type.Type;
 
 public final class ConNode<T extends Type> extends Node {
   T _t;
-  public ConNode( T t ) { super(OP_CON,Env.top_scope()); _t=t; }
+  public ConNode( T t ) { super(OP_CON,Env._start); _t=t; }
   @Override String xstr() { return _t.toString(); }
   @Override public Node ideal(GVNGCM gvn) { return null; }
   @Override public Type value(GVNGCM gvn) { return _t; }

@@ -99,7 +99,7 @@ public abstract class Node implements Cloneable {
   public String dump( int max ) { return dump(max,null); }
   public String dump( int max, GVNGCM gvn ) { return dump(0, new SB(),max,new BitSet(),gvn).toString();  }
   private SB dump( int d, SB sb, GVNGCM gvn ) {
-    sb.i(d).p(_uid).p(':').p(xstr()).p(' ');
+    sb.i(d).p(_uid).p(':').p(xstr()).p(": ");
     if( is_dead() ) return sb.p("DEAD");
     for( Node n : _defs ) (n == null ? sb.p('_') : n.str(sb)).p(' ');
     sb.p(" [[");

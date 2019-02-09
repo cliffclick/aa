@@ -286,7 +286,7 @@ public class TestParse {
     test_isa("A= :@{n:A?, v:flt}; A(@{n=0,v=1.2}).v;", TypeFlt.con(1.2));
 
     // TODO: Needs a way to easily test simple recursive types
-    TypeEnv te3 = Exec.go("args","A= :@{n:A?, v:int}");
+    TypeEnv te3 = Exec.go(Env.top(),"args","A= :@{n:A?, v:int}");
     if( te3._errs != null ) System.err.println(te3._errs.toString());
     Assert.assertNull(te3._errs);
     TypeName tname3 = (TypeName)((TypeFun)te3._t).val();
@@ -326,7 +326,7 @@ public class TestParse {
     test_isa(ll_def+ll_con+ll_map+ll_fun, TypeFun.GENERIC_FUN);
     
     // TODO: Needs a way to easily test simple recursive types
-    TypeEnv te4 = Exec.go("args",ll_def+ll_con+ll_map+ll_fun+ll_apl);
+    TypeEnv te4 = Exec.go(Env.top(),"args",ll_def+ll_con+ll_map+ll_fun+ll_apl);
     if( te4._errs != null ) System.err.println(te4._errs.toString());
     Assert.assertNull(te4._errs);
     TypeName tname4 = (TypeName)te4._t;
@@ -530,7 +530,7 @@ c[x]=1;
    */
   
   static private TypeEnv run( String program ) {
-    TypeEnv te = Exec.go("args",program);
+    TypeEnv te = Exec.go(Env.top(),"args",program);
     if( te._errs != null ) System.err.println(te._errs.toString());
     Assert.assertNull(te._errs);
     return te;
@@ -555,7 +555,7 @@ c[x]=1;
   }
   static private void testerr( String program, String err, String cursor ) {
     String err2 = "\nargs:0:"+err+"\n"+program+"\n"+cursor+"^\n";
-    TypeEnv te = Exec.go("args",program);
+    TypeEnv te = Exec.go(Env.top(),"args",program);
     assertTrue(te._errs != null && te._errs._len>=1);
     assertEquals(err2,te._errs.last());
   }
