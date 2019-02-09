@@ -7,8 +7,7 @@ import java.util.Scanner;
 
 public abstract class REPL {
   private static final String prompt="> ";
-  public static void go( ) {
-    Env env = Env.top();
+  public static void go( Env env ) {
     Scanner stdin = new Scanner(System.in);
     System.out.print(prompt);
     System.out.flush();

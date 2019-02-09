@@ -2,6 +2,7 @@ package com.cliffc.aa;
 
 /** an implementation of language AA
  */
+import com.cliffc.aa.node.StartNode;
 
 public abstract class AA {
   public static RuntimeException unimpl() { throw new RuntimeException("unimplemented"); }
@@ -17,7 +18,8 @@ public abstract class AA {
   }
   public static void main( String[] args ) {
     System.out.println(ABV.toString());
-    if( args.length > 0 ) System.out.println(Exec.go("args",String.join(" ",args))._t.toString());
-    else REPL.go();
+    Env top = Env.top(new StartNode());
+    if( args.length > 0 ) System.out.println(Exec.go(top,"args",String.join(" ",args))._t.toString());
+    else REPL.go(top);
   }
 }

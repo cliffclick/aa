@@ -10,7 +10,8 @@ import java.util.BitSet;
 import java.util.HashMap;
 import java.util.function.Predicate;
 
-// Lexical-Scope Node.  
+// Lexical-Scope Node.  Maps defs to uses both via offset and name.  No (real)
+// uses, it's just a mapping function that keeps it's defs alive.
 public class ScopeNode extends Node {
   // Mapping from names to def indices.  Named defs are added upfront and some
   // unnamed defs are added & removed as part of parsing.  Named function defs
@@ -261,7 +262,7 @@ public class ScopeNode extends Node {
   
   @Override public Node ideal(GVNGCM gvn) { return null; }
   @Override public Type value(GVNGCM gvn) { return all_type(); }
-  @Override public Type all_type() { return Type.CTRL; }
+  @Override public Type all_type() { return Type.ALL; }
   @Override public int hashCode() { return 123456789; }
   // ScopeNodes are never equal
   @Override public boolean equals(Object o) { return this==o; }

@@ -9,11 +9,12 @@ public class Env implements AutoCloseable {
   Env( Env par ) {
     _par=par;
     _scope = _gvn.init(new ScopeNode());
-    update(" control ",_scope,null,true);
   }
 
   public final static GVNGCM _gvn = new GVNGCM(); // Initial GVN, defaults to ALL, lifts towards ANY
   private final static Env TOP = new Env(null);   // Top-most lexical Environment
+  // A new top-level Env, above this is the basic public Env with all the primitives
+  public static Env top() { return new Env(TOP); }
   public static ScopeNode top_scope() { return TOP._scope; }
   static { TOP.init(); }
   private void init() {
@@ -51,9 +52,6 @@ public class Env implements AutoCloseable {
 
   void add_type( String name, Type t ) { _scope.add_type(name,t); }
   
-  // A new top-level Env, above this is the basic public Env with all the primitives
-  public static Env top() { return new Env(TOP); }
-
   // Close the current Env, making its lexical scope dead (and making dead
   // anything only pointed at by this scope).
   @Override public void close() {
