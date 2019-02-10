@@ -118,7 +118,7 @@ public abstract class Node implements Cloneable {
     bs.set(_uid);
     if( d < max ) {    // Limit at depth
       // Print parser scopes first (deepest)
-      for( Node n : _defs ) if( n instanceof ScopeNode && n._uid != 0 ) n.dump(d+1,sb,max,bs,gvn);
+      for( Node n : _defs ) if( n instanceof ScopeNode ) n.dump(d+1,sb,max,bs,gvn);
       // Print constants early
       for( Node n : _defs ) if( n instanceof ConNode ) n.dump(d+1,sb,max,bs,gvn);
       // Do not recursively print root Scope, nor Unresolved of primitives.
@@ -149,8 +149,8 @@ public abstract class Node implements Cloneable {
     bs.set(_uid);
     dump(d,sb,gvn).nl();
   }
-  private boolean is_multi_head() { return _op==OP_FUN  || _op==OP_REGION || _op==OP_CALL || _op==OP_IF; }
-  private boolean is_multi_tail() { return _op==OP_PARM || _op==OP_PHI    || _op==OP_PROJ              ; }
+  private boolean is_multi_head() { return _op==OP_FUN  || _op==OP_REGION || _op==OP_CALL || _op==OP_IF || _op==OP_START; }
+  private boolean is_multi_tail() { return _op==OP_PARM || _op==OP_PHI    || _op==OP_PROJ ; }
   
   public  Node find( int uid ) { return find(uid,new BitSet()); }
   private Node find( int uid, BitSet bs ) {

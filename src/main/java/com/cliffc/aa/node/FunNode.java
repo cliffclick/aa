@@ -511,14 +511,22 @@ public class FunNode extends RegionNode {
     // top-level result.  This is only a partial fix, and only to make the body
     // executable - in case the only use is to return from the parser.
     Node s = in(1);
-    if( !(s instanceof ScopeNode) ) return false;
+    if( s != Env._ctl0 ) return false;
     // TODO: broken hack to see if this is the top-level return from the
     // top-level Scope - which means its never actually called, but we're going
     // to act like there is a generic top-level caller.
-    if( s._defs._len < 3 ) return false;
-    Node e = s.in(s._defs._len-2); // Epilog
-    if( !(e instanceof EpilogNode) ) return false;
-    return ((EpilogNode) e).fun() == this;
+    //if( s._defs._len < 3 ) return false;
+    //Node e = s.in(s._defs._len-2); // Epilog
+    //if( !(e instanceof EpilogNode) ) return false;
+    //return ((EpilogNode) e).fun() == this;
+
+    // CNC: ... Prior closing out top-level callers, slot#1 pts to a generic
+    // ConNode of Ctrl for unknown callers.  After top-parse (not REPL) we dump
+    // slot#1 for all FunNodes (except any returned Epilog, which represents
+    // the returned function being call-able from the REPL/result), and then
+    // GCP... which should wire-up all call sites.  FunNode.slot1 goes away.
+    
+    return true;
   }
 
   // Compute value from inputs.  Slot#1 is always the unknown caller.  If

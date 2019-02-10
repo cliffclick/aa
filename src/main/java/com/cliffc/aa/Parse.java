@@ -103,18 +103,16 @@ public class Parse {
   
   private TypeEnv opto_type(Node res) {
     try {
+      // Optimize and compute types.
       Env par = _e._par;
-      _e._scope.add_def(res);     // Hook, so not deleted
       _e._scope.add_def(_e._scope); // Self hook, so not deleted
-      
-      _gvn.iter(); // Pessimistic optimizations; might improve error situation
-      // Run GCP from the global top, so we also get all the initial constants
-      // and all users of those constants.
-      _gvn.gcp(_e._scope);      // Global Constant Propagation
-      _gvn.iter(); // Re-check all ideal calls now that types have been maximally lifted
-
-      _e._scope.pop();          // Remove self-hook
+      _e._scope.add_def(res);     // Hook, so not deleted
+      _gvn.iter();   // Pessimistic optimizations; might improve error situation
+      res = _e._scope._defs.last(); // Update result value for GCP return
+      _gvn.gcp(res); // Global Constant Propagation
+      _gvn.iter();   // Re-check all ideal calls now that types have been maximally lifted
       res = _e._scope.pop();    // New and improved result
+      _e._scope.pop();          // Remove self-hook
 
       // Hunt for typing errors in the alive code
       assert par._par==null;      // Top-level only

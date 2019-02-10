@@ -82,13 +82,16 @@ public class Env implements AutoCloseable {
     ScopeNode pscope = _par._scope;
     _scope.promote_forward_del_locals(_gvn,_par._par == null ? null : pscope);
     if( _scope.is_dead() ) return;
-    if( _par._par == null ) {
-      CallNode.reset_to_init0();
+    // Closing top-most scope (exiting compilation unit)?
+    if( _par._par == null ) {   // Then reset global statics to allow another compilation unit
+      CallNode.reset_to_init0(); 
       FunNode .reset_to_init0();
       _gvn    .reset_to_init0();
+      // StartNode is used by global constants, which in turn are only used by
+      // dead cycles.
       while( _start._uses._len > NINIT_CONS ) {
         Node x = _start._uses.pop();
-        assert !_gvn.touched(x);
+        assert !_gvn.touched(x); // Uses are all dead (but not reclaimed because in a cycle)
       }
       return;
     }

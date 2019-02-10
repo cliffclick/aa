@@ -6,8 +6,8 @@ import com.cliffc.aa.type.Type;
  *  Short short names on purpose; so they don't obscure the printing.
  *  Can't believe this wasn't done long long ago. */
 public final class SB {
-  public final StringBuilder _sb;
-  int _indent = 0;
+  private final StringBuilder _sb;
+  private int _indent = 0;
   public SB(        ) { _sb = new StringBuilder( ); }
   public SB(String s) { _sb = new StringBuilder(s); }
   public SB p( String s ) { _sb.append(s); return this; }

@@ -347,19 +347,25 @@ public class GVNGCM {
   public boolean _whole_program;// If false, then REPL may provide more program
   public boolean _post_gcp;     // During and after GCP (all callers are known)
   public boolean _opt;          // GCP in-progress
-  void gcp(ScopeNode end) {
+  void gcp(Node rez) {
     assert _work._len==0;
     assert _wrk_bits.isEmpty();
     assert !_post_gcp;
     _post_gcp = true;
     Ary<CallNode> calls = new Ary<>(new CallNode[1],0);
-    // Set all types to all_type().dual()
+    // Set all types to null (except primitives); null is the visit flag when
+    // setting types to their highest value.
     Arrays.fill(_ts._es,_INIT0_CNT,_ts._len,null);
-    walk_initype( end );
-    for( Node use : Env._start._uses ) walk_initype( use ); // Grab all constants
-    // Prime worklist
-    add_work(end);
-    
+    assert Env._start._uid==0;
+    assert Env._ctl0 ._uid==1;
+    assert Env._mem0 ._uid==2;
+    _ts.setX(0,null);
+    _ts.setX(1,null);
+    _ts.setX(2,null);
+    // Set all types to all_type().dual(), their most optimistic type,
+    // and prime the worklist.
+    walk_initype( Env._start );
+
     _opt = true;                // Lazily fill with best value
     // Repeat, if we remove some ambiguous choices, and keep falling until the
     // graph stabilizes without ambiguity.
@@ -370,7 +376,7 @@ public class GVNGCM {
         Node n = _work.pop();
         _wrk_bits.clear(n._uid);
         assert !n.is_dead();
-        if( n._uid < _INIT0_CNT ) continue; // Ignore primitives (type is unchanged and conservative)
+        if( 3 <= n._uid && n._uid < _INIT0_CNT ) continue; // Ignore primitives (type is unchanged and conservative)
         if( n instanceof CallNode && calls.find((CallNode)n)== -1 ) {
           Type tf = type(n.in(1));
           if( tf instanceof TypeFun && // Might be e.g. ~Scalar
@@ -411,7 +417,6 @@ public class GVNGCM {
 
     // Revisit the entire reachable program, as ideal calls may do something
     // with the maximally lifted types.
-    Node rez = end.in(end._defs._len-2);
     FunNode frez = rez instanceof EpilogNode ? ((EpilogNode)rez).fun() : null;
     walk_opt(rez,frez);
   }
