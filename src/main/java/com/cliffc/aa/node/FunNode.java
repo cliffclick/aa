@@ -1,6 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.AA;
+import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
@@ -58,7 +59,7 @@ public class FunNode extends RegionNode {
   // Used to start an anonymous function in the Parser
   public FunNode(Type[] ts, Node scope) { this(scope,TypeFunPtr.make(TypeTuple.make(ts),Type.SCALAR,CNT,ts.length),-1,null); }
   // Used to forward-decl anon functions
-  FunNode(Node scope, String name) { this(scope,TypeFunPtr.make_forward_ref(CNT),-1,name); }
+  FunNode(String name) { this(Env._start,TypeFunPtr.make_forward_ref(CNT),-1,name); }
   // Shared common constructor
   private FunNode(Node scope, TypeFunPtr tf, int op_prec, String name) {
     super(OP_FUN);
@@ -384,6 +385,7 @@ public class FunNode extends RegionNode {
         }
       }
     }
+    if( dany._uses._len==0 ) gvn.kill(dany);
 
     // Kill split-out path-ins to the old code.  If !_all_callers_known then
     // always keep slot#1, otherwise kill slots being taken over by the new

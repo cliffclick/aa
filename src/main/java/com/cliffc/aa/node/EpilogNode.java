@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.Type;
@@ -54,8 +55,8 @@ public class EpilogNode extends Node {
   // declared.  Hence we want a callable function pointer, but have no defined
   // body (yet).  Make a function pointer that takes/ignores all args, and
   // returns a scalar.
-  public static Node forward_ref( GVNGCM gvn, Node scope, String name, Parse unkref ) {
-    FunNode fun = gvn.init(new FunNode(scope,name));
+  public static Node forward_ref( GVNGCM gvn, String name, Parse unkref ) {
+    FunNode fun = gvn.init(new FunNode(name));
     String referr = unkref.errMsg("Unknown ref '"+name+"'");
     return new EpilogNode(fun,gvn.con(Type.SCALAR),gvn.con(TypeRPC.ALL_CALL),fun,fun._tf.fidx(), referr);
   }
@@ -69,7 +70,7 @@ public class EpilogNode extends Node {
   public void merge_ref_def( GVNGCM gvn, String tok, EpilogNode def ) {
     FunNode rfun = fun();
     FunNode dfun = def.fun();
-    assert rfun._defs._len==2 && rfun.in(0)==null && rfun.in(1) instanceof ScopeNode; // Forward ref has no callers
+    assert rfun._defs._len==2 && rfun.in(0)==null && rfun.in(1) == Env._start; // Forward ref has no callers
     assert dfun._defs._len==2 && dfun.in(0)==null;
     assert def._uses._len==0;                      // Def is brand new, no uses
 

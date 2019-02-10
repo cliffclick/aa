@@ -297,8 +297,8 @@ public class Parse {
       if_scope.add_def(gvn(new PhiNode(phi_errmsg,ctrl(),ctrls.in(1),ctrls.in(3)))); // Add a PhiNode for the result, hook to prevent deletion
       if( !t_sharp.is_dead() && t_sharp._uses._len == 0 ) kill(t_sharp);
       if( !f_sharp.is_dead() && f_sharp._uses._len == 0 ) kill(f_sharp);
-      kill(t_scope);
-      kill(f_scope);
+      kill(t_scope);  assert t_scope.is_dead();
+      kill(f_scope);  assert f_scope.is_dead();
     }
     return _e._scope.pop();
   }
@@ -455,7 +455,7 @@ public class Parse {
     if( tok == null ) return null;
     Node var = lookup(tok);
     if( var == null ) // Assume any unknown ref is a forward-ref of a recursive function
-      return _e.update(tok,gvn(EpilogNode.forward_ref(_gvn,_e._scope,tok,this)),null,false);
+      return _e.update(tok,gvn(EpilogNode.forward_ref(_gvn,tok,this)),null,false);
     // Disallow uniop and binop functions as factors.
     if( var.op_prec() > 0 ) { _x = oldx; return null; }
     return var;

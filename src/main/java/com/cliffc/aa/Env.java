@@ -18,20 +18,24 @@ public class Env implements AutoCloseable {
 
   public final static GVNGCM _gvn; // Initial GVN, defaults to ALL, lifts towards ANY
   public final static StartNode _start; // Program start values (control, empty memory, cmd-line args)
+  public final static CProjNode _ctl0;  // Program start value control
+  public final static MProjNode _mem0;  // Program start value memory
+  private final static int NINIT_CONS;
   private final static Env TOP; // Top-most lexical Environment, has all primitives, unable to be removed
   static {
     _gvn   = new GVNGCM();     // Initial GVN, defaults to ALL, lifts towards ANY
+    // Initial control, memory, args, program state
     _start = new StartNode();
+    _ctl0 = _gvn.init(new CProjNode(_start,0));
+    _mem0 = _gvn.init(new MProjNode(_start,1));
     TOP    = new Env(null);        // Top-most lexical Environment
     TOP.install_primitives();
+    NINIT_CONS = _start._uses._len;
   }
   private void install_primitives() {
     _scope  .init0(); // Add base types
-    // Initial control, memory, args, program state
-    Node ctl0 = _gvn.init(new CProjNode(_start,0));
-    Node mem0 = _gvn.init(new MProjNode(_start,1));
-    _scope.update(" control ",ctl0,_gvn,true);
-    _scope.update(" memory " ,mem0,_gvn,true);
+    _scope.update(" control ",_ctl0,_gvn,true);
+    _scope.update(" memory " ,_mem0,_gvn,true);
     for( PrimNode prim : PrimNode.PRIMS )
       _scope.add_fun(prim._name,(EpilogNode)_gvn.xform(as_fun(prim)));
     // Now that all the UnresolvedNodes have all possible hits for a name,
@@ -57,7 +61,7 @@ public class Env implements AutoCloseable {
   EpilogNode as_fun( PrimNode prim ) {
     TypeTuple targs = prim._targs;
     String[] args = prim._args;
-    FunNode  fun = ( FunNode)_gvn.xform(new  FunNode(_start, prim)); // Points to ScopeNode only
+    FunNode  fun = ( FunNode)_gvn.xform(new  FunNode(_ctl0, prim)); // Points to ScopeNode only
     ParmNode rpc = (ParmNode)_gvn.xform(new ParmNode(-1,"rpc",fun,_gvn.con(TypeRPC.ALL_CALL),null));
     prim.add_def(null);         // Control for the primitive
     for( int i=0; i<args.length; i++ )
@@ -82,6 +86,10 @@ public class Env implements AutoCloseable {
       CallNode.reset_to_init0();
       FunNode .reset_to_init0();
       _gvn    .reset_to_init0();
+      while( _start._uses._len > NINIT_CONS ) {
+        Node x = _start._uses.pop();
+        assert !_gvn.touched(x);
+      }
       return;
     }
     // Whats left is function-ref generic entry points which promote to next

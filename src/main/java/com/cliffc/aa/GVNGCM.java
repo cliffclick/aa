@@ -413,7 +413,7 @@ public class GVNGCM {
     // with the maximally lifted types.
     Node rez = end.in(end._defs._len-2);
     FunNode frez = rez instanceof EpilogNode ? ((EpilogNode)rez).fun() : null;
-    walk_opt(rez,Env._start,frez);
+    walk_opt(rez,frez);
   }
 
   // Forward reachable walk, setting all_type.dual (except Start) and priming
@@ -430,10 +430,10 @@ public class GVNGCM {
   }
   
   // GCP optimizations on the live subgraph
-  private void walk_opt( Node n, Node start, FunNode frez ) {
+  private void walk_opt( Node n, FunNode frez ) {
     assert !n.is_dead();
     if( _wrk_bits.get(n._uid) ) return; // Been there, done that
-    if( n==start ) return;              // Top-level scope
+    if( n==Env._start ) return;         // Top-level scope
     add_work(n);                        // Only walk once
     // Replace with a constant, if possible
     Type t = type(n);
@@ -471,7 +471,7 @@ public class GVNGCM {
     // Walk reachable graph
     for( Node def : n._defs )
       if( def != null )
-        walk_opt(def,start,frez);
+        walk_opt(def,frez);
   }
 
 }

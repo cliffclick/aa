@@ -212,8 +212,8 @@ public class ScopeNode extends Node {
     boolean f_is_mutable = f._ms.get(fii);
     Node tn = t.in(tii);
     Node fn = f.in(fii);
-    
-    if( tn.is_forward_ref() ) {
+
+    if( tn != null && tn.is_forward_ref() ) {
       assert !t_is_mutable;
       if( fn.is_forward_ref() ) {
         assert !f_is_mutable;
@@ -222,7 +222,7 @@ public class ScopeNode extends Node {
       update(name,P.err_ctrl1("'"+name+"' not defined on "+true+" arm of trinary",gvn.type(fn).widen()),gvn,false);
       return;
     }
-    if( fn.is_forward_ref() ) {
+    if( fn != null && fn.is_forward_ref() ) {
       update(name,P.err_ctrl1("'"+name+"' not defined on "+false+" arm of trinary",gvn.type(tn).widen()),gvn,false);
       return;
     }
@@ -248,7 +248,9 @@ public class ScopeNode extends Node {
   // Replace uses of dull with sharp, used after an IfNode test
   void sharpen( Node dull, Node sharp, ScopeNode arm ) {
     assert dull != sharp;
-    for( int i=1; i<_defs._len; i++ ) // Fill in all fields
+    // CNC: New scopes now come with 2 pre-cooked inputs, up from 1.
+    // Not the right invariant, need to lose the "2".
+    for( int i=2; i<_defs._len; i++ ) // Fill in all fields
       arm.add_def(in(i)==dull ? sharp : null);
     // Update sharpen value lookup
     for( String name : _vals.keySet() ) {
