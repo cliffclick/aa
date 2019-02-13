@@ -6,6 +6,7 @@ import com.cliffc.aa.type.TypeFun;
 import com.cliffc.aa.type.TypeFunPtr;
 import com.cliffc.aa.type.TypeTuple;
 import com.cliffc.aa.util.Ary;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Arrays;
 import java.util.BitSet;
@@ -99,7 +100,7 @@ public class GVNGCM {
     return n._uid < _ts._len ? _ts._es[n._uid] : n.all_type();
   }
   // Make globally shared common ConNode for this type.
-  public ConNode con( Type t ) {
+  public @NotNull ConNode con( Type t ) {
     ConNode con = new ConNode<>(t);
     Node con2 = _vals.get(con);
     if( con2 != null ) { kill0(con); return (ConNode)con2; } // TODO: con goes dead, should be recycled

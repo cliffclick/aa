@@ -5,6 +5,7 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.Bits;
 import com.cliffc.aa.util.SB;
+import org.jetbrains.annotations.NotNull;
 
 import java.text.NumberFormat;
 import java.text.ParsePosition;
@@ -545,26 +546,37 @@ public class Parse {
       set_ctrl(ctrl);           // Carry control thru
       Ary<String> toks = new Ary<>(new String[1],0);
       Ary<Type  > ts   = new Ary<>(new Type  [1],0);
+      BitSet rs = new BitSet();
       while( true ) {
         String tok = token();    // Scan for 'id'
         if( tok == null ) break; // end-of-struct-def
         Type t = Type.ALL;       // Untyped, most generic type
-        if( peek(':') )          // Has type annotation?
-          if( (t=type())==null ) throw AA.unimpl(); // return an error here
         Node stmt = con(Type.SCALAR);
-        if( peek('=') )
-          if( (stmt=stmt())==null ) throw AA.unimpl(); // return an error here
-        stmt = gvn(new TypeNode(t,stmt,errMsg()));
-        if( e._scope.get(tok)!=null ) {
-          kill(stmt);
-          ErrNode err = err_ctrl2("Cannot define field '." + tok + "' twice");
-          e._scope.update(tok,err,_gvn,false);
-          ts.set(toks.find(fld -> fld.equals(tok)),err._t);
-        } else {
-          e.update(tok,stmt,null,false); // Field now available 'bare' inside rest of scope
-          toks.add(tok);          // Gather for final type
-          ts  .add(_gvn.type(stmt));
+        if( peek(":=") ) {      // Parse := re-assignable field token
+          rs.set(toks._len);    // Flag as mutable
+          _x--;                 // Reparse '=' as assignment
         }
+        if( peek('=') ) {       // Parse field initial value
+          if( (stmt=stmt())==null )
+            stmt = err_ctrl2("Missing ifex after assignment of '"+tok+"'");
+        } else if( peek(':') )  // Has type annotation?
+          if( (t=type())==null )
+            stmt = err_ctrl2("Missing type after ':'");
+        // Check for repeating a field name
+        if( e._scope.get(tok)!=null ) {
+          kill(stmt);           // Kill assignment
+          ErrNode err = err_ctrl2("Cannot define field '." + tok + "' twice");
+          stmt = err;           // Error is now the result
+          ts.set(toks.find(fld -> fld.equals(tok)),err._t); // Prior field is also typed error
+        }
+        // Add type-check into graph
+        if( t != null ) stmt = gvn(new TypeNode(t,stmt,errMsg()));
+        // Add field into lexical scope, field is usable after initial set
+        e.update(tok,stmt,_gvn,false); // Field now available 'bare' inside rest of scope
+        boolean mutable = rs.get(toks._len); // Assignment is mutable or final
+        toks.add(tok);          // Gather for final type
+        ts  .add(_gvn.type(stmt));
+        if( mutable ) throw AA.unimpl();
         if( !peek(',') ) break; // Final comma is optional
       }
       require('}');
@@ -575,7 +587,7 @@ public class Parse {
       return gvn(new NewNode(toks.asAry(),flds));
     } // Pop lexical scope around struct
   }
-  
+
   private String token() { skipWS();  return token0(); }
   // Lexical tokens.  Any alpha, followed by any alphanumerics is a alpha-
   // token; alpha-tokens end with WS or any operator character.  Any collection
@@ -746,7 +758,7 @@ public class Parse {
   }
   private boolean peek( String s ) {
     if( !peek(s.charAt(0)) ) return false;
-    if( peek(s.charAt(1)) ) return true;
+    if(  peek(s.charAt(1)) ) return true ;
     _x--;
     return false;
   }
@@ -782,7 +794,7 @@ public class Parse {
   // Set and return a new control
   private void set_ctrl(Node n) { _e._scope.update(" control ",n,_gvn,true); }
 
-  private ConNode con( Type t ) { return _gvn.con(t); }
+  private @NotNull ConNode con( Type t ) { return _gvn.con(t); }
 
   public Node lookup( String tok ) { return _e.lookup(tok); }
   

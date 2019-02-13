@@ -254,6 +254,8 @@ public class TestParse {
     test    ("Point=:@{x,y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
     testerr ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1,y=2}))", "@{x:1,y:2} is not a Point:@{x,y}","                                                                    ");
     testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1) is not a @{x,y}","                           ");
+    testerr("x=@{n:,}","Missing type after ':'","      ");
+    testerr("x=@{n=,}","Missing ifex after assignment of 'n'","      ");
   }
 
   @Test public void testParse5() {
@@ -469,7 +471,11 @@ public class TestParse {
     test   ("x:=0; 1 ? (x =4):; x", TypeInt.con(4)); // x final on 1 arm, dead on other arm
     testerr("x:=0; math_rand(1) ? (x =4):3; x", "'x' not final on false arm of trinary","                             "); // x mutable ahead; ok to mutate on 1 arm and later
   }
-  
+
+  @Test public void testParse10() {
+    // Test re-assignment in struct
+    //test("x=@{n:=1,v:=2}", TypeStruct.make(FLDS, TypeInt.con(1), TypeInt.con(2)));
+  }
   /*
 
 // No ambiguity:
