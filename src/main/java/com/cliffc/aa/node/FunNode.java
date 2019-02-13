@@ -107,7 +107,7 @@ public class FunNode extends RegionNode {
   }
 
   // True if no future unknown callers.
-  public void are_all_callers_known( ) { return in(1)!=Env.ALL_CTRL; }
+  private boolean has_unknown_callers() { return in(1) == Env.ALL_CTRL; }
   
   // ----
   @Override public Node ideal(GVNGCM gvn) {
@@ -165,7 +165,7 @@ public class FunNode extends RegionNode {
   // Visit all ParmNodes, looking for unresolved call uses that can be improved
   // by type-splitting
   private int find_type_split_index( GVNGCM gvn, ParmNode[] parms ) {
-    assert !are_all_callers_known(); // Only overly-wide calls.
+    assert has_unknown_callers(); // Only overly-wide calls.
     for( ParmNode parm : parms ) // For all parms
       if( parm != null )         //   (some can be dead)
         for( Node call : parm._uses ) // See if a parm-user needs a type-specialization split
@@ -183,7 +183,7 @@ public class FunNode extends RegionNode {
   }
     
   private Type[] find_type_split( GVNGCM gvn, ParmNode[] parms ) {
-    assert !are_all_callers_known(); // Only overly-wide calls.
+    assert has_unknown_callers(); // Only overly-wide calls.
     // Look for splitting to help an Unresolved Call.
     int idx = find_type_split_index(gvn,parms);
     if( idx != -1 ) {           // Found; split along a specific input path using widened types
@@ -230,6 +230,7 @@ public class FunNode extends RegionNode {
   //
   // Same argument for field Loads from unspecialized values.
   private FunNode type_special( GVNGCM gvn, ParmNode[] parms ) {
+    if( !has_unknown_callers() ) return null; // Only overly-wide calls.
     Type[] sig = find_type_split(gvn,parms);
     if( sig == null ) return null; // No unresolved calls; no point in type-specialization
 
@@ -241,13 +242,10 @@ public class FunNode extends RegionNode {
     TypeTuple ts = TypeTuple.make(sig);
     assert ts.isa(_tf._ts);
     assert ts != _tf._ts;            // Must see improvement
-    assert !are_all_callers_known(); // Only doing this with unknown callers???
     // Make a prototype new function header.
     FunNode fun = new FunNode(ts,_tf._ret,name(),_tf._nargs);
-    // Make the unknown_caller path dead.  Only 1 path will be live here.
-    Node xctrl = gvn.con(Type.XCTRL);
-    fun.set_def(1,xctrl,gvn);
     // Look in remaining paths and decide if they split or stay
+    Node xctrl = gvn.con(Type.XCTRL);
     for( int j=2; j<_defs._len; j++ ) {
       boolean split=true;
       for( int i=0; i<parms.length; i++ )
@@ -291,7 +289,7 @@ public class FunNode extends RegionNode {
     // Pick which input to inline.  Only based on having some constant inputs
     // right now.
     int m=-1, mncons = -1;
-    for( int i=1; i<_defs._len; i++ ) {
+    for( int i=has_unknown_callers() ? 2 : 1; i<_defs._len; i++ ) {
       int ncon=0;
       for( ParmNode parm : parms )
         if( parm != null &&     // Some can be dead
@@ -308,10 +306,14 @@ public class FunNode extends RegionNode {
         cnts[OP_PRIM] > 6 )  // Allow small-ish primitive counts to inline
       return null;
 
+    // Make a prototype new function header.  No generic unknown caller
+    // in slot 1.  The one inlined call in slot 'm'.
     // Make a prototype new function header.
-    Node top = gvn.con(Type.XCTRL);
     FunNode fun = new FunNode(_tf._ts,_tf._ret,name(),_tf._nargs);
-    fun.set_def(1,in(m),gvn);
+    fun.pop();                  // Remove junk ALL_CTRL input
+    Node top = gvn.con(Type.XCTRL);
+    for( int i=1; i<_defs._len; i++ )
+      fun.add_def(i==m ? in(i) : top);
     return fun;
   }
 
@@ -352,16 +354,15 @@ public class FunNode extends RegionNode {
         // Slot#1 for a type-split gets the new generic type from the new signature.
         // Slot#1 for other live splits gets from the old parm inputs.
         int idx = ((ParmNode)n)._idx;
-        //Node x = _all_callers_known             // Post-GCP not a type-split
-        //  ? (fun.in(1)==any ? dany : n.in(1))   // Just another argument
-        //  // Else type-split; maybe more unknown callers... so slot#1 remains generic
-        //  : gvn.con(idx==-1 ? TypeRPC.ALL_CALL : fun._tf.arg(idx)); // Generic arg#1
-        //c.add_def(x); 
-        //for( int j=2; j<_defs._len; j++ ) // Get the new parm path or null according to split
-        //  c.add_def( fun.in(j)==any ? dany : n.in(j) );
-        //// Update default type to match signature
-        //if( idx != -1 ) ((ParmNode)c)._default_type = fun._tf.arg(idx);
-        throw AA.unimpl();
+        Node x = has_unknown_callers() 
+          // type-split; maybe more unknown callers... so slot#1 remains generic
+          ? gvn.con(idx==-1 ? TypeRPC.ALL_CALL : fun._tf.arg(idx)) // Generic arg#1
+          : (fun.in(1)==any ? dany : n.in(1));   // Just another argument
+        c.add_def(x); 
+        for( int j=2; j<_defs._len; j++ ) // Get the new parm path or null according to split
+          c.add_def( fun.in(j)==any ? dany : n.in(j) );
+        // Update default type to match signature
+        if( idx != -1 ) ((ParmNode)c)._default_type = fun._tf.arg(idx);
       } else if( n != this ) {  // Interior nodes
         for( Node def : n._defs ) {
           // Map old to new, except if using the old epilog in a recursive fcn,
@@ -373,105 +374,104 @@ public class FunNode extends RegionNode {
       }
     }
     if( dany._uses._len==0 ) gvn.kill(dany);
-    throw AA.unimpl();
     // Kill split-out path-ins to the old code.  If !_all_callers_known then
     // always keep slot#1, otherwise kill slots being taken over by the new
     // function.
-    //for( int j=1; j<_defs._len; j++ )
-    //  if( fun.in(j)!=any )  // Path split out?
-    //    set_def(j,any,gvn); // Kill incoming path on old FunNode
-    //
-    //// Put all new nodes into the GVN tables and worklists
-    //for( Map.Entry<Node,Node> e : map.entrySet() ) {
-    //  Node nn = e.getValue();         // New node
-    //  Type ot = gvn.type(e.getKey()); // Generally just copy type from original nodes
-    //  if( nn instanceof ParmNode && ((ParmNode)nn)._idx==-1 )
-    //    ot = nn.all_type();     // Except the RPC, which has new callers
-    //  else if( nn instanceof EpilogNode ) {
-    //    TypeFun tt = (TypeFun)ot; // And the epilog, which has a new funnode and RPCs
-    //    ot = TypeFun.make(tt.ctl(),tt.val(),TypeRPC.ALL_CALL,fun._tf);
-    //  }
-    //  gvn.rereg(nn,ot);
-    //}
-    //assert !epi.is_dead();      // Not expecting this to be dead already
-    //
-    //// Repoint all Calls uses of the original Epilog to an Unresolved choice of
-    //// the old and new functions and let the Calls resolve individually.
-    //if( !fun._all_callers_known ) { // Split-for-type, possible many future callers
-    //  UnresolvedNode new_unr = new UnresolvedNode();
-    //  new_unr.add_def(epi);
-    //  gvn.init(new_unr);
-    //
-    //  // Direct all Call uses to the new Unresolved
-    //  for( int i=0; i<epi._uses._len; i++ ) {
-    //    Node call = epi._uses.at(i);
-    //    if( call instanceof CallNode && call.in(1)==epi ) {
-    //      gvn.set_def_reg(call,1,new_unr);// As part of removing call->epi edge, compress epi uses
-    //      i--;             // Rerun set point in epi use list after compression
-    //    }
-    //  }
-    //  // Include the new Epilog in all Unresolved
-    //  for( int i=0; i<epi._uses._len; i++ ) {
-    //    Node unr = epi._uses.at(i);
-    //    assert !(unr instanceof CallNode);
-    //    if( unr instanceof UnresolvedNode )
-    //      gvn.add_def(unr,newepi);
-    //  }      
-    //
-    //} else {                    // All-callers-known, so actually only 1
-    //  // Single path being inlined
-    //  int path_being_inlined=-1;
-    //  for( int j=1; j<_defs._len; j++ )
-    //    if( fun.in(j)!=any )
-    //      path_being_inlined = j;
-    //
-    //  // The old Epilog has a set of CallNodes, but only the one in #path_being_inlined is
-    //  // being split-for-size.  Repoint the one Call._rpc matching rpc_parm
-    //  // in(path_being_inlined) to new_epi.
-    //  int rpc = ((TypeRPC)gvn.type(rpc_parm.in(path_being_inlined))).rpc();
-    //  for( Node use : epi._uses ) {
-    //    if( use instanceof CallNode && 
-    //        ((CallNode)use)._rpc == rpc ) {
-    //      gvn.set_def_reg(use,1,newepi);
-    //      break;
-    //    }
-    //  }
-    //}
-    //
-    //// There are new some cloned new Calls; these point to some old functions
-    //// which might belive "_all_calls_known" - which excludes these new Calls.
-    //// The situation is still theoretically correct: the original Calls all
-    //// split into 2 non-overlapping sets: calls from the new Calls and those
-    //// left behind coming from the old Calls.  Update the old functions with
-    //// these new Calls as-needed.  If _all_calls_known is false, the old
-    //// function is prepared to handle unexpected new Calls already.  If its
-    //// true, then immediately wire up the new Call, add the new RPC input and
-    //// correct all types.
-    //if( _all_callers_known )
-    //  for( Node c : map.values() ) {
-    //    if( c instanceof CallNode ) { // For all cloned Calls
-    //      Type tfunptr = gvn.type(c.in(1));
-    //      TypeFunPtr tfun = ((TypeFun)tfunptr).fun();
-    //      for( int fidx : tfun._fidxs ) { // For all possible targets of the Call
-    //        FunNode oldfun = FunNode.find_fidx(fidx);
-    //        assert !oldfun.is_dead();
-    //        if( oldfun._all_callers_known ) {
-    //          gvn.add_work(oldfun);
-    //          Node x = ((CallNode)c).wire(gvn,oldfun);
-    //          assert x != null;
-    //          ParmNode rpc = oldfun.rpc();
-    //          if( rpc != null ) // Can be null there is a single return point, which got constant-folded
-    //            gvn.setype(rpc,rpc.value(gvn));
-    //          EpilogNode oldepi = oldfun.epi();
-    //          gvn.setype(oldepi,oldepi.value(gvn));
-    //        }
-    //      }
-    //    }
-    //  }
-    //
-    //// TODO: Hook with proper signature into ScopeNode under an Unresolved.
-    //// Future calls may resolve to either the old version or the new.
-    //return is_dead() ? fun : this;
+    for( int j=has_unknown_callers() ? 2 : 1; j<_defs._len; j++ )
+      if( fun.in(j)!=any )  // Path split out?
+        set_def(j,any,gvn); // Kill incoming path on old FunNode
+    
+    // Put all new nodes into the GVN tables and worklists
+    for( Map.Entry<Node,Node> e : map.entrySet() ) {
+      Node nn = e.getValue();         // New node
+      Type ot = gvn.type(e.getKey()); // Generally just copy type from original nodes
+      if( nn instanceof ParmNode && ((ParmNode)nn)._idx==-1 )
+        ot = nn.all_type();     // Except the RPC, which has new callers
+      else if( nn instanceof EpilogNode ) {
+        TypeFun tt = (TypeFun)ot; // And the epilog, which has a new funnode and RPCs
+        ot = TypeFun.make(tt.ctl(),tt.val(),TypeRPC.ALL_CALL,fun._tf);
+      }
+      gvn.rereg(nn,ot);
+    }
+    assert !epi.is_dead();      // Not expecting this to be dead already
+    
+    // Repoint all Calls uses of the original Epilog to an Unresolved choice of
+    // the old and new functions and let the Calls resolve individually.
+    if( _tf._ts != fun._tf._ts ) { // Split-for-type, possible many future callers
+      UnresolvedNode new_unr = new UnresolvedNode();
+      new_unr.add_def(epi);
+      gvn.init(new_unr);
+    
+      // Direct all Call uses to the new Unresolved
+      for( int i=0; i<epi._uses._len; i++ ) {
+        Node call = epi._uses.at(i);
+        if( call instanceof CallNode && call.in(1)==epi ) {
+          gvn.set_def_reg(call,1,new_unr);// As part of removing call->epi edge, compress epi uses
+          i--;             // Rerun set point in epi use list after compression
+        }
+      }
+      // Include the new Epilog in all Unresolved
+      for( int i=0; i<epi._uses._len; i++ ) {
+        Node unr = epi._uses.at(i);
+        assert !(unr instanceof CallNode);
+        if( unr instanceof UnresolvedNode )
+          gvn.add_def(unr,newepi);
+      }      
+    
+    } else {                    // Split-for-size and only 1 caller
+      // Single path being inlined
+      int path_being_inlined=-1;
+      for( int j=1; j<_defs._len; j++ )
+        if( fun.in(j)!=any )
+          path_being_inlined = j;
+    
+      // The old Epilog has a set of CallNodes, but only the one in #path_being_inlined is
+      // being split-for-size.  Repoint the one Call._rpc matching rpc_parm
+      // in(path_being_inlined) to new_epi.
+      int rpc = ((TypeRPC)gvn.type(rpc_parm.in(path_being_inlined))).rpc();
+      for( Node use : epi._uses ) {
+        if( use instanceof CallNode && 
+            ((CallNode)use)._rpc == rpc ) {
+          gvn.set_def_reg(use,1,newepi);
+          break;
+        }
+      }
+    }
+
+    // There are new some cloned new Calls; these point to some old functions
+    // which might believe "all_calls_known" - which excludes these new Calls.
+    // The situation is still theoretically correct: the original Calls all
+    // split into 2 non-overlapping sets: calls from the new Calls and those
+    // left behind coming from the old Calls.  Update the old functions with
+    // these new Calls as-needed.  If has_unknown_callers(), the old
+    // function is prepared to handle unexpected new Calls already.  If its
+    // not true, then immediately wire up the new Call, add the new RPC input and
+    // correct all types.
+    if( !is_dead() && !has_unknown_callers() )
+      for( Node c : map.values() ) {
+        if( c instanceof CallNode ) { // For all cloned Calls
+          Type tfunptr = gvn.type(c.in(1));
+          TypeFunPtr tfun = ((TypeFun)tfunptr).fun();
+          for( int fidx : tfun._fidxs ) { // For all possible targets of the Call
+            FunNode oldfun = FunNode.find_fidx(fidx);
+            assert !oldfun.is_dead();
+            if( !oldfun.has_unknown_callers() ) {
+              gvn.add_work(oldfun);
+              Node x = ((CallNode)c).wire(gvn,oldfun);
+              assert x != null;
+              ParmNode rpc = oldfun.rpc();
+              if( rpc != null ) // Can be null there is a single return point, which got constant-folded
+                gvn.setype(rpc,rpc.value(gvn));
+              EpilogNode oldepi = oldfun.epi();
+              gvn.setype(oldepi,oldepi.value(gvn));
+            }
+          }
+        }
+      }
+
+    // TODO: Hook with proper signature into ScopeNode under an Unresolved.
+    // Future calls may resolve to either the old version or the new.
+    return is_dead() ? fun : this;
   }
 
   // Compute value from inputs.  Slot#1 is always the unknown caller.  If

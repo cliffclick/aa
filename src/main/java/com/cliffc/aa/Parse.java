@@ -110,7 +110,9 @@ public class Parse {
     Node res = _e._scope.in(_e._scope._defs._len-2);
     Node fun = res instanceof EpilogNode ? ((EpilogNode)res).fun() : null;
     // For all other unknown uses of functions, they will all be known after
-    // GCP.  Remove the hyper-conservative ALL_CTRL edge.
+    // GCP.  Remove the hyper-conservative ALL_CTRL edge.  Note that I canNOT
+    // run the pessimistic opto() at this point, as GCP needs to discover all
+    // the actual call-graph edges and install them directly on the FunNodes.
     for( int i=0; i<uses._len; i++ ) {
       Node use = uses.at(i);
       if( use._uid >= GVNGCM._INIT0_CNT && use != fun ) {
@@ -118,6 +120,7 @@ public class Parse {
         assert use.in(1)==Env.ALL_CTRL;
         _gvn.unreg(use);        // Changing edges, so unregister
         use.set_def(1,_gvn.con(Type.XCTRL),_gvn);
+        _gvn.rereg(use,Type.CTRL);
         i--;
       }
     }

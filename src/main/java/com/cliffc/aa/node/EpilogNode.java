@@ -70,7 +70,7 @@ public class EpilogNode extends Node {
   public void merge_ref_def( GVNGCM gvn, String tok, EpilogNode def ) {
     FunNode rfun = fun();
     FunNode dfun = def.fun();
-    assert rfun._defs._len==2 && rfun.in(0)==null && rfun.in(1) == Env.START; // Forward ref has no callers
+    assert rfun._defs._len==2 && rfun.in(0)==null && rfun.in(1) == Env.ALL_CTRL; // Forward ref has no callers
     assert dfun._defs._len==2 && dfun.in(0)==null;
     assert def._uses._len==0;                      // Def is brand new, no uses
 

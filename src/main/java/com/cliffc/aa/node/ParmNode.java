@@ -55,11 +55,6 @@ public class ParmNode extends PhiNode {
     if( !(in(0) instanceof FunNode) ) return null; // Dead, report elsewhere
     FunNode fun = (FunNode) in(0);
     assert fun._defs._len==_defs._len;
-    // For the function being returned-at-top, and thus NOT called on this path
-    // - ignore the argument check.  Function is not being called.
-    if( _defs._len==2 )
-      throw com.cliffc.aa.AA.unimpl();
-    //return null; // Never called, so no argument fails
     if( _idx < 0 ) return null;                                 // No arg check on RPC
     Type formal = fun._tf.arg(_idx);
     for( int i=1; i<_defs._len; i++ ) {

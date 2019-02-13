@@ -1,8 +1,10 @@
 package com.cliffc.aa;
 
-import com.cliffc.aa.AA;
 import com.cliffc.aa.node.*;
-import com.cliffc.aa.type.*;
+import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeFun;
+import com.cliffc.aa.type.TypeFunPtr;
+import com.cliffc.aa.type.TypeTuple;
 import com.cliffc.aa.util.Ary;
 
 import java.util.Arrays;
@@ -361,8 +363,6 @@ public class GVNGCM {
   // program GCP is active.
   public boolean _opt;          // GCP in-progress
   void gcp(ScopeNode rez ) {
-    assert _work._len==0;
-    assert _wrk_bits.isEmpty();
     // Set all types to null (except primitives); null is the visit flag when
     // setting types to their highest value.
     Arrays.fill(_ts._es,_INIT0_CNT,_ts._len,null);

@@ -179,7 +179,7 @@ public class CallNode extends Node {
   // knowledge of its callers and arguments.
   // Leaves the Call in the graph - making the graph "a little odd" - double
   // CTRL users - once for the call, and once for the function being called.
-  private Node wire(GVNGCM gvn, FunNode fun) {
+  Node wire(GVNGCM gvn, FunNode fun) {
     Node ctrl = in(0);
     for( int i=1; i<fun._defs.len(); i++ )
       if( fun.in(i)==ctrl ) // Look for same control
@@ -226,7 +226,7 @@ public class CallNode extends Node {
         // Can be wiring up the '#[ALL]' list.  Stop after seeing all existing functions
         if( fidx >= FunNode.FUNS._len ) return;
         FunNode fun = FunNode.find_fidx(fidx);
-        if( !fun.is_dead() ) wire(gvn,fun);
+        if( !fun.is_dead() && !fun.is_forward_ref() ) wire(gvn,fun);
       }
     }
   }
