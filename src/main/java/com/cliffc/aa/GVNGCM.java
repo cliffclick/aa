@@ -1,5 +1,6 @@
 package com.cliffc.aa;
 
+import com.cliffc.aa.AA;
 import com.cliffc.aa.node.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
@@ -78,7 +79,6 @@ public class GVNGCM {
         if( n._uses.at(i)._uid >= CNT )
           n._uses.del(i--);
     }
-    _post_gcp = false;
   }
 
   public Type type( Node n ) {
@@ -343,29 +343,41 @@ public class GVNGCM {
     }
   }
 
-  // Global Optimistic Constant Propagation.
-  public boolean _whole_program;// If false, then REPL may provide more program
-  public boolean _post_gcp;     // During and after GCP (all callers are known)
+  // Global Optimistic Constant Propagation.  Passed in the final program state
+  // (including any return result, i/o & memory state), and a flag stating if
+  // more program can appear (e.g. via the REPL).  Returns the most-precise
+  // types possible, and replaces constants types with constants.
+  //
+  // Besides the obvious GCP algorithm (and the type-precision that results
+  // from the analysis), GCP does a few more things.
+  //
+  // Not all callers are known and this is approximated by being called by
+  // ALL_CTRL, a ConNode of Type CTRL, as a permanently available unknown
+  // caller.  If the whole program is available to us, the we can compute all
+  // callers conservatively and precisely - we may have extra never-taken
+  // caller/callee edges, but no missing caller/callee edges.  These edges are
+  // virtual going in (and represented by ALL_CTRL); we can remove the ALL_CTRL
+  // path and add in physical edges in the CallNode.value() call while whole-
+  // program GCP is active.
   public boolean _opt;          // GCP in-progress
-  void gcp(Node rez) {
+  void gcp(ScopeNode rez ) {
     assert _work._len==0;
     assert _wrk_bits.isEmpty();
-    assert !_post_gcp;
-    _post_gcp = true;
-    Ary<CallNode> calls = new Ary<>(new CallNode[1],0);
     // Set all types to null (except primitives); null is the visit flag when
     // setting types to their highest value.
     Arrays.fill(_ts._es,_INIT0_CNT,_ts._len,null);
-    assert Env._start._uid==0;
-    assert Env._ctl0 ._uid==1;
-    assert Env._mem0 ._uid==2;
+    assert Env.START._uid==0;
+    assert Env.CTL_0._uid==1;
+    assert Env.MEM_0._uid==2;
     _ts.setX(0,null);
     _ts.setX(1,null);
     _ts.setX(2,null);
     // Set all types to all_type().dual(), their most optimistic type,
     // and prime the worklist.
-    walk_initype( Env._start );
+    walk_initype( Env.START);
 
+    // Collect unresolved calls, and verify they get resolved.
+    Ary<CallNode> calls = new Ary<>(new CallNode[1],0);
     _opt = true;                // Lazily fill with best value
     // Repeat, if we remove some ambiguous choices, and keep falling until the
     // graph stabilizes without ambiguity.
@@ -417,8 +429,8 @@ public class GVNGCM {
 
     // Revisit the entire reachable program, as ideal calls may do something
     // with the maximally lifted types.
-    FunNode frez = rez instanceof EpilogNode ? ((EpilogNode)rez).fun() : null;
-    walk_opt(rez,frez);
+    //FunNode frez = rez instanceof EpilogNode ? ((EpilogNode)rez).fun() : null;
+    walk_opt(rez/*,frez*/);
   }
 
   // Forward reachable walk, setting all_type.dual (except Start) and priming
@@ -435,10 +447,10 @@ public class GVNGCM {
   }
   
   // GCP optimizations on the live subgraph
-  private void walk_opt( Node n, FunNode frez ) {
+  private void walk_opt( Node n/*, FunNode frez*/ ) {
     assert !n.is_dead();
     if( _wrk_bits.get(n._uid) ) return; // Been there, done that
-    if( n==Env._start ) return;         // Top-level scope
+    if( n==Env.START ) return;         // Top-level scope
     add_work(n);                        // Only walk once
     // Replace with a constant, if possible
     Type t = type(n);
@@ -446,17 +458,9 @@ public class GVNGCM {
       subsume(n,con(t));        // Constant replacement
       return;
     }
-    // Functions have no more unknown callers
+    // Functions can sharpen return value
     if( n instanceof FunNode && n._uid >= _INIT0_CNT ) {
       FunNode fun = (FunNode)n;
-      if( !fun._tf.is_forward_ref() && // No forward ref (error at this point)
-          !fun._all_callers_known &&   // Not already flagged as all-calls-known
-           _whole_program &&           // No more callers from the REPL
-          fun != frez) {               // Not being returned as top-level result
-        fun.all_callers_known();
-        set_def_reg(fun,1,con(Type.XCTRL));
-      }
-      // Functions can sharpen return value
       EpilogNode epi = fun.epi();
       if( type(fun)==Type.CTRL && epi != null ) {
         TypeTuple  tt = (TypeTuple)   type(epi);
@@ -476,7 +480,7 @@ public class GVNGCM {
     // Walk reachable graph
     for( Node def : n._defs )
       if( def != null )
-        walk_opt(def,frez);
+        walk_opt(def/*,frez*/);
   }
 
 }

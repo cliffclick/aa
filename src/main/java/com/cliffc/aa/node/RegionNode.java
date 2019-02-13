@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
 
@@ -9,9 +10,7 @@ import java.util.function.Predicate;
 public class RegionNode extends Node {
   public RegionNode( Node... ctrls) { super(OP_REGION,ctrls); }
   RegionNode( byte op ) { super(op); add_def(null); } // For FunNodes
-  @Override public Node ideal(GVNGCM gvn) { return ideal(gvn,false); }
-  // Ideal call, but FunNodes keep index#1 for future parsed call sites
-  Node ideal(GVNGCM gvn, boolean keepslot1) {
+  @Override public Node ideal(GVNGCM gvn) {
     // TODO: The unzip xform, especially for funnodes doing type-specialization
     // TODO: Check for dead-diamond merges
     // TODO: treat _cidx like U/F and skip_dead it also
@@ -19,7 +18,7 @@ public class RegionNode extends Node {
     // Look for dead paths.  If found, cut dead path out of all Phis and this
     // Node, and return-for-progress.
     int dlen = _defs.len();
-    for( int i=keepslot1 ? 2 : 1; i<dlen; i++ )
+    for( int i=1; i<dlen; i++ )
       if( gvn.type(in(i))==Type.XCTRL ) { // Found dead path; cut out
         for( Node phi : _uses )
           if( phi instanceof PhiNode ) {
@@ -29,10 +28,12 @@ public class RegionNode extends Node {
         return this; // Progress
       }
 
+    if( dlen>2 ) return null; // Multiple live paths
+    if( dlen == 1 ) return null; // No live inputs; dead in value() call
+    if( in(1) == Env.ALL_CTRL ) return null; // Alive from unknown caller
     // If only 1 live path and no Phis then return 1 live path.
-    if( dlen>2 || keepslot1 ) return null; // Multiple live paths
-    if( dlen == 1 ) return null; // No live inputs
     for( Node phi : _uses ) if( phi instanceof PhiNode ) return null;
+    // Self-dead-cycle is dead in value() call
     return in(1)==this ? null : in(1);
   }
 

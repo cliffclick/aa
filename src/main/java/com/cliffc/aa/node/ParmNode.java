@@ -26,7 +26,6 @@ public class ParmNode extends PhiNode {
     FunNode fun = (FunNode) in(0);
     assert fun._defs._len==_defs._len;
     if( gvn.type(fun) == Type.XCTRL ) return null; // All dead, c-prop will fold up
-    if( !fun._all_callers_known ) return null;     // More callers to come, no change yet
     // Arg-check before folding up
     if( _idx != -1 ) {
       Type formal = fun._tf.arg(_idx);        // Formal argument type
@@ -45,14 +44,7 @@ public class ParmNode extends PhiNode {
     if( !(in(0) instanceof FunNode) ) return t; // Dying
     FunNode fun = (FunNode) in(0);
     assert fun._defs._len==_defs._len;
-    // TODO: During GCP, slot#1 is the "default" input and assumed never
-    // called.  As callers appear, they wire up and become actual input edges.
-    // Leaving slot#1 alive here makes every call appear to be called by the
-    // default caller.  Fix is to have the default (undiscovered) caller
-    // control be different from the top-level REPL caller, and set the
-    // undiscovered control to XCTRL.
-    int s = fun.slot1(gvn) ? 1 : 2;
-    for( int i=s; i<_defs._len; i++ )
+    for( int i=1; i<_defs._len; i++ )
       if( gvn.type(fun.in(i))!=Type.XCTRL ) { // Only meet alive paths
         Type pt = gvn.type(in(i));
         t = t.meet(pt.isa(_default_type) ? pt : _default_type);
@@ -65,7 +57,9 @@ public class ParmNode extends PhiNode {
     assert fun._defs._len==_defs._len;
     // For the function being returned-at-top, and thus NOT called on this path
     // - ignore the argument check.  Function is not being called.
-    if( _defs._len==2 && !fun._all_callers_known ) return null; // Never called, so no argument fails
+    if( _defs._len==2 )
+      throw com.cliffc.aa.AA.unimpl();
+    //return null; // Never called, so no argument fails
     if( _idx < 0 ) return null;                                 // No arg check on RPC
     Type formal = fun._tf.arg(_idx);
     for( int i=1; i<_defs._len; i++ ) {

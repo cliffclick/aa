@@ -25,9 +25,9 @@ public class TmpNode extends Node implements AutoCloseable {
     Node n = _defs.remove(i);
     n._uses.del(n._uses.find(this));
     if( n._uses._len==0 )
-      Env._gvn.kill(n); // Recursively begin deleting
+      Env.GVN.kill(n); // Recursively begin deleting
   }
   // Parser support of small lists of nodes to be kept alive during parsing.
   // Nuke this node and anything it keeps alive
-  @Override public void close() { Env._gvn.kill_new(this); }
+  @Override public void close() { Env.GVN.kill_new(this); }
 }

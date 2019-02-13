@@ -32,7 +32,7 @@ public abstract class Node implements Cloneable {
   static final byte OP_MAX   =20;
   private static final String[] STRS = new String[] { null, "Call", "Cast", "Con", "Epi", "Err", "Fun", "If", "Load", "New", "Parm", "Phi", "Prim", "Proj", "Region", "Scope", "Start", "Tmp", "Type", "Unresolved" };
 
-  public int _uid=Env._gvn.uid(); // Unique ID, will have gaps, used to give a dense numbering to nodes
+  public int _uid=Env.GVN.uid(); // Unique ID, will have gaps, used to give a dense numbering to nodes
   final byte _op;
 
   // Defs.  Generally fixed length, ordered, nulls allowed, no unused trailing space.  Zero is Control.
@@ -83,7 +83,7 @@ public abstract class Node implements Cloneable {
   <N extends Node> N copy() {
     try {
       N n = (N)clone();                   // Preserve base java type
-      n._uid = Env._gvn.uid();            // A new UID
+      n._uid = Env.GVN.uid();            // A new UID
       n._defs = new Ary<>(new Node[1],0); // New empty defs
       n._uses = new Ary<>(new Node[1],0); // New empty uses
       return n;
@@ -274,7 +274,7 @@ public abstract class Node implements Cloneable {
   // Walk a subset of the dominator tree, looking for the last place (highest
   // in tree) this predicate passes, or null if it never does.  
   Node walk_dom_last(Predicate<Node> P) {
-    if( this==Env._start ) return null; // Walked off the top
+    if( this==Env.START ) return null; // Walked off the top
     assert in(0) != null;       // All default control nodes pass ctrl in slot 0
     Node n = in(0).walk_dom_last(P);
     if( n != null ) return n;   // Take last answer first

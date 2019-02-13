@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
 
@@ -14,6 +15,7 @@ public class PhiNode extends Node {
     RegionNode r = (RegionNode) in(0);
     assert r._defs._len==_defs._len;
     if( gvn.type(r) == Type.XCTRL ) return null; // All dead, c-prop will fold up
+    if( r._defs.len() > 1 &&  r.in(1) == Env.ALL_CTRL ) return null;
     // If only 1 unique live input, return that
     Node live=null;
     for( int i=1; i<_defs._len; i++ ) {

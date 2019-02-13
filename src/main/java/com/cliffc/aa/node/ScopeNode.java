@@ -86,6 +86,8 @@ public class ScopeNode extends Node {
   // promoted.
   public void promote_forward_del_locals(GVNGCM gvn, ScopeNode parent) {
     for( String name : _vals.keySet() ) {
+      // control & memory & io survive alive to next outer scope
+      if( name.charAt(0)==' ' ) continue;
       int idx = _vals.get(name);
       Node n = in(idx);
       if( n != null && parent != null && n.is_forward_ref() )

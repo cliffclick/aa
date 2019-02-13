@@ -62,7 +62,7 @@ public class EpilogNode extends Node {
   }
 
   // True if this is a forward_ref
-  @Override public boolean is_forward_ref() { return in(0)== in(3) && in(3) instanceof FunNode && fun()._tf.is_forward_ref(); }
+  @Override public boolean is_forward_ref() { return in(0)== in(3) && in(3) instanceof FunNode && fun().is_forward_ref(); }
 
   // 'this' is a forward reference, probably with multiple uses (and no inlined
   // callers).  Passed in the matching function definition, which is brand new
@@ -70,7 +70,7 @@ public class EpilogNode extends Node {
   public void merge_ref_def( GVNGCM gvn, String tok, EpilogNode def ) {
     FunNode rfun = fun();
     FunNode dfun = def.fun();
-    assert rfun._defs._len==2 && rfun.in(0)==null && rfun.in(1) == Env._start; // Forward ref has no callers
+    assert rfun._defs._len==2 && rfun.in(0)==null && rfun.in(1) == Env.START; // Forward ref has no callers
     assert dfun._defs._len==2 && dfun.in(0)==null;
     assert def._uses._len==0;                      // Def is brand new, no uses
 

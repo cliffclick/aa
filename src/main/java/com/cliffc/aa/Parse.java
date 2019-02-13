@@ -69,7 +69,7 @@ public class Parse {
     _nf.setGroupingUsed(false);
     _pp = new ParsePosition(0);
     _str = str;          // Keep a complete string copy for java number parsing
-    _gvn = Env._gvn;     // Pessimistic during parsing
+    _gvn = Env.GVN;     // Pessimistic during parsing
   }
 
   // Parse the string in the given lookup context, and return an executable
@@ -77,76 +77,89 @@ public class Parse {
   // ScopeNode with existing variables which survive to the next call.  Used by
   // the REPL to do incremental typing.
   TypeEnv go_partial( ) {
-    Node res = prog();
-    return opto_type(res);
+    prog();         // Parse a program
+    _gvn.iter();   // Pessimistic optimizations; might improve error situation
+    _gvn.gcp(_e._scope); // Global Constant Propagation
+    _gvn.iter();   // Re-check all ideal calls now that types have been maximally lifted
+    return gather_errors();
   }
   // Parse the string in the given lookup context, and return an executable
   // program.  Called in a whole-program context; passed in an empty ScopeNode
   // and nothing survives since there is no next call.  Used by the Exec to do
   // whole-compilation-unit typing.
   TypeEnv go_whole( ) {
-    Node res = prog();
-    clean_top_level_scope(res);
-    return opto_type(res);
+    prog();                     // Parse a program
+    clean_top_level_scope();
+    _gvn.iter();   // Pessimistic optimizations; might improve error situation
+    remove_unknown_callers();
+    _gvn.gcp(_e._scope); // Global Constant Propagation
+    _gvn.iter();   // Re-check all ideal calls now that types have been maximally lifted
+    return gather_errors();
   }
   
-  private void clean_top_level_scope(Node res) {
-    _e._scope.add_def(ctrl());  // Hook, so not deleted
-    _e._scope.add_def(res);     // Hook, so not deleted
+  private void clean_top_level_scope() {
     // Delete names at the top scope before final optimization.
+    // Keep return results & exit control.
     _e._scope.promote_forward_del_locals(_gvn,null);
-    Node res2 = _e._scope.pop();
-    assert res==res2;
-    set_ctrl(_e._scope.pop());
-    _gvn._whole_program = true;
+  }
+
+  private void remove_unknown_callers() {
+    Ary<Node> uses = Env.ALL_CTRL._uses;
+    // Leave any final result function 'hooked' by the unknown caller to keep
+    // it alive to be returned.
+    Node res = _e._scope.in(_e._scope._defs._len-2);
+    Node fun = res instanceof EpilogNode ? ((EpilogNode)res).fun() : null;
+    // For all other unknown uses of functions, they will all be known after
+    // GCP.  Remove the hyper-conservative ALL_CTRL edge.
+    for( int i=0; i<uses._len; i++ ) {
+      Node use = uses.at(i);
+      if( use._uid >= GVNGCM._INIT0_CNT && use != fun ) {
+        assert use instanceof FunNode;
+        assert use.in(1)==Env.ALL_CTRL;
+        _gvn.unreg(use);        // Changing edges, so unregister
+        use.set_def(1,_gvn.con(Type.XCTRL),_gvn);
+        i--;
+      }
+    }
   }
   
-  private TypeEnv opto_type(Node res) {
-    try {
-      // Optimize and compute types.
-      Env par = _e._par;
-      _e._scope.add_def(_e._scope); // Self hook, so not deleted
-      _e._scope.add_def(res);     // Hook, so not deleted
-      _gvn.iter();   // Pessimistic optimizations; might improve error situation
-      res = _e._scope._defs.last(); // Update result value for GCP return
-      _gvn.gcp(res); // Global Constant Propagation
-      _gvn.iter();   // Re-check all ideal calls now that types have been maximally lifted
-      res = _e._scope.pop();    // New and improved result
-      _e._scope.pop();          // Remove self-hook
-
-      // Hunt for typing errors in the alive code
-      assert par._par==null;      // Top-level only
-      BitSet bs = new BitSet();
-      bs.set(0);                  // Do not walk initial scope (primitives and constants only)
-      bs.set(_e._scope._uid);     // Do not walk top-level scope
-      Ary<String> errs0 = new Ary<>(new String[1],0);
-      Ary<String> errs1 = new Ary<>(new String[1],0);
-      Ary<String> errs2 = new Ary<>(new String[1],0);
-      res   .walkerr_def(errs0,errs1,errs2,bs,_gvn);
-      ctrl().walkerr_def(errs0,errs1,errs2,bs,_gvn);
-      if( errs0.isEmpty() ) errs0.addAll(errs1);
-      if( errs0.isEmpty() ) _e._scope.walkerr_use(errs0,new BitSet(),_gvn);
-      if( errs0.isEmpty() && skipWS() != -1 ) errs0.add(errMsg("Syntax error; trailing junk"));
-      if( errs0.isEmpty() ) res.walkerr_gc(errs0,new BitSet(),_gvn);
-      // If the ONLY error is from unresolved calls, report them last.  Most
-      // other errors result in unresolved calls, so report others first.
-      if( errs0.isEmpty() ) errs0.addAll(errs2);
-      errs0.sort_update(String::compareTo);
-
-      Type tres = _gvn.type(res);
-      kill(res);       // Kill Node for returned Type result
-      set_ctrl(null);  // Kill control also
-      return new TypeEnv(tres,_e,errs0.isEmpty() ? null : errs0);
-    } finally {
-      _gvn._post_gcp = false;
-    }
+  private TypeEnv gather_errors() {
+    _e._scope.pop();          // Remove self-hook
+    Node res = _e._scope.pop(); // New and improved result
+    
+    // Hunt for typing errors in the alive code
+    assert _e._par._par==null; // Top-level only
+    BitSet bs = new BitSet();
+    bs.set(0);                  // Do not walk initial scope (primitives and constants only)
+    bs.set(_e._scope._uid);     // Do not walk top-level scope
+    Ary<String> errs0 = new Ary<>(new String[1],0);
+    Ary<String> errs1 = new Ary<>(new String[1],0);
+    Ary<String> errs2 = new Ary<>(new String[1],0);
+    res   .walkerr_def(errs0,errs1,errs2,bs,_gvn);
+    ctrl().walkerr_def(errs0,errs1,errs2,bs,_gvn);
+    if( errs0.isEmpty() ) errs0.addAll(errs1);
+    if( errs0.isEmpty() ) _e._scope.walkerr_use(errs0,new BitSet(),_gvn);
+    if( errs0.isEmpty() && skipWS() != -1 ) errs0.add(errMsg("Syntax error; trailing junk"));
+    if( errs0.isEmpty() ) res.walkerr_gc(errs0,new BitSet(),_gvn);
+    // If the ONLY error is from unresolved calls, report them last.  Most
+    // other errors result in unresolved calls, so report others first.
+    if( errs0.isEmpty() ) errs0.addAll(errs2);
+    errs0.sort_update(String::compareTo);
+    
+    Type tres = _gvn.type(res);
+    kill(res);       // Kill Node for returned Type result
+    set_ctrl(null);  // Kill control also
+    return new TypeEnv(tres,_e,errs0.isEmpty() ? null : errs0);
   }
 
   /** Parse a top-level:
    *  prog = ifex END */
-  private Node prog() {
+  private void prog() {
     Node res = stmts();
-    return res == null ? con(Type.ANY) : res;
+    if( res == null ) res = con(Type.ANY);
+    _e._scope.add_def(res);       // Hook, so not deleted
+    _e._scope.add_def(_e._scope); // Self hook, so not deleted
+
   }
     
   /** Parse a list of statements; final semi-colon is optional.
@@ -498,7 +511,7 @@ public class Parse {
       bads.add(bad);
     }
     Node old_ctrl = ctrl();
-    FunNode fun = init(new FunNode(ts.asAry(),old_ctrl));
+    FunNode fun = init(new FunNode(ts.asAry()));
     try( Env e = new Env(_e) ) {// Nest an environment for the local vars
       _e = e;                   // Push nested environment
       set_ctrl(fun);            // New control is function head
@@ -787,7 +800,7 @@ public class Parse {
 
   // Whack current control with a syntax error
   private ErrNode err_ctrl2( String s ) { return err_ctrl1(s,Type.ANY); }
-  public  ErrNode err_ctrl1(String s, Type t) { return init(new ErrNode(Env._start,errMsg(s),t)); }
+  public  ErrNode err_ctrl1(String s, Type t) { return init(new ErrNode(Env.START,errMsg(s),t)); }
   private void err_ctrl0(String s) {
     set_ctrl(gvn(new ErrNode(ctrl(),errMsg(s),Type.CTRL)));
   }

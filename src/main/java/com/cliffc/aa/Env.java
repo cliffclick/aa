@@ -10,46 +10,48 @@ public class Env implements AutoCloseable {
     _par = par;
     ScopeNode scope = new ScopeNode();
     if( par != null ) {
-      scope.update(" control ",par._scope.get(" control "),_gvn,true);
-      scope.update(" memory " ,par._scope.get(" memory " ),_gvn,true);
+      scope.update(" control ",par._scope.get(" control "), GVN,true);
+      scope.update(" memory " ,par._scope.get(" memory " ), GVN,true);
     }
-    _scope = _gvn.init(scope);
+    _scope = GVN.init(scope);
   }
 
-  public final static GVNGCM _gvn; // Initial GVN, defaults to ALL, lifts towards ANY
-  public final static StartNode _start; // Program start values (control, empty memory, cmd-line args)
-  public final static CProjNode _ctl0;  // Program start value control
-  public final static MProjNode _mem0;  // Program start value memory
+  public final static GVNGCM GVN; // Initial GVN, defaults to ALL, lifts towards ANY
+  public final static StartNode START; // Program start values (control, empty memory, cmd-line args)
+         final static CProjNode CTL_0; // Program start value control
+         final static MProjNode MEM_0; // Program start value memory
+  public final static   ConNode ALL_CTRL;
   private final static int NINIT_CONS;
   private final static Env TOP; // Top-most lexical Environment, has all primitives, unable to be removed
   static {
-    _gvn   = new GVNGCM();     // Initial GVN, defaults to ALL, lifts towards ANY
+    GVN = new GVNGCM();     // Initial GVN, defaults to ALL, lifts towards ANY
     // Initial control, memory, args, program state
-    _start = new StartNode();
-    _ctl0 = _gvn.init(new CProjNode(_start,0));
-    _mem0 = _gvn.init(new MProjNode(_start,1));
+    START = new StartNode();
+    CTL_0 = GVN.init(new CProjNode(START,0));
+    MEM_0 = GVN.init(new MProjNode(START,1));
+    ALL_CTRL = GVN.init(new ConNode<Type>(Type.CTRL));
     TOP    = new Env(null);        // Top-most lexical Environment
     TOP.install_primitives();
-    NINIT_CONS = _start._uses._len;
+    NINIT_CONS = START._uses._len;
   }
   private void install_primitives() {
     _scope  .init0(); // Add base types
-    _scope.update(" control ",_ctl0,_gvn,true);
-    _scope.update(" memory " ,_mem0,_gvn,true);
+    _scope.update(" control ", CTL_0, GVN,true);
+    _scope.update(" memory " , MEM_0, GVN,true);
     for( PrimNode prim : PrimNode.PRIMS )
-      _scope.add_fun(prim._name,(EpilogNode)_gvn.xform(as_fun(prim)));
+      _scope.add_fun(prim._name,(EpilogNode) GVN.xform(as_fun(prim)));
     // Now that all the UnresolvedNodes have all possible hits for a name,
     // register them with GVN.
-    for( Node val : _scope._defs )  _gvn.init0(val);
+    for( Node val : _scope._defs )  GVN.init0(val);
     // Top-level constants
-    _scope.update("math_pi",_gvn.con(TypeFlt.PI),null,false);
+    _scope.update("math_pi", GVN.con(TypeFlt.PI),null,false);
     // Run the worklist dry
     _scope.add_def(_scope); // Self-hook to prevent deletion
-    _gvn.iter();
+    GVN.iter();
     _scope.pop();
     CallNode.init0(); // Done with adding primitives
     FunNode .init0(); // Done with adding primitives
-    _gvn    .init0(); // Done with adding primitives
+    GVN.init0(); // Done with adding primitives
   }
   
   // A new top-level Env, above this is the basic public Env with all the primitives
@@ -61,12 +63,12 @@ public class Env implements AutoCloseable {
   EpilogNode as_fun( PrimNode prim ) {
     TypeTuple targs = prim._targs;
     String[] args = prim._args;
-    FunNode  fun = ( FunNode)_gvn.xform(new  FunNode(_ctl0, prim)); // Points to ScopeNode only
-    ParmNode rpc = (ParmNode)_gvn.xform(new ParmNode(-1,"rpc",fun,_gvn.con(TypeRPC.ALL_CALL),null));
+    FunNode  fun = ( FunNode) GVN.xform(new  FunNode(prim)); // Points to ScopeNode only
+    ParmNode rpc = (ParmNode) GVN.xform(new ParmNode(-1,"rpc",fun, GVN.con(TypeRPC.ALL_CALL),null));
     prim.add_def(null);         // Control for the primitive
     for( int i=0; i<args.length; i++ )
-      prim.add_def(_gvn.xform(new ParmNode(i,args[i],fun,_gvn.con(targs.at(i)),null)));
-    PrimNode x = _gvn.init(prim);
+      prim.add_def(GVN.xform(new ParmNode(i,args[i],fun, GVN.con(targs.at(i)),null)));
+    PrimNode x = GVN.init(prim);
     assert x==prim;
     return new EpilogNode(fun,prim,rpc,fun,fun._tf.fidx(),null);
   }
@@ -80,18 +82,18 @@ public class Env implements AutoCloseable {
   // anything only pointed at by this scope).
   @Override public void close() {
     ScopeNode pscope = _par._scope;
-    _scope.promote_forward_del_locals(_gvn,_par._par == null ? null : pscope);
+    _scope.promote_forward_del_locals(GVN,_par._par == null ? null : pscope);
     if( _scope.is_dead() ) return;
     // Closing top-most scope (exiting compilation unit)?
     if( _par._par == null ) {   // Then reset global statics to allow another compilation unit
       CallNode.reset_to_init0(); 
       FunNode .reset_to_init0();
-      _gvn    .reset_to_init0();
+      GVN.reset_to_init0();
       // StartNode is used by global constants, which in turn are only used by
       // dead cycles.
-      while( _start._uses._len > NINIT_CONS ) {
-        Node x = _start._uses.pop();
-        assert !_gvn.touched(x); // Uses are all dead (but not reclaimed because in a cycle)
+      while( START._uses._len > NINIT_CONS ) {
+        Node x = START._uses.pop();
+        assert !GVN.touched(x); // Uses are all dead (but not reclaimed because in a cycle)
       }
       return;
     }
@@ -101,16 +103,16 @@ public class Env implements AutoCloseable {
       Node use = _scope._uses.at(0);
       assert use != pscope;
       int idx = use._defs.find(_scope);
-      _gvn.set_def_reg(use,idx, idx==0 ? pscope.get(" control ") : pscope);
+      GVN.set_def_reg(use,idx, idx==0 ? pscope.get(" control ") : pscope);
     }
-    _gvn.kill(_scope);
+    GVN.kill(_scope);
   }
 
   // Test support, return top-level token type
   static Type lookup_valtype( String token ) { return lookup_valtype(TOP.lookup(token)); }
   // Top-level exit type lookup
   private static Type lookup_valtype( Node n ) {
-    Type t = _gvn.type(n);
+    Type t = GVN.type(n);
     if( t != Type.CTRL ) return t;
   //  if( n instanceof ProjNode ) // Get function type when returning a function
   //    return ((FunNode)(n.in(0).in(2)))._tf;

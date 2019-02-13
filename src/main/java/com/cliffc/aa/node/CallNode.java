@@ -179,11 +179,11 @@ public class CallNode extends Node {
   // knowledge of its callers and arguments.
   // Leaves the Call in the graph - making the graph "a little odd" - double
   // CTRL users - once for the call, and once for the function being called.
-  Node wire(GVNGCM gvn, FunNode fun) {
+  private Node wire(GVNGCM gvn, FunNode fun) {
     Node ctrl = in(0);
-    for( int i=fun._all_callers_known?1:2; i<fun._defs.len(); i++ ) // Skip default control (for top-level calls vs top-level fun-defs)
-      if( fun._defs.at(i)==ctrl ) // Look for same control
-        return null;              // Already wired up
+    for( int i=1; i<fun._defs.len(); i++ )
+      if( fun.in(i)==ctrl ) // Look for same control
+        return null;        // Already wired up
 
     // Make sure we have enough args before wiring up (makes later life easier
     // to assume correct arg counts).  Note that we cannot, in general,
@@ -209,8 +209,8 @@ public class CallNode extends Node {
     // Add Control for this path.  Sometimes called from fun.Ideal() (because
     // inlining), sometimes called by Epilog when it discovers all callers
     // known.
-    if( gvn.touched(fun) || gvn._opt ) gvn.add_def(fun,in(0));
-    else                               fun.add_def(    in(0));
+    assert gvn.touched(fun);
+    gvn.add_def(fun,in(0));
     return this;
   }
 
@@ -244,7 +244,7 @@ public class CallNode extends Node {
 
     if( gvn._opt ) // Manifesting optimistic virtual edges between caller and callee
       wire(gvn,t); // Make real edges from virtual edges
-
+    
     Type trez = Type.ALL; // Base for JOIN
     if( fp instanceof UnresolvedNode ) {
       // For unresolved, we can take the BEST choice; i.e. the JOIN of every
@@ -255,7 +255,7 @@ public class CallNode extends Node {
     } else {                                  // Single resolved target
       trez = value1(gvn,t);                   // Return type or SCALAR if invalid args
     }
-
+    
     // Return {control,value} tuple.
     return TypeTuple.make(Type.CTRL,trez);
   }
