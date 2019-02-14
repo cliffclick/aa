@@ -9,12 +9,17 @@ import java.util.Arrays;
 // Make a new object of given type
 public class NewNode extends Node {
   private final String[] _names; // Field names
-  public NewNode( String[] names, Node[] flds ) {
+  private final byte[] _finals;  // Final fields
+  public NewNode( Node[] flds, String[] names ) { this(flds,names,bs(names.length)); }
+  public NewNode( Node[] flds, String[] names, byte[] finals ) {
     super(OP_NEW,flds);
-    assert flds [0]==null;      // no ctrl field
-    assert names.length==flds.length-1;
-    _names=names;
+    assert flds[0]==null;       // no ctrl field
+    assert names .length==flds.length-1;
+    assert finals.length==flds.length-1;
+    _names = names;
+    _finals= finals;
   }
+  private static byte[] bs(int len) { byte[] bs = new byte[len]; Arrays.fill(bs,(byte)1); return bs; }
   String xstr() { return "New#"; } // Self short name
   String  str() { return xstr(); } // Inline short name
   @Override public Node ideal(GVNGCM gvn) { return null; }
@@ -27,7 +32,7 @@ public class NewNode extends Node {
       if( !t.isa(Type. SCALAR) ) t = Type. SCALAR;
       ts[i] = t;
     }
-    TypeStruct newt = TypeStruct.make(_names,ts);
+    TypeStruct newt = TypeStruct.make(_names,ts,_finals);
     // Get the existing type, without installing if missing because blows the
     // "new newnode" assert if this node gets replaced during parsing.
     Type oldt = gvn.self_type(this);

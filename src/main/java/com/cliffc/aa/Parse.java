@@ -488,7 +488,7 @@ public class Parse {
       s=stmts();
     }
     require(')');
-    return gvn(new NewNode(TypeStruct.FLDS(ns._len-1),ns.asAry()));
+    return gvn(new NewNode(ns.asAry(),TypeStruct.FLDS(ns._len-1)));
   }
 
   /** Parse an anonymous function; the opening '{' already parsed.  After the
@@ -536,7 +536,8 @@ public class Parse {
 
   /** Parse anonymous struct; the opening "@{" already parsed.  Next comes
    *  statements, with each assigned value becoming a struct member.  A lexical
-   *  scope is made (non top-level assignments are removed at the end), then the closing "}".
+   *  scope is made (non top-level assignments are removed at the end), then
+   *  the closing "}".
    *  \@{ [id[:type]?[=stmt]?,]* }
    */
   private Node struct() {
@@ -546,16 +547,14 @@ public class Parse {
       set_ctrl(ctrl);           // Carry control thru
       Ary<String> toks = new Ary<>(new String[1],0);
       Ary<Type  > ts   = new Ary<>(new Type  [1],0);
-      BitSet rs = new BitSet();
+      BitSet fs = new BitSet();
       while( true ) {
         String tok = token();    // Scan for 'id'
         if( tok == null ) break; // end-of-struct-def
         Type t = Type.ALL;       // Untyped, most generic type
         Node stmt = con(Type.SCALAR);
-        if( peek(":=") ) {      // Parse := re-assignable field token
-          rs.set(toks._len);    // Flag as mutable
-          _x--;                 // Reparse '=' as assignment
-        }
+        boolean is_final = true;
+        if( peek(":=") ) { is_final = false; _x--; } // Parse := re-assignable field token
         if( peek('=') ) {       // Parse field initial value
           if( (stmt=stmt())==null )
             stmt = err_ctrl2("Missing ifex after assignment of '"+tok+"'");
@@ -573,10 +572,9 @@ public class Parse {
         if( t != null ) stmt = gvn(new TypeNode(t,stmt,errMsg()));
         // Add field into lexical scope, field is usable after initial set
         e.update(tok,stmt,_gvn,false); // Field now available 'bare' inside rest of scope
-        boolean mutable = rs.get(toks._len); // Assignment is mutable or final
+        if( is_final ) fs.set(toks._len);
         toks.add(tok);          // Gather for final type
         ts  .add(_gvn.type(stmt));
-        if( mutable ) throw AA.unimpl();
         if( !peek(',') ) break; // Final comma is optional
       }
       require('}');
@@ -584,7 +582,9 @@ public class Parse {
       _e = _e._par;             // Pop nested environment
       if( e._scope != c ) set_ctrl(c);
       Node[] flds = e._scope.get(toks);
-      return gvn(new NewNode(toks.asAry(),flds));
+      byte[] finals = new byte[toks._len];
+      for(int i=0; i<toks._len; i++ ) if( fs.get(i) ) finals[i] = 1;
+      return gvn(new NewNode(flds,toks.asAry(),finals));
     } // Pop lexical scope around struct
   }
 

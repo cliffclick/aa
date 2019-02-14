@@ -172,6 +172,7 @@ public class TypeStruct extends TypeOop<TypeStruct> {
   private static byte[] bs(Type[] ts) { byte[] bs = new byte[ts.length]; Arrays.fill(bs,(byte)1); return bs; } // All read-only
   public  static TypeStruct make(Type... ts               ) { return malloc(false,FLDS[ts.length],ts,bs(ts)).hashcons_free(); }
   public  static TypeStruct make(String[] flds, Type... ts) { return malloc(false,flds,ts,bs(ts)).hashcons_free(); }
+  public  static TypeStruct make(String[] flds, Type[] ts, byte[] finals) { return malloc(false,flds,ts,finals).hashcons_free(); }
 
   private static final TypeStruct POINT = make(flds("x","y"),ts(TypeFlt.FLT64,TypeFlt.FLT64));
           static final TypeStruct X     = make(flds("x"),ts(TypeFlt.FLT64 )); // @{x:flt}
@@ -179,7 +180,7 @@ public class TypeStruct extends TypeOop<TypeStruct> {
   public  static final TypeStruct A     = make(flds("a"),ts(TypeFlt.FLT64 ));
   private static final TypeStruct C0    = make(flds("c"),ts(TypeNil.SCALAR)); // @{c:0}
   private static final TypeStruct D1    = make(flds("d"),ts(TypeInt.TRUE  )); // @{d:1}
-  private static final TypeStruct ARW   = malloc(false,flds("a"),ts(TypeFlt.FLT64),new byte[1]).hashcons_free();
+  private static final TypeStruct ARW   = make(flds("a"),ts(TypeFlt.FLT64),new byte[1]);
   public  static final TypeStruct GENERIC = malloc(true,FLD0,new Type[0],new byte[0]).hashcons_free();
 
   // Recursive meet in progress

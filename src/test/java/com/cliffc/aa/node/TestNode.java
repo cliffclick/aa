@@ -144,7 +144,8 @@ public class TestNode {
     test1monotonic(new    FunNode(new Type[]{TypeInt.INT64}));
     test1monotonic(new     IfNode(_ins[0],_ins[1]));
     test1monotonic(new   LoadNode(_ins[0],_ins[1],0,null));
-    test1monotonic(new    NewNode(TypeStruct.FLDS(2),new Node[]{null,_ins[1],_ins[2]}));
+    test1monotonic(new    NewNode(new Node[]{null,_ins[1],_ins[2]},TypeStruct.FLDS(2)));
+    test1monotonic(new    NewNode(new Node[]{null,_ins[1],_ins[2]},TypeStruct.FLDS(2),new byte[2]));
     test1monotonic(new   ParmNode( 1, "x",_ins[0],(ConNode)_ins[1],"badgc"));
     test1monotonic(new    PhiNode("badgc",_ins[0],_ins[1],_ins[2]));
     for( PrimNode prim : PrimNode.PRIMS )
