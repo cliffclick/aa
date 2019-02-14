@@ -36,21 +36,24 @@ public class TypeStruct extends TypeOop<TypeStruct> {
   // is Top; a '.' is Bot; all other values are valid field names.
   public @NotNull String @NotNull[] _flds;  // The field names
   public Type[] _ts;            // Matching field types
+  private byte[] _finals;       // Fields that are final (read-only)
   private int _hash; // Hash pre-computed to avoid large computes duing interning
-  private TypeStruct     ( boolean any, String[] flds, Type[] ts ) { super(TSTRUCT, any); init(any,flds,ts); }
-  private TypeStruct init( boolean any, String[] flds, Type[] ts ) {
+  private TypeStruct _uf = null;// Tarjan Union-Find
+  private TypeStruct     ( boolean any, String[] flds, Type[] ts, byte[] finals ) { super(TSTRUCT, any); init(any,flds,ts,finals); }
+  private TypeStruct init( boolean any, String[] flds, Type[] ts, byte[] finals ) {
     super.init(TSTRUCT, any);
-    _flds= flds;
-    _ts  = ts;
-    _uf  = null;
-    _hash= hash();
+    _flds  = flds;
+    _ts    = ts;
+    _finals= finals;
+    _uf    = null;
+    _hash  = hash();
     return this;
   }
   // Precomputed hash code.  Note that it can NOT depend on the field types -
   // because during recursive construction the types are not available.  
   private int hash() {
     int sum=0;
-    for( String fld : _flds ) sum += fld.hashCode();
+    for( int i=0; i<_flds.length; i++ ) sum += _flds[i].hashCode()+_finals[i];
     return sum;
   }
   private static final Ary<TypeStruct> CYCLES = new Ary<>(new TypeStruct[0]);
@@ -66,9 +69,9 @@ public class TypeStruct extends TypeOop<TypeStruct> {
     TypeStruct t = (TypeStruct)o;
     if( _any!=t._any || _hash != t._hash || _ts.length != t._ts.length )
       return false;
-    if( _ts == t._ts && _flds == t._flds ) return true;
+    if( _ts == t._ts && _flds == t._flds && _finals == t._finals ) return true;
     for( int i=0; i<_ts.length; i++ )
-      if( !_flds[i].equals(t._flds[i]) )
+      if( !_flds[i].equals(t._flds[i]) || _finals[i]!=t._finals[i] )
         return false;
 
     // Unlike all other non-cyclic structures which are built bottom-up, cyclic
@@ -86,9 +89,9 @@ public class TypeStruct extends TypeOop<TypeStruct> {
     if( t3 !=null ) return t3==this;// Already in cycle report equals or not
     if( _any!=t._any || _hash != t._hash || _ts.length != t._ts.length )
       return false;
-    if( _ts == t._ts && _flds == t._flds ) return true;
+    if( _ts == t._ts && _flds == t._flds && _finals == t._finals ) return true;
     for( int i=0; i<_ts.length; i++ )
-      if( !_flds[i].equals(t._flds[i]) )
+      if( !_flds[i].equals(t._flds[i]) || _finals[i]!=t._finals[i] )
         return false;
     
     int len = CYCLES._len;
@@ -126,19 +129,19 @@ public class TypeStruct extends TypeOop<TypeStruct> {
   
   String str( BitSet dups) {
     if( dups == null ) dups = new BitSet();
-    else if( dups.get(_uid) ) return "*"; // Break recursive cycle
+    else if( dups.get(_uid) ) return "*"; // Break recursive printing cycle
     dups.set(_uid);
 
     SB sb = new SB();
     if( _uf!=null ) return "=>"+_uf;
     if( _any ) sb.p('~');
     boolean is_tup = _flds.length==0 || fldTop(_flds[0]) || fldBot(_flds[0]);
-    if( !is_tup ) sb.p('@');
+    if( !is_tup ) sb.p('@');    // Not a tuple
     sb.p(is_tup ? '(' : '{');
     for( int i=0; i<_flds.length; i++ ) {
       if( !is_tup ) sb.p(_flds[i]);
       Type t = at(i);
-      if( !is_tup && t != SCALAR ) sb.p(':');
+      if( !is_tup && t != SCALAR ) sb.p(_finals[i]==0 ? '#' : ':');
       if( t != SCALAR ) sb.p(t==null ? "!" : t.str(dups));
       if( i<_flds.length-1 ) sb.p(',');
     }
@@ -150,10 +153,10 @@ public class TypeStruct extends TypeOop<TypeStruct> {
   // cyclic types for which a DAG-like bottom-up-remove-dups approach cannot work.
   private static TypeStruct FREE=null;
   @Override protected TypeStruct free( TypeStruct ret ) { FREE=this; return ret; }
-  static TypeStruct malloc( boolean any, String[] flds, Type[] ts ) {
-    if( FREE == null ) return new TypeStruct(any,flds,ts);
+  static TypeStruct malloc( boolean any, String[] flds, Type[] ts, byte[] finals ) {
+    if( FREE == null ) return new TypeStruct(any,flds,ts,finals);
     TypeStruct t1 = FREE;  FREE = null;
-    return t1.init(any,flds,ts);
+    return t1.init(any,flds,ts,finals);
   }
   private TypeStruct hashcons_free() { TypeStruct t2 = (TypeStruct)hashcons();  return this==t2 ? this : free(t2);  }
 
@@ -166,8 +169,9 @@ public class TypeStruct extends TypeOop<TypeStruct> {
   public  static       String[] FLDS( int len ) { return FLDS[len]; }
   private static String[] flds(String... fs) { return fs; }
   private static Type[] ts(Type... ts) { return ts; }
-  public  static TypeStruct make(Type... ts               ) { return malloc(false,FLDS[ts.length],ts).hashcons_free(); }
-  public  static TypeStruct make(String[] flds, Type... ts) { return malloc(false,flds,ts).hashcons_free(); }
+  private static byte[] bs(Type[] ts) { byte[] bs = new byte[ts.length]; Arrays.fill(bs,(byte)1); return bs; } // All read-only
+  public  static TypeStruct make(Type... ts               ) { return malloc(false,FLDS[ts.length],ts,bs(ts)).hashcons_free(); }
+  public  static TypeStruct make(String[] flds, Type... ts) { return malloc(false,flds,ts,bs(ts)).hashcons_free(); }
 
   private static final TypeStruct POINT = make(flds("x","y"),ts(TypeFlt.FLT64,TypeFlt.FLT64));
           static final TypeStruct X     = make(flds("x"),ts(TypeFlt.FLT64 )); // @{x:flt}
@@ -175,7 +179,8 @@ public class TypeStruct extends TypeOop<TypeStruct> {
   public  static final TypeStruct A     = make(flds("a"),ts(TypeFlt.FLT64 ));
   private static final TypeStruct C0    = make(flds("c"),ts(TypeNil.SCALAR)); // @{c:0}
   private static final TypeStruct D1    = make(flds("d"),ts(TypeInt.TRUE  )); // @{d:1}
-  public  static final TypeStruct GENERIC = malloc(true,FLD0,new Type[0]).hashcons_free();
+  private static final TypeStruct ARW   = malloc(false,flds("a"),ts(TypeFlt.FLT64),new byte[1]).hashcons_free();
+  public  static final TypeStruct GENERIC = malloc(true,FLD0,new Type[0],new byte[0]).hashcons_free();
 
   // Recursive meet in progress
   private static final HashMap<TypeStruct,TypeStruct> MEETS1 = new HashMap<>(), MEETS2 = new HashMap<>();
@@ -184,7 +189,7 @@ public class TypeStruct extends TypeOop<TypeStruct> {
   public static void init1() {
     TypeStr.init();             // Force TypeStr <clinit> 
     TypeNil.init();             // Force TypeNil <clinit> 
-    TypeStruct ts1 = malloc(false,new String[]{"n","v"},new Type[2]);
+    TypeStruct ts1 = malloc(false,new String[]{"n","v"},new Type[2],new byte[]{1,1});
     RECURSIVE_MEET++;
     Type tsn = TypeNil.make(ts1);  tsn._cyclic = true;
     ts1._ts[0] = tsn;    ts1._cyclic = true;
@@ -192,7 +197,7 @@ public class TypeStruct extends TypeOop<TypeStruct> {
     RECURSIVE_MEET--;
     RECURS_NIL_FLT = ts1.install_cyclic();
 
-    ts1 = malloc(false,FLD2,new Type[2]);
+    ts1 = malloc(false,FLD2,new Type[2],new byte[]{1,1});
     RECURSIVE_MEET++;
     tsn = TypeNil.make(ts1);  tsn._cyclic = true;
     ts1._ts[0] = tsn;    ts1._cyclic = true;
@@ -200,7 +205,7 @@ public class TypeStruct extends TypeOop<TypeStruct> {
     RECURSIVE_MEET--;
     RECURT_NIL_FLT = ts1.install_cyclic();
 
-    ts1 = malloc(false, new String[]{"l","r","v"}, new Type[3]);
+    ts1 = malloc(false, new String[]{"l","r","v"}, new Type[3], new byte[]{1,1,1});
     RECURSIVE_MEET++;
     tsn = TypeNil.make(ts1);  tsn._cyclic = true;
     ts1._ts[0] = tsn;         ts1._cyclic = true;
@@ -212,16 +217,18 @@ public class TypeStruct extends TypeOop<TypeStruct> {
   }
   public static TypeStruct RECURS_NIL_FLT, RECURT_NIL_FLT, RECURS_TREE;
   
-  static final TypeStruct[] TYPES = new TypeStruct[]{POINT,X,A,C0,D1};
+  static final TypeStruct[] TYPES = new TypeStruct[]{POINT,X,A,C0,D1,ARW};
 
 
   // Dual the flds, dual the tuple.
   @Override TypeStruct xdual() {
     String[] as = new String[_flds.length];
     Type  [] ts = new Type  [_ts  .length];
+    byte  [] bs = new byte  [_ts  .length];
     for( int i=0; i<as.length; i++ ) as[i]=sdual(_flds[i]);
     for( int i=0; i<ts.length; i++ ) ts[i] = _ts[i].dual();
-    return new TypeStruct(!_any,as,ts);
+    for( int i=0; i<bs.length; i++ ) bs[i] = (byte)(_finals[i]^1);
+    return new TypeStruct(!_any,as,ts,bs);
   }
 
   // Recursive dual
@@ -229,8 +236,10 @@ public class TypeStruct extends TypeOop<TypeStruct> {
     if( _dual != null ) return _dual;
     String[] as = new String[_flds.length];
     Type  [] ts = new Type  [_ts  .length];
+    byte  [] bs = new byte  [_ts  .length];
     for( int i=0; i<as.length; i++ ) as[i]=sdual(_flds[i]);
-    TypeStruct dual = _dual = new TypeStruct(!_any,as,ts);
+    for( int i=0; i<bs.length; i++ ) bs[i] = (byte)(_finals[i]^1);
+    TypeStruct dual = _dual = new TypeStruct(!_any,as,ts,bs);
     for( int i=0; i<ts.length; i++ ) ts[i] = _ts[i].rdual();
     dual._hash = dual.hash();
     dual._dual = this;
@@ -294,16 +303,19 @@ public class TypeStruct extends TypeOop<TypeStruct> {
     // Meet of common elements
     String[] as = new String[len];
     Type  [] ts = new Type  [len];
+    byte  [] bs = new byte  [len];
     for( int i=0; i<_ts.length; i++ ) {
       as[i] = smeet(_flds[i],tmax._flds[i]);
       ts[i] =    _ts[i].meet(tmax._ts  [i]); // Recursive not cyclic
+      bs[i] = (byte)(_finals[i]|tmax._finals[i]);
     }
     // Elements only in the longer tuple
     for( int i=_ts.length; i<len; i++ ) {
-      as[i] = tmax._flds[i];
-      ts[i] = tmax._ts  [i];
+      as[i] = tmax._flds  [i];
+      ts[i] = tmax._ts    [i];
+      bs[i] = tmax._finals[i];
     }
-    return malloc(_any&tmax._any,as,ts).hashcons_free();
+    return malloc(_any&tmax._any,as,ts,bs).hashcons_free();
   }
 
   // Both structures are cyclic.  The meet will be "as if" both structures are
@@ -349,13 +361,16 @@ public class TypeStruct extends TypeOop<TypeStruct> {
     // things that can be computed without the cycle.  _ts not filled in yet.
     int len = mt.len(mx); // Length depends on all the Structs Meet'ing here
     if( len != mt._ts.length ) {
-      mt._flds= Arrays.copyOf(mt._flds, len);
-      mt._ts  = Arrays.copyOf(mt._ts  , len);
+      mt._flds  = Arrays.copyOf(mt._flds  , len);
+      mt._ts    = Arrays.copyOf(mt._ts    , len);
+      mt._finals= Arrays.copyOf(mt._finals, len);
     }
     if( mt._any && !mx._any ) mt._any=false;
     len = Math.min(len,mx._ts.length);
-    for( int i=0; i<len; i++ )
+    for( int i=0; i<len; i++ ) {
       mt._flds[i] = smeet(mt._flds[i],mx._flds[i]); // Set the Meet of field names
+      mt._finals[i] |= mx._finals[i];
+    }
 
     // Since the result is cyclic, we cannot test the cyclic parts for
     // pre-existence until the entire cycle is built.  We can't intern the
@@ -413,13 +428,12 @@ public class TypeStruct extends TypeOop<TypeStruct> {
     assert _cyclic;
     Type[] ts = new Type[_ts.length];
     Arrays.fill(ts,Type.XSCALAR);
-    TypeStruct tstr = malloc(_any,_flds.clone(),ts);
+    TypeStruct tstr = malloc(_any,_flds.clone(),ts,_finals.clone());
     tstr._cyclic = true;
     return tstr;
   }
 
   // Tarjan Union-Find to help build cyclic structures
-  private TypeStruct _uf = null;
   private void union(TypeStruct tt) {
     assert !interned() && !tt.interned();
     assert _uf==null && tt._uf==null;
@@ -463,9 +477,7 @@ public class TypeStruct extends TypeOop<TypeStruct> {
   static private boolean fldTop( String s ) { return s.charAt(0)=='^'; }
   static private boolean fldBot( String s ) { return s.charAt(0)=='.'; }
   // String meet
-  private static String smeet( String s0, String s1 ) {
-    if( s0 == null ) return s1;
-    if( s1 == null ) return s0;
+  private static String smeet( @NotNull String s0, @NotNull String s1 ) {
     if( fldTop(s0) ) return s1;
     if( fldTop(s1) ) return s0;
     if( fldBot(s0) ) return s0;
@@ -548,7 +560,7 @@ public class TypeStruct extends TypeOop<TypeStruct> {
       return this;              // Just use as-is
     // Need to clone 'this'
     Type[] ts = new Type[_ts.length];
-    TypeStruct rez = malloc(_any,_flds,ts);
+    TypeStruct rez = malloc(_any,_flds,ts,_finals);
     rez._cyclic=true;           // Whole structure is cyclic
     if( nnn==null ) nnn = rez;
     for( int i=0; i<_ts.length; i++ )

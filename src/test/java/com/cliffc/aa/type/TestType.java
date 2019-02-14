@@ -184,12 +184,12 @@ public class TestType {
     String[] flds = new String[]{"n","v"};
 
     // Anonymous recursive structs
-    TypeStruct ts0 = TypeStruct.malloc(false,flds,new Type[2]);
+    TypeStruct ts0 = TypeStruct.malloc(false,flds,new Type[2],new byte[]{1,1});
     ts0._ts[0] = ts0;    ts0._cyclic = true;
     ts0._ts[1] = TypeInt.INT64;
     ts0 = ts0.install_cyclic();
 
-    TypeStruct ts1 = TypeStruct.malloc(false,flds,new Type[2]);
+    TypeStruct ts1 = TypeStruct.malloc(false,flds,new Type[2],new byte[]{1,1});
     Type.RECURSIVE_MEET++;
     Type tsn = TypeNil.make(ts1);  tsn._cyclic = true;
     ts1._ts[0] = tsn;    ts1._cyclic = true;
@@ -270,7 +270,7 @@ public class TestType {
     String[] flds = TypeStruct.FLDS(2);
 
     // T = :(T?,i64)
-    TypeStruct T = TypeStruct.malloc(false,flds,new Type[2]);
+    TypeStruct T = TypeStruct.malloc(false,flds,new Type[2],new byte[]{1,1});
     Type.RECURSIVE_MEET++;
     Type TN = TypeNil.make(T);  TN._cyclic = true;
     T._ts[0] = TN;    T._cyclic = true;
