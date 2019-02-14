@@ -3,6 +3,7 @@ package com.cliffc.aa.type;
 import com.cliffc.aa.AA;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Arrays;
 import java.util.BitSet;
@@ -19,9 +20,9 @@ import java.util.function.Predicate;
  *  Meet of two cyclic structures.  The cycles will not generally be of the
  *  same length.  However, each field Meets independently (and fields in one
  *  structure but not the other are not in the final Meet).  This means we are
- *  NOT trying to solve the general problem of graph-equivalence (a known hard
- *  problem).  Instead we can solve each field independently and also intersect
- *  across common fields.
+ *  NOT trying to solve the general problem of graph-equivalence (a known NP
+ *  hard problem).  Instead we can solve each field independently and also
+ *  intersect across common fields.
  * 
  *  When solving across a single field, we will find some prefix and then
  *  possibly a cycle - conceptually the type unrolls forever.  When doing the
@@ -33,21 +34,23 @@ public class TypeStruct extends TypeOop<TypeStruct> {
   // Fields are named in-order and aligned with the Tuple values.  Field names
   // are never null, and never zero-length.  If the 1st char is a '^' the field
   // is Top; a '.' is Bot; all other values are valid field names.
-  public String[] _flds;        // The field names
+  public @NotNull String @NotNull[] _flds;  // The field names
   public Type[] _ts;            // Matching field types
   private int _hash; // Hash pre-computed to avoid large computes duing interning
   private TypeStruct     ( boolean any, String[] flds, Type[] ts ) { super(TSTRUCT, any); init(any,flds,ts); }
   private TypeStruct init( boolean any, String[] flds, Type[] ts ) {
     super.init(TSTRUCT, any);
-    _flds=flds;
-    _ts=ts;
-    _uf=null;
+    _flds= flds;
+    _ts  = ts;
+    _uf  = null;
     _hash= hash();
     return this;
   }
+  // Precomputed hash code.  Note that it can NOT depend on the field types -
+  // because during recursive construction the types are not available.  
   private int hash() {
     int sum=0;
-    for( String fld : _flds ) sum += fld==null ? 0 : fld.hashCode();
+    for( String fld : _flds ) sum += fld.hashCode();
     return sum;
   }
   private static final Ary<TypeStruct> CYCLES = new Ary<>(new TypeStruct[0]);
@@ -179,8 +182,8 @@ public class TypeStruct extends TypeOop<TypeStruct> {
   
   // Build a recursive struct type for tests: @{n=*?,v=flt}
   public static void init1() {
-    Type dummy0 = TypeStr.STR; // Force TypeStr <clinit>
-    Type dummy1 = TypeNil.NIL; // Force TypeNil <clinit>
+    TypeStr.init();             // Force TypeStr <clinit> 
+    TypeNil.init();             // Force TypeNil <clinit> 
     TypeStruct ts1 = malloc(false,new String[]{"n","v"},new Type[2]);
     RECURSIVE_MEET++;
     Type tsn = TypeNil.make(ts1);  tsn._cyclic = true;
@@ -201,7 +204,7 @@ public class TypeStruct extends TypeOop<TypeStruct> {
     RECURSIVE_MEET++;
     tsn = TypeNil.make(ts1);  tsn._cyclic = true;
     ts1._ts[0] = tsn;         ts1._cyclic = true;
-    ts1._ts[1] = tsn;         ts1._cyclic = true;
+    ts1._ts[1] = tsn;
     ts1._ts[2] = TypeInt.INT64;
     RECURSIVE_MEET--;
     RECURS_TREE = ts1.install_cyclic();
@@ -226,8 +229,8 @@ public class TypeStruct extends TypeOop<TypeStruct> {
     if( _dual != null ) return _dual;
     String[] as = new String[_flds.length];
     Type  [] ts = new Type  [_ts  .length];
-    TypeStruct dual = _dual = new TypeStruct(!_any,as,ts);
     for( int i=0; i<as.length; i++ ) as[i]=sdual(_flds[i]);
+    TypeStruct dual = _dual = new TypeStruct(!_any,as,ts);
     for( int i=0; i<ts.length; i++ ) ts[i] = _ts[i].rdual();
     dual._hash = dual.hash();
     dual._dual = this;

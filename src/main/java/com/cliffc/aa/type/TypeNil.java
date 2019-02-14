@@ -28,6 +28,7 @@ public class TypeNil extends Type<TypeNil> {
     if( _t==null ) return "nil";
     return _t.str(dups)+(_t.above_center() ? "+0" : "?");
   }
+  public static void init() {} // Used to force class init
   
   private static TypeNil FREE=null;
   @Override protected TypeNil free( TypeNil ret ) {

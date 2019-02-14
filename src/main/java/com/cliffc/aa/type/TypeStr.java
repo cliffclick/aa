@@ -39,6 +39,7 @@ public class TypeStr extends TypeOop<TypeStr> {
     return t1==t2 ? t1 : t1.free(t2);
   }
   public static TypeStr con(String con) { return make(false,con); }
+  public static void init() {} // Used to force class init
 
   public  static final TypeStr  STR = make(false,null); // not null
   public  static final TypeStr XSTR = make(true ,null); // choice string
