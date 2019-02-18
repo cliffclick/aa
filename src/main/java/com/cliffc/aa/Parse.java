@@ -20,7 +20,10 @@ import java.util.BitSet;
  *  stmt = tvar = :type            // type variable assignment
  *  ifex = expr ? expr : expr      // trinary logic
  *  expr = term [binop term]*      // gather all the binops and sort by prec
- *  term = tfact [tuple or fact or .field]* // application (includes uniop) or field (and tuple) lookup
+ *  term = term(tuple)             // application (includes uniop), via paren arg list
+ *  term = term tfact              // application (includes uniop), via adjacent single arg
+ *  term = term.field[:type] [[:]= ifex]  // field lookup or assignment
+ *  term = tfact                   // Just a typed fact
  *  tfact= fact[:type]             // Typed fact
  *  fact = id                      // variable lookup
  *  fact = num                     // number
@@ -389,7 +392,7 @@ public class Parse {
         boolean arglist = peek('(');
         int oldx = _x;
         Node arg = arglist ? tuple(stmts()) : tfact(); // Start of an argument list?
-        if( arg == null )       // Function but no arg is just the function
+        if( arg == null )       // tfact but no arg is just the tfact
           break;
         Type tn = _gvn.type(n);
         if( !(tn instanceof TypeFun) && arg.may_prec() >= 0 ) { _x=oldx; break; }
