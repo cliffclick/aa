@@ -15,15 +15,16 @@ import java.util.BitSet;
  *
  *  GRAMMAR:
  *  prog = stmts END
- *  stmts= stmt [; stmt]*[;]?      // multiple statments; final ';' is optional
+ *  stmts= [tstmt|stmt][; stmts]*[;]? // multiple statments; final ';' is optional
+ *  tstmt= tvar = :type            // type variable assignment
  *  stmt = [id[:type]? [:]=]* ifex // ids are (re-)assigned, and are available in later statements
- *  stmt = tvar = :type            // type variable assignment
  *  ifex = expr ? expr : expr      // trinary logic
  *  expr = term [binop term]*      // gather all the binops and sort by prec
- *  term = term(tuple)             // application (includes uniop), via paren arg list
- *  term = term tfact              // application (includes uniop), via adjacent single arg
- *  term = term.field[:type] [[:]= ifex]  // field lookup or assignment
- *  term = tfact                   // Just a typed fact
+ *  term = tfact [tuple or tfact or .field]* // application (includes uniop) or field,tuple lookup
+ *                                 // application arg list: tfact(tuple)
+ *                                 // application adjacent: tfact tfact
+ *                                 // field and tuple lookup: tfact.field
+ *  term = tfact .field [:]= stmt  // field assignment
  *  tfact= fact[:type]             // Typed fact
  *  fact = id                      // variable lookup
  *  fact = num                     // number
@@ -170,40 +171,83 @@ public class Parse {
   }
     
   /** Parse a list of statements; final semi-colon is optional.
-   *  stmts= stmt [; stmt]*[;]? 
+   *  stmts= [tstmt or stmt] [; stmts]*[;]? 
    */
   private Node stmts() {
-    Node stmt = stmt(), last = null;
+    Node stmt = tstmt(), last = null;
+    if( stmt == null ) stmt = stmt();
     while( stmt != null ) {
       if( !peek(';') ) return stmt;
       last = stmt;
-      stmt = stmt();
-      if( stmt==null ) {
+      stmt = tstmt();
+      if( stmt == null ) stmt = stmt();
+      if( stmt == null ) {
         if( peek(';') ) { _x--; stmt=last; }   // Ignore empty statement
       } else if( !last.is_dead() ) kill(last); // prior expression result no longer alive in parser
     }
     return last;
   }
-    
+
+  /** A type-statement assigns a type to a type variable.  Type variable
+   *  assignments are always final, and can not exist before assignment (hence
+   *  a variable cannot have a normal value and be re-assigned as a type
+   *  variable).  In addition to allowing 'tvar' to appear in a type expression
+   *  a pair of type constructor functions are made: one taking the base type
+   *  and returning the same value as the named type, and the other for Structs
+   *  taking the unpacked struct fields and returning the named type.  The
+   *  ':type' is the type being assigned; a space is allowed between '= :type'.
+   *
+   *  tstmt = tvar = :type
+   */
+  private Node tstmt() {
+    int oldx = _x;
+    String tvar = token();      // Scan for tvar
+    if( tvar == null ) return null;
+    if( !peek('=') || !peek(':') ) { _x = oldx; return null; }
+    // Must be a type-variable assignment
+    Type t = type(true);
+    if( t==null ) return err_ctrl2("Missing type after ':'");
+    if( t instanceof TypeNil ) return err_ctrl2("Named types are never nil");
+    if( lookup(tvar) != null ) return err_ctrl2("Cannot re-assign val '"+tvar+"' as a type");
+    Type ot = _e.lookup_type(tvar);
+    TypeName tn;
+    if( ot == null ) {        // Name does not pre-exist
+      tn = TypeName.make(tvar,_e._scope.types(),t);
+      _e.add_type(tvar,tn);   // Assign type-name
+    } else {
+      tn = ot.merge_recursive_type(t);
+      if( tn == null ) return err_ctrl2("Cannot re-assign type '"+tvar+"'");
+    }
+  
+    // Add a constructor function
+    PrimNode cvt = PrimNode.convertTypeName(t,tn,errMsg());
+    Node rez = _e.add_fun(tvar,gvn(_e.as_fun(cvt))); // Return type-name constructor
+    if( t instanceof TypeStruct ) { // Add struct types with expanded arg lists
+      PrimNode cvts = PrimNode.convertTypeNameStruct((TypeStruct)t,tn,errMsg());
+      Node rez2 = _e.add_fun(tvar,gvn(_e.as_fun(cvts))); // type-name constructor with expanded arg list
+      // UnresolvedNode needs touching once all constructors are done
+      _gvn.init0(rez2._uses.at(0));
+    }
+    // TODO: Add reverse cast-away
+    return rez;
+  }
+  
   /** A statement is a list of variables to final-assign or re-assign, and an
    *  ifex for the value.  The variables must not be forward refs and are
    *  available in all later statements.  Final-assigned variables can never be
-   *  assigned again.  Type variable assignments are always final, and can not
-   *  exist before assignment (hence a variable cannot have a normal value and
-   *  be re-assigned as a type variable).  All type annotations on a variable
-   *  always apply to all assignments (final or not); a variable cannot be
-   *  "loosened" during a reassignment.
+   *  assigned again.  All type annotations on a variable always apply to all
+   *  assignments (final or not); a variable cannot be "loosened" during a
+   *  reassignment.
    *
    *  stmt = [id[:type]? [:]=]* ifex
-   *  stmt = tvar = :type
    *
    *  Note the syntax difference between:
-   *    stmt = id := val  // re-assignment
-   *    stmt = id =:type  // type variable decl, type assignment
+   *    stmt = id := val  //    re-assignment
+   *    stmt = id  = val  // final assignment
+   *   tstmt = id =:type  // type variable decl, type assignment
    *
    *  The ':=' is the re-assignment token, no spaces allowed.
-   *  The ':type' is the type being assigned; a space is allowed between '= :type'.
-   *  Variable re-assignment does not involve Memory; no State is changed.
+   *  Variable re-assignment does not involve Memory and no State is changed.
    */
   private Node stmt() {
     Ary<String> toks = new Ary<>(new String[1],0);
@@ -222,35 +266,6 @@ public class Parse {
       ts  .add(t  );
     }
     
-    // tvar assignment only allows 1 id
-    if( toks._len == 1 && ts.at(0)==null && peek(':') ) {
-      Type t = type(true); // Get the type, allowing forward refs
-      if( t==null ) return err_ctrl2("Missing type after ':'");
-      if( t instanceof TypeNil ) return err_ctrl2("Named types are never nil");
-      String tvar = toks.at(0);
-      if( lookup(tvar) != null ) return err_ctrl2("Cannot re-assign val '"+tvar+"' as a type");
-      Type ot = _e.lookup_type(tvar);
-      TypeName tn;
-      if( ot == null ) {        // Name does not pre-exist
-        tn = TypeName.make(tvar,_e._scope.types(),t);
-        _e.add_type(tvar,tn);   // Assign type-name
-      } else {
-        tn = ot.merge_recursive_type(t);
-        if( tn == null ) return err_ctrl2("Cannot re-assign type '"+tvar+"'");
-      }
-      // Add a constructor function
-      PrimNode cvt = PrimNode.convertTypeName(t,tn,errMsg());
-      Node rez = _e.add_fun(tvar,gvn(_e.as_fun(cvt))); // Return type-name constructor
-      if( t instanceof TypeStruct ) { // Add struct types with expanded arg lists
-        PrimNode cvts = PrimNode.convertTypeNameStruct((TypeStruct)t,tn,errMsg());
-        Node rez2 = _e.add_fun(tvar,gvn(_e.as_fun(cvts))); // type-name constructor with expanded arg list
-        // UnresolvedNode needs touching once all constructors are done
-        _gvn.init0(rez2._uses.at(0));
-      }
-      // TODO: Add reverse cast-away
-      return rez;
-    }
-
     // Normal statement value parse
     Node ifex = ifex();         // Parse an expression for the statement value
     if( ifex == null )          // No statement?
@@ -373,6 +388,7 @@ public class Parse {
     if( n == null ) return null;
     while( true ) {             // Repeated application or field lookup is fine
       if( peek('.') ) {         // Field?
+        
         String fld = token();   // Field name
         LoadNode ld = null;
         if( fld == null ) {     // No field name, look for field number

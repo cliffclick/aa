@@ -52,6 +52,10 @@ BNF                           | Comment
 `stmt = tvar = :type`         | type variable assignment
 `ifex = expr ? expr : expr`   | trinary logic
 `expr = term [binop term]*`   | gather all the binops and sort by prec
+`term = term(tuple)`          | application (includes uniop), via paren arg list
+`term = term tfact`           | application (includes uniop), via adjacent single arg
+`term = term.field[:type] [[:]= ifex]` | field lookup or assignment
+`term = tfact`                | Just a typed fact
 `term = tfact [tuple or fact or .field]*` | function application (includes uniop) or field (and tuple) lookup
 `tfact= fact[:type]`          | Optionally typed fact
 `fact = id`                   | variable lookup

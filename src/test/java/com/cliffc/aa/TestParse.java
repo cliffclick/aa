@@ -475,7 +475,7 @@ public class TestParse {
   @Test public void testParse10() {
     // Test re-assignment in struct
     test("x=@{n:=1,v:=2}", TypeStruct.make(FLDS, new Type[]{TypeInt.con(1), TypeInt.con(2)},new byte[2]));
-    testerr("x=@{n=1,v:=2}; x.n  = 3; ", "Cannot re-assign field '.n'","                      ");
+    testerr("x=@{n=1,v:=2}; x.n  = 3; ", "Cannot re-assign field '.n'","                       ");
     //test("x=@{n:=1,v:=2}; x.n := 3", TypeStruct.make(FLDS, new Type[]{TypeInt.con(3), TypeInt.con(2)},new byte[2]));
   }
   /*
