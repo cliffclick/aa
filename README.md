@@ -47,16 +47,16 @@ GRAMMAR
 BNF                           | Comment
 ---                           | -------
 `prog = stmts END`            |
-`stmts= stmt [; stmt]*[;]?`   | multiple statments; final ';' is optional
-`stmt = [id[:type]? [:]=]* ifex` | ids must not exist, and are available in later statements
-`stmt = tvar = :type`         | type variable assignment
+`stmts= [tstmt or stmt][; stmts]*[;]?` | multiple statments; final ';' is optional
+`tstmt= tvar = :type`         | type variable assignment
+`stmt = [id[:type]? [:]=]* ifex` | ids are (re-)assigned, and are available in later statements
+`stmt = ifex.field[:type] [:]= ifex` | Field assignment
 `ifex = expr ? expr : expr`   | trinary logic
 `expr = term [binop term]*`   | gather all the binops and sort by prec
-`term = term(tuple)`          | application (includes uniop), via paren arg list
-`term = term tfact`           | application (includes uniop), via adjacent single arg
-`term = term.field[:type] [[:]= ifex]` | field lookup or assignment
-`term = tfact`                | Just a typed fact
-`term = tfact [tuple or fact or .field]*` | function application (includes uniop) or field (and tuple) lookup
+`term = tfact [tuple or tfact or .field]*` | application (includes uniop) or field,tuple lookup
+` `                           | application arg list: tfact(tuple)
+` `                           | application adjacent: tfact tfact
+` `                           | field and tuple lookup: tfact.field
 `tfact= fact[:type]`          | Optionally typed fact
 `fact = id`                   | variable lookup
 `fact = num`                  | number

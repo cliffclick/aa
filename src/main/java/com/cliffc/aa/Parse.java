@@ -18,13 +18,13 @@ import java.util.BitSet;
  *  stmts= [tstmt|stmt][; stmts]*[;]? // multiple statments; final ';' is optional
  *  tstmt= tvar = :type            // type variable assignment
  *  stmt = [id[:type]? [:]=]* ifex // ids are (re-)assigned, and are available in later statements
+ *  stmt = ifex.field[:type] [:]= ifex // Field assignment
  *  ifex = expr ? expr : expr      // trinary logic
  *  expr = term [binop term]*      // gather all the binops and sort by prec
  *  term = tfact [tuple or tfact or .field]* // application (includes uniop) or field,tuple lookup
  *                                 // application arg list: tfact(tuple)
  *                                 // application adjacent: tfact tfact
  *                                 // field and tuple lookup: tfact.field
- *  term = tfact .field [:]= stmt  // field assignment
  *  tfact= fact[:type]             // Typed fact
  *  fact = id                      // variable lookup
  *  fact = num                     // number
@@ -239,7 +239,7 @@ public class Parse {
    *  assignments (final or not); a variable cannot be "loosened" during a
    *  reassignment.
    *
-   *  stmt = [id[:type]? [:]=]* ifex
+   *  stmt = [[id or ifex.field][:type] [:]=]* ifex // 
    *
    *  Note the syntax difference between:
    *    stmt = id := val  //    re-assignment
@@ -247,7 +247,11 @@ public class Parse {
    *   tstmt = id =:type  // type variable decl, type assignment
    *
    *  The ':=' is the re-assignment token, no spaces allowed.
-   *  Variable re-assignment does not involve Memory and no State is changed.
+   *  Variable assignment does not involve Memory and no State is changed.
+   *  Field    assignment does     involve Memory and    State is changed.
+   *
+   *  Both kinds of assigments are legal in the same stmt:
+   *    x = y = z = fcn(arg0,arg1).fld1.fld2 = some_more_ifex;
    */
   private Node stmt() {
     Ary<String> toks = new Ary<>(new String[1],0);
@@ -388,7 +392,6 @@ public class Parse {
     if( n == null ) return null;
     while( true ) {             // Repeated application or field lookup is fine
       if( peek('.') ) {         // Field?
-        
         String fld = token();   // Field name
         LoadNode ld = null;
         if( fld == null ) {     // No field name, look for field number
