@@ -18,13 +18,16 @@ import java.util.BitSet;
  *  stmts= [tstmt|stmt][; stmts]*[;]? // multiple statments; final ';' is optional
  *  tstmt= tvar = :type            // type variable assignment
  *  stmt = [id[:type]? [:]=]* ifex // ids are (re-)assigned, and are available in later statements
- *  stmt = ifex.field[:type] [:]= ifex // Field assignment
  *  ifex = expr ? expr : expr      // trinary logic
  *  expr = term [binop term]*      // gather all the binops and sort by prec
  *  term = tfact [tuple or tfact or .field]* // application (includes uniop) or field,tuple lookup
  *                                 // application arg list: tfact(tuple)
  *                                 // application adjacent: tfact tfact
  *                                 // field and tuple lookup: tfact.field
+ *
+ *  term = tfact post
+ *  post = empty | (tuple) post | tfact post | .field post | .field [:]= stmt
+ *
  *  tfact= fact[:type]             // Typed fact
  *  fact = id                      // variable lookup
  *  fact = num                     // number
@@ -294,7 +297,7 @@ public class Parse {
         } else if( _e.is_mutable(tok) )
           _e.update(tok,ifex,_gvn,mutable);
         else
-          err_ctrl0("Cannot re-assign val '"+tok+"'");
+          err_ctrl0("Cannot re-assign final val '"+tok+"'");
       }
     }
     return ifex;
@@ -385,7 +388,12 @@ public class Parse {
   }
 
   /** Parse a term, either an optional application or a field lookup
-   *  term = tfact [tuple | fact | .field]* // application (includes uniop) or field (and tuple) lookup
+   *    term = tfact [tuple | fact | .field]* // application (includes uniop) or field (and tuple) lookup
+   *  An alternative expression of the same grammar is:
+   *    term = tfact post
+   *    post = empty | (tuple) post | tfact post | .field post
+   *  Also, field assignments are:
+   *    post = .field [:]= stmt
    */
   private Node term() {
     Node n = tfact();
@@ -393,20 +401,18 @@ public class Parse {
     while( true ) {             // Repeated application or field lookup is fine
       if( peek('.') ) {         // Field?
         String fld = token();   // Field name
-        LoadNode ld = null;
-        if( fld == null ) {     // No field name, look for field number
-          int fnum = field_number();
-          if( fnum != -1 ) ld = new LoadNode(ctrl(),n,fnum,errMsg());
-        } else             ld = new LoadNode(ctrl(),n,fld ,errMsg());
-        n = ld == null          // Missing field?
-          ? err_ctrl2("Missing field name after '.'")
-          :  gvn(ld);
-        if( peek('=') ) {       // Right now, no field re-assigns of any type
+        int fnum = fld==null ? field_number() : -1;
+        if( fld==null && fnum==-1 ) n = err_ctrl2("Missing field name after '.'");
+        else if( peek(":=") || peek('=') ) {
           Node stmt = stmt();
           if( stmt == null ) n = err_ctrl2("Missing stmt after assigning field '."+fld+"'");
-          else { kill(stmt); n = err_ctrl2("Cannot re-assign field '."+fld+"'"); }
+          else if( fld != null ) n = gvn(new StoreNode(ctrl(),n,fld ,errMsg()));
+          else                   n = gvn(new StoreNode(ctrl(),n,fnum,errMsg()));
+        } else {
+          if( fld != null ) n = gvn(new LoadNode(ctrl(),n,fld ,errMsg()));
+          else              n = gvn(new LoadNode(ctrl(),n,fnum,errMsg()));
         }
-
+      
       } else {                  // Attempt a function-call
         boolean arglist = peek('(');
         int oldx = _x;
@@ -780,7 +786,7 @@ public class Parse {
   }
   private boolean peek( String s ) {
     if( !peek(s.charAt(0)) ) return false;
-    if(  peek(s.charAt(1)) ) return true ;
+    if(  peek_noWS(s.charAt(1)) ) return true ;
     _x--;
     return false;
   }

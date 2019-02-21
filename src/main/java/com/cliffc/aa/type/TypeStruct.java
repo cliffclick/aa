@@ -36,7 +36,7 @@ public class TypeStruct extends TypeOop<TypeStruct> {
   // is Top; a '.' is Bot; all other values are valid field names.
   public @NotNull String @NotNull[] _flds;  // The field names
   public Type[] _ts;            // Matching field types
-  private byte[] _finals;       // Fields that are final (read-only)
+  public byte[] _finals;        // Fields that are final (read-only)
   private int _hash; // Hash pre-computed to avoid large computes duing interning
   private TypeStruct _uf = null;// Tarjan Union-Find
   private TypeStruct     ( boolean any, String[] flds, Type[] ts, byte[] finals ) { super(TSTRUCT, any); init(any,flds,ts,finals); }
