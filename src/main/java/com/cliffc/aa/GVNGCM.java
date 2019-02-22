@@ -391,7 +391,7 @@ public class GVNGCM {
         assert !n.is_dead();
         if( 3 <= n._uid && n._uid < _INIT0_CNT ) continue; // Ignore primitives (type is unchanged and conservative)
         if( n instanceof CallNode && calls.find((CallNode)n)== -1 ) {
-          Type tf = type(n.in(1));
+          Type tf = type(((CallNode)n).fun());
           if( tf instanceof TypeFun && // Might be e.g. ~Scalar
               ((TypeFun)tf).fun().is_ambiguous_fun() )
             calls.add((CallNode)n); // Track ambiguous calls
@@ -418,8 +418,8 @@ public class GVNGCM {
         if( call.is_dead() ) calls.del(i--); // Remove from worklist
         else {
           Node fun = call.resolve(this);
-          if( fun != null ) {   // Unresolved gets left on worklist
-            set_def_reg(call, 1, fun); // Set resolved edge
+          if( fun != null && call.fun() != fun ) {   // Unresolved gets left on worklist
+            set_def_reg(call, 2, fun); // Set resolved edge
             calls.del(i--); // Remove from worklist
           }
         }
@@ -476,6 +476,12 @@ public class GVNGCM {
           rereg(fun,Type.CTRL);
         }
       }
+    }
+    // All (live) Call ambiguity has been resolved
+    if( n instanceof CallNode && type(n.in(0))==Type.CTRL ) {
+      Type tf = type(((CallNode)n).fun());
+      assert tf instanceof TypeFun &&
+        !((TypeFun)tf).fun().is_ambiguous_fun();
     }
 
     // Walk reachable graph

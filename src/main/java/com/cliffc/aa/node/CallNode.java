@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.AA;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
@@ -58,9 +59,9 @@ public class CallNode extends Node {
   // Actual arguments.
   Node arg( int x ) { return _defs.at(x+3); }
 
-  Node ctl() { return in(0); }
-  Node mem() { return in(1); }
-  Node fun() { return in(2); }
+  private Node ctl() { return in(0); }
+  private Node mem() { return in(1); }
+  public  Node fun() { return in(2); }
   
   // Clones during inlining all become unique new call sites
   @Override Node copy() {
@@ -240,6 +241,7 @@ public class CallNode extends Node {
   @Override public Type value(GVNGCM gvn) {
     Type tc = gvn.type(ctl());  // Control type
     Type tm = gvn.type(mem());  // Memory type
+    assert tm==TypeMem.MEM || tm==TypeMem.MEM.dual();
     Node fp = fun();            // If inlined, its the result, if not inlined, its the function being called
     Type t = gvn.type(fp);      // If inlined, its the result, if not inlined, its the function being called
     if( _inlined )              // Inlined functions just pass thru & disappear
@@ -313,9 +315,10 @@ public class CallNode extends Node {
 
     // Set of possible choices with fewest conversions
     int min_cvts = 999;         // Required conversions
-    int cvts[] = new int[64];
-    int fxs [] = new int[64];
+    int cvts[] = new int[8];
+    int fxs [] = new int[8];
     int len=0;
+    TypeTuple prior = null;
 
     // For each function, see if the actual args isa the formal args.  If not,
     // toss it out.  Also count conversions, and keep the minimal conversion
@@ -325,6 +328,16 @@ public class CallNode extends Node {
       TypeFunPtr fun = FunNode.find_fidx(fidx)._tf;
       if( fun.nargs() != nargs() ) continue; // Wrong arg count, toss out
       TypeTuple formals = fun._ts;   // Type of each argument
+      
+      // If this set of formals is strictly less than a prior set acceptable
+      // set, replace the prior set.  Similarly, if strictly greater than a
+      // prior set, toss this one out.
+      if( prior != null ) {
+        if( prior.isa(formals) ) throw AA.unimpl();
+        else if( formals.isa(prior) ) throw AA.unimpl();
+      }
+      prior = formals;
+      
       // Now check if the arguments are compatible in all, keeping lowest cost
       int xcvts = 0;             // Count of conversions required
       boolean unk = false;       // Unknown arg might be incompatible or free to convert
@@ -339,6 +352,7 @@ public class CallNode extends Node {
         if( cvt == -1 ) unk = true; // Unknown yet
         else xcvts += cvt;          // Count conversions
       }
+
       if( !unk && xcvts < min_cvts ) min_cvts = xcvts; // Keep minimal known conversion
       cvts[len] = xcvts;        // Keep count of conversions
       fxs [len] = fidx; // This is an acceptable choice, so far (args can be made to work)

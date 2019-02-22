@@ -236,17 +236,9 @@ public class ScopeNode extends Node {
       return;
     }
 
-    update(name,tn==fn ? fn : P.gvn(new PhiNode(phi_errmsg, P.ctrl(),tn,fn)),gvn,t_is_mutable);
+    update(name,tn==fn ? fn : P.gvn(new PhiNode(phi_errmsg, gvn.type(tn).meet(gvn.type(fn)), P.ctrl(),tn,fn)),gvn,t_is_mutable);
   }
   
-  private Node undef(Parse P, GVNGCM gvn, Node xn, String name, boolean arm ) {
-    return xn.is_forward_ref() ? xn :
-      P.err_ctrl1("'"+name+"' not defined on "+arm+" arm of trinary",gvn.type(xn).widen());
-  }
-  private void add_phi(Parse P, String errmsg, String name, Node tn, Node fn, boolean mutable) {
-    update(name,tn==fn ? fn : P.gvn(new PhiNode(errmsg, P.ctrl(),tn,fn)),null,mutable);
-  }
-
   // Replace uses of dull with sharp, used after an IfNode test
   void sharpen( Node dull, Node sharp, ScopeNode arm ) {
     assert dull != sharp;

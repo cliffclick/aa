@@ -102,12 +102,16 @@ public class FunNode extends RegionNode {
   public String name() { return name(_tf.fidx()); }
   public static String name(int fidx) { return NAMES.atX(fidx); }
 
-  @Override Node copy() {
-    throw AA.unimpl();          // Gotta make a new FIDX
-  }
+  @Override Node copy() { throw AA.unimpl(); } // Gotta make a new FIDX
 
   // True if no future unknown callers.
   private boolean has_unknown_callers() { return in(1) == Env.ALL_CTRL; }
+
+  private Type targ(int idx) {
+    if( idx == -1 ) return TypeRPC.ALL_CALL;
+    if( idx == -2 ) return TypeMem.MEM;
+    return _tf.arg(idx);
+  }
   
   // ----
   @Override public Node ideal(GVNGCM gvn) {
@@ -356,13 +360,13 @@ public class FunNode extends RegionNode {
         int idx = ((ParmNode)n)._idx;
         Node x = has_unknown_callers() 
           // type-split; maybe more unknown callers... so slot#1 remains generic
-          ? gvn.con(idx==-1 ? TypeRPC.ALL_CALL : fun._tf.arg(idx)) // Generic arg#1
-          : (fun.in(1)==any ? dany : n.in(1));   // Just another argument
+          ? gvn.con(fun.targ(idx))             // Generic arg#1
+          : (fun.in(1)==any ? dany : n.in(1)); // Just another argument
         c.add_def(x); 
         for( int j=2; j<_defs._len; j++ ) // Get the new parm path or null according to split
           c.add_def( fun.in(j)==any ? dany : n.in(j) );
         // Update default type to match signature
-        if( idx != -1 ) ((ParmNode)c)._default_type = fun._tf.arg(idx);
+        if( idx != -1 && idx != -2 ) ((ParmNode)c)._default_type = fun._tf.arg(idx);
       } else if( n != this ) {  // Interior nodes
         for( Node def : n._defs ) {
           // Map old to new, except if using the old epilog in a recursive fcn,
@@ -406,7 +410,7 @@ public class FunNode extends RegionNode {
       for( int i=0; i<epi._uses._len; i++ ) {
         Node call = epi._uses.at(i);
         if( call instanceof CallNode && ((CallNode)call).fun()==epi ) {
-          gvn.set_def_reg(call,1,new_unr);// As part of removing call->epi edge, compress epi uses
+          gvn.set_def_reg(call,2,new_unr);// As part of removing call->epi edge, compress epi uses
           i--;             // Rerun set point in epi use list after compression
         }
       }
@@ -432,7 +436,7 @@ public class FunNode extends RegionNode {
       for( Node use : epi._uses ) {
         if( use instanceof CallNode && 
             ((CallNode)use)._rpc == rpc ) {
-          gvn.set_def_reg(use,1,newepi);
+          gvn.set_def_reg(use,2,newepi);
           break;
         }
       }
