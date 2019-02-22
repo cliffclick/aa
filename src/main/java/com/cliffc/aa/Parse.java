@@ -164,7 +164,7 @@ public class Parse {
   }
 
   /** Parse a top-level:
-   *  prog = ifex END */
+   *  prog = stmts END */
   private void prog() {
     Node res = stmts();
     if( res == null ) res = con(Type.ANY);
@@ -377,7 +377,7 @@ public class Parse {
           Node fun = funs.at(i);
           assert fun.op_prec() <= max;
           if( fun.op_prec() < max ) continue; // Not yet
-          Node call = do_call(new CallNode(true,errMsg(),ctrl(),fun,args.in(i-1),args.in(i)));
+          Node call = do_call(new CallNode(true,errMsg(),ctrl(),mem(),fun,args.in(i-1),args.in(i)));
           args.set_def(i-1,call,_gvn);
           funs.remove(i);  args.remove(i);  i--;
         }
@@ -433,7 +433,7 @@ public class Parse {
           kill(arg);
           n = err_ctrl2("A function is being called, but "+tn+" is not a function type");
         } else {
-          n = do_call(new CallNode(!arglist,errMsg(),ctrl(),n,arg)); // Pass the 1 arg
+          n = do_call(new CallNode(!arglist,errMsg(),ctrl(),mem(),n,arg)); // Pass the 1 arg
         }
       }
     } // Else no trailing arg, just return value
@@ -543,6 +543,7 @@ public class Parse {
       bads.add(bad);
     }
     Node old_ctrl = ctrl();
+    Node old_mem  = mem ();
     FunNode fun = init(new FunNode(ts.asAry()));
     try( Env e = new Env(_e) ) {// Nest an environment for the local vars
       _e = e;                   // Push nested environment
@@ -552,12 +553,15 @@ public class Parse {
       for( int i=0; i<ids._len; i++ )
         _e.update(ids.at(i),gvn(new ParmNode(cnt++,ids.at(i),fun,con(ts.at(i)),errmsg)),null,args_are_mutable);
       Node rpc = gvn(new ParmNode(-1,"rpc",fun,_gvn.con(TypeRPC.ALL_CALL),null));
+      Node mem = gvn(new ParmNode(-2,"mem",fun,_gvn.con(TypeMem.MEM),null));
+      set_mem(mem);
       Node rez = stmts();       // Parse function body
       if( rez == null ) rez = err_ctrl1("Missing function body", Type.SCALAR);
       require('}');             //
-      Node epi = gvn(new EpilogNode(ctrl(),rez,rpc,fun,fun._tf.fidx(),null));
+      Node epi = gvn(new EpilogNode(ctrl(),mem(),rez,rpc,fun,fun._tf.fidx(),null));
       _e = _e._par;             // Pop nested environment
       set_ctrl(old_ctrl);       // Back to the pre-function-def control
+      set_mem (old_mem );
       return epi;               // Return function; close-out and DCE 'e'
     }
   }
@@ -819,8 +823,10 @@ public class Parse {
   private <N extends Node> N init( N n ) { return n==null ? null : _gvn.init (n); }
   private void kill( Node n ) { if( n._uses._len==0 ) _gvn.kill(n); }
   public Node ctrl() { return _e._scope.get(" control "); }
+  public Node mem () { return _e._scope.get(" memory " ); }
   // Set and return a new control
   private void set_ctrl(Node n) { _e._scope.update(" control ",n,_gvn,true); }
+  private void set_mem (Node n) { _e._scope.update(" memory " ,n,_gvn,true); }
 
   private @NotNull ConNode con( Type t ) { return _gvn.con(t); }
 
@@ -834,7 +840,8 @@ public class Parse {
 
     call.add_def(call);         // Hook, so not deleted after 1st use
     set_ctrl(  gvn(new CProjNode(call,0)));
-    Node ret = gvn(new  ProjNode(call,1));
+    set_mem (  gvn(new MProjNode(call,1)));
+    Node ret = gvn(new  ProjNode(call,2));
     ret.add_def(ret);           // Hook, so not deleted when call goes
     if( call.pop()._uses._len==0 )
       _gvn.kill(call);

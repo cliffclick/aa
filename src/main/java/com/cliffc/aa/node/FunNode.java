@@ -150,7 +150,7 @@ public class FunNode extends RegionNode {
     for( Node use : _uses )
       if( use instanceof ParmNode ) {
         ParmNode parm = (ParmNode)use;
-        if( parm._idx != -1 ) {
+        if( parm._idx != -1 && parm._idx != -2 ) {
           parms[parm._idx] = parm;
           // Check that all actuals are isa all formals.  This is a little
           // conservative, as we could inline on non-error paths.
@@ -170,7 +170,7 @@ public class FunNode extends RegionNode {
       if( parm != null )         //   (some can be dead)
         for( Node call : parm._uses ) // See if a parm-user needs a type-specialization split
           if( call instanceof CallNode &&
-              call.in(1) instanceof UnresolvedNode ) { // Call overload not resolved
+              ((CallNode)call).fun() instanceof UnresolvedNode ) { // Call overload not resolved
             Type t0 = gvn.type(parm.in(1));            // Generic type in slot#1
             for( int i=2; i<parm._defs._len; i++ ) {   // For all other inputs
               Type ti = gvn.type(parm.in(i)).widen();  // Get the widen'd type
@@ -405,7 +405,7 @@ public class FunNode extends RegionNode {
       // Direct all Call uses to the new Unresolved
       for( int i=0; i<epi._uses._len; i++ ) {
         Node call = epi._uses.at(i);
-        if( call instanceof CallNode && call.in(1)==epi ) {
+        if( call instanceof CallNode && ((CallNode)call).fun()==epi ) {
           gvn.set_def_reg(call,1,new_unr);// As part of removing call->epi edge, compress epi uses
           i--;             // Rerun set point in epi use list after compression
         }
@@ -450,7 +450,8 @@ public class FunNode extends RegionNode {
     if( !is_dead() && !has_unknown_callers() )
       for( Node c : map.values() ) {
         if( c instanceof CallNode ) { // For all cloned Calls
-          Type tfunptr = gvn.type(c.in(1));
+          CallNode call = (CallNode)c;
+          Type tfunptr = gvn.type(call.fun());
           TypeFunPtr tfun = ((TypeFun)tfunptr).fun();
           for( int fidx : tfun._fidxs ) { // For all possible targets of the Call
             FunNode oldfun = FunNode.find_fidx(fidx);

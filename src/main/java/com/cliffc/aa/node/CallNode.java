@@ -43,9 +43,10 @@ public class CallNode extends Node {
   public static void reset_to_init0() { RPC = PRIM_RPC; }
 
   // Inline the CallNode
-  private Node inline( GVNGCM gvn, Node ctrl, Node rez ) {
+  private Node inline( GVNGCM gvn, Node ctrl, Node mem, Node rez ) {
     set_def(0,ctrl,gvn);        // New control is function epilog control
-    set_def(1,rez ,gvn);        // New result  is function epilog result 
+    set_def(1,mem ,gvn);        // New memory  is function epilog memory
+    set_def(2,rez ,gvn);        // New result  is function epilog result 
     _inlined = true;
     return this;
   }
@@ -53,9 +54,13 @@ public class CallNode extends Node {
   @Override public Node is_copy(GVNGCM gvn, int idx) { return _inlined ? in(idx) : null; }
 
   // Number of actual arguments
-  int nargs() { return _defs._len-2; }
+  int nargs() { return _defs._len-3; }
   // Actual arguments.
-  Node arg( int x ) { return _defs.at(x+2); }
+  Node arg( int x ) { return _defs.at(x+3); }
+
+  Node ctl() { return in(0); }
+  Node mem() { return in(1); }
+  Node fun() { return in(2); }
   
   // Clones during inlining all become unique new call sites
   @Override Node copy() {
@@ -70,7 +75,7 @@ public class CallNode extends Node {
     // If an upcast is in-progress, no other opts until it finishes
     if( _cast_ret !=null ) return null;
     // Dead, do nothing
-    if( gvn.type(in(0))==Type.XCTRL ) return null;
+    if( gvn.type(ctl())==Type.XCTRL ) return null;
 
     // When do i do 'pattern matching'?  For the moment, right here: if not
     // already unpacked a tuple, and can see the NewNode, unpack it right now.
@@ -94,14 +99,14 @@ public class CallNode extends Node {
 
     // Type-checking a function; requires 2 steps, one now, one in the
     // following data Proj from the worklist.
-    Node unk  = in(1);          // Function epilog/function pointer
+    Node unk  = fun();          // Function epilog/function pointer
     if( unk instanceof TypeNode ) {
       TypeNode tn = (TypeNode)unk;
       TypeFun t_funptr = (TypeFun)tn._t;
       TypeFunPtr tf = t_funptr.fun();
-      set_def(1,tn.in(1),gvn);
+      set_def(2,tn.in(1),gvn);
       for( int i=0; i<nargs(); i++ ) // Insert casts for each parm
-        set_def(i+2,gvn.xform(new TypeNode(tf._ts.at(i),arg(i),tn._error_parse)),gvn);
+        set_def(i+3,gvn.xform(new TypeNode(tf._ts.at(i),arg(i),tn._error_parse)),gvn);
       _cast_ret = tf._ret;       // Upcast return results
       _cast_P = tn._error_parse; // Upcast failure message
       return this;
@@ -110,7 +115,7 @@ public class CallNode extends Node {
     // If the function is unresolved, see if we can resolve it now
     if( unk instanceof UnresolvedNode ) {
       Node fun = ((UnresolvedNode)unk).resolve(gvn,this);
-      if( fun != null ) { set_def(1,fun,gvn); return this; }
+      if( fun != null ) { set_def(2,fun,gvn); return this; }
     }
 
     // Unknown function(s) being called
@@ -119,10 +124,11 @@ public class CallNode extends Node {
     // From here on down we know the exact function being called
     EpilogNode epi = (EpilogNode)unk;
     Node ctrl = epi.ctrl();
+    Node mem  = epi.mem();
     Node rez  = epi.val();
     // Function is single-caller (me) and collapsing
-    if( epi.is_copy(gvn,3) != null )
-      return inline(gvn,ctrl,rez);
+    if( epi.is_copy(gvn,4) != null )
+      return inline(gvn,ctrl,mem,rez);
     // Function is well-formed
     
     // Arg counts must be compatible
@@ -135,7 +141,7 @@ public class CallNode extends Node {
     TypeTuple formals = tfun._ts;
     for( int i=0; i<nargs(); i++ ) {
       if( fun.parm(i)==null )   // Argument is dead and can be dropped?
-        set_def(i+2,gvn.con(Type.XSCALAR),gvn); // Replace with some generic placeholder
+        set_def(i+3,gvn.con(Type.XSCALAR),gvn); // Replace with some generic placeholder
       else {
         Type formal = formals.at(i);
         Type actual = gvn.type(arg(i));
@@ -149,9 +155,9 @@ public class CallNode extends Node {
 
     // Check for several trivial cases that can be fully inlined immediately.
     // Check for zero-op body (id function)
-    if( rez instanceof ParmNode && rez.in(0) == fun ) return inline(gvn,in(0),arg(((ParmNode)rez)._idx));
+    if( rez instanceof ParmNode && rez.in(0) == fun ) return inline(gvn,ctl(),mem(),arg(((ParmNode)rez)._idx));
     // Check for constant body
-    if( rez instanceof ConNode ) return inline(gvn,in(0),rez);
+    if( rez instanceof ConNode ) return inline(gvn,ctl(),mem(),rez);
 
     // Check for a 1-op body using only constants or parameters
     boolean can_inline=true;
@@ -165,7 +171,7 @@ public class CallNode extends Node {
       for( Node parm : rez._defs )
         irez.add_def((parm instanceof ParmNode && parm.in(0) == fun) ? arg(((ParmNode)parm)._idx) : parm);
       if( irez instanceof PrimNode ) ((PrimNode)irez)._badargs = _badargs;
-      return inline(gvn,in(0),gvn.xform(irez)); // New exciting replacement for inlined call
+      return inline(gvn,ctl(),mem(),gvn.xform(irez)); // New exciting replacement for inlined call
     }
 
     assert fun.in(1)._uid!=0; // Never wire into a primitive, just clone/inline it instead (done just above)
@@ -180,7 +186,7 @@ public class CallNode extends Node {
   // Leaves the Call in the graph - making the graph "a little odd" - double
   // CTRL users - once for the call, and once for the function being called.
   Node wire(GVNGCM gvn, FunNode fun) {
-    Node ctrl = in(0);
+    Node ctrl = ctl();
     for( int i=1; i<fun._defs.len(); i++ )
       if( fun.in(i)==ctrl ) // Look for same control
         return null;        // Already wired up
@@ -210,7 +216,7 @@ public class CallNode extends Node {
     // inlining), sometimes called by Epilog when it discovers all callers
     // known.
     assert gvn.touched(fun);
-    gvn.add_def(fun,in(0));
+    gvn.add_def(fun,ctrl);
     return this;
   }
 
@@ -232,15 +238,16 @@ public class CallNode extends Node {
   }
   
   @Override public Type value(GVNGCM gvn) {
-    Type tc = gvn.type(in(0));  // Control type
-    Node fp = in(1);            // If inlined, its the result, if not inlined, its the function being called
+    Type tc = gvn.type(ctl());  // Control type
+    Type tm = gvn.type(mem());  // Memory type
+    Node fp = fun();            // If inlined, its the result, if not inlined, its the function being called
     Type t = gvn.type(fp);      // If inlined, its the result, if not inlined, its the function being called
     if( _inlined )              // Inlined functions just pass thru & disappear
-      return TypeTuple.make(tc,t);
+      return TypeTuple.make(tc,tm,t);
     if( tc == Type.XCTRL || tc == Type.ANY ) // Call is dead?
-      return TypeTuple.make(Type.XCTRL,Type.XSCALAR);
+      return TypeTuple.make(Type.XCTRL,TypeMem.MEM.dual(),Type.XSCALAR);
     if( Type.SCALAR.isa(t) ) // Calling something that MIGHT be a function, no idea what the result is
-      return TypeTuple.make(Type.CTRL,Type.SCALAR);
+      return TypeTuple.make(Type.CTRL,TypeMem.MEM,Type.SCALAR);
 
     if( gvn._opt ) // Manifesting optimistic virtual edges between caller and callee
       wire(gvn,t); // Make real edges from virtual edges
@@ -257,7 +264,7 @@ public class CallNode extends Node {
     }
     
     // Return {control,value} tuple.
-    return TypeTuple.make(Type.CTRL,trez);
+    return TypeTuple.make(Type.CTRL,tm,trez);
   }
 
   // See if the arguments are valid.  If valid, return the function's return
@@ -298,10 +305,10 @@ public class CallNode extends Node {
   // conversions are kept; if there is more than one then the join of them is
   // kept - and the program is not-yet type correct (ambiguous choices).
   public Node resolve( GVNGCM gvn ) {
-    Type t = gvn.type(in(1));
+    Type t = gvn.type(fun());
     if( !(t instanceof TypeFun) ) return null; // Might be e.g. ~Scalar
     TypeFun tfp = (TypeFun)t;
-    if( !tfp.fun().is_ambiguous_fun() ) return in(1); // Sane as-is
+    if( !tfp.fun().is_ambiguous_fun() ) return fun(); // Sane as-is
     Bits fidxs = tfp.fun()._fidxs;
 
     // Set of possible choices with fewest conversions
@@ -360,7 +367,7 @@ public class CallNode extends Node {
       if( arg(j).is_forward_ref() )
         return _badargs.forward_ref_err((TypeFun)gvn.type(arg(j)));
     
-    Node fp = in(1);      // Either function pointer, or unresolve list of them
+    Node fp = fun();      // Either function pointer, or unresolve list of them
     Node xfp = fp instanceof UnresolvedNode ? fp.in(0) : fp;
     Type txfp = gvn.type(xfp);
     if( !(txfp instanceof TypeFun) )
@@ -396,7 +403,7 @@ public class CallNode extends Node {
     return new TypeNode(t,null,_cast_P);
   }
 
-  @Override public Type all_type() { return TypeTuple.make(Type.CTRL,Type.SCALAR); }
+  @Override public Type all_type() { return TypeTuple.make(Type.CTRL,TypeMem.MEM,Type.SCALAR); }
   @Override public int hashCode() { return super.hashCode()+_rpc; }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;

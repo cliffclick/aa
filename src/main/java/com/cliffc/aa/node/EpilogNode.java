@@ -3,26 +3,25 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeFun;
-import com.cliffc.aa.type.TypeRPC;
+import com.cliffc.aa.type.*;
 
 // Tail end of functions.  Gathers:
 // - exit control; function may never exit or may be more than one
+// - exit memory; updated program state
 // - exit value;
 // - RPC - where to jump-to next; the Continuation
 // - The FunNode function header (quickly maps to SESE region header)
 public class EpilogNode extends Node {
   int _fidx;
   private final String _unkref_err; // Unknown ref error (not really a forward ref)
-  public EpilogNode( Node ctrl, Node val, Node rpc, Node fun, int fidx, String unkref_err ) {
-    super(OP_EPI,ctrl,val,rpc,fun);
+  public EpilogNode( Node ctrl, Node mem, Node val, Node rpc, Node fun, int fidx, String unkref_err ) {
+    super(OP_EPI,ctrl,mem,val,rpc,fun);
     _unkref_err = unkref_err;
     _fidx = fidx;              // Record function index, so can tell it exactly
   }
   @Override public Node ideal(GVNGCM gvn) {
     // If is_copy is true, CallNodes uses need to fold away as well
-    if( is_copy(gvn,3) != null )
+    if( is_copy(gvn,4) != null )
       for( Node use : _uses ) gvn.add_work(use);
     return null;
   }
@@ -39,13 +38,14 @@ public class EpilogNode extends Node {
 
   @Override public Node is_copy(GVNGCM gvn, int idx) {
     // FunNode has disappeared/optimized away, so should this Epilog
-    return (in(3) instanceof FunNode && fun()._tf.fidx()==_fidx) ? null : in(idx);
+    return (in(4) instanceof FunNode && fun()._tf.fidx()==_fidx) ? null : in(idx);
   }
   
   public    Node ctrl() { return          in(0); } // internal function control
-            Node val () { return          in(1); } // standard exit value
-  public    Node rpc () { return          in(2); } // Almost surely a PhiNode merging RPCs
-  public FunNode fun () { return (FunNode)in(3); } // Function header
+            Node mem () { return          in(1); } // standard exit value
+            Node val () { return          in(2); } // standard exit value
+  public    Node rpc () { return          in(3); } // Almost surely a PhiNode merging RPCs
+  public FunNode fun () { return (FunNode)in(4); } // Function header
   @Override String xstr() {                        // Self short name
     String name = FunNode.name(_fidx);
     return name==null ? "Epilog" : "Epi#"+name;
@@ -58,11 +58,11 @@ public class EpilogNode extends Node {
   public static Node forward_ref( GVNGCM gvn, String name, Parse unkref ) {
     FunNode fun = gvn.init(new FunNode(name));
     String referr = unkref.errMsg("Unknown ref '"+name+"'");
-    return new EpilogNode(fun,gvn.con(Type.SCALAR),gvn.con(TypeRPC.ALL_CALL),fun,fun._tf.fidx(), referr);
+    return new EpilogNode(fun,gvn.con(TypeMem.MEM),gvn.con(Type.SCALAR),gvn.con(TypeRPC.ALL_CALL),fun,fun._tf.fidx(), referr);
   }
 
   // True if this is a forward_ref
-  @Override public boolean is_forward_ref() { return in(0)== in(3) && in(3) instanceof FunNode && fun().is_forward_ref(); }
+  @Override public boolean is_forward_ref() { return in(0)== in(4) && in(4) instanceof FunNode && fun().is_forward_ref(); }
 
   // 'this' is a forward reference, probably with multiple uses (and no inlined
   // callers).  Passed in the matching function definition, which is brand new

@@ -65,12 +65,13 @@ public class Env implements AutoCloseable {
     String[] args = prim._args;
     FunNode  fun = ( FunNode) GVN.xform(new  FunNode(prim)); // Points to ScopeNode only
     ParmNode rpc = (ParmNode) GVN.xform(new ParmNode(-1,"rpc",fun, GVN.con(TypeRPC.ALL_CALL),null));
+    ParmNode mem = (ParmNode) GVN.xform(new ParmNode(-2,"mem",fun, GVN.con(TypeMem.MEM     ),null));
     prim.add_def(null);         // Control for the primitive
     for( int i=0; i<args.length; i++ )
       prim.add_def(GVN.xform(new ParmNode(i,args[i],fun, GVN.con(targs.at(i)),null)));
     PrimNode x = GVN.init(prim);
     assert x==prim;
-    return new EpilogNode(fun,prim,rpc,fun,fun._tf.fidx(),null);
+    return new EpilogNode(fun,mem,prim,rpc,fun,fun._tf.fidx(),null);
   }
 
   public Node update( String name, Node val, GVNGCM gvn, boolean mutable ) { return _scope.update(name,val,gvn,mutable); }
