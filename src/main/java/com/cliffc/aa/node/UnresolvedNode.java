@@ -52,7 +52,7 @@ public class UnresolvedNode extends Node {
     // Set of possible choices with fewest conversions
     Ary<Node> ns = new Ary<>(new Node[1],0);
     int min_cvts = 999;         // Required conversions
-    int cvts[] = new int[_defs._len];
+    int[] cvts = new int[_defs._len];
 
     // For each function, see if the actual args isa the formal args.  If not,
     // toss it out.  Also count conversions, and keep the minimal conversion
@@ -68,6 +68,8 @@ public class UnresolvedNode extends Node {
       boolean unk = false;       // Unknown arg might be incompatible or free to convert
       for( int j=0; j<call.nargs(); j++ ) {
         Type actual = gvn.type(call.arg(j));
+        if( actual==Type.XSCALAR && call.arg(j) instanceof ConNode )
+          continue; // Forced super-high arg is always compatible before formal is dead
         Type tx = actual.join(formals.at(j));
         if( tx.above_center() ) // Actual and formal have values in common?
           continue outerloop;   // No, this function will never work; e.g. cannot cast 1.2 as any integer

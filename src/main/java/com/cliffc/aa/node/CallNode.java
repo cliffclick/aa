@@ -1,9 +1,9 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.AA;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.Bits;
 
 // See FunNode.  Control is not required for an apply but inlining the function
@@ -179,14 +179,14 @@ public class CallNode extends Node {
     assert tfun.nargs() == nargs();
 
     // Always wire caller args into known functions
-    return wire(gvn,fun);
+    return wire(gvn,fun,false);
   }
 
   // Wire the call args to a known function, letting the function have precise
   // knowledge of its callers and arguments.
   // Leaves the Call in the graph - making the graph "a little odd" - double
   // CTRL users - once for the call, and once for the function being called.
-  Node wire(GVNGCM gvn, FunNode fun) {
+  Node wire(GVNGCM gvn, FunNode fun, boolean is_gcp) {
     Node ctrl = ctl();
     for( int i=1; i<fun._defs.len(); i++ )
       if( fun.in(i)==ctrl ) // Look for same control
@@ -197,19 +197,27 @@ public class CallNode extends Node {
     // type-check the args during GCP, as they will start out too-high and pass
     // any isa-check.  Later, after wiring up in GCP they might fall to an
     // error state - so we have to support having error args coming in.
-    for( Node arg : fun._uses )
-      if( arg.in(0) == fun && arg instanceof ParmNode &&
-          ((ParmNode)arg)._idx >= nargs() )
-        return null;          // Wrong arg-count
+    for( Node arg : fun._uses ) {
+      if( arg.in(0) == fun && arg instanceof ParmNode ) {
+        int idx = ((ParmNode)arg)._idx; // Argument number, or -1 for rpc or -2 for memory
+        if( idx >= nargs() ) return null; // Wrong arg-count
+        if( is_gcp ) {
+          Type formal = fun.targ(idx);
+          Type actual = idx==-1 ? TypeRPC.make(_rpc) : (idx==-2 ? TypeMem.MEM : gvn.type(arg(idx)));
+          if( !actual.isa(formal) )
+            return null;     // Even if actual falls more, will never be formal
+        }
+      }
+    }
     
     // Add an input path to all incoming arg ParmNodes from the Call.  Cannot
     // assert finding all args, because dead args may already be removed - and
     // so there's no Parm/Phi to attach the incoming arg to.
     for( Node arg : fun._uses ) {
       if( arg.in(0) == fun && arg instanceof ParmNode ) {
-        int idx = ((ParmNode)arg)._idx; // Argument number, or -1 for rpc
+        int idx = ((ParmNode)arg)._idx; // Argument number, or -1 for rpc or -2 for memory
         assert idx<nargs();
-        Node actual = idx==-1 ? gvn.con(TypeRPC.make(_rpc)) : arg(idx);
+        Node actual = idx==-1 ? gvn.con(TypeRPC.make(_rpc)) : (idx==-2 ? mem() : arg(idx));
         gvn.add_def(arg,actual);
       }
     }
@@ -233,7 +241,7 @@ public class CallNode extends Node {
         // Can be wiring up the '#[ALL]' list.  Stop after seeing all existing functions
         if( fidx >= FunNode.FUNS._len ) return;
         FunNode fun = FunNode.find_fidx(fidx);
-        if( !fun.is_dead() && !fun.is_forward_ref() ) wire(gvn,fun);
+        if( !fun.is_dead() && !fun.is_forward_ref() ) wire(gvn,fun,true);
       }
     }
   }
@@ -314,11 +322,13 @@ public class CallNode extends Node {
     Bits fidxs = tfp.fun()._fidxs;
 
     // Set of possible choices with fewest conversions
-    int min_cvts = 999;         // Required conversions
-    int cvts[] = new int[8];
-    int fxs [] = new int[8];
-    int len=0;
-    TypeTuple prior = null;
+    class Data {
+      private final int _xcvt, _fidx;
+      private final boolean _unk;
+      private final TypeTuple _formals;
+      private Data( int x, boolean u, int f, TypeTuple ts ) { _xcvt = x; _unk=u; _fidx=f; _formals=ts; }
+    }
+    Ary<Data> ds = new Ary<>(new Data[0]);
 
     // For each function, see if the actual args isa the formal args.  If not,
     // toss it out.  Also count conversions, and keep the minimal conversion
@@ -329,20 +339,13 @@ public class CallNode extends Node {
       if( fun.nargs() != nargs() ) continue; // Wrong arg count, toss out
       TypeTuple formals = fun._ts;   // Type of each argument
       
-      // If this set of formals is strictly less than a prior set acceptable
-      // set, replace the prior set.  Similarly, if strictly greater than a
-      // prior set, toss this one out.
-      if( prior != null ) {
-        if( prior.isa(formals) ) throw AA.unimpl();
-        else if( formals.isa(prior) ) throw AA.unimpl();
-      }
-      prior = formals;
-      
       // Now check if the arguments are compatible in all, keeping lowest cost
       int xcvts = 0;             // Count of conversions required
       boolean unk = false;       // Unknown arg might be incompatible or free to convert
       for( int j=0; j<nargs(); j++ ) {
         Type actual = gvn.type(arg(j));
+        if( actual==Type.XSCALAR && arg(j) instanceof ConNode )
+          continue; // Forced super-high arg is always compatible before formal is dead
         Type tx = actual.join(formals.at(j));
         if( tx.above_center() ) // Actual and formal have values in common?
           continue outerloop;   // No, this function will never work; e.g. cannot cast 1.2 as any integer
@@ -353,22 +356,34 @@ public class CallNode extends Node {
         else xcvts += cvt;          // Count conversions
       }
 
-      if( !unk && xcvts < min_cvts ) min_cvts = xcvts; // Keep minimal known conversion
-      cvts[len] = xcvts;        // Keep count of conversions
-      fxs [len] = fidx; // This is an acceptable choice, so far (args can be made to work)
-      len++;
+      Data d = new Data(xcvts,unk,fidx,formals);
+      ds.push(d);
     }
+    
     // Toss out choices with strictly more conversions than the minimal
-    for( int i=0; i<len; i++ )
-      if( cvts[i] > min_cvts ) {
-        cvts[i] = cvts[len-1];
-        fxs [i] = fxs [len-1];
-        len--;
-      }
+    int min = 999;              // Required conversions
+    for( Data d : ds )          // Find minimal conversions
+      if( !d._unk && d._xcvt < min )
+        min = d._xcvt;
+    for( int i=0; i<ds._len; i++ ) // Toss out more expensive options
+      if( ds.at(i)._xcvt > min )
+        ds.del(i--);
 
-    if( len==0 ) return null;   // No choices apply?  No changes.
-    if( len==1 )                // Return the one choice
-      return FunNode.find_fidx(fxs[0]).epi();
+    // If this set of formals is strictly less than a prior acceptable set,
+    // replace the prior set.  Similarly, if strictly greater than a prior set,
+    // toss this one out.
+    for( int i=0; i<ds._len; i++ ) {
+      TypeTuple ifs = ds.at(i)._formals;
+      for( int j=i+1; j<ds._len; j++ ) {
+        TypeTuple jfs = ds.at(j)._formals;
+        if( ifs.isa(jfs) ) ds.del(j--); // Toss more expansive option j
+        else if( jfs.isa(ifs) ) { ds.del(i--); break; } // Toss option i
+      }
+    }
+
+    if( ds._len==0 ) return null;   // No choices apply?  No changes.
+    if( ds._len==1 )                // Return the one choice
+      return FunNode.find_fidx(ds.pop()._fidx).epi();
     // TODO: return shrunk list
     return null;  // No improvement
   }

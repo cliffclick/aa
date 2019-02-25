@@ -16,7 +16,6 @@ public class TestParse {
   
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
-    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(0),fact(1),fact(2))",TypeStruct.make(TypeNil.NIL,TypeInt.con(1),TypeInt.con(2)));
     // A collection of tests which like to fail easily
     testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1) is not a @{x,y}","                           ");
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'","                    ");
@@ -153,7 +152,7 @@ public class TestParse {
     test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
     test("sq={x -> x*x}; sq 2.1", TypeFlt.con(4.41)); // No () required for single args
     testerr("sq={x -> x&x}; sq(\"abc\")", "\"abc\" is not a int64","                        ");
-    testerr("sq={x -> x*x}; sq(\"abc\")", "~str is not a flt64","            ");
+    testerr("sq={x -> x*x}; sq(\"abc\")", "\"abc\" is not a flt64","            ");
     testerr("f0 = { f x -> f0(x-1) }; f0({+},2)", "Passing 1 arguments to f0{Scalar Scalar -> Scalar} which takes 2 arguments","                     ");
     // Recursive:
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
@@ -379,6 +378,7 @@ public class TestParse {
 
   
   @Test public void testParse8() {
+    TypeStruct.init1();
     // A linked-list mixing ints and strings, always in pairs
     String ll_cona = "a=0; ";
     String ll_conb = "b=math_rand(1) ? ((a,1),\"abc\") : a; ";

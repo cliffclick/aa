@@ -67,7 +67,7 @@ public abstract class PrimNode extends Node {
 
     new   EQ_OOP(),
     new   NE_OOP(),
-    //new AddStrStr(),
+    new AddStrStr(),
   };
 
   // Loss-less conversions only, plus int64->flt64 (standard lossy conversion)

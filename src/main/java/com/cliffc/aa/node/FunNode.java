@@ -107,7 +107,7 @@ public class FunNode extends RegionNode {
   // True if no future unknown callers.
   private boolean has_unknown_callers() { return in(1) == Env.ALL_CTRL; }
 
-  private Type targ(int idx) {
+  Type targ(int idx) {
     if( idx == -1 ) return TypeRPC.ALL_CALL;
     if( idx == -2 ) return TypeMem.MEM;
     return _tf.arg(idx);
@@ -278,7 +278,7 @@ public class FunNode extends RegionNode {
       if( n != epi )            // Except for the Epilog
         work.addAll(n._uses);   // Visit all uses also
       if( op==OP_CALL ) {       // Call-of-primitive?
-        Node n1 = n.in(1);
+        Node n1 = ((CallNode)n).fun();
         Node n2 = n1 instanceof UnresolvedNode ? n1.in(0) : n1;
         if( n2 instanceof EpilogNode &&
             ((EpilogNode)n2).val() instanceof PrimNode )
@@ -462,7 +462,7 @@ public class FunNode extends RegionNode {
             assert !oldfun.is_dead();
             if( !oldfun.has_unknown_callers() ) {
               gvn.add_work(oldfun);
-              Node x = ((CallNode)c).wire(gvn,oldfun);
+              Node x = ((CallNode)c).wire(gvn,oldfun,false);
               assert x != null;
               ParmNode rpc = oldfun.rpc();
               if( rpc != null ) // Can be null there is a single return point, which got constant-folded
@@ -479,14 +479,10 @@ public class FunNode extends RegionNode {
     return is_dead() ? fun : this;
   }
 
-  // Compute value from inputs.  Slot#1 is always the unknown caller.  If
-  // Slot#1 is not a ScopeNode, then it is a constant CTRL just in case we make
-  // a new caller (e.g. via inlining).  If there are no other inputs and no
-  // data uses, then the function is dead.  If there are data uses, they might
-  // hit a new CallNode - and this requires GCP to discover the full set of
-  // possible callers.
+  // Compute value from inputs.  Simple meet over inputs.
   @Override public Type value(GVNGCM gvn) {
-    // Will be an error eventually, but act like its executed so the trailing EpilogNode gets visited during GCP
+    // Will be an error eventually, but act like its executed so the trailing
+    // EpilogNode gets visited during GCP
     if( _tf.is_forward_ref() ) return Type.CTRL;
     Type t = Type.XCTRL;
     for( int i=1; i<_defs._len; i++ )

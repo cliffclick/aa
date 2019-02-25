@@ -227,7 +227,7 @@ public class GVNGCM {
   public void kill( Node n ) {  kill0(unreg0(n)); }
   // Version for never-GVN'd; common for e.g. constants to die early or
   // RootNode, and some other make-and-toss Nodes.
-  void kill0( Node n ) {
+  private void kill0( Node n ) {
     assert n._uses._len==0;
     for( int i=0; i<n._defs._len; i++ )
       n.set_def(i,null,this);   // Recursively destroy dead nodes
@@ -388,7 +388,7 @@ public class GVNGCM {
       while( _work._len > 0 ) {
         Node n = _work.pop();
         _wrk_bits.clear(n._uid);
-        assert !n.is_dead();
+        if( n.is_dead() ) continue; // Can be dead functions after removing ambiguous calls
         if( 3 <= n._uid && n._uid < _INIT0_CNT ) continue; // Ignore primitives (type is unchanged and conservative)
         if( n instanceof CallNode && calls.find((CallNode)n)== -1 ) {
           Type tf = type(((CallNode)n).fun());
@@ -480,8 +480,9 @@ public class GVNGCM {
     // All (live) Call ambiguity has been resolved
     if( n instanceof CallNode && type(n.in(0))==Type.CTRL ) {
       Type tf = type(((CallNode)n).fun());
-      assert tf instanceof TypeFun &&
-        !((TypeFun)tf).fun().is_ambiguous_fun();
+      assert (tf instanceof TypeFun &&
+        !((TypeFun)tf).fun().is_ambiguous_fun()) ||
+              n.err(this) != null; // Or else call is in-error
     }
 
     // Walk reachable graph

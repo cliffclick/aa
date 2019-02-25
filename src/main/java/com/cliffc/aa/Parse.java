@@ -77,7 +77,7 @@ public class Parse {
     _nf.setGroupingUsed(false);
     _pp = new ParsePosition(0);
     _str = str;          // Keep a complete string copy for java number parsing
-    _gvn = Env.GVN;     // Pessimistic during parsing
+    _gvn = Env.GVN;      // Pessimistic during parsing
   }
 
   // Parse the string in the given lookup context, and return an executable
@@ -161,6 +161,7 @@ public class Parse {
     Type tres = _gvn.type(res);
     kill(res);       // Kill Node for returned Type result
     set_ctrl(null);  // Kill control also
+    set_mem (null);  // Kill memory  also
     return new TypeEnv(tres,_e,errs0.isEmpty() ? null : errs0);
   }
 

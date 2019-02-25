@@ -128,8 +128,8 @@ public class TestNode {
     Node mem = new ConNode<Type>(TypeMem.MEM);
 
     Node unr = Env.top().lookup("+"); // All the "+" functions
-    test1monotonic(new   CallNode(false,null,_ins[0],  unr  ,_ins[2],_ins[3]));
-    test1monotonic(new   CallNode(false,null,_ins[0],_ins[1],_ins[2],_ins[3]));
+    test1monotonic(new   CallNode(false,null,_ins[0],mem,  unr  ,_ins[2],_ins[3]));
+    test1monotonic(new   CallNode(false,null,_ins[0],mem,_ins[1],_ins[2],_ins[3]));
     test1monotonic(new    ConNode<Type>(          TypeInt.FALSE));
     test1monotonic(new    ConNode<Type>(          TypeStr.ABC  ));
     test1monotonic(new    ConNode<Type>(          TypeFlt.FLT64));
