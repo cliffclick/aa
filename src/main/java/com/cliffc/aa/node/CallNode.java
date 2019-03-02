@@ -62,6 +62,8 @@ public class CallNode extends Node {
   private Node ctl() { return in(0); }
   private Node mem() { return in(1); }
   public  Node fun() { return in(2); }
+  public void set_fun(Node fun, GVNGCM gvn) { set_def(2,fun,gvn); }
+  public void set_fun_reg(Node fun, GVNGCM gvn) { gvn.set_def_reg(this,2,fun); }
   
   // Clones during inlining all become unique new call sites
   @Override Node copy() {
@@ -105,7 +107,7 @@ public class CallNode extends Node {
       TypeNode tn = (TypeNode)unk;
       TypeFun t_funptr = (TypeFun)tn._t;
       TypeFunPtr tf = t_funptr.fun();
-      set_def(2,tn.in(1),gvn);
+      set_fun(tn.in(1),gvn);
       for( int i=0; i<nargs(); i++ ) // Insert casts for each parm
         set_def(i+3,gvn.xform(new TypeNode(tf._ts.at(i),arg(i),tn._error_parse)),gvn);
       _cast_ret = tf._ret;       // Upcast return results
@@ -115,8 +117,8 @@ public class CallNode extends Node {
 
     // If the function is unresolved, see if we can resolve it now
     if( unk instanceof UnresolvedNode ) {
-      Node fun = ((UnresolvedNode)unk).resolve(gvn,this);
-      if( fun != null ) { set_def(2,fun,gvn); return this; }
+      Node fun = resolve(gvn);
+      if( fun != null ) { set_fun(fun,gvn); return this; }
     }
 
     // Unknown function(s) being called
@@ -318,7 +320,7 @@ public class CallNode extends Node {
     Type t = gvn.type(fun());
     if( !(t instanceof TypeFun) ) return null; // Might be e.g. ~Scalar
     TypeFun tfp = (TypeFun)t;
-    if( !tfp.fun().is_ambiguous_fun() ) return fun(); // Sane as-is
+    if( !tfp.fun().is_ambiguous_fun() ) return null; // Sane as-is
     Bits fidxs = tfp.fun()._fidxs;
 
     // Set of possible choices with fewest conversions
@@ -339,7 +341,7 @@ public class CallNode extends Node {
       if( fun.nargs() != nargs() ) continue; // Wrong arg count, toss out
       TypeTuple formals = fun._ts;   // Type of each argument
       
-      // Now check if the arguments are compatible in all, keeping lowest cost
+      // Now check if the arguments are compatible at all, keeping lowest cost
       int xcvts = 0;             // Count of conversions required
       boolean unk = false;       // Unknown arg might be incompatible or free to convert
       for( int j=0; j<nargs(); j++ ) {
@@ -363,18 +365,20 @@ public class CallNode extends Node {
     // Toss out choices with strictly more conversions than the minimal
     int min = 999;              // Required conversions
     for( Data d : ds )          // Find minimal conversions
-      if( !d._unk && d._xcvt < min )
+      if( !d._unk && d._xcvt < min ) // If unknown, might need more converts
         min = d._xcvt;
     for( int i=0; i<ds._len; i++ ) // Toss out more expensive options
-      if( ds.at(i)._xcvt > min )
+      if( ds.at(i)._xcvt > min )   // Including unknown... which might need more converts
         ds.del(i--);
 
     // If this set of formals is strictly less than a prior acceptable set,
     // replace the prior set.  Similarly, if strictly greater than a prior set,
     // toss this one out.
     for( int i=0; i<ds._len; i++ ) {
+      if( ds.at(i)._unk ) continue; 
       TypeTuple ifs = ds.at(i)._formals;
       for( int j=i+1; j<ds._len; j++ ) {
+        if( ds.at(j)._unk ) continue; 
         TypeTuple jfs = ds.at(j)._formals;
         if( ifs.isa(jfs) ) ds.del(j--); // Toss more expansive option j
         else if( jfs.isa(ifs) ) { ds.del(i--); break; } // Toss option i
@@ -384,8 +388,10 @@ public class CallNode extends Node {
     if( ds._len==0 ) return null;   // No choices apply?  No changes.
     if( ds._len==1 )                // Return the one choice
       return FunNode.find_fidx(ds.pop()._fidx).epi();
+    if( ds._len==fun()._defs._len ) return null; // No improvement
     // TODO: return shrunk list
-    return null;  // No improvement
+    //return gvn.xform(new UnresolvedNode(ns.asAry())); // return shrunk choice list
+    return null;
   }
   
   @Override public String err(GVNGCM gvn) {

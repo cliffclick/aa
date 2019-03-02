@@ -418,9 +418,9 @@ public class GVNGCM {
         if( call.is_dead() ) calls.del(i--); // Remove from worklist
         else {
           Node fun = call.resolve(this);
-          if( fun != null && call.fun() != fun ) {   // Unresolved gets left on worklist
+          if( fun != null ) {          // Unresolved gets left on worklist
             set_def_reg(call, 2, fun); // Set resolved edge
-            calls.del(i--); // Remove from worklist
+            calls.del(i--);            // Remove from worklist
           }
         }
       }

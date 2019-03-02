@@ -410,7 +410,7 @@ public class FunNode extends RegionNode {
       for( int i=0; i<epi._uses._len; i++ ) {
         Node call = epi._uses.at(i);
         if( call instanceof CallNode && ((CallNode)call).fun()==epi ) {
-          gvn.set_def_reg(call,2,new_unr);// As part of removing call->epi edge, compress epi uses
+          ((CallNode)call).set_fun_reg(new_unr,gvn);// As part of removing call->epi edge, compress epi uses
           i--;             // Rerun set point in epi use list after compression
         }
       }
@@ -436,7 +436,7 @@ public class FunNode extends RegionNode {
       for( Node use : epi._uses ) {
         if( use instanceof CallNode && 
             ((CallNode)use)._rpc == rpc ) {
-          gvn.set_def_reg(use,2,newepi);
+          ((CallNode)use).set_fun_reg(newepi,gvn);
           break;
         }
       }
