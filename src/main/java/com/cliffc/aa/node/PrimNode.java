@@ -167,12 +167,13 @@ static class ConvertTypeNameStruct extends PrimNode {
     _badargs=badargs;
   }
   @Override public Node ideal(GVNGCM gvn) {
-    Node nn = gvn.xform(new NewNode(_defs.asAry(),_args));
+    Node nn = gvn.xform(new  NewNode(_defs.asAry(),_args));
+    Node an = gvn.xform(new ProjNode(nn,1));
     TypeStruct ts = TypeStruct.make(_args,_targs._ts);
     TypeName tn = TypeName.make(_name,_lex,ts);
     Node cvt = new ConvertTypeName(ts,tn,_badargs);
     cvt.add_def(null); // Control
-    cvt.add_def(nn);
+    cvt.add_def(an);
     return cvt;
   }
   

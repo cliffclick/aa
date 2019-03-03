@@ -149,6 +149,7 @@ public class Parse {
     Ary<String> errs2 = new Ary<>(new String[1],0);
     res   .walkerr_def(errs0,errs1,errs2,bs,_gvn);
     ctrl().walkerr_def(errs0,errs1,errs2,bs,_gvn);
+    mem() .walkerr_def(errs0,errs1,errs2,bs,_gvn);
     if( errs0.isEmpty() ) errs0.addAll(errs1);
     if( errs0.isEmpty() ) _e._scope.walkerr_use(errs0,new BitSet(),_gvn);
     if( errs0.isEmpty() && skipWS() != -1 ) errs0.add(errMsg("Syntax error; trailing junk"));
@@ -408,11 +409,11 @@ public class Parse {
         else if( peek(":=") || peek('=') ) {
           Node stmt = stmt();
           if( stmt == null ) n = err_ctrl2("Missing stmt after assigning field '."+fld+"'");
-          else if( fld != null ) n = gvn(new StoreNode(ctrl(),n,fld ,errMsg()));
-          else                   n = gvn(new StoreNode(ctrl(),n,fnum,errMsg()));
+          else if( fld != null ) set_mem(gvn(new StoreNode(ctrl(),mem(),n,n=stmt,fld ,errMsg())));
+          else                   set_mem(gvn(new StoreNode(ctrl(),mem(),n,n=stmt,fnum,errMsg())));
         } else {
-          if( fld != null ) n = gvn(new LoadNode(ctrl(),n,fld ,errMsg()));
-          else              n = gvn(new LoadNode(ctrl(),n,fnum,errMsg()));
+          if( fld != null ) n = gvn(new LoadNode(ctrl(),mem(),n,fld ,errMsg()));
+          else              n = gvn(new LoadNode(ctrl(),mem(),n,fnum,errMsg()));
         }
       
       } else {                  // Attempt a function-call
@@ -518,7 +519,7 @@ public class Parse {
       s=stmts();
     }
     require(')');
-    return gvn(new NewNode(ns.asAry(),TypeStruct.FLDS(ns._len-1)));
+    return do_mem(new NewNode(ns.asAry(),TypeStruct.FLDS(ns._len-1)));
   }
 
   /** Parse an anonymous function; the opening '{' already parsed.  After the
@@ -618,7 +619,7 @@ public class Parse {
       Node[] flds = e._scope.get(toks);
       byte[] finals = new byte[toks._len];
       for(int i=0; i<toks._len; i++ ) if( fs.get(i) ) finals[i] = 1;
-      return gvn(new NewNode(flds,toks.asAry(),finals));
+      return do_mem(new NewNode(flds,toks.asAry(),finals));
     } // Pop lexical scope around struct
   }
 
@@ -850,6 +851,16 @@ public class Parse {
     return ret.pop();
   }
 
+  // NewNode updates merges the new allocation into all-of-memory and returns a
+  // reference.
+  private Node do_mem(NewNode nnn) {
+    Node nn = gvn(nnn);
+    Node nmem = gvn(new MProjNode(nn,0));
+    Node nadr = gvn(new  ProjNode(nn,1));
+    set_mem(gvn(new MergeMemNode(mem(),nmem)));
+    return nadr;
+  }
+  
   // Whack current control with a syntax error
   private ErrNode err_ctrl2( String s ) { return err_ctrl1(s,Type.ANY); }
   public  ErrNode err_ctrl1(String s, Type t) { return init(new ErrNode(Env.START,errMsg(s),t)); }

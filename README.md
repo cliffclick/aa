@@ -252,8 +252,8 @@ Recursive types | ---
 `List(List(0,1.2),2.3)` | `List:@{next:List:@{next:nil,val:1.2},val:2.3}` Sample linked-list, with all types shown
 `map_sq={x -> x ? (map_sq(x.0),x.1*x.1) : 0}; map_sq((0,1.2))` | `(nil,1.44)` Strongly typed `map_sq` with a simple tuple
 
-Examples:
----------
+LARGER EXAMPLES:
+----------------
 
 
 

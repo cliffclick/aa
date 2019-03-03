@@ -2,11 +2,14 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.type.TypeStruct;
+import com.cliffc.aa.type.TypeTuple;
 
 import java.util.Arrays;
 
-// Make a new object of given type
+// Make a new object of given type.  Returns both the pointer and the memory
+// state, so the output is similar to standard Call.
 public class NewNode extends Node {
   private final String[] _names; // Field names
   private final byte[] _finals;  // Final fields
@@ -35,8 +38,9 @@ public class NewNode extends Node {
     TypeStruct newt = TypeStruct.make(_names,ts,_finals);
     // Get the existing type, without installing if missing because blows the
     // "new newnode" assert if this node gets replaced during parsing.
-    Type oldt = gvn.self_type(this);
-    return approx(newt,oldt);
+    Type oldnnn = gvn.self_type(this);
+    Type oldt = oldnnn instanceof TypeTuple ? ((TypeTuple)oldnnn).at(1) : newt;
+    return TypeTuple.make(TypeMem.MEM,approx(newt,oldt));
   }
   
   // NewNodes can participate in cycles, where the same structure is appended
@@ -56,7 +60,7 @@ public class NewNode extends Node {
   @Override public Type all_type() {
     Type[] ts = new Type[_names.length];
     Arrays.fill(ts,Type.SCALAR);
-    return TypeStruct.make(_names,ts);
+    return TypeTuple.make(TypeMem.MEM,TypeStruct.make(_names,ts));
   }
   
   @Override public int hashCode() { return super.hashCode()+ Arrays.hashCode(_names); }

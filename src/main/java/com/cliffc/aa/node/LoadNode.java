@@ -12,21 +12,28 @@ public class LoadNode extends Node {
   private final int _fld_num;
   private final String _badfld;
   private final String _badnil;
-  private LoadNode( Node ctrl, Node st, String fld, int fld_num, Parse bad ) {
-    super(OP_LOAD,ctrl,st);
+  private LoadNode( Node ctrl, Node mem, Node adr, String fld, int fld_num, Parse bad ) {
+    super(OP_LOAD,ctrl,mem,adr);
     _fld = fld;
     _fld_num = fld_num;
     // Tests can pass a null, but nobody else does
     _badfld = bad==null ? null : bad.errMsg("Unknown field '."+fld+"'");
     _badnil = bad==null ? null : bad.errMsg("Struct might be nil when reading field '."+fld+"'");
   }
-  public LoadNode( Node ctrl, Node st, String fld , Parse bad ) { this(ctrl,st,fld,-1,bad); }
-  public LoadNode( Node ctrl, Node st, int fld_num, Parse bad ) { this(ctrl,st,null,fld_num,bad); }
+  public LoadNode( Node ctrl, Node mem, Node adr, String fld , Parse bad ) { this(ctrl,mem,adr,fld,-1,bad); }
+  public LoadNode( Node ctrl, Node mem, Node adr, int fld_num, Parse bad ) { this(ctrl,mem,adr,null,fld_num,bad); }
   String xstr() { return "."+(_fld==null ? ""+_fld_num : _fld); } // Self short name
   String  str() { return xstr(); }      // Inline short name
+  Node ctl() { return in(0); }
+  Node mem() { return in(1); }
+  Node adr() { return in(2); }
+  Node set_ctl(Node c, GVNGCM gvn) { return set_def(0,c,gvn); }
+  Node set_mem(Node m, GVNGCM gvn) { return set_def(1,m,gvn); }
+  Node set_adr(Node a, GVNGCM gvn) { return set_def(2,a,gvn); }
+  
   @Override public Node ideal(GVNGCM gvn) {
-    Node ctrl = in(0);
-    Node addr = in(1);
+    Node ctrl = ctl();
+    Node addr = adr();
     if( ctrl==null || gvn.type(ctrl)!=Type.CTRL )
       return null;              // Dead load, or a no-control-no-fail load
     Type t = gvn.type(addr);    // Address type
@@ -36,7 +43,7 @@ public class LoadNode extends Node {
     // to a CastNode (to remove nil-ness) and remove the control.
     if( !TypeNil.NIL.isa(t) ) // No nil, no need for ctrl
       // remove ctrl; address already casts-away-nil
-      return set_def(0,null,gvn);
+      return set_ctl(null,gvn);
 
     // Looking for a nil-check pattern:
     //   this.0->dom*->True->If->addr
@@ -58,12 +65,12 @@ public class LoadNode extends Node {
 
     if( !(t instanceof TypeNil) )
       return null; // below a nil (e.g. Scalar), do nothing yet
-    set_def(1,gvn.xform(new CastNode(tru,baseaddr,((TypeNil)t)._t)),gvn);
-    return set_def(0,null,gvn);
+    set_adr(gvn.xform(new CastNode(tru,baseaddr,((TypeNil)t)._t)),gvn);
+    return set_ctl(null,gvn);
   }
 
   @Override public Type value(GVNGCM gvn) {
-    Type t = gvn.type(in(1)).base();
+    Type t = gvn.type(adr()).base();
     if( t.isa(TypeNil.XOOP) ) return Type.XSCALAR; // Very high address; might fall to any valid value
     if( t.isa(TypeOop.XOOP) ) return Type.XSCALAR; // Very high address; might fall to any valid value
     if( t instanceof TypeNil ) {
@@ -91,7 +98,7 @@ public class LoadNode extends Node {
   }
 
   @Override public String err(GVNGCM gvn) {
-    Type t = gvn.type(in(1));
+    Type t = gvn.type(adr());
     while( t instanceof TypeName ) t = ((TypeName)t)._t;
     if( t instanceof TypeNil && !t.above_center() ) return _badnil;
     if( TypeOop.OOP.isa(t) ) return _badfld; // Too low, might not have any fields

@@ -84,17 +84,25 @@ public class CallNode extends Node {
     // already unpacked a tuple, and can see the NewNode, unpack it right now.
     if( !_unpacked ) { // Not yet unpacked a tuple
       assert nargs()==1;
-      Node nn = arg(0);
-      Type tn = gvn.type(nn);
+      Node a0 = arg(0);
+      Type tn = gvn.type(a0);
       if( tn instanceof TypeStruct ) {
         TypeStruct tt = (TypeStruct)tn;
         // Either all the edges from a NewNode (for non-constants), or all the
         // constants types from a constant Tuple from a ConNode
-        assert nn instanceof NewNode || tt.is_con();
-        int len = nn instanceof NewNode ? nn._defs._len-1 : tt._ts.length;
-        pop();  gvn.add_work(nn);  // Pop off the NewNode/ConNode tuple
-        for( int i=0; i<len; i++ ) // Push the args; unpacks the tuple
-          add_def( nn instanceof NewNode ? nn.in(i+1) : gvn.con(tt.at(i)) );
+        if( tt.is_con() ) {     // Allocation has constant-folded
+          int len = tt._ts.length;
+          pop();  gvn.add_work(a0);  // Pop off the ConNode tuple
+          for( int i=0; i<len; i++ ) // Push the args; unpacks the tuple
+            add_def( gvn.con(tt.at(i)) );
+        } else {                // Allocation exists, unpack args
+          assert a0 instanceof ProjNode && a0.in(0) instanceof NewNode;
+          Node nn = a0.in(0);
+          int len = nn._defs._len-1;
+          pop();  gvn.add_work(a0);  // Pop off the NewNode/ConNode tuple
+          for( int i=0; i<len; i++ ) // Push the args; unpacks the tuple
+            add_def( nn.in(i+1));
+        }
         _unpacked = true;       // Only do it once
         return this;
       }

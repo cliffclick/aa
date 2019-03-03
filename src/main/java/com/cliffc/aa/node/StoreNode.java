@@ -13,8 +13,8 @@ public class StoreNode extends Node {
   private final String _badfld;
   private final String _badnil;
   private final String _badfin;
-  private StoreNode( Node ctrl, Node st, String fld, int fld_num, Parse bad ) {
-    super(OP_STORE,ctrl,st);
+  private StoreNode( Node ctrl, Node mem, Node adr, Node val, String fld, int fld_num, Parse bad ) {
+    super(OP_STORE,ctrl,mem,adr,val);
     _fld = fld;
     _fld_num = fld_num;
     // Tests can pass a null, but nobody else does
@@ -22,17 +22,22 @@ public class StoreNode extends Node {
     _badnil = bad==null ? null : bad.errMsg("Struct might be nil when writing field '."+fld+"'");
     _badfin = bad==null ? null : bad.errMsg("Cannot re-assign final field '."+fld+"'");
   }
-  public StoreNode( Node ctrl, Node st, String fld , Parse bad ) { this(ctrl,st,fld,-1,bad); }
-  public StoreNode( Node ctrl, Node st, int fld_num, Parse bad ) { this(ctrl,st,null,fld_num,bad); }
+  public StoreNode( Node ctrl, Node mem, Node adr, Node val, String fld , Parse bad ) { this(ctrl,mem,adr,val,fld,-1,bad); }
+  public StoreNode( Node ctrl, Node mem, Node adr, Node val, int fld_num, Parse bad ) { this(ctrl,mem,adr,val,null,fld_num,bad); }
   String xstr() { return "."+(_fld==null ? ""+_fld_num : _fld); } // Self short name
   String  str() { return xstr(); }      // Inline short name
+
+  Node ctl() { return in(0); }
+  Node mem() { return in(1); }
+  Node adr() { return in(2); }
+  Node val() { return in(3); }
   
   @Override public Node ideal(GVNGCM gvn) {
     return null;
   }
 
   @Override public Type value(GVNGCM gvn) {
-    Type t = gvn.type(in(1)).base();
+    Type t = gvn.type(adr()).base();
     if( t.isa(TypeNil.XOOP) ) return TypeMem.MEM.dual(); // Very high address; might fall to any valid value
     if( t.isa(TypeOop.XOOP) ) return TypeMem.MEM.dual(); // Very high address; might fall to any valid value
     if( t instanceof TypeNil ) {
@@ -63,7 +68,7 @@ public class StoreNode extends Node {
   }
 
   @Override public String err(GVNGCM gvn) {
-    Type t = gvn.type(in(1));
+    Type t = gvn.type(adr());
     while( t instanceof TypeName ) t = ((TypeName)t)._t;
     if( t instanceof TypeNil && !t.above_center() ) return _badnil;
     if( TypeOop.OOP.isa(t) ) return _badfld; // Too low, might not have any fields
@@ -77,11 +82,8 @@ public class StoreNode extends Node {
   }
   @Override public Type all_type() { return TypeMem.MEM; }
   @Override public int hashCode() { return super.hashCode()+(_fld==null ? _fld_num : _fld.hashCode()); }
-  @Override public boolean equals(Object o) {
-    if( this==o ) return true;
-    if( !super.equals(o) ) return false;
-    if( !(o instanceof StoreNode) ) return false;
-    StoreNode st = (StoreNode)o;
-    return _fld_num == st._fld_num && (_fld==null ? st._fld==null : _fld.equals(st._fld));
-  }
+  // Stores are never CSE/equal lest we force a partially-execution to become a
+  // total execution (require a store on some path it didn't happen).  Stores
+  // that are common in local SESE regions can be optimized with local peepholes.
+  @Override public boolean equals(Object o) { return this==o; }
 }

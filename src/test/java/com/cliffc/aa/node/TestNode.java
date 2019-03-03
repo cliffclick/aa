@@ -144,7 +144,8 @@ public class TestNode {
     test1monotonic(new    ErrNode(_ins[0],"err",  Type   .CTRL ));
     test1monotonic(new    FunNode(new Type[]{TypeInt.INT64}));
     test1monotonic(new     IfNode(_ins[0],_ins[1]));
-    test1monotonic(new   LoadNode(_ins[0],_ins[1],0,null));
+    test1monotonic(new   LoadNode(_ins[0],_ins[1],_ins[2],0,null));
+    test1monotonic(new MergeMemNode(_ins[0],_ins[1]));
     test1monotonic(new    NewNode(new Node[]{null,_ins[1],_ins[2]},TypeStruct.FLDS(2)));
     test1monotonic(new    NewNode(new Node[]{null,_ins[1],_ins[2]},TypeStruct.FLDS(2),new byte[2]));
     test1monotonic(new   ParmNode( 1, "x",_ins[0],(ConNode)_ins[1],"badgc"));
@@ -153,6 +154,7 @@ public class TestNode {
       test1monotonic_prim(prim);
     test1monotonic(new   ProjNode(_ins[0],1));
     test1monotonic(new RegionNode(null,_ins[1],_ins[2]));
+    test1monotonic(new  StoreNode(_ins[0],_ins[1],_ins[2],_ins[3],0,null));
     //                  ScopeNode has no inputs, and value() call is monotonic
     //                    TmpNode has no inputs, and value() call is monotonic
     test1monotonic(new   TypeNode(TypeInt.FALSE,_ins[1],null));

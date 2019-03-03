@@ -18,20 +18,21 @@ public abstract class Node implements Cloneable {
   static final byte OP_FUN   = 6;
   static final byte OP_IF    = 7;
   static final byte OP_LOAD  = 8;
-  static final byte OP_NEW   = 9;
-  static final byte OP_PARM  =10;
-  static final byte OP_PHI   =11;
-  static final byte OP_PRIM  =12;
-  static final byte OP_PROJ  =13;
-  static final byte OP_REGION=14;
-  static final byte OP_SCOPE =15;
-  static final byte OP_START =16;
-  static final byte OP_STORE =17;
-  static final byte OP_TMP   =18;
-  static final byte OP_TYPE  =19;
-  static final byte OP_UNR   =20;
-  static final byte OP_MAX   =21;
-  private static final String[] STRS = new String[] { null, "Call", "Cast", "Con", "Epi", "Err", "Fun", "If", "Load", "New", "Parm", "Phi", "Prim", "Proj", "Region", "Scope", "Start", "Store", "Tmp", "Type", "Unresolved" };
+  static final byte OP_MERGE = 9;
+  static final byte OP_NEW   =10;
+  static final byte OP_PARM  =11;
+  static final byte OP_PHI   =12;
+  static final byte OP_PRIM  =13;
+  static final byte OP_PROJ  =14;
+  static final byte OP_REGION=15;
+  static final byte OP_SCOPE =16;
+  static final byte OP_START =17;
+  static final byte OP_STORE =18;
+  static final byte OP_TMP   =19;
+  static final byte OP_TYPE  =10;
+  static final byte OP_UNR   =21;
+  static final byte OP_MAX   =22;
+  private static final String[] STRS = new String[] { null, "Call", "Cast", "Con", "Epi", "Err", "Fun", "If", "Load", "Merge", "New", "Parm", "Phi", "Prim", "Proj", "Region", "Scope", "Start", "Store", "Tmp", "Type", "Unresolved" };
 
   public int _uid=Env.GVN.uid(); // Unique ID, will have gaps, used to give a dense numbering to nodes
   final byte _op;
