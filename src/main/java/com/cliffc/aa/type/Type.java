@@ -174,13 +174,14 @@ public class Type<T extends Type<T>> {
   static final byte TTUPLE  =20; // Tuples; finite collections of unrelated Types, kept in parallel
   static final byte TSTRUCT =21; // Structs; tuples with named fields
   static final byte TFUNPTR =22; // Function signature; both domain and range are a Tuple; see TypeFun; many functions share the same signature
-  static final byte TFUN    =23; // Function *pointer*, a "fat" pointer refering to a single block of code
+  static final byte TFUN    =23; // Function, a "fat" pointer refering to a single block of code
   static final byte TRPC    =24; // Return PCs; Continuations; call-site return points; see TypeRPC
   static final byte TFLT    =25; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
   static final byte TINT    =26; // All Integers, including signed/unsigned and various sizes; see TypeInt
   static final byte TSTR    =27; // String type
   static final byte TMEM    =28; // Memory  type
-  static final byte TLAST   =29; // Type check
+  static final byte TMEMPTR =29; // Memory pointer type
+  static final byte TLAST   =30; // Type check
 
   public  static final Type ALL    = make( TALL   ); // Bottom
   public  static final Type ANY    = make( TANY   ); // Top
@@ -216,7 +217,7 @@ public class Type<T extends Type<T>> {
   public Type base() { Type t = this; while( t._type == TNAME ) t = ((TypeName)t)._t; return t; }
   // Strip off any subclassing just for names
   byte simple_type() { return base()._type; }
-  private boolean is_ptr() { byte t = simple_type();  return t == TOOP || t == TSTR || t == TSTRUCT || t == TTUPLE || t == TFUN || t == TFUNPTR; }
+  private boolean is_ptr() { byte t = simple_type();  return t == TOOP || t == TSTR || t == TSTRUCT || t == TTUPLE || t == TFUN || t == TFUNPTR || t == TMEMPTR; }
           boolean is_num() { byte t = simple_type();  return t == TNUM || t == TXNUM || t == TNNUM || t == TXNNUM || t == TREAL || t == TXREAL || t == TNREAL || t == TXNREAL || t == TINT || t == TFLT; }
   // True if 'this' isa SCALAR, without the cost of a full 'meet()'
   final boolean isa_scalar() { return _type != TCTRL && _type != TXCTRL; }
@@ -373,6 +374,7 @@ public class Type<T extends Type<T>> {
     ts = concat(ts,TypeRPC   .TYPES);
     ts = concat(ts,TypeName  .TYPES);
     ts = concat(ts,TypeMem   .TYPES);
+    ts = concat(ts,TypeMemPtr.TYPES);
     // Partial order Sort, makes for easier tests later.  Arrays.sort requires
     // a total order (i.e., the obvious Comparator breaks the sort contract),
     // so we hand-roll a simple bubble sort.

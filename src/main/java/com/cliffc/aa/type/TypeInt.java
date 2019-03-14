@@ -64,15 +64,16 @@ public class TypeInt extends Type<TypeInt> {
     switch( t._type ) {
     case TINT:   break;
     case TFLT:   return xmeetf((TypeFlt)t);
-    case TOOP:
-    case TSTR:
-    case TSTRUCT:
     case TTUPLE:
     case TFUNPTR:
-    case TFUN:
+    case TMEMPTR:
     case TRPC:   return must_nil() ? SCALAR : NSCALR;
     case TNIL:
     case TNAME:  return t.xmeet(this); // Let other side decide
+    case TFUN:
+    case TOOP:
+    case TSTR:
+    case TSTRUCT:
     case TMEM:   return ALL;
     default: throw typerr(t);
     }

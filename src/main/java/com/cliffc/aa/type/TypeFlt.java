@@ -53,15 +53,16 @@ public class TypeFlt extends Type<TypeFlt> {
     switch( t._type ) {
     case TFLT:   break;
     case TINT:   return ((TypeInt)t).xmeetf(this);
-    case TOOP:
-    case TSTR:
-    case TSTRUCT:
     case TTUPLE:
     case TFUNPTR:
-    case TFUN:
+    case TMEMPTR:
     case TRPC:   return must_nil() ? SCALAR : NSCALR;
     case TNIL:
     case TNAME:  return t.xmeet(this); // Let other side decide
+    case TFUN:
+    case TOOP:
+    case TSTR:
+    case TSTRUCT:
     case TMEM:   return ALL;
     default: throw typerr(t);
     }

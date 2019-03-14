@@ -59,16 +59,17 @@ public class TypeFun extends TypeTuple<TypeFun> {
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TFUN: break;
+    case TNAME:
     case TSTR:
     case TFLT:
     case TINT:
+    case TTUPLE: 
     case TFUNPTR:
+    case TMEMPTR:
     case TOOP:
     case TSTRUCT:
-    case TTUPLE: 
-    case TRPC:   return t.must_nil() ? SCALAR : NSCALR;
+    case TRPC:
     case TNIL:
-    case TNAME:  return t.xmeet(this); // Let other side decide
     case TMEM:   return ALL;
     default: throw typerr(t);
     }

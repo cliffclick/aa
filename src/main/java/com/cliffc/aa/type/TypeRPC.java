@@ -42,17 +42,18 @@ public class TypeRPC extends Type<TypeRPC> {
   @Override protected TypeRPC xdual() { return new TypeRPC(_rpcs.dual()); }
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
-    case TOOP:
+    case TRPC:   break;
     case TTUPLE: 
     case TFUNPTR:
-    case TSTRUCT:
-    case TFUN:
+    case TMEMPTR:
     case TFLT:
-    case TINT:
-    case TSTR:   return t.must_nil() ? SCALAR : NSCALR;
-    case TRPC:   break;
+    case TINT:   return t.must_nil() ? SCALAR : NSCALR;
     case TNIL:
     case TNAME:  return t.xmeet(this); // Let other side decide
+    case TOOP:
+    case TSTRUCT:
+    case TFUN:
+    case TSTR:
     case TMEM:   return ALL;
     default: throw typerr(t);   // All else should not happen
     }

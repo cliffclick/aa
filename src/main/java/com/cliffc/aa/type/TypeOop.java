@@ -44,14 +44,15 @@ public class TypeOop<O extends TypeOop<O>> extends Type<O> {
     case TSTRUCT:
     case TSTR:
       break;
-    case TTUPLE:
+    case TNAME:  return t.xmeet(this); // Let other side decide
+    case TNIL:
     case TFLT:
     case TINT:
+    case TTUPLE:
     case TFUNPTR:
+    case TMEMPTR:
     case TFUN:
-    case TRPC:   return t.must_nil() ? SCALAR : NSCALR;
-    case TNIL:
-    case TNAME:  return t.xmeet(this); // Let other side decide
+    case TRPC:
     case TMEM:   return ALL;
     default: throw typerr(t);
     }

@@ -112,13 +112,14 @@ public class TypeTuple<P extends TypeTuple<P>> extends Type<P> {
     case TFLT:
     case TINT:
     case TFUNPTR:
-    case TFUN:
-    case TSTR:
+    case TMEMPTR:
     case TRPC:   return t.must_nil() ? SCALAR : NSCALR;
-    case TOOP:
-    case TSTRUCT:
     case TNIL:
     case TNAME:  return t.xmeet(this); // Let other side decide
+    case TFUN:
+    case TSTR:
+    case TOOP:
+    case TSTRUCT:
     case TMEM:   return ALL;
     default: throw typerr(t);
     }

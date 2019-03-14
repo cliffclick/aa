@@ -259,23 +259,17 @@ public class TypeStruct extends TypeOop<TypeStruct> {
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TSTRUCT:break;
+    case TOOP:
     case TSTR:   return OOP;
-    case TTUPLE :
+    case TNAME:  return t.xmeet(this); // Let other side decide
+    case TNIL:
     case TFLT:
     case TINT:
+    case TTUPLE :
     case TFUNPTR:
+    case TMEMPTR:
+    case TRPC:
     case TFUN:
-    case TRPC:   return t.must_nil() ? SCALAR : NSCALR;
-      
-    case TNIL:
-      // Cannot swap args and go again, because it screws up the cyclic_meet.
-      // This means we handle struct-meet-nil right here.
-      if( t == TypeNil.NIL ) return meet_nil();
-      Type smt = meet(((TypeNil)t)._t);
-      return t.above_center() ? smt : TypeNil.make(smt);
-      
-    case TOOP:
-    case TNAME:  return t.xmeet(this); // Let other side decide
     case TMEM:   return ALL;
     default: throw typerr(t);   // All else should not happen
     }

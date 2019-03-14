@@ -6,7 +6,11 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 // Nil types are just a nil, but along a particular type domain.  Used so the
-// parser can just parse a '0' as the same nil for all other types.
+// parser can just parse a '0' as the same nil for all other types.  Nil values
+// are represented as all-zero-bits, and are limited to Scalar types like
+// pointers (both to functions and memory) and numbers, and specifically
+// excludes *memory* things like TypeStruct.  TypePtr-to-TypeMem-of-TypeStruct
+// is fine, but not the memory itself.
 public class TypeNil extends Type<TypeNil> {
   public  Type _t;
   private TypeNil  ( Type t ) { super(TNIL); init(t); }
@@ -37,7 +41,15 @@ public class TypeNil extends Type<TypeNil> {
     return ret;
   }
   private static TypeNil make0( Type t ) {
-    assert !(t instanceof TypeNil) && !(t instanceof TypeTuple);
+    assert
+      t._type != TNIL   &&
+      t._type != TTUPLE &&
+      t._type != TOOP   &&
+      t._type != TSTR   &&
+      t._type != TSTRUCT&&
+      t._type != TINT   &&
+      t._type != TFLT   ;
+      
     TypeNil t1 = FREE;
     if( t1 == null ) t1 = new TypeNil(t);
     else { FREE = null; t1.init(t); }
@@ -54,11 +66,11 @@ public class TypeNil extends Type<TypeNil> {
   // This is the Parser's canonical NIL, suitable for initializing all data
   // types.  It is not in the lattice, and is not returned from any meet
   // (except when meet'ing itself).
-  public  static final TypeNil NIL  = make0(null);
-  public  static final TypeNil OOP  = make0(TypeOop.OOP);
-  public  static final TypeNil XOOP = make0(TypeOop.XOOP);
-          static final TypeNil STR  = make0(TypeStr.STR);
-  public  static final TypeNil ABC  = make0(TypeStr.ABC);
+  public  static final TypeNil NIL = make0(null);
+  public  static final TypeNil OOP = make0(TypeMemPtr.MEMPTR);
+  //public  static final TypeNil XOOP = make0(TypeOop.XOOP);
+          static final TypeNil STR = make0(TypeMemPtr.STRPTR);
+  public  static final TypeNil ABC = make0(TypeMemPtr.ABCPTR);
 
   static final TypeNil[] TYPES = new TypeNil[]{OOP,STR,ABC};
   

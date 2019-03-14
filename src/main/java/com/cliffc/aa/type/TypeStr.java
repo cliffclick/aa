@@ -42,8 +42,10 @@ public class TypeStr extends TypeOop<TypeStr> {
   public static void init() {} // Used to force class init
 
   public  static final TypeStr  STR = make(false,null); // not null
+  public  static final int STR_alias = TypeMem.new_alias();
   public  static final TypeStr XSTR = make(true ,null); // choice string
   public  static final TypeStr  ABC = con("abc"); // a string constant
+  public  static final int ABC_alias = TypeMem.new_alias();
   private static final TypeStr  DEF = con("def"); // a string constant
   static final TypeStr[] TYPES = new TypeStr[]{STR,XSTR,ABC,DEF};
   static void init1( HashMap<String,Type> types ) { types.put("str",STR); }
@@ -53,17 +55,18 @@ public class TypeStr extends TypeOop<TypeStr> {
   @Override protected TypeStr xdual() { return new TypeStr(!_any,_con); }
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
-    case TSTR:   break;
+    case TSTR:     break;
+    case TOOP:
     case TSTRUCT:  return OOP;
+    case TNAME:  return t.xmeet(this); // Let other side decide
+    case TNIL:
     case TTUPLE: 
     case TFUNPTR:
+    case TMEMPTR:
     case TFLT:
     case TINT:
     case TFUN:
-    case TRPC:   return t.must_nil() ? SCALAR : NSCALR;
-    case TOOP:
-    case TNIL:
-    case TNAME:  return t.xmeet(this); // Let other side decide
+    case TRPC:
     case TMEM:   return ALL;
     default: throw typerr(t);
     }

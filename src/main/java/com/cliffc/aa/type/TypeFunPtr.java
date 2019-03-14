@@ -8,6 +8,9 @@ import java.util.BitSet;
 import java.util.function.Consumer;
 
 // Function constants and signatures.  Contrast this to 'TypeFun'.
+// A single instance can include all possible aliased function pointers.
+// Function pointers can be executed, are not GC'd, and cannot be
+// Loaded or Stored through (although they can be loaded & stored).
 public final class TypeFunPtr extends Type<TypeFunPtr> {
   public TypeTuple _ts;         // Arg types
   public Type _ret;             // return types
@@ -67,16 +70,17 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TFUNPTR:break;
-    case TOOP:
-    case TSTRUCT:
     case TTUPLE:
     case TFLT:
     case TINT:
-    case TSTR:
-    case TFUN:
+    case TMEMPTR:
     case TRPC:   return t.must_nil() ? SCALAR : NSCALR;
     case TNIL:
     case TNAME:  return t.xmeet(this); // Let other side decide
+    case TFUN:
+    case TSTR:
+    case TOOP:
+    case TSTRUCT:
     case TMEM:   return ALL;
     default: throw typerr(t);   // All else should not happen
     }

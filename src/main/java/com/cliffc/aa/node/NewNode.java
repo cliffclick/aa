@@ -11,7 +11,6 @@ public class NewNode extends Node {
   // Unique dense alias number, one number per unique memory allocation site.
   // Note that the _uid could serve the same purpose, except its not very dense
   // (ratio of NewNodes to all nodes).  
-  static private int ALIAS;      // Unique dense alias number
   private final String[] _names; // Field names
   private final byte[] _finals;  // Final fields
   private int _alias;            // Alias number
@@ -23,7 +22,7 @@ public class NewNode extends Node {
     assert finals.length==flds.length-1;
     _names = names;
     _finals= finals;
-    _alias = ALIAS++;
+    _alias = TypeMem.new_alias();
   }
   private static byte[] bs(int len) { byte[] bs = new byte[len]; Arrays.fill(bs,(byte)1); return bs; }
   String xstr() { return "New#"; } // Self short name
@@ -42,8 +41,11 @@ public class NewNode extends Node {
     // Get the existing type, without installing if missing because blows the
     // "new newnode" assert if this node gets replaced during parsing.
     Type oldnnn = gvn.self_type(this);
-    Type oldt = oldnnn instanceof TypeTuple ? ((TypeTuple)oldnnn).at(1) : newt;
-    return TypeTuple.make(TypeMem.MEM,approx(newt,oldt));
+    Type oldt= oldnnn instanceof TypeTuple ? ((TypeTuple)oldnnn).at(1) : newt;
+    Type apxt= approx(newt,oldt); // Approximate infinite types
+    Type ptr = TypeMemPtr.make(_alias);
+    Type mem = TypeMem.make(_alias,apxt);
+    return TypeTuple.make(mem,ptr);
   }
   
   // NewNodes can participate in cycles, where the same structure is appended
@@ -69,7 +71,7 @@ public class NewNode extends Node {
   // Clones during inlining all become unique new sites
   @Override NewNode copy() {
     NewNode nnn = super.copy();
-    nnn._alias = ALIAS++;
+    nnn._alias = TypeMem.new_alias();
     return nnn;
   }
   
