@@ -54,8 +54,8 @@ public class TypeStr extends TypeOop<TypeStr> {
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TSTR:   break;
-    case TSTRUCT:
-    case TTUPLE: return OOP;
+    case TSTRUCT:  return OOP;
+    case TTUPLE: 
     case TFUNPTR:
     case TFLT:
     case TINT:

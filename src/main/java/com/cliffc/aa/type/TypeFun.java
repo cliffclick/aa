@@ -88,9 +88,4 @@ public class TypeFun extends TypeTuple<TypeFun> {
   public TypeFunPtr fun() { return (TypeFunPtr)_ts[3]; }
   @Override boolean must_nil() { return false; }
   @Override Type not_nil(Type ignore) { return this; }
-  // Return an error message, if any exists
-  @Override public String errMsg() {
-    // Ok to have a function which cannot be executed
-    return null;
-  }
 }

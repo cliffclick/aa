@@ -4,7 +4,7 @@ import com.cliffc.aa.AA;
 
 import java.util.BitSet;
 
-// All Generic Nullable Oops, including Strings, Structs, Tuples, Arrays.
+// All Generic Nullable Oops, including Strings, Structs, Arrays.
 // Excludes nil; to add a nil wrap with TypeNil.
 public class TypeOop<O extends TypeOop<O>> extends Type<O> {
   boolean _any;                 // True=choice/join; False=all/meet
@@ -42,9 +42,9 @@ public class TypeOop<O extends TypeOop<O>> extends Type<O> {
     switch( t._type ) {
     case TOOP:
     case TSTRUCT:
-    case TTUPLE:
     case TSTR:
       break;
+    case TTUPLE:
     case TFLT:
     case TINT:
     case TFUNPTR:

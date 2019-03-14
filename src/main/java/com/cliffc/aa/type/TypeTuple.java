@@ -7,16 +7,19 @@ import java.util.BitSet;
 import java.util.HashMap;
 import java.util.function.Consumer;
 
-/** Internal fixed-length non-recursive tuples.  Used for function arguments,
- *  and multi-arg results like IfNode and CallNode. */
-public class TypeTuple<P extends TypeTuple<P>> extends TypeOop<P> {
-  public Type[] _ts;     // The fixed known types
-  private int _hash;     // Hash pre-computed to avoid large computes duing interning
-  protected TypeTuple( byte type, boolean any, Type[] ts ) { super(type,any); init(type, any, ts);  }
+// Internal fixed-length non-recursive tuples.  Used for function arguments,
+// and multi-arg results like IfNode and CallNode.  This is not the same as a
+// no-named-field TypeStruct, and is not exposed at the language level.
+public class TypeTuple<P extends TypeTuple<P>> extends Type<P> {
+  boolean _any;      // True=choice/join; False=all/meet
+  public Type[] _ts; // The fixed known types
+  private int _hash; // Hash pre-computed to avoid large computes duing interning
+  protected TypeTuple( byte type, boolean any, Type[] ts ) { super(type); init(type, any, ts);  }
   protected void init( byte type, boolean any, Type[] ts ) {
-    super.init(type,any);
+    super.init(type);
+    _any = any;
     _ts = ts;
-    int sum=super.hashCode();
+    int sum=super.hashCode()+(_any?1:0);
     for( Type t : ts ) sum += t.hashCode();
     _hash=sum;
   }
@@ -110,8 +113,8 @@ public class TypeTuple<P extends TypeTuple<P>> extends TypeOop<P> {
     case TINT:
     case TFUNPTR:
     case TFUN:
+    case TSTR:
     case TRPC:   return t.must_nil() ? SCALAR : NSCALR;
-    case TSTR:   return OOP;
     case TOOP:
     case TSTRUCT:
     case TNIL:
@@ -139,6 +142,7 @@ public class TypeTuple<P extends TypeTuple<P>> extends TypeOop<P> {
 
   public Type at( int idx ) { return _ts[idx]; } // Must be in-size
 
+  @Override public boolean above_center() { return _any; }
   // True if all internals may_be_con
   @Override public boolean may_be_con() {
     for( Type _t : _ts ) if( !_t.may_be_con() ) return false;
@@ -149,6 +153,9 @@ public class TypeTuple<P extends TypeTuple<P>> extends TypeOop<P> {
     for( Type _t : _ts ) if( !_t.is_con() ) return false;
     return true;
   }
+  @Override boolean must_nil() { return false; }
+  @Override Type not_nil(Type ignore) { return this; }
+  @Override public Type meet_nil() { return TypeNil.make(this); }
 
   // Return true if this is a function pointer (return type from EpilogNode)
   // 0 - Control for the function
@@ -181,37 +188,4 @@ public class TypeTuple<P extends TypeTuple<P>> extends TypeOop<P> {
     throw AA.unimpl();
   }
   
-  // Make a (possibly cyclic & infinite) named type.  Prevent the infinite
-  // unrolling of names by not allowing a named-type with depth >= D from
-  // holding (recursively) the head of a named-type cycle.  We need to cap the
-  // unroll, to prevent loops/recursion from infinitely unrolling.
-  @Override TypeTuple<P> make_recur(TypeName tn, int d, BitSet bs ) {
-    throw AA.unimpl();
-  }
-
-  // Iterate over any nested child types
-  @Override public void iter( Consumer<Type> c ) { for( Type t : _ts) c.accept(t); }
-  @Override boolean contains( Type t, BitSet bs ) {
-    if( bs==null ) bs=new BitSet();
-    for( Type t2 : _ts) if( t2==t || t2.contains(t,bs) ) return true;
-    return false;
-  }
-  @Override int depth( BitSet bs ) {
-    if( bs==null ) bs=new BitSet();
-    int max=0;
-    for( Type t : _ts) max = Math.max(max,t.depth(bs));
-    return max+1;
-  }
-  @Override Type replace( Type old, Type nnn, HashMap<Type,Type> HASHCONS ) {
-    throw AA.unimpl();
-  }
-  
-  // Return an error message, if any exists
-  @Override public String errMsg() {
-    String s;
-    for( Type t : _ts )
-      if( (s=t.errMsg()) != null )
-        return s;
-    return null;
-  }
 }

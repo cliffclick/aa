@@ -64,8 +64,9 @@ import com.cliffc.aa.type.*;
 //
 // - An assert that walks the entire graph, and ensures no duplicate memory
 //   aliases in any program slice.
-// - A TypePtr that supports a tree-shape of memory aliases; maybe can be
-//   variations of plain Types (or only Names or Structs).
+//-  NewNode tracks unique memory aliases, same as CallNode for RPCs.
+// - A TypePtr has a Bits of memory aliases
+// - A TypeMem has a mapping from every alias to a Type
 // - NewNode produces a TypeMem with 1 alias to a e.g. Struct and a TypePtr.
 // - StartNode produces a empty TypeMem.
 // - TypeMem supports merging TypeMems with unrelated aliases.  Error to merge

@@ -66,7 +66,7 @@ public class CallNode extends Node {
   public void set_fun_reg(Node fun, GVNGCM gvn) { gvn.set_def_reg(this,2,fun); }
   
   // Clones during inlining all become unique new call sites
-  @Override Node copy() {
+  @Override CallNode copy() {
     CallNode call = super.copy();
     call._rpc = RPC++;
     return call;

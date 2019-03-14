@@ -179,7 +179,7 @@ public class Type<T extends Type<T>> {
   static final byte TFLT    =25; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
   static final byte TINT    =26; // All Integers, including signed/unsigned and various sizes; see TypeInt
   static final byte TSTR    =27; // String type
-  static final byte TMEM    =28; // String type
+  static final byte TMEM    =28; // Memory  type
   static final byte TLAST   =29; // Type check
 
   public  static final Type ALL    = make( TALL   ); // Bottom
@@ -538,8 +538,6 @@ public class Type<T extends Type<T>> {
   public Type widen() { return this; } // Overridden in subclasses
   // Operator precedence
   public byte op_prec() { return -1; } // Overridden in subclasses
-  // Contains an error type string, perhaps embedded in some subtype
-  public String errMsg() { return null; }
 
   // True if type must include a nil (as opposed to may-nil, which means the
   // type can choose something other than nil).

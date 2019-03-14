@@ -259,8 +259,8 @@ public class TypeStruct extends TypeOop<TypeStruct> {
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TSTRUCT:break;
-    case TTUPLE :
     case TSTR:   return OOP;
+    case TTUPLE :
     case TFLT:
     case TINT:
     case TFUNPTR:
