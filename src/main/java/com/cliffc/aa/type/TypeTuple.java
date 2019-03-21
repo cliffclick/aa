@@ -10,16 +10,14 @@ import java.util.function.Consumer;
 // Internal fixed-length non-recursive tuples.  Used for function arguments,
 // and multi-arg results like IfNode and CallNode.  This is not the same as a
 // no-named-field TypeStruct, and is not exposed at the language level.
-public class TypeTuple<P extends TypeTuple<P>> extends Type<P> {
-  boolean _any;      // True=choice/join; False=all/meet
+public class TypeTuple<O extends TypeTuple<O>> extends TypeAnyAll<O> {
   public Type[] _ts; // The fixed known types
   private int _hash; // Hash pre-computed to avoid large computes duing interning
-  protected TypeTuple( byte type, boolean any, Type[] ts ) { super(type); init(type, any, ts);  }
+  protected TypeTuple( byte type, boolean any, Type[] ts ) { super(type,any); init(type, any, ts);  }
   protected void init( byte type, boolean any, Type[] ts ) {
-    super.init(type);
-    _any = any;
+    super.init(type,any);
     _ts = ts;
-    int sum=super.hashCode()+(_any?1:0);
+    int sum=super.hashCode();
     for( Type t : ts ) sum += t.hashCode();
     _hash=sum;
   }
@@ -61,7 +59,7 @@ public class TypeTuple<P extends TypeTuple<P>> extends Type<P> {
   }
 
   private static TypeTuple FREE=null;
-  @Override protected P free( P ret ) { FREE=this; return ret; }
+  @Override protected O free( O ret ) { FREE=this; return ret; }
   static TypeTuple make0( boolean any, Type... ts ) {
     TypeTuple t1 = FREE;
     if( t1 == null ) t1 = new TypeTuple(TTUPLE, any, ts);
@@ -100,10 +98,10 @@ public class TypeTuple<P extends TypeTuple<P>> extends Type<P> {
   
   // The length of Tuples is a constant, and so is its own dual.  Otherwise
   // just dual each element.  Also flip the infinitely extended tail type.
-  @Override protected P xdual() {
+  @Override protected O xdual() {
     Type[] ts = new Type[_ts.length];
     for( int i=0; i<_ts.length; i++ ) ts[i] = _ts[i].dual();
-    return (P)new TypeTuple(TTUPLE, !_any, ts);
+    return (O)new TypeTuple(TTUPLE, !_any, ts);
   }
   // Standard Meet.
   @Override protected Type xmeet( Type t ) {
@@ -118,7 +116,6 @@ public class TypeTuple<P extends TypeTuple<P>> extends Type<P> {
     case TNAME:  return t.xmeet(this); // Let other side decide
     case TFUN:
     case TSTR:
-    case TOOP:
     case TSTRUCT:
     case TMEM:   return ALL;
     default: throw typerr(t);

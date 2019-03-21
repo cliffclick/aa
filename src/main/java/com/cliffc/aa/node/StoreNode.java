@@ -39,23 +39,24 @@ public class StoreNode extends Node {
   @Override public Type value(GVNGCM gvn) {
     Type t = gvn.type(adr()).base();
     if( t.isa(TypeNil.XOOP) ) return TypeMem.MEM.dual(); // Very high address; might fall to any valid value
-    if( t.isa(TypeOop.XOOP) ) return TypeMem.MEM.dual(); // Very high address; might fall to any valid value
-    if( t instanceof TypeNil ) {
-      if( !t.above_center() )     // NIL or below?
-        return TypeMem.MEM;       // Fails - might be nil at runtime
-      t = ((TypeNil)t)._t.base(); // Assume guarded by test
-    }
-
-    if( t instanceof TypeStruct ) {
-      TypeStruct ts = (TypeStruct)t;
-      int idx = find(ts);       // Find the named field
-      if( idx != -1 ) {
-        // return ts.at(idx); // Field type
-        return TypeMem.MEM;
-      }
-    }
-
-    return TypeMem.MEM;
+    throw AA.unimpl();
+    //if( t.isa(TypeOop.XOOP) ) return TypeMem.MEM.dual(); // Very high address; might fall to any valid value
+    //if( t instanceof TypeNil ) {
+    //  if( !t.above_center() )     // NIL or below?
+    //    return TypeMem.MEM;       // Fails - might be nil at runtime
+    //  t = ((TypeNil)t)._t.base(); // Assume guarded by test
+    //}
+    //
+    //if( t instanceof TypeStruct ) {
+    //  TypeStruct ts = (TypeStruct)t;
+    //  int idx = find(ts);       // Find the named field
+    //  if( idx != -1 ) {
+    //    // return ts.at(idx); // Field type
+    //    return TypeMem.MEM;
+    //  }
+    //}
+    //
+    //return TypeMem.MEM;
   }
 
   private int find(TypeStruct ts) {
@@ -71,14 +72,15 @@ public class StoreNode extends Node {
     Type t = gvn.type(adr());
     while( t instanceof TypeName ) t = ((TypeName)t)._t;
     if( t instanceof TypeNil && !t.above_center() ) return _badnil;
-    if( TypeOop.OOP.isa(t) ) return _badfld; // Too low, might not have any fields
-    if( !(t instanceof TypeStruct) ) return _badfld;
-    TypeStruct ts = (TypeStruct)t;
-    int fnum = find(ts);
-    if( fnum == -1 )
-      return _badfld;
-    if( ts._finals[fnum] == 1 ) return _badfin; // Trying to over-write a final
-    return null;
+    throw AA.unimpl();
+    //if( TypeOop.OOP.isa(t) ) return _badfld; // Too low, might not have any fields
+    //if( !(t instanceof TypeStruct) ) return _badfld;
+    //TypeStruct ts = (TypeStruct)t;
+    //int fnum = find(ts);
+    //if( fnum == -1 )
+    //  return _badfld;
+    //if( ts._finals[fnum] == 1 ) return _badfin; // Trying to over-write a final
+    //return null;
   }
   @Override public Type all_type() { return TypeMem.MEM; }
   @Override public int hashCode() { return super.hashCode()+(_fld==null ? _fld_num : _fld.hashCode()); }

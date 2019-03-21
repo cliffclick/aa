@@ -170,18 +170,17 @@ public class Type<T extends Type<T>> {
   // Implemented in subclasses
   static final byte TNIL    =17; // Nil-types
   static final byte TNAME   =18; // Named types; always a subtype of some other type
-  static final byte TOOP    =19; // Includes all GC ptrs & null; structs, strings.  Excludes functions, ints, floats
-  static final byte TTUPLE  =20; // Tuples; finite collections of unrelated Types, kept in parallel
-  static final byte TSTRUCT =21; // Structs; tuples with named fields
-  static final byte TFUNPTR =22; // Function signature; both domain and range are a Tuple; see TypeFun; many functions share the same signature
-  static final byte TFUN    =23; // Function, a "fat" pointer refering to a single block of code
-  static final byte TRPC    =24; // Return PCs; Continuations; call-site return points; see TypeRPC
-  static final byte TFLT    =25; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
-  static final byte TINT    =26; // All Integers, including signed/unsigned and various sizes; see TypeInt
-  static final byte TSTR    =27; // String type
-  static final byte TMEM    =28; // Memory  type
-  static final byte TMEMPTR =29; // Memory pointer type
-  static final byte TLAST   =30; // Type check
+  static final byte TTUPLE  =19; // Tuples; finite collections of unrelated Types, kept in parallel
+  static final byte TSTRUCT =20; // Structs; tuples with named fields
+  static final byte TFUNPTR =21; // Function signature; both domain and range are a Tuple; see TypeFun; many functions share the same signature
+  static final byte TFUN    =22; // Function, a "fat" pointer refering to a single block of code
+  static final byte TRPC    =23; // Return PCs; Continuations; call-site return points; see TypeRPC
+  static final byte TFLT    =24; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
+  static final byte TINT    =25; // All Integers, including signed/unsigned and various sizes; see TypeInt
+  static final byte TSTR    =26; // String type
+  static final byte TMEM    =27; // Memory  type
+  static final byte TMEMPTR =28; // Memory pointer type
+  static final byte TLAST   =29; // Type check
 
   public  static final Type ALL    = make( TALL   ); // Bottom
   public  static final Type ANY    = make( TANY   ); // Top
@@ -217,10 +216,11 @@ public class Type<T extends Type<T>> {
   public Type base() { Type t = this; while( t._type == TNAME ) t = ((TypeName)t)._t; return t; }
   // Strip off any subclassing just for names
   byte simple_type() { return base()._type; }
-  private boolean is_ptr() { byte t = simple_type();  return t == TOOP || t == TSTR || t == TSTRUCT || t == TTUPLE || t == TFUN || t == TFUNPTR || t == TMEMPTR; }
+  private boolean is_ptr() { byte t = simple_type();  return t == TFUNPTR || t == TMEMPTR; }
           boolean is_num() { byte t = simple_type();  return t == TNUM || t == TXNUM || t == TNNUM || t == TXNNUM || t == TREAL || t == TXREAL || t == TNREAL || t == TXNREAL || t == TINT || t == TFLT; }
   // True if 'this' isa SCALAR, without the cost of a full 'meet()'
-  final boolean isa_scalar() { return _type != TCTRL && _type != TXCTRL; }
+  private static final byte[] ISA_SCALAR = new byte[]{0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,1,0,0,0,1,0,1,1,1,0,0,1};
+  final boolean isa_scalar() { assert ISA_SCALAR.length==TLAST; return ISA_SCALAR[_type]!=0; }
   
   // Return cached dual
   public final T dual() { return _dual; }
@@ -266,6 +266,9 @@ public class Type<T extends Type<T>> {
     if(  type <= TXCTRL ) return _type==TXCTRL && t._type==TXCTRL ? XCTRL : CTRL;
     if( _type <= TXCTRL || t._type <= TXCTRL ) return ALL;
 
+    // Meeting scalar and non-scalar falls to ALL.  Includes most Memory shapes.
+    if( isa_scalar() ^ t.isa_scalar() ) return ALL;
+    
     // Memory does something complex with memory
     if( t._type==TMEM ) return t.xmeet(this);
     
@@ -364,7 +367,6 @@ public class Type<T extends Type<T>> {
     Type[] ts =    Type      .TYPES ;
     ts = concat(ts,TypeInt   .TYPES);
     ts = concat(ts,TypeFlt   .TYPES);
-    ts = concat(ts,TypeOop   .TYPES);
     ts = concat(ts,TypeNil   .TYPES);
     ts = concat(ts,TypeStr   .TYPES);
     ts = concat(ts,TypeTuple .TYPES);
@@ -431,7 +433,7 @@ public class Type<T extends Type<T>> {
     assert errs==0 : "Found "+errs+" non-join-type errors";
 
     // Check scalar primitives; all are SCALARS and none sub-type each other.
-    SCALAR_PRIMS = new Type[] { TypeInt.INT64, TypeFlt.FLT64, TypeOop.OOP, TypeFunPtr.GENERIC_FUNPTR, TypeRPC.ALL_CALL };
+    SCALAR_PRIMS = new Type[] { TypeInt.INT64, TypeFlt.FLT64, TypeMemPtr.MEMPTR, TypeFunPtr.GENERIC_FUNPTR, TypeRPC.ALL_CALL };
     for( Type t : SCALAR_PRIMS ) assert t.isa(SCALAR);
     for( int i=0; i<SCALAR_PRIMS.length; i++ ) 
       for( int j=i+1; j<SCALAR_PRIMS.length; j++ )
@@ -620,6 +622,12 @@ public class Type<T extends Type<T>> {
   void walk( Predicate<Type> p ) { assert is_simple(); p.test(this); }
 
   TypeStruct repeats_in_cycles(TypeStruct head, BitSet bs) { return null; }
+  
+  // Get a unique new alias#, used to group chunks of memory together - 
+  // such that Loads and Stores approximate in the same alias chunk.
+  // Placed here to avoid a cyclic class dependency with TypeMem.
+  private static int ALIAS=1;   // Unique alias number, skipping 0
+  public static int new_alias() { return ALIAS++; }
   
   RuntimeException typerr(Type t) {
     throw new RuntimeException("Should not reach here: internal type system error with "+this+(t==null?"":(" and "+t)));

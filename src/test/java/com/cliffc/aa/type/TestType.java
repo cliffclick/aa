@@ -13,6 +13,15 @@ public class TestType {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testType() {
     Type.init0(new HashMap<>());
+    Type t0 = Type.XNSCALR; // ~nScalar ; high any scalar not nil
+    Type t1 = TypeNil.STR;  // Low String-ptr-and-nil.
+    Type t2 = t0.meet(t1);
+    assertEquals(t2,TypeNil.STR);
+    Type t02 = t2._dual.meet(t0._dual);// ptr-to-choice-str-or-nil meet scalar-not-nil
+    assertEquals(t02,t0._dual);
+    Type t12 = t2._dual.meet(t1._dual);
+    assertEquals(t12,t1._dual);
+    
   }
   
   @Test public void testNamesInts() {
@@ -58,20 +67,64 @@ public class TestType {
     assertEquals(xni8,xi8.meet(xni8));
     assertEquals(TypeInt.BOOL, o .meet(xni8));
   }
+
+  // Memory is on a different line than pointers.
+  // Memory canNOT be nil, but ptrs can be nil.
+  // Memory contents can be any/all, vs ptrs being any/all.
+  // A any-ptr-alias#6 means *any* of the alias#6 choices; same for all.
+  // all ->  mem  -> { str,tup} -> { string constants, tuple constants} -> {~str,~tup} -> ~mem    -> any
+  // all -> *mem? -> {*mem,nil} -> {*str,*tup,nil} -> {~*str,~*tup,nil} -> {~*mem,nil} -> ~*mem+? -> any
   
-  // oop? -> {str?,tup?} -> { null, string constants, tuple constants } -> {~str+?,~tup+?} -> ~oop+?
-  // Notice multiple NILs; can be many for each type.
   @Test public void testOOPsNulls() {
     Type.init0(new HashMap<>());
-    Type bot  = Type     .ALL;
-    Type oop0 = TypeNil  .OOP;  // OOP? (OOP and null)
-    Type str0 = TypeNil  .STR;  // str? (str AND null)
-    Type str  = TypeStr  .STR;  // str no null
-    Type tup  = TypeStruct.make(); // tup no null ; infinite repeat of SCALAR fields
-    Type tup0 = TypeNil.make(tup); // tup? (tup AND null); infinite repeat of SCALAR fields
+    Type bot = Type      .ALL;
+
+    Type mem = TypeMEM   .MEM;  // All memory
+    Type str = TypeStr   .STR;  // All Strings
+    Type tup = TypeStruct.ALLSTRUCT; // All Structs
+    
+    Type abc = TypeStr  .ABC;   // String constant
+    Type zer = TypeInt  .FALSE;
+    Type tp0 = TypeStruct.make(zer);  // tuple of a '0'
+    
+    Type tupX= tup.dual();
+    Type strX= str.dual();
+    Type memX= mem.dual();
+
+    Type top = Type.ANY;
+
+    assertTrue( top.isa(memX));
+
+    assertTrue(memX.isa(strX));
+    assertTrue(memX.isa(tupX));
+
+    assertTrue( strX.isa(abc));
+    assertTrue( tupX.isa(tp0));
+    assertTrue(!strX.isa(zer));
+    assertTrue(!tupX.isa(zer));
+
+    assertTrue( abc .isa(str));
+    assertTrue( tup0.isa(tup));
+    assertTrue(!zer .isa(str));
+    assertTrue(!zer .isa(tup));
+
+    assertTrue( str .isa(oop));
+    assertTrue( tup .isa(oop));
+    
+    assertTrue( oop .isa(bot));
+
+    // ---
+    Type pmem0= TypeNil   .OOP;    // *[ALL]?
+    Type pmem = TypeMemPtr.MEMPTR; // *[ALL]
+
+
+    
+    
+    Type str0 = TypeNil  .STR;  // *[str]? (str AND null)
+
+    Type tup  = TypeStruct.EMPTY_alias; // tup no null ; infinite repeat of SCALAR fields
+    Type tup0 = TypeNil.make(TypeStruct.EMPTY_alias); 
     Type i0   = TypeInt.FALSE;
-    Type abc  = TypeStr  .ABC;
-    Type fld  = TypeStruct.make(TypeInt.INT64);  // 1 field of int64
     
     Type tupx = tup .dual();      // ~tup   (choice tup, no NULL)
     Type tup_ = tup0.dual();      // ~tup+? (choice tup  OR NULL)
@@ -126,14 +179,15 @@ public class TestType {
     Type tss = ts0.meet(t0);
     assertEquals(t0,tss);      // t0.isa(ts0)
 
-    // meet @{c:0}? and @{c:@{x:1}?,}
-    Type    nc0 = TypeNil.make(TypeStruct.make(new String[]{"c"},TypeNil.NIL )); // @{c:nil}?
-    Type    nx1 = TypeNil.make(TypeStruct.make(new String[]{"x"},TypeInt.TRUE)); // @{x:1}?
-    TypeOop cx  = TypeStruct.make(new String[]{"c"},nx1); // @{c:@{x:1}?}
-    // JOIN tosses the top-level null choice, and the inside struct choice
-    Type cj  = nc0.join(cx);
-    Type c0  = TypeStruct.make(new String[]{"c"},TypeNil.NIL); // @{c:0}
-    assertEquals(c0,cj);
+    //// meet @{c:0}? and @{c:@{x:1}?,}
+    //Type    nc0 = TypeNil.make(TypeStruct.make(new String[]{"c"},TypeNil.NIL )); // @{c:nil}?
+    //Type    nx1 = TypeNil.make(TypeStruct.make(new String[]{"x"},TypeInt.TRUE)); // @{x:1}?
+    //TypeOop cx  = TypeStruct.make(new String[]{"c"},nx1); // @{c:@{x:1}?}
+    //// JOIN tosses the top-level null choice, and the inside struct choice
+    //Type cj  = nc0.join(cx);
+    //Type c0  = TypeStruct.make(new String[]{"c"},TypeNil.NIL); // @{c:0}
+    //assertEquals(c0,cj);
+    throw com.cliffc.aa.AA.unimpl();
   }
 
   @Ignore @Test public void testUnion() {
@@ -248,7 +302,6 @@ public class TestType {
     }
     int d = phi.depth()-9999; // added +9999 for cycle
     assertTrue(0 <= d && d <10);
-
   }
 
 

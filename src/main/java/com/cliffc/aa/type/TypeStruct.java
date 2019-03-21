@@ -30,7 +30,7 @@ import java.util.function.Predicate;
  *  element... but when both types have looped, we can stop and the discovered
  *  cycle is the Meet's cycle.
  */
-public class TypeStruct extends TypeOop<TypeStruct> {
+public class TypeStruct extends TypeAnyAll<TypeStruct> {
   // Fields are named in-order and aligned with the Tuple values.  Field names
   // are never null, and never zero-length.  If the 1st char is a '^' the field
   // is Top; a '.' is Bot; all other values are valid field names.
@@ -181,6 +181,8 @@ public class TypeStruct extends TypeOop<TypeStruct> {
   private static final TypeStruct C0    = make(flds("c"),ts(TypeNil.SCALAR)); // @{c:0}
   private static final TypeStruct D1    = make(flds("d"),ts(TypeInt.TRUE  )); // @{d:1}
   private static final TypeStruct ARW   = make(flds("a"),ts(TypeFlt.FLT64),new byte[1]);
+  public  static final TypeStruct ALLSTRUCT = make();
+  public  static final int ALLSTRUCT_alias = TypeMem.new_alias();
   public  static final TypeStruct GENERIC = malloc(true,FLD0,new Type[0],new byte[0]).hashcons_free();
 
   // Recursive meet in progress
@@ -259,12 +261,11 @@ public class TypeStruct extends TypeOop<TypeStruct> {
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TSTRUCT:break;
-    case TOOP:
-    case TSTR:   return OOP;
     case TNAME:  return t.xmeet(this); // Let other side decide
-    case TNIL:
     case TFLT:
     case TINT:
+    case TNIL:
+    case TSTR:
     case TTUPLE :
     case TFUNPTR:
     case TMEMPTR:

@@ -754,16 +754,15 @@ public class Parse {
     if( tok==null ) return null;
     if( tok.equals("->") ) return Type.ANY; // Found -> return sentinel
     Type t = _e.lookup_type(tok);
-    if( t==null ) {                // Not a known type var
-      if( lookup(tok) != null ||// Yes a known normal var; resolve as a normal var
-          !type_var ) {            // Or not inside a type-var assignment
-        _x = oldx;                 // Unwind if not a known type var
-        return null;               // Not a type
+    if( t==null ) {              // Not a known type var
+      if( lookup(tok) != null || // Yes a known normal var; resolve as a normal var
+          !type_var ) {          // Or not inside a type-var assignment
+        _x = oldx;               // Unwind if not a known type var
+        return null;             // Not a type
       }
       _e.add_type(tok,t=TypeName.make_forward_def_type(tok,_e._scope.types()));
     }
-    Type tb = t.base();
-    return tb instanceof TypeOop || tb==Type.SCALAR ? typeq(t) : t;
+    return t.isa(Type.SCALAR) ? typeq(t) : t;
   }
 
   // Require a specific character (after skipping WS) or polite error

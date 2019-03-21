@@ -66,7 +66,6 @@ public class TypeFun extends TypeTuple<TypeFun> {
     case TTUPLE: 
     case TFUNPTR:
     case TMEMPTR:
-    case TOOP:
     case TSTRUCT:
     case TRPC:
     case TNIL:

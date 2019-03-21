@@ -50,7 +50,6 @@ public class TypeRPC extends Type<TypeRPC> {
     case TINT:   return t.must_nil() ? SCALAR : NSCALR;
     case TNIL:
     case TNAME:  return t.xmeet(this); // Let other side decide
-    case TOOP:
     case TSTRUCT:
     case TFUN:
     case TSTR:

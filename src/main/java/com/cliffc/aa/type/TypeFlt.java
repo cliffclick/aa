@@ -60,7 +60,6 @@ public class TypeFlt extends Type<TypeFlt> {
     case TNIL:
     case TNAME:  return t.xmeet(this); // Let other side decide
     case TFUN:
-    case TOOP:
     case TSTR:
     case TSTRUCT:
     case TMEM:   return ALL;

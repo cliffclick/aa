@@ -6,7 +6,7 @@ import java.util.BitSet;
 import java.util.HashMap;
 import java.util.function.Predicate;
 
-public class TypeStr extends TypeOop<TypeStr> {
+public class TypeStr extends TypeAnyAll<TypeStr> {
   private String _con;          // 
   private TypeStr  (boolean any, String con ) { super(TSTR,any); init(any,con); }
   private void init(boolean any, String con ) {
@@ -56,9 +56,8 @@ public class TypeStr extends TypeOop<TypeStr> {
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TSTR:     break;
-    case TOOP:
-    case TSTRUCT:  return OOP;
     case TNAME:  return t.xmeet(this); // Let other side decide
+    case TSTRUCT:
     case TNIL:
     case TTUPLE: 
     case TFUNPTR:
@@ -90,7 +89,7 @@ public class TypeStr extends TypeOop<TypeStr> {
   // +1 requires a bit-changing conversion; no auto-unboxing
   // 99 Bottom; No free converts; e.g. Flt->Str requires explicit rounding
   @Override public byte isBitShape(Type t) {
-    if( t._type==TNIL || t._type==Type.TSTR || t._type==Type.TOOP || t._type==Type.TSCALAR ) return 0;
+    if( t._type==TNIL || t._type==Type.TSTR ) return 0;
     return 99;
   }
   @Override public Type widen() { return STR; }

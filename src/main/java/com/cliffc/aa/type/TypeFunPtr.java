@@ -79,7 +79,6 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     case TNAME:  return t.xmeet(this); // Let other side decide
     case TFUN:
     case TSTR:
-    case TOOP:
     case TSTRUCT:
     case TMEM:   return ALL;
     default: throw typerr(t);   // All else should not happen

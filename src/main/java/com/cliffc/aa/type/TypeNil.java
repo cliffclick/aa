@@ -41,15 +41,7 @@ public class TypeNil extends Type<TypeNil> {
     return ret;
   }
   private static TypeNil make0( Type t ) {
-    assert
-      t._type != TNIL   &&
-      t._type != TTUPLE &&
-      t._type != TOOP   &&
-      t._type != TSTR   &&
-      t._type != TSTRUCT&&
-      t._type != TINT   &&
-      t._type != TFLT   ;
-      
+    assert t== null || t.isa(SCALAR);
     TypeNil t1 = FREE;
     if( t1 == null ) t1 = new TypeNil(t);
     else { FREE = null; t1.init(t); }
@@ -68,7 +60,7 @@ public class TypeNil extends Type<TypeNil> {
   // (except when meet'ing itself).
   public  static final TypeNil NIL = make0(null);
   public  static final TypeNil OOP = make0(TypeMemPtr.MEMPTR);
-  //public  static final TypeNil XOOP = make0(TypeOop.XOOP);
+  public  static final TypeNil XOOP= make0(TypeMemPtr.MEMPTR.dual());
           static final TypeNil STR = make0(TypeMemPtr.STRPTR);
   public  static final TypeNil ABC = make0(TypeMemPtr.ABCPTR);
 

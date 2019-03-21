@@ -42,7 +42,7 @@ public class NewNode extends Node {
     // "new newnode" assert if this node gets replaced during parsing.
     Type oldnnn = gvn.self_type(this);
     Type oldt= oldnnn instanceof TypeTuple ? ((TypeTuple)oldnnn).at(1) : newt;
-    Type apxt= approx(newt,oldt); // Approximate infinite types
+    TypeStruct apxt= approx(newt,oldt); // Approximate infinite types
     Type ptr = TypeMemPtr.make(_alias);
     Type mem = TypeMem.make(_alias,apxt);
     return TypeTuple.make(mem,ptr);
@@ -52,13 +52,13 @@ public class NewNode extends Node {
   // to in a loop until the size grows without bound.  If we detect this we
   // need to approximate a new cyclic type.
   private final static int CUTOFF=5; // Depth of types before we start forcing approximations
-  public static Type approx(TypeStruct newt, Type oldt) {
+  public static TypeStruct approx(TypeStruct newt, Type oldt) {
     if( !(oldt instanceof TypeStruct) ) return newt;
     if( newt == oldt ) return newt;
     if( !newt.contains(oldt) ) return newt;
     if( oldt.depth() <= CUTOFF ) return newt;
     TypeStruct tsa = newt.approx((TypeStruct)oldt);
-    return tsa.meet(oldt);
+    return (TypeStruct)(tsa.meet(oldt));
   }
 
   // Worse-case type for this Node

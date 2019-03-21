@@ -72,20 +72,21 @@ public class LoadNode extends Node {
   @Override public Type value(GVNGCM gvn) {
     Type t = gvn.type(adr()).base();
     if( t.isa(TypeNil.XOOP) ) return Type.XSCALAR; // Very high address; might fall to any valid value
-    if( t.isa(TypeOop.XOOP) ) return Type.XSCALAR; // Very high address; might fall to any valid value
+    if( t.isa(TypeMemPtr.MEMPTR.dual()) ) return Type.XSCALAR; // Very high address; might fall to any valid value
     if( t instanceof TypeNil ) {
       if( !t.above_center() )     // NIL or below?
         return Type.SCALAR;       // Fails - might be nil at runtime
       t = ((TypeNil)t)._t.base(); // Assume guarded by test
     }
 
-    if( t instanceof TypeStruct ) {
-      TypeStruct ts = (TypeStruct)t;
-      int idx = find(ts);       // Find the named field
-      if( idx != -1 ) return ts.at(idx); // Field type
-    }
-
-    return Type.SCALAR;
+    //if( t instanceof TypeStruct ) {
+    //  TypeStruct ts = (TypeStruct)t;
+    //  int idx = find(ts);       // Find the named field
+    //  if( idx != -1 ) return ts.at(idx); // Field type
+    //}
+    //
+    //return Type.SCALAR;
+    throw AA.unimpl();
   }
 
   private int find(TypeStruct ts) {
@@ -101,11 +102,17 @@ public class LoadNode extends Node {
     Type t = gvn.type(adr());
     while( t instanceof TypeName ) t = ((TypeName)t)._t;
     if( t instanceof TypeNil && !t.above_center() ) return _badnil;
-    if( TypeOop.OOP.isa(t) ) return _badfld; // Too low, might not have any fields
-    if( !(t instanceof TypeStruct) ) return _badfld;
-    if( find((TypeStruct)t) == -1 )
-      return _badfld;
-    return null;
+    Type t2 = t instanceof TypeNil ? ((TypeNil)t)._t : t; // Strip off the nil
+    //if( TypeOop.OOP.isa(t) ) return _badfld; // Too low, might not have any fields
+    if( !(t2 instanceof TypeMemPtr) ) return _badfld; // Not a pointer, cannot load a field
+    TypeMemPtr t3 = (TypeMemPtr)t2; 
+    TypeMem t4 = (TypeMem)gvn.type(mem()); // Should be memory
+    Type t5 = t4.meets(t3); // Meets of all aliases
+    throw AA.unimpl();
+    //if( !(t instanceof TypeStruct) ) return _badfld;
+    //if( find((TypeStruct)t) == -1 )
+    //  return _badfld;
+    //return null;
   }
   @Override public Type all_type() { return Type.SCALAR; }
   @Override public int hashCode() { return super.hashCode()+(_fld==null ? _fld_num : _fld.hashCode()); }
