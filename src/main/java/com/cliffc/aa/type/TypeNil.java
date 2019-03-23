@@ -63,8 +63,9 @@ public class TypeNil extends Type<TypeNil> {
   public  static final TypeNil XOOP= make0(TypeMemPtr.MEMPTR.dual());
           static final TypeNil STR = make0(TypeMemPtr.STRPTR);
   public  static final TypeNil ABC = make0(TypeMemPtr.ABCPTR);
+  public  static final TypeNil TUP = make0(TypeMemPtr.TUPPTR);
 
-  static final TypeNil[] TYPES = new TypeNil[]{OOP,STR,ABC};
+  static final TypeNil[] TYPES = new TypeNil[]{OOP,STR,ABC,TUP};
   
   @Override public long   getl() { assert is_con(); return 0; }
   @Override public double getd() { assert is_con(); return 0; }

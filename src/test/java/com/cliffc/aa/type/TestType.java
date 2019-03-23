@@ -69,7 +69,7 @@ public class TestType {
   }
 
   // Memory is on a different line than pointers.
-  // Memory canNOT be nil, but ptrs can be nil.
+  // Memory canNOT be nil, but ptrs to memory can be nil.
   // Memory contents can be any/all, vs ptrs being any/all.
   // A any-ptr-alias#6 means *any* of the alias#6 choices; same for all.
   // all ->  mem  -> { str,tup} -> { string constants, tuple constants} -> {~str,~tup} -> ~mem    -> any
@@ -79,7 +79,7 @@ public class TestType {
     Type.init0(new HashMap<>());
     Type bot = Type      .ALL;
 
-    Type mem = TypeMEM   .MEM;  // All memory
+    Type mem = TypeMem   .MEM;  // All memory
     Type str = TypeStr   .STR;  // All Strings
     Type tup = TypeStruct.ALLSTRUCT; // All Structs
     
@@ -95,8 +95,8 @@ public class TestType {
 
     assertTrue( top.isa(memX));
 
-    assertTrue(memX.isa(strX));
-    assertTrue(memX.isa(tupX));
+    //assertTrue(memX.isa(strX)); // mem is a CONTAINER for memory objects, e.g. Struct,Str
+    //assertTrue(memX.isa(tupX));
 
     assertTrue( strX.isa(abc));
     assertTrue( tupX.isa(tp0));
@@ -104,66 +104,70 @@ public class TestType {
     assertTrue(!tupX.isa(zer));
 
     assertTrue( abc .isa(str));
-    assertTrue( tup0.isa(tup));
+    assertTrue( tp0 .isa(tup));
     assertTrue(!zer .isa(str));
     assertTrue(!zer .isa(tup));
 
-    assertTrue( str .isa(oop));
-    assertTrue( tup .isa(oop));
+    //assertTrue( str .isa(mem)); // mem is a CONTAINER for memory objects, e.g. Struct,Str
+    //assertTrue( tup .isa(mem));
     
-    assertTrue( oop .isa(bot));
+    assertTrue( mem .isa(bot));
 
     // ---
     Type pmem0= TypeNil   .OOP;    // *[ALL]?
     Type pmem = TypeMemPtr.MEMPTR; // *[ALL]
-
-
+    Type pstr0= TypeNil   .STR;    // *[str]?
+    Type pstr = TypeStr   .STR;    // *[str]
+    Type ptup0= TypeNil   .TUP;    // *[tup]?
+    Type ptup = TypeMemPtr.TUPPTR; // *[tup]
     
+    Type pabc0= TypeNil   .ABC;    // *["abc"]?
+    Type pabc = TypeMemPtr.ABCPTR; // *["abc"]
+    Type pzer = TypeMemPtr.make(TypeMem.new_alias());// *[(0)]
+    Type pzer0= TypeNil.make(pzer);// *[(0)]?
+    Type nil  = TypeNil.NIL;
+
+    Type xtup = ptup .dual();
+    Type xtup0= ptup0.dual();
+    Type xstr = pstr .dual();
+    Type xstr0= pstr0.dual();
+    Type xmem = pmem .dual();
+    Type xmem0= pmem0.dual();
+
+    assertTrue( top .isa(xmem0));
+    assertTrue(xmem0.isa(xmem ));
     
-    Type str0 = TypeNil  .STR;  // *[str]? (str AND null)
+    assertTrue(xmem0.isa(xstr0));
+    assertTrue(xmem .isa(xstr ));
+    assertTrue(xmem0.isa(xtup0));
+    assertTrue(xmem .isa(xtup ));
 
-    Type tup  = TypeStruct.EMPTY_alias; // tup no null ; infinite repeat of SCALAR fields
-    Type tup0 = TypeNil.make(TypeStruct.EMPTY_alias); 
-    Type i0   = TypeInt.FALSE;
+    assertTrue(xstr0.isa( nil ));
+    assertTrue(xstr0.isa(pabc0));
+    assertTrue(xstr .isa(pabc ));
+    assertTrue(xtup0.isa( nil ));
+    assertTrue(xtup0.isa(pzer0));
+    assertTrue(xtup .isa(pzer ));
     
-    Type tupx = tup .dual();      // ~tup   (choice tup, no NULL)
-    Type tup_ = tup0.dual();      // ~tup+? (choice tup  OR NULL)
-    Type strx = str .dual();      // ~str   (choice str, no NULL)
-    Type str_ = str0.dual();      // ~str+? (choice str  OR NULL)
-    Type oop_ = oop0.dual();      // ~OOP+? (choice OOP  OR null)
-    Type top  = Type.ANY;
-
-    assertTrue(top .isa(oop_));
-
-    assertTrue(oop_.isa(str_));
-    assertTrue(oop_.isa(tup_));
-
-    assertTrue(str_.isa(strx));
-    assertTrue(tup_.isa(tupx));
-    assertTrue(!str_.isa(i0 ));
-    assertTrue(!tup_.isa(i0 ));
-    assertTrue(str_.isa(TypeNil.ABC));
-
-    assertTrue(strx.isa(abc ));
-    assertTrue(tupx.isa(fld ));
+    assertTrue( nil .isa(pabc0));
+    assertTrue( nil .isa(pzer0));
     
-    assertTrue(abc .isa(str ));
-    assertTrue(fld .isa(tup ));
-    assertTrue(!i0 .isa(str0));
-    assertTrue(!i0 .isa(tup0));
-
-    assertTrue(str .isa(str0));
-    assertTrue(tup .isa(tup0));
-
-    assertTrue(str0.isa(oop0));
-    assertTrue(tup0.isa(oop0));
+    assertTrue( nil .isa(pstr0));
+    assertTrue(pabc0.isa(pstr0));
+    assertTrue(pabc .isa(pstr ));
+    assertTrue( nil .isa(ptup0));
+    assertTrue(pzer0.isa(ptup0));
+    assertTrue(pzer .isa(ptup ));
+    assertTrue(ptup0.isa(pmem0));
+    assertTrue(ptup .isa(pmem ));
     
-    assertTrue(oop0.isa(bot ));
+    assertTrue(pmem .isa(pmem0));
+    assertTrue(pmem0.isa( bot ));
     
-    // Crossing ints and OOP+null
+    // Crossing ints and *[ALL]+null
     Type  i8 = TypeInt.INT8;
     Type xi8 = i8.dual();
-    assertEquals( Type.NSCALR, xi8.meet(oop_)); // ~OOP+0 &   ~i8 -> 0
+    assertEquals( Type.NSCALR, xi8.meet(xmem0)); // ~OOP+0 &   ~i8 -> 0
   }
   
   @Test public void testStructTuple() {

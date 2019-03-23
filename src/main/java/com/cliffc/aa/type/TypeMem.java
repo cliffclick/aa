@@ -80,10 +80,9 @@ public class TypeMem extends TypeAnyAll<TypeMem> {
     return make(false,ALL,oops);
   }
 
-  public  static final TypeMem MEM = make(false,TypeStruct.GENERIC,new Type[0]);
-  private static final TypeMem MEM_EMPTY = make(true,TypeStruct.GENERIC.dual(),new Type[0]);
+  public  static final TypeMem MEM = make(false,TypeStruct.ALLSTRUCT,new Type[0]);
   private static final TypeMem MEM_STR = make(TypeStr.STR_alias,TypeStr.STR);
-  static final TypeMem[] TYPES = new TypeMem[]{MEM,MEM_EMPTY,MEM_STR};
+  static final TypeMem[] TYPES = new TypeMem[]{MEM,MEM_STR};
 
   // All mapped memories remain, but each memory flips internally.
   @Override protected TypeMem xdual() {

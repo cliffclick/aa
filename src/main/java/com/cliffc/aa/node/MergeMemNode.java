@@ -78,6 +78,15 @@ import com.cliffc.aa.type.*;
 //   but in any case the gvn.opto will discover the minimal update set.
 // - Phi keeps mem types fully alias precise unless TypePtrs are also becoming
 //   imprecise?  No need to ever get approx?
+//-----
+// More thinking:
+//
+// Keep OOP as parent of Str,Struct,Array.  These are memory-content values.
+// TypeMem is a collection of OOPs, indexed into Alias sets.
+// TypeMemPtr is a collection of Alias#s.
+
+
+
 
 
 // Merging 'wide' memory (memory from all prior state) and a new 'skinny'

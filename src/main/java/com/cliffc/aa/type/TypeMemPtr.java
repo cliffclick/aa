@@ -1,6 +1,5 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.node.FunNode;
 import com.cliffc.aa.util.Bits;
 import com.cliffc.aa.util.SB;
 
@@ -41,10 +40,11 @@ public final class TypeMemPtr extends TypeAnyAll<TypeMemPtr> {
     return t1==t2 ? t1 : t1.free(t2);
   }
 
-  public static final TypeMemPtr  MEMPTR = make(false,Bits.FULL);
-         static final TypeMemPtr  STRPTR = make(TypeStr.STR_alias);
-         static final TypeMemPtr  ABCPTR = make(TypeStr.ABC_alias);
-  static final TypeMemPtr[] TYPES = new TypeMemPtr[]{MEMPTR,STRPTR,ABCPTR};
+  public static final TypeMemPtr MEMPTR = make(false,Bits.FULL);
+         static final TypeMemPtr STRPTR = make(TypeStr.STR_alias);
+         static final TypeMemPtr ABCPTR = make(TypeStr.ABC_alias);
+  public static final TypeMemPtr TUPPTR = make(TypeStruct.ALLSTRUCT_alias);
+  static final TypeMemPtr[] TYPES = new TypeMemPtr[]{MEMPTR,STRPTR,ABCPTR,TUPPTR};
   
   @Override protected TypeMemPtr xdual() { return new TypeMemPtr(!_any,_aliases.dual()); }
   @Override protected Type xmeet( Type t ) {
