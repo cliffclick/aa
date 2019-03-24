@@ -81,8 +81,9 @@ import com.cliffc.aa.type.*;
 //-----
 // More thinking:
 //
-// Keep OOP as parent of Str,Struct,Array.  These are memory-content values.
-// TypeMem is a collection of OOPs, indexed into Alias sets.
+// Bring back TypeOop as TypeObj - base of Objects.
+// Obj is parent of Struct,Array (Str is an instance of Array).  These are memory-content values.
+// TypeMem is a collection of Objs, indexed by Alias#s.
 // TypeMemPtr is a collection of Alias#s.
 
 

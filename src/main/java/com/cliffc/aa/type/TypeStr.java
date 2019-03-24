@@ -6,7 +6,9 @@ import java.util.BitSet;
 import java.util.HashMap;
 import java.util.function.Predicate;
 
-public class TypeStr extends TypeAnyAll<TypeStr> {
+// Strings.  Just an alternative TypeObj to TypeStruct - but basically really
+// should be replaced with a named Array.
+public class TypeStr extends TypeObj<TypeStr> {
   private String _con;          // 
   private TypeStr  (boolean any, String con ) { super(TSTR,any); init(any,con); }
   private void init(boolean any, String con ) {

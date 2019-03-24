@@ -7,12 +7,13 @@ import java.util.BitSet;
 
 // Pointers-to-memory; these can be both the address and the value part of
 // Loads and Stores.  They carry a set of aliased TypeMems. 
-public final class TypeMemPtr extends TypeAnyAll<TypeMemPtr> {
+public final class TypeMemPtr extends Type<TypeMemPtr> {
+  private boolean _any; // Aliases are JOIN vs MEET
   // List of known memory aliases
-  private Bits _aliases;
+  Bits _aliases;
 
-  private TypeMemPtr(boolean any, Bits aliases ) { super     (TMEMPTR,any); init(any,aliases); }
-  private void init (boolean any, Bits aliases ) { super.init(TMEMPTR,any); _aliases = aliases; }
+  private TypeMemPtr(boolean any, Bits aliases ) { super     (TMEMPTR); init(any,aliases); }
+  private void init (boolean any, Bits aliases ) { super.init(TMEMPTR); _any = any; _aliases = aliases; }
   @Override public int hashCode( ) { return TMEMPTR + _aliases.hashCode();  }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
@@ -52,11 +53,12 @@ public final class TypeMemPtr extends TypeAnyAll<TypeMemPtr> {
     case TMEMPTR:break;
     case TFLT:
     case TINT:
-    case TSTR:
     case TFUNPTR:
     case TRPC:   return t.must_nil() ? SCALAR : NSCALR;
     case TNIL:
     case TNAME:  return t.xmeet(this); // Let other side decide
+    case TOBJ:
+    case TSTR:
     case TSTRUCT:
     case TTUPLE:
     case TFUN:

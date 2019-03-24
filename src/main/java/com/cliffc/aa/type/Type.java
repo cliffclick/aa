@@ -140,14 +140,15 @@ public class Type<T extends Type<T>> {
     return true;
   }
 
-  // Simple types are implemented fully here
+  // Simple types are implemented fully here.  "Simple" means: the code and
+  // type hierarchy are simple, not that the Type is conceptually simple.
   static final byte TALL    = 0; // Bottom
   static final byte TANY    = 1; // Top
   static final byte TCTRL   = 2; // Ctrl flow bottom
   static final byte TXCTRL  = 3; // Ctrl flow top (mini-lattice: any-xctrl-ctrl-all)
   // Scalars; all possible finite types that fit in a machine register;
   // includes pointers (functions, structs), ints, floats; excludes state of
-  // Memory and Ctrl.
+  // Memory and Ctrl.  Scalars are stateless and "free" to make copies.
   static final byte TSCALAR = 4; // Scalars
   static final byte TXSCALAR= 5; // Invert scalars
   // Not-nil Scalars.  Same as Scalars above but excludes nil/0.  Note that I
@@ -167,20 +168,21 @@ public class Type<T extends Type<T>> {
   static final byte TXNREAL =15; // Invert Numbers-not-nil
   static final byte TSIMPLE =16; // End of the Simple Types
   private static final String[] STRS = new String[]{"all","any","Ctrl","~Ctrl","Scalar","~Scalar","nScalar","~nScalar","Number","~Number","nNumber","~nNumber","Real","~Real","nReal","~nReal"};
-  // Implemented in subclasses
-  static final byte TNIL    =17; // Nil-types
-  static final byte TNAME   =18; // Named types; always a subtype of some other type
-  static final byte TTUPLE  =19; // Tuples; finite collections of unrelated Types, kept in parallel
-  static final byte TSTRUCT =20; // Structs; tuples with named fields
-  static final byte TFUNPTR =21; // Function signature; both domain and range are a Tuple; see TypeFun; many functions share the same signature
-  static final byte TFUN    =22; // Function, a "fat" pointer refering to a single block of code
-  static final byte TRPC    =23; // Return PCs; Continuations; call-site return points; see TypeRPC
-  static final byte TFLT    =24; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
-  static final byte TINT    =25; // All Integers, including signed/unsigned and various sizes; see TypeInt
-  static final byte TSTR    =26; // String type
-  static final byte TMEM    =27; // Memory  type
-  static final byte TMEMPTR =28; // Memory pointer type
-  static final byte TLAST   =29; // Type check
+  // Complex types - Implemented in subclasses
+  static final byte TINT    =17; // All Integers, including signed/unsigned and various sizes; see TypeInt
+  static final byte TFLT    =18; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
+  static final byte TRPC    =19; // Return PCs; Continuations; call-site return points; see TypeRPC
+  static final byte TNIL    =20; // Nil-types
+  static final byte TNAME   =21; // Named types; always a subtype of some other type
+  static final byte TTUPLE  =22; // Tuples; finite collections of unrelated Types, kept in parallel
+  static final byte TOBJ    =23; // Memory objects; arrays and structs and stings
+  static final byte TSTRUCT =24; // Memory Structs; tuples with named fields
+  static final byte TSTR    =25; // Memory String type
+  static final byte TMEM    =26; // Memory type; a map of Alias#s to TOBJs
+  static final byte TMEMPTR =27; // Memory pointer type; a collection of Alias#s
+  static final byte TFUNPTR =28; // Function signature; both domain and range are a Tuple; see TypeFun; many functions share the same signature
+  static final byte TFUN    =29; // Function, a "fat" pointer refering to a single block of code
+  static final byte TLAST   =30; // Type check
 
   public  static final Type ALL    = make( TALL   ); // Bottom
   public  static final Type ANY    = make( TANY   ); // Top
@@ -219,7 +221,7 @@ public class Type<T extends Type<T>> {
   private boolean is_ptr() { byte t = simple_type();  return t == TFUNPTR || t == TMEMPTR; }
           boolean is_num() { byte t = simple_type();  return t == TNUM || t == TXNUM || t == TNNUM || t == TXNNUM || t == TREAL || t == TXREAL || t == TNREAL || t == TXNREAL || t == TINT || t == TFLT; }
   // True if 'this' isa SCALAR, without the cost of a full 'meet()'
-  private static final byte[] ISA_SCALAR = new byte[]{0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,1,0,0,0,1,0,1,1,1,0,0,1};
+  private static final byte[] ISA_SCALAR = new byte[]{0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0, 1,1,1,1,0,1,0,0,0,0,1,1,0};
   final boolean isa_scalar() { assert ISA_SCALAR.length==TLAST; return ISA_SCALAR[_type]!=0; }
   
   // Return cached dual
@@ -365,18 +367,19 @@ public class Type<T extends Type<T>> {
   public static Type[] ALL_TYPES() {
     if( ALL_TYPES != null ) return ALL_TYPES;
     Type[] ts =    Type      .TYPES ;
-    ts = concat(ts,TypeInt   .TYPES);
     ts = concat(ts,TypeFlt   .TYPES);
-    ts = concat(ts,TypeNil   .TYPES);
-    ts = concat(ts,TypeStr   .TYPES);
-    ts = concat(ts,TypeTuple .TYPES);
-    ts = concat(ts,TypeStruct.TYPES);
-    ts = concat(ts,TypeFunPtr.TYPES);
     ts = concat(ts,TypeFun   .TYPES);
-    ts = concat(ts,TypeRPC   .TYPES);
-    ts = concat(ts,TypeName  .TYPES);
+    ts = concat(ts,TypeFunPtr.TYPES);
+    ts = concat(ts,TypeInt   .TYPES);
     ts = concat(ts,TypeMem   .TYPES);
     ts = concat(ts,TypeMemPtr.TYPES);
+    ts = concat(ts,TypeName  .TYPES);
+    ts = concat(ts,TypeNil   .TYPES);
+    ts = concat(ts,TypeObj   .TYPES);
+    ts = concat(ts,TypeRPC   .TYPES);
+    ts = concat(ts,TypeStr   .TYPES);
+    ts = concat(ts,TypeStruct.TYPES);
+    ts = concat(ts,TypeTuple .TYPES);
     // Partial order Sort, makes for easier tests later.  Arrays.sort requires
     // a total order (i.e., the obvious Comparator breaks the sort contract),
     // so we hand-roll a simple bubble sort.

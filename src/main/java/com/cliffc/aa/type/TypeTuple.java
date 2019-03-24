@@ -10,12 +10,14 @@ import java.util.function.Consumer;
 // Internal fixed-length non-recursive tuples.  Used for function arguments,
 // and multi-arg results like IfNode and CallNode.  This is not the same as a
 // no-named-field TypeStruct, and is not exposed at the language level.
-public class TypeTuple<O extends TypeTuple<O>> extends TypeAnyAll<O> {
+public class TypeTuple<O extends TypeTuple<O>> extends Type<O> {
+  public boolean _any;
   public Type[] _ts; // The fixed known types
   private int _hash; // Hash pre-computed to avoid large computes duing interning
-  protected TypeTuple( byte type, boolean any, Type[] ts ) { super(type,any); init(type, any, ts);  }
+  protected TypeTuple( byte type, boolean any, Type[] ts ) { super(type); init(type, any, ts);  }
   protected void init( byte type, boolean any, Type[] ts ) {
-    super.init(type,any);
+    super.init(type);
+    _any = any;
     _ts = ts;
     int sum=super.hashCode();
     for( Type t : ts ) sum += t.hashCode();

@@ -12,7 +12,9 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 /** A memory-based Tuple with optionally named fields.  This is a recursive
- *  type, only produced by NewNode and structure or tuple constants.  
+ *  type, only produced by NewNode and structure or tuple constants.  Fields
+ *  can be indexed by field name or numeric constant (i.e. tuples), but NOT by
+ *  a general number - thats an Array.
  *
  *  The recursive type poses some interesting challenges.  It is represented as
  *  literally a cycle of pointers which must include a TypeStruct (and not a
@@ -30,7 +32,7 @@ import java.util.function.Predicate;
  *  element... but when both types have looped, we can stop and the discovered
  *  cycle is the Meet's cycle.
  */
-public class TypeStruct extends TypeAnyAll<TypeStruct> {
+public class TypeStruct extends TypeObj<TypeStruct> {
   // Fields are named in-order and aligned with the Tuple values.  Field names
   // are never null, and never zero-length.  If the 1st char is a '^' the field
   // is Top; a '.' is Bot; all other values are valid field names.
@@ -224,7 +226,7 @@ public class TypeStruct extends TypeAnyAll<TypeStruct> {
 
 
   // Dual the flds, dual the tuple.
-  @Override TypeStruct xdual() {
+  @Override protected TypeStruct xdual() {
     String[] as = new String[_flds.length];
     Type  [] ts = new Type  [_ts  .length];
     byte  [] bs = new byte  [_ts  .length];

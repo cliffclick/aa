@@ -117,19 +117,19 @@ public class TestType {
     Type pmem0= TypeNil   .OOP;    // *[ALL]?
     Type pmem = TypeMemPtr.MEMPTR; // *[ALL]
     Type pstr0= TypeNil   .STR;    // *[str]?
-    Type pstr = TypeStr   .STR;    // *[str]
+    TypeMemPtr pstr = TypeMemPtr.STRPTR; // *[str]
     Type ptup0= TypeNil   .TUP;    // *[tup]?
     Type ptup = TypeMemPtr.TUPPTR; // *[tup]
     
     Type pabc0= TypeNil   .ABC;    // *["abc"]?
-    Type pabc = TypeMemPtr.ABCPTR; // *["abc"]
+    TypeMemPtr pabc = TypeMemPtr.ABCPTR; // *["abc"]
     Type pzer = TypeMemPtr.make(TypeMem.new_alias());// *[(0)]
     Type pzer0= TypeNil.make(pzer);// *[(0)]?
     Type nil  = TypeNil.NIL;
 
     Type xtup = ptup .dual();
     Type xtup0= ptup0.dual();
-    Type xstr = pstr .dual();
+    TypeMemPtr xstr = pstr.dual();
     Type xstr0= pstr0.dual();
     Type xmem = pmem .dual();
     Type xmem0= pmem0.dual();
@@ -143,31 +143,43 @@ public class TestType {
     assertTrue(xmem .isa(xtup ));
 
     assertTrue(xstr0.isa( nil ));
-    assertTrue(xstr0.isa(pabc0));
-    assertTrue(xstr .isa(pabc ));
-    assertTrue(xtup0.isa( nil ));
-    assertTrue(xtup0.isa(pzer0));
-    assertTrue(xtup .isa(pzer ));
     
-    assertTrue( nil .isa(pabc0));
-    assertTrue( nil .isa(pzer0));
+    // This is a choice ptr-to-alias#1, vs a nil-able ptr-to-alias#2.  Since
+    // they are from different alias classes, they are NEVER equal (unless both
+    // nil).  We cannot tell what they point-to, so we do not know if the
+    // memory pointed-at is compatible or not.
+    assertFalse(xstr0.isa(pabc0)); // ~*[1]+0 vs ~*[2]?
+    assertFalse(xstr .isa(pabc ));
+    // We can instead assert that values loaded are compatible:
+    assertTrue (TypeMem.MEM_STR.dual().ld(xstr).isa(TypeMem.MEM_ABC.ld(pabc)));
     
-    assertTrue( nil .isa(pstr0));
-    assertTrue(pabc0.isa(pstr0));
-    assertTrue(pabc .isa(pstr ));
-    assertTrue( nil .isa(ptup0));
-    assertTrue(pzer0.isa(ptup0));
-    assertTrue(pzer .isa(ptup ));
-    assertTrue(ptup0.isa(pmem0));
-    assertTrue(ptup .isa(pmem ));
+    assertTrue (xtup0.isa( nil ));
+    assertFalse(xtup0.isa(pzer0));
+    assertFalse(xtup .isa(pzer ));
+    //assertTrue(TypeMem.MEM_TUP.dual().ld(xstr).isa(TypeMem.MEM_ZER.ld(pabc)));
     
-    assertTrue(pmem .isa(pmem0));
-    assertTrue(pmem0.isa( bot ));
+    assertTrue ( nil .isa(pabc0));
+    assertTrue ( nil .isa(pzer0));
+    
+    assertTrue ( nil .isa(pstr0));
+    assertFalse(pabc0.isa(pstr0));
+    assertFalse(pabc .isa(pstr ));
+    assertTrue (TypeMem.MEM_ABC.ld(pabc).isa(TypeMem.MEM_STR.ld(pstr)));
+    assertTrue ( nil .isa(ptup0));
+    assertFalse(pzer0.isa(ptup0));
+    assertFalse(pzer .isa(ptup ));
+    //assertTrue(TypeMem.MEM_TUP.dual().ld(xstr).isa(TypeMem.MEM_ZER.ld(pabc)));
+    assertTrue (ptup0.isa(pmem0));
+    assertTrue (ptup .isa(pmem ));
+    
+    assertTrue (pmem .isa(pmem0));
+    assertTrue (pmem0.isa( bot ));
+    
     
     // Crossing ints and *[ALL]+null
     Type  i8 = TypeInt.INT8;
     Type xi8 = i8.dual();
-    assertEquals( Type.NSCALR, xi8.meet(xmem0)); // ~OOP+0 &   ~i8 -> 0
+    assertEquals( Type.NSCALR, xi8.meet(xmem0)); // ~OOP+0 & ~i8 -> 0
   }
   
   @Test public void testStructTuple() {
