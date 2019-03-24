@@ -14,7 +14,7 @@ public class Bits implements Iterable<Integer> {
   // If _bits is not-null, then _con is -2 for meet, and -1 for join.
   // The last bit of _bits is the "sign" bit, and extends infinitely.
   private long[] _bits;         // Bits set or null for a single bit
-  private int _con;             // value of single bit, or 0 for meet or -1 for join
+  private int _con;             // value of single bit, or -2 for meet or -1 for join
   private int _hash;            // Pre-computed hashcode
   private      Bits(int con, long[] bits ) { init(con,bits); }
   private void init(int con, long[] bits ) {
@@ -76,8 +76,8 @@ public class Bits implements Iterable<Integer> {
     if( bit >= 63 ) throw AA.unimpl();
     return make(bit,null);
   }
-  
   public static Bits FULL = make(-2,new long[]{-1});
+  public static Bits NZERO= make(-2,new long[]{-2});
   public static Bits ANY  = FULL.dual();
   
   private static int  idx (int i) { return i>>6; }
@@ -119,7 +119,7 @@ public class Bits implements Iterable<Integer> {
       
       if( bigbs._con==-2 ) {     // Meet of constant and set
         if( bigbs.test(conbs._con) ) return bigbs; // already a member
-        // Grow set to hold constant and OR it it
+        // Grow set to hold constant and OR it in
         long[] bits = bits(bigbs.max(),conbs._con);
         System.arraycopy(bigbs._bits,0,bits,0,bigbs._bits.length);
         or( bits,conbs._con);
@@ -127,10 +127,16 @@ public class Bits implements Iterable<Integer> {
         assert bs0.inf()==bigbs.inf();
         return bs0;
       }
-      // Join of constant and set
+      // Meet of constant and joined set
       if( bigbs.test(conbs._con) ) return conbs; // Already a member
-      throw AA.unimpl();    // join constant and any bit from big set
-
+      // Pick first non-zero bit, and meet with constant
+      if( conbs._con >= 64 ) throw AA.unimpl();
+      for( int e : bigbs )
+        if( e != 0 ) {
+          if( e >= 64 ) throw AA.unimpl();
+          return make(-2,new long[]{(1L<<e) | (1L<<conbs._con)});
+        }
+      throw AA.unimpl(); // Should not reach here
     }
 
     if( _con==-2 ) {            // Meet

@@ -71,12 +71,12 @@ public class LoadNode extends Node {
 
   @Override public Type value(GVNGCM gvn) {
     Type t = gvn.type(adr()).base();
-    if( t.isa(TypeNil.XOOP) ) return Type.XSCALAR; // Very high address; might fall to any valid value
-    if( t.isa(TypeMemPtr.MEMPTR.dual()) ) return Type.XSCALAR; // Very high address; might fall to any valid value
+    if( t.isa(TypeMemPtr.OOP0.dual()) ) return Type.XSCALAR; // Very high address; might fall to any valid value
     if( t instanceof TypeNil ) {
-      if( !t.above_center() )     // NIL or below?
-        return Type.SCALAR;       // Fails - might be nil at runtime
-      t = ((TypeNil)t)._t.base(); // Assume guarded by test
+      //if( !t.above_center() )     // NIL or below?
+      //  return Type.SCALAR;       // Fails - might be nil at runtime
+      //t = ((TypeNil)t)._t.base(); // Assume guarded by test
+      throw AA.unimpl();        // Theory sez: only TypeMemPtr for Address, never TypeNil
     }
 
     //if( t instanceof TypeStruct ) {

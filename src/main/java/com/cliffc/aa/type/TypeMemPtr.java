@@ -8,46 +8,50 @@ import java.util.BitSet;
 // Pointers-to-memory; these can be both the address and the value part of
 // Loads and Stores.  They carry a set of aliased TypeMems. 
 public final class TypeMemPtr extends Type<TypeMemPtr> {
-  private boolean _any; // Aliases are JOIN vs MEET
-  // List of known memory aliases
+  // List of known memory aliases.  Zero is nil.
   Bits _aliases;
 
-  private TypeMemPtr(boolean any, Bits aliases ) { super     (TMEMPTR); init(any,aliases); }
-  private void init (boolean any, Bits aliases ) { super.init(TMEMPTR); _any = any; _aliases = aliases; }
+  private TypeMemPtr(Bits aliases ) { super     (TMEMPTR); init(aliases); }
+  private void init (Bits aliases ) { super.init(TMEMPTR); _aliases = aliases; }
   @Override public int hashCode( ) { return TMEMPTR + _aliases.hashCode();  }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeMemPtr) ) return false;
     TypeMemPtr tf = (TypeMemPtr)o;
-    return _any==tf._any && _aliases==tf._aliases;
+    return _aliases==tf._aliases;
   }
   // Never part of a cycle, so the normal check works
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
   @Override String str( BitSet dups) {
-    SB sb = new SB();
-    if( _any ) sb.p('~');
-    sb.p('*').p(_aliases.toString());
-    return sb.toString();
+    return "*"+_aliases;
   }
 
   private static TypeMemPtr FREE=null;
   @Override protected TypeMemPtr free( TypeMemPtr ret ) { FREE=this; return ret; }
-  public static TypeMemPtr make( int alias ) { return make(false, Bits.make(alias)); }
-  public static TypeMemPtr make( boolean any, Bits aliases ) {
+  public static TypeMemPtr make( int alias ) { return make(Bits.make(alias)); }
+  public static TypeMemPtr make( Bits aliases ) {
     TypeMemPtr t1 = FREE;
-    if( t1 == null ) t1 = new TypeMemPtr(any,aliases);
-    else { FREE = null;          t1.init(any,aliases); }
+    if( t1 == null ) t1 = new TypeMemPtr(aliases);
+    else { FREE = null;          t1.init(aliases); }
     TypeMemPtr t2 = (TypeMemPtr)t1.hashcons();
     return t1==t2 ? t1 : t1.free(t2);
   }
+  public static TypeMemPtr make_nil( int alias ) {
+    if( alias >=64 ) throw com.cliffc.aa.AA.unimpl();
+    return make(Bits.make0(-2,new long[]{(1L<<alias)|1}));
+  }
 
-  public static final TypeMemPtr MEMPTR = make(false,Bits.FULL);
+  public static final TypeMemPtr OOP0   = make(Bits.FULL); // Includes nil
+  public static final TypeMemPtr OOP    = make(Bits.NZERO);// Excludes nil
          static final TypeMemPtr STRPTR = make(TypeStr.STR_alias);
+         static final TypeMemPtr STR0   = make_nil(TypeStr.STR_alias);
          static final TypeMemPtr ABCPTR = make(TypeStr.ABC_alias);
-  public static final TypeMemPtr TUPPTR = make(TypeStruct.ALLSTRUCT_alias);
-  static final TypeMemPtr[] TYPES = new TypeMemPtr[]{MEMPTR,STRPTR,ABCPTR,TUPPTR};
+  public static final TypeMemPtr ABC0   = make_nil(TypeStr.ABC_alias);
+  public static final TypeMemPtr STRUCT = make(TypeStruct.ALLSTRUCT_alias);
+  public static final TypeMemPtr STRUCT0= make_nil(TypeStruct.ALLSTRUCT_alias);
+  static final TypeMemPtr[] TYPES = new TypeMemPtr[]{OOP0,STRPTR,ABCPTR,STRUCT,ABC0};
   
-  @Override protected TypeMemPtr xdual() { return new TypeMemPtr(!_any,_aliases.dual()); }
+  @Override protected TypeMemPtr xdual() { return new TypeMemPtr(_aliases.dual()); }
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TMEMPTR:break;
@@ -65,17 +69,19 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     case TMEM:   return ALL;
     default: throw typerr(t);   // All else should not happen
     }
-    // Join of args; meet of aliases
-    TypeMemPtr ptr = (TypeMemPtr)t;
-    Bits aliases = _aliases.meet( ptr._aliases );
-    return make(_any&ptr._any,aliases);
+    // Meet of aliases
+    return make(_aliases.meet( ((TypeMemPtr)t)._aliases ));
   }
 
-  @Override public boolean above_center() { return _any; }
-  @Override public boolean may_be_con()   { return _any || _aliases.is_con(); }
+  @Override public boolean above_center() { return _aliases.above_center(); }
+  @Override public boolean may_be_con()   { return _aliases.above_center() || _aliases.is_con(); }
   @Override public boolean is_con()       { return false; }
-  @Override boolean must_nil() { return false; }
-  @Override Type not_nil(Type ignore) { return this; }
-  @Override public Type meet_nil() { return TypeNil.make(this); }
+  @Override boolean must_nil() { throw com.cliffc.aa.AA.unimpl(); }
+  @Override Type not_nil(Type ignore) { throw com.cliffc.aa.AA.unimpl(); }
+  @Override public Type meet_nil() {
+    if( _aliases.test(0) )      // Already has a nil?
+      return _aliases.above_center() ? TypeNil.NIL : this;
+    throw com.cliffc.aa.AA.unimpl();
+  }
   public int alias() { return _aliases.getbit(); }
 }

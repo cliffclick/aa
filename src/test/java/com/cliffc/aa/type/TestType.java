@@ -1,7 +1,6 @@
 package com.cliffc.aa.type;
 
 import com.cliffc.aa.util.Bits;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.HashMap;
@@ -14,9 +13,9 @@ public class TestType {
   @Test public void testType() {
     Type.init0(new HashMap<>());
     Type t0 = Type.XNSCALR; // ~nScalar ; high any scalar not nil
-    Type t1 = TypeNil.STR;  // Low String-ptr-and-nil.
+    Type t1 = TypeMemPtr.STR0;  // Low String-ptr-and-nil.
     Type t2 = t0.meet(t1);
-    assertEquals(t2,TypeNil.STR);
+    assertEquals(t2,TypeMemPtr.STRPTR);
     Type t02 = t2._dual.meet(t0._dual);// ptr-to-choice-str-or-nil meet scalar-not-nil
     assertEquals(t02,t0._dual);
     Type t12 = t2._dual.meet(t1._dual);
@@ -114,17 +113,17 @@ public class TestType {
     assertTrue( mem .isa(bot));
 
     // ---
-    Type pmem0= TypeNil   .OOP;    // *[ALL]?
-    Type pmem = TypeMemPtr.MEMPTR; // *[ALL]
-    Type pstr0= TypeNil   .STR;    // *[str]?
+    Type pmem0= TypeMemPtr.OOP0;    // *[ALL]?
+    Type pmem = TypeMemPtr.OOP ;    // *[ALL]
+    Type pstr0= TypeMemPtr.STR0;    // *[str]?
     TypeMemPtr pstr = TypeMemPtr.STRPTR; // *[str]
-    Type ptup0= TypeNil   .TUP;    // *[tup]?
-    Type ptup = TypeMemPtr.TUPPTR; // *[tup]
+    Type ptup0= TypeMemPtr.STRUCT0; // *[tup]?
+    Type ptup = TypeMemPtr.STRUCT;  // *[tup]
     
-    Type pabc0= TypeNil   .ABC;    // *["abc"]?
+    Type pabc0= TypeMemPtr.ABC0;    // *["abc"]?
     TypeMemPtr pabc = TypeMemPtr.ABCPTR; // *["abc"]
-    Type pzer = TypeMemPtr.make(TypeMem.new_alias());// *[(0)]
-    Type pzer0= TypeNil.make(pzer);// *[(0)]?
+    Type pzer = TypeMemPtr.make    (TypeMem.new_alias());// *[(0)]
+    Type pzer0= TypeMemPtr.make_nil(TypeMem.new_alias());// *[(0)]?
     Type nil  = TypeNil.NIL;
 
     Type xtup = ptup .dual();
@@ -195,33 +194,17 @@ public class TestType {
     Type tss = ts0.meet(t0);
     assertEquals(t0,tss);      // t0.isa(ts0)
 
-    //// meet @{c:0}? and @{c:@{x:1}?,}
-    //Type    nc0 = TypeNil.make(TypeStruct.make(new String[]{"c"},TypeNil.NIL )); // @{c:nil}?
-    //Type    nx1 = TypeNil.make(TypeStruct.make(new String[]{"x"},TypeInt.TRUE)); // @{x:1}?
-    //TypeOop cx  = TypeStruct.make(new String[]{"c"},nx1); // @{c:@{x:1}?}
-    //// JOIN tosses the top-level null choice, and the inside struct choice
-    //Type cj  = nc0.join(cx);
-    //Type c0  = TypeStruct.make(new String[]{"c"},TypeNil.NIL); // @{c:0}
-    //assertEquals(c0,cj);
-    throw com.cliffc.aa.AA.unimpl();
+    // meet @{c:0}? and @{c:@{x:1}?,}
+    TypeObj a1 = TypeStruct.make(new String[]{"c"},TypeNil.NIL ); // @{c:nil}
+    TypeObj a2 = TypeStruct.make(new String[]{"c"},TypeMemPtr.make_nil(3)); // @{c:*{3#}?}
+    TypeObj a3 = TypeStruct.make(new String[]{"x"},TypeInt.TRUE); // @{x: 1 }
+    TypeMem mem = TypeMem.make(false,null,new TypeObj[]{null,a1,a2,a3});
+    // *[1]? join *[2] ==> *[1+2]
+    Type ptr12 = TypeMemPtr.make_nil(1).join( TypeMemPtr.make(2));
+    // mem.ld(*[1+2]) ==> @{c:0}
+    Type ld = mem.ld((TypeMemPtr)ptr12);
+    assertEquals(a1,ld);
   }
-
-  @Ignore @Test public void testUnion() {
-    Type.init0(new HashMap<>());
-
-    Type a = TypeUnion.make(false,TypeInt.FALSE,TypeFlt.FLT32);
-    assertEquals(TypeFlt.FLT32,a); // 0 isa FLT32, so collapses
-    Type b = TypeUnion.make(false,TypeInt.con(123456789),TypeFlt.FLT32);
-    assertEquals(Type.REAL,b); // Does not collapse
-    Type c = TypeUnion.make(false,TypeInt.FALSE,TypeInt.TRUE);
-    assertEquals(TypeInt.BOOL,c); // {0*1} combines to bool
-    Type d = TypeUnion.make(false,TypeInt.FALSE,TypeInt.FALSE);
-    assertTrue(d instanceof TypeUnion); // Does not collapse
-
-    //Type e = TypeInt.FALSE.meet(TypeUnion.NIL);
-    //assertEquals(TypeInt.FALSE,e);
-  }
-
 
   // meet of functions: arguments *join*, fidxes union (meet), and return types
   // meet.  Inverse of all of this for functions join'ing, and UnresolvedNode
@@ -335,7 +318,6 @@ public class TestType {
   @Test public void testCycles() {
     Type.init0(new HashMap<>());
     Type ignore0 = TypeTuple.ALL; // Break class-loader cycle; load Tuple before Fun.
-    Type ignore1 = TypeNil.OOP; // Break class-loader cycle; load Tuple before Fun.
     String[] flds = TypeStruct.FLDS(2);
 
     // T = :(T?,i64)

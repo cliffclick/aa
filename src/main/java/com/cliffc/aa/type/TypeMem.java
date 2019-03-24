@@ -79,7 +79,7 @@ public class TypeMem extends Type<TypeMem> {
   
   private static TypeMem FREE=null;
   @Override protected TypeMem free( TypeMem ret ) { _aliases=null; FREE=this; return ret; }
-  private static TypeMem make( boolean any, TypeObj def, TypeObj[] aliases ) {
+  static TypeMem make( boolean any, TypeObj def, TypeObj[] aliases ) {
     TypeMem t1 = FREE;
     if( t1 == null ) t1 = new TypeMem(any,def,aliases);
     else { FREE = null;       t1.init(any,def,aliases); }

@@ -41,7 +41,9 @@ public class TypeNil extends Type<TypeNil> {
     return ret;
   }
   private static TypeNil make0( Type t ) {
-    assert t== null || t.isa(SCALAR);
+    assert t==null || (t.isa(SCALAR) &&
+                       !t.is_num() && // Numbers fold in zero directly
+                       !(t instanceof TypeMemPtr)); // Ptr folds in zero directly
     TypeNil t1 = FREE;
     if( t1 == null ) t1 = new TypeNil(t);
     else { FREE = null; t1.init(t); }
@@ -49,7 +51,6 @@ public class TypeNil extends Type<TypeNil> {
     return t1==t2 ? t1 : t1.free(t2);
   }
   public static Type make( Type t ) {
-    assert !t.is_num(); // Numbers fold in zero directly
     if( t==NSCALR ) return SCALAR;
     if( t==XNSCALR ) return XSCALAR;
     return t == SCALAR || t == XSCALAR || t instanceof TypeNil ? t : make0(t);
@@ -59,13 +60,8 @@ public class TypeNil extends Type<TypeNil> {
   // types.  It is not in the lattice, and is not returned from any meet
   // (except when meet'ing itself).
   public  static final TypeNil NIL = make0(null);
-  public  static final TypeNil OOP = make0(TypeMemPtr.MEMPTR);
-  public  static final TypeNil XOOP= make0(TypeMemPtr.MEMPTR.dual());
-          static final TypeNil STR = make0(TypeMemPtr.STRPTR);
-  public  static final TypeNil ABC = make0(TypeMemPtr.ABCPTR);
-  public  static final TypeNil TUP = make0(TypeMemPtr.TUPPTR);
 
-  static final TypeNil[] TYPES = new TypeNil[]{OOP,STR,ABC,TUP};
+  static final TypeNil[] TYPES = new TypeNil[]{NIL};
   
   @Override public long   getl() { assert is_con(); return 0; }
   @Override public double getd() { assert is_con(); return 0; }

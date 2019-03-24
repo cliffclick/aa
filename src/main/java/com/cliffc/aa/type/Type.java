@@ -436,7 +436,7 @@ public class Type<T extends Type<T>> {
     assert errs==0 : "Found "+errs+" non-join-type errors";
 
     // Check scalar primitives; all are SCALARS and none sub-type each other.
-    SCALAR_PRIMS = new Type[] { TypeInt.INT64, TypeFlt.FLT64, TypeMemPtr.MEMPTR, TypeFunPtr.GENERIC_FUNPTR, TypeRPC.ALL_CALL };
+    SCALAR_PRIMS = new Type[] { TypeInt.INT64, TypeFlt.FLT64, TypeMemPtr.OOP0, TypeFunPtr.GENERIC_FUNPTR, TypeRPC.ALL_CALL };
     for( Type t : SCALAR_PRIMS ) assert t.isa(SCALAR);
     for( int i=0; i<SCALAR_PRIMS.length; i++ ) 
       for( int j=i+1; j<SCALAR_PRIMS.length; j++ )

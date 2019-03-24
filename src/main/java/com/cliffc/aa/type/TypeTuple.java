@@ -84,7 +84,7 @@ public class TypeTuple<O extends TypeTuple<O>> extends Type<O> {
   public  static final TypeTuple INT64   = make(TypeInt.INT64 );
   public  static final TypeTuple FLT64   = make(TypeFlt.FLT64 );
   public  static final TypeTuple STR     = make(TypeStr.STR   );
-  public  static final TypeTuple OOP_OOP = make(TypeNil.OOP,TypeNil.OOP);
+  public  static final TypeTuple OOP_OOP = make(TypeMemPtr.OOP0,TypeMemPtr.OOP0);
   public  static final TypeTuple INT64_INT64 = make(TypeInt.INT64,TypeInt.INT64);
   public  static final TypeTuple FLT64_FLT64 = make(TypeFlt.FLT64,TypeFlt.FLT64);
   private static final TypeTuple FLT64_INT64 = make(TypeFlt.FLT64,TypeInt.INT64);

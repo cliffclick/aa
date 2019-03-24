@@ -38,7 +38,9 @@ public class StoreNode extends Node {
 
   @Override public Type value(GVNGCM gvn) {
     Type t = gvn.type(adr()).base();
-    if( t.isa(TypeNil.XOOP) ) return TypeMem.MEM.dual(); // Very high address; might fall to any valid value
+    if( t.isa(TypeMemPtr.OOP0.dual()) )
+      // TODO: very weak; actually store limited to changes in any appropriate field
+      return TypeMem.MEM.dual(); // Very high address; might fall to any valid value
     throw AA.unimpl();
     //if( t.isa(TypeOop.XOOP) ) return TypeMem.MEM.dual(); // Very high address; might fall to any valid value
     //if( t instanceof TypeNil ) {
