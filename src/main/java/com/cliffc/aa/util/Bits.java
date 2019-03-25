@@ -64,13 +64,24 @@ public class Bits implements Iterable<Integer> {
     else { FREE=t1; t1=t2; }
     return t1;
   }
-
+  // Constructor taking an array of bits, and allowing join/meet selection
   public static Bits make0( int con, long[] bits ) {
     assert con==-2 || con==-1;
     // TODO: convert to single-bit-form if only 1 bit set
     // TODO: remove trailing sign-extend words
     return make(con,bits);
-  }        
+  }
+  // Constructor taking a list of bits; bits are 'meet'.
+  public static Bits make( int... bits ) {
+    long[] ls = new long[1];
+    for( int bit : bits ) {
+      if( bit < 0 ) throw new IllegalArgumentException("bit must be positive");
+      if( bit >= 63 ) throw AA.unimpl();
+      ls[0] |= 1L<<bit;
+    }
+    return make(-2,ls);
+  }
+  // Constructor taking a single bit
   public static Bits make( int bit ) {
     if( bit < 0 ) throw new IllegalArgumentException("bit must be positive");
     if( bit >= 63 ) throw AA.unimpl();

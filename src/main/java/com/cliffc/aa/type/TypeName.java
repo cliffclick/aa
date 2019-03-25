@@ -9,14 +9,14 @@ import java.util.function.Predicate;
 
 // Named types are essentially a subclass of the named type.
 // They also must be used to make recursive types.
-public class TypeName extends Type<TypeName> {
+public class TypeName extends TypeObj<TypeName> {
   public  String _name;
   public  HashMap<String,Type> _lex; // Lexical scope of this named type
   public  Type _t;                // Named type
   private short _depth; // Nested depth of TypeNames, or -1/ for a forward-ref type-var, -2 for type-cycle head
   // Named type variable
-  private TypeName ( String name, HashMap<String,Type> lex, Type t, short depth ) { super(TNAME); init(name,lex,t,depth); }
-  private void init( String name, HashMap<String,Type> lex, Type t, short depth ) { assert name!=null && lex !=null; _name=name; _lex=lex; _t=t; _depth = depth; }
+  private TypeName ( String name, HashMap<String,Type> lex, Type t, short depth ) { super(TNAME,false); init(name,lex,t,depth); }
+  private void init( String name, HashMap<String,Type> lex, Type t, short depth ) { super.init(TNAME,false); assert name!=null && lex !=null; _name=name; _lex=lex; _t=t; _depth = depth; }
   private static short depth( Type t ) { return(short)(t instanceof TypeName ? ((TypeName)t)._depth+1 : 0); }
   @Override public int hashCode( ) { return TNAME+_name.hashCode();  } // No recursion on _t to break type cycles
   @Override public boolean equals( Object o ) {
@@ -80,7 +80,7 @@ public class TypeName extends Type<TypeName> {
   
   static final TypeName[] TYPES = new TypeName[]{TEST_ENUM,TEST_FLT,TEST_E2};
 
-  @Override TypeName xdual() { return new TypeName(_name,_lex,_t. dual(),_depth); }
+  @Override protected TypeName xdual() { return new TypeName(_name,_lex,_t. dual(),_depth); }
   @Override TypeName rdual() {
     if( _dual != null ) return _dual;
     TypeName dual = _dual = new TypeName(_name,_lex,_t.rdual(),_depth);

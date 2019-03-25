@@ -41,6 +41,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     if( alias >=64 ) throw com.cliffc.aa.AA.unimpl();
     return make(Bits.make0(-2,new long[]{(1L<<alias)|1}));
   }
+  public static TypeMemPtr make( int... aliases ) { return make(Bits.make(aliases)); }
   public int alias() { return _aliases.getbit(); }
 
   public static final TypeMemPtr OOP0   = make(Bits.FULL); // Includes nil
