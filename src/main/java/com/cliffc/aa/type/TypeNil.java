@@ -60,8 +60,8 @@ public class TypeNil extends Type<TypeNil> {
   // types.  It is not in the lattice, and is not returned from any meet
   // (except when meet'ing itself).
   public  static final TypeNil NIL = make0(null);
-
-  static final TypeNil[] TYPES = new TypeNil[]{NIL};
+  // NIL is not in the lattice.
+  static final TypeNil[] TYPES = new TypeNil[]{};
   
   @Override public long   getl() { assert is_con(); return 0; }
   @Override public double getd() { assert is_con(); return 0; }
@@ -102,7 +102,7 @@ public class TypeNil extends Type<TypeNil> {
   @Override public boolean is_con()   { return _t == null; } // Constant nil
   @Override public byte isBitShape(Type t) { return _t==null || this==t ? 0 : _t.isBitShape(t); }
   @Override boolean must_nil() { return _t==null || !_t.above_center(); }
-  @Override Type not_nil(Type ignore) { return _t!=null && _t.above_center() ? _t : this; }
+  @Override Type not_nil() { return _t!=null && _t.above_center() ? _t : this; }
   @Override public Type meet_nil() { return _t.above_center() ? NIL : this; }
   // Make a (possibly cyclic & infinite) named type.  Prevent the infinite
   // unrolling of names by not allowing a named-type with depth >= D from

@@ -107,21 +107,7 @@ public class TypeTuple<O extends TypeTuple<O>> extends Type<O> {
   }
   // Standard Meet.
   @Override protected Type xmeet( Type t ) {
-    switch( t._type ) {
-    case TTUPLE: break;
-    case TFLT:
-    case TINT:
-    case TFUNPTR:
-    case TMEMPTR:
-    case TRPC:   return t.must_nil() ? SCALAR : NSCALR;
-    case TNIL:
-    case TNAME:  return t.xmeet(this); // Let other side decide
-    case TFUN:
-    case TSTR:
-    case TSTRUCT:
-    case TMEM:   return ALL;
-    default: throw typerr(t);
-    }
+    if( t._type != TTUPLE ) return ALL; // Tuples are internal types only, not user exposed
     // If unequal length; then if short is low it "wins" (result is short) else
     // short is high and it "loses" (result is long).
     TypeTuple tt = (TypeTuple)t;
@@ -154,7 +140,7 @@ public class TypeTuple<O extends TypeTuple<O>> extends Type<O> {
     return true;
   }
   @Override boolean must_nil() { return false; }
-  @Override Type not_nil(Type ignore) { return this; }
+  @Override Type not_nil() { return this; }
   @Override public Type meet_nil() { return TypeNil.make(this); }
 
   // Return true if this is a function pointer (return type from EpilogNode)

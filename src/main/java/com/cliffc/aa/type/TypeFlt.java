@@ -53,13 +53,14 @@ public class TypeFlt extends Type<TypeFlt> {
     switch( t._type ) {
     case TFLT:   break;
     case TINT:   return ((TypeInt)t).xmeetf(this);
-    case TTUPLE:
     case TFUNPTR:
     case TMEMPTR:
-    case TRPC:   return must_nil() ? SCALAR : NSCALR;
+    case TRPC:   return must_nil() || t.must_nil() ? SCALAR : NSCALR;
     case TNIL:
     case TNAME:  return t.xmeet(this); // Let other side decide
     case TFUN:
+    case TTUPLE:
+    case TOBJ:
     case TSTR:
     case TSTRUCT:
     case TMEM:   return ALL;
@@ -90,7 +91,7 @@ public class TypeFlt extends Type<TypeFlt> {
   @Override public boolean may_be_con() { return _x>=0; }
   @Override public boolean is_con()   { return _x==0; }
   @Override boolean must_nil() { assert _x!=0||_con!=0; return _x==-2; }
-  @Override Type not_nil(Type ignore) { return _x==2 ? make(1,_z,_con) : this; }
+  @Override Type not_nil() { return _x==2 ? make(1,_z,_con) : this; }
   @Override public Type meet_nil() { return meet(TypeInt.FALSE); }
   
   // Lattice of conversions:

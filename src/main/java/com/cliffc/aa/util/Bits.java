@@ -67,8 +67,17 @@ public class Bits implements Iterable<Integer> {
   // Constructor taking an array of bits, and allowing join/meet selection
   public static Bits make0( int con, long[] bits ) {
     assert con==-2 || con==-1;
-    // TODO: convert to single-bit-form if only 1 bit set
-    // TODO: remove trailing sign-extend words
+    int len = bits.length;
+    while( len > 0 && (bits[len-1]==0 || bits[len-1]== -1) ) len--;
+    if( len != bits.length ) throw AA.unimpl(); // TODO: remove trailing sign-extend words
+    long b = bits[len-1];
+    if( (b & (b-1))==0 ) {      // Last word has only a single bit
+      for( int i=0; i<len-1; i++ )
+        if( bits[i] != 0 )
+          return make(con,bits);
+      con = 63-Long.numberOfLeadingZeros(b);
+      return make(con,null);    // Single bit in last word only, switch to con version
+    }
     return make(con,bits);
   }
   // Constructor taking a list of bits; bits are 'meet'.
@@ -79,7 +88,7 @@ public class Bits implements Iterable<Integer> {
       if( bit >= 63 ) throw AA.unimpl();
       ls[0] |= 1L<<bit;
     }
-    return make(-2,ls);
+    return make0(-2,ls);
   }
   // Constructor taking a single bit
   public static Bits make( int bit ) {
@@ -99,13 +108,23 @@ public class Bits implements Iterable<Integer> {
   public int   abit() { return _bits==null ? _con : -1; }
   public boolean is_con() { return _bits==null; }
   public boolean above_center() { return _con==-1; }
-  
+
+  // Test a specific bit is set or clear
   public boolean test(int i) {
     if( _bits==null ) return i==_con;
     int idx = idx(i);
     return idx < _bits.length ? (_bits[idx]&mask(i))!=0 : inf();
   }
-
+  public Bits clear(int i) {
+    if( !test(i) ) return this; // Already clear
+    if( _con==i ) return make();  // No bits set???
+    assert _con<0;
+    int idx = idx(i);
+    long[] bits = _bits.clone();
+    bits[idx] &= ~mask(i);
+    return make0(_con,bits);
+  }
+  
   private int max() { return (_bits.length<<6)-1; }
   private static void or( long[] bits, int con ) { bits[idx(con)] |= mask(con); }
   private static long[] bits( int a, int b ) { return new long[idx(Math.max(a,b))+1]; }

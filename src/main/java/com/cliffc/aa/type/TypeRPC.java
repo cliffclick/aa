@@ -66,5 +66,5 @@ public class TypeRPC extends Type<TypeRPC> {
   @Override public boolean may_be_con()   { return _rpcs.abit()>0; }
   @Override public boolean is_con()       { return _rpcs.abit()>0; }
   @Override boolean must_nil() { return false; } // never a nil
-  @Override Type not_nil(Type ignore) { return this; }
+  @Override Type not_nil() { return this; }
 }

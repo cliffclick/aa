@@ -221,7 +221,7 @@ public class Type<T extends Type<T>> {
   private boolean is_ptr() { byte t = simple_type();  return t == TFUNPTR || t == TMEMPTR; }
           boolean is_num() { byte t = simple_type();  return t == TNUM || t == TXNUM || t == TNNUM || t == TXNNUM || t == TREAL || t == TXREAL || t == TNREAL || t == TXNREAL || t == TINT || t == TFLT; }
   // True if 'this' isa SCALAR, without the cost of a full 'meet()'
-  private static final byte[] ISA_SCALAR = new byte[]{0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0, 1,1,1,1,0,1,0,0,0,0,1,1,0};
+  private static final byte[] ISA_SCALAR = new byte[]{0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0, 1,1,1,1,0,0,0,0,0,0,1,1,0};
   final boolean isa_scalar() { assert ISA_SCALAR.length==TLAST; return ISA_SCALAR[_type]!=0; }
   
   // Return cached dual
@@ -285,8 +285,8 @@ public class Type<T extends Type<T>> {
     // Not-nil variants
     if(   _type == TNSCALR ) return t.must_nil() ? SCALAR : NSCALR;
     if( t._type == TNSCALR ) return   must_nil() ? SCALAR : NSCALR;
-    if(   _type == TXNSCALR) return t.not_nil(this);
-    if( t._type == TXNSCALR) return   not_nil(t   );
+    if(   _type == TXNSCALR) return t.not_nil();
+    if( t._type == TXNSCALR) return   not_nil();
 
     // Scalar values break out into: nums(reals (int,flt)), GC-ptrs (structs(tuples), arrays(strings)), fun-ptrs, RPC
     if( t._type == TFUN   ) return must_nil() ? SCALAR : NSCALR; // If 't' is a FUN and 'this' is not a FUN (because not equal to 't')
@@ -311,8 +311,8 @@ public class Type<T extends Type<T>> {
         // Not-nil variants
         if(   _type == TNNUM ) return t.must_nil() ? NUM : NNUM;
         if( t._type == TNNUM ) return   must_nil() ? NUM : NNUM;
-        if(   _type == TXNNUM) return t.not_nil(this);
-        if( t._type == TXNNUM) return   not_nil(t   );
+        if(   _type == TXNNUM) return t.not_nil();
+        if( t._type == TXNNUM) return   not_nil();
 
         // Real; same pattern as ANY/ALL, or SCALAR/XSCALAR
         if( _type == TREAL || t._type == TREAL ) return REAL;
@@ -322,8 +322,8 @@ public class Type<T extends Type<T>> {
         // Not-nil variants
         if(   _type == TNREAL ) return t.must_nil() ? REAL : NREAL;
         if( t._type == TNREAL ) return   must_nil() ? REAL : NREAL;
-        if(   _type == TXNREAL) return t.not_nil(this);
-        if( t._type == TXNREAL) return   not_nil(t   );
+        if(   _type == TXNREAL) return t.not_nil();
+        if( t._type == TXNREAL) return   not_nil();
       }
     }
     // Named numbers or whatever: let name sort it out
@@ -568,8 +568,9 @@ public class Type<T extends Type<T>> {
   }
   // Return the type without a nil-choice.  Only applies to above_center types,
   // as these are the only types with a nil-choice.  Only called during meets
-  // with above-center types.
-  Type not_nil(Type ignore) {
+  // with above-center types.  If called with below-center, there is no
+  // nil-choice (might be a must-nil but not a choice-nil), so can return this.
+  Type not_nil() {
     switch( _type ) {
     case TXSCALAR:  return XNSCALR;
     case TXNUM   :  return XNNUM  ;
@@ -593,6 +594,10 @@ public class Type<T extends Type<T>> {
     case TNREAL:    return REAL;
     case TNSCALR:   return SCALAR;
     case TCTRL: case TXCTRL: return ALL;
+    case TRPC:      // RPCs never nil, never user-exposed
+    case TOBJ:
+    case TSTR:
+    case TSTRUCT:
     case TMEM:      return ALL;
     default:        throw typerr(null); // Overridden in subclass
     }

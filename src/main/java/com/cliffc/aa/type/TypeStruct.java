@@ -264,10 +264,11 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     switch( t._type ) {
     case TSTRUCT:break;
     case TNAME:  return t.xmeet(this); // Let other side decide
+    case TOBJ:
+    case TSTR:   return OBJ;
     case TFLT:
     case TINT:
     case TNIL:
-    case TSTR:
     case TTUPLE :
     case TFUNPTR:
     case TMEMPTR:
