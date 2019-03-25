@@ -4,6 +4,7 @@ import com.cliffc.aa.util.Bits;
 import com.cliffc.aa.util.SB;
 
 import java.util.BitSet;
+import java.util.function.Predicate;
 
 // Pointers-to-memory; these can be both the address and the value part of
 // Loads and Stores.  They carry a set of aliased TypeMems. 
@@ -40,6 +41,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     if( alias >=64 ) throw com.cliffc.aa.AA.unimpl();
     return make(Bits.make0(-2,new long[]{(1L<<alias)|1}));
   }
+  public int alias() { return _aliases.getbit(); }
 
   public static final TypeMemPtr OOP0   = make(Bits.FULL); // Includes nil
   public static final TypeMemPtr OOP    = make(Bits.NZERO);// Excludes nil
@@ -83,5 +85,5 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
       return _aliases.above_center() ? TypeNil.NIL : this;
     throw com.cliffc.aa.AA.unimpl();
   }
-  public int alias() { return _aliases.getbit(); }
+  @Override void walk( Predicate<Type> p ) { p.test(this); }
 }

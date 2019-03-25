@@ -198,7 +198,7 @@ public class TestType {
     TypeObj a1 = TypeStruct.make(new String[]{"c"},TypeNil.NIL ); // @{c:nil}
     TypeObj a2 = TypeStruct.make(new String[]{"c"},TypeMemPtr.make_nil(3)); // @{c:*{3#}?}
     TypeObj a3 = TypeStruct.make(new String[]{"x"},TypeInt.TRUE); // @{x: 1 }
-    TypeMem mem = TypeMem.make(false,null,new TypeObj[]{null,a1,a2,a3});
+    TypeMem mem = TypeMem.make(null,new TypeObj[]{null,a1,a2,a3});
     // *[1]? join *[2] ==> *[1+2]
     Type ptr12 = TypeMemPtr.make_nil(1).join( TypeMemPtr.make(2));
     // mem.ld(*[1+2]) ==> @{c:0}
@@ -236,26 +236,35 @@ public class TestType {
     Type.init0(new HashMap<>());
     String[] flds = new String[]{"n","v"};
 
-    // Anonymous recursive structs
+    // Recursive types no longer cyclic in the concrete definition?  Because
+    // TypeObj can contain TypeMemPtrs but not another nested TypeObj...
+    final int alias = 1;
+    final TypeMemPtr ts0ptr = TypeMemPtr.make    (alias);
+    final TypeMemPtr ts0ptr0= TypeMemPtr.make_nil(alias);
+    
+    // Anonymous recursive structs - 
     TypeStruct ts0 = TypeStruct.malloc(false,flds,new Type[2],new byte[]{1,1});
-    ts0._ts[0] = ts0;    ts0._cyclic = true;
+    ts0._ts[0] = ts0ptr;    ts0._cyclic = true;
     ts0._ts[1] = TypeInt.INT64;
     ts0 = ts0.install_cyclic();
-
+    TypeMem ts0mem = TypeMem.make(alias,ts0); // {1:@{n:*[1],v:int} }
+    
     TypeStruct ts1 = TypeStruct.malloc(false,flds,new Type[2],new byte[]{1,1});
-    Type.RECURSIVE_MEET++;
-    Type tsn = TypeNil.make(ts1);  tsn._cyclic = true;
-    ts1._ts[0] = tsn;    ts1._cyclic = true;
+    ts1._ts[0] = ts0ptr0;  ts1._cyclic = true;
     ts1._ts[1] = TypeInt.INT64;
-    Type.RECURSIVE_MEET--;
     ts1 = ts1.install_cyclic();
-
+    TypeMem ts1mem = TypeMem.make(alias,ts1); // {1:@{n:*[0,1],v:int} }
+    
     Type tsmt = ts0.meet(ts1);
     assertEquals(ts1,tsmt);
+    Type tsmemmt = ts0mem.meet(ts1mem);
+    assertEquals(ts1mem,tsmemmt);
+
     
     // Cyclic named struct: "A:@{n:A?,v:int64}"
     // If we unrolled this (and used S for Struct and 0 for Nil) we'd get:
     // AS0AS0AS0AS0AS0AS0...
+    assertTrue(false); // TODO...
     TypeName tfa = TypeName.make_forward_def_type("A",TypeName.TEST_SCOPE);
     Type tna = TypeNil.make(tfa);
     TypeStruct tsna = TypeStruct.make(flds,tna,TypeInt.INT64);
