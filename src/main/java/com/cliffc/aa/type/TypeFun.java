@@ -87,6 +87,6 @@ public class TypeFun extends TypeTuple<TypeFun> {
   public Type val() { return _ts[1]; }
   public Type rpc() { return _ts[2]; }
   public TypeFunPtr fun() { return (TypeFunPtr)_ts[3]; }
-  @Override boolean must_nil() { return false; }
+  @Override public boolean must_nil() { return false; }
   @Override Type not_nil() { return this; }
 }

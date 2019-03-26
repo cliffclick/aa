@@ -20,7 +20,7 @@ public abstract class PrimNode extends Node {
   final Type _ret;
   public final String _name;    // Unique name (and program bits)
   public final String[] _args;  // Handy
-  public Parse _badargs;
+  public Parse _badargs;        // Filled in when inlined in CallNode
   PrimNode( String name, String[] args, TypeTuple targs, Type ret, Node... nodes ) { super(OP_PRIM,nodes); _name=name; _args=args; _targs = targs; _ret = ret; _badargs=null; }
   
   final static String[] ARGS1 = new String[]{"x"};
@@ -192,19 +192,27 @@ static class ConvertInt64F64 extends PrimNode {
 }
 
 static class ConvertI64Str extends PrimNode {
-  ConvertI64Str(Node... nodes) { super("str",PrimNode.ARGS1,TypeTuple.INT64,TypeStr.STR,nodes); }
-  @Override public TypeStr apply( Type[] args ) { return TypeStr.con(Long.toString(args[1].getl())); }
+  ConvertI64Str(Node... nodes) { super("str",PrimNode.ARGS1,TypeTuple.INT64,TypeMemPtr.STRPTR,nodes); }
+  @Override public TypeMemPtr apply( Type[] args ) {
+    //return TypeStr.con(Long.toString(args[1].getl()));
+    throw AA.unimpl();
+  }
   @Override public boolean is_lossy() { return false; }
 }
 
 static class ConvertF64Str extends PrimNode {
-  ConvertF64Str(Node... nodes) { super("str",PrimNode.ARGS1,TypeTuple.FLT64,TypeStr.STR,nodes); }
-  @Override public TypeStr apply( Type[] args ) { return TypeStr.con(Double.toString(args[1].getd())); }
+  ConvertF64Str(Node... nodes) { super("str",PrimNode.ARGS1,TypeTuple.FLT64,TypeMemPtr.STRPTR,nodes); }
+  // "allocates" a constant string with a unique alias same as a NewNode, reads
+  // no memory, only writes to the unique alias.
+  @Override public TypeMemPtr apply( Type[] args ) {
+    throw AA.unimpl();
+    //return TypeStr.con(Double.toString(args[1].getd()));
+  }
   @Override public boolean is_lossy() { return false; }
 }
 
 static class ConvertStrStr extends PrimNode {
-  ConvertStrStr(Node... nodes) { super("str",PrimNode.ARGS1,TypeTuple.STR,TypeStr.STR,nodes); }
+  ConvertStrStr(Node... nodes) { super("str",PrimNode.ARGS1,TypeTuple.STRPTR,TypeMemPtr.STRPTR,nodes); }
   @Override public Type apply( Type[] args ) { return args[1]; }
   @Override public Node ideal(GVNGCM gvn) { return in(1); }
   @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)); }

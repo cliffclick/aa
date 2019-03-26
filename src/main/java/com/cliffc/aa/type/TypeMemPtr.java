@@ -46,7 +46,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
 
   public static final TypeMemPtr OOP0   = make(Bits.FULL); // Includes nil
   public static final TypeMemPtr OOP    = make(Bits.NZERO);// Excludes nil
-         static final TypeMemPtr STRPTR = make(TypeStr.STR_alias);
+  public static final TypeMemPtr STRPTR = make(TypeStr.STR_alias);
          static final TypeMemPtr STR0   = make_nil(TypeStr.STR_alias);
          static final TypeMemPtr ABCPTR = make(TypeStr.ABC_alias);
   public static final TypeMemPtr ABC0   = make_nil(TypeStr.ABC_alias);
@@ -78,9 +78,9 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
 
   @Override public boolean above_center() { return _aliases.above_center(); }
   @Override public boolean may_be_con()   { return _aliases.above_center() || _aliases.is_con(); }
-  @Override public boolean is_con()       { return false; }
-  @Override boolean must_nil() { return _aliases.test(0) && !above_center(); }
-  @Override boolean may_nil() { return _aliases.may_nil(); }
+  @Override public boolean is_con()       { return _aliases.is_con() && _aliases.getbit()==0; }
+  @Override public boolean must_nil() { return _aliases.test(0) && !above_center(); }
+  @Override public boolean may_nil() { return _aliases.may_nil(); }
   @Override Type not_nil() {
     // Below center, return this; above center remove nil choice
     return above_center() && _aliases.test(0) ? make(_aliases.clear(0)) : this;

@@ -173,8 +173,8 @@ public class TypeInt extends Type<TypeInt> {
   @Override public boolean above_center() { return _x>0; }
   @Override public boolean may_be_con() { return _x>=0; }
   @Override public boolean is_con()   { return _x==0; }
-  @Override boolean must_nil() { return _x==-2 || (_x==0 && _con==0); }
-  @Override boolean may_nil() { return _x>0 || (_x==0 && _con==0); }
+  @Override public boolean must_nil() { return _x==-2 || (_x==0 && _con==0); }
+  @Override public boolean may_nil() { return _x>0 || (_x==0 && _con==0); }
   @Override Type not_nil() {
     // Choice {0,1} ==> {1}
     if( this==BOOL.dual() ) return TRUE;

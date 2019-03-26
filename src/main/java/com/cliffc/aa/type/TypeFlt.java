@@ -90,8 +90,8 @@ public class TypeFlt extends Type<TypeFlt> {
   @Override public boolean above_center() { return _x>0; }
   @Override public boolean may_be_con() { return _x>=0; }
   @Override public boolean is_con()   { return _x==0; }
-  @Override boolean must_nil() { assert _x!=0||_con!=0; return _x==-2; }
-  @Override boolean may_nil() { return _x>0 || (_x==0 && _con==0); }
+  @Override public boolean must_nil() { assert _x!=0||_con!=0; return _x==-2; }
+  @Override public boolean may_nil() { return _x>0 || (_x==0 && _con==0); }
   @Override Type not_nil() { return _x==2 ? make(1,_z,_con) : this; }
   @Override public Type meet_nil() { return meet(TypeInt.FALSE); }
   

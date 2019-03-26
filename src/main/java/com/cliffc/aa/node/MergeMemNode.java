@@ -9,8 +9,9 @@ import com.cliffc.aa.type.*;
 
 // Tuples are not memory, just a collection.
 
-// TypeMem has an Alias and a Named Struct (name is optional).  Structs ARE
-// memory and list the known fields and contents.
+// TypeMem has an Alias and a Obj - either a Struct, String or Array
+// (optionally Named).  Structs ARE memory and list the known fields and
+// contents.
 
 // NewNode produces both a memory and a pointer.
 
@@ -28,65 +29,33 @@ import com.cliffc.aa.type.*;
 // Example: x.b:='def'
 //   This updates mem-alias-X from @{a:=2,b:='abc'} to @{a:=2,b:='def'}
 
-// Aliases have a heirarchy of at least 3- "all" of memory, "all" of a Named-
-// Struct type, and a specific allocation site.  In the past, have looked at
-// negative alias types (all minus X), and also complete splits.  Did complete
-// splits with alias bits, and the infinite-bit set (see Bits.java).
+// Alias#s merge all allocations from the same allocation site, but then are
+// never merged after that - no "wide" or "fat" memory approximations.  Might
+// happen strictly for representation compression, but always without loss.
 
-// Look at: No merging of discrete bits into a "fat" memory and then splitting
-// it apart - because the merge into "fat" will lose precision.  Just keep it
-// split always? - except at program entry/exit?  Whole-program issues: need to
-// look at approximations to keep size in check.  Maybe: unrelated fcns keep
-// unrelated memory fat - which means split-around a Call site (same as Cntrl)
-// many-skinny flow around a Call - and the call contents are not messing with
-// the external memory.
-//
-// Gets into Call signatures for memory - untouched memory, read-only memory,
-// r/w memory, freed vs borrowed memory, etc.
+// Function signatures include memory - untouched memory, read-only memory, r/w
+// memory, freed vs borrowed memory, etc.  The default fcn sig will be to use
+// and return changed All memory.  'Pure' functions do not read or write
+// memory, and we also can support read-only functions, or functions which only
+// operate on certain aliases (those passed-in).
 
-// Types: TypeMem has sub-types for every alias, and generically TypeMem for
-// bulk (non-aliased).  Not allowed to Load/Store from Bulk memory (approx
-// issues).  So TypeMem e.g. an array indexed by Alias#, or a HashTable indexed
-// by Alias# for very sparse.  Use an accessor and change impl as needed.  So
-// has a list of specific Alias#s.  Also needs a list of "fat" alias#s, which
-// can be the inverted bitvector.  Again, use accessor and change impl.  Will
-// need to support a Merge operation (allowed on a 2 mid-tier or a mid-tier and
-// a NewNode alias).
-//
-// Need a TypePtr which has a mid-tier and a new-node specific alias.  There
-// can be a "allptr" pointing to "all", but maybe there's only 1 (like type
-// Scalar it has no shape or content).
-//
-// Can be many "tiers" in the heirarchy, as there are Names in the Types.
-// NewNode is basically a named subtype of its result type.
+// TypeMem maps from Alias# to a TypeObj, and generically TypeObj for bulk
+// (non-aliased).  Not allowed to Load/Store from Bulk memory (approx issues).
+// TypeMem supports a 'ld' for doing approximate base-pointer meet, and a
+// NewNode+TypeMem merge (plus the usual Meet for PhiNodes).
 //
 // Action items:
 //
 // - An assert that walks the entire graph, and ensures no duplicate memory
 //   aliases in any program slice.
-//-  NewNode tracks unique memory aliases, same as CallNode for RPCs.
-// - A TypePtr has a Bits of memory aliases
-// - A TypeMem has a mapping from every alias to a Type
-// - NewNode produces a TypeMem with 1 alias to a e.g. Struct and a TypePtr.
 // - StartNode produces a empty TypeMem.
 // - TypeMem supports merging TypeMems with unrelated aliases.  Error to merge
 //   same alias.
-// - Load & Store take in a TypeMem & a TypePtr.  TypeMem can be "fat" with many
-//   aliases but the TypePtr can only be mid-tier "fat".
 // - Calls take in a TypeMem and can update all Aliases in the TypeMem's
 //   subtypes.  Calls can be more strongly user-typed to limit r/w aliases -
 //   but in any case the gvn.opto will discover the minimal update set.
 // - Phi keeps mem types fully alias precise unless TypePtrs are also becoming
 //   imprecise?  No need to ever get approx?
-//-----
-// More thinking:
-//
-// Bring back TypeOop as TypeObj - base of Objects.
-// Obj is parent of Struct,Array (Str is an instance of Array).  These are memory-content values.
-// TypeMem is a collection of Objs, indexed by Alias#s.
-// TypeMemPtr is a collection of Alias#s.
-
-
 
 
 

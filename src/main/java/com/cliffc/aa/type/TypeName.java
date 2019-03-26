@@ -172,7 +172,7 @@ public class TypeName extends TypeObj<TypeName> {
   @Override public double getd  () { return _t.getd  (); }
   @Override public long   getl  () { return _t.getl  (); }
   @Override public String getstr() { return _t.getstr(); }
-  @Override boolean must_nil() { return _t.above_center() || _t.must_nil(); }
+  @Override public boolean must_nil() { return _t.above_center() || _t.must_nil(); }
   @Override Type not_nil() {
     Type nn = _t.not_nil();
     if( base().must_nil() ) return nn; // Cannot remove all nils and keep the name, so lose the name

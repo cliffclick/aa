@@ -24,12 +24,12 @@ public class LoadNode extends Node {
   public LoadNode( Node ctrl, Node mem, Node adr, int fld_num, Parse bad ) { this(ctrl,mem,adr,null,fld_num,bad); }
   String xstr() { return "."+(_fld==null ? ""+_fld_num : _fld); } // Self short name
   String  str() { return xstr(); }      // Inline short name
-  Node ctl() { return in(0); }
-  Node mem() { return in(1); }
-  Node adr() { return in(2); }
-  Node set_ctl(Node c, GVNGCM gvn) { return set_def(0,c,gvn); }
-  Node set_mem(Node m, GVNGCM gvn) { return set_def(1,m,gvn); }
-  Node set_adr(Node a, GVNGCM gvn) { return set_def(2,a,gvn); }
+  private Node ctl() { return in(0); }
+  private Node mem() { return in(1); }
+  private Node adr() { return in(2); }
+  private Node set_ctl(Node c, GVNGCM gvn) { return set_def(0,c,gvn); }
+  private Node set_mem(Node m, GVNGCM gvn) { return set_def(1,m,gvn); }
+  private Node set_adr(Node a, GVNGCM gvn) { return set_def(2,a,gvn); }
   
   @Override public Node ideal(GVNGCM gvn) {
     Node ctrl = ctl();
@@ -70,23 +70,25 @@ public class LoadNode extends Node {
   }
 
   @Override public Type value(GVNGCM gvn) {
-    Type t = gvn.type(adr()).base();
-    if( t.isa(TypeMemPtr.OOP0.dual()) ) return Type.XSCALAR; // Very high address; might fall to any valid value
-    if( t instanceof TypeNil ) {
-      //if( !t.above_center() )     // NIL or below?
-      //  return Type.SCALAR;       // Fails - might be nil at runtime
-      //t = ((TypeNil)t)._t.base(); // Assume guarded by test
-      throw AA.unimpl();        // Theory sez: only TypeMemPtr for Address, never TypeNil
-    }
+    Type adr = gvn.type(adr()).base();
+    if( adr.isa(TypeMemPtr.OOP0.dual()) ) return Type.XSCALAR; // Very high address; might fall to any valid value
+    if( adr.must_nil() ) return Type.SCALAR; // Not provable not-nil, so fails
+    if( TypeMemPtr.OOP0.isa(adr) ) return Type.SCALAR; // Very low, might be any address
+    if( !(adr instanceof TypeMemPtr) )
+      return adr.above_center() ? Type.XSCALAR : Type.SCALAR;
 
-    //if( t instanceof TypeStruct ) {
-    //  TypeStruct ts = (TypeStruct)t;
-    //  int idx = find(ts);       // Find the named field
-    //  if( idx != -1 ) return ts.at(idx); // Field type
-    //}
-    //
-    //return Type.SCALAR;
-    throw AA.unimpl();
+    Type mem = gvn.type(mem());     // Memory
+    if( !(mem instanceof TypeMem) ) // Nothing sane
+      return mem.above_center() ? Type.XSCALAR : Type.SCALAR;
+    TypeObj obj = ((TypeMem)mem).ld((TypeMemPtr)adr);
+    
+    if( obj instanceof TypeStruct ) {
+      TypeStruct ts = (TypeStruct)obj;
+      int idx = find(ts);       // Find the named field
+      if( idx != -1 ) return ts.at(idx); // Field type
+      // No such field
+    }
+    return Type.XSCALAR;        // No loading from e.g. Strings
   }
 
   private int find(TypeStruct ts) {

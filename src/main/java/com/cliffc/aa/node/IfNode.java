@@ -18,16 +18,21 @@ public class IfNode extends Node {
     Type pred = gvn.type(in(1)).base();
     if( pred.isa(TypeInt.XINT1) ) return TypeTuple.IF_ANY; // Choice of {0,1}
     if( TypeInt.BOOL.isa(pred)  ) return TypeTuple.IF_ALL; // Can be either
-    if( pred instanceof TypeTuple)return TypeTuple.IF_ALL;// Nonsense, and never nil
-    if( pred instanceof TypeRPC ) return TypeTuple.IF_ALL;// Nonsense, and never nil
     if( pred == TypeInt.FALSE || pred == TypeNil.NIL )
       return TypeTuple.IF_FALSE;   // False only
-    assert pred != TypeFlt.con(0); // Only expect int numeric constants?
+    
+    if( pred instanceof TypeTuple)return TypeTuple.IF_ANY;// Nonsense, so test is dead
+    if( pred instanceof TypeObj ) return TypeTuple.IF_ANY;// Nonsense, so test is dead
     if( pred instanceof TypeNil )  // Check for nil-or- vs nil-and-
       return pred.above_center() ? TypeTuple.IF_ANY : TypeTuple.IF_ALL;
-    if( pred.meet_nil() != pred ) return TypeTuple.IF_TRUE;// Has no nil
-    
-    if( pred.is_con() ) { assert pred.getl() != 0; return TypeTuple.IF_TRUE; } // True only
+    // Already checked for exactly NIL.
+    // If pred maybe a nil, then we can choose nil or something else
+    if( pred. may_nil() ) return TypeTuple.IF_ANY;
+    // If pred must include a nil, then we can see nil or something else
+    if( pred.must_nil() ) return TypeTuple.IF_ALL;
+    // If meeting a nil changes things, then the original excluded nil and so
+    // was always true.
+    if( pred.meet_nil() != pred ) return TypeTuple.IF_TRUE;
     
     throw AA.unimpl(); // Dunno what test this is?
   }

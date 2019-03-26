@@ -65,10 +65,10 @@ public class TypeRPC extends Type<TypeRPC> {
   public int rpc() { return _rpcs.getbit(); }
   public boolean test(int rpc) { return _rpcs.test(rpc); }
   @Override public boolean above_center() { return _rpcs.above_center(); }
-  @Override public boolean may_be_con()   { return _rpcs.abit()>0; }
-  @Override public boolean is_con()       { return _rpcs.abit()>0; }
-  @Override boolean must_nil() { return _rpcs.test(0) && !above_center(); }
-  @Override boolean may_nil() { return _rpcs.may_nil(); }
+  @Override public boolean may_be_con()   { return _rpcs.is_con() || _rpcs.above_center(); }
+  @Override public boolean is_con()       { return _rpcs.is_con(); }
+  @Override public boolean must_nil() { return _rpcs.test(0) && !above_center(); }
+  @Override public boolean may_nil() { return _rpcs.may_nil(); }
   @Override Type not_nil() {
     // Below center, return this; above center remove nil choice
     return above_center() && _rpcs.test(0) ? make(_rpcs.clear(0)) : this;

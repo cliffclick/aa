@@ -9,6 +9,8 @@ import org.junit.Test;
 
 import java.util.Arrays;
 
+import static org.junit.Assert.assertEquals;
+
 public class TestNode {
   // A private set of input nodes to feed into each tested Node - a hand-rolled
   // sub-graph.
@@ -29,6 +31,8 @@ public class TestNode {
   private int[][] _min_subtypes;
 
   private NonBlockingHashMapLong<Type> _values;
+
+  private int _errs;
   
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testNode() {
@@ -104,6 +108,7 @@ public class TestNode {
   // monotonicity invariant.
 
   @Test public void testMonotonic() {
+    assert _errs == 0;          // Start with no errors
     // All The Types we care to reason about.  There's an infinite number of
     // Types, but mostly are extremely similar - so we limit ourselves to a
     // subset which has at least one of unique (Java) subtype, plus some
@@ -161,6 +166,8 @@ public class TestNode {
     test1monotonic(new   TypeNode(TypeStr.ABC  ,_ins[1],null));
     test1monotonic(new   TypeNode(TypeFlt.FLT64,_ins[1],null));
     test1monotonic(new UnresolvedNode(_ins[0],_ins[1],_ins[2]));
+    
+    assertEquals(0,_errs);
   }
 
   private void test1monotonic(Node n) {
@@ -179,6 +186,7 @@ public class TestNode {
   }
   
   private void test1monotonic_init(final Node n) {
+    System.out.println(n.xstr());
     _values.clear();
     set_value_type(n,0);
     test1monotonic(n,0);
@@ -208,6 +216,7 @@ public class TestNode {
             if( !vn.isa(vm) ) {
               System.out.println(n.xstr()+"("+all[xx(xx,0)]+","+all[xx(xx,1)]+","+all[xx(xx,2)]+","+all[xx(xx,3)]+") = "+vn);
               System.out.println(n.xstr()+"("+all[     x0 ]+","+all[     x1 ]+","+all[     x2 ]+","+all[     x3 ]+") = "+vm);
+              _errs++;
             }
             if( !visited ) test1monotonic(n,xxx); // Recurse
           }

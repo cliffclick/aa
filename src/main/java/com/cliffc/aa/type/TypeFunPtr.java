@@ -102,8 +102,8 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   @Override public boolean above_center() { return _fidxs.above_center(); }
   @Override public boolean may_be_con()   { return _fidxs.is_con() || _fidxs.above_center(); }
   @Override public boolean is_con()       { return _fidxs.is_con(); }
-  @Override boolean must_nil() { return false; }
-  @Override boolean may_nil() { return _fidxs.may_nil(); }
+  @Override public boolean must_nil() { return _fidxs.test(0) && !above_center(); }
+  @Override public boolean may_nil() { return _fidxs.may_nil(); }
   @Override Type not_nil() { return this; }
   @Override public Type meet_nil() {
     if( _fidxs.test(0) )      // Already has a nil?

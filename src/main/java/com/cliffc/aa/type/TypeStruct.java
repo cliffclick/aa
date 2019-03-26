@@ -532,7 +532,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   
   // Iterate over any nested child types
   @Override public void iter( Consumer<Type> c ) { for( Type t : _ts) c.accept(t); }
-  @Override public Type meet_nil() { return TypeNil.make(above_center() ? make(_flds,_ts) : this); }
+  @Override public Type meet_nil() { return this; }
   
   @Override boolean contains( Type t, BitSet bs ) {
     if( bs==null ) bs=new BitSet();

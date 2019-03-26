@@ -83,7 +83,7 @@ public class TypeTuple<O extends TypeTuple<O>> extends Type<O> {
           static final TypeTuple INT32   = make(TypeInt.INT32 );
   public  static final TypeTuple INT64   = make(TypeInt.INT64 );
   public  static final TypeTuple FLT64   = make(TypeFlt.FLT64 );
-  public  static final TypeTuple STR     = make(TypeStr.STR   );
+  public  static final TypeTuple STRPTR  = make(TypeMemPtr.STRPTR);
   public  static final TypeTuple OOP_OOP = make(TypeMemPtr.OOP0,TypeMemPtr.OOP0);
   public  static final TypeTuple INT64_INT64 = make(TypeInt.INT64,TypeInt.INT64);
   public  static final TypeTuple FLT64_FLT64 = make(TypeFlt.FLT64,TypeFlt.FLT64);
@@ -96,7 +96,7 @@ public class TypeTuple<O extends TypeTuple<O>> extends Type<O> {
   public  static final TypeTuple IF_FALSE= make(CTRL ,XCTRL);
 
   public  static final TypeTuple STATE = make(CTRL, TypeMem.MEM);
-  static final TypeTuple[] TYPES = new TypeTuple[]{XSCALARS,SCALAR0,SCALAR1,STR,INT32,INT64,FLT64,INT64_INT64,FLT64_FLT64,FLT64_INT64, IF_ALL, IF_TRUE, IF_FALSE, OOP_OOP};
+  static final TypeTuple[] TYPES = new TypeTuple[]{XSCALARS,SCALAR0,SCALAR1,STRPTR,INT32,INT64,FLT64,INT64_INT64,FLT64_FLT64,FLT64_INT64, IF_ALL, IF_TRUE, IF_FALSE, OOP_OOP};
   
   // The length of Tuples is a constant, and so is its own dual.  Otherwise
   // just dual each element.  Also flip the infinitely extended tail type.
@@ -139,7 +139,7 @@ public class TypeTuple<O extends TypeTuple<O>> extends Type<O> {
     for( Type _t : _ts ) if( !_t.is_con() ) return false;
     return true;
   }
-  @Override boolean must_nil() { return false; }
+  @Override public boolean must_nil() { return false; }
   @Override Type not_nil() { return this; }
   @Override public Type meet_nil() { return TypeNil.make(this); }
 

@@ -552,12 +552,15 @@ public class Type<T extends Type<T>> {
 
   // True if type must include a nil (as opposed to may-nil, which means the
   // type can choose something other than nil).
-  boolean must_nil() {
+  public boolean must_nil() {
     switch( _type ) {
     case TALL:
     case TNUM:
     case TREAL:
     case TSCALAR:
+    case TCTRL:  // Nonsense, only for IfNode.value test
+    case TXCTRL: // Nonsense, only for IfNode.value test
+    case TMEM:   // Nonsense, only for IfNode.value test
       return true;              // These all must include a nil
     case TANY:
     case TXNUM:
@@ -572,7 +575,7 @@ public class Type<T extends Type<T>> {
   }
   // True if type may include a nil (as opposed to must-nil).
   // True for many above-center or zero values.
-  boolean may_nil() {
+  public boolean may_nil() {
     switch(_type) {
     case TALL:
     case TNUM:
@@ -587,6 +590,9 @@ public class Type<T extends Type<T>> {
     case TXNUM:
     case TXREAL:
     case TXSCALAR:
+    case TCTRL:  // Nonsense, only for IfNode.value test
+    case TXCTRL: // Nonsense, only for IfNode.value test
+    case TMEM:   // Nonsense, only for IfNode.value test
       return true;
     default: throw typerr(null); // Overridden in subclass
     }
@@ -629,19 +635,7 @@ public class Type<T extends Type<T>> {
   }
 
   // Mismatched scalar types that can only cross-nils
-  Type cross_nil(Type t) {
-    boolean must0 =   must_nil();
-    boolean must1 = t.must_nil();
-    return must0 || must1 ? SCALAR : NSCALR;
-    //boolean  may0 =    may_nil();
-    //boolean  may1 = t. may_nil();
-    //if( must0 && must1 ) return SCALAR; // Unrelated non-choice nils
-    //if( must0 ) return may1 ? this: SCALAR;
-    //if( must1 ) return may0 ? t   : SCALAR;
-    //if( may0 ) return t.meet_nil();
-    //if( may1 ) return   meet_nil();
-    //return NSCALR;
-  }
+  Type cross_nil(Type t) { return must_nil() || t.must_nil() ? SCALAR : NSCALR; }
     
   // Make a (possibly cyclic & infinite) named type.  Prevent the infinite
   // unrolling of names by not allowing a named-type with depth >= D from
