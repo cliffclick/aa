@@ -13,12 +13,14 @@ public class TestType {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testType() {
     Type.init0(new HashMap<>());
-    Type t0 = TypeObj.OBJ;
-    Type t1 = TypeName.TEST_ENUM;
+    Type t0 = TypeMem.MEM;
+    Type t1 = TypeMem.MEM_STR;
     Type t2 = t0.meet(t1);
-    Type t2x= t1.meet(t0);
-    assertEquals(t2,t2x);
-    assertEquals(Type.ALL,t2);
+
+    Type t3 = t2.dual();
+    Type t4 = t1.dual();
+    Type t5 = t3.meet(t4);
+    assertEquals(t4,t5);
 
   }
   
@@ -146,13 +148,13 @@ public class TestType {
     // they are from different alias classes, they are NEVER equal (unless both
     // nil).  We cannot tell what they point-to, so we do not know if the
     // memory pointed-at is compatible or not.
-    assertFalse(xstr0.isa(pabc0)); // ~*[1]+0 vs ~*[2]?
+    assertTrue (xstr0.isa(pabc0)); // ~*[1]+0 vs ~*[2]?
     assertFalse(xstr .isa(pabc ));
     // We can instead assert that values loaded are compatible:
     assertTrue (TypeMem.MEM_STR.dual().ld(xstr).isa(TypeMem.MEM_ABC.ld(pabc)));
     
     assertTrue (xtup0.isa( nil ));
-    assertFalse(xtup0.isa(pzer0));
+    assertTrue (xtup0.isa(pzer0));
     assertFalse(xtup .isa(pzer ));
     //assertTrue(TypeMem.MEM_TUP.dual().ld(xstr).isa(TypeMem.MEM_ZER.ld(pabc)));
     
@@ -197,7 +199,7 @@ public class TestType {
     TypeObj a1 = TypeStruct.make(new String[]{"c"},TypeNil.NIL ); // @{c:nil}
     TypeObj a2 = TypeStruct.make(new String[]{"c"},TypeMemPtr.make_nil(3)); // @{c:*{3#}?}
     TypeObj a3 = TypeStruct.make(new String[]{"x"},TypeInt.TRUE); // @{x: 1 }
-    TypeMem mem = TypeMem.make(null,new TypeObj[]{null,a1,a2,a3});
+    TypeMem mem = TypeMem.make(TypeObj.OBJ,new TypeObj[]{null,a1,a2,a3});
     // *[1]? join *[2] ==> *[1+2]
     Type ptr12 = TypeMemPtr.make_nil(1).join( TypeMemPtr.make(2));
     // mem.ld(*[1+2]) ==> @{c:0}
@@ -288,7 +290,7 @@ public class TestType {
     // Twice: SAS AS0AS0AS0AS0AS0...
     // Meet:  SAS0AS0AS0AS0AS0AS0...
     // which is the Once yet again
-    TypeMem mem234 = TypeMem.make(null,new TypeObj[]{null,null,ta2,ta3,ta4});
+    TypeMem mem234 = TypeMem.make(TypeObj.OBJ,new TypeObj[]{null,null,ta2,ta3,ta4});
     TypeMemPtr ptr34 = TypeMemPtr.make(alias3,alias4);
 
     // Since hacking ptrs about from mem values, no cycles so instead...

@@ -632,14 +632,15 @@ public class Type<T extends Type<T>> {
   Type cross_nil(Type t) {
     boolean must0 =   must_nil();
     boolean must1 = t.must_nil();
-    boolean  may0 =    may_nil();
-    boolean  may1 = t. may_nil();
-    if( must0 && must1 ) return SCALAR; // Unrelated non-choice nils
-    if( must0 ) return may1 ? this: SCALAR;
-    if( must1 ) return may0 ? t   : SCALAR;
-    if( may0 ) return t.meet_nil();
-    if( may1 ) return   meet_nil();
-    return NSCALR;
+    return must0 || must1 ? SCALAR : NSCALR;
+    //boolean  may0 =    may_nil();
+    //boolean  may1 = t. may_nil();
+    //if( must0 && must1 ) return SCALAR; // Unrelated non-choice nils
+    //if( must0 ) return may1 ? this: SCALAR;
+    //if( must1 ) return may0 ? t   : SCALAR;
+    //if( may0 ) return t.meet_nil();
+    //if( may1 ) return   meet_nil();
+    //return NSCALR;
   }
     
   // Make a (possibly cyclic & infinite) named type.  Prevent the infinite

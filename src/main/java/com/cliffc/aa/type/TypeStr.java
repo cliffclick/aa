@@ -59,8 +59,8 @@ public class TypeStr extends TypeObj<TypeStr> {
     switch( t._type ) {
     case TSTR:     break;
     case TNAME:  return t.xmeet(this); // Let other side decide
-    case TOBJ:
     case TSTRUCT:return OBJ;
+    case TOBJ:   return t.above_center() ? this : t;
     case TNIL:
     case TTUPLE: 
     case TFUNPTR:

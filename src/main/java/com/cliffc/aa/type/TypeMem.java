@@ -37,7 +37,7 @@ public class TypeMem extends Type<TypeMem> {
   @Override public int hashCode( ) {
     return super.hashCode() +
       (_aliases==null ? 0 : Arrays.hashCode(_aliases)) +
-      (_def==null ? 0 : _def.hashCode());
+      _def.hashCode();
   }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
@@ -54,7 +54,7 @@ public class TypeMem extends Type<TypeMem> {
   @Override String str( BitSet dups ) {
     SB sb = new SB();
     sb.p("{");
-    if( _def != null )
+    if( _def != TypeObj.OBJ )
       sb.p("mem:").p(_def.toString()).p(",");
     for( int i=0; i<_aliases.length; i++ )
       if( _aliases[i] != null )
@@ -62,11 +62,6 @@ public class TypeMem extends Type<TypeMem> {
     return sb.p("}").toString();
   }
   // Alias must exist
-  TypeObj at(int alias) {
-    TypeObj rez = at0(alias);
-    assert rez != null : "Fetching alias "+alias+" which does not exist";
-    return rez;
-  }
   private TypeObj at0(int alias) {
     if( alias >= _aliases.length ) return _def;
     TypeObj obj = _aliases[alias];
@@ -88,10 +83,10 @@ public class TypeMem extends Type<TypeMem> {
     assert oop!=null;
     TypeObj[] oops = new TypeObj[alias+1];
     oops[alias] = oop;
-    return make(null,oops);
+    return make(TypeObj.OBJ,oops);
   }
 
-  public  static final TypeMem MEM = make(TypeStruct.ALLSTRUCT,new TypeObj[0]);
+  public  static final TypeMem MEM = make(TypeObj.OBJ,new TypeObj[0]);
   public  static final TypeMem MEM_STR = make(TypeStr.STR_alias,TypeStr.STR);
   public  static final TypeMem MEM_ABC = make(TypeStr.ABC_alias,TypeStr.ABC);
   static final TypeMem[] TYPES = new TypeMem[]{MEM,MEM_STR};
@@ -102,20 +97,19 @@ public class TypeMem extends Type<TypeMem> {
     for(int i=0; i<_aliases.length; i++ )
       if( _aliases[i] != null )
         oops[i] = (TypeObj)_aliases[i].dual();
-    return new TypeMem(_def==null ? null : (TypeObj)_def.dual(), oops);
+    return new TypeMem((TypeObj)_def.dual(), oops);
   }
   @Override protected Type xmeet( Type t ) {
     if( t._type != TMEM ) return ALL; //
     TypeMem tf = (TypeMem)t;
     // Meet of default values, meet of element-by-element.
-    // If either default is null, take the other.
-    TypeObj def = _def==null ? tf._def : (tf._def==null ? _def : (TypeObj)_def.meet(tf._def));
+    TypeObj def = (TypeObj)_def.meet(tf._def);
     int len = Math.max(_aliases.length,tf._aliases.length);
     TypeObj[] objs = new TypeObj[len];
     for( int i=0; i<len; i++ ) {
       TypeObj o0 =    at0(i);
       TypeObj o1 = tf.at0(i);
-      TypeObj obj = o0==null ? o1 : (o1==null ? o0 : (TypeObj)o0.meet(o1));
+      TypeObj obj = (TypeObj)o0.meet(o1);
       if( obj == def ) obj = null;
       objs[i] = obj;
     }
@@ -131,7 +125,7 @@ public class TypeMem extends Type<TypeMem> {
     TypeObj obj = TypeObj.OBJ;
     if( !any ) obj = (TypeObj)TypeObj.OBJ.dual();
     for( int alias : ptr._aliases ) {
-      TypeObj x = at(alias);
+      TypeObj x = at0(alias);
       obj = (TypeObj)(any ? obj.join(x) : obj.meet(x));
     }
     return obj;
