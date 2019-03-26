@@ -61,7 +61,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     case TFLT:
     case TINT:
     case TFUNPTR:
-    case TRPC:   return must_nil() || t.must_nil() ? SCALAR : NSCALR;
+    case TRPC:   return cross_nil(t);
     case TNIL:
     case TNAME:  return t.xmeet(this); // Let other side decide
     case TOBJ:
@@ -80,6 +80,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   @Override public boolean may_be_con()   { return _aliases.above_center() || _aliases.is_con(); }
   @Override public boolean is_con()       { return false; }
   @Override boolean must_nil() { return _aliases.test(0) && !above_center(); }
+  @Override boolean may_nil() { return _aliases.may_nil(); }
   @Override Type not_nil() {
     // Below center, return this; above center remove nil choice
     return above_center() && _aliases.test(0) ? make(_aliases.clear(0)) : this;
@@ -87,7 +88,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   @Override public Type meet_nil() {
     if( _aliases.test(0) )      // Already has a nil?
       return _aliases.above_center() ? TypeNil.NIL : this;
-    throw com.cliffc.aa.AA.unimpl();
+    return make(_aliases.meet(Bits.make(0)));
   }
   @Override void walk( Predicate<Type> p ) { p.test(this); }
 }

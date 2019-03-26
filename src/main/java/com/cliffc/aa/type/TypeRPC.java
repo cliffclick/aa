@@ -37,22 +37,24 @@ public class TypeRPC extends Type<TypeRPC> {
   }
 
   public static final TypeRPC ALL_CALL = make(Bits.FULL);
-  static final TypeRPC[] TYPES = new TypeRPC[]{make(1),ALL_CALL};
+  public static final TypeRPC RPC1 = make(1);
+  static final TypeRPC[] TYPES = new TypeRPC[]{RPC1,ALL_CALL};
   
   @Override protected TypeRPC xdual() { return new TypeRPC(_rpcs.dual()); }
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TRPC:   break;
-    case TTUPLE: 
     case TFUNPTR:
     case TMEMPTR:
     case TFLT:
-    case TINT:   return t.must_nil() ? SCALAR : NSCALR;
+    case TINT:   return cross_nil(t);
     case TNIL:
     case TNAME:  return t.xmeet(this); // Let other side decide
-    case TSTRUCT:
+    case TTUPLE: 
     case TFUN:
+    case TOBJ:
     case TSTR:
+    case TSTRUCT:
     case TMEM:   return ALL;
     default: throw typerr(t);   // All else should not happen
     }
@@ -65,6 +67,15 @@ public class TypeRPC extends Type<TypeRPC> {
   @Override public boolean above_center() { return _rpcs.above_center(); }
   @Override public boolean may_be_con()   { return _rpcs.abit()>0; }
   @Override public boolean is_con()       { return _rpcs.abit()>0; }
-  @Override boolean must_nil() { return false; } // never a nil
-  @Override Type not_nil() { return this; }
+  @Override boolean must_nil() { return _rpcs.test(0) && !above_center(); }
+  @Override boolean may_nil() { return _rpcs.may_nil(); }
+  @Override Type not_nil() {
+    // Below center, return this; above center remove nil choice
+    return above_center() && _rpcs.test(0) ? make(_rpcs.clear(0)) : this;
+  }
+  @Override public Type meet_nil() {
+    if( _rpcs.test(0) )      // Already has a nil?
+      return _rpcs.above_center() ? TypeNil.NIL : this;
+    return make(_rpcs.meet(Bits.make(0)));
+  }
 }

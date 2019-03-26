@@ -108,6 +108,7 @@ public class Bits implements Iterable<Integer> {
   public int   abit() { return _bits==null ? _con : -1; }
   public boolean is_con() { return _bits==null; }
   public boolean above_center() { return _con==-1; }
+  public boolean may_nil() { return _con==0 || (_con==-1 && ((_bits[0]&1) == 1)); }
 
   // Test a specific bit is set or clear
   public boolean test(int i) {

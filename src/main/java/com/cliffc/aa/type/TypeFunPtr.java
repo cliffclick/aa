@@ -63,21 +63,22 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   private static final TypeTuple GENERIC_ARGS=TypeTuple.XSCALARS;
   private static final Type      GENERIC_RET =Type.SCALAR; // Can return almost anything
           static final TypeFunPtr GENERIC_FUNPTR = make_generic();
-  private static final TypeFunPtr FUNPTR1 = any(1,1);
+          static final TypeFunPtr FUNPTR1 = any(1,1);
   static final TypeFunPtr[] TYPES = new TypeFunPtr[]{FUNPTR1,GENERIC_FUNPTR};
   
   @Override protected TypeFunPtr xdual() { return new TypeFunPtr((TypeTuple)_ts.dual(),_ret.dual(),_fidxs.dual(),_nargs); }
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TFUNPTR:break;
-    case TTUPLE:
     case TFLT:
     case TINT:
     case TMEMPTR:
-    case TRPC:   return t.must_nil() ? SCALAR : NSCALR;
+    case TRPC:   return cross_nil(t);
     case TNIL:
     case TNAME:  return t.xmeet(this); // Let other side decide
     case TFUN:
+    case TTUPLE:
+    case TOBJ:
     case TSTR:
     case TSTRUCT:
     case TMEM:   return ALL;
@@ -102,8 +103,13 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   @Override public boolean may_be_con()   { return _fidxs.is_con() || _fidxs.above_center(); }
   @Override public boolean is_con()       { return _fidxs.is_con(); }
   @Override boolean must_nil() { return false; }
+  @Override boolean may_nil() { return _fidxs.may_nil(); }
   @Override Type not_nil() { return this; }
-  @Override public Type meet_nil() { return TypeNil.make(this); }
+  @Override public Type meet_nil() {
+    if( _fidxs.test(0) )      // Already has a nil?
+      return _fidxs.above_center() ? TypeNil.NIL : this;
+    return make(_ts,_ret,_fidxs.meet(Bits.make(0)),_nargs);
+  }
       
   // Return true if this is an ambiguous function pointer
   public boolean is_ambiguous_fun() { return _fidxs.above_center(); }

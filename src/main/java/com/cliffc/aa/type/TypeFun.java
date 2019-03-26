@@ -60,12 +60,13 @@ public class TypeFun extends TypeTuple<TypeFun> {
     switch( t._type ) {
     case TFUN: break;
     case TNAME:
-    case TSTR:
     case TFLT:
     case TINT:
     case TTUPLE: 
     case TFUNPTR:
     case TMEMPTR:
+    case TOBJ:
+    case TSTR:
     case TSTRUCT:
     case TRPC:
     case TNIL:

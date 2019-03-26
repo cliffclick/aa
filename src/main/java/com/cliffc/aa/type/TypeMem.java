@@ -137,7 +137,7 @@ public class TypeMem extends Type<TypeMem> {
     return obj;
   }
   
-  @Override public boolean above_center() { throw com.cliffc.aa.AA.unimpl();}
+  @Override public boolean above_center() { return false; }
   @Override public boolean may_be_con()   { throw com.cliffc.aa.AA.unimpl();}
   @Override public boolean is_con()       { throw com.cliffc.aa.AA.unimpl();}
   @Override boolean must_nil() { return false; } // never a nil

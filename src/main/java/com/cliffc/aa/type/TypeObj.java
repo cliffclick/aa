@@ -27,8 +27,12 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
   
   @Override protected O xdual() { return (O)new TypeObj(TOBJ,!_any); }
   @Override protected Type xmeet( Type t ) {
-    if( t instanceof TypeObj ) return _any ? t : this;
-    else return ALL;
+    switch( t._type ) {
+    case TNAME: return t.meet(this);
+    case TOBJ:  case TSTR:  case TSTRUCT: 
+      return _any ? t : this;
+    default: return ALL;
+    }
   }  
   @Override public boolean above_center() { return _any; }
   @Override public boolean may_be_con() { return _any; }

@@ -64,13 +64,14 @@ public class TypeInt extends Type<TypeInt> {
     switch( t._type ) {
     case TINT:   break;
     case TFLT:   return xmeetf((TypeFlt)t);
-    case TTUPLE:
     case TFUNPTR:
     case TMEMPTR:
-    case TRPC:   return must_nil() ? SCALAR : NSCALR;
+    case TRPC:   return cross_nil(t);
     case TNIL:
     case TNAME:  return t.xmeet(this); // Let other side decide
     case TFUN:
+    case TTUPLE:
+    case TOBJ:
     case TSTR:
     case TSTRUCT:
     case TMEM:   return ALL;
@@ -173,6 +174,7 @@ public class TypeInt extends Type<TypeInt> {
   @Override public boolean may_be_con() { return _x>=0; }
   @Override public boolean is_con()   { return _x==0; }
   @Override boolean must_nil() { return _x==-2 || (_x==0 && _con==0); }
+  @Override boolean may_nil() { return _x>0 || (_x==0 && _con==0); }
   @Override Type not_nil() {
     // Choice {0,1} ==> {1}
     if( this==BOOL.dual() ) return TRUE;

@@ -13,16 +13,13 @@ public class TestType {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testType() {
     Type.init0(new HashMap<>());
-    Type t0 = TypeFlt.PI; // 3.14
-    Type t1 = TypeMemPtr.STR0;  // Low String-ptr-and-nil. *[0,2]
+    Type t0 = TypeObj.OBJ;
+    Type t1 = TypeName.TEST_ENUM;
     Type t2 = t0.meet(t1);
-    assertEquals(Type.SCALAR,t2);
-    Type t3 = t1.meet(t0);
-    assertEquals(Type.SCALAR,t3);
+    Type t2x= t1.meet(t0);
+    assertEquals(t2,t2x);
+    assertEquals(Type.ALL,t2);
 
-    // ~nScalar meet *[0+2+] ==> *[2+] which is just *[2]
-    Type t4 = Type.XNSCALR.meet(t1.dual());
-    assertEquals(TypeMemPtr.STRPTR,t4);
   }
   
   @Test public void testNamesInts() {

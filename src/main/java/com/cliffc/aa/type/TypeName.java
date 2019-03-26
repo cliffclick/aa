@@ -75,7 +75,7 @@ public class TypeName extends TypeObj<TypeName> {
 
           static final HashMap<String,Type> TEST_SCOPE = new HashMap<>();
           static final TypeName TEST_ENUM = make("__test_enum",TEST_SCOPE,TypeInt.INT8);
-  private static final TypeName TEST_FLT  = make("__test_flt" ,TEST_SCOPE,TypeFlt.FLT32);
+          static final TypeName TEST_FLT  = make("__test_flt" ,TEST_SCOPE,TypeFlt.FLT32);
   private static final TypeName TEST_E2   = make("__test_e2"  ,TEST_SCOPE,TEST_ENUM);
   
   static final TypeName[] TYPES = new TypeName[]{TEST_ENUM,TEST_FLT,TEST_E2};
@@ -111,6 +111,7 @@ public class TypeName extends TypeObj<TypeName> {
     default:
       if( t.above_center() ) { // t is high
         Type mt = _t.meet(t);  // If meet fails to be anything, drop the name
+        if( mt==ALL ) return ALL;
         if( mt==SCALAR || mt==NSCALR ) return SCALAR;
         return make(_name,_lex,mt);
       }

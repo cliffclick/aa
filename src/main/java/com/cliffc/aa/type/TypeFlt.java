@@ -55,7 +55,7 @@ public class TypeFlt extends Type<TypeFlt> {
     case TINT:   return ((TypeInt)t).xmeetf(this);
     case TFUNPTR:
     case TMEMPTR:
-    case TRPC:   return must_nil() || t.must_nil() ? SCALAR : NSCALR;
+    case TRPC:   return cross_nil(t);
     case TNIL:
     case TNAME:  return t.xmeet(this); // Let other side decide
     case TFUN:
@@ -91,6 +91,7 @@ public class TypeFlt extends Type<TypeFlt> {
   @Override public boolean may_be_con() { return _x>=0; }
   @Override public boolean is_con()   { return _x==0; }
   @Override boolean must_nil() { assert _x!=0||_con!=0; return _x==-2; }
+  @Override boolean may_nil() { return _x>0 || (_x==0 && _con==0); }
   @Override Type not_nil() { return _x==2 ? make(1,_z,_con) : this; }
   @Override public Type meet_nil() { return meet(TypeInt.FALSE); }
   

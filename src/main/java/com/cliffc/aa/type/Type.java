@@ -1,5 +1,7 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.AA;
+
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.HashMap;
@@ -197,7 +199,7 @@ public class Type<T extends Type<T>> {
           static final Type  NNUM  = make( TNNUM  );
   private static final Type XNNUM  = make(TXNNUM  );
   public  static final Type   REAL = make( TREAL  );
-  private static final Type  XREAL = make(TXREAL  );
+          static final Type  XREAL = make(TXREAL  );
           static final Type  NREAL = make( TNREAL );
   private static final Type XNREAL = make(TXNREAL );
 
@@ -269,7 +271,7 @@ public class Type<T extends Type<T>> {
     if( _type <= TXCTRL || t._type <= TXCTRL ) return ALL;
 
     // Meeting scalar and non-scalar falls to ALL.  Includes most Memory shapes.
-    if( isa_scalar() ^ t.isa_scalar() ) return ALL;
+    if( isa_scalar() ^ t.base().isa_scalar() ) return ALL;
     
     // Memory does something complex with memory
     if( t._type==TMEM ) return t.xmeet(this);
@@ -289,8 +291,10 @@ public class Type<T extends Type<T>> {
     if( t._type == TXNSCALR) return   not_nil();
 
     // Scalar values break out into: nums(reals (int,flt)), GC-ptrs (structs(tuples), arrays(strings)), fun-ptrs, RPC
-    if( t._type == TFUN   ) return must_nil() ? SCALAR : NSCALR; // If 't' is a FUN and 'this' is not a FUN (because not equal to 't')
-    if( t._type == TRPC   ) return must_nil() ? SCALAR : NSCALR; // If 't' is a RPC and 'this' is not a RPC (because not equal to 't')
+    if( t._type == TFUNPTR ||
+        t._type == TMEMPTR ||
+        t._type == TRPC   )
+      return cross_nil(t);
 
     if( t._type == TNIL   ) return t.xmeet(this);
 
@@ -347,7 +351,7 @@ public class Type<T extends Type<T>> {
     Type ta = mt._dual.xmeet0(t._dual);
     Type tb = mt._dual.xmeet0(  _dual);
     if( ta==t._dual && tb==_dual ) return true;
-    System.err.print("("+this+"&"+t+")=="+mt+" but \n("+mt._dual+"&");
+    System.err.print("("+this+" & "+t+")=="+mt+" but \n("+mt._dual+" & ");
     if( ta!=t._dual ) System.err.println(t._dual+")=="+ta+" \nwhich is not "+t._dual);
     else              System.err.println(  _dual+")=="+tb+" \nwhich is not "+  _dual);
     return false;
@@ -566,6 +570,28 @@ public class Type<T extends Type<T>> {
     default: throw typerr(null); // Overridden in subclass
     }
   }
+  // True if type may include a nil (as opposed to must-nil).
+  // True for many above-center or zero values.
+  boolean may_nil() {
+    switch(_type) {
+    case TALL:
+    case TNUM:
+    case TREAL:
+    case TSCALAR:
+    case TXNSCALR: case TNSCALR: 
+    case TXNNUM:   case TNNUM:   
+    case TXNREAL:  case TNREAL:
+    case TTUPLE:
+      return false;
+    case TANY:
+    case TXNUM:
+    case TXREAL:
+    case TXSCALAR:
+      return true;
+    default: throw typerr(null); // Overridden in subclass
+    }
+  }
+  
   // Return the type without a nil-choice.  Only applies to above_center types,
   // as these are the only types with a nil-choice.  Only called during meets
   // with above-center types.  If called with below-center, there is no
@@ -590,17 +616,30 @@ public class Type<T extends Type<T>> {
     case TXNNUM:    return TypeInt.BOOL;
     case TXNREAL:   return TypeInt.BOOL;
     case TXNSCALR:  return TypeInt.BOOL;
-    case TNNUM:     return NUM;
-    case TNREAL:    return REAL;
-    case TNSCALR:   return SCALAR;
-    case TCTRL: case TXCTRL: return ALL;
-    case TRPC:      // RPCs never nil, never user-exposed
+    case TNUM:    case TNNUM:     return NUM;
+    case TREAL:   case TNREAL:    return REAL;
+    case TSCALAR: case TNSCALR:   return SCALAR;
+    case TCTRL:   case TXCTRL:    return ALL;
     case TOBJ:
     case TSTR:
     case TSTRUCT:
     case TMEM:      return ALL;
     default:        throw typerr(null); // Overridden in subclass
     }
+  }
+
+  // Mismatched scalar types that can only cross-nils
+  Type cross_nil(Type t) {
+    boolean must0 =   must_nil();
+    boolean must1 = t.must_nil();
+    boolean  may0 =    may_nil();
+    boolean  may1 = t. may_nil();
+    if( must0 && must1 ) return SCALAR; // Unrelated non-choice nils
+    if( must0 ) return may1 ? this: SCALAR;
+    if( must1 ) return may0 ? t   : SCALAR;
+    if( may0 ) return t.meet_nil();
+    if( may1 ) return   meet_nil();
+    return NSCALR;
   }
     
   // Make a (possibly cyclic & infinite) named type.  Prevent the infinite
