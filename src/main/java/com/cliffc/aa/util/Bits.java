@@ -193,8 +193,14 @@ public class Bits implements Iterable<Integer> {
     // join of 2 sets; return intersection
     if(    subset(bs  ) ) return this;
     if( bs.subset(this) ) return bs  ;
-    
-    throw AA.unimpl();          // 2 big sets
+
+    // join of 2 joined sets.  OR all bits together.
+    Bits smlbs = this, bigbs = bs;
+    if( smlbs._bits.length > bigbs._bits.length ) { smlbs=bs; bigbs=this; }
+    long[] bits =  bigbs._bits.clone();
+    for( int i=0; i<smlbs._bits.length; i++ )
+      bits[i] |= smlbs._bits[i];
+    return make(-1,bits);
   }
   
   private boolean subset(Bits bs) {
