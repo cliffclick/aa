@@ -33,7 +33,11 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
       return _any ? t : this;
     default: return ALL;
     }
-  }  
+  }
+  // Update (approximately) the current TypeObj
+  TypeObj update(String fld, int fld_num, Type val) {
+    return OBJ;                 // Approximate by falling to bottom OBJ
+  }
   @Override public boolean above_center() { return _any; }
   @Override public boolean may_be_con() { return _any; }
   @Override public boolean is_con() { return false; }

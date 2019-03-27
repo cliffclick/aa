@@ -177,12 +177,8 @@ static class ConvertTypeNameStruct extends PrimNode {
     return cvt;
   }
   
-  @Override public Type value(GVNGCM gvn) {
-    throw AA.unimpl();
-  }
-  @Override public Type apply( Type[] args ) {
-    throw AA.unimpl();
-  }
+  @Override public Type value(GVNGCM gvn) { throw AA.unimpl(); }
+  @Override public Type apply( Type[] args ) { throw AA.unimpl(); }
 }
 
 static class ConvertInt64F64 extends PrimNode {
@@ -192,21 +188,31 @@ static class ConvertInt64F64 extends PrimNode {
 }
 
 static class ConvertI64Str extends PrimNode {
-  ConvertI64Str(Node... nodes) { super("str",PrimNode.ARGS1,TypeTuple.INT64,TypeMemPtr.STRPTR,nodes); }
+  private int _alias;            // Alias number 
+  ConvertI64Str(Node... nodes) {
+    super("str",PrimNode.ARGS1,TypeTuple.INT64,TypeMemPtr.STRPTR,nodes);
+    _alias = TypeMem.new_alias();
+  }
+  // Conversion to String allocates memory - so the apply() call returns a new
+  // pointer aliased to a hidden String allocation site.  The memory returned
+  // is read-only (and can be shared).  Need to have a TypeMem-flavored Value
+  // call to handle memory results.
   @Override public TypeMemPtr apply( Type[] args ) {
-    //return TypeStr.con(Long.toString(args[1].getl()));
-    throw AA.unimpl();
+    //TypeStr str = TypeStr.con(Long.toString(args[1].getl()));
+    //TypeMem.make(_alias,str);
+    //return TypeMemPtr.make(_alias);
+    return TypeMemPtr.STRPTR;
   }
   @Override public boolean is_lossy() { return false; }
 }
 
 static class ConvertF64Str extends PrimNode {
   ConvertF64Str(Node... nodes) { super("str",PrimNode.ARGS1,TypeTuple.FLT64,TypeMemPtr.STRPTR,nodes); }
-  // "allocates" a constant string with a unique alias same as a NewNode, reads
-  // no memory, only writes to the unique alias.
   @Override public TypeMemPtr apply( Type[] args ) {
-    throw AA.unimpl();
-    //return TypeStr.con(Double.toString(args[1].getd()));
+    //TypeStr str = TypeStr.con(Double.toString(args[1].getd()));
+    //TypeMem.make(_alias,str);
+    //return TypeMemPtr.make(_alias);
+    return TypeMemPtr.STRPTR;
   }
   @Override public boolean is_lossy() { return false; }
 }

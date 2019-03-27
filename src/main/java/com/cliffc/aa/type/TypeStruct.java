@@ -222,7 +222,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   }
   public static TypeStruct RECURS_NIL_FLT, RECURT_NIL_FLT, RECURS_TREE;
   
-  static final TypeStruct[] TYPES = new TypeStruct[]{POINT,X,A,C0,D1,ARW};
+  static final TypeStruct[] TYPES = new TypeStruct[]{ALLSTRUCT,POINT,X,A,C0,D1,ARW};
 
 
   // Dual the flds, dual the tuple.
@@ -490,8 +490,11 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return s;
   }
 
-  // Return the index of the matching field, or -1 if not found
-  public int find( String fld ) {
+  // Return the index of the matching field (or nth tuple), or -1 if not found
+  // or field-num out-of-bounds.
+  public int find( String fld, int fld_num ) {
+    if( fld==null )
+      return fld_num < _ts.length ? fld_num : -1;
     for( int i=0; i<_flds.length; i++ )
       if( fld.equals(_flds[i]) )
         return i;
@@ -500,6 +503,18 @@ public class TypeStruct extends TypeObj<TypeStruct> {
 
   public Type at( int idx ) { return _ts[idx]; }
 
+  // Update (approximately) the current TypeObj.  Updates the named field.
+  @Override TypeObj update(String fld, int fld_num, Type val) {
+    assert val.isa_scalar();
+    int idx = find(fld,fld_num);
+    // No-such-field to update, so this is a program type-error.
+    if( idx==-1 ) return ALLSTRUCT;
+    // Update to a final field.  This is a program type-error
+    if( _finals[idx] == 0 ) return this;
+    Type[] ts = _ts.clone();
+    ts[idx] = val;
+    return malloc(_any,_flds,ts,_finals).hashcons_free();
+  }
   // True if isBitShape on all bits
   @Override public byte isBitShape(Type t) {
     if( isa(t) ) return 0; // Can choose compatible format

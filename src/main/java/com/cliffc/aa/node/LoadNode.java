@@ -84,20 +84,11 @@ public class LoadNode extends Node {
     
     if( obj instanceof TypeStruct ) {
       TypeStruct ts = (TypeStruct)obj;
-      int idx = find(ts);       // Find the named field
+      int idx = ts.find(_fld,_fld_num);  // Find the named field
       if( idx != -1 ) return ts.at(idx); // Field type
       // No such field
     }
     return Type.XSCALAR;        // No loading from e.g. Strings
-  }
-
-  private int find(TypeStruct ts) {
-    if( _fld == null ) { // No fields, i.e. a tuple?
-      if( _fld_num < ts._ts.length ) // Range-check tuple
-        return _fld_num; // Return nth tuple field
-      else
-        throw AA.unimpl();
-    } else return ts.find(_fld);  // Find the named field
   }
 
   @Override public String err(GVNGCM gvn) {

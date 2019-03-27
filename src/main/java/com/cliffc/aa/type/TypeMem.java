@@ -35,9 +35,7 @@ public class TypeMem extends Type<TypeMem> {
     return aliases.length==0 || aliases[aliases.length-1] != def;
   }
   @Override public int hashCode( ) {
-    return super.hashCode() +
-      (_aliases==null ? 0 : Arrays.hashCode(_aliases)) +
-      _def.hashCode();
+    return super.hashCode() + Arrays.hashCode(_aliases) + _def.hashCode();
   }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
@@ -70,7 +68,7 @@ public class TypeMem extends Type<TypeMem> {
   
   private static TypeMem FREE=null;
   @Override protected TypeMem free( TypeMem ret ) { _aliases=null; FREE=this; return ret; }
-  static TypeMem make( TypeObj def, TypeObj[] aliases ) {
+  private static TypeMem make( TypeObj def, TypeObj[] aliases ) {
     TypeMem t1 = FREE;
     if( t1 == null ) t1 = new TypeMem(def,aliases);
     else { FREE = null;       t1.init(def,aliases); }
@@ -84,6 +82,15 @@ public class TypeMem extends Type<TypeMem> {
     TypeObj[] oops = new TypeObj[alias+1];
     oops[alias] = oop;
     return make(TypeObj.OBJ,oops);
+  }
+  // Canonicalize memory before making
+  static TypeMem make0( TypeObj def, TypeObj[] objs ) {
+    // Remove elements redundant with the default value
+    int len = objs.length;
+    for( int i=0; i<len; i++ )  if( objs[i]==def )  objs[i]=null;
+    while( len > 0 && objs[len-1]==null ) len--;
+    if( len < objs.length ) objs = Arrays.copyOf(objs,len);
+    return make(def,objs);
   }
 
   public  static final TypeMem MEM = make(TypeObj.OBJ,new TypeObj[0]);
@@ -106,17 +113,9 @@ public class TypeMem extends Type<TypeMem> {
     TypeObj def = (TypeObj)_def.meet(tf._def);
     int len = Math.max(_aliases.length,tf._aliases.length);
     TypeObj[] objs = new TypeObj[len];
-    for( int i=0; i<len; i++ ) {
-      TypeObj o0 =    at0(i);
-      TypeObj o1 = tf.at0(i);
-      TypeObj obj = (TypeObj)o0.meet(o1);
-      if( obj == def ) obj = null;
-      objs[i] = obj;
-    }
-    // Remove elements redundant with the default value
-    while( len > 0 && objs[len-1]==null ) len--;
-    if( len < objs.length ) objs = Arrays.copyOf(objs,len);
-    return make(def,objs);
+    for( int i=0; i<len; i++ )
+      objs[i] = (TypeObj)at0(i).meet(tf.at0(i));
+    return make0(def,objs);
   }
 
   // Meet of all possible loadable values
@@ -130,8 +129,17 @@ public class TypeMem extends Type<TypeMem> {
     }
     return obj;
   }
+
+  // Meet of all possible storable values, after updates
+  public TypeMem st( TypeMemPtr ptr, String fld, int fld_num, Type val ) {
+    assert val.isa_scalar();
+    TypeObj[] objs = new TypeObj[_aliases.length];
+    for( int alias : ptr._aliases )
+      objs[alias] = at0(alias).update(fld,fld_num,val);
+    return make0(_def,objs);
+  }
   
-  @Override public boolean above_center() { return false; }
+  @Override public boolean above_center() { return _def.above_center(); }
   @Override public boolean may_be_con()   { return false;}
   @Override public boolean is_con()       { return false;}
   @Override public boolean must_nil() { return false; } // never a nil

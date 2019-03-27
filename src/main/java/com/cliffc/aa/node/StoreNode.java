@@ -24,7 +24,7 @@ public class StoreNode extends Node {
   }
   public StoreNode( Node ctrl, Node mem, Node adr, Node val, String fld , Parse bad ) { this(ctrl,mem,adr,val,fld,-1,bad); }
   public StoreNode( Node ctrl, Node mem, Node adr, Node val, int fld_num, Parse bad ) { this(ctrl,mem,adr,val,null,fld_num,bad); }
-  String xstr() { return "."+(_fld==null ? ""+_fld_num : _fld); } // Self short name
+  String xstr() { return "."+(_fld==null ? ""+_fld_num : _fld)+"="; } // Self short name
   String  str() { return xstr(); }      // Inline short name
 
   Node ctl() { return in(0); }
@@ -37,37 +37,26 @@ public class StoreNode extends Node {
   }
 
   @Override public Type value(GVNGCM gvn) {
-    Type t = gvn.type(adr()).base();
-    if( t.isa(TypeMemPtr.OOP0.dual()) )
-      // TODO: very weak; actually store limited to changes in any appropriate field
-      return TypeMem.MEM.dual(); // Very high address; might fall to any valid value
-    throw AA.unimpl();
-    //if( t.isa(TypeOop.XOOP) ) return TypeMem.MEM.dual(); // Very high address; might fall to any valid value
-    //if( t instanceof TypeNil ) {
-    //  if( !t.above_center() )     // NIL or below?
-    //    return TypeMem.MEM;       // Fails - might be nil at runtime
-    //  t = ((TypeNil)t)._t.base(); // Assume guarded by test
-    //}
-    //
-    //if( t instanceof TypeStruct ) {
-    //  TypeStruct ts = (TypeStruct)t;
-    //  int idx = find(ts);       // Find the named field
-    //  if( idx != -1 ) {
-    //    // return ts.at(idx); // Field type
-    //    return TypeMem.MEM;
-    //  }
-    //}
-    //
-    //return TypeMem.MEM;
-  }
+    final Type  M = TypeMem.MEM;
+    final Type XM = TypeMem.MEM.dual();
+    Type adr = gvn.type(adr()).base();
+    if( adr.isa(TypeMemPtr.OOP0.dual()) ) return XM; // Very high address; might fall to any valid address
+    if( adr.must_nil() ) return M;           // Not provable not-nil, so fails
+    if( TypeMemPtr.OOP0.isa(adr) ) return M; // Very low, might be any address
+    if( !(adr instanceof TypeMemPtr) )
+      return adr.above_center() ? XM : M;
 
-  private int find(TypeStruct ts) {
-    if( _fld == null ) { // No fields, i.e. a tuple?
-      if( _fld_num < ts._ts.length ) // Range-check tuple
-        return _fld_num; // Return nth tuple field
-      else
-        throw AA.unimpl();
-    } else return ts.find(_fld);  // Find the named field
+    Type mem = gvn.type(mem());     // Memory
+    if( !(mem instanceof TypeMem) ) // Nothing sane
+      return mem.above_center() ? XM : M;
+
+    Type val = gvn.type(val());     // Value
+    if( !val.isa_scalar() )         // Nothing sane
+      val = val.above_center() ? Type.XSCALAR : Type.SCALAR; // Pin to scalar for updates
+    // Compute an updated memory state
+    TypeMem mem2 = ((TypeMem)mem).st((TypeMemPtr)adr, _fld, _fld_num, val);
+    
+    return mem2;
   }
 
   @Override public String err(GVNGCM gvn) {
