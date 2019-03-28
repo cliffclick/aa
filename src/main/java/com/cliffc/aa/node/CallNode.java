@@ -55,7 +55,7 @@ public class CallNode extends Node {
   @Override public Node is_copy(GVNGCM gvn, int idx) { return _inlined ? in(idx) : null; }
 
   // Number of actual arguments
-  int nargs() { return _defs._len-3; }
+  private int nargs() { return _defs._len-3; }
   // Actual arguments.
   Node arg( int x ) { return _defs.at(x+3); }
 
@@ -84,27 +84,33 @@ public class CallNode extends Node {
     // already unpacked a tuple, and can see the NewNode, unpack it right now.
     if( !_unpacked ) { // Not yet unpacked a tuple
       assert nargs()==1;
-      Node a0 = arg(0);
-      Type tn = gvn.type(a0);
-      if( tn instanceof TypeStruct ) {
-        TypeStruct tt = (TypeStruct)tn;
-        // Either all the edges from a NewNode (for non-constants), or all the
-        // constants types from a constant Tuple from a ConNode
-        if( tt.is_con() ) {     // Allocation has constant-folded
-          int len = tt._ts.length;
-          pop();  gvn.add_work(a0);  // Pop off the ConNode tuple
-          for( int i=0; i<len; i++ ) // Push the args; unpacks the tuple
-            add_def( gvn.con(tt.at(i)) );
-        } else {                // Allocation exists, unpack args
-          assert a0 instanceof ProjNode && a0.in(0) instanceof NewNode;
-          Node nn = a0.in(0);
-          int len = nn._defs._len-1;
-          pop();  gvn.add_work(a0);  // Pop off the NewNode/ConNode tuple
-          for( int i=0; i<len; i++ ) // Push the args; unpacks the tuple
-            add_def( nn.in(i+1));
+      Node mem = mem();
+      Type tn = gvn.type(arg(0));
+      if( tn instanceof TypeMemPtr ) {
+        Type tm = gvn.type(mem);
+        if( tm instanceof TypeMem ) {
+          Type tx = ((TypeMem)tm).ld((TypeMemPtr)tn);
+          if( tx instanceof TypeStruct ) {
+            TypeStruct tt = (TypeStruct)tx;
+            // Either all the edges from a NewNode (for non-constants), or all
+            // the constants types from a constant Tuple from a ConNode
+            if( tt.is_con() ) {     // Allocation has constant-folded
+              int len = tt._ts.length;
+              pop();  gvn.add_work(mem); // Pop off the ConNode tuple
+              for( int i=0; i<len; i++ ) // Push the args; unpacks the tuple
+                add_def( gvn.con(tt.at(i)) );
+            } else {                // Allocation exists, unpack args
+              assert mem instanceof MergeMemNode && mem.in(1) instanceof MProjNode && mem.in(1).in(0) instanceof NewNode;
+              Node nn = mem.in(1).in(0);
+              int len = nn._defs._len-1;
+              pop();  gvn.add_work(mem); // Pop off the NewNode/ConNode tuple
+              for( int i=0; i<len; i++ ) // Push the args; unpacks the tuple
+                add_def( nn.in(i+1));
+            }
+            _unpacked = true;       // Only do it once
+            return this;
+          }
         }
-        _unpacked = true;       // Only do it once
-        return this;
       }
     }
 
@@ -259,7 +265,7 @@ public class CallNode extends Node {
   @Override public Type value(GVNGCM gvn) {
     Type tc = gvn.type(ctl());  // Control type
     Type tm = gvn.type(mem());  // Memory type
-    assert tm==TypeMem.MEM || tm==TypeMem.MEM.dual();
+    assert tm instanceof TypeMem;
     Node fp = fun();            // If inlined, its the result, if not inlined, its the function being called
     Type t = gvn.type(fp);      // If inlined, its the result, if not inlined, its the function being called
     if( _inlined )              // Inlined functions just pass thru & disappear

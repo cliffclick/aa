@@ -4,6 +4,7 @@ import com.cliffc.aa.AA;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.node.MergeMemNode;
 
 import java.util.HashMap;
 
@@ -89,6 +90,7 @@ public abstract class PrimNode extends Node {
   }
   
   public abstract Type apply( Type[] args ); // Execute primitive
+  public Node mem( ParmNode mem, GVNGCM gvn ) { return mem; } // Prim-specific memory side-effects
   public boolean is_lossy() { return true; }
   @Override public String xstr() { return _name+"::"+_ret; }
   @Override public Node ideal(GVNGCM gvn) { return null; }
@@ -188,32 +190,32 @@ static class ConvertInt64F64 extends PrimNode {
 }
 
 static class ConvertI64Str extends PrimNode {
-  private int _alias;            // Alias number 
-  ConvertI64Str(Node... nodes) {
-    super("str",PrimNode.ARGS1,TypeTuple.INT64,TypeMemPtr.STRPTR,nodes);
-    _alias = TypeMem.new_alias();
+  ConvertI64Str(Node... nodes) { super("str",PrimNode.ARGS1,TypeTuple.INT64,TypeMemPtr.make(TypeMem.new_alias()),nodes); }
+  // Memory side-effect: adds a new private alias, like a NewNode
+  @Override public Node mem( ParmNode mem, GVNGCM gvn ) {
+    //TypeStr str = TypeStr.con(Long.toString(args[1].getl()));
+    return gvn.init(new MergeMemNode(mem,gvn.con(TypeMem.make(((TypeMemPtr)_ret).get_alias(), TypeStr.STR))));
   }
   // Conversion to String allocates memory - so the apply() call returns a new
   // pointer aliased to a hidden String allocation site.  The memory returned
   // is read-only (and can be shared).  Need to have a TypeMem-flavored Value
   // call to handle memory results.
-  @Override public TypeMemPtr apply( Type[] args ) {
-    //TypeStr str = TypeStr.con(Long.toString(args[1].getl()));
-    //TypeMem.make(_alias,str);
-    //return TypeMemPtr.make(_alias);
-    return TypeMemPtr.STRPTR;
-  }
+  @Override public TypeMemPtr apply( Type[] args ) { return (TypeMemPtr)_ret; }
   @Override public boolean is_lossy() { return false; }
 }
 
 static class ConvertF64Str extends PrimNode {
-  ConvertF64Str(Node... nodes) { super("str",PrimNode.ARGS1,TypeTuple.FLT64,TypeMemPtr.STRPTR,nodes); }
-  @Override public TypeMemPtr apply( Type[] args ) {
+  ConvertF64Str(Node... nodes) { super("str",PrimNode.ARGS1,TypeTuple.FLT64,TypeMemPtr.make(TypeMem.new_alias()),nodes); }
+  // Memory side-effect: adds a new private alias, like a NewNode
+  @Override public Node mem( ParmNode mem, GVNGCM gvn ) {
     //TypeStr str = TypeStr.con(Double.toString(args[1].getd()));
-    //TypeMem.make(_alias,str);
-    //return TypeMemPtr.make(_alias);
-    return TypeMemPtr.STRPTR;
+    return gvn.init(new MergeMemNode(mem,gvn.con(TypeMem.make(((TypeMemPtr)_ret).get_alias(), TypeStr.STR))));
   }
+  // Conversion to String allocates memory - so the apply() call returns a new
+  // pointer aliased to a hidden String allocation site.  The memory returned
+  // is read-only (and can be shared).  Need to have a TypeMem-flavored Value
+  // call to handle memory results.
+  @Override public TypeMemPtr apply( Type[] args ) { return (TypeMemPtr)_ret; }
   @Override public boolean is_lossy() { return false; }
 }
 

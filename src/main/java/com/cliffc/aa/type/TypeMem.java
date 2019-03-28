@@ -138,6 +138,24 @@ public class TypeMem extends Type<TypeMem> {
       objs[alias] = at0(alias).update(fld,fld_num,val);
     return make0(_def,objs);
   }
+
+  // Merge two memories with no overlaps.  This is similar to a st(), except
+  // updating an entire Obj not just a field, and not a replacement.  The
+  // given memory is precise - the default field is ignorable.
+  public TypeMem merge( TypeMem mem ) {
+    // Check no overlap
+    int  len =     _aliases.length;
+    int mlen = mem._aliases.length;
+    for( int i=0; i<mlen; i++ ) {
+      if( mem._aliases[i]==null ) continue;
+      assert i >= len || _aliases[i]==null;
+    }
+    TypeObj[] objs = Arrays.copyOf(_aliases,Math.max(len,mlen));
+    for( int i=0; i<mlen; i++ )
+      if( mem._aliases[i]!=null)
+        objs[i] = mem._aliases[i];
+    return make(_def,objs);
+  }
   
   @Override public boolean above_center() { return _def.above_center(); }
   @Override public boolean may_be_con()   { return false;}

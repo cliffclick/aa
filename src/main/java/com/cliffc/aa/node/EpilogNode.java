@@ -31,7 +31,7 @@ public class EpilogNode extends Node {
     Type m = gvn.type(mem ()); // Function memory value
     Type v = gvn.type(val ()); // Function return value
     Type r = gvn.type(rpc ()); // Caller; the Continuation
-    assert m==TypeMem.MEM || m==TypeMem.MEM.dual();
+    assert m instanceof TypeMem;
     if( c==Type.ANY  || r==Type.ANY  ) return all_type().dual();
     if( (c!=Type.CTRL && c!=Type.XCTRL) || !(r instanceof TypeRPC) ) return all_type();
     return TypeFun.make(c, v, r, FunNode.find_fidx(_fidx)._tf);

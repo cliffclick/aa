@@ -68,14 +68,22 @@ public class MergeMemNode extends Node {
     // If the skinny memory is from a MProj from a NewNode, and the only proj
     // is the MProj, then there is no *address* user, and the New object must
     // be dead.  Remove the New.
-    if( in(1) instanceof MProjNode &&
-        in(1).in(0) instanceof NewNode &&
-        in(1).in(0)._uses._len==1 )
-      return in(0);             // Skinny memory is dead, nothing to merge
+    //if( in(1) instanceof MProjNode &&
+    //    in(1).in(0) instanceof NewNode &&
+    //    in(1).in(0)._uses._len==1 )
+    //  return in(0);             // Skinny memory is dead, nothing to merge
     return null;
   }
 
-  @Override public Type value(GVNGCM gvn) { return TypeMem.MEM; }
+  @Override public Type value(GVNGCM gvn) {
+    Type twide = gvn.type(in(0));
+    Type tskin = gvn.type(in(1));
+    if( !(twide instanceof TypeMem) ||
+        !(tskin instanceof TypeMem) )
+      return twide.above_center() ? TypeMem.MEM.dual() : TypeMem.MEM;
+    TypeMem tmerge = ((TypeMem)twide).merge((TypeMem)tskin);
+    return tmerge;
+  }
   @Override public Type all_type() { return TypeMem.MEM; }
 }
 
