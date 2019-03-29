@@ -62,8 +62,8 @@ public class CallNode extends Node {
   private Node ctl() { return in(0); }
   private Node mem() { return in(1); }
   public  Node fun() { return in(2); }
-  public void set_fun(Node fun, GVNGCM gvn) { set_def(2,fun,gvn); }
-  public void set_fun_reg(Node fun, GVNGCM gvn) { gvn.set_def_reg(this,2,fun); }
+  private void set_fun(Node fun, GVNGCM gvn) { set_def(2,fun,gvn); }
+  void set_fun_reg(Node fun, GVNGCM gvn) { gvn.set_def_reg(this,2,fun); }
   
   // Clones during inlining all become unique new call sites
   @Override CallNode copy() {

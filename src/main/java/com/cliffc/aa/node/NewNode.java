@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.AA;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 
@@ -27,7 +28,11 @@ public class NewNode extends Node {
   private static byte[] bs(int len) { byte[] bs = new byte[len]; Arrays.fill(bs,(byte)1); return bs; }
   String xstr() { return "New#"; } // Self short name
   String  str() { return xstr(); } // Inline short name
-  @Override public Node ideal(GVNGCM gvn) { return null; }
+  @Override public Node ideal(GVNGCM gvn) {
+    if( _uses.len() == 1 )      // If only memory or address is used...
+      throw AA.unimpl();        // If only memory produced, but no address, then memory is dead.
+    return null;
+  }
   @Override public Type value(GVNGCM gvn) {
     Type[] ts = new Type[_defs._len-1];
     for( int i=0; i<ts.length; i++ ) {
@@ -63,9 +68,7 @@ public class NewNode extends Node {
 
   // Worse-case type for this Node
   @Override public Type all_type() {
-    Type[] ts = new Type[_names.length];
-    Arrays.fill(ts,Type.SCALAR);
-    return TypeTuple.make(TypeMem.MEM,TypeStruct.make(_names,ts));
+    return TypeTuple.make(TypeMem.MEM,TypeMemPtr.STRUCT);
   }
   
   // Clones during inlining all become unique new sites
