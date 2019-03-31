@@ -51,13 +51,13 @@ public class TypeMem extends Type<TypeMem> {
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
   @Override String str( BitSet dups ) {
     SB sb = new SB();
-    sb.p("{");
+    sb.p("[");
     if( _def != TypeObj.OBJ )
-      sb.p("mem:").p(_def.toString()).p(",");
+      sb.p("mem#:").p(_def.toString()).p(",");
     for( int i=0; i<_aliases.length; i++ )
       if( _aliases[i] != null )
-        sb.p(i).p(":").p(_aliases[i].toString()).p(",");
-    return sb.p("}").toString();
+        sb.p(i).p("#:").p(_aliases[i].toString()).p(",");
+    return sb.p("]").toString();
   }
   // Alias must exist
   private TypeObj at0(int alias) {

@@ -170,6 +170,7 @@ public abstract class Node implements Cloneable {
   // points have not all appeared).  Returns null if no-progress, or a better
   // version of 'this'.
   abstract public Node ideal(GVNGCM gvn);
+  public boolean ideal_impacted_by_losing_uses() { return _op==OP_NEW || _op==OP_FUN; }
 
   // Compute the current best Type for this Node, based on the types of its inputs.
   // May return the local "all_type()", especially if its inputs are in error.

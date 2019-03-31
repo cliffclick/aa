@@ -229,8 +229,11 @@ public class GVNGCM {
   // RootNode, and some other make-and-toss Nodes.
   private void kill0( Node n ) {
     assert n._uses._len==0;
-    for( int i=0; i<n._defs._len; i++ )
+    for( int i=0; i<n._defs._len; i++ ) {
+      Node def = n._defs.at(i);
+      if( def != null && def.ideal_impacted_by_losing_uses() ) add_work(def);
       n.set_def(i,null,this);   // Recursively destroy dead nodes
+    }
     n.set_dead();               // n is officially dead now
     _live.clear(n._uid);
     if( n._uid==CNT-1 ) {       // Roll back unused node indices
@@ -266,7 +269,7 @@ public class GVNGCM {
     if( n instanceof ConNode || n instanceof ErrNode )
       return false; // Already a constant, or never touch an ErrNode
     return t.is_con(); // Replace with a ConNode
-  };
+  }
 
   /** Look for a better version of 'n'.  Can change n's defs via the ideal()
    *  call, including making new nodes.  Can replace 'n' wholly, with n's uses

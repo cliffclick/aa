@@ -16,7 +16,7 @@ public class TestParse {
   
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
-    test("str(3.14)", TypeStr.con("3.14"));
+    test("str(3.14)", TypeMemPtr.make(5), TypeMem.make(5,TypeStr.STR));
     // A collection of tests which like to fail easily
     testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1) is not a @{x,y}","                           ");
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'","                    ");
@@ -552,6 +552,11 @@ c[x]=1;
   
   static private void test( String program, Type expected ) {
     assertEquals(expected,run(program)._t);
+  }
+  static private void test( String program, Type expected, TypeMem mem_expected ) {
+    TypeEnv te = run(program);
+    assertEquals(    expected,te._t   );
+    assertEquals(mem_expected,te._tmem);
   }
   static private void test( String program, Function<HashMap<String,Type>,Type> expected ) {
     TypeEnv te = run(program);

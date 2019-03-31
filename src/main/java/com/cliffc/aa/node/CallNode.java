@@ -188,7 +188,7 @@ public class CallNode extends Node {
       for( Node parm : rez._defs )
         irez.add_def((parm instanceof ParmNode && parm.in(0) == fun) ? arg(((ParmNode)parm)._idx) : parm);
       if( irez instanceof PrimNode ) ((PrimNode)irez)._badargs = _badargs;
-      return inline(gvn,ctl(),mem(),gvn.xform(irez)); // New exciting replacement for inlined call
+      return inline(gvn,ctl(),mem,gvn.xform(irez)); // New exciting replacement for inlined call
     }
 
     assert fun.in(1)._uid!=0; // Never wire into a primitive, just clone/inline it instead (done just above)

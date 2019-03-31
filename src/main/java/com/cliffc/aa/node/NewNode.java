@@ -14,7 +14,7 @@ public class NewNode extends Node {
   // (ratio of NewNodes to all nodes).  
   private final String[] _names; // Field names
   private final byte[] _finals;  // Final fields
-  private int _alias;            // Alias number
+  int _alias;                    // Alias number, or -1 if dead
   public NewNode( Node[] flds, String[] names ) { this(flds,names,bs(names.length)); }
   public NewNode( Node[] flds, String[] names, byte[] finals ) {
     super(OP_NEW,flds);
@@ -26,14 +26,21 @@ public class NewNode extends Node {
     _alias = TypeMem.new_alias();
   }
   private static byte[] bs(int len) { byte[] bs = new byte[len]; Arrays.fill(bs,(byte)1); return bs; }
-  String xstr() { return "New#"; } // Self short name
-  String  str() { return xstr(); } // Inline short name
+  String xstr() { return "New#"+_alias; } // Self short name
+  String  str() { return _alias==-1 ? "New#dead" : xstr(); } // Inline short name
   @Override public Node ideal(GVNGCM gvn) {
-    if( _uses.len() == 1 )      // If only memory or address is used...
-      throw AA.unimpl();        // If only memory produced, but no address, then memory is dead.
+    // If the address is dead, then the object is unused and can be nuked
+    if( _uses.len()==1 && ((ProjNode)_uses.at(0))._idx==0 ) {
+      for( int i=0; i<_defs.len(); i++ )
+        set_def(i,null,gvn);
+      _alias = -1;              // Flag as dead
+    }
     return null;
   }
   @Override public Type value(GVNGCM gvn) {
+    // If the address is dead, then the object is unused and can be nuked
+    if( _alias == -1 )
+      return TypeTuple.make(TypeMem.MEM.dual(),TypeMemPtr.OOP0.dual());
     Type[] ts = new Type[_defs._len-1];
     for( int i=0; i<ts.length; i++ ) {
       Type t = gvn.type(in(i+1));
@@ -68,7 +75,9 @@ public class NewNode extends Node {
 
   // Worse-case type for this Node
   @Override public Type all_type() {
-    return TypeTuple.make(TypeMem.MEM,TypeMemPtr.STRUCT);
+    if( _alias == -1 )
+      return TypeTuple.make(TypeMem.MEM.dual(),TypeMemPtr.OOP0.dual());
+    return TypeTuple.make(TypeMem.MEM,TypeMemPtr.make(_alias));
   }
   
   // Clones during inlining all become unique new sites

@@ -160,10 +160,11 @@ public class Parse {
     errs0.sort_update(String::compareTo);
     
     Type tres = _gvn.type(res);
+    TypeMem tmem = (TypeMem)_gvn.type(mem());
     kill(res);       // Kill Node for returned Type result
     set_ctrl(null);  // Kill control also
     set_mem (null);  // Kill memory  also
-    return new TypeEnv(tres,_e,errs0.isEmpty() ? null : errs0);
+    return new TypeEnv(tres,tmem,_e,errs0.isEmpty() ? null : errs0);
   }
 
   /** Parse a top-level:

@@ -68,10 +68,10 @@ public class MergeMemNode extends Node {
     // If the skinny memory is from a MProj from a NewNode, and the only proj
     // is the MProj, then there is no *address* user, and the New object must
     // be dead.  Remove the New.
-    //if( in(1) instanceof MProjNode &&
-    //    in(1).in(0) instanceof NewNode &&
-    //    in(1).in(0)._uses._len==1 )
-    //  return in(0);             // Skinny memory is dead, nothing to merge
+    if( in(1) instanceof MProjNode &&
+        in(1).in(0) instanceof NewNode &&
+        ((NewNode)in(1).in(0))._alias == -1 )
+      return in(0);             // Skinny memory is dead, nothing to merge
     return null;
   }
 
