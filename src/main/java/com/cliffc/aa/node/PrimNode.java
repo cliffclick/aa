@@ -4,7 +4,6 @@ import com.cliffc.aa.AA;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.node.MergeMemNode;
 
 import java.util.HashMap;
 
@@ -22,7 +21,8 @@ public abstract class PrimNode extends Node {
   public final String _name;    // Unique name (and program bits)
   public final String[] _args;  // Handy
   public Parse _badargs;        // Filled in when inlined in CallNode
-  PrimNode( String name, String[] args, TypeTuple targs, Type ret, Node... nodes ) { super(OP_PRIM,nodes); _name=name; _args=args; _targs = targs; _ret = ret; _badargs=null; }
+  PrimNode( byte op, String name, String[] args, TypeTuple targs, Type ret ) { super(op); _name=name; _args=args; _targs = targs; _ret = ret; _badargs=null; }
+  PrimNode( String name, String[] args, TypeTuple targs, Type ret ) { this(OP_PRIM,name,args,targs,ret); }
   
   final static String[] ARGS1 = new String[]{"x"};
   final static String[] ARGS2 = new String[]{"x","y"};
@@ -34,8 +34,6 @@ public abstract class PrimNode extends Node {
     new Id(Type.REAL),
     
     new ConvertInt64F64(),
-    new ConvertI64Str(),
-    new ConvertF64Str(),
     new ConvertStrStr(),
 
     new MinusF64(),
@@ -71,17 +69,6 @@ public abstract class PrimNode extends Node {
     new AddStrStr(),
   };
 
-  // Loss-less conversions only, plus int64->flt64 (standard lossy conversion)
-  static PrimNode convert( Node actual, Type from, Type to ) {
-    if( from.isa(TypeInt.INT64) && to.isa(TypeFlt.FLT64) ) return new ConvertInt64F64(null,actual);
-    //if( from==Type.UInt32 && to==Type.I64 ) return convUInt32I64;
-    //if( from==Type.UInt32 && to==Type.FLT64 ) return convUInt32F64;
-    //if( from==Type. I64 && to==Type.FLT64 ) return  convI64F64;
-    if( from.isa(TypeInt.INT64) && to.isa(TypeStr.STR) ) return new ConvertI64Str(null,actual);
-    if( from.isa(TypeFlt.FLT64) && to.isa(TypeStr.STR) ) return new ConvertF64Str(null,actual);
-
-    throw AA.unimpl();
-  }
   public static PrimNode convertTypeName( Type from, TypeName to, Parse badargs ) {
     return new ConvertTypeName(from,to,badargs);
   }
@@ -90,7 +77,6 @@ public abstract class PrimNode extends Node {
   }
   
   public abstract Type apply( Type[] args ); // Execute primitive
-  public Node mem( ParmNode mem, GVNGCM gvn ) { return mem; } // Prim-specific memory side-effects
   public boolean is_lossy() { return true; }
   @Override public String xstr() { return _name+"::"+_ret; }
   @Override public Node ideal(GVNGCM gvn) { return null; }
@@ -129,6 +115,19 @@ public abstract class PrimNode extends Node {
     if( !(o instanceof PrimNode) ) return false;
     PrimNode p = (PrimNode)o;
     return _name.equals(p._name) && _targs==p._targs;
+  }
+
+  // Called during basic Env creation and making of type constructors, this
+  // wraps a PrimNode as a full 1st-class function to be passed about or
+  // assigned to variables.
+  public EpilogNode as_fun( GVNGCM gvn ) {
+    FunNode  fun = ( FunNode) gvn.xform(new  FunNode(this)); // Points to ScopeNode only
+    ParmNode rpc = (ParmNode) gvn.xform(new ParmNode(-1,"rpc",fun, gvn.con(TypeRPC.ALL_CALL),null));
+    ParmNode mem = (ParmNode) gvn.xform(new ParmNode(-2,"mem",fun, gvn.con(TypeMem.MEM     ),null));
+    add_def(null);              // Control for the primitive in slot 0
+    for( int i=0; i<_args.length; i++ )
+      add_def(gvn.init(new ParmNode(i,_args[i],fun, gvn.con(_targs.at(i)),null)));
+    return new EpilogNode(fun,mem,gvn.init(this),rpc,fun,fun._tf.fidx(),null);
   }
 
 
@@ -184,43 +183,13 @@ static class ConvertTypeNameStruct extends PrimNode {
 }
 
 static class ConvertInt64F64 extends PrimNode {
-  ConvertInt64F64(Node... nodes) { super("flt64",PrimNode.ARGS1,TypeTuple.INT64,TypeFlt.FLT64,nodes); }
+  ConvertInt64F64() { super("flt64",PrimNode.ARGS1,TypeTuple.INT64,TypeFlt.FLT64); }
   @Override public TypeFlt apply( Type[] args ) { return TypeFlt.con((double)args[1].getl()); }
   @Override public boolean is_lossy() { return false; }
 }
 
-static class ConvertI64Str extends PrimNode {
-  ConvertI64Str(Node... nodes) { super("str",PrimNode.ARGS1,TypeTuple.INT64,TypeMemPtr.make(TypeMem.new_alias()),nodes); }
-  // Memory side-effect: adds a new private alias, like a NewNode
-  @Override public Node mem( ParmNode mem, GVNGCM gvn ) {
-    //TypeStr str = TypeStr.con(Long.toString(args[1].getl()));
-    return gvn.init(new MergeMemNode(mem,gvn.con(TypeMem.make(((TypeMemPtr)_ret).get_alias(), TypeStr.STR))));
-  }
-  // Conversion to String allocates memory - so the apply() call returns a new
-  // pointer aliased to a hidden String allocation site.  The memory returned
-  // is read-only (and can be shared).  Need to have a TypeMem-flavored Value
-  // call to handle memory results.
-  @Override public TypeMemPtr apply( Type[] args ) { return (TypeMemPtr)_ret; }
-  @Override public boolean is_lossy() { return false; }
-}
-
-static class ConvertF64Str extends PrimNode {
-  ConvertF64Str(Node... nodes) { super("str",PrimNode.ARGS1,TypeTuple.FLT64,TypeMemPtr.make(TypeMem.new_alias()),nodes); }
-  // Memory side-effect: adds a new private alias, like a NewNode
-  @Override public Node mem( ParmNode mem, GVNGCM gvn ) {
-    //TypeStr str = TypeStr.con(Double.toString(args[1].getd()));
-    return gvn.init(new MergeMemNode(mem,gvn.con(TypeMem.make(((TypeMemPtr)_ret).get_alias(), TypeStr.STR))));
-  }
-  // Conversion to String allocates memory - so the apply() call returns a new
-  // pointer aliased to a hidden String allocation site.  The memory returned
-  // is read-only (and can be shared).  Need to have a TypeMem-flavored Value
-  // call to handle memory results.
-  @Override public TypeMemPtr apply( Type[] args ) { return (TypeMemPtr)_ret; }
-  @Override public boolean is_lossy() { return false; }
-}
-
 static class ConvertStrStr extends PrimNode {
-  ConvertStrStr(Node... nodes) { super("str",PrimNode.ARGS1,TypeTuple.STRPTR,TypeMemPtr.STRPTR,nodes); }
+  ConvertStrStr() { super("str",PrimNode.ARGS1,TypeTuple.STRPTR,TypeMemPtr.STRPTR); }
   @Override public Type apply( Type[] args ) { return args[1]; }
   @Override public Node ideal(GVNGCM gvn) { return in(1); }
   @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)); }

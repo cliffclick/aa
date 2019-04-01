@@ -29,26 +29,27 @@ public class Env implements AutoCloseable {
     START = new StartNode();
     CTL_0 = GVN.init(new CProjNode(START,0));
     MEM_0 = GVN.init(new MProjNode(START,1));
-    ALL_CTRL = GVN.init(new ConNode<Type>(Type.CTRL));
+    ALL_CTRL = GVN.init(new ConNode<>(Type.CTRL));
     TOP    = new Env(null);        // Top-most lexical Environment
     TOP.install_primitives();
     NINIT_CONS = START._uses._len;
   }
   private void install_primitives() {
+    _scope.add_def(_scope); // Self-hook to prevent deletion
     _scope  .init0(); // Add base types
     _scope.update(" control ", CTL_0, GVN,true);
     _scope.update(" memory " , MEM_0, GVN,true);
     for( PrimNode prim : PrimNode.PRIMS )
-      _scope.add_fun(prim._name,(EpilogNode) GVN.xform(as_fun(prim)));
+      _scope.add_fun(prim._name,(EpilogNode) GVN.xform(prim.as_fun(GVN)));
+    for( PrimNode prim : LibCallNode.LIBCALLS )
+      _scope.add_fun(prim._name,(EpilogNode) GVN.xform(prim.as_fun(GVN)));
     // Now that all the UnresolvedNodes have all possible hits for a name,
     // register them with GVN.
     for( Node val : _scope._defs )  GVN.init0(val);
     // Top-level constants
     _scope.update("math_pi", GVN.con(TypeFlt.PI),null,false);
     // Run the worklist dry
-    _scope.add_def(_scope); // Self-hook to prevent deletion
     GVN.iter();
-    _scope.pop();
     CallNode.init0(); // Done with adding primitives
     FunNode .init0(); // Done with adding primitives
     GVN.init0(); // Done with adding primitives
@@ -57,24 +58,6 @@ public class Env implements AutoCloseable {
   // A new top-level Env, above this is the basic public Env with all the primitives
   public static Env top() { return new Env(TOP); }
   
-  // Called during basic Env creation and making of type constructors, this
-  // wraps a PrimNode as a full 1st-class function to be passed about or
-  // assigned to variables.
-  EpilogNode as_fun( PrimNode prim ) {
-    TypeTuple targs = prim._targs;
-    String[] args = prim._args;
-    FunNode  fun = ( FunNode) GVN.xform(new  FunNode(prim)); // Points to ScopeNode only
-    ParmNode rpc = (ParmNode) GVN.xform(new ParmNode(-1,"rpc",fun, GVN.con(TypeRPC.ALL_CALL),null));
-    ParmNode mem = (ParmNode) GVN.xform(new ParmNode(-2,"mem",fun, GVN.con(TypeMem.MEM     ),null));
-    prim.add_def(null);         // Control for the primitive
-    for( int i=0; i<args.length; i++ )
-      prim.add_def(GVN.xform(new ParmNode(i,args[i],fun, GVN.con(targs.at(i)),null)));
-    PrimNode x = GVN.init(prim);
-    assert x==prim;
-    Node pmem = prim.mem(mem,GVN);  // Any primitive memory side-effects
-    return new EpilogNode(fun,pmem,prim,rpc,fun,fun._tf.fidx(),null);
-  }
-
   Node update( String name, Node val, GVNGCM gvn, boolean mutable ) { return _scope.update(name,val,gvn,mutable); }
   Node add_fun( String name, Node val ) { return _scope.add_fun(name,(EpilogNode)val); }
 

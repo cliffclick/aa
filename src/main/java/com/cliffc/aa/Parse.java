@@ -228,10 +228,10 @@ public class Parse {
   
     // Add a constructor function
     PrimNode cvt = PrimNode.convertTypeName(t,tn,errMsg());
-    Node rez = _e.add_fun(tvar,gvn(_e.as_fun(cvt))); // Return type-name constructor
+    Node rez = _e.add_fun(tvar,gvn(cvt.as_fun(_gvn))); // Return type-name constructor
     if( t instanceof TypeStruct ) { // Add struct types with expanded arg lists
       PrimNode cvts = PrimNode.convertTypeNameStruct((TypeStruct)t,tn,errMsg());
-      Node rez2 = _e.add_fun(tvar,gvn(_e.as_fun(cvts))); // type-name constructor with expanded arg list
+      Node rez2 = _e.add_fun(tvar,gvn(cvts.as_fun(_gvn))); // type-name constructor with expanded arg list
       // UnresolvedNode needs touching once all constructors are done
       _gvn.init0(rez2._uses.at(0));
     }

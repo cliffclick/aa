@@ -160,6 +160,7 @@ public class TypeInt extends Type<TypeInt> {
     if( t._type == TXSCALAR ) return 0;
     if( t._type == TINT ) return (byte)(_z<=((TypeInt)t)._z ? 0 : 99);
     if( t._type == TFLT ) return 2; // Int->Flt ignores large int overflow issues
+    if( t._type == Type.TMEMPTR ) return 99; // No flt->ptr conversion
     if( t._type == TREAL ) return 1;
     if( t._type == TSCALAR ) return 1;
     if( t._type == TSTR ) return 99;

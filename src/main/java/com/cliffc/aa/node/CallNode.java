@@ -102,10 +102,10 @@ public class CallNode extends Node {
             } else {                // Allocation exists, unpack args
               assert mem instanceof MergeMemNode && mem.in(1) instanceof MProjNode && mem.in(1).in(0) instanceof NewNode;
               Node nn = mem.in(1).in(0);
-              int len = nn._defs._len-1;
+              int len = nn._defs._len;
               pop();  gvn.add_work(mem); // Pop off the NewNode/ConNode tuple
-              for( int i=0; i<len; i++ ) // Push the args; unpacks the tuple
-                add_def( nn.in(i+1));
+              for( int i=1; i<len; i++ ) // Push the args; unpacks the tuple
+                add_def( nn.in(i));
             }
             _unpacked = true;       // Only do it once
             return this;
