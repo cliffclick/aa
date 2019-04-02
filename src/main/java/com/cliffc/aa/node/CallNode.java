@@ -174,7 +174,7 @@ public class CallNode extends Node {
     // Check for zero-op body (id function)
     if( rez instanceof ParmNode && rez.in(0) == fun ) return inline(gvn,ctl(),mem(),arg(((ParmNode)rez)._idx));
     // Check for constant body
-    if( rez instanceof ConNode ) return inline(gvn,ctl(),mem(),rez);
+    if( gvn.type(rez).is_con() ) return inline(gvn,ctl(),mem(),rez);
 
     // Check for a 1-op body using only constants or parameters
     boolean can_inline=true;

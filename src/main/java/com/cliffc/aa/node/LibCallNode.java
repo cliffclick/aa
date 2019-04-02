@@ -38,6 +38,15 @@ public abstract class LibCallNode extends PrimNode {
     return new EpilogNode(fun,mem2,val,rpc,fun,fun._tf.fidx(),null);
   }
   
+  // Clones during inlining all become unique new sites
+  @Override NewNode copy() {
+    NewNode nnn = super.copy();
+    nnn._alias = TypeMemPtr.make(TypeMem.new_alias());
+    //return nnn;
+    // must split the existing alias in twain
+    throw AA.unimpl();
+  }
+  
   static class ConvertI64Str extends LibCallNode {
     ConvertI64Str(TypeMemPtr alias) {
       super("str",PrimNode.ARGS1,TypeTuple.INT64,
@@ -46,6 +55,11 @@ public abstract class LibCallNode extends PrimNode {
             alias);
     }
             
+    // Library calls update memory.  These calls have the default boot-time
+    // memory inputs and outputs.
+    @Override TypeMem argmem() { return TypeMem.MEM.dual(); }
+    @Override TypeMem retmem() { return TypeMem.make(_alias.get_alias(),TypeStr.STR); }
+  
     // Conversion to String allocates memory - so the apply() call returns a new
     // pointer aliased to a hidden String allocation site.  The memory returned
     // is read-only (and can be shared).
@@ -69,6 +83,11 @@ public abstract class LibCallNode extends PrimNode {
             alias);
     }
             
+    // Library calls update memory.  These calls have the default boot-time
+    // memory inputs and outputs.
+    @Override TypeMem argmem() { return TypeMem.MEM.dual(); }
+    @Override TypeMem retmem() { return TypeMem.make(_alias.get_alias(),TypeStr.STR); }
+    
     // Conversion to String allocates memory - so the apply() call returns a new
     // pointer aliased to a hidden String allocation site.  The memory returned
     // is read-only (and can be shared).

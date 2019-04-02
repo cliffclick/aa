@@ -44,11 +44,11 @@ public class FunNode extends RegionNode {
   private final byte _op_prec;  // Operator precedence; only set top-level primitive wrappers
   
   // Used to make the primitives at boot time
-  public FunNode(PrimNode prim) { this(TypeFunPtr.make(prim._targs,prim._ret,CNT,prim._targs._ts.length),prim.op_prec(),prim._name); }
+  public FunNode(PrimNode prim) { this(TypeFunPtr.make(prim._targs,prim.argmem(),prim._ret,prim.retmem(),CNT,prim._targs._ts.length),prim.op_prec(),prim._name); }
   // Used to make copies when inlining/cloning function bodies
-  private FunNode(TypeTuple ts, Type ret, String name, int nargs) { this(TypeFunPtr.make(ts,ret,CNT,nargs),-1,name); }
+  private FunNode(TypeTuple ts, Type argmem, Type ret, Type retmem, String name, int nargs) { this(TypeFunPtr.make(ts,argmem,ret,retmem,CNT,nargs),-1,name); }
   // Used to start an anonymous function in the Parser
-  public FunNode(Type[] ts) { this(TypeFunPtr.make(TypeTuple.make(ts),Type.SCALAR,CNT,ts.length),-1,null); }
+  public FunNode(Type[] ts) { this(TypeFunPtr.make(TypeTuple.make(ts),TypeMem.MEM,Type.SCALAR,TypeMem.MEM,CNT,ts.length),-1,null); }
   // Used to forward-decl anon functions
   FunNode(String name) { this(TypeFunPtr.make_forward_ref(CNT),-1,name); }
   // Shared common constructor
@@ -247,7 +247,7 @@ public class FunNode extends RegionNode {
     assert ts.isa(_tf._ts);
     assert ts != _tf._ts;            // Must see improvement
     // Make a prototype new function header.
-    FunNode fun = new FunNode(ts,_tf._ret,name(),_tf._nargs);
+    FunNode fun = new FunNode(ts,_tf._argmem,_tf._ret,_tf._retmem,name(),_tf._nargs);
     // Look in remaining paths and decide if they split or stay
     Node xctrl = gvn.con(Type.XCTRL);
     for( int j=2; j<_defs._len; j++ ) {
@@ -313,7 +313,7 @@ public class FunNode extends RegionNode {
     // Make a prototype new function header.  No generic unknown caller
     // in slot 1.  The one inlined call in slot 'm'.
     // Make a prototype new function header.
-    FunNode fun = new FunNode(_tf._ts,_tf._ret,name(),_tf._nargs);
+    FunNode fun = new FunNode(_tf._ts,_tf._argmem,_tf._ret,_tf._retmem,name(),_tf._nargs);
     fun.pop();                  // Remove junk ALL_CTRL input
     Node top = gvn.con(Type.XCTRL);
     for( int i=1; i<_defs._len; i++ )

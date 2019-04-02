@@ -29,7 +29,7 @@ public abstract class Node implements Cloneable {
   static final byte OP_SCOPE =17;
   static final byte OP_START =18;
   static final byte OP_STORE =19;
-  static final byte OP_TMP   =10;
+  static final byte OP_TMP   =20;
   static final byte OP_TYPE  =21;
   static final byte OP_UNR   =22;
   static final byte OP_MAX   =23;

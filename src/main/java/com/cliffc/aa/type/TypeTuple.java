@@ -88,7 +88,7 @@ public class TypeTuple<O extends TypeTuple<O>> extends Type<O> {
   public  static final TypeTuple INT64_INT64 = make(TypeInt.INT64,TypeInt.INT64);
   public  static final TypeTuple FLT64_FLT64 = make(TypeFlt.FLT64,TypeFlt.FLT64);
   private static final TypeTuple FLT64_INT64 = make(TypeFlt.FLT64,TypeInt.INT64);
-  public  static final TypeTuple STR_STR     = make(TypeStr.STR  ,TypeStr.STR  );
+  public  static final TypeTuple STR_STR     = make(TypeMemPtr.STRPTR,TypeMemPtr.STRPTR);
   
   public  static final TypeTuple IF_ANY  = make(XCTRL,XCTRL);
   public  static final TypeTuple IF_ALL  = make(CTRL ,CTRL );
@@ -149,11 +149,13 @@ public class TypeTuple<O extends TypeTuple<O>> extends Type<O> {
   // 2 - RPC (set of callers)
   // 3 - Classic TypeFunPtr, includes declared return type
   final boolean is_fun() {
-    return _ts.length==4 &&
+    return _ts.length==5 &&
      (_ts[0]==CTRL || _ts[0]==XCTRL) &&
-      _ts[2] instanceof TypeRPC &&
-      //assert ts[3].is_con(); // Not always a constant F-P, e.g. Unresolved doing joins of F-P's
-      _ts[3] instanceof TypeFunPtr;
+      _ts[1] instanceof TypeMem &&
+      _ts[2].isa(SCALAR) &&
+      _ts[3] instanceof TypeRPC &&
+      //assert ts[4].is_con(); // Not always a constant F-P, e.g. Unresolved doing joins of F-P's
+      _ts[4] instanceof TypeFunPtr;
   }
 
   // True if isBitShape on all bits

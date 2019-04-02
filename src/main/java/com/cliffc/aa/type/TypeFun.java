@@ -4,24 +4,19 @@ import com.cliffc.aa.node.FunNode;
 
 /** A Tuple with exactly 4 fields:
  *  0 - Function exit control
- *  1 - Function exit value type
- *  2 - Function RPC type (set of callers) - Short cut available type, to avoid
+ *  1 - Function exit memory value type
+ *  2 - Function exit value type
+ *  3 - Function RPC type (set of callers) - Short cut available type, to avoid
  *      going to the FunNode and reversing to the RPC.
- *  3 - Function signature, with a single FIDX 
+ *  4 - Function signature, with a single FIDX 
  * 
  *  This is the type of EpilogNodes, and is somewhat redundant because they
  *  also have a _fidx to map to the FunNode (used when the FunNode is
  *  collapsing) AND a pointer to the FunNode.
 */
 public class TypeFun extends TypeTuple<TypeFun> {
-  private TypeFun( boolean any, Type[] ts ) {
-    super(TFUN, any, ts);
-    init(any,ts);
-  }
-  protected void init( boolean any, Type[] ts ) {
-    super.init(TFUN, any, ts);
-    assert is_fun();
-  }
+  private TypeFun    ( boolean any, Type[] ts ) { super(TFUN, any, ts); init(any,ts); }
+  protected void init( boolean any, Type[] ts ) { super.init(TFUN, any, ts);  assert is_fun(); }
   
   @Override public boolean equals( Object o ) { return o instanceof TypeFun && super.equals(o); }    
   
@@ -37,10 +32,10 @@ public class TypeFun extends TypeTuple<TypeFun> {
     return t1==t2 ? t1 : t1.free(t2);
   }
   
-  public static TypeFun make( Type ctrl, Type ret, Type rpc, TypeFunPtr fun ) {
-    return make(false,new Type[]{ctrl,ret,rpc,fun});
+  public static TypeFun make( Type ctrl, Type mem, Type ret, Type rpc, TypeFunPtr fun ) {
+    return make(false,new Type[]{ctrl,mem,ret,rpc,fun});
   }
-  public static TypeFun make( TypeFunPtr fun ) { return make(Type.CTRL,fun._ret,TypeRPC.ALL_CALL, fun); }
+  public static TypeFun make( TypeFunPtr fun ) { return make(Type.CTRL,fun._retmem,fun._ret,TypeRPC.ALL_CALL, fun); }
   public static TypeFun make( int fidx ) { return make(FunNode.find_fidx(fidx)._tf); }
 
          static final TypeFun FUN1        = make(TypeFunPtr.any(1, 0)); // Some 1-arg function
@@ -75,7 +70,7 @@ public class TypeFun extends TypeTuple<TypeFun> {
     }
     TypeFun tt = (TypeFun)t;
     assert _ts.length==tt._ts.length;
-    Type[] ts = new Type[4];
+    Type[] ts = new Type[5];
     for( int i=0; i<_ts.length; i++ )  ts[i] = _ts[i].meet(tt._ts[i]);
     return make(_any&tt._any,ts);
   }
@@ -84,9 +79,10 @@ public class TypeFun extends TypeTuple<TypeFun> {
   @Override public boolean is_forward_ref() { return fun().is_forward_ref(); }
 
   public Type ctl() { return _ts[0]; }
-  public Type val() { return _ts[1]; }
-  public Type rpc() { return _ts[2]; }
-  public TypeFunPtr fun() { return (TypeFunPtr)_ts[3]; }
+  public Type mem() { return _ts[1]; }
+  public Type val() { return _ts[2]; }
+  public Type rpc() { return _ts[3]; }
+  public TypeFunPtr fun() { return (TypeFunPtr)_ts[4]; }
   @Override public boolean must_nil() { return false; }
   @Override Type not_nil() { return this; }
 }

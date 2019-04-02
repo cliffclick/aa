@@ -23,6 +23,10 @@ public abstract class PrimNode extends Node {
   public Parse _badargs;        // Filled in when inlined in CallNode
   PrimNode( byte op, String name, String[] args, TypeTuple targs, Type ret ) { super(op); _name=name; _args=args; _targs = targs; _ret = ret; _badargs=null; }
   PrimNode( String name, String[] args, TypeTuple targs, Type ret ) { this(OP_PRIM,name,args,targs,ret); }
+
+  // Primitives are "pure" - neither have any memory expectations, nor return any changes
+  TypeMem argmem() { return TypeMem.MEM; }
+  TypeMem retmem() { return TypeMem.MEM.dual(); }
   
   final static String[] ARGS1 = new String[]{"x"};
   final static String[] ARGS2 = new String[]{"x","y"};
@@ -30,7 +34,7 @@ public abstract class PrimNode extends Node {
   public static PrimNode[] PRIMS = new PrimNode[] {
     new RandI64(),
     new Id(TypeMemPtr.OOP0), // Pre-split OOP from non-OOP
-    new Id(TypeFun.GENERIC_FUN),
+    new Id(TypeFunPtr.GENERIC_FUNPTR),
     new Id(Type.REAL),
     
     new ConvertInt64F64(),
@@ -380,7 +384,7 @@ static class Id extends PrimNode {
 }
 
 static class AddStrStr extends PrimNode {
-  AddStrStr( ) { super("+",PrimNode.ARGS2,TypeTuple.STR_STR,TypeStr.STR); }
+  AddStrStr( ) { super("+",PrimNode.ARGS2,TypeTuple.STR_STR,TypeMemPtr.STRPTR); }
   public TypeStr apply( Type[] args ) { return TypeStr.con(args[1].getstr()+args[2].getstr()); }
 }
 

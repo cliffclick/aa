@@ -475,8 +475,9 @@ public class GVNGCM {
         if( tret != tfun._ret &&    // can sharpen function return
             tret.isa(tfun._ret) ) { // Only if sharpened (might not be true for errors)
           unreg(fun);
-          fun._tf = TypeFunPtr.make(tfun._ts,tret,tfun._fidxs,tfun._nargs);
-          rereg(fun,Type.CTRL);
+          //fun._tf = TypeFunPtr.make(tfun._ts,targmem,tret,tretmem,tfun._fidxs,tfun._nargs);
+          //rereg(fun,Type.CTRL);
+          throw AA.unimpl();
         }
       }
     }

@@ -711,7 +711,8 @@ public class Parse {
         ret = ts.pop();         // Get single return type
       }
       TypeTuple targs = TypeTuple.make(ts.asAry());
-      return peek('}') ? typeq(TypeFun.make(TypeFunPtr.make(targs,ret,Bits.FULL,ts._len))) : null;
+      //return peek('}') ? typeq(TypeFun.make(TypeFunPtr.make(targs,targmem,ret,tretmem,Bits.FULL,ts._len))) : null;
+      throw AA.unimpl();
     }
 
     if( peek2(c,"@{") ) { // Struct type

@@ -214,7 +214,8 @@ public class TestParse {
   }
   static private Function<HashMap<String,Type>,Type> name_tuple_constructor(Type... ts) {
     TypeStruct tt = TypeStruct.make(ts);
-    return (tmap -> TypeFun.make(TypeFunPtr.make(TypeTuple.make(tt),TypeName.make("A",tmap,tt),Bits.FULL,1)));
+    //return (tmap -> TypeFun.make(TypeFunPtr.make(TypeTuple.make(tt),TypeName.make("A",tmap,tt),Bits.FULL,1)));
+    throw AA.unimpl();
   }
 
   @Test public void testParse4() {
@@ -244,8 +245,9 @@ public class TestParse {
     test("(1,\"abc\").1", TypeStr.ABC);
     
     // Named type variables
-    test_isa("gal=:flt"       , (tmap -> TypeFun.make(TypeFunPtr.make(TypeTuple.FLT64,TypeName.make("gal",tmap,TypeFlt.FLT64),Bits.FULL,1))));
-    test_isa("gal=:flt; gal"  , (tmap -> TypeFun.make(TypeFunPtr.make(TypeTuple.FLT64,TypeName.make("gal",tmap,TypeFlt.FLT64),Bits.FULL,1))));
+    final TypeMem nomem = TypeMem.MEM.dual();
+    test_isa("gal=:flt"       , (tmap -> TypeFun.make(TypeFunPtr.make(TypeTuple.FLT64,nomem,TypeName.make("gal",tmap,TypeFlt.FLT64),nomem,Bits.FULL,1))));
+    test_isa("gal=:flt; gal"  , (tmap -> TypeFun.make(TypeFunPtr.make(TypeTuple.FLT64,nomem,TypeName.make("gal",tmap,TypeFlt.FLT64),nomem,Bits.FULL,1))));
     test    ("gal=:flt; 3==gal(2)+1", TypeInt.TRUE);
     test    ("gal=:flt; tank:gal = gal(2)", (tmap -> TypeName.make("gal",tmap,TypeInt.con(2))));
     // test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: figure out if free cast for bare constants?
