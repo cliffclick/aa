@@ -83,7 +83,7 @@ public class NewNode extends Node {
   // Clones during inlining all become unique new sites
   @Override NewNode copy() {
     NewNode nnn = super.copy();
-    nnn._alias = TypeMem.new_alias();
+    nnn._alias = TypeMem.split_alias(_alias);
     return nnn;
   }
   

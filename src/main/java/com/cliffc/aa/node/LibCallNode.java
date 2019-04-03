@@ -1,24 +1,22 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.*;
+import com.cliffc.aa.AA;
+import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.node.MergeMemNode;
-
-import java.util.HashMap;
 
 // Known (intrinsic) library calls.  They typically have memory side effects,
 // or else they would be a PrimNode instead.  Like PrimNodes they are wrapped
 // in a Fun/Epilog but include memory effects.
 public abstract class LibCallNode extends PrimNode {
-  final TypeMemPtr _alias;
-  LibCallNode( String name, String[] args, TypeTuple targs, Type ret, TypeMemPtr alias ) {
+  int _alias;
+  LibCallNode( String name, String[] args, TypeTuple targs, Type ret, int alias ) {
     super(OP_LIBCALL,name,args,targs,ret);
     _alias = alias;
   }
   
   public static LibCallNode[] LIBCALLS = new LibCallNode[] {
-    new ConvertI64Str(TypeMemPtr.make(Type.new_alias())),
-    new ConvertF64Str(TypeMemPtr.make(Type.new_alias())),
+    new ConvertI64Str(Type.new_alias()),
+    new ConvertF64Str(Type.new_alias()),
   };
 
   // Wrap the PrimNode with a Fun/Epilog wrapper that includes memory effects.
@@ -39,66 +37,66 @@ public abstract class LibCallNode extends PrimNode {
   }
   
   // Clones during inlining all become unique new sites
-  @Override NewNode copy() {
-    NewNode nnn = super.copy();
-    nnn._alias = TypeMemPtr.make(TypeMem.new_alias());
-    //return nnn;
-    // must split the existing alias in twain
-    throw AA.unimpl();
+  @Override LibCallNode copy() {
+    LibCallNode nnn = super.copy();
+    nnn._alias = TypeMem.split_alias(_alias);
+    return nnn;
   }
   
   static class ConvertI64Str extends LibCallNode {
-    ConvertI64Str(TypeMemPtr alias) {
+    ConvertI64Str(int alias) {
       super("str",PrimNode.ARGS1,TypeTuple.INT64,
             // Return is a tuple of: (mem#alias:str, ptr#alias)
-            TypeTuple.make(TypeMem.make(alias.get_alias(),TypeStr.STR),alias),
+            TypeTuple.make(TypeMem.make(alias,TypeStr.STR),TypeMemPtr.make(alias)),
             alias);
     }
             
     // Library calls update memory.  These calls have the default boot-time
     // memory inputs and outputs.
     @Override TypeMem argmem() { return TypeMem.MEM.dual(); }
-    @Override TypeMem retmem() { return TypeMem.make(_alias.get_alias(),TypeStr.STR); }
+    @Override TypeMem retmem() { return TypeMem.make(_alias,TypeStr.STR); }
   
     // Conversion to String allocates memory - so the apply() call returns a new
     // pointer aliased to a hidden String allocation site.  The memory returned
     // is read-only (and can be shared).
     @Override public TypeTuple apply( Type[] args ) {
       TypeMem mem = (TypeMem)args[1];
+      TypeMemPtr alias = TypeMemPtr.make(_alias);
       Type val = args[2];
-      TypeObj obj = mem.ld(_alias);
+      TypeObj obj = mem.ld(alias);
       TypeStr str = TypeStr.con(Long.toString(val.getl()));
       TypeObj obj2 = (TypeObj)obj.meet(str);
-      TypeMem res = mem.st(_alias,null,-1,obj2);
-      return TypeTuple.make(res,_alias);
+      TypeMem res = mem.st(alias,null,-1,obj2);
+      return TypeTuple.make(res,alias);
     }
     @Override public boolean is_lossy() { return false; }
   }
   
   static class ConvertF64Str extends LibCallNode {
-    ConvertF64Str(TypeMemPtr alias) {
+    ConvertF64Str(int alias) {
       super("str",PrimNode.ARGS1,TypeTuple.FLT64,
             // Return is a tuple of: (mem#alias:str, ptr#alias)
-            TypeTuple.make(TypeMem.make(alias.get_alias(),TypeStr.STR),alias),
+            TypeTuple.make(TypeMem.make(alias,TypeStr.STR),TypeMemPtr.make(alias)),
             alias);
     }
             
     // Library calls update memory.  These calls have the default boot-time
     // memory inputs and outputs.
     @Override TypeMem argmem() { return TypeMem.MEM.dual(); }
-    @Override TypeMem retmem() { return TypeMem.make(_alias.get_alias(),TypeStr.STR); }
+    @Override TypeMem retmem() { return TypeMem.make(_alias,TypeStr.STR); }
     
     // Conversion to String allocates memory - so the apply() call returns a new
     // pointer aliased to a hidden String allocation site.  The memory returned
     // is read-only (and can be shared).
     @Override public TypeTuple apply( Type[] args ) {
       TypeMem mem = (TypeMem)args[1];
+      TypeMemPtr alias = TypeMemPtr.make(_alias);
       Type val = args[2];
-      TypeObj obj = mem.ld(_alias);
+      TypeObj obj = mem.ld(alias);
       TypeStr str = TypeStr.con(Double.toString(args[1].getd()));
       TypeObj obj2 = (TypeObj)obj.meet(str);
-      TypeMem res = mem.st(_alias,null,-1,obj2);
-      return TypeTuple.make(res,_alias);
+      TypeMem res = mem.st(alias,null,-1,obj2);
+      return TypeTuple.make(res,alias);
     }
     @Override public boolean is_lossy() { return false; }
   }

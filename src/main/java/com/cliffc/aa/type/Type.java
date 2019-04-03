@@ -670,6 +670,41 @@ public class Type<T extends Type<T>> {
   // Placed here to avoid a cyclic class dependency with TypeMem.
   private static int ALIAS=1;   // Unique alias number, skipping 0
   public static int new_alias() { return ALIAS++; }
+
+
+  // Conceptually, each alias# represents an infinite set of pointers - broken
+  // into equivalence classes.  We can split such a class in half - some
+  // pointers will go left and some go right, and where we can't tell we'll use
+  // both sets.  Any alias set is a tree-like nested set of sets bottoming out
+  // in individual pointers.  The types are conceptually unchanged if we start
+  // using e.g. 2 alias#s instead of 1 everywhere - we've just explicitly named
+  // the next layer in the tree-of-sets.
+  
+  // Split an existing alias# in half, such that some ptrs point to one half or
+  // the other, and most point to either (or both).  Basically find all
+  // references to alias#X and add a new alias#Y paired with X - making all
+  // alias types use both equally.  Leave the base constructor of an X alias
+  // (some NewNode) alone - it still produces just an X.  The Node calling
+  // split_alias gets Y alone, and the system as a whole makes a conservative
+  // approximation that {XY} are always confused.  Afterwards we can lift the
+  // types to refine as needed.
+  
+  // Do this "cheaply"!  I can think of 2 approaches: (1) visit all Types in
+  // the GVN type array replacing TypeMem[Ptr]{alias#X} with {alias#XY}, or (2)
+  // update the Types themselves.  Due to the interning, it suffices to swap
+  // all the Alias Bits for Bits with Y# set.  Bits are used for both Alias and
+  // RPC and FIDXs so we'd need seperate intern sets for these.
+  public static int split_alias( int alias ) {
+    // I think its important to log these changes over time, so I can track/debug.
+    int a2 = new_alias();
+    System.out.println("Alias split "+alias+" into {"+alias+","+a2+"}");
+
+    // For now voting for the GVN hack
+
+    
+    throw AA.unimpl();
+  }
+  
   
   RuntimeException typerr(Type t) {
     throw new RuntimeException("Should not reach here: internal type system error with "+this+(t==null?"":(" and "+t)));

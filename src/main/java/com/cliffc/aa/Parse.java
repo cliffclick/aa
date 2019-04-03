@@ -3,7 +3,6 @@ package com.cliffc.aa;
 import com.cliffc.aa.node.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
-import com.cliffc.aa.util.Bits;
 import com.cliffc.aa.util.SB;
 import org.jetbrains.annotations.NotNull;
 
