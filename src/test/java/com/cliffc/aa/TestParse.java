@@ -1,7 +1,6 @@
 package com.cliffc.aa;
 
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.Bits;
 import org.junit.Assert;
 import org.junit.Ignore;
 import org.junit.Test;

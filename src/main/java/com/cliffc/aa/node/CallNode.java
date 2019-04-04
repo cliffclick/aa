@@ -4,7 +4,6 @@ import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
-import com.cliffc.aa.util.Bits;
 
 // See FunNode.  Control is not required for an apply but inlining the function
 // body will require it; slot 0 is for Control.  Slot 1 is a function value - a

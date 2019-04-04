@@ -1,6 +1,7 @@
-package com.cliffc.aa.util;
+package com.cliffc.aa.type;
 
 import com.cliffc.aa.AA;
+import com.cliffc.aa.util.SB;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;

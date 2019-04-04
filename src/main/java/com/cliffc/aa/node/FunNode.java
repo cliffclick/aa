@@ -5,7 +5,6 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
-import com.cliffc.aa.util.Bits;
 import com.cliffc.aa.util.SB;
 
 import java.util.BitSet;
