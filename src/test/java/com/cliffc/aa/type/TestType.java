@@ -1,6 +1,5 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.type.Bits;
 import org.junit.Ignore;
 import org.junit.Test;
 

@@ -15,7 +15,7 @@ hs_err_pid*
 /sandbox
 
 # Emacs
-#*#
+\#*#
 *~
 .#*
 TAGS

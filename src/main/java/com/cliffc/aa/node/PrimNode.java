@@ -26,7 +26,7 @@ public abstract class PrimNode extends Node {
 
   // Primitives are "pure" - neither have any memory expectations, nor return any changes
   TypeMem argmem() { return TypeMem.MEM; }
-  TypeMem retmem() { return TypeMem.MEM.dual(); }
+  TypeMem retmem() { return TypeMem.XMEM; }
   
   final static String[] ARGS1 = new String[]{"x"};
   final static String[] ARGS2 = new String[]{"x","y"};

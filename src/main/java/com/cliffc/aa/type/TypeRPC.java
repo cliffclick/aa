@@ -27,7 +27,7 @@ public class TypeRPC extends Type<TypeRPC> {
   
   private static TypeRPC FREE=null;
   @Override protected TypeRPC free( TypeRPC ret ) { FREE=this; return ret; }
-  public static TypeRPC make( int rpc ) { return make(Bits.make(rpc)); }
+  public static TypeRPC make( int rpc ) { return make(Bits.make0(rpc)); }
   public static TypeRPC make( Bits rpcs ) {
     TypeRPC t1 = FREE;
     if( t1 == null ) t1 = new TypeRPC(rpcs);
@@ -76,6 +76,6 @@ public class TypeRPC extends Type<TypeRPC> {
   @Override public Type meet_nil() {
     if( _rpcs.test(0) )      // Already has a nil?
       return _rpcs.above_center() ? TypeNil.NIL : this;
-    return make(_rpcs.meet(Bits.make(0)));
+    return make(_rpcs.meet(Bits.NIL));
   }
 }

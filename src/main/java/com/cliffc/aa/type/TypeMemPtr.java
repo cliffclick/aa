@@ -10,10 +10,10 @@ import java.util.function.Predicate;
 // Loads and Stores.  They carry a set of aliased TypeMems. 
 public final class TypeMemPtr extends Type<TypeMemPtr> {
   // List of known memory aliases.  Zero is nil.
-  Bits _aliases;
+  BitsAlias _aliases;
 
-  private TypeMemPtr(Bits aliases ) { super     (TMEMPTR); init(aliases); }
-  private void init (Bits aliases ) { super.init(TMEMPTR); _aliases = aliases; }
+  private TypeMemPtr(BitsAlias aliases ) { super     (TMEMPTR); init(aliases); }
+  private void init (BitsAlias aliases ) { super.init(TMEMPTR); _aliases = aliases; }
   @Override public int hashCode( ) { return TMEMPTR + _aliases.hashCode();  }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
@@ -29,8 +29,8 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
 
   private static TypeMemPtr FREE=null;
   @Override protected TypeMemPtr free( TypeMemPtr ret ) { FREE=this; return ret; }
-  public static TypeMemPtr make( int alias ) { return make(Bits.make(alias)); }
-  public static TypeMemPtr make( Bits aliases ) {
+  public static TypeMemPtr make( int alias ) { return make(BitsAlias.make0(alias)); }
+  public static TypeMemPtr make( BitsAlias aliases ) {
     TypeMemPtr t1 = FREE;
     if( t1 == null ) t1 = new TypeMemPtr(aliases);
     else { FREE = null;          t1.init(aliases); }
@@ -39,13 +39,13 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   }
   public static TypeMemPtr make_nil( int alias ) {
     if( alias >=64 ) throw com.cliffc.aa.AA.unimpl();
-    return make(Bits.make0(-2,new long[]{(1L<<alias)|1}));
+    return make(BitsAlias.make0(-2,new long[]{(1L<<alias)|1}));
   }
-  public static TypeMemPtr make( int... aliases ) { return make(Bits.make(aliases)); }
+  public static TypeMemPtr make( int... aliases ) { return make(BitsAlias.make0(aliases)); }
   public int alias() { return _aliases.getbit(); }
 
-  public static final TypeMemPtr OOP0   = make(Bits.FULL); // Includes nil
-  public static final TypeMemPtr OOP    = make(Bits.NZERO);// Excludes nil
+  public static final TypeMemPtr OOP0   = make(BitsAlias.FULL); // Includes nil
+  public static final TypeMemPtr OOP    = make(BitsAlias.NZERO);// Excludes nil
   public static final TypeMemPtr STRPTR = make(TypeStr.STR_alias);
          static final TypeMemPtr STR0   = make_nil(TypeStr.STR_alias);
          static final TypeMemPtr ABCPTR = make(TypeStr.ABC_alias);
@@ -88,7 +88,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   @Override public Type meet_nil() {
     if( _aliases.test(0) )      // Already has a nil?
       return _aliases.above_center() ? TypeNil.NIL : this;
-    return make(_aliases.meet(Bits.make(0)));
+    return make(_aliases.meet(BitsAlias.NIL));
   }
   @Override void walk( Predicate<Type> p ) { p.test(this); }
 }

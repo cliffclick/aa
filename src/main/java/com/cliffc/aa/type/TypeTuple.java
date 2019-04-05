@@ -95,7 +95,7 @@ public class TypeTuple<O extends TypeTuple<O>> extends Type<O> {
   public  static final TypeTuple IF_TRUE = make(XCTRL,CTRL );
   public  static final TypeTuple IF_FALSE= make(CTRL ,XCTRL);
 
-  public  static final TypeTuple STATE = make(CTRL, TypeMem.MEM.dual());
+  public  static final TypeTuple STATE = make(CTRL, TypeMem.XMEM);
   static final TypeTuple[] TYPES = new TypeTuple[]{XSCALARS,SCALAR0,SCALAR1,STRPTR,INT32,INT64,FLT64,INT64_INT64,FLT64_FLT64,FLT64_INT64, IF_ALL, IF_TRUE, IF_FALSE, OOP_OOP};
   
   // The length of Tuples is a constant, and so is its own dual.  Otherwise

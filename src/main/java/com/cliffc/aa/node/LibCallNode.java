@@ -1,6 +1,5 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.AA;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 
@@ -53,7 +52,7 @@ public abstract class LibCallNode extends PrimNode {
             
     // Library calls update memory.  These calls have the default boot-time
     // memory inputs and outputs.
-    @Override TypeMem argmem() { return TypeMem.MEM.dual(); }
+    @Override TypeMem argmem() { return TypeMem.XMEM; }
     @Override TypeMem retmem() { return TypeMem.make(_alias,TypeStr.STR); }
   
     // Conversion to String allocates memory - so the apply() call returns a new
@@ -82,7 +81,7 @@ public abstract class LibCallNode extends PrimNode {
             
     // Library calls update memory.  These calls have the default boot-time
     // memory inputs and outputs.
-    @Override TypeMem argmem() { return TypeMem.MEM.dual(); }
+    @Override TypeMem argmem() { return TypeMem.XMEM; }
     @Override TypeMem retmem() { return TypeMem.make(_alias,TypeStr.STR); }
     
     // Conversion to String allocates memory - so the apply() call returns a new

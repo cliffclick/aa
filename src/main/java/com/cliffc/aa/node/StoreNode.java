@@ -38,7 +38,7 @@ public class StoreNode extends Node {
 
   @Override public Type value(GVNGCM gvn) {
     final Type  M = TypeMem.MEM;
-    final Type XM = TypeMem.MEM.dual();
+    final Type XM = TypeMem.XMEM;
     Type adr = gvn.type(adr()).base();
     if( adr.isa(TypeMemPtr.OOP0.dual()) ) return XM; // Very high address; might fall to any valid address
     if( adr.must_nil() ) return M;           // Not provable not-nil, so fails

@@ -94,6 +94,7 @@ public class TypeMem extends Type<TypeMem> {
   }
 
   public  static final TypeMem MEM = make(TypeObj.OBJ,new TypeObj[0]);
+  public  static final TypeMem XMEM = MEM.dual();
   public  static final TypeMem MEM_STR = make(TypeStr.STR_alias,TypeStr.STR);
   public  static final TypeMem MEM_ABC = make(TypeStr.ABC_alias,TypeStr.ABC);
   static final TypeMem[] TYPES = new TypeMem[]{MEM,MEM_STR};

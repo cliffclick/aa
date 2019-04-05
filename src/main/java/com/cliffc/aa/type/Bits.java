@@ -4,7 +4,9 @@ import com.cliffc.aa.AA;
 import com.cliffc.aa.util.SB;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.NoSuchElementException;
 
 // Bits supporting a lattice; immutable; hash-cons'd.
 public class Bits implements Iterable<Integer> {
@@ -14,14 +16,12 @@ public class Bits implements Iterable<Integer> {
   // If _bits is NULL, then _con holds the single set bit (including 0).
   // If _bits is not-null, then _con is -2 for meet, and -1 for join.
   // The last bit of _bits is the "sign" bit, and extends infinitely.
-  private long[] _bits;         // Bits set or null for a single bit
-  private int _con;             // value of single bit, or -2 for meet or -1 for join
-  private int _hash;            // Pre-computed hashcode
-  private      Bits(int con, long[] bits ) { init(con,bits); }
-  private void init(int con, long[] bits ) {
+  private long[] _bits;   // Bits set or null for a single bit
+  private int _con;       // value of single bit, or -2 for meet or -1 for join
+  private int _hash;      // Pre-computed hashcode
+  void init(int con, long[] bits ) {
     if( bits==null ) assert con >= 0;
     else             assert con==-2 || con==-1;
-
     int sum=con;
     if( bits != null ) for( long bit : bits ) sum += bit;
     _hash=sum;
@@ -43,7 +43,7 @@ public class Bits implements Iterable<Integer> {
   }
   @Override public String toString() { return toString(new SB()).toString(); }
   public SB toString(SB sb) {
-    if( this==FULL ) return sb.p("[ALL]");
+    if( this==FULL() ) return sb.p("[ALL]");
     else if( _con==-1 && _bits.length==1 && _bits[0]==-1 ) return sb.p("[~ALL]");
     sb.p('[');
     if( _bits==null ) sb.p(_con);
@@ -54,19 +54,25 @@ public class Bits implements Iterable<Integer> {
     return sb.p(']');
   }
 
+  // Intern: lookup and return an existing Bits or install in hashmap and
+  // return a new Bits.  Overridden in subclasses to make type-specific Bits.
   private static HashMap<Bits,Bits> INTERN = new HashMap<>();
   private static Bits FREE=null;
-  private static Bits make( int con, long[] bits ) {
-    Bits t1 = FREE;
-    if( t1 == null ) t1 = new Bits(con,bits);
-    else { FREE = null; t1.init(con,bits); }
-    Bits t2 = INTERN.get(t1);
-    if( t2 == null ) INTERN.put(t1,t1);
-    else { FREE=t1; t1=t2; }
-    return t1;
+  Bits make_impl(int con, long[] bits ) {
+    Bits b1 = FREE;
+    if( b1 == null ) b1 = new Bits();
+    else FREE = null;
+    b1.init(con,bits);
+    Bits b2 = INTERN.get(b1);
+    if( b2 != null ) { FREE = b1; b1 = b2; }
+    else INTERN.put(b1,b1);
+    return b1;
   }
-  // Constructor taking an array of bits, and allowing join/meet selection
-  public static Bits make0( int con, long[] bits ) {
+  
+  // Constructor taking an array of bits, and allowing join/meet selection.
+  // The 'this' pointer is only used to clone the class.
+  static Bits make0( int con, long[] bits ) { return FULL.make(con,bits); }
+  final Bits make( int con, long[] bits ) {
     assert con==-2 || con==-1;
     int len = bits.length;
     while( len > 0 && (bits[len-1]==0 || bits[len-1]== -1) ) len--;
@@ -75,41 +81,44 @@ public class Bits implements Iterable<Integer> {
     if( (b & (b-1))==0 ) {      // Last word has only a single bit
       for( int i=0; i<len-1; i++ )
         if( bits[i] != 0 )
-          return make(con,bits);
+          return make_impl(con,bits);
       con = 63-Long.numberOfLeadingZeros(b);
-      return make(con,null);    // Single bit in last word only, switch to con version
+      return make_impl(con,null);    // Single bit in last word only, switch to con version
     }
-    return make(con,bits);
+    return make_impl(con,bits);
   }
   // Constructor taking a list of bits; bits are 'meet'.
-  public static Bits make( int... bits ) {
+  final Bits make( int... bits ) {
     long[] ls = new long[1];
     for( int bit : bits ) {
       if( bit < 0 ) throw new IllegalArgumentException("bit must be positive");
       if( bit >= 63 ) throw AA.unimpl();
       ls[0] |= 1L<<bit;
     }
-    return make0(-2,ls);
+    return make(-2,ls);
   }
   // Constructor taking a single bit
-  public static Bits make( int bit ) {
+  static Bits make0( int bit ) { return FULL.make(bit); }
+  final Bits make( int bit ) {
     if( bit < 0 ) throw new IllegalArgumentException("bit must be positive");
     if( bit >= 63 ) throw AA.unimpl();
-    return make(bit,null);
+    return make_impl(bit,null);
   }
-  public static Bits FULL = make(-2,new long[]{-1});
-  public static Bits NZERO= make(-2,new long[]{-2});
+  
+  public static Bits FULL = new Bits().make_impl(-2,new long[]{-1});
+  public static Bits NIL  = FULL.make(0);
   public static Bits ANY  = FULL.dual();
+  public Bits FULL() { return FULL; }
   
   private static int  idx (int i) { return i>>6; }
   private static long mask(int i) { return 1L<<(i&63); }
   public  boolean inf() { return _bits !=null && (_bits[_bits.length-1]>>63)==-1; }
   
-  public int getbit() { assert _bits==null; return _con; }
+  int getbit() { assert _bits==null; return _con; }
   public int   abit() { return _bits==null ? _con : -1; }
   public boolean is_con() { return _bits==null; }
   public boolean above_center() { return _con==-1; }
-  public boolean may_nil() { return _con==0 || (_con==-1 && ((_bits[0]&1) == 1)); }
+  boolean may_nil() { return _con==0 || (_con==-1 && ((_bits[0]&1) == 1)); }
 
   // Test a specific bit is set or clear
   public boolean test(int i) {
@@ -118,13 +127,13 @@ public class Bits implements Iterable<Integer> {
     return idx < _bits.length ? (_bits[idx]&mask(i))!=0 : inf();
   }
   public Bits clear(int i) {
-    if( !test(i) ) return this; // Already clear
-    if( _con==i ) return make();  // No bits set???
+    if( !test(i) ) return this;  // Already clear
+    if( _con==i ) return make(); // No bits set???
     assert _con<0;
     int idx = idx(i);
     long[] bits = _bits.clone();
     bits[idx] &= ~mask(i);
-    return make0(_con,bits);
+    return make(_con,bits);
   }
   
   private int max() { return (_bits.length<<6)-1; }
@@ -133,7 +142,8 @@ public class Bits implements Iterable<Integer> {
   
   public Bits meet( Bits bs ) {
     if( this==bs ) return this;
-    if( this==FULL || bs==FULL ) return FULL;
+    Bits full = FULL();         // Subclass-specific version of full
+    if( this==full || bs==full ) return full;
     if( this==ANY ) return bs;
     if( bs  ==ANY ) return this;
     if( _bits==null || bs._bits==null ) { // One or both are constants
@@ -204,7 +214,7 @@ public class Bits implements Iterable<Integer> {
     return make(-1,bits);
   }
   
-  private boolean subset(Bits bs) {
+  private boolean subset( Bits bs ) {
     if( _bits.length > bs._bits.length ) return false;
     for( int i=0; i<_bits.length; i++ )
       if( (_bits[i]&bs._bits[i]) != _bits[i] )
@@ -216,7 +226,7 @@ public class Bits implements Iterable<Integer> {
     if( _bits==null ) return this; // Dual of a constant is itself
     // Otherwise just flip _con
     assert _con==-2 || _con==-1;
-    return make(-3-_con,_bits);
+    return make_impl(-3-_con,_bits);
   }
   // join is defined in terms of meet and dual
   public Bits join(Bits bs) { return dual().meet(bs.dual()).dual(); }

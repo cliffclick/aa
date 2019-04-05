@@ -1,7 +1,6 @@
 package com.cliffc.aa.type;
 
 import com.cliffc.aa.node.FunNode;
-import com.cliffc.aa.type.Bits;
 import com.cliffc.aa.util.SB;
 
 import java.util.BitSet;
@@ -59,7 +58,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
 
   private static TypeFunPtr FREE=null;
   @Override protected TypeFunPtr free( TypeFunPtr ret ) { FREE=this; return ret; }
-  public static TypeFunPtr make( TypeTuple ts, Type argmem, Type ret, Type retmem, int  fidx , int nargs ) { return make(ts,argmem,ret,retmem,Bits.make(fidx),nargs); }
+  public static TypeFunPtr make( TypeTuple ts, Type argmem, Type ret, Type retmem, int  fidx , int nargs ) { return make(ts,argmem,ret,retmem,Bits.make0(fidx),nargs); }
   public static TypeFunPtr make( TypeTuple ts, Type argmem, Type ret, Type retmem, Bits fidxs, int nargs ) {
     TypeFunPtr t1 = FREE;
     if( t1 == null ) t1 = new TypeFunPtr(ts,argmem,ret,retmem,fidxs,nargs);
@@ -69,7 +68,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   }
 
   public static TypeFunPtr any( int nargs, int fidx ) {
-    Bits bs = fidx==-1 ? Bits.FULL : Bits.make(fidx);
+    Bits bs = fidx==-1 ? Bits.FULL : Bits.make0(fidx);
     switch( nargs ) {
     case 0: return make(TypeTuple.SCALAR0,TypeMem.MEM,Type.SCALAR,TypeMem.MEM, bs,nargs);
     case 1: return make(TypeTuple.SCALAR1,TypeMem.MEM,Type.SCALAR,TypeMem.MEM, bs,nargs);
@@ -81,7 +80,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   private static final TypeTuple GENERIC_ARGS=TypeTuple.XSCALARS;
   private static final Type      GENERIC_RET =Type.SCALAR; // Can return almost anything
   public  static final TypeFunPtr GENERIC_FUNPTR = make_generic();
-          static final TypeFunPtr FUNPTR1 = any(1,1);
+  private static final TypeFunPtr FUNPTR1 = any(1,1);
   static final TypeFunPtr[] TYPES = new TypeFunPtr[]{FUNPTR1,GENERIC_FUNPTR};
   
   @Override protected TypeFunPtr xdual() {
@@ -138,7 +137,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   @Override public Type meet_nil() {
     if( _fidxs.test(0) )      // Already has a nil?
       return _fidxs.above_center() ? TypeNil.NIL : this;
-    return make(_ts,_argmem,_ret,_retmem,_fidxs.meet(Bits.make(0)),_nargs);
+    return make(_ts,_argmem,_ret,_retmem,_fidxs.meet(Bits.NIL),_nargs);
   }
       
   // Return true if this is an ambiguous function pointer
@@ -147,8 +146,8 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
 
   // Generic functions
   public boolean is_forward_ref()                    { return _nargs == -1; }
-  public static TypeFunPtr make_forward_ref( int fidx ) { return make(GENERIC_ARGS, TypeMem.MEM, GENERIC_RET,TypeMem.MEM, Bits.make(fidx),-1); }
-  private static TypeFunPtr make_generic()              { return make(GENERIC_ARGS, TypeMem.MEM, GENERIC_RET,TypeMem.MEM, Bits.FULL,99); }
+  public static TypeFunPtr make_forward_ref( int fidx ) { return make(GENERIC_ARGS, TypeMem.XMEM, GENERIC_RET,TypeMem.MEM, Bits.make0(fidx),-1); }
+  private static TypeFunPtr make_generic()              { return make(GENERIC_ARGS, TypeMem.XMEM, GENERIC_RET,TypeMem.MEM, Bits.FULL,99); }
   // Iterate over any nested child types
   @Override public void iter( Consumer<Type> c ) { _ts.iter(c); c.accept(_ret); }
 }

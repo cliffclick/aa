@@ -17,7 +17,7 @@ public class MProjNode extends ProjNode {
       if( _idx < ct._ts.length )
         return ct._ts[_idx];
     }
-    return c.above_center() ? TypeMem.MEM.dual() : TypeMem.MEM;
+    return c.above_center() ? TypeMem.XMEM : TypeMem.MEM;
   }
   @Override public Type all_type() { return TypeMem.MEM; }
 }

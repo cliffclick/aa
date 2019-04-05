@@ -80,7 +80,7 @@ public class MergeMemNode extends Node {
     Type tskin = gvn.type(in(1));
     if( !(twide instanceof TypeMem) ||
         !(tskin instanceof TypeMem) )
-      return twide.above_center() ? TypeMem.MEM.dual() : TypeMem.MEM;
+      return twide.above_center() ? TypeMem.XMEM : TypeMem.MEM;
     TypeMem tmerge = ((TypeMem)twide).merge((TypeMem)tskin);
     return tmerge;
   }

@@ -270,7 +270,7 @@ public class CallNode extends Node {
     if( _inlined )              // Inlined functions just pass thru & disappear
       return TypeTuple.make(tc,tm,t);
     if( tc == Type.XCTRL || tc == Type.ANY ) // Call is dead?
-      return TypeTuple.make(Type.XCTRL,TypeMem.MEM.dual(),Type.XSCALAR);
+      return TypeTuple.make(Type.XCTRL,TypeMem.XMEM,Type.XSCALAR);
     if( Type.SCALAR.isa(t) ) // Calling something that MIGHT be a function, no idea what the result is
       return TypeTuple.make(Type.CTRL,TypeMem.MEM,Type.SCALAR);
 
