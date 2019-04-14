@@ -218,7 +218,7 @@ public class TestType {
     TypeFunPtr f1f2f = TypeFunPtr.make(TypeTuple.FLT64,nomem,TypeFlt.FLT64,nomem,2/*fidx*/,1/*nargs*/);
     assertTrue(f1f2f.isa(gf));
     TypeFunPtr mt = (TypeFunPtr)f1i2i.meet(f1f2f);
-    TypeFunPtr f3i2r = TypeFunPtr.make(TypeTuple.INT32,nomem,Type.REAL    ,nomem,Bits.make0(-2,new long[]{(1<<1)|(1<<2)}),1/*nargs*/);
+    TypeFunPtr f3i2r = TypeFunPtr.make(TypeTuple.INT32,nomem,Type.REAL    ,nomem,BitsFun.make0(-2,new long[]{(1<<1)|(1<<2)}),1/*nargs*/);
     assertEquals(f3i2r,mt);
     assertTrue(f3i2r.isa(gf));
     assertTrue(f1i2i.isa(f3i2r));

@@ -16,11 +16,11 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public Type _ret;             // return types
   public Type _retmem;          // return MEMORY types
   // List of known functions in set, or 'flip' for choice-of-functions.
-  public Bits _fidxs;           //
+  public BitsFun _fidxs;        // Known function bits
   public int _nargs;            // Count of args or -1 for forward_ref
 
-  private TypeFunPtr(TypeTuple ts, Type argmem, Type ret, Type retmem, Bits fidxs, int nargs ) { super(TFUNPTR); init(ts,argmem,ret,retmem,fidxs,nargs); }
-  private void init (TypeTuple ts, Type argmem, Type ret, Type retmem, Bits fidxs, int nargs ) {
+  private TypeFunPtr(TypeTuple ts, Type argmem, Type ret, Type retmem, BitsFun fidxs, int nargs ) { super(TFUNPTR); init(ts,argmem,ret,retmem,fidxs,nargs); }
+  private void init (TypeTuple ts, Type argmem, Type ret, Type retmem, BitsFun fidxs, int nargs ) {
     _ts = ts;
     _argmem = argmem;
     _ret = ret;
@@ -58,8 +58,8 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
 
   private static TypeFunPtr FREE=null;
   @Override protected TypeFunPtr free( TypeFunPtr ret ) { FREE=this; return ret; }
-  public static TypeFunPtr make( TypeTuple ts, Type argmem, Type ret, Type retmem, int  fidx , int nargs ) { return make(ts,argmem,ret,retmem,Bits.make0(fidx),nargs); }
-  public static TypeFunPtr make( TypeTuple ts, Type argmem, Type ret, Type retmem, Bits fidxs, int nargs ) {
+  public static TypeFunPtr make( TypeTuple ts, Type argmem, Type ret, Type retmem, int  fidx , int nargs ) { return make(ts,argmem,ret,retmem,BitsFun.make0(fidx),nargs); }
+  public static TypeFunPtr make( TypeTuple ts, Type argmem, Type ret, Type retmem, BitsFun fidxs, int nargs ) {
     TypeFunPtr t1 = FREE;
     if( t1 == null ) t1 = new TypeFunPtr(ts,argmem,ret,retmem,fidxs,nargs);
     else {   FREE = null;        t1.init(ts,argmem,ret,retmem,fidxs,nargs); }
@@ -68,7 +68,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   }
 
   public static TypeFunPtr any( int nargs, int fidx ) {
-    Bits bs = fidx==-1 ? Bits.FULL : Bits.make0(fidx);
+    BitsFun bs = fidx==-1 ? BitsFun.FULL : BitsFun.make0(fidx);
     switch( nargs ) {
     case 0: return make(TypeTuple.SCALAR0,TypeMem.MEM,Type.SCALAR,TypeMem.MEM, bs,nargs);
     case 1: return make(TypeTuple.SCALAR1,TypeMem.MEM,Type.SCALAR,TypeMem.MEM, bs,nargs);
@@ -110,7 +110,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     }
     // Join of args; meet of ret & fidxs
     TypeFunPtr tf = (TypeFunPtr)t;
-    Bits fidxs = _fidxs.meet( tf._fidxs );
+    BitsFun fidxs = _fidxs.meet( tf._fidxs );
     TypeTuple ts = (TypeTuple)_ts.join(tf._ts);
     Type argmem = _argmem.join(tf._argmem);
     Type ret = _ret.meet(tf._ret);
@@ -137,7 +137,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   @Override public Type meet_nil() {
     if( _fidxs.test(0) )      // Already has a nil?
       return _fidxs.above_center() ? TypeNil.NIL : this;
-    return make(_ts,_argmem,_ret,_retmem,_fidxs.meet(Bits.NIL),_nargs);
+    return make(_ts,_argmem,_ret,_retmem,_fidxs.meet(BitsFun.NIL),_nargs);
   }
       
   // Return true if this is an ambiguous function pointer
@@ -146,8 +146,8 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
 
   // Generic functions
   public boolean is_forward_ref()                    { return _nargs == -1; }
-  public static TypeFunPtr make_forward_ref( int fidx ) { return make(GENERIC_ARGS, TypeMem.XMEM, GENERIC_RET,TypeMem.MEM, Bits.make0(fidx),-1); }
-  private static TypeFunPtr make_generic()              { return make(GENERIC_ARGS, TypeMem.XMEM, GENERIC_RET,TypeMem.MEM, Bits.FULL,99); }
+  public static TypeFunPtr make_forward_ref( int fidx ) { return make(GENERIC_ARGS, TypeMem.XMEM, GENERIC_RET,TypeMem.MEM, BitsFun.make0(fidx),-1); }
+  private static TypeFunPtr make_generic()              { return make(GENERIC_ARGS, TypeMem.XMEM, GENERIC_RET,TypeMem.MEM, BitsFun.FULL,99); }
   // Iterate over any nested child types
   @Override public void iter( Consumer<Type> c ) { _ts.iter(c); c.accept(_ret); }
 }

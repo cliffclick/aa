@@ -7,10 +7,10 @@ import java.util.BitSet;
 
 // Return-Program-Counters, or Continuation constants
 public class TypeRPC extends Type<TypeRPC> {
-  public Bits _rpcs;            // 
+  public BitsRPC _rpcs;         // 
 
-  private TypeRPC( Bits rpcs ) { super(TRPC); init(rpcs); }
-  private void init( Bits rpcs ) { _rpcs = rpcs; }
+  private TypeRPC( BitsRPC rpcs ) { super(TRPC); init(rpcs); }
+  private void init( BitsRPC rpcs ) { _rpcs = rpcs; }
   @Override public int hashCode( ) { return TRPC + _rpcs.hashCode();  }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
@@ -27,8 +27,8 @@ public class TypeRPC extends Type<TypeRPC> {
   
   private static TypeRPC FREE=null;
   @Override protected TypeRPC free( TypeRPC ret ) { FREE=this; return ret; }
-  public static TypeRPC make( int rpc ) { return make(Bits.make0(rpc)); }
-  public static TypeRPC make( Bits rpcs ) {
+  public static TypeRPC make( int rpc ) { return make(BitsRPC.make0(rpc)); }
+  public static TypeRPC make( BitsRPC rpcs ) {
     TypeRPC t1 = FREE;
     if( t1 == null ) t1 = new TypeRPC(rpcs);
     else { FREE = null; t1.init(rpcs); }
@@ -36,7 +36,7 @@ public class TypeRPC extends Type<TypeRPC> {
     return t1==t2 ? t1 : t1.free(t2);
   }
 
-  public static final TypeRPC ALL_CALL = make(Bits.FULL);
+  public static final TypeRPC ALL_CALL = make(BitsRPC.FULL);
   public static final TypeRPC RPC1 = make(1);
   static final TypeRPC[] TYPES = new TypeRPC[]{RPC1,ALL_CALL};
   
@@ -76,6 +76,6 @@ public class TypeRPC extends Type<TypeRPC> {
   @Override public Type meet_nil() {
     if( _rpcs.test(0) )      // Already has a nil?
       return _rpcs.above_center() ? TypeNil.NIL : this;
-    return make(_rpcs.meet(Bits.NIL));
+    return make(_rpcs.meet(BitsRPC.NIL));
   }
 }

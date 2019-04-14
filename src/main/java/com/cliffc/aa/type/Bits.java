@@ -9,7 +9,7 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 // Bits supporting a lattice; immutable; hash-cons'd.
-public class Bits implements Iterable<Integer> {
+public abstract class Bits implements Iterable<Integer> {
   // Holds a set of bits meet'd together, or join'd together, along
   // with an infinite extent or a single bit choice as a constant.
   //
@@ -58,20 +58,10 @@ public class Bits implements Iterable<Integer> {
   // return a new Bits.  Overridden in subclasses to make type-specific Bits.
   private static HashMap<Bits,Bits> INTERN = new HashMap<>();
   private static Bits FREE=null;
-  Bits make_impl(int con, long[] bits ) {
-    Bits b1 = FREE;
-    if( b1 == null ) b1 = new Bits();
-    else FREE = null;
-    b1.init(con,bits);
-    Bits b2 = INTERN.get(b1);
-    if( b2 != null ) { FREE = b1; b1 = b2; }
-    else INTERN.put(b1,b1);
-    return b1;
-  }
+  abstract Bits make_impl(int con, long[] bits );
   
   // Constructor taking an array of bits, and allowing join/meet selection.
   // The 'this' pointer is only used to clone the class.
-  static Bits make0( int con, long[] bits ) { return FULL.make(con,bits); }
   final Bits make( int con, long[] bits ) {
     assert con==-2 || con==-1;
     int len = bits.length;
@@ -98,17 +88,14 @@ public class Bits implements Iterable<Integer> {
     return make(-2,ls);
   }
   // Constructor taking a single bit
-  static Bits make0( int bit ) { return FULL.make(bit); }
   final Bits make( int bit ) {
     if( bit < 0 ) throw new IllegalArgumentException("bit must be positive");
     if( bit >= 63 ) throw AA.unimpl();
     return make_impl(bit,null);
   }
   
-  public static Bits FULL = new Bits().make_impl(-2,new long[]{-1});
-  public static Bits NIL  = FULL.make(0);
-  public static Bits ANY  = FULL.dual();
-  public Bits FULL() { return FULL; }
+  public abstract Bits FULL();
+  public abstract Bits ANY ();
   
   private static int  idx (int i) { return i>>6; }
   private static long mask(int i) { return 1L<<(i&63); }
@@ -144,8 +131,9 @@ public class Bits implements Iterable<Integer> {
     if( this==bs ) return this;
     Bits full = FULL();         // Subclass-specific version of full
     if( this==full || bs==full ) return full;
-    if( this==ANY ) return bs;
-    if( bs  ==ANY ) return this;
+    Bits any  = ANY ();         // Subclass-specific version of any
+    if( this==any ) return bs;
+    if( bs  ==any ) return this;
     if( _bits==null || bs._bits==null ) { // One or both are constants
       Bits conbs = this, bigbs = bs;
       if( bs._bits==null ) { conbs = bs;  bigbs = this; }

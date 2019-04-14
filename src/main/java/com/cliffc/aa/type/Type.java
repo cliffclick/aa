@@ -693,7 +693,7 @@ public class Type<T extends Type<T>> {
   // the GVN type array replacing TypeMem[Ptr]{alias#X} with {alias#XY}, or (2)
   // update the Types themselves.  Due to the interning, it suffices to swap
   // all the Alias Bits for Bits with Y# set.  Bits are used for both Alias and
-  // RPC and FIDXs so we'd need seperate intern sets for these.
+  // RPC and FIDXs so we'd need separate intern sets for these.
   public static int split_alias( int alias ) {
     // I think its important to log these changes over time, so I can track/debug.
     int a2 = new_alias();

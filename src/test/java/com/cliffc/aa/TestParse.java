@@ -245,8 +245,8 @@ public class TestParse {
     
     // Named type variables
     final TypeMem nomem = TypeMem.MEM.dual();
-    test_isa("gal=:flt"       , (tmap -> TypeFun.make(TypeFunPtr.make(TypeTuple.FLT64,nomem,TypeName.make("gal",tmap,TypeFlt.FLT64),nomem,Bits.FULL,1))));
-    test_isa("gal=:flt; gal"  , (tmap -> TypeFun.make(TypeFunPtr.make(TypeTuple.FLT64,nomem,TypeName.make("gal",tmap,TypeFlt.FLT64),nomem,Bits.FULL,1))));
+    test_isa("gal=:flt"       , (tmap -> TypeFun.make(TypeFunPtr.make(TypeTuple.FLT64,nomem,TypeName.make("gal",tmap,TypeFlt.FLT64),nomem,BitsFun.FULL,1))));
+    test_isa("gal=:flt; gal"  , (tmap -> TypeFun.make(TypeFunPtr.make(TypeTuple.FLT64,nomem,TypeName.make("gal",tmap,TypeFlt.FLT64),nomem,BitsFun.FULL,1))));
     test    ("gal=:flt; 3==gal(2)+1", TypeInt.TRUE);
     test    ("gal=:flt; tank:gal = gal(2)", (tmap -> TypeName.make("gal",tmap,TypeInt.con(2))));
     // test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: figure out if free cast for bare constants?
