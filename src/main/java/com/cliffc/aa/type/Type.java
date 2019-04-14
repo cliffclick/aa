@@ -699,7 +699,9 @@ public class Type<T extends Type<T>> {
     int a2 = new_alias();
     System.out.println("Alias split "+alias+" into {"+alias+","+a2+"}");
 
-    // For now voting for the GVN hack
+    // For now voting for the GVN hack... which is not done here, in Type ubt
+    // in GVN.  And called during FunNode.inlining.
+    
 
     
     throw AA.unimpl();
