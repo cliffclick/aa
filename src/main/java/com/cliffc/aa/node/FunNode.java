@@ -43,7 +43,7 @@ public class FunNode extends RegionNode {
   private final byte _op_prec;  // Operator precedence; only set top-level primitive wrappers
   
   // Used to make the primitives at boot time
-  public FunNode(PrimNode prim) { this(TypeFunPtr.make(prim._targs,prim.argmem(),prim._ret,prim.retmem(),CNT,prim._targs._ts.length),prim.op_prec(),prim._name); }
+  public FunNode(PrimNode prim, Type ret) { this(TypeFunPtr.make(prim._targs,prim.argmem(),ret,prim.retmem(),CNT,prim._targs._ts.length),prim.op_prec(),prim._name); }
   // Used to make copies when inlining/cloning function bodies
   private FunNode(TypeTuple ts, Type argmem, Type ret, Type retmem, String name, int nargs) { this(TypeFunPtr.make(ts,argmem,ret,retmem,CNT,nargs),-1,name); }
   // Used to start an anonymous function in the Parser
@@ -392,7 +392,7 @@ public class FunNode extends RegionNode {
         ot = nn.all_type();     // Except the RPC, which has new callers
       else if( nn instanceof EpilogNode ) {
         TypeFun tt = (TypeFun)ot; // And the epilog, which has a new funnode and RPCs
-        ot = TypeFun.make(tt.ctl(),tt.val(),TypeRPC.ALL_CALL,fun._tf);
+        ot = TypeFun.make(tt.ctl(),tt.mem(),tt.val(),TypeRPC.ALL_CALL,fun._tf);
       }
       gvn.rereg(nn,ot);
     }

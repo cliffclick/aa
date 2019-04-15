@@ -125,7 +125,7 @@ public abstract class PrimNode extends Node {
   // wraps a PrimNode as a full 1st-class function to be passed about or
   // assigned to variables.
   public EpilogNode as_fun( GVNGCM gvn ) {
-    FunNode  fun = ( FunNode) gvn.xform(new  FunNode(this)); // Points to ScopeNode only
+    FunNode  fun = ( FunNode) gvn.xform(new  FunNode(this,_ret)); // Points to ScopeNode only
     ParmNode rpc = (ParmNode) gvn.xform(new ParmNode(-1,"rpc",fun, gvn.con(TypeRPC.ALL_CALL),null));
     ParmNode mem = (ParmNode) gvn.xform(new ParmNode(-2,"mem",fun, gvn.con(TypeMem.MEM     ),null));
     add_def(null);              // Control for the primitive in slot 0

@@ -1,9 +1,11 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.util.*;
+import com.cliffc.aa.util.SB;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
+import java.util.HashMap;
 
 // Memory type; the state of all of memory; memory edges order memory ops.
 // Produced at the program start, consumed by all function calls, consumed be
@@ -60,7 +62,7 @@ public class TypeMem extends Type<TypeMem> {
     return sb.p("]").toString();
   }
   // Alias must exist
-  private TypeObj at0(int alias) {
+  public TypeObj at0(int alias) {
     if( alias >= _aliases.length ) return _def;
     TypeObj obj = _aliases[alias];
     return obj==null ? _def : obj;
@@ -163,4 +165,29 @@ public class TypeMem extends Type<TypeMem> {
   @Override public boolean is_con()       { return false;}
   @Override public boolean must_nil() { return false; } // never a nil
   @Override Type not_nil() { return this; }
+
+  /** See giant discussion in {@link Bits#split_alias(int, HashMap)}.  Change
+   *  all instances of TypeMem.at0(a1) to include a2 - updating in-place and
+   *  changing the hash as appropriate. */
+  static void split_alias( int a1, int a2 ) {
+    ArrayList<TypeMem> tms = new ArrayList<>();
+    INTERN.entrySet().removeIf(entry -> {
+        Type t = entry.getKey();
+        if( !(t instanceof TypeMem) ) return false;
+        TypeMem tm = (TypeMem)t;
+        TypeObj[] tos = tm._aliases;
+        if( a1 >= tos.length ) return false; // No a1 instance
+        TypeObj to = tos[a1];
+        if( to==null ) return false; // a1 is the default, so is a2
+        assert to != tm._def;
+        tms.add(tm);                 // Must update this TypeMem and rehash
+        if( a2 >= tos.length )
+          tm._aliases = tos = Arrays.copyOf(tos,a2+1);
+        tos[a2] = to;
+        return true;
+      });
+    // For all updated TypeMems re-insert with new hash code
+    for( TypeMem tm : tms )
+      tm.retern();
+  }
 }

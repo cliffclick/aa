@@ -1,7 +1,5 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.AA;
-
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.HashMap;
@@ -85,7 +83,7 @@ public class Type<T extends Type<T>> {
   // Hash-Cons - all Types are interned in this hash table.  Thus an equality
   // check of a (possibly very large) Type is always a simple pointer-equality
   // check, except during construction and intern'ing.
-  private static HashMap<Type,Type> INTERN = new HashMap<>();
+  static HashMap<Type,Type> INTERN = new HashMap<>();
   static int RECURSIVE_MEET;    // Count of recursive meet depth
   final Type hashcons() {
     Type t2 = INTERN.get(this); // Lookup
@@ -672,42 +670,6 @@ public class Type<T extends Type<T>> {
   public static int new_alias() { return ALIAS++; }
 
 
-  // Conceptually, each alias# represents an infinite set of pointers - broken
-  // into equivalence classes.  We can split such a class in half - some
-  // pointers will go left and some go right, and where we can't tell we'll use
-  // both sets.  Any alias set is a tree-like nested set of sets bottoming out
-  // in individual pointers.  The types are conceptually unchanged if we start
-  // using e.g. 2 alias#s instead of 1 everywhere - we've just explicitly named
-  // the next layer in the tree-of-sets.
-  
-  // Split an existing alias# in half, such that some ptrs point to one half or
-  // the other, and most point to either (or both).  Basically find all
-  // references to alias#X and add a new alias#Y paired with X - making all
-  // alias types use both equally.  Leave the base constructor of an X alias
-  // (some NewNode) alone - it still produces just an X.  The Node calling
-  // split_alias gets Y alone, and the system as a whole makes a conservative
-  // approximation that {XY} are always confused.  Afterwards we can lift the
-  // types to refine as needed.
-  
-  // Do this "cheaply"!  I can think of 2 approaches: (1) visit all Types in
-  // the GVN type array replacing TypeMem[Ptr]{alias#X} with {alias#XY}, or (2)
-  // update the Types themselves.  Due to the interning, it suffices to swap
-  // all the Alias Bits for Bits with Y# set.  Bits are used for both Alias and
-  // RPC and FIDXs so we'd need separate intern sets for these.
-  public static int split_alias( int alias ) {
-    // I think its important to log these changes over time, so I can track/debug.
-    int a2 = new_alias();
-    System.out.println("Alias split "+alias+" into {"+alias+","+a2+"}");
-
-    // For now voting for the GVN hack... which is not done here, in Type ubt
-    // in GVN.  And called during FunNode.inlining.
-    
-
-    
-    throw AA.unimpl();
-  }
-  
-  
   RuntimeException typerr(Type t) {
     throw new RuntimeException("Should not reach here: internal type system error with "+this+(t==null?"":(" and "+t)));
   }

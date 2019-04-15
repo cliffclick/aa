@@ -4,8 +4,6 @@ import com.cliffc.aa.AA;
 import com.cliffc.aa.util.SB;
 
 import java.util.BitSet;
-import java.util.HashMap;
-import java.util.function.Consumer;
 
 // Internal fixed-length non-recursive tuples.  Used for function arguments,
 // and multi-arg results like IfNode and CallNode.  This is not the same as a
@@ -96,6 +94,7 @@ public class TypeTuple<O extends TypeTuple<O>> extends Type<O> {
   public  static final TypeTuple IF_FALSE= make(CTRL ,XCTRL);
 
   public  static final TypeTuple STATE = make(CTRL, TypeMem.XMEM);
+  public  static final TypeTuple CALL  = make(CTRL, TypeMem.MEM, SCALAR);
   static final TypeTuple[] TYPES = new TypeTuple[]{XSCALARS,SCALAR0,SCALAR1,STRPTR,INT32,INT64,FLT64,INT64_INT64,FLT64_FLT64,FLT64_INT64, IF_ALL, IF_TRUE, IF_FALSE, OOP_OOP};
   
   // The length of Tuples is a constant, and so is its own dual.  Otherwise

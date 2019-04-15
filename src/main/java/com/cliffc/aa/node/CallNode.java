@@ -95,14 +95,16 @@ public class CallNode extends Node {
             // the constants types from a constant Tuple from a ConNode
             if( tt.is_con() ) {     // Allocation has constant-folded
               int len = tt._ts.length;
-              pop();  gvn.add_work(mem); // Pop off the ConNode tuple
+              remove(_defs._len-1,gvn);  // Pop off the ConNode tuple
+              //gvn.add_work(mem); 
               for( int i=0; i<len; i++ ) // Push the args; unpacks the tuple
                 add_def( gvn.con(tt.at(i)) );
             } else {                // Allocation exists, unpack args
               assert mem instanceof MergeMemNode && mem.in(1) instanceof MProjNode && mem.in(1).in(0) instanceof NewNode;
+              remove(_defs._len-1,gvn); // Pop off the NewNode tuple
+              //pop();  gvn.add_work(mem); // Pop off the NewNode tuple
               Node nn = mem.in(1).in(0);
               int len = nn._defs._len;
-              pop();  gvn.add_work(mem); // Pop off the NewNode/ConNode tuple
               for( int i=1; i<len; i++ ) // Push the args; unpacks the tuple
                 add_def( nn.in(i));
             }
@@ -277,46 +279,46 @@ public class CallNode extends Node {
     if( gvn._opt ) // Manifesting optimistic virtual edges between caller and callee
       wire(gvn,t); // Make real edges from virtual edges
     
-    Type trez = Type.ALL; // Base for JOIN
+    TypeTuple trez = TypeTuple.CALL; // Base for JOIN
     if( fp instanceof UnresolvedNode ) {
       // For unresolved, we can take the BEST choice; i.e. the JOIN of every
       // choice.  Typically one choice works and the others report type
       // errors on arguments.
       for( Node epi : fp._defs )
-        trez = trez.join(value1(gvn,gvn.type(epi))); // JOIN of choices
+        trez = (TypeTuple)trez.join(value1(gvn,gvn.type(epi))); // JOIN of choices
     } else {                                  // Single resolved target
       trez = value1(gvn,t);                   // Return type or SCALAR if invalid args
     }
     
-    // Return {control,value} tuple.
-    return TypeTuple.make(Type.CTRL,tm,trez);
+    // Return {control,mem,value} tuple.
+    return trez;
   }
 
   // See if the arguments are valid.  If valid, return the function's return
   // type.  If not valid return SCALAR - as an indicator that the function
   // cannot be called, so the JOIN of valid returns is not lowered.
-  private Type value1( GVNGCM gvn, Type t ) {
+  private TypeTuple value1( GVNGCM gvn, Type t ) {
     if( !(t instanceof TypeFun) ) // Might be any function, returning anything
-      return t.above_center() ? Type.XSCALAR : Type.SCALAR;
+      return t.above_center() ? (TypeTuple)TypeTuple.CALL.dual() : TypeTuple.CALL;
     TypeFun tepi = (TypeFun)t;
     Type    tctrl=tepi.ctl();
+    Type    tmem =tepi.mem();
     Type    tval =tepi.val();
     TypeFunPtr tfun =tepi.fun();
-    if( tctrl == Type.XCTRL ) return Type.XSCALAR; // Function will never return
+    if( tctrl == Type.XCTRL ) return (TypeTuple)TypeTuple.CALL.dual(); // Function will never return
     assert tctrl==Type.CTRL;      // Function will never return?
-    if( t.is_forward_ref() ) return tfun.ret(); // Forward refs do no argument checking
-    if( tfun.nargs() != nargs() ) return Type.SCALAR; // Function not called, nothing to JOIN
+    if( t.is_forward_ref() ) return TypeTuple.make(tctrl,tmem,tfun.ret()); // Forward refs do no argument checking
+    if( tfun.nargs() != nargs() ) return TypeTuple.CALL; // Function not called, nothing to JOIN
     // Now do an arg-check
     TypeTuple formals = tfun._ts; // Type of each argument
     for( int j=0; j<nargs(); j++ ) {
       Type actual = gvn.type(arg(j));
       Type formal = formals.at(j);
       if( !actual.isa(formal) ) // Actual is not a formal; accumulate type errors
-        return Type.SCALAR;     // Argument not valid, nothing to JOIN
+        return TypeTuple.CALL;  // Argument not valid, nothing to JOIN
     }
-    return tval;
+    return TypeTuple.make(tctrl,tmem,tval);
   }
-
   
   // Given a list of actuals, apply them to each function choice.  If any
   // (!actual-isa-formal), then that function does not work and supplies an

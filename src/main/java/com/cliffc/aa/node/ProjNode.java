@@ -27,7 +27,7 @@ public class ProjNode extends Node {
       if( _idx < ct._ts.length )
         return ct._ts[_idx];
     }
-    return c.above_center() ? Type.ANY : Type.ALL;
+    return c.above_center() ? Type.XSCALAR : Type.SCALAR;
   }
   @Override public Type all_type() { return Type.SCALAR; }
 

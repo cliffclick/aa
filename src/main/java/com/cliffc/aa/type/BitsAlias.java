@@ -33,4 +33,5 @@ public class BitsAlias extends Bits {
   @Override public BitsAlias dual() { return (BitsAlias)super.dual(); }
   public BitsAlias meet( BitsAlias bs ) { return (BitsAlias)super.meet(bs); }
   @Override public BitsAlias clear(int i) { return (BitsAlias)super.clear(i); }
+  public static int split( int alias ) { return split(alias,INTERN); }
 }

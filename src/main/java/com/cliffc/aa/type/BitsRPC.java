@@ -32,4 +32,5 @@ public class BitsRPC extends Bits {
   @Override public BitsRPC dual() { return (BitsRPC)super.dual(); }
   public BitsRPC meet( BitsRPC bs ) { return (BitsRPC)super.meet(bs); }
   @Override public BitsRPC clear(int i) { return (BitsRPC)super.clear(i); }
+  public static int split( int alias ) { return split(alias,INTERN); }
 }

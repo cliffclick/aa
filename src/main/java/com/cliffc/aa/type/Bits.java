@@ -16,17 +16,20 @@ public abstract class Bits implements Iterable<Integer> {
   // If _bits is NULL, then _con holds the single set bit (including 0).
   // If _bits is not-null, then _con is -2 for meet, and -1 for join.
   // The last bit of _bits is the "sign" bit, and extends infinitely.
-  private long[] _bits;   // Bits set or null for a single bit
-  private int _con;       // value of single bit, or -2 for meet or -1 for join
-  private int _hash;      // Pre-computed hashcode
+  long[] _bits;   // Bits set or null for a single bit
+  int _con;       // value of single bit, or -2 for meet or -1 for join
+  int _hash;      // Pre-computed hashcode
   void init(int con, long[] bits ) {
     if( bits==null ) assert con >= 0;
     else             assert con==-2 || con==-1;
-    int sum=con;
-    if( bits != null ) for( long bit : bits ) sum += bit;
-    _hash=sum;
     _con = con;
     _bits=bits;
+    _hash=compute_hash();
+  }
+  int compute_hash() {
+    int sum=_con;
+    if( _bits != null ) for( long bit : _bits ) sum += bit;
+    return sum;
   }
   @Override public int hashCode( ) { return _hash; }
   @Override public boolean equals( Object o ) {
@@ -237,5 +240,68 @@ public abstract class Bits implements Iterable<Integer> {
       if( idx(_i) < _bits.length ) return _i;
       throw new NoSuchElementException();
     }
+  }
+
+  
+  // Conceptually, each alias# represents an infinite set of pointers - broken
+  // into equivalence classes.  We can split such a class in half - some
+  // pointers will go left and some go right, and where we can't tell we'll use
+  // both sets.  Any alias set is a tree-like nested set of sets bottoming out
+  // in individual pointers.  The types are conceptually unchanged if we start
+  // using e.g. 2 alias#s instead of 1 everywhere - we've just explicitly named
+  // the next layer in the tree-of-sets.
+  
+  // Split an existing alias# in half, such that some ptrs point to one half or
+  // the other, and most point to either (or both).  Basically find all
+  // references to alias#X and add a new alias#Y paired with X - making all
+  // alias types use both equally.  Leave the base constructor of an X alias
+  // (some NewNode) alone - it still produces just an X.  The Node calling
+  // split_alias gets Y alone, and the system as a whole makes a conservative
+  // approximation that {XY} are always confused.  Afterwards we can lift the
+  // types to refine as needed.
+  
+  // Do this "cheaply"!  I can think of 2 approaches: (1) visit all Types in
+  // the GVN type array replacing TypeMem[Ptr]{alias#X} with {alias#XY}, or (2)
+  // update the Types themselves.  Due to the interning, it suffices to swap
+  // all the Alias Bits for Bits with Y# set.  Bits are used for both Alias and
+  // RPC and FIDXs so we'd need separate intern sets for these.
+  static <B extends Bits> int split( int a1, HashMap<B, B> intern ) {
+    // I think its important to log these changes over time, so I can track/debug.
+    int a2 = Type.new_alias();
+    System.out.println("Alias split "+a1+" into {"+a1+","+a2+"}");
+
+    // For now voting for the BitsAlias hack.
+
+    // Ugly: all Types' hashcodes change that depend on a BitsAlias.  This
+    // includes TypeTuple, TypeFun, TypeMemPtr and things that include them -
+    // TypeStruct.  Maybe have a cyclic re-hash???
+    
+    // Walk the given intern table, and add a2 to whereever a1 appears.
+    B[] bits = (B[])intern.keySet().toArray(new Bits[0]); // Copy to array
+    for( B b : bits ) {
+      if( b.test(a1) == b.test(a2) ) continue;
+      long[] bs = b._bits;
+      if( bs==null ) {          // Only a single constant bit
+        b._con = -2;            // Become a MEET of 2 bits
+        b._bits = bits(a1,a2);  // Big enuf for both bits
+        b._bits[idx(a1)] |= mask(a1);
+        b._bits[idx(a2)] |= mask(a2);
+      } else {                  // An array of bits already
+        int i1 = idx(a1);
+        if( i1 >= bits.length ) // Need to grow
+          throw AA.unimpl();
+        int i2 = idx(a2);
+        if( (bs[i1]&mask(a1))==0 ) bs[i2] &= mask(a2);
+        else                       bs[i2] |= mask(a2);
+      }
+      b._hash = b.compute_hash();
+    }
+    // Re-hash as needed.
+    intern.clear();
+    for( B b : bits ) intern.put(b,b);
+
+    // Also split the TypeMem collections
+    TypeMem.split_alias(a1,a2);
+    return a2;
   }
 }

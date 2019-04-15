@@ -1,8 +1,5 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.type.Bits;
-import com.cliffc.aa.util.SB;
-
 import java.util.BitSet;
 import java.util.function.Predicate;
 
@@ -77,7 +74,8 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   }
   public int get_alias() { return _aliases.getbit(); }
   @Override public boolean above_center() { return _aliases.above_center(); }
-  @Override public boolean may_be_con()   { return _aliases.above_center() || _aliases.is_con(); }
+  // Aliases represent *classes* of pointers and are thus never constants
+  @Override public boolean may_be_con()   { return false; }
   @Override public boolean is_con()       { return _aliases.is_con() && _aliases.getbit()==0; }
   @Override public boolean must_nil() { return _aliases.test(0) && !above_center(); }
   @Override public boolean may_nil() { return _aliases.may_nil(); }
