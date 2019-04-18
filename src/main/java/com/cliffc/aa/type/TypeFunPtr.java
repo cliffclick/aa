@@ -29,11 +29,24 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     _fidxs = fidxs;
     _nargs=nargs;
   }
-  @Override TypeFunPtr compute_hash(BitSet visit, Ary<Type> oldtypes) {
-    if( oldtypes !=null ) // If set, need to 
-      throw com.cliffc.aa.AA.unimpl();
-    _hash = TFUNPTR + _ts._hash + _argmem._hash + _ret._hash + _retmem._hash + _fidxs._hash + _nargs;
-    return this;
+  @Override int compute_hash() {
+    int hash = TFUNPTR + _nargs +
+      _ts    ._hash +
+      _argmem._hash +
+      _ret   ._hash +
+      _retmem._hash +
+      _fidxs ._hash;
+    return hash;
+  }
+  @Override int recompute_hash(BitSet visit) {
+    if( has_hash(visit) ) return _hash; // Expensive (recursive) hash, so avoid duplicate visits.
+    int hash = TFUNPTR + _nargs +
+      _ts    .recompute_hash(visit) +
+      _argmem.recompute_hash(visit) +
+      _ret   .recompute_hash(visit) +
+      _retmem.recompute_hash(visit) +
+      _fidxs ._hash;
+    return retern_hash(hash);
   }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;

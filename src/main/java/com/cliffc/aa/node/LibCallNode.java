@@ -39,8 +39,7 @@ public abstract class LibCallNode extends PrimNode {
   @Override LibCallNode copy(GVNGCM gvn) {
     LibCallNode nnn = super.copy(gvn);
     nnn._alias = BitsAlias.split(_alias);
-    throw com.cliffc.aa.AA.unimpl();
-    //return nnn;
+    return nnn;
   }
   
   static class ConvertI64Str extends LibCallNode {

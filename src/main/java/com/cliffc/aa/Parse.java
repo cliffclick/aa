@@ -100,6 +100,7 @@ public class Parse {
     clean_top_level_scope();
     _gvn.iter();   // Pessimistic optimizations; might improve error situation
     remove_unknown_callers();
+    System.out.println(_e._scope.dump(99,_gvn));
     _gvn.gcp(_e._scope); // Global Constant Propagation
     _gvn.iter();   // Re-check all ideal calls now that types have been maximally lifted
     return gather_errors();

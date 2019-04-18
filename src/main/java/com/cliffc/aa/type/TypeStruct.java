@@ -51,11 +51,10 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   }
   // Precomputed hash code.  Note that it can NOT depend on the field types -
   // because during recursive construction the types are not available.  
-  @Override TypeStruct compute_hash(BitSet visit, Ary<Type> changed) {
-    if( changed != null ) return this;
-    super.compute_hash(visit,changed);
-    for( int i=0; i<_flds.length; i++ ) _hash += _flds[i].hashCode()+_finals[i];
-    return this;
+  @Override int compute_hash() {
+    int hash = super.compute_hash();
+    for( int i=0; i<_flds.length; i++ ) hash += _flds[i].hashCode()+_finals[i];
+    return hash;
   }
   
   private static final Ary<TypeStruct> CYCLES = new Ary<>(new TypeStruct[0]);
@@ -243,8 +242,9 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     byte  [] bs = new byte  [_ts  .length];
     for( int i=0; i<as.length; i++ ) as[i]=sdual(_flds[i]);
     for( int i=0; i<bs.length; i++ ) bs[i] = (byte)(_finals[i]^1);
-    TypeStruct dual = _dual = new TypeStruct(!_any,as,ts,bs).compute_hash(null,null);
+    TypeStruct dual = _dual = new TypeStruct(!_any,as,ts,bs);
     for( int i=0; i<ts.length; i++ ) ts[i] = _ts[i].rdual();
+    dual._hash = dual.compute_hash();
     dual._dual = this;
     dual._cyclic = true;
     return dual;

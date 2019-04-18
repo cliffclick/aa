@@ -37,13 +37,16 @@ public class TypeMem extends Type<TypeMem> {
           return false; // Extra instances of default; messes up canonical rep for hash-cons
     return aliases.length==0 || aliases[aliases.length-1] != def;
   }
-  @Override TypeMem compute_hash(BitSet visit, Ary<Type> changed) {
-    if( changed != null )
-      throw com.cliffc.aa.AA.unimpl();
-    int sum = TMEMPTR + _def._hash;
-    for( TypeObj obj : _aliases )  if( obj != null ) sum += obj._hash;
-    _hash = sum;
-    return this;
+  @Override int compute_hash() {
+    int hash = TMEMPTR + _def._hash;
+    for( TypeObj obj : _aliases )  if( obj != null )  hash += obj._hash;
+    return hash;
+  }
+  @Override int recompute_hash(BitSet visit) {
+    if( has_hash(visit) ) return _hash; // Expensive (recursive) hash, so avoid duplicate visits.
+    int hash = TMEMPTR + _def.recompute_hash(visit);
+    for( TypeObj obj : _aliases )  if( obj != null )  hash += obj.recompute_hash(visit);
+    return retern_hash(hash);
   }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
@@ -172,28 +175,22 @@ public class TypeMem extends Type<TypeMem> {
   @Override public boolean must_nil() { return false; } // never a nil
   @Override Type not_nil() { return this; }
 
-  ///** See giant discussion in {@link Bits#split_alias(int, HashMap)}.  Change
-  // *  all instances of TypeMem.at0(a1) to include a2 - updating in-place and
-  // *  changing the hash as appropriate. */
-  //static void split_alias( int a1, int a2 ) {
-  //  ArrayList<TypeMem> tms = new ArrayList<>();
-  //  INTERN.entrySet().removeIf(entry -> {
-  //      Type t = entry.getKey();
-  //      if( !(t instanceof TypeMem) ) return false;
-  //      TypeMem tm = (TypeMem)t;
-  //      TypeObj[] tos = tm._aliases;
-  //      if( a1 >= tos.length ) return false; // No a1 instance
-  //      TypeObj to = tos[a1];
-  //      if( to==null ) return false; // a1 is the default, so is a2
-  //      assert to != tm._def;
-  //      tms.add(tm);                 // Must update this TypeMem and rehash
-  //      if( a2 >= tos.length )
-  //        tm._aliases = tos = Arrays.copyOf(tos,a2+1);
-  //      tos[a2] = to;
-  //      return true;
-  //    });
-  //  // For all updated TypeMems re-insert with new hash code
-  //  for( TypeMem tm : tms )
-  //    tm.retern();
-  //}
+  /** See giant discussion in {@link Bits#split_alias(int, HashMap)}.  Change
+   *  all instances of TypeMem.at0(a1) to include a2 - updating in-place and
+   *  changing the hash as appropriate. */
+  static void split_alias( int a1, int a2 ) {
+    for( Type t : INTERN.keySet() ) {
+      if( !(t instanceof TypeMem) ) continue;
+      TypeMem tm = (TypeMem)t;
+      TypeObj[] tos = tm._aliases;
+      if( a1 >= tos.length ) continue; // No a1 instance
+      TypeObj to = tos[a1];
+      if( to==null ) continue; // a1 is the default, so is a2
+      assert to != tm._def;
+      if( a2 >= tos.length )
+        tm._aliases = tos = Arrays.copyOf(tos,a2+1);
+      tos[a2] = to;
+      // Blows the _hash, but a rehash is coming
+    }
+  }
 }

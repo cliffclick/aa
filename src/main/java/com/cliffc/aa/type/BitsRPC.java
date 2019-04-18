@@ -32,5 +32,13 @@ public class BitsRPC extends Bits {
   @Override public BitsRPC dual() { return (BitsRPC)super.dual(); }
   public BitsRPC meet( BitsRPC bs ) { return (BitsRPC)super.meet(bs); }
   @Override public BitsRPC clear(int i) { return (BitsRPC)super.clear(i); }
-  public static int split( int alias ) { return split(alias,INTERN); }
+  public static int split( int alias ) {
+    int new_alias = split(alias,INTERN);
+    
+    // Now must rehash everything that depends on these changed Bits, including
+    // recursive depends.
+    Type.bulk_rehash();
+
+    return new_alias;
+  }
 }

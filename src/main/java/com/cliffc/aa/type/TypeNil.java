@@ -17,14 +17,11 @@ public class TypeNil extends Type<TypeNil> {
   public  Type _t;
   private TypeNil  ( Type t ) { super(TNIL); init(t); }
   private void init( Type t ) { _t=t; }
-  @Override TypeNil compute_hash(BitSet visit, Ary<Type> changed) {
-    _hash = TNIL;
-    if( _t!=null ) {
-      if( changed !=null )
-        throw com.cliffc.aa.AA.unimpl();
-      _hash += _t._hash;
-    }
-    return this;
+  @Override int compute_hash() { return TNIL + (_t==null ? 0 : _t._hash); }
+  @Override int recompute_hash(BitSet visit) {
+    if( has_hash(visit) ) return _hash;
+    int hash = TNIL + (_t==null ? 0 : _t.recompute_hash(visit));
+    return retern_hash(hash);
   }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;

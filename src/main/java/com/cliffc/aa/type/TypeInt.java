@@ -12,7 +12,7 @@ public class TypeInt extends Type<TypeInt> {
   private TypeInt( int x, int z, long con ) { super(TINT); init(x,z,con); }
   private void init(int x, int z, long con ) { _x=(byte)x; _z=(byte)z; _con = con; }
   // Hash does not depend on other types
-  @Override TypeInt compute_hash(BitSet visit, Ary<Type> ignore) { _hash = TINT+_x+_z+(int)_con; return this; }
+  @Override int compute_hash() { return TINT+_x+_z+(int)_con; }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeInt) ) return false;

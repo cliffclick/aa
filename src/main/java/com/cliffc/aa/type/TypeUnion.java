@@ -18,7 +18,7 @@ public class TypeUnion extends Type<TypeUnion> {
     _ts = ts;
     _any=any;
   }
-  @Override TypeUnion compute_hash(BitSet visit, Ary<Type> oldtypes) {
+  @Override int compute_hash() {
     //_hash = _ts.compute_hash(oldtypes)+(_any?1:0);  }
     //return this;
     throw com.cliffc.aa.AA.unimpl();

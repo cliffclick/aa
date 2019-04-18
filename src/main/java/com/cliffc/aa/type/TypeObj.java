@@ -14,8 +14,8 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
   boolean _any;                 // True=choice/join; False=all/meet
   TypeObj(byte type, boolean any) { super(type); init(type,any); }
   protected void init (byte type, boolean any) { super.init(type); _any=any; }
-  // Hash does not depend on other types
-  @Override O compute_hash(BitSet visit, Ary<Type> ignore) { _hash = TOBJ+(_any?1:0); return (O)this; }
+  // Hash does not depend on other types, so never changes
+  @Override int compute_hash() { return TOBJ+(_any?1:0); }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     return o instanceof TypeObj && _any==((TypeObj)o)._any && _type==((TypeObj)o)._type;

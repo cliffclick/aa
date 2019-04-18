@@ -21,10 +21,7 @@ public class TypeName extends TypeObj<TypeName> {
   private static short depth( Type t ) { return(short)(t instanceof TypeName ? ((TypeName)t)._depth+1 : 0); }
   // Hash does not depend on other types.
   // No recursion on _t to break type cycles
-  @Override TypeName compute_hash(BitSet visit, Ary<Type> changed) {
-    if( changed != null ) throw AA.unimpl();
-    super.compute_hash(visit,changed); _hash += _name.hashCode(); return this;
-  }
+  @Override int compute_hash() { return super.compute_hash() + _name.hashCode(); }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeName) ) return false;

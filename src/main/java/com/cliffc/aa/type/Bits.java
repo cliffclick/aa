@@ -271,6 +271,8 @@ public abstract class Bits implements Iterable<Integer> {
   // RPC and FIDXs so we'd need separate intern sets for these.
 
   static <B extends Bits> int split( int a1, HashMap<B, B> intern ) {
+    for( Type t : Type.INTERN.keySet() )
+      assert t.compute_hash()==t._hash && Type.INTERN.get(t)==t;
     // I think its important to log these changes over time, so I can track/debug.
     int a2 = Type.new_alias();
     System.out.println("Alias split "+a1+" into {"+a1+","+a2+"}");
@@ -300,11 +302,6 @@ public abstract class Bits implements Iterable<Integer> {
     // Re-intern
     intern.clear();
     for( B b : bits ) intern.put(b,b);
-
-    // Now must rehash everything that depends on these changed Bits, including
-    // recursive depends.
-    Type.bulk_rehash();
-
     return a2;
   }
 }

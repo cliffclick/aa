@@ -2,7 +2,7 @@ package com.cliffc.aa.type;
 
 import com.cliffc.aa.node.FunNode;
 
-/** A Tuple with exactly 4 fields:
+/** A Tuple with exactly 5 fields:
  *  0 - Function exit control
  *  1 - Function exit memory value type
  *  2 - Function exit value type

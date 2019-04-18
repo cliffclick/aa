@@ -12,7 +12,7 @@ public class TypeFlt extends Type<TypeFlt> {
   private TypeFlt( int x, int z, double con ) { super(TFLT); init(x,z,con); }
   private void init(int x, int z, double con ) { _x=(byte)x; _z=(byte)z; _con = con; }
   // Hash does not depend on other types
-  @Override TypeFlt compute_hash(BitSet visit, Ary<Type> ignore) { _hash = TFLT+_x+_z+(int)_con;  return this; }
+  @Override int compute_hash() { return TFLT+_x+_z+(int)_con; }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeFlt) ) return false;

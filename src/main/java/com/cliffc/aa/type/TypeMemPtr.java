@@ -12,14 +12,11 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
 
   private TypeMemPtr(BitsAlias aliases ) { super     (TMEMPTR); init(aliases); }
   private void init (BitsAlias aliases ) { super.init(TMEMPTR); _aliases = aliases; }
-  @Override TypeMemPtr compute_hash(BitSet visit, Ary<Type> changed) {
-    int hash = TMEMPTR + _aliases._hash;
-    if( changed != null && hash != _hash ) {
-      untern();
-      changed.add(this);
-    }
-    _hash = hash;
-    return this;
+  @Override int compute_hash() { return TMEMPTR + _aliases._hash; }
+  @Override int recompute_hash(BitSet visit) {
+    // Hash is cheap, but not invariant - since BitsAlias might split.
+    if( has_hash(visit) ) return _hash;
+    return retern_hash(compute_hash());
   }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;

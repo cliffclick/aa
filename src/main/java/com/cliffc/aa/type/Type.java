@@ -1,9 +1,12 @@
 package com.cliffc.aa.type;
 
 import com.cliffc.aa.util.Ary;
+import com.cliffc.aa.util.NonBlockingHashMap;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.HashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
@@ -53,8 +56,28 @@ public class Type<T extends Type<T>> {
   protected Type(byte type) { init(type); }
   protected void init(byte type) { _type=type; _cyclic=false; }
   @Override public final int hashCode( ) { return _hash; }
-  // Simple types just hash with type, and depend on no other types.
-  T compute_hash(BitSet visit, Ary<Type> ignore) { assert is_simple(); _hash = _type; return (T)this; }
+  // Compute the hash and return it, with all child types already having their
+  // hash computed.  Subclasses override this.
+  int compute_hash() { assert is_simple(); return _type; }
+
+  // Compute the hash code and set the field.  Subclasses override this.  The
+  // children have potentially incorrect hashcodes, and are recursively
+  // recomputed.  If the 'this' hash changes, it un-interns (with the old hash)
+  // and re-interns with the new hash.  Invariant hashes can just return.
+  int recompute_hash(BitSet visit) { return _hash; }
+  boolean has_hash(BitSet visit) {
+    if( visit.get(_uid) ) return true;
+    visit.set(_uid);
+    return false;
+  }
+  int retern_hash(int hash) {
+    assert _hash != 0 && hash != 0;
+    if( hash == _hash ) return hash;
+    untern();
+    _hash = hash;
+    retern();
+    return hash;
+  }
   // Is anything equals to this?
   @Override public boolean equals( Object o ) {
     assert is_simple();         // Overridden in subclasses
@@ -88,10 +111,10 @@ public class Type<T extends Type<T>> {
   // Hash-Cons - all Types are interned in this hash table.  Thus an equality
   // check of a (possibly very large) Type is always a simple pointer-equality
   // check, except during construction and intern'ing.
-  static HashMap<Type,Type> INTERN = new NonBlockingHashMap<>();
+  static ConcurrentMap<Type,Type> INTERN = new ConcurrentHashMap<>();
   static int RECURSIVE_MEET;    // Count of recursive meet depth
   final Type hashcons() {
-    compute_hash(null,null);    // Set hash
+    _hash = compute_hash();     // Set hash
     Type t2 = INTERN.get(this); // Lookup
     if( t2!=null ) {            // Found prior
       assert t2._dual != null;  // Prior is complete with dual
@@ -102,7 +125,8 @@ public class Type<T extends Type<T>> {
     // Not in type table
     _dual = null;                // No dual yet
     INTERN.put(this,this);       // Put in table without dual
-    T d = xdual().compute_hash(null,null); // Compute dual without requiring table lookup
+    T d = xdual();               // Compute dual without requiring table lookup
+    d._hash = d.compute_hash();  // Set dual hash
     _dual = d;
     if( this==d ) return d;      // Self-symmetric?  Dual is self
     if( equals(d) ) { d.free(null); _dual=(T)this; return this; } // If self symmetric then use self
@@ -679,14 +703,10 @@ public class Type<T extends Type<T>> {
   // Acts like a Smalltalk "becomes" call.
   static void bulk_rehash() {
     BitSet visit = new BitSet();
-    Ary<Type> changed = new Ary<>(new Type[1]);
-    for( Type t : INTERN.keySet() ) {
-      if( visit.get(t._uid) ) continue;
-      visit.set(t._uid);
-      t.compute_hash(visit,changed).retern();
-    }
-    if( changed.len() > 0 )
-      throw com.cliffc.aa.AA.unimpl();
+    for( Type t : INTERN.keySet() )
+      t.recompute_hash(visit);
+    for( Type t : INTERN.keySet() )
+      assert t.compute_hash()==t._hash && INTERN.get(t)==t;
   }
 
   RuntimeException typerr(Type t) {

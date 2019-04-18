@@ -133,7 +133,7 @@ public abstract class Node implements Cloneable {
     }
     // Print multi-node combos all-at-once
     Node x = is_multi_tail() ? in(0) : this;
-    if( x.is_multi_head() ) {
+    if( x != null && x.is_multi_head() ) {
       int dx = d+(x==this?0:1);
       for( Node n : x._uses ) if( n.is_multi_tail() )
         for( Node m : n._defs ) m.dump(dx,sb,max,bs,gvn);
