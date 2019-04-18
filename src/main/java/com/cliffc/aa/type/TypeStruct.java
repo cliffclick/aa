@@ -52,12 +52,9 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // Precomputed hash code.  Note that it can NOT depend on the field types -
   // because during recursive construction the types are not available.  
   @Override TypeStruct compute_hash(BitSet visit, Ary<Type> changed) {
-    if( changed != null )
-      throw AA.unimpl();
+    if( changed != null ) return this;
     super.compute_hash(visit,changed);
-    int sum=_hash;
-    for( int i=0; i<_flds.length; i++ ) sum += _flds[i].hashCode()+_finals[i];
-    _hash = sum;
+    for( int i=0; i<_flds.length; i++ ) _hash += _flds[i].hashCode()+_finals[i];
     return this;
   }
   

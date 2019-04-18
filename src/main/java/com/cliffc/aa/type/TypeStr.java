@@ -17,9 +17,10 @@ public class TypeStr extends TypeObj<TypeStr> {
     _con = con;
   }
   @Override TypeStr compute_hash(BitSet visit, Ary<Type> changed) {
-    if( changed != null ) throw com.cliffc.aa.AA.unimpl();
+    if( changed != null ) return this;
     super.compute_hash(visit,changed);
-    _hash += (_con==null ? 0 : _con.hashCode()); return this;
+    _hash += (_con==null ? 0 : _con.hashCode());
+    return this;
   }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;

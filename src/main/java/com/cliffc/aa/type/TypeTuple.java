@@ -18,14 +18,16 @@ public class TypeTuple<O extends TypeTuple<O>> extends Type<O> {
     _any = any;
     _ts = ts;
   }
-  
+
+  // If visit is null, children have had their hash already computed.
+  // If visit is not null, children need to be recursively visited.
   @Override public O compute_hash( BitSet visit, Ary<Type> changed ) {
     int sum = TTUPLE+(_any?0:1);
     for( Type t : _ts ) {
       if( visit != null && !visit.get(t._uid) ) { visit.set(t._uid); t.compute_hash(visit,changed); }
       sum += t._hash;
     }
-    if( sum != _hash ) { changed.add(this); untern(); }
+    if( visit != null && sum != _hash ) { changed.add(this); untern(); }
     _hash = sum;
     return (O)this;
   }

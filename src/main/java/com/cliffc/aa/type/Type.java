@@ -88,7 +88,7 @@ public class Type<T extends Type<T>> {
   // Hash-Cons - all Types are interned in this hash table.  Thus an equality
   // check of a (possibly very large) Type is always a simple pointer-equality
   // check, except during construction and intern'ing.
-  static HashMap<Type,Type> INTERN = new HashMap<>();
+  static HashMap<Type,Type> INTERN = new NonBlockingHashMap<>();
   static int RECURSIVE_MEET;    // Count of recursive meet depth
   final Type hashcons() {
     compute_hash(null,null);    // Set hash
@@ -685,6 +685,8 @@ public class Type<T extends Type<T>> {
       visit.set(t._uid);
       t.compute_hash(visit,changed).retern();
     }
+    if( changed.len() > 0 )
+      throw com.cliffc.aa.AA.unimpl();
   }
 
   RuntimeException typerr(Type t) {
