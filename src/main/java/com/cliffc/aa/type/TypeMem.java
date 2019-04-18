@@ -1,5 +1,6 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 
 import java.util.ArrayList;
@@ -36,8 +37,13 @@ public class TypeMem extends Type<TypeMem> {
           return false; // Extra instances of default; messes up canonical rep for hash-cons
     return aliases.length==0 || aliases[aliases.length-1] != def;
   }
-  @Override public int hashCode( ) {
-    return super.hashCode() + Arrays.hashCode(_aliases) + _def.hashCode();
+  @Override TypeMem compute_hash(BitSet visit, Ary<Type> changed) {
+    if( changed != null )
+      throw com.cliffc.aa.AA.unimpl();
+    int sum = TMEMPTR + _def._hash;
+    for( TypeObj obj : _aliases )  if( obj != null ) sum += obj._hash;
+    _hash = sum;
+    return this;
   }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
@@ -151,7 +157,7 @@ public class TypeMem extends Type<TypeMem> {
     int mlen = mem._aliases.length;
     for( int i=0; i<mlen; i++ ) {
       if( mem._aliases[i]==null ) continue;
-      assert i >= len || _aliases[i]==null;
+      assert i >= len || _aliases[i]==null || _aliases[i]==mem._aliases[i];
     }
     TypeObj[] objs = Arrays.copyOf(_aliases,Math.max(len,mlen));
     for( int i=0; i<mlen; i++ )
@@ -166,28 +172,28 @@ public class TypeMem extends Type<TypeMem> {
   @Override public boolean must_nil() { return false; } // never a nil
   @Override Type not_nil() { return this; }
 
-  /** See giant discussion in {@link Bits#split_alias(int, HashMap)}.  Change
-   *  all instances of TypeMem.at0(a1) to include a2 - updating in-place and
-   *  changing the hash as appropriate. */
-  static void split_alias( int a1, int a2 ) {
-    ArrayList<TypeMem> tms = new ArrayList<>();
-    INTERN.entrySet().removeIf(entry -> {
-        Type t = entry.getKey();
-        if( !(t instanceof TypeMem) ) return false;
-        TypeMem tm = (TypeMem)t;
-        TypeObj[] tos = tm._aliases;
-        if( a1 >= tos.length ) return false; // No a1 instance
-        TypeObj to = tos[a1];
-        if( to==null ) return false; // a1 is the default, so is a2
-        assert to != tm._def;
-        tms.add(tm);                 // Must update this TypeMem and rehash
-        if( a2 >= tos.length )
-          tm._aliases = tos = Arrays.copyOf(tos,a2+1);
-        tos[a2] = to;
-        return true;
-      });
-    // For all updated TypeMems re-insert with new hash code
-    for( TypeMem tm : tms )
-      tm.retern();
-  }
+  ///** See giant discussion in {@link Bits#split_alias(int, HashMap)}.  Change
+  // *  all instances of TypeMem.at0(a1) to include a2 - updating in-place and
+  // *  changing the hash as appropriate. */
+  //static void split_alias( int a1, int a2 ) {
+  //  ArrayList<TypeMem> tms = new ArrayList<>();
+  //  INTERN.entrySet().removeIf(entry -> {
+  //      Type t = entry.getKey();
+  //      if( !(t instanceof TypeMem) ) return false;
+  //      TypeMem tm = (TypeMem)t;
+  //      TypeObj[] tos = tm._aliases;
+  //      if( a1 >= tos.length ) return false; // No a1 instance
+  //      TypeObj to = tos[a1];
+  //      if( to==null ) return false; // a1 is the default, so is a2
+  //      assert to != tm._def;
+  //      tms.add(tm);                 // Must update this TypeMem and rehash
+  //      if( a2 >= tos.length )
+  //        tm._aliases = tos = Arrays.copyOf(tos,a2+1);
+  //      tos[a2] = to;
+  //      return true;
+  //    });
+  //  // For all updated TypeMems re-insert with new hash code
+  //  for( TypeMem tm : tms )
+  //    tm.retern();
+  //}
 }

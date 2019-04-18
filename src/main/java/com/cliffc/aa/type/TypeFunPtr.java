@@ -1,5 +1,6 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.node.FunNode;
 import com.cliffc.aa.util.SB;
 
@@ -28,14 +29,11 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     _fidxs = fidxs;
     _nargs=nargs;
   }
-  @Override public int hashCode( ) { return
-      TFUNPTR +
-      _ts.hashCode() +
-      _argmem.hashCode() +
-      _ret.hashCode() +
-      _retmem.hashCode() +
-      _fidxs.hashCode() +
-      _nargs;
+  @Override TypeFunPtr compute_hash(BitSet visit, Ary<Type> oldtypes) {
+    if( oldtypes !=null ) // If set, need to 
+      throw com.cliffc.aa.AA.unimpl();
+    _hash = TFUNPTR + _ts._hash + _argmem._hash + _ret._hash + _retmem._hash + _fidxs._hash + _nargs;
+    return this;
   }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;

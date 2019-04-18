@@ -1,5 +1,6 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.util.Ary;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.HashMap;
@@ -44,13 +45,16 @@ import java.util.function.Predicate;
 public class Type<T extends Type<T>> {
   static private int CNT=1;
   final int _uid=CNT++;  // Unique ID, will have gaps, used to uniquely order Types in Unions
+  int _hash;             // Hash for this Type; built recursively
   byte _type;            // Simple types use a simple enum
   boolean _cyclic;       // Part of a type cycle
-  T _dual; // All types support a dual notion, lazily computed and cached here
+  T _dual;  // All types support a dual notion, lazily computed and cached here
 
   protected Type(byte type) { init(type); }
   protected void init(byte type) { _type=type; _cyclic=false; }
-  @Override public int hashCode( ) { return _type; }
+  @Override public final int hashCode( ) { return _hash; }
+  // Simple types just hash with type, and depend on no other types.
+  T compute_hash(BitSet visit, Ary<Type> ignore) { assert is_simple(); _hash = _type; return (T)this; }
   // Is anything equals to this?
   @Override public boolean equals( Object o ) {
     assert is_simple();         // Overridden in subclasses
@@ -61,6 +65,7 @@ public class Type<T extends Type<T>> {
     assert is_simple();         // Overridden in subclasses
     return _type==o._type;
   }
+  
   // In order to handle recursive printing, this is the only toString call in
   // the Type hierarchy.  Instead, subtypes override 'str(HashSet)' where the
   // HashSet is only installed by the head of a type-cycle (always and only
@@ -86,6 +91,7 @@ public class Type<T extends Type<T>> {
   static HashMap<Type,Type> INTERN = new HashMap<>();
   static int RECURSIVE_MEET;    // Count of recursive meet depth
   final Type hashcons() {
+    compute_hash(null,null);    // Set hash
     Type t2 = INTERN.get(this); // Lookup
     if( t2!=null ) {            // Found prior
       assert t2._dual != null;  // Prior is complete with dual
@@ -96,7 +102,7 @@ public class Type<T extends Type<T>> {
     // Not in type table
     _dual = null;                // No dual yet
     INTERN.put(this,this);       // Put in table without dual
-    T d = xdual();               // Compute dual without requiring table lookup
+    T d = xdual().compute_hash(null,null); // Compute dual without requiring table lookup
     _dual = d;
     if( this==d ) return d;      // Self-symmetric?  Dual is self
     if( equals(d) ) { d.free(null); _dual=(T)this; return this; } // If self symmetric then use self
@@ -114,7 +120,6 @@ public class Type<T extends Type<T>> {
     return (T)this;
   }
   final T retern( ) {
-    assert _cyclic;
     assert _dual._dual == this;
     INTERN.put(this,this);
     assert INTERN.get(this)==this;
@@ -669,6 +674,18 @@ public class Type<T extends Type<T>> {
   private static int ALIAS=1;   // Unique alias number, skipping 0
   public static int new_alias() { return ALIAS++; }
 
+  // Some Types changed contents and hash; recursively re-hash everything.
+  // Called by the Bits.splits code when "splitting a bit".
+  // Acts like a Smalltalk "becomes" call.
+  static void bulk_rehash() {
+    BitSet visit = new BitSet();
+    Ary<Type> changed = new Ary<>(new Type[1]);
+    for( Type t : INTERN.keySet() ) {
+      if( visit.get(t._uid) ) continue;
+      visit.set(t._uid);
+      t.compute_hash(visit,changed).retern();
+    }
+  }
 
   RuntimeException typerr(Type t) {
     throw new RuntimeException("Should not reach here: internal type system error with "+this+(t==null?"":(" and "+t)));

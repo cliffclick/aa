@@ -1,5 +1,6 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.type.Bits;
 import com.cliffc.aa.util.SB;
 
@@ -11,7 +12,7 @@ public class TypeRPC extends Type<TypeRPC> {
 
   private TypeRPC( BitsRPC rpcs ) { super(TRPC); init(rpcs); }
   private void init( BitsRPC rpcs ) { _rpcs = rpcs; }
-  @Override public int hashCode( ) { return TRPC + _rpcs.hashCode();  }
+  @Override public TypeRPC compute_hash(BitSet visit, Ary<Type> oldtypes ) { _hash = TRPC + _rpcs._hash; return this; }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeRPC) ) return false;

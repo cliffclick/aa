@@ -36,10 +36,11 @@ public abstract class LibCallNode extends PrimNode {
   }
   
   // Clones during inlining all become unique new sites
-  @Override LibCallNode copy() {
-    LibCallNode nnn = super.copy();
+  @Override LibCallNode copy(GVNGCM gvn) {
+    LibCallNode nnn = super.copy(gvn);
     nnn._alias = BitsAlias.split(_alias);
-    return nnn;
+    throw com.cliffc.aa.AA.unimpl();
+    //return nnn;
   }
   
   static class ConvertI64Str extends LibCallNode {

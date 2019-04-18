@@ -1,5 +1,6 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.AA;
 import com.cliffc.aa.util.SB;
 
@@ -11,18 +12,23 @@ import java.util.BitSet;
 public class TypeTuple<O extends TypeTuple<O>> extends Type<O> {
   public boolean _any;
   public Type[] _ts; // The fixed known types
-  private int _hash; // Hash pre-computed to avoid large computes duing interning
   protected TypeTuple( byte type, boolean any, Type[] ts ) { super(type); init(type, any, ts);  }
   protected void init( byte type, boolean any, Type[] ts ) {
     super.init(type);
     _any = any;
     _ts = ts;
-    int sum=super.hashCode();
-    for( Type t : ts ) sum += t.hashCode();
-    _hash=sum;
   }
   
-  @Override public int hashCode( ) { return _hash;  }
+  @Override public O compute_hash( BitSet visit, Ary<Type> changed ) {
+    int sum = TTUPLE+(_any?0:1);
+    for( Type t : _ts ) {
+      if( visit != null && !visit.get(t._uid) ) { visit.set(t._uid); t.compute_hash(visit,changed); }
+      sum += t._hash;
+    }
+    if( sum != _hash ) { changed.add(this); untern(); }
+    _hash = sum;
+    return (O)this;
+  }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeTuple) ) return false;

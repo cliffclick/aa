@@ -1,5 +1,6 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.util.Ary;
 import java.util.BitSet;
 import java.util.function.Predicate;
 
@@ -11,7 +12,12 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
 
   private TypeMemPtr(BitsAlias aliases ) { super     (TMEMPTR); init(aliases); }
   private void init (BitsAlias aliases ) { super.init(TMEMPTR); _aliases = aliases; }
-  @Override public int hashCode( ) { return TMEMPTR + _aliases.hashCode();  }
+  @Override TypeMemPtr compute_hash(BitSet visit, Ary<Type> changed) {
+    if( changed != null )
+      throw com.cliffc.aa.AA.unimpl();
+    _hash = TMEMPTR + _aliases._hash;
+    return this;
+  }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeMemPtr) ) return false;

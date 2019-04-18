@@ -39,7 +39,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public @NotNull String @NotNull[] _flds;  // The field names
   public Type[] _ts;            // Matching field types
   public byte[] _finals;        // Fields that are final (read-only)
-  private int _hash; // Hash pre-computed to avoid large computes duing interning
   private TypeStruct _uf = null;// Tarjan Union-Find
   private TypeStruct     ( boolean any, String[] flds, Type[] ts, byte[] finals ) { super(TSTRUCT, any); init(any,flds,ts,finals); }
   private TypeStruct init( boolean any, String[] flds, Type[] ts, byte[] finals ) {
@@ -48,23 +47,26 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     _ts    = ts;
     _finals= finals;
     _uf    = null;
-    _hash  = hash();
     return this;
   }
   // Precomputed hash code.  Note that it can NOT depend on the field types -
   // because during recursive construction the types are not available.  
-  private int hash() {
-    int sum=0;
+  @Override TypeStruct compute_hash(BitSet visit, Ary<Type> changed) {
+    if( changed != null )
+      throw AA.unimpl();
+    super.compute_hash(visit,changed);
+    int sum=_hash;
     for( int i=0; i<_flds.length; i++ ) sum += _flds[i].hashCode()+_finals[i];
-    return sum;
+    _hash = sum;
+    return this;
   }
+  
   private static final Ary<TypeStruct> CYCLES = new Ary<>(new TypeStruct[0]);
   private TypeStruct find_other() {
     int idx = CYCLES.find(this);
     return idx != -1 ? CYCLES.at(idx^1) : null;
   }
   
-  @Override public int hashCode( ) { return _hash; }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeStruct) ) return false;
@@ -244,9 +246,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     byte  [] bs = new byte  [_ts  .length];
     for( int i=0; i<as.length; i++ ) as[i]=sdual(_flds[i]);
     for( int i=0; i<bs.length; i++ ) bs[i] = (byte)(_finals[i]^1);
-    TypeStruct dual = _dual = new TypeStruct(!_any,as,ts,bs);
+    TypeStruct dual = _dual = new TypeStruct(!_any,as,ts,bs).compute_hash(null,null);
     for( int i=0; i<ts.length; i++ ) ts[i] = _ts[i].rdual();
-    dual._hash = dual.hash();
     dual._dual = this;
     dual._cyclic = true;
     return dual;

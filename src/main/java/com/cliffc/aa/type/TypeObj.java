@@ -1,6 +1,7 @@
 package com.cliffc.aa.type;
 
 import com.cliffc.aa.AA;
+import com.cliffc.aa.util.Ary;
 
 import java.util.BitSet;
 
@@ -13,7 +14,8 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
   boolean _any;                 // True=choice/join; False=all/meet
   TypeObj(byte type, boolean any) { super(type); init(type,any); }
   protected void init (byte type, boolean any) { super.init(type); _any=any; }
-  @Override public int hashCode( ) { return super.hashCode()+(_any?1:0); }
+  // Hash does not depend on other types
+  @Override O compute_hash(BitSet visit, Ary<Type> ignore) { _hash = TOBJ+(_any?1:0); return (O)this; }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     return o instanceof TypeObj && _any==((TypeObj)o)._any && _type==((TypeObj)o)._type;

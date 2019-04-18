@@ -101,7 +101,7 @@ public class FunNode extends RegionNode {
   public String name() { return name(_tf.fidx()); }
   public static String name(int fidx) { return NAMES.atX(fidx); }
 
-  @Override Node copy() { throw AA.unimpl(); } // Gotta make a new FIDX
+  @Override Node copy(GVNGCM gvn) { throw AA.unimpl(); } // Gotta make a new FIDX
 
   // True if no future unknown callers.
   private boolean has_unknown_callers() { return in(1) == Env.ALL_CTRL; }
@@ -339,7 +339,7 @@ public class FunNode extends RegionNode {
       assert n.in(0)!=epi && (n._defs._len<=1 || n.in(1)!= epi || n instanceof CallNode); // Do not walk past epilog
       if( n != epi )           // Except for the Epilog
         work.addAll(n._uses);  // Visit all uses also
-      map.put(n,n.copy()); // Make a blank copy with no edges and map from old to new
+      map.put(n,n.copy(gvn));  // Make a blank copy with no edges and map from old to new
     }
     // Correct new function index
     EpilogNode newepi = (EpilogNode)map.get(epi);

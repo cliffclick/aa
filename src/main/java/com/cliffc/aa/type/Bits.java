@@ -1,6 +1,7 @@
 package com.cliffc.aa.type;
 
 import com.cliffc.aa.AA;
+import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 import org.jetbrains.annotations.NotNull;
 
@@ -242,6 +243,9 @@ public abstract class Bits implements Iterable<Integer> {
     }
   }
 
+  // Smalltalk-style "becomes"!!!!
+
+  // Convert everywhere a type X to a type Y!!!
   
   // Conceptually, each alias# represents an infinite set of pointers - broken
   // into equivalence classes.  We can split such a class in half - some
@@ -265,6 +269,7 @@ public abstract class Bits implements Iterable<Integer> {
   // update the Types themselves.  Due to the interning, it suffices to swap
   // all the Alias Bits for Bits with Y# set.  Bits are used for both Alias and
   // RPC and FIDXs so we'd need separate intern sets for these.
+
   static <B extends Bits> int split( int a1, HashMap<B, B> intern ) {
     // I think its important to log these changes over time, so I can track/debug.
     int a2 = Type.new_alias();
@@ -272,10 +277,6 @@ public abstract class Bits implements Iterable<Integer> {
 
     // For now voting for the BitsAlias hack.
 
-    // Ugly: all Types' hashcodes change that depend on a BitsAlias.  This
-    // includes TypeTuple, TypeFun, TypeMemPtr and things that include them -
-    // TypeStruct.  Maybe have a cyclic re-hash???
-    
     // Walk the given intern table, and add a2 to whereever a1 appears.
     B[] bits = (B[])intern.keySet().toArray(new Bits[0]); // Copy to array
     for( B b : bits ) {
@@ -294,14 +295,16 @@ public abstract class Bits implements Iterable<Integer> {
         if( (bs[i1]&mask(a1))==0 ) bs[i2] &= mask(a2);
         else                       bs[i2] |= mask(a2);
       }
-      b._hash = b.compute_hash();
+      b._hash = b.compute_hash(); // Set new hashcode
     }
-    // Re-hash as needed.
+    // Re-intern
     intern.clear();
     for( B b : bits ) intern.put(b,b);
 
-    // Also split the TypeMem collections
-    TypeMem.split_alias(a1,a2);
+    // Now must rehash everything that depends on these changed Bits, including
+    // recursive depends.
+    Type.bulk_rehash();
+
     return a2;
   }
 }

@@ -1,5 +1,6 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 
 import java.util.BitSet;
@@ -15,7 +16,11 @@ public class TypeStr extends TypeObj<TypeStr> {
     super.init(TSTR,any);
     _con = con;
   }
-  @Override public int hashCode( ) { return super.hashCode()+(_con==null ? 0 : _con.hashCode());  }
+  @Override TypeStr compute_hash(BitSet visit, Ary<Type> changed) {
+    if( changed != null ) throw com.cliffc.aa.AA.unimpl();
+    super.compute_hash(visit,changed);
+    _hash += (_con==null ? 0 : _con.hashCode()); return this;
+  }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeStr) ) return false;

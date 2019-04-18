@@ -26,7 +26,7 @@ public class TypeNode extends Node {
       // Cannot change the "shape" of function nodes with potential unknown
       // callers, as the future callers need to see the same arguments.
       if( !(region instanceof FunNode) ) {
-        Node nphi = arg.copy();
+        Node nphi = arg.copy(gvn);
         nphi.add_def(region);
         for( int i=1; i<arg._defs._len; i++ )
           nphi.add_def(gvn.xform(new TypeNode(_t,arg.in(i),_error_parse)));

@@ -1,5 +1,6 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.util.Ary;
 import java.util.BitSet;
 import java.util.HashMap;
 import java.util.function.Predicate;
@@ -10,7 +11,8 @@ public class TypeFlt extends Type<TypeFlt> {
   double _con;
   private TypeFlt( int x, int z, double con ) { super(TFLT); init(x,z,con); }
   private void init(int x, int z, double con ) { _x=(byte)x; _z=(byte)z; _con = con; }
-  @Override public int hashCode( ) { return TFLT+_x+_z+(int)_con;  }
+  // Hash does not depend on other types
+  @Override TypeFlt compute_hash(BitSet visit, Ary<Type> ignore) { _hash = TFLT+_x+_z+(int)_con;  return this; }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeFlt) ) return false;

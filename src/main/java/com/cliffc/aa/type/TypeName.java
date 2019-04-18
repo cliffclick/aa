@@ -1,6 +1,7 @@
 package com.cliffc.aa.type;
 
 import com.cliffc.aa.AA;
+import com.cliffc.aa.util.Ary;
 
 import java.util.BitSet;
 import java.util.HashMap;
@@ -18,7 +19,12 @@ public class TypeName extends TypeObj<TypeName> {
   private TypeName ( String name, HashMap<String,Type> lex, Type t, short depth ) { super(TNAME,false); init(name,lex,t,depth); }
   private void init( String name, HashMap<String,Type> lex, Type t, short depth ) { super.init(TNAME,false); assert name!=null && lex !=null; _name=name; _lex=lex; _t=t; _depth = depth; }
   private static short depth( Type t ) { return(short)(t instanceof TypeName ? ((TypeName)t)._depth+1 : 0); }
-  @Override public int hashCode( ) { return TNAME+_name.hashCode();  } // No recursion on _t to break type cycles
+  // Hash does not depend on other types.
+  // No recursion on _t to break type cycles
+  @Override TypeName compute_hash(BitSet visit, Ary<Type> changed) {
+    if( changed != null ) throw AA.unimpl();
+    super.compute_hash(visit,changed); _hash += _name.hashCode(); return this;
+  }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeName) ) return false;

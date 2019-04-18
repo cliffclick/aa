@@ -80,10 +80,11 @@ public class NewNode extends Node {
   }
   
   // Clones during inlining all become unique new sites
-  @Override NewNode copy() {
-    NewNode nnn = super.copy();
+  @Override NewNode copy(GVNGCM gvn) {
+    NewNode nnn = super.copy(gvn);
     nnn._alias = BitsAlias.split(_alias);
-    return nnn;
+    //return nnn;
+    throw com.cliffc.aa.AA.unimpl();
   }
   
   @Override public int hashCode() { return super.hashCode()+ Arrays.hashCode(_names); }

@@ -1,5 +1,7 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.util.Ary;
+
 import java.util.BitSet;
 import java.util.HashMap;
 import java.util.function.Consumer;
@@ -15,7 +17,15 @@ public class TypeNil extends Type<TypeNil> {
   public  Type _t;
   private TypeNil  ( Type t ) { super(TNIL); init(t); }
   private void init( Type t ) { _t=t; }
-  @Override public int hashCode( ) { return TNIL+(_t==null ? 0 : _t.hashCode());  }
+  @Override TypeNil compute_hash(BitSet visit, Ary<Type> changed) {
+    _hash = TNIL;
+    if( _t!=null ) {
+      if( changed !=null )
+        throw com.cliffc.aa.AA.unimpl();
+      _hash += _t._hash;
+    }
+    return this;
+  }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeNil) ) return false;

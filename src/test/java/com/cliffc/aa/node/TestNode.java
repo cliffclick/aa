@@ -177,7 +177,7 @@ public class TestNode {
   
   // Fill a Node with {null,edge,edge} and start the search
   private void test1monotonic_prim(PrimNode prim) {
-    PrimNode n = prim.copy();
+    PrimNode n = prim.copy(_gvn);
     assert n._defs._len==0;
     n.add_def( null  );
     n.add_def(_ins[1]);

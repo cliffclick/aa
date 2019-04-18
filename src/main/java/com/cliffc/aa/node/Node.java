@@ -84,16 +84,14 @@ public abstract class Node implements Cloneable {
   }
 
   // Make a copy of the base node, with no defs nor uses and a new UID.
-  <N extends Node> N copy() {
-    try {
-      N n = (N)clone();                   // Preserve base java type
-      n._uid = Env.GVN.uid();            // A new UID
-      n._defs = new Ary<>(new Node[1],0); // New empty defs
-      n._uses = new Ary<>(new Node[1],0); // New empty uses
-      return n;
-    } catch( CloneNotSupportedException cns ) {
-      throw new RuntimeException(cns);
-    }
+  <N extends Node> N copy(GVNGCM gvn) {
+    N n;
+    try { n = (N)clone(); }     // Preserve base java type
+    catch( CloneNotSupportedException cns ) { throw new RuntimeException(cns); }
+    n._uid = gvn.uid();                 // A new UID
+    n._defs = new Ary<>(new Node[1],0); // New empty defs
+    n._uses = new Ary<>(new Node[1],0); // New empty uses
+    return n;
   }
   
   // Short string name

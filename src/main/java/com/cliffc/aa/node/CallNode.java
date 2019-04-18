@@ -65,10 +65,11 @@ public class CallNode extends Node {
   void set_fun_reg(Node fun, GVNGCM gvn) { gvn.set_def_reg(this,2,fun); }
   
   // Clones during inlining all become unique new call sites
-  @Override CallNode copy() {
-    CallNode call = super.copy();
+  @Override CallNode copy(GVNGCM gvn) {
+    CallNode call = super.copy(gvn);
     call._rpc = RPC++;
-    return call;
+    //return call;
+    throw com.cliffc.aa.AA.unimpl();
   }
   
   @Override public Node ideal(GVNGCM gvn) {
@@ -185,7 +186,7 @@ public class CallNode extends Node {
           !(parm instanceof ConNode) )
         can_inline=false;       // Not trivial
     if( can_inline ) {
-      Node irez = rez.copy();   // Copy the entire function body
+      Node irez = rez.copy(gvn);// Copy the entire function body
       for( Node parm : rez._defs )
         irez.add_def((parm instanceof ParmNode && parm.in(0) == fun) ? arg(((ParmNode)parm)._idx) : parm);
       if( irez instanceof PrimNode ) ((PrimNode)irez)._badargs = _badargs;
@@ -272,9 +273,9 @@ public class CallNode extends Node {
     if( _inlined )              // Inlined functions just pass thru & disappear
       return TypeTuple.make(tc,tm,t);
     if( tc == Type.XCTRL || tc == Type.ANY ) // Call is dead?
-      return TypeTuple.make(Type.XCTRL,TypeMem.XMEM,Type.XSCALAR);
+      return TypeTuple.CALL.dual();
     if( Type.SCALAR.isa(t) ) // Calling something that MIGHT be a function, no idea what the result is
-      return TypeTuple.make(Type.CTRL,TypeMem.MEM,Type.SCALAR);
+      return TypeTuple.CALL;
 
     if( gvn._opt ) // Manifesting optimistic virtual edges between caller and callee
       wire(gvn,t); // Make real edges from virtual edges

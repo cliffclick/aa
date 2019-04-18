@@ -18,7 +18,11 @@ public class TypeUnion extends Type<TypeUnion> {
     _ts = ts;
     _any=any;
   }
-  @Override public int hashCode( ) { return _ts.hashCode()+(_any?1:0);  }
+  @Override TypeUnion compute_hash(BitSet visit, Ary<Type> oldtypes) {
+    //_hash = _ts.compute_hash(oldtypes)+(_any?1:0);  }
+    //return this;
+    throw com.cliffc.aa.AA.unimpl();
+  }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeUnion) ) return false;
