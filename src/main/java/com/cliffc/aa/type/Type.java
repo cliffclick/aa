@@ -60,24 +60,6 @@ public class Type<T extends Type<T>> {
   // hash computed.  Subclasses override this.
   int compute_hash() { assert is_simple(); return _type; }
 
-  // Compute the hash code and set the field.  Subclasses override this.  The
-  // children have potentially incorrect hashcodes, and are recursively
-  // recomputed.  If the 'this' hash changes, it un-interns (with the old hash)
-  // and re-interns with the new hash.  Invariant hashes can just return.
-  int recompute_hash(BitSet visit) { return _hash; }
-  boolean has_hash(BitSet visit) {
-    if( visit.get(_uid) ) return true;
-    visit.set(_uid);
-    return false;
-  }
-  int retern_hash(int hash) {
-    assert _hash != 0 && hash != 0;
-    if( hash == _hash ) return hash;
-    untern();
-    _hash = hash;
-    retern();
-    return hash;
-  }
   // Is anything equals to this?
   @Override public boolean equals( Object o ) {
     assert is_simple();         // Overridden in subclasses
@@ -692,23 +674,6 @@ public class Type<T extends Type<T>> {
 
   TypeStruct repeats_in_cycles(TypeStruct head, BitSet bs) { return null; }
   
-  // Get a unique new alias#, used to group chunks of memory together - 
-  // such that Loads and Stores approximate in the same alias chunk.
-  // Placed here to avoid a cyclic class dependency with TypeMem.
-  private static int ALIAS=1;   // Unique alias number, skipping 0
-  public static int new_alias() { return ALIAS++; }
-
-  // Some Types changed contents and hash; recursively re-hash everything.
-  // Called by the Bits.splits code when "splitting a bit".
-  // Acts like a Smalltalk "becomes" call.
-  static void bulk_rehash() {
-    BitSet visit = new BitSet();
-    for( Type t : INTERN.keySet() )
-      t.recompute_hash(visit);
-    for( Type t : INTERN.keySet() )
-      assert t.compute_hash()==t._hash && INTERN.get(t)==t;
-  }
-
   RuntimeException typerr(Type t) {
     throw new RuntimeException("Should not reach here: internal type system error with "+this+(t==null?"":(" and "+t)));
   }

@@ -7,17 +7,14 @@ import java.util.function.Predicate;
 // Pointers-to-memory; these can be both the address and the value part of
 // Loads and Stores.  They carry a set of aliased TypeMems. 
 public final class TypeMemPtr extends Type<TypeMemPtr> {
-  // List of known memory aliases.  Zero is nil.
-  BitsAlias _aliases;
+
+  // A set of TypeOops...
+
+  
 
   private TypeMemPtr(BitsAlias aliases ) { super     (TMEMPTR); init(aliases); }
   private void init (BitsAlias aliases ) { super.init(TMEMPTR); _aliases = aliases; }
   @Override int compute_hash() { return TMEMPTR + _aliases._hash; }
-  @Override int recompute_hash(BitSet visit) {
-    // Hash is cheap, but not invariant - since BitsAlias might split.
-    if( has_hash(visit) ) return _hash;
-    return retern_hash(compute_hash());
-  }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeMemPtr) ) return false;
@@ -32,7 +29,6 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
 
   private static TypeMemPtr FREE=null;
   @Override protected TypeMemPtr free( TypeMemPtr ret ) { FREE=this; return ret; }
-  public static TypeMemPtr make( int alias ) { return make(BitsAlias.make0(alias)); }
   public static TypeMemPtr make( BitsAlias aliases ) {
     TypeMemPtr t1 = FREE;
     if( t1 == null ) t1 = new TypeMemPtr(aliases);
@@ -40,21 +36,18 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     TypeMemPtr t2 = (TypeMemPtr)t1.hashcons();
     return t1==t2 ? t1 : t1.free(t2);
   }
-  public static TypeMemPtr make_nil( int alias ) {
-    if( alias >=64 ) throw com.cliffc.aa.AA.unimpl();
-    return make(BitsAlias.make0(-2,new long[]{(1L<<alias)|1}));
+  public static TypeMemPtr make_nil( TypeOop oop ) {
+    throw com.cliffc.aa.AA.unimpl();
   }
-  public static TypeMemPtr make( int... aliases ) { return make(BitsAlias.make0(aliases)); }
-  public int alias() { return _aliases.getbit(); }
-
+  
   public static final TypeMemPtr OOP0   = make(BitsAlias.FULL); // Includes nil
   public static final TypeMemPtr OOP    = make(BitsAlias.NZERO);// Excludes nil
   public static final TypeMemPtr STRPTR = make(TypeStr.STR_alias);
          static final TypeMemPtr STR0   = make_nil(TypeStr.STR_alias);
          static final TypeMemPtr ABCPTR = make(TypeStr.ABC_alias);
   public static final TypeMemPtr ABC0   = make_nil(TypeStr.ABC_alias);
-  public static final TypeMemPtr STRUCT = make(TypeStruct.ALLSTRUCT_alias);
-  public static final TypeMemPtr STRUCT0= make_nil(TypeStruct.ALLSTRUCT_alias);
+  public static final TypeMemPtr STRUCT = make(TypeStruct.ALLSTRUCT);
+  public static final TypeMemPtr STRUCT0= make_nil(TypeStruct.ALLSTRUCT);
   static final TypeMemPtr[] TYPES = new TypeMemPtr[]{OOP0,STRPTR,ABCPTR,STRUCT,ABC0};
   
   @Override protected TypeMemPtr xdual() { return new TypeMemPtr(_aliases.dual()); }

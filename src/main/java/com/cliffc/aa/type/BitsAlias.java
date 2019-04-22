@@ -34,14 +34,15 @@ public class BitsAlias extends Bits {
   public BitsAlias meet( BitsAlias bs ) { return (BitsAlias)super.meet(bs); }
   @Override public BitsAlias clear(int i) { return (BitsAlias)super.clear(i); }
   public static int split( int alias ) {
-    int new_alias = split(alias,INTERN);
-    // TypeMem uses the old alias in its internal structures.
-    TypeMem.split_alias(alias,new_alias);
-    
-    // Now must rehash everything that depends on these changed Bits, including
-    // recursive depends.
-    Type.bulk_rehash();
-
-    return new_alias;
+    //int new_alias = split(alias,INTERN);
+    //// TypeMem uses the old alias in its internal structures.
+    //TypeMem.split_alias(alias,new_alias);
+    //
+    //// Now must rehash everything that depends on these changed Bits, including
+    //// recursive depends.
+    //Type.bulk_rehash();
+    //
+    //return new_alias;
+    throw com.cliffc.aa.AA.unimpl();
   }
 }

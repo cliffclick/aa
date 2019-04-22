@@ -38,16 +38,6 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
       _fidxs ._hash;
     return hash;
   }
-  @Override int recompute_hash(BitSet visit) {
-    if( has_hash(visit) ) return _hash; // Expensive (recursive) hash, so avoid duplicate visits.
-    int hash = TFUNPTR + _nargs +
-      _ts    .recompute_hash(visit) +
-      _argmem.recompute_hash(visit) +
-      _ret   .recompute_hash(visit) +
-      _retmem.recompute_hash(visit) +
-      _fidxs ._hash;
-    return retern_hash(hash);
-  }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeFunPtr) ) return false;

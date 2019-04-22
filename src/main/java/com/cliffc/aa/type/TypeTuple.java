@@ -26,12 +26,6 @@ public class TypeTuple<O extends TypeTuple<O>> extends Type<O> {
     for( Type t : _ts ) hash += t.compute_hash();
     return hash;
   }
-  @Override public int recompute_hash( BitSet visit ) {
-    if( has_hash(visit) ) return _hash; // Expensive (recursive) hash, so avoid duplicate visits.
-    int hash = TTUPLE+(_any?0:1);
-    for( Type t : _ts ) hash += t.recompute_hash(visit);
-    return retern_hash(hash);
-  }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeTuple) ) return false;

@@ -18,11 +18,6 @@ public class TypeNil extends Type<TypeNil> {
   private TypeNil  ( Type t ) { super(TNIL); init(t); }
   private void init( Type t ) { _t=t; }
   @Override int compute_hash() { return TNIL + (_t==null ? 0 : _t._hash); }
-  @Override int recompute_hash(BitSet visit) {
-    if( has_hash(visit) ) return _hash;
-    int hash = TNIL + (_t==null ? 0 : _t.recompute_hash(visit));
-    return retern_hash(hash);
-  }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeNil) ) return false;
