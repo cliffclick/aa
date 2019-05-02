@@ -15,7 +15,7 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
   TypeObj(byte type, boolean any) { super(type); init(type,any); }
   protected void init (byte type, boolean any) { super.init(type); _any=any; }
   // Hash does not depend on other types, so never changes
-  @Override int compute_hash() { return TOBJ+(_any?1:0); }
+  @Override int compute_hash() { return _type+(_any?1:0); }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     return o instanceof TypeObj && _any==((TypeObj)o)._any && _type==((TypeObj)o)._type;

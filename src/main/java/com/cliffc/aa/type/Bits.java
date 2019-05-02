@@ -242,44 +242,12 @@ public abstract class Bits implements Iterable<Integer> {
       throw new NoSuchElementException();
     }
   }
+  public static int split( int oldalias, int newalias0, int newalias1, TypeObj class_specific_tree_recorder ) {
+    // need to record tree-structure amongst bits
 
-  // Smalltalk-style "becomes"!!!!
+    // need to print tree-structure in printouts
 
-  // Convert everywhere a type X to a type Y!!!
-  
-  static <B extends Bits> int split( int a1, HashMap<B, B> intern ) {
-    //for( Type t : Type.INTERN.keySet() )
-    //  assert t.compute_hash()==t._hash && Type.INTERN.get(t)==t;
-    //// I think its important to log these changes over time, so I can track/debug.
-    //int a2 = Type.new_alias();
-    //System.out.println("Alias split "+a1+" into {"+a1+","+a2+"}");
-    //
-    //// For now voting for the BitsAlias hack.
-    //
-    //// Walk the given intern table, and add a2 to whereever a1 appears.
-    //B[] bits = (B[])intern.keySet().toArray(new Bits[0]); // Copy to array
-    //for( B b : bits ) {
-    //  if( b.test(a1) == b.test(a2) ) continue;
-    //  long[] bs = b._bits;
-    //  if( bs==null ) {          // Only a single constant bit
-    //    b._con = -2;            // Become a MEET of 2 bits
-    //    b._bits = bits(a1,a2);  // Big enuf for both bits
-    //    b._bits[idx(a1)] |= mask(a1);
-    //    b._bits[idx(a2)] |= mask(a2);
-    //  } else {                  // An array of bits already
-    //    int i1 = idx(a1);
-    //    if( i1 >= bits.length ) // Need to grow
-    //      throw AA.unimpl();
-    //    int i2 = idx(a2);
-    //    if( (bs[i1]&mask(a1))==0 ) bs[i2] &= mask(a2);
-    //    else                       bs[i2] |= mask(a2);
-    //  }
-    //  b._hash = b.compute_hash(); // Set new hashcode
-    //}
-    //// Re-intern
-    //intern.clear();
-    //for( B b : bits ) intern.put(b,b);
-    //return a2;
+    // mem.ld/mem.st need to account for tree-structure
     throw com.cliffc.aa.AA.unimpl();
   }
 }

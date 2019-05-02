@@ -33,14 +33,4 @@ public class BitsFun extends Bits {
   @Override public BitsFun dual() { return (BitsFun)super.dual(); }
   public BitsFun meet( BitsFun bs ) { return (BitsFun)super.meet(bs); }
   @Override public BitsFun clear(int i) { return (BitsFun)super.clear(i); }
-  public static int split( int alias ) {
-    //int new_alias = split(alias,INTERN);
-    //
-    //// Now must rehash everything that depends on these changed Bits, including
-    //// recursive depends.
-    //Type.bulk_rehash();
-    //
-    //return new_alias;
-    throw com.cliffc.aa.AA.unimpl();
-  }
 }

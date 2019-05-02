@@ -7,7 +7,7 @@ import com.cliffc.aa.type.*;
 // or else they would be a PrimNode instead.  Like PrimNodes they are wrapped
 // in a Fun/Epilog but include memory effects.
 public abstract class LibCallNode extends PrimNode {
-  int _alias;
+  int _alias;                   // Alias class for new memory
   LibCallNode( String name, String[] args, TypeTuple targs, Type ret, int alias ) {
     super(OP_LIBCALL,name,args,targs,ret);
     _alias = alias;
@@ -38,7 +38,7 @@ public abstract class LibCallNode extends PrimNode {
   // Clones during inlining all become unique new sites
   @Override LibCallNode copy(GVNGCM gvn) {
     LibCallNode nnn = super.copy(gvn);
-    nnn._alias = BitsAlias.split(_alias);
+    BitsAlias.split(_alias,_alias=Type.new_alias(),nnn._alias=Type.new_alias());
     return nnn;
   }
   

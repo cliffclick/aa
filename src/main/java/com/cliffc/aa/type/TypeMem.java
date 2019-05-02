@@ -9,6 +9,13 @@ import java.util.BitSet;
 import java.util.HashMap;
 
 /**
+   Memory type; the state of all of memory; memory edges order memory ops.
+   Produced at the program start, consumed by all function calls, consumed be
+   Loads, consumed and produced by Stores.  Can be broken out in the "equiv-
+   alence class" (Alias#) model of memory over a bulk memory to allow more fine
+   grained knowledge.  Memory is accessed via Alias#s, where all TypeObjs in an
+   Alias class are Meet together as an approximation.
+
    Conceptually, each alias# represents an infinite set of pointers - broken
    into equivalence classes.  We can split such a class in half - some pointers
    will go left and some go right, and where we can't tell we'll use both sets.
@@ -26,68 +33,17 @@ import java.util.HashMap;
    approximation that {XY} are always confused.  Afterwards we can lift the
    types to refine as needed.
 
-   Do this "cheaply"!  I can think of 2 approaches: (1) visit all Types in the
-   GVN type array replacing TypeMem[Ptr]{alias#X} with {alias#XY}, or (2)
-   update the Types themselves.  Due to the interning, it suffices to swap all
-   the Alias Bits for Bits with Y# set.  Bits are used for both Alias and RPC
-   and FIDXs so we'd need separate intern sets for these.
+   During iter()/pessimistic-GVN we'll have ptrs to a single New which splits -
+   and this splits the aliases; repeated splitting induces a tree.  Some ptrs
+   to the tree-root will remain, and represent conservative approximation as
+   updates to outputs from all News.  We'll also have sharper direct ptrs
+   flowing out, pointing to only results from a single New.  At the opto()
+   point we'll not have any more confused types.
 
-   I attempted (2) with an in-place replacement - but every hashcode changes.
-   Then I need to yank from the hashtable (using the old hash) and re-insert
-   using the new hash - both from the INTERN table, but also all other uses in
-   e.g. Nodes.  Inlining, which triggers this, does so with a Map from the old
-   function to the being-built new function, which immediately doesn't work
-   without rehashing.
-
-   ---
-
-   Round (3) - TypeMem holds collections of TypeObjs, grouped by alias class.
-   The alias-class is a SINGLE allocation site (a Node) and is a TypeObj.  The
-   allocation site can "split" - and the original TypeObj becomes the parent
-   with 2 children (the old and new allocation sites), whose's objects are
-   blended in the analysis so-far.  TypeMemPtr points to a TypeMem - typically
-   a sub-memory of the outstanding TypeMem.
-
-   - TypeObj is the parent "type".  It can have N children, all independent
-   alias subtypes (with refinements of the parent).  The parent has an original
-   allocation site, but after splitting that original allocation site moves to
-   one of the splits, and its clone moves to another.  These are made either
-   from whole-cloth (with a given allocation site during parsing) or by
-   splitting (which adds a new Node#).  The internal type fields can be refined
-   (e.g. by a StoreNode) but the allocation-site will remain on the resulting
-   type.  
-
-   - Merging / Phi probably has to walk up the "tree" of splits to get a LCA.
-   
-   - Not sure if the allocation site is part of the hash, or not.  After a
-   split we'll have 2 Types with the same Node#: the parent and one of the
-   children.
-
-   - Original Type is given an alias# (could be Node*) and a "parent" marker
-   for equiv and hash.  Child has same node, but a "child" marker, so unique
-   hash.  parent/child markers can be depth#.  Allow N-way splits, but unique
-   equiv-class at each level.
-
-   - Implementation (a) TypeObj + TypeMem.  TypeObj is either array (string) or
-   struct.  TypeMem collects unaliased TypeObjs, indexed by alias#.  To split a
-   TypeObj, make a TypeMem with a single TypeObj, then split the TypeMem.
-
-   - Implementation (b) uses only TypeObj, which includes the ability to split
-   same as TypeMem above.
-
+   CNC - Observe that the alias Trees on Fields applies to Indices on arrays as
+   well - if we can group indices in a tree-like access pattern (obvious one
+   being All vs some Constants).
 */
-
-
-
-
-
-
-// Memory type; the state of all of memory; memory edges order memory ops.
-// Produced at the program start, consumed by all function calls, consumed be
-// Loads, consumed and produced by Stores.  Can be broken out in the "equiv-
-// alence class" (Alias#) model of memory over a bulk memory to allow more fine
-// grained knowledge.  Memory is accessed via Alias#s, where all TypeObjs in an
-// Alias class are Meet together as an approximation.
 public class TypeMem extends Type<TypeMem> {
   // Mapping from alias#s to the current known alias state
   private TypeObj[] _aliases;
@@ -112,7 +68,7 @@ public class TypeMem extends Type<TypeMem> {
     return aliases.length==0 || aliases[aliases.length-1] != def;
   }
   @Override int compute_hash() {
-    int hash = TMEMPTR + _def._hash;
+    int hash = TMEM + _def._hash;
     for( TypeObj obj : _aliases )  if( obj != null )  hash += obj._hash;
     return hash;
   }
@@ -242,23 +198,4 @@ public class TypeMem extends Type<TypeMem> {
   @Override public boolean is_con()       { return false;}
   @Override public boolean must_nil() { return false; } // never a nil
   @Override Type not_nil() { return this; }
-
-  /** See giant discussion in {@link Bits#split_alias(int, HashMap)}.  Change
-   *  all instances of TypeMem.at0(a1) to include a2 - updating in-place and
-   *  changing the hash as appropriate. */
-  static void split_alias( int a1, int a2 ) {
-    for( Type t : INTERN.keySet() ) {
-      if( !(t instanceof TypeMem) ) continue;
-      TypeMem tm = (TypeMem)t;
-      TypeObj[] tos = tm._aliases;
-      if( a1 >= tos.length ) continue; // No a1 instance
-      TypeObj to = tos[a1];
-      if( to==null ) continue; // a1 is the default, so is a2
-      assert to != tm._def;
-      if( a2 >= tos.length )
-        tm._aliases = tos = Arrays.copyOf(tos,a2+1);
-      tos[a2] = to;
-      // Blows the _hash, but a rehash is coming
-    }
-  }
 }
