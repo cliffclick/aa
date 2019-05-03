@@ -242,6 +242,18 @@ public abstract class Bits implements Iterable<Integer> {
       throw new NoSuchElementException();
     }
   }
+
+
+  // Record a tree-structure in e.g. arrays-of-ints; the backing storage is
+  // passed in and varies between the Bits subclasses.  Goal is lazy replace
+  // the 1 oldalias bit with the 2 newalias bits, via e.g. a read barrier.  No
+  // new oldalias instances are every made again, but existing ones are about.
+  // Every use of a Bits has to check for needing to be forwarded to the
+  // expanded version.  Bits have multiple bits (duh) and maybe more than one
+  // is being split at a time; so need an efficient check read-barrier check.
+  // Splitting is rare, so perhaps just have a max-alias-bit-checked field
+  // perbit.  If the Bits-instance-specific-max-alias is >= the Bits-class-
+  // specific-max-alias, then we already checked.
   public static int split( int oldalias, int newalias0, int newalias1, TypeObj class_specific_tree_recorder ) {
     // need to record tree-structure amongst bits
 
