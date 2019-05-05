@@ -45,10 +45,10 @@ public class TypeStr extends TypeObj<TypeStr> {
   public static void init() {} // Used to force class init
 
   public  static final TypeStr  STR = make(false,null); // not null
-  public  static final int STR_alias = TypeMem.new_alias();
+  public  static final int STR_alias = BitsAlias.new_alias();
   public  static final TypeStr XSTR = make(true ,null); // choice string
   public  static final TypeStr  ABC = con("abc"); // a string constant
-  public  static final int ABC_alias = TypeMem.new_alias();
+  public  static final int ABC_alias = BitsAlias.new_alias();
   private static final TypeStr  DEF = con("def"); // a string constant
   static final TypeStr[] TYPES = new TypeStr[]{STR,XSTR,ABC,DEF};
   static void init1( HashMap<String,Type> types ) { types.put("str",STR); }

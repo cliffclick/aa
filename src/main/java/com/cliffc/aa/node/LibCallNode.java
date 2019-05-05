@@ -14,8 +14,8 @@ public abstract class LibCallNode extends PrimNode {
   }
   
   public static LibCallNode[] LIBCALLS = new LibCallNode[] {
-    new ConvertI64Str(Type.new_alias()),
-    new ConvertF64Str(Type.new_alias()),
+    new ConvertI64Str(BitsAlias.new_alias()),
+    new ConvertF64Str(BitsAlias.new_alias()),
   };
 
   // Wrap the PrimNode with a Fun/Epilog wrapper that includes memory effects.
@@ -38,7 +38,8 @@ public abstract class LibCallNode extends PrimNode {
   // Clones during inlining all become unique new sites
   @Override LibCallNode copy(GVNGCM gvn) {
     LibCallNode nnn = super.copy(gvn);
-    BitsAlias.split(_alias,_alias=Type.new_alias(),nnn._alias=Type.new_alias());
+    _alias = BitsAlias.split(_alias);
+    nnn._alias = _alias+1;
     return nnn;
   }
   

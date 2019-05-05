@@ -672,12 +672,6 @@ public class Type<T extends Type<T>> {
 
   TypeStruct repeats_in_cycles(TypeStruct head, BitSet bs) { return null; }
   
-  // Get a unique new alias#, used to group chunks of memory together - 
-  // such that Loads and Stores approximate in the same alias chunk.
-  // Placed here to avoid a cyclic class dependency with TypeMem.
-  private static int ALIAS=1;   // Unique alias number, skipping 0
-  public static int new_alias() { return ALIAS++; }
-  
   RuntimeException typerr(Type t) {
     throw new RuntimeException("Should not reach here: internal type system error with "+this+(t==null?"":(" and "+t)));
   }

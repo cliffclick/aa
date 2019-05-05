@@ -33,4 +33,7 @@ public class BitsFun extends Bits {
   @Override public BitsFun dual() { return (BitsFun)super.dual(); }
   public BitsFun meet( BitsFun bs ) { return (BitsFun)super.meet(bs); }
   @Override public BitsFun clear(int i) { return (BitsFun)super.clear(i); }
+  
+  BitsFun rd_bar() { throw com.cliffc.aa.AA.unimpl(); }
+  
 }

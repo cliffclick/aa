@@ -119,8 +119,8 @@ public class TestType {
     
     Type pabc0= TypeMemPtr.ABC0;    // *["abc"]?
     TypeMemPtr pabc = TypeMemPtr.ABCPTR; // *["abc"]
-    Type pzer = TypeMemPtr.make    (TypeMem.new_alias());// *[(0)]
-    Type pzer0= TypeMemPtr.make_nil(TypeMem.new_alias());// *[(0)]?
+    Type pzer = TypeMemPtr.make    (BitsAlias.new_alias());// *[(0)]
+    Type pzer0= TypeMemPtr.make_nil(BitsAlias.new_alias());// *[(0)]?
     Type nil  = TypeNil.NIL;
 
     Type xtup = ptup .dual();

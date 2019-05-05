@@ -22,7 +22,7 @@ public class NewNode extends Node {
     assert finals.length==flds.length-1;
     _names = names;
     _finals= finals;
-    _alias = Type.new_alias();
+    _alias = BitsAlias.new_alias();
   }
   private static byte[] bs(int len) { byte[] bs = new byte[len]; Arrays.fill(bs,(byte)1); return bs; }
   String xstr() { return "New#"+_alias; } // Self short name
@@ -82,7 +82,8 @@ public class NewNode extends Node {
   // Clones during inlining all become unique new sites
   @Override NewNode copy(GVNGCM gvn) {
     NewNode nnn = super.copy(gvn);
-    BitsAlias.split(_alias,_alias=Type.new_alias(),nnn._alias=Type.new_alias());
+    _alias = BitsAlias.split(_alias);
+    nnn._alias = _alias+1;
     return nnn;
   }
   

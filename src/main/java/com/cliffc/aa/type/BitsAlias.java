@@ -33,7 +33,33 @@ public class BitsAlias extends Bits {
   @Override public BitsAlias dual() { return (BitsAlias)super.dual(); }
   public BitsAlias meet( BitsAlias bs ) { return (BitsAlias)super.meet(bs); }
   @Override public BitsAlias clear(int i) { return (BitsAlias)super.clear(i); }
-  public static int split( int oldalias, int newalias0, int newalias1 ) {
-    throw com.cliffc.aa.AA.unimpl();
+
+  // Individual bits can be *split* into two children bits.  The original bit
+  // is lazily everywhere replaced with the children, without changing the hash
+  // or equivalence properties.  A split-bit is never put into a new Bits ever
+  // again, but old instances may exist until all Types are visited.  This is
+  // done with a Read Barrier before any operation which walks bits (e.g. any
+  // alias updates for stores/calls or debug prints) and where possible the
+  // post-Read-Barrier variant replaces what was there before.
+
+  // Entry X is 0 if bit X is unsplit; otherwise the hi/lo Short holds the two
+  // split values - which are guaranteed to be larger than the unsplit bit.
+  // Split bits form a Tree structure.
+  static long[] SPLITS = new long[1];
+  // Next bit number; max used length of SPLITS
+  private static int NBITS = 0;
+  public static int new_alias() { return NBITS++; }
+  // Max split every seen
+  static int MAX_SPLITS = 0;
+  // Read-barrier check
+  BitsAlias rd_bar() { return (BitsAlias)rd_bar(SPLITS,MAX_SPLITS); }
+  
+  // Split this bit in twain.  Returns 2 new bits
+  public static int split( int old_bit ) {
+    if( old_bit > MAX_SPLITS ) MAX_SPLITS = old_bit; // Raise max split seen
+    int new_bits = NBITS;        // Get 2 new bits
+    NBITS += 2;
+    SPLITS = Bits.split(old_bit,SPLITS,new_bits);
+    return new_bits;
   }
 }

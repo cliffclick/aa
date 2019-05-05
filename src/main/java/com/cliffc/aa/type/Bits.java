@@ -5,6 +5,7 @@ import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
@@ -49,12 +50,13 @@ public abstract class Bits implements Iterable<Integer> {
   public SB toString(SB sb) {
     if( this==FULL() ) return sb.p("[ALL]");
     else if( _con==-1 && _bits.length==1 && _bits[0]==-1 ) return sb.p("[~ALL]");
+    Bits b = rd_bar();
     sb.p('[');
-    if( _bits==null ) sb.p(_con);
+    if( b._bits==null ) sb.p(b._con);
     else {
-      for( Integer idx : this ) sb.p(idx).p(above_center()?'+':',');
+      for( Integer idx : b ) sb.p(idx).p(above_center()?'+':',');
     }
-    if( inf() ) sb.p("...");
+    if( b.inf() ) sb.p("...");
     return sb.p(']');
   }
 
@@ -243,6 +245,26 @@ public abstract class Bits implements Iterable<Integer> {
     }
   }
 
+  // Individual bits can be *split* into two children bits.  The original bit
+  // is lazily everywhere replaced with the children, without changing the hash
+  // or equivalence properties.  A split-bit is never put into a new Bits ever
+  // again, but old instances may exist until all Types are visited.  This is
+  // done with a Read Barrier before any operation which walks bits (e.g. any
+  // alias updates for stores/calls or debug prints) and where possible the
+  // post-Read-Barrier variant replaces what was there before.
+
+  // Largest MAX_SPLITS checked against
+  private int _max_read_barrier_check = 0;
+  
+  abstract Bits rd_bar();
+  Bits rd_bar(long[] SPLITS, int MAX_SPLITS) {
+    if( _max_read_barrier_check >= MAX_SPLITS ) return this;
+    _max_read_barrier_check = MAX_SPLITS;
+    // Need to check bits from _max_read... to MAX_SPLITS for splitting, and
+    // get a replacement Bits.
+    throw AA.unimpl();
+  }
+
 
   // Record a tree-structure in e.g. arrays-of-ints; the backing storage is
   // passed in and varies between the Bits subclasses.  Goal is lazy replace
@@ -251,15 +273,18 @@ public abstract class Bits implements Iterable<Integer> {
   // Every use of a Bits has to check for needing to be forwarded to the
   // expanded version.  Bits have multiple bits (duh) and maybe more than one
   // is being split at a time; so need an efficient check read-barrier check.
-  // Splitting is rare, so perhaps just have a max-alias-bit-checked field
-  // perbit.  If the Bits-instance-specific-max-alias is >= the Bits-class-
+  // Splitting is rare, so perhaps just have a max-alias-bit-checked field per
+  // bit.  If the Bits-instance-specific-max-alias is >= the Bits-class-
   // specific-max-alias, then we already checked.
-  public static int split( int oldalias, int newalias0, int newalias1, TypeObj class_specific_tree_recorder ) {
-    // need to record tree-structure amongst bits
-
-    // need to print tree-structure in printouts
-
-    // mem.ld/mem.st need to account for tree-structure
-    throw com.cliffc.aa.AA.unimpl();
+  static long[] split( int old_bit, long[] SPLITS, int new_bits ) {
+    int max_bits = new_bits+2;
+    assert max_bits < 32767;
+    while( max_bits >= SPLITS.length )
+      SPLITS = Arrays.copyOf(SPLITS,SPLITS.length*2);
+    // Record tree structure
+    SPLITS[old_bit   ] |= (new_bits<<16) | (new_bits+1); // record 2 children from parent
+    SPLITS[new_bits  ] |= (long)old_bit<<32;             // record parent in two children
+    SPLITS[new_bits+1] |= (long)old_bit<<32;
+    return SPLITS;
   }
 }
