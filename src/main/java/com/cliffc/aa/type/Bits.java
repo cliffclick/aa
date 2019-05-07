@@ -255,10 +255,11 @@ public abstract class Bits implements Iterable<Integer> {
 
   // Largest MAX_SPLITS checked against
   private int _max_read_barrier_check = 0;
-  
+
   abstract Bits rd_bar();
+  private Bits _barriered;
   Bits rd_bar(long[] SPLITS, int MAX_SPLITS) {
-    if( _max_read_barrier_check >= MAX_SPLITS ) return this;
+    if( _max_read_barrier_check >= MAX_SPLITS ) return _barriered;
     _max_read_barrier_check = MAX_SPLITS;
     // Need to check bits from _max_read... to MAX_SPLITS for splitting, and
     // get a replacement Bits.
