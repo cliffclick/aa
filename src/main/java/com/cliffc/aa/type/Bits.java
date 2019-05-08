@@ -257,12 +257,17 @@ public abstract class Bits implements Iterable<Integer> {
   private int _max_read_barrier_check = 0;
 
   abstract Bits rd_bar();
-  private Bits _barriered;
+  private Bits _barriered=this;
   Bits rd_bar(long[] SPLITS, int MAX_SPLITS) {
     if( _max_read_barrier_check >= MAX_SPLITS ) return _barriered;
+    // Need to check bits from _max_read_barrier_check to MAX_SPLITS for
+    // splitting, and get a replacement Bits.
+    for( int i=_max_read_barrier_check; i<MAX_SPLITS; i++ )
+      if( SPLITS[i] != 0 && test(i) )
+        throw AA.unimpl();
+
+
     _max_read_barrier_check = MAX_SPLITS;
-    // Need to check bits from _max_read... to MAX_SPLITS for splitting, and
-    // get a replacement Bits.
     throw AA.unimpl();
   }
 
@@ -280,7 +285,7 @@ public abstract class Bits implements Iterable<Integer> {
   static long[] split( int old_bit, long[] SPLITS, int new_bits ) {
     int max_bits = new_bits+2;
     assert max_bits < 32767;
-    while( max_bits >= SPLITS.length )
+    while( max_bits > SPLITS.length )
       SPLITS = Arrays.copyOf(SPLITS,SPLITS.length*2);
     // Record tree structure
     SPLITS[old_bit   ] |= (new_bits<<16) | (new_bits+1); // record 2 children from parent

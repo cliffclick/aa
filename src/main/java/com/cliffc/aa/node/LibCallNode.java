@@ -40,6 +40,8 @@ public abstract class LibCallNode extends PrimNode {
     LibCallNode nnn = super.copy(gvn);
     _alias = BitsAlias.split(_alias);
     nnn._alias = _alias+1;
+    System.out.println(this);
+    System.out.println(nnn );
     return nnn;
   }
   

@@ -89,7 +89,7 @@ public class TypeMem extends Type<TypeMem> {
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
   @Override String str( BitSet dups ) {
     if( _aliases.length < BitsAlias.MAX_SPLITS )
-      throw aa.unimpl(); // Might need to split this guy
+      throw com.cliffc.aa.AA.unimpl(); // Might need to split this guy
     SB sb = new SB();
     sb.p("[");
     if( _def != TypeObj.OBJ )
@@ -125,7 +125,7 @@ public class TypeMem extends Type<TypeMem> {
   }
   // Canonicalize memory before making
   static TypeMem make0( TypeObj def, TypeObj[] objs ) {
-    assert obj.length >= BitsAlias.MAX_SPLITS; // Already updated
+    assert objs.length >= BitsAlias.MAX_SPLITS; // Already updated
     // Remove elements redundant with the default value
     int len = objs.length;
     for( int i=0; i<len; i++ )  if( objs[i]==def )  objs[i]=null;
@@ -151,8 +151,8 @@ public class TypeMem extends Type<TypeMem> {
   @Override protected Type xmeet( Type t ) {
     if( t._type != TMEM ) return ALL; //
     TypeMem tf = (TypeMem)t;
-    if(    _aliases.length < BitsAlias.MAX_SPLITS ) throw aa.unimpl(); // Might need to split this guy
-    if( tf._aliases.length < BitsAlias.MAX_SPLITS ) throw aa.unimpl(); // Might need to split this guy
+    if(    _aliases.length < BitsAlias.MAX_SPLITS ) throw com.cliffc.aa.AA.unimpl(); // Might need to split this guy
+    if( tf._aliases.length < BitsAlias.MAX_SPLITS ) throw com.cliffc.aa.AA.unimpl(); // Might need to split this guy
     // Meet of default values, meet of element-by-element.
     TypeObj def = (TypeObj)_def.meet(tf._def);
     int len = Math.max(_aliases.length,tf._aliases.length);
@@ -164,7 +164,7 @@ public class TypeMem extends Type<TypeMem> {
 
   // Meet of all possible loadable values
   public TypeObj ld( TypeMemPtr ptr ) {
-    if(    _aliases.length < BitsAlias.MAX_SPLITS ) throw aa.unimpl(); // Might need to split this guy
+    if(    _aliases.length < BitsAlias.MAX_SPLITS ) throw com.cliffc.aa.AA.unimpl(); // Might need to split this guy
     boolean any = ptr.above_center();
     TypeObj obj = TypeObj.OBJ;
     if( !any ) obj = (TypeObj)TypeObj.OBJ.dual();
@@ -177,7 +177,7 @@ public class TypeMem extends Type<TypeMem> {
 
   // Meet of all possible storable values, after updates
   public TypeMem st( TypeMemPtr ptr, String fld, int fld_num, Type val ) {
-    if(    _aliases.length < BitsAlias.MAX_SPLITS ) throw aa.unimpl(); // Might need to split this guy
+    if(    _aliases.length < BitsAlias.MAX_SPLITS ) throw com.cliffc.aa.AA.unimpl(); // Might need to split this guy
     assert val.isa_scalar();
     TypeObj[] objs = new TypeObj[_aliases.length];
     for( int alias : ptr._aliases )
@@ -189,8 +189,8 @@ public class TypeMem extends Type<TypeMem> {
   // updating an entire Obj not just a field, and not a replacement.  The
   // given memory is precise - the default field is ignorable.
   public TypeMem merge( TypeMem mem ) {
-    if(     _aliases.length < BitsAlias.MAX_SPLITS ) throw aa.unimpl(); // Might need to split this guy
-    if( mem._aliases.length < BitsAlias.MAX_SPLITS ) throw aa.unimpl(); // Might need to split this guy
+    if(     _aliases.length < BitsAlias.MAX_SPLITS ) throw com.cliffc.aa.AA.unimpl(); // Might need to split this guy
+    if( mem._aliases.length < BitsAlias.MAX_SPLITS ) throw com.cliffc.aa.AA.unimpl(); // Might need to split this guy
     // Check no overlap
     int  len =     _aliases.length;
     int mlen = mem._aliases.length;
