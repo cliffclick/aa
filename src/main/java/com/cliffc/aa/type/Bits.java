@@ -1,7 +1,6 @@
 package com.cliffc.aa.type;
 
 import com.cliffc.aa.AA;
-import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 import org.jetbrains.annotations.NotNull;
 
@@ -262,12 +261,12 @@ public abstract class Bits implements Iterable<Integer> {
     if( _max_read_barrier_check >= MAX_SPLITS ) return _barriered;
     // Need to check bits from _max_read_barrier_check to MAX_SPLITS for
     // splitting, and get a replacement Bits.
-    for( int i=_max_read_barrier_check; i<MAX_SPLITS; i++ )
+    for( int i=_max_read_barrier_check; i<=MAX_SPLITS; i++ )
       if( SPLITS[i] != 0 && test(i) )
         throw AA.unimpl();
 
 
-    _max_read_barrier_check = MAX_SPLITS;
+    _max_read_barrier_check = MAX_SPLITS+1;
     throw AA.unimpl();
   }
 
