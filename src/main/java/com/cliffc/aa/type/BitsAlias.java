@@ -44,12 +44,18 @@ public class BitsAlias extends Bits {
 
   // Entry X is 0 if bit X is unsplit; otherwise the hi/lo Short holds the two
   // split values - which are guaranteed to be larger than the unsplit bit.
-  // Split bits form a Tree structure.
-  static long[] SPLITS = new long[1];
+  // The high 32 Int holds the parent.  Split bits form a Tree structure.
+  private static long[] SPLITS = new long[1];
+  // Get the numerically lower split; the next split is +1.
+  // Zero means no-split, no-child
+  static int get_child(int alias) { return alias < SPLITS.length ? (int)((SPLITS[alias]>>16)&0xFFFFL) : 0; }
+  // Get the tree parent, or 0
+  static int get_parent(int alias) { return alias < SPLITS.length ? (int)((SPLITS[alias]>>32)&0xFFFFL) : 0; }
+  
   // Next bit number; max used length of SPLITS
   private static int NBITS = 0;
   public static int new_alias() { return NBITS++; }
-  // Max split every seen
+  // Max split ever seen
   static int MAX_SPLITS = 0;
   // Read-barrier check
   BitsAlias rd_bar() { return (BitsAlias)rd_bar(SPLITS,MAX_SPLITS); }

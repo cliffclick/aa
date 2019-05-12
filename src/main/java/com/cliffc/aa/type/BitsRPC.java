@@ -32,5 +32,7 @@ public class BitsRPC extends Bits {
   @Override public BitsRPC dual() { return (BitsRPC)super.dual(); }
   public BitsRPC meet( BitsRPC bs ) { return (BitsRPC)super.meet(bs); }
   @Override public BitsRPC clear(int i) { return (BitsRPC)super.clear(i); }
-  BitsRPC rd_bar() { throw com.cliffc.aa.AA.unimpl(); }
+
+  // TODO: RPC not currently bit-split, but should around inlined calls
+  BitsRPC rd_bar() { return this; }
 }

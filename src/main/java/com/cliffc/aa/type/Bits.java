@@ -129,7 +129,8 @@ public abstract class Bits implements Iterable<Integer> {
   }
   
   private int max() { return (_bits.length<<6)-1; }
-  private static void or( long[] bits, int con ) { bits[idx(con)] |= mask(con); }
+  private static void or ( long[] bits, int con ) { bits[idx(con)] |= mask(con); }
+  private static void and( long[] bits, int con ) { bits[idx(con)] &=~mask(con); }
   private static long[] bits( int a, int b ) { return new long[idx(Math.max(a,b))+1]; }
   
   public Bits meet( Bits bs ) {
@@ -261,15 +262,27 @@ public abstract class Bits implements Iterable<Integer> {
     if( _max_read_barrier_check >= MAX_SPLITS ) return _barriered;
     // Need to check bits from _max_read_barrier_check to MAX_SPLITS for
     // splitting, and get a replacement Bits.
+    boolean split=false;
     for( int i=_max_read_barrier_check; i<=MAX_SPLITS; i++ )
-      if( SPLITS[i] != 0 && test(i) )
-        throw AA.unimpl();
-
-
+      if( SPLITS[i] != 0 && test(i) ) // A splitting-bit exists?
+        return rd_bar_do(SPLITS,MAX_SPLITS);
+    // Passed all checks, bump max checked
     _max_read_barrier_check = MAX_SPLITS+1;
-    throw AA.unimpl();
+    return this;
   }
-
+  // Copy the bits from the old one, and begin splitting.
+  private Bits rd_bar_do(long[] SPLITS, int MAX_SPLITS) {
+    long[] bits;
+    if( _bits == null ) { bits = new long[idx(_con)+1]; or(bits,_con); }
+    else bits = _bits.clone();
+    for( int i=_max_read_barrier_check; i<=MAX_SPLITS; i++ )
+      if( SPLITS[i] != 0 && test(i) ) {
+        and(bits,i);                      // Clear split bit
+        or(bits, (short) SPLITS[i]     ); // OR in the 2 new split bits
+        or(bits, (short)(SPLITS[i]>>16));
+      }
+    return make(_bits==null ? -2 : _con,bits);
+  }
 
   // Record a tree-structure in e.g. arrays-of-ints; the backing storage is
   // passed in and varies between the Bits subclasses.  Goal is lazy replace

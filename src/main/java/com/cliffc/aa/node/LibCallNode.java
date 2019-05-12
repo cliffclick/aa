@@ -44,6 +44,7 @@ public abstract class LibCallNode extends PrimNode {
     System.out.println(nnn );
     return nnn;
   }
+  @Override public String xstr() { return _name+"::#"+_alias; }
   
   static class ConvertI64Str extends LibCallNode {
     ConvertI64Str(int alias) {

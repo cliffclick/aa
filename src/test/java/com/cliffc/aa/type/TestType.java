@@ -195,7 +195,7 @@ public class TestType {
     TypeObj a1 = TypeStruct.make(new String[]{"c"},TypeNil.NIL ); // @{c:nil}
     TypeObj a2 = TypeStruct.make(new String[]{"c"},TypeMemPtr.make_nil(3)); // @{c:*{3#}?}
     TypeObj a3 = TypeStruct.make(new String[]{"x"},TypeInt.TRUE); // @{x: 1 }
-    TypeMem mem = TypeMem.make0(TypeObj.OBJ,new TypeObj[]{null,a1,a2,a3});
+    TypeMem mem = TypeMem.make0(false,new TypeObj[]{null,a1,a2,a3});
     // *[1]? join *[2] ==> *[1+2]
     Type ptr12 = TypeMemPtr.make_nil(1).join( TypeMemPtr.make(2));
     // mem.ld(*[1+2]) ==> @{c:0}
@@ -287,7 +287,7 @@ public class TestType {
     // Twice: SAS AS0AS0AS0AS0AS0...
     // Meet:  SAS0AS0AS0AS0AS0AS0...
     // which is the Once yet again
-    TypeMem mem234 = TypeMem.make0(TypeObj.OBJ,new TypeObj[]{null,null,ta2,ta3,ta4});
+    TypeMem mem234 = TypeMem.make0(false,new TypeObj[]{null,null,ta2,ta3,ta4});
     TypeMemPtr ptr34 = TypeMemPtr.make(alias3,alias4);
 
     // Since hacking ptrs about from mem values, no cycles so instead...

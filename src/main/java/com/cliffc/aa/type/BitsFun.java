@@ -34,6 +34,6 @@ public class BitsFun extends Bits {
   public BitsFun meet( BitsFun bs ) { return (BitsFun)super.meet(bs); }
   @Override public BitsFun clear(int i) { return (BitsFun)super.clear(i); }
   
-  BitsFun rd_bar() { throw com.cliffc.aa.AA.unimpl(); }
-  
+  // TODO: Fun not currently bit-split, but should around inlined calls
+  BitsFun rd_bar() { return this; }
 }
