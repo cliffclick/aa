@@ -44,11 +44,16 @@ public class TypeStr extends TypeObj<TypeStr> {
   public static TypeStr con(String con) { return make(false,con); }
   public static void init() {} // Used to force class init
 
+  // All string alias#s are split from this alias#, and we want a unique one
+  // per e.g. allocation site.  There's no real "parent-child" relationship
+  // between many of the splits; they just come from different parsed instances.
+  public  static final int STR_alias = BitsAlias.STR_alias;
+  public  static final int LIB_alias = BitsAlias.split(STR_alias)+0;
+  public  static final int ABC_alias = BitsAlias.split(STR_alias)+1;// The constant 'abc'.  Never split again, so not very efficient use of split bits
+  
   public  static final TypeStr  STR = make(false,null); // not null
-  public  static final int STR_alias = BitsAlias.new_alias();
   public  static final TypeStr XSTR = make(true ,null); // choice string
   public  static final TypeStr  ABC = con("abc"); // a string constant
-  public  static final int ABC_alias = BitsAlias.new_alias();
   private static final TypeStr  DEF = con("def"); // a string constant
   static final TypeStr[] TYPES = new TypeStr[]{STR,XSTR,ABC,DEF};
   static void init1( HashMap<String,Type> types ) { types.put("str",STR); }

@@ -7,16 +7,21 @@ import com.cliffc.aa.type.*;
 // or else they would be a PrimNode instead.  Like PrimNodes they are wrapped
 // in a Fun/Epilog but include memory effects.
 public abstract class LibCallNode extends PrimNode {
-  int _alias;                   // Alias class for new memory
-  LibCallNode( String name, String[] args, TypeTuple targs, Type ret, int alias ) {
+  long _alias;                   // Alias class for new memory
+  LibCallNode( String name, String[] args, TypeTuple targs, Type ret, long alias ) {
     super(OP_LIBCALL,name,args,targs,ret);
     _alias = alias;
   }
+
+  static int LIBCALL_log_reserved_aliases = 2; // Allocate 1<<2, or 4 reserved aliases
+  static long LIBCALL_alias = Bits.split_log(TypeStr.LIB_alias,LIBCALL_log_reserved_aliases);
+  static long LIBCALL_alias_max = LIBCALL_alias + (1L<<LIBCALL_log_reserved_aliases);
   
   public static LibCallNode[] LIBCALLS = new LibCallNode[] {
-    new ConvertI64Str(BitsAlias.new_alias()),
-    new ConvertF64Str(BitsAlias.new_alias()),
+    new ConvertI64Str(LIBCALL_alias++),
+    new ConvertF64Str(LIBCALL_alias++),
   };
+  static { assert LIBCALL_alias <= LIBCALL_alias_max; }
 
   // Wrap the PrimNode with a Fun/Epilog wrapper that includes memory effects.
   @Override public EpilogNode as_fun( GVNGCM gvn ) {
@@ -38,8 +43,8 @@ public abstract class LibCallNode extends PrimNode {
   // Clones during inlining all become unique new sites
   @Override LibCallNode copy(GVNGCM gvn) {
     LibCallNode nnn = super.copy(gvn);
-    _alias = BitsAlias.split(_alias);
-    nnn._alias = _alias+1;
+    _alias = BitsAlias.split(_alias); // Original gets the low of the split
+    nnn._alias = _alias+1;            // New gets the high bit
     System.out.println(this);
     System.out.println(nnn );
     return nnn;
@@ -47,7 +52,7 @@ public abstract class LibCallNode extends PrimNode {
   @Override public String xstr() { return _name+"::#"+_alias; }
   
   static class ConvertI64Str extends LibCallNode {
-    ConvertI64Str(int alias) {
+    ConvertI64Str(long alias) {
       super("str",PrimNode.ARGS1,TypeTuple.INT64,
             // Return is a tuple of: (mem#alias:str, ptr#alias)
             TypeTuple.make(TypeMem.make(alias,TypeStr.STR),TypeMemPtr.make(alias)),
@@ -76,7 +81,7 @@ public abstract class LibCallNode extends PrimNode {
   }
   
   static class ConvertF64Str extends LibCallNode {
-    ConvertF64Str(int alias) {
+    ConvertF64Str(long alias) {
       super("str",PrimNode.ARGS1,TypeTuple.FLT64,
             // Return is a tuple of: (mem#alias:str, ptr#alias)
             TypeTuple.make(TypeMem.make(alias,TypeStr.STR),TypeMemPtr.make(alias)),

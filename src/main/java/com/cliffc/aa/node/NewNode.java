@@ -8,12 +8,10 @@ import java.util.Arrays;
 // Make a new object of given type.  Returns both the pointer and the memory
 // state, so the output is similar to standard Call.
 public class NewNode extends Node {
-  // Unique dense alias number, one number per unique memory allocation site.
-  // Note that the _uid could serve the same purpose, except its not very dense
-  // (ratio of NewNodes to all nodes).  
   private final String[] _names; // Field names
   private final byte[] _finals;  // Final fields
-  int _alias;                    // Alias number, or -1 if dead
+  // Unique alias number, one number per unique memory allocation site.
+  long _alias;                  // Alias number, or -1 if dead
   public NewNode( Node[] flds, String[] names ) { this(flds,names,bs(names.length)); }
   public NewNode( Node[] flds, String[] names, byte[] finals ) {
     super(OP_NEW,flds);
@@ -22,7 +20,7 @@ public class NewNode extends Node {
     assert finals.length==flds.length-1;
     _names = names;
     _finals= finals;
-    _alias = BitsAlias.new_alias();
+    _alias = TypeStruct.new_alias();
   }
   private static byte[] bs(int len) { byte[] bs = new byte[len]; Arrays.fill(bs,(byte)1); return bs; }
   String xstr() { return "New#"+_alias; } // Self short name
@@ -82,8 +80,8 @@ public class NewNode extends Node {
   // Clones during inlining all become unique new sites
   @Override NewNode copy(GVNGCM gvn) {
     NewNode nnn = super.copy(gvn);
-    _alias = BitsAlias.split(_alias);
-    nnn._alias = _alias+1;
+    _alias = BitsAlias.split(_alias); // Original gets the low of the alias pair
+    nnn._alias = _alias+1;            // Clone gets the high
     return nnn;
   }
   

@@ -12,9 +12,9 @@ import com.cliffc.aa.type.*;
 // - RPC - where to jump-to next; the Continuation
 // - The FunNode function header (quickly maps to SESE region header)
 public class EpilogNode extends Node {
-  int _fidx;
+  long _fidx;
   private final String _unkref_err; // Unknown ref error (not really a forward ref)
-  public EpilogNode( Node ctrl, Node mem, Node val, Node rpc, Node fun, int fidx, String unkref_err ) {
+  public EpilogNode( Node ctrl, Node mem, Node val, Node rpc, Node fun, long fidx, String unkref_err ) {
     super(OP_EPI,ctrl,mem,val,rpc,fun);
     _unkref_err = unkref_err;
     _fidx = fidx;              // Record function index, so can tell it exactly

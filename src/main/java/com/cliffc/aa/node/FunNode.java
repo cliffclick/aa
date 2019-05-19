@@ -68,21 +68,22 @@ public class FunNode extends RegionNode {
 
   // Find FunNodes by fidx
   static Ary<FunNode> FUNS = new Ary<>(new FunNode[]{null,});
-  public static FunNode find_fidx(int fidx) { return FUNS.at(fidx); }
+  public static FunNode find_fidx(long fidx) { assert fidx <= (1L<<32); return FUNS.at((int)fidx); }
 
   @Override String xstr() { return _tf.toString(); }
   @Override String str() { return names(_tf._fidxs,new SB()).toString(); }
   // Debug only: make an attempt to bind name to a function
   private static Ary<String> NAMES = new Ary<>(new String[1],0);
   public void bind( String tok ) {
-    int fidx = _tf.fidx();
-    String name = NAMES.atX(fidx);
+    long fidx = _tf.fidx();
+    assert fidx <= (1L<<32);
+    String name = NAMES.atX((int)fidx);
     assert name==null || name.equals(tok); // Attempt to double-bind
-    NAMES.setX(fidx,tok);
+    NAMES.setX((int)fidx,tok);
   }
   // Can return nothing, or "name" or "{name0,name1,name2...}"
   public static SB names(Bits fidxs, SB sb ) {
-    int fidx = fidxs.abit();
+    long fidx = fidxs.abit();
     if( fidx >= 0 ) return name(fidx,sb);
     sb.p('{');
     int cnt=0;
@@ -94,12 +95,13 @@ public class FunNode extends RegionNode {
     sb.p('}');
     return sb;
   }
-  private static SB name( int i, SB sb ) {
-    String name = NAMES.atX(i);
-    return sb.p(name==null ? Integer.toString(i) : name);
+  private static SB name( long i, SB sb ) {
+    assert i<=(1L<<32);
+    String name = NAMES.atX((int)i);
+    return sb.p(name==null ? Long.toString(i) : name);
   }
   public String name() { return name(_tf.fidx()); }
-  public static String name(int fidx) { return NAMES.atX(fidx); }
+  public static String name(long fidx) { assert fidx <= (1L<<31); return NAMES.atX((int)fidx); }
 
   @Override Node copy(GVNGCM gvn) { throw AA.unimpl(); } // Gotta make a new FIDX
 
@@ -431,7 +433,7 @@ public class FunNode extends RegionNode {
       // The old Epilog has a set of CallNodes, but only the one in #path_being_inlined is
       // being split-for-size.  Repoint the one Call._rpc matching rpc_parm
       // in(path_being_inlined) to new_epi.
-      int rpc = ((TypeRPC)gvn.type(rpc_parm.in(path_being_inlined))).rpc();
+      long rpc = ((TypeRPC)gvn.type(rpc_parm.in(path_being_inlined))).rpc();
       for( Node use : epi._uses ) {
         if( use instanceof CallNode && 
             ((CallNode)use)._rpc == rpc ) {

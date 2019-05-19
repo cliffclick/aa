@@ -1,6 +1,5 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.util.Ary;
 import java.util.BitSet;
 import java.util.function.Predicate;
 
@@ -34,21 +33,21 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     TypeMemPtr t2 = (TypeMemPtr)t1.hashcons();
     return t1==t2 ? t1 : t1.free(t2);
   }
-  public static TypeMemPtr make( int alias ) { return make(BitsAlias.make0(alias)); }
-  public static TypeMemPtr make_nil( int alias ) {
+  public static TypeMemPtr make( long alias ) { return make(BitsAlias.make0(alias)); }
+  static TypeMemPtr make_nil( long alias ) {
     if( alias >=64 ) throw com.cliffc.aa.AA.unimpl();
-    return make(BitsAlias.make0(-2,new long[]{(1L<<alias)|1}));
+    return make(BitsAlias.make0(-2,new long[]{(1L<<BitsAlias.NUL_alias)|(1L<<alias)}));
   }
-  public static TypeMemPtr make( int... aliases ) { return make(BitsAlias.make0(aliases)); }
+  public static TypeMemPtr make( long... aliases ) { return make(BitsAlias.make0(aliases)); }
   
   public static final TypeMemPtr OOP0   = make(BitsAlias.FULL); // Includes nil
-  public static final TypeMemPtr OOP    = make(BitsAlias.NZERO);// Excludes nil
+         static final TypeMemPtr OOP    = make(BitsAlias.NZERO);// Excludes nil
   public static final TypeMemPtr STRPTR = make(TypeStr.STR_alias);
          static final TypeMemPtr STR0   = make_nil(TypeStr.STR_alias);
          static final TypeMemPtr ABCPTR = make(TypeStr.ABC_alias);
   public static final TypeMemPtr ABC0   = make_nil(TypeStr.ABC_alias);
-  public static final TypeMemPtr STRUCT = make(TypeStruct.ALLSTRUCT_alias);
-  public static final TypeMemPtr STRUCT0= make_nil(TypeStruct.ALLSTRUCT_alias);
+         static final TypeMemPtr STRUCT = make(TypeStruct.ALLSTRUCT_alias);
+         static final TypeMemPtr STRUCT0= make_nil(TypeStruct.ALLSTRUCT_alias);
   static final TypeMemPtr[] TYPES = new TypeMemPtr[]{OOP0,STRPTR,ABCPTR,STRUCT,ABC0};
   
   @Override protected TypeMemPtr xdual() { return new TypeMemPtr(_aliases.dual()); }
@@ -72,7 +71,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     // Meet of aliases
     return make(_aliases.meet( ((TypeMemPtr)t)._aliases ));
   }
-  public int get_alias() { return _aliases.getbit(); }
+  public long get_alias() { return _aliases.getbit(); }
   @Override public boolean above_center() { return _aliases.above_center(); }
   // Aliases represent *classes* of pointers and are thus never constants
   @Override public boolean may_be_con()   { return false; }

@@ -143,7 +143,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
       
   // Return true if this is an ambiguous function pointer
   public boolean is_ambiguous_fun() { return _fidxs.above_center(); }
-  public int fidx() { return _fidxs.getbit(); }
+  public long fidx() { return _fidxs.getbit(); }
 
   // Generic functions
   public boolean is_forward_ref()                    { return _nargs == -1; }

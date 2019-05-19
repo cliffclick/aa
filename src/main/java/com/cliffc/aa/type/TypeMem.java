@@ -49,8 +49,6 @@ import java.util.BitSet;
 public class TypeMem extends Type<TypeMem> {
 
   private boolean _any;
-  // CNC: Check rd_bar & if pass era-check use brooks-barrier version (if fail,
-  // get an updated brooks-barrier version).
 
   // Mapping from alias#s to the current known alias state
   private TypeObj[] _aliases;
@@ -62,13 +60,28 @@ public class TypeMem extends Type<TypeMem> {
     _aliases = aliases;
     assert check();
   }
-  // False if any bit needs to split or not "tight": no extra instances of default
+  // False if not 'tight' (no trailing null pairs) or any matching pairs (should
+  // collapse to their parent) or any mixed parent/child.
   private boolean check() {
     TypeObj to = _any ? TypeObj.XOBJ : TypeObj.OBJ;
-    for( int i=0; i<_aliases.length; i++ )
-      if( (_aliases[i]!=null && BitsAlias.get_child(i)!=0) || _aliases[i]==to )
-        return false;
-    return _aliases.length==0 || _aliases[_aliases.length-1] != null;
+    TypeObj[] as = _aliases;
+    if( as.length == 0 ) return true;
+    if( ((as.length)&1) == 1 ) return false; // Must be even
+    if( as[0]!=null ) return false; // null is null is null is null...
+    // No instances of default
+    for( TypeObj tt : _aliases ) if( tt==to ) return false;
+    
+    // Look at the 'parent' and both 'children'
+    for( int i=1; i<(as.length>>1); i++ ) {
+      int j=i<<1;               // Children
+      if( as[i] == null ) {     // Parent is null
+        // Illegal for both children to be equal and not-null (can roll up otherwise).
+        if( as[j]==as[j+1] && as[j]!=null ) return false;
+      } else {                  // Parent not-null; children must be null
+        if( j < as.length && (as[j]!=null || as[j+1] != null) ) return false;
+      }
+    }
+    return _aliases[_aliases.length-2] != null || _aliases[_aliases.length-1] != null;
   }
   @Override int compute_hash() {
     int hash = TMEM + (_any?1:0);
@@ -90,26 +103,21 @@ public class TypeMem extends Type<TypeMem> {
   @Override String str( BitSet dups ) {
     SB sb = new SB();
     sb.p("[").p(_any?"any,":"");
-    for( int i=0; i<_aliases.length; i++ ) if( _aliases[i] != null ) sb(sb,_aliases[i].toString(),i);
+    for( int i=0; i<_aliases.length; i++ )
+      if( _aliases[i] != null )
+        sb.p(i).p("#:").p(_aliases[i].toString()).p(",");
     return sb.p("]").toString();
   }
-  // Recursively walk the split tree, and print bits.  Type is same for all
-  // bits - it can only differ for new post-split types.
-  private SB sb(SB sb, String sobj, int i) {
-    int a0 = BitsAlias.get_child(i);
-    if( a0 == 0 )  return sb.p(i).p("#:").p(sobj).p(",");
-    return sb(sb(sb,sobj,a0),sobj,a0+1);  // Recursively do 2 bits
-  }
                 
-  // Alias
-  public TypeObj at0(int alias) {
-    TypeObj obj = alias < _aliases.length ? _aliases[alias] : null;
-    int p = BitsAlias.get_parent(alias);
-    if( p != 0 && _aliases[p] != null ) {
-      assert obj==null;         // not both parent and child
-      return _aliases[p];       // Return parent
+  // Alias-at.  Walks up the tree to parent aliases as needed.
+  public TypeObj at0(long alias) {
+    while( alias>0 ) {
+      if( alias < _aliases.length && _aliases[(int)alias]!=null )
+        return _aliases[(int)alias];
+      alias>>=1;
     }
-    return obj==null ? (_any ? TypeObj.XOBJ : TypeObj.OBJ) : obj;
+    // Rolled off the top, it is the default
+    return _any ? TypeObj.XOBJ : TypeObj.OBJ;
   }
   
   private static TypeMem FREE=null;
@@ -123,9 +131,11 @@ public class TypeMem extends Type<TypeMem> {
   }
 
   // Precise single alias
-  public static TypeMem make(int alias, TypeObj oop ) {
-    TypeObj[] as = new TypeObj[alias+1];
-    as[alias] = oop;
+  public static TypeMem make(long alias, TypeObj oop ) {
+    long len = (alias|1)+1;      // Round up to even pairs
+    assert 0 <= len && len < (1<<20); // Time to change data structures!!!
+    TypeObj[] as = new TypeObj[(int)len];
+    as[(int)alias] = oop;
     return make(false,as);
   }
 
@@ -135,23 +145,22 @@ public class TypeMem extends Type<TypeMem> {
     TypeObj def = any ? TypeObj.XOBJ : TypeObj.OBJ;
     int len = objs.length;
     for( int i=0; i<len; i++ )  if( objs[i]==def )  objs[i]=null;
-    while( len > 0 && objs[len-1]==null ) len--;
-    if( len < objs.length ) objs = Arrays.copyOf(objs,len);
-    // Split any split bits
-    int a0;  TypeObj obj;
-    for( int i=0; i<len; i++ )
-      if( (obj=objs[i])!=null && (a0=BitsAlias.get_child(i))!=0 ) {
-        if( a0+2 >= objs.length ) objs = Arrays.copyOf(objs,a0+2);
-        objs[i   ] = null;
-        objs[a0  ] = obj;
-        objs[a0+1] = obj;
+    // Clean out pairs
+    for( int i=2; i<(len&-2); i+=2 ) // Limit 'i' to even/odd pairs
+      if( objs[i]!=null && objs[i]==objs[i+1] ) { // matching pair?
+        objs[i>>1] = objs[i];                     // roll up the pair to parent
+        objs[i]=objs[i+1]=null;
       }
+    // Remove trailing nulls
+    while( len > 0 && objs[len-1]==null ) len--;
+    len = (len+1)&-2;           // Round to pairs
+    if( len < objs.length ) objs = Arrays.copyOf(objs,len); // trim length
     return make(any,objs);
   }
 
   public  static final TypeMem MEM = make(false,new TypeObj[0]);
   public  static final TypeMem XMEM = MEM.dual();
-          static final TypeMem MEM_STR = make(TypeStr.STR_alias,TypeStr.STR);
+          static final TypeMem MEM_STR = make(BitsAlias.STR_alias,TypeStr.STR);
           static final TypeMem MEM_ABC = make(TypeStr.ABC_alias,TypeStr.ABC);
   static final TypeMem[] TYPES = new TypeMem[]{MEM,MEM_STR};
 
@@ -170,47 +179,34 @@ public class TypeMem extends Type<TypeMem> {
     // Meet of default values, meet of element-by-element.
     int len = Math.max(_aliases.length,tf._aliases.length);
     TypeObj[] objs = new TypeObj[len];
-    boolean any = _any&tf._any;
-    TypeObj to = any ? TypeObj.XOBJ : TypeObj.OBJ;
-    for( int i=0; i<len; i++ ) {
-      TypeObj obj = (TypeObj)at0(i).meet(tf.at0(i));
-      objs[i] = obj==to ? null : obj; // Use null for the default, canonicalize
-      // Check the read-barrier to see if either side of the meet contains
-      // split-bits.
-      int a0;
-      if( obj!=to && (a0=BitsAlias.get_child(i))!=0 ) {
-        // Do the splits now - if the split-bit has non-default values it will
-        // get set again sharper.
-        if( a0+2 >= objs.length ) objs = Arrays.copyOf(objs,a0+2);
-        objs[i   ] = null;      // Never return the split-bit again
-        objs[a0  ] = obj;
-        objs[a0+1] = obj;
-      }
-    }
-    return make0(any,objs);
+    for( int i=0; i<len; i++ )
+      if( (i<   _aliases.length &&    _aliases[i] != null) ||
+          (i<tf._aliases.length && tf._aliases[i] != null) ) // short-cut for both null
+        objs[i] = (TypeObj)at0(i).meet(tf.at0(i));           // meet element-by-element
+    return make0(_any&tf._any,objs);
   }
 
   // Meet of all possible loadable values
   public TypeObj ld( TypeMemPtr ptr ) {
-    if(    _aliases.length < BitsAlias.MAX_SPLITS ) throw com.cliffc.aa.AA.unimpl(); // Might need to split this guy
-    boolean any = ptr.above_center();
-    TypeObj obj = TypeObj.OBJ;
-    if( !any ) obj = (TypeObj)TypeObj.OBJ.dual();
-    for( int alias : ptr._aliases ) {
-      TypeObj x = at0(alias);
-      obj = (TypeObj)(any ? obj.join(x) : obj.meet(x));
-    }
-    return obj;
+    throw com.cliffc.aa.AA.unimpl();
+    //boolean any = ptr.above_center();
+    //TypeObj obj = TypeObj.OBJ;
+    //if( !any ) obj = (TypeObj)TypeObj.OBJ.dual();
+    //for( int alias : ptr._aliases ) {
+    //  TypeObj x = at0(alias);
+    //  obj = (TypeObj)(any ? obj.join(x) : obj.meet(x));
+    //}
+    //return obj;
   }
 
   // Meet of all possible storable values, after updates
   public TypeMem st( TypeMemPtr ptr, String fld, int fld_num, Type val ) {
-    if(    _aliases.length < BitsAlias.MAX_SPLITS ) throw com.cliffc.aa.AA.unimpl(); // Might need to split this guy
     assert val.isa_scalar();
-    TypeObj[] objs = new TypeObj[_aliases.length];
-    for( int alias : ptr._aliases )
-      objs[alias] = at0(alias).update(fld,fld_num,val);
-    return make0(_any,objs);
+    //TypeObj[] objs = new TypeObj[_aliases.length];
+    //for( int alias : ptr._aliases )
+    //  objs[alias] = at0(alias).update(fld,fld_num,val);
+    //return make0(_any,objs);
+    throw com.cliffc.aa.AA.unimpl();
   }
 
   // Merge two memories with no overlaps.  This is similar to a st(), except

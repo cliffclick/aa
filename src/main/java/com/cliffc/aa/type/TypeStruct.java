@@ -181,10 +181,19 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   private static final TypeStruct C0    = make(flds("c"),ts(TypeNil.SCALAR)); // @{c:0}
   private static final TypeStruct D1    = make(flds("d"),ts(TypeInt.TRUE  )); // @{d:1}
   private static final TypeStruct ARW   = make(flds("a"),ts(TypeFlt.FLT64),new byte[1]);
-  public  static final TypeStruct ALLSTRUCT = make();
-  public  static final int ALLSTRUCT_alias = BitsAlias.new_alias();
   public  static final TypeStruct GENERIC = malloc(true,FLD0,new Type[0],new byte[0]).hashcons_free();
-
+  public  static final TypeStruct ALLSTRUCT = make();
+  
+  public  static final long ALLSTRUCT_alias = BitsAlias.REC_alias;
+  static int  NEWSTRUCT_log_reserved_aliases = 20; // Allocate 1<<20, or ~1million reserved aliases
+  static long NEWSTRUCT_alias = Bits.split_log(BitsAlias.REC_alias,NEWSTRUCT_log_reserved_aliases);
+  static long NEWSTRUCT_alias_max = NEWSTRUCT_alias + (1<<NEWSTRUCT_log_reserved_aliases);
+  public static long new_alias() {
+    long a = NEWSTRUCT_alias++;
+    assert NEWSTRUCT_alias <= NEWSTRUCT_alias_max;
+    return a;
+  }
+  
   // Recursive meet in progress
   private static final HashMap<TypeStruct,TypeStruct> MEETS1 = new HashMap<>(), MEETS2 = new HashMap<>();
   
