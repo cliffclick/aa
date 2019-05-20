@@ -38,18 +38,19 @@ import java.util.Map;
 // the incoming args come from a known input path.
 // 
 public class FunNode extends RegionNode {
-  private static int CNT=1;     // Function index; 0 reserved
   public TypeFunPtr _tf;        // Worse-case correct type, updated by GCP
   private final byte _op_prec;  // Operator precedence; only set top-level primitive wrappers
   
   // Used to make the primitives at boot time
-  public FunNode(PrimNode prim, Type ret) { this(TypeFunPtr.make(prim._targs,prim.argmem(),ret,prim.retmem(),CNT,prim._targs._ts.length),prim.op_prec(),prim._name); }
+  public FunNode(PrimNode prim, Type ret) {
+    this(TypeFunPtr.make_new(prim._targs,prim.argmem(),ret,prim.retmem(),prim._targs._ts.length),prim.op_prec(),prim._name); }
   // Used to make copies when inlining/cloning function bodies
-  private FunNode(TypeTuple ts, Type argmem, Type ret, Type retmem, String name, int nargs) { this(TypeFunPtr.make(ts,argmem,ret,retmem,CNT,nargs),-1,name); }
+  private FunNode(TypeTuple ts, Type argmem, Type ret, Type retmem, String name, int nargs) {
+    this(TypeFunPtr.make_new(ts,argmem,ret,retmem,nargs),-1,name); }
   // Used to start an anonymous function in the Parser
-  public FunNode(Type[] ts) { this(TypeFunPtr.make(TypeTuple.make(ts),TypeMem.MEM,Type.SCALAR,TypeMem.MEM,CNT,ts.length),-1,null); }
+  public FunNode(Type[] ts) { this(TypeFunPtr.make_new(TypeTuple.make(ts),TypeMem.MEM,Type.SCALAR,TypeMem.MEM,ts.length),-1,null); }
   // Used to forward-decl anon functions
-  FunNode(String name) { this(TypeFunPtr.make_forward_ref(CNT),-1,name); }
+  FunNode(String name) { this(TypeFunPtr.make_forward_ref(),-1,name); }
   // Shared common constructor
   private FunNode(TypeFunPtr tf, int op_prec, String name) {
     super(OP_FUN);
@@ -57,14 +58,12 @@ public class FunNode extends RegionNode {
     _tf = tf;
     _op_prec = (byte)op_prec;
     if( name != null ) bind(name);
-    FUNS.add(this);             // Track FunNode by fidx
-    CNT++;                      // Bump global unique fidx number
+    FUNS.setX((int)tf.fidx(),this); // Track FunNode by fidx
   }
   
   // Fast reset of parser state between calls to Exec
-  static int PRIM_CNT;
-  public static void init0() { PRIM_CNT=CNT; }
-  public static void reset_to_init0() { CNT = PRIM_CNT; NAMES.set_len(PRIM_CNT); FUNS.set_len(PRIM_CNT); }
+  public static void init0() { }
+  public static void reset_to_init0() { NAMES.set_len(BitsFun.PRIM_CNT); FUNS.set_len(BitsFun.PRIM_CNT); }
 
   // Find FunNodes by fidx
   static Ary<FunNode> FUNS = new Ary<>(new FunNode[]{null,});

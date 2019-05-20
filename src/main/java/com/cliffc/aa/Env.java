@@ -50,9 +50,12 @@ public class Env implements AutoCloseable {
     _scope.update("math_pi", GVN.con(TypeFlt.PI),null,false);
     // Run the worklist dry
     GVN.iter();
-    CallNode.init0(); // Done with adding primitives
-    FunNode .init0(); // Done with adding primitives
-    GVN.init0(); // Done with adding primitives
+    BitsFun   .init0();// Done with adding primitives
+    BitsRPC   .init0();// Done with adding primitives
+    TypeStruct.init0();
+    TypeStr   .init0();
+    FunNode   .init0(); // Done with adding primitives
+    GVN       .init0(); // Done with adding primitives
   }
   
   // A new top-level Env, above this is the basic public Env with all the primitives
@@ -71,9 +74,12 @@ public class Env implements AutoCloseable {
     if( _scope.is_dead() ) return;
     // Closing top-most scope (exiting compilation unit)?
     if( _par._par == null ) {   // Then reset global statics to allow another compilation unit
-      CallNode.reset_to_init0(); 
-      FunNode .reset_to_init0();
-      GVN.reset_to_init0();
+      BitsFun   .reset_to_init0();// Done with adding primitives
+      BitsRPC   .reset_to_init0();// Done with adding primitives
+      TypeStruct.reset_to_init0();
+      TypeStr   .reset_to_init0();
+      FunNode   .reset_to_init0(); // Done with adding primitives
+      GVN       .reset_to_init0(); // Done with adding primitives
       // StartNode is used by global constants, which in turn are only used by
       // dead cycles.
       while( START._uses._len > NINIT_CONS ) {

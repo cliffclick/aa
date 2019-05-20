@@ -4,7 +4,7 @@ import com.cliffc.aa.AA;
 import com.cliffc.aa.util.SB;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.HashMap;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
@@ -51,7 +51,11 @@ public abstract class Bits implements Iterable<Integer> {
       // b & (b>>1) only true if a pair is set.  And with 0x55 and only even/odd pairs.
       if( (b&(b>>1)&0x55555555L) != 0 )
         return false;
-    return true;
+    // If parent is set, then both children are clear
+    for( int i=2; i<(_bits.length<<6)>>1; i++ )
+      if( test(i) && (test((i<<1)) || test((i<<1)+1)) )
+        return false;
+    return _bits.length <= 1 || _bits[_bits.length - 1] != 0; // "tight", no trailing zeros
   }
   int compute_hash() {
     int sum=(int)(_con | (_con>>32));
@@ -86,8 +90,6 @@ public abstract class Bits implements Iterable<Integer> {
 
   // Intern: lookup and return an existing Bits or install in hashmap and
   // return a new Bits.  Overridden in subclasses to make type-specific Bits.
-  private static HashMap<Bits,Bits> INTERN = new HashMap<>();
-  private static Bits FREE=null;
   abstract Bits make_impl(long con, long[] bits );
   
   // Constructor taking an array of bits, and allowing join/meet selection.
@@ -97,18 +99,23 @@ public abstract class Bits implements Iterable<Integer> {
     int len = bits.length;
     // Remove pairs
     for( int i=len*64-2; i>=2; i-=2 ) { // working backwards in pairs
+      int pi = i>>1;             // Parent bit
       int idx = idx(i);          // bit index and mask
       long mask = 3L<<(i&63);    // mask has 2 bits
       long b = bits[idx];        // bits to check
       if( (b&mask)==mask ) {     // found a pair
         bits[idx] = b & ~mask;   // strip the pair
         or(bits,i>>1);           // add in the pair-parent
+      } else if( (b&mask)!=0 ) { // Either bit is set
+        if( (bits[idx(pi)] & mask(pi))!=0 ) { // Parent is set, eclipses children
+          bits[idx] = b & ~mask; // strip the pair
+        }
       }
     }
     // Remove any trailing empty words
     while( len > 0 && (bits[len-1]==0 || bits[len-1]== -1) ) len--;
-    if( len != bits.length ) throw AA.unimpl(); // TODO: remove trailing sign-extend words
-    
+    bits = Arrays.copyOf(bits,len);
+
     // Check for a single bit
     long b = bits[len-1];
     if( (b & (b-1))!=0 )
@@ -133,7 +140,6 @@ public abstract class Bits implements Iterable<Integer> {
   // Constructor taking a single bit
   final Bits make( long bit ) {
     if( bit < 0 ) throw new IllegalArgumentException("bit must be positive");
-    if( bit >= 63 ) throw AA.unimpl();
     return make_impl(bit,null);
   }
   

@@ -71,7 +71,6 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     // Meet of aliases
     return make(_aliases.meet( ((TypeMemPtr)t)._aliases ));
   }
-  public long get_alias() { return _aliases.getbit(); }
   @Override public boolean above_center() { return _aliases.above_center(); }
   // Aliases represent *classes* of pointers and are thus never constants
   @Override public boolean may_be_con()   { return false; }

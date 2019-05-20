@@ -18,14 +18,26 @@ public class BitsFun extends Bits {
     else { INTERN.put(b1,b1); return b1; }
   }
 
-  public static final int NUL_alias = 0;
-  public static final int ALL_alias = 1;
+  public static final int NUL_fidx = 0;
+  public static final int ALL_fidx = 1;
+  static int FUN_log_reserved_fidxes = 6; // Allocate 1<<10, or a thousand reserved fidxes
+  static long FUN_fidx = Bits.split_log(ALL_fidx,FUN_log_reserved_fidxes);
+  static long FUN_fidx_max = FUN_fidx + (1L<<FUN_log_reserved_fidxes);
+  public static long new_fidx() {
+    long a = FUN_fidx++;
+    assert FUN_fidx <= FUN_fidx_max;
+    return a;
+  }
+  // Fast reset of parser state between calls to Exec
+  public static int PRIM_CNT;
+  public static void init0() { PRIM_CNT=(int)FUN_fidx; }
+  public static void reset_to_init0() { FUN_fidx = PRIM_CNT; }
   
   // Have to make a first BitsFun here; thereafter the v-call to make_impl
   // will make more on demand.  But need the first one to make a v-call.
-  public static final BitsFun FULL = new BitsFun().make_impl(-2,new long[]{(1L<<NUL_alias) | (1L<<ALL_alias)});
+  public static final BitsFun FULL = new BitsFun().make_impl(-2,new long[]{(1L<<NUL_fidx) | (1L<<ALL_fidx)});
   static final BitsFun ANY  = FULL.dual();
-  static final BitsFun NZERO= make0(-2,new long[]{1L<<ALL_alias});
+  static final BitsFun NZERO= make0(-2,new long[]{1L<<ALL_fidx});
   public static final BitsFun NIL  = make0(0);
   @Override public BitsFun FULL() { return FULL; }
   @Override public BitsFun ANY () { return ANY ; }

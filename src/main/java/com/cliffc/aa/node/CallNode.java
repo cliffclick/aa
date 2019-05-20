@@ -20,8 +20,7 @@ import com.cliffc.aa.util.Ary;
 // several possible returns apply... and can be merged like a PhiNode
 
 public class CallNode extends Node {
-  private static int RPC=1; // Call-site return PC
-  int _rpc;         // Call-site return PC
+  long _rpc;                    // Call-site return PC
   private boolean _unpacked;    // Call site allows unpacking a tuple (once)
   private boolean _inlined;     // Inlining a call-site is a 2-stage process; function return wired to the call return
   private Type   _cast_ret;     // Return type has been up-casted
@@ -29,18 +28,13 @@ public class CallNode extends Node {
           Parse  _badargs;      // Error for e.g. wrong arg counts or incompatible args
   public CallNode( boolean unpacked, Parse badargs, Node... defs ) {
     super(OP_CALL,defs);
-    _rpc = RPC++;               // Unique call-site index
+    _rpc = BitsRPC.new_rpc();   // Unique call-site index
     _unpacked=unpacked;         // Arguments are typically packed into a tuple and need unpacking, but not always
     _badargs = badargs;
   }
 
   String xstr() { return "Call#"+_rpc; } // Self short name
   String  str() { return xstr(); }       // Inline short name
-
-  // Fast reset of parser state between calls to Exec
-  private static int PRIM_RPC; // Primitives count of call-sites
-  public static void init0() { PRIM_RPC=RPC; }
-  public static void reset_to_init0() { RPC = PRIM_RPC; }
 
   // Inline the CallNode
   private Node inline( GVNGCM gvn, Node ctrl, Node mem, Node rez ) {
@@ -67,7 +61,8 @@ public class CallNode extends Node {
   // Clones during inlining all become unique new call sites
   @Override CallNode copy(GVNGCM gvn) {
     CallNode call = super.copy(gvn);
-    call._rpc = RPC++;
+    _rpc = BitsRPC.split(_rpc); // Original gets the low of the split
+    call._rpc = _rpc+1;         // New gets the high bit
     //return call;
     throw com.cliffc.aa.AA.unimpl();
   }
@@ -255,7 +250,7 @@ public class CallNode extends Node {
     Bits fidxs = tf._fidxs;     // Get all the propagated reaching functions
     if( fidxs.above_center() ) return;
     for( int fidx : fidxs ) {   // For all functions
-      if( fidx >= FunNode.PRIM_CNT ) { // Do not wire up primitives, but forever take their default inputs and outputs
+      if( fidx >= BitsFun.PRIM_CNT ) { // Do not wire up primitives, but forever take their default inputs and outputs
         // Can be wiring up the '#[ALL]' list.  Stop after seeing all existing functions
         if( fidx >= FunNode.FUNS._len ) return;
         FunNode fun = FunNode.find_fidx(fidx);
@@ -455,7 +450,7 @@ public class CallNode extends Node {
   }
 
   @Override public Type all_type() { return TypeTuple.make(Type.CTRL,TypeMem.MEM,Type.SCALAR); }
-  @Override public int hashCode() { return super.hashCode()+_rpc; }
+  @Override public int hashCode() { return super.hashCode()+(int)(_rpc|(_rpc>>32)); }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !super.equals(o) ) return false;

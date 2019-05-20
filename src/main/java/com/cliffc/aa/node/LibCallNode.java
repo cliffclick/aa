@@ -13,15 +13,10 @@ public abstract class LibCallNode extends PrimNode {
     _alias = alias;
   }
 
-  static int LIBCALL_log_reserved_aliases = 2; // Allocate 1<<2, or 4 reserved aliases
-  static long LIBCALL_alias = Bits.split_log(TypeStr.LIB_alias,LIBCALL_log_reserved_aliases);
-  static long LIBCALL_alias_max = LIBCALL_alias + (1L<<LIBCALL_log_reserved_aliases);
-  
   public static LibCallNode[] LIBCALLS = new LibCallNode[] {
-    new ConvertI64Str(LIBCALL_alias++),
-    new ConvertF64Str(LIBCALL_alias++),
+    new ConvertI64Str(TypeStr.new_alias()),
+    new ConvertF64Str(TypeStr.new_alias()),
   };
-  static { assert LIBCALL_alias <= LIBCALL_alias_max; }
 
   // Wrap the PrimNode with a Fun/Epilog wrapper that includes memory effects.
   @Override public EpilogNode as_fun( GVNGCM gvn ) {
@@ -45,8 +40,6 @@ public abstract class LibCallNode extends PrimNode {
     LibCallNode nnn = super.copy(gvn);
     _alias = BitsAlias.split(_alias); // Original gets the low of the split
     nnn._alias = _alias+1;            // New gets the high bit
-    System.out.println(this);
-    System.out.println(nnn );
     return nnn;
   }
   @Override public String xstr() { return _name+"::#"+_alias; }

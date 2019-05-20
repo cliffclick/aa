@@ -119,8 +119,8 @@ public class TestType {
     
     Type pabc0= TypeMemPtr.ABC0;    // *["abc"]?
     TypeMemPtr pabc = TypeMemPtr.ABCPTR; // *["abc"]
-    Type pzer = TypeMemPtr.make    (BitsAlias.new_alias());// *[(0)]
-    Type pzer0= TypeMemPtr.make_nil(BitsAlias.new_alias());// *[(0)]?
+    Type pzer = TypeMemPtr.make    (TypeStruct.new_alias());// *[(0)]
+    Type pzer0= TypeMemPtr.make_nil(TypeStruct.new_alias());// *[(0)]?
     Type nil  = TypeNil.NIL;
 
     Type xtup = ptup .dual();
@@ -195,7 +195,7 @@ public class TestType {
     TypeObj a1 = TypeStruct.make(new String[]{"c"},TypeNil.NIL ); // @{c:nil}
     TypeObj a2 = TypeStruct.make(new String[]{"c"},TypeMemPtr.make_nil(3)); // @{c:*{3#}?}
     TypeObj a3 = TypeStruct.make(new String[]{"x"},TypeInt.TRUE); // @{x: 1 }
-    TypeMem mem = TypeMem.make0(false,new TypeObj[]{null,a1,a2,a3});
+    TypeMem mem = TypeMem.make0(new TypeObj[]{null,TypeObj.OBJ,a1,a2,a3});
     // *[1]? join *[2] ==> *[1+2]
     Type ptr12 = TypeMemPtr.make_nil(1).join( TypeMemPtr.make(2));
     // mem.ld(*[1+2]) ==> @{c:0}
@@ -213,9 +213,9 @@ public class TestType {
     TypeFunPtr gf = TypeFunPtr.GENERIC_FUNPTR;
     TypeMem nomem = TypeMem.MEM.dual();
 
-    TypeFunPtr f1i2i = TypeFunPtr.make(TypeTuple.INT64,nomem,TypeInt.INT64,nomem,1/*fidx*/,1/*nargs*/);
+    TypeFunPtr f1i2i = TypeFunPtr.make_new(TypeTuple.INT64,nomem,TypeInt.INT64,nomem,1/*nargs*/);
     assertTrue(f1i2i.isa(gf));
-    TypeFunPtr f1f2f = TypeFunPtr.make(TypeTuple.FLT64,nomem,TypeFlt.FLT64,nomem,2/*fidx*/,1/*nargs*/);
+    TypeFunPtr f1f2f = TypeFunPtr.make_new(TypeTuple.FLT64,nomem,TypeFlt.FLT64,nomem,1/*nargs*/);
     assertTrue(f1f2f.isa(gf));
     TypeFunPtr mt = (TypeFunPtr)f1i2i.meet(f1f2f);
     TypeFunPtr f3i2r = TypeFunPtr.make(TypeTuple.INT32,nomem,Type.REAL    ,nomem,BitsFun.make0(-2,new long[]{(1<<1)|(1<<2)}),1/*nargs*/);
@@ -287,7 +287,7 @@ public class TestType {
     // Twice: SAS AS0AS0AS0AS0AS0...
     // Meet:  SAS0AS0AS0AS0AS0AS0...
     // which is the Once yet again
-    TypeMem mem234 = TypeMem.make0(false,new TypeObj[]{null,null,ta2,ta3,ta4});
+    TypeMem mem234 = TypeMem.make0(new TypeObj[]{null,TypeObj.OBJ,ta2,ta3,ta4});
     TypeMemPtr ptr34 = TypeMemPtr.make(alias3,alias4);
 
     // Since hacking ptrs about from mem values, no cycles so instead...

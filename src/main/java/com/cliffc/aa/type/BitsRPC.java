@@ -17,14 +17,26 @@ public class BitsRPC extends Bits {
     else { INTERN.put(b1,b1); return b1; }
   }
 
-  public static final int NUL_alias = 0;
-  public static final int ALL_alias = 1;
+  public static final int NUL_rpc = 0;
+  public static final int ALL_rpc = 1;
+  static int RPC_log_reserved_rpcs = 10; // Allocate 1<<10, or a thousand reserved RPCs
+  static long RPC_rpc = Bits.split_log(ALL_rpc,RPC_log_reserved_rpcs);
+  static long RPC_rpc_max = RPC_rpc + (1L<<RPC_log_reserved_rpcs);
+  public static long new_rpc() {
+    long a = RPC_rpc++;
+    assert RPC_rpc <= RPC_rpc_max;
+    return a;
+  }
+  // Fast reset of parser state between calls to Exec
+  public static int PRIM_CNT;
+  public static void init0() { PRIM_CNT=(int)RPC_rpc; }
+  public static void reset_to_init0() { }
   
   // Have to make a first BitsRPC here; thereafter the v-call to make_impl
   // will make more on demand.  But need the first one to make a v-call.
-  static final BitsRPC FULL = new BitsRPC().make_impl(-2,new long[]{(1L<<NUL_alias) | (1L<<ALL_alias)});
+  static final BitsRPC FULL = new BitsRPC().make_impl(-2,new long[]{(1L<<NUL_rpc) | (1L<<ALL_rpc)});
   static final BitsRPC ANY  = FULL.dual();
-  static final BitsRPC NZERO= make0(-2,new long[]{1L<<ALL_alias});
+  static final BitsRPC NZERO= make0(-2,new long[]{1L<<ALL_rpc});
   public static final BitsRPC NIL  = make0(0);
   @Override public BitsRPC FULL() { return FULL; }
   @Override public BitsRPC ANY () { return ANY ; }
