@@ -44,6 +44,16 @@ public abstract class LibCallNode extends PrimNode {
   }
   @Override public String xstr() { return _name+"::#"+_alias; }
   
+  @Override public String err(GVNGCM gvn) {
+    for( int i=0; i<_targs._ts.length; i++ ) {
+      Type tactual = gvn.type(in(i+2));
+      Type tformal = _targs._ts[i];
+      if( !tactual.isa(tformal) )
+        return _badargs==null ? "bad arguments" : _badargs.typerr(tactual,tformal);
+    }
+    return null;
+  }
+
   static class ConvertI64Str extends LibCallNode {
     ConvertI64Str(long alias) {
       super("str",PrimNode.ARGS1,TypeTuple.INT64,
@@ -56,6 +66,9 @@ public abstract class LibCallNode extends PrimNode {
     // memory inputs and outputs.
     @Override TypeMem argmem() { return TypeMem.MEM; }
     @Override TypeMem retmem() { return TypeMem.make(_alias,TypeStr.STR); }
+    @Override public Type startype() {
+      return TypeTuple.make(TypeMem.make(_alias,TypeStr.XSTR), TypeMemPtr.make(_alias).dual());
+    }
   
     // Conversion to String allocates memory - so the apply() call returns a new
     // pointer aliased to a hidden String allocation site.  The memory returned
@@ -85,6 +98,9 @@ public abstract class LibCallNode extends PrimNode {
     // memory inputs and outputs.
     @Override TypeMem argmem() { return TypeMem.XMEM; }
     @Override TypeMem retmem() { return TypeMem.make(_alias,TypeStr.STR); }
+    @Override public Type startype() {
+      return TypeTuple.make(TypeMem.make(_alias,TypeStr.XSTR), TypeMemPtr.make(_alias).dual());
+    }
     
     // Conversion to String allocates memory - so the apply() call returns a new
     // pointer aliased to a hidden String allocation site.  The memory returned
@@ -106,7 +122,7 @@ public abstract class LibCallNode extends PrimNode {
       // aliased to a hidden String allocation site.  The memory returned is
       // read-only (and can be shared).
       TypeMem mem = (TypeMem)gvn.type(in(1));
-      TypeObj obj = mem.at0(_alias); // Prior memory contents at this alias
+      TypeObj obj = mem.at(_alias);  // Prior memory contents at this alias
       Type val = gvn.type(in(2));    // Known constant
       TypeStr str = TypeStr.con(Double.toString(val.getd()));
       TypeObj obj2 = (TypeObj)obj.meet(str);

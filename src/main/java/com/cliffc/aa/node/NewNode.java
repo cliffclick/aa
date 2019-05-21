@@ -37,7 +37,7 @@ public class NewNode extends Node {
   @Override public Type value(GVNGCM gvn) {
     // If the address is dead, then the object is unused and can be nuked
     if( _alias == -1 )
-      return TypeTuple.make(TypeMem.XMEM,TypeMemPtr.OOP0.dual());
+      return TypeTuple.make(TypeMem.EMPTY_MEM,TypeMemPtr.OOP0.dual());
     Type[] ts = new Type[_defs._len-1];
     for( int i=0; i<ts.length; i++ ) {
       Type t = gvn.type(in(i+1));
@@ -72,9 +72,14 @@ public class NewNode extends Node {
 
   // Worse-case type for this Node
   @Override public Type all_type() {
-    if( _alias == -1 )
-      return TypeTuple.make(TypeMem.XMEM,TypeMemPtr.OOP0.dual());
-    return TypeTuple.make(TypeMem.MEM,TypeMemPtr.make(_alias));
+    return _alias == -1 
+      ? TypeTuple.make(TypeMem.XMEM, TypeMemPtr.OOP0.dual())
+      : TypeTuple.make(TypeMem.make(_alias,TypeObj.OBJ), TypeMemPtr.make(_alias));
+  }
+  @Override public Type startype() {
+    return _alias == -1 
+      ? TypeTuple.make(TypeMem.XMEM, TypeMemPtr.OOP0.dual())
+      : TypeTuple.make(TypeMem.make(_alias,TypeObj.XOBJ), TypeMemPtr.make(_alias).dual());
   }
   
   // Clones during inlining all become unique new sites

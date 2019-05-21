@@ -24,8 +24,8 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
   private static TypeObj make( boolean any ) {
     return (TypeObj)(new TypeObj(TOBJ,any).hashcons());
   }
-  static final TypeObj OBJ = make(false);
-  static final TypeObj XOBJ = (TypeObj)OBJ.dual();
+  public static final TypeObj OBJ = make(false);
+  public static final TypeObj XOBJ = (TypeObj)OBJ.dual();
   static final TypeObj[] TYPES = new TypeObj[]{OBJ,XOBJ};
   
   @Override protected O xdual() { return (O)new TypeObj(TOBJ,!_any); }
