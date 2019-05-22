@@ -15,10 +15,10 @@ import java.util.concurrent.ConcurrentHashMap;
 // Global Value Numbering, Global Code Motion
 public class GVNGCM {
   // Unique dense node-numbering
-  private int CNT;
-  private BitSet _live = new BitSet();  // Conservative approximation of live; due to loops some things may be marked live, but are dead
+  private static int CNT;
+  private static BitSet _live = new BitSet();  // Conservative approximation of live; due to loops some things may be marked live, but are dead
 
-  public int uid() { assert CNT < 100000 : "infinite node create loop"; _live.set(CNT);  return CNT++; }
+  public static int uid() { assert CNT < 100000 : "infinite node create loop"; _live.set(CNT);  return CNT++; }
 
   // Iterative worklist
   private Ary<Node> _work = new Ary<>(new Node[1], 0);

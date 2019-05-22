@@ -1,5 +1,6 @@
 package com.cliffc.aa;
 
+import com.cliffc.aa.node.LibCallNode;
 import com.cliffc.aa.type.*;
 import org.junit.Assert;
 import org.junit.Ignore;
@@ -15,7 +16,8 @@ public class TestParse {
   
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
-    test("str(3.14)", TypeMemPtr.make(53), TypeMem.make(53,TypeStr.con("3.14")));
+    Object dummy = Env.GVN; // Force class loading cycle
+    test("str(3.14)", TypeMemPtr.make(2*LibCallNode.CF64_alias+1), TypeMem.make(2*LibCallNode.CF64_alias+1,TypeStr.con("3.14")));
     // A collection of tests which like to fail easily
     testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1) is not a @{x,y}","                           ");
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'","                    ");

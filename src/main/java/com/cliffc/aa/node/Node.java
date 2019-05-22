@@ -36,7 +36,7 @@ public abstract class Node implements Cloneable {
   
   private static final String[] STRS = new String[] { null, "Call", "Cast", "Con", "Epi", "Err", "Fun", "If", "LibCall", "Load", "Merge", "New", "Parm", "Phi", "Prim", "Proj", "Region", "Scope", "Start", "Store", "Tmp", "Type", "Unresolved" };
 
-  public int _uid=Env.GVN.uid(); // Unique ID, will have gaps, used to give a dense numbering to nodes
+  public int _uid; // Unique ID, will have gaps, used to give a dense numbering to nodes
   final byte _op;
 
   // Defs.  Generally fixed length, ordered, nulls allowed, no unused trailing space.  Zero is Control.
@@ -74,21 +74,23 @@ public abstract class Node implements Cloneable {
   public void remove(int idx, GVNGCM gvn) { unuse(_defs.remove(idx),gvn); }
 
   // Uses.  Generally variable length; unordered, no nulls, compressed, unused trailing space
-  public Ary<Node> _uses = new Ary<>(new Node[1],0);
+  public Ary<Node> _uses;
 
-  Node( byte op ) { _op = op; _defs = new Ary<>(new Node[1],0); }
+  Node( byte op ) { this(op,new Node[0]); }
   Node( byte op, Node... defs ) {
-    _op = op;
+    _op   = op;
+    _uid  = GVNGCM.uid();
     _defs = new Ary<>(defs);
+    _uses = new Ary<>(new Node[1],0);
     for( Node def : defs ) if( def != null ) def._uses.add(this);
-  }
+   }
 
   // Make a copy of the base node, with no defs nor uses and a new UID.
   <N extends Node> N copy(GVNGCM gvn) {
     N n;
     try { n = (N)clone(); }     // Preserve base java type
     catch( CloneNotSupportedException cns ) { throw new RuntimeException(cns); }
-    n._uid = gvn.uid();                 // A new UID
+    n._uid = GVNGCM.uid();                 // A new UID
     n._defs = new Ary<>(new Node[1],0); // New empty defs
     n._uses = new Ary<>(new Node[1],0); // New empty uses
     return n;

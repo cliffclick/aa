@@ -12,10 +12,12 @@ public abstract class LibCallNode extends PrimNode {
     super(OP_LIBCALL,name,args,targs,ret);
     _alias = alias;
   }
+  public static long CI64_alias = TypeStr.new_alias();
+  public static long CF64_alias = TypeStr.new_alias();
 
   public static LibCallNode[] LIBCALLS = new LibCallNode[] {
-    new ConvertI64Str(TypeStr.new_alias()),
-    new ConvertF64Str(TypeStr.new_alias()),
+    new ConvertI64Str(CI64_alias),
+    new ConvertF64Str(CF64_alias)
   };
 
   // Wrap the PrimNode with a Fun/Epilog wrapper that includes memory effects.
