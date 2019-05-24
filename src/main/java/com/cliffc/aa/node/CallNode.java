@@ -20,7 +20,7 @@ import com.cliffc.aa.util.Ary;
 // several possible returns apply... and can be merged like a PhiNode
 
 public class CallNode extends Node {
-  long _rpc;                    // Call-site return PC
+  int _rpc;                     // Call-site return PC
   private boolean _unpacked;    // Call site allows unpacking a tuple (once)
   private boolean _inlined;     // Inlining a call-site is a 2-stage process; function return wired to the call return
   private Type   _cast_ret;     // Return type has been up-casted
@@ -450,7 +450,7 @@ public class CallNode extends Node {
   }
 
   @Override public Type all_type() { return TypeTuple.make(Type.CTRL,TypeMem.MEM,Type.SCALAR); }
-  @Override public int hashCode() { return super.hashCode()+(int)(_rpc|(_rpc>>32)); }
+  @Override public int hashCode() { return super.hashCode()+_rpc; }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !super.equals(o) ) return false;

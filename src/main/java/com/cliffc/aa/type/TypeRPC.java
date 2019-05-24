@@ -28,7 +28,7 @@ public class TypeRPC extends Type<TypeRPC> {
   
   private static TypeRPC FREE=null;
   @Override protected TypeRPC free( TypeRPC ret ) { FREE=this; return ret; }
-  public static TypeRPC make( long rpc ) { return make(BitsRPC.make0(rpc)); }
+  public static TypeRPC make( int rpc ) { return make(BitsRPC.make0(rpc)); }
   public static TypeRPC make( BitsRPC rpcs ) {
     TypeRPC t1 = FREE;
     if( t1 == null ) t1 = new TypeRPC(rpcs);

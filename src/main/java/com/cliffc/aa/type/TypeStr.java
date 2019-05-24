@@ -1,6 +1,7 @@
 package com.cliffc.aa.type;
 
 import com.cliffc.aa.util.SB;
+import com.cliffc.aa.AA;
 
 import java.util.BitSet;
 import java.util.HashMap;
@@ -46,23 +47,19 @@ public class TypeStr extends TypeObj<TypeStr> {
   // All string alias#s are split from this alias#, and we want a unique one
   // per e.g. allocation site.  There's no real "parent-child" relationship
   // between many of the splits; they just come from different parsed instances.
-  static int  STR_log_reserved_aliases = 2; // Allocate 1<<10, or ~1thousand reserved aliases
-  static long STR_alias = Bits.split_log(BitsAlias.STR_alias,STR_log_reserved_aliases);
-  static long STR_alias_max = STR_alias + (1<<STR_log_reserved_aliases);
-  public static long new_alias() {
-    long a = STR_alias++;
-    assert STR_alias <= STR_alias_max;
-    return a;
+  static int STR_alias = -9999;
+  public static int new_alias() {
+    throw AA.unimpl();
   }
   // Fast reset of parser state between calls to Exec
   public static int PRIM_CNT;
-  public static void init0() { PRIM_CNT=(int)STR_alias; }
+  public static void init0() { PRIM_CNT=STR_alias; }
   public static void reset_to_init0() { STR_alias = PRIM_CNT; }
   
   public  static final TypeStr  STR = make(false,null); // not null
   public  static final TypeStr XSTR = make(true ,null); // choice string
   public  static final TypeStr  ABC = con("abc"); // a string constant
-  public  static final long ABC_alias = new_alias(); // Memory alias for this one constant
+  public  static final int ABC_alias = new_alias(); // Memory alias for this one constant
   private static final TypeStr  DEF = con("def"); // a string constant
   static final TypeStr[] TYPES = new TypeStr[]{STR,XSTR,STR,DEF};
   static void init1( HashMap<String,Type> types ) { types.put("str",STR); }

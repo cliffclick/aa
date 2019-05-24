@@ -1,8 +1,8 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.AA;
 import com.cliffc.aa.util.SB;
 
-import java.util.Arrays;
 import java.util.BitSet;
 
 /**
@@ -65,25 +65,15 @@ public class TypeMem extends Type<TypeMem> {
   private boolean check() {
     TypeObj[] as = _aliases;
     if( as.length == 0 ) return true;
-    if( ((as.length)&1) == 1 ) return false; // Must be even
     if( as[0]!=null ) return false;          // Slot 0 reserved
-    if( as[1]==null ) return false;          // Slot 1 never null
-    if( as[1]!=TypeObj.OBJ && as[1]!=TypeObj.XOBJ )
+    if( as[1]!=TypeObj.OBJ && as[1]!=TypeObj.XOBJ && as[1] != null )
       return false;             // Only 2 choices
+    if( as.length==2 ) return true; // Trivial all of memory
+    // "tight" - something in the last slot
+    if( _aliases[_aliases.length-1] == null ) return false;
     // No instances of default
-    TypeObj def = as[1];
-    for( int i=2; i<as.length; i++ ) if( as[i]==def ) return false;
     // Look at the 'parent' and both 'children'
-    for( int i=1; i<(as.length>>1); i++ ) {
-      TypeObj par=as[i], c0=as[i<<1], c1=as[(i<<1)+1];
-      if( c0==null && c1 == null ) continue; // Both children are null is OK
-      if( c0==c1 ) return false;             // Both children equal should roll up to parent
-      if( c0!=null && c1 != null && par!=null )
-        return false;           // Both children set, then parent is eclipsed
-      if( par!=null && (c0==par || c1==par) ) return false; // Child is eclipsed by parent
-    }
-    // "tight" - something in the last pair
-    return _aliases[_aliases.length-2] != null || _aliases[_aliases.length-1] != null;
+    throw AA.unimpl();
   }
   @Override int compute_hash() {
     int hash = TMEM;
@@ -114,14 +104,12 @@ public class TypeMem extends Type<TypeMem> {
   // Alias-at.  Walks up the tree to parent aliases as needed.  Always hits on
   // _aliases[1], and now never returns a null.  Prior versions go back-n-forth
   // on whether or not this call returns a null.
-  public TypeObj at0(long alias) {
-    while( alias >= _aliases.length || _aliases[(int)alias]==null )
-      alias>>=1;
-    return _aliases[(int)alias];
+  public TypeObj at0(int alias) {
+    throw AA.unimpl();
   }
   // Alias-at, but defaults to "XOBJ" for easy meet() calls.
   // Never returns a null.
-  public TypeObj at(long alias) {
+  public TypeObj at(int alias) {
     TypeObj obj = at0(alias);
     return obj==null ? TypeObj.XOBJ : obj;
   }
@@ -141,30 +129,17 @@ public class TypeMem extends Type<TypeMem> {
     int len = objs.length;
     TypeObj def = objs[1];
     // Remove elements redundant with the default value
-    for( int i=2; i<len; i++ )  if( objs[i]==def )  objs[i]=null;
+    
     // Clean out pairs, looping backwards
-    for( int i=(len&-2)-2; i>=2; i-=2 ) {
-      TypeObj par = objs[i>>1], c0 = objs[i], c1 = objs[i+1];
-      if( c0==par ) objs[i  ]=c0=null; // Eclisped by parent
-      if( c1==par ) objs[i+1]=c1=null;
-      if( c0==null || c1==null ) continue;
-      objs[i>>1] = c0==c1 ? c0 : null;     // roll up the pair to parent
-      if( c0==c1 ) objs[i]=objs[i+1]=null; // matching pair just uses parent
-    }
+    
     // Remove trailing nulls; make the array "tight"
-    while( len > 0 && objs[len-1]==null ) len--;
-    len = (len+1)&-2;           // Round to pairs
-    if( len != objs.length ) objs = Arrays.copyOf(objs,len); // trim length
-    return make(objs);
+    throw AA.unimpl();
   }
 
   // Precise single alias.  Other aliases are "dont care".  Nil not allowed.
-  public static TypeMem make(long alias, TypeObj oop ) {
-    long len = (alias|1)+1;      // Round up to even pairs
-    assert 0 <= len && len < (1<<20); // Time to change data structures!!!
-    TypeObj[] as = new TypeObj[(int)len];
-    as[1] = TypeObj.XOBJ;       // Default is "dont care"
-    as[(int)alias] = oop;
+  public static TypeMem make(int alias, TypeObj oop ) {
+    TypeObj[] as = new TypeObj[alias+1];
+    as[alias] = oop;
     return make(as);
   }
 
@@ -215,7 +190,7 @@ public class TypeMem extends Type<TypeMem> {
     //for( int alias : ptr._aliases )
     //  objs[alias] = at0(alias).update(fld,fld_num,val);
     //return make0(_any,objs);
-    throw com.cliffc.aa.AA.unimpl();
+    throw AA.unimpl();
   }
 
   // Merge two memories with no overlaps.  This is similar to a st(), except
@@ -223,18 +198,19 @@ public class TypeMem extends Type<TypeMem> {
   // given memory is precise.
   public TypeMem merge( TypeMem mem ) {
     // Given memory must be "skinny", only a single alias.
-    TypeObj[] ms = mem._aliases;
-    int mlen = ms.length;
-    int alias = ms[mlen-1]==null ? mlen-2 : mlen-1;
-    TypeObj obj = ms[alias];
-    assert alias >= 2 && obj != null;
-    for( int i=2; i<mlen-2; i++ )  assert ms[i]==null;
-    
-    // Check no overlap or conflicts
-    assert at0(alias) == _aliases[1]; // Alias about-to-be-stomped is the default
-    TypeObj[] objs = Arrays.copyOf(_aliases,Math.max(_aliases.length,alias+1));
-    objs[alias]=obj;
-    return make0(objs);
+    //TypeObj[] ms = mem._aliases;
+    //int mlen = ms.length;
+    //int alias = ms[mlen-1]==null ? mlen-2 : mlen-1;
+    //TypeObj obj = ms[alias];
+    //assert alias >= 2 && obj != null;
+    //for( int i=2; i<mlen-2; i++ )  assert ms[i]==null;
+    //
+    //// Check no overlap or conflicts
+    //assert at0(alias) == _aliases[1]; // Alias about-to-be-stomped is the default
+    //TypeObj[] objs = Arrays.copyOf(_aliases,Math.max(_aliases.length,alias+1));
+    //objs[alias]=obj;
+    //return make0(objs);
+    throw AA.unimpl();
   }
   
   @Override public boolean above_center() { return _aliases[1].above_center(); }

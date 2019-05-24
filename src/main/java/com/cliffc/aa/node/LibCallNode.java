@@ -7,13 +7,13 @@ import com.cliffc.aa.type.*;
 // or else they would be a PrimNode instead.  Like PrimNodes they are wrapped
 // in a Fun/Epilog but include memory effects.
 public abstract class LibCallNode extends PrimNode {
-  long _alias;                   // Alias class for new memory
-  LibCallNode( String name, String[] args, TypeTuple targs, Type ret, long alias ) {
+  int _alias;                   // Alias class for new memory
+  LibCallNode( String name, String[] args, TypeTuple targs, Type ret, int alias ) {
     super(OP_LIBCALL,name,args,targs,ret);
     _alias = alias;
   }
-  public static long CI64_alias = TypeStr.new_alias();
-  public static long CF64_alias = TypeStr.new_alias();
+  public static int CI64_alias = TypeStr.new_alias();
+  public static int CF64_alias = TypeStr.new_alias();
 
   public static LibCallNode[] LIBCALLS = new LibCallNode[] {
     new ConvertI64Str(CI64_alias),
@@ -57,7 +57,7 @@ public abstract class LibCallNode extends PrimNode {
   }
 
   static class ConvertI64Str extends LibCallNode {
-    ConvertI64Str(long alias) {
+    ConvertI64Str(int alias) {
       super("str",PrimNode.ARGS1,TypeTuple.INT64,
             // Return is a tuple of: (mem#alias:str, ptr#alias)
             TypeTuple.make(TypeMem.make(alias,TypeStr.STR),TypeMemPtr.make(alias)),
@@ -89,7 +89,7 @@ public abstract class LibCallNode extends PrimNode {
   }
   
   static class ConvertF64Str extends LibCallNode {
-    ConvertF64Str(long alias) {
+    ConvertF64Str(int alias) {
       super("str",PrimNode.ARGS1,TypeTuple.FLT64,
             // Return is a tuple of: (mem#alias:str, ptr#alias)
             TypeTuple.make(TypeMem.make(alias,TypeStr.STR),TypeMemPtr.make(alias)),

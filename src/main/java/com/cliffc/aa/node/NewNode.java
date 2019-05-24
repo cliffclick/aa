@@ -11,7 +11,7 @@ public class NewNode extends Node {
   private final String[] _names; // Field names
   private final byte[] _finals;  // Final fields
   // Unique alias number, one number per unique memory allocation site.
-  long _alias;                  // Alias number, or -1 if dead
+  int _alias;                   // Alias number, or -1 if dead
   public NewNode( Node[] flds, String[] names ) { this(flds,names,bs(names.length)); }
   public NewNode( Node[] flds, String[] names, byte[] finals ) {
     super(OP_NEW,flds);

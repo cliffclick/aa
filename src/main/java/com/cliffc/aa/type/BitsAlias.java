@@ -8,7 +8,7 @@ public class BitsAlias extends Bits {
   // return a new Bits.  Overridden in subclasses to make type-specific Bits.
   private static HashMap<BitsAlias,BitsAlias> INTERN = new HashMap<>();
   private static BitsAlias FREE=null;
-  @Override BitsAlias make_impl(long con, long[] bits ) {
+  @Override BitsAlias make_impl(int con, long[] bits ) {
     BitsAlias b1 = FREE;
     if( b1 == null ) b1 = new BitsAlias();
     else FREE = null;
@@ -18,11 +18,11 @@ public class BitsAlias extends Bits {
     else { INTERN.put(b1,b1); return b1; }
   }
 
-  public static final long NUL_alias = 0;
-  public static final long ALL_alias = 1;
-  public static final long REC_alias = split(ALL_alias)+0; // All Structs (records?)
-  public static final long ARY_alias = split(ALL_alias)+1; // All Arrays, including Strings
-  public static final long STR_alias = split(ARY_alias)+0; // Strings (split from Arrays)
+  public static final int NUL_alias = 0;
+  public static final int ALL_alias = 1;
+  public static final int REC_alias = split(ALL_alias)+0; // All Structs (records?)
+  public static final int ARY_alias = split(ALL_alias)+1; // All Arrays, including Strings
+  public static final int STR_alias = split(ARY_alias)+0; // Strings (split from Arrays)
 
   // Have to make a first BitsAlias here; thereafter the v-call to make_impl
   // will make more on demand.  But need the first one to make a v-call.
@@ -33,11 +33,11 @@ public class BitsAlias extends Bits {
   @Override public BitsAlias FULL() { return FULL; }
   @Override public BitsAlias ANY () { return ANY ; }
 
-  static BitsAlias make0( long con, long[] bits ) { return (BitsAlias)FULL.make(con,bits); }
-  static BitsAlias make0( long... bits ) { return (BitsAlias)FULL.make(bits); }
-  static BitsAlias make0( long bit ) { return (BitsAlias)FULL.make(bit); }
+  static BitsAlias make0( int con, long[] bits ) { return (BitsAlias)FULL.make(con,bits); }
+  static BitsAlias make0( int... bits ) { return (BitsAlias)FULL.make(bits); }
+  static BitsAlias make0( int bit ) { return (BitsAlias)FULL.make(bit); }
   @Override public BitsAlias dual() { return (BitsAlias)super.dual(); }
   public BitsAlias meet( BitsAlias bs ) { return (BitsAlias)super.meet(bs); }
-  @Override public BitsAlias clear(long i) { return (BitsAlias)super.clear(i); }
+  @Override public BitsAlias clear(int i) { return (BitsAlias)super.clear(i); }
 
 }

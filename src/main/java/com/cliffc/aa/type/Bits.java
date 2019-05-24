@@ -19,11 +19,8 @@ import java.util.NoSuchElementException;
 // instances, just might be some confusion at first.
 //
 // Bit 0 - is always the 'null' or 'empty' instance.
-// Bit 1 - is the first and only "real" bit.  It can be split into bits 2 & 3.
-// Bit 2 can be split into 4 & 5; bit 3 into 6 & 7.  Bits always split pairwise
-// by powers of 2.  You cannot set an arbitrary bit, only split a prior bit
-// into two choices, which are always double the split bit and the +1 bit.
-
+// Bit 1 - is the first "real" bit, and represents all-of-memory.
+// Other bits always split from bit 1, and can split in any pattern.
 public abstract class Bits implements Iterable<Integer> {
   // Holds a set of bits meet'd together, or join'd together, along
   // with an infinite extent or a single bit choice as a constant.
@@ -32,33 +29,31 @@ public abstract class Bits implements Iterable<Integer> {
   // If _bits is not-null, then _con is -2 for meet, and -1 for join.
   // The last bit of _bits is the "sign" bit, and extends infinitely.
   long[] _bits;   // Bits set or null for a single bit
-  long _con;      // value of single bit, or -2 for meet or -1 for join
+  int _con;       // value of single bit, or -2 for meet or -1 for join
   int _hash;      // Pre-computed hashcode
-  void init(long con, long[] bits ) {
-    if( bits==null ) assert con >= 0;
-    else             assert con==-2 || con==-1;
+  void init(int con, long[] bits ) {
     _con = con;
     _bits=bits;
     assert check();
     _hash=compute_hash();
   }
   private boolean check() {
-    if( _bits==null ) return true;
-    // Bits 0 & 1 both set is OK (null+all or null&all).
-    if( _bits.length==1 && _bits[0]==3 ) return true;
+    if( _bits==null ) return _con >= 0; // Must be a single constant bit#
+    if( _con != -2 && _con != -1 ) return false;
+    if( _bits.length==0 ) return false;
+    // Either bits 0 & 1 both set is OK (null+all or null&all).
+    if( _bits.length==1 && _bits[0]>=1 && _bits[0]<=3 ) return true;
+
+    if( _bits[_bits.length - 1] != 0 ) return false; // "tight", no trailing zeros
+
     // Otherwise, never a pair is set as these can be canonically rolled up
-    for( long b : _bits )
-      // b & (b>>1) only true if a pair is set.  And with 0x55 and only even/odd pairs.
-      if( (b&(b>>1)&0x55555555L) != 0 )
-        return false;
+    
     // If parent is set, then both children are clear
-    for( int i=2; i<(_bits.length<<6)>>1; i++ )
-      if( test(i) && (test((i<<1)) || test((i<<1)+1)) )
-        return false;
-    return _bits.length <= 1 || _bits[_bits.length - 1] != 0; // "tight", no trailing zeros
+    
+    throw AA.unimpl();
   }
   int compute_hash() {
-    int sum=(int)(_con | (_con>>32));
+    int sum= _con;
     if( _bits != null ) for( long bit : _bits ) sum += bit;
     return sum;
   }
@@ -90,28 +85,15 @@ public abstract class Bits implements Iterable<Integer> {
 
   // Intern: lookup and return an existing Bits or install in hashmap and
   // return a new Bits.  Overridden in subclasses to make type-specific Bits.
-  abstract Bits make_impl(long con, long[] bits );
+  abstract Bits make_impl(int con, long[] bits );
   
   // Constructor taking an array of bits, and allowing join/meet selection.
   // Canonicalizes the bits.  The 'this' pointer is only used to clone the class.
-  final Bits make( long con, long[] bits ) {
-    assert con==-2 || con==-1;
+  final Bits make( int con, long[] bits ) {
     int len = bits.length;
     // Remove pairs
-    for( int i=len*64-2; i>=2; i-=2 ) { // working backwards in pairs
-      int pi = i>>1;             // Parent bit
-      int idx = idx(i);          // bit index and mask
-      long mask = 3L<<(i&63);    // mask has 2 bits
-      long b = bits[idx];        // bits to check
-      if( (b&mask)==mask ) {     // found a pair
-        bits[idx] = b & ~mask;   // strip the pair
-        or(bits,i>>1);           // add in the pair-parent
-      } else if( (b&mask)!=0 ) { // Either bit is set
-        if( (bits[idx(pi)] & mask(pi))!=0 ) { // Parent is set, eclipses children
-          bits[idx] = b & ~mask; // strip the pair
-        }
-      }
-    }
+    if( true )
+      throw AA.unimpl();
     // Remove any trailing empty words
     while( len > 0 && (bits[len-1]==0 || bits[len-1]== -1) ) len--;
     bits = Arrays.copyOf(bits,len);
@@ -128,7 +110,7 @@ public abstract class Bits implements Iterable<Integer> {
     return make_impl(con,null); // Single bit in last word only, switch to con version
   }
   // Constructor taking a list of bits; bits are 'meet'.
-  final Bits make( long... bits ) {
+  final Bits make( int... bits ) {
     long[] ls = new long[1];
     for( long bit : bits ) {
       if( bit < 0 ) throw new IllegalArgumentException("bit must be positive");
@@ -138,7 +120,7 @@ public abstract class Bits implements Iterable<Integer> {
     return make(-2,ls);
   }
   // Constructor taking a single bit
-  final Bits make( long bit ) {
+  final Bits make( int bit ) {
     if( bit < 0 ) throw new IllegalArgumentException("bit must be positive");
     return make_impl(bit,null);
   }
@@ -157,12 +139,12 @@ public abstract class Bits implements Iterable<Integer> {
   boolean may_nil() { return _con==0 || (_con==-1 && ((_bits[0]&1) == 1)); }
 
   // Test a specific bit is set or clear
-  public boolean test(long i) {
+  public boolean test(int i) {
     if( _bits==null ) return i==_con;
     int idx = idx(i);
     return idx < _bits.length ? (_bits[idx]&mask(i))!=0 : inf();
   }
-  public Bits clear(long i) {
+  public Bits clear(int i) {
     if( !test(i) ) return this;  // Already clear
     if( _con==i ) return make(); // No bits set???
     assert _con<0;
@@ -178,11 +160,7 @@ public abstract class Bits implements Iterable<Integer> {
   private static long[] bits( long a, long b ) { return new long[idx(Math.max(a,b))+1]; }
 
   // Split this bit in twain.  Returns 2 new bits
-  public static long split( long old_bit ) { return old_bit<<1; }
-  // Split out 2^log bits.  E.g. starting from bit 5, and asking for 8 or 2^3
-  // bits, we return 5<<3 which is bits 40 through 47.
-  public static long split_log( long old_bit, int ln2 ) { return old_bit<<ln2; }
-
+  public static int split( int old_bit ) { throw AA.unimpl(); }
   
   public Bits meet( Bits bs ) {
     if( this==bs ) return this;
@@ -290,7 +268,7 @@ public abstract class Bits implements Iterable<Integer> {
       return false;
     }
     @Override public Integer next() {
-      if( _bits==null ) { assert _con <= (1L<<32); return (int)_con; }
+      if( _bits==null ) return _con;
       if( idx(_i) < _bits.length ) return _i;
       throw new NoSuchElementException();
     }
