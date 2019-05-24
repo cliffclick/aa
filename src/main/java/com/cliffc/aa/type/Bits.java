@@ -91,9 +91,11 @@ public abstract class Bits implements Iterable<Integer> {
   // Canonicalizes the bits.  The 'this' pointer is only used to clone the class.
   final Bits make( int con, long[] bits ) {
     int len = bits.length;
-    // Remove pairs
-    if( true )
+    // Either bits 0 & 1 both set is OK (null+all or null&all).
+    if( _bits.length>1 || _bits[0]>3 ) {
+      // Remove pairs
       throw AA.unimpl();
+    }
     // Remove any trailing empty words
     while( len > 0 && (bits[len-1]==0 || bits[len-1]== -1) ) len--;
     bits = Arrays.copyOf(bits,len);

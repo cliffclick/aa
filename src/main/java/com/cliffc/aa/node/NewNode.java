@@ -10,8 +10,8 @@ import java.util.Arrays;
 public class NewNode extends Node {
   private final String[] _names; // Field names
   private final byte[] _finals;  // Final fields
-  // Unique alias number, one number per unique memory allocation site.
-  int _alias;                   // Alias number, or -1 if dead
+  // Unique alias class, one class per unique memory allocation site.
+  TypeTree _alias;              // Alias class
   public NewNode( Node[] flds, String[] names ) { this(flds,names,bs(names.length)); }
   public NewNode( Node[] flds, String[] names, byte[] finals ) {
     super(OP_NEW,flds);
@@ -20,23 +20,23 @@ public class NewNode extends Node {
     assert finals.length==flds.length-1;
     _names = names;
     _finals= finals;
-    _alias = TypeStruct.new_alias();
+    _alias = BitsAlias.new_alias(BitsAlias.REC);
   }
   private static byte[] bs(int len) { byte[] bs = new byte[len]; Arrays.fill(bs,(byte)1); return bs; }
   String xstr() { return "New#"+_alias; } // Self short name
-  String  str() { return _alias==-1 ? "New#dead" : xstr(); } // Inline short name
+  String  str() { return _alias==null ? "New#dead" : xstr(); } // Inline short name
   @Override public Node ideal(GVNGCM gvn) {
     // If the address is dead, then the object is unused and can be nuked
     if( _uses.len()==1 && ((ProjNode)_uses.at(0))._idx==0 ) {
       for( int i=0; i<_defs.len(); i++ )
         set_def(i,null,gvn);
-      _alias = -1;              // Flag as dead
+      _alias = null;              // Flag as dead
     }
     return null;
   }
   @Override public Type value(GVNGCM gvn) {
     // If the address is dead, then the object is unused and can be nuked
-    if( _alias == -1 )
+    if( _alias == null )
       return TypeTuple.make(TypeMem.EMPTY_MEM,TypeMemPtr.OOP0.dual());
     Type[] ts = new Type[_defs._len-1];
     for( int i=0; i<ts.length; i++ ) {
@@ -52,8 +52,8 @@ public class NewNode extends Node {
     Type oldnnn = gvn.self_type(this);
     Type oldt= oldnnn instanceof TypeTuple ? ((TypeTuple)oldnnn).at(1) : newt;
     TypeStruct apxt= approx(newt,oldt); // Approximate infinite types
-    Type ptr = TypeMemPtr.make(_alias);
-    Type mem = TypeMem.make(_alias,apxt);
+    Type ptr = TypeMemPtr.make(_alias._idx);
+    Type mem = TypeMem.make(_alias._idx,apxt);
     return TypeTuple.make(mem,ptr);
   }
   
@@ -72,21 +72,22 @@ public class NewNode extends Node {
 
   // Worse-case type for this Node
   @Override public Type all_type() {
-    return _alias == -1 
+    return _alias == null 
       ? TypeTuple.make(TypeMem.XMEM, TypeMemPtr.OOP0.dual())
-      : TypeTuple.make(TypeMem.make(_alias,TypeObj.OBJ), TypeMemPtr.make(_alias));
+      : TypeTuple.make(TypeMem.make(_alias._idx,TypeObj.OBJ), TypeMemPtr.make(_alias._idx));
   }
   @Override public Type startype() {
-    return _alias == -1 
+    return _alias == null 
       ? TypeTuple.make(TypeMem.XMEM, TypeMemPtr.OOP0.dual())
-      : TypeTuple.make(TypeMem.make(_alias,TypeObj.XOBJ), TypeMemPtr.make(_alias).dual());
+      : TypeTuple.make(TypeMem.make(_alias._idx,TypeObj.XOBJ), TypeMemPtr.make(_alias._idx).dual());
   }
   
   // Clones during inlining all become unique new sites
   @Override NewNode copy(GVNGCM gvn) {
     NewNode nnn = super.copy(gvn);
-    _alias = BitsAlias.split(_alias); // Original gets the low of the alias pair
-    nnn._alias = _alias+1;            // Clone gets the high
+    TypeTree par = _alias;      // Parent alias class
+        _alias = BitsAlias.new_alias(par); // Children alias classes
+    nnn._alias = BitsAlias.new_alias(par); // Children alias classes
     return nnn;
   }
   

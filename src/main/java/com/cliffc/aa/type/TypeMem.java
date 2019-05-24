@@ -71,8 +71,11 @@ public class TypeMem extends Type<TypeMem> {
     if( as.length==2 ) return true; // Trivial all of memory
     // "tight" - something in the last slot
     if( _aliases[_aliases.length-1] == null ) return false;
-    // No instances of default
-    // Look at the 'parent' and both 'children'
+
+    // If the parent is set, it is the default and no child should have the
+    // same type as the default.  If the parent is closed and all children are
+    // set, then the parent is not needed.
+
     throw AA.unimpl();
   }
   @Override int compute_hash() {
@@ -146,8 +149,8 @@ public class TypeMem extends Type<TypeMem> {
   public  static final TypeMem MEM = make(new TypeObj[]{null,TypeObj.OBJ}); // Every alias filled with something
   public  static final TypeMem XMEM = MEM.dual(); // Every alias filled with anything
   public  static final TypeMem EMPTY_MEM = XMEM; //make(new TypeObj[0]); // Tried no-memory-vs-XOBJ-memory
-          static final TypeMem MEM_STR = make(BitsAlias.STR_alias,TypeStr.STR);
-          static final TypeMem MEM_ABC = make(TypeStr.ABC_alias,TypeStr.ABC);
+          static final TypeMem MEM_STR = make(BitsAlias.STR._idx,TypeStr.STR);
+          static final TypeMem MEM_ABC = make(BitsAlias.STR._idx,TypeStr.ABC);
   static final TypeMem[] TYPES = new TypeMem[]{MEM,MEM_STR};
 
   // All mapped memories remain, but each memory flips internally.

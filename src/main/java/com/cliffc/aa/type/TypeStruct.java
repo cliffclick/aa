@@ -184,16 +184,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public  static final TypeStruct GENERIC = malloc(true,FLD0,new Type[0],new byte[0]).hashcons_free();
   public  static final TypeStruct ALLSTRUCT = make();
   
-  public  static final int ALLSTRUCT_alias = BitsAlias.REC_alias;
-  static int NEWSTRUCT_alias = -9999;
-  public static int new_alias() {
-    throw AA.unimpl();
-  }
-  // Fast reset of parser state between calls to Exec
-  public static int PRIM_CNT;
-  public static void init0() { PRIM_CNT=NEWSTRUCT_alias; }
-  public static void reset_to_init0() { NEWSTRUCT_alias = PRIM_CNT; }
-  
   // Recursive meet in progress
   private static final HashMap<TypeStruct,TypeStruct> MEETS1 = new HashMap<>(), MEETS2 = new HashMap<>();
   

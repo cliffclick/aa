@@ -18,17 +18,37 @@ public class BitsAlias extends Bits {
     else { INTERN.put(b1,b1); return b1; }
   }
 
-  public static final int NUL_alias = 0;
-  public static final int ALL_alias = 1;
-  public static final int REC_alias = split(ALL_alias)+0; // All Structs (records?)
-  public static final int ARY_alias = split(ALL_alias)+1; // All Arrays, including Strings
-  public static final int STR_alias = split(ARY_alias)+0; // Strings (split from Arrays)
+  private static int CNT;
+  public static TypeTree new_alias(TypeTree par) { return new TypeTree(par,CNT++); }
+  public static TypeTree new_string() { return new TypeTree(STR,CNT++); }
+  public static final TypeTree NUL, ALL, REC, ARY, STR, ABC;
+  public static final int NUL_alias;
+  static {
+    NUL = new_alias(null);
+    NUL_alias = NUL._idx;
+    // The All-Memory alias class
+    ALL = new_alias(null);
+    // Split All-Memory into Structs/Records and Arrays (including Strings).
+    // Everything falls into one of these two camps.
+    REC = new_alias(ALL);
+    ARY = new_alias(ALL);
+    ALL.close();
+    // Split Arrays into Strings (and other arrays)
+    STR = new_alias(ARY);
+    // Split a few constant test Strings out
+    ABC = new_string();
+  }
+  // Fast reset of parser state between calls to Exec
+  public static int PRIM_CNT;
+  public static void init0() { PRIM_CNT=CNT; }
+  public static void reset_to_init0() { CNT = PRIM_CNT; }
+
 
   // Have to make a first BitsAlias here; thereafter the v-call to make_impl
   // will make more on demand.  But need the first one to make a v-call.
-  static final BitsAlias FULL = new BitsAlias().make_impl(-2,new long[]{(1L<<NUL_alias) | (1L<<ALL_alias)});
+  static final BitsAlias FULL = new BitsAlias().make_impl(-2,new long[]{(1L<<NUL_alias) | (1L<<ALL._idx)});
   static final BitsAlias ANY  = FULL.dual();
-  static final BitsAlias NZERO= make0(-2,new long[]{1L<<ALL_alias});
+  static final BitsAlias NZERO= make0(-2,new long[]{1L<<ALL._idx});
   public static final BitsAlias NIL  = make0(0);
   @Override public BitsAlias FULL() { return FULL; }
   @Override public BitsAlias ANY () { return ANY ; }

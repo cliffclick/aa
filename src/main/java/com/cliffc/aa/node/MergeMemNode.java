@@ -70,7 +70,7 @@ public class MergeMemNode extends Node {
     // be dead.  Remove the New.
     if( in(1) instanceof MProjNode &&
         in(1).in(0) instanceof NewNode &&
-        ((NewNode)in(1).in(0))._alias == -1 )
+        ((NewNode)in(1).in(0))._alias == null )
       return in(0);             // Skinny memory is dead, nothing to merge
     return null;
   }

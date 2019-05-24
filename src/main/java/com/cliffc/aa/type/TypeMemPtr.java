@@ -41,12 +41,12 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   
   public static final TypeMemPtr OOP0   = make(BitsAlias.FULL); // Includes nil
          static final TypeMemPtr OOP    = make(BitsAlias.NZERO);// Excludes nil
-  public static final TypeMemPtr STRPTR = make(TypeStr.STR_alias);
-         static final TypeMemPtr STR0   = make_nil(TypeStr.STR_alias);
-         static final TypeMemPtr ABCPTR = make(TypeStr.ABC_alias);
-  public static final TypeMemPtr ABC0   = make_nil(TypeStr.ABC_alias);
-         static final TypeMemPtr STRUCT = make(TypeStruct.ALLSTRUCT_alias);
-         static final TypeMemPtr STRUCT0= make_nil(TypeStruct.ALLSTRUCT_alias);
+  public static final TypeMemPtr STRPTR = make(BitsAlias.STR._idx);
+         static final TypeMemPtr STR0   = make_nil(BitsAlias.STR._idx);
+         static final TypeMemPtr ABCPTR = make(BitsAlias.ABC._idx);
+  public static final TypeMemPtr ABC0   = make_nil(BitsAlias.ABC._idx);
+         static final TypeMemPtr STRUCT = make(BitsAlias.REC._idx);
+         static final TypeMemPtr STRUCT0= make_nil(BitsAlias.REC._idx);
   static final TypeMemPtr[] TYPES = new TypeMemPtr[]{OOP0,STRPTR,ABCPTR,STRUCT,ABC0};
   
   @Override protected TypeMemPtr xdual() { return new TypeMemPtr(_aliases.dual()); }
