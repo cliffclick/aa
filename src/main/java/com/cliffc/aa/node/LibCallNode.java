@@ -43,7 +43,7 @@ public abstract class LibCallNode extends PrimNode {
     nnn._alias = BitsAlias.new_alias(par); // Children alias classes
     return nnn;
   }
-  @Override public String xstr() { return _name+"::#"+_alias; }
+  @Override public String xstr() { return _name+"::#"+_alias._idx; }
   
   @Override public String err(GVNGCM gvn) {
     for( int i=0; i<_targs._ts.length; i++ ) {

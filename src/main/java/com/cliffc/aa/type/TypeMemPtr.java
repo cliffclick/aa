@@ -34,9 +34,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     return t1==t2 ? t1 : t1.free(t2);
   }
   public static TypeMemPtr make( int alias ) { return make(BitsAlias.make0(alias)); }
-  static TypeMemPtr make_nil( int alias ) {
-    return make(BitsAlias.make0(-2,new long[]{(1L<<BitsAlias.NUL_alias)|(1L<<alias)}));
-  }
+  static TypeMemPtr make_nil( int alias ) { return make(0,alias); }
   public static TypeMemPtr make( int... aliases ) { return make(BitsAlias.make0(aliases)); }
   
   public static final TypeMemPtr OOP0   = make(BitsAlias.FULL); // Includes nil

@@ -41,16 +41,10 @@ public abstract class Bits implements Iterable<Integer> {
     if( _bits==null ) return _con >= 0; // Must be a single constant bit#
     if( _con != -2 && _con != -1 ) return false;
     if( _bits.length==0 ) return false;
-    // Either bits 0 & 1 both set is OK (null+all or null&all).
-    if( _bits.length==1 && _bits[0]>=1 && _bits[0]<=3 ) return true;
-
-    if( _bits[_bits.length - 1] != 0 ) return false; // "tight", no trailing zeros
-
-    // Otherwise, never a pair is set as these can be canonically rolled up
-    
-    // If parent is set, then both children are clear
-    
-    throw AA.unimpl();
+    // TODO: if a parent is set, then all children are cleared.
+    // If the parent is clear and closed, then at least one child is cleared.
+    // Requires the matching TypeTree.
+    return true;
   }
   int compute_hash() {
     int sum= _con;
@@ -91,14 +85,9 @@ public abstract class Bits implements Iterable<Integer> {
   // Canonicalizes the bits.  The 'this' pointer is only used to clone the class.
   final Bits make( int con, long[] bits ) {
     int len = bits.length;
-    // Either bits 0 & 1 both set is OK (null+all or null&all).
-    if( _bits.length>1 || _bits[0]>3 ) {
-      // Remove pairs
-      throw AA.unimpl();
-    }
     // Remove any trailing empty words
     while( len > 0 && (bits[len-1]==0 || bits[len-1]== -1) ) len--;
-    bits = Arrays.copyOf(bits,len);
+    if( bits.length != len ) bits = Arrays.copyOf(bits,len);
 
     // Check for a single bit
     long b = bits[len-1];
@@ -134,7 +123,7 @@ public abstract class Bits implements Iterable<Integer> {
   private static long mask(long i) { return 1L<<(i&63); }
   public  boolean inf() { return _bits !=null && (_bits[_bits.length-1]>>63)==-1; }
   
-  long getbit() { assert _bits==null; return _con; }
+  int getbit() { assert _bits==null; return _con; }
   public long abit() { return _bits==null ? _con : -1; }
   public boolean is_con() { return _bits==null; }
   public boolean above_center() { return _con==-1; }

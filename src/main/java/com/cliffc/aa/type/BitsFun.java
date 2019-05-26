@@ -1,6 +1,7 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.AA;
+import com.cliffc.aa.util.Ary;
+
 import java.util.HashMap;
 
 // Function index Bits supporting a lattice; immutable; hash-cons'd.
@@ -19,27 +20,27 @@ public class BitsFun extends Bits {
     else { INTERN.put(b1,b1); return b1; }
   }
 
-  public static final int NUL_fidx = 0;
-  public static final int ALL_fidx = 1;
-  static int FUN_fidx = -9999;
-  public static int new_fidx() {
-    throw AA.unimpl();
-  }
+  public static final Ary<TypeTree> TREES = new Ary<>(new TypeTree[1],0);
+  public static TypeTree new_fidx(TypeTree par) { return TREES.push(new TypeTree(par,TREES._len)); }
+  public static final TypeTree ALL = new_fidx(null);
   // Fast reset of parser state between calls to Exec
   public static int PRIM_CNT;
-  public static void init0() { PRIM_CNT=FUN_fidx; }
-  public static void reset_to_init0() { FUN_fidx = PRIM_CNT; }
+  public static void init0() { PRIM_CNT=TREES._len; }
+  public static void reset_to_init0() { TREES.set_len(PRIM_CNT); }
   
   // Have to make a first BitsFun here; thereafter the v-call to make_impl
   // will make more on demand.  But need the first one to make a v-call.
-  public static final BitsFun FULL = new BitsFun().make_impl(-2,new long[]{(1L<<NUL_fidx) | (1L<<ALL_fidx)});
+  public static final BitsFun FULL = new BitsFun().make_impl(-2,new long[]{(1L<<0) | (1L<<ALL._idx)});
   static final BitsFun ANY  = FULL.dual();
-  static final BitsFun NZERO= make0(-2,new long[]{1L<<ALL_fidx});
+  static final BitsFun NZERO= make0(ALL._idx);
   public static final BitsFun NIL  = make0(0);
   @Override public BitsFun FULL() { return FULL; }
   @Override public BitsFun ANY () { return ANY ; }
 
-  static BitsFun make0( int con, long[] bits ) { return (BitsFun)FULL.make(con,bits); }
+  // Make a NEW fidx, with the given parent, and return the Bits with just it
+  static BitsFun make_new_fidx( int parent_fidx ) {
+    return make0(new_fidx(TREES.at(parent_fidx))._idx);
+  }
   static BitsFun make0( int... bits ) { return (BitsFun)FULL.make(bits); }
   static BitsFun make0( int bit ) { return (BitsFun)FULL.make(bit); }
   @Override public BitsFun dual() { return (BitsFun)super.dual(); }

@@ -28,7 +28,7 @@ public class CallNode extends Node {
           Parse  _badargs;      // Error for e.g. wrong arg counts or incompatible args
   public CallNode( boolean unpacked, Parse badargs, Node... defs ) {
     super(OP_CALL,defs);
-    _rpc = BitsRPC.new_rpc();   // Unique call-site index
+    _rpc = BitsRPC.make_new_rpc(BitsRPC.ALL._idx); // Unique call-site index
     _unpacked=unpacked;         // Arguments are typically packed into a tuple and need unpacking, but not always
     _badargs = badargs;
   }

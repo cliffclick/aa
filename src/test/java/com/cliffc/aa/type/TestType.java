@@ -213,12 +213,12 @@ public class TestType {
     TypeFunPtr gf = TypeFunPtr.GENERIC_FUNPTR;
     TypeMem nomem = TypeMem.MEM.dual();
 
-    TypeFunPtr f1i2i = TypeFunPtr.make_new(TypeTuple.INT64,nomem,TypeInt.INT64,nomem,1/*nargs*/);
+    TypeFunPtr f1i2i = TypeFunPtr.make_new(TypeTuple.INT64,nomem,TypeInt.INT64,nomem,BitsFun.ALL._idx,1/*nargs*/);
     assertTrue(f1i2i.isa(gf));
-    TypeFunPtr f1f2f = TypeFunPtr.make_new(TypeTuple.FLT64,nomem,TypeFlt.FLT64,nomem,1/*nargs*/);
+    TypeFunPtr f1f2f = TypeFunPtr.make_new(TypeTuple.FLT64,nomem,TypeFlt.FLT64,nomem,BitsFun.ALL._idx,1/*nargs*/);
     assertTrue(f1f2f.isa(gf));
     TypeFunPtr mt = (TypeFunPtr)f1i2i.meet(f1f2f);
-    TypeFunPtr f3i2r = TypeFunPtr.make(TypeTuple.INT32,nomem,Type.REAL    ,nomem,BitsFun.make0(-2,new long[]{(1<<1)|(1<<2)}),1/*nargs*/);
+    TypeFunPtr f3i2r = TypeFunPtr.make(TypeTuple.INT32,nomem,Type.REAL    ,nomem,BitsFun.make0(1,2),1/*nargs*/);
     assertEquals(f3i2r,mt);
     assertTrue(f3i2r.isa(gf));
     assertTrue(f1i2i.isa(f3i2r));

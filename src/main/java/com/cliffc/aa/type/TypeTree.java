@@ -2,6 +2,7 @@ package com.cliffc.aa.type;
 
 import com.cliffc.aa.AA;
 import com.cliffc.aa.util.Ary;
+import com.cliffc.aa.util.SB;
 
 // Tree-like types, used to make equivalence classes.  Tree children are lazily
 // split adding layers on demand.  Splitting in a new child is useful during
@@ -31,12 +32,14 @@ public class TypeTree {
       par._kids.push(this);
     }
   }
-
   void close() { _closed = true; }
   boolean closed() { return _closed; }
-
-  
-  @Override public String toString() {
-    throw AA.unimpl();
+  @Override public String toString() { return str(new SB(),0).toString(); }
+  private SB str(SB sb, int d) {
+    sb.i(d).p('[').p(_idx).p(_closed?']':'-').nl();
+    if( _kids != null )
+      for( int i=0; i<_kids._len; i++ )
+        _kids.at(i).str(sb,d+1);
+    return sb;
   }
 }

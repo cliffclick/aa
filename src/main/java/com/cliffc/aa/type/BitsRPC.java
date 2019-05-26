@@ -1,6 +1,6 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.AA;
+import com.cliffc.aa.util.Ary;
 
 import java.util.HashMap;
 
@@ -20,27 +20,25 @@ public class BitsRPC extends Bits {
     else { INTERN.put(b1,b1); return b1; }
   }
 
-  public static final int NUL_rpc = 0;
-  public static final int ALL_rpc = 1;
-  public static int RPC_rpc = -9999;
-  public static int new_rpc() {
-    throw AA.unimpl();
-  }
+  public static final Ary<TypeTree> TREES = new Ary<>(new TypeTree[1],0);
+  public static TypeTree new_rpc(TypeTree par) { return TREES.push(new TypeTree(par,TREES._len)); }
+  // Make a NEW RPC, with the given parent index
+  public static int make_new_rpc( int parent_rpc ) { return new_rpc(TREES.at(parent_rpc))._idx; }
+  public static final TypeTree ALL = new_rpc(null);
   // Fast reset of parser state between calls to Exec
   public static int PRIM_CNT;
-  public static void init0() { PRIM_CNT=RPC_rpc; }
-  public static void reset_to_init0() { }
+  public static void init0() { PRIM_CNT=TREES._len; }
+  public static void reset_to_init0() { TREES.set_len(PRIM_CNT); }
   
   // Have to make a first BitsRPC here; thereafter the v-call to make_impl
   // will make more on demand.  But need the first one to make a v-call.
-  static final BitsRPC FULL = new BitsRPC().make_impl(-2,new long[]{(1L<<NUL_rpc) | (1L<<ALL_rpc)});
+  static final BitsRPC FULL = new BitsRPC().make_impl(-2,new long[]{(1L<<0) | (1L<<ALL._idx)});
   static final BitsRPC ANY  = FULL.dual();
-  static final BitsRPC NZERO= make0(-2,new long[]{1L<<ALL_rpc});
+  static final BitsRPC NZERO= make0(ALL._idx);
   public static final BitsRPC NIL  = make0(0);
   @Override public BitsRPC FULL() { return FULL; }
   @Override public BitsRPC ANY () { return ANY ; }
 
-  static BitsRPC make0( int con, long[] bits ) { return (BitsRPC)FULL.make(con,bits); }
   static BitsRPC make0( int... bits ) { return (BitsRPC)FULL.make(bits); }
   static BitsRPC make0( int bit ) { return (BitsRPC)FULL.make(bit); }
   @Override public BitsRPC dual() { return (BitsRPC)super.dual(); }

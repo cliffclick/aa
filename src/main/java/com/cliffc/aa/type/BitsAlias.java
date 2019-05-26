@@ -1,5 +1,7 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.util.Ary;
+
 import java.util.HashMap;
 
 // Alias Bits supporting a lattice; immutable; hash-cons'd.
@@ -18,14 +20,11 @@ public class BitsAlias extends Bits {
     else { INTERN.put(b1,b1); return b1; }
   }
 
-  private static int CNT;
-  public static TypeTree new_alias(TypeTree par) { return new TypeTree(par,CNT++); }
-  public static TypeTree new_string() { return new TypeTree(STR,CNT++); }
-  public static final TypeTree NUL, ALL, REC, ARY, STR, ABC;
-  public static final int NUL_alias;
+  public static final Ary<TypeTree> TREES = new Ary<>(new TypeTree[1],1);
+  public static TypeTree new_alias(TypeTree par) { return TREES.push(new TypeTree(par,TREES._len)); }
+  public static TypeTree new_string() { return new_alias(STR); }
+  public static final TypeTree ALL, REC, ARY, STR, ABC;
   static {
-    NUL = new_alias(null);
-    NUL_alias = NUL._idx;
     // The All-Memory alias class
     ALL = new_alias(null);
     // Split All-Memory into Structs/Records and Arrays (including Strings).
@@ -40,20 +39,19 @@ public class BitsAlias extends Bits {
   }
   // Fast reset of parser state between calls to Exec
   public static int PRIM_CNT;
-  public static void init0() { PRIM_CNT=CNT; }
-  public static void reset_to_init0() { CNT = PRIM_CNT; }
+  public static void init0() { PRIM_CNT=TREES._len; }
+  public static void reset_to_init0() { TREES.set_len(PRIM_CNT); }
 
 
   // Have to make a first BitsAlias here; thereafter the v-call to make_impl
   // will make more on demand.  But need the first one to make a v-call.
-  static final BitsAlias FULL = new BitsAlias().make_impl(-2,new long[]{(1L<<NUL_alias) | (1L<<ALL._idx)});
+  static final BitsAlias FULL = new BitsAlias().make_impl(-2,new long[]{(1L<<0) | (1L<<ALL._idx)});
   static final BitsAlias ANY  = FULL.dual();
-  static final BitsAlias NZERO= make0(-2,new long[]{1L<<ALL._idx});
+  static final BitsAlias NZERO= make0(ALL._idx);
   public static final BitsAlias NIL  = make0(0);
   @Override public BitsAlias FULL() { return FULL; }
   @Override public BitsAlias ANY () { return ANY ; }
 
-  static BitsAlias make0( int con, long[] bits ) { return (BitsAlias)FULL.make(con,bits); }
   static BitsAlias make0( int... bits ) { return (BitsAlias)FULL.make(bits); }
   static BitsAlias make0( int bit ) { return (BitsAlias)FULL.make(bit); }
   @Override public BitsAlias dual() { return (BitsAlias)super.dual(); }

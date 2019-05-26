@@ -58,8 +58,8 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
 
   private static TypeFunPtr FREE=null;
   @Override protected TypeFunPtr free( TypeFunPtr ret ) { FREE=this; return ret; }
-  public static TypeFunPtr make_new( TypeTuple ts, Type argmem, Type ret, Type retmem, int nargs ) {
-    return make(ts,argmem,ret,retmem,BitsFun.make0(BitsFun.new_fidx()),nargs);
+  public static TypeFunPtr make_new( TypeTuple ts, Type argmem, Type ret, Type retmem, int parent_fidx, int nargs ) {
+    return make(ts,argmem,ret,retmem,BitsFun.make_new_fidx(parent_fidx),nargs);
   }
   public static TypeFunPtr make( TypeTuple ts, Type argmem, Type ret, Type retmem, BitsFun fidxs, int nargs ) {
     TypeFunPtr t1 = FREE;
@@ -144,11 +144,11 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
       
   // Return true if this is an ambiguous function pointer
   public boolean is_ambiguous_fun() { return _fidxs.above_center(); }
-  public long fidx() { return _fidxs.getbit(); }
+  public int fidx() { return _fidxs.getbit(); }
 
   // Generic functions
   public boolean is_forward_ref()                    { return _nargs == -1; }
-  public static TypeFunPtr make_forward_ref() { return make(GENERIC_ARGS, TypeMem.XMEM, GENERIC_RET,TypeMem.MEM, BitsFun.make0(BitsFun.new_fidx()),-1); }
+  public static TypeFunPtr make_forward_ref() { return make(GENERIC_ARGS, TypeMem.XMEM, GENERIC_RET,TypeMem.MEM, BitsFun.make_new_fidx(BitsFun.ALL._idx),-1); }
   private static TypeFunPtr make_generic()    { return make(GENERIC_ARGS, TypeMem.XMEM, GENERIC_RET,TypeMem.MEM, BitsFun.FULL,99); }
   // Iterate over any nested child types
   @Override public void iter( Consumer<Type> c ) { _ts.iter(c); c.accept(_ret); }
