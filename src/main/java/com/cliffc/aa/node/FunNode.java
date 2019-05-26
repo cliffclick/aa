@@ -67,7 +67,7 @@ public class FunNode extends RegionNode {
 
   // Find FunNodes by fidx
   static Ary<FunNode> FUNS = new Ary<>(new FunNode[]{null,});
-  public static FunNode find_fidx(long fidx) { assert fidx <= (1L<<32); return FUNS.at((int)fidx); }
+  public static FunNode find_fidx(int fidx) { return FUNS.at(fidx); }
 
   @Override String xstr() { return _tf.toString(); }
   @Override String str() { return names(_tf._fidxs,new SB()).toString(); }
@@ -430,7 +430,7 @@ public class FunNode extends RegionNode {
       // The old Epilog has a set of CallNodes, but only the one in #path_being_inlined is
       // being split-for-size.  Repoint the one Call._rpc matching rpc_parm
       // in(path_being_inlined) to new_epi.
-      long rpc = ((TypeRPC)gvn.type(rpc_parm.in(path_being_inlined))).rpc();
+      int rpc = ((TypeRPC)gvn.type(rpc_parm.in(path_being_inlined))).rpc();
       for( Node use : epi._uses ) {
         if( use instanceof CallNode && 
             ((CallNode)use)._rpc == rpc ) {

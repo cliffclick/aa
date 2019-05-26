@@ -147,9 +147,10 @@ public class TypeTuple<O extends TypeTuple<O>> extends Type<O> {
 
   // Return true if this is a function pointer (return type from EpilogNode)
   // 0 - Control for the function
-  // 1 - Return type of the function as implemented
-  // 2 - RPC (set of callers)
-  // 3 - Classic TypeFunPtr, includes declared return type
+  // 1 - Return memory type, as implemented
+  // 2 - Return type of the function as implemented
+  // 3 - RPC (set of callers)
+  // 4 - Classic TypeFunPtr, includes declared return type
   final boolean is_fun() {
     return _ts.length==5 &&
      (_ts[0]==CTRL || _ts[0]==XCTRL) &&
