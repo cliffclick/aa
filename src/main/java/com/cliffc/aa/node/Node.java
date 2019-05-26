@@ -183,10 +183,6 @@ public abstract class Node implements Cloneable {
   
   // Worse-case type for this Node
   public Type all_type() { return Type.ALL; }
-  // Starting type for GVN.  Typically just the dual of all_type(), but the
-  // StartNode keeps its type and most New allocations report XOBJ for other
-  // memories, and the dual of only what they produce.
-  public Type startype() { return all_type().dual(); }
   
   // Operator precedence is only valid for ConNode of binary functions
   public byte  op_prec() { return -1; }

@@ -23,7 +23,7 @@ public class NewNode extends Node {
     _alias = BitsAlias.new_alias(BitsAlias.REC);
   }
   private static byte[] bs(int len) { byte[] bs = new byte[len]; Arrays.fill(bs,(byte)1); return bs; }
-  String xstr() { return "New#"+_alias; } // Self short name
+  String xstr() { return "New#"+_alias._idx; } // Self short name
   String  str() { return _alias==null ? "New#dead" : xstr(); } // Inline short name
   @Override public Node ideal(GVNGCM gvn) {
     // If the address is dead, then the object is unused and can be nuked
@@ -75,11 +75,6 @@ public class NewNode extends Node {
     return _alias == null 
       ? TypeTuple.make(TypeMem.XMEM, TypeMemPtr.OOP0.dual())
       : TypeTuple.make(TypeMem.make(_alias._idx,TypeObj.OBJ), TypeMemPtr.make(_alias._idx));
-  }
-  @Override public Type startype() {
-    return _alias == null 
-      ? TypeTuple.make(TypeMem.XMEM, TypeMemPtr.OOP0.dual())
-      : TypeTuple.make(TypeMem.make(_alias._idx,TypeObj.XOBJ), TypeMemPtr.make(_alias._idx).dual());
   }
   
   // Clones during inlining all become unique new sites

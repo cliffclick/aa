@@ -39,11 +39,11 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   
   public static final TypeMemPtr OOP0   = make(BitsAlias.FULL); // Includes nil
          static final TypeMemPtr OOP    = make(BitsAlias.NZERO);// Excludes nil
-  public static final TypeMemPtr STRPTR = make(BitsAlias.STR._idx);
+  public static final TypeMemPtr STRPTR = make    (BitsAlias.STR._idx);
          static final TypeMemPtr STR0   = make_nil(BitsAlias.STR._idx);
-         static final TypeMemPtr ABCPTR = make(BitsAlias.ABC._idx);
-  public static final TypeMemPtr ABC0   = make_nil(BitsAlias.ABC._idx);
-         static final TypeMemPtr STRUCT = make(BitsAlias.REC._idx);
+         static final TypeMemPtr ABCPTR = make    (TypeStr.ABC.get_alias()._idx);
+  public static final TypeMemPtr ABC0   = make_nil(TypeStr.ABC.get_alias()._idx);
+         static final TypeMemPtr STRUCT = make    (BitsAlias.REC._idx);
          static final TypeMemPtr STRUCT0= make_nil(BitsAlias.REC._idx);
   static final TypeMemPtr[] TYPES = new TypeMemPtr[]{OOP0,STRPTR,ABCPTR,STRUCT,ABC0};
   
@@ -84,4 +84,5 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     return make(_aliases.meet(BitsAlias.NIL));
   }
   @Override void walk( Predicate<Type> p ) { p.test(this); }
+  public int getbit() { return _aliases.getbit(); }
 }

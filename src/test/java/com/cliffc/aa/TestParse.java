@@ -16,8 +16,7 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
     Object dummy = Env.GVN; // Force class loading cycle
-    //test("str(3.14)", TypeMemPtr.make(10), TypeMem.make(10,TypeStr.con("3.14")));
-    test("str(3.14)", Type.SCALAR);
+    test_ptr("str(3.14)"   , (alias)-> TypeMem.make(alias,TypeStr.con("3.14")));
     // A collection of tests which like to fail easily
     testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1) is not a @{x,y}","                           ");
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'","                    ");
@@ -64,10 +63,10 @@ public class TestParse {
     test("1+2.3",   TypeFlt.make(0,64,3.3));
   
     // Simple strings
-    test("\"Hello, world\"", TypeStr.con("Hello, world"));
-    test("str(3.14)", TypeStr.con("3.14"));
-    test("str(3)", TypeStr.con("3"));
-    test("str(\"abc\")", TypeStr.ABC);
+    test_ptr("\"Hello, world\"", (alias)-> TypeMem.make(alias,TypeStr.con("Hello, world")));
+    test_ptr("str(3.14)"   , (alias)-> TypeMem.make(alias,TypeStr.con("3.14")));
+    test_ptr("str(3)"      , (alias)-> TypeMem.make(alias,TypeStr.con("3"   )));
+    test_ptr("str(\"abc\")", (alias)-> TypeMem.make(alias,TypeStr.ABC));
 
     // Variable lookup
     test("math_pi", TypeFlt.PI);
@@ -545,35 +544,44 @@ c[x];
 c[x]=1;
 
    */
-  
+
+  // Caller must close TypeEnv
   static private TypeEnv run( String program ) {
-    TypeEnv te = Exec.go(Env.top(),"args",program);
+    TypeEnv te = Exec.open(Env.top(),"args",program);
     if( te._errs != null ) System.err.println(te._errs.toString());
     Assert.assertNull(te._errs);
     return te;
   }
   
   static private void test( String program, Type expected ) {
-    assertEquals(expected,run(program)._t);
+    try( TypeEnv te = run(program) ) {
+      assertEquals(expected,te._t);
+    }
   }
-  static private void test( String program, Type expected, TypeMem mem_expected ) {
-    TypeEnv te = run(program);
-    assertEquals(    expected,te._t   );
-    assertEquals(mem_expected,te._tmem);
+  static private void test_ptr( String program, Function<Integer,Type> expected ) {
+    try( TypeEnv te = run(program) ) {
+      assertTrue(te._t instanceof TypeMemPtr);
+      int alias = ((TypeMemPtr)te._t).getbit(); // internally asserts only 1 bit set
+      Type t_expected = expected.apply(alias);
+      assertEquals(t_expected,te._tmem);
+    }
   }
   static private void test( String program, Function<HashMap<String,Type>,Type> expected ) {
-    TypeEnv te = run(program);
-    Type t_expected = expected.apply(te._env._scope.types());
-    assertEquals(t_expected,te._t);
+    try( TypeEnv te = run(program) ) {
+      Type t_expected = expected.apply(te._env._scope.types());
+      assertEquals(t_expected,te._t);
+    }
   }
   static private void test_isa( String program, Type expected ) {
-    TypeEnv te = run(program);
-    assertTrue(te._t.isa(expected));
+    try( TypeEnv te = run(program) ) {
+      assertTrue(te._t.isa(expected));
+    }
   }
   static private void test_isa( String program, Function<HashMap<String,Type>,Type> expected ) {
-    TypeEnv te = run(program);
-    Type t_expected = expected.apply(te._env._scope.types());
-    assertTrue(te._t.isa(t_expected));
+    try( TypeEnv te = run(program) ) {
+      Type t_expected = expected.apply(te._env._scope.types());
+      assertTrue(te._t.isa(t_expected));
+    }
   }
   static private void testerr( String program, String err, String cursor ) {
     String err2 = "\nargs:0:"+err+"\n"+program+"\n"+cursor+"^\n";

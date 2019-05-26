@@ -184,9 +184,9 @@ public class Type<T extends Type<T>> {
   static final byte TNIL    =20; // Nil-types
   static final byte TNAME   =21; // Named types; always a subtype of some other type
   static final byte TTUPLE  =22; // Tuples; finite collections of unrelated Types, kept in parallel
-  static final byte TOBJ    =23; // Memory objects; arrays and structs and stings
+  static final byte TOBJ    =23; // Memory objects; arrays and structs and strings
   static final byte TSTRUCT =24; // Memory Structs; tuples with named fields
-  static final byte TSTR    =25; // Memory String type
+  static final byte TSTR    =25; // Memory String type; an array of chars
   static final byte TMEM    =26; // Memory type; a map of Alias#s to TOBJs
   static final byte TMEMPTR =27; // Memory pointer type; a collection of Alias#s
   static final byte TFUNPTR =28; // Function signature; both domain and range are a Tuple; see TypeFun; many functions share the same signature
@@ -671,6 +671,9 @@ public class Type<T extends Type<T>> {
   void walk( Predicate<Type> p ) { assert is_simple(); p.test(this); }
 
   TypeStruct repeats_in_cycles(TypeStruct head, BitSet bs) { return null; }
+
+  // Dual, except keep TypeMem.XOBJ as high for starting GVNGCM.opto() state.
+  public Type startype() { return this==ANY ? ANY : dual(); }
   
   RuntimeException typerr(Type t) {
     throw new RuntimeException("Should not reach here: internal type system error with "+this+(t==null?"":(" and "+t)));

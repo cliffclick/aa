@@ -74,15 +74,14 @@ public class FunNode extends RegionNode {
   // Debug only: make an attempt to bind name to a function
   private static Ary<String> NAMES = new Ary<>(new String[1],0);
   public void bind( String tok ) {
-    long fidx = _tf.fidx();
-    assert fidx <= (1L<<32);
-    String name = NAMES.atX((int)fidx);
+    int fidx = _tf.fidx();
+    String name = NAMES.atX(fidx);
     assert name==null || name.equals(tok); // Attempt to double-bind
-    NAMES.setX((int)fidx,tok);
+    NAMES.setX(fidx,tok);
   }
   // Can return nothing, or "name" or "{name0,name1,name2...}"
-  public static SB names(Bits fidxs, SB sb ) {
-    long fidx = fidxs.abit();
+  public static SB names(BitsFun fidxs, SB sb ) {
+    int fidx = fidxs.abit();
     if( fidx >= 0 ) return name(fidx,sb);
     sb.p('{');
     int cnt=0;
@@ -90,17 +89,16 @@ public class FunNode extends RegionNode {
       if( ++cnt==4 ) break;
       name(ii,sb).p(fidxs.above_center()?'+':',');
     }
-    if( cnt>=4 || fidxs.inf() ) sb.p("...");
+    if( cnt>=4 ) sb.p("...");
     sb.p('}');
     return sb;
   }
-  private static SB name( long i, SB sb ) {
-    assert i<=(1L<<32);
-    String name = NAMES.atX((int)i);
-    return sb.p(name==null ? Long.toString(i) : name);
+  private static SB name( int i, SB sb ) {
+    String name = NAMES.atX(i);
+    return sb.p(name==null ? Integer.toString(i) : name);
   }
   public String name() { return name(_tf.fidx()); }
-  public static String name(long fidx) { assert fidx <= (1L<<31); return NAMES.atX((int)fidx); }
+  public static String name(int fidx) { return NAMES.atX(fidx); }
 
   @Override Node copy(GVNGCM gvn) { throw AA.unimpl(); } // Gotta make a new FIDX
 

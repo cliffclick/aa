@@ -1,10 +1,7 @@
 package com.cliffc.aa;
 
 import com.cliffc.aa.node.*;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeFun;
-import com.cliffc.aa.type.TypeFunPtr;
-import com.cliffc.aa.type.TypeTuple;
+import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import org.jetbrains.annotations.NotNull;
 
@@ -441,7 +438,8 @@ public class GVNGCM {
   // the worklist for nodes that are not above centerline.
   private void walk_initype( Node n ) {
     if( n==null || touched(n) ) return; // Been there, done that
-    setype(n,n.startype());
+    Type startype = n.all_type().startype();
+    setype(n,startype);
     add_work(n);
     // Walk reachable graph
     for( Node use : n._uses ) walk_initype(use);
@@ -467,8 +465,10 @@ public class GVNGCM {
       if( type(fun)==Type.CTRL && epi != null ) {
         TypeTuple  tt = (TypeTuple)   type(epi);
         Type       tctl =             tt.at(0);
-        Type       tret =             tt.at(1);
-        TypeFunPtr tfun = (TypeFunPtr)tt.at(3);
+        Type       tmem =             tt.at(1);
+        Type       tret =             tt.at(2);
+        Type       trpc =             tt.at(3);
+        TypeFunPtr tfun = (TypeFunPtr)tt.at(4);
         if( tctl != Type.CTRL ) throw AA.unimpl(); // never-return function (maybe never called?)
         if( tret != tfun._ret &&    // can sharpen function return
             tret.isa(tfun._ret) ) { // Only if sharpened (might not be true for errors)

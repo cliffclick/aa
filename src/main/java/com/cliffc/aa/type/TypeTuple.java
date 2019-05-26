@@ -177,5 +177,12 @@ public class TypeTuple<O extends TypeTuple<O>> extends Type<O> {
     
     throw AA.unimpl();
   }
+
+  // Dual, except keep TypeMem.XOBJ as high for starting GVNGCM.opto() state.
+  @Override public TypeTuple startype() {
+    Type[] ts = new Type[_ts.length];
+    for( int i=0; i<_ts.length; i++ ) ts[i] = _ts[i].startype();
+    return make0(!_any, ts);
+  }
   
 }

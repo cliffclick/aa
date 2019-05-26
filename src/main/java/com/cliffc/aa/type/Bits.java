@@ -1,6 +1,7 @@
 package com.cliffc.aa.type;
 
 import com.cliffc.aa.AA;
+import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 import org.jetbrains.annotations.NotNull;
 
@@ -20,16 +21,16 @@ import java.util.NoSuchElementException;
 //
 // Bit 0 - is always the 'null' or 'empty' instance.
 // Bit 1 - is the first "real" bit, and represents all-of-memory.
-// Other bits always split from bit 1, and can split in any pattern.
-public abstract class Bits implements Iterable<Integer> {
+// Other bits always split from bit 1, and can split in any pattern.  This
+// pattern is held in a TypeTree which must be passed in for canonicalization.
+public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   // Holds a set of bits meet'd together, or join'd together, along
   // with an infinite extent or a single bit choice as a constant.
   //
   // If _bits is NULL, then _con holds the single set bit (including 0).
   // If _bits is not-null, then _con is -2 for meet, and -1 for join.
-  // The last bit of _bits is the "sign" bit, and extends infinitely.
-  long[] _bits;   // Bits set or null for a single bit
-  int _con;       // value of single bit, or -2 for meet or -1 for join
+  private long[] _bits;   // Bits set or null for a single bit
+  private int _con;       // value of single bit, or -2 for meet or -1 for join
   int _hash;      // Pre-computed hashcode
   void init(int con, long[] bits ) {
     _con = con;
@@ -73,18 +74,49 @@ public abstract class Bits implements Iterable<Integer> {
     else {
       for( Integer idx : this ) sb.p(idx).p(above_center()?'+':',');
     }
-    if( inf() ) sb.p("...");
     return sb.p(']');
   }
 
   // Intern: lookup and return an existing Bits or install in hashmap and
   // return a new Bits.  Overridden in subclasses to make type-specific Bits.
-  abstract Bits make_impl(int con, long[] bits );
-  
+  abstract Bits<B> make_impl(int con, long[] bits );
+
   // Constructor taking an array of bits, and allowing join/meet selection.
   // Canonicalizes the bits.  The 'this' pointer is only used to clone the class.
-  final Bits make( int con, long[] bits ) {
+  final Bits<B> make( int con, long[] bits, Ary<TypeTree> trees ) {
     int len = bits.length;
+
+    // Verify proper tree structure: if parent is set, then all children are
+    // clear; if parent is clear and closed, and all children are set - then
+    // the parent can replace the children.
+    if( trees != null ) { // Canonicalization is skipped for various initialization cases
+      // Build an iterator over the bits that does not allocate
+      for( int idx=0; idx<len; idx++ ) {
+        // Walk the bits from lowest to highest, looking only at set bits
+        for( long b = bits[idx]; b != 0; b = b&(b-1)/*clears low bit*/ ) {
+          long bit = (b&(b-1))^b;   // Lowest bit
+          int bnum = Long.numberOfTrailingZeros(bit);
+          int i = (idx<<6)+bnum; // Set bit number
+          if( i==0 ) continue;   // Ignore nil
+          TypeTree t = trees.at(i);
+          TypeTree par = t._par;
+          if( par != null && (bits[idx(par._idx)]&mask(par._idx))!=0 ) { // Parent is set?
+            bits[idx] &= ~bit;  // Parent is set, so clear kid
+          } else {              // Parent is clear
+            if( par != null && par.closed() && par._kids != null ) {
+              // Parent is clear and closed.  See if all kids are set.
+              boolean all_set = true;
+              for( TypeTree kid : par._kids )
+                if( (bits[idx(kid._idx)]&mask(kid._idx))==0 )
+                  { all_set=false; break; }
+              if( all_set )     // All set; instead set parent and clear this kid (and all future kids)
+                throw AA.unimpl();
+            }
+          }
+        }
+      }
+    }
+    
     // Remove any trailing empty words
     while( len > 0 && (bits[len-1]==0 || bits[len-1]== -1) ) len--;
     if( bits.length != len ) bits = Arrays.copyOf(bits,len);
@@ -101,30 +133,29 @@ public abstract class Bits implements Iterable<Integer> {
     return make_impl(con,null); // Single bit in last word only, switch to con version
   }
   // Constructor taking a list of bits; bits are 'meet'.
-  final Bits make( int... bits ) {
+  final Bits make( Ary<TypeTree> trees, int... bits ) {
     long[] ls = new long[1];
     for( long bit : bits ) {
       if( bit < 0 ) throw new IllegalArgumentException("bit must be positive");
       if( bit >= 63 ) throw AA.unimpl();
       ls[0] |= 1L<<bit;
     }
-    return make(-2,ls);
+    return make(-2,ls,trees);
   }
   // Constructor taking a single bit
   final Bits make( int bit ) {
     if( bit < 0 ) throw new IllegalArgumentException("bit must be positive");
     return make_impl(bit,null);
   }
+
+  public abstract Bits<B> FULL();
+  public abstract Bits<B> ANY ();
   
-  public abstract Bits FULL();
-  public abstract Bits ANY ();
-  
-  private static int  idx (long i) { assert i>>6 <= (1L<<32); return (int)(i>>6); }
+  private static int  idx (long i) { return (int)(i>>6); }
   private static long mask(long i) { return 1L<<(i&63); }
-  public  boolean inf() { return _bits !=null && (_bits[_bits.length-1]>>63)==-1; }
   
   int getbit() { assert _bits==null; return _con; }
-  public long abit() { return _bits==null ? _con : -1; }
+  public int abit() { return _bits==null ? _con : -1; }
   public boolean is_con() { return _bits==null; }
   public boolean above_center() { return _con==-1; }
   boolean may_nil() { return _con==0 || (_con==-1 && ((_bits[0]&1) == 1)); }
@@ -133,44 +164,38 @@ public abstract class Bits implements Iterable<Integer> {
   public boolean test(int i) {
     if( _bits==null ) return i==_con;
     int idx = idx(i);
-    return idx < _bits.length ? (_bits[idx]&mask(i))!=0 : inf();
+    return idx < _bits.length ? (_bits[idx]&mask(i))!=0 : false;
   }
   public Bits clear(int i) {
     if( !test(i) ) return this;  // Already clear
-    if( _con==i ) return make(); // No bits set???
+    if( _con==i ) return make(null); // No bits set???
     assert _con<0;
     int idx = idx(i);
     long[] bits = _bits.clone();
     bits[idx] &= ~mask(i);
-    return make(_con,bits);
+    return make(_con,bits,null);
   }
   
   private int max() { return (_bits.length<<6)-1; }
   private static void or ( long[] bits, long con ) { bits[idx(con)] |= mask(con); }
-  private static void and( long[] bits, long con ) { bits[idx(con)] &=~mask(con); }
   private static long[] bits( long a, long b ) { return new long[idx(Math.max(a,b))+1]; }
 
-  // Split this bit in twain.  Returns 2 new bits
-  public static int split( int old_bit ) { throw AA.unimpl(); }
-  
-  public Bits meet( Bits bs ) {
+  public Bits<B> meet( Bits<B> bs, Ary<TypeTree> trees ) {
     if( this==bs ) return this;
-    Bits full = FULL();         // Subclass-specific version of full
+    Bits<B> full = FULL();         // Subclass-specific version of full
     if( this==full || bs==full ) return full;
     Bits any  = ANY ();         // Subclass-specific version of any
     if( this==any ) return bs;
     if( bs  ==any ) return this;
     if( _bits==null || bs._bits==null ) { // One or both are constants
-      Bits conbs = this, bigbs = bs;
+      Bits<B> conbs = this, bigbs = bs;
       if( bs._bits==null ) { conbs = bs;  bigbs = this; }
       if( bigbs._bits==null ) { // both constants
         // two constants; make a big enough bits array for both
         long[] bits = bits(conbs._con,bigbs._con);
         or( bits,conbs._con);
         or( bits,bigbs._con);
-        Bits bs0 = make(-2,bits);
-        assert !bs0.inf(); // didn't set sign bit by accident (need bigger array if so)
-        return bs0;
+        return make(-2,bits,trees);
       }
       
       if( bigbs._con==-2 ) {     // Meet of constant and set
@@ -179,9 +204,7 @@ public abstract class Bits implements Iterable<Integer> {
         long[] bits = bits(bigbs.max(),conbs._con);
         System.arraycopy(bigbs._bits,0,bits,0,bigbs._bits.length);
         or( bits,conbs._con);
-        Bits bs0 = make(-2,bits);
-        assert bs0.inf()==bigbs.inf();
-        return bs0;
+        return make(-2,bits,trees);
       }
       // Meet of constant and joined set
       if( bigbs.test(conbs._con) ) return conbs; // Already a member
@@ -190,7 +213,7 @@ public abstract class Bits implements Iterable<Integer> {
       for( int e : bigbs )
         if( e != 0 ) {
           if( e >= 64 ) throw AA.unimpl();
-          return make(-2,new long[]{(1L<<e) | (1L<<conbs._con)});
+          return make(-2,new long[]{(1L<<e) | (1L<<conbs._con)},trees);
         }
       throw AA.unimpl(); // Should not reach here
     }
@@ -201,16 +224,16 @@ public abstract class Bits implements Iterable<Integer> {
         if( smlbs._bits.length > bigbs._bits.length ) { smlbs=bs; bigbs=this; }
         long[] bits = bigbs._bits.clone();
         for( int i=0; i<smlbs._bits.length; i++ ) bits[i]|=smlbs._bits[i];
-        return make(-2,bits);
+        return make(-2,bits,trees);
 
       } else {                  // Meet of a high set and low set
-        // Probably require 1 bit from high set in the low set.
+        // TODO: Require 1 bit from high set in the low set.
         // For now, just return low set
         return this;
       }
     }
     if( bs._con==-2 ) { // Meet of a low set and high set
-      // Probably require 1 bit from high set in the low set.
+      // TODO: Require 1 bit from high set in the low set.
       // For now, just return low set
       return bs;
     }
@@ -225,7 +248,7 @@ public abstract class Bits implements Iterable<Integer> {
     long[] bits =  bigbs._bits.clone();
     for( int i=0; i<smlbs._bits.length; i++ )
       bits[i] |= smlbs._bits[i];
-    return make(-1,bits);
+    return make(-1,bits,trees);
   }
   
   private boolean subset( Bits bs ) {
@@ -236,14 +259,14 @@ public abstract class Bits implements Iterable<Integer> {
     return true;
   }
   
-  public Bits dual() {
+  public Bits<B> dual() {
     if( _bits==null ) return this; // Dual of a constant is itself
     // Otherwise just flip _con
     assert _con==-2 || _con==-1;
     return make_impl(-3-_con,_bits);
   }
   // join is defined in terms of meet and dual
-  public Bits join(Bits bs) { return dual().meet(bs.dual()).dual(); }
+  public Bits<B> join(Bits<B> bs, Ary<TypeTree> trees) { return dual().meet(bs.dual(),trees).dual(); }
 
   /** @return an iterator */
   @NotNull @Override public Iterator<Integer> iterator() { return new Iter(); }

@@ -127,7 +127,7 @@ public class Parse {
         assert use instanceof FunNode;
         assert use.in(1)==Env.ALL_CTRL;
         _gvn.unreg(use);        // Changing edges, so unregister
-        use.set_def(1,_gvn.con(Type.XCTRL),_gvn);
+        use.set_def(1,con(Type.XCTRL),_gvn);
         _gvn.rereg(use,Type.CTRL);
         i--;
       }
@@ -555,8 +555,8 @@ public class Parse {
       int cnt=0;                // Add parameters to local environment
       for( int i=0; i<ids._len; i++ )
         _e.update(ids.at(i),gvn(new ParmNode(cnt++,ids.at(i),fun,con(ts.at(i)),errmsg)),null,args_are_mutable);
-      Node rpc = gvn(new ParmNode(-1,"rpc",fun,_gvn.con(TypeRPC.ALL_CALL),null));
-      Node mem = gvn(new ParmNode(-2,"mem",fun,_gvn.con(TypeMem.MEM),null));
+      Node rpc = gvn(new ParmNode(-1,"rpc",fun,con(TypeRPC.ALL_CALL),null));
+      Node mem = gvn(new ParmNode(-2,"mem",fun,con(TypeMem.MEM),null));
       set_mem(mem);
       Node rez = stmts();       // Parse function body
       if( rez == null ) rez = err_ctrl1("Missing function body", Type.SCALAR);
@@ -674,7 +674,13 @@ public class Parse {
       if( c=='\\' ) throw AA.unimpl();
       if( _x == _buf.length ) return null;
     }
-    return TypeStr.con(new String(_buf,oldx,_x-oldx-1));
+    TypeStr ts = TypeStr.con(new String(_buf,oldx,_x-oldx-1));
+    // Convert to ptr-to-constant-memory-string
+    TypeMemPtr ptr = TypeMemPtr.make(ts.get_alias()._idx);
+    // Store the constant string to memory
+    Node con_mem = con(TypeMem.make(ptr.getbit(),ts));
+    set_mem(gvn(new MergeMemNode(mem(),con_mem)));
+    return ptr;
   }
 
   /** Parse a type or return null

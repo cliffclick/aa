@@ -61,8 +61,8 @@ public class CallNode extends Node {
   // Clones during inlining all become unique new call sites
   @Override CallNode copy(GVNGCM gvn) {
     CallNode call = super.copy(gvn);
-    _rpc = BitsRPC.split(_rpc); // Original gets the low of the split
-    call._rpc = _rpc+1;         // New gets the high bit
+    //_rpc = BitsRPC.split(_rpc); // Original gets the low of the split
+    //call._rpc = _rpc+1;         // New gets the high bit
     //return call;
     throw com.cliffc.aa.AA.unimpl();
   }
@@ -247,7 +247,7 @@ public class CallNode extends Node {
     if( !(funptr instanceof TypeFun) ) return; // Not fallen to a funptr yet
     TypeFun tfunptr = (TypeFun)funptr;
     TypeFunPtr tf = tfunptr.fun(); // Get type-propagated function list
-    Bits fidxs = tf._fidxs;     // Get all the propagated reaching functions
+    BitsFun fidxs = tf._fidxs;     // Get all the propagated reaching functions
     if( fidxs.above_center() ) return;
     for( int fidx : fidxs ) {   // For all functions
       if( fidx >= BitsFun.PRIM_CNT ) { // Do not wire up primitives, but forever take their default inputs and outputs
@@ -332,7 +332,7 @@ public class CallNode extends Node {
     if( !(t instanceof TypeFun) ) return null; // Might be e.g. ~Scalar
     TypeFun tfp = (TypeFun)t;
     if( !tfp.fun().is_ambiguous_fun() ) return null; // Sane as-is
-    Bits fidxs = tfp.fun()._fidxs;
+    BitsFun fidxs = tfp.fun()._fidxs;
 
     // Set of possible choices with fewest conversions
     class Data {

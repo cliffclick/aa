@@ -1,7 +1,6 @@
 package com.cliffc.aa.type;
 
 import com.cliffc.aa.util.SB;
-import com.cliffc.aa.AA;
 
 import java.util.BitSet;
 import java.util.HashMap;
@@ -44,11 +43,25 @@ public class TypeStr extends TypeObj<TypeStr> {
   public static TypeStr con(String con) { return make(false,con); }
   public static void init() {} // Used to force class init
 
+  // Mapping from parse-time constant strings to their alias class.  Allows
+  // parse-time interning (and read-only or COW semantics on strings).
+  private static HashMap<TypeStr,TypeTree> CON_ALIASES = new HashMap<>();
+  static void reset_to_init0() { CON_ALIASES.clear(); }
+  // Get the alias for string constants.  Since string constants are interned,
+  // so are the aliases.
+  public TypeTree get_alias() {
+    TypeTree tt = CON_ALIASES.get(this);
+    if( tt==null ) tt = BitsAlias.new_string();
+    CON_ALIASES.put(this,tt);
+    return tt;
+  }
+
+  
   public  static final TypeStr  STR = make(false,null); // not null
   public  static final TypeStr XSTR = make(true ,null); // choice string
   public  static final TypeStr  ABC = con("abc"); // a string constant
   private static final TypeStr  DEF = con("def"); // a string constant
-  static final TypeStr[] TYPES = new TypeStr[]{STR,XSTR,STR,DEF};
+  static final TypeStr[] TYPES = new TypeStr[]{STR,XSTR,ABC,DEF};
   static void init1( HashMap<String,Type> types ) { types.put("str",STR); }
   // Return a String from a TypeStr constant; assert otherwise.
   @Override public String getstr() { assert is_con(); return _con; }
@@ -99,4 +112,6 @@ public class TypeStr extends TypeObj<TypeStr> {
   }
   @Override public Type widen() { return STR; }
   @Override void walk( Predicate<Type> p ) { p.test(this); }
+  // Dual, except keep TypeMem.XOBJ as high for starting GVNGCM.opto() state.
+  @Override public TypeObj startype() { return dual(); }
 }

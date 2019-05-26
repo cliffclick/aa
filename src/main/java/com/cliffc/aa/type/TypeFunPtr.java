@@ -51,9 +51,12 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     sb.p('{');
     for( int i=0; i<_ts._ts.length; i++ ) sb.p(arg(i).str(dups)).p(' ');
     if( _nargs==99 ) sb.p("... ");
-    sb.p(_argmem.str(dups));
-    sb.p("-> ").p(_ret.str(dups)).p(_retmem.str(dups)).p('}');
-    return sb.toString();
+    if( _argmem != TypeMem.MEM ) // Argument memory is only interesting if required to be something special
+      sb.p(_argmem.str(dups));
+    sb.p("-> ").p(_ret.str(dups));
+    if( _retmem != TypeMem.XMEM ) // Return memory is only interesting if returning something special
+      sb.p(_retmem.str(dups));
+    return sb.p('}').toString();
   }
 
   private static TypeFunPtr FREE=null;

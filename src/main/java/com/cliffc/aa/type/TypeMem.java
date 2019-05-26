@@ -118,6 +118,8 @@ public class TypeMem extends Type<TypeMem> {
   // Never part of a cycle, so the normal check works
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
   @Override String str( BitSet dups ) {
+    if( this== MEM ) return "[mem]";
+    if( this==XMEM ) return "[~mem]";
     SB sb = new SB();
     sb.p("[");
     for( int i=1; i<_aliases.length; i++ )
@@ -270,4 +272,12 @@ public class TypeMem extends Type<TypeMem> {
   @Override public boolean is_con()       { return false;}
   @Override public boolean must_nil() { return false; } // never a nil
   @Override Type not_nil() { return this; }
+  // Dual, except keep TypeMem.XOBJ as high for starting GVNGCM.opto() state.
+  @Override public TypeMem startype() {
+    TypeObj[] oops = new TypeObj[_aliases.length];
+    for(int i=0; i<_aliases.length; i++ )
+      if( _aliases[i] != null )
+        oops[i] = _aliases[i].startype();
+    return make0(oops);
+  }
 }

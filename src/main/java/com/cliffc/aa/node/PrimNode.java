@@ -16,11 +16,11 @@ import java.util.HashMap;
 //
 
 public abstract class PrimNode extends Node {
-  public final TypeTuple _targs;
+  final TypeTuple _targs;
   final Type _ret;
   public final String _name;    // Unique name (and program bits)
-  public final String[] _args;  // Handy
-  public Parse _badargs;        // Filled in when inlined in CallNode
+  final String[] _args;  // Handy
+  Parse _badargs;        // Filled in when inlined in CallNode
   PrimNode( byte op, String name, String[] args, TypeTuple targs, Type ret ) { super(op); _name=name; _args=args; _targs = targs; _ret = ret; _badargs=null; }
   PrimNode( String name, String[] args, TypeTuple targs, Type ret ) { this(OP_PRIM,name,args,targs,ret); }
 
@@ -29,7 +29,7 @@ public abstract class PrimNode extends Node {
   TypeMem retmem() { return TypeMem.XMEM; }
   
   final static String[] ARGS1 = new String[]{"x"};
-  final static String[] ARGS2 = new String[]{"x","y"};
+  private final static String[] ARGS2 = new String[]{"x","y"};
 
   public static PrimNode[] PRIMS = new PrimNode[] {
     new RandI64(),
