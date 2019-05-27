@@ -217,6 +217,50 @@ public class Parse {
     if( lookup(tvar) != null ) return err_ctrl2("Cannot re-assign val '"+tvar+"' as a type");
     Type ot = _e.lookup_type(tvar);
     TypeName tn;
+
+    // CNC...
+
+    // Adding a 2nd major alias category: object shape.  An object with a field
+    // "x" is clearly not aliased to an object without a field "x".  First
+    // major category is code-place: each NewNode gets its own alias#.
+    
+    // If type is a TypeObj, then actually naming the TypeMemPtr over all the
+    // available instances behind the TypeObj.  The type-constructor does not
+    // have a NewNode to get an alias, so its typing all possible future
+    // NewNodes...  which means its naming [XXXBitsAlias.RECXXX] all *shape-
+    // specific* aliases.  Most aliases do not match the required type
+    // structure; this gets resolved at the apply point.
+
+    // Now we get weird: suppose I make a struct of shape "@{a,b}" here, and a
+    // struct of shape "@{b,c}" over there and pass both into a function
+    // requiring a "b".  This is allowed but it forces the two different
+    // structs to share the same memory layout - to keep the "b" field offset
+    // fixed.  This tie-together effect only is required for aliases sharing
+    // field names AND usages.... OR perhaps I clone the code per-struct-layout?
+    //
+    // More weird: Add a third struct "@{c,a}".  Can I mix struct shapes in
+    // different pointers?  Maybe this isn't any more weird than the prior
+    // paragraph which is mixing pointers at function-arg time.  Can ponder
+    // a hidden internal "@{a,b,c}" type for passing into functions taking
+    // any one of the 3 fields.
+    //
+    // If/when this happens ponder the case allowing a subset struct shape with
+    // nothing more than a leading (and trailing) offset.  E.g.  "@{name,rank,
+    // ser_num,x,y}" is passed into a function taking a "@{x,y}" - if @{x,y}
+    // are placed next to each other in a fixed relation, then the larger
+    // struct can be "cast" to the smaller with a simple ADD - and it means the
+    // GC supports interior pointers.
+
+    // I need to make a shape-specific alias, and all NewNodes producing this
+    // shape can make child-aliases from this alias.
+    
+    // So the generated function takes in memory of type 't' and an arg of type
+    // '*t' and returns a named-ptr-to-t (not a ptr-to-named-t).
+
+    // The explicit-field version just ideal()s a NewNode right away and then
+    // feeds into the original version.
+
+    
     if( ot == null ) {        // Name does not pre-exist
       tn = TypeName.make(tvar,_e._scope.types(),t);
       _e.add_type(tvar,tn);   // Assign type-name
