@@ -55,7 +55,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
       sb.p(_argmem.str(dups));
     sb.p("-> ").p(_ret.str(dups));
     if( _retmem != TypeMem.XMEM ) // Return memory is only interesting if returning something special
-      sb.p(_retmem.str(dups));
+      sb.p(' ').p(_retmem.str(dups));
     return sb.p('}').toString();
   }
 
@@ -127,7 +127,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   }
 
   public final int nargs() { return _nargs; }
-  public final Type arg(int idx) { return _ts.at(idx); }
+  public final Type arg(int idx) { return _idx==-2 ? _argmem : _ts.at(idx); }
   public final Type ret() { return _ret; }
 
   @Override public boolean above_center() { return _fidxs.above_center(); }

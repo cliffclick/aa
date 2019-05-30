@@ -76,9 +76,6 @@ public abstract class PrimNode extends Node {
   public static PrimNode convertTypeName( Type from, TypeName to, Parse badargs ) {
     return new ConvertTypeName(from,to,badargs);
   }
-  public static PrimNode convertTypeNameStruct( TypeStruct from_ts, TypeName to, Parse badargs ) {
-    return new ConvertTypeNameStruct(from_ts,to,badargs);
-  }
   
   public abstract Type apply( Type[] args ); // Execute primitive
   public boolean is_lossy() { return true; }
@@ -160,30 +157,6 @@ static class ConvertTypeName extends PrimNode {
       return _badargs.typerr(actual,formal);
     return null;
   }
-}
-
-// Default name constructor using expanded args list
-static class ConvertTypeNameStruct extends PrimNode {
-  private final Parse _badargs; // Only for converts
-  private final HashMap<String,Type> _lex; // Unique lexical scope
-  ConvertTypeNameStruct(TypeStruct from, TypeName to, Parse badargs) {
-    super(to._name,from._flds,TypeTuple.make(from._ts),to);
-    _lex=to._lex;
-    _badargs=badargs;
-  }
-  @Override public Node ideal(GVNGCM gvn) {
-    Node nn = gvn.xform(new  NewNode(_defs.asAry(),_args));
-    Node an = gvn.xform(new ProjNode(nn,1));
-    TypeStruct ts = TypeStruct.make(_args,_targs._ts);
-    TypeName tn = TypeName.make(_name,_lex,ts);
-    Node cvt = new ConvertTypeName(ts,tn,_badargs);
-    cvt.add_def(null); // Control
-    cvt.add_def(an);
-    return cvt;
-  }
-  
-  @Override public Type value(GVNGCM gvn) { throw AA.unimpl(); }
-  @Override public Type apply( Type[] args ) { throw AA.unimpl(); }
 }
 
 static class ConvertInt64F64 extends PrimNode {

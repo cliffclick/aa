@@ -107,7 +107,6 @@ public class FunNode extends RegionNode {
 
   Type targ(int idx) {
     if( idx == -1 ) return TypeRPC.ALL_CALL;
-    if( idx == -2 ) return TypeMem.MEM;
     return _tf.arg(idx);
   }
   
@@ -152,13 +151,15 @@ public class FunNode extends RegionNode {
     for( Node use : _uses )
       if( use instanceof ParmNode ) {
         ParmNode parm = (ParmNode)use;
-        if( parm._idx != -1 && parm._idx != -2 ) {
-          parms[parm._idx] = parm;
+        if( parm._idx != -1 ) {
           // Check that all actuals are isa all formals.  This is a little
           // conservative, as we could inline on non-error paths.
           for( int i=1; i<_defs._len; i++ )
             if( !gvn.type(parm.in(i)).isa(_tf.arg(parm._idx)) )
               return null; // Actual !isa formal; do not inline while in-error
+          // TODO: FAILS for -2, memory arg.
+          // TODO: Ponder swapping all parms+1 idx, and reversing memory_idx for 0
+          parms[parm._idx] = parm;
         }
       } else if( use instanceof EpilogNode ) { assert epi==null || epi==use; epi = (EpilogNode)use; }
     return epi;                 // Epilog (or null if dead)

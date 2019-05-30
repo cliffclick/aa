@@ -26,7 +26,7 @@ public class BitsFun extends Bits<BitsFun> {
   // Fast reset of parser state between calls to Exec
   public static int PRIM_CNT;
   public static void init0() { PRIM_CNT=TREES._len; }
-  public static void reset_to_init0() { TREES.set_len(PRIM_CNT); }
+  public static void reset_to_init0() { TypeTree.reset_to_len(TREES,PRIM_CNT); }
   
   // Have to make a first BitsFun here; thereafter the v-call to make_impl
   // will make more on demand.  But need the first one to make a v-call.

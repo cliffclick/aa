@@ -40,7 +40,10 @@ public class BitsAlias extends Bits<BitsAlias> {
   // Fast reset of parser state between calls to Exec
   private static int PRIM_CNT;
   public static void init0() { PRIM_CNT=TREES._len; }
-  public static void reset_to_init0() { TREES.set_len(PRIM_CNT); TypeStr.reset_to_init0(); }
+  public static void reset_to_init0() {
+    TypeTree.reset_to_len(TREES,PRIM_CNT);
+    TypeStr.reset_to_init0();
+  }
 
 
   // Have to make a first BitsAlias here; thereafter the v-call to make_impl

@@ -217,50 +217,6 @@ public class Parse {
     if( lookup(tvar) != null ) return err_ctrl2("Cannot re-assign val '"+tvar+"' as a type");
     Type ot = _e.lookup_type(tvar);
     TypeName tn;
-
-    // CNC...
-
-    // Adding a 2nd major alias category: object shape.  An object with a field
-    // "x" is clearly not aliased to an object without a field "x".  First
-    // major category is code-place: each NewNode gets its own alias#.
-    
-    // If type is a TypeObj, then actually naming the TypeMemPtr over all the
-    // available instances behind the TypeObj.  The type-constructor does not
-    // have a NewNode to get an alias, so its typing all possible future
-    // NewNodes...  which means its naming [XXXBitsAlias.RECXXX] all *shape-
-    // specific* aliases.  Most aliases do not match the required type
-    // structure; this gets resolved at the apply point.
-
-    // Now we get weird: suppose I make a struct of shape "@{a,b}" here, and a
-    // struct of shape "@{b,c}" over there and pass both into a function
-    // requiring a "b".  This is allowed but it forces the two different
-    // structs to share the same memory layout - to keep the "b" field offset
-    // fixed.  This tie-together effect only is required for aliases sharing
-    // field names AND usages.... OR perhaps I clone the code per-struct-layout?
-    //
-    // More weird: Add a third struct "@{c,a}".  Can I mix struct shapes in
-    // different pointers?  Maybe this isn't any more weird than the prior
-    // paragraph which is mixing pointers at function-arg time.  Can ponder
-    // a hidden internal "@{a,b,c}" type for passing into functions taking
-    // any one of the 3 fields.
-    //
-    // If/when this happens ponder the case allowing a subset struct shape with
-    // nothing more than a leading (and trailing) offset.  E.g.  "@{name,rank,
-    // ser_num,x,y}" is passed into a function taking a "@{x,y}" - if @{x,y}
-    // are placed next to each other in a fixed relation, then the larger
-    // struct can be "cast" to the smaller with a simple ADD - and it means the
-    // GC supports interior pointers.
-
-    // I need to make a shape-specific alias, and all NewNodes producing this
-    // shape can make child-aliases from this alias.
-    
-    // So the generated function takes in memory of type 't' and an arg of type
-    // '*t' and returns a named-ptr-to-t (not a ptr-to-named-t).
-
-    // The explicit-field version just ideal()s a NewNode right away and then
-    // feeds into the original version.
-
-    
     if( ot == null ) {        // Name does not pre-exist
       tn = TypeName.make(tvar,_e._scope.types(),t);
       _e.add_type(tvar,tn);   // Assign type-name
@@ -268,12 +224,25 @@ public class Parse {
       tn = ot.merge_recursive_type(t);
       if( tn == null ) return err_ctrl2("Cannot re-assign type '"+tvar+"'");
     }
-  
-    // Add a constructor function
-    PrimNode cvt = PrimNode.convertTypeName(t,tn,errMsg());
+
+    // Single-inheritance & vtables & RTTI:
+    //            "Objects know thy Class"
+    // Which means a TypeObj knows its Name.  Its baked into the vtable.
+    // Which means TypeObjs are named and not the pointer-to-TypeObj.
+    // "Point= :@{x,y}" declares "Point" to be a type Name for "@{x,y}".
+
+    // Add a constructor function.  If this is a primitive, build a constructor
+    // taking the primitive.  If this is a TypeObj, build a constructor taking
+    // a pointer-to-TypeObj - and the associated memory state, i.e.  takes a
+    // ptr-to-@{x,y} and returns a ptr-to-Named:@{x,y}.  This stores a v-table
+    // ptr into an object.  The alias# does not change, but a TypeMem[alias#]
+    // would now map to the Named variant.
+    PrimNode cvt = t instanceof TypeObj
+      ? LibCallNode.convertTypeName((TypeObj)t,tn,errMsg())
+      : PrimNode   .convertTypeName(t,tn,errMsg());
     Node rez = _e.add_fun(tvar,gvn(cvt.as_fun(_gvn))); // Return type-name constructor
     if( t instanceof TypeStruct ) { // Add struct types with expanded arg lists
-      PrimNode cvts = PrimNode.convertTypeNameStruct((TypeStruct)t,tn,errMsg());
+      PrimNode cvts = LibCallNode.convertTypeNameStruct((TypeStruct)t,tn,errMsg());
       Node rez2 = _e.add_fun(tvar,gvn(cvts.as_fun(_gvn))); // type-name constructor with expanded arg list
       // UnresolvedNode needs touching once all constructors are done
       _gvn.init0(rez2._uses.at(0));
@@ -300,7 +269,7 @@ public class Parse {
    *  Variable assignment does not involve Memory and no State is changed.
    *  Field    assignment does     involve Memory and    State is changed.
    *
-   *  Both kinds of assigments are legal in the same stmt:
+   *  Both kinds of assignments are legal in the same stmt:
    *    x = y = z = fcn(arg0,arg1).fld1.fld2 = some_more_ifex;
    */
   private Node stmt() {
@@ -728,10 +697,12 @@ public class Parse {
   }
 
   /** Parse a type or return null
-   *  type = tcon | tfun[?] | tstruct[?] | tvar  // Types are a tcon or a tfun or a tstruct
+   *  type = tcon | tfun[?] | tstruct[?] | ttuple | tvar  // Type choices
    *  tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str[?]
-   *  tfun = {[[type]* ->]? type }// Function types mirror func decls
-   *  tstruct = @{ [id[:type],]*} // Struct types are field names with optional types
+   *  tfun = {[[type]* ->]? type } // Function types mirror func decls
+   *  tstruct = @{ [id[:type],]*}  // Struct types are field names with optional types
+   *  ttuple = ([type] [,[type]]*) // List of types, trailing comma optional
+   *  tvar = A previously declared type variable
    *
    *  Unknown tokens when type_var is false are treated as not-a-type.  When
    *  true, unknown tokens are treated as a forward-ref new type.
@@ -789,9 +760,9 @@ public class Parse {
     // "(, , )" is a 2-entry tuple
     if( peek1(c,'(') ) { // Tuple type
       Ary<Type> ts = new Ary<>(new Type[1],0);
-      while( skipWS() != ')' ) { // No more types...
+      while( (c=skipWS()) != ')' ) { // No more types...
         Type t = Type.SCALAR;    // Untyped, most generic field type
-        if( peek(':') &&         // Has type annotation?
+        if( c!=',' && c!=')' &&  // Has space for type annotation?
             (t=type(type_var))==null ) throw AA.unimpl(); // return an error here, missing type
         ts.add(typeq(t));
         if( !peek(',') ) break; // Final comma is optional

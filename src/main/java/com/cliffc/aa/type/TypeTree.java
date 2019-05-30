@@ -1,6 +1,5 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.AA;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 
@@ -27,7 +26,7 @@ public class TypeTree {
     _idx=idx;
     _par=par;
     if( par != null ) {
-      assert !_closed;
+      assert !par._closed;
       if( par._kids==null ) par._kids = new Ary<>(new TypeTree[1],0);
       par._kids.push(this);
     }
@@ -41,5 +40,18 @@ public class TypeTree {
       for( int i=0; i<_kids._len; i++ )
         _kids.at(i).str(sb,d+1);
     return sb;
+  }
+
+  static void reset_to_len( Ary<TypeTree> TREES, int len ) {
+    // Truncate whole array to given length
+    TREES.set_len(len);
+    // Drop any kids with index past the given length
+    for( TypeTree par : TREES )
+      if( par != null && par._kids != null )
+        for( int i=0; i<par._kids._len; i++ )
+          if( par._kids.at(i)._idx >= len ) {
+            par._kids.set_len(i);
+            break;
+          }
   }
 }

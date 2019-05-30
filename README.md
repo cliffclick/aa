@@ -76,8 +76,9 @@ BNF                           | Comment
 `type = tcon OR tfun OR tstruct OR ttuple OR tvar` | Types are a tcon or a tfun or a tstruct or a ttuple or a type variable
 `tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str` | Primitive types
 `tfun = {[[type]* ->]? type }` | Function types mirror func decls
-`ttuple = ( [:type]?,* )` | Tuple types are just a list of optional types; the count of commas dictates the length, zero commas is zero length
-`tstruct = @{ [id[:type],]*}` | Struct types are field names with optional types
+`tstruct = @{ [id[:type],]*}`  | Struct types are field names with optional types
+`ttuple = ([type][,[type]]* )` | Tuple types are just a list of optional types; the count of commas dictates the length, zero commas is zero length
+`tvar = id`                   | Type variable lookup 
 
 SIMPLE EXAMPLES
 ---------------

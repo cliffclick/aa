@@ -43,7 +43,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
          static final TypeMemPtr STR0   = make_nil(BitsAlias.STR._idx);
          static final TypeMemPtr ABCPTR = make    (TypeStr.ABC.get_alias()._idx);
   public static final TypeMemPtr ABC0   = make_nil(TypeStr.ABC.get_alias()._idx);
-         static final TypeMemPtr STRUCT = make    (BitsAlias.REC._idx);
+  public static final TypeMemPtr STRUCT = make    (BitsAlias.REC._idx);
          static final TypeMemPtr STRUCT0= make_nil(BitsAlias.REC._idx);
   static final TypeMemPtr[] TYPES = new TypeMemPtr[]{OOP0,STRPTR,ABCPTR,STRUCT,ABC0};
   

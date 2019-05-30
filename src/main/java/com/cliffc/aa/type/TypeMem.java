@@ -260,8 +260,6 @@ public class TypeMem extends Type<TypeMem> {
     assert alias >= 2 && obj != null;
     for( int i=2; i<alias; i++ )  assert ms[i]==null;
 
-    // Check no overlap or conflicts
-    assert at0(alias) == _aliases[1]; // Alias about-to-be-stomped is the default
     TypeObj[] objs = Arrays.copyOf(_aliases,Math.max(_aliases.length,alias+1));
     objs[alias]=obj;
     return make0(objs);
