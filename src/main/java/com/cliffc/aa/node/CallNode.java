@@ -252,7 +252,7 @@ public class CallNode extends Node {
     BitsFun fidxs = tf._fidxs;     // Get all the propagated reaching functions
     if( fidxs.above_center() ) return;
     for( int fidx : fidxs ) {   // For all functions
-      if( fidx >= BitsFun.PRIM_CNT ) { // Do not wire up primitives, but forever take their default inputs and outputs
+      if( fidx >= FunNode.PRIM_CNT ) { // Do not wire up primitives, but forever take their default inputs and outputs
         // Can be wiring up the '#[ALL]' list.  Stop after seeing all existing functions
         if( fidx >= FunNode.FUNS._len ) return;
         FunNode fun = FunNode.find_fidx(fidx);

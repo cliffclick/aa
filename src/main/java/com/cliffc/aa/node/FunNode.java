@@ -64,8 +64,9 @@ public class FunNode extends RegionNode {
   }
   
   // Fast reset of parser state between calls to Exec
-  public static void init0() { }
-  public static void reset_to_init0() { NAMES.set_len(BitsFun.PRIM_CNT); FUNS.set_len(BitsFun.PRIM_CNT); }
+  static int PRIM_CNT;
+  public static void init0() { PRIM_CNT = NAMES._len; }
+  public static void reset_to_init0() { NAMES.set_len(PRIM_CNT); FUNS.set_len(PRIM_CNT); }
 
   // Find FunNodes by fidx
   static Ary<FunNode> FUNS = new Ary<>(new FunNode[]{null,});

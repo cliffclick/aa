@@ -24,8 +24,23 @@ import java.util.NoSuchElementException;
 // instances, just might be some confusion at first.
 //
 // Bit 0 - is always the 'null' or 'empty' instance.
-// Bit 1 - is the first "real" bit, and represents all-of-memory.
-// Other bits always split from bit 1, and can split in any pattern.  
+// Bit 1 - is the first "real" bit, and represents all-of-a-class.
+// Other bits always split from bit 1, and can split in any pattern.
+//
+// Individual bits can be considered either constants (on the centerline) or a
+// class of things that are either meet'd or join'd (above or below the
+// centerline).  Aliases are usually classes because a single NewNode can be
+// executed in a loop, producing many objects with the same alias#.  FIDXs and
+// RPCs are always constants, as there is a single instance of a function or a
+// return-point.  Code-cloning (i.e. inlining) splits the constant instantly
+// into 2 new values which are both constants; i.e. single FIDX#s and RPC#s are
+// never *classes*.
+//
+// Constant-or-class is on a per-bit basis, as some NewNodes are known to
+// execute once (hence produce a constant alias class or a Singleton) and
+// others execute many times.  This is handled by the callers, which use 2 bits
+// for a single NewNode to force a class-of-two, or 1 bit for a constant.
+
 public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   // Holds a set of bits meet'd together, or join'd together, along
   // with a single bit choice as a constant.
@@ -220,8 +235,8 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   // compute hashes that do not move after a split.
   static class HashMaker<B extends Bits<B>> {
     static class Q { Q(int a,int s) { _alias=a; _split=s; } final int _alias, _split; }
-    Ary<Q> _splits = new Ary<>(new Q[1],0);
-    int _cnt=1; // skip nil
+    int _init;             // One-time set at init, used to reset between tests
+    Ary<Q> _splits = new Ary<>(new Q[1],0); //
 
     @Override public String toString() {
       SB sb = new SB().p("HashMaker[");
@@ -231,9 +246,10 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     }
     
     int split(int par, HashMap<B,B> INTERN) {
-      if( par==0 ) return _cnt++;    // Ignore init
+      if( par==0 ) return 1;    // Ignore init
       // Split the parent bit in twain.  Instances of the parent are everywhere
       // updated to have both bits, but hash to the same value as the parent.
+      int new_alias = _splits._len+2;
 
       // Walk and update
       for( B bits : INTERN.keySet() ) {
@@ -242,20 +258,19 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
           assert con!=0;        // nil is never split
           if( bits._bits==null ) {
             bits._con = con < 0 ? -1 : 1;
-            or(bits._bits = bits(con,_cnt),Math.abs(con));
-          } else if( _cnt > max(bits._bits) ) bits._bits = bits(0,_cnt);
-          or(bits._bits,_cnt);
+            or(bits._bits = bits(con,new_alias),Math.abs(con));
+          } else if( new_alias > max(bits._bits) ) bits._bits = bits(0,new_alias);
+          or(bits._bits,new_alias);
         }
       }
       
-      _splits.push(new Q(par,_cnt++)); // Record the split
+      _splits.push(new Q(par,new_alias)); // Record the split
 
       // Assert hash not changed
-      for( B bits : INTERN.keySet() ) {
+      for( B bits : INTERN.keySet() )
         assert bits._hash == compute_hash(bits);
-      }
       
-      return _cnt-1;
+      return new_alias;
     }
     int compute_hash(Bits bits) {
       long sum=0;
@@ -265,13 +280,13 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
       }
       // Minus the exceptions
       for( Q q : _splits )
-        if( bits.test(q._alias) && bits.test(q._split) )
+        if( q != null && bits.test(q._alias) && bits.test(q._split) )
           sum -= mask(q._split);
       // Fold to an int
       return (int)((sum>>32)|sum);
     }
-    int init0() { throw AA.unimpl(); }
-    void reset_to_init0(int PRIM_CNT) { throw AA.unimpl(); }
+    void init0() { _init = _splits._len; }
+    void reset_to_init0() { _splits.set_len(_init); }
   }
   
   /** @return an iterator */
