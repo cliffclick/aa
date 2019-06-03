@@ -26,7 +26,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
 
   private static TypeMemPtr FREE=null;
   @Override protected TypeMemPtr free( TypeMemPtr ret ) { FREE=this; return ret; }
-  public static TypeMemPtr make( BitsAlias aliases ) {
+  public static TypeMemPtr make(BitsAlias aliases ) {
     TypeMemPtr t1 = FREE;
     if( t1 == null ) t1 = new TypeMemPtr(aliases);
     else { FREE = null;          t1.init(aliases); }
@@ -34,17 +34,16 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     return t1==t2 ? t1 : t1.free(t2);
   }
   public static TypeMemPtr make( int alias ) { return make(BitsAlias.make0(alias)); }
-  static TypeMemPtr make_nil( int alias ) { return make(0,alias); }
-  public static TypeMemPtr make( int... aliases ) { return make(BitsAlias.make0(aliases)); }
+  static TypeMemPtr make_nil( int alias ) { return make(BitsAlias.make0(alias).meet_nil()); }
   
   public static final TypeMemPtr OOP0   = make(BitsAlias.FULL); // Includes nil
          static final TypeMemPtr OOP    = make(BitsAlias.NZERO);// Excludes nil
-  public static final TypeMemPtr STRPTR = make    (BitsAlias.STR._idx);
-         static final TypeMemPtr STR0   = make_nil(BitsAlias.STR._idx);
-         static final TypeMemPtr ABCPTR = make    (TypeStr.ABC.get_alias()._idx);
-  public static final TypeMemPtr ABC0   = make_nil(TypeStr.ABC.get_alias()._idx);
-  public static final TypeMemPtr STRUCT = make    (BitsAlias.REC._idx);
-         static final TypeMemPtr STRUCT0= make_nil(BitsAlias.REC._idx);
+  public static final TypeMemPtr STRPTR = make    (BitsAlias.STR);
+         static final TypeMemPtr STR0   = make_nil(BitsAlias.STR);
+         static final TypeMemPtr ABCPTR = make    (TypeStr.ABC.get_alias());
+  public static final TypeMemPtr ABC0   = make_nil(TypeStr.ABC.get_alias());
+  public static final TypeMemPtr STRUCT = make    (BitsAlias.REC);
+         static final TypeMemPtr STRUCT0= make_nil(BitsAlias.REC);
   static final TypeMemPtr[] TYPES = new TypeMemPtr[]{OOP0,STRPTR,ABCPTR,STRUCT,ABC0};
   
   @Override protected TypeMemPtr xdual() { return new TypeMemPtr(_aliases.dual()); }
@@ -69,14 +68,15 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     return make(_aliases.meet( ((TypeMemPtr)t)._aliases ));
   }
   @Override public boolean above_center() { return _aliases.above_center(); }
-  // Aliases represent *classes* of pointers and are thus never constants
-  @Override public boolean may_be_con()   { return false; }
-  @Override public boolean is_con()       { return _aliases.is_con() && _aliases.getbit()==0; }
+  // Aliases represent *classes* of pointers and are thus never constants.
+  // nil is a constant.
+  @Override public boolean may_be_con()   { return may_nil(); }
+  @Override public boolean is_con()       { return _aliases.abit()==0; } // only nil
   @Override public boolean must_nil() { return _aliases.test(0) && !above_center(); }
   @Override public boolean may_nil() { return _aliases.may_nil(); }
   @Override Type not_nil() {
-    // Below center, return this; above center remove nil choice
-    return above_center() && _aliases.test(0) ? make(_aliases.clear(0)) : this;
+    BitsAlias bits = _aliases.not_nil();
+    return bits==_aliases ? this : make(bits);
   }
   @Override public Type meet_nil() {
     if( _aliases.test(0) )      // Already has a nil?

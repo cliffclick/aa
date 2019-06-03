@@ -24,12 +24,8 @@ public abstract class PrimNode extends Node {
   PrimNode( byte op, String name, String[] args, TypeTuple targs, Type ret ) { super(op); _name=name; _args=args; _targs = targs; _ret = ret; _badargs=null; }
   PrimNode( String name, String[] args, TypeTuple targs, Type ret ) { this(OP_PRIM,name,args,targs,ret); }
 
-  // Primitives are "pure" - neither have any memory expectations, nor return any changes
-  TypeMem argmem() { return TypeMem.MEM; }
-  TypeMem retmem() { return TypeMem.XMEM; }
-  
-  final static String[] ARGS1 = new String[]{"x"};
-  private final static String[] ARGS2 = new String[]{"x","y"};
+  final static String[] ARGS1 = new String[]{"mem","x"};
+  private final static String[] ARGS2 = new String[]{"mem","x","y"};
 
   public static PrimNode[] PRIMS = new PrimNode[] {
     new RandI64(),
@@ -122,13 +118,12 @@ public abstract class PrimNode extends Node {
   // wraps a PrimNode as a full 1st-class function to be passed about or
   // assigned to variables.
   public EpilogNode as_fun( GVNGCM gvn ) {
-    FunNode  fun = ( FunNode) gvn.xform(new  FunNode(this,_ret)); // Points to ScopeNode only
+    FunNode  fun = ( FunNode) gvn.xform(new  FunNode(this,_ret,TypeMem.XMEM)); // Points to ScopeNode only
     ParmNode rpc = (ParmNode) gvn.xform(new ParmNode(-1,"rpc",fun, gvn.con(TypeRPC.ALL_CALL),null));
-    ParmNode mem = (ParmNode) gvn.xform(new ParmNode(-2,"mem",fun, gvn.con(TypeMem.MEM     ),null));
     add_def(null);              // Control for the primitive in slot 0
     for( int i=0; i<_args.length; i++ )
       add_def(gvn.init(new ParmNode(i,_args[i],fun, gvn.con(_targs.at(i)),null)));
-    return new EpilogNode(fun,mem,gvn.init(this),rpc,fun,fun._tf.fidx(),null);
+    return new EpilogNode(fun,in(1),gvn.init(this),rpc,fun,fun._tf.fidx(),null);
   }
 
 
@@ -137,7 +132,7 @@ public abstract class PrimNode extends Node {
 static class ConvertTypeName extends PrimNode {
   private final Parse _badargs; // Only for converts
   private final HashMap<String,Type> _lex; // Unique lexical scope
-  ConvertTypeName(Type from, TypeName to, Parse badargs) { super(to._name,PrimNode.ARGS1,TypeTuple.make(from),to); _lex=to._lex; _badargs=badargs; }
+  ConvertTypeName(Type from, TypeName to, Parse badargs) { super(to._name,PrimNode.ARGS1,TypeTuple.make(TypeMem.MEM,from),to); _lex=to._lex; _badargs=badargs; }
   @Override public Type value(GVNGCM gvn) {
     Type[] ts = new Type[_defs._len];
     for( int i=1; i<_defs._len; i++ )
@@ -167,9 +162,9 @@ static class ConvertInt64F64 extends PrimNode {
 
 static class ConvertStrStr extends PrimNode {
   ConvertStrStr() { super("str",PrimNode.ARGS1,TypeTuple.STRPTR,TypeMemPtr.STRPTR); }
-  @Override public Type apply( Type[] args ) { return args[1]; }
-  @Override public Node ideal(GVNGCM gvn) { return in(1); }
-  @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)); }
+  @Override public Type apply( Type[] args ) { return args[2]; }
+  @Override public Node ideal(GVNGCM gvn) { return in(2); }
+  @Override public Type value(GVNGCM gvn) { return gvn.type(in(2)); }
   @Override public boolean is_lossy() { return false; }
 }
 
@@ -343,17 +338,17 @@ static class NE_OOP extends PrimNode {
 
 static class RandI64 extends PrimNode {
   RandI64() { super("math_rand",PrimNode.ARGS1,TypeTuple.INT64,TypeInt.INT64); }
-  @Override public TypeInt apply( Type[] args ) { return TypeInt.con(new java.util.Random().nextInt((int)args[1].getl())); }
-  @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)).meet(TypeInt.FALSE); }
+  @Override public TypeInt apply( Type[] args ) { return TypeInt.con(new java.util.Random().nextInt((int)args[2].getl())); }
+  @Override public Type value(GVNGCM gvn) { return gvn.type(in(2)).meet(TypeInt.FALSE); }
   // Rands have hidden internal state; 2 Rands are never equal
   @Override public boolean equals(Object o) { return this==o; }
 }
 
 static class Id extends PrimNode {
-  Id(Type arg) { super("id",PrimNode.ARGS1,TypeTuple.make(arg),arg); }
-  @Override public Type apply( Type[] args ) { return args[1]; }
-  @Override public Node ideal(GVNGCM gvn) { return in(1); }
-  @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)); }
+  Id(Type arg) { super("id",PrimNode.ARGS1,TypeTuple.make(TypeMem.MEM,arg),arg); }
+  @Override public Type apply( Type[] args ) { return args[2]; }
+  @Override public Node ideal(GVNGCM gvn) { return in(2); }
+  @Override public Type value(GVNGCM gvn) { return gvn.type(in(2)); }
 }
 
 static class AddStrStr extends PrimNode {

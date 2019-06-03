@@ -438,7 +438,7 @@ public class GVNGCM {
   // the worklist for nodes that are not above centerline.
   private void walk_initype( Node n ) {
     if( n==null || touched(n) ) return; // Been there, done that
-    Type startype = n.all_type().startype();
+    Type startype = n.all_type().dual();
     setype(n,startype);
     add_work(n);
     // Walk reachable graph

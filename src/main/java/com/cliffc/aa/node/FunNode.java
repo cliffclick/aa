@@ -17,7 +17,7 @@ import java.util.Map;
 // callers can appear after parsing.  Each unique call-site to a function gets
 // a new path to the FunNode.
 //
-// FunNodes are finite in count and can be unique densely numbered.
+// FunNodes are finite in count and are unique densely numbered, see BitsFun.
 //
 // Pointing to the FunNode are ParmNodes which are also PhiNodes; one input
 // path for each known caller.  Zero slot points to the FunNode.  Arg1 points
@@ -25,7 +25,9 @@ import java.util.Map;
 // worse-case legit bottom type).  The collection of these ConNodes can share
 // TypeVars to structurally type the inputs.  ParmNodes merge all input path
 // types (since they are a Phi), and the call "loses precision" for type
-// inference there.
+// inference there.  Parm#0 (NOT the zero-slot but the zero idx) is the
+// incoming memory argument.  Parm#1 and up (NOT the one-slot but the one idx)
+// are the classic function arguments.
 //
 // The function body points to the FunNode and ParmNodes like C2.
 //
@@ -42,13 +44,13 @@ public class FunNode extends RegionNode {
   private final byte _op_prec;  // Operator precedence; only set top-level primitive wrappers
   
   // Used to make the primitives at boot time
-  public FunNode(PrimNode prim, Type ret) {
-    this(TypeFunPtr.make_new(prim._targs,prim.argmem(),ret,prim.retmem(),BitsFun.ALL._idx,prim._targs._ts.length),prim.op_prec(),prim._name); }
+  public FunNode(PrimNode prim, Type ret, TypeMem retmem) {
+    this(TypeFunPtr.make_new(prim._targs,ret,retmem,BitsFun.ALL,prim._targs._ts.length),prim.op_prec(),prim._name); }
   // Used to make copies when inlining/cloning function bodies
-  private FunNode(TypeTuple ts, Type argmem, Type ret, Type retmem, int parent_fidx, String name, int nargs) {
-    this(TypeFunPtr.make_new(ts,argmem,ret,retmem,parent_fidx, nargs),-1,name); }
-  // Used to start an anonymous function in the Parser
-  public FunNode(Type[] ts) { this(TypeFunPtr.make_new(TypeTuple.make(ts),TypeMem.MEM,Type.SCALAR,TypeMem.MEM,BitsFun.ALL._idx,ts.length),-1,null); }
+  private FunNode(TypeTuple ts, Type ret, TypeMem retmem, int parent_fidx, String name, int nargs) {
+    this(TypeFunPtr.make_new(ts,ret,retmem,parent_fidx, nargs),-1,name); }
+  // Used to start an anonymous function in the Parser, includes argument memory in ts[0]
+  public FunNode(Type[] ts) { this(TypeFunPtr.make_new(TypeTuple.make(ts),Type.SCALAR,TypeMem.MEM,BitsFun.ALL,ts.length),-1,null); }
   // Used to forward-decl anon functions
   FunNode(String name) { this(TypeFunPtr.make_forward_ref(),-1,name); }
   // Shared common constructor
@@ -106,8 +108,7 @@ public class FunNode extends RegionNode {
   private boolean has_unknown_callers() { return in(1) == Env.ALL_CTRL; }
 
   Type targ(int idx) {
-    if( idx == -1 ) return TypeRPC.ALL_CALL;
-    return _tf.arg(idx);
+    return idx == -1 ? TypeRPC.ALL_CALL : _tf.arg(idx);
   }
   
   // ----
@@ -191,7 +192,10 @@ public class FunNode extends RegionNode {
     int idx = find_type_split_index(gvn,parms);
     if( idx != -1 ) {           // Found; split along a specific input path using widened types
       Type[] sig = new Type[parms.length];
-      for( int i=0; i<parms.length; i++ )
+      // Memory is parm#0, and default memory allows all memory input state.
+      // Also, widen() for memory currently does not do anything.
+      sig[0] = parms[0]==null ? TypeMem.MEM : gvn.type(parms[0].in(idx)).widen();
+      for( int i=1; i<parms.length; i++ )
         sig[i] = parms[i]==null ? Type.SCALAR : gvn.type(parms[i].in(idx)).widen();
       return sig;
     }
@@ -246,7 +250,7 @@ public class FunNode extends RegionNode {
     assert ts.isa(_tf._ts);
     assert ts != _tf._ts;            // Must see improvement
     // Make a prototype new function header.
-    FunNode fun = new FunNode(ts,_tf._argmem,_tf._ret,_tf._retmem,_tf.fidx(),name(),_tf._nargs);
+    FunNode fun = new FunNode(ts,_tf._ret,_tf._retmem,_tf.fidx(),name(),_tf._nargs);
     // Look in remaining paths and decide if they split or stay
     Node xctrl = gvn.con(Type.XCTRL);
     for( int j=2; j<_defs._len; j++ ) {
@@ -312,7 +316,7 @@ public class FunNode extends RegionNode {
     // Make a prototype new function header.  No generic unknown caller
     // in slot 1.  The one inlined call in slot 'm'.
     // Make a prototype new function header.
-    FunNode fun = new FunNode(_tf._ts,_tf._argmem,_tf._ret,_tf._retmem,_tf.fidx(),name(),_tf._nargs);
+    FunNode fun = new FunNode(_tf._ts,_tf._ret,_tf._retmem,_tf.fidx(),name(),_tf._nargs);
     fun.pop();                  // Remove junk ALL_CTRL input
     Node top = gvn.con(Type.XCTRL);
     for( int i=1; i<_defs._len; i++ )

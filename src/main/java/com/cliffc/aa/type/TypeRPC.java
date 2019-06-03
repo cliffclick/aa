@@ -64,13 +64,18 @@ public class TypeRPC extends Type<TypeRPC> {
   public int rpc() { return _rpcs.getbit(); }
   public boolean test(int rpc) { return _rpcs.test(rpc); }
   @Override public boolean above_center() { return _rpcs.above_center(); }
-  @Override public boolean may_be_con()   { return _rpcs.is_con() || _rpcs.above_center(); }
-  @Override public boolean is_con()       { return _rpcs.is_con(); }
+  // RPCs represent *classes* of return pointers and are thus never constants.
+  // TODO: This is weak, since call-sites are only rarely cloned so typically a
+  // RPC refers to the single call-site - but we can only strengthen this is we
+  // declare a call-site to be uncloneable.
+  // nil is a constant.
+  @Override public boolean may_be_con()   { return may_nil(); }
+  @Override public boolean is_con()       { return _rpcs.abit()==0; } // only nil
   @Override public boolean must_nil() { return _rpcs.test(0) && !above_center(); }
   @Override public boolean may_nil() { return _rpcs.may_nil(); }
   @Override Type not_nil() {
-    // Below center, return this; above center remove nil choice
-    return above_center() && _rpcs.test(0) ? make(_rpcs.clear(0)) : this;
+    BitsRPC bits = _rpcs.not_nil();
+    return bits==_rpcs ? this : make(bits);
   }
   @Override public Type meet_nil() {
     if( _rpcs.test(0) )      // Already has a nil?

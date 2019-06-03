@@ -11,27 +11,25 @@ import java.util.function.Consumer;
 // Function pointers can be executed, are not GC'd, and cannot be
 // Loaded or Stored through (although they can be loaded & stored).
 public final class TypeFunPtr extends Type<TypeFunPtr> {
-  public TypeTuple _ts;         // Arg types
-  public Type _argmem;          // Argument MEMORY types
+  public TypeTuple _ts;         // Arg types; 1-based, 0 reserved for the memory argument
   public Type _ret;             // return types
-  public Type _retmem;          // return MEMORY types
+  public TypeMem _retmem;       // return MEMORY types
   // List of known functions in set, or 'flip' for choice-of-functions.
   public BitsFun _fidxs;        // Known function bits
   public int _nargs;            // Count of args or -1 for forward_ref
 
-  private TypeFunPtr(TypeTuple ts, Type argmem, Type ret, Type retmem, BitsFun fidxs, int nargs ) { super(TFUNPTR); init(ts,argmem,ret,retmem,fidxs,nargs); }
-  private void init (TypeTuple ts, Type argmem, Type ret, Type retmem, BitsFun fidxs, int nargs ) {
+  private TypeFunPtr(TypeTuple ts, Type ret, TypeMem retmem, BitsFun fidxs, int nargs ) { super(TFUNPTR); init(ts,ret,retmem,fidxs,nargs); }
+  private void init (TypeTuple ts, Type ret, TypeMem retmem, BitsFun fidxs, int nargs ) {
     _ts = ts;
-    _argmem = argmem;
     _ret = ret;
     _retmem = retmem;
     _fidxs = fidxs;
     _nargs=nargs;
+    assert ts.at(0) instanceof TypeMem; // argmem in argument#0
   }
   @Override int compute_hash() {
     int hash = TFUNPTR + _nargs +
       _ts    ._hash +
-      _argmem._hash +
       _ret   ._hash +
       _retmem._hash +
       _fidxs ._hash;
@@ -41,7 +39,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     if( this==o ) return true;
     if( !(o instanceof TypeFunPtr) ) return false;
     TypeFunPtr tf = (TypeFunPtr)o;
-    return _ts==tf._ts && _argmem==tf._argmem && _ret==tf._ret && _retmem==tf._retmem && _fidxs==tf._fidxs && _nargs==tf._nargs;
+    return _ts==tf._ts && _ret==tf._ret && _retmem==tf._retmem && _fidxs==tf._fidxs && _nargs==tf._nargs;
   }
   // Never part of a cycle, so the normal check works
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
@@ -51,8 +49,6 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     sb.p('{');
     for( int i=0; i<_ts._ts.length; i++ ) sb.p(arg(i).str(dups)).p(' ');
     if( _nargs==99 ) sb.p("... ");
-    if( _argmem != TypeMem.MEM ) // Argument memory is only interesting if required to be something special
-      sb.p(_argmem.str(dups));
     sb.p("-> ").p(_ret.str(dups));
     if( _retmem != TypeMem.XMEM ) // Return memory is only interesting if returning something special
       sb.p(' ').p(_retmem.str(dups));
@@ -61,13 +57,13 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
 
   private static TypeFunPtr FREE=null;
   @Override protected TypeFunPtr free( TypeFunPtr ret ) { FREE=this; return ret; }
-  public static TypeFunPtr make_new( TypeTuple ts, Type argmem, Type ret, Type retmem, int parent_fidx, int nargs ) {
-    return make(ts,argmem,ret,retmem,BitsFun.make_new_fidx(parent_fidx),nargs);
+  public static TypeFunPtr make_new( TypeTuple ts, Type ret, TypeMem retmem, int parent_fidx, int nargs ) {
+    return make(ts,ret,retmem,BitsFun.make_new_fidx(parent_fidx),nargs);
   }
-  public static TypeFunPtr make( TypeTuple ts, Type argmem, Type ret, Type retmem, BitsFun fidxs, int nargs ) {
+  public static TypeFunPtr make( TypeTuple ts, Type ret, TypeMem retmem, BitsFun fidxs, int nargs ) {
     TypeFunPtr t1 = FREE;
-    if( t1 == null ) t1 = new TypeFunPtr(ts,argmem,ret,retmem,fidxs,nargs);
-    else {   FREE = null;        t1.init(ts,argmem,ret,retmem,fidxs,nargs); }
+    if( t1 == null ) t1 = new TypeFunPtr(ts,ret,retmem,fidxs,nargs);
+    else {   FREE = null;        t1.init(ts,ret,retmem,fidxs,nargs); }
     TypeFunPtr t2 = (TypeFunPtr)t1.hashcons();
     return t1==t2 ? t1 : t1.free(t2);
   }
@@ -75,9 +71,9 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public static TypeFunPtr any( int nargs, int fidx ) {
     BitsFun bs = fidx==-1 ? BitsFun.FULL : BitsFun.make0(fidx);
     switch( nargs ) {
-    case 0: return make(TypeTuple.SCALAR0,TypeMem.MEM,Type.SCALAR,TypeMem.MEM, bs,nargs);
-    case 1: return make(TypeTuple.SCALAR1,TypeMem.MEM,Type.SCALAR,TypeMem.MEM, bs,nargs);
-    case 2: return make(TypeTuple.SCALAR2,TypeMem.MEM,Type.SCALAR,TypeMem.MEM, bs,nargs);
+    case 0: return make(TypeTuple.SCALAR0,Type.SCALAR,TypeMem.MEM, bs,nargs);
+    case 1: return make(TypeTuple.SCALAR1,Type.SCALAR,TypeMem.MEM, bs,nargs);
+    case 2: return make(TypeTuple.SCALAR2,Type.SCALAR,TypeMem.MEM, bs,nargs);
     default: throw com.cliffc.aa.AA.unimpl();
     }
   }
@@ -90,7 +86,6 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   
   @Override protected TypeFunPtr xdual() {
     return new TypeFunPtr((TypeTuple)_ts.dual(),
-                          _argmem.dual(),
                           _ret.dual(),
                           _retmem.dual(),
                           _fidxs.dual(),
@@ -117,32 +112,36 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     TypeFunPtr tf = (TypeFunPtr)t;
     BitsFun fidxs = _fidxs.meet( tf._fidxs );
     TypeTuple ts = (TypeTuple)_ts.join(tf._ts);
-    Type argmem = _argmem.join(tf._argmem);
     Type ret = _ret.meet(tf._ret);
-    Type retmem = _retmem.meet(tf._retmem);
+    TypeMem retmem = (TypeMem)_retmem.meet(tf._retmem);
     int nargs = tf._ret.above_center()
       ? (_ret.above_center() ? Math.min(_nargs,tf._nargs) :   _nargs )
       : (_ret.above_center() ? tf._nargs : Math.max(_nargs,tf._nargs));
-    return make(ts,argmem,ret,retmem,fidxs,nargs);
+    return make(ts,ret,retmem,fidxs,nargs);
   }
 
   public final int nargs() { return _nargs; }
-  public final Type arg(int idx) { return _idx==-2 ? _argmem : _ts.at(idx); }
+  public final Type arg(int idx) { return _ts.at(idx); }
   public final Type ret() { return _ret; }
 
   @Override public boolean above_center() { return _fidxs.above_center(); }
-  @Override public boolean may_be_con()   { return _fidxs.is_con() || _fidxs.above_center(); }
-  @Override public boolean is_con()       { return _fidxs.is_con(); }
+  // Fidxes represent *classes* of code pointers and are thus never constants.
+  // TODO: This is weak, since functions are only rarely cloned so typically a
+  // FIDX refers to the single instance - but we can only strengthen this is we
+  // declare a function to be uncloneable.
+  // nil is a constant.
+  @Override public boolean may_be_con()   { return may_nil(); }
+  @Override public boolean is_con()       { return _fidxs.abit()==0; } // only nil
   @Override public boolean must_nil() { return _fidxs.test(0) && !above_center(); }
   @Override public boolean may_nil() { return _fidxs.may_nil(); }
   @Override Type not_nil() {
-    // Below center, return this; above center remove nil choice
-    return above_center() && _fidxs.test(0) ? make(_ts,_argmem,_ret,_retmem,_fidxs.clear(0),_nargs) : this;
+    BitsFun bits = _fidxs.not_nil();
+    return bits==_fidxs ? this : make(_ts,_ret,_retmem,bits,_nargs);
   }
   @Override public Type meet_nil() {
     if( _fidxs.test(0) )      // Already has a nil?
       return _fidxs.above_center() ? TypeNil.NIL : this;
-    return make(_ts,_argmem,_ret,_retmem,_fidxs.meet(BitsFun.NIL),_nargs);
+    return make(_ts,_ret,_retmem,_fidxs.meet(BitsFun.NIL),_nargs);
   }
       
   // Return true if this is an ambiguous function pointer
@@ -151,8 +150,8 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
 
   // Generic functions
   public boolean is_forward_ref()                    { return _nargs == -1; }
-  public static TypeFunPtr make_forward_ref() { return make(GENERIC_ARGS, TypeMem.XMEM, GENERIC_RET,TypeMem.MEM, BitsFun.make_new_fidx(BitsFun.ALL._idx),-1); }
-  private static TypeFunPtr make_generic()    { return make(GENERIC_ARGS, TypeMem.XMEM, GENERIC_RET,TypeMem.MEM, BitsFun.FULL,99); }
+  public static TypeFunPtr make_forward_ref() { return make(GENERIC_ARGS, GENERIC_RET,TypeMem.MEM, BitsFun.make_new_fidx(BitsFun.ALL),-1); }
+  private static TypeFunPtr make_generic()    { return make(GENERIC_ARGS, GENERIC_RET,TypeMem.MEM, BitsFun.FULL,99); }
   // Iterate over any nested child types
   @Override public void iter( Consumer<Type> c ) { _ts.iter(c); c.accept(_ret); }
 }

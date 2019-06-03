@@ -44,7 +44,7 @@ public class EpilogNode extends Node {
   }
   
   public    Node ctrl() { return          in(0); } // internal function control
-            Node mem () { return          in(1); } // standard exit value
+            Node mem () { return          in(1); } // standard exit memory
             Node val () { return          in(2); } // standard exit value
   public    Node rpc () { return          in(3); } // Almost surely a PhiNode merging RPCs
   public FunNode fun () { return (FunNode)in(4); } // Function header

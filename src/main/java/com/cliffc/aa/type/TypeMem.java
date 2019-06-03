@@ -48,16 +48,17 @@ import java.util.BitSet;
    being All vs some Constants).
 */
 public class TypeMem extends Type<TypeMem> {
-  
+  private boolean _any;
   // Mapping from alias#s to the current known alias state.  Slot 0 is
-  // reserved, and TypeMem is never a nil.  Slot#1 is the Parent-Of-All
-  // aliases, and is the default value.  Default values are replaced with null
-  // - a tad easier to debug, but no other real reason.
+  // reserved; TypeMem is never a nil.  Slot#1 is the Parent-Of-All aliases and
+  // is the default value.  Default values are replaced with null during
+  // canonicalization.
   private TypeObj[] _aliases;
   
-  private TypeMem  (TypeObj[] aliases) { super(TMEM); init(aliases); }
-  private void init(TypeObj[] aliases) {
+  private TypeMem  (boolean any, TypeObj[] aliases) { super(TMEM); init(any,aliases); }
+  private void init(boolean any, TypeObj[] aliases) {
     super.init(TMEM);
+    _any = any;
     _aliases = aliases;
     assert check();
   }
@@ -72,36 +73,14 @@ public class TypeMem extends Type<TypeMem> {
     if( as.length==2 ) return true; // Trivial all of memory
     // "tight" - something in the last slot
     if( _aliases[_aliases.length-1] == null ) return false;
-
-    // If the parent is set, it is the default and no child should have the
-    // same type as the default.  If the parent is closed and all children are
-    // set, then the parent is not needed; if all children are the same they
-    // can be replaced by the closed parent.
-    for( int i=as.length-1; i>=1; i-- ) {
-      TypeTree par = BitsAlias.TREES.at(i), x=par._par;
-      assert par._idx==i;
-      if( par._kids==null ) continue; // Not a parent
-      TypeObj part = as[i];           // Parent type
-      while( part == null ) {
-        assert x._kids != null;
-        part = as[x._idx];
-        x = x._par;
-      }
-      int uidx = -1;                  // unique type index
-      for( int j=0; j<par._kids._len; j++ ) {
-        int kidx = par._kids.at(j)._idx;
-        TypeObj kidt = kidx < as.length ? as[kidx] : null;
-        if( kidt == null ) continue;   // Kid not reporting
-        if( kidt==part ) return false; // Kid should be shadowed by parent
-        if( uidx == -1 ) uidx = kidt._uid;      // Gather unique kid type
-        else if( uidx != kidt._uid ) uidx = -2; // Different kid types
-      }
-      if( par.closed() && uidx== -2 ) return false; // All equal kid types shadow parent
-    }
+    // No dups of the default in slot 1
+    for( int i=2; i<as.length; i++ )
+      if( as[i]==as[1] )
+        return false;
     return true;
   }
   @Override int compute_hash() {
-    int hash = TMEM;
+    int hash = TMEM + (_any?1:0);
     for( TypeObj obj : _aliases )  if( obj != null )  hash += obj._hash;
     return hash;
   }
@@ -109,7 +88,7 @@ public class TypeMem extends Type<TypeMem> {
     if( this==o ) return true;
     if( !(o instanceof TypeMem) ) return false;
     TypeMem tf = (TypeMem)o;
-    if( _aliases.length != tf._aliases.length ) return false;
+    if( _any!=tf._any || _aliases.length != tf._aliases.length ) return false;
     for( int i=0; i<_aliases.length; i++ )
       if( _aliases[i] != tf._aliases[i] ) // note '==' and NOT '.equals()'
         return false;
@@ -121,21 +100,17 @@ public class TypeMem extends Type<TypeMem> {
     if( this== MEM ) return "[mem]";
     if( this==XMEM ) return "[~mem]";
     SB sb = new SB();
-    sb.p("[");
+    if( _any ) sb.p('~');
+    sb.p('[');
     for( int i=1; i<_aliases.length; i++ )
       if( _aliases[i] != null )
         sb.p(i).p("#:").p(_aliases[i].toString()).p(",");
-    return sb.p("]").toString();
+    return sb.p(']').toString();
   }
                 
-  // Alias-at.  Walks up the tree to parent aliases as needed.  Always hits on
-  // _aliases[1], and now never returns a null.  Prior versions go back-n-forth
-  // on whether or not this call returns a null.
-  public TypeObj at0(int alias) {
-    while( alias >= _aliases.length || _aliases[alias]==null )
-      alias = BitsAlias.TREES.at(alias)._par._idx; // Walk up the alias tree
-    return _aliases[alias];
-  }
+  // Alias-at.  Now never returns a null.  Prior versions go back-n-forth on
+  // whether or not this call returns a null.
+  public TypeObj at0(int alias) { return alias < _aliases.length ? _aliases[alias] : null;  }
   // Alias-at, but defaults to "XOBJ" for easy meet() calls.
   // Never returns a null.
   public TypeObj at(int alias) {
@@ -145,64 +120,43 @@ public class TypeMem extends Type<TypeMem> {
   
   private static TypeMem FREE=null;
   @Override protected TypeMem free( TypeMem ret ) { _aliases=null; FREE=this; return ret; }
-  private static TypeMem make(TypeObj[] aliases) {
+  private static TypeMem make(boolean any, TypeObj[] aliases) {
     TypeMem t1 = FREE;
-    if( t1 == null ) t1 = new TypeMem(aliases);
-    else { FREE = null;       t1.init(aliases); }
+    if( t1 == null ) t1 = new TypeMem(any, aliases);
+    else { FREE = null;       t1.init(any, aliases); }
     TypeMem t2 = (TypeMem)t1.hashcons();
     return t1==t2 ? t1 : t1.free(t2);
   }
 
   // Canonicalize memory before making.  Unless specified, the default memory is "dont care"
-  static TypeMem make0( TypeObj[] as ) {
-    int len = as.length;
+  static TypeMem make0( boolean any, TypeObj[] as ) {
     if( as[1]==null ) as[1] = TypeObj.XOBJ; // Default memory is "dont care"
-    if( len == 2 ) return make(as);
-    // If the parent is set, it is the default and no child should have the
-    // same type as the default.  If the parent is closed and all children are
-    // set, then the parent is not needed; if all children are the same they
-    // can be replaced by the closed parent.
-    for( int i=as.length-1; i>=1; i-- ) {
-      TypeTree par = BitsAlias.TREES.at(i);
-      if( par._kids==null ) continue; // Not a parent
-      TypeObj part = as[i];           // Parent type
-      for( TypeTree x = par._par; part==null; x = x._par )
-        part = as[x._idx];
-      
-      TypeObj utype = null;     // Unique kid type
-      for( int j=0; j<par._kids._len; j++ ) {
-        int kidx = par._kids.at(j)._idx;
-        TypeObj kidt = kidx < as.length ? as[kidx] : null;
-        if( kidt==part ) as[kidx]=null;  // Kid is shadowed by parent
-        if( kidt==null ) kidt=part;      // Kid not reporting, use parent type
-        
-        if( utype == null ) utype = kidt;       // Gather unique kid type
-        else if( utype != kidt ) utype = as[1]; // Different kid types
-      }
-      if( par.closed() && utype != as[1] && utype != null )
-        throw AA.unimpl();      // Parent is closed and null and all kids are equal
-    }
-    
+    int len = as.length;
+    if( len == 2 ) return make(any,as);
+    // No dups of default in slot 1
+    for( int i=2; i<len; i++ )
+      if( as[i]==as[1] )
+        as[i]=as[1];
     // Remove trailing nulls; make the array "tight"
     while( as[len-1] == null ) len--;
     if( as.length!=len ) as = Arrays.copyOf(as,len);
 
-    return make(as);
+    return make(any,as);
   }
 
   // Precise single alias.  Other aliases are "dont care".  Nil not allowed.
   public static TypeMem make(int alias, TypeObj oop ) {
     TypeObj[] as = new TypeObj[alias+1];
-    as[BitsAlias.ALL._idx] = TypeObj.XOBJ; // Everything else is "dont care"
+    as[BitsAlias.ALL] = TypeObj.XOBJ; // Everything else is "dont care"
     as[alias] = oop;
-    return make(as);
+    return make(false,as);
   }
 
-  public  static final TypeMem MEM = make(new TypeObj[]{null,TypeObj.OBJ}); // Every alias filled with something
-  public  static final TypeMem XMEM = MEM.dual(); // Every alias filled with anything
+  public  static final TypeMem  MEM = make(false,new TypeObj[]{null,TypeObj. OBJ}); // Every alias filled with something
+  public  static final TypeMem XMEM = make(false,new TypeObj[]{null,TypeObj.XOBJ}); // Every alias filled with anything
   public  static final TypeMem EMPTY_MEM = XMEM; //make(new TypeObj[0]); // Tried no-memory-vs-XOBJ-memory
-          static final TypeMem MEM_STR = make(BitsAlias.STR._idx,TypeStr.STR);
-          static final TypeMem MEM_ABC = make(BitsAlias.STR._idx,TypeStr.ABC);
+          static final TypeMem MEM_STR = make(BitsAlias.STR,TypeStr.STR);
+          static final TypeMem MEM_ABC = make(BitsAlias.STR,TypeStr.ABC);
   static final TypeMem[] TYPES = new TypeMem[]{MEM,MEM_STR};
 
   // All mapped memories remain, but each memory flips internally.
@@ -211,7 +165,7 @@ public class TypeMem extends Type<TypeMem> {
     for(int i=0; i<_aliases.length; i++ )
       if( _aliases[i] != null )
         oops[i] = (TypeObj)_aliases[i].dual();
-    return new TypeMem(oops);
+    return new TypeMem(!_any,oops);
   }
   @Override protected Type xmeet( Type t ) {
     if( t._type != TMEM ) return ALL; //
@@ -224,7 +178,7 @@ public class TypeMem extends Type<TypeMem> {
       if( (i<   _aliases.length &&    _aliases[i] != null) ||
           (i<tf._aliases.length && tf._aliases[i] != null) ) // short-cut for both null
         objs[i] = (TypeObj)at(i).meet(tf.at(i));             // meet element-by-element
-    return make0(objs);
+    return make0(_any&&tf._any,objs);
   }
 
   // Meet of all possible loadable values
@@ -232,8 +186,10 @@ public class TypeMem extends Type<TypeMem> {
     boolean any = ptr.above_center();
     TypeObj obj = any ? TypeObj.OBJ : TypeObj.XOBJ;
     for( int alias : ptr._aliases ) {
-      TypeObj x = at0(alias);
-      obj = (TypeObj)(any ? obj.join(x) : obj.meet(x));
+      if( alias != 0 ) {        // nil on a JOIN is ignored, on a MEET is failure
+        TypeObj x = at(alias);
+        obj = (TypeObj)(any ? obj.join(x) : obj.meet(x));
+      }
     }
     return obj;
   }
@@ -257,25 +213,17 @@ public class TypeMem extends Type<TypeMem> {
     int mlen = ms.length;
     int alias = mlen-1;
     TypeObj obj = ms[alias];
-    assert alias >= 2 && obj != null;
+    assert alias >= 1 && obj != null;
     for( int i=2; i<alias; i++ )  assert ms[i]==null;
 
     TypeObj[] objs = Arrays.copyOf(_aliases,Math.max(_aliases.length,alias+1));
     objs[alias]=obj;
-    return make0(objs);
+    return make0(_any,objs);
   }
   
-  @Override public boolean above_center() { return _aliases[1].above_center(); }
+  @Override public boolean above_center() { return _any; }
   @Override public boolean may_be_con()   { return false;}
   @Override public boolean is_con()       { return false;}
   @Override public boolean must_nil() { return false; } // never a nil
   @Override Type not_nil() { return this; }
-  // Dual, except keep TypeMem.XOBJ as high for starting GVNGCM.opto() state.
-  @Override public TypeMem startype() {
-    TypeObj[] oops = new TypeObj[_aliases.length];
-    for(int i=0; i<_aliases.length; i++ )
-      if( _aliases[i] != null )
-        oops[i] = _aliases[i].startype();
-    return make0(oops);
-  }
 }

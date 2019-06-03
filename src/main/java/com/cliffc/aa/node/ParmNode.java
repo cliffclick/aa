@@ -27,7 +27,7 @@ public class ParmNode extends PhiNode {
     assert fun._defs._len==_defs._len;
     if( gvn.type(fun) == Type.XCTRL ) return null; // All dead, c-prop will fold up
     // Arg-check before folding up
-    if( _idx != -1 && _idx != -2 ) {
+    if( _idx != -1 ) {
       Type formal = fun._tf.arg(_idx);        // Formal argument type
       for( int i=1; i<_defs._len; i++  )      // For all arguments
         if( gvn.type(fun.in(i))==Type.CTRL && // Path is alive

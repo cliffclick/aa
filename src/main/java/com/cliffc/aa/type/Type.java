@@ -672,9 +672,6 @@ public class Type<T extends Type<T>> {
 
   TypeStruct repeats_in_cycles(TypeStruct head, BitSet bs) { return null; }
 
-  // Dual, except keep TypeMem.XOBJ as high for starting GVNGCM.opto() state.
-  public Type startype() { return this==ANY ? ANY : dual(); }
-  
   RuntimeException typerr(Type t) {
     throw new RuntimeException("Should not reach here: internal type system error with "+this+(t==null?"":(" and "+t)));
   }

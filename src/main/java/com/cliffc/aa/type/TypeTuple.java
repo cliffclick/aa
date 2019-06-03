@@ -76,19 +76,19 @@ public class TypeTuple<O extends TypeTuple<O>> extends Type<O> {
     return tt;
   }
 
-          static final TypeTuple XSCALARS= make0(true);
-          static final TypeTuple SCALAR0 = make();
-          static final TypeTuple SCALAR1 = make(SCALAR);
-  public  static final TypeTuple SCALAR2 = make(SCALAR, SCALAR);
-          static final TypeTuple INT32   = make(TypeInt.INT32 );
-  public  static final TypeTuple INT64   = make(TypeInt.INT64 );
-  public  static final TypeTuple FLT64   = make(TypeFlt.FLT64 );
-  public  static final TypeTuple STRPTR  = make(TypeMemPtr.STRPTR);
-  public  static final TypeTuple OOP_OOP = make(TypeMemPtr.OOP0,TypeMemPtr.OOP0);
-  public  static final TypeTuple INT64_INT64 = make(TypeInt.INT64,TypeInt.INT64);
-  public  static final TypeTuple FLT64_FLT64 = make(TypeFlt.FLT64,TypeFlt.FLT64);
-  private static final TypeTuple FLT64_INT64 = make(TypeFlt.FLT64,TypeInt.INT64);
-  public  static final TypeTuple STR_STR     = make(TypeMemPtr.STRPTR,TypeMemPtr.STRPTR);
+          static final TypeTuple XSCALARS= make0(true,TypeMem.XMEM);
+          static final TypeTuple SCALAR0 = make(TypeMem.XMEM);
+          static final TypeTuple SCALAR1 = make(TypeMem.XMEM,SCALAR);
+  public  static final TypeTuple SCALAR2 = make(TypeMem.XMEM,SCALAR, SCALAR);
+          static final TypeTuple INT32   = make(TypeMem.XMEM,TypeInt.INT32 );
+  public  static final TypeTuple INT64   = make(TypeMem.XMEM,TypeInt.INT64 );
+  public  static final TypeTuple FLT64   = make(TypeMem.XMEM,TypeFlt.FLT64 );
+  public  static final TypeTuple STRPTR  = make(TypeMem.XMEM,TypeMemPtr.STRPTR);
+  public  static final TypeTuple OOP_OOP = make(TypeMem.XMEM,TypeMemPtr.OOP0,TypeMemPtr.OOP0);
+  public  static final TypeTuple INT64_INT64 = make(TypeMem.XMEM,TypeInt.INT64,TypeInt.INT64);
+  public  static final TypeTuple FLT64_FLT64 = make(TypeMem.XMEM,TypeFlt.FLT64,TypeFlt.FLT64);
+  private static final TypeTuple FLT64_INT64 = make(TypeMem.XMEM,TypeFlt.FLT64,TypeInt.INT64);
+  public  static final TypeTuple STR_STR     = make(TypeMem.XMEM,TypeMemPtr.STRPTR,TypeMemPtr.STRPTR);
   
   public  static final TypeTuple IF_ANY  = make(XCTRL,XCTRL);
   public  static final TypeTuple IF_ALL  = make(CTRL ,CTRL );
@@ -179,11 +179,4 @@ public class TypeTuple<O extends TypeTuple<O>> extends Type<O> {
     throw AA.unimpl();
   }
 
-  // Dual, except keep TypeMem.XOBJ as high for starting GVNGCM.opto() state.
-  @Override public TypeTuple startype() {
-    Type[] ts = new Type[_ts.length];
-    for( int i=0; i<_ts.length; i++ ) ts[i] = _ts[i].startype();
-    return make0(!_any, ts);
-  }
-  
 }

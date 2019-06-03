@@ -9,11 +9,13 @@ import java.util.function.Predicate;
 // Strings.  Just an alternative TypeObj to TypeStruct - but basically really
 // should be replaced with a named Array.
 public class TypeStr extends TypeObj<TypeStr> {
-  private String _con;          // 
-  private TypeStr  (boolean any, String con ) { super(TSTR,any); init(any,con); }
-  private void init(boolean any, String con ) {
+  private String _con;          //
+  private int _alias;           // 
+  private TypeStr  (boolean any, String con, int alias ) { super(TSTR,any); init(any,con,alias); }
+  private void init(boolean any, String con, int alias ) {
     super.init(TSTR,any);
     _con = con;
+    _alias=alias;
   }
   @Override int compute_hash() { return super.compute_hash() + (_con==null ? 0 : _con.hashCode());  }
   @Override public boolean equals( Object o ) {
@@ -32,33 +34,31 @@ public class TypeStr extends TypeObj<TypeStr> {
   }
   private static TypeStr FREE=null;
   @Override protected TypeStr free( TypeStr ret ) { FREE=this; return ret; }
-  public static TypeStr make( boolean any, String con ) {
+  public static TypeStr make( boolean any, String con, int alias ) {
     assert con==null || !any;
     TypeStr t1 = FREE;
-    if( t1 == null ) t1 = new TypeStr(any,con);
-    else { FREE = null; t1.init(any,con); }
+    if( t1 == null ) t1 = new TypeStr(any,con,alias);
+    else { FREE = null; t1.init(any,con,alias); }
     TypeStr t2 = (TypeStr)t1.hashcons();
-    return t1==t2 ? t1 : t1.free(t2);
+    TypeStr rez = t1==t2 ? t1 : t1.free(t2);
+    // Monotonically set alias from zero to non-zero
+    if( rez._alias==0 ) rez._alias = alias;
+    else if( alias != 0 ) assert rez._alias==alias;
+    return rez;
   }
-  public static TypeStr con(String con) { return make(false,con); }
+  public static TypeStr con(String con) { return make(false,con,0); }
   public static void init() {} // Used to force class init
 
-  // Mapping from parse-time constant strings to their alias class.  Allows
-  // parse-time interning (and read-only or COW semantics on strings).
-  private static HashMap<TypeStr,TypeTree> CON_ALIASES = new HashMap<>();
-  static void reset_to_init0() { CON_ALIASES.clear(); }
   // Get the alias for string constants.  Since string constants are interned,
   // so are the aliases.
-  public TypeTree get_alias() {
-    TypeTree tt = CON_ALIASES.get(this);
-    if( tt==null ) tt = BitsAlias.new_string();
-    CON_ALIASES.put(this,tt);
-    return tt;
+  public int get_alias() {
+    if( _alias ==0 ) _alias = BitsAlias.new_string();
+    return _alias;
   }
 
   
-  public  static final TypeStr  STR = make(false,null); // not null
-  public  static final TypeStr XSTR = make(true ,null); // choice string
+  public  static final TypeStr  STR = make(false,null,BitsAlias.STR); // not null
+  public  static final TypeStr XSTR = make(true ,null,BitsAlias.STR); // choice string
   public  static final TypeStr  ABC = con("abc"); // a string constant
   private static final TypeStr  DEF = con("def"); // a string constant
   static final TypeStr[] TYPES = new TypeStr[]{STR,XSTR,ABC,DEF};
@@ -66,7 +66,7 @@ public class TypeStr extends TypeObj<TypeStr> {
   // Return a String from a TypeStr constant; assert otherwise.
   @Override public String getstr() { assert is_con(); return _con; }
 
-  @Override protected TypeStr xdual() { return new TypeStr(!_any,_con); }
+  @Override protected TypeStr xdual() { return new TypeStr(!_any,_con,_alias); }
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TSTR:     break;
@@ -112,6 +112,4 @@ public class TypeStr extends TypeObj<TypeStr> {
   }
   @Override public Type widen() { return STR; }
   @Override void walk( Predicate<Type> p ) { p.test(this); }
-  // Dual, except keep TypeMem.XOBJ as high for starting GVNGCM.opto() state.
-  @Override public TypeObj startype() { return dual(); }
 }

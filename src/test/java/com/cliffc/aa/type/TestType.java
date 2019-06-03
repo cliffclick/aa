@@ -119,8 +119,8 @@ public class TestType {
     
     Type pabc0= TypeMemPtr.ABC0;    // *["abc"]?
     TypeMemPtr pabc = TypeMemPtr.ABCPTR; // *["abc"]
-    Type pzer = TypeMemPtr.make    (BitsAlias.new_alias(BitsAlias.REC)._idx);// *[(0)]
-    Type pzer0= TypeMemPtr.make_nil(BitsAlias.new_alias(BitsAlias.REC)._idx);// *[(0)]?
+    TypeMemPtr pzer = TypeMemPtr.make(BitsAlias.new_alias(BitsAlias.REC));// *[(0)]
+    Type pzer0= pzer.meet_nil();  // *[(0)]?
     Type nil  = TypeNil.NIL;
 
     Type xtup = ptup .dual();
@@ -145,25 +145,25 @@ public class TestType {
     // nil).  We cannot tell what they point-to, so we do not know if the
     // memory pointed-at is compatible or not.
     assertTrue (xstr0.isa(pabc0)); // ~*[1]+0 vs ~*[2]?
-    assertFalse(xstr .isa(pabc ));
+    assertTrue (xstr .isa(pabc ));
     // We can instead assert that values loaded are compatible:
     assertTrue (TypeMem.MEM_STR.dual().ld(xstr).isa(TypeMem.MEM_ABC.ld(pabc)));
     
     assertTrue (xtup0.isa( nil ));
     assertTrue (xtup0.isa(pzer0));
-    assertFalse(xtup .isa(pzer ));
+    assertTrue (xtup .isa(pzer ));
     //assertTrue(TypeMem.MEM_TUP.dual().ld(xstr).isa(TypeMem.MEM_ZER.ld(pabc)));
     
     assertTrue ( nil .isa(pabc0));
     assertTrue ( nil .isa(pzer0));
     
     assertTrue ( nil .isa(pstr0));
-    assertFalse(pabc0.isa(pstr0));
-    assertFalse(pabc .isa(pstr ));
+    assertTrue (pabc0.isa(pstr0));
+    assertTrue (pabc .isa(pstr ));
     assertTrue (TypeMem.MEM_ABC.ld(pabc).isa(TypeMem.MEM_STR.ld(pstr)));
     assertTrue ( nil .isa(ptup0));
-    assertFalse(pzer0.isa(ptup0));
-    assertFalse(pzer .isa(ptup ));
+    assertTrue (pzer0.isa(ptup0));
+    assertTrue (pzer .isa(ptup ));
     //assertTrue(TypeMem.MEM_TUP.dual().ld(xstr).isa(TypeMem.MEM_ZER.ld(pabc)));
     assertTrue (ptup0.isa(pmem0));
     assertTrue (ptup .isa(pmem ));
@@ -195,10 +195,10 @@ public class TestType {
     TypeObj a1 = TypeStruct.make(new String[]{"c"},TypeNil.NIL ); // @{c:nil}
     TypeObj a2 = TypeStruct.make(new String[]{"c"},TypeMemPtr.make_nil(3)); // @{c:*{3#}?}
     TypeObj a3 = TypeStruct.make(new String[]{"x"},TypeInt.TRUE); // @{x: 1 }
-    TypeMem mem = TypeMem.make0(new TypeObj[]{null,TypeObj.OBJ,a1,a2,a3});
-    // *[1]? join *[2] ==> *[1+2]
-    Type ptr12 = TypeMemPtr.make_nil(1).join( TypeMemPtr.make(2));
-    // mem.ld(*[1+2]) ==> @{c:0}
+    TypeMem mem = TypeMem.make0(false,new TypeObj[]{null,TypeObj.OBJ,a1,a2,a3});
+    // *[1]? join *[2] ==> *[1+2]?
+    Type ptr12 = TypeNil.NIL.join(TypeMemPtr.make(-1)).join( TypeMemPtr.make(-2));
+    // mem.ld(*[1+2]?) ==> @{c:0}
     Type ld = mem.ld((TypeMemPtr)ptr12);
     assertEquals(a1,ld);
   }
@@ -213,12 +213,13 @@ public class TestType {
     TypeFunPtr gf = TypeFunPtr.GENERIC_FUNPTR;
     TypeMem nomem = TypeMem.MEM.dual();
 
-    TypeFunPtr f1i2i = TypeFunPtr.make_new(TypeTuple.INT64,nomem,TypeInt.INT64,nomem,BitsFun.ALL._idx,1/*nargs*/);
+    TypeFunPtr f1i2i = TypeFunPtr.make_new(TypeTuple.INT64,TypeInt.INT64,nomem,BitsFun.ALL,1/*nargs*/);
     assertTrue(f1i2i.isa(gf));
-    TypeFunPtr f1f2f = TypeFunPtr.make_new(TypeTuple.FLT64,nomem,TypeFlt.FLT64,nomem,BitsFun.ALL._idx,1/*nargs*/);
+    TypeFunPtr f1f2f = TypeFunPtr.make_new(TypeTuple.FLT64,TypeFlt.FLT64,nomem,BitsFun.ALL,1/*nargs*/);
     assertTrue(f1f2f.isa(gf));
     TypeFunPtr mt = (TypeFunPtr)f1i2i.meet(f1f2f);
-    TypeFunPtr f3i2r = TypeFunPtr.make(TypeTuple.INT32,nomem,Type.REAL    ,nomem,BitsFun.make0(1,2),1/*nargs*/);
+    BitsFun funs = BitsFun.make0(2).meet(BitsFun.make0(3));
+    TypeFunPtr f3i2r = TypeFunPtr.make(TypeTuple.INT32,Type.REAL    ,nomem,funs,1/*nargs*/);
     assertEquals(f3i2r,mt);
     assertTrue(f3i2r.isa(gf));
     assertTrue(f1i2i.isa(f3i2r));
@@ -287,20 +288,21 @@ public class TestType {
     // Twice: SAS AS0AS0AS0AS0AS0...
     // Meet:  SAS0AS0AS0AS0AS0AS0...
     // which is the Once yet again
-    TypeMem mem234 = TypeMem.make0(new TypeObj[]{null,TypeObj.OBJ,ta2,ta3,ta4});
-    TypeMemPtr ptr34 = TypeMemPtr.make(alias3,alias4);
+    TypeMem mem234 = TypeMem.make0(false,new TypeObj[]{null,TypeObj.OBJ,ta2,ta3,ta4});
+    TypeMemPtr ptr34 = (TypeMemPtr)TypeMemPtr.make(alias3).meet(TypeMemPtr.make(alias4));
 
     // Since hacking ptrs about from mem values, no cycles so instead...
     Type mta = mem234.ld(ptr34);
     //assertEquals(ta3,mta);
-    Type xta = TypeName.make("A",TypeName.TEST_SCOPE,TypeStruct.make(flds,TypeMemPtr.make(0,2,3),TypeInt.INT64));
+    TypeMemPtr ptr023 = (TypeMemPtr)TypeMemPtr.make_nil(2).meet(TypeMemPtr.make(3));
+    Type xta = TypeName.make("A",TypeName.TEST_SCOPE,TypeStruct.make(flds,ptr023,TypeInt.INT64));
     assertEquals(xta,mta);
 
 
     
     // Mismatched Names in a cycle; force a new cyclic type to appear
     final int alias5 = 5;
-    TypeStruct tsnb = TypeStruct.make(flds,TypeMemPtr.make(0,alias5),TypeFlt.FLT64);
+    TypeStruct tsnb = TypeStruct.make(flds,TypeMemPtr.make_nil(alias5),TypeFlt.FLT64);
     TypeName tfb = TypeName.make("B",TypeName.TEST_SCOPE,tsnb);
     Type mtab = ta2.meet(tfb);
     
@@ -328,6 +330,7 @@ public class TestType {
     //}
     //int d = phi.depth()-9999; // added +9999 for cycle
     //assertTrue(0 <= d && d <10);
+    throw com.cliffc.aa.AA.unimpl();
   }
 
 

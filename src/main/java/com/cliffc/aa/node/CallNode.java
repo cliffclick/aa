@@ -7,7 +7,7 @@ import com.cliffc.aa.util.Ary;
 
 // See FunNode.  Control is not required for an apply but inlining the function
 // body will require it; slot 0 is for Control.  Slot 1 is a function value - a
-// Node with a TypeFunPtr.  Slots 2+ are for args.
+// Node with a TypeFunPtr.  Slots 2+ are for args, with slot 2 for memory arg.
 //
 // When the function simplifies to a single TypeFunPtr, the Call can inline.
 //
@@ -28,7 +28,7 @@ public class CallNode extends Node {
           Parse  _badargs;      // Error for e.g. wrong arg counts or incompatible args
   public CallNode( boolean unpacked, Parse badargs, Node... defs ) {
     super(OP_CALL,defs);
-    _rpc = BitsRPC.make_new_rpc(BitsRPC.ALL._idx); // Unique call-site index
+    _rpc = BitsRPC.new_rpc(BitsRPC.ALL); // Unique call-site index
     _unpacked=unpacked;         // Arguments are typically packed into a tuple and need unpacking, but not always
     _badargs = badargs;
   }
@@ -38,9 +38,12 @@ public class CallNode extends Node {
 
   // Inline the CallNode
   private Node inline( GVNGCM gvn, Node ctrl, Node mem, Node rez ) {
+    rez.add_def(rez);
+    mem.add_def(mem);
     set_def(0,ctrl,gvn);        // New control is function epilog control
-    set_def(1,mem ,gvn);        // New memory  is function epilog memory
-    set_def(2,rez ,gvn);        // New result  is function epilog result 
+    set_def(1,rez ,gvn);        // New result  is function epilog result
+    set_def(2,mem ,gvn);        // New memory  is function epilog memory
+    rez.pop();  mem.pop();
     _inlined = true;
     return this;
   }
@@ -48,15 +51,15 @@ public class CallNode extends Node {
   @Override public Node is_copy(GVNGCM gvn, int idx) { return _inlined ? in(idx) : null; }
 
   // Number of actual arguments
-  private int nargs() { return _defs._len-3; }
+  private int nargs() { return _defs._len-2; }
   // Actual arguments.
-  Node arg( int x ) { return _defs.at(x+3); }
+  Node arg( int x ) { return _defs.at(x+2); }
 
   private Node ctl() { return in(0); }
-  private Node mem() { return in(1); }
-  public  Node fun() { return in(2); }
-  private void set_fun(Node fun, GVNGCM gvn) { set_def(2,fun,gvn); }
-  void set_fun_reg(Node fun, GVNGCM gvn) { gvn.set_def_reg(this,2,fun); }
+  public  Node fun() { return in(1); }
+  private Node mem() { return in(2); }
+  private void set_fun(Node fun, GVNGCM gvn) { set_def(1,fun,gvn); }
+  void set_fun_reg(Node fun, GVNGCM gvn) { gvn.set_def_reg(this,1,fun); }
   
   // Clones during inlining all become unique new call sites
   @Override CallNode copy(GVNGCM gvn) {
@@ -78,9 +81,9 @@ public class CallNode extends Node {
     // When do i do 'pattern matching'?  For the moment, right here: if not
     // already unpacked a tuple, and can see the NewNode, unpack it right now.
     if( !_unpacked ) { // Not yet unpacked a tuple
-      assert nargs()==1;
+      assert nargs()==2;
       Node mem = mem();
-      Type tn = gvn.type(arg(0));
+      Type tn = gvn.type(arg(1));
       if( tn instanceof TypeMemPtr ) {
         Type tm = gvn.type(mem);
         if( tm instanceof TypeMem ) {
@@ -98,7 +101,6 @@ public class CallNode extends Node {
             } else {                // Allocation exists, unpack args
               assert mem instanceof MergeMemNode && mem.in(1) instanceof MProjNode && mem.in(1).in(0) instanceof NewNode;
               remove(_defs._len-1,gvn); // Pop off the NewNode tuple
-              //pop();  gvn.add_work(mem); // Pop off the NewNode tuple
               Node nn = mem.in(1).in(0);
               int len = nn._defs._len;
               for( int i=1; i<len; i++ ) // Push the args; unpacks the tuple
@@ -120,7 +122,7 @@ public class CallNode extends Node {
       TypeFunPtr tf = t_funptr.fun();
       set_fun(tn.in(1),gvn);
       for( int i=0; i<nargs(); i++ ) // Insert casts for each parm
-        set_def(i+3,gvn.xform(new TypeNode(tf._ts.at(i),arg(i),tn._error_parse)),gvn);
+        set_def(i+2,gvn.xform(new TypeNode(tf._ts.at(i),arg(i),tn._error_parse)),gvn);
       _cast_ret = tf._ret;       // Upcast return results
       _cast_P = tn._error_parse; // Upcast failure message
       return this;
@@ -155,7 +157,7 @@ public class CallNode extends Node {
     TypeTuple formals = tfun._ts;
     for( int i=0; i<nargs(); i++ ) {
       if( fun.parm(i)==null )   // Argument is dead and can be dropped?
-        set_def(i+3,gvn.con(Type.XSCALAR),gvn); // Replace with some generic placeholder
+        set_def(i+2,gvn.con(Type.XSCALAR),gvn); // Replace with some generic placeholder
       else {
         Type formal = formals.at(i);
         Type actual = gvn.type(arg(i));
@@ -212,11 +214,11 @@ public class CallNode extends Node {
     // error state - so we have to support having error args coming in.
     for( Node arg : fun._uses ) {
       if( arg.in(0) == fun && arg instanceof ParmNode ) {
-        int idx = ((ParmNode)arg)._idx; // Argument number, or -1 for rpc or -2 for memory
+        int idx = ((ParmNode)arg)._idx; // Argument number, or -1 for rpc
         if( idx >= nargs() ) return null; // Wrong arg-count
         if( is_gcp ) {
           Type formal = fun.targ(idx);
-          Type actual = idx==-1 ? TypeRPC.make(_rpc) : (idx==-2 ? TypeMem.MEM : gvn.type(arg(idx)));
+          Type actual = idx==-1 ? TypeRPC.make(_rpc) : gvn.type(arg(idx));
           if( !actual.isa(formal) )
             return null;     // Even if actual falls more, will never be formal
         }
@@ -228,9 +230,9 @@ public class CallNode extends Node {
     // so there's no Parm/Phi to attach the incoming arg to.
     for( Node arg : fun._uses ) {
       if( arg.in(0) == fun && arg instanceof ParmNode ) {
-        int idx = ((ParmNode)arg)._idx; // Argument number, or -1 for rpc or -2 for memory
+        int idx = ((ParmNode)arg)._idx; // Argument number, or -1 for rpc
         assert idx<nargs();
-        Node actual = idx==-1 ? gvn.con(TypeRPC.make(_rpc)) : (idx==-2 ? mem() : arg(idx));
+        Node actual = idx==-1 ? gvn.con(TypeRPC.make(_rpc)) : arg(idx);
         gvn.add_def(arg,actual);
       }
     }
@@ -413,7 +415,7 @@ public class CallNode extends Node {
       if( arg(j).is_forward_ref() )
         return _badargs.forward_ref_err((TypeFun)gvn.type(arg(j)));
     
-    Node fp = fun();      // Either function pointer, or unresolve list of them
+    Node fp = fun();      // Either function pointer, or unresolved list of them
     Node xfp = fp instanceof UnresolvedNode ? fp.in(0) : fp;
     Type txfp = gvn.type(xfp);
     if( !(txfp instanceof TypeFun) )
@@ -426,7 +428,7 @@ public class CallNode extends Node {
     // Error#2: bad-arg-count
     TypeFunPtr tfp = tfun.fun();
     if( tfp.nargs() != nargs() )
-      return _badargs.errMsg("Passing "+nargs()+" arguments to "+tfp+" which takes "+tfp.nargs()+" arguments");
+      return _badargs.errMsg("Passing "+(nargs()-1)+" arguments to "+tfp+" which takes "+(tfp.nargs()-1)+" arguments");
 
     // Error#3: Now do an arg-check
     TypeTuple formals = tfp._ts; // Type of each argument

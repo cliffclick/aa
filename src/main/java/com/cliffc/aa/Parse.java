@@ -393,7 +393,7 @@ public class Parse {
           Node fun = funs.at(i);
           assert fun.op_prec() <= max;
           if( fun.op_prec() < max ) continue; // Not yet
-          Node call = do_call(new CallNode(true,errMsg(),ctrl(),mem(),fun,args.in(i-1),args.in(i)));
+          Node call = do_call(new CallNode(true,errMsg(),ctrl(),fun,mem(),args.in(i-1),args.in(i)));
           args.set_def(i-1,call,_gvn);
           funs.remove(i);  args.remove(i);  i--;
         }
@@ -449,7 +449,7 @@ public class Parse {
           kill(arg);
           n = err_ctrl2("A function is being called, but "+tn+" is not a function type");
         } else {
-          n = do_call(new CallNode(!arglist,errMsg(),ctrl(),mem(),n,arg)); // Pass the 1 arg
+          n = do_call(new CallNode(!arglist,errMsg(),ctrl(),n,mem(),arg)); // Pass the 1 arg
         }
       }
     } // Else no trailing arg, just return value
@@ -546,6 +546,11 @@ public class Parse {
     Ary<String> ids = new Ary<>(new String[1],0);
     Ary<Type  > ts  = new Ary<>(new Type  [1],0);
     Ary<Parse > bads= new Ary<>(new Parse [1],0);
+    // Memory first.  No syntax for parsing the memory argument.
+    ids .add(" memory ");
+    ts  .add(TypeMem.MEM);       // Untyped, most generic type
+    bads.add(null);              // No syntax error
+    
     while( true ) {
       String tok = token();
       if( tok == null ) { ids.clear(); _x=oldx; break; } // not a "[id]* ->"
@@ -569,15 +574,12 @@ public class Parse {
       for( int i=0; i<ids._len; i++ )
         _e.update(ids.at(i),gvn(new ParmNode(cnt++,ids.at(i),fun,con(ts.at(i)),errmsg)),null,args_are_mutable);
       Node rpc = gvn(new ParmNode(-1,"rpc",fun,con(TypeRPC.ALL_CALL),null));
-      Node mem = gvn(new ParmNode(-2,"mem",fun,con(TypeMem.MEM),null));
-      set_mem(mem);
       Node rez = stmts();       // Parse function body
       if( rez == null ) rez = err_ctrl1("Missing function body", Type.SCALAR);
       require('}');             //
       Node epi = gvn(new EpilogNode(ctrl(),mem(),rez,rpc,fun,fun._tf.fidx(),null));
       _e = _e._par;             // Pop nested environment
       set_ctrl(old_ctrl);       // Back to the pre-function-def control
-      set_mem (old_mem );
       return epi;               // Return function; close-out and DCE 'e'
     }
   }
@@ -689,7 +691,7 @@ public class Parse {
     }
     TypeStr ts = TypeStr.con(new String(_buf,oldx,_x-oldx-1));
     // Convert to ptr-to-constant-memory-string
-    TypeMemPtr ptr = TypeMemPtr.make(ts.get_alias()._idx);
+    TypeMemPtr ptr = TypeMemPtr.make(ts.get_alias());
     // Store the constant string to memory
     Node con_mem = con(TypeMem.make(ptr.getbit(),ts));
     set_mem(gvn(new MergeMemNode(mem(),con_mem)));
