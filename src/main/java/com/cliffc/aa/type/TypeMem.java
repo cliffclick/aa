@@ -108,14 +108,10 @@ public class TypeMem extends Type<TypeMem> {
     return sb.p(']').toString();
   }
                 
-  // Alias-at.  Now never returns a null.  Prior versions go back-n-forth on
-  // whether or not this call returns a null.
-  public TypeObj at0(int alias) { return alias < _aliases.length ? _aliases[alias] : null;  }
-  // Alias-at, but defaults to "XOBJ" for easy meet() calls.
-  // Never returns a null.
+  // Alias-at.  Out of bounds or null uses the default.
   public TypeObj at(int alias) {
-    TypeObj obj = at0(alias);
-    return obj==null ? TypeObj.XOBJ : obj;
+    TypeObj obj = alias < _aliases.length ? _aliases[alias] : null;
+    return obj==null ? _aliases[1] : obj;
   }
   
   private static TypeMem FREE=null;
@@ -136,7 +132,7 @@ public class TypeMem extends Type<TypeMem> {
     // No dups of default in slot 1
     for( int i=2; i<len; i++ )
       if( as[i]==as[1] )
-        as[i]=as[1];
+        as[i]=null;
     // Remove trailing nulls; make the array "tight"
     while( as[len-1] == null ) len--;
     if( as.length!=len ) as = Arrays.copyOf(as,len);
@@ -174,10 +170,8 @@ public class TypeMem extends Type<TypeMem> {
     // Meet of default values, meet of element-by-element.
     int len = Math.max(_aliases.length,tf._aliases.length);
     TypeObj[] objs = new TypeObj[len];
-    for( int i=0; i<len; i++ )
-      if( (i<   _aliases.length &&    _aliases[i] != null) ||
-          (i<tf._aliases.length && tf._aliases[i] != null) ) // short-cut for both null
-        objs[i] = (TypeObj)at(i).meet(tf.at(i));             // meet element-by-element
+    for( int i=1; i<len; i++ )
+      objs[i] = (TypeObj)at(i).meet(tf.at(i)); // meet element-by-element
     return make0(_any&&tf._any,objs);
   }
 

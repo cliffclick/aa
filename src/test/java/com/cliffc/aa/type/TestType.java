@@ -12,12 +12,10 @@ public class TestType {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testType() {
     Type.init0(new HashMap<>());
-    Type t0 = TypeFunPtr.GENERIC_FUNPTR; // includes nil
-    Type t1 = Type.NSCALR;
-    Type t2 = t0.join(t1);
-    assertFalse(t2.must_nil());
-    //assertEquals(ALL_FUN,t2);
-
+    Type t0 = TypeMemPtr.STRUCT.dual();
+    Type t1 = TypeMemPtr.ABCPTR.dual();
+    Type tx = t0.meet(t1);
+    assertEquals(t1,tx);
   }
   
   @Test public void testNamesInts() {

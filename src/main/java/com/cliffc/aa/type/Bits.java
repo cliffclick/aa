@@ -53,6 +53,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     if( _bits==null ) return true; // Must be a single constant bit#
     if( _con != 1 && _con != -1 ) return false;
     if( _bits.length==0 ) return false;  // Empty bits replaced by a con
+    if( _bits.length==1 && _bits[0]== 0) return true; // NO bits is OK
     if( _bits[_bits.length-1]==0 ) return false; // Array is "tight"
     // For efficiency, 1 bit set uses 'con' instead of 'bits'
     if( check_one_bit(_bits) ) return false; // Found single bit
@@ -94,16 +95,18 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
 
   // Constructor taking an array of bits, and allowing join/meet selection.
   // Canonicalizes the bits.  The 'this' pointer is only used to clone the class.
-  final B make( int con, long[] bits ) {
+  final B make( boolean any, long[] bits ) {
     // Remove any trailing empty words
     int len = bits.length;
     while( len > 1 && bits[len-1]==0 ) len--;
     if( bits.length != len ) bits = Arrays.copyOf(bits,len);
     
-    // Check for a single bit
-    if( check_one_bit(bits) )
-      return make_impl((63-Long.numberOfLeadingZeros(bits[len-1]))+((len-1)<<6),null);
-    return make_impl(con,bits);
+    // Check for a single bit or NO bits
+    if( !check_one_bit(bits) || (len==1 && bits[0]==0) ) return make_impl(any ? -1 : 1,bits);
+    int bnum0 = 63 - Long.numberOfLeadingZeros(bits[len-1]);
+    int bnum = bnum0 + ((len-1)<<6);
+    if( any ) bnum = -bnum;
+    return make_impl(bnum,null);
   }
   // Constructor taking a single bit
   final B make( int bit ) { return make_impl(bit,null); }
@@ -122,7 +125,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     if( bs==null )              // Is a single compressed bit
       or(bs = bits(0,Math.abs(_con)),Math.abs(_con)); // Decompress single bit into array
     bs[0] |= 1;                 // Set nil
-    return make(1,bs);
+    return make(false,bs);
   }
 
   // Test a specific bit is set or clear on a given bits
@@ -139,14 +142,15 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   // with above-center types.  If called with below-center, there is no
   // nil-choice (might be a must-nil but not a choice-nil), so can return this.
   B not_nil() {
-    if( _con != -1 ) return (B)this;     // Below or at center
+    assert _con != 0; // cannot remove nil from nil?
+    if( _con != -1 || _bits == null ) return (B)this;     // Below or at center
     if( !test(_bits,0) ) return (B)this; // No nil choice
     long[] bs = _bits.clone();           // Keep all other bits
     and(bs,0);                           // remove nil choice
-    return make(-1,bs);
+    return make(true,bs);                // Choices without nil
   }
   
-  int max() { return (_bits.length<<6)-1; }
+  static int max(long[] bits) { return (bits.length<<6)-1; }
   private static void or ( long[] bits, long con ) { bits[idx(con)] |=  mask(con); }
   private static void and( long[] bits, long con ) { bits[idx(con)] &= ~mask(con); }
   private static long[] bits( int a, int b ) { return new long[idx(Math.max(a,b))+1]; }
@@ -176,35 +180,37 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
       long[] bits = bits0.clone();        // Clone larger
       for( int i=0; i<bits1.length; i++ ) // OR in smaller bits
         bits[i] |= bits1[i];
-      return make(1,bits);
+      return make(false,bits);
     }
     // Both joins?  Set-intersection
     if( con0 == -1 && con1 == -1 ) {
       long[] bits = bits1.clone();        // Clone smaller
       for( int i=0; i<bits1.length; i++ ) // AND in smaller bits
         bits[i] &= bits0[i];
-      return make(-1,bits);
+      return make(true,bits);
     }
 
     // Mixed meet/join.  Find any bit in the join that is also in the meet.  If
     // found, we do not need to expand the meet - return it as-is.
     for( int i=0; i<Math.min(bits0.length,bits1.length); i++ )
       if( (bits0[i]&bits1[i]) != 0 )
-        return make(1,con0== 1 ? bits0 : bits1);
+        return make(false,con0== 1 ? bits0 : bits1);
 
     // Mixed meet/join.  Need to expand the meet with the smallest bit from the join.
-    
+    int bnum = find_smallest_bit(con0==-1 ? bits0 : bits1);
+    long[] mbits = con0==1 ? bits0 : bits1; // Meet bits
+    mbits = Arrays.copyOfRange(mbits,0,Math.max(mbits.length,idx(bnum)+1));
+    or(mbits,bnum);
+    return make(false,mbits);
+  }
+  
+  private static int find_smallest_bit(long[] bits) {
+    for( int i=0; i<bits.length; i++ )
+      if( bits[i]!=0 )
+        return Long.numberOfTrailingZeros(bits[i]);
     throw AA.unimpl();
   }
-  
-  boolean subset( Bits bs ) {
-    if( _bits.length > bs._bits.length ) return false;
-    for( int i=0; i<_bits.length; i++ )
-      if( (_bits[i]&bs._bits[i]) != _bits[i] )
-        return false;
-    return true;
-  }
-  
+
   public B dual() { return make_impl(-_con,_bits); } // Just flip con
   // join is defined in terms of meet and dual
   public Bits<B> join(Bits<B> bs) { return dual().meet(bs.dual()).dual(); }
@@ -237,7 +243,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
           if( bits._bits==null ) {
             bits._con = con < 0 ? -1 : 1;
             or(bits._bits = bits(con,_cnt),Math.abs(con));
-          } else if( _cnt > bits.max() ) bits._bits = bits(0,_cnt);
+          } else if( _cnt > max(bits._bits) ) bits._bits = bits(0,_cnt);
           or(bits._bits,_cnt);
         }
       }
