@@ -149,12 +149,11 @@ public class CallNode extends Node {
     
     // Arg counts must be compatible
     FunNode fun = epi.fun();
-    TypeFunPtr tfun = fun._tf;
-    if( tfun.nargs() != nargs() )
+    if( fun.nargs() != nargs() )
       return null;
 
     // Single choice; insert actual conversions as needed
-    TypeTuple formals = tfun._ts;
+    TypeTuple formals = fun._ts;
     for( int i=0; i<nargs(); i++ ) {
       if( fun.parm(i)==null )   // Argument is dead and can be dropped?
         set_def(i+2,gvn.con(Type.XSCALAR),gvn); // Replace with some generic placeholder
@@ -191,7 +190,7 @@ public class CallNode extends Node {
     }
 
     assert fun.in(1)._uid!=0; // Never wire into a primitive, just clone/inline it instead (done just above)
-    assert tfun.nargs() == nargs();
+    assert fun.nargs() == nargs();
 
     // Always wire caller args into known functions
     return wire(gvn,fun,false);
@@ -350,7 +349,7 @@ public class CallNode extends Node {
     // function with all arguments known.
     outerloop:
     for( int fidx : fidxs ) {
-      TypeFunPtr fun = FunNode.find_fidx(fidx)._tf;
+      FunNode fun = FunNode.find_fidx(fidx);
       if( fun.nargs() != nargs() ) continue; // Wrong arg count, toss out
       TypeTuple formals = fun._ts;   // Type of each argument
       

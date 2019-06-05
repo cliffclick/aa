@@ -34,13 +34,13 @@ public class EpilogNode extends Node {
     assert m instanceof TypeMem;
     if( c==Type.ANY  || r==Type.ANY  ) return all_type().dual();
     if( (c!=Type.CTRL && c!=Type.XCTRL) || !(r instanceof TypeRPC) ) return all_type();
-    return TypeFun.make(c, m, v, r, FunNode.find_fidx(_fidx)._tf);
+    return TypeFun.make(c, m, v, r, FunNode.find_fidx(_fidx).tf());
   }
   @Override public String err(GVNGCM gvn) { return is_forward_ref() ? _unkref_err : null; }
 
   @Override public Node is_copy(GVNGCM gvn, int idx) {
     // FunNode has disappeared/optimized away, so should this Epilog
-    return (in(4) instanceof FunNode && fun()._tf.fidx()==_fidx) ? null : in(idx);
+    return (in(4) instanceof FunNode && fun()._fidx==_fidx) ? null : in(idx);
   }
   
   public    Node ctrl() { return          in(0); } // internal function control
@@ -49,7 +49,7 @@ public class EpilogNode extends Node {
   public    Node rpc () { return          in(3); } // Almost surely a PhiNode merging RPCs
   public FunNode fun () { return (FunNode)in(4); } // Function header
   @Override String xstr() {                        // Self short name
-    String name = FunNode.name(_fidx);
+    String name = FunNode.find_fidx(_fidx)._name;
     return name==null ? "Epilog" : "Epi#"+name;
   }
 
@@ -60,7 +60,7 @@ public class EpilogNode extends Node {
   public static Node forward_ref( GVNGCM gvn, String name, Parse unkref ) {
     FunNode fun = gvn.init(new FunNode(name));
     String referr = unkref.errMsg("Unknown ref '"+name+"'");
-    return new EpilogNode(fun,gvn.con(TypeMem.MEM),gvn.con(Type.SCALAR),gvn.con(TypeRPC.ALL_CALL),fun,fun._tf.fidx(), referr);
+    return new EpilogNode(fun,gvn.con(TypeMem.MEM),gvn.con(Type.SCALAR),gvn.con(TypeRPC.ALL_CALL),fun,fun._fidx, referr);
   }
 
   // True if this is a forward_ref

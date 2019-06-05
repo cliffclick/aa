@@ -75,8 +75,14 @@ public class TypeTuple<O extends TypeTuple<O>> extends Type<O> {
     assert !tt.is_fun();
     return tt;
   }
+  private static TypeTuple make_generic_args() {
+    Type[] args = new Type[99];
+    java.util.Arrays.fill(args,XSCALAR);
+    args[0] = TypeMem.XMEM;
+    return make0(true,args);
+  }
 
-          static final TypeTuple XSCALARS= make0(true,TypeMem.XMEM);
+          static final TypeTuple XSCALARS= make_generic_args();
           static final TypeTuple SCALAR0 = make(TypeMem.XMEM);
           static final TypeTuple SCALAR1 = make(TypeMem.XMEM,SCALAR);
   public  static final TypeTuple SCALAR2 = make(TypeMem.XMEM,SCALAR, SCALAR);

@@ -28,7 +28,7 @@ public class ParmNode extends PhiNode {
     if( gvn.type(fun) == Type.XCTRL ) return null; // All dead, c-prop will fold up
     // Arg-check before folding up
     if( _idx != -1 ) {
-      Type formal = fun._tf.arg(_idx);        // Formal argument type
+      Type formal = fun.targ(_idx);           // Formal argument type
       for( int i=1; i<_defs._len; i++  )      // For all arguments
         if( gvn.type(fun.in(i))==Type.CTRL && // Path is alive
             in(i)!=this &&                    // Can ignore self- only other inputs will determine arg-check
@@ -56,7 +56,7 @@ public class ParmNode extends PhiNode {
     FunNode fun = (FunNode) in(0);
     assert fun._defs._len==_defs._len;
     if( _idx < 0 ) return null;                                 // No arg check on RPC
-    Type formal = fun._tf.arg(_idx);
+    Type formal = fun.targ(_idx);
     for( int i=1; i<_defs._len; i++ ) {
       Type argt = gvn.type(in(i)); // Arg type for this incoming path
       if( !argt.isa(formal) ) {    // Argument is legal?

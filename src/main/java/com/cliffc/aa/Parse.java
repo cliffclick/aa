@@ -578,7 +578,7 @@ public class Parse {
       Node rez = stmts();       // Parse function body
       if( rez == null ) rez = err_ctrl1("Missing function body", Type.SCALAR);
       require('}');             //
-      Node epi = gvn(new EpilogNode(ctrl(),mem(),rez,rpc,fun,fun._tf.fidx(),null));
+      Node epi = gvn(new EpilogNode(ctrl(),mem(),rez,rpc,fun,fun._fidx,null));
       _e = _e._par;             // Pop nested environment
       set_ctrl(old_ctrl);       // Back to the pre-function-def control
       return epi;               // Return function; close-out and DCE 'e'
@@ -913,7 +913,7 @@ public class Parse {
   // Standard mis-use of a forward-ref error (assumed to be a forward-decl of a
   // recursive function; all other uses are treated as an unknown-ref error).
   public String forward_ref_err(TypeFun tfun) {
-    String name = FunNode.name(tfun.fun().fidx());
+    String name = FunNode.name(tfun.fun().fidx(), new SB()).toString();
     return errMsg("Unknown ref '"+name+"'");
   }
   

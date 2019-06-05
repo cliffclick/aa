@@ -10,7 +10,7 @@ public class UnresolvedNode extends Node {
     if( in(0) instanceof EpilogNode ) {
       EpilogNode epi = (EpilogNode)in(0);
       if( epi.in(3) instanceof FunNode )
-        return "Unr:"+epi.fun().name();
+        return "Unr:"+epi.fun()._name;
     }
     return "Unr???";
   }
@@ -28,8 +28,8 @@ public class UnresolvedNode extends Node {
   public Node filter( GVNGCM gvn, int nargs ) {
     Node x = null;
     for( Node epi : _defs ) {
-      TypeFunPtr tf = ((EpilogNode)epi).fun()._tf;
-      if( tf.nargs() != nargs ) continue;
+      FunNode fun =  ((EpilogNode)epi).fun();
+      if( fun.nargs() != nargs ) continue;
       if( x == null ) x = epi;
       else if( x instanceof UnresolvedNode ) x.add_def(epi);
       else x = new UnresolvedNode(x,epi);

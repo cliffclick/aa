@@ -47,6 +47,7 @@ public class BitsAlias extends Bits<BitsAlias> {
   // will make more on demand.  But need the first one to make a v-call.
   private static final BitsAlias ANY  = FULL.dual();
   public static final BitsAlias NIL  = make0(0);
+  @Override boolean is_class() { return true; } // All bits are class of allocated objects
   @Override HashMaker hashmaker() { return HASHMAKER; }
   @Override public BitsAlias ALL() { return FULL; }
   @Override public BitsAlias ANY() { return ANY ; }

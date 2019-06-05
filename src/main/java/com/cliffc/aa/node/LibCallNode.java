@@ -45,7 +45,7 @@ public abstract class LibCallNode extends PrimNode {
     Node val = gvn.xform(new ProjNode(prim,1));
     Node mem = in(1);
     Node mem2 = gvn.xform(new MergeMemNode(mem,mem_prim));
-    return new EpilogNode(fun,mem2,val,rpc,fun,fun._tf.fidx(),null);
+    return new EpilogNode(fun,mem2,val,rpc,fun,fun._fidx,null);
   }
   
   // Clones during inlining all become unique new sites

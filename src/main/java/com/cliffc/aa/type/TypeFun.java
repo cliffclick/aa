@@ -36,10 +36,9 @@ public class TypeFun extends TypeTuple<TypeFun> {
     return make(false,new Type[]{ctrl,mem,ret,rpc,fun});
   }
   public static TypeFun make( TypeFunPtr fun ) { return make(Type.CTRL,fun._retmem,fun._ret,TypeRPC.ALL_CALL, fun); }
-  public static TypeFun make( int fidx ) { return make(FunNode.find_fidx(fidx)._tf); }
 
-         static final TypeFun FUN1        = make(TypeFunPtr.any(1, 0)); // Some 1-arg function
-  public static final TypeFun FUN2        = make(TypeFunPtr.any(2,-1)); // Some 2-arg function
+         static final TypeFun FUN1        = make(TypeFunPtr.any1(0)); // Some 1-arg function
+  public static final TypeFun FUN2        = make(TypeFunPtr.any2());  // Some 2-arg function
   public static final TypeFun GENERIC_FUN = make(TypeFunPtr.GENERIC_FUNPTR); // For EpilogNode default type
   static final TypeFun[] TYPES = new TypeFun[]{FUN1,FUN2};
   

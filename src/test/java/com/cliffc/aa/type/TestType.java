@@ -12,7 +12,7 @@ public class TestType {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testType() {
     Type.init0(new HashMap<>());
-    Type t0 = TypeMemPtr.STRUCT.dual();
+    Type t0 = TypeMemPtr.STRPTR.dual();
     Type t1 = TypeMemPtr.ABCPTR.dual();
     Type tx = t0.meet(t1);
     assertEquals(t1,tx);
@@ -211,19 +211,19 @@ public class TestType {
     TypeFunPtr gf = TypeFunPtr.GENERIC_FUNPTR;
     TypeMem nomem = TypeMem.MEM.dual();
 
-    TypeFunPtr f1i2i = TypeFunPtr.make_new(TypeTuple.INT64,TypeInt.INT64,nomem,BitsFun.ALL,1/*nargs*/);
+    TypeFunPtr f1i2i = TypeFunPtr.make_new(TypeTuple.INT64,TypeInt.INT64,nomem,BitsFun.ALL);
     assertTrue(f1i2i.isa(gf));
-    TypeFunPtr f1f2f = TypeFunPtr.make_new(TypeTuple.FLT64,TypeFlt.FLT64,nomem,BitsFun.ALL,1/*nargs*/);
+    TypeFunPtr f1f2f = TypeFunPtr.make_new(TypeTuple.FLT64,TypeFlt.FLT64,nomem,BitsFun.ALL);
     assertTrue(f1f2f.isa(gf));
     TypeFunPtr mt = (TypeFunPtr)f1i2i.meet(f1f2f);
     BitsFun funs = BitsFun.make0(2).meet(BitsFun.make0(3));
-    TypeFunPtr f3i2r = TypeFunPtr.make(TypeTuple.INT32,Type.REAL    ,nomem,funs,1/*nargs*/);
+    TypeFunPtr f3i2r = TypeFunPtr.make(TypeTuple.INT32,Type.REAL    ,nomem,funs);
     assertEquals(f3i2r,mt);
     assertTrue(f3i2r.isa(gf));
     assertTrue(f1i2i.isa(f3i2r));
     assertTrue(f1f2f.isa(f3i2r));
     
-    TypeFunPtr f2 = TypeFunPtr.any(2,23); // Some generic function (happens to be #23, '&')
+    TypeFunPtr f2 = TypeFunPtr.any1(23); // Some generic function (happens to be #23, '&')
     assertTrue(f2.isa(gf));
   }
 

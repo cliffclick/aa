@@ -152,7 +152,7 @@ public class TypeMem extends Type<TypeMem> {
   public  static final TypeMem XMEM = make(false,new TypeObj[]{null,TypeObj.XOBJ}); // Every alias filled with anything
   public  static final TypeMem EMPTY_MEM = XMEM; //make(new TypeObj[0]); // Tried no-memory-vs-XOBJ-memory
           static final TypeMem MEM_STR = make(BitsAlias.STR,TypeStr.STR);
-          static final TypeMem MEM_ABC = make(BitsAlias.STR,TypeStr.ABC);
+          static final TypeMem MEM_ABC = make(TypeStr.ABC.get_alias(),TypeStr.ABC);
   static final TypeMem[] TYPES = new TypeMem[]{MEM,MEM_STR};
 
   // All mapped memories remain, but each memory flips internally.

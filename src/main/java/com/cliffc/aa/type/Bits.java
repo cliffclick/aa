@@ -8,7 +8,6 @@ import org.jetbrains.annotations.NotNull;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.NoSuchElementException;
 
 // Bits supporting a lattice; immutable; hash-cons'd.  Bits can be *split* in
 // twain, are everywhere immediately updated (ala Smalltalk "becomes") to the
@@ -45,7 +44,8 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   // Holds a set of bits meet'd together, or join'd together, along
   // with a single bit choice as a constant.
   // If _bits is NULL and _con is 0, this is nil and a constant.
-  // If _bits is NULL, then _con is a single class bit and is +/- for meet/join.
+  // If _bits is NULL, then _con is a single class bit and is +/- for
+  // meet/join, OR "is_class()" is false and _con is a single constant.
   // If _bits is not-null, then _con is +1 for meet, and -1 for join.
   long[] _bits;   // Bits set or null for a single bit
   int _con;       // value of single bit
@@ -53,6 +53,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   // Intern: lookup and return an existing Bits or install in hashmap and
   // return a new Bits.  Overridden in subclasses to make type-specific Bits.
   abstract B make_impl(int con, long[] bits );
+  abstract boolean is_class();    // All bits are constants or classes
   abstract HashMaker hashmaker(); // Hashcode maker, that handles split bits
   public abstract B ALL();
   public abstract B ANY();
@@ -65,7 +66,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     assert check();
   }
   private boolean check() {
-    if( _bits==null ) return true; // Must be a single constant bit#
+    if( _bits==null ) return is_class() || _con >= 0; // Must be a single constant bit#
     if( _con != 1 && _con != -1 ) return false;
     if( _bits.length==0 ) return false;  // Empty bits replaced by a con
     if( _bits.length==1 && _bits[0]== 0) return true; // NO bits is OK
@@ -76,7 +77,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   }
   private static boolean check_one_bit(long[] bits) {
     int len = bits.length;
-    long b = bits[len-1];
+    long b = bits[len-1];              // Last word
     if( (b & (b-1))!=0 ) return false; // Last word has multiple bits
     // Check multiple bits spread over multiple words
     for( int i=0; i<len-1; i++ ) if( bits[i] != 0 ) return false;
@@ -120,7 +121,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     if( !check_one_bit(bits) || (len==1 && bits[0]==0) ) return make_impl(any ? -1 : 1,bits);
     int bnum0 = 63 - Long.numberOfLeadingZeros(bits[len-1]);
     int bnum = bnum0 + ((len-1)<<6);
-    if( any ) bnum = -bnum;
+    if( any && is_class() ) bnum = -bnum;
     return make_impl(bnum,null);
   }
   // Constructor taking a single bit
@@ -158,7 +159,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   // nil-choice (might be a must-nil but not a choice-nil), so can return this.
   B not_nil() {
     assert _con != 0; // cannot remove nil from nil?
-    if( _con != -1 || _bits == null ) return (B)this;     // Below or at center
+    if( _con != -1 || _bits == null ) return (B)this; // Below or at center
     if( !test(_bits,0) ) return (B)this; // No nil choice
     long[] bs = _bits.clone();           // Keep all other bits
     and(bs,0);                           // remove nil choice
@@ -226,7 +227,8 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     throw AA.unimpl();
   }
 
-  public B dual() { return make_impl(-_con,_bits); } // Just flip con
+  // Constants are self-dual; classes just flip the meet/join bit.
+  public B dual() { return _bits==null && !is_class() ? (B)this : make_impl(-_con,_bits); }
   // join is defined in terms of meet and dual
   public Bits<B> join(Bits<B> bs) { return dual().meet(bs.dual()).dual(); }
 
@@ -245,6 +247,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
       return sb.p("]").toString();
     }
     
+    // Split out a bit to form a new constant, from a prior a bit
     int split(int par, HashMap<B,B> INTERN) {
       if( par==0 ) return 1;    // Ignore init
       // Split the parent bit in twain.  Instances of the parent are everywhere
@@ -273,11 +276,10 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
       return new_alias;
     }
     int compute_hash(Bits bits) {
+      // Sum of bits, minus exceptions
       long sum=0;
       if( bits._bits==null ) sum = mask(Math.abs(bits._con));
-      else { // Sum of bits, minus exceptions
-        for( long b : bits._bits ) sum += b;
-      }
+      else for( long b : bits._bits ) sum += b;
       // Minus the exceptions
       for( Q q : _splits )
         if( q != null && bits.test(q._alias) && bits.test(q._split) )
@@ -305,7 +307,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     @Override public Integer next() {
       if( _bits==null ) return Math.abs(_con);
       if( idx(_i) < _bits.length ) return _i;
-      throw new NoSuchElementException();
+      throw new java.util.NoSuchElementException();
     }
   }
 }

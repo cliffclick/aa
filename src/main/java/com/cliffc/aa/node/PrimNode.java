@@ -123,7 +123,7 @@ public abstract class PrimNode extends Node {
     add_def(null);              // Control for the primitive in slot 0
     for( int i=0; i<_args.length; i++ )
       add_def(gvn.init(new ParmNode(i,_args[i],fun, gvn.con(_targs.at(i)),null)));
-    return new EpilogNode(fun,in(1),gvn.init(this),rpc,fun,fun._tf.fidx(),null);
+    return new EpilogNode(fun,in(1),gvn.init(this),rpc,fun,fun._fidx,null);
   }
 
 

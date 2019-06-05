@@ -81,8 +81,8 @@ public class TypeUnion extends Type<TypeUnion> {
   }
 
   //public  static final TypeUnion NIL  = (TypeUnion)make(true, Type.NIL, TypeStr.NIL, TypeTuple.NIL, TypeInt.FALSE);
-  private static final TypeUnion FUNS = (TypeUnion)make(true, TypeFunPtr.any(0,-1), TypeFunPtr.any(1,-1));
-  static final TypeUnion[] TYPES = new TypeUnion[]{FUNS};
+  //private static final TypeUnion FUNS = (TypeUnion)make(true, TypeFunPtr.any(0,-1), TypeFunPtr.any(1,-1));
+  //static final TypeUnion[] TYPES = new TypeUnion[]{FUNS};
 
   @Override protected TypeUnion xdual() {
     // The obvious thing is to just ask _ts for it's dual(), but Tuples are not
