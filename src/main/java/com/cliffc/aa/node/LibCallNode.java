@@ -50,7 +50,7 @@ public abstract class LibCallNode extends PrimNode {
   
   // Clones during inlining all become unique new sites
   @Override LibCallNode copy(GVNGCM gvn) {
-    LibCallNode nnn = super.copy(gvn);
+    LibCallNode nnn = (LibCallNode)super.copy(gvn);
     nnn._alias = BitsAlias.new_alias(_alias); // Children alias classes
     return nnn;
   }
@@ -58,7 +58,7 @@ public abstract class LibCallNode extends PrimNode {
   
   @Override public String err(GVNGCM gvn) {
     for( int i=0; i<_targs._ts.length; i++ ) {
-      Type tactual = gvn.type(in(i+2));
+      Type tactual = gvn.type(in(i+1));
       Type tformal = _targs._ts[i];
       if( !tactual.isa(tformal) )
         return _badargs==null ? "bad arguments" : _badargs.typerr(tactual,tformal);

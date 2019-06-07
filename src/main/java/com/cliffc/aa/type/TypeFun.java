@@ -1,14 +1,11 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.node.FunNode;
-
 /** A Tuple with exactly 5 fields:
  *  0 - Function exit control
  *  1 - Function exit memory value type
  *  2 - Function exit value type
  *  3 - Function RPC type (set of callers) - Short cut available type, to avoid
  *      going to the FunNode and reversing to the RPC.
- *  4 - Function signature, with a single FIDX 
  * 
  *  This is the type of EpilogNodes, and is somewhat redundant because they
  *  also have a _fidx to map to the FunNode (used when the FunNode is
@@ -32,10 +29,10 @@ public class TypeFun extends TypeTuple<TypeFun> {
     return t1==t2 ? t1 : t1.free(t2);
   }
   
-  public static TypeFun make( Type ctrl, Type mem, Type ret, Type rpc, TypeFunPtr fun ) {
-    return make(false,new Type[]{ctrl,mem,ret,rpc,fun});
+  public static TypeFun make( Type ctrl, Type mem, Type ret, Type rpc ) {
+    return make(false,new Type[]{ctrl,mem,ret,rpc});
   }
-  public static TypeFun make( TypeFunPtr fun ) { return make(Type.CTRL,fun._retmem,fun._ret,TypeRPC.ALL_CALL, fun); }
+  public static TypeFun make( TypeFunPtr fun ) { return make(Type.CTRL,fun._retmem,fun._ret,TypeRPC.ALL_CALL); }
 
          static final TypeFun FUN1        = make(TypeFunPtr.any1(0)); // Some 1-arg function
   public static final TypeFun FUN2        = make(TypeFunPtr.any2());  // Some 2-arg function
@@ -75,13 +72,15 @@ public class TypeFun extends TypeTuple<TypeFun> {
   }
 
   // Return true if this is a forward-ref function pointer (return type from EpilogNode)
-  @Override public boolean is_forward_ref() { return fun().is_forward_ref(); }
+  @Override public boolean is_forward_ref() {
+    throw com.cliffc.aa.AA.unimpl();
+    //return fun().is_forward_ref();
+  }
 
   public Type ctl() { return _ts[0]; }
   public Type mem() { return _ts[1]; }
   public Type val() { return _ts[2]; }
   public Type rpc() { return _ts[3]; }
-  public TypeFunPtr fun() { return (TypeFunPtr)_ts[4]; }
   @Override public boolean must_nil() { return false; }
   @Override Type not_nil() { return this; }
 }

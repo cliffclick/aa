@@ -221,6 +221,7 @@ public class TypeName extends TypeObj<TypeName> {
   @Override public void iter( Consumer<Type> c ) { c.accept(_t); }
   @Override boolean contains( Type t, BitSet bs ) { return _t == t || _t.contains(t, bs); }
   @Override int depth( BitSet bs ) { return 1+_t.depth(bs); }
+  @SuppressWarnings("unchecked")
   @Override Type replace( Type old, Type nnn, HashMap<Type,Type> MEETS  ) {
     Type x = _t.replace(old,nnn,MEETS);
     if( x==_t ) return this;
@@ -229,6 +230,7 @@ public class TypeName extends TypeObj<TypeName> {
     return rez;
   }
 
+  @SuppressWarnings("unchecked")
   @Override void walk( Predicate<Type> p ) { if( p.test(this) ) _t.walk(p); }
   @Override TypeStruct repeats_in_cycles(TypeStruct head, BitSet bs) { return _cyclic ? _t.repeats_in_cycles(head,bs) : null; }
 }

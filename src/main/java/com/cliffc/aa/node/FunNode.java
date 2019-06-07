@@ -64,7 +64,7 @@ public class FunNode extends RegionNode {
     _ts = ts;
     _ret = ret;
     _retmem = retmem;
-    _fidx = fidx == -1 ? BitsFun.new_fidx(BitsFun.ALL) : fidx;
+    _fidx = BitsFun.new_fidx(fidx == -1 ? BitsFun.ALL : fidx);
     _op_prec = (byte)op_prec;
     FUNS.setX(_fidx,this); // Track FunNode by fidx
     add_def(Env.ALL_CTRL);
@@ -110,10 +110,12 @@ public class FunNode extends RegionNode {
     return sb;
   }
   public static SB name( int i, SB sb ) {
-    String name = find_fidx(i)._name;
+    FunNode fun = find_fidx(i);
+    String name = fun == null ? null : fun._name;
     return sb.p(name==null ? Integer.toString(i) : name);
   }
 
+  @SuppressWarnings("unchecked")
   @Override Node copy(GVNGCM gvn) { throw AA.unimpl(); } // Gotta make a new FIDX
 
   // True if no future unknown callers.
@@ -468,28 +470,31 @@ public class FunNode extends RegionNode {
     // function is prepared to handle unexpected new Calls already.  If its
     // not true, then immediately wire up the new Call, add the new RPC input and
     // correct all types.
-    if( !is_dead() && !has_unknown_callers() )
+    if( !is_dead() && !has_unknown_callers() ) {
       for( Node c : map.values() ) {
         if( c instanceof CallNode ) { // For all cloned Calls
           CallNode call = (CallNode)c;
-          Type tfunptr = gvn.type(call.fun());
-          TypeFunPtr tfun = ((TypeFun)tfunptr).fun();
-          for( int fidx : tfun._fidxs ) { // For all possible targets of the Call
-            FunNode oldfun = FunNode.find_fidx(fidx);
-            assert !oldfun.is_dead();
-            if( !oldfun.has_unknown_callers() ) {
-              gvn.add_work(oldfun);
-              Node x = ((CallNode)c).wire(gvn,oldfun,false);
-              assert x != null;
-              ParmNode rpc = oldfun.rpc();
-              if( rpc != null ) // Can be null there is a single return point, which got constant-folded
-                gvn.setype(rpc,rpc.value(gvn));
-              EpilogNode oldepi = oldfun.epi();
-              gvn.setype(oldepi,oldepi.value(gvn));
-            }
-          }
+          // TODO: Should not happen, after i split RPCs properly
+          throw AA.unimpl();
+      //    Type tfunptr = gvn.type(call.fun());
+      //    TypeFunPtr tfun = ((TypeFun)tfunptr).fun();
+      //    for( int fidx : tfun._fidxs ) { // For all possible targets of the Call
+      //      FunNode oldfun = FunNode.find_fidx(fidx);
+      //      assert !oldfun.is_dead();
+      //      if( !oldfun.has_unknown_callers() ) {
+      //        gvn.add_work(oldfun);
+      //        Node x = ((CallNode)c).wire(gvn,oldfun,false);
+      //        assert x != null;
+      //        ParmNode rpc = oldfun.rpc();
+      //        if( rpc != null ) // Can be null there is a single return point, which got constant-folded
+      //          gvn.setype(rpc,rpc.value(gvn));
+      //        EpilogNode oldepi = oldfun.epi();
+      //        gvn.setype(oldepi,oldepi.value(gvn));
+      //      }
+      //    }
         }
       }
+    }
 
     // TODO: Hook with proper signature into ScopeNode under an Unresolved.
     // Future calls may resolve to either the old version or the new.

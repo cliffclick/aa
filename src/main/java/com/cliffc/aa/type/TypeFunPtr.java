@@ -141,5 +141,6 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public static TypeFunPtr make_forward_ref() { return make(null, GENERIC_RET,TypeMem.MEM, BitsFun.make_new_fidx(BitsFun.ALL)); }
   private static TypeFunPtr make_generic()    { return make(GENERIC_ARGS, GENERIC_RET,TypeMem.MEM, BitsFun.FULL); }
   // Iterate over any nested child types
+  @SuppressWarnings("unchecked")
   @Override public void iter( Consumer<Type> c ) { _ts.iter(c); c.accept(_ret); }
 }

@@ -81,6 +81,7 @@ public class Type<T extends Type<T>> {
   // interned.  One-entry pool for now.
   private static Type FREE=null;
   protected T free( T ret ) { assert getClass()==Type.class; FREE=this; return ret; }
+  @SuppressWarnings("unchecked")
   static Type make( byte type ) {
     Type t1 = FREE;
     if( t1 == null ) t1 = new Type(type);
@@ -93,6 +94,7 @@ public class Type<T extends Type<T>> {
   // check, except during construction and intern'ing.
   static ConcurrentMap<Type,Type> INTERN = new ConcurrentHashMap<>();
   static int RECURSIVE_MEET;    // Count of recursive meet depth
+  @SuppressWarnings("unchecked")
   final Type hashcons() {
     _hash = compute_hash();     // Set hash
     Type t2 = INTERN.get(this); // Lookup
@@ -118,11 +120,13 @@ public class Type<T extends Type<T>> {
   }
   // Remove a forward-ref type from the interning dictionary, prior to
   // interning it again - as a self-recursive type
+  @SuppressWarnings("unchecked")
   final T untern( ) {
     Type rez = INTERN.remove(this);
     assert rez != null;
     return (T)this;
   }
+  @SuppressWarnings("unchecked")
   final T retern( ) {
     assert _dual._dual == this;
     INTERN.put(this,this);
@@ -237,6 +241,7 @@ public class Type<T extends Type<T>> {
   public final T dual() { return _dual; }
   
   // Compute dual right now.  Overridden in subclasses.
+  @SuppressWarnings("unchecked")
   T xdual() {
     assert is_simple();
     return (T)new Type((byte)(_type^1));
@@ -671,6 +676,9 @@ public class Type<T extends Type<T>> {
   void walk( Predicate<Type> p ) { assert is_simple(); p.test(this); }
 
   TypeStruct repeats_in_cycles(TypeStruct head, BitSet bs) { return null; }
+
+  // Dual, except keep TypeMem.XOBJ as high for starting GVNGCM.opto() state.
+  public Type startype() { return this==ANY ? ANY : dual(); }
 
   RuntimeException typerr(Type t) {
     throw new RuntimeException("Should not reach here: internal type system error with "+this+(t==null?"":(" and "+t)));

@@ -126,6 +126,14 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   }
   // Constructor taking a single bit
   final B make( int bit ) { return make_impl(bit,null); }
+  // Constructor taking an array of bits
+  public final B make( int... bits ) {
+    int max= -1;                // Find max bit
+    for( int bit : bits ) max=Math.max(max,bit);
+    long[] ls = bits(0,max);  // Big enuf bits
+    for( int bit : bits ) or(ls,bit);
+    return make(false,ls);
+  }
 
   private static int  idx (long i) { return (int)(i>>6); }
   private static long mask(long i) { return 1L<<(i&63); }
@@ -135,6 +143,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   public boolean above_center() { return _con<0; }
   boolean may_nil() { return _con==0 || (_con==-1 && ((_bits[0]&1) == 1)); }
   // Add a nil
+  @SuppressWarnings("unchecked")
   B meet_nil() {
     if( _con==0 ) return (B)this;// Already a nil constant
     long[] bs = _bits;
@@ -157,6 +166,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   // as these are the only types with a nil-choice.  Only called during meets
   // with above-center types.  If called with below-center, there is no
   // nil-choice (might be a must-nil but not a choice-nil), so can return this.
+  @SuppressWarnings("unchecked")
   B not_nil() {
     assert _con != 0; // cannot remove nil from nil?
     if( _con != -1 || _bits == null ) return (B)this; // Below or at center
@@ -166,11 +176,12 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     return make(true,bs);                // Choices without nil
   }
   
-  static int max(long[] bits) { return (bits.length<<6)-1; }
+  private static int max( long[] bits ) { return (bits.length<<6)-1; }
   private static void or ( long[] bits, long con ) { bits[idx(con)] |=  mask(con); }
   private static void and( long[] bits, long con ) { bits[idx(con)] &= ~mask(con); }
   private static long[] bits( int a, int b ) { return new long[idx(Math.max(a,b))+1]; }
 
+  @SuppressWarnings("unchecked")
   public B meet( B bs ) {
     if( this==bs ) return (B)this;
     B full = ALL();             // Subclass-specific version of full
@@ -221,13 +232,14 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   }
   
   private static int find_smallest_bit(long[] bits) {
-    for( int i=0; i<bits.length; i++ )
-      if( bits[i]!=0 )
-        return Long.numberOfTrailingZeros(bits[i]);
+    for( long bit : bits )
+      if( bit != 0 )
+        return Long.numberOfTrailingZeros(bit);
     throw AA.unimpl();
   }
 
-  // Constants are self-dual; classes just flip the meet/join bit.
+  // Constants are self-dual; classes just flip the meet/join bit.  
+  @SuppressWarnings("unchecked")
   public B dual() { return _bits==null && !is_class() ? (B)this : make_impl(-_con,_bits); }
   // join is defined in terms of meet and dual
   public Bits<B> join(Bits<B> bs) { return dual().meet(bs.dual()).dual(); }
@@ -266,6 +278,12 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
           or(bits._bits,new_alias);
         }
       }
+
+      // Also, for BitsAlias, have to expand TypeMems to match
+      if( this==BitsAlias.HASHMAKER )
+        for( Type t : Type.INTERN.keySet() )
+          if( t instanceof TypeMem )
+            ((TypeMem)t).split(par,new_alias);
       
       _splits.push(new Q(par,new_alias)); // Record the split
 
@@ -286,6 +304,17 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
           sum -= mask(q._split);
       // Fold to an int
       return (int)((sum>>32)|sum);
+    }
+    int compute_hash(TypeObj[] as) {
+      // Sum of hashes, minus exceptions
+      int sum=0, len=as.length;
+      for( TypeObj obj : as ) if( obj != null ) sum+=obj._hash;
+      // Minus the exceptions
+      for( Q q : _splits )
+        if( q != null && q._alias < len && q._split < len &&
+            as[q._alias]!=null && as[q._split]!=null )
+          sum -= as[q._split]._hash;
+      return sum;
     }
     void init0() { _init = _splits._len; }
     void reset_to_init0() { _splits.set_len(_init); }

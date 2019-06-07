@@ -295,6 +295,7 @@ public class NonBlockingHashMapLong<TypeV>
     return putIfMatch( key, newValue, oldValue ) == oldValue;
   }
 
+  @SuppressWarnings("unchecked")
   private TypeV putIfMatch( long key, Object newVal, Object oldVal ) {
     if (oldVal == null || newVal == null)  throw new NullPointerException();
     if( key == NO_KEY ) {
@@ -345,6 +346,7 @@ public class NonBlockingHashMapLong<TypeV>
    *  most one such mapping.)
    * @throws NullPointerException if the specified key is null */
   // Never returns a Prime nor a Tombstone.
+  @SuppressWarnings("unchecked")
   public final TypeV get( long key ) {
     if( key == NO_KEY ) {
       final Object V = _val_1;
@@ -1105,6 +1107,7 @@ public class NonBlockingHashMapLong<TypeV>
   }
 
   /** Keys as a long array.  Array may be zero-padded if keys are concurrently deleted. */
+  @SuppressWarnings("unchecked")
   public long[] keySetLong() {
     long[] dom = new long[size()];
     IteratorLong i=(IteratorLong)keySet().iterator();
@@ -1189,6 +1192,7 @@ public class NonBlockingHashMapLong<TypeV>
 
   // --- readObject --------------------------------------------------------
   // Read a CHM from a stream
+  @SuppressWarnings("unchecked")
   private void readObject(java.io.ObjectInputStream s) throws IOException, ClassNotFoundException  {
     s.defaultReadObject();      // Read nothing
     initialize(MIN_SIZE);

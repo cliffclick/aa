@@ -132,6 +132,7 @@ public class TypeNil extends Type<TypeNil> {
   @Override public void iter( Consumer<Type> c ) { c.accept(_t); }
   @Override boolean contains( Type t, BitSet bs ) { return _t == t || (_t != null && _t.contains(t, bs)); }
   @Override int depth( BitSet bs ) { return 1+(_t==null ? 0 : _t.depth(bs)); }
+  @SuppressWarnings("unchecked")
   @Override Type replace( Type old, Type nnn, HashMap<Type,Type> HASHCONS ) {
     if( _t==null ) return this;
     Type x = _t.replace(old,nnn,HASHCONS);
@@ -142,6 +143,7 @@ public class TypeNil extends Type<TypeNil> {
     if( hc == null ) { HASHCONS.put(rez,rez); return rez; }
     return rez.free(hc);
   }
+  @SuppressWarnings("unchecked")
   @Override void walk( Predicate<Type> p ) { if( p.test(this) && _t!=null ) _t.walk(p); }
   @Override TypeStruct repeats_in_cycles(TypeStruct head, BitSet bs) {
     if( !_cyclic || _t==null ) return null;

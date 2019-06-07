@@ -565,6 +565,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // Replace old with nnn in a 'this' clone.  We are initially called with
   // 'this==old', so in the clone there is a pointer to the initial
   // Type... which means the whole structure is cyclic when we are done.
+  @SuppressWarnings("unchecked")
   @Override Type replace( Type old, Type nnn, HashMap<Type,Type> HASHCONS ) {
     if( this==old ) return nnn; // Found a copy of 'old', so replace with 'nnn'
     if( _cyclic && !contains(old) ) // Not related, no need to update/clone
@@ -578,8 +579,11 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       ts[i] = _ts[i].replace(old,nnn,HASHCONS);
     return rez.hashcons_free();
   }
+  @SuppressWarnings("unchecked")
   @Override void walk( Predicate<Type> p ) {
     if( p.test(this) )
       for( Type _t : _ts ) _t.walk(p);
   }
+  // Dual, except keep TypeMem.XOBJ as high for starting GVNGCM.opto() state.
+  @Override public TypeObj startype() { return dual(); }
 }

@@ -79,7 +79,7 @@ public class NewNode extends Node {
   
   // Clones during inlining all become unique new sites
   @Override NewNode copy(GVNGCM gvn) {
-    NewNode nnn = super.copy(gvn);
+    NewNode nnn = (NewNode)super.copy(gvn);
     nnn._alias = BitsAlias.new_alias(_alias); // Children alias classes, split from parent
     return nnn;
   }

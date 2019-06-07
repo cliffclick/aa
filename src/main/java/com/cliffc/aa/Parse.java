@@ -913,8 +913,9 @@ public class Parse {
   // Standard mis-use of a forward-ref error (assumed to be a forward-decl of a
   // recursive function; all other uses are treated as an unknown-ref error).
   public String forward_ref_err(TypeFun tfun) {
-    String name = FunNode.name(tfun.fun().fidx(), new SB()).toString();
-    return errMsg("Unknown ref '"+name+"'");
+    throw AA.unimpl();
+    //String name = FunNode.name(tfun.fun().fidx(), new SB()).toString();
+    //return errMsg("Unknown ref '"+name+"'");
   }
   
   // Build a string of the given message, the current line being parsed,

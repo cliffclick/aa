@@ -346,6 +346,7 @@ public class NonBlockingHashMap<TypeK, TypeV>
   // there before.  If oldVal is the returned value, then newVal was inserted,
   // otherwise not.  A null oldVal means the key does not exist (only insert if
   // missing); a null newVal means to remove the key.
+  @SuppressWarnings("unchecked")
   public final TypeV putIfMatchAllowNull( Object key, Object newVal, Object oldVal ) {
     if( oldVal == null ) oldVal = TOMBSTONE;
     if( newVal == null ) newVal = TOMBSTONE;
@@ -355,6 +356,7 @@ public class NonBlockingHashMap<TypeK, TypeV>
     return res == TOMBSTONE ? null : res;
   }
 
+  @SuppressWarnings("unchecked")
   private final TypeV putIfMatch( Object key, Object newVal, Object oldVal ) {
     if (oldVal == null || newVal == null) throw new NullPointerException();
     final Object res = putIfMatch( this, _kvs, key, newVal, oldVal );
@@ -409,6 +411,7 @@ public class NonBlockingHashMap<TypeK, TypeV>
    *
    * @return  a clone of the hashtable.
    */
+  @SuppressWarnings("unchecked")
   @Override
   public Object clone() {
     try {
@@ -497,6 +500,7 @@ public class NonBlockingHashMap<TypeK, TypeV>
    *  most one such mapping.)
    * @throws NullPointerException if the specified key is null */
   // Never returns a Prime nor a Tombstone.
+  @SuppressWarnings("unchecked")
   @Override
   public TypeV get( Object key ) {
     final Object V = get_impl(this,_kvs,key);
@@ -558,6 +562,7 @@ public class NonBlockingHashMap<TypeK, TypeV>
    *  if this map contains no mapping for the key.
    * @throws NullPointerException if the specified key is null */
   // Never returns a Prime nor a Tombstone.
+  @SuppressWarnings("unchecked")
   public TypeK getk( TypeK key ) {
     return (TypeK)getk_impl(this,_kvs,key);
   }
@@ -1245,6 +1250,7 @@ public class NonBlockingHashMap<TypeK, TypeV>
   }
 
   // --- keySet --------------------------------------------------------------
+  @SuppressWarnings("unchecked")
   private class SnapshotK implements Iterator<TypeK>, Enumeration<TypeK> {
     final SnapshotV _ss;
     public SnapshotK() { _ss = new SnapshotV(); }
@@ -1296,6 +1302,7 @@ public class NonBlockingHashMap<TypeK, TypeV>
     }
   }
 
+  @SuppressWarnings("unchecked")
   private class SnapshotE implements Iterator<Map.Entry<TypeK,TypeV>> {
     final SnapshotV _ss;
     public SnapshotE() { _ss = new SnapshotV(); }
@@ -1360,6 +1367,7 @@ public class NonBlockingHashMap<TypeK, TypeV>
 
   // --- readObject --------------------------------------------------------
   // Read a CHM from a stream
+  @SuppressWarnings("unchecked")
   private void readObject(java.io.ObjectInputStream s) throws IOException, ClassNotFoundException {
     s.defaultReadObject();      // Read nothing
     initialize(MIN_SIZE);

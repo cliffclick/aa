@@ -86,14 +86,15 @@ public abstract class Node implements Cloneable {
    }
 
   // Make a copy of the base node, with no defs nor uses and a new UID.
-  <N extends Node> N copy(GVNGCM gvn) {
-    N n;
-    try { n = (N)clone(); }     // Preserve base java type
-    catch( CloneNotSupportedException cns ) { throw new RuntimeException(cns); }
-    n._uid = GVNGCM.uid();                 // A new UID
-    n._defs = new Ary<>(new Node[1],0); // New empty defs
-    n._uses = new Ary<>(new Node[1],0); // New empty uses
-    return n;
+  Node copy(GVNGCM gvn) {
+    try {
+      Node n = (Node)clone();
+      n._uid = GVNGCM.uid();              // A new UID
+      n._defs = new Ary<>(new Node[1],0); // New empty defs
+      n._uses = new Ary<>(new Node[1],0); // New empty uses
+      return n;
+    } catch( CloneNotSupportedException cns ) { throw new RuntimeException(cns); }
+
   }
   
   // Short string name
@@ -133,15 +134,18 @@ public abstract class Node implements Cloneable {
       // Print anything not yet printed, including multi-node combos
       for( Node n : _defs ) if( n != null ) n.dump(d+1,sb,max,bs,gvn);
     }
-    // Print multi-node combos all-at-once
+    // Print multi-node combos all-at-once, including all tails even if they
+    // exceed the depth limit by 1.
     Node x = is_multi_tail() ? in(0) : this;
     if( x != null && x.is_multi_head() ) {
       int dx = d+(x==this?0:1);
+      // Print all tails, all at once - nothing recursively below the tail
       for( Node n : x._uses ) if( n.is_multi_tail() )
-        for( Node m : n._defs ) m.dump(dx,sb,max,bs,gvn);
-      bs.clear(_uid);           // Reset for self, so prints in the mix
+        for( Node m : n._defs ) m.dump(dx+1,sb,max,bs,gvn);
+      if( x==this ) bs.clear(_uid); // Reset for self, so prints right now
       x.dump(dx,sb,bs,gvn); // Conditionally print head of combo
       // Print all combo tails, if not already printed
+      if( x!=this ) bs.clear(_uid); // Reset for self, so prints in the mix below
       for( Node n : x._uses ) if( n.is_multi_tail() ) n.dump(dx-1,sb,bs,gvn);
       return sb;
     } else { // Neither combo head nor tail, just print

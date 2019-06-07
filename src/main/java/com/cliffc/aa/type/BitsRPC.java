@@ -20,7 +20,7 @@ public class BitsRPC extends Bits<BitsRPC> {
     else { INTERN.put(b1,b1); return b1; }
   }
 
-  private static final Bits.HashMaker HASHMAKER = new Bits.HashMaker();
+  private static final Bits.HashMaker<BitsRPC> HASHMAKER = new Bits.HashMaker<>();
   public static final int ALL = new_rpc(0);
   public static int new_rpc( int par ) { return HASHMAKER.split(par,INTERN); }
   // Fast reset of parser state between calls to Exec

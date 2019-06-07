@@ -80,9 +80,8 @@ public class TypeMem extends Type<TypeMem> {
     return true;
   }
   @Override int compute_hash() {
-    int hash = TMEM + (_any?1:0);
-    for( TypeObj obj : _aliases )  if( obj != null )  hash += obj._hash;
-    return hash;
+    // Hash is preserved across splitting bits
+    return TMEM + (_any?1:0) + BitsAlias.HASHMAKER.compute_hash(_aliases);
   }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
@@ -175,6 +174,15 @@ public class TypeMem extends Type<TypeMem> {
     return make0(_any&&tf._any,objs);
   }
 
+  // Part of a Smalltalk-ish "becomes" operation on splitting alias Bits.
+  // See big comment in Bits.java.
+  void split( int paridx, int newidx ) {
+    if( paridx >= _aliases.length || _aliases[paridx]==null ) return;
+    if( newidx >= _aliases.length )
+      _aliases = Arrays.copyOf(_aliases,newidx+1);
+    _aliases[newidx] = _aliases[paridx];
+  }
+  
   // Meet of all possible loadable values
   public TypeObj ld( TypeMemPtr ptr ) {
     boolean any = ptr.above_center();
@@ -199,19 +207,14 @@ public class TypeMem extends Type<TypeMem> {
   }
 
   // Merge two memories with no overlaps.  This is similar to a st(), except
-  // updating an entire Obj not just a field, and not a replacement.  The
-  // given memory is precise.
+  // updating an entire Obj not just a field, and not a replacement.  The given
+  // memory is generally precise, except after a alias split and before any
+  // inputs are re-value()'d.
   public TypeMem merge( TypeMem mem ) {
-    // Given memory must be "skinny", only a single alias.
-    TypeObj[] ms = mem._aliases;
-    int mlen = ms.length;
-    int alias = mlen-1;
-    TypeObj obj = ms[alias];
-    assert alias >= 1 && obj != null;
-    for( int i=2; i<alias; i++ )  assert ms[i]==null;
-
-    TypeObj[] objs = Arrays.copyOf(_aliases,Math.max(_aliases.length,alias+1));
-    objs[alias]=obj;
+    TypeObj[] objs = Arrays.copyOf(_aliases,Math.max(_aliases.length,mem._aliases.length));
+    for( int i=2; i<mem._aliases.length; i++ )
+      if( mem._aliases[i] != null )
+        objs[i] = mem._aliases[i];
     return make0(_any,objs);
   }
   
@@ -220,4 +223,12 @@ public class TypeMem extends Type<TypeMem> {
   @Override public boolean is_con()       { return false;}
   @Override public boolean must_nil() { return false; } // never a nil
   @Override Type not_nil() { return this; }
+  // Dual, except keep TypeMem.XOBJ as high for starting GVNGCM.opto() state.
+  @Override public TypeMem startype() {
+    TypeObj[] oops = new TypeObj[_aliases.length];
+    for(int i=0; i<_aliases.length; i++ )
+      if( _aliases[i] != null )
+        oops[i] = _aliases[i].startype();
+    return make0(!_any,oops);
+  }
 }

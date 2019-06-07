@@ -25,6 +25,7 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
   public static final TypeObj XOBJ = (TypeObj)OBJ.dual();
   static final TypeObj[] TYPES = new TypeObj[]{OBJ,XOBJ};
   
+  @SuppressWarnings("unchecked")
   @Override protected O xdual() { return (O)new TypeObj(TOBJ,!_any); }
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
@@ -43,4 +44,6 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
   @Override public boolean is_con() { return false; }
   @Override public boolean must_nil() { return false; }
   @Override public boolean  may_nil() { return false; }
+  // Dual, except keep TypeMem.XOBJ as high for starting GVNGCM.opto() state.
+  @Override public TypeObj startype() { assert _type==TOBJ; return XOBJ; }
 }

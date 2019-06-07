@@ -43,7 +43,7 @@ public class TypeStr extends TypeObj<TypeStr> {
     TypeStr rez = t1==t2 ? t1 : t1.free(t2);
     // Monotonically set alias from zero to non-zero
     if( rez._alias==0 ) rez._alias = alias;
-    else if( alias != 0 ) assert rez._alias==alias;
+    else assert alias == 0 || rez._alias == alias;
     return rez;
   }
   public static TypeStr con(String con) { return make(false,con,0); }
@@ -112,4 +112,6 @@ public class TypeStr extends TypeObj<TypeStr> {
   }
   @Override public Type widen() { return STR; }
   @Override void walk( Predicate<Type> p ) { p.test(this); }
+  // Dual, except keep TypeMem.XOBJ as high for starting GVNGCM.opto() state.
+  @Override public TypeObj startype() { return dual(); }
 }

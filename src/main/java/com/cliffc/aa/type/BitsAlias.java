@@ -18,7 +18,7 @@ public class BitsAlias extends Bits<BitsAlias> {
     else { INTERN.put(b1,b1); return b1; }
   }
 
-  private static final Bits.HashMaker<BitsAlias> HASHMAKER;
+          static final Bits.HashMaker<BitsAlias> HASHMAKER;
   public  static final int REC;
           static final int ALL, STR;
   private static final int ARY;

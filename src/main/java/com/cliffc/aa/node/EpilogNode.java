@@ -34,7 +34,7 @@ public class EpilogNode extends Node {
     assert m instanceof TypeMem;
     if( c==Type.ANY  || r==Type.ANY  ) return all_type().dual();
     if( (c!=Type.CTRL && c!=Type.XCTRL) || !(r instanceof TypeRPC) ) return all_type();
-    return TypeFun.make(c, m, v, r, FunNode.find_fidx(_fidx).tf());
+    return TypeFun.make(c, m, v, r, tf());
   }
   @Override public String err(GVNGCM gvn) { return is_forward_ref() ? _unkref_err : null; }
 
@@ -52,6 +52,8 @@ public class EpilogNode extends Node {
     String name = FunNode.find_fidx(_fidx)._name;
     return name==null ? "Epilog" : "Epi#"+name;
   }
+  TypeFunPtr tf() { return FunNode.find_fidx(_fidx).tf(); }
+  BitsFun fidxs() { return BitsFun.make0(_fidx); }
 
   // A forward-ref is an assumed unknown-function being used before being
   // declared.  Hence we want a callable function pointer, but have no defined

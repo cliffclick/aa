@@ -11,6 +11,7 @@ public class Ary<E> implements Iterable<E> {
   public int _len;
   public Ary(E[] es) { this(es,es.length); }
   public Ary(E[] es, int len) { _es=es; _len=len; }
+  @SuppressWarnings("unchecked")
   public Ary(Class<E> clazz) { this((E[]) Array.newInstance(clazz, 1),0); }
 
   /** @return list is empty */

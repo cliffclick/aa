@@ -177,7 +177,7 @@ public class TestNode {
   
   // Fill a Node with {null,edge,edge} and start the search
   private void test1monotonic_prim(PrimNode prim) {
-    PrimNode n = prim.copy(_gvn);
+    PrimNode n = (PrimNode)prim.copy(_gvn);
     assert n._defs._len==0;
     n.add_def( null  );
     n.add_def(_ins[1]);
@@ -235,6 +235,7 @@ public class TestNode {
     return vt;
   }
   // Set the value Type for 4 input types.  Must not exist.
+  @SuppressWarnings("unchecked")
   private Type set_value_type(Node n, long xx ) {
     Type[] alltypes = Type.ALL_TYPES();
     _gvn.setype(_ins[0],                        alltypes[xx(xx,0)]);

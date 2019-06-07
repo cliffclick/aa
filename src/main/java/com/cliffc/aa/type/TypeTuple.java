@@ -9,7 +9,7 @@ import java.util.BitSet;
 // and multi-arg results like IfNode and CallNode.  This is not the same as a
 // no-named-field TypeStruct, and is not exposed at the language level.
 public class TypeTuple<O extends TypeTuple<O>> extends Type<O> {
-  public boolean _any;
+  boolean _any;
   public Type[] _ts; // The fixed known types
   protected TypeTuple( byte type, boolean any, Type[] ts ) { super(type); init(type, any, ts);  }
   protected void init( byte type, boolean any, Type[] ts ) {
@@ -22,7 +22,7 @@ public class TypeTuple<O extends TypeTuple<O>> extends Type<O> {
   // If visit is not null, children need to be recursively visited.
   @Override public int compute_hash( ) {
     int hash = TTUPLE+(_any?0:1);
-    for( Type t : _ts ) hash += t.compute_hash();
+    for( Type t : _ts ) hash += t._hash;
     return hash;
   }
   @Override public boolean equals( Object o ) {
@@ -62,6 +62,7 @@ public class TypeTuple<O extends TypeTuple<O>> extends Type<O> {
 
   private static TypeTuple FREE=null;
   @Override protected O free( O ret ) { FREE=this; return ret; }
+  @SuppressWarnings("unchecked")
   static TypeTuple make0( boolean any, Type... ts ) {
     TypeTuple t1 = FREE;
     if( t1 == null ) t1 = new TypeTuple(TTUPLE, any, ts);
@@ -108,6 +109,7 @@ public class TypeTuple<O extends TypeTuple<O>> extends Type<O> {
   
   // The length of Tuples is a constant, and so is its own dual.  Otherwise
   // just dual each element.  Also flip the infinitely extended tail type.
+  @SuppressWarnings("unchecked")
   @Override protected O xdual() {
     Type[] ts = new Type[_ts.length];
     for( int i=0; i<_ts.length; i++ ) ts[i] = _ts[i].dual();
@@ -185,4 +187,10 @@ public class TypeTuple<O extends TypeTuple<O>> extends Type<O> {
     throw AA.unimpl();
   }
 
+  // Dual, except keep TypeMem.XOBJ as high for starting GVNGCM.opto() state.
+  @Override public TypeTuple startype() {
+    Type[] ts = new Type[_ts.length];
+    for( int i=0; i<_ts.length; i++ ) ts[i] = _ts[i].startype();
+    return make0(!_any, ts);
+  }
 }

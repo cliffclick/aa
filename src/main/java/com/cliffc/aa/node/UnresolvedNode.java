@@ -1,8 +1,10 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.*;
-import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.Ary;
+import com.cliffc.aa.AA;
+import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.type.BitsFun;
+import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeFun;
 
 public class UnresolvedNode extends Node {
   UnresolvedNode( Node... funs ) { super(OP_UNR,funs); }
@@ -23,6 +25,12 @@ public class UnresolvedNode extends Node {
     for( Node def : _defs )
       t = t.join(gvn.type(def)); // Join of incoming functions
     return t;
+  }
+  BitsFun fidxs() {
+    int[] bits = new int[_defs._len];
+    for( int i=0; i<_defs._len; i++ )
+      bits[i] = ((EpilogNode)in(i))._fidx;
+    return BitsFun.make0(bits).dual();
   }
   // Filter out all the wrong-arg-count functions
   public Node filter( GVNGCM gvn, int nargs ) {

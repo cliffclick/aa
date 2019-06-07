@@ -288,23 +288,14 @@ public class GVNGCM {
     // Either no-progress, or progress and need to re-insert n back into system
     _ts._es[n._uid] = oldt;     // Restore old type, in case we recursively ask for it
     Type t = n.value(this);     // Get best type
-    assert t.isa(oldt);         // Types only improve
+    assert t.isa(oldt) || n instanceof UnresolvedNode;         // Types only improve
     _ts._es[n._uid] = null;     // Remove in case we replace it
     // Replace with a constant, if possible
     if( replace_con(t,n) )
       return con(t);            // Constant replacement
-    // Function-pointer tuples are not considered constants, but can refer to a
-    // constant function and show up any place a Scalar is allowed; e.g. as
-    // arguments to functions or loaded from fields.  Replace with the constant
-    // function's EpilogNode.
-    if( t instanceof TypeFun ) {
-      Type       tc = ((TypeFun)t).ctl();
-      TypeFunPtr tf = ((TypeFun)t).fun();
-      if( tf.is_con() && tc == Type.CTRL && n.is_copy(this,0)==null ) {
-        EpilogNode epi = FunNode.find_fidx(tf.fidx()).epi();
-        if( n != epi ) return epi;
-      }
-    }
+    // TypeFuns only come from Epilogs & Unresolved; TypeFunPtrs however can show up
+    // anyplace a Scalar is allowed.  Make sure they're not confused.
+    assert !(t instanceof TypeFun) || n instanceof EpilogNode || n instanceof UnresolvedNode;
     // Global Value Numbering
     Node z = _vals.putIfAbsent(n,n);
     if( z != null ) return z;
@@ -378,7 +369,7 @@ public class GVNGCM {
     walk_initype( Env.START);
 
     // Collect unresolved calls, and verify they get resolved.
-    Ary<CallNode> calls = new Ary<>(new CallNode[1],0);
+    Ary<CallNode> ambi_calls = new Ary<>(new CallNode[1],0);
     _opt = true;                // Lazily fill with best value
     // Repeat, if we remove some ambiguous choices, and keep falling until the
     // graph stabilizes without ambiguity.
@@ -390,12 +381,9 @@ public class GVNGCM {
         _wrk_bits.clear(n._uid);
         if( n.is_dead() ) continue; // Can be dead functions after removing ambiguous calls
         if( 3 <= n._uid && n._uid < _INIT0_CNT ) continue; // Ignore primitives (type is unchanged and conservative)
-        if( n instanceof CallNode && calls.find((CallNode)n)== -1 ) {
-          Type tf = type(((CallNode)n).fun());
-          if( tf instanceof TypeFun && // Might be e.g. ~Scalar
-              ((TypeFun)tf).fun().is_ambiguous_fun() )
-            calls.add((CallNode)n); // Track ambiguous calls
-        }
+        if( n instanceof CallNode && ambi_calls.find((CallNode)n)== -1 &&
+            ((CallNode)n).fidxs().above_center() )
+          ambi_calls.add((CallNode)n); // Track ambiguous calls
         Type ot = type(n);       // Old type
         Type nt = n.value(this); // New type
         assert ot.isa(nt);       // Types only fall monotonically
@@ -413,14 +401,14 @@ public class GVNGCM {
       }
 
       // Remove CallNode ambiguity after worklist runs dry
-      for( int i=0; i<calls.len(); i++ ) {
-        CallNode call = calls.at(i);
-        if( call.is_dead() ) calls.del(i--); // Remove from worklist
+      for( int i=0; i<ambi_calls.len(); i++ ) {
+        CallNode call = ambi_calls.at(i);
+        if( call.is_dead() ) ambi_calls.del(i--); // Remove from worklist
         else {
           Node fun = call.resolve(this);
           if( fun != null ) {          // Unresolved gets left on worklist
             set_def_reg(call, 2, fun); // Set resolved edge
-            calls.del(i--);            // Remove from worklist
+            ambi_calls.del(i--);       // Remove from worklist
           }
         }
       }
@@ -438,7 +426,7 @@ public class GVNGCM {
   // the worklist for nodes that are not above centerline.
   private void walk_initype( Node n ) {
     if( n==null || touched(n) ) return; // Been there, done that
-    Type startype = n.all_type().dual();
+    Type startype = n.all_type().startype();
     setype(n,startype);
     add_work(n);
     // Walk reachable graph
@@ -481,10 +469,8 @@ public class GVNGCM {
     }
     // All (live) Call ambiguity has been resolved
     if( n instanceof CallNode && type(n.in(0))==Type.CTRL ) {
-      Type tf = type(((CallNode)n).fun());
-      assert (tf instanceof TypeFun &&
-        !((TypeFun)tf).fun().is_ambiguous_fun()) ||
-              n.err(this) != null; // Or else call is in-error
+      assert !((CallNode)n).fidxs().above_center() ||
+        n.err(this) != null; // Or else call is in-error
     }
 
     // Walk reachable graph

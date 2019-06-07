@@ -3,6 +3,7 @@ package com.cliffc.aa;
 /** an implementation of language AA
  */
 
+@SuppressWarnings("unchecked")
 public abstract class AA {
   public static RuntimeException unimpl() { throw new RuntimeException("unimplemented"); }
   private static final AbstractBuildVersion ABV;
