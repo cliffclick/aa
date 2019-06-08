@@ -3,6 +3,7 @@ package com.cliffc.aa.type;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.Consumer;
@@ -152,6 +153,15 @@ public class Type<T extends Type<T>> {
     System.out.println("INTERN_CHECK FAIL: "+_uid+":"+this+" vs "+v._uid+":"+v);
     return true;
   }
+  public static void reset_to_init0() {
+    // Every type which includes a split-Bits type has to be cleared out, as
+    // the next Parse might split a different way.
+    BitSet bs = new BitSet();
+    for( Iterator<Type> i = INTERN.keySet().iterator(); i.hasNext(); )
+      if( i.next().hasBits(bs) )
+        i.remove();
+  }
+  boolean hasBits(BitSet bs) { return false; }
 
   // Simple types are implemented fully here.  "Simple" means: the code and
   // type hierarchy are simple, not that the Type is conceptually simple.

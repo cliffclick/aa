@@ -40,7 +40,7 @@ public class BitsAlias extends Bits<BitsAlias> {
   public  static int new_string() { return new_alias(STR); }
   // Fast reset of parser state between calls to Exec
   public static void init0() { HASHMAKER.init0(); }
-  public static void reset_to_init0() { HASHMAKER.reset_to_init0(); }
+  public static void reset_to_init0() { HASHMAKER.reset_to_init0(); INTERN.clear(); }
 
 
   // Have to make a first BitsAlias here; thereafter the v-call to make_impl

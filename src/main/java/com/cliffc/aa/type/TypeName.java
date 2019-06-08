@@ -233,4 +233,9 @@ public class TypeName extends TypeObj<TypeName> {
   @SuppressWarnings("unchecked")
   @Override void walk( Predicate<Type> p ) { if( p.test(this) ) _t.walk(p); }
   @Override TypeStruct repeats_in_cycles(TypeStruct head, BitSet bs) { return _cyclic ? _t.repeats_in_cycles(head,bs) : null; }
+  @Override boolean hasBits(BitSet bs) {
+    if( bs.get(_uid) ) return false;
+    bs.set(_uid);
+    return _t.hasBits(bs);
+  }
 }

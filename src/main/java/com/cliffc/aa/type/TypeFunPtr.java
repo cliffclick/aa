@@ -143,4 +143,5 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   // Iterate over any nested child types
   @SuppressWarnings("unchecked")
   @Override public void iter( Consumer<Type> c ) { _ts.iter(c); c.accept(_ret); }
+  @Override boolean hasBits(BitSet bs) { return true; }
 }

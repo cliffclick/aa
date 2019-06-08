@@ -23,7 +23,7 @@ public class BitsFun extends Bits<BitsFun> {
   public static int new_fidx( int par ) { return HASHMAKER.split(par,INTERN); }
   // Fast reset of parser state between calls to Exec
   public static void init0() { HASHMAKER.init0(); }
-  public static void reset_to_init0() { HASHMAKER.reset_to_init0(); }
+  public static void reset_to_init0() { HASHMAKER.reset_to_init0(); INTERN.clear(); }
   
   // Have to make a first BitsFun here; thereafter the v-call to make_impl
   // will make more on demand.  But need the first one to make a v-call.

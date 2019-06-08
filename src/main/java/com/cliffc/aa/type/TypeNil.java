@@ -1,7 +1,5 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.util.Ary;
-
 import java.util.BitSet;
 import java.util.HashMap;
 import java.util.function.Consumer;
@@ -148,5 +146,10 @@ public class TypeNil extends Type<TypeNil> {
   @Override TypeStruct repeats_in_cycles(TypeStruct head, BitSet bs) {
     if( !_cyclic || _t==null ) return null;
     return _t.repeats_in_cycles(head,bs);
+  }
+  @Override boolean hasBits(BitSet bs) {
+    if( bs.get(_uid) ) return false;
+    bs.set(_uid);
+    return _t != null && _t.hasBits(bs);
   }
 }

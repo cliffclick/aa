@@ -190,4 +190,12 @@ public class TypeTuple<O extends TypeTuple<O>> extends Type<O> {
     for( int i=0; i<_ts.length; i++ ) ts[i] = _ts[i].startype();
     return make0(!_any, ts);
   }
+  @Override boolean hasBits(BitSet bs) {
+    if( bs.get(_uid) ) return false;
+    bs.set(_uid);
+    for( Type t: _ts )
+      if( t.hasBits(bs) )
+        return true;
+    return false;
+  }
 }

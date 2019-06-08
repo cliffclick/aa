@@ -231,4 +231,12 @@ public class TypeMem extends Type<TypeMem> {
         oops[i] = _aliases[i].startype();
     return make0(!_any,oops);
   }
+  @Override boolean hasBits(BitSet bs) {
+    if( bs.get(_uid) ) return false;
+    bs.set(_uid);
+    for( Type t: _aliases )
+      if( t!=null && t.hasBits(bs) )
+        return true;
+    return false;
+  }
 }
