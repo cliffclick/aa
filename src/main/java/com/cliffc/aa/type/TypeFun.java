@@ -66,7 +66,7 @@ public class TypeFun extends TypeTuple<TypeFun> {
     }
     TypeFun tt = (TypeFun)t;
     assert _ts.length==tt._ts.length;
-    Type[] ts = new Type[5];
+    Type[] ts = new Type[4];
     for( int i=0; i<_ts.length; i++ )  ts[i] = _ts[i].meet(tt._ts[i]);
     return make(_any&tt._any,ts);
   }

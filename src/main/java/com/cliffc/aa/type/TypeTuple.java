@@ -158,15 +158,12 @@ public class TypeTuple<O extends TypeTuple<O>> extends Type<O> {
   // 1 - Return memory type, as implemented
   // 2 - Return type of the function as implemented
   // 3 - RPC (set of callers)
-  // 4 - Classic TypeFunPtr, includes declared return type
   final boolean is_fun() {
-    return _ts.length==5 &&
+    return _ts.length==4 &&
      (_ts[0]==CTRL || _ts[0]==XCTRL) &&
       _ts[1] instanceof TypeMem &&
       _ts[2].isa(SCALAR) &&
-      _ts[3] instanceof TypeRPC &&
-      //assert ts[4].is_con(); // Not always a constant F-P, e.g. Unresolved doing joins of F-P's
-      _ts[4] instanceof TypeFunPtr;
+      _ts[3] instanceof TypeRPC;
   }
 
   // True if isBitShape on all bits

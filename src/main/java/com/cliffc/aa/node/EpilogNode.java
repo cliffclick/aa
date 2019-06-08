@@ -34,7 +34,7 @@ public class EpilogNode extends Node {
     assert m instanceof TypeMem;
     if( c==Type.ANY  || r==Type.ANY  ) return all_type().dual();
     if( (c!=Type.CTRL && c!=Type.XCTRL) || !(r instanceof TypeRPC) ) return all_type();
-    return TypeFun.make(c, m, v, r, tf());
+    return TypeFun.make(c, m, v, r);
   }
   @Override public String err(GVNGCM gvn) { return is_forward_ref() ? _unkref_err : null; }
 

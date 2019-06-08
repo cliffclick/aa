@@ -267,7 +267,6 @@ public class CallNode extends Node {
     Type tc = gvn.type(ctl());  // Control type
     if( _inlined )              // Inlined functions just pass thru & disappear
       return TypeTuple.make(tc,gvn.type(in(1)),gvn.type(in(2)));
-    Type tm = gvn.type(mem());  // Memory type
     Node fp = fun();            // If inlined, its the result, if not inlined, its the function being called
     Type t = gvn.type(fp);
     if( tc == Type.XCTRL || tc == Type.ANY ) // Call is dead?

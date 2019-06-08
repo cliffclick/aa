@@ -412,7 +412,7 @@ public class FunNode extends RegionNode {
         ot = nn.all_type();     // Except the RPC, which has new callers
       else if( nn instanceof EpilogNode ) {
         TypeFun tt = (TypeFun)ot; // And the epilog, which has a new funnode and RPCs
-        ot = TypeFun.make(tt.ctl(),tt.mem(),tt.val(),TypeRPC.ALL_CALL,fun.tf());
+        ot = TypeFun.make(tt.ctl(),tt.mem(),tt.val(),TypeRPC.ALL_CALL);
       }
       gvn.rereg(nn,ot);
     }
