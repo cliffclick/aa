@@ -36,8 +36,8 @@ public class LoadNode extends Node {
     Node addr = adr();
     if( ctrl==null || gvn.type(ctrl)!=Type.CTRL )
       return null;              // Dead load, or a no-control-no-fail load
+    if( addr.is_forward_ref() ) return null;
     Type t = gvn.type(addr);    // Address type
-    if( t.is_forward_ref() ) return null;
 
     // Lift control on Loads as high as possible... and move them over
     // to a CastNode (to remove nil-ness) and remove the control.
@@ -71,7 +71,8 @@ public class LoadNode extends Node {
 
   @Override public Type value(GVNGCM gvn) {
     Type adr = gvn.type(adr()).base();
-    if( adr.isa(TypeMemPtr.OOP0.dual()) ) return Type.XSCALAR; // Very high address; might fall to any valid value
+    if( adr.isa(TypeMemPtr.OOP0.dual()) ) return Type.XSCALAR;
+    if( adr().is_forward_ref() ) return Type.XSCALAR;
     if( adr.must_nil() ) return Type.SCALAR; // Not provable not-nil, so fails
     if( TypeMemPtr.OOP0.isa(adr) ) return Type.SCALAR; // Very low, might be any address
     if( !(adr instanceof TypeMemPtr) )

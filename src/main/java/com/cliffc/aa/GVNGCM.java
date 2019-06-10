@@ -451,19 +451,21 @@ public class GVNGCM {
       FunNode fun = (FunNode)n;
       EpilogNode epi = fun.epi();
       if( type(fun)==Type.CTRL && epi != null ) {
-        TypeTuple  tt = (TypeTuple)   type(epi);
-        Type       tctl =             tt.at(0);
-        Type       tmem =             tt.at(1);
-        Type       tret =             tt.at(2);
-        Type       trpc =             tt.at(3);
-        TypeFunPtr tfun = (TypeFunPtr)tt.at(4);
-        if( tctl != Type.CTRL ) throw AA.unimpl(); // never-return function (maybe never called?)
-        if( tret != tfun._ret &&    // can sharpen function return
-            tret.isa(tfun._ret) ) { // Only if sharpened (might not be true for errors)
+        TypeFun tfun = (TypeFun)type(epi);
+        if( tfun.ctl() != Type.CTRL ) throw AA.unimpl(); // never-return function (maybe never called?)
+        Type tret = tfun.val();    // Actual return value
+        if( tret !=  fun._ret &&   // can sharpen function return
+            tret.isa(fun._ret) ) { // Only if sharpened (might not be true for errors)
           unreg(fun);
-          //fun._tf = TypeFunPtr.make(tfun._ts,targmem,tret,tretmem,tfun._fidxs,tfun._nargs);
-          //rereg(fun,Type.CTRL);
-          throw AA.unimpl();
+          fun._ret = tret;
+          rereg(fun,Type.CTRL);
+        }
+        Type tmem = tfun.mem();       // Actual return value
+        if( tmem !=  fun._retmem &&   // can sharpen function return
+            tmem.isa(fun._retmem) ) { // Only if sharpened (might not be true for errors)
+          unreg(fun);
+          fun._retmem = (TypeMem)tmem;
+          rereg(fun,Type.CTRL);
         }
       }
     }

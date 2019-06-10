@@ -418,7 +418,7 @@ public class CallNode extends Node {
     // Error#1: fail for passed-in unknown references
     for( int j=0; j<nargs(); j++ ) 
       if( arg(j).is_forward_ref() )
-        return _badargs.forward_ref_err((TypeFun)gvn.type(arg(j)));
+        return _badargs.forward_ref_err(((EpilogNode)arg(j)).fun());
     
     Node fp = fun();      // Either function pointer, or unresolved list of them
     Node xfp = fp instanceof UnresolvedNode ? fp.in(0) : fp;
@@ -426,12 +426,12 @@ public class CallNode extends Node {
     if( !(txfp instanceof TypeFun) )
       return _badargs.errMsg("A function is being called, but "+txfp+" is not a function type");
 
-    TypeFun tfun = (TypeFun)txfp;
+    EpilogNode epi = (EpilogNode)xfp;
     if( fp.is_forward_ref() ) // Forward ref on incoming function
-      return _badargs.forward_ref_err(tfun);
+      return _badargs.forward_ref_err(epi.fun());
 
     // Error#2: bad-arg-count
-    TypeFunPtr tfp = ((EpilogNode)xfp).tf();
+    TypeFunPtr tfp = epi.fun().tf();
     if( tfp.nargs() != nargs() )
       return _badargs.errMsg("Passing "+(nargs()-1)+" arguments to "+tfp+" which takes "+(tfp.nargs()-1)+" arguments");
 

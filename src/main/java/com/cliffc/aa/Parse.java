@@ -765,8 +765,8 @@ public class Parse {
       Ary<Type> ts = new Ary<>(new Type[1],0);
       while( (c=skipWS()) != ')' ) { // No more types...
         Type t = Type.SCALAR;    // Untyped, most generic field type
-        if( c!=',' && c!=')' &&  // Has space for type annotation?
-            (t=type(type_var))==null ) throw AA.unimpl(); // return an error here, missing type
+        if( c!=',' &&            // Has space for type annotation?
+            (t=type(type_var))==null ) return null; // return an error here, missing type
         ts.add(typeq(t));
         if( !peek(',') ) break; // Final comma is optional
       }
@@ -905,17 +905,15 @@ public class Parse {
 
   // Polite error message for mismatched types
   public String typerr( Type t0, Type t1 ) {
-    return t0.is_forward_ref() // Forward/unknown refs as args to a call report their own error
-      ? forward_ref_err((TypeFun)t0)
-      : errMsg(t0.toString()+" is not a "+t1);
+    assert !t0.is_forward_ref(); // Forward/unknown refs as args to a call report their own error
+    return errMsg(t0.toString()+" is not a "+t1);
   }
 
   // Standard mis-use of a forward-ref error (assumed to be a forward-decl of a
   // recursive function; all other uses are treated as an unknown-ref error).
-  public String forward_ref_err(TypeFun tfun) {
-    throw AA.unimpl();
-    //String name = FunNode.name(tfun.fun().fidx(), new SB()).toString();
-    //return errMsg("Unknown ref '"+name+"'");
+  public String forward_ref_err(FunNode fun) {
+    String name = fun._name;
+    return errMsg("Unknown ref '"+name+"'");
   }
   
   // Build a string of the given message, the current line being parsed,

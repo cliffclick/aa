@@ -40,10 +40,10 @@ import java.util.Map;
 // the incoming args come from a known input path.
 // 
 public class FunNode extends RegionNode {
-  String _name;                 // Optional for anon functions; can be set later via bind()
+  public String _name;          // Optional for anon functions; can be set later via bind()
   final TypeTuple _ts;          // Arg types; 1-based, 0 reserved for the memory argument
-  private final Type _ret;      // return types
-  private final TypeMem _retmem;// return MEMORY types
+  public Type _ret;             // return types
+  public TypeMem _retmem;       // return MEMORY types
   public final int _fidx;       // Unique function index
   private final byte _op_prec;  // Operator precedence; only set top-level primitive wrappers
   
@@ -526,7 +526,7 @@ public class FunNode extends RegionNode {
     return null;
   }
 
-  @Override public int hashCode() { return super.hashCode()+_ts.hashCode()+_ret.hashCode()+_retmem.hashCode()+_fidx; }
+  @Override public int hashCode() { return super.hashCode()+(_ts==null ? 0 : _ts.hashCode())+_ret.hashCode()+_retmem.hashCode()+_fidx; }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !(o instanceof FunNode) ) return false;
