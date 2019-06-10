@@ -49,8 +49,8 @@ public class EpilogNode extends Node {
   public    Node rpc () { return          in(3); } // Almost surely a PhiNode merging RPCs
   public FunNode fun () { return (FunNode)in(4); } // Function header
   @Override String xstr() {                        // Self short name
-    String name = FunNode.find_fidx(_fidx)._name;
-    return name==null ? "Epilog" : "Epi#"+name;
+    FunNode fun = FunNode.find_fidx(_fidx);
+    return fun==null ? "Epilog" : "Epi#"+fun._name;
   }
   TypeFunPtr tf() { return FunNode.find_fidx(_fidx).tf(); }
   BitsFun fidxs() { return BitsFun.make0(_fidx); }

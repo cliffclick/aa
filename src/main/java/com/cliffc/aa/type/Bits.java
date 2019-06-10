@@ -149,6 +149,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     long[] bs = _bits;
     if( bs==null )              // Is a single compressed bit
       or(bs = bits(0,Math.abs(_con)),Math.abs(_con)); // Decompress single bit into array
+    else bs = _bits.clone();    // Make a private set
     bs[0] |= 1;                 // Set nil
     return make(false,bs);
   }
@@ -180,6 +181,9 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   private static void or ( long[] bits, long con ) { bits[idx(con)] |=  mask(con); }
   private static void and( long[] bits, long con ) { bits[idx(con)] &= ~mask(con); }
   private static long[] bits( int a, int b ) { return new long[idx(Math.max(a,b))+1]; }
+  int max( ) {
+    return _bits==null ? _con : (63 - Long.numberOfLeadingZeros(_bits[_bits.length-1]))+((_bits.length-1)<<6);
+  }
 
   @SuppressWarnings("unchecked")
   public B meet( B bs ) {
@@ -318,6 +322,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     }
     void init0() { _init = _splits._len; }
     void reset_to_init0() { _splits.set_len(_init); }
+    boolean has_bits(B b) { return b.max() >= _init+2; }
   }
   
   /** @return an iterator */

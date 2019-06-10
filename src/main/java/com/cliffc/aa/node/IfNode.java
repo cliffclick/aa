@@ -12,17 +12,18 @@ public class IfNode extends Node {
     // If the input excludes   zero, we can return true : {CONTROL,ANY}
     // If the input excludes   both, we can return ANY:   {ANY,ANY}
     // If the input includes   both, we can return both:  {CONTROL,CONTROL}
-    if( gvn.type(in(0))==Type.XCTRL ) return TypeTuple.IF_ANY; // Test is dead
+    Type ctrl = gvn.type(in(0));
+    if( ctrl!=Type.CTRL && ctrl != Type.ALL ) return TypeTuple.IF_ANY; // Test is dead
     if( in(0) instanceof ProjNode && in(0).in(0)==this )
       return TypeTuple.IF_ANY; // Test is dead cycle of self (during collapse of dead loops)
     Type pred = gvn.type(in(1)).base();
+    if( pred instanceof TypeTuple)return TypeTuple.IF_ANY;// Nonsense, so test is dead
+    if( pred instanceof TypeObj ) return TypeTuple.IF_ANY;// Nonsense, so test is dead
     if( pred.isa(TypeInt.XINT1) ) return TypeTuple.IF_ANY; // Choice of {0,1}
     if( TypeInt.BOOL.isa(pred)  ) return TypeTuple.IF_ALL; // Can be either
     if( pred == TypeInt.FALSE || pred == TypeNil.NIL )
       return TypeTuple.IF_FALSE;   // False only
     
-    if( pred instanceof TypeTuple)return TypeTuple.IF_ANY;// Nonsense, so test is dead
-    if( pred instanceof TypeObj ) return TypeTuple.IF_ANY;// Nonsense, so test is dead
     if( pred instanceof TypeNil )  // Check for nil-or- vs nil-and-
       return pred.above_center() ? TypeTuple.IF_ANY : TypeTuple.IF_ALL;
     // Already checked for exactly NIL.

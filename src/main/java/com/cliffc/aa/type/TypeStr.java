@@ -52,14 +52,14 @@ public class TypeStr extends TypeObj<TypeStr> {
   // Get the alias for string constants.  Since string constants are interned,
   // so are the aliases.
   public int get_alias() {
-    if( _alias ==0 ) _alias = BitsAlias.new_string();
+    if( _alias ==0 ) _alias = BitsAlias.new_alias(BitsAlias.STR);
     return _alias;
   }
 
   
   public  static final TypeStr  STR = make(false,null,BitsAlias.STR); // not null
   public  static final TypeStr XSTR = make(true ,null,BitsAlias.STR); // choice string
-  public  static final TypeStr  ABC = con("abc"); // a string constant
+  public  static final TypeStr  ABC = make(false,"abc",BitsAlias.ABC); // a string constant
   private static final TypeStr  DEF = con("def"); // a string constant
   static final TypeStr[] TYPES = new TypeStr[]{STR,XSTR,ABC,DEF};
   static void init1( HashMap<String,Type> types ) { types.put("str",STR); }

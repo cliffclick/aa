@@ -17,9 +17,11 @@ public abstract class LibCallNode extends PrimNode {
     _alias = alias;
   }
 
+  final static String[] MARGS1 = new String[]{"mem", "x"};
+  
   public static LibCallNode[] LIBCALLS = new LibCallNode[] {
-    new ConvertI64Str(BitsAlias.new_string()),
-    new ConvertF64Str(BitsAlias.new_string())
+    new ConvertI64Str(BitsAlias.I64),
+    new ConvertF64Str(BitsAlias.F64)
   };
 
   // Return is a ptr-to-memory; tuple of: (mem#alias:obj, ptr#alias)
@@ -30,7 +32,7 @@ public abstract class LibCallNode extends PrimNode {
   // after copy/clone.  Required to be precise for GVNGCM.opto starting point.
   @Override public Type all_type() { return ret(_alias,TypeStr.STR); }
 
-  static TypeMem argmem(TypeObj from) { return TypeMem.make(BitsAlias.REC,from); }
+  static TypeMem argmem(TypeObj from) { return TypeMem.make(BitsAlias.RECBITS,from); }
   abstract TypeMem argmem();
   
   // Wrap the PrimNode with a Fun/Epilog wrapper that includes memory effects.
@@ -80,7 +82,7 @@ public abstract class LibCallNode extends PrimNode {
     final TypeObj _from;
     final TypeName _to;
     ConvertPtrTypeName(TypeObj from, TypeName to, Parse badargs) {
-      super(to._name,PrimNode.ARGS1,TypeTuple.make(argmem(from),TypeMemPtr.STRUCT),ret(BitsAlias.REC,to), BitsAlias.REC);
+      super(to._name,MARGS1,TypeTuple.make(argmem(from),TypeMemPtr.STRUCT),ret(BitsAlias.REC,to), BitsAlias.REC);
       _lex = to._lex;
       _badargs = badargs;
       _from = from;
@@ -90,7 +92,7 @@ public abstract class LibCallNode extends PrimNode {
     // type.  Most structs will NOT have this type.  The pointer passed in must
     // have this type to type-check.
     @Override TypeMem argmem() { return argmem(_from); }
-    @Override public Type all_type() { return TypeTuple.make(TypeMem.make(BitsAlias.REC,_to),TypeMemPtr.STRUCT); }
+    @Override public Type all_type() { return TypeTuple.make(TypeMem.make(BitsAlias.RECBITS,_to),TypeMemPtr.STRUCT); }
     
     @Override public Type value(GVNGCM gvn) {
       Node nmem = _defs.at(1);
@@ -109,7 +111,7 @@ public abstract class LibCallNode extends PrimNode {
         return TypeTuple.make(TypeMem.make(BitsAlias.REC,_to.dual()),_to.dual());
       }
       TypeName named_object = TypeName.make(_name,_lex,ld);
-      TypeMem named_memory = TypeMem.make(tptr.getbit(),named_object);
+      TypeMem named_memory = TypeMem.make(tptr._aliases,named_object);
       TypeMem mem = tmem.merge(named_memory); // Overall memory
       return TypeTuple.make(mem,tptr);
     }
@@ -134,13 +136,20 @@ public abstract class LibCallNode extends PrimNode {
     private final HashMap<String,Type> _lex; // Unique lexical scope
     final TypeStruct _from;
     ConvertTypeNameStruct(TypeStruct from, TypeName to, Parse badargs) {
-      super(to._name,from._flds,make_args(from),ret(BitsAlias.REC,to),BitsAlias.REC);
+      super(to._name,make_args(from._flds),make_targs(from),ret(BitsAlias.REC,to),BitsAlias.REC);
       _lex=to._lex;
       _badargs=badargs;
       _from=from;
+    }    // Insert memory in front of the other arguments
+    private static String[] make_args(String[] flds) {
+      String[] ts = new String[flds.length+1];
+      System.arraycopy(flds,0,ts,1,flds.length);
+      ts[0] = "mem";
+      return ts;
     }
+
     // Insert memory in front of the other arguments
-    private static TypeTuple make_args(TypeStruct from) {
+    private static TypeTuple make_targs(TypeStruct from) {
       Type[] ts = new Type[from._ts.length+1];
       System.arraycopy(from._ts,0,ts,1,from._ts.length);
       ts[0] = argmem(from);
@@ -148,9 +157,9 @@ public abstract class LibCallNode extends PrimNode {
     }
     @Override TypeMem argmem() { return argmem(_from); }
     @Override public Node ideal(GVNGCM gvn) {
-      Node[] flds = new Node[_args.length+1];
+      Node[] flds = new Node[_args.length];
       for( int i=1; i<flds.length; i++ )
-        flds[i] = _defs.at(i+1);
+        flds[i] = _defs.at(i);
       Node nn = gvn.xform(new   NewNode(flds,_args));
       Node mn = gvn.xform(new MProjNode(nn,0));
       Node an = gvn.xform(new  ProjNode(nn,1));
@@ -170,7 +179,7 @@ public abstract class LibCallNode extends PrimNode {
   // --------------------------------------------------------------------------
   static class ConvertI64Str extends LibCallNode {
     ConvertI64Str(int alias) {
-      super("str",PrimNode.ARGS1,TypeTuple.INT64, ret(alias,TypeStr.STR), alias);
+      super("str",MARGS1,TypeTuple.INT64, ret(alias,TypeStr.STR), alias);
     }
             
     // Library calls update memory.  These calls have the default boot-time
@@ -185,20 +194,16 @@ public abstract class LibCallNode extends PrimNode {
       // return _ret.dual, the highest allowed result; if all inputs are
       // constants we constant fold; else some input is low so we return _ret,
       // the lowest possible result.
-      boolean is_con = true;
-      for( int i=1; i<_defs._len; i++ ) {
-        Type t = _targs.at(i-1).dual().meet(gvn.type(in(i)));
-        if( t.above_center() ) is_con = false; // Not a constant
-        else if( !t.is_con() ) return _ret;    // Some input is too low
-      }
-      if( !is_con ) return _ret.dual(); // Some inputs above center and none are low
+      Type val = gvn.type(in(2));
+      Type t = TypeInt.INT64.dual().meet(val);
+      if( t.above_center() ) return _ret.dual();
+      if( !t.is_con() ) return _ret;    // Some input is too low
       
       // Conversion to String allocates memory - so return a new pointer
       // aliased to a hidden String allocation site.  The memory returned is
       // read-only (and can be shared).
       TypeMem mem = (TypeMem)gvn.type(in(1));
       TypeObj obj = mem.at(_alias);  // Prior memory contents at this alias
-      Type val = gvn.type(in(2));    // Known constant
       TypeStr str = TypeStr.con(Long.toString(val.getl()));
       TypeObj obj2 = (TypeObj)obj.meet(str);
       TypeMem res = TypeMem.make(_alias,obj2);
@@ -210,7 +215,7 @@ public abstract class LibCallNode extends PrimNode {
   
   static class ConvertF64Str extends LibCallNode {
     ConvertF64Str(int alias) {
-      super("str",PrimNode.ARGS1,TypeTuple.FLT64, ret(alias,TypeStr.STR), alias);
+      super("str",MARGS1,TypeTuple.FLT64, ret(alias,TypeStr.STR), alias);
     }
             
     // Library calls update memory.  These calls have the default boot-time

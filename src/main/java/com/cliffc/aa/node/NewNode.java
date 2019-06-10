@@ -27,7 +27,7 @@ public class NewNode extends Node {
   String  str() { return _alias==0 ? "New#dead" : xstr(); } // Inline short name
   @Override public Node ideal(GVNGCM gvn) {
     // If the address is dead, then the object is unused and can be nuked
-    if( _uses.len()==1 && ((ProjNode)_uses.at(0))._idx==0 ) {
+    if( _alias != 0 && _uses.len()==1 && ((ProjNode)_uses.at(0))._idx==0 ) {
       for( int i=0; i<_defs.len(); i++ )
         set_def(i,null,gvn);
       _alias = 0;               // Flag as dead

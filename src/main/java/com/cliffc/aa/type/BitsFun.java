@@ -18,7 +18,7 @@ public class BitsFun extends Bits<BitsFun> {
     else { INTERN.put(b1,b1); return b1; }
   }
 
-  private static final Bits.HashMaker<BitsFun> HASHMAKER = new Bits.HashMaker<>();
+  static final Bits.HashMaker<BitsFun> HASHMAKER = new Bits.HashMaker<>();
   public static final int ALL = new_fidx(0);
   public static int new_fidx( int par ) { return HASHMAKER.split(par,INTERN); }
   // Fast reset of parser state between calls to Exec

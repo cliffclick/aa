@@ -271,7 +271,11 @@ public class CallNode extends Node {
     Type t = gvn.type(fp);
     if( tc == Type.XCTRL || tc == Type.ANY ) // Call is dead?
       return TypeTuple.CALL.dual();
+    if( !(fp instanceof UnresolvedNode || fp instanceof EpilogNode) )
+      return TypeTuple.CALL.dual();
     if( Type.SCALAR.isa(t) ) // Calling something that MIGHT be a function, no idea what the result is
+      return TypeTuple.CALL;
+    if( !t.isa(TypeFun.GENERIC_FUN) ) // Calling something that MIGHT be a function, no idea what the result is
       return TypeTuple.CALL;
 
     if( gvn._opt ) // Manifesting optimistic virtual edges between caller and callee
@@ -423,7 +427,7 @@ public class CallNode extends Node {
       return _badargs.errMsg("A function is being called, but "+txfp+" is not a function type");
 
     TypeFun tfun = (TypeFun)txfp;
-    if( tfun.is_forward_ref() ) // Forward ref on incoming function
+    if( fp.is_forward_ref() ) // Forward ref on incoming function
       return _badargs.forward_ref_err(tfun);
 
     // Error#2: bad-arg-count

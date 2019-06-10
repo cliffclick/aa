@@ -1,6 +1,5 @@
 package com.cliffc.aa;
 
-import com.cliffc.aa.Env;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.util.Ary;

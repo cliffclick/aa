@@ -377,7 +377,7 @@ public class Parse {
         int oldx = _x;
         String bin = token();
         if( bin==null ) break;    // Valid parse, but no more Kleene star
-        Node binfun = _e.lookup_filter(bin,_gvn,2); // BinOp, or null
+        Node binfun = _e.lookup_filter(bin,_gvn,3); // BinOp, or null
         if( binfun==null ) { _x=oldx; break; } // Not a binop, no more Kleene star
         term = term();
         if( term == null ) term = err_ctrl2("missing expr after binary op "+bin);
@@ -501,7 +501,7 @@ public class Parse {
     // Anonymous function or operator
     if( peek1(c,'{') ) {
       String tok = token0();
-      Node op = tok == null ? null : _e.lookup_filter(tok,_gvn,2); // TODO: filter by >1 not ==2
+      Node op = tok == null ? null : _e.lookup_filter(tok,_gvn,3); // TODO: filter by >2 not ==3
       if( peek('}') && op != null && op.op_prec() > 0 )
         return op;              // Return operator as a function constant
       _x = oldx+1;              // Back to the opening paren

@@ -16,16 +16,16 @@ import java.util.HashMap;
 //
 
 public abstract class PrimNode extends Node {
-  final TypeTuple _targs;
-  final Type _ret;
+  final TypeTuple _targs;       // Includes XMEM, and then argument types
+  final Type _ret;              // Primitive return type, no memory
   public final String _name;    // Unique name (and program bits)
-  final String[] _args;  // Handy
-  Parse _badargs;        // Filled in when inlined in CallNode
+  final String[] _args;         // Handy
+  Parse _badargs;               // Filled in when inlined in CallNode
   PrimNode( byte op, String name, String[] args, TypeTuple targs, Type ret ) { super(op); _name=name; _args=args; _targs = targs; _ret = ret; _badargs=null; }
   PrimNode( String name, String[] args, TypeTuple targs, Type ret ) { this(OP_PRIM,name,args,targs,ret); }
 
-  final static String[] ARGS1 = new String[]{"mem","x"};
-  private final static String[] ARGS2 = new String[]{"mem","x","y"};
+  private final static String[] ARGS1 = new String[]{"x"};
+  private final static String[] ARGS2 = new String[]{"x","y"};
 
   public static PrimNode[] PRIMS = new PrimNode[] {
     new RandI64(),
@@ -84,16 +84,16 @@ public abstract class PrimNode extends Node {
     // constants we constant fold; else some input is low so we return _ret,
     // the lowest possible result.
     boolean is_con = true;
-    for( int i=1; i<_defs._len; i++ ) {
-      Type t = _targs.at(i-1).dual().meet(ts[i] = gvn.type(in(i)));
+    for( int i=1; i<_defs._len; i++ ) { // i=1, skip control
+      Type t = _targs.at(i).dual().meet(ts[i] = gvn.type(in(i)));
       if( t.above_center() ) is_con = false; // Not a constant
       else if( !t.is_con() ) return _ret;    // Some input is too low
     }
     return is_con ? apply(ts) : _ret.dual();
   }
   @Override public String err(GVNGCM gvn) {
-    for( int i=0; i<_targs._ts.length; i++ ) {
-      Type tactual = gvn.type(in(i+1));
+    for( int i=1; i<_targs._ts.length; i++ ) {
+      Type tactual = gvn.type(in(i));
       Type tformal = _targs._ts[i];
       if( !tactual.isa(tformal) )
         return _badargs==null ? "bad arguments" : _badargs.typerr(tactual,tformal);
@@ -119,11 +119,12 @@ public abstract class PrimNode extends Node {
   // assigned to variables.
   public EpilogNode as_fun( GVNGCM gvn ) {
     FunNode  fun = ( FunNode) gvn.xform(new  FunNode(this,_ret,TypeMem.XMEM)); // Points to ScopeNode only
-    ParmNode rpc = (ParmNode) gvn.xform(new ParmNode(-1,"rpc",fun, gvn.con(TypeRPC.ALL_CALL),null));
+    ParmNode rpc = (ParmNode) gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
+    ParmNode mem = (ParmNode) gvn.xform(new ParmNode( 0,"mem",fun,gvn.con(TypeMem.XMEM    ),null));
     add_def(null);              // Control for the primitive in slot 0
     for( int i=0; i<_args.length; i++ )
-      add_def(gvn.init(new ParmNode(i,_args[i],fun, gvn.con(_targs.at(i)),null)));
-    return new EpilogNode(fun,in(1),gvn.init(this),rpc,fun,fun._fidx,null);
+      add_def(gvn.init(new ParmNode(i+1,_args[i],fun, gvn.con(_targs.at(i+1)),null)));
+    return new EpilogNode(fun,mem,gvn.init(this),rpc,fun,fun._fidx,null);
   }
 
 
@@ -147,7 +148,7 @@ static class ConvertTypeName extends PrimNode {
   @Override public boolean is_lossy() { return false; }
   @Override public String err(GVNGCM gvn) {
     Type actual = gvn.type(in(1));
-    Type formal = _targs.at(0);
+    Type formal = _targs.at(1);
     if( !actual.isa(formal) ) // Actual is not a formal
       return _badargs.typerr(actual,formal);
     return null;
@@ -162,9 +163,9 @@ static class ConvertInt64F64 extends PrimNode {
 
 static class ConvertStrStr extends PrimNode {
   ConvertStrStr() { super("str",PrimNode.ARGS1,TypeTuple.STRPTR,TypeMemPtr.STRPTR); }
-  @Override public Type apply( Type[] args ) { return args[2]; }
-  @Override public Node ideal(GVNGCM gvn) { return in(2); }
-  @Override public Type value(GVNGCM gvn) { return gvn.type(in(2)); }
+  @Override public Type apply( Type[] args ) { return args[1]; }
+  @Override public Node ideal(GVNGCM gvn) { return in(1); }
+  @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)); }
   @Override public boolean is_lossy() { return false; }
 }
 
@@ -339,16 +340,16 @@ static class NE_OOP extends PrimNode {
 static class RandI64 extends PrimNode {
   RandI64() { super("math_rand",PrimNode.ARGS1,TypeTuple.INT64,TypeInt.INT64); }
   @Override public TypeInt apply( Type[] args ) { return TypeInt.con(new java.util.Random().nextInt((int)args[2].getl())); }
-  @Override public Type value(GVNGCM gvn) { return gvn.type(in(2)).meet(TypeInt.FALSE); }
+  @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)).meet(TypeInt.FALSE); }
   // Rands have hidden internal state; 2 Rands are never equal
   @Override public boolean equals(Object o) { return this==o; }
 }
 
 static class Id extends PrimNode {
   Id(Type arg) { super("id",PrimNode.ARGS1,TypeTuple.make(TypeMem.MEM,arg),arg); }
-  @Override public Type apply( Type[] args ) { return args[2]; }
-  @Override public Node ideal(GVNGCM gvn) { return in(2); }
-  @Override public Type value(GVNGCM gvn) { return gvn.type(in(2)); }
+  @Override public Type apply( Type[] args ) { return args[1]; }
+  @Override public Node ideal(GVNGCM gvn) { return in(1); }
+  @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)); }
 }
 
 static class AddStrStr extends PrimNode {

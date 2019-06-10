@@ -13,9 +13,9 @@ import java.util.function.Consumer;
 public final class TypeFunPtr extends Type<TypeFunPtr> {
   public TypeTuple _ts;         // Arg types; 1-based, 0 reserved for the memory argument
   public Type _ret;             // return types
-  public TypeMem _retmem;       // return MEMORY types
+  TypeMem _retmem;              // return MEMORY types
   // List of known functions in set, or 'flip' for choice-of-functions.
-  public BitsFun _fidxs;        // Known function bits
+  private BitsFun _fidxs;       // Known function bits
 
   private TypeFunPtr(TypeTuple ts, Type ret, TypeMem retmem, BitsFun fidxs ) { super(TFUNPTR); init(ts,ret,retmem,fidxs); }
   private void init (TypeTuple ts, Type ret, TypeMem retmem, BitsFun fidxs ) {
@@ -45,8 +45,10 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     SB sb = FunNode.names(_fidxs,new SB());
     if( _ts==null ) return sb.p("{forward_ref}").toString();
     sb.p('{');
-    for( int i=0; i<Math.min(4,nargs()); i++ ) sb.p(_ts.at(i).str(dups)).p(' ');
-    if( nargs() > 4 ) sb.p("...");
+    int nargs = nargs();
+    if( nargs > 0 && _ts.at(0)!=TypeMem.XMEM ) sb.p(_ts.at(0).str(dups)).p(' ');
+    for( int i=1; i<Math.min(4,nargs); i++ ) sb.p(_ts.at(i).str(dups)).p(' ');
+    if( nargs > 4 ) sb.p("...");
     sb.p("-> ").p(_ret.str(dups));
     if( _retmem != TypeMem.XMEM ) // Return memory is only interesting if returning something special
       sb.p(' ').p(_retmem.str(dups));
@@ -55,7 +57,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
 
   private static TypeFunPtr FREE=null;
   @Override protected TypeFunPtr free( TypeFunPtr ret ) { FREE=this; return ret; }
-  public static TypeFunPtr make_new( TypeTuple ts, Type ret, TypeMem retmem, int parent_fidx ) {
+  static TypeFunPtr make_new( TypeTuple ts, Type ret, TypeMem retmem, int parent_fidx ) {
     return make(ts,ret,retmem,BitsFun.make_new_fidx(parent_fidx));
   }
   public static TypeFunPtr make( TypeTuple ts, Type ret, TypeMem retmem, BitsFun fidxs ) {
@@ -143,5 +145,5 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   // Iterate over any nested child types
   @SuppressWarnings("unchecked")
   @Override public void iter( Consumer<Type> c ) { _ts.iter(c); c.accept(_ret); }
-  @Override boolean hasBits(BitSet bs) { return true; }
+  @Override boolean hasBits(BitSet bs) { return BitsFun.HASHMAKER.has_bits(_fidxs); }
 }

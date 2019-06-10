@@ -140,7 +140,7 @@ public class Env implements AutoCloseable {
     if( t != null ) return t;
     return _par == null ? null : _par.lookup_type(token);
   }
-  public boolean is_mutable( String name ) {
+  boolean is_mutable( String name ) {
     Integer ii = _scope.get_idx(name);
     return ii == null ? _par.is_mutable(name) : _scope.is_mutable(ii);
   }

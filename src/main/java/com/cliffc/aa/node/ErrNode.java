@@ -9,7 +9,8 @@ public final class ErrNode extends Node {
   final String _msg;            // Error message
   public final Type _t;         // Default value if no error
   public ErrNode( Node ctrl, String msg, Type t ) { super(OP_ERR,ctrl); _msg = msg; _t=t; }
-  @Override String xstr() { return _msg; }
+  @Override String xstr() { return _msg.split("\n")[1]; }
+  @Override String str() { return "Err"; }
   @Override public Node ideal(GVNGCM gvn) { return null; }
   @Override public Type value(GVNGCM gvn) {
     Type t = gvn.type(in(0));

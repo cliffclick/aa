@@ -8,6 +8,7 @@ import com.cliffc.aa.util.Util;
 import org.junit.Test;
 
 import java.util.Arrays;
+import java.util.HashMap;
 
 import static org.junit.Assert.assertEquals;
 
@@ -36,7 +37,8 @@ public class TestNode {
   
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testNode() {
-    
+    Type.init0(new HashMap<>());
+    Env.top();
   }
 
   // A sparse list of all subtypes.  The outer array is the index into
@@ -108,11 +110,13 @@ public class TestNode {
   // monotonicity invariant.
 
   @Test public void testMonotonic() {
+    Type.init0(new HashMap<>());
+    Env.top();
     assert _errs == 0;          // Start with no errors
     // All The Types we care to reason about.  There's an infinite number of
     // Types, but mostly are extremely similar - so we limit ourselves to a
-    // subset which has at least one of unique (Java) subtype, plus some
-    // variations inside the more complete (Java) Types.
+    // subset which has at least one of unique subtype, plus some variations
+    // inside the more complex Types.
     _subtypes = make_subtypes(Type.ALL_TYPES());
 
     // Build a minimal spanning sub-Type tree from the set of sample types.
@@ -127,14 +131,14 @@ public class TestNode {
     // known inputs.
     _gvn = new GVNGCM();
     _ins = new Node[4];
-    _ins[0] = new RegionNode(null,new ConNode<Type>(Type.CTRL),new ConNode<Type>(Type.CTRL));
+    _ins[0] = new RegionNode(null,new ConNode<>(Type.CTRL),new ConNode<>(Type.CTRL));
     for( int i=1; i<_ins.length; i++ )
-      _ins[i] = new ConNode<Type>(Type.SCALAR);
+      _ins[i] = new ConNode<>(Type.SCALAR);
     Node mem = new ConNode<Type>(TypeMem.MEM);
-
+    
     Node unr = Env.top().lookup("+"); // All the "+" functions
-    test1monotonic(new   CallNode(false,null,_ins[0],mem,  unr  ,_ins[2],_ins[3]));
-    test1monotonic(new   CallNode(false,null,_ins[0],mem,_ins[1],_ins[2],_ins[3]));
+    test1monotonic(new   CallNode(false,null,_ins[0],  unr  ,mem,_ins[2],_ins[3]));
+    test1monotonic(new   CallNode(false,null,_ins[0],_ins[1],mem,_ins[2],_ins[3]));
     test1monotonic(new    ConNode<Type>(          TypeInt.FALSE));
     test1monotonic(new    ConNode<Type>(          TypeStr.ABC  ));
     test1monotonic(new    ConNode<Type>(          TypeFlt.FLT64));
@@ -143,10 +147,10 @@ public class TestNode {
     test1monotonic(new   CastNode(_ins[0],_ins[1],TypeFlt.FLT64));
     test1monotonic(new  CProjNode(_ins[0],0));
     test1monotonic(new EpilogNode(_ins[0],mem,_ins[1],_ins[2],_ins[3],1,"unknown_ref"));
-    test1monotonic(new    ErrNode(_ins[0],"err",  TypeInt.FALSE));
-    test1monotonic(new    ErrNode(_ins[0],"err",  TypeStr.ABC  ));
-    test1monotonic(new    ErrNode(_ins[0],"err",  TypeFlt.FLT64));
-    test1monotonic(new    ErrNode(_ins[0],"err",  Type   .CTRL ));
+    test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  TypeInt.FALSE));
+    test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  TypeStr.ABC  ));
+    test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  TypeFlt.FLT64));
+    test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  Type   .CTRL ));
     test1monotonic(new    FunNode(new Type[]{TypeInt.INT64}));
     test1monotonic(new     IfNode(_ins[0],_ins[1]));
     test1monotonic(new   LoadNode(_ins[0],_ins[1],_ins[2],0,null));
@@ -181,7 +185,7 @@ public class TestNode {
     assert n._defs._len==0;
     n.add_def( null  );
     n.add_def(_ins[1]);
-    if( n._targs._ts.length >= 2 ) n.add_def(_ins[2]);
+    if( n._targs._ts.length >= 3 ) n.add_def(_ins[2]);
     test1monotonic_init(n);
   }
   

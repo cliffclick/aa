@@ -146,6 +146,13 @@ public class TypeMem extends Type<TypeMem> {
     as[alias] = oop;
     return make(false,as);
   }
+  public static TypeMem make(BitsAlias bits, TypeObj oop ) {
+    TypeObj[] as = new TypeObj[bits.max()+1];
+    as[BitsAlias.ALL] = TypeObj.XOBJ; // Everything else is "dont care"
+    for( int b : bits )
+      as[b] = oop;
+    return make0(false,as);
+  }
 
   public  static final TypeMem  MEM = make(false,new TypeObj[]{null,TypeObj. OBJ}); // Every alias filled with something
   public  static final TypeMem XMEM = make(false,new TypeObj[]{null,TypeObj.XOBJ}); // Every alias filled with anything

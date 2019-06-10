@@ -40,12 +40,12 @@ import java.util.Map;
 // the incoming args come from a known input path.
 // 
 public class FunNode extends RegionNode {
-  String _name;        // Optional for anon functions; can be set later via bind()
-  final TypeTuple _ts;         // Arg types; 1-based, 0 reserved for the memory argument
-  final Type _ret;             // return types
-  final TypeMem _retmem;       // return MEMORY types
-  public final int _fidx;      // Unique function index
-  private final byte _op_prec; // Operator precedence; only set top-level primitive wrappers
+  String _name;                 // Optional for anon functions; can be set later via bind()
+  final TypeTuple _ts;          // Arg types; 1-based, 0 reserved for the memory argument
+  private final Type _ret;      // return types
+  private final TypeMem _retmem;// return MEMORY types
+  public final int _fidx;       // Unique function index
+  private final byte _op_prec;  // Operator precedence; only set top-level primitive wrappers
   
   // Used to make the primitives at boot time
   public FunNode(PrimNode prim, Type ret, TypeMem retmem) {
@@ -77,7 +77,7 @@ public class FunNode extends RegionNode {
 
   // Find FunNodes by fidx
   static Ary<FunNode> FUNS = new Ary<>(new FunNode[]{null,});
-  public static FunNode find_fidx(int fidx) { return FUNS.at(fidx); }
+  static FunNode find_fidx( int fidx ) { return fidx >= FUNS._len ? null : FUNS.at(fidx); }
 
   @Override String xstr() {
     SB sb = name(_fidx,new SB());
@@ -90,7 +90,6 @@ public class FunNode extends RegionNode {
   }
   @Override String str() { return _name==null ? Integer.toString(_fidx) : _name; }
   // Debug only: make an attempt to bind name to a function
-  private static Ary<String> NAMES = new Ary<>(new String[1],0);
   public void bind( String tok ) {
     assert _name==null || _name.equals(tok); // Attempt to double-bind
     _name = tok;
@@ -115,7 +114,6 @@ public class FunNode extends RegionNode {
     return sb.p(name==null ? Integer.toString(i) : name);
   }
 
-  @SuppressWarnings("unchecked")
   @Override Node copy(GVNGCM gvn) { throw AA.unimpl(); } // Gotta make a new FIDX
 
   // True if no future unknown callers.
