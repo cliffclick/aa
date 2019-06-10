@@ -72,7 +72,6 @@ public class LoadNode extends Node {
   @Override public Type value(GVNGCM gvn) {
     Type adr = gvn.type(adr()).base();
     if( adr.isa(TypeMemPtr.OOP0.dual()) ) return Type.XSCALAR;
-    if( adr().is_forward_ref() ) return Type.XSCALAR;
     if( adr.must_nil() ) return Type.SCALAR; // Not provable not-nil, so fails
     if( TypeMemPtr.OOP0.isa(adr) ) return Type.SCALAR; // Very low, might be any address
     if( !(adr instanceof TypeMemPtr) )

@@ -7,9 +7,7 @@ package com.cliffc.aa.type;
  *  3 - Function RPC type (set of callers) - Short cut available type, to avoid
  *      going to the FunNode and reversing to the RPC.
  * 
- *  This is the type of EpilogNodes, and is somewhat redundant because they
- *  also have a _fidx to map to the FunNode (used when the FunNode is
- *  collapsing) AND a pointer to the FunNode.
+ *  This is the type of EpilogNodes.
 */
 public class TypeFun extends TypeTuple<TypeFun> {
   private TypeFun    ( boolean any, Type[] ts ) { super(TFUN, any, ts); init(any,ts); }
@@ -20,7 +18,6 @@ public class TypeFun extends TypeTuple<TypeFun> {
   private static TypeFun FREE=null;
   @Override protected TypeFun free( TypeFun ret ) { FREE=this; return ret; }
   private static TypeFun make( boolean any, Type[] ts ) {
-    // TODO: assert fun().is_con() or _ts[3]._fidxes.is_con()
     TypeFun t1 = FREE;
     if( t1 == null ) t1 = new TypeFun(any,ts);
     else { FREE = null; t1.init(any,ts); }

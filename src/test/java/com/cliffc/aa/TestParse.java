@@ -16,8 +16,42 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
     Object dummy = Env.GVN; // Force class loading cycle
+    
+    // TODO: CNC:
+    // - Drop TypeFun as the return-type of Epilogs.
+    // - In TypeFunPtr, drop all but the BitsFidxs.
+    // - Epilogs return a constant TypeFunPtr (single fidx bit).
+    // - Users of Epilogs (CallNodes, Unresolved) can get what they need
+    //   directly from the Epilog - no "graph shape change" yet, but the type
+    //   info comes from Epilogs.
+    // - CallNodes with a pile of fidxs coming in will need to build a merged-
+    //   signature to decide if the call is legit.  Note that I'm talking about
+    //   a merged FORMAL signature not ACTUALS; merged actuals are already
+    //   cached in the ParmNodes.  Question is to pre-merge FORMALS in a Node
+    //   so the cost of the merge is cached by the graph; can image a Call
+    //   Prelude node which takes the set of fidxs a computes a merged formal;
+    //   If the fidx set changes, then so does the Prelude; but if they do not
+    //   change then evaluating the Call does not require recomputing the merge.
+    //   OVERTHINKING IT!
+    // - CallNodes can be pushed "up" through a Phi to get at a more precise
+    //   fidx.  This is independent from merged-signature issues and is an
+    //   optimization and cannot be counted on during Typing.
+
+    
+    // This test shows that I am passing a TypeFun to a CallNode, not a
+    // TypeFunPtr as the test merges 2 TypeFunPtrs in a Phi.
+    test("(math_rand(1) ? {+} : {*})(2,3)",TypeInt.INT8); // either 2+3 or 2*3, or {5,6} which is INT8.
+
+    // Fails right now, because a failed load of a forward-ref returns a
+    // SCALAR, but !GENERIC_FUN.isa(SCALAR).  i.e., the return from the load of
+    // ".c" is a SCALAR which is NOT a TypeFun, and so cannot be called.  Of
+    // course, a SCALAR could be a TypeFunPtr which CAN be called.  The test on
+    // Parse.java:449 needs to be vs a GENERIC_FUNPTR, which would pass and
+    // then the test below would error out correctly.
     testerr("a.b.c();","Unknown ref 'a'"," ");
+
     test("{+}", Env.lookup_valtype("+"));
+
     // A collection of tests which like to fail easily
     testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1) is not a @{x,y}","                           ");
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'","                    ");

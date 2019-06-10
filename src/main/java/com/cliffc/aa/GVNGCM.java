@@ -293,9 +293,6 @@ public class GVNGCM {
     // Replace with a constant, if possible
     if( replace_con(t,n) )
       return con(t);            // Constant replacement
-    // TypeFuns only come from Epilogs & Unresolved; TypeFunPtrs however can show up
-    // anyplace a Scalar is allowed.  Make sure they're not confused.
-    assert !(t instanceof TypeFun) || n instanceof EpilogNode || n instanceof UnresolvedNode;
     // Global Value Numbering
     Node z = _vals.putIfAbsent(n,n);
     if( z != null ) return z;

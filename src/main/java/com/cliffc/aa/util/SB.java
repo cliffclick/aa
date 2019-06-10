@@ -39,26 +39,6 @@ public final class SB {
   public SB i( ) { return i(0); }
   public SB ip(String s) { return i().p(s); }
   public SB s() { _sb.append(' '); return this; }
-  // Java specific append of double
-  public SB pj( double  s ) {
-    if (Double.isInfinite(s))
-      _sb.append("Double.").append(s>0? "POSITIVE_INFINITY" : "NEGATIVE_INFINITY");
-    else if (Double.isNaN(s))
-      _sb.append("Double.NaN");
-    else
-      _sb.append(s);
-    return this;
-  }
-  // Java specific append of float
-  public SB pj( float  s ) {
-    if (Float.isInfinite(s))
-      _sb.append("Float.").append(s>0? "POSITIVE_INFINITY" : "NEGATIVE_INFINITY");
-    else if (Float.isNaN(s))
-      _sb.append("Float.NaN");
-    else
-      _sb.append(s).append('f');
-    return this;
-  }
 
   // Increase indentation
   public SB ii( int i) { _indent += i; return this; }

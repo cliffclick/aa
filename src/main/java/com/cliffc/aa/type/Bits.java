@@ -37,8 +37,8 @@ import java.util.Iterator;
 //
 // Constant-or-class is on a per-bit basis, as some NewNodes are known to
 // execute once (hence produce a constant alias class or a Singleton) and
-// others execute many times.  This is handled by the callers, which use 2 bits
-// for a single NewNode to force a class-of-two, or 1 bit for a constant.
+// others execute many times.  This is handled by the subclasses; BitsAlias may
+// track singletons at some future date.
 
 public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   // Holds a set of bits meet'd together, or join'd together, along
