@@ -16,42 +16,6 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
     Object dummy = Env.GVN; // Force class loading cycle
-    
-    // TODO: CNC:
-    // - Drop TypeFun as the return-type of Epilogs.
-    // - In TypeFunPtr, drop all but the BitsFidxs.
-    // - Epilogs return a constant TypeFunPtr (single fidx bit).
-    // - Users of Epilogs (CallNodes, Unresolved) can get what they need
-    //   directly from the Epilog - no "graph shape change" yet, but the type
-    //   info comes from Epilogs.
-    // - CallNodes with a pile of fidxs coming in will need to build a merged-
-    //   signature to decide if the call is legit.  Note that I'm talking about
-    //   a merged FORMAL signature not ACTUALS; merged actuals are already
-    //   cached in the ParmNodes.  Question is to pre-merge FORMALS in a Node
-    //   so the cost of the merge is cached by the graph; can image a Call
-    //   Prelude node which takes the set of fidxs a computes a merged formal;
-    //   If the fidx set changes, then so does the Prelude; but if they do not
-    //   change then evaluating the Call does not require recomputing the merge.
-    //   OVERTHINKING IT!
-    // - CallNodes can be pushed "up" through a Phi to get at a more precise
-    //   fidx.  This is independent from merged-signature issues and is an
-    //   optimization and cannot be counted on during Typing.
-
-    
-    // This test shows that I am passing a TypeFun to a CallNode, not a
-    // TypeFunPtr as the test merges 2 TypeFunPtrs in a Phi.
-    test("(math_rand(1) ? {+} : {*})(2,3)",TypeInt.INT8); // either 2+3 or 2*3, or {5,6} which is INT8.
-
-    // Fails right now, because a failed load of a forward-ref returns a
-    // SCALAR, but !GENERIC_FUN.isa(SCALAR).  i.e., the return from the load of
-    // ".c" is a SCALAR which is NOT a TypeFun, and so cannot be called.  Of
-    // course, a SCALAR could be a TypeFunPtr which CAN be called.  The test on
-    // Parse.java:449 needs to be vs a GENERIC_FUNPTR, which would pass and
-    // then the test below would error out correctly.
-    testerr("a.b.c();","Unknown ref 'a'"," ");
-
-    test("{+}", Env.lookup_valtype("+"));
-
     // A collection of tests which like to fail easily
     testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1) is not a @{x,y}","                           ");
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'","                    ");
@@ -59,7 +23,7 @@ public class TestParse {
     test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
     testerr("x=1+y","Unknown ref 'y'","     ");
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
-    test_isa("{x y -> x+y}", TypeFun.FUN2); // {Flt,Int} x {Flt,Int} -> {Flt,Int}
+    test_isa("{x y -> x+y}", TypeInt.con(42)); // {Flt,Int} x {Flt,Int} -> {Flt,Int}
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.TRUE );
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({&},2)", TypeInt.FALSE);
   }
@@ -114,9 +78,9 @@ public class TestParse {
     test("{-}(1,2)", TypeInt.con(-1)); // binary version
     test(" - (1  )", TypeInt.con(-1)); // unary version
     // error; mismatch arg count
-    testerr("!()       ", "Passing 0 arguments to !{int64 -> int1} which takes 1 arguments","   ");
+    testerr("!()       ", "Passing 0 arguments to ! which takes 1 arguments","   ");
     testerr("math_pi(1)", "A function is being called, but 3.141592653589793 is not a function type","          ");
-    testerr("{+}(1,2,3)", "Passing 3 arguments to +{flt64 flt64 -> flt64} which takes 2 arguments","          ");
+    testerr("{+}(1,2,3)", "Passing 3 arguments to + which takes 2 arguments","          ");
 
     // Parsed as +(1,(2*3))
     test("{+}(1, 2 * 3) ", TypeInt.con(7));
@@ -164,7 +128,7 @@ public class TestParse {
 
   @Test public void testParse2() {
     // Anonymous function definition
-    test_isa("{x y -> x+y}", TypeFun.FUN2); // {SCALAR,SCALAR->SCALAR}
+    test_isa("{x y -> x+y}", TypeInt.con(42)); // {SCALAR,SCALAR->SCALAR}
     test("{5}()", TypeInt.con(5)); // No args nor -> required; this is simply a function returning 5, being executed
 
     // ID in different contexts; in general requires a new TypeVar per use; for
@@ -208,6 +172,10 @@ public class TestParse {
     // like to lift the type to (i64,i64->i64) and move that future maybe-error
     // to the function args and away from the primitive call.
     //test("{x y -> x & y}", TypeFun.make(TypeFunPtr.make(TypeTuple.INT64_INT64,TypeInt.INT64,Bits.FULL,2)));
+
+    // This test shows that I am passing a TypeFun to a CallNode, not a
+    // TypeFunPtr as the test merges 2 TypeFunPtrs in a Phi.
+    test("(math_rand(1) ? {+} : {*})(2,3)",TypeInt.INT8); // either 2+3 or 2*3, or {5,6} which is INT8.
   }
 
   @Test public void testParse3() {
@@ -281,8 +249,8 @@ public class TestParse {
     
     // Named type variables
     final TypeMem nomem = TypeMem.MEM.dual();
-    test_isa("gal=:flt"       , (tmap -> TypeFun.make(TypeFunPtr.make(TypeTuple.FLT64,TypeName.make("gal",tmap,TypeFlt.FLT64),nomem,BitsFun.FULL))));
-    test_isa("gal=:flt; gal"  , (tmap -> TypeFun.make(TypeFunPtr.make(TypeTuple.FLT64,TypeName.make("gal",tmap,TypeFlt.FLT64),nomem,BitsFun.FULL))));
+    test_isa("gal=:flt"       , (tmap -> {throw AA.unimpl();}));
+    test_isa("gal=:flt; gal"  , (tmap -> {throw AA.unimpl();}));
     test    ("gal=:flt; 3==gal(2)+1", TypeInt.TRUE);
     test    ("gal=:flt; tank:gal = gal(2)", (tmap -> TypeName.make("gal",tmap,TypeInt.con(2))));
     // test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: figure out if free cast for bare constants?
@@ -329,7 +297,7 @@ public class TestParse {
     TypeEnv te3 = Exec.go(Env.top(),"args","A= :@{n:A?, v:int}");
     if( te3._errs != null ) System.err.println(te3._errs.toString());
     Assert.assertNull(te3._errs);
-    TypeName tname3 = (TypeName)((TypeFun)te3._t).val();
+    TypeName tname3 = null; //(TypeName)((TypeFunPtr)te3._t).val();
     assertEquals("A", tname3._name);
     TypeStruct tt3 = (TypeStruct)tname3._t;
     TypeNil tnil3 = (TypeNil)tt3.at(0);
@@ -350,7 +318,7 @@ public class TestParse {
     // Passing a function recursively
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({&},2)", TypeInt.FALSE);
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({+},2)", TypeInt.con(2));
-    test_isa("A= :@{n:A?, v:int}; f={x:A? -> x ? A(f(x.n),x.v*x.v) : 0}", TypeFun.GENERIC_FUN);
+    test_isa("A= :@{n:A?, v:int}; f={x:A? -> x ? A(f(x.n),x.v*x.v) : 0}", TypeFunPtr.GENERIC_FUNPTR);
     test_isa("A= :@{n:A?, v:flt}; f={x:A? -> x ? A(f(x.n),x.v*x.v) : 0}; f(A(0,1.2)).v;", TypeFlt.con(1.2*1.2));
 
     // User-defined linked list
@@ -360,10 +328,10 @@ public class TestParse {
     String ll_fun = "sq = {x -> x*x};";
     String ll_apl = "map(sq,tmp);";
 
-    test_isa(ll_def, TypeFun.GENERIC_FUN);
+    test_isa(ll_def, TypeFunPtr.GENERIC_FUNPTR);
     test(ll_def+ll_con+"; tmp.next.val", TypeFlt.con(1.2));
     //test(ll_def+ll_con+ll_map, TypeFun.GENERIC_FUN);
-    test_isa(ll_def+ll_con+ll_map+ll_fun, TypeFun.GENERIC_FUN);
+    test_isa(ll_def+ll_con+ll_map+ll_fun, TypeFunPtr.GENERIC_FUNPTR);
     
     // TODO: Needs a way to easily test simple recursive types
     TypeEnv te4 = Exec.go(Env.top(),"args",ll_def+ll_con+ll_map+ll_fun+ll_apl);

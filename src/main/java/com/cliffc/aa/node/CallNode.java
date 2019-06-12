@@ -25,7 +25,6 @@ public class CallNode extends Node {
   private boolean _unpacked;    // Call site allows unpacking a tuple (once)
   private boolean _inlined;     // Inlining a call-site is a 2-stage process; function return wired to the call return
   private Type   _cast_ret;     // Return type has been up-casted
-  private Parse  _cast_P;       // Return type cast fail message
           Parse  _badargs;      // Error for e.g. wrong arg counts or incompatible args
   public CallNode( boolean unpacked, Parse badargs, Node... defs ) {
     super(OP_CALL,defs);
@@ -61,9 +60,9 @@ public class CallNode extends Node {
   private Node mem() { return in(2); }
   private void set_fun(Node fun, GVNGCM gvn) { set_def(1,fun,gvn); }
   void set_fun_reg(Node fun, GVNGCM gvn) { gvn.set_def_reg(this,1,fun); }
-  public BitsFun fidxs() {
-    Node fun = fun();
-    return fun instanceof EpilogNode ? ((EpilogNode)fun).fidxs() : ((UnresolvedNode)fun).fidxs();
+  public BitsFun fidxs(GVNGCM gvn) {
+    Type tf = gvn.type(fun());
+    return tf instanceof TypeFunPtr ? ((TypeFunPtr)tf).fidxs() : null;
   }
   
   // Clones during inlining all become unique new call sites
@@ -123,8 +122,8 @@ public class CallNode extends Node {
     Node unk  = fun();          // Function epilog/function pointer
     if( unk instanceof TypeNode ) {
       TypeNode tn = (TypeNode)unk;
-      TypeFun t_funptr = (TypeFun)tn._t;
-      set_fun(tn.in(1),gvn);
+      //TypeFun t_funptr = (TypeFun)tn._t;
+      //set_fun(tn.in(1),gvn);
       //TypeFunPtr tf = t_funptr.fun();
       //for( int i=0; i<nargs(); i++ ) // Insert casts for each parm
       //  set_def(i+2,gvn.xform(new TypeNode(tf._ts.at(i),arg(i),tn._error_parse)),gvn);
@@ -145,7 +144,7 @@ public class CallNode extends Node {
       return null;
     // From here on down we know the exact function being called
     EpilogNode epi = (EpilogNode)unk;
-    Node ctrl = epi.ctrl();
+    Node ctrl = epi.ctl();
     Node mem  = epi.mem();
     Node rez  = epi.val();
     // Function is single-caller (me) and collapsing
@@ -251,7 +250,7 @@ public class CallNode extends Node {
 
   // Make real call edges from virtual call edges
   private void wire(GVNGCM gvn) {
-    BitsFun fidxs = fidxs();     // Get all the propagated reaching functions
+    BitsFun fidxs = fidxs(gvn);     // Get all the propagated reaching functions
     if( fidxs.above_center() ) return;
     for( int fidx : fidxs ) {   // For all functions
       if( fidx >= FunNode.PRIM_CNT ) { // Do not wire up primitives, but forever take their default inputs and outputs
@@ -275,7 +274,7 @@ public class CallNode extends Node {
       return TypeTuple.CALL.dual();
     if( Type.SCALAR.isa(t) ) // Calling something that MIGHT be a function, no idea what the result is
       return TypeTuple.CALL;
-    if( !t.isa(TypeFun.GENERIC_FUN) ) // Calling something that MIGHT be a function, no idea what the result is
+    if( !t.isa(TypeFunPtr.GENERIC_FUNPTR) ) // Calling something that MIGHT be a function, no idea what the result is
       return TypeTuple.CALL;
 
     if( gvn._opt ) // Manifesting optimistic virtual edges between caller and callee
@@ -301,24 +300,23 @@ public class CallNode extends Node {
   // cannot be called, so the JOIN of valid returns is not lowered.
   private TypeTuple value1( GVNGCM gvn, EpilogNode epi ) {
     Type t = gvn.type(epi);
-    if( !(t instanceof TypeFun) ) // Might be any function, returning anything
+    if( !(t instanceof TypeFunPtr) ) // Might be any function, returning anything
       return t.above_center() ? (TypeTuple)TypeTuple.CALL.dual() : TypeTuple.CALL;
-    TypeFun tepi = (TypeFun)t;
-    Type    tctrl=tepi.ctl();
-    Type    tmem =tepi.mem();
-    Type    tval =tepi.val();
+    Type    tctrl=gvn.type(epi.ctl());
+    Type    tmem =gvn.type(epi.mem());
+    Type    tval =gvn.type(epi.val());
     if( tctrl == Type.XCTRL ) return (TypeTuple)TypeTuple.CALL.dual(); // Function will never return
     assert tctrl==Type.CTRL;      // Function will never return?
-    if( epi.fun().is_forward_ref() ) return TypeTuple.make(tctrl,tmem,tval); // Forward refs do no argument checking
+    FunNode fun = epi.fun();
+    if( fun.is_forward_ref() ) return TypeTuple.make(tctrl,tmem,tval); // Forward refs do no argument checking
 
-    TypeFunPtr tfun = epi.tf();
-    if( tfun.nargs() != nargs() ) return TypeTuple.CALL; // Function not called, nothing to JOIN
+    if( fun.nargs() != nargs() ) return TypeTuple.CALL; // Function not called, nothing to JOIN
     // Now do an arg-check
-    TypeTuple formals = tfun._ts; // Type of each argument
+    TypeTuple formals = fun._ts; // Type of each argument
     for( int j=0; j<nargs(); j++ ) {
       Type actual = gvn.type(arg(j));
       Type formal = formals.at(j);
-      if( !actual.isa(formal) ) // Actual is not a formal; accumulate type errors
+      if( !actual.isa(formal) ) // Actual is not a formal; call will not go thru
         return TypeTuple.CALL;  // Argument not valid, nothing to JOIN
     }
     return TypeTuple.make(tctrl,tmem,tval);
@@ -336,9 +334,8 @@ public class CallNode extends Node {
   // conversions are kept; if there is more than one then the join of them is
   // kept - and the program is not-yet type correct (ambiguous choices).
   public Node resolve( GVNGCM gvn ) {
-    Type t = gvn.type(fun());
-    if( !(t instanceof TypeFun) ) return null; // Might be e.g. ~Scalar
-    BitsFun fidxs = fidxs();
+    BitsFun fidxs = fidxs(gvn);
+    if( fidxs == null ) return null; // Might be e.g. ~Scalar
     if( !fidxs.above_center() ) return null; // Sane as-is
 
     // Set of possible choices with fewest conversions
@@ -423,7 +420,7 @@ public class CallNode extends Node {
     Node fp = fun();      // Either function pointer, or unresolved list of them
     Node xfp = fp instanceof UnresolvedNode ? fp.in(0) : fp;
     Type txfp = gvn.type(xfp);
-    if( !(txfp instanceof TypeFun) )
+    if( !(txfp instanceof TypeFunPtr) )
       return _badargs.errMsg("A function is being called, but "+txfp+" is not a function type");
 
     EpilogNode epi = (EpilogNode)xfp;
@@ -431,12 +428,12 @@ public class CallNode extends Node {
       return _badargs.forward_ref_err(epi.fun());
 
     // Error#2: bad-arg-count
-    TypeFunPtr tfp = epi.fun().tf();
-    if( tfp.nargs() != nargs() )
-      return _badargs.errMsg("Passing "+(nargs()-1)+" arguments to "+tfp+" which takes "+(tfp.nargs()-1)+" arguments");
+    FunNode fun = epi.fun();
+    if( fun.nargs() != nargs() )
+      return _badargs.errMsg("Passing "+(nargs()-1)+" arguments to "+(fun.str())+" which takes "+(fun.nargs()-1)+" arguments");
 
     // Error#3: Now do an arg-check
-    TypeTuple formals = tfp._ts; // Type of each argument
+    TypeTuple formals = fun._ts; // Type of each argument
     for( int j=0; j<nargs(); j++ ) {
       Type actual = gvn.type(arg(j));
       Type formal = formals.at(j);
@@ -453,7 +450,7 @@ public class CallNode extends Node {
     if( t==null ) return null;  // No cast-in-progress
     _cast_ret = null;           // Gonna upcast the return result now
     gvn.add_work(this);         // Revisit after the data-proj cleans out
-    return new TypeNode(t,null,_cast_P);
+    return new TypeNode(t,null,null);
   }
 
   @Override public Type all_type() { return TypeTuple.make(Type.CTRL,TypeMem.MEM,Type.SCALAR); }

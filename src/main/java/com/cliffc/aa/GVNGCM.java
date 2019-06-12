@@ -378,9 +378,12 @@ public class GVNGCM {
         _wrk_bits.clear(n._uid);
         if( n.is_dead() ) continue; // Can be dead functions after removing ambiguous calls
         if( 3 <= n._uid && n._uid < _INIT0_CNT ) continue; // Ignore primitives (type is unchanged and conservative)
-        if( n instanceof CallNode && ambi_calls.find((CallNode)n)== -1 &&
-            ((CallNode)n).fidxs().above_center() )
-          ambi_calls.add((CallNode)n); // Track ambiguous calls
+        if( n instanceof CallNode ) {
+          CallNode call = (CallNode)n;
+          BitsFun fidxs = call.fidxs(this);
+          if( fidxs != null && fidxs.above_center() && ambi_calls.find(call)== -1 )
+            ambi_calls.add((CallNode)n); // Track ambiguous calls
+        }
         Type ot = type(n);       // Old type
         Type nt = n.value(this); // New type
         assert ot.isa(nt);       // Types only fall monotonically
@@ -448,16 +451,15 @@ public class GVNGCM {
       FunNode fun = (FunNode)n;
       EpilogNode epi = fun.epi();
       if( type(fun)==Type.CTRL && epi != null ) {
-        TypeFun tfun = (TypeFun)type(epi);
-        if( tfun.ctl() != Type.CTRL ) throw AA.unimpl(); // never-return function (maybe never called?)
-        Type tret = tfun.val();    // Actual return value
+        if( type(epi.ctl()) != Type.CTRL ) throw AA.unimpl(); // never-return function (maybe never called?)
+        Type tret = type(epi.val()); // Actual return value
         if( tret !=  fun._ret &&   // can sharpen function return
             tret.isa(fun._ret) ) { // Only if sharpened (might not be true for errors)
           unreg(fun);
           fun._ret = tret;
           rereg(fun,Type.CTRL);
         }
-        Type tmem = tfun.mem();       // Actual return value
+        Type tmem = type(epi.mem());  // Actual return value
         if( tmem !=  fun._retmem &&   // can sharpen function return
             tmem.isa(fun._retmem) ) { // Only if sharpened (might not be true for errors)
           unreg(fun);
@@ -468,7 +470,8 @@ public class GVNGCM {
     }
     // All (live) Call ambiguity has been resolved
     if( n instanceof CallNode && type(n.in(0))==Type.CTRL ) {
-      assert !((CallNode)n).fidxs().above_center() ||
+      BitsFun fidxs = ((CallNode)n).fidxs(this);
+      assert fidxs==null || !fidxs.above_center() ||
         n.err(this) != null; // Or else call is in-error
     }
 

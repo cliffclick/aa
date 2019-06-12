@@ -77,9 +77,9 @@ public class FunNode extends RegionNode {
 
   // Find FunNodes by fidx
   static Ary<FunNode> FUNS = new Ary<>(new FunNode[]{null,});
-  static FunNode find_fidx( int fidx ) { return fidx >= FUNS._len ? null : FUNS.at(fidx); }
+  public static FunNode find_fidx( int fidx ) { return fidx >= FUNS._len ? null : FUNS.at(fidx); }
 
-  @Override String xstr() {
+  @Override public String xstr() {
     SB sb = name(_fidx,new SB());
     if( _ts==null ) return sb.p("{forward_ref}").toString();
     // Supposed to be the self SHORT name, but include full signature.
@@ -98,14 +98,14 @@ public class FunNode extends RegionNode {
   public static SB names(BitsFun fidxs, SB sb ) {
     int fidx = fidxs.abit();
     if( fidx >= 0 ) return name(fidx,sb);
-    sb.p('{');
+    sb.p('[');
     int cnt=0;
     for( Integer ii : fidxs ) {
       if( ++cnt==4 ) break;
       name(ii,sb).p(fidxs.above_center()?'+':',');
     }
     if( cnt>=4 ) sb.p("...");
-    sb.p('}');
+    sb.p(']');
     return sb;
   }
   public static SB name( int i, SB sb ) {
@@ -121,9 +121,7 @@ public class FunNode extends RegionNode {
   // Argument type; 0 is memory
   Type targ(int idx) { return idx == -1 ? TypeRPC.ALL_CALL : _ts.at(idx); }
   int nargs() { return _ts._ts.length; }
-  TypeFunPtr tf() {
-    return TypeFunPtr.make(_ts,_ret,_retmem,BitsFun.make0(_fidx));
-  }
+  TypeFunPtr tf() { return TypeFunPtr.make(BitsFun.make0(_fidx)); }
   
   // ----
   @Override public Node ideal(GVNGCM gvn) {
@@ -408,10 +406,8 @@ public class FunNode extends RegionNode {
       Type ot = gvn.type(e.getKey()); // Generally just copy type from original nodes
       if( nn instanceof ParmNode && ((ParmNode)nn)._idx==-1 )
         ot = nn.all_type();     // Except the RPC, which has new callers
-      else if( nn instanceof EpilogNode ) {
-        TypeFun tt = (TypeFun)ot; // And the epilog, which has a new funnode and RPCs
-        ot = TypeFun.make(tt.ctl(),tt.mem(),tt.val(),TypeRPC.ALL_CALL);
-      }
+      else if( nn instanceof EpilogNode )
+        ot = fun.tf();          // Except the Epilog, which matches a new function
       gvn.rereg(nn,ot);
     }
     assert !epi.is_dead();      // Not expecting this to be dead already

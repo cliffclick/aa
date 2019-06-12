@@ -27,14 +27,12 @@ public class EpilogNode extends Node {
   }
 
   @Override public Type value(GVNGCM gvn) {
-    Type c = gvn.type(ctrl()); // Function exits, or not
-    Type m = gvn.type(mem ()); // Function memory value
-    Type v = gvn.type(val ()); // Function return value
-    Type r = gvn.type(rpc ()); // Caller; the Continuation
-    assert m instanceof TypeMem;
+    Type c = gvn.type(ctl()); // Function exits, or not
+    Type r = gvn.type(rpc()); // Caller; the Continuation
+    assert gvn.type(mem()) instanceof TypeMem;
     if( c==Type.ANY  || r==Type.ANY  ) return all_type().dual();
     if( (c!=Type.CTRL && c!=Type.XCTRL) || !(r instanceof TypeRPC) ) return all_type();
-    return TypeFun.make(c, m, v, r);
+    return TypeFunPtr.make(BitsFun.make0(_fidx));
   }
   @Override public String err(GVNGCM gvn) { return is_forward_ref() ? _unkref_err : null; }
 
@@ -43,17 +41,15 @@ public class EpilogNode extends Node {
     return (in(4) instanceof FunNode && fun()._fidx==_fidx) ? null : in(idx);
   }
   
-  public    Node ctrl() { return          in(0); } // internal function control
-            Node mem () { return          in(1); } // standard exit memory
-            Node val () { return          in(2); } // standard exit value
-  public    Node rpc () { return          in(3); } // Almost surely a PhiNode merging RPCs
-  public FunNode fun () { return (FunNode)in(4); } // Function header
-  @Override String xstr() {                        // Self short name
+  public    Node ctl() { return          in(0); } // internal function control
+  public    Node mem() { return          in(1); } // standard exit memory
+  public    Node val() { return          in(2); } // standard exit value
+  public    Node rpc() { return          in(3); } // Almost surely a PhiNode merging RPCs
+  public FunNode fun() { return (FunNode)in(4); } // Function header
+  @Override String xstr() {                       // Self short name
     FunNode fun = FunNode.find_fidx(_fidx);
     return fun==null ? "Epilog" : "Epi#"+fun._name;
   }
-  TypeFunPtr tf() { return FunNode.find_fidx(_fidx).tf(); }
-  BitsFun fidxs() { return BitsFun.make0(_fidx); }
 
   // A forward-ref is an assumed unknown-function being used before being
   // declared.  Hence we want a callable function pointer, but have no defined
@@ -82,7 +78,7 @@ public class EpilogNode extends Node {
     dfun.bind(tok);
   }
 
-  @Override public Type all_type() { return TypeFun.GENERIC_FUN; }
+  @Override public TypeFunPtr all_type() { return TypeFunPtr.GENERIC_FUNPTR; }
   
   // True if epilog or function is uncalled (but possibly returned or stored as
   // a constant).  Such code is not searched for errors.

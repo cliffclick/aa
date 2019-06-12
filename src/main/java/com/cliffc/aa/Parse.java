@@ -437,8 +437,8 @@ public class Parse {
         if( arg == null )       // tfact but no arg is just the tfact
           break;
         Type tn = _gvn.type(n);
-        if( !(tn instanceof TypeFun) && arg.may_prec() >= 0 ) { _x=oldx; break; }
-        if( !(tn instanceof TypeFun) &&
+        if( !(tn instanceof TypeFunPtr) && arg.may_prec() >= 0 ) { _x=oldx; break; }
+        if( !(tn instanceof TypeFunPtr) &&
             // Notice the backwards condition: n was already tested for !(tn instanceof TypeFun).
             // Now we test the other way: the generic function can never be an 'n'.
             // Only if we cannot 'isa' in either direction do we bail out early
@@ -446,7 +446,7 @@ public class Parse {
             // and during GCP be 'lifted' to a function; if we bail out now we
             // may disallow a legal program with function arguments.  However,
             // if 'n' is a e.g. Float there's no way it can 'lift' to a function.
-            !TypeFun.GENERIC_FUN.isa(tn) ) {
+            !TypeFunPtr.GENERIC_FUNPTR.isa(tn) ) {
           kill(arg);
           n = err_ctrl2("A function is being called, but "+tn+" is not a function type");
         } else {

@@ -22,15 +22,15 @@ public class BitsFun extends Bits<BitsFun> {
   public static final int ALL = new_fidx(0);
   public static int new_fidx( int par ) { return HASHMAKER.split(par,INTERN); }
   // Fast reset of parser state between calls to Exec
-  public static void init0() { HASHMAKER.init0(); }
-  public static void reset_to_init0() { HASHMAKER.reset_to_init0(); INTERN.clear(); }
+  public static void init0() { HASHMAKER.init0();  init0(INTERN); }
+  public static void reset_to_init0() { HASHMAKER.reset_to_init0();  reset_to_init0(INTERN); }
   
   // Have to make a first BitsFun here; thereafter the v-call to make_impl
   // will make more on demand.  But need the first one to make a v-call.
-  public static final BitsFun FULL = new BitsFun().make_impl(1,new long[]{1L | (1L<<ALL)});
+  private static final BitsFun FULL = new BitsFun().make_impl(1,new long[]{1L | (1L<<ALL)});
   private static final BitsFun ANY = FULL.dual();
   public  static final BitsFun NIL = make0(0);
-  @Override boolean is_class() { return false; } // All bits are constants
+  @Override boolean is_class() { return test(ALL); } // All bits are constants, except the first "ALL" bit
   @Override HashMaker hashmaker() { return HASHMAKER; } 
   @Override public BitsFun ALL() { return FULL; }
   @Override public BitsFun ANY() { return ANY ; }

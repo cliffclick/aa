@@ -50,6 +50,8 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   long[] _bits;   // Bits set or null for a single bit
   int _con;       // value of single bit
   int _hash;      // Pre-computed hashcode
+  long[] _reset_bits;
+  int _reset_con = -999999;
   // Intern: lookup and return an existing Bits or install in hashmap and
   // return a new Bits.  Overridden in subclasses to make type-specific Bits.
   abstract B make_impl(int con, long[] bits );
@@ -72,16 +74,15 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     if( _bits.length==1 && _bits[0]== 0) return true; // NO bits is OK
     if( _bits[_bits.length-1]==0 ) return false; // Array is "tight"
     // For efficiency, 1 bit set uses 'con' instead of 'bits'
-    if( check_one_bit(_bits) ) return false; // Found single bit
-    return true;
+    return check_multi_bits(_bits); // Found multiple bits
   }
-  private static boolean check_one_bit(long[] bits) {
+  private static boolean check_multi_bits( long[] bits) {
     int len = bits.length;
     long b = bits[len-1];              // Last word
-    if( (b & (b-1))!=0 ) return false; // Last word has multiple bits
+    if( (b & (b-1))!=0 ) return true; // Last word has multiple bits
     // Check multiple bits spread over multiple words
-    for( int i=0; i<len-1; i++ ) if( bits[i] != 0 ) return false;
-    return true;                // Found a single bit in last word
+    for( int i=0; i<len-1; i++ ) if( bits[i] != 0 ) return true;
+    return false;                // Found a single bit in last word
   }
   @Override public int hashCode( ) { return _hash; }
   @Override public boolean equals( Object o ) {
@@ -118,7 +119,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     if( bits.length != len ) bits = Arrays.copyOf(bits,len);
     
     // Check for a single bit or NO bits
-    if( !check_one_bit(bits) || (len==1 && bits[0]==0) ) return make_impl(any ? -1 : 1,bits);
+    if( check_multi_bits(bits) || (len==1 && bits[0]==0) ) return make_impl(any ? -1 : 1,bits);
     int bnum0 = 63 - Long.numberOfLeadingZeros(bits[len-1]);
     int bnum = bnum0 + ((len-1)<<6);
     if( any && is_class() ) bnum = -bnum;
@@ -248,6 +249,27 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   // join is defined in terms of meet and dual
   public Bits<B> join(Bits<B> bs) { return dual().meet(bs.dual()).dual(); }
 
+  // Make a deep copy, for reseting INTERN to the starting state between tests
+  static <T extends Bits> void init0(HashMap<T,T> INTERN) {
+    for( T b : INTERN.keySet() ) {
+      b._reset_con  = b._con;   // Saves con, and also removes -999999 sentinal
+      b._reset_bits = b._bits == null ? null : b._bits.clone();
+    }
+  }
+  // Make a deep copy, for reseting INTERN to the starting state between tests
+  static <T extends Bits> void reset_to_init0(HashMap<T,T> INTERN) {
+    Iterator<T> it = INTERN.keySet().iterator();
+    while( it.hasNext() ) {
+      T b = it.next();
+      if( b._reset_con == -999999 ) { // If never called by init0, not part of the starting types
+        it.remove();                  // So remove it
+      } else {
+        b._con  = b._reset_con;
+        b._bits = b._reset_bits==null ? null : b._reset_bits.clone();
+      }
+    }
+  }
+ 
   // Instances are unique-per-subclass of Bits, i.e., one for each of
   // BitsAlias, BitsFun, BitsRPC.  These record the split history, to let us
   // compute hashes that do not move after a split.
@@ -268,7 +290,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
       if( par==0 ) return 1;    // Ignore init
       // Split the parent bit in twain.  Instances of the parent are everywhere
       // updated to have both bits, but hash to the same value as the parent.
-      int new_alias = _splits._len+2;
+      int new_split = _splits._len+2;
 
       // Walk and update
       for( B bits : INTERN.keySet() ) {
@@ -277,9 +299,9 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
           assert con!=0;        // nil is never split
           if( bits._bits==null ) {
             bits._con = con < 0 ? -1 : 1;
-            or(bits._bits = bits(con,new_alias),Math.abs(con));
-          } else if( new_alias > max(bits._bits) ) bits._bits = bits(0,new_alias);
-          or(bits._bits,new_alias);
+            or(bits._bits = bits(con,new_split),Math.abs(con));
+          } else if( new_split > max(bits._bits) ) bits._bits = bits(0,new_split);
+          or(bits._bits,new_split);
         }
       }
 
@@ -287,15 +309,15 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
       if( this==BitsAlias.HASHMAKER )
         for( Type t : Type.INTERN.keySet() )
           if( t instanceof TypeMem )
-            ((TypeMem)t).split(par,new_alias);
+            ((TypeMem)t).split(par,new_split);
       
-      _splits.push(new Q(par,new_alias)); // Record the split
+      _splits.push(new Q(par,new_split)); // Record the split
 
       // Assert hash not changed
       for( B bits : INTERN.keySet() )
         assert bits._hash == compute_hash(bits);
       
-      return new_alias;
+      return new_split;
     }
     int compute_hash(Bits bits) {
       // Sum of bits, minus exceptions

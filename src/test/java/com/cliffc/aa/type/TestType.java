@@ -211,20 +211,21 @@ public class TestType {
     TypeFunPtr gf = TypeFunPtr.GENERIC_FUNPTR;
     TypeMem nomem = TypeMem.MEM.dual();
 
-    TypeFunPtr f1i2i = TypeFunPtr.make_new(TypeTuple.INT64,TypeInt.INT64,nomem,BitsFun.ALL);
+    TypeFunPtr f1i2i = TypeFunPtr.make_new();
     assertTrue(f1i2i.isa(gf));
-    TypeFunPtr f1f2f = TypeFunPtr.make_new(TypeTuple.FLT64,TypeFlt.FLT64,nomem,BitsFun.ALL);
+    TypeFunPtr f1f2f = TypeFunPtr.make_new();
     assertTrue(f1f2f.isa(gf));
     TypeFunPtr mt = (TypeFunPtr)f1i2i.meet(f1f2f);
     BitsFun funs = BitsFun.make0(2).meet(BitsFun.make0(3));
-    TypeFunPtr f3i2r = TypeFunPtr.make(TypeTuple.INT32,Type.REAL    ,nomem,funs);
+    TypeFunPtr f3i2r = TypeFunPtr.make(funs);
     assertEquals(f3i2r,mt);
     assertTrue(f3i2r.isa(gf));
     assertTrue(f1i2i.isa(f3i2r));
     assertTrue(f1f2f.isa(f3i2r));
-    
-    TypeFunPtr f2 = TypeFunPtr.any1(23); // Some generic function (happens to be #23, '&')
-    assertTrue(f2.isa(gf));
+
+    // No longer true; must use make_new and split from parent fidx.
+    //TypeFunPtr f2 = TypeFunPtr.make(BitsFun.make0(23)); // Some generic function (happens to be #23, '&')
+    //assertTrue(f2.isa(gf));
   }
 
   // Test limits on recursive type structures; recursively building nested

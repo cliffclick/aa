@@ -84,18 +84,18 @@ public class TypeTuple<O extends TypeTuple<O>> extends Type<O> {
   }
 
           static final TypeTuple XSCALARS= make_generic_args();
-          static final TypeTuple SCALAR0 = make(TypeMem.XMEM);
-          static final TypeTuple SCALAR1 = make(TypeMem.XMEM,SCALAR);
-  public  static final TypeTuple SCALAR2 = make(TypeMem.XMEM,SCALAR, SCALAR);
-          static final TypeTuple INT32   = make(TypeMem.XMEM,TypeInt.INT32 );
-  public  static final TypeTuple INT64   = make(TypeMem.XMEM,TypeInt.INT64 );
-  public  static final TypeTuple FLT64   = make(TypeMem.XMEM,TypeFlt.FLT64 );
-  public  static final TypeTuple STRPTR  = make(TypeMem.XMEM,TypeMemPtr.STRPTR);
-  public  static final TypeTuple OOP_OOP = make(TypeMem.XMEM,TypeMemPtr.OOP0,TypeMemPtr.OOP0);
-  public  static final TypeTuple INT64_INT64 = make(TypeMem.XMEM,TypeInt.INT64,TypeInt.INT64);
-  public  static final TypeTuple FLT64_FLT64 = make(TypeMem.XMEM,TypeFlt.FLT64,TypeFlt.FLT64);
-  private static final TypeTuple FLT64_INT64 = make(TypeMem.XMEM,TypeFlt.FLT64,TypeInt.INT64);
-  public  static final TypeTuple STR_STR     = make(TypeMem.XMEM,TypeMemPtr.STRPTR,TypeMemPtr.STRPTR);
+          static final TypeTuple SCALAR0 = make(TypeMem.MEM);
+          static final TypeTuple SCALAR1 = make(TypeMem.MEM,SCALAR);
+  public  static final TypeTuple SCALAR2 = make(TypeMem.MEM,SCALAR, SCALAR);
+          static final TypeTuple INT32   = make(TypeMem.MEM,TypeInt.INT32 );
+  public  static final TypeTuple INT64   = make(TypeMem.MEM,TypeInt.INT64 );
+  public  static final TypeTuple FLT64   = make(TypeMem.MEM,TypeFlt.FLT64 );
+  public  static final TypeTuple STRPTR  = make(TypeMem.MEM,TypeMemPtr.STRPTR);
+  public  static final TypeTuple OOP_OOP = make(TypeMem.MEM,TypeMemPtr.OOP0,TypeMemPtr.OOP0);
+  public  static final TypeTuple INT64_INT64 = make(TypeMem.MEM,TypeInt.INT64,TypeInt.INT64);
+  public  static final TypeTuple FLT64_FLT64 = make(TypeMem.MEM,TypeFlt.FLT64,TypeFlt.FLT64);
+  private static final TypeTuple FLT64_INT64 = make(TypeMem.MEM,TypeFlt.FLT64,TypeInt.INT64);
+  public  static final TypeTuple STR_STR     = make(TypeMem.MEM,TypeMemPtr.STRPTR,TypeMemPtr.STRPTR);
   
   public  static final TypeTuple IF_ANY  = make(XCTRL,XCTRL);
   public  static final TypeTuple IF_ALL  = make(CTRL ,CTRL );

@@ -215,12 +215,12 @@ public class Type<T extends Type<T>> {
   public  static final Type XSCALAR= make(TXSCALAR); // ptrs, ints, flts; things that fit in a machine register
   public  static final Type  NSCALR= make( TNSCALR); // Scalars-not-nil
           static final Type XNSCALR= make(TXNSCALR); // Scalars-not-nil
-          static final Type   NUM  = make( TNUM   );
-          static final Type  XNUM  = make(TXNUM   );
-          static final Type  NNUM  = make( TNNUM  );
+  private static final Type   NUM  = make( TNUM   );
+  private static final Type  XNUM  = make(TXNUM   );
+  private static final Type  NNUM  = make( TNNUM  );
   private static final Type XNNUM  = make(TXNNUM  );
   public  static final Type   REAL = make( TREAL  );
-          static final Type  XREAL = make(TXREAL  );
+  private static final Type  XREAL = make(TXREAL  );
           static final Type  NREAL = make( TNREAL );
   private static final Type XNREAL = make(TXNREAL );
 
@@ -240,7 +240,7 @@ public class Type<T extends Type<T>> {
   // Return base type of named types
   public Type base() { Type t = this; while( t._type == TNAME ) t = ((TypeName)t)._t; return t; }
   // Strip off any subclassing just for names
-  byte simple_type() { return base()._type; }
+  private byte simple_type() { return base()._type; }
   private boolean is_ptr() { byte t = simple_type();  return t == TFUNPTR || t == TMEMPTR; }
           boolean is_num() { byte t = simple_type();  return t == TNUM || t == TXNUM || t == TNNUM || t == TXNNUM || t == TREAL || t == TXREAL || t == TNREAL || t == TXNREAL || t == TINT || t == TFLT; }
   // True if 'this' isa SCALAR, without the cost of a full 'meet()'
@@ -394,7 +394,6 @@ public class Type<T extends Type<T>> {
     if( ALL_TYPES != null ) return ALL_TYPES;
     Type[] ts =    Type      .TYPES ;
     ts = concat(ts,TypeFlt   .TYPES);
-    ts = concat(ts,TypeFun   .TYPES);
     ts = concat(ts,TypeFunPtr.TYPES);
     ts = concat(ts,TypeInt   .TYPES);
     ts = concat(ts,TypeMem   .TYPES);
@@ -641,13 +640,13 @@ public class Type<T extends Type<T>> {
     case TXNUM:
     case TXREAL:
     case TXSCALAR:  return TypeNil.NIL;
-    case TXNNUM:    return TypeInt.BOOL;
-    case TXNREAL:   return TypeInt.BOOL;
+    case TXNNUM:
+    case TXNREAL:
     case TXNSCALR:  return TypeInt.BOOL;
     case TNUM:    case TNNUM:     return NUM;
     case TREAL:   case TNREAL:    return REAL;
     case TSCALAR: case TNSCALR:   return SCALAR;
-    case TCTRL:   case TXCTRL:    return ALL;
+    case TCTRL:   case TXCTRL:
     case TOBJ:
     case TSTR:
     case TSTRUCT:

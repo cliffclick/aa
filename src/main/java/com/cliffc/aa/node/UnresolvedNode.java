@@ -4,7 +4,7 @@ import com.cliffc.aa.AA;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.BitsFun;
 import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeFun;
+import com.cliffc.aa.type.TypeFunPtr;
 
 public class UnresolvedNode extends Node {
   UnresolvedNode( Node... funs ) { super(OP_UNR,funs); }
@@ -45,7 +45,7 @@ public class UnresolvedNode extends Node {
     return x instanceof UnresolvedNode ? gvn.xform(x) : x;
   }
   
-  @Override public Type all_type() { return TypeFun.GENERIC_FUN; }
+  @Override public TypeFunPtr all_type() { return TypeFunPtr.GENERIC_FUNPTR; }
   
   // Return the op_prec of the returned value.  Not sensible except when called
   // on primitives.  Should be the same across all defs.
