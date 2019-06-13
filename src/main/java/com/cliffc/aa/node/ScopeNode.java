@@ -78,7 +78,6 @@ public class ScopeNode extends Node {
   }
 
   // Name must exist
-  public boolean is_mutable( String name ) { return is_mutable(_vals.get(name)); }
   public boolean is_mutable( Integer ii ) { return _ms.get(ii); }
   
   // The current local scope ends; delete local var refs.  Forward refs first

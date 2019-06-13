@@ -290,7 +290,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
       if( par==0 ) return 1;    // Ignore init
       // Split the parent bit in twain.  Instances of the parent are everywhere
       // updated to have both bits, but hash to the same value as the parent.
-      int new_split = _splits._len+2;
+      int new_split = last_split()+1;
 
       // Walk and update
       for( B bits : INTERN.keySet() ) {
@@ -345,6 +345,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     void init0() { _init = _splits._len; }
     void reset_to_init0() { _splits.set_len(_init); }
     boolean has_bits(B b) { return b.max() >= _init+2; }
+    int last_split() { return _splits._len+1; }
   }
   
   /** @return an iterator */

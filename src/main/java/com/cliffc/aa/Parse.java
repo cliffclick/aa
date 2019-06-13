@@ -565,7 +565,6 @@ public class Parse {
       bads.add(bad);
     }
     Node old_ctrl = ctrl();
-    Node old_mem  = mem ();
     FunNode fun = init(new FunNode(ts.asAry()));
     try( Env e = new Env(_e) ) {// Nest an environment for the local vars
       _e = e;                   // Push nested environment
@@ -573,7 +572,8 @@ public class Parse {
       String errmsg = errMsg("Cannot mix GC and non-GC types");      
       int cnt=0;                // Add parameters to local environment
       for( int i=0; i<ids._len; i++ )
-        _e.update(ids.at(i),gvn(new ParmNode(cnt++,ids.at(i),fun,con(ts.at(i)),errmsg)),null,args_are_mutable);
+        _e.update(ids.at(i),gvn(new ParmNode(cnt++,ids.at(i),fun,con(ts.at(i)),errmsg)),null,
+                  /*memory is mutable*/i == 0 || args_are_mutable);
       Node rpc = gvn(new ParmNode(-1,"rpc",fun,con(TypeRPC.ALL_CALL),null));
       Node rez = stmts();       // Parse function body
       if( rez == null ) rez = err_ctrl1("Missing function body", Type.SCALAR);

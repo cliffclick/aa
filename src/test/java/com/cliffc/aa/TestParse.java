@@ -16,6 +16,8 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
     Object dummy = Env.GVN; // Force class loading cycle
+    test("id({+})",Env.lookup_valtype("+")); //
+
     // A collection of tests which like to fail easily
     testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1) is not a @{x,y}","                           ");
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'","                    ");
@@ -128,7 +130,7 @@ public class TestParse {
 
   @Test public void testParse2() {
     // Anonymous function definition
-    test_isa("{x y -> x+y}", TypeInt.con(42)); // {SCALAR,SCALAR->SCALAR}
+    test_isa("{x y -> x+y}", TypeFunPtr.make(BitsFun.make0(BitsFun.last_fidx()))); // {Scalar Scalar -> Scalar}
     test("{5}()", TypeInt.con(5)); // No args nor -> required; this is simply a function returning 5, being executed
 
     // ID in different contexts; in general requires a new TypeVar per use; for

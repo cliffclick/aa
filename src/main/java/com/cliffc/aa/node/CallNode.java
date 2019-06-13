@@ -54,10 +54,11 @@ public class CallNode extends Node {
   private int nargs() { return _defs._len-2; }
   // Actual arguments.
   Node arg( int x ) { return _defs.at(x+2); }
+  private void set_arg(int idx, Node arg, GVNGCM gvn) { set_def(idx+2,arg,gvn); }
 
   private Node ctl() { return in(0); }
   public  Node fun() { return in(1); }
-  private Node mem() { return in(2); }
+  private Node mem() { return in(2); } // Same as arg(0)
   private void set_fun(Node fun, GVNGCM gvn) { set_def(1,fun,gvn); }
   void set_fun_reg(Node fun, GVNGCM gvn) { gvn.set_def_reg(this,1,fun); }
   public BitsFun fidxs(GVNGCM gvn) {
@@ -126,7 +127,7 @@ public class CallNode extends Node {
       //set_fun(tn.in(1),gvn);
       //TypeFunPtr tf = t_funptr.fun();
       //for( int i=0; i<nargs(); i++ ) // Insert casts for each parm
-      //  set_def(i+2,gvn.xform(new TypeNode(tf._ts.at(i),arg(i),tn._error_parse)),gvn);
+      //  set_arg(i,gvn.xform(new TypeNode(tf._ts.at(i),arg(i),tn._error_parse)),gvn);
       //_cast_ret = tf._ret;       // Upcast return results
       //_cast_P = tn._error_parse; // Upcast failure message
       //return this;
@@ -161,7 +162,7 @@ public class CallNode extends Node {
     TypeTuple formals = fun._ts;
     for( int i=0; i<nargs(); i++ ) {
       if( fun.parm(i)==null )   // Argument is dead and can be dropped?
-        set_def(i+2,gvn.con(Type.XSCALAR),gvn); // Replace with some generic placeholder
+        set_arg(i,gvn.con(i==0 ? TypeMem.XMEM : Type.XSCALAR),gvn); // Replace with some generic placeholder
       else {
         Type formal = formals.at(i);
         Type actual = gvn.type(arg(i));
@@ -364,7 +365,7 @@ public class CallNode extends Node {
         if( actual==Type.XSCALAR && arg(j) instanceof ConNode )
           continue; // Forced super-high arg is always compatible before formal is dead
         Type tx = actual.join(formals.at(j));
-        if( tx.above_center() ) // Actual and formal have values in common?
+        if( tx != actual && tx.above_center() ) // Actual and formal have values in common?
           continue outerloop;   // No, this function will never work; e.g. cannot cast 1.2 as any integer
         byte cvt = actual.isBitShape(formals.at(j)); // +1 needs convert, 0 no-cost convert, -1 unknown, 99 never
         if( cvt == 99 )         // Happens if actual is e.g. TypeErr
