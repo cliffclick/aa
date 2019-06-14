@@ -69,10 +69,8 @@ public class CallNode extends Node {
   // Clones during inlining all become unique new call sites
   @Override CallNode copy(GVNGCM gvn) {
     CallNode call = (CallNode)super.copy(gvn);
-    //_rpc = BitsRPC.split(_rpc); // Original gets the low of the split
-    //call._rpc = _rpc+1;         // New gets the high bit
-    //return call;
-    throw com.cliffc.aa.AA.unimpl();
+    call._rpc = BitsRPC.new_rpc(_rpc); // Children RPC
+    return call;
   }
   
   @Override public Node ideal(GVNGCM gvn) {
@@ -151,10 +149,12 @@ public class CallNode extends Node {
     // Function is single-caller (me) and collapsing
     if( epi.is_copy(gvn,4) != null )
       return inline(gvn,ctrl,mem,rez);
+
     // Function is well-formed
-    
-    // Arg counts must be compatible
     FunNode fun = epi.fun();
+    if( fun.is_forward_ref() ) return null;
+
+    // Arg counts must be compatible
     if( fun.nargs() != nargs() )
       return null;
 
@@ -272,6 +272,8 @@ public class CallNode extends Node {
     if( tc == Type.XCTRL || tc == Type.ANY ) // Call is dead?
       return TypeTuple.CALL.dual();
     if( !(fp instanceof UnresolvedNode || fp instanceof EpilogNode) )
+      return TypeTuple.CALL.dual();
+    if( fp.is_forward_ref() )
       return TypeTuple.CALL.dual();
     if( Type.SCALAR.isa(t) ) // Calling something that MIGHT be a function, no idea what the result is
       return TypeTuple.CALL;
