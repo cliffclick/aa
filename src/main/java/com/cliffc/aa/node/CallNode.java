@@ -51,14 +51,14 @@ public class CallNode extends Node {
   @Override public Node is_copy(GVNGCM gvn, int idx) { return _inlined ? in(idx) : null; }
 
   // Number of actual arguments
-  private int nargs() { return _defs._len-2; }
+  private int nargs() { return _defs._len-3; }
   // Actual arguments.
-  Node arg( int x ) { return _defs.at(x+2); }
-  private void set_arg(int idx, Node arg, GVNGCM gvn) { set_def(idx+2,arg,gvn); }
+  Node arg( int x ) { return _defs.at(x+3); }
+  private void set_arg(int idx, Node arg, GVNGCM gvn) { set_def(idx+3,arg,gvn); }
 
   private Node ctl() { return in(0); }
   public  Node fun() { return in(1); }
-  private Node mem() { return in(2); } // Same as arg(0)
+  private Node mem() { return in(2); }
   private void set_fun(Node fun, GVNGCM gvn) { set_def(1,fun,gvn); }
   void set_fun_reg(Node fun, GVNGCM gvn) { gvn.set_def_reg(this,1,fun); }
   public BitsFun fidxs(GVNGCM gvn) {
@@ -84,9 +84,9 @@ public class CallNode extends Node {
     // When do i do 'pattern matching'?  For the moment, right here: if not
     // already unpacked a tuple, and can see the NewNode, unpack it right now.
     if( !_unpacked ) { // Not yet unpacked a tuple
-      assert nargs()==2;
+      assert nargs()==1;
       Node mem = mem();
-      Type tn = gvn.type(arg(1));
+      Type tn = gvn.type(arg(0));
       if( tn instanceof TypeMemPtr ) {
         Type tm = gvn.type(mem);
         if( tm instanceof TypeMem ) {
@@ -102,7 +102,7 @@ public class CallNode extends Node {
               for( int i=0; i<len; i++ ) // Push the args; unpacks the tuple
                 add_def( gvn.con(tt.at(i)) );
             } else {                // Allocation exists, unpack args
-              assert mem instanceof MergeMemNode && mem.in(1) instanceof MProjNode && mem.in(1).in(0) instanceof NewNode;
+              assert mem instanceof MemMergeNode && mem.in(1) instanceof MProjNode && mem.in(1).in(0) instanceof NewNode;
               remove(_defs._len-1,gvn); // Pop off the NewNode tuple
               Node nn = mem.in(1).in(0);
               int len = nn._defs._len;
@@ -162,7 +162,7 @@ public class CallNode extends Node {
     TypeTuple formals = fun._ts;
     for( int i=0; i<nargs(); i++ ) {
       if( fun.parm(i)==null )   // Argument is dead and can be dropped?
-        set_arg(i,gvn.con(i==0 ? TypeMem.XMEM : Type.XSCALAR),gvn); // Replace with some generic placeholder
+        set_arg(i,gvn.con(Type.XSCALAR),gvn); // Replace with some generic placeholder
       else {
         Type formal = formals.at(i);
         Type actual = gvn.type(arg(i));
@@ -237,7 +237,7 @@ public class CallNode extends Node {
       if( arg.in(0) == fun && arg instanceof ParmNode ) {
         int idx = ((ParmNode)arg)._idx; // Argument number, or -1 for rpc
         assert idx<nargs();
-        Node actual = idx==-1 ? gvn.con(TypeRPC.make(_rpc)) : arg(idx);
+        Node actual = idx==-1 ? gvn.con(TypeRPC.make(_rpc)) : (idx==-2 ? mem() : arg(idx));
         gvn.add_def(arg,actual);
       }
     }

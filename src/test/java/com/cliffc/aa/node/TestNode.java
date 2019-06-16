@@ -153,8 +153,10 @@ public class TestNode {
     test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  Type   .CTRL ));
     test1monotonic(new    FunNode(new Type[]{TypeInt.INT64}));
     test1monotonic(new     IfNode(_ins[0],_ins[1]));
+    for( IntrinsicNode prim : IntrinsicNode.INTRINSICS )
+      test1monotonic_intrinsic(prim);
     test1monotonic(new   LoadNode(_ins[0],_ins[1],_ins[2],0,null));
-    test1monotonic(new MergeMemNode(_ins[0],_ins[1]));
+    test1monotonic(new MemMergeNode(_ins[0],_ins[1]));
     test1monotonic(new    NewNode(new Node[]{null,_ins[1],_ins[2]},TypeStruct.FLDS(2)));
     test1monotonic(new    NewNode(new Node[]{null,_ins[1],_ins[2]},TypeStruct.FLDS(2),new byte[2]));
     test1monotonic(new   ParmNode( 1, "x",_ins[0],(ConNode)_ins[1],"badgc"));
@@ -185,7 +187,18 @@ public class TestNode {
     assert n._defs._len==0;
     n.add_def( null  );
     n.add_def(_ins[1]);
-    if( n._targs._ts.length >= 3 ) n.add_def(_ins[2]);
+    if( n._targs._ts.length >= 2 ) n.add_def(_ins[2]);
+    test1monotonic_init(n);
+  }
+  
+  // Fill a Node with {null,edge,edge} and start the search
+  private void test1monotonic_intrinsic(IntrinsicNode prim) {
+    IntrinsicNode n = prim.copy(_gvn);
+    assert n._defs._len==0;
+    n.add_def( null  );
+    n.add_def(_ins[1]);         // memory
+    n.add_def(_ins[2]);         // arg
+    if( n._targs._ts.length >= 2 ) n.add_def(_ins[3]);
     test1monotonic_init(n);
   }
   

@@ -22,26 +22,24 @@ import java.util.Map;
 // Pointing to the FunNode are ParmNodes which are also PhiNodes; one input
 // path for each known caller.  Zero slot points to the FunNode.  Arg1 points
 // to the generic unknown worse-case caller (a type-specific ConNode with
-// worse-case legit bottom type).  The collection of these ConNodes can share
-// TypeVars to structurally type the inputs.  ParmNodes merge all input path
-// types (since they are a Phi), and the call "loses precision" for type
-// inference there.  Parm#0 (NOT the zero-slot but the zero idx) is the
-// incoming memory argument.  Parm#1 and up (NOT the one-slot but the one idx)
-// are the classic function arguments.
+// worse-case legit bottom type).  ParmNodes merge all input path types (since
+// they are a Phi), and the call "loses precision" for type inference there.
+// Parm#0 and up (NOT the zero-slot but the zero idx) are the classic function
+// arguments; Parm#-1 is for the RPC and Parm#-2 is for memory.
 //
 // The function body points to the FunNode and ParmNodes like C2.
 //
 // EpilogNode is different from C2s RetNode, to support precise function type
-// inference.  Epilogs point to the return control, return value, RPC and the
-// original FunNode; its type is a control Tuple, similar to IfNodes.  Pointing
-// to the Epilog are RPCNodes with call-site indices; they carry the control-
-// out of the function for their call-site.  While there is a single Epilog for
-// all call-sites, Calls can "peek through" to see the function body learning
-// the incoming args come from a known input path.
+// inference.  Epilogs point to the return control, memory, value, RPC and the
+// original FunNode; its type is a TypeFunPtr.  Pointing to the Epilog are
+// CallNodes with call-site indices; they carry the control- out of the
+// function for their call-site.  While there is a single Epilog for all
+// call-sites, Calls can "peek through" to see the function body learning the
+// incoming args come from a known input path.
 // 
 public class FunNode extends RegionNode {
   public String _name;          // Optional for anon functions; can be set later via bind()
-  final TypeTuple _ts;          // Arg types; 1-based, 0 reserved for the memory argument
+  final TypeTuple _ts;          // Arg types, 0-based, used to detect argument type errors; null for forward_refs
   public Type _ret;             // return types
   public TypeMem _retmem;       // return MEMORY types
   public final int _fidx;       // Unique function index
@@ -49,14 +47,16 @@ public class FunNode extends RegionNode {
   
   // Used to make the primitives at boot time
   public FunNode(PrimNode prim, Type ret, TypeMem retmem) {
-    this(prim._targs,ret,retmem,-1,prim.op_prec(),prim._name); }
+    this(prim._targs,ret,retmem,BitsFun.ALL,prim.op_prec(),prim._name); }
+  public FunNode(IntrinsicNode prim, Type ret, TypeMem retmem) {
+    this(prim._targs,ret,retmem,BitsFun.ALL,-1,prim._name); }
   // Used to make copies when inlining/cloning function bodies
   private FunNode(TypeTuple ts, Type ret, TypeMem retmem, int parent_fidx, String name) {
     this(ts,ret,retmem,parent_fidx,-1,name); }
   // Used to start an anonymous function in the Parser, includes argument memory in ts[0]
-  public FunNode(Type[] ts) { this(TypeTuple.make(ts),Type.SCALAR,TypeMem.MEM,-1,-1,null); }
+  public FunNode(Type[] ts) { this(TypeTuple.make(ts),Type.SCALAR,TypeMem.MEM,BitsFun.ALL,-1,null); }
   // Used to forward-decl anon functions
-  FunNode(String name) { this(null,Type.SCALAR,TypeMem.MEM,-1,-1,name); }
+  FunNode(String name) { this(null,Type.SCALAR,TypeMem.MEM,BitsFun.ALL,-1,name); }
   // Shared common constructor
   private FunNode(TypeTuple ts, Type ret, TypeMem retmem, int fidx, int op_prec, String name) {
     super(OP_FUN);
@@ -64,20 +64,19 @@ public class FunNode extends RegionNode {
     _ts = ts;
     _ret = ret;
     _retmem = retmem;
-    _fidx = BitsFun.new_fidx(fidx == -1 ? BitsFun.ALL : fidx);
+    _fidx = BitsFun.new_fidx(fidx);
     _op_prec = (byte)op_prec;
     FUNS.setX(_fidx,this); // Track FunNode by fidx
     add_def(Env.ALL_CTRL);
   }
   
+  // Find FunNodes by fidx
+  static Ary<FunNode> FUNS = new Ary<>(new FunNode[]{null,});
+  public static FunNode find_fidx( int fidx ) { return fidx >= FUNS._len ? null : FUNS.at(fidx); }
   // Fast reset of parser state between calls to Exec
   static int PRIM_CNT;
   public static void init0() { PRIM_CNT = FUNS._len; }
   public static void reset_to_init0() { FUNS.set_len(PRIM_CNT); }
-
-  // Find FunNodes by fidx
-  static Ary<FunNode> FUNS = new Ary<>(new FunNode[]{null,});
-  public static FunNode find_fidx( int fidx ) { return fidx >= FUNS._len ? null : FUNS.at(fidx); }
 
   @Override public String xstr() {
     SB sb = name(_fidx,new SB());
@@ -88,6 +87,7 @@ public class FunNode extends RegionNode {
       sb.p(' ').p(_retmem);
     return sb.p('}').toString();
   }
+  // Inline name
   @Override String str() { return _name==null ? Integer.toString(_fidx) : _name; }
   // Debug only: make an attempt to bind name to a function
   public void bind( String tok ) {
@@ -108,18 +108,21 @@ public class FunNode extends RegionNode {
     sb.p(']');
     return sb;
   }
-  public static SB name( int i, SB sb ) {
-    FunNode fun = find_fidx(i);
+  public static SB name( int fidx, SB sb ) {
+    FunNode fun = find_fidx(fidx);
     String name = fun == null ? null : fun._name;
-    return sb.p(name==null ? Integer.toString(i) : name);
+    return sb.p(name==null ? Integer.toString(fidx) : name);
   }
 
   @Override Node copy(GVNGCM gvn) { throw AA.unimpl(); } // Gotta make a new FIDX
 
   // True if no future unknown callers.
   private boolean has_unknown_callers() { return in(1) == Env.ALL_CTRL; }
-  // Argument type; 0 is memory
-  Type targ(int idx) { return idx == -1 ? TypeRPC.ALL_CALL : _ts.at(idx); }
+  // Argument type
+  Type targ(int idx) {
+    return idx == -1 ? TypeRPC.ALL_CALL :
+      (idx == -2 ? TypeMem.MEM : _ts.at(idx));
+  }
   int nargs() { return _ts._ts.length; }
   TypeFunPtr tf() { return TypeFunPtr.make(BitsFun.make0(_fidx)); }
   
@@ -164,14 +167,12 @@ public class FunNode extends RegionNode {
     for( Node use : _uses )
       if( use instanceof ParmNode ) {
         ParmNode parm = (ParmNode)use;
-        if( parm._idx != -1 ) {
+        if( parm._idx >= 0 ) {  // Skip memory, rpc
           // Check that all actuals are isa all formals.  This is a little
           // conservative, as we could inline on non-error paths.
           for( int i=1; i<_defs._len; i++ )
             if( !gvn.type(parm.in(i)).isa(targ(parm._idx)) )
               return null; // Actual !isa formal; do not inline while in-error
-          // TODO: FAILS for -2, memory arg.
-          // TODO: Ponder swapping all parms+1 idx, and reversing memory_idx for 0
           parms[parm._idx] = parm;
         }
       } else if( use instanceof EpilogNode ) { assert epi==null || epi==use; epi = (EpilogNode)use; }
@@ -204,10 +205,7 @@ public class FunNode extends RegionNode {
     int idx = find_type_split_index(gvn,parms);
     if( idx != -1 ) {           // Found; split along a specific input path using widened types
       Type[] sig = new Type[parms.length];
-      // Memory is parm#0, and default memory allows all memory input state.
-      // Also, widen() for memory currently does not do anything.
-      sig[0] = parms[0]==null ? TypeMem.MEM : gvn.type(parms[0].in(idx)).widen();
-      for( int i=1; i<parms.length; i++ )
+      for( int i=0; i<parms.length; i++ )
         sig[i] = parms[i]==null ? Type.SCALAR : gvn.type(parms[i].in(idx)).widen();
       return sig;
     }
@@ -381,7 +379,7 @@ public class FunNode extends RegionNode {
         for( int j=2; j<_defs._len; j++ ) // Get the new parm path or null according to split
           c.add_def( fun.in(j)==any ? dany : n.in(j) );
         // Update default type to match signature
-        if( idx != -1 ) ((ParmNode)c)._default_type = fun.targ(idx);
+        if( idx >= 0 ) ((ParmNode)c)._default_type = fun.targ(idx);
       } else if( n != this ) {  // Interior nodes
         for( Node def : n._defs ) {
           // Map old to new, except if using the old epilog in a recursive fcn,

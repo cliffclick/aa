@@ -14,15 +14,13 @@ import java.util.HashMap;
 //
 // Fun/Parm-per-arg/Prim/Ret
 //
-
 public abstract class PrimNode extends Node {
-  final TypeTuple _targs;       // Includes XMEM, and then argument types
+  final TypeTuple _targs;       // Argument types, 0-based
   final Type _ret;              // Primitive return type, no memory
   public final String _name;    // Unique name (and program bits)
-  final String[] _args;         // Handy
+  final String[] _args;         // Handy; 0-based
   Parse _badargs;               // Filled in when inlined in CallNode
-  PrimNode( byte op, String name, String[] args, TypeTuple targs, Type ret ) { super(op); _name=name; _args=args; _targs = targs; _ret = ret; _badargs=null; }
-  PrimNode( String name, String[] args, TypeTuple targs, Type ret ) { this(OP_PRIM,name,args,targs,ret); }
+  PrimNode( String name, String[] args, TypeTuple targs, Type ret ) { super(OP_PRIM); _name=name; _args=args; _targs = targs; _ret = ret; _badargs=null; }
 
   private final static String[] ARGS1 = new String[]{"x"};
   private final static String[] ARGS2 = new String[]{"x","y"};
@@ -72,20 +70,22 @@ public abstract class PrimNode extends Node {
   public static PrimNode convertTypeName( Type from, TypeName to, Parse badargs ) {
     return new ConvertTypeName(from,to,badargs);
   }
-  
+
+  // Apply types are 1-based (same as the incoming node index), and not
+  // zero-based (not same as the _targs and _args fields).
   public abstract Type apply( Type[] args ); // Execute primitive
   public boolean is_lossy() { return true; }
   @Override public String xstr() { return _name+"::"+_ret; }
   @Override public Node ideal(GVNGCM gvn) { return null; }
   @Override public Type value(GVNGCM gvn) {
-    Type[] ts = new Type[_defs._len];
+    Type[] ts = new Type[_defs._len]; // 1-based
     // If the meet with _targs.dual stays above center for all inputs, then we
     // return _ret.dual, the highest allowed result; if all inputs are
     // constants we constant fold; else some input is low so we return _ret,
     // the lowest possible result.
     boolean is_con = true;
     for( int i=1; i<_defs._len; i++ ) { // i=1, skip control
-      Type t = _targs.at(i).dual().meet(ts[i] = gvn.type(in(i)));
+      Type t = _targs.at(i-1).dual().meet(ts[i] = gvn.type(in(i)));
       if( t.above_center() ) is_con = false; // Not a constant
       else if( !t.is_con() ) return _ret;    // Some input is too low
     }
@@ -120,10 +120,10 @@ public abstract class PrimNode extends Node {
   public EpilogNode as_fun( GVNGCM gvn ) {
     FunNode  fun = ( FunNode) gvn.xform(new  FunNode(this,_ret,TypeMem.XMEM)); // Points to ScopeNode only
     ParmNode rpc = (ParmNode) gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
-    ParmNode mem = (ParmNode) gvn.xform(new ParmNode( 0,"mem",fun,gvn.con(TypeMem.XMEM    ),null));
+    ParmNode mem = (ParmNode) gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.XMEM    ),null));
     add_def(null);              // Control for the primitive in slot 0
     for( int i=0; i<_args.length; i++ )
-      add_def(gvn.init(new ParmNode(i+1,_args[i],fun, gvn.con(_targs.at(i+1)),null)));
+      add_def(gvn.init(new ParmNode(i,_args[i],fun, gvn.con(_targs.at(i)),null)));
     return new EpilogNode(fun,mem,gvn.init(this),rpc,fun,fun._fidx,null);
   }
 
@@ -133,7 +133,7 @@ public abstract class PrimNode extends Node {
 static class ConvertTypeName extends PrimNode {
   private final Parse _badargs; // Only for converts
   private final HashMap<String,Type> _lex; // Unique lexical scope
-  ConvertTypeName(Type from, TypeName to, Parse badargs) { super(to._name,PrimNode.ARGS1,TypeTuple.make(TypeMem.MEM,from),to); _lex=to._lex; _badargs=badargs; }
+  ConvertTypeName(Type from, TypeName to, Parse badargs) { super(to._name,PrimNode.ARGS1,TypeTuple.make(from),to); _lex=to._lex; _badargs=badargs; }
   @Override public Type value(GVNGCM gvn) {
     Type[] ts = new Type[_defs._len];
     for( int i=1; i<_defs._len; i++ )
@@ -346,7 +346,7 @@ static class RandI64 extends PrimNode {
 }
 
 static class Id extends PrimNode {
-  Id(Type arg) { super("id",PrimNode.ARGS1,TypeTuple.make(TypeMem.MEM,arg),arg); }
+  Id(Type arg) { super("id",PrimNode.ARGS1,TypeTuple.make(arg),arg); }
   @Override public Type apply( Type[] args ) { return args[1]; }
   @Override public Node ideal(GVNGCM gvn) { return in(1); }
   @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)); }

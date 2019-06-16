@@ -1,6 +1,5 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.AA;
 import com.cliffc.aa.util.SB;
 
 import java.util.Arrays;
@@ -48,17 +47,15 @@ import java.util.BitSet;
    being All vs some Constants).
 */
 public class TypeMem extends Type<TypeMem> {
-  private boolean _any;
   // Mapping from alias#s to the current known alias state.  Slot 0 is
   // reserved; TypeMem is never a nil.  Slot#1 is the Parent-Of-All aliases and
   // is the default value.  Default values are replaced with null during
   // canonicalization.
   private TypeObj[] _aliases;
   
-  private TypeMem  (boolean any, TypeObj[] aliases) { super(TMEM); init(any,aliases); }
-  private void init(boolean any, TypeObj[] aliases) {
+  private TypeMem  (TypeObj[] aliases) { super(TMEM); init(aliases); }
+  private void init(TypeObj[] aliases) {
     super.init(TMEM);
-    _any = any;
     _aliases = aliases;
     assert check();
   }
@@ -80,14 +77,25 @@ public class TypeMem extends Type<TypeMem> {
     return true;
   }
   @Override int compute_hash() {
+    // Horrible class-loader ordering bug:
+    // - TypeMem.clinit makes
+    // - TypeMem.ALL which calls hashcons which calls
+    // - TypeMem.compute_hash which calls
+    // - BitsAlias.HASHMAKER which calls
+    // - BitsAlias.clinit which splits many alias bits which calls
+    // - Bits.HASHMAKER.split which looks in
+    // - Type.INTERN to split all TypeMems.
+    // - But TypeMem.ALL is not yet in Type.INTERN
+    if( _aliases.length==2 ) return TMEM + _aliases[1]._hash;
+       
     // Hash is preserved across splitting bits
-    return TMEM + (_any?1:0) + BitsAlias.HASHMAKER.compute_hash(_aliases);
+    return TMEM + BitsAlias.HASHMAKER.compute_hash(_aliases);
   }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeMem) ) return false;
     TypeMem tf = (TypeMem)o;
-    if( _any!=tf._any || _aliases.length != tf._aliases.length ) return false;
+    if( _aliases.length != tf._aliases.length ) return false;
     for( int i=0; i<_aliases.length; i++ )
       if( _aliases[i] != tf._aliases[i] ) // note '==' and NOT '.equals()'
         return false;
@@ -99,7 +107,6 @@ public class TypeMem extends Type<TypeMem> {
     if( this== MEM ) return "[mem]";
     if( this==XMEM ) return "[~mem]";
     SB sb = new SB();
-    if( _any ) sb.p('~');
     sb.p('[');
     for( int i=1; i<_aliases.length; i++ )
       if( _aliases[i] != null )
@@ -115,19 +122,19 @@ public class TypeMem extends Type<TypeMem> {
   
   private static TypeMem FREE=null;
   @Override protected TypeMem free( TypeMem ret ) { _aliases=null; FREE=this; return ret; }
-  private static TypeMem make(boolean any, TypeObj[] aliases) {
+  private static TypeMem make(TypeObj[] aliases) {
     TypeMem t1 = FREE;
-    if( t1 == null ) t1 = new TypeMem(any, aliases);
-    else { FREE = null;       t1.init(any, aliases); }
+    if( t1 == null ) t1 = new TypeMem(aliases);
+    else { FREE = null;       t1.init(aliases); }
     TypeMem t2 = (TypeMem)t1.hashcons();
     return t1==t2 ? t1 : t1.free(t2);
   }
 
   // Canonicalize memory before making.  Unless specified, the default memory is "dont care"
-  static TypeMem make0( boolean any, TypeObj[] as ) {
+  static TypeMem make0( TypeObj[] as ) {
     if( as[1]==null ) as[1] = TypeObj.XOBJ; // Default memory is "dont care"
     int len = as.length;
-    if( len == 2 ) return make(any,as);
+    if( len == 2 ) return make(as);
     // No dups of default in slot 1
     for( int i=2; i<len; i++ )
       if( as[i]==as[1] )
@@ -136,30 +143,40 @@ public class TypeMem extends Type<TypeMem> {
     while( as[len-1] == null ) len--;
     if( as.length!=len ) as = Arrays.copyOf(as,len);
 
-    return make(any,as);
+    return make(as);
   }
 
   // Precise single alias.  Other aliases are "dont care".  Nil not allowed.
   public static TypeMem make(int alias, TypeObj oop ) {
     TypeObj[] as = new TypeObj[alias+1];
-    as[BitsAlias.ALL] = TypeObj.XOBJ; // Everything else is "dont care"
+    as[1] = TypeObj.XOBJ; // Everything else is "dont care"
     as[alias] = oop;
-    return make(false,as);
+    return make0(as);
   }
   public static TypeMem make(BitsAlias bits, TypeObj oop ) {
     TypeObj[] as = new TypeObj[bits.max()+1];
     as[BitsAlias.ALL] = TypeObj.XOBJ; // Everything else is "dont care"
     for( int b : bits )
       as[b] = oop;
-    return make0(false,as);
+    return make0(as);
   }
 
-  public  static final TypeMem  MEM = make(false,new TypeObj[]{null,TypeObj. OBJ}); // Every alias filled with something
-  public  static final TypeMem XMEM = make(false,new TypeObj[]{null,TypeObj.XOBJ}); // Every alias filled with anything
-  public  static final TypeMem EMPTY_MEM = XMEM; //make(new TypeObj[0]); // Tried no-memory-vs-XOBJ-memory
-          static final TypeMem MEM_STR = make(BitsAlias.STR,TypeStr.STR);
-          static final TypeMem MEM_ABC = make(TypeStr.ABC.get_alias(),TypeStr.ABC);
-  static final TypeMem[] TYPES = new TypeMem[]{MEM,MEM_STR};
+  public static final TypeMem  MEM; // Every alias filled with something
+  public static final TypeMem XMEM; // Every alias filled with anything
+  public static final TypeMem EMPTY_MEM;
+         static final TypeMem MEM_STR;
+         static final TypeMem MEM_ABC;
+  static {
+    MEM  = make(new TypeObj[]{null,TypeObj. OBJ}); // Every alias filled with something
+    XMEM = make(new TypeObj[]{null,TypeObj.XOBJ}); // Every alias filled with anything
+    EMPTY_MEM = XMEM; //make(new TypeObj[0]); // Tried no-memory-vs-XOBJ-memory
+    // This next init will trigger BitsAlias to build all inital aliases
+    // splitting all the strings.
+    MEM_STR = make(BitsAlias.STRBITS,TypeStr.STR);
+    MEM_ABC = make(TypeStr.ABC.get_alias(),TypeStr.ABC);
+    assert MEM_ABC._aliases.length==BitsAlias.HASHMAKER.last_split()+1;
+  }
+  static final TypeMem[] TYPES = new TypeMem[]{MEM,MEM_STR,MEM_ABC};
 
   // All mapped memories remain, but each memory flips internally.
   @Override protected TypeMem xdual() {
@@ -167,7 +184,7 @@ public class TypeMem extends Type<TypeMem> {
     for(int i=0; i<_aliases.length; i++ )
       if( _aliases[i] != null )
         oops[i] = (TypeObj)_aliases[i].dual();
-    return new TypeMem(!_any,oops);
+    return new TypeMem(oops);
   }
   @Override protected Type xmeet( Type t ) {
     if( t._type != TMEM ) return ALL; //
@@ -178,12 +195,13 @@ public class TypeMem extends Type<TypeMem> {
     TypeObj[] objs = new TypeObj[len];
     for( int i=1; i<len; i++ )
       objs[i] = (TypeObj)at(i).meet(tf.at(i)); // meet element-by-element
-    return make0(_any&&tf._any,objs);
+    return make0(objs);
   }
 
   // Part of a Smalltalk-ish "becomes" operation on splitting alias Bits.
   // See big comment in Bits.java.
-  void split( int paridx, int newidx ) {
+  void split_bit( int paridx, int newidx ) {
+    if( paridx == 1 ) return; // New index splits from the default, do nothing.
     if( paridx >= _aliases.length || _aliases[paridx]==null ) return;
     if( newidx >= _aliases.length )
       _aliases = Arrays.copyOf(_aliases,newidx+1);
@@ -206,11 +224,10 @@ public class TypeMem extends Type<TypeMem> {
   // Meet of all possible storable values, after updates
   public TypeMem st( TypeMemPtr ptr, String fld, int fld_num, Type val ) {
     assert val.isa_scalar();
-    //TypeObj[] objs = new TypeObj[_aliases.length];
-    //for( int alias : ptr._aliases )
-    //  objs[alias] = at0(alias).update(fld,fld_num,val);
-    //return make0(_any,objs);
-    throw AA.unimpl();
+    TypeObj[] objs = Arrays.copyOf(_aliases,Math.max(_aliases.length,ptr._aliases.max()+1));
+    for( int alias : ptr._aliases )
+      objs[alias] = at(alias).update(fld,fld_num,val);
+    return make0(objs);
   }
 
   // Merge two memories with no overlaps.  This is similar to a st(), except
@@ -222,21 +239,34 @@ public class TypeMem extends Type<TypeMem> {
     for( int i=2; i<mem._aliases.length; i++ )
       if( mem._aliases[i] != null )
         objs[i] = mem._aliases[i];
-    return make0(_any,objs);
+    return make0(objs);
+  }
+
+  // Return is a Tuple of TypeMem's, all with unrelated aliases.  The slot0
+  // is the default and is same as this (except that the named _aliases
+  // are going to be overwritten).  All others are in alias order, but not
+  // matching alias#, and contain a TypeMem with just that alias.
+  public TypeTuple split(int[] aliases) {
+    TypeMem[] ts = new TypeMem[aliases.length+1];
+    ts[0] = this;
+    for( int i=0; i<aliases.length; i++ )
+      ts[i+1] = TypeMem.make(aliases[i],at(aliases[i]));
+    return TypeTuple.make0(false,ts);
   }
   
-  @Override public boolean above_center() { return _any; }
+  @Override public boolean above_center() { return _aliases[1].above_center(); }
   @Override public boolean may_be_con()   { return false;}
   @Override public boolean is_con()       { return false;}
   @Override public boolean must_nil() { return false; } // never a nil
   @Override Type not_nil() { return this; }
   // Dual, except keep TypeMem.XOBJ as high for starting GVNGCM.opto() state.
   @Override public TypeMem startype() {
+    if( this==XMEM ) return XMEM;
     TypeObj[] oops = new TypeObj[_aliases.length];
     for(int i=0; i<_aliases.length; i++ )
       if( _aliases[i] != null )
         oops[i] = _aliases[i].startype();
-    return make0(!_any,oops);
+    return make0(oops);
   }
   @Override boolean hasBits(BitSet bs) {
     if( bs.get(_uid) ) return false;

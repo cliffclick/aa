@@ -306,10 +306,10 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
       }
 
       // Also, for BitsAlias, have to expand TypeMems to match
-      if( this==BitsAlias.HASHMAKER )
+      if( this==BitsAlias.HASHMAKER && Type.INTERN != null )
         for( Type t : Type.INTERN.keySet() )
           if( t instanceof TypeMem )
-            ((TypeMem)t).split(par,new_split);
+            ((TypeMem)t).split_bit(par,new_split);
       
       _splits.push(new Q(par,new_split)); // Record the split
 

@@ -16,7 +16,9 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
     Object dummy = Env.GVN; // Force class loading cycle
-    test("id({+})",Env.lookup_valtype("+")); //
+    test_ptr("str(3.14)"   , (alias)-> TypeMem.make(alias,TypeStr.con("3.14")));
+    test_ptr("\"Hello, world\"", (alias)-> TypeMem.make(alias,TypeStr.con("Hello, world")));
+    testerr("sq={x -> x&x}; sq(\"abc\")", "\"abc\" is not a int64","                        ");
 
     // A collection of tests which like to fail easily
     testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1) is not a @{x,y}","                           ");

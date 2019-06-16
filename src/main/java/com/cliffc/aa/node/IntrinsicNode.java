@@ -10,53 +10,68 @@ import java.util.HashMap;
 // Known (intrinsic) library calls.  They typically have memory side effects,
 // or else they would be a PrimNode instead.  Like PrimNodes they are wrapped
 // in a Fun/Epilog but include memory effects.
-public abstract class LibCallNode extends PrimNode {
+//
+// These intrinsics take in memory of their alias# (same as a NewNode) and
+// update it (like a Store would) producing a new instance of the same alias#.
+// They also take in other arguments, and typically use them to define the
+// contents of memory.  They output a TypeTuple[ctrl,mem,val] same as a
+// CallNode, although the [ctrl] is always true and ignored.
+//
+// The function wrapping these takes in all memory (like all functions do) and
+// split out just the alias in question, and remerge with all memory before the
+// epilog.
+public abstract class IntrinsicNode extends Node {
+  final TypeTuple _targs;       // Argument types, 0-based, no memory.
+  final Type _ret;              // Primitive return type, no memory
+  public final String _name;    // Unique name (and program bits)
+  final String[] _args;         // Handy; 0-based
+  Parse _badargs;               // Filled in when inlined in CallNode
   int _alias;                   // Alias class for new memory
-  LibCallNode( String name, String[] args, TypeTuple targs, Type ret, int alias ) {
-    super(OP_LIBCALL,name,args,targs,ret);
+  IntrinsicNode( String name, String[] args, TypeTuple targs, Type ret, int alias ) {
+    super(OP_LIBCALL);
+    _name=name; _args=args; _targs = targs; _ret = ret;
+    _badargs=null;
     _alias = alias;
   }
 
-  final static String[] MARGS1 = new String[]{"mem", "x"};
+  private final static String[] ARGS1 = new String[]{"x"};
   
-  public static LibCallNode[] LIBCALLS = new LibCallNode[] {
+  public static IntrinsicNode[] INTRINSICS = new IntrinsicNode[] {
     new ConvertI64Str(BitsAlias.I64),
     new ConvertF64Str(BitsAlias.F64)
   };
 
-  // Return is a ptr-to-memory; tuple of: (mem#alias:obj, ptr#alias)
-  private static TypeTuple ret(int alias, TypeObj obj) {
-    return TypeTuple.make(TypeMem.make(alias,obj),TypeMemPtr.make(alias));
-  }
-  // Worse-case type for this Node.  Preserves precise alias - so improves Type
-  // after copy/clone.  Required to be precise for GVNGCM.opto starting point.
-  @Override public Type all_type() { return ret(_alias,TypeStr.STR); }
+  @Override public Type all_type() { return TypeTuple.CALL; }
 
-  static TypeMem argmem(TypeObj from) { return TypeMem.make(BitsAlias.RECBITS,from); }
-  abstract TypeMem argmem();
-  
   // Wrap the PrimNode with a Fun/Epilog wrapper that includes memory effects.
-  @Override public EpilogNode as_fun( GVNGCM gvn ) {
-    FunNode  fun = ( FunNode) gvn.xform(new  FunNode(this,((TypeTuple)_ret).at(1),argmem())); // Points to ScopeNode only
-    ParmNode rpc = (ParmNode) gvn.xform(new ParmNode(-1,"rpc",fun, gvn.con(TypeRPC.ALL_CALL),null));
+  public EpilogNode as_fun( GVNGCM gvn ) {
+    FunNode  fun = ( FunNode) gvn.xform(new  FunNode(this,TypeMemPtr.make(_alias),TypeMem.make(_alias,TypeObj.OBJ)));
+    ParmNode rpc = (ParmNode) gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
+    ParmNode memp= (ParmNode) gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM     ),null));
+    // Pre-split memory by alias
+    Node split  = gvn.xform(new MemSplitNode(memp,_alias));
+    Node memall = gvn.xform(new MProjNode(split,0));
+    Node memali = gvn.xform(new MProjNode(split,_alias));
+    // Add input edges to the intrinsic
     add_def(null);              // Control for the primitive in slot 0
+    add_def(memali);            // Aliased Memory in slot 1
     for( int i=0; i<_args.length; i++ ) // Args follow
       add_def(gvn.xform(new ParmNode(i,_args[i],fun, gvn.con(_targs.at(i)),null)));
     Node prim = gvn.xform(this);
-    Node mem_prim = gvn.xform(new MProjNode(prim,0));
-    Node val = gvn.xform(new ProjNode(prim,1));
-    Node mem = in(1);
-    Node mem2 = gvn.xform(new MergeMemNode(mem,mem_prim));
-    return new EpilogNode(fun,mem2,val,rpc,fun,fun._fidx,null);
+    Node mem2= gvn.xform(new MProjNode(prim,1));
+    Node val = gvn.xform(new  ProjNode(prim,2));
+    Node merge= gvn.xform(new MemMergeNode(memall,mem2));
+    return new EpilogNode(fun,merge,val,rpc,fun,fun._fidx,null);
   }
   
   // Clones during inlining all become unique new sites
-  @Override LibCallNode copy(GVNGCM gvn) {
-    LibCallNode nnn = (LibCallNode)super.copy(gvn);
+  @Override IntrinsicNode copy(GVNGCM gvn) {
+    IntrinsicNode nnn = (IntrinsicNode)super.copy(gvn);
     nnn._alias = BitsAlias.new_alias(_alias); // Children alias classes
     return nnn;
   }
   @Override public String xstr() { return _name+"_#"+_alias; }
+  @Override public Node ideal(GVNGCM gvn) { return null; }
   
   @Override public String err(GVNGCM gvn) {
     for( int i=0; i<_targs._ts.length; i++ ) {
@@ -69,29 +84,28 @@ public abstract class LibCallNode extends PrimNode {
   }
 
   // --------------------------------------------------------------------------
-  public static LibCallNode convertTypeName( TypeObj from, TypeName to, Parse badargs ) {
+  public static IntrinsicNode convertTypeName( TypeObj from, TypeName to, Parse badargs ) {
     // Builds a function which takes in a TypeMemPtr.STRUCT and TypeMem[#REC,
     // from] (memory is constrained to match the 'from' type), and returns a a
     // TypeMem[#REC,to].  The input is asserted to be sharper than a plain #REC
     // alias, in both iter() and opto() phases, and can never be nil.
     return new ConvertPtrTypeName(from,to,badargs);
   }
-  static class ConvertPtrTypeName extends LibCallNode {
-    private final Parse _badargs; // Only for converts
+  static class ConvertPtrTypeName extends IntrinsicNode {
     private final HashMap<String,Type> _lex; // Unique lexical scope
     final TypeObj _from;
     final TypeName _to;
     ConvertPtrTypeName(TypeObj from, TypeName to, Parse badargs) {
-      super(to._name,MARGS1,TypeTuple.make(argmem(from),TypeMemPtr.STRUCT),ret(BitsAlias.REC,to), BitsAlias.REC);
-      _lex = to._lex;
-      _badargs = badargs;
-      _from = from;
-      _to = to;
+      super(to._name,ARGS1,TypeTuple.make(TypeMemPtr.STRUCT),TypeStruct.ALLSTRUCT, BitsAlias.REC);
+      //_lex = to._lex;
+      //_badargs = badargs;
+      //_from = from;
+      //_to = to;
+      throw AA.unimpl();
     }
     // Take in any struct alias or subclass thereof, with the given 'from'
     // type.  Most structs will NOT have this type.  The pointer passed in must
     // have this type to type-check.
-    @Override TypeMem argmem() { return argmem(_from); }
     @Override public Type all_type() { return TypeTuple.make(TypeMem.make(BitsAlias.RECBITS,_to),TypeMemPtr.STRUCT); }
     
     @Override public Type value(GVNGCM gvn) {
@@ -108,15 +122,13 @@ public abstract class LibCallNode extends PrimNode {
       TypeObj ld = tmem.ld(tptr);
 
       if( !ld.isa(_from) ) {
-        return TypeTuple.make(TypeMem.make(BitsAlias.REC,_to.dual()),_to.dual());
+        return TypeTuple.make(Type.CTRL,TypeMem.make(BitsAlias.REC,_to.dual()),_to.dual());
       }
       TypeName named_object = TypeName.make(_name,_lex,ld);
       TypeMem named_memory = TypeMem.make(tptr._aliases,named_object);
       TypeMem mem = tmem.merge(named_memory); // Overall memory
-      return TypeTuple.make(mem,tptr);
+      return TypeTuple.make(Type.CTRL,mem,tptr);
     }
-    @Override public TypeTuple apply( Type[] args ) { throw AA.unimpl(); }
-    @Override public boolean is_lossy() { return false; }
     @Override public String err(GVNGCM gvn) {
       Type actual = gvn.type(in(1));
       Type formal = _targs.at(0);
@@ -128,34 +140,23 @@ public abstract class LibCallNode extends PrimNode {
     
   // --------------------------------------------------------------------------
   // Default name constructor using expanded args list
-  public static LibCallNode convertTypeNameStruct( TypeStruct from_ts, TypeName to, Parse badargs ) {
+  public static IntrinsicNode convertTypeNameStruct( TypeStruct from_ts, TypeName to, Parse badargs ) {
     return new ConvertTypeNameStruct(from_ts,to,badargs);
   }
-  static class ConvertTypeNameStruct extends LibCallNode {
-    private final Parse _badargs; // Only for converts
+  static class ConvertTypeNameStruct extends IntrinsicNode {
     private final HashMap<String,Type> _lex; // Unique lexical scope
     final TypeStruct _from;
     ConvertTypeNameStruct(TypeStruct from, TypeName to, Parse badargs) {
-      super(to._name,make_args(from._flds),make_targs(from),ret(BitsAlias.REC,to),BitsAlias.REC);
+      super(to._name,from._flds,make_targs(from),TypeStruct.ALLSTRUCT,BitsAlias.REC);
       _lex=to._lex;
       _badargs=badargs;
       _from=from;
-    }    // Insert memory in front of the other arguments
-    private static String[] make_args(String[] flds) {
-      String[] ts = new String[flds.length+1];
-      System.arraycopy(flds,0,ts,1,flds.length);
-      ts[0] = "mem";
-      return ts;
     }
 
-    // Insert memory in front of the other arguments
+    // Tuple from Struct
     private static TypeTuple make_targs(TypeStruct from) {
-      Type[] ts = new Type[from._ts.length+1];
-      System.arraycopy(from._ts,0,ts,1,from._ts.length);
-      ts[0] = argmem(from);
-      return TypeTuple.make(ts);
+      return TypeTuple.make(from._ts);
     }
-    @Override TypeMem argmem() { return argmem(_from); }
     @Override public Node ideal(GVNGCM gvn) {
       Node[] flds = new Node[_args.length];
       for( int i=1; i<flds.length; i++ )
@@ -173,19 +174,16 @@ public abstract class LibCallNode extends PrimNode {
     }
     
     @Override public Type value(GVNGCM gvn) { throw AA.unimpl(); }
-    @Override public Type apply( Type[] args ) { throw AA.unimpl(); }
   }
 
   // --------------------------------------------------------------------------
-  static class ConvertI64Str extends LibCallNode {
+  static class ConvertI64Str extends IntrinsicNode {
+    final TypeTuple _all_type;
     ConvertI64Str(int alias) {
-      super("str",MARGS1,TypeTuple.INT64, ret(alias,TypeStr.STR), alias);
+      super("str",ARGS1,TypeTuple.INT64, TypeMemPtr.make(alias), alias);
+      _all_type = TypeTuple.make(Type.CTRL,TypeMem.make(alias,TypeStr.STR),_ret);
     }
             
-    // Library calls update memory.  These calls have the default boot-time
-    // memory inputs and outputs.
-    @Override TypeMem argmem() { return TypeMem.XMEM; }
-
     // Conversion to String allocates memory - so the apply() call returns a new
     // pointer aliased to a hidden String allocation site.  The memory returned
     // is read-only (and can be shared).
@@ -194,34 +192,31 @@ public abstract class LibCallNode extends PrimNode {
       // return _ret.dual, the highest allowed result; if all inputs are
       // constants we constant fold; else some input is low so we return _ret,
       // the lowest possible result.
+      Type mem = gvn.type(in(1));
+      if( !(mem instanceof TypeMem) ) return mem.above_center() ? _all_type.dual() : _all_type;
       Type val = gvn.type(in(2));
       Type t = TypeInt.INT64.dual().meet(val);
-      if( t.above_center() ) return _ret.dual();
-      if( !t.is_con() ) return _ret;    // Some input is too low
+      if( t.above_center() ) return _all_type.dual();
+      if( !t.is_con() )      return _all_type;
       
       // Conversion to String allocates memory - so return a new pointer
       // aliased to a hidden String allocation site.  The memory returned is
       // read-only (and can be shared).
-      TypeMem mem = (TypeMem)gvn.type(in(1));
-      TypeObj obj = mem.at(_alias);  // Prior memory contents at this alias
+      TypeObj obj = ((TypeMem)mem).at(_alias);  // Prior memory contents at this alias
       TypeStr str = TypeStr.con(Long.toString(val.getl()));
       TypeObj obj2 = (TypeObj)obj.meet(str);
       TypeMem res = TypeMem.make(_alias,obj2);
-      return TypeTuple.make(res,TypeMemPtr.make(_alias));
+      return TypeTuple.make(Type.CTRL,res,_ret);
     }
-    @Override public TypeTuple apply( Type[] args ) { throw AA.unimpl(); }
-    @Override public boolean is_lossy() { return false; }
   }
   
-  static class ConvertF64Str extends LibCallNode {
+  static class ConvertF64Str extends IntrinsicNode {
+    final TypeTuple _all_type;
     ConvertF64Str(int alias) {
-      super("str",MARGS1,TypeTuple.FLT64, ret(alias,TypeStr.STR), alias);
+      super("str",ARGS1,TypeTuple.FLT64, TypeMemPtr.make(alias), alias);
+      _all_type = TypeTuple.make(Type.CTRL,TypeMem.make(alias,TypeStr.STR),_ret);
     }
             
-    // Library calls update memory.  These calls have the default boot-time
-    // memory inputs and outputs.
-    @Override TypeMem argmem() { return TypeMem.XMEM; }
-
     // Conversion to String allocates memory - so the apply() call returns a new
     // pointer aliased to a hidden String allocation site.  The memory returned
     // is read-only (and can be shared).
@@ -230,22 +225,21 @@ public abstract class LibCallNode extends PrimNode {
       // return _ret.dual, the highest allowed result; if all inputs are
       // constants we constant fold; else some input is low so we return _ret,
       // the lowest possible result.
+      Type mem = gvn.type(in(1));
+      if( !(mem instanceof TypeMem) ) return mem.above_center() ? _all_type.dual() : _all_type;
       Type val = gvn.type(in(2));
       Type t = TypeFlt.FLT64.dual().meet(val);
-      if( t.above_center() ) return _ret.dual();
-      if( !t.is_con() ) return _ret;    // Some input is too low
+      if( t.above_center() ) return _all_type.dual();
+      if( !t.is_con() )      return _all_type;
       
       // Conversion to String allocates memory - so return a new pointer
       // aliased to a hidden String allocation site.  The memory returned is
       // read-only (and can be shared).
-      TypeMem mem = (TypeMem)gvn.type(in(1));
-      TypeObj obj = mem.at(_alias);  // Prior memory contents at this alias
+      TypeObj obj = ((TypeMem)mem).at(_alias);  // Prior memory contents at this alias
       TypeStr str = TypeStr.con(Double.toString(val.getd()));
       TypeObj obj2 = (TypeObj)obj.meet(str);
       TypeMem res = TypeMem.make(_alias,obj2);
-      return TypeTuple.make(res,TypeMemPtr.make(_alias));
+      return TypeTuple.make(Type.CTRL,res,_ret);
     }
-    @Override public TypeTuple apply( Type[] args ) { throw AA.unimpl(); }
-    @Override public boolean is_lossy() { return false; }
   }
 }

@@ -238,14 +238,15 @@ public class Parse {
     // ptr-to-@{x,y} and returns a ptr-to-Named:@{x,y}.  This stores a v-table
     // ptr into an object.  The alias# does not change, but a TypeMem[alias#]
     // would now map to the Named variant.
-    PrimNode cvt = t instanceof TypeObj
-      ? LibCallNode.convertTypeName((TypeObj)t,tn,errMsg())
-      : PrimNode   .convertTypeName(t,tn,errMsg());
+    if( !(t instanceof TypeObj) ) {
+      PrimNode cvt = PrimNode.convertTypeName(t,tn,errMsg());
+      return _e.add_fun(tvar,gvn(cvt.as_fun(_gvn))); // Return type-name constructor
+    }
+    IntrinsicNode cvt = IntrinsicNode.convertTypeName((TypeObj)t,tn,errMsg());
     Node rez = _e.add_fun(tvar,gvn(cvt.as_fun(_gvn))); // Return type-name constructor
     if( t instanceof TypeStruct ) { // Add struct types with expanded arg lists
-      PrimNode cvts = LibCallNode.convertTypeNameStruct((TypeStruct)t,tn,errMsg());
+      IntrinsicNode cvts = IntrinsicNode.convertTypeNameStruct((TypeStruct)t,tn,errMsg());
       Node rez2 = _e.add_fun(tvar,gvn(cvts.as_fun(_gvn))); // type-name constructor with expanded arg list
-      // UnresolvedNode needs touching once all constructors are done
       _gvn.init0(rez2._uses.at(0));
     }
     // TODO: Add reverse cast-away
@@ -377,7 +378,7 @@ public class Parse {
         int oldx = _x;
         String bin = token();
         if( bin==null ) break;    // Valid parse, but no more Kleene star
-        Node binfun = _e.lookup_filter(bin,_gvn,3); // BinOp, or null
+        Node binfun = _e.lookup_filter(bin,_gvn,2); // BinOp, or null
         if( binfun==null ) { _x=oldx; break; } // Not a binop, no more Kleene star
         term = term();
         if( term == null ) term = err_ctrl2("missing expr after binary op "+bin);
@@ -501,7 +502,7 @@ public class Parse {
     // Anonymous function or operator
     if( peek1(c,'{') ) {
       String tok = token0();
-      Node op = tok == null ? null : _e.lookup_filter(tok,_gvn,3); // TODO: filter by >2 not ==3
+      Node op = tok == null ? null : _e.lookup_filter(tok,_gvn,2); // TODO: filter by >2 not ==3
       if( peek('}') && op != null && op.op_prec() > 0 )
         return op;              // Return operator as a function constant
       _x = oldx+1;              // Back to the opening paren
@@ -695,7 +696,7 @@ public class Parse {
     TypeMemPtr ptr = TypeMemPtr.make(ts.get_alias());
     // Store the constant string to memory
     Node con_mem = con(TypeMem.make(ptr.getbit(),ts));
-    set_mem(gvn(new MergeMemNode(mem(),con_mem)));
+    set_mem(gvn(new MemMergeNode(mem(),con_mem)));
     return ptr;
   }
 
@@ -881,7 +882,7 @@ public class Parse {
     Node nn = gvn(nnn);
     Node nmem = gvn(new MProjNode(nn,0));
     Node nadr = gvn(new  ProjNode(nn,1));
-    set_mem(gvn(new MergeMemNode(mem(),nmem)));
+    set_mem(gvn(new MemMergeNode(mem(),nmem)));
     return nadr;
   }
   

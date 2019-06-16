@@ -1,9 +1,8 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.AA;
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.Parse;
-import com.cliffc.aa.type.*;
+import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeMem;
 
 // CNC notes-
 
@@ -61,8 +60,8 @@ import com.cliffc.aa.type.*;
 
 // Merging 'wide' memory (memory from all prior state) and a new 'skinny'
 // memory from a NewNode.
-public class MergeMemNode extends Node {
-  public MergeMemNode( Node wide, Node skinny ) { super(OP_MERGE,wide,skinny); }
+public class MemMergeNode extends Node {
+  public MemMergeNode( Node wide, Node skinny ) { super(OP_MERGE,wide,skinny); }
   
   @Override public Node ideal(GVNGCM gvn) {
     // If the skinny memory is from a MProj from a NewNode, and the only proj
