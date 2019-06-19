@@ -286,7 +286,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     }
     
     // Split out a bit to form a new constant, from a prior a bit
-    int split(int par, HashMap<B,B> INTERN) {
+    int split(int par, HashMap<B,B> INTERN, TypeObj obj) {
       if( par==0 ) return 1;    // Ignore init
       // Split the parent bit in twain.  Instances of the parent are everywhere
       // updated to have both bits, but hash to the same value as the parent.
@@ -309,7 +309,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
       if( this==BitsAlias.HASHMAKER && Type.INTERN != null )
         for( Type t : Type.INTERN.keySet() )
           if( t instanceof TypeMem )
-            ((TypeMem)t).split_bit(par,new_split);
+            ((TypeMem)t).split_bit(par,new_split,obj);
       
       _splits.push(new Q(par,new_split)); // Record the split
 
@@ -338,7 +338,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
       // Minus the exceptions
       for( Q q : _splits )
         if( q != null && q._alias < len && q._split < len &&
-            as[q._alias]!=null && as[q._split]!=null )
+            as[q._split]!=null )
           sum -= as[q._split]._hash;
       return sum;
     }

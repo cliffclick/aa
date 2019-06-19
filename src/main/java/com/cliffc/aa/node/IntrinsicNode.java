@@ -21,17 +21,24 @@ import java.util.HashMap;
 // split out just the alias in question, and remerge with all memory before the
 // epilog.
 public abstract class IntrinsicNode extends Node {
-  final TypeTuple _targs;       // Argument types, 0-based, no memory.
-  final Type _ret;              // Primitive return type, no memory
   public final String _name;    // Unique name (and program bits)
   final String[] _args;         // Handy; 0-based
+  final TypeTuple _targs;       // Argument types, 0-based, no memory.
   Parse _badargs;               // Filled in when inlined in CallNode
   int _alias;                   // Alias class for new memory
-  IntrinsicNode( String name, String[] args, TypeTuple targs, Type ret, int alias ) {
+  TypeMemPtr _ptr;              // private cache of the alias pointer
+  TypeTuple _all_type;          // private cache of the CallNode-like return type
+  IntrinsicNode( String name, String[] args, TypeTuple targs, int alias ) {
     super(OP_LIBCALL);
-    _name=name; _args=args; _targs = targs; _ret = ret;
+    _name=name; _args=args; _targs = targs;
     _badargs=null;
+    update_alias(alias);
+  }
+  private IntrinsicNode update_alias(int alias) {
     _alias = alias;
+    _ptr = TypeMemPtr.make(alias);
+    _all_type = TypeTuple.make(Type.CTRL,TypeMem.make(alias,TypeStr.STR),_ptr);
+    return this;
   }
 
   private final static String[] ARGS1 = new String[]{"x"};
@@ -41,41 +48,36 @@ public abstract class IntrinsicNode extends Node {
     new ConvertF64Str(BitsAlias.F64)
   };
 
-  @Override public Type all_type() { return TypeTuple.CALL; }
+  @Override public Type all_type() { return _all_type; }
 
   // Wrap the PrimNode with a Fun/Epilog wrapper that includes memory effects.
   public EpilogNode as_fun( GVNGCM gvn ) {
     FunNode  fun = ( FunNode) gvn.xform(new  FunNode(this,TypeMemPtr.make(_alias),TypeMem.make(_alias,TypeObj.OBJ)));
     ParmNode rpc = (ParmNode) gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
     ParmNode memp= (ParmNode) gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM     ),null));
-    // Pre-split memory by alias
-    Node split  = gvn.xform(new MemSplitNode(memp,_alias));
-    Node memall = gvn.xform(new MProjNode(split,0));
-    Node memali = gvn.xform(new MProjNode(split,_alias));
     // Add input edges to the intrinsic
     add_def(null);              // Control for the primitive in slot 0
-    add_def(memali);            // Aliased Memory in slot 1
+    add_def(memp);              // Aliased Memory in slot 1
     for( int i=0; i<_args.length; i++ ) // Args follow
       add_def(gvn.xform(new ParmNode(i,_args[i],fun, gvn.con(_targs.at(i)),null)));
     Node prim = gvn.xform(this);
     Node mem2= gvn.xform(new MProjNode(prim,1));
     Node val = gvn.xform(new  ProjNode(prim,2));
-    Node merge= gvn.xform(new MemMergeNode(memall,mem2));
+    Node merge= gvn.xform(new MemMergeNode(memp,mem2));
     return new EpilogNode(fun,merge,val,rpc,fun,fun._fidx,null);
   }
   
   // Clones during inlining all become unique new sites
   @Override IntrinsicNode copy(GVNGCM gvn) {
     IntrinsicNode nnn = (IntrinsicNode)super.copy(gvn);
-    nnn._alias = BitsAlias.new_alias(_alias); // Children alias classes
-    return nnn;
+    return nnn.update_alias(BitsAlias.new_alias(_alias)); // Children alias classes
   }
   @Override public String xstr() { return _name+"_#"+_alias; }
   @Override public Node ideal(GVNGCM gvn) { return null; }
   
   @Override public String err(GVNGCM gvn) {
     for( int i=0; i<_targs._ts.length; i++ ) {
-      Type tactual = gvn.type(in(i+1));
+      Type tactual = gvn.type(in(i+2));
       Type tformal = _targs._ts[i];
       if( !tactual.isa(tformal) )
         return _badargs==null ? "bad arguments" : _badargs.typerr(tactual,tformal);
@@ -96,7 +98,7 @@ public abstract class IntrinsicNode extends Node {
     final TypeObj _from;
     final TypeName _to;
     ConvertPtrTypeName(TypeObj from, TypeName to, Parse badargs) {
-      super(to._name,ARGS1,TypeTuple.make(TypeMemPtr.STRUCT),TypeStruct.ALLSTRUCT, BitsAlias.REC);
+      super(to._name,ARGS1,TypeTuple.make(TypeMemPtr.STRUCT), BitsAlias.REC);
       //_lex = to._lex;
       //_badargs = badargs;
       //_from = from;
@@ -106,7 +108,7 @@ public abstract class IntrinsicNode extends Node {
     // Take in any struct alias or subclass thereof, with the given 'from'
     // type.  Most structs will NOT have this type.  The pointer passed in must
     // have this type to type-check.
-    @Override public Type all_type() { return TypeTuple.make(TypeMem.make(BitsAlias.RECBITS,_to),TypeMemPtr.STRUCT); }
+    @Override public Type all_type() { return TypeTuple.make(Type.CTRL,TypeMem.make(BitsAlias.RECBITS,_to),TypeMemPtr.STRUCT); }
     
     @Override public Type value(GVNGCM gvn) {
       Node nmem = _defs.at(1);
@@ -126,7 +128,7 @@ public abstract class IntrinsicNode extends Node {
       }
       TypeName named_object = TypeName.make(_name,_lex,ld);
       TypeMem named_memory = TypeMem.make(tptr._aliases,named_object);
-      TypeMem mem = tmem.merge(named_memory); // Overall memory
+      TypeMem mem = (TypeMem)tmem.meet(named_memory); // Overall memory
       return TypeTuple.make(Type.CTRL,mem,tptr);
     }
     @Override public String err(GVNGCM gvn) {
@@ -147,7 +149,7 @@ public abstract class IntrinsicNode extends Node {
     private final HashMap<String,Type> _lex; // Unique lexical scope
     final TypeStruct _from;
     ConvertTypeNameStruct(TypeStruct from, TypeName to, Parse badargs) {
-      super(to._name,from._flds,make_targs(from),TypeStruct.ALLSTRUCT,BitsAlias.REC);
+      super(to._name,from._flds,make_targs(from),BitsAlias.REC);
       _lex=to._lex;
       _badargs=badargs;
       _from=from;
@@ -178,19 +180,16 @@ public abstract class IntrinsicNode extends Node {
 
   // --------------------------------------------------------------------------
   static class ConvertI64Str extends IntrinsicNode {
-    final TypeTuple _all_type;
-    ConvertI64Str(int alias) {
-      super("str",ARGS1,TypeTuple.INT64, TypeMemPtr.make(alias), alias);
-      _all_type = TypeTuple.make(Type.CTRL,TypeMem.make(alias,TypeStr.STR),_ret);
-    }
-            
+    ConvertI64Str(int alias) { super("str",ARGS1,TypeTuple.INT64, alias); }
+
     // Conversion to String allocates memory - so the apply() call returns a new
     // pointer aliased to a hidden String allocation site.  The memory returned
     // is read-only (and can be shared).
     @Override public Type value(GVNGCM gvn) {
+      
       // If the meet with _targs.dual stays above center for all inputs, then we
-      // return _ret.dual, the highest allowed result; if all inputs are
-      // constants we constant fold; else some input is low so we return _ret,
+      // return _ptr.dual, the highest allowed result; if all inputs are
+      // constants we constant fold; else some input is low so we return _ptr,
       // the lowest possible result.
       Type mem = gvn.type(in(1));
       if( !(mem instanceof TypeMem) ) return mem.above_center() ? _all_type.dual() : _all_type;
@@ -206,24 +205,20 @@ public abstract class IntrinsicNode extends Node {
       TypeStr str = TypeStr.con(Long.toString(val.getl()));
       TypeObj obj2 = (TypeObj)obj.meet(str);
       TypeMem res = TypeMem.make(_alias,obj2);
-      return TypeTuple.make(Type.CTRL,res,_ret);
+      return TypeTuple.make(Type.CTRL,res,_ptr);
     }
   }
   
   static class ConvertF64Str extends IntrinsicNode {
-    final TypeTuple _all_type;
-    ConvertF64Str(int alias) {
-      super("str",ARGS1,TypeTuple.FLT64, TypeMemPtr.make(alias), alias);
-      _all_type = TypeTuple.make(Type.CTRL,TypeMem.make(alias,TypeStr.STR),_ret);
-    }
+    ConvertF64Str(int alias) { super("str",ARGS1,TypeTuple.FLT64, alias); }
             
     // Conversion to String allocates memory - so the apply() call returns a new
     // pointer aliased to a hidden String allocation site.  The memory returned
     // is read-only (and can be shared).
     @Override public Type value(GVNGCM gvn) {
       // If the meet with _targs.dual stays above center for all inputs, then we
-      // return _ret.dual, the highest allowed result; if all inputs are
-      // constants we constant fold; else some input is low so we return _ret,
+      // return _ptr.dual, the highest allowed result; if all inputs are
+      // constants we constant fold; else some input is low so we return _ptr,
       // the lowest possible result.
       Type mem = gvn.type(in(1));
       if( !(mem instanceof TypeMem) ) return mem.above_center() ? _all_type.dual() : _all_type;
@@ -239,7 +234,7 @@ public abstract class IntrinsicNode extends Node {
       TypeStr str = TypeStr.con(Double.toString(val.getd()));
       TypeObj obj2 = (TypeObj)obj.meet(str);
       TypeMem res = TypeMem.make(_alias,obj2);
-      return TypeTuple.make(Type.CTRL,res,_ret);
+      return TypeTuple.make(Type.CTRL,res,_ptr);
     }
   }
 }

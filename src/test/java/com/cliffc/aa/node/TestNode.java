@@ -157,8 +157,8 @@ public class TestNode {
       test1monotonic_intrinsic(prim);
     test1monotonic(new   LoadNode(_ins[0],_ins[1],_ins[2],0,null));
     test1monotonic(new MemMergeNode(_ins[0],_ins[1]));
-    test1monotonic(new    NewNode(new Node[]{null,_ins[1],_ins[2]},TypeStruct.FLDS(2)));
-    test1monotonic(new    NewNode(new Node[]{null,_ins[1],_ins[2]},TypeStruct.FLDS(2),new byte[2]));
+    test1monotonic(new    NewNode(new Node[]{null,_ins[1],_ins[2],_ins[3]},TypeStruct.FLDS(2)));
+    test1monotonic(new    NewNode(new Node[]{null,_ins[1],_ins[2],_ins[3]},TypeStruct.FLDS(2),new byte[2]));
     test1monotonic(new   ParmNode( 1, "x",_ins[0],(ConNode)_ins[1],"badgc"));
     test1monotonic(new    PhiNode("badgc",_ins[0],_ins[1],_ins[2]));
     for( PrimNode prim : PrimNode.PRIMS )

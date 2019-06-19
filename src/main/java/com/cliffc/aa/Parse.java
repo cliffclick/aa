@@ -598,7 +598,6 @@ public class Parse {
       _e = e;                   // Push nested environment
       set_ctrl(ctrl);           // Carry control thru
       Ary<String> toks = new Ary<>(new String[1],0);
-      Ary<Type  > ts   = new Ary<>(new Type  [1],0);
       BitSet fs = new BitSet();
       while( true ) {
         String tok = token();    // Scan for 'id'
@@ -618,7 +617,6 @@ public class Parse {
           kill(stmt);           // Kill assignment
           ErrNode err = err_ctrl2("Cannot define field '." + tok + "' twice");
           stmt = err;           // Error is now the result
-          ts.set(toks.find(fld -> fld.equals(tok)),err._t); // Prior field is also typed error
         }
         // Add type-check into graph
         if( t != null ) stmt = gvn(new TypeNode(t,stmt,errMsg()));
@@ -626,16 +624,18 @@ public class Parse {
         e.update(tok,stmt,_gvn,false); // Field now available 'bare' inside rest of scope
         if( is_final ) fs.set(toks._len);
         toks.add(tok);          // Gather for final type
-        ts  .add(_gvn.type(stmt));
         if( !peek(',') ) break; // Final comma is optional
       }
       require('}');
-      Node c = _e._scope.remove(" control ");
-      _e = _e._par;             // Pop nested environment
-      if( e._scope != c ) set_ctrl(c);
-      Node[] flds = e._scope.get(toks);
+      Node c = e._scope.remove(" control ");
+      _e = e._par;              // Pop nested environment
+      if( e._scope != c ) { set_ctrl(c); throw AA.unimpl(/*untested*/);} // Carry any control changes back to outer scope
+
+      Node[] flds = new Node[toks._len+1];
+      for( int i=0; i<toks._len; i++ )
+        flds[i+1] = e._scope.get(toks.at(i));
       byte[] finals = new byte[toks._len];
-      for(int i=0; i<toks._len; i++ ) if( fs.get(i) ) finals[i] = 1;
+      for(int i=0; i<finals.length; i++ ) if( fs.get(i) ) finals[i] = 1;
       return do_mem(new NewNode(flds,toks.asAry(),finals));
     } // Pop lexical scope around struct
   }

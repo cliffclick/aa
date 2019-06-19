@@ -35,12 +35,12 @@ public class BitsAlias extends Bits<BitsAlias> {
     NIL = make0(0);             // No need to dual; NIL is its own dual
     // Split All-Memory into Structs/Records and Arrays (including Strings).
     // Everything falls into one of these two camps.
-    RECBITS = make0(REC = new_alias(ALL));
+    RECBITS = make0(REC = new_alias(ALL, TypeStruct.ALLSTRUCT));
     RECBITS0 = RECBITS.meet_nil();
     // Arrays
     ARY = new_alias(ALL);
     // Split Arrays into Strings (and other arrays)
-    STRBITS = make0(STR = new_alias(ARY));
+    STRBITS = make0(STR = new_alias(ARY, TypeStr.STR));
     STRBITS0 = STRBITS.meet_nil();
     // LibCall conversion string aliases
     I64 = new_alias(STR);
@@ -49,7 +49,8 @@ public class BitsAlias extends Bits<BitsAlias> {
     ABCBITS = make0(ABC = new_alias(STR));
     ABCBITS0 = ABCBITS.meet_nil();
   }
-  public static int new_alias(int par) { return HASHMAKER.split(par,INTERN); }
+  public static int new_alias(int par) { return HASHMAKER.split(par,INTERN, null); }
+  public static int new_alias(int par, TypeObj obj) { return HASHMAKER.split(par,INTERN,obj); }
   // Fast reset of parser state between calls to Exec
   public static void init0() { HASHMAKER.init0();  init0(INTERN); }
   public static void reset_to_init0() { HASHMAKER.reset_to_init0();  reset_to_init0(INTERN); }

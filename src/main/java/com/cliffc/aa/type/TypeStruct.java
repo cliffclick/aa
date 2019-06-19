@@ -585,7 +585,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       for( Type _t : _ts ) _t.walk(p);
   }
   // Dual, except keep TypeMem.XOBJ as high for starting GVNGCM.opto() state.
-  @Override public TypeObj startype() { return dual(); }
+  @Override public TypeObj startype() { return above_center() ? this : dual(); }
   @Override boolean hasBits(BitSet bs) {
     if( bs.get(_uid) ) return false;
     bs.set(_uid);

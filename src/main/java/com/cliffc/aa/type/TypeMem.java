@@ -148,16 +148,13 @@ public class TypeMem extends Type<TypeMem> {
 
   // Precise single alias.  Other aliases are "dont care".  Nil not allowed.
   public static TypeMem make(int alias, TypeObj oop ) {
-    TypeObj[] as = new TypeObj[alias+1];
-    as[1] = TypeObj.XOBJ; // Everything else is "dont care"
+    TypeObj[] as = Arrays.copyOf(XMEM._aliases,Math.max(XMEM._aliases.length,alias+1));
     as[alias] = oop;
     return make0(as);
   }
   public static TypeMem make(BitsAlias bits, TypeObj oop ) {
-    TypeObj[] as = new TypeObj[bits.max()+1];
-    as[BitsAlias.ALL] = TypeObj.XOBJ; // Everything else is "dont care"
-    for( int b : bits )
-      as[b] = oop;
+    TypeObj[] as = Arrays.copyOf(XMEM._aliases,Math.max(XMEM._aliases.length,bits.max()+1));
+    for( int b : bits )  as[b] = oop;
     return make0(as);
   }
 
@@ -200,12 +197,12 @@ public class TypeMem extends Type<TypeMem> {
 
   // Part of a Smalltalk-ish "becomes" operation on splitting alias Bits.
   // See big comment in Bits.java.
-  void split_bit( int paridx, int newidx ) {
-    if( paridx == 1 ) return; // New index splits from the default, do nothing.
-    if( paridx >= _aliases.length || _aliases[paridx]==null ) return;
+  void split_bit( int paridx, int newidx, TypeObj obj ) {
+    if( paridx == 1 && obj==null ) return; // New index splits from the default, do nothing.
+    if( obj == null && (paridx >= _aliases.length || _aliases[paridx]==null) ) return;
     if( newidx >= _aliases.length )
       _aliases = Arrays.copyOf(_aliases,newidx+1);
-    _aliases[newidx] = _aliases[paridx];
+    _aliases[newidx] = obj==null ? _aliases[paridx] : (above_center() ? (TypeObj)obj.dual() : obj);
   }
   
   // Meet of all possible loadable values
@@ -227,18 +224,6 @@ public class TypeMem extends Type<TypeMem> {
     TypeObj[] objs = Arrays.copyOf(_aliases,Math.max(_aliases.length,ptr._aliases.max()+1));
     for( int alias : ptr._aliases )
       objs[alias] = at(alias).update(fld,fld_num,val);
-    return make0(objs);
-  }
-
-  // Merge two memories with no overlaps.  This is similar to a st(), except
-  // updating an entire Obj not just a field, and not a replacement.  The given
-  // memory is generally precise, except after a alias split and before any
-  // inputs are re-value()'d.
-  public TypeMem merge( TypeMem mem ) {
-    TypeObj[] objs = Arrays.copyOf(_aliases,Math.max(_aliases.length,mem._aliases.length));
-    for( int i=2; i<mem._aliases.length; i++ )
-      if( mem._aliases[i] != null )
-        objs[i] = mem._aliases[i];
     return make0(objs);
   }
 

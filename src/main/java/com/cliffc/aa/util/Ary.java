@@ -1,5 +1,7 @@
 package com.cliffc.aa.util;
 
+import org.jetbrains.annotations.NotNull;
+
 import java.lang.reflect.Array;
 import java.util.*;
 import java.util.function.Function;
@@ -206,6 +208,7 @@ public class Ary<E> implements Iterable<E> {
   }
   
   /** @return an iterator */
+  @NotNull
   @Override public Iterator<E> iterator() { return new Iter(); }
   private class Iter implements Iterator<E> {
     int _i=0;

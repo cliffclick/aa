@@ -20,7 +20,7 @@ public class BitsFun extends Bits<BitsFun> {
 
   static final Bits.HashMaker<BitsFun> HASHMAKER = new Bits.HashMaker<>();
   public static final int ALL = new_fidx(0);
-  public static int new_fidx( int par ) { return HASHMAKER.split(par,INTERN); }
+  public static int new_fidx( int par ) { return HASHMAKER.split(par,INTERN,null); }
   // Fast reset of parser state between calls to Exec
   public static void init0() { HASHMAKER.init0();  init0(INTERN); }
   public static void reset_to_init0() { HASHMAKER.reset_to_init0();  reset_to_init0(INTERN); }

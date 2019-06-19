@@ -3,6 +3,9 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
+import com.cliffc.aa.type.TypeTuple;
+
+import java.util.Arrays;
 
 public class MemSplitNode extends Node {
   private final int[] _aliases;
@@ -29,6 +32,10 @@ public class MemSplitNode extends Node {
     // matching alias#, and contain a TypeMem with just that alias.
     return tmem.split(_aliases);
   }
-  @Override public Type all_type() { return TypeMem.MEM; }
+  @Override public Type all_type() {
+    Type[] ts = new Type[_aliases.length];
+    Arrays.fill(ts,TypeMem.MEM);
+    return TypeTuple.make(ts);
+  }
 }
 

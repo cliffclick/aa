@@ -57,32 +57,19 @@ import com.cliffc.aa.type.TypeMem;
 //   imprecise?  No need to ever get approx?
 
 
-
-// Merging 'wide' memory (memory from all prior state) and a new 'skinny'
-// memory from a NewNode.
+// Merge two memories, as the RHS has stomped over something on the LHS.
+// Generally the RHS has just added some new memory, but the total result is
+// more approximate than the original.
 public class MemMergeNode extends Node {
-  public MemMergeNode( Node wide, Node skinny ) { super(OP_MERGE,wide,skinny); }
-  
+  public MemMergeNode( Node m0, Node m1 ) { super(OP_MERGE,m0,m1); }
   @Override public Node ideal(GVNGCM gvn) {
-    // If the skinny memory is from a MProj from a NewNode, and the only proj
-    // is the MProj, then there is no *address* user, and the New object must
-    // be dead.  Remove the New.
     if( in(1) instanceof MProjNode &&
         in(1).in(0) instanceof NewNode &&
-        ((NewNode)in(1).in(0))._alias == 0 )
+        ((NewNode)in(1).in(0)).is_dead_address() )
       return in(0);             // Skinny memory is dead, nothing to merge
     return null;
   }
-
-  @Override public Type value(GVNGCM gvn) {
-    Type twide = gvn.type(in(0));
-    Type tskin = gvn.type(in(1));
-    if( !(twide instanceof TypeMem) ||
-        !(tskin instanceof TypeMem) )
-      return twide.above_center() ? TypeMem.XMEM : TypeMem.MEM;
-    TypeMem tmerge = ((TypeMem)twide).merge((TypeMem)tskin);
-    return tmerge;
-  }
+  @Override public Type value(GVNGCM gvn) { return gvn.type(in(0)).meet(gvn.type(in(1))); }
   @Override public Type all_type() { return TypeMem.MEM; }
 }
 

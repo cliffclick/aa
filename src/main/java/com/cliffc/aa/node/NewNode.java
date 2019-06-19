@@ -9,38 +9,40 @@ import java.util.Arrays;
 // state, so the output is similar to standard Call.
 public class NewNode extends Node {
   private final String[] _names; // Field names
-  private final byte[] _finals;  // Final fields
+  private final byte[] _finals;  // Final field booleans
   // Unique alias class, one class per unique memory allocation site.
+  // Only effectively-final, because the copy/clone sets a new alias value.
   int _alias;                   // Alias class
-  public NewNode( Node[] flds, String[] names ) { this(flds,names,bs(names.length)); }
+  public NewNode( Node[] flds, String[] names ) { this(flds,names,finals(names.length)); }
   public NewNode( Node[] flds, String[] names, byte[] finals ) {
     super(OP_NEW,flds);
     assert flds[0]==null;       // no ctrl field
-    assert names .length==flds.length-1;
-    assert finals.length==flds.length-1;
+    assert def_idx(names .length)==flds.length;
+    assert def_idx(finals.length)==flds.length;
     _names = names;
     _finals= finals;
     _alias = BitsAlias.new_alias(BitsAlias.REC);
   }
-  private static byte[] bs(int len) { byte[] bs = new byte[len]; Arrays.fill(bs,(byte)1); return bs; }
-  String xstr() { return "New#"+_alias; } // Self short name
-  String  str() { return _alias==0 ? "New#dead" : xstr(); } // Inline short name
+  private static byte[] finals(int len) { byte[] bs = new byte[len]; Arrays.fill(bs,(byte)1); return bs; }
+  private int def_idx(int fld) { return fld+1; }
+  private Node fld(int fld) { return in(def_idx(fld)); }
+  boolean is_dead_address() { return fld(0)==null; }  
+  String xstr() { return is_dead_address() ? "New#dead" : ("New#"+_alias); } // Self short name
+  String  str() { return xstr(); } // Inline short name
   @Override public Node ideal(GVNGCM gvn) {
     // If the address is dead, then the object is unused and can be nuked
-    if( _alias != 0 && _uses.len()==1 && ((ProjNode)_uses.at(0))._idx==0 ) {
-      for( int i=0; i<_defs.len(); i++ )
-        set_def(i,null,gvn);
-      _alias = 0;               // Flag as dead
-    }
+    if( _uses.len()==1 && ((ProjNode)_uses.at(0))._idx==0 )
+      for( int i=0; i<_names.length; i++ )
+        set_def(def_idx(i),null,gvn); // Flag as dead
     return null;
   }
   @Override public Type value(GVNGCM gvn) {
     // If the address is dead, then the object is unused and can be nuked
-    if( _alias == 0 )
-      return TypeTuple.make(TypeMem.EMPTY_MEM,TypeMemPtr.OOP0.dual());
-    Type[] ts = new Type[_defs._len-1];
-    for( int i=0; i<ts.length; i++ ) {
-      Type t = gvn.type(in(i+1));
+    if( is_dead_address() )
+      return TypeTuple.make(TypeMem.XMEM,TypeMemPtr.make(_alias));
+    Type[] ts = new Type[_names.length];
+    for( int i=0; i<_names.length; i++ ) {
+      Type t = gvn.type(fld(i));
       // Limit to Scalar results
       if(  t.isa(Type.XSCALAR) ) t = Type.XSCALAR;
       if( !t.isa(Type. SCALAR) ) t = Type. SCALAR;
@@ -50,11 +52,11 @@ public class NewNode extends Node {
     // Get the existing type, without installing if missing because blows the
     // "new newnode" assert if this node gets replaced during parsing.
     Type oldnnn = gvn.self_type(this);
-    Type oldt= oldnnn instanceof TypeTuple ? ((TypeTuple)oldnnn).at(1) : newt;
+    Type oldt= oldnnn instanceof TypeTuple ? ((TypeTuple)oldnnn).at(0) : newt;
     TypeStruct apxt= approx(newt,oldt); // Approximate infinite types
     Type ptr = TypeMemPtr.make(_alias);
-    Type mem = TypeMem.make(_alias,apxt);
-    return TypeTuple.make(mem,ptr);
+    Type mem1 = TypeMem.make(_alias,apxt);
+    return TypeTuple.make(mem1,ptr);
   }
   
   // NewNodes can participate in cycles, where the same structure is appended
@@ -72,8 +74,8 @@ public class NewNode extends Node {
 
   // Worse-case type for this Node
   @Override public Type all_type() {
-    return _alias == 0
-      ? TypeTuple.make(TypeMem.XMEM, TypeMemPtr.OOP0.dual())
+    return is_dead_address()
+      ? TypeTuple.make(TypeMem.XMEM, TypeMemPtr.make(_alias))
       : TypeTuple.make(TypeMem.make(_alias,TypeObj.OBJ), TypeMemPtr.make(_alias));
   }
   
@@ -83,7 +85,7 @@ public class NewNode extends Node {
     nnn._alias = BitsAlias.new_alias(_alias); // Children alias classes, split from parent
     return nnn;
   }
-  
+
   @Override public int hashCode() { return super.hashCode()+ Arrays.hashCode(_names); }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;

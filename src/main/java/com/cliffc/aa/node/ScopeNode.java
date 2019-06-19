@@ -30,14 +30,6 @@ public class ScopeNode extends Node {
   }
   public Integer get_idx(String name) { return _vals.get(name); }
   
-  // Get a set of names into an array.  Skip zero, which is control.
-  public Node[] get( Ary<String> names ) {
-    Node[] ns = new Node[names._len+1];
-    for( int i=0; i<names._len; i++ )
-      ns[i+1] = get(names.at(i));
-    return ns;
-  }
-  
   // Add a Node to an UnresolvedNode.  Must be a function.
   public EpilogNode add_fun(String name, EpilogNode epi) {
     Integer ii = _vals.get(name);

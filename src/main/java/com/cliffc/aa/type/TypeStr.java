@@ -112,6 +112,6 @@ public class TypeStr extends TypeObj<TypeStr> {
   }
   @Override public Type widen() { return STR; }
   @Override void walk( Predicate<Type> p ) { p.test(this); }
-  // Dual, except keep TypeMem.XOBJ as high for starting GVNGCM.opto() state.
-  @Override public TypeObj startype() { return dual(); }
+  // Flip low to high
+  @Override public TypeObj startype() { return this==STR ? XSTR : this; }
 }
