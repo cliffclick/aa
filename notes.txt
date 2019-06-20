@@ -1,0 +1,77 @@
+Bits-split fail attempts
+
+- Plan A: split 6 into 9,10; remove all 6's via a read-barrier-before-use.
+  Fails because do not want read-barrier before equality checks.  i.e., I like
+  defining   "isa = x -> meet(x)==x" as
+  opposed to "isa = x -> meet(x)==rd_bar(x)"
+
+- Plan B: Visit all types in Nodes&GVN and replace 6s with 9,10s.  Too hard to
+  track them all.
+
+- Plan C: Split 6 into 12,13.  Canonicalize even/odd pairs back to parent.
+  Numbers grow fast (by powers of 2), but managable in a long.  Comment: "Plan
+  C fails, unwinding.  Cannot do even/odd bits-split pairs, because i need to
+  be able to walk the expanded bits, but i do not track how much expansion was
+  done. Really needs an explicit tree structure. Unwinding the even-odd
+  bit-pairs notion."
+
+- Plan D, explicit tree structure.  Didn't write up the failure, only that it
+  got complicated.
+
+- Plan A2: 6 "becomes" 6,7 everywhere instantly.  For the local users, this is
+  great.  Reset logic between tests is insane (must reset all of Bits,
+  BitsAlias, BitsRPC, BitsFun and all TypeMems).  The setup (clinit) is also
+  insane, because splitting happens during the clinit so must be ordered
+  extremely carefully.  Must be careful to track whether something is a single
+  alias#num, or a BitsAlias collection.  Collections split over time and grow,
+  but the single number does not.
+
+
+Now pondering a D2 to avoid the horrible reset in A2.
+
+Explicit trees again.
+
+Tree nodes have an alias# and a type; they are invariant, hashconsed & shared.
+They only point "up" to the root.  A "split" call requires a parent, and makes
+a hash-consed child.  All children of a Tree node are given unique dense alias
+numbers which are unique across the tree.
+
+After the reset, the same node will hand out the same numbers every time, so
+Bits collections do not need to be reset.  This can be implemented with a "side
+doubling array of ints".  This side array is not part of the Tree Node...
+!!!Hey, cheap structure that splits-the-same after reset, so does not need to reset Bits!!!
+
+
+Still thinking TypeMem might be like a tuple (so no any/all choice)???  Drop it
+for now...
+
+TypeMem has all the tree leafs (and so does not need the interior???).
+No... all "open" tree nodes have unknown future splits, and need a type for
+them.  So TypeMem has the interior nodes; unless i declare "closed" at a level,
+and then canonicalization demands I collapse this.  But "closed" not useful for
+a long time; only Parse constant syntax strings are closed right now, and
+NewNodes making singletons.  Funs and RPCs only closed/singleton if I disallow
+cloning for inlining.
+
+Brings me around to: do i need explicit trees or not.  Maybe not: a tree of
+numbers only.  If i ask for a new child of a "tree middle node", i get a new
+alias#, extend the lazy-ly growing tree.  If parent is from a TypeMem, then
+i have its type for the child initial type.  Given a child#, and a TypeMem,
+I can lookup the type in the TypeMem by walking the tree structure....
+
+---------------
+(1) Drop the "becomes", horrible reset logic.
+
+(2) Keep explicit numbers-only tree.  Array-of-ints for parents.  Array-of-
+    Array-of-ints for children.  This is a bare-bones tree structure with dense
+    #s for every node that does not change between test resets.
+
+    Array-of-ints for child lengths.  This is reset between tests; the initial
+    part matches the 1st init, but the later part is just zeros.  Any child
+    reporting a zero is actually lazily filled in by CNT++.
+
+(3) TypeMem maps #s to Types (via NBHML? vs array?).  Missing values just do a
+    tree-based lookup.  Still have a above/below notion based on #1.
+
+(4) No "closed" types (yet).  So no need to canonicalize Bits beyond the
+    1-vs-many bit patterns.

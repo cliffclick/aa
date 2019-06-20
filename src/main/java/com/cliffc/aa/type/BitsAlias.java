@@ -18,7 +18,8 @@ public class BitsAlias extends Bits<BitsAlias> {
     else { INTERN.put(b1,b1); return b1; }
   }
 
-          static final Bits.HashMaker<BitsAlias> HASHMAKER  = new Bits.HashMaker<>();
+          static final Bits.Tree<BitsAlias> TREE  = new Bits.Tree<>();
+  @Override Tree<BitsAlias> tree() { return TREE; } 
   public  static final int REC, I64, F64;
   static final int ALL, STR, ABC;
   private static final int ARY;
@@ -35,12 +36,12 @@ public class BitsAlias extends Bits<BitsAlias> {
     NIL = make0(0);             // No need to dual; NIL is its own dual
     // Split All-Memory into Structs/Records and Arrays (including Strings).
     // Everything falls into one of these two camps.
-    RECBITS = make0(REC = new_alias(ALL, TypeStruct.ALLSTRUCT));
+    RECBITS = make0(REC = new_alias(ALL));
     RECBITS0 = RECBITS.meet_nil();
     // Arrays
     ARY = new_alias(ALL);
     // Split Arrays into Strings (and other arrays)
-    STRBITS = make0(STR = new_alias(ARY, TypeStr.STR));
+    STRBITS = make0(STR = new_alias(ARY));
     STRBITS0 = STRBITS.meet_nil();
     // LibCall conversion string aliases
     I64 = new_alias(STR);
@@ -49,16 +50,14 @@ public class BitsAlias extends Bits<BitsAlias> {
     ABCBITS = make0(ABC = new_alias(STR));
     ABCBITS0 = ABCBITS.meet_nil();
   }
-  public static int new_alias(int par) { return HASHMAKER.split(par,INTERN, null); }
-  public static int new_alias(int par, TypeObj obj) { return HASHMAKER.split(par,INTERN,obj); }
+  public static int new_alias(int par) { return TREE.split(par); }
   // Fast reset of parser state between calls to Exec
-  public static void init0() { HASHMAKER.init0();  init0(INTERN); }
-  public static void reset_to_init0() { HASHMAKER.reset_to_init0();  reset_to_init0(INTERN); }
+  public static void init0() { TREE.init0(); }
+  public static void reset_to_init0() { TREE.reset_to_init0();}
 
   // Have to make a first BitsAlias here; thereafter the v-call to make_impl
   // will make more on demand.  But need the first one to make a v-call.
   @Override boolean is_class() { return true; } // All bits are class of allocated objects
-  @Override HashMaker hashmaker() { return HASHMAKER; }
   @Override public BitsAlias ALL() { return FULL; }
   @Override public BitsAlias ANY() { return ANY ; }
 

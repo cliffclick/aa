@@ -76,7 +76,6 @@ public class Env implements AutoCloseable {
       BitsAlias.reset_to_init0(); // Done with adding primitives
       BitsFun  .reset_to_init0(); // Done with adding primitives
       BitsRPC  .reset_to_init0(); // Done with adding primitives
-      Type     .reset_to_init0(); // Done with adding primitives
       FunNode  .reset_to_init0(); // Done with adding primitives
       GVN      .reset_to_init0(); // Done with adding primitives
       // StartNode is used by global constants, which in turn are only used by

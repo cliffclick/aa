@@ -85,5 +85,4 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   }
   @Override void walk( Predicate<Type> p ) { p.test(this); }
   public int getbit() { return _aliases.getbit(); }
-  @Override boolean hasBits(BitSet bs) { return BitsAlias.HASHMAKER.has_bits(_aliases); }
 }

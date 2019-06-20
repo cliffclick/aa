@@ -147,9 +147,4 @@ public class TypeNil extends Type<TypeNil> {
     if( !_cyclic || _t==null ) return null;
     return _t.repeats_in_cycles(head,bs);
   }
-  @Override boolean hasBits(BitSet bs) {
-    if( bs.get(_uid) ) return false;
-    bs.set(_uid);
-    return _t != null && _t.hasBits(bs);
-  }
 }

@@ -1,12 +1,10 @@
 package com.cliffc.aa.type;
 
 import com.cliffc.aa.AA;
-import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.Iterator;
 
 // Bits supporting a lattice; immutable; hash-cons'd.  Bits can be *split* in
@@ -50,13 +48,11 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   long[] _bits;   // Bits set or null for a single bit
   int _con;       // value of single bit
   int _hash;      // Pre-computed hashcode
-  long[] _reset_bits;
-  int _reset_con = -999999;
   // Intern: lookup and return an existing Bits or install in hashmap and
   // return a new Bits.  Overridden in subclasses to make type-specific Bits.
   abstract B make_impl(int con, long[] bits );
   abstract boolean is_class();    // All bits are constants or classes
-  abstract HashMaker hashmaker(); // Hashcode maker, that handles split bits
+  abstract Tree<B> tree();
   public abstract B ALL();
   public abstract B ANY();
 
@@ -64,7 +60,9 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   void init(int con, long[] bits ) {
     _con = con;
     _bits=bits;
-    _hash=hashmaker().compute_hash(this);
+    long sum=_con;
+    if( _bits != null ) for( long l : _bits ) sum += l;
+    _hash = (int)((sum>>32)+sum);
     assert check();
   }
   private boolean check() {
@@ -73,6 +71,12 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     if( _bits.length==0 ) return false;  // Empty bits replaced by a con
     if( _bits.length==1 && _bits[0]== 0) return true; // NO bits is OK
     if( _bits[_bits.length-1]==0 ) return false; // Array is "tight"
+    // No set bit has a parent bit set
+    Tree<B> tree = tree();
+    for( int i : this )
+      while( (i = tree.parent(i)) != 0 )
+        if( test(i) )
+          return false;
     // For efficiency, 1 bit set uses 'con' instead of 'bits'
     return check_multi_bits(_bits); // Found multiple bits
   }
@@ -113,6 +117,21 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   // Constructor taking an array of bits, and allowing join/meet selection.
   // Canonicalizes the bits.  The 'this' pointer is only used to clone the class.
   final B make( boolean any, long[] bits ) {
+    // If a 'parent' bit is set, then no need to have any child bits set.
+    Tree<B> tree = tree();
+    for( int i=0; i<bits.length; i++ ) { // For all words
+      long l = bits[i];
+      if( l!=0 ) {
+        for( int j=0; j<64; j++ ) // For all bits in word
+          if( (mask(j)&l) != 0 ) {
+            int par = (i<<6)+j; // Kid index
+            while( (par = tree.parent(par)) != 0 ) // Walk parent chain
+              if( test(bits,par) )                 // If parent set
+                { bits[i]&=~mask(j); break; }      // then clear kid
+          }
+      }
+    }
+    
     // Remove any trailing empty words
     int len = bits.length;
     while( len > 1 && bits[len-1]==0 ) len--;
@@ -249,103 +268,72 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   // join is defined in terms of meet and dual
   public Bits<B> join(Bits<B> bs) { return dual().meet(bs.dual()).dual(); }
 
-  // Make a deep copy, for reseting INTERN to the starting state between tests
-  static <T extends Bits> void init0(HashMap<T,T> INTERN) {
-    for( T b : INTERN.keySet() ) {
-      b._reset_con  = b._con;   // Saves con, and also removes -999999 sentinal
-      b._reset_bits = b._bits == null ? null : b._bits.clone();
-    }
-  }
-  // Make a deep copy, for reseting INTERN to the starting state between tests
-  static <T extends Bits> void reset_to_init0(HashMap<T,T> INTERN) {
-    Iterator<T> it = INTERN.keySet().iterator();
-    while( it.hasNext() ) {
-      T b = it.next();
-      if( b._reset_con == -999999 ) { // If never called by init0, not part of the starting types
-        it.remove();                  // So remove it
-      } else {
-        b._con  = b._reset_con;
-        b._bits = b._reset_bits==null ? null : b._reset_bits.clone();
-      }
-    }
-  }
- 
-  // Instances are unique-per-subclass of Bits, i.e., one for each of
-  // BitsAlias, BitsFun, BitsRPC.  These record the split history, to let us
-  // compute hashes that do not move after a split.
-  static class HashMaker<B extends Bits<B>> {
-    static class Q { Q(int a,int s) { _alias=a; _split=s; } final int _alias, _split; }
-    int _init;             // One-time set at init, used to reset between tests
-    Ary<Q> _splits = new Ary<>(new Q[1],0); //
+  // Bits are split in a tree like pattern, recorded here.  To avoid rehashing,
+  // the exact same tree-split is handed out between tests.  Basically there is
+  // only 1 tree shape, lazily discovered, for all tests.
+  static class Tree<B extends Bits<B>> {
+    int _cnt = 1, _last;        // Next available bit number, last bit handed out (for tests)
+    // Invariants: _pars[kid]==parent && _kids[parent].contains(kid)
+    int[] _pars = new int[2];   // Parent bit from child bit; _cnt is the in-use part
+    int[][] _kids = new int[2][];// List of kids from a parent; 1st element is is-use length
+    int[] _init;                 // Used to reset _kids[X][0] for all X
 
-    @Override public String toString() {
-      SB sb = new SB().p("HashMaker[");
-      for( Q q : _splits )
-        sb.p(q._alias).p("->").p(q._split).p(',');
-      return sb.p("]").toString();
+    int parent( int kid ) { return _pars[kid]; }
+    @Override public String toString() { return toString(new SB(),1).toString(); }
+    private SB toString(SB sb,int i) {
+      sb.i().p(i).nl();
+      if( i<_kids.length && _kids[i]!=null && _kids[i][0] > 0 ) {
+        sb.ii(1);
+        for( int j=1; j<_kids[i][0]; j++ )
+          toString(sb,_kids[i][j]);
+        sb.di(1);
+      }
+      return sb;
     }
     
     // Split out a bit to form a new constant, from a prior a bit
-    int split(int par, HashMap<B,B> INTERN, TypeObj obj) {
-      if( par==0 ) return 1;    // Ignore init
-      // Split the parent bit in twain.  Instances of the parent are everywhere
-      // updated to have both bits, but hash to the same value as the parent.
-      int new_split = last_split()+1;
-
-      // Walk and update
-      for( B bits : INTERN.keySet() ) {
-        if( bits.test(par) ) {
-          int con = bits._con;
-          assert con!=0;        // nil is never split
-          if( bits._bits==null ) {
-            bits._con = con < 0 ? -1 : 1;
-            or(bits._bits = bits(con,new_split),Math.abs(con));
-          } else if( new_split > max(bits._bits) ) bits._bits = bits(0,new_split);
-          or(bits._bits,new_split);
+    int split(int par) {
+      // See if we have an existing bit
+      if( par < _kids.length ) { // This parent has kids already
+        int[] kids = _kids[par]; //
+        if( kids != null ) {
+          int klen = kids[0];        // Number of kids already, 1-based
+          if( klen < kids.length ) { // Room for more in array?
+            int bit = kids[klen];  
+            if( bit != 0 ) {            // Pre-allocated kid from prior test?
+              assert _pars[bit] == par; // Then parent must already be preallocated
+              kids[0] = klen+1;
+              return _last=bit;
+            }
+          }
         }
       }
-
-      // Also, for BitsAlias, have to expand TypeMems to match
-      if( this==BitsAlias.HASHMAKER && Type.INTERN != null )
-        for( Type t : Type.INTERN.keySet() )
-          if( t instanceof TypeMem )
-            ((TypeMem)t).split_bit(par,new_split,obj);
-      
-      _splits.push(new Q(par,new_split)); // Record the split
-
-      // Assert hash not changed
-      for( B bits : INTERN.keySet() )
-        assert bits._hash == compute_hash(bits);
-      
-      return new_split;
+      // Need a new bit
+      int bit = _last = _cnt++; // Next available bit number
+      while( bit >= _pars.length ) _pars = Arrays.copyOf(_pars,_pars.length<<1);
+      assert _pars[bit]==0;
+      _pars[bit] = par;
+      while( par >= _kids.length ) _kids = Arrays.copyOf(_kids,_kids.length<<1);
+      int[] kids = _kids[par];
+      if( kids==null ) _kids[par] = kids = new int[]{1};
+      int klen = kids[0];
+      if( klen == kids.length )
+        _kids[par] = kids = Arrays.copyOf(kids,klen<<1);
+      kids[klen] = bit;
+      kids[0] = klen+1;
+      return bit;
     }
-    int compute_hash(Bits bits) {
-      // Sum of bits, minus exceptions
-      long sum=0;
-      if( bits._bits==null ) sum = mask(Math.abs(bits._con));
-      else for( long b : bits._bits ) sum += b;
-      // Minus the exceptions
-      for( Q q : _splits )
-        if( q != null && bits.test(q._alias) && bits.test(q._split) )
-          sum -= mask(q._split);
-      // Fold to an int
-      return (int)((sum>>32)|sum);
+    void init0() {
+      _init = new int[_kids.length];
+      for( int i=0; i<_kids.length; i++ )
+        _init[i] = _kids[i]==null ? 0 : _kids[i][0];
     }
-    int compute_hash(TypeObj[] as) {
-      // Sum of hashes, minus exceptions
-      int sum=0, len=as.length;
-      for( TypeObj obj : as ) if( obj != null ) sum+=obj._hash;
-      // Minus the exceptions
-      for( Q q : _splits )
-        if( q != null && q._alias < len && q._split < len &&
-            as[q._split]!=null )
-          sum -= as[q._split]._hash;
-      return sum;
+    void reset_to_init0() {
+      for( int i=0; i<_kids.length; i++ )
+        if( _kids[i] != null )
+          _kids[i][0] = i<_init.length ? _init[i] : 0;
     }
-    void init0() { _init = _splits._len; }
-    void reset_to_init0() { _splits.set_len(_init); }
-    boolean has_bits(B b) { return b.max() >= _init+2; }
-    int last_split() { return _splits._len+1; }
+    int last_split() { return _last; }
   }
   
   /** @return an iterator */

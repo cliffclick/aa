@@ -61,8 +61,8 @@ public abstract class IntrinsicNode extends Node {
     for( int i=0; i<_args.length; i++ ) // Args follow
       add_def(gvn.xform(new ParmNode(i,_args[i],fun, gvn.con(_targs.at(i)),null)));
     Node prim = gvn.xform(this);
-    Node mem2= gvn.xform(new MProjNode(prim,1));
-    Node val = gvn.xform(new  ProjNode(prim,2));
+    Node mem2 = gvn.xform(new MProjNode(prim,1));
+    Node val  = gvn.xform(new  ProjNode(prim,2));
     Node merge= gvn.xform(new MemMergeNode(memp,mem2));
     return new EpilogNode(fun,merge,val,rpc,fun,fun._fidx,null);
   }
@@ -202,9 +202,10 @@ public abstract class IntrinsicNode extends Node {
       // aliased to a hidden String allocation site.  The memory returned is
       // read-only (and can be shared).
       TypeObj obj = ((TypeMem)mem).at(_alias);  // Prior memory contents at this alias
+      TypeObj obj2= (TypeObj)obj.join(TypeStr.STR); // Expect memory at least correct, or else type error was feed in
       TypeStr str = TypeStr.con(Long.toString(val.getl()));
-      TypeObj obj2 = (TypeObj)obj.meet(str);
-      TypeMem res = TypeMem.make(_alias,obj2);
+      TypeObj obj3 = (TypeObj)obj2.meet(str);
+      TypeMem res = TypeMem.make(_alias,obj3);
       return TypeTuple.make(Type.CTRL,res,_ptr);
     }
   }
@@ -231,9 +232,10 @@ public abstract class IntrinsicNode extends Node {
       // aliased to a hidden String allocation site.  The memory returned is
       // read-only (and can be shared).
       TypeObj obj = ((TypeMem)mem).at(_alias);  // Prior memory contents at this alias
+      TypeObj obj2= (TypeObj)obj.join(TypeStr.STR); // Expect memory at least correct, or else type error was feed in
       TypeStr str = TypeStr.con(Double.toString(val.getd()));
-      TypeObj obj2 = (TypeObj)obj.meet(str);
-      TypeMem res = TypeMem.make(_alias,obj2);
+      TypeObj obj3 = (TypeObj)obj2.meet(str);
+      TypeMem res = TypeMem.make(_alias,obj3);
       return TypeTuple.make(Type.CTRL,res,_ptr);
     }
   }

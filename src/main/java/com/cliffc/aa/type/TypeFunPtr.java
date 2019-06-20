@@ -94,5 +94,4 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
 
   // Generic functions
   public boolean is_forward_ref() { throw com.cliffc.aa.AA.unimpl(); }
-  @Override boolean hasBits(BitSet bs) { return BitsFun.HASHMAKER.has_bits(_fidxs); }
 }

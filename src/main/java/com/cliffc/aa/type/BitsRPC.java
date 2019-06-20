@@ -20,12 +20,13 @@ public class BitsRPC extends Bits<BitsRPC> {
     else { INTERN.put(b1,b1); return b1; }
   }
 
-  private static final Bits.HashMaker<BitsRPC> HASHMAKER = new Bits.HashMaker<>();
+  private static final Bits.Tree<BitsRPC> TREE = new Bits.Tree<>();
+  @Override Tree<BitsRPC> tree() { return TREE; } 
   public static final int ALL = new_rpc(0);
-  public static int new_rpc( int par ) { return HASHMAKER.split(par,INTERN,null); }
+  public static int new_rpc( int par ) { return TREE.split(par); }
   // Fast reset of parser state between calls to Exec
-  public static void init0() { HASHMAKER.init0();  init0(INTERN); }
-  public static void reset_to_init0() { HASHMAKER.reset_to_init0();  reset_to_init0(INTERN); }
+  public static void init0() { TREE.init0(); }
+  public static void reset_to_init0() { TREE.reset_to_init0(); }
   
   // Have to make a first BitsRPC here; thereafter the v-call to make_impl
   // will make more on demand.  But need the first one to make a v-call.
@@ -33,7 +34,6 @@ public class BitsRPC extends Bits<BitsRPC> {
   private static final BitsRPC ANY = FULL.dual();
   public  static final BitsRPC NIL = make0(0);
   @Override boolean is_class() { return test(ALL); } // All bits are constants, except the first "ALL" bit
-  @Override HashMaker hashmaker() { return HASHMAKER; } 
   @Override public BitsRPC ALL() { return FULL; }
   @Override public BitsRPC ANY() { return ANY ; }
 

@@ -70,26 +70,18 @@ public class TypeMem extends Type<TypeMem> {
     if( as.length==2 ) return true; // Trivial all of memory
     // "tight" - something in the last slot
     if( _aliases[_aliases.length-1] == null ) return false;
-    // No dups of the default in slot 1
-    for( int i=2; i<as.length; i++ )
-      if( as[i]==as[1] )
-        return false;
+    // No dups of a parent
+    for( int i=1; i<as.length; i++ )
+      if( as[i] != null )
+        for( int par = BitsAlias.TREE.parent(i); par!=0; par = BitsAlias.TREE.parent(par) )
+          if( as[par] == as[i] )
+            return false;
     return true;
   }
   @Override int compute_hash() {
-    // Horrible class-loader ordering bug:
-    // - TypeMem.clinit makes
-    // - TypeMem.ALL which calls hashcons which calls
-    // - TypeMem.compute_hash which calls
-    // - BitsAlias.HASHMAKER which calls
-    // - BitsAlias.clinit which splits many alias bits which calls
-    // - Bits.HASHMAKER.split which looks in
-    // - Type.INTERN to split all TypeMems.
-    // - But TypeMem.ALL is not yet in Type.INTERN
-    if( _aliases.length==2 ) return TMEM + _aliases[1]._hash;
-       
-    // Hash is preserved across splitting bits
-    return TMEM + BitsAlias.HASHMAKER.compute_hash(_aliases);
+    int sum=TMEM;
+    for( TypeObj obj : _aliases ) sum += obj==null ? 0 : obj._hash;
+    return sum;
   }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
@@ -114,10 +106,13 @@ public class TypeMem extends Type<TypeMem> {
     return sb.p(']').toString();
   }
                 
-  // Alias-at.  Out of bounds or null uses the default.
+  // Alias-at.  Out of bounds or null uses the parent value.
   public TypeObj at(int alias) {
-    TypeObj obj = alias < _aliases.length ? _aliases[alias] : null;
-    return obj==null ? _aliases[1] : obj;
+    while( true ) {
+      if( alias < _aliases.length && _aliases[alias] != null )
+        return _aliases[alias];
+      alias = BitsAlias.TREE.parent(alias);
+    }
   }
   
   private static TypeMem FREE=null;
@@ -135,10 +130,12 @@ public class TypeMem extends Type<TypeMem> {
     if( as[1]==null ) as[1] = TypeObj.XOBJ; // Default memory is "dont care"
     int len = as.length;
     if( len == 2 ) return make(as);
-    // No dups of default in slot 1
-    for( int i=2; i<len; i++ )
-      if( as[i]==as[1] )
-        as[i]=null;
+    // No dups of a parent
+    for( int i=1; i<as.length; i++ )
+      if( as[i] != null )
+        for( int par = BitsAlias.TREE.parent(i); par!=0; par = BitsAlias.TREE.parent(par) )
+          if( as[par] == as[i] )
+            { as[i] = null; break; }
     // Remove trailing nulls; make the array "tight"
     while( as[len-1] == null ) len--;
     if( as.length!=len ) as = Arrays.copyOf(as,len);
@@ -171,7 +168,6 @@ public class TypeMem extends Type<TypeMem> {
     // splitting all the strings.
     MEM_STR = make(BitsAlias.STRBITS,TypeStr.STR);
     MEM_ABC = make(TypeStr.ABC.get_alias(),TypeStr.ABC);
-    assert MEM_ABC._aliases.length==BitsAlias.HASHMAKER.last_split()+1;
   }
   static final TypeMem[] TYPES = new TypeMem[]{MEM,MEM_STR,MEM_ABC};
 
@@ -186,25 +182,20 @@ public class TypeMem extends Type<TypeMem> {
   @Override protected Type xmeet( Type t ) {
     if( t._type != TMEM ) return ALL; //
     TypeMem tf = (TypeMem)t;
-
+    // Shortcut common case
+    if( this==MEM || tf==MEM ) return MEM;
+    if( this==XMEM ) return t;
+    if( tf  ==XMEM ) return this;
     // Meet of default values, meet of element-by-element.
-    int len = Math.max(_aliases.length,tf._aliases.length);
+    int  len = Math.max(_aliases.length,tf._aliases.length);
+    int mlen = Math.min(_aliases.length,tf._aliases.length);
     TypeObj[] objs = new TypeObj[len];
     for( int i=1; i<len; i++ )
-      objs[i] = (TypeObj)at(i).meet(tf.at(i)); // meet element-by-element
+      objs[i] = i<mlen && _aliases[i]==null && tf._aliases[i]==null // Shortcut null-vs-null
+        ? null : (TypeObj)at(i).meet(tf.at(i)); // meet element-by-element
     return make0(objs);
   }
 
-  // Part of a Smalltalk-ish "becomes" operation on splitting alias Bits.
-  // See big comment in Bits.java.
-  void split_bit( int paridx, int newidx, TypeObj obj ) {
-    if( paridx == 1 && obj==null ) return; // New index splits from the default, do nothing.
-    if( obj == null && (paridx >= _aliases.length || _aliases[paridx]==null) ) return;
-    if( newidx >= _aliases.length )
-      _aliases = Arrays.copyOf(_aliases,newidx+1);
-    _aliases[newidx] = obj==null ? _aliases[paridx] : (above_center() ? (TypeObj)obj.dual() : obj);
-  }
-  
   // Meet of all possible loadable values
   public TypeObj ld( TypeMemPtr ptr ) {
     boolean any = ptr.above_center();
@@ -252,13 +243,5 @@ public class TypeMem extends Type<TypeMem> {
       if( _aliases[i] != null )
         oops[i] = _aliases[i].startype();
     return make0(oops);
-  }
-  @Override boolean hasBits(BitSet bs) {
-    if( bs.get(_uid) ) return false;
-    bs.set(_uid);
-    for( Type t: _aliases )
-      if( t!=null && t.hasBits(bs) )
-        return true;
-    return false;
   }
 }
