@@ -12,9 +12,9 @@ public class TestType {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testType() {
     Type.init0(new HashMap<>());
-    Type t0 = TypeMemPtr.STRPTR.dual();
-    Type t1 = TypeMemPtr.ABCPTR.dual();
-    Type tx = t0.meet(t1);
+    BitsAlias t0 = TypeMemPtr.STRPTR._aliases.dual();
+    BitsAlias t1 = TypeMemPtr.ABCPTR._aliases.dual();
+    BitsAlias tx = t0.meet(t1);
     assertEquals(t1,tx);
   }
   

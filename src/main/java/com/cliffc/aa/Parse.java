@@ -548,10 +548,6 @@ public class Parse {
     Ary<String> ids = new Ary<>(new String[1],0);
     Ary<Type  > ts  = new Ary<>(new Type  [1],0);
     Ary<Parse > bads= new Ary<>(new Parse [1],0);
-    // Memory first.  No syntax for parsing the memory argument.
-    ids .add(" memory ");
-    ts  .add(TypeMem.MEM);       // Untyped, most generic type
-    bads.add(null);              // No syntax error
     
     while( true ) {
       String tok = token();
