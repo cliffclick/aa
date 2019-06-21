@@ -20,6 +20,9 @@ import java.util.Iterator;
 // optimized away.  i.e., its useful to make the distinction between the cloned
 // instances, just might be some confusion at first.
 //
+// Splitting induces a tree-structure to the bits; there is a parent / child
+// relationship defined in the inner Tree class, and used in meet calls.
+//
 // Bit 0 - is always the 'null' or 'empty' instance.
 // Bit 1 - is the first "real" bit, and represents all-of-a-class.
 // Other bits always split from bit 1, and can split in any pattern.
@@ -37,7 +40,7 @@ import java.util.Iterator;
 // execute once (hence produce a constant alias class or a Singleton) and
 // others execute many times.  This is handled by the subclasses; BitsAlias may
 // track singletons at some future date.
-
+//
 public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   // Holds a set of bits meet'd together, or join'd together, along
   // with a single bit choice as a constant.
@@ -119,6 +122,8 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   final B make( boolean any, long[] bits ) {
     // If a 'parent' bit is set, then no need to have any child bits set.
     Tree<B> tree = tree();
+    // TODO: Run this loop backwards, avoids most tree-walks; lowers O(n log n)
+    // to O(n).
     for( int i=0; i<bits.length; i++ ) { // For all words
       long l = bits[i];
       if( l!=0 ) {
@@ -205,6 +210,15 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     return _bits==null ? _con : (63 - Long.numberOfLeadingZeros(_bits[_bits.length-1]))+((_bits.length-1)<<6);
   }
 
+  // Meet is more complex than the obvious AND/OR over bits.  There's a bit of
+  // prefix logic to remove common cases (meet with ANY/ALL/NIL), and a final
+  // expanding into a large bit array.  After that we need to honor the tree
+  // semantics; any set bits automatically include all their children as well.
+  //
+  // AS-IF: For any given set-bit, we "unpack" it setting every child bit.  We
+  // then do the proper AND/OR operation on the bits, followed by a repack.
+  // 
+  
   @SuppressWarnings("unchecked")
   public B meet( B bs ) {
     if( this==bs ) return (B)this;
@@ -231,13 +245,16 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
       long[] bits = bits0.clone();        // Clone larger
       for( int i=0; i<bits1.length; i++ ) // OR in smaller bits
         bits[i] |= bits1[i];
-      return make(false,bits);
+      return make(false,bits);  // This will remove parent/child dups
     }
     // Both joins?  Set-intersection
+    Tree<B> tree = tree();
     if( con0 == -1 && con1 == -1 ) {
-      long[] bits = bits1.clone();        // Clone smaller
-      for( int i=0; i<bits1.length; i++ ) // AND in smaller bits
-        bits[i] &= bits0[i];
+      long[] bits = new long[bits0.length];// Result array
+      join(tree,bits0,bits1,bits);         // Merge left into right
+      join(tree,bits1,bits0,bits);         // Merge right into left
+      // Nil is not part of the parent tree, so needs to be set explicitly
+      if( (bits0[0]&1)==1 && (bits1[0]&1)==1 )  bits[0]|=1; 
       return make(true,bits);
     }
 
@@ -247,12 +264,17 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
       if( (bits0[i]&bits1[i]) != 0 )
         return make(false,con0== 1 ? bits0 : bits1);
 
+    // Walk all the meet bits; if any are in the join we're done.  This is a
+    // more exact version of the above any-bits-in-common test.
+    if( (con0==1 ? test(tree,bits0,bits1) : test(tree,bits1,bits0)) )
+      return make(false,con0== 1 ? bits0 : bits1);
+
     // Mixed meet/join.  Need to expand the meet with the smallest bit from the join.
     int bnum = find_smallest_bit(con0==-1 ? bits0 : bits1);
     long[] mbits = con0==1 ? bits0 : bits1; // Meet bits
     mbits = Arrays.copyOfRange(mbits,0,Math.max(mbits.length,idx(bnum)+1));
-    or(mbits,bnum);
-    return make(false,mbits);
+    or(mbits,bnum);             // Add a bit in.  Could make a dup bit
+    return make(false,mbits);   // This will remove parent/child dups
   }
   
   private static int find_smallest_bit(long[] bits) {
@@ -262,6 +284,44 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     throw AA.unimpl();
   }
 
+  // Virtually expand all bits in both arrays to cover all children,
+  // then AND the bits, then re-pack.  However, we do it tree-by-tree
+  // keep from doing the full expansion costs.
+  private static void join( Tree tree, long[] bits0, long[] bits1, long[] bits2 ) {
+    // If a 'parent' bit is set, then no need to have any child bits set.
+    for( int i=0; i<bits0.length; i++ ) { // For all words
+      long l = bits0[i];
+      if( l!=0 ) {
+        // TODO: Use Long.numberOfTrailingZeros (or LeadingZeros probably) to
+        // do this only once-per-set-bit.
+        for( int j=0; j<64; j++ ) // For all bits in word
+          if( (mask(j)&l) != 0 ) {
+            for( int par = (i<<6)+j; par!=0; par = tree.parent(par) ) // Walk parent chain
+              if( test(bits1,par) )                // If parent set
+                { bits2[i]|=mask(j); break; }      // then set kid
+          }
+      }
+    }
+  }
+
+  // Walk all the meet bits; if any are in the join return true.
+  private static boolean test( Tree tree, long[] meets, long[] joins ) {
+    for( int i=0; i<meets.length; i++ ) { // For all words
+      long l = meets[i];
+      if( l!=0 ) {
+        // TODO: Use Long.numberOfTrailingZeros (or LeadingZeros probably) to
+        // do this only once-per-set-bit.
+        for( int j=0; j<64; j++ ) // For all bits in word
+          if( (mask(j)&l) != 0 ) {
+            for( int par = (i<<6)+j; par!=0; par = tree.parent(par) ) // Walk parent chain
+              if( test(joins,par) )                // If parent set in join
+                return true;
+          }
+      }
+    }
+    return false;
+  }
+  
   // Constants are self-dual; classes just flip the meet/join bit.  
   @SuppressWarnings("unchecked")
   public B dual() { return _bits==null && !is_class() ? (B)this : make_impl(-_con,_bits); }
