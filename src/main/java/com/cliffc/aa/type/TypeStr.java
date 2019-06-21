@@ -66,7 +66,7 @@ public class TypeStr extends TypeObj<TypeStr> {
   // Return a String from a TypeStr constant; assert otherwise.
   @Override public String getstr() { assert is_con(); return _con; }
 
-  @Override protected TypeStr xdual() { return new TypeStr(!_any,_con,_alias); }
+  @Override protected TypeStr xdual() { return _con==null ? new TypeStr(!_any,_con,_alias) : this; }
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TSTR:     break;
