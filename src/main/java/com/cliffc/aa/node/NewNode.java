@@ -12,7 +12,8 @@ public class NewNode extends Node {
   private final byte[] _finals;  // Final field booleans
   // Unique alias class, one class per unique memory allocation site.
   // Only effectively-final, because the copy/clone sets a new alias value.
-  int _alias;                   // Alias class
+  private int _alias;            // Alias class
+  private boolean _dead;         // No users of the address
   public NewNode( Node[] flds, String[] names ) { this(flds,names,finals(names.length)); }
   public NewNode( Node[] flds, String[] names, byte[] finals ) {
     super(OP_NEW,flds);
@@ -26,14 +27,17 @@ public class NewNode extends Node {
   private static byte[] finals(int len) { byte[] bs = new byte[len]; Arrays.fill(bs,(byte)1); return bs; }
   private int def_idx(int fld) { return fld+1; }
   private Node fld(int fld) { return in(def_idx(fld)); }
-  boolean is_dead_address() { return fld(0)==null; }  
+  boolean is_dead_address() { return _dead; }  
   String xstr() { return is_dead_address() ? "New#dead" : ("New#"+_alias); } // Self short name
   String  str() { return xstr(); } // Inline short name
   @Override public Node ideal(GVNGCM gvn) {
-    // If the address is dead, then the object is unused and can be nuked
-    if( _uses.len()==1 && ((ProjNode)_uses.at(0))._idx==0 )
+    // If the address is dead, then the object is unused and can be nuked.
+    // Check for 1 user, and its the memory proj not the ptr proj.
+    if( _uses.len()==1 && ((ProjNode)_uses.at(0))._idx==0 ) {
+      _dead = true;
       for( int i=0; i<_names.length; i++ )
-        set_def(def_idx(i),null,gvn); // Flag as dead
+        set_def(def_idx(i),null,gvn); // Kill contents of memory
+    }
     return null;
   }
   @Override public Type value(GVNGCM gvn) {
