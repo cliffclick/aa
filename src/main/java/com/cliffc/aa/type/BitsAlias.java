@@ -18,9 +18,9 @@ public class BitsAlias extends Bits<BitsAlias> {
     else { INTERN.put(b1,b1); return b1; }
   }
 
-          static final Bits.Tree<BitsAlias> TREE  = new Bits.Tree<>();
+  static final Bits.Tree<BitsAlias> TREE = new Bits.Tree<>();
   @Override Tree<BitsAlias> tree() { return TREE; } 
-  public  static final int REC, I64, F64;
+  public static final int REC, I64, F64;
   static final int ALL, STR, ABC;
   private static final int ARY;
           static BitsAlias NZERO, FULL, RECBITS0, STRBITS, STRBITS0, ABCBITS, ABCBITS0;

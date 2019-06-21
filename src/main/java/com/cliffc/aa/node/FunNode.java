@@ -42,7 +42,7 @@ public class FunNode extends RegionNode {
   final TypeTuple _ts;          // Arg types, 0-based, used to detect argument type errors; null for forward_refs
   public Type _ret;             // return types
   public TypeMem _retmem;       // return MEMORY types
-  public final int _fidx;       // Unique function index
+  public int _fidx;             // Unique function index
   private final byte _op_prec;  // Operator precedence; only set top-level primitive wrappers
   
   // Used to make the primitives at boot time
@@ -64,15 +64,24 @@ public class FunNode extends RegionNode {
     _ts = ts;
     _ret = ret;
     _retmem = retmem;
-    _fidx = BitsFun.new_fidx(fidx);
     _op_prec = (byte)op_prec;
-    FUNS.setX(_fidx,this); // Track FunNode by fidx
     add_def(Env.ALL_CTRL);
+    set_new_fidx(fidx,null);
   }
   
   // Find FunNodes by fidx
   static Ary<FunNode> FUNS = new Ary<>(new FunNode[]{null,});
   public static FunNode find_fidx( int fidx ) { return fidx >= FUNS._len ? null : FUNS.at(fidx); }
+  private void set_new_fidx(int parent_fidx, GVNGCM gvn) {
+    _fidx = BitsFun.new_fidx(parent_fidx);
+    FUNS.setX(_fidx,this); // Track FunNode by fidx
+    if( gvn != null ) {
+      EpilogNode epi = epi();
+      epi._fidx = _fidx;        // Epilog matches
+      gvn.add_work(epi);        // 
+    }
+  }
+  
   // Fast reset of parser state between calls to Exec
   static int PRIM_CNT;
   public static void init0() { PRIM_CNT = FUNS._len; }
@@ -259,8 +268,11 @@ public class FunNode extends RegionNode {
     TypeTuple ts = TypeTuple.make(sig);
     assert ts.isa(_ts);
     assert ts != _ts;           // Must see improvement
-    // Make a prototype new function header.
+    // Make a prototype new function header split from the original.
     FunNode fun = new FunNode(ts,_ret,_retmem,_fidx,_name);
+    // Renumber the original as well; the original _fidx is now a *class* of 2
+    // fidxs.  Each FunNode fidx is only ever a constant.
+    set_new_fidx(_fidx,gvn);
     // Look in remaining paths and decide if they split or stay
     Node xctrl = gvn.con(Type.XCTRL);
     for( int j=2; j<_defs._len; j++ ) {
@@ -327,6 +339,9 @@ public class FunNode extends RegionNode {
     // in slot 1.  The one inlined call in slot 'm'.
     // Make a prototype new function header.
     FunNode fun = new FunNode(_ts,_ret,_retmem,_fidx,_name);
+    // Renumber the original as well; the original _fidx is now a *class* of 2
+    // fidxs.  Each FunNode fidx is only ever a constant.
+    set_new_fidx(_fidx,gvn);
     fun.pop();                  // Remove junk ALL_CTRL input
     Node top = gvn.con(Type.XCTRL);
     for( int i=1; i<_defs._len; i++ )
