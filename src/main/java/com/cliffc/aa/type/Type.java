@@ -193,8 +193,8 @@ public class Type<T extends Type<T>> {
   static final byte TSTR    =25; // Memory String type; an array of chars
   static final byte TMEM    =26; // Memory type; a map of Alias#s to TOBJs
   static final byte TMEMPTR =27; // Memory pointer type; a collection of Alias#s
-  static final byte TFUNPTR =28; // Function signature; both domain and range are a Tuple; see TypeFun; many functions share the same signature
-  static final byte TFUN    =29; // Function, a "fat" pointer refering to a single block of code
+  static final byte TFUNPTR =28; // Function pointer, refers to a collection of concrete functions
+  static final byte TFUN    =29; // A simple function signature, not a function nor function pointer
   static final byte TLAST   =30; // Type check
 
   public  static final Type ALL    = make( TALL   ); // Bottom
@@ -384,6 +384,7 @@ public class Type<T extends Type<T>> {
     if( ALL_TYPES != null ) return ALL_TYPES;
     Type[] ts =    Type      .TYPES ;
     ts = concat(ts,TypeFlt   .TYPES);
+    ts = concat(ts,TypeFun   .TYPES);
     ts = concat(ts,TypeFunPtr.TYPES);
     ts = concat(ts,TypeInt   .TYPES);
     ts = concat(ts,TypeMem   .TYPES);

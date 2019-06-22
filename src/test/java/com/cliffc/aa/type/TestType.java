@@ -195,7 +195,7 @@ public class TestType {
     TypeObj a3 = TypeStruct.make(new String[]{"x"},TypeInt.TRUE); // @{x: 1 }
     TypeMem mem = TypeMem.make0(new TypeObj[]{null,TypeObj.OBJ,a1,a2,a3});
     // *[1]? join *[2] ==> *[1+2]?
-    Type ptr12 = TypeNil.NIL.join(TypeMemPtr.make(-1)).join( TypeMemPtr.make(-2));
+    Type ptr12 = TypeNil.NIL.join(TypeMemPtr.make(-2)).join( TypeMemPtr.make(-3));
     // mem.ld(*[1+2]?) ==> @{c:0}
     Type ld = mem.ld((TypeMemPtr)ptr12);
     assertEquals(a1,ld);

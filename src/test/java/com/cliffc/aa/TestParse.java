@@ -16,7 +16,7 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
     Object dummy = Env.GVN; // Force class loading cycle
-    test("(math_rand(1) ? {+} : {*})(2,3)",TypeInt.INT8); // either 2+3 or 2*3, or {5,6} which is INT8.
+    testerr("x=3; fun:{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int64","                              ");
 
     // A collection of tests which like to fail easily
     testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1) is not a @{x,y}","                           ");
@@ -194,7 +194,7 @@ public class TestParse {
 
     test   (" -1 :int1", TypeInt.con(-1));
     testerr("(-1):int1", "-1 is not a int1","         ");
-    testerr("\"abc\":int", "\"abc\" is not a int64","         ");
+    testerr("\"abc\":int", "*[7] is not a int64","         ");
     testerr("1:str", "1 is not a str","     ");
 
     testerr("x=3; fun:{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int64","                              ");
