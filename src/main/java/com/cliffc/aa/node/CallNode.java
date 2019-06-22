@@ -263,18 +263,18 @@ public class CallNode extends Node {
     }
   }
   
-  @Override public Type value(GVNGCM gvn) {
+  @Override public TypeTuple value(GVNGCM gvn) {
     Type tc = gvn.type(ctl());  // Control type
     if( _inlined )              // Inlined functions just pass thru & disappear
       return TypeTuple.make(tc,gvn.type(in(1)),gvn.type(in(2)));
     Node fp = fun();            // If inlined, its the result, if not inlined, its the function being called
     Type t = gvn.type(fp);
     if( tc == Type.XCTRL || tc == Type.ANY ) // Call is dead?
-      return TypeTuple.CALL.dual();
+      return TypeTuple.XCALL;
     if( !(fp instanceof UnresolvedNode || fp instanceof EpilogNode) )
-      return TypeTuple.CALL.dual();
+      return TypeTuple.XCALL;
     if( fp.is_forward_ref() )
-      return TypeTuple.CALL.dual();
+      return TypeTuple.XCALL;
     if( Type.SCALAR.isa(t) ) // Calling something that MIGHT be a function, no idea what the result is
       return TypeTuple.CALL;
     if( !t.isa(TypeFunPtr.GENERIC_FUNPTR) ) // Calling something that MIGHT be a function, no idea what the result is
@@ -283,19 +283,27 @@ public class CallNode extends Node {
     if( gvn._opt ) // Manifesting optimistic virtual edges between caller and callee
       wire(gvn);   // Make real edges from virtual edges
     
-    TypeTuple trez = TypeTuple.CALL; // Base for JOIN
-    if( fp instanceof UnresolvedNode ) {
+    if( fp instanceof EpilogNode )
+      // Return {control,mem,value} tuple.
+      return value1(gvn,(EpilogNode)fp); // Return type or SCALAR if invalid args
+      
+    if( gvn._opt ) {
+      TypeTuple trez = TypeTuple.CALL; // Base for JOIN
       // For unresolved, we can take the BEST choice; i.e. the JOIN of every
       // choice.  Typically one choice works and the others report type
       // errors on arguments.
       for( Node epi : fp._defs )
         trez = (TypeTuple)trez.join(value1(gvn,(EpilogNode)epi)); // JOIN of choices
-    } else {                             // Single resolved target
-      trez = value1(gvn,(EpilogNode)fp); // Return type or SCALAR if invalid args
+      return trez;              // Return {control,mem,value} tuple.
+    } else {
+      TypeTuple trez = TypeTuple.XCALL; // Base for MEET
+      // For unresolved, we can take the BEST choice; i.e. the JOIN of every
+      // choice.  Typically one choice works and the others report type
+      // errors on arguments.
+      for( Node epi : fp._defs )
+        trez = (TypeTuple)trez.meet(value1(gvn,(EpilogNode)epi)); // JOIN of choices
+      return trez;              // Return {control,mem,value} tuple.
     }
-    
-    // Return {control,mem,value} tuple.
-    return trez;
   }
 
   // See if the arguments are valid.  If valid, return the function's return

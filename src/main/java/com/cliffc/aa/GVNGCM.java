@@ -73,12 +73,15 @@ public class GVNGCM {
     _ts.set_len(_INIT0_CNT);
     _vals.clear();
     for( Node n : _INIT0_NODES ) {
-      assert !n.is_dead();
-      _vals.put(n,n);
       for( int i=0; i<n._uses._len; i++ )
         if( n._uses.at(i)._uid >= CNT )
           n._uses.del(i--);
+      assert !n.is_dead();
+      _vals.put(n,n);
+      _ts.set(n._uid,n.value(this)); // Reset types
     }
+    for( Node n : _INIT0_NODES ) // Again, because doing it bulk instead of following edges.
+      _ts.set(n._uid,n.value(this));
   }
 
   public Type type( Node n ) {

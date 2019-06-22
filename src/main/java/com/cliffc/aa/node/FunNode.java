@@ -85,7 +85,14 @@ public class FunNode extends RegionNode {
   // Fast reset of parser state between calls to Exec
   static int PRIM_CNT;
   public static void init0() { PRIM_CNT = FUNS._len; }
-  public static void reset_to_init0() { FUNS.set_len(PRIM_CNT); }
+  public static void reset_to_init0() {
+    FUNS.set_len(PRIM_CNT);
+    for( int i=2; i<PRIM_CNT; i++ ) {
+      FunNode fun = FUNS.at(i);
+      if( fun._fidx != i )      // Cloned primitives get renumbered, so renumber back
+        fun._fidx = fun.epi()._fidx = i;
+    }
+  }
 
   @Override public String xstr() {
     SB sb = name(_fidx,new SB());
