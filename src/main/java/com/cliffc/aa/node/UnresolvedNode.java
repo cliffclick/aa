@@ -11,7 +11,7 @@ public class UnresolvedNode extends Node {
   @Override String xstr() {
     if( in(0) instanceof EpilogNode ) {
       EpilogNode epi = (EpilogNode)in(0);
-      if( epi.in(3) instanceof FunNode )
+      if( epi.in(4) instanceof FunNode )
         return "Unr:"+epi.fun()._name;
     }
     return "Unr???";

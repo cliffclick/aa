@@ -85,12 +85,15 @@ public class CallNode extends Node {
     // already unpacked a tuple, and can see the NewNode, unpack it right now.
     if( !_unpacked ) { // Not yet unpacked a tuple
       assert nargs()==1;
-      Node mem = mem();
       Type tn = gvn.type(arg(0));
       if( tn instanceof TypeMemPtr ) {
+        TypeMemPtr tnptr = (TypeMemPtr)tn;
+        Node mem = mem();
         Type tm = gvn.type(mem);
         if( tm instanceof TypeMem ) {
-          Type tx = ((TypeMem)tm).ld((TypeMemPtr)tn);
+          if( mem instanceof MemMergeNode )
+            tm = gvn.type(mem.in(1));
+          Type tx = ((TypeMem)tm).ld(tnptr);
           if( tx instanceof TypeStruct ) {
             TypeStruct tt = (TypeStruct)tx;
             // Either all the edges from a NewNode (for non-constants), or all
@@ -433,6 +436,8 @@ public class CallNode extends Node {
     Type txfp = gvn.type(xfp);
     if( !(txfp instanceof TypeFunPtr) )
       return _badargs.errMsg("A function is being called, but "+txfp+" is not a function type");
+    if( txfp.above_center() )
+      return _badargs.errMsg("An ambiguous function is being called");
 
     EpilogNode epi = (EpilogNode)xfp;
     if( fp.is_forward_ref() ) // Forward ref on incoming function

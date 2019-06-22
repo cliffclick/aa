@@ -16,7 +16,7 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
     Object dummy = Env.GVN; // Force class loading cycle
-    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
+    test("(math_rand(1) ? {+} : {*})(2,3)",TypeInt.INT8); // either 2+3 or 2*3, or {5,6} which is INT8.
 
     // A collection of tests which like to fail easily
     testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1) is not a @{x,y}","                           ");
@@ -80,9 +80,9 @@ public class TestParse {
     test("{-}(1,2)", TypeInt.con(-1)); // binary version
     test(" - (1  )", TypeInt.con(-1)); // unary version
     // error; mismatch arg count
-    testerr("!()       ", "Passing 0 arguments to ! which takes 1 arguments","   ");
+    testerr("!()       ", "Passing 0 arguments to !{(int64)-> int1} which takes 1 arguments","   ");
     testerr("math_pi(1)", "A function is being called, but 3.141592653589793 is not a function type","          ");
-    testerr("{+}(1,2,3)", "Passing 3 arguments to + which takes 2 arguments","          ");
+    testerr("{+}(1,2,3)", "Passing 3 arguments to +{(flt64,flt64)-> flt64} which takes 2 arguments","          ");
 
     // Parsed as +(1,(2*3))
     test("{+}(1, 2 * 3) ", TypeInt.con(7));
@@ -160,8 +160,9 @@ public class TestParse {
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
     test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)",TypeInt.INT64);
     test("f0 = { x -> x ? {+}(f0(x-1),1) : 0 }; f0(2)", TypeInt.con(2));
-    testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact()","Passing 0 arguments to fact{Scalar -> Scalar} which takes 1 arguments","                                                ");
-    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(0),fact(1),fact(2))",TypeStruct.make(TypeNil.NIL,TypeInt.con(1),TypeInt.con(2)));
+    testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact()","Passing 0 arguments to fact{(Scalar)-> Scalar [mem]} which takes 1 arguments","                                                ");
+    test_ptr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(0),fact(1),fact(2))",
+             (alias)-> TypeMem.make(alias,TypeStruct.make(TypeNil.NIL,TypeInt.con(1),TypeInt.con(2))));
 
     // Co-recursion requires parallel assignment & type inference across a lexical scope
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.TRUE );
@@ -177,7 +178,7 @@ public class TestParse {
 
     // This test shows that I am passing a TypeFun to a CallNode, not a
     // TypeFunPtr as the test merges 2 TypeFunPtrs in a Phi.
-    test("(math_rand(1) ? {+} : {*})(2,3)",TypeInt.INT8); // either 2+3 or 2*3, or {5,6} which is INT8.
+    testerr("(math_rand(1) ? {+} : {*})(2,3)","An ambiguous function is being called"/*TypeInt.INT8*/,"                               "); // either 2+3 or 2*3, or {5,6} which is INT8.
   }
 
   @Test public void testParse3() {

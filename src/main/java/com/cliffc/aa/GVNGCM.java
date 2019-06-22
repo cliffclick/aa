@@ -390,16 +390,19 @@ public class GVNGCM {
         Type ot = type(n);       // Old type
         Type nt = n.value(this); // New type
         assert ot.isa(nt);       // Types only fall monotonically
-        if( ot != nt )           // Progress
+        if( ot != nt ) {         // Progress
           _ts.setX(n._uid,nt);   // Record progress
-        for( Node use : n._uses ) {
-          if( type(use) == Type.ANY || // Not yet typed
-              (ot != nt && use.all_type() != type(use))) // If not already at bottom
-            if( use != n ) add_work(use); // Re-run users to check for progress
-          // When new control paths appear on Regions, the Region stays the
-          // same type (Ctrl) but the Phis must merge new values.
-          if( use instanceof RegionNode )
-            for( Node phi : use._uses ) if( phi != n ) add_work(phi);
+          for( Node use : n._uses ) {
+            if( use==n ) continue;        // Stop self-cycle (not legit, but happens during debugging)
+            if( use.all_type() != type(use)) // Minor optimization: If not already at bottom
+              add_work(use); // Re-run users to check for progress
+            // When new control paths appear on Regions, the Region stays the
+            // same type (Ctrl) but the Phis must merge new values.  Same for
+            // Epilogs; the output type does not change (TypeFunPtr) but
+            // CallNodes "peek" through the Epilog to get results.
+            if( use instanceof RegionNode || use instanceof EpilogNode )
+              for( Node phi : use._uses ) if( phi != n ) add_work(phi);
+          }
         }
       }
 

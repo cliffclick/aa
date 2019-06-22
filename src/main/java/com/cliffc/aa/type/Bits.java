@@ -180,7 +180,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   }
 
   // Test a specific bit is set or clear on a given bits
-  private static boolean test(long[] bits, int i) { return (bits[idx(i)]&mask(i))!=0; }
+  private static boolean test(long[] bits, int i) { return idx(i) < bits.length && (bits[idx(i)]&mask(i))!=0; }
   // Test a specific bit is set or clear on this Bits
   public boolean test(int i) {
     if( _bits==null ) return i==Math.abs(_con);
