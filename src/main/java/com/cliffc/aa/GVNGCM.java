@@ -410,7 +410,7 @@ public class GVNGCM {
         else {
           Node fun = call.resolve(this);
           if( fun != null ) {          // Unresolved gets left on worklist
-            set_def_reg(call, 2, fun); // Set resolved edge
+            call.set_fun_reg(fun,this); // Set resolved edge
             ambi_calls.del(i--);       // Remove from worklist
           }
         }

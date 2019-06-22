@@ -59,8 +59,8 @@ public class CallNode extends Node {
   private Node ctl() { return in(0); }
   public  Node fun() { return in(1); }
   private Node mem() { return in(2); }
-  private void set_fun(Node fun, GVNGCM gvn) { set_def(1,fun,gvn); }
-  void set_fun_reg(Node fun, GVNGCM gvn) { gvn.set_def_reg(this,1,fun); }
+  private void set_fun    (Node fun, GVNGCM gvn) {     set_def    (1,fun,gvn); }
+  public  void set_fun_reg(Node fun, GVNGCM gvn) { gvn.set_def_reg(this,1,fun); }
   public BitsFun fidxs(GVNGCM gvn) {
     Type tf = gvn.type(fun());
     return tf instanceof TypeFunPtr ? ((TypeFunPtr)tf).fidxs() : null;
@@ -274,7 +274,7 @@ public class CallNode extends Node {
     if( !(fp instanceof UnresolvedNode || fp instanceof EpilogNode) )
       return TypeTuple.XCALL;
     if( fp.is_forward_ref() )
-      return TypeTuple.XCALL;
+      return TypeTuple.CALL;
     if( Type.SCALAR.isa(t) ) // Calling something that MIGHT be a function, no idea what the result is
       return TypeTuple.CALL;
     if( !t.isa(TypeFunPtr.GENERIC_FUNPTR) ) // Calling something that MIGHT be a function, no idea what the result is
@@ -312,11 +312,11 @@ public class CallNode extends Node {
   private TypeTuple value1( GVNGCM gvn, EpilogNode epi ) {
     Type t = gvn.type(epi);
     if( !(t instanceof TypeFunPtr) ) // Might be any function, returning anything
-      return t.above_center() ? (TypeTuple)TypeTuple.CALL.dual() : TypeTuple.CALL;
+      return t.above_center() ? TypeTuple.XCALL : TypeTuple.CALL;
     Type    tctrl=gvn.type(epi.ctl());
     Type    tmem =gvn.type(epi.mem());
     Type    tval =gvn.type(epi.val());
-    if( tctrl == Type.XCTRL ) return (TypeTuple)TypeTuple.CALL.dual(); // Function will never return
+    if( tctrl == Type.XCTRL ) return TypeTuple.XCALL; // Function will never return
     assert tctrl==Type.CTRL;      // Function will never return?
     FunNode fun = epi.fun();
     if( fun.is_forward_ref() ) return TypeTuple.make(tctrl,tmem,tval); // Forward refs do no argument checking
@@ -441,7 +441,7 @@ public class CallNode extends Node {
     // Error#2: bad-arg-count
     FunNode fun = epi.fun();
     if( fun.nargs() != nargs() )
-      return _badargs.errMsg("Passing "+nargs()+" arguments to "+(fun.str())+" which takes "+fun.nargs()+" arguments");
+      return _badargs.errMsg("Passing "+nargs()+" arguments to "+(fun.xstr())+" which takes "+fun.nargs()+" arguments");
 
     // Error#3: Now do an arg-check
     TypeTuple formals = fun._ts; // Type of each argument
