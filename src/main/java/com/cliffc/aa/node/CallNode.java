@@ -424,7 +424,7 @@ public class CallNode extends Node {
     Type txfp = gvn.type(xfp);
     if( !(txfp instanceof TypeFunPtr) )
       return _badargs.errMsg("A function is being called, but "+txfp+" is not a function type");
-    if( txfp.above_center() )
+    if( ((TypeFunPtr)txfp).fidxs().above_center() )
       return _badargs.errMsg("An ambiguous function is being called");
 
     EpilogNode epi = (EpilogNode)xfp;

@@ -12,7 +12,7 @@ import com.cliffc.aa.type.*;
 // - RPC - where to jump-to next; the Continuation
 // - The FunNode function header (quickly maps to SESE region header)
 public class EpilogNode extends Node {
-  private final TypeTuple _args; // Used when the function dies, to keep a sane type
+  TypeTuple _args; // Used when the function dies, to keep a sane type
   private final String _unkref_err; // Unknown ref error (not really a forward ref)
   public EpilogNode( Node ctrl, Node mem, Node val, Node rpc, FunNode fun, String unkref_err ) {
     super(OP_EPI,ctrl,mem,val,rpc,fun);
@@ -36,7 +36,7 @@ public class EpilogNode extends Node {
     if( is_forward_ref() ) return all_type();
     Type v = gvn.type(val());
     if( is_copy() )             // Function is dead, epilog is dying; type makes no sense
-      return TypeFunPtr.make(BitsFun.ANY,_args,v);
+      return TypeFunPtr.make(BitsFun.NZERO.dual(),_args,v);
     FunNode fun = fun();
     return TypeFunPtr.make(fun._tf.fidxs(),fun._tf._args,v);
   }

@@ -76,14 +76,15 @@ public class TypeTuple extends Type<TypeTuple> {
     assert !tt.is_fun();
     return tt;
   }
-  private static TypeTuple make_generic_args() {
+  private static TypeTuple make_generic_args(boolean any) {
     Type[] args = new Type[99];
-    java.util.Arrays.fill(args,XSCALAR);
-    return make0(true,args);
+    java.util.Arrays.fill(args,any ? XSCALAR : SCALAR);
+    return make0(any,args);
   }
 
   // Most primitive function call argument type lists are 0-based
-  public  static final TypeTuple XSCALARS= make_generic_args();
+  public  static final TypeTuple XSCALARS= make_generic_args(true );
+  public  static final TypeTuple  SCALARS= make_generic_args(false);
           static final TypeTuple SCALAR0 = make();
           static final TypeTuple SCALAR1 = make(SCALAR);
   public  static final TypeTuple SCALAR2 = make(SCALAR, SCALAR);
@@ -127,13 +128,16 @@ public class TypeTuple extends Type<TypeTuple> {
 
   // Meet 2 tuples, shorter is 'this'
   private TypeTuple xmeet1( TypeTuple tmax ) {
+    // If both are high, take the min; if both low take the max;
+    // else take the single low choice.
     int len = tmax._any ? _ts.length : tmax._ts.length;
     // Meet of common elements
     Type[] ts = new Type[len];
     for( int i=0; i<_ts.length; i++ )  ts[i] = _ts[i].meet(tmax._ts[i]);
-    // Elements only in the longer tuple
+    // Elements only in the longer tuple.  The short tuple extra elements are
+    // either SCALAR or XSCALAR.
     for( int i=_ts.length; i<len; i++ )
-      ts[i] = tmax._ts[i];
+      ts[i] = _any ? tmax._ts[i] : Type.SCALAR;
     return make0(_any&tmax._any,ts);
   }
 

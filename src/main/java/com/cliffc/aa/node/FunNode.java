@@ -52,7 +52,7 @@ public class FunNode extends RegionNode {
   // Used to start an anonymous function in the Parser, includes argument memory in ts[0]
   public FunNode(Type[] ts) { this(null,TypeFunPtr.make_new(TypeTuple.make(ts),Type.SCALAR),-1); }
   // Used to forward-decl anon functions
-  FunNode(String name) { this(name,TypeFunPtr.make_new(TypeTuple.XSCALARS,Type.SCALAR),-2); }
+  FunNode(String name) { this(name,TypeFunPtr.make_new(TypeTuple.SCALARS,Type.SCALAR),-2); }
   // Shared common constructor
   private FunNode(String name, TypeFunPtr tf, int op_prec) {
     super(OP_FUN);
@@ -363,7 +363,10 @@ public class FunNode extends RegionNode {
         work.addAll(n._uses);  // Visit all uses also
       map.put(n,n.copy(gvn));  // Make a blank copy with no edges and map from old to new
     }
-
+    // Correct new function sig
+    EpilogNode newepi = (EpilogNode)map.get(epi);
+    newepi._args = fun._tf._args;
+    
     // Fill in edges.  New Nodes point to New instead of Old; everybody
     // shares old nodes not in the function (and not cloned).  The
     // FunNode & Parms only get the matching slice of args.
@@ -417,7 +420,6 @@ public class FunNode extends RegionNode {
     
     // Repoint all Calls uses of the original Epilog to an Unresolved choice of
     // the old and new functions and let the Calls resolve individually.
-    EpilogNode newepi = (EpilogNode)map.get(epi);
     if( _tf._args != fun._tf._args ) { // Split-for-type, possible many future callers
       UnresolvedNode new_unr = new UnresolvedNode();
       new_unr.add_def(epi);
