@@ -39,48 +39,34 @@ import java.util.Map;
 // 
 public class FunNode extends RegionNode {
   public String _name;          // Optional for anon functions; can be set later via bind()
-  final TypeTuple _ts;          // Arg types, 0-based, used to detect argument type errors; null for forward_refs
-  public Type _ret;             // return types
-  public TypeMem _retmem;       // return MEMORY types
-  public int _fidx;             // Unique function index
-  private final byte _op_prec;  // Operator precedence; only set top-level primitive wrappers
+  public TypeFunPtr _tf;        // FIDX, arg & ret types
+  // Operator precedence; only set on top-level primitive wrappers.
+  // -1 for normal non-operator functions and -2 for forward_decls.
+  private final byte _op_prec;  // Operator precedence; only set on top-level primitive wrappers
   
   // Used to make the primitives at boot time
-  public FunNode(PrimNode prim, Type ret, TypeMem retmem) {
-    this(prim._targs,ret,retmem,BitsFun.ALL,prim.op_prec(),prim._name); }
-  public FunNode(IntrinsicNode prim, Type ret, TypeMem retmem) {
-    this(prim._targs,ret,retmem,BitsFun.ALL,-1,prim._name); }
+  public FunNode(     PrimNode prim) { this(prim._name,TypeFunPtr.make_new(prim._targs,prim._ret),prim.op_prec()); }
+  public FunNode(IntrinsicNode prim, Type ret) { this(prim._name,TypeFunPtr.make_new(prim._targs,ret),-1); }
   // Used to make copies when inlining/cloning function bodies
-  private FunNode(TypeTuple ts, Type ret, TypeMem retmem, int parent_fidx, String name) {
-    this(ts,ret,retmem,parent_fidx,-1,name); }
+  private FunNode(String name,TypeFunPtr tf) { this(name,tf,-1); }
   // Used to start an anonymous function in the Parser, includes argument memory in ts[0]
-  public FunNode(Type[] ts) { this(TypeTuple.make(ts),Type.SCALAR,TypeMem.MEM,BitsFun.ALL,-1,null); }
+  public FunNode(Type[] ts) { this(null,TypeFunPtr.make(BitsFun.NZERO,TypeTuple.make(ts),Type.SCALAR),-1); }
   // Used to forward-decl anon functions
-  FunNode(String name) { this(null,Type.SCALAR,TypeMem.MEM,BitsFun.ALL,-1,name); }
+  FunNode(String name) { this(name,TypeFunPtr.make_new(TypeTuple.XSCALARS,Type.SCALAR),-2); }
   // Shared common constructor
-  private FunNode(TypeTuple ts, Type ret, TypeMem retmem, int fidx, int op_prec, String name) {
+  private FunNode(String name, TypeFunPtr tf, int op_prec) {
     super(OP_FUN);
     _name = name;
-    _ts = ts;
-    _ret = ret;
-    _retmem = retmem;
+    _tf = tf;
     _op_prec = (byte)op_prec;
     add_def(Env.ALL_CTRL);
-    set_new_fidx(fidx,null);
+    FUNS.setX(fidx(),this); // Track FunNode by fidx; assert single-bit fidxs
   }
   
   // Find FunNodes by fidx
   static Ary<FunNode> FUNS = new Ary<>(new FunNode[]{null,});
   public static FunNode find_fidx( int fidx ) { return fidx >= FUNS._len ? null : FUNS.at(fidx); }
-  private void set_new_fidx(int parent_fidx, GVNGCM gvn) {
-    _fidx = BitsFun.new_fidx(parent_fidx);
-    FUNS.setX(_fidx,this); // Track FunNode by fidx
-    if( gvn != null ) {
-      EpilogNode epi = epi();
-      epi._fidx = _fidx;        // Epilog matches
-      gvn.add_work(epi);        // 
-    }
-  }
+  int fidx() { return _tf.fidx(); } // Asserts single-bit internally
   
   // Fast reset of parser state between calls to Exec
   static int PRIM_CNT;
@@ -89,28 +75,21 @@ public class FunNode extends RegionNode {
     FUNS.set_len(PRIM_CNT);
     for( int i=2; i<PRIM_CNT; i++ ) {
       FunNode fun = FUNS.at(i);
-      if( fun._fidx != i )      // Cloned primitives get renumbered, so renumber back
-        fun._fidx = fun.epi()._fidx = i;
+      if( fun.fidx() != i ) // Cloned primitives get renumbered, so renumber back
+        fun._tf = fun._tf.make_fidx(i);
     }
   }
 
-  @Override public String xstr() {
-    SB sb = name(_fidx,new SB());
-    if( _ts==null ) return sb.p("{forward_ref}").toString();
-    // Supposed to be the self SHORT name, but include full signature.
-    sb.p('{').p(_ts).p("-> ").p(_ret);
-    if( _retmem != TypeMem.XMEM ) // Return memory is only interesting if returning something special
-      sb.p(' ').p(_retmem);
-    return sb.p('}').toString();
-  }
+  // Supposed to be the self SHORT name, but include full signature.
+  @Override public String xstr() {  return _tf.str(null); }
   // Inline name
-  @Override String str() { return _name==null ? Integer.toString(_fidx) : _name; }
+  @Override String str() { return _name==null ? Integer.toString(fidx()) : _name; }
   // Debug only: make an attempt to bind name to a function
   public void bind( String tok ) {
     assert _name==null || _name.equals(tok); // Attempt to double-bind
     _name = tok;
   }
-  // Can return nothing, or "name" or "{name0,name1,name2...}"
+  // Can return nothing, or "name" or "[name0,name1,name2...]" or "[35]"
   public static SB names(BitsFun fidxs, SB sb ) {
     int fidx = fidxs.abit();
     if( fidx >= 0 ) return name(fidx,sb);
@@ -127,7 +106,9 @@ public class FunNode extends RegionNode {
   public static SB name( int fidx, SB sb ) {
     FunNode fun = find_fidx(fidx);
     String name = fun == null ? null : fun._name;
-    return sb.p(name==null ? Integer.toString(fidx) : name);
+    if( name==null && fun != null && fun.is_forward_ref() ) name="<forward_decl_"+fidx+">";
+    if( name==null ) name = Integer.toString(fidx);
+    return sb.p(name);
   }
 
   @Override Node copy(GVNGCM gvn) { throw AA.unimpl(); } // Gotta make a new FIDX
@@ -137,10 +118,9 @@ public class FunNode extends RegionNode {
   // Argument type
   Type targ(int idx) {
     return idx == -1 ? TypeRPC.ALL_CALL :
-      (idx == -2 ? TypeMem.MEM : _ts.at(idx));
+      (idx == -2 ? TypeMem.MEM : _tf.arg(idx));
   }
-  int nargs() { return _ts._ts.length; }
-  TypeFunPtr tf() { return TypeFunPtr.make(BitsFun.make0(_fidx)); }
+  int nargs() { return _tf._args._ts.length; }
   
   // ----
   @Override public Node ideal(GVNGCM gvn) {
@@ -272,14 +252,16 @@ public class FunNode extends RegionNode {
     // (all Scalar args).  Peel out 2nd call-site args and generalize them.
     
     // Make a new function header with new signature
-    TypeTuple ts = TypeTuple.make(sig);
-    assert ts.isa(_ts);
-    assert ts != _ts;           // Must see improvement
+    TypeTuple args = TypeTuple.make(sig);
+    assert args.isa(_tf._args);
+    assert args != _tf._args;   // Must see improvement
     // Make a prototype new function header split from the original.
-    FunNode fun = new FunNode(ts,_ret,_retmem,_fidx,_name);
+    int fidx = fidx();
+    FunNode fun = new FunNode(_name,TypeFunPtr.make(BitsFun.make_new_fidx(fidx),args,_tf._ret));
     // Renumber the original as well; the original _fidx is now a *class* of 2
     // fidxs.  Each FunNode fidx is only ever a constant.
-    set_new_fidx(_fidx,gvn);
+    _tf = _tf.make_new_fidx(fidx);
+    FUNS.setX(fidx(),this);     // Track FunNode by fidx
     // Look in remaining paths and decide if they split or stay
     Node xctrl = gvn.con(Type.XCTRL);
     for( int j=2; j<_defs._len; j++ ) {
@@ -345,10 +327,12 @@ public class FunNode extends RegionNode {
     // Make a prototype new function header.  No generic unknown caller
     // in slot 1.  The one inlined call in slot 'm'.
     // Make a prototype new function header.
-    FunNode fun = new FunNode(_ts,_ret,_retmem,_fidx,_name);
+    int fidx = fidx();
+    FunNode fun = new FunNode(_name,_tf.make_new_fidx(fidx));
     // Renumber the original as well; the original _fidx is now a *class* of 2
     // fidxs.  Each FunNode fidx is only ever a constant.
-    set_new_fidx(_fidx,gvn);
+    _tf = _tf.make_new_fidx(fidx);
+    FUNS.setX(fidx(),this);     // Track FunNode by fidx
     fun.pop();                  // Remove junk ALL_CTRL input
     Node top = gvn.con(Type.XCTRL);
     for( int i=1; i<_defs._len; i++ )
@@ -377,9 +361,6 @@ public class FunNode extends RegionNode {
         work.addAll(n._uses);  // Visit all uses also
       map.put(n,n.copy(gvn));  // Make a blank copy with no edges and map from old to new
     }
-    // Correct new function index
-    EpilogNode newepi = (EpilogNode)map.get(epi);
-    newepi._fidx = fun._fidx;
 
     // Fill in edges.  New Nodes point to New instead of Old; everybody
     // shares old nodes not in the function (and not cloned).  The
@@ -427,14 +408,15 @@ public class FunNode extends RegionNode {
       if( nn instanceof ParmNode && ((ParmNode)nn)._idx==-1 )
         ot = nn.all_type();     // Except the RPC, which has new callers
       else if( nn instanceof EpilogNode )
-        ot = fun.tf();          // Except the Epilog, which matches a new function
+        ot = fun._tf;           // Except the Epilog, which matches a new function
       gvn.rereg(nn,ot);
     }
     assert !epi.is_dead();      // Not expecting this to be dead already
     
     // Repoint all Calls uses of the original Epilog to an Unresolved choice of
     // the old and new functions and let the Calls resolve individually.
-    if( _ts != fun._ts ) { // Split-for-type, possible many future callers
+    EpilogNode newepi = (EpilogNode)map.get(epi);
+    if( _tf._args != fun._tf._args ) { // Split-for-type, possible many future callers
       UnresolvedNode new_unr = new UnresolvedNode();
       new_unr.add_def(epi);
       gvn.init(new_unr);
@@ -527,7 +509,7 @@ public class FunNode extends RegionNode {
   }
 
   // True if this is a forward_ref
-  @Override public boolean is_forward_ref() { return _ts==null; }
+  @Override public boolean is_forward_ref() { return _op_prec==-2; }
   ParmNode parm( int idx ) {
     for( Node use : _uses )
       if( use instanceof ParmNode && ((ParmNode)use)._idx==idx )
@@ -542,12 +524,12 @@ public class FunNode extends RegionNode {
     return null;
   }
 
-  @Override public int hashCode() { return super.hashCode()+(_ts==null ? 0 : _ts.hashCode())+_ret.hashCode()+_retmem.hashCode()+_fidx; }
+  @Override public int hashCode() { return super.hashCode()+_tf.hashCode(); }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !(o instanceof FunNode) ) return false;
     FunNode fun = (FunNode)o;
-    return _fidx == fun._fidx;
+    return _tf == fun._tf;
   }
   @Override public byte op_prec() { return _op_prec; }
 }

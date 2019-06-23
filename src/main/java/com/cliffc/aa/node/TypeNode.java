@@ -10,8 +10,8 @@ import com.cliffc.aa.type.Type;
 // semantics, but the join is not-locally-obviously-correct.  The Cast makes it
 // locally obvious.
 public class TypeNode extends Node {
-  final Type _t;            // TypeVar???
-  final Parse _error_parse; // Used for error messages
+  private final Type _t;            // TypeVar???
+  private final Parse _error_parse; // Used for error messages
   public TypeNode( Type t, Node n, Parse P ) { super(OP_TYPE,null,n); _t=t; _error_parse = P; }
   @Override String xstr() { return ":"+_t; }
   @Override public Node ideal(GVNGCM gvn) {

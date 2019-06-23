@@ -444,7 +444,7 @@ public class GVNGCM {
   private void walk_opt( Node n/*, FunNode frez*/ ) {
     assert !n.is_dead();
     if( _wrk_bits.get(n._uid) ) return; // Been there, done that
-    if( n==Env.START ) return;         // Top-level scope
+    if( n==Env.START ) return;          // Top-level scope
     add_work(n);                        // Only walk once
     // Replace with a constant, if possible
     Type t = type(n);
@@ -458,18 +458,13 @@ public class GVNGCM {
       EpilogNode epi = fun.epi();
       if( type(fun)==Type.CTRL && epi != null ) {
         if( type(epi.ctl()) != Type.CTRL ) throw AA.unimpl(); // never-return function (maybe never called?)
-        Type tret = type(epi.val()); // Actual return value
-        if( tret !=  fun._ret &&   // can sharpen function return
-            tret.isa(fun._ret) ) { // Only if sharpened (might not be true for errors)
+        TypeFunPtr tf = (TypeFunPtr)type(epi);
+        if( tf != fun._tf && !tf.isa(fun._tf) )
+          throw AA.unimpl();    // Untested...
+        if( tf != fun._tf &&    // can sharpen function return
+            tf.isa(fun._tf) ) { // Only if sharpened (might not be true for errors)
           unreg(fun);
-          fun._ret = tret;
-          rereg(fun,Type.CTRL);
-        }
-        Type tmem = type(epi.mem());  // Actual return value
-        if( tmem !=  fun._retmem &&   // can sharpen function return
-            tmem.isa(fun._retmem) ) { // Only if sharpened (might not be true for errors)
-          unreg(fun);
-          fun._retmem = (TypeMem)tmem;
+          fun._tf = tf;
           rereg(fun,Type.CTRL);
         }
       }

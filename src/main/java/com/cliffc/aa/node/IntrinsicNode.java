@@ -22,15 +22,19 @@ import java.util.HashMap;
 // epilog.
 public abstract class IntrinsicNode extends Node {
   public final String _name;    // Unique name (and program bits)
-  final String[] _args;         // Handy; 0-based
-  final TypeTuple _targs;       // Argument types, 0-based, no memory.
+  final TypeTuple _targs;       // Argument types, 0-based
+  final Type _funret;           // Primitive return type for outer as_fun, not memory effects
+  final String[] _args;         // Handy string arg names; 0-based
   Parse _badargs;               // Filled in when inlined in CallNode
   int _alias;                   // Alias class for new memory
   TypeMemPtr _ptr;              // private cache of the alias pointer
   TypeTuple _all_type;          // private cache of the CallNode-like return type
-  IntrinsicNode( String name, String[] args, TypeTuple targs, int alias ) {
+  IntrinsicNode( String name, String[] args, TypeTuple targs, Type funret, int alias ) {
     super(OP_LIBCALL);
-    _name=name; _args=args; _targs = targs;
+    _name=name;
+    _targs = targs;
+    _funret = funret;           // Passed to the outer FunNode built in as_fun
+    _args=args;
     _badargs=null;
     update_alias(alias);
   }
@@ -52,7 +56,7 @@ public abstract class IntrinsicNode extends Node {
 
   // Wrap the PrimNode with a Fun/Epilog wrapper that includes memory effects.
   public EpilogNode as_fun( GVNGCM gvn ) {
-    FunNode  fun = ( FunNode) gvn.xform(new  FunNode(this,TypeMemPtr.make(_alias),TypeMem.make(_alias,TypeObj.OBJ)));
+    FunNode  fun = ( FunNode) gvn.xform(new  FunNode(this,_funret));
     ParmNode rpc = (ParmNode) gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
     ParmNode memp= (ParmNode) gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM     ),null));
     // Add input edges to the intrinsic
@@ -60,11 +64,11 @@ public abstract class IntrinsicNode extends Node {
     add_def(memp);              // Aliased Memory in slot 1
     for( int i=0; i<_args.length; i++ ) // Args follow
       add_def(gvn.xform(new ParmNode(i,_args[i],fun, gvn.con(_targs.at(i)),null)));
-    Node prim = gvn.xform(this);
+    Node prim = gvn.xform(this); // Intrinsic returns a CallNode style tuple [ctrl,mem,ptr]
     Node mem2 = gvn.xform(new MProjNode(prim,1));
     Node val  = gvn.xform(new  ProjNode(prim,2));
     Node merge= gvn.xform(new MemMergeNode(memp,mem2));
-    return new EpilogNode(fun,merge,val,rpc,fun,fun._fidx,null);
+    return new EpilogNode(fun,merge,val,rpc,fun,null);
   }
   
   // Clones during inlining all become unique new sites
@@ -98,7 +102,7 @@ public abstract class IntrinsicNode extends Node {
     final TypeObj _from;
     final TypeName _to;
     ConvertPtrTypeName(TypeObj from, TypeName to, Parse badargs) {
-      super(to._name,ARGS1,TypeTuple.make(TypeMemPtr.STRUCT), BitsAlias.REC);
+      super(to._name,ARGS1,TypeTuple.make(TypeMemPtr.STRUCT), TypeMemPtr.STRUCT, BitsAlias.REC);
       //_lex = to._lex;
       //_badargs = badargs;
       //_from = from;
@@ -149,16 +153,12 @@ public abstract class IntrinsicNode extends Node {
     private final HashMap<String,Type> _lex; // Unique lexical scope
     final TypeStruct _from;
     ConvertTypeNameStruct(TypeStruct from, TypeName to, Parse badargs) {
-      super(to._name,from._flds,make_targs(from),BitsAlias.REC);
+      super(to._name,from._flds,TypeTuple.make(from),TypeMemPtr.STRUCT,BitsAlias.REC);
       _lex=to._lex;
       _badargs=badargs;
       _from=from;
     }
 
-    // Tuple from Struct
-    private static TypeTuple make_targs(TypeStruct from) {
-      return TypeTuple.make(from._ts);
-    }
     @Override public Node ideal(GVNGCM gvn) {
       Node[] flds = new Node[_args.length];
       for( int i=1; i<flds.length; i++ )
@@ -180,7 +180,7 @@ public abstract class IntrinsicNode extends Node {
 
   // --------------------------------------------------------------------------
   static class ConvertI64Str extends IntrinsicNode {
-    ConvertI64Str(int alias) { super("str",ARGS1,TypeTuple.INT64, alias); }
+    ConvertI64Str(int alias) { super("str",ARGS1,TypeTuple.INT64, TypeMemPtr.STRPTR,alias); }
 
     // Conversion to String allocates memory - so the apply() call returns a new
     // pointer aliased to a hidden String allocation site.  The memory returned
@@ -211,7 +211,7 @@ public abstract class IntrinsicNode extends Node {
   }
   
   static class ConvertF64Str extends IntrinsicNode {
-    ConvertF64Str(int alias) { super("str",ARGS1,TypeTuple.FLT64, alias); }
+    ConvertF64Str(int alias) { super("str",ARGS1,TypeTuple.FLT64, TypeMemPtr.STRPTR, alias); }
             
     // Conversion to String allocates memory - so the apply() call returns a new
     // pointer aliased to a hidden String allocation site.  The memory returned

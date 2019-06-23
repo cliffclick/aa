@@ -29,7 +29,7 @@ public class UnresolvedNode extends Node {
   BitsFun fidxs() {
     int[] bits = new int[_defs._len];
     for( int i=0; i<_defs._len; i++ )
-      bits[i] = ((EpilogNode)in(i))._fidx;
+      bits[i] = ((EpilogNode)in(i)).fidx();
     return BitsFun.make0(bits).dual();
   }
   // Filter out all the wrong-arg-count functions

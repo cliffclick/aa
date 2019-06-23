@@ -12,49 +12,55 @@ import java.util.BitSet;
 // classic code pointer.  Cloning the code immediately also clones the fidx
 // with a new fidx bit for the new cloned copy.
 //
-// No other types, these are obtained from the function itself.  This is the
-// type of EpilogNodes, and CallNodes get argument types from the FunNode via
-// the Epilog, and return types directly from the Epilog.
+// The formal function signature is included.  This is the type of EpilogNodes,
+// and is included in FunNodes (FunNodes type is same as a RegionNode; simply
+// Control or not).
+
+// CallNodes use this type to check their incoming arguments.  CallNodes get
+// their return values (including memory) from the Epilog itself, not the
+// FunNode and not this type.
+
 public final class TypeFunPtr extends Type<TypeFunPtr> {
   // List of known functions in set, or 'flip' for choice-of-functions.
   private BitsFun _fidxs;       // Known function bits
+  // Union (or join) signature of said functions; depends on if _fidxs is
+  // above_center() or not.
+  public TypeTuple _args;       // Standard args, zero-based, no memory
+  public Type _ret;             // Standard formal return type.
 
-  private TypeFunPtr(BitsFun fidxs ) { super(TFUNPTR); init(fidxs); }
-  private void init (BitsFun fidxs ) { _fidxs = fidxs; }
-  @Override int compute_hash() { return TFUNPTR + _fidxs ._hash; }
+  private TypeFunPtr(BitsFun fidxs, TypeTuple args, Type ret ) { super(TFUNPTR); init(fidxs,args,ret); }
+  private void init (BitsFun fidxs, TypeTuple args, Type ret ) { _fidxs = fidxs; _args=args; _ret=ret; }
+  @Override int compute_hash() { return TFUNPTR + _fidxs._hash + _args._hash + _ret._hash; }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeFunPtr) ) return false;
     TypeFunPtr tf = (TypeFunPtr)o;
-    return _fidxs==tf._fidxs;
+    return _fidxs==tf._fidxs && _args==tf._args && _ret==tf._ret;
   }
   // Never part of a cycle, so the normal check works
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
-  @Override String str( BitSet dups) {
-    int fidx = _fidxs.abit();
-    if( fidx == -1 )
-      return FunNode.names(_fidxs,new SB()).p("{...}").toString();
-    FunNode fun = FunNode.find_fidx(fidx);
-    return fun==null ? new SB().p('[').p(fidx).p(']').toString() : fun.xstr();
+  @Override public String str( BitSet dups) {
+    return FunNode.names(_fidxs,new SB()).toString()+"{"+_args.str(dups)+"-> "+_ret.str(dups)+"}";
   }
 
   private static TypeFunPtr FREE=null;
   @Override protected TypeFunPtr free( TypeFunPtr ret ) { FREE=this; return ret; }
-  public static TypeFunPtr make( BitsFun fidxs ) {
+  public static TypeFunPtr make( BitsFun fidxs, TypeTuple args, Type ret ) {
     TypeFunPtr t1 = FREE;
-    if( t1 == null ) t1 = new TypeFunPtr(fidxs);
-    else {   FREE = null;        t1.init(fidxs); }
+    if( t1 == null ) t1 = new TypeFunPtr(fidxs,args,ret);
+    else {   FREE = null;        t1.init(fidxs,args,ret); }
     TypeFunPtr t2 = (TypeFunPtr)t1.hashcons();
     return t1==t2 ? t1 : t1.free(t2);
   }
   // Used by testing only
-  static TypeFunPtr make_new() { return make(BitsFun.make_new_fidx(BitsFun.ALL)); }
-  public BitsFun fidxs() { return _fidxs; }
+  public static TypeFunPtr make_new(TypeTuple args, Type ret) { return make(BitsFun.make_new_fidx(BitsFun.ALL),args,ret); }
+  public TypeFunPtr make_fidx( int fidx ) { return make(BitsFun.make0(fidx),_args,_ret); }
+  public TypeFunPtr make_new_fidx( int parent ) { return make(BitsFun.make_new_fidx(parent),_args,_ret); }
 
-  public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.make0(BitsFun.ALL)); // Only for testing
+  public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.NZERO,TypeTuple.XSCALARS,Type.SCALAR); // Only for testing
   static final TypeFunPtr[] TYPES = new TypeFunPtr[]{GENERIC_FUNPTR};
   
-  @Override protected TypeFunPtr xdual() { return new TypeFunPtr(_fidxs.dual()); }
+  @Override protected TypeFunPtr xdual() { return new TypeFunPtr(_fidxs.dual(),_args.dual(),_ret.dual()); }
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TFUNPTR:break;
@@ -72,9 +78,15 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     case TMEM:   return ALL;
     default: throw typerr(t);   // All else should not happen
     }
-    return make(_fidxs.meet( ((TypeFunPtr)t)._fidxs ));
+    TypeFunPtr tf = (TypeFunPtr)t;
+    // JOIN of args
+    return make(_fidxs.meet(tf._fidxs),(TypeTuple)_args.join(tf._args),_ret.meet(tf._ret));
   }
 
+  public BitsFun fidxs() { return _fidxs; }
+  public int fidx() { return _fidxs.getbit(); } // Asserts internally single-bit
+  public Type arg(int idx) { return _args.at(idx); }
+  
   @Override public boolean above_center() { return _fidxs.above_center(); }
   // Fidxes represent a single function and thus are constants, but TypeFunPtrs
   // represent the execution of a function, and are never constants.
@@ -84,12 +96,12 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   @Override public boolean may_nil() { return _fidxs.may_nil(); }
   @Override Type not_nil() {
     BitsFun bits = _fidxs.not_nil();
-    return bits==_fidxs ? this : make(bits);
+    return bits==_fidxs ? this : make(bits,_args,_ret);
   }
   @Override public Type meet_nil() {
     if( _fidxs.test(0) )      // Already has a nil?
       return _fidxs.above_center() ? TypeNil.NIL : this;
-    return make(_fidxs.meet(BitsFun.NIL));
+    return make(_fidxs.meet(BitsFun.NIL),_args,_ret);
   }
 
   // Generic functions

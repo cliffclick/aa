@@ -8,7 +8,7 @@ import java.util.BitSet;
 // Internal fixed-length non-recursive tuples.  Used for function arguments,
 // and multi-arg results like IfNode and CallNode.  This is not the same as a
 // no-named-field TypeStruct, and is not exposed at the language level.
-public class TypeTuple<O extends TypeTuple<O>> extends Type<O> {
+public class TypeTuple extends Type<TypeTuple> {
   boolean _any;
   public Type[] _ts; // The fixed known types
   protected TypeTuple( byte type, boolean any, Type[] ts ) { super(type); init(type, any, ts);  }
@@ -61,7 +61,7 @@ public class TypeTuple<O extends TypeTuple<O>> extends Type<O> {
   }
 
   private static TypeTuple FREE=null;
-  @Override protected O free( O ret ) { FREE=this; return ret; }
+  @Override protected TypeTuple free( TypeTuple ret ) { FREE=this; return ret; }
   @SuppressWarnings("unchecked")
   static TypeTuple make0( boolean any, Type... ts ) {
     TypeTuple t1 = FREE;
@@ -83,7 +83,7 @@ public class TypeTuple<O extends TypeTuple<O>> extends Type<O> {
   }
 
   // Most primitive function call argument type lists are 0-based
-          static final TypeTuple XSCALARS= make_generic_args();
+  public  static final TypeTuple XSCALARS= make_generic_args();
           static final TypeTuple SCALAR0 = make();
           static final TypeTuple SCALAR1 = make(SCALAR);
   public  static final TypeTuple SCALAR2 = make(SCALAR, SCALAR);
@@ -105,16 +105,16 @@ public class TypeTuple<O extends TypeTuple<O>> extends Type<O> {
   // This is the starting state of the program; CTRL is active and memory is empty.
   public  static final TypeTuple START_STATE = make(CTRL, TypeMem.EMPTY_MEM);
   public  static final TypeTuple CALL  = make(CTRL, TypeMem.MEM, SCALAR);
-  public  static final TypeTuple XCALL = (TypeTuple)CALL.dual();
+  public  static final TypeTuple XCALL = CALL.dual();
   static final TypeTuple[] TYPES = new TypeTuple[]{XSCALARS,SCALAR0,SCALAR1,STRPTR,INT32,INT64,FLT64,INT64_INT64,FLT64_FLT64,FLT64_INT64, IF_ALL, IF_TRUE, IF_FALSE, OOP_OOP};
   
   // The length of Tuples is a constant, and so is its own dual.  Otherwise
   // just dual each element.  Also flip the infinitely extended tail type.
   @SuppressWarnings("unchecked")
-  @Override protected O xdual() {
+  @Override protected TypeTuple xdual() {
     Type[] ts = new Type[_ts.length];
     for( int i=0; i<_ts.length; i++ ) ts[i] = _ts[i].dual();
-    return (O)new TypeTuple(TTUPLE, !_any, ts);
+    return new TypeTuple(TTUPLE, !_any, ts);
   }
   // Standard Meet.
   @Override protected Type xmeet( Type t ) {

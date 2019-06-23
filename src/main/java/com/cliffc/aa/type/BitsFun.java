@@ -21,7 +21,7 @@ public class BitsFun extends Bits<BitsFun> {
   private static final Bits.Tree<BitsFun> TREE = new Bits.Tree<>();
   @Override Tree<BitsFun> tree() { return TREE; } 
   public static final int ALL = new_fidx(0);
-  public static int new_fidx( int par ) { return TREE.split(par); }
+  private static int new_fidx( int par ) { return TREE.split(par); }
   // Fast reset of parser state between calls0 to Exec
   public static void init0() { TREE.init0(); }
   public static void reset_to_init0() { TREE.reset_to_init0(); }
@@ -29,14 +29,15 @@ public class BitsFun extends Bits<BitsFun> {
   // Have to make a first BitsFun here; thereafter the v-call to make_impl
   // will make more on demand.  But need the first one to make a v-call.
   private static final BitsFun FULL = new BitsFun().make_impl(1,new long[]{1L | (1L<<ALL)});
-  private static final BitsFun ANY = FULL.dual();
+  public  static final BitsFun NZERO= make0(ALL);
+  public  static final BitsFun ANY = FULL.dual();
   public  static final BitsFun NIL = make0(0);
   @Override boolean is_class() { return test(ALL); } // All bits are constants, except the first "ALL" bit
   @Override public BitsFun ALL() { return FULL; }
   @Override public BitsFun ANY() { return ANY ; }
 
   // Make a NEW fidx, with the given parent, and return the Bits with just it
-  static BitsFun make_new_fidx( int parent_fidx ) { return make0(new_fidx(parent_fidx)); }
+  public static BitsFun make_new_fidx( int parent_fidx ) { return make0(new_fidx(parent_fidx)); }
   public static BitsFun make0( int bit ) { return FULL.make(bit); }
   public static BitsFun make0( int... bits ) { return FULL.make(bits); }
   public static int last_fidx() { return TREE.last_split(); }

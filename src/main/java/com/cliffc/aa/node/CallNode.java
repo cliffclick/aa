@@ -162,7 +162,7 @@ public class CallNode extends Node {
       return null;
 
     // Single choice; insert actual conversions as needed
-    TypeTuple formals = fun._ts;
+    TypeTuple formals = fun._tf._args;
     for( int i=0; i<nargs(); i++ ) {
       if( fun.parm(i)==null )   // Argument is dead and can be dropped?
         set_arg(i,gvn.con(Type.XSCALAR),gvn); // Replace with some generic placeholder
@@ -326,7 +326,7 @@ public class CallNode extends Node {
 
     if( fun.nargs() != nargs() ) return TypeTuple.CALL; // Function not called, nothing to JOIN
     // Now do an arg-check
-    TypeTuple formals = fun._ts; // Type of each argument
+    TypeTuple formals = fun._tf._args; // Type of each argument
     for( int j=0; j<nargs(); j++ ) {
       Type actual = gvn.type(arg(j));
       Type formal = formals.at(j);
@@ -368,7 +368,7 @@ public class CallNode extends Node {
     for( int fidx : fidxs ) {
       FunNode fun = FunNode.find_fidx(fidx);
       if( fun.nargs() != nargs() ) continue; // Wrong arg count, toss out
-      TypeTuple formals = fun._ts;   // Type of each argument
+      TypeTuple formals = fun._tf._args;   // Type of each argument
       
       // Now check if the arguments are compatible at all, keeping lowest cost
       int xcvts = 0;             // Count of conversions required
@@ -449,7 +449,7 @@ public class CallNode extends Node {
       return _badargs.errMsg("Passing "+nargs()+" arguments to "+(fun.xstr())+" which takes "+fun.nargs()+" arguments");
 
     // Error#3: Now do an arg-check
-    TypeTuple formals = fun._ts; // Type of each argument
+    TypeTuple formals = fun._tf._args; // Type of each argument
     for( int j=0; j<nargs(); j++ ) {
       Type actual = gvn.type(arg(j));
       Type formal = formals.at(j);

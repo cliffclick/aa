@@ -15,12 +15,19 @@ import java.util.HashMap;
 // Fun/Parm-per-arg/Prim/Ret
 //
 public abstract class PrimNode extends Node {
+  public final String _name;    // Unique name (and program bits)
   final TypeTuple _targs;       // Argument types, 0-based
   final Type _ret;              // Primitive return type, no memory
-  public final String _name;    // Unique name (and program bits)
-  final String[] _args;         // Handy; 0-based
+  final String[] _args;         // Handy string arg names; 0-based
   Parse _badargs;               // Filled in when inlined in CallNode
-  PrimNode( String name, String[] args, TypeTuple targs, Type ret ) { super(OP_PRIM); _name=name; _args=args; _targs = targs; _ret = ret; _badargs=null; }
+  PrimNode( String name, String[] args, TypeTuple targs, Type ret ) {
+    super(OP_PRIM);
+    _name=name;
+    _targs=targs;
+    _ret=ret;
+    _args=args;
+    _badargs=null;
+  }
 
   private final static String[] ARGS1 = new String[]{"x"};
   private final static String[] ARGS2 = new String[]{"x","y"};
@@ -74,7 +81,6 @@ public abstract class PrimNode extends Node {
   // Apply types are 1-based (same as the incoming node index), and not
   // zero-based (not same as the _targs and _args fields).
   public abstract Type apply( Type[] args ); // Execute primitive
-  public boolean is_lossy() { return true; }
   @Override public String xstr() { return _name+"::"+_ret; }
   @Override public Node ideal(GVNGCM gvn) { return null; }
   @Override public Type value(GVNGCM gvn) {
@@ -85,16 +91,18 @@ public abstract class PrimNode extends Node {
     // the lowest possible result.
     boolean is_con = true;
     for( int i=1; i<_defs._len; i++ ) { // i=1, skip control
-      Type t = _targs.at(i-1).dual().meet(ts[i] = gvn.type(in(i)));
-      if( t.above_center() ) is_con = false; // Not a constant
-      else if( !t.is_con() ) return _ret;    // Some input is too low
+      Type tactual = gvn.type(in(i));
+      Type tformal = _targs.at(i-1);
+      Type t = tformal.dual().meet(ts[i] = tactual);
+      if( t.above_center() ) is_con = false;  // Not a constant
+      else if( !t.is_con() ) return _ret;     // Some input is too low
     }
     return is_con ? apply(ts) : _ret.dual();
   }
   @Override public String err(GVNGCM gvn) {
-    for( int i=1; i<_targs._ts.length; i++ ) {
+    for( int i=1; i<_defs._len; i++ ) { // i=1, skip control
       Type tactual = gvn.type(in(i));
-      Type tformal = _targs._ts[i];
+      Type tformal = _targs.at(i-1);
       if( !tactual.isa(tformal) )
         return _badargs==null ? "bad arguments" : _badargs.typerr(tactual,tformal);
     }
@@ -105,7 +113,7 @@ public abstract class PrimNode extends Node {
   // Prims are equal for same-name-same-signature (and same inputs).
   // E.g. float-minus of x and y is NOT the same as int-minus of x and y
   // despite both names being '-'.
-  @Override public int hashCode() { return super.hashCode()+_name.hashCode()+_targs.hashCode(); }
+  @Override public int hashCode() { return super.hashCode()+_name.hashCode()+_targs._hash; }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !super.equals(o) ) return false;
@@ -118,13 +126,13 @@ public abstract class PrimNode extends Node {
   // wraps a PrimNode as a full 1st-class function to be passed about or
   // assigned to variables.
   public EpilogNode as_fun( GVNGCM gvn ) {
-    FunNode  fun = ( FunNode) gvn.xform(new  FunNode(this,_ret,TypeMem.XMEM)); // Points to ScopeNode only
+    FunNode  fun = ( FunNode) gvn.xform(new  FunNode(this)); // Points to ScopeNode only
     ParmNode rpc = (ParmNode) gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
     ParmNode mem = (ParmNode) gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.XMEM    ),null));
     add_def(null);              // Control for the primitive in slot 0
     for( int i=0; i<_args.length; i++ )
       add_def(gvn.init(new ParmNode(i,_args[i],fun, gvn.con(_targs.at(i)),null)));
-    return new EpilogNode(fun,mem,gvn.init(this),rpc,fun,fun._fidx,null);
+    return new EpilogNode(fun,mem,gvn.init(this),rpc,fun,null);
   }
 
 
@@ -133,7 +141,11 @@ public abstract class PrimNode extends Node {
 static class ConvertTypeName extends PrimNode {
   private final Parse _badargs; // Only for converts
   private final HashMap<String,Type> _lex; // Unique lexical scope
-  ConvertTypeName(Type from, TypeName to, Parse badargs) { super(to._name,PrimNode.ARGS1,TypeTuple.make(from),to); _lex=to._lex; _badargs=badargs; }
+  ConvertTypeName(Type from, TypeName to, Parse badargs) {
+    super(to._name,PrimNode.ARGS1,TypeTuple.make(from),to);
+    _lex=to._lex;
+    _badargs=badargs;
+  }
   @Override public Type value(GVNGCM gvn) {
     Type[] ts = new Type[_defs._len];
     for( int i=1; i<_defs._len; i++ )
@@ -145,7 +157,6 @@ static class ConvertTypeName extends PrimNode {
     // If args are illegal, the output is still no worse than _ret in either direction
     return _ret.dual().isa(tn) ? (tn.isa(_ret) ? tn : _ret) : _ret.dual();
   }
-  @Override public boolean is_lossy() { return false; }
   @Override public String err(GVNGCM gvn) {
     Type actual = gvn.type(in(1));
     Type formal = _targs.at(1);
@@ -158,7 +169,6 @@ static class ConvertTypeName extends PrimNode {
 static class ConvertInt64F64 extends PrimNode {
   ConvertInt64F64() { super("flt64",PrimNode.ARGS1,TypeTuple.INT64,TypeFlt.FLT64); }
   @Override public TypeFlt apply( Type[] args ) { return TypeFlt.con((double)args[1].getl()); }
-  @Override public boolean is_lossy() { return false; }
 }
 
 static class ConvertStrStr extends PrimNode {
@@ -166,7 +176,6 @@ static class ConvertStrStr extends PrimNode {
   @Override public Type apply( Type[] args ) { return args[1]; }
   @Override public Node ideal(GVNGCM gvn) { return in(1); }
   @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)); }
-  @Override public boolean is_lossy() { return false; }
 }
 
 // 1Ops have uniform input/output types, so take a shortcut on name printing

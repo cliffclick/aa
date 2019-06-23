@@ -135,6 +135,7 @@ public class TestNode {
     for( int i=1; i<_ins.length; i++ )
       _ins[i] = new ConNode<>(Type.SCALAR);
     Node mem = new ConNode<Type>(TypeMem.MEM);
+    FunNode fun = new FunNode("anon");
     
     Node unr = Env.top().lookup("+"); // All the "+" functions
     test1monotonic(new   CallNode(false,null,_ins[0],  unr  ,mem,_ins[2],_ins[3]));
@@ -146,7 +147,7 @@ public class TestNode {
     test1monotonic(new   CastNode(_ins[0],_ins[1],TypeStr.ABC  ));
     test1monotonic(new   CastNode(_ins[0],_ins[1],TypeFlt.FLT64));
     test1monotonic(new  CProjNode(_ins[0],0));
-    test1monotonic(new EpilogNode(_ins[0],mem,_ins[1],_ins[2],_ins[3],1,"unknown_ref"));
+    test1monotonic(new EpilogNode(_ins[0],mem,_ins[1],_ins[2],fun,"unknown_ref"));
     test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  TypeInt.FALSE));
     test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  TypeStr.ABC  ));
     test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  TypeFlt.FLT64));

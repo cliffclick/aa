@@ -130,7 +130,7 @@ public class TestParse {
 
   @Test public void testParse2() {
     // Anonymous function definition
-    test_isa("{x y -> x+y}", TypeFunPtr.make(BitsFun.make0(BitsFun.last_fidx()))); // {Scalar Scalar -> Scalar}
+    test_isa("{x y -> x+y}", TypeFunPtr.make(BitsFun.make0(BitsFun.last_fidx()),TypeTuple.SCALAR2,Type.SCALAR)); // {Scalar Scalar -> Scalar}
     test("{5}()", TypeInt.con(5)); // No args nor -> required; this is simply a function returning 5, being executed
 
     // ID in different contexts; in general requires a new TypeVar per use; for

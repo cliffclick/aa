@@ -575,7 +575,7 @@ public class Parse {
       Node rez = stmts();       // Parse function body
       if( rez == null ) rez = err_ctrl1("Missing function body", Type.SCALAR);
       require('}');             //
-      Node epi = gvn(new EpilogNode(ctrl(),mem(),rez,rpc,fun,fun._fidx,null));
+      Node epi = gvn(new EpilogNode(ctrl(),mem(),rez,rpc,fun,null));
       _e = _e._par;             // Pop nested environment
       set_ctrl(old_ctrl);       // Back to the pre-function-def control
       return epi;               // Return function; close-out and DCE 'e'

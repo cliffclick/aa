@@ -46,7 +46,7 @@ import java.util.function.Predicate;
 public class Type<T extends Type<T>> {
   static private int CNT=1;
   final int _uid=CNT++;  // Unique ID, will have gaps, used to uniquely order Types in Unions
-  int _hash;             // Hash for this Type; built recursively
+  public int _hash;      // Hash for this Type; built recursively
   byte _type;            // Simple types use a simple enum
   boolean _cyclic;       // Part of a type cycle
   T _dual;  // All types support a dual notion, lazily computed and cached here

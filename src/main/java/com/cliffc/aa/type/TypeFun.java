@@ -29,7 +29,7 @@ public class TypeFun extends Type<TypeFun> {
   public static final TypeFun FUN1 = make(TypeTuple.SCALAR1,Type.SCALAR);
   static final TypeFun[] TYPES = new TypeFun[]{FUN1};
   
-  @Override protected TypeFun xdual() { return new TypeFun((TypeTuple)_args.dual(),_ret.dual()); }
+  @Override protected TypeFun xdual() { return new TypeFun(_args.dual(),_ret.dual()); }
   // Standard Meet.
   @Override protected Type xmeet( Type t ) {
     if( t._type != TFUN ) return ALL;
