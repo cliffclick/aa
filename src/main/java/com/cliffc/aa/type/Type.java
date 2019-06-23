@@ -384,7 +384,6 @@ public class Type<T extends Type<T>> {
     if( ALL_TYPES != null ) return ALL_TYPES;
     Type[] ts =    Type      .TYPES ;
     ts = concat(ts,TypeFlt   .TYPES);
-    ts = concat(ts,TypeFun   .TYPES);
     ts = concat(ts,TypeFunPtr.TYPES);
     ts = concat(ts,TypeInt   .TYPES);
     ts = concat(ts,TypeMem   .TYPES);

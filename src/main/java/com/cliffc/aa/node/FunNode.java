@@ -50,16 +50,18 @@ public class FunNode extends RegionNode {
   // Used to make copies when inlining/cloning function bodies
   private FunNode(String name,TypeFunPtr tf) { this(name,tf,-1); }
   // Used to start an anonymous function in the Parser, includes argument memory in ts[0]
-  public FunNode(Type[] ts) { this(null,TypeFunPtr.make(BitsFun.NZERO,TypeTuple.make(ts),Type.SCALAR),-1); }
+  public FunNode(Type[] ts) { this(null,TypeFunPtr.make_new(TypeTuple.make(ts),Type.SCALAR),-1); }
   // Used to forward-decl anon functions
   FunNode(String name) { this(name,TypeFunPtr.make_new(TypeTuple.XSCALARS,Type.SCALAR),-2); }
   // Shared common constructor
   private FunNode(String name, TypeFunPtr tf, int op_prec) {
     super(OP_FUN);
     _name = name;
+    assert tf.isa(TypeFunPtr.GENERIC_FUNPTR);
     _tf = tf;
     _op_prec = (byte)op_prec;
     add_def(Env.ALL_CTRL);
+    assert !tf.is_class();
     FUNS.setX(fidx(),this); // Track FunNode by fidx; assert single-bit fidxs
   }
   

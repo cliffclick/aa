@@ -732,7 +732,7 @@ public class Parse {
       }
       TypeTuple targs = TypeTuple.make(ts.asAry());
       if( !peek('}') ) return null;
-      return typeq(TypeFun.make(targs,ret));
+      return typeq(TypeFunPtr.make(BitsFun.NZERO,targs,ret));
     }
 
     if( peek2(c,"@{") ) { // Struct type

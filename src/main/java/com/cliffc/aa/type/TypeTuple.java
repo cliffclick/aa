@@ -127,7 +127,7 @@ public class TypeTuple extends Type<TypeTuple> {
 
   // Meet 2 tuples, shorter is 'this'
   private TypeTuple xmeet1( TypeTuple tmax ) {
-    int len = _any ? tmax._ts.length : _ts.length;
+    int len = tmax._any ? _ts.length : tmax._ts.length;
     // Meet of common elements
     Type[] ts = new Type[len];
     for( int i=0; i<_ts.length; i++ )  ts[i] = _ts[i].meet(tmax._ts[i]);

@@ -12,10 +12,10 @@ public class TestType {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testType() {
     Type.init0(new HashMap<>());
-    BitsAlias t0 = TypeMemPtr.STRPTR._aliases.dual();
-    BitsAlias t1 = TypeMemPtr.ABCPTR._aliases.dual();
-    BitsAlias tx = t0.meet(t1);
-    assertEquals(t1,tx);
+    Type t0 = TypeTuple.XSCALARS;
+    Type t1 = TypeTuple.FLT64_FLT64;
+    Type t2 = t0.join(t1);
+    assertEquals(t1,t2);
   }
   
   @Test public void testNamesInts() {

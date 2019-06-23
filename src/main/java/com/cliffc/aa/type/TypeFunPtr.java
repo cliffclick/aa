@@ -86,6 +86,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public BitsFun fidxs() { return _fidxs; }
   public int fidx() { return _fidxs.getbit(); } // Asserts internally single-bit
   public Type arg(int idx) { return _args.at(idx); }
+  public boolean is_class() { return _fidxs.is_class(); }
   
   @Override public boolean above_center() { return _fidxs.above_center(); }
   // Fidxes represent a single function and thus are constants, but TypeFunPtrs
@@ -105,5 +106,13 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   }
 
   // Generic functions
-  public boolean is_forward_ref() { throw com.cliffc.aa.AA.unimpl(); }
+  public boolean is_forward_ref() {
+    if( _fidxs.abit() == -1 ) return false; // Multiple fidxs
+    return FunNode.find_fidx(fidx()).is_forward_ref();
+  }
+
+  // Dual, except keep high args high
+  @Override public TypeFunPtr startype() {
+    return make(_fidxs.dual(),_args,_ret.dual());
+  }
 }

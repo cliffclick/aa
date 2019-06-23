@@ -2,7 +2,6 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.AA;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 
@@ -24,7 +23,6 @@ public class CallNode extends Node {
   int _rpc;                     // Call-site return PC
   private boolean _unpacked;    // Call site allows unpacking a tuple (once)
   private boolean _inlined;     // Inlining a call-site is a 2-stage process; function return wired to the call return
-  private Type   _cast_ret;     // Return type has been up-casted
           Parse  _badargs;      // Error for e.g. wrong arg counts or incompatible args
   public CallNode( boolean unpacked, Parse badargs, Node... defs ) {
     super(OP_CALL,defs);
@@ -122,18 +120,8 @@ public class CallNode extends Node {
     // Type-checking a function; requires 2 steps, one now, one in the
     // following data Proj from the worklist.
     Node unk  = fun();          // Function epilog/function pointer
-    if( unk instanceof TypeNode ) {
-      TypeNode tn = (TypeNode)unk;
-      //TypeFun t_funptr = (TypeFun)tn._t;
-      //set_fun(tn.in(1),gvn);
-      //TypeFunPtr tf = t_funptr.fun();
-      //for( int i=0; i<nargs(); i++ ) // Insert casts for each parm
-      //  set_arg(i,gvn.xform(new TypeNode(tf._ts.at(i),arg(i),tn._error_parse)),gvn);
-      //_cast_ret = tf._ret;       // Upcast return results
-      //_cast_P = tn._error_parse; // Upcast failure message
-      //return this;
-      throw AA.unimpl();
-    }
+    if( unk instanceof TypeNode )
+      return do_typenode((TypeNode)unk,gvn);
 
     // If the function is unresolved, see if we can resolve it now
     if( unk instanceof UnresolvedNode ) {
@@ -375,8 +363,8 @@ public class CallNode extends Node {
       boolean unk = false;       // Unknown arg might be incompatible or free to convert
       for( int j=0; j<nargs(); j++ ) {
         Type actual = gvn.type(arg(j));
-        if( actual==Type.XSCALAR && arg(j) instanceof ConNode )
-          continue; // Forced super-high arg is always compatible before formal is dead
+        //if( actual==Type.XSCALAR && arg(j) instanceof ConNode )
+        //  continue; // Forced super-high arg is always compatible before formal is dead
         Type tx = actual.join(formals.at(j));
         if( tx != actual && tx.above_center() ) // Actual and formal have values in common?
           continue outerloop;   // No, this function will never work; e.g. cannot cast 1.2 as any integer
@@ -459,17 +447,31 @@ public class CallNode extends Node {
     
     return null;
   }
-  
+
+  // Type-checking a function; requires 2 steps, one now, one in the
+  // following data Proj from the worklist.
+  private Type _cast_ret;     // Return type has been up-casted
+  private Parse _cast_P;      // Error message for failed return type
+  private CallNode do_typenode( TypeNode tn, GVNGCM gvn ) {
+    TypeFunPtr tf = (TypeFunPtr)tn._t; // Get call cast type
+    set_fun(tn.in(1),gvn);             // Remove the TypeNode on the function argument
+    // Insert each argument cast before each argument
+    for( int i=0; i<nargs(); i++ ) // Insert casts for each parm
+      set_arg(i,gvn.xform(new TypeNode(tf.arg(i),arg(i),tn._error_parse)),gvn);
+    _cast_ret = tf._ret;      // Upcast return results, lazily installed later
+    _cast_P = tn._error_parse;
+    return this;
+  }
   // Called from the data proj.  Return a TypeNode with proper casting on return result.
   TypeNode upcast_return(GVNGCM gvn) {
     Type t = _cast_ret;
     if( t==null ) return null;  // No cast-in-progress
     _cast_ret = null;           // Gonna upcast the return result now
     gvn.add_work(this);         // Revisit after the data-proj cleans out
-    return new TypeNode(t,null,null);
+    return new TypeNode(t,null,_cast_P);
   }
 
-  @Override public Type all_type() { return TypeTuple.make(Type.CTRL,TypeMem.MEM,Type.SCALAR); }
+  @Override public TypeTuple all_type() { return TypeTuple.make(Type.CTRL,TypeMem.MEM,Type.SCALAR); }
   @Override public int hashCode() { return super.hashCode()+_rpc; }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;

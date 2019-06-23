@@ -33,6 +33,7 @@ public class EpilogNode extends Node {
     assert gvn.type(mem()) instanceof TypeMem;
     if( c==Type.ANY  || r==Type.ANY  ) return all_type().dual();
     if( (c!=Type.CTRL && c!=Type.XCTRL) || !(r instanceof TypeRPC) ) return all_type();
+    if( is_forward_ref() ) return all_type();
     Type v = gvn.type(val());
     if( is_copy() )             // Function is dead, epilog is dying; type makes no sense
       return TypeFunPtr.make(BitsFun.ANY,_args,v);
@@ -66,7 +67,7 @@ public class EpilogNode extends Node {
   }
 
   // True if this is a forward_ref
-  @Override public boolean is_forward_ref() { return in(0)== in(4) && in(4) instanceof FunNode && fun().is_forward_ref(); }
+  @Override public boolean is_forward_ref() { return in(0)== in(4) && !is_copy() && fun().is_forward_ref(); }
 
   // 'this' is a forward reference, probably with multiple uses (and no inlined
   // callers).  Passed in the matching function definition, which is brand new
@@ -82,7 +83,7 @@ public class EpilogNode extends Node {
     dfun.bind(tok);
   }
 
-  @Override public TypeFunPtr all_type() { return TypeFunPtr.GENERIC_FUNPTR; }
+  @Override public TypeFunPtr all_type() { return fun()._tf; }
   
   // True if epilog or function is uncalled (but possibly returned or stored as
   // a constant).  Such code is not searched for errors.
