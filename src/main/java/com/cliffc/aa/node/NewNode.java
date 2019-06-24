@@ -22,7 +22,7 @@ public class NewNode extends Node {
     assert def_idx(finals.length)==flds.length;
     _names = names;
     _finals= finals;
-    _alias = BitsAlias.new_alias(BitsAlias.REC);
+    _alias = BitsAlias.new_alias(BitsAlias.REC,type());
   }
   private static byte[] finals(int len) { byte[] bs = new byte[len]; Arrays.fill(bs,(byte)1); return bs; }
   private int def_idx(int fld) { return fld+1; }
@@ -77,16 +77,21 @@ public class NewNode extends Node {
   }
 
   // Worse-case type for this Node
+  TypeStruct type() {
+    Type[] ts = new Type[_names.length];
+    Arrays.fill(ts,Type.SCALAR);
+    return TypeStruct.make(_names,ts,_finals);
+  };
   @Override public Type all_type() {
     return is_dead_address()
       ? TypeTuple.make(TypeMem.XMEM, TypeMemPtr.make(_alias))
-      : TypeTuple.make(TypeMem.make(_alias,TypeObj.OBJ), TypeMemPtr.make(_alias));
+      : TypeTuple.make(TypeMem.make(_alias,type()), TypeMemPtr.make(_alias));
   }
   
   // Clones during inlining all become unique new sites
   @Override NewNode copy(GVNGCM gvn) {
     NewNode nnn = (NewNode)super.copy(gvn);
-    nnn._alias = BitsAlias.new_alias(_alias); // Children alias classes, split from parent
+    nnn._alias = BitsAlias.new_alias(_alias,type()); // Children alias classes, split from parent
     return nnn;
   }
 

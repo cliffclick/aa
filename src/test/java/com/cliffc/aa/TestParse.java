@@ -16,8 +16,8 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
     Object dummy = Env.GVN; // Force class loading cycle
-    testerr("x=z" , "Unknown ref 'z'","   ");
-    testerr("f0 = { f x -> f0(x-1) }; f0({+},2)", "Passing 1 arguments to f0{(Scalar,Scalar)-> Scalar} which takes 2 arguments","                     ");
+    testerr("sq={x -> x&x}; sq(\"abc\")", "*\"abc\" is not a int64","                        ");
+    testerr("1:str", "1 is not a *str","     ");
 
     // A collection of tests which like to fail easily
     testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1) is not a @{x,y}","                           ");
@@ -130,8 +130,9 @@ public class TestParse {
   }
 
   @Test public void testParse2() {
+    Object dummy = Env.GVN; // Force class loading cycle
     // Anonymous function definition
-    test_isa("{x y -> x+y}", TypeFunPtr.make(BitsFun.make0(BitsFun.last_fidx()),TypeTuple.SCALAR2,Type.SCALAR)); // {Scalar Scalar -> Scalar}
+    test_isa("{x y -> x+y}", TypeFunPtr.make(BitsFun.make0(BitsFun.last_fidx()+1),TypeTuple.SCALAR2,Type.SCALAR)); // {Scalar Scalar -> Scalar}
     test("{5}()", TypeInt.con(5)); // No args nor -> required; this is simply a function returning 5, being executed
 
     // ID in different contexts; in general requires a new TypeVar per use; for
@@ -154,8 +155,8 @@ public class TestParse {
     test("x=3; mul2={x -> x*2}; mul2(2.1)", TypeFlt.con(2.1*2.0)); // must inline to resolve overload {*}:Flt with I->F conversion
     test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
     test("sq={x -> x*x}; sq 2.1", TypeFlt.con(4.41)); // No () required for single args
-    testerr("sq={x -> x&x}; sq(\"abc\")", "*[7] is not a int64","                        ");
-    testerr("sq={x -> x*x}; sq(\"abc\")", "*[7] is not a flt64","            ");
+    testerr("sq={x -> x&x}; sq(\"abc\")", "*\"abc\" is not a int64","                        ");
+    testerr("sq={x -> x*x}; sq(\"abc\")", "*\"abc\" is not a flt64","            ");
     testerr("f0 = { f x -> f0(x-1) }; f0({+},2)", "Passing 1 arguments to f0{(Scalar,Scalar)-> Scalar} which takes 2 arguments","                     ");
     // Recursive:
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
@@ -195,8 +196,8 @@ public class TestParse {
 
     test   (" -1 :int1", TypeInt.con(-1));
     testerr("(-1):int1", "-1 is not a int1","         ");
-    testerr("\"abc\":int", "*[7] is not a int64","         ");
-    testerr("1:str", "1 is not a str","     ");
+    testerr("\"abc\":int", "*\"abc\" is not a int64","         ");
+    testerr("1:str", "1 is not a *str","     ");
 
     testerr("x=3; fun:{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int64","                              ");
     test("x=3; fun:{real->real}={x -> x*2}; fun(2.1)+fun(x)", TypeFlt.con(2.1*2+3*2)); // Mix of types to fun()
@@ -205,7 +206,7 @@ public class TestParse {
     testerr("fun:{real->flt32}={x -> x}; fun(123456789)", "123456789 is not a flt32","                          ");
 
     test   ("{x:int -> x*2}(1)", TypeInt.con(2)); // Types on parms
-    testerr("{x:str -> x}(1)", "1 is not a str", "               ");
+    testerr("{x:str -> x}(1)", "1 is not a *str", "               ");
 
     // Tuple types
     test_isa("A= :(         )", name_tuple_constructor()); // Zero-length tuple

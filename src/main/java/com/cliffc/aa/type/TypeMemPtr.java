@@ -1,6 +1,7 @@
 package com.cliffc.aa.type;
 
 import java.util.BitSet;
+import java.util.HashMap;
 import java.util.function.Predicate;
 
 // Pointers-to-memory; these can be both the address and the value part of
@@ -21,7 +22,8 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   // Never part of a cycle, so the normal check works
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
   @Override String str( BitSet dups) {
-    return "*"+_aliases;
+    if( _aliases.abit()==-1 ) return "*"+_aliases;
+    return "*"+BitsAlias.TREE.err_report(getbit());
   }
 
   private static TypeMemPtr FREE=null;
@@ -45,6 +47,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   public static final TypeMemPtr STRUCT = make(BitsAlias.RECBITS );
          static final TypeMemPtr STRUCT0= make(BitsAlias.RECBITS0);
   static final TypeMemPtr[] TYPES = new TypeMemPtr[]{OOP0,STRPTR,ABCPTR,STRUCT,ABC0};
+  static void init1( HashMap<String,Type> types ) { types.put("str",STRPTR); }
   
   @Override protected TypeMemPtr xdual() { return new TypeMemPtr(_aliases.dual()); }
   @Override protected Type xmeet( Type t ) {

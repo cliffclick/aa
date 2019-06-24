@@ -3,7 +3,6 @@ package com.cliffc.aa.type;
 import com.cliffc.aa.util.SB;
 
 import java.util.BitSet;
-import java.util.HashMap;
 import java.util.function.Predicate;
 
 // Strings.  Just an alternative TypeObj to TypeStruct - but basically really
@@ -52,7 +51,7 @@ public class TypeStr extends TypeObj<TypeStr> {
   // Get the alias for string constants.  Since string constants are interned,
   // so are the aliases.
   public int get_alias() {
-    if( _alias ==0 ) _alias = BitsAlias.new_alias(BitsAlias.STR);
+    if( _alias ==0 ) _alias = BitsAlias.new_alias(BitsAlias.STR,this);
     return _alias;
   }
 
@@ -62,7 +61,6 @@ public class TypeStr extends TypeObj<TypeStr> {
   public  static final TypeStr  ABC = make(false,"abc",BitsAlias.ABC); // a string constant
   private static final TypeStr  DEF = con("def"); // a string constant
   static final TypeStr[] TYPES = new TypeStr[]{STR,XSTR,ABC,DEF};
-  static void init1( HashMap<String,Type> types ) { types.put("str",STR); }
   // Return a String from a TypeStr constant; assert otherwise.
   @Override public String getstr() { assert is_con(); return _con; }
 

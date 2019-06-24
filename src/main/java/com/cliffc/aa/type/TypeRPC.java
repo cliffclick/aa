@@ -36,7 +36,7 @@ public class TypeRPC extends Type<TypeRPC> {
   }
 
   public static final TypeRPC ALL_CALL = make(BitsRPC.FULL);
-  private static final TypeRPC RPC1 = make(BitsRPC.new_rpc(BitsRPC.ALL));
+  static final TypeRPC RPC1 = make(BitsRPC.new_rpc(BitsRPC.ALL));
   static final TypeRPC[] TYPES = new TypeRPC[]{RPC1,ALL_CALL};
   
   @Override protected TypeRPC xdual() { return new TypeRPC(_rpcs.dual()); }

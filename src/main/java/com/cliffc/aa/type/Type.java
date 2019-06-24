@@ -376,7 +376,7 @@ public class Type<T extends Type<T>> {
     types.put("scalar",SCALAR);
     TypeInt.init1(types);
     TypeFlt.init1(types);
-    TypeStr.init1(types);
+    TypeMemPtr.init1(types);
   }
 
   private static Type[] ALL_TYPES; // Used for tests

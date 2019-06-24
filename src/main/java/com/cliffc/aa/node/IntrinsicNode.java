@@ -74,7 +74,7 @@ public abstract class IntrinsicNode extends Node {
   // Clones during inlining all become unique new sites
   @Override IntrinsicNode copy(GVNGCM gvn) {
     IntrinsicNode nnn = (IntrinsicNode)super.copy(gvn);
-    return nnn.update_alias(BitsAlias.new_alias(_alias)); // Children alias classes
+    return nnn.update_alias(BitsAlias.new_alias(_alias,TypeStr.STR)); // Children alias classes
   }
   @Override public String xstr() { return _name+"_#"+_alias; }
   @Override public Node ideal(GVNGCM gvn) { return null; }
