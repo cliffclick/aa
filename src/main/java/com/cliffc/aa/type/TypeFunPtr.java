@@ -114,6 +114,6 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
 
   // Dual, except keep high args high
   @Override public TypeFunPtr startype() {
-    return make(_fidxs.dual(),_args.dual(),_ret.dual());
+    return make(_fidxs.dual(),_args,_ret.dual());
   }
 }
