@@ -398,7 +398,9 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
           _kids[i][0] = i<_init.length ? _init[i] : 0;
     }
     int last_split() { return _last; }
-    Type err_report(int bit) { return _err_types.at(bit); }
+    Type err_report(int bit) {
+      return bit >= 0 ? _err_types.at(bit) : _err_types.at(-bit).dual();
+    }
   }
   
   /** @return an iterator */

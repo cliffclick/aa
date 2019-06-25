@@ -57,8 +57,10 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public TypeFunPtr make_fidx( int fidx ) { return make(BitsFun.make0(fidx),_args,_ret); }
   public TypeFunPtr make_new_fidx( int parent ) { return make(BitsFun.make_new_fidx(parent),_args,_ret); }
 
-  public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.NZERO,TypeTuple.SCALARS,Type.SCALAR); // Only for testing
-  static final TypeFunPtr[] TYPES = new TypeFunPtr[]{GENERIC_FUNPTR};
+  public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.NZERO,TypeTuple.XSCALARS,Type.SCALAR); // Only for testing
+  public  static final TypeFunPtr TEST_INEG = new FunNode(TypeTuple.INT64._ts)._tf;
+  
+  static final TypeFunPtr[] TYPES = new TypeFunPtr[]{GENERIC_FUNPTR,TEST_INEG};
   
   @Override protected TypeFunPtr xdual() { return new TypeFunPtr(_fidxs.dual(),_args.dual(),_ret.dual()); }
   @Override protected Type xmeet( Type t ) {
@@ -79,7 +81,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     default: throw typerr(t);   // All else should not happen
     }
     TypeFunPtr tf = (TypeFunPtr)t;
-    return make(_fidxs.meet(tf._fidxs),(TypeTuple)_args.meet(tf._args),_ret.meet(tf._ret));
+    return make(_fidxs.meet(tf._fidxs),(TypeTuple)_args.join(tf._args),_ret.meet(tf._ret));
   }
 
   public BitsFun fidxs() { return _fidxs; }
@@ -87,7 +89,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public Type arg(int idx) { return _args.at(idx); }
   public boolean is_class() { return _fidxs.is_class(); }
   
-  @Override public boolean above_center() { return _args.above_center(); }
+  @Override public boolean above_center() { return _fidxs.above_center(); }
   // Fidxes represent a single function and thus are constants, but TypeFunPtrs
   // represent the execution of a function, and are never constants.
   @Override public boolean may_be_con()   { return false; }

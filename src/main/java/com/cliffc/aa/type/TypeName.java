@@ -1,7 +1,6 @@
 package com.cliffc.aa.type;
 
 import com.cliffc.aa.AA;
-import com.cliffc.aa.util.Ary;
 
 import java.util.BitSet;
 import java.util.HashMap;
@@ -78,10 +77,11 @@ public class TypeName extends TypeObj<TypeName> {
 
           static final HashMap<String,Type> TEST_SCOPE = new HashMap<>();
           static final TypeName TEST_ENUM = make("__test_enum",TEST_SCOPE,TypeInt.INT8);
-          static final TypeName TEST_FLT  = make("__test_flt" ,TEST_SCOPE,TypeFlt.FLT32);
+  private static final TypeName TEST_FLT  = make("__test_flt" ,TEST_SCOPE,TypeFlt.FLT32);
   private static final TypeName TEST_E2   = make("__test_e2"  ,TEST_SCOPE,TEST_ENUM);
+  public  static final TypeName TEST_STRUCT=make("__test_struct",TEST_SCOPE,TypeStruct.POINT);
   
-  static final TypeName[] TYPES = new TypeName[]{TEST_ENUM,TEST_FLT,TEST_E2};
+  static final TypeName[] TYPES = new TypeName[]{TEST_ENUM,TEST_FLT,TEST_E2,TEST_STRUCT};
 
   @Override protected TypeName xdual() { return new TypeName(_name,_lex,_t. dual(),_depth); }
   @Override TypeName rdual() {
@@ -116,6 +116,7 @@ public class TypeName extends TypeObj<TypeName> {
         Type mt = _t.meet(t);  // If meet fails to be anything, drop the name
         if( mt==ALL ) return ALL;
         if( mt==SCALAR || mt==NSCALR ) return SCALAR;
+        if( mt==TypeObj.OBJ ) return TypeObj.OBJ;
         return make(_name,_lex,mt);
       }
       if( t==TypeNil.NIL ) return TypeNil.make(this);
@@ -143,8 +144,9 @@ public class TypeName extends TypeObj<TypeName> {
     }
     // Recursively drop multiple names
     case TNAME:    return ((TypeName)tx).drop_name(t);
-    case TXSCALAR: return t;
+    case TXSCALAR:
     case TXNSCALR: return t;
+    case TOBJ:
     case TSTRUCT:  return tx.dual();
     default: throw AA.unimpl();
     }
@@ -185,6 +187,9 @@ public class TypeName extends TypeObj<TypeName> {
     Type x = _t.meet_nil();     // Compute meet-nil without the name
     if( x instanceof TypeNil ) return TypeNil.make(TypeName.make(_name,_lex,((TypeNil)x)._t));
     else                       return              TypeName.make(_name,_lex,          x); // Just name-wrap
+  }
+  @Override public TypeObj startype() {
+    return make(_name,_lex,_t.startype());
   }
   @Override public byte isBitShape(Type t) {
     if( t instanceof TypeNil ) t = ((TypeNil)t)._t; // Strip nil and go again

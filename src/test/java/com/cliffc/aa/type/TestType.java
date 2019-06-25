@@ -12,10 +12,19 @@ public class TestType {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testType() {
     Type.init0(new HashMap<>());
-    Type t0 = TypeTuple.XSCALARS;
-    Type t1 = TypeTuple.FLT64_FLT64;
-    Type t2 = t0.join(t1);
-    assertEquals(t1,t2);
+
+    Type s0 = TypeName.TEST_STRUCT;
+    Type s1 = TypeStr.STR.dual();
+    Type s2 = s0.meet(s1);
+    assertEquals(TypeObj.OBJ,s2);
+    
+
+    TypeStruct t0 = TypeStruct.make(TypeNil.NIL,TypeInt.TRUE);
+    TypeStruct t1 = TypeStruct.make(new String[]{"x","y"},Type.SCALAR,Type.SCALAR);
+    TypeName tn = TypeName.make("Point",TypeName.TEST_SCOPE,t1);
+    Type tnd = tn.dual();
+    Type t2 = tnd.meet(t0);
+    //assertEquals(t0,t2);
   }
   
   @Test public void testNamesInts() {
@@ -209,15 +218,14 @@ public class TestType {
     Type ignore = TypeTuple.ANY; // Break class-loader cycle; load Tuple before Fun.
 
     TypeFunPtr gf = TypeFunPtr.GENERIC_FUNPTR;
-    TypeMem nomem = TypeMem.MEM.dual();
 
     TypeFunPtr f1i2i = TypeFunPtr.make_new(TypeTuple.INT64_INT64,TypeInt.INT64);
     assertTrue(f1i2i.isa(gf));
     TypeFunPtr f1f2f = TypeFunPtr.make_new(TypeTuple.FLT64_FLT64,TypeFlt.FLT64);
     assertTrue(f1f2f.isa(gf));
     TypeFunPtr mt = (TypeFunPtr)f1i2i.meet(f1f2f);
-    BitsFun funs = BitsFun.make0(2).meet(BitsFun.make0(3));
-    TypeFunPtr f3i2r = TypeFunPtr.make(funs,TypeTuple.make(TypeInt.INT32,TypeInt.INT32),Type.REAL);
+    BitsFun funs = BitsFun.make0(36).meet(BitsFun.make0(37));
+    TypeFunPtr f3i2r = TypeFunPtr.make(funs,TypeTuple.make_args(TypeInt.INT32,TypeInt.INT32),Type.REAL);
     assertEquals(f3i2r,mt);
     assertTrue(f3i2r.isa(gf));
     assertTrue(f1i2i.isa(f3i2r));

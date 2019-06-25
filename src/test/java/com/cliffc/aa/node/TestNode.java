@@ -135,9 +135,11 @@ public class TestNode {
     for( int i=1; i<_ins.length; i++ )
       _ins[i] = new ConNode<>(Type.SCALAR);
     Node mem = new ConNode<Type>(TypeMem.MEM);
-    FunNode fun = new FunNode("anon");
+    FunNode fun_forward_ref = new FunNode("anon");
     
     Node unr = Env.top().lookup("+"); // All the "+" functions
+    FunNode fun_plus = ((EpilogNode)unr.in(1)).fun();
+
     test1monotonic(new   CallNode(false,null,_ins[0],  unr  ,mem,_ins[2],_ins[3]));
     test1monotonic(new   CallNode(false,null,_ins[0],_ins[1],mem,_ins[2],_ins[3]));
     test1monotonic(new    ConNode<Type>(          TypeInt.FALSE));
@@ -147,15 +149,21 @@ public class TestNode {
     test1monotonic(new   CastNode(_ins[0],_ins[1],TypeStr.ABC  ));
     test1monotonic(new   CastNode(_ins[0],_ins[1],TypeFlt.FLT64));
     test1monotonic(new  CProjNode(_ins[0],0));
-    test1monotonic(new EpilogNode(_ins[0],mem,_ins[1],_ins[2],fun,"unknown_ref"));
+    test1monotonic(new EpilogNode(_ins[0],mem,_ins[1],_ins[2],fun_forward_ref,"unknown_ref"));
+    test1monotonic(new EpilogNode(_ins[0],mem,_ins[1],_ins[2],fun_plus,"plus"));
     test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  TypeInt.FALSE));
     test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  TypeStr.ABC  ));
     test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  TypeFlt.FLT64));
     test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  Type   .CTRL ));
     test1monotonic(new    FunNode(new Type[]{TypeInt.INT64}));
     test1monotonic(new     IfNode(_ins[0],_ins[1]));
-    for( IntrinsicNode prim : IntrinsicNode.INTRINSICS )
+    for( IntrinsicNewNode prim : IntrinsicNewNode.INTRINSICS )
       test1monotonic_intrinsic(prim);
+    Node cptn = IntrinsicNode.convertTypeName(TypeStruct.POINT,TypeName.TEST_STRUCT,null);
+    cptn.add_def(_ins[0]);
+    cptn.add_def(mem);
+    cptn.add_def(_ins[2]);
+    test1monotonic(cptn);
     test1monotonic(new   LoadNode(_ins[0],_ins[1],_ins[2],0,null));
     test1monotonic(new MemMergeNode(_ins[0],_ins[1]));
     test1monotonic(new    NewNode(new Node[]{null,_ins[1],_ins[2]},TypeStruct.FLDS(2)));
@@ -193,8 +201,8 @@ public class TestNode {
   }
   
   // Fill a Node with {null,edge,edge} and start the search
-  private void test1monotonic_intrinsic(IntrinsicNode prim) {
-    IntrinsicNode n = prim.copy(_gvn);
+  private void test1monotonic_intrinsic(IntrinsicNewNode prim) {
+    IntrinsicNewNode n = prim.copy(_gvn);
     assert n._defs._len==0;
     n.add_def( null  );
     n.add_def(_ins[1]);         // memory

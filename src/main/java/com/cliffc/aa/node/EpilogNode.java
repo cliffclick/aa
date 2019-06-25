@@ -31,8 +31,7 @@ public class EpilogNode extends Node {
     Type c = gvn.type(ctl()); // Function exits, or not
     Type r = gvn.type(rpc()); // Caller; the Continuation
     assert gvn.type(mem()) instanceof TypeMem;
-    if( c==Type.ANY  || r==Type.ANY  ) return all_type().dual();
-    if( (c!=Type.CTRL && c!=Type.XCTRL) || !(r instanceof TypeRPC) ) return all_type();
+    if( c!=Type.CTRL || !(r instanceof TypeRPC))  return all_type().dual();
     if( is_forward_ref() ) return all_type();
     Type v = gvn.type(val());
     if( is_copy() )             // Function is dead, epilog is dying; type makes no sense

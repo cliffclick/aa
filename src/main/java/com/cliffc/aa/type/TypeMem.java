@@ -1,5 +1,6 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.AA;
 import com.cliffc.aa.util.SB;
 
 import java.util.Arrays;
@@ -157,17 +158,30 @@ public class TypeMem extends Type<TypeMem> {
 
   public static final TypeMem  MEM; // Every alias filled with something
   public static final TypeMem XMEM; // Every alias filled with anything
-  public static final TypeMem EMPTY_MEM;
+         static final TypeMem EMPTY_MEM;
          static final TypeMem MEM_STR;
          static final TypeMem MEM_ABC;
+  public static final TypeMem MEM_STRUCT;
   static {
-    MEM  = make(new TypeObj[]{null,TypeObj. OBJ}); // Every alias filled with something
-    XMEM = make(new TypeObj[]{null,TypeObj.XOBJ}); // Every alias filled with anything
+    // All memory.  Triggers BitsAlias.<clinit> which makes all the initial
+    // alias splits.
+    TypeObj[] objs = new TypeObj[BitsAlias.STR+1];
+    objs[BitsAlias.ALL] = TypeObj.OBJ;
+    objs[BitsAlias.REC] = TypeStruct.ALLSTRUCT;
+    objs[BitsAlias.STR] = TypeStr.STR;
+    MEM  = make(objs);          // Every alias filled with something
+    
+    TypeObj[] xobjs = new TypeObj[BitsAlias.STR+1];
+    xobjs[BitsAlias.ALL] = TypeObj.XOBJ;
+    xobjs[BitsAlias.REC] = TypeStruct.ALLSTRUCT.dual();
+    xobjs[BitsAlias.STR] = TypeStr.XSTR;
+    XMEM = make(xobjs);         // Every alias filled with anything
     EMPTY_MEM = XMEM; //make(new TypeObj[0]); // Tried no-memory-vs-XOBJ-memory
-    // This next init will trigger BitsAlias to build all inital aliases
-    // splitting all the strings.
+    
     MEM_STR = make(BitsAlias.STRBITS,TypeStr.STR);
     MEM_ABC = make(TypeStr.ABC.get_alias(),TypeStr.ABC);
+    // All possible structs
+    MEM_STRUCT = make(BitsAlias.RECBITS,TypeStruct.ALLSTRUCT);
   }
   static final TypeMem[] TYPES = new TypeMem[]{MEM,MEM_STR,MEM_ABC};
 
@@ -215,6 +229,17 @@ public class TypeMem extends Type<TypeMem> {
     TypeObj[] objs = Arrays.copyOf(_aliases,Math.max(_aliases.length,ptr._aliases.max()+1));
     for( int alias : ptr._aliases )
       objs[alias] = at(alias).update(fld,fld_num,val);
+    return make0(objs);
+  }
+
+  // Meet of all possible storable values, after updates
+  public TypeMem st( TypeMemPtr ptr, TypeObj val ) {
+    TypeObj[] objs = Arrays.copyOf(_aliases,Math.max(_aliases.length,ptr._aliases.max()+1));
+    if( ptr.is_con() ) throw AA.unimpl(); // objs[ptr.get_con()]=val;
+    else
+      for( int alias : ptr._aliases )
+        if( alias != 0 )
+          objs[alias] = (TypeObj)at(alias).meet(val);
     return make0(objs);
   }
 

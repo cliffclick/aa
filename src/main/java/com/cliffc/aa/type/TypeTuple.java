@@ -7,7 +7,8 @@ import java.util.BitSet;
 
 // Internal fixed-length non-recursive tuples.  Used for function arguments,
 // and multi-arg results like IfNode and CallNode.  This is not the same as a
-// no-named-field TypeStruct, and is not exposed at the language level.
+// no-named-field TypeStruct, and is not exposed at the language level.  With
+// mixed tuple lengths, tuples are infinitely extended with ANY/ALL.
 public class TypeTuple extends Type<TypeTuple> {
   boolean _any;
   public Type[] _ts; // The fixed known types
@@ -52,9 +53,14 @@ public class TypeTuple extends Type<TypeTuple> {
     if( _any ) sb.p('~');
     sb.p('(');
     if( _ts.length>0 ) {        // No commas for zero-length
+      int j = _ts.length-1;     // Find length of trailing equal parts
+      Type last = _ts[j];       // Last type
+      for( j--; j>0; j-- ) if( _ts[j] != last )  break;
       sb.p(_ts[0].str(dups));
-      for( int i=1; i<_ts.length; i++ )
+      for( int i=1; i<=j; i++ )
         sb.p(',').p(_ts[i].str(dups));
+      if( j+1<_ts.length-1 )  sb.p("...");
+      if( _ts.length> 1 ) sb.p(',').p(last);
     }
     sb.p(')');
     return sb.toString();
@@ -71,11 +77,9 @@ public class TypeTuple extends Type<TypeTuple> {
     TypeTuple t2 = (TypeTuple)t1.hashcons();
     return t1==t2 ? t1 : t1.free(t2);
   }
-  public static TypeTuple make( Type... ts ) {
-    TypeTuple tt = make0(false,ts);
-    assert !tt.is_fun();
-    return tt;
-  }
+  public static TypeTuple make( Type... ts ) { return make0(false,ts); }
+  // Arguments are infinitely-extended with ANY, not ALL
+  public static TypeTuple make_args( Type... ts ) { return make0(false,ts); }
   private static TypeTuple make_generic_args(boolean any) {
     Type[] args = new Type[99];
     java.util.Arrays.fill(args,any ? XSCALAR : SCALAR);
@@ -85,18 +89,18 @@ public class TypeTuple extends Type<TypeTuple> {
   // Most primitive function call argument type lists are 0-based
   public  static final TypeTuple XSCALARS= make_generic_args(true );
   public  static final TypeTuple  SCALARS= make_generic_args(false);
-          static final TypeTuple SCALAR0 = make();
-          static final TypeTuple SCALAR1 = make(SCALAR);
-  public  static final TypeTuple SCALAR2 = make(SCALAR, SCALAR);
-          static final TypeTuple INT32   = make(TypeInt.INT32 );
-  public  static final TypeTuple INT64   = make(TypeInt.INT64 );
-  public  static final TypeTuple FLT64   = make(TypeFlt.FLT64 );
-  public  static final TypeTuple STRPTR  = make(TypeMemPtr.STRPTR);
-  public  static final TypeTuple OOP_OOP = make(TypeMemPtr.OOP0,TypeMemPtr.OOP0);
-  public  static final TypeTuple INT64_INT64 = make(TypeInt.INT64,TypeInt.INT64);
-  public  static final TypeTuple FLT64_FLT64 = make(TypeFlt.FLT64,TypeFlt.FLT64);
-  private static final TypeTuple FLT64_INT64 = make(TypeFlt.FLT64,TypeInt.INT64);
-  public  static final TypeTuple STR_STR     = make(TypeMemPtr.STRPTR,TypeMemPtr.STRPTR);
+          static final TypeTuple SCALAR0 = make_args();
+          static final TypeTuple SCALAR1 = make_args(SCALAR);
+  public  static final TypeTuple SCALAR2 = make_args(SCALAR, SCALAR);
+          static final TypeTuple INT32   = make_args(TypeInt.INT32 );
+  public  static final TypeTuple INT64   = make_args(TypeInt.INT64 );
+  public  static final TypeTuple FLT64   = make_args(TypeFlt.FLT64 );
+  public  static final TypeTuple STRPTR  = make_args(TypeMemPtr.STRPTR);
+  public  static final TypeTuple OOP_OOP = make_args(TypeMemPtr.OOP0,TypeMemPtr.OOP0);
+  public  static final TypeTuple INT64_INT64 = make_args(TypeInt.INT64,TypeInt.INT64);
+  public  static final TypeTuple FLT64_FLT64 = make_args(TypeFlt.FLT64,TypeFlt.FLT64);
+  private static final TypeTuple FLT64_INT64 = make_args(TypeFlt.FLT64,TypeInt.INT64);
+  public  static final TypeTuple STR_STR     = make_args(TypeMemPtr.STRPTR,TypeMemPtr.STRPTR);
   
   public  static final TypeTuple IF_ANY  = make(XCTRL,XCTRL);
   public  static final TypeTuple IF_ALL  = make(CTRL ,CTRL );
@@ -120,24 +124,23 @@ public class TypeTuple extends Type<TypeTuple> {
   // Standard Meet.
   @Override protected Type xmeet( Type t ) {
     if( t._type != TTUPLE ) return ALL; // Tuples are internal types only, not user exposed
-    // If unequal length; then if short is low it "wins" (result is short) else
-    // short is high and it "loses" (result is long).
+    // Tuples have an infinite extent of 'ALL' for low, or 'ANY' for high.
+    // After the meet, the infinite tail is trimmed.
     TypeTuple tt = (TypeTuple)t;
     return _ts.length < tt._ts.length ? xmeet1(tt) : tt.xmeet1(this);
   }
 
-  // Meet 2 tuples, shorter is 'this'
+  // Meet 2 tuples, shorter is 'this'.
   private TypeTuple xmeet1( TypeTuple tmax ) {
-    // If both are high, take the min; if both low take the max;
-    // else take the single low choice.
-    int len = tmax._any ? _ts.length : tmax._ts.length;
+    // Short is high; short extended by ANY so tail is a copy of long.
+    // Short is low ; short extended by ALL so tail is ALL so trimmed to short.
+    int len = _any ? tmax._ts.length : _ts.length;
     // Meet of common elements
     Type[] ts = new Type[len];
     for( int i=0; i<_ts.length; i++ )  ts[i] = _ts[i].meet(tmax._ts[i]);
-    // Elements only in the longer tuple.  The short tuple extra elements are
-    // either SCALAR or XSCALAR.
+    // Elements only in the longer tuple.
     for( int i=_ts.length; i<len; i++ )
-      ts[i] = _any ? tmax._ts[i] : Type.SCALAR;
+      ts[i] = tmax._ts[i];
     return make0(_any&tmax._any,ts);
   }
 

@@ -57,7 +57,7 @@ public class BitsAlias extends Bits<BitsAlias> {
 
   // Have to make a first BitsAlias here; thereafter the v-call to make_impl
   // will make more on demand.  But need the first one to make a v-call.
-  @Override boolean is_class() { return true; } // All bits are class of allocated objects
+  @Override boolean is_class() { return abit()!=0; } // All bits are class of allocated objects, except nil alone
   @Override public BitsAlias ALL() { return FULL; }
   @Override public BitsAlias ANY() { return ANY ; }
 

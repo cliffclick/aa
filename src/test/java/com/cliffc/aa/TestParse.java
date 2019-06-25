@@ -16,9 +16,6 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
     Object dummy = Env.GVN; // Force class loading cycle
-    testerr("sq={x -> x&x}; sq(\"abc\")", "*\"abc\" is not a int64","                        ");
-    testerr("1:str", "1 is not a *str","     ");
-
     // A collection of tests which like to fail easily
     testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1) is not a @{x,y}","                           ");
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'","                    ");
@@ -221,9 +218,7 @@ public class TestParse {
     testerr("A= :(:str?, :int)?","Named types are never nil","                  ");
   }
   static private Function<HashMap<String,Type>,Type> name_tuple_constructor(Type... ts) {
-    TypeStruct tt = TypeStruct.make(ts);
-    //return (tmap -> TypeFun.make(TypeFunPtr.make(TypeTuple.make(tt),TypeName.make("A",tmap,tt),Bits.FULL,1)));
-    throw AA.unimpl();
+    return (tmap -> TypeName.make("A",tmap,TypeStruct.make(ts)));
   }
 
   @Test public void testParse4() {

@@ -355,7 +355,7 @@ static class RandI64 extends PrimNode {
 }
 
 static class Id extends PrimNode {
-  Id(Type arg) { super("id",PrimNode.ARGS1,TypeTuple.make(arg),arg); }
+  Id(Type arg) { super("id",PrimNode.ARGS1,TypeTuple.make_args(arg),arg); }
   @Override public Type apply( Type[] args ) { return args[1]; }
   @Override public Node ideal(GVNGCM gvn) { return in(1); }
   @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)); }

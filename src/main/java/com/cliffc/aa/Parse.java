@@ -14,11 +14,11 @@ import java.util.BitSet;
  *
  *  GRAMMAR:
  *  prog = stmts END
- *  stmts= [tstmt|stmt][; stmts]*[;]? // multiple statments; final ';' is optional
+ *  stmts= [tstmt|stmt][; stmts]*[;]? // multiple statements; final ';' is optional
  *  tstmt= tvar = :type            // type variable assignment
  *  stmt = [id[:type]? [:]=]* ifex // ids are (re-)assigned, and are available in later statements
  *  ifex = expr ? expr : expr      // trinary logic
- *  expr = term [binop term]*      // gather all the binops and sort by prec
+ *  expr = term [binop term]*      // gather all the binops and sort by precedence
  *  term = tfact [tuple or tfact or .field]* // application (includes uniop) or field,tuple lookup
  *                                 // application arg list: tfact(tuple)
  *                                 // application adjacent: tfact tfact
@@ -46,7 +46,7 @@ import java.util.BitSet;
  *  str  = %[num]?[.num]?fact      // Percent escape embeds a 'fact' in a string; "name=%name\n"
  *  type = tcon | tvar | tfun[?] | tstruct[?] | ttuple[?] // Types are a tcon or a tfun or a tstruct or a type variable.  A trailing ? means 'nilable'
  *  tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str[?]
- *  tfun = {[[type]* ->]? type }   // Function types mirror func decls
+ *  tfun = {[[type]* ->]? type }   // Function types mirror func declarations
  *  ttuple = ( [:type]?,* )        // Tuple types are just a list of optional types; the count of commas dictates the length, zero commas is zero length
  *  tstruct = @{ [id[:type],]*}    // Struct types are field names with optional types
  */
@@ -229,7 +229,7 @@ public class Parse {
     // Single-inheritance & vtables & RTTI:
     //            "Objects know thy Class"
     // Which means a TypeObj knows its Name.  Its baked into the vtable.
-    // Which means TypeObjs are named and not the pointer-to-TypeObj.
+    // Which means TypeObj is named and not the pointer-to-TypeObj.
     // "Point= :@{x,y}" declares "Point" to be a type Name for "@{x,y}".
 
     // Add a constructor function.  If this is a primitive, build a constructor
@@ -245,8 +245,8 @@ public class Parse {
     IntrinsicNode cvt = IntrinsicNode.convertTypeName((TypeObj)t,tn,errMsg());
     Node rez = _e.add_fun(tvar,gvn(cvt.as_fun(_gvn))); // Return type-name constructor
     if( t instanceof TypeStruct ) { // Add struct types with expanded arg lists
-      IntrinsicNode cvts = IntrinsicNode.convertTypeNameStruct((TypeStruct)t,tn,errMsg());
-      Node rez2 = _e.add_fun(tvar,gvn(cvts.as_fun(_gvn))); // type-name constructor with expanded arg list
+      EpilogNode epi = IntrinsicNode.convertTypeNameStruct((TypeStruct)t,tn,errMsg(),_gvn);
+      Node rez2 = _e.add_fun(tvar,epi); // type-name constructor with expanded arg list
       _gvn.init0(rez2._uses.at(0));
     }
     // TODO: Add reverse cast-away
@@ -615,8 +615,7 @@ public class Parse {
         // Check for repeating a field name
         if( e._scope.get(tok)!=null ) {
           kill(stmt);           // Kill assignment
-          ErrNode err = err_ctrl2("Cannot define field '." + tok + "' twice");
-          stmt = err;           // Error is now the result
+          stmt = err_ctrl2("Cannot define field '." + tok + "' twice"); // Error is now the result
         }
         // Add type-check into graph
         if( t != null ) stmt = gvn(new TypeNode(t,stmt,errMsg()));
@@ -797,11 +796,11 @@ public class Parse {
     err_ctrl0("Expected '"+c+"' but "+(_x>=_buf.length?"ran out of text":"found '"+(char)(_buf[_x])+"' instead"));
   }
 
-  // Skip WS, return true&skip if match, false&noskip if miss.
+  // Skip WS, return true&skip if match, false & do not skip if miss.
   private boolean peek( char c ) { return peek1(skipWS(),c); }
   private boolean peek_noWS( char c ) { return peek1(_x >= _buf.length ? -1 : _buf[_x],c); }
   // Already skipped WS & have character;
-  // return true&skip if match, false&noskip if miss.
+  // return true & skip if match, false& do not skip if miss.
   private boolean peek1( byte c0, char c ) {
     assert c0==-1 || c0== _buf[_x];
     if( c0!=c ) return false;
@@ -809,7 +808,7 @@ public class Parse {
     return true;
   }
   // Already skipped WS & have character;
-  // return true&skip if match, false&noskip if miss.
+  // return true&skip if match, false & do not skip if miss.
   private boolean peek2( byte c0, String s2 ) {
     if( c0 != s2.charAt(0) ) return false;
     if( _x+1 >= _buf.length || _buf[_x+1] != s2.charAt(1) ) return false;

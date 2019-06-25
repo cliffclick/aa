@@ -52,7 +52,7 @@ public class FunNode extends RegionNode {
   // Used to start an anonymous function in the Parser, includes argument memory in ts[0]
   public FunNode(Type[] ts) { this(null,TypeFunPtr.make_new(TypeTuple.make(ts),Type.SCALAR),-1); }
   // Used to forward-decl anon functions
-  FunNode(String name) { this(name,TypeFunPtr.make_new(TypeTuple.SCALARS,Type.SCALAR),-2); }
+  FunNode(String name) { this(name,TypeFunPtr.make_new(TypeTuple.XSCALARS,Type.SCALAR),-2); }
   // Shared common constructor
   private FunNode(String name, TypeFunPtr tf, int op_prec) {
     super(OP_FUN);

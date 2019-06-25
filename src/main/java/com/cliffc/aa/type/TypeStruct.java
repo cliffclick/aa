@@ -174,7 +174,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public  static TypeStruct make(String[] flds, Type... ts) { return malloc(false,flds,ts,bs(ts)).hashcons_free(); }
   public  static TypeStruct make(String[] flds, Type[] ts, byte[] finals) { return malloc(false,flds,ts,finals).hashcons_free(); }
 
-  private static final TypeStruct POINT = make(flds("x","y"),ts(TypeFlt.FLT64,TypeFlt.FLT64));
+  public  static final TypeStruct POINT = make(flds("x","y"),ts(TypeFlt.FLT64,TypeFlt.FLT64));
           static final TypeStruct X     = make(flds("x"),ts(TypeFlt.FLT64 )); // @{x:flt}
           static final TypeStruct TFLT64= make(          ts(TypeFlt.FLT64 )); //  (  flt)
   public  static final TypeStruct A     = make(flds("a"),ts(TypeFlt.FLT64 ));
