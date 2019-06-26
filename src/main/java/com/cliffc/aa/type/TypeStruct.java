@@ -229,7 +229,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     byte  [] bs = new byte  [_ts  .length];
     for( int i=0; i<as.length; i++ ) as[i]=sdual(_flds[i]);
     for( int i=0; i<ts.length; i++ ) ts[i] = _ts[i].dual();
-    for( int i=0; i<bs.length; i++ ) bs[i] = (byte)(_finals[i]^1);
+    for( int i=0; i<bs.length; i++ ) bs[i] = _finals[i];
     return new TypeStruct(!_any,as,ts,bs);
   }
 
@@ -240,7 +240,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     Type  [] ts = new Type  [_ts  .length];
     byte  [] bs = new byte  [_ts  .length];
     for( int i=0; i<as.length; i++ ) as[i]=sdual(_flds[i]);
-    for( int i=0; i<bs.length; i++ ) bs[i] = (byte)(_finals[i]^1);
+    for( int i=0; i<bs.length; i++ ) bs[i] = (byte)(_finals[i]);
     TypeStruct dual = _dual = new TypeStruct(!_any,as,ts,bs);
     for( int i=0; i<ts.length; i++ ) ts[i] = _ts[i].rdual();
     dual._hash = dual.compute_hash();

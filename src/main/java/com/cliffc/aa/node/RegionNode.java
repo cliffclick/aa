@@ -42,7 +42,7 @@ public class RegionNode extends Node {
     Type t = Type.XCTRL;
     for( int i=1; i<_defs._len; i++ )
       t = t.meet(gvn.type(in(i)));
-    return t;
+    return t == Type.XCTRL ? t : Type.CTRL;
   }
   
   @Override public Type all_type() { return Type.CTRL; }

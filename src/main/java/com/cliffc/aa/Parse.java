@@ -880,8 +880,8 @@ public class Parse {
   // reference.
   private Node do_mem(NewNode nnn) {
     Node nn = gvn(nnn);
-    Node nmem = gvn(new MProjNode(nn,0));
-    Node nadr = gvn(new  ProjNode(nn,1));
+    Node nmem = gvn(new ProjNode(nn,0));
+    Node nadr = gvn(new ProjNode(nn,1));
     set_mem(gvn(new MemMergeNode(mem(),nmem)));
     return nadr;
   }

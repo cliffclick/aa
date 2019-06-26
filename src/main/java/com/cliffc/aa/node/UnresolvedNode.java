@@ -21,10 +21,10 @@ public class UnresolvedNode extends Node {
     return null;
   }
   @Override public Type value(GVNGCM gvn) {
-    Type t = Type.ALL;
+    Type t = TypeFunPtr.GENERIC_FUNPTR;
     for( Node def : _defs )
       t = t.join(gvn.type(def)); // Join of incoming functions
-    return t;
+    return t.meet(TypeFunPtr.GENERIC_FUNPTR.dual());
   }
   BitsFun fidxs() {
     int[] bits = new int[_defs._len];

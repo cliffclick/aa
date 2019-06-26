@@ -63,14 +63,16 @@ import com.cliffc.aa.type.TypeMem;
 public class MemMergeNode extends Node {
   public MemMergeNode( Node m0, Node m1 ) { super(OP_MERGE,m0,m1); }
   @Override public Node ideal(GVNGCM gvn) {
-    if( in(1) instanceof MProjNode &&
+    if( in(1) instanceof ProjNode &&
         in(1).in(0) instanceof NewNode &&
         ((NewNode)in(1).in(0)).is_dead_address() )
       return in(0);             // Skinny memory is dead, nothing to merge
     return null;
   }
   @Override public Type value(GVNGCM gvn) {
-    return gvn.type(in(0)).meet(gvn.type(in(1))).join(TypeMem.MEM).meet(TypeMem.XMEM);
+    Type mem = gvn.type(in(0));
+    Type obj = gvn.type(in(1));
+    return mem.meet(gvn.type(in(1))).bound(TypeMem.MEM);
   }
   @Override public Type all_type() { return TypeMem.MEM; }
 }

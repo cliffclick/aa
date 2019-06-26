@@ -175,7 +175,7 @@ static class ConvertStrStr extends PrimNode {
   ConvertStrStr() { super("str",PrimNode.ARGS1,TypeTuple.STRPTR,TypeMemPtr.STRPTR); }
   @Override public Type apply( Type[] args ) { return args[1]; }
   @Override public Node ideal(GVNGCM gvn) { return in(1); }
-  @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)); }
+  @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)).bound(_ret); }
 }
 
 // 1Ops have uniform input/output types, so take a shortcut on name printing
@@ -349,7 +349,7 @@ static class NE_OOP extends PrimNode {
 static class RandI64 extends PrimNode {
   RandI64() { super("math_rand",PrimNode.ARGS1,TypeTuple.INT64,TypeInt.INT64); }
   @Override public TypeInt apply( Type[] args ) { return TypeInt.con(new java.util.Random().nextInt((int)args[2].getl())); }
-  @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)).meet(TypeInt.FALSE); }
+  @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)).meet(TypeInt.FALSE).bound(TypeInt.INT64); }
   // Rands have hidden internal state; 2 Rands are never equal
   @Override public boolean equals(Object o) { return this==o; }
 }
@@ -358,7 +358,7 @@ static class Id extends PrimNode {
   Id(Type arg) { super("id",PrimNode.ARGS1,TypeTuple.make_args(arg),arg); }
   @Override public Type apply( Type[] args ) { return args[1]; }
   @Override public Node ideal(GVNGCM gvn) { return in(1); }
-  @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)); }
+  @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)).bound(_ret); }
 }
 
 static class AddStrStr extends PrimNode {

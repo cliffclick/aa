@@ -371,6 +371,13 @@ public class Type<T extends Type<T>> {
   
   public Type join( Type t ) { return dual().meet(t.dual()).dual(); }
 
+  // True if 'this' isa/subtypes 't'.  E.g. Int32-isa-Int64, but not vice-versa
+  // E.g. ANY-isa-XSCALAR; XSCALAR-isa-XREAL; XREAL-isa-Int(Any); Int(Any)-isa-Int(3)
+  public boolean isa( Type t ) { return meet(t)==t; }
+
+  // Trim 'this' to being within lower bound 't' and upper bound 't.dual'
+  public Type bound( Type t ) { return meet(t._dual).join(t); }
+
   public static void init0( HashMap<String,Type> types ) {
     types.put("real",REAL);
     types.put("scalar",SCALAR);
@@ -465,10 +472,6 @@ public class Type<T extends Type<T>> {
     return ts;
   }
   
-  // True if 'this' isa/subtypes 't'.  E.g. Int32-isa-Int64, but not vice-versa
-  // E.g. ANY-isa-XSCALAR; XSCALAR-isa-XREAL; XREAL-isa-Int(Any); Int(Any)-isa-Int(3)
-  public boolean isa( Type t ) { return meet(t)==t; }
-
   // True if value is above the centerline (no definite value, ambiguous)
   public boolean above_center() {
     switch( _type ) {
