@@ -61,7 +61,8 @@ import com.cliffc.aa.type.TypeMem;
 // Generally the RHS has just added some new memory, but the total result is
 // more approximate than the original.
 public class MemMergeNode extends Node {
-  public MemMergeNode( Node m0, Node m1 ) { super(OP_MERGE,m0,m1); }
+  final int _alias;
+  public MemMergeNode( Node mem, Node obj, int alias ) { super(OP_MERGE,mem,obj); _alias = alias; }
   @Override public Node ideal(GVNGCM gvn) {
     if( in(1) instanceof ProjNode &&
         in(1).in(0) instanceof NewNode &&
@@ -72,8 +73,17 @@ public class MemMergeNode extends Node {
   @Override public Type value(GVNGCM gvn) {
     Type mem = gvn.type(in(0));
     Type obj = gvn.type(in(1));
-    return mem.meet(gvn.type(in(1))).bound(TypeMem.MEM);
+    //return mem.meet(gvn.type(in(1))).bound(TypeMem.MEM);
+    throw com.cliffc.aa.AA.unimpl();
   }
   @Override public Type all_type() { return TypeMem.MEM; }
+  @Override public int hashCode() { return super.hashCode()+_alias; }
+  @Override public boolean equals(Object o) {
+    if( this==o ) return true;
+    if( !super.equals(o) ) return false;
+    if( !(o instanceof MemMergeNode) ) return false;
+    MemMergeNode mem = (MemMergeNode)o;
+    return _alias==mem._alias;
+  }
 }
 

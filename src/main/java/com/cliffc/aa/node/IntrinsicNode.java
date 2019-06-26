@@ -51,9 +51,9 @@ public abstract class IntrinsicNode extends Node {
     for( int i=0; i<_args.length; i++ ) // Args follow
       add_def(gvn.xform(new ParmNode(i,_args[i],fun, gvn.con(_targs.at(i)),null)));
     Node prim = gvn.xform(this); // Intrinsic returns a CallNode style tuple [ctrl,mem,ptr]
-    Node mem2 = gvn.xform(new MProjNode(prim,1));
-    Node val  = gvn.xform(new  ProjNode(prim,2));
-    Node merge= gvn.xform(new MemMergeNode(memp,mem2));
+    Node mem2 = gvn.xform(new ProjNode(prim,1));
+    Node val  = gvn.xform(new ProjNode(prim,2));
+    Node merge= gvn.xform(new MemMergeNode(memp,mem2,_alias));
     return new EpilogNode(fun,merge,val,rpc,fun,null);
   }
   
@@ -157,10 +157,10 @@ public abstract class IntrinsicNode extends Node {
     Node[] flds = new Node[from._flds.length+1];
     for( int i=0; i<from._flds.length; i++ ) // Args follow
       flds[i+1] = gvn.xform(new ParmNode(i,from._flds[i],fun, gvn.con(from.at(i)),null));
-    Node nn = gvn.xform(new NewNode(flds,from._flds));
+    NewNode nn = (NewNode)gvn.xform(new NewNode(flds,from._flds));
     Node mn = gvn.xform(new MProjNode(nn,0));
     Node an = gvn.xform(new  ProjNode(nn,1));
-    Node mem1= gvn.xform(new MemMergeNode(memp,mn));
+    Node mem1= gvn.xform(new MemMergeNode(memp,mn,nn._alias));
     
     // Replace the single struct input from a parm with a NewNode from pieces-parts.
     assert ((ParmNode)cptn.in(2))._idx==0;

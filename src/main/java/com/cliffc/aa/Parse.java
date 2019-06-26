@@ -693,10 +693,11 @@ public class Parse {
     }
     TypeStr ts = TypeStr.con(new String(_buf,oldx,_x-oldx-1));
     // Convert to ptr-to-constant-memory-string
-    TypeMemPtr ptr = TypeMemPtr.make(ts.get_alias());
+    int alias = ts.get_alias();
+    TypeMemPtr ptr = TypeMemPtr.make(alias);
     // Store the constant string to memory
     Node con_mem = con(TypeMem.make(ptr.getbit(),ts));
-    set_mem(gvn(new MemMergeNode(mem(),con_mem)));
+    set_mem(gvn(new MemMergeNode(mem(),con_mem,alias)));
     return ptr;
   }
 
@@ -882,7 +883,7 @@ public class Parse {
     Node nn = gvn(nnn);
     Node nmem = gvn(new ProjNode(nn,0));
     Node nadr = gvn(new ProjNode(nn,1));
-    set_mem(gvn(new MemMergeNode(mem(),nmem)));
+    set_mem(gvn(new MemMergeNode(mem(),nmem,nnn._alias)));
     return nadr;
   }
   

@@ -12,8 +12,8 @@ public class NewNode extends Node {
   private final byte[] _finals;  // Final field booleans
   // Unique alias class, one class per unique memory allocation site.
   // Only effectively-final, because the copy/clone sets a new alias value.
-  private int _alias;            // Alias class
-  private TypeMemPtr _ptr;       // Cache of TypeMemPtr(_alias)
+  public int _alias;            // Alias class
+  private TypeMemPtr _ptr;      // Cache of TypeMemPtr(_alias)
   private TypeStruct _struct;
   
   private boolean _dead;         // No users of the address
