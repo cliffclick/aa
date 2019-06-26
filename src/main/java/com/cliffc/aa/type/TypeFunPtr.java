@@ -56,9 +56,10 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public static TypeFunPtr make_new(TypeTuple args, Type ret) { return make(BitsFun.make_new_fidx(BitsFun.ALL),args,ret); }
   public TypeFunPtr make_fidx( int fidx ) { return make(BitsFun.make0(fidx),_args,_ret); }
   public TypeFunPtr make_new_fidx( int parent ) { return make(BitsFun.make_new_fidx(parent),_args,_ret); }
+  public static TypeFunPtr make_anon() { return make_new(TypeTuple.ALL_ARGS,Type.SCALAR); } // Make a new anonymous function ptr
 
-  public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.NZERO,TypeTuple.XSCALARS,Type.SCALAR); // Only for testing
-  public  static final TypeFunPtr TEST_INEG = new FunNode(TypeTuple.INT64._ts)._tf;
+  public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.NZERO,TypeTuple.ALL_ARGS,Type.SCALAR);
+  public  static final TypeFunPtr TEST_INEG = new FunNode(TypeTuple.INT64._ts)._tf; // Only for testing
   
   static final TypeFunPtr[] TYPES = new TypeFunPtr[]{GENERIC_FUNPTR,TEST_INEG};
   
@@ -81,7 +82,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     default: throw typerr(t);   // All else should not happen
     }
     TypeFunPtr tf = (TypeFunPtr)t;
-    return make(_fidxs.meet(tf._fidxs),(TypeTuple)_args.join(tf._args),_ret.meet(tf._ret));
+    return make(_fidxs.meet(tf._fidxs),(TypeTuple)_args/*QQQ.meet*/.join(tf._args),_ret.meet(tf._ret));
   }
 
   public BitsFun fidxs() { return _fidxs; }
@@ -89,7 +90,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public Type arg(int idx) { return _args.at(idx); }
   public boolean is_class() { return _fidxs.is_class(); }
   
-  @Override public boolean above_center() { return _fidxs.above_center(); }
+  @Override public boolean above_center() { return /*QQQ*/!_args.above_center(); }
   // Fidxes represent a single function and thus are constants, but TypeFunPtrs
   // represent the execution of a function, and are never constants.
   @Override public boolean may_be_con()   { return false; }
@@ -109,11 +110,14 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   // Generic functions
   public boolean is_forward_ref() {
     if( _fidxs.abit() == -1 ) return false; // Multiple fidxs
+    if( _fidxs.getbit() == 1 ) return false; // Thats the generic function ptr
     return FunNode.find_fidx(fidx()).is_forward_ref();
   }
 
   // Dual, except keep high args high
   @Override public TypeFunPtr startype() {
-    return make(_fidxs.dual(),_args,_ret.dual());
+    //TypeTuple args = _args.above_center() ? _args : _args.dual(); // QQQ
+    //return make(_fidxs.dual(),args,_ret.dual());
+    return make(_fidxs.dual(),_args/*QQQ*/.dual(),_ret.dual());
   }
 }

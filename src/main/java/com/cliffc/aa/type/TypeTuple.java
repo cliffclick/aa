@@ -56,10 +56,10 @@ public class TypeTuple extends Type<TypeTuple> {
       int j = _ts.length-1;     // Find length of trailing equal parts
       Type last = _ts[j];       // Last type
       for( j--; j>0; j-- ) if( _ts[j] != last )  break;
-      sb.p(_ts[0].str(dups));
-      for( int i=1; i<=j; i++ )
+      sb.p(_ts[0].str(dups));   // First type
+      for( int i=1; i<=j; i++ ) // All types up to trailing equal parts
         sb.p(',').p(_ts[i].str(dups));
-      if( j+1<_ts.length-1 )  sb.p("...");
+      if( j+1<_ts.length-1 )  sb.p("..."); // Abbreviate tail
       if( _ts.length> 1 ) sb.p(',').p(last);
     }
     sb.p(')');
@@ -78,17 +78,11 @@ public class TypeTuple extends Type<TypeTuple> {
     return t1==t2 ? t1 : t1.free(t2);
   }
   public static TypeTuple make( Type... ts ) { return make0(false,ts); }
-  // Arguments are infinitely-extended with ANY, not ALL
-  public static TypeTuple make_args( Type... ts ) { return make0(false,ts); }
-  private static TypeTuple make_generic_args(boolean any) {
-    Type[] args = new Type[99];
-    java.util.Arrays.fill(args,any ? XSCALAR : SCALAR);
-    return make0(any,args);
-  }
+  // Arguments are infinitely-extended with ANY not ALL
+  public static TypeTuple make_args( Type... ts ) { return make0(/*QQQfalse*/true,ts); }
 
   // Most primitive function call argument type lists are 0-based
-  public  static final TypeTuple XSCALARS= make_generic_args(true );
-  public  static final TypeTuple  SCALARS= make_generic_args(false);
+  public  static final TypeTuple ALL_ARGS= make0(/*QQQfalse*/true); // Zero args and high
           static final TypeTuple SCALAR0 = make_args();
           static final TypeTuple SCALAR1 = make_args(SCALAR);
   public  static final TypeTuple SCALAR2 = make_args(SCALAR, SCALAR);
@@ -111,7 +105,7 @@ public class TypeTuple extends Type<TypeTuple> {
   public  static final TypeTuple START_STATE = make(CTRL, TypeMem.EMPTY_MEM);
   public  static final TypeTuple CALL  = make(CTRL, TypeMem.MEM, SCALAR);
   public  static final TypeTuple XCALL = CALL.dual();
-  static final TypeTuple[] TYPES = new TypeTuple[]{XSCALARS,SCALAR0,SCALAR1,STRPTR,INT32,INT64,FLT64,INT64_INT64,FLT64_FLT64,FLT64_INT64, IF_ALL, IF_TRUE, IF_FALSE, OOP_OOP};
+  static final TypeTuple[] TYPES = new TypeTuple[]{ALL_ARGS,SCALAR0,SCALAR1,STRPTR,INT32,INT64,FLT64,INT64_INT64,FLT64_FLT64,FLT64_INT64, IF_ALL, IF_TRUE, IF_FALSE, OOP_OOP};
   
   // The length of Tuples is a constant, and so is its own dual.  Otherwise
   // just dual each element.  Also flip the infinitely extended tail type.
@@ -121,11 +115,10 @@ public class TypeTuple extends Type<TypeTuple> {
     for( int i=0; i<_ts.length; i++ ) ts[i] = _ts[i].dual();
     return new TypeTuple(TTUPLE, !_any, ts);
   }
-  // Standard Meet.
+  // Standard Meet.  Tuples have an infinite extent of 'ALL' for low, or 'ANY'
+  // for high.  After the meet, the infinite tail is trimmed.
   @Override protected Type xmeet( Type t ) {
     if( t._type != TTUPLE ) return ALL; // Tuples are internal types only, not user exposed
-    // Tuples have an infinite extent of 'ALL' for low, or 'ANY' for high.
-    // After the meet, the infinite tail is trimmed.
     TypeTuple tt = (TypeTuple)t;
     return _ts.length < tt._ts.length ? xmeet1(tt) : tt.xmeet1(this);
   }

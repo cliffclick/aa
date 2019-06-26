@@ -438,8 +438,9 @@ public class Parse {
         if( arg == null )       // tfact but no arg is just the tfact
           break;
         Type tn = _gvn.type(n);
-        if( !(tn instanceof TypeFunPtr) && arg.may_prec() >= 0 ) { _x=oldx; break; }
-        if( !(tn instanceof TypeFunPtr) &&
+        boolean may_fun = tn.isa(TypeFunPtr.GENERIC_FUNPTR);
+        if( !may_fun && arg.may_prec() >= 0 ) { _x=oldx; break; }
+        if( !may_fun &&
             // Notice the backwards condition: n was already tested for !(tn instanceof TypeFun).
             // Now we test the other way: the generic function can never be an 'n'.
             // Only if we cannot 'isa' in either direction do we bail out early

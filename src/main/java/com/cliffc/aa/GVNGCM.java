@@ -456,7 +456,7 @@ public class GVNGCM {
     if( n instanceof FunNode && n._uid >= _INIT0_CNT ) {
       FunNode fun = (FunNode)n;
       EpilogNode epi = fun.epi();
-      if( type(fun)==Type.CTRL && epi != null ) {
+      if( type(fun)==Type.CTRL && epi != null && !epi.is_forward_ref() ) {
         if( type(epi.ctl()) != Type.CTRL ) throw AA.unimpl(); // never-return function (maybe never called?)
         TypeFunPtr tf = (TypeFunPtr)type(epi);
         if( tf != fun._tf && !tf.isa(fun._tf) )

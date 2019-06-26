@@ -69,7 +69,9 @@ public class MemMergeNode extends Node {
       return in(0);             // Skinny memory is dead, nothing to merge
     return null;
   }
-  @Override public Type value(GVNGCM gvn) { return gvn.type(in(0)).meet(gvn.type(in(1))); }
+  @Override public Type value(GVNGCM gvn) {
+    return gvn.type(in(0)).meet(gvn.type(in(1))).join(TypeMem.MEM).meet(TypeMem.XMEM);
+  }
   @Override public Type all_type() { return TypeMem.MEM; }
 }
 

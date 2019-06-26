@@ -32,7 +32,7 @@ public class EpilogNode extends Node {
     Type r = gvn.type(rpc()); // Caller; the Continuation
     assert gvn.type(mem()) instanceof TypeMem;
     if( c!=Type.CTRL || !(r instanceof TypeRPC))  return all_type().dual();
-    if( is_forward_ref() ) return all_type();
+    if( is_forward_ref() ) return all_type().startype();
     Type v = gvn.type(val());
     if( is_copy() )             // Function is dead, epilog is dying; type makes no sense
       return TypeFunPtr.make(BitsFun.NZERO.dual(),_args,v);

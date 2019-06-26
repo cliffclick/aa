@@ -16,7 +16,9 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
     Object dummy = Env.GVN; // Force class loading cycle
+    testerr("fun={x -> }; fun(0)", "Missing function body","          ");
     testerr("x=z" , "Unknown ref 'z'","   ");
+    testerr("f0 = { f x -> f0(x-1) }; f0({+},2)", "Passing 1 arguments to f0{~(Scalar,Scalar)-> Scalar} which takes 2 arguments","                     ");
     // A collection of tests which like to fail easily
     testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1) is not a @{x,y}","                           ");
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'","                    ");
@@ -79,9 +81,9 @@ public class TestParse {
     test("{-}(1,2)", TypeInt.con(-1)); // binary version
     test(" - (1  )", TypeInt.con(-1)); // unary version
     // error; mismatch arg count
-    testerr("!()       ", "Passing 0 arguments to !{(int64)-> int1} which takes 1 arguments","   ");
+    testerr("!()       ", "Passing 0 arguments to !{~(int64)-> int1} which takes 1 arguments","   ");
     testerr("math_pi(1)", "A function is being called, but 3.141592653589793 is not a function type","          ");
-    testerr("{+}(1,2,3)", "Passing 3 arguments to +{(flt64,flt64)-> flt64} which takes 2 arguments","          ");
+    testerr("{+}(1,2,3)", "Passing 3 arguments to +{~(flt64,flt64)-> flt64} which takes 2 arguments","          ");
 
     // Parsed as +(1,(2*3))
     test("{+}(1, 2 * 3) ", TypeInt.con(7));
@@ -155,12 +157,12 @@ public class TestParse {
     test("sq={x -> x*x}; sq 2.1", TypeFlt.con(4.41)); // No () required for single args
     testerr("sq={x -> x&x}; sq(\"abc\")", "*\"abc\" is not a int64","                        ");
     testerr("sq={x -> x*x}; sq(\"abc\")", "*\"abc\" is not a flt64","            ");
-    testerr("f0 = { f x -> f0(x-1) }; f0({+},2)", "Passing 1 arguments to f0{(Scalar,Scalar)-> Scalar} which takes 2 arguments","                     ");
+    testerr("f0 = { f x -> f0(x-1) }; f0({+},2)", "Passing 1 arguments to f0{~(Scalar,Scalar)-> Scalar} which takes 2 arguments","                     ");
     // Recursive:
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
     test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)",TypeInt.INT64);
     test("f0 = { x -> x ? {+}(f0(x-1),1) : 0 }; f0(2)", TypeInt.con(2));
-    testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact()","Passing 0 arguments to fact{(Scalar)-> Scalar} which takes 1 arguments","                                                ");
+    testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact()","Passing 0 arguments to fact{~(Scalar)-> Scalar} which takes 1 arguments","                                                ");
     test_ptr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(0),fact(1),fact(2))",
              (alias)-> TypeMem.make(alias,TypeStruct.make(TypeNil.NIL,TypeInt.con(1),TypeInt.con(2))));
 

@@ -33,6 +33,9 @@ public class TestNode {
 
   private NonBlockingHashMapLong<Type> _values;
 
+  // Worse-case output for a Node
+  private Type _alltype;
+  
   private int _errs;
   
   // temp/junk holder for "instant" junits, when debugged moved into other tests
@@ -140,6 +143,21 @@ public class TestNode {
     Node unr = Env.top().lookup("+"); // All the "+" functions
     FunNode fun_plus = ((EpilogNode)unr.in(1)).fun();
 
+    test1monotonic(new    NewNode(new Node[]{null,_ins[1],_ins[2]},TypeStruct.FLDS(2)));
+    test1monotonic(new    NewNode(new Node[]{null,_ins[1],_ins[2]},TypeStruct.FLDS(2),new byte[2]));
+    test1monotonic(new   ParmNode( 1, "x",_ins[0],(ConNode)_ins[1],"badgc"));
+    test1monotonic(new    PhiNode("badgc",_ins[0],_ins[1],_ins[2]));
+    for( PrimNode prim : PrimNode.PRIMS )
+      test1monotonic_prim(prim);
+    test1monotonic(new   ProjNode(_ins[0],1));
+    test1monotonic(new RegionNode(null,_ins[1],_ins[2]));
+    test1monotonic(new  StoreNode(_ins[0],_ins[1],_ins[2],_ins[3],0,null));
+    //                  ScopeNode has no inputs, and value() call is monotonic
+    //                    TmpNode has no inputs, and value() call is monotonic
+    test1monotonic(new   TypeNode(TypeInt.FALSE,_ins[1],null));
+    test1monotonic(new   TypeNode(TypeStr.ABC  ,_ins[1],null));
+    test1monotonic(new   TypeNode(TypeFlt.FLT64,_ins[1],null));
+    test1monotonic(new UnresolvedNode(_ins[0],_ins[1],_ins[2]));
     test1monotonic(new   CallNode(false,null,_ins[0],  unr  ,mem,_ins[2],_ins[3]));
     test1monotonic(new   CallNode(false,null,_ins[0],_ins[1],mem,_ins[2],_ins[3]));
     test1monotonic(new    ConNode<Type>(          TypeInt.FALSE));
@@ -166,22 +184,7 @@ public class TestNode {
     test1monotonic(cptn);
     test1monotonic(new   LoadNode(_ins[0],_ins[1],_ins[2],0,null));
     test1monotonic(new MemMergeNode(_ins[0],_ins[1]));
-    test1monotonic(new    NewNode(new Node[]{null,_ins[1],_ins[2]},TypeStruct.FLDS(2)));
-    test1monotonic(new    NewNode(new Node[]{null,_ins[1],_ins[2]},TypeStruct.FLDS(2),new byte[2]));
-    test1monotonic(new   ParmNode( 1, "x",_ins[0],(ConNode)_ins[1],"badgc"));
-    test1monotonic(new    PhiNode("badgc",_ins[0],_ins[1],_ins[2]));
-    for( PrimNode prim : PrimNode.PRIMS )
-      test1monotonic_prim(prim);
-    test1monotonic(new   ProjNode(_ins[0],1));
-    test1monotonic(new RegionNode(null,_ins[1],_ins[2]));
-    test1monotonic(new  StoreNode(_ins[0],_ins[1],_ins[2],_ins[3],0,null));
-    //                  ScopeNode has no inputs, and value() call is monotonic
-    //                    TmpNode has no inputs, and value() call is monotonic
-    test1monotonic(new   TypeNode(TypeInt.FALSE,_ins[1],null));
-    test1monotonic(new   TypeNode(TypeStr.ABC  ,_ins[1],null));
-    test1monotonic(new   TypeNode(TypeFlt.FLT64,_ins[1],null));
-    test1monotonic(new UnresolvedNode(_ins[0],_ins[1],_ins[2]));
-    
+
     assertEquals(0,_errs);
   }
 
@@ -214,6 +217,7 @@ public class TestNode {
   private void test1monotonic_init(final Node n) {
     System.out.println(n.xstr());
     _values.clear();
+    _alltype = n.all_type();
     set_value_type(n,0);
     test1monotonic(n,0);
   }
@@ -269,6 +273,9 @@ public class TestNode {
     _gvn.setype(_ins[2],((ConNode)_ins[2])._t = alltypes[xx(xx,2)]);
     _gvn.setype(_ins[3],((ConNode)_ins[3])._t = alltypes[xx(xx,3)]);
     Type vt = n.value(_gvn);
+    // Assert the alltype() bounds any value() call result.
+    assert vt.isa(_alltype);
+    assert _alltype.dual().isa(vt);
     Type old = _values.put(xx,vt);
     assert old==null;
     return vt;

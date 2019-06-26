@@ -49,15 +49,16 @@ public class FunNode extends RegionNode {
   public FunNode(IntrinsicNode prim, Type ret) { this(prim._name,TypeFunPtr.make_new(prim._targs,ret),-1); }
   // Used to make copies when inlining/cloning function bodies
   private FunNode(String name,TypeFunPtr tf) { this(name,tf,-1); }
-  // Used to start an anonymous function in the Parser, includes argument memory in ts[0]
-  public FunNode(Type[] ts) { this(null,TypeFunPtr.make_new(TypeTuple.make(ts),Type.SCALAR),-1); }
+  // Used to start an anonymous function in the Parser
+  public FunNode(Type[] ts) { this(null,TypeFunPtr.make_new(TypeTuple.make_args(ts),Type.SCALAR),-1); }
   // Used to forward-decl anon functions
-  FunNode(String name) { this(name,TypeFunPtr.make_new(TypeTuple.XSCALARS,Type.SCALAR),-2); }
+  FunNode(String name) { this(name,TypeFunPtr.make_anon(),-2); }
   // Shared common constructor
   private FunNode(String name, TypeFunPtr tf, int op_prec) {
     super(OP_FUN);
     _name = name;
     assert tf.isa(TypeFunPtr.GENERIC_FUNPTR);
+    assert TypeFunPtr.GENERIC_FUNPTR.dual().isa(tf);
     _tf = tf;
     _op_prec = (byte)op_prec;
     add_def(Env.ALL_CTRL);
@@ -254,7 +255,7 @@ public class FunNode extends RegionNode {
     // (all Scalar args).  Peel out 2nd call-site args and generalize them.
     
     // Make a new function header with new signature
-    TypeTuple args = TypeTuple.make(sig);
+    TypeTuple args = TypeTuple.make_args(sig);
     assert args.isa(_tf._args);
     assert args != _tf._args;   // Must see improvement
     // Make a prototype new function header split from the original.

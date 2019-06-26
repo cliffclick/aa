@@ -218,8 +218,20 @@ public class TestType {
     Type ignore = TypeTuple.ANY; // Break class-loader cycle; load Tuple before Fun.
 
     TypeFunPtr gf = TypeFunPtr.GENERIC_FUNPTR;
-
+    // New functions fall squarely between +/- GENERIC_FUNPTR.
+    
+    // TypeTuple structure demands the shortest Tuple wins the "length
+    // war" (determines the length of the result based on short's any/all flag).
     TypeFunPtr f1i2i = TypeFunPtr.make_new(TypeTuple.INT64_INT64,TypeInt.INT64);
+    // To be a GF result, GF has to be shorter and high; the isa does a meet of
+    // TypeFunPtrs which does a *join* of args, which duals the GF args down
+    // low.  GF is zero length and low, and wins the meet.
+    assertTrue(f1i2i.isa(gf));        // To be long  result, short must be high
+    // To have GF.dual() be anything else and short, GF.dual must be high and
+    // thus the result is a copy of F1I2I.
+    assertTrue(gf.dual().isa(f1i2i)); // To be short result, short must be low
+
+    
     assertTrue(f1i2i.isa(gf));
     TypeFunPtr f1f2f = TypeFunPtr.make_new(TypeTuple.FLT64_FLT64,TypeFlt.FLT64);
     assertTrue(f1f2f.isa(gf));

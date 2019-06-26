@@ -74,6 +74,7 @@ public class LoadNode extends Node {
     if( adr.isa(TypeMemPtr.OOP0.dual()) ) return Type.XSCALAR;
     if( adr.must_nil() ) return Type.SCALAR; // Not provable not-nil, so fails
     if( TypeMemPtr.OOP0.isa(adr) ) return Type.SCALAR; // Very low, might be any address
+    if( adr.is_forward_ref() ) return Type.SCALAR;
     if( !(adr instanceof TypeMemPtr) )
       return adr.above_center() ? Type.XSCALAR : Type.SCALAR;
 
