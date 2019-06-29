@@ -45,14 +45,14 @@ public class FunNode extends RegionNode {
   private final byte _op_prec;  // Operator precedence; only set on top-level primitive wrappers
   
   // Used to make the primitives at boot time
-  public FunNode(     PrimNode prim) { this(prim._name,TypeFunPtr.make_new(prim._targs,prim._ret),prim.op_prec()); }
-  public FunNode(IntrinsicNode prim, Type ret) { this(prim._name,TypeFunPtr.make_new(prim._targs,ret),-1); }
+  public  FunNode(PrimNode prim) { this(prim._name,TypeFunPtr.make_new(prim._targs,prim._ret),prim.op_prec()); }
+  public  FunNode(IntrinsicNewNode prim, Type ret) { this(prim._name,TypeFunPtr.make_new(prim._targs,ret),-1); }
   // Used to make copies when inlining/cloning function bodies
-  private FunNode(String name,TypeFunPtr tf) { this(name,tf,-1); }
+          FunNode(String name,TypeFunPtr tf) { this(name,tf,-1); }
   // Used to start an anonymous function in the Parser
-  public FunNode(Type[] ts) { this(null,TypeFunPtr.make_new(TypeTuple.make_args(ts),Type.SCALAR),-1); }
+  public  FunNode(Type[] ts) { this(null,TypeFunPtr.make_new(TypeTuple.make_args(ts),Type.SCALAR),-1); }
   // Used to forward-decl anon functions
-  FunNode(String name) { this(name,TypeFunPtr.make_anon(),-2); }
+          FunNode(String name) { this(name,TypeFunPtr.make_anon(),-2); }
   // Shared common constructor
   private FunNode(String name, TypeFunPtr tf, int op_prec) {
     super(OP_FUN);

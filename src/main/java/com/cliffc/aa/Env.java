@@ -41,7 +41,7 @@ public class Env implements AutoCloseable {
     _scope.update(" memory " , MEM_0, GVN,true);
     for( PrimNode prim : PrimNode.PRIMS )
       _scope.add_fun(prim._name,(EpilogNode) GVN.xform(prim.as_fun(GVN)));
-    for( IntrinsicNode lib : IntrinsicNewNode.INTRINSICS )
+    for( IntrinsicNewNode lib : IntrinsicNewNode.INTRINSICS )
       _scope.add_fun(lib._name,(EpilogNode) GVN.xform(lib.as_fun(GVN)));
     // Now that all the UnresolvedNodes have all possible hits for a name,
     // register them with GVN.

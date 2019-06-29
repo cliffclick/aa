@@ -8,27 +8,20 @@ import java.util.Arrays;
 // Make a new object of given type.  Returns both the pointer and the TypeObj
 // but NOT the memory state.
 public class NewNode extends Node {
-  private final String[] _names; // Field names
-  private final byte[] _finals;  // Final field booleans
   // Unique alias class, one class per unique memory allocation site.
   // Only effectively-final, because the copy/clone sets a new alias value.
   public int _alias;            // Alias class
   private TypeMemPtr _ptr;      // Cache of TypeMemPtr(_alias)
-  private TypeStruct _struct;
+  private TypeObj _obj;         // Result type - same as _ts except can be named
+  private TypeStruct _ts;       // Allocate a struct
   
   private boolean _dead;         // No users of the address
-  public NewNode( Node[] flds, String[] names ) { this(flds,names,finals(names.length)); }
-  public NewNode( Node[] flds, String[] names, byte[] finals ) {
+  public NewNode( Node[] flds, TypeObj obj ) {
     super(OP_NEW,flds);
     assert flds[0]==null;       // no ctrl field
-    assert def_idx(names .length)==flds.length;
-    assert def_idx(finals.length)==flds.length;
-    _names = names;
-    _finals= finals;
-    Type[] ts = new Type[_names.length];  // Worse-case type for this Node
-    Arrays.fill(ts,Type.SCALAR);
-    _struct = TypeStruct.make(names,ts,finals);
-    _alias = BitsAlias.new_alias(BitsAlias.REC,_struct);
+    _obj = obj;
+    _ts = (TypeStruct)obj.base();
+    _alias = BitsAlias.new_alias(BitsAlias.REC,obj);
     _ptr = TypeMemPtr.make(_alias);
   }
   private static byte[] finals(int len) { byte[] bs = new byte[len]; Arrays.fill(bs,(byte)1); return bs; }
@@ -42,29 +35,26 @@ public class NewNode extends Node {
     // Check for 1 user, and its the memory proj not the ptr proj.
     if( _uses.len()==1 && ((ProjNode)_uses.at(0))._idx==0 ) {
       _dead = true;
-      for( int i=0; i<_names.length; i++ )
-        set_def(def_idx(i),null,gvn); // Kill contents of memory
+      for( int i=0; i<_defs._len; i++ )
+        set_def(i,null,gvn);    // Kill contents of memory
     }
     return null;
   }
   @Override public Type value(GVNGCM gvn) {
     // If the address is dead, then the object is unused and can be nuked
     if( is_dead_address() )
-      return TypeTuple.make(TypeMem.XMEM,_ptr);
-    Type[] ts = new Type[_names.length];
-    for( int i=0; i<_names.length; i++ ) {
-      Type t = gvn.type(fld(i));
-      // Limit to Scalar results
-      if(  t.isa(Type.XSCALAR) ) t = Type.XSCALAR;
-      if( !t.isa(Type. SCALAR) ) t = Type. SCALAR;
-      ts[i] = t;
-    }
-    TypeStruct newt = TypeStruct.make(_names,ts,_finals);
+      return all_type();
+    Type[] ts = new Type[_ts._ts.length];
+    for( int i=0; i<_ts._ts.length; i++ )
+      ts[i] = gvn.type(fld(i)).bound(_ts._ts[i]); // Limit to Scalar results
+    TypeStruct newt = TypeStruct.make(_ts._flds,ts,_ts._finals);
     // Get the existing type, without installing if missing because blows the
     // "new newnode" assert if this node gets replaced during parsing.
     Type oldnnn = gvn.self_type(this);
     Type oldt= oldnnn instanceof TypeTuple ? ((TypeTuple)oldnnn).at(0) : newt;
     TypeStruct apxt= approx(newt,oldt); // Approximate infinite types
+    if( _obj instanceof TypeName )      // Re-wrap in a name
+      return TypeTuple.make(((TypeName)_obj).make(apxt),_ptr);
     return TypeTuple.make(apxt,_ptr);
   }
   
@@ -82,23 +72,23 @@ public class NewNode extends Node {
   }
 
   @Override public Type all_type() {
-    return TypeTuple.make( _dead ? _struct.dual() : _struct,_ptr);
+    return TypeTuple.make( _dead ? _obj.dual() : _obj,_ptr);
   }
   
   // Clones during inlining all become unique new sites
   @Override NewNode copy(GVNGCM gvn) {
     NewNode nnn = (NewNode)super.copy(gvn);
-    nnn._alias = BitsAlias.new_alias(_alias,_struct); // Children alias classes, split from parent
+    nnn._alias = BitsAlias.new_alias(_alias,_ts); // Children alias classes, split from parent
     nnn._ptr = TypeMemPtr.make(nnn._alias);
     return nnn;
   }
 
-  @Override public int hashCode() { return super.hashCode()+ Arrays.hashCode(_names); }
+  @Override public int hashCode() { return super.hashCode()+ _ts._hash + _alias; }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !super.equals(o) ) return false;
     if( !(o instanceof NewNode) ) return false;
     NewNode nnn = (NewNode)o;
-    return Arrays.equals(_names,nnn._names);
+    return _alias==nnn._alias && _ts==nnn._ts;
   }
 }

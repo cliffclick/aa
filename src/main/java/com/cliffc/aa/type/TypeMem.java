@@ -233,13 +233,13 @@ public class TypeMem extends Type<TypeMem> {
   }
 
   // Meet of all possible storable values, after updates
-  public TypeMem st( TypeMemPtr ptr, TypeObj val ) {
+  public TypeMem st( TypeObj obj, TypeMemPtr ptr ) {
     TypeObj[] objs = Arrays.copyOf(_aliases,Math.max(_aliases.length,ptr._aliases.max()+1));
-    if( ptr.is_con() ) throw AA.unimpl(); // objs[ptr.get_con()]=val;
+    if( ptr.is_con() ) throw AA.unimpl(); // objs[ptr.get_con()]=obj;
     else
       for( int alias : ptr._aliases )
         if( alias != 0 )
-          objs[alias] = (TypeObj)at(alias).meet(val);
+          objs[alias] = (TypeObj)at(alias).meet(obj);
     return make0(objs);
   }
 

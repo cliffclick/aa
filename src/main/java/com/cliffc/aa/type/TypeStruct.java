@@ -173,6 +173,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public  static TypeStruct make(Type... ts               ) { return malloc(false,FLDS[ts.length],ts,bs(ts)).hashcons_free(); }
   public  static TypeStruct make(String[] flds, Type... ts) { return malloc(false,flds,ts,bs(ts)).hashcons_free(); }
   public  static TypeStruct make(String[] flds, Type[] ts, byte[] finals) { return malloc(false,flds,ts,finals).hashcons_free(); }
+  public  static TypeStruct make( int x ) { throw AA.unimpl(); }
+  public  static TypeStruct make(String[] flds, byte[] finals) { throw AA.unimpl(); }
 
   public  static final TypeStruct POINT = make(flds("x","y"),ts(TypeFlt.FLT64,TypeFlt.FLT64));
           static final TypeStruct X     = make(flds("x"),ts(TypeFlt.FLT64 )); // @{x:flt}
@@ -229,7 +231,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     byte  [] bs = new byte  [_ts  .length];
     for( int i=0; i<as.length; i++ ) as[i]=sdual(_flds[i]);
     for( int i=0; i<ts.length; i++ ) ts[i] = _ts[i].dual();
-    for( int i=0; i<bs.length; i++ ) bs[i] = _finals[i];
+    for( int i=0; i<bs.length; i++ ) bs[i] = (byte)(_finals[i]^1);
     return new TypeStruct(!_any,as,ts,bs);
   }
 
@@ -240,7 +242,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     Type  [] ts = new Type  [_ts  .length];
     byte  [] bs = new byte  [_ts  .length];
     for( int i=0; i<as.length; i++ ) as[i]=sdual(_flds[i]);
-    for( int i=0; i<bs.length; i++ ) bs[i] = (byte)(_finals[i]);
+    for( int i=0; i<bs.length; i++ ) bs[i] = (byte)(_finals[i]^1);
     TypeStruct dual = _dual = new TypeStruct(!_any,as,ts,bs);
     for( int i=0; i<ts.length; i++ ) ts[i] = _ts[i].rdual();
     dual._hash = dual.compute_hash();

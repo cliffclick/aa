@@ -73,6 +73,7 @@ public class TypeName extends TypeObj<TypeName> {
     if( tn1==null || tn1._depth!= -2 || RECURSIVE_MEET>0 ) return tn0;
     return tn0.make_recur(tn1,0,new BitSet());
   }
+  public TypeName make( Type t) { return make(_name,_lex,t); }
   public static TypeName make_forward_def_type( String name, HashMap<String,Type> lex ) { return make0(name,lex,Type.SCALAR,(short)-1); }
 
           static final HashMap<String,Type> TEST_SCOPE = new HashMap<>();

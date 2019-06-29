@@ -233,21 +233,21 @@ public class Parse {
     // "Point= :@{x,y}" declares "Point" to be a type Name for "@{x,y}".
 
     // Add a constructor function.  If this is a primitive, build a constructor
-    // taking the primitive.  If this is a TypeObj, build a constructor taking
-    // a pointer-to-TypeObj - and the associated memory state, i.e.  takes a
-    // ptr-to-@{x,y} and returns a ptr-to-Named:@{x,y}.  This stores a v-table
-    // ptr into an object.  The alias# does not change, but a TypeMem[alias#]
-    // would now map to the Named variant.
+    // taking the primitive.
     if( !(t instanceof TypeObj) ) {
       PrimNode cvt = PrimNode.convertTypeName(t,tn,errMsg());
       return _e.add_fun(tvar,gvn(cvt.as_fun(_gvn))); // Return type-name constructor
     }
-    IntrinsicNode cvt = IntrinsicNode.convertTypeName((TypeObj)t,tn,errMsg());
-    Node rez = _e.add_fun(tvar,gvn(cvt.as_fun(_gvn))); // Return type-name constructor
-    if( t instanceof TypeStruct ) { // Add struct types with expanded arg lists
-      EpilogNode epi = IntrinsicNode.convertTypeNameStruct((TypeStruct)t,tn,errMsg(),_gvn);
-      Node rez2 = _e.add_fun(tvar,epi); // type-name constructor with expanded arg list
-      _gvn.init0(rez2._uses.at(0));
+    // If this is a TypeObj, build a constructor taking a pointer-to-TypeObj -
+    // and the associated memory state, i.e.  takes a ptr-to-@{x,y} and returns
+    // a ptr-to-Named:@{x,y}.  This stores a v-table ptr into an object.  The
+    // alias# does not change, but a TypeMem[alias#] would now map to the Named
+    // variant.
+    EpilogNode epi1 = IntrinsicNode.convertTypeName((TypeObj)t,tn,errMsg(),_gvn);
+    Node rez = _e.add_fun(tvar,epi1); // Return type-name constructor
+    if( t instanceof TypeStruct ) {   // Add struct types with expanded arg lists
+      EpilogNode epi2 = IntrinsicNode.convertTypeNameStruct((TypeStruct)t,tn,errMsg(),_gvn);
+      _e.add_fun(tvar,epi2);    // type-name constructor with expanded arg list
     }
     // TODO: Add reverse cast-away
     return rez;
@@ -535,7 +535,7 @@ public class Parse {
       s=stmts();
     }
     require(')');
-    return do_mem(new NewNode(ns.asAry(),TypeStruct.FLDS(ns._len-1)));
+    return do_mem(new NewNode(ns.asAry(),TypeStruct.make(ns._len-1)));
   }
 
   /** Parse an anonymous function; the opening '{' already parsed.  After the
@@ -636,7 +636,7 @@ public class Parse {
         flds[i+1] = e._scope.get(toks.at(i));
       byte[] finals = new byte[toks._len];
       for(int i=0; i<finals.length; i++ ) if( fs.get(i) ) finals[i] = 1;
-      return do_mem(new NewNode(flds,toks.asAry(),finals));
+      return do_mem(new NewNode(flds,TypeStruct.make(toks.asAry(),finals)));
     } // Pop lexical scope around struct
   }
 
@@ -693,11 +693,9 @@ public class Parse {
     }
     TypeStr ts = TypeStr.con(new String(_buf,oldx,_x-oldx-1));
     // Convert to ptr-to-constant-memory-string
-    int alias = ts.get_alias();
-    TypeMemPtr ptr = TypeMemPtr.make(alias);
+    TypeMemPtr ptr = TypeMemPtr.make(ts.get_alias());
     // Store the constant string to memory
-    Node con_mem = con(TypeMem.make(ptr.getbit(),ts));
-    set_mem(gvn(new MemMergeNode(mem(),con_mem,alias)));
+    set_mem(gvn(new MemMergeNode(mem(),con(ts),con(ptr))));
     return ptr;
   }
 
@@ -883,7 +881,7 @@ public class Parse {
     Node nn = gvn(nnn);
     Node nmem = gvn(new ProjNode(nn,0));
     Node nadr = gvn(new ProjNode(nn,1));
-    set_mem(gvn(new MemMergeNode(mem(),nmem,nnn._alias)));
+    set_mem(gvn(new MemMergeNode(mem(),nmem,nnn)));
     return nadr;
   }
   

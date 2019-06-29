@@ -43,6 +43,24 @@ public abstract class IntrinsicNewNode extends IntrinsicNode {
     return nnn.update_alias(BitsAlias.new_alias(_alias,TypeStr.STR)); // Children alias classes
   }
   @Override public String xstr() { return _name+"_#"+_alias; }
+
+  // Wrap the PrimNode with a Fun/Epilog wrapper that includes memory effects.
+  public EpilogNode as_fun( GVNGCM gvn ) {
+    FunNode  fun = ( FunNode) gvn.xform(new  FunNode(this,_funret));
+    ParmNode rpc = (ParmNode) gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
+    ParmNode memp= (ParmNode) gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM     ),null));
+    // Add input edges to the intrinsic
+    add_def(null);              // Control for the primitive in slot 0
+    add_def(memp);              // Aliased Memory in slot 1
+    for( int i=0; i<_args.length; i++ ) // Args follow
+      add_def(gvn.xform(new ParmNode(i,_args[i],fun, gvn.con(_targs.at(i)),null)));
+    Node prim = gvn.xform(this); // Intrinsic returns a CallNode style tuple [ctrl,mem,ptr]
+    Node mem2 = gvn.xform(new ProjNode(prim,1));
+    Node ptr  = gvn.xform(new ProjNode(prim,2));
+    Node mmem = gvn.xform(new MemMergeNode(memp,mem2,ptr));
+    return new EpilogNode(fun,mmem,ptr,rpc,fun,null);
+  }
+  
   // --------------------------------------------------------------------------
   static class ConvertI64Str extends IntrinsicNewNode {
     ConvertI64Str(int alias) { super("str",ARGS1,TypeTuple.INT64, TypeMemPtr.STRPTR,alias); }
