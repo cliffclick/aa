@@ -1,6 +1,7 @@
 package com.cliffc.aa.type;
 
 import com.cliffc.aa.AA;
+import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 
 import java.util.Arrays;
@@ -214,11 +215,12 @@ public class TypeMem extends Type<TypeMem> {
   public TypeObj ld( TypeMemPtr ptr ) {
     boolean any = ptr.above_center();
     TypeObj obj = any ? TypeObj.OBJ : TypeObj.XOBJ;
-    for( int alias : ptr._aliases ) {
-      if( alias != 0 ) {        // nil on a JOIN is ignored, on a MEET is failure
-        TypeObj x = at(alias);
-        obj = (TypeObj)(any ? obj.join(x) : obj.meet(x));
-      }
+    // Any alias, plus all of its children, are meet/joined.  This does a
+    // tree-based scan on the inner loop.
+    BitSet bs = ptr._aliases.tree().plus_kids(ptr._aliases);
+    for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) ) {
+      TypeObj x = at(alias);
+      obj = (TypeObj)(any ? obj.join(x) : obj.meet(x));
     }
     return obj;
   }
@@ -234,13 +236,18 @@ public class TypeMem extends Type<TypeMem> {
 
   // Meet of all possible storable values, after updates
   public TypeMem st( TypeObj obj, TypeMemPtr ptr ) {
-    TypeObj[] objs = Arrays.copyOf(_aliases,Math.max(_aliases.length,ptr._aliases.max()+1));
     if( ptr.is_con() ) throw AA.unimpl(); // objs[ptr.get_con()]=obj;
-    else
-      for( int alias : ptr._aliases )
-        if( alias != 0 )
-          objs[alias] = (TypeObj)at(alias).meet(obj);
-    return make0(objs);
+    else {
+      // Any alias, plus all of its children, are meet/joined.  This does a
+      // tree-based scan on the inner loop.
+      Ary<TypeObj> objs = new Ary<>(_aliases.clone(),_aliases.length);
+      BitSet bs = ptr._aliases.tree().plus_kids(ptr._aliases);
+      for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) )
+        objs.setX(alias, (TypeObj)at(alias).meet(obj));
+      // Really loose stores might hit all-of-memory.  Force a little sanity.
+      if( objs.at(1) != TypeObj.XOBJ ) objs.setX(1,TypeObj.OBJ);
+      return make0(objs.asAry());
+    }    
   }
 
   // Return is a Tuple of TypeMem's, all with unrelated aliases.  The slot0

@@ -169,12 +169,13 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public  static       String[] FLDS( int len ) { return FLDS[len]; }
   private static String[] flds(String... fs) { return fs; }
   private static Type[] ts(Type... ts) { return ts; }
+  private static Type[] ts(int n) { Type[] ts = new Type[n]; Arrays.fill(ts,SCALAR); return ts; }
   private static byte[] bs(Type[] ts) { byte[] bs = new byte[ts.length]; Arrays.fill(bs,(byte)1); return bs; } // All read-only
-  public  static TypeStruct make(Type... ts               ) { return malloc(false,FLDS[ts.length],ts,bs(ts)).hashcons_free(); }
+  public  static TypeStruct make(               Type... ts) { return malloc(false,FLDS[ts.length],ts,bs(ts)).hashcons_free(); }
   public  static TypeStruct make(String[] flds, Type... ts) { return malloc(false,flds,ts,bs(ts)).hashcons_free(); }
   public  static TypeStruct make(String[] flds, Type[] ts, byte[] finals) { return malloc(false,flds,ts,finals).hashcons_free(); }
-  public  static TypeStruct make( int x ) { throw AA.unimpl(); }
-  public  static TypeStruct make(String[] flds, byte[] finals) { throw AA.unimpl(); }
+  public  static TypeStruct make( int x ) { return make(ts(x)); }
+  public  static TypeStruct make(String[] flds, byte[] finals) { return make(flds,ts(flds.length),finals); }
 
   public  static final TypeStruct POINT = make(flds("x","y"),ts(TypeFlt.FLT64,TypeFlt.FLT64));
           static final TypeStruct X     = make(flds("x"),ts(TypeFlt.FLT64 )); // @{x:flt}

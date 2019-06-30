@@ -16,11 +16,9 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
     Object dummy = Env.GVN; // Force class loading cycle
-    testerr("fun={x -> }; fun(0)", "Missing function body","          ");
-    testerr("x=z" , "Unknown ref 'z'","   ");
-    testerr("f0 = { f x -> f0(x-1) }; f0({+},2)", "Passing 1 arguments to f0{~(Scalar,Scalar)-> Scalar} which takes 2 arguments","                     ");
     // A collection of tests which like to fail easily
-    testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1) is not a @{x,y}","                           ");
+    test_ptr("str(3.14)"   , (alias)-> TypeMem.make(alias,TypeStr.con("3.14")));
+    testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1) is not a @{x,y}","             ");
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'","                    ");
     testerr("{+}(1,2,3)", "Passing 3 arguments to +{flt64 flt64 -> flt64} which takes 2 arguments","          ");
     test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators

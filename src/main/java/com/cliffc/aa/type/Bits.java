@@ -6,6 +6,7 @@ import com.cliffc.aa.util.Ary;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.Iterator;
 
 // Bits supporting a lattice; immutable; hash-cons'd.  Bits can be *split* in
@@ -401,6 +402,21 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     Type err_report(int bit) {
       return bit >= 0 ? _err_types.at(bit) : _err_types.at(-bit).dual();
     }
+    // Smear out the kids in a non-canonical representation, to allow the caller
+    // to iterate more easily.
+    BitSet plus_kids(Bits<B> bits) {
+      BitSet bs = new BitSet();
+      for( int i : bits )
+        if( i != 0 )
+          _plus_kids(bs,i);
+      return bs;
+    }
+    void _plus_kids(BitSet bs, int i) {
+      bs.set(i);
+      int nkids = i >= _kids.length || _kids[i]==null ? 0 : _kids[i][0];
+      for( int kid=1; kid<nkids; kid++ )
+        _plus_kids(bs,_kids[i][kid]);
+    }
   }
   
   /** @return an iterator */
@@ -422,4 +438,5 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
       throw new java.util.NoSuchElementException();
     }
   }
+
 }

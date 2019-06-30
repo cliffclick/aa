@@ -247,7 +247,8 @@ public class Parse {
     Node rez = _e.add_fun(tvar,epi1); // Return type-name constructor
     if( t instanceof TypeStruct ) {   // Add struct types with expanded arg lists
       EpilogNode epi2 = IntrinsicNode.convertTypeNameStruct((TypeStruct)t,tn,errMsg(),_gvn);
-      _e.add_fun(tvar,epi2);    // type-name constructor with expanded arg list
+      Node rez2 = _e.add_fun(tvar,epi2); // type-name constructor with expanded arg list
+      _gvn.init0(rez2._uses.at(0)); // Force init of Unresolved
     }
     // TODO: Add reverse cast-away
     return rez;
@@ -629,7 +630,7 @@ public class Parse {
       require('}');
       Node c = e._scope.remove(" control ");
       _e = e._par;              // Pop nested environment
-      if( e._scope != c ) { set_ctrl(c); throw AA.unimpl(/*untested*/);} // Carry any control changes back to outer scope
+      if( e._scope != c ) set_ctrl(c);  // Carry any control changes back to outer scope
 
       Node[] flds = new Node[toks._len+1];
       for( int i=0; i<toks._len; i++ )
@@ -879,9 +880,11 @@ public class Parse {
   // reference.
   private Node do_mem(NewNode nnn) {
     Node nn = gvn(nnn);
-    Node nmem = gvn(new ProjNode(nn,0));
-    Node nadr = gvn(new ProjNode(nn,1));
-    set_mem(gvn(new MemMergeNode(mem(),nmem,nnn)));
+    Node nobj = gvn(new OProjNode(nn,0));
+    Node nadr = gvn(new  ProjNode(nn,1));
+    nadr.add_def(nadr);         // Self-hook to prevent deletion
+    set_mem(gvn(new MemMergeNode(mem(),nobj,nadr)));
+    nadr.pop();                 // Remove self-hook
     return nadr;
   }
   

@@ -10,7 +10,7 @@ import java.util.BitSet;
 // no-named-field TypeStruct, and is not exposed at the language level.  With
 // mixed tuple lengths, tuples are infinitely extended with ANY/ALL.
 public class TypeTuple extends Type<TypeTuple> {
-  boolean _any;
+  private boolean _any;
   public Type[] _ts; // The fixed known types
   protected TypeTuple( byte type, boolean any, Type[] ts ) { super(type); init(type, any, ts);  }
   protected void init( byte type, boolean any, Type[] ts ) {

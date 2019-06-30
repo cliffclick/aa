@@ -59,7 +59,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public static TypeFunPtr make_anon() { return make_new(TypeTuple.ALL_ARGS,Type.SCALAR); } // Make a new anonymous function ptr
 
   public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.NZERO,TypeTuple.ALL_ARGS,Type.SCALAR);
-  public  static final TypeFunPtr TEST_INEG = new FunNode(TypeTuple.INT64._ts)._tf; // Only for testing
+  private static final TypeFunPtr TEST_INEG = new FunNode(TypeTuple.INT64._ts)._tf; // Only for testing
   
   static final TypeFunPtr[] TYPES = new TypeFunPtr[]{GENERIC_FUNPTR,TEST_INEG};
   

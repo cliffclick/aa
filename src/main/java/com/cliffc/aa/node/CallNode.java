@@ -83,36 +83,32 @@ public class CallNode extends Node {
     // already unpacked a tuple, and can see the NewNode, unpack it right now.
     if( !_unpacked ) { // Not yet unpacked a tuple
       assert nargs()==1;
+      if( mem() instanceof MemMergeNode ) {
+        NewNode nnn = ((MemMergeNode)mem()).exact(arg(0));
+        if( nnn != null ) {
+          remove(_defs._len-1,gvn); // Pop off the NewNode tuple
+          int len = nnn._defs._len;
+          for( int i=1; i<len; i++ ) // Push the args; unpacks the tuple
+            add_def( nnn.in(i));
+          gvn.add_work(mem());
+          _unpacked = true;     // Only do it once
+          return this;
+        }
+      }
+      // Another version of structural unpacking: we can find a constant input tuple.
+      Type tm = gvn.type(mem());
       Type tn = gvn.type(arg(0));
-      if( tn instanceof TypeMemPtr ) {
-        TypeMemPtr tnptr = (TypeMemPtr)tn;
-        Node mem = mem();
-        Type tm = gvn.type(mem);
-        if( tm instanceof TypeMem ) {
-          if( mem instanceof MemMergeNode )
-            tm = gvn.type(mem.in(1));
-          Type tx = ((TypeMem)tm).ld(tnptr);
-          if( tx instanceof TypeStruct ) {
-            TypeStruct tt = (TypeStruct)tx;
-            // Either all the edges from a NewNode (for non-constants), or all
-            // the constants types from a constant Tuple from a ConNode
-            if( tt.is_con() ) {     // Allocation has constant-folded
-              int len = tt._ts.length;
-              remove(_defs._len-1,gvn);  // Pop off the ConNode tuple
-              //gvn.add_work(mem); 
-              for( int i=0; i<len; i++ ) // Push the args; unpacks the tuple
-                add_def( gvn.con(tt.at(i)) );
-            } else {                // Allocation exists, unpack args
-              assert mem instanceof MemMergeNode && mem.in(1) instanceof MProjNode && mem.in(1).in(0) instanceof NewNode;
-              remove(_defs._len-1,gvn); // Pop off the NewNode tuple
-              Node nn = mem.in(1).in(0);
-              int len = nn._defs._len;
-              for( int i=1; i<len; i++ ) // Push the args; unpacks the tuple
-                add_def( nn.in(i));
-            }
-            _unpacked = true;       // Only do it once
-            return this;
-          }
+      if( tn instanceof TypeMemPtr && tm instanceof TypeMem ) {
+        Type tx = ((TypeMem)tm).ld((TypeMemPtr)tn);
+        if( tx instanceof TypeStruct && tx.is_con() ) {
+          throw com.cliffc.aa.AA.unimpl(); // untested but probably correct
+          //TypeStruct tt = (TypeStruct)tx;
+          //int len = tt._ts.length;
+          //remove(_defs._len-1,gvn);  // Pop off the ConNode tuple
+          //for( int i=0; i<len; i++ ) // Push the args; unpacks the tuple
+          //  add_def( gvn.con(tt.at(i)) );
+          //_unpacked = true;     // Only do it once
+          //return this;
         }
       }
     }
@@ -167,12 +163,13 @@ public class CallNode extends Node {
 
     // Check for several trivial cases that can be fully inlined immediately.
     // Check for zero-op body (id function)
-    if( rez instanceof ParmNode && rez.in(0) == fun ) return inline(gvn,ctl(),mem(),arg(((ParmNode)rez)._idx));
+    if( rez instanceof ParmNode && rez.in(0) == fun && mem() == mem )
+      return inline(gvn,ctl(),mem(),arg(((ParmNode)rez)._idx));
     // Check for constant body
     if( gvn.type(rez).is_con() ) return inline(gvn,ctl(),mem(),rez);
 
     // Check for a 1-op body using only constants or parameters
-    boolean can_inline=true;
+    boolean can_inline=!(rez instanceof ParmNode);
     for( Node parm : rez._defs )
       if( parm != null && parm != fun &&
           !(parm instanceof ParmNode && parm.in(0) == fun) &&

@@ -10,12 +10,11 @@ import java.util.Arrays;
 public class NewNode extends Node {
   // Unique alias class, one class per unique memory allocation site.
   // Only effectively-final, because the copy/clone sets a new alias value.
-  public int _alias;            // Alias class
+  private int _alias;           // Alias class
   private TypeMemPtr _ptr;      // Cache of TypeMemPtr(_alias)
   private TypeObj _obj;         // Result type - same as _ts except can be named
-  private TypeStruct _ts;       // Allocate a struct
+  final TypeStruct _ts;         // Allocate a struct
   
-  private boolean _dead;         // No users of the address
   public NewNode( Node[] flds, TypeObj obj ) {
     super(OP_NEW,flds);
     assert flds[0]==null;       // no ctrl field
@@ -27,23 +26,10 @@ public class NewNode extends Node {
   private static byte[] finals(int len) { byte[] bs = new byte[len]; Arrays.fill(bs,(byte)1); return bs; }
   private int def_idx(int fld) { return fld+1; }
   private Node fld(int fld) { return in(def_idx(fld)); }
-  boolean is_dead_address() { return _dead; }  
-  String xstr() { return is_dead_address() ? "New#dead" : ("New#"+_alias); } // Self short name
+  String xstr() { return "New#"+_alias; } // Self short name
   String  str() { return xstr(); } // Inline short name
-  @Override public Node ideal(GVNGCM gvn) {
-    // If the address is dead, then the object is unused and can be nuked.
-    // Check for 1 user, and its the memory proj not the ptr proj.
-    if( _uses.len()==1 && ((ProjNode)_uses.at(0))._idx==0 ) {
-      _dead = true;
-      for( int i=0; i<_defs._len; i++ )
-        set_def(i,null,gvn);    // Kill contents of memory
-    }
-    return null;
-  }
+  @Override public Node ideal(GVNGCM gvn) { return null; }
   @Override public Type value(GVNGCM gvn) {
-    // If the address is dead, then the object is unused and can be nuked
-    if( is_dead_address() )
-      return all_type();
     Type[] ts = new Type[_ts._ts.length];
     for( int i=0; i<_ts._ts.length; i++ )
       ts[i] = gvn.type(fld(i)).bound(_ts._ts[i]); // Limit to Scalar results
@@ -62,7 +48,7 @@ public class NewNode extends Node {
   // to in a loop until the size grows without bound.  If we detect this we
   // need to approximate a new cyclic type.
   private final static int CUTOFF=5; // Depth of types before we start forcing approximations
-  public static TypeStruct approx(TypeStruct newt, Type oldt) {
+  private static TypeStruct approx( TypeStruct newt, Type oldt ) {
     if( !(oldt instanceof TypeStruct) ) return newt;
     if( newt == oldt ) return newt;
     if( !newt.contains(oldt) ) return newt;
@@ -71,9 +57,7 @@ public class NewNode extends Node {
     return (TypeStruct)(tsa.meet(oldt));
   }
 
-  @Override public Type all_type() {
-    return TypeTuple.make( _dead ? _obj.dual() : _obj,_ptr);
-  }
+  @Override public Type all_type() { return TypeTuple.make(_obj,_ptr); }
   
   // Clones during inlining all become unique new sites
   @Override NewNode copy(GVNGCM gvn) {
