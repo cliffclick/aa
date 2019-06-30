@@ -472,8 +472,8 @@ public class GVNGCM {
     // All (live) Call ambiguity has been resolved
     if( n instanceof CallNode && type(n.in(0))==Type.CTRL ) {
       BitsFun fidxs = ((CallNode)n).fidxs(this);
-      assert fidxs==null || !fidxs.above_center() ||
-        n.err(this) != null; // Or else call is in-error
+      //assert fidxs==null || !fidxs.above_center() ||
+      //  n.err(this) != null; // Or else call is in-error
     }
 
     // Walk reachable graph

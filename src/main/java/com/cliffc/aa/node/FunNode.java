@@ -475,24 +475,20 @@ public class FunNode extends RegionNode {
       for( Node c : map.values() ) {
         if( c instanceof CallNode ) { // For all cloned Calls
           CallNode call = (CallNode)c;
-          // TODO: Should not happen, after i split RPCs properly
-          throw AA.unimpl();
-      //    Type tfunptr = gvn.type(call.fun());
-      //    TypeFunPtr tfun = ((TypeFun)tfunptr).fun();
-      //    for( int fidx : tfun._fidxs ) { // For all possible targets of the Call
-      //      FunNode oldfun = FunNode.find_fidx(fidx);
-      //      assert !oldfun.is_dead();
-      //      if( !oldfun.has_unknown_callers() ) {
-      //        gvn.add_work(oldfun);
-      //        Node x = ((CallNode)c).wire(gvn,oldfun,false);
-      //        assert x != null;
-      //        ParmNode rpc = oldfun.rpc();
-      //        if( rpc != null ) // Can be null there is a single return point, which got constant-folded
-      //          gvn.setype(rpc,rpc.value(gvn));
-      //        EpilogNode oldepi = oldfun.epi();
-      //        gvn.setype(oldepi,oldepi.value(gvn));
-      //      }
-      //    }
+          for( int fidx : call.fidxs(gvn) ) { // For all possible targets of the Call
+            FunNode oldfun = FunNode.find_fidx(fidx);
+            assert !oldfun.is_dead();
+            if( !oldfun.has_unknown_callers() ) {
+              gvn.add_work(oldfun);
+              Node x = ((CallNode)c).wire(gvn,oldfun,false);
+              assert x != null;
+              ParmNode rpc = oldfun.rpc();
+              if( rpc != null ) // Can be null there is a single return point, which got constant-folded
+                gvn.setype(rpc,rpc.value(gvn));
+              EpilogNode oldepi = oldfun.epi();
+              gvn.setype(oldepi,oldepi.value(gvn));
+            }
+          }
         }
       }
     }

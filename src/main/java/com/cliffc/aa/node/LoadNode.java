@@ -1,6 +1,5 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.AA;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
@@ -102,11 +101,10 @@ public class LoadNode extends Node {
     TypeMemPtr t3 = (TypeMemPtr)t2; 
     TypeMem t4 = (TypeMem)gvn.type(mem()); // Should be memory
     Type t5 = t4.ld(t3); // Meets of all aliases
-    throw AA.unimpl();
-    //if( !(t instanceof TypeStruct) ) return _badfld;
-    //if( find((TypeStruct)t) == -1 )
-    //  return _badfld;
-    //return null;
+    if( !(t5 instanceof TypeStruct) ) return _badfld;
+    if( ((TypeStruct)t5).find(_fld,_fld_num) == -1 )
+      return _badfld;
+    return null;
   }
   @Override public Type all_type() { return Type.SCALAR; }
   @Override public int hashCode() { return super.hashCode()+(_fld==null ? _fld_num : _fld.hashCode()); }

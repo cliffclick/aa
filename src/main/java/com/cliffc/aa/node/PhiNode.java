@@ -3,13 +3,18 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeMem;
 
 // Merge results; extended by ParmNode
 public class PhiNode extends Node {
   final String _badgc;
   Type _default_type;
   public PhiNode( String badgc, Node... vals) { this(badgc,Type.SCALAR,vals); }
-  public PhiNode( String badgc, Type defalt, Node... vals) { super(OP_PHI,vals); _default_type = defalt; _badgc = badgc; }
+  public PhiNode( String badgc, Type defalt, Node... vals) {
+    super(OP_PHI,vals);
+    _default_type = defalt instanceof TypeMem ? TypeMem.MEM : defalt;
+    _badgc = badgc;
+  }
   PhiNode( byte op, Node fun, ConNode defalt, String badgc ) { super(op,fun,defalt); _badgc = badgc; _default_type = defalt._t; } // For ParmNodes
   @Override public Node ideal(GVNGCM gvn) {
     if( gvn.type(in(0)) == Type.XCTRL ) return null;

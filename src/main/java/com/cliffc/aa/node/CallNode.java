@@ -194,7 +194,7 @@ public class CallNode extends Node {
   // knowledge of its callers and arguments.
   // Leaves the Call in the graph - making the graph "a little odd" - double
   // CTRL users - once for the call, and once for the function being called.
-  private Node wire( GVNGCM gvn, FunNode fun, boolean is_gcp ) {
+  Node wire( GVNGCM gvn, FunNode fun, boolean is_gcp ) {
     Node ctrl = ctl();
     for( int i=1; i<fun._defs.len(); i++ )
       if( fun.in(i)==ctrl ) // Look for same control
@@ -260,7 +260,7 @@ public class CallNode extends Node {
     if( tc == Type.XCTRL || tc == Type.ANY ) // Call is dead?
       return TypeTuple.XCALL;
     if( !(fp instanceof UnresolvedNode || fp instanceof EpilogNode) )
-      return TypeTuple.XCALL;
+      return TypeTuple.CALL;
     if( fp.is_forward_ref() )
       return TypeTuple.CALL;
     if( Type.SCALAR.isa(t) ) // Calling something that MIGHT be a function, no idea what the result is
@@ -275,23 +275,12 @@ public class CallNode extends Node {
       // Return {control,mem,value} tuple.
       return value1(gvn,(EpilogNode)fp); // Return type or SCALAR if invalid args
       
-    if( gvn._opt ) {
-      TypeTuple trez = TypeTuple.CALL; // Base for JOIN
-      // For unresolved, we can take the BEST choice; i.e. the JOIN of every
-      // choice.  Typically one choice works and the others report type
-      // errors on arguments.
-      for( Node epi : fp._defs )
-        trez = (TypeTuple)trez.join(value1(gvn,(EpilogNode)epi)); // JOIN of choices
-      return trez;              // Return {control,mem,value} tuple.
-    } else {
-      TypeTuple trez = TypeTuple.XCALL; // Base for MEET
-      // For unresolved, we can take the BEST choice; i.e. the JOIN of every
-      // choice.  Typically one choice works and the others report type
-      // errors on arguments.
-      for( Node epi : fp._defs )
-        trez = (TypeTuple)trez.meet(value1(gvn,(EpilogNode)epi)); // JOIN of choices
-      return trez;              // Return {control,mem,value} tuple.
-    }
+    TypeTuple trez = TypeTuple.CALL; // Base for JOIN
+    // For unresolved, we can take the BEST choice; i.e. the JOIN of every choice.
+    // Typically one choice works and the others report type errors on arguments.
+    for( Node epi : fp._defs )
+      trez = (TypeTuple)trez.join(value1(gvn,(EpilogNode)epi)); // JOIN of choices
+    return trez;              // Return {control,mem,value} tuple.
   }
 
   // See if the arguments are valid.  If valid, return the function's return

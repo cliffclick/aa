@@ -30,12 +30,12 @@ public class EpilogNode extends Node {
   @Override public Type value(GVNGCM gvn) {
     Type c = gvn.type(ctl()); // Function exits, or not
     Type r = gvn.type(rpc()); // Caller; the Continuation
-    assert gvn.type(mem()) instanceof TypeMem;
-    if( c!=Type.CTRL || !(r instanceof TypeRPC))  return all_type().dual();
-    if( is_forward_ref() ) return all_type().startype();
     Type v = gvn.type(val());
+    assert gvn.type(mem()) instanceof TypeMem;
     if( is_copy() )             // Function is dead, epilog is dying; type makes no sense
       return TypeFunPtr.make(BitsFun.NZERO.dual(),_args,v);
+    if( c!=Type.CTRL || !(r instanceof TypeRPC))  return all_type().dual();
+    if( is_forward_ref() ) return all_type().startype();
     FunNode fun = fun();
     return TypeFunPtr.make(fun._tf.fidxs(),fun._tf._args,v);
   }

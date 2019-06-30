@@ -334,7 +334,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   // the exact same tree-split is handed out between tests.  Basically there is
   // only 1 tree shape, lazily discovered, for all tests.
   static class Tree<B extends Bits<B>> {
-    int _cnt = 1, _last;        // Next available bit number, last bit handed out (for tests)
+    int _cnt = 1; // Next available bit number
     // Invariants: _pars[kid]==parent && _kids[parent].contains(kid)
     int[] _pars = new int[2];   // Parent bit from child bit; _cnt is the in-use part
     int[][] _kids = new int[2][];// List of kids from a parent; 1st element is is-use length
@@ -366,14 +366,14 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
             if( bit != 0 ) {            // Pre-allocated kid from prior test?
               assert _pars[bit] == par; // Then parent must already be preallocated
               kids[0] = klen+1;
-              _err_types.setX(_last=bit,err_report);
+              _err_types.setX(bit,err_report);
               return bit;
             }
           }
         }
       }
       // Need a new bit
-      int bit = _last = _cnt++; // Next available bit number
+      int bit = _cnt++; // Next available bit number
       while( bit >= _pars.length ) _pars = Arrays.copyOf(_pars,_pars.length<<1);
       assert _pars[bit]==0;
       _pars[bit] = par;
@@ -385,7 +385,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
         _kids[par] = kids = Arrays.copyOf(kids,klen<<1);
       kids[klen] = bit;
       kids[0] = klen+1;
-      _err_types.setX(_last=bit,err_report);
+      _err_types.setX(bit,err_report);
       return bit;
     }
     void init0() {
@@ -398,7 +398,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
         if( _kids[i] != null )
           _kids[i][0] = i<_init.length ? _init[i] : 0;
     }
-    int last_split() { return _last; }
+    int peek() { return _kids[1][_kids[1][0]]; } // for testing
     Type err_report(int bit) {
       return bit >= 0 ? _err_types.at(bit) : _err_types.at(-bit).dual();
     }

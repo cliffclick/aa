@@ -40,5 +40,5 @@ public class BitsFun extends Bits<BitsFun> {
   public static BitsFun make_new_fidx( int parent_fidx ) { return make0(new_fidx(parent_fidx)); }
   public static BitsFun make0( int bit ) { return FULL.make(bit); }
   public static BitsFun make0( int... bits ) { return FULL.make(bits); }
-  public static int last_fidx() { return TREE.last_split(); }
+  public static int peek() { return TREE.peek(); }
 }

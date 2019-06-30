@@ -16,15 +16,15 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
     Object dummy = Env.GVN; // Force class loading cycle
+    test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({&},2)", TypeInt.FALSE);
     // A collection of tests which like to fail easily
-    test_ptr("str(3.14)"   , (alias)-> TypeMem.make(alias,TypeStr.con("3.14")));
     testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1) is not a @{x,y}","             ");
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'","                    ");
-    testerr("{+}(1,2,3)", "Passing 3 arguments to +{flt64 flt64 -> flt64} which takes 2 arguments","          ");
+    testerr("{+}(1,2,3)", "Passing 3 arguments to +{~(flt64,flt64)-> flt64} which takes 2 arguments","          ");
     test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
     testerr("x=1+y","Unknown ref 'y'","     ");
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
-    test_isa("{x y -> x+y}", TypeInt.con(42)); // {Flt,Int} x {Flt,Int} -> {Flt,Int}
+    test_isa("{x y -> x+y}", TypeFunPtr.make(BitsFun.make0(BitsFun.peek()),TypeTuple.SCALAR2,Type.SCALAR)); // {Scalar Scalar -> Scalar}
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.TRUE );
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({&},2)", TypeInt.FALSE);
   }
@@ -130,7 +130,7 @@ public class TestParse {
   @Test public void testParse2() {
     Object dummy = Env.GVN; // Force class loading cycle
     // Anonymous function definition
-    test_isa("{x y -> x+y}", TypeFunPtr.make(BitsFun.make0(BitsFun.last_fidx()+1),TypeTuple.SCALAR2,Type.SCALAR)); // {Scalar Scalar -> Scalar}
+    test_isa("{x y -> x+y}", TypeFunPtr.make(BitsFun.make0(36),TypeTuple.SCALAR2,Type.SCALAR)); // {Scalar Scalar -> Scalar}
     test("{5}()", TypeInt.con(5)); // No args nor -> required; this is simply a function returning 5, being executed
 
     // ID in different contexts; in general requires a new TypeVar per use; for
