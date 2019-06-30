@@ -389,7 +389,7 @@ public class GVNGCM {
         }
         Type ot = type(n);       // Old type
         Type nt = n.value(this); // New type
-        assert ot.isa(nt);       // Types only fall monotonically
+        assert ot.isa(nt) || n instanceof UnresolvedNode;       // Types only fall monotonically
         if( ot != nt ) {         // Progress
           _ts.setX(n._uid,nt);   // Record progress
           for( Node use : n._uses ) {

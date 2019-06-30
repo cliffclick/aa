@@ -1,8 +1,7 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.AA;
-import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.Ary;
+import com.cliffc.aa.util.SB;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Arrays;
@@ -275,7 +274,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     int bnum = find_smallest_bit(con0==-1 ? bits0 : bits1);
     long[] mbits = con0==1 ? bits0 : bits1; // Meet bits
     mbits = Arrays.copyOfRange(mbits,0,Math.max(mbits.length,idx(bnum)+1));
-    or(mbits,bnum);             // Add a bit in.  Could make a dup bit
+    if( bnum != -1) or(mbits,bnum); // Add a bit in.  Could make a dup bit
     return make(false,mbits);   // This will remove parent/child dups
   }
   
@@ -283,7 +282,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     for( long bit : bits )
       if( bit != 0 )
         return Long.numberOfTrailingZeros(bit);
-    throw AA.unimpl();
+    return -1;
   }
 
   // Virtually expand all bits in both arrays to cover all children,
