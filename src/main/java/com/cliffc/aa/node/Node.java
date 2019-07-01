@@ -57,7 +57,8 @@ public abstract class Node implements Cloneable {
     if( old != null ) {
       old._uses.del(old._uses.find(this));
       if( old._uses._len==0 && !(old instanceof ScopeNode) ) gvn.kill(old); // Recursively begin deleting
-      if( !old.is_dead() && old.is_multi_head() && is_multi_tail() )
+      if( (!old.is_dead() && old.is_multi_head() && is_multi_tail()) ||
+          old.ideal_impacted_by_losing_uses() )
         gvn.add_work(old);
     }
     return this;
@@ -177,7 +178,7 @@ public abstract class Node implements Cloneable {
   // points have not all appeared).  Returns null if no-progress, or a better
   // version of 'this'.
   abstract public Node ideal(GVNGCM gvn);
-  public boolean ideal_impacted_by_losing_uses() { return _op==OP_NEW || _op==OP_FUN; }
+  public boolean ideal_impacted_by_losing_uses() { return _op==OP_NEW || _op==OP_FUN || _op==OP_MERGE; }
 
   // Compute the current best Type for this Node, based on the types of its inputs.
   // May return the local "all_type()", especially if its inputs are in error.

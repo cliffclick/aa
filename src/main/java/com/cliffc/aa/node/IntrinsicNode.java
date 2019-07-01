@@ -85,8 +85,17 @@ public abstract class IntrinsicNode extends Node {
       if( mem() instanceof MemMergeNode ) {
         MemMergeNode mem = (MemMergeNode)mem();
         NewNode nnn = mem.exact(ptr());
-        if( nnn != null && nnn._ts.isa(_from) ) {
-          throw AA.unimpl();
+        if( mem._uses._len == 2 && // Use is 'this' and the MemMerge just after 'this'
+            nnn != null ) {     // Un-aliased NewNode
+          // NewNode is well-typed and producing a pointer to memory with the
+          // correct type?
+          Type tnnn = gvn.type(nnn);
+          if( tnnn instanceof TypeTuple &&
+              ((TypeTuple)tnnn).at(0).isa(_from) ) {
+            nnn.set_name(_to);
+            gvn.add_work(nnn);
+            return mem.obj();
+          }
         }
       }
       return null;

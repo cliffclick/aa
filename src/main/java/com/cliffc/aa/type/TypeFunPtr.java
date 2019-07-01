@@ -82,6 +82,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     default: throw typerr(t);   // All else should not happen
     }
     TypeFunPtr tf = (TypeFunPtr)t;
+    // QQQ - Function args are JOINed during the MEET.
     return make(_fidxs.meet(tf._fidxs),(TypeTuple)_args/*QQQ.meet*/.join(tf._args),_ret.meet(tf._ret));
   }
 
@@ -90,6 +91,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public Type arg(int idx) { return _args.at(idx); }
   public boolean is_class() { return _fidxs.is_class(); }
   
+  // QQQ - Function args below center when the TFP is above center.
   @Override public boolean above_center() { return /*QQQ*/!_args.above_center(); }
   // Fidxes represent a single function and thus are constants, but TypeFunPtrs
   // represent the execution of a function, and are never constants.
@@ -112,12 +114,5 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     if( _fidxs.abit() == -1 ) return false; // Multiple fidxs
     if( _fidxs.getbit() == 1 ) return false; // Thats the generic function ptr
     return FunNode.find_fidx(fidx()).is_forward_ref();
-  }
-
-  // Dual, except keep high args high
-  @Override public TypeFunPtr startype() {
-    //TypeTuple args = _args.above_center() ? _args : _args.dual(); // QQQ
-    //return make(_fidxs.dual(),args,_ret.dual());
-    return make(_fidxs.dual(),_args/*QQQ*/.dual(),_ret.dual());
   }
 }

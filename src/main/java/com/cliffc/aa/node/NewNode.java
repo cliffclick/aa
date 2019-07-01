@@ -3,8 +3,6 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 
-import java.util.Arrays;
-
 // Make a new object of given type.  Returns both the pointer and the TypeObj
 // but NOT the memory state.
 public class NewNode extends Node {
@@ -13,7 +11,7 @@ public class NewNode extends Node {
   private int _alias;           // Alias class
   private TypeMemPtr _ptr;      // Cache of TypeMemPtr(_alias)
   private TypeObj _obj;         // Result type - same as _ts except can be named
-  final TypeStruct _ts;         // Allocate a struct
+  private TypeStruct _ts;       // Allocate a struct
   
   public NewNode( Node[] flds, TypeObj obj ) {
     super(OP_NEW,flds);
@@ -23,9 +21,14 @@ public class NewNode extends Node {
     _alias = BitsAlias.new_alias(BitsAlias.REC,obj);
     _ptr = TypeMemPtr.make(_alias);
   }
-  private static byte[] finals(int len) { byte[] bs = new byte[len]; Arrays.fill(bs,(byte)1); return bs; }
   private int def_idx(int fld) { return fld+1; }
   private Node fld(int fld) { return in(def_idx(fld)); }
+  // Called when folding a Named Constructor into this allocation site
+  void set_name( TypeName to ) {
+    assert to.base().isa(_ts);
+    _obj = to;
+    _ts = (TypeStruct)to.base();
+  }
   String xstr() { return "New#"+_alias; } // Self short name
   String  str() { return xstr(); } // Inline short name
   @Override public Node ideal(GVNGCM gvn) { return null; }

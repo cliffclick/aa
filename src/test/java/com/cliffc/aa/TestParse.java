@@ -16,6 +16,8 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
     Object dummy = Env.GVN; // Force class loading cycle
+    test_isa("A= :(         )", name_tuple_constructor()); // Zero-length tuple
+    test_ptr("A= :(str?, int); A((\"abc\",2))", "A:(*\"abc\",2)");
     // A collection of tests which like to fail easily
     testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1) is not a @{x,y}","             ");
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'","                    ");
@@ -567,6 +569,13 @@ c[x]=1;
       int alias = ((TypeMemPtr)te._t).getbit(); // internally asserts only 1 bit set
       Type t_expected = expected.apply(alias);
       assertEquals(t_expected,te._tmem);
+    }
+  }
+  static private void test_ptr( String program, String expected ) {
+    try( TypeEnv te = run(program) ) {
+      assertTrue(te._t instanceof TypeMemPtr);
+      TypeObj to = te._tmem.ld((TypeMemPtr)te._t);
+      assertEquals(expected,to.toString());
     }
   }
   static private void test( String program, Function<HashMap<String,Type>,Type> expected ) {

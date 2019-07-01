@@ -1,5 +1,7 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.util.SB;
+
 import java.util.BitSet;
 import java.util.HashMap;
 import java.util.function.Predicate;
@@ -22,8 +24,22 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   // Never part of a cycle, so the normal check works
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
   @Override String str( BitSet dups) {
-    if( _aliases.abit()==-1 ) return "*"+_aliases;
-    return "*"+BitsAlias.TREE.err_report(getbit());
+    int x = 0; boolean nil=false;
+    for( int i : _aliases ) {
+      if( i==0 ) nil=true;
+      else if( x==0 ) x=i;
+      else x = -i;
+    }
+    SB sb = new SB().p('*');
+    if( x < 0 ) sb.p('[');
+    for( int i : _aliases )
+      if( i!=0 ) {
+        sb.p(BitsAlias.TREE.err_report(i).toString());
+        if( i<Math.abs(x) ) sb.p(',');
+      }
+    if( x < 0 ) sb.p(']');
+    if( nil ) sb.p('?');
+    return sb.toString();
   }
 
   private static TypeMemPtr FREE=null;

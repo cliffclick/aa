@@ -242,9 +242,9 @@ Nilable and not-nil modeled after Kotlin | ---
 `nil=0; "abc"!=nil` | `1:int` Another name for 0/nil
 `a = math_rand(1) ? 0 : @{x=1}; b = math_rand(1) ? 0 : @{c=a}; b ? (b.c ? b.c.x : 0) : 0` | `int1` Nested nilable structs
 Recursive types | ---
-`A= :(:A?, :int); A((0,2))`|`A:(nil,2)` Simple recursive tuple
-`A= :(:A?, :int); A(0,2)`|`A:(nil,2)` Same thing using explicit args
-`A= :(:A?, :int); A(A(0,2),3)`|`A:(A:(nil,2),3)` Simple recursive tuple
+`A= :(A?, int); A((0,2))`|`A:(nil,2)` Simple recursive tuple
+`A= :(A?, int); A(0,2)`|`A:(nil,2)` Same thing using explicit args
+`A= :(A?, int); A(A(0,2),3)`|`A:(A:(nil,2),3)` Simple recursive tuple
 `A= :@{n:A?, v:flt}; A(@{n=0,v=1.2}).v` | `1.2:flt` Named recursive structure
 `A= :@{n:A?, v:flt}; A(0,1.2).v` | `1.2:flt` Same thing using explicit args
 `A= :@{n:B?, v:int}; a = A(0,2); a.n` | `nil` Unknown type B is never assigned, so no type error

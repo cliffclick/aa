@@ -717,7 +717,7 @@ public class Parse {
     return (t==null || t==Type.ANY) ? null : t;
   }
   // Wrap in a nullable if there is a trailing '?'.  No spaces allowed
-  private Type typeq(Type t) { return peek_noWS('?') ? TypeNil.make(t) : t; }
+  private Type typeq(Type t) { return peek_noWS('?') ? t.meet_nil() : t; }
   
   // Type or null or TypeErr.ANY for '->' token
   private Type type0(boolean type_var) {
