@@ -37,7 +37,7 @@ public abstract class PrimNode extends Node {
     new Id(TypeMemPtr.OOP0), // Pre-split OOP from non-OOP
     new Id(TypeFunPtr.GENERIC_FUNPTR),
     new Id(Type.REAL),
-    
+
     new ConvertInt64F64(),
     new ConvertStrStr(),
 
@@ -48,14 +48,14 @@ public abstract class PrimNode extends Node {
     new   AddF64(),
     new   SubF64(),
     new   MulF64(),
-          
+
     new   LT_F64(),
     new   LE_F64(),
     new   GT_F64(),
     new   GE_F64(),
     new   EQ_F64(),
     new   NE_F64(),
-    
+
     new   AddI64(),
     new   SubI64(),
     new   MulI64(),
@@ -136,7 +136,7 @@ public abstract class PrimNode extends Node {
   }
 
 
-  // --------------------  
+  // --------------------
 // Default name constructor using a single tuple type
 static class ConvertTypeName extends PrimNode {
   private final Parse _badargs; // Only for converts
@@ -159,7 +159,7 @@ static class ConvertTypeName extends PrimNode {
   }
   @Override public String err(GVNGCM gvn) {
     Type actual = gvn.type(in(1));
-    Type formal = _targs.at(1);
+    Type formal = _targs.at(0);
     if( !actual.isa(formal) ) // Actual is not a formal
       return _badargs.typerr(actual,formal);
     return null;

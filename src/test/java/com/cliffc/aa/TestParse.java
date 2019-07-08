@@ -12,13 +12,13 @@ import static org.junit.Assert.*;
 
 public class TestParse {
   private static String[] FLDS = new String[]{"n","v"};
-  
+
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
     Object dummy = Env.GVN; // Force class loading cycle
-    testerr("A= :(str?, int)?","Named types are never nil","                  ");
+    test_name("A= :(       )" ); // Zero-length tuple
     // A collection of tests which like to fail easily
-    testerr ("Point=:@{x,y}; Point((0,1))", "*[8](nil,1) is not a *[2]@{x,y}","                           ");
+    testerr ("Point=:@{x,y}; Point((0,1))", "*[8](nil,1) is not a *[2]@{x,y}","             ");
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'","                    ");
     testerr("{+}(1,2,3)", "Passing 3 arguments to +{(flt64,flt64)-> flt64} which takes 2 arguments","          ");
     test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
@@ -61,7 +61,7 @@ public class TestParse {
     test("1.2+3.4", TypeFlt.make(0,64,4.6));
     // Mixed int/float with conversion
     test("1+2.3",   TypeFlt.make(0,64,3.3));
-  
+
     // Simple strings
     test_ptr("\"Hello, world\"", (alias)-> TypeMemPtr.make(alias,TypeStr.con("Hello, world")));
     test_ptr("str(3.14)"   , (alias)-> TypeMemPtr.make(alias,TypeStr.con("3.14")));
@@ -93,7 +93,7 @@ public class TestParse {
     test("{+}(1;2 ,3)", TypeInt.con(5)); // statements in arguments
     test("{+}(1;2;,3)", TypeInt.con(5)); // statements in arguments
   }
-  
+
   @Test public void testParse1() {
     // Syntax for variable assignment
     test("x=1", TypeInt.TRUE);
@@ -138,7 +138,7 @@ public class TestParse {
     test("id", Env.lookup_valtype("id"));
     test("id(1)",TypeInt.con(1));
     test("id(3.14)",TypeFlt.con(3.14));
-    test("id({+})",Env.lookup_valtype("+")); // 
+    test("id({+})",Env.lookup_valtype("+")); //
     test("id({+})(id(1),id(math_pi))",TypeFlt.make(0,64,Math.PI+1));
 
     // Function execution and result typing
@@ -243,7 +243,7 @@ public class TestParse {
     test("(0,\"abc\")", TypeStruct.make(TypeNil.NIL,TypeStr.ABC));
     test("(1,\"abc\").0", TypeInt.TRUE);
     test("(1,\"abc\").1", TypeStr.ABC);
-    
+
     // Named type variables
     final TypeMem nomem = TypeMem.MEM.dual();
     test_isa("gal=:flt"       , (tmap -> {throw AA.unimpl();}));
@@ -252,7 +252,7 @@ public class TestParse {
     test    ("gal=:flt; tank:gal = gal(2)", (tmap -> TypeName.make("gal",tmap,TypeInt.con(2))));
     // test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: figure out if free cast for bare constants?
     testerr ("gal=:flt; tank:gal = gal(2)+1", "3 is not a gal:flt64","                             ");
-    
+
     test    ("A= :(:str?, :int); A( \"abc\",2 )",(tmap -> TypeName.make("A",tmap,TypeStruct.make(TypeStr.ABC,TypeInt.con(2)))));
     test    ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
     test    ("Point=:@{x,y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
@@ -282,7 +282,7 @@ public class TestParse {
   @Test public void testParse6() {
     test_isa("A= :(:A?, :int); A(0,2)",(tmap -> TypeName.make("A",tmap,TypeStruct.make(TypeNil.NIL,TypeInt.con(2)))));
     test_isa("A= :(:A?, :int); A(A(0,2),3)",(tmap -> TypeName.make("A",tmap,TypeStruct.make(TypeName.make("A",tmap,TypeStruct.make(TypeNil.NIL,TypeInt.con(2))),TypeInt.con(3)))));
-    
+
     // Building recursive types
     test_isa("A= :int; A(1)", (tmap -> TypeName.make("A",tmap,TypeInt.INT64)));
     test("A= :(:str?, :int); A(0,2)",(tmap -> TypeName.make("A",tmap,TypeStruct.make(TypeNil.NIL,TypeInt.con(2)))));
@@ -310,7 +310,7 @@ public class TestParse {
     // Mutually recursive type
     test_isa("A= :@{n:B, v:int}; B= :@{n:A, v:flt}", Type.SCALAR);
   }
-  
+
   @Test public void testParse7() {
     // Passing a function recursively
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({&},2)", TypeInt.FALSE);
@@ -329,7 +329,7 @@ public class TestParse {
     test(ll_def+ll_con+"; tmp.next.val", TypeFlt.con(1.2));
     //test(ll_def+ll_con+ll_map, TypeFun.GENERIC_FUN);
     test_isa(ll_def+ll_con+ll_map+ll_fun, TypeFunPtr.GENERIC_FUNPTR);
-    
+
     // TODO: Needs a way to easily test simple recursive types
     TypeEnv te4 = Exec.go(Env.top(),"args",ll_def+ll_con+ll_map+ll_fun+ll_apl);
     if( te4._errs != null ) System.err.println(te4._errs.toString());
@@ -341,12 +341,12 @@ public class TestParse {
     assertEquals(2.3*2.3,tt4.at(1).getd(),1e-6);
     assertEquals("next",tt4._flds[0]);
     assertEquals("val",tt4._flds[1]);
-    
+
     assertEquals("List", tname5._name);
     TypeStruct tt5 = (TypeStruct)tname5._t;
     assertEquals(TypeNil.NIL,tt5.at(0));
     assertEquals(1.2*1.2,tt5.at(1).getd(),1e-6);
-    
+
     // Test inferring a recursive struct type, with a little help
     test("map={x:@{n,v:flt}? -> x ? @{n=map(x.n),v=x.v*x.v} : 0}; map(@{n=0,v=1.2})",
          TypeStruct.make(FLDS,TypeNil.NIL,TypeFlt.con(1.2*1.2)));
@@ -362,7 +362,7 @@ public class TestParse {
     test_isa("map={x -> x ? @{n=map(x.n),v=x.v*x.v} : 0};"+
          "map(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0,v=1.2},v=2.3},v=3.4},v=4.5})",
          TypeStruct.make(FLDS,TypeNil.make(TypeStruct.RECURS_NIL_FLT),TypeFlt.con(4.5*4.5)));
-    
+
     // Test inferring a recursive tuple type, with less help.  This one
     // inlines so doesn't actually test inferring a recursive type.
     test("map={x -> x ? (map(x.0),x.1*x.1) : 0}; map((0,1.2))",
@@ -371,7 +371,7 @@ public class TestParse {
     test_isa("map={x -> x ? (map(x.0),x.1*x.1) : 0};"+
          "map((math_rand(1)?0: (math_rand(1)?0: (math_rand(1)?0: (0,1.2), 2.3), 3.4), 4.5))",
          TypeStruct.make(TypeNil.make(TypeStruct.RECURT_NIL_FLT),TypeFlt.con(4.5*4.5)));
-    
+
 
     // TODO: Need real TypeVars for these
     //test("id:{A->A}"    , Env.lookup_valtype("id"));
@@ -379,7 +379,7 @@ public class TestParse {
     //test("id:{int->int}", Env.lookup_valtype("id"));
   }
 
-  
+
   @Test public void testParse8() {
     TypeStruct.init1();
     // A linked-list mixing ints and strings, always in pairs
@@ -434,7 +434,7 @@ public class TestParse {
          "map(tmp,{x->x+x})",
             "Cannot define field '.l' twice",
             "                                                             ");
-    
+
     test("tmp=@{"+
          "  l=@{"+
          "    l=@{ l=0, r=0, v=3 },"+
@@ -454,7 +454,7 @@ public class TestParse {
          "map(tmp,{x->x+x})",
          TypeNil.make(TypeStruct.RECURS_TREE));
   }
-  
+
   @Test public void testParse9() {
     // Test re-assignment
     test("x=1", TypeInt.TRUE);
@@ -462,10 +462,10 @@ public class TestParse {
     testerr("x=y=", "Missing ifex after assignment of 'y'","    ");
     testerr("x=z" , "Unknown ref 'z'","   ");
     testerr("x=1+y","Unknown ref 'y'","     ");
-    
+
     test("x:=1", TypeInt.TRUE);
     test("x:=0; a=x; x:=1; b=x; x:=2; (a,b,x)", TypeStruct.make(TypeNil.NIL,TypeInt.con(1),TypeInt.con(2)));
-    
+
     testerr("x=1; x:=2", "Cannot re-assign final val 'x'", "         ");
     testerr("x=1; x=2", "Cannot re-assign final val 'x'", "        ");
 
@@ -552,7 +552,7 @@ c[x]=1;
     Assert.assertNull(te._errs);
     return te;
   }
-  
+
   static private void test( String program, Type expected ) {
     try( TypeEnv te = run(program) ) {
       assertEquals(expected,te._t);

@@ -58,7 +58,7 @@ public class Parse {
   private int _x;                       // Parser index
   private int _line;                    // Zero-based line number
   private GVNGCM _gvn;                  // Pessimistic types
-  
+
   // Fields strictly for Java number parsing
   private final NumberFormat _nf;
   private final ParsePosition _pp;
@@ -105,7 +105,7 @@ public class Parse {
     _gvn.iter();   // Re-check all ideal calls now that types have been maximally lifted
     return gather_errors();
   }
-  
+
   private void clean_top_level_scope() {
     // Delete names at the top scope before final optimization.
     // Keep return results & exit control.
@@ -134,11 +134,11 @@ public class Parse {
       }
     }
   }
-  
+
   private TypeEnv gather_errors() {
     _e._scope.pop();          // Remove self-hook
     Node res = _e._scope.pop(); // New and improved result
-    
+
     // Hunt for typing errors in the alive code
     assert _e._par._par==null; // Top-level only
     BitSet bs = new BitSet();
@@ -158,7 +158,7 @@ public class Parse {
     // other errors result in unresolved calls, so report others first.
     if( errs0.isEmpty() ) errs0.addAll(errs2);
     errs0.sort_update(String::compareTo);
-    
+
     Type tres = _gvn.type(res);
     TypeMem tmem = (TypeMem)_gvn.type(mem());
     kill(res);       // Kill Node for returned Type result
@@ -176,9 +176,9 @@ public class Parse {
     _e._scope.add_def(_e._scope); // Self hook, so not deleted
 
   }
-    
+
   /** Parse a list of statements; final semi-colon is optional.
-   *  stmts= [tstmt or stmt] [; stmts]*[;]? 
+   *  stmts= [tstmt or stmt] [; stmts]*[;]?
    */
   private Node stmts() {
     Node stmt = tstmt(), last = null;
@@ -214,8 +214,13 @@ public class Parse {
     // Must be a type-variable assignment
     Type t = type(true);
     if( t==null ) return err_ctrl2("Missing type after ':'");
-    if( t instanceof TypeNil ) return err_ctrl2("Named types are never nil");
+    if( t.meet_nil()==t ) return err_ctrl2("Named types are never nil");
     if( lookup(tvar) != null ) return err_ctrl2("Cannot re-assign val '"+tvar+"' as a type");
+    // Single-inheritance & vtables & RTTI:
+    //            "Objects know thy Class"
+    // Which means a TypeObj knows its Name.  Its baked into the vtable.
+    // Which means TypeObj is named and not the pointer-to-TypeObj.
+    // "Point= :@{x,y}" declares "Point" to be a type Name for "@{x,y}".
     Type ot = _e.lookup_type(tvar);
     TypeName tn;
     if( ot == null ) {        // Name does not pre-exist
@@ -225,12 +230,6 @@ public class Parse {
       tn = ot.merge_recursive_type(t);
       if( tn == null ) return err_ctrl2("Cannot re-assign type '"+tvar+"'");
     }
-
-    // Single-inheritance & vtables & RTTI:
-    //            "Objects know thy Class"
-    // Which means a TypeObj knows its Name.  Its baked into the vtable.
-    // Which means TypeObj is named and not the pointer-to-TypeObj.
-    // "Point= :@{x,y}" declares "Point" to be a type Name for "@{x,y}".
 
     // Add a constructor function.  If this is a primitive, build a constructor
     // taking the primitive.
@@ -253,7 +252,7 @@ public class Parse {
     // TODO: Add reverse cast-away
     return rez;
   }
-  
+
   /** A statement is a list of variables to final-assign or re-assign, and an
    *  ifex for the value.  The variables must not be forward refs and are
    *  available in all later statements.  Final-assigned variables can never be
@@ -261,7 +260,7 @@ public class Parse {
    *  assignments (final or not); a variable cannot be "loosened" during a
    *  reassignment.
    *
-   *  stmt = [[id or ifex.field][:type] [:]=]* ifex // 
+   *  stmt = [[id or ifex.field][:type] [:]=]* ifex //
    *
    *  Note the syntax difference between:
    *    stmt = id := val  //    re-assignment
@@ -291,7 +290,7 @@ public class Parse {
       toks.add(tok);
       ts  .add(t  );
     }
-    
+
     // Normal statement value parse
     Node ifex = ifex();         // Parse an expression for the statement value
     if( ifex == null )          // No statement?
@@ -321,7 +320,7 @@ public class Parse {
     }
     return ifex;
   }
-  
+
   /** Parse an if-expression, with lazy eval on the branches.  Assignments to
    *  new variables are allowed in either arm (as-if each arm is in a mini
    *  scope), and variables assigned on all live arms are available afterwards.
@@ -361,7 +360,7 @@ public class Parse {
     }
     return _e._scope.pop();
   }
-  
+
   /** Parse an expression, a list of terms and infix operators.  The whole list
    *  is broken up into a tree based on operator precedence.
    *  expr = term [binop term]*
@@ -431,7 +430,7 @@ public class Parse {
           if( fld != null ) n = gvn(new LoadNode(ctrl(),mem(),n,fld ,errMsg()));
           else              n = gvn(new LoadNode(ctrl(),mem(),n,fnum,errMsg()));
         }
-      
+
       } else {                  // Attempt a function-call
         boolean arglist = peek('(');
         int oldx = _x;
@@ -459,7 +458,7 @@ public class Parse {
     } // Else no trailing arg, just return value
     return n;                   // No more terms
   }
-  
+
   /** Parse an optional type
    *  tfact = fact[:type]
    */
@@ -472,7 +471,7 @@ public class Parse {
     if( t==null ) { _x = oldx; return fact; } // No error for missing type, because can be ?: instead
     return gvn(new TypeNode(t,fact,errMsg()));
   }
-  
+
   /** Parse a factor, a leaf grammar token
    *  fact = num       // number
    *  fact = "string"  // string
@@ -512,7 +511,7 @@ public class Parse {
     }
     // Anonymous struct
     if( peek2(c,"@{") ) return struct();
-    
+
     // Check for a valid 'id'
     String tok = token0();
     if( tok == null ) return null;
@@ -550,7 +549,7 @@ public class Parse {
     Ary<String> ids = new Ary<>(new String[1],0);
     Ary<Type  > ts  = new Ary<>(new Type  [1],0);
     Ary<Parse > bads= new Ary<>(new Parse [1],0);
-    
+
     while( true ) {
       String tok = token();
       if( tok == null ) { ids.clear(); _x=oldx; break; } // not a "[id]* ->"
@@ -569,7 +568,7 @@ public class Parse {
     try( Env e = new Env(_e) ) {// Nest an environment for the local vars
       _e = e;                   // Push nested environment
       set_ctrl(fun);            // New control is function head
-      String errmsg = errMsg("Cannot mix GC and non-GC types");      
+      String errmsg = errMsg("Cannot mix GC and non-GC types");
       int cnt=0;                // Add parameters to local environment
       for( int i=0; i<ids._len; i++ )
         _e.update(ids.at(i),gvn(new ParmNode(cnt++,ids.at(i),fun,con(ts.at(i)),errmsg)),null,
@@ -672,7 +671,7 @@ public class Parse {
     byte c = _buf[_x];
     if( !isDigit(c) ) return -1;
     _x++;
-    int sum = c-'0';  
+    int sum = c-'0';
     while( _x < _buf.length && isDigit(c=_buf[_x]) ) {
       _x++;
       sum = sum*10+c-'0';
@@ -718,7 +717,7 @@ public class Parse {
   }
   // Wrap in a nullable if there is a trailing '?'.  No spaces allowed
   private Type typeq(Type t) { return peek_noWS('?') ? t.meet_nil() : t; }
-  
+
   // Type or null or TypeErr.ANY for '->' token
   private Type type0(boolean type_var) {
     byte c = skipWS();
@@ -822,7 +821,7 @@ public class Parse {
     _x--;
     return false;
   }
-  
+
   /** Advance parse pointer to the first non-whitespace character, and return
    *  that character, -1 otherwise.  */
   private byte skipWS() {
@@ -859,7 +858,7 @@ public class Parse {
   private @NotNull ConNode con( Type t ) { return _gvn.con(t); }
 
   public Node lookup( String tok ) { return _e.lookup(tok); }
-  
+
   private Node do_call( Node call0 ) {
     Node call = gvn(call0);
     // Primitives frequently inline immediately, and do not need following
@@ -885,17 +884,17 @@ public class Parse {
     nn.pop(); // Remove self-hook
     return nn;
   }
-  
+
   // Whack current control with a syntax error
   private ErrNode err_ctrl2( String s ) { return err_ctrl1(s,Type.ANY); }
   public  ErrNode err_ctrl1(String s, Type t) { return init(new ErrNode(Env.START,errMsg(s),t)); }
   private void err_ctrl0(String s) {
     set_ctrl(gvn(new ErrNode(ctrl(),errMsg(s),Type.CTRL)));
   }
-  
+
   // Make a private clone just for delayed error messages
   private Parse( Parse P ) {
-    _src = P._src;  
+    _src = P._src;
     _buf = P._buf;
     _x   = P._x;
     _line= P._line;
@@ -916,7 +915,7 @@ public class Parse {
     String name = fun._name;
     return errMsg("Unknown ref '"+name+"'");
   }
-  
+
   // Build a string of the given message, the current line being parsed,
   // and line of the pointer to the current index.
   public String errMsg(String s) {
@@ -937,7 +936,7 @@ public class Parse {
       sb.p(' ');
     return sb.p("^\n").toString();
   }
-  // Handy for the debugger to print 
+  // Handy for the debugger to print
   @Override public String toString() { return new String(_buf,_x,_buf.length-_x); }
 
 }
