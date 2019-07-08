@@ -16,12 +16,11 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
     Object dummy = Env.GVN; // Force class loading cycle
-    test_name("A= :(         )" ); // Zero-length tuple
-    test_ptr("A= :(str?, int); A((\"abc\",2))", "A:(*\"abc\",2)");
+    testerr("A= :(str?, int)?","Named types are never nil","                  ");
     // A collection of tests which like to fail easily
-    testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1) is not a @{x,y}","             ");
+    testerr ("Point=:@{x,y}; Point((0,1))", "*[8](nil,1) is not a *[2]@{x,y}","                           ");
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'","                    ");
-    testerr("{+}(1,2,3)", "Passing 3 arguments to +{~(flt64,flt64)-> flt64} which takes 2 arguments","          ");
+    testerr("{+}(1,2,3)", "Passing 3 arguments to +{(flt64,flt64)-> flt64} which takes 2 arguments","          ");
     test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
     testerr("x=1+y","Unknown ref 'y'","     ");
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
@@ -208,16 +207,15 @@ public class TestParse {
     testerr("{x:str -> x}(1)", "1 is not a *[4]str", "               ");
 
     // Tuple types
-    test_name("A= :(         )" ); // Zero-length tuple
-    test_name("A= :(    ,    )", Type.SCALAR); // One-length tuple
-    test_name("A= :(    ,   ,)", Type.SCALAR  ,Type.SCALAR  );
-    test_name("A= :(:flt,    )", TypeFlt.FLT64 );
-    test_name("A= :(:flt,:int)", TypeFlt.FLT64,TypeInt.INT64);
-    test_name("A= :(    ,:int)", Type.SCALAR  ,TypeInt.INT64);
+    test_name("A= :(       )" ); // Zero-length tuple
+    test_name("A= :(   ,   )", Type.SCALAR); // One-length tuple
+    test_name("A= :(   ,  ,)", Type.SCALAR  ,Type.SCALAR  );
+    test_name("A= :(flt,   )", TypeFlt.FLT64 );
+    test_name("A= :(flt,int)", TypeFlt.FLT64,TypeInt.INT64);
+    test_name("A= :(   ,int)", Type.SCALAR  ,TypeInt.INT64);
 
-    test   ("A= :(:str?, :int); A((\"abc\",2))",(tmap -> TypeName.make("A",tmap,TypeStruct.make(TypeStr.ABC,TypeInt.con(2)))));
-    test   ("A= :(:str?, :int); A( \"abc\",2 )",(tmap -> TypeName.make("A",tmap,TypeStruct.make(TypeStr.ABC,TypeInt.con(2)))));
-    testerr("A= :(:str?, :int)?","Named types are never nil","                  ");
+    test_ptr("A= :(str?, int); A( \"abc\",2 )","A:(*[7]\"abc\",2)");
+    testerr("A= :(str?, int)?","Named types are never nil","                  ");
   }
 
   @Test public void testParse4() {

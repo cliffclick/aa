@@ -13,7 +13,7 @@ public class MemMergeNode extends Node {
   Node ptr() { return in(1); }
   
   @Override public Node ideal(GVNGCM gvn) {
-    // If I have a Named Constructor usage, and have 2 uses (named constuctor
+    // If I have a Named Constructor usage, and have 2 uses (named constructor
     // and the Merge following it), make sure the Named Constructor can run
     // ideal() so it can fold away.
     //if( _uses._len==2 )
@@ -31,8 +31,7 @@ public class MemMergeNode extends Node {
     if( mem() instanceof MemMergeNode ) {
       MemMergeNode mem = (MemMergeNode)mem();
       if( ptr() == mem.ptr() )
-        //return mem();
-        throw com.cliffc.aa.AA.unimpl();
+        return mem();
     }
     return null;
   }

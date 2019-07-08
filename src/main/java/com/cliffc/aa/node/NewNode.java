@@ -24,10 +24,13 @@ public class NewNode extends Node {
   private int def_idx(int fld) { return fld+1; }
   private Node fld(int fld) { return in(def_idx(fld)); }
   // Called when folding a Named Constructor into this allocation site
-  void set_name( TypeName to ) {
-    assert to.base()==_ts; // Cannot change the target fields, just the name
+  void set_name( GVNGCM gvn, TypeName to ) {
+    assert to.base().isa(_ts); // Cannot change the target fields, just the name
+    gvn.unreg(this);
+    _ts = (TypeStruct)to.base();
     _obj = to;
     _ptr = TypeMemPtr.make(_alias,to);
+    gvn.rereg(this,_ptr);
   }
   String xstr() { return "New*"+_alias; } // Self short name
   String  str() { return "New"+_ptr; } // Inline less-short name

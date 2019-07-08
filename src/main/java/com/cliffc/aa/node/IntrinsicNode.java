@@ -97,13 +97,11 @@ public abstract class IntrinsicNode extends Node {
           // NewNode is well-typed and producing a pointer to memory with the
           // correct type?  Fold into the NewNode and remove this Convert.
           Type tnnn = gvn.type(nnn);
-          //if( tnnn instanceof TypeTuple &&
-          //    ((TypeTuple)tnnn).at(0).isa(_from) ) {
-          //  nnn.set_name(_to);
-          //  gvn.add_work(nnn);
-          //  return mem.obj();
-          //}
-          throw AA.unimpl();
+          if( tnnn.isa(_targs.at(0)) ) {
+            nnn.set_name(gvn,(TypeName)_funret._obj);
+            gvn.add_work(nnn);
+            return nnn;
+          }
         }
       }
       return null;
@@ -135,9 +133,12 @@ public abstract class IntrinsicNode extends Node {
     @Override public String err(GVNGCM gvn) {
       Type mem = gvn.type(mem());
       Type ptr = gvn.type(ptr());
-      Type actual = ((TypeMem)mem).ld((TypeMemPtr)ptr);
-      //if( !actual.isa(_from) )
-      //  return _badargs.typerr(actual,_from);
+      if( ptr instanceof TypeMemPtr ) {
+        Type from = ((TypeMemPtr) ptr)._obj;
+        Type actual = ((TypeMem) mem).ld((TypeMemPtr) ptr);
+        if( !actual.isa(from) )
+          return _badargs.typerr(actual, from);
+      }
       throw AA.unimpl();        // Did not remove the aliasing
     }
   }
