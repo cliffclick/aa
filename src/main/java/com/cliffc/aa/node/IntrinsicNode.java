@@ -21,10 +21,10 @@ import com.cliffc.aa.type.*;
 public abstract class IntrinsicNode extends Node {
   public final String _name;    // Unique name (and program bits)
   final TypeTuple _targs;       // Argument types, 0-based
-  final Type _funret;           // Primitive return type for outer as_fun, not memory effects
+  TypeMemPtr _funret;   // Primitive return type for outer as_fun, not memory effects
   final String[] _args;         // Handy string arg names; 0-based
   Parse _badargs;               // Filled in when inlined in CallNode
-  IntrinsicNode( String name, String[] args, TypeTuple targs, Type funret, Node... ns ) {
+  IntrinsicNode( String name, String[] args, TypeTuple targs, TypeMemPtr funret, Node... ns ) {
     super(OP_LIBCALL,ns);
     _name=name;
     _targs = targs;
@@ -54,33 +54,40 @@ public abstract class IntrinsicNode extends Node {
   // referred to without the Name.  Error if the memory cannot be proven
   // unaliased.  The Ideal call collapses the Name into the unaliased NewNode.
   public static EpilogNode convertTypeName( TypeObj from, TypeName to, Parse badargs, GVNGCM gvn ) {
-    TypeFunPtr tf = TypeFunPtr.make_new(TypeTuple.make(TypeMemPtr.OOP),TypeMemPtr.OOP);
+    // The incoming memory type is *exact* and does not have any extra fields.
+    // The usual duck typing is "this-or-below", which allows and ignores extra
+    // fields.  For Naming - which involves installing a v-table (or any other
+    // RTTI) the type is exact at that moment.  Super-type constructors are
+    // possible but here the type is exact.
+
+    // So TypeFunPtr takes in a ptr-to-from and returns a ptr-to-to.
+    TypeMemPtr from_ptr = TypeMemPtr.make(BitsAlias.REC,from);
+    TypeMemPtr to_ptr   = TypeMemPtr.make(BitsAlias.REC,to  );
+    TypeFunPtr tf = TypeFunPtr.make_new(TypeTuple.make(from_ptr),to_ptr);
     FunNode fun = (FunNode) gvn.xform(new FunNode(to._name,tf));
     Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
     Node mem = gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM     ),null));
-    Node ptr = gvn.xform(new ParmNode( 0,"ptr",fun,gvn.con(TypeMemPtr.OOP  ),null));
-    Node cvt = gvn.xform(new ConvertPtrTypeName(from,to,badargs,mem,ptr));
-    Node mmem= gvn.xform(new MemMergeNode(mem,cvt,ptr));
-    return new EpilogNode(fun,mmem,ptr,rpc,fun,null);
+    Node ptr = gvn.xform(new ParmNode( 0,"ptr",fun,gvn.con(from_ptr        ),null));
+    Node cvt = gvn.xform(new ConvertPtrTypeName(to._name,from_ptr,to_ptr,badargs,mem,ptr));
+    Node mmem= gvn.xform(new MemMergeNode(mem,cvt));
+    return new EpilogNode(fun,mmem,cvt,rpc,fun,null);
   }
 
   // Names an unaliased memory.  Needs to collapse away, or else an error.
   static class ConvertPtrTypeName extends IntrinsicNode {
-    final TypeObj _from;
-    final TypeName _to;
-    ConvertPtrTypeName(TypeObj from, TypeName to, Parse badargs, Node mem, Node ptr) {
-      super(to._name,ARGS1,TypeTuple.make(TypeMemPtr.OOP), TypeMemPtr.OOP, null, mem, ptr);
+    ConvertPtrTypeName(String name, TypeMemPtr from_ptr, TypeMemPtr to_ptr, Parse badargs, Node mem, Node ptr) {
+      super(name,ARGS1,TypeTuple.make(from_ptr), to_ptr, null, mem, ptr);
       _badargs = badargs;
-      _from = from;
-      _to = to;
     }
     Node mem() { return in(1); }
     Node ptr() { return in(2); }
     // Take in any struct alias or subclass thereof, with the given 'from'
     // type.  Most structs will NOT have this type.  The pointer passed in must
     // have this type to type-check.
-    @Override public Type all_type() { return _to; }
+    @Override public Type all_type() { return _funret; }
 
+    // If the input memory is unaliased, fold into the NewNode.
+    // If this node does not fold away, the program is in error.
     @Override public Node ideal(GVNGCM gvn) {
       if( mem() instanceof MemMergeNode ) {
         MemMergeNode mem = (MemMergeNode)mem();
@@ -88,38 +95,49 @@ public abstract class IntrinsicNode extends Node {
         if( mem._uses._len == 2 && // Use is 'this' and the MemMerge just after 'this'
             nnn != null ) {     // Un-aliased NewNode
           // NewNode is well-typed and producing a pointer to memory with the
-          // correct type?
+          // correct type?  Fold into the NewNode and remove this Convert.
           Type tnnn = gvn.type(nnn);
-          if( tnnn instanceof TypeTuple &&
-              ((TypeTuple)tnnn).at(0).isa(_from) ) {
-            nnn.set_name(_to);
-            gvn.add_work(nnn);
-            return mem.obj();
-          }
+          //if( tnnn instanceof TypeTuple &&
+          //    ((TypeTuple)tnnn).at(0).isa(_from) ) {
+          //  nnn.set_name(_to);
+          //  gvn.add_work(nnn);
+          //  return mem.obj();
+          //}
+          throw AA.unimpl();
         }
       }
       return null;
     }
+
+    // Semantics are to extract a TypeObj from mem and ptr, and if there is no
+    // aliasing, sharpen the TypeObj to a TypeName.  We can be correct and
+    // conservative by doing nothing.
     
+    // The inputs are a TypeMem and a TypeMemPtr to an unnamed TypeObj.  If the
+    // ptr is of the "from" type, we cast a Name to it and produce a pointer to
+    // the "to" type, otherwise we get the most conservative "to" type.
     @Override public Type value(GVNGCM gvn) {
-      // Semantics are to extract a TypeObj from mem and ptr, and if there is
-      // no aliasing, sharpen the TypeObj to a TypeName.  We can be correct and
-      // conservative by doing nothing.
+      TypeMemPtr from = (TypeMemPtr)_targs._ts[0];
+      TypeMemPtr to   =             _funret;
+      TypeName tname  = (TypeName  )to._obj;
       Type mem = gvn.type(mem());
       Type ptr = gvn.type(ptr());
       if( !(mem instanceof TypeMem && ptr instanceof TypeMemPtr) )
-        return _to;             // Inputs are confused
-      Type obj = ((TypeMem)mem).ld((TypeMemPtr)ptr);
-      if( !obj.isa(_from) )     // Inputs not correct _from
-        return _to;             // 
-      return _to.make(obj).bound(_to);     // Wrap a Name around the Obj
+        return to;              // Inputs are confused
+
+      TypeObj obj = ((TypeMem)mem).ld((TypeMemPtr)ptr);
+      if( !obj.isa(from._obj) ) return to; // Inputs not correct from, and node is in-error
+      if( obj.isa(from._obj.dual()) ) return to.dual();
+      
+      TypeName tnto = tname.make(obj);// Named to obj
+      return to.make(tnto);
     }
     @Override public String err(GVNGCM gvn) {
       Type mem = gvn.type(mem());
       Type ptr = gvn.type(ptr());
       Type actual = ((TypeMem)mem).ld((TypeMemPtr)ptr);
-      if( !actual.isa(_from) )
-        return _badargs.typerr(actual,_from);
+      //if( !actual.isa(_from) )
+      //  return _badargs.typerr(actual,_from);
       throw AA.unimpl();        // Did not remove the aliasing
     }
   }
@@ -128,20 +146,18 @@ public abstract class IntrinsicNode extends Node {
   // Default name constructor using expanded args list.  Just a NewNode but the
   // result is a named type.  Same as convertTypeName on an unaliased NewNode.
   public static EpilogNode convertTypeNameStruct( TypeStruct from, TypeName to, Parse badargs, GVNGCM gvn ) {
-    TypeFunPtr tf = TypeFunPtr.make_new(TypeTuple.make(from._ts),TypeMemPtr.OOP);
+    NewNode nnn = new NewNode(new Node[1],to);
+    TypeFunPtr tf = TypeFunPtr.make_new(TypeTuple.make(from._ts),nnn._ptr);
     FunNode fun = (FunNode) gvn.xform(new FunNode(to._name,tf));
     Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
     Node memp= gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM     ),null));
-    Node[] ns= new Node[from._ts.length+1];
     // Add input edges to the NewNode
     for( int i=0; i<from._ts.length; i++ )
-      ns[i+1] = gvn.xform(new ParmNode(i,from._flds[i],fun, gvn.con(from._ts[i]),null));
-    Node nnn = gvn.xform(new NewNode(ns,to));
-    Node obj = gvn.xform(new OProjNode(nnn,0)); // TypeStruct
-    Node ptr = gvn.xform(new  ProjNode(nnn,1)); // ptr-to-TypeStruct
-    ptr.add_def(ptr);                           // Add self-hook to prevent deletion
-    Node mmem= gvn.xform(new MemMergeNode(memp,obj,ptr));
-    ptr.pop();                  // Remove self-hook
+      nnn.add_def(gvn.xform(new ParmNode(i,from._flds[i],fun, gvn.con(from._ts[i]),null)));
+    Node ptr = gvn.xform(nnn);
+    ptr.add_def(ptr); // Self-hook to prevent deletion
+    Node mmem= gvn.xform(new MemMergeNode(memp,ptr));
+    ptr.pop();
     return new EpilogNode(fun,mmem,ptr,rpc,fun,null);
   }
 

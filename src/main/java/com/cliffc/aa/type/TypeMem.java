@@ -147,12 +147,12 @@ public class TypeMem extends Type<TypeMem> {
 
   // Precise single alias.  Other aliases are "dont care".  Nil not allowed.
   public static TypeMem make(int alias, TypeObj oop ) {
-    TypeObj[] as = Arrays.copyOf(XMEM._aliases,Math.max(XMEM._aliases.length,alias+1));
+    TypeObj[] as = Arrays.copyOf(MEM._aliases,Math.max(MEM._aliases.length,alias+1));
     as[alias] = oop;
     return make0(as);
   }
   public static TypeMem make(BitsAlias bits, TypeObj oop ) {
-    TypeObj[] as = Arrays.copyOf(XMEM._aliases,Math.max(XMEM._aliases.length,bits.max()+1));
+    TypeObj[] as = Arrays.copyOf(MEM._aliases,Math.max(MEM._aliases.length,bits.max()+1));
     for( int b : bits )  as[b] = oop;
     return make0(as);
   }
@@ -225,7 +225,8 @@ public class TypeMem extends Type<TypeMem> {
     return obj;
   }
 
-  // Meet of all possible storable values, after updates
+  // Meet of all possible storable values, after updates.  This updates a field
+  // in a TypeObj.
   public TypeMem st( TypeMemPtr ptr, String fld, int fld_num, Type val ) {
     assert val.isa_scalar();
     TypeObj[] objs = Arrays.copyOf(_aliases,Math.max(_aliases.length,ptr._aliases.max()+1));
@@ -234,8 +235,8 @@ public class TypeMem extends Type<TypeMem> {
     return make0(objs);
   }
 
-  // Meet of all possible storable values, after updates
-  public TypeMem st( TypeObj obj, TypeMemPtr ptr ) {
+  // Meet of all possible storable values, after updates.  This is a whole-TypeObj update.
+  public TypeMem st( TypeMemPtr ptr ) {
     if( ptr.is_con() ) throw AA.unimpl(); // objs[ptr.get_con()]=obj;
     else {
       // Any alias, plus all of its children, are meet/joined.  This does a
@@ -243,7 +244,7 @@ public class TypeMem extends Type<TypeMem> {
       Ary<TypeObj> objs = new Ary<>(_aliases.clone(),_aliases.length);
       BitSet bs = ptr._aliases.tree().plus_kids(ptr._aliases);
       for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) )
-        objs.setX(alias, (TypeObj)at(alias).meet(obj));
+        objs.setX(alias, (TypeObj)at(alias).meet(ptr._obj));
       // Really loose stores might hit all-of-memory.  Force a little sanity.
       if( objs.at(1) != TypeObj.XOBJ ) objs.setX(1,TypeObj.OBJ);
       return make0(objs.asAry());

@@ -168,8 +168,9 @@ public class CallNode extends Node {
     // Check for constant body
     if( gvn.type(rez).is_con() ) return inline(gvn,ctl(),mem(),rez);
 
-    // Check for a 1-op body using only constants or parameters
-    boolean can_inline=!(rez instanceof ParmNode);
+    // Check for a 1-op body using only constants or parameters and no memory effects
+    boolean can_inline=!(rez instanceof ParmNode) &&
+            mem instanceof ParmNode && mem.in(0)==fun;
     for( Node parm : rez._defs )
       if( parm != null && parm != fun &&
           !(parm instanceof ParmNode && parm.in(0) == fun) &&

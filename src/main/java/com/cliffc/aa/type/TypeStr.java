@@ -51,7 +51,7 @@ public class TypeStr extends TypeObj<TypeStr> {
   // Get the alias for string constants.  Since string constants are interned,
   // so are the aliases.
   public int get_alias() {
-    if( _alias ==0 ) _alias = BitsAlias.new_alias(BitsAlias.STR,this);
+    if( _alias ==0 ) _alias = BitsAlias.new_alias(BitsAlias.STR);
     return _alias;
   }
 

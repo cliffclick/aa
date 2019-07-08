@@ -17,6 +17,7 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
     if( this==o ) return true;
     return o instanceof TypeObj && _any==((TypeObj)o)._any && _type==((TypeObj)o)._type;
   }
+  @Override public boolean cycle_equals( Type o ) { return equals(o); }
   @Override String str( BitSet dups ) { return _any?"~obj":"obj"; }
   private static TypeObj make( boolean any ) {
     return (TypeObj)(new TypeObj(TOBJ,any).hashcons());

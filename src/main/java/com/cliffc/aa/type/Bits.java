@@ -338,7 +338,6 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     int[] _pars = new int[2];   // Parent bit from child bit; _cnt is the in-use part
     int[][] _kids = new int[2][];// List of kids from a parent; 1st element is is-use length
     int[] _init;                 // Used to reset _kids[X][0] for all X
-    Ary<Type> _err_types = new Ary<>(new Type[1],0);
 
     int parent( int kid ) { return _pars[kid]; }
     @Override public String toString() { return toString(new SB(),1).toString(); }
@@ -354,7 +353,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     }
     
     // Split out a bit to form a new constant, from a prior a bit
-    int split(int par, Type err_report) {
+    int split(int par) {
       // See if we have an existing bit
       if( par < _kids.length ) { // This parent has kids already
         int[] kids = _kids[par]; //
@@ -365,7 +364,6 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
             if( bit != 0 ) {            // Pre-allocated kid from prior test?
               assert _pars[bit] == par; // Then parent must already be preallocated
               kids[0] = klen+1;
-              _err_types.setX(bit,err_report);
               return bit;
             }
           }
@@ -384,7 +382,6 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
         _kids[par] = kids = Arrays.copyOf(kids,klen<<1);
       kids[klen] = bit;
       kids[0] = klen+1;
-      _err_types.setX(bit,err_report);
       return bit;
     }
     void init0() {
@@ -398,9 +395,6 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
           _kids[i][0] = i<_init.length ? _init[i] : 0;
     }
     int peek() { return _kids[1][_kids[1][0]]; } // for testing
-    Type err_report(int bit) {
-      return bit >= 0 ? _err_types.at(bit) : _err_types.at(-bit).dual();
-    }
     // Smear out the kids in a non-canonical representation, to allow the caller
     // to iterate more easily.
     BitSet plus_kids(Bits<B> bits) {

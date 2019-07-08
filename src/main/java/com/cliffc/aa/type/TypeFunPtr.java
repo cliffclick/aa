@@ -83,7 +83,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     }
     TypeFunPtr tf = (TypeFunPtr)t;
     // QQQ - Function args are JOINed during the MEET.
-    return make(_fidxs.meet(tf._fidxs),(TypeTuple)_args/*QQQ.meet*/.join(tf._args),_ret.meet(tf._ret));
+    return make(_fidxs.meet(tf._fidxs),(TypeTuple)_args/*QQQ.meet*/.meet(tf._args),_ret.meet(tf._ret));
   }
 
   public BitsFun fidxs() { return _fidxs; }
@@ -92,7 +92,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public boolean is_class() { return _fidxs.is_class(); }
   
   // QQQ - Function args below center when the TFP is above center.
-  @Override public boolean above_center() { return /*QQQ*/!_args.above_center(); }
+  @Override public boolean above_center() { return /*QQQ*/_args.above_center(); }
   // Fidxes represent a single function and thus are constants, but TypeFunPtrs
   // represent the execution of a function, and are never constants.
   @Override public boolean may_be_con()   { return false; }

@@ -78,11 +78,11 @@ public class TypeTuple extends Type<TypeTuple> {
     return t1==t2 ? t1 : t1.free(t2);
   }
   public static TypeTuple make( Type... ts ) { return make0(false,ts); }
-  // Arguments are infinitely-extended with ANY not ALL
-  public static TypeTuple make_args( Type... ts ) { return make0(/*QQQfalse*/true,ts); }
+  // Arguments are infinitely-extended with ALL
+  public static TypeTuple make_args( Type... ts ) { return make0(/*QQQfalse*/false,ts); }
 
   // Most primitive function call argument type lists are 0-based
-  public  static final TypeTuple ALL_ARGS= make0(/*QQQfalse*/true); // Zero args and high
+  public  static final TypeTuple ALL_ARGS= make0(/*QQQfalse*/false); // Zero args and high
           static final TypeTuple SCALAR0 = make_args();
           static final TypeTuple SCALAR1 = make_args(SCALAR);
   public  static final TypeTuple SCALAR2 = make_args(SCALAR, SCALAR);

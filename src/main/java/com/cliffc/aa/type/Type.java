@@ -92,7 +92,7 @@ public class Type<T extends Type<T>> {
   // Hash-Cons - all Types are interned in this hash table.  Thus an equality
   // check of a (possibly very large) Type is always a simple pointer-equality
   // check, except during construction and intern'ing.
-  static ConcurrentMap<Type,Type> INTERN = new ConcurrentHashMap<>();
+  private static ConcurrentMap<Type,Type> INTERN = new ConcurrentHashMap<>();
   static int RECURSIVE_MEET;    // Count of recursive meet depth
   @SuppressWarnings("unchecked")
   final Type hashcons() {
@@ -262,8 +262,6 @@ public class Type<T extends Type<T>> {
   private Type xmeet0( Type t ) {
     // Short cut for the self case
     if( t == this ) return this;
-    // Short cut for the exactly dual case
-    if( t._dual==this ) return above_center() ? t : this;    
     // Reverse; xmeet 2nd arg is never "is_simple" and never equal to "this"
     return !is_simple() && t.is_simple() ? t.xmeet(this) : xmeet(t);
   }
@@ -680,7 +678,16 @@ public class Type<T extends Type<T>> {
   TypeStruct repeats_in_cycles(TypeStruct head, BitSet bs) { return null; }
 
   // Dual, except keep TypeMem.XOBJ as high for starting GVNGCM.opto() state.
-  public Type startype() { return above_center() ? this : dual(); }
+  public Type startype() {
+    if( is_con() ) {
+      assert dual()==this;
+      return dual();
+    }
+    // Various error codes start high
+    if( this==ANY || this == XCTRL ) return this;
+    assert !above_center();
+    return dual();
+  }
 
   RuntimeException typerr(Type t) {
     throw new RuntimeException("Should not reach here: internal type system error with "+this+(t==null?"":(" and "+t)));

@@ -23,7 +23,7 @@ public class BitsRPC extends Bits<BitsRPC> {
   private static final Bits.Tree<BitsRPC> TREE = new Bits.Tree<>();
   @Override Tree<BitsRPC> tree() { return TREE; } 
   public static final int ALL = new_rpc(0);
-  public static int new_rpc( int par ) { return TREE.split(par,TypeRPC.RPC1); }
+  public static int new_rpc( int par ) { return TREE.split(par); }
   // Fast reset of parser state between calls to Exec
   public static void init0() { TREE.init0(); }
   public static void reset_to_init0() { TREE.reset_to_init0(); }

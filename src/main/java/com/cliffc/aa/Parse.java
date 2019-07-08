@@ -85,7 +85,7 @@ public class Parse {
   // ScopeNode with existing variables which survive to the next call.  Used by
   // the REPL to do incremental typing.
   TypeEnv go_partial( ) {
-    prog();         // Parse a program
+    prog();        // Parse a program
     _gvn.iter();   // Pessimistic optimizations; might improve error situation
     _gvn.gcp(_e._scope); // Global Constant Propagation
     _gvn.iter();   // Re-check all ideal calls now that types have been maximally lifted
@@ -694,9 +694,9 @@ public class Parse {
     }
     TypeStr ts = TypeStr.con(new String(_buf,oldx,_x-oldx-1));
     // Convert to ptr-to-constant-memory-string
-    TypeMemPtr ptr = TypeMemPtr.make(ts.get_alias());
+    TypeMemPtr ptr = TypeMemPtr.make(ts.get_alias(),ts);
     // Store the constant string to memory
-    set_mem(gvn(new MemMergeNode(mem(),con(ts),con(ptr))));
+    set_mem(gvn(new MemMergeNode(mem(),con(ptr))));
     return ptr;
   }
 
@@ -880,12 +880,10 @@ public class Parse {
   // reference.
   private Node do_mem(NewNode nnn) {
     Node nn = gvn(nnn);
-    Node nobj = gvn(new OProjNode(nn,0));
-    Node nadr = gvn(new  ProjNode(nn,1));
-    nadr.add_def(nadr);         // Self-hook to prevent deletion
-    set_mem(gvn(new MemMergeNode(mem(),nobj,nadr)));
-    nadr.pop();                 // Remove self-hook
-    return nadr;
+    nn.add_def(nn); // Self-hook to prevent deletion
+    set_mem(gvn(new MemMergeNode(mem(),nn)));
+    nn.pop(); // Remove self-hook
+    return nn;
   }
   
   // Whack current control with a syntax error

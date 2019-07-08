@@ -18,14 +18,13 @@ import com.cliffc.aa.type.*;
 // epilog.
 public abstract class IntrinsicNewNode extends IntrinsicNode {
   int _alias;                   // Alias class for new memory
-  TypeMemPtr _ptr;              // private cache of the alias pointer
-  IntrinsicNewNode( String name, String[] args, TypeTuple targs, Type funret, int alias ) {
+  IntrinsicNewNode( String name, String[] args, TypeTuple targs, TypeMemPtr funret, int alias ) {
     super(name,args,targs,funret);
     update_alias(alias);
   }
   private IntrinsicNewNode update_alias(int alias) {
     _alias = alias;
-    _ptr = TypeMemPtr.make(alias);
+    _funret = TypeMemPtr.make(alias,_funret._obj);
     return this;
   }
   public static IntrinsicNewNode[] INTRINSICS = new IntrinsicNewNode[] {
@@ -35,10 +34,10 @@ public abstract class IntrinsicNewNode extends IntrinsicNode {
   // Clones during inlining all become unique new sites
   @Override IntrinsicNewNode copy(GVNGCM gvn) {
     IntrinsicNewNode nnn = (IntrinsicNewNode)super.copy(gvn);
-    return nnn.update_alias(BitsAlias.new_alias(_alias,TypeStr.STR)); // Children alias classes
+    return nnn.update_alias(BitsAlias.new_alias(_alias)); // Children alias classes
   }
-  @Override public String xstr() { return _name+"_#"+_alias; }
-  @Override public Type all_type() { return TypeStr.STR; }
+  @Override public String xstr() { return _name+"*"+_alias; }
+  @Override public Type all_type() { return _funret; }
 
   // Wrap the PrimNode with a Fun/Epilog wrapper that includes memory effects.
   public EpilogNode as_fun( GVNGCM gvn ) {
@@ -47,11 +46,11 @@ public abstract class IntrinsicNewNode extends IntrinsicNode {
     ParmNode memp= (ParmNode) gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM     ),null));
     // Add input edges to the intrinsic
     add_def(null);              // Control for the primitive in slot 0
+    add_def(memp);              // Control for the memory    in slot 1
     for( int i=0; i<_args.length; i++ ) // Args follow
       add_def(gvn.xform(new ParmNode(i,_args[i],fun, gvn.con(_targs.at(i)),null)));
-    Node obj = gvn.xform(this); // Returns a TypeObj
-    Node ptr = gvn.con(_ptr);
-    Node mmem = gvn.xform(new MemMergeNode(memp,obj,ptr));
+    Node ptr = gvn.xform(this); // Returns a TypeMemPtr to a TypeObj
+    Node mmem = gvn.xform(new MemMergeNode(memp,ptr));
     return new EpilogNode(fun,mmem,ptr,rpc,fun,null);
   }
   
@@ -59,20 +58,20 @@ public abstract class IntrinsicNewNode extends IntrinsicNode {
   static class ConvertI64Str extends IntrinsicNewNode {
     ConvertI64Str(int alias) { super("str",ARGS1,TypeTuple.INT64, TypeMemPtr.STRPTR,alias); }
     @Override public Type value(GVNGCM gvn) {
-      Type t = gvn.type(in(1));
-      if( t.above_center() ) return TypeStr.XSTR;
-      if( !t.is_con() || !(t instanceof TypeInt) ) return TypeStr.STR;
-      return TypeStr.con(Long.toString(t.getl()));
+      Type t = gvn.type(in(2));
+      if( t.above_center() ) return _funret.dual();
+      if( !t.is_con() || !(t instanceof TypeInt) ) return _funret;
+      return TypeMemPtr.make(_alias,TypeStr.con(Long.toString(t.getl())));
     }
   }
   
   static class ConvertF64Str extends IntrinsicNewNode {
     ConvertF64Str(int alias) { super("str",ARGS1,TypeTuple.FLT64, TypeMemPtr.STRPTR, alias); }
     @Override public Type value(GVNGCM gvn) {
-      Type t = gvn.type(in(1));
-      if( t.above_center() ) return TypeStr.XSTR;
-      if( !t.is_con() || !(t instanceof TypeFlt) ) return TypeStr.STR;
-      return TypeStr.con(Double.toString(t.getd()));
+      Type t = gvn.type(in(2));
+      if( t.above_center() ) return _funret.dual();
+      if( !t.is_con() || !(t instanceof TypeFlt) ) return _funret;
+      return TypeMemPtr.make(_alias,TypeStr.con(Double.toString(t.getd())));
     }
   }
 }

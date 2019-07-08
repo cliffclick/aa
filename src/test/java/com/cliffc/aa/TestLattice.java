@@ -270,6 +270,7 @@ public class TestLattice {
     N by0 = new N("[y,^]0" ,bb0,ty0);
     N bt0 = new N("[^,^]0" ,bx0,by0,tt0);
 
+    // The 8 different flavors of nil...
     N nilbb = new N("0[_,_]0",tb0);
     N nilxb = new N("0[x,_]0",tx0);
     N nilyb = new N("0[y,_]0",ty0);
@@ -462,15 +463,15 @@ public class TestLattice {
     N num  =new N("num"     ,scal);
     N oop0= new N("oop?"    ,scal);
     N str0= new N("str?"    ,oop0);
-    N i64 = new N("{i64}"   ,oop0);
+    N i64 = new N("{i64}"   ,oop0); // tuple with a single int field
     
     N i8  = new N("{i8}"    ,i64);
     N str = new N("str"     ,str0);
     N abc = new N("abc"     ,str);
     N def = new N("def"     ,str);
     N t7  = new N("{7}"     ,i8);
-    N t0  = new N("{nil}"   ,i8);
-    N nil = new N("nil"     ,str0,num);
+    N t0  = new N("{nil}"   ,i8);       // two different flavors of nil
+    N nil = new N("nil"     ,str0,num); // two different flavors of nil
     N xstr= new N("~str"    ,abc,def);
     N xi8 = new N("~{~i8}"  ,t0,t7);
     
@@ -778,5 +779,51 @@ public class TestLattice {
     def0.set_dual(def_ );
 
     test(xscl);
+  }
+
+
+  // Lattice!
+  // This structure is tested to be a lattice.
+  
+  // Testing mixed tuple contents:
+  //                  ( ANY,ANY...)
+  //                             (ANY,ALL...)
+  //   (~i64,ANY...)  (~str,ANY...)
+  //                       (~i64,ALL...)  (~str,ALL...)
+  //   ( i64,ANY...)  ( str,ANY...)
+  //                       ( i64,ALL...)  ( str,ALL...)
+  //          (ALL,ANY...)
+  //                  ( ALL,ALL...)
+  @Test public void testLattice9() {
+    N.reset();
+    N bot = new N("( ALL,ALL)");
+    N i64 = new N("( i64,ALL)",bot);
+    N str = new N("( str,ALL)",bot);
+    
+    N xi64= new N("(~i64,ALL)",i64);
+    N xstr= new N("(~str,ALL)",str);
+    
+    N xbot= new N("( ANY,ALL)",xstr,xi64);
+    N xtop= new N("( ALL,ANY)",bot);
+
+    N i64x= new N("( i64,ANY)",xtop);
+    N strx= new N("( str,ANY)",xtop);
+    
+    N xi64x=new N("(~i64,ANY)",i64x);
+    N xstrx=new N("(~str,ANY)",strx);
+    
+    N top = new N("( ANY,ANY)" ,xi64x,xstrx,xbot);
+
+    // Mark the non-centerline duals
+    bot.set_dual(top);
+    xbot.set_dual(xtop);
+    
+    i64.set_dual(xi64x);
+    str.set_dual(xstrx);
+
+    xi64.set_dual(i64x);
+    xstr.set_dual(strx);
+
+    test(top);
   }
 }

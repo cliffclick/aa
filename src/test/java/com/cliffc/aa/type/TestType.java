@@ -126,7 +126,7 @@ public class TestType {
     
     Type pabc0= TypeMemPtr.ABC0;    // *["abc"]?
     TypeMemPtr pabc = TypeMemPtr.ABCPTR; // *["abc"]
-    TypeMemPtr pzer = TypeMemPtr.make(BitsAlias.new_alias(BitsAlias.REC,TypeStruct.ALLSTRUCT));// *[(0)]
+    TypeMemPtr pzer = TypeMemPtr.make(BitsAlias.new_alias(BitsAlias.REC),TypeStruct.ALLSTRUCT);// *[(0)]
     Type pzer0= pzer.meet_nil();  // *[(0)]?
     Type nil  = TypeNil.NIL;
 
@@ -200,11 +200,11 @@ public class TestType {
 
     // meet @{c:0}? and @{c:@{x:1}?,}
     TypeObj a1 = TypeStruct.make(new String[]{"c"},TypeNil.NIL ); // @{c:nil}
-    TypeObj a2 = TypeStruct.make(new String[]{"c"},TypeMemPtr.make_nil(9)); // @{c:*{3#}?}
+    TypeObj a2 = TypeStruct.make(new String[]{"c"},TypeMemPtr.make_nil(9,a1)); // @{c:*{3#}?}
     TypeObj a3 = TypeStruct.make(new String[]{"x"},TypeInt.TRUE); // @{x: 1 }
     TypeMem mem = TypeMem.make0(new TypeObj[]{null,TypeObj.OBJ,null,null,null,null,null,null,null,a1,a2,a3});
     // *[1]? join *[2] ==> *[1+2]?
-    Type ptr12 = TypeNil.NIL.join(TypeMemPtr.make(-9)).join( TypeMemPtr.make(-10));
+    Type ptr12 = TypeNil.NIL.join(TypeMemPtr.make(-9,a1)).join( TypeMemPtr.make(-10,a2));
     // mem.ld(*[1+2]?) ==> @{c:0}
     Type ld = mem.ld((TypeMemPtr)ptr12);
     assertEquals(a1,ld);
@@ -257,8 +257,8 @@ public class TestType {
     // Recursive types no longer cyclic in the concrete definition?  Because
     // TypeObj can contain TypeMemPtrs but not another nested TypeObj...
     final int alias1 = 1;
-    final TypeMemPtr ts0ptr = TypeMemPtr.make    (alias1);
-    final TypeMemPtr ts0ptr0= TypeMemPtr.make_nil(alias1);
+    final TypeMemPtr ts0ptr = TypeMemPtr.make    (alias1,TypeObj.OBJ);
+    final TypeMemPtr ts0ptr0= TypeMemPtr.make_nil(alias1,TypeObj.OBJ);
     
     // Anonymous recursive structs -
     // - struct with pointer to self
@@ -284,14 +284,14 @@ public class TestType {
     // If we unrolled this (and used S for Struct and 0 for Nil) we'd get:
     // AS0AS0AS0AS0AS0AS0...
     final int alias2 = 2;
-    TypeMemPtr tptr2= TypeMemPtr.make_nil(alias2); // *[0,2]
+    TypeMemPtr tptr2= TypeMemPtr.make_nil(alias2,TypeObj.OBJ); // *[0,2]
     TypeStruct ts2 = TypeStruct.make(flds,tptr2,TypeInt.INT64); // @{n:*[0,2],v:int}
     TypeName ta2 = TypeName.make("A",TypeName.TEST_SCOPE,ts2);
 
     // Peel A once without the nil: Memory#3: A:@{n:*[2],v:int}
     // ASAS0AS0AS0AS0AS0AS0...
     final int alias3 = 3;
-    TypeMemPtr tptr3= TypeMemPtr.make(alias3); // *[3]
+    TypeMemPtr tptr3= TypeMemPtr.make(alias3,TypeObj.OBJ); // *[3]
     TypeStruct ts3 = TypeStruct.make(flds,tptr2,TypeInt.INT64); // @{n:*[2],v:int}
     TypeName ta3 = TypeName.make("A",TypeName.TEST_SCOPE,ts3);
 
@@ -308,12 +308,12 @@ public class TestType {
     // Meet:  SAS0AS0AS0AS0AS0AS0...
     // which is the Once yet again
     TypeMem mem234 = TypeMem.make0(new TypeObj[]{null,TypeObj.OBJ,ta2,ta3,ta4});
-    TypeMemPtr ptr34 = (TypeMemPtr)TypeMemPtr.make(alias3).meet(TypeMemPtr.make(alias4));
+    TypeMemPtr ptr34 = (TypeMemPtr)TypeMemPtr.make(alias3,TypeObj.OBJ).meet(TypeMemPtr.make(alias4,TypeObj.OBJ));
 
     // Since hacking ptrs about from mem values, no cycles so instead...
     Type mta = mem234.ld(ptr34);
     //assertEquals(ta3,mta);
-    TypeMemPtr ptr023 = (TypeMemPtr)TypeMemPtr.make_nil(2).meet(TypeMemPtr.make(3));
+    TypeMemPtr ptr023 = (TypeMemPtr)TypeMemPtr.make_nil(2,TypeObj.OBJ).meet(TypeMemPtr.make(3,TypeObj.OBJ));
     Type xta = TypeName.make("A",TypeName.TEST_SCOPE,TypeStruct.make(flds,ptr023,TypeInt.INT64));
     assertEquals(xta,mta);
 
@@ -321,7 +321,7 @@ public class TestType {
     
     // Mismatched Names in a cycle; force a new cyclic type to appear
     final int alias5 = 5;
-    TypeStruct tsnb = TypeStruct.make(flds,TypeMemPtr.make_nil(alias5),TypeFlt.FLT64);
+    TypeStruct tsnb = TypeStruct.make(flds,TypeMemPtr.make_nil(alias5,TypeObj.OBJ),TypeFlt.FLT64);
     TypeName tfb = TypeName.make("B",TypeName.TEST_SCOPE,tsnb);
     Type mtab = ta2.meet(tfb);
     

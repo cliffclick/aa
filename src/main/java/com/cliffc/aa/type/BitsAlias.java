@@ -29,28 +29,28 @@ public class BitsAlias extends Bits<BitsAlias> {
 
   static {
     // The All-Memory alias class
-    ALL = new_alias(0,TypeObj.OBJ);
+    ALL = new_alias(0);
     NZERO = new BitsAlias().make_impl(ALL,null);
     FULL = NZERO.meet_nil();    // All aliases, with a nil
     ANY = FULL.dual();          // Precompute dual
     NIL = make0(0);             // No need to dual; NIL is its own dual
     // Split All-Memory into Structs/Records and Arrays (including Strings).
     // Everything falls into one of these two camps.
-    RECBITS = make0(REC = new_alias(ALL,TypeStruct.ALLSTRUCT));
+    RECBITS = make0(REC = new_alias(ALL));
     RECBITS0 = RECBITS.meet_nil();
     // Arrays
-    ARY = new_alias(ALL,TypeObj.OBJ);
+    ARY = new_alias(ALL);
     // Split Arrays into Strings (and other arrays)
-    STRBITS = make0(STR = new_alias(ARY,TypeStr.STR));
+    STRBITS = make0(STR = new_alias(ARY));
     STRBITS0 = STRBITS.meet_nil();
     // LibCall conversion string aliases
-    I64 = new_alias(STR,TypeStr.STR);
-    F64 = new_alias(STR,TypeStr.STR);
+    I64 = new_alias(STR);
+    F64 = new_alias(STR);
     // A sample test string
-    ABCBITS = make0(ABC = new_alias(STR,TypeStr.ABC));
+    ABCBITS = make0(ABC = new_alias(STR));
     ABCBITS0 = ABCBITS.meet_nil();
   }
-  public static int new_alias(int par, TypeObj err_report) { return TREE.split(par,err_report); }
+  public static int new_alias(int par) { return TREE.split(par); }
   // Fast reset of parser state between calls to Exec
   public static void init0() { TREE.init0(); }
   public static void reset_to_init0() { TREE.reset_to_init0();}

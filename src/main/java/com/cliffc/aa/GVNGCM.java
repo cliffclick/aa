@@ -459,8 +459,6 @@ public class GVNGCM {
       if( type(fun)==Type.CTRL && epi != null && !epi.is_forward_ref() ) {
         if( type(epi.ctl()) != Type.CTRL ) throw AA.unimpl(); // never-return function (maybe never called?)
         TypeFunPtr tf = (TypeFunPtr)type(epi);
-        if( tf != fun._tf && !tf.isa(fun._tf) )
-          throw AA.unimpl();    // Untested...
         if( tf != fun._tf &&    // can sharpen function return
             tf.isa(fun._tf) ) { // Only if sharpened (might not be true for errors)
           unreg(fun);

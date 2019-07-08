@@ -16,7 +16,7 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
     Object dummy = Env.GVN; // Force class loading cycle
-    test_isa("A= :(         )", name_tuple_constructor()); // Zero-length tuple
+    test_name("A= :(         )" ); // Zero-length tuple
     test_ptr("A= :(str?, int); A((\"abc\",2))", "A:(*\"abc\",2)");
     // A collection of tests which like to fail easily
     testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1) is not a @{x,y}","             ");
@@ -64,10 +64,10 @@ public class TestParse {
     test("1+2.3",   TypeFlt.make(0,64,3.3));
   
     // Simple strings
-    test_ptr("\"Hello, world\"", (alias)-> TypeMem.make(alias,TypeStr.con("Hello, world")));
-    test_ptr("str(3.14)"   , (alias)-> TypeMem.make(alias,TypeStr.con("3.14")));
-    test_ptr("str(3)"      , (alias)-> TypeMem.make(alias,TypeStr.con("3"   )));
-    test_ptr("str(\"abc\")", (alias)-> TypeMem.make(alias,TypeStr.ABC));
+    test_ptr("\"Hello, world\"", (alias)-> TypeMemPtr.make(alias,TypeStr.con("Hello, world")));
+    test_ptr("str(3.14)"   , (alias)-> TypeMemPtr.make(alias,TypeStr.con("3.14")));
+    test_ptr("str(3)"      , (alias)-> TypeMemPtr.make(alias,TypeStr.con("3"   )));
+    test_ptr("str(\"abc\")", (alias)-> TypeMemPtr.make(alias,TypeStr.ABC));
 
     // Variable lookup
     test("math_pi", TypeFlt.PI);
@@ -80,9 +80,9 @@ public class TestParse {
     test("{-}(1,2)", TypeInt.con(-1)); // binary version
     test(" - (1  )", TypeInt.con(-1)); // unary version
     // error; mismatch arg count
-    testerr("!()       ", "Passing 0 arguments to !{~(int64)-> int1} which takes 1 arguments","   ");
+    testerr("!()       ", "Passing 0 arguments to !{(int64)-> int1} which takes 1 arguments","   ");
     testerr("math_pi(1)", "A function is being called, but 3.141592653589793 is not a function type","          ");
-    testerr("{+}(1,2,3)", "Passing 3 arguments to +{~(flt64,flt64)-> flt64} which takes 2 arguments","          ");
+    testerr("{+}(1,2,3)", "Passing 3 arguments to +{(flt64,flt64)-> flt64} which takes 2 arguments","          ");
 
     // Parsed as +(1,(2*3))
     test("{+}(1, 2 * 3) ", TypeInt.con(7));
@@ -154,16 +154,16 @@ public class TestParse {
     test("x=3; mul2={x -> x*2}; mul2(2.1)", TypeFlt.con(2.1*2.0)); // must inline to resolve overload {*}:Flt with I->F conversion
     test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
     test("sq={x -> x*x}; sq 2.1", TypeFlt.con(4.41)); // No () required for single args
-    testerr("sq={x -> x&x}; sq(\"abc\")", "*\"abc\" is not a int64","                        ");
-    testerr("sq={x -> x*x}; sq(\"abc\")", "*\"abc\" is not a flt64","            ");
-    testerr("f0 = { f x -> f0(x-1) }; f0({+},2)", "Passing 1 arguments to f0{~(Scalar,Scalar)-> Scalar} which takes 2 arguments","                     ");
+    testerr("sq={x -> x&x}; sq(\"abc\")", "*[7]\"abc\" is not a int64","                        ");
+    testerr("sq={x -> x*x}; sq(\"abc\")", "*[7]\"abc\" is not a flt64","            ");
+    testerr("f0 = { f x -> f0(x-1) }; f0({+},2)", "Passing 1 arguments to f0{(Scalar,Scalar)-> Scalar} which takes 2 arguments","                     ");
     // Recursive:
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
     test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)",TypeInt.INT64);
     test("f0 = { x -> x ? {+}(f0(x-1),1) : 0 }; f0(2)", TypeInt.con(2));
-    testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact()","Passing 0 arguments to fact{~(Scalar)-> Scalar} which takes 1 arguments","                                                ");
+    testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact()","Passing 0 arguments to fact{(Scalar)-> Scalar} which takes 1 arguments","                                                ");
     test_ptr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(0),fact(1),fact(2))",
-             (alias)-> TypeMem.make(alias,TypeStruct.make(TypeNil.NIL,TypeInt.con(1),TypeInt.con(2))));
+             (alias)-> TypeMemPtr.make(alias,TypeStruct.make(TypeNil.NIL,TypeInt.con(1),TypeInt.con(2))));
 
     // Co-recursion requires parallel assignment & type inference across a lexical scope
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.TRUE );
@@ -195,8 +195,8 @@ public class TestParse {
 
     test   (" -1 :int1", TypeInt.con(-1));
     testerr("(-1):int1", "-1 is not a int1","         ");
-    testerr("\"abc\":int", "*\"abc\" is not a int64","         ");
-    testerr("1:str", "1 is not a *str","     ");
+    testerr("\"abc\":int", "*[7]\"abc\" is not a int64","         ");
+    testerr("1:str", "1 is not a *[4]str","     ");
 
     testerr("x=3; fun:{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int64","                              ");
     test("x=3; fun:{real->real}={x -> x*2}; fun(2.1)+fun(x)", TypeFlt.con(2.1*2+3*2)); // Mix of types to fun()
@@ -205,22 +205,19 @@ public class TestParse {
     testerr("fun:{real->flt32}={x -> x}; fun(123456789)", "123456789 is not a flt32","                          ");
 
     test   ("{x:int -> x*2}(1)", TypeInt.con(2)); // Types on parms
-    testerr("{x:str -> x}(1)", "1 is not a *str", "               ");
+    testerr("{x:str -> x}(1)", "1 is not a *[4]str", "               ");
 
     // Tuple types
-    test_isa("A= :(         )", name_tuple_constructor()); // Zero-length tuple
-    test_isa("A= :(    ,    )", name_tuple_constructor(Type.SCALAR)); // One-length tuple
-    test_isa("A= :(    ,   ,)", name_tuple_constructor(Type.SCALAR  ,Type.SCALAR  ));
-    test_isa("A= :(:flt,    )", name_tuple_constructor(TypeFlt.FLT64 ));
-    test_isa("A= :(:flt,:int)", name_tuple_constructor(TypeFlt.FLT64,TypeInt.INT64));
-    test_isa("A= :(    ,:int)", name_tuple_constructor(Type.SCALAR  ,TypeInt.INT64));
+    test_name("A= :(         )" ); // Zero-length tuple
+    test_name("A= :(    ,    )", Type.SCALAR); // One-length tuple
+    test_name("A= :(    ,   ,)", Type.SCALAR  ,Type.SCALAR  );
+    test_name("A= :(:flt,    )", TypeFlt.FLT64 );
+    test_name("A= :(:flt,:int)", TypeFlt.FLT64,TypeInt.INT64);
+    test_name("A= :(    ,:int)", Type.SCALAR  ,TypeInt.INT64);
 
     test   ("A= :(:str?, :int); A((\"abc\",2))",(tmap -> TypeName.make("A",tmap,TypeStruct.make(TypeStr.ABC,TypeInt.con(2)))));
     test   ("A= :(:str?, :int); A( \"abc\",2 )",(tmap -> TypeName.make("A",tmap,TypeStruct.make(TypeStr.ABC,TypeInt.con(2)))));
     testerr("A= :(:str?, :int)?","Named types are never nil","                  ");
-  }
-  static private Function<HashMap<String,Type>,Type> name_tuple_constructor(Type... ts) {
-    return (tmap -> TypeName.make("A",tmap,TypeStruct.make(ts)));
   }
 
   @Test public void testParse4() {
@@ -563,12 +560,24 @@ c[x]=1;
       assertEquals(expected,te._t);
     }
   }
+  static private void test_name( String program, Type... args ) {
+    try( TypeEnv te = run(program) ) {
+      assertTrue(te._t instanceof TypeFunPtr);
+      TypeFunPtr actual = (TypeFunPtr)te._t;
+      TypeStruct from = TypeStruct.make(args);
+      TypeName to = TypeName.make("A",te._env._scope.types(),from);
+      TypeMemPtr inptr = TypeMemPtr.make(BitsAlias.REC,from);
+      TypeMemPtr outptr = TypeMemPtr.make(BitsAlias.REC,to);
+      TypeFunPtr expected = TypeFunPtr.make(actual.fidxs(),TypeTuple.make(inptr),outptr);
+      assertEquals(expected,actual);
+    }
+  }
   static private void test_ptr( String program, Function<Integer,Type> expected ) {
     try( TypeEnv te = run(program) ) {
       assertTrue(te._t instanceof TypeMemPtr);
       int alias = ((TypeMemPtr)te._t).getbit(); // internally asserts only 1 bit set
       Type t_expected = expected.apply(alias);
-      assertEquals(t_expected,te._tmem);
+      assertEquals(t_expected,te._t);
     }
   }
   static private void test_ptr( String program, String expected ) {

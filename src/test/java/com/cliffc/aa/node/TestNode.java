@@ -112,6 +112,7 @@ public class TestNode {
   // Node.  However, all legal inputs should produce an output with the
   // monotonicity invariant.
 
+  @SuppressWarnings("unchecked")
   @Test public void testMonotonic() {
     Type.init0(new HashMap<>());
     Env.top();
@@ -162,9 +163,12 @@ public class TestNode {
     test1monotonic(new     IfNode(_ins[0],_ins[1]));
     for( IntrinsicNewNode prim : IntrinsicNewNode.INTRINSICS )
       test1monotonic_intrinsic(prim);
-    test1monotonic(new IntrinsicNode.ConvertPtrTypeName(TypeStruct.POINT,TypeName.TEST_STRUCT,null,mem,_ins[1]));
+    int alias = BitsAlias.new_alias(BitsAlias.REC);
+    TypeMemPtr from_ptr = TypeMemPtr.make(alias,TypeStruct.POINT);
+    TypeMemPtr to_ptr   = TypeMemPtr.make(alias,TypeName.TEST_STRUCT);
+    test1monotonic(new IntrinsicNode.ConvertPtrTypeName("test",from_ptr,to_ptr,null,mem,_ins[1]));
     test1monotonic(new   LoadNode(_ins[0],_ins[1],_ins[2],0,null));
-    test1monotonic(new MemMergeNode(_ins[1],_ins[2],_ins[3]));
+    test1monotonic(new MemMergeNode(_ins[1],_ins[2]));
     test1monotonic(new    NewNode(new Node[]{null,_ins[1],_ins[2]},TypeStruct.POINT));
     test1monotonic(new    NewNode(new Node[]{null,_ins[1],_ins[2]},TypeName.TEST_STRUCT));
     ((ConNode<Type>)_ins[1])._t = Type.SCALAR; // ParmNode reads this for _alltype
