@@ -16,9 +16,9 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
     Object dummy = Env.GVN; // Force class loading cycle
-    test_name("A= :(       )" ); // Zero-length tuple
+    testerr("a=@{x=1,x=2}", "Cannot define field '.x' twice","           ");
     // A collection of tests which like to fail easily
-    testerr ("Point=:@{x,y}; Point((0,1))", "*[8](nil,1) is not a *[2]@{x,y}","             ");
+    testerr ("Point=:@{x,y}; Point((0,1))", "*[8](nil,1) is not a *[2]@{x,y}","                           ");
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'","                    ");
     testerr("{+}(1,2,3)", "Passing 3 arguments to +{(flt64,flt64)-> flt64} which takes 2 arguments","          ");
     test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
@@ -215,12 +215,12 @@ public class TestParse {
     test_name("A= :(   ,int)", Type.SCALAR  ,TypeInt.INT64);
 
     test_ptr("A= :(str?, int); A( \"abc\",2 )","A:(*[7]\"abc\",2)");
-    testerr("A= :(str?, int)?","Named types are never nil","                  ");
+    testerr("A= :(str?, int)?","Named types are never nil","                ");
   }
 
   @Test public void testParse4() {
     // simple anon struct tests
-    test   ("  @{x,y} ", TypeStruct.make(new String[]{"x","y"},Type.SCALAR,Type.SCALAR)); // simple anon struct decl
+    test_ptr("  @{x,y} ", (alias -> TypeMemPtr.make(alias,TypeStruct.make(new String[]{"x","y"},Type.SCALAR,Type.SCALAR)))); // simple anon struct decl
     testerr("a=@{x=1.2,y}; x", "Unknown ref 'x'","               ");
     testerr("a=@{x=1,x=2}", "Cannot define field '.x' twice","           ");
     test   ("a=@{x=1.2,y,}; a.x", TypeFlt.con(1.2)); // standard "." field naming; trailing comma optional

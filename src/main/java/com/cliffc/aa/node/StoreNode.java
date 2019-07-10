@@ -62,16 +62,15 @@ public class StoreNode extends Node {
   @Override public String err(GVNGCM gvn) {
     Type t = gvn.type(adr());
     while( t instanceof TypeName ) t = ((TypeName)t)._t;
-    if( t instanceof TypeNil && !t.above_center() ) return _badnil;
-    throw AA.unimpl();
-    //if( TypeOop.OOP.isa(t) ) return _badfld; // Too low, might not have any fields
-    //if( !(t instanceof TypeStruct) ) return _badfld;
-    //TypeStruct ts = (TypeStruct)t;
-    //int fnum = find(ts);
-    //if( fnum == -1 )
-    //  return _badfld;
-    //if( ts._finals[fnum] == 1 ) return _badfin; // Trying to over-write a final
-    //return null;
+    if( t.may_nil() ) return _badnil;
+    if( !(t instanceof TypeMemPtr) ) return _badfld; // Too low, might not have any fields
+    if( !(((TypeMemPtr)t)._obj instanceof TypeStruct) ) return _badfld;
+    TypeStruct ts = (TypeStruct)((TypeMemPtr)t)._obj;
+    int fnum = ts.find(_fld,_fld_num);
+    if( fnum == -1 )
+      return _badfld;
+    if( ts._finals[fnum] == 1 ) return _badfin; // Trying to over-write a final
+    return null;
   }
   @Override public Type all_type() { return TypeMem.MEM; }
   @Override public int hashCode() { return super.hashCode()+(_fld==null ? _fld_num : _fld.hashCode()); }

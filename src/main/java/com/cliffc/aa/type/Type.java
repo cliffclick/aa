@@ -68,7 +68,7 @@ public class Type<T extends Type<T>> {
     assert is_simple();         // Overridden in subclasses
     return _type==o._type;
   }
-  
+
   // In order to handle recursive printing, this is the only toString call in
   // the Type hierarchy.  Instead, subtypes override 'str(HashSet)' where the
   // HashSet is only installed by the head of a type-cycle (always and only
@@ -216,16 +216,16 @@ public class Type<T extends Type<T>> {
 
   // Collection of sample types for checking type lattice properties.
   private static final Type[] TYPES = new Type[]{ALL,ANY,CTRL,XCTRL,SCALAR,XSCALAR,NSCALR,XNSCALR,NUM,XNUM,NNUM,XNNUM,REAL,XREAL,NREAL,XNREAL};
-  
+
   // The complete list of primitive types that are disjoint and also is-a
   // SCALAR; nothing else is a SCALAR except what is on this list (or
   // subtypes).  Useful when type-specializing functions to break SCALAR args
   // into a concrete list of specific types.  Specifically excludes e.g.
   // TypeTuple - these may be passed as a scalar reference type in the future
   // but for now Tuples explicitly refer to multiple values, and a SCALAR is
-  // exactly 1 value.  
+  // exactly 1 value.
   private static /*final*/ Type[] SCALAR_PRIMS;
-  
+
   private boolean is_simple() { return _type < TSIMPLE; }
   // Return base type of named types
   public Type base() { Type t = this; while( t._type == TNAME ) t = ((TypeName)t)._t; return t; }
@@ -236,10 +236,10 @@ public class Type<T extends Type<T>> {
   // True if 'this' isa SCALAR, without the cost of a full 'meet()'
   private static final byte[] ISA_SCALAR = new byte[]{0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0, 1,1,1,1,0,0,0,0,0,0,1,1,0};
   public final boolean isa_scalar() { assert ISA_SCALAR.length==TLAST; return ISA_SCALAR[_type]!=0; }
-  
+
   // Return cached dual
   public final T dual() { return _dual; }
-  
+
   // Compute dual right now.  Overridden in subclasses.
   @SuppressWarnings("unchecked")
   T xdual() {
@@ -265,7 +265,7 @@ public class Type<T extends Type<T>> {
     // Reverse; xmeet 2nd arg is never "is_simple" and never equal to "this"
     return !is_simple() && t.is_simple() ? t.xmeet(this) : xmeet(t);
   }
-  
+
   // Compute meet right now.  Overridden in subclasses.
   // Handles cases where 'this.is_simple()' and unequal to 't'.
   // Subclassed xmeet calls can assert that '!t.is_simple()'.
@@ -282,10 +282,10 @@ public class Type<T extends Type<T>> {
 
     // Meeting scalar and non-scalar falls to ALL.  Includes most Memory shapes.
     if( isa_scalar() ^ t.base().isa_scalar() ) return ALL;
-    
+
     // Memory does something complex with memory
     if( t._type==TMEM ) return t.xmeet(this);
-    
+
     // Scalar is close to bottom: nearly everything falls to SCALAR, except
     // Bottom (already handled) and Control (error; already handled).
     if( _type == TSCALAR || t._type == TSCALAR ) return SCALAR;
@@ -311,7 +311,7 @@ public class Type<T extends Type<T>> {
     boolean that_oop = t.is_ptr();
     boolean that_num = t.is_num();
     assert !(that_oop&&that_num);
-    
+
     // Down to just nums and GC-ptrs
     if( is_num() ) {
       // May be OOP0 or STR or STRUCT or TUPLE
@@ -366,7 +366,7 @@ public class Type<T extends Type<T>> {
     else              System.err.println(  _dual+")=="+tb+" \nwhich is not "+  _dual);
     return false;
   }
-  
+
   public Type join( Type t ) { return dual().meet(t.dual()).dual(); }
 
   // True if 'this' isa/subtypes 't'.  E.g. Int32-isa-Int64, but not vice-versa
@@ -452,16 +452,16 @@ public class Type<T extends Type<T>> {
             }
           }
         }
-      }    
+      }
     assert errs==0 : "Found "+errs+" non-join-type errors";
 
     // Check scalar primitives; all are SCALARS and none sub-type each other.
     SCALAR_PRIMS = new Type[] { TypeInt.INT64, TypeFlt.FLT64, TypeMemPtr.OOP0, TypeFunPtr.GENERIC_FUNPTR, TypeRPC.ALL_CALL };
     for( Type t : SCALAR_PRIMS ) assert t.isa(SCALAR);
-    for( int i=0; i<SCALAR_PRIMS.length; i++ ) 
+    for( int i=0; i<SCALAR_PRIMS.length; i++ )
       for( int j=i+1; j<SCALAR_PRIMS.length; j++ )
         assert !SCALAR_PRIMS[i].isa(SCALAR_PRIMS[j]);
-    
+
     return true;
   }
   private static Type[] concat( Type[] ts0, Type[] ts1 ) {
@@ -469,7 +469,7 @@ public class Type<T extends Type<T>> {
     System.arraycopy(ts1,0,ts,ts0.length,ts1.length);
     return ts;
   }
-  
+
   // True if value is above the centerline (no definite value, ambiguous)
   public boolean above_center() {
     switch( _type ) {
@@ -533,14 +533,14 @@ public class Type<T extends Type<T>> {
   public boolean is_forward_ref() { return false; }
   // Return the recursive type if this is a forward-ref type def, and null otherwise
   public TypeName merge_recursive_type( Type t ) { return null; }
-  
+
   // Return a long   from a TypeInt constant; assert otherwise.
   public long   getl() { throw typerr(null); }
   // Return a double from a TypeFlt constant; assert otherwise.
   public double getd() { throw typerr(null); }
   // Return a String from a TypeStr constant; assert otherwise.
   public String getstr() { throw typerr(null); }
-  
+
   // Lattice of conversions:
   // -1 unknown; top; might fail, might be free (Scalar->Int); Scalar might lift
   //    to e.g. Float and require a user-provided rounding conversion from F64->Int.
@@ -578,8 +578,8 @@ public class Type<T extends Type<T>> {
     case TXNUM:
     case TXREAL:
     case TXSCALAR:
-    case TXNSCALR: case TNSCALR: 
-    case TXNNUM:   case TNNUM:   
+    case TXNSCALR: case TNSCALR:
+    case TXNNUM:   case TNNUM:
     case TXNREAL:  case TNREAL:
       return false;             // These all may be non-nil
     default: throw typerr(null); // Overridden in subclass
@@ -593,8 +593,8 @@ public class Type<T extends Type<T>> {
     case TNUM:
     case TREAL:
     case TSCALAR:
-    case TXNSCALR: case TNSCALR: 
-    case TXNNUM:   case TNNUM:   
+    case TXNSCALR: case TNSCALR:
+    case TXNNUM:   case TNNUM:
     case TXNREAL:  case TNREAL:
     case TTUPLE:
       return false;
@@ -609,7 +609,7 @@ public class Type<T extends Type<T>> {
     default: throw typerr(null); // Overridden in subclass
     }
   }
-  
+
   // Return the type without a nil-choice.  Only applies to above_center types,
   // as these are the only types with a nil-choice.  Only called during meets
   // with above-center types.  If called with below-center, there is no
@@ -648,7 +648,7 @@ public class Type<T extends Type<T>> {
 
   // Mismatched scalar types that can only cross-nils
   Type cross_nil(Type t) { return must_nil() || t.must_nil() ? SCALAR : NSCALR; }
-    
+
   // Make a (possibly cyclic & infinite) named type.  Prevent the infinite
   // unrolling of names by not allowing a named-type with depth >= D from
   // holding (recursively) the head of a named-type cycle.  We need to cap the
@@ -665,7 +665,7 @@ public class Type<T extends Type<T>> {
   void mark_cycle( Type t, BitSet visit, BitSet cycle ) { }
   // Replace old with nnn in a clone
   Type replace( Type old, Type nnn, HashMap<Type,Type> ignore ) { return this; }
-  
+
   // Iterate over any nested child types.  Only side-effect results.
   public void iter( Consumer<Type> c ) { /*None in the base class*/ }
 
@@ -684,7 +684,7 @@ public class Type<T extends Type<T>> {
       return dual();
     }
     // Various error codes start high
-    if( this==ANY || this == XCTRL ) return this;
+    if( this==ANY || this == XCTRL || this == XSCALAR ) return this;
     assert !above_center();
     return dual();
   }

@@ -214,7 +214,7 @@ public class Parse {
     // Must be a type-variable assignment
     Type t = type(true);
     if( t==null ) return err_ctrl2("Missing type after ':'");
-    if( t.meet_nil()==t ) return err_ctrl2("Named types are never nil");
+    if( peek('?') ) return err_ctrl2("Named types are never nil");
     if( lookup(tvar) != null ) return err_ctrl2("Cannot re-assign val '"+tvar+"' as a type");
     // Single-inheritance & vtables & RTTI:
     //            "Objects know thy Class"
@@ -597,13 +597,13 @@ public class Parse {
     try( Env e = new Env(_e) ) {// Nest an environment for the local vars
       Node ctrl = ctrl();
       _e = e;                   // Push nested environment
-      set_ctrl(ctrl);           // Carry control thru
+      set_ctrl(ctrl);           // Carry control through
       Ary<String> toks = new Ary<>(new String[1],0);
       BitSet fs = new BitSet();
       while( true ) {
         String tok = token();    // Scan for 'id'
         if( tok == null ) break; // end-of-struct-def
-        Type t = Type.ALL;       // Untyped, most generic type
+        Type t = Type.SCALAR;    // Untyped, most generic type that fits in a field
         Node stmt = con(Type.SCALAR);
         boolean is_final = true;
         if( peek(":=") ) { is_final = false; _x--; } // Parse := re-assignable field token
@@ -700,11 +700,11 @@ public class Parse {
   }
 
   /** Parse a type or return null
-   *  type = tcon | tfun[?] | tstruct[?] | ttuple | tvar  // Type choices
+   *  type = tcon | tfun | tstruct | ttuple | tvar  // Type choices
    *  tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str[?]
    *  tfun = {[[type]* ->]? type } // Function types mirror func decls
-   *  tstruct = @{ [id[:type],]*}  // Struct types are field names with optional types
-   *  ttuple = ([type] [,[type]]*) // List of types, trailing comma optional
+   *  tstruct = @{ [id[:type?],]*}  // Struct types are field names with optional types
+   *  ttuple = ([type?] [,[type?]]*) // List of types, trailing comma optional
    *  tvar = A previously declared type variable
    *
    *  Unknown tokens when type_var is false are treated as not-a-type.  When
@@ -745,14 +745,18 @@ public class Parse {
         String tok = token();    // Scan for 'id'
         if( tok == null ) break; // end-of-struct-def
         Type t = Type.SCALAR;    // Untyped, most generic field type
-        if( peek(':') &&         // Has type annotation?
-            (t=type(type_var))==null ) throw AA.unimpl(); // return an error here, missing type
+        if( peek(':') ) {        // Has type annotation?
+          t = type(type_var);    // Parse type
+          if( t==null ) throw AA.unimpl(); // return an error here, missing type
+          if( t instanceof TypeObj ) // Automatically convert to reference for fields
+            t = typeq(TypeMemPtr.make(BitsAlias.REC,(TypeObj)t)); // And check for null-ness
+        }
         if( flds.find(tok) != -1 ) throw AA.unimpl(); // cannot use same field name twice
         flds.add(tok);          // Gather for final type
         ts  .add(typeq(t));
         if( !peek(',') ) break; // Final comma is optional
       }
-      return peek('}') ? typeq(TypeStruct.make(flds.asAry(),ts.asAry())) : null;
+      return peek('}') ? TypeStruct.make(flds.asAry(),ts.asAry()) : null;
     }
 
     // "()" is the zero-entry tuple
@@ -765,12 +769,16 @@ public class Parse {
       Ary<Type> ts = new Ary<>(new Type[1],0);
       while( (c=skipWS()) != ')' ) { // No more types...
         Type t = Type.SCALAR;    // Untyped, most generic field type
-        if( c!=',' &&            // Has space for type annotation?
-            (t=type(type_var))==null ) return null; // return an error here, missing type
+        if( c!=',' ) {           // Has type annotation?
+          t = type(type_var);    // Parse type
+          if( t==null ) return null; // not a type
+          if( t instanceof TypeObj ) // Automatically convert to reference for fields
+            t = typeq(TypeMemPtr.make(BitsAlias.REC,(TypeObj)t)); // And check for null-ness
+        }
         ts.add(typeq(t));
         if( !peek(',') ) break; // Final comma is optional
       }
-      return peek(')') ? typeq(TypeStruct.make(ts.asAry())) : null;
+      return peek(')') ? TypeStruct.make(ts.asAry()) : null;
     }
 
     // Primitive type
@@ -886,7 +894,7 @@ public class Parse {
   }
 
   // Whack current control with a syntax error
-  private ErrNode err_ctrl2( String s ) { return err_ctrl1(s,Type.ANY); }
+  private ErrNode err_ctrl2( String s ) { return err_ctrl1(s,Type.SCALAR); }
   public  ErrNode err_ctrl1(String s, Type t) { return init(new ErrNode(Env.START,errMsg(s),t)); }
   private void err_ctrl0(String s) {
     set_ctrl(gvn(new ErrNode(ctrl(),errMsg(s),Type.CTRL)));
