@@ -16,7 +16,7 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
     Object dummy = Env.GVN; // Force class loading cycle
-    testerr ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1,y=2}))", "@{x:1,y:2} is not a Point:@{x,y}","                                                                    ");
+    testerr ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1,y=2}))", "*[9]@{x:1,y:2} is not a *[1]Point:@{x,y}","                                                                    ");
     // A collection of tests which like to fail easily
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'","                    ");
     testerr ("Point=:@{x,y}; Point((0,1))", "*[8](nil,1) is not a *[2]@{x,y}","                           ");
@@ -254,8 +254,8 @@ public class TestParse {
 
     test    ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
     test    ("Point=:@{x,y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
-    testerr ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1,y=2}))", "@{x:1,y:2} is not a Point:@{x,y}","                                                                    ");
-    testerr ("Point=:@{x,y}; Point((0,1))", "(nil,1) is not a @{x,y}","                           ");
+    testerr ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1,y=2}))", "*[8]@{x:1,y:2} is not a *[1]Point:@{x,y}","                                                                    ");
+    testerr ("Point=:@{x,y}; Point((0,1))", "*[8](nil,1) is not a *[2]@{x,y}","                           ");
     testerr("x=@{n:,}","Missing type after ':'","      ");
     testerr("x=@{n=,}","Missing ifex after assignment of 'n'","      ");
   }
@@ -263,7 +263,7 @@ public class TestParse {
   @Test public void testParse5() {
     // nullable and not-null pointers
     test   ("x:str? = 0", TypeNil.NIL); // question-type allows null or not; zero digit is null
-    test   ("x:str? = \"abc\"", TypeStr.ABC); // question-type allows null or not
+    test   ("x:str? = \"abc\"", TypeMemPtr.ABC0); // question-type allows null or not
     testerr("x:str  = 0", "nil is not a str", "          ");
     test   ("math_rand(1)?0:\"abc\"", TypeMemPtr.ABC0);
     testerr("(math_rand(1)?0 : @{x=1}).x", "Struct might be nil when reading field '.x'", "                           ");

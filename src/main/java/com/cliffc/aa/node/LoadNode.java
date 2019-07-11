@@ -101,8 +101,15 @@ public class LoadNode extends Node {
     if( !(t2 instanceof TypeMemPtr) ) return _badfld; // Not a pointer, cannot load a field
     TypeMemPtr t3 = (TypeMemPtr)t2;
     TypeMem t4 = (TypeMem)gvn.type(mem()); // Should be memory
-    Type t5 = t4.ld(t3); // Meets of all aliases
-    if( !(t5 instanceof TypeStruct) ) return _badfld;
+    Type t5 = t4.ld(t3);                   // Meets of all aliases
+    if( !(t5 instanceof TypeStruct) ) {    // No fields, so memory or ptr is in-error
+      Type t6 = t3._obj.base();
+      if( t6 instanceof TypeStruct ) {
+        t5 = t6;
+      } else {
+        return _badfld;
+      }
+    }
     if( ((TypeStruct)t5).find(_fld,_fld_num) == -1 )
       return _badfld;
     return null;
