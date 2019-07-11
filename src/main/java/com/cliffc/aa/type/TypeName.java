@@ -52,7 +52,7 @@ public class TypeName extends TypeObj<TypeName> {
     }
     return _name+":"+_t.str(dups);
   }
-  
+
   private static TypeName FREE=null;
   @Override protected TypeName free( TypeName ret ) { FREE=this; return ret; }
   private static TypeName make0( String name, HashMap<String,Type> lex, Type t, short depth) {
@@ -74,14 +74,14 @@ public class TypeName extends TypeObj<TypeName> {
     return tn0.make_recur(tn1,0,new BitSet());
   }
   public TypeName make( Type t) { return make(_name,_lex,t); }
-  public static TypeName make_forward_def_type( String name, HashMap<String,Type> lex ) { return make0(name,lex,Type.SCALAR,(short)-1); }
+  public static TypeName make_forward_def_type( String name, HashMap<String,Type> lex ) { return make0(name,lex,TypeObj.OBJ,(short)-1); }
 
           static final HashMap<String,Type> TEST_SCOPE = new HashMap<>();
           static final TypeName TEST_ENUM = make("__test_enum",TEST_SCOPE,TypeInt.INT8);
   private static final TypeName TEST_FLT  = make("__test_flt" ,TEST_SCOPE,TypeFlt.FLT32);
   private static final TypeName TEST_E2   = make("__test_e2"  ,TEST_SCOPE,TEST_ENUM);
   public  static final TypeName TEST_STRUCT=make("__test_struct",TEST_SCOPE,TypeStruct.POINT);
-  
+
   static final TypeName[] TYPES = new TypeName[]{TEST_ENUM,TEST_FLT,TEST_E2,TEST_STRUCT};
 
   @Override protected TypeName xdual() { return new TypeName(_name,_lex,_t. dual(),_depth); }
@@ -152,12 +152,12 @@ public class TypeName extends TypeObj<TypeName> {
     default: throw AA.unimpl();
     }
   }
-  
+
   // 'this' is a forward ref type definition; the actual type-def is 't' which
   // may include embedded references to 'this'
   @Override public TypeName merge_recursive_type( Type t ) {
     if( _depth >= 0 ) return null; // Not a recursive type-def
-    assert _t==Type.SCALAR;
+    assert _t==TypeObj.OBJ;
     // Remove from INTERN table, since hacking type will not match hash
     untern()._dual.untern();
     // Hack type and it's dual.  Type is now recursive.

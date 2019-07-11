@@ -24,8 +24,11 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   // Never part of a cycle, so the normal check works
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
   @Override String str( BitSet dups) {
+    if( dups == null ) dups = new BitSet();
+    else if( dups.get(_uid) ) return "*"; // Break recursive printing cycle
+    dups.set(_uid);
     SB sb = new SB().p('*');
-    _aliases.toString(sb).p(_obj);
+    _aliases.toString(sb).p(_obj.str(dups));
     if( _aliases.test(0) ) sb.p('?');
     return sb.toString();
   }

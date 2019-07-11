@@ -14,7 +14,7 @@ public class CastNode extends Node {
   @Override String xstr() { return "("+_t+")"; }
   @Override public Node ideal(GVNGCM gvn) {
     // Must keep a cast, even if it useless, if it points to an Epilog.  The
-    // Epilog may split (the function may be split) and the callers seperated.
+    // Epilog may split (the function may be split) and the callers separated.
     // The cast funnels the data-uses along one CFG path to this single node,
     // so on a split we can move all these data uses to the old or the new
     // Epilog by just moving the cast.  Once an Epilog can no longer split, we

@@ -40,7 +40,7 @@ public class LoadNode extends Node {
 
     // Lift control on Loads as high as possible... and move them over
     // to a CastNode (to remove nil-ness) and remove the control.
-    if( !TypeNil.NIL.isa(t) ) // No nil, no need for ctrl
+    if( !t.must_nil() ) // No nil, no need for ctrl
       // remove ctrl; address already casts-away-nil
       return set_ctl(null,gvn);
 
@@ -62,9 +62,10 @@ public class LoadNode extends Node {
     if( tru==null ) return null;
     assert !(tru==ctrl && addr != baseaddr) : "not the immediate location or we would be not-nil already";
 
-    if( !(t instanceof TypeNil) )
+    if( !(t instanceof TypeMemPtr) )
       return null; // below a nil (e.g. Scalar), do nothing yet
-    set_adr(gvn.xform(new CastNode(tru,baseaddr,((TypeNil)t)._t)),gvn);
+    Type tnz = t.join(TypeMemPtr.OOP); // Remove nil choice
+    set_adr(gvn.xform(new CastNode(tru,baseaddr,tnz)),gvn);
     return set_ctl(null,gvn);
   }
 

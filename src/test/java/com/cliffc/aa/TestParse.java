@@ -280,14 +280,14 @@ public class TestParse {
   }
 
   @Test public void testParse6() {
-    test_isa("A= :(:A?, :int); A(0,2)",(tmap -> TypeName.make("A",tmap,TypeStruct.make(TypeNil.NIL,TypeInt.con(2)))));
-    test_isa("A= :(:A?, :int); A(A(0,2),3)",(tmap -> TypeName.make("A",tmap,TypeStruct.make(TypeName.make("A",tmap,TypeStruct.make(TypeNil.NIL,TypeInt.con(2))),TypeInt.con(3)))));
+    test_isa("A= :(A?, int); A(0,2)",(tmap -> TypeName.make("A",tmap,TypeStruct.make(TypeNil.NIL,TypeInt.con(2)))));
+    test_isa("A= :(A?, int); A(A(0,2),3)",(tmap -> TypeName.make("A",tmap,TypeStruct.make(TypeName.make("A",tmap,TypeStruct.make(TypeNil.NIL,TypeInt.con(2))),TypeInt.con(3)))));
 
     // Building recursive types
     test_isa("A= :int; A(1)", (tmap -> TypeName.make("A",tmap,TypeInt.INT64)));
-    test("A= :(:str?, :int); A(0,2)",(tmap -> TypeName.make("A",tmap,TypeStruct.make(TypeNil.NIL,TypeInt.con(2)))));
+    test("A= :(str?, int); A(0,2)",(tmap -> TypeName.make("A",tmap,TypeStruct.make(TypeNil.NIL,TypeInt.con(2)))));
     // Named recursive types
-    test_isa("A= :(:A?, :int); A(0,2)",Type.SCALAR);// No error casting (0,2) to an A
+    test_isa("A= :(A?, int); A(0,2)",Type.SCALAR);// No error casting (0,2) to an A
     test_isa("A= :@{n:A?, v:flt}; A(@{n=0,v=1.2}).v;", TypeFlt.con(1.2));
 
     // TODO: Needs a way to easily test simple recursive types
