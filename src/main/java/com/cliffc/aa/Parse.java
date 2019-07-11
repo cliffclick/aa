@@ -720,7 +720,7 @@ public class Parse {
   }
   private Type typep(boolean type_var) {
     Type t = type0(type_var);
-    return t instanceof TypeObj // Automatically convert to reference for fields
+    return t!=null && (t.base() instanceof TypeObj) // Automatically convert to reference for fields
       ? typeq(TypeMemPtr.make(BitsAlias.ALL,(TypeObj)t)) // And check for null-ness
       : t;
   }

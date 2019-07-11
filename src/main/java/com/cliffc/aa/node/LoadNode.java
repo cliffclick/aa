@@ -81,9 +81,10 @@ public class LoadNode extends Node {
     if( !(mem instanceof TypeMem) ) // Nothing sane
       return mem.above_center() ? Type.XSCALAR : Type.SCALAR;
     TypeObj obj = ((TypeMem)mem).ld((TypeMemPtr)adr);
+    Type base = obj.base();
 
-    if( obj instanceof TypeStruct ) {
-      TypeStruct ts = (TypeStruct)obj;
+    if( base instanceof TypeStruct ) {
+      TypeStruct ts = (TypeStruct)base;
       int idx = ts.find(_fld,_fld_num);  // Find the named field
       if( idx != -1 ) return ts.at(idx); // Field type
       // No such field
