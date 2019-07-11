@@ -29,7 +29,7 @@ public class LoadNode extends Node {
   private Node set_ctl(Node c, GVNGCM gvn) { return set_def(0,c,gvn); }
   private Node set_mem(Node m, GVNGCM gvn) { return set_def(1,m,gvn); }
   private Node set_adr(Node a, GVNGCM gvn) { return set_def(2,a,gvn); }
-  
+
   @Override public Node ideal(GVNGCM gvn) {
     Node ctrl = ctl();
     Node addr = adr();
@@ -81,14 +81,14 @@ public class LoadNode extends Node {
     if( !(mem instanceof TypeMem) ) // Nothing sane
       return mem.above_center() ? Type.XSCALAR : Type.SCALAR;
     TypeObj obj = ((TypeMem)mem).ld((TypeMemPtr)adr);
-    
+
     if( obj instanceof TypeStruct ) {
       TypeStruct ts = (TypeStruct)obj;
       int idx = ts.find(_fld,_fld_num);  // Find the named field
       if( idx != -1 ) return ts.at(idx); // Field type
       // No such field
     }
-    return Type.XSCALAR;        // No loading from e.g. Strings
+    return Type.SCALAR;        // No loading from e.g. Strings
   }
 
   @Override public String err(GVNGCM gvn) {
@@ -98,7 +98,7 @@ public class LoadNode extends Node {
     Type t2 = t instanceof TypeNil ? ((TypeNil)t)._t : t; // Strip off the nil
     //if( TypeOop.OOP.isa(t) ) return _badfld; // Too low, might not have any fields
     if( !(t2 instanceof TypeMemPtr) ) return _badfld; // Not a pointer, cannot load a field
-    TypeMemPtr t3 = (TypeMemPtr)t2; 
+    TypeMemPtr t3 = (TypeMemPtr)t2;
     TypeMem t4 = (TypeMem)gvn.type(mem()); // Should be memory
     Type t5 = t4.ld(t3); // Meets of all aliases
     if( !(t5 instanceof TypeStruct) ) return _badfld;

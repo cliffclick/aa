@@ -40,12 +40,8 @@ public class NewNode extends Node {
     // Gather args and produce a TypeStruct
     Type[] ts = new Type[_ts._ts.length];
     for( int i=0; i<_ts._ts.length; i++ )
-      ts[i] = gvn.type(fld(i)); // Limit to Scalar results
+      ts[i] = gvn.type(fld(i)).bound(_ts._ts[i]); // Limit to Scalar results
     TypeStruct newt = TypeStruct.make(_ts._flds,ts,_ts._finals);
-    // If cannot fall to correct args, the inputs are in-error
-    if( !newt.isa(_ts) ) return _ptr; // Limit output to sanity
-    // If input is too high, limit output to sanity
-    if( newt.isa(_ts.dual()) ) return _ptr.dual();
     
     // Get the existing type, without installing if missing because blows the
     // "new newnode" assert if this node gets replaced during parsing.

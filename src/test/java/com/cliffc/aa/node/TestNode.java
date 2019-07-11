@@ -23,7 +23,7 @@ public class TestNode {
   // Type.ALL_TYPES(), and the inner array is the set of immediate sub-Types
   // (again as indices into ALL_TYPES).  Numbers are sorted.
   private int[][] _subtypes;
-  
+
   // Build a minimal spanning sub-Type tree from the set of sample types.
   // We'll use this to know which other types sub-Type this type... and thus be
   // more efficient in testing all Types which subtype another Type.  The outer
@@ -35,9 +35,9 @@ public class TestNode {
 
   // Worse-case output for a Node
   private Type _alltype;
-  
+
   private int _errs;
-  
+
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testNode() {
     Type.init0(new HashMap<>());
@@ -60,7 +60,7 @@ public class TestNode {
     }
     return subs;
   }
-  
+
   // Build a minimal subtype graph from the set of sample types.  We'll use
   // this to know which other types sub-Type this type... and thus be more
   // efficient in testing all Types which subtype another Type.  The outer
@@ -71,7 +71,7 @@ public class TestNode {
     int[][] subs = new int[_subtypes.length][];
     for( int i=0; i<subs.length; i++ )
       subs[i] = _subtypes[i].clone();
-    
+
     // For all types
     for( int i=0; i<subs.length; i++ ) {
       int[] subis = subs[i];
@@ -97,10 +97,10 @@ public class TestNode {
       int ix = Util.find(subs[i],-1);
       if( ix != -1 ) subs[i] = Arrays.copyOfRange(subs[i],0,ix); // Compress extra elements
     }
-    
+
     return subs;
   }
-  
+
   // Major test for monotonic behavior from value() calls.  Required to prove
   // correctness & linear-time speed from GCP & a major part of GVN.iter().
   // (for GVN.iter(), ideal() calls ALSO have to be monotonic but using a
@@ -140,7 +140,7 @@ public class TestNode {
       _ins[i] = new ConNode<>(Type.SCALAR);
     Node mem = new ConNode<Type>(TypeMem.MEM);
     FunNode fun_forward_ref = new FunNode("anon");
-    
+
     Node unr = Env.top().lookup("+"); // All the "+" functions
     FunNode fun_plus = ((EpilogNode)unr.in(1)).fun();
 
@@ -192,7 +192,7 @@ public class TestNode {
     assert n._defs._len>0;
     test1monotonic_init(n);
   }
-  
+
   // Fill a Node with {null,edge,edge} and start the search
   private void test1monotonic_prim(PrimNode prim) {
     PrimNode n = (PrimNode)prim.copy(_gvn);
@@ -202,7 +202,7 @@ public class TestNode {
     if( n._targs._ts.length >= 2 ) n.add_def(_ins[2]);
     test1monotonic_init(n);
   }
-  
+
   // Fill a Node with {null,edge,edge} and start the search
   private void test1monotonic_intrinsic(IntrinsicNewNode prim) {
     IntrinsicNewNode n = prim.copy(_gvn);
@@ -213,7 +213,7 @@ public class TestNode {
     if( n._targs._ts.length >= 2 ) n.add_def(_ins[3]);
     test1monotonic_init(n);
   }
-  
+
   private void test1monotonic_init(final Node n) {
     System.out.println(n.xstr());
     _values.clear();
@@ -222,7 +222,7 @@ public class TestNode {
     set_value_type(n,0);
     test1monotonic(n,0);
   }
-  
+
   // Recursively walk all combos of types, compute values and verifying
   // monotonicity
   private void test1monotonic(final Node n, final long xx) {

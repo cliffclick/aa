@@ -16,10 +16,10 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
     Object dummy = Env.GVN; // Force class loading cycle
-    testerr("a=@{x=1,x=2}", "Cannot define field '.x' twice","           ");
+    test    ("gal=:flt; tank:gal = gal(2)", (tmap -> TypeName.make("gal",tmap,TypeInt.con(2))));
     // A collection of tests which like to fail easily
-    testerr ("Point=:@{x,y}; Point((0,1))", "*[8](nil,1) is not a *[2]@{x,y}","                           ");
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'","                    ");
+    testerr ("Point=:@{x,y}; Point((0,1))", "*[8](nil,1) is not a *[2]@{x,y}","                           ");
     testerr("{+}(1,2,3)", "Passing 3 arguments to +{(flt64,flt64)-> flt64} which takes 2 arguments","          ");
     test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
     testerr("x=1+y","Unknown ref 'y'","     ");
@@ -195,7 +195,7 @@ public class TestParse {
     test   (" -1 :int1", TypeInt.con(-1));
     testerr("(-1):int1", "-1 is not a int1","         ");
     testerr("\"abc\":int", "*[7]\"abc\" is not a int64","         ");
-    testerr("1:str", "1 is not a *[4]str","     ");
+    testerr("1:str", "1 is not a *[1]str","     ");
 
     testerr("x=3; fun:{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int64","                              ");
     test("x=3; fun:{real->real}={x -> x*2}; fun(2.1)+fun(x)", TypeFlt.con(2.1*2+3*2)); // Mix of types to fun()
@@ -204,7 +204,7 @@ public class TestParse {
     testerr("fun:{real->flt32}={x -> x}; fun(123456789)", "123456789 is not a flt32","                          ");
 
     test   ("{x:int -> x*2}(1)", TypeInt.con(2)); // Types on parms
-    testerr("{x:str -> x}(1)", "1 is not a *[4]str", "               ");
+    testerr("{x:str -> x}(1)", "1 is not a *[1]str", "               ");
 
     // Tuple types
     test_name("A= :(       )" ); // Zero-length tuple
@@ -240,14 +240,13 @@ public class TestParse {
     test   ("dist={p->p//qqq\n.//qqq\nx*p.x+p.y*p.y}; dist(//qqq\n@{x//qqq\n=1,y=2})", TypeInt.con(5));
 
     // Tuple
-    test("(0,\"abc\")", TypeStruct.make(TypeNil.NIL,TypeStr.ABC));
+    test_ptr("(0,\"abc\")", (alias -> TypeMemPtr.make(alias,TypeStruct.make(TypeNil.NIL,TypeMemPtr.ABCPTR))));
     test("(1,\"abc\").0", TypeInt.TRUE);
-    test("(1,\"abc\").1", TypeStr.ABC);
+    test("(1,\"abc\").1", TypeMemPtr.ABCPTR);
 
     // Named type variables
-    final TypeMem nomem = TypeMem.MEM.dual();
-    test_isa("gal=:flt"       , (tmap -> {throw AA.unimpl();}));
-    test_isa("gal=:flt; gal"  , (tmap -> {throw AA.unimpl();}));
+    test("gal=:flt"     , (tmap -> TypeFunPtr.make(BitsFun.make0(36),TypeTuple.make(TypeFlt.FLT64), TypeName.make("gal",tmap,TypeFlt.FLT64))));
+    test("gal=:flt; gal", (tmap -> TypeFunPtr.make(BitsFun.make0(36),TypeTuple.make(TypeFlt.FLT64), TypeName.make("gal",tmap,TypeFlt.FLT64))));
     test    ("gal=:flt; 3==gal(2)+1", TypeInt.TRUE);
     test    ("gal=:flt; tank:gal = gal(2)", (tmap -> TypeName.make("gal",tmap,TypeInt.con(2))));
     // test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: figure out if free cast for bare constants?

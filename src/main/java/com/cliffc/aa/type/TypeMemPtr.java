@@ -3,7 +3,6 @@ package com.cliffc.aa.type;
 import com.cliffc.aa.util.SB;
 
 import java.util.BitSet;
-import java.util.HashMap;
 import java.util.function.Predicate;
 
 // Pointers-to-memory; these can be both the address and the value part of
@@ -53,7 +52,6 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   public static final TypeMemPtr STRUCT = make(BitsAlias.RECBITS , TypeStruct.ALLSTRUCT);
          static final TypeMemPtr STRUCT0= make(BitsAlias.RECBITS0, TypeStruct.ALLSTRUCT);
   static final TypeMemPtr[] TYPES = new TypeMemPtr[]{OOP0,STRPTR,ABCPTR,STRUCT,ABC0};
-  static void init1( HashMap<String,Type> types ) { types.put("str",STRPTR); }
   
   @Override protected TypeMemPtr xdual() { return new TypeMemPtr(_aliases.dual(),(TypeObj)_obj.dual()); }
   @Override protected Type xmeet( Type t ) {

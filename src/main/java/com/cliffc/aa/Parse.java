@@ -212,7 +212,7 @@ public class Parse {
     if( tvar == null ) return null;
     if( !peek('=') || !peek(':') ) { _x = oldx; return null; }
     // Must be a type-variable assignment
-    Type t = type(true);
+    Type t = typev();
     if( t==null ) return err_ctrl2("Missing type after ':'");
     if( peek('?') ) return err_ctrl2("Named types are never nil");
     if( lookup(tvar) != null ) return err_ctrl2("Cannot re-assign val '"+tvar+"' as a type");
@@ -284,8 +284,8 @@ public class Parse {
       if( tok == null ) break;
       int oldx2 = _x;
       Type t = null;
-      if( peek(':') && (t=type())==null ) _x = oldx2; // attempt type parse
-      if( peek(":=") ) rs.set(toks._len);             // Re-assignment parse
+      if( peek(':') && (t=type())==null ) _x = oldx2; // Grammar ambiguity, resolve p?a:b from a:int
+      if( peek(":=") ) rs.set(toks._len);   // Re-assignment parse
       else if( !peek('=') ) { _x = oldx; break; } // Unwind token parse, and not assignment
       toks.add(tok);
       ts  .add(t  );
@@ -710,10 +710,19 @@ public class Parse {
    *  Unknown tokens when type_var is false are treated as not-a-type.  When
    *  true, unknown tokens are treated as a forward-ref new type.
    */
-  private Type type() { return type(false); }
-  private Type type(boolean type_var) {
+  private Type type() { return typep(false); }
+  // Returning a type variable assignment result.  Do not wrap TypeObj in a
+  // TypeMemPtr, return a bare TypeObj instead... so it can be Named by the
+  // type variable.  Flag to allow unknown type variables as forward-refs.
+  private Type typev() {
+    Type t = type0(true);
+    return t==Type.ANY ? null : t;
+  }
+  private Type typep(boolean type_var) {
     Type t = type0(type_var);
-    return (t==null || t==Type.ANY) ? null : t;
+    return t instanceof TypeObj // Automatically convert to reference for fields
+      ? typeq(TypeMemPtr.make(BitsAlias.ALL,(TypeObj)t)) // And check for null-ness
+      : t;
   }
   // Wrap in a nullable if there is a trailing '?'.  No spaces allowed
   private Type typeq(Type t) { return peek_noWS('?') ? t.meet_nil() : t; }
@@ -723,11 +732,11 @@ public class Parse {
     byte c = skipWS();
     if( peek1(c,'{') ) { // Function type
       Ary<Type> ts = new Ary<>(new Type[1],0);  Type t;
-      while( (t=type0(type_var)) != null && t != Type.ANY  )
+      while( (t=typep(type_var)) != null && t != Type.ANY  )
         ts.add(t);              // Collect arg types
       Type ret;
       if( t==Type.ANY ) {       // Found ->, expect return type
-        ret = type0(type_var);
+        ret = typep(type_var);
         if( ret == null ) return null; // should return TypeErr missing type after ->
       } else {                  // Allow no-args and simple return type
         if( ts._len != 1 ) return null; // should return TypeErr missing -> in tfun
@@ -745,15 +754,12 @@ public class Parse {
         String tok = token();    // Scan for 'id'
         if( tok == null ) break; // end-of-struct-def
         Type t = Type.SCALAR;    // Untyped, most generic field type
-        if( peek(':') ) {        // Has type annotation?
-          t = type(type_var);    // Parse type
-          if( t==null ) throw AA.unimpl(); // return an error here, missing type
-          if( t instanceof TypeObj ) // Automatically convert to reference for fields
-            t = typeq(TypeMemPtr.make(BitsAlias.REC,(TypeObj)t)); // And check for null-ness
-        }
+        if( peek(':') &&         // Has type annotation?
+            (t=typep(type_var)) == null)              // Parse type, wrap ptrs
+          return null;                                // not a type
         if( flds.find(tok) != -1 ) throw AA.unimpl(); // cannot use same field name twice
         flds.add(tok);          // Gather for final type
-        ts  .add(typeq(t));
+        ts  .add(t);
         if( !peek(',') ) break; // Final comma is optional
       }
       return peek('}') ? TypeStruct.make(flds.asAry(),ts.asAry()) : null;
@@ -769,13 +775,10 @@ public class Parse {
       Ary<Type> ts = new Ary<>(new Type[1],0);
       while( (c=skipWS()) != ')' ) { // No more types...
         Type t = Type.SCALAR;    // Untyped, most generic field type
-        if( c!=',' ) {           // Has type annotation?
-          t = type(type_var);    // Parse type
-          if( t==null ) return null; // not a type
-          if( t instanceof TypeObj ) // Automatically convert to reference for fields
-            t = typeq(TypeMemPtr.make(BitsAlias.REC,(TypeObj)t)); // And check for null-ness
-        }
-        ts.add(typeq(t));
+        if( c!=',' &&            // Has type annotation?
+            (t=typep(type_var)) == null) // Parse type, wrap ptrs
+          return null;                   // not a type
+        ts.add(t);
         if( !peek(',') ) break; // Final comma is optional
       }
       return peek(')') ? TypeStruct.make(ts.asAry()) : null;
@@ -795,7 +798,7 @@ public class Parse {
       }
       _e.add_type(tok,t=TypeName.make_forward_def_type(tok,_e._scope.types()));
     }
-    return t.isa(Type.SCALAR) ? typeq(t) : t;
+    return t;
   }
 
   // Require a specific character (after skipping WS) or polite error
