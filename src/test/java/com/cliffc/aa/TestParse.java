@@ -16,7 +16,9 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
     Object dummy = Env.GVN; // Force class loading cycle
-    testerr ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1,y=2}))", "*[9]@{x:1,y:2} is not a *[1]Point:@{x,y}","                                                                    ");
+    test   ("a = math_rand(1) ? 0 : @{x=1}; // a is null or a struct\n"+
+            "b = math_rand(1) ? 0 : @{c=a}; // b is null or a struct\n"+
+            "b ? (b.c ? b.c.x : 0) : 0      // Null-safe field load", TypeInt.BOOL); // Nested null-safe field load
     // A collection of tests which like to fail easily
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'","                    ");
     testerr ("Point=:@{x,y}; Point((0,1))", "*[8](nil,1) is not a *[2]@{x,y}","                           ");
@@ -263,8 +265,8 @@ public class TestParse {
   @Test public void testParse5() {
     // nullable and not-null pointers
     test   ("x:str? = 0", TypeNil.NIL); // question-type allows null or not; zero digit is null
-    test   ("x:str? = \"abc\"", TypeMemPtr.ABC0); // question-type allows null or not
-    testerr("x:str  = 0", "nil is not a str", "          ");
+    test   ("x:str? = \"abc\"", TypeMemPtr.ABCPTR); // question-type allows null or not
+    testerr("x:str  = 0", "nil is not a *[1]str", "          ");
     test   ("math_rand(1)?0:\"abc\"", TypeMemPtr.ABC0);
     testerr("(math_rand(1)?0 : @{x=1}).x", "Struct might be nil when reading field '.x'", "                           ");
     test   ("p=math_rand(1)?0:@{x=1}; p ? p.x : 0", TypeInt.BOOL); // not-null-ness after a null-check

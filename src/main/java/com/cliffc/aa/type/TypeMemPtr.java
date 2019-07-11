@@ -89,7 +89,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   @Override public Type meet_nil() {
     if( _aliases.test(0) )      // Already has a nil?
       return _aliases.above_center() ? TypeNil.NIL : this;
-    return make(_aliases.meet(BitsAlias.NIL),_obj);
+    return make(_aliases.meet_nil(),_obj);
   }
   @Override void walk( Predicate<Type> p ) { p.test(this); }
   public int getbit() { return _aliases.getbit(); }

@@ -95,7 +95,7 @@ public class LoadNode extends Node {
   @Override public String err(GVNGCM gvn) {
     Type t = gvn.type(adr());
     while( t instanceof TypeName ) t = ((TypeName)t)._t;
-    if( t instanceof TypeNil && !t.above_center() ) return _badnil;
+    if( t.must_nil() ) return _badnil;
     Type t2 = t instanceof TypeNil ? ((TypeNil)t)._t : t; // Strip off the nil
     //if( TypeOop.OOP.isa(t) ) return _badfld; // Too low, might not have any fields
     if( !(t2 instanceof TypeMemPtr) ) return _badfld; // Not a pointer, cannot load a field
