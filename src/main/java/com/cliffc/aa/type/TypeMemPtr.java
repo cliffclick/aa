@@ -57,6 +57,13 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   static final TypeMemPtr[] TYPES = new TypeMemPtr[]{OOP0,STRPTR,ABCPTR,STRUCT,ABC0};
   
   @Override protected TypeMemPtr xdual() { return new TypeMemPtr(_aliases.dual(),(TypeObj)_obj.dual()); }
+  @Override TypeMemPtr rdual() {
+    if( _dual != null ) return _dual;
+    TypeMemPtr dual = _dual = new TypeMemPtr(_aliases,(TypeObj)_obj.rdual());
+    dual._dual = this;
+    dual._cyclic = true;
+    return dual;
+  }
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TMEMPTR:break;
@@ -94,6 +101,22 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
       return _aliases.above_center() ? TypeNil.NIL : this;
     return make(_aliases.meet_nil(),_obj);
   }
+
+  // Build a depth-limited named type
+  @Override TypeMemPtr make_recur(TypeName tn, int d, BitSet bs ) {
+    Type t2 = _obj.make_recur(tn,d,bs);
+    return t2==_obj ? this : make(_aliases,(TypeObj)t2);
+  }
+  // Mark if part of a cycle
+  @Override void mark_cycle( Type head, BitSet visit, BitSet cycle ) {
+    if( visit.get(_uid) ) return;
+    visit.set(_uid);
+    if( this==head ) { cycle.set(_uid); _cyclic=_dual._cyclic=true; }
+    _obj.mark_cycle(head,visit,cycle);
+    if( cycle.get(_obj._uid) )
+      { cycle.set(_uid); _cyclic=_dual._cyclic=true; }
+  }
+
   @Override void walk( Predicate<Type> p ) { p.test(this); }
   public int getbit() { return _aliases.getbit(); }
 }

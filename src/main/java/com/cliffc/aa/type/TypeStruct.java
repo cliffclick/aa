@@ -25,7 +25,7 @@ import java.util.function.Predicate;
  *  NOT trying to solve the general problem of graph-equivalence (a known NP
  *  hard problem).  Instead we can solve each field independently and also
  *  intersect across common fields.
- * 
+ *
  *  When solving across a single field, we will find some prefix and then
  *  possibly a cycle - conceptually the type unrolls forever.  When doing the
  *  Meet we conceptually unroll both types forever, compute the Meet element by
@@ -50,19 +50,19 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return this;
   }
   // Precomputed hash code.  Note that it can NOT depend on the field types -
-  // because during recursive construction the types are not available.  
+  // because during recursive construction the types are not available.
   @Override int compute_hash() {
     int hash = super.compute_hash();
     for( int i=0; i<_flds.length; i++ ) hash += _flds[i].hashCode()+_finals[i];
     return hash;
   }
-  
+
   private static final Ary<TypeStruct> CYCLES = new Ary<>(new TypeStruct[0]);
   private TypeStruct find_other() {
     int idx = CYCLES.find(this);
     return idx != -1 ? CYCLES.at(idx^1) : null;
   }
-  
+
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeStruct) ) return false;
@@ -93,7 +93,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     for( int i=0; i<_ts.length; i++ )
       if( !_flds[i].equals(t._flds[i]) || _finals[i]!=t._finals[i] )
         return false;
-    
+
     int len = CYCLES._len;
     CYCLES.add(this).add(t);
     boolean eq=cycle_equals0(t);
@@ -126,7 +126,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     }
     return null;
   }
-  
+
   String str( BitSet dups) {
     if( dups == null ) dups = new BitSet();
     else if( dups.get(_uid) ) return "*"; // Break recursive printing cycle
@@ -166,7 +166,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   private static final String[] FLD2={".","."};
   private static final String[] FLD3={".",".","."};
   private static final String[][] FLDS={FLD0,FLD1,FLD2,FLD3};
-  public  static       String[] FLDS( int len ) { return FLDS[len]; }
+          static String[] FLDS( int len ) { return FLDS[len]; }
   private static String[] flds(String... fs) { return fs; }
   private static Type[] ts(Type... ts) { return ts; }
   private static Type[] ts(int n) { Type[] ts = new Type[n]; Arrays.fill(ts,SCALAR); return ts; }
@@ -185,15 +185,15 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   private static final TypeStruct D1    = make(flds("d"),ts(TypeInt.TRUE  )); // @{d:1}
   private static final TypeStruct ARW   = make(flds("a"),ts(TypeFlt.FLT64),new byte[1]);
   public  static final TypeStruct GENERIC = malloc(true,FLD0,new Type[0],new byte[0]).hashcons_free();
-  public  static final TypeStruct ALLSTRUCT = make();
-  
+          static final TypeStruct ALLSTRUCT = make();
+
   // Recursive meet in progress
   private static final HashMap<TypeStruct,TypeStruct> MEETS1 = new HashMap<>(), MEETS2 = new HashMap<>();
-  
+
   // Build a recursive struct type for tests: @{n=*?,v=flt}
   public static void init1() {
-    TypeStr.init();             // Force TypeStr <clinit> 
-    TypeNil.init();             // Force TypeNil <clinit> 
+    TypeStr.init();             // Force TypeStr <clinit>
+    TypeNil.init();             // Force TypeNil <clinit>
     TypeStruct ts1 = malloc(false,new String[]{"n","v"},new Type[2],new byte[]{1,1});
     RECURSIVE_MEET++;
     Type tsn = TypeNil.make(ts1);  tsn._cyclic = true;
@@ -218,10 +218,10 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     ts1._ts[2] = TypeInt.INT64;
     RECURSIVE_MEET--;
     RECURS_TREE = ts1.install_cyclic();
-    
+
   }
   public static TypeStruct RECURS_NIL_FLT, RECURT_NIL_FLT, RECURS_TREE;
-  
+
   static final TypeStruct[] TYPES = new TypeStruct[]{ALLSTRUCT,POINT,X,A,C0,D1,ARW};
 
 
@@ -251,12 +251,12 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     dual._cyclic = true;
     return dual;
   }
-  
+
   // Standard Meet.  Types-meet-Types and fld-meet-fld.  Fld strings can be
   // top/bottom for tuples.  Structs with fewer fields are virtually extended
   // with either top or bottom accordingly, to Meet against the other side.
   // Field names only restrict matches and do not affect the algorithm complexity.
-  // 
+  //
   // Types can be in cycles: See Large Comment Above.  We effectively unroll
   // each type infinitely until both sides are cycling and take the GCD of
   // cycles.  Different fields are Meet independently and unroll independently.
@@ -379,7 +379,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     RECURSIVE_MEET++;
 
     // For-all _ts edges do the Meet.  Some are not-recursive and mapped, some
-    // are part of the cycle and mapped, some 
+    // are part of the cycle and mapped, some
     for( int i=0; i<len; i++ ) {
       Type lfi = this._ts[i];
       Type rti = that._ts[i];
@@ -394,7 +394,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     // speculative and not interned.
     if( --RECURSIVE_MEET > 0 )
       return mt;                // And, if not yet done, just exit with it
-    
+
     // This completes 'mt' as the Meet structure.
     return mt.install_cyclic();
   }
@@ -421,7 +421,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     MEETS2.clear();
     return old;
   }
-  
+
   // Make a clone of this TypeStruct that is not interned.
   private TypeStruct shallow_clone() {
     assert _cyclic;
@@ -472,7 +472,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // short is high and it "loses" (result is long).
   private int len( TypeStruct tt ) { return _ts.length <= tt._ts.length ? len0(tt) : tt.len0(this); }
   private int len0( TypeStruct tmax ) { return _any ? tmax._ts.length : _ts.length; }
-  
+
   static private boolean fldTop( String s ) { return s.charAt(0)=='^'; }
   static private boolean fldBot( String s ) { return s.charAt(0)=='.'; }
   // String meet
@@ -544,11 +544,11 @@ public class TypeStruct extends TypeObj<TypeStruct> {
         { cycle.set(_uid); _cyclic=_dual._cyclic=true; }
     }
   }
-  
+
   // Iterate over any nested child types
   @Override public void iter( Consumer<Type> c ) { for( Type t : _ts) c.accept(t); }
   @Override public Type meet_nil() { return this; }
-  
+
   @Override boolean contains( Type t, BitSet bs ) {
     if( bs==null ) bs=new BitSet();
     if( bs.get(_uid) ) return false;

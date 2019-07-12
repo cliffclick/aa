@@ -254,9 +254,6 @@ public class Type<T extends Type<T>> {
       assert !mt.interned();
       mt._cyclic = true;
     }
-    // Expensive asserts in an common place, turn off when stable
-    //assert check_commute  (t,mt);
-    //assert check_symmetric(t,mt);
     return mt;
   }
   private Type xmeet0( Type t ) {

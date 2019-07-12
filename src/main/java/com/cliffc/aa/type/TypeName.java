@@ -74,7 +74,7 @@ public class TypeName extends TypeObj<TypeName> {
     return tn0.make_recur(tn1,0,new BitSet());
   }
   public TypeName make( Type t) { return make(_name,_lex,t); }
-  public static TypeName make_forward_def_type( String name, HashMap<String,Type> lex ) { return make0(name,lex,TypeObj.OBJ,(short)-1); }
+  public static TypeName make_forward_def_type( String name, HashMap<String,Type> lex ) { return make0(name,lex,TypeStruct.ALLSTRUCT,(short)-1); }
 
           static final HashMap<String,Type> TEST_SCOPE = new HashMap<>();
           static final TypeName TEST_ENUM = make("__test_enum",TEST_SCOPE,TypeInt.INT8);
@@ -157,7 +157,7 @@ public class TypeName extends TypeObj<TypeName> {
   // may include embedded references to 'this'
   @Override public TypeName merge_recursive_type( Type t ) {
     if( _depth >= 0 ) return null; // Not a recursive type-def
-    assert _t==TypeObj.OBJ;
+    assert _t==TypeStruct.ALLSTRUCT;
     // Remove from INTERN table, since hacking type will not match hash
     untern()._dual.untern();
     // Hack type and it's dual.  Type is now recursive.

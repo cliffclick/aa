@@ -720,9 +720,13 @@ public class Parse {
   }
   private Type typep(boolean type_var) {
     Type t = type0(type_var);
-    return t!=null && (t.base() instanceof TypeObj) // Automatically convert to reference for fields
-      ? typeq(TypeMemPtr.make(BitsAlias.ALL,(TypeObj)t)) // And check for null-ness
-      : t;
+    if( t==null ) return t;
+    Type base = t.base();
+    if( !(base instanceof TypeObj) ) return t;
+    // Automatically convert to reference for fields.
+    // Grab reasonably precise alias.
+    TypeMemPtr tmp = TypeMemPtr.make(base instanceof TypeStruct ? BitsAlias.REC : BitsAlias.ARY,(TypeObj)t);
+    return typeq(tmp);          // And check for null-ness
   }
   // Wrap in a nullable if there is a trailing '?'.  No spaces allowed
   private Type typeq(Type t) { return peek_noWS('?') ? t.meet_nil() : t; }

@@ -20,9 +20,8 @@ public class BitsAlias extends Bits<BitsAlias> {
 
   static final Bits.Tree<BitsAlias> TREE = new Bits.Tree<>();
   @Override Tree<BitsAlias> tree() { return TREE; } 
-  public static final int ALL, REC, I64, F64;
-  static final int STR, ABC;
-  private static final int ARY;
+  public  static final int ALL, REC, ARY, I64, F64;
+          static final int STR, ABC;
           static BitsAlias NZERO, FULL, RECBITS0, STRBITS, STRBITS0, ABCBITS, ABCBITS0;
   public  static BitsAlias RECBITS, NIL;
   private static BitsAlias ANY;

@@ -16,9 +16,7 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
     Object dummy = Env.GVN; // Force class loading cycle
-    test   ("a = math_rand(1) ? 0 : @{x=1}; // a is null or a struct\n"+
-            "b = math_rand(1) ? 0 : @{c=a}; // b is null or a struct\n"+
-            "b ? (b.c ? b.c.x : 0) : 0      // Null-safe field load", TypeInt.BOOL); // Nested null-safe field load
+    test_isa("A= :(A?, int); A(0,2)",(tmap -> TypeName.make("A",tmap,TypeStruct.make(TypeNil.NIL,TypeInt.con(2)))));
     // A collection of tests which like to fail easily
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'","                    ");
     testerr ("Point=:@{x,y}; Point((0,1))", "*[8](nil,1) is not a *[2]@{x,y}","                           ");

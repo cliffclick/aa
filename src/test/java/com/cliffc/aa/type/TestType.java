@@ -17,16 +17,8 @@ public class TestType {
     Type s1 = TypeStr.STR.dual();
     Type s2 = s0.meet(s1);
     assertEquals(TypeObj.OBJ,s2);
-    
-
-    TypeStruct t0 = TypeStruct.make(TypeNil.NIL,TypeInt.TRUE);
-    TypeStruct t1 = TypeStruct.make(new String[]{"x","y"},Type.SCALAR,Type.SCALAR);
-    TypeName tn = TypeName.make("Point",TypeName.TEST_SCOPE,t1);
-    Type tnd = tn.dual();
-    Type t2 = tnd.meet(t0);
-    //assertEquals(t0,t2);
   }
-  
+
   @Test public void testNamesInts() {
     Type.init0(new HashMap<>());
 
@@ -77,7 +69,7 @@ public class TestType {
   // A any-ptr-alias#6 means *any* of the alias#6 choices; same for all.
   // all ->  mem  -> { str,tup} -> { string constants, tuple constants} -> {~str,~tup} -> ~mem    -> any
   // all -> *mem? -> {*mem,nil} -> {*str,*tup,nil} -> {~*str,~*tup,nil} -> {~*mem,nil} -> ~*mem+? -> any
-  
+
   @Test public void testOOPsNulls() {
     Type.init0(new HashMap<>());
     Type bot = Type      .ALL;
@@ -85,11 +77,11 @@ public class TestType {
     Type mem = TypeMem   .MEM;  // All memory
     Type str = TypeStr   .STR;  // All Strings
     Type tup = TypeStruct.ALLSTRUCT; // All Structs
-    
+
     Type abc = TypeStr  .ABC;   // String constant
     Type zer = TypeInt  .FALSE;
     Type tp0 = TypeStruct.make(zer);  // tuple of a '0'
-    
+
     Type tupX= tup.dual();
     Type strX= str.dual();
     Type memX= mem.dual();
@@ -113,7 +105,7 @@ public class TestType {
 
     //assertTrue( str .isa(mem)); // mem is a CONTAINER for memory objects, e.g. Struct,Str
     //assertTrue( tup .isa(mem));
-    
+
     assertTrue( mem .isa(bot));
 
     // ---
@@ -123,7 +115,7 @@ public class TestType {
     TypeMemPtr pstr = TypeMemPtr.STRPTR; // *[str]
     Type ptup0= TypeMemPtr.STRUCT0; // *[tup]?
     Type ptup = TypeMemPtr.STRUCT;  // *[tup]
-    
+
     Type pabc0= TypeMemPtr.ABC0;    // *["abc"]?
     TypeMemPtr pabc = TypeMemPtr.ABCPTR; // *["abc"]
     TypeMemPtr pzer = TypeMemPtr.make(BitsAlias.new_alias(BitsAlias.REC),TypeStruct.ALLSTRUCT);// *[(0)]
@@ -139,14 +131,14 @@ public class TestType {
 
     assertTrue( top .isa(xmem0));
     assertTrue(xmem0.isa(xmem ));
-    
+
     assertTrue(xmem0.isa(xstr0));
     assertTrue(xmem .isa(xstr ));
     assertTrue(xmem0.isa(xtup0));
     assertTrue(xmem .isa(xtup ));
 
     assertTrue(xstr0.isa( nil ));
-    
+
     // This is a choice ptr-to-alias#1, vs a nil-able ptr-to-alias#2.  Since
     // they are from different alias classes, they are NEVER equal (unless both
     // nil).  We cannot tell what they point-to, so we do not know if the
@@ -155,15 +147,15 @@ public class TestType {
     assertTrue (xstr .isa(pabc ));
     // We can instead assert that values loaded are compatible:
     assertTrue (TypeMem.MEM_STR.dual().ld(xstr).isa(TypeMem.MEM_ABC.ld(pabc)));
-    
+
     assertTrue (xtup0.isa( nil ));
     assertTrue (xtup0.isa(pzer0));
     assertTrue (xtup .isa(pzer ));
     //assertTrue(TypeMem.MEM_TUP.dual().ld(xstr).isa(TypeMem.MEM_ZER.ld(pabc)));
-    
+
     assertTrue ( nil .isa(pabc0));
     assertTrue ( nil .isa(pzer0));
-    
+
     assertTrue ( nil .isa(pstr0));
     assertTrue (pabc0.isa(pstr0));
     assertTrue (pabc .isa(pstr ));
@@ -174,17 +166,17 @@ public class TestType {
     //assertTrue(TypeMem.MEM_TUP.dual().ld(xstr).isa(TypeMem.MEM_ZER.ld(pabc)));
     assertTrue (ptup0.isa(pmem0));
     assertTrue (ptup .isa(pmem ));
-    
+
     assertTrue (pmem .isa(pmem0));
     assertTrue (pmem0.isa( bot ));
-    
-    
+
+
     // Crossing ints and *[ALL]+null
     Type  i8 = TypeInt.INT8;
     Type xi8 = i8.dual();
     assertEquals( Type.NSCALR, xi8.meet(xmem0)); // ~OOP+0 & ~i8 -> 0
   }
-  
+
   @Test public void testStructTuple() {
     Type.init0(new HashMap<>());
     Type nil  = TypeNil.NIL;
@@ -219,7 +211,7 @@ public class TestType {
 
     TypeFunPtr gf = TypeFunPtr.GENERIC_FUNPTR;
     // New functions fall squarely between +/- GENERIC_FUNPTR.
-    
+
     // TypeTuple structure demands the shortest Tuple wins the "length
     // war" (determines the length of the result based on short's any/all flag).
     TypeFunPtr f1i2i = TypeFunPtr.make_new(TypeTuple.INT64_INT64,TypeInt.INT64);
@@ -231,13 +223,13 @@ public class TestType {
     // thus the result is a copy of F1I2I.
     assertTrue(gf.dual().isa(f1i2i)); // To be short result, short must be low
 
-    
+
     assertTrue(f1i2i.isa(gf));
     TypeFunPtr f1f2f = TypeFunPtr.make_new(TypeTuple.FLT64_FLT64,TypeFlt.FLT64);
     assertTrue(f1f2f.isa(gf));
     TypeFunPtr mt = (TypeFunPtr)f1i2i.meet(f1f2f);
     BitsFun funs = BitsFun.make0(36).meet(BitsFun.make0(37));
-    TypeFunPtr f3i2r = TypeFunPtr.make(funs,TypeTuple.make_args(TypeInt.INT32,TypeInt.INT32),Type.REAL);
+    TypeFunPtr f3i2r = TypeFunPtr.make(funs,TypeTuple.make_args(Type.REAL,Type.REAL),Type.REAL);
     assertEquals(f3i2r,mt);
     assertTrue(f3i2r.isa(gf));
     assertTrue(f1i2i.isa(f3i2r));
@@ -259,7 +251,7 @@ public class TestType {
     final int alias1 = 1;
     final TypeMemPtr ts0ptr = TypeMemPtr.make    (alias1,TypeObj.OBJ);
     final TypeMemPtr ts0ptr0= TypeMemPtr.make_nil(alias1,TypeObj.OBJ);
-    
+
     // Anonymous recursive structs -
     // - struct with pointer to self
     TypeStruct ts0 = TypeStruct.malloc(false,flds,new Type[2],new byte[]{1,1});
@@ -267,14 +259,14 @@ public class TestType {
     ts0._ts[1] = TypeInt.INT64;
     ts0 = ts0.install_cyclic();
     TypeMem ts0mem = TypeMem.make(alias1,ts0); // {1:@{n:*[1],v:int} }
-    
+
     // - struct with pointer to self or nil
     TypeStruct ts1 = TypeStruct.malloc(false,flds,new Type[2],new byte[]{1,1});
     ts1._ts[0] = ts0ptr0;  ts1._cyclic = true;
     ts1._ts[1] = TypeInt.INT64;
     ts1 = ts1.install_cyclic();
     TypeMem ts1mem = TypeMem.make(alias1,ts1); // {1:@{n:*[0,1],v:int} }
-    
+
     Type tsmt = ts0.meet(ts1);
     assertEquals(ts1,tsmt);
     Type tsmemmt = ts0mem.meet(ts1mem);
@@ -318,13 +310,13 @@ public class TestType {
     assertEquals(xta,mta);
 
 
-    
+
     // Mismatched Names in a cycle; force a new cyclic type to appear
     final int alias5 = 5;
     TypeStruct tsnb = TypeStruct.make(flds,TypeMemPtr.make_nil(alias5,TypeObj.OBJ),TypeFlt.FLT64);
     TypeName tfb = TypeName.make("B",TypeName.TEST_SCOPE,tsnb);
     Type mtab = ta2.meet(tfb);
-    
+
     // TODO: Needs a way to easily test simple recursive types
     TypeStruct mtab0 = (TypeStruct)mtab;
     assertEquals("n",mtab0._flds[0]);
@@ -332,13 +324,13 @@ public class TestType {
     TypeMemPtr mtab1 = (TypeMemPtr)mtab0.at(0);
     assertTrue(mtab1._aliases.test(alias2)&& mtab1._aliases.test(alias5));
     assertEquals(Type.REAL,mtab0.at(1));
-    
+
 
     // In the ptr/mem model, all Objs from the same NewNode are immediately
     // approximated by a single Alias#.  This stops any looping type growth.
     // The only way to get precision back is to inline the NewNode and get new
     // Alias#s.
-    
+
     // Nest a linked-list style tuple 10 deep; verify actual depth is capped at
     // less than 5.  Any data loop must contain a Phi; if structures are
     // nesting infinitely deep, then it must contain a NewNode also.
@@ -363,7 +355,7 @@ public class TestType {
   // Unrolled:   TypeNil ==> TypeStruct ==> TypeNil ==> ...
   // Unrolled:  ?S?S?S?S?S?S?....
   // Note: Leading '?' but otherwise infinitely equal to the prior unroll
-  // 
+  //
   @Ignore
   @Test public void testCycles() {
     Type.init0(new HashMap<>());
@@ -432,10 +424,10 @@ public class TestType {
     Type mt0 = T.meet(Ts0ss0s); // Ts0s.isa(Ts0ss0s) ==> Ts0s.meet(Ts0ss0s) == Ts0ss0s
     assertEquals(T,mt0);
   }
-  
+
   @Test public void testCommuteSymmetricAssociative() {
     Type.init0(new HashMap<>());
 
     assertTrue(Type.check_startup());
-  }  
+  }
 }
