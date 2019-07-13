@@ -235,9 +235,8 @@ public class TestType {
     assertTrue(f1i2i.isa(f3i2r));
     assertTrue(f1f2f.isa(f3i2r));
 
-    // No longer true; must use make_new and split from parent fidx.
-    //TypeFunPtr f2 = TypeFunPtr.make(BitsFun.make0(23)); // Some generic function (happens to be #23, '&')
-    //assertTrue(f2.isa(gf));
+    TypeFunPtr f2 = TypeFunPtr.make(BitsFun.make0(23),TypeTuple.INT64_INT64,TypeInt.INT64); // Some generic function (happens to be #23, '&')
+    assertTrue(f2.isa(gf));
   }
 
   // Test limits on recursive type structures; recursively building nested
@@ -248,9 +247,9 @@ public class TestType {
 
     // Recursive types no longer cyclic in the concrete definition?  Because
     // TypeObj can contain TypeMemPtrs but not another nested TypeObj...
-    final int alias1 = 1;
-    final TypeMemPtr ts0ptr = TypeMemPtr.make    (alias1,TypeObj.OBJ);
-    final TypeMemPtr ts0ptr0= TypeMemPtr.make_nil(alias1,TypeObj.OBJ);
+    final int alias1 = BitsAlias.REC;
+    final TypeMemPtr ts0ptr = TypeMemPtr.make    (alias1,TypeStruct.ALLSTRUCT);
+    final TypeMemPtr ts0ptr0= TypeMemPtr.make_nil(alias1,TypeStruct.ALLSTRUCT);
 
     // Anonymous recursive structs -
     // - struct with pointer to self
@@ -334,14 +333,16 @@ public class TestType {
     // Nest a linked-list style tuple 10 deep; verify actual depth is capped at
     // less than 5.  Any data loop must contain a Phi; if structures are
     // nesting infinitely deep, then it must contain a NewNode also.
-    //Type phi = TypeNil.NIL;
-    //for( int i=0; i<20; i++ ) {
-    //  TypeStruct newt = TypeStruct.make(TypeStruct.FLDS(2),phi,TypeInt.con(i));
-    //  phi=com.cliffc.aa.node.NewNode.approx(newt,phi);
-    //}
-    //int d = phi.depth()-9999; // added +9999 for cycle
-    //assertTrue(0 <= d && d <10);
-    throw com.cliffc.aa.AA.unimpl();
+    int alias = BitsAlias.new_alias(BitsAlias.REC);
+    TypeStruct ts = TypeStruct.make(TypeStruct.FLDS(2),TypeNil.NIL,TypeInt.con(0));
+    TypeMemPtr phi = TypeMemPtr.make(alias,ts);
+    for( int i=1; i<20; i++ ) {
+      TypeStruct newt = TypeStruct.make(TypeStruct.FLDS(2),phi,TypeInt.con(i));
+      TypeStruct approx = com.cliffc.aa.node.NewNode.approx(newt,ts);
+      phi = TypeMemPtr.make(alias,ts=approx);
+    }
+    int d = phi.depth()-9999; // added +9999 for cycle
+    assertTrue(0 <= d && d <10);
   }
 
 
@@ -363,9 +364,10 @@ public class TestType {
     String[] flds = TypeStruct.FLDS(2);
 
     // T = :(T?,i64)
+    int alias = BitsAlias.new_alias(BitsAlias.REC);
     TypeStruct T = TypeStruct.malloc(false,flds,new Type[2],new byte[]{1,1});
     Type.RECURSIVE_MEET++;
-    Type TN = TypeNil.make(T);  TN._cyclic = true;
+    Type TN = TypeMemPtr.make_nil(alias,T);  TN._cyclic = true;
     T._ts[0] = TN;    T._cyclic = true;
     T._ts[1] = TypeInt.INT64;
     Type.RECURSIVE_MEET--;
@@ -373,12 +375,8 @@ public class TestType {
     TN = T._ts[0]; // Reload after interning
 
     // Adding a Nil to T brings to another spot in the cycle
-    Type tn2 = TypeNil.make(T);
+    Type tn2 = TypeMemPtr.make_nil(alias,T);
     assertSame(TN, tn2);
-
-    // Meet of 2 elements of the cycle yields the cycle back.
-    Type mt = T.meet(TN);
-    assertTrue(mt==T || mt==TN);
 
     // Test from an unrolled map() call, during GCP one of the guarding IF tests
     // is still showing false, so we alternate having NILs or not.
@@ -399,7 +397,7 @@ public class TestType {
     //   T         .meet( T        ) ==   T
     // T == T.  QED
 
-    Type Ts      = TypeStruct.make(T     ,TypeInt.INT64); //    (T,i64)
+    Type Ts      = TypeStruct.make(TN    ,TypeInt.INT64); //    (T,i64)
 
     // Ugh: backwards from QED above; in fact Ts isa T since adding a Nil to a
     // Ts is strictly lower in the lattice... and immediately makes it a T.

@@ -3,6 +3,7 @@ package com.cliffc.aa.type;
 import com.cliffc.aa.util.SB;
 
 import java.util.BitSet;
+import java.util.HashMap;
 import java.util.function.Predicate;
 
 // Pointers-to-memory; these can be both the address and the value part of
@@ -116,7 +117,19 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     if( cycle.get(_obj._uid) )
       { cycle.set(_uid); _cyclic=_dual._cyclic=true; }
   }
+  @Override boolean contains( Type t, BitSet bs ) { return _obj == t || _obj.contains(t, bs); }
+  @Override int depth( BitSet bs ) { return 1+_obj.depth(bs); }
+  @SuppressWarnings("unchecked")
+  @Override Type replace( Type old, Type nnn, HashMap<Type,Type> MEETS  ) {
+    Type x = _obj.replace(old,nnn,MEETS);
+    if( x==_obj ) return this;
+    Type rez = make((TypeObj)x);
+    rez._cyclic=true;
+    return rez;
+  }
 
-  @Override void walk( Predicate<Type> p ) { p.test(this); }
+  @SuppressWarnings("unchecked")
+  @Override void walk( Predicate<Type> p ) { if( p.test(this) ) _obj.walk(p); }
+  @Override TypeStruct repeats_in_cycles(TypeStruct head, BitSet bs) { return _cyclic ? _obj.repeats_in_cycles(head,bs) : null; }
   public int getbit() { return _aliases.getbit(); }
 }

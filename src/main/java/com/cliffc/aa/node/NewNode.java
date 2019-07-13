@@ -56,7 +56,7 @@ public class NewNode extends Node {
   // to in a loop until the size grows without bound.  If we detect this we
   // need to approximate a new cyclic type.
   private final static int CUTOFF=5; // Depth of types before we start forcing approximations
-  private static TypeStruct approx( TypeStruct newt, TypeObj oldt ) {
+  public static TypeStruct approx( TypeStruct newt, TypeObj oldt ) {
     if( !(oldt instanceof TypeStruct) ) return newt;
     if( newt == oldt ) return newt;
     if( !newt.contains(oldt) ) return newt;
