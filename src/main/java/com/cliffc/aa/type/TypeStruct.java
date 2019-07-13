@@ -370,11 +370,12 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       mt._flds[i] = smeet(mt._flds[i],mx._flds[i]); // Set the Meet of field names
       mt._finals[i] |= mx._finals[i];
     }
+    mt._hash = mt.compute_hash(); // Compute hash now that fields and finals are set
 
     // Since the result is cyclic, we cannot test the cyclic parts for
     // pre-existence until the entire cycle is built.  We can't intern the
     // partially built parts, but we want to use the normal xmeet call - which
-    // normally recursively interns.  Turn of interning with the global
+    // normally recursively interns.  Turn off interning with the global
     // RECURSIVE_MEET flag.
     RECURSIVE_MEET++;
 

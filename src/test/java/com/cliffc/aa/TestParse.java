@@ -16,7 +16,7 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
     Object dummy = Env.GVN; // Force class loading cycle
-    test_isa("A= :(A?, int); A(0,2)",(tmap -> TypeName.make("A",tmap,TypeStruct.make(TypeNil.NIL,TypeInt.con(2)))));
+    testerr ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1,y=2}))", "*[8]@{x:1,y:2} is not a *[1]Point:@{x,y}","                                                                    ");
     // A collection of tests which like to fail easily
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'","                    ");
     testerr ("Point=:@{x,y}; Point((0,1))", "*[8](nil,1) is not a *[2]@{x,y}","                           ");
@@ -195,7 +195,7 @@ public class TestParse {
     test   (" -1 :int1", TypeInt.con(-1));
     testerr("(-1):int1", "-1 is not a int1","         ");
     testerr("\"abc\":int", "*[7]\"abc\" is not a int64","         ");
-    testerr("1:str", "1 is not a *[1]str","     ");
+    testerr("1:str", "1 is not a *[3]str","     ");
 
     testerr("x=3; fun:{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int64","                              ");
     test("x=3; fun:{real->real}={x -> x*2}; fun(2.1)+fun(x)", TypeFlt.con(2.1*2+3*2)); // Mix of types to fun()
@@ -204,7 +204,7 @@ public class TestParse {
     testerr("fun:{real->flt32}={x -> x}; fun(123456789)", "123456789 is not a flt32","                          ");
 
     test   ("{x:int -> x*2}(1)", TypeInt.con(2)); // Types on parms
-    testerr("{x:str -> x}(1)", "1 is not a *[1]str", "               ");
+    testerr("{x:str -> x}(1)", "1 is not a *[3]str", "               ");
 
     // Tuple types
     test_name("A= :(       )" ); // Zero-length tuple
@@ -264,7 +264,7 @@ public class TestParse {
     // nullable and not-null pointers
     test   ("x:str? = 0", TypeNil.NIL); // question-type allows null or not; zero digit is null
     test   ("x:str? = \"abc\"", TypeMemPtr.ABCPTR); // question-type allows null or not
-    testerr("x:str  = 0", "nil is not a *[1]str", "          ");
+    testerr("x:str  = 0", "nil is not a *[3]str", "          ");
     test   ("math_rand(1)?0:\"abc\"", TypeMemPtr.ABC0);
     testerr("(math_rand(1)?0 : @{x=1}).x", "Struct might be nil when reading field '.x'", "                           ");
     test   ("p=math_rand(1)?0:@{x=1}; p ? p.x : 0", TypeInt.BOOL); // not-null-ness after a null-check
@@ -278,12 +278,12 @@ public class TestParse {
   }
 
   @Test public void testParse6() {
-    test_isa("A= :(A?, int); A(0,2)",(tmap -> TypeName.make("A",tmap,TypeStruct.make(TypeNil.NIL,TypeInt.con(2)))));
-    test_isa("A= :(A?, int); A(A(0,2),3)",(tmap -> TypeName.make("A",tmap,TypeStruct.make(TypeName.make("A",tmap,TypeStruct.make(TypeNil.NIL,TypeInt.con(2))),TypeInt.con(3)))));
+    test_ptr("A= :(A?, int); A(0,2)","A:(nil,2)");
+    test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*[12]A:(nil,2),3)");
 
     // Building recursive types
     test_isa("A= :int; A(1)", (tmap -> TypeName.make("A",tmap,TypeInt.INT64)));
-    test("A= :(str?, int); A(0,2)",(tmap -> TypeName.make("A",tmap,TypeStruct.make(TypeNil.NIL,TypeInt.con(2)))));
+    test_ptr("A= :(str?, int); A(0,2)","A:(nil,2)");
     // Named recursive types
     test_isa("A= :(A?, int); A(0,2)",Type.SCALAR);// No error casting (0,2) to an A
     test_isa("A= :@{n:A?, v:flt}; A(@{n=0,v=1.2}).v;", TypeFlt.con(1.2));
@@ -292,21 +292,23 @@ public class TestParse {
     TypeEnv te3 = Exec.go(Env.top(),"args","A= :@{n:A?, v:int}");
     if( te3._errs != null ) System.err.println(te3._errs.toString());
     Assert.assertNull(te3._errs);
-    TypeName tname3 = null; //(TypeName)((TypeFunPtr)te3._t).val();
+    TypeFunPtr tfp = (TypeFunPtr)te3._t;
+    TypeMemPtr ptr = (TypeMemPtr)tfp._ret;
+    TypeName tname3 = (TypeName)ptr._obj;
     assertEquals("A", tname3._name);
     TypeStruct tt3 = (TypeStruct)tname3._t;
-    TypeNil tnil3 = (TypeNil)tt3.at(0);
-    assertSame(tnil3._t , tname3);
+    TypeMemPtr tnil3 = (TypeMemPtr)tt3.at(0);
+    assertSame(tnil3._obj , tname3);
     assertSame(tt3.at(1), TypeInt.INT64);
     assertEquals("n",tt3._flds[0]);
     assertEquals("v",tt3._flds[1]);
 
     // Missing type B is also never worked on.
-    test_isa("A= :@{n:B?, v:int}", Type.SCALAR);
-    test_isa("A= :@{n:B?, v:int}; a = A(0,2)", Type.SCALAR);
+    test_isa("A= :@{n:B?, v:int}", TypeFunPtr.GENERIC_FUNPTR);
+    test_isa("A= :@{n:B?, v:int}; a = A(0,2)", TypeMemPtr.OOP);
     test_isa("A= :@{n:B?, v:int}; a = A(0,2); a.n", TypeNil.NIL);
     // Mutually recursive type
-    test_isa("A= :@{n:B, v:int}; B= :@{n:A, v:flt}", Type.SCALAR);
+    test_isa("A= :@{n:B, v:int}; B= :@{n:A, v:flt}", TypeFunPtr.GENERIC_FUNPTR);
   }
 
   @Test public void testParse7() {
