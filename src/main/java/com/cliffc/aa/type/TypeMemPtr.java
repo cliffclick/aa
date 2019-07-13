@@ -7,12 +7,12 @@ import java.util.HashMap;
 import java.util.function.Predicate;
 
 // Pointers-to-memory; these can be both the address and the value part of
-// Loads and Stores.  They carry a set of aliased TypeObjs.  
+// Loads and Stores.  They carry a set of aliased TypeObjs.
 public final class TypeMemPtr extends Type<TypeMemPtr> {
   // List of known memory aliases.  Zero is nil.
   BitsAlias _aliases;
   public TypeObj _obj;          // Meet/join of aliases
-  
+
   private TypeMemPtr(BitsAlias aliases, TypeObj obj ) { super     (TMEMPTR); init(aliases,obj); }
   private void init (BitsAlias aliases, TypeObj obj ) { super.init(TMEMPTR); _aliases = aliases; _obj=obj; }
   @Override int compute_hash() { return TMEMPTR + _aliases._hash + _obj._hash; }
@@ -22,8 +22,13 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     TypeMemPtr tf = (TypeMemPtr)o;
     return _aliases==tf._aliases && _obj==tf._obj;
   }
-  // Never part of a cycle, so the normal check works
-  @Override public boolean cycle_equals( Type o ) { return equals(o); }
+  @Override public boolean cycle_equals( Type o ) {
+    if( this==o ) return true;
+    if( !(o instanceof TypeMemPtr) ) return false;
+    TypeMemPtr t2 = (TypeMemPtr)o;
+    if( _aliases != t2._aliases ) return false;
+    return _obj == t2._obj || _obj.cycle_equals(t2._obj);
+  }
   @Override String str( BitSet dups) {
     if( dups == null ) dups = new BitSet();
     else if( dups.get(_uid) ) return "*"; // Break recursive printing cycle
@@ -46,7 +51,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   public static TypeMemPtr make    ( int alias, TypeObj obj ) { return make(BitsAlias.make0(alias)           ,obj); }
          static TypeMemPtr make_nil( int alias, TypeObj obj ) { return make(BitsAlias.make0(alias).meet_nil(),obj); }
   public        TypeMemPtr make    (            TypeObj obj ) { return make(_aliases,obj); }
-  
+
   public static final TypeMemPtr OOP0   = make(BitsAlias.FULL    , TypeObj.OBJ); // Includes nil
   public static final TypeMemPtr OOP    = make(BitsAlias.NZERO   , TypeObj.OBJ);// Excludes nil
   public static final TypeMemPtr STRPTR = make(BitsAlias.STRBITS , TypeStr.STR);
@@ -56,7 +61,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   public static final TypeMemPtr STRUCT = make(BitsAlias.RECBITS , TypeStruct.ALLSTRUCT);
          static final TypeMemPtr STRUCT0= make(BitsAlias.RECBITS0, TypeStruct.ALLSTRUCT);
   static final TypeMemPtr[] TYPES = new TypeMemPtr[]{OOP0,STRPTR,ABCPTR,STRUCT,ABC0};
-  
+
   @Override protected TypeMemPtr xdual() { return new TypeMemPtr(_aliases.dual(),(TypeObj)_obj.dual()); }
   @Override TypeMemPtr rdual() {
     if( _dual != null ) return _dual;

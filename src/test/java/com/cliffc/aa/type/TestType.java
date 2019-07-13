@@ -1,6 +1,5 @@
 package com.cliffc.aa.type;
 
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.HashMap;
@@ -357,7 +356,6 @@ public class TestType {
   // Unrolled:  ?S?S?S?S?S?S?....
   // Note: Leading '?' but otherwise infinitely equal to the prior unroll
   //
-  @Ignore
   @Test public void testCycles() {
     Type.init0(new HashMap<>());
     Type ignore0 = TypeTuple.ALL; // Break class-loader cycle; load Tuple before Fun.
@@ -366,6 +364,7 @@ public class TestType {
     // T = :(T?,i64)
     int alias = BitsAlias.new_alias(BitsAlias.REC);
     TypeStruct T = TypeStruct.malloc(false,flds,new Type[2],new byte[]{1,1});
+    T._hash = T.compute_hash();
     Type.RECURSIVE_MEET++;
     Type TN = TypeMemPtr.make_nil(alias,T);  TN._cyclic = true;
     T._ts[0] = TN;    T._cyclic = true;
@@ -397,23 +396,23 @@ public class TestType {
     //   T         .meet( T        ) ==   T
     // T == T.  QED
 
-    Type Ts      = TypeStruct.make(TN    ,TypeInt.INT64); //    (T,i64)
+    TypeStruct Ts = TypeStruct.make(TN    ,TypeInt.INT64); //    (T,i64)
 
     // Ugh: backwards from QED above; in fact Ts isa T since adding a Nil to a
     // Ts is strictly lower in the lattice... and immediately makes it a T.
     Type mt3 = T.meet(Ts);
     assertEquals(T,mt3);
 
-    Type Ts0     = TypeNil   .make(Ts);                   //    (T,i64)?
-    Type Ts0s    = TypeStruct.make(Ts0   ,TypeInt.INT64); //   ((T,i64)?,i64)
+    Type Ts0     = TypeMemPtr.make_nil(alias,Ts);         //    (T,i64)?
+    TypeStruct Ts0s    = TypeStruct.make(Ts0   ,TypeInt.INT64); //   ((T,i64)?,i64)
 
     // Ugh: backwards from QED above, same as above: adding any counts of
     // TypeNil clearly makes an unrolled T which rolls back up to a T.
     Type mt2 = T.meet(Ts0s);
     assertEquals(T,mt2);
 
-    Type Ts0ss   = TypeStruct.make(Ts0s  ,TypeInt.INT64); //  (((T,i64)?,i64),i64)
-    Type Ts0ss0  = TypeNil   .make(Ts0ss);                //  (((T,i64)?,i64),i64)?
+    TypeStruct Ts0ss   = TypeStruct.make(TypeMemPtr.make(alias,Ts0s),TypeInt.INT64); //  (((T,i64)?,i64),i64)
+    Type Ts0ss0  = TypeMemPtr.make_nil(alias,Ts0ss);      //  (((T,i64)?,i64),i64)?
     Type Ts0ss0s = TypeStruct.make(Ts0ss0,TypeInt.INT64); // ((((T,i64)?,i64),i64)?,i64)
 
     Type mt1 = Ts0s.meet(Ts0ss0s); // Ts0s.isa(Ts0ss0s) ==> Ts0s.meet(Ts0ss0s) == Ts0ss0s
