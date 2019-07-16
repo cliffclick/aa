@@ -38,7 +38,7 @@ public class GVNGCM {
       _wrk2_bits.set(n._uid);
     }
   }
-  
+
   // Array of types representing current node types.  Essentially a throw-away
   // temp extra field on Nodes.  It is either bottom-up, conservatively correct
   // or top-down and optimistic.
@@ -48,7 +48,7 @@ public class GVNGCM {
   private ConcurrentHashMap<Node,Node> _vals = new ConcurrentHashMap<>();
 
   public String dump( Node n, int max ) { return n.dump(max,this); }
-  
+
   // Initial state after loading e.g. primitives & boot libs.  Record state
   // here, so can reset to here cheaply and parse again.
   public static int _INIT0_CNT;
@@ -133,7 +133,7 @@ public class GVNGCM {
 
   // True if in _ts and _vals, false otherwise
   public boolean touched( Node n ) { return _ts.atX(n._uid)!=null; }
-  
+
   // Remove from GVN structures.  Used rarely for whole-merge changes
   public void unreg( Node n ) { assert !check_new(n); unreg0(n); }
   private Node unreg0( Node n ) {
@@ -142,7 +142,7 @@ public class GVNGCM {
     // TODO: Remove from worklist also
     return n;
   }
-  
+
   // Used rarely for whole-merge changes
   public void rereg( Node n, Type oldt ) {
     assert !check_opt(n);
@@ -160,7 +160,7 @@ public class GVNGCM {
     _vals.put(n,n);             // Back in GVN table
     add_work(n);
   }
-  
+
   // Node new to GVN and unregistered, or old and registered
   private boolean check_new(Node n) {
     if( check_opt(n) ) return false; // Not new
@@ -221,7 +221,7 @@ public class GVNGCM {
   }
 
   // Recursively kill off a new dead node, which might make lots of other nodes
-  // go dead.  Since its new, no need to remove from GVN system.  
+  // go dead.  Since its new, no need to remove from GVN system.
   public void kill_new( Node n ) { assert check_new(n);  kill0(n); }
   // Recursively kill off a dead node, which might make lots of other nodes go dead
   public void kill( Node n ) {  kill0(unreg0(n)); }
@@ -240,7 +240,7 @@ public class GVNGCM {
       while( !_live.get(CNT-1) ) CNT--;
     }
   }
-  
+
   private void xform_old( Node old ) {
     Node nnn = xform_old0(old);
     if( nnn==null ) return;
@@ -439,7 +439,7 @@ public class GVNGCM {
     for( Node use : n._uses ) walk_initype(use);
     for( Node def : n._defs ) walk_initype(def);
   }
-  
+
   // GCP optimizations on the live subgraph
   private void walk_opt( Node n/*, FunNode frez*/ ) {
     assert !n.is_dead();

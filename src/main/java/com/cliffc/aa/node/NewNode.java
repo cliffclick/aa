@@ -12,7 +12,7 @@ public class NewNode extends Node {
   private TypeStruct _ts;       // Result struct (may be named)
   private TypeObj _obj;         // Optional named struct
   TypeMemPtr _ptr;              // Cached pointer-to-_obj
-  
+
   public NewNode( Node[] flds, TypeObj obj ) {
     super(OP_NEW,flds);
     assert flds[0]==null;       // no ctrl field
@@ -42,16 +42,16 @@ public class NewNode extends Node {
     for( int i=0; i<_ts._ts.length; i++ )
       ts[i] = gvn.type(fld(i)).bound(_ts._ts[i]); // Limit to Scalar results
     TypeStruct newt = TypeStruct.make(_ts._flds,ts,_ts._finals);
-    
+
     // Get the existing type, without installing if missing because blows the
-    // "new newnode" assert if this node gets replaced during parsing.
+    // "new NewNode" assert if this node gets replaced during parsing.
     Type oldnnn = gvn.self_type(this);
     TypeObj oldt = oldnnn ==null ? newt : ((TypeMemPtr)oldnnn)._obj;
     TypeStruct apxt= approx(newt,oldt); // Approximate infinite types
     TypeObj res = _obj instanceof TypeName ? ((TypeName)_obj).make(apxt) : apxt;
     return TypeMemPtr.make(_alias,res);
   }
-  
+
   // NewNodes can participate in cycles, where the same structure is appended
   // to in a loop until the size grows without bound.  If we detect this we
   // need to approximate a new cyclic type.
@@ -66,11 +66,12 @@ public class NewNode extends Node {
   }
 
   @Override public Type all_type() { return _ptr; }
-  
+
   // Clones during inlining all become unique new sites
   @Override NewNode copy(GVNGCM gvn) {
     NewNode nnn = (NewNode)super.copy(gvn);
     nnn._alias = BitsAlias.new_alias(_alias); // Children alias classes, split from parent
+    nnn._ptr = TypeMemPtr.make(nnn._alias,_obj);
     return nnn;
   }
 
