@@ -43,7 +43,7 @@ public class FunNode extends RegionNode {
   // Operator precedence; only set on top-level primitive wrappers.
   // -1 for normal non-operator functions and -2 for forward_decls.
   private final byte _op_prec;  // Operator precedence; only set on top-level primitive wrappers
-  
+
   // Used to make the primitives at boot time
   public  FunNode(PrimNode prim) { this(prim._name,TypeFunPtr.make_new(prim._targs,prim._ret),prim.op_prec()); }
   public  FunNode(IntrinsicNewNode prim, Type ret) { this(prim._name,TypeFunPtr.make_new(prim._targs,ret),-1); }
@@ -117,7 +117,7 @@ public class FunNode extends RegionNode {
   @Override Node copy(GVNGCM gvn) { throw AA.unimpl(); } // Gotta make a new FIDX
 
   // True if no future unknown callers.
-  private boolean has_unknown_callers() { return in(1) == Env.ALL_CTRL; }
+  boolean has_unknown_callers() { return in(1) == Env.ALL_CTRL; }
   // Argument type
   Type targ(int idx) {
     return idx == -1 ? TypeRPC.ALL_CALL :
@@ -503,10 +503,7 @@ public class FunNode extends RegionNode {
     // Will be an error eventually, but act like its executed so the trailing
     // EpilogNode gets visited during GCP
     if( is_forward_ref() ) return Type.CTRL;
-    Type t = Type.XCTRL;
-    for( int i=1; i<_defs._len; i++ )
-      t = t.meet(gvn.type(in(i)));
-    return t;
+    return super.value(gvn);
   }
 
   // True if this is a forward_ref

@@ -20,10 +20,10 @@ import com.cliffc.aa.util.Ary;
 // several possible returns apply... and can be merged like a PhiNode
 
 public class CallNode extends Node {
-  int _rpc;                     // Call-site return PC
-  private boolean _unpacked;    // Call site allows unpacking a tuple (once)
-  private boolean _inlined;     // Inlining a call-site is a 2-stage process; function return wired to the call return
-          Parse  _badargs;      // Error for e.g. wrong arg counts or incompatible args
+  int _rpc;                 // Call-site return PC
+  private boolean _unpacked;// Call site allows unpacking a tuple (once)
+  private boolean _inlined; // Inlining a call-site is a 2-stage process; function return wired to the call return
+  Parse  _badargs;          // Error for e.g. wrong arg counts or incompatible args
   public CallNode( boolean unpacked, Parse badargs, Node... defs ) {
     super(OP_CALL,defs);
     _rpc = BitsRPC.new_rpc(BitsRPC.ALL); // Unique call-site index
@@ -63,19 +63,17 @@ public class CallNode extends Node {
     Type tf = gvn.type(fun());
     return tf instanceof TypeFunPtr ? ((TypeFunPtr)tf).fidxs() : null;
   }
-  
+
   // Clones during inlining all become unique new call sites
   @Override CallNode copy(GVNGCM gvn) {
     CallNode call = (CallNode)super.copy(gvn);
     call._rpc = BitsRPC.new_rpc(_rpc); // Children RPC
     return call;
   }
-  
+
   @Override public Node ideal(GVNGCM gvn) {
     // If an inline is in-progress, no other opts and this node will go dead
     if( _inlined ) return null;
-    // If an upcast is in-progress, no other opts until it finishes
-    if( _cast_ret !=null ) return null;
     // Dead, do nothing
     if( gvn.type(ctl())==Type.XCTRL ) return null;
 
@@ -113,12 +111,7 @@ public class CallNode extends Node {
       }
     }
 
-    // Type-checking a function; requires 2 steps, one now, one in the
-    // following data Proj from the worklist.
     Node unk  = fun();          // Function epilog/function pointer
-    if( unk instanceof TypeNode )
-      return do_typenode((TypeNode)unk,gvn);
-
     // If the function is unresolved, see if we can resolve it now
     if( unk instanceof UnresolvedNode ) {
       Node fun = resolve(gvn);
@@ -166,11 +159,13 @@ public class CallNode extends Node {
     if( rez instanceof ParmNode && rez.in(0) == fun && mem() == mem )
       return inline(gvn,ctl(),mem(),arg(((ParmNode)rez)._idx));
     // Check for constant body
-    if( gvn.type(rez).is_con() ) return inline(gvn,ctl(),mem(),rez);
+    if( gvn.type(rez).is_con() && ctrl==fun )
+      return inline(gvn,ctl(),mem(),rez);
 
     // Check for a 1-op body using only constants or parameters and no memory effects
     boolean can_inline=!(rez instanceof ParmNode) &&
-            mem instanceof ParmNode && mem.in(0)==fun;
+            mem instanceof ParmNode && mem.in(0)==fun &&
+            ctrl==fun;
     for( Node parm : rez._defs )
       if( parm != null && parm != fun &&
           !(parm instanceof ParmNode && parm.in(0) == fun) &&
@@ -218,7 +213,7 @@ public class CallNode extends Node {
         }
       }
     }
-    
+
     // Add an input path to all incoming arg ParmNodes from the Call.  Cannot
     // assert finding all args, because dead args may already be removed - and
     // so there's no Parm/Phi to attach the incoming arg to.
@@ -251,7 +246,7 @@ public class CallNode extends Node {
       }
     }
   }
-  
+
   @Override public TypeTuple value(GVNGCM gvn) {
     Type tc = gvn.type(ctl());  // Control type
     if( _inlined )              // Inlined functions just pass thru & disappear
@@ -271,11 +266,11 @@ public class CallNode extends Node {
 
     if( gvn._opt ) // Manifesting optimistic virtual edges between caller and callee
       wire(gvn);   // Make real edges from virtual edges
-    
+
     if( fp instanceof EpilogNode )
       // Return {control,mem,value} tuple.
       return value1(gvn,(EpilogNode)fp); // Return type or SCALAR if invalid args
-      
+
     TypeTuple trez = TypeTuple.CALL; // Base for JOIN
     // For unresolved, we can take the BEST choice; i.e. the JOIN of every choice.
     // Typically one choice works and the others report type errors on arguments.
@@ -310,7 +305,7 @@ public class CallNode extends Node {
     }
     return TypeTuple.make(tctrl,tmem,tval);
   }
-  
+
   // Given a list of actuals, apply them to each function choice.  If any
   // (!actual-isa-formal), then that function does not work and supplies an
   // ALL to the JOIN.  This is common for non-inlined calls where the unknown
@@ -344,7 +339,7 @@ public class CallNode extends Node {
       FunNode fun = FunNode.find_fidx(fidx);
       if( fun.nargs() != nargs() ) continue; // Wrong arg count, toss out
       TypeTuple formals = fun._tf._args;   // Type of each argument
-      
+
       // Now check if the arguments are compatible at all, keeping lowest cost
       int xcvts = 0;             // Count of conversions required
       boolean unk = false;       // Unknown arg might be incompatible or free to convert
@@ -365,7 +360,7 @@ public class CallNode extends Node {
       Data d = new Data(xcvts,unk,fidx,formals);
       ds.push(d);
     }
-    
+
     // Toss out choices with strictly more conversions than the minimal
     int min = 999;              // Required conversions
     for( Data d : ds )          // Find minimal conversions
@@ -379,10 +374,10 @@ public class CallNode extends Node {
     // replace the prior set.  Similarly, if strictly greater than a prior set,
     // toss this one out.
     for( int i=0; i<ds._len; i++ ) {
-      if( ds.at(i)._unk ) continue; 
+      if( ds.at(i)._unk ) continue;
       TypeTuple ifs = ds.at(i)._formals;
       for( int j=i+1; j<ds._len; j++ ) {
-        if( ds.at(j)._unk ) continue; 
+        if( ds.at(j)._unk ) continue;
         TypeTuple jfs = ds.at(j)._formals;
         if( ifs.isa(jfs) ) ds.del(j--); // Toss more expansive option j
         else if( jfs.isa(ifs) ) { ds.del(i--); break; } // Toss option i
@@ -397,15 +392,15 @@ public class CallNode extends Node {
     //return gvn.xform(new UnresolvedNode(ns.asAry())); // return shrunk choice list
     return null;
   }
-  
+
   @Override public String err(GVNGCM gvn) {
     assert !_inlined;           // Should have already cleaned out
-    
+
     // Error#1: fail for passed-in unknown references
-    for( int j=0; j<nargs(); j++ ) 
+    for( int j=0; j<nargs(); j++ )
       if( arg(j).is_forward_ref() )
         return _badargs.forward_ref_err(((EpilogNode)arg(j)).fun());
-    
+
     Node fp = fun();      // Either function pointer, or unresolved list of them
     Node xfp = fp instanceof UnresolvedNode ? fp.in(0) : fp;
     Type txfp = gvn.type(xfp);
@@ -431,31 +426,8 @@ public class CallNode extends Node {
       if( !actual.isa(formal) ) // Actual is not a formal
         return _badargs.typerr(actual,formal);
     }
-    
-    return null;
-  }
 
-  // Type-checking a function; requires 2 steps, one now, one in the
-  // following data Proj from the worklist.
-  private Type _cast_ret;     // Return type has been up-casted
-  private Parse _cast_P;      // Error message for failed return type
-  private CallNode do_typenode( TypeNode tn, GVNGCM gvn ) {
-    TypeFunPtr tf = (TypeFunPtr)tn._t; // Get call cast type
-    set_fun(tn.in(1),gvn);             // Remove the TypeNode on the function argument
-    // Insert each argument cast before each argument
-    for( int i=0; i<nargs(); i++ ) // Insert casts for each parm
-      set_arg(i,gvn.xform(new TypeNode(tf.arg(i),arg(i),tn._error_parse)),gvn);
-    _cast_ret = tf._ret;      // Upcast return results, lazily installed later
-    _cast_P = tn._error_parse;
-    return this;
-  }
-  // Called from the data proj.  Return a TypeNode with proper casting on return result.
-  TypeNode upcast_return(GVNGCM gvn) {
-    Type t = _cast_ret;
-    if( t==null ) return null;  // No cast-in-progress
-    _cast_ret = null;           // Gonna upcast the return result now
-    gvn.add_work(this);         // Revisit after the data-proj cleans out
-    return new TypeNode(t,null,_cast_P);
+    return null;
   }
 
   @Override public TypeTuple all_type() { return TypeTuple.make(Type.CTRL,TypeMem.MEM,Type.SCALAR); }

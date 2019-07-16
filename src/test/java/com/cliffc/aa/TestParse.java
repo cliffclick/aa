@@ -16,10 +16,9 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
     Object dummy = Env.GVN; // Force class loading cycle
-    testerr ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1,y=2}))", "*[8]@{x:1,y:2} is not a *[1]Point:@{x,y}","                                                                    ");
     // A collection of tests which like to fail easily
+    testerr ("Point=:@{x,y}; Point((0,1))", "*[9](nil,1) is not a *[2]@{x,y}","                           ");
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'","                    ");
-    testerr ("Point=:@{x,y}; Point((0,1))", "*[8](nil,1) is not a *[2]@{x,y}","                           ");
     testerr("{+}(1,2,3)", "Passing 3 arguments to +{(flt64,flt64)-> flt64} which takes 2 arguments","          ");
     test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
     testerr("x=1+y","Unknown ref 'y'","     ");
@@ -197,6 +196,7 @@ public class TestParse {
     testerr("\"abc\":int", "*[7]\"abc\" is not a int64","         ");
     testerr("1:str", "1 is not a *[3]str","     ");
 
+    testerr("fun:{int str -> int}={x y -> x*2}; fun(2,3)", "3 is not a *[3]str","                                 ");
     testerr("x=3; fun:{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int64","                              ");
     test("x=3; fun:{real->real}={x -> x*2}; fun(2.1)+fun(x)", TypeFlt.con(2.1*2+3*2)); // Mix of types to fun()
     test("fun:{real->flt32}={x -> x}; fun(123 )", TypeInt.con(123 ));
@@ -254,7 +254,7 @@ public class TestParse {
 
     test    ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
     test    ("Point=:@{x,y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
-    testerr ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1,y=2}))", "*[8]@{x:1,y:2} is not a *[1]Point:@{x,y}","                                                                    ");
+    testerr ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1,y=2}))", "*[8]@{x:1,y:2} is not a *[2]Point:@{x,y}","                               ");
     testerr ("Point=:@{x,y}; Point((0,1))", "*[8](nil,1) is not a *[2]@{x,y}","                           ");
     testerr("x=@{n:,}","Missing type after ':'","      ");
     testerr("x=@{n=,}","Missing ifex after assignment of 'n'","      ");
@@ -279,7 +279,7 @@ public class TestParse {
 
   @Test public void testParse6() {
     test_ptr("A= :(A?, int); A(0,2)","A:(nil,2)");
-    test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*[12]A:(nil,2),3)");
+    test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*[122]A:(nil,2),3)");
 
     // Building recursive types
     test_isa("A= :int; A(1)", (tmap -> TypeName.make("A",tmap,TypeInt.INT64)));

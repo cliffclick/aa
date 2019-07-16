@@ -40,16 +40,7 @@ public class ParmNode extends PhiNode {
   }
 
   @Override public Type value(GVNGCM gvn) {
-    Type t = _default_type.dual();
-    if( !(in(0) instanceof FunNode) ) return t; // Dying
-    FunNode fun = (FunNode) in(0);
-    assert fun._defs._len==_defs._len;
-    for( int i=1; i<_defs._len; i++ )
-      if( gvn.type(fun.in(i))!=Type.XCTRL ) { // Only meet alive paths
-        Type pt = gvn.type(in(i));
-        t = t.meet(pt.isa(_default_type) ? pt : _default_type);
-      }
-    return t;
+    return in(0) instanceof FunNode ? super.value(gvn) : _default_type.dual(); // Dying returns default.dual
   }
   @Override public String err( GVNGCM gvn ) {
     if( !(in(0) instanceof FunNode) ) return null; // Dead, report elsewhere

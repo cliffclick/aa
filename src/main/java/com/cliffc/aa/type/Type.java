@@ -371,7 +371,10 @@ public class Type<T extends Type<T>> {
   public boolean isa( Type t ) { return meet(t)==t; }
 
   // Trim 'this' to being within lower bound 't' and upper bound 't.dual'
-  public Type bound( Type t ) { return meet(t._dual).join(t); }
+  public Type bound( Type t ) {
+    if( t.dual().isa(this) && this.isa(t) ) return this;
+    return above_center() ? t.dual() : t;
+  }
 
   public static void init0( HashMap<String,Type> types ) {
     types.put("real",REAL);

@@ -157,7 +157,9 @@ public class Parse {
     // If the ONLY error is from unresolved calls, report them last.  Most
     // other errors result in unresolved calls, so report others first.
     if( errs0.isEmpty() ) errs0.addAll(errs2);
-    errs0.sort_update(String::compareTo);
+    // Do not sort the errors, because they are reported in Reverse Post-Order
+    // which means control-dependent errors are reported after earlier control
+    // errors... i.e., you get the errors in execution order.
 
     Type tres = _gvn.type(res);
     TypeMem tmem = (TypeMem)_gvn.type(mem());
@@ -297,7 +299,15 @@ public class Parse {
       return toks._len == 0 ? null
         : err_ctrl2("Missing ifex after assignment of '"+toks.last()+"'");
     // Honor all type requests, all at once
-    for( Type t : ts ) if( t != null ) ifex = gvn(new TypeNode(t,ifex,errMsg()));
+    try( TmpNode keep = new TmpNode() ) { // TODO: THIS IS REALLY UGLY KEEP-ALIVE
+      keep.add_def(ifex);
+      for( Type t : ts )
+        if( t != null &&
+            !_gvn.type(ifex).isa(t) ) // shortcut if TypeNode elides immediately
+          set_ctrl(gvn(new TypeNode(t,ctrl(),ifex,errMsg())));
+      ifex.add_def(ifex);
+    }
+    ifex.pop();
     // Assign tokens to value
     for( int i=0; i<toks._len; i++ ) {
       String tok = toks.at(i);     // Token being assigned
@@ -339,14 +349,14 @@ public class Parse {
       set_ctrl(gvn(new CProjNode(ifex,1))); // Control for true branch, and sharpen tested value
       Node t_sharp = ctrl().sharpen(_gvn,if_scope,t_scope);
       Node tex = expr();
-      ctrls.add_def(tex==null ? err_ctrl1("missing expr after '?'",Type.SCALAR) : tex);
+      ctrls.add_def(tex==null ? err_ctrl2("missing expr after '?'") : tex);
       ctrls.add_def(ctrl()); // 2 - hook true-side control
       require(':');
       ScopeNode f_scope = (_e = new Env(e_if))._scope; // Push new scope for false arm
       set_ctrl(gvn(new CProjNode(ifex,0))); // Control for true branch, and sharpen tested value
       Node f_sharp = ctrl().sharpen(_gvn,if_scope,f_scope);
       Node fex = expr();
-      ctrls.add_def(fex==null ? err_ctrl1("missing expr after ':'",Type.SCALAR) : fex);
+      ctrls.add_def(fex==null ? err_ctrl2("missing expr after ':'") : fex);
       ctrls.add_def(ctrl()); // 4 - hook false-side control
       _e = e_if;             // Pop the arms scope
       set_ctrl(init(new RegionNode(null,ctrls.in(2),ctrls.in(4))));
@@ -469,7 +479,9 @@ public class Parse {
     if( !peek(':') ) { _x = oldx; return fact; }
     Type t = type();
     if( t==null ) { _x = oldx; return fact; } // No error for missing type, because can be ?: instead
-    return gvn(new TypeNode(t,fact,errMsg()));
+    if( _gvn.type(fact).isa(t) ) return fact;
+    set_ctrl(gvn(new TypeNode(t,ctrl(),fact,errMsg())));
+    return fact;
   }
 
   /** Parse a factor, a leaf grammar token
@@ -570,14 +582,17 @@ public class Parse {
       set_ctrl(fun);            // New control is function head
       String errmsg = errMsg("Cannot mix GC and non-GC types");
       int cnt=0;                // Add parameters to local environment
-      for( int i=0; i<ids._len; i++ )
-        _e.update(ids.at(i),gvn(new ParmNode(cnt++,ids.at(i),fun,con(ts.at(i)),errmsg)),null,
-                  /*memory is mutable*/i == 0 || args_are_mutable);
+      for( int i=0; i<ids._len; i++ ) {
+        Type t = ts.at(i);
+        Node parm = gvn(new ParmNode(cnt++,ids.at(i),fun,con(Type.SCALAR),errmsg));
+        _e.update(ids.at(i),parm,null, args_are_mutable);
+        if( t!=Type.SCALAR ) set_ctrl(gvn(new TypeNode(t,ctrl(),parm,errMsg()))); // Add user type-annotation
+      }
       Node rpc = gvn(new ParmNode(-1,"rpc",fun,con(TypeRPC.ALL_CALL),null));
       Node mem = gvn(new ParmNode(-2,"mem",fun,con(TypeMem.MEM),null));
       set_mem(mem);
       Node rez = stmts();       // Parse function body
-      if( rez == null ) rez = err_ctrl1("Missing function body", Type.SCALAR);
+      if( rez == null ) rez = err_ctrl2("Missing function body");
       require('}');             //
       Node epi = gvn(new EpilogNode(ctrl(),mem(),rez,rpc,fun,null));
       _e = _e._par;             // Pop nested environment
@@ -603,23 +618,26 @@ public class Parse {
       while( true ) {
         String tok = token();    // Scan for 'id'
         if( tok == null ) break; // end-of-struct-def
-        Type t = Type.SCALAR;    // Untyped, most generic type that fits in a field
+        Type t = null;           // Untyped, most generic type that fits in a field
         Node stmt = con(Type.SCALAR);
         boolean is_final = true;
         if( peek(":=") ) { is_final = false; _x--; } // Parse := re-assignable field token
-        if( peek('=') ) {       // Parse field initial value
-          if( (stmt=stmt())==null )
-            stmt = err_ctrl2("Missing ifex after assignment of '"+tok+"'");
-        } else if( peek(':') )  // Has type annotation?
+        if( peek(':') ) { // Has type annotation?
           if( (t=type())==null )
             stmt = err_ctrl2("Missing type after ':'");
+          if( peek(":=") ) { is_final = false; _x--; } // Parse := re-assignable field token
+        }
+        if( peek('=') )         // Parse field initial value
+          if( (stmt=stmt())==null )
+            stmt = err_ctrl2("Missing ifex after assignment of '"+tok+"'");
+
         // Check for repeating a field name
         if( e._scope.get(tok)!=null ) {
           kill(stmt);           // Kill assignment
           stmt = err_ctrl2("Cannot define field '." + tok + "' twice"); // Error is now the result
         }
         // Add type-check into graph
-        if( t != null ) stmt = gvn(new TypeNode(t,stmt,errMsg()));
+        if( t != null ) set_ctrl(gvn(new TypeNode(t,ctrl(),stmt,errMsg())));
         // Add field into lexical scope, field is usable after initial set
         e.update(tok,stmt,_gvn,false); // Field now available 'bare' inside rest of scope
         if( is_final ) fs.set(toks._len);

@@ -34,10 +34,10 @@ public abstract class IntrinsicNode extends Node {
   }
 
   final static String[] ARGS1 = new String[]{"x"};
-  
+
   @Override public String xstr() { return _name; }
   @Override public Node ideal(GVNGCM gvn) { return null; }
-  
+
   @Override public String err(GVNGCM gvn) {
     for( int i=0; i<_targs._ts.length; i++ ) {
       Type tactual = gvn.type(in(i+2));
@@ -67,7 +67,7 @@ public abstract class IntrinsicNode extends Node {
     FunNode fun = (FunNode) gvn.xform(new FunNode(to._name,tf));
     Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
     Node mem = gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM     ),null));
-    Node ptr = gvn.xform(new ParmNode( 0,"ptr",fun,gvn.con(from_ptr        ),null));
+    Node ptr = gvn.xform(new ParmNode( 0,"ptr",fun,gvn.con(Type.SCALAR     ),null));
     Node cvt = gvn.xform(new ConvertPtrTypeName(to._name,from_ptr,to_ptr,badargs,mem,ptr));
     Node mmem= gvn.xform(new MemMergeNode(mem,cvt));
     return new EpilogNode(fun,mmem,cvt,rpc,fun,null);
@@ -110,7 +110,7 @@ public abstract class IntrinsicNode extends Node {
     // Semantics are to extract a TypeObj from mem and ptr, and if there is no
     // aliasing, sharpen the TypeObj to a TypeName.  We can be correct and
     // conservative by doing nothing.
-    
+
     // The inputs are a TypeMem and a TypeMemPtr to an unnamed TypeObj.  If the
     // ptr is of the "from" type, we cast a Name to it and produce a pointer to
     // the "to" type, otherwise we get the most conservative "to" type.
@@ -126,7 +126,7 @@ public abstract class IntrinsicNode extends Node {
       TypeObj obj = ((TypeMem)mem).ld((TypeMemPtr)ptr);
       if( !obj.isa(from._obj) ) return to; // Inputs not correct from, and node is in-error
       if( obj.isa(from._obj.dual()) ) return to.dual();
-      
+
       TypeName tnto = tname.make(obj);// Named to obj
       return to.make(tnto);
     }
@@ -139,10 +139,10 @@ public abstract class IntrinsicNode extends Node {
         if( !actual.isa(from) )
           return _badargs.typerr(actual, from);
       }
-      throw AA.unimpl();        // Did not remove the aliasing
+      return _badargs.typerr(ptr,_targs.at(0));        // Did not remove the aliasing
     }
   }
-    
+
   // --------------------------------------------------------------------------
   // Default name constructor using expanded args list.  Just a NewNode but the
   // result is a named type.  Same as convertTypeName on an unaliased NewNode.

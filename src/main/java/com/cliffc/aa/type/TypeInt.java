@@ -81,7 +81,6 @@ public class TypeInt extends Type<TypeInt> {
     }
     TypeInt tt = (TypeInt)t;
     assert !equals(tt);         // Already covered by interning
-    if( _x==tt._x && _z==tt._z && _con==tt._con ) return this;
     int maxz = Math.max(_z,tt._z);
     int minz = Math.min(_z,tt._z);
     if( _x== 0 && tt._x== 0 && _con==tt._con ) return make(0,maxz,_con);
