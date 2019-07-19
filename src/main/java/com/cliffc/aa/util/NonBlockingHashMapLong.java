@@ -112,7 +112,7 @@ public class NonBlockingHashMapLong<TypeV>
     catch( java.lang.NoSuchFieldException e ) { throw new RuntimeException(e); }
     _val_1_offset = _unsafe.objectFieldOffset(f);
   }
-  
+
   private final boolean CAS( final long offset, final Object old, final Object nnn ) {
     return _unsafe.compareAndSwapObject(this, offset, old, nnn );
   }
@@ -318,6 +318,13 @@ public class NonBlockingHashMapLong<TypeV>
   /** Removes all of the mappings from this map. */
   public void clear() {         // Smack a new empty table down
     CHM newchm = new CHM(this,new ConcurrentAutoTable(),MIN_SIZE_LOG);
+    while( !CAS(_chm_offset,_chm,newchm) ) { /*Spin until the clear works*/}
+    CAS(_val_1_offset,_val_1,TOMBSTONE);
+  }
+  public void clear(boolean large) {         // Smack a new empty table down
+    int len = _chm._keys.length, log=0;
+    while( len > 1 ) { len>>=1; log++; }
+    CHM newchm = new CHM(this,new ConcurrentAutoTable(),log);
     while( !CAS(_chm_offset,_chm,newchm) ) { /*Spin until the clear works*/}
     CAS(_val_1_offset,_val_1,TOMBSTONE);
   }
@@ -884,7 +891,7 @@ public class NonBlockingHashMapLong<TypeV>
       if( workdone > 0 ) {
         while( !_copyDoneUpdater.compareAndSet(this,copyDone,copyDone+workdone) ) {
           copyDone = _copyDone; // Reload, retry
-          assert (copyDone+workdone) <= oldlen; 
+          assert (copyDone+workdone) <= oldlen;
         }
       }
 
