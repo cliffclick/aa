@@ -142,15 +142,7 @@ public class TypeName extends TypeObj<TypeName> {
       // Unequal names
       if( !mt.above_center() ) return mt;
       // Unequal high names... fall to the highest value below-center
-      switch( mt._type ) {
-      case TXNUM: case TXNNUM: case TXREAL: case TXNREAL: case TINT: case TFLT:
-        // Return a number that is not-null (to preserve any not-null-number
-        // property) but forces a move off the centerline.
-        return mt.must_nil() ? TypeInt.BOOL : TypeInt.TRUE;
-      case TOBJ:
-      case TSTRUCT:  return mt.dual();
-      default: throw AA.unimpl();
-      }
+      return off_center(mt);
 
     default:
       return extend(t);
@@ -163,14 +155,29 @@ public class TypeName extends TypeObj<TypeName> {
     int xnd = x instanceof TypeName ? ((TypeName)x)._depth : -1;
     int tnd = t instanceof TypeName ? ((TypeName)t)._depth : -1;
     if( xnd < tnd ) return x; // No common prefix
-    if( x==Type.ALL ) return x;
+    if( x==Type.ALL || x==Type.NSCALR || x==Type.SCALAR || x==TypeObj.OBJ ) return x;
     // Same strategy as TypeStruct and extra fields...
-    // short guy high, keep long 
+    // short guy high, keep long
     // short guy  low, keep short
     if( t.above_center() ) return make(_name,_lex,x);
-    //// Both high, keep long else keep short
-    //if( above_center() && t.above_center() ) return make(_name,_lex,x);
-    return x;
+    // Fails lattice if 'x' is a constant because cannot add names...
+    // Force 'x' to not be a constant.
+    return off_center(x);
+  }
+
+  // Must fall to the 1st thing just below center
+  private static Type off_center(Type mt) {
+    if( !mt.above_center() && !mt.is_con() ) return mt; // Already below-center
+    switch( mt._type ) {
+    case TXNUM: case TXNNUM: case TXREAL: case TXNREAL:
+    case TINT:  case TFLT:
+      // Return a number that is not-null (to preserve any not-null-number
+      // property) but forces a move off the centerline.
+      return mt.must_nil() ? TypeInt.BOOL : TypeInt.make(-1,1,1);
+    case TNAME:
+      return mt;
+    default: throw AA.unimpl();
+    }
   }
 
   // 'this' is a forward ref type definition; the actual type-def is 't' which

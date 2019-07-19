@@ -15,6 +15,62 @@ public class TestType {
     Type s1 = TypeName.TEST_E2  ;    // B:A:int
     Type s2 = TypeName.TEST_STRUCT;  //   C:{x,y}
     Type i8 = TypeInt.INT8;
+    Type i8d = i8.dual();
+    Type i1 = TypeInt.BOOL;
+    Type i1d = i1.dual();
+
+    //Type xx = TypeStruct.POINT.join(TypeStr.STR);
+    //assertFalse(xx.above_center());
+
+
+    // B:int8 isa Scalar
+    assertTrue(s0.isa(Type.SCALAR));
+    //   B: int8 JOIN C: flt32
+    // ~(B:~int8 MEET C:~flt32)  <<== unequal high values, fall to highest value just below center
+    // ~(  ~int8 MEET   ~flt32) <<== approx B meet C as {A,B,C,...}
+    // ~(  ~int8)
+    //    falls to highest value below center: bool
+    // ~(   int1 )
+    // ~int1
+
+    // {A,B,C}:int8 <<<--- will never be above center, so will never be a C:flt32
+    Type t02 = s0           .join(TypeName.TEST_FLT);
+    assertEquals(TypeInt.make(1,1,1),t02);
+    //      Scalar JOIN C: flt32
+    // ~(  ~Scalar MEET C:~flt32)
+    // ~(C:~Scalar MEET C:~flt32)
+    // ~(C:~flt32)
+    // C:flt32
+    Type t12 = Type.SCALAR.join(TypeName.TEST_FLT);
+    assertEquals(TypeName.TEST_FLT,t12);
+    // {A,B,C,...}:int8 isa C:flt32  !!!!
+    Type s20 = t02.meet(t12);
+    assertEquals(t12,s20);
+
+
+    Type pi1 = TypeInt.make(+1,1,1);
+    assertEquals(i1,pi1.meet(i1));
+
+    // (~nScalar&~int1) & B:int1 == ~nScalar & (~int1 & B:int1);
+    // (~1) & B:int1 == ~nScalar & (B:int1);
+    // con1 & B:int1 == ~nScalar & (B:int1); <<== FALL ~1 to con1
+    // Now blend all-1s and B:{0,1}
+    //    {:1,A:1,    B:1,C:1,A:B:C:1,...}  and {B:0,B:1}  ==>
+    //    {:1,A:1,B:0,B:1,C:1,A:B:C:1,...} ==>> int1
+    // int1 == B:int1
+    //
+    // Looking at other side: ~int1 & B:int
+    //   { :0 + :1 + A:0 + A:1 + B:0 + B:1... } and {B:0,B:1}
+    // Looking at other side: ~nScalar & B:int
+    //   { ~@{x,y} + :1 + :2 + A:1 + A:2 + B:1 + B:2 ... } and {B:0,B:1,B:2,...}
+    Type s14 = i1d.meet(Type.XNSCALR);
+    assertEquals(pi1,s14); // 1?  or ~1?
+    //assertEquals(TypeInt.TRUE,s14); // 1?  or ~1?
+    Type s15 = s0.meet(s14); // B:int1 MEET (~1) == B:int1 vs int1
+    assertEquals(s0,s15); // B:int1
+    Type s16 = i1d.meet(s0); // ~int1 MEET B:int1
+    assertEquals(s0,s16); // B:int1
+    assertEquals(s0,s16.meet(Type.XNSCALR)); // B:int1
 
     Type s3 = s0.meet(s1);
     assertEquals(s0,s3);        // B.A.int isa A.int
@@ -50,7 +106,6 @@ public class TestType {
     // (~nScalar JOIN B:int8) isa (A:int8 JOIN B:int8)
 
     // ~nScalar MEET A:int8 == A:int8   <<== can add A:2 to A:int8 set, gets A:int8
-    Type i8d = i8.dual();
     Type bi8 = TypeName.make("B",TypeName.TEST_SCOPE,i8);
     assertEquals(s1,Type.XNSCALR.meet(s1));
     // ~nScalar JOIN B:int8 = ~nScalar
@@ -58,7 +113,7 @@ public class TestType {
     assertEquals(Type.XNSCALR,Type.XNSCALR.join(bi8));
     //    A:int8   JOIN  B:int8  =   1
     // ~(~A:int8   MEET ~B:int8) = ~(1) = 1  <<== Set of {A:1,B:1}
-    assertEquals(TypeInt.TRUE,s1.join(bi8));
+    assertEquals(pi1,s1.join(bi8));
     //
     // ~nScalar isa  1 !?!?
     // ~nScalar MEET 1 == 1  !!!!
@@ -75,7 +130,7 @@ public class TestType {
     assertEquals(Type.XNSCALR,Type.XNSCALR.join(TypeName.TEST_FLT));
     //    A:int8   JOIN  B:flt32  = ~int8
     // ~(~A:int8   MEET ~B:flt32) = ~(A:~int8 MEET B:~int8 ) = ~(int8) = ~int8  <<== Set of {A:2,B:2}
-    assertEquals(TypeInt.TRUE,s1.join(TypeName.TEST_FLT));
+    assertEquals(pi1,s1.join(TypeName.TEST_FLT));
     //
     // ~nScalar isa  ~int8 !?!?
     // ~nScalar MEET ~int8 == ~nint8  !!!!
@@ -85,11 +140,8 @@ public class TestType {
     Type s13 = TypeFlt.NFLT64.dual().meet(s0);
     assertEquals(s0,s13); // ~nflt64 isa B:int   same as   ~nScalar isa A:B:int
 
-    // ==========
-    // (~nScalar&~int1) & __test_e2:__test_enum:int8 == ~nScalar & (~int1 & __test_e2:__test_enum:int8);
-    // (1) & __test_e2:__test_enum:int8 == ~nScalar & (__test_e2:__test_enum:int8);
-    // int8 == __test_e2:__test_enum:int8
-
+    Type s19 = TypeFlt.PI.meet(s1);
+    assertEquals(TypeFlt.FLT64,s19);
 
   }
 
@@ -129,12 +181,12 @@ public class TestType {
     //      Confirm lattice: {~i8 -> N:~i8 -> 0 -> N:i8 -> i8; N:0 -> 0 }
     // NOT: Confirm lattice: {N:~i8 -> ~i8; N:i8 -> i8 }
     assertEquals(xni8,xni8.meet( xi8));//   ~i8 -> N:~i8
-    assertEquals(TypeInt.FALSE, z  .meet(xni8));// N:~i8 -> {0,1}??? When falling off from a Named Int, must fall below ANY constant to keep a true lattice
+    assertEquals(TypeInt.BOOL, z  .meet(xni8));// N:~i8 -> {0,1}??? When falling off from a Named Int, must fall below ANY constant to keep a true lattice
     assertEquals(  i8, ni8.meet(   z));//     0 -> N:i8
     assertEquals(  i8,  i8.meet( ni8));// N: i8 ->   i8
 
     assertEquals(xni8,xi8.meet(xni8));
-    assertEquals(TypeInt.TRUE, o .meet(xni8));
+    assertEquals(TypeInt.make(-1,1,1), o .meet(xni8));
   }
 
   // Memory is on a different line than pointers.
