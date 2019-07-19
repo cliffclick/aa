@@ -34,8 +34,8 @@ public class TestNode {
   private NonBlockingHashMapLong<Type> _values;
 
   // Array doubling of longs
-  long[] _work = new long[1];
-  int _work_len;
+  private long[] _work = new long[1];
+  private int _work_len;
 
   // Worse-case output for a Node
   private Type _alltype;
@@ -140,6 +140,7 @@ public class TestNode {
   // Node.  However, all legal inputs should produce an output with the
   // monotonicity invariant.
 
+  public static void main( String[] args ) { new TestNode().testMonotonic();  }
   @SuppressWarnings("unchecked")
   @Test public void testMonotonic() {
     Type.init0(new HashMap<>());
@@ -156,23 +157,12 @@ public class TestNode {
     // more efficient in testing all Types which subtype another Type.
     _min_subtypes = make_minimal_graph();
 
-    // Add self-type in slot0 of the minimal graph, so we iterate over
-    // ourselves and our children
-    for( int i=0; i<_min_subtypes.length; i++ ) {
-      int[] ms = _min_subtypes[i];
-      int[] xs = new int[ms.length+1];
-      System.arraycopy(ms,0,xs,1,ms.length);
-      xs[0] = i;
-      _min_subtypes[i] = xs;
-    }
-    
-
     // Per-node-type cached value() results
-    _values = new NonBlockingHashMapLong<>();
+    _values = new NonBlockingHashMapLong<Type>(8*1000000,false);
 
     // Print the types and subtypes in a RPO
-    print(0,0);
-    _values.clear();
+    //print(0,0);
+    //_values.clear(true);
 
     // Setup to compute a value() call: we need a tiny chunk of Node graph with
     // known inputs.
@@ -259,44 +249,77 @@ public class TestNode {
     test1monotonic_init(n);
   }
 
+  @SuppressWarnings("unchecked")
   private void test1monotonic_init(final Node n) {
     System.out.println(n.xstr());
-    _values.clear();
+    _values.clear(true);
     _alltype = n.all_type();
     assert _alltype.is_con() || (!_alltype.above_center() && _alltype.dual().above_center());
 
     set_value_type(n,0);        // Setup worklist and first node
     Type[] all = Type.ALL_TYPES();
+    long t0 = System.currentTimeMillis();
+    long nprobes = 0, nprobes1=0;
     while( _work_len > 0 ) {
       long xx = pop();
-      int i0 = xx(xx,0), i1 = xx(xx,1), i2 = xx(xx,2), i3 = xx(xx,3);
-      System.out.println(""+i0+","+i1+","+i2+","+i3+","+all[i0]+","+all[i1]+","+all[i2]+","+all[3]);
       Type vn = get_value_type(xx);
+      int x0 = xx(xx,0), x1 = xx(xx,1), x2 = xx(xx,2), x3 = xx(xx,3);
+      // Prep graph edges
+      _gvn.setype(_ins[0],                        all[x0]);
+      _gvn.setype(_ins[1],((ConNode)_ins[1])._t = all[x1]);
+      _gvn.setype(_ins[2],((ConNode)_ins[2])._t = all[x2]);
+      _gvn.setype(_ins[3],((ConNode)_ins[3])._t = all[x3]);
+
       // Subtypes in 4 node input directions
       int[] stx0 = stx(n,xx,0);
+      for( int y0 : stx0 )
+        set_value_type(n, vn, xx, xx(y0,x1,x2,x3), 0, y0, all );
       int[] stx1 = stx(n,xx,1);
+      for( int y1 : stx1 )
+        set_value_type(n, vn, xx, xx(x0,y1,x2,x3), 1, y1, all );
       int[] stx2 = stx(n,xx,2);
+      for( int y2 : stx2 )
+        set_value_type(n, vn, xx, xx(x0,x1,y2,x3), 2, y2, all );
       int[] stx3 = stx(n,xx,3);
+      for( int y3 : stx3 )
+        set_value_type(n, vn, xx, xx(x0,x1,x2,y3), 3, y3, all );
 
-      for( int x0 : stx0 )
-        for( int x1 : stx1 )
-          for( int x2 : stx2 )
-            for( int x3 : stx3 ) {
-              // Check for this type combo from the cache
-              long xxx = xx(x0,x1,x2,x3);
-              Type vm = _values.get(xxx);
-              if( vm == null ) vm = set_value_type(n,xxx);
-              // The major monotonicity assert
-              if( !vn.isa(vm) ) {
-                System.out.println(n.xstr()+"("+all[xx(xx,0)]+","+all[xx(xx,1)]+","+all[xx(xx,2)]+","+all[xx(xx,3)]+") = "+vn);
-                System.out.println(n.xstr()+"("+all[     x0 ]+","+all[     x1 ]+","+all[     x2 ]+","+all[     x3 ]+") = "+vm);
-                _errs++;
-              }
-          }
+      nprobes1 += stx0.length+stx1.length+stx2.length+stx3.length;
+      long t1 = System.currentTimeMillis();
+      if( t1-t0 >= 1000 ) {
+        nprobes += nprobes1;
+        System.out.println("Did "+nprobes1+" in "+(t1-t0)+"msecs, worklist has "+_work_len+" states, total probes "+nprobes);
+        nprobes1=0;
+        t0=t1;
+      }
     }
   }
 
-  private static int[] stx_any = new int[]{0};
+  @SuppressWarnings("unchecked")
+  private void set_value_type(Node n, Type vn, long xx, long xxx, int idx, int yx, Type[] all ) {
+    Type vm = _values.get(xxx);
+    if( vm == null ) {
+      if( idx > 0 ) ((ConNode)_ins[idx])._t = all[yx];
+      _gvn.setype(_ins[idx], all[yx]);
+      vm = n.value(_gvn);
+      //vm = Type.ALL;
+      // Assert the alltype() bounds any value() call result.
+      assert vm.isa(_alltype);
+      assert _alltype.dual().isa(vm);
+      Type old = _values.put(xxx,vm);
+      //assert old==null;
+      push(xxx);            // Now visit all children
+    }
+    // The major monotonicity assert
+    if( vn!= vm && !vn.isa(vm) ) {
+      int x0 = xx(xx,0), x1 = xx(xx,1), x2 = xx(xx,2), x3 = xx(xx,3);
+      System.out.println(n.xstr()+"("+all[x0]+","+all[x1]+","+all[x2]+","+all[x3]+") = "+vn);
+      System.out.println(n.xstr()+"("+all[idx==0?yx:x0]+","+all[idx==1?yx:x1]+","+all[idx==2?yx:x2]+","+all[idx==3?yx:x3]+") = "+vm);
+      _errs++;
+    }
+  }
+
+  private static int[] stx_any = new int[]{};
   private int[] stx(final Node n, long xx, int i) {
     if( i >= n._defs._len || n.in(i) == null ) return stx_any;
     return _min_subtypes[xx(xx,i)];
