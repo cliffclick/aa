@@ -82,11 +82,11 @@ public class TypeTuple extends Type<TypeTuple> {
   public static TypeTuple make_args( Type... ts ) { return make0(/*QQQfalse*/false,ts); }
 
   // Most primitive function call argument type lists are 0-based
-  public  static final TypeTuple ALL_ARGS= make0(/*QQQfalse*/false); // Zero args and high
-          static final TypeTuple SCALAR0 = make_args();
-          static final TypeTuple SCALAR1 = make_args(SCALAR);
+          static final TypeTuple ALL_ARGS= make0(/*QQQfalse*/false); // Zero args and high
+  private static final TypeTuple SCALAR0 = make_args();
+  private static final TypeTuple SCALAR1 = make_args(SCALAR);
   public  static final TypeTuple SCALAR2 = make_args(SCALAR, SCALAR);
-          static final TypeTuple INT32   = make_args(TypeInt.INT32 );
+  private static final TypeTuple INT32   = make_args(TypeInt.INT32 );
   public  static final TypeTuple INT64   = make_args(TypeInt.INT64 );
   public  static final TypeTuple FLT64   = make_args(TypeFlt.FLT64 );
   public  static final TypeTuple STRPTR  = make_args(TypeMemPtr.STRPTR);
@@ -95,7 +95,7 @@ public class TypeTuple extends Type<TypeTuple> {
   public  static final TypeTuple FLT64_FLT64 = make_args(TypeFlt.FLT64,TypeFlt.FLT64);
   private static final TypeTuple FLT64_INT64 = make_args(TypeFlt.FLT64,TypeInt.INT64);
   public  static final TypeTuple STR_STR     = make_args(TypeMemPtr.STRPTR,TypeMemPtr.STRPTR);
-  
+
   public  static final TypeTuple IF_ANY  = make(XCTRL,XCTRL);
   public  static final TypeTuple IF_ALL  = make(CTRL ,CTRL );
   public  static final TypeTuple IF_TRUE = make(XCTRL,CTRL );
@@ -105,8 +105,8 @@ public class TypeTuple extends Type<TypeTuple> {
   public  static final TypeTuple START_STATE = make(CTRL, TypeMem.EMPTY_MEM);
   public  static final TypeTuple CALL  = make(CTRL, TypeMem.MEM, SCALAR);
   public  static final TypeTuple XCALL = CALL.dual();
-  static final TypeTuple[] TYPES = new TypeTuple[]{ALL_ARGS,SCALAR0,SCALAR1,STRPTR,INT32,INT64,FLT64,INT64_INT64,FLT64_FLT64,FLT64_INT64, IF_ALL, IF_TRUE, IF_FALSE, OOP_OOP};
-  
+  static final TypeTuple[] TYPES = new TypeTuple[]{SCALAR0,SCALAR1,STRPTR,INT32,INT64,FLT64,INT64_INT64,FLT64_FLT64,FLT64_INT64, IF_ALL, IF_TRUE, IF_FALSE, OOP_OOP};
+
   // The length of Tuples is a constant, and so is its own dual.  Otherwise
   // just dual each element.  Also flip the infinitely extended tail type.
   @SuppressWarnings("unchecked")
@@ -181,7 +181,7 @@ public class TypeTuple extends Type<TypeTuple> {
         if( (x=_ts[i].isBitShape(tt._ts[i])) != 0 )
           return x;
     }
-    
+
     throw AA.unimpl();
   }
 

@@ -11,11 +11,86 @@ public class TestType {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testType() {
     Type.init0(new HashMap<>());
+    Type s0 = TypeName.TEST_ENUM;    //   A:int
+    Type s1 = TypeName.TEST_E2  ;    // B:A:int
+    Type s2 = TypeName.TEST_STRUCT;  //   C:{x,y}
+    Type i8 = TypeInt.INT8;
 
-    Type s0 = TypeName.TEST_STRUCT;
-    Type s1 = TypeStr.STR.dual();
-    Type s2 = s0.meet(s1);
-    assertEquals(TypeObj.OBJ,s2);
+    Type s3 = s0.meet(s1);
+    assertEquals(s0,s3);        // B.A.int isa A.int
+
+    Type s4 = s0.join(s1);
+    assertEquals(s1,s4);        // A.~int isa B.A.~int
+
+    Type s5 = s1.meet(s2);
+    assertEquals(Type.ALL,s5);  // B:A:int meet C:{x,y} == ALL
+
+    Type s6 = s1.join(s2);
+    assertEquals(Type.ANY,s6);  // B:A:int join C:{x,y} == ANY
+
+    // ~nScalar = no zero, but choice of all ints including _t_e2:_t_enum:~nint8
+    // (~nScalar & __test_e2:__test_enum:int8) ==
+    // (__test_e2:__test_enum:~nint8 & __test_e2:__test_enum:int8) == __test_e2:__test_enum:int8
+    Type s7 = s1.meet(Type.XNSCALR);
+    assertEquals(s1,s7);        // ~nScalar isa B:A:int
+    //assertEquals(i8,s7);        // ~nScalar isa int, diagonal meet drops name
+
+    Type s8 = s1.dual().meet(Type.NSCALR);
+    assertEquals(Type.NSCALR,s8);
+
+    Type s9 = TypeFlt.FLT64.dual().meet(s1.dual());
+    assertEquals(s1.dual(),s9);
+
+    Type s10 = TypeInt.BOOL.dual().meet(s2);
+    // No named ALLs
+    //assertEquals(TypeName.make("__test_struct",TypeName.TEST_SCOPE,Type.ALL),s10);
+    assertEquals(Type.ALL,s10);
+
+    //  ~nScalar              isa  A:int8, SO
+    // (~nScalar JOIN B:int8) isa (A:int8 JOIN B:int8)
+
+    // ~nScalar MEET A:int8 == A:int8   <<== can add A:2 to A:int8 set, gets A:int8
+    Type i8d = i8.dual();
+    Type bi8 = TypeName.make("B",TypeName.TEST_SCOPE,i8);
+    assertEquals(s1,Type.XNSCALR.meet(s1));
+    // ~nScalar JOIN B:int8 = ~nScalar
+    // ~(~~nScalar MEET ~B:int8) = ~(nScalar MEET B:~int8) = ~(nScalar) = ~nScalar <<== Add B:2 to nScalar, gets nScalar
+    assertEquals(Type.XNSCALR,Type.XNSCALR.join(bi8));
+    //    A:int8   JOIN  B:int8  =   1
+    // ~(~A:int8   MEET ~B:int8) = ~(1) = 1  <<== Set of {A:1,B:1}
+    assertEquals(TypeInt.TRUE,s1.join(bi8));
+    //
+    // ~nScalar isa  1 !?!?
+    // ~nScalar MEET 1 == 1  !!!!
+    Type s11 = Type.XNSCALR.meet(TypeInt.TRUE);
+    assertEquals(TypeInt.TRUE,s11);
+
+    //  ~nScalar               isa  A:int8, SO
+    // (~nScalar JOIN B:flt32) isa (A:int8 JOIN B:flt32)
+
+    // ~nScalar MEET A:int8 == A:int8   <<== can add A:2 to A:int8 set, gets A:int8
+    assertEquals(s1,Type.XNSCALR.meet(s1));
+    // ~nScalar JOIN B:flt32 = ~nScalar
+    // ~(~~nScalar MEET ~B:flt32) = ~(nScalar MEET B:~flt32) = ~(nScalar) = ~nScalar <<== Add B:2 to nScalar, gets nScalar
+    assertEquals(Type.XNSCALR,Type.XNSCALR.join(TypeName.TEST_FLT));
+    //    A:int8   JOIN  B:flt32  = ~int8
+    // ~(~A:int8   MEET ~B:flt32) = ~(A:~int8 MEET B:~int8 ) = ~(int8) = ~int8  <<== Set of {A:2,B:2}
+    assertEquals(TypeInt.TRUE,s1.join(TypeName.TEST_FLT));
+    //
+    // ~nScalar isa  ~int8 !?!?
+    // ~nScalar MEET ~int8 == ~nint8  !!!!
+    Type s12 = Type.XNSCALR.meet(TypeInt.TRUE);
+    assertEquals(TypeInt.TRUE,s12);
+
+    Type s13 = TypeFlt.NFLT64.dual().meet(s0);
+    assertEquals(s0,s13); // ~nflt64 isa B:int   same as   ~nScalar isa A:B:int
+
+    // ==========
+    // (~nScalar&~int1) & __test_e2:__test_enum:int8 == ~nScalar & (~int1 & __test_e2:__test_enum:int8);
+    // (1) & __test_e2:__test_enum:int8 == ~nScalar & (__test_e2:__test_enum:int8);
+    // int8 == __test_e2:__test_enum:int8
+
+
   }
 
   @Test public void testNamesInts() {
@@ -54,12 +129,12 @@ public class TestType {
     //      Confirm lattice: {~i8 -> N:~i8 -> 0 -> N:i8 -> i8; N:0 -> 0 }
     // NOT: Confirm lattice: {N:~i8 -> ~i8; N:i8 -> i8 }
     assertEquals(xni8,xni8.meet( xi8));//   ~i8 -> N:~i8
-    assertEquals(TypeInt.BOOL, z  .meet(xni8));// N:~i8 -> {0,1}??? When falling off from a Named Int, must fall below ANY constant to keep a true lattice
+    assertEquals(TypeInt.FALSE, z  .meet(xni8));// N:~i8 -> {0,1}??? When falling off from a Named Int, must fall below ANY constant to keep a true lattice
     assertEquals(  i8, ni8.meet(   z));//     0 -> N:i8
     assertEquals(  i8,  i8.meet( ni8));// N: i8 ->   i8
 
     assertEquals(xni8,xi8.meet(xni8));
-    assertEquals(TypeInt.BOOL, o .meet(xni8));
+    assertEquals(TypeInt.TRUE, o .meet(xni8));
   }
 
   // Memory is on a different line than pointers.
@@ -145,7 +220,7 @@ public class TestType {
     assertTrue (xstr0.isa(pabc0)); // ~*[1]+0 vs ~*[2]?
     assertTrue (xstr .isa(pabc ));
     // We can instead assert that values loaded are compatible:
-    assertTrue (TypeMem.MEM_STR.dual().ld(xstr).isa(TypeMem.MEM_ABC.ld(pabc)));
+    assertTrue (TypeMem.MEM.dual().ld(xstr).isa(TypeMem.MEM_ABC.ld(pabc)));
 
     assertTrue (xtup0.isa( nil ));
     assertTrue (xtup0.isa(pzer0));
@@ -158,7 +233,7 @@ public class TestType {
     assertTrue ( nil .isa(pstr0));
     assertTrue (pabc0.isa(pstr0));
     assertTrue (pabc .isa(pstr ));
-    assertTrue (TypeMem.MEM_ABC.ld(pabc).isa(TypeMem.MEM_STR.ld(pstr)));
+    assertTrue (TypeMem.MEM_ABC.ld(pabc).isa(TypeMem.MEM.ld(pstr)));
     assertTrue ( nil .isa(ptup0));
     assertTrue (pzer0.isa(ptup0));
     assertTrue (pzer .isa(ptup ));
@@ -253,6 +328,7 @@ public class TestType {
     // Anonymous recursive structs -
     // - struct with pointer to self
     TypeStruct ts0 = TypeStruct.malloc(false,flds,new Type[2],new byte[]{1,1});
+    ts0._hash = ts0.compute_hash();
     ts0._ts[0] = ts0ptr;    ts0._cyclic = true;
     ts0._ts[1] = TypeInt.INT64;
     ts0 = ts0.install_cyclic();
@@ -260,6 +336,7 @@ public class TestType {
 
     // - struct with pointer to self or nil
     TypeStruct ts1 = TypeStruct.malloc(false,flds,new Type[2],new byte[]{1,1});
+    ts1._hash = ts1.compute_hash();
     ts1._ts[0] = ts0ptr0;  ts1._cyclic = true;
     ts1._ts[1] = TypeInt.INT64;
     ts1 = ts1.install_cyclic();

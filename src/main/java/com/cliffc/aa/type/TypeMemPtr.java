@@ -42,6 +42,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   private static TypeMemPtr FREE=null;
   @Override protected TypeMemPtr free( TypeMemPtr ret ) { FREE=this; return ret; }
   public static TypeMemPtr make(BitsAlias aliases, TypeObj obj ) {
+    if( aliases==BitsAlias.NIL ) obj=obj.above_center() ? TypeObj.XOBJ : TypeObj.OBJ;
     TypeMemPtr t1 = FREE;
     if( t1 == null ) t1 = new TypeMemPtr(aliases,obj);
     else { FREE = null;          t1.init(aliases,obj); }
@@ -60,7 +61,10 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   public static final TypeMemPtr ABC0   = make(BitsAlias.ABCBITS0, TypeStr.ABC);
   public static final TypeMemPtr STRUCT = make(BitsAlias.RECBITS , TypeStruct.ALLSTRUCT);
          static final TypeMemPtr STRUCT0= make(BitsAlias.RECBITS0, TypeStruct.ALLSTRUCT);
-  static final TypeMemPtr[] TYPES = new TypeMemPtr[]{OOP0,STRPTR,ABCPTR,STRUCT,ABC0};
+  public static final TypeMemPtr PNTPTR = make(BitsAlias.RECBITS , TypeName.TEST_STRUCT);
+         static final TypeMemPtr PNT0   = make(BitsAlias.RECBITS0, TypeName.TEST_STRUCT);
+  public static final TypeMemPtr NIL    = make(BitsAlias.NIL,      TypeObj.OBJ);
+  static final TypeMemPtr[] TYPES = new TypeMemPtr[]{OOP0,STRPTR,ABCPTR,STRUCT,ABC0,PNTPTR,PNT0};
 
   @Override protected TypeMemPtr xdual() { return new TypeMemPtr(_aliases.dual(),(TypeObj)_obj.dual()); }
   @Override TypeMemPtr rdual() {

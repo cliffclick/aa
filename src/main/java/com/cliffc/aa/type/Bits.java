@@ -137,12 +137,12 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
           }
       }
     }
-    
+
     // Remove any trailing empty words
     int len = bits.length;
     while( len > 1 && bits[len-1]==0 ) len--;
     if( bits.length != len ) bits = Arrays.copyOf(bits,len);
-    
+
     // Check for a single bit or NO bits
     if( check_multi_bits(bits) || (len==1 && bits[0]==0) ) return make_impl(any ? -1 : 1,bits);
     int bnum0 = 63 - Long.numberOfLeadingZeros(bits[len-1]);
@@ -163,7 +163,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
 
   private static int  idx (long i) { return (int)(i>>6); }
   private static long mask(long i) { return 1L<<(i&63); }
-  
+
   int getbit() { assert _bits==null; return _con; }
   public int abit() { return _bits==null ? _con : -1; }
   public boolean above_center() { return _con<0; }
@@ -195,14 +195,13 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   // nil-choice (might be a must-nil but not a choice-nil), so can return this.
   @SuppressWarnings("unchecked")
   B not_nil() {
-    assert _con != 0; // cannot remove nil from nil?
     if( _con != -1 || _bits == null ) return (B)this; // Below or at center
     if( !test(_bits,0) ) return (B)this; // No nil choice
     long[] bs = _bits.clone();           // Keep all other bits
     and(bs,0);                           // remove nil choice
     return make(true,bs);                // Choices without nil
   }
-  
+
   private static int max( long[] bits ) { return (bits.length<<6)-1; }
   private static void or ( long[] bits, long con ) { bits[idx(con)] |=  mask(con); }
   private static void and( long[] bits, long con ) { bits[idx(con)] &= ~mask(con); }
@@ -218,8 +217,8 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   //
   // AS-IF: For any given set-bit, we "unpack" it setting every child bit.  We
   // then do the proper AND/OR operation on the bits, followed by a repack.
-  // 
-  
+  //
+
   @SuppressWarnings("unchecked")
   public B meet( B bs ) {
     if( this==bs ) return (B)this;
@@ -236,9 +235,9 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     // Expand any single bits
     if( bits0==null ) or(bits0=bits(0,con0), con0);
     if( bits1==null ) or(bits1=bits(0,con1), con1);
-    con0 =    _con < 0 ? -1 : 1; 
-    con1 = bs._con < 0 ? -1 : 1; 
-    
+    con0 =    _con < 0 ? -1 : 1;
+    con1 = bs._con < 0 ? -1 : 1;
+
     // Bigger in bits0
     if( bits0.length < bits1.length ) { long[] tmp=bits0; bits0=bits1; bits1=tmp; int t=con0; con0=con1; con1=t; }
     // Both meets?  Set-union
@@ -255,7 +254,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
       join(tree,bits0,bits1,bits);         // Merge left into right
       join(tree,bits1,bits0,bits);         // Merge right into left
       // Nil is not part of the parent tree, so needs to be set explicitly
-      if( (bits0[0]&1)==1 && (bits1[0]&1)==1 )  bits[0]|=1; 
+      if( (bits0[0]&1)==1 && (bits1[0]&1)==1 )  bits[0]|=1;
       return make(true,bits);
     }
 
@@ -277,7 +276,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     if( bnum != -1) or(mbits,bnum); // Add a bit in.  Could make a dup bit
     return make(false,mbits);   // This will remove parent/child dups
   }
-  
+
   private static int find_smallest_bit(long[] bits) {
     for( long bit : bits )
       if( bit != 0 )
@@ -322,8 +321,8 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     }
     return false;
   }
-  
-  // Constants are self-dual; classes just flip the meet/join bit.  
+
+  // Constants are self-dual; classes just flip the meet/join bit.
   @SuppressWarnings("unchecked")
   public B dual() { return _bits==null && !is_class() ? (B)this : make_impl(-_con,_bits); }
   // join is defined in terms of meet and dual
@@ -351,7 +350,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
       }
       return sb;
     }
-    
+
     // Split out a bit to form a new constant, from a prior a bit
     int split(int par) {
       // See if we have an existing bit
@@ -360,7 +359,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
         if( kids != null ) {
           int klen = kids[0];        // Number of kids already, 1-based
           if( klen < kids.length ) { // Room for more in array?
-            int bit = kids[klen];  
+            int bit = kids[klen];
             if( bit != 0 ) {            // Pre-allocated kid from prior test?
               assert _pars[bit] == par; // Then parent must already be preallocated
               kids[0] = klen+1;
@@ -411,7 +410,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
         _plus_kids(bs,_kids[i][kid]);
     }
   }
-  
+
   /** @return an iterator */
   @NotNull @Override public Iterator<Integer> iterator() { return new Iter(); }
   private class Iter implements Iterator<Integer> {

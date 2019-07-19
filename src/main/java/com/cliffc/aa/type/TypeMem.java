@@ -54,7 +54,7 @@ public class TypeMem extends Type<TypeMem> {
   // is the default value.  Default values are replaced with null during
   // canonicalization.
   private TypeObj[] _aliases;
-  
+
   private TypeMem  (TypeObj[] aliases) { super(TMEM); init(aliases); }
   private void init(TypeObj[] aliases) {
     super.init(TMEM);
@@ -107,7 +107,7 @@ public class TypeMem extends Type<TypeMem> {
         sb.p(i).p("#:").p(_aliases[i].toString()).p(",");
     return sb.p(']').toString();
   }
-                
+
   // Alias-at.  Out of bounds or null uses the parent value.
   public TypeObj at(int alias) {
     while( true ) {
@@ -116,7 +116,7 @@ public class TypeMem extends Type<TypeMem> {
       alias = BitsAlias.TREE.parent(alias);
     }
   }
-  
+
   private static TypeMem FREE=null;
   @Override protected TypeMem free( TypeMem ret ) { _aliases=null; FREE=this; return ret; }
   private static TypeMem make(TypeObj[] aliases) {
@@ -160,31 +160,28 @@ public class TypeMem extends Type<TypeMem> {
   public static final TypeMem  MEM; // Every alias filled with something
   public static final TypeMem XMEM; // Every alias filled with anything
          static final TypeMem EMPTY_MEM;
-         static final TypeMem MEM_STR;
          static final TypeMem MEM_ABC;
-  public static final TypeMem MEM_STRUCT;
+  public static final TypeMem MEM_NAME;
   static {
-    // All memory.  Triggers BitsAlias.<clinit> which makes all the initial
-    // alias splits.
+    // All memory.  Includes breakouts for all structs and all strings.
+    // Triggers BitsAlias.<clinit> which makes all the initial alias splits.
     TypeObj[] objs = new TypeObj[BitsAlias.STR+1];
     objs[BitsAlias.ALL] = TypeObj.OBJ;
     objs[BitsAlias.REC] = TypeStruct.ALLSTRUCT;
     objs[BitsAlias.STR] = TypeStr.STR;
     MEM  = make(objs);          // Every alias filled with something
-    
+
     TypeObj[] xobjs = new TypeObj[BitsAlias.STR+1];
     xobjs[BitsAlias.ALL] = TypeObj.XOBJ;
     xobjs[BitsAlias.REC] = TypeStruct.ALLSTRUCT.dual();
     xobjs[BitsAlias.STR] = TypeStr.XSTR;
     XMEM = make(xobjs);         // Every alias filled with anything
     EMPTY_MEM = XMEM; //make(new TypeObj[0]); // Tried no-memory-vs-XOBJ-memory
-    
-    MEM_STR = make(BitsAlias.STRBITS,TypeStr.STR);
+
     MEM_ABC = make(TypeStr.ABC.get_alias(),TypeStr.ABC);
-    // All possible structs
-    MEM_STRUCT = make(BitsAlias.RECBITS,TypeStruct.ALLSTRUCT);
+    MEM_NAME = make(BitsAlias.RECBITS,TypeName.TEST_STRUCT);
   }
-  static final TypeMem[] TYPES = new TypeMem[]{MEM,MEM_STR,MEM_ABC};
+  static final TypeMem[] TYPES = new TypeMem[]{MEM,MEM_ABC,MEM_NAME};
 
   // All mapped memories remain, but each memory flips internally.
   @Override protected TypeMem xdual() {
@@ -248,7 +245,7 @@ public class TypeMem extends Type<TypeMem> {
       // Really loose stores might hit all-of-memory.  Force a little sanity.
       if( objs.at(1) != TypeObj.XOBJ ) objs.setX(1,TypeObj.OBJ);
       return make0(objs.asAry());
-    }    
+    }
   }
 
   // Return is a Tuple of TypeMem's, all with unrelated aliases.  The slot0
@@ -262,7 +259,7 @@ public class TypeMem extends Type<TypeMem> {
       ts[i+1] = TypeMem.make(aliases[i],at(aliases[i]));
     return TypeTuple.make0(false,ts);
   }
-  
+
   @Override public boolean above_center() { return _aliases[1].above_center(); }
   @Override public boolean may_be_con()   { return false;}
   @Override public boolean is_con()       { return false;}

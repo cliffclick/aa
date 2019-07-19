@@ -33,6 +33,10 @@ public class TestNode {
 
   private NonBlockingHashMapLong<Type> _values;
 
+  // Array doubling of longs
+  long[] _work = new long[1];
+  int _work_len;
+
   // Worse-case output for a Node
   private Type _alltype;
 
@@ -101,6 +105,30 @@ public class TestNode {
     return subs;
   }
 
+  private void push( long x ) {
+    if( _work_len == _work.length )
+      _work = Arrays.copyOf(_work,_work_len<<1);
+    _work[_work_len++] = x;
+  }
+
+  private long pop() { return _work[--_work_len]; }
+
+  // Print subtypes in RPO
+  private void print( int x, int d ) {
+    Type dt = _values.get(x);
+    if( dt==null ) {
+      _values.put(x,dt=TypeInt.con(d));
+      int[] subs = _min_subtypes[x];
+      for( int sub : subs )
+        print(sub,d+1);
+      System.out.println("#"+x+" = "+Type.ALL_TYPES()[x]+" "+d+" "+dt.getl());
+    } else if( d < dt.getl() ) {
+      _values.put(x,TypeInt.con(d));
+      System.out.println("Shrink #"+x+" = "+Type.ALL_TYPES()[x]+" "+d+" "+dt.getl());
+    }
+  }
+
+
   // Major test for monotonic behavior from value() calls.  Required to prove
   // correctness & linear-time speed from GCP & a major part of GVN.iter().
   // (for GVN.iter(), ideal() calls ALSO have to be monotonic but using a
@@ -128,8 +156,23 @@ public class TestNode {
     // more efficient in testing all Types which subtype another Type.
     _min_subtypes = make_minimal_graph();
 
+    // Add self-type in slot0 of the minimal graph, so we iterate over
+    // ourselves and our children
+    for( int i=0; i<_min_subtypes.length; i++ ) {
+      int[] ms = _min_subtypes[i];
+      int[] xs = new int[ms.length+1];
+      System.arraycopy(ms,0,xs,1,ms.length);
+      xs[0] = i;
+      _min_subtypes[i] = xs;
+    }
+    
+
     // Per-node-type cached value() results
     _values = new NonBlockingHashMapLong<>();
+
+    // Print the types and subtypes in a RPO
+    print(0,0);
+    _values.clear();
 
     // Setup to compute a value() call: we need a tiny chunk of Node graph with
     // known inputs.
@@ -143,6 +186,11 @@ public class TestNode {
 
     Node unr = Env.top().lookup("+"); // All the "+" functions
     FunNode fun_plus = ((EpilogNode)unr.in(1)).fun();
+
+    TypeMemPtr from_ptr = TypeMemPtr.make(BitsAlias.REC,TypeStruct.POINT);
+    TypeMemPtr to_ptr   = TypeMemPtr.make(BitsAlias.REC,TypeName.TEST_STRUCT);
+    test1monotonic(new IntrinsicNode.ConvertPtrTypeName("test",from_ptr,to_ptr,null,_ins[1],_ins[2]));
+
 
     test1monotonic(new   CallNode(false,null,_ins[0],  unr  ,mem,_ins[2],_ins[3]));
     test1monotonic(new   CallNode(false,null,_ins[0],_ins[1],mem,_ins[2],_ins[3]));
@@ -163,9 +211,6 @@ public class TestNode {
     test1monotonic(new     IfNode(_ins[0],_ins[1]));
     for( IntrinsicNewNode prim : IntrinsicNewNode.INTRINSICS )
       test1monotonic_intrinsic(prim);
-    int alias = BitsAlias.new_alias(BitsAlias.REC);
-    TypeMemPtr from_ptr = TypeMemPtr.make(alias,TypeStruct.POINT);
-    TypeMemPtr to_ptr   = TypeMemPtr.make(alias,TypeName.TEST_STRUCT);
     test1monotonic(new IntrinsicNode.ConvertPtrTypeName("test",from_ptr,to_ptr,null,mem,_ins[1]));
     test1monotonic(new   LoadNode(_ins[0],_ins[1],_ins[2],0,null));
     test1monotonic(new MemMergeNode(_ins[1],_ins[2]));
@@ -219,38 +264,36 @@ public class TestNode {
     _values.clear();
     _alltype = n.all_type();
     assert _alltype.is_con() || (!_alltype.above_center() && _alltype.dual().above_center());
-    set_value_type(n,0);
-    test1monotonic(n,0);
-  }
 
-  // Recursively walk all combos of types, compute values and verifying
-  // monotonicity
-  private void test1monotonic(final Node n, final long xx) {
+    set_value_type(n,0);        // Setup worklist and first node
     Type[] all = Type.ALL_TYPES();
-    Type vn = get_value_type(xx);
-    // Subtypes in 4 node input directions
-    int[] stx0 = stx(n,xx,0);
-    int[] stx1 = stx(n,xx,1);
-    int[] stx2 = stx(n,xx,2);
-    int[] stx3 = stx(n,xx,3);
+    while( _work_len > 0 ) {
+      long xx = pop();
+      int i0 = xx(xx,0), i1 = xx(xx,1), i2 = xx(xx,2), i3 = xx(xx,3);
+      System.out.println(""+i0+","+i1+","+i2+","+i3+","+all[i0]+","+all[i1]+","+all[i2]+","+all[3]);
+      Type vn = get_value_type(xx);
+      // Subtypes in 4 node input directions
+      int[] stx0 = stx(n,xx,0);
+      int[] stx1 = stx(n,xx,1);
+      int[] stx2 = stx(n,xx,2);
+      int[] stx3 = stx(n,xx,3);
 
-    for( int x0 : stx0 )
-      for( int x1 : stx1 )
-        for( int x2 : stx2 )
-          for( int x3 : stx3 ) {
-            // Check for this type combo from the cache
-            long xxx = xx(x0,x1,x2,x3);
-            Type vm = _values.get(xxx);
-            boolean visited = vm != null;
-            if( !visited ) vm = set_value_type(n,xxx);
-            // The major monotonicity assert
-            if( !vn.isa(vm) ) {
-              System.out.println(n.xstr()+"("+all[xx(xx,0)]+","+all[xx(xx,1)]+","+all[xx(xx,2)]+","+all[xx(xx,3)]+") = "+vn);
-              System.out.println(n.xstr()+"("+all[     x0 ]+","+all[     x1 ]+","+all[     x2 ]+","+all[     x3 ]+") = "+vm);
-              _errs++;
-            }
-            if( !visited ) test1monotonic(n,xxx); // Recurse
+      for( int x0 : stx0 )
+        for( int x1 : stx1 )
+          for( int x2 : stx2 )
+            for( int x3 : stx3 ) {
+              // Check for this type combo from the cache
+              long xxx = xx(x0,x1,x2,x3);
+              Type vm = _values.get(xxx);
+              if( vm == null ) vm = set_value_type(n,xxx);
+              // The major monotonicity assert
+              if( !vn.isa(vm) ) {
+                System.out.println(n.xstr()+"("+all[xx(xx,0)]+","+all[xx(xx,1)]+","+all[xx(xx,2)]+","+all[xx(xx,3)]+") = "+vn);
+                System.out.println(n.xstr()+"("+all[     x0 ]+","+all[     x1 ]+","+all[     x2 ]+","+all[     x3 ]+") = "+vm);
+                _errs++;
+              }
           }
+    }
   }
 
   private static int[] stx_any = new int[]{0};
@@ -279,6 +322,7 @@ public class TestNode {
     assert _alltype.dual().isa(vt);
     Type old = _values.put(xx,vt);
     assert old==null;
+    push(xx);                   // Now visit all children
     return vt;
   }
 
