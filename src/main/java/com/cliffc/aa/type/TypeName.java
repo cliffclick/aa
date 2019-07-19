@@ -8,7 +8,29 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 // Named types are essentially a subclass of the named type.
-// They also must be used to make recursive types.
+// They also must be used to make recursive types.  Examples:
+//   A.B.int << B.int << int   // Subtypes
+//     B.int.isa(int)
+//   A.B.int.isa(B.int)
+//     C.int.meet(B.int) == int
+//   A.B.int.meet(C.int) == int
+//
+//   A.B.~int.join(B.~int) == A.B.~int
+//     C.~int.join(B.~int) ==     ~int
+//
+//   B. int.meet(  ~int) == B. int.meet(B.~int) == B.int
+//   B.~int.meet(   int) ==    int
+//   B.~int.meet(C. int) ==    int
+//   B.~int.meet(B. int) == B. int
+//   B.~int.meet(C.~int) ==    int // Nothing in common, fall to int
+//   B.~int.meet(  ~int) == B.~int
+// A.B.~int.meet(B.~int) == A.B.~int // both high, keep long; short guy high, keep long
+// A.B.~int.meet(B. int) ==   B. int // one low, keep low   ; short guy  low, keep short
+// A.B. int.meet(B.~int) == A.B. int // one low, keep low   ; short guy high, keep long
+// A.B. int.meet(B. int) ==   B. int // both low, keep short; short guy  low, keep short
+//
+// A.B.~int.meet(D.B.~int) == B.int // Nothing in common, fall to int
+
 public class TypeName extends TypeObj<TypeName> {
   public  String _name;
   public  HashMap<String,Type> _lex; // Lexical scope of this named type
@@ -78,8 +100,8 @@ public class TypeName extends TypeObj<TypeName> {
 
           static final HashMap<String,Type> TEST_SCOPE = new HashMap<>();
           static final TypeName TEST_ENUM = make("__test_enum",TEST_SCOPE,TypeInt.INT8);
-  private static final TypeName TEST_FLT  = make("__test_flt" ,TEST_SCOPE,TypeFlt.FLT32);
-  private static final TypeName TEST_E2   = make("__test_e2"  ,TEST_SCOPE,TEST_ENUM);
+          static final TypeName TEST_FLT  = make("__test_flt" ,TEST_SCOPE,TypeFlt.FLT32);
+          static final TypeName TEST_E2   = make("__test_e2"  ,TEST_SCOPE,TEST_ENUM);
   public  static final TypeName TEST_STRUCT=make("__test_struct",TEST_SCOPE,TypeStruct.POINT);
 
   static final TypeName[] TYPES = new TypeName[]{TEST_ENUM,TEST_FLT,TEST_E2,TEST_STRUCT};
@@ -104,53 +126,51 @@ public class TypeName extends TypeObj<TypeName> {
       return t.above_center() ? nmt : TypeNil.make(nmt);
 
     case TNAME:
+      // Matching inner names can be kept.  If one side is an extension of the
+      // other, we keep the low-side prefix (long or short).  If there is no
+      // match on a name, then the result must fall- even if both inner types
+      // and names are the same (but high).
       TypeName tn = (TypeName)t;
       int thisd =    _depth<0 ? 0 :   _depth;
       int thatd = tn._depth<0 ? 0 : tn._depth;
-      if( thatd > thisd ) return tn.xmeet(this); // Deeper on 'this'
-      if( thatd== thisd && _name.equals(tn._name) )
-        return make(_name,_lex,_t.meet(tn._t)); // Peel name and meet
-      t = tn.drop_name(t);      // Names or depth unequal; treat as unnamed
-      break;
-    default:
-      if( t.above_center() ) { // t is high
-        Type mt = _t.meet(t);  // If meet fails to be anything, drop the name
-        if( mt==ALL ) return ALL;
-        if( mt==SCALAR || mt==NSCALR ) return SCALAR;
-        if( mt==TypeObj.OBJ ) return TypeObj.OBJ;
-        return make(_name,_lex,mt);
+      // Recursive on depth until depths are equal
+      if( thisd > thatd ) return extend(t);
+      if( thatd > thisd ) return tn.extend(this);
+      Type mt = _t.meet(tn._t);
+      if( _name.equals(tn._name) )   // Equal names?
+        return make(_name,_lex,mt); // Peel name and meet
+      // Unequal names
+      if( !mt.above_center() ) return mt;
+      // Unequal high names... fall to the highest value below-center
+      switch( mt._type ) {
+      case TXNUM: case TXNNUM: case TXREAL: case TXNREAL: case TINT: case TFLT:
+        // Return a number that is not-null (to preserve any not-null-number
+        // property) but forces a move off the centerline.
+        return mt.must_nil() ? TypeInt.BOOL : TypeInt.TRUE;
+      case TOBJ:
+      case TSTRUCT:  return mt.dual();
+      default: throw AA.unimpl();
       }
-      if( t==TypeNil.NIL ) return TypeNil.make(this);
-      // Special case: close the recursive type loop, instead of falling
-      if( _t==t && _depth == -2 )
-        return this;
+
+    default:
+      return extend(t);
     }
-    Type t0 = drop_name(t);
-    return t0.meet(t);
   }
 
-  // Drop in lattice, until we can drop the name.  Generally means we must drop
-  // from above_center to exactly 1 step below center.  Types already below
-  // center can just drop the name, which drops them 1 step in the lattice.
-  private Type drop_name(Type t) {
-    Type tx = _t;
-    if( !tx.may_be_con() ) return tx; // Already below centerline; can just drop the name
-    // If at or above the centerline, just dropping the name amounts to a
-    // lift/join of the type - not allowed, can only fall.
-    switch( tx._type ) {
-    case TXNUM: case TXNNUM: case TXREAL: case TXNREAL: case TINT: case TFLT: {
-      // Return a number that is not-null (to preserve any not-null-number
-      // property) but forces a move off the centerline.
-      return must_nil() ? TypeInt.BOOL : TypeInt.TRUE;
-    }
-    // Recursively drop multiple names
-    case TNAME:    return ((TypeName)tx).drop_name(t);
-    case TXSCALAR:
-    case TXNSCALR: return t;
-    case TOBJ:
-    case TSTRUCT:  return tx.dual();
-    default: throw AA.unimpl();
-    }
+  // Longer side is 'this'.  Shorter side is 'tn'.
+  private Type extend(Type t) {
+    Type x = _t.meet(t); // Recursive, removing longer name
+    int xnd = x instanceof TypeName ? ((TypeName)x)._depth : -1;
+    int tnd = t instanceof TypeName ? ((TypeName)t)._depth : -1;
+    if( xnd < tnd ) return x; // No common prefix
+    if( x==Type.ALL ) return x;
+    // Same strategy as TypeStruct and extra fields...
+    // short guy high, keep long 
+    // short guy  low, keep short
+    if( t.above_center() ) return make(_name,_lex,x);
+    //// Both high, keep long else keep short
+    //if( above_center() && t.above_center() ) return make(_name,_lex,x);
+    return x;
   }
 
   // 'this' is a forward ref type definition; the actual type-def is 't' which
@@ -178,10 +198,10 @@ public class TypeName extends TypeObj<TypeName> {
   @Override public double getd  () { return _t.getd  (); }
   @Override public long   getl  () { return _t.getl  (); }
   @Override public String getstr() { return _t.getstr(); }
-  @Override public boolean must_nil() { return _t.above_center() || _t.must_nil(); }
+  @Override public boolean must_nil() { return _t.must_nil(); }
   @Override Type not_nil() {
     Type nn = _t.not_nil();
-    if( base().must_nil() ) return nn; // Cannot remove all nils and keep the name, so lose the name
+    //if( !_t.above_center() ) return nn;
     return make(_name,_lex,nn);
   }
   @Override public Type meet_nil() {
