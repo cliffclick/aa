@@ -35,7 +35,7 @@ public class TypeName extends TypeObj<TypeName> {
   public  String _name;
   public  HashMap<String,Type> _lex; // Lexical scope of this named type
   public  Type _t;                // Named type
-  private short _depth; // Nested depth of TypeNames, or -1/ for a forward-ref type-var, -2 for type-cycle head
+  public  short _depth; // Nested depth of TypeNames, or -1/ for a forward-ref type-var, -2 for type-cycle head
   // Named type variable
   private TypeName ( String name, HashMap<String,Type> lex, Type t, short depth ) { super(TNAME,false); init(name,lex,t,depth); }
   private void init( String name, HashMap<String,Type> lex, Type t, short depth ) { super.init(TNAME,false); assert name!=null && lex !=null; _name=name; _lex=lex; _t=t; _depth = depth; }

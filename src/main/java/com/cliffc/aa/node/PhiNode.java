@@ -33,13 +33,15 @@ public class PhiNode extends Node {
     return live;                // Single unique input
   }
   @Override public Type value(GVNGCM gvn) {
-    Type t = _default_type.dual();
-    if( gvn.type(in(0)) == Type.XCTRL ) return t;
+    Type ctl = gvn.type(in(0));
+    if( ctl != Type.CTRL ) return ctl.above_center() ? _default_type.dual() : _default_type;
     RegionNode r = (RegionNode) in(0);
     assert r._defs._len==_defs._len;
+    Type t = _default_type.dual();
     for( int i=1; i<_defs._len; i++ )
-      if( gvn.type(r.in(i))!=Type.XCTRL ) // Only meet alive paths
+      if( gvn.type(r.in(i))==Type.CTRL ) // Only meet alive paths
         t = t.meet(gvn.type(in(i)));
+    if( _default_type.isa(t) ) t = _default_type; // Limit to sane results
     return t;
   }
   @Override public Type all_type() { return _default_type; }

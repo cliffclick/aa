@@ -35,7 +35,7 @@ public class CastNode extends Node {
   }
   @Override public Type value(GVNGCM gvn) {
     Type c = gvn.type(in(0));
-    if( c == Type.XCTRL ) return Type.ANY;
+    if( c != Type.CTRL ) return c.above_center() ? Type.ANY : Type.ALL;
     Type t = gvn.type(in(1));
     // CNC - I really badly do not like this, but I don't have a better answer
     // right now.  The case arises when null-check is partially processed in
@@ -44,7 +44,7 @@ public class CastNode extends Node {
     // fast, and then goes dead.  The old type was some legit thing, and then
     // e.g. inlining or some other ideal() call triggers a non-monotonic update
     // and the input becomes nil.
-    if( t == TypeNil.NIL && _t==Type.NSCALR ) return gvn.self_type(this);
+    //if( t == TypeNil.NIL && _t==Type.NSCALR ) return gvn.self_type(this);
     return _t.join(t);
   }
 }

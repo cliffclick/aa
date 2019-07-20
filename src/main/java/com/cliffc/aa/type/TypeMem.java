@@ -160,7 +160,7 @@ public class TypeMem extends Type<TypeMem> {
   public static final TypeMem  MEM; // Every alias filled with something
   public static final TypeMem XMEM; // Every alias filled with anything
          static final TypeMem EMPTY_MEM;
-         static final TypeMem MEM_ABC;
+  public static final TypeMem MEM_ABC;
   public static final TypeMem MEM_NAME;
   static {
     // All memory.  Includes breakouts for all structs and all strings.
@@ -226,10 +226,13 @@ public class TypeMem extends Type<TypeMem> {
   // in a TypeObj.
   public TypeMem st( TypeMemPtr ptr, String fld, int fld_num, Type val ) {
     assert val.isa_scalar();
-    TypeObj[] objs = Arrays.copyOf(_aliases,Math.max(_aliases.length,ptr._aliases.max()+1));
-    for( int alias : ptr._aliases )
-      objs[alias] = at(alias).update(fld,fld_num,val);
-    return make0(objs);
+    // Any alias, plus all of its children, are meet/joined.  This does a
+    // tree-based scan on the inner loop.
+    Ary<TypeObj> objs = new Ary<>(_aliases.clone(),_aliases.length);
+    BitSet bs = ptr._aliases.tree().plus_kids(ptr._aliases);
+    for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) )
+      objs.setX(alias, at(alias).update(fld,fld_num,val));
+    return make0(objs.asAry());
   }
 
   // Meet of all possible storable values, after updates.  This is a whole-TypeObj update.

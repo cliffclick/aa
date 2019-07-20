@@ -252,13 +252,13 @@ public class CallNode extends Node {
     if( _inlined )              // Inlined functions just pass thru & disappear
       return TypeTuple.make(tc,gvn.type(in(1)),gvn.type(in(2)));
     Node fp = fun();            // If inlined, its the result, if not inlined, its the function being called
-    Type t = gvn.type(fp);
-    if( tc == Type.XCTRL || tc == Type.ANY ) // Call is dead?
-      return TypeTuple.XCALL;
+    if( tc != Type.CTRL )       // Call is dead?
+      return tc.above_center() ? TypeTuple.XCALL : TypeTuple.CALL;
     if( !(fp instanceof UnresolvedNode || fp instanceof EpilogNode) )
       return TypeTuple.CALL;
     if( fp.is_forward_ref() )
       return TypeTuple.CALL;
+    Type t = gvn.type(fp);
     if( Type.SCALAR.isa(t) ) // Calling something that MIGHT be a function, no idea what the result is
       return TypeTuple.CALL;
     if( !t.isa(TypeFunPtr.GENERIC_FUNPTR) ) // Calling something that MIGHT be a function, no idea what the result is

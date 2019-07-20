@@ -39,9 +39,11 @@ public class RegionNode extends Node {
 
   @Override public Type value(GVNGCM gvn) {
     if( _defs._len==2 && in(1)==this ) return Type.XCTRL; // Dead self-loop
-    for( int i=1; i<_defs._len; i++ )
-      if( gvn.type(in(i)) == Type.CTRL )
+    for( int i=1; i<_defs._len; i++ ) {
+      Type c = gvn.type(in(i));
+      if( c == Type.CTRL || c == Type.ALL )
         return Type.CTRL;
+    }
     return Type.XCTRL;
   }
   

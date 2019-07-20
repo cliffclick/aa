@@ -179,9 +179,13 @@ public class TestNode {
 
     TypeMemPtr from_ptr = TypeMemPtr.make(BitsAlias.REC,TypeStruct.POINT);
     TypeMemPtr to_ptr   = TypeMemPtr.make(BitsAlias.REC,TypeName.TEST_STRUCT);
-    test1monotonic(new IntrinsicNode.ConvertPtrTypeName("test",from_ptr,to_ptr,null,_ins[1],_ins[2]));
 
-
+    // Testing 1 set of types into a value call.
+    // Comment out when not debugging.
+    Type rez = test1jig(new StoreNode(_ins[0],_ins[1],_ins[2],_ins[3],0,null),
+                        Type.ANY,TypeMem.MEM_ABC,TypeMemPtr.STRPTR,Type.ALL);
+             
+    // All the Nodes, all Values, all Types
     test1monotonic(new   CallNode(false,null,_ins[0],  unr  ,mem,_ins[2],_ins[3]));
     test1monotonic(new   CallNode(false,null,_ins[0],_ins[1],mem,_ins[2],_ins[3]));
     test1monotonic(new    ConNode<Type>(          TypeInt.FALSE));
@@ -201,7 +205,7 @@ public class TestNode {
     test1monotonic(new     IfNode(_ins[0],_ins[1]));
     for( IntrinsicNewNode prim : IntrinsicNewNode.INTRINSICS )
       test1monotonic_intrinsic(prim);
-    test1monotonic(new IntrinsicNode.ConvertPtrTypeName("test",from_ptr,to_ptr,null,mem,_ins[1]));
+    test1monotonic(new IntrinsicNode.ConvertPtrTypeName("test",from_ptr,to_ptr,null,_ins[1],_ins[2]));
     test1monotonic(new   LoadNode(_ins[0],_ins[1],_ins[2],0,null));
     test1monotonic(new MemMergeNode(_ins[1],_ins[2]));
     test1monotonic(new    NewNode(new Node[]{null,_ins[1],_ins[2]},TypeStruct.POINT));
@@ -223,6 +227,19 @@ public class TestNode {
     assertEquals(0,_errs);
   }
 
+  @SuppressWarnings("unchecked")
+  private Type test1jig(final Node n, Type t0, Type t1, Type t2, Type t3) {
+    _alltype = n.all_type();
+    assert _alltype.is_con() || (!_alltype.above_center() && _alltype.dual().above_center());
+    Type[] all = Type.ALL_TYPES();
+    // Prep graph edges
+    _gvn.setype(_ins[0],                        t0);
+    _gvn.setype(_ins[1],((ConNode)_ins[1])._t = t1);
+    _gvn.setype(_ins[2],((ConNode)_ins[2])._t = t2);
+    _gvn.setype(_ins[3],((ConNode)_ins[3])._t = t3);
+    return n.value(_gvn);
+  }
+  
   private void test1monotonic(Node n) {
     assert n._defs._len>0;
     test1monotonic_init(n);
@@ -256,7 +273,9 @@ public class TestNode {
     _alltype = n.all_type();
     assert _alltype.is_con() || (!_alltype.above_center() && _alltype.dual().above_center());
 
-    set_value_type(n,0);        // Setup worklist and first node
+    _values.put(0,Type.ANY);    // First args are all ANY, so is result
+    push(0);                    // Init worklist
+    
     Type[] all = Type.ALL_TYPES();
     long t0 = System.currentTimeMillis();
     long nprobes = 0, nprobes1=0;
@@ -274,15 +293,22 @@ public class TestNode {
       int[] stx0 = stx(n,xx,0);
       for( int y0 : stx0 )
         set_value_type(n, vn, xx, xx(y0,x1,x2,x3), 0, y0, all );
+      set_type(0,all[x0]);
+
       int[] stx1 = stx(n,xx,1);
       for( int y1 : stx1 )
         set_value_type(n, vn, xx, xx(x0,y1,x2,x3), 1, y1, all );
+      set_type(1,all[x1]);
+
       int[] stx2 = stx(n,xx,2);
       for( int y2 : stx2 )
         set_value_type(n, vn, xx, xx(x0,x1,y2,x3), 2, y2, all );
+      set_type(2,all[x2]);
+      
       int[] stx3 = stx(n,xx,3);
       for( int y3 : stx3 )
         set_value_type(n, vn, xx, xx(x0,x1,x2,y3), 3, y3, all );
+      set_type(3,all[x3]);
 
       nprobes1 += stx0.length+stx1.length+stx2.length+stx3.length;
       long t1 = System.currentTimeMillis();
@@ -295,19 +321,16 @@ public class TestNode {
     }
   }
 
-  @SuppressWarnings("unchecked")
   private void set_value_type(Node n, Type vn, long xx, long xxx, int idx, int yx, Type[] all ) {
     Type vm = _values.get(xxx);
     if( vm == null ) {
-      if( idx > 0 ) ((ConNode)_ins[idx])._t = all[yx];
-      _gvn.setype(_ins[idx], all[yx]);
+      set_type(idx,all[yx]);
       vm = n.value(_gvn);
-      //vm = Type.ALL;
       // Assert the alltype() bounds any value() call result.
       assert vm.isa(_alltype);
       assert _alltype.dual().isa(vm);
       Type old = _values.put(xxx,vm);
-      //assert old==null;
+      assert old==null;
       push(xxx);            // Now visit all children
     }
     // The major monotonicity assert
@@ -317,6 +340,11 @@ public class TestNode {
       System.out.println(n.xstr()+"("+all[idx==0?yx:x0]+","+all[idx==1?yx:x1]+","+all[idx==2?yx:x2]+","+all[idx==3?yx:x3]+") = "+vm);
       _errs++;
     }
+  }
+  @SuppressWarnings("unchecked")
+  private void set_type(int idx, Type tyx) {
+    if( idx > 0 ) ((ConNode)_ins[idx])._t = tyx;
+    _gvn.setype(_ins[idx], tyx);
   }
 
   private static int[] stx_any = new int[]{};

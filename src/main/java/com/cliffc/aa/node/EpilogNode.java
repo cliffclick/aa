@@ -34,10 +34,13 @@ public class EpilogNode extends Node {
     assert gvn.type(mem()) instanceof TypeMem;
     if( is_copy() )             // Function is dead, epilog is dying; type makes no sense
       return TypeFunPtr.make(BitsFun.NZERO.dual(),_args,v);
-    if( c!=Type.CTRL || !(r instanceof TypeRPC))  return all_type().dual();
-    if( is_forward_ref() ) return all_type().startype();
     FunNode fun = fun();
-    return TypeFunPtr.make(fun._tf.fidxs(),fun._tf._args,v);
+    TypeFunPtr tfp = fun._tf;
+    if( is_forward_ref() ) return tfp.startype();
+    if(  c!=Type.CTRL          ) return c.above_center() ? tfp.dual() : tfp;
+    if( !(r instanceof TypeRPC)) return r.above_center() ? tfp.dual() : tfp;
+    v = v.bound(tfp._ret);      // Limit to sane results
+    return TypeFunPtr.make(tfp.fidxs(),tfp._args,v);
   }
   @Override public String err(GVNGCM gvn) { return is_forward_ref() ? _unkref_err : null; }
 

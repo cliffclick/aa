@@ -121,11 +121,16 @@ public abstract class IntrinsicNode extends Node {
       Type ptr = gvn.type(ptr());
       if( !(mem instanceof TypeMem && ptr instanceof TypeMemPtr) )
         return to;              // Inputs are confused
-
+      // Get the Obj from the pointer.  We are renaming it in-place, basically
+      // changing the vtable.  We need the l-value.
       TypeObj obj = ((TypeMem)mem).ld((TypeMemPtr)ptr);
       if( !obj.isa(from._obj) ) return to; // Inputs not correct from, and node is in-error
       if( obj.isa(from._obj.dual()) ) return to.dual();
-
+      // Obj needs to share a common name heirarchy (same Name-depth) as 'from'
+      int fd = from._obj instanceof TypeName ? ((TypeName)from._obj)._depth : -1;
+      int od =       obj instanceof TypeName ? ((TypeName)      obj)._depth : -1;
+      if( fd != od ) return obj.above_center() ? to.dual() : to; // Name-depth does not match, node is in-error
+      // Wrap result in 1 layer of Name
       TypeName tnto = tname.make(obj);// Named to obj
       return to.make(tnto);
     }
