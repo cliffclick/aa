@@ -16,10 +16,10 @@ public class MemMergeNode extends Node {
     // If I have a Named Constructor usage, and have 2 uses (named constructor
     // and the Merge following it), make sure the Named Constructor can run
     // ideal() so it can fold away.
-    //if( _uses._len==2 )
-    //  for( Node use : _uses )
-    //    if( use instanceof IntrinsicNode.ConvertPtrTypeName )
-    //      gvn.add_work(use);
+    if( _uses._len==2 )
+      for( Node use : _uses )
+        if( use instanceof IntrinsicNode.ConvertPtrTypeName )
+          gvn.add_work(use);
     
     // If merging from a NewNode, and the NewNode's address is not looked at
     // then memory contents cannot be looked at and are also dead.

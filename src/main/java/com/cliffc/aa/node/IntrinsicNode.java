@@ -132,7 +132,7 @@ public abstract class IntrinsicNode extends Node {
       if( fd != od ) return obj.above_center() ? to.dual() : to; // Name-depth does not match, node is in-error
       // Wrap result in 1 layer of Name
       TypeName tnto = tname.make(obj);// Named to obj
-      return to.make(tnto);
+      return ((TypeMemPtr)ptr).make(tnto);
     }
     @Override public String err(GVNGCM gvn) {
       Type mem = gvn.type(mem());

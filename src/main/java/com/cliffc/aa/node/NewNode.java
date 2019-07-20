@@ -26,11 +26,14 @@ public class NewNode extends Node {
   // Called when folding a Named Constructor into this allocation site
   void set_name( GVNGCM gvn, TypeName to ) {
     assert to.base().isa(_ts); // Cannot change the target fields, just the name
+    Type oldt = gvn.type(this);
     gvn.unreg(this);
     _ts = (TypeStruct)to.base();
     _obj = to;
     _ptr = TypeMemPtr.make(_alias,to);
-    gvn.rereg(this,_ptr);
+    if( !(oldt instanceof TypeMemPtr) )  throw com.cliffc.aa.AA.unimpl();
+    TypeMemPtr nameptr = _ptr.make(to.make(((TypeMemPtr)oldt)._obj));
+    gvn.rereg(this,nameptr);
   }
   String xstr() { return "New*"+_alias; } // Self short name
   String  str() { return "New"+_ptr; } // Inline less-short name
