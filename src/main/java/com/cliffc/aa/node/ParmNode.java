@@ -36,7 +36,12 @@ public class ParmNode extends PhiNode {
           return null;          // Not correct arg-type; refuse to collapse
     }
     // Let PhiNode collapse
-    return super.ideal(gvn);
+    //return super.ideal(gvn);
+    
+    // Do not let PhiNode collapse single input - preserve the standard calling
+    // convention.  Otherwise a collapsed single input touches code outside the
+    // function body and confuses, e.g., inlining of a calling function.
+    return null;
   }
 
   @Override public Type value(GVNGCM gvn) {
