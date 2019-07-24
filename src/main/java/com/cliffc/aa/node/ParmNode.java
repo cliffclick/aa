@@ -6,7 +6,7 @@ import com.cliffc.aa.type.Type;
 // Function parameter node; just a Phi with a name
 public class ParmNode extends PhiNode {
   public final int _idx;    // Parameter index, zero-based; -1 reserved for RPC
-  private final String _name;   // Parameter name
+  final String _name;   // Parameter name
   public ParmNode( int idx, String name, Node fun, ConNode defalt, String badgc) {
     super(OP_PARM,fun,defalt,badgc);
     _idx=idx;
@@ -28,20 +28,22 @@ public class ParmNode extends PhiNode {
     if( gvn.type(fun) == Type.XCTRL ) return null; // All dead, c-prop will fold up
     // Arg-check before folding up
     if( _idx >= 0 ) {                         // Skip RPC and memory
-      Type formal = fun.targ(_idx);           // Formal argument type
+      assert fun.targ(_idx) == _default_type;
       for( int i=1; i<_defs._len; i++  )      // For all arguments
         if( gvn.type(fun.in(i))==Type.CTRL && // Path is alive
             in(i)!=this &&                    // Can ignore self- only other inputs will determine arg-check
-            !gvn.type(in(i)).isa(formal) )    // Arg is NOT correct type
+            !gvn.type(in(i)).isa(_default_type) ) // Arg is NOT correct type
           return null;          // Not correct arg-type; refuse to collapse
     }
-    // Let PhiNode collapse
-    //return super.ideal(gvn);
-    
     // Do not let PhiNode collapse single input - preserve the standard calling
     // convention.  Otherwise a collapsed single input touches code outside the
-    // function body and confuses, e.g., inlining of a calling function.
-    return null;
+    // function body and confuses, e.g., inlining of a calling function.  Allow
+    // the collapse only if the FunNode is also collapsing... i.e., a single
+    // caller FunNode being inlined.
+    if( fun._defs._len==2 && !fun.has_unknown_callers() ) // Single-caller
+      return in(1);             // Collapse correct args
+    // return super.ideal(gvn); // Let PhiNode collapse 
+    return null;                // Do not let PhiNode collapse
   }
 
   @Override public Type value(GVNGCM gvn) {

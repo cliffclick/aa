@@ -66,7 +66,7 @@ public abstract class IntrinsicNode extends Node {
     FunNode fun = (FunNode) gvn.xform(new FunNode(to._name,tf));
     Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
     Node mem = gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM     ),null));
-    Node ptr = gvn.xform(new ParmNode( 0,"ptr",fun,gvn.con(Type.SCALAR     ),null));
+    Node ptr = gvn.xform(new ParmNode( 0,"ptr",fun,gvn.con(from_ptr        ),null));
     Node cvt = gvn.xform(new ConvertPtrTypeName(to._name,from_ptr,to_ptr,badargs,mem,ptr));
     Node mmem= gvn.xform(new MemMergeNode(mem,cvt));
     return new EpilogNode(fun,mmem,cvt,rpc,fun,null);

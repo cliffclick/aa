@@ -251,11 +251,9 @@ public class CallNode extends Node {
     Type tc = gvn.type(ctl());  // Control type
     if( _inlined )              // Inlined functions just pass thru & disappear
       return TypeTuple.make(tc,gvn.type(in(1)),gvn.type(in(2)));
-    Node fp = fun();            // If inlined, its the result, if not inlined, its the function being called
     if( tc != Type.CTRL )       // Call is dead?
       return tc.above_center() ? TypeTuple.XCALL : TypeTuple.CALL;
-    if( !(fp instanceof UnresolvedNode || fp instanceof EpilogNode) )
-      return TypeTuple.CALL;
+    Node fp = fun();            // Function being called
     if( fp.is_forward_ref() )
       return TypeTuple.CALL;
     Type t = gvn.type(fp);
@@ -267,6 +265,18 @@ public class CallNode extends Node {
     if( gvn._opt ) // Manifesting optimistic virtual edges between caller and callee
       wire(gvn);   // Make real edges from virtual edges
 
+    // See if we can reduce this to a single function (or unresolved).
+    if( !(fp instanceof UnresolvedNode || fp instanceof EpilogNode) ) {
+      BitsFun fidxs = fidxs(gvn);
+      int fidx = fidxs.abit();
+      if( fidx == -1 || fidx == BitsFun.ALL ) return TypeTuple.CALL;
+      // During e.g. opto discover a single function target.  Use this for the
+      // value1 calls.
+      FunNode fun = FunNode.find_fidx(fidx);
+      assert fun != null;
+      fp = fun.epi();
+    }
+    
     if( fp instanceof EpilogNode )
       // Return {control,mem,value} tuple.
       return value1(gvn,(EpilogNode)fp); // Return type or SCALAR if invalid args
@@ -290,7 +300,7 @@ public class CallNode extends Node {
     Type    tmem =gvn.type(epi.mem());
     Type    tval =gvn.type(epi.val());
     if( tctrl == Type.XCTRL ) return TypeTuple.XCALL; // Function will never return
-    assert tctrl==Type.CTRL;      // Function will never return?
+    assert tctrl==Type.CTRL;      // Function returns?
     FunNode fun = epi.fun();
     if( fun.is_forward_ref() ) return TypeTuple.make(tctrl,tmem,tval); // Forward refs do no argument checking
 

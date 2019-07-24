@@ -167,12 +167,14 @@ public class FunNode extends RegionNode {
       if( use instanceof ParmNode ) {
         ParmNode parm = (ParmNode)use;
         if( parm._idx >= 0 ) {  // Skip memory, rpc
-          // CNC - must inline non-error paths
-          //// Check that all actuals are isa all formals.  This is a little
-          //// conservative, as we could inline on non-error paths.
-          //for( int i=1; i<_defs._len; i++ )
-          //  if( !gvn.type(parm.in(i)).isa(targ(parm._idx)) )
-          //    return null; // Actual !isa formal; do not inline while in-error
+          // Check that all actuals are isa all formals.  TODO: This is a
+          // little conservative, as we could inline on non-error paths.
+          for( int i=1; i<_defs._len; i++ )
+            if( !gvn.type(parm.in(i)).isa(targ(parm._idx)) ) {
+              // CNC - must inline non-error paths
+              System.out.println("inline despite "+parm._name+"["+i+"] having type "+gvn.type(parm.in(i))+" and the fun arg type being "+targ(parm._idx));
+              return null; // Actual !isa formal; do not inline while in-error
+            }
           parms[parm._idx] = parm;
         }
       } else if( use instanceof EpilogNode ) { assert epi==null || epi==use; epi = (EpilogNode)use; }
