@@ -102,7 +102,7 @@ public class TypeNil extends Type<TypeNil> {
   @Override public boolean is_con()   { return _t == null; } // Constant nil
   @Override public byte isBitShape(Type t) { return _t==null || this==t ? 0 : _t.isBitShape(t); }
   @Override public boolean must_nil() { return _t==null || !_t.above_center(); }
-  @Override Type not_nil() { return _t!=null && _t.above_center() ? _t : this; }
+  @Override Type not_nil() { return _t==null ? Type.SCALAR :(_t.above_center() ? _t : this); }
   @Override public Type meet_nil() { return _t.above_center() ? NIL : this; }
   // Make a (possibly cyclic & infinite) named type.  Prevent the infinite
   // unrolling of names by not allowing a named-type with depth >= D from

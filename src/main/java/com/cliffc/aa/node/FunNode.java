@@ -169,12 +169,12 @@ public class FunNode extends RegionNode {
         if( parm._idx >= 0 ) {  // Skip memory, rpc
           // Check that all actuals are isa all formals.  TODO: This is a
           // little conservative, as we could inline on non-error paths.
-          for( int i=1; i<_defs._len; i++ )
-            if( !gvn.type(parm.in(i)).isa(targ(parm._idx)) ) {
-              // CNC - must inline non-error paths
-              System.out.println("inline despite "+parm._name+"["+i+"] having type "+gvn.type(parm.in(i))+" and the fun arg type being "+targ(parm._idx));
-              return null; // Actual !isa formal; do not inline while in-error
-            }
+          //for( int i=1; i<_defs._len; i++ )
+          //  if( !gvn.type(parm.in(i)).isa(targ(parm._idx)) ) {
+          //    // CNC - must inline non-error paths
+          //    System.out.println("inline despite "+parm._name+"["+i+"] having type "+gvn.type(parm.in(i))+" and the fun arg type being "+targ(parm._idx));
+          //    //return null; // Actual !isa formal; do not inline while in-error
+          //  }
           parms[parm._idx] = parm;
         }
       } else if( use instanceof EpilogNode ) { assert epi==null || epi==use; epi = (EpilogNode)use; }
@@ -260,6 +260,7 @@ public class FunNode extends RegionNode {
     // Make a new function header with new signature
     TypeTuple args = TypeTuple.make_args(sig);
     assert args.isa(_tf._args);
+    if( args == _tf._args ) return null; // Must see improvement
     assert args != _tf._args;   // Must see improvement
     // Make a prototype new function header split from the original.
     int fidx = fidx();

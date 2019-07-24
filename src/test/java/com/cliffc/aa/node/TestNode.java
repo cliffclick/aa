@@ -132,7 +132,7 @@ public class TestNode {
   // Major test for monotonic behavior from value() calls.  Required to prove
   // correctness & linear-time speed from GCP & a major part of GVN.iter().
   // (for GVN.iter(), ideal() calls ALSO have to be monotonic but using a
-  // different metric thats harder to test for).
+  // different metric that is harder to test for).
 
   // How this works: for all Node.value() calls, for all input types, if the
   // input type changes monotonically, so does the output type.  Many input
@@ -227,7 +227,6 @@ public class TestNode {
     assertEquals(0,_errs);
   }
 
-  @SuppressWarnings("unchecked")
   private Type test1jig(final Node n, Type t0, Type t1, Type t2, Type t3) {
     _alltype = n.all_type();
     assert _alltype.is_con() || (!_alltype.above_center() && _alltype.dual().above_center());
@@ -266,7 +265,6 @@ public class TestNode {
     test1monotonic_init(n);
   }
 
-  @SuppressWarnings("unchecked")
   private void test1monotonic_init(final Node n) {
     System.out.println(n.xstr());
     _values.clear(true);
@@ -341,7 +339,6 @@ public class TestNode {
       _errs++;
     }
   }
-  @SuppressWarnings("unchecked")
   private void set_type(int idx, Type tyx) {
     if( idx > 0 ) ((ConNode)_ins[idx])._t = tyx;
     _gvn.setype(_ins[idx], tyx);
@@ -357,23 +354,6 @@ public class TestNode {
   private Type get_value_type(long xx) {
     Type vt = _values.get(xx);
     assert vt!=null;
-    return vt;
-  }
-  // Set the value Type for 4 input types.  Must not exist.
-  @SuppressWarnings("unchecked")
-  private Type set_value_type(Node n, long xx ) {
-    Type[] alltypes = Type.ALL_TYPES();
-    _gvn.setype(_ins[0],                        alltypes[xx(xx,0)]);
-    _gvn.setype(_ins[1],((ConNode)_ins[1])._t = alltypes[xx(xx,1)]);
-    _gvn.setype(_ins[2],((ConNode)_ins[2])._t = alltypes[xx(xx,2)]);
-    _gvn.setype(_ins[3],((ConNode)_ins[3])._t = alltypes[xx(xx,3)]);
-    Type vt = n.value(_gvn);
-    // Assert the alltype() bounds any value() call result.
-    assert vt.isa(_alltype);
-    assert _alltype.dual().isa(vt);
-    Type old = _values.put(xx,vt);
-    assert old==null;
-    push(xx);                   // Now visit all children
     return vt;
   }
 
