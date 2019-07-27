@@ -684,9 +684,7 @@ public class Type<T extends Type<T>> {
       return dual();
     }
     // Various error codes start high
-    if( this==ANY || this == XCTRL || this == XSCALAR ) return this;
-    assert !above_center();
-    return dual();
+    return above_center() ? this : dual();
   }
 
   RuntimeException typerr(Type t) {

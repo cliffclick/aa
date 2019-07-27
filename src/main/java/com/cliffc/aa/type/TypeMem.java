@@ -217,6 +217,7 @@ public class TypeMem extends Type<TypeMem> {
     BitSet bs = ptr._aliases.tree().plus_kids(ptr._aliases);
     for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) ) {
       TypeObj x = at(alias);
+      if( !x.isa(ptr._obj) ) x = ptr._obj; // loading a type error, use the conservative ptr type
       obj = (TypeObj)(any ? obj.join(x) : obj.meet(x));
     }
     return obj;

@@ -86,7 +86,7 @@ public class FunNode extends RegionNode {
   // Supposed to be the self SHORT name, but include full signature.
   @Override public String xstr() {  return _tf.str(null); }
   // Inline name
-  @Override String str() { return _name==null ? Integer.toString(fidx()) : _name; }
+  @Override String str() { return _name==null ? "fun"+Integer.toString(fidx()) : _name; }
   // Debug only: make an attempt to bind name to a function
   public void bind( String tok ) {
     assert _name==null || _name.equals(tok); // Attempt to double-bind
@@ -110,7 +110,7 @@ public class FunNode extends RegionNode {
     FunNode fun = find_fidx(fidx);
     String name = fun == null ? null : fun._name;
     if( name==null && fun != null && fun.is_forward_ref() ) name="<forward_decl_"+fidx+">";
-    if( name==null ) name = Integer.toString(fidx);
+    if( name==null ) name = "fun"+Integer.toString(fidx);
     return sb.p(name);
   }
 
@@ -192,7 +192,9 @@ public class FunNode extends RegionNode {
               ((CallNode)call).fun() instanceof UnresolvedNode ) { // Call overload not resolved
             Type t0 = gvn.type(parm.in(1));            // Generic type in slot#1
             for( int i=2; i<parm._defs._len; i++ ) {   // For all other inputs
-              Type ti = gvn.type(parm.in(i)).widen();  // Get the widen'd type
+              Type tp = gvn.type(parm.in(i));
+              if( tp.above_center() ) continue;        // This parm input is in-error
+              Type ti = tp.widen();                    // Get the widen'd type
               assert ti.isa(t0);                       // Must be isa-generic type, or else type-error
               if( ti != t0 ) return i; // Sharpens?  Then splitting here should help
             }
@@ -273,8 +275,12 @@ public class FunNode extends RegionNode {
     Node xctrl = gvn.con(Type.XCTRL);
     for( int j=2; j<_defs._len; j++ ) {
       boolean split=true;
-      for( int i=0; i<parms.length; i++ )
-        split &= parms[i] == null || gvn.type(parms[i].in(j)).widen().isa(sig[i]);
+      for( int i=0; i<parms.length; i++ ) {
+        if( parms[i]==null ) continue;
+        Type tp = gvn.type(parms[i].in(j));
+        if( tp.above_center() || !tp.isa(sig[i]) )
+          { split=false; break; }
+      }
       fun.add_def(split ? in(j) : xctrl);
     }
     return fun;
@@ -370,6 +376,7 @@ public class FunNode extends RegionNode {
     }
     // Correct new function sig
     EpilogNode newepi = (EpilogNode)map.get(epi);
+    newepi._fun = fun;
     newepi._args = fun._tf._args;
     
     // Fill in edges.  New Nodes point to New instead of Old; everybody

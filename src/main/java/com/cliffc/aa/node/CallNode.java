@@ -57,6 +57,7 @@ public class CallNode extends Node {
   private Node ctl() { return in(0); }
   public  Node fun() { return in(1); }
   private Node mem() { return in(2); }
+  private void set_ctl    (Node ctl, GVNGCM gvn) {     set_def    (0,ctl,gvn); }
   private void set_fun    (Node fun, GVNGCM gvn) {     set_def    (1,fun,gvn); }
   public  void set_fun_reg(Node fun, GVNGCM gvn) { gvn.set_def_reg(this,1,fun); }
   public BitsFun fidxs(GVNGCM gvn) {
@@ -117,7 +118,7 @@ public class CallNode extends Node {
       Node fun = resolve(gvn);
       if( fun != null ) { set_fun(fun,gvn); return this; }
     }
-
+    
     // Unknown function(s) being called
     if( !(unk instanceof EpilogNode) )
       return null;
@@ -201,18 +202,10 @@ public class CallNode extends Node {
     // type-check the args during GCP, as they will start out too-high and pass
     // any isa-check.  Later, after wiring up in GCP they might fall to an
     // error state - so we have to support having error args coming in.
-    for( Node arg : fun._uses ) {
-      if( arg.in(0) == fun && arg instanceof ParmNode ) {
-        int idx = ((ParmNode)arg)._idx; // Argument number, or -1 for rpc
-        if( idx >= nargs() ) return null; // Wrong arg-count
-        if( is_gcp ) {
-          Type formal = fun.targ(idx);
-          Type actual = idx==-1 ? TypeRPC.make(_rpc) : gvn.type(arg(idx));
-          if( !actual.isa(formal) )
-            return null;     // Even if actual falls more, will never be formal
-        }
-      }
-    }
+    for( Node arg : fun._uses )
+      if( arg.in(0) == fun && arg instanceof ParmNode &&
+          ((ParmNode)arg)._idx >= nargs() )
+        return null;            // Wrong arg-count
 
     // Add an input path to all incoming arg ParmNodes from the Call.  Cannot
     // assert finding all args, because dead args may already be removed - and
@@ -331,6 +324,7 @@ public class CallNode extends Node {
     BitsFun fidxs = fidxs(gvn);
     if( fidxs == null ) return null; // Might be e.g. ~Scalar
     if( !fidxs.above_center() ) return null; // Sane as-is
+    if( fidxs.test(BitsFun.ALL) ) return null;
 
     // Set of possible choices with fewest conversions
     class Data {

@@ -231,12 +231,19 @@ public abstract class Node implements Cloneable {
       use.walkerr_use(errs,bs,gvn);
   }
   
-  // Gather errors; forwards reachable data uses only
+  // Gather errors; forwards reachable data uses only.  This is an RPO walk.
   public void walkerr_def( Ary<String> errs0, Ary<String> errs1, Ary<String> errs2, BitSet bs, GVNGCM gvn ) {
     assert !is_dead();
     if( bs.get(_uid) ) return;  // Been there, done that
     bs.set(_uid);               // Only walk once
     if( is_uncalled(gvn) ) return; // Function is a constant, but never executed, do not check for errors
+    // Reverse walk: start and exit/return of graph and walk towards root/start.
+    for( int i=0; i<_defs._len; i++ ) {
+      Node def = _defs.at(i);   // Walk data defs for more errors
+      if( def == null || gvn.type(def) == Type.XCTRL ) continue;
+      def.walkerr_def(errs0,errs1,errs2,bs,gvn);
+    }
+    // Post-Order walk: check after walking
     String msg = err(gvn);      // Get any error
     if( msg != null ) {         // Gather errors
       Ary<String> errs;
@@ -246,11 +253,6 @@ public abstract class Node implements Cloneable {
       else if( this instanceof CallNode && in(1) instanceof UnresolvedNode ) errs=errs2;
       else errs=errs1;          // Other errors (e.g. bad fields for Loads)
       errs.add(msg);
-    }
-    for( int i=0; i<_defs._len; i++ ) {
-      Node def = _defs.at(i);   // Walk data defs for more errors
-      if( def == null || gvn.type(def) == Type.XCTRL ) continue;
-      def.walkerr_def(errs0,errs1,errs2,bs,gvn);
     }
   }
   

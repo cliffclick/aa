@@ -220,13 +220,14 @@ public class TestNode {
     test1monotonic(new  StoreNode(_ins[0],_ins[1],_ins[2],_ins[3],0,null));
     //                  ScopeNode has no inputs, and value() call is monotonic
     //                    TmpNode has no inputs, and value() call is monotonic
-    test1monotonic(new   TypeNode(TypeInt.FALSE,_ins[0],_ins[1],null));
-    test1monotonic(new   TypeNode(TypeStr.ABC  ,_ins[0],_ins[1],null));
-    test1monotonic(new   TypeNode(TypeFlt.FLT64,_ins[0],_ins[1],null));
+    test1monotonic(new   TypeNode(TypeInt.FALSE,_ins[1],null));
+    test1monotonic(new   TypeNode(TypeStr.ABC  ,_ins[1],null));
+    test1monotonic(new   TypeNode(TypeFlt.FLT64,_ins[1],null));
 
     assertEquals(0,_errs);
   }
 
+  @SuppressWarnings("unchecked")
   private Type test1jig(final Node n, Type t0, Type t1, Type t2, Type t3) {
     _alltype = n.all_type();
     assert _alltype.is_con() || (!_alltype.above_center() && _alltype.dual().above_center());
@@ -265,6 +266,7 @@ public class TestNode {
     test1monotonic_init(n);
   }
 
+  @SuppressWarnings("unchecked")
   private void test1monotonic_init(final Node n) {
     System.out.println(n.xstr());
     _values.clear(true);
@@ -339,6 +341,7 @@ public class TestNode {
       _errs++;
     }
   }
+  @SuppressWarnings("unchecked")
   private void set_type(int idx, Type tyx) {
     if( idx > 0 ) ((ConNode)_ins[idx])._t = tyx;
     _gvn.setype(_ins[idx], tyx);

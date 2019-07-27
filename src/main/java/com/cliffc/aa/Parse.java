@@ -299,15 +299,8 @@ public class Parse {
       return toks._len == 0 ? null
         : err_ctrl2("Missing ifex after assignment of '"+toks.last()+"'");
     // Honor all type requests, all at once
-    try( TmpNode keep = new TmpNode() ) { // TODO: THIS IS REALLY UGLY KEEP-ALIVE
-      keep.add_def(ifex);
-      for( Type t : ts )
-        if( t != null &&
-            !_gvn.type(ifex).isa(t) ) // shortcut if TypeNode elides immediately
-          set_ctrl(gvn(new TypeNode(t,ctrl(),ifex,errMsg())));
-      ifex.add_def(ifex);
-    }
-    ifex.pop();
+    for( Type t : ts )
+      ifex = typechk(ifex,t);
     // Assign tokens to value
     for( int i=0; i<toks._len; i++ ) {
       String tok = toks.at(i);     // Token being assigned
@@ -460,7 +453,7 @@ public class Parse {
             // if 'n' is a e.g. Float there's no way it can 'lift' to a function.
             !TypeFunPtr.GENERIC_FUNPTR.isa(tn) ) {
           kill(arg);
-          n = err_ctrl2("A function is being called, but "+tn+" is not a function type");
+          n = err_ctrl2("A function is being called, but "+tn+" is not a function");
         } else {
           n = do_call(new CallNode(!arglist,errMsg(),ctrl(),n,mem(),arg)); // Pass the 1 arg
         }
@@ -479,9 +472,7 @@ public class Parse {
     if( !peek(':') ) { _x = oldx; return fact; }
     Type t = type();
     if( t==null ) { _x = oldx; return fact; } // No error for missing type, because can be ?: instead
-    if( _gvn.type(fact).isa(t) ) return fact;
-    set_ctrl(gvn(new TypeNode(t,ctrl(),fact,errMsg())));
-    return fact;
+    return typechk(fact,t);
   }
 
   /** Parse a factor, a leaf grammar token
@@ -583,10 +574,8 @@ public class Parse {
       String errmsg = errMsg("Cannot mix GC and non-GC types");
       int cnt=0;                // Add parameters to local environment
       for( int i=0; i<ids._len; i++ ) {
-        Type t = ts.at(i);
-        Node parm = gvn(new ParmNode(cnt++,ids.at(i),fun,con(Type.SCALAR),errmsg));
+        Node parm = gvn(new ParmNode(cnt++,ids.at(i),fun,con(ts.at(i)),errmsg));
         _e.update(ids.at(i),parm,null, args_are_mutable);
-        if( t!=Type.SCALAR ) set_ctrl(gvn(new TypeNode(t,ctrl(),parm,errMsg()))); // Add user type-annotation
       }
       Node rpc = gvn(new ParmNode(-1,"rpc",fun,con(TypeRPC.ALL_CALL),null));
       Node mem = gvn(new ParmNode(-2,"mem",fun,con(TypeMem.MEM),null));
@@ -637,7 +626,7 @@ public class Parse {
           stmt = err_ctrl2("Cannot define field '." + tok + "' twice"); // Error is now the result
         }
         // Add type-check into graph
-        if( t != null ) set_ctrl(gvn(new TypeNode(t,ctrl(),stmt,errMsg())));
+        if( t != null )  stmt = typechk(stmt,t);
         // Add field into lexical scope, field is usable after initial set
         e.update(tok,stmt,_gvn,false); // Field now available 'bare' inside rest of scope
         if( is_final ) fs.set(toks._len);
@@ -658,6 +647,11 @@ public class Parse {
     } // Pop lexical scope around struct
   }
 
+  // Add a typecheck into the graph, with a shortcut if trivially ok.
+  private Node typechk(Node x, Type t) {
+    return t == null || _gvn.type(x).isa(t) ? x : gvn(new TypeNode(t,x,errMsg()));
+  }
+  
   private String token() { skipWS();  return token0(); }
   // Lexical tokens.  Any alpha, followed by any alphanumerics is a alpha-
   // token; alpha-tokens end with WS or any operator character.  Any collection
@@ -894,10 +888,6 @@ public class Parse {
 
   private Node do_call( Node call0 ) {
     Node call = gvn(call0);
-    // Primitives frequently inline immediately, and do not need following
-    // control/data projections.
-    if( !(call instanceof CallNode)) return call;
-
     call.add_def(call);         // Hook, so not deleted after 1st use
     set_ctrl(  gvn(new CProjNode(call,0)));
     set_mem (  gvn(new MProjNode(call,1)));

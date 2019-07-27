@@ -41,8 +41,7 @@ public class PhiNode extends Node {
     for( int i=1; i<_defs._len; i++ )
       if( gvn.type(r.in(i))==Type.CTRL ) // Only meet alive paths
         t = t.meet(gvn.type(in(i)));
-    if( _default_type.isa(t) ) t = _default_type; // Limit to sane results
-    return t;
+    return t.bound(_default_type); // Limit to sane results
   }
   @Override public Type all_type() { return _default_type; }
 }

@@ -12,14 +12,16 @@ import com.cliffc.aa.type.*;
 // - RPC - where to jump-to next; the Continuation
 // - The FunNode function header (quickly maps to SESE region header)
 public class EpilogNode extends Node {
-  TypeTuple _args; // Used when the function dies, to keep a sane type
+  FunNode _fun;             // Used when the function dies, keep the correct SESE region
+  TypeTuple _args;          // Used when the function dies, to keep a sane type
   private final String _unkref_err; // Unknown ref error (not really a forward ref)
   public EpilogNode( Node ctrl, Node mem, Node val, Node rpc, FunNode fun, String unkref_err ) {
     super(OP_EPI,ctrl,mem,val,rpc,fun);
+    _fun = fun;
     _unkref_err = unkref_err;
     _args = fun._tf._args;
   }
-  private boolean is_copy() { return !(in(4) instanceof FunNode); }
+  private boolean is_copy() { return in(4) != _fun; }
   @Override public Node ideal(GVNGCM gvn) {
     // If is_copy is true, CallNodes uses need to fold away as well
     if( is_copy() )
@@ -47,12 +49,12 @@ public class EpilogNode extends Node {
   // FunNode has disappeared/optimized away, so should this Epilog
   @Override public Node is_copy(GVNGCM gvn, int idx) { return is_copy() ? in(idx) : null; }
   
-  public    Node ctl() { return          in(0); } // internal function control
-  public    Node mem() { return          in(1); } // standard exit memory
-  public    Node val() { return          in(2); } // standard exit value
-  public    Node rpc() { return          in(3); } // Almost surely a PhiNode merging RPCs
-  public FunNode fun() { return (FunNode)in(4); } // Function header
-  @Override String xstr() {                       // Self short name
+  public    Node ctl() { return in(0); } // internal function control
+  public    Node mem() { return in(1); } // standard exit memory
+  public    Node val() { return in(2); } // standard exit value
+  public    Node rpc() { return in(3); } // Almost surely a PhiNode merging RPCs
+  public FunNode fun() { return _fun ; } // Function header
+  @Override String xstr() {              // Self short name
     FunNode fun = is_copy() ? null : fun();
     return fun==null ? "Epilog" : "Epi#"+fun._name;
   }

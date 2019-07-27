@@ -20,6 +20,18 @@ import java.util.BitSet;
 // their return values (including memory) from the Epilog itself, not the
 // FunNode and not this type.
 
+
+// CNC!!!!  TFP represents code-pointers, and can be constants.  The signature
+// is not needed.... can be built from the union of FunNode sigs from the
+// fidxs.  Perhaps: allow TFP to be constants but the dual does not flip
+// signature bits.  Handle meet-vs-join of code-pointers by meet/join sigs from
+// FunNode.  Doesn't work...
+// Plan B: no sig in TFP, just a collection of code-pointer bits.
+//         FunNode has args & ret seperately.  Epilog might also.
+//         Type of Epilog is a Code-pointer (a TFP no sig).
+//         CallNodes need to get arg types from the fidx->FunNode path.
+// Probably unwind most changes, get back to parse1-6 working.
+// 
 public final class TypeFunPtr extends Type<TypeFunPtr> {
   // List of known functions in set, or 'flip' for choice-of-functions.
   private BitsFun _fidxs;       // Known function bits
@@ -40,7 +52,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   // Never part of a cycle, so the normal check works
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
   @Override public String str( BitSet dups) {
-    return FunNode.names(_fidxs,new SB()).toString()+"{"+_args.str(dups)+"-> "+_ret.str(dups)+"}";
+    return FunNode.names(_fidxs,new SB()).toString()+":{"+_args.str(dups)+"-> "+_ret.str(dups)+"}";
   }
 
   private static TypeFunPtr FREE=null;
