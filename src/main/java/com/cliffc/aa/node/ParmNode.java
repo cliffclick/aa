@@ -36,15 +36,8 @@ public class ParmNode extends PhiNode {
             !gvn.type(in(i)).isa(_default_type) ) // Arg is NOT correct type
           return null;          // Not correct arg-type; refuse to collapse
     }
-    // Do not let PhiNode collapse single input - preserve the standard calling
-    // convention.  Otherwise a collapsed single input touches code outside the
-    // function body and confuses, e.g., inlining of a calling function.  Allow
-    // the collapse only if the FunNode is also collapsing... i.e., a single
-    // caller FunNode being inlined.
-    if( fun._defs._len==2 && !fun.has_unknown_callers() ) // Single-caller
-      return in(1);             // Collapse correct args
-    // return super.ideal(gvn); // Let PhiNode collapse 
-    return null;                // Do not let PhiNode collapse
+
+    return super.ideal(gvn); // Let PhiNode collapse 
   }
 
   @Override public Type value( GVNGCM gvn) {

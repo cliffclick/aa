@@ -14,7 +14,7 @@ public class TestParse {
   private static String[] FLDS = new String[]{"n","v"};
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
-  @Ignore @Test public void testParse() {
+  @Test public void testParse() {
     Object dummy = Env.GVN; // Force class loading cycle
 
     //test_isa("A= :@{n:A?, v:flt}; f={x:A? -> x ? A(f(x.n),x.v*x.v) : 0}; f(A(0,1.2)).v;", TypeFlt.con(1.2*1.2));
@@ -289,7 +289,7 @@ public class TestParse {
 
   @Test public void testParse6() {
     test_ptr("A= :(A?, int); A(0,2)","A:(nil,2)");
-    test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*[129]A:(nil,2),3)");
+    test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*[12]A:(nil,2),3)");
 
     // Building recursive types
     test_isa("A= :int; A(1)", (tmap -> TypeName.make("A",tmap,TypeInt.INT64)));
