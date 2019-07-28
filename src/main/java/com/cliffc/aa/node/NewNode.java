@@ -63,8 +63,11 @@ public class NewNode extends Node {
     TypeStruct apxt= approx(newt,oldt); // Approximate infinite types
     if( apxt != newt ) _did_meet=true;
     else if( _did_meet ) {
-      TypeStruct mt = (TypeStruct)(gvn._opt ? apxt.meet(oldt) : apxt.join(oldt));
-      if( mt == apxt ) _did_meet = false;
+      // If did meet once, need to keep doing it until the types propagate
+      // through the graph and catch up to our inputs... which means the Node
+      // graph finally matches the type graph.
+      TypeStruct mt = (TypeStruct) (gvn._opt ? apxt.meet(oldt) : apxt.join(oldt));
+      if( apxt.isa(oldt) || mt == apxt ) _did_meet = false;
       else apxt = mt;
     }
 
@@ -88,9 +91,16 @@ public class NewNode extends Node {
 
   // Clones during inlining all become unique new sites
   @Override NewNode copy(GVNGCM gvn) {
+    // Split the original '_alias' class into 2 sub-classes
     NewNode nnn = (NewNode)super.copy(gvn);
     nnn._alias = BitsAlias.new_alias(_alias); // Children alias classes, split from parent
     nnn._ptr = TypeMemPtr.make(nnn._alias,_obj);
+    // The original NewNode also splits from the parent alias
+    Type oldt = gvn.type(this);
+    gvn.unreg(this);
+    _alias = BitsAlias.new_alias(_alias);
+    _ptr = TypeMemPtr.make(_alias,_obj);
+    gvn.rereg(this,oldt);
     return nnn;
   }
 

@@ -315,7 +315,7 @@ public class FunNode extends RegionNode {
     }
     assert cnts[OP_FUN]==1;
     assert cnts[OP_SCOPE]==0 && cnts[OP_TMP]==0;
-    assert cnts[OP_REGION] <= cnts[OP_IF];
+    assert cnts[OP_REGION] <= cnts[OP_IF] || cnts[OP_EPI]>1;
 
     // Pick which input to inline.  Only based on having some constant inputs
     // right now.

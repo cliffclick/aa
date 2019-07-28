@@ -289,7 +289,7 @@ public class TestParse {
 
   @Test public void testParse6() {
     test_ptr("A= :(A?, int); A(0,2)","A:(nil,2)");
-    test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*[125]A:(nil,2),3)");
+    test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*[129]A:(nil,2),3)");
 
     // Building recursive types
     test_isa("A= :int; A(1)", (tmap -> TypeName.make("A",tmap,TypeInt.INT64)));
@@ -361,17 +361,17 @@ public class TestParse {
     assertEquals(TypeNil.NIL,tt5.at(0));
 
     // Test inferring a recursive struct type, with a little help
-    test("map={x:@{n,v:flt}? -> x ? @{n=map(x.n),v=x.v*x.v} : 0}; map(@{n=0,v=1.2})",
-         TypeStruct.make(FLDS,TypeNil.NIL,TypeFlt.con(1.2*1.2)));
+    test_ptr("map={x:@{n,v:flt}? -> x ? @{n=map(x.n),v=x.v*x.v} : 0}; map(@{n=0,v=1.2})",
+             (alias) -> TypeMemPtr.make(alias,TypeStruct.make(FLDS,TypeNil.NIL,TypeFlt.con(1.2*1.2))));
 
     // Test inferring a recursive struct type, with less help.  This one
     // inlines so doesn't actually test inferring a recursive type.
-    test("map={x -> x ? @{n=map(x.n),v=x.v*x.v} : 0}; map(@{n=0,v=1.2})",
-         TypeStruct.make(FLDS,TypeNil.NIL,TypeFlt.con(1.2*1.2)));
+    test_ptr("map={x -> x ? @{n=map(x.n),v=x.v*x.v} : 0}; map(@{n=0,v=1.2})",
+             (alias) -> TypeMemPtr.make(alias,TypeStruct.make(FLDS,TypeNil.NIL,TypeFlt.con(1.2*1.2))));
 
     // Test inferring a recursive struct type, with less help. Too complex to
     // inline, so actual inference happens
-    TypeStruct.init1();
+    //TypeStruct.init1();
     test_isa("map={x -> x ? @{n=map(x.n),v=x.v*x.v} : 0};"+
          "map(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0,v=1.2},v=2.3},v=3.4},v=4.5})",
          TypeStruct.make(FLDS,TypeNil.make(TypeStruct.RECURS_NIL_FLT),TypeFlt.con(4.5*4.5)));
