@@ -127,7 +127,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
       { cycle.set(_uid); _cyclic=_dual._cyclic=true; }
   }
   @Override boolean contains( Type t, BitSet bs ) { return _obj == t || _obj.contains(t, bs); }
-  @Override int depth( BitSet bs ) { return 1+_obj.depth(bs); }
+  @Override int depth( BitSet bs ) { return _obj.depth(bs); }
   @SuppressWarnings("unchecked")
   @Override Type replace( Type old, Type nnn, HashMap<Type,Type> MEETS  ) {
     Type x = _obj.replace(old,nnn,MEETS);

@@ -11,6 +11,7 @@ public class NewNode extends Node {
   private int _alias;           // Alias class
   private TypeStruct _ts;       // Result struct (may be named)
   private TypeObj _obj;         // Optional named struct
+  private boolean _did_meet;
   TypeMemPtr _ptr;              // Cached pointer-to-_obj
 
   public NewNode( Node[] flds, TypeObj obj ) {
@@ -49,8 +50,24 @@ public class NewNode extends Node {
     // Get the existing type, without installing if missing because blows the
     // "new NewNode" assert if this node gets replaced during parsing.
     Type oldnnn = gvn.self_type(this);
-    TypeObj oldt = oldnnn ==null ? newt : ((TypeMemPtr)oldnnn)._obj;
+    // Get the struct-part of the old type for cycle checking
+    TypeStruct oldt = newt;
+    if( oldnnn != null ) {
+      TypeObj tobj = ((TypeMemPtr)oldnnn)._obj;
+      if( _obj instanceof TypeName ) {
+        assert ((TypeName)tobj)._name == ((TypeName)_obj)._name; // == not equals
+        oldt = (TypeStruct)((TypeName)tobj)._t;
+      } else oldt = (TypeStruct)tobj;
+    }
+
     TypeStruct apxt= approx(newt,oldt); // Approximate infinite types
+    if( apxt != newt ) _did_meet=true;
+    else if( _did_meet ) {
+      TypeStruct mt = (TypeStruct)(gvn._opt ? apxt.meet(oldt) : apxt.join(oldt));
+      if( mt == apxt ) _did_meet = false;
+      else apxt = mt;
+    }
+
     TypeObj res = _obj instanceof TypeName ? ((TypeName)_obj).make(apxt) : apxt;
     return TypeMemPtr.make(_alias,res);
   }
@@ -59,12 +76,11 @@ public class NewNode extends Node {
   // to in a loop until the size grows without bound.  If we detect this we
   // need to approximate a new cyclic type.
   private final static int CUTOFF=5; // Depth of types before we start forcing approximations
-  public static TypeStruct approx( TypeStruct newt, TypeObj oldt ) {
-    if( !(oldt instanceof TypeStruct) ) return newt;
+  public static TypeStruct approx( TypeStruct newt, TypeStruct oldt ) {
     if( newt == oldt ) return newt;
     if( !newt.contains(oldt) ) return newt;
     if( oldt.depth() <= CUTOFF ) return newt;
-    TypeStruct tsa = newt.approx((TypeStruct)oldt);
+    TypeStruct tsa = newt.approx(oldt);
     return (TypeStruct)(tsa.meet(oldt));
   }
 
