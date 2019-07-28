@@ -78,7 +78,7 @@ public class FunNode extends RegionNode {
     FUNS.set_len(PRIM_CNT);
     for( int i=2; i<PRIM_CNT; i++ ) {
       FunNode fun = FUNS.at(i);
-      if( fun.fidx() != i ) // Cloned primitives get renumbered, so renumber back
+      if( fun != null && fun.fidx() != i ) // Cloned primitives get renumbered, so renumber back
         fun._tf = fun._tf.make_fidx(i);
     }
   }
@@ -304,7 +304,7 @@ public class FunNode extends RegionNode {
       if( op == OP_PARM && n.in(0) != this ) continue; // Arg  to other function, not part of inlining
       if( n != epi )            // Except for the Epilog
         work.addAll(n._uses);   // Visit all uses also
-      if( op==OP_CALL ) {       // Call-of-primitive?
+      if( op == OP_CALL ) {     // Call-of-primitive?
         Node n1 = ((CallNode)n).fun();
         Node n2 = n1 instanceof UnresolvedNode ? n1.in(0) : n1;
         if( n2 instanceof EpilogNode &&
@@ -313,7 +313,7 @@ public class FunNode extends RegionNode {
       }
       cnts[op]++;               // Histogram ops
     }
-    assert cnts[OP_FUN]==1 && cnts[OP_EPI]==1;
+    assert cnts[OP_FUN]==1;
     assert cnts[OP_SCOPE]==0 && cnts[OP_TMP]==0;
     assert cnts[OP_REGION] <= cnts[OP_IF];
 
@@ -332,7 +332,8 @@ public class FunNode extends RegionNode {
     // Specifically ignoring constants, parms, phis, rpcs, types,
     // unresolved, and casts.  These all track & control values, but actually
     // do not generate any code.
-    if( cnts[OP_CALL] > 1 || // Careful inlining more calls; leads to exponential growth
+    if( cnts[OP_EPI ] > 1 || // Found epilog of nested function, do not inline the outer function
+        cnts[OP_CALL] > 1 || // Careful inlining more calls; leads to exponential growth
         cnts[OP_IF  ] > 1+mncons || // Allow some trivial filtering to inline
         cnts[OP_PRIM] > 6 )  // Allow small-ish primitive counts to inline
       return null;

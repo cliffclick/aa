@@ -27,6 +27,7 @@ public class Env implements AutoCloseable {
     GVN = new GVNGCM();     // Initial GVN, defaults to ALL, lifts towards ANY
     // Initial control, memory, args, program state
     START = new StartNode();
+    assert START._uid==0;
     CTL_0 = GVN.init(new CProjNode(START,0));
     MEM_0 = GVN.init(new MProjNode(START,1));
     ALL_CTRL = GVN.init(new ConNode<>(Type.CTRL));

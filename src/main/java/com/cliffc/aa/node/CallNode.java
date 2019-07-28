@@ -413,12 +413,13 @@ public class CallNode extends Node {
     if( ((TypeFunPtr)txfp).fidxs().above_center() )
       return _badargs.errMsg("An ambiguous function is being called");
 
+    assert xfp instanceof EpilogNode; // If not, then we failed to wire all callers up in opto
     EpilogNode epi = (EpilogNode)xfp;
+    FunNode fun = epi.fun();
     if( fp.is_forward_ref() ) // Forward ref on incoming function
-      return _badargs.forward_ref_err(epi.fun());
+      return _badargs.forward_ref_err(fun);
 
     // Error#2: bad-arg-count
-    FunNode fun = epi.fun();
     if( fun.nargs() != nargs() )
       return _badargs.errMsg("Passing "+nargs()+" arguments to "+(fun.xstr())+" which takes "+fun.nargs()+" arguments");
 

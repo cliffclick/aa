@@ -289,7 +289,7 @@ public class TestParse {
 
   @Test public void testParse6() {
     test_ptr("A= :(A?, int); A(0,2)","A:(nil,2)");
-    test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*[12]A:(nil,2),3)");
+    test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*[125]A:(nil,2),3)");
 
     // Building recursive types
     test_isa("A= :int; A(1)", (tmap -> TypeName.make("A",tmap,TypeInt.INT64)));

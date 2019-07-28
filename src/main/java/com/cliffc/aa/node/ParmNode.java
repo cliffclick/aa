@@ -36,7 +36,6 @@ public class ParmNode extends PhiNode {
             !gvn.type(in(i)).isa(_default_type) ) // Arg is NOT correct type
           return null;          // Not correct arg-type; refuse to collapse
     }
-
     return super.ideal(gvn); // Let PhiNode collapse 
   }
 

@@ -328,12 +328,14 @@ public class GVNGCM {
     // graph) until other optimizations are done.  Gather the possible inline
     // requests and set them aside until the main list is empty, then work down
     // the inline list.
+    int cnt=0;
     while( (_small_work=_work._len > 0) || _work2._len > 0 ) {
       Node n = (_small_work ? _work : _work2).pop(); // Pull from main worklist before functions
       (_small_work ? _wrk_bits : _wrk2_bits).clear(n._uid);
       if( n.is_dead() ) continue;
       if( n._uses._len==0 ) kill(n);
       else xform_old(n);
+      cnt++; assert cnt < 10000; // Catch infinite ideal-loops
     }
   }
 
