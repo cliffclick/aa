@@ -1,6 +1,5 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 import org.jetbrains.annotations.NotNull;
 
@@ -120,7 +119,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
 
   // Constructor taking an array of bits, and allowing join/meet selection.
   // Canonicalizes the bits.  The 'this' pointer is only used to clone the class.
-  final B make( boolean any, long[] bits ) {
+  private B make( boolean any, long[] bits ) {
     // If a 'parent' bit is set, then no need to have any child bits set.
     Tree<B> tree = tree();
     // TODO: Run this loop backwards, avoids most tree-walks; lowers O(n log n)
@@ -202,7 +201,6 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     return make(true,bs);                // Choices without nil
   }
 
-  private static int max( long[] bits ) { return (bits.length<<6)-1; }
   private static void or ( long[] bits, long con ) { bits[idx(con)] |=  mask(con); }
   private static void and( long[] bits, long con ) { bits[idx(con)] &= ~mask(con); }
   private static long[] bits( int a, int b ) { return new long[idx(Math.max(a,b))+1]; }

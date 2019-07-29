@@ -184,14 +184,14 @@ public class CallNode extends Node {
     assert fun.nargs() == nargs();
 
     // Always wire caller args into known functions
-    return wire(gvn,fun,false);
+    return wire(gvn,fun);
   }
 
   // Wire the call args to a known function, letting the function have precise
   // knowledge of its callers and arguments.
   // Leaves the Call in the graph - making the graph "a little odd" - double
   // CTRL users - once for the call, and once for the function being called.
-  Node wire( GVNGCM gvn, FunNode fun, boolean is_gcp ) {
+  Node wire( GVNGCM gvn, FunNode fun ) {
     Node ctrl = ctl();
     for( int i=1; i<fun._defs.len(); i++ )
       if( fun.in(i)==ctrl ) // Look for same control
@@ -235,7 +235,7 @@ public class CallNode extends Node {
         // Can be wiring up the '#[ALL]' list.  Stop after seeing all existing functions
         if( fidx >= FunNode.FUNS._len ) return;
         FunNode fun = FunNode.find_fidx(fidx);
-        if( !fun.is_dead() && !fun.is_forward_ref() ) wire(gvn,fun,true);
+        if( !fun.is_dead() && !fun.is_forward_ref() ) wire(gvn,fun);
       }
     }
   }

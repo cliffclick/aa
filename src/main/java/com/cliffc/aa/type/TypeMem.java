@@ -161,7 +161,7 @@ public class TypeMem extends Type<TypeMem> {
   public static final TypeMem XMEM; // Every alias filled with anything
          static final TypeMem EMPTY_MEM;
   public static final TypeMem MEM_ABC;
-  public static final TypeMem MEM_NAME;
+  private static final TypeMem MEM_NAME;
   static {
     // All memory.  Includes breakouts for all structs and all strings.
     // Triggers BitsAlias.<clinit> which makes all the initial alias splits.

@@ -4,13 +4,12 @@ import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.type.TypeMemPtr;
-import com.cliffc.aa.type.TypeObj;
 
 // Merge a TypeObj at address TypeMemPtr into a TypeMem.
 public class MemMergeNode extends Node {
   public MemMergeNode( Node mem, Node ptr ) { super(OP_MERGE,mem,ptr);  }
-  Node mem() { return in(0); }
-  Node ptr() { return in(1); }
+  private Node mem() { return in(0); }
+  private Node ptr() { return in(1); }
   
   @Override public Node ideal(GVNGCM gvn) {
     // If I have a Named Constructor usage, and have 2 uses (named constructor

@@ -1,5 +1,6 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.node.PrimNode;
 import org.junit.Test;
 
 import java.util.HashMap;
@@ -334,6 +335,7 @@ public class TestType {
   @Test public void testFunction() {
     Type.init0(new HashMap<>());
     Type ignore = TypeTuple.ANY; // Break class-loader cycle; load Tuple before Fun.
+    PrimNode[] ignore2 = PrimNode.PRIMS; // Force node
 
     TypeFunPtr gf = TypeFunPtr.GENERIC_FUNPTR;
     // New functions fall squarely between +/- GENERIC_FUNPTR.
@@ -354,14 +356,14 @@ public class TestType {
     TypeFunPtr f1f2f = TypeFunPtr.make_new(TypeTuple.FLT64_FLT64,TypeFlt.FLT64);
     assertTrue(f1f2f.isa(gf));
     TypeFunPtr mt = (TypeFunPtr)f1i2i.meet(f1f2f);
-    BitsFun funs = BitsFun.make0(36).meet(BitsFun.make0(37));
+    BitsFun funs = BitsFun.make0(3).meet(BitsFun.make0(4));
     TypeFunPtr f3i2r = TypeFunPtr.make(funs,TypeTuple.make_args(Type.REAL,Type.REAL),Type.REAL);
     assertEquals(f3i2r,mt);
     assertTrue(f3i2r.isa(gf));
     assertTrue(f1i2i.isa(f3i2r));
     assertTrue(f1f2f.isa(f3i2r));
 
-    TypeFunPtr f2 = TypeFunPtr.make(BitsFun.make0(23),TypeTuple.INT64_INT64,TypeInt.INT64); // Some generic function (happens to be #23, '&')
+    TypeFunPtr f2 = TypeFunPtr.make(BitsFun.make0(4),TypeTuple.INT64_INT64,TypeInt.INT64); // Some generic function (happens to be #23, '&')
     assertTrue(f2.isa(gf));
   }
 

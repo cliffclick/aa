@@ -86,7 +86,7 @@ public class FunNode extends RegionNode {
   // Supposed to be the self SHORT name, but include full signature.
   @Override public String xstr() {  return _tf.str(null); }
   // Inline name
-  @Override String str() { return _name==null ? "fun"+Integer.toString(fidx()) : _name; }
+  @Override String str() { return _name==null ? "fun"+fidx() : _name; }
   // Debug only: make an attempt to bind name to a function
   public void bind( String tok ) {
     assert _name==null || _name.equals(tok); // Attempt to double-bind
@@ -110,7 +110,7 @@ public class FunNode extends RegionNode {
     FunNode fun = find_fidx(fidx);
     String name = fun == null ? null : fun._name;
     if( name==null && fun != null && fun.is_forward_ref() ) name="<forward_decl_"+fidx+">";
-    if( name==null ) name = "fun"+Integer.toString(fidx);
+    if( name==null ) name = "fun"+fidx;
     return sb.p(name);
   }
 
@@ -263,7 +263,6 @@ public class FunNode extends RegionNode {
     TypeTuple args = TypeTuple.make_args(sig);
     assert args.isa(_tf._args);
     if( args == _tf._args ) return null; // Must see improvement
-    assert args != _tf._args;   // Must see improvement
     // Make a prototype new function header split from the original.
     int fidx = fidx();
     FunNode fun = new FunNode(_name,TypeFunPtr.make(BitsFun.make_new_fidx(fidx),args,_tf._ret));
@@ -492,7 +491,7 @@ public class FunNode extends RegionNode {
             assert !oldfun.is_dead();
             if( !oldfun.has_unknown_callers() ) {
               gvn.add_work(oldfun);
-              Node x = ((CallNode)c).wire(gvn,oldfun,false);
+              Node x = ((CallNode)c).wire(gvn,oldfun);
               assert x != null;
               ParmNode rpc = oldfun.rpc();
               if( rpc != null ) // Can be null there is a single return point, which got constant-folded

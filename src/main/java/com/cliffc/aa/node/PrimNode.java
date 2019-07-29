@@ -18,7 +18,7 @@ public abstract class PrimNode extends Node {
   public final String _name;    // Unique name (and program bits)
   final TypeTuple _targs;       // Argument types, 0-based
   final Type _ret;              // Primitive return type, no memory
-  final String[] _args;         // Handy string arg names; 0-based
+  private final String[] _args; // Handy string arg names; 0-based
   Parse _badargs;               // Filled in when inlined in CallNode
   PrimNode( String name, String[] args, TypeTuple targs, Type ret ) {
     super(OP_PRIM);

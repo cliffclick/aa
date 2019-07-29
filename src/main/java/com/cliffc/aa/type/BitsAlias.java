@@ -23,7 +23,7 @@ public class BitsAlias extends Bits<BitsAlias> {
   public  static final int ALL, REC, ARY, I64, F64;
           static final int STR, ABC;
           static BitsAlias NZERO, FULL, RECBITS0, STRBITS, STRBITS0, ABCBITS, ABCBITS0;
-  public  static BitsAlias RECBITS, NIL;
+          static BitsAlias RECBITS, NIL;
   private static BitsAlias ANY;
 
   static {

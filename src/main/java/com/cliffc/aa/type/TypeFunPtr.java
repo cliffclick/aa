@@ -1,7 +1,6 @@
 package com.cliffc.aa.type;
 
 import com.cliffc.aa.node.FunNode;
-import com.cliffc.aa.node.PrimNode;
 import com.cliffc.aa.util.SB;
 
 import java.util.BitSet;
@@ -125,6 +124,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public boolean is_forward_ref() {
     if( _fidxs.abit() == -1 ) return false; // Multiple fidxs
     if( _fidxs.getbit() == 1 ) return false; // Thats the generic function ptr
-    return FunNode.find_fidx(fidx()).is_forward_ref();
+    FunNode fun = FunNode.find_fidx(fidx());
+    return fun != null && fun.is_forward_ref();
   }
 }
