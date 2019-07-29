@@ -66,7 +66,10 @@ public class GVNGCM {
     while( _work._len > 0 ) {   // Can be a few leftover dead bits...
       Node n = _work.pop();     // from top-level parse killing result...
       _wrk_bits.clear(n._uid);  // after getting type to return
-      assert n.is_dead();
+      if( !n.is_dead() )        // Unreachable loops can be dead; break the loop and delete
+        for( int i=0; i<n._defs._len; i++ ) 
+          if( !n.is_dead() && n.in(i)!=null )
+            set_def_reg(n,i,null);
     }
     CNT = _INIT0_CNT;
     _live.clear();  _live.set(0,_INIT0_CNT);
