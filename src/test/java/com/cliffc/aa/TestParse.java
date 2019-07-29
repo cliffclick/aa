@@ -17,7 +17,6 @@ public class TestParse {
   @Test public void testParse() {
     Object dummy = Env.GVN; // Force class loading cycle
 
-    //test_isa("A= :@{n:A?, v:flt}; f={x:A? -> x ? A(f(x.n),x.v*x.v) : 0}; f(A(0,1.2)).v;", TypeFlt.con(1.2*1.2));
     // A collection of tests which like to fail easily
     testerr ("Point=:@{x,y}; Point((0,1))", "*[9](nil,1) is not a *[2]@{x,y}",27);
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'",20);
@@ -371,10 +370,9 @@ public class TestParse {
 
     // Test inferring a recursive struct type, with less help. Too complex to
     // inline, so actual inference happens
-    //TypeStruct.init1();
-    test_isa("map={x -> x ? @{n=map(x.n),v=x.v*x.v} : 0};"+
-         "map(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0,v=1.2},v=2.3},v=3.4},v=4.5})",
-         TypeStruct.make(FLDS,TypeNil.make(TypeStruct.RECURS_NIL_FLT),TypeFlt.con(4.5*4.5)));
+    test_ptr_isa("map={x -> x ? @{n=map(x.n),v=x.v*x.v} : 0};"+
+                 "map(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0,v=1.2},v=2.3},v=3.4},v=4.5})",
+                 (alias) -> TypeMemPtr.make(alias,TypeStruct.make(FLDS,TypeMemPtr.STRUCT0,TypeFlt.con(20.25))));
 
     // Test inferring a recursive tuple type, with less help.  This one
     // inlines so doesn't actually test inferring a recursive type.
@@ -588,6 +586,15 @@ c[x]=1;
       int alias = ((TypeMemPtr)te._t).getbit(); // internally asserts only 1 bit set
       Type t_expected = expected.apply(alias);
       assertEquals(t_expected,te._t);
+    }
+  }
+  // Slightly weaker than test_ptr
+  static private void test_ptr_isa( String program, Function<Integer,Type> expected ) {
+    try( TypeEnv te = run(program) ) {
+      assertTrue(te._t instanceof TypeMemPtr);
+      int alias = ((TypeMemPtr)te._t).getbit(); // internally asserts only 1 bit set
+      Type t_expected = expected.apply(alias);
+      assertTrue(te._t.isa(t_expected));
     }
   }
   static private void test_ptr( String program, String expected ) {

@@ -599,9 +599,7 @@ public class Parse {
    */
   private Node struct() {
     try( Env e = new Env(_e) ) {// Nest an environment for the local vars
-      Node ctrl = ctrl();
       _e = e;                   // Push nested environment
-      set_ctrl(ctrl);           // Carry control through
       Ary<String> toks = new Ary<>(new String[1],0);
       BitSet fs = new BitSet();
       while( true ) {
@@ -634,9 +632,11 @@ public class Parse {
         if( !peek(',') ) break; // Final comma is optional
       }
       require('}');
-      Node c = e._scope.remove(" control ");
-      _e = e._par;              // Pop nested environment
-      if( e._scope != c ) set_ctrl(c);  // Carry any control changes back to outer scope
+      Node ctl = ctrl(), mem = mem();
+      assert ctl != e._scope;
+      _e = e._par;             // Pop nested environment
+      set_ctrl(ctl);           // Carry any control changes back to outer scope
+      set_mem (mem);           // Carry any memroy  changes back to outer scope
 
       Node[] flds = new Node[toks._len+1];
       for( int i=0; i<toks._len; i++ )

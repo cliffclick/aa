@@ -53,17 +53,17 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
          static TypeMemPtr make_nil( int alias, TypeObj obj ) { return make(BitsAlias.make0(alias).meet_nil(),obj); }
   public        TypeMemPtr make    (            TypeObj obj ) { return make(_aliases,obj); }
 
-  public static final TypeMemPtr OOP0   = make(BitsAlias.FULL    , TypeObj.OBJ); // Includes nil
-  public static final TypeMemPtr OOP    = make(BitsAlias.NZERO   , TypeObj.OBJ);// Excludes nil
-  public static final TypeMemPtr STRPTR = make(BitsAlias.STRBITS , TypeStr.STR);
-         static final TypeMemPtr STR0   = make(BitsAlias.STRBITS0, TypeStr.STR);
-  public static final TypeMemPtr ABCPTR = make(BitsAlias.ABCBITS , TypeStr.ABC);
-  public static final TypeMemPtr ABC0   = make(BitsAlias.ABCBITS0, TypeStr.ABC);
-  public static final TypeMemPtr STRUCT = make(BitsAlias.RECBITS , TypeStruct.ALLSTRUCT);
-         static final TypeMemPtr STRUCT0= make(BitsAlias.RECBITS0, TypeStruct.ALLSTRUCT);
-  public static final TypeMemPtr PNTPTR = make(BitsAlias.RECBITS , TypeName.TEST_STRUCT);
-         static final TypeMemPtr PNT0   = make(BitsAlias.RECBITS0, TypeName.TEST_STRUCT);
-  public static final TypeMemPtr NIL    = make(BitsAlias.NIL,      TypeObj.OBJ);
+  public  static final TypeMemPtr OOP0   = make(BitsAlias.FULL    , TypeObj.OBJ); // Includes nil
+  public  static final TypeMemPtr OOP    = make(BitsAlias.NZERO   , TypeObj.OBJ);// Excludes nil
+  public  static final TypeMemPtr STRPTR = make(BitsAlias.STRBITS , TypeStr.STR);
+          static final TypeMemPtr STR0   = make(BitsAlias.STRBITS0, TypeStr.STR);
+  public  static final TypeMemPtr ABCPTR = make(BitsAlias.ABCBITS , TypeStr.ABC);
+  public  static final TypeMemPtr ABC0   = make(BitsAlias.ABCBITS0, TypeStr.ABC);
+          static final TypeMemPtr STRUCT = make(BitsAlias.RECBITS , TypeStruct.ALLSTRUCT);
+  public  static final TypeMemPtr STRUCT0= make(BitsAlias.RECBITS0, TypeStruct.ALLSTRUCT);
+  private static final TypeMemPtr PNTPTR = make(BitsAlias.RECBITS , TypeName.TEST_STRUCT);
+  private static final TypeMemPtr PNT0   = make(BitsAlias.RECBITS0, TypeName.TEST_STRUCT);
+  public  static final TypeMemPtr NIL    = make(BitsAlias.NIL,      TypeObj.OBJ);
   static final TypeMemPtr[] TYPES = new TypeMemPtr[]{OOP0,STRPTR,ABCPTR,STRUCT,ABC0,PNTPTR,PNT0};
 
   @Override protected TypeMemPtr xdual() { return new TypeMemPtr(_aliases.dual(),(TypeObj)_obj.dual()); }

@@ -89,6 +89,7 @@ public class LoadNode extends Node {
       int idx = ts.find(_fld,_fld_num);  // Find the named field
       if( idx != -1 ) return ts.at(idx); // Field type
       // No such field
+      return base.above_center() ? Type.XSCALAR : Type.SCALAR;
     }
     return Type.SCALAR;        // No loading from e.g. Strings
   }
@@ -99,7 +100,8 @@ public class LoadNode extends Node {
     if( t.must_nil() ) return _badnil;
     Type t2 = t instanceof TypeNil ? ((TypeNil)t)._t : t; // Strip off the nil
     //if( TypeOop.OOP.isa(t) ) return _badfld; // Too low, might not have any fields
-    if( !(t2 instanceof TypeMemPtr) ) return _badfld; // Not a pointer, cannot load a field
+    if( !(t2 instanceof TypeMemPtr) )
+      return _badfld; // Not a pointer, cannot load a field
     TypeMemPtr t3 = (TypeMemPtr)t2;
     TypeMem t4 = (TypeMem)gvn.type(mem()); // Should be memory
     Type t5 = t4.ld(t3);                   // Meets of all aliases
