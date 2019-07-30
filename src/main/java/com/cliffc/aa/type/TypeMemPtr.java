@@ -31,7 +31,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   }
   @Override String str( BitSet dups) {
     if( dups == null ) dups = new BitSet();
-    else if( dups.get(_uid) ) return "*"; // Break recursive printing cycle
+    else if( dups.get(_uid) ) return "$"; // Break recursive printing cycle
     dups.set(_uid);
     SB sb = new SB().p('*');
     _aliases.toString(sb).p(_obj.str(dups));
@@ -129,12 +129,14 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   @Override boolean contains( Type t, BitSet bs ) { return _obj == t || _obj.contains(t, bs); }
   @Override int depth( BitSet bs ) { return _obj.depth(bs); }
   @SuppressWarnings("unchecked")
-  @Override Type replace( Type old, Type nnn, HashMap<Type,Type> MEETS  ) {
-    Type x = _obj.replace(old,nnn,MEETS);
+  @Override Type replace( Type old, Type nnn, HashMap<Type,Type> HASHCONS ) {
+    Type x = _obj.replace(old,nnn,HASHCONS);
     if( x==_obj ) return this;
     Type rez = make((TypeObj)x);
     rez._cyclic=true;
-    return rez;
+    TypeMemPtr hc = (TypeMemPtr)HASHCONS.get(rez);
+    if( hc == null ) { HASHCONS.put(rez,rez); return rez; }
+    return rez.free(hc);
   }
 
   @SuppressWarnings("unchecked")

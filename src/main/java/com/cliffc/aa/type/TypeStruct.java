@@ -129,7 +129,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
 
   String str( BitSet dups) {
     if( dups == null ) dups = new BitSet();
-    else if( dups.get(_uid) ) return "*"; // Break recursive printing cycle
+    else if( dups.get(_uid) ) return "$"; // Break recursive printing cycle
     dups.set(_uid);
 
     SB sb = new SB();
@@ -190,37 +190,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // Recursive meet in progress
   private static final HashMap<TypeStruct,TypeStruct> MEETS1 = new HashMap<>(), MEETS2 = new HashMap<>();
 
-  // Build a recursive struct type for tests: @{n=*?,v=flt}
-  public static void init1() {
-    TypeStr.init();             // Force TypeStr <clinit>
-    TypeNil.init();             // Force TypeNil <clinit>
-    TypeStruct ts1 = malloc(false,new String[]{"n","v"},new Type[2],new byte[]{1,1});
-    RECURSIVE_MEET++;
-    Type tsn = TypeNil.make(ts1);  tsn._cyclic = true;
-    ts1._ts[0] = tsn;    ts1._cyclic = true;
-    ts1._ts[1] = TypeFlt.FLT64;
-    RECURSIVE_MEET--;
-    RECURS_NIL_FLT = ts1.install_cyclic();
-
-    ts1 = malloc(false,FLD2,new Type[2],new byte[]{1,1});
-    RECURSIVE_MEET++;
-    tsn = TypeNil.make(ts1);  tsn._cyclic = true;
-    ts1._ts[0] = tsn;    ts1._cyclic = true;
-    ts1._ts[1] = TypeFlt.FLT64;
-    RECURSIVE_MEET--;
-    RECURT_NIL_FLT = ts1.install_cyclic();
-
-    ts1 = malloc(false, new String[]{"l","r","v"}, new Type[3], new byte[]{1,1,1});
-    RECURSIVE_MEET++;
-    tsn = TypeNil.make(ts1);  tsn._cyclic = true;
-    ts1._ts[0] = tsn;         ts1._cyclic = true;
-    ts1._ts[1] = tsn;
-    ts1._ts[2] = TypeInt.INT64;
-    RECURSIVE_MEET--;
-    RECURS_TREE = ts1.install_cyclic();
-
-  }
-  public static TypeStruct RECURS_NIL_FLT, RECURT_NIL_FLT, RECURS_TREE;
+  public static TypeStruct RECURS_TREE;
 
   static final TypeStruct[] TYPES = new TypeStruct[]{ALLSTRUCT,POINT,X,A,C0,D1,ARW};
 
@@ -449,22 +419,22 @@ public class TypeStruct extends TypeObj<TypeStruct> {
 
   // THIS contains THAT, and THAT is too deep.  Make a new cyclic type for THIS
   // where THAT is replaced by THIS, before doing the Meet.
-  private static final HashMap<Type,Type> MEET = new HashMap<>();
+  private static final HashMap<Type,Type> HASHCONS = new HashMap<>();
   public TypeStruct approx( final TypeStruct that ) {
     assert this.contains(that);
     // Recursively clone THIS, replacing the reference to THAT with the THIS clone.
     // Do not install until the cycle is complete.
-    assert RECURSIVE_MEET == 0 && MEET.isEmpty();
+    assert RECURSIVE_MEET == 0 && HASHCONS.isEmpty();
     RECURSIVE_MEET++;
-    TypeStruct mt = (TypeStruct)replace(that,null,MEET);
+    TypeStruct mt = (TypeStruct)replace(that,null,HASHCONS);
     // The result might not be minimal.  Look for a smaller cycle.
     TypeStruct mt2 = mt.repeats_in_cycles(); // Returns first dup instance
     if( mt2 != null ) // Shrink again
-      mt = (TypeStruct)mt.replace(mt2,null,MEET);
+      mt = (TypeStruct)mt.replace(mt2,null,HASHCONS);
     assert mt.repeats_in_cycles()==null; // TODO: Need to do this once-per-field?
     --RECURSIVE_MEET;
     assert RECURSIVE_MEET==0;
-    MEET.clear();
+    HASHCONS.clear();
     // Install the cycle
     return mt.install_cyclic();
   }

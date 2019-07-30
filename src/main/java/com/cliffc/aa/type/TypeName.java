@@ -255,12 +255,14 @@ public class TypeName extends TypeObj<TypeName> {
   @Override boolean contains( Type t, BitSet bs ) { return _t == t || _t.contains(t, bs); }
   @Override int depth( BitSet bs ) { return 1+_t.depth(bs); }
   @SuppressWarnings("unchecked")
-  @Override Type replace( Type old, Type nnn, HashMap<Type,Type> MEETS  ) {
-    Type x = _t.replace(old,nnn,MEETS);
+  @Override Type replace( Type old, Type nnn, HashMap<Type,Type> HASHCONS ) {
+    Type x = _t.replace(old,nnn,HASHCONS);
     if( x==_t ) return this;
     Type rez = make(_name,_lex,x);
     rez._cyclic=true;
-    return rez;
+    TypeName hc = (TypeName)HASHCONS.get(rez);
+    if( hc == null ) { HASHCONS.put(rez,rez); return rez; }
+    return rez.free(hc);
   }
 
   @SuppressWarnings("unchecked")
