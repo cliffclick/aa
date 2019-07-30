@@ -446,7 +446,7 @@ public class GVNGCM {
   }
 
   // GCP optimizations on the live subgraph
-  private void walk_opt( Node n/*, FunNode frez*/ ) {
+  private void walk_opt( Node n ) {
     assert !n.is_dead();
     if( _wrk_bits.get(n._uid) ) return; // Been there, done that
     if( n==Env.START ) return;          // Top-level scope
@@ -475,14 +475,14 @@ public class GVNGCM {
     // All (live) Call ambiguity has been resolved
     if( n instanceof CallNode && type(n.in(0))==Type.CTRL ) {
       BitsFun fidxs = ((CallNode)n).fidxs(this);
-      //assert fidxs==null || !fidxs.above_center() ||
-      //  n.err(this) != null; // Or else call is in-error
+      assert fidxs==null || !fidxs.above_center() ||
+        n.err(this) != null; // Or else call is in-error
     }
 
     // Walk reachable graph
     for( Node def : n._defs )
       if( def != null )
-        walk_opt(def/*,frez*/);
+        walk_opt(def);
   }
 
 }

@@ -82,7 +82,7 @@ public class Type<T extends Type<T>> {
   private static Type FREE=null;
   protected T free( T ret ) { assert getClass()==Type.class; FREE=this; return ret; }
   @SuppressWarnings("unchecked")
-  static Type make( byte type ) {
+  private static Type make( byte type ) {
     Type t1 = FREE;
     if( t1 == null ) t1 = new Type(type);
     else { FREE = null; t1.init(type); }

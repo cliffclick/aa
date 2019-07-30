@@ -23,15 +23,3 @@ public abstract class AA {
     else REPL.go(top);
   }
 }
-/*
-  Work-In-Progress
-
-  - Yanking all old versions of "all_callers_known" and "whole program"
-  - Removing hooks keeping unknown-callers to FunNodes alive.
-  - Basically, keeping virtual call-graph alive until it can be discovered.
-
-  - Some form of incremental call-graph building.  Currently not-inlined
-    calls with a discovered call-graph edge, have the edge added to the FunNode
-    but it also is on the CallNode, leading to a double-ctrl-user.
-  - 
- */

@@ -40,6 +40,7 @@ public class NewNode extends Node {
   String  str() { return "New"+_ptr; } // Inline less-short name
   @Override public Node ideal(GVNGCM gvn) { return null; }
   // Produces a TypeMemPtr
+  @SuppressWarnings("StringEquality")
   @Override public Type value(GVNGCM gvn) {
     // Gather args and produce a TypeStruct
     Type[] ts = new Type[_ts._ts.length];

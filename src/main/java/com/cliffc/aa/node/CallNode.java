@@ -189,7 +189,7 @@ public class CallNode extends Node {
 
   // Wire the call args to a known function, letting the function have precise
   // knowledge of its callers and arguments.
-  // Leaves the Call in the graph - making the graph "a little odd" - double
+  // TODO: Leaves the Call in the graph - making the graph "a little odd" - double
   // CTRL users - once for the call, and once for the function being called.
   Node wire( GVNGCM gvn, FunNode fun ) {
     Node ctrl = ctl();

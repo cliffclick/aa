@@ -26,9 +26,8 @@ public class LoadNode extends Node {
   private Node ctl() { return in(0); }
   private Node mem() { return in(1); }
   private Node adr() { return in(2); }
-  private Node set_ctl(Node c, GVNGCM gvn) { return set_def(0,c,gvn); }
-  private Node set_mem(Node m, GVNGCM gvn) { return set_def(1,m,gvn); }
-  private Node set_adr(Node a, GVNGCM gvn) { return set_def(2,a,gvn); }
+  private Node nil_ctl(GVNGCM gvn) { return set_def(0,null,gvn); }
+  private void set_adr(Node a, GVNGCM gvn) { set_def(2,a,gvn); }
 
   @Override public Node ideal(GVNGCM gvn) {
     Node ctrl = ctl();
@@ -42,7 +41,7 @@ public class LoadNode extends Node {
     // to a CastNode (to remove nil-ness) and remove the control.
     if( !t.must_nil() ) // No nil, no need for ctrl
       // remove ctrl; address already casts-away-nil
-      return set_ctl(null,gvn);
+      return nil_ctl(gvn);
 
     // Looking for a nil-check pattern:
     //   this.0->dom*->True->If->addr
@@ -66,7 +65,7 @@ public class LoadNode extends Node {
       return null; // below a nil (e.g. Scalar), do nothing yet
     Type tnz = t.join(TypeMemPtr.OOP); // Remove nil choice
     set_adr(gvn.xform(new CastNode(tru,baseaddr,tnz)),gvn);
-    return set_ctl(null,gvn);
+    return nil_ctl(gvn);
   }
 
   @Override public Type value(GVNGCM gvn) {

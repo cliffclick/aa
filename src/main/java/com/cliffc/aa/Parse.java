@@ -732,7 +732,7 @@ public class Parse {
   }
   private Type typep(boolean type_var) {
     Type t = type0(type_var);
-    if( t==null ) return t;
+    if( t==null ) return null;
     Type base = t.base();
     if( !(base instanceof TypeObj) ) return t;
     // Automatically convert to reference for fields.

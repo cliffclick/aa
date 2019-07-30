@@ -190,10 +190,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // Recursive meet in progress
   private static final HashMap<TypeStruct,TypeStruct> MEETS1 = new HashMap<>(), MEETS2 = new HashMap<>();
 
-  public static TypeStruct RECURS_TREE;
-
   static final TypeStruct[] TYPES = new TypeStruct[]{ALLSTRUCT,POINT,X,A,C0,D1,ARW};
-
 
   // Dual the flds, dual the tuple.
   @Override protected TypeStruct xdual() {
