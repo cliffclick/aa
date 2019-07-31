@@ -2,7 +2,6 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeNil;
 
 // Regain precision after a call.  Calls return some intended value which
 // varies by call-site; e.g. map({A->B}, A[]) returns B[] - but the B type

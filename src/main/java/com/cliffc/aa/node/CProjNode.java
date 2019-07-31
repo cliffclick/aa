@@ -2,7 +2,6 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeNil;
 import com.cliffc.aa.type.TypeTuple;
 
 // Proj control
@@ -39,7 +38,7 @@ public class CProjNode extends ProjNode {
     add_def(this);              // Self-hook to prevent accidental deletion
     Node sharp = _idx==1
       ? gvn.xform(new CastNode(this,test,Type.NSCALR))
-      : gvn.con(TypeNil.NIL);
+      : gvn.con(Type.NIL);
     scope.sharpen(test,sharp,arm);
     pop();                      // Remove self-hook
     return sharp;

@@ -162,11 +162,11 @@ public class TestParse {
     test("f0 = { x -> x ? {+}(f0(x-1),1) : 0 }; f0(2)", TypeInt.con(2));
     testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact()","Passing 0 arguments to fact:{(Scalar)-> Scalar} which takes 1 arguments",48);
     test_ptr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(0),fact(1),fact(2))",
-             (alias)-> TypeMemPtr.make(alias,TypeStruct.make(TypeNil.NIL,TypeInt.con(1),TypeInt.con(2))));
+             (alias)-> TypeMemPtr.make(alias,TypeStruct.make(Type.NIL,TypeInt.con(1),TypeInt.con(2))));
 
     // Co-recursion requires parallel assignment & type inference across a lexical scope
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.TRUE );
-    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(5)", TypeNil.NIL  );
+    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(5)", Type.NIL  );
 
     // Not currently inferring top-level function return very well.  Acting
     // "as-if" called by Scalar, which pretty much guarantees a fail result.
@@ -249,7 +249,7 @@ public class TestParse {
     test   ("dist={p->p//qqq\n.//qqq\nx*p.x+p.y*p.y}; dist(//qqq\n@{x//qqq\n=1,y=2})", TypeInt.con(5));
 
     // Tuple
-    test_ptr("(0,\"abc\")", (alias -> TypeMemPtr.make(alias,TypeStruct.make(TypeNil.NIL,TypeMemPtr.ABCPTR))));
+    test_ptr("(0,\"abc\")", (alias -> TypeMemPtr.make(alias,TypeStruct.make(Type.NIL,TypeMemPtr.ABCPTR))));
     test("(1,\"abc\").0", TypeInt.TRUE);
     test("(1,\"abc\").1", TypeMemPtr.ABCPTR);
 
@@ -271,13 +271,13 @@ public class TestParse {
 
   @Test public void testParse5() {
     // nullable and not-null pointers
-    test   ("x:str? = 0", TypeNil.NIL); // question-type allows null or not; zero digit is null
+    test   ("x:str? = 0", Type.NIL); // question-type allows null or not; zero digit is null
     test   ("x:str? = \"abc\"", TypeMemPtr.ABCPTR); // question-type allows null or not
     testerr("x:str  = 0", "nil is not a *[3]str", 10);
     test   ("math_rand(1)?0:\"abc\"", TypeMemPtr.ABC0);
     testerr("(math_rand(1)?0 : @{x=1}).x", "Struct might be nil when reading field '.x'", 27);
     test   ("p=math_rand(1)?0:@{x=1}; p ? p.x : 0", TypeInt.BOOL); // not-null-ness after a null-check
-    test   ("x:int = y:str? = z:flt = 0", TypeNil.NIL); // null/0 freely recasts
+    test   ("x:int = y:str? = z:flt = 0", Type.NIL); // null/0 freely recasts
     test   ("\"abc\"==0", TypeInt.FALSE ); // No type error, just not null
     test   ("\"abc\"!=0", TypeInt.TRUE  ); // No type error, just not null
     test   ("nil=0; \"abc\"!=nil", TypeInt.TRUE); // Another way to name null
@@ -315,7 +315,7 @@ public class TestParse {
     // Missing type B is also never worked on.
     test_isa("A= :@{n:B?, v:int}", TypeFunPtr.GENERIC_FUNPTR);
     test_isa("A= :@{n:B?, v:int}; a = A(0,2)", TypeMemPtr.OOP);
-    test_isa("A= :@{n:B?, v:int}; a = A(0,2); a.n", TypeNil.NIL);
+    test_isa("A= :@{n:B?, v:int}; a = A(0,2); a.n", Type.NIL);
     // Mutually recursive type
     test_isa("A= :@{n:B, v:int}; B= :@{n:A, v:flt}", TypeFunPtr.GENERIC_FUNPTR);
   }
@@ -357,16 +357,16 @@ public class TestParse {
     assertEquals("List", tname5._name);
     TypeStruct tt5 = (TypeStruct)tname5._t;
     assertEquals(1.2*1.2,tt5.at(1).getd(),1e-6);
-    assertEquals(TypeNil.NIL,tt5.at(0));
+    assertEquals(Type.NIL,tt5.at(0));
 
     // Test inferring a recursive struct type, with a little help
     test_ptr("map={x:@{n,v:flt}? -> x ? @{n=map(x.n),v=x.v*x.v} : 0}; map(@{n=0,v=1.2})",
-             (alias) -> TypeMemPtr.make(alias,TypeStruct.make(FLDS,TypeNil.NIL,TypeFlt.con(1.2*1.2))));
+             (alias) -> TypeMemPtr.make(alias,TypeStruct.make(FLDS,Type.NIL,TypeFlt.con(1.2*1.2))));
 
     // Test inferring a recursive struct type, with less help.  This one
     // inlines so doesn't actually test inferring a recursive type.
     test_ptr("map={x -> x ? @{n=map(x.n),v=x.v*x.v} : 0}; map(@{n=0,v=1.2})",
-             (alias) -> TypeMemPtr.make(alias,TypeStruct.make(FLDS,TypeNil.NIL,TypeFlt.con(1.2*1.2))));
+             (alias) -> TypeMemPtr.make(alias,TypeStruct.make(FLDS,Type.NIL,TypeFlt.con(1.2*1.2))));
 
     // Test inferring a recursive struct type, with less help. Too complex to
     // inline, so actual inference happens
@@ -377,7 +377,7 @@ public class TestParse {
     // Test inferring a recursive tuple type, with less help.  This one
     // inlines so doesn't actually test inferring a recursive type.
     test_ptr("map={x -> x ? (map(x.0),x.1*x.1) : 0}; map((0,1.2))",
-            (alias) -> TypeMemPtr.make(alias,TypeStruct.make(TypeNil.NIL,TypeFlt.con(1.2*1.2))));
+            (alias) -> TypeMemPtr.make(alias,TypeStruct.make(Type.NIL,TypeFlt.con(1.2*1.2))));
 
     test_ptr_isa("map={x -> x ? (map(x.0),x.1*x.1) : 0};"+
                  "map((math_rand(1)?0: (math_rand(1)?0: (math_rand(1)?0: (0,1.2), 2.3), 3.4), 4.5))",
@@ -459,7 +459,7 @@ public class TestParse {
     testerr("x=1+y","Unknown ref 'y'",5);
 
     test("x:=1", TypeInt.TRUE);
-    test_ptr("x:=0; a=x; x:=1; b=x; x:=2; (a,b,x)", (alias) -> TypeMemPtr.make(alias,TypeStruct.make(TypeNil.NIL,TypeInt.con(1),TypeInt.con(2))));
+    test_ptr("x:=0; a=x; x:=1; b=x; x:=2; (a,b,x)", (alias) -> TypeMemPtr.make(alias,TypeStruct.make(Type.NIL,TypeInt.con(1),TypeInt.con(2))));
 
     testerr("x=1; x:=2", "Cannot re-assign final val 'x'", 9);
     testerr("x=1; x=2", "Cannot re-assign final val 'x'", 8);

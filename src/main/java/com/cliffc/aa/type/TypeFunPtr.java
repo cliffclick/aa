@@ -116,7 +116,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   }
   @Override public Type meet_nil() {
     if( _fidxs.test(0) )      // Already has a nil?
-      return _fidxs.above_center() ? TypeNil.NIL : this;
+      return _fidxs.above_center() ? NIL : this;
     return make(_fidxs.meet(BitsFun.NIL),_args,_ret);
   }
 

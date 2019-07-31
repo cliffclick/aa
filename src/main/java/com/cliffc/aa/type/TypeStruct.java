@@ -181,7 +181,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
           static final TypeStruct X     = make(flds("x"),ts(TypeFlt.FLT64 )); // @{x:flt}
           static final TypeStruct TFLT64= make(          ts(TypeFlt.FLT64 )); //  (  flt)
   public  static final TypeStruct A     = make(flds("a"),ts(TypeFlt.FLT64 ));
-  private static final TypeStruct C0    = make(flds("c"),ts(TypeNil.SCALAR)); // @{c:0}
+  private static final TypeStruct C0    = make(flds("c"),ts(NIL           )); // @{c:0}
   private static final TypeStruct D1    = make(flds("d"),ts(TypeInt.TRUE  )); // @{d:1}
   private static final TypeStruct ARW   = make(flds("a"),ts(TypeFlt.FLT64),new byte[1]);
   public  static final TypeStruct GENERIC = malloc(true,FLD0,new Type[0],new byte[0]).hashcons_free();

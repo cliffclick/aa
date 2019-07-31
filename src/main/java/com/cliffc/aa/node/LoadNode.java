@@ -97,11 +97,9 @@ public class LoadNode extends Node {
     Type t = gvn.type(adr());
     while( t instanceof TypeName ) t = ((TypeName)t)._t;
     if( t.must_nil() ) return _badnil;
-    Type t2 = t instanceof TypeNil ? ((TypeNil)t)._t : t; // Strip off the nil
-    //if( TypeOop.OOP.isa(t) ) return _badfld; // Too low, might not have any fields
-    if( !(t2 instanceof TypeMemPtr) )
+    if( !(t instanceof TypeMemPtr) )
       return _badfld; // Not a pointer, cannot load a field
-    TypeMemPtr t3 = (TypeMemPtr)t2;
+    TypeMemPtr t3 = (TypeMemPtr)t;
     TypeMem t4 = (TypeMem)gvn.type(mem()); // Should be memory
     Type t5 = t4.ld(t3);                   // Meets of all aliases
     if( !(t5 instanceof TypeStruct) ) {    // No fields, so memory or ptr is in-error

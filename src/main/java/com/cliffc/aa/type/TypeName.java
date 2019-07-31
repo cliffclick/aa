@@ -78,7 +78,6 @@ public class TypeName extends TypeObj<TypeName> {
   private static TypeName FREE=null;
   @Override protected TypeName free( TypeName ret ) { FREE=this; return ret; }
   private static TypeName make0( String name, HashMap<String,Type> lex, Type t, short depth) {
-    assert !(t instanceof TypeNil); // No named nils (but ok to nil a named type)
     TypeName t1 = FREE;
     if( t1 == null ) t1 = new TypeName(name,lex,t,depth);
     else { FREE = null; t1.init(name,lex,t,depth); }
@@ -115,15 +114,11 @@ public class TypeName extends TypeObj<TypeName> {
     return dual;
   }
   @Override protected Type xmeet( Type t ) {
-    assert !(base() instanceof TypeNil); // No name-wrapping-nils
     switch( t._type ) {
     case TNIL:
       // Cannot swap args and go again, because it screws up the cyclic_meet.
       // This means we handle name-meet-nil right here.
-      //return t.xmeet(this);
-      if( t == TypeNil.NIL ) return meet_nil();
-      Type nmt = meet(((TypeNil)t)._t);
-      return t.above_center() ? nmt : TypeNil.make(nmt);
+      return meet_nil();
 
     case TNAME:
       // Matching inner names can be kept.  If one side is an extension of the
@@ -211,16 +206,9 @@ public class TypeName extends TypeObj<TypeName> {
     //if( !_t.above_center() ) return nn;
     return make(_name,_lex,nn);
   }
-  @Override public Type meet_nil() {
-    Type x = _t.meet_nil();     // Compute meet-nil without the name
-    if( x instanceof TypeNil ) return TypeNil.make(TypeName.make(_name,_lex,((TypeNil)x)._t));
-    else                       return              TypeName.make(_name,_lex,          x); // Just name-wrap
-  }
-  @Override public TypeObj startype() {
-    return make(_name,_lex,_t.startype());
-  }
+  @Override public Type meet_nil() { return TypeName.make(_name,_lex, _t.meet_nil()); } // Just name-wrap
+  @Override public TypeObj startype() { return make(_name,_lex,_t.startype()); }
   @Override public byte isBitShape(Type t) {
-    if( t instanceof TypeNil ) t = ((TypeNil)t)._t; // Strip nil and go again
     if( t instanceof TypeName ) {
       if( ((TypeName)t)._name.equals(_name) ) return _t.isBitShape(((TypeName)t)._t);
       return 99; // Incompatible names do not mix

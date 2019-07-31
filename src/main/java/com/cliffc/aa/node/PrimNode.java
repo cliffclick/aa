@@ -312,8 +312,8 @@ static class EQ_OOP extends PrimNode {
     // string pointers.
     Type t1 = gvn.type(in(1));
     Type t2 = gvn.type(in(2));
-    if( t2==TypeNil.NIL && !t1.must_nil()) return TypeInt.FALSE;
-    if( t1==TypeNil.NIL && !t2.must_nil()) return TypeInt.FALSE;
+    if( t2==Type.NIL && !t1.must_nil()) return TypeInt.FALSE;
+    if( t1==Type.NIL && !t2.must_nil()) return TypeInt.FALSE;
     return TypeInt.BOOL;
   }
   @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
@@ -337,8 +337,8 @@ static class NE_OOP extends PrimNode {
     // string pointers.
     Type t1 = gvn.type(in(1));
     Type t2 = gvn.type(in(2));
-    if( t2==TypeNil.NIL && !t1.must_nil()) return TypeInt.TRUE;
-    if( t1==TypeNil.NIL && !t2.must_nil()) return TypeInt.TRUE;
+    if( t2==Type.NIL && !t1.must_nil()) return TypeInt.TRUE;
+    if( t1==Type.NIL && !t2.must_nil()) return TypeInt.TRUE;
     return TypeInt.BOOL;
   }
   @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }

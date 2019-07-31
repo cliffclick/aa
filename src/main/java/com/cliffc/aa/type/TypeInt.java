@@ -166,7 +166,7 @@ public class TypeInt extends Type<TypeInt> {
     if( t._type == TREAL ) return 1;
     if( t._type == TSCALAR ) return 1;
     if( t._type == TSTR ) return 99;
-    if( t == TypeNil.NIL ) return 99; // Cannot not-nil to nil
+    if( t == NIL ) return 99; // Cannot not-nil to nil
     throw com.cliffc.aa.AA.unimpl();
   }
   @Override public Type widen() {

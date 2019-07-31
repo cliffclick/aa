@@ -674,7 +674,7 @@ public class Parse {
     _pp.setIndex(_x);
     Number n = _nf.parse(_str,_pp);
     _x = _pp.getIndex();
-    if( n instanceof Long   ) return n.longValue()==0 ? TypeNil.NIL : TypeInt.con(n.  longValue());
+    if( n instanceof Long   ) return n.longValue()==0 ? Type.NIL : TypeInt.con(n.  longValue());
     if( n instanceof Double ) return TypeFlt.con(n.doubleValue());
     throw new RuntimeException(n.getClass().toString()); // Should not happen
   }

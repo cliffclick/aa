@@ -137,13 +137,8 @@ public class Type<T extends Type<T>> {
   Type intern_lookup() { return INTERN.get(this); }
   static int intern_size() { return INTERN.size(); }
   static boolean intern_check() {
-    for( Type k : INTERN.keySet() ) {
+    for( Type k : INTERN.keySet() )
       if( k.intern_check0() ) return false;
-      if( k instanceof TypeNil &&
-          ((TypeNil)k)._t != null &&
-          ((TypeNil)k)._t.intern_check0() )
-        return false;
-    }
     return true;
   }
   private boolean intern_check0() {
@@ -179,13 +174,13 @@ public class Type<T extends Type<T>> {
   static final byte TXREAL  =13; // Any Real Numbers; dual of REAL
   static final byte TNREAL  =14; // Numbers-not-nil
   static final byte TXNREAL =15; // Invert Numbers-not-nil
-  static final byte TSIMPLE =16; // End of the Simple Types
-  private static final String[] STRS = new String[]{"all","any","Ctrl","~Ctrl","Scalar","~Scalar","nScalar","~nScalar","Number","~Number","nNumber","~nNumber","Real","~Real","nReal","~nReal"};
+  static final byte TNIL    =16; // The Nil-type
+  static final byte TSIMPLE =17; // End of the Simple Types
+  private static final String[] STRS = new String[]{"all","any","Ctrl","~Ctrl","Scalar","~Scalar","nScalar","~nScalar","Number","~Number","nNumber","~nNumber","Real","~Real","nReal","~nReal","nil"};
   // Complex types - Implemented in subclasses
-  static final byte TINT    =17; // All Integers, including signed/unsigned and various sizes; see TypeInt
-  static final byte TFLT    =18; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
-  static final byte TRPC    =19; // Return PCs; Continuations; call-site return points; see TypeRPC
-  static final byte TNIL    =20; // Nil-types
+  static final byte TINT    =18; // All Integers, including signed/unsigned and various sizes; see TypeInt
+  static final byte TFLT    =19; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
+  static final byte TRPC    =20; // Return PCs; Continuations; call-site return points; see TypeRPC
   static final byte TNAME   =21; // Named types; always a subtype of some other type
   static final byte TTUPLE  =22; // Tuples; finite collections of unrelated Types, kept in parallel
   static final byte TOBJ    =23; // Memory objects; arrays and structs and strings
@@ -205,6 +200,7 @@ public class Type<T extends Type<T>> {
   public  static final Type XSCALAR= make(TXSCALAR); // ptrs, ints, flts; things that fit in a machine register
   public  static final Type  NSCALR= make( TNSCALR); // Scalars-not-nil
           static final Type XNSCALR= make(TXNSCALR); // Scalars-not-nil
+  public  static final Type   NIL  = make( TNIL   ); // The Nil.
   private static final Type   NUM  = make( TNUM   );
   private static final Type  XNUM  = make(TXNUM   );
   private static final Type  NNUM  = make( TNNUM  );
@@ -232,9 +228,9 @@ public class Type<T extends Type<T>> {
   // Strip off any subclassing just for names
   private byte simple_type() { return base()._type; }
   private boolean is_ptr() { byte t = simple_type();  return t == TFUNPTR || t == TMEMPTR; }
-          boolean is_num() { byte t = simple_type();  return t == TNUM || t == TXNUM || t == TNNUM || t == TXNNUM || t == TREAL || t == TXREAL || t == TNREAL || t == TXNREAL || t == TINT || t == TFLT; }
+  private boolean is_num() { byte t = simple_type();  return t == TNUM || t == TXNUM || t == TNNUM || t == TXNNUM || t == TREAL || t == TXREAL || t == TNREAL || t == TXNREAL || t == TINT || t == TFLT; }
   // True if 'this' isa SCALAR, without the cost of a full 'meet()'
-  private static final byte[] ISA_SCALAR = new byte[]{0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0, 1,1,1,1,0,0,0,0,0,0,1,1,0};
+  private static final byte[] ISA_SCALAR = new byte[]{/*ALL-0*/0,0,0,0,1,1,1,1,1,1,/*TNNUM-10*/1,1,1,1,1,1,1,/*TSIMPLE-17*/0, 1,1,1,1,0,0,0,0,0,1,1,/*TFUN-29*/0}/*TLAST=30*/;
   public final boolean isa_scalar() { assert ISA_SCALAR.length==TLAST; return ISA_SCALAR[_type]!=0; }
 
   // Return cached dual
@@ -244,6 +240,7 @@ public class Type<T extends Type<T>> {
   @SuppressWarnings("unchecked")
   T xdual() {
     assert is_simple();
+    if( _type==TNIL ) return (T)this; // NIL is a constant and thus self-dual
     return (T)new Type((byte)(_type^1));
   }
   T rdual() { assert _dual!=null; return _dual; }
@@ -297,13 +294,13 @@ public class Type<T extends Type<T>> {
     if(   _type == TXNSCALR) return t.not_nil();
     if( t._type == TXNSCALR) return   not_nil();
 
+    if( _type == TNIL   ) return t.meet_nil();
+
     // Scalar values break out into: nums(reals (int,flt)), GC-ptrs (structs(tuples), arrays(strings)), fun-ptrs, RPC
     if( t._type == TFUNPTR ||
         t._type == TMEMPTR ||
         t._type == TRPC   )
       return cross_nil(t);
-
-    if( t._type == TNIL   ) return t.xmeet(this);
 
     boolean that_oop = t.is_ptr();
     boolean that_num = t.is_num();
@@ -394,7 +391,6 @@ public class Type<T extends Type<T>> {
     ts = concat(ts,TypeMem   .TYPES);
     ts = concat(ts,TypeMemPtr.TYPES);
     ts = concat(ts,TypeName  .TYPES);
-    ts = concat(ts,TypeNil   .TYPES);
     ts = concat(ts,TypeObj   .TYPES);
     ts = concat(ts,TypeRPC   .TYPES);
     ts = concat(ts,TypeStr   .TYPES);
@@ -570,6 +566,7 @@ public class Type<T extends Type<T>> {
     case TNUM:
     case TREAL:
     case TSCALAR:
+    case TNIL:
     case TCTRL:  // Nonsense, only for IfNode.value test
     case TXCTRL: // Nonsense, only for IfNode.value test
     case TMEM:   // Nonsense, only for IfNode.value test
@@ -630,7 +627,7 @@ public class Type<T extends Type<T>> {
     switch( _type ) {
     case TXNUM:
     case TXREAL:
-    case TXSCALAR:  return TypeNil.NIL;
+    case TXSCALAR:  return NIL;
     case TXNNUM:
     case TXNREAL:
     case TXNSCALR:  return TypeInt.BOOL;

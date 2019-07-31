@@ -66,7 +66,10 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   public  static final TypeMemPtr NIL    = make(BitsAlias.NIL,      TypeObj.OBJ);
   static final TypeMemPtr[] TYPES = new TypeMemPtr[]{OOP0,STRPTR,ABCPTR,STRUCT,ABC0,PNTPTR,PNT0};
 
-  @Override protected TypeMemPtr xdual() { return new TypeMemPtr(_aliases.dual(),(TypeObj)_obj.dual()); }
+  @Override protected TypeMemPtr xdual() {
+    if( _aliases==BitsAlias.NIL ) { assert _obj==TypeObj.OBJ; return this; }
+    return new TypeMemPtr(_aliases.dual(),(TypeObj)_obj.dual());
+  }
   @Override TypeMemPtr rdual() {
     if( _dual != null ) return _dual;
     TypeMemPtr dual = _dual = new TypeMemPtr(_aliases,(TypeObj)_obj.rdual());
@@ -108,7 +111,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   }
   @Override public Type meet_nil() {
     if( _aliases.test(0) )      // Already has a nil?
-      return _aliases.above_center() ? TypeNil.NIL : this;
+      return _aliases.above_center() ? NIL : this;
     return make(_aliases.meet_nil(),_obj);
   }
 

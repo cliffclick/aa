@@ -152,7 +152,7 @@ public class TypeTuple extends Type<TypeTuple> {
   }
   @Override public boolean must_nil() { return false; }
   @Override Type not_nil() { return this; }
-  @Override public Type meet_nil() { return TypeNil.make(this); }
+  @Override public Type meet_nil() { throw AA.unimpl(); }
 
   // Return true if this is a function pointer (return type from EpilogNode)
   // 0 - Control for the function
@@ -171,7 +171,6 @@ public class TypeTuple extends Type<TypeTuple> {
   @Override public byte isBitShape(Type t) {
     if( isa(t) ) return 0; // Can choose compatible format
     if( t instanceof TypeName ) return t.isBitShape(this);
-    if( t instanceof TypeNil ) return isBitShape(((TypeNil)t)._t);
     if( t instanceof TypeStruct ) return 99; // Not allowed to upcast a tuple to a struct
     if( t instanceof TypeTuple ) {
       TypeTuple tt = (TypeTuple)t;

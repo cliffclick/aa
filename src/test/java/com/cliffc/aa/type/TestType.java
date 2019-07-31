@@ -20,10 +20,15 @@ public class TestType {
     Type i1 = TypeInt.BOOL;
     Type i1d = i1.dual();
 
-    //Type xx = TypeStruct.POINT.join(TypeStr.STR);
-    //assertFalse(xx.above_center());
+    Type f0 = TypeFlt.FLT64;
+    Type nil= Type.NIL;
+    Type mt  = f0.meet(nil);
+    Type ta = mt.dual().meet(f0 .dual());
+    Type tb = mt.dual().meet(nil.dual());
+    assertEquals(f0 .dual(),ta);
+    assertEquals(nil.dual(),tb);
 
-
+    
     // B:int8 isa Scalar
     assertTrue(s0.isa(Type.SCALAR));
     //   B: int8 JOIN C: flt32
@@ -247,7 +252,7 @@ public class TestType {
     TypeMemPtr pabc = TypeMemPtr.ABCPTR; // *["abc"]
     TypeMemPtr pzer = TypeMemPtr.make(BitsAlias.new_alias(BitsAlias.REC),TypeStruct.ALLSTRUCT);// *[(0)]
     Type pzer0= pzer.meet_nil();  // *[(0)]?
-    Type nil  = TypeNil.NIL;
+    Type nil  = Type.NIL;
 
     Type xtup = ptup .dual();
     Type xtup0= ptup0.dual();
@@ -264,7 +269,9 @@ public class TestType {
     assertTrue(xmem0.isa(xtup0));
     assertTrue(xmem .isa(xtup ));
 
-    assertTrue(xstr0.isa( nil ));
+    // "~str?" or "*[~0+4+]~str?" includes a nil, but nothing can fall to a nil
+    // (breaks lattice)... instead they fall to their appropriate nil-type.
+    assertEquals(TypeMemPtr.NIL,xstr0.meet( nil )); 
 
     // This is a choice ptr-to-alias#1, vs a nil-able ptr-to-alias#2.  Since
     // they are from different alias classes, they are NEVER equal (unless both
@@ -275,7 +282,9 @@ public class TestType {
     // We can instead assert that values loaded are compatible:
     assertTrue (TypeMem.MEM.dual().ld(xstr).isa(TypeMem.MEM_ABC.ld(pabc)));
 
-    assertTrue (xtup0.isa( nil ));
+    // "~@{}?" or "*[~0+2+]~@{}?" includes a nil, but nothing can fall to a nil
+    // (breaks lattice)... instead they fall to their appropriate nil-type.
+    assertEquals(TypeMemPtr.NIL,xtup0.meet( nil ));
     assertTrue (xtup0.isa(pzer0));
     assertTrue (xtup .isa(pzer ));
     //assertTrue(TypeMem.MEM_TUP.dual().ld(xstr).isa(TypeMem.MEM_ZER.ld(pabc)));
@@ -306,7 +315,7 @@ public class TestType {
 
   @Test public void testStructTuple() {
     Type.init0(new HashMap<>());
-    Type nil  = TypeNil.NIL;
+    Type nil  = Type.NIL;
     // Tuple is more general that Struct
     Type tf = TypeStruct.TFLT64; //  (  flt64); choice leading field name
     Type tsx= TypeStruct.X;      // @{x:flt64}; fixed  leading field name
@@ -318,15 +327,15 @@ public class TestType {
     assertEquals(t0,tss);      // t0.isa(ts0)
 
     // meet @{c:0}? and @{c:@{x:1}?,}
-    TypeObj a1 = TypeStruct.make(new String[]{"c"},TypeNil.NIL ); // @{c:nil}
+    TypeObj a1 = TypeStruct.make(new String[]{"c"},Type.NIL ); // @{c:nil}
     TypeObj a2 = TypeStruct.make(new String[]{"c"},TypeMemPtr.make_nil(9,a1)); // @{c:*{3#}?}
     TypeObj a3 = TypeStruct.make(new String[]{"x"},TypeInt.TRUE); // @{x: 1 }
     TypeMem mem = TypeMem.make0(new TypeObj[]{null,TypeObj.OBJ,null,null,null,null,null,null,null,a1,a2,a3});
     // *[1]? join *[2] ==> *[1+2]?
-    Type ptr12 = TypeNil.NIL.join(TypeMemPtr.make(-9,a1)).join( TypeMemPtr.make(-10,a2));
+    Type ptr12 = Type.NIL.join(TypeMemPtr.make(-9,a1)).join( TypeMemPtr.make(-10,a2));
     // mem.ld(*[1+2]?) ==> @{c:0}
     Type ld = mem.ld((TypeMemPtr)ptr12);
-    assertEquals(a1,ld);
+    assertEquals(TypeStruct.make(new String[]{"c"},TypeMemPtr.NIL),ld);
   }
 
   // meet of functions: arguments *join*, fidxes union (meet), and return types
@@ -464,7 +473,7 @@ public class TestType {
     // less than 5.  Any data loop must contain a Phi; if structures are
     // nesting infinitely deep, then it must contain a NewNode also.
     int alias = BitsAlias.new_alias(BitsAlias.REC);
-    TypeStruct ts = TypeStruct.make(TypeStruct.FLDS(2),TypeNil.NIL,TypeInt.con(0));
+    TypeStruct ts = TypeStruct.make(TypeStruct.FLDS(2),Type.NIL,TypeInt.con(0));
     TypeMemPtr phi = TypeMemPtr.make(alias,ts);
     for( int i=1; i<20; i++ ) {
       TypeStruct newt = TypeStruct.make(TypeStruct.FLDS(2),phi,TypeInt.con(i));
