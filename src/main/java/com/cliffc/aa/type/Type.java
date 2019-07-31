@@ -474,7 +474,9 @@ public class Type<T extends Type<T>> {
     case TNUM:    case TNNUM:
     case TREAL:   case TNREAL:
     case TSCALAR: case TNSCALR:
-      return false;             // These are all below center, no simple class is on the center
+      return false;             // These are all below center
+    case TNIL:
+      return false;             // At center, not above
     case TANY:
     case TXCTRL:
     case TXNUM:    case TXNNUM:
@@ -522,6 +524,8 @@ public class Type<T extends Type<T>> {
     case TXNSCALR:
     case TXSCALAR:
       return false;             // Not exactly a constant
+    case TNIL:
+      return true;
     default: throw typerr(null);// Overridden in subclass
     }
   }
@@ -531,7 +535,7 @@ public class Type<T extends Type<T>> {
   public TypeName merge_recursive_type( Type t ) { return null; }
 
   // Return a long   from a TypeInt constant; assert otherwise.
-  public long   getl() { throw typerr(null); }
+  public long   getl() { if( _type==TNIL ) return 0; throw typerr(null); }
   // Return a double from a TypeFlt constant; assert otherwise.
   public double getd() { throw typerr(null); }
   // Return a String from a TypeStr constant; assert otherwise.
@@ -544,6 +548,7 @@ public class Type<T extends Type<T>> {
   // +1 requires a bit-changing conversion (Int->Flt)
   // 99 Bottom; No free converts; e.g. Flt->Int requires explicit rounding
   public byte isBitShape(Type t) {
+    if( _type == TNIL ) return 0; // Nil is free to convert always
     if( above_center() && isa(t) ) return 0; // Can choose compatible format
     if( _type == t._type ) return 0; // Same type is OK
     if( t._type==TSCALAR ) return 0; // Generic function arg never requires a conversion

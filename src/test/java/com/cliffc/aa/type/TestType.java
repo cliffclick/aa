@@ -19,15 +19,6 @@ public class TestType {
     Type i8d = i8.dual();
     Type i1 = TypeInt.BOOL;
     Type i1d = i1.dual();
-
-    Type f0 = TypeFlt.FLT64;
-    Type nil= Type.NIL;
-    Type mt  = f0.meet(nil);
-    Type ta = mt.dual().meet(f0 .dual());
-    Type tb = mt.dual().meet(nil.dual());
-    assertEquals(f0 .dual(),ta);
-    assertEquals(nil.dual(),tb);
-
     
     // B:int8 isa Scalar
     assertTrue(s0.isa(Type.SCALAR));
