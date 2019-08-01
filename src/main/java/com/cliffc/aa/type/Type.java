@@ -624,6 +624,7 @@ public class Type<T extends Type<T>> {
     case TSCALAR:   case TNSCALR:   case TXNSCALR:
     case TNUM:      case TNNUM:     case TXNNUM:
     case TREAL:     case TNREAL:    case TXNREAL:
+    case TNIL:
       return this;
     default: throw typerr(null); // Overridden in subclass
     }

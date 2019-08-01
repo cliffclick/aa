@@ -156,8 +156,11 @@ public abstract class IntrinsicNode extends Node {
     Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
     Node memp= gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM     ),null));
     // Add input edges to the NewNode
-    for( int i=0; i<from._ts.length; i++ )
-      nnn.add_def(gvn.xform(new ParmNode(i,from._flds[i],fun, gvn.con(from._ts[i]),null)));
+    for( int i=0; i<from._ts.length; i++ ) {
+      String argx = from._flds[i];
+      String argy = argx=="." ? "arg"+i : argx;
+      nnn.add_def(gvn.xform(new ParmNode(i,argy,fun, gvn.con(from._ts[i]),null)));
+    }
     Node ptr = gvn.xform(nnn);
     ptr.add_def(ptr); // Self-hook to prevent deletion
     Node mmem= gvn.xform(new MemMergeNode(memp,ptr));

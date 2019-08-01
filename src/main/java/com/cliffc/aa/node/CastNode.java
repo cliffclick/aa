@@ -43,7 +43,7 @@ public class CastNode extends Node {
     // fast, and then goes dead.  The old type was some legit thing, and then
     // e.g. inlining or some other ideal() call triggers a non-monotonic update
     // and the input becomes nil.
-    //if( t == TypeNil.NIL && _t==Type.NSCALR ) return gvn.self_type(this);
+    if( t == Type.NIL && _t==Type.NSCALR ) return gvn.self_type(this);
     return _t.join(t);
   }
 }
