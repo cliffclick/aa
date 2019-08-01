@@ -4,7 +4,6 @@ import com.cliffc.aa.AA;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.Type;
-import com.cliffc.aa.util.Ary;
 
 import java.util.BitSet;
 import java.util.HashMap;
@@ -21,7 +20,7 @@ public class ScopeNode extends Node {
   private final BitSet _ms;     // True if mutable, indexed with input#
   // Mapping from type-variables to Types.  Types have a scope lifetime like values.
   private final HashMap<String,Type> _types; // user-typing type names
-  public ScopeNode() { super(OP_SCOPE); _vals = new HashMap<>(); _types = new HashMap<>(); _ms = new BitSet(); }
+  public ScopeNode() { super(OP_SCOPE); _vals = new HashMap<>(); _types = new HashMap<>(); _ms = new BitSet(); keep(); }
 
   // Name to node lookup, or null
   public Node get(String name) {

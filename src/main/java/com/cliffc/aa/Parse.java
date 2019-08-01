@@ -116,7 +116,7 @@ public class Parse {
     Ary<Node> uses = Env.ALL_CTRL._uses;
     // Leave any final result function 'hooked' by the unknown caller to keep
     // it alive to be returned.
-    Node res = _e._scope.in(_e._scope._defs._len-2);
+    Node res = _e._scope.in(_e._scope._defs._len-1);
     Node fun = res instanceof EpilogNode ? ((EpilogNode)res).fun() : null;
     // For all other unknown uses of functions, they will all be known after
     // GCP.  Remove the hyper-conservative ALL_CTRL edge.  Note that I canNOT
@@ -136,7 +136,6 @@ public class Parse {
   }
 
   private TypeEnv gather_errors() {
-    _e._scope.pop();          // Remove self-hook
     Node res = _e._scope.pop(); // New and improved result
 
     // Hunt for typing errors in the alive code
@@ -174,9 +173,7 @@ public class Parse {
   private void prog() {
     Node res = stmts();
     if( res == null ) res = con(Type.ANY);
-    _e._scope.add_def(res);       // Hook, so not deleted
-    _e._scope.add_def(_e._scope); // Self hook, so not deleted
-
+    _e._scope.add_def(res);       // Hook result
   }
 
   /** Parse a list of statements; final semi-colon is optional.
@@ -330,7 +327,7 @@ public class Parse {
    *  ifex = expr ? expr : expr
    */
   private Node ifex() {
-    Node expr = expr();
+    Node expr = expr(), res=null;
     if( expr == null ) return null; // Expr is required, so missing expr implies not any ifex
     if( !peek('?') ) return expr;   // No if-expression
     try( TmpNode ctrls = new TmpNode() ) {
@@ -340,14 +337,14 @@ public class Parse {
       ScopeNode if_scope = e_if._scope;
       ScopeNode t_scope = (_e = new Env(e_if))._scope; // Push new scope for true arm
       set_ctrl(gvn(new CProjNode(ifex,1))); // Control for true branch, and sharpen tested value
-      Node t_sharp = ctrl().sharpen(_gvn,if_scope,t_scope);
+      Node t_sharp = ctrl().sharpen(_gvn,if_scope,t_scope).keep();
       Node tex = expr();
       ctrls.add_def(tex==null ? err_ctrl2("missing expr after '?'") : tex);
       ctrls.add_def(ctrl()); // 2 - hook true-side control
       require(':');
       ScopeNode f_scope = (_e = new Env(e_if))._scope; // Push new scope for false arm
       set_ctrl(gvn(new CProjNode(ifex,0))); // Control for true branch, and sharpen tested value
-      Node f_sharp = ctrl().sharpen(_gvn,if_scope,f_scope);
+      Node f_sharp = ctrl().sharpen(_gvn,if_scope,f_scope).keep();
       Node fex = expr();
       ctrls.add_def(fex==null ? err_ctrl2("missing expr after ':'") : fex);
       ctrls.add_def(ctrl()); // 4 - hook false-side control
@@ -355,13 +352,13 @@ public class Parse {
       set_ctrl(init(new RegionNode(null,ctrls.in(2),ctrls.in(4))));
       String phi_errmsg = errMsg("Cannot mix GC and non-GC types");
       if_scope.common(this,_gvn,phi_errmsg,t_scope,f_scope,expr,t_sharp,f_sharp); // Add a PhiNode for all commonly defined variables
-      if_scope.add_def(gvn(new PhiNode(phi_errmsg,ctrl(),ctrls.in(1),ctrls.in(3)))); // Add a PhiNode for the result, hook to prevent deletion
-      if( !t_sharp.is_dead() && t_sharp._uses._len == 0 ) kill(t_sharp);
-      if( !f_sharp.is_dead() && f_sharp._uses._len == 0 ) kill(f_sharp);
-      kill(t_scope);  assert t_scope.is_dead();
-      kill(f_scope);  assert f_scope.is_dead();
+      res = gvn(new PhiNode(phi_errmsg,ctrl(),ctrls.in(1),ctrls.in(3))).keep(); // Add a PhiNode for the result, hook to prevent deletion
+      t_sharp.unkeep(_gvn);
+      f_sharp.unkeep(_gvn);
+      t_scope.unkeep(_gvn);  assert t_scope.is_dead();
+      f_scope.unkeep(_gvn);  assert f_scope.is_dead();
     }
-    return _e._scope.pop();
+    return res.unhook();
   }
 
   /** Parse an expression, a list of terms and infix operators.  The whole list
@@ -887,25 +884,20 @@ public class Parse {
   public Node lookup( String tok ) { return _e.lookup(tok); }
 
   private Node do_call( Node call0 ) {
-    Node call = gvn(call0);
-    call.add_def(call);         // Hook, so not deleted after 1st use
+    Node call = gvn(call0).keep();
     set_ctrl(  gvn(new CProjNode(call,0)));
     set_mem (  gvn(new MProjNode(call,1)));
-    Node ret = gvn(new  ProjNode(call,2));
-    ret.add_def(ret);           // Hook, so not deleted when call goes
-    if( call.pop()._uses._len==0 )
-      _gvn.kill(call);
-    return ret.pop();
+    Node ret = gvn(new  ProjNode(call,2)).keep();
+    call.unkeep(_gvn);
+    return ret.unhook();
   }
 
   // NewNode updates merges the new allocation into all-of-memory and returns a
   // reference.
   private Node do_mem(NewNode nnn) {
-    Node nn = gvn(nnn);
-    nn.add_def(nn); // Self-hook to prevent deletion
+    Node nn = gvn(nnn).keep();
     set_mem(gvn(new MemMergeNode(mem(),nn)));
-    nn.pop(); // Remove self-hook
-    return nn;
+    return nn.unhook();
   }
 
   // Whack current control with a syntax error

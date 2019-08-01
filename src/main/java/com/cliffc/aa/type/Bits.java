@@ -333,7 +333,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     int _cnt = 1; // Next available bit number
     // Invariants: _pars[kid]==parent && _kids[parent].contains(kid)
     int[] _pars = new int[2];   // Parent bit from child bit; _cnt is the in-use part
-    int[][] _kids = new int[2][];// List of kids from a parent; 1st element is is-use length
+    int[][] _kids = new int[2][];// List of kids from a parent; 1st element is in-use length
     int[] _init;                 // Used to reset _kids[X][0] for all X
 
     int parent( int kid ) { return _pars[kid]; }

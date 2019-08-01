@@ -202,9 +202,9 @@ public class GVNGCM {
     int cnt=0;  Node x;        // Progress bit
     while( (x = n.ideal(this)) != null ) {
       if( x != n ) {            // Different return, so delete original dead node
-        x._uses.add(x);         // Hook X to prevent accidental deletion
+        x.keep();               // Keep alive during deletion of n
         kill_new(n); // n was new, replaced so immediately recycle n and dead subgraph
-        n = x._uses.del(x._uses.find(x)); // Remove hook, keep better n
+        n = x.unhook();         // Remove keep-alive
       }
       if( !check_new(n) ) return n; // If the replacement is old, no need to re-ideal
       cnt++; assert cnt < 1000;     // Catch infinite ideal-loops
@@ -231,7 +231,7 @@ public class GVNGCM {
   // Version for never-GVN'd; common for e.g. constants to die early or
   // RootNode, and some other make-and-toss Nodes.
   private void kill0( Node n ) {
-    assert n._uses._len==0;
+    assert n._uses._len==0 && n._keep==0;
     for( int i=0; i<n._defs._len; i++ ) {
       Node def = n._defs.at(i);
       if( def != null && def.ideal_impacted_by_losing_uses() ) add_work(def);
@@ -315,12 +315,12 @@ public class GVNGCM {
       _vals.remove(u); // Use is about to change edges; remove from type table
       u._defs.set(u._defs.find(old),nnn); // was old now nnn
       nnn._uses.add(u);
-      _vals.put(u,u);         // Back in the table, since its still in the graph
-      add_work(u);            // And put on worklist, to get re-visited
+      _vals.put(u,u);        // Back in the table, since its still in the graph
+      add_work(u);           // And put on worklist, to get re-visited
     }
-    nnn._uses.add(nnn);       // Self-hook, to prevent accidental deletion
-    kill(old);                // Delete the old n, and anything it uses
-    nnn._uses.del(nnn._uses.find(nnn)); // Remove self-hook
+    nnn.keep();                 // Keep-alive    
+    kill(old);                  // Delete the old n, and anything it uses
+    nnn.unhook();               // Remove keep-alive
   }
 
   // Once the program is complete, any time anything is on the worklist we can
@@ -336,7 +336,7 @@ public class GVNGCM {
       Node n = (_small_work ? _work : _work2).pop(); // Pull from main worklist before functions
       (_small_work ? _wrk_bits : _wrk2_bits).clear(n._uid);
       if( n.is_dead() ) continue;
-      if( n._uses._len==0 ) kill(n);
+      if( n._uses._len==0 && n._keep==0 ) kill(n);
       else xform_old(n);
       cnt++; assert cnt < 10000; // Catch infinite ideal-loops
     }

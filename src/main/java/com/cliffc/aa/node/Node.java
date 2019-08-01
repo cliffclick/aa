@@ -37,8 +37,9 @@ public abstract class Node implements Cloneable {
   
   private static final String[] STRS = new String[] { null, "Call", "Cast", "Con", "Epi", "Err", "Fun", "If", "LibCall", "Load", "Merge", "New", "Parm", "Phi", "Prim", "Proj", "Region", "Scope", "Split", "Start", "Store", "Tmp", "Type", "Unresolved" };
 
-  public int _uid; // Unique ID, will have gaps, used to give a dense numbering to nodes
-  final byte _op;
+  public int _uid;  // Unique ID, will have gaps, used to give a dense numbering to nodes
+  final byte _op;   // Opcode (besides the object class), used to avoid v-calls in some places
+  public byte _keep;// Keep-alive in parser, even as last use goes away
 
   // Defs.  Generally fixed length, ordered, nulls allowed, no unused trailing space.  Zero is Control.
   public Ary<Node> _defs;
@@ -56,13 +57,16 @@ public abstract class Node implements Cloneable {
   private Node unuse( Node old, GVNGCM gvn ) {
     if( old != null ) {
       old._uses.del(old._uses.find(this));
-      if( old._uses._len==0 && !(old instanceof ScopeNode) ) gvn.kill(old); // Recursively begin deleting
+      if( old._uses._len==0 && old._keep==0 ) gvn.kill(old); // Recursively begin deleting
       if( (!old.is_dead() && old.is_multi_head() && is_multi_tail()) ||
           old.ideal_impacted_by_losing_uses() )
         gvn.add_work(old);
     }
     return this;
   }
+  public Node   keep(          ) { _keep++;  return this; }
+  public Node unhook(          ) { _keep--;  return this; }
+  public void unkeep(GVNGCM gvn) { _keep--;  if( _keep==0 && _uses._len==0 ) gvn.kill(this); }
   // Return Node at idx, withOUT auto-deleting it, even if this is the last
   // use.  Used by the parser to retrieve final Nodes from tmp holders.  Does
   // NOT preserve order.

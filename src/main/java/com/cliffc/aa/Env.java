@@ -74,6 +74,7 @@ public class Env implements AutoCloseable {
     if( _scope.is_dead() ) return;
     // Closing top-most scope (exiting compilation unit)?
     if( _par._par == null ) {   // Then reset global statics to allow another compilation unit
+      _scope.unkeep(GVN);
       BitsAlias.reset_to_init0(); // Done with adding primitives
       BitsFun  .reset_to_init0(); // Done with adding primitives
       BitsRPC  .reset_to_init0(); // Done with adding primitives
@@ -95,7 +96,8 @@ public class Env implements AutoCloseable {
       int idx = use._defs.find(_scope);
       GVN.set_def_reg(use,idx, idx==0 ? pscope.get(" control ") : pscope);
     }
-    GVN.kill(_scope);
+    _scope.unkeep(GVN);
+    assert _scope.is_dead();
   }
 
   // Test support, return top-level token type

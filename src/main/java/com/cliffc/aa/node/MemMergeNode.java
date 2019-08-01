@@ -23,7 +23,8 @@ public class MemMergeNode extends Node {
     // If merging from a NewNode, and the NewNode's address is not looked at
     // then memory contents cannot be looked at and are also dead.
     if( ptr() instanceof NewNode &&
-        ptr()._uses._len==1 )   // Nobody uses the pointer, except this
+        ptr()._uses._len==1  && // Nobody uses the pointer, except this
+        ptr()._keep == 0 )      // Including future parser uses
       return in(0);             // Skinny memory is dead, nothing to merge
 
     // Back-to-back merges collapse, same as back-to-back stores

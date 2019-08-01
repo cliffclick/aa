@@ -35,12 +35,12 @@ public class CProjNode extends ProjNode {
     Node iff = in(0);
     if( !(iff instanceof IfNode) ) return this; // Already collapsed IfNode, no sharpen
     Node test = iff.in(1);
-    add_def(this);              // Self-hook to prevent accidental deletion
+    keep();                     // Self-hook to prevent accidental deletion
     Node sharp = _idx==1
       ? gvn.xform(new CastNode(this,test,Type.NSCALR))
       : gvn.con(Type.NIL);
     scope.sharpen(test,sharp,arm);
-    pop();                      // Remove self-hook
+    unkeep(gvn);                // Remove self-hook
     return sharp;
   }
 }

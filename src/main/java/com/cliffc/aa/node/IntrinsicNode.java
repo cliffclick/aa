@@ -161,11 +161,9 @@ public abstract class IntrinsicNode extends Node {
       String argy = argx=="." ? "arg"+i : argx;
       nnn.add_def(gvn.xform(new ParmNode(i,argy,fun, gvn.con(from._ts[i]),null)));
     }
-    Node ptr = gvn.xform(nnn);
-    ptr.add_def(ptr); // Self-hook to prevent deletion
+    Node ptr = gvn.xform(nnn).keep();
     Node mmem= gvn.xform(new MemMergeNode(memp,ptr));
-    ptr.pop();
-    return new EpilogNode(fun,mmem,ptr,rpc,fun,null);
+    return new EpilogNode(fun,mmem,ptr.unhook(),rpc,fun,null);
   }
 
 }
