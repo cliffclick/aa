@@ -1,6 +1,5 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.AA;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
@@ -27,10 +26,9 @@ public class StoreNode extends Node {
   String xstr() { return "."+(_fld==null ? ""+_fld_num : _fld)+"="; } // Self short name
   String  str() { return xstr(); }      // Inline short name
 
-  Node ctl() { return in(0); }
-  Node mem() { return in(1); }
-  Node adr() { return in(2); }
-  Node val() { return in(3); }
+  private Node mem() { return in(1); }
+  private Node adr() { return in(2); }
+  private Node val() { return in(3); }
   
   @Override public Node ideal(GVNGCM gvn) {
     return null;

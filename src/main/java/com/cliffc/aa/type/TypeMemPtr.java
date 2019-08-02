@@ -148,4 +148,8 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   @Override void walk( Predicate<Type> p ) { if( p.test(this) ) _obj.walk(p); }
   @Override TypeStruct repeats_in_cycles(TypeStruct head, BitSet bs) { return _cyclic ? _obj.repeats_in_cycles(head,bs) : null; }
   public int getbit() { return _aliases.getbit(); }
+  // Keep the high parts
+  @Override public TypeMemPtr startype() {
+    return TypeMemPtr.make(_aliases.above_center() ? _aliases : _aliases.dual(), _obj.startype());
+  }
 }

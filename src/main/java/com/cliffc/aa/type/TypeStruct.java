@@ -38,7 +38,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // is Top; a '.' is Bot; all other values are valid field names.
   public @NotNull String @NotNull[] _flds;  // The field names
   public Type[] _ts;            // Matching field types
-  public byte[] _finals;        // Fields that are final (read-only)
+  public byte[] _finals;        // Fields that are final; 1==read-only, 0=r/w
   private TypeStruct _uf = null;// Tarjan Union-Find
   private TypeStruct     ( boolean any, String[] flds, Type[] ts, byte[] finals ) { super(TSTRUCT, any); init(any,flds,ts,finals); }
   private TypeStruct init( boolean any, String[] flds, Type[] ts, byte[] finals ) {
@@ -141,7 +141,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     for( int i=0; i<_flds.length; i++ ) {
       if( !is_tup ) sb.p(_flds[i]);
       Type t = at(i);
-      if( !is_tup && t != SCALAR ) sb.p(_finals[i]==0 ? '#' : ':');
+      if( !is_tup && t != SCALAR ) sb.p(_finals[i]==0 ? ":=" : "=");
       if( t != SCALAR ) sb.p(t==null ? "!" : t.str(dups));
       if( i<_flds.length-1 ) sb.p(',');
     }
@@ -478,7 +478,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     // No-such-field to update, so this is a program type-error.
     if( idx==-1 ) return ALLSTRUCT;
     // Update to a final field.  This is a program type-error
-    if( _finals[idx] == 0 ) return this;
+    if( _finals[idx] == 1 ) return this;
     Type[] ts = _ts.clone();
     ts[idx] = val;
     return malloc(_any,_flds,ts,_finals).hashcons_free();
@@ -555,6 +555,13 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     if( p.test(this) )
       for( Type _t : _ts ) _t.walk(p);
   }
-  // Dual, except keep TypeMem.XOBJ as high for starting GVNGCM.opto() state.
-  @Override public TypeObj startype() { return above_center() ? this : dual(); }
+  // Keep the high parts
+  @Override public TypeObj startype() {
+    String[] as = new String[_flds.length];
+    Type  [] ts = new Type  [_ts  .length];
+    byte  [] bs = new byte  [_ts  .length]; // r-w is the high value
+    for( int i=0; i<as.length; i++ ) as[i] = fldBot(_flds[i]) ? "^" : _flds[i];
+    for( int i=0; i<ts.length; i++ ) ts[i] = _ts[i].above_center() ? _ts[i] : _ts[i].dual();
+    return malloc(true,as,ts,bs).hashcons_free();
+  }
 }

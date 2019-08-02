@@ -263,7 +263,7 @@ public class TestParse {
 
     test    ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
     test    ("Point=:@{x,y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
-    testerr ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1,y=2}))", "*[8]@{x:1,y:2} is not a *[2]Point:@{x,y}",68);
+    testerr ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1,y=2}))", "*[8]@{x=1,y=2} is not a *[2]Point:@{x,y}",68);
     testerr ("Point=:@{x,y}; Point((0,1))", "*[8](nil,1) is not a *[2]@{x,y}",27);
     testerr("x=@{n:,}","Missing type after ':'",6);
     testerr("x=@{n=,}","Missing ifex after assignment of 'n'",6);
@@ -447,7 +447,7 @@ public class TestParse {
          "     ? @{l=map(tree.l,fun),r=map(tree.r,fun),v=fun(tree.v)}"+
          "     : 0};"+
          "map(tmp,{x->x+x})",
-         "@{l:*[0,226,]$?,r:$,v:int64}");
+         "@{l=*[0,226,]$?,r=$,v=int64}");
   }
 
   @Test public void testParse9() {
@@ -474,13 +474,12 @@ public class TestParse {
 
   @Test @Ignore
   public void testParse10() {
-    test   ("x=@{n:=1,v:=2}; x.n  = 3", TypeInt.con(3));
     // Test re-assignment in struct
-    test   ("x=@{n:=1,v:=2}", TypeStruct.make(FLDS, new Type[]{TypeInt.con(1), TypeInt.con(2)},new byte[2]));
-    testerr("x=@{n =1,v:=2}; x.n  = 3; ", "Cannot re-assign final field '.n'",24);
-    test   ("x=@{n:=1,v:=2}; x.n  = 3", TypeInt.con(3));
-    test   ("x=@{n:=1,v:=2}; x.n := 3; x", TypeStruct.make(FLDS, new Type[]{TypeInt.con(3), TypeInt.con(2)},new byte[2]));
-    testerr("x=@{n:=1,v:=2}; x.n  = 3; x.v = 1; x.n = 4", "Cannot re-assign final field '.n'",24);
+    test_ptr("x=@{n:=1,v:=2}", (alias) -> TypeMemPtr.make(alias,TypeStruct.make(FLDS, new Type[]{TypeInt.con(1), TypeInt.con(2)},new byte[2])));
+    testerr ("x=@{n =1,v:=2}; x.n  = 3; ", "Cannot re-assign final field '.n'",24);
+    test    ("x=@{n:=1,v:=2}; x.n  = 3", TypeInt.con(3));
+    test_ptr("x=@{n:=1,v:=2}; x.n := 3; x", (alias) -> TypeMemPtr.make(alias,TypeStruct.make(FLDS, new Type[]{TypeInt.con(3), TypeInt.con(2)},new byte[2])));
+    testerr ("x=@{n:=1,v:=2}; x.n  = 3; x.v = 1; x.n = 4", "Cannot re-assign final field '.n'",24);
   }
   /*
 
