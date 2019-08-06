@@ -222,7 +222,9 @@ public class TestNode {
     test1monotonic(new    ConNode<Type>(          TypeInt.FALSE));
     test1monotonic(new    ConNode<Type>(          TypeStr.ABC  ));
     test1monotonic(new    ConNode<Type>(          TypeFlt.FLT64));
-    test1monotonic(new   CastNode(_ins[0],_ins[1],TypeInt.FALSE));
+    // Cannot cast-to-NIL - can only move away from NIL
+    //test1monotonic(new   CastNode(_ins[0],_ins[1],TypeInt.FALSE));
+    test1monotonic(new   CastNode(_ins[0],_ins[1],Type.NSCALR));
     test1monotonic(new   CastNode(_ins[0],_ins[1],TypeFlt.FLT64));
     test1monotonic(new   CastNode(_ins[0],_ins[1],TypeMemPtr.STRPTR));
     test1monotonic(new   CastNode(_ins[0],_ins[1],TypeMemPtr.STR0));
@@ -345,7 +347,7 @@ public class TestNode {
       long t1 = System.currentTimeMillis();
       if( t1-t0 >= 1000 ) {
         nprobes += nprobes1;
-        System.out.println("Did "+nprobes1+" in "+(t1-t0)+"msecs, worklist has "+_work_len+" states, total probes "+nprobes);
+        System.out.println("Did "+nprobes1+" in "+(t1-t0)+"msecs, worklist has "+_work_len+" states, total probes "+nprobes+", values="+_values.size());
         nprobes1=0;
         t0=t1;
       }

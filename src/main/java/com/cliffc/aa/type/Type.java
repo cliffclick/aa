@@ -43,6 +43,48 @@ import java.util.function.Predicate;
 // Structs are tuples with a set of named fields; the fields can be top, a
 // field name, or bottom.
 // Strings are OOPs which again can be top, a constant, or bottom.
+//
+// ===========================================================================
+//
+// A Treatise on NIL
+//
+// I want to have a distinguished NIL-type in the language - too obvious, too
+// useful.  Hence "i=0" or "ptr=0" or "ptr ? s1 : s2" all use the concept of
+// nil.  However, having a single type which can be both an integer and a
+// pointer breaks the major Type Lattice property.  Basically if nil can be
+// used to "cross" between Integers and Pointers (or Fun Pointers, Floats, etc)
+// then the Type system is no longer a Lattice and all sorts of havok ensues.
+//
+// Over the past 1.5yrs I've tried every possible combination of things I can
+// do with nil that also lets me keep it in the language and used in both
+// integer and pointer contexts, but also in the Lattice.  The Type code is
+// full of train-wreck leftovers from various attempts.
+//
+// Example:
+//    ~int  == int.dual() (the high ints)
+//    *str? == a nil-able pointer to a string
+// A "NIL" such that ~int.meet(NIL) == NIL, but also NIL.meet(*str?) == (*str?)
+// seems highly desirable... and crosses between ints and string-pointers.
+
+// Cast-not-nil (after a if-test for nil) in dying (not dead) code often sees
+// nil inputs.  Casts do a JOIN on their input - so we might see e.g.
+// nil.join(*str).  The problem is, the nil can drop to an int before the Cast
+// goes dead.  Thus the Cast computes int.join(*str).  Since nil.isa(int) the
+// Cast inputs drop monotonically... so the output should also.  Thus
+// nil.join(*str).isa(int.join(*str)).  This is a standard distributivity
+// property and is one of the major Type system asserts... and it doesn't hold.
+
+// nil.isa(int) == TRUE          ; the nil is treated as a TypeInt.ZERO
+// nil.join(*str) == *[0+4+]str? ; the nil is treated as a TypeMemPtr.NIL.
+// int.join(*str) == nScalar     ; Nothing in common
+// *[0+4+]str?.isa(nScalar) == FALSE!!!!! ; Crossing-nil has failed again...
+
+// The current "solution" is that nil is in the Type system, but OUT of the
+// Lattice.  At any given use point the nil collapses exactly one of the more
+// refined nils (TypeInt.ZERO, TypeMemPtr.NIL, etc) but until then it is an
+// undistinguished nil.
+
+
 public class Type<T extends Type<T>> {
   static private int CNT=1;
   final int _uid=CNT++;  // Unique ID, will have gaps, used to uniquely order Types in Unions

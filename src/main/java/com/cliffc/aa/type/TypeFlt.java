@@ -87,7 +87,7 @@ public class TypeFlt extends Type<TypeFlt> {
     return make(that.nn(),that._z,0); // No longer a constant
   }
   private int nn() { assert _x <=0; return _con!=0 || _x== -1 ? -1 : -2; }
-  private static int log( double con ) { return ((double)(float)con)==con ? 32 : 64; }
+  static int log( double con ) { return ((double)(float)con)==con ? 32 : 64; }
   
   @Override public boolean above_center() { return _x>0; }
   @Override public boolean may_be_con() { return _x>=0; }
