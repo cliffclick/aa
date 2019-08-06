@@ -12,134 +12,95 @@ public class TestType {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testType() {
     Type.init0(new HashMap<>());
-    Type s0 = TypeName.TEST_ENUM;    //   A:int
-    Type s1 = TypeName.TEST_E2  ;    // B:A:int
-    Type s2 = TypeName.TEST_STRUCT;  //   C:{x,y}
-    Type i8 = TypeInt.INT8;
-    Type i8d = i8.dual();
-    Type i1 = TypeInt.BOOL;
-    Type i1d = i1.dual();
+    // CastNode does a JOIN, sometimes with NIL.  This leads to weird crossing-
+    // nil cases that we end up checking for, which should not matter For Real.
+    // Example: Cast to a "str" which is really a *[4]str.  Argument is either
+    // a NIL or a Number.  This is a basic distributivity property:
     
-    // B:int8 isa Scalar
-    assertTrue(s0.isa(Type.SCALAR));
-    //   B: int8 JOIN C: flt32
-    // ~(B:~int8 MEET C:~flt32)  <<== unequal high values, fall to highest value just below center
-    // ~(  ~int8 MEET   ~flt32) <<== approx B meet C as {A,B,C,...}
-    // ~(  ~int8)
-    //    falls to highest value below center: bool
-    // ~(   int1 )
-    // ~int1
+    // If A-isa-B, then A.join(C) -isa- B.join(C).
+    
+    // NIL-isa-Number.  Thus NIL.join(str) -isa- Number.join(str).
+    // NIL-JOIN-*[4]str yields *[0+4+]str? (high string-or-NIL choice).
+    // Number-JOIN-*[4]str yields ~nScalar (because the Cast is in-error,
+    // mixing numbers and pointers).  Since NIL-isa-Number, we expect
+    // *[0+4+]str?-isa-~nScalar (via basic distributivity property).
 
-    // {A,B,C}:int8 <<<--- will never be above center, so will never be a C:flt32
-    Type t02 = s0           .join(TypeName.TEST_FLT);
-    assertEquals(TypeInt.make(1,1,1),t02);
-    //      Scalar JOIN C: flt32
-    // ~(  ~Scalar MEET C:~flt32)
-    // ~(C:~Scalar MEET C:~flt32)
-    // ~(C:~flt32)
-    // C:flt32
-    Type t12 = Type.SCALAR.join(TypeName.TEST_FLT);
-    assertEquals(TypeName.TEST_FLT,t12);
-    // {A,B,C,...}:int8 isa C:flt32  !!!!
-    Type s20 = t02.meet(t12);
-    assertEquals(t12,s20);
+    Type nil = Type.NIL;
+    Type num = Type.NUM;
+    Type str = TypeMemPtr.STRPTR;
+    Type nil_m_num = nil.meet(num);
+    assertEquals(num,nil_m_num);
+    assertTrue(nil.isa(num));   // NIL-isa-Number
 
+    // NIL-isa-Number.
+    // Thus NIL.join(str) -isa- Number.join(str).
+    Type nil_j_str = nil.join(str);
 
-    Type pi1 = TypeInt.make(+1,1,1);
-    assertEquals(i1,pi1.meet(i1));
-
-    // (~nScalar&~int1) & B:int1 == ~nScalar & (~int1 & B:int1);
-    // (~1) & B:int1 == ~nScalar & (B:int1);
-    // con1 & B:int1 == ~nScalar & (B:int1); <<== FALL ~1 to con1
-    // Now blend all-1s and B:{0,1}
-    //    {:1,A:1,    B:1,C:1,A:B:C:1,...}  and {B:0,B:1}  ==>
-    //    {:1,A:1,B:0,B:1,C:1,A:B:C:1,...} ==>> int1
-    // int1 == B:int1
+    // Problem: nil is a choice of (zero,null) or (0.0,null).
+    // NIL-isa-Number ==> NIL falls from (zero,null) to (zero).
+    // But then NIL.join(str) -isa- Number.join(str) turns into
+    // zero.join(str) -isa- Number.join(str)
+    // ~Scalar isa ~Scalar.  Distribution holds.  QED.
     //
-    // Looking at other side: ~int1 & B:int
-    //   { :0 + :1 + A:0 + A:1 + B:0 + B:1... } and {B:0,B:1}
-    // Looking at other side: ~nScalar & B:int
-    //   { ~@{x,y} + :1 + :2 + A:1 + A:2 + B:1 + B:2 ... } and {B:0,B:1,B:2,...}
-    Type s14 = i1d.meet(Type.XNSCALR);
-    assertEquals(pi1,s14); // 1?  or ~1?
-    //assertEquals(TypeInt.TRUE,s14); // 1?  or ~1?
-    Type s15 = s0.meet(s14); // B:int1 MEET (~1) == B:int1 vs int1
-    assertEquals(s0,s15); // B:int1
-    Type s16 = i1d.meet(s0); // ~int1 MEET B:int1
-    assertEquals(s0,s16); // B:int1
-    assertEquals(s0,s16.meet(Type.XNSCALR)); // B:int1
+    // If instead NIL falls to (null) we have:
+    // null.isa.Number ==> FALSE.  Distribution holds.  QED.
 
-    Type s3 = s0.meet(s1);
-    assertEquals(s0,s3);        // B.A.int isa A.int
+    // Can I force NILs to choose exactly once, but each textual NIL can make
+    // its own choice?  This is an "odd choice"... because I dont know the
+    // best way to fall.
 
-    Type s4 = s0.join(s1);
-    assertEquals(s1,s4);        // A.~int isa B.A.~int
+    // Another option: resurrect TypeUnion and use NIL as a Union of (0,null).
+    // null might also turn into each alias-class of null in a tree... of nulls.
+    // 
+    
+    
 
-    Type s5 = s1.meet(s2);
-    assertEquals(Type.ALL,s5);  // B:A:int meet C:{x,y} == ALL
+    //--- new stuff: NIL is a TypeUnion of [0,null]
+    // Number is (nums&0) NOT nil.
+    // (nums&0) join (str) ==>
+    // ~(~(nums&0) meet ~str) ==>
+    // ~((~nums+~0) meet ~str) ==>
+    // ~((~nums+0) meet ~str) ==>
+    // ~((~nums+0) meet ~str) ==> ~([99,"abc"]+[0,"abc"]) // sample choices
+    // ~(nScalar + "abc"?) ==> ~("abc"&X + "abc"&0)
+    // ~("abc"*(X+0)) ==> ~("abc"*(Scalar))
+    // ~Scalar
 
-    Type s6 = s1.join(s2);
-    assertEquals(Type.ANY,s6);  // B:A:int join C:{x,y} == ANY
+    // NIL is choice-of-[0,null] ==> [0+null]
+    // NIL.join.str ==>
+    // ~(~[0+null] meet ~str) ==>
+    // ~([~0&~null] meet ~str) ==>
+    // ~([0&null] meet ~str) ==> ~(0&null&"abc")// sample string choice
+    // (~0 + ~null + ~"abc") ==>
+    // (0 + null + "abc" ) ==> NIL + "abc" ??? or NIL + STR ?
 
-    // ~nScalar = no zero, but choice of all ints including _t_e2:_t_enum:~nint8
-    // (~nScalar & __test_e2:__test_enum:int8) ==
-    // (__test_e2:__test_enum:~nint8 & __test_e2:__test_enum:int8) == __test_e2:__test_enum:int8
-    Type s7 = s1.meet(Type.XNSCALR);
-    assertEquals(s1,s7);        // ~nScalar isa B:A:int
-    //assertEquals(i8,s7);        // ~nScalar isa int, diagonal meet drops name
+    // NIL.isa.Number: (0+null) isa Number ==> (0&Number)+(null&Number) ==> (Number)+(empty) ==> Number
 
-    Type s8 = s1.dual().meet(Type.NSCALR);
-    assertEquals(Type.NSCALR,s8);
+    // NIL.join.str ==> ~(~(0+null) & ~str) ==> ~(0&null&~str) ==> 0+null+str
+    
 
-    Type s9 = TypeFlt.FLT64.dual().meet(s1.dual());
-    assertEquals(s1.dual(),s9);
+    // --- old stuff---
+    // ~nil==nil
+    // ~str==[0+4+]~str // invert str
+    // ~nil & ~str == [0,4]~str <<== did not drop str?
+    // // must have nil, but pick 1 string?  ==> [0,9]"abc" ???
+    // ~(nil&~str) == [0+4+]str <<== mixed up and down
+    // OR... ~[0,9]"abc" ==> [0+9+]"abc"
+    //assertEquals(TypeMemPtr.STR0.dual(),nil_j_str);
+    
+    // Number.join(str) ==> ~(~num & ~str)
+    Type xnum_m_xstr = num.dual().meet(str.dual());
+    // Here I'd rather something else.
+    // Choice-number-nil, plus choice str ("abc").
+    // If I choice nil ==> [0,9]"abc".  Leads to nil-crossing.
+    // If I choice  1  ==> nScalar.
+    assertEquals(Type.NSCALR,xnum_m_xstr);
 
-    Type s10 = TypeInt.BOOL.dual().meet(s2);
-    // No named ALLs
-    //assertEquals(TypeName.make("__test_struct",TypeName.TEST_SCOPE,Type.ALL),s10);
-    assertEquals(Type.ALL,s10);
-
-    //  ~nScalar              isa  A:int8, SO
-    // (~nScalar JOIN B:int8) isa (A:int8 JOIN B:int8)
-
-    // ~nScalar MEET A:int8 == A:int8   <<== can add A:2 to A:int8 set, gets A:int8
-    Type bi8 = TypeName.make("B",TypeName.TEST_SCOPE,i8);
-    assertEquals(s1,Type.XNSCALR.meet(s1));
-    // ~nScalar JOIN B:int8 = ~nScalar
-    // ~(~~nScalar MEET ~B:int8) = ~(nScalar MEET B:~int8) = ~(nScalar) = ~nScalar <<== Add B:2 to nScalar, gets nScalar
-    assertEquals(Type.XNSCALR,Type.XNSCALR.join(bi8));
-    //    A:int8   JOIN  B:int8  =   1
-    // ~(~A:int8   MEET ~B:int8) = ~(1) = 1  <<== Set of {A:1,B:1}
-    assertEquals(pi1,s1.join(bi8));
-    //
-    // ~nScalar isa  1 !?!?
-    // ~nScalar MEET 1 == 1  !!!!
-    Type s11 = Type.XNSCALR.meet(TypeInt.TRUE);
-    assertEquals(TypeInt.TRUE,s11);
-
-    //  ~nScalar               isa  A:int8, SO
-    // (~nScalar JOIN B:flt32) isa (A:int8 JOIN B:flt32)
-
-    // ~nScalar MEET A:int8 == A:int8   <<== can add A:2 to A:int8 set, gets A:int8
-    assertEquals(s1,Type.XNSCALR.meet(s1));
-    // ~nScalar JOIN B:flt32 = ~nScalar
-    // ~(~~nScalar MEET ~B:flt32) = ~(nScalar MEET B:~flt32) = ~(nScalar) = ~nScalar <<== Add B:2 to nScalar, gets nScalar
-    assertEquals(Type.XNSCALR,Type.XNSCALR.join(TypeName.TEST_FLT));
-    //    A:int8   JOIN  B:flt32  = ~int8
-    // ~(~A:int8   MEET ~B:flt32) = ~(A:~int8 MEET B:~int8 ) = ~(int8) = ~int8  <<== Set of {A:2,B:2}
-    assertEquals(pi1,s1.join(TypeName.TEST_FLT));
-    //
-    // ~nScalar isa  ~int8 !?!?
-    // ~nScalar MEET ~int8 == ~nint8  !!!!
-    Type s12 = Type.XNSCALR.meet(TypeInt.TRUE);
-    assertEquals(TypeInt.TRUE,s12);
-
-    Type s13 = TypeFlt.NFLT64.dual().meet(s0);
-    assertEquals(s0,s13); // ~nflt64 isa B:int   same as   ~nScalar isa A:B:int
-
-    Type s19 = TypeFlt.PI.meet(s1);
-    assertEquals(TypeFlt.FLT64,s19);
-
+    
+    // NIL-isa-Number.
+    // Thus NIL.join(str) -isa- Number.join(str).
+    Type num_j_str = num.join(str);
+    assertTrue(nil_j_str.isa(num_j_str));
   }
 
   @Test public void testNamesInts() {
@@ -178,7 +139,7 @@ public class TestType {
     //      Confirm lattice: {~i8 -> N:~i8 -> 0 -> N:i8 -> i8; N:0 -> 0 }
     // NOT: Confirm lattice: {N:~i8 -> ~i8; N:i8 -> i8 }
     assertEquals(xni8,xni8.meet( xi8));//   ~i8 -> N:~i8
-    assertEquals(TypeInt.BOOL, z  .meet(xni8));// N:~i8 -> {0,1}??? When falling off from a Named Int, must fall below ANY constant to keep a true lattice
+    assertEquals(Type.NIL, z  .meet(xni8));// N:~i8 -> {0,1}??? When falling off from a Named Int, must fall below ANY constant to keep a true lattice
     assertEquals(  i8, ni8.meet(   z));//     0 -> N:i8
     assertEquals(  i8,  i8.meet( ni8));// N: i8 ->   i8
 

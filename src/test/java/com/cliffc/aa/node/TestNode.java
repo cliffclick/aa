@@ -19,19 +19,25 @@ public class TestNode {
   // A private GVN for computing value() calls.
   private GVNGCM _gvn;
 
+  // Types being used for testing
+  private Type[] _alltypes;
+  
   // A sparse list of all subtypes.  The outer array is the index into
-  // Type.ALL_TYPES(), and the inner array is the set of immediate sub-Types
-  // (again as indices into ALL_TYPES).  Numbers are sorted.
+  // Type._alltypes(), and the inner array is the set of immediate sub-Types
+  // (again as indices into _alltypes).  Numbers are sorted.
   private int[][] _subtypes;
 
   // Build a minimal spanning sub-Type tree from the set of sample types.
   // We'll use this to know which other types sub-Type this type... and thus be
   // more efficient in testing all Types which subtype another Type.  The outer
-  // array is the index into Type.ALL_TYPES(), and the inner array is the set
-  // of immediate sub-Types (again as indices into ALL_TYPES).
+  // array is the index into Type._alltypes(), and the inner array is the set
+  // of immediate sub-Types (again as indices into _alltypes).
   private int[][] _min_subtypes;
 
   private NonBlockingHashMapLong<Type> _values;
+  private static long hash( long h ) { return h<<2; }
+  private Type get( long h ) { return _values.get(hash(h)); }
+  private Type put( long h, Type t ) { return _values.put(hash(h),t); }
 
   // Array doubling of longs
   private long[] _work = new long[1];
@@ -49,16 +55,16 @@ public class TestNode {
   }
 
   // A sparse list of all subtypes.  The outer array is the index into
-  // Type.ALL_TYPES(), and the inner array is the set of immediate sub-Types
-  // (again as indices into ALL_TYPES).  ALL_TYPES is sorted by 'isa'.  Numbers
+  // _alltypes, and the inner array is the set of immediate sub-Types
+  // (again as indices into _alltypes).  _alltypes is sorted by 'isa'.  Numbers
   // in subs[i] are sorted and always greater than 'i'.
-  private static int[][] make_subtypes(Type[] alltypes) {
-    int[][] subs = new int[alltypes.length][];
-    int[] tmp = new int[alltypes.length];
+  private int[][] make_subtypes() {
+    int[][] subs = new int[_alltypes.length][];
+    int[] tmp = new int[_alltypes.length];
     for( int i=0; i<subs.length; i++ ) {
       int len=0;
       for( int j=0; j<subs.length; j++ )
-        if( i!=j && alltypes[i].isa(alltypes[j]) )
+        if( i!=j && _alltypes[i].isa(_alltypes[j]) )
           tmp[len++]=j;         // isa numbers are sorted by increasing 'j'
       subs[i] = Arrays.copyOfRange(tmp,0,len);
     }
@@ -68,8 +74,8 @@ public class TestNode {
   // Build a minimal subtype graph from the set of sample types.  We'll use
   // this to know which other types sub-Type this type... and thus be more
   // efficient in testing all Types which subtype another Type.  The outer
-  // array is the index into Type.ALL_TYPES(), and the inner array is the set
-  // of immediate sub-Types (again as indices into ALL_TYPES).
+  // array is the index into Type._alltypes(), and the inner array is the set
+  // of immediate sub-Types (again as indices into _alltypes).
   private int[][] make_minimal_graph() {
 
     int[][] subs = new int[_subtypes.length][];
@@ -115,16 +121,16 @@ public class TestNode {
 
   // Print subtypes in RPO
   private void print( int x, int d ) {
-    Type dt = _values.get(x);
+    Type dt = get(x);
     if( dt==null ) {
-      _values.put(x,dt=TypeInt.con(d));
+      put(x,dt=TypeInt.con(d));
       int[] subs = _min_subtypes[x];
       for( int sub : subs )
         print(sub,d+1);
-      System.out.println("#"+x+" = "+Type.ALL_TYPES()[x]+" "+d+" "+dt.getl());
+      System.out.println("#"+x+" = "+_alltypes[x]+" "+d+" "+dt.getl());
     } else if( d < dt.getl() ) {
-      _values.put(x,TypeInt.con(d));
-      System.out.println("Shrink #"+x+" = "+Type.ALL_TYPES()[x]+" "+d+" "+dt.getl());
+      put(x,TypeInt.con(d));
+      System.out.println("Shrink #"+x+" = "+_alltypes[x]+" "+d+" "+dt.getl());
     }
   }
 
@@ -146,11 +152,24 @@ public class TestNode {
     Type.init0(new HashMap<>());
     Env.top();
     assert _errs == 0;          // Start with no errors
+
+    // Types we are testing
+    _alltypes = Type.ALL_TYPES();
+    // A subset used to help diagnose this algorithm.
+    //Type[] ts = new Type[] {
+    //  Type.ALL,Type.ANY,Type.CTRL,Type.XCTRL, Type.SCALAR, Type.XSCALAR, Type.NSCALR, Type.XNSCALR,
+    //  Type.NUM, Type.XNUM, Type.NIL
+    //};
+    //for( int i=0; i<ts.length; i++ )
+    //  for( int j=i+1; j<ts.length; j++ )
+    //    if( ts[j].isa(ts[i]) ) { Type tmp = ts[i]; ts[i] = ts[j]; ts[j] = tmp; }
+    //_alltypes = ts;
+    
     // All The Types we care to reason about.  There's an infinite number of
     // Types, but mostly are extremely similar - so we limit ourselves to a
     // subset which has at least one of unique subtype, plus some variations
     // inside the more complex Types.
-    _subtypes = make_subtypes(Type.ALL_TYPES());
+    _subtypes = make_subtypes();
 
     // Build a minimal spanning sub-Type tree from the set of sample types.
     // We'll use this to know which other types sub-Type this type... and thus be
@@ -158,7 +177,7 @@ public class TestNode {
     _min_subtypes = make_minimal_graph();
 
     // Per-node-type cached value() results
-    _values = new NonBlockingHashMapLong<Type>(8*1000000,false);
+    _values = new NonBlockingHashMapLong<Type>(128*1024*1024,false);
 
     // Print the types and subtypes in a RPO
     //print(0,0);
@@ -182,9 +201,21 @@ public class TestNode {
 
     // Testing 1 set of types into a value call.
     // Comment out when not debugging.
-    Type rez = test1jig(new StoreNode(_ins[0],_ins[1],_ins[2],_ins[3],0,null),
-                        Type.ANY,TypeMem.MEM_ABC,TypeMemPtr.STRPTR,Type.ALL);
-             
+    Type rez = test1jig(new CastNode(_ins[0],_ins[1],TypeMemPtr.STRPTR),
+            Type.CTRL,Type.NUM,Type.ANY,Type.ANY);
+
+    // Cast(flt) ==>
+    //   ~nScalar ^ flt = ~nScalar
+    //     nil    ^ flt =   0
+    // BUT ~nScalar isa nil, but ~nScalar !isa! 0
+    // WHY ~nScalar isa nil????  ... should fall to smallest value below nil... that still works for ints & ptrs
+    //
+    //   nil  ^ *[4] ==> *[+0+4]    // picks up nil choice
+    // Number ^ *[4] ==> ~nScalar   // nil isa Number, but *[0+4] !isa! ~nScalar
+    //
+    // PLAN B: nil isa many_things, nothing isa nil because its supposed to be
+    // outside the lattice.  Just weaken asserts around nil?  
+    
     // All the Nodes, all Values, all Types
     test1monotonic(new   CallNode(false,null,_ins[0],  unr  ,mem,_ins[2],_ins[3]));
     test1monotonic(new   CallNode(false,null,_ins[0],_ins[1],mem,_ins[2],_ins[3]));
@@ -192,8 +223,9 @@ public class TestNode {
     test1monotonic(new    ConNode<Type>(          TypeStr.ABC  ));
     test1monotonic(new    ConNode<Type>(          TypeFlt.FLT64));
     test1monotonic(new   CastNode(_ins[0],_ins[1],TypeInt.FALSE));
-    test1monotonic(new   CastNode(_ins[0],_ins[1],TypeStr.ABC  ));
     test1monotonic(new   CastNode(_ins[0],_ins[1],TypeFlt.FLT64));
+    test1monotonic(new   CastNode(_ins[0],_ins[1],TypeMemPtr.STRPTR));
+    test1monotonic(new   CastNode(_ins[0],_ins[1],TypeMemPtr.STR0));
     test1monotonic(new  CProjNode(_ins[0],0));
     test1monotonic(new EpilogNode(_ins[0],mem,_ins[1],_ins[2],fun_forward_ref,"unknown_ref"));
     test1monotonic(new EpilogNode(_ins[0],mem,_ins[1],_ins[2],fun_plus,"plus"));
@@ -231,7 +263,6 @@ public class TestNode {
   private Type test1jig(final Node n, Type t0, Type t1, Type t2, Type t3) {
     _alltype = n.all_type();
     assert _alltype.is_con() || (!_alltype.above_center() && _alltype.dual().above_center());
-    Type[] all = Type.ALL_TYPES();
     // Prep graph edges
     _gvn.setype(_ins[0],                        t0);
     _gvn.setype(_ins[1],((ConNode)_ins[1])._t = t1);
@@ -273,11 +304,11 @@ public class TestNode {
     _alltype = n.all_type();
     assert _alltype.is_con() || (!_alltype.above_center() && _alltype.dual().above_center());
 
-    _values.put(0,Type.ANY);    // First args are all ANY, so is result
+    put(0,Type.ANY);            // First args are all ANY, so is result
     push(0);                    // Init worklist
     
-    Type[] all = Type.ALL_TYPES();
-    long t0 = System.currentTimeMillis();
+    Type[] all = _alltypes;
+    long t0 = System.currentTimeMillis(), t2=t0;
     long nprobes = 0, nprobes1=0;
     while( _work_len > 0 ) {
       long xx = pop();
@@ -319,28 +350,49 @@ public class TestNode {
         t0=t1;
       }
     }
+    nprobes += nprobes1;
+    System.out.println("Total probes "+nprobes+" in "+(t2-t0)+"msecs, values="+_values.size());
   }
 
   private void set_value_type(Node n, Type vn, long xx, long xxx, int idx, int yx, Type[] all ) {
-    Type vm = _values.get(xxx);
+    Type vm = get(xxx);
     if( vm == null ) {
       set_type(idx,all[yx]);
       vm = n.value(_gvn);
       // Assert the alltype() bounds any value() call result.
       assert vm.isa(_alltype);
       assert _alltype.dual().isa(vm);
-      Type old = _values.put(xxx,vm);
+      Type old = put(xxx,vm);
       assert old==null;
       push(xxx);            // Now visit all children
     }
     // The major monotonicity assert
-    if( vn!= vm && !vn.isa(vm) ) {
-      int x0 = xx(xx,0), x1 = xx(xx,1), x2 = xx(xx,2), x3 = xx(xx,3);
+    int x1 = xx(xx,1);
+    int y1 = idx==1 ? yx : x1;
+    if( vn!= vm && !vn.isa(vm) && !special_cast_exception(n,x1,y1,all) ) {
+      int x0 = xx(xx,0), x2 = xx(xx,2), x3 = xx(xx,3);
       System.out.println(n.xstr()+"("+all[x0]+","+all[x1]+","+all[x2]+","+all[x3]+") = "+vn);
       System.out.println(n.xstr()+"("+all[idx==0?yx:x0]+","+all[idx==1?yx:x1]+","+all[idx==2?yx:x2]+","+all[idx==3?yx:x3]+") = "+vm);
       _errs++;
     }
   }
+
+  // CastNode does a JOIN, sometimes with NIL.  This leads to weird
+  // crossing-nil cases that we end up checking for, which should not matter
+  // For Real.  Example: Cast to a "str" which is really a *[4]str.  Argument
+  // is either a NIL or a Number.  This is a basic distributivity property:
+  // If A-isa-B, then A.join(C) -isa- B.join(C).
+  //  NIL-isa-Number.  Thus NIL.join(str) -isa- Number.join(str).
+  // NIL-JOIN-*[4]str yields *[0+4+]str? (high string-or-NIL choice).
+  // Number-JOIN-*[4]str yields ~nScalar (because the Cast is in-error, mixing
+  // numbers and pointers).  Since NIL-isa-Number, we expect
+  // *[0+4+]str?-isa-~nScalar (via basic distributivity property).
+  // 
+  private boolean special_cast_exception(Node n, int x1, int y1, Type[] all ) {
+    //return n instanceof CastNode && (all[x1]==Type.NIL || all[y1]==Type.NIL);
+    return false;
+  }
+  
   @SuppressWarnings("unchecked")
   private void set_type(int idx, Type tyx) {
     if( idx > 0 ) ((ConNode)_ins[idx])._t = tyx;
@@ -355,7 +407,7 @@ public class TestNode {
 
   // Get the value Type for 4 input types.  Must exist.
   private Type get_value_type(long xx) {
-    Type vt = _values.get(xx);
+    Type vt = get(xx);
     assert vt!=null;
     return vt;
   }

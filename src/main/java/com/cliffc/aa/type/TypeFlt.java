@@ -1,6 +1,5 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.util.Ary;
 import java.util.BitSet;
 import java.util.HashMap;
 import java.util.function.Predicate;
@@ -26,19 +25,20 @@ public class TypeFlt extends Type<TypeFlt> {
   }
   private static TypeFlt FREE=null;
   @Override protected TypeFlt free( TypeFlt ret ) { FREE=this; return ret; }
-  public static TypeFlt make( int x, int z, double con ) {
+  public static Type make( int x, int z, double con ) {
+    if( x==0 && con==0 ) return NIL;
     TypeFlt t1 = FREE;
     if( t1 == null ) t1 = new TypeFlt(x,z,con);
-    else { FREE = null; t1.init(x,z,con); }
+    else {  FREE = null;      t1.init(x,z,con); }
     TypeFlt t2 = (TypeFlt)t1.hashcons();
     return t1==t2 ? t1 : t1.free(t2);
   }
-  public static TypeFlt con(double con) { return make(0,log(con),con); }
+  public static Type con(double con) { return make(0,log(con),con); }
   
-  public static final TypeFlt FLT64 = make(-2,64,0);
-         static final TypeFlt FLT32 = make(-2,32,0);
-  public static final TypeFlt PI    = con(Math.PI);
-  public static final TypeFlt NFLT64= make(-1,64,0);
+  public static final TypeFlt FLT64 = (TypeFlt)make(-2,64,0);
+         static final TypeFlt FLT32 = (TypeFlt)make(-2,32,0);
+  public static final TypeFlt PI    = (TypeFlt)con(Math.PI);
+  public static final TypeFlt NFLT64= (TypeFlt)make(-1,64,0);
   public static final TypeFlt[] TYPES = new TypeFlt[]{FLT64,FLT32,PI,NFLT64};
   static void init1( HashMap<String,Type> types ) {
     types.put("flt32",FLT32);
@@ -95,7 +95,7 @@ public class TypeFlt extends Type<TypeFlt> {
   @Override public boolean must_nil() { assert _x!=0||_con!=0; return _x==-2; }
   @Override public boolean may_nil() { return _x>0 || (_x==0 && _con==0); }
   @Override Type not_nil() { return _x==2 ? make(1,_z,_con) : this; }
-  @Override public Type meet_nil() { return meet(TypeInt.FALSE); }
+  @Override public Type meet_nil() { return TypeInt.ZERO.xmeetf(this); }
   
   // Lattice of conversions:
   // -1 unknown; top; might fail, might be free (Scalar->Int); Scalar might lift

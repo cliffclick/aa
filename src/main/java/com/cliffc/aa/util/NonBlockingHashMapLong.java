@@ -1,5 +1,7 @@
 package com.cliffc.aa.util;
 
+import sun.misc.Unsafe;
+
 import java.io.IOException;
 import java.io.Serializable;
 import java.lang.reflect.Field;
@@ -7,8 +9,6 @@ import java.util.*;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLongFieldUpdater;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
-
-import sun.misc.Unsafe;
 
 /**
  * A lock-free alternate implementation of {@link java.util.concurrent.ConcurrentHashMap}
@@ -321,11 +321,11 @@ public class NonBlockingHashMapLong<TypeV>
     while( !CAS(_chm_offset,_chm,newchm) ) { /*Spin until the clear works*/}
     CAS(_val_1_offset,_val_1,TOMBSTONE);
   }
+  // Non-atomic clear, preserving existing large arrays
   public void clear(boolean large) {         // Smack a new empty table down
     int len = _chm._keys.length, log=0;
     while( len > 1 ) { len>>=1; log++; }
-    CHM newchm = new CHM(this,new ConcurrentAutoTable(),log);
-    while( !CAS(_chm_offset,_chm,newchm) ) { /*Spin until the clear works*/}
+    _chm.clear();
     CAS(_val_1_offset,_val_1,TOMBSTONE);
   }
 
@@ -406,7 +406,7 @@ public class NonBlockingHashMapLong<TypeV>
     final NonBlockingHashMapLong _nbhml;
 
     // Size in active K,V pairs
-    private final ConcurrentAutoTable _size;
+    private ConcurrentAutoTable _size;
     public int size () { return (int)_size.get(); }
 
     // ---
@@ -419,7 +419,7 @@ public class NonBlockingHashMapLong<TypeV>
     // keys) then we need a larger table to cut down on the churn.
 
     // Count of used slots, to tell when table is full of dead unusable slots
-    private final ConcurrentAutoTable _slots;
+    private ConcurrentAutoTable _slots;
     public int slots() { return (int)_slots.get(); }
 
     // ---
@@ -471,6 +471,13 @@ public class NonBlockingHashMapLong<TypeV>
       _slots= new ConcurrentAutoTable();
       _keys = new long  [1<<logsize];
       _vals = new Object[1<<logsize];
+    }
+    // Non-atomic clear
+    void clear() {
+      _size = new ConcurrentAutoTable();
+      _slots= new ConcurrentAutoTable();
+      Arrays.fill(_keys,0);
+      Arrays.fill(_vals,null);
     }
 
     // --- print innards
@@ -674,7 +681,7 @@ public class NonBlockingHashMapLong<TypeV>
     // current table, while a 'get' has decided the same key cannot be in this
     // table because of too many reprobes.  The invariant is:
     //   slots.estimate_sum >= max_reprobe_cnt >= reprobe_limit(len)
-    private final boolean tableFull( int reprobe_cnt, int len ) {
+    private boolean tableFull( int reprobe_cnt, int len ) {
       return
         // Do the cheap check first: we allow some number of reprobes always
         reprobe_cnt >= REPROBE_LIMIT &&
@@ -689,7 +696,7 @@ public class NonBlockingHashMapLong<TypeV>
     // Since this routine has a fast cutout for copy-already-started, callers
     // MUST 'help_copy' lest we have a path which forever runs through
     // 'resize' only to discover a copy-in-progress which never progresses.
-    private final CHM resize() {
+    private CHM resize() {
       // Check for resize already in progress, probably triggered by another thread
       CHM newchm = _newchm;     // VOLATILE READ
       if( newchm != null )      // See if resize is already in progress

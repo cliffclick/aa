@@ -67,7 +67,18 @@ public class TypeTuple extends Type<TypeTuple> {
   }
 
   private static TypeTuple FREE=null;
-  @Override protected TypeTuple free( TypeTuple ret ) { FREE=this; return ret; }
+  private static Type[] FREE3=null;
+  @Override protected TypeTuple free( TypeTuple ret ) {
+    if( _ts.length==3 ) FREE3=_ts;
+    FREE=this;
+    return ret;
+  }
+  private static Type[] make_ary(int len) {
+    Type[] ts = FREE3;
+    if( len!=3 || ts==null ) return new Type[len];
+    FREE3=null;
+    return ts;
+  }
   @SuppressWarnings("unchecked")
   static TypeTuple make0( boolean any, Type... ts ) {
     TypeTuple t1 = FREE;
@@ -129,7 +140,7 @@ public class TypeTuple extends Type<TypeTuple> {
     // Short is low ; short extended by ALL so tail is ALL so trimmed to short.
     int len = _any ? tmax._ts.length : _ts.length;
     // Meet of common elements
-    Type[] ts = new Type[len];
+    Type[] ts = make_ary(len);
     for( int i=0; i<_ts.length; i++ )  ts[i] = _ts[i].meet(tmax._ts[i]);
     // Elements only in the longer tuple.
     for( int i=_ts.length; i<len; i++ )

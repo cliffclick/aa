@@ -261,6 +261,7 @@ public class CallNode extends Node {
     // See if we can reduce this to a single function (or unresolved).
     if( !(fp instanceof UnresolvedNode || fp instanceof EpilogNode) ) {
       BitsFun fidxs = fidxs(gvn);
+      if( fidxs==null ) return gvn.type(fun()).above_center() ? TypeTuple.XCALL : TypeTuple.CALL;
       int fidx = fidxs.abit();
       if( fidx == -1 || fidx == BitsFun.ALL ) return TypeTuple.CALL;
       // During e.g. opto discover a single function target.  Use this for the

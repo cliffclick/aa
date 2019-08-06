@@ -1,6 +1,5 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.util.Ary;
 import java.util.BitSet;
 import java.util.HashMap;
 import java.util.function.Predicate;
@@ -27,7 +26,8 @@ public class TypeInt extends Type<TypeInt> {
   }
   private static TypeInt FREE=null;
   @Override protected TypeInt free( TypeInt ret ) { FREE=this; return ret; }
-  public static TypeInt make( int x, int z, long con ) {
+  public static Type make( int x, int z, long con ) {
+    if( x==0 && con==0 ) return NIL;
     if( Math.abs(x)==1 && z==1 && con==0) con=1; // not-null-bool is just a 1
     TypeInt t1 = FREE;
     if( t1 == null ) t1 = new TypeInt(x,z,con);
@@ -35,19 +35,20 @@ public class TypeInt extends Type<TypeInt> {
     TypeInt t2 = (TypeInt)t1.hashcons();
     return t1==t2 ? t1 : t1.free(t2);
   }
-  public static TypeInt con(long con) { return make(0,log(con),con); }
+  public static Type con(long con) { return make(0,log(con),con); }
 
-  static public  final TypeInt  INT64 = make(-2,64,0);
-  static         final TypeInt  INT32 = make(-2,32,0);
-  static         final TypeInt  INT16 = make(-2,16,0);
-  static public  final TypeInt  INT8  = make(-2, 8,0);
-  static public  final TypeInt  BOOL  = make(-2, 1,0);
-  static public  final TypeInt TRUE   = make( 0, 1,1);
-  static public  final TypeInt FALSE  = make( 0, 1,0);
-  static public  final TypeInt XINT1  = make( 2, 1,0);
-  static public  final TypeInt NINT8  = make(-1, 8,0);
-  static private final TypeInt NINT64 = make(-1,64,0);
-  static final TypeInt[] TYPES = new TypeInt[]{INT64,INT32,INT16,BOOL,TRUE,FALSE,XINT1,NINT64};
+  static public  final TypeInt  INT64 = (TypeInt)make(-2,64,0);
+  static         final TypeInt  INT32 = (TypeInt)make(-2,32,0);
+  static         final TypeInt  INT16 = (TypeInt)make(-2,16,0);
+  static public  final TypeInt  INT8  = (TypeInt)make(-2, 8,0);
+  static public  final TypeInt  BOOL  = (TypeInt)make(-2, 1,0);
+  static public  final TypeInt TRUE   = (TypeInt)make( 0, 1,1);
+  static public  final Type    FALSE  = NIL;
+  static public  final TypeInt XINT1  = (TypeInt)make( 2, 1,0);
+  static public  final TypeInt NINT8  = (TypeInt)make(-1, 8,0);
+  static private final TypeInt NINT64 = (TypeInt)make(-1,64,0);
+  static         final TypeInt ZERO   = (TypeInt)new TypeInt(0,0,0).hashcons(); // Not exposed since not the canonical NIL
+  static final TypeInt[] TYPES = new TypeInt[]{INT64,INT32,INT16,BOOL,TRUE,XINT1,NINT64};
   static void init1( HashMap<String,Type> types ) {
     types.put("bool" ,BOOL);
     types.put("int1" ,BOOL);
@@ -95,7 +96,7 @@ public class TypeInt extends Type<TypeInt> {
     TypeInt ttop = _x>0 ? this : tt;
     if( that._x<0 ) return that; // Return low value
     if( log(that._con) <= ttop._z && (that._con!=0 || ttop._x==2) )
-      return that;                    // Keep a fitting constant
+      return that==ZERO ? NIL : that; // Keep a fitting constant
     return make(that.nn(),that._z,0); // No longer a constant
   }
 
@@ -136,7 +137,8 @@ public class TypeInt extends Type<TypeInt> {
       }
       // tf._x > 0 // Can a high float fall to the int constant?
       double dcon = tf._z==32 ? (float)_con : (double)_con;
-      if( (long)dcon == _con && (_con!=0 || tf._x == 2) ) return this;
+      if( (long)dcon == _con && (_con!=0 || tf._x == 2) )
+        return this==ZERO ? NIL : this;
       tx = _con==0 ? -2 : -1; // Fall from constant
     } // Fall into the bottom-int case
 
@@ -188,7 +190,7 @@ public class TypeInt extends Type<TypeInt> {
     // Never had a nil choice
     return this;
   }
-  @Override public Type meet_nil() { return meet(FALSE); }
+  @Override public Type meet_nil() { return xmeet(ZERO); }
   @Override Type make_recur(TypeName tn, int d, BitSet bs ) { return this; }
   @Override void walk( Predicate<Type> p ) { p.test(this); }
 }

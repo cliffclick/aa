@@ -29,6 +29,8 @@ public class IfNode extends Node {
     if( pred. may_nil() ) return TypeTuple.IF_ANY;
     // If pred must include a nil, then we can see nil or something else
     if( pred.must_nil() ) return TypeTuple.IF_ALL;
+    // Let input fall before deciding
+    if( pred.above_center() ) return TypeTuple.IF_ANY;
     // If meeting a nil changes things, then the original excluded nil and so
     // was always true.
     if( pred.meet_nil() != pred ) return TypeTuple.IF_TRUE;

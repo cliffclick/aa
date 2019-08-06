@@ -199,11 +199,11 @@ public class Type<T extends Type<T>> {
   public  static final Type  SCALAR= make( TSCALAR); // ptrs, ints, flts; things that fit in a machine register
   public  static final Type XSCALAR= make(TXSCALAR); // ptrs, ints, flts; things that fit in a machine register
   public  static final Type  NSCALR= make( TNSCALR); // Scalars-not-nil
-          static final Type XNSCALR= make(TXNSCALR); // Scalars-not-nil
+  public  static final Type XNSCALR= make(TXNSCALR); // Scalars-not-nil
   public  static final Type   NIL  = make( TNIL   ); // The Nil.
-  private static final Type   NUM  = make( TNUM   );
-  private static final Type  XNUM  = make(TXNUM   );
-  private static final Type  NNUM  = make( TNNUM  );
+  public  static final Type   NUM  = make( TNUM   );
+  public  static final Type  XNUM  = make(TXNUM   );
+  public  static final Type  NNUM  = make( TNNUM  );
   private static final Type XNNUM  = make(TXNNUM  );
   public  static final Type   REAL = make( TREAL  );
   private static final Type  XREAL = make(TXREAL  );
@@ -310,7 +310,7 @@ public class Type<T extends Type<T>> {
     if( is_num() ) {
       // May be OOP0 or STR or STRUCT or TUPLE
       if( that_oop ) return (must_nil() || t.must_nil()) ? SCALAR : NSCALR;
-      if( that_num ) {
+      if( that_num || t==NIL ) {
         // Numeric; same pattern as ANY/ALL, or SCALAR/XSCALAR
         if( _type == TNUM || t._type == TNUM ) return NUM;
         if(   _type == TXNUM ) return t   ;
@@ -500,6 +500,7 @@ public class Type<T extends Type<T>> {
     case TXNUM:    case TXNNUM:
     case TXSCALAR: case TXNSCALR:
     case TXCTRL:
+    case TNIL:
       return true;              // These all include some constants
     default: throw typerr(null);
     }
@@ -537,7 +538,7 @@ public class Type<T extends Type<T>> {
   // Return a long   from a TypeInt constant; assert otherwise.
   public long   getl() { if( _type==TNIL ) return 0; throw typerr(null); }
   // Return a double from a TypeFlt constant; assert otherwise.
-  public double getd() { throw typerr(null); }
+  public double getd() { if( _type==TNIL ) return 0.0; throw typerr(null); }
   // Return a String from a TypeStr constant; assert otherwise.
   public String getstr() { throw typerr(null); }
 
@@ -631,6 +632,7 @@ public class Type<T extends Type<T>> {
   }
   public Type meet_nil() {
     switch( _type ) {
+    case TANY:
     case TXNUM:
     case TXREAL:
     case TXSCALAR:  return NIL;

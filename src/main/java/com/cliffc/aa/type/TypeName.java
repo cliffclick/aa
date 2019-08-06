@@ -206,7 +206,8 @@ public class TypeName extends TypeObj<TypeName> {
     //if( !_t.above_center() ) return nn;
     return make(_name,_lex,nn);
   }
-  @Override public Type meet_nil() { return TypeName.make(_name,_lex, _t.meet_nil()); } // Just name-wrap
+  // Since meeting an unnamed NIL, end result is never high and never named
+  @Override public Type meet_nil() { return _t.meet_nil(); }
   @Override public TypeObj startype() { return make(_name,_lex,_t.startype()); }
   @Override public byte isBitShape(Type t) {
     if( t instanceof TypeName ) {
