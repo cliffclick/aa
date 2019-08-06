@@ -10,7 +10,7 @@ import java.util.BitSet;
 // no-named-field TypeStruct, and is not exposed at the language level.  With
 // mixed tuple lengths, tuples are infinitely extended with ANY/ALL.
 public class TypeTuple extends Type<TypeTuple> {
-  private boolean _any;
+  boolean _any;
   public Type[] _ts; // The fixed known types
   protected TypeTuple( byte type, boolean any, Type[] ts ) { super(type); init(type, any, ts);  }
   protected void init( byte type, boolean any, Type[] ts ) {
@@ -48,10 +48,12 @@ public class TypeTuple extends Type<TypeTuple> {
       if( _ts[i]!=t._ts[i] && !_ts[i].cycle_equals(t._ts[i]) ) return false;
     return true;
   }
+  String open_parens() { return "("; }
+  String clos_parens() { return ")"; }
   @Override String str( BitSet dups) {
     SB sb = new SB();
     if( _any ) sb.p('~');
-    sb.p('(');
+    sb.p(open_parens());
     if( _ts.length>0 ) {        // No commas for zero-length
       int j = _ts.length-1;     // Find length of trailing equal parts
       Type last = _ts[j];       // Last type
@@ -62,7 +64,7 @@ public class TypeTuple extends Type<TypeTuple> {
       if( j+1<_ts.length-1 )  sb.p("..."); // Abbreviate tail
       if( _ts.length> 1 ) sb.p(',').p(last);
     }
-    sb.p(')');
+    sb.p(clos_parens());
     return sb.toString();
   }
 
