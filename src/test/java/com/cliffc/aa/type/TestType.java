@@ -427,7 +427,8 @@ public class TestType {
 
   @Test public void testCommuteSymmetricAssociative() {
     Type.init0(new HashMap<>());
-
+    BitsFun.make_new_fidx(BitsFun.ALL);
+    
     assertTrue(Type.check_startup());
   }
 }

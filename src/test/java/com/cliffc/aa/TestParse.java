@@ -130,7 +130,7 @@ public class TestParse {
   @Test public void testParse2() {
     Object dummy = Env.GVN; // Force class loading cycle
     // Anonymous function definition
-    test_isa("{x y -> x+y}", TypeFunPtr.make(BitsFun.make0(36),TypeTuple.SCALAR2,Type.SCALAR)); // {Scalar Scalar -> Scalar}
+    test_isa("{x y -> x+y}", TypeFunPtr.make(BitsFun.make0(35),TypeTuple.SCALAR2,Type.SCALAR)); // {Scalar Scalar -> Scalar}
     test("{5}()", TypeInt.con(5)); // No args nor -> required; this is simply a function returning 5, being executed
 
     // ID in different contexts; in general requires a new TypeVar per use; for
@@ -254,8 +254,8 @@ public class TestParse {
     test("(1,\"abc\").1", TypeMemPtr.ABCPTR);
 
     // Named type variables
-    test("gal=:flt"     , (tmap -> TypeFunPtr.make(BitsFun.make0(36),TypeTuple.make(TypeFlt.FLT64), TypeName.make("gal",tmap,TypeFlt.FLT64))));
-    test("gal=:flt; gal", (tmap -> TypeFunPtr.make(BitsFun.make0(36),TypeTuple.make(TypeFlt.FLT64), TypeName.make("gal",tmap,TypeFlt.FLT64))));
+    test("gal=:flt"     , (tmap -> TypeFunPtr.make(BitsFun.make0(35),TypeTuple.make(TypeFlt.FLT64), TypeName.make("gal",tmap,TypeFlt.FLT64))));
+    test("gal=:flt; gal", (tmap -> TypeFunPtr.make(BitsFun.make0(35),TypeTuple.make(TypeFlt.FLT64), TypeName.make("gal",tmap,TypeFlt.FLT64))));
     test    ("gal=:flt; 3==gal(2)+1", TypeInt.TRUE);
     test    ("gal=:flt; tank:gal = gal(2)", (tmap -> TypeName.make("gal",tmap,TypeInt.con(2))));
     // test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: figure out if free cast for bare constants?

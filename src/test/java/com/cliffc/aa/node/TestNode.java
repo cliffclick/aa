@@ -35,7 +35,12 @@ public class TestNode {
   private int[][] _min_subtypes;
 
   private NonBlockingHashMapLong<Type> _values;
-  private static long hash( long h ) { return h<<2; }
+  private static long hash( long h ) {
+    h ^= (h>>>20) ^ (h>>>12);
+    h ^= (h>>> 7) ^ (h>>> 4);
+    h += h<<7; // smear low bits up high, for hashcodes that only differ by 1
+    return h;
+  }
   private Type get( long h ) { return _values.get(hash(h)); }
   private Type put( long h, Type t ) { return _values.put(hash(h),t); }
 
@@ -353,7 +358,7 @@ public class TestNode {
       }
     }
     nprobes += nprobes1;
-    System.out.println("Total probes "+nprobes+" in "+(t2-t0)+"msecs, values="+_values.size());
+    System.out.println("Total probes "+nprobes+" in "+(t0-t2)+"msecs, values="+_values.size());
   }
 
   private void set_value_type(Node n, Type vn, long xx, long xxx, int idx, int yx, Type[] all ) {

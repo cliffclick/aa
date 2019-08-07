@@ -71,7 +71,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public static TypeFunPtr make_anon() { return make_new(TypeTuple.ALL_ARGS,Type.SCALAR); } // Make a new anonymous function ptr
 
   public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.NZERO,TypeTuple.ALL_ARGS,Type.SCALAR);
-  private static final TypeFunPtr TEST_INEG = make_new(TypeTuple.INT64,TypeInt.INT64);
+  private static final TypeFunPtr TEST_INEG = make(BitsFun.make0(2),TypeTuple.INT64,TypeInt.INT64);
   static final TypeFunPtr[] TYPES = new TypeFunPtr[]{GENERIC_FUNPTR,TEST_INEG};
   
   @Override protected TypeFunPtr xdual() { return new TypeFunPtr(_fidxs.dual(),_args.dual(),_ret.dual()); }
