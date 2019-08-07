@@ -126,7 +126,7 @@ public abstract class IntrinsicNode extends Node {
       TypeObj obj = ((TypeMem)mem).ld((TypeMemPtr)ptr);
       if( !obj.isa(from._obj) ) return to; // Inputs not correct from, and node is in-error
       if( obj.isa(from._obj.dual()) ) return to.dual();
-      // Obj needs to share a common name heirarchy (same Name-depth) as 'from'
+      // Obj needs to share a common name hierarchy (same Name-depth) as 'from'
       int fd = from._obj instanceof TypeName ? ((TypeName)from._obj)._depth : -1;
       int od =       obj instanceof TypeName ? ((TypeName)      obj)._depth : -1;
       if( fd != od ) return obj.above_center() ? to.dual() : to; // Name-depth does not match, node is in-error
