@@ -128,10 +128,16 @@ public abstract class PrimNode extends Node {
   public EpilogNode as_fun( GVNGCM gvn ) {
     FunNode  fun = ( FunNode) gvn.xform(new  FunNode(this)); // Points to ScopeNode only
     ParmNode rpc = (ParmNode) gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
-    ParmNode mem = (ParmNode) gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM     ),null));
     add_def(null);              // Control for the primitive in slot 0
     for( int i=0; i<_args.length; i++ )
       add_def(gvn.init(new ParmNode(i,_args[i],fun, gvn.con(_targs.at(i)),null)));
+    
+    // This is a funny short-cut approximation: really primitives should have a
+    // ParmNode of memory that merges all the incoming memories from all
+    // resolved call sites.  However, to speed up testing, we do not allow the
+    // primitive functions to be wired-up, and instead CallNode has special
+    // handling for the memory state of primitives.
+    Node mem = gvn.con(TypeMem.XMEM); // Primitives are pure
     return new EpilogNode(fun,mem,gvn.init(this),rpc,fun,null);
   }
 
@@ -171,6 +177,7 @@ static class ConvertInt64F64 extends PrimNode {
   @Override public Type apply( Type[] args ) { return TypeFlt.con((double)args[1].getl()); }
 }
 
+  // TODO: Type-check strptr input args
 static class ConvertStrStr extends PrimNode {
   ConvertStrStr() { super("str",PrimNode.ARGS1,TypeTuple.STRPTR,TypeMemPtr.STRPTR); }
   @Override public Node ideal(GVNGCM gvn) { return in(1); }

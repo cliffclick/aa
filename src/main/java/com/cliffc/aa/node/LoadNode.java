@@ -76,12 +76,14 @@ public class LoadNode extends Node {
     if( adr.is_forward_ref() ) return Type.SCALAR;
     if( !(adr instanceof TypeMemPtr) )
       return adr.above_center() ? Type.XSCALAR : Type.SCALAR;
+    TypeMemPtr tadr = (TypeMemPtr)adr;
 
     Type mem = gvn.type(mem());     // Memory
     if( !(mem instanceof TypeMem) ) // Nothing sane
       return mem.above_center() ? Type.XSCALAR : Type.SCALAR;
-    TypeObj obj = ((TypeMem)mem).ld((TypeMemPtr)adr);
-    Type base = obj.base();
+    TypeObj obj = ((TypeMem)mem).ld(tadr);
+    TypeObj obj2 = (TypeObj)obj.meet(tadr._obj); // Loaded obj is in expected type bounds of pointer?
+    Type base = obj2.base();
 
     if( base instanceof TypeStruct ) {
       TypeStruct ts = (TypeStruct)base;

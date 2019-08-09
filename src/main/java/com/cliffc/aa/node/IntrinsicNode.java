@@ -135,13 +135,7 @@ public abstract class IntrinsicNode extends Node {
       return ((TypeMemPtr)ptr).make(tnto);
     }
     @Override public String err(GVNGCM gvn) {
-      Type mem = gvn.type(mem());
       Type ptr = gvn.type(ptr());
-      if( ptr instanceof TypeMemPtr ) {
-        Type from = ((TypeMemPtr) ptr)._obj;
-        Type actual = ((TypeMem) mem).ld((TypeMemPtr) ptr);
-        assert actual.isa(from); // Since guarded by TypeNode, should never be an error
-      }
       return _badargs.typerr(ptr,_targs.at(0)); // Did not remove the aliasing
     }
   }

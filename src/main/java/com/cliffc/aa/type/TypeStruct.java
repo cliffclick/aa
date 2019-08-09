@@ -142,7 +142,10 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       if( !is_tup ) sb.p(_flds[i]);
       Type t = at(i);
       if( !is_tup && t != SCALAR ) sb.p(_finals[i]==0 ? ":=" : "=");
-      if( t != SCALAR ) sb.p(t==null ? "!" : t.str(dups));
+      if( t==null ) sb.p("!");  // Graceful with broken types
+      else if( t==SCALAR ) ;    // Default answer, do not print
+      else if( t instanceof TypeMemPtr ) sb.p(((TypeMemPtr)t)._aliases.toString()); // Do not recurse here, gets too big too fast
+      else sb.p(t.str(dups));   // Recursively print field type
       if( i<_flds.length-1 ) sb.p(',');
     }
     sb.p(!is_tup ? '}' : ')');

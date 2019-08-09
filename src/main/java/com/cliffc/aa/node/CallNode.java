@@ -127,6 +127,10 @@ public class CallNode extends Node {
     Node ctrl = epi.ctl();
     Node mem  = epi.mem();
     Node rez  = epi.val();
+    // This is due to a shortcut, where we do not modify the types of
+    // primitives so they can be reused in tests.  Instead, the primitive is
+    // "pure" and the memory is just a pass-through of the Call memory.
+    if( gvn.type(mem) == TypeMem.XMEM ) mem = mem();
     // Function is single-caller (me) and collapsing
     if( epi.is_copy(gvn,4) != null )
       return inline(gvn,ctrl,mem,rez);
@@ -164,9 +168,7 @@ public class CallNode extends Node {
       return inline(gvn,ctl(),mem(),rez);
 
     // Check for a 1-op body using only constants or parameters and no memory effects
-    boolean can_inline=!(rez instanceof ParmNode) &&
-            mem instanceof ParmNode && mem.in(0)==fun &&
-            ctrl==fun;
+    boolean can_inline=!(rez instanceof ParmNode) && mem==mem();
     for( Node parm : rez._defs )
       if( parm != null && parm != fun &&
           !(parm instanceof ParmNode && parm.in(0) == fun) &&
@@ -294,7 +296,12 @@ public class CallNode extends Node {
     Type    tmem =gvn.type(epi.mem());
     Type    tval =gvn.type(epi.val());
     if( tctrl == Type.XCTRL ) return TypeTuple.XCALL; // Function will never return
-    assert tctrl==Type.CTRL;      // Function returns?
+    if( tmem == TypeMem.XMEM ) // Primitives that never take memory?
+      // This is due to a shortcut, where we do not modify the types of
+      // primitives so they can be reused in tests.  Instead, the primitive is
+      // "pure" and the memory is just a pass-through of the Call memory.
+      tmem = gvn.type(mem());   // Use the call memory instead
+    assert tctrl==Type.CTRL;    // Function returns?
     FunNode fun = epi.fun();
     if( fun.is_forward_ref() ) return TypeTuple.make(tctrl,tmem,tval); // Forward refs do no argument checking
 
