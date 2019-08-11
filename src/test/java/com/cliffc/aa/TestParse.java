@@ -16,9 +16,6 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
     Object dummy = Env.GVN; // Force class loading cycle
-    test_ptr_isa("map={x -> x ? @{n=map(x.n),v=x.v*x.v} : 0};"+
-                    "map(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0,v=1.2},v=2.3},v=3.4},v=4.5})",
-            (alias) -> TypeMemPtr.make(alias,TypeStruct.make(FLDS,TypeMemPtr.STRUCT0,TypeFlt.con(20.25))));
 
     // A collection of tests which like to fail easily
     testerr ("Point=:@{x,y}; Point((0,1))", "*[9](nil,1) is not a *[2]@{x,y}",27);
@@ -227,7 +224,7 @@ public class TestParse {
     test_name("A= :(flt,int)", TypeFlt.FLT64,TypeInt.INT64);
     test_name("A= :(   ,int)", Type.SCALAR  ,TypeInt.INT64);
 
-    test_ptr("A= :(str?, int); A( \"abc\",2 )","A:(*[7]\"abc\",2)");
+    test_ptr("A= :(str?, int); A( \"abc\",2 )","A:(*[7],2)");
     testerr("A= :(str?, int)?","Named types are never nil",16);
   }
 
@@ -292,7 +289,7 @@ public class TestParse {
 
   @Test public void testParse6() {
     test_ptr("A= :(A?, int); A(0,2)","A:(nil,2)");
-    test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*[129]A:(nil,2),3)");
+    test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*[130],3)");
 
     // Building recursive types
     test_isa("A= :int; A(1)", (tmap -> TypeName.make("A",tmap,TypeInt.INT64)));

@@ -32,6 +32,14 @@ public class LoadNode extends Node {
   @Override public Node ideal(GVNGCM gvn) {
     Node ctrl = ctl();
     Node addr = adr();
+    // Loads against a NewNode cannot NPE, cannot fail, always return the input
+    if( addr instanceof NewNode ) {
+      NewNode nnn = (NewNode)addr;
+      int idx = nnn._ts.find(_fld,_fld_num);  // Find the named field
+      if( idx != -1 ) return nnn.fld(idx);    // Field value
+      // Broken load-vs-new
+    }
+    
     if( ctrl==null || gvn.type(ctrl)!=Type.CTRL )
       return null;              // Dead load, or a no-control-no-fail load
     if( addr.is_forward_ref() ) return null;

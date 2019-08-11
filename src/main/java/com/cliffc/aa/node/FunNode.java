@@ -12,10 +12,11 @@ import java.util.HashMap;
 import java.util.Map;
 
 // FunNode is a RegionNode; args point to all the known callers.  Zero slot is
-// null, same as a C2 Region.  Args 1+ point to callers; Arg 1 points to Scope
-// as the generic unknown worse-case caller; This can be removed once no more
-// callers can appear after parsing.  Each unique call-site to a function gets
-// a new path to the FunNode.
+// null, same as a C2 Region.  Args 1+ point to the callers control.  Before
+// GCP/opto arg 1 points to ALL_CTRL as the generic unknown worse-case caller.
+// ALL_CTRL is removed just prior to GCP, the precise call-graph is discovered,
+// and calls are directly wired to the FunNode as part of GCP.  After GPC the
+// call-graph is known precisely and is explicit in the graph.
 //
 // FunNodes are finite in count and are unique densely numbered, see BitsFun.
 //
@@ -29,13 +30,10 @@ import java.util.Map;
 //
 // The function body points to the FunNode and ParmNodes like C2.
 //
-// EpilogNode is different from C2s RetNode, to support precise function type
-// inference.  Epilogs point to the return control, memory, value, RPC and the
-// original FunNode; its type is a TypeFunPtr.  Pointing to the Epilog are
-// CallNodes with call-site indices; they carry the control- out of the
-// function for their call-site.  While there is a single Epilog for all
-// call-sites, Calls can "peek through" to see the function body learning the
-// incoming args come from a known input path.
+// RetNode points to the return control, memory, value and RPC.  EpilogNode
+// points to the RetNode and is typed as a TypeFunPtr.  The TFP is used as a
+// 1st-class function pointer and is carried through the program like a normal
+// value.  Direct Calls will point to the Epilog directly.
 // 
 public class FunNode extends RegionNode {
   public String _name;          // Optional for anon functions; can be set later via bind()

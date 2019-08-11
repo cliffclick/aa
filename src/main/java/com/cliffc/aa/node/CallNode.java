@@ -5,19 +5,48 @@ import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 
-// See FunNode.  Control is not required for an apply but inlining the function
-// body will require it; slot 0 is for Control.  Slot 1 is a function value - a
-// Node with a TypeFunPtr.  Slots 2+ are for args, with slot 2 for memory arg.
+// Call/apply node.
+//
+// Control is not required for an apply but inlining the function body will
+// require it; slot 0 is for Control.  Slot 1 is a function value - a Node
+// typed as a TypeFunPtr; can be an Epilog, an Unresolved, or e.g. a Phi or a
+// Load.  Slot 2 is for memory.  Slots 3+ are for other args.
 //
 // When the function simplifies to a single TypeFunPtr, the Call can inline.
 //
-// Call-inlining can happen anytime we have a known function pointer, and
-// might be several known function pointers - we are inlining the type analysis
-// and not the execution code.  For this kind of inlining we replace the
-// CallNode with a call-site specific Epilog, move all the CallNode args to
-// the ParmNodes just like the Fun/Parm is a Region/Phi.  The call-site index
-// is just like a ReturnPC value on a real machine; it dictates which of
-// several possible returns apply... and can be merged like a PhiNode
+// The Call-graph is lazily discovered during GCP/opto.  Before then all
+// functions are kept alive with a special control (see FunNode), and all Calls
+// are assumed to call all functions... unless their fun() input is a trival
+// function constant.
+//
+// As the Call-graph is discovered, Calls are "wired" to make it explicit: the
+// Call control is wired to the FunNode/Region; call args are wired directly to
+// function ParmNodes/PhiNode; the CallEpi is wired to the function RetNode.
+// After GCP/opto the call-graph is explicit and fairly precise.  The call-site
+// index is just like a ReturnPC value on a real machine; it dictates which of
+// several possible returns apply... and can be merged like a PhiNode.
+//
+// ASCIIGram: Vertical   lines are part of the original graph.
+//            Horizontal lines are lazily wired during GCP.
+//
+// TFP&Math
+//    |  arg0 arg1
+//    \  |   /           Other Calls
+//     | |  /             /  |  \
+//     v v v             /   |   \
+//      Call            /    |    \
+//        +--------->------>------>             Wired during GCP
+//                 FUN0   FUN1   FUN2
+//                 +--+   +--+   +--+
+//                 |  |   |  |   |  |
+//                 |  |   |  |   |  |
+//                 +--+   +--+   +--+
+//            /-----Ret<---Ret<---Ret--\        Wired during GCP
+//     CallEpi     Epi    Epi    Epi    Other
+//      CProj         \    |    /       CallEpis
+//      MProj          \   |   /
+//      DProj           TFP&Math
+
 
 public class CallNode extends Node {
   int _rpc;                 // Call-site return PC
@@ -293,26 +322,28 @@ public class CallNode extends Node {
     if( !(t instanceof TypeFunPtr) ) // Might be any function, returning anything
       return t.above_center() ? TypeTuple.XCALL : TypeTuple.CALL;
     Type    tctrl=gvn.type(epi.ctl());
-    Type    tmem =gvn.type(epi.mem());
+    Type    tmem =gvn.type(epi.mem()), failmem;
     Type    tval =gvn.type(epi.val());
     if( tctrl == Type.XCTRL ) return TypeTuple.XCALL; // Function will never return
     if( tmem == TypeMem.XMEM ) // Primitives that never take memory?
       // This is due to a shortcut, where we do not modify the types of
       // primitives so they can be reused in tests.  Instead, the primitive is
       // "pure" and the memory is just a pass-through of the Call memory.
-      tmem = gvn.type(mem());   // Use the call memory instead
+      failmem = tmem = gvn.type(mem());   // Use the call memory instead
+    else
+      failmem = TypeMem.MEM;
     assert tctrl==Type.CTRL;    // Function returns?
     FunNode fun = epi.fun();
     if( fun.is_forward_ref() ) return TypeTuple.make(tctrl,tmem,tval); // Forward refs do no argument checking
 
-    if( fun.nargs() != nargs() ) return TypeTuple.CALL; // Function not called, nothing to JOIN
+    if( fun.nargs() != nargs() ) return TypeTuple.make(Type.CTRL,failmem,Type.SCALAR); // Function not called, nothing to JOIN
     // Now do an arg-check
     TypeTuple formals = fun._tf._args; // Type of each argument
     for( int j=0; j<nargs(); j++ ) {
       Type actual = gvn.type(arg(j));
       Type formal = formals.at(j);
       if( !actual.isa(formal) ) // Actual is not a formal; call will not go thru
-        return TypeTuple.CALL;  // Argument not valid, nothing to JOIN
+        return TypeTuple.make(Type.CTRL,failmem,Type.SCALAR);  // Argument not valid, nothing to JOIN
     }
     return TypeTuple.make(tctrl,tmem,tval);
   }

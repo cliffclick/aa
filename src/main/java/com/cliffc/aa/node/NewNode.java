@@ -9,7 +9,7 @@ public class NewNode extends Node {
   // Unique alias class, one class per unique memory allocation site.
   // Only effectively-final, because the copy/clone sets a new alias value.
   private int _alias;           // Alias class
-  private TypeStruct _ts;       // Result struct (may be named)
+  TypeStruct _ts;               // Result struct (may be named)
   private TypeObj _obj;         // Optional named struct
   private boolean _did_meet;
   TypeMemPtr _ptr;              // Cached pointer-to-_obj
@@ -23,7 +23,7 @@ public class NewNode extends Node {
     _ptr = TypeMemPtr.make(_alias,_obj);
   }
   private int def_idx(int fld) { return fld+1; }
-  private Node fld(int fld) { return in(def_idx(fld)); }
+  Node fld(int fld) { return in(def_idx(fld)); }
   // Called when folding a Named Constructor into this allocation site
   void set_name( GVNGCM gvn, TypeName to ) {
     assert to.base().isa(_ts); // Cannot change the target fields, just the name
