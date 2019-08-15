@@ -133,6 +133,13 @@ public class GVNGCM {
     _vals.put(n,n);
     add_work(n);
   }
+  public void remove( Node n, int idx ) {
+    Node x = _vals.remove(n);
+    assert x == n || (x==null && _wrk_bits.get(n._uid));
+    n.remove(idx,this);
+    _vals.put(n,n);
+    add_work(n);
+  }
 
   // True if in _ts and _vals, false otherwise
   public boolean touched( Node n ) { return _ts.atX(n._uid)!=null; }
@@ -402,10 +409,8 @@ public class GVNGCM {
             if( use.all_type() != type(use)) // Minor optimization: If not already at bottom
               add_work(use); // Re-run users to check for progress
             // When new control paths appear on Regions, the Region stays the
-            // same type (Ctrl) but the Phis must merge new values.  Same for
-            // Epilogs; the output type does not change (TypeFunPtr) but
-            // CallNodes "peek" through the Epilog to get results.
-            if( use instanceof RegionNode || use instanceof EpilogNode )
+            // same type (Ctrl) but the Phis must merge new values.
+            if( use instanceof RegionNode )
               for( Node phi : use._uses ) if( phi != n ) add_work(phi);
           }
         }
@@ -429,8 +434,7 @@ public class GVNGCM {
 
     // Revisit the entire reachable program, as ideal calls may do something
     // with the maximally lifted types.
-    //FunNode frez = rez instanceof EpilogNode ? ((EpilogNode)rez).fun() : null;
-    walk_opt(rez/*,frez*/);
+    walk_opt(rez);
   }
 
   // Forward reachable walk, setting all_type.dual (except Start) and priming
@@ -462,7 +466,7 @@ public class GVNGCM {
       FunNode fun = (FunNode)n;
       EpilogNode epi = fun.epi();
       if( type(fun)==Type.CTRL && epi != null && !epi.is_forward_ref() ) {
-        if( type(epi.ctl()) != Type.CTRL ) throw AA.unimpl(); // never-return function (maybe never called?)
+        if( type(epi.ret().ctl()) != Type.CTRL ) throw AA.unimpl(); // never-return function (maybe never called?)
         TypeFunPtr tf = (TypeFunPtr)type(epi);
         if( tf != fun._tf &&    // can sharpen function return
             tf.isa(fun._tf) ) { // Only if sharpened (might not be true for errors)

@@ -51,7 +51,8 @@ public abstract class IntrinsicNewNode extends IntrinsicNode {
       add_def(gvn.xform(new ParmNode(i,_args[i],fun, gvn.con(_targs.at(i)),null)));
     Node ptr = gvn.xform(this); // Returns a TypeMemPtr to a TypeObj
     Node mmem = gvn.xform(new MemMergeNode(memp,ptr));
-    return new EpilogNode(fun,mmem,ptr,rpc,fun,null);
+    RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,ptr,rpc));
+    return new EpilogNode(fun,ret,null);
   }
   
   // --------------------------------------------------------------------------

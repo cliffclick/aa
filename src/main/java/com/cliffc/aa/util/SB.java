@@ -45,7 +45,6 @@ public final class SB {
   // Decrease indentation
   public SB di( int i) { _indent -= i; return this; }
 
-  // Copy indent from given string buffer
   public SB nl( ) { return p('\n'); }
 
   @Override public String toString() { return _sb.toString(); }

@@ -69,7 +69,8 @@ public abstract class IntrinsicNode extends Node {
     Node ptr = gvn.xform(new ParmNode( 0,"ptr",fun,gvn.con(from_ptr        ),null));
     Node cvt = gvn.xform(new ConvertPtrTypeName(to._name,from_ptr,to_ptr,badargs,mem,ptr));
     Node mmem= gvn.xform(new MemMergeNode(mem,cvt));
-    return new EpilogNode(fun,mmem,cvt,rpc,fun,null);
+    RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,cvt,rpc));
+    return new EpilogNode(fun,ret,null);
   }
 
   // Names an unaliased memory.  Needs to collapse away, or else an error.
@@ -157,7 +158,8 @@ public abstract class IntrinsicNode extends Node {
     }
     Node ptr = gvn.xform(nnn).keep();
     Node mmem= gvn.xform(new MemMergeNode(memp,ptr));
-    return new EpilogNode(fun,mmem,ptr.unhook(),rpc,fun,null);
+    RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,ptr.unhook(),rpc));
+    return new EpilogNode(fun,ret,null);
   }
 
 }

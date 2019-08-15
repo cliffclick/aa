@@ -1,6 +1,5 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.AA;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.BitsFun;
 import com.cliffc.aa.type.Type;
@@ -11,13 +10,15 @@ public class UnresolvedNode extends Node {
   @Override String xstr() {
     if( in(0) instanceof EpilogNode ) {
       EpilogNode epi = (EpilogNode)in(0);
-      if( epi.in(4) instanceof FunNode )
+      if( epi.in(0) instanceof FunNode )
         return "Unr:"+epi.fun()._name;
     }
     return "Unr???";
   }
   @Override public Node ideal(GVNGCM gvn) {
-    if( _defs._len < 2 ) throw AA.unimpl(); // Should collapse
+    if( _defs._len < 2 )
+      //throw AA.unimpl(); // Should collapse
+      System.out.println("Should collapse");
     return null;
   }
   @Override public Type value(GVNGCM gvn) {

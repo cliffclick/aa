@@ -138,7 +138,8 @@ public abstract class PrimNode extends Node {
     // primitive functions to be wired-up, and instead CallNode has special
     // handling for the memory state of primitives.
     Node mem = gvn.con(TypeMem.XMEM); // Primitives are pure
-    return new EpilogNode(fun,mem,gvn.init(this),rpc,fun,null);
+    RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mem,gvn.init(this),rpc));
+    return new EpilogNode(fun,ret,null);
   }
 
 

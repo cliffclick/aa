@@ -224,6 +224,7 @@ public class TestNode {
     // All the Nodes, all Values, all Types
     test1monotonic(new   CallNode(false,null,_ins[0],  unr  ,mem,_ins[2],_ins[3]));
     test1monotonic(new   CallNode(false,null,_ins[0],_ins[1],mem,_ins[2],_ins[3]));
+    test1monotonic(new CallEpiNode(_ins[0],_ins[1])); // CallNode, then some count of RetNode
     test1monotonic(new    ConNode<Type>(          TypeInt.FALSE));
     test1monotonic(new    ConNode<Type>(          TypeStr.ABC  ));
     test1monotonic(new    ConNode<Type>(          TypeFlt.FLT64));
@@ -234,8 +235,8 @@ public class TestNode {
     test1monotonic(new   CastNode(_ins[0],_ins[1],TypeMemPtr.STRPTR));
     test1monotonic(new   CastNode(_ins[0],_ins[1],TypeMemPtr.STR0));
     test1monotonic(new  CProjNode(_ins[0],0));
-    test1monotonic(new EpilogNode(_ins[0],mem,_ins[1],_ins[2],fun_forward_ref,"unknown_ref"));
-    test1monotonic(new EpilogNode(_ins[0],mem,_ins[1],_ins[2],fun_plus,"plus"));
+    test1monotonic(new EpilogNode(fun_forward_ref,_ins[1],"unknown_ref"));
+    test1monotonic(new EpilogNode(fun_plus       ,_ins[1],"plus"));
     test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  TypeInt.FALSE));
     test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  TypeStr.ABC  ));
     test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  TypeFlt.FLT64));
@@ -256,6 +257,7 @@ public class TestNode {
       test1monotonic_prim(prim);
     test1monotonic(new   ProjNode(_ins[0],1));
     test1monotonic(new RegionNode(null,_ins[1],_ins[2]));
+    test1monotonic(new    RetNode(_ins[0],mem,_ins[1],_ins[2])); // ctl,mem,val,rpc
     test1monotonic(new  StoreNode(_ins[0],_ins[1],_ins[2],_ins[3],0,null));
     //                  ScopeNode has no inputs, and value() call is monotonic
     //                    TmpNode has no inputs, and value() call is monotonic

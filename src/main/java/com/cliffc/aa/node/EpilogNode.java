@@ -6,22 +6,21 @@ import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
 
 // Tail end of functions.  Gathers:
-// - exit control; function may never exit or may be more than one
-// - exit memory; updated program state
-// - exit value;
-// - RPC - where to jump-to next; the Continuation
 // - The FunNode function header (quickly maps to SESE region header)
+// - The RetNode which gathers: control (function exits or not), memory, value, rpc
 public class EpilogNode extends Node {
-  FunNode _fun;             // Used when the function dies, keep the correct SESE region
-  TypeTuple _args;          // Used when the function dies, to keep a sane type
+  int _funuid;     // Used when the function dies, keep the correct SESE region
+  TypeFunPtr _tfp; // Used when the function dies, to keep a sane type
   private final String _unkref_err; // Unknown ref error (not really a forward ref)
-  public EpilogNode( Node ctrl, Node mem, Node val, Node rpc, FunNode fun, String unkref_err ) {
-    super(OP_EPI,ctrl,mem,val,rpc,fun);
-    _fun = fun;
+  public EpilogNode( FunNode fun, Node ret, String unkref_err ) {
+    super(OP_EPI,fun,ret);
+    _funuid = fun._uid;
+    _tfp = fun._tf;
     _unkref_err = unkref_err;
-    _args = fun._tf._args;
   }
-  private boolean is_copy() { return in(4) != _fun; }
+  // FunNode has disappeared/optimized away, so should this Epilog
+  @Override public Node is_copy(GVNGCM gvn, int idx) { return is_copy() ? (idx==0 ? ret().in(0) : in(idx)) : null; }
+  private boolean is_copy() { return in(0)._uid != _funuid; }
   @Override public Node ideal(GVNGCM gvn) {
     // If is_copy is true, CallNodes uses need to fold away as well
     if( is_copy() )
@@ -30,48 +29,29 @@ public class EpilogNode extends Node {
   }
 
   @Override public Type value(GVNGCM gvn) {
-    Type c = gvn.type(ctl()); // Function exits, or not
-    Type r = gvn.type(rpc()); // Caller; the Continuation
-    Type v = gvn.type(val());
-    assert gvn.type(mem()) instanceof TypeMem;
-    if( is_copy() )             // Function is dead, epilog is dying; type makes no sense
-      return TypeFunPtr.make(BitsFun.NZERO.dual(),_args,v);
-    FunNode fun = fun();
-    TypeFunPtr tfp = fun._tf;
-    if( is_forward_ref() ) return tfp.startype();
-    if(  c!=Type.CTRL          ) return c.above_center() ? tfp.dual() : tfp;
-    if( !(r instanceof TypeRPC)) return r.above_center() ? tfp.dual() : tfp;
-    v = v.bound(tfp._ret);      // Limit to sane results
-    return TypeFunPtr.make(tfp.fidxs(),tfp._args,v);
+    if( is_forward_ref() ) return _tfp.startype();
+    return _tfp;
   }
   @Override public String err(GVNGCM gvn) { return is_forward_ref() ? _unkref_err : null; }
 
-  // FunNode has disappeared/optimized away, so should this Epilog
-  @Override public Node is_copy(GVNGCM gvn, int idx) { return is_copy() ? in(idx) : null; }
-  
-  public    Node ctl() { return in(0); } // internal function control
-  public    Node mem() { return in(1); } // standard exit memory
-  public    Node val() { return in(2); } // standard exit value
-  public    Node rpc() { return in(3); } // Almost surely a PhiNode merging RPCs
-  public FunNode fun() { return _fun ; } // Function header
-  @Override String xstr() {              // Self short name
-    FunNode fun = is_copy() ? null : fun();
-    return fun==null ? "Epilog" : "Epi#"+fun._name;
-  }
-  int fidx() { return fun().fidx(); }
+  public FunNode fun() { return (FunNode)in(0) ; } // Function
+  public RetNode ret() { return (RetNode)in(1) ; } // Return
+  @Override String xstr() { return "Epi#"+_tfp;  }
+  int fidx() { return _tfp.fidx(); }
 
   // A forward-ref is an assumed unknown-function being used before being
   // declared.  Hence we want a callable function pointer, but have no defined
   // body (yet).  Make a function pointer that takes/ignores all args, and
   // returns a scalar.
   public static Node forward_ref( GVNGCM gvn, String name, Parse unkref ) {
-    FunNode fun = gvn.init(new FunNode(name));
     String referr = unkref.errMsg("Unknown ref '"+name+"'");
-    return new EpilogNode(fun,gvn.con(TypeMem.MEM),gvn.con(Type.SCALAR),gvn.con(TypeRPC.ALL_CALL),fun, referr);
+    FunNode fun = gvn.init(new FunNode(name));
+    RetNode ret = gvn.init(new RetNode(fun,gvn.con(TypeMem.MEM),gvn.con(Type.SCALAR),gvn.con(TypeRPC.ALL_CALL)));
+    return new EpilogNode(fun,ret, referr);
   }
 
   // True if this is a forward_ref
-  @Override public boolean is_forward_ref() { return in(0)== in(4) && !is_copy() && fun().is_forward_ref(); }
+  @Override public boolean is_forward_ref() { return _tfp.is_forward_ref(); }
 
   // 'this' is a forward reference, probably with multiple uses (and no inlined
   // callers).  Passed in the matching function definition, which is brand new
@@ -87,15 +67,15 @@ public class EpilogNode extends Node {
     dfun.bind(tok);
   }
 
-  @Override public TypeFunPtr all_type() { return fun()._tf; }
+  @Override public TypeFunPtr all_type() { return _tfp; }
   
   // True if epilog or function is uncalled (but possibly returned or stored as
   // a constant).  Such code is not searched for errors.
-  @Override boolean is_uncalled(GVNGCM gvn) { return !is_forward_ref() && gvn.type(rpc())== TypeRPC.ALL_CALL; }
+  @Override boolean is_uncalled(GVNGCM gvn) { return !is_forward_ref() && gvn.type(ret().rpc())== TypeRPC.ALL_CALL; }
   
   // Return the op_prec of the returned value.  Not sensible except when called
   // on primitives.
   @Override public byte op_prec() {
-    return val()._uid < GVNGCM._INIT0_CNT ? val().op_prec() : -1;
+    return ret().val()._uid < GVNGCM._INIT0_CNT ? ret().val().op_prec() : -1;
   }
 }

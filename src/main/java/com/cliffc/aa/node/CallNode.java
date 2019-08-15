@@ -60,7 +60,7 @@ public class CallNode extends Node {
     _badargs = badargs;
   }
 
-  String xstr() { return "Call#"+_rpc; } // Self short name
+  String xstr() { return (_inlined ? "_c" : "C")+"all#"+_rpc; } // Self short name
   String  str() { return xstr(); }       // Inline short name
 
   // Inline the CallNode
@@ -92,6 +92,10 @@ public class CallNode extends Node {
   public BitsFun fidxs(GVNGCM gvn) {
     Type tf = gvn.type(fun());
     return tf instanceof TypeFunPtr ? ((TypeFunPtr)tf).fidxs() : null;
+  }
+  public CallEpiNode callepi() {
+    assert _uses._len==1;
+    return (CallEpiNode)_uses.at(0);
   }
 
   // Clones during inlining all become unique new call sites
@@ -153,16 +157,21 @@ public class CallNode extends Node {
       return null;
     // From here on down we know the exact function being called
     EpilogNode epi = (EpilogNode)unk;
-    Node ctrl = epi.ctl();
-    Node mem  = epi.mem();
-    Node rez  = epi.val();
+    RetNode ret = epi.ret();
+    Node ctrl = ret.ctl();
+    Node mem  = ret.mem();
+    Node rez  = ret.val();
     // This is due to a shortcut, where we do not modify the types of
     // primitives so they can be reused in tests.  Instead, the primitive is
     // "pure" and the memory is just a pass-through of the Call memory.
     if( gvn.type(mem) == TypeMem.XMEM ) mem = mem();
     // Function is single-caller (me) and collapsing
-    if( epi.is_copy(gvn,4) != null )
-      return inline(gvn,ctrl,mem,rez);
+    if( epi.is_copy(gvn,0) != null ) {
+      CallEpiNode cepi = callepi();
+      assert cepi._defs._len==2; // [0] for the call, and [1] for the only return
+      gvn.set_def_reg(cepi,1,null);  // Remove the CallEpi return path
+      return inline(gvn, ctrl, mem, rez); // Rewire all function exits as the Call result
+    }
 
     // Function is well-formed
     FunNode fun = epi.fun();
@@ -223,6 +232,8 @@ public class CallNode extends Node {
   // TODO: Leaves the Call in the graph - making the graph "a little odd" - double
   // CTRL users - once for the call, and once for the function being called.
   Node wire( GVNGCM gvn, FunNode fun ) {
+    if( _keep > 0 ) { gvn.add_work(this); return null; } // Do not wire before CallEpi is built in parser.
+    
     Node ctrl = ctl();
     for( int i=1; i<fun._defs.len(); i++ )
       if( fun.in(i)==ctrl ) // Look for same control
@@ -238,6 +249,10 @@ public class CallNode extends Node {
           ((ParmNode)arg)._idx >= nargs() )
         return null;            // Wrong arg-count
 
+    // Check for a sane setup
+    assert gvn.touched(fun);
+    CallEpiNode cepi = callepi();
+    
     // Add an input path to all incoming arg ParmNodes from the Call.  Cannot
     // assert finding all args, because dead args may already be removed - and
     // so there's no Parm/Phi to attach the incoming arg to.
@@ -252,8 +267,9 @@ public class CallNode extends Node {
     // Add Control for this path.  Sometimes called from fun.Ideal() (because
     // inlining), sometimes called by Epilog when it discovers all callers
     // known.
-    assert gvn.touched(fun);
     gvn.add_def(fun,ctrl);
+    // Add the CallEpi hook
+    gvn.add_def(cepi,fun.epi().ret());
     return this;
   }
 
@@ -321,9 +337,10 @@ public class CallNode extends Node {
     Type t = gvn.type(epi);
     if( !(t instanceof TypeFunPtr) ) // Might be any function, returning anything
       return t.above_center() ? TypeTuple.XCALL : TypeTuple.CALL;
-    Type    tctrl=gvn.type(epi.ctl());
-    Type    tmem =gvn.type(epi.mem()), failmem;
-    Type    tval =gvn.type(epi.val());
+    TypeTuple tret = (TypeTuple)gvn.type(epi.ret());
+    Type    tctrl=tret.at(0);
+    Type    tmem =tret.at(1), failmem;
+    Type    tval =tret.at(2);
     if( tctrl == Type.XCTRL ) return TypeTuple.XCALL; // Function will never return
     if( tmem == TypeMem.XMEM ) // Primitives that never take memory?
       // This is due to a shortcut, where we do not modify the types of

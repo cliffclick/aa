@@ -7,7 +7,7 @@ import com.cliffc.aa.type.Type;
 public final class ConNode<T extends Type> extends Node {
   T _t;
   public ConNode( T t ) { super(OP_CON,Env.START); _t=t; }
-  @Override String xstr() { return Env.ALL_CTRL == this ? "ALL_CTRL" : _t.toString(); }
+  @Override String xstr() { return Env.ALL_CTRL == this ? "ALL_CTL" : _t.toString(); }
   @Override public Node ideal(GVNGCM gvn) { return null; }
   @Override public Type value(GVNGCM gvn) { return _t; }
   @Override public Type all_type() { return _t; }

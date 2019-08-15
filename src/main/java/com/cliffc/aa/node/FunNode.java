@@ -81,10 +81,10 @@ public class FunNode extends RegionNode {
     }
   }
 
-  // Supposed to be the self SHORT name, but include full signature.
-  @Override public String xstr() {  return _tf.str(null); }
-  // Inline name
-  @Override String str() { return _name==null ? "fun"+fidx() : _name; }
+  // Inline longer info
+  @Override public String str() {  return _tf.str(null); }
+  // Short self name
+  @Override String xstr() { return _name==null ? "fun"+fidx() : _name; }
   // Debug only: make an attempt to bind name to a function
   public void bind( String tok ) {
     assert _name==null || _name.equals(tok); // Attempt to double-bind
@@ -266,7 +266,7 @@ public class FunNode extends RegionNode {
     FunNode fun = new FunNode(_name,TypeFunPtr.make(BitsFun.make_new_fidx(fidx),args,_tf._ret));
     // Renumber the original as well; the original _fidx is now a *class* of 2
     // fidxs.  Each FunNode fidx is only ever a constant.
-    _tf = _tf.make_new_fidx(fidx);
+    _tf = epi()._tfp = _tf.make_new_fidx(fidx);
     FUNS.setX(fidx(),this);     // Track FunNode by fidx
     // Look in remaining paths and decide if they split or stay
     Node xctrl = gvn.con(Type.XCTRL);
@@ -299,18 +299,18 @@ public class FunNode extends RegionNode {
       int op = n._op;           // opcode
       if( op == OP_FUN  && n       != this ) continue; // Call to other function, not part of inlining
       if( op == OP_PARM && n.in(0) != this ) continue; // Arg  to other function, not part of inlining
-      if( n != epi )            // Except for the Epilog
+      if( n != epi && n != epi.ret() )  // Except for the Epilog and Ret
         work.addAll(n._uses);   // Visit all uses also
       if( op == OP_CALL ) {     // Call-of-primitive?
         Node n1 = ((CallNode)n).fun();
         Node n2 = n1 instanceof UnresolvedNode ? n1.in(0) : n1;
         if( n2 instanceof EpilogNode &&
-            ((EpilogNode)n2).val() instanceof PrimNode )
+            ((EpilogNode)n2).ret().val() instanceof PrimNode )
           op = OP_PRIM;         // Treat as primitive for inlining purposes
       }
       cnts[op]++;               // Histogram ops
     }
-    assert cnts[OP_FUN]==1;
+    assert cnts[OP_FUN]==1 && cnts[OP_RET]==1;
     assert cnts[OP_SCOPE]==0 && cnts[OP_TMP]==0;
     assert cnts[OP_REGION] <= cnts[OP_IF] || cnts[OP_EPI]>1;
 
@@ -368,14 +368,14 @@ public class FunNode extends RegionNode {
       if( op == OP_PARM && n.in(0) != this ) continue; // Arg  to other function, not part of inlining
       assert n._uid < fun._uid; // Recursive calls will call 'fun' directly
       assert n.in(0)!=epi && (n._defs._len<=1 || n.in(1)!= epi || n instanceof CallNode); // Do not walk past epilog
-      if( n != epi )           // Except for the Epilog
+      if( n != epi && n != epi.ret()) // Except for the Epilog and Ret
         work.addAll(n._uses);  // Visit all uses also
       map.put(n,n.copy(gvn));  // Make a blank copy with no edges and map from old to new
     }
     // Correct new function sig
     EpilogNode newepi = (EpilogNode)map.get(epi);
-    newepi._fun = fun;
-    newepi._args = fun._tf._args;
+    newepi._funuid = fun._uid;
+    newepi._tfp = fun._tf;
     
     // Fill in edges.  New Nodes point to New instead of Old; everybody
     // shares old nodes not in the function (and not cloned).  The
@@ -400,10 +400,8 @@ public class FunNode extends RegionNode {
         if( idx >= 0 ) ((ParmNode)c)._default_type = fun.targ(idx);
       } else if( n != this ) {  // Interior nodes
         for( Node def : n._defs ) {
-          // Map old to new, except if using the old epilog in a recursive fcn,
-          // need to stay pointing to the old fcn.  The epilog choices will be
-          // updated further below.
-          Node newdef = def==epi ? def : map.get(def);
+          // Map old to new.  The epilog choices will be updated further below.
+          Node newdef = map.get(def);
           c.add_def(newdef==null ? def : newdef);
         }
       }
@@ -421,65 +419,86 @@ public class FunNode extends RegionNode {
       Node nn = e.getValue();         // New node
       Type ot = gvn.type(e.getKey()); // Generally just copy type from original nodes
       if( nn instanceof ParmNode && ((ParmNode)nn)._idx==-1 )
-        ot = nn.all_type();     // Except the RPC, which has new callers
+        ot = nn.all_type();     // Except the new RPC, which has new callers
       else if( nn instanceof EpilogNode )
-        ot = fun._tf;           // Except the Epilog, which matches a new function
+        ot = fun._tf;           // Except the new Epilog, which matches a new function
       gvn.rereg(nn,ot);
     }
     assert !epi.is_dead();      // Not expecting this to be dead already
+
     
-    // Repoint all Calls uses of the original Epilog to an Unresolved choice of
+    // Repoint all uses of the original Epilog to an Unresolved choice of
     // the old and new functions and let the Calls resolve individually.
+    epi.keep();  newepi.keep();
     if( _tf._args != fun._tf._args ) { // Split-for-type, possible many future callers
+      
       UnresolvedNode new_unr = new UnresolvedNode();
-      new_unr.add_def(epi);
       gvn.init(new_unr);
     
-      // Direct all Call uses to the new Unresolved
-      for( int i=0; i<epi._uses._len; i++ ) {
-        Node call = epi._uses.at(i);
-        if( call instanceof CallNode && ((CallNode)call).fun()==epi ) {
-          ((CallNode)call).set_fun_reg(new_unr,gvn);// As part of removing call->epi edge, compress epi uses
-          i--;             // Rerun set point in epi use list after compression
+      unwire_newepi(gvn,fun,newepi,new_unr);
+      
+      // Direct all uses of the old Epilog to the new Unresolved choice.
+      while( epi._uses._len > 0 ) {
+        Node euse = epi._uses.at(0);
+        // If the use is a wired call, rewrite it.
+        int idx = euse._defs.find(epi);
+        if( euse instanceof CallNode ) {
+          // If the call is to the generic function, it should not be wired
+          // now.  If it is to the new function, is should be wired to the new
+          // function.
+          CallEpiNode cepi = ((CallNode)euse).callepi();
+          boolean call_to_unresolved = fun._defs.find(euse.in(0)) == -1;
+          if( call_to_unresolved ) cepi.unwire( gvn, epi);
+          else                     cepi.rewire( gvn, epi, newepi);
+          gvn.set_def_reg(euse,idx,call_to_unresolved ? new_unr : newepi);
+        } else {                // Replace use of epi with the new unresolved
+          gvn.set_def_reg(euse,idx,new_unr);
         }
       }
+      
       // Include the new Epilog in all Unresolved
+      gvn.add_def(new_unr,epi);
       for( int i=0; i<epi._uses._len; i++ ) {
         Node unr = epi._uses.at(i);
         assert !(unr instanceof CallNode);
         if( unr instanceof UnresolvedNode )
           gvn.add_def(unr,newepi);
-      }      
+      }
     
     } else {                    // Split-for-size and only 1 caller
+
+      unwire_newepi(gvn,fun,newepi,epi);
+      
       // Single path being inlined
       int path_being_inlined=-1;
       for( int j=1; j<_defs._len; j++ )
         if( fun.in(j)!=any )
           path_being_inlined = j;
     
-      // The old Epilog has a set of CallNodes, but only the one in #path_being_inlined is
-      // being split-for-size.  Repoint the one Call._rpc matching rpc_parm
-      // in(path_being_inlined) to new_epi.
+      // The old Epilog has a set of uses, but only the Call in
+      // #path_being_inlined is being split-for-size.  Repoint the one
+      // Call._rpc matching rpc_parm in(path_being_inlined) to new_epi.
       int rpc = ((TypeRPC)gvn.type(rpc_parm.in(path_being_inlined))).rpc();
       for( Node use : epi._uses ) {
+        CallNode call;
         if( use instanceof CallNode && 
-            ((CallNode)use)._rpc == rpc ) {
-          ((CallNode)use).set_fun_reg(newepi,gvn);
-          break;
+            (call=(CallNode)use)._rpc == rpc ) {
+          call.callepi().rewire(gvn,epi,newepi);
+          call.set_fun_reg(newepi,gvn);
         }
       }
     }
+    epi.unkeep(gvn);  newepi.unkeep(gvn);
 
     // There are new some cloned new Calls; these point to some old functions
     // which might believe "all_calls_known" - which excludes these new Calls.
     // The situation is still theoretically correct: the original Calls all
     // split into 2 non-overlapping sets: calls from the new Calls and those
     // left behind coming from the old Calls.  Update the old functions with
-    // these new Calls as-needed.  If has_unknown_callers(), the old
-    // function is prepared to handle unexpected new Calls already.  If its
-    // not true, then immediately wire up the new Call, add the new RPC input and
-    // correct all types.
+    // these new Calls as-needed.  If has_unknown_callers(), the old function
+    // is prepared to handle unexpected new Calls already.  If its not true,
+    // then immediately wire up the new Call, add the new RPC input and correct
+    // all types.
     if( !is_dead() && !has_unknown_callers() ) {
       for( Node c : map.values() ) {
         if( c instanceof CallNode ) { // For all cloned Calls
@@ -492,7 +511,7 @@ public class FunNode extends RegionNode {
               Node x = ((CallNode)c).wire(gvn,oldfun);
               assert x != null;
               ParmNode rpc = oldfun.rpc();
-              if( rpc != null ) // Can be null there is a single return point, which got constant-folded
+              if( rpc != null ) // Can be null if there is a single return point, which got constant-folded
                 gvn.setype(rpc,rpc.value(gvn));
               EpilogNode oldepi = oldfun.epi();
               gvn.setype(oldepi,oldepi.value(gvn));
@@ -507,6 +526,29 @@ public class FunNode extends RegionNode {
     return is_dead() ? fun : this;
   }
 
+  // Uses in the old function that pointed to the old Epilog (e.g.  recursion
+  // or storing the self-function pointer) got remapped to the new Epilog.
+  // For single-use splits everything in the new function should remain
+  // pointing to the old function (basically we peeled one execution).
+  // For multi-use type splits, everything in the new function needs to be
+  // re-resolved because the new calls are all wired up to the old function.
+  private void unwire_newepi(GVNGCM gvn, FunNode fun, EpilogNode newepi, Node replace) {
+    while( newepi._uses._len > 0 ) {
+      Node euse = newepi._uses.at(0);
+      // If the use is a wired call, rewrite it.
+      if( euse instanceof CallNode ) {
+        // If the call is to the generic function, it should not be wired
+        // now.  If it is to the new function, is should be wired to the new
+        // function.
+        assert fun._defs.find(euse.in(0)) == -1;
+        CallEpiNode cepi = ((CallNode)euse).callepi();
+        cepi.unwire( gvn, newepi);
+      }
+      int idx = euse._defs.find(newepi);
+      gvn.set_def_reg(euse,idx,replace);
+    }
+  }
+      
   // Compute value from inputs.  Simple meet over inputs.
   @Override public Type value(GVNGCM gvn) {
     // Will be an error eventually, but act like its executed so the trailing

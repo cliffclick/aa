@@ -79,6 +79,7 @@ public class Parse {
     _gvn = Env.GVN;      // Pessimistic during parsing
   }
   String dump() { return _e._scope.dump(99,_gvn); }// debugging hook
+  String dumprpo() { return Env.START.dumprpo(_gvn,false); }// debugging hook
 
   // Parse the string in the given lookup context, and return an executable
   // program.  Called in a partial-program context; passed in an existing
@@ -581,7 +582,8 @@ public class Parse {
       Node rez = stmts();       // Parse function body
       if( rez == null ) rez = err_ctrl2("Missing function body");
       require('}');             //
-      Node epi = gvn(new EpilogNode(ctrl(),mem(),rez,rpc,fun,null));
+      RetNode ret = (RetNode)gvn(new RetNode(ctrl(),mem(),rez,rpc));
+      Node epi = gvn(new EpilogNode(fun,ret,null));
       _e = _e._par;             // Pop nested environment
       set_ctrl(old_ctrl);       // Back to the pre-function-def control
       set_mem (old_mem );
@@ -884,12 +886,14 @@ public class Parse {
 
   public Node lookup( String tok ) { return _e.lookup(tok); }
 
-  private Node do_call( Node call0 ) {
-    Node call = gvn(call0).keep();
-    set_ctrl(  gvn(new CProjNode(call,0)));
-    set_mem (  gvn(new MProjNode(call,1)));
-    Node ret = gvn(new  ProjNode(call,2)).keep();
+  private Node do_call( CallNode call0 ) {
+    Node call = gvn(call0.keep());
+    Node callepi = gvn(new CallEpiNode(call)).keep();
+    set_ctrl(  gvn(new CProjNode(callepi,0)));
+    set_mem (  gvn(new MProjNode(callepi,1)));
+    Node ret = gvn(new  ProjNode(callepi,2)).keep();
     call.unkeep(_gvn);
+    callepi.unkeep(_gvn);
     return ret.unhook();
   }
 

@@ -10,32 +10,33 @@ import java.util.function.Predicate;
 
 // Sea-of-Nodes
 public abstract class Node implements Cloneable {
-  static final byte OP_CALL  = 1;
-  static final byte OP_CAST  = 2;
-  static final byte OP_CON   = 3;
-  static final byte OP_EPI   = 4;
-  static final byte OP_ERR   = 5;
-  static final byte OP_FUN   = 6;
-  static final byte OP_IF    = 7;
-  static final byte OP_LIBCALL=8;
-  static final byte OP_LOAD  = 9;
-  static final byte OP_MERGE =10;
-  static final byte OP_NEW   =11;
-  static final byte OP_PARM  =12;
-  static final byte OP_PHI   =13;
-  static final byte OP_PRIM  =14;
-  static final byte OP_PROJ  =15;
-  static final byte OP_REGION=16;
-  static final byte OP_SCOPE =17;
-  static final byte OP_SPLIT =18;
-  static final byte OP_START =19;
-  static final byte OP_STORE =20;
-  static final byte OP_TMP   =21;
-  static final byte OP_TYPE  =22;
-  static final byte OP_UNR   =23;
-  static final byte OP_MAX   =24;
+  static final byte OP_CALL   = 1;
+  static final byte OP_CALLEPI= 2;
+  static final byte OP_CAST   = 3;
+  static final byte OP_CON    = 4;
+  static final byte OP_EPI    = 5;
+  static final byte OP_ERR    = 6;
+  static final byte OP_FUN    = 7;
+  static final byte OP_IF     = 8;
+  static final byte OP_LIBCALL= 9;
+  static final byte OP_LOAD   =10;
+  static final byte OP_MERGE  =11;
+  static final byte OP_NEW    =12;
+  static final byte OP_PARM   =13;
+  static final byte OP_PHI    =14;
+  static final byte OP_PRIM   =15;
+  static final byte OP_PROJ   =16;
+  static final byte OP_REGION =17;
+  static final byte OP_RET    =18;
+  static final byte OP_SCOPE  =19;
+  static final byte OP_START  =20;
+  static final byte OP_STORE  =21;
+  static final byte OP_TMP    =22;
+  static final byte OP_TYPE   =23;
+  static final byte OP_UNR    =24;
+  static final byte OP_MAX    =25;
   
-  private static final String[] STRS = new String[] { null, "Call", "Cast", "Con", "Epi", "Err", "Fun", "If", "LibCall", "Load", "Merge", "New", "Parm", "Phi", "Prim", "Proj", "Region", "Scope", "Split", "Start", "Store", "Tmp", "Type", "Unresolved" };
+  private static final String[] STRS = new String[] { null, "Call", "CallEpi", "Cast", "Con", "Epi", "Err", "Fun", "If", "LibCall", "Load", "Merge", "New", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Scope", "Start", "Store", "Tmp", "Type", "Unresolved" };
 
   public int _uid;  // Unique ID, will have gaps, used to give a dense numbering to nodes
   final byte _op;   // Opcode (besides the object class), used to avoid v-calls in some places
@@ -44,7 +45,8 @@ public abstract class Node implements Cloneable {
   // Defs.  Generally fixed length, ordered, nulls allowed, no unused trailing space.  Zero is Control.
   public Ary<Node> _defs;
   // Add def/use edge
-  public Node add_def(Node n) { _defs.add(n); if( n!=null ) n._uses.add(this); return n; }
+  public Node add_def(Node n) { _defs.add(n); if( n!=null )
+    n._uses.add(this); return n; }
   public Node in( int i) { return _defs.at(i); }
   // Replace def/use edge
   public Node set_def( int idx, Node n, GVNGCM gvn ) {
@@ -104,50 +106,60 @@ public abstract class Node implements Cloneable {
   }
   
   // Short string name
-  String xstr() { return STRS[_op]; } // Self   short name
-  String  str() { return xstr(); }    // Inline short name
+  String xstr() { return STRS[_op]; } // Self   short  name
+  String  str() { return xstr(); }    // Inline longer name
   @Override public String toString() { return dump(0,new SB(),null).toString(); }
   public String dump( int max ) { return dump(max,null); }
-  public String dump( int max, GVNGCM gvn ) { return dump(0, new SB(),max,new BitSet(),gvn).toString();  }
+  public String dump( int max, GVNGCM gvn ) { return dump(max,gvn,_uid<GVNGCM._INIT0_CNT);  }
+  public String dump( int max, GVNGCM gvn, boolean prims ) { return dump(0, new SB(),max,new BitSet(),gvn,prims).toString();  }
   private SB dump( int d, SB sb, GVNGCM gvn ) {
-    sb.i(d).p(_uid).p(':').p(xstr()).p(": ");
+    String xs = String.format("%4d: %-7.7s ",_uid,xstr());
+    sb.i(d).p(xs);
     if( is_dead() ) return sb.p("DEAD");
-    for( Node n : _defs ) (n == null ? sb.p('_') : n.str(sb)).p(' ');
+    for( Node n : _defs ) sb.p(n == null ? "____ " : String.format("%4d ",n._uid));
     sb.p(" [[");
-    for( Node n : _uses ) sb.p(n._uid).p(' ');
+    for( Node n : _uses ) sb.p(String.format("%4d ",n._uid));
     sb.p("]]  ");
+    sb.p(str());
     if( gvn != null ) {
-      Type t = gvn.type(this);
-      sb.p(t==null ? "null" : t.toString());
+      Type t = gvn.self_type(this);
+      sb.s().p(t==null ? "----" : t.toString());
     }
     return sb;
   }
+  private void dump(int d, SB sb, BitSet bs, GVNGCM gvn) {
+    if( bs.get(_uid) ) return;
+    bs.set(_uid);
+    dump(d,sb,gvn).nl();
+  }
   private SB str(SB sb) { return sb.p(_uid).p(':').p(str()).p(' '); }
   // Recursively print, up to depth
-  private SB dump( int d, SB sb, int max, BitSet bs, GVNGCM gvn ) {
+  private SB dump( int d, SB sb, int max, BitSet bs, GVNGCM gvn, boolean prims ) {
     if( bs.get(_uid) ) return sb;
     bs.set(_uid);
     if( d < max ) {    // Limit at depth
       // Print parser scopes first (deepest)
-      for( Node n : _defs ) if( n instanceof ScopeNode ) n.dump(d+1,sb,max,bs,gvn);
+      for( Node n : _defs ) if( n instanceof ScopeNode ) n.dump(d+1,sb,max,bs,gvn,prims);
       // Print constants early
-      for( Node n : _defs ) if( n instanceof ConNode ) n.dump(d+1,sb,max,bs,gvn);
+      for( Node n : _defs ) if( n instanceof ConNode ) n.dump(d+1,sb,max,bs,gvn,prims);
       // Do not recursively print root Scope, nor Unresolved of primitives.
       // These are too common, and uninteresting.
-      for( Node n : _defs ) if( n != null && n._uid < GVNGCM._INIT0_CNT ) bs.set(n._uid);
+      for( Node n : _defs ) if( n != null && (!prims && n._uid < GVNGCM._INIT0_CNT) ) bs.set(n._uid);
       // Recursively print most of the rest, just not the multi-node combos
-      for( Node n : _defs ) if( n != null && !n.is_multi_head() && !n.is_multi_tail() ) n.dump(d+1,sb,max,bs,gvn);
+      for( Node n : _defs ) if( n != null && !n.is_multi_head() && !n.is_multi_tail() ) n.dump(d+1,sb,max,bs,gvn,prims);
       // Print anything not yet printed, including multi-node combos
-      for( Node n : _defs ) if( n != null ) n.dump(d+1,sb,max,bs,gvn);
+      for( Node n : _defs ) if( n != null ) n.dump(d+1,sb,max,bs,gvn,prims);
     }
     // Print multi-node combos all-at-once, including all tails even if they
     // exceed the depth limit by 1.
     Node x = is_multi_tail() ? in(0) : this;
     if( x != null && x.is_multi_head() ) {
       int dx = d+(x==this?0:1);
-      // Print all tails, all at once - nothing recursively below the tail
-      for( Node n : x._uses ) if( n.is_multi_tail() )
-        for( Node m : n._defs ) m.dump(dx+1,sb,max,bs,gvn);
+      // Print all tails paths, all at once - nothing recursively below the tail
+      for( Node n : x._uses )
+        if( n.is_multi_tail() )
+          for( Node m : n._defs )
+            m.dump(dx+1,sb,max,bs,gvn,prims);
       if( x==this ) bs.clear(_uid); // Reset for self, so prints right now
       x.dump(dx,sb,bs,gvn); // Conditionally print head of combo
       // Print all combo tails, if not already printed
@@ -158,13 +170,37 @@ public abstract class Node implements Cloneable {
       return dump(d,sb,gvn).nl();
     }
   }
-  private void dump(int d, SB sb, BitSet bs, GVNGCM gvn) {
-    if( bs.get(_uid) ) return;
-    bs.set(_uid);
-    dump(d,sb,gvn).nl();
+  private boolean is_multi_head() { return _op==OP_CALLEPI || _op==OP_FUN || _op==OP_IF || _op==OP_LIBCALL || _op==OP_NEW || _op==OP_REGION || _op==OP_START; }
+  private boolean is_multi_tail() { return _op==OP_PARM || _op==OP_PHI || _op==OP_PROJ ; }
+
+  public String dumprpo( GVNGCM gvn, boolean prims ) {
+    Ary<Node> nodes = new Ary<>(new Node[1],0);
+    postorder(nodes,new BitSet());
+    // Dump in reverse post order
+    SB sb = new SB();
+    for( int i=nodes._len-1; i>=0; i-- ) {
+      Node n = nodes.at(i);
+      if( n._uid <= Env.ALL_CTRL._uid || n._uid >= GVNGCM._INIT0_CNT || prims )
+        n.dump(0,sb,gvn).nl();
+    }
+    return sb.toString();
   }
-  private boolean is_multi_head() { return _op==OP_CALL || _op==OP_FUN || _op==OP_IF || _op==OP_LIBCALL || _op==OP_NEW || _op==OP_REGION || _op==OP_SCOPE || _op==OP_START || _op==OP_TMP; }
-  private boolean is_multi_tail() { return _op==OP_PARM || _op==OP_PHI    || _op==OP_PROJ ; }
+  private void postorder( Ary<Node> nodes, BitSet bs ) {
+    bs.set(_uid);
+    for( Node use : _uses ) {
+      //if color.get(succ) == 'grey':
+      //  print 'CYCLE: {0}-->{1}'.format(node, succ)
+      if( !bs.get(use._uid) )
+        use.postorder(nodes,bs);
+      //color[node] = 'black'
+    }
+    // Slight PO tweak: heads and tails together.
+    if( is_multi_head() )
+      for( Node use : _uses )
+        if( use.is_multi_tail() )
+          nodes.push(use);
+    if( !is_multi_tail() ) nodes.push(this);
+  }
   
   public  Node find( int uid ) { return find(uid,new BitSet()); }
   private Node find( int uid, BitSet bs ) {
