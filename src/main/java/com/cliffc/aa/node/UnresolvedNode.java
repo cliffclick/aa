@@ -8,8 +8,8 @@ import com.cliffc.aa.type.TypeFunPtr;
 public class UnresolvedNode extends Node {
   UnresolvedNode( Node... funs ) { super(OP_UNR,funs); }
   @Override String xstr() {
-    if( in(0) instanceof EpilogNode ) {
-      EpilogNode epi = (EpilogNode)in(0);
+    if( in(0) instanceof QNode ) {
+      QNode epi = (QNode)in(0);
       if( epi.in(0) instanceof FunNode )
         return "Unr:"+epi.fun()._name;
     }
@@ -30,14 +30,14 @@ public class UnresolvedNode extends Node {
   BitsFun fidxs() {
     int[] bits = new int[_defs._len];
     for( int i=0; i<_defs._len; i++ )
-      bits[i] = ((EpilogNode)in(i)).fidx();
+      bits[i] = ((QNode)in(i)).fidx();
     return BitsFun.make0(bits).dual();
   }
   // Filter out all the wrong-arg-count functions
   public Node filter( GVNGCM gvn, int nargs ) {
     Node x = null;
     for( Node epi : _defs ) {
-      FunNode fun =  ((EpilogNode)epi).fun();
+      FunNode fun =  ((FunPtrNode)epi).fun();
       if( fun.nargs() != nargs ) continue;
       if( x == null ) x = epi;
       else if( x instanceof UnresolvedNode ) x.add_def(epi);

@@ -125,7 +125,7 @@ public abstract class PrimNode extends Node {
   // Called during basic Env creation and making of type constructors, this
   // wraps a PrimNode as a full 1st-class function to be passed about or
   // assigned to variables.
-  public EpilogNode as_fun( GVNGCM gvn ) {
+  public FunPtrNode as_fun( GVNGCM gvn ) {
     FunNode  fun = ( FunNode) gvn.xform(new  FunNode(this)); // Points to ScopeNode only
     ParmNode rpc = (ParmNode) gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
     add_def(null);              // Control for the primitive in slot 0
@@ -138,8 +138,8 @@ public abstract class PrimNode extends Node {
     // primitive functions to be wired-up, and instead CallNode has special
     // handling for the memory state of primitives.
     Node mem = gvn.con(TypeMem.XMEM); // Primitives are pure
-    RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mem,gvn.init(this),rpc));
-    return new EpilogNode(fun,ret,null);
+    RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mem,gvn.init(this),rpc,fun));
+    return new FunPtrNode(ret);
   }
 
 

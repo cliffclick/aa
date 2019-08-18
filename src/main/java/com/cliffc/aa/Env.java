@@ -41,9 +41,9 @@ public class Env implements AutoCloseable {
     _scope.update(" control ", CTL_0, GVN,true);
     _scope.update(" memory " , MEM_0, GVN,true);
     for( PrimNode prim : PrimNode.PRIMS )
-      _scope.add_fun(prim._name,(EpilogNode) GVN.xform(prim.as_fun(GVN)));
+      _scope.add_fun(prim._name,(FunPtrNode) GVN.xform(prim.as_fun(GVN)));
     for( IntrinsicNewNode lib : IntrinsicNewNode.INTRINSICS )
-      _scope.add_fun(lib._name,(EpilogNode) GVN.xform(lib.as_fun(GVN)));
+      _scope.add_fun(lib ._name,(FunPtrNode) GVN.xform(lib .as_fun(GVN)));
     // Now that all the UnresolvedNodes have all possible hits for a name,
     // register them with GVN.
     for( Node val : _scope._defs )  GVN.init0(val);
@@ -62,7 +62,7 @@ public class Env implements AutoCloseable {
   public static Env top() { return new Env(TOP); }
   
   Node update( String name, Node val, GVNGCM gvn, boolean mutable ) { return _scope.update(name,val,gvn,mutable); }
-  Node add_fun( String name, Node val ) { return _scope.add_fun(name,(EpilogNode)val); }
+  Node add_fun( String name, Node val ) { return _scope.add_fun(name,(FunPtrNode)val); }
 
   void add_type( String name, Type t ) { _scope.add_type(name,t); }
   

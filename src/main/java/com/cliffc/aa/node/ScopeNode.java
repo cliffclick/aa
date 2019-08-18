@@ -29,17 +29,17 @@ public class ScopeNode extends Node {
   }
   public Integer get_idx(String name) { return _vals.get(name); }
   
-  // Add a Node to an UnresolvedNode.  Must be a function.
-  public EpilogNode add_fun(String name, EpilogNode epi) {
+  // Add a Node to an UnresolvedNode.  Must be a function ptr.
+  public FunPtrNode add_fun( String name, FunPtrNode ptr) {
     Integer ii = _vals.get(name);
     if( ii==null ) {
-      update(name,epi,null,false);
+      update(name,ptr,null,false);
     } else {
       Node n = _defs.at(ii);
-      if( n instanceof UnresolvedNode ) n.add_def(epi);
-      else set_def(ii,new UnresolvedNode(n,epi),null);
+      if( n instanceof UnresolvedNode ) n.add_def(ptr);
+      else set_def(ii,new UnresolvedNode(n,ptr),null);
     }
-    return epi;
+    return ptr;
   }
   
   // Add or update the scope with a name

@@ -40,7 +40,7 @@ public abstract class IntrinsicNewNode extends IntrinsicNode {
   @Override public Type all_type() { return _funret; }
 
   // Wrap the PrimNode with a Fun/Epilog wrapper that includes memory effects.
-  public EpilogNode as_fun( GVNGCM gvn ) {
+  public FunPtrNode as_fun( GVNGCM gvn ) {
     FunNode  fun = ( FunNode) gvn.xform(new  FunNode(this,_funret));
     ParmNode rpc = (ParmNode) gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
     ParmNode memp= (ParmNode) gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM     ),null));
@@ -51,8 +51,8 @@ public abstract class IntrinsicNewNode extends IntrinsicNode {
       add_def(gvn.xform(new ParmNode(i,_args[i],fun, gvn.con(_targs.at(i)),null)));
     Node ptr = gvn.xform(this); // Returns a TypeMemPtr to a TypeObj
     Node mmem = gvn.xform(new MemMergeNode(memp,ptr));
-    RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,ptr,rpc));
-    return new EpilogNode(fun,ret,null);
+    RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,ptr,rpc,fun));
+    return new FunPtrNode(ret);
   }
   
   // --------------------------------------------------------------------------

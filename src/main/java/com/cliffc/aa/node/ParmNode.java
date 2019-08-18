@@ -54,8 +54,8 @@ public class ParmNode extends PhiNode {
         // The merge of all incoming calls for this argument is not legal.
         // Find the call bringing the broken args, and use it for error
         // reporting - it MUST exist, or we have a really weird situation
-        EpilogNode epi=fun.epi();  // Only 1 epilog per fun
-        for( Node use : epi._uses ) {
+        FunPtrNode fptr=fun.ret().funptr();  // Only 1 FunPtr per fun
+        for( Node use : fptr._uses ) {
           if( use instanceof UnresolvedNode )
             use = use._uses.at(0); // TODO: Need to loop over the tree of uses
           if( use instanceof CallNode ) {

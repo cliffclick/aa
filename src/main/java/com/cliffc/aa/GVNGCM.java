@@ -421,7 +421,7 @@ public class GVNGCM {
         CallNode call = ambi_calls.at(i);
         if( call.is_dead() ) ambi_calls.del(i--); // Remove from worklist
         else {
-          Node fun = call.resolve(this);
+          FunPtrNode fun = call.resolve(this);
           if( fun != null ) {          // Unresolved gets left on worklist
             call.set_fun_reg(fun,this); // Set resolved edge
             ambi_calls.del(i--);       // Remove from worklist
@@ -464,10 +464,11 @@ public class GVNGCM {
     // Functions can sharpen return value
     if( n instanceof FunNode && n._uid >= _INIT0_CNT ) {
       FunNode fun = (FunNode)n;
-      EpilogNode epi = fun.epi();
-      if( type(fun)==Type.CTRL && epi != null && !epi.is_forward_ref() ) {
-        if( type(epi.ret().ctl()) != Type.CTRL ) throw AA.unimpl(); // never-return function (maybe never called?)
-        TypeFunPtr tf = (TypeFunPtr)type(epi);
+      RetNode ret = fun.ret();
+      FunPtrNode funptr = ret.funptr();
+      if( type(fun)==Type.CTRL && funptr != null && !funptr.is_forward_ref() ) {
+        if( type(ret.ctl()) != Type.CTRL ) throw AA.unimpl(); // never-return function (maybe never called?)
+        TypeFunPtr tf = (TypeFunPtr)type(funptr);
         if( tf != fun._tf &&    // can sharpen function return
             tf.isa(fun._tf) ) { // Only if sharpened (might not be true for errors)
           unreg(fun);

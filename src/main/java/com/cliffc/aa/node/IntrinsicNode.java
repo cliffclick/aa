@@ -52,7 +52,7 @@ public abstract class IntrinsicNode extends Node {
   // vtable name type in memory.  Unaliased, so the same memory cannot be
   // referred to without the Name.  Error if the memory cannot be proven
   // unaliased.  The Ideal call collapses the Name into the unaliased NewNode.
-  public static EpilogNode convertTypeName( TypeObj from, TypeName to, Parse badargs, GVNGCM gvn ) {
+  public static QNode convertTypeName( TypeObj from, TypeName to, Parse badargs, GVNGCM gvn ) {
     // The incoming memory type is *exact* and does not have any extra fields.
     // The usual duck typing is "this-or-below", which allows and ignores extra
     // fields.  For Naming - which involves installing a v-table (or any other
@@ -69,8 +69,8 @@ public abstract class IntrinsicNode extends Node {
     Node ptr = gvn.xform(new ParmNode( 0,"ptr",fun,gvn.con(from_ptr        ),null));
     Node cvt = gvn.xform(new ConvertPtrTypeName(to._name,from_ptr,to_ptr,badargs,mem,ptr));
     Node mmem= gvn.xform(new MemMergeNode(mem,cvt));
-    RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,cvt,rpc));
-    return new EpilogNode(fun,ret,null);
+    RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,cvt,rpc,fun));
+    return new QNode(fun,ret,null);
   }
 
   // Names an unaliased memory.  Needs to collapse away, or else an error.
@@ -144,7 +144,7 @@ public abstract class IntrinsicNode extends Node {
   // --------------------------------------------------------------------------
   // Default name constructor using expanded args list.  Just a NewNode but the
   // result is a named type.  Same as convertTypeName on an unaliased NewNode.
-  public static EpilogNode convertTypeNameStruct( TypeStruct from, TypeName to, Parse badargs, GVNGCM gvn ) {
+  public static QNode convertTypeNameStruct( TypeStruct from, TypeName to, Parse badargs, GVNGCM gvn ) {
     NewNode nnn = new NewNode(new Node[1],to);
     TypeFunPtr tf = TypeFunPtr.make_new(TypeTuple.make(from._ts),nnn._ptr);
     FunNode fun = (FunNode) gvn.xform(new FunNode(to._name,tf));
@@ -158,8 +158,8 @@ public abstract class IntrinsicNode extends Node {
     }
     Node ptr = gvn.xform(nnn).keep();
     Node mmem= gvn.xform(new MemMergeNode(memp,ptr));
-    RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,ptr.unhook(),rpc));
-    return new EpilogNode(fun,ret,null);
+    RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,ptr.unhook(),rpc,fun));
+    return new QNode(fun,ret,null);
   }
 
 }

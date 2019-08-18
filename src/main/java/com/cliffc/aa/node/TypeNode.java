@@ -40,8 +40,8 @@ public class TypeNode extends Node {
       Node mem = gvn.xform(new MProjNode(call,1));
       Node val = gvn.xform(new  ProjNode(call,2));
       Node chk = gvn.xform(new  TypeNode(tfp._ret,val,_error_parse)); // Type-check the return also
-      RetNode ret = (RetNode)gvn.xform(new RetNode(ctl,mem,chk,rpc));
-      Node epi = gvn.xform(new EpilogNode(fun,ret,null));
+      RetNode ret = (RetNode)gvn.xform(new RetNode(ctl,mem,chk,rpc,fun));
+      Node epi = gvn.xform(new QNode(fun,ret,null));
       return epi;
     }
     

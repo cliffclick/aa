@@ -8,11 +8,11 @@ import com.cliffc.aa.type.*;
 // Tail end of functions.  Gathers:
 // - The FunNode function header (quickly maps to SESE region header)
 // - The RetNode which gathers: control (function exits or not), memory, value, rpc
-public class EpilogNode extends Node {
+public class QNode extends Node {
   int _funuid;     // Used when the function dies, keep the correct SESE region
   TypeFunPtr _tfp; // Used when the function dies, to keep a sane type
   private final String _unkref_err; // Unknown ref error (not really a forward ref)
-  public EpilogNode( FunNode fun, Node ret, String unkref_err ) {
+  public QNode( FunNode fun, Node ret, String unkref_err ) {
     super(OP_EPI,fun,ret);
     _funuid = fun._uid;
     _tfp = fun._tf;
@@ -43,11 +43,11 @@ public class EpilogNode extends Node {
   // declared.  Hence we want a callable function pointer, but have no defined
   // body (yet).  Make a function pointer that takes/ignores all args, and
   // returns a scalar.
-  public static Node forward_ref( GVNGCM gvn, String name, Parse unkref ) {
+  public static QNode forward_ref( GVNGCM gvn, String name, Parse unkref ) {
     String referr = unkref.errMsg("Unknown ref '"+name+"'");
     FunNode fun = gvn.init(new FunNode(name));
-    RetNode ret = gvn.init(new RetNode(fun,gvn.con(TypeMem.MEM),gvn.con(Type.SCALAR),gvn.con(TypeRPC.ALL_CALL)));
-    return new EpilogNode(fun,ret, referr);
+    RetNode ret = gvn.init(new RetNode(fun,gvn.con(TypeMem.MEM),gvn.con(Type.SCALAR),gvn.con(TypeRPC.ALL_CALL),fun));
+    return new QNode(fun,ret,referr);
   }
 
   // True if this is a forward_ref
@@ -56,7 +56,7 @@ public class EpilogNode extends Node {
   // 'this' is a forward reference, probably with multiple uses (and no inlined
   // callers).  Passed in the matching function definition, which is brand new
   // and has no uses.  Merge the two.
-  public void merge_ref_def( GVNGCM gvn, String tok, EpilogNode def ) {
+  public void merge_ref_def( GVNGCM gvn, String tok, QNode def ) {
     FunNode rfun = fun();
     FunNode dfun = def.fun();
     assert rfun._defs._len==2 && rfun.in(0)==null && rfun.in(1) == Env.ALL_CTRL; // Forward ref has no callers

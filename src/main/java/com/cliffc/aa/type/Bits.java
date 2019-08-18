@@ -163,7 +163,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   private static int  idx (long i) { return (int)(i>>6); }
   private static long mask(long i) { return 1L<<(i&63); }
 
-  int getbit() { assert _bits==null; return _con; }
+  public int getbit() { assert _bits==null; return _con; }
   public int abit() { return _bits==null ? _con : -1; }
   public boolean above_center() { return _con<0; }
   boolean may_nil() { return _con==0 || (_con==-1 && _bits != null && ((_bits[0]&1) == 1)); }

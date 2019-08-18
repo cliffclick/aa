@@ -199,7 +199,7 @@ public class TestNode {
     FunNode fun_forward_ref = new FunNode("anon");
 
     Node unr = Env.top().lookup("+"); // All the "+" functions
-    FunNode fun_plus = ((EpilogNode)unr.in(1)).fun();
+    FunNode fun_plus = ((QNode)unr.in(1)).fun();
 
     TypeMemPtr from_ptr = TypeMemPtr.make(BitsAlias.REC,TypeStruct.POINT);
     TypeMemPtr to_ptr   = TypeMemPtr.make(BitsAlias.REC,TypeName.TEST_STRUCT);
@@ -235,8 +235,8 @@ public class TestNode {
     test1monotonic(new   CastNode(_ins[0],_ins[1],TypeMemPtr.STRPTR));
     test1monotonic(new   CastNode(_ins[0],_ins[1],TypeMemPtr.STR0));
     test1monotonic(new  CProjNode(_ins[0],0));
-    test1monotonic(new EpilogNode(fun_forward_ref,_ins[1],"unknown_ref"));
-    test1monotonic(new EpilogNode(fun_plus       ,_ins[1],"plus"));
+    test1monotonic(new QNode(fun_forward_ref,_ins[1],"unknown_ref"));
+    test1monotonic(new QNode(fun_plus       ,_ins[1],"plus"));
     test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  TypeInt.FALSE));
     test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  TypeStr.ABC  ));
     test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  TypeFlt.FLT64));
@@ -257,7 +257,7 @@ public class TestNode {
       test1monotonic_prim(prim);
     test1monotonic(new   ProjNode(_ins[0],1));
     test1monotonic(new RegionNode(null,_ins[1],_ins[2]));
-    test1monotonic(new    RetNode(_ins[0],mem,_ins[1],_ins[2])); // ctl,mem,val,rpc
+    test1monotonic(new    RetNode(_ins[0],mem,_ins[1],_ins[2],(FunNode)_ins[0])); // ctl,mem,val,rpc,fun
     test1monotonic(new  StoreNode(_ins[0],_ins[1],_ins[2],_ins[3],0,null));
     //                  ScopeNode has no inputs, and value() call is monotonic
     //                    TmpNode has no inputs, and value() call is monotonic

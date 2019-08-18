@@ -17,26 +17,27 @@ public abstract class Node implements Cloneable {
   static final byte OP_EPI    = 5;
   static final byte OP_ERR    = 6;
   static final byte OP_FUN    = 7;
-  static final byte OP_IF     = 8;
-  static final byte OP_LIBCALL= 9;
-  static final byte OP_LOAD   =10;
-  static final byte OP_MERGE  =11;
-  static final byte OP_NEW    =12;
-  static final byte OP_PARM   =13;
-  static final byte OP_PHI    =14;
-  static final byte OP_PRIM   =15;
-  static final byte OP_PROJ   =16;
-  static final byte OP_REGION =17;
-  static final byte OP_RET    =18;
-  static final byte OP_SCOPE  =19;
-  static final byte OP_START  =20;
-  static final byte OP_STORE  =21;
-  static final byte OP_TMP    =22;
-  static final byte OP_TYPE   =23;
-  static final byte OP_UNR    =24;
-  static final byte OP_MAX    =25;
+  static final byte OP_FUNPTR = 8;
+  static final byte OP_IF     = 9;
+  static final byte OP_LIBCALL=10;
+  static final byte OP_LOAD   =11;
+  static final byte OP_MERGE  =12;
+  static final byte OP_NEW    =13;
+  static final byte OP_PARM   =14;
+  static final byte OP_PHI    =15;
+  static final byte OP_PRIM   =16;
+  static final byte OP_PROJ   =17;
+  static final byte OP_REGION =18;
+  static final byte OP_RET    =19;
+  static final byte OP_SCOPE  =20;
+  static final byte OP_START  =21;
+  static final byte OP_STORE  =22;
+  static final byte OP_TMP    =23;
+  static final byte OP_TYPE   =24;
+  static final byte OP_UNR    =25;
+  static final byte OP_MAX    =26;
   
-  private static final String[] STRS = new String[] { null, "Call", "CallEpi", "Cast", "Con", "Epi", "Err", "Fun", "If", "LibCall", "Load", "Merge", "New", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Scope", "Start", "Store", "Tmp", "Type", "Unresolved" };
+  private static final String[] STRS = new String[] { null, "Call", "CallEpi", "Cast", "Con", "Epi", "Err", "Fun", "FunPtr", "If", "LibCall", "Load", "Merge", "New", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Scope", "Start", "Store", "Tmp", "Type", "Unresolved" };
 
   public int _uid;  // Unique ID, will have gaps, used to give a dense numbering to nodes
   final byte _op;   // Opcode (besides the object class), used to avoid v-calls in some places
@@ -132,7 +133,6 @@ public abstract class Node implements Cloneable {
     bs.set(_uid);
     dump(d,sb,gvn).nl();
   }
-  private SB str(SB sb) { return sb.p(_uid).p(':').p(str()).p(' '); }
   // Recursively print, up to depth
   private SB dump( int d, SB sb, int max, BitSet bs, GVNGCM gvn, boolean prims ) {
     if( bs.get(_uid) ) return sb;
@@ -321,7 +321,7 @@ public abstract class Node implements Cloneable {
   // a constant).  Such code is not searched for errors.
   boolean is_uncalled(GVNGCM gvn) { return false; }
   
-  // Only true for some EpilogNodes
+  // Only true for some RetNodes and FunNodes
   public boolean is_forward_ref() { return false; }
   
   // Walk a subset of the dominator tree, looking for the last place (highest

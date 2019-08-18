@@ -118,7 +118,7 @@ public class Parse {
     // Leave any final result function 'hooked' by the unknown caller to keep
     // it alive to be returned.
     Node res = _e._scope.in(_e._scope._defs._len-1);
-    Node fun = res instanceof EpilogNode ? ((EpilogNode)res).fun() : null;
+    Node fun = res instanceof QNode ? ((QNode)res).fun() : null;
     // For all other unknown uses of functions, they will all be known after
     // GCP.  Remove the hyper-conservative ALL_CTRL edge.  Note that I canNOT
     // run the pessimistic opto() at this point, as GCP needs to discover all
@@ -242,11 +242,11 @@ public class Parse {
     // a ptr-to-Named:@{x,y}.  This stores a v-table ptr into an object.  The
     // alias# does not change, but a TypeMem[alias#] would now map to the Named
     // variant.
-    EpilogNode epi1 = IntrinsicNode.convertTypeName((TypeObj)t,tn,errMsg(),_gvn);
+    QNode epi1 = IntrinsicNode.convertTypeName((TypeObj)t,tn,errMsg(),_gvn);
     Node rez = _e.add_fun(tvar,epi1); // Return type-name constructor
     // For Structs, add a second constructor taking an expanded arg list
     if( t instanceof TypeStruct ) {   // Add struct types with expanded arg lists
-      EpilogNode epi2 = IntrinsicNode.convertTypeNameStruct((TypeStruct)t,tn,errMsg(),_gvn);
+      QNode epi2 = IntrinsicNode.convertTypeNameStruct((TypeStruct)t,tn,errMsg(),_gvn);
       Node rez2 = _e.add_fun(tvar,epi2); // type-name constructor with expanded arg list
       _gvn.init0(rez2._uses.at(0));      // Force init of Unresolved
     }
@@ -308,12 +308,12 @@ public class Parse {
       if( n==null ) {              // Token not already bound to a value
         if( !ifex.is_forward_ref() ) { // Do not assign unknown refs to another name
           _e.update(tok,ifex,null,mutable); // Bind token to a value
-          if( ifex instanceof EpilogNode ) ((EpilogNode)ifex).fun().bind(tok); // Debug only: give name to function
+          if( ifex instanceof FunPtrNode ) ((FunPtrNode)ifex).fun().bind(tok); // Debug only: give name to function
         }
       } else { // Handle re-assignments and forward referenced function definitions
         if( n.is_forward_ref() ) { // Prior is actually a forward-ref, so this is the def
           assert !_e.is_mutable(tok);
-          ((EpilogNode)n).merge_ref_def(_gvn,tok,(EpilogNode)ifex);
+          ((QNode)n).merge_ref_def(_gvn,tok,(QNode)ifex);
         } else if( _e.is_mutable(tok) )
           _e.update(tok,ifex,_gvn,mutable);
         else
@@ -519,7 +519,7 @@ public class Parse {
     if( tok == null ) return null;
     Node var = lookup(tok);
     if( var == null ) // Assume any unknown ref is a forward-ref of a recursive function
-      return _e.update(tok,gvn(EpilogNode.forward_ref(_gvn,tok,this)),null,false);
+      return _e.update(tok,gvn(FunPtrNode.forward_ref(_gvn,tok,this)),null,false);
     // Disallow uniop and binop functions as factors.
     if( var.op_prec() > 0 ) { _x = oldx; return null; }
     return var;
@@ -582,12 +582,12 @@ public class Parse {
       Node rez = stmts();       // Parse function body
       if( rez == null ) rez = err_ctrl2("Missing function body");
       require('}');             //
-      RetNode ret = (RetNode)gvn(new RetNode(ctrl(),mem(),rez,rpc));
-      Node epi = gvn(new EpilogNode(fun,ret,null));
+      RetNode ret = (RetNode)gvn(new RetNode(ctrl(),mem(),rez,rpc,fun));
+      Node fptr = gvn(new FunPtrNode(ret));
       _e = _e._par;             // Pop nested environment
       set_ctrl(old_ctrl);       // Back to the pre-function-def control
       set_mem (old_mem );
-      return epi;               // Return function; close-out and DCE 'e'
+      return fptr;              // Return function; close-out and DCE 'e'
     }
   }
 

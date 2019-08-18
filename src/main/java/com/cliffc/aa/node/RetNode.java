@@ -4,32 +4,44 @@ import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeTuple;
 
-// See CallNode comments.  The RetNode which gathers {control (function exits
-// or not), memory, value, rpc}, and sits at the end of a function just prior
-// to the EpilogNode.
+// See CallNode comments.  The RetNode gathers {control (function exits or
+// not), memory, value, rpc, fun}, and sits at the end of a function.  The RPC
+// dictates which calls can be reached from here.  The Fun is used to rapidly
+// find the FunNode, as a SESE region shortcut.  A FunPtrNode points to this
+// Ret, and is used for all function-pointer uses.  Otherwise only CallEpis
+// point to a Ret representing wired calls.
+
 public final class RetNode extends Node {
-  public RetNode( Node ctrl, Node mem, Node val, Node rpc ) { super(OP_RET,ctrl,mem,val,rpc); }
+  int _fidx;                    // Shortcut to fidx when the FunNode has collapsed
+  public RetNode( Node ctrl, Node mem, Node val, Node rpc, FunNode fun ) { super(OP_RET,ctrl,mem,val,rpc,fun); _fidx = fun.fidx();}
   public Node ctl() { return in(0); }
   public Node mem() { return in(1); }
   public Node val() { return in(2); }
   public Node rpc() { return in(3); }
-  
-  @Override public Node ideal(GVNGCM gvn) {
-    if( _uses._len >0 ) { // ignore parsing startup
-      if( in(1)==null ) return null; // Already stripped
-      // Should be used by exactly one Epilog, plus some CallEpis.  If no Epilog,
-      // then the function inlined, the Epilog inlined and this should too.
-      for( Node use : _uses )
-        if( use instanceof EpilogNode && use.is_copy(gvn,0)==null )
-          return null;
-      // Strip off input edges, all dead now
-      //for( int i=1; i<_defs._len; i++ ) set_def(i,null,gvn);
-      //return this;
-    }
+  public FunNode fun() { return (FunNode)in(4); }
+  public FunPtrNode funptr() {
+    for( Node use : _uses )
+      if( use instanceof FunPtrNode )
+        return (FunPtrNode)use;
     return null;
   }
+
+  public int fidx() {
+    assert !(in(4) instanceof FunNode) || fun().fidx()==_fidx;
+    return _fidx;
+  }
+  @Override public Node ideal(GVNGCM gvn) { return null; }
   @Override public Type value(GVNGCM gvn) {
     return TypeTuple.make(gvn.type(ctl()),gvn.type(mem()),gvn.type(val()));
   }
   @Override public Type all_type() { return TypeTuple.CALL; }
+
+  @Override public Node is_copy(GVNGCM gvn, int idx) { throw com.cliffc.aa.AA.unimpl(); }
+  // Return the op_prec of the returned value.  Not sensible except when called
+  // on primitives.
+  @Override public byte op_prec() {
+    return val()._uid < GVNGCM._INIT0_CNT ? val().op_prec() : -1;
+  }
+  
+  @Override public boolean is_forward_ref() { return fun().is_forward_ref(); }
 }

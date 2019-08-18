@@ -3,6 +3,7 @@ package com.cliffc.aa.type;
 import java.util.HashMap;
 
 // Function index Bits supporting a lattice; immutable; hash-cons'd.
+
 public class BitsFun extends Bits<BitsFun> {
   // Intern: lookup and return an existing Bits or install in hashmap and
   // return a new Bits.  Overridden in subclasses to make type-specific Bits.
@@ -32,6 +33,7 @@ public class BitsFun extends Bits<BitsFun> {
   public  static final BitsFun NZERO= make0(ALL);
   public  static final BitsFun ANY = FULL.dual();
   public  static final BitsFun NIL = make0(0);
+  public  static final BitsFun EMPTY = make0();
   @Override boolean is_class() { return test(ALL); } // All bits are constants, except the first "ALL" bit
   @Override public BitsFun ALL() { return FULL; }
   @Override public BitsFun ANY() { return ANY ; }
