@@ -54,9 +54,7 @@ public class BitsAlias extends Bits<BitsAlias> {
   public static void init0() { TREE.init0(); }
   public static void reset_to_init0() { TREE.reset_to_init0();}
 
-  // Have to make a first BitsAlias here; thereafter the v-call to make_impl
-  // will make more on demand.  But need the first one to make a v-call.
-  @Override boolean is_class() { return abit()!=0; } // All bits are class of allocated objects, except nil alone
+  @Override boolean is_class(int fidx) { return fidx!=0; } // All bits are class of allocated objects, except nil alone
   @Override public BitsAlias ALL() { return FULL; }
   @Override public BitsAlias ANY() { return ANY ; }
 

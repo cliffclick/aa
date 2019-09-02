@@ -49,7 +49,8 @@ public final class CallEpiNode extends Node {
       
 
     // If call allows many functions, bail out.
-    if( fidxs.abit() == -1 ) return null; // Multiple fidxs
+    if( fidxs.is_class() )
+      return null; // Multiple fidxs
 
     // The one allowed function is already wired?  Then directly inline.
     if( _defs._len==2 ) {
@@ -72,7 +73,7 @@ public final class CallEpiNode extends Node {
     TypeTuple formals = fun._tf._args;
     for( int i=0; i<call.nargs(); i++ ) {
       if( fun.parm(i)==null )   // Argument is dead and can be dropped?
-        call.set_arg(i,gvn.con(Type.XSCALAR),gvn); // Replace with some generic placeholder
+        call.set_arg_reg(i,gvn.con(Type.XSCALAR),gvn); // Replace with some generic placeholder
       else {
         Type formal = formals.at(i);
         Type actual = gvn.type(call.arg(i));

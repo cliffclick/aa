@@ -42,7 +42,7 @@ import com.cliffc.aa.util.Ary;
 //                 |  |   |  |   |  |
 //                 +--+   +--+   +--+
 //            /-----Ret<---Ret<---Ret--\        Wired during GCP
-//     CallEpi     Epi    Epi    Epi    Other
+//     CallEpi     fptr   fptr   fptr  Other
 //      CProj         \    |    /       CallEpis
 //      MProj          \   |   /
 //      DProj           TFP&Math
@@ -67,6 +67,7 @@ public class CallNode extends Node {
   // Actual arguments.
   Node arg( int x ) { return _defs.at(x+3); }
   void set_arg(int idx, Node arg, GVNGCM gvn) { set_def(idx+3,arg,gvn); }
+  void set_arg_reg(int idx, Node arg, GVNGCM gvn) { gvn.set_def_reg(this,idx+3,arg); }
 
           Node ctl() { return in(0); }
   public  Node fun() { return in(1); }

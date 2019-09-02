@@ -427,9 +427,25 @@ public class FunNode extends RegionNode {
     FunPtrNode new_funptr = (FunPtrNode)gvn.xform(new FunPtrNode(newret));
     
     if( _tf._args != fun._tf._args ) { // Split-for-type, possible many future callers
+
+      FunPtrNode old_funptr = ret.funptr();
+      UnresolvedNode new_unr = new UnresolvedNode();
+      new_unr.add_def(new_funptr);
+      gvn.init(new_unr);
+
+      // Direct all uses of the old function pointer to the unresolved.
+      // Leaves old_funptr hanging.
+      gvn.replace(old_funptr,new_unr);
+      // Now hook old_funptr.
+      gvn.add_def(new_unr,old_funptr);
+      // Update Unresolved type, since otherwise it starts very low
+      gvn.setype(new_unr,new_unr.value(gvn));
+
+      // If we are pre-opto, we can leave the new function unwired.  After opto
+      // we must wire all calls, because opto assumes a full CFG.
+      if( gvn._opt ) 
+        throw com.cliffc.aa.AA.unimpl();
       
-      //UnresolvedNode new_unr = new UnresolvedNode();
-      //gvn.init(new_unr);
       //
       //unwire_newepi(gvn,fun,newret,new_unr);
       //
@@ -460,7 +476,6 @@ public class FunNode extends RegionNode {
       //  if( unr instanceof UnresolvedNode )
       //    gvn.add_def(unr,newret);
       //}
-      throw com.cliffc.aa.AA.unimpl();
     
     } else {                    // Split-for-size and only 1 caller
       // Find the 1 caller, and directly wire to the cloned function body

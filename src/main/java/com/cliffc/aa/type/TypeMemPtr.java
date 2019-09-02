@@ -107,7 +107,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   // Aliases represent *classes* of pointers and are thus never constants.
   // nil is a constant.
   @Override public boolean may_be_con()   { return may_nil(); }
-  @Override public boolean is_con()       { return !_aliases.is_class(); } // only nil
+  @Override public boolean is_con()       { return _aliases==BitsAlias.NIL; } // only nil
   @Override public boolean must_nil() { return _aliases.test(0) && !above_center(); }
   @Override public boolean may_nil() { return _aliases.may_nil(); }
   @Override Type not_nil() {

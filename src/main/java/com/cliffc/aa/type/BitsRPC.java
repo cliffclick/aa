@@ -33,7 +33,7 @@ public class BitsRPC extends Bits<BitsRPC> {
   static final BitsRPC FULL = new BitsRPC().make_impl(1,new long[]{1L | (1L<<ALL)});
   private static final BitsRPC ANY = FULL.dual();
   public  static final BitsRPC NIL = make0(0);
-  @Override boolean is_class() { return test(ALL); } // All bits are constants, except the first "ALL" bit
+  @Override boolean is_class(int fidx) { return ALL==fidx; } // All bits are constants, except the first "ALL" bit
   @Override public BitsRPC ALL() { return FULL; }
   @Override public BitsRPC ANY() { return ANY ; }
 

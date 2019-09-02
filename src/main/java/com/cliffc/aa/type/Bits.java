@@ -54,7 +54,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   // Intern: lookup and return an existing Bits or install in hashmap and
   // return a new Bits.  Overridden in subclasses to make type-specific Bits.
   abstract B make_impl(int con, long[] bits );
-  abstract boolean is_class();    // All bits are constants or classes
+  abstract boolean is_class(int idx); // This bit is a class all by itself
   abstract Tree<B> tree();
   public abstract B ALL();
   public abstract B ANY();
@@ -69,7 +69,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     assert check();
   }
   private boolean check() {
-    if( _bits==null ) return is_class() || _con >= 0; // Must be a single constant bit#
+    if( _bits==null ) return _con >= 0 || is_class(-_con); // Must be a single constant bit#
     if( _con != 1 && _con != -1 ) return false;
     if( _bits.length==0 ) return false;  // Empty bits replaced by a con
     if( _bits.length==1 && _bits[0]== 0) return true; // NO bits is OK
@@ -116,6 +116,13 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     }
     return sb.p(']');
   }
+  // This bit set contains more than 1 concrete element type
+  public boolean is_class() {
+    return
+      _bits!=null ||            // many bits are set
+      _con<0 ||                 // or JOIN of set of bits
+      is_class(_con);           // or single bit is a class not a constant
+  }
 
   // Constructor taking an array of bits, and allowing join/meet selection.
   // Canonicalizes the bits.  The 'this' pointer is only used to clone the class.
@@ -146,7 +153,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     if( check_multi_bits(bits) || (len==1 && bits[0]==0) ) return make_impl(any ? -1 : 1,bits);
     int bnum0 = 63 - Long.numberOfLeadingZeros(bits[len-1]);
     int bnum = bnum0 + ((len-1)<<6);
-    if( any && is_class() ) bnum = -bnum;
+    if( any && is_class(bnum) ) bnum = -bnum;
     return make_impl(bnum,null);
   }
   // Constructor taking a single bit
@@ -322,7 +329,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
 
   // Constants are self-dual; classes just flip the meet/join bit.
   @SuppressWarnings("unchecked")
-  public B dual() { return _bits==null && !is_class() ? (B)this : make_impl(-_con,_bits); }
+  public B dual() { return _bits==null && !is_class(_con) ? (B)this : make_impl(-_con,_bits); }
   // join is defined in terms of meet and dual
   public Bits<B> join(Bits<B> bs) { return dual().meet(bs.dual()).dual(); }
 
@@ -336,11 +343,14 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     int[][] _kids = new int[2][];// List of kids from a parent; 1st element is in-use length
     int[] _init;                 // Used to reset _kids[X][0] for all X
 
+    boolean is_parent(int par) {
+      return par < _kids.length && _kids[par]!=null && _kids[par][0] > 0;
+    }
     int parent( int kid ) { return _pars[kid]; }
     @Override public String toString() { return toString(new SB(),1).toString(); }
     private SB toString(SB sb,int i) {
       sb.i().p(i).nl();
-      if( i<_kids.length && _kids[i]!=null && _kids[i][0] > 0 ) {
+      if( is_parent(i) ) {
         sb.ii(1);
         for( int j=1; j<_kids[i][0]; j++ )
           toString(sb,_kids[i][j]);

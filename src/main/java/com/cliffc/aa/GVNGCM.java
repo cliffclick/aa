@@ -315,8 +315,8 @@ public class GVNGCM {
     return oldt == t && y==null ? null : n; // Progress if types improved
   }
 
-  // Complete replacement; point uses to 'nnn'.  The goal is to completely replace 'old'.
-  public void subsume( Node old, Node nnn ) {
+  // Replace, but do not delete old.  Really used to insert a node in front of old.
+  public void replace( Node old, Node nnn ) {
     while( old._uses._len > 0 ) {
       Node u = old._uses.del(0);  // Old use
       _vals.remove(u); // Use is about to change edges; remove from type table
@@ -325,6 +325,11 @@ public class GVNGCM {
       _vals.put(u,u);        // Back in the table, since its still in the graph
       add_work(u);           // And put on worklist, to get re-visited
     }
+  }
+
+  // Complete replacement; point uses to 'nnn'.  The goal is to completely replace 'old'.
+  public void subsume( Node old, Node nnn ) {
+    replace(old,nnn);
     nnn.keep();                 // Keep-alive    
     kill(old);                  // Delete the old n, and anything it uses
     nnn.unhook();               // Remove keep-alive
