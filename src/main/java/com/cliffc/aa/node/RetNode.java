@@ -25,11 +25,18 @@ public final class RetNode extends Node {
         return (FunPtrNode)use;
     return null;
   }
-
   public int fidx() {
     assert !(in(4) instanceof FunNode) || fun().fidx()==_fidx;
     return _fidx;
   }
+  // Short self name
+  @Override String xstr() {
+    FunNode fun = FunNode.find_fidx(_fidx);
+    return "Ret_"+(fun==null ? ""+_fidx : fun.name());
+  }
+  // Inline longer name
+  @Override public String str() { return in(4) instanceof FunNode ? "Ret"+fun().str() : xstr(); }
+
   @Override public Node ideal(GVNGCM gvn) { return null; }
   @Override public Type value(GVNGCM gvn) {
     return TypeTuple.make(gvn.type(ctl()),gvn.type(mem()),gvn.type(val()));
@@ -37,6 +44,7 @@ public final class RetNode extends Node {
   @Override public Type all_type() { return TypeTuple.CALL; }
 
   @Override public Node is_copy(GVNGCM gvn, int idx) { throw com.cliffc.aa.AA.unimpl(); }
+  public boolean is_copy() { return !(in(4) instanceof FunNode); }
   // Return the op_prec of the returned value.  Not sensible except when called
   // on primitives.
   @Override public byte op_prec() {
@@ -44,4 +52,15 @@ public final class RetNode extends Node {
   }
   
   @Override public boolean is_forward_ref() { return fun().is_forward_ref(); }
+
+  // Check all CallEpi uses for sanity
+  String check() {
+    for( Node use : _uses )
+      if( use instanceof CallEpiNode ) {
+        String err = ((CallEpiNode)use).check();
+        if( err != null )
+          return err;
+      }
+    return null;                // No errors
+  }
 }

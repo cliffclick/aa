@@ -16,7 +16,8 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
     Object dummy = Env.GVN; // Force class loading cycle
-    test("mul3={x -> y=3; x*y}; mul3(2)", TypeInt.con(6)); // multiple statements in func body
+    testerr("f0 = { f x -> f0(x-1) }; f0({+},2)", "Passing 1 arguments to f0={->} which takes 2 arguments",21);
+    test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
     test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)",TypeInt.INT64);
 
     // A collection of tests which like to fail easily
@@ -82,9 +83,9 @@ public class TestParse {
     test("{-}(1,2)", TypeInt.con(-1)); // binary version
     test(" - (1  )", TypeInt.con(-1)); // unary version
     // error; mismatch arg count
-    testerr("!()       ", "Passing 0 arguments to ! which takes 1 arguments",3);
+    testerr("!()       ", "Passing 0 arguments to !={->} which takes 1 arguments",3);
     testerr("math_pi(1)", "A function is being called, but 3.141592653589793 is not a function",10);
-    testerr("{+}(1,2,3)", "Passing 3 arguments to + which takes 2 arguments",10);
+    testerr("{+}(1,2,3)", "Passing 3 arguments to {+} which takes 2 arguments",10);
 
     // Parsed as +(1,(2*3))
     test("{+}(1, 2 * 3) ", TypeInt.con(7));
@@ -158,7 +159,7 @@ public class TestParse {
     test("sq={x -> x*x}; sq 2.1", TypeFlt.con(4.41)); // No () required for single args
     testerr("sq={x -> x&x}; sq(\"abc\")", "*[7]\"abc\" is not a int64",12);
     testerr("sq={x -> x*x}; sq(\"abc\")", "*[7]\"abc\" is not a flt64",12);
-    testerr("f0 = { f x -> f0(x-1) }; f0({+},2)", "Passing 1 arguments to f0 which takes 2 arguments",21);
+    testerr("f0 = { f x -> f0(x-1) }; f0({+},2)", "Passing 1 arguments to f0={->} which takes 2 arguments",21);
     // Recursive:
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
     test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)",TypeInt.INT64);

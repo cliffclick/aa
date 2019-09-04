@@ -223,7 +223,10 @@ public abstract class Node implements Cloneable {
   // Compute the current best Type for this Node, based on the types of its inputs.
   // May return the local "all_type()", especially if its inputs are in error.
   abstract public Type value(GVNGCM gvn);
-
+  // If an ideal() change breaks type monotonicity, the ideal() call knows this
+  // and assures monotonicity happens some other way.
+  public boolean monotonicity_assured() { return false; }
+    
   // Return any type error message, or null if no error
   public String err(GVNGCM gvn) { return null; }
   

@@ -17,6 +17,8 @@ public class GVNGCM {
 
   public static int uid() { assert CNT < 100000 : "infinite node create loop"; _live.set(CNT);  return CNT++; }
 
+  public int _opt_mode;         // 0 - Parse (discovery), 1 - iter, 2 - gcp/opto
+
   // Iterative worklist
   private Ary<Node> _work = new Ary<>(new Node[1], 0);
   private BitSet _wrk_bits = new BitSet();
@@ -251,7 +253,7 @@ public class GVNGCM {
     }
   }
 
-  private void xform_old( Node old ) {
+  public void xform_old( Node old ) {
     Node nnn = xform_old0(old);
     if( nnn==null ) return;
     if( nnn == old ) {          // Progress, but not replacement
@@ -301,7 +303,7 @@ public class GVNGCM {
     // Either no-progress, or progress and need to re-insert n back into system
     _ts._es[n._uid] = oldt;     // Restore old type, in case we recursively ask for it
     Type t = n.value(this);     // Get best type
-    assert t.isa(oldt) || n instanceof UnresolvedNode;         // Types only improve
+    assert t.isa(oldt) || n.monotonicity_assured();  // Types only improve, or there is an external monotonic behavior
     _ts._es[n._uid] = null;     // Remove in case we replace it
     // Replace with a constant, if possible
     if( replace_con(t,n) )
@@ -330,7 +332,7 @@ public class GVNGCM {
   // Complete replacement; point uses to 'nnn'.  The goal is to completely replace 'old'.
   public void subsume( Node old, Node nnn ) {
     replace(old,nnn);
-    nnn.keep();                 // Keep-alive    
+    nnn.keep();                 // Keep-alive
     kill(old);                  // Delete the old n, and anything it uses
     nnn.unhook();               // Remove keep-alive
   }
@@ -339,6 +341,7 @@ public class GVNGCM {
   // always conservatively iterate on it.
   public boolean _small_work;
   void iter() {
+    _opt_mode = 1;
     // As a modest debugging convenience, avoid inlining (which blows up the
     // graph) until other optimizations are done.  Gather the possible inline
     // requests and set them aside until the main list is empty, then work down
@@ -355,14 +358,14 @@ public class GVNGCM {
   }
 
   // Global Optimistic Constant Propagation.  Passed in the final program state
-  // (including any return result, i/o & memory state), and a flag stating if
-  // more program can appear (e.g. via the REPL).  Returns the most-precise
+  // (including any return result, i/o & memory state).  Returns the most-precise
   // types possible, and replaces constants types with constants.
   //
   // Besides the obvious GCP algorithm (and the type-precision that results
   // from the analysis), GCP does a few more things.
   //
-  // Not all callers are known and this is approximated by being called by
+  // GCP builds an explicit Call-Graph.  Before GCP
+  // not all callers are known and this is approximated by being called by
   // ALL_CTRL, a ConNode of Type CTRL, as a permanently available unknown
   // caller.  If the whole program is available to us, the we can compute all
   // callers conservatively and precisely - we may have extra never-taken
@@ -370,8 +373,8 @@ public class GVNGCM {
   // virtual going in (and represented by ALL_CTRL); we can remove the ALL_CTRL
   // path and add in physical edges in the CallNode.value() call while whole-
   // program GCP is active.
-  public boolean _opt;          // GCP in-progress
   void gcp(ScopeNode rez ) {
+    _opt_mode = 2;
     // Set all types to null (except primitives); null is the visit flag when
     // setting types to their highest value.
     Arrays.fill(_ts._es,_INIT0_CNT,_ts._len,null);
@@ -387,7 +390,7 @@ public class GVNGCM {
 
     // Collect unresolved calls, and verify they get resolved.
     Ary<CallNode> ambi_calls = new Ary<>(new CallNode[1],0);
-    _opt = true;                // Lazily fill with best value
+
     // Repeat, if we remove some ambiguous choices, and keep falling until the
     // graph stabilizes without ambiguity.
     while( _work._len > 0 ) {
@@ -434,8 +437,6 @@ public class GVNGCM {
         }
       }
     }
-
-    _opt = false;               // Back to pessimistic behavior on new nodes
 
     // Revisit the entire reachable program, as ideal calls may do something
     // with the maximally lifted types.

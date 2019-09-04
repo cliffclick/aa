@@ -35,30 +35,32 @@ public final class CallEpiNode extends Node {
     if( !(tcall.at(1) instanceof TypeFunPtr) ) return null;
     TypeFunPtr tfp = (TypeFunPtr)tcall.at(1);
     
-    // If the call's allowed functions excludes any wired, remove the extras
+    // The one allowed function is already wired?  Then directly inline.
     BitsFun fidxs = tfp.fidxs();
-    if( !fidxs.test(BitsFun.ALL) )
-      for( int i=1; i<_defs._len; i++ ) {
-        RetNode ret = (RetNode)in(i);
-        if( !fidxs.test(ret.fidx()) ) // Wired call is not actually executable?
+    if( _defs._len==2 ) {
+      RetNode ret = (RetNode)in(1);
+      if( ret.is_copy() || !ret.fun().has_unknown_callers() ) {
+        assert ret.is_copy() || ret.fun()._tf.isa(tfp);
+        return inline(gvn, ret.ctl(), ret.mem(), ret.val());
+      }
+    }
+
+    // If the call's allowed functions excludes any wired, remove the extras
+    BitSet bs = fidxs.tree().plus_kids(fidxs);
+    if( !fidxs.test(BitsFun.ALL) ) {
+      for( int i = 1; i < _defs._len; i++ ) {
+        RetNode ret = (RetNode) in(i);
+        if( !bs.get(ret.fidx()) ) // Wired call is not actually executable?
           // Remove the edge.  Happens after e.g. cloning a function, where
           // both cloned and original versions are wired, but only one is
           // reachable.
           del(i--);
       }
-      
+    }
 
     // If call allows many functions, bail out.
     if( fidxs.is_class() )
       return null; // Multiple fidxs
-
-    // The one allowed function is already wired?  Then directly inline.
-    if( _defs._len==2 ) {
-      RetNode ret = (RetNode)in(1);
-      assert ret.fidx()==fidxs.getbit();
-      if( !ret.fun().has_unknown_callers() )
-        return inline(gvn,ret.ctl(),ret.mem(),ret.val());
-    }
 
     // Call allows 1 function not yet wired, sanity check it.
     int fidx = tfp.fidx();
@@ -125,7 +127,7 @@ public final class CallEpiNode extends Node {
   // knowledge of its callers and arguments.  This adds an edge in the Call-Graph.
   // TODO: Leaves the Call in the graph - making the graph "a little odd" - double
   // CTRL users - once for the call, and once for the function being called.
-  Node wire( GVNGCM gvn, CallNode call, FunNode fun, RetNode ret ) {
+  private Node wire( GVNGCM gvn, CallNode call, FunNode fun, RetNode ret ) {
     assert _keep==0;            // not expecting this during calls
 
     for( int i=1; i<_defs._len; i++ )
@@ -174,8 +176,8 @@ public final class CallEpiNode extends Node {
     if( !(ctt.at(1) instanceof TypeFunPtr) )
       return TypeTuple.CALL;
     TypeFunPtr funt = (TypeFunPtr)ctt.at(1);
-    BitsFun bitsfun = funt.fidxs();
-    if( bitsfun.test(BitsFun.ALL) ) // All functions are possible?
+    BitsFun fidxs = funt.fidxs();
+    if( fidxs.test(BitsFun.ALL) ) // All functions are possible?
       return TypeTuple.CALL;        // Worse-case result
 
     // If there are any fidxs that do not have a matching Return, we must
@@ -184,16 +186,21 @@ public final class CallEpiNode extends Node {
     BitSet bs = new BitSet();
     for( int i=1; i<_defs._len; i++ )
       bs.set(((RetNode)_defs.at(i)).fidx());
-    for( int fidx : bitsfun )
-      if( !bs.get(fidx) )
+    for( int fidx : fidxs )
+      // FIDXs that are parents got split & cloned... and always both child
+      // fidxs get wired, although the parent never shows up wired anymore.  If
+      // not a parent and not wired, must be an unwired call returning a max
+      // pessimal result.
+      if( !fidxs.tree().is_parent(fidx) && !bs.get(fidx) )
         return TypeTuple.CALL;
     
     // If there are any Returns without a matching fidx, we can assume that
     // function is not called and not merge it.
+    BitSet bsplus = fidxs.tree().plus_kids(fidxs);
     Type t = TypeTuple.XCALL;
     for( int i=1; i<_defs._len; i++ ) {
       RetNode ret = (RetNode)_defs.at(i);
-      if( bitsfun.test(ret.fidx()) )  // This function is possible
+      if( bsplus.get(ret.fidx()) )     // This function is possible
         t = t.meet(gvn.type(ret)); // So merge his results
     }
     
@@ -213,4 +220,30 @@ public final class CallEpiNode extends Node {
   private boolean is_copy() { return !(in(0) instanceof CallNode); }
   @Override public Node is_copy(GVNGCM gvn, int idx) { return is_copy() ? in(idx) : null; }
   @Override public Type all_type() { return TypeTuple.CALL; }
+
+  // Check for proper wiring at this call-site.  All wired RetNodes have
+  // matching input paths to the Call.  *Types* are not checked, as we might be
+  // mid-opto or mid-iter.
+  String check() {
+    CallNode call = call();
+    TypeRPC trpc = TypeRPC.make(call._rpc);
+    // Check all wired functions for a matching RPC to this Call.
+    for( int i=1; i<_defs._len; i++ ) {
+      RetNode ret = (RetNode)in(i); // Wired return
+      FunNode fun = ret.fun();      // Wired function
+      ParmNode rpcs = fun.rpc();    // Wired RPC
+      if( rpcs == null ) return "Missing RPC parm";
+      int xpath = -1;
+      for( int path=1; path<rpcs._defs._len; path++ ) {
+        if( rpcs.in(path) instanceof ConNode &&
+            ((ConNode)rpcs.in(path))._t == trpc ) {
+          if( xpath != -1 ) return "RPC found twice, once on path "+xpath+" and again on path "+path;
+          xpath = path;
+        }
+      }
+      if( xpath == -1 ) return "Wired "+fun+", with RPCS "+rpcs+", but no matching RPC for "+call;
+    }
+    return null;
+  }
+  
 }

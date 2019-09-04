@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
@@ -11,9 +12,17 @@ public final class FunPtrNode extends Node {
   private final String _referr;
   public  FunPtrNode( RetNode ret ) { super(OP_FUNPTR,ret); _referr = null; }
   private FunPtrNode( RetNode ret, String referr ) { super(OP_FUNPTR,ret); _referr = referr; }
-
   public RetNode ret() { return (RetNode)in(0); }
   public FunNode fun() { return ret().fun(); }
+  // Self   short  name
+  @Override String xstr() {
+    int fidx = ret().fidx();    // Reliably returns a fidx
+    FunNode fun = FunNode.find_fidx(fidx);
+    return "*"+(fun==null ? ""+fidx : fun.name());
+  }
+  // Inline longer name
+  @Override String  str() { FunNode fun = fun();  return fun==null ? xstr() : fun.str(); }
+
   @Override public Node ideal(GVNGCM gvn) { return null; }
   @Override public Type value(GVNGCM gvn) {
     if( !(in(0) instanceof RetNode) )
@@ -37,6 +46,28 @@ public final class FunPtrNode extends Node {
 
   // True if this is a forward_ref
   @Override public boolean is_forward_ref() { return _referr!=null; }
+
+  // 'this' is a forward reference, probably with multiple uses (and no inlined
+  // callers).  Passed in the matching function definition, which is brand new
+  // and has no uses.  Merge the two.
+  public void merge_ref_def( GVNGCM gvn, String tok, FunPtrNode def ) {
+    FunNode rfun = fun();
+    FunNode dfun = def.fun();
+    assert rfun._defs._len==2 && rfun.in(0)==null && rfun.in(1) == Env.ALL_CTRL; // Forward ref has no callers
+    assert dfun._defs._len==2 && dfun.in(0)==null;
+    assert def ._uses._len==0;  // Def is brand new, no uses
+    // Make a function pointer based on the original forward-ref fidx, but with
+    // the known types.
+    FunNode.FUNS.setX(dfun.fidx(),null); // Track FunNode by fidx
+    TypeFunPtr tfp = TypeFunPtr.make(rfun._tf.fidxs(),dfun._tf._args,dfun._tf._ret);
+    gvn.setype(def,tfp);
+    gvn.unreg(dfun);  dfun._tf = tfp;  gvn.rereg(dfun,Type.CTRL);
+    int fidx = def.ret()._fidx = rfun._tf.fidx();
+    FunNode.FUNS.setX(fidx,dfun);     // Track FunNode by fidx
+
+    gvn.subsume(this,def);
+    dfun.bind(tok);
+  }
 
   
   @Override public String err(GVNGCM gvn) { return is_forward_ref() ? _referr : null; }

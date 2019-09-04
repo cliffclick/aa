@@ -65,7 +65,7 @@ public class FunNode extends RegionNode {
   }
   
   // Find FunNodes by fidx
-  private static Ary<FunNode> FUNS = new Ary<>(new FunNode[]{null,});
+  static Ary<FunNode> FUNS = new Ary<>(new FunNode[]{null,});
   public static FunNode find_fidx( int fidx ) { return fidx >= FUNS._len ? null : FUNS.at(fidx); }
   int fidx() { return _tf.fidx(); } // Asserts single-bit internally
   
@@ -83,38 +83,38 @@ public class FunNode extends RegionNode {
     }
   }
 
+  // Short self name
+  @Override String xstr() { return name(); }
   // Inline longer info
   @Override public String str() { return is_forward_ref() ? xstr() : _tf.str(null); }
-  // Short self name
-  @Override String xstr() {
-    if( is_forward_ref() ) return "<?"+_name+">";
-    return _name == null ? "fun_"+fidx() : _name;
+  // Name from fidx alone
+  static String name( int fidx ) {
+    FunNode fun = find_fidx(fidx);
+    return fun == null ? ""+fidx : fun.name();
   }
-  // Debug only: make an attempt to bind name to a function
-  public void bind( String tok ) {
-    assert _name==null || _name.equals(tok); // Attempt to double-bind
-    _name = tok;
+  // Name from FunNode
+  String name() {
+    return is_forward_ref()
+      ? "?"+_name
+      : (_op_prec >= 0 ? "{"+_name+"}" : _name+"={->}");
   }
   // Can return nothing, or "name" or "[name0,name1,name2...]" or "[35]"
   public static SB names(BitsFun fidxs, SB sb ) {
     int fidx = fidxs.abit();
-    if( fidx >= 0 ) return name(fidx,sb);
-    sb.p('[');
+    if( fidx >= 0 ) return sb.p(name(fidx));
     int cnt=0;
     for( Integer ii : fidxs ) {
-      if( ++cnt==4 ) break;
-      name(ii,sb).p(fidxs.above_center()?'+':',');
+      if( ++cnt==5 ) break;
+      sb.p(name(ii)).p(fidxs.above_center()?'+':',');
     }
-    if( cnt>=4 ) sb.p("...");
-    sb.p(']');
+    if( cnt>=5 ) sb.p("...");
     return sb;
   }
-  public static SB name( int fidx, SB sb ) {
-    FunNode fun = find_fidx(fidx);
-    String name = fun == null ? null : fun._name;
-    if( name==null && fun != null && fun.is_forward_ref() ) name="<forward_decl_"+fidx+">";
-    if( name==null ) name = "fun"+fidx;
-    return sb.p(name);
+
+  // Debug only: make an attempt to bind name to a function
+  public void bind( String tok ) {
+    assert _name==null || _name.equals(tok); // Attempt to double-bind
+    _name = tok;
   }
 
   @Override Node copy(GVNGCM gvn) { throw AA.unimpl(); } // Gotta make a new FIDX
@@ -146,6 +146,12 @@ public class FunNode extends RegionNode {
     ParmNode[] parms = new ParmNode[nargs()];
     RetNode ret = split_callers_gather(gvn,parms);
     if( ret == null ) return null;
+
+    // Major Call-Graph layout check
+    String err=null;
+    assert (err=ret.check())==null; // Check all outgoing wired CallEpis for sanity.
+    assert (err=    check(gvn,ret,rpc_parm,true))==null; // Check all incoming paths for being both alive and wired. 
+    
     // Look for appropriate type-specialize callers
     FunNode fun = type_special(gvn,ret,parms);
     if( fun == null ) { // No type-specialization to do
@@ -154,7 +160,7 @@ public class FunNode extends RegionNode {
       if( fun == null ) return null;
     }
     // Split the callers according to the new 'fun'.
-    return split_callers(gvn,rpc_parm,ret,fun);
+    return split_callers(gvn,ret,fun);
   }
 
   // Gather the ParmNodes into an array.  Return null if any input path is dead
@@ -263,8 +269,10 @@ public class FunNode extends RegionNode {
     // Renumber the original as well; the original _fidx is now a *class* of 2
     // fidxs.  Each FunNode fidx is only ever a constant.
     _tf = _tf.make_new_fidx(oldfidx);
-    ret._fidx = fidx();         // Renumber in the old FunPtrNode
-    FUNS.setX(fidx(),this);     // Track FunNode by fidx
+    int newfidx = fidx();
+    ret._fidx = newfidx;        // Renumber in the old RetNode
+    gvn.add_work(ret);  gvn.add_work(ret.funptr());
+    FUNS.setX(newfidx,this);    // Track FunNode by fidx
     // Look in remaining paths and decide if they split or stay
     Node xctrl = gvn.con(Type.XCTRL);
     for( int j=2; j<_defs._len; j++ ) {
@@ -340,6 +348,7 @@ public class FunNode extends RegionNode {
     // fidxs.  Each FunNode fidx is only ever a constant.
     _tf = _tf.make_new_fidx(oldfidx);
     ret._fidx = fidx();         // Renumber in the old FunPtrNode
+    gvn.add_work(ret);  gvn.add_work(ret.funptr());
     FUNS.setX(fidx(),this);     // Track FunNode by fidx
     fun.pop();                  // Remove junk ALL_CTRL input
     Node top = gvn.con(Type.XCTRL);
@@ -351,7 +360,7 @@ public class FunNode extends RegionNode {
   // Clone the function body, and split the callers of 'this' into 2 sets; one
   // for the old and one for the new body.  The new function may have a more
   // refined signature, and perhaps no unknown callers.  
-  private Node split_callers( GVNGCM gvn, ParmNode rpc_parm, RetNode ret, FunNode fun) {
+  private Node split_callers( GVNGCM gvn, RetNode ret, FunNode fun) {
     // Clone the function body
     HashMap<Node,Node> map = new HashMap<>();
     Ary<Node> work = new Ary<>(new Node[1],0);
@@ -363,11 +372,11 @@ public class FunNode extends RegionNode {
       int op = n._op;           // opcode
       if( op == OP_FUN  && n       != this ) continue; // Call to other function, not part of inlining
       if( op == OP_PARM && n.in(0) != this ) continue; // Arg  to other function, not part of inlining
+      if( op == OP_CALLEPI && n.in(0) == ret ) continue; // Wired call 
       assert n._uid < fun._uid; // Recursive calls will call 'fun' directly
-      assert n.in(0)!=ret && (n._defs._len<=1 || n.in(1)!= ret || n instanceof CallNode); // Do not walk past epilog
-      if( n != ret )           // Except for the Return
-        work.addAll(n._uses);  // Visit all uses also
       map.put(n,n.copy(gvn));  // Make a blank copy with no edges and map from old to new
+      if( n != ret )           // Do not walk past the RetNode
+        work.addAll(n._uses);  // Visit all uses also
     }
 
     // Fill in edges.  New Nodes point to New instead of Old; everybody
@@ -379,6 +388,8 @@ public class FunNode extends RegionNode {
       Node c = map.get(n);
       if( n instanceof ParmNode && n.in(0) == this ) {  // Leading edge ParmNodes
         c.add_def(map.get(n.in(0))); // Control
+        //for( int j=1; j<_defs._len; j++ ) // Get the new parm path or ~Scalar according to split
+        //  c.add_def( fun.in(j)==any ? dany : n.in(j) );
         // Slot#1 for a type-split gets the new generic type from the new signature.
         // Slot#1 for other live splits gets from the old parm inputs.
         int idx = ((ParmNode)n)._idx;
@@ -425,10 +436,10 @@ public class FunNode extends RegionNode {
     RetNode newret = (RetNode)map.get(ret);
     newret._fidx = fun.fidx();
     FunPtrNode new_funptr = (FunPtrNode)gvn.xform(new FunPtrNode(newret));
-    
+    FunPtrNode old_funptr = ret.funptr();
+
     if( _tf._args != fun._tf._args ) { // Split-for-type, possible many future callers
 
-      FunPtrNode old_funptr = ret.funptr();
       UnresolvedNode new_unr = new UnresolvedNode();
       new_unr.add_def(new_funptr);
       gvn.init(new_unr);
@@ -443,51 +454,41 @@ public class FunNode extends RegionNode {
 
       // If we are pre-opto, we can leave the new function unwired.  After opto
       // we must wire all calls, because opto assumes a full CFG.
-      if( gvn._opt ) 
+      if( gvn._opt_mode == 2 )
         throw com.cliffc.aa.AA.unimpl();
-      
-      //
-      //unwire_newepi(gvn,fun,newret,new_unr);
-      //
-      //// Direct all uses of the old Epilog to the new Unresolved choice.
-      //while( ret._uses._len > 0 ) {
-      //  Node euse = ret._uses.at(0);
-      //  // If the use is a wired call, rewrite it.
-      //  int idx = euse._defs.find(ret);
-      //  if( euse instanceof CallNode ) {
-      //    // If the call is to the generic function, it should not be wired
-      //    // now.  If it is to the new function, is should be wired to the new
-      //    // function.
-      //    CallEpiNode cepi = ((CallNode)euse).callepi();
-      //    boolean call_to_unresolved = fun._defs.find(euse.in(0)) == -1;
-      //    if( call_to_unresolved ) cepi.unwire( gvn, ret);
-      //    else                     cepi.rewire( gvn, ret, newret);
-      //    gvn.set_def_reg(euse,idx,call_to_unresolved ? new_unr : newret);
-      //  } else {                // Replace use of ret with the new unresolved
-      //    gvn.set_def_reg(euse,idx,new_unr);
-      //  }
-      //}
-      //
-      //// Include the new Epilog in all Unresolved
-      //gvn.add_def(new_unr,ret);
-      //for( int i=0; i<ret._uses._len; i++ ) {
-      //  Node unr = ret._uses.at(i);
-      //  assert !(unr instanceof CallNode);
-      //  if( unr instanceof UnresolvedNode )
-      //    gvn.add_def(unr,newret);
-      //}
-    
-    } else {                    // Split-for-size and only 1 caller
-      // Find the 1 caller, and directly wire to the cloned function body
-      FunPtrNode old_funptr = ret.funptr();
-      for( Node cepi : ret._uses )
-        if( cepi instanceof CallEpiNode ) {
-          CallNode call = ((CallEpiNode)cepi).call();
-          assert call.fun()==old_funptr;
-          gvn.add_def(cepi,newret); //
-          call.set_fun_reg(new_funptr,gvn);
-        }
     }
+
+    // Wire matching CallEpis to the new RetNode.
+    ParmNode rpc_parm = rpc();
+    ret.keep(); // Can go dead, if a generic functions last-use is being inlined
+    for( int k=0; k<ret._uses._len; k++ ) {
+      Node cepi = ret._uses.at(k); // Find all Calls to the original function
+      if( cepi instanceof CallEpiNode ) {
+        CallNode call = ((CallEpiNode)cepi).call(); // Matching call
+        int rpc = call._rpc;    // Find the original call RPC
+        // Find the matching path for this RPC.
+        for( int i=1; i<rpc_parm._defs._len; i++ ) { // Find matching original path
+          TypeRPC trpc = (TypeRPC)gvn.type(rpc_parm.in(i));
+          if( trpc != TypeRPC.ALL_CALL && trpc.rpc()==rpc ) { // RPC matches?
+            // Is this path dead in the original (and live in the clone)?
+            if( gvn.type(in(i))==Type.XCTRL ) {
+              assert gvn.type(fun.in(i))==Type.CTRL;
+              if( call.fun()==old_funptr )
+                call.set_fun_reg(new_funptr,gvn);
+              // Then re-wire this CallEpi to the new RetNode
+              for( int j=1; j<cepi._defs._len; j++ )
+                if( cepi.in(j)==ret ) {
+                  gvn.set_def_reg(cepi,j,newret);
+                  k--;        // Must rerun same 'k' since removed use
+                  break;
+                }
+            }
+            break;
+          }
+        }
+      }
+    }
+    ret.unkeep(gvn);
 
     // There are new some cloned new Calls; these point to some old functions
     // which might believe "all_calls_known" - which excludes these new Calls.
@@ -521,34 +522,18 @@ public class FunNode extends RegionNode {
       }
     }
     
+    // Major Call-Graph layout check
+    String err=null;
+    assert ret.is_dead() || (err=   ret.check())==null; // Check all outgoing wired CallEpis for sanity.
+    assert                  (err=newret.check())==null; // Check all outgoing wired CallEpis for sanity.
+    assert ret.is_dead() || (err=       check(gvn,   ret,    rpc(),false))==null; // Check all incoming paths for being both alive and wired.
+    assert                  (err=fun.   check(gvn,newret,fun.rpc(),false))==null; // Check all incoming paths for being both alive and wired.
+    
     // TODO: Hook with proper signature into ScopeNode under an Unresolved.
     // Future calls may resolve to either the old version or the new.
     return this;
   }
 
-  //// Uses in the old function that pointed to the old Epilog (e.g.  recursion
-  //// or storing the self-function pointer) got remapped to the new Epilog.
-  //// For single-use splits everything in the new function should remain
-  //// pointing to the old function (basically we peeled one execution).
-  //// For multi-use type splits, everything in the new function needs to be
-  //// re-resolved because the new calls are all wired up to the old function.
-  //private void unwire_newepi( GVNGCM gvn, FunNode fun, QNode newepi, Node replace) {
-  //  while( newepi._uses._len > 0 ) {
-  //    Node euse = newepi._uses.at(0);
-  //    // If the use is a wired call, rewrite it.
-  //    if( euse instanceof CallNode ) {
-  //      // If the call is to the generic function, it should not be wired
-  //      // now.  If it is to the new function, is should be wired to the new
-  //      // function.
-  //      assert fun._defs.find(euse.in(0)) == -1;
-  //      CallEpiNode cepi = ((CallNode)euse).callepi();
-  //      cepi.unwire( gvn, newepi);
-  //    }
-  //    int idx = euse._defs.find(newepi);
-  //    gvn.set_def_reg(euse,idx,replace);
-  //  }
-  //}
-      
   // Compute value from inputs.  Simple meet over inputs.
   @Override public Type value(GVNGCM gvn) {
     // Will be an error eventually, but act like its executed so the trailing
@@ -581,4 +566,24 @@ public class FunNode extends RegionNode {
     return _tf == fun._tf;
   }
   @Override public byte op_prec() { return _op_prec; }
+
+  String check(GVNGCM gvn, RetNode ret, ParmNode rpc_parm, boolean clean) {
+    // Check all incoming paths for being both alive and wired. 
+    for( int i=1; i<_defs._len; i++ ) {
+      if( gvn.type(_defs.at(i))!=Type.CTRL ) { // Dead paths already cleared out coming into inlining
+        assert !clean;                         // But inlining makes some dead paths
+        continue;
+      }
+      TypeRPC trpc = (TypeRPC)gvn.type(rpc_parm.in(i));
+      if( trpc == TypeRPC.ALL_CALL ) continue; // Skip the unknown caller
+      int rpc = trpc.rpc(), found=0;
+      // Must exist a wired CallEpi/Call pair matching this incoming RPC.
+      for( Node cepi : ret._uses )
+        if( cepi instanceof CallEpiNode &&
+            ((CallEpiNode)cepi).call()._rpc == rpc )
+          { found = 1; break; }
+      if( found==0 ) return "Call RPC#"+rpc+" is wired, but no matching Call/CallEpi is wired";
+    }
+    return null;
+  }
 }

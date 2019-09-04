@@ -67,7 +67,7 @@ public class NewNode extends Node {
       // If did meet once, need to keep doing it until the types propagate
       // through the graph and catch up to our inputs... which means the Node
       // graph finally matches the type graph.
-      TypeStruct mt = (TypeStruct) (gvn._opt ? apxt.meet(oldt) : apxt.join(oldt));
+      TypeStruct mt = (TypeStruct) (gvn._opt_mode==2 ? apxt.meet(oldt) : apxt.join(oldt));
       if( apxt.isa(oldt) || mt == apxt ) _did_meet = false;
       else apxt = mt;
     }

@@ -336,17 +336,15 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   // Bits are split in a tree like pattern, recorded here.  To avoid rehashing,
   // the exact same tree-split is handed out between tests.  Basically there is
   // only 1 tree shape, lazily discovered, for all tests.
-  static class Tree<B extends Bits<B>> {
+  public static class Tree<B extends Bits<B>> {
     int _cnt = 1; // Next available bit number
     // Invariants: _pars[kid]==parent && _kids[parent].contains(kid)
-    int[] _pars = new int[2];   // Parent bit from child bit; _cnt is the in-use part
+    int[]   _pars = new int[2];  // Parent bit from child bit; _cnt is the in-use part
     int[][] _kids = new int[2][];// List of kids from a parent; 1st element is in-use length
     int[] _init;                 // Used to reset _kids[X][0] for all X
 
-    boolean is_parent(int par) {
-      return par < _kids.length && _kids[par]!=null && _kids[par][0] > 0;
-    }
     int parent( int kid ) { return _pars[kid]; }
+    public boolean is_parent( int idx ) { return idx<_kids.length && _kids[idx]!=null &&_kids[idx][0]>1; }
     @Override public String toString() { return toString(new SB(),1).toString(); }
     private SB toString(SB sb,int i) {
       sb.i().p(i).nl();
@@ -378,19 +376,23 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
       }
       // Need a new bit
       int bit = _cnt++; // Next available bit number
+      
+      // Make space in the parents array to hold the parent of 'bit'
       while( bit >= _pars.length ) _pars = Arrays.copyOf(_pars,_pars.length<<1);
       assert _pars[bit]==0;
       _pars[bit] = par;
+      // Make space in the kids array to hold the children of 'par'
       while( par >= _kids.length ) _kids = Arrays.copyOf(_kids,_kids.length<<1);
-      int[] kids = _kids[par];
+      int[] kids = _kids[par];  // All the children of 'par'
       if( kids==null ) _kids[par] = kids = new int[]{1};
-      int klen = kids[0];
-      if( klen == kids.length )
+      int klen = kids[0];       // 1-based number of children.  '1' means 'no children'
+      if( klen == kids.length ) // Make space as needed
         _kids[par] = kids = Arrays.copyOf(kids,klen<<1);
-      kids[klen] = bit;
-      kids[0] = klen+1;
+      kids[klen] = bit;         // Insert new child of parent
+      kids[0] = klen+1;         // Bump count of children
       return bit;
     }
+
     void init0() {
       _init = new int[_kids.length];
       for( int i=0; i<_kids.length; i++ )
@@ -399,12 +401,12 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     void reset_to_init0() {
       for( int i=0; i<_kids.length; i++ )
         if( _kids[i] != null )
-          _kids[i][0] = i<_init.length ? _init[i] : 0;
+          _kids[i][0] = i<_init.length ? _init[i] : 1;
     }
     int peek() { return _kids[1][_kids[1][0]]; } // for testing
     // Smear out the kids in a non-canonical representation, to allow the caller
     // to iterate more easily.
-    BitSet plus_kids(Bits<B> bits) {
+    public BitSet plus_kids(Bits<B> bits) {
       BitSet bs = new BitSet();
       for( int i : bits )
         if( i != 0 )

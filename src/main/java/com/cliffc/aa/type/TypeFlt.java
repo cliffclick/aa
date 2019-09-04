@@ -109,7 +109,7 @@ public class TypeFlt extends Type<TypeFlt> {
     if( t._type == Type.TINT ) return 99; // Flt->Int always requires user intervention
     if( t._type == Type.TMEMPTR ) return 99; // No flt->ptr conversion
     if( t._type == Type.TREAL ) return 1;
-    if( t._type == Type.TSCALAR ) return 1;
+    if( t._type == TSCALAR ) return 9; // Might have to autobox
     throw com.cliffc.aa.AA.unimpl();
   }
   @Override public Type widen() {

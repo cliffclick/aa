@@ -172,6 +172,7 @@ public class Parse {
   /** Parse a top-level:
    *  prog = stmts END */
   private void prog() {
+    _gvn._opt_mode = 0;
     Node res = stmts();
     if( res == null ) res = con(Type.ANY);
     _e._scope.add_def(res);       // Hook result
@@ -313,7 +314,7 @@ public class Parse {
       } else { // Handle re-assignments and forward referenced function definitions
         if( n.is_forward_ref() ) { // Prior is actually a forward-ref, so this is the def
           assert !_e.is_mutable(tok);
-          ((QNode)n).merge_ref_def(_gvn,tok,(QNode)ifex);
+          ((FunPtrNode)n).merge_ref_def(_gvn,tok,(FunPtrNode)ifex);
         } else if( _e.is_mutable(tok) )
           _e.update(tok,ifex,_gvn,mutable);
         else

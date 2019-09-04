@@ -5,6 +5,8 @@ import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 
+import java.util.BitSet;
+
 // Call/apply node.
 //
 // Control is not required for an apply but inlining the function body will
@@ -51,6 +53,7 @@ import com.cliffc.aa.util.Ary;
 public class CallNode extends Node {
   int _rpc;                 // Call-site return PC
   private boolean _unpacked;// Call site allows unpacking a tuple (once)
+  private boolean _monotonicity_assured;
   Parse  _badargs;          // Error for e.g. wrong arg counts or incompatible args
   public CallNode( boolean unpacked, Parse badargs, Node... defs ) {
     super(OP_CALL,defs);
@@ -129,7 +132,19 @@ public class CallNode extends Node {
     // If the function is unresolved, see if we can resolve it now
     if( unk instanceof UnresolvedNode ) {
       FunPtrNode fun = resolve(gvn);
-      if( fun != null ) { set_fun(fun,gvn); return this; }
+      if( fun != null ) {
+        // Replace the Unresolved with the resolved.
+        set_fun(fun,gvn);
+        // Resolving a Call typically lowers its type in the lattice.  Before
+        // resolving it is taking the JOIN of all potential calls but after
+        // resolving only 1 call is actually happening.  This blows the simple
+        // type monotonicity result in the iter() phase, but passes a more
+        // complex monotonicity test: a call only resolves once.  After
+        // resolving, types once again only fall.  Bypass the type-monotonicity
+        // asset in iter().
+        _monotonicity_assured = true;
+        return this;
+      }
     }
 
     return null;
@@ -140,7 +155,13 @@ public class CallNode extends Node {
   @Override public TypeTuple value(GVNGCM gvn) {
     return TypeTuple.make(gvn.type(ctl()),gvn.type(fun()));
   }
-
+  // One-shot toggle set after a successful resolve.  Bypasses type
+  // monotonicity assert in iter().
+  @Override public boolean monotonicity_assured() {
+    boolean m = _monotonicity_assured;
+    _monotonicity_assured = false;
+    return m;
+  }
 
   // Given a list of actuals, apply them to each function choice.  If any
   // (!actual-isa-formal), then that function does not work and supplies an
@@ -158,6 +179,9 @@ public class CallNode extends Node {
     if( fidxs == null ) return null; // Might be e.g. ~Scalar
     if( !fidxs.above_center() ) return null; // Sane as-is
     if( fidxs.test(BitsFun.ALL) ) return null;
+    // Any alias, plus all of its children, are meet/joined.  This does a
+    // tree-based scan on the inner loop.
+    BitSet bs = fidxs.tree().plus_kids(fidxs);
 
     // Set of possible choices with fewest conversions
     class Data {
@@ -172,7 +196,7 @@ public class CallNode extends Node {
     // toss it out.  Also count conversions, and keep the minimal conversion
     // function with all arguments known.
     outerloop:
-    for( int fidx : fidxs ) {
+    for( int fidx = bs.nextSetBit(0); fidx >= 0; fidx = bs.nextSetBit(fidx+1) ) {
       FunNode fun = FunNode.find_fidx(fidx);
       if( fun.nargs() != nargs() ) continue; // Wrong arg count, toss out
       TypeTuple formals = fun._tf._args;   // Type of each argument
@@ -278,4 +302,3 @@ public class CallNode extends Node {
   }
 
 }
-

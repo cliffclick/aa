@@ -19,8 +19,8 @@ public class BitsFun extends Bits<BitsFun> {
     else { INTERN.put(b1,b1); return b1; }
   }
 
-  private static final Bits.Tree<BitsFun> TREE = new Bits.Tree<>();
-  @Override Tree<BitsFun> tree() { return TREE; } 
+  static final Bits.Tree<BitsFun> TREE = new Bits.Tree<>();
+  @Override public Tree<BitsFun> tree() { return TREE; }
   public static final int ALL = new_fidx(0);
   private static int new_fidx( int par ) { return TREE.split(par); }
   // Fast reset of parser state between calls0 to Exec

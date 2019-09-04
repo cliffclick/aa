@@ -62,4 +62,12 @@ public class UnresolvedNode extends Node {
     for( Node f : _defs ) if( (prec=f.op_prec()) >= 0 ) return prec;
     return prec;
   }
+  // Explicitly break monotonicity.  Happens because we are doing a *join*
+  // (choice) of functions, and if we inline any one of these choices the
+  // orginal FIDX becomes a class, and gets renumbered to a constant member of
+  // the class...  and the JOIN loses a choice (which is all members of the
+  // class).
+  @Override public boolean monotonicity_assured() {
+    return true;
+  }
 }
