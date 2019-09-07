@@ -21,13 +21,21 @@ public final class FunPtrNode extends Node {
     return "*"+(fun==null ? ""+fidx : fun.name());
   }
   // Inline longer name
-  @Override String  str() { FunNode fun = fun();  return fun==null ? xstr() : fun.str(); }
+  @Override String  str() {
+    RetNode ret = ret();
+    if( ret.is_copy() ) return "*!!!{->}";
+    FunNode fun = ret.fun();
+    return fun==null ? xstr() : fun.str();
+  }
 
   @Override public Node ideal(GVNGCM gvn) { return null; }
   @Override public Type value(GVNGCM gvn) {
     if( !(in(0) instanceof RetNode) )
       return TypeFunPtr.EMPTY;
-    return fun()._tf;
+    RetNode ret = ret();
+    if( ret.is_copy() )
+      return FunNode.find_fidx(ret._fidx)._tf;
+    return ret.fun()._tf;
   }
   @Override public Type all_type() { return TypeFunPtr.GENERIC_FUNPTR; }
   // Return the op_prec of the returned value.  Not sensible except when called

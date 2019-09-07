@@ -22,7 +22,11 @@ public class RegionNode extends Node {
       if( gvn.type(in(i))==Type.XCTRL ) { // Found dead path; cut out
         for( Node phi : _uses )
           if( phi instanceof PhiNode ) {
-            Type ot = gvn.type(phi); gvn.unreg(phi); phi.remove(i,gvn); gvn.rereg(phi,ot);
+            assert !phi.is_dead();
+            Type ot = gvn.type(phi);
+            gvn.unreg(phi);
+            phi.remove(i,gvn);
+            if( !phi.is_dead() ) gvn.rereg(phi,ot);
           }
         remove(i,gvn);
         return this; // Progress

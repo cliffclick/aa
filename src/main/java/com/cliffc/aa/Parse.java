@@ -567,7 +567,7 @@ public class Parse {
     }
     Node old_ctrl = ctrl();
     Node old_mem  = mem ();
-    FunNode fun = init(new FunNode(ts.asAry()));
+    FunNode fun = (FunNode)init(new FunNode(ts.asAry()).add_def(Env.ALL_CTRL));
     try( Env e = new Env(_e) ) {// Nest an environment for the local vars
       _e = e;                   // Push nested environment
       set_ctrl(fun);            // New control is function head

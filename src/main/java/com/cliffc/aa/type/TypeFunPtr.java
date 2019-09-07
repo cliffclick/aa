@@ -67,7 +67,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   // Used by testing only
   public static TypeFunPtr make_new(TypeTuple args, Type ret) { return make(BitsFun.make_new_fidx(BitsFun.ALL),args,ret); }
   public TypeFunPtr make_fidx( int fidx ) { return make(BitsFun.make0(fidx),_args,_ret); }
-  public TypeFunPtr make_new_fidx( int parent ) { return make(BitsFun.make_new_fidx(parent),_args,_ret); }
+  public TypeFunPtr make_new_fidx( int parent, TypeTuple args ) { return make(BitsFun.make_new_fidx(parent),args,_ret); }
   public static TypeFunPtr make_anon() { return make_new(TypeTuple.ALL_ARGS,Type.SCALAR); } // Make a new anonymous function ptr
 
   public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.NZERO,TypeTuple.ALL_ARGS,Type.SCALAR);
