@@ -76,8 +76,8 @@ public class CallNode extends Node {
   public  Node fun() { return in(1); }
           Node mem() { return in(2); }
   //private void set_ctl    (Node ctl, GVNGCM gvn) {     set_def    (0,ctl,gvn); }
-  private void set_fun    (FunPtrNode fun, GVNGCM gvn) {     set_def    (1,fun,gvn); }
-  public  void set_fun_reg(FunPtrNode fun, GVNGCM gvn) { gvn.set_def_reg(this,1,fun); }
+  public  void set_fun    (Node fun, GVNGCM gvn) {     set_def    (1,fun,gvn); }
+  public  void set_fun_reg(Node fun, GVNGCM gvn) { gvn.set_def_reg(this,1,fun); }
   public BitsFun fidxs(GVNGCM gvn) {
     Type tf = gvn.type(fun());
     return tf instanceof TypeFunPtr ? ((TypeFunPtr)tf).fidxs() : null;

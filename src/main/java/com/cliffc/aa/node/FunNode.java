@@ -353,44 +353,40 @@ public class FunNode extends RegionNode {
   private Node split_callers( GVNGCM gvn, ParmNode[] parms, RetNode oldret, FunNode fun, CGEdge[] cgedges, int path) {
     // Map from old to cloned function body
     HashMap<Node,Node> map = new HashMap<>();
-    map.put(this,fun);
+    // Strip out all wired calls to this function.  All will re-resolve later.
+    for( CGEdge cg : cgedges )
+      if( cg != null && cg._cepi != null )
+        gvn.remove(cg._cepi,cg._cepi._defs.find(oldret));
+    // Strip out all paths to this function.
+    for( Node parm : _uses ) if( parm instanceof ParmNode ) gvn.unreg(parm);
+    for( int i=has_unknown_callers() ? 2 : 1; i<=_defs._len; i++ ) {
+      pop();
+      for( Node parm : _uses ) if( parm instanceof ParmNode ) parm.pop();
+    }
+    for( Node parm : _uses ) if( parm instanceof ParmNode ) gvn.rereg(parm,((ParmNode)parm)._default_type);
+    
     // Clone the function body
+    map.put(this,fun);
     Ary<Node> work = new Ary<>(new Node[1],0);
     work.addAll(_uses);                  // Prime worklist
     while( work._len > 0 ) {             // While have work
       Node n = work.pop();               // Get work
       if( map.get(n) != null ) continue; // Already visited?
+      if( n == oldret ) continue;        // Do not walk past the RetNode
       int op = n._op;                    // opcode
       if( op == OP_FUN  && n       != this ) continue; // Call to other function, not part of inlining
       if( op == OP_PARM && n.in(0) != this ) continue; // Arg  to other function, not part of inlining
-      if( n == oldret ) continue; // Do not walk past the RetNode
       map.put(n,n.copy(gvn)); // Make a blank copy with no edges and map from old to new
       work.addAll(n._uses);   // Visit all uses also
     }
     
-    // If type-split/multi-path, recursive calls will go to the clone.  Copy
-    // the newfun, newret, and newfunptr INTO the map before cloning edges.
-
-    // If single-path/no-types, leave the newfun, newret, newfunptr OUT of the
-    // map.  Recursive calls will stay to the original function.
-    
     // Collect the old/new funptrs and add to map also.
     RetNode newret = (RetNode)oldret.copy(gvn);
     newret._fidx = fun.fidx();
+    map.put(oldret,newret);
     FunPtrNode old_funptr = oldret.funptr();
     FunPtrNode new_funptr = (FunPtrNode)old_funptr.copy(gvn);
-    if( path < 0 ) {            // Type-split multi-path?
-      // Type-split; cycles get cloned into new code.
-      // Move all edge nodes into the map.
-      map.put(oldret    ,newret    );
-      map.put(old_funptr,new_funptr);
-    } else {                    // Single-path?
-      // Single-path being inlined; funnode uses the old inputs.  Ret and
-      // FunPtr use the new nodes but are not in the map, to avoid recursive
-      // Call and CallEpi picking them up.
-      for( Node def : oldret._defs ) newret.add_def(map.get(def));
-      new_funptr.add_def(newret);
-    }
+    new_funptr.add_def(newret);
     
     // Fill in edges.  New Nodes point to New instead of Old; everybody
     // shares old nodes not in the function (and not cloned).
@@ -402,89 +398,43 @@ public class FunNode extends RegionNode {
         c.add_def(newdef==null ? def : newdef);
       }
     }
-    
-    // Fix the Call Graph: move all wired calls to either the old or new
-    // directly.
-    Node any = gvn.con(Type.XCTRL); // Dead control
-    for( int e = 1; e < cgedges.length; e++ ) {
-      CGEdge cg = cgedges[e];
-      CallNode call = cg._cepi == null ? null : cg._cepi.call();
-      assert cg._path==e;
-      assert cg._ridx==-1 || cg._cepi.in(cg._ridx)==oldret;
-      assert cg._ridx==-1 || call.fun()==old_funptr;        
-      assert cg._rpc.in(0)==this;
-      Node newctrl = map.get(in(e));
-      // Recursive calls:
-      // If the control edge from the old FunNode has been cloned, then it is
-      // to an internal control, i.e. a recursive call.
-      if( newctrl != null ) {
-        CallNode newcall = (CallNode)map.get(call);
-        if( path < 0 ) {        // Type-split / multi-path
-          // No real CG edge changes, as the old function calls the old and the
-          // new calls the new.  Both have self-cycles, to themselves.  Change
-          // the new RPC which just copied the old RPC.
-          ParmNode newrpc  = (ParmNode)map.get(cg._rpc);
-          newrpc.set_def(e,gvn.con(TypeRPC.make(newcall._rpc)),gvn);
-          
-        } else if( path != e ) {
-          // New clone calls the old (not new) directly.  These same inputs
-          // appear in both old and new.  The old self calls old are OK,
-          // unchanged.  The new never calls itself, but instead those calls
-          // also go to the old.
-          fun.set_def(e,any,gvn); // Kill in new
-          add_def(newctrl);       // Add  to old
-          for( Node parm : _uses )// Add path to all parms
-            if( parm instanceof ParmNode ) {
-              Node newuse = ((ParmNode)parm)._idx == -1
-                ? gvn.con(TypeRPC.make(newcall._rpc)) // Use the new call's new RPC
-                : map.get(parm.in(e));                // Otherwise take value mapped from the new clone
-              gvn.add_def(parm,newuse);               // Add path to all parms
-            }
-        } else  {
-          // Cloning along a recursive path, to double a small recursive
-          // function body.  Very similar to loop unrolling.
-          System.out.println("abc");
-        }
-        continue;
-      }
+    if( path >= 0 )
+      fun.set_def(1,gvn.con(Type.XCTRL),gvn);
 
-      // Both old and new keep cloned unknown caller edges
-      if( path < 0 && e==1 && has_unknown_callers() )  continue;
-      
-      boolean split=true;       // True if moving CG to new
-      // Single target inline?
-      if( path >= 1 )           // Inlining single target?
-        split = path==e;        // Move if matching path
-      else {
-        // Must be a type-split.
-        assert fun._tf != _tf;
-        // Look for parm inputs which are too generic for the new type.
-        // These stay on the old otherwise move to the new.
-        TypeTuple new_targs = fun._tf._args;
-        for( int i=0; i<parms.length; i++ ) {
-          if( parms[i]==null ) continue;
-          Type tp = gvn.type(parms[i].in(e));
-          if( tp.above_center() || !tp.isa(new_targs._ts[i]) )
-            { split=false; break; }
+    // Make an Unresolved choice of the old and new functions, to be used by
+    // non-application uses.
+    gvn.setype(new_funptr,new_funptr.value(gvn));
+    Node new_unr = null;
+    if( path < 0 ) {
+      new_unr = gvn.xform(new UnresolvedNode(old_funptr,new_funptr));
+      for( int i=0; i<old_funptr._uses._len; i++ ) {
+        Node use = old_funptr._uses.at(i);
+        if( use != new_unr &&
+            !(use instanceof CallNode) ) {
+          // TODO: move to the new_unr
+          throw com.cliffc.aa.AA.unimpl();
         }
       }
-      
-      // Kill either the left or right input path
-      if( split ) {             // CGEdge is to old, moved to new
-        set_def(e,any,gvn);     // Kill in old FunNode
-        gvn.set_def_reg(cg._cepi, cg._ridx, newret);
-        call.set_fun_reg(new_funptr,gvn);
-      } else {
-        fun.set_def(e,any,gvn); // CGEdge is dead in new
-      }
+      gvn.add_work(new_unr);
     }
-    assert !oldret.is_dead();      // Not expecting this to be dead already
     
-    // Put all new nodes into the GVN tables and worklists
-    if( path >= 0 ) {           // Single-path?
-      map.put(oldret,newret);
-      map.put(old_funptr,new_funptr);
+    // Set all calls to the correct version.  If doing a type-split, use the
+    // Unresolved and the calls will individually resolve.  If doing a
+    // path-split, all have been left at the original; just force the path to
+    // the new.
+    Node mapped_path = path >= 0 ? map.get(cgedges[path]._cepi.call()) : null;
+    for( int e=has_unknown_callers() ? 2 : 1; e<cgedges.length; e++ ) {
+      CGEdge cg = cgedges[e];
+      Node fp = path < 0 ? new_unr : (path==e ? new_funptr : old_funptr);
+      CallNode call = cg._cepi.call();
+      CallNode newcall = (CallNode)map.get(call); // Fetch before changing edges, hence map hash
+      call.set_fun_reg(fp,gvn);
+      gvn.setype(call,call.value(gvn));
+      if( newcall != null )
+        newcall.set_fun(path < 0 ? new_unr : old_funptr, gvn);
     }
+   
+    // Put all new nodes into the GVN tables and worklists
     for( Map.Entry<Node,Node> e : map.entrySet() ) {
       Node nn = e.getValue();         // New node
       Type ot = gvn.type(e.getKey()); // Generally just copy type from original nodes
@@ -492,28 +442,27 @@ public class FunNode extends RegionNode {
         int idx = ((ParmNode)nn)._idx; // Update default type to match signature
         if( idx == -1 ) ot = nn.all_type(); // Except the new RPC, which has new callers
         else if( idx >= 0 ) ((ParmNode)nn)._default_type = fun.targ(idx);
-      } else if( nn == new_funptr )
+      } else if( nn == new_funptr ) {
         ot = fun._tf;           // New TFP for the new FunPtr
+      }
       gvn.rereg(nn,ot);
     }
-    
-    // Make an Unresolved choice of the old and new functions, to be used by
-    // not-yet-wired Calls and non-application uses.
-    Node new_unr = gvn.xform(new UnresolvedNode(old_funptr,new_funptr));
-    for( int i=0; i<old_funptr._uses._len; i++ ) {
-      Node use = old_funptr._uses.at(i);
-      if( use == new_unr ) continue;
-      if( use instanceof CallNode ) {
-        // This is a wired-use; the trailing CallEpi has exactly 1 wired input
-        // edge to the matching RetNode
-        assert ((CallNode)use)._uses.at(0).in(1)==oldret;
-      } else {
-        // TODO: move to the new_unr
-        throw com.cliffc.aa.AA.unimpl();
-      }
+
+    // If fixed path, wire it directly right now
+    if( path>=0 ) {
+      CallEpiNode cepi = cgedges[path]._cepi;
+      Type oldt = gvn.type(cepi);
+      gvn.unreg(cepi);
+      cepi.wire(gvn,cepi.call(),fun,newret);
+      gvn.rereg(cepi,oldt);
+      // If recursive fixed path (i.e., loop unrolling a recursive function)
+      // the cloned new call got a copy of the old call's updated type...
+      // which points to the wrong thing for the new call.  Force type update
+      // right now to survive monotonicity assert later.
+      if( mapped_path != null )
+        gvn.setype(mapped_path,mapped_path.value(gvn));
     }
-    gvn.add_work(new_unr);
-    
+
     return this;
   }
 

@@ -36,11 +36,11 @@ public final class CallEpiNode extends Node {
     TypeFunPtr tfp = (TypeFunPtr)tcall.at(1);
     
     // The one allowed function is already wired?  Then directly inline.
+    // Requires this calls 1 target, and the 1 target is only called by this.
     BitsFun fidxs = tfp.fidxs();
     if( _defs._len==2 ) {
       RetNode ret = (RetNode)in(1);
-      if( ret.is_copy() || !ret.fun().has_unknown_callers() ) {
-        assert ret.is_copy() || ret.fun()._tf.isa(tfp);
+      if( ret.is_copy() ) {     // FunNode already single-caller and collapsed
         return inline(gvn, ret.ctl(), ret.mem(), ret.val());
       }
     }
@@ -127,7 +127,7 @@ public final class CallEpiNode extends Node {
   // knowledge of its callers and arguments.  This adds an edge in the Call-Graph.
   // TODO: Leaves the Call in the graph - making the graph "a little odd" - double
   // CTRL users - once for the call, and once for the function being called.
-  private Node wire( GVNGCM gvn, CallNode call, FunNode fun, RetNode ret ) {
+  Node wire( GVNGCM gvn, CallNode call, FunNode fun, RetNode ret ) {
     assert _keep==0;            // not expecting this during calls
 
     for( int i=1; i<_defs._len; i++ )
