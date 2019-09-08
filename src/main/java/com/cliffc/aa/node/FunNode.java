@@ -387,6 +387,7 @@ public class FunNode extends RegionNode {
     FunPtrNode old_funptr = oldret.funptr();
     FunPtrNode new_funptr = (FunPtrNode)old_funptr.copy(gvn);
     new_funptr.add_def(newret);
+    old_funptr.keep(); // Keep around; do not kill last use before the clone is done
     
     // Fill in edges.  New Nodes point to New instead of Old; everybody
     // shares old nodes not in the function (and not cloned).
@@ -462,6 +463,7 @@ public class FunNode extends RegionNode {
       if( mapped_path != null )
         gvn.setype(mapped_path,mapped_path.value(gvn));
     }
+    old_funptr.unkeep(gvn);
 
     return this;
   }
