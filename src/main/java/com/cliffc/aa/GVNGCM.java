@@ -303,7 +303,6 @@ public class GVNGCM {
     // Either no-progress, or progress and need to re-insert n back into system
     _ts._es[n._uid] = oldt;     // Restore old type, in case we recursively ask for it
     Type t = n.value(this);     // Get best type
-    assert t.isa(oldt) || n.monotonicity_assured();  // Types only improve, or there is an external monotonic behavior
     _ts._es[n._uid] = null;     // Remove in case we replace it
     // Replace with a constant, if possible
     if( replace_con(t,n) )

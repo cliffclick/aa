@@ -144,8 +144,16 @@ public abstract class Node implements Cloneable {
       // Do not recursively print root Scope, nor Unresolved of primitives.
       // These are too common, and uninteresting.
       for( Node n : _defs ) if( n != null && (!prims && n._uid < GVNGCM._INIT0_CNT) ) bs.set(n._uid);
-      // Recursively print most of the rest, just not the multi-node combos
-      for( Node n : _defs ) if( n != null && !n.is_multi_head() && !n.is_multi_tail() ) n.dump(d+1,sb,max,bs,gvn,prims);
+      // Recursively print most of the rest, just not the multi-node combos and
+      // Unresolve & FunPtrs.
+      for( Node n : _defs )
+        if( n != null && !n.is_multi_head() && !n.is_multi_tail() &&
+            !(n instanceof UnresolvedNode) && !(n instanceof FunPtrNode) )
+          n.dump(d+1,sb,max,bs,gvn,prims);
+      // Print Unresolved and FunPtrs, which typically catch whole functions.
+      for( Node n : _defs )
+        if( (n instanceof UnresolvedNode) || (n instanceof FunPtrNode) )
+          n.dump(d+1,sb,max,bs,gvn,prims);
       // Print anything not yet printed, including multi-node combos
       for( Node n : _defs ) if( n != null ) n.dump(d+1,sb,max,bs,gvn,prims);
     }

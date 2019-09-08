@@ -40,9 +40,8 @@ public final class CallEpiNode extends Node {
     BitsFun fidxs = tfp.fidxs();
     if( _defs._len==2 ) {
       RetNode ret = (RetNode)in(1);
-      if( ret.is_copy() ) {     // FunNode already single-caller and collapsed
+      if( ret.is_copy() )       // FunNode already single-caller and collapsed
         return inline(gvn, ret.ctl(), ret.mem(), ret.val());
-      }
     }
 
     // If the call's allowed functions excludes any wired, remove the extras
@@ -179,30 +178,21 @@ public final class CallEpiNode extends Node {
     BitsFun fidxs = funt.fidxs();
     if( fidxs.test(BitsFun.ALL) ) // All functions are possible?
       return TypeTuple.CALL;        // Worse-case result
-
-    // If there are any fidxs that do not have a matching Return, we must
-    // assume it is an unwired call returning the max pessimal result and bail
-    // out with TypeTuple.CALL.
-    BitSet bs = new BitSet();
-    for( int i=1; i<_defs._len; i++ )
-      bs.set(((RetNode)_defs.at(i)).fidx());
-    for( int fidx : fidxs )
-      // FIDXs that are parents got split & cloned... and always both child
-      // fidxs get wired, although the parent never shows up wired anymore.  If
-      // not a parent and not wired, must be an unwired call returning a max
-      // pessimal result.
-      if( !fidxs.tree().is_parent(fidx) && !bs.get(fidx) )
-        return TypeTuple.CALL;
     
-    // If there are any Returns without a matching fidx, we can assume that
-    // function is not called and not merge it.
-    BitSet bsplus = fidxs.tree().plus_kids(fidxs);
-    Type t = TypeTuple.XCALL;
-    for( int i=1; i<_defs._len; i++ ) {
-      RetNode ret = (RetNode)_defs.at(i);
-      if( bsplus.get(ret.fidx()) )     // This function is possible
-        t = t.meet(gvn.type(ret)); // So merge his results
-    }
+
+    // Merge returns from all fidxs, wired or not.  Required during GCP to keep
+    // optimistic.  JOIN if above center, merge otherwise.  Wiring the calls
+    // gives us a faster lookup, but need to be correct wired or not.
+    Bits.Tree<BitsFun> tree = fidxs.tree();
+    BitSet bs = tree.plus_kids(fidxs);
+    boolean lifting = gvn._opt_mode == 2 && fidxs.above_center();
+    Type t = lifting ? TypeTuple.CALL : TypeTuple.XCALL;
+    for( int fidx = bs.nextSetBit(0); fidx >= 0; fidx = bs.nextSetBit(fidx+1) ) {
+      if( tree.is_parent(fidx) ) continue;   // Will be covered by children
+      FunNode fun = FunNode.find_fidx(fidx); // Lookup, even if not wired
+      Type ret = gvn.type(fun.ret());        // Type of the return
+      t = lifting ? t.join(ret) : t.meet(ret);
+    }    
     
     return t;
   }

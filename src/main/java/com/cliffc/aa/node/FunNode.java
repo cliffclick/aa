@@ -359,7 +359,8 @@ public class FunNode extends RegionNode {
         gvn.remove(cg._cepi,cg._cepi._defs.find(oldret));
     // Strip out all paths to this function.
     for( Node parm : _uses ) if( parm instanceof ParmNode ) gvn.unreg(parm);
-    for( int i=has_unknown_callers() ? 2 : 1; i<=_defs._len; i++ ) {
+    int lim = has_unknown_callers() ? 2 : 1;
+    while( lim < _defs._len ) {
       pop();
       for( Node parm : _uses ) if( parm instanceof ParmNode ) parm.pop();
     }
