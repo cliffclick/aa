@@ -206,8 +206,6 @@ public class CallNode extends Node {
       boolean unk = false;       // Unknown arg might be incompatible or free to convert
       for( int j=0; j<nargs(); j++ ) {
         Type actual = gvn.type(arg(j));
-        //if( actual==Type.XSCALAR && arg(j) instanceof ConNode )
-        //  continue; // Forced super-high arg is always compatible before formal is dead
         Type tx = actual.join(formals.at(j));
         if( tx != actual && tx.above_center() ) // Actual and formal have values in common?
           continue outerloop;   // No, this function will never work; e.g. cannot cast 1.2 as any integer

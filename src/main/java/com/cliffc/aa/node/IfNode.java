@@ -6,7 +6,9 @@ import com.cliffc.aa.type.*;
 // Split control
 public class IfNode extends Node {
   public IfNode( Node ctrl, Node pred ) { super(OP_IF,ctrl,pred); }
-  @Override public Node ideal(GVNGCM gvn) { return null; }
+  @Override public Node ideal(GVNGCM gvn) {
+    return gvn.type(in(0)) == Type.XCTRL ? gvn.con(TypeTuple.IF_ANY) : null;
+  }
   @Override public TypeTuple value(GVNGCM gvn) {
     // If the input is exactly zero, we can return false: {ANY,CONTROL}
     // If the input excludes   zero, we can return true : {CONTROL,ANY}
@@ -40,6 +42,7 @@ public class IfNode extends Node {
   @Override public Type all_type() { return TypeTuple.IF_ALL; }
   @Override public Node is_copy(GVNGCM gvn, int idx) {
     TypeTuple tt = (TypeTuple)gvn.type(this);
+    if( tt==TypeTuple.IF_ANY ) return gvn.con(Type.XCTRL);
     if( tt==TypeTuple.IF_TRUE  && idx==1 ) return in(0);
     if( tt==TypeTuple.IF_FALSE && idx==0 ) return in(0);
     return null;

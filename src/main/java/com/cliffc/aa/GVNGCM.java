@@ -440,6 +440,7 @@ public class GVNGCM {
     // Revisit the entire reachable program, as ideal calls may do something
     // with the maximally lifted types.
     walk_opt(rez);
+    walk_dead(Env.START);
   }
 
   // Forward reachable walk, setting all_type.dual (except Start) and priming
@@ -470,14 +471,13 @@ public class GVNGCM {
     if( n instanceof FunNode && n._uid >= _INIT0_CNT ) {
       FunNode fun = (FunNode)n;
       RetNode ret = fun.ret();
-      FunPtrNode funptr = ret.funptr();
-      if( type(fun)==Type.CTRL && funptr != null && !funptr.is_forward_ref() ) {
+      if( type(fun)==Type.CTRL && !fun.is_forward_ref() ) {
         if( type(ret.ctl()) != Type.CTRL ) throw AA.unimpl(); // never-return function (maybe never called?)
-        TypeFunPtr tf = (TypeFunPtr)type(funptr);
-        if( tf != fun._tf &&    // can sharpen function return
-            tf.isa(fun._tf) ) { // Only if sharpened (might not be true for errors)
+        Type tret = ((TypeTuple)type(ret)).at(2);
+        if( fun._tf._ret != tret && // can sharpen function return
+            tret.isa(fun._tf._ret) ) { // Only if sharpened (might not be true for errors)
           unreg(fun);
-          fun._tf = tf;
+          fun._tf = TypeFunPtr.make(fun._tf.fidxs(),fun._tf._args,tret);
           rereg(fun,Type.CTRL);
         }
       }
@@ -495,4 +495,12 @@ public class GVNGCM {
         walk_opt(def);
   }
 
+  // Walk dead control and place on worklist
+  private void walk_dead( Node n ) {
+    assert !n.is_dead();
+    if( _wrk_bits.get(n._uid) ) return; // Been there, done that
+    if( n._uid != 0 && n._uid <= _INIT0_CNT ) return;  // Not primitives
+    add_work(n);                        // Only walk once
+    for( Node use : n._uses ) walk_dead(use);
+  }
 }

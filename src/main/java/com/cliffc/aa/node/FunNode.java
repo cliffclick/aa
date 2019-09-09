@@ -446,6 +446,8 @@ public class FunNode extends RegionNode {
         else if( idx >= 0 ) ((ParmNode)nn)._default_type = fun.targ(idx);
       } else if( nn == new_funptr ) {
         ot = fun._tf;           // New TFP for the new FunPtr
+      } else if( nn instanceof CallEpiNode ) { // Old calls might be wired, new calls need to re-wire
+        while( nn._defs._len > 1 ) nn.pop();
       }
       gvn.rereg(nn,ot);
     }
@@ -465,6 +467,11 @@ public class FunNode extends RegionNode {
         gvn.setype(mapped_path,mapped_path.value(gvn));
     }
     old_funptr.unkeep(gvn);
+    // TODO: This fixup shouldn't be here, since old_funptr can go dead at any
+    // time.  Anytime a FunPtrNode goes dead, there are NO uses which lead to
+    // calls, unknown or not.
+    if( old_funptr.is_dead() && !is_dead() && has_unknown_callers() )
+      set_def(1,gvn.con(Type.XCTRL),gvn);
 
     return this;
   }
