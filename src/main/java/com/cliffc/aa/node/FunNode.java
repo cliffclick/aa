@@ -93,9 +93,10 @@ public class FunNode extends RegionNode {
   }
   // Name from FunNode
   String name() {
+    String name = _name==null ? "fun"+fidx() : _name;
     return is_forward_ref()
-      ? "?"+_name
-      : (_op_prec >= 0 ? "{"+_name+"}" : _name+"={->}");
+      ? "?"+name
+      : (_op_prec >= 0 ? "{"+name+"}" : name+"={->}");
   }
   // Can return nothing, or "name" or "[name0,name1,name2...]" or "[35]"
   public static SB names(BitsFun fidxs, SB sb ) {

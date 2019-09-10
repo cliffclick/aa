@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
@@ -27,7 +28,7 @@ public class TypeNode extends Node {
       TypeFunPtr tfp = (TypeFunPtr)_t;
       Type[] targs = tfp._args._ts;
       Node[] args = new Node[targs.length+3];
-      FunNode fun = gvn.init(new FunNode(targs));
+      FunNode fun = gvn.init((FunNode)(new FunNode(targs).add_def(Env.ALL_CTRL)));
       args[0] = fun;            // Call control
       args[1] = arg;            // Call function is the argument being function-type-checked here
       args[2] = gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM),null));
@@ -36,15 +37,15 @@ public class TypeNode extends Node {
         // All the parms, with types
         args[i+3] = gvn.xform(new ParmNode(i,"arg"+i,fun,gvn.con(targs[i]),null));
       Node call = gvn.xform(new CallNode(true,_error_parse,args));
-      Node ctl = gvn.xform(new CProjNode(call,0));
-      Node mem = gvn.xform(new MProjNode(call,1));
-      Node val = gvn.xform(new  ProjNode(call,2));
-      Node chk = gvn.xform(new  TypeNode(tfp._ret,val,_error_parse)); // Type-check the return also
+      Node cepi = gvn.xform(new CallEpiNode(call));
+      Node ctl  = gvn.xform(new CProjNode(cepi,0));
+      Node mem  = gvn.xform(new MProjNode(cepi,1));
+      Node val  = gvn.xform(new  ProjNode(cepi,2));
+      Node chk  = gvn.xform(new  TypeNode(tfp._ret,val,_error_parse)); // Type-check the return also
       RetNode ret = (RetNode)gvn.xform(new RetNode(ctl,mem,chk,rpc,fun));
-      Node epi = gvn.xform(new QNode(fun,ret,null));
-      return epi;
+      return gvn.xform(new FunPtrNode(ret));
     }
-    
+
     // Push TypeNodes 'up' to widen the space they apply to, and hopefully push
     // the type check closer to the source of a conflict.
     Node fun = arg.in(0);
