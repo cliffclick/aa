@@ -253,7 +253,7 @@ public class GVNGCM {
     }
   }
 
-  public void xform_old( Node old ) {
+  private void xform_old( Node old ) {
     Node nnn = xform_old0(old);
     if( nnn==null ) return;
     if( nnn == old ) {          // Progress, but not replacement

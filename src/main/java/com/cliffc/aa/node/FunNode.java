@@ -120,7 +120,7 @@ public class FunNode extends RegionNode {
   @Override Node copy(GVNGCM gvn) { throw AA.unimpl(); } // Gotta make a new FIDX
 
   // True if no future unknown callers.
-  boolean has_unknown_callers() { return in(1) == Env.ALL_CTRL; }
+  boolean has_unknown_callers() { return _defs._len > 1 && in(1) == Env.ALL_CTRL; }
   // Argument type
   Type targ(int idx) {
     return idx == -1 ? TypeRPC.ALL_CALL :
@@ -134,6 +134,15 @@ public class FunNode extends RegionNode {
     Node n = super.ideal(gvn);
     if( n!=null ) return n;
 
+    // If no trailing RetNode and hence no FunPtr... function is uncallable
+    // from the unknown caller.
+    RetNode ret = ret();
+    if( has_unknown_callers() && ret == null && gvn._opt_mode == 1 ) { // Dead after construction?
+      set_def(1,gvn.con(Type.XCTRL),gvn); // Kill unknown caller
+      return this;
+    }
+    
+
     if( gvn._small_work ) { // Only doing small-work now
       gvn.add_work2(this);  // Maybe want to inline later
       return null;
@@ -144,8 +153,7 @@ public class FunNode extends RegionNode {
     ParmNode rpc_parm = rpc();
     if( rpc_parm == null ) return null; // Single caller const-folds the RPC, but also inlines in CallNode
     ParmNode[] parms = new ParmNode[nargs()];
-    RetNode ret = split_callers_gather(gvn,parms);
-    if( ret == null ) return null;
+    if( split_callers_gather(gvn,parms) == null ) return null;
 
     // Gather callers of this function being cloned.  Also does a decent sanity
     // check, so done before the split-choice heuristics.

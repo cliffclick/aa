@@ -199,7 +199,8 @@ public class TestNode {
     FunNode fun_forward_ref = new FunNode("anon");
 
     Node unr = Env.top().lookup("+"); // All the "+" functions
-    FunNode fun_plus = ((QNode)unr.in(1)).fun();
+    FunNode fun_plus = ((FunPtrNode)unr.in(1)).fun();
+    RetNode ret = fun_plus.ret();
 
     TypeMemPtr from_ptr = TypeMemPtr.make(BitsAlias.REC,TypeStruct.POINT);
     TypeMemPtr to_ptr   = TypeMemPtr.make(BitsAlias.REC,TypeName.TEST_STRUCT);
@@ -235,13 +236,12 @@ public class TestNode {
     test1monotonic(new   CastNode(_ins[0],_ins[1],TypeMemPtr.STRPTR));
     test1monotonic(new   CastNode(_ins[0],_ins[1],TypeMemPtr.STR0));
     test1monotonic(new  CProjNode(_ins[0],0));
-    test1monotonic(new QNode(fun_forward_ref,_ins[1],"unknown_ref"));
-    test1monotonic(new QNode(fun_plus       ,_ins[1],"plus"));
     test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  TypeInt.FALSE));
     test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  TypeStr.ABC  ));
     test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  TypeFlt.FLT64));
     test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  Type   .CTRL ));
     test1monotonic(new    FunNode(new Type[]{TypeInt.INT64}));
+    test1monotonic(new FunPtrNode(ret));
     test1monotonic(new     IfNode(_ins[0],_ins[1]));
     for( IntrinsicNewNode prim : IntrinsicNewNode.INTRINSICS )
       test1monotonic_intrinsic(prim);

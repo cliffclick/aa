@@ -286,7 +286,7 @@ public abstract class Node implements Cloneable {
     assert !is_dead();
     if( bs.get(_uid) ) return;  // Been there, done that
     bs.set(_uid);               // Only walk once
-    if( is_uncalled(gvn) ) return; // Function is a constant, but never executed, do not check for errors
+    if( is_uncalled(gvn) ) return; // FunPtr is a constant, but never executed, do not check for errors
     // Reverse walk: start and exit/return of graph and walk towards root/start.
     for( int i=0; i<_defs._len; i++ ) {
       Node def = _defs.at(i);   // Walk data defs for more errors
@@ -310,7 +310,7 @@ public abstract class Node implements Cloneable {
   public void walkerr_gc( Ary<String> errs, BitSet bs, GVNGCM gvn ) {
     if( bs.get(_uid) ) return;  // Been there, done that
     bs.set(_uid);               // Only walk once
-    if( is_uncalled(gvn) ) return; // Function is a constant, but never executed, do not check for errors
+    if( is_uncalled(gvn) ) return; // FunPtr is a constant, but never executed, do not check for errors
     if( this instanceof PhiNode &&
         (gvn.type(this).contains(Type.SCALAR) ||
          gvn.type(this).contains(Type.NSCALR)) ) // Cannot have code that deals with unknown-GC-state
@@ -327,7 +327,7 @@ public abstract class Node implements Cloneable {
   // on the ProjNode index
   public Node is_copy(GVNGCM gvn, int idx) { return null; }
 
-  // True if epilog or function is uncalled (but possibly returned or stored as
+  // True if function is uncalled (but possibly returned or stored as
   // a constant).  Such code is not searched for errors.
   boolean is_uncalled(GVNGCM gvn) { return false; }
   

@@ -52,10 +52,15 @@ public class TypeNode extends Node {
     if( arg instanceof PhiNode &&
         // Not allowed to push up the typing on the unknown arg... because
         // unknown new callers also need the check.
-        (!(fun instanceof FunNode) || !((FunNode)fun).has_unknown_callers()) ) {
-      assert fun instanceof RegionNode;
+        
+        // TODO: Probably not legit for FunNodes ever, because have to match
+        // the CallNode args with the FunNode args.  Or need to add the very
+        // same node as the matching call arg.  Alternatively, simplify the
+        // double-edge game going on with CG edges.
+        //(!(fun instanceof FunNode) || !((FunNode)fun).has_unknown_callers()) ) {
+        fun.getClass() == RegionNode.class ) {
       for( int i=1; i<arg._defs._len; i++ )
-        gvn.set_def_reg(fun,i,gvn.xform(new TypeNode(_t,arg.in(i),_error_parse)));
+        gvn.set_def_reg(arg,i,gvn.xform(new TypeNode(_t,arg.in(i),_error_parse)));
       return arg;               // Remove TypeNode, since completely replaced
     }
 

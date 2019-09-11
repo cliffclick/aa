@@ -115,17 +115,13 @@ public class Parse {
 
   private void remove_unknown_callers() {
     Ary<Node> uses = Env.ALL_CTRL._uses;
-    // Leave any final result function 'hooked' by the unknown caller to keep
-    // it alive to be returned.
-    Node res = _e._scope.in(_e._scope._defs._len-1);
-    Node fun = res instanceof QNode ? ((QNode)res).fun() : null;
-    // For all other unknown uses of functions, they will all be known after
-    // GCP.  Remove the hyper-conservative ALL_CTRL edge.  Note that I canNOT
-    // run the pessimistic opto() at this point, as GCP needs to discover all
-    // the actual call-graph edges and install them directly on the FunNodes.
+    // For all unknown uses of functions, they will all be known after GCP.
+    // Remove the hyper-conservative ALL_CTRL edge.  Note that I canNOT run the
+    // pessimistic opto() at this point, as GCP needs to discover all the
+    // actual call-graph edges and install them directly on the FunNodes.
     for( int i=0; i<uses._len; i++ ) {
       Node use = uses.at(i);
-      if( use._uid >= GVNGCM._INIT0_CNT && use != fun ) {
+      if( use._uid >= GVNGCM._INIT0_CNT ) {
         assert use instanceof FunNode;
         assert use.in(1)==Env.ALL_CTRL;
         _gvn.unreg(use);        // Changing edges, so unregister
@@ -243,11 +239,11 @@ public class Parse {
     // a ptr-to-Named:@{x,y}.  This stores a v-table ptr into an object.  The
     // alias# does not change, but a TypeMem[alias#] would now map to the Named
     // variant.
-    QNode epi1 = IntrinsicNode.convertTypeName((TypeObj)t,tn,errMsg(),_gvn);
+    FunPtrNode epi1 = IntrinsicNode.convertTypeName((TypeObj)t,tn,errMsg(),_gvn);
     Node rez = _e.add_fun(tvar,epi1); // Return type-name constructor
     // For Structs, add a second constructor taking an expanded arg list
     if( t instanceof TypeStruct ) {   // Add struct types with expanded arg lists
-      QNode epi2 = IntrinsicNode.convertTypeNameStruct((TypeStruct)t,tn,errMsg(),_gvn);
+      FunPtrNode epi2 = IntrinsicNode.convertTypeNameStruct((TypeStruct)t,tn,errMsg(),_gvn);
       Node rez2 = _e.add_fun(tvar,epi2); // type-name constructor with expanded arg list
       _gvn.init0(rez2._uses.at(0));      // Force init of Unresolved
     }

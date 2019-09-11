@@ -25,10 +25,7 @@ public final class RetNode extends Node {
         return (FunPtrNode)use;
     return null;
   }
-  public int fidx() {
-    assert !(in(4) instanceof FunNode) || fun().fidx()==_fidx;
-    return _fidx;
-  }
+  public int fidx() { return _fidx; }
   // Short self name
   @Override String xstr() {
     FunNode fun = FunNode.find_fidx(_fidx);
@@ -44,7 +41,7 @@ public final class RetNode extends Node {
   @Override public Type all_type() { return TypeTuple.CALL; }
 
   @Override public Node is_copy(GVNGCM gvn, int idx) { throw com.cliffc.aa.AA.unimpl(); }
-  public boolean is_copy() { return !(in(4) instanceof FunNode); }
+  public boolean is_copy() { return !(in(4) instanceof FunNode) || fun()._tf.fidx() != _fidx; }
   // Return the op_prec of the returned value.  Not sensible except when called
   // on primitives.
   @Override public byte op_prec() {

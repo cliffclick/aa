@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
@@ -52,7 +53,7 @@ public abstract class IntrinsicNode extends Node {
   // vtable name type in memory.  Unaliased, so the same memory cannot be
   // referred to without the Name.  Error if the memory cannot be proven
   // unaliased.  The Ideal call collapses the Name into the unaliased NewNode.
-  public static QNode convertTypeName( TypeObj from, TypeName to, Parse badargs, GVNGCM gvn ) {
+  public static FunPtrNode convertTypeName( TypeObj from, TypeName to, Parse badargs, GVNGCM gvn ) {
     // The incoming memory type is *exact* and does not have any extra fields.
     // The usual duck typing is "this-or-below", which allows and ignores extra
     // fields.  For Naming - which involves installing a v-table (or any other
@@ -63,14 +64,14 @@ public abstract class IntrinsicNode extends Node {
     TypeMemPtr from_ptr = TypeMemPtr.make(BitsAlias.REC,from);
     TypeMemPtr to_ptr   = TypeMemPtr.make(BitsAlias.REC,to  );
     TypeFunPtr tf = TypeFunPtr.make_new(TypeTuple.make(from_ptr),to_ptr);
-    FunNode fun = (FunNode) gvn.xform(new FunNode(to._name,tf));
+    FunNode fun = (FunNode) gvn.xform(new FunNode(to._name,tf).add_def(Env.ALL_CTRL));
     Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
     Node mem = gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM     ),null));
     Node ptr = gvn.xform(new ParmNode( 0,"ptr",fun,gvn.con(from_ptr        ),null));
     Node cvt = gvn.xform(new ConvertPtrTypeName(to._name,from_ptr,to_ptr,badargs,mem,ptr));
     Node mmem= gvn.xform(new MemMergeNode(mem,cvt));
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,cvt,rpc,fun));
-    return new QNode(fun,ret,null);
+    return (FunPtrNode)gvn.xform(new FunPtrNode(ret));
   }
 
   // Names an unaliased memory.  Needs to collapse away, or else an error.
@@ -144,10 +145,10 @@ public abstract class IntrinsicNode extends Node {
   // --------------------------------------------------------------------------
   // Default name constructor using expanded args list.  Just a NewNode but the
   // result is a named type.  Same as convertTypeName on an unaliased NewNode.
-  public static QNode convertTypeNameStruct( TypeStruct from, TypeName to, Parse badargs, GVNGCM gvn ) {
+  public static FunPtrNode convertTypeNameStruct( TypeStruct from, TypeName to, Parse badargs, GVNGCM gvn ) {
     NewNode nnn = new NewNode(new Node[1],to);
     TypeFunPtr tf = TypeFunPtr.make_new(TypeTuple.make(from._ts),nnn._ptr);
-    FunNode fun = (FunNode) gvn.xform(new FunNode(to._name,tf));
+    FunNode fun = (FunNode) gvn.xform(new FunNode(to._name,tf).add_def(Env.ALL_CTRL));
     Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
     Node memp= gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM     ),null));
     // Add input edges to the NewNode
@@ -159,7 +160,7 @@ public abstract class IntrinsicNode extends Node {
     Node ptr = gvn.xform(nnn).keep();
     Node mmem= gvn.xform(new MemMergeNode(memp,ptr));
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,ptr.unhook(),rpc,fun));
-    return new QNode(fun,ret,null);
+    return (FunPtrNode)gvn.xform(new FunPtrNode(ret));
   }
 
 }
