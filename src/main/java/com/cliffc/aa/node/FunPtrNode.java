@@ -16,7 +16,7 @@ public final class FunPtrNode extends Node {
   public FunNode fun() { return ret().fun(); }
   // Self   short  name
   @Override String xstr() {
-    int fidx = ret().fidx();    // Reliably returns a fidx
+    int fidx = ret()._fidx;    // Reliably returns a fidx
     FunNode fun = FunNode.find_fidx(fidx);
     return "*"+(fun==null ? ""+fidx : fun.name());
   }
