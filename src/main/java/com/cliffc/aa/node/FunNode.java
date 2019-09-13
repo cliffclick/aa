@@ -312,11 +312,16 @@ public class FunNode extends RegionNode {
     for( int i=has_unknown_callers() ? 2 : 1; i<_defs._len; i++ ) {
       int ncon=0;
       for( ParmNode parm : parms )
-        if( parm != null &&     // Some can be dead
-            gvn.type(parm.in(i)).is_con() )
-          ncon++;
+        if( parm != null ) {    // Some can be dead
+          Type t = gvn.type(parm.in(i));
+          if( !t.isa(parm._default_type) ) // Path is in-error?
+            { ncon = -2; break; } // This path is in-error, cannot inline even if small & constants
+          if( t.is_con() ) ncon++; // Count constants along each path
+        }
       if( ncon > mncons ) { mncons = ncon; m = i; }
     }
+    if( m == -1 )               // No paths are not in-error?
+      return -1;                // No inline
 
     // Specifically ignoring constants, parms, phis, rpcs, types,
     // unresolved, and casts.  These all track & control values, but actually
