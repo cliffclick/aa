@@ -243,7 +243,7 @@ public class Parse {
     Node rez = _e.add_fun(tvar,epi1); // Return type-name constructor
     // For Structs, add a second constructor taking an expanded arg list
     if( t instanceof TypeStruct ) {   // Add struct types with expanded arg lists
-      FunPtrNode epi2 = IntrinsicNode.convertTypeNameStruct((TypeStruct)t,tn,errMsg(),_gvn);
+      FunPtrNode epi2 = IntrinsicNode.convertTypeNameStruct((TypeStruct)t,tn, _gvn);
       Node rez2 = _e.add_fun(tvar,epi2); // type-name constructor with expanded arg list
       _gvn.init0(rez2._uses.at(0));      // Force init of Unresolved
     }

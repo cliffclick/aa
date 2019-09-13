@@ -69,14 +69,13 @@ public class CallNode extends Node {
   int nargs() { return _defs._len-3; }
   // Actual arguments.
   Node arg( int x ) { return _defs.at(x+3); }
-  void set_arg(int idx, Node arg, GVNGCM gvn) { set_def(idx+3,arg,gvn); }
   void set_arg_reg(int idx, Node arg, GVNGCM gvn) { gvn.set_def_reg(this,idx+3,arg); }
 
           Node ctl() { return in(0); }
   public  Node fun() { return in(1); }
           Node mem() { return in(2); }
   //private void set_ctl    (Node ctl, GVNGCM gvn) {     set_def    (0,ctl,gvn); }
-  public  void set_fun    (Node fun, GVNGCM gvn) {     set_def    (1,fun,gvn); }
+  private void set_fun    (Node fun, GVNGCM gvn) {     set_def    (1,fun,gvn); }
   public  void set_fun_reg(Node fun, GVNGCM gvn) { gvn.set_def_reg(this,1,fun); }
   public BitsFun fidxs(GVNGCM gvn) {
     Type tf = gvn.type(fun());

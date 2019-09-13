@@ -145,7 +145,7 @@ public abstract class IntrinsicNode extends Node {
   // --------------------------------------------------------------------------
   // Default name constructor using expanded args list.  Just a NewNode but the
   // result is a named type.  Same as convertTypeName on an unaliased NewNode.
-  public static FunPtrNode convertTypeNameStruct( TypeStruct from, TypeName to, Parse badargs, GVNGCM gvn ) {
+  public static FunPtrNode convertTypeNameStruct( TypeStruct from, TypeName to, GVNGCM gvn ) {
     NewNode nnn = new NewNode(new Node[1],to);
     TypeFunPtr tf = TypeFunPtr.make_new(TypeTuple.make(from._ts),nnn._ptr);
     FunNode fun = (FunNode) gvn.xform(new FunNode(to._name,tf).add_def(Env.ALL_CTRL));
@@ -154,7 +154,7 @@ public abstract class IntrinsicNode extends Node {
     // Add input edges to the NewNode
     for( int i=0; i<from._ts.length; i++ ) {
       String argx = from._flds[i];
-      String argy = argx=="." ? "arg"+i : argx;
+      String argy = argx.equals(".") ? "arg"+i : argx;
       nnn.add_def(gvn.xform(new ParmNode(i,argy,fun, gvn.con(from._ts[i]),null)));
     }
     Node ptr = gvn.xform(nnn).keep();

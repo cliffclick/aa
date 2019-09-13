@@ -210,30 +210,4 @@ public final class CallEpiNode extends Node {
   private boolean is_copy() { return !(in(0) instanceof CallNode); }
   @Override public Node is_copy(GVNGCM gvn, int idx) { return is_copy() ? in(idx) : null; }
   @Override public Type all_type() { return TypeTuple.CALL; }
-
-  // Check for proper wiring at this call-site.  All wired RetNodes have
-  // matching input paths to the Call.  *Types* are not checked, as we might be
-  // mid-opto or mid-iter.
-  String check() {
-    CallNode call = call();
-    TypeRPC trpc = TypeRPC.make(call._rpc);
-    // Check all wired functions for a matching RPC to this Call.
-    for( int i=1; i<_defs._len; i++ ) {
-      RetNode ret = (RetNode)in(i); // Wired return
-      FunNode fun = ret.fun();      // Wired function
-      ParmNode rpcs = fun.rpc();    // Wired RPC
-      if( rpcs == null ) return "Missing RPC parm";
-      int xpath = -1;
-      for( int path=1; path<rpcs._defs._len; path++ ) {
-        if( rpcs.in(path) instanceof ConNode &&
-            ((ConNode)rpcs.in(path))._t == trpc ) {
-          if( xpath != -1 ) return "RPC found twice, once on path "+xpath+" and again on path "+path;
-          xpath = path;
-        }
-      }
-      if( xpath == -1 ) return "Wired "+fun+", with RPCS "+rpcs+", but no matching RPC for "+call;
-    }
-    return null;
-  }
-
 }

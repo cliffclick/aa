@@ -144,7 +144,7 @@ public class GVNGCM {
   }
 
   // True if in _ts and _vals, false otherwise
-  public boolean touched( Node n ) { return _ts.atX(n._uid)!=null; }
+  boolean touched( Node n ) { return _ts.atX(n._uid)!=null; }
 
   // Remove from GVN structures.  Used rarely for whole-merge changes
   public void unreg( Node n ) { assert !check_new(n); unreg0(n); }

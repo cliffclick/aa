@@ -1,13 +1,13 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.type.BitsFun;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeFunPtr;
 
 public class UnresolvedNode extends Node {
   UnresolvedNode( Node... funs ) { super(OP_UNR,funs); }
   @Override String xstr() {
+    if( is_dead() ) return "DEAD";
     if( in(0) instanceof FunPtrNode ) {
       FunPtrNode fptr = (FunPtrNode)in(0);
       if( fptr.in(0) instanceof FunNode )
@@ -26,12 +26,6 @@ public class UnresolvedNode extends Node {
     for( Node def : _defs )
       t = t.join(gvn.type(def)); // Join of incoming functions
     return t.meet(TypeFunPtr.GENERIC_FUNPTR.dual());
-  }
-  BitsFun fidxs() {
-    int[] bits = new int[_defs._len];
-    for( int i=0; i<_defs._len; i++ )
-      bits[i] = ((FunPtrNode)in(i)).ret()._fidx;
-    return BitsFun.make0(bits).dual();
   }
   // Filter out all the wrong-arg-count functions
   public Node filter( GVNGCM gvn, int nargs ) {
