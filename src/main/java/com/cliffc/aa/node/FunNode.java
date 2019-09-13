@@ -409,7 +409,10 @@ public class FunNode extends RegionNode {
         c.add_def(newdef==null ? def : newdef);
       }
     }
-    if( path >= 0 )
+    // We kept the unknown caller path on 'this', and then copied it to 'fun'.
+    // But if inlining along a specific path, only that path should be present.
+    // Kill the unknown_caller path.
+    if( path >= 0 && has_unknown_callers() )
       fun.set_def(1,gvn.con(Type.XCTRL),gvn);
 
     // Make an Unresolved choice of the old and new functions, to be used by
@@ -461,10 +464,17 @@ public class FunNode extends RegionNode {
       gvn.rereg(nn,ot);
     }
 
+    // TODO: CNC - Post Opto must rewire unwired paths directly, or else they go dead & delete.
+    // TODO: If pre -Opto, and    type-split, unwire as now.
+    // TODO: If pre -Opto, and     path-only, clone all paths in-place, then unwire.
+    // TODO: If post-Opto, must be path-only, clone all paths in-place, then unwire.
     // If fixed path, wire it directly right now
-    if( path>=0 ) {
+    for( int i=1; i<cgedges.length; i++ ) {
       CallEpiNode cepi = cgedges[path]._cepi;
       Type oldt = gvn.type(cepi);
+      
+          if( path>=0 ) {
+
       gvn.unreg(cepi);
       cepi.wire(gvn,cepi.call(),fun,newret);
       gvn.rereg(cepi,oldt);

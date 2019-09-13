@@ -19,7 +19,7 @@ public final class RetNode extends Node {
   public Node val() { return in(2); }
   public Node rpc() { return in(3); }
   public FunNode fun() { return (FunNode)in(4); }
-  public FunPtrNode funptr() {
+  FunPtrNode funptr() {
     for( Node use : _uses )
       if( use instanceof FunPtrNode )
         return (FunPtrNode)use;
@@ -41,23 +41,12 @@ public final class RetNode extends Node {
   @Override public Type all_type() { return TypeTuple.CALL; }
 
   @Override public Node is_copy(GVNGCM gvn, int idx) { throw com.cliffc.aa.AA.unimpl(); }
-  public boolean is_copy() { return !(in(4) instanceof FunNode) || fun()._tf.fidx() != _fidx; }
+  boolean is_copy() { return !(in(4) instanceof FunNode) || fun()._tf.fidx() != _fidx; }
   // Return the op_prec of the returned value.  Not sensible except when called
   // on primitives.
   @Override public byte op_prec() {
     return val()._uid < GVNGCM._INIT0_CNT ? val().op_prec() : -1;
   }
-  
-  @Override public boolean is_forward_ref() { return fun().is_forward_ref(); }
 
-  // Check all CallEpi uses for sanity
-  String check() {
-    for( Node use : _uses )
-      if( use instanceof CallEpiNode ) {
-        String err = ((CallEpiNode)use).check();
-        if( err != null )
-          return err;
-      }
-    return null;                // No errors
-  }
+  @Override public boolean is_forward_ref() { return fun().is_forward_ref(); }
 }
