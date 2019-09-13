@@ -87,7 +87,7 @@ public class FunNode extends RegionNode {
   // Inline longer info
   @Override public String str() { return is_forward_ref() ? xstr() : _tf.str(null); }
   // Name from fidx alone
-  static String name( int fidx ) {
+  private static String name( int fidx ) {
     FunNode fun = find_fidx(fidx);
     return fun == null ? ""+fidx : fun.name();
   }
@@ -120,7 +120,7 @@ public class FunNode extends RegionNode {
   @Override Node copy(GVNGCM gvn) { throw AA.unimpl(); } // Gotta make a new FIDX
 
   // True if no future unknown callers.
-  boolean has_unknown_callers() { return _defs._len > 1 && in(1) == Env.ALL_CTRL; }
+  private boolean has_unknown_callers() { return _defs._len > 1 && in(1) == Env.ALL_CTRL; }
   // Argument type
   Type targ(int idx) {
     return idx == -1 ? TypeRPC.ALL_CALL :
@@ -161,11 +161,11 @@ public class FunNode extends RegionNode {
     CGEdge[] cgedges = new CGEdge[_defs._len];
     for( int i=1; i<_defs._len; i++ ) {
       assert gvn.type(in(i))==Type.CTRL; // Dead paths already removed
-      cgedges[i] = new CGEdge(gvn,this,rpc_parm,i,ret);
+      cgedges[i] = new CGEdge(gvn, rpc_parm,i,ret);
     }
     
     // Look for appropriate type-specialize callers
-    TypeTuple args = type_special(gvn,ret,parms);
+    TypeTuple args = type_special(gvn, parms);
     int path = -1;              // Paths will split according to type
     if( args == null ) {        // No type-specialization to do
       args = _tf._args;         // Use old args
@@ -265,21 +265,14 @@ public class FunNode extends RegionNode {
   // on arguments that help immediately.
   //
   // Same argument for field Loads from unspecialized values.
-  private TypeTuple type_special( GVNGCM gvn, RetNode ret, ParmNode[] parms ) {
+  private TypeTuple type_special( GVNGCM gvn, ParmNode[] parms ) {
     if( !has_unknown_callers() ) return null; // Only overly-wide calls.
     Type[] sig = find_type_split(gvn,parms);
     if( sig == null ) return null; // No unresolved calls; no point in type-specialization
-
-    // If Parm has unresolved calls, we want to type-specialize on its
-    // arguments.  Call-site #1 is the most generic call site for the parser
-    // (all Scalar args).  Peel out 2nd call-site args and generalize them.
-    
     // Make a new function header with new signature
     TypeTuple args = TypeTuple.make_args(sig);
     assert args.isa(_tf._args);
-    if( args == _tf._args ) return null; // Must see improvement
-    // Make a prototype new function header with alternative arg types
-    return args;
+    return args == _tf._args ? null : args; // Must see improvement
   }
 
   // Split a single-use copy (e.g. fully inline) if the function is "small
@@ -360,21 +353,21 @@ public class FunNode extends RegionNode {
   // for the old and one for the new body.  The new function may have a more
   // refined signature, and perhaps no unknown callers.  
   private Node split_callers( GVNGCM gvn, ParmNode[] parms, RetNode oldret, FunNode fun, CGEdge[] cgedges, int path) {
-    // Map from old to cloned function body
-    HashMap<Node,Node> map = new HashMap<>();
     // Strip out all wired calls to this function.  All will re-resolve later.
     for( CGEdge cg : cgedges )
       if( cg != null && cg._cepi != null )
         gvn.remove(cg._cepi,cg._cepi._defs.find(oldret));
     // Strip out all paths to this function.
-    for( Node parm : _uses ) if( parm instanceof ParmNode ) gvn.unreg(parm);
-    int lim = has_unknown_callers() ? 2 : 1;
+    final int lim = has_unknown_callers() ? 2 : 1;
     while( lim < _defs._len ) {
       pop();
-      for( Node parm : _uses ) if( parm instanceof ParmNode ) parm.pop();
+      for( Node parm : _uses )
+        if( parm instanceof ParmNode )
+          { gvn.unreg(parm); parm.pop(); gvn.rereg(parm,((ParmNode)parm)._default_type); }
     }
-    for( Node parm : _uses ) if( parm instanceof ParmNode ) gvn.rereg(parm,((ParmNode)parm)._default_type);
     
+    // Map from old to cloned function body
+    HashMap<Node,Node> map = new HashMap<>();
     // Clone the function body
     map.put(this,fun);
     Ary<Node> work = new Ary<>(new Node[1],0);
@@ -430,24 +423,9 @@ public class FunNode extends RegionNode {
         }
       }
       gvn.add_work(new_unr);
+      new_unr.keep();
     }
     
-    // Set all calls to the correct version.  If doing a type-split, use the
-    // Unresolved and the calls will individually resolve.  If doing a
-    // path-split, all have been left at the original; just force the path to
-    // the new.
-    Node mapped_path = path >= 0 ? map.get(cgedges[path]._cepi.call()) : null;
-    for( int e=has_unknown_callers() ? 2 : 1; e<cgedges.length; e++ ) {
-      CGEdge cg = cgedges[e];
-      Node fp = path < 0 ? new_unr : (path==e ? new_funptr : old_funptr);
-      CallNode call = cg._cepi.call();
-      CallNode newcall = (CallNode)map.get(call); // Fetch before changing edges, hence map hash
-      call.set_fun_reg(fp,gvn);
-      gvn.setype(call,call.value(gvn));
-      if( newcall != null )
-        newcall.set_fun(path < 0 ? new_unr : old_funptr, gvn);
-    }
-   
     // Put all new nodes into the GVN tables and worklists
     for( Map.Entry<Node,Node> e : map.entrySet() ) {
       Node nn = e.getValue();         // New node
@@ -463,28 +441,49 @@ public class FunNode extends RegionNode {
       }
       gvn.rereg(nn,ot);
     }
+    gvn.add_work(this);
+    gvn.add_work(fun );
 
-    // TODO: CNC - Post Opto must rewire unwired paths directly, or else they go dead & delete.
-    // TODO: If pre -Opto, and    type-split, unwire as now.
-    // TODO: If pre -Opto, and     path-only, clone all paths in-place, then unwire.
-    // TODO: If post-Opto, must be path-only, clone all paths in-place, then unwire.
-    // If fixed path, wire it directly right now
-    for( int i=1; i<cgedges.length; i++ ) {
-      CallEpiNode cepi = cgedges[path]._cepi;
-      Type oldt = gvn.type(cepi);
-      
-          if( path>=0 ) {
-
-      gvn.unreg(cepi);
-      cepi.wire(gvn,cepi.call(),fun,newret);
-      gvn.rereg(cepi,oldt);
-      // If recursive fixed path (i.e., loop unrolling a recursive function)
-      // the cloned new call got a copy of the old call's updated type...
-      // which points to the wrong thing for the new call.  Force type update
-      // right now to survive monotonicity assert later.
-      if( mapped_path != null )
-        gvn.setype(mapped_path,mapped_path.value(gvn));
+    // Rewire all previously wired calls
+    for( int e=has_unknown_callers() ? 2 : 1; e<cgedges.length; e++ ) {
+      CGEdge cg = cgedges[e];
+      CallNode call = cg.call();
+      CallNode newcall = (CallNode)map.get(call); // Fetch before changing edges, hence map hash
+      FunPtrNode fp;
+      if( path < 0 ) {          // Type-split, each call site resolves left or right
+        call.set_fun_reg(new_unr,gvn); // Unresolved; need to resolve
+        fp = old_funptr;
+        // Recompute path choice, as when we computed the new type sig.
+        for( ParmNode parm : parms ) // For all parms
+          if( parm != null ) {       //   (some can be dead)
+            Type tp = gvn.type(call.arg(parm._idx)); // Specific path type
+            if( !tp.isa(fun.targ(parm._idx)) || // If this path cannot use the sharper sig
+                tp.above_center() )             // Or path is in-error
+              { fp = old_funptr; break; } // Take the old, more generic version            
+            if( tp.widen() != parm._default_type ) // Even widened, path is more specific than the generic
+              fp = new_funptr;  // Then take it, but check remaining paths
+          }
+      } else {                  // Fixed inline path, choice already made
+        fp = path==e ? new_funptr : old_funptr;
+      }
+      // Rewire all previously wired calls
+      call.set_fun_reg(fp,gvn);
+      gvn.setype(call,call.value(gvn));
+      gvn.unreg(cg._cepi);
+      cg._cepi.wire(gvn,call,fp == old_funptr ? this : fun, fp == old_funptr ? oldret : newret);
+      gvn.rereg(cg._cepi,cg._cepi.value(gvn));
+      // If we cloned a recursive call, it also needs updating but can resolve
+      // and wire like any other new call.
+      if( newcall != null ) {
+        newcall.set_fun_reg(path < 0 ? new_unr : old_funptr, gvn);
+        gvn.setype(newcall,newcall.value(gvn));
+      }
     }
+    // 'this' gets re-registered during the re-wiring process, blowing the
+    // standard ideal() invariant.
+    gvn.unreg(this);
+   
+    if( new_unr != null ) new_unr.unkeep(gvn);
     old_funptr.unkeep(gvn);
     // TODO: This fixup shouldn't be here, since old_funptr can go dead at any
     // time.  Anytime a FunPtrNode goes dead, there are NO uses which lead to
@@ -528,26 +527,6 @@ public class FunNode extends RegionNode {
   }
   @Override public byte op_prec() { return _op_prec; }
 
-  String check(GVNGCM gvn, RetNode ret, ParmNode rpc_parm, boolean clean) {
-    // Check all incoming paths for being both alive and wired. 
-    for( int i=1; i<_defs._len; i++ ) {
-      if( gvn.type(_defs.at(i))!=Type.CTRL ) { // Dead paths already cleared out coming into inlining
-        assert !clean;                         // But inlining makes some dead paths
-        continue;
-      }
-      TypeRPC trpc = (TypeRPC)gvn.type(rpc_parm.in(i));
-      if( trpc == TypeRPC.ALL_CALL ) continue; // Skip the unknown caller
-      int rpc = trpc.rpc(), found=0;
-      // Must exist a wired CallEpi/Call pair matching this incoming RPC.
-      for( Node cepi : ret._uses )
-        if( cepi instanceof CallEpiNode &&
-            ((CallEpiNode)cepi).call()._rpc == rpc )
-          { found = 1; break; }
-      if( found==0 ) return "Call RPC#"+rpc+" is wired, but no matching Call/CallEpi is wired";
-    }
-    return null;
-  }
-
   // Small/cheap holder for a call-graph edge
   private static class CGEdge {
     final CallEpiNode _cepi;    // Call epilog.
@@ -557,7 +536,7 @@ public class FunNode extends RegionNode {
     final TypeRPC _trpc;        // Type of RPCNode, matches call._rpc
 
     // Build a CG edge from a FunNode and input path
-    CGEdge( GVNGCM gvn, FunNode fun, ParmNode rpc_parm, int path, RetNode ret ) {
+    CGEdge( GVNGCM gvn, ParmNode rpc_parm, int path, RetNode ret ) {
       _path = path;
       _rpc  = rpc_parm;         // The ParmNode
       _trpc = (TypeRPC)gvn.type(rpc_parm.in(path));
@@ -576,21 +555,6 @@ public class FunNode extends RegionNode {
       // Unknown caller path
       _cepi = null;  _ridx = -1;
     }
-    // Build a CG edge from a CallEpi/Ret pair
-    CGEdge( GVNGCM gvn, CallEpiNode cepi, RetNode ret ) {
-      _cepi = cepi;
-      _ridx = cepi._defs.find(ret);
-      assert _ridx != -1;       // Must find, since wired
-      FunNode fun = ret.fun();
-      _rpc = fun.rpc();
-      assert _rpc != null;      // Must find, since wired
-      _path = fun._defs.find(call().in(0));
-      assert _path != -1;       // Must find, since wired
-      _trpc = (TypeRPC)gvn.type(_rpc.in(_path));
-      assert _trpc.rpc()==call()._rpc;
-    }
     CallNode call() { return _cepi.call(); }
-    RetNode ret() { return (RetNode)_cepi.in(_ridx); }
-    FunNode fun() { return ret().fun(); }
   }
 }
