@@ -5,10 +5,10 @@ import com.cliffc.aa.type.*;
 import java.util.BitSet;
 
 // TODO CNC NOTES
-// 
+//
 // Move Unresolved handling into CallEpi from Call, since it will not wire
 // but the result type is more precise.
-// 
+//
 // ----
 // See CallNode.  Slot 0 is the matching Call, which returns a type of its
 // input args and function pointer.  The remaining slots are Returns which are
@@ -24,7 +24,7 @@ public final class CallEpiNode extends Node {
   public CallEpiNode( Node... rets ) { super(OP_CALLEPI,rets); }
   String xstr() { return (is_copy() ? "x" : "C")+"allEpi"; } // Self short name
   public CallNode call() { return (CallNode)in(0); }
-  
+
   @Override public Node ideal(GVNGCM gvn) {
     // If inlined, no further xforms.  The using Projs will fold up.
     if( is_copy() ) return null;
@@ -34,7 +34,7 @@ public final class CallEpiNode extends Node {
     if( tcall.at(0) != Type.CTRL ) return null; // Call not executable
     if( !(tcall.at(1) instanceof TypeFunPtr) ) return null;
     TypeFunPtr tfp = (TypeFunPtr)tcall.at(1);
-    
+
     // The one allowed function is already wired?  Then directly inline.
     // Requires this calls 1 target, and the 1 target is only called by this.
     BitsFun fidxs = tfp.fidxs();
@@ -65,11 +65,11 @@ public final class CallEpiNode extends Node {
     int fidx = tfp.fidx();
     FunNode fun = FunNode.find_fidx(fidx);
     if( fun.is_forward_ref() ) return null;
-    
+
     // Arg counts must be compatible
     if( fun.nargs() != call.nargs() )
       return null;
-    
+
     // Single choice; check no conversions needed
     TypeTuple formals = fun._tf._args;
     for( int i=0; i<call.nargs(); i++ ) {
@@ -81,7 +81,7 @@ public final class CallEpiNode extends Node {
         if( actual.isBitShape(formal) == 99 ) return null; // Requires user-specified conversion
       }
     }
-    
+
     // Check for several trivial cases that can be fully inlined immediately.
     Node cctl = call.ctl();
     Node cmem = call.mem();
@@ -93,7 +93,7 @@ public final class CallEpiNode extends Node {
     // primitives so they can be reused in tests.  Instead, the primitive is
     // "pure" and the memory is just a pass-through of the Call memory.
     if( gvn.type(mem) == TypeMem.XMEM ) mem = cmem;
-    
+
     // Check for zero-op body (id function)
     if( rez instanceof ParmNode && rez.in(0) == fun && cmem == mem )
       return inline(gvn,cctl,cmem,call.arg(((ParmNode)rez)._idx));
@@ -115,9 +115,9 @@ public final class CallEpiNode extends Node {
       if( irez instanceof PrimNode ) ((PrimNode)irez)._badargs = call._badargs;
       return inline(gvn,cctl,cmem,gvn.xform(irez)); // New exciting replacement for inlined call
     }
-    
+
     assert fun.in(1)._uid!=0; // Never wire into a primitive, just clone/inline it instead (done just above)
-    
+
     // Always wire caller args into known functions
     return wire(gvn,call,fun,ret);
   }
@@ -168,7 +168,7 @@ public final class CallEpiNode extends Node {
   @Override public Type value(GVNGCM gvn) {
     if( is_copy() )             // Already collapsed?  Just echo inputs
       return TypeTuple.make(gvn.type(in(0)),gvn.type(in(1)),gvn.type(in(2)));
-    
+
     CallNode call = call();
     TypeTuple ctt = (TypeTuple)gvn.type(call);
     if( ctt.at(0) == Type.XCTRL ) return TypeTuple.XCALL;
@@ -178,7 +178,7 @@ public final class CallEpiNode extends Node {
     BitsFun fidxs = funt.fidxs();
     if( fidxs.test(BitsFun.ALL) ) // All functions are possible?
       return TypeTuple.CALL;        // Worse-case result
-    
+
 
     // Merge returns from all fidxs, wired or not.  Required during GCP to keep
     // optimistic.  JOIN if above center, merge otherwise.  Wiring the calls
@@ -192,8 +192,8 @@ public final class CallEpiNode extends Node {
       FunNode fun = FunNode.find_fidx(fidx); // Lookup, even if not wired
       Type ret = gvn.type(fun.ret());        // Type of the return
       t = lifting ? t.join(ret) : t.meet(ret);
-    }    
-    
+    }
+
     return t;
   }
 
@@ -235,5 +235,5 @@ public final class CallEpiNode extends Node {
     }
     return null;
   }
-  
+
 }
