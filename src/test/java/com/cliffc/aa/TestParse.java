@@ -373,7 +373,7 @@ public class TestParse {
     // inline, so actual inference happens
     test_ptr_isa("map={x -> x ? @{n=map(x.n),v=x.v*x.v} : 0};"+
                  "map(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0,v=1.2},v=2.3},v=3.4},v=4.5})",
-                 (alias) -> TypeMemPtr.make(alias,TypeStruct.make(FLDS,TypeMemPtr.STRUCT0,TypeFlt.con(20.25))));
+                 (alias) -> TypeMemPtr.make(alias,TypeStruct.make(FLDS,TypeMemPtr.STRUCT0,TypeFlt.FLT64/*TypeFlt.con(20.25)*/)));
 
     // Test inferring a recursive tuple type, with less help.  This one
     // inlines so doesn't actually test inferring a recursive type.
@@ -382,7 +382,7 @@ public class TestParse {
 
     test_ptr_isa("map={x -> x ? (map(x.0),x.1*x.1) : 0};"+
                  "map((math_rand(1)?0: (math_rand(1)?0: (math_rand(1)?0: (0,1.2), 2.3), 3.4), 4.5))",
-                 (alias) -> TypeMemPtr.make(alias,TypeStruct.make(TypeMemPtr.STRUCT0,TypeFlt.con(20.25))));
+                 (alias) -> TypeMemPtr.make(alias,TypeStruct.make(TypeMemPtr.STRUCT0,TypeFlt.FLT64/*TypeFlt.con(20.25)*/)));
 
     // TODO: Need real TypeVars for these
     //test("id:{A->A}"    , Env.lookup_valtype("id"));
