@@ -65,6 +65,7 @@ public final class CallEpiNode extends Node {
     int fidx = tfp.fidx();
     FunNode fun = FunNode.find_fidx(fidx);
     if( fun.is_forward_ref() ) return null;
+    if( gvn.type(fun) == Type.XCTRL ) return null;
 
     // Arg counts must be compatible
     if( fun.nargs() != call.nargs() )
@@ -157,7 +158,8 @@ public final class CallEpiNode extends Node {
     // Add matching control
     gvn.add_def(fun,call.ctl());
     // Add the CallEpi hook
-    add_def(ret);
+    if( gvn._opt_mode == 2 ) gvn.add_def(this,ret);
+    else                         add_def(     ret);
     return this;
   }
 
@@ -176,9 +178,8 @@ public final class CallEpiNode extends Node {
       return TypeTuple.CALL;
     TypeFunPtr funt = (TypeFunPtr)ctt.at(1);
     BitsFun fidxs = funt.fidxs();
-    if( fidxs.test(BitsFun.ALL) ) // All functions are possible?
+    if( gvn._opt_mode != 2 && fidxs.test(BitsFun.ALL) ) // All functions are possible?
       return TypeTuple.CALL;        // Worse-case result
-
 
     // Merge returns from all fidxs, wired or not.  Required during GCP to keep
     // optimistic.  JOIN if above center, merge otherwise.  Wiring the calls
@@ -190,8 +191,16 @@ public final class CallEpiNode extends Node {
     for( int fidx = bs.nextSetBit(0); fidx >= 0; fidx = bs.nextSetBit(fidx+1) ) {
       if( tree.is_parent(fidx) ) continue;   // Will be covered by children
       FunNode fun = FunNode.find_fidx(fidx); // Lookup, even if not wired
-      Type ret = gvn.type(fun.ret());        // Type of the return
-      t = lifting ? t.join(ret) : t.meet(ret);
+      RetNode ret = fun.ret();
+      Type tret = gvn.type(ret); // Type of the return
+      t = lifting ? t.join(tret) : t.meet(tret);
+      
+      // Make real from virtual CG edges in GCP/Opto by wiring calls.
+      if( gvn._opt_mode==2 &&        // Manifesting optimistic virtual edges between caller and callee
+          !fidxs.above_center() &&   // Still settling down to possibilities
+          !fun.is_forward_ref() &&   // Call is in-error
+          fidx >= FunNode.PRIM_CNT ) // Do not wire up primitives, but forever take their default inputs and outputs
+        wire(gvn,call,fun,ret);      
     }
 
     return t;

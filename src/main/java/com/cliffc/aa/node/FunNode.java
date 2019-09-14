@@ -69,7 +69,7 @@ public class FunNode extends RegionNode {
   int fidx() { return _tf.fidx(); } // Asserts single-bit internally
   
   // Fast reset of parser state between calls to Exec
-  private static int PRIM_CNT;
+  static int PRIM_CNT;
   public static void init0() { PRIM_CNT = FUNS._len; }
   public static void reset_to_init0() {
     FUNS.set_len(PRIM_CNT);
