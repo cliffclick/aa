@@ -421,10 +421,11 @@ public class Parse {
         int fnum = fld==null ? field_number() : -1;
         if( fld==null && fnum==-1 ) n = err_ctrl2("Missing field name after '.'");
         else if( peek(":=") || peek('=') ) {
+          byte fin = (byte)(_buf[_x-2]==':' ? 0 : 1); // 1 for final store
           Node stmt = stmt();
           if( stmt == null ) n = err_ctrl2("Missing stmt after assigning field '."+fld+"'");
-          else if( fld != null ) set_mem(gvn(new StoreNode(ctrl(),mem(),n,n=stmt,fld ,errMsg())));
-          else                   set_mem(gvn(new StoreNode(ctrl(),mem(),n,n=stmt,fnum,errMsg())));
+          else if( fld != null ) set_mem(gvn(new StoreNode(ctrl(),mem(),n,n=stmt,fin,fld ,errMsg())));
+          else                   set_mem(gvn(new StoreNode(ctrl(),mem(),n,n=stmt,fin,fnum,errMsg())));
         } else {
           if( fld != null ) n = gvn(new LoadNode(ctrl(),mem(),n,fld ,errMsg()));
           else              n = gvn(new LoadNode(ctrl(),mem(),n,fnum,errMsg()));

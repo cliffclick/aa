@@ -37,7 +37,7 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
     }
   }
   // Update (approximately) the current TypeObj
-  TypeObj update(String fld, int fld_num, Type val) {
+  TypeObj update(byte fin, String fld, int fld_num, Type val) {
     return OBJ;                 // Approximate by falling to bottom OBJ
   }
   @Override public boolean above_center() { return _any; }

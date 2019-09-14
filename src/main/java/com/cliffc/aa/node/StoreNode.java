@@ -12,17 +12,19 @@ public class StoreNode extends Node {
   private final String _badfld;
   private final String _badnil;
   private final String _badfin;
-  private StoreNode( Node ctrl, Node mem, Node adr, Node val, String fld, int fld_num, Parse bad ) {
+  private final byte _fin;   // Final store==1
+  private StoreNode( Node ctrl, Node mem, Node adr, Node val, byte fin, String fld, int fld_num, Parse bad ) {
     super(OP_STORE,ctrl,mem,adr,val);
     _fld = fld;
     _fld_num = fld_num;
+    _fin = fin;
     // Tests can pass a null, but nobody else does
     _badfld = bad==null ? null : bad.errMsg("Unknown field '."+fld+"'");
     _badnil = bad==null ? null : bad.errMsg("Struct might be nil when writing field '."+fld+"'");
     _badfin = bad==null ? null : bad.errMsg("Cannot re-assign final field '."+fld+"'");
   }
-  public StoreNode( Node ctrl, Node mem, Node adr, Node val, String fld , Parse bad ) { this(ctrl,mem,adr,val,fld,-1,bad); }
-  public StoreNode( Node ctrl, Node mem, Node adr, Node val, int fld_num, Parse bad ) { this(ctrl,mem,adr,val,null,fld_num,bad); }
+  public StoreNode( Node ctrl, Node mem, Node adr, Node val, byte fin, String fld , Parse bad ) { this(ctrl,mem,adr,val,fin,fld,-1,bad); }
+  public StoreNode( Node ctrl, Node mem, Node adr, Node val, byte fin, int fld_num, Parse bad ) { this(ctrl,mem,adr,val,fin,null,fld_num,bad); }
   String xstr() { return "."+(_fld==null ? ""+_fld_num : _fld)+"="; } // Self short name
   String  str() { return xstr(); }      // Inline short name
 
@@ -52,7 +54,7 @@ public class StoreNode extends Node {
     if( !val.isa_scalar() )         // Nothing sane
       val = val.above_center() ? Type.XSCALAR : Type.SCALAR; // Pin to scalar for updates
     // Compute an updated memory state
-    TypeMem mem2 = ((TypeMem)mem).st((TypeMemPtr)adr, _fld, _fld_num, val);
+    TypeMem mem2 = ((TypeMem)mem).st((TypeMemPtr)adr, _fin, _fld, _fld_num, val);
     
     return mem2;
   }
@@ -62,8 +64,11 @@ public class StoreNode extends Node {
     while( t instanceof TypeName ) t = ((TypeName)t)._t;
     if( t.may_nil() ) return _badnil;
     if( !(t instanceof TypeMemPtr) ) return _badfld; // Too low, might not have any fields
-    if( !(((TypeMemPtr)t)._obj instanceof TypeStruct) ) return _badfld;
-    TypeStruct ts = (TypeStruct)((TypeMemPtr)t)._obj;
+    TypeMemPtr tptr = (TypeMemPtr)t;
+    TypeMem tmem = (TypeMem)gvn.type(mem());
+    TypeObj tobj = tmem.ld(tptr);
+    if( !(tobj instanceof TypeStruct) ) return _badfld;
+    TypeStruct ts = (TypeStruct)tobj;
     int fnum = ts.find(_fld,_fld_num);
     if( fnum == -1 )
       return _badfld;

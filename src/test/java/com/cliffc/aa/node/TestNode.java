@@ -258,7 +258,8 @@ public class TestNode {
     test1monotonic(new   ProjNode(_ins[0],1));
     test1monotonic(new RegionNode(null,_ins[1],_ins[2]));
     test1monotonic(new    RetNode(_ins[0],mem,_ins[1],_ins[2],(FunNode)_ins[0])); // ctl,mem,val,rpc,fun
-    test1monotonic(new  StoreNode(_ins[0],_ins[1],_ins[2],_ins[3],0,null));
+    test1monotonic(new  StoreNode(_ins[0],_ins[1],_ins[2],_ins[3],(byte)0,0,null));
+    test1monotonic(new  StoreNode(_ins[0],_ins[1],_ins[2],_ins[3],(byte)1,0,null));
     //                  ScopeNode has no inputs, and value() call is monotonic
     //                    TmpNode has no inputs, and value() call is monotonic
     test1monotonic(new   TypeNode(TypeInt.FALSE,_ins[1],null));

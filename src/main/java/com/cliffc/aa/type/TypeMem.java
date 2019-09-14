@@ -224,14 +224,14 @@ public class TypeMem extends Type<TypeMem> {
 
   // Meet of all possible storable values, after updates.  This updates a field
   // in a TypeObj.
-  public TypeMem st( TypeMemPtr ptr, String fld, int fld_num, Type val ) {
+  public TypeMem st( TypeMemPtr ptr, byte fin, String fld, int fld_num, Type val ) {
     assert val.isa_scalar();
     // Any alias, plus all of its children, are meet/joined.  This does a
     // tree-based scan on the inner loop.
     Ary<TypeObj> objs = new Ary<>(_aliases.clone(),_aliases.length);
     BitSet bs = ptr._aliases.tree().plus_kids(ptr._aliases);
     for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) )
-      objs.setX(alias, at(alias).update(fld,fld_num,val));
+      objs.setX(alias, at(alias).update(fin,fld,fld_num,val));
     return make0(objs.asAry());
   }
 

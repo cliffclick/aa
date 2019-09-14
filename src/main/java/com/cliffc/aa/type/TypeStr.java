@@ -93,7 +93,7 @@ public class TypeStr extends TypeObj<TypeStr> {
 
   // Update (approximately) the current TypeObj.  Strings are not allowed to be
   // updated, so this is a program type-error.
-  @Override TypeObj update(String fld, int fld_num, Type val) {
+  @Override TypeObj update(byte fin, String fld, int fld_num, Type val) {
     return STR;                 // Strings not allowed to be updated
   }
   @Override public boolean may_be_con() { return super.may_be_con() || _con != null; }

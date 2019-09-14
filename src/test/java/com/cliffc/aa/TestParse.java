@@ -480,7 +480,7 @@ public class TestParse {
     testerr ("x=@{n =1,v:=2}; x.n  = 3; ", "Cannot re-assign final field '.n'",24);
     test    ("x=@{n:=1,v:=2}; x.n  = 3", TypeInt.con(3));
     test_ptr("x=@{n:=1,v:=2}; x.n := 3; x", "@{n:=3,v:=2}");
-    testerr ("x=@{n:=1,v:=2}; x.n  = 3; x.v = 1; x.n = 4", "Cannot re-assign final field '.n'",24);
+    testerr ("x=@{n:=1,v:=2}; x.n  = 3; x.v = 1; x.n = 4", "Cannot re-assign final field '.n'",42);
   }
   /*
 

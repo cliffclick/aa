@@ -475,16 +475,18 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public Type at( int idx ) { return _ts[idx]; }
 
   // Update (approximately) the current TypeObj.  Updates the named field.
-  @Override TypeObj update(String fld, int fld_num, Type val) {
+  @Override TypeObj update(byte fin, String fld, int fld_num, Type val) {
     assert val.isa_scalar();
     int idx = find(fld,fld_num);
     // No-such-field to update, so this is a program type-error.
     if( idx==-1 ) return ALLSTRUCT;
     // Update to a final field.  This is a program type-error
     if( _finals[idx] == 1 ) return this;
-    Type[] ts = _ts.clone();
-    ts[idx] = val;
-    return malloc(_any,_flds,ts,_finals).hashcons_free();
+    byte[] finals = _finals;
+    Type[] ts     = _ts;
+    if( _finals[idx] != fin ) { finals = _finals.clone(); finals[idx] = fin; }
+    if( _ts    [idx] != val ) { ts     = _ts    .clone(); ts    [idx] = val; }
+    return malloc(_any,_flds,ts,finals).hashcons_free();
   }
   // True if isBitShape on all bits
   @Override public byte isBitShape(Type t) {
