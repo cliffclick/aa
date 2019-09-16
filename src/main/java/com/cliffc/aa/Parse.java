@@ -10,6 +10,32 @@ import java.text.NumberFormat;
 import java.text.ParsePosition;
 import java.util.BitSet;
 
+/*
+  read-only syntax:
+    A:=@{n,v}
+  var:!A := ...some pointer to A, but cannot write @{n,v}
+  var:@{!n,v} := anything (including A) but cannot write n, but can write v
+
+  Array creation: just [7] where '[' is a unary prefix, and ']' is a unary postfix.
+  ary = [7]; // untyped, will infer
+  ary = [7]:int; // typed as array of int
+
+  Index: "ary [ int" with '[' as an infix operator.
+  Yields a "fat pointer".
+  Get: ']' postfix operator.  Example: ary[3] looks up item #3
+  Put: ']='  infix operator.  Example: ary[2]=5; 
+
+  Parallel map on arrays; yields a new array
+    ary.{e idx -> fun e}
+  Parallel map/reduce
+    (ary2, reduction) = ary.{e -> fun e}.{b1 b2 -> b1+b2 }
+  For loop, serial order
+    ary.for({e idx -> .... })
+  For loop, no array
+    for( i=0; i<ary.len; i++ ) ...
+
+ */
+
 /** an implementation of language AA
  *
  *  GRAMMAR:
