@@ -3,6 +3,8 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 
+import java.util.BitSet;
+
 // TODO: fix recursive types
 //
 // Types are extended via NewNode; TypeStructs only created here - but merged
@@ -37,15 +39,14 @@ public class NewNode extends Node {
   TypeStruct _ts;               // Result struct (may be named)
   private TypeObj _obj;         // Optional named struct
   TypeMemPtr _ptr;              // Cached pointer-to-_obj
-  private NewNode _nuf;         // U-F during cyclic type discovery
 
   public NewNode( Node[] flds, TypeObj obj ) {
     super(OP_NEW,flds);
     assert flds[0]==null;       // no ctrl field
     _alias = BitsAlias.new_alias(BitsAlias.REC);
     TypeStruct ts = (TypeStruct)obj.base();
-    // Reconstruct obj with 'this' _nuf
-    _ts = TypeStruct.make(ts._flds,ts._ts,ts._finals,this);
+    // Reconstruct obj with 'this' _news
+    _ts = TypeStruct.make(ts._flds,ts._ts,ts._finals,BitsAlias.make0(_alias));
     // If a TypeName wrapper, rewrap
     if( obj instanceof TypeName ) obj = ((TypeName)obj).make(_ts);
     else obj = _ts;
@@ -57,13 +58,15 @@ public class NewNode extends Node {
   
   // Called when folding a Named Constructor into this allocation site
   void set_name( GVNGCM gvn, TypeName to ) {
-    assert to.base().isa(_ts); // Cannot change the target fields, just the name
-    assert ((TypeStruct)to.base())._nuf == this;
     Type oldt = gvn.type(this);
     gvn.unreg(this);
-    _ts = (TypeStruct)to.base();
-    _obj = to;
-    _ptr = TypeMemPtr.make(_alias,to);
+    TypeStruct ts = (TypeStruct)to.base();
+    // Reconstruct obj with 'this' _news
+    TypeStruct ts2 = TypeStruct.make(ts._flds,ts._ts,ts._finals,BitsAlias.make0(_alias));
+    assert ts2.isa(_ts);
+    _ts = ts2;
+    _obj = to.make(_ts);
+    _ptr = TypeMemPtr.make(_alias,_obj);
     if( !(oldt instanceof TypeMemPtr) )  throw com.cliffc.aa.AA.unimpl();
     TypeMemPtr nameptr = _ptr.make(to.make(((TypeMemPtr)oldt)._obj));
     gvn.rereg(this,nameptr);
@@ -72,20 +75,6 @@ public class NewNode extends Node {
   String xstr() { return "New*"+_alias; } // Self short name
   String  str() { return "New"+_ptr; } // Inline less-short name
 
-  public NewNode ufind() {
-    if( _nuf == null ) return this;
-    if( _nuf._nuf == null ) return _nuf;
-    throw com.cliffc.aa.AA.unimpl();
-  }
-  // Union 'this' and 'nuf'.  Both are set bases.
-  // Keep the smallest _uid for the set base, and return the base.
-  public NewNode union( NewNode nuf ) {
-    NewNode nuf0 = ufind(), nuf1 = nuf.ufind();
-    if( nuf0 == nuf1 ) return nuf0;
-    assert nuf0._nuf==null && nuf1._nuf==null; // Both are set bases
-    return (nuf0._uid < nuf1._uid) ? (nuf1._nuf = nuf0) : (nuf0._nuf = nuf1);
-  }
-  
   @Override public Node ideal(GVNGCM gvn) { return null; }
   
   // Produces a TypeMemPtr
@@ -94,13 +83,13 @@ public class NewNode extends Node {
     Type[] ts = new Type[_ts._ts.length];
     for( int i=0; i<_ts._ts.length; i++ )
       ts[i] = gvn.type(fld(i)).bound(_ts._ts[i]); // Limit to Scalar results
-    TypeStruct newt = TypeStruct.make(_ts._flds,ts,_ts._finals,this);
+    TypeStruct newt = TypeStruct.make(_ts._flds,ts,_ts._finals,BitsAlias.make0(_alias));
 
     // Check for TypeStructs with this same NewNode U-F types occuring more
     // than CUTOFF deep, and fold the deepest ones onto themselves to limit the
     // type depth.  If this happens, the types become recursive with the
     // approximations happening at the deepest points.
-    TypeStruct ts2 = newt.approx2(ufind()._uid,CUTOFF);
+    TypeStruct ts2 = newt.approx2(new BitSet(),_alias,CUTOFF);
     if( ts2 != null ) throw com.cliffc.aa.AA.unimpl();
     
     //// Get the existing type, without installing if missing because blows the

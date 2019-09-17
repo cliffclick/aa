@@ -99,7 +99,7 @@ public class TypeStr extends TypeObj<TypeStr> {
   @Override public boolean may_be_con() { return super.may_be_con() || _con != null; }
   @Override public boolean is_con() { return _con!=null; }
   @Override public Type meet_nil() { return this; }
-  @Override public TypeStruct approx2( int nuf, int d ) { return null; }
+  @Override public TypeStruct approx2( BitSet visit, int nuf, int d ) { return null; }
   
   // Lattice of conversions:
   // -1 unknown; top; might fail, might be free (Scalar->Str); Scalar might lift

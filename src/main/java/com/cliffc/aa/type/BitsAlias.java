@@ -58,5 +58,5 @@ public class BitsAlias extends Bits<BitsAlias> {
   @Override public BitsAlias ALL() { return FULL; }
   @Override public BitsAlias ANY() { return ANY ; }
 
-  static BitsAlias make0( int bit ) { return NZERO.make(bit); }
+  public static BitsAlias make0( int bit ) { return NZERO.make(bit); }
 }

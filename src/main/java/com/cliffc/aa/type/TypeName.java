@@ -254,9 +254,7 @@ public class TypeName extends TypeObj<TypeName> {
     if( hc == null ) { HASHCONS.put(rez,rez); return rez; }
     return rez.free(hc);
   }
-  @Override public TypeStruct approx2( int nuf, int d ) { return _t.approx2(nuf,d); }
-  // Used by tests to strip '_nuf'
-  @Override public TypeName test_nonuf() { return make(_name,_lex,_t.test_nonuf()); }
+  @Override public TypeStruct approx2( BitSet visit, int nuf, int d ) { return _t.approx2(visit,nuf,d); }
 
   @SuppressWarnings("unchecked")
   @Override void walk( Predicate<Type> p ) { if( p.test(this) ) _t.walk(p); }

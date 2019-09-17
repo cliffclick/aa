@@ -15,6 +15,7 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
     Object dummy = Env.GVN; // Force class loading cycle
+    test_isa("A= :@{n:A?, v:flt}; f={x:A? -> x ? A(f(x.n),x.v*x.v) : 0}; f(A(0,1.2)).v;", TypeFlt.con(1.2*1.2));
 
     // A collection of tests which like to fail easily
     testerr ("Point=:@{x,y}; Point((0,1))", "*[9](nil,1) is not a *[2]@{x,y}",27);
@@ -162,7 +163,7 @@ public class TestParse {
     test("f0 = { x -> x ? {+}(f0(x-1),1) : 0 }; f0(2)", TypeInt.con(2));
     testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact()","Passing 0 arguments to fact={->} which takes 1 arguments",48);
     test_ptr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(0),fact(1),fact(2))",
-             (alias)-> TypeMemPtr.make(alias,TypeStruct.make(Type.NIL,TypeInt.con(1),TypeInt.con(2))));
+             (alias)-> TypeMemPtr.make(alias,TypeStruct.make(alias,Type.NIL,TypeInt.con(1),TypeInt.con(2))));
 
     // Co-recursion requires parallel assignment & type inference across a lexical scope
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.TRUE );
@@ -205,7 +206,7 @@ public class TestParse {
     testerr("fun:{int str -> int}={x y -> x+y}; fun(2,3)", "3 is not a *[3]str",43);
     // Test that the type-check is on the variable and not the function.
     test_ptr("fun={x y -> x*2}; bar:{int str -> int} = fun; baz:{int @{x,y} -> int} = fun; (fun(2,3),bar(2,\"abc\"))",
-            (alias -> TypeMemPtr.make(alias,TypeStruct.make(TypeInt.con(4),TypeInt.con(4)))) );
+            (alias -> TypeMemPtr.make(alias,TypeStruct.make(alias,TypeInt.con(4),TypeInt.con(4)))) );
     testerr("fun={x y -> x+y}; baz:{int @{x,y} -> int} = fun; (fun(2,3), baz(2,3))",
             "3 is not a *[2]@{x,y}", 68);
 
@@ -229,7 +230,7 @@ public class TestParse {
 
   @Test public void testParse4() {
     // simple anon struct tests
-    test_ptr("  @{x,y} ", (alias -> TypeMemPtr.make(alias,TypeStruct.make(new String[]{"x","y"},Type.SCALAR,Type.SCALAR)))); // simple anon struct decl
+    test_ptr("  @{x,y} ", (alias -> TypeMemPtr.make(alias,TypeStruct.make(new String[]{"x","y"},new Type []{Type.SCALAR,Type.SCALAR},new byte[]{1,1},alias)))); // simple anon struct decl
     testerr("a=@{x=1.2,y}; x", "Unknown ref 'x'",15);
     testerr("a=@{x=1,x=2}", "Cannot define field '.x' twice",11);
     test   ("a=@{x=1.2,y,}; a.x", TypeFlt.con(1.2)); // standard "." field naming; trailing comma optional
@@ -249,7 +250,7 @@ public class TestParse {
     test   ("dist={p->p//qqq\n.//qqq\nx*p.x+p.y*p.y}; dist(//qqq\n@{x//qqq\n=1,y=2})", TypeInt.con(5));
 
     // Tuple
-    test_ptr("(0,\"abc\")", (alias -> TypeMemPtr.make(alias,TypeStruct.make(Type.NIL,TypeMemPtr.ABCPTR))));
+    test_ptr("(0,\"abc\")", (alias -> TypeMemPtr.make(alias,TypeStruct.make(alias,Type.NIL,TypeMemPtr.ABCPTR))));
     test("(1,\"abc\").0", TypeInt.TRUE);
     test("(1,\"abc\").1", TypeMemPtr.ABCPTR);
 
@@ -288,7 +289,7 @@ public class TestParse {
 
   @Test public void testParse6() {
     test_ptr("A= :(A?, int); A(0,2)","A:(nil,2)");
-    test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*[135],3)");
+    test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*[13],3)");
 
     // Building recursive types
     test_isa("A= :int; A(1)", (tmap -> TypeName.make("A",tmap,TypeInt.INT64)));
@@ -475,7 +476,7 @@ public class TestParse {
   @Test
   public void testParse10() {
     // Test re-assignment in struct
-    test_ptr("x=@{n:=1,v:=2}", (alias) -> TypeMemPtr.make(alias,TypeStruct.make(FLDS, new Type[]{TypeInt.con(1), TypeInt.con(2)},new byte[2])));
+    test_ptr("x=@{n:=1,v:=2}", (alias) -> TypeMemPtr.make(alias,TypeStruct.make(FLDS, new Type[]{TypeInt.con(1), TypeInt.con(2)},new byte[2],alias)));
     testerr ("x=@{n =1,v:=2}; x.n  = 3; ", "Cannot re-assign final field '.n'",24);
     test    ("x=@{n:=1,v:=2}; x.n  = 3", TypeInt.con(3));
     test_ptr("x=@{n:=1,v:=2}; x.n := 3; x", "@{n:=3,v:=2}");
@@ -569,8 +570,7 @@ c[x]=1;
       assertTrue(te._t instanceof TypeMemPtr);
       int alias = ((TypeMemPtr)te._t).getbit(); // internally asserts only 1 bit set
       Type t_expected = expected.apply(alias);
-      Type t_actual = te._t.test_nonuf();
-      assertEquals(t_expected,t_actual);
+      assertEquals(t_expected,te._t);
     }
   }
   // Slightly weaker than test_ptr

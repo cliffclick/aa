@@ -717,14 +717,8 @@ public class Type<T extends Type<T>> {
   Type replace( Type old, Type nnn, HashMap<Type,Type> ignore ) { return this; }
 
   // Look for types beyond a certain depth, and approximate.
-  public TypeStruct approx2( int nuf, int d ) {
+  public TypeStruct approx2( BitSet visit, int nuf, int d ) {
     if( isa_scalar() ) return null;
-    throw typerr(null);
-  }
-  // Used by tests to strip '_nuf'
-  @SuppressWarnings("unchecked")
-  public T test_nonuf() {
-    if( isa_scalar() ) return (T)this;
     throw typerr(null);
   }
   
