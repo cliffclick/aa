@@ -11,7 +11,6 @@ public class NewNode extends Node {
   private int _alias;           // Alias class
   TypeStruct _ts;               // Result struct (may be named)
   private TypeObj _obj;         // Optional named struct
-  private boolean _did_meet;
   TypeMemPtr _ptr;              // Cached pointer-to-_obj
 
   public NewNode( Node[] flds, TypeObj obj ) {
@@ -61,11 +60,13 @@ public class NewNode extends Node {
       } else oldt = (TypeStruct)tobj;
     }
 
-    TypeStruct apxt= approx(newt,oldt); // Approximate infinite types
-    if( _did_meet || apxt != newt ) {   // If approximating, need to keep meeting old and new
-      _did_meet=true;       // If did meet once, need to keep doing it forever.
-      apxt = (TypeStruct) (gvn._opt_mode==2 ? apxt.meet(oldt) : apxt.join(oldt));
+    // Approximate infinite types
+    TypeStruct apxt = newt;
+    if( approx(newt,oldt) ) {   // If approximating, need to keep meeting old and new
+      TypeStruct apxt1 = newt.approx(oldt);
+      apxt = (TypeStruct) (gvn._opt_mode==2 ? apxt1.meet(oldt) : apxt1.join(oldt));
     }
+    assert apxt.depth() <= CUTOFF+1 || apxt.depth() >= 9999;
 
     TypeObj res = _obj instanceof TypeName ? ((TypeName)_obj).make(apxt) : apxt;
     return TypeMemPtr.make(_alias,res);
@@ -75,10 +76,9 @@ public class NewNode extends Node {
   // to in a loop until the size grows without bound.  If we detect this we
   // need to approximate a new cyclic type.
   private final static int CUTOFF=5; // Depth of types before we start forcing approximations
-  public static TypeStruct approx( TypeStruct newt, TypeStruct oldt ) {
-    return newt != oldt && newt.contains(oldt) && oldt.depth() > CUTOFF
-      ? (TypeStruct)newt.approx(oldt)
-      : newt;
+  public static boolean approx( TypeStruct newt, TypeStruct oldt ) {
+    return newt != oldt && newt.contains(oldt) && oldt.depth() > CUTOFF &&
+            (newt.above_center() || !oldt.above_center());
   }
 
   @Override public Type all_type() { return _ptr; }
