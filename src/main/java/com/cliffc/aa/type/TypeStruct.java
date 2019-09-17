@@ -215,8 +215,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     for( int i=0; i<as.length; i++ ) as[i]=sdual(_flds[i]);
     for( int i=0; i<bs.length; i++ ) bs[i] = (byte)(_finals[i]^1);
     TypeStruct dual = _dual = new TypeStruct(!_any,as,ts,bs);
+    dual._hash = dual.compute_hash(); // Compute hash before recursion
     for( int i=0; i<ts.length; i++ ) ts[i] = _ts[i].rdual();
-    dual._hash = dual.compute_hash();
     dual._dual = this;
     dual._cyclic = true;
     return dual;
@@ -549,6 +549,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     // Need to clone 'this'
     Type[] ts = new Type[_ts.length];
     TypeStruct rez = malloc(_any,_flds,ts,_finals);
+    rez._hash = rez.compute_hash();
     rez._cyclic=true;           // Whole structure is cyclic
     if( nnn==null ) nnn = rez;
     for( int i=0; i<_ts.length; i++ )

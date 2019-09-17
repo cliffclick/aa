@@ -110,6 +110,7 @@ public class TypeName extends TypeObj<TypeName> {
     if( _dual != null ) return _dual;
     TypeName dual = _dual = new TypeName(_name,_lex,_t.rdual(),_depth);
     dual._dual = this;
+    dual._hash = compute_hash();
     dual._cyclic = true;
     return dual;
   }

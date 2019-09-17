@@ -2,7 +2,6 @@ package com.cliffc.aa;
 
 import com.cliffc.aa.type.*;
 import org.junit.Assert;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.HashMap;
@@ -16,6 +15,32 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
     Object dummy = Env.GVN; // Force class loading cycle
+    // User-defined linked list
+    String ll_def = "List=:@{next,val};";
+    String ll_con = "tmp=List(List(0,1.2),2.3);";
+    String ll_fun = "sq = {x -> x*x};";
+    String ll_map = "map = { list -> list ? (map(list.0),sq(list.1)) : 0};";
+    String ll_apl = "map(tmp);";
+
+    // TODO: Needs a way to easily test simple recursive types
+    TypeEnv te4 = Exec.go(Env.top(),"args",ll_def+ll_con+ll_map+ll_fun+ll_apl);
+    if( te4._errs != null ) System.err.println(te4._errs.toString());
+    Assert.assertNull(te4._errs);
+    TypeMemPtr tmp4 = (TypeMemPtr)te4._t;
+    TypeObj tobj4 = tmp4._obj;
+    TypeName tname4 = (TypeName)tobj4;
+    assertEquals("List", tname4._name);
+    TypeStruct tt4 = (TypeStruct)tname4._t;
+    TypeMemPtr tmp5 = (TypeMemPtr)tt4.at(0);
+    TypeName tname5 = (TypeName)tmp5._obj;
+    assertEquals(2.3*2.3,tt4.at(1).getd(),1e-6);
+    assertEquals("next",tt4._flds[0]);
+    assertEquals("val",tt4._flds[1]);
+
+    assertEquals("List", tname5._name);
+    TypeStruct tt5 = (TypeStruct)tname5._t;
+    assertEquals(1.2*1.2,tt5.at(1).getd(),1e-6);
+    assertEquals(Type.NIL,tt5.at(0));
 
     // A collection of tests which like to fail easily
     testerr ("Point=:@{x,y}; Point((0,1))", "*[9](nil,1) is not a *[2]@{x,y}",27);
@@ -289,7 +314,7 @@ public class TestParse {
 
   @Test public void testParse6() {
     test_ptr("A= :(A?, int); A(0,2)","A:(nil,2)");
-    test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*[130],3)");
+    test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*[135],3)");
 
     // Building recursive types
     test_isa("A= :int; A(1)", (tmap -> TypeName.make("A",tmap,TypeInt.INT64)));
@@ -473,7 +498,7 @@ public class TestParse {
     testerr("x:=0; math_rand(1) ? (x =4):3; x", "'x' not final on false arm of trinary",29); // x mutable ahead; ok to mutate on 1 arm and later
   }
 
-  @Test @Ignore
+  @Test
   public void testParse10() {
     // Test re-assignment in struct
     test_ptr("x=@{n:=1,v:=2}", (alias) -> TypeMemPtr.make(alias,TypeStruct.make(FLDS, new Type[]{TypeInt.con(1), TypeInt.con(2)},new byte[2])));

@@ -15,13 +15,13 @@ import java.util.function.Predicate;
 // bounded lattice.  See https://en.wikipedia.org/wiki/Complete_lattice.
 
 // Symmetric around the centerline of constants.  Fixed height, so a finite
-// count of Meet stablizes; a unique All (Bottom; no known value) and due to
+// count of Meet stabilizes; a unique All (Bottom; no known value) and due to
 // symmetry a unique Any (Top, all values simultaneously).  Support function
 // types, various kinds of numeric ranges, nil, tuples and structs, and named
 // subtypes of the above.
 //
 // During program typing, always keeping the "loosest" possible program and if
-// this program still types as 'Any' then the program is ambiguious.  'All'
+// this program still types as 'Any' then the program is ambiguous.  'All'
 // represents a type conflict.
 //
 // ASCII-Grams of Type Lattices
@@ -53,7 +53,7 @@ import java.util.function.Predicate;
 // nil.  However, having a single type which can be both an integer and a
 // pointer breaks the major Type Lattice property.  Basically if nil can be
 // used to "cross" between Integers and Pointers (or Fun Pointers, Floats, etc)
-// then the Type system is no longer a Lattice and all sorts of havok ensues.
+// then the Type system is no longer a Lattice and all sorts of havoc ensues.
 //
 // Over the past 1.5yrs I've tried every possible combination of things I can
 // do with nil that also lets me keep it in the language and used in both
@@ -164,6 +164,7 @@ public class Type<T extends Type<T>> {
   // interning it again - as a self-recursive type
   @SuppressWarnings("unchecked")
   final T untern( ) {
+    assert _hash != 0;
     Type rez = INTERN.remove(this);
     assert rez != null;
     return (T)this;
@@ -171,6 +172,7 @@ public class Type<T extends Type<T>> {
   @SuppressWarnings("unchecked")
   final T retern( ) {
     assert _dual._dual == this;
+    assert _hash != 0;
     INTERN.put(this,this);
     assert INTERN.get(this)==this;
     return (T)this;

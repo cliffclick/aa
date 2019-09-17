@@ -15,7 +15,10 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
 
   private TypeMemPtr(BitsAlias aliases, TypeObj obj ) { super     (TMEMPTR); init(aliases,obj); }
   private void init (BitsAlias aliases, TypeObj obj ) { super.init(TMEMPTR); _aliases = aliases; _obj=obj; }
-  @Override int compute_hash() { return TMEMPTR + _aliases._hash + _obj._hash; }
+  @Override int compute_hash() {
+    assert _obj._hash != 0;
+    return TMEMPTR + _aliases._hash + _obj._hash;
+  }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeMemPtr) ) return false;
@@ -77,6 +80,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     if( _dual != null ) return _dual;
     TypeMemPtr dual = _dual = new TypeMemPtr(_aliases,(TypeObj)_obj.rdual());
     dual._dual = this;
+    dual._hash = dual.compute_hash();
     dual._cyclic = true;
     return dual;
   }

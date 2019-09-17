@@ -62,14 +62,9 @@ public class NewNode extends Node {
     }
 
     TypeStruct apxt= approx(newt,oldt); // Approximate infinite types
-    if( apxt != newt ) _did_meet=true;
-    else if( _did_meet ) {
-      // If did meet once, need to keep doing it until the types propagate
-      // through the graph and catch up to our inputs... which means the Node
-      // graph finally matches the type graph.
-      TypeStruct mt = (TypeStruct) (gvn._opt_mode==2 ? apxt.meet(oldt) : apxt.join(oldt));
-      if( apxt.isa(oldt) || mt == apxt ) _did_meet = false;
-      else apxt = mt;
+    if( _did_meet || apxt != newt ) {   // If approximating, need to keep meeting old and new
+      _did_meet=true;       // If did meet once, need to keep doing it forever.
+      apxt = (TypeStruct) (gvn._opt_mode==2 ? apxt.meet(oldt) : apxt.join(oldt));
     }
 
     TypeObj res = _obj instanceof TypeName ? ((TypeName)_obj).make(apxt) : apxt;
@@ -81,11 +76,9 @@ public class NewNode extends Node {
   // need to approximate a new cyclic type.
   private final static int CUTOFF=5; // Depth of types before we start forcing approximations
   public static TypeStruct approx( TypeStruct newt, TypeStruct oldt ) {
-    if( newt == oldt ) return newt;
-    if( !newt.contains(oldt) ) return newt;
-    if( oldt.depth() <= CUTOFF ) return newt;
-    TypeStruct tsa = newt.approx(oldt);
-    return (TypeStruct)(tsa.meet(oldt));
+    return newt != oldt && newt.contains(oldt) && oldt.depth() > CUTOFF
+      ? (TypeStruct)newt.approx(oldt)
+      : newt;
   }
 
   @Override public Type all_type() { return _ptr; }
