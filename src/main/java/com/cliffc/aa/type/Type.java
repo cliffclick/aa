@@ -716,6 +716,18 @@ public class Type<T extends Type<T>> {
   // Replace old with nnn in a clone
   Type replace( Type old, Type nnn, HashMap<Type,Type> ignore ) { return this; }
 
+  // Look for types beyond a certain depth, and approximate.
+  public TypeStruct approx2( int nuf, int d ) {
+    if( isa_scalar() ) return null;
+    throw typerr(null);
+  }
+  // Used by tests to strip '_nuf'
+  @SuppressWarnings("unchecked")
+  public T test_nonuf() {
+    if( isa_scalar() ) return (T)this;
+    throw typerr(null);
+  }
+  
   // Iterate over any nested child types.  Only side-effect results.
   public void iter( Consumer<Type> c ) { /*None in the base class*/ }
 

@@ -393,11 +393,13 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
       return bit;
     }
 
+    // Record all starting types tree relationships.
     void init0() {
       _init = new int[_kids.length];
       for( int i=0; i<_kids.length; i++ )
         _init[i] = _kids[i]==null ? 0 : _kids[i][0];
     }
+    // Chop back alias tree to only those types recorded during 'init0'
     void reset_to_init0() {
       for( int i=0; i<_kids.length; i++ )
         if( _kids[i] != null )

@@ -151,6 +151,9 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     if( hc == null ) { HASHCONS.put(rez,rez); return rez; }
     return rez.free(hc);
   }
+  @Override public TypeStruct approx2( int nuf, int d ) { return _obj.approx2(nuf,d); }
+  // Used by tests to strip '_nuf'
+  @Override public TypeMemPtr test_nonuf() { return make(_aliases,(TypeObj)_obj.test_nonuf()); }
 
   @SuppressWarnings("unchecked")
   @Override void walk( Predicate<Type> p ) { if( p.test(this) ) _obj.walk(p); }

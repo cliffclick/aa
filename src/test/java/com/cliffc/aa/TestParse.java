@@ -569,7 +569,8 @@ c[x]=1;
       assertTrue(te._t instanceof TypeMemPtr);
       int alias = ((TypeMemPtr)te._t).getbit(); // internally asserts only 1 bit set
       Type t_expected = expected.apply(alias);
-      assertEquals(t_expected,te._t);
+      Type t_actual = te._t.test_nonuf();
+      assertEquals(t_expected,t_actual);
     }
   }
   // Slightly weaker than test_ptr

@@ -253,7 +253,7 @@ public class TestType {
 
     // Anonymous recursive structs -
     // - struct with pointer to self
-    TypeStruct ts0 = TypeStruct.malloc(false,flds,new Type[2],new byte[]{1,1});
+    TypeStruct ts0 = TypeStruct.malloc(false,flds,new Type[2],new byte[]{1,1},null);
     ts0._hash = ts0.compute_hash();
     ts0._ts[0] = ts0ptr;    ts0._cyclic = true;
     ts0._ts[1] = TypeInt.INT64;
@@ -261,7 +261,7 @@ public class TestType {
     TypeMem ts0mem = TypeMem.make(alias1,ts0); // {1:@{n:*[1],v:int} }
 
     // - struct with pointer to self or nil
-    TypeStruct ts1 = TypeStruct.malloc(false,flds,new Type[2],new byte[]{1,1});
+    TypeStruct ts1 = TypeStruct.malloc(false,flds,new Type[2],new byte[]{1,1},null);
     ts1._hash = ts1.compute_hash();
     ts1._ts[0] = ts0ptr0;  ts1._cyclic = true;
     ts1._ts[1] = TypeInt.INT64;
@@ -370,7 +370,7 @@ public class TestType {
 
     // T = :(T?,i64)
     int alias = BitsAlias.new_alias(BitsAlias.REC);
-    TypeStruct T = TypeStruct.malloc(false,flds,new Type[2],new byte[]{1,1});
+    TypeStruct T = TypeStruct.malloc(false,flds,new Type[2],new byte[]{1,1},null);
     T._hash = T.compute_hash();
     Type.RECURSIVE_MEET++;
     Type TN = TypeMemPtr.make_nil(alias,T);  TN._cyclic = true;

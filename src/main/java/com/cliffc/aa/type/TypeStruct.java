@@ -1,6 +1,7 @@
 package com.cliffc.aa.type;
 
 import com.cliffc.aa.AA;
+import com.cliffc.aa.node.NewNode;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 import org.jetbrains.annotations.NotNull;
@@ -39,13 +40,15 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public @NotNull String @NotNull[] _flds;  // The field names
   public Type[] _ts;            // Matching field types
   public byte[] _finals;        // Fields that are final; 1==read-only, 0=r/w
-  private TypeStruct _uf = null;// Tarjan Union-Find
-  private TypeStruct     ( boolean any, String[] flds, Type[] ts, byte[] finals ) { super(TSTRUCT, any); init(any,flds,ts,finals); }
-  private TypeStruct init( boolean any, String[] flds, Type[] ts, byte[] finals ) {
+  public NewNode _nuf;          // Unique construction site; used to close cyclic types
+  private TypeStruct _uf;       // Tarjan Union-Find, used during cyclic meet
+  private TypeStruct     ( boolean any, String[] flds, Type[] ts, byte[] finals, NewNode nuf ) { super(TSTRUCT, any); init(any,flds,ts,finals,nuf); }
+  private TypeStruct init( boolean any, String[] flds, Type[] ts, byte[] finals, NewNode nuf ) {
     super.init(TSTRUCT, any);
     _flds  = flds;
     _ts    = ts;
     _finals= finals;
+    _nuf   = nuf;
     _uf    = null;
     return this;
   }
@@ -53,6 +56,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // because during recursive construction the types are not available.
   @Override int compute_hash() {
     int hash = super.compute_hash();
+    if( _nuf!=null ) hash += _nuf.ufind()._uid;
     for( int i=0; i<_flds.length; i++ ) hash += _flds[i].hashCode()+_finals[i];
     return hash;
   }
@@ -63,17 +67,28 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return idx != -1 ? CYCLES.at(idx^1) : null;
   }
 
+  // Returns 1 for definitely equals, 0 for definitely unequals, and -1 if
+  // needing the cyclic test.
+  private int cmp( TypeStruct t ) {
+    if( _any!=t._any || _hash != t._hash || _ts.length != t._ts.length )
+      return 0;
+    if( _nuf == t._nuf && _ts == t._ts && _flds == t._flds && _finals == t._finals ) return 1;
+    if( _nuf != t._nuf && (_nuf==null || t._nuf==null || _nuf.ufind() != t._nuf.ufind()) ) return 0;
+    for( int i=0; i<_ts.length; i++ )
+      if( !_flds[i].equals(t._flds[i]) || _finals[i]!=t._finals[i] )
+        return 0;
+    for( int i=0; i<_ts.length; i++ )
+      if( _ts[i]!=t._ts[i] )
+        return -1;              // Some not-pointer-equals child types, must do the full check
+    return 1;                   // All child types are pointer-equals, so must be equals.
+  }
+  
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeStruct) ) return false;
     TypeStruct t = (TypeStruct)o;
-    if( _any!=t._any || _hash != t._hash || _ts.length != t._ts.length )
-      return false;
-    if( _ts == t._ts && _flds == t._flds && _finals == t._finals ) return true;
-    for( int i=0; i<_ts.length; i++ )
-      if( !_flds[i].equals(t._flds[i]) || _finals[i]!=t._finals[i] )
-        return false;
-
+    int x = cmp(t);
+    if( x != -1 ) return x == 1;
     // Unlike all other non-cyclic structures which are built bottom-up, cyclic
     // types have to be built all-at-once, and thus hash-cons and equality-
     // tested with a cyclic-aware equals check.
@@ -87,12 +102,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     if( t2 !=null ) return t2==t   ; // Already in cycle report equals or not
     TypeStruct t3 = t.find_other();
     if( t3 !=null ) return t3==this;// Already in cycle report equals or not
-    if( _any!=t._any || _hash != t._hash || _ts.length != t._ts.length )
-      return false;
-    if( _ts == t._ts && _flds == t._flds && _finals == t._finals ) return true;
-    for( int i=0; i<_ts.length; i++ )
-      if( !_flds[i].equals(t._flds[i]) || _finals[i]!=t._finals[i] )
-        return false;
+    int x = cmp(t);
+    if( x != -1 ) return x == 1;
 
     int len = CYCLES._len;
     CYCLES.add(this).add(t);
@@ -156,10 +167,10 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // cyclic types for which a DAG-like bottom-up-remove-dups approach cannot work.
   private static TypeStruct FREE=null;
   @Override protected TypeStruct free( TypeStruct ret ) { FREE=this; return ret; }
-  static TypeStruct malloc( boolean any, String[] flds, Type[] ts, byte[] finals ) {
-    if( FREE == null ) return new TypeStruct(any,flds,ts,finals);
+  static TypeStruct malloc( boolean any, String[] flds, Type[] ts, byte[] finals, NewNode nuf ) {
+    if( FREE == null ) return new TypeStruct(any,flds,ts,finals,nuf);
     TypeStruct t1 = FREE;  FREE = null;
-    return t1.init(any,flds,ts,finals);
+    return t1.init(any,flds,ts,finals,nuf);
   }
   private TypeStruct hashcons_free() { TypeStruct t2 = (TypeStruct)hashcons();  return this==t2 ? this : free(t2);  }
 
@@ -174,9 +185,10 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   private static Type[] ts(Type... ts) { return ts; }
   private static Type[] ts(int n) { Type[] ts = new Type[n]; Arrays.fill(ts,SCALAR); return ts; }
   private static byte[] bs(Type[] ts) { byte[] bs = new byte[ts.length]; Arrays.fill(bs,(byte)1); return bs; } // All read-only
-  public  static TypeStruct make(               Type... ts) { return malloc(false,FLDS[ts.length],ts,bs(ts)).hashcons_free(); }
-  public  static TypeStruct make(String[] flds, Type... ts) { return malloc(false,flds,ts,bs(ts)).hashcons_free(); }
-  public  static TypeStruct make(String[] flds, Type[] ts, byte[] finals) { return malloc(false,flds,ts,finals).hashcons_free(); }
+  public  static TypeStruct make(               Type... ts) { return malloc(false,FLDS[ts.length],ts,bs(ts),null).hashcons_free(); }
+  public  static TypeStruct make(String[] flds, Type... ts) { return malloc(false,flds,ts,bs(ts),null).hashcons_free(); }
+  public  static TypeStruct make(String[] flds, Type[] ts, byte[] finals) { return malloc(false,flds,ts,finals,null).hashcons_free(); }
+  public  static TypeStruct make(String[] flds, Type[] ts, byte[] finals, NewNode nuf) { return malloc(false,flds,ts,finals,nuf).hashcons_free(); }
   public  static TypeStruct make( int x ) { return make(ts(x)); }
   public  static TypeStruct make(String[] flds, byte[] finals) { return make(flds,ts(flds.length),finals); }
 
@@ -187,7 +199,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   private static final TypeStruct C0    = make(flds("c"),ts(TypeInt.FALSE )); // @{c:0}
   private static final TypeStruct D1    = make(flds("d"),ts(TypeInt.TRUE  )); // @{d:1}
   private static final TypeStruct ARW   = make(flds("a"),ts(TypeFlt.FLT64),new byte[1]);
-  public  static final TypeStruct GENERIC = malloc(true,FLD0,new Type[0],new byte[0]).hashcons_free();
+  public  static final TypeStruct GENERIC = malloc(true,FLD0,new Type[0],new byte[0],null).hashcons_free();
           static final TypeStruct ALLSTRUCT = make();
 
   // Recursive meet in progress
@@ -203,7 +215,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     for( int i=0; i<as.length; i++ ) as[i]=sdual(_flds[i]);
     for( int i=0; i<ts.length; i++ ) ts[i] = _ts[i].dual();
     for( int i=0; i<bs.length; i++ ) bs[i] = (byte)(_finals[i]^1);
-    return new TypeStruct(!_any,as,ts,bs);
+    return new TypeStruct(!_any,as,ts,bs,_nuf);
   }
 
   // Recursive dual
@@ -214,7 +226,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     byte  [] bs = new byte  [_ts  .length];
     for( int i=0; i<as.length; i++ ) as[i]=sdual(_flds[i]);
     for( int i=0; i<bs.length; i++ ) bs[i] = (byte)(_finals[i]^1);
-    TypeStruct dual = _dual = new TypeStruct(!_any,as,ts,bs);
+    TypeStruct dual = _dual = new TypeStruct(!_any,as,ts,bs,_nuf);
     dual._hash = dual.compute_hash(); // Compute hash before recursion
     for( int i=0; i<ts.length; i++ ) ts[i] = _ts[i].rdual();
     dual._dual = this;
@@ -284,7 +296,12 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       ts[i] = tmax._ts    [i];
       bs[i] = tmax._finals[i];
     }
-    return malloc(_any&tmax._any,as,ts,bs).hashcons_free();
+    // Keep any null _nuf as the widest possible (below any specific NewNode).
+    // If both are not-null, then union them (make a wider set of NewNodes).
+    NewNode nuf = _nuf;
+    if( nuf!=null ) nuf = tmax._nuf;
+    if( nuf!=null ) nuf = _nuf.union(nuf);
+    return malloc(_any&tmax._any,as,ts,bs,nuf).hashcons_free();
   }
 
   // Both structures are cyclic.  The meet will be "as if" both structures are
@@ -398,7 +415,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     assert _cyclic;
     Type[] ts = new Type[_ts.length];
     Arrays.fill(ts,Type.XSCALAR);
-    TypeStruct tstr = malloc(_any,_flds.clone(),ts,_finals.clone());
+    TypeStruct tstr = malloc(_any,_flds.clone(),ts,_finals.clone(),_nuf);
     tstr._cyclic = true;
     return tstr;
   }
@@ -439,6 +456,20 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return mt.install_cyclic();
   }
 
+  @Override public TypeStruct approx2( int nuf, int d ) {
+    if( _nuf != null && nuf == _nuf.ufind()._uid ) {
+      d--;
+      if( d<0 ) throw AA.unimpl();
+    }
+    for( int i=0; i<_ts.length; i++ ) {
+      Type t = _ts[i].approx2(nuf,d);
+      if( t != null ) throw AA.unimpl();
+    }
+    return null;                // No changes, so no approximation
+  }
+  // Used by tests to strip '_nuf'
+  @Override public TypeStruct test_nonuf() { return malloc(_any,_flds,_ts,_finals,null).hashcons_free(); }
+  
   // If unequal length; then if short is low it "wins" (result is short) else
   // short is high and it "loses" (result is long).
   private int len( TypeStruct tt ) { return _ts.length <= tt._ts.length ? len0(tt) : tt.len0(this); }
@@ -486,7 +517,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     Type[] ts     = _ts;
     if( _finals[idx] != fin ) { finals = _finals.clone(); finals[idx] = fin; }
     if( _ts    [idx] != val ) { ts     = _ts    .clone(); ts    [idx] = val; }
-    return malloc(_any,_flds,ts,finals).hashcons_free();
+    return malloc(_any,_flds,ts,finals,_nuf).hashcons_free();
   }
   // True if isBitShape on all bits
   @Override public byte isBitShape(Type t) {
@@ -541,14 +572,13 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // Replace old with nnn in a 'this' clone.  We are initially called with
   // 'this==old', so in the clone there is a pointer to the initial
   // Type... which means the whole structure is cyclic when we are done.
-  @SuppressWarnings("unchecked")
   @Override Type replace( Type old, Type nnn, HashMap<Type,Type> HASHCONS ) {
     if( this==old ) return nnn; // Found a copy of 'old', so replace with 'nnn'
     if( _cyclic && !contains(old) ) // Not related, no need to update/clone
       return this;              // Just use as-is
     // Need to clone 'this'
     Type[] ts = new Type[_ts.length];
-    TypeStruct rez = malloc(_any,_flds,ts,_finals);
+    TypeStruct rez = malloc(_any,_flds,ts,_finals,_nuf);
     rez._hash = rez.compute_hash();
     rez._cyclic=true;           // Whole structure is cyclic
     if( nnn==null ) nnn = rez;
@@ -556,7 +586,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       ts[i] = _ts[i].replace(old,nnn,HASHCONS);
     return rez.hashcons_free();
   }
-  @SuppressWarnings("unchecked")
   @Override void walk( Predicate<Type> p ) {
     if( p.test(this) )
       for( Type _t : _ts ) _t.walk(p);
@@ -568,6 +597,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     byte  [] bs = new byte  [_ts  .length]; // r-w is the high value
     for( int i=0; i<as.length; i++ ) as[i] = fldBot(_flds[i]) ? "^" : _flds[i];
     for( int i=0; i<ts.length; i++ ) ts[i] = _ts[i].above_center() ? _ts[i] : _ts[i].dual();
-    return malloc(true,as,ts,bs).hashcons_free();
+    return malloc(true,as,ts,bs,_nuf).hashcons_free();
   }
 }
