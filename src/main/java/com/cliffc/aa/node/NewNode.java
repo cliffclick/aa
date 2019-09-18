@@ -85,34 +85,12 @@ public class NewNode extends Node {
       ts[i] = gvn.type(fld(i)).bound(_ts._ts[i]); // Limit to Scalar results
     TypeStruct newt = TypeStruct.make(_ts._flds,ts,_ts._finals,BitsAlias.make0(_alias));
 
-    // Check for TypeStructs with this same NewNode U-F types occuring more
+    // Check for TypeStructs with this same NewNode U-F types occurring more
     // than CUTOFF deep, and fold the deepest ones onto themselves to limit the
     // type depth.  If this happens, the types become recursive with the
     // approximations happening at the deepest points.
-    TypeStruct ts2 = newt.approx2(new BitSet(),_alias,CUTOFF);
-    if( ts2 != null ) throw com.cliffc.aa.AA.unimpl();
-    
-    //// Get the existing type, without installing if missing because blows the
-    //// "new NewNode" assert if this node gets replaced during parsing.
-    //Type oldnnn = gvn.self_type(this);
-    //// Get the struct-part of the old type for cycle checking
-    //TypeStruct oldt = newt;
-    //if( oldnnn != null ) {
-    //  TypeObj tobj = ((TypeMemPtr)oldnnn)._obj;
-    //  if( _obj instanceof TypeName ) {
-    //    assert ((TypeName)tobj)._name == ((TypeName)_obj)._name; // == not equals
-    //    oldt = (TypeStruct)((TypeName)tobj)._t;
-    //  } else oldt = (TypeStruct)tobj;
-    //}
-    //
-    //// Approximate infinite types
-    //TypeStruct apxt = newt;
-    //if( approx(newt,oldt) ) {   // If approximating, need to keep meeting old and new
-    //  TypeStruct apxt1 = newt.approx(oldt);
-    //  apxt = (TypeStruct) (gvn._opt_mode==2 ? apxt1.meet(oldt) : apxt1.join(oldt));
-    //}
-    //assert apxt.depth() <= CUTOFF+1 || apxt.depth() >= 9999;
-    //
+    Type ts2 = newt.approx2(new BitSet(),_alias,CUTOFF);
+    if( ts2 != null ) newt = (TypeStruct)ts2;
     TypeObj res = _obj instanceof TypeName ? ((TypeName)_obj).make(newt) : newt;
     return TypeMemPtr.make(_alias,res);
   }

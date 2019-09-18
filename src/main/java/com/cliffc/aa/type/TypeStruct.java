@@ -179,9 +179,9 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   private static final String[][] FLDS={FLD0,FLD1,FLD2,FLD3};
           static String[] FLDS( int len ) { return FLDS[len]; }
   private static String[] flds(String... fs) { return fs; }
-  private static Type[] ts(Type... ts) { return ts; }
+  public  static Type[] ts(Type... ts) { return ts; }
   private static Type[] ts(int n) { Type[] ts = new Type[n]; Arrays.fill(ts,SCALAR); return ts; }
-  private static byte[] bs(Type[] ts) { byte[] bs = new byte[ts.length]; Arrays.fill(bs,(byte)1); return bs; } // All read-only
+  public  static byte[] bs(Type[] ts) { byte[] bs = new byte[ts.length]; Arrays.fill(bs,(byte)1); return bs; } // All read-only
   public  static TypeStruct make(         Type... ts) { return make(BitsAlias.REC,ts); }
   public  static TypeStruct make(int nnn, Type... ts) { return malloc(false,FLDS[ts.length],ts,bs(ts),BitsAlias.make0(nnn)).hashcons_free(); }
   public  static TypeStruct make(String[] flds, Type... ts) { return malloc(false,flds,ts,bs(ts),BitsAlias.RECBITS).hashcons_free(); }
@@ -454,18 +454,37 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // Look for recursive instances of TypeStruct with the same 'nuf' value.  If
   // we find more than 'd', it is time to fold the deeper instances together to
   // get a recursive approximation type.
-  @Override public TypeStruct approx2( BitSet visit, int nnn, int d ) {
+  @Override public Type approx2( BitSet visit, int nnn, int d ) {
     if( visit.get(_uid) ) return null;
     visit.set(_uid);
-    if( _news.test(nnn) ) {
-      d--;
-      if( d<0 ) throw AA.unimpl();
+    int oldd = d;
+    if( _news.test(nnn) ) {     // Found another instance of alias 'nnn'
+      d--;                      // Lower remaining depth
+      if( d < 0 ) return this;  // Got too low, stop searching
     }
+    
+    // Else recursively hunt.  If found a deeper change, just wrap it.  If
+    // exactly at depth 0, and also found a deeper change - time to make an
+    // approximation.
+    Type[] ts = null;           // Lazily constructed
     for( int i=0; i<_ts.length; i++ ) {
       Type t = _ts[i].approx2(visit,nnn,d);
-      if( t != null ) throw AA.unimpl();
+      if( t != null ) {         // Found a change, must wrap
+        if( oldd ==0 && d==0 ) return t; // Still unwinding from the bottom-out
+        if( oldd > 0 && d==0 ) {
+          // Replace cutoff 't' with self, forming a cyclic type.
+          TypeStruct apx = approx((TypeStruct)t);
+          // TODO: Need to repeat for other fields (i.e. binary-trees both Left & Right.
+          // TODO: Need to meet with 't' because 't'++ can be lower than the path from this to 't'.
+          return apx;
+        }
+        // Returning a replacement for nested types
+        if( ts == null ) ts = _ts.clone();
+        ts[i] = t;
+      }
     }
-    return null;                // No changes, so no approximation
+    // If no changes, return no change.  Else return the wrapped change.
+    return ts == null ? null : make(_flds,ts,_finals,_news);
   }
   
   // If unequal length; then if short is low it "wins" (result is short) else

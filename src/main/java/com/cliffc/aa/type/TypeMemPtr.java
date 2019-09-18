@@ -151,7 +151,10 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     if( hc == null ) { HASHCONS.put(rez,rez); return rez; }
     return rez.free(hc);
   }
-  @Override public TypeStruct approx2( BitSet visit, int nuf, int d ) { return _obj.approx2(visit,nuf,d); }
+  @Override public Type approx2( BitSet visit, int nuf, int d ) {
+    Type apx = _obj.approx2(visit,nuf,d);
+    return apx == null ? null : (d==0 ? apx : make((TypeObj)apx));
+  }
 
   @SuppressWarnings("unchecked")
   @Override void walk( Predicate<Type> p ) { if( p.test(this) ) _obj.walk(p); }

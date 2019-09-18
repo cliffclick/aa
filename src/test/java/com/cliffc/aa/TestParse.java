@@ -15,7 +15,6 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
     Object dummy = Env.GVN; // Force class loading cycle
-    test_isa("A= :@{n:A?, v:flt}; f={x:A? -> x ? A(f(x.n),x.v*x.v) : 0}; f(A(0,1.2)).v;", TypeFlt.con(1.2*1.2));
 
     // A collection of tests which like to fail easily
     testerr ("Point=:@{x,y}; Point((0,1))", "*[9](nil,1) is not a *[2]@{x,y}",27);
@@ -289,7 +288,7 @@ public class TestParse {
 
   @Test public void testParse6() {
     test_ptr("A= :(A?, int); A(0,2)","A:(nil,2)");
-    test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*[13],3)");
+    test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*[135],3)");
 
     // Building recursive types
     test_isa("A= :int; A(1)", (tmap -> TypeName.make("A",tmap,TypeInt.INT64)));
@@ -361,28 +360,29 @@ public class TestParse {
     assertEquals(Type.NIL,tt5.at(0));
 
     // Test inferring a recursive struct type, with a little help
+    Type[] ts0 = new Type[]{Type.NIL,TypeFlt.con(1.2*1.2)};
     test_ptr("map={x:@{n,v:flt}? -> x ? @{n=map(x.n),v=x.v*x.v} : 0}; map(@{n=0,v=1.2})",
-             (alias) -> TypeMemPtr.make(alias,TypeStruct.make(FLDS,Type.NIL,TypeFlt.con(1.2*1.2))));
+             (alias) -> TypeMemPtr.make(alias,TypeStruct.make(FLDS,ts0,TypeStruct.bs(ts0),alias)));
 
     // Test inferring a recursive struct type, with less help.  This one
     // inlines so doesn't actually test inferring a recursive type.
     test_ptr("map={x -> x ? @{n=map(x.n),v=x.v*x.v} : 0}; map(@{n=0,v=1.2})",
-             (alias) -> TypeMemPtr.make(alias,TypeStruct.make(FLDS,Type.NIL,TypeFlt.con(1.2*1.2))));
+             (alias) -> TypeMemPtr.make(alias,TypeStruct.make(FLDS,ts0,TypeStruct.bs(ts0),alias)));
 
     // Test inferring a recursive struct type, with less help. Too complex to
     // inline, so actual inference happens
     test_ptr_isa("map={x -> x ? @{n=map(x.n),v=x.v*x.v} : 0};"+
                  "map(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0,v=1.2},v=2.3},v=3.4},v=4.5})",
-                 (alias) -> TypeMemPtr.make(alias,TypeStruct.make(FLDS,TypeMemPtr.STRUCT0,TypeFlt.FLT64/*TypeFlt.con(20.25)*/)));
+                 (alias) -> TypeMemPtr.make(alias,TypeStruct.make(FLDS,TypeMemPtr.STRUCT0,TypeFlt.con(20.25))));
 
     // Test inferring a recursive tuple type, with less help.  This one
     // inlines so doesn't actually test inferring a recursive type.
     test_ptr("map={x -> x ? (map(x.0),x.1*x.1) : 0}; map((0,1.2))",
-            (alias) -> TypeMemPtr.make(alias,TypeStruct.make(Type.NIL,TypeFlt.con(1.2*1.2))));
+             (alias) -> TypeMemPtr.make(alias,TypeStruct.make(alias,Type.NIL,TypeFlt.con(1.2*1.2))));
 
     test_ptr_isa("map={x -> x ? (map(x.0),x.1*x.1) : 0};"+
                  "map((math_rand(1)?0: (math_rand(1)?0: (math_rand(1)?0: (0,1.2), 2.3), 3.4), 4.5))",
-                 (alias) -> TypeMemPtr.make(alias,TypeStruct.make(TypeMemPtr.STRUCT0,TypeFlt.FLT64/*TypeFlt.con(20.25)*/)));
+                 (alias) -> TypeMemPtr.make(alias,TypeStruct.make(TypeMemPtr.STRUCT0,TypeFlt.con(20.25))));
 
     // TODO: Need real TypeVars for these
     //test("id:{A->A}"    , Env.lookup_valtype("id"));
@@ -460,7 +460,7 @@ public class TestParse {
     testerr("x=1+y","Unknown ref 'y'",5);
 
     test("x:=1", TypeInt.TRUE);
-    test_ptr("x:=0; a=x; x:=1; b=x; x:=2; (a,b,x)", (alias) -> TypeMemPtr.make(alias,TypeStruct.make(Type.NIL,TypeInt.con(1),TypeInt.con(2))));
+    test_ptr("x:=0; a=x; x:=1; b=x; x:=2; (a,b,x)", (alias) -> TypeMemPtr.make(alias,TypeStruct.make(alias,Type.NIL,TypeInt.con(1),TypeInt.con(2))));
 
     testerr("x=1; x:=2", "Cannot re-assign final val 'x'", 9);
     testerr("x=1; x=2", "Cannot re-assign final val 'x'", 8);

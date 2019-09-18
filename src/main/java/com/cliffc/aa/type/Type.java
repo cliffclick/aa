@@ -710,14 +710,14 @@ public class Type<T extends Type<T>> {
   boolean contains( Type t, BitSet bs ) { return this==t; }
   // Depth of nested types
   public final int depth() { return depth(null); }
-  int depth( BitSet bs ) { return 1; }
+  int depth( BitSet bs ) { return 0; }
   // Mark if part of a cycle
   void mark_cycle( Type t, BitSet visit, BitSet cycle ) { }
   // Replace old with nnn in a clone
   Type replace( Type old, Type nnn, HashMap<Type,Type> ignore ) { return this; }
 
   // Look for types beyond a certain depth, and approximate.
-  public TypeStruct approx2( BitSet visit, int nuf, int d ) {
+  public Type approx2( BitSet visit, int nuf, int d ) {
     if( isa_scalar() ) return null;
     throw typerr(null);
   }

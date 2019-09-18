@@ -243,7 +243,7 @@ public class TypeName extends TypeObj<TypeName> {
   // Iterate over any nested child types
   @Override public void iter( Consumer<Type> c ) { c.accept(_t); }
   @Override boolean contains( Type t, BitSet bs ) { return _t == t || _t.contains(t, bs); }
-  @Override int depth( BitSet bs ) { return 1+_t.depth(bs); }
+  @Override int depth( BitSet bs ) { return _t.depth(bs); }
   @SuppressWarnings("unchecked")
   @Override Type replace( Type old, Type nnn, HashMap<Type,Type> HASHCONS ) {
     Type x = _t.replace(old,nnn,HASHCONS);
@@ -254,7 +254,10 @@ public class TypeName extends TypeObj<TypeName> {
     if( hc == null ) { HASHCONS.put(rez,rez); return rez; }
     return rez.free(hc);
   }
-  @Override public TypeStruct approx2( BitSet visit, int nuf, int d ) { return _t.approx2(visit,nuf,d); }
+  @Override public Type approx2( BitSet visit, int nuf, int d ) {
+    Type apx = _t.approx2(visit,nuf,d);
+    return apx==null ? null : (d==0 ? apx : make(apx));
+  }
 
   @SuppressWarnings("unchecked")
   @Override void walk( Predicate<Type> p ) { if( p.test(this) ) _t.walk(p); }
