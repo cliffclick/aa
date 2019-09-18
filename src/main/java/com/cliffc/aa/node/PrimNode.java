@@ -72,7 +72,6 @@ public abstract class PrimNode extends Node {
 
     new   EQ_OOP(),
     new   NE_OOP(),
-    new AddStrStr(),
   };
 
   public static PrimNode convertTypeName( Type from, TypeName to, Parse badargs ) {
@@ -150,7 +149,7 @@ static class ConvertTypeName extends PrimNode {
   private final Parse _badargs; // Only for converts
   private final HashMap<String,Type> _lex; // Unique lexical scope
   ConvertTypeName(Type from, TypeName to, Parse badargs) {
-    super(to._name,PrimNode.ARGS1,TypeTuple.make(from),to);
+    super(to._name,ARGS1,TypeTuple.make(from),to);
     _lex=to._lex;
     _badargs=badargs;
   }
@@ -175,13 +174,13 @@ static class ConvertTypeName extends PrimNode {
 }
 
 static class ConvertInt64F64 extends PrimNode {
-  ConvertInt64F64() { super("flt64",PrimNode.ARGS1,TypeTuple.INT64,TypeFlt.FLT64); }
+  ConvertInt64F64() { super("flt64",ARGS1,TypeTuple.INT64,TypeFlt.FLT64); }
   @Override public Type apply( Type[] args ) { return TypeFlt.con((double)args[1].getl()); }
 }
 
   // TODO: Type-check strptr input args
 static class ConvertStrStr extends PrimNode {
-  ConvertStrStr() { super("str",PrimNode.ARGS1,TypeTuple.STRPTR,TypeMemPtr.STRPTR); }
+  ConvertStrStr() { super("str",ARGS1,TypeTuple.STRPTR,TypeMemPtr.STRPTR); }
   @Override public Node ideal(GVNGCM gvn) { return in(1); }
   @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)).bound(_ret); }
   @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
@@ -189,7 +188,7 @@ static class ConvertStrStr extends PrimNode {
 
 // 1Ops have uniform input/output types, so take a shortcut on name printing
 abstract static class Prim1OpF64 extends PrimNode {
-  Prim1OpF64( String name ) { super(name,PrimNode.ARGS1,TypeTuple.FLT64,TypeFlt.FLT64); }
+  Prim1OpF64( String name ) { super(name,ARGS1,TypeTuple.FLT64,TypeFlt.FLT64); }
   public Type apply( Type[] args ) { return TypeFlt.con(op(args[1].getd())); }
   abstract double op( double d );
 }
@@ -201,7 +200,7 @@ static class MinusF64 extends Prim1OpF64 {
 
 // 1Ops have uniform input/output types, so take a shortcut on name printing
 abstract static class Prim1OpI64 extends PrimNode {
-  Prim1OpI64( String name ) { super(name,PrimNode.ARGS1,TypeTuple.INT64,TypeInt.INT64); }
+  Prim1OpI64( String name ) { super(name,ARGS1,TypeTuple.INT64,TypeInt.INT64); }
   @Override public Type apply( Type[] args ) { return TypeInt.con(op(args[1].getl())); }
   abstract long op( long d );
 }
@@ -212,13 +211,13 @@ static class MinusI64 extends Prim1OpI64 {
 }
 
 static class NotI64 extends PrimNode {
-  NotI64() { super("!",PrimNode.ARGS1,TypeTuple.INT64,TypeInt.BOOL); }
+  NotI64() { super("!",ARGS1,TypeTuple.INT64,TypeInt.BOOL); }
   @Override public Type apply( Type[] args ) { return args[1].getl()==0?TypeInt.TRUE:TypeInt.FALSE; }
 }
 
 // 2Ops have uniform input/output types, so take a shortcut on name printing
 abstract static class Prim2OpF64 extends PrimNode {
-  Prim2OpF64( String name ) { super(name,PrimNode.ARGS2,TypeTuple.FLT64_FLT64,TypeFlt.FLT64); }
+  Prim2OpF64( String name ) { super(name,ARGS2,TypeTuple.FLT64_FLT64,TypeFlt.FLT64); }
   @Override public Type apply( Type[] args ) { return TypeFlt.con(op(args[1].getd(),args[2].getd())); }
   abstract double op( double x, double y );
 }
@@ -243,7 +242,7 @@ static class MulF64 extends Prim2OpF64 {
 
 // 2RelOps have uniform input types, and bool output
 abstract static class Prim2RelOpF64 extends PrimNode {
-  Prim2RelOpF64( String name ) { super(name,PrimNode.ARGS2,TypeTuple.FLT64_FLT64,TypeInt.BOOL); }
+  Prim2RelOpF64( String name ) { super(name,ARGS2,TypeTuple.FLT64_FLT64,TypeInt.BOOL); }
   @Override public Type apply( Type[] args ) { return op(args[1].getd(),args[2].getd())?TypeInt.TRUE:TypeInt.FALSE; }
   abstract boolean op( double x, double y );
   @Override public byte op_prec() { return 4; }
@@ -259,7 +258,7 @@ static class NE_F64 extends Prim2RelOpF64 { NE_F64() { super("!="); } boolean op
 
 // 2Ops have uniform input/output types, so take a shortcut on name printing
 abstract static class Prim2OpI64 extends PrimNode {
-  Prim2OpI64( String name ) { super(name,PrimNode.ARGS2,TypeTuple.INT64_INT64,TypeInt.INT64); }
+  Prim2OpI64( String name ) { super(name,ARGS2,TypeTuple.INT64_INT64,TypeInt.INT64); }
   @Override public Type apply( Type[] args ) { return TypeInt.con(op(args[1].getl(),args[2].getl())); }
   abstract long op( long x, long y );
 }
@@ -290,7 +289,7 @@ static class AndI64 extends Prim2OpI64 {
 
 // 2RelOps have uniform input types, and bool output
 abstract static class Prim2RelOpI64 extends PrimNode {
-  Prim2RelOpI64( String name ) { super(name,PrimNode.ARGS2,TypeTuple.INT64_INT64,TypeInt.BOOL); }
+  Prim2RelOpI64( String name ) { super(name,ARGS2,TypeTuple.INT64_INT64,TypeInt.BOOL); }
   @Override public Type apply( Type[] args ) { return op(args[1].getl(),args[2].getl())?TypeInt.TRUE:TypeInt.FALSE; }
   abstract boolean op( long x, long y );
   @Override public byte op_prec() { return 4; }
@@ -305,7 +304,7 @@ static class NE_I64 extends Prim2RelOpI64 { NE_I64() { super("!="); } boolean op
 
 
 static class EQ_OOP extends PrimNode {
-  EQ_OOP() { super("==",PrimNode.ARGS2,TypeTuple.OOP_OOP,TypeInt.BOOL); }
+  EQ_OOP() { super("==",ARGS2,TypeTuple.OOP_OOP,TypeInt.BOOL); }
   @Override public Type value(GVNGCM gvn) {
     // Oop-equivalence is based on pointer-equivalence NOT on a "deep equals".
     // Probably need a java-like "===" vs "==" to mean deep-equals.  You are
@@ -336,7 +335,7 @@ static class EQ_OOP extends PrimNode {
 }
 
 static class NE_OOP extends PrimNode {
-  NE_OOP() { super("!=",PrimNode.ARGS2,TypeTuple.OOP_OOP,TypeInt.BOOL); }
+  NE_OOP() { super("!=",ARGS2,TypeTuple.OOP_OOP,TypeInt.BOOL); }
   @Override public Type value(GVNGCM gvn) {
     // Oop-equivalence is based on pointer-equivalence NOT on a "deep equals".
     // Probably need a java-like "===" vs "==" to mean deep-equals.  You are
@@ -363,7 +362,7 @@ static class NE_OOP extends PrimNode {
 
 
 static class RandI64 extends PrimNode {
-  RandI64() { super("math_rand",PrimNode.ARGS1,TypeTuple.INT64,TypeInt.INT64); }
+  RandI64() { super("math_rand",ARGS1,TypeTuple.INT64,TypeInt.INT64); }
   @Override public Type value(GVNGCM gvn) {
     Type t = gvn.type(in(1));
     if( t.above_center() ) return TypeInt.BOOL.dual();
@@ -375,15 +374,10 @@ static class RandI64 extends PrimNode {
 }
 
 static class Id extends PrimNode {
-  Id(Type arg) { super("id",PrimNode.ARGS1,TypeTuple.make_args(arg),arg); }
+  Id(Type arg) { super("id",ARGS1,TypeTuple.make_args(arg),arg); }
   @Override public Node ideal(GVNGCM gvn) { return in(1); }
   @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)).bound(_ret); }
   @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
-}
-
-static class AddStrStr extends PrimNode {
-  AddStrStr( ) { super("+",PrimNode.ARGS2,TypeTuple.STR_STR,TypeMemPtr.STRPTR); }
-  public TypeStr apply( Type[] args ) { return TypeStr.con(args[1].getstr()+args[2].getstr()); }
 }
 
 }

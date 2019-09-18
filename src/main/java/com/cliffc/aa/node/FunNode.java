@@ -76,8 +76,9 @@ public class FunNode extends RegionNode {
     for( int i=2; i<PRIM_CNT; i++ ) {
       FunNode fun = FUNS.at(i);
       if( fun != null && fun.fidx() != i ) { // Cloned primitives get renumbered, so renumber back
+        RetNode ret = fun.ret();
         fun._tf = fun._tf.make_fidx(i);
-        fun.ret()._fidx = i;
+        ret._fidx = i;
       }
     }
   }
@@ -119,8 +120,8 @@ public class FunNode extends RegionNode {
 
   @Override Node copy(GVNGCM gvn) { throw AA.unimpl(); } // Gotta make a new FIDX
 
-  // True if no future unknown callers.
-  private boolean has_unknown_callers() { return _defs._len > 1 && in(1) == Env.ALL_CTRL; }
+  // True if may have future unknown callers.
+  boolean has_unknown_callers() { return _defs._len > 1 && in(1) == Env.ALL_CTRL; }
   // Argument type
   Type targ(int idx) {
     return idx == -1 ? TypeRPC.ALL_CALL :
@@ -326,7 +327,7 @@ public class FunNode extends RegionNode {
     // Specifically ignoring constants, parms, phis, rpcs, types,
     // unresolved, and casts.  These all track & control values, but actually
     // do not generate any code.
-    if( cnts[OP_CALL] > 1 || // Careful inlining more calls; leads to exponential growth
+    if( cnts[OP_CALL] > 2 || // Careful inlining more calls; leads to exponential growth
         cnts[OP_IF  ] > 1+mncons || // Allow some trivial filtering to inline
         cnts[OP_PRIM] > 6 )  // Allow small-ish primitive counts to inline
       return -1;
@@ -518,7 +519,7 @@ public class FunNode extends RegionNode {
   public ParmNode rpc() { return parm(-1); }
   public RetNode ret() {
     for( Node use : _uses )
-      if( use instanceof RetNode )
+      if( use instanceof RetNode && !((RetNode)use).is_copy() )
         return (RetNode)use;
     return null;
   }

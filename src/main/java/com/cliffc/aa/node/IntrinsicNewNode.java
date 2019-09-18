@@ -30,7 +30,8 @@ public abstract class IntrinsicNewNode extends IntrinsicNode {
   }
   public static IntrinsicNewNode[] INTRINSICS = new IntrinsicNewNode[] {
     new ConvertI64Str(BitsAlias.I64),
-    new ConvertF64Str(BitsAlias.F64)
+    new ConvertF64Str(BitsAlias.F64),
+    new AddStrStr(BitsAlias.STR),
   };
   // Clones during inlining all become unique new sites
   @Override IntrinsicNewNode copy(GVNGCM gvn) {
@@ -75,5 +76,33 @@ public abstract class IntrinsicNewNode extends IntrinsicNode {
       if( !t.is_con() || !(t instanceof TypeFlt) ) return _funret;
       return TypeMemPtr.make(_alias,TypeStr.con(Double.toString(t.getd())));
     }
+  }
+  
+  // String concat.  NIL values are treated "as-if" the empty string.
+  // If both arguments are NIL, NIL is returned.
+  // If one  argument  is  NIL, the other non-nil argument is returned.
+  // If neither argument is NIL, the two strings are concatenated into a new third string.
+  static class AddStrStr extends IntrinsicNewNode {
+    AddStrStr(int alias) { super("+",ARGS2,TypeTuple.STR_STR, TypeMemPtr.STRPTR, alias); }
+    @Override public Type value(GVNGCM gvn) {
+      Type m   = gvn.type(in(1));
+      Type sp0 = gvn.type(in(2));
+      Type sp1 = gvn.type(in(3));
+      if( m.above_center() || sp0.above_center() || sp1.above_center() ) return _funret.dual();
+      if( !(m instanceof TypeMem) ) return _funret;
+      if( sp0==Type.NIL ) return sp1;
+      if( sp1==Type.NIL ) return sp0;
+      if( !sp0.isa(TypeMemPtr.STRPTR) || !sp1.isa(TypeMemPtr.STRPTR) ) return _funret;
+      TypeMem mem = (TypeMem)m;
+      Type s0 = mem.ld((TypeMemPtr)sp0);
+      Type s1 = mem.ld((TypeMemPtr)sp1);
+      if( !(s0 instanceof TypeStr) || !(s1 instanceof TypeStr) ) return _funret;
+      TypeStr str0 = (TypeStr)s0;
+      TypeStr str1 = (TypeStr)s1;
+      if( !str0.is_con() || !str1.is_con() ) return _funret;
+      
+      return TypeMemPtr.make(_alias,TypeStr.con(str0.getstr()+str1.getstr()));
+    }
+    @Override public byte op_prec() { return 5; }
   }
 }

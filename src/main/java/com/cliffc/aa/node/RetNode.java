@@ -29,7 +29,7 @@ public final class RetNode extends Node {
   // Short self name
   @Override String xstr() {
     FunNode fun = FunNode.find_fidx(_fidx);
-    return "Ret_"+(fun==null ? ""+_fidx : fun.name());
+    return "Ret_"+(is_copy() ? "!copy!" : (fun==null ? ""+_fidx : fun.name()));
   }
   // Inline longer name
   @Override public String str() { return in(4) instanceof FunNode ? "Ret"+fun().str() : xstr(); }

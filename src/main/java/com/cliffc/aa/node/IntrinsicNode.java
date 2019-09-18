@@ -34,6 +34,7 @@ public abstract class IntrinsicNode extends Node {
   }
 
   final static String[] ARGS1 = new String[]{"x"};
+  final static String[] ARGS2 = new String[]{"x","y"};
 
   @Override public String xstr() { return _name; }
   @Override public Node ideal(GVNGCM gvn) { return null; }

@@ -23,7 +23,7 @@ public final class FunPtrNode extends Node {
   // Inline longer name
   @Override String  str() {
     RetNode ret = ret();
-    if( ret.is_copy() ) return "*!!!{->}";
+    if( ret.is_copy() ) return "*!copy!{->}";
     FunNode fun = ret.fun();
     return fun==null ? xstr() : fun.str();
   }

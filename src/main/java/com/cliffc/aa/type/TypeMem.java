@@ -263,7 +263,7 @@ public class TypeMem extends Type<TypeMem> {
     return TypeTuple.make0(false,ts);
   }
 
-  @Override public boolean above_center() { return _aliases[1].above_center(); }
+  @Override public boolean above_center() { return false; }
   @Override public boolean may_be_con()   { return false;}
   @Override public boolean is_con()       { return false;}
   @Override public boolean must_nil() { return false; } // never a nil

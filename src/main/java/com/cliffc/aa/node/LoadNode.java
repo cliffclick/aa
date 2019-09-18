@@ -16,7 +16,7 @@ public class LoadNode extends Node {
     _fld = fld;
     _fld_num = fld_num;
     // Tests can pass a null, but nobody else does
-    _badfld = bad==null ? null : bad.errMsg("Unknown field '."+fld+"'");
+    _badfld = bad==null ? null : bad.errMsg("Unknown field '."+(fld==null ? fld_num : fld)+"'");
     _badnil = bad==null ? null : bad.errMsg("Struct might be nil when reading field '."+fld+"'");
   }
   public LoadNode( Node ctrl, Node mem, Node adr, String fld , Parse bad ) { this(ctrl,mem,adr,fld,-1,bad); }
