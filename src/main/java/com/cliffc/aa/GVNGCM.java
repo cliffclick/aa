@@ -69,7 +69,7 @@ public class GVNGCM {
       Node n = _work.pop();     // from top-level parse killing result...
       _wrk_bits.clear(n._uid);  // after getting type to return
       if( !n.is_dead() )        // Unreachable loops can be dead; break the loop and delete
-        for( int i=0; i<n._defs._len; i++ ) 
+        for( int i=0; i<n._defs._len; i++ )
           if( !n.is_dead() && n.in(i)!=null )
             set_def_reg(n,i,null);
     }
@@ -81,11 +81,15 @@ public class GVNGCM {
       for( int i=0; i<n._uses._len; i++ )
         if( n._uses.at(i)._uid >= CNT )
           n._uses.del(i--);
+      for( int i=0; i<n._defs._len; i++ )
+        if( n._defs.at(i) != null && n._defs.at(i)._uid >= CNT )
+          { assert n instanceof FunNode || n instanceof ParmNode; n._defs.del(i--); }
       assert !n.is_dead();
       _vals.put(n,n);
-      _ts.set(n._uid,n.value(this)); // Reset types
     }
-    for( Node n : _INIT0_NODES ) // Again, because doing it bulk instead of following edges.
+    for( Node n : _INIT0_NODES ) // Reset types
+      _ts.set(n._uid,n.value(this));
+    for( Node n : _INIT0_NODES ) // Reset types
       _ts.set(n._uid,n.value(this));
   }
 

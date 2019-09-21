@@ -260,31 +260,33 @@ public class CallNode extends Node {
         return _badargs.forward_ref_err(((FunPtrNode)arg(j)).fun());
 
     Node fp = fun();      // Either function pointer, or unresolved list of them
+    Type tfp = gvn.type(fp);
+    if( !(tfp instanceof TypeFunPtr) )
+      return _badargs.errMsg("A function is being called, but "+tfp+" is not a function type");
     Node xfp = fp instanceof UnresolvedNode ? fp.in(0) : fp;
-    Type txfp = gvn.type(xfp);
-    if( !(txfp instanceof TypeFunPtr) )
-      return _badargs.errMsg("A function is being called, but "+txfp+" is not a function type");
-    if( ((TypeFunPtr)txfp).fidxs().above_center() )
-      return _badargs.errMsg("An ambiguous function is being called");
-
-    assert xfp instanceof FunPtrNode; // If not, then we failed to wire all callers up in opto
-    FunPtrNode ptr = (FunPtrNode)xfp;
-    FunNode fun = ptr.fun();
-    if( fp.is_forward_ref() ) // Forward ref on incoming function
-      return _badargs.forward_ref_err(fun);
-
-    // Error#2: bad-arg-count
-    if( fun.nargs() != nargs() )
-      return _badargs.errMsg("Passing "+nargs()+" arguments to "+(fun.xstr())+" which takes "+fun.nargs()+" arguments");
-
-    // Error#3: Now do an arg-check
-    TypeTuple formals = fun._tf._args; // Type of each argument
-    for( int j=0; j<nargs(); j++ ) {
-      Type actual = gvn.type(arg(j));
-      Type formal = formals.at(j);
-      if( !actual.isa(formal) ) // Actual is not a formal
-        return _badargs.typerr(actual,formal);
+    if( xfp instanceof FunPtrNode ) {
+      FunPtrNode ptr = (FunPtrNode)xfp;
+      FunNode fun = ptr.fun();
+      if( fp.is_forward_ref() ) // Forward ref on incoming function
+        return _badargs.forward_ref_err(fun);
+      
+      // Error#2: bad-arg-count
+      if( fun.nargs() != nargs() )
+        return _badargs.errMsg("Passing "+nargs()+" arguments to "+(fun.xstr())+" which takes "+fun.nargs()+" arguments");
+      
+      // Error#3: Now do an arg-check
+      TypeTuple formals = fun._tf._args; // Type of each argument
+      for( int j=0; j<nargs(); j++ ) {
+        Type actual = gvn.type(arg(j));
+        Type formal = formals.at(j);
+        if( !actual.isa(formal) ) // Actual is not a formal
+          return _badargs.typerr(actual,formal);
+      }
     }
+
+    if( ((TypeFunPtr)tfp).fidxs().above_center() )
+      return _badargs.errMsg("An ambiguous function is being called");
+    // No more unresolved
 
     return null;
   }

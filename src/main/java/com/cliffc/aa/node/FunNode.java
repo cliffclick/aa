@@ -34,7 +34,7 @@ import java.util.Map;
 // points to the RetNode and is typed as a TypeFunPtr.  The TFP is used as a
 // 1st-class function pointer and is carried through the program like a normal
 // value.  Direct Calls will point to the Epilog directly.
-// 
+//
 public class FunNode extends RegionNode {
   public String _name;          // Optional for anon functions; can be set later via bind()
   public TypeFunPtr _tf;        // FIDX, arg & ret types
@@ -62,12 +62,12 @@ public class FunNode extends RegionNode {
     assert !tf.is_class();
     FUNS.setX(fidx(),this); // Track FunNode by fidx; assert single-bit fidxs
   }
-  
+
   // Find FunNodes by fidx
   static Ary<FunNode> FUNS = new Ary<>(new FunNode[]{null,});
   public static FunNode find_fidx( int fidx ) { return fidx >= FUNS._len ? null : FUNS.at(fidx); }
   int fidx() { return _tf.fidx(); } // Asserts single-bit internally
-  
+
   // Fast reset of parser state between calls to Exec
   static int PRIM_CNT;
   public static void init0() { PRIM_CNT = FUNS._len; }
@@ -128,7 +128,7 @@ public class FunNode extends RegionNode {
       (idx == -2 ? TypeMem.MEM : _tf.arg(idx));
   }
   int nargs() { return _tf._args._ts.length; }
-  
+
   // ----
   @Override public Node ideal(GVNGCM gvn) {
     // Generic Region ideal
@@ -142,13 +142,13 @@ public class FunNode extends RegionNode {
       set_def(1,gvn.con(Type.XCTRL),gvn); // Kill unknown caller
       return this;
     }
-    
+
 
     if( gvn._small_work ) { // Only doing small-work now
       gvn.add_work2(this);  // Maybe want to inline later
       return null;
     }
-      
+
     // Type-specialize as-needed
     if( is_forward_ref() ) return null;
     ParmNode rpc_parm = rpc();
@@ -164,7 +164,7 @@ public class FunNode extends RegionNode {
       assert gvn.type(in(i))==Type.CTRL; // Dead paths already removed
       cgedges[i] = new CGEdge(gvn, rpc_parm,i,ret);
     }
-    
+
     // Look for appropriate type-specialize callers
     TypeTuple args = type_special(gvn, parms);
     int path = -1;              // Paths will split according to type
@@ -218,7 +218,7 @@ public class FunNode extends RegionNode {
           }
     return -1; // No unresolved calls; no point in type-specialization
   }
-    
+
   private Type[] find_type_split( GVNGCM gvn, ParmNode[] parms ) {
     assert has_unknown_callers(); // Only overly-wide calls.
     // Look for splitting to help an Unresolved Call.
@@ -251,14 +251,14 @@ public class FunNode extends RegionNode {
 
   private static Type find_load_use(Node puse, Type tp) {
     if( !tp.isa(TypeStruct.GENERIC) ) return tp;
-    if( puse instanceof CastNode ) 
+    if( puse instanceof CastNode )
       throw AA.unimpl();
-    if( puse instanceof LoadNode ) 
+    if( puse instanceof LoadNode )
       throw AA.unimpl();
     return tp;                  // Unknown use, can ignore
   }
 
-  
+
   // Look for type-specialization inlining.  If any ParmNode has an unresolved
   // Call user, then we'd like to make a clone of the function body (in least
   // up to getting all the Unresolved functions to clear out).  The specialized
@@ -357,7 +357,7 @@ public class FunNode extends RegionNode {
   // ---------------------------------------------------------------------------
   // Clone the function body, and split the callers of 'this' into 2 sets; one
   // for the old and one for the new body.  The new function may have a more
-  // refined signature, and perhaps no unknown callers.  
+  // refined signature, and perhaps no unknown callers.
   private Node split_callers( GVNGCM gvn, ParmNode[] parms, RetNode oldret, FunNode fun, CGEdge[] cgedges, int path) {
     // Strip out all wired calls to this function.  All will re-resolve later.
     for( CGEdge cg : cgedges )
@@ -371,7 +371,7 @@ public class FunNode extends RegionNode {
         if( parm instanceof ParmNode )
           { gvn.unreg(parm); parm.pop(); gvn.rereg(parm,((ParmNode)parm)._default_type); }
     }
-    
+
     // Map from old to cloned function body
     HashMap<Node,Node> map = new HashMap<>();
     // Clone the function body
@@ -388,7 +388,7 @@ public class FunNode extends RegionNode {
       map.put(n,n.copy(gvn)); // Make a blank copy with no edges and map from old to new
       work.addAll(n._uses);   // Visit all uses also
     }
-    
+
     // Collect the old/new funptrs and add to map also.
     RetNode newret = (RetNode)oldret.copy(gvn);
     newret._fidx = fun.fidx();
@@ -397,13 +397,13 @@ public class FunNode extends RegionNode {
     FunPtrNode new_funptr = (FunPtrNode)old_funptr.copy(gvn);
     new_funptr.add_def(newret);
     old_funptr.keep(); // Keep around; do not kill last use before the clone is done
-    
+
     // Fill in edges.  New Nodes point to New instead of Old; everybody
     // shares old nodes not in the function (and not cloned).
     for( Node n : map.keySet() ) {
       Node c = map.get(n);
       assert c._defs._len==0;
-      for( Node def : n._defs ) { 
+      for( Node def : n._defs ) {
         Node newdef = map.get(def);// Map old to new
         c.add_def(newdef==null ? def : newdef);
       }
@@ -415,24 +415,26 @@ public class FunNode extends RegionNode {
       fun.set_def(1,gvn.con(Type.XCTRL),gvn);
 
     // Make an Unresolved choice of the old and new functions, to be used by
-    // non-application uses.
+    // non-application uses.  E.g., passing a unresolved function pointer to a
+    // 'map()' call.
     gvn.setype(new_funptr,new_funptr.value(gvn));
-    Node new_unr = null;
+    UnresolvedNode new_unr = null;
     if( path < 0 ) {
-      new_unr = gvn.xform(new UnresolvedNode(old_funptr,new_funptr));
+      new_unr = (UnresolvedNode)gvn.xform(new UnresolvedNode(old_funptr,new_funptr));
       for( int i=0; i<old_funptr._uses._len; i++ ) {
         Node use = old_funptr._uses.at(i);
-        if( use != new_unr &&
-            !(use instanceof CallNode) ) {
-          // TODO: move to the new_unr
-          throw com.cliffc.aa.AA.unimpl();
-        }
+        if( use == new_unr ) continue;
+        // Find the use idx; skip CallNode.fun() uses as these will be wired
+        // correctly shortly.
+        for( int idx=0; idx < use._defs._len; idx++ )
+          if( use.in(idx) == old_funptr && !(use instanceof CallNode && idx==1) )
+            { gvn.set_def_reg(use,idx,new_unr); i--; break; }
       }
       gvn.add_work(new_unr);
       new_unr.keep();
     }
-    
-    // Put all new nodes into the GVN tables and worklists
+
+    // Put all new nodes into the GVN tables and worklist
     for( Map.Entry<Node,Node> e : map.entrySet() ) {
       Node nn = e.getValue();         // New node
       Type ot = gvn.type(e.getKey()); // Generally just copy type from original nodes
@@ -465,7 +467,7 @@ public class FunNode extends RegionNode {
             Type tp = gvn.type(call.arg(parm._idx)); // Specific path type
             if( !tp.isa(fun.targ(parm._idx)) || // If this path cannot use the sharper sig
                 tp.above_center() )             // Or path is in-error
-              { fp = old_funptr; break; } // Take the old, more generic version            
+              { fp = old_funptr; break; } // Take the old, more generic version
             if( tp.widen() != parm._default_type ) // Even widened, path is more specific than the generic
               fp = new_funptr;  // Then take it, but check remaining paths
           }
@@ -488,7 +490,7 @@ public class FunNode extends RegionNode {
     // 'this' gets re-registered during the re-wiring process, blowing the
     // standard ideal() invariant.
     gvn.unreg(this);
-   
+
     if( new_unr != null ) new_unr.unkeep(gvn);
     old_funptr.unkeep(gvn);
     // TODO: This fixup shouldn't be here, since old_funptr can go dead at any

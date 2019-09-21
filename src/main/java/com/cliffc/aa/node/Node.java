@@ -103,7 +103,7 @@ public abstract class Node implements Cloneable {
     } catch( CloneNotSupportedException cns ) { throw new RuntimeException(cns); }
 
   }
-  
+
   // Short string name
   String xstr() { return STRS[_op]; } // Self   short  name
   String  str() { return xstr(); }    // Inline longer name
@@ -207,7 +207,7 @@ public abstract class Node implements Cloneable {
           nodes.push(use);
     if( !is_multi_tail() ) nodes.push(this);
   }
-  
+
   public  Node find( int uid ) { return find(uid,new BitSet()); }
   private Node find( int uid, BitSet bs ) {
     if( _uid==uid ) return this;
@@ -232,13 +232,13 @@ public abstract class Node implements Cloneable {
   // If an ideal() change breaks type monotonicity, the ideal() call knows this
   // and assures monotonicity happens some other way.
   public boolean monotonicity_assured() { return false; }
-    
+
   // Return any type error message, or null if no error
   public String err(GVNGCM gvn) { return null; }
-  
+
   // Worse-case type for this Node
   public Type all_type() { return Type.ALL; }
-  
+
   // Operator precedence is only valid for ConNode of binary functions
   public byte  op_prec() { return -1; }
   public byte may_prec() { return -1; }
@@ -268,7 +268,7 @@ public abstract class Node implements Cloneable {
   // non-null check will hash to the pre-test Load, and so bypass this
   // sharpening.
   public Node sharpen( GVNGCM gvn, ScopeNode scope, ScopeNode arm ) { return this; }
-    
+
   // Gather errors; backwards reachable control uses only
   public void walkerr_use( Ary<String> errs, BitSet bs, GVNGCM gvn ) {
     assert !is_dead();
@@ -279,7 +279,7 @@ public abstract class Node implements Cloneable {
     for( Node use : _uses )     // Walk control users for more errors
       use.walkerr_use(errs,bs,gvn);
   }
-  
+
   // Gather errors; forwards reachable data uses only.  This is an RPO walk.
   public void walkerr_def( Ary<String> errs0, Ary<String> errs1, Ary<String> errs2, BitSet bs, GVNGCM gvn ) {
     assert !is_dead();
@@ -301,10 +301,11 @@ public abstract class Node implements Cloneable {
       // triggered this one.
       else if( this instanceof CallNode && in(1) instanceof UnresolvedNode ) errs=errs2;
       else errs=errs1;          // Other errors (e.g. bad fields for Loads)
-      errs.add(msg);
+      if( errs.find(msg::equals) == -1 ) // Filter dups; happens due to e.g. inlining replicating busted code
+        errs.add(msg);
     }
   }
-  
+
   // Gather errors; forwards reachable data uses only
   public void walkerr_gc( Ary<String> errs, BitSet bs, GVNGCM gvn ) {
     if( bs.get(_uid) ) return;  // Been there, done that
@@ -329,12 +330,12 @@ public abstract class Node implements Cloneable {
   // True if function is uncalled (but possibly returned or stored as
   // a constant).  Such code is not searched for errors.
   boolean is_uncalled(GVNGCM gvn) { return false; }
-  
+
   // Only true for some RetNodes and FunNodes
   public boolean is_forward_ref() { return false; }
-  
+
   // Walk a subset of the dominator tree, looking for the last place (highest
-  // in tree) this predicate passes, or null if it never does.  
+  // in tree) this predicate passes, or null if it never does.
   Node walk_dom_last(Predicate<Node> P) {
     if( this==Env.START ) return null; // Walked off the top
     assert in(0) != null;       // All default control nodes pass ctrl in slot 0
@@ -342,5 +343,5 @@ public abstract class Node implements Cloneable {
     if( n != null ) return n;   // Take last answer first
     return P.test(this) ? this : null;
   }
-  
+
 }

@@ -23,7 +23,7 @@ import java.util.BitSet;
   Index: "ary [ int" with '[' as an infix operator.
   Yields a "fat pointer".
   Get: ']' postfix operator.  Example: ary[3] looks up item #3
-  Put: ']='  infix operator.  Example: ary[2]=5; 
+  Put: ']='  infix operator.  Example: ary[2]=5;
 
   Parallel map on arrays; yields a new array
     ary.{e idx -> fun e}
@@ -176,9 +176,8 @@ public class Parse {
     if( errs0.isEmpty() ) _e._scope.walkerr_use(errs0,new BitSet(),_gvn);
     if( errs0.isEmpty() && skipWS() != -1 ) errs0.add(errMsg("Syntax error; trailing junk"));
     if( errs0.isEmpty() ) res.walkerr_gc(errs0,new BitSet(),_gvn);
-    // If the ONLY error is from unresolved calls, report them last.  Most
-    // other errors result in unresolved calls, so report others first.
-    if( errs0.isEmpty() ) errs0.addAll(errs2);
+    // Most errors result in unresolved calls, so report others first.
+    errs0.addAll(errs2);
     // Do not sort the errors, because they are reported in Reverse Post-Order
     // which means control-dependent errors are reported after earlier control
     // errors... i.e., you get the errors in execution order.
@@ -675,7 +674,7 @@ public class Parse {
   private Node typechk(Node x, Type t) {
     return t == null || _gvn.type(x).isa(t) ? x : gvn(new TypeNode(t,x,errMsg()));
   }
-  
+
   private String token() { skipWS();  return token0(); }
   // Lexical tokens.  Any alpha, followed by any alphanumerics is a alpha-
   // token; alpha-tokens end with WS or any operator character.  Any collection

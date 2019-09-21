@@ -30,6 +30,7 @@ public final class CallEpiNode extends Node {
     if( is_copy() ) return null;
 
     CallNode call = call();
+    Node cctl = call.ctl();
     TypeTuple tcall = (TypeTuple)gvn.type(call);
     if( tcall.at(0) != Type.CTRL ) return null; // Call not executable
     if( !(tcall.at(1) instanceof TypeFunPtr) ) return null;
@@ -41,7 +42,7 @@ public final class CallEpiNode extends Node {
     if( _defs._len==2 ) {
       RetNode ret = (RetNode)in(1);
       if( ret.is_copy() )       // FunNode already single-caller and collapsed
-        return inline(gvn, ret.ctl(), ret.mem(), ret.val());
+        return inline(gvn, ret.ctl(), ret.mem(), ret.val(), ret);
     }
 
     // If the call's allowed functions excludes any wired, remove the extras
@@ -84,7 +85,6 @@ public final class CallEpiNode extends Node {
     }
 
     // Check for several trivial cases that can be fully inlined immediately.
-    Node cctl = call.ctl();
     Node cmem = call.mem();
     RetNode ret = fun.ret();    // Return from function
     Node ctl  = ret.ctl();      // Control being returned
@@ -97,10 +97,10 @@ public final class CallEpiNode extends Node {
 
     // Check for zero-op body (id function)
     if( rez instanceof ParmNode && rez.in(0) == fun && cmem == mem )
-      return inline(gvn,cctl,cmem,call.arg(((ParmNode)rez)._idx));
+      return inline(gvn,cctl,cmem,call.arg(((ParmNode)rez)._idx), ret);
     // Check for constant body
     if( gvn.type(rez).is_con() && ctl==fun )
-      return inline(gvn,cctl,cmem,rez);
+      return inline(gvn,cctl,cmem,rez,ret);
 
     // Check for a 1-op body using only constants or parameters and no memory effects
     boolean can_inline=!(rez instanceof ParmNode) && mem==cmem;
@@ -114,10 +114,8 @@ public final class CallEpiNode extends Node {
       for( Node parm : rez._defs )
         irez.add_def((parm instanceof ParmNode && parm.in(0) == fun) ? call.arg(((ParmNode)parm)._idx) : parm);
       if( irez instanceof PrimNode ) ((PrimNode)irez)._badargs = call._badargs;
-      return inline(gvn,cctl,cmem,gvn.xform(irez)); // New exciting replacement for inlined call
+      return inline(gvn,cctl,cmem,gvn.xform(irez),ret); // New exciting replacement for inlined call
     }
-
-    assert fun.in(1)._uid!=0; // Never wire into a primitive, just clone/inline it instead (done just above)
 
     // Always wire caller args into known functions
     return wire(gvn,call,fun,ret);
@@ -194,13 +192,13 @@ public final class CallEpiNode extends Node {
       RetNode ret = fun.ret();
       Type tret = gvn.type(ret); // Type of the return
       t = lifting ? t.join(tret) : t.meet(tret);
-      
+
       // Make real from virtual CG edges in GCP/Opto by wiring calls.
       if( gvn._opt_mode==2 &&        // Manifesting optimistic virtual edges between caller and callee
           !fidxs.above_center() &&   // Still settling down to possibilities
           !fun.is_forward_ref() &&   // Call is in-error
           fidx >= FunNode.PRIM_CNT ) // Do not wire up primitives, but forever take their default inputs and outputs
-        wire(gvn,call,fun,ret);      
+        wire(gvn,call,fun,ret);
     }
 
     return t;
@@ -208,7 +206,15 @@ public final class CallEpiNode extends Node {
 
   // Inline the CallNode.  Remove all edges except the results.  This triggers
   // "is_copy()", which in turn will trigger the following ProjNodes to inline.
-  private Node inline( GVNGCM gvn, Node ctl, Node mem, Node rez ) {
+  private Node inline( GVNGCM gvn, Node ctl, Node mem, Node rez, RetNode ret ) {
+    assert _defs._len == 1 || _defs._len==2;   // not wired to several choices
+    // Unwire any wired called function
+    if( _defs._len == 2 && !ret.is_copy() ) {  // Wired, and called function not already collapsing
+      FunNode fun = ret.fun();
+      for( int i=0; i<fun._defs._len; i++ ) // Unwire
+        if( fun.in(i)==ctl ) gvn.set_def_reg(fun,i,gvn.con(Type.XCTRL));
+    }
+    // Remove all edges except the inlined results
     add_def(ctl);
     add_def(mem);
     add_def(rez);
