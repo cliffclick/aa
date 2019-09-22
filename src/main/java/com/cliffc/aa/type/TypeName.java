@@ -254,9 +254,8 @@ public class TypeName extends TypeObj<TypeName> {
     if( hc == null ) { HASHCONS.put(rez,rez); return rez; }
     return rez.free(hc);
   }
-  @Override public Type approx2( BitSet visit, int nuf, int d ) {
-    Type apx = _t.approx2(visit,nuf,d);
-    return apx==null ? null : (d==0 ? apx : make(apx));
+  @Override public int approx2( HashMap<TypeStruct,Integer> ds, int nnn, int d ) {
+    return _t.approx2(ds,nnn,d);
   }
 
   @SuppressWarnings("unchecked")

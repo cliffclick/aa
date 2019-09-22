@@ -148,12 +148,11 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     Type rez = make((TypeObj)x);
     rez._cyclic=true;
     TypeMemPtr hc = (TypeMemPtr)HASHCONS.get(rez);
-    if( hc == null ) { HASHCONS.put(rez,rez); return rez; }
+    if( hc == null ) { HASHCONS.put(rez ,rez); return rez; }
     return rez.free(hc);
   }
-  @Override public Type approx2( BitSet visit, int nuf, int d ) {
-    Type apx = _obj.approx2(visit,nuf,d);
-    return apx == null ? null : (d==0 ? apx : make((TypeObj)apx));
+  @Override public int approx2( HashMap<TypeStruct,Integer> ds, int nnn, int d ) {
+    return _obj.approx2(ds,nnn,d);
   }
 
   @SuppressWarnings("unchecked")

@@ -3,7 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 
-import java.util.BitSet;
+import java.util.HashMap;
 
 // TODO: fix recursive types
 //
@@ -25,7 +25,7 @@ import java.util.BitSet;
 // ptr, and NewNode has a UF ptr also.  Standard UF; "union" happens when 2 TS
 // types are meet with different NNs.  When computing depth, can use the UF NN
 // id to look for repeats, and report back the depth(0) to the depth(1).
-// 
+//
 // At compilation unit end, can wipe out all TS with non-null NN?
 
 
@@ -55,7 +55,7 @@ public class NewNode extends Node {
   }
   private int def_idx(int fld) { return fld+1; }
   Node fld(int fld) { return in(def_idx(fld)); }
-  
+
   // Called when folding a Named Constructor into this allocation site
   void set_name( GVNGCM gvn, TypeName to ) {
     Type oldt = gvn.type(this);
@@ -71,12 +71,12 @@ public class NewNode extends Node {
     TypeMemPtr nameptr = _ptr.make(to.make(((TypeMemPtr)oldt)._obj));
     gvn.rereg(this,nameptr);
   }
-  
+
   String xstr() { return "New*"+_alias; } // Self short name
   String  str() { return "New"+_ptr; } // Inline less-short name
 
   @Override public Node ideal(GVNGCM gvn) { return null; }
-  
+
   // Produces a TypeMemPtr
   @Override public Type value(GVNGCM gvn) {
     // Gather args and produce a TypeStruct
@@ -89,8 +89,23 @@ public class NewNode extends Node {
     // than CUTOFF deep, and fold the deepest ones onto themselves to limit the
     // type depth.  If this happens, the types become recursive with the
     // approximations happening at the deepest points.
-    Type ts2 = newt.approx2(new BitSet(),_alias,CUTOFF);
-    if( ts2 != null ) newt = (TypeStruct)ts2;
+    HashMap<TypeStruct,Integer> ds = new HashMap<>();
+    int d = newt.approx2(ds,_alias,CUTOFF+1);
+    if( d >= CUTOFF ) {
+      // All depth==1 to depth==0 transitions will need to be approximated
+      for( TypeStruct t1 : ds.keySet() ) {
+        if( ds.get(t1)==1 && t1._news.test(_alias) ) {
+          // There can be many t0's and many t1's pointing to many t0's.  t1
+          // can have zero or more t0's as children, with any amount of cyclic
+          // unrelated types in-between.  Find them all, and approximate each.
+          for( Type t2 : t1._ts ) {
+            throw com.cliffc.aa.AA.unimpl();
+          }
+        }
+      }
+    }
+    //Type ts2 = newt.approx2(new BitSet(),_alias,CUTOFF);
+    //if( ts2 != null ) newt = (TypeStruct)ts2;
     TypeObj res = _obj instanceof TypeName ? ((TypeName)_obj).make(newt) : newt;
     return TypeMemPtr.make(_alias,res);
   }

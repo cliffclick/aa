@@ -392,6 +392,24 @@ public class TestParse {
 
 
   @Test public void testParse8() {
+    testerr("tmp=@{"+
+                    "  l=@{"+
+                    "    l=@{ l=0, r=0, v=3 },"+
+                    "    l=@{ l=0, r=0, v=7 },"+
+                    "    v=5"+
+                    "  },"+
+                    "  r=@{"+
+                    "    l=@{ l=0, r=0, v=15 },"+
+                    "    l=@{ l=0, r=0, v=22 },"+
+                    "    v=20"+
+                    "  },"+
+                    "  v=12 "+
+                    "};"+
+                    "map={tree fun -> tree"+
+                    "     ? @{l=map(tree.l,fun),r=map(tree.r,fun),v=fun(tree.v)}"+
+                    "     : 0};"+
+                    "map(tmp,{x->x+x})",
+            "Cannot define field '.l' twice",61);
     // A linked-list mixing ints and strings, always in pairs
     String ll_cona = "a=0; ";
     String ll_conb = "b=math_rand(1) ? ((a,1),\"abc\") : a; ";

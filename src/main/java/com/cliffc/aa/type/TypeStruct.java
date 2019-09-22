@@ -79,7 +79,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
         return -1;              // Some not-pointer-equals child types, must do the full check
     return 1;                   // All child types are pointer-equals, so must be equals.
   }
-  
+
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeStruct) ) return false;
@@ -451,42 +451,55 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return mt.install_cyclic();
   }
 
-  // Look for recursive instances of TypeStruct with the same 'nuf' value.  If
+  // Look for recursive instances of TypeStruct with the same alias value.  If
   // we find more than 'd', it is time to fold the deeper instances together to
-  // get a recursive approximation type.
-  @Override public Type approx2( BitSet visit, int nnn, int d ) {
-    if( visit.get(_uid) ) return null;
-    visit.set(_uid);
-    int oldd = d;
-    if( _news.test(nnn) ) {     // Found another instance of alias 'nnn'
-      d--;                      // Lower remaining depth
-      if( d < 0 ) return this;  // Got too low, stop searching
-    }
-    
-    // Else recursively hunt.  If found a deeper change, just wrap it.  If
-    // exactly at depth 0, and also found a deeper change - time to make an
-    // approximation.
-    Type[] ts = null;           // Lazily constructed
-    for( int i=0; i<_ts.length; i++ ) {
-      Type t = _ts[i].approx2(visit,nnn,d);
-      if( t != null ) {         // Found a change, must wrap
-        if( oldd ==0 && d==0 ) return t; // Still unwinding from the bottom-out
-        if( oldd > 0 && d==0 ) {
-          // Replace cutoff 't' with self, forming a cyclic type.
-          TypeStruct apx = approx((TypeStruct)t);
-          // TODO: Need to repeat for other fields (i.e. binary-trees both Left & Right.
-          // TODO: Need to meet with 't' because 't'++ can be lower than the path from this to 't'.
-          return apx;
-        }
-        // Returning a replacement for nested types
-        if( ts == null ) ts = _ts.clone();
-        ts[i] = t;
-      }
-    }
-    // If no changes, return no change.  Else return the wrapped change.
-    return ts == null ? null : make(_flds,ts,_finals,_news);
+  // get a recursive approximation type.  This is a classic longest-path
+  // algorithm.
+  @Override public int approx2( HashMap<TypeStruct,Integer> ds, int alias, int d ) {
+    Integer my_d = ds.get(this);
+    if( my_d != null ) return my_d;
+    int d2 =_news.test(alias) ? d-1 : d; // Another instance of alias?  Or unrelated?
+    if( d2==0 ) return dput(ds,0);       // Bottomed out
+    int md = dput(ds,-1);       // as-if we are a leaf, actual depth not known
+    for( Type t : _ts ) md = Math.max(md, t.approx2(ds, alias, d2));
+    if( _news.test(alias) ) md++; // Largest of my children+1
+    return dput(ds,md);           //
   }
-  
+  private int dput( HashMap<TypeStruct,Integer> ds, int d ) { ds.put(this,d); return d; }
+
+  //@Override public Type approx2( BitSet visit, int nnn, int d ) {
+  //  if( visit.get(_uid) ) return null;
+  //  visit.set(_uid);
+  //  int oldd = d;
+  //  if( _news.test(nnn) ) {     // Found another instance of alias 'nnn'
+  //    d--;                      // Lower remaining depth
+  //    if( d < 0 ) return this;  // Got too low, stop searching
+  //  }
+  //
+  //  // Else recursively hunt.  If found a deeper change, just wrap it.  If
+  //  // exactly at depth 0, and also found a deeper change - time to make an
+  //  // approximation.
+  //  Type[] ts = null;           // Lazily constructed
+  //  for( int i=0; i<_ts.length; i++ ) {
+  //    Type t = _ts[i].approx2(visit,nnn,d);
+  //    if( t != null ) {         // Found a change, must wrap
+  //      if( oldd ==0 && d==0 ) return t; // Still unwinding from the bottom-out
+  //      if( oldd > 0 && d==0 ) {
+  //        // Replace cutoff 't' with self, forming a cyclic type.
+  //        TypeStruct apx = approx((TypeStruct)t);
+  //        // TODO: Need to repeat for other fields (i.e. binary-trees both Left & Right.
+  //        // TODO: Need to meet with 't' because 't'++ can be lower than the path from this to 't'.
+  //        return apx;
+  //      }
+  //      // Returning a replacement for nested types
+  //      if( ts == null ) ts = _ts.clone();
+  //      ts[i] = t;
+  //    }
+  //  }
+  //  // If no changes, return no change.  Else return the wrapped change.
+  //  return ts == null ? null : make(_flds,ts,_finals,_news);
+  //}
+
   // If unequal length; then if short is low it "wins" (result is short) else
   // short is high and it "loses" (result is long).
   private int len( TypeStruct tt ) { return _ts.length <= tt._ts.length ? len0(tt) : tt.len0(this); }
@@ -594,12 +607,15 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     if( this==old ) return nnn; // Found a copy of 'old', so replace with 'nnn'
     if( _cyclic && !contains(old) ) // Not related, no need to update/clone
       return this;              // Just use as-is
+    Type mmm = HASHCONS.get(this);
+    if( mmm != null ) return mmm;
     // Need to clone 'this'
     Type[] ts = new Type[_ts.length];
     TypeStruct rez = malloc(_any,_flds,ts,_finals,_news);
     rez._hash = rez.compute_hash();
     rez._cyclic=true;           // Whole structure is cyclic
     if( nnn==null ) nnn = rez;
+    HASHCONS.put(this,rez);
     for( int i=0; i<_ts.length; i++ )
       ts[i] = _ts[i].replace(old,nnn,HASHCONS);
     return rez.hashcons_free();

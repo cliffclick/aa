@@ -717,8 +717,8 @@ public class Type<T extends Type<T>> {
   Type replace( Type old, Type nnn, HashMap<Type,Type> ignore ) { return this; }
 
   // Look for types beyond a certain depth, and approximate.
-  public Type approx2( BitSet visit, int nuf, int d ) {
-    if( isa_scalar() ) return null;
+  public int approx2( HashMap<TypeStruct,Integer> ds, int nnn, int d ) {
+    if( isa_scalar() ) return -1;
     throw typerr(null);
   }
   
