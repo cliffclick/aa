@@ -329,7 +329,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
 
   // Constants are self-dual; classes just flip the meet/join bit.
   @SuppressWarnings("unchecked")
-  public B dual() { return _bits==null && !is_class(_con) ? (B)this : make_impl(-_con,_bits); }
+  public B dual() { return _bits==null && !is_class(Math.abs(_con)) ? (B)this : make_impl(-_con,_bits); }
   // join is defined in terms of meet and dual
   public Bits<B> join(Bits<B> bs) { return dual().meet(bs.dual()).dual(); }
 
@@ -376,7 +376,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
       }
       // Need a new bit
       int bit = _cnt++; // Next available bit number
-      
+
       // Make space in the parents array to hold the parent of 'bit'
       while( bit >= _pars.length ) _pars = Arrays.copyOf(_pars,_pars.length<<1);
       assert _pars[bit]==0;

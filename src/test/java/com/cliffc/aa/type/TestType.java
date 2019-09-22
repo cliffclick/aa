@@ -134,7 +134,7 @@ public class TestType {
 
     // "~str?" or "*[~0+4+]~str?" includes a nil, but nothing can fall to a nil
     // (breaks lattice)... instead they fall to their appropriate nil-type.
-    assertEquals(TypeMemPtr.NIL,xstr0.meet( nil )); 
+    assertEquals(TypeMemPtr.NIL,xstr0.meet( nil ));
 
     // This is a choice ptr-to-alias#1, vs a nil-able ptr-to-alias#2.  Since
     // they are from different alias classes, they are NEVER equal (unless both
@@ -253,7 +253,7 @@ public class TestType {
 
     // Anonymous recursive structs -
     // - struct with pointer to self
-    TypeStruct ts0 = TypeStruct.malloc(false,flds,new Type[2],new byte[]{1,1},null);
+    TypeStruct ts0 = TypeStruct.malloc(false,flds,new Type[2],new byte[]{1,1},BitsAlias.RECBITS);
     ts0._hash = ts0.compute_hash();
     ts0._ts[0] = ts0ptr;    ts0._cyclic = true;
     ts0._ts[1] = TypeInt.INT64;
@@ -261,7 +261,7 @@ public class TestType {
     TypeMem ts0mem = TypeMem.make(alias1,ts0); // {1:@{n:*[1],v:int} }
 
     // - struct with pointer to self or nil
-    TypeStruct ts1 = TypeStruct.malloc(false,flds,new Type[2],new byte[]{1,1},null);
+    TypeStruct ts1 = TypeStruct.malloc(false,flds,new Type[2],new byte[]{1,1},BitsAlias.RECBITS);
     ts1._hash = ts1.compute_hash();
     ts1._ts[0] = ts0ptr0;  ts1._cyclic = true;
     ts1._ts[1] = TypeInt.INT64;
@@ -370,7 +370,7 @@ public class TestType {
 
     // T = :(T?,i64)
     int alias = BitsAlias.new_alias(BitsAlias.REC);
-    TypeStruct T = TypeStruct.malloc(false,flds,new Type[2],new byte[]{1,1},null);
+    TypeStruct T = TypeStruct.malloc(false,flds,new Type[2],new byte[]{1,1},BitsAlias.RECBITS);
     T._hash = T.compute_hash();
     Type.RECURSIVE_MEET++;
     Type TN = TypeMemPtr.make_nil(alias,T);  TN._cyclic = true;
@@ -432,7 +432,7 @@ public class TestType {
   @Test public void testCommuteSymmetricAssociative() {
     Type.init0(new HashMap<>());
     BitsFun.make_new_fidx(BitsFun.ALL);
-    
+
     assertTrue(Type.check_startup());
   }
 }
