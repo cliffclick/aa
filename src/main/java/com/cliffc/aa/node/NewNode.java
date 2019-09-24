@@ -113,7 +113,7 @@ public class NewNode extends Node {
   // NewNodes can participate in cycles, where the same structure is appended
   // to in a loop until the size grows without bound.  If we detect this we
   // need to approximate a new cyclic type.
-  private final static int CUTOFF=5; // Depth of types before we start forcing approximations
+  public final static int CUTOFF=5; // Depth of types before we start forcing approximations
   public static boolean approx( TypeStruct newt, TypeStruct oldt ) {
     return newt != oldt && newt.contains(oldt) && oldt.depth() > CUTOFF &&
             (newt.above_center() || !oldt.above_center());

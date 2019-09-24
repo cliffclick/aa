@@ -338,15 +338,15 @@ public class TestType {
     int alias = BitsAlias.new_alias(BitsAlias.REC);
     TypeStruct ts = TypeStruct.make(TypeStruct.FLDS(2),Type.NIL,TypeInt.con(0));
     TypeMemPtr phi = TypeMemPtr.make(alias,ts);
-    for( int i=1; i<20; i++ ) {
-      TypeStruct newt = TypeStruct.make(TypeStruct.FLDS(2),phi,TypeInt.con(i));
-      TypeStruct approx = newt;
-      if(com.cliffc.aa.node.NewNode.approx(newt,ts) ) {
-        TypeStruct apxt1 = newt.approx(ts);
-        approx = (TypeStruct) apxt1.join(ts);
-      }
-      phi = TypeMemPtr.make(alias,ts=approx);
-    }
+    //for( int i=1; i<20; i++ ) {
+    //  TypeStruct newt = TypeStruct.make(TypeStruct.FLDS(2),phi,TypeInt.con(i));
+    //  TypeStruct approx = newt;
+    //  if(com.cliffc.aa.node.NewNode.approx(newt,ts) ) {
+    //    TypeStruct apxt1 = newt.approx(ts);
+    //    approx = (TypeStruct) apxt1.join(ts);
+    //  }
+    //  phi = TypeMemPtr.make(alias,ts=approx);
+    //}
     int d = phi.depth()-9999; // added +9999 for cycle
     assertTrue(0 <= d && d <10);
   }

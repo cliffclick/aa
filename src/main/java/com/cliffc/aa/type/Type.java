@@ -714,7 +714,7 @@ public class Type<T extends Type<T>> {
   // Mark if part of a cycle
   void mark_cycle( Type t, BitSet visit, BitSet cycle ) { }
   // Replace old with nnn in a clone
-  Type replace( Type old, Type nnn, HashMap<Type,Type> ignore ) { return this; }
+  Type replace( ) { return this; }
 
   // Look for types beyond a certain depth, and approximate.
   public int approx2( HashMap<TypeStruct,Integer> ds, int nnn, int d ) {

@@ -6,7 +6,7 @@ import java.util.BitSet;
 
 // Return-Program-Counters, or Continuation constants
 public class TypeRPC extends Type<TypeRPC> {
-  public BitsRPC _rpcs;         // 
+  private BitsRPC _rpcs;         //
 
   private TypeRPC( BitsRPC rpcs ) { super(TRPC); init(rpcs); }
   private void init( BitsRPC rpcs ) { _rpcs = rpcs; }
@@ -23,7 +23,7 @@ public class TypeRPC extends Type<TypeRPC> {
     SB sb = new SB().p("#");
     return _rpcs.toString(sb).toString();
   }
-  
+
   private static TypeRPC FREE=null;
   @Override protected TypeRPC free( TypeRPC ret ) { FREE=this; return ret; }
   public static TypeRPC make( int rpc ) { return make(BitsRPC.make0(rpc)); }
@@ -36,9 +36,9 @@ public class TypeRPC extends Type<TypeRPC> {
   }
 
   public static final TypeRPC ALL_CALL = make(BitsRPC.FULL);
-  static final TypeRPC RPC1 = make(BitsRPC.new_rpc(BitsRPC.ALL));
+  private static final TypeRPC RPC1 = make(BitsRPC.new_rpc(BitsRPC.ALL));
   static final TypeRPC[] TYPES = new TypeRPC[]{RPC1,ALL_CALL};
-  
+
   @Override protected TypeRPC xdual() { return new TypeRPC(_rpcs.dual()); }
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
@@ -49,7 +49,7 @@ public class TypeRPC extends Type<TypeRPC> {
     case TINT:   return cross_nil(t);
     case TNIL:
     case TNAME:  return t.xmeet(this); // Let other side decide
-    case TTUPLE: 
+    case TTUPLE:
     case TFUN:
     case TOBJ:
     case TSTR:
@@ -60,7 +60,7 @@ public class TypeRPC extends Type<TypeRPC> {
     TypeRPC tf = (TypeRPC)t;
     return make(_rpcs.meet( tf._rpcs ));
   }
-  
+
   public int rpc() { return _rpcs.getbit(); }
   public boolean test(int rpc) { return _rpcs.test(rpc); }
   @Override public boolean above_center() { return _rpcs.above_center(); }

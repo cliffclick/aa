@@ -142,15 +142,16 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   @Override boolean contains( Type t, BitSet bs ) { return _obj == t || _obj.contains(t, bs); }
   @Override int depth( BitSet bs ) { return _obj.depth(bs); }
   @SuppressWarnings("unchecked")
-  @Override Type replace( Type old, Type nnn, HashMap<Type,Type> HASHCONS ) {
-    Type x = _obj.replace(old,nnn,HASHCONS);
+  @Override Type replace( ) {
+    Type x = _obj.replace();
     if( x==_obj ) return this;
     Type rez = make((TypeObj)x);
     rez._cyclic=true;
-    TypeMemPtr hc = (TypeMemPtr)HASHCONS.get(rez);
-    if( hc == null ) { HASHCONS.put(rez ,rez); return rez; }
+    TypeMemPtr hc = (TypeMemPtr)TypeStruct.HASHCONS.get(rez);
+    if( hc == null ) { TypeStruct.HASHCONS.put(this ,rez); return rez; }
     return rez.free(hc);
   }
+  @SuppressWarnings("unchecked")
   @Override public int approx2( HashMap<TypeStruct,Integer> ds, int nnn, int d ) {
     return _obj.approx2(ds,nnn,d);
   }

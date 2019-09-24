@@ -429,76 +429,135 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     throw AA.unimpl();
   }
 
-  // THIS contains THAT, and THAT is too deep.  Make a new cyclic type for THIS
-  // where THAT is replaced by THIS, before doing the Meet.
-  private static final HashMap<Type,Type> HASHCONS = new HashMap<>();
-  public TypeStruct approx( final TypeStruct that ) {
-    assert this.contains(that);
+  // This is a struct that has grown 'too deep'.
+  static final HashMap<Type,Type> HASHCONS = new HashMap<>();
+  private static TypeStruct NNN, OLD, DMT;
+  private static HashMap<Type,Integer> DEPTHS;
+  private static int CUTOFF;
+  public TypeStruct approx( int cutoff, HashMap<Type,Integer> depths ) {
+    // Assert statics cleaned after last pass
+    assert RECURSIVE_MEET == 0 && HASHCONS.isEmpty() && DEPTHS == null && NNN == null && OLD == null && DMT == null;
+    int max = 0;
+    for( int x : depths.values() )  max = Math.max(max,x);
+    assert cutoff==max;         // Something at cutoff depth, nothing greater
+    assert 0 == depths.get(this); // 'this' is the root of the depths
+    int alias = _news.getbit();   // Must only be 1 alias at top level
+    DEPTHS = depths;
+    CUTOFF = cutoff;
+    Type dmt = Type.ANY;        // Generic structure meet
+    for( Type t : depths.keySet() )
+      if( depths.get(t)==cutoff   && t instanceof TypeStruct && ((TypeStruct)t)._news.test(alias) )
+        dmt = dmt.meet(t);
+    assert dmt instanceof TypeStruct;
+    DMT = (TypeStruct)dmt;
+
+    for( Type t : depths.keySet() ) {
+      if( depths.get(t)==cutoff-1 && t instanceof TypeStruct && ((TypeStruct)t)._news.test(alias) ) {
+        if( OLD != null ) throw AA.unimpl(); // TODO: Need to handle many, so need to loop over the next stanza
+        OLD = (TypeStruct)t;
+      }
+    }
+
     // Recursively clone THIS, replacing the reference to THAT with the THIS clone.
     // Do not install until the cycle is complete.
-    assert RECURSIVE_MEET == 0 && HASHCONS.isEmpty();
     RECURSIVE_MEET++;
-    TypeStruct mt = (TypeStruct)replace(that,null,HASHCONS);
+    TypeStruct mt = (TypeStruct)replace();
     // The result might not be minimal.  Look for a smaller cycle.
     TypeStruct mt2 = mt.repeats_in_cycles(); // Returns first dup instance
     if( mt2 != null ) // Shrink again
-      mt = (TypeStruct)mt.replace(mt2,null,HASHCONS);
+      //mt = (TypeStruct)mt.replace(mt2,null,HASHCONS);
+      throw AA.unimpl();
     assert mt.repeats_in_cycles()==null; // TODO: Need to do this once-per-field?
     --RECURSIVE_MEET;
     assert RECURSIVE_MEET==0;
     HASHCONS.clear();
+    DMT = NNN = OLD = null;
+    DEPTHS = null;
     // Install the cycle
     return mt.install_cyclic();
+  }
+
+  // Replace types with depth==CUTOFF (assert none greater) with a clone of
+  // 'old' called 'nnn' (both at depth CUTOFF-1).  The end structure is cyclic
+  // at depth CUTOFF-1.
+  @SuppressWarnings("unchecked")
+  @Override Type replace() {
+    int d = DEPTHS.get(this);   // Must exist or NPE
+    assert d <= CUTOFF;         // Never larger than cutoff
+    if( d==CUTOFF ) {           // Too deep, replace with NNN
+      assert NNN != null;       // Must exist
+      return NNN;
+    }
+    Type mmm = HASHCONS.get(this);
+    if( mmm != null ) return mmm; // Been there, done that
+    if( d==CUTOFF-1 && this != OLD )
+      return this;              // Unrelated deep arm; do them 1 at a time
+    // Need to clone 'this'
+    Type[] ts = new Type[_ts.length];
+    TypeStruct rez = malloc(_any,_flds,ts,_finals,_news);
+    rez._hash = rez.compute_hash();
+    rez._cyclic=true;           // Whole structure is cyclic
+    // The loop-making special replacement?
+    if( this==OLD ) { assert NNN==null && d==CUTOFF-1; NNN = rez; }
+    HASHCONS.put(this,rez);
+    for( int i=0; i<_ts.length; i++ ) {
+      Type tx = _ts[i].replace();
+      if( this==OLD ) tx = tx.meet(DMT.at(i)); // Leaf edges must also 'meet' the replaced value
+      ts[i] = tx;
+    }
+    TypeStruct rez2 = rez.hashcons_free();
+    if( rez2 != rez )
+      //HASHCONS.put(this,rez2);
+      throw AA.unimpl(); // untested();
+    return rez2;
+  }
+
+  // Breadth first walk, counting shortest path from 'this' root that uses the
+  // same alias class.
+  HashMap<Type,Integer> depth(int alias) {
+    HashMap<Type,Integer> ds = new HashMap<>();
+    Ary<Type> t0 = new Ary<>(new Type[]{this});
+    Ary<Type> t1 = new Ary<>(new Type[1],0);
+    int d=0;                    // Current depth
+    while( !t0.isEmpty() ) {
+      while( !t0.isEmpty() ) {
+        Type t = t0.pop();
+        if( ds.get(t)!=null ) continue; // Been there, done that
+        ds.put(t,d);            // Everything in t0 is in the current depth
+        switch( t._type ) {
+        case TNAME:    t0.push(((TypeName  )t)._t  ); break;
+        case TMEMPTR:  t0.push(((TypeMemPtr)t)._obj); break;
+        case TSTRUCT:
+          TypeStruct ts = (TypeStruct)t;
+          Ary<Type> tx = ts._news.test(alias) ? t1 : t0;
+          for( Type tf : ts._ts ) tx.push(tf);
+          break;
+        default: break;
+        }
+      }
+      Ary<Type> tmp = t0; t0 = t1; t1 = tmp; // Swap t0,t1
+      d++;                                   // Raise depth
+    }
+    return ds;
   }
 
   // Look for recursive instances of TypeStruct with the same alias value.  If
   // we find more than 'd', it is time to fold the deeper instances together to
   // get a recursive approximation type.  This is a classic longest-path
   // algorithm.
-  @Override public int approx2( HashMap<TypeStruct,Integer> ds, int alias, int d ) {
-    Integer my_d = ds.get(this);
-    if( my_d != null ) return my_d;
-    int d2 =_news.test(alias) ? d-1 : d; // Another instance of alias?  Or unrelated?
-    if( d2==0 ) return dput(ds,0);       // Bottomed out
-    int md = dput(ds,-1);       // as-if we are a leaf, actual depth not known
-    for( Type t : _ts ) md = Math.max(md, t.approx2(ds, alias, d2));
-    if( _news.test(alias) ) md++; // Largest of my children+1
-    return dput(ds,md);           //
-  }
-  private int dput( HashMap<TypeStruct,Integer> ds, int d ) { ds.put(this,d); return d; }
-
-  //@Override public Type approx2( BitSet visit, int nnn, int d ) {
-  //  if( visit.get(_uid) ) return null;
-  //  visit.set(_uid);
-  //  int oldd = d;
-  //  if( _news.test(nnn) ) {     // Found another instance of alias 'nnn'
-  //    d--;                      // Lower remaining depth
-  //    if( d < 0 ) return this;  // Got too low, stop searching
-  //  }
-  //
-  //  // Else recursively hunt.  If found a deeper change, just wrap it.  If
-  //  // exactly at depth 0, and also found a deeper change - time to make an
-  //  // approximation.
-  //  Type[] ts = null;           // Lazily constructed
-  //  for( int i=0; i<_ts.length; i++ ) {
-  //    Type t = _ts[i].approx2(visit,nnn,d);
-  //    if( t != null ) {         // Found a change, must wrap
-  //      if( oldd ==0 && d==0 ) return t; // Still unwinding from the bottom-out
-  //      if( oldd > 0 && d==0 ) {
-  //        // Replace cutoff 't' with self, forming a cyclic type.
-  //        TypeStruct apx = approx((TypeStruct)t);
-  //        // TODO: Need to repeat for other fields (i.e. binary-trees both Left & Right.
-  //        // TODO: Need to meet with 't' because 't'++ can be lower than the path from this to 't'.
-  //        return apx;
-  //      }
-  //      // Returning a replacement for nested types
-  //      if( ts == null ) ts = _ts.clone();
-  //      ts[i] = t;
-  //    }
-  //  }
-  //  // If no changes, return no change.  Else return the wrapped change.
-  //  return ts == null ? null : make(_flds,ts,_finals,_news);
+  //@SuppressWarnings("unchecked")
+  //@Override public int approx2( HashMap<TypeStruct,Integer> ds, int alias, int d ) {
+  //  Integer my_d = ds.get(this);
+  //  if( my_d != null ) return my_d;
+  //  int d2 =_news.test(alias) ? d-1 : d; // Another instance of alias?  Or unrelated?
+  //  if( d2==0 ) return dput(ds,0);       // Bottomed out
+  //  int md = dput(ds,-1);       // as-if we are a leaf, actual depth not known
+  //  for( Type t : _ts ) md = Math.max(md, t.approx2(ds, alias, d2));
+  //  if( _news.test(alias) ) md++; // Largest of my children+1
+  //  return dput(ds,md);           //
   //}
+  //private int dput( HashMap<TypeStruct,Integer> ds, int d ) { ds.put(this,d); return d; }
+
 
   // If unequal length; then if short is low it "wins" (result is short) else
   // short is high and it "loses" (result is long).
@@ -598,27 +657,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     int max=0;
     for( Type t : _ts) max = Math.max(max,t.depth(bs));
     return max+1;
-  }
-  // Replace old with nnn in a 'this' clone.  We are initially called with
-  // 'this==old', so in the clone there is a pointer to the initial
-  // Type... which means the whole structure is cyclic when we are done.
-  @SuppressWarnings("unchecked")
-  @Override Type replace( Type old, Type nnn, HashMap<Type,Type> HASHCONS ) {
-    if( this==old ) return nnn; // Found a copy of 'old', so replace with 'nnn'
-    if( _cyclic && !contains(old) ) // Not related, no need to update/clone
-      return this;              // Just use as-is
-    Type mmm = HASHCONS.get(this);
-    if( mmm != null ) return mmm;
-    // Need to clone 'this'
-    Type[] ts = new Type[_ts.length];
-    TypeStruct rez = malloc(_any,_flds,ts,_finals,_news);
-    rez._hash = rez.compute_hash();
-    rez._cyclic=true;           // Whole structure is cyclic
-    if( nnn==null ) nnn = rez;
-    HASHCONS.put(this,rez);
-    for( int i=0; i<_ts.length; i++ )
-      ts[i] = _ts[i].replace(old,nnn,HASHCONS);
-    return rez.hashcons_free();
   }
   @SuppressWarnings("unchecked")
   @Override void walk( Predicate<Type> p ) {

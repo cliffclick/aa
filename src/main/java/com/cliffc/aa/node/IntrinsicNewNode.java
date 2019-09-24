@@ -83,6 +83,20 @@ public abstract class IntrinsicNewNode extends IntrinsicNode {
   // If one  argument  is  NIL, the other non-nil argument is returned.
   // If neither argument is NIL, the two strings are concatenated into a new third string.
   static class AddStrStr extends IntrinsicNewNode {
+    // TODO BUG: Default behavior stomps memory type to [mem] when not inlined,
+    // and not resolved.  GCP then cannot keep the correct memory type.
+    // Probably need Unresolved to disallow memory updates in e.g. CallEpiNode
+    // across all Prims.
+    //
+    // TODO: Confirm unknown-caller in GCP on Prims is dead path; so when doing
+    // Unresolved, all prims "look dead", including memory state.  Keep them
+    // dead until resolving or not.
+    //
+    // TODO: If fail to resolve during GCP, probably need to bail out there as
+    // a hard error.  All calls should resolve during GCP, or else cannot
+    // further propagate optimality.
+
+    
     AddStrStr(int alias) { super("+",ARGS2,TypeTuple.STR_STR, TypeMemPtr.STRPTR, alias); }
     @Override public Type value(GVNGCM gvn) {
       Type m   = gvn.type(in(1));

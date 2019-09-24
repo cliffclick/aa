@@ -34,7 +34,7 @@ import java.util.function.Predicate;
 public class TypeName extends TypeObj<TypeName> {
   public  String _name;
   public  HashMap<String,Type> _lex; // Lexical scope of this named type
-  public  Type _t;                // Named type
+  public  Type _t;                   // Named type
   public  short _depth; // Nested depth of TypeNames, or -1/ for a forward-ref type-var, -2 for type-cycle head
   // Named type variable
   private TypeName ( String name, HashMap<String,Type> lex, Type t, short depth ) { super(TNAME,false); init(name,lex,t,depth); }
@@ -245,15 +245,16 @@ public class TypeName extends TypeObj<TypeName> {
   @Override boolean contains( Type t, BitSet bs ) { return _t == t || _t.contains(t, bs); }
   @Override int depth( BitSet bs ) { return _t.depth(bs); }
   @SuppressWarnings("unchecked")
-  @Override Type replace( Type old, Type nnn, HashMap<Type,Type> HASHCONS ) {
-    Type x = _t.replace(old,nnn,HASHCONS);
+  @Override Type replace(  ) {
+    Type x = _t.replace();
     if( x==_t ) return this;
     Type rez = make(_name,_lex,x);
     rez._cyclic=true;
-    TypeName hc = (TypeName)HASHCONS.get(rez);
-    if( hc == null ) { HASHCONS.put(rez,rez); return rez; }
+    TypeName hc = (TypeName)TypeStruct.HASHCONS.get(rez);
+    if( hc == null ) { TypeStruct.HASHCONS.put(this,rez); return rez; }
     return rez.free(hc);
   }
+  @SuppressWarnings("unchecked")
   @Override public int approx2( HashMap<TypeStruct,Integer> ds, int nnn, int d ) {
     return _t.approx2(ds,nnn,d);
   }
