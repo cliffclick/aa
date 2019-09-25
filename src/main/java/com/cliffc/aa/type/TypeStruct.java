@@ -120,13 +120,15 @@ public class TypeStruct extends TypeObj<TypeStruct> {
 
   // Test if this is a cyclic value (and should not be interned) with internal
   // repeats.  i.e., not a minimal cycle.
-  private TypeStruct repeats_in_cycles() {
+  TypeStruct repeats_in_cycles() {
     assert _cyclic;
+    assert _uf == null;         // Not collapsing
     return repeats_in_cycles(this,new BitSet());
   }
   @Override TypeStruct repeats_in_cycles(TypeStruct head, BitSet bs) {
     if( bs.get(_uid) ) return null;
     bs.set(_uid);
+    assert _uf == null;         // Not collapsing
     if( this!=head && equals(head) ) return this;
     for( Type t : _ts ) {
       TypeStruct ts = t.repeats_in_cycles(head,bs);
@@ -373,13 +375,23 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       mt._ts[i] = mts;          // Finally update
     }
 
+    // Check for repeats right now
+    for( TypeStruct ts : MEETS1.values() )
+      if( ts!=mt && ts.equals(mt) )
+        { mt.union(ts); mt = ts; break; } // Union together
+
     // Lower recursive-meet flag.  At this point the Meet 'mt' is still
     // speculative and not interned.
     if( --RECURSIVE_MEET > 0 )
       return mt;                // And, if not yet done, just exit with it
 
+    // Remove any final UF before installation
+    RECURSIVE_MEET++;
+    TypeStruct mt2 = mt.ufold(new BitSet());
+    --RECURSIVE_MEET;
+
     // This completes 'mt' as the Meet structure.
-    return mt.install_cyclic();
+    return mt2.install_cyclic();
   }
 
   // Install, cleanup and return
@@ -423,10 +435,26 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       _uf = tt;
   }
   private TypeStruct ufind() {
-    if( _uf==null ) return this;
-    if( _uf._uf==null ) return _uf;
-    // Tarjan Union-Find
-    throw AA.unimpl();
+    TypeStruct u = _uf;
+    if( u==null ) return this;
+    while( u._uf != null ) u = u._uf;
+    TypeStruct t = this;
+    while( t != u ) { TypeStruct tmp = t._uf; t._uf = u; t=tmp; }
+    return u;
+  }
+
+  // Collapse any leftover U-F edges
+  @Override TypeStruct ufold(BitSet bs) {
+    if( bs.get(_uid) ) return this;
+    bs.set(_uid);
+    if( _uf != null ) return ufind();
+    Type[] ts = new Type[_ts.length];
+    _uf = malloc(_any,_flds,ts,_finals,_news);
+    _uf._hash = _uf.compute_hash();
+    _uf._cyclic = true;
+    for( int i=0; i<_ts.length; i++ )
+      ts[i] = _ts[i].ufold(bs);
+    return _uf.hashcons_free();
   }
 
   // This is a struct that has grown 'too deep'.
@@ -437,22 +465,22 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public TypeStruct approx( int cutoff, HashMap<Type,Integer> depths ) {
     // Assert statics cleaned after last pass
     assert RECURSIVE_MEET == 0 && HASHCONS.isEmpty() && DEPTHS == null && NNN == null && OLD == null && DMT == null;
-    int max = 0;
-    for( int x : depths.values() )  max = Math.max(max,x);
-    assert cutoff==max;         // Something at cutoff depth, nothing greater
     assert 0 == depths.get(this); // 'this' is the root of the depths
     int alias = _news.getbit();   // Must only be 1 alias at top level
+    assert cutoff==max(alias,depths); // Something at cutoff depth, nothing greater
     DEPTHS = depths;
     CUTOFF = cutoff;
-    Type dmt = Type.ANY;        // Generic structure meet
+    // Meet of all TypeStructs at the cutoff-depth and being replaced.
+    // All edges past CUTOFF replaced with 'ANY'.
+    Type dmt = Type.ANY;
     for( Type t : depths.keySet() )
-      if( depths.get(t)==cutoff   && t instanceof TypeStruct && ((TypeStruct)t)._news.test(alias) )
+      if( depths.get(t)==cutoff && filter(alias,t) )
         dmt = dmt.meet(t);
     assert dmt instanceof TypeStruct;
     DMT = (TypeStruct)dmt;
 
     for( Type t : depths.keySet() ) {
-      if( depths.get(t)==cutoff-1 && t instanceof TypeStruct && ((TypeStruct)t)._news.test(alias) ) {
+      if( depths.get(t)==cutoff-1 && filter(alias,t) ) {
         if( OLD != null ) throw AA.unimpl(); // TODO: Need to handle many, so need to loop over the next stanza
         OLD = (TypeStruct)t;
       }
@@ -462,23 +490,18 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     // Do not install until the cycle is complete.
     RECURSIVE_MEET++;
     TypeStruct mt = (TypeStruct)replace();
-    // The result might not be minimal.  Look for a smaller cycle.
-    TypeStruct mt2 = mt.repeats_in_cycles(); // Returns first dup instance
-    if( mt2 != null ) // Shrink again
-      //mt = (TypeStruct)mt.replace(mt2,null,HASHCONS);
-      throw AA.unimpl();
-    assert mt.repeats_in_cycles()==null; // TODO: Need to do this once-per-field?
+    TypeStruct mt2 = mt.ufold(new BitSet());
     --RECURSIVE_MEET;
     assert RECURSIVE_MEET==0;
     HASHCONS.clear();
     DMT = NNN = OLD = null;
     DEPTHS = null;
     // Install the cycle
-    return mt.install_cyclic();
+    return mt2.install_cyclic();
   }
 
   // Replace types with depth==CUTOFF (assert none greater) with a clone of
-  // 'old' called 'nnn' (both at depth CUTOFF-1).  The end structure is cyclic
+  // 'OLD' called 'NNN' (both at depth CUTOFF-1).  The end structure is cyclic
   // at depth CUTOFF-1.
   @SuppressWarnings("unchecked")
   @Override Type replace() {
@@ -500,15 +523,17 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     // The loop-making special replacement?
     if( this==OLD ) { assert NNN==null && d==CUTOFF-1; NNN = rez; }
     HASHCONS.put(this,rez);
-    for( int i=0; i<_ts.length; i++ ) {
-      Type tx = _ts[i].replace();
-      if( this==OLD ) tx = tx.meet(DMT.at(i)); // Leaf edges must also 'meet' the replaced value
-      ts[i] = tx;
+    for( int i=0; i<_ts.length; i++ )
+      ts[i] = _ts[i].replace(); // Read from old, replace in new
+    if( this==OLD ) {           // Before hash-cons, if at the OLD point, meet old-depth-meets
+      for( int i=0; i<ts.length; i++ )
+        ts[i] = ts[i].meet(DMT.at(i)); // Leaf edges must also 'meet' the replaced value
+      TypeStruct rez3 = rez.repeats_in_cycles();
+      if( rez3 != null ) rez3.union(rez);
     }
     TypeStruct rez2 = rez.hashcons_free();
     if( rez2 != rez )
-      //HASHCONS.put(this,rez2);
-      throw AA.unimpl(); // untested();
+      HASHCONS.put(this,rez2);
     return rez2;
   }
 
@@ -541,22 +566,16 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return ds;
   }
 
-  // Look for recursive instances of TypeStruct with the same alias value.  If
-  // we find more than 'd', it is time to fold the deeper instances together to
-  // get a recursive approximation type.  This is a classic longest-path
-  // algorithm.
-  //@SuppressWarnings("unchecked")
-  //@Override public int approx2( HashMap<TypeStruct,Integer> ds, int alias, int d ) {
-  //  Integer my_d = ds.get(this);
-  //  if( my_d != null ) return my_d;
-  //  int d2 =_news.test(alias) ? d-1 : d; // Another instance of alias?  Or unrelated?
-  //  if( d2==0 ) return dput(ds,0);       // Bottomed out
-  //  int md = dput(ds,-1);       // as-if we are a leaf, actual depth not known
-  //  for( Type t : _ts ) md = Math.max(md, t.approx2(ds, alias, d2));
-  //  if( _news.test(alias) ) md++; // Largest of my children+1
-  //  return dput(ds,md);           //
-  //}
-  //private int dput( HashMap<TypeStruct,Integer> ds, int d ) { ds.put(this,d); return d; }
+  static int max(int alias, HashMap<Type,Integer> ds) {
+    int max = 0;
+    for( Type t : ds.keySet() )
+      if( filter(alias,t) )
+        max = Math.max(max,ds.get(t));
+    return max;
+  }
+  static boolean filter( int alias, Type t ) {
+    return (t instanceof TypeStruct) && ((TypeStruct)t)._news.test(alias);
+  }
 
 
   // If unequal length; then if short is low it "wins" (result is short) else

@@ -262,4 +262,9 @@ public class TypeName extends TypeObj<TypeName> {
   @SuppressWarnings("unchecked")
   @Override void walk( Predicate<Type> p ) { if( p.test(this) ) _t.walk(p); }
   @Override TypeStruct repeats_in_cycles(TypeStruct head, BitSet bs) { return _cyclic ? _t.repeats_in_cycles(head,bs) : null; }
+  @Override Type ufold(BitSet bs) {
+    Type x = _t.ufold(bs);
+    if( x == _t ) return this;
+    return make(x);
+  }
 }

@@ -151,6 +151,15 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     if( hc == null ) { TypeStruct.HASHCONS.put(this ,rez); return rez; }
     return rez.free(hc);
   }
+  @Override Type ufold(BitSet bs) {
+    Type x = _obj.ufold(bs);
+    if( x == _obj ) return this;
+    Type rez = make((TypeObj)x);
+    rez._cyclic=true;
+    TypeMemPtr hc = (TypeMemPtr)TypeStruct.HASHCONS.get(rez);
+    if( hc == null ) { TypeStruct.HASHCONS.put(rez,rez); return rez; }
+    return rez.free(hc);
+  }
   @SuppressWarnings("unchecked")
   @Override public int approx2( HashMap<TypeStruct,Integer> ds, int nnn, int d ) {
     return _obj.approx2(ds,nnn,d);

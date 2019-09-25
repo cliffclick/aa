@@ -732,6 +732,8 @@ public class Type<T extends Type<T>> {
   void walk( Predicate<Type> p ) { assert is_simple(); p.test(this); }
 
   TypeStruct repeats_in_cycles(TypeStruct head, BitSet bs) { return null; }
+  
+  Type ufold(BitSet bs) { return this; }
 
   // Dual, except keep TypeMem.XOBJ as high for starting GVNGCM.opto() state.
   public Type startype() {
