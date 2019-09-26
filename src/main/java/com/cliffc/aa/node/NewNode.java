@@ -89,25 +89,14 @@ public class NewNode extends Node {
     // than CUTOFF deep, and fold the deepest ones onto themselves to limit the
     // type depth.  If this happens, the types become recursive with the
     // approximations happening at the deepest points.
-    HashMap<TypeStruct,Integer> ds = new HashMap<>();
-    int d = newt.approx2(ds,_alias,CUTOFF+1);
-    if( d >= CUTOFF ) {
-      // All depth==1 to depth==0 transitions will need to be approximated
-      for( TypeStruct t1 : ds.keySet() ) {
-        if( ds.get(t1)==1 && t1._news.test(_alias) ) {
-          // There can be many t0's and many t1's pointing to many t0's.  t1
-          // can have zero or more t0's as children, with any amount of cyclic
-          // unrelated types in-between.  Find them all, and approximate each.
-          for( Type t2 : t1._ts ) {
-            throw com.cliffc.aa.AA.unimpl();
-          }
-        }
-      }
-    }
-    //Type ts2 = newt.approx2(new BitSet(),_alias,CUTOFF);
-    //if( ts2 != null ) newt = (TypeStruct)ts2;
-    TypeObj res = _obj instanceof TypeName ? ((TypeName)_obj).make(newt) : newt;
-    return TypeMemPtr.make(_alias,res);
+    
+    //TypeStruct res = newt.approx(CUTOFF);
+    throw com.cliffc.aa.AA.unimpl();
+
+
+    
+    //TypeObj res = _obj instanceof TypeName ? ((TypeName)_obj).make(newt) : newt;
+    //return TypeMemPtr.make(_alias,res);
   }
 
   // NewNodes can participate in cycles, where the same structure is appended

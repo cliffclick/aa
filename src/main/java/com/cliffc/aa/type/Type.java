@@ -1,5 +1,7 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.util.SB;
+
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.HashMap;
@@ -116,8 +118,9 @@ public class Type<T extends Type<T>> {
   // HashSet is only installed by the head of a type-cycle (always and only
   // TypeName) and is used (again only by TypeName) to end cyclic printing.
   // All other 'str()' callers just pass along.
-  @Override public final String toString() { return str(null); }
+  @Override public final String toString() { return dstr(new SB(),null).toString(); }
   String str( BitSet dups ) { return STRS[_type]; }
+  SB dstr( SB sb, BitSet dups ) { return sb.p(str(dups)); }
 
   // Object Pooling to handle frequent (re)construction of temp objects being
   // interned.  One-entry pool for now.
@@ -714,14 +717,8 @@ public class Type<T extends Type<T>> {
   // Mark if part of a cycle
   void mark_cycle( Type t, BitSet visit, BitSet cycle ) { }
   // Replace old with nnn in a clone
-  Type replace( ) { return this; }
+  Type replace(HashMap<Type,Type> intern) { return this; }
 
-  // Look for types beyond a certain depth, and approximate.
-  public int approx2( HashMap<TypeStruct,Integer> ds, int nnn, int d ) {
-    if( isa_scalar() ) return -1;
-    throw typerr(null);
-  }
-  
   // Iterate over any nested child types.  Only side-effect results.
   public void iter( Consumer<Type> c ) { /*None in the base class*/ }
 
@@ -733,8 +730,6 @@ public class Type<T extends Type<T>> {
 
   TypeStruct repeats_in_cycles(TypeStruct head, BitSet bs) { return null; }
   
-  Type ufold(BitSet bs) { return this; }
-
   // Dual, except keep TypeMem.XOBJ as high for starting GVNGCM.opto() state.
   public Type startype() {
     if( is_con() ) {

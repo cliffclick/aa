@@ -38,8 +38,6 @@ public class TestApprox {
     Type.RECURSIVE_MEET--;
     t0 = t0.install_cyclic();
     t1 = t1.install_cyclic();
-    p1 = (TypeMemPtr)t0._ts[0];
-    p0 = (TypeMemPtr)t1._ts[0];
 
     // Meet them
     TypeStruct mt = (TypeStruct)t0.meet(t1);
@@ -68,19 +66,19 @@ public class TestApprox {
     HashMap<Type,Integer> ds = t0.depth(alias0);
     assertEquals(0,(int)ds.get(t0));
 
-    TypeStruct t1 = TypeStruct.make(flds,new Type[]{p0,TypeFlt.PI},finals,alias0);
+    TypeStruct t1 = TypeStruct.make(flds,new Type[]{p0,TypeInt.con(98)},finals,alias0);
     TypeMemPtr p1 = TypeMemPtr.make(alias0,t1);
     ds = t1.depth(alias0);
     assertEquals(1,(int)ds.get(t0));
     assertEquals(0,(int)ds.get(t1));
     assertEquals(1,(int)ds.get(p0));
 
-    TypeStruct t2 = TypeStruct.make(flds,new Type[]{p1,TypeInt.con(99)},finals,alias0);
+    TypeStruct t2 = TypeStruct.make(flds,new Type[]{p1,TypeInt.con(97)},finals,alias0);
     TypeMemPtr p2 = TypeMemPtr.make(alias0,t2);
     ds = t2.depth(alias0);
     assertEquals(2,(int)ds.get(t0));
 
-    TypeStruct t3 = TypeStruct.make(flds,new Type[]{p2,TypeInt.con(99)},finals,alias0);
+    TypeStruct t3 = TypeStruct.make(flds,new Type[]{p2,TypeInt.con(96)},finals,alias0);
     ds = t3.depth(alias0);
     assertEquals(CUTOFF  ,(int)ds.get(t0));
     assertEquals(CUTOFF-1,(int)ds.get(t1));
@@ -102,7 +100,7 @@ public class TestApprox {
     // collapse redundant ptrs to t1, and MEET t0-tail and t1-tail
     // t3[,99] -> p2 -> t2[,99] -> {p0,p1} -> t1[,{flt&int}] -> {p0,p1}
 
-    TypeStruct tax = t3.approx(CUTOFF,ds);
+    TypeStruct tax = t3.approx(CUTOFF);
     HashMap<Type,Integer> ds2 = tax.depth(alias0);
     assertEquals(CUTOFF-1,TypeStruct.max(alias0,ds2));
     TypeMemPtr txp1 = (TypeMemPtr)tax.at(0);
@@ -113,7 +111,7 @@ public class TestApprox {
     assertEquals(2,(int)ds2.get(txp2));
     TypeStruct txs2 = (TypeStruct)txp2._obj;
     assertEquals(2,(int)ds2.get(txs2));
-    assertEquals(TypeFlt.NFLT64,txs2.at(1));
+    assertEquals(TypeInt.NINT8,txs2.at(1));
     TypeMemPtr txp3 = (TypeMemPtr)txs2.at(0);
     assertEquals(3,(int)ds2.get(txp3));
     assertEquals(txs2,txp3._obj);
@@ -160,7 +158,7 @@ public class TestApprox {
     ds = t2.depth(alias0);
     assertEquals(2,(int)ds.get(t0));
 
-    TypeStruct t3 = TypeStruct.make(flds,new Type[]{p2,TypeInt.con(99)},finals,alias0);
+    TypeStruct t3 = TypeStruct.make(flds,new Type[]{p2,TypeInt.con(98)},finals,alias0);
     ds = t3.depth(alias0);
     assertEquals(CUTOFF  ,(int)ds.get(t0));
     assertEquals(CUTOFF-1,(int)ds.get(t1));
@@ -174,15 +172,15 @@ public class TestApprox {
     // X clone.
 
     // original, too deep
-    // t3[,99] -> p2 -> t2[,99] -> p1 -> t1[,flt] -> p0 -> t0[,int] -> p1*
+    // t3[,98] -> p2 -> t2[,99] -> p1 -> t1[,flt] -> p0 -> t0[,int] -> p1*
 
     // replace ptrs to t0 with ptrs to t1
-    // t3[,99] -> p2 -> t2[,99] -> p1 -> t1[,flt] -> p0 -> t1*
+    // t3[,98] -> p2 -> t2[,99] -> p1 -> t1[,flt] -> p0 -> t1*
 
     // collapse redundant ptrs to t1, and MEET t0-tail and t1-tail
-    // t3[,99] -> p2 -> t2[,99] -> {p0,p1} -> t1[,{flt&int}] -> {p0,p1}
+    // t3[,98] -> p2 -> t2[,99] -> {p0,p1} -> t1[,{flt&int}] -> {p0,p1}
 
-    TypeStruct tax = t3.approx(CUTOFF,ds);
+    TypeStruct tax = t3.approx(CUTOFF);
     TypeMemPtr p3 = TypeMemPtr.make(alias0,tax);
 
     HashMap<Type,Integer> ds2 = tax.depth(alias0);
@@ -202,11 +200,10 @@ public class TestApprox {
     assertSame(txs2, txp3._obj);
 
     // Add another layer, and approx again
-    TypeStruct t4 = TypeStruct.make(flds,new Type[]{p3,TypeInt.con(99)},finals,alias0);
+    TypeStruct t4 = TypeStruct.make(flds,new Type[]{p3,TypeInt.con(97)},finals,alias0);
     ds = t4.depth(alias0);
     assertEquals(CUTOFF,(int)ds.get(txs2)); // Structure too deep
-    TypeStruct tax4 = t4.approx(CUTOFF,ds);
-    TypeMemPtr p4 = TypeMemPtr.make(alias0,tax4);
+    TypeStruct tax4 = t4.approx(CUTOFF);
 
     ds2 = tax4.depth(alias0);
     assertEquals(CUTOFF-1,TypeStruct.max(alias0,ds2));
@@ -220,9 +217,7 @@ public class TestApprox {
     assertEquals(CUTOFF-1,(int)ds2.get(t4s2));
     assertEquals(Type.REAL,t4s2.at(1));
     TypeMemPtr t4p3 = (TypeMemPtr)t4s2.at(0);
-    assertEquals(CUTOFF  ,(int)ds2.get(t4p3));
+    assertEquals(CUTOFF-1,(int)ds2.get(t4p3));
     assertEquals(t4s2,t4p3._obj);
-
-
   }
 }

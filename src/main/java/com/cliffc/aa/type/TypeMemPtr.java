@@ -41,7 +41,16 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     if( _aliases.test(0) ) sb.p('?');
     return sb.toString();
   }
-
+  @Override SB dstr( SB sb, BitSet dups ) {
+    if( dups == null ) dups = new BitSet();
+    sb.p('_').p(_uid);
+    if( dups.get(_uid) ) return sb.p('$'); // Break recursive printing cycle
+    dups.set(_uid);
+    sb.p('*');
+    _obj.dstr(_aliases.toString(sb).p(" -> "),dups);
+    return sb;
+  }
+  
   private static TypeMemPtr FREE=null;
   @Override protected TypeMemPtr free( TypeMemPtr ret ) { FREE=this; return ret; }
   public static TypeMemPtr make(BitsAlias aliases, TypeObj obj ) {
@@ -142,27 +151,20 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   @Override boolean contains( Type t, BitSet bs ) { return _obj == t || _obj.contains(t, bs); }
   @Override int depth( BitSet bs ) { return _obj.depth(bs); }
   @SuppressWarnings("unchecked")
-  @Override Type replace( ) {
-    Type x = _obj.replace();
-    if( x==_obj ) return this;
-    Type rez = make((TypeObj)x);
-    rez._cyclic=true;
-    TypeMemPtr hc = (TypeMemPtr)TypeStruct.HASHCONS.get(rez);
-    if( hc == null ) { TypeStruct.HASHCONS.put(this ,rez); return rez; }
-    return rez.free(hc);
-  }
-  @Override Type ufold(BitSet bs) {
-    Type x = _obj.ufold(bs);
-    if( x == _obj ) return this;
-    Type rez = make((TypeObj)x);
-    rez._cyclic=true;
-    TypeMemPtr hc = (TypeMemPtr)TypeStruct.HASHCONS.get(rez);
-    if( hc == null ) { TypeStruct.HASHCONS.put(rez,rez); return rez; }
-    return rez.free(hc);
-  }
-  @SuppressWarnings("unchecked")
-  @Override public int approx2( HashMap<TypeStruct,Integer> ds, int nnn, int d ) {
-    return _obj.approx2(ds,nnn,d);
+  @Override TypeMemPtr replace(HashMap<Type,Type> intern) {
+    TypeMemPtr old = (TypeMemPtr)intern.get(this);
+    if( old != null ) return old; // Been there, done that
+    Type x = _obj.replace(intern);// Recursively on children
+    if( x==_obj ) return this;    // No change, so no change
+    TypeMemPtr rez = make((TypeObj)x);  // Make (and do not intern, and do not expect any prior hits)
+    rez._cyclic = _cyclic;
+    old = (TypeMemPtr)intern.get(rez);
+    if( old == null ) {         // No prior version
+      intern.put(this,rez);     // Map this to copy
+      return rez;               // And return it
+    }
+    intern.put(this,old);       // Map this to old
+    return rez.free(old);       // Free unused rez
   }
 
   @SuppressWarnings("unchecked")

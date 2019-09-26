@@ -121,7 +121,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // Test if this is a cyclic value (and should not be interned) with internal
   // repeats.  i.e., not a minimal cycle.
   TypeStruct repeats_in_cycles() {
-    assert _cyclic;
+    //assert _cyclic;
     assert _uf == null;         // Not collapsing
     return repeats_in_cycles(this,new BitSet());
   }
@@ -160,6 +160,30 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     }
     sb.p(!is_tup ? '}' : ')');
     return sb.toString();
+  }
+  @Override SB dstr( SB sb, BitSet dups ) {
+    if( dups == null ) dups = new BitSet();
+    sb.p('_').p(_uid);
+    if( dups.get(_uid) ) return sb.p('$'); // Break recursive printing cycle
+    dups.set(_uid);
+
+    if( _uf!=null ) return _uf.dstr(sb.p("=>"),dups);
+    if( _any ) sb.p('~');
+    boolean is_tup = _flds.length==0 || fldTop(_flds[0]) || fldBot(_flds[0]);
+    if( !is_tup ) sb.p('@');    // Not a tuple
+    sb.p(is_tup ? '(' : '{').nl().ii(1); // open struct, newline, increase_indent
+    for( int i=0; i<_flds.length; i++ ) {
+      sb.i();                   // indent, 1 field per line
+      if( !is_tup ) sb.p(_flds[i]);
+      Type t = at(i);
+      if( !is_tup && t != SCALAR ) sb.p(_finals[i]==0 ? ":=" : "=");
+      if( t==null ) sb.p("!");  // Graceful with broken types
+      else if( t==SCALAR ) ;    // Default answer, do not print
+      else t.dstr(sb,dups);     // Recursively print field type
+      if( i<_flds.length-1 ) sb.p(',');
+      sb.nl();                  // one field per line
+    }
+    return sb.di(1).i().p(!is_tup ? '}' : ')');
   }
 
   // Unlike other types, TypeStruct never makes dups - instead it might make
@@ -386,12 +410,15 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       return mt;                // And, if not yet done, just exit with it
 
     // Remove any final UF before installation
+    // Recursively clone THIS, replacing the reference to OLD with NNN.
+    // Do not install until the cycle is complete.
     RECURSIVE_MEET++;
-    TypeStruct mt2 = mt.ufold(new BitSet());
+    TypeStruct rep = mt.replace(new HashMap<>());
     --RECURSIVE_MEET;
+    assert rep.check_uf();
 
     // This completes 'mt' as the Meet structure.
-    return mt2.install_cyclic();
+    return rep.install_cyclic();
   }
 
   // Install, cleanup and return
@@ -428,8 +455,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   }
 
   // Tarjan Union-Find to help build cyclic structures
-  private void union(TypeStruct tt) {
-    assert !interned() && !tt.interned();
+  private void union( TypeStruct tt) {
+    assert !interned() ;
     assert _uf==null && tt._uf==null;
     if( this!=tt )
       _uf = tt;
@@ -443,102 +470,148 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return u;
   }
 
-  // Collapse any leftover U-F edges
-  @Override TypeStruct ufold(BitSet bs) {
-    if( bs.get(_uid) ) return this;
-    bs.set(_uid);
-    if( _uf != null ) return ufind();
-    Type[] ts = new Type[_ts.length];
-    _uf = malloc(_any,_flds,ts,_finals,_news);
-    _uf._hash = _uf.compute_hash();
-    _uf._cyclic = true;
-    for( int i=0; i<_ts.length; i++ )
-      ts[i] = _ts[i].ufold(bs);
-    return _uf.hashcons_free();
-  }
-
   // This is a struct that has grown 'too deep'.
-  static final HashMap<Type,Type> HASHCONS = new HashMap<>();
-  private static TypeStruct NNN, OLD, DMT;
-  private static HashMap<Type,Integer> DEPTHS;
-  private static int CUTOFF;
-  public TypeStruct approx( int cutoff, HashMap<Type,Integer> depths ) {
+  public TypeStruct approx( int cutoff ) {
     // Assert statics cleaned after last pass
-    assert RECURSIVE_MEET == 0 && HASHCONS.isEmpty() && DEPTHS == null && NNN == null && OLD == null && DMT == null;
-    assert 0 == depths.get(this); // 'this' is the root of the depths
+    assert RECURSIVE_MEET == 0;
+    // Check depths; return self if structure is shallow
     int alias = _news.getbit();   // Must only be 1 alias at top level
-    assert cutoff==max(alias,depths); // Something at cutoff depth, nothing greater
-    DEPTHS = depths;
-    CUTOFF = cutoff;
+    HashMap<Type,Integer> depths = depth(alias);
+    int maxd = max(alias,depths);
+    if( maxd < cutoff ) return this; // Not deep enough
+
+    assert maxd==cutoff; // Something at cutoff depth, nothing greater
     // Meet of all TypeStructs at the cutoff-depth and being replaced.
-    // All edges past CUTOFF replaced with 'ANY'.
+    // All edges past cutoff replaced with 'ANY'.
     Type dmt = Type.ANY;
+    TypeStruct OLD=null;
     for( Type t : depths.keySet() )
-      if( depths.get(t)==cutoff && filter(alias,t) )
-        dmt = dmt.meet(t);
-    assert dmt instanceof TypeStruct;
-    DMT = (TypeStruct)dmt;
-
-    for( Type t : depths.keySet() ) {
-      if( depths.get(t)==cutoff-1 && filter(alias,t) ) {
-        if( OLD != null ) throw AA.unimpl(); // TODO: Need to handle many, so need to loop over the next stanza
-        OLD = (TypeStruct)t;
+      if( filter(alias,t) ) {
+        int d = depths.get(t);
+        if( d==cutoff )  dmt = dmt.meet(t);
+        else if( d==cutoff-1 ) {
+          if( OLD != null ) throw AA.unimpl(); // TODO: Need to handle many, so need to loop over the next stanza
+          OLD = (TypeStruct)t;
+        }
       }
-    }
 
-    // Recursively clone THIS, replacing the reference to THAT with the THIS clone.
+    // Recursively clone THIS, replacing the reference to OLD with NNN.
     // Do not install until the cycle is complete.
     RECURSIVE_MEET++;
-    TypeStruct mt = (TypeStruct)replace();
-    TypeStruct mt2 = mt.ufold(new BitSet());
+    HashMap<Type,Type> intern0 = new HashMap<>();
+    intern0.put(OLD,(TypeStruct)dmt);
+    TypeStruct rep = replace(intern0);
     --RECURSIVE_MEET;
-    assert RECURSIVE_MEET==0;
-    HASHCONS.clear();
-    DMT = NNN = OLD = null;
-    DEPTHS = null;
-    // Install the cycle
-    return mt2.install_cyclic();
+    // TODO expecting this to fail, need UF cleanup
+    assert rep.check_uf();
+
+    // Install the cyclic structure
+    TypeStruct rep2 = rep.install_cyclic();
+
+    // Meet with self
+    TypeStruct mt = (TypeStruct)meet(rep2);
+    // Should not fail (both types are already interned and minimal, so result
+    // should be also)
+    assert mt.check_uf();
+
+    // Now replace tail with the 'new' OLD.  Gather old and new
+    TypeStruct NNN = OLD = null;
+    depths = mt.depth(alias);
+    for( Type t : depths.keySet() )
+      if( filter(alias,t) ) {
+        int d = depths.get(t);
+        if( d==cutoff ) { assert OLD==null; OLD = (TypeStruct)t; }
+        else if( d==cutoff-1 ) {
+          if( NNN != null ) throw AA.unimpl(); // TODO: Need to handle many, so need to loop over the next stanza
+          NNN = (TypeStruct)t;
+        }
+      }
+    if( OLD == null ) return mt; // Can happen if collapse is eager enough
+
+    // Recursively clone THIS, replacing the reference to OLD with NNN.
+    // Do not install until the cycle is complete.
+    RECURSIVE_MEET++;
+    HashMap<Type,Type> intern1 = new HashMap<>();
+    intern1.put(OLD,NNN);
+    TypeStruct rep3 = mt.replace(intern1);
+    --RECURSIVE_MEET;
+    // TODO expecting this to fail, need UF cleanup
+    assert rep3.check_uf();
+
+    return rep3.install_cyclic();
   }
 
-  // Replace types with depth==CUTOFF (assert none greater) with a clone of
-  // 'OLD' called 'NNN' (both at depth CUTOFF-1).  The end structure is cyclic
-  // at depth CUTOFF-1.
+  // Make a clone of THIS, replacing OLD with NNN.  The end result is probably
+  // cyclic, and possibly not minimal (has cyclic elements which are 'equals'
+  // but not '==' to each other), and possibly contains UF marked Types.
+  // Portions of the structure may be interned, and some parts not.
   @SuppressWarnings("unchecked")
-  @Override Type replace() {
-    int d = DEPTHS.get(this);   // Must exist or NPE
-    assert d <= CUTOFF;         // Never larger than cutoff
-    if( d==CUTOFF ) {           // Too deep, replace with NNN
-      assert NNN != null;       // Must exist
-      return NNN;
+  @Override TypeStruct replace(HashMap<Type,Type> intern) {
+    TypeStruct old = (TypeStruct)intern.get(this), tmp;
+    if( old != null ) {
+      while( (tmp = (TypeStruct)intern.get(old)) != null && tmp != old)  old = tmp;
+      return old;
     }
-    Type mmm = HASHCONS.get(this);
-    if( mmm != null ) return mmm; // Been there, done that
-    if( d==CUTOFF-1 && this != OLD )
-      return this;              // Unrelated deep arm; do them 1 at a time
+    TypeStruct uf = ufind();
+    if( uf != this ) return uf;
+
     // Need to clone 'this'
-    Type[] ts = new Type[_ts.length];
+    Type[] ts = _ts.clone();
     TypeStruct rez = malloc(_any,_flds,ts,_finals,_news);
     rez._hash = rez.compute_hash();
-    rez._cyclic=true;           // Whole structure is cyclic
-    // The loop-making special replacement?
-    if( this==OLD ) { assert NNN==null && d==CUTOFF-1; NNN = rez; }
-    HASHCONS.put(this,rez);
+    rez._cyclic=_cyclic;
+    intern.put(this,rez);     // Into hash table before recursively calling children
     for( int i=0; i<_ts.length; i++ )
-      ts[i] = _ts[i].replace(); // Read from old, replace in new
-    if( this==OLD ) {           // Before hash-cons, if at the OLD point, meet old-depth-meets
-      for( int i=0; i<ts.length; i++ )
-        ts[i] = ts[i].meet(DMT.at(i)); // Leaf edges must also 'meet' the replaced value
-      TypeStruct rez3 = rez.repeats_in_cycles();
-      if( rez3 != null ) rez3.union(rez);
+      ts[i] = ts[i].replace(intern); // Read from old, replace in new
+
+    // See if we have an interned version already.
+    old = (TypeStruct)rez.intern_lookup();
+    // Make a dup-check on the not-interned Types
+    if( old == null )
+      old = (TypeStruct)intern.get(rez);
+
+    if( old == null ) {         // No prior version
+      // Since dup-checked above, do not expect to see any repeats
+      assert !rez._cyclic || rez.repeats_in_cycles() == null;
+      return rez;
     }
-    TypeStruct rez2 = rez.hashcons_free();
-    if( rez2 != rez )
-      HASHCONS.put(this,rez2);
-    return rez2;
+
+    intern.put(this,old);   // Map to the old
+    intern.put(rez ,old);   // Map to the old
+    if( !interned() ) union(old);
+    rez.union(old);           // Map to the old
+    return old;               // Use old instead
   }
 
-  // Breadth first walk, counting shortest path from 'this' root that uses the
-  // same alias class.
+  // Walk, looking for not-minimal
+  private boolean check_uf() {
+    int err=0;
+    HashMap<TypeStruct,TypeStruct> ss = new HashMap<>();
+    Ary<Type> work = new Ary<>(new Type[]{this});
+    while( !work.isEmpty() ) {
+      Type t = work.pop();
+      switch( t._type ) {
+      case TNAME:    work.push(((TypeName  )t)._t  ); break;
+      case TMEMPTR:  work.push(((TypeMemPtr)t)._obj); break;
+      case TSTRUCT:
+        TypeStruct ts0 = (TypeStruct)t;
+        TypeStruct ts1 = ss.get(ts0);
+        if( ts1 == ts0 ) continue; // Been there, done that
+        if( ts1 != null || // Found unresolved dup; ts0.equals(ts1) but ts0!=ts1
+            ts0._uf != null ) // Found unresolved UF
+          err++;
+        if( ts1 != null ) continue;
+        ss.put(ts0,ts0);
+        for( Type tf : ts0._ts ) work.push(tf);
+        break;
+      default: break;
+      }
+    }
+    return err==0;
+  }
+
+  // Build a mapping from types to their depth in a shortest-path walk from the
+  // root.  Only counts depth on TypeStructs with the matching alias.
   HashMap<Type,Integer> depth(int alias) {
     HashMap<Type,Integer> ds = new HashMap<>();
     Ary<Type> t0 = new Ary<>(new Type[]{this});

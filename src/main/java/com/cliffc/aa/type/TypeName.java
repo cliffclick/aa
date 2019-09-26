@@ -1,6 +1,7 @@
 package com.cliffc.aa.type;
 
 import com.cliffc.aa.AA;
+import com.cliffc.aa.util.SB;
 
 import java.util.BitSet;
 import java.util.HashMap;
@@ -74,7 +75,16 @@ public class TypeName extends TypeObj<TypeName> {
     }
     return _name+":"+_t.str(dups);
   }
-
+  @Override SB dstr( SB sb, BitSet dups ) {
+    if( _depth < 0 ) {          // Only for recursive-type-heads
+      if( dups == null ) dups = new BitSet();
+      sb.p('_').p(_uid);
+      if( dups.get(_uid) ) return sb.p(_name); // Break recursive cycle
+      dups.set(_uid);
+    }
+    return _t.dstr(sb.p(_name).p(':'),dups);
+  }
+  
   private static TypeName FREE=null;
   @Override protected TypeName free( TypeName ret ) { FREE=this; return ret; }
   private static TypeName make0( String name, HashMap<String,Type> lex, Type t, short depth) {
@@ -245,26 +255,23 @@ public class TypeName extends TypeObj<TypeName> {
   @Override boolean contains( Type t, BitSet bs ) { return _t == t || _t.contains(t, bs); }
   @Override int depth( BitSet bs ) { return _t.depth(bs); }
   @SuppressWarnings("unchecked")
-  @Override Type replace(  ) {
-    Type x = _t.replace();
-    if( x==_t ) return this;
-    Type rez = make(_name,_lex,x);
-    rez._cyclic=true;
-    TypeName hc = (TypeName)TypeStruct.HASHCONS.get(rez);
-    if( hc == null ) { TypeStruct.HASHCONS.put(this,rez); return rez; }
-    return rez.free(hc);
-  }
-  @SuppressWarnings("unchecked")
-  @Override public int approx2( HashMap<TypeStruct,Integer> ds, int nnn, int d ) {
-    return _t.approx2(ds,nnn,d);
+  @Override TypeName replace(HashMap<Type,Type> intern) {
+    TypeName old = (TypeName)intern.get(this);
+    if( old != null ) return old; // Been there, done that
+    Type x = _t.replace(intern);  // Recursively on children
+    if( x==_t ) return this;      // No change, so no change
+    TypeName rez = make(_name,_lex,(TypeObj)x);  // Make (and do not intern, and do not expect any prior hits)
+    rez._cyclic = _cyclic;
+    old = (TypeName)intern.get(rez);
+    if( old == null ) {         // No prior version
+      intern.put(this,rez);     // Map this to copy
+      return rez;               // And return it
+    }
+    intern.put(this,old);       // Map this to old
+    return rez.free(old);       // Free unused rez
   }
 
   @SuppressWarnings("unchecked")
   @Override void walk( Predicate<Type> p ) { if( p.test(this) ) _t.walk(p); }
   @Override TypeStruct repeats_in_cycles(TypeStruct head, BitSet bs) { return _cyclic ? _t.repeats_in_cycles(head,bs) : null; }
-  @Override Type ufold(BitSet bs) {
-    Type x = _t.ufold(bs);
-    if( x == _t ) return this;
-    return make(x);
-  }
 }
