@@ -161,6 +161,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     old = (TypeMemPtr)intern.get(rez);
     if( old == null ) {         // No prior version
       intern.put(this,rez);     // Map this to copy
+      intern.put(rez ,rez);     // Map rez also, to catch dups from cloning cycles
       return rez;               // And return it
     }
     intern.put(this,old);       // Map this to old

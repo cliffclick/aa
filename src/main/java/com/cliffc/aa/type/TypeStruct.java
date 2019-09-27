@@ -499,7 +499,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     // Do not install until the cycle is complete.
     RECURSIVE_MEET++;
     HashMap<Type,Type> intern0 = new HashMap<>();
-    intern0.put(OLD,(TypeStruct)dmt);
+    intern0.put(OLD,dmt);
     TypeStruct rep = replace(intern0);
     --RECURSIVE_MEET;
     // TODO expecting this to fail, need UF cleanup
@@ -646,7 +646,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
         max = Math.max(max,ds.get(t));
     return max;
   }
-  static boolean filter( int alias, Type t ) {
+  private static boolean filter( int alias, Type t ) {
     return (t instanceof TypeStruct) && ((TypeStruct)t)._news.test(alias);
   }
 

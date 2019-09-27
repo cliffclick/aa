@@ -42,7 +42,7 @@ public class TestApprox {
     // Meet them
     TypeStruct mt = (TypeStruct)t0.meet(t1);
 
-    // End result should be a cycle of lenght 1: [,real] -> * ->
+    // End result should be a cycle of length 1: [,real] -> * ->
     // And NOT: [,real] -> * -> [,real] -> * ->
     assertEquals(Type.REAL,mt.at(1));
     TypeMemPtr pmt = (TypeMemPtr)mt.at(0);
@@ -116,6 +116,7 @@ public class TestApprox {
     assertEquals(3,(int)ds2.get(txp3));
     assertEquals(txs2,txp3._obj);
 
+    assertTrue(t3.isa(tax));
   }
 
   // Test approximating infinite recursive types.  End of chain is already
@@ -198,6 +199,7 @@ public class TestApprox {
     // Pointer-equals; 'equals()' is not good enough
     assertSame(txp2, txp3);
     assertSame(txs2, txp3._obj);
+    assertTrue(t3.isa(tax));
 
     // Add another layer, and approx again
     TypeStruct t4 = TypeStruct.make(flds,new Type[]{p3,TypeInt.con(97)},finals,alias0);
@@ -219,5 +221,174 @@ public class TestApprox {
     TypeMemPtr t4p3 = (TypeMemPtr)t4s2.at(0);
     assertEquals(CUTOFF-1,(int)ds2.get(t4p3));
     assertEquals(t4s2,t4p3._obj);
+    assertTrue(t4.isa(tax4));
   }
+
+  // Interleaving unrelated type X, and approximating type A which is too deep.
+  // A0 -> (X0 <-> X1) -> A1 -> X2 -> A2 -> (X3 <-> X4 ) -> A3 -> X5
+  // Approx:
+  // A0 -> (X0 <-> X1) -> A1 -> X2 -> A23-> (X35<-> X45) -> A23
+  @Test public void testApprox3() {
+    Type.init0(new HashMap<>());
+    final int CUTOFF = 3;
+    int alias0 = BitsAlias.new_alias(BitsAlias.REC);
+    int alias1 = BitsAlias.new_alias(BitsAlias.REC);
+    BitsAlias ba0 = BitsAlias.make0(alias0);
+    BitsAlias ba1 = BitsAlias.make0(alias1);
+    String[] flds2 = new String[]{"x","v"};
+    String[] flds3 = new String[]{"a","x","v"};
+    byte[] finals2 = new byte[]{1,1};
+    byte[] finals3 = new byte[]{1,1,1};
+
+    // ......................................................... -> X5
+    TypeStruct  x5 = TypeStruct.make(flds3,new Type[]{Type.NIL,Type.NIL,TypeInt.con(15)},finals3,alias1);
+    TypeMemPtr px5 = TypeMemPtr.make(alias1,x5);
+
+    // ................................................... -> A3 -> X5
+    TypeStruct  a3 = TypeStruct.make(flds2,new Type[]{px5,TypeInt.con(3)},finals2,alias0);
+    TypeMemPtr pa3 = TypeMemPtr.make(alias0,a3);
+
+    // Build two structs pointing to each other
+    // ...................................... (X3 <-> X4 ) -> A3 -> X5
+    Type i13 = TypeInt.con(13);
+    Type i14 = TypeInt.con(14);
+    Type.RECURSIVE_MEET++;
+    TypeStruct x3 = TypeStruct.malloc(false,flds3,new Type[3],finals3,ba1);
+    TypeStruct x4 = TypeStruct.malloc(false,flds3,new Type[3],finals3,ba1);
+    x3._hash = x3.compute_hash();  x3._cyclic = true;
+    x4._hash = x4.compute_hash();  x4._cyclic = true;
+    TypeMemPtr px3 = TypeMemPtr.make(alias1,x3);  px3._cyclic = true;
+    TypeMemPtr px4 = TypeMemPtr.make(alias1,x4);  px4._cyclic = true;
+    x3._ts[0] = pa3;
+    x3._ts[1] = px4;
+    x3._ts[2] = i13;
+    x4._ts[0] = pa3;
+    x4._ts[1] = px3;
+    x4._ts[2] = i14;
+    Type.RECURSIVE_MEET--;
+    x3 = x3.install_cyclic();
+    x4 = x4.install_cyclic();
+    px4 = (TypeMemPtr)x3._ts[1]; // Reload after cyclic install normalizes
+    px3 = (TypeMemPtr)x4._ts[1];
+
+    // ................................ A2 -> (X3 <-> X4 ) -> A3 -> X5
+    TypeStruct  a2 = TypeStruct.make(flds2,new Type[]{px3,TypeInt.con(2)},finals2,alias0);
+    TypeMemPtr pa2 = TypeMemPtr.make(alias0,a2);
+
+    // Check sanity
+    HashMap<Type,Integer> depths = a2.depth(alias0);
+    int maxd = TypeStruct.max(alias0,depths);
+    assertEquals(1,maxd);
+    assertEquals(1,(int)depths.get(a3));
+
+    // .......................... X2 -> A2 -> (X3 <-> X4 ) -> A3 -> X5
+    TypeStruct  x2 = TypeStruct.make(flds3,new Type[]{pa2,Type.NIL,TypeInt.con(12)},finals3,alias1);
+    TypeMemPtr px2 = TypeMemPtr.make(alias1,x2);
+
+    // .................... A1 -> X2 -> A2 -> (X3 <-> X4 ) -> A3 -> X5
+    TypeStruct  a1 = TypeStruct.make(flds2,new Type[]{px2,TypeInt.con(1)},finals2,alias0);
+    TypeMemPtr pa1 = TypeMemPtr.make(alias0,a1);
+
+    // Build two structs pointing to each other
+    // ..... (X0 <-> X1) -> A1 -> X2 -> A2 -> (X3 <-> X4 ) -> A3 -> X5
+    Type i10 = TypeInt.con(10);
+    Type i11 = TypeInt.con(11);
+    Type.RECURSIVE_MEET++;
+    TypeStruct x0 = TypeStruct.malloc(false,flds3,new Type[3],finals3,ba1);
+    TypeStruct x1 = TypeStruct.malloc(false,flds3,new Type[3],finals3,ba1);
+    x0._hash = x0.compute_hash();  x0._cyclic = true;
+    x1._hash = x1.compute_hash();  x1._cyclic = true;
+    TypeMemPtr px0 = TypeMemPtr.make(alias1,x0);  px0._cyclic = true;
+    TypeMemPtr px1 = TypeMemPtr.make(alias1,x1);  px1._cyclic = true;
+    x0._ts[0] = pa1;
+    x0._ts[1] = px1;
+    x0._ts[2] = i10;
+    x1._ts[0] = pa1;
+    x1._ts[1] = px0;
+    x1._ts[2] = i11;
+    Type.RECURSIVE_MEET--;
+    x0 = x0.install_cyclic();
+    x1 = x1.install_cyclic();
+    px1 = (TypeMemPtr)x0._ts[1]; // Reload after cyclic install normalizes
+    px0 = (TypeMemPtr)x1._ts[1];
+
+    // A0 -> (X0 <-> X1) -> A1 -> X2 -> A2 -> (X3 <-> X4 ) -> A3 -> X5
+    TypeStruct  a0 = TypeStruct.make(flds2,new Type[]{px0,TypeInt.con(0)},finals2,alias0);
+    TypeMemPtr pa0 = TypeMemPtr.make(alias0,a0);
+
+    // Check sanity
+    depths = a0.depth(alias0);
+    assertEquals(0,(int)depths.get(a0));
+    assertEquals(1,(int)depths.get(a1));
+    assertEquals(2,(int)depths.get(a2));
+    assertEquals(3,(int)depths.get(a3));
+    assertEquals(3,TypeStruct.max(alias0,depths));
+
+    // Approximate
+    TypeStruct zsa0 = a0.approx(3);
+
+    // Check sanity
+    // A0 -> (X0 <-> X1) -> A1 -> X2 -> A23-> (X35<-> X45) -> A23
+    TypeMemPtr zpx0 = (TypeMemPtr)zsa0._ts[0];
+    assertSame  (TypeInt.con(0) , zsa0._ts[1]);
+
+    TypeStruct zsx0 = (TypeStruct)zpx0._obj;
+    TypeMemPtr zpa1 = (TypeMemPtr)zsx0._ts[0];
+    TypeMemPtr zpx1 = (TypeMemPtr)zsx0._ts[1];
+    assertSame  (i10 ,            zsx0._ts[2]);
+
+    TypeStruct zsx1 = (TypeStruct)zpx1._obj;
+    assertSame  (zpa1,            zsx1._ts[0]);
+    assertSame  (zpx0,            zsx1._ts[1]);
+    assertSame  (i11 ,            zsx1._ts[2]);
+
+    TypeStruct zsa1 = (TypeStruct)zpa1._obj;
+    TypeMemPtr zpx2 = (TypeMemPtr)zsa1._ts[0];
+    assertSame  (TypeInt.con(1),  zsa1._ts[1]);
+
+    TypeStruct zsx2 = (TypeStruct)zpx2._obj;
+    TypeMemPtr zpa23= (TypeMemPtr)zsx2._ts[0];
+    assertSame  (Type.NIL,        zsx2._ts[1]);
+    assertSame  (TypeInt.con(12), zsx2._ts[2]);
+
+    TypeStruct zsa23= (TypeStruct)zpa23._obj;
+    TypeMemPtr zpx35= (TypeMemPtr)zsa23._ts[0];
+    assertSame  (TypeInt.NINT8,   zsa23._ts[1]);
+
+    TypeStruct zsx35= (TypeStruct)zpx35._obj;
+    TypeMemPtr zpa45= (TypeMemPtr)zsx35._ts[1];
+    assertSame  (TypeInt.NINT8,   zsx35._ts[2]);
+
+    TypeStruct zsx45= (TypeStruct)zpa45._obj;
+    assertSame  (zpa23,           zsx45._ts[0]);
+    assertSame  (TypeInt.con(14), zsx45._ts[2]);
+
+    assertTrue(a0.isa(zsa0));
+    depths = zsa0.depth(alias0);
+    assertEquals(0,(int)depths.get(zsa0));
+    assertEquals(1,(int)depths.get(zsa1));
+    assertEquals(2,(int)depths.get(zsa23));
+    assertEquals(2,TypeStruct.max(alias0,depths));
+  }
+
+
+  // Type A expands tree-like and gets too deep.
+  // A0 -> A00 -> A000
+  //           -> A001
+  //       A01 -> A010
+  //           -> A011
+  // And then:
+  // A0 -> A00 -> A000 -> A0000
+  // Approx:
+  // A0 -> A00 -> A000/A0000
+  //           -> A001
+  //       A01 -> A010
+  //           -> A011
+  // ... and so forth.  The first few tree layers remain expanded, but the tree
+  // tail collapses.
+  @Test public void testApprox4() {
+    assertTrue(false);
+  }
+
+
 }
