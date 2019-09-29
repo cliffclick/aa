@@ -1,5 +1,6 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.node.NewNode;
 import com.cliffc.aa.node.PrimNode;
 import org.junit.Test;
 
@@ -257,7 +258,7 @@ public class TestType {
     ts0._hash = ts0.compute_hash();
     ts0._ts[0] = ts0ptr;    ts0._cyclic = true;
     ts0._ts[1] = TypeInt.INT64;
-    ts0 = ts0.install_cyclic();
+    ts0 = ts0.install_cyclic(ts0.reachable());
     TypeMem ts0mem = TypeMem.make(alias1,ts0); // {1:@{n:*[1],v:int} }
 
     // - struct with pointer to self or nil
@@ -265,7 +266,7 @@ public class TestType {
     ts1._hash = ts1.compute_hash();
     ts1._ts[0] = ts0ptr0;  ts1._cyclic = true;
     ts1._ts[1] = TypeInt.INT64;
-    ts1 = ts1.install_cyclic();
+    ts1 = ts1.install_cyclic(ts1.reachable());
     TypeMem ts1mem = TypeMem.make(alias1,ts1); // {1:@{n:*[0,1],v:int} }
 
     Type tsmt = ts0.meet(ts1);
@@ -338,15 +339,11 @@ public class TestType {
     int alias = BitsAlias.new_alias(BitsAlias.REC);
     TypeStruct ts = TypeStruct.make(TypeStruct.FLDS(2),Type.NIL,TypeInt.con(0));
     TypeMemPtr phi = TypeMemPtr.make(alias,ts);
-    //for( int i=1; i<20; i++ ) {
-    //  TypeStruct newt = TypeStruct.make(TypeStruct.FLDS(2),phi,TypeInt.con(i));
-    //  TypeStruct approx = newt;
-    //  if(com.cliffc.aa.node.NewNode.approx(newt,ts) ) {
-    //    TypeStruct apxt1 = newt.approx(ts);
-    //    approx = (TypeStruct) apxt1.join(ts);
-    //  }
-    //  phi = TypeMemPtr.make(alias,ts=approx);
-    //}
+    for( int i=1; i<20; i++ ) {
+      TypeStruct newt = TypeStruct.make(TypeStruct.FLDS(2),phi,TypeInt.con(i));
+      TypeStruct approx = newt.approx(NewNode.CUTOFF);
+      phi = TypeMemPtr.make(alias,approx);
+    }
     int d = phi.depth()-9999; // added +9999 for cycle
     assertTrue(0 <= d && d <10);
   }
@@ -377,7 +374,7 @@ public class TestType {
     T._ts[0] = TN;    T._cyclic = true;
     T._ts[1] = TypeInt.INT64;
     Type.RECURSIVE_MEET--;
-    T = T.install_cyclic();
+    T = T.install_cyclic(T.reachable());
     TN = T._ts[0]; // Reload after interning
 
     // Adding a Nil to T brings to another spot in the cycle

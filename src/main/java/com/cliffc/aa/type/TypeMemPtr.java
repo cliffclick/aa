@@ -50,7 +50,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     _obj.dstr(_aliases.toString(sb).p(" -> "),dups);
     return sb;
   }
-  
+
   private static TypeMemPtr FREE=null;
   @Override protected TypeMemPtr free( TypeMemPtr ret ) { FREE=this; return ret; }
   public static TypeMemPtr make(BitsAlias aliases, TypeObj obj ) {
@@ -157,7 +157,6 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     Type x = _obj.replace(intern);// Recursively on children
     if( x==_obj ) return this;    // No change, so no change
     TypeMemPtr rez = make((TypeObj)x);  // Make (and do not intern, and do not expect any prior hits)
-    rez._cyclic = _cyclic;
     old = (TypeMemPtr)intern.get(rez);
     if( old == null ) {         // No prior version
       intern.put(this,rez);     // Map this to copy
