@@ -2,8 +2,7 @@ package com.cliffc.aa.type;
 
 import com.cliffc.aa.AA;
 import com.cliffc.aa.util.SB;
-
-import java.util.BitSet;
+import com.cliffc.aa.util.VBitSet;
 
 // Internal fixed-length non-recursive tuples.  Used for function arguments,
 // and multi-arg results like IfNode and CallNode.  This is not the same as a
@@ -50,7 +49,7 @@ public class TypeTuple extends Type<TypeTuple> {
   }
   String open_parens() { return "("; }
   String clos_parens() { return ")"; }
-  @Override String str( BitSet dups) {
+  @Override String str( VBitSet dups) {
     SB sb = new SB();
     if( _any ) sb.p('~');
     sb.p(open_parens());

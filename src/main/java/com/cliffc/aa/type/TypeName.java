@@ -68,20 +68,18 @@ public class TypeName extends TypeObj<TypeName> {
     // simple cycles and lets the interning close the loop.
     return (t2._depth<0 ? 0 : t2._depth) == (_depth<0 ? 0 :_depth);
   }
-  @Override String str( BitSet dups) {
+  @Override String str( VBitSet dups) {
     if( _depth < 0 ) {          // Only for recursive-type-heads
-      if( dups == null ) dups = new BitSet();
-      else if( dups.get(_uid) ) return _name; // Break recursive cycle
-      dups.set(_uid);
+      if( dups == null ) dups = new VBitSet();
+      if( dups.tset(_uid) ) return _name; // Break recursive cycle
     }
     return _name+":"+_t.str(dups);
   }
-  @Override SB dstr( SB sb, BitSet dups ) {
+  @Override SB dstr( SB sb, VBitSet dups ) {
     if( _depth < 0 ) {          // Only for recursive-type-heads
-      if( dups == null ) dups = new BitSet();
       sb.p('_').p(_uid);
-      if( dups.get(_uid) ) return sb.p(_name); // Break recursive cycle
-      dups.set(_uid);
+      if( dups == null ) dups = new VBitSet();
+      if( dups.tset(_uid) ) return sb.p(_name); // Break recursive cycle
     }
     return _t.dstr(sb.p(_name).p(':'),dups);
   }
@@ -103,7 +101,7 @@ public class TypeName extends TypeObj<TypeName> {
     TypeName tn0 = make0(name,lex,t,depth(t));
     TypeName tn1 = (TypeName)lex.get(name);
     if( tn1==null || tn1._depth!= -2 || RECURSIVE_MEET>0 ) return tn0;
-    return tn0.make_recur(tn1,0,new BitSet());
+    return tn0.make_recur(tn1,0,new VBitSet());
   }
   public TypeName make( Type t) { return make(_name,_lex,t); }
   public static TypeName make_forward_def_type( String name, HashMap<String,Type> lex ) { return make0(name,lex,TypeStruct.ALLSTRUCT,(short)-1); }
@@ -228,7 +226,7 @@ public class TypeName extends TypeObj<TypeName> {
     }
     return _t.isBitShape(t); // Strip name and try again
   }
-  @Override TypeName make_recur(TypeName tn, int d, BitSet bs ) {
+  @Override TypeName make_recur(TypeName tn, int d, VBitSet bs ) {
     if( bs.get(_uid) ) return this; // Looping on some other recursive type
     bs.set(_uid);
     // Make a (possibly cyclic & infinite) named type.  Prevent the infinite

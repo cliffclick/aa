@@ -3,6 +3,7 @@ package com.cliffc.aa.type;
 import com.cliffc.aa.AA;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
+import com.cliffc.aa.util.VBitSet;
 
 import java.util.Arrays;
 import java.util.BitSet;
@@ -97,7 +98,7 @@ public class TypeMem extends Type<TypeMem> {
   }
   // Never part of a cycle, so the normal check works
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
-  @Override String str( BitSet dups ) {
+  @Override String str( VBitSet dups ) {
     if( this== MEM ) return "[mem]";
     if( this==XMEM ) return "[~mem]";
     SB sb = new SB();

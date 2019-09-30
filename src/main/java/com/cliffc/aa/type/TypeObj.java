@@ -1,6 +1,6 @@
 package com.cliffc.aa.type;
 
-import java.util.BitSet;
+import com.cliffc.aa.util.VBitSet;
 
 // Types which extend memory-based objects - currently Structs (which include
 // tuples but not TypeTuple) and Str (Strings); will include Arrays at some
@@ -18,7 +18,7 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
     return o instanceof TypeObj && _any==((TypeObj)o)._any && _type==((TypeObj)o)._type;
   }
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
-  @Override String str( BitSet dups ) { return _any?"~obj":"obj"; }
+  @Override String str( VBitSet dups ) { return _any?"~obj":"obj"; }
   private static TypeObj make( boolean any ) {
     return (TypeObj)(new TypeObj(TOBJ,any).hashcons());
   }
@@ -45,7 +45,7 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
   @Override public boolean is_con() { return false; }
   @Override public boolean must_nil() { return false; }
   @Override public boolean  may_nil() { return false; }
-  @Override Type make_recur(TypeName tn, int d, BitSet bs ) { return this; }
+  @Override Type make_recur(TypeName tn, int d, VBitSet bs ) { return this; }
   // Dual, except keep TypeMem.XOBJ as high for starting GVNGCM.opto() state.
   @Override public TypeObj startype() { assert _type==TOBJ; return XOBJ; }
 }

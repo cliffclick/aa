@@ -2,8 +2,7 @@ package com.cliffc.aa.type;
 
 import com.cliffc.aa.node.FunNode;
 import com.cliffc.aa.util.SB;
-
-import java.util.BitSet;
+import com.cliffc.aa.util.VBitSet;
 
 // Function indices or function pointers; a single instance can include all
 // possible aliased function pointers.  Function pointers can be executed, are
@@ -51,7 +50,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   }
   // Never part of a cycle, so the normal check works
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
-  @Override public String str( BitSet dups) {
+  @Override public String str( VBitSet dups) {
     return "*"+FunNode.names(_fidxs,new SB()).toString()+":{"+_args.str(dups)+"-> "+_ret.str(dups)+"}";
   }
 

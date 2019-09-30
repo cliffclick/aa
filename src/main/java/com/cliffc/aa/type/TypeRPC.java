@@ -1,8 +1,7 @@
 package com.cliffc.aa.type;
 
 import com.cliffc.aa.util.SB;
-
-import java.util.BitSet;
+import com.cliffc.aa.util.VBitSet;
 
 // Return-Program-Counters, or Continuation constants
 public class TypeRPC extends Type<TypeRPC> {
@@ -19,7 +18,7 @@ public class TypeRPC extends Type<TypeRPC> {
   }
   // Never part of a cycle, so the normal check works
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
-  @Override String str( BitSet dups) {
+  @Override String str( VBitSet dups) {
     SB sb = new SB().p("#");
     return _rpcs.toString(sb).toString();
   }

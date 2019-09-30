@@ -120,8 +120,8 @@ public class Type<T extends Type<T>> {
   // TypeName) and is used (again only by TypeName) to end cyclic printing.
   // All other 'str()' callers just pass along.
   @Override public final String toString() { return str(null); }
-  String str( BitSet dups ) { return STRS[_type]; }
-  SB dstr( SB sb, BitSet dups ) { return sb.p(str(dups)); }
+  String str( VBitSet dups ) { return STRS[_type]; }
+  SB dstr( SB sb, VBitSet dups ) { return sb.p(str(dups)); }
 
   // Object Pooling to handle frequent (re)construction of temp objects being
   // interned.  One-entry pool for now.
@@ -707,7 +707,7 @@ public class Type<T extends Type<T>> {
   // unrolling of names by not allowing a named-type with depth >= D from
   // holding (recursively) the head of a named-type cycle.  We need to cap the
   // unroll, to prevent loops/recursion from infinitely unrolling.
-  Type make_recur(TypeName tn, int d, BitSet bs ) { assert is_simple(); return this; }
+  Type make_recur(TypeName tn, int d, VBitSet bs ) { assert is_simple(); return this; }
 
   // Is t type contained within this?  Short-circuits on a true
   public final boolean contains( Type t ) { return contains(t,null); }

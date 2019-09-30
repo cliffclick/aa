@@ -1,8 +1,8 @@
 package com.cliffc.aa.type;
 
 import com.cliffc.aa.util.SB;
+import com.cliffc.aa.util.VBitSet;
 
-import java.util.BitSet;
 import java.util.HashMap;
 import java.util.function.Predicate;
 
@@ -25,7 +25,7 @@ public class TypeStr extends TypeObj<TypeStr> {
     return _any == t2._any && (_con==null ? t2._con==null : _con.equals(t2._con));
   }
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
-  @Override String str( BitSet dups) {
+  @Override String str( VBitSet dups) {
     SB sb = new SB();
     if( _any ) sb.p('~');
     if( _con == null ) sb.p("str");

@@ -33,20 +33,18 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     if( _aliases != t2._aliases ) return false;
     return _obj == t2._obj || _obj.cycle_equals(t2._obj);
   }
-  @Override String str( BitSet dups) {
-    if( dups == null ) dups = new BitSet();
-    else if( dups.get(_uid) ) return "$"; // Break recursive printing cycle
-    dups.set(_uid);
+  @Override String str( VBitSet dups) {
+    if( dups == null ) dups = new VBitSet();
+    if( dups.tset(_uid) ) return "$"; // Break recursive printing cycle
     SB sb = new SB().p('*');
     _aliases.toString(sb).p(_obj.str(dups));
     if( _aliases.test(0) ) sb.p('?');
     return sb.toString();
   }
-  @Override SB dstr( SB sb, BitSet dups ) {
-    if( dups == null ) dups = new BitSet();
+  @Override SB dstr( SB sb, VBitSet dups ) {
     sb.p('_').p(_uid);
-    if( dups.get(_uid) ) return sb.p('$'); // Break recursive printing cycle
-    dups.set(_uid);
+    if( dups == null ) dups = new VBitSet();
+    if( dups.tset(_uid) ) return sb.p('$'); // Break recursive printing cycle
     sb.p('*');
     _obj.dstr(_aliases.toString(sb).p(" -> "),dups);
     return sb;
@@ -136,7 +134,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   }
 
   // Build a depth-limited named type
-  @Override TypeMemPtr make_recur(TypeName tn, int d, BitSet bs ) {
+  @Override TypeMemPtr make_recur(TypeName tn, int d, VBitSet bs ) {
     Type t2 = _obj.make_recur(tn,d,bs);
     return t2==_obj ? this : make(_aliases,(TypeObj)t2);
   }

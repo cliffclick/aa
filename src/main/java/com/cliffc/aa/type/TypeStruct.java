@@ -137,10 +137,9 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return null;
   }
 
-  String str( BitSet dups) {
-    if( dups == null ) dups = new BitSet();
-    else if( dups.get(_uid) ) return "$"; // Break recursive printing cycle
-    dups.set(_uid);
+  String str( VBitSet dups) {
+    if( dups == null ) dups = new VBitSet();
+    if( dups.tset(_uid) ) return "$"; // Break recursive printing cycle
 
     SB sb = new SB();
     if( _uf!=null ) return "=>"+_uf;
@@ -161,11 +160,10 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     sb.p(!is_tup ? '}' : ')');
     return sb.toString();
   }
-  @Override SB dstr( SB sb, BitSet dups ) {
-    if( dups == null ) dups = new BitSet();
+  @Override SB dstr( SB sb, VBitSet dups ) {
     sb.p('_').p(_uid);
-    if( dups.get(_uid) ) return sb.p('$'); // Break recursive printing cycle
-    dups.set(_uid);
+    if( dups == null ) dups = new VBitSet();
+    if( dups.tset(_uid) ) return sb.p('$'); // Break recursive printing cycle
 
     if( _uf!=null ) return _uf.dstr(sb.p("=>"),dups);
     if( _any ) sb.p('~');
@@ -831,7 +829,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return 99;
   }
   // Build a depth-limited named type
-  @Override TypeStruct make_recur(TypeName tn, int d, BitSet bs ) {
+  @Override TypeStruct make_recur(TypeName tn, int d, VBitSet bs ) {
     // Mid-construction recursive types are always self-type
     for( Type t : _ts )  if( t == null )  return this;
     boolean eq = true;
