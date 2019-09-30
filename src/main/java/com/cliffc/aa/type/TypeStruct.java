@@ -471,15 +471,15 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public TypeStruct approx( int cutoff ) {
     int alias = _news.getbit();   // Must only be 1 alias at top level
     RECURSIVE_MEET++;
+    Ary<Type> reaches = reachable(true);
     IHashMap old2apx = new IHashMap();
-    copy(old2apx,this);
+    copy(old2apx,reaches);
 
     // Scan the old copy for elements that are too deep.
     // 'Meet' those into the clone at one layer up.
     ax_impl( old2apx, new VBitSet(), alias, cutoff, 0, this, this );
 
     TypeStruct apx = old2apx.get(this);
-    Ary<Type> reaches;
     while( check_uf(reaches = apx.reachable()) )
       apx = (TypeStruct)shrink( new IHashMap(), apx );
     RECURSIVE_MEET--;
@@ -584,37 +584,30 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     }
   }
 
-  private Type copy(IHashMap old2apx, Type t ) {
-    Type tn = old2apx.get(t);
-    if( tn != null ) return tn; // Been there, done that
-
+  private void copy(IHashMap old2apx, Ary<Type> reaches ) {
+    for( Type t : reaches )
+      old2apx.put(t,t.clone());
+    for( Type t : reaches ) {
     switch( t._type ) {
-    case TNAME  : {
-      Type x = copy(old2apx,((TypeName)t)._t);
-      tn = old2apx.get(t);
-      if( tn == null )
-        old2apx.put(t,tn = ((TypeName)t).make(x));
-      break;
-    }
-    case TMEMPTR: {
-      Type x = copy(old2apx,((TypeMemPtr)t)._obj);
-      tn = old2apx.get(t);
-      if( tn == null )
-        old2apx.put(t,tn = ((TypeMemPtr)t).make((TypeObj)x));
-      break;
-    }
+    case TNAME  : TypeName   tn = (TypeName  )t;  old2apx.get(tn)._t  = getx(old2apx,tn._t  );  break;
+    case TMEMPTR: TypeMemPtr tm = (TypeMemPtr)t;  old2apx.get(tm)._obj= getx(old2apx,tm._obj);  break;
     case TSTRUCT:
-      TypeStruct ts = (TypeStruct)t;
-      tn = malloc(ts._any,ts._flds.clone(),new Type[ts._ts.length],ts._finals.clone(),ts._news);
-      tn._hash = tn.compute_hash();
-      old2apx.put(ts,tn);     // Put before recursive call
+      TypeStruct ts = (TypeStruct)t, nts = old2apx.get(ts);
+      nts._flds   = ts._flds  .clone();
+      nts._finals = ts._finals.clone();
+      nts._ts     = new Type[ts._ts.length];
       for( int i=0; i<ts._ts.length; i++ )
-        ((TypeStruct)tn)._ts[i] = copy(old2apx,ts._ts[i]);
+        nts._ts[i] = getx(old2apx,ts._ts[i]);
       break;
-    default: tn = t;            // Not part of the cycle
+    default: throw AA.unimpl(); // Should not reach here
     }
-    return tn;
+    }
+    for( Type t : reaches ) {
+      Type nt = old2apx.get(t);
+      nt._hash = nt.compute_hash();
+    }
   }
+  private <T> T getx(IHashMap old2apx, T t) { T x = old2apx.get(t); return x==null ? t : x; }
 
   private static Type shrink( IHashMap intern, Type old ) {
     assert !(old instanceof TypeStruct && ((TypeStruct)old)._uf != null);
@@ -666,25 +659,26 @@ public class TypeStruct extends TypeObj<TypeStruct> {
 
   // Reachable collection of TypeMemPtr, TypeName and TypeStruct.
   // Optionally keep interned Types.  List is pre-order.
-  Ary<Type> reachable() {
+  Ary<Type> reachable() { return reachable(false); }
+  Ary<Type> reachable(boolean keep) {
     Ary<Type> work = new Ary<>(new Type[1],0);
-    push(work, this);
+    push(work, keep, this);
     int idx=0;
     while( idx < work._len ) {
       Type t = work.at(idx++);
       switch( t._type ) {
-      case TNAME:    push(work, ((TypeName  )t)._t  ); break;
-      case TMEMPTR:  push(work, ((TypeMemPtr)t)._obj); break;
-      case TSTRUCT:  for( Type tf : ((TypeStruct)t)._ts ) push(work, tf); break;
+      case TNAME:    push(work, keep, ((TypeName  )t)._t  ); break;
+      case TMEMPTR:  push(work, keep, ((TypeMemPtr)t)._obj); break;
+      case TSTRUCT:  for( Type tf : ((TypeStruct)t)._ts ) push(work, keep, tf); break;
       default: break;
       }
     }
     return work;
   }
-  private void push( Ary<Type> work, Type t ) {
+  private void push( Ary<Type> work, boolean keep, Type t ) {
     int y = t._type;
     if( (y==TNAME || y==TMEMPTR || y==TSTRUCT) &&
-        !t.interned() && work.find(t)==-1 )
+        (keep || !t.interned()) && work.find(t)==-1 )
       work.push(t);
   }
 

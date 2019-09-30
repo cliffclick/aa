@@ -88,7 +88,7 @@ import java.util.function.Predicate;
 // undistinguished nil.
 
 
-public class Type<T extends Type<T>> {
+public class Type<T extends Type<T>> implements Cloneable {
   static private int CNT=1;
   final int _uid=CNT++;  // Unique ID, will have gaps, used to uniquely order Types in Unions
   public int _hash;      // Hash for this Type; built recursively
@@ -741,5 +741,9 @@ public class Type<T extends Type<T>> {
 
   RuntimeException typerr(Type t) {
     throw new RuntimeException("Should not reach here: internal type system error with "+this+(t==null?"":(" and "+t)));
+  }
+  protected Type clone() {
+    try { return (Type)super.clone(); }
+    catch( CloneNotSupportedException cns ) { throw new RuntimeException(cns); }
   }
 }
