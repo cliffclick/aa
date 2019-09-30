@@ -341,7 +341,7 @@ public class TestType {
     TypeMemPtr phi = TypeMemPtr.make(alias,ts);
     for( int i=1; i<20; i++ ) {
       TypeStruct newt = TypeStruct.make(TypeStruct.FLDS(2),phi,TypeInt.con(i));
-      TypeStruct approx = newt.approx3(NewNode.CUTOFF);
+      TypeStruct approx = newt.approx(NewNode.CUTOFF);
       phi = TypeMemPtr.make(alias,approx);
     }
     int d = phi.depth()-9999; // added +9999 for cycle

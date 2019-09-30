@@ -119,7 +119,7 @@ public class Type<T extends Type<T>> {
   // HashSet is only installed by the head of a type-cycle (always and only
   // TypeName) and is used (again only by TypeName) to end cyclic printing.
   // All other 'str()' callers just pass along.
-  @Override public final String toString() { return dstr(new SB(),null).toString(); }
+  @Override public final String toString() { return str(null); }
   String str( BitSet dups ) { return STRS[_type]; }
   SB dstr( SB sb, BitSet dups ) { return sb.p(str(dups)); }
 
@@ -728,7 +728,7 @@ public class Type<T extends Type<T>> {
   void walk( Predicate<Type> p ) { assert is_simple(); p.test(this); }
 
   TypeStruct repeats_in_cycles(TypeStruct head, VBitSet bs) { return null; }
-  
+
   // Dual, except keep TypeMem.XOBJ as high for starting GVNGCM.opto() state.
   public Type startype() {
     if( is_con() ) {

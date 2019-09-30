@@ -38,6 +38,11 @@ public class NewNode extends Node {
   private TypeObj _obj;         // Optional named struct
   TypeMemPtr _ptr;              // Cached pointer-to-_obj
 
+  // NewNodes can participate in cycles, where the same structure is appended
+  // to in a loop until the size grows without bound.  If we detect this we
+  // need to approximate a new cyclic type.
+  public final static int CUTOFF=5; // Depth of types before we start forcing approximations
+
   public NewNode( Node[] flds, TypeObj obj ) {
     super(OP_NEW,flds);
     assert flds[0]==null;       // no ctrl field
@@ -87,18 +92,9 @@ public class NewNode extends Node {
     // than CUTOFF deep, and fold the deepest ones onto themselves to limit the
     // type depth.  If this happens, the types become recursive with the
     // approximations happening at the deepest points.
-    TypeStruct res = newt.approx3(CUTOFF);
-    TypeObj res2 = _obj instanceof TypeName ? ((TypeName)_obj).make(newt) : newt;
+    TypeStruct res = newt.approx(CUTOFF);
+    TypeObj res2 = _obj instanceof TypeName ? ((TypeName)_obj).make(res) : res;
     return TypeMemPtr.make(_alias,res2);
-  }
-
-  // NewNodes can participate in cycles, where the same structure is appended
-  // to in a loop until the size grows without bound.  If we detect this we
-  // need to approximate a new cyclic type.
-  public final static int CUTOFF=5; // Depth of types before we start forcing approximations
-  public static boolean approx( TypeStruct newt, TypeStruct oldt ) {
-    return newt != oldt && newt.contains(oldt) && oldt.depth() > CUTOFF &&
-            (newt.above_center() || !oldt.above_center());
   }
 
   @Override public Type all_type() { return _ptr; }

@@ -472,7 +472,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
 
   // This is for a struct that has grown 'too deep', and needs to be
   // approximated to avoid infinite growth.
-  public TypeStruct approx3( int cutoff ) {
+  public TypeStruct approx( int cutoff ) {
     int alias = _news.getbit();   // Must only be 1 alias at top level
     RECURSIVE_MEET++;
     HashMap<Type,Type> old2apx = new HashMap<>();
@@ -480,7 +480,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
 
     // Scan the old copy for elements that are too deep.
     // 'Meet' those into the clone at one layer up.
-    ax3_impl( old2apx, new VBitSet(), alias, cutoff, 0, this, this );
+    ax_impl( old2apx, new VBitSet(), alias, cutoff, 0, this, this );
 
     TypeStruct apx = (TypeStruct)old2apx.get(this);
     Ary<Type> reaches;
@@ -491,14 +491,14 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return apx.install_cyclic(reaches);
   }
 
-  private static void ax3_impl( HashMap<Type,Type> old2apx, VBitSet bs, int alias, int cutoff, int d, TypeStruct dold, Type old ) {
+  private static void ax_impl( HashMap<Type,Type> old2apx, VBitSet bs, int alias, int cutoff, int d, TypeStruct dold, Type old ) {
     if( bs.tset(old._uid) ) return; // Been there, done that
     assert old.interned();
 
     // Walk internal structure, meeting into the approximation
     switch( old._type ) {
-    case TNAME  : ax3_impl(old2apx,bs,alias,cutoff,d,dold,((TypeName  )old)._t  ); break;
-    case TMEMPTR: ax3_impl(old2apx,bs,alias,cutoff,d,dold,((TypeMemPtr)old)._obj); break;
+    case TNAME  : ax_impl(old2apx,bs,alias,cutoff,d,dold,((TypeName  )old)._t  ); break;
+    case TMEMPTR: ax_impl(old2apx,bs,alias,cutoff,d,dold,((TypeMemPtr)old)._obj); break;
     case TSTRUCT:
       TypeStruct ts = (TypeStruct)old;
       if( ts._news.test(alias) ) { // Depth-increasing struct?
@@ -508,20 +508,20 @@ public class TypeStruct extends TypeObj<TypeStruct> {
           xts.union(nts);
           old2apx.put(dold,nts); // Update after ufind
           old2apx.put( old,nts); // Update after union
-          ax3_meet(new VBitSet(), nts,old);
+          ax_meet(new VBitSet(), nts,old);
           return;
         }
         d++;              // Increase depth
         dold = ts;        // And this is the last TypeStruct seen at this depth
       }
       for( int i=0; i<ts._ts.length; i++ )
-        ax3_impl(old2apx,bs,alias,cutoff,d,dold,ts._ts[i]);
+        ax_impl(old2apx,bs,alias,cutoff,d,dold,ts._ts[i]);
       break;
     }
   }
   // Update-in-place 'meet' of pre-allocated new types.  Walk all the old type
   // and meet into the corresponding new type.
-  private static void ax3_meet( VBitSet bs, Type t, Type old ) {
+  private static void ax_meet( VBitSet bs, Type t, Type old ) {
     assert old.interned() && !t.interned();
     // TODO: Flip switch to switch on 't' not 'old', moves NIL case into TMEMPTR.
     // TODO: Make a non-recursive "meet into".
@@ -533,9 +533,24 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       nptr._aliases = nptr._aliases.meet_nil();
       break;
     }
-    case TNAME:
+    case TSCALAR:
+      if( !(t instanceof TypeMemPtr) ) throw AA.unimpl();
+      // TODO: Really begs for UF on all Types
+      throw AA.unimpl(); // Update nptr to a SCALAR and chop the link
+    case TNAME: {
       if( bs.tset(old._uid) ) return; // Been there, done that
-      throw AA.unimpl();
+      if( !(t instanceof TypeName) ) throw AA.unimpl();
+      TypeName n = (TypeName)old, nn = (TypeName)t;
+      if( !(n._name.equals(nn._name) &&
+            n._depth==nn._depth &&
+            n._lex==nn._lex) )
+        throw AA.unimpl();
+      Type nto = nn._t;
+      if( nto instanceof TypeStruct ) nn._t = nto = ((TypeStruct)nto).ufind();
+      if( nto.interned() ) nn._t = nto.meet(n._t);
+      else ax_meet(bs,nto,n._t);
+      break;
+    }
     case TMEMPTR: {
       if( bs.tset(old._uid) ) return; // Been there, done that
       if( !(t instanceof TypeMemPtr) ) throw AA.unimpl();
@@ -544,7 +559,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       TypeObj nto = nptr._obj;
       if( nto instanceof TypeStruct ) nptr._obj = nto = ((TypeStruct)nto).ufind();
       if( nto.interned() ) nptr._obj = (TypeObj)nto.meet(ptr._obj);
-      else ax3_meet(bs,nto,ptr._obj);
+      else ax_meet(bs,nto,ptr._obj);
       break;
     }
     case TSTRUCT:
@@ -566,7 +581,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
         Type ntf = nts._ts[i];
         assert !(ntf instanceof TypeStruct);
         if( ntf.interned() ) nts._ts[i] = ntf.meet(tf);
-        else ax3_meet(bs,ntf,tf);
+        else ax_meet(bs,ntf,tf);
       }
       break;
     default: throw AA.unimpl();
@@ -578,13 +593,20 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     if( tn != null ) return tn; // Been there, done that
 
     switch( t._type ) {
-    case TNAME  : throw AA.unimpl();
-    case TMEMPTR:
+    case TNAME  : {
+      Type x = copy(old2apx,((TypeName)t)._t);
+      tn = old2apx.get(t);
+      if( tn == null )
+        old2apx.put(t,tn = ((TypeName)t).make(x));
+      break;
+    }
+    case TMEMPTR: {
       Type x = copy(old2apx,((TypeMemPtr)t)._obj);
       tn = old2apx.get(t);
       if( tn == null )
         old2apx.put(t,tn = ((TypeMemPtr)t).make((TypeObj)x));
       break;
+    }
     case TSTRUCT:
       TypeStruct ts = (TypeStruct)t;
       tn = malloc(ts._any,ts._flds.clone(),new Type[ts._ts.length],ts._finals.clone(),ts._news);
