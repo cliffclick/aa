@@ -1,6 +1,7 @@
 package com.cliffc.aa.type;
 
 import com.cliffc.aa.util.SB;
+import com.cliffc.aa.util.VBitSet;
 
 import java.util.Arrays;
 import java.util.BitSet;
@@ -710,14 +711,12 @@ public class Type<T extends Type<T>> {
 
   // Is t type contained within this?  Short-circuits on a true
   public final boolean contains( Type t ) { return contains(t,null); }
-  boolean contains( Type t, BitSet bs ) { return this==t; }
+  boolean contains( Type t, VBitSet bs ) { return this==t; }
   // Depth of nested types
   public final int depth() { return depth(null); }
-  int depth( BitSet bs ) { return 0; }
+  int depth( VBitSet bs ) { return 0; }
   // Mark if part of a cycle
-  void mark_cycle( Type t, BitSet visit, BitSet cycle ) { }
-  // Replace old with nnn in a clone
-  Type replace(HashMap<Type,Type> intern) { return this; }
+  void mark_cycle( Type t, VBitSet visit, BitSet cycle ) { }
 
   // Iterate over any nested child types.  Only side-effect results.
   public void iter( Consumer<Type> c ) { /*None in the base class*/ }
@@ -728,7 +727,7 @@ public class Type<T extends Type<T>> {
   // visiting the same Type again.
   void walk( Predicate<Type> p ) { assert is_simple(); p.test(this); }
 
-  TypeStruct repeats_in_cycles(TypeStruct head, BitSet bs) { return null; }
+  TypeStruct repeats_in_cycles(TypeStruct head, VBitSet bs) { return null; }
   
   // Dual, except keep TypeMem.XOBJ as high for starting GVNGCM.opto() state.
   public Type startype() {

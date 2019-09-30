@@ -2,6 +2,7 @@ package com.cliffc.aa.type;
 
 import com.cliffc.aa.AA;
 import com.cliffc.aa.util.SB;
+import com.cliffc.aa.util.VBitSet;
 
 import java.util.BitSet;
 import java.util.HashMap;
@@ -198,7 +199,7 @@ public class TypeName extends TypeObj<TypeName> {
     _dual._t = t._dual;
     _depth = _dual._depth = -2;
     // Flag all as cyclic
-    t.mark_cycle(this,new BitSet(),new BitSet());
+    t.mark_cycle(this,new VBitSet(),new BitSet());
     // Back into the INTERN table
     retern()._dual.retern();
 
@@ -241,9 +242,8 @@ public class TypeName extends TypeObj<TypeName> {
     return t2==_t ? this : make0(_name,_lex,t2,_depth);
   }
   // Mark if part of a cycle
-  @Override void mark_cycle( Type head, BitSet visit, BitSet cycle ) {
-    if( visit.get(_uid) ) return;
-    visit.set(_uid);
+  @Override void mark_cycle( Type head, VBitSet visit, BitSet cycle ) {
+    if( visit.tset(_uid) ) return;
     if( this==head ) { cycle.set(_uid); _cyclic=_dual._cyclic=true; }
     _t.mark_cycle(head,visit,cycle);
     if( cycle.get(_t._uid) )
@@ -252,26 +252,9 @@ public class TypeName extends TypeObj<TypeName> {
 
   // Iterate over any nested child types
   @Override public void iter( Consumer<Type> c ) { c.accept(_t); }
-  @Override boolean contains( Type t, BitSet bs ) { return _t == t || _t.contains(t, bs); }
-  @Override int depth( BitSet bs ) { return _t.depth(bs); }
-  @SuppressWarnings("unchecked")
-  @Override TypeName replace(HashMap<Type,Type> intern) {
-    TypeName old = (TypeName)intern.get(this);
-    if( old != null ) return old; // Been there, done that
-    Type x = _t.replace(intern);  // Recursively on children
-    if( x==_t ) return this;      // No change, so no change
-    TypeName rez = make(_name,_lex,(TypeObj)x);  // Make (and do not intern, and do not expect any prior hits)
-    rez._cyclic = _cyclic;
-    old = (TypeName)intern.get(rez);
-    if( old == null ) {         // No prior version
-      intern.put(this,rez);     // Map this to copy
-      return rez;               // And return it
-    }
-    intern.put(this,old);       // Map this to old
-    return rez.free(old);       // Free unused rez
-  }
-
+  @Override boolean contains( Type t, VBitSet bs ) { return _t == t || _t.contains(t, bs); }
+  @Override int depth( VBitSet bs ) { return _t.depth(bs); }
   @SuppressWarnings("unchecked")
   @Override void walk( Predicate<Type> p ) { if( p.test(this) ) _t.walk(p); }
-  @Override TypeStruct repeats_in_cycles(TypeStruct head, BitSet bs) { return _cyclic ? _t.repeats_in_cycles(head,bs) : null; }
+  @Override TypeStruct repeats_in_cycles(TypeStruct head, VBitSet bs) { return _cyclic ? _t.repeats_in_cycles(head,bs) : null; }
 }

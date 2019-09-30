@@ -16,7 +16,6 @@ public class TestApprox {
   // Check TypeStruct.meet for a more complex recursive case
   @Test public void testTSMeet() {
     Type.init0(new HashMap<>());
-    final int CUTOFF = 3;
     int alias0 = BitsAlias.new_alias(BitsAlias.REC);
     BitsAlias alias = BitsAlias.make0(alias0);
     String[] flds = new String[]{"a","b"};
@@ -99,7 +98,7 @@ public class TestApprox {
     // collapse redundant ptrs to t1, and MEET t0-tail and t1-tail
     // t3[,99] -> p2 -> t2[,99] -> {p0,p1} -> t1[,{flt&int}] -> {p0,p1}
 
-    TypeStruct tax = t3.approx2(CUTOFF);
+    TypeStruct tax = t3.approx3(CUTOFF);
     HashMap<Type,Integer> ds2 = tax.depth(alias0);
     assertEquals(CUTOFF-1,TypeStruct.max(alias0,ds2));
     TypeMemPtr txp1 = (TypeMemPtr)tax.at(0);
@@ -178,7 +177,7 @@ public class TestApprox {
     // collapse redundant ptrs to t1, and MEET t0-tail and t1-tail
     // t3[,98] -> p2 -> t2[,99] -> {p0,p1} -> t1[,{flt&int}] -> {p0,p1}
 
-    TypeStruct tax = t3.approx2(CUTOFF);
+    TypeStruct tax = t3.approx3(CUTOFF);
     TypeMemPtr p3 = TypeMemPtr.make(alias0,tax);
 
     HashMap<Type,Integer> ds2 = tax.depth(alias0);
@@ -202,7 +201,7 @@ public class TestApprox {
     TypeStruct t4 = TypeStruct.make(flds,new Type[]{p3,TypeInt.con(97)},finals,alias0);
     ds = t4.depth(alias0);
     assertEquals(CUTOFF,(int)ds.get(txs2)); // Structure too deep
-    TypeStruct tax4 = t4.approx2(CUTOFF);
+    TypeStruct tax4 = t4.approx3(CUTOFF);
 
     ds2 = tax4.depth(alias0);
     assertEquals(CUTOFF-1,TypeStruct.max(alias0,ds2));
@@ -318,7 +317,7 @@ public class TestApprox {
     assertEquals(3,TypeStruct.max(alias0,depths));
 
     // Approximate
-    TypeStruct zsa0 = a0.approx2(3);
+    TypeStruct zsa0 = a0.approx3(3);
 
     // Check sanity!
     // Was: A0 -> (X0 <-> X1) -> A1 -> X2 -> A2 -> (X3 <->  X4) -> A3 -> X5
@@ -357,8 +356,8 @@ public class TestApprox {
 
     TypeStruct zsx4 = (TypeStruct)zpa4._obj;
     assertSame(TypeStr.con("X4"), zsx4._ts[0]);
-    TypeMemPtr zpa3 = (TypeMemPtr)zsx4._ts[1] ;
-    assertSame(zpa23,             zsx4._ts[2]);
+    assertSame(zpx35,             zsx4._ts[1]);
+    assertSame(zpa23q,            zsx4._ts[2]);
 
     depths = zsa0.depth(alias0);
     assertEquals(0,(int)depths.get(zsa0));
@@ -443,7 +442,7 @@ public class TestApprox {
     assertEquals(3,TypeStruct.max(alias,depths));
 
     // Approximate
-    TypeStruct z1 = x1.approx2(3);
+    TypeStruct z1 = x1.approx3(CUTOFF);
     assertSame( TypeInt.con(1), z1._ts[0]);
     TypeMemPtr p2 = (TypeMemPtr)z1._ts[1] ;
     TypeMemPtr p3 = (TypeMemPtr)z1._ts[2] ;
@@ -458,10 +457,10 @@ public class TestApprox {
     TypeMemPtr p6 = (TypeMemPtr)z3._ts[1] ;
     TypeMemPtr p7 = (TypeMemPtr)z3._ts[2] ;
 
-    check_leaf(p4,alias);
-    check_leaf(p5,alias);
-    check_leaf(p6,alias);
-    check_leaf(p7,alias);
+    check_leaf(p4,alias,TypeInt.NINT8);
+    check_leaf(p5,alias,TypeInt.NINT8);
+    check_leaf(p6,alias,TypeInt.NINT8);
+    check_leaf(p7,alias,(TypeInt)TypeInt.con(7));
 
     depths = z1.depth(alias);
     assertEquals(2,TypeStruct.max(alias,depths));
@@ -469,9 +468,9 @@ public class TestApprox {
 
   // Leaf is a TypeInt.NINT8, and both pointer fields are either NIL or contain
   // alias 8 (and optionally nil) and point to a leaf type.
-  private void check_leaf( TypeMemPtr p, int alias ) {
+  private void check_leaf( TypeMemPtr p, int alias, TypeInt vt ) {
     TypeStruct z = (TypeStruct)p._obj;
-    assertSame( TypeInt.NINT8, z._ts[0]);
+    assertSame( vt, z._ts[0]);
     Type x1 = z._ts[1];
     if( x1 != Type.NIL ) {
       TypeMemPtr px = (TypeMemPtr)x1;

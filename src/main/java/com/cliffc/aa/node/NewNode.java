@@ -90,7 +90,7 @@ public class NewNode extends Node {
     // type depth.  If this happens, the types become recursive with the
     // approximations happening at the deepest points.
     
-    //TypeStruct res = newt.approx(CUTOFF);
+    //TypeStruct res = newt.approx3(CUTOFF);
     throw com.cliffc.aa.AA.unimpl();
 
 

@@ -1,6 +1,7 @@
 package com.cliffc.aa.type;
 
 import com.cliffc.aa.util.SB;
+import com.cliffc.aa.util.VBitSet;
 
 import java.util.BitSet;
 import java.util.HashMap;
@@ -140,36 +141,18 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     return t2==_obj ? this : make(_aliases,(TypeObj)t2);
   }
   // Mark if part of a cycle
-  @Override void mark_cycle( Type head, BitSet visit, BitSet cycle ) {
-    if( visit.get(_uid) ) return;
-    visit.set(_uid);
+  @Override void mark_cycle( Type head, VBitSet visit, BitSet cycle ) {
+    if( visit.tset(_uid) ) return;
     if( this==head ) { cycle.set(_uid); _cyclic=_dual._cyclic=true; }
     _obj.mark_cycle(head,visit,cycle);
     if( cycle.get(_obj._uid) )
       { cycle.set(_uid); _cyclic=_dual._cyclic=true; }
   }
-  @Override boolean contains( Type t, BitSet bs ) { return _obj == t || _obj.contains(t, bs); }
-  @Override int depth( BitSet bs ) { return _obj.depth(bs); }
-  @SuppressWarnings("unchecked")
-  @Override TypeMemPtr replace(HashMap<Type,Type> intern) {
-    TypeMemPtr old = (TypeMemPtr)intern.get(this);
-    if( old != null ) return old; // Been there, done that
-    Type x = _obj.replace(intern);// Recursively on children
-    if( x==_obj ) return this;    // No change, so no change
-    TypeMemPtr rez = make((TypeObj)x);  // Make (and do not intern, and do not expect any prior hits)
-    old = (TypeMemPtr)intern.get(rez);
-    if( old == null ) {         // No prior version
-      intern.put(this,rez);     // Map this to copy
-      intern.put(rez ,rez);     // Map rez also, to catch dups from cloning cycles
-      return rez;               // And return it
-    }
-    intern.put(this,old);       // Map this to old
-    return rez.free(old);       // Free unused rez
-  }
-
+  @Override boolean contains( Type t, VBitSet bs ) { return _obj == t || _obj.contains(t, bs); }
+  @Override int depth( VBitSet bs ) { return _obj.depth(bs); }
   @SuppressWarnings("unchecked")
   @Override void walk( Predicate<Type> p ) { if( p.test(this) ) _obj.walk(p); }
-  @Override TypeStruct repeats_in_cycles(TypeStruct head, BitSet bs) { return _cyclic ? _obj.repeats_in_cycles(head,bs) : null; }
+  @Override TypeStruct repeats_in_cycles(TypeStruct head, VBitSet bs) { return _cyclic ? _obj.repeats_in_cycles(head,bs) : null; }
   public int getbit() { return _aliases.getbit(); }
   // Keep the high parts
   @Override public TypeMemPtr startype() {
