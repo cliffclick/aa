@@ -2,7 +2,6 @@ package com.cliffc.aa.type;
 
 import org.junit.Test;
 
-import java.util.BitSet;
 import java.util.HashMap;
 
 import static org.junit.Assert.*;
@@ -100,7 +99,7 @@ public class TestApprox {
     // collapse redundant ptrs to t1, and MEET t0-tail and t1-tail
     // t3[,99] -> p2 -> t2[,99] -> {p0,p1} -> t1[,{flt&int}] -> {p0,p1}
 
-    TypeStruct tax = t3.approx(CUTOFF);
+    TypeStruct tax = t3.approx2(CUTOFF);
     HashMap<Type,Integer> ds2 = tax.depth(alias0);
     assertEquals(CUTOFF-1,TypeStruct.max(alias0,ds2));
     TypeMemPtr txp1 = (TypeMemPtr)tax.at(0);
@@ -179,7 +178,7 @@ public class TestApprox {
     // collapse redundant ptrs to t1, and MEET t0-tail and t1-tail
     // t3[,98] -> p2 -> t2[,99] -> {p0,p1} -> t1[,{flt&int}] -> {p0,p1}
 
-    TypeStruct tax = t3.approx(CUTOFF);
+    TypeStruct tax = t3.approx2(CUTOFF);
     TypeMemPtr p3 = TypeMemPtr.make(alias0,tax);
 
     HashMap<Type,Integer> ds2 = tax.depth(alias0);
@@ -203,7 +202,7 @@ public class TestApprox {
     TypeStruct t4 = TypeStruct.make(flds,new Type[]{p3,TypeInt.con(97)},finals,alias0);
     ds = t4.depth(alias0);
     assertEquals(CUTOFF,(int)ds.get(txs2)); // Structure too deep
-    TypeStruct tax4 = t4.approx(CUTOFF);
+    TypeStruct tax4 = t4.approx2(CUTOFF);
 
     ds2 = tax4.depth(alias0);
     assertEquals(CUTOFF-1,TypeStruct.max(alias0,ds2));
@@ -319,7 +318,7 @@ public class TestApprox {
     assertEquals(3,TypeStruct.max(alias0,depths));
 
     // Approximate
-    TypeStruct zsa0 = a0.approx(3);
+    TypeStruct zsa0 = a0.approx2(3);
 
     // Check sanity!
     // Was: A0 -> (X0 <-> X1) -> A1 -> X2 -> A2 -> (X3 <->  X4) -> A3 -> X5
@@ -444,7 +443,7 @@ public class TestApprox {
     assertEquals(3,TypeStruct.max(alias,depths));
 
     // Approximate
-    TypeStruct z1 = x1.approx(3);
+    TypeStruct z1 = x1.approx2(3);
     assertSame( TypeInt.con(1), z1._ts[0]);
     TypeMemPtr p2 = (TypeMemPtr)z1._ts[1] ;
     TypeMemPtr p3 = (TypeMemPtr)z1._ts[2] ;

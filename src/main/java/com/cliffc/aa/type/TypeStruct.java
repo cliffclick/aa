@@ -474,21 +474,131 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return u;
   }
 
-  // This is a struct that has grown 'too deep'.
 
-  // TODO: CNC: Really close.  Too "strong", in that the approx keeps too much
-  // "shape" for Types unrelated to the main alias - allowing unlimited cloning
-  // of other alias types, making THEIR structure exceed cutoff depth.  The final
-  // result is not also "isa" the original because of the extra precision.
-  //
-  // TODO: Plan D?  Approx does a parallel walk of old/new mapping to a new
-  // structure which is strictly a subtype of the original.  The 'new' remains
-  // a 'meet' of all reachable too-deep from EACH cutoff 'old'.  Need to map
-  // both old/new walkers to the meet (same as 'meet' does).  in the new
-  // structure.  Some walks (either from left side or right side) can take a
-  // nil on one side but not the other; in this case the 'nil' side does not
-  // contribute - but we walk the full other side.
-  
+  // This is for a struct that has grown 'too deep', and needs to be
+  // approximated to avoid infinite growth.
+  public TypeStruct approx2( int cutoff ) {
+    int alias = _news.getbit();   // Must only be 1 alias at top level
+    RECURSIVE_MEET++;
+    TypeStruct apx = (TypeStruct)ax_impl( new HashMap<>(), alias, cutoff, 0, this, this );
+    // Remove/replace the not-interned parts with any interned parts
+    Ary<Type> reaches;
+    while( check_interned(reaches=apx.reachable()) )
+      apx = (TypeStruct)shrink( new HashMap<>(), apx);
+    --RECURSIVE_MEET;
+
+    assert check_uf(reaches);
+    return apx.install_cyclic(reaches);
+  }
+
+  // Walk a left type path (the original unchanged and too large path), and
+  // build an approximation at the same time.  The approximation is cutoff at
+  // depth.  Keep a mapping from the original to the approximation, and track
+  // the last old Type to be used in the approximation when it gets too deep.
+  private static Type ax_impl( HashMap<Type,Type> intern, int alias, int cutoff, int d, TypeStruct dold, Type old ) {
+    assert old.interned();
+    Type rez = intern.get(old);
+    if( rez != null ) return rez; // Been there, done that
+
+    // Walk internal structure, meeting into the approximation
+    switch( old._type ) {
+    case TNAME: {
+      TypeName tname = (TypeName)old;
+      Type nnx = ax_impl(intern,alias,cutoff,d,dold,tname._t);
+      rez = tname.make(nnx);
+      break;
+    }
+    case TMEMPTR: {
+      TypeMemPtr tptr= (TypeMemPtr)old;
+      Type nnx = ax_impl(intern,alias,cutoff,d,dold,tptr._obj);
+      rez = tptr.make((TypeObj)nnx);
+      break;
+    }
+    case TSTRUCT: {             // Structs must break cycles by installing early
+      TypeStruct ts = (TypeStruct)old, rezts;
+      if( ts._news.test(alias) ) { // Depth-increasing struct?
+        if( d==cutoff ) {          // Cannot increase depth any more
+          rez = intern.get(dold);  // Switch to using mapped version of last old path, instead of 'old'
+        } else {                   // Increasing depth
+          d++;                     // Increase depth
+          dold = ts;               // And this is the last TypeStruct seen at this depth
+        }
+      }
+      if( rez == null ) {       // No prior?  Just clone 'old'
+        rez = rezts = malloc(ts._any,ts._flds,new Type[ts._ts.length],ts._finals,ts._news);
+      } else {       // Must do meet of non-recursive parts of ts and rez/rezts
+        rezts = (TypeStruct)rez;
+        rezts._any &= ts._any;
+        if( ts._flds != rezts._flds ) throw AA.unimpl();
+        if( ts._finals != rezts._finals ) throw AA.unimpl();
+        if( ts._news != rezts._news ) throw AA.unimpl();
+      }
+      rezts._hash = rezts.compute_hash();
+      intern.put(old,rezts);    // Install before recursive call, so can hit on self
+      for( int i=0; i<ts._ts.length; i++ ) {
+        Type tax = ax_impl(intern,alias,cutoff,d,dold,ts._ts[i]);
+        if( rezts._ts[i] != null ) {
+          // meet of tax & rezts._ts[i].  Neither are interned.  Bug is on 2nd
+          // breakpoint of Approx3.  The tail 67:{X5,nil,nil} was cloned to
+          // 155:{X5,nil,nil}, which is sitting in rezts[i].  The ax_impl on
+          // the field yields: 153->151:{X3,*152,*A23} and 152:{X4,*151,*A23}.
+          // The standard meet peels an iteration of the 151<->152 cycle.  This
+          // makes the X's go too deep (adds a depth, and its already at or
+          // past limit), and somehow blows the isa relationship).
+          Type foo = tax.meet(rezts._ts[i]);
+          tax = foo;
+        }
+        rezts._ts[i] = tax;
+      }
+      // Do not install rez/rezts for dup-hits on the new structure, as rez/
+      // rezts may yet be MEET again, changing its field names and thus its
+      // hash and equivalence... wait until we're done do MEETs.  Just return.
+      return rez;
+    }
+    default: return old;        // Not recursive, no need to clone
+    }
+
+    Type rez2 = intern.get(rez);
+    if( rez2 != null ) { assert rez2 != rez; rez = rez.free(rez2); }
+    intern.put(old,rez);
+    intern.put(rez,rez);
+    return rez;
+  }
+
+  private static Type shrink( HashMap<TypeStruct,TypeStruct> intern, Type old ) {
+    Type rez = old.intern_lookup();
+    if( rez != null ) return rez; // Already have an interned version (which could be self)
+
+    // Walk internal structure, shrinking as you go
+    switch( old._type ) {
+    case TNAME:   return ((TypeName  )old).make(         shrink(intern,((TypeName  )old)._t  ));
+    case TMEMPTR: return ((TypeMemPtr)old).make((TypeObj)shrink(intern,((TypeMemPtr)old)._obj));
+    case TSTRUCT: {             // Structs must break cycles by installing early
+      TypeStruct ts1 = intern.get(old);    // Check for cyclic new stuff, and return it
+      if( ts1 != null ) return ts1;
+      TypeStruct ts0 = (TypeStruct)old;
+      ts1 = malloc(ts0._any,ts0._flds,new Type[ts0._ts.length],ts0._finals,ts0._news);
+      ts1._hash = ts1.compute_hash();
+      intern.put(ts0,ts1);  // Install before recursive call, so can hit on self
+      // Build the complete (recursive) TypeStruct, with any previously interned children
+      for( int i=0; i<ts0._ts.length; i++ )
+        ts1._ts[i] = shrink(intern,ts0._ts[i]);
+      return ts1;
+    }
+    default:      return old;   // Not recursive, no need to clone
+    }
+  }
+
+  // Walk, looking for prior interned
+  private static boolean check_interned(Ary<Type> reachs) {
+    for( Type t : reachs )
+      if( t.intern_lookup() != null )
+        return true;
+    return false;
+  }
+
+  // This is for a struct that has grown 'too deep', and needs to be
+  // approximated to avoid infinite growth.
   public TypeStruct approx( int cutoff ) {
     // Assert statics cleaned after last pass
     assert RECURSIVE_MEET == 0;
