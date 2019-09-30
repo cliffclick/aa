@@ -1,9 +1,7 @@
 package com.cliffc.aa.type;
 
 import com.cliffc.aa.AA;
-import com.cliffc.aa.util.Ary;
-import com.cliffc.aa.util.SB;
-import com.cliffc.aa.util.VBitSet;
+import com.cliffc.aa.util.*;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Arrays;
@@ -412,7 +410,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     RECURSIVE_MEET++;
     Ary<Type> reaches;
     while( check_uf(reaches = mt.reachable()) )
-      mt = (TypeStruct)shrink( new HashMap<>(), mt );
+      mt = (TypeStruct)shrink( new IHashMap(), mt );
     RECURSIVE_MEET--;
     // This completes 'mt' as the Meet structure.
     return mt.install_cyclic(reaches);
@@ -473,23 +471,23 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public TypeStruct approx( int cutoff ) {
     int alias = _news.getbit();   // Must only be 1 alias at top level
     RECURSIVE_MEET++;
-    HashMap<Type,Type> old2apx = new HashMap<>();
+    IHashMap old2apx = new IHashMap();
     copy(old2apx,this);
 
     // Scan the old copy for elements that are too deep.
     // 'Meet' those into the clone at one layer up.
     ax_impl( old2apx, new VBitSet(), alias, cutoff, 0, this, this );
 
-    TypeStruct apx = (TypeStruct)old2apx.get(this);
+    TypeStruct apx = old2apx.get(this);
     Ary<Type> reaches;
     while( check_uf(reaches = apx.reachable()) )
-      apx = (TypeStruct)shrink( new HashMap<>(), apx );
+      apx = (TypeStruct)shrink( new IHashMap(), apx );
     RECURSIVE_MEET--;
     assert !check_interned(reaches);
     return apx.install_cyclic(reaches);
   }
 
-  private static void ax_impl( HashMap<Type,Type> old2apx, VBitSet bs, int alias, int cutoff, int d, TypeStruct dold, Type old ) {
+  private static void ax_impl( IHashMap old2apx, VBitSet bs, int alias, int cutoff, int d, TypeStruct dold, Type old ) {
     if( bs.tset(old._uid) ) return; // Been there, done that
     assert old.interned();
 
@@ -501,11 +499,11 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       TypeStruct ts = (TypeStruct)old;
       if( ts._news.test(alias) ) { // Depth-increasing struct?
         if( d==cutoff ) {          // Cannot increase depth any more
-          TypeStruct nts = ((TypeStruct)old2apx.get(dold)).ufind();
-          TypeStruct xts = ((TypeStruct)old2apx.get( old)).ufind();
+          TypeStruct nts = old2apx.get(dold).ufind();
+          TypeStruct xts = old2apx.get( ts ).ufind();
           xts.union(nts);
           old2apx.put(dold,nts); // Update after ufind
-          old2apx.put( old,nts); // Update after union
+          old2apx.put( ts ,nts); // Update after union
           ax_meet(new VBitSet(), nts,old);
           return;
         }
@@ -586,7 +584,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     }
   }
 
-  private Type copy(HashMap<Type,Type> old2apx, Type t ) {
+  private Type copy(IHashMap old2apx, Type t ) {
     Type tn = old2apx.get(t);
     if( tn != null ) return tn; // Been there, done that
 
@@ -618,7 +616,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return tn;
   }
 
-  private static Type shrink( HashMap<Type,Type> intern, Type old ) {
+  private static Type shrink( IHashMap intern, Type old ) {
     assert !(old instanceof TypeStruct && ((TypeStruct)old)._uf != null);
     Type rez = old.intern_lookup();
     if( rez != null ) return rez; // Already have an interned version (which could be self)
@@ -638,7 +636,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     case TSTRUCT: {             // Structs must break cycles by installing early
       TypeStruct ts0 = (TypeStruct)old;
       ts0 = ts0.ufind();
-      TypeStruct ts1 = (TypeStruct)intern.get(ts0); // Check for cyclic new stuff, and return it
+      TypeStruct ts1 = intern.get(ts0); // Check for cyclic new stuff, and return it
       if( ts1 != null ) return ts1;
       ts1 = malloc(ts0._any,ts0._flds,new Type[ts0._ts.length],ts0._finals,ts0._news);
       ts1._hash = ts1.compute_hash();
@@ -692,10 +690,10 @@ public class TypeStruct extends TypeObj<TypeStruct> {
 
   // Walk, looking for not-minimal.  Happens during 'approx' which might
   // require running several rounds of 'replace' to fold everything up.
-  private static boolean check_uf(Ary<Type> reachs) {
+  private static boolean check_uf(Ary<Type> reaches) {
     int err=0;
     HashMap<Type,Type> ss = new HashMap<>();
-    for( Type t : reachs ) {
+    for( Type t : reaches ) {
       Type tt;
       if( ss.get(t) != null || // Found unresolved dup; ts0.equals(ts1) but ts0!=ts1
           ((tt = t.intern_lookup()) != null && tt != t) ||
@@ -860,10 +858,11 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     for( Type t2 : _ts) if( t2==t || t2.contains(t,bs) ) return true;
     return false;
   }
+  // Not currently correct... needs e.g. shortest-path algo
   @Override int depth( VBitSet bs ) {
     if( _cyclic ) return 9999;
     if( bs==null ) bs=new VBitSet();
-    if( bs.get(_uid) ) return 0;
+    if( bs.tset(_uid) ) return 0;
     int max=0;
     for( Type t : _ts) max = Math.max(max,t.depth(bs));
     return max+1;
