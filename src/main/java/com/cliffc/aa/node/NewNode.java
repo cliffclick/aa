@@ -3,8 +3,6 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 
-import java.util.HashMap;
-
 // TODO: fix recursive types
 //
 // Types are extended via NewNode; TypeStructs only created here - but merged
@@ -89,14 +87,9 @@ public class NewNode extends Node {
     // than CUTOFF deep, and fold the deepest ones onto themselves to limit the
     // type depth.  If this happens, the types become recursive with the
     // approximations happening at the deepest points.
-    
-    //TypeStruct res = newt.approx3(CUTOFF);
-    throw com.cliffc.aa.AA.unimpl();
-
-
-    
-    //TypeObj res = _obj instanceof TypeName ? ((TypeName)_obj).make(newt) : newt;
-    //return TypeMemPtr.make(_alias,res);
+    TypeStruct res = newt.approx3(CUTOFF);
+    TypeObj res2 = _obj instanceof TypeName ? ((TypeName)_obj).make(newt) : newt;
+    return TypeMemPtr.make(_alias,res2);
   }
 
   // NewNodes can participate in cycles, where the same structure is appended
