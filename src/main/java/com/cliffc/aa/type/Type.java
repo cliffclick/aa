@@ -90,7 +90,7 @@ import java.util.function.Predicate;
 
 public class Type<T extends Type<T>> implements Cloneable {
   static private int CNT=1;
-  final int _uid=CNT++;  // Unique ID, will have gaps, used to uniquely order Types in Unions
+  int _uid=CNT++; // Unique ID, will have gaps, used to uniquely order Types in Unions
   public int _hash;      // Hash for this Type; built recursively
   byte _type;            // Simple types use a simple enum
   boolean _cyclic;       // Part of a type cycle
@@ -743,7 +743,12 @@ public class Type<T extends Type<T>> implements Cloneable {
     throw new RuntimeException("Should not reach here: internal type system error with "+this+(t==null?"":(" and "+t)));
   }
   protected Type clone() {
-    try { return (Type)super.clone(); }
+    try {
+      Type t = (Type)super.clone();
+      t._uid = CNT++;
+      t._dual = null;
+      return t;
+    }
     catch( CloneNotSupportedException cns ) { throw new RuntimeException(cns); }
   }
 }

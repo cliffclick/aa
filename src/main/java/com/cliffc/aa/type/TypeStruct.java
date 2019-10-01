@@ -408,9 +408,9 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     // Remove any final UF before installation.
     // Do not install until the cycle is complete.
     RECURSIVE_MEET++;
-    Ary<Type> reaches;
-    while( check_uf(reaches = mt.reachable()) )
-      mt = (TypeStruct)shrink( new IHashMap(), mt );
+    Ary<Type> reaches = mt.reachable();
+    mt = shrink(mt.reachable(),mt);
+    assert check_uf(reaches = mt.reachable());
     RECURSIVE_MEET--;
     // This completes 'mt' as the Meet structure.
     return mt.install_cyclic(reaches);
@@ -478,12 +478,12 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     // Scan the old copy for elements that are too deep.
     // 'Meet' those into the clone at one layer up.
     ax_impl( old2apx, new VBitSet(), alias, cutoff, 0, this, this );
-
     TypeStruct apx = old2apx.get(this);
-    while( check_uf(reaches = apx.reachable()) )
-      apx = (TypeStruct)shrink( new IHashMap(), apx );
-    RECURSIVE_MEET--;
+    // Remove any leftover internal duplication
+    apx = shrink(apx.reachable(),apx);
+    assert check_uf(reaches = apx.reachable());
     assert !check_interned(reaches);
+    RECURSIVE_MEET--;
     return apx.install_cyclic(reaches);
   }
 
@@ -609,44 +609,67 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   }
   private <T> T getx(IHashMap old2apx, T t) { T x = old2apx.get(t); return x==null ? t : x; }
 
-  private static Type shrink( IHashMap intern, Type old ) {
-    assert !(old instanceof TypeStruct && ((TypeStruct)old)._uf != null);
-    Type rez = old.intern_lookup();
-    if( rez != null ) return rez; // Already have an interned version (which could be self)
-    rez = intern.get(old);        // Been here, done that?
-    if( rez != null ) return rez;
+  // Walk an existing, not-interned, structure.  Stop at any interned leaves.
+  // Check for duplicating an interned Type or a UF hit, and use that instead.
+  private static TypeStruct shrink( Ary<Type> reaches, TypeStruct tstart ) {
+    HashMap<Integer,Type> uf = new HashMap<>();
+    IHashMap dups = new IHashMap();
+    for( Type t : reaches )
+      if( t instanceof TypeStruct && ((TypeStruct)t)._uf != null )
+        uf.put(t._uid,((TypeStruct)t).ufind());
 
+    // Need back-edges to do this iteratively in 1 pass.
+    boolean progress = true;
+    while( progress ) {
+      progress = false;
+      dups.clear();
+      for( Type t : reaches ) {
+        Type t0 = ufind(uf,t);
+        Type t1 = t0.intern_lookup();
+        if( t1==null ) t1 = dups.get(t0);
+        if( t1 == t0 ) continue; // This one is already interned
+        if( t1 != null ) { progress = union(uf,t0,t1); continue; }
 
-    // Walk internal structure, shrinking as you go
-    switch( old._type ) {
-    case TNAME: throw AA.unimpl();
-    case TMEMPTR:
-      TypeMemPtr nptr = (TypeMemPtr)old;
-      TypeObj nto = nptr._obj;
-      if( nto instanceof TypeStruct ) nptr._obj = nto = ((TypeStruct)nto).ufind();
-      rez = ((TypeMemPtr)old).make((TypeObj)shrink(intern,nto));
-      break;
-    case TSTRUCT: {             // Structs must break cycles by installing early
-      TypeStruct ts0 = (TypeStruct)old;
-      ts0 = ts0.ufind();
-      TypeStruct ts1 = intern.get(ts0); // Check for cyclic new stuff, and return it
-      if( ts1 != null ) return ts1;
-      ts1 = malloc(ts0._any,ts0._flds,new Type[ts0._ts.length],ts0._finals,ts0._news);
-      ts1._hash = ts1.compute_hash();
-      intern.put(ts0,ts1);  // Install before recursive call, so can hit on self
-      // Build the complete (recursive) TypeStruct, with any previously interned children
-      for( int i=0; i<ts0._ts.length; i++ )
-        ts1._ts[i] = shrink(intern,ts0._ts[i]);
-      rez = ts1;
-      break;
+        switch( t._type ) {
+        case TNAME:
+          TypeName tn = (TypeName)t0;  Type t3 = tn._t;
+          progress |= (t3 != (tn._t = ufind(uf,t3)));
+          break;
+        case TMEMPTR:
+          TypeMemPtr tm = (TypeMemPtr)t0;  TypeObj t4 = tm._obj;
+          progress |= (t4 != (tm._obj = ufind(uf,t4)));
+          break;
+        case TSTRUCT:
+          TypeStruct ts = (TypeStruct)t0;
+          for( int i=0; i<ts._ts.length; i++ ) {
+            Type tf = ts._ts[i];
+            progress |= (tf != (ts._ts[i] = ufind(uf,tf)));
+          }
+          break;
+        default: break;
+        }
+        dups.put(t0);
+      }
     }
-    default: return old;        // Not recursive, no need to clone
-    }
-    Type rez2 = intern.get(rez);
-    if( rez2 != null ) return rez2;
-    intern.put(old,rez);
-    intern.put(rez,rez);
-    return rez;
+    return ufind(uf,tstart);
+  }
+  @SuppressWarnings("unchecked")
+  private static <T extends Type> T ufind(HashMap<Integer,Type> uf, T t) {
+    T t0 = (T)uf.get(t._uid), tu;
+    if( t0 == null ) return t;  // One step, hit end of line
+    // Find end of U-F line
+    while( (tu = (T)uf.get(t0._uid)) != null ) t0=tu;
+    // Set whole line to 1-step end of line
+    while( (tu = (T)uf.get(t ._uid)) != null ) { assert t._uid != t0._uid; uf.put(t._uid,t0); t=tu; }
+    return t0;
+  }
+  private static <T extends Type> boolean union(HashMap<Integer,Type> uf, T tnew, T told) {
+    assert !tnew.interned();
+    assert uf.get(tnew._uid)==null && uf.get(told._uid)==null;
+    assert tnew != told;
+    assert tnew._uid != told._uid;
+    uf.put(tnew._uid,told);
+    return true;
   }
 
   // Walk, looking for prior interned
@@ -660,7 +683,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // Reachable collection of TypeMemPtr, TypeName and TypeStruct.
   // Optionally keep interned Types.  List is pre-order.
   Ary<Type> reachable() { return reachable(false); }
-  Ary<Type> reachable(boolean keep) {
+  private Ary<Type> reachable( boolean keep ) {
     Ary<Type> work = new Ary<>(new Type[1],0);
     push(work, keep, this);
     int idx=0;
@@ -695,7 +718,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
         err++;
       ss.put(t,t);
     }
-    return err != 0;
+    return err == 0;
   }
 
   // Get BitSet of not-interned cyclic bits
