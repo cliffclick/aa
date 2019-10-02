@@ -194,6 +194,15 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     int idx = idx(i);
     return idx < _bits.length && test(_bits, i);
   }
+  // Test if this bit, or any parent of this bit, is set
+  public boolean test_recur(int i) {
+    if( test(i) ) return true;
+    Tree<B> tree = tree();
+    while( (i = tree.parent(i)) != 0 )
+      if( test(i) )
+        return true;
+    return false;
+  }
 
   // Return the type without a nil-choice.  Only applies to above_center types,
   // as these are the only types with a nil-choice.  Only called during meets

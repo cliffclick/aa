@@ -409,8 +409,9 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     // Do not install until the cycle is complete.
     RECURSIVE_MEET++;
     Ary<Type> reaches = mt.reachable();
-    mt = shrink(mt.reachable(),mt);
-    assert check_uf(reaches = mt.reachable());
+    NonBlockingHashMapLong<Type> uf = new NonBlockingHashMapLong<>();
+    mt = shrink(mt.reachable(),uf,mt);
+    assert check_uf(reaches = mt.reachable(),uf);
     RECURSIVE_MEET--;
     // This completes 'mt' as the Meet structure.
     return mt.install_cyclic(reaches);
@@ -477,111 +478,102 @@ public class TypeStruct extends TypeObj<TypeStruct> {
 
     // Scan the old copy for elements that are too deep.
     // 'Meet' those into the clone at one layer up.
-    ax_impl( old2apx, new VBitSet(), alias, cutoff, 0, this, this );
+    NonBlockingHashMapLong<Type> uf = new NonBlockingHashMapLong<>();
+    ax_impl( old2apx, new VBitSet(), uf, alias, cutoff, 0, this, this );
     TypeStruct apx = old2apx.get(this);
     // Remove any leftover internal duplication
-    apx = shrink(apx.reachable(),apx);
-    assert check_uf(reaches = apx.reachable());
+    apx = shrink(apx.reachable(),uf,apx);
+    assert check_uf(reaches = apx.reachable(),uf);
     assert !check_interned(reaches);
     RECURSIVE_MEET--;
     return apx.install_cyclic(reaches);
   }
 
-  private static void ax_impl( IHashMap old2apx, VBitSet bs, int alias, int cutoff, int d, TypeStruct dold, Type old ) {
+  private static void ax_impl( IHashMap old2apx, VBitSet bs, NonBlockingHashMapLong<Type> uf, int alias, int cutoff, int d, TypeStruct dold, Type old ) {
     if( bs.tset(old._uid) ) return; // Been there, done that
     assert old.interned();
 
     // Walk internal structure, meeting into the approximation
     switch( old._type ) {
-    case TNAME  : ax_impl(old2apx,bs,alias,cutoff,d,dold,((TypeName  )old)._t  ); break;
-    case TMEMPTR: ax_impl(old2apx,bs,alias,cutoff,d,dold,((TypeMemPtr)old)._obj); break;
+    case TNAME  : ax_impl(old2apx,bs,uf,alias,cutoff,d,dold,((TypeName  )old)._t  ); break;
+    case TMEMPTR: ax_impl(old2apx,bs,uf,alias,cutoff,d,dold,((TypeMemPtr)old)._obj); break;
     case TSTRUCT:
       TypeStruct ts = (TypeStruct)old;
-      if( ts._news.test(alias) ) { // Depth-increasing struct?
+      if( ts._news.test_recur(alias) ) { // Depth-increasing struct?
         if( d==cutoff ) {          // Cannot increase depth any more
-          TypeStruct nts = old2apx.get(dold).ufind();
-          TypeStruct xts = old2apx.get( ts ).ufind();
-          xts.union(nts);
+          TypeStruct nts = ufind(uf,old2apx.get(dold)); // new version, @depth-1
+          TypeStruct xts = ufind(uf,old2apx.get( ts )); // new version, @depth
+          union(uf,xts,nts);     // Map new versions, mapping @depth to @depth-1
           old2apx.put(dold,nts); // Update after ufind
           old2apx.put( ts ,nts); // Update after union
-          ax_meet(new VBitSet(), nts,old);
+          ax_meet(new BitSetSparse(), uf, nts,old);
           return;
         }
         d++;              // Increase depth
         dold = ts;        // And this is the last TypeStruct seen at this depth
       }
       for( int i=0; i<ts._ts.length; i++ )
-        ax_impl(old2apx,bs,alias,cutoff,d,dold,ts._ts[i]);
+        ax_impl(old2apx,bs,uf,alias,cutoff,d,dold,ts._ts[i]);
       break;
     }
   }
   // Update-in-place 'meet' of pre-allocated new types.  Walk all the old type
   // and meet into the corresponding new type.
-  private static void ax_meet( VBitSet bs, Type t, Type old ) {
-    assert old.interned() && !t.interned();
-    // TODO: Flip switch to switch on 't' not 'old', moves NIL case into TMEMPTR.
+
+  // TODO: UF: pass in old2apx; when used to replace a structual type (losing an
+  // edge to Scalar) remap old2apx to match a scalar.  When calling ax_meet,
+  // return the new type, as well as map old2pax.  The caller needs to update
+  // where it got the called value from.
+  private static Type ax_meet( BitSetSparse bs, NonBlockingHashMapLong<Type> uf, Type nt, Type old ) {
+    assert old.interned();
+    if( nt.interned() ) return nt.meet(old);
+    nt = ufind(uf,nt);
+    if( bs.tset(nt._uid,old._uid) ) return nt; // Been there, done that
+    // Needs to handle ufind the new way, and ditch the old way.
+    
     // TODO: Make a non-recursive "meet into".
     // Meet old into t
-    switch( old._type ) {
-    case TNIL: {
-      if( !(t instanceof TypeMemPtr) ) throw AA.unimpl();
-      TypeMemPtr nptr = (TypeMemPtr)t;
-      nptr._aliases = nptr._aliases.meet_nil();
-      break;
-    }
-    case TSCALAR:
-      if( !(t instanceof TypeMemPtr) ) throw AA.unimpl();
-      // TODO: Really begs for UF on all Types
-      throw AA.unimpl(); // Update nptr to a SCALAR and chop the link
+    switch( nt._type ) {
     case TNAME: {
-      if( bs.tset(old._uid) ) return; // Been there, done that
-      if( !(t instanceof TypeName) ) throw AA.unimpl();
-      TypeName n = (TypeName)old, nn = (TypeName)t;
-      if( !(n._name.equals(nn._name) &&
-            n._depth==nn._depth &&
-            n._lex==nn._lex) )
+      if( !(old instanceof TypeName) ) throw AA.unimpl();
+      TypeName on = (TypeName)old, nn = (TypeName)nt;
+      if( !(on._name.equals(nn._name) &&
+            on._depth ==    nn._depth &&
+            on._lex   ==    nn._lex) )
         throw AA.unimpl();
-      Type nto = nn._t;
-      if( nto instanceof TypeStruct ) nn._t = nto = ((TypeStruct)nto).ufind();
-      if( nto.interned() ) nn._t = nto.meet(n._t);
-      else ax_meet(bs,nto,n._t);
+      nn._t = ax_meet(bs,uf,nn._t,on._t);
       break;
     }
     case TMEMPTR: {
-      if( bs.tset(old._uid) ) return; // Been there, done that
-      if( !(t instanceof TypeMemPtr) ) throw AA.unimpl();
-      TypeMemPtr ptr = (TypeMemPtr)old, nptr = (TypeMemPtr)t;
-      nptr._aliases = nptr._aliases.meet(ptr._aliases);
-      TypeObj nto = nptr._obj;
-      if( nto instanceof TypeStruct ) nptr._obj = nto = ((TypeStruct)nto).ufind();
-      if( nto.interned() ) nptr._obj = (TypeObj)nto.meet(ptr._obj);
-      else ax_meet(bs,nto,ptr._obj);
+      TypeMemPtr nptr = (TypeMemPtr)nt;
+      if( old == Type.NIL ) { nptr._aliases = nptr._aliases.meet_nil();  break; }
+      if( old == Type.SCALAR )
+        return union(uf,nt,old); // Result is a scalar, which changes the structure of the new types.
+      if( !(old instanceof TypeMemPtr) ) throw AA.unimpl();
+      TypeMemPtr optr = (TypeMemPtr)old;
+      nptr._aliases = nptr._aliases.meet(optr._aliases);
+      nptr._obj = (TypeObj)ax_meet(bs,uf,nptr._obj,optr._obj);
       break;
     }
     case TSTRUCT:
-      if( bs.tset(old._uid) ) return; // Been there, done that
-      if( !(t instanceof TypeStruct) ) throw AA.unimpl();
-      TypeStruct ts = (TypeStruct)old, nts = (TypeStruct)t;
+      if( !(old instanceof TypeStruct) ) throw AA.unimpl();
+      TypeStruct ots = (TypeStruct)old, nts = (TypeStruct)nt;
       assert nts._uf==null;     // Already handled by the caller
       // Meet all the non-recursive parts
-      if( nts._ts.length != ts._ts.length ) throw AA.unimpl();
-      nts._any &= ts._any;
-      for( int i=0; i<ts._ts.length; i++ ) {
-        nts._flds[i] = smeet(nts._flds[i],ts._flds[i]); // Set the Meet of field names
-        nts._finals[i] |= ts._finals[i];
+      if( nts._ts.length != ots._ts.length ) throw AA.unimpl();
+      nts._any &= ots._any;
+      for( int i=0; i<nts._ts.length; i++ ) {
+        nts._flds[i] = smeet(nts._flds[i],ots._flds[i]); // Set the Meet of field names
+        nts._finals[i] |= ots._finals[i];
       }
-      nts._news = nts._news.meet(ts._news);
+      nts._news = nts._news.meet(ots._news);
       // Now recursively do all fields
-      for( int i=0; i<ts._ts.length; i++ ) {
-        Type  tf =  ts._ts[i];
-        Type ntf = nts._ts[i];
-        assert !(ntf instanceof TypeStruct);
-        if( ntf.interned() ) nts._ts[i] = ntf.meet(tf);
-        else ax_meet(bs,ntf,tf);
-      }
+      for( int i=0; i<ots._ts.length; i++ )
+        nts._ts[i] = ax_meet(bs,uf,nts._ts[i],ots._ts[i]);
       break;
     default: throw AA.unimpl();
     }
+    return nt;
   }
 
   private void copy(IHashMap old2apx, Ary<Type> reaches ) {
@@ -611,8 +603,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
 
   // Walk an existing, not-interned, structure.  Stop at any interned leaves.
   // Check for duplicating an interned Type or a UF hit, and use that instead.
-  private static TypeStruct shrink( Ary<Type> reaches, TypeStruct tstart ) {
-    HashMap<Integer,Type> uf = new HashMap<>();
+  private static TypeStruct shrink( Ary<Type> reaches, NonBlockingHashMapLong<Type> uf, TypeStruct tstart ) {
     IHashMap dups = new IHashMap();
     for( Type t : reaches )
       if( t instanceof TypeStruct && ((TypeStruct)t)._uf != null )
@@ -628,7 +619,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
         Type t1 = t0.intern_lookup();
         if( t1==null ) t1 = dups.get(t0);
         if( t1 == t0 ) continue; // This one is already interned
-        if( t1 != null ) { progress = union(uf,t0,t1); continue; }
+        if( t1 != null ) { union(uf,t0,t1); progress = true; continue; }
 
         switch( t._type ) {
         case TNAME:
@@ -654,7 +645,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return ufind(uf,tstart);
   }
   @SuppressWarnings("unchecked")
-  private static <T extends Type> T ufind(HashMap<Integer,Type> uf, T t) {
+  private static <T extends Type> T ufind(NonBlockingHashMapLong<Type> uf, T t) {
     T t0 = (T)uf.get(t._uid), tu;
     if( t0 == null ) return t;  // One step, hit end of line
     // Find end of U-F line
@@ -663,13 +654,13 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     while( (tu = (T)uf.get(t ._uid)) != null ) { assert t._uid != t0._uid; uf.put(t._uid,t0); t=tu; }
     return t0;
   }
-  private static <T extends Type> boolean union(HashMap<Integer,Type> uf, T tnew, T told) {
-    assert !tnew.interned();
-    assert uf.get(tnew._uid)==null && uf.get(told._uid)==null;
-    assert tnew != told;
-    assert tnew._uid != told._uid;
-    uf.put(tnew._uid,told);
-    return true;
+  private static <T extends Type> T union(NonBlockingHashMapLong<Type> uf, T lost, T kept) {
+    assert !lost.interned();
+    assert uf.get(lost._uid)==null && uf.get(kept._uid)==null;
+    assert lost != kept;
+    assert lost._uid != kept._uid;
+    uf.put(lost._uid,kept);
+    return kept;
   }
 
   // Walk, looking for prior interned
@@ -707,14 +698,15 @@ public class TypeStruct extends TypeObj<TypeStruct> {
 
   // Walk, looking for not-minimal.  Happens during 'approx' which might
   // require running several rounds of 'replace' to fold everything up.
-  private static boolean check_uf(Ary<Type> reaches) {
+  private static boolean check_uf(Ary<Type> reaches, NonBlockingHashMapLong<Type> uf) {
     int err=0;
     HashMap<Type,Type> ss = new HashMap<>();
     for( Type t : reaches ) {
       Type tt;
       if( ss.get(t) != null || // Found unresolved dup; ts0.equals(ts1) but ts0!=ts1
           ((tt = t.intern_lookup()) != null && tt != t) ||
-          (t instanceof TypeStruct && ((TypeStruct)t)._uf != null) ) // Found unresolved UF
+          (t instanceof TypeStruct && ((TypeStruct)t)._uf != null) || // Found unresolved UF
+          ufind(uf,t) != t )
         err++;
       ss.put(t,t);
     }
@@ -763,7 +755,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
         case TMEMPTR:  t0.push(((TypeMemPtr)t)._obj); break;
         case TSTRUCT:
           TypeStruct ts = (TypeStruct)t;
-          Ary<Type> tx = ts._news.test(alias) ? t1 : t0;
+          Ary<Type> tx = ts._news.test_recur(alias) ? t1 : t0;
           for( Type tf : ts._ts ) tx.push(tf);
           break;
         default: break;
@@ -783,7 +775,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return max;
   }
   private static boolean filter( int alias, Type t ) {
-    return (t instanceof TypeStruct) && ((TypeStruct)t)._news.test(alias);
+    return (t instanceof TypeStruct) && ((TypeStruct)t)._news.test_recur(alias);
   }
 
 
