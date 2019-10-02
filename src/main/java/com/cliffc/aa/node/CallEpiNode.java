@@ -22,7 +22,7 @@ import java.util.BitSet;
 
 public final class CallEpiNode extends Node {
   public CallEpiNode( Node... rets ) { super(OP_CALLEPI,rets); }
-  String xstr() { return (is_copy() ? "x" : "C")+"allEpi"; } // Self short name
+  String xstr() { return ((is_dead() || is_copy()) ? "x" : "C")+"allEpi"; } // Self short name
   public CallNode call() { return (CallNode)in(0); }
 
   @Override public Node ideal(GVNGCM gvn) {

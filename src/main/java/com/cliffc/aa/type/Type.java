@@ -120,6 +120,7 @@ public class Type<T extends Type<T>> implements Cloneable {
   // TypeName) and is used (again only by TypeName) to end cyclic printing.
   // All other 'str()' callers just pass along.
   @Override public final String toString() { return str(null); }
+  //@Override public final String toString() { return dstr(new SB(),null).toString(); }
   String str( VBitSet dups ) { return STRS[_type]; }
   SB dstr( SB sb, VBitSet dups ) { return sb.p(str(dups)); }
 
@@ -742,6 +743,7 @@ public class Type<T extends Type<T>> implements Cloneable {
   RuntimeException typerr(Type t) {
     throw new RuntimeException("Should not reach here: internal type system error with "+this+(t==null?"":(" and "+t)));
   }
+  @SuppressWarnings("unchecked")
   protected Type clone() {
     try {
       Type t = (Type)super.clone();

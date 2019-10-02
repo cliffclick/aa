@@ -28,6 +28,7 @@ public final class RetNode extends Node {
   public int fidx() { return _fidx; }
   // Short self name
   @Override String xstr() {
+    if( is_dead() ) return "Ret";
     FunNode fun = FunNode.find_fidx(_fidx);
     return "Ret_"+(is_copy() ? "!copy!" : (fun==null ? ""+_fidx : fun.name()));
   }
