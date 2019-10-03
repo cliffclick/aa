@@ -76,14 +76,14 @@ public class TypeName extends TypeObj<TypeName> {
     return _name+":"+_t.str(dups);
   }
   @Override SB dstr( SB sb, VBitSet dups ) {
+    sb.p('_').p(_uid);
     if( _depth < 0 ) {          // Only for recursive-type-heads
-      sb.p('_').p(_uid);
       if( dups == null ) dups = new VBitSet();
-      if( dups.tset(_uid) ) return sb.p(_name); // Break recursive cycle
+      if( dups.tset(_uid) ) return sb.p('$'); // Break recursive cycle
     }
     return _t.dstr(sb.p(_name).p(':'),dups);
   }
-  
+
   private static TypeName FREE=null;
   @Override protected TypeName free( TypeName ret ) { FREE=this; return ret; }
   private static TypeName make0( String name, HashMap<String,Type> lex, Type t, short depth) {

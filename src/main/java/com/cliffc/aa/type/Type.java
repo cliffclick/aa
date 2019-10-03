@@ -749,6 +749,7 @@ public class Type<T extends Type<T>> implements Cloneable {
       Type t = (Type)super.clone();
       t._uid = CNT++;
       t._dual = null;
+      t._hash = 0;
       return t;
     }
     catch( CloneNotSupportedException cns ) { throw new RuntimeException(cns); }

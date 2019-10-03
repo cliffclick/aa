@@ -518,15 +518,12 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     }
   }
   // Update-in-place 'meet' of pre-allocated new types.  Walk all the old type
-  // and meet into the corresponding new type.
-
-  // TODO: UF: pass in old2apx; when used to replace a structual type (losing an
-  // edge to Scalar) remap old2apx to match a scalar.  When calling ax_meet,
-  // return the new type, as well as map old2pax.  The caller needs to update
-  // where it got the called value from.
+  // and meet into the corresponding new type.  Changes the internal edges of
+  // the new types, so their hash remains undefined.
   private static Type ax_meet( BitSetSparse bs, NonBlockingHashMapLong<Type> uf, Type nt, Type old ) {
     assert old.interned();
     if( nt.interned() ) return nt.meet(old);
+    assert nt._hash==0;         // Not definable yet
     nt = ufind(uf,nt);
     if( bs.tset(nt._uid,old._uid) ) return nt; // Been there, done that
     // Needs to handle ufind the new way, and ditch the old way.
@@ -576,9 +573,13 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return nt;
   }
 
+  // Clone everything in reaches.  Do not set the hashes in the clones, as they
+  // have their internal structures modified.
   private void copy(IHashMap old2apx, Ary<Type> reaches ) {
+    // Clone all the types, making a mapping from the old to the clones.
     for( Type t : reaches )
       old2apx.put(t,t.clone());
+    // Clone all the edges
     for( Type t : reaches ) {
     switch( t._type ) {
     case TNAME  : TypeName   tn = (TypeName  )t;  old2apx.get(tn)._t  = getx(old2apx,tn._t  );  break;
@@ -594,22 +595,24 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     default: throw AA.unimpl(); // Should not reach here
     }
     }
-    for( Type t : reaches ) {
-      Type nt = old2apx.get(t);
-      nt._hash = nt.compute_hash();
-    }
   }
   private <T> T getx(IHashMap old2apx, T t) { T x = old2apx.get(t); return x==null ? t : x; }
 
   // Walk an existing, not-interned, structure.  Stop at any interned leaves.
   // Check for duplicating an interned Type or a UF hit, and use that instead.
+  // Computes the final hash code.
   private static TypeStruct shrink( Ary<Type> reaches, NonBlockingHashMapLong<Type> uf, TypeStruct tstart ) {
     IHashMap dups = new IHashMap();
+    // Structs never change their hash based on field types.  Set their hash first.
     for( Type t : reaches )
-      if( t instanceof TypeStruct && ((TypeStruct)t)._uf != null )
-        uf.put(t._uid,((TypeStruct)t).ufind());
+      if( t instanceof TypeStruct )
+        t._hash = t.compute_hash();
+    for( Type t : reaches ) // TypeName, TypeMemPtr hash changes based on field contents.
+      if( !(t instanceof TypeStruct) )
+        set_hash(t);
 
-    // Need back-edges to do this iteratively in 1 pass.
+    // Need back-edges to do this iteratively in 1 pass.  This algo just sweeps
+    // until no more progress, but with generic looping instead of recursion.
     boolean progress = true;
     while( progress ) {
       progress = false;
@@ -622,15 +625,17 @@ public class TypeStruct extends TypeObj<TypeStruct> {
         if( t1 != null ) { union(uf,t0,t1); progress = true; continue; }
 
         switch( t._type ) {
-        case TNAME:
+        case TNAME:             // Update TypeName internal field
           TypeName tn = (TypeName)t0;  Type t3 = tn._t;
-          progress |= (t3 != (tn._t = ufind(uf,t3)));
+          if( (tn._t = pre_mod(tn,uf,dups,t3)) != t3 )
+            progress |= post_mod(tn,dups);
           break;
-        case TMEMPTR:
+        case TMEMPTR:           // Update TypeMemPtr internal field
           TypeMemPtr tm = (TypeMemPtr)t0;  TypeObj t4 = tm._obj;
-          progress |= (t4 != (tm._obj = ufind(uf,t4)));
+          if( (tm._obj = pre_mod(tm,uf,dups,t4)) != t4 )
+            progress |= post_mod(tm,dups);
           break;
-        case TSTRUCT:
+        case TSTRUCT:           // Update all TypeStruct fields
           TypeStruct ts = (TypeStruct)t0;
           for( int i=0; i<ts._ts.length; i++ ) {
             Type tf = ts._ts[i];
@@ -644,6 +649,28 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     }
     return ufind(uf,tstart);
   }
+
+  private static <T extends Type> T pre_mod(Type t, NonBlockingHashMapLong<Type> uf, IHashMap dups, T tf) {
+    T tu = ufind(uf,tf);
+    if( tu == tf ) return tf;   // No change
+    dups.remove(t);   // Remove before field update changes equals(),hashCode()
+    return tu;
+  }
+  // Set hash after field mod, and re-install in dups
+  private static boolean post_mod(Type t, IHashMap dups) {
+    t._hash = t.compute_hash();
+    dups.put(t);
+    return true;
+  }
+
+  // Note the difference from compute_hash
+  private static void set_hash(Type t) {
+    if( t._hash != 0 ) return;
+    set_hash(t instanceof TypeName ? ((TypeName)t)._t : ((TypeMemPtr)t)._obj);
+    t._hash = t.compute_hash();
+  }
+
+  
   @SuppressWarnings("unchecked")
   private static <T extends Type> T ufind(NonBlockingHashMapLong<Type> uf, T t) {
     T t0 = (T)uf.get(t._uid), tu;
