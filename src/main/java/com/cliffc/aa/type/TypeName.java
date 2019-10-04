@@ -37,10 +37,10 @@ public class TypeName extends TypeObj<TypeName> {
   public  String _name;
   public  HashMap<String,Type> _lex; // Lexical scope of this named type
   public  Type _t;                   // Named type
-  public  short _depth; // Nested depth of TypeNames, or -1/ for a forward-ref type-var, -2 for type-cycle head
+  public  short _depth;              // Nested depth of TypeNames
   // Named type variable
   private TypeName ( String name, HashMap<String,Type> lex, Type t, short depth ) { super(TNAME,false); init(name,lex,t,depth); }
-  private void init( String name, HashMap<String,Type> lex, Type t, short depth ) { super.init(TNAME,false); assert name!=null && lex !=null; _name=name; _lex=lex; _t=t; _depth = depth; }
+  private void init( String name, HashMap<String,Type> lex, Type t, short depth ) { super.init(TNAME,false); assert name!=null && lex !=null; _name=name; _lex=lex; _t=t; _depth = depth; assert depth >= -1; }
   private static short depth( Type t ) { return(short)(t instanceof TypeName ? ((TypeName)t)._depth+1 : 0); }
   // Hash does not depend on other types.
   // No recursion on _t to break type cycles
@@ -49,61 +49,36 @@ public class TypeName extends TypeObj<TypeName> {
     if( this==o ) return true;
     if( !(o instanceof TypeName) ) return false;
     TypeName t2 = (TypeName)o;
-    if( _lex != t2._lex  || !_name.equals(t2._name) || _t!=t2._t ) return false;
-    if( _depth==t2._depth ) return true;
-    // Also return true for comparing TypeName(name,type) where the types
-    // match, but the 'this' TypeName is depth 0 vs depth -1 - this detects
-    // simple cycles and lets the interning close the loop.
-    return (t2._depth<0 ? 0 : t2._depth) == (_depth<0 ? 0 :_depth);
+    return _lex == t2._lex && _name.equals(t2._name) && _t==t2._t && _depth == t2._depth;
   }
   @Override public boolean cycle_equals( Type o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeName) ) return false;
     TypeName t2 = (TypeName)o;
-    if( _lex != t2._lex  || !_name.equals(t2._name) ) return false;
-    if( _t!=t2._t && !_t.cycle_equals(t2._t) ) return false;
-    if( _depth==t2._depth ) return true;
-    // Also return true for comparing TypeName(name,type) where the types
-    // match, but the 'this' TypeName is depth 0 vs depth -1 - this detects
-    // simple cycles and lets the interning close the loop.
-    return (t2._depth<0 ? 0 : t2._depth) == (_depth<0 ? 0 :_depth);
+    if( _lex != t2._lex  || !_name.equals(t2._name) || _depth != t2._depth ) return false;
+    return _t==t2._t || _t.cycle_equals(t2._t);
   }
-  @Override String str( VBitSet dups) {
-    if( _depth < 0 ) {          // Only for recursive-type-heads
-      if( dups == null ) dups = new VBitSet();
-      if( dups.tset(_uid) ) return _name; // Break recursive cycle
-    }
-    return _name+":"+_t.str(dups);
-  }
-  @Override SB dstr( SB sb, VBitSet dups ) {
-    sb.p('_').p(_uid);
-    if( _depth < 0 ) {          // Only for recursive-type-heads
-      if( dups == null ) dups = new VBitSet();
-      if( dups.tset(_uid) ) return sb.p('$'); // Break recursive cycle
-    }
-    return _t.dstr(sb.p(_name).p(':'),dups);
-  }
+  @Override String str( VBitSet dups) { return _name+":"+_t.str(dups); }
+  @Override SB dstr( SB sb, VBitSet dups ) { return _t.dstr(sb.p('_').p(_uid).p(_name).p(':'),dups); }
 
   private static TypeName FREE=null;
   @Override protected TypeName free( TypeName ret ) { FREE=this; return ret; }
-  private static TypeName make0( String name, HashMap<String,Type> lex, Type t, short depth) {
+  public static TypeName make0( String name, HashMap<String,Type> lex, Type t, short depth) {
     TypeName t1 = FREE;
     if( t1 == null ) t1 = new TypeName(name,lex,t,depth);
     else { FREE = null; t1.init(name,lex,t,depth); }
     TypeName t2 = (TypeName)t1.hashcons();
-    // Close some recursions: keep -2 and -1 depths vs 0
-    if( t1._depth < t2._depth )
-      t2._depth = t1._depth;    // keep deeper depth
     return t1==t2 ? t1 : t1.free(t2);
   }
 
   public static TypeName make( String name, HashMap<String,Type> lex, Type t) {
     TypeName tn0 = make0(name,lex,t,depth(t));
     TypeName tn1 = (TypeName)lex.get(name);
-    if( tn1==null || tn1._depth!= -2 || RECURSIVE_MEET>0 ) return tn0;
-    return tn0.make_recur(tn1,0,new VBitSet());
+    if( tn1==null || tn0==tn1 || RECURSIVE_MEET>0 ) return tn0;
+    //return tn0.make_recur(tn1,0,new VBitSet());
+    throw AA.unimpl();
   }
-  public TypeName make( Type t) { return make(_name,_lex,t); }
+  public TypeName make( Type t) { return make0(_name,_lex,t,_depth); }
   public static TypeName make_forward_def_type( String name, HashMap<String,Type> lex ) { return make0(name,lex,TypeStruct.ALLSTRUCT,(short)-1); }
 
           static final HashMap<String,Type> TEST_SCOPE = new HashMap<>();
@@ -136,14 +111,12 @@ public class TypeName extends TypeObj<TypeName> {
       // match on a name, then the result must fall- even if both inner types
       // and names are the same (but high).
       TypeName tn = (TypeName)t;
-      int thisd =    _depth<0 ? 0 :   _depth;
-      int thatd = tn._depth<0 ? 0 : tn._depth;
       // Recursive on depth until depths are equal
-      if( thisd > thatd ) return extend(t);
-      if( thatd > thisd ) return tn.extend(this);
+      if( _depth > tn._depth ) return extend(t);
+      if( tn._depth > _depth ) return tn.extend(this);
       Type mt = _t.meet(tn._t);
       if( _name.equals(tn._name) )   // Equal names?
-        return make(_name,_lex,mt); // Peel name and meet
+        return make(mt);             // Peel name and meet
       // Unequal names
       if( !mt.above_center() ) return mt;
       // Unequal high names... fall to the highest value below-center
@@ -164,7 +137,7 @@ public class TypeName extends TypeObj<TypeName> {
     // Same strategy as TypeStruct and extra fields...
     // short guy high, keep long
     // short guy  low, keep short
-    if( t.above_center() ) return make(_name,_lex,x);
+    if( t.above_center() ) return make(x);
     // Fails lattice if 'x' is a constant because cannot add names...
     // Force 'x' to not be a constant.
     return off_center(x);
@@ -195,7 +168,6 @@ public class TypeName extends TypeObj<TypeName> {
     // Hack type and it's dual.  Type is now recursive.
     _t = t;
     _dual._t = t._dual;
-    _depth = _dual._depth = -2;
     // Flag all as cyclic
     t.mark_cycle(this,new VBitSet(),new BitSet());
     // Back into the INTERN table
@@ -205,20 +177,16 @@ public class TypeName extends TypeObj<TypeName> {
   }
 
   @Override public boolean above_center() { return _t.above_center(); }
-  @Override public boolean may_be_con() { return _depth >= 0 && _t.may_be_con(); }
-  @Override public boolean is_con()   { return _depth >= 0 && _t.is_con(); } // No recursive structure is a constant
+  @Override public boolean may_be_con() { return _t.may_be_con(); }
+  @Override public boolean is_con()   { return _t.is_con(); }
   @Override public double getd  () { return _t.getd  (); }
   @Override public long   getl  () { return _t.getl  (); }
   @Override public String getstr() { return _t.getstr(); }
   @Override public boolean must_nil() { return _t.must_nil(); }
-  @Override Type not_nil() {
-    Type nn = _t.not_nil();
-    //if( !_t.above_center() ) return nn;
-    return make(_name,_lex,nn);
-  }
+  @Override Type not_nil() { return make(_t.not_nil()); }
   // Since meeting an unnamed NIL, end result is never high and never named
   @Override public Type meet_nil() { return _t.meet_nil(); }
-  @Override public TypeObj startype() { return make(_name,_lex,_t.startype()); }
+  @Override public TypeObj startype() { return make(_t.startype()); }
   @Override public byte isBitShape(Type t) {
     if( t instanceof TypeName ) {
       if( ((TypeName)t)._name.equals(_name) ) return _t.isBitShape(((TypeName)t)._t);
@@ -237,7 +205,7 @@ public class TypeName extends TypeObj<TypeName> {
     if( _lex==tn._lex && _name.equals(tn._name) && d++ == D )
       return above_center() ? tn.dual() : tn;
     Type t2 = _t.make_recur(tn,d,bs);
-    return t2==_t ? this : make0(_name,_lex,t2,_depth);
+    return t2==_t ? this : make(t2);
   }
   // Mark if part of a cycle
   @Override void mark_cycle( Type head, VBitSet visit, BitSet cycle ) {
@@ -255,4 +223,5 @@ public class TypeName extends TypeObj<TypeName> {
   @SuppressWarnings("unchecked")
   @Override void walk( Predicate<Type> p ) { if( p.test(this) ) _t.walk(p); }
   @Override TypeStruct repeats_in_cycles(TypeStruct head, VBitSet bs) { return _cyclic ? _t.repeats_in_cycles(head,bs) : null; }
+  @Override TypeObj make_base(TypeStruct obj) { return make(((TypeObj)_t).make_base(obj)); }
 }

@@ -160,9 +160,9 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   final B make( int bit ) { return make_impl(bit,null); }
   // Constructor taking an array of bits
   public final B make( int... bits ) {
-    int max= -1;                // Find max bit
+    int max= 0;                // Find max bit
     for( int bit : bits ) max=Math.max(max,bit);
-    long[] ls = bits(0,max);  // Big enuf bits
+    long[] ls = bits(max);  // Big enuf bits
     for( int bit : bits ) or(ls,bit);
     return make(false,ls);
   }
@@ -170,7 +170,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   private static int  idx (long i) { return (int)(i>>6); }
   private static long mask(long i) { return 1L<<(i&63); }
 
-  public int getbit() { assert _bits==null; return _con; }
+  int getbit() { assert _bits==null; return _con; }
   public int abit() { return _bits==null ? _con : -1; }
   public boolean above_center() { return _con<0; }
   boolean may_nil() { return _con==0 || (_con==-1 && _bits != null && ((_bits[0]&1) == 1)); }
@@ -179,11 +179,13 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   B meet_nil() {
     if( _con==0 ) return (B)this;// Already a nil constant
     long[] bs = _bits;
+    if( _con == -1 && (bs[0]&1)==1 ) // JOIN includes nil?
+      return make(0);                // Return just NIL
     if( bs==null )              // Is a single compressed bit
-      or(bs = bits(0,Math.abs(_con)),Math.abs(_con)); // Decompress single bit into array
+      or(bs = bits(Math.abs(_con)),Math.abs(_con)); // Decompress single bit into array
     else bs = _bits.clone();    // Make a private set
     bs[0] |= 1;                 // Set nil
-    return make(false,bs);
+    return make(false,bs);      // Its below center now, even if the original was above
   }
 
   // Test a specific bit is set or clear on a given bits
@@ -195,7 +197,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     return idx < _bits.length && test(_bits, i);
   }
   // Test if this bit, or any parent of this bit, is set
-  public boolean test_recur(int i) {
+  boolean test_recur( int i ) {
     if( test(i) ) return true;
     Tree<B> tree = tree();
     while( (i = tree.parent(i)) != 0 )
@@ -216,10 +218,26 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     and(bs,0);                           // remove nil choice
     return make(true,bs);                // Choices without nil
   }
+  // Remove the nil bit, but otherwise preserve the type
+  @SuppressWarnings("unchecked")
+  B strip_nil() {
+    if( _bits == null ) return (B)this; // Should not be a nil to remove
+    if( (_bits[0] &1)==0 ) return (B) this; // No nil
+    long[] bs = _bits.clone();
+    bs[0] &= ~1;                // Strip nil
+    return make(_con==-1,bs);
+  }
+  // Ignore nil in 'this', and make both Bits below center, and check 'isa'
+  boolean is_contained(B bs1) {
+    B bs0 = strip_nil();
+    if( bs0.above_center() ) bs0 = bs0.dual();
+    if( bs1.above_center() ) bs1 = bs1.dual();
+    return bs0.isa(bs1);
+  }
 
   private static void or ( long[] bits, long con ) { bits[idx(con)] |=  mask(con); }
   private static void and( long[] bits, long con ) { bits[idx(con)] &= ~mask(con); }
-  private static long[] bits( int a, int b ) { return new long[idx(Math.max(a,b))+1]; }
+  private static long[] bits( int b ) { return new long[idx(b)+1]; }
   int max( ) {
     return _bits==null ? _con : (63 - Long.numberOfLeadingZeros(_bits[_bits.length-1]))+((_bits.length-1)<<6);
   }
@@ -247,8 +265,8 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     if( bits1==null && con1==0 ) return    meet_nil();
 
     // Expand any single bits
-    if( bits0==null ) or(bits0=bits(0,con0), con0);
-    if( bits1==null ) or(bits1=bits(0,con1), con1);
+    if( bits0==null ) or(bits0=bits(con0), con0);
+    if( bits1==null ) or(bits1=bits(con1), con1);
     con0 =    _con < 0 ? -1 : 1;
     con1 = bs._con < 0 ? -1 : 1;
 
@@ -341,6 +359,8 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   public B dual() { return _bits==null && !is_class(Math.abs(_con)) ? (B)this : make_impl(-_con,_bits); }
   // join is defined in terms of meet and dual
   public Bits<B> join(Bits<B> bs) { return dual().meet(bs.dual()).dual(); }
+  // Note no special nil handling; both sides need to either handle nil or not
+  public boolean isa(B bs) { return meet(bs) == bs; }
 
   // Bits are split in a tree like pattern, recorded here.  To avoid rehashing,
   // the exact same tree-split is handed out between tests.  Basically there is

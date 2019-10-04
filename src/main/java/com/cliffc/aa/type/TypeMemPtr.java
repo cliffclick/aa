@@ -4,7 +4,6 @@ import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
 
 import java.util.BitSet;
-import java.util.HashMap;
 import java.util.function.Predicate;
 
 // Pointers-to-memory; these can be both the address and the value part of
@@ -53,16 +52,43 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   private static TypeMemPtr FREE=null;
   @Override protected TypeMemPtr free( TypeMemPtr ret ) { FREE=this; return ret; }
   public static TypeMemPtr make(BitsAlias aliases, TypeObj obj ) {
+    // Canonical form: cannot have a pointer with only NIL allowed... instead
+    // we only use NIL directly.
     assert aliases != BitsAlias.NIL;
+    // Check that a pointer-to-struct does not include more structs than what
+    // is pointed at.
+    Type a2 = obj.base();       // Strip off any 'Names'
+    assert !(a2 instanceof TypeStruct) || aliases.strip_nil()==((TypeStruct)a2)._news;  // Pointing at same set
+
     TypeMemPtr t1 = FREE;
     if( t1 == null ) t1 = new TypeMemPtr(aliases,obj);
     else { FREE = null;          t1.init(aliases,obj); }
     TypeMemPtr t2 = (TypeMemPtr)t1.hashcons();
     return t1==t2 ? t1 : t1.free(t2);
   }
-  public static TypeMemPtr make    ( int alias, TypeObj obj ) { return make(BitsAlias.make0(alias)           ,obj); }
-         static TypeMemPtr make_nil( int alias, TypeObj obj ) { return make(BitsAlias.make0(alias).meet_nil(),obj); }
-  public        TypeMemPtr make    (            TypeObj obj ) { return make(_aliases,obj); }
+  
+  public static TypeMemPtr make( int alias, TypeObj obj ) {
+    BitsAlias aliases = BitsAlias.make0(alias);
+    return make(aliases,narrow_obj(aliases,obj));
+  }
+  static TypeMemPtr make_nil( int alias, TypeObj obj ) {
+    BitsAlias aliases = BitsAlias.make0(alias);
+    return make(aliases.meet_nil(),narrow_obj(aliases,obj));
+  }
+  public TypeMemPtr make(TypeObj obj ) { return make(_aliases,obj); }
+
+  private static TypeObj narrow_obj( BitsAlias aliases, TypeObj obj ) {
+    // Check that a pointer-to-struct does not include more structs than what
+    // is pointed at.
+    Type obj2 = obj.base();                         // Strip off any 'Names'
+    if( !(obj2 instanceof TypeStruct) ) return obj; // No change
+    TypeStruct ts = (TypeStruct)obj2;
+    BitsAlias a0 = aliases.strip_nil();
+    if( a0 == ts._news ) return obj; // All good
+    assert aliases.is_contained(ts._news); // narrow pointer, pointing at wide structure.
+    TypeStruct nts = ts.make(a0); // Make a narrower structure
+    return obj.make_base(nts);    // Rewrap with any 'Name' wrappers
+  }
 
   // Cannot have a NIL here, because a CastNode (JOIN) of a NIL to a "*[4]obj?"
   // yields a TypeMemPtr.NIL instead of a Type.NIL which confuses all ISA tests
@@ -113,7 +139,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     TypeMemPtr ptr = (TypeMemPtr)t;
     BitsAlias aliases = _aliases.meet(ptr._aliases);
     if( aliases == BitsAlias.NIL ) return NIL;
-    return make(aliases, (TypeObj)_obj.meet(ptr._obj));
+    return make(aliases, narrow_obj(aliases,(TypeObj)_obj.meet(ptr._obj)));
   }
   @Override public boolean above_center() { return _aliases.above_center(); }
   // Aliases represent *classes* of pointers and are thus never constants.

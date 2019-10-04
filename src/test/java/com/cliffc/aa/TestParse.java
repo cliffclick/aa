@@ -254,10 +254,10 @@ public class TestParse {
     test("(1,\"abc\").1", TypeMemPtr.ABCPTR);
 
     // Named type variables
-    test("gal=:flt"     , (tmap -> TypeFunPtr.make(BitsFun.make0(35),TypeTuple.make(TypeFlt.FLT64), TypeName.make("gal",tmap,TypeFlt.FLT64))));
-    test("gal=:flt; gal", (tmap -> TypeFunPtr.make(BitsFun.make0(35),TypeTuple.make(TypeFlt.FLT64), TypeName.make("gal",tmap,TypeFlt.FLT64))));
+    test("gal=:flt"     , (tmap -> TypeFunPtr.make(BitsFun.make0(35),TypeTuple.make(TypeFlt.FLT64), TypeName.make0("gal",tmap,TypeFlt.FLT64,(short)0))));
+    test("gal=:flt; gal", (tmap -> TypeFunPtr.make(BitsFun.make0(35),TypeTuple.make(TypeFlt.FLT64), TypeName.make0("gal",tmap,TypeFlt.FLT64,(short)0))));
     test    ("gal=:flt; 3==gal(2)+1", TypeInt.TRUE);
-    test    ("gal=:flt; tank:gal = gal(2)", (tmap -> TypeName.make("gal",tmap,TypeInt.con(2))));
+    test    ("gal=:flt; tank:gal = gal(2)", (tmap -> TypeName.make0("gal",tmap,TypeInt.con(2),(short)0)));
     // test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: figure out if free cast for bare constants?
     testerr ("gal=:flt; tank:gal = gal(2)+1", "3 is not a gal:flt64",29);
 
@@ -576,8 +576,8 @@ c[x]=1;
       assertTrue(te._t instanceof TypeFunPtr);
       TypeFunPtr actual = (TypeFunPtr)te._t;
       TypeStruct from = TypeStruct.make(args);
-      TypeName to = TypeName.make("A",te._env._scope.types(),from);
-      TypeMemPtr inptr = TypeMemPtr.make(BitsAlias.REC,from);
+      TypeName to = TypeName.make0("A",te._env._scope.types(),from,(short)0);
+      TypeMemPtr  inptr = TypeMemPtr.make(BitsAlias.REC,from);
       TypeMemPtr outptr = TypeMemPtr.make(BitsAlias.REC,to);
       TypeFunPtr expected = TypeFunPtr.make(actual.fidxs(),TypeTuple.make(inptr),outptr);
       assertEquals(expected,actual);

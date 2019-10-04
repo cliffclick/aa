@@ -131,7 +131,7 @@ public abstract class PrimNode extends Node {
     add_def(null);              // Control for the primitive in slot 0
     for( int i=0; i<_args.length; i++ )
       add_def(gvn.init(new ParmNode(i,_args[i],fun, gvn.con(_targs.at(i)),null)));
-    
+
     // This is a funny short-cut approximation: really primitives should have a
     // ParmNode of memory that merges all the incoming memories from all
     // resolved call sites.  However, to speed up testing, we do not allow the
@@ -148,9 +148,11 @@ public abstract class PrimNode extends Node {
 static class ConvertTypeName extends PrimNode {
   private final Parse _badargs; // Only for converts
   private final HashMap<String,Type> _lex; // Unique lexical scope
+  private final short _depth;
   ConvertTypeName(Type from, TypeName to, Parse badargs) {
     super(to._name,ARGS1,TypeTuple.make(from),to);
     _lex=to._lex;
+    _depth = to._depth;
     _badargs=badargs;
   }
   @Override public Type value(GVNGCM gvn) {
@@ -160,7 +162,7 @@ static class ConvertTypeName extends PrimNode {
     return apply(ts);     // Apply (convert) even if some args are not constant
   }
   @Override public Type apply( Type[] args ) {
-    TypeName tn = TypeName.make(_name,_lex,args[1]);
+    TypeName tn = TypeName.make0(_name,_lex,args[1],_depth);
     // If args are illegal, the output is still no worse than _ret in either direction
     return _ret.dual().isa(tn) ? (tn.isa(_ret) ? tn : _ret) : _ret.dual();
   }

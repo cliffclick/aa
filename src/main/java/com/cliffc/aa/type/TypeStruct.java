@@ -38,7 +38,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public @NotNull String @NotNull[] _flds;  // The field names
   public Type[] _ts;            // Matching field types
   public byte[] _finals;        // Fields that are final; 1==read-only, 0=r/w
-  private BitsAlias _news;      // NewNode aliases that make this type
+  BitsAlias _news;              // NewNode aliases that make this type
   private TypeStruct _uf;       // Tarjan Union-Find, used during cyclic meet
   private TypeStruct     ( boolean any, String[] flds, Type[] ts, byte[] finals, BitsAlias news) { super(TSTRUCT, any); init(any,flds,ts,finals,news); }
   private TypeStruct init( boolean any, String[] flds, Type[] ts, byte[] finals, BitsAlias news) {
@@ -164,6 +164,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     if( dups.tset(_uid) ) return sb.p('$'); // Break recursive printing cycle
 
     if( _uf!=null ) return _uf.dstr(sb.p("=>"),dups);
+    _news.toString(sb);
     if( _any ) sb.p('~');
     boolean is_tup = _flds.length==0 || fldTop(_flds[0]) || fldBot(_flds[0]);
     if( !is_tup ) sb.p('@');    // Not a tuple
@@ -187,6 +188,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   private static TypeStruct FREE=null;
   @Override protected TypeStruct free( TypeStruct ret ) { FREE=this; return ret; }
   static TypeStruct malloc( boolean any, String[] flds, Type[] ts, byte[] finals, BitsAlias news ) {
+    assert !news.test(0);       // Structs are not nil
     if( FREE == null ) return new TypeStruct(any,flds,ts,finals,news);
     TypeStruct t1 = FREE;  FREE = null;
     return t1.init(any,flds,ts,finals,news);
@@ -202,8 +204,9 @@ public class TypeStruct extends TypeObj<TypeStruct> {
           static String[] FLDS( int len ) { return FLDS[len]; }
   private static String[] flds(String... fs) { return fs; }
   public  static Type[] ts(Type... ts) { return ts; }
-  private static Type[] ts(int n) { Type[] ts = new Type[n]; Arrays.fill(ts,SCALAR); return ts; }
+  private static Type[] ts(int n) { Type[] ts = new Type[n]; Arrays.fill(ts,SCALAR); return ts; } // All Scalar fields
   public  static byte[] bs(Type[] ts) { byte[] bs = new byte[ts.length]; Arrays.fill(bs,(byte)1); return bs; } // All read-only
+  
   public  static TypeStruct make(         Type... ts) { return make(BitsAlias.REC,ts); }
   public  static TypeStruct make(int nnn, Type... ts) { return malloc(false,FLDS[ts.length],ts,bs(ts),BitsAlias.make0(nnn)).hashcons_free(); }
   public  static TypeStruct make(String[] flds, Type... ts) { return malloc(false,flds,ts,bs(ts),BitsAlias.RECBITS).hashcons_free(); }
@@ -222,12 +225,12 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   private static final TypeStruct ARW   = make(flds("a"),ts(TypeFlt.FLT64),new byte[1]);
   public  static final TypeStruct GENERIC = malloc(true,FLD0,new Type[0],new byte[0],BitsAlias.RECBITS).hashcons_free();
           static final TypeStruct ALLSTRUCT = make();
-
-  // Recursive meet in progress
-  private static final HashMap<TypeStruct,TypeStruct> MEETS1 = new HashMap<>(), MEETS2 = new HashMap<>();
-
+  
   static final TypeStruct[] TYPES = new TypeStruct[]{ALLSTRUCT,POINT,X,A,C0,D1,ARW};
 
+  // Make a TypeStruct with a given 'news' from the original
+  TypeStruct make(BitsAlias news) { return make(_flds,_ts,_finals,news);  }
+  
   // Dual the flds, dual the tuple.
   @Override protected TypeStruct xdual() {
     String[] as = new String[_flds.length];
@@ -254,6 +257,9 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     dual._cyclic = _cyclic;
     return dual;
   }
+
+  // Recursive meet in progress
+  private static final HashMap<TypeStruct,TypeStruct> MEETS1 = new HashMap<>(), MEETS2 = new HashMap<>();
 
   // Standard Meet.  Types-meet-Types and fld-meet-fld.  Fld strings can be
   // top/bottom for tuples.  Structs with fewer fields are virtually extended
@@ -486,7 +492,9 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     assert check_uf(reaches = apx.reachable(),uf);
     assert !check_interned(reaches);
     RECURSIVE_MEET--;
-    return apx.install_cyclic(reaches);
+    TypeStruct rez = apx.install_cyclic(reaches);
+    assert this.isa(rez); 
+    return rez;
   }
 
   private static void ax_impl( IHashMap old2apx, VBitSet bs, NonBlockingHashMapLong<Type> uf, int alias, int cutoff, int d, TypeStruct dold, Type old ) {
@@ -499,7 +507,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     case TMEMPTR: ax_impl(old2apx,bs,uf,alias,cutoff,d,dold,((TypeMemPtr)old)._obj); break;
     case TSTRUCT:
       TypeStruct ts = (TypeStruct)old;
-      if( ts._news.test_recur(alias) ) { // Depth-increasing struct?
+      if( BitsAlias.make0(alias).isa(ts._news) ) { // Depth-increasing struct?
         if( d==cutoff ) {          // Cannot increase depth any more
           TypeStruct nts = ufind(uf,old2apx.get(dold)); // new version, @depth-1
           TypeStruct xts = ufind(uf,old2apx.get( ts )); // new version, @depth
@@ -917,4 +925,5 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     for( int i=0; i<ts.length; i++ ) ts[i] = _ts[i].above_center() ? _ts[i] : _ts[i].dual();
     return malloc(true,as,ts,bs,_news.dual()).hashcons_free();
   }
+  @Override TypeStruct make_base(TypeStruct obj) { return obj; }
 }

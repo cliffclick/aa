@@ -191,12 +191,14 @@ public class TestType {
     assertEquals(t0,tss);      // t0.isa(ts0)
 
     // meet @{c:0}? and @{c:@{x:1}?,}
+    int alias0 = BitsAlias.new_alias(BitsAlias.REC);
+    int alias1 = BitsAlias.new_alias(BitsAlias.REC);
     TypeObj a1 = TypeStruct.make(new String[]{"c"},Type.NIL ); // @{c:nil}
-    TypeObj a2 = TypeStruct.make(new String[]{"c"},TypeMemPtr.make_nil(9,a1)); // @{c:*{3#}?}
+    TypeObj a2 = TypeStruct.make(new String[]{"c"},TypeMemPtr.make_nil(alias0,a1)); // @{c:*{3#}?}
     TypeObj a3 = TypeStruct.make(new String[]{"x"},TypeInt.TRUE); // @{x: 1 }
     TypeMem mem = TypeMem.make0(new TypeObj[]{null,TypeObj.OBJ,null,null,null,null,null,null,null,a1,a2,a3});
     // *[1]? join *[2] ==> *[1+2]?
-    Type ptr12 = Type.NIL.join(TypeMemPtr.make(-9,a1)).join( TypeMemPtr.make(-10,a2));
+    Type ptr12 = Type.NIL.join(TypeMemPtr.make(-alias0,a1)).join( TypeMemPtr.make(-alias1,a2));
     // mem.ld(*[1+2]?) ==> @{c:0}
     Type ld = mem.ld((TypeMemPtr)ptr12);
     assertEquals(TypeStruct.make(new String[]{"c"},TypeMemPtr.NIL),ld);
@@ -337,10 +339,13 @@ public class TestType {
     // less than 5.  Any data loop must contain a Phi; if structures are
     // nesting infinitely deep, then it must contain a NewNode also.
     int alias = BitsAlias.new_alias(BitsAlias.REC);
-    TypeStruct ts = TypeStruct.make(TypeStruct.FLDS(2),Type.NIL,TypeInt.con(0));
+    Type[] tts = TypeStruct.ts(Type.NIL,TypeInt.con(0));
+    byte[] finals = TypeStruct.bs(tts);
+    TypeStruct ts = TypeStruct.make(TypeStruct.FLDS(2),tts,finals,alias);
     TypeMemPtr phi = TypeMemPtr.make(alias,ts);
     for( int i=1; i<20; i++ ) {
-      TypeStruct newt = TypeStruct.make(TypeStruct.FLDS(2),phi,TypeInt.con(i));
+      Type[] ntts = TypeStruct.ts(phi,TypeInt.con(i));
+      TypeStruct newt = TypeStruct.make(TypeStruct.FLDS(2),ntts,finals,alias);
       TypeStruct approx = newt.approx(NewNode.CUTOFF);
       phi = TypeMemPtr.make(alias,approx);
     }
