@@ -534,19 +534,21 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     assert nt._hash==0;         // Not definable yet
     nt = ufind(uf,nt);
     if( bs.tset(nt._uid,old._uid) ) return nt; // Been there, done that
-    // Needs to handle ufind the new way, and ditch the old way.
     
     // TODO: Make a non-recursive "meet into".
-    // Meet old into t
+    // Meet old into nt
     switch( nt._type ) {
     case TNAME: {
       if( !(old instanceof TypeName) ) throw AA.unimpl();
       TypeName on = (TypeName)old, nn = (TypeName)nt;
+      Type mt = ax_meet(bs,uf,nn._t,on._t);
+      if( on.pdepth() == nn.pdepth() && !on._name.equals(nn._name) )
+        return union(uf,mt,old); // No equal name, result drops the name
       if( !(on._name.equals(nn._name) &&
             on._depth ==    nn._depth &&
             on._lex   ==    nn._lex) )
         throw AA.unimpl();
-      nn._t = ax_meet(bs,uf,nn._t,on._t);
+      nn._t = mt;
       break;
     }
     case TMEMPTR: {
@@ -564,16 +566,25 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       if( !(old instanceof TypeStruct) ) throw AA.unimpl();
       TypeStruct ots = (TypeStruct)old, nts = (TypeStruct)nt;
       assert nts._uf==null;     // Already handled by the caller
+      // Compute a new target length.  Generally size is unchanged, but will
+      // change if mixing structs.
+      int len = ots.len(nts);     // New length
+      if( len != nts._ts.length ) { // Grow/shrink as needed
+        nts._flds  = Arrays.copyOf(nts._flds  , len);
+        nts._ts    = Arrays.copyOf(nts._ts    , len);
+        nts._finals= Arrays.copyOf(nts._finals, len);
+      }
+      int clen = Math.min(len,ots._ts.length);
       // Meet all the non-recursive parts
-      if( nts._ts.length != ots._ts.length ) throw AA.unimpl();
       nts._any &= ots._any;
-      for( int i=0; i<nts._ts.length; i++ ) {
-        nts._flds[i] = smeet(nts._flds[i],ots._flds[i]); // Set the Meet of field names
+      for( int i=0; i<clen; i++ ) {
+        nts._flds  [i]  = smeet(nts._flds[i],ots._flds[i]); // Set the Meet of field names
         nts._finals[i] |= ots._finals[i];
       }
+      if( clen != len ) throw AA.unimpl();
       nts._news = nts._news.meet(ots._news);
       // Now recursively do all fields
-      for( int i=0; i<ots._ts.length; i++ )
+      for( int i=0; i<clen; i++ )
         nts._ts[i] = ax_meet(bs,uf,nts._ts[i],ots._ts[i]);
       break;
     default: throw AA.unimpl();

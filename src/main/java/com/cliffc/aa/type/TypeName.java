@@ -42,6 +42,7 @@ public class TypeName extends TypeObj<TypeName> {
   private TypeName ( String name, HashMap<String,Type> lex, Type t, short depth ) { super(TNAME,false); init(name,lex,t,depth); }
   private void init( String name, HashMap<String,Type> lex, Type t, short depth ) { super.init(TNAME,false); assert name!=null && lex !=null; _name=name; _lex=lex; _t=t; _depth = depth; assert depth >= -1; }
   private static short depth( Type t ) { return(short)(t instanceof TypeName ? ((TypeName)t)._depth+1 : 0); }
+  int pdepth() { return Math.max(0,_depth); }
   // Hash does not depend on other types.
   // No recursion on _t to break type cycles
   @Override int compute_hash() { return super.compute_hash() + _name.hashCode(); }
