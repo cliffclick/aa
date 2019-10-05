@@ -206,7 +206,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public  static Type[] ts(Type... ts) { return ts; }
   private static Type[] ts(int n) { Type[] ts = new Type[n]; Arrays.fill(ts,SCALAR); return ts; } // All Scalar fields
   public  static byte[] bs(Type[] ts) { byte[] bs = new byte[ts.length]; Arrays.fill(bs,(byte)1); return bs; } // All read-only
-  
+
   public  static TypeStruct make(         Type... ts) { return make(BitsAlias.REC,ts); }
   public  static TypeStruct make(int nnn, Type... ts) { return malloc(false,FLDS[ts.length],ts,bs(ts),BitsAlias.make0(nnn)).hashcons_free(); }
   public  static TypeStruct make(String[] flds, Type... ts) { return malloc(false,flds,ts,bs(ts),BitsAlias.RECBITS).hashcons_free(); }
@@ -225,12 +225,12 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   private static final TypeStruct ARW   = make(flds("a"),ts(TypeFlt.FLT64),new byte[1]);
   public  static final TypeStruct GENERIC = malloc(true,FLD0,new Type[0],new byte[0],BitsAlias.RECBITS).hashcons_free();
           static final TypeStruct ALLSTRUCT = make();
-  
+
   static final TypeStruct[] TYPES = new TypeStruct[]{ALLSTRUCT,POINT,X,A,C0,D1,ARW};
 
   // Make a TypeStruct with a given 'news' from the original
   TypeStruct make(BitsAlias news) { return make(_flds,_ts,_finals,news);  }
-  
+
   // Dual the flds, dual the tuple.
   @Override protected TypeStruct xdual() {
     String[] as = new String[_flds.length];
@@ -493,7 +493,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     assert !check_interned(reaches);
     RECURSIVE_MEET--;
     TypeStruct rez = apx.install_cyclic(reaches);
-    assert this.isa(rez); 
+    assert this.isa(rez);
     return rez;
   }
 
@@ -533,8 +533,9 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     if( nt.interned() ) return nt.meet(old);
     assert nt._hash==0;         // Not definable yet
     nt = ufind(uf,nt);
+    if( nt == old ) return old;
     if( bs.tset(nt._uid,old._uid) ) return nt; // Been there, done that
-    
+
     // TODO: Make a non-recursive "meet into".
     // Meet old into nt
     switch( nt._type ) {
@@ -543,7 +544,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       TypeName on = (TypeName)old, nn = (TypeName)nt;
       Type mt = ax_meet(bs,uf,nn._t,on._t);
       if( on.pdepth() == nn.pdepth() && !on._name.equals(nn._name) )
-        return union(uf,mt,old); // No equal name, result drops the name
+        return union(uf,nn,mt); // No equal name, result drops the name
       if( !(on._name.equals(nn._name) &&
             on._depth ==    nn._depth &&
             on._lex   ==    nn._lex) )
@@ -556,6 +557,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       if( old == Type.NIL ) { nptr._aliases = nptr._aliases.meet_nil();  break; }
       if( old == Type.SCALAR )
         return union(uf,nt,old); // Result is a scalar, which changes the structure of the new types.
+      if( old == Type.XSCALAR ) break; // Result is the nt unchanged
       if( !(old instanceof TypeMemPtr) ) throw AA.unimpl();
       TypeMemPtr optr = (TypeMemPtr)old;
       nptr._aliases = nptr._aliases.meet(optr._aliases);
@@ -689,7 +691,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     t._hash = t.compute_hash();
   }
 
-  
+
   @SuppressWarnings("unchecked")
   private static <T extends Type> T ufind(NonBlockingHashMapLong<Type> uf, T t) {
     T t0 = (T)uf.get(t._uid), tu;
@@ -909,7 +911,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
 
   @Override boolean contains( Type t, VBitSet bs ) {
     if( bs==null ) bs=new VBitSet();
-    if( bs.get(_uid) ) return false;
+    if( bs.tset(_uid) ) return false;
     for( Type t2 : _ts) if( t2==t || t2.contains(t,bs) ) return true;
     return false;
   }
