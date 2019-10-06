@@ -1,9 +1,11 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.*;
+import com.cliffc.aa.Env;
+import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.type.Type;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
-import com.cliffc.aa.type.Type;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.BitSet;
 import java.util.function.Predicate;
@@ -93,7 +95,7 @@ public abstract class Node implements Cloneable {
    }
 
   // Make a copy of the base node, with no defs nor uses and a new UID.
-  Node copy(GVNGCM gvn) {
+  @NotNull Node copy( GVNGCM gvn) {
     try {
       Node n = (Node)clone();
       n._uid = GVNGCM.uid();              // A new UID

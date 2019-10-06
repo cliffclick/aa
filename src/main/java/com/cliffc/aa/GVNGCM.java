@@ -110,6 +110,10 @@ public class GVNGCM {
   }
   // Make globally shared common ConNode for this type.
   public @NotNull ConNode con( Type t ) {
+    // Check for a function constant, and return the globally shared common
+    // FunPtrNode instead.
+    if( t instanceof TypeFunPtr && t.is_con() )
+      return FunNode.find_fidx(((TypeFunPtr)t).fidx()).ret().funptr();
     ConNode con = new ConNode<>(t);
     Node con2 = _vals.get(con);
     if( con2 != null ) { kill0(con); return (ConNode)con2; } // TODO: con goes dead, should be recycled
@@ -225,7 +229,7 @@ public class GVNGCM {
     // Compute a type for n
     Type t = n.value(this);              // Get best type
     // Replace with a constant, if possible
-    if( t.may_be_con() && !(n instanceof ConNode) )
+    if( t.may_be_con() && !(n instanceof ConNode) && !(n instanceof FunPtrNode))
       { kill_new(n); return con(t); }
     // Global Value Numbering
     x = _vals.putIfAbsent(n,n);
@@ -282,7 +286,7 @@ public class GVNGCM {
   // - Not an ErrNode AND
   // - Type isa Con
   private static boolean replace_con(Type t, Node n) {
-    if( n instanceof ConNode || n instanceof ErrNode )
+    if( n instanceof ConNode || n instanceof ErrNode || n instanceof FunPtrNode )
       return false; // Already a constant, or never touch an ErrNode
     return t.is_con(); // Replace with a ConNode
   }

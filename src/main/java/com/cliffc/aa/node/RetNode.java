@@ -19,7 +19,7 @@ public final class RetNode extends Node {
   public Node val() { return in(2); }
   public Node rpc() { return in(3); }
   public FunNode fun() { return (FunNode)in(4); }
-  FunPtrNode funptr() {
+  public FunPtrNode funptr() {
     for( Node use : _uses )
       if( use instanceof FunPtrNode )
         return (FunPtrNode)use;

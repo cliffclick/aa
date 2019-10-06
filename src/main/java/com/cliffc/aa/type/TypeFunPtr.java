@@ -104,10 +104,8 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   
   // QQQ - Function args below center when the TFP is above center.
   @Override public boolean above_center() { return /*QQQ*/_args.above_center(); }
-  // Fidxes represent a single function and thus are constants, but TypeFunPtrs
-  // represent the execution of a function, and are never constants.
-  @Override public boolean may_be_con()   { return false; }
-  @Override public boolean is_con()       { return false; }
+  @Override public boolean may_be_con()   { return above_center() || is_con(); }
+  @Override public boolean is_con()       { return _fidxs.abit() != -1 && !is_class(); }
   @Override public boolean must_nil() { return _fidxs.test(0) && !above_center(); }
   @Override public boolean may_nil() { return _fidxs.may_nil(); }
   @Override Type not_nil() {

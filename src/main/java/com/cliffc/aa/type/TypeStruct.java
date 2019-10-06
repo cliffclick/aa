@@ -53,9 +53,9 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // Precomputed hash code.  Note that it can NOT depend on the field types -
   // because during recursive construction the types are not available.
   @Override int compute_hash() {
-    int hash = super.compute_hash() + _news.hashCode();
+    int hash = super.compute_hash() + _news.hashCode(), hash1=hash;
     for( int i=0; i<_flds.length; i++ ) hash += _flds[i].hashCode()+_finals[i];
-    return hash;
+    return hash == 0 ? hash1 : hash;
   }
 
   private static final Ary<TypeStruct> CYCLES = new Ary<>(new TypeStruct[0]);
@@ -477,28 +477,31 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // approximated to avoid infinite growth.
   public TypeStruct approx( int cutoff ) {
     int alias = _news.getbit();   // Must only be 1 alias at top level
-    RECURSIVE_MEET++;
     Ary<Type> reaches = reachable(true);
+    if( reaches._len == 1 )
+      return this; // Just the self-same pointer, no approx needed
+    RECURSIVE_MEET++;
     IHashMap old2apx = new IHashMap();
     copy(old2apx,reaches);
 
     // Scan the old copy for elements that are too deep.
     // 'Meet' those into the clone at one layer up.
     NonBlockingHashMapLong<Type> uf = new NonBlockingHashMapLong<>();
-    ax_impl( old2apx, new VBitSet(), uf, alias, cutoff, 0, this, this );
+    ax_impl( old2apx, new BitSetSparse(), uf, alias, cutoff, 0, this, this );
     TypeStruct apx = old2apx.get(this);
     // Remove any leftover internal duplication
     apx = shrink(apx.reachable(),uf,apx);
+    RECURSIVE_MEET--;
+    if( apx == this ) return this;
     assert check_uf(reaches = apx.reachable(),uf);
     assert !check_interned(reaches);
-    RECURSIVE_MEET--;
     TypeStruct rez = apx.install_cyclic(reaches);
     assert this.isa(rez);
     return rez;
   }
 
-  private static void ax_impl( IHashMap old2apx, VBitSet bs, NonBlockingHashMapLong<Type> uf, int alias, int cutoff, int d, TypeStruct dold, Type old ) {
-    if( bs.tset(old._uid) ) return; // Been there, done that
+  private static void ax_impl( IHashMap old2apx, BitSetSparse bs, NonBlockingHashMapLong<Type> uf, int alias, int cutoff, int d, TypeStruct dold, Type old ) {
+    if( bs.tset(old._uid,dold._uid) ) return; // Been there, done that
     assert old.interned();
 
     // Walk internal structure, meeting into the approximation
@@ -539,6 +542,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     // TODO: Make a non-recursive "meet into".
     // Meet old into nt
     switch( nt._type ) {
+    case TSCALAR: break; // Nothing to meet
     case TNAME: {
       if( !(old instanceof TypeName) ) throw AA.unimpl();
       TypeName on = (TypeName)old, nn = (TypeName)nt;
@@ -560,8 +564,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       if( old == Type.XSCALAR ) break; // Result is the nt unchanged
       if( !(old instanceof TypeMemPtr) ) throw AA.unimpl();
       TypeMemPtr optr = (TypeMemPtr)old;
-      nptr._aliases = nptr._aliases.meet(optr._aliases);
-      nptr._obj = (TypeObj)ax_meet(bs,uf,nptr._obj,optr._obj);
+      BitsAlias mt_alias = nptr._aliases = nptr._aliases.meet(optr._aliases);
+      nptr._obj = TypeMemPtr.narrow_obj(mt_alias,(TypeObj)ax_meet(bs,uf,nptr._obj,optr._obj));
       break;
     }
     case TSTRUCT:
@@ -653,7 +657,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
           break;
         case TMEMPTR:           // Update TypeMemPtr internal field
           TypeMemPtr tm = (TypeMemPtr)t0;  TypeObj t4 = tm._obj;
-          if( (tm._obj = pre_mod(tm,uf,dups,t4)) != t4 )
+          if( (tm._obj = TypeMemPtr.narrow_obj(tm._aliases,pre_mod(tm,uf,dups,t4))) != t4 )
             progress |= post_mod(tm,dups);
           break;
         case TSTRUCT:           // Update all TypeStruct fields
@@ -703,9 +707,9 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return t0;
   }
   private static <T extends Type> T union(NonBlockingHashMapLong<Type> uf, T lost, T kept) {
+    if( lost == kept ) return kept;
     assert !lost.interned();
     assert uf.get(lost._uid)==null && uf.get(kept._uid)==null;
-    assert lost != kept;
     assert lost._uid != kept._uid;
     uf.put(lost._uid,kept);
     return kept;

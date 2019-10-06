@@ -4,6 +4,7 @@ import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.BitSet;
 
@@ -82,10 +83,26 @@ public class CallNode extends Node {
     return tf instanceof TypeFunPtr ? ((TypeFunPtr)tf).fidxs() : null;
   }
 
-  // Clones during inlining all become unique new call sites
-  @Override CallNode copy(GVNGCM gvn) {
+  // Clones during inlining all become unique new call sites.  The original RPC
+  // splits into 2, and the two new children RPCs replace it entirely.  The
+  // original RPC may exist in the type system for a little while, until the
+  // children propagate everywhere.
+  @Override @NotNull CallNode copy( GVNGCM gvn) {
     CallNode call = (CallNode)super.copy(gvn);
+    ConNode old_rpc = gvn.con(TypeRPC.make(_rpc));
+    int olen = old_rpc._uses._len;
+    if( olen==0 ) old_rpc=null;
+    else assert olen==1;               // Exactly a wired callsite
     call._rpc = BitsRPC.new_rpc(_rpc); // Children RPC
+    Type oldt = gvn.type(this);        //
+    gvn.unreg(this);                   // Changes hash, so must remove from hash table
+    _rpc = BitsRPC.new_rpc(_rpc);      // New child RPC for 'this' as well.
+    gvn.rereg(this,oldt);              // Back on list
+    // Swap out the existing old rpc users for the new.
+    if( old_rpc != null ) {
+      ConNode new_rpc = gvn.con(TypeRPC.make(_rpc));
+      gvn.subsume(old_rpc,new_rpc);
+    }
     return call;
   }
 
@@ -269,11 +286,11 @@ public class CallNode extends Node {
       FunNode fun = ptr.fun();
       if( fp.is_forward_ref() ) // Forward ref on incoming function
         return _badargs.forward_ref_err(fun);
-      
+
       // Error#2: bad-arg-count
       if( fun.nargs() != nargs() )
         return _badargs.errMsg("Passing "+nargs()+" arguments to "+(fun.xstr())+" which takes "+fun.nargs()+" arguments");
-      
+
       // Error#3: Now do an arg-check
       TypeTuple formals = fun._tf._args; // Type of each argument
       for( int j=0; j<nargs(); j++ ) {

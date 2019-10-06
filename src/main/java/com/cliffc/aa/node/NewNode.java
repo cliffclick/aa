@@ -2,6 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
+import org.jetbrains.annotations.NotNull;
 
 // TODO: fix recursive types
 //
@@ -41,7 +42,7 @@ public class NewNode extends Node {
   // NewNodes can participate in cycles, where the same structure is appended
   // to in a loop until the size grows without bound.  If we detect this we
   // need to approximate a new cyclic type.
-  public final static int CUTOFF=5; // Depth of types before we start forcing approximations
+  public final static int CUTOFF=2; // Depth of types before we start forcing approximations
 
   public NewNode( Node[] flds, TypeObj obj ) {
     super(OP_NEW,flds);
@@ -86,7 +87,7 @@ public class NewNode extends Node {
     Type[] ts = new Type[_ts._ts.length];
     for( int i=0; i<_ts._ts.length; i++ )
       ts[i] = gvn.type(fld(i)).bound(_ts._ts[i]); // Limit to Scalar results
-    TypeStruct newt = TypeStruct.make(_ts._flds,ts,_ts._finals,BitsAlias.make0(_alias));
+    TypeStruct newt = TypeStruct.make(_ts._flds,ts,_ts._finals,_alias);
 
     // Check for TypeStructs with this same NewNode U-F types occurring more
     // than CUTOFF deep, and fold the deepest ones onto themselves to limit the
@@ -100,7 +101,7 @@ public class NewNode extends Node {
   @Override public Type all_type() { return _ptr; }
 
   // Clones during inlining all become unique new sites
-  @Override NewNode copy(GVNGCM gvn) {
+  @Override @NotNull NewNode copy( GVNGCM gvn) {
     // Split the original '_alias' class into 2 sub-classes
     NewNode nnn = (NewNode)super.copy(gvn);
     nnn._alias = BitsAlias.new_alias(_alias); // Children alias classes, split from parent

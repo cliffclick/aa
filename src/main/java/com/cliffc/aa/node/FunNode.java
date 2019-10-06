@@ -121,7 +121,7 @@ public class FunNode extends RegionNode {
   @Override Node copy(GVNGCM gvn) { throw AA.unimpl(); } // Gotta make a new FIDX
 
   // True if may have future unknown callers.
-  boolean has_unknown_callers() { return _defs._len > 1 && in(1) == Env.ALL_CTRL; }
+  private boolean has_unknown_callers() { return _defs._len > 1 && in(1) == Env.ALL_CTRL; }
   // Argument type
   Type targ(int idx) {
     return idx == -1 ? TypeRPC.ALL_CALL :
@@ -368,8 +368,12 @@ public class FunNode extends RegionNode {
     while( lim < _defs._len ) {
       pop();
       for( Node parm : _uses )
-        if( parm instanceof ParmNode )
-          { gvn.unreg(parm); parm.pop(); gvn.rereg(parm,((ParmNode)parm)._default_type); }
+        if( parm instanceof ParmNode ) {
+          Type oldt = gvn.type(parm);
+          gvn.unreg(parm);
+          parm.pop();
+          gvn.rereg(parm,oldt);
+        }
     }
 
     // Map from old to cloned function body

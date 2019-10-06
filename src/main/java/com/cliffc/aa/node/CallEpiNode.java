@@ -189,6 +189,8 @@ public final class CallEpiNode extends Node {
     for( int fidx = bs.nextSetBit(0); fidx >= 0; fidx = bs.nextSetBit(fidx+1) ) {
       if( tree.is_parent(fidx) ) continue;   // Will be covered by children
       FunNode fun = FunNode.find_fidx(fidx); // Lookup, even if not wired
+      if( fun.is_dead() )
+        continue; // Can be dead, if the news has not traveled yet
       RetNode ret = fun.ret();
       Type tret = gvn.type(ret); // Type of the return
       t = lifting ? t.join(tret) : t.meet(tret);

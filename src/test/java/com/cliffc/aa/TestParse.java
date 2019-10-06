@@ -295,7 +295,7 @@ public class TestParse {
     test_ptr("A= :(str?, int); A(0,2)","A:(nil,2)");
     // Named recursive types
     test_isa("A= :(A?, int); A(0,2)",Type.SCALAR);// No error casting (0,2) to an A
-    test_isa("A= :@{n:A?, v:flt}; A(@{n=0,v=1.2}).v;", TypeFlt.con(1.2));
+    test    ("A= :@{n:A?, v:flt}; A(@{n=0,v=1.2}).v;", TypeFlt.con(1.2));
 
     // TODO: Needs a way to easily test simple recursive types
     TypeEnv te3 = Exec.go(Env.top(),"args","A= :@{n:A?, v:int}");
@@ -325,7 +325,7 @@ public class TestParse {
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({&},2)", TypeInt.FALSE);
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({+},2)", TypeInt.con(2));
     test_isa("A= :@{n:A?, v:int}; f={x:A? -> x ? A(f(x.n),x.v*x.v) : 0}", TypeFunPtr.GENERIC_FUNPTR);
-    test_isa("A= :@{n:A?, v:flt}; f={x:A? -> x ? A(f(x.n),x.v*x.v) : 0}; f(A(0,1.2)).v;", TypeFlt.con(1.2*1.2));
+    test    ("A= :@{n:A?, v:flt}; f={x:A? -> x ? A(f(x.n),x.v*x.v) : 0}; f(A(0,1.2)).v;", TypeFlt.con(1.2*1.2));
 
     // User-defined linked list
     String ll_def = "List=:@{next,val};";
@@ -423,10 +423,9 @@ public class TestParse {
     String ll_apl2 = "map(plus,tmp);";
     // End type: ((((*?,scalar)?,str)?,int64),str)?
 
-    // This expression results in an embedded Scalar (caused by the map mixing
-    // ints and strs).
-    testerr(ll_cona+ll_conb+ll_conc+ll_cond+ll_cone+ll_cont+ll_map2+ll_fun2+ll_apl2,
-            "Unknown field '.1'", 209);
+    // After inlining once, we become pair-aware.
+    test_isa(ll_cona+ll_conb+ll_conc+ll_cond+ll_cone+ll_cont+ll_map2+ll_fun2+ll_apl2,
+             TypeMemPtr.make(BitsAlias.RECBITS0,TypeStruct.make(TypeMemPtr.make(BitsAlias.RECBITS0,TypeStruct.make(TypeMemPtr.STRUCT0,TypeInt.INT64)),TypeMemPtr.STRPTR)));
 
     // Failed attempt at a Tree-structure inference test.  Triggered all sorts
     // of bugs and error reporting issues, so keeping it as a regression test.
@@ -449,6 +448,7 @@ public class TestParse {
          "map(tmp,{x->x+x})",
             "Cannot define field '.l' twice",61);
 
+    // Good tree-structure inference test
     test_ptr("tmp=@{"+
          "  l=@{"+
          "    l=@{ l=0, r=0, v=3 },"+
@@ -466,7 +466,7 @@ public class TestParse {
          "     ? @{l=map(tree.l,fun),r=map(tree.r,fun),v=fun(tree.v)}"+
          "     : 0};"+
          "map(tmp,{x->x+x})",
-         "@{l=*[0,226,]$?,r=$,v=int64}");
+         "@{l=*[0,220,],r=*[0,220,],v=int64}");
   }
 
   @Test public void testParse9() {

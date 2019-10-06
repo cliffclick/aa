@@ -8,10 +8,13 @@ import com.cliffc.aa.type.*;
 // See CallNode comments.  The FunPtrNode converts a RetNode into a constant
 // TypeFunPtr with the constant fidx.  Used to allow 1st class functions to be
 // passed about.
-public final class FunPtrNode extends Node {
+public final class FunPtrNode extends ConNode<TypeFunPtr> {
   private final String _referr;
-  public  FunPtrNode( RetNode ret ) { super(OP_FUNPTR,ret); _referr = null; }
-  private FunPtrNode( RetNode ret, String referr ) { super(OP_FUNPTR,ret); _referr = referr; }
+  public  FunPtrNode( RetNode ret ) { this(ret,null); }
+  private FunPtrNode( RetNode ret, String referr ) {
+    super(OP_FUNPTR,ret,ret.fun()._tf);
+    _referr = referr;
+  }
   public RetNode ret() { return (RetNode)in(0); }
   public FunNode fun() { return ret().fun(); }
   // Self   short  name
@@ -39,6 +42,7 @@ public final class FunPtrNode extends Node {
     return ret.fun()._tf;
   }
   @Override public Type all_type() { return TypeFunPtr.GENERIC_FUNPTR; }
+  @Override public String toString() { return super.toString(); }
   // Return the op_prec of the returned value.  Not sensible except when called
   // on primitives.
   @Override public byte op_prec() { return ret().op_prec(); }

@@ -66,6 +66,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     long sum=_con;
     if( _bits != null ) for( long l : _bits ) sum += l;
     _hash = (int)((sum>>32)+sum);
+    if( _hash==0 ) _hash=1;
     assert check();
   }
   private boolean check() {

@@ -77,7 +77,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   }
   public TypeMemPtr make(TypeObj obj ) { return make(_aliases,obj); }
 
-  private static TypeObj narrow_obj( BitsAlias aliases, TypeObj obj ) {
+  static TypeObj narrow_obj( BitsAlias aliases, TypeObj obj ) {
     // Check that a pointer-to-struct does not include more structs than what
     // is pointed at.
     Type obj2 = obj.base();                         // Strip off any 'Names'

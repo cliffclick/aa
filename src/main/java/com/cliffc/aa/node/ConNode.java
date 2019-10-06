@@ -3,10 +3,12 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeFunPtr;
 
-public final class ConNode<T extends Type> extends Node {
+public class ConNode<T extends Type> extends Node {
   T _t;
   public ConNode( T t ) { super(OP_CON,Env.START); _t=t; }
+  ConNode( byte type, RetNode ret, T tfp ) { super(type,ret); _t = tfp; }
   @Override String xstr() { return Env.ALL_CTRL == this ? "ALL_CTL" : _t.toString(); }
   @Override public Node ideal(GVNGCM gvn) { return null; }
   @Override public Type value(GVNGCM gvn) { return _t; }
