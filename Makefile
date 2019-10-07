@@ -137,7 +137,7 @@ JVM=nice java -Xms1g -Xms1g -XX:+PrintGC -ea -cp "build/aa.jar${SEP}${jars}${SEP
 # Actually makes jvm_cmd.txt and status.0 along with out.0
 sandbox/out.0:	sandbox/tests.txt $(test_classes) build/aa.jar 
 	@echo "  testing " $@ " because " $?
-	@echo $(JVM) > sandbox/jvm_cmd.txt
+	@echo $(JVM) org.junit.runner.JUnitCore `cat sandbox/tests.txt` > sandbox/jvm_cmd.txt
 	@($(JVM) org.junit.runner.JUnitCore `cat sandbox/tests.txt`  2>&1 ; echo $$? > sandbox/status.0) 1> sandbox/out.0 2>&1
 
 # Filter and sort test execution times
