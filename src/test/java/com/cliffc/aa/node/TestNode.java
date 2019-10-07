@@ -201,6 +201,7 @@ public class TestNode {
     Node unr = Env.top().lookup("+"); // All the "+" functions
     FunNode fun_plus = ((FunPtrNode)unr.in(1)).fun();
     RetNode ret = fun_plus.ret();
+    CallNode call = new CallNode(false,null,unr);
 
     TypeMemPtr from_ptr = TypeMemPtr.make(BitsAlias.REC,TypeStruct.POINT);
     TypeMemPtr to_ptr   = TypeMemPtr.make(BitsAlias.REC,TypeName.TEST_STRUCT);
@@ -225,7 +226,7 @@ public class TestNode {
     // All the Nodes, all Values, all Types
     test1monotonic(new   CallNode(false,null,_ins[0],  unr  ,mem,_ins[2],_ins[3]));
     test1monotonic(new   CallNode(false,null,_ins[0],_ins[1],mem,_ins[2],_ins[3]));
-    test1monotonic(new CallEpiNode(_ins[0],_ins[1])); // CallNode, then some count of RetNode
+    test1monotonic(new CallEpiNode(call,ret,_ins[1])); // CallNode, then some count of RetNode
     test1monotonic(new    ConNode<Type>(          TypeInt.FALSE));
     test1monotonic(new    ConNode<Type>(          TypeStr.ABC  ));
     test1monotonic(new    ConNode<Type>(          TypeFlt.FLT64));
@@ -257,7 +258,7 @@ public class TestNode {
       test1monotonic_prim(prim);
     test1monotonic(new   ProjNode(_ins[0],1));
     test1monotonic(new RegionNode(null,_ins[1],_ins[2]));
-    test1monotonic(new    RetNode(_ins[0],mem,_ins[1],_ins[2],(FunNode)_ins[0])); // ctl,mem,val,rpc,fun
+    test1monotonic(new    RetNode(_ins[0],mem,_ins[1],_ins[2],fun_plus)); // ctl,mem,val,rpc,fun
     test1monotonic(new  StoreNode(_ins[0],_ins[1],_ins[2],_ins[3],(byte)0,0,null));
     test1monotonic(new  StoreNode(_ins[0],_ins[1],_ins[2],_ins[3],(byte)1,0,null));
     //                  ScopeNode has no inputs, and value() call is monotonic
@@ -265,7 +266,7 @@ public class TestNode {
     test1monotonic(new   TypeNode(TypeInt.FALSE,_ins[1],null));
     test1monotonic(new   TypeNode(TypeMemPtr.ABCPTR,_ins[1],null));
     test1monotonic(new   TypeNode(TypeFlt.FLT64,_ins[1],null));
-
+    
     assertEquals(0,_errs);
   }
 
