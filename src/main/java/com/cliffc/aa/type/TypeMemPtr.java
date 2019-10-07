@@ -2,6 +2,7 @@ package com.cliffc.aa.type;
 
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
+import com.cliffc.aa.util.NonBlockingHashMapLong;
 
 import java.util.BitSet;
 import java.util.function.Predicate;
@@ -173,7 +174,8 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
       { cycle.set(_uid); _cyclic=_dual._cyclic=true; }
   }
   @Override boolean contains( Type t, VBitSet bs ) { return _obj == t || _obj.contains(t, bs); }
-  @Override int depth( VBitSet bs ) { return _obj.depth(bs); }
+  @SuppressWarnings("unchecked")
+  @Override int depth( NonBlockingHashMapLong<Integer> ds ) { return _obj.depth(ds); }
   @SuppressWarnings("unchecked")
   @Override void walk( Predicate<Type> p ) { if( p.test(this) ) _obj.walk(p); }
   @Override TypeStruct repeats_in_cycles(TypeStruct head, VBitSet bs) { return _cyclic ? _obj.repeats_in_cycles(head,bs) : null; }

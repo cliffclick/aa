@@ -477,57 +477,83 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // approximated to avoid infinite growth.
   public TypeStruct approx( int cutoff ) {
     int alias = _news.getbit();   // Must only be 1 alias at top level
-    Ary<Type> reaches = reachable(true);
-    if( reaches._len == 1 )
-      return this; // Just the self-same pointer, no approx needed
-    RECURSIVE_MEET++;
-    IHashMap old2apx = new IHashMap();
-    copy(old2apx,reaches);
 
     // Scan the old copy for elements that are too deep.
     // 'Meet' those into the clone at one layer up.
+    RECURSIVE_MEET++;
+    IHashMap old2apx = new IHashMap();
     NonBlockingHashMapLong<Type> uf = new NonBlockingHashMapLong<>();
-    ax_impl( old2apx, new BitSetSparse(), uf, alias, cutoff, 0, this, this );
-    TypeStruct apx = old2apx.get(this);
+    TypeStruct apx = (TypeStruct)ax_impl( old2apx, uf, alias, cutoff, null, 0, this, this );
     // Remove any leftover internal duplication
     apx = shrink(apx.reachable(),uf,apx);
     RECURSIVE_MEET--;
     if( apx == this ) return this;
-    assert check_uf(reaches = apx.reachable(),uf);
+    Ary<Type> reaches = apx.reachable();
+    assert check_uf(reaches,uf);
     assert !check_interned(reaches);
     TypeStruct rez = apx.install_cyclic(reaches);
     assert this.isa(rez);
     return rez;
   }
 
-  private static void ax_impl( IHashMap old2apx, BitSetSparse bs, NonBlockingHashMapLong<Type> uf, int alias, int cutoff, int d, TypeStruct dold, Type old ) {
-    if( bs.tset(old._uid,dold._uid) ) return; // Been there, done that
+  private static Type ax_impl( IHashMap old2apx, NonBlockingHashMapLong<Type> uf, int alias, int cutoff, Ary<TypeStruct> cutoffs, int d, TypeStruct dold, Type old ) {
     assert old.interned();
+    Type nt = old2apx.get(old);
+    if( nt != null ) return ufind(uf,nt);
 
     // Walk internal structure, meeting into the approximation
     switch( old._type ) {
-    case TNAME  : ax_impl(old2apx,bs,uf,alias,cutoff,d,dold,((TypeName  )old)._t  ); break;
-    case TMEMPTR: ax_impl(old2apx,bs,uf,alias,cutoff,d,dold,((TypeMemPtr)old)._obj); break;
+    case TNAME  :
+      TypeName   ont = (TypeName  )old, nnt = (TypeName   )ont.clone();
+      nnt._t = Type.ANY;
+      old2apx.put(ont,nnt);
+      nnt._t = ax_impl(old2apx,uf,alias,cutoff,cutoffs,d,dold,ont._t  );
+      return nnt;
+
+    case TMEMPTR:
+      TypeMemPtr omp = (TypeMemPtr)old, nmp = (TypeMemPtr)omp.clone();
+      nmp._obj = TypeObj.XOBJ;
+      old2apx.put(omp,nmp);
+      nmp._obj=(TypeObj)ax_impl(old2apx,uf,alias,cutoff,cutoffs,d,dold,omp._obj);
+      if( d+1==cutoff ) old2apx.put(omp,null); // Do not keep sharing the "tails"
+      return nmp;
+
     case TSTRUCT:
-      TypeStruct ts = (TypeStruct)old;
-      if( BitsAlias.make0(alias).isa(ts._news) ) { // Depth-increasing struct?
-        if( d==cutoff ) {          // Cannot increase depth any more
-          TypeStruct nts = ufind(uf,old2apx.get(dold)); // new version, @depth-1
-          TypeStruct xts = ufind(uf,old2apx.get( ts )); // new version, @depth
-          union(uf,xts,nts);     // Map new versions, mapping @depth to @depth-1
-          old2apx.put(dold,nts); // Update after ufind
-          old2apx.put( ts ,nts); // Update after union
-          ax_meet(new BitSetSparse(), uf, nts,old);
-          return;
+      TypeStruct ots = (TypeStruct)old;
+      boolean isnews = BitsAlias.make0(alias).isa(ots._news);
+      if( isnews ) {            // Depth-increasing struct?
+        if( d==cutoff ) {       // Cannot increase depth any more
+          cutoffs.push(ots);    // Save cutoff point for later MEET
+          return old2apx.get(dold); // Return last valid depth - forces cycle
+        } else {
+          assert cutoffs == null;
+          cutoffs = d+1==cutoff ? new Ary<>(TypeStruct.class) : null;
         }
         d++;              // Increase depth
-        dold = ts;        // And this is the last TypeStruct seen at this depth
+        dold = ots;       // And this is the last TypeStruct seen at this depth
       }
-      for( int i=0; i<ts._ts.length; i++ )
-        ax_impl(old2apx,bs,uf,alias,cutoff,d,dold,ts._ts[i]);
-      break;
+      TypeStruct nts = (TypeStruct)ots.clone();
+      nts._flds   = ots._flds  .clone();
+      nts._finals = ots._finals.clone();
+      nts._ts     = ots._ts    .clone();
+      for( int i=0; i<ots._ts.length; i++ )
+        nts._ts[i] = Type.ANY;
+      old2apx.put(ots,nts);
+      for( int i=0; i<ots._ts.length; i++ )
+        nts._ts[i] = ax_impl(old2apx,uf,alias,cutoff,cutoffs,d,dold,ots._ts[i]);
+      if( isnews && d==cutoff ) {
+        while( !cutoffs.isEmpty() ) {
+          Type mt = ax_meet(new BitSetSparse(), uf, nts,cutoffs.pop());
+          assert mt==nts;
+        }
+      }
+      if( d==cutoff ) old2apx.put(ots,null); // Do not keep sharing the "tails"
+      return nts;
+    default:
+      return old;
     }
   }
+
   // Update-in-place 'meet' of pre-allocated new types.  Walk all the old type
   // and meet into the corresponding new type.  Changes the internal edges of
   // the new types, so their hash remains undefined.
@@ -646,6 +672,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
         Type t0 = ufind(uf,t);
         Type t1 = t0.intern_lookup();
         if( t1==null ) t1 = dups.get(t0);
+        if( t1 != null ) t1 = ufind(uf,t1);
         if( t1 == t0 ) continue; // This one is already interned
         if( t1 != null ) { union(uf,t0,t1); progress = true; continue; }
 
@@ -656,9 +683,15 @@ public class TypeStruct extends TypeObj<TypeStruct> {
             progress |= post_mod(tn,dups);
           break;
         case TMEMPTR:           // Update TypeMemPtr internal field
-          TypeMemPtr tm = (TypeMemPtr)t0;  TypeObj t4 = tm._obj;
-          if( (tm._obj = TypeMemPtr.narrow_obj(tm._aliases,pre_mod(tm,uf,dups,t4))) != t4 )
+          TypeMemPtr tm = (TypeMemPtr)t0;
+          TypeObj t4 = tm._obj;
+          TypeObj t5 = TypeMemPtr.narrow_obj(tm._aliases,ufind(uf,t4));
+          if( t4 != t5 ) {
+            tm._obj = t5;
             progress |= post_mod(tm,dups);
+            if( !t5.interned() )
+              reaches.push(t5);
+          }
           break;
         case TSTRUCT:           // Update all TypeStruct fields
           TypeStruct ts = (TypeStruct)t0;
@@ -919,13 +952,16 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     for( Type t2 : _ts) if( t2==t || t2.contains(t,bs) ) return true;
     return false;
   }
-  // Not currently correct... needs e.g. shortest-path algo
-  @Override int depth( VBitSet bs ) {
-    if( _cyclic ) return 9999;
-    if( bs==null ) bs=new VBitSet();
-    if( bs.tset(_uid) ) return 0;
+  // Not currently correct... needs e.g. longest-path algo
+  @SuppressWarnings("unchecked")
+  @Override int depth( NonBlockingHashMapLong<Integer> ds ) {
+    if( _cyclic ) return 10000;
+    if( ds==null ) ds=new NonBlockingHashMapLong<>();
+    Integer ii = ds.get(_uid);
+    if( ii != null ) return ii;
     int max=0;
-    for( Type t : _ts) max = Math.max(max,t.depth(bs));
+    for( Type t : _ts) max = Math.max(max,t.depth(ds));
+    ds.put(_uid,max+1);
     return max+1;
   }
   @SuppressWarnings("unchecked")

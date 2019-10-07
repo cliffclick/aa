@@ -224,7 +224,7 @@ public class TestApprox {
   // A0 -> (X0 <-> X1) -> A1 -> X2 -> A2 -> (X3 <-> X4 ) -> A3 -> X5
   // Approx:
   // A0 -> (X0 <-> X1) -> A1 -> X2 -> A23-> (X35<-> X45) -> A23
-  @Test public void testApprox() {
+  @Test public void testApprox3() {
     Type.init0(new HashMap<>());
     final int CUTOFF = 3;
     int alias0 = BitsAlias.new_alias(BitsAlias.REC);
@@ -481,7 +481,91 @@ public class TestApprox {
       TypeMemPtr px = (TypeMemPtr)x2;
       assertTrue(px._aliases.test(alias));
     }
+  }
 
+  // Type A expands tree-like and gets too deep; CUTOFF=2
+  // A1 -> {l=S ,r=S ,v} depth=1
+  // A2 -> {l=A1,r=S ,v} depth=2
+  // A3 -> {l=A1,r=A1,v} depth=2
+  // A4 -> {l=A2,r=A3,v} depth=3
+  // Should approx to:
+  // Z1 -> {l=A1,r=A1,v} depth=2, and Z1=A3
+  @Test public void testApprox5() {
+    Type.init0(new HashMap<>());
+    final int CUTOFF = 2;
+    int alias = BitsAlias.new_alias(BitsAlias.REC);
+    String[] flds = new String[]{"l","r","v"};
+    byte[] finals = new byte[]{1,1,1};
+
+    TypeStruct  x1= TypeStruct.make(flds,new Type[]{Type.SCALAR,Type.SCALAR,Type.SCALAR},finals,alias);
+    TypeMemPtr px1= TypeMemPtr.make(alias,x1);
+    assertEquals(1,x1.depth());
+
+    TypeStruct  x2= TypeStruct.make(flds,new Type[]{   px1     ,Type.SCALAR,Type.SCALAR},finals,alias);
+    TypeMemPtr px2= TypeMemPtr.make(alias,x2);
+    assertEquals(2,x2.depth());
+
+    TypeStruct  x3= TypeStruct.make(flds,new Type[]{   px1     ,  px1      ,Type.SCALAR},finals,alias);
+    TypeMemPtr px3= TypeMemPtr.make(alias,x3);
+    assertEquals(2,x3.depth());
+
+    TypeStruct  x4= TypeStruct.make(flds,new Type[]{   px2     ,  px3      ,Type.SCALAR},finals,alias);
+    TypeMemPtr px4= TypeMemPtr.make(alias,x4);
+    assertEquals(3,x4.depth());
+
+    // Approximate
+    TypeStruct z1 = x4.approx(CUTOFF);
+    assertEquals(2,z1.depth());
+    assertSame(x3,z1);
+  }
+
+  // Type A expands tree-like and gets too deep; CUTOFF=2
+  // A1[0,18] -> {l=0 ,r=A1,v} depth=1, cyclic
+  // A2[0,18] -> {l=A1,r=A1,v} depth=2, not cyclic
+  //             {l=A1,r=A2,v} depth=3, not cyclic
+  // Should approx to:
+  // A3[0,18] -> {l=A3,r=A3,v} depth=1, cyclic
+  //             {l=A1,r=A3,v} depth=2
+  @Test public void testApprox6() {
+    Type.init0(new HashMap<>());
+    final int CUTOFF = 2;
+    int alias = BitsAlias.new_alias(BitsAlias.REC);
+    BitsAlias ba = BitsAlias.make0(alias);
+    String[] flds = new String[]{"l","r","v"};
+    byte[] finals = new byte[]{1,1,1};
+
+    Type.RECURSIVE_MEET++;
+    TypeStruct  x1 = TypeStruct.malloc(false,flds,new Type[3],finals,ba);
+    x1._hash = x1.compute_hash();  x1._cyclic = true;
+    TypeMemPtr px1 = TypeMemPtr.make_nil(alias,x1);  px1._cyclic = true;
+    x1._ts[0] = Type.NIL;
+    x1._ts[1] = px1;
+    x1._ts[2] = Type.SCALAR;
+    Type.RECURSIVE_MEET--;
+    x1 = x1.install_cyclic(x1.reachable());
+    assertSame(px1,x1._ts[1]);
+
+    TypeStruct  x2= TypeStruct.make(flds,new Type[]{px1,px1,Type.SCALAR},finals,alias);
+    TypeMemPtr px2= TypeMemPtr.make_nil(alias,x2);
+
+    TypeStruct  z0= TypeStruct.make(flds,new Type[]{px1,px2,Type.SCALAR},finals,alias);
+    // Approximate
+    TypeStruct z1 = z0.approx(CUTOFF);
+
+    Type.RECURSIVE_MEET++;
+    TypeStruct  x3 = TypeStruct.malloc(false,flds,new Type[3],finals,ba);
+    x3._hash = x3.compute_hash();  x3._cyclic = true;
+    TypeMemPtr px3 = TypeMemPtr.make_nil(alias,x3);  px3._cyclic = true;
+    x3._ts[0] = px3;
+    x3._ts[1] = px3;
+    x3._ts[2] = Type.SCALAR;
+    Type.RECURSIVE_MEET--;
+    x3 = x3.install_cyclic(x3.reachable());
+    px3 = (TypeMemPtr)x3._ts[0];
+
+    TypeStruct x4= TypeStruct.make(flds,new Type[]{px1,px3,Type.SCALAR},finals,alias);
+
+    assertSame(x4,z1);
   }
 
 }

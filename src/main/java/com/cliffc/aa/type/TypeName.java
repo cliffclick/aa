@@ -3,6 +3,7 @@ package com.cliffc.aa.type;
 import com.cliffc.aa.AA;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
+import com.cliffc.aa.util.NonBlockingHashMapLong;
 
 import java.util.BitSet;
 import java.util.HashMap;
@@ -220,7 +221,8 @@ public class TypeName extends TypeObj<TypeName> {
   // Iterate over any nested child types
   @Override public void iter( Consumer<Type> c ) { c.accept(_t); }
   @Override boolean contains( Type t, VBitSet bs ) { return _t == t || _t.contains(t, bs); }
-  @Override int depth( VBitSet bs ) { return _t.depth(bs); }
+  @SuppressWarnings("unchecked")
+  @Override int depth( NonBlockingHashMapLong<Integer> ds ) { return _t.depth(ds); }
   @SuppressWarnings("unchecked")
   @Override void walk( Predicate<Type> p ) { if( p.test(this) ) _t.walk(p); }
   @Override TypeStruct repeats_in_cycles(TypeStruct head, VBitSet bs) { return _cyclic ? _t.repeats_in_cycles(head,bs) : null; }

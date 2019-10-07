@@ -2,6 +2,7 @@ package com.cliffc.aa.type;
 
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
+import com.cliffc.aa.util.NonBlockingHashMapLong;
 
 import java.util.Arrays;
 import java.util.BitSet;
@@ -123,6 +124,7 @@ public class Type<T extends Type<T>> implements Cloneable {
   //@Override public final String toString() { return dstr(new SB(),null).toString(); }
   String str( VBitSet dups ) { return STRS[_type]; }
   SB dstr( SB sb, VBitSet dups ) { return sb.p(str(dups)); }
+  String q() { return dstr(new SB(),null).toString(); }
 
   // Object Pooling to handle frequent (re)construction of temp objects being
   // interned.  One-entry pool for now.
@@ -713,9 +715,9 @@ public class Type<T extends Type<T>> implements Cloneable {
   // Is t type contained within this?  Short-circuits on a true
   public final boolean contains( Type t ) { return contains(t,null); }
   boolean contains( Type t, VBitSet bs ) { return this==t; }
-  // Depth of nested types
-  public final int depth() { return depth(null); }
-  int depth( VBitSet bs ) { return 0; }
+  // Deepest depth of nested TypeStructs; cycles at a base of 10000.
+  final int depth() { return depth(null); }
+  int depth( NonBlockingHashMapLong<Integer> ds ) { return 0; }
   // Mark if part of a cycle
   void mark_cycle( Type t, VBitSet visit, BitSet cycle ) { }
 
