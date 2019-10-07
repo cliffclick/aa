@@ -201,7 +201,7 @@ public class TestType {
     Type ptr12 = Type.NIL.join(TypeMemPtr.make(-alias0,a1)).join( TypeMemPtr.make(-alias1,a2));
     // mem.ld(*[1+2]?) ==> @{c:0}
     Type ld = mem.ld((TypeMemPtr)ptr12);
-    assertEquals(TypeStruct.make(new String[]{"c"},TypeMemPtr.NIL),ld);
+    assertEquals(TypeStruct.make(new String[]{"c"},Type.NIL),ld);
   }
 
   // meet of functions: arguments *join*, fidxes union (meet), and return types
