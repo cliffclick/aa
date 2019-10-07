@@ -31,15 +31,24 @@ public class LoadNode extends Node {
 
   @Override public Node ideal(GVNGCM gvn) {
     Node ctrl = ctl();
+    Node mem  = mem();
     Node addr = adr();
     // Loads against a NewNode cannot NPE, cannot fail, always return the input
-    if( addr instanceof NewNode ) {
+    if( addr instanceof NewNode && mem instanceof MemMergeNode && mem.in(1)==addr ) {
       NewNode nnn = (NewNode)addr;
       int idx = nnn._ts.find(_fld,_fld_num);  // Find the named field
       if( idx != -1 ) return nnn.fld(idx);    // Field value
       // Broken load-vs-new
     }
-    
+    // Loads against an equal store; cannot NPE since the Store did not.
+    StoreNode st;
+    if( mem instanceof StoreNode && addr == (st=((StoreNode)mem)).adr() ) {
+      if( _fld.equals(st._fld) && _fld_num == st._fld_num )
+        return st.val();
+      // TODO: Else can use field-level aliasing to by pass.  Needs a
+      // field-level alias notion on memory edges.
+    }
+      
     if( ctrl==null || gvn.type(ctrl)!=Type.CTRL )
       return null;              // Dead load, or a no-control-no-fail load
     if( addr.is_forward_ref() ) return null;

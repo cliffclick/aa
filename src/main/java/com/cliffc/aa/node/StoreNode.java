@@ -7,8 +7,8 @@ import com.cliffc.aa.type.*;
 // Store a value into a named struct field.  Does it's own nil-check and value
 // testing; also checks final field updates.
 public class StoreNode extends Node {
-  private final String _fld;
-  private final int _fld_num;
+  final String _fld;
+  final int _fld_num;
   private final String _badfld;
   private final String _badnil;
   private final String _badfin;
@@ -28,9 +28,9 @@ public class StoreNode extends Node {
   String xstr() { return "."+(_fld==null ? ""+_fld_num : _fld)+"="; } // Self short name
   String  str() { return xstr(); }      // Inline short name
 
-  private Node mem() { return in(1); }
-  private Node adr() { return in(2); }
-  private Node val() { return in(3); }
+  Node mem() { return in(1); }
+  Node adr() { return in(2); }
+  Node val() { return in(3); }
   
   @Override public Node ideal(GVNGCM gvn) {
     return null;

@@ -13,8 +13,8 @@ import java.util.BitSet;
 /*
   read-only syntax:
     A:=@{n,v}
-  var:!A := ...some pointer to A, but cannot write @{n,v}
-  var:@{!n,v} := anything (including A) but cannot write n, but can write v
+  var:!A := ...read-only pointer to A, cannot write @{n,v}
+  var:@{!n,v} := read anything (including A) but cannot write n, but can write v
 
   Array creation: just [7] where '[' is a unary prefix, and ']' is a unary postfix.
   ary = [7]; // untyped, will infer

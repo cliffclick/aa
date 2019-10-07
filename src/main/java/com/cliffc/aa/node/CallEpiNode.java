@@ -99,7 +99,7 @@ public final class CallEpiNode extends Node {
     if( rez instanceof ParmNode && rez.in(0) == fun && cmem == mem )
       return inline(gvn,cctl,cmem,call.arg(((ParmNode)rez)._idx), ret);
     // Check for constant body
-    if( gvn.type(rez).is_con() && ctl==fun )
+    if( gvn.type(rez).is_con() && ctl==fun && cmem == mem)
       return inline(gvn,cctl,cmem,rez,ret);
 
     // Check for a 1-op body using only constants or parameters and no memory effects
