@@ -2,6 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.type.TypeTuple;
 
 // See CallNode comments.  The RetNode gathers {control (function exits or
@@ -37,7 +38,10 @@ public final class RetNode extends Node {
 
   @Override public Node ideal(GVNGCM gvn) { return null; }
   @Override public Type value(GVNGCM gvn) {
-    return TypeTuple.make(gvn.type(ctl()),gvn.type(mem()),gvn.type(val()));
+    Type ctl = gvn.type(ctl()).bound(Type.CTRL);
+    Type mem = gvn.type(mem()).bound(TypeMem.MEM);
+    Type val = gvn.type(val()).bound(Type.SCALAR);
+    return TypeTuple.make(ctl,mem,val);
   }
   @Override public Type all_type() { return TypeTuple.CALL; }
 

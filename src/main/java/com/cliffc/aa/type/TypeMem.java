@@ -264,7 +264,7 @@ public class TypeMem extends Type<TypeMem> {
     return TypeTuple.make0(false,ts);
   }
 
-  @Override public boolean above_center() { return false; }
+  @Override public boolean above_center() { return this==XMEM; } // TODO: false?  Or really needs to be aliases[1]?  Or all aliases?
   @Override public boolean may_be_con()   { return false;}
   @Override public boolean is_con()       { return false;}
   @Override public boolean must_nil() { return false; } // never a nil

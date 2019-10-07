@@ -169,8 +169,10 @@ public class CallNode extends Node {
   // Gather only the control and function pointer; gathered so CallEpi will
   // re-evaluate if the set of callable functions changes.
   @Override public TypeTuple value(GVNGCM gvn) {
+    Type ct = gvn.type(ctl());
+    ct = ct.above_center() ? Type.XCTRL : Type.CTRL;
     Type tf = gvn.type(fun());
-    return TypeTuple.make(gvn.type(ctl()),tf.bound(TypeFunPtr.GENERIC_FUNPTR));
+    return TypeTuple.make(ct,tf.bound(TypeFunPtr.GENERIC_FUNPTR));
   }
   // One-shot toggle set after a successful resolve.  Bypasses type
   // monotonicity assert in iter().

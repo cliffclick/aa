@@ -2,6 +2,7 @@ package com.cliffc.aa.type;
 
 import com.cliffc.aa.node.NewNode;
 import com.cliffc.aa.node.PrimNode;
+import com.cliffc.aa.util.Ary;
 import org.junit.Test;
 
 import java.util.HashMap;
@@ -65,7 +66,6 @@ public class TestType {
   // A any-ptr-alias#6 means *any* of the alias#6 choices; same for all.
   // all ->  mem  -> { str,tup} -> { string constants, tuple constants} -> {~str,~tup} -> ~mem    -> any
   // all -> *mem? -> {*mem,nil} -> {*str,*tup,nil} -> {~*str,~*tup,nil} -> {~*mem,nil} -> ~*mem+? -> any
-
   @Test public void testOOPsNulls() {
     Type.init0(new HashMap<>());
     Type bot = Type      .ALL;
@@ -189,19 +189,28 @@ public class TestType {
     TypeStruct ts0= TypeStruct.make(new String[]{"x"},nil);  // @{x:nil}
     Type tss = ts0.meet(t0);
     assertEquals(t0,tss);      // t0.isa(ts0)
+    byte[] finals = new byte[]{1};
 
     // meet @{c:0}? and @{c:@{x:1}?,}
     int alias0 = BitsAlias.new_alias(BitsAlias.REC);
-    int alias1 = BitsAlias.new_alias(BitsAlias.REC);
-    TypeObj a1 = TypeStruct.make(new String[]{"c"},Type.NIL ); // @{c:nil}
-    TypeObj a2 = TypeStruct.make(new String[]{"c"},TypeMemPtr.make_nil(alias0,a1)); // @{c:*{3#}?}
-    TypeObj a3 = TypeStruct.make(new String[]{"x"},TypeInt.TRUE); // @{x: 1 }
-    TypeMem mem = TypeMem.make0(new TypeObj[]{null,TypeObj.OBJ,null,null,null,null,null,null,null,a1,a2,a3});
+    int alias1 = BitsAlias.new_alias(alias0);
+    int alias2 = BitsAlias.new_alias(alias0);
+    int alias3 = BitsAlias.new_alias(BitsAlias.REC);
+    TypeObj a1 = TypeStruct.make(new String[]{"c"},new Type[]{Type.NIL},finals,alias1 ); // @{c:nil}
+    TypeObj a2 = TypeStruct.make(new String[]{"c"},new Type[]{TypeMemPtr.make_nil(alias1,a1)},finals,alias2); // @{c:*{3#}?}
+    TypeObj a3 = TypeStruct.make(new String[]{"x"},new Type[]{TypeInt.TRUE},finals,alias3); // @{x: 1 }
+    Ary<TypeObj> tos = new Ary<>(TypeObj.class);
+    tos.setX(BitsAlias.REC,TypeObj.OBJ);
+    tos.setX(alias1,a1);
+    tos.setX(alias2,a2);
+    tos.setX(alias3,a3);
+    TypeMem mem = TypeMem.make0(tos.asAry());
     // *[1]? join *[2] ==> *[1+2]?
-    Type ptr12 = Type.NIL.join(TypeMemPtr.make(-alias0,a1)).join( TypeMemPtr.make(-alias1,a2));
+    Type ptr12 = Type.NIL.join(TypeMemPtr.make(-alias1,a1)).join( TypeMemPtr.make(-alias2,a2));
     // mem.ld(*[1+2]?) ==> @{c:0}
     Type ld = mem.ld((TypeMemPtr)ptr12);
-    assertEquals(TypeStruct.make(new String[]{"c"},Type.NIL),ld);
+    TypeObj ax = TypeStruct.make(new String[]{"c"},new Type[]{Type.NIL},finals,BitsAlias.NZERO.make() ); // @{c:nil}
+    assertEquals(ax,ld);
   }
 
   // meet of functions: arguments *join*, fidxes union (meet), and return types
@@ -231,14 +240,16 @@ public class TestType {
     TypeFunPtr f1f2f = TypeFunPtr.make_new(TypeTuple.FLT64_FLT64,TypeFlt.FLT64);
     assertTrue(f1f2f.isa(gf));
     TypeFunPtr mt = (TypeFunPtr)f1i2i.meet(f1f2f);
-    BitsFun funs = BitsFun.make0(3).meet(BitsFun.make0(4));
+    int fidx0 = f1i2i.fidx();
+    int fidx1 = f1f2f.fidx();
+    BitsFun funs = BitsFun.make0(fidx0).meet(BitsFun.make0(fidx1));
     TypeFunPtr f3i2r = TypeFunPtr.make(funs,TypeTuple.make_args(Type.REAL,Type.REAL),Type.REAL);
     assertEquals(f3i2r,mt);
     assertTrue(f3i2r.isa(gf));
     assertTrue(f1i2i.isa(f3i2r));
     assertTrue(f1f2f.isa(f3i2r));
 
-    TypeFunPtr f2 = TypeFunPtr.make(BitsFun.make0(4),TypeTuple.INT64_INT64,TypeInt.INT64); // Some generic function (happens to be #23, '&')
+    TypeFunPtr f2 = TypeFunPtr.make(BitsFun.make0(fidx1),TypeTuple.INT64_INT64,TypeInt.INT64); // Some generic function (happens to be #23, '&')
     assertTrue(f2.isa(gf));
   }
 

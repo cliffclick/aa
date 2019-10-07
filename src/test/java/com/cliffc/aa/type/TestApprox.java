@@ -1,6 +1,7 @@
 package com.cliffc.aa.type;
 
 import org.junit.Test;
+import org.junit.Ignore;
 
 import java.util.HashMap;
 
@@ -23,6 +24,8 @@ public class TestApprox {
 
     // Build two structs pointing to each other.
     //   -> [,int] -> * -> [,flt] -> * ->
+    Object dummy0 = TypeStruct.TYPES;
+    Object dummy1 = TypeMemPtr.TYPES;
     Type.RECURSIVE_MEET++;
     TypeStruct t0 = TypeStruct.malloc(false,flds,new Type[2],finals,alias);
     TypeStruct t1 = TypeStruct.malloc(false,flds,new Type[2],finals,alias);
@@ -130,6 +133,8 @@ public class TestApprox {
     // p3 -> t3[,99] -> p2 -> t2[,99] -> p1 -> t1[,flt] -> p0 -> t0[,int] -> p1*
 
     // Build two structs pointing to each other
+    Object dummy0 = TypeStruct.TYPES;
+    Object dummy1 = TypeMemPtr.TYPES;
     Type.RECURSIVE_MEET++;
     TypeStruct t0 = TypeStruct.malloc(false,flds,new Type[2],finals,alias);
     TypeStruct t1 = TypeStruct.malloc(false,flds,new Type[2],finals,alias);
@@ -534,6 +539,8 @@ public class TestApprox {
     String[] flds = new String[]{"l","r","v"};
     byte[] finals = new byte[]{1,1,1};
 
+    Object dummy0 = TypeStruct.TYPES;
+    Object dummy1 = TypeMemPtr.TYPES;
     Type.RECURSIVE_MEET++;
     TypeStruct  x1 = TypeStruct.malloc(false,flds,new Type[3],finals,ba);
     x1._hash = x1.compute_hash();  x1._cyclic = true;
