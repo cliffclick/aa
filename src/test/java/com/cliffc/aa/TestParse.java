@@ -485,6 +485,8 @@ public class TestParse {
     test    ("x=@{n:=1,v:=2}; y=@{n=3,v:=4}; tmp = math_rand(1) ? x : y; tmp.n", TypeInt.NINT8);
     testerr ("x=@{n:=1,v:=2}; y=@{n=3,v:=4}; tmp = math_rand(1) ? x : y; tmp.n = 5", "Cannot re-assign final field '.n'",68);
     test    ("x=@{n:=1,v:=2}; foo={q -> q.n=3}; foo(x); x.n",TypeInt.con(3)); // Side effects persist out of functions
+    // Tuple assignment
+    testerr ("x=(1,2); x.0=3; x", "Cannot re-assign final field '.0'",14);
   }
   /*
 
@@ -525,22 +527,6 @@ map = { f list -> list ? List(@{map(f,list.next),f(list.val)}) : 0 }
 strs:List(0)    = ... // List of nulls
 strs:List(str)  = ... // List of not-null strings
 strs:List(str?) = ... // List of null-or-strings
-
-// With re-assignment, more excitement around LHS!
-// So fields in a tuple type have a init-value, a final-value, an
-// un-init-value, a mixed-init-value, and a name
-make_point={@{x,y}} // returns {x,y} with both un-init
-a=make_point(); a.x=1; // a.x init; a.y uninit
-b=make_point(); b.y=2; // a.x uninit; b.y init
-c = rand ? a : b;      // c: worse-case x & y mixed init & uninit
-c.x = 1; // Error; might be    init
-c.x;     // Error; might be un-init
-// reflection read/write of fields.
-// '[' binary operator returns a LHS value (really a 2-tuple).
-// ']' postfix operator takes a LHS, returns value
-// ']=' binary operator takes a LHS and a value, and returns same value... and SIDE-EFFECTS
-c[x];
-c[x]=1;
 
    */
 

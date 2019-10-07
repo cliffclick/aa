@@ -19,9 +19,10 @@ public class StoreNode extends Node {
     _fld_num = fld_num;
     _fin = fin;
     // Tests can pass a null, but nobody else does
-    _badfld = bad==null ? null : bad.errMsg("Unknown field '."+fld+"'");
-    _badnil = bad==null ? null : bad.errMsg("Struct might be nil when writing field '."+fld+"'");
-    _badfin = bad==null ? null : bad.errMsg("Cannot re-assign final field '."+fld+"'");
+    String f = fld==null ? ""+_fld_num : fld;
+    _badfld = bad==null ? null : bad.errMsg("Unknown field '."+f+"'");
+    _badnil = bad==null ? null : bad.errMsg("Struct might be nil when writing field '."+f+"'");
+    _badfin = bad==null ? null : bad.errMsg("Cannot re-assign final field '."+f+"'");
   }
   public StoreNode( Node ctrl, Node mem, Node adr, Node val, byte fin, String fld , Parse bad ) { this(ctrl,mem,adr,val,fin,fld,-1,bad); }
   public StoreNode( Node ctrl, Node mem, Node adr, Node val, byte fin, int fld_num, Parse bad ) { this(ctrl,mem,adr,val,fin,null,fld_num,bad); }
