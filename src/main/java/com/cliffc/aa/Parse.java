@@ -443,7 +443,7 @@ public class Parse {
         int fnum = fld==null ? field_number() : -1;
         if( fld==null && fnum==-1 ) n = err_ctrl2("Missing field name after '.'");
         else if( peek(":=") || peek('=') ) {
-          byte fin = _buf[_x-2]==':' ? TypeStruct.f_rw() : TypeStruct.f_final();
+          byte fin = _buf[_x-2]==':' ? TypeStruct.frw() : TypeStruct.ffinal();
           Node stmt = stmt();
           if( stmt == null ) n = err_ctrl2("Missing stmt after assigning field '."+fld+"'");
           else if( fld != null ) set_mem(gvn(new StoreNode(ctrl(),mem(),n,n=stmt,fin,fld ,errMsg())));
@@ -557,7 +557,7 @@ public class Parse {
       s=stmts();
     }
     require(')');
-    return do_mem(new NewNode(ns.asAry(),TypeStruct.make(ns._len-1)));
+    return do_mem(new NewNode(ns.asAry(),TypeStruct.make_tuple(ns._len-1)));
   }
 
   /** Parse an anonymous function; the opening '{' already parsed.  After the
@@ -637,7 +637,7 @@ public class Parse {
         if( peek('=') ) {       // Parse field initial value
           if( (stmt=stmt())==null )
             stmt = err_ctrl2("Missing ifex after assignment of '"+tok+"'");
-        }
+        } //else is_final=false;  // No assignment at all, assume r/w
 
         // Check for repeating a field name
         if( e._scope.get(tok)!=null ) {
@@ -663,7 +663,7 @@ public class Parse {
       for( int i=0; i<toks._len; i++ )
         flds[i+1] = e._scope.get(toks.at(i));
       byte[] finals = new byte[toks._len];
-      for(int i=0; i<finals.length; i++ ) finals[i] = fs.get(i) ? TypeStruct.f_final() : TypeStruct.f_rw();
+      for(int i=0; i<finals.length; i++ ) finals[i] = fs.get(i) ? TypeStruct.ffinal() : TypeStruct.frw();
       return do_mem(new NewNode(flds,TypeStruct.make(toks.asAry(),finals)));
     } // Pop lexical scope around struct
   }
@@ -765,13 +765,15 @@ public class Parse {
   // Wrap in a nullable if there is a trailing '?'.  No spaces allowed
   private Type typeq(Type t) { return peek_noWS('?') ? t.meet_nil() : t; }
 
-  // No mod is r/o, the default.  '!' is read-write, '~' is final.
+  // No mod is r/w, the default.  '~' is read-only, '!' is final.
   // Current '-' is ambiguous with function arrow ->.
   private byte tmod() {
-    if( peek('!') ) return TypeStruct.f_rw();    // read-write
-    if( peek('~') ) return TypeStruct.f_final(); // final
-    return TypeStruct.f_ro();   // read-only
+    if( peek('!') ) return TypeStruct.ffinal();    // final
+    if( peek('~') ) return TypeStruct.fro(); // read-only
+    return tmod_default();
   }
+  private byte tmod_default() { return TypeStruct.ffinal(); }
+  //return TypeStruct.frw();   // read-write
 
   // Type or null or TypeErr.ANY for '->' token
   private Type type0(boolean type_var) {
@@ -801,7 +803,7 @@ public class Parse {
         byte tmodf = tmod();             // Field access mod
         String tok = token();            // Scan for 'id'
         if( tok == null ) {              // end-of-struct-def
-          if( tmodf != 0 ) return null;  // Found a field access mod but not field
+          if( tmodf != tmod_default() ) return null;  // Found a field access mod but not field
           break;
         }
         Type t = Type.SCALAR;            // Untyped, most generic field type
@@ -811,14 +813,14 @@ public class Parse {
         if( flds.find(tok) != -1 ) throw AA.unimpl(); // cannot use same field name twice
         flds  .add(tok);                 // Gather for final type
         ts    .add(t);
-        mods  .add((byte)Math.max(tmod,tmodf));// Most conservative of struct & field mods
+        mods  .add(TypeStruct.fmeet(tmod,tmodf));// Most conservative of struct & field mods
         if( !peek(',') ) break; // Final comma is optional
       }
       byte[] finals = new byte[mods._len];
       for( int i=0; i<mods._len; i++ )  finals[i] = mods.at(i);
       return peek('}') ? TypeStruct.make(flds.asAry(),ts.asAry(),finals) : null;
     }
-    if( tmod != TypeStruct.f_ro() ) return null; // Found a struct-modifier without a struct
+    if( tmod != tmod_default() ) return null; // Found a struct-modifier without a struct
 
     // "()" is the zero-entry tuple
     // "(   ,)" is a 1-entry tuple

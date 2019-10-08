@@ -189,7 +189,7 @@ public class TestType {
     TypeStruct ts0= TypeStruct.make(new String[]{"x"},nil);  // @{x:nil}
     Type tss = ts0.meet(t0);
     assertEquals(t0,tss);      // t0.isa(ts0)
-    byte[] finals = new byte[]{TypeStruct.f_final()};
+    byte[] finals = new byte[]{TypeStruct.ffinal()};
 
     // meet @{c:0}? and @{c:@{x:1}?,}
     int alias0 = BitsAlias.new_alias(BitsAlias.REC);
@@ -267,7 +267,7 @@ public class TestType {
 
     // Anonymous recursive structs -
     // - struct with pointer to self
-    byte[] finals = new byte[]{TypeStruct.f_final(),TypeStruct.f_final()};
+    byte[] finals = new byte[]{TypeStruct.ffinal(),TypeStruct.ffinal()};
     TypeStruct ts0 = TypeStruct.malloc(false,flds,new Type[2],finals,BitsAlias.RECBITS);
     ts0._hash = ts0.compute_hash();
     ts0._ts[0] = ts0ptr;    ts0._cyclic = true;
@@ -383,7 +383,7 @@ public class TestType {
 
     // T = :(T?,i64)
     int alias = BitsAlias.new_alias(BitsAlias.REC);
-    byte[] finals = new byte[]{TypeStruct.f_final(),TypeStruct.f_final()};
+    byte[] finals = new byte[]{TypeStruct.ffinal(),TypeStruct.ffinal()};
     TypeStruct T = TypeStruct.malloc(false,flds,new Type[2],finals,BitsAlias.RECBITS);
     T._hash = T.compute_hash();
     Type.RECURSIVE_MEET++;

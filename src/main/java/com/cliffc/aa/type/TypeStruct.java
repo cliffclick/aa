@@ -149,9 +149,9 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     if( !is_tup ) sb.p('@');    // Not a tuple
     sb.p(is_tup ? '(' : '{');
     for( int i=0; i<_flds.length; i++ ) {
-      if( !is_tup ) sb.p(_flds[i]);
+      if( !is_tup ) sb.p(fstr(_finals[i])).p(_flds[i]);
       Type t = at(i);
-      if( !is_tup && t != SCALAR ) sb.p(fstr(_finals[i])).p('=');
+      if( !is_tup && t != SCALAR ) sb.p('=');
       if( t==null ) sb.p("!");  // Graceful with broken types
       else if( t==SCALAR ) ;    // Default answer, do not print
       else if( t instanceof TypeMemPtr ) sb.p("*"+((TypeMemPtr)t)._aliases); // Do not recurse here, gets too big too fast
@@ -174,9 +174,9 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     sb.p(is_tup ? '(' : '{').nl().ii(1); // open struct, newline, increase_indent
     for( int i=0; i<_flds.length; i++ ) {
       sb.i();                   // indent, 1 field per line
-      if( !is_tup ) sb.p(_flds[i]);
+      if( !is_tup ) sb.p(fstr(_finals[i])).p(_flds[i]);
       Type t = at(i);
-      if( !is_tup && t != SCALAR ) sb.p(fstr(_finals[i])).p('=');
+      if( !is_tup && t != SCALAR ) sb.p('=');
       if( t==null ) sb.p("!");  // Graceful with broken types
       else if( t==SCALAR ) ;    // Default answer, do not print
       else t.dstr(sb,dups);     // Recursively print field type
@@ -208,17 +208,17 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   private static String[] flds(String... fs) { return fs; }
   public  static Type[] ts(Type... ts) { return ts; }
   public  static Type[] ts(int n) { Type[] ts = new Type[n]; Arrays.fill(ts,SCALAR); return ts; } // All Scalar fields
-  public  static byte[] bs(Type[] ts) { byte[] bs = new byte[ts.length]; Arrays.fill(bs,f_ro()); return bs; } // All read-only
-  public  static byte[] finals(Type[] ts) { byte[] bs = new byte[ts.length]; Arrays.fill(bs,f_final()); return bs; } // All read-only
-  public  static byte[] rw(Type[] ts) { byte[] bs = new byte[ts.length]; Arrays.fill(bs,f_rw()); return bs; } // All read-only
+  public  static byte[] fbots (int n) { byte[] bs = new byte[n]; Arrays.fill(bs,fbot  ()); return bs; }
+  public  static byte[] finals(int n) { byte[] bs = new byte[n]; Arrays.fill(bs,ffinal()); return bs; } // All read-only
+  public  static byte[] frws  (int n) { byte[] bs = new byte[n]; Arrays.fill(bs,frw   ()); return bs; } // All read-write
 
-  public  static TypeStruct make(         Type... ts) { return make(BitsAlias.REC,ts); }
-  public  static TypeStruct make(int nnn, Type... ts) { return malloc(false,FLDS[ts.length],ts,bs(ts),BitsAlias.make0(nnn)).hashcons_free(); }
-  public  static TypeStruct make(String[] flds, Type... ts) { return malloc(false,flds,ts,bs(ts),BitsAlias.RECBITS).hashcons_free(); }
+  public  static TypeStruct make(Type... ts) { return make_alias(BitsAlias.REC,ts); }
+  public  static TypeStruct make_alias(int nnn, Type... ts) { return malloc(false,FLDS[ts.length],ts,frws(ts.length),BitsAlias.make0(nnn)).hashcons_free(); }
+  public  static TypeStruct make(String[] flds, Type... ts) { return malloc(false,flds,ts,fbots(ts.length),BitsAlias.RECBITS).hashcons_free(); }
   public  static TypeStruct make(String[] flds, Type[] ts, byte[] finals) { return malloc(false,flds,ts,finals,BitsAlias.RECBITS).hashcons_free(); }
   public  static TypeStruct make(String[] flds, Type[] ts, byte[] finals, BitsAlias news) { return malloc(false,flds,ts,finals,news).hashcons_free(); }
   public  static TypeStruct make(String[] flds, Type[] ts, byte[] finals, int nnn) { return malloc(false,flds,ts,finals,BitsAlias.make0(nnn)).hashcons_free(); }
-  public  static TypeStruct make( int x ) { return make(ts(x)); }
+  public  static TypeStruct make_tuple( int x ) { return make(FLDS[x],ts(x),frws(x)); }
   public  static TypeStruct make(String[] flds, byte[] finals) { return make(flds,ts(flds.length),finals); }
 
   public  static final TypeStruct POINT = make(flds("x","y"),ts(TypeFlt.FLT64,TypeFlt.FLT64));
@@ -227,7 +227,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public  static final TypeStruct A     = make(flds("a"),ts(TypeFlt.FLT64 ));
   private static final TypeStruct C0    = make(flds("c"),ts(TypeInt.FALSE )); // @{c:0}
   private static final TypeStruct D1    = make(flds("d"),ts(TypeInt.TRUE  )); // @{d:1}
-  private static final TypeStruct ARW   = make(flds("a"),ts(TypeFlt.FLT64),new byte[]{f_rw()});
+  private static final TypeStruct ARW   = make(flds("a"),ts(TypeFlt.FLT64),new byte[]{frw()});
   public  static final TypeStruct GENERIC = malloc(true,FLD0,new Type[0],new byte[0],BitsAlias.RECBITS).hashcons_free();
           static final TypeStruct ALLSTRUCT = make();
 
@@ -241,7 +241,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     String[] as = new String[_flds.length];
     Type  [] ts = new Type  [_ts  .length];
     byte  [] bs = new byte  [_ts  .length];
-    for( int i=0; i<as.length; i++ ) as[i]=sdual(_flds[i]);
+    for( int i=0; i<as.length; i++ ) as[i] = sdual(_flds  [i]);
     for( int i=0; i<ts.length; i++ ) ts[i] = _ts[i].dual();
     for( int i=0; i<bs.length; i++ ) bs[i] = fdual(_finals[i]);
     return new TypeStruct(!_any,as,ts,bs,_news.dual());
@@ -254,7 +254,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     Type  [] ts = new Type  [_ts  .length];
     byte  [] bs = new byte  [_ts  .length];
     for( int i=0; i<as.length; i++ ) as[i]=sdual(_flds[i]);
-    for( int i=0; i<bs.length; i++ ) bs[i] = fdual(_finals[i]);
+    for( int i=0; i<bs.length; i++ ) bs[i]=fdual(_finals[i]);
     TypeStruct dual = _dual = new TypeStruct(!_any,as,ts,bs,_news.dual());
     dual._hash = dual.compute_hash(); // Compute hash before recursion
     for( int i=0; i<ts.length; i++ ) ts[i] = _ts[i].rdual();
@@ -318,9 +318,9 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     Type  [] ts = new Type  [len];
     byte  [] bs = new byte  [len];
     for( int i=0; i<_ts.length; i++ ) {
-      as[i] = smeet(_flds[i],tmax._flds[i]);
-      ts[i] =    _ts[i].meet(tmax._ts  [i]); // Recursive not cyclic
-      bs[i] = fmeet(_finals[i],tmax._finals[i]);
+      as[i] = smeet(_flds  [i],     tmax._flds  [i]);
+      ts[i] =       _ts    [i].meet(tmax._ts    [i]); // Recursive not cyclic
+      bs[i] = fmeet(_finals[i],     tmax._finals[i]);
     }
     // Elements only in the longer tuple
     for( int i=_ts.length; i<len; i++ ) {
@@ -892,19 +892,20 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   }
 
   // Field modifiers make a tiny non-obvious lattice:
-  //    choice=0
-  // r/w=1     final=2
-  //    r-only=3
+  //           other-rw  other-read
+  // self-rw     r/w=3    own=  1
+  // self-read   r/o=2    final=0
   // Note that r/w is parallel to final, and mixing the two falls away from final.
-  static private byte fmeet( byte f0, byte f1 ) { return (byte)(f0|f1); }
-  static private byte fdual( byte f ) { return f==0||f==3 ? (byte)(3-f) : f; }
-  // Shows as "fld=1" for final, "fld:=1" for r/w, "fld-=1" for read-only, "fld~=1" for choice
-  static private String fstr( byte f ) { return new String[]{"~",":","","-"}[f]; }
-  public static byte f_choice(){ return 0; }
-  public static byte f_rw()   { return 1; }
-  public static byte f_final(){ return 2; }
-  public static byte f_ro()   { return 3; }
-
+  public  static byte fmeet( byte f0, byte f1 ) { return (byte)(f0&f1); }
+  private static byte fdual( byte f ) { return (byte)(3-f); }
+  // Shows as "fld=1" for final, "fld:=1" for r/w, "fld-=1" for read-only
+  private static String fstr( byte f ) { return new String[]{"!","+","~",":"}[f]; }
+  public static byte ftop()  { return frw(); }
+  public static byte fbot()  { return fdual(ftop()); }
+  public static byte frw()   { return 3; }
+  public static byte fro()   { return 2; }
+  public static byte fown()  { return 1; }
+  public static byte ffinal(){ return 0; }
 
   // Return the index of the matching field (or nth tuple), or -1 if not found
   // or field-num out-of-bounds.
@@ -926,11 +927,11 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     // No-such-field to update, so this is a program type-error.
     if( idx==-1 ) return ALLSTRUCT;
     // Update to a read-only/final field.  This is a program type-error
-    if( _finals[idx] != f_rw() ) return this;
+    if( _finals[idx] != frw() && _finals[idx] != fown() ) return this;
     byte[] finals = _finals;
     Type[] ts     = _ts;
     if( _finals[idx] != fin ) { finals = _finals.clone(); finals[idx] = fin; }
-    if( _ts    [idx] != val ) { ts     = _ts    .clone(); ts    [idx] = val; }
+    if( _ts    [idx] != val ) { ts     = _ts    .clone(); ts    [idx] = (val); }
     return malloc(_any,_flds,ts,finals,_news).hashcons_free();
   }
   // True if isBitShape on all bits
@@ -993,9 +994,10 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   @Override public TypeObj startype() {
     String[] as = new String[_flds.length];
     Type  [] ts = new Type  [_ts  .length];
-    byte  [] bs = new byte  [_ts  .length]; // f_choice is the high value is 0
+    byte  [] bs = new byte  [_ts  .length];
     for( int i=0; i<as.length; i++ ) as[i] = fldBot(_flds[i]) ? "^" : _flds[i];
     for( int i=0; i<ts.length; i++ ) ts[i] = _ts[i].above_center() ? _ts[i] : _ts[i].dual();
+    for( int i=0; i<bs.length; i++ ) bs[i] = ftop(); // top of lattice
     return malloc(true,as,ts,bs,_news.dual()).hashcons_free();
   }
   @Override TypeStruct make_base(TypeStruct obj) { return obj; }

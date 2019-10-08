@@ -71,7 +71,9 @@ public class StoreNode extends Node {
     int fnum = ts.find(_fld,_fld_num);
     if( fnum == -1 )
       return _badfld;
-    if( ts._finals[fnum] != TypeStruct.f_rw() ) return _badfin; // Trying to over-write a read-only or final
+    byte fmod = ts._finals[fnum];
+    if( fmod != TypeStruct.frw() && fmod != TypeStruct.fown() )
+      return _badfin; // Trying to over-write a read-only or final
     return null;
   }
   @Override public Type all_type() { return TypeMem.MEM; }

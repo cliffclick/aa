@@ -69,7 +69,7 @@ public class NewNode extends Node {
     gvn.unreg(this);
     TypeStruct ts = (TypeStruct)to.base();
     // Reconstruct obj with 'this' _news
-    TypeStruct ts2 = TypeStruct.make(ts._flds,ts._ts,oldts._finals,BitsAlias.make0(_alias));
+    TypeStruct ts2 = TypeStruct.make(ts._flds,ts._ts,ts._finals,BitsAlias.make0(_alias));
     assert ts2.isa(_ts);
     _ts = ts2;
     _obj = to.make(_ts);

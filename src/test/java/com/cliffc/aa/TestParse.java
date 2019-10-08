@@ -15,12 +15,11 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
     Object dummy = Env.GVN; // Force class loading cycle
-    //testerr ("a = @{y:=1}; b:!@{y} = a", "Fields are not final in final-only assignment",20);
-    testerr ("a = @{y:=1}; b:~@{y} = a", "Fields are not final in final-only assignment",20);
+    test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*[130],3)");
 
     // A collection of tests which like to fail easily
-    testerr ("Point=:@{x,y}; Point((0,1))", "*[9](nil,1) is not a *[2]@{x,y}",27);
-    test_ptr("x=@{n:=1,v:=2}; x.n := 3; x", "@{n:=3,v:=2}");
+    testerr ("Point=:@{x,y}; Point((0,1))", "*[9](nil,1) is not a *[2]@{!x,!y}",27);
+    test_ptr("x=@{n:=1,v:=2}; x.n := 3; x", "@{:n=3,:v=2}");
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'",20);
     testerr("{+}(1,2,3)", "Passing 3 arguments to {+} which takes 2 arguments",10);
     test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
@@ -164,7 +163,7 @@ public class TestParse {
     test("f0 = { x -> x ? {+}(f0(x-1),1) : 0 }; f0(2)", TypeInt.con(2));
     testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact()","Passing 0 arguments to fact={->} which takes 1 arguments",48);
     test_ptr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(0),fact(1),fact(2))",
-             (alias)-> TypeMemPtr.make(alias,TypeStruct.make(alias,Type.NIL,TypeInt.con(1),TypeInt.con(2))));
+             (alias)-> TypeMemPtr.make(alias,TypeStruct.make_alias(alias,Type.NIL,TypeInt.con(1),TypeInt.con(2))));
 
     // Co-recursion requires parallel assignment & type inference across a lexical scope
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.TRUE );
@@ -207,9 +206,9 @@ public class TestParse {
     testerr("fun:{int str -> int}={x y -> x+y}; fun(2,3)", "3 is not a *[3]str",43);
     // Test that the type-check is on the variable and not the function.
     test_ptr("fun={x y -> x*2}; bar:{int str -> int} = fun; baz:{int @{x,y} -> int} = fun; (fun(2,3),bar(2,\"abc\"))",
-            (alias -> TypeMemPtr.make(alias,TypeStruct.make(alias,TypeInt.con(4),TypeInt.con(4)))) );
+            (alias -> TypeMemPtr.make(alias,TypeStruct.make_alias(alias,TypeInt.con(4),TypeInt.con(4)))) );
     testerr("fun={x y -> x+y}; baz:{int @{x,y} -> int} = fun; (fun(2,3), baz(2,3))",
-            "3 is not a *[2]@{x,y}", 68);
+            "3 is not a *[2]@{!x,!y}", 68);
 
     testerr("x=3; fun:{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int64",40);
     test("x=3; fun:{real->real}={x -> x*2}; fun(2.1)+fun(x)", TypeFlt.con(2.1*2+3*2)); // Mix of types to fun()
@@ -231,8 +230,7 @@ public class TestParse {
 
   @Test public void testParse4() {
     // simple anon struct tests
-    Type[] ts = TypeStruct.ts(2);
-    test_ptr("  @{x,y} ", (alias -> TypeMemPtr.make(alias,TypeStruct.make(new String[]{"x","y"},ts,TypeStruct.finals(ts),alias)))); // simple anon struct decl
+    test_ptr("@{x,y}", (alias -> TypeMemPtr.make(alias,TypeStruct.make(new String[]{"x","y"},TypeStruct.ts(2),TypeStruct.finals(2),alias)))); // simple anon struct decl
     testerr("a=@{x=1.2,y}; x", "Unknown ref 'x'",15);
     testerr("a=@{x=1,x=2}", "Cannot define field '.x' twice",11);
     test   ("a=@{x=1.2,y,}; a.x", TypeFlt.con(1.2)); // standard "." field naming; trailing comma optional
@@ -252,7 +250,7 @@ public class TestParse {
     test   ("dist={p->p//qqq\n.//qqq\nx*p.x+p.y*p.y}; dist(//qqq\n@{x//qqq\n=1,y=2})", TypeInt.con(5));
 
     // Tuple
-    test_ptr("(0,\"abc\")", (alias -> TypeMemPtr.make(alias,TypeStruct.make(alias,Type.NIL,TypeMemPtr.ABCPTR))));
+    test_ptr("(0,\"abc\")", (alias -> TypeMemPtr.make(alias,TypeStruct.make_alias(alias,Type.NIL,TypeMemPtr.ABCPTR))));
     test("(1,\"abc\").0", TypeInt.TRUE);
     test("(1,\"abc\").1", TypeMemPtr.ABCPTR);
 
@@ -266,8 +264,8 @@ public class TestParse {
 
     test    ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
     test    ("Point=:@{x,y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
-    testerr ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1,y=2}))", "*[8]@{x=1,y=2} is not a *[2]Point:@{x,y}",68);
-    testerr ("Point=:@{x,y}; Point((0,1))", "*[8](nil,1) is not a *[2]@{x,y}",27);
+    testerr ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1,y=2}))", "*[8]@{!x=1,!y=2} is not a *[2]Point:@{!x,!y}",68);
+    testerr ("Point=:@{x,y}; Point((0,1))", "*[8](nil,1) is not a *[2]@{!x,!y}",27);
     testerr("x=@{n:,}","Missing type after ':'",6);
     testerr("x=@{n=,}","Missing ifex after assignment of 'n'",6);
   }
@@ -365,12 +363,12 @@ public class TestParse {
     // Test inferring a recursive struct type, with a little help
     Type[] ts0 = new Type[]{Type.NIL,TypeFlt.con(1.2*1.2)};
     test_ptr("map={x:@{n,v:flt}? -> x ? @{n=map(x.n),v=x.v*x.v} : 0}; map(@{n=0,v=1.2})",
-             (alias) -> TypeMemPtr.make(alias,TypeStruct.make(FLDS,ts0,TypeStruct.finals(ts0),alias)));
+             (alias) -> TypeMemPtr.make(alias,TypeStruct.make(FLDS,ts0,TypeStruct.finals(2),alias)));
 
     // Test inferring a recursive struct type, with less help.  This one
     // inlines so doesn't actually test inferring a recursive type.
     test_ptr("map={x -> x ? @{n=map(x.n),v=x.v*x.v} : 0}; map(@{n=0,v=1.2})",
-             (alias) -> TypeMemPtr.make(alias,TypeStruct.make(FLDS,ts0,TypeStruct.finals(ts0),alias)));
+             (alias) -> TypeMemPtr.make(alias,TypeStruct.make(FLDS,ts0,TypeStruct.finals(2),alias)));
 
     // Test inferring a recursive struct type, with less help. Too complex to
     // inline, so actual inference happens
@@ -381,7 +379,7 @@ public class TestParse {
     // Test inferring a recursive tuple type, with less help.  This one
     // inlines so doesn't actually test inferring a recursive type.
     test_ptr("map={x -> x ? (map(x.0),x.1*x.1) : 0}; map((0,1.2))",
-             (alias) -> TypeMemPtr.make(alias,TypeStruct.make(alias,Type.NIL,TypeFlt.con(1.2*1.2))));
+             (alias) -> TypeMemPtr.make(alias,TypeStruct.make_alias(alias,Type.NIL,TypeFlt.con(1.2*1.2))));
 
     test_ptr_isa("map={x -> x ? (map(x.0),x.1*x.1) : 0};"+
                  "map((math_rand(1)?0: (math_rand(1)?0: (math_rand(1)?0: (0,1.2), 2.3), 3.4), 4.5))",
@@ -463,7 +461,7 @@ public class TestParse {
     testerr("x=1+y","Unknown ref 'y'",5);
 
     test("x:=1", TypeInt.TRUE);
-    test_ptr("x:=0; a=x; x:=1; b=x; x:=2; (a,b,x)", (alias) -> TypeMemPtr.make(alias,TypeStruct.make(alias,Type.NIL,TypeInt.con(1),TypeInt.con(2))));
+    test_ptr("x:=0; a=x; x:=1; b=x; x:=2; (a,b,x)", (alias) -> TypeMemPtr.make(alias,TypeStruct.make_alias(alias,Type.NIL,TypeInt.con(1),TypeInt.con(2))));
 
     testerr("x=1; x:=2", "Cannot re-assign final val 'x'", 9);
     testerr("x=1; x=2", "Cannot re-assign final val 'x'", 8);
@@ -480,31 +478,30 @@ public class TestParse {
   @Test public void testParse10() {
     // Test re-assignment in struct
     Type[] ts = TypeStruct.ts(TypeInt.con(1), TypeInt.con(2));
-    test_ptr("x=@{n:=1,v:=2}", (alias) -> TypeMemPtr.make(alias,TypeStruct.make(FLDS, ts,TypeStruct.rw(ts),alias)));
+    test_ptr("x=@{n:=1,v:=2}", (alias) -> TypeMemPtr.make(alias,TypeStruct.make(FLDS, ts,TypeStruct.frws(2),alias)));
     testerr ("x=@{n =1,v:=2}; x.n  = 3; ", "Cannot re-assign final field '.n'",24);
     test    ("x=@{n:=1,v:=2}; x.n  = 3", TypeInt.con(3));
-    test_ptr("x=@{n:=1,v:=2}; x.n := 3; x", "@{n:=3,v:=2}");
+    test_ptr("x=@{n:=1,v:=2}; x.n := 3; x", "@{:n=3,:v=2}");
     testerr ("x=@{n:=1,v:=2}; x.n  = 3; x.v = 1; x.n = 4", "Cannot re-assign final field '.n'",42);
     test    ("x=@{n:=1,v:=2}; y=@{n=3,v:=4}; tmp = math_rand(1) ? x : y; tmp.n", TypeInt.NINT8);
     testerr ("x=@{n:=1,v:=2}; y=@{n=3,v:=4}; tmp = math_rand(1) ? x : y; tmp.n = 5", "Cannot re-assign final field '.n'",68);
     test    ("x=@{n:=1,v:=2}; foo={q -> q.n=3}; foo(x); x.n",TypeInt.con(3)); // Side effects persist out of functions
-    // Tuple assignment
-    testerr ("x=(1,2); x.0=3; x", "Cannot re-assign final field '.0'",14);
-    // Final-only type syntax.
-    testerr ("a = @{y:=1}; b:~@{y} = a", "Fields are not final in final-only assignment",20);
-    test    ("@{x:=1,y =2}:@{x,~y}.y", TypeInt.con(2)); // Allowed reading final field
-    testerr ("@{x:=1,y:=2}:@{x,~y}.y", "@{x,y} is not a @{x,~y}",24);
-    test    ("f={b:@{x,!y} -> b.y  }; f(@{x:=1,y =2}).y", TypeInt.con(2)); // Allowed reading final field
-    testerr ("f={b:@{x,!y} -> b.y  }; f(@{x:=1,y:=2}).y", "@{x,y} is not a @{x,!y}",24);
-    testerr ("f={b:@{x,!y} -> b.y=3}", "Cannot reassign final field '.y'",20);
-    // Read-only type syntax
-    test    ("f={b:@{-x,y} -> b.y=3}; f(@{x:=1,y:=2}).y", TypeInt.con(3));
-    testerr ("f={b:@{-x,y} -> b.y=3}; f(@{x:=1,y =2})","Cannot reassign final field '.y'",36);
-    testerr ("f={b:@{x,-y} -> b.y=3}","Cannot reassign read-only field '.y'",24);
-    testerr ("f={b:-@{x,y} -> b.y=3}","Cannot reassign read-only field '.y'",24);
-    test    ("f={b: @{x,y} -> b.y  }; f(@{x:=1,y:=2}:@{x,-y}).y", TypeInt.con(2));
-    testerr ("f={b: @{x,y} -> b.y=3}; f(@{x:=1,y:=2}:@{x,-y}).y", "Cannot reassign read-only field '.y'",36);
-
+    //// Tuple assignment
+    //testerr ("x=(1,2); x.0=3; x", "Cannot re-assign final field '.0'",14);
+    //// Final-only type syntax.
+    //testerr ("a = @{y:=1}; b:~@{y} = a", "Fields are not final in final-only assignment",20);
+    //test    ("@{x:=1,y =2}:@{x,~y}.y", TypeInt.con(2)); // Allowed reading final field
+    //testerr ("@{x:=1,y:=2}:@{x,~y}.y", "@{x,y} is not a @{x,~y}",24);
+    //test    ("f={b:@{x,!y} -> b.y  }; f(@{x:=1,y =2}).y", TypeInt.con(2)); // Allowed reading final field
+    //testerr ("f={b:@{x,!y} -> b.y  }; f(@{x:=1,y:=2}).y", "@{x,y} is not a @{x,!y}",24);
+    //testerr ("f={b:@{x,!y} -> b.y=3}", "Cannot reassign final field '.y'",20);
+    //// Read-only type syntax
+    //test    ("f={b:@{-x,y} -> b.y=3}; f(@{x:=1,y:=2}).y", TypeInt.con(3));
+    //testerr ("f={b:@{-x,y} -> b.y=3}; f(@{x:=1,y =2})","Cannot reassign final field '.y'",36);
+    //testerr ("f={b:@{x,-y} -> b.y=3}","Cannot reassign read-only field '.y'",24);
+    //testerr ("f={b:-@{x,y} -> b.y=3}","Cannot reassign read-only field '.y'",24);
+    //test    ("f={b: @{x,y} -> b.y  }; f(@{x:=1,y:=2}:@{x,-y}).y", TypeInt.con(2));
+    //testerr ("f={b: @{x,y} -> b.y=3}; f(@{x:=1,y:=2}:@{x,-y}).y", "Cannot reassign read-only field '.y'",36);
   }
   /*
 
