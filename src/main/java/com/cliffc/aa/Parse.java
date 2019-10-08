@@ -839,7 +839,7 @@ public class Parse {
         ts.add(t);
         if( !peek(',') ) break; // Final comma is optional
       }
-      return peek(')') ? TypeStruct.make(ts.asAry()) : null;
+      return peek(')') ? TypeStruct.make_tuple(ts.asAry()) : null;
     }
 
     // Primitive type

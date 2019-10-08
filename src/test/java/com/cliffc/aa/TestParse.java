@@ -15,7 +15,6 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
     Object dummy = Env.GVN; // Force class loading cycle
-    test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*[130],3)");
 
     // A collection of tests which like to fail easily
     testerr ("Point=:@{x,y}; Point((0,1))", "*[9](nil,1) is not a *[2]@{!x,!y}",27);
@@ -289,7 +288,7 @@ public class TestParse {
 
   @Test public void testParse6() {
     test_ptr("A= :(A?, int); A(0,2)","A:(nil,2)");
-    test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*[130],3)");
+    test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*[138],3)");
 
     // Building recursive types
     test_isa("A= :int; A(1)", (tmap -> TypeName.make("A",tmap,TypeInt.INT64)));
@@ -449,7 +448,7 @@ public class TestParse {
          "     ? @{l=map(tree.l,fun),r=map(tree.r,fun),v=fun(tree.v)}"+
          "     : 0};"+
          "map(tmp,{x->x+x})",
-         "@{l=*[0,216,],r=*[0,216,],v=int64}");
+         "@{!l=*[0,224,],!r=*[0,224,],!v=int64}");
   }
 
   @Test public void testParse9() {

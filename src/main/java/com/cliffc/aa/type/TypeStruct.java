@@ -213,12 +213,13 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public  static byte[] frws  (int n) { byte[] bs = new byte[n]; Arrays.fill(bs,frw   ()); return bs; } // All read-write
 
   public  static TypeStruct make(Type... ts) { return make_alias(BitsAlias.REC,ts); }
-  public  static TypeStruct make_alias(int nnn, Type... ts) { return malloc(false,FLDS[ts.length],ts,frws(ts.length),BitsAlias.make0(nnn)).hashcons_free(); }
+  public  static TypeStruct make_alias(int nnn, Type... ts) { return malloc(false,FLDS[ts.length],ts,finals(ts.length),BitsAlias.make0(nnn)).hashcons_free(); }
   public  static TypeStruct make(String[] flds, Type... ts) { return malloc(false,flds,ts,fbots(ts.length),BitsAlias.RECBITS).hashcons_free(); }
   public  static TypeStruct make(String[] flds, Type[] ts, byte[] finals) { return malloc(false,flds,ts,finals,BitsAlias.RECBITS).hashcons_free(); }
   public  static TypeStruct make(String[] flds, Type[] ts, byte[] finals, BitsAlias news) { return malloc(false,flds,ts,finals,news).hashcons_free(); }
   public  static TypeStruct make(String[] flds, Type[] ts, byte[] finals, int nnn) { return malloc(false,flds,ts,finals,BitsAlias.make0(nnn)).hashcons_free(); }
-  public  static TypeStruct make_tuple( int x ) { return make(FLDS[x],ts(x),frws(x)); }
+  public  static TypeStruct make_tuple( int x ) { return make_tuple(ts(x)); }
+  public  static TypeStruct make_tuple( Type[] ts ) { return make(FLDS[ts.length],ts,finals(ts.length)); }
   public  static TypeStruct make(String[] flds, byte[] finals) { return make(flds,ts(flds.length),finals); }
 
   public  static final TypeStruct POINT = make(flds("x","y"),ts(TypeFlt.FLT64,TypeFlt.FLT64));
