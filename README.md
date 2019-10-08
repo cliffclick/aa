@@ -49,14 +49,16 @@ BNF                           | Comment
 `prog = stmts END`            |
 `stmts= [tstmt or stmt][; stmts]*[;]?` | multiple statments; final ';' is optional
 `tstmt= tvar = :type`         | type variable assignment
-`stmt = [id[:type]? [:]=]* ifex` | ids are (re-)assigned, and are available in later statements
+`stmt = [id[:type]? [:]=]* ifex` | ids are (re-)assigned, and are available in later statements.  
 `stmt = ifex.field[:type] [:]= ifex` | Field assignment
 `ifex = expr ? expr : expr`   | trinary logic
 `expr = term [binop term]*`   | gather all the binops and sort by prec
-`term = tfact [tuple or tfact or .field]*` | application (includes uniop) or field,tuple lookup
-` `                           | application arg list: tfact(tuple)
-` `                           | application adjacent: tfact tfact
-` `                           | field and tuple lookup: tfact.field
+`term = tfact post`           | A term is a tfact and some more stuff...
+`post = empty`                | A term can be just a plain 'tfact'
+`post = (tuple) post`         | Application argument list
+`post = tfact post`           | Application as adjacent value
+`post = .field post`          | Field and tuple lookup
+`post = .field [:]= post`     | Field (re)assignment.  Plain '=' is a final assignment
 `tfact= fact[:type]`          | Optionally typed fact
 `fact = id`                   | variable lookup
 `fact = num`                  | number
@@ -76,8 +78,9 @@ BNF                           | Comment
 `type = tcon OR tfun OR tstruct OR ttuple OR tvar` | Types are a tcon or a tfun or a tstruct or a ttuple or a type variable
 `tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str` | Primitive types
 `tfun = {[[type]* ->]? type }` | Function types mirror func decls
-`tstruct = @{ [id[:type],]*}`  | Struct types are field names with optional types
-`ttuple = ([type][,[type]]* )` | Tuple types are just a list of optional types; the count of commas dictates the length, zero commas is zero length
+`tmod = empty | ! | ~`        | Empty for read-only, ! for read-write, ~ for final
+`tstruct = tmod@{ [tmod id[:type],]*}`  | Struct types are field names with optional types; modifiers can lead either the @ or any field.  Spaces not allowed.
+`ttuple = ([type][,[type]]* )` | Tuple types are just a list of optional types; the count of commas dictates the length, zero commas is zero length.  Tuples are always final.
 `tvar = id`                   | Type variable lookup 
 
 SIMPLE EXAMPLES

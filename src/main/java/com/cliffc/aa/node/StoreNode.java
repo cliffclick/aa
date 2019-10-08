@@ -12,7 +12,7 @@ public class StoreNode extends Node {
   private final String _badfld;
   private final String _badnil;
   private final String _badfin;
-  private final byte _fin;   // Final store==1
+  private final byte _fin;   // TypeStruct.f_final or TypeStruct.f_rw
   private StoreNode( Node ctrl, Node mem, Node adr, Node val, byte fin, String fld, int fld_num, Parse bad ) {
     super(OP_STORE,ctrl,mem,adr,val);
     _fld = fld;
@@ -55,9 +55,7 @@ public class StoreNode extends Node {
     if( !val.isa_scalar() )         // Nothing sane
       val = val.above_center() ? Type.XSCALAR : Type.SCALAR; // Pin to scalar for updates
     // Compute an updated memory state
-    TypeMem mem2 = ((TypeMem)mem).st((TypeMemPtr)adr, _fin, _fld, _fld_num, val);
-    
-    return mem2;
+    return ((TypeMem)mem).st((TypeMemPtr)adr, _fin, _fld, _fld_num, val);
   }
 
   @Override public String err(GVNGCM gvn) {
@@ -73,7 +71,7 @@ public class StoreNode extends Node {
     int fnum = ts.find(_fld,_fld_num);
     if( fnum == -1 )
       return _badfld;
-    if( ts._finals[fnum] == 1 ) return _badfin; // Trying to over-write a final
+    if( ts._finals[fnum] != TypeStruct.f_rw() ) return _badfin; // Trying to over-write a read-only or final
     return null;
   }
   @Override public Type all_type() { return TypeMem.MEM; }

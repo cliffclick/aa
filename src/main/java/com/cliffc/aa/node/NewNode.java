@@ -63,16 +63,18 @@ public class NewNode extends Node {
   // Called when folding a Named Constructor into this allocation site
   void set_name( GVNGCM gvn, TypeName to ) {
     Type oldt = gvn.type(this);
+    if( !(oldt instanceof TypeMemPtr) )  throw com.cliffc.aa.AA.unimpl();
+    TypeMemPtr poldt = (TypeMemPtr)oldt;
+    TypeStruct oldts = (TypeStruct)poldt._obj;
     gvn.unreg(this);
     TypeStruct ts = (TypeStruct)to.base();
     // Reconstruct obj with 'this' _news
-    TypeStruct ts2 = TypeStruct.make(ts._flds,ts._ts,ts._finals,BitsAlias.make0(_alias));
+    TypeStruct ts2 = TypeStruct.make(ts._flds,ts._ts,oldts._finals,BitsAlias.make0(_alias));
     assert ts2.isa(_ts);
     _ts = ts2;
     _obj = to.make(_ts);
     _ptr = TypeMemPtr.make(_alias,_obj);
-    if( !(oldt instanceof TypeMemPtr) )  throw com.cliffc.aa.AA.unimpl();
-    TypeMemPtr nameptr = _ptr.make(to.make(((TypeMemPtr)oldt)._obj));
+    TypeMemPtr nameptr = _ptr.make(to.make(poldt._obj));
     gvn.rereg(this,nameptr);
   }
 

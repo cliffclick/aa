@@ -189,7 +189,7 @@ public class TestType {
     TypeStruct ts0= TypeStruct.make(new String[]{"x"},nil);  // @{x:nil}
     Type tss = ts0.meet(t0);
     assertEquals(t0,tss);      // t0.isa(ts0)
-    byte[] finals = new byte[]{1};
+    byte[] finals = new byte[]{TypeStruct.f_final()};
 
     // meet @{c:0}? and @{c:@{x:1}?,}
     int alias0 = BitsAlias.new_alias(BitsAlias.REC);
@@ -267,7 +267,8 @@ public class TestType {
 
     // Anonymous recursive structs -
     // - struct with pointer to self
-    TypeStruct ts0 = TypeStruct.malloc(false,flds,new Type[2],new byte[]{1,1},BitsAlias.RECBITS);
+    byte[] finals = new byte[]{TypeStruct.f_final(),TypeStruct.f_final()};
+    TypeStruct ts0 = TypeStruct.malloc(false,flds,new Type[2],finals,BitsAlias.RECBITS);
     ts0._hash = ts0.compute_hash();
     ts0._ts[0] = ts0ptr;    ts0._cyclic = true;
     ts0._ts[1] = TypeInt.INT64;
@@ -275,7 +276,7 @@ public class TestType {
     TypeMem ts0mem = TypeMem.make(alias1,ts0); // {1:@{n:*[1],v:int} }
 
     // - struct with pointer to self or nil
-    TypeStruct ts1 = TypeStruct.malloc(false,flds,new Type[2],new byte[]{1,1},BitsAlias.RECBITS);
+    TypeStruct ts1 = TypeStruct.malloc(false,flds,new Type[2],finals,BitsAlias.RECBITS);
     ts1._hash = ts1.compute_hash();
     ts1._ts[0] = ts0ptr0;  ts1._cyclic = true;
     ts1._ts[1] = TypeInt.INT64;
@@ -351,7 +352,6 @@ public class TestType {
     // nesting infinitely deep, then it must contain a NewNode also.
     int alias = BitsAlias.new_alias(BitsAlias.REC);
     Type[] tts = TypeStruct.ts(Type.NIL,TypeInt.con(0));
-    byte[] finals = TypeStruct.bs(tts);
     TypeStruct ts = TypeStruct.make(TypeStruct.FLDS(2),tts,finals,alias);
     TypeMemPtr phi = TypeMemPtr.make(alias,ts);
     for( int i=1; i<20; i++ ) {
@@ -383,7 +383,8 @@ public class TestType {
 
     // T = :(T?,i64)
     int alias = BitsAlias.new_alias(BitsAlias.REC);
-    TypeStruct T = TypeStruct.malloc(false,flds,new Type[2],new byte[]{1,1},BitsAlias.RECBITS);
+    byte[] finals = new byte[]{TypeStruct.f_final(),TypeStruct.f_final()};
+    TypeStruct T = TypeStruct.malloc(false,flds,new Type[2],finals,BitsAlias.RECBITS);
     T._hash = T.compute_hash();
     Type.RECURSIVE_MEET++;
     Type TN = TypeMemPtr.make_nil(alias,T);  TN._cyclic = true;

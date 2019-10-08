@@ -11,11 +11,6 @@ import java.text.ParsePosition;
 import java.util.BitSet;
 
 /*
-  read-only syntax:
-    A:=@{n,v}
-  var:!A := ...read-only pointer to A, cannot write @{n,v}
-  var:@{!n,v} := read anything (including A) but cannot write n, but can write v
-
   Array creation: just [7] where '[' is a unary prefix, and ']' is a unary postfix.
   ary = [7]; // untyped, will infer
   ary = [7]:int; // typed as array of int
@@ -45,14 +40,12 @@ import java.util.BitSet;
  *  stmt = [id[:type]? [:]=]* ifex // ids are (re-)assigned, and are available in later statements
  *  ifex = expr ? expr : expr      // trinary logic
  *  expr = term [binop term]*      // gather all the binops and sort by precedence
- *  term = tfact [tuple or tfact or .field]* // application (includes uniop) or field,tuple lookup
- *                                 // application arg list: tfact(tuple)
- *                                 // application adjacent: tfact tfact
- *                                 // field and tuple lookup: tfact.field
- *
- *  term = tfact post
- *  post = empty | (tuple) post | tfact post | .field post | .field [:]= stmt
- *
+ *  term = tfact post              // A term is a tfact and some more stuff...
+ *  post = empty                   // A term can be just a plain 'tfact'
+ *  post = (tuple) post            // Application argument list
+ *  post = tfact post              // Application as adjacent value
+ *  post = .field post             // Field and tuple lookup
+ *  post = .field [:]= post        // Field (re)assignment.  Plain '=' is a final assignment
  *  tfact= fact[:type]             // Typed fact
  *  fact = id                      // variable lookup
  *  fact = num                     // number
@@ -73,8 +66,12 @@ import java.util.BitSet;
  *  type = tcon | tvar | tfun[?] | tstruct[?] | ttuple[?] // Types are a tcon or a tfun or a tstruct or a type variable.  A trailing ? means 'nilable'
  *  tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str[?]
  *  tfun = {[[type]* ->]? type }   // Function types mirror func declarations
- *  ttuple = ( [:type]?,* )        // Tuple types are just a list of optional types; the count of commas dictates the length, zero commas is zero length
- *  tstruct = @{ [id[:type],]*}    // Struct types are field names with optional types
+ *  ttuple = ( [:type]?,* )        // Tuple types are just a list of optional types;
+                                   // the count of commas dictates the length, zero commas is zero length.
+                                   // Tuples are always final.
+ *  tmod = empty | ! | ~           // Empty for read-only, ! for read-write, ~ for final
+ *  tstruct = tmod@{ [tmod id[:type],]*} // Struct types are field names with optional types.  Modifiers can lead either the @ or any field.  Spaces not allowed.
+
  */
 
 public class Parse {
@@ -446,7 +443,7 @@ public class Parse {
         int fnum = fld==null ? field_number() : -1;
         if( fld==null && fnum==-1 ) n = err_ctrl2("Missing field name after '.'");
         else if( peek(":=") || peek('=') ) {
-          byte fin = (byte)(_buf[_x-2]==':' ? 0 : 1); // 1 for final store
+          byte fin = _buf[_x-2]==':' ? TypeStruct.f_rw() : TypeStruct.f_final();
           Node stmt = stmt();
           if( stmt == null ) n = err_ctrl2("Missing stmt after assigning field '."+fld+"'");
           else if( fld != null ) set_mem(gvn(new StoreNode(ctrl(),mem(),n,n=stmt,fin,fld ,errMsg())));
@@ -637,9 +634,10 @@ public class Parse {
             stmt = err_ctrl2("Missing type after ':'");
           if( peek(":=") ) { is_final = false; _x--; } // Parse := re-assignable field token
         }
-        if( peek('=') )         // Parse field initial value
+        if( peek('=') ) {       // Parse field initial value
           if( (stmt=stmt())==null )
             stmt = err_ctrl2("Missing ifex after assignment of '"+tok+"'");
+        }
 
         // Check for repeating a field name
         if( e._scope.get(tok)!=null ) {
@@ -665,7 +663,7 @@ public class Parse {
       for( int i=0; i<toks._len; i++ )
         flds[i+1] = e._scope.get(toks.at(i));
       byte[] finals = new byte[toks._len];
-      for(int i=0; i<finals.length; i++ ) if( fs.get(i) ) finals[i] = 1;
+      for(int i=0; i<finals.length; i++ ) finals[i] = fs.get(i) ? TypeStruct.f_final() : TypeStruct.f_rw();
       return do_mem(new NewNode(flds,TypeStruct.make(toks.asAry(),finals)));
     } // Pop lexical scope around struct
   }
@@ -738,7 +736,8 @@ public class Parse {
    *  type = tcon | tfun | tstruct | ttuple | tvar  // Type choices
    *  tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str[?]
    *  tfun = {[[type]* ->]? type } // Function types mirror func decls
-   *  tstruct = @{ [id[:type?],]*}  // Struct types are field names with optional types
+   *  tmod = | - | !  // Empty for r/o, ! for read-write, ~ for final
+   *  tstruct = tmod @{ [tmod id[:type?],]*}  // Struct types are field names with optional types
    *  ttuple = ([type?] [,[type?]]*) // List of types, trailing comma optional
    *  tvar = A previously declared type variable
    *
@@ -766,10 +765,17 @@ public class Parse {
   // Wrap in a nullable if there is a trailing '?'.  No spaces allowed
   private Type typeq(Type t) { return peek_noWS('?') ? t.meet_nil() : t; }
 
+  // No mod is r/o, the default.  '!' is read-write, '~' is final.
+  // Current '-' is ambiguous with function arrow ->.
+  private byte tmod() {
+    if( peek('!') ) return TypeStruct.f_rw();    // read-write
+    if( peek('~') ) return TypeStruct.f_final(); // final
+    return TypeStruct.f_ro();   // read-only
+  }
+
   // Type or null or TypeErr.ANY for '->' token
   private Type type0(boolean type_var) {
-    byte c = skipWS();
-    if( peek1(c,'{') ) { // Function type
+    if( peek('{') ) {           // Function type
       Ary<Type> ts = new Ary<>(new Type[1],0);  Type t;
       while( (t=typep(type_var)) != null && t != Type.ANY  )
         ts.add(t);              // Collect arg types
@@ -786,23 +792,33 @@ public class Parse {
       return typeq(TypeFunPtr.make(BitsFun.NZERO,targs,ret));
     }
 
-    if( peek2(c,"@{") ) { // Struct type
+    byte tmod = tmod();         // Whole-struct access modifier
+    if( peek("@{") ) {          // Struct type
       Ary<String> flds = new Ary<>(new String[1],0);
       Ary<Type  > ts   = new Ary<>(new Type  [1],0);
+      Ary<Byte  > mods = new Ary<>(new Byte  [1],0);
       while( true ) {
-        String tok = token();    // Scan for 'id'
-        if( tok == null ) break; // end-of-struct-def
-        Type t = Type.SCALAR;    // Untyped, most generic field type
-        if( peek(':') &&         // Has type annotation?
-            (t=typep(type_var)) == null)              // Parse type, wrap ptrs
-          return null;                                // not a type
+        byte tmodf = tmod();             // Field access mod
+        String tok = token();            // Scan for 'id'
+        if( tok == null ) {              // end-of-struct-def
+          if( tmodf != 0 ) return null;  // Found a field access mod but not field
+          break;
+        }
+        Type t = Type.SCALAR;            // Untyped, most generic field type
+        if( peek(':') &&                 // Has type annotation?
+            (t=typep(type_var)) == null) // Parse type, wrap ptrs
+          return null;                   // not a type
         if( flds.find(tok) != -1 ) throw AA.unimpl(); // cannot use same field name twice
-        flds.add(tok);          // Gather for final type
-        ts  .add(t);
+        flds  .add(tok);                 // Gather for final type
+        ts    .add(t);
+        mods  .add((byte)Math.max(tmod,tmodf));// Most conservative of struct & field mods
         if( !peek(',') ) break; // Final comma is optional
       }
-      return peek('}') ? TypeStruct.make(flds.asAry(),ts.asAry()) : null;
+      byte[] finals = new byte[mods._len];
+      for( int i=0; i<mods._len; i++ )  finals[i] = mods.at(i);
+      return peek('}') ? TypeStruct.make(flds.asAry(),ts.asAry(),finals) : null;
     }
+    if( tmod != TypeStruct.f_ro() ) return null; // Found a struct-modifier without a struct
 
     // "()" is the zero-entry tuple
     // "(   ,)" is a 1-entry tuple
@@ -810,7 +826,8 @@ public class Parse {
     // "(int,)" is a 1-entry tuple (optional trailing comma)
     // "(,int)" is a 2-entry tuple
     // "(, , )" is a 2-entry tuple
-    if( peek1(c,'(') ) { // Tuple type
+    if( peek('(') ) { // Tuple type
+      byte c;
       Ary<Type> ts = new Ary<>(new Type[1],0);
       while( (c=skipWS()) != ')' ) { // No more types...
         Type t = Type.SCALAR;    // Untyped, most generic field type

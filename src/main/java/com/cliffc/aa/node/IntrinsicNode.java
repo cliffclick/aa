@@ -133,9 +133,16 @@ public abstract class IntrinsicNode extends Node {
       int fd = from._obj instanceof TypeName ? ((TypeName)from._obj)._depth : -1;
       int od =       obj instanceof TypeName ? ((TypeName)      obj)._depth : -1;
       if( fd != od ) return obj.above_center() ? to.dual() : to; // Name-depth does not match, node is in-error
+      // 'ptr' might be 'dull' during iter() while 'mem' gets sharp first.
+      // Then the 'ld' can correctly return a TypeStruct with a sharper '_news'
+      // than 'ptr'.  Bail out and wait for ptr to sharpen up.
+      TypeMemPtr tptr = (TypeMemPtr)ptr;
+      if( obj instanceof TypeStruct && tptr._aliases != ((TypeStruct)obj)._news )
+        return obj.above_center() ? to.dual() : to; // Name-depth does not match, node is in-error
+      
       // Wrap result in 1 layer of Name
       TypeName tnto = tname.make(obj);// Named to obj
-      return ((TypeMemPtr)ptr).make(tnto);
+      return tptr.make(tnto);
     }
     @Override public String err(GVNGCM gvn) {
       Type ptr = gvn.type(ptr());

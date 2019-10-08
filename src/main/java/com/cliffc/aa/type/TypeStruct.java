@@ -13,17 +13,20 @@ import java.util.function.Predicate;
 /** A memory-based Tuple with optionally named fields.  This is a recursive
  *  type, only produced by NewNode and structure or tuple constants.  Fields
  *  can be indexed by field name or numeric constant (i.e. tuples), but NOT by
- *  a general number - thats an Array.
+ *  a general number - thats an Array.  Field access mods make a small lattice
+ *  of: {choice,r/w,final,r-o}.  Note that mixing r/w and final moves to r-o and
+ *  loses the final property.
  *
  *  The recursive type poses some interesting challenges.  It is represented as
  *  literally a cycle of pointers which must include a TypeStruct (and not a
- *  TypeTuple which only roots Types).  Type inference involves finding the
- *  Meet of two cyclic structures.  The cycles will not generally be of the
- *  same length.  However, each field Meets independently (and fields in one
- *  structure but not the other are not in the final Meet).  This means we are
- *  NOT trying to solve the general problem of graph-equivalence (a known NP
- *  hard problem).  Instead we can solve each field independently and also
- *  intersect across common fields.
+ *  TypeTuple which only roots Types) and a TypeMemPtr (edge), and possibly
+ *  some TypeNames.  Type inference involves finding the Meet of two cyclic
+ *  structures.  The cycles will not generally be of the same length.  However,
+ *  each field Meets independently (and fields in one structure but not the
+ *  other are not in the final Meet).  This means we are NOT trying to solve
+ *  the general problem of graph-equivalence (a known NP hard problem).
+ *  Instead we can solve each field independently and also intersect across
+ *  common fields.
  *
  *  When solving across a single field, we will find some prefix and then
  *  possibly a cycle - conceptually the type unrolls forever.  When doing the
@@ -37,8 +40,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // is Top; a '.' is Bot; all other values are valid field names.
   public @NotNull String @NotNull[] _flds;  // The field names
   public Type[] _ts;            // Matching field types
-  public byte[] _finals;        // Fields that are final; 1==read-only, 0=r/w
-  BitsAlias _news;              // NewNode aliases that make this type
+  public byte[] _finals;        // Fields that are final; see fmeet, fdual, fstr
+  public BitsAlias _news;       // NewNode aliases that make this type
   private TypeStruct _uf;       // Tarjan Union-Find, used during cyclic meet
   private TypeStruct     ( boolean any, String[] flds, Type[] ts, byte[] finals, BitsAlias news) { super(TSTRUCT, any); init(any,flds,ts,finals,news); }
   private TypeStruct init( boolean any, String[] flds, Type[] ts, byte[] finals, BitsAlias news) {
@@ -148,7 +151,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     for( int i=0; i<_flds.length; i++ ) {
       if( !is_tup ) sb.p(_flds[i]);
       Type t = at(i);
-      if( !is_tup && t != SCALAR ) sb.p(_finals[i]==0 ? ":=" : "=");
+      if( !is_tup && t != SCALAR ) sb.p(fstr(_finals[i])).p('=');
       if( t==null ) sb.p("!");  // Graceful with broken types
       else if( t==SCALAR ) ;    // Default answer, do not print
       else if( t instanceof TypeMemPtr ) sb.p("*"+((TypeMemPtr)t)._aliases); // Do not recurse here, gets too big too fast
@@ -173,7 +176,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       sb.i();                   // indent, 1 field per line
       if( !is_tup ) sb.p(_flds[i]);
       Type t = at(i);
-      if( !is_tup && t != SCALAR ) sb.p(_finals[i]==0 ? ":=" : "=");
+      if( !is_tup && t != SCALAR ) sb.p(fstr(_finals[i])).p('=');
       if( t==null ) sb.p("!");  // Graceful with broken types
       else if( t==SCALAR ) ;    // Default answer, do not print
       else t.dstr(sb,dups);     // Recursively print field type
@@ -204,8 +207,10 @@ public class TypeStruct extends TypeObj<TypeStruct> {
           static String[] FLDS( int len ) { return FLDS[len]; }
   private static String[] flds(String... fs) { return fs; }
   public  static Type[] ts(Type... ts) { return ts; }
-  private static Type[] ts(int n) { Type[] ts = new Type[n]; Arrays.fill(ts,SCALAR); return ts; } // All Scalar fields
-  public  static byte[] bs(Type[] ts) { byte[] bs = new byte[ts.length]; Arrays.fill(bs,(byte)1); return bs; } // All read-only
+  public  static Type[] ts(int n) { Type[] ts = new Type[n]; Arrays.fill(ts,SCALAR); return ts; } // All Scalar fields
+  public  static byte[] bs(Type[] ts) { byte[] bs = new byte[ts.length]; Arrays.fill(bs,f_ro()); return bs; } // All read-only
+  public  static byte[] finals(Type[] ts) { byte[] bs = new byte[ts.length]; Arrays.fill(bs,f_final()); return bs; } // All read-only
+  public  static byte[] rw(Type[] ts) { byte[] bs = new byte[ts.length]; Arrays.fill(bs,f_rw()); return bs; } // All read-only
 
   public  static TypeStruct make(         Type... ts) { return make(BitsAlias.REC,ts); }
   public  static TypeStruct make(int nnn, Type... ts) { return malloc(false,FLDS[ts.length],ts,bs(ts),BitsAlias.make0(nnn)).hashcons_free(); }
@@ -222,7 +227,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public  static final TypeStruct A     = make(flds("a"),ts(TypeFlt.FLT64 ));
   private static final TypeStruct C0    = make(flds("c"),ts(TypeInt.FALSE )); // @{c:0}
   private static final TypeStruct D1    = make(flds("d"),ts(TypeInt.TRUE  )); // @{d:1}
-  private static final TypeStruct ARW   = make(flds("a"),ts(TypeFlt.FLT64),new byte[1]);
+  private static final TypeStruct ARW   = make(flds("a"),ts(TypeFlt.FLT64),new byte[]{f_rw()});
   public  static final TypeStruct GENERIC = malloc(true,FLD0,new Type[0],new byte[0],BitsAlias.RECBITS).hashcons_free();
           static final TypeStruct ALLSTRUCT = make();
 
@@ -238,7 +243,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     byte  [] bs = new byte  [_ts  .length];
     for( int i=0; i<as.length; i++ ) as[i]=sdual(_flds[i]);
     for( int i=0; i<ts.length; i++ ) ts[i] = _ts[i].dual();
-    for( int i=0; i<bs.length; i++ ) bs[i] = (byte)(_finals[i]^1);
+    for( int i=0; i<bs.length; i++ ) bs[i] = fdual(_finals[i]);
     return new TypeStruct(!_any,as,ts,bs,_news.dual());
   }
 
@@ -249,7 +254,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     Type  [] ts = new Type  [_ts  .length];
     byte  [] bs = new byte  [_ts  .length];
     for( int i=0; i<as.length; i++ ) as[i]=sdual(_flds[i]);
-    for( int i=0; i<bs.length; i++ ) bs[i] = (byte)(_finals[i]^1);
+    for( int i=0; i<bs.length; i++ ) bs[i] = fdual(_finals[i]);
     TypeStruct dual = _dual = new TypeStruct(!_any,as,ts,bs,_news.dual());
     dual._hash = dual.compute_hash(); // Compute hash before recursion
     for( int i=0; i<ts.length; i++ ) ts[i] = _ts[i].rdual();
@@ -315,7 +320,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     for( int i=0; i<_ts.length; i++ ) {
       as[i] = smeet(_flds[i],tmax._flds[i]);
       ts[i] =    _ts[i].meet(tmax._ts  [i]); // Recursive not cyclic
-      bs[i] = (byte)(_finals[i]|tmax._finals[i]);
+      bs[i] = fmeet(_finals[i],tmax._finals[i]);
     }
     // Elements only in the longer tuple
     for( int i=_ts.length; i<len; i++ ) {
@@ -377,7 +382,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     len = Math.min(len,mx._ts.length);
     for( int i=0; i<len; i++ ) {
       mt._flds[i] = smeet(mt._flds[i],mx._flds[i]); // Set the Meet of field names
-      mt._finals[i] |= mx._finals[i];
+      mt._finals[i] = fmeet(mt._finals[i],mx._finals[i]);
     }
     mt._news = mt._news.meet(mx._news);
     mt._hash = mt.compute_hash(); // Compute hash now that fields and finals are set
@@ -610,8 +615,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       // Meet all the non-recursive parts
       nts._any &= ots._any;
       for( int i=0; i<clen; i++ ) {
-        nts._flds  [i]  = smeet(nts._flds[i],ots._flds[i]); // Set the Meet of field names
-        nts._finals[i] |= ots._finals[i];
+        nts._flds  [i] = smeet(nts._flds[i],ots._flds[i]); // Set the Meet of field names
+        nts._finals[i] = fmeet(nts._finals[i],ots._finals[i]);
       }
       if( clen != len ) throw AA.unimpl();
       nts._news = nts._news.meet(ots._news);
@@ -886,6 +891,21 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return s;
   }
 
+  // Field modifiers make a tiny non-obvious lattice:
+  //    choice=0
+  // r/w=1     final=2
+  //    r-only=3
+  // Note that r/w is parallel to final, and mixing the two falls away from final.
+  static private byte fmeet( byte f0, byte f1 ) { return (byte)(f0|f1); }
+  static private byte fdual( byte f ) { return f==0||f==3 ? (byte)(3-f) : f; }
+  // Shows as "fld=1" for final, "fld:=1" for r/w, "fld-=1" for read-only, "fld~=1" for choice
+  static private String fstr( byte f ) { return new String[]{"~",":","","-"}[f]; }
+  public static byte f_choice(){ return 0; }
+  public static byte f_rw()   { return 1; }
+  public static byte f_final(){ return 2; }
+  public static byte f_ro()   { return 3; }
+
+
   // Return the index of the matching field (or nth tuple), or -1 if not found
   // or field-num out-of-bounds.
   public int find( String fld, int fld_num ) {
@@ -905,8 +925,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     int idx = find(fld,fld_num);
     // No-such-field to update, so this is a program type-error.
     if( idx==-1 ) return ALLSTRUCT;
-    // Update to a final field.  This is a program type-error
-    if( _finals[idx] == 1 ) return this;
+    // Update to a read-only/final field.  This is a program type-error
+    if( _finals[idx] != f_rw() ) return this;
     byte[] finals = _finals;
     Type[] ts     = _ts;
     if( _finals[idx] != fin ) { finals = _finals.clone(); finals[idx] = fin; }
@@ -973,7 +993,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   @Override public TypeObj startype() {
     String[] as = new String[_flds.length];
     Type  [] ts = new Type  [_ts  .length];
-    byte  [] bs = new byte  [_ts  .length]; // r-w is the high value
+    byte  [] bs = new byte  [_ts  .length]; // f_choice is the high value is 0
     for( int i=0; i<as.length; i++ ) as[i] = fldBot(_flds[i]) ? "^" : _flds[i];
     for( int i=0; i<ts.length; i++ ) ts[i] = _ts[i].above_center() ? _ts[i] : _ts[i].dual();
     return malloc(true,as,ts,bs,_news.dual()).hashcons_free();

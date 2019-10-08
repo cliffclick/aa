@@ -11,7 +11,7 @@ import java.util.function.Predicate;
 // Loads and Stores.  They carry a set of aliased TypeObjs.
 public final class TypeMemPtr extends Type<TypeMemPtr> {
   // List of known memory aliases.  Zero is nil.
-  BitsAlias _aliases;
+  public BitsAlias _aliases;
   public TypeObj _obj;          // Meet/join of aliases
 
   private TypeMemPtr(BitsAlias aliases, TypeObj obj ) { super     (TMEMPTR); init(aliases,obj); }
@@ -67,7 +67,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     TypeMemPtr t2 = (TypeMemPtr)t1.hashcons();
     return t1==t2 ? t1 : t1.free(t2);
   }
-  
+
   public static TypeMemPtr make( int alias, TypeObj obj ) {
     BitsAlias aliases = BitsAlias.make0(alias);
     return make(aliases,narrow_obj(aliases,obj));

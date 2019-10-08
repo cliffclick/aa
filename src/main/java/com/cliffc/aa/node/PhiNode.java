@@ -10,7 +10,7 @@ public class PhiNode extends Node {
   final String _badgc;
   Type _default_type;
   public PhiNode( String badgc, Node... vals) { this(badgc,Type.SCALAR,vals); }
-  public PhiNode( String badgc, Type defalt, Node... vals) {
+  PhiNode( String badgc, Type defalt, Node... vals ) {
     super(OP_PHI,vals);
     _default_type = defalt instanceof TypeMem ? TypeMem.MEM : defalt;
     _badgc = badgc;
