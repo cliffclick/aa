@@ -143,7 +143,6 @@ public class FunNode extends RegionNode {
       return this;
     }
 
-
     if( gvn._small_work ) { // Only doing small-work now
       gvn.add_work2(this);  // Maybe want to inline later
       return null;
@@ -417,6 +416,12 @@ public class FunNode extends RegionNode {
     // Kill the unknown_caller path.
     if( path >= 0 && has_unknown_callers() )
       fun.set_def(1,gvn.con(Type.XCTRL),gvn);
+    else if( path < 0 && has_unknown_callers() ) {
+      // Change the unknown caller parm types to match the new sig
+      for( Node parm : fun._uses )
+        if( parm instanceof ParmNode )
+          parm.set_def(1,gvn.con(fun.targ(((ParmNode)parm)._idx)),gvn);
+    }
 
     // Make an Unresolved choice of the old and new functions, to be used by
     // non-application uses.  E.g., passing a unresolved function pointer to a
