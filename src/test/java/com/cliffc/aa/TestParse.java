@@ -17,7 +17,7 @@ public class TestParse {
     Object dummy = Env.GVN; // Force class loading cycle
 
     // A collection of tests which like to fail easily
-    testerr ("Point=:@{x,y}; Point((0,1))", "*[9](nil,1) is not a *[2]@{!x,!y}",27);
+    testerr ("Point=:@{x,y}; Point((0,1))", "*[9](nil,1) is not a *[2]@{~x,~y}",27);
     test_ptr("x=@{n:=1,v:=2}; x.n := 3; x", "@{:n=3,:v=2}");
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'",20);
     testerr("{+}(1,2,3)", "Passing 3 arguments to {+} which takes 2 arguments",10);
@@ -207,7 +207,7 @@ public class TestParse {
     test_ptr("fun={x y -> x*2}; bar:{int str -> int} = fun; baz:{int @{x,y} -> int} = fun; (fun(2,3),bar(2,\"abc\"))",
             (alias -> TypeMemPtr.make(alias,TypeStruct.make_tuple(alias,TypeInt.con(4),TypeInt.con(4)))) );
     testerr("fun={x y -> x+y}; baz:{int @{x,y} -> int} = fun; (fun(2,3), baz(2,3))",
-            "3 is not a *[2]@{!x,!y}", 68);
+            "3 is not a *[2]@{~x,~y}", 68);
 
     testerr("x=3; fun:{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int64",40);
     test("x=3; fun:{real->real}={x -> x*2}; fun(2.1)+fun(x)", TypeFlt.con(2.1*2+3*2)); // Mix of types to fun()
@@ -263,8 +263,8 @@ public class TestParse {
 
     test    ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
     test    ("Point=:@{x,y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
-    testerr ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1,y=2}))", "*[8]@{!x=1,!y=2} is not a *[2]Point:@{!x,!y}",68);
-    testerr ("Point=:@{x,y}; Point((0,1))", "*[8](nil,1) is not a *[2]@{!x,!y}",27);
+    testerr ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1,y=2}))", "*[8]@{!x=1,!y=2} is not a *[2]Point:@{~x,~y}",68);
+    testerr ("Point=:@{x,y}; Point((0,1))", "*[8](nil,1) is not a *[2]@{~x,~y}",27);
     testerr("x=@{n:,}","Missing type after ':'",6);
     testerr("x=@{n=,}","Missing ifex after assignment of 'n'",6);
   }
@@ -503,8 +503,8 @@ public class TestParse {
     // Tuple assignment
     testerr ("x=(1,2); x.0=3; x", "Cannot re-assign final field '.0'",14);
     // Final-only type syntax.
-    //testerr ("a = @{y:=1}; b:~@{y} = a; b", "Fields are not final in final-only assignment",20);
-    //test    ("@{x:=1,y =2}:@{x,~y}.y", TypeInt.con(2)); // Allowed reading final field
+    testerr ("ptr2rw = @{f:=1}; ptr2final:~@{f} = ptr2rw; ptr2final", "*[270]@{:f=1} is not a *[2]@{!f}",42);
+    test    ("@{x:=1,y =2}:@{x,~y}.y", TypeInt.con(2)); // Allowed reading final  field
     //testerr ("@{x:=1,y:=2}:@{x,~y}.y", "@{x,y} is not a @{x,~y}",24);
     //test    ("f={b:@{x,!y} -> b.y  }; f(@{x:=1,y =2}).y", TypeInt.con(2)); // Allowed reading final field
     //testerr ("f={b:@{x,!y} -> b.y  }; f(@{x:=1,y:=2}).y", "@{x,y} is not a @{x,!y}",24);

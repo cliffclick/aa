@@ -69,7 +69,7 @@ import java.util.BitSet;
  *  ttuple = ( [:type]?,* )        // Tuple types are just a list of optional types;
                                    // the count of commas dictates the length, zero commas is zero length.
                                    // Tuples are always final.
- *  tmod = empty | ! | ~           // Empty for read-only, ! for read-write, ~ for final
+ *  tmod = empty | ~ | !           // Empty for read-only, ! for read-write, ~ for final
  *  tstruct = tmod@{ [tmod id[:type],]*} // Struct types are field names with optional types.  Modifiers can lead either the @ or any field.  Spaces not allowed.
 
  */
@@ -736,7 +736,7 @@ public class Parse {
    *  type = tcon | tfun | tstruct | ttuple | tvar  // Type choices
    *  tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str[?]
    *  tfun = {[[type]* ->]? type } // Function types mirror func decls
-   *  tmod = | - | !  // Empty for r/o, ! for read-write, ~ for final
+   *  tmod = | ~ | !  // Empty for r/o, ~ for final, ! for read-write; do not love the syntax
    *  tstruct = tmod @{ [tmod id[:type?],]*}  // Struct types are field names with optional types
    *  ttuple = ([type?] [,[type?]]*) // List of types, trailing comma optional
    *  tvar = A previously declared type variable
@@ -765,15 +765,17 @@ public class Parse {
   // Wrap in a nullable if there is a trailing '?'.  No spaces allowed
   private Type typeq(Type t) { return peek_noWS('?') ? t.meet_nil() : t; }
 
-  // No mod is r/w, the default.  '~' is read-only, '!' is final.
-  // Current '-' is ambiguous with function arrow ->.
+  // No mod is r/o, the default and lattice bottom.  '!' is read-write, '~' is
+  // final.  Currently '-' is ambiguous with function arrow ->.
   private byte tmod() {
-    if( peek('!') ) return TypeStruct.ffinal();    // final
-    if( peek('~') ) return TypeStruct.fro(); // read-only
+    if( peek('~') ) return TypeStruct.ffinal(); // final
+    if( peek('!') ) return TypeStruct.frw();    // read-write
     return tmod_default();
   }
-  private byte tmod_default() { return TypeStruct.ffinal(); }
-  //return TypeStruct.frw();   // read-write
+  // Experimenting, would like to default to most unconstrained type: r/w.  But
+  // r/o is the lattice bottom, and defaulting to r/w means the default cannot
+  // accept final-fields.  Using lattice bottom for the default.
+  private byte tmod_default() { return TypeStruct.fro(); }
 
   // Type or null or TypeErr.ANY for '->' token
   private Type type0(boolean type_var) {
@@ -801,6 +803,8 @@ public class Parse {
       Ary<Byte  > mods = new Ary<>(new Byte  [1],0);
       while( true ) {
         byte tmodf = tmod();             // Field access mod
+        if( tmodf == tmod_default() ) tmodf = tmod; // Not specified, then use struct mod
+        else if( tmod != tmod_default() && tmodf != tmod ) return null; // Mixing unrelated type mods at field and struct levels
         String tok = token();            // Scan for 'id'
         if( tok == null ) {              // end-of-struct-def
           if( tmodf != tmod_default() ) return null;  // Found a field access mod but not field
@@ -813,7 +817,7 @@ public class Parse {
         if( flds.find(tok) != -1 ) throw AA.unimpl(); // cannot use same field name twice
         flds  .add(tok);                 // Gather for final type
         ts    .add(t);
-        mods  .add(TypeStruct.fmeet(tmod,tmodf));// Most conservative of struct & field mods
+        mods  .add(tmodf);
         if( !peek(',') ) break; // Final comma is optional
       }
       byte[] finals = new byte[mods._len];
