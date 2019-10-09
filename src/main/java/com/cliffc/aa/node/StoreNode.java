@@ -32,7 +32,7 @@ public class StoreNode extends Node {
   Node mem() { return in(1); }
   Node adr() { return in(2); }
   Node val() { return in(3); }
-  
+
   @Override public Node ideal(GVNGCM gvn) {
     return null;
   }
@@ -72,7 +72,7 @@ public class StoreNode extends Node {
     if( fnum == -1 )
       return _badfld;
     byte fmod = ts._finals[fnum];
-    if( fmod != TypeStruct.frw() && fmod != TypeStruct.fown() )
+    if( fmod == TypeStruct.fro() || fmod == TypeStruct.ffinal() )
       return _badfin; // Trying to over-write a read-only or final
     return null;
   }

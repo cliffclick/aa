@@ -70,9 +70,9 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // Returns 1 for definitely equals, 0 for definitely unequals, and -1 if
   // needing the cyclic test.
   private int cmp( TypeStruct t ) {
-    if( _any!=t._any || _hash != t._hash || _ts.length != t._ts.length )
+    if( _any!=t._any || _hash != t._hash || _ts.length != t._ts.length || _news != t._news )
       return 0;
-    if( _news == t._news && _ts == t._ts && _flds == t._flds && _finals == t._finals ) return 1;
+    if( _ts == t._ts && _flds == t._flds && _finals == t._finals ) return 1;
     for( int i=0; i<_ts.length; i++ )
       if( !_flds[i].equals(t._flds[i]) || _finals[i]!=t._finals[i] )
         return 0;
@@ -213,13 +213,14 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public  static byte[] frws  (int n) { byte[] bs = new byte[n]; Arrays.fill(bs,frw   ()); return bs; } // All read-write
 
   public  static TypeStruct make(Type... ts) { return make_alias(BitsAlias.REC,ts); }
-  public  static TypeStruct make_alias(int nnn, Type... ts) { return malloc(false,FLDS[ts.length],ts,finals(ts.length),BitsAlias.make0(nnn)).hashcons_free(); }
+  public  static TypeStruct make_alias(int nnn, Type... ts) { return malloc(false,FLDS[ts.length],ts,fbots(ts.length),BitsAlias.make0(nnn)).hashcons_free(); }
   public  static TypeStruct make(String[] flds, Type... ts) { return malloc(false,flds,ts,fbots(ts.length),BitsAlias.RECBITS).hashcons_free(); }
   public  static TypeStruct make(String[] flds, Type[] ts, byte[] finals) { return malloc(false,flds,ts,finals,BitsAlias.RECBITS).hashcons_free(); }
   public  static TypeStruct make(String[] flds, Type[] ts, byte[] finals, BitsAlias news) { return malloc(false,flds,ts,finals,news).hashcons_free(); }
   public  static TypeStruct make(String[] flds, Type[] ts, byte[] finals, int nnn) { return malloc(false,flds,ts,finals,BitsAlias.make0(nnn)).hashcons_free(); }
   public  static TypeStruct make_tuple( int x ) { return make_tuple(ts(x)); }
-  public  static TypeStruct make_tuple( Type[] ts ) { return make(FLDS[ts.length],ts,finals(ts.length)); }
+  public  static TypeStruct make_tuple( Type[] ts ) { return make_tuple(BitsAlias.REC,ts); }
+  public  static TypeStruct make_tuple( int alias, Type... ts ) { return make(FLDS[ts.length],ts,finals(ts.length),alias); }
   public  static TypeStruct make(String[] flds, byte[] finals) { return make(flds,ts(flds.length),finals); }
 
   public  static final TypeStruct POINT = make(flds("x","y"),ts(TypeFlt.FLT64,TypeFlt.FLT64));
@@ -893,20 +894,19 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   }
 
   // Field modifiers make a tiny non-obvious lattice:
-  //           other-rw  other-read
-  // self-rw     r/w=3    own=  1
-  // self-read   r/o=2    final=0
-  // Note that r/w is parallel to final, and mixing the two falls away from final.
-  public  static byte fmeet( byte f0, byte f1 ) { return (byte)(f0&f1); }
-  private static byte fdual( byte f ) { return (byte)(3-f); }
+  //           0unknown
+  //      1final     2read/write
+  //          3read-only
+  public  static byte fmeet( byte f0, byte f1 ) { return (byte)(f0|f1); }
+  private static byte fdual( byte f ) { return f==funk() || f==fro() ? (byte)(3-f) : f; }
   // Shows as "fld=1" for final, "fld:=1" for r/w, "fld-=1" for read-only
-  private static String fstr( byte f ) { return new String[]{"!","+","~",":"}[f]; }
-  public static byte ftop()  { return frw(); }
+  private static String fstr( byte f ) { return new String[]{"?","!",":","~"}[f]; }
+  public static byte ftop()  { return funk(); }
   public static byte fbot()  { return fdual(ftop()); }
-  public static byte frw()   { return 3; }
-  public static byte fro()   { return 2; }
-  public static byte fown()  { return 1; }
-  public static byte ffinal(){ return 0; }
+  public static byte funk()  { return 0; }
+  public static byte ffinal(){ return 1; }
+  public static byte frw()   { return 2; }
+  public static byte fro()   { return 3; }
 
   // Return the index of the matching field (or nth tuple), or -1 if not found
   // or field-num out-of-bounds.
@@ -928,7 +928,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     // No-such-field to update, so this is a program type-error.
     if( idx==-1 ) return ALLSTRUCT;
     // Update to a read-only/final field.  This is a program type-error
-    if( _finals[idx] != frw() && _finals[idx] != fown() ) return this;
+    if( _finals[idx] == fro() || _finals[idx] == ffinal() ) return this;
     byte[] finals = _finals;
     Type[] ts     = _ts;
     if( _finals[idx] != fin ) { finals = _finals.clone(); finals[idx] = fin; }

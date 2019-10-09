@@ -383,8 +383,7 @@ public class TestType {
 
     // T = :(T?,i64)
     int alias = BitsAlias.new_alias(BitsAlias.REC);
-    byte[] finals = new byte[]{TypeStruct.ffinal(),TypeStruct.ffinal()};
-    TypeStruct T = TypeStruct.malloc(false,flds,new Type[2],finals,BitsAlias.RECBITS);
+    TypeStruct T = TypeStruct.malloc(false,flds,new Type[2],TypeStruct.fbots(2),BitsAlias.RECBITS);
     T._hash = T.compute_hash();
     Type.RECURSIVE_MEET++;
     Type TN = TypeMemPtr.make_nil(alias,T);  TN._cyclic = true;

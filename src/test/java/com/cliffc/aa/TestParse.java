@@ -29,7 +29,7 @@ public class TestParse {
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({&},2)", TypeInt.FALSE);
   }
 
-  @Test public void testParse0() {
+  @Test public void testParse00() {
     // Simple int
     test("1",   TypeInt.TRUE);
     // Unary operator
@@ -94,7 +94,7 @@ public class TestParse {
     test("{+}(1;2;,3)", TypeInt.con(5)); // statements in arguments
   }
 
-  @Test public void testParse1() {
+  @Test public void testParse01() {
     // Syntax for variable assignment
     test("x=1", TypeInt.TRUE);
     test("x=y=1", TypeInt.TRUE);
@@ -127,7 +127,7 @@ public class TestParse {
     testerr("a.b.c();","Unknown ref 'a'",1);
   }
 
-  @Test public void testParse2() {
+  @Test public void testParse02() {
     Object dummy = Env.GVN; // Force class loading cycle
     // Anonymous function definition
     test_isa("{x y -> x+y}", TypeFunPtr.make(BitsFun.make0(35),TypeTuple.SCALAR2,Type.SCALAR)); // {Scalar Scalar -> Scalar}
@@ -162,7 +162,7 @@ public class TestParse {
     test("f0 = { x -> x ? {+}(f0(x-1),1) : 0 }; f0(2)", TypeInt.con(2));
     testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact()","Passing 0 arguments to fact={->} which takes 1 arguments",48);
     test_ptr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(0),fact(1),fact(2))",
-             (alias)-> TypeMemPtr.make(alias,TypeStruct.make_alias(alias,Type.NIL,TypeInt.con(1),TypeInt.con(2))));
+             (alias)-> TypeMemPtr.make(alias,TypeStruct.make_tuple(alias,Type.NIL,TypeInt.con(1),TypeInt.con(2))));
 
     // Co-recursion requires parallel assignment & type inference across a lexical scope
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.TRUE );
@@ -181,7 +181,7 @@ public class TestParse {
     testerr("(math_rand(1) ? {+} : {*})(2,3)","An ambiguous function is being called"/*TypeInt.INT8*/,31); // either 2+3 or 2*3, or {5,6} which is INT8.
   }
 
-  @Test public void testParse3() {
+  @Test public void testParse03() {
     // Type annotations
     test("-1:int", TypeInt.con( -1));
     test("(1+2.3):flt", TypeFlt.make(0,64,3.3));
@@ -205,7 +205,7 @@ public class TestParse {
     testerr("fun:{int str -> int}={x y -> x+y}; fun(2,3)", "3 is not a *[3]str",43);
     // Test that the type-check is on the variable and not the function.
     test_ptr("fun={x y -> x*2}; bar:{int str -> int} = fun; baz:{int @{x,y} -> int} = fun; (fun(2,3),bar(2,\"abc\"))",
-            (alias -> TypeMemPtr.make(alias,TypeStruct.make_alias(alias,TypeInt.con(4),TypeInt.con(4)))) );
+            (alias -> TypeMemPtr.make(alias,TypeStruct.make_tuple(alias,TypeInt.con(4),TypeInt.con(4)))) );
     testerr("fun={x y -> x+y}; baz:{int @{x,y} -> int} = fun; (fun(2,3), baz(2,3))",
             "3 is not a *[2]@{!x,!y}", 68);
 
@@ -227,7 +227,7 @@ public class TestParse {
     testerr("A= :(str?, int)?","Named types are never nil",16);
   }
 
-  @Test public void testParse4() {
+  @Test public void testParse04() {
     // simple anon struct tests
     test_ptr("@{x,y}", (alias -> TypeMemPtr.make(alias,TypeStruct.make(new String[]{"x","y"},TypeStruct.ts(2),TypeStruct.finals(2),alias)))); // simple anon struct decl
     testerr("a=@{x=1.2,y}; x", "Unknown ref 'x'",15);
@@ -249,7 +249,7 @@ public class TestParse {
     test   ("dist={p->p//qqq\n.//qqq\nx*p.x+p.y*p.y}; dist(//qqq\n@{x//qqq\n=1,y=2})", TypeInt.con(5));
 
     // Tuple
-    test_ptr("(0,\"abc\")", (alias -> TypeMemPtr.make(alias,TypeStruct.make_alias(alias,Type.NIL,TypeMemPtr.ABCPTR))));
+    test_ptr("(0,\"abc\")", (alias -> TypeMemPtr.make(alias,TypeStruct.make_tuple(alias,Type.NIL,TypeMemPtr.ABCPTR))));
     test("(1,\"abc\").0", TypeInt.TRUE);
     test("(1,\"abc\").1", TypeMemPtr.ABCPTR);
 
@@ -269,7 +269,7 @@ public class TestParse {
     testerr("x=@{n=,}","Missing ifex after assignment of 'n'",6);
   }
 
-  @Test public void testParse5() {
+  @Test public void testParse05() {
     // nullable and not-null pointers
     test   ("x:str? = 0", Type.NIL); // question-type allows null or not; zero digit is null
     test   ("x:str? = \"abc\"", TypeMemPtr.ABCPTR); // question-type allows null or not
@@ -286,9 +286,9 @@ public class TestParse {
             "b ? (b.c ? b.c.x : 0) : 0      // Null-safe field load", TypeInt.BOOL); // Nested null-safe field load
   }
 
-  @Test public void testParse6() {
+  @Test public void testParse06() {
     test_ptr("A= :(A?, int); A(0,2)","A:(nil,2)");
-    test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*[138],3)");
+    test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*[130],3)");
 
     // Building recursive types
     test_isa("A= :int; A(1)", (tmap -> TypeName.make("A",tmap,TypeInt.INT64)));
@@ -320,7 +320,7 @@ public class TestParse {
     test_isa("A= :@{n:B, v:int}; B= :@{n:A, v:flt}", TypeFunPtr.GENERIC_FUNPTR);
   }
 
-  @Test public void testParse7() {
+  @Test public void testParse07() {
     // Passing a function recursively
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({&},2)", TypeInt.FALSE);
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({+},2)", TypeInt.con(2));
@@ -378,7 +378,7 @@ public class TestParse {
     // Test inferring a recursive tuple type, with less help.  This one
     // inlines so doesn't actually test inferring a recursive type.
     test_ptr("map={x -> x ? (map(x.0),x.1*x.1) : 0}; map((0,1.2))",
-             (alias) -> TypeMemPtr.make(alias,TypeStruct.make_alias(alias,Type.NIL,TypeFlt.con(1.2*1.2))));
+             (alias) -> TypeMemPtr.make(alias,TypeStruct.make_tuple(alias,Type.NIL,TypeFlt.con(1.2*1.2))));
 
     test_ptr_isa("map={x -> x ? (map(x.0),x.1*x.1) : 0};"+
                  "map((math_rand(1)?0: (math_rand(1)?0: (math_rand(1)?0: (0,1.2), 2.3), 3.4), 4.5))",
@@ -391,7 +391,7 @@ public class TestParse {
   }
 
 
-  @Test public void testParse8() {
+  @Test public void testParse08() {
     // A linked-list mixing ints and strings, always in pairs
     String ll_cona = "a=0; ";
     String ll_conb = "b=math_rand(1) ? ((a,1),\"abc\") : a; ";
@@ -448,10 +448,10 @@ public class TestParse {
          "     ? @{l=map(tree.l,fun),r=map(tree.r,fun),v=fun(tree.v)}"+
          "     : 0};"+
          "map(tmp,{x->x+x})",
-         "@{!l=*[0,224,],!r=*[0,224,],!v=int64}");
+         "@{!l=*[0,216,],!r=*[0,216,],!v=int64}");
   }
 
-  @Test public void testParse9() {
+  @Test public void testParse09() {
     // Test re-assignment
     test("x=1", TypeInt.TRUE);
     test("x=y=1", TypeInt.TRUE);
@@ -460,7 +460,7 @@ public class TestParse {
     testerr("x=1+y","Unknown ref 'y'",5);
 
     test("x:=1", TypeInt.TRUE);
-    test_ptr("x:=0; a=x; x:=1; b=x; x:=2; (a,b,x)", (alias) -> TypeMemPtr.make(alias,TypeStruct.make_alias(alias,Type.NIL,TypeInt.con(1),TypeInt.con(2))));
+    test_ptr("x:=0; a=x; x:=1; b=x; x:=2; (a,b,x)", (alias) -> TypeMemPtr.make(alias,TypeStruct.make_tuple(alias,Type.NIL,TypeInt.con(1),TypeInt.con(2))));
 
     testerr("x=1; x:=2", "Cannot re-assign final val 'x'", 9);
     testerr("x=1; x=2", "Cannot re-assign final val 'x'", 8);
@@ -474,6 +474,21 @@ public class TestParse {
     testerr("x:=0; math_rand(1) ? (x =4):3; x", "'x' not final on false arm of trinary",29); // x mutable ahead; ok to mutate on 1 arm and later
   }
 
+
+  // Finals are declared with an assignment.  This is to avoid the C++/Java
+  // problem of making final-field cycles.  Java requires final fields to be
+  // only assigned in constructors before the value escapes, which prevents any
+  // final-cyclic structures.  Final assignments have to be unambiguous - they
+  // fold into a 'New' at some point, same as casting to a 'Name', but they can
+  // interleave with other operations (such as other News) as long as the store
+  // is unambiguous.
+  //                                                   unknown
+  // Field mod status makes a small lattice:      final       read/write
+  //                                                  read-only
+  // Type-error if a final assignment does not fold into a New.
+  // Cannot cast final to r/w, nor r/w to final.
+  // Can cast both to r/o.
+
   @Test public void testParse10() {
     // Test re-assignment in struct
     Type[] ts = TypeStruct.ts(TypeInt.con(1), TypeInt.con(2));
@@ -485,10 +500,10 @@ public class TestParse {
     test    ("x=@{n:=1,v:=2}; y=@{n=3,v:=4}; tmp = math_rand(1) ? x : y; tmp.n", TypeInt.NINT8);
     testerr ("x=@{n:=1,v:=2}; y=@{n=3,v:=4}; tmp = math_rand(1) ? x : y; tmp.n = 5", "Cannot re-assign final field '.n'",68);
     test    ("x=@{n:=1,v:=2}; foo={q -> q.n=3}; foo(x); x.n",TypeInt.con(3)); // Side effects persist out of functions
-    //// Tuple assignment
-    //testerr ("x=(1,2); x.0=3; x", "Cannot re-assign final field '.0'",14);
-    //// Final-only type syntax.
-    //testerr ("a = @{y:=1}; b:~@{y} = a", "Fields are not final in final-only assignment",20);
+    // Tuple assignment
+    testerr ("x=(1,2); x.0=3; x", "Cannot re-assign final field '.0'",14);
+    // Final-only type syntax.
+    //testerr ("a = @{y:=1}; b:~@{y} = a; b", "Fields are not final in final-only assignment",20);
     //test    ("@{x:=1,y =2}:@{x,~y}.y", TypeInt.con(2)); // Allowed reading final field
     //testerr ("@{x:=1,y:=2}:@{x,~y}.y", "@{x,y} is not a @{x,~y}",24);
     //test    ("f={b:@{x,!y} -> b.y  }; f(@{x:=1,y =2}).y", TypeInt.con(2)); // Allowed reading final field
@@ -502,11 +517,68 @@ public class TestParse {
     //test    ("f={b: @{x,y} -> b.y  }; f(@{x:=1,y:=2}:@{x,-y}).y", TypeInt.con(2));
     //testerr ("f={b: @{x,y} -> b.y=3}; f(@{x:=1,y:=2}:@{x,-y}).y", "Cannot reassign read-only field '.y'",36);
   }
+
+
   /*
+
+"Final store" ==> memory words can become "final"; unchangable by any thread.
+Which means the memory value holds the truth about writability.  Also means
+cannot flip to final, if ptr to memory has "escaped".
+
+Can cast that a ptr ptrs-to only final memory.  Type-error if memory is not
+final.  Cannot cast-away "finalness"; type-error if memory is final.
+  ptr2f = @{f=1};  ptr2rw:@{!f} = ptr2f;  ptr2rw.f=2;  // type error, casting away final
+  ptr2f = @{f=1};  ptr2rw:@{!f} = ptr2f;           2;  // Ok, ptr2rw is dead
+  ptr2f = @{f=1};  ptr2ro:@{~f} = ptr2f;  ptr2ro.f  ;  // OK, casting away final to R/O
+  ptr2f = @{f=1};  ptr2ro:@{~f} = ptr2f;  ptr2ro.f=2;  // MIGHT be ok, as store is dead
+  ptr2f = @{f=1};  ptr2ro:@{~f} = ptr2f;  ptr2ro.f=2; ptr2ro.f // ERROR, store not dead and not correct
+
+When doing a "meet" of final/non-final, dunno which one should "win".
+But cannot use a "meet" to cast-away final-ness and store-into.
+Also, cannot use a "meet" to cast into final-ness, and get a ptr typed as
+"final" but remotely modifiable.
+  MEET(final,final)==final, MEET(rw,rw)==rw
+  MEET(final,rw/ro)==ro   , MEET(rw,ro)==ro
+
+Cannot make a final on mixed memory!!!
+Just like 'Naming' memory.
+Final Store MUST fold into 'New' or its an error!
+  ptr0 = @{f:=1}; ptr1 = @{f:=2};  ptr = (rand ? ptr0 : ptr1);  ptr.f=2;  ptr; // ERROR, final stores only into unaliased memory
+  ptr0 = @{f:=1}; ptr1 = @{f:=2};  ptr = (rand ? ptr0 : ptr1);  ptr.f=2;  // MIGHT be ok, as store is dead
+  ptr0 = @{f:=1}; ptr1 = @{f =2};  ptr = (rand ? ptr0 : ptr1);  ptr.f;  // OK, ptr is typed 'read-only' not final
+
+
+
+Want to enable easy final "cycles":
+  ptr0 = @{a}; ptr1 = @{a=ptr0}; ptr0.a = ptr1; // This is OK; both stores can fold into New
+Basically stretching out the final assignment to interleave the constructors.
+Gonna see 2 parallel News in the graph, with crossing ptr-dep edges.
+
+Not ok if we "escape" a non-final version?
+  ptr0 = @{a};
+  ptr1 = @{a=ptr0};
+  ...  foo=ptr0 ...   // still OK as foo will get from the 'New' which eventually gets tagged as 'final field a'
+  ptr0.a = ptr1;
+
+Can see pre-final-store variants or not?  And still safely declare 'final'?
+Might work, if foo.a collapses to a '1', still requires final store into NEW.
+Might type-err if cannot collapse final-store
+  ptr0 = @{a := 1 };  // Field a is non-final 1
+  vala = ptr.a;       // Load before final store, sees 1 not 2
+  ptr0.a = 2;         // anti-dep edge prevents sliding foo.a after ptr0.a=2
+  vala
+
+ERROR, value escaped, cannot be final
+  ptr0 = @{a := 1 };  // Field a is non-final 1
+  ...complex(ptr0) ...  // Saves ptr0 (as r/w) somewhere deep
+  ptr0.a = 2;    // anti-dep edge prevents sliding above complex.
+
+
+
 
 // No ambiguity:
  { x } // no-arg-function returning external variable x; same as { -> x }
- { x,} // 1-elem tuple     wrapping external variable x
+ { x,} // 1-elem struct    wrapping external variable x, without using '@{}'
 @{ x } // 1-elem struct type with field named x
 
 // type variables are free in : type expressions
@@ -561,7 +633,7 @@ strs:List(str?) = ... // List of null-or-strings
     try( TypeEnv te = run(program) ) {
       assertTrue(te._t instanceof TypeFunPtr);
       TypeFunPtr actual = (TypeFunPtr)te._t;
-      TypeStruct from = TypeStruct.make(args);
+      TypeStruct from = TypeStruct.make_tuple(args);
       TypeName to = TypeName.make0("A",te._env._scope.types(),from,(short)0);
       TypeMemPtr  inptr = TypeMemPtr.make(BitsAlias.REC,from);
       TypeMemPtr outptr = TypeMemPtr.make(BitsAlias.REC,to);
