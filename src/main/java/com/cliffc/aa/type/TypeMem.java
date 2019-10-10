@@ -227,6 +227,10 @@ public class TypeMem extends Type<TypeMem> {
   // in a TypeObj.
   public TypeMem st( TypeMemPtr ptr, byte fin, String fld, int fld_num, Type val ) {
     assert val.isa_scalar();
+    // Choice store: something got stored into, but we can choose, and we
+    // choose nothing visible to anybody else.  
+    if( ptr.above_center() )
+      return this;
     // Any alias, plus all of its children, are meet/joined.  This does a
     // tree-based scan on the inner loop.
     Ary<TypeObj> objs = new Ary<>(_aliases.clone(),_aliases.length);

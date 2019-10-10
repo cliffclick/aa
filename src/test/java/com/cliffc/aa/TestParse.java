@@ -508,7 +508,7 @@ public class TestParse {
              (alias) -> TypeMemPtr.make(alias,TypeStruct.make(new String[]{"f"},new Type[]{TypeInt.con(1)},TypeStruct.finals(1),alias)));
     test    ("@{x:=1,y =2}:@{x,y==}.y", TypeInt.con(2)); // Allowed reading final field
     testerr ("f={ptr2final:@{x,y==} -> ptr2final.y }; f(@{x:=1,y:=2}).y", "*[$]@{x:=1,y:=2} is not a *[$]@{x=,y==}",55); // Another version of casting-to-final
-    //testerr ("f={b:@{x,!y} -> b.y=3}", "Cannot reassign final field '.y'",20);
+    testerr ("f={ptr2final:@{x,y==} -> ptr2final.y=3}; f(@{x=1,y=2});", "Cannot re-assign final field '.y'",38);
     //// Read-only type syntax
     //test    ("f={b:@{-x,y} -> b.y=3}; f(@{x:=1,y:=2}).y", TypeInt.con(3));
     //testerr ("f={b:@{-x,y} -> b.y=3}; f(@{x:=1,y =2})","Cannot reassign final field '.y'",36);
