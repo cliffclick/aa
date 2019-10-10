@@ -229,7 +229,7 @@ public class GVNGCM {
     // Compute a type for n
     Type t = n.value(this);              // Get best type
     // Replace with a constant, if possible
-    if( t.may_be_con() && !(n instanceof ConNode) && !(n instanceof FunPtrNode))
+    if( t.may_be_con() && !(n instanceof ConNode) && n._keep==0 )
       { kill_new(n); return con(t); }
     // Global Value Numbering
     x = _vals.putIfAbsent(n,n);

@@ -69,8 +69,8 @@ import java.util.BitSet;
  *  ttuple = ( [:type]?,* )        // Tuple types are just a list of optional types;
                                    // the count of commas dictates the length, zero commas is zero length.
                                    // Tuples are always final.
- *  tmod = empty | ~ | !           // Empty for read-only, ! for read-write, ~ for final
- *  tstruct = tmod@{ [tmod id[:type],]*} // Struct types are field names with optional types.  Modifiers can lead either the @ or any field.  Spaces not allowed.
+ *  tmod = = | := | ==  // '=' is r/only, ':=' is r/w, '==' is final
+ *  tstruct = @{ [id [tmod [type?]],]*}  // Struct types are field names with optional types.  Spaces not allowed
 
  */
 
@@ -579,7 +579,11 @@ public class Parse {
       Type t = Type.SCALAR;    // Untyped, most generic type
       Parse bad = errMsg();    // Capture location in case of type error
       if( peek(':') )          // Has type annotation?
-        if( (t=type())==null ) throw AA.unimpl(); // return an error here
+        if( (t=type())==null ) {
+          err_ctrl0("Missing or bad type arg");
+          t = Type.SCALAR;
+          skipNonWS();         // Skip possible type sig, looking for next arg
+        }
       ids .add(tok);
       ts  .add(t  );
       bads.add(bad);
@@ -736,8 +740,8 @@ public class Parse {
    *  type = tcon | tfun | tstruct | ttuple | tvar  // Type choices
    *  tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str[?]
    *  tfun = {[[type]* ->]? type } // Function types mirror func decls
-   *  tmod = | ~ | !  // Empty for r/o, ~ for final, ! for read-write; do not love the syntax
-   *  tstruct = tmod @{ [tmod id[:type?],]*}  // Struct types are field names with optional types
+   *  tmod = = | := | ==  // '=' is r/only, ':=' is r/w, '==' is final
+   *  tstruct = @{ [id [tmod [type?]],]*}  // Struct types are field names with optional types.  Spaces not allowed
    *  ttuple = ([type?] [,[type?]]*) // List of types, trailing comma optional
    *  tvar = A previously declared type variable
    *
@@ -765,11 +769,11 @@ public class Parse {
   // Wrap in a nullable if there is a trailing '?'.  No spaces allowed
   private Type typeq(Type t) { return peek_noWS('?') ? t.meet_nil() : t; }
 
-  // No mod is r/o, the default and lattice bottom.  '!' is read-write, '~' is
+  // No mod is r/o, the default and lattice bottom.  ':' is read-write, '=' is
   // final.  Currently '-' is ambiguous with function arrow ->.
   private byte tmod() {
-    if( peek('~') ) return TypeStruct.ffinal(); // final
-    if( peek('!') ) return TypeStruct.frw();    // read-write
+    if( peek("==") ) { _x--; return TypeStruct.ffinal(); } // final     , leaving trailing '='
+    if( peek(":=") ) { _x--; return TypeStruct.frw();    } // read-write, leaving trailing '='
     return tmod_default();
   }
   // Experimenting, would like to default to most unconstrained type: r/w.  But
@@ -796,24 +800,18 @@ public class Parse {
       return typeq(TypeFunPtr.make(BitsFun.NZERO,targs,ret));
     }
 
-    byte tmod = tmod();         // Whole-struct access modifier
     if( peek("@{") ) {          // Struct type
       Ary<String> flds = new Ary<>(new String[1],0);
       Ary<Type  > ts   = new Ary<>(new Type  [1],0);
       Ary<Byte  > mods = new Ary<>(new Byte  [1],0);
       while( true ) {
-        byte tmodf = tmod();             // Field access mod
-        if( tmodf == tmod_default() ) tmodf = tmod; // Not specified, then use struct mod
-        else if( tmod != tmod_default() && tmodf != tmod ) return null; // Mixing unrelated type mods at field and struct levels
         String tok = token();            // Scan for 'id'
-        if( tok == null ) {              // end-of-struct-def
-          if( tmodf != tmod_default() ) return null;  // Found a field access mod but not field
-          break;
-        }
+        if( tok == null ) break;         // end-of-struct-def
         Type t = Type.SCALAR;            // Untyped, most generic field type
-        if( peek(':') &&                 // Has type annotation?
+        byte tmodf = tmod();             // Field access mod; trailing '=' left for us
+        if( peek('=') &&                 // Has type annotation?
             (t=typep(type_var)) == null) // Parse type, wrap ptrs
-          return null;                   // not a type
+          t = Type.SCALAR;               // No type found, assume default
         if( flds.find(tok) != -1 ) throw AA.unimpl(); // cannot use same field name twice
         flds  .add(tok);                 // Gather for final type
         ts    .add(t);
@@ -824,7 +822,6 @@ public class Parse {
       for( int i=0; i<mods._len; i++ )  finals[i] = mods.at(i);
       return peek('}') ? TypeStruct.make(flds.asAry(),ts.asAry(),finals) : null;
     }
-    if( tmod != tmod_default() ) return null; // Found a struct-modifier without a struct
 
     // "()" is the zero-entry tuple
     // "(   ,)" is a 1-entry tuple
@@ -910,6 +907,10 @@ public class Parse {
   }
   private void skipEOL  () { while( _x < _buf.length && _buf[_x] != '\n' ) _x++; }
   private void skipBlock() { throw AA.unimpl(); }
+  // Advance parse pointer to next WS.  Used for parser syntax error recovery.
+  private void skipNonWS() {
+    while( _x < _buf.length && !isWS(_buf[_x]) ) _x++;
+  }
 
   /** Return true if `c` passes a test */
   private static boolean isWS    (byte c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r'; }

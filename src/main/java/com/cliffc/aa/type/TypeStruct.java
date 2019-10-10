@@ -149,9 +149,9 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     if( !is_tup ) sb.p('@');    // Not a tuple
     sb.p(is_tup ? '(' : '{');
     for( int i=0; i<_flds.length; i++ ) {
-      if( !is_tup ) sb.p(fstr(_finals[i])).p(_flds[i]);
+      if( !is_tup ) 
+        sb.p(_flds[i]).p(fstr(_finals[i])).p('='); // Field name, access mod
       Type t = at(i);
-      if( !is_tup && t != SCALAR ) sb.p('=');
       if( t==null ) sb.p("!");  // Graceful with broken types
       else if( t==SCALAR ) ;    // Default answer, do not print
       else if( t instanceof TypeMemPtr ) sb.p("*"+((TypeMemPtr)t)._aliases); // Do not recurse here, gets too big too fast
@@ -174,9 +174,9 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     sb.p(is_tup ? '(' : '{').nl().ii(1); // open struct, newline, increase_indent
     for( int i=0; i<_flds.length; i++ ) {
       sb.i();                   // indent, 1 field per line
-      if( !is_tup ) sb.p(fstr(_finals[i])).p(_flds[i]);
       Type t = at(i);
-      if( !is_tup && t != SCALAR ) sb.p('=');
+      if( !is_tup )
+        sb.p(_flds[i]).p(fstr(_finals[i])).p('='); // Field name, access mod
       if( t==null ) sb.p("!");  // Graceful with broken types
       else if( t==SCALAR ) ;    // Default answer, do not print
       else t.dstr(sb,dups);     // Recursively print field type
@@ -899,8 +899,9 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   //          3read-only
   public  static byte fmeet( byte f0, byte f1 ) { return (byte)(f0|f1); }
   private static byte fdual( byte f ) { return f==funk() || f==fro() ? (byte)(3-f) : f; }
-  // Shows as "fld=1" for final, "fld:=1" for r/w, "fld-=1" for read-only
-  private static String fstr( byte f ) { return new String[]{"?","!",":","~"}[f]; }
+  // Shows as:  fld?=val, fld==val, fld:=val, fld=val
+  private static String fstr( byte f ) { return new String[]{"?","=",":",""}[f]; }
+      
   public static byte ftop()  { return funk(); }
   public static byte fbot()  { return fdual(ftop()); }
   public static byte funk()  { return 0; }

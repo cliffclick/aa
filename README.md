@@ -78,8 +78,8 @@ BNF                           | Comment
 `type = tcon OR tfun OR tstruct OR ttuple OR tvar` | Types are a tcon or a tfun or a tstruct or a ttuple or a type variable
 `tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str` | Primitive types
 `tfun = {[[type]* ->]? type }` | Function types mirror func decls
-`tmod = empty | ! | ~`        | Empty for read-only, ! for read-write, ~ for final
-`tstruct = tmod@{ [tmod id[:type],]*}`  | Struct types are field names with optional types; modifiers can lead either the @ or any field.  Spaces not allowed.
+`tmod = = | := | ==  `        | '=' is r/only, ':=' is r/w, '==' is final
+`tstruct = @{ [id [tmod [type?]],]*}` | Struct types are field names with optional access and optional types.  Spaces not allowed
 `ttuple = ([type][,[type]]* )` | Tuple types are just a list of optional types; the count of commas dictates the length, zero commas is zero length.  Tuples are always final.
 `tvar = id`                   | Type variable lookup 
 
