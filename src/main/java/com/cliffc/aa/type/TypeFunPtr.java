@@ -51,8 +51,9 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   // Never part of a cycle, so the normal check works
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
   @Override public String str( VBitSet dups) {
-    return "*"+FunNode.names(_fidxs,new SB()).toString()+":{"+_args.str(dups)+"-> "+_ret.str(dups)+"}";
+    return "*"+names()+":{"+_args.str(dups)+"-> "+_ret.str(dups)+"}";
   }
+  public String names() { return FunNode.names(_fidxs,new SB()).toString(); }
 
   private static TypeFunPtr FREE=null;
   @Override protected TypeFunPtr free( TypeFunPtr ret ) { FREE=this; return ret; }

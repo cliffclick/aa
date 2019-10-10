@@ -971,8 +971,8 @@ public class Parse {
 
   // Polite error message for mismatched types
   public String typerr( Type t0, Type t1 ) {
-    assert !t0.is_forward_ref(); // Forward/unknown refs as args to a call report their own error
-    return errMsg(t0.toString()+" is not a "+t1);
+    String s = t0.is_forward_ref() ? ((TypeFunPtr)t0).names() : t0.toString();
+    return errMsg(s+" is not a "+t1);
   }
 
   // Standard mis-use of a forward-ref error (assumed to be a forward-decl of a

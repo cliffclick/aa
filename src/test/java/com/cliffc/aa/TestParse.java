@@ -503,8 +503,10 @@ public class TestParse {
     // Tuple assignment
     testerr ("x=(1,2); x.0=3; x", "Cannot re-assign final field '.0'",14);
     // Final-only type syntax.
-    testerr ("ptr2rw = @{f:=1}; ptr2final:~@{f} = ptr2rw; ptr2final", "*[270]@{:f=1} is not a *[2]@{!f}",42);
-    test    ("@{x:=1,y =2}:@{x,~y}.y", TypeInt.con(2)); // Allowed reading final  field
+    testerr ("ptr2rw = @{f:=1}; ptr2final:~@{f} = ptr2rw; ptr2final", "*[18]@{:f=1} is not a *[2]@{!f}",42); // Cannot cast-to-final
+    test_ptr("ptr2   = @{f =1}; ptr2final:~@{f} = ptr2  ; ptr2final",
+             (alias) -> TypeMemPtr.make(alias,TypeStruct.make(new String[]{"f"},new Type[]{TypeInt.con(1)},TypeStruct.finals(1),alias)));
+    test    ("@{x:=1,y =2}:@{x,~y}.y", TypeInt.con(2)); // Allowed reading final field
     //testerr ("@{x:=1,y:=2}:@{x,~y}.y", "@{x,y} is not a @{x,~y}",24);
     //test    ("f={b:@{x,!y} -> b.y  }; f(@{x:=1,y =2}).y", TypeInt.con(2)); // Allowed reading final field
     //testerr ("f={b:@{x,!y} -> b.y  }; f(@{x:=1,y:=2}).y", "@{x,y} is not a @{x,!y}",24);
