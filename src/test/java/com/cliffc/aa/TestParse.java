@@ -509,9 +509,9 @@ public class TestParse {
     test    ("@{x:=1,y =2}:@{x,y==}.y", TypeInt.con(2)); // Allowed reading final field
     testerr ("f={ptr2final:@{x,y==} -> ptr2final.y }; f(@{x:=1,y:=2}).y", "*[$]@{x:=1,y:=2} is not a *[$]@{x=,y==}",55); // Another version of casting-to-final
     testerr ("f={ptr2final:@{x,y==} -> ptr2final.y=3}; f(@{x=1,y=2});", "Cannot re-assign final field '.y'",38);
-    //// Read-only type syntax
-    //test    ("f={b:@{-x,y} -> b.y=3}; f(@{x:=1,y:=2}).y", TypeInt.con(3));
-    //testerr ("f={b:@{-x,y} -> b.y=3}; f(@{x:=1,y =2})","Cannot reassign final field '.y'",36);
+    test    ("f={ptr:@{x=,y:=} -> ptr.y=3; ptr}; f(@{x:=1,y:=2}).y", TypeInt.con(3)); // On field x, cast-away r/w for r/o
+    test    ("f={ptr:@{x==,y:=} -> ptr.y=3; ptr}; f(@{x=1,y:=2}).y", TypeInt.con(3)); // On field x, cast-up r/o for final but did not read
+    //testerr ("f={ptr:@{x,y} -> ptr.y=3}; f(@{x:=1,y:=2});", "Cannot re-assign read-only field '.y'",38);
     //testerr ("f={b:@{x,-y} -> b.y=3}","Cannot reassign read-only field '.y'",24);
     //testerr ("f={b:-@{x,y} -> b.y=3}","Cannot reassign read-only field '.y'",24);
     //test    ("f={b: @{x,y} -> b.y  }; f(@{x:=1,y:=2}:@{x,-y}).y", TypeInt.con(2));
