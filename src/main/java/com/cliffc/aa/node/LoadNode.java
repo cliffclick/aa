@@ -43,7 +43,7 @@ public class LoadNode extends Node {
     // Loads against an equal store; cannot NPE since the Store did not.
     StoreNode st;
     if( mem instanceof StoreNode && addr == (st=((StoreNode)mem)).adr() ) {
-      if( _fld.equals(st._fld) && _fld_num == st._fld_num )
+      if( _fld.equals(st._fld) && _fld_num == st._fld_num && st.err(gvn)==null )
         return st.val();
       // TODO: Else can use field-level aliasing to by pass.  Needs a
       // field-level alias notion on memory edges.

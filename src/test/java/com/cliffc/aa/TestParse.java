@@ -532,15 +532,18 @@ public class TestParse {
     // a Phi).  Goal of MeetNode is to keep a *downcast* in order to keep the
     // following checks.  Can be removed when no following checks on downcast
     // value, or no downcast happens during iter().  Dunno how to check for "no
-    // following checks"?  Drop the default value on phi/parm?  Add TypeNodes
-    // whenever a Parm declares a type (and MeetNode?).  Note relation between
-    // default on parm vs function type, and the fun()._tf value.  Use MeetNode
-    // is enforce read-only casts.
+    // following checks"?  Goal: Use MeetNode is enforce read-only casts.
+    
+    // THINK: Drop the default value on phi/parm?  Goal: no inlining if args
+    // are in-error.  Actual goal: keep arg-casts as *casts*, and check
+    // validity; errors reported as-if no inline.  Add TypeNodes whenever a
+    // Parm declares a type (and MeetNode?).  Note relation between default on
+    // parm vs function type, and the fun()._tf value.
     //
-    // ACTION: Move read-only/read-write into TMP.  Goal: constraint on
-    // read-only is lexically scoped and not e.g. memory threaded.  Goal: keep
-    // final/mutable on TypeMem and memory threaded.  Goal: can declare parms
-    // as read-only (equiv: cast to read-only), and honor the constraint, while
+    // ACTION: Move read-only/read-write into TMP.  Goal: constraint on read-
+    // only is lexically scoped and not e.g. memory threaded.  Goal: keep final
+    // /mutable on TypeMem and memory threaded.  Goal: can declare parms as
+    // read-only (equiv: cast to read-only) and honor the constraint, while
     // leaving the original ptr able to Store.
   }
 
