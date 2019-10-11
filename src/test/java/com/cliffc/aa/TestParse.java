@@ -511,11 +511,17 @@ public class TestParse {
     testerr ("f={ptr2final:@{x,y==} -> ptr2final.y=3}; f(@{x=1,y=2});", "Cannot re-assign final field '.y'",38);
     test    ("f={ptr:@{x=,y:=} -> ptr.y=3; ptr}; f(@{x:=1,y:=2}).y", TypeInt.con(3)); // On field x, cast-away r/w for r/o
     test    ("f={ptr:@{x==,y:=} -> ptr.y=3; ptr}; f(@{x=1,y:=2}).y", TypeInt.con(3)); // On field x, cast-up r/o for final but did not read
-    //testerr ("f={ptr:@{x,y} -> ptr.y=3}; f(@{x:=1,y:=2});", "Cannot re-assign read-only field '.y'",38);
-    //testerr ("f={b:@{x,-y} -> b.y=3}","Cannot reassign read-only field '.y'",24);
-    //testerr ("f={b:-@{x,y} -> b.y=3}","Cannot reassign read-only field '.y'",24);
-    //test    ("f={b: @{x,y} -> b.y  }; f(@{x:=1,y:=2}:@{x,-y}).y", TypeInt.con(2));
-    //testerr ("f={b: @{x,y} -> b.y=3}; f(@{x:=1,y:=2}:@{x,-y}).y", "Cannot reassign read-only field '.y'",36);
+    test    ("f={ptr:@{x,y} -> ptr.y }; f(@{x:=1,y:=2}:@{x,y=})", TypeInt.con(2));
+
+    // TODO: Open Question: is this legit?  Clearly a store against a read-
+    // only; it is locally INCORRECT.  Turns out that only r/w memory is
+    // involved.  Globally correct.  Since R/O is bottom of the access lattice,
+    // all FINAL and R/W are also R/O... and having passed that check, the cast
+    // to R/O can be forgotten.
+    //
+    //testerr ("ptr=@{f:=1}; ptr:@{f=}.f=2","Cannot re-assign read-only field '.f'",20);
+    //testerr ("f={ptr:@{x,y} -> ptr.y=3}; f(@{x:=1,y:=2});"       , "Cannot re-assign read-only field '.y'",38);
+    //testerr ("f={ptr:@{x,y} -> ptr.y=3}; f(@{x:=1,y:=2}:@{x,y=})", "Cannot re-assign read-only field '.y'",38);
   }
 
 
