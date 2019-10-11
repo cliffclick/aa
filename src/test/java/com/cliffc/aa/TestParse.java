@@ -504,11 +504,13 @@ public class TestParse {
     testerr ("x=(1,2); x.0=3; x", "Cannot re-assign final field '.0'",14);
     // Final-only type syntax.
     testerr ("ptr2rw = @{f:=1}; ptr2final:@{f==} = ptr2rw; ptr2final", "*[$]@{f:=1} is not a *[$]@{f==}",43); // Cannot cast-to-final
-    test_ptr("ptr2   = @{f =1}; ptr2final:@{f==} = ptr2  ; ptr2final",
+    test_ptr("ptr2   = @{f =1}; ptr2final:@{f==} = ptr2  ; ptr2final", // Good cast
              (alias) -> TypeMemPtr.make(alias,TypeStruct.make(new String[]{"f"},new Type[]{TypeInt.con(1)},TypeStruct.finals(1),alias)));
+    testerr ("ptr=@{f=1}; ptr2rw:@{f:=} = ptr; ptr2rw", "*[$]@{f==1} is not a *[$]@{f:=}", 31); // Cannot cast-away final
+
     test    ("@{x:=1,y =2}:@{x,y==}.y", TypeInt.con(2)); // Allowed reading final field
-    testerr ("f={ptr2final:@{x,y==} -> ptr2final.y }; f(@{x:=1,y:=2}).y", "*[$]@{x:=1,y:=2} is not a *[$]@{x=,y==}",55); // Another version of casting-to-final
-    testerr ("f={ptr2final:@{x,y==} -> ptr2final.y=3}; f(@{x=1,y=2});", "Cannot re-assign final field '.y'",38);
+    testerr ("f={ptr2final:@{x,y==} -> ptr2final.y  }; f(@{x:=1,y:=2})", "*[$]@{x:=1,y:=2} is not a *[$]@{x=,y==}",56); // Another version of casting-to-final
+    testerr ("f={ptr2final:@{x,y==} -> ptr2final.y=3}; f(@{x =1,y =2})", "Cannot re-assign final field '.y'",38);
     test    ("f={ptr:@{x=,y:=} -> ptr.y=3; ptr}; f(@{x:=1,y:=2}).y", TypeInt.con(3)); // On field x, cast-away r/w for r/o
     test    ("f={ptr:@{x==,y:=} -> ptr.y=3; ptr}; f(@{x=1,y:=2}).y", TypeInt.con(3)); // On field x, cast-up r/o for final but did not read
     test    ("f={ptr:@{x,y} -> ptr.y }; f(@{x:=1,y:=2}:@{x,y=})", TypeInt.con(2));
@@ -522,6 +524,24 @@ public class TestParse {
     //testerr ("ptr=@{f:=1}; ptr:@{f=}.f=2","Cannot re-assign read-only field '.f'",20);
     //testerr ("f={ptr:@{x,y} -> ptr.y=3}; f(@{x:=1,y:=2});"       , "Cannot re-assign read-only field '.y'",38);
     //testerr ("f={ptr:@{x,y} -> ptr.y=3}; f(@{x:=1,y:=2}:@{x,y=})", "Cannot re-assign read-only field '.y'",38);
+    //
+    // Need to ponder lexical scoping of access constraints; read-only is NOT a
+    // final store.  Thus means access on PTRs and final on MEMs.
+    //
+    // ACTION: Add a MeetNode which does a Meet with a constant (very close to
+    // a Phi).  Goal of MeetNode is to keep a *downcast* in order to keep the
+    // following checks.  Can be removed when no following checks on downcast
+    // value, or no downcast happens during iter().  Dunno how to check for "no
+    // following checks"?  Drop the default value on phi/parm?  Add TypeNodes
+    // whenever a Parm declares a type (and MeetNode?).  Note relation between
+    // default on parm vs function type, and the fun()._tf value.  Use MeetNode
+    // is enforce read-only casts.
+    //
+    // ACTION: Move read-only/read-write into TMP.  Goal: constraint on
+    // read-only is lexically scoped and not e.g. memory threaded.  Goal: keep
+    // final/mutable on TypeMem and memory threaded.  Goal: can declare parms
+    // as read-only (equiv: cast to read-only), and honor the constraint, while
+    // leaving the original ptr able to Store.
   }
 
 
@@ -533,18 +553,11 @@ cannot flip to final, if ptr to memory has "escaped".
 
 Can cast that a ptr ptrs-to only final memory.  Type-error if memory is not
 final.  Cannot cast-away "finalness"; type-error if memory is final.
-  ptr2f = @{f=1};  ptr2rw:@{!f} = ptr2f;  ptr2rw.f=2;  // type error, casting away final
+  ptr2f = @{f=1};  ptr2rw:@{f:=} = ptr2f;  ptr2rw.f=2;  // type error, casting away final
   ptr2f = @{f=1};  ptr2rw:@{!f} = ptr2f;           2;  // Ok, ptr2rw is dead
   ptr2f = @{f=1};  ptr2ro:@{~f} = ptr2f;  ptr2ro.f  ;  // OK, casting away final to R/O
   ptr2f = @{f=1};  ptr2ro:@{~f} = ptr2f;  ptr2ro.f=2;  // MIGHT be ok, as store is dead
   ptr2f = @{f=1};  ptr2ro:@{~f} = ptr2f;  ptr2ro.f=2; ptr2ro.f // ERROR, store not dead and not correct
-
-When doing a "meet" of final/non-final, dunno which one should "win".
-But cannot use a "meet" to cast-away final-ness and store-into.
-Also, cannot use a "meet" to cast into final-ness, and get a ptr typed as
-"final" but remotely modifiable.
-  MEET(final,final)==final, MEET(rw,rw)==rw
-  MEET(final,rw/ro)==ro   , MEET(rw,ro)==ro
 
 Cannot make a final on mixed memory!!!
 Just like 'Naming' memory.
