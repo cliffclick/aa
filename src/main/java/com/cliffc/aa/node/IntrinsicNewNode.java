@@ -39,7 +39,7 @@ public abstract class IntrinsicNewNode extends IntrinsicNode {
     return nnn.update_alias(BitsAlias.new_alias(_alias)); // Children alias classes
   }
   @Override public String xstr() { return _name+"*"+_alias; }
-  @Override public Type all_type() { return _funret; }
+  @Override public Type all_type() { return TypeTuple.make(_funret._obj,_funret); }
 
   // Wrap the PrimNode with a Fun/Epilog wrapper that includes memory effects.
   public FunPtrNode as_fun( GVNGCM gvn ) {
@@ -51,33 +51,37 @@ public abstract class IntrinsicNewNode extends IntrinsicNode {
     add_def(memp);              // Control for the memory    in slot 1
     for( int i=0; i<_args.length; i++ ) // Args follow
       add_def(gvn.xform(new ParmNode(i,_args[i],fun, gvn.con(_targs.at(i)),null)));
-    Node ptr = gvn.xform(this); // Returns a TypeMemPtr to a TypeObj
-    Node mmem = gvn.xform(new MemMergeNode(memp,ptr));
+    Node rez = gvn.xform(this); // Returns a Tuple(mem,ptr)
+    Node mem = gvn.xform(new OProjNode(rez,0));
+    Node ptr = gvn.xform(new  ProjNode(rez,1));
+    Node mmem = gvn.xform(new MemMergeNode(memp,mem));
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,ptr,rpc,fun));
     return new FunPtrNode(ret);
   }
-  
+
   // --------------------------------------------------------------------------
   static class ConvertI64Str extends IntrinsicNewNode {
     ConvertI64Str(int alias) { super("str",ARGS1,TypeTuple.INT64, TypeMemPtr.STRPTR,alias); }
     @Override public Type value(GVNGCM gvn) {
       Type t = gvn.type(in(2));
-      if( t.above_center() ) return _funret.dual();
-      if( !t.is_con() || !(t instanceof TypeInt) ) return _funret;
-      return TypeMemPtr.make(_alias,TypeStr.con(Long.toString(t.getl())));
+      if( t.above_center() ) return all_type().dual();
+      if( !t.is_con() || !(t instanceof TypeInt) ) return all_type();
+      TypeStr str = TypeStr.con(Long.toString(t.getl()));
+      return TypeTuple.make(str,TypeMemPtr.make(_alias,str));
     }
   }
-  
+
   static class ConvertF64Str extends IntrinsicNewNode {
     ConvertF64Str(int alias) { super("str",ARGS1,TypeTuple.FLT64, TypeMemPtr.STRPTR, alias); }
     @Override public Type value(GVNGCM gvn) {
       Type t = gvn.type(in(2));
-      if( t.above_center() ) return _funret.dual();
-      if( !t.is_con() || !(t instanceof TypeFlt) ) return _funret;
-      return TypeMemPtr.make(_alias,TypeStr.con(Double.toString(t.getd())));
+      if( t.above_center() ) return all_type().dual();
+      if( !t.is_con() || !(t instanceof TypeFlt) ) return all_type();
+      TypeStr str = TypeStr.con(Double.toString(t.getd()));
+      return TypeTuple.make(str,TypeMemPtr.make(_alias,str));
     }
   }
-  
+
   // String concat.  NIL values are treated "as-if" the empty string.
   // If both arguments are NIL, NIL is returned.
   // If one  argument  is  NIL, the other non-nil argument is returned.
@@ -95,27 +99,25 @@ public abstract class IntrinsicNewNode extends IntrinsicNode {
     // TODO: If fail to resolve during GCP, probably need to bail out there as
     // a hard error.  All calls should resolve during GCP, or else cannot
     // further propagate optimality.
-
-    
     AddStrStr(int alias) { super("+",ARGS2,TypeTuple.STR_STR, TypeMemPtr.STRPTR, alias); }
     @Override public Type value(GVNGCM gvn) {
       Type m   = gvn.type(in(1));
       Type sp0 = gvn.type(in(2));
       Type sp1 = gvn.type(in(3));
-      if( m.above_center() || sp0.above_center() || sp1.above_center() ) return _funret.dual();
-      if( !(m instanceof TypeMem) ) return _funret;
-      if( sp0==Type.NIL ) return sp1;
-      if( sp1==Type.NIL ) return sp0;
-      if( !sp0.isa(TypeMemPtr.STRPTR) || !sp1.isa(TypeMemPtr.STRPTR) ) return _funret;
+      if( m.above_center() || sp0.above_center() || sp1.above_center() ) return all_type().dual();
+      if( !(m instanceof TypeMem) ) return all_type();
+      if( sp0==Type.NIL ) return TypeTuple.make(((TypeMemPtr)sp1)._obj,sp1);
+      if( sp1==Type.NIL ) return TypeTuple.make(((TypeMemPtr)sp0)._obj,sp1);
+      if( !sp0.isa(TypeMemPtr.STRPTR) || !sp1.isa(TypeMemPtr.STRPTR) ) return all_type();
       TypeMem mem = (TypeMem)m;
       Type s0 = mem.ld((TypeMemPtr)sp0);
       Type s1 = mem.ld((TypeMemPtr)sp1);
-      if( !(s0 instanceof TypeStr) || !(s1 instanceof TypeStr) ) return _funret;
+      if( !(s0 instanceof TypeStr) || !(s1 instanceof TypeStr) ) return all_type();
       TypeStr str0 = (TypeStr)s0;
       TypeStr str1 = (TypeStr)s1;
-      if( !str0.is_con() || !str1.is_con() ) return _funret;
-      
-      return TypeMemPtr.make(_alias,TypeStr.con(str0.getstr()+str1.getstr()));
+      if( !str0.is_con() || !str1.is_con() ) return all_type();
+      TypeStr str = TypeStr.con(str0.getstr()+str1.getstr());
+      return TypeTuple.make(str,TypeMemPtr.make(_alias,str));
     }
     @Override public byte op_prec() { return 5; }
   }

@@ -178,6 +178,9 @@ public class TypeName extends TypeObj<TypeName> {
     return this;
   }
 
+  @Override BitsAlias aliases() { return _t instanceof TypeObj ? ((TypeObj)_t).aliases() : BitsAlias.NIL; }
+  @Override public TypeObj realias(int alias) { return _t instanceof TypeObj ? make(((TypeObj)_t).realias(alias)) : this; }
+  @Override public TypeObj lift_final() { return _t instanceof TypeObj ? make(((TypeObj)_t).lift_final()) : this; }
   @Override public boolean above_center() { return _t.above_center(); }
   @Override public boolean may_be_con() { return _t.may_be_con(); }
   @Override public boolean is_con()   { return _t.is_con(); }

@@ -149,7 +149,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     if( !is_tup ) sb.p('@');    // Not a tuple
     sb.p(is_tup ? '(' : '{');
     for( int i=0; i<_flds.length; i++ ) {
-      if( !is_tup ) 
+      if( !is_tup )
         sb.p(_flds[i]).p(fstr(_finals[i])).p('='); // Field name, access mod
       Type t = at(i);
       if( t==null ) sb.p("!");  // Graceful with broken types
@@ -222,6 +222,16 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public  static TypeStruct make_tuple( Type[] ts ) { return make_tuple(BitsAlias.REC,ts); }
   public  static TypeStruct make_tuple( int alias, Type... ts ) { return make(FLDS[ts.length],ts,finals(ts.length),alias); }
   public  static TypeStruct make(String[] flds, byte[] finals) { return make(flds,ts(flds.length),finals); }
+
+  // If has lattice-bottom field-mods (i.e. read-only), make a highest-possible
+  // struct except for the field mods.  This struct is suitable for doing a
+  // meet and only dropping the fields to field-bot.
+  public TypeStruct make_fmod_bot() { return has_fmod_bot()? make(_dual._flds, _dual._ts, _finals, _dual._news) : null; }
+  private boolean has_fmod_bot() {
+    for( byte b : _finals ) if( b==fbot() ) return true;
+    return false;
+  }
+
 
   public  static final TypeStruct POINT = make(flds("x","y"),ts(TypeFlt.FLT64,TypeFlt.FLT64));
           static final TypeStruct X     = make(flds("x"),ts(TypeFlt.FLT64 )); // @{x:flt}
@@ -901,7 +911,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   private static byte fdual( byte f ) { return f==funk() || f==fro() ? (byte)(3-f) : f; }
   // Shows as:  fld?=val, fld==val, fld:=val, fld=val
   private static String fstr( byte f ) { return new String[]{"?","=",":",""}[f]; }
-      
+
   public static byte ftop()  { return funk(); }
   public static byte fbot()  { return fdual(ftop()); }
   public static byte funk()  { return 0; }
@@ -923,18 +933,36 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public Type at( int idx ) { return _ts[idx]; }
 
   // Update (approximately) the current TypeObj.  Updates the named field.
-  @Override TypeObj update(byte fin, String fld, int fld_num, Type val) {
+  @Override public TypeObj update(byte fin, String fld, int fld_num, Type val) { return update(fin,fld,fld_num,val,false); }
+  @Override public TypeObj st    (byte fin, String fld, int fld_num, Type val) { return update(fin,fld,fld_num,val,true ); }
+  private TypeObj update(byte fin, String fld, int fld_num, Type val, boolean precise) {
     assert val.isa_scalar();
     int idx = find(fld,fld_num);
     // No-such-field to update, so this is a program type-error.
     if( idx==-1 ) return ALLSTRUCT;
-    // Update to a read-only/final field.  This is a program type-error
-    if( _finals[idx] == fro() || _finals[idx] == ffinal() ) return this;
+    // Pointers & Memory to a Store can fall during GCP, and go from r/w to r/o
+    // and the StoreNode output must remain monotonic.  This means store
+    // updates are allowed to proceed even if in-error.
+    //if( _finals[idx] == fro() || _finals[idx] == ffinal() ) return this;
     byte[] finals = _finals;
     Type[] ts     = _ts;
     if( _finals[idx] != fin ) { finals = _finals.clone(); finals[idx] = fin; }
-    if( _ts    [idx] != val ) { ts     = _ts    .clone(); ts    [idx] = (val); }
+    if( _ts    [idx] != val ) { ts     = _ts    .clone(); ts[idx] = precise ? val : ts[idx].meet(val); }
     return malloc(_any,_flds,ts,finals,_news).hashcons_free();
+  }
+  // Allowed to update this field?
+  @Override public boolean can_update(String fld, int fld_num) {
+    int idx = find(fld,fld_num);
+    if( idx == -1 ) return false;
+    return _finals[idx] == frw() || _finals[idx] == funk();
+  }
+  @Override BitsAlias aliases() { return _news; }
+  @Override public TypeObj realias(int alias) { return make(_flds,_ts,_finals,alias); }
+  @Override public TypeObj lift_final() {
+    byte[] bs = new byte[_finals.length];
+    for( int i=0; i<_finals.length; i++ )
+      bs[i] = _finals[i] == frw() ? funk() : _finals[i];
+    return malloc(_any,_flds,_ts,bs,_news).hashcons_free();
   }
   // True if isBitShape on all bits
   @Override public byte isBitShape(Type t) {

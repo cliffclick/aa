@@ -62,10 +62,9 @@ public class NewNode extends Node {
 
   // Called when folding a Named Constructor into this allocation site
   void set_name( GVNGCM gvn, TypeName to ) {
-    Type oldt = gvn.type(this);
-    if( !(oldt instanceof TypeMemPtr) )  throw com.cliffc.aa.AA.unimpl();
-    TypeMemPtr poldt = (TypeMemPtr)oldt;
-    TypeStruct oldts = (TypeStruct)poldt._obj;
+    TypeTuple oldt = (TypeTuple)gvn.type(this);
+    TypeStruct oldts = (TypeStruct)oldt.at(0);
+    TypeMemPtr poldt = (TypeMemPtr)oldt.at(1);
     gvn.unreg(this);
     TypeStruct ts = (TypeStruct)to.base();
     // Reconstruct obj with 'this' _news
@@ -97,22 +96,22 @@ public class NewNode extends Node {
     // approximations happening at the deepest points.
     TypeStruct res = newt.approx(CUTOFF);
     TypeObj res2 = _obj instanceof TypeName ? ((TypeName)_obj).make(res) : res;
-    return TypeMemPtr.make(_alias,res2);
+    return TypeTuple.make(res2,TypeMemPtr.make(_alias,res2));
   }
 
-  @Override public Type all_type() { return _ptr; }
+  @Override public Type all_type() { return TypeTuple.make(_obj,_ptr); }
 
   // Clones during inlining all become unique new sites
   @Override @NotNull NewNode copy( GVNGCM gvn) {
     // Split the original '_alias' class into 2 sub-classes
     NewNode nnn = (NewNode)super.copy(gvn);
     nnn._alias = BitsAlias.new_alias(_alias); // Children alias classes, split from parent
-    nnn._ptr = TypeMemPtr.make(nnn._alias,_obj);
+    nnn._ptr = TypeMemPtr.make(nnn._alias,nnn._obj = _obj.realias(nnn._alias));
     // The original NewNode also splits from the parent alias
     Type oldt = gvn.type(this);
     gvn.unreg(this);
     _alias = BitsAlias.new_alias(_alias);
-    _ptr = TypeMemPtr.make(_alias,_obj);
+    _ptr = TypeMemPtr.make(_alias,_obj = _obj.realias(_alias));
     gvn.rereg(this,oldt);
     return nnn;
   }

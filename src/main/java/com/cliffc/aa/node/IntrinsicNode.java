@@ -86,7 +86,7 @@ public abstract class IntrinsicNode extends Node {
     // Take in any struct alias or subclass thereof, with the given 'from'
     // type.  Most structs will NOT have this type.  The pointer passed in must
     // have this type to type-check.
-    @Override public Type all_type() { return _funret; }
+    @Override public TypeObj all_type() { return _funret._obj; }
 
     // If the input memory is unaliased, fold into the NewNode.
     // If this node does not fold away, the program is in error.
@@ -98,8 +98,8 @@ public abstract class IntrinsicNode extends Node {
             nnn != null ) {     // Un-aliased NewNode
           // NewNode is well-typed and producing a pointer to memory with the
           // correct type?  Fold into the NewNode and remove this Convert.
-          Type tnnn = gvn.type(nnn);
-          if( tnnn.isa(_targs.at(0)) ) {
+          TypeTuple tnnn = (TypeTuple)gvn.type(nnn);
+          if( tnnn.at(1).isa(_targs.at(0)) ) {
             nnn.set_name(gvn,(TypeName)_funret._obj);
             gvn.add_work(nnn);
             return nnn;
@@ -123,26 +123,25 @@ public abstract class IntrinsicNode extends Node {
       Type mem = gvn.type(mem());
       Type ptr = gvn.type(ptr());
       if( !(mem instanceof TypeMem && ptr instanceof TypeMemPtr) )
-        return to;              // Inputs are confused
+        return tname;            // Inputs are confused
       // Get the Obj from the pointer.  We are renaming it in-place, basically
       // changing the vtable.  We need the l-value.
       TypeObj obj = ((TypeMem)mem).ld((TypeMemPtr)ptr);
-      if( !obj.isa(from._obj) ) return to; // Inputs not correct from, and node is in-error
-      if( obj.isa(from._obj.dual()) ) return to.dual();
+      if( !obj.isa(from._obj) ) return tname; // Inputs not correct from, and node is in-error
+      if( obj.isa(from._obj.dual()) ) return tname.dual();
       // Obj needs to share a common name hierarchy (same Name-depth) as 'from'
       int fd = from._obj instanceof TypeName ? ((TypeName)from._obj)._depth : -1;
       int od =       obj instanceof TypeName ? ((TypeName)      obj)._depth : -1;
-      if( fd != od ) return obj.above_center() ? to.dual() : to; // Name-depth does not match, node is in-error
+      if( fd != od ) return obj.above_center() ? tname.dual() : tname; // Name-depth does not match, node is in-error
       // 'ptr' might be 'dull' during iter() while 'mem' gets sharp first.
       // Then the 'ld' can correctly return a TypeStruct with a sharper '_news'
       // than 'ptr'.  Bail out and wait for ptr to sharpen up.
       TypeMemPtr tptr = (TypeMemPtr)ptr;
       if( obj instanceof TypeStruct && tptr._aliases != ((TypeStruct)obj)._news )
-        return obj.above_center() ? to.dual() : to; // Name-depth does not match, node is in-error
-      
+        return obj.above_center() ? tname.dual() : tname; // Name-depth does not match, node is in-error
+
       // Wrap result in 1 layer of Name
-      TypeName tnto = tname.make(obj);// Named to obj
-      return tptr.make(tnto);
+      return tname.make(obj);
     }
     @Override public String err(GVNGCM gvn) {
       Type ptr = gvn.type(ptr());
@@ -165,9 +164,11 @@ public abstract class IntrinsicNode extends Node {
       String argy = argx.equals(".") ? "arg"+i : argx;
       nnn.add_def(gvn.xform(new ParmNode(i,argy,fun, gvn.con(from._ts[i]),null)));
     }
-    Node ptr = gvn.xform(nnn).keep();
-    Node mmem= gvn.xform(new MemMergeNode(memp,ptr));
-    RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,ptr.unhook(),rpc,fun));
+    Node nnn2 = gvn.xform(nnn);
+    Node obj = gvn.xform(new OProjNode(nnn2,0));
+    Node ptr = gvn.xform(new  ProjNode(nnn2,1));
+    Node mmem= gvn.xform(new MemMergeNode(memp,obj));
+    RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,ptr,rpc,fun));
     return (FunPtrNode)gvn.xform(new FunPtrNode(ret));
   }
 

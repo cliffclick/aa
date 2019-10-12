@@ -15,6 +15,8 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
     Object dummy = Env.GVN; // Force class loading cycle
+    //testerr ("f={ptr:@{x,y} -> ptr.y=3}; f(@{x:=1,y:=2});"       , "Cannot re-assign read-only field '.y'",38);
+    //testerr ("f={ptr:@{x,y} -> ptr.y=3}; f(@{x:=1,y:=2}:@{x,y=})", "Cannot re-assign read-only field '.y'",38);
 
     // A collection of tests which like to fail easily
     testerr ("Point=:@{x,y}; Point((0,1))", "*[$](nil,1) is not a *[$]@{x=,y=}",27);
@@ -234,7 +236,7 @@ public class TestParse {
     testerr("a=@{x=1,x=2}", "Cannot define field '.x' twice",11);
     test   ("a=@{x=1.2,y,}; a.x", TypeFlt.con(1.2)); // standard "." field naming; trailing comma optional
     testerr("(a=@{x,y}; a.)", "Missing field name after '.'",13);
-    testerr("a=@{x,y}; a.x=1","Cannot re-assign final field '.x'",15);
+    testerr("a=@{x,y}; a.x=1","Cannot re-assign read-only field '.x'",15);
     test   ("a=@{x=0,y=1}; b=@{x=2}  ; c=math_rand(1)?a:b; c.x", TypeInt.INT8); // either 0 or 2; structs can be partially merged
     testerr("a=@{x=0,y=1}; b=@{x=2}; c=math_rand(1)?a:b; c.y",  "Unknown field '.y'",47);
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'",20);
@@ -493,15 +495,15 @@ public class TestParse {
     // Test re-assignment in struct
     Type[] ts = TypeStruct.ts(TypeInt.con(1), TypeInt.con(2));
     test_ptr("x=@{n:=1,v:=2}", (alias) -> TypeMemPtr.make(alias,TypeStruct.make(FLDS, ts,TypeStruct.frws(2),alias)));
-    testerr ("x=@{n =1,v:=2}; x.n  = 3; ", "Cannot re-assign final field '.n'",24);
+    testerr ("x=@{n =1,v:=2}; x.n  = 3; ", "Cannot re-assign read-only field '.n'",24);
     test    ("x=@{n:=1,v:=2}; x.n  = 3", TypeInt.con(3));
     test_ptr("x=@{n:=1,v:=2}; x.n := 3; x", "@{n:=3,v:=2}");
-    testerr ("x=@{n:=1,v:=2}; x.n  = 3; x.v = 1; x.n = 4", "Cannot re-assign final field '.n'",42);
+    testerr ("x=@{n:=1,v:=2}; x.n  = 3; x.v = 1; x.n = 4", "Cannot re-assign read-only field '.n'",42);
     test    ("x=@{n:=1,v:=2}; y=@{n=3,v:=4}; tmp = math_rand(1) ? x : y; tmp.n", TypeInt.NINT8);
-    testerr ("x=@{n:=1,v:=2}; y=@{n=3,v:=4}; tmp = math_rand(1) ? x : y; tmp.n = 5", "Cannot re-assign final field '.n'",68);
+    testerr ("x=@{n:=1,v:=2}; y=@{n=3,v:=4}; tmp = math_rand(1) ? x : y; tmp.n = 5", "Cannot re-assign read-only field '.n'",68);
     test    ("x=@{n:=1,v:=2}; foo={q -> q.n=3}; foo(x); x.n",TypeInt.con(3)); // Side effects persist out of functions
     // Tuple assignment
-    testerr ("x=(1,2); x.0=3; x", "Cannot re-assign final field '.0'",14);
+    testerr ("x=(1,2); x.0=3; x", "Cannot re-assign read-only field '.0'",14);
     // Final-only type syntax.
     testerr ("ptr2rw = @{f:=1}; ptr2final:@{f==} = ptr2rw; ptr2final", "*[$]@{f:=1} is not a *[$]@{f==}",43); // Cannot cast-to-final
     test_ptr("ptr2   = @{f =1}; ptr2final:@{f==} = ptr2  ; ptr2final", // Good cast
@@ -510,41 +512,21 @@ public class TestParse {
 
     test    ("@{x:=1,y =2}:@{x,y==}.y", TypeInt.con(2)); // Allowed reading final field
     testerr ("f={ptr2final:@{x,y==} -> ptr2final.y  }; f(@{x:=1,y:=2})", "*[$]@{x:=1,y:=2} is not a *[$]@{x=,y==}",56); // Another version of casting-to-final
-    testerr ("f={ptr2final:@{x,y==} -> ptr2final.y=3}; f(@{x =1,y =2})", "Cannot re-assign final field '.y'",38);
-    test    ("f={ptr:@{x=,y:=} -> ptr.y=3; ptr}; f(@{x:=1,y:=2}).y", TypeInt.con(3)); // On field x, cast-away r/w for r/o
-    test    ("f={ptr:@{x==,y:=} -> ptr.y=3; ptr}; f(@{x=1,y:=2}).y", TypeInt.con(3)); // On field x, cast-up r/o for final but did not read
+    testerr ("f={ptr2final:@{x,y==} -> ptr2final.y=3}; f(@{x =1,y =2})", "Cannot re-assign read-only field '.y'",38);
+    test    ("f={ptr:@{x= ,y:=} -> ptr.y=3; ptr}; f(@{x:=1,y:=2}).y", TypeInt.con(3)); // On field x, cast-away r/w for r/o
+    test    ("f={ptr:@{x==,y:=} -> ptr.y=3; ptr}; f(@{x =1,y:=2}).y", TypeInt.con(3)); // On field x, cast-up r/o for final but did not read
+    testerr ("f={ptr:@{x==,y:=} -> ptr.y=3; ptr}; f(@{x:=1,y:=2}).x", "*[$]@{x:=1,y:=2} is not a *[$]@{x==,y:=}",51); // On field x, cast-up r/o for final and read
     test    ("f={ptr:@{x,y} -> ptr.y }; f(@{x:=1,y:=2}:@{x,y=})", TypeInt.con(2));
-
-    // TODO: Open Question: is this legit?  Clearly a store against a read-
-    // only; it is locally INCORRECT.  Turns out that only r/w memory is
-    // involved.  Globally correct.  Since R/O is bottom of the access lattice,
-    // all FINAL and R/W are also R/O... and having passed that check, the cast
-    // to R/O can be forgotten.
-    //
-    //testerr ("ptr=@{f:=1}; ptr:@{f=}.f=2","Cannot re-assign read-only field '.f'",20);
-    //testerr ("f={ptr:@{x,y} -> ptr.y=3}; f(@{x:=1,y:=2});"       , "Cannot re-assign read-only field '.y'",38);
+    testerr ("ptr=@{f:=1}; ptr:@{f=}.f=2","Cannot re-assign read-only field '.f'",26);
+    //testerr ("f={ptr:@{x,y} -> ptr.y=3}; f(@{x:=1,y:=2});", "Cannot re-assign read-only field '.y'",38);
     //testerr ("f={ptr:@{x,y} -> ptr.y=3}; f(@{x:=1,y:=2}:@{x,y=})", "Cannot re-assign read-only field '.y'",38);
-    //
-    // Need to ponder lexical scoping of access constraints; read-only is NOT a
-    // final store.  Thus means access on PTRs and final on MEMs.
-    //
-    // ACTION: Add a MeetNode which does a Meet with a constant (very close to
-    // a Phi).  Goal of MeetNode is to keep a *downcast* in order to keep the
-    // following checks.  Can be removed when no following checks on downcast
-    // value, or no downcast happens during iter().  Dunno how to check for "no
-    // following checks"?  Goal: Use MeetNode is enforce read-only casts.
-    
+
     // THINK: Drop the default value on phi/parm?  Goal: no inlining if args
     // are in-error.  Actual goal: keep arg-casts as *casts*, and check
     // validity; errors reported as-if no inline.  Add TypeNodes whenever a
     // Parm declares a type (and MeetNode?).  Note relation between default on
     // parm vs function type, and the fun()._tf value.
     //
-    // ACTION: Move read-only/read-write into TMP.  Goal: constraint on read-
-    // only is lexically scoped and not e.g. memory threaded.  Goal: keep final
-    // /mutable on TypeMem and memory threaded.  Goal: can declare parms as
-    // read-only (equiv: cast to read-only) and honor the constraint, while
-    // leaving the original ptr able to Store.
   }
 
 

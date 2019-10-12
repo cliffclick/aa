@@ -37,9 +37,14 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
     }
   }
   // Update (approximately) the current TypeObj
-  TypeObj update(byte fin, String fld, int fld_num, Type val) {
-    return OBJ;                 // Approximate by falling to bottom OBJ
-  }
+  public TypeObj update(byte fin, String fld, int fld_num, Type val) { return OBJ; }
+  // Exact object update
+  public TypeObj st    (byte fin, String fld, int fld_num, Type val) { return OBJ; }
+  // Allowed to update this field?
+  public boolean can_update(String fld, int fld_num) { return false; }
+  public TypeObj realias(int alias) { return this; }
+  public TypeObj lift_final() { return this; }
+  BitsAlias aliases() { return BitsAlias.NZERO; }
   @Override public boolean above_center() { return _any; }
   @Override public boolean may_be_con() { return _any; }
   @Override public boolean is_con() { return false; }

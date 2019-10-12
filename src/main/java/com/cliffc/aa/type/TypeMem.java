@@ -1,6 +1,5 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.AA;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
@@ -225,35 +224,35 @@ public class TypeMem extends Type<TypeMem> {
 
   // Meet of all possible storable values, after updates.  This updates a field
   // in a TypeObj.
-  public TypeMem st( TypeMemPtr ptr, byte fin, String fld, int fld_num, Type val ) {
+  public TypeMem update( byte fin, String fld, int fld_num, Type val, TypeMemPtr ptr ) {
     assert val.isa_scalar();
-    // Choice store: something got stored into, but we can choose, and we
-    // choose nothing visible to anybody else.  
-    if( ptr.above_center() )
-      return this;
     // Any alias, plus all of its children, are meet/joined.  This does a
     // tree-based scan on the inner loop.
     Ary<TypeObj> objs = new Ary<>(_aliases.clone(),_aliases.length);
     BitSet bs = ptr._aliases.tree().plus_kids(ptr._aliases);
-    for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) )
-      objs.setX(alias, at(alias).update(fin,fld,fld_num,val));
+    // Choice store: something got stored into, but we can choose, and we
+    // choose nothing visible to anybody else.
+    if( ptr.above_center() ) {
+      if( fin != TypeStruct.ffinal() ) return this;
+      for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) )
+        objs.setX(alias, at(alias).lift_final());
+    } else {
+      for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) )
+        objs.setX(alias, at(alias).update(fin,fld,fld_num,val));
+    }
     return make0(objs.asAry());
   }
 
   // Meet of all possible storable values, after updates.  This is a whole-TypeObj update.
-  public TypeMem st( TypeMemPtr ptr ) {
-    if( ptr.is_con() ) throw AA.unimpl(); // objs[ptr.get_con()]=obj;
-    else {
-      // Any alias, plus all of its children, are meet/joined.  This does a
-      // tree-based scan on the inner loop.
-      Ary<TypeObj> objs = new Ary<>(_aliases.clone(),_aliases.length);
-      BitSet bs = ptr._aliases.tree().plus_kids(ptr._aliases);
-      for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) )
-        objs.setX(alias, (TypeObj)at(alias).meet(ptr._obj));
-      // Really loose stores might hit all-of-memory.  Force a little sanity.
-      if( objs.at(1) != TypeObj.XOBJ ) objs.setX(1,TypeObj.OBJ);
-      return make0(objs.asAry());
-    }
+  public TypeMem update( TypeObj obj ) {
+    // Any alias, plus all of its children, are meet.  This does a tree-based
+    // scan on the inner loop.
+    BitsAlias aliases = obj.aliases();
+    Ary<TypeObj> objs = new Ary<>(_aliases.clone(),_aliases.length);
+    BitSet bs = aliases.tree().plus_kids(aliases);
+    for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) )
+      objs.setX(alias, (TypeObj)at(alias).meet(obj));
+    return make0(objs.asAry());
   }
 
   // Return is a Tuple of TypeMem's, all with unrelated aliases.  The slot0

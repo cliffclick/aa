@@ -598,7 +598,8 @@ public class Parse {
       int cnt=0;                // Add parameters to local environment
       for( int i=0; i<ids._len; i++ ) {
         Node parm = gvn(new ParmNode(cnt++,ids.at(i),fun,con(ts.at(i)),errmsg));
-        _e.update(ids.at(i),parm,null, args_are_mutable);
+        Node mt = typechk(parm,ts.at(i));
+        _e.update(ids.at(i),mt,null, args_are_mutable);
       }
       Node rpc = gvn(new ParmNode(-1,"rpc",fun,con(TypeRPC.ALL_CALL),null));
       Node mem = gvn(new ParmNode(-2,"mem",fun,con(TypeMem.MEM),null));
@@ -674,7 +675,19 @@ public class Parse {
 
   // Add a typecheck into the graph, with a shortcut if trivially ok.
   private Node typechk(Node x, Type t) {
-    return t == null || _gvn.type(x).isa(t) ? x : gvn(new TypeNode(t,x,errMsg()));
+    if( t == null ) return x;
+    if( !_gvn.type(x).isa(t) ) x = gvn(new TypeNode(t,x,errMsg()));
+    // Specifically if type is a pointer, and we are throwing away write-
+    // privilege (really: casting to a lower field-access-mod) then insert a
+    // MeetNode to lower precision.
+    TypeMemPtr tmp;
+    if( !t.isa(_gvn.type(x))  && t instanceof TypeMemPtr &&
+        (tmp=((TypeMemPtr)t))._obj instanceof TypeStruct ) {
+      TypeStruct ts = ((TypeStruct)tmp._obj).make_fmod_bot();
+      if( ts != null )
+        x = gvn(new MeetNode(x,TypeMemPtr.make(BitsAlias.RECBITS0.dual(),ts)));
+    }
+    return x;
   }
 
   private String token() { skipWS();  return token0(); }
@@ -732,7 +745,7 @@ public class Parse {
     // Convert to ptr-to-constant-memory-string
     TypeMemPtr ptr = TypeMemPtr.make(ts.get_alias(),ts);
     // Store the constant string to memory
-    set_mem(gvn(new MemMergeNode(mem(),con(ptr))));
+    set_mem(gvn(new MemMergeNode(mem(),con(ts))));
     return ptr;
   }
 
@@ -947,9 +960,11 @@ public class Parse {
   // NewNode updates merges the new allocation into all-of-memory and returns a
   // reference.
   private Node do_mem(NewNode nnn) {
-    Node nn = gvn(nnn).keep();
-    set_mem(gvn(new MemMergeNode(mem(),nn)));
-    return nn.unhook();
+    Node nn  = gvn(nnn);
+    Node mem = gvn(new OProjNode(nn,0));
+    Node ptr = gvn(new  ProjNode(nn,1));
+    set_mem(gvn(new MemMergeNode(mem(),mem)));
+    return ptr;
   }
 
   // Whack current control with a syntax error

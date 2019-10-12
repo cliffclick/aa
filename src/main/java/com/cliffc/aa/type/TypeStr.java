@@ -93,9 +93,11 @@ public class TypeStr extends TypeObj<TypeStr> {
 
   // Update (approximately) the current TypeObj.  Strings are not allowed to be
   // updated, so this is a program type-error.
-  @Override TypeObj update(byte fin, String fld, int fld_num, Type val) {
-    return STR;                 // Strings not allowed to be updated
-  }
+  @Override public TypeObj update(byte fin, String fld, int fld_num, Type val) { return STR; }
+  @Override public TypeObj st    (byte fin, String fld, int fld_num, Type val) { return STR; }
+  @Override BitsAlias aliases() { return BitsAlias.STRBITS; }
+  @Override public TypeObj realias(int alias) { return this; }
+  @Override public TypeObj lift_final() { return this; }
   @Override public boolean may_be_con() { return super.may_be_con() || _con != null; }
   @Override public boolean is_con() { return _con!=null; }
   @Override public Type meet_nil() { return this; }
