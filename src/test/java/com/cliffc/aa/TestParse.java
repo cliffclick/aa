@@ -15,8 +15,6 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
     Object dummy = Env.GVN; // Force class loading cycle
-    //testerr ("f={ptr:@{x,y} -> ptr.y=3}; f(@{x:=1,y:=2});"       , "Cannot re-assign read-only field '.y'",38);
-    //testerr ("f={ptr:@{x,y} -> ptr.y=3}; f(@{x:=1,y:=2}:@{x,y=})", "Cannot re-assign read-only field '.y'",38);
 
     // A collection of tests which like to fail easily
     testerr ("Point=:@{x,y}; Point((0,1))", "*[$](nil,1) is not a *[$]@{x=,y=}",27);
@@ -504,81 +502,36 @@ public class TestParse {
     test    ("x=@{n:=1,v:=2}; foo={q -> q.n=3}; foo(x); x.n",TypeInt.con(3)); // Side effects persist out of functions
     // Tuple assignment
     testerr ("x=(1,2); x.0=3; x", "Cannot re-assign read-only field '.0'",14);
-    // Final-only type syntax.
+    // Final-only and read-only type syntax.
     testerr ("ptr2rw = @{f:=1}; ptr2final:@{f==} = ptr2rw; ptr2final", "*[$]@{f:=1} is not a *[$]@{f==}",43); // Cannot cast-to-final
     test_ptr("ptr2   = @{f =1}; ptr2final:@{f==} = ptr2  ; ptr2final", // Good cast
              (alias) -> TypeMemPtr.make(alias,TypeStruct.make(new String[]{"f"},new Type[]{TypeInt.con(1)},TypeStruct.finals(1),alias)));
     testerr ("ptr=@{f=1}; ptr2rw:@{f:=} = ptr; ptr2rw", "*[$]@{f==1} is not a *[$]@{f:=}", 31); // Cannot cast-away final
-
+    test    ("ptr=@{f=1}; ptr2rw:@{f:=} = ptr; 2", TypeInt.con(2)); // Dead cast-away of final
     test    ("@{x:=1,y =2}:@{x,y==}.y", TypeInt.con(2)); // Allowed reading final field
     testerr ("f={ptr2final:@{x,y==} -> ptr2final.y  }; f(@{x:=1,y:=2})", "*[$]@{x:=1,y:=2} is not a *[$]@{x=,y==}",56); // Another version of casting-to-final
     testerr ("f={ptr2final:@{x,y==} -> ptr2final.y=3}; f(@{x =1,y =2})", "Cannot re-assign read-only field '.y'",38);
     test    ("f={ptr:@{x= ,y:=} -> ptr.y=3; ptr}; f(@{x:=1,y:=2}).y", TypeInt.con(3)); // On field x, cast-away r/w for r/o
     test    ("f={ptr:@{x==,y:=} -> ptr.y=3; ptr}; f(@{x =1,y:=2}).y", TypeInt.con(3)); // On field x, cast-up r/o for final but did not read
-    testerr ("f={ptr:@{x==,y:=} -> ptr.y=3; ptr}; f(@{x:=1,y:=2}).x", "*[$]@{x:=1,y:=2} is not a *[$]@{x==,y:=}",51); // On field x, cast-up r/o for final and read
-    test    ("f={ptr:@{x,y} -> ptr.y }; f(@{x:=1,y:=2}:@{x,y=})", TypeInt.con(2));
+    testerr ("f={ptr:@{x==,y:=} -> ptr.y=3; ptr}; f(@{x:=1,y:=2}).x", "*[$]@{x:=1,y:=2} is not a *[$]@{x==,y:=}",51); // On field x, cast-up r/w for final and read
+    test    ("f={ptr:@{x,y} -> ptr.y }; f(@{x:=1,y:=2}:@{x,y=})", TypeInt.con(2)); // cast r/w to r/o, and read
+    test    ("f={ptr:@{x,y} -> ptr }; f(@{x=1,y=2}).y", TypeInt.con(2)); // cast final to r/o and read
     testerr ("ptr=@{f:=1}; ptr:@{f=}.f=2","Cannot re-assign read-only field '.f'",26);
-    //testerr ("f={ptr:@{x,y} -> ptr.y=3}; f(@{x:=1,y:=2});", "Cannot re-assign read-only field '.y'",38);
-    //testerr ("f={ptr:@{x,y} -> ptr.y=3}; f(@{x:=1,y:=2}:@{x,y=})", "Cannot re-assign read-only field '.y'",38);
+    testerr ("f={ptr:@{x,y} -> ptr.y=3}; f(@{x:=1,y:=2});", "Cannot re-assign read-only field '.y'",24);
+    testerr ("f={ptr:@{x,y} -> ptr.y=3}; f(@{x:=1,y:=2}:@{x,y=})", "Cannot re-assign read-only field '.y'",24);
+    test    ("ptr=@{a:=1}; val=ptr.a; ptr.a=2; val",TypeInt.con(1));
+    // Allowed to build final pointer cycles
+    test    ("ptr0=@{p:=0,v:=1}; ptr1=@{p=ptr0,v:=2}; ptr0.p=ptr1; ptr0.p.v+ptr1.p.v+(ptr0.p==ptr1)", TypeInt.con(4)); // final pointer-cycle is ok
+
 
     // THINK: Drop the default value on phi/parm?  Goal: no inlining if args
     // are in-error.  Actual goal: keep arg-casts as *casts*, and check
     // validity; errors reported as-if no inline.  Add TypeNodes whenever a
     // Parm declares a type (and MeetNode?).  Note relation between default on
     // parm vs function type, and the fun()._tf value.
-    //
   }
 
-
   /*
-
-"Final store" ==> memory words can become "final"; unchangable by any thread.
-Which means the memory value holds the truth about writability.  Also means
-cannot flip to final, if ptr to memory has "escaped".
-
-Can cast that a ptr ptrs-to only final memory.  Type-error if memory is not
-final.  Cannot cast-away "finalness"; type-error if memory is final.
-  ptr2f = @{f=1};  ptr2rw:@{f:=} = ptr2f;  ptr2rw.f=2;  // type error, casting away final
-  ptr2f = @{f=1};  ptr2rw:@{!f} = ptr2f;           2;  // Ok, ptr2rw is dead
-  ptr2f = @{f=1};  ptr2ro:@{~f} = ptr2f;  ptr2ro.f  ;  // OK, casting away final to R/O
-  ptr2f = @{f=1};  ptr2ro:@{~f} = ptr2f;  ptr2ro.f=2;  // MIGHT be ok, as store is dead
-  ptr2f = @{f=1};  ptr2ro:@{~f} = ptr2f;  ptr2ro.f=2; ptr2ro.f // ERROR, store not dead and not correct
-
-Cannot make a final on mixed memory!!!
-Just like 'Naming' memory.
-Final Store MUST fold into 'New' or its an error!
-  ptr0 = @{f:=1}; ptr1 = @{f:=2};  ptr = (rand ? ptr0 : ptr1);  ptr.f=2;  ptr; // ERROR, final stores only into unaliased memory
-  ptr0 = @{f:=1}; ptr1 = @{f:=2};  ptr = (rand ? ptr0 : ptr1);  ptr.f=2;  // MIGHT be ok, as store is dead
-  ptr0 = @{f:=1}; ptr1 = @{f =2};  ptr = (rand ? ptr0 : ptr1);  ptr.f;  // OK, ptr is typed 'read-only' not final
-
-
-
-Want to enable easy final "cycles":
-  ptr0 = @{a}; ptr1 = @{a=ptr0}; ptr0.a = ptr1; // This is OK; both stores can fold into New
-Basically stretching out the final assignment to interleave the constructors.
-Gonna see 2 parallel News in the graph, with crossing ptr-dep edges.
-
-Not ok if we "escape" a non-final version?
-  ptr0 = @{a};
-  ptr1 = @{a=ptr0};
-  ...  foo=ptr0 ...   // still OK as foo will get from the 'New' which eventually gets tagged as 'final field a'
-  ptr0.a = ptr1;
-
-Can see pre-final-store variants or not?  And still safely declare 'final'?
-Might work, if foo.a collapses to a '1', still requires final store into NEW.
-Might type-err if cannot collapse final-store
-  ptr0 = @{a := 1 };  // Field a is non-final 1
-  vala = ptr.a;       // Load before final store, sees 1 not 2
-  ptr0.a = 2;         // anti-dep edge prevents sliding foo.a after ptr0.a=2
-  vala
-
-ERROR, value escaped, cannot be final
-  ptr0 = @{a := 1 };  // Field a is non-final 1
-  ...complex(ptr0) ...  // Saves ptr0 (as r/w) somewhere deep
-  ptr0.a = 2;    // anti-dep edge prevents sliding above complex.
-
-
-
 
 // No ambiguity:
  { x } // no-arg-function returning external variable x; same as { -> x }

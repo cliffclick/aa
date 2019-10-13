@@ -9,7 +9,6 @@ public class MeetNode extends Node {
   public final Type _t;
   public MeetNode( Node val, Type t ) { super(OP_MEET,null,val); _t=t; }
   @Override String xstr() { return "&"+_t; }
-  // Remove is inverse of CastNode
-  @Override public Node ideal(GVNGCM gvn) { return _t.isa (gvn.type(in(1))) ? in(1) : null;  }
+  @Override public Node ideal(GVNGCM gvn) { return null;  }
   @Override public Type value(GVNGCM gvn) { return _t.meet(gvn.type(in(1))); }
 }

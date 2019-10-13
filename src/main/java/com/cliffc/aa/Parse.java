@@ -442,7 +442,7 @@ public class Parse {
         String fld = token();   // Field name
         int fnum = fld==null ? field_number() : -1;
         if( fld==null && fnum==-1 ) n = err_ctrl2("Missing field name after '.'");
-        else if( peek(":=") || peek('=') ) {
+        else if( peek(":=") || peek_not('=','=')) {                                        
           byte fin = _buf[_x-2]==':' ? TypeStruct.frw() : TypeStruct.ffinal();
           Node stmt = stmt();
           if( stmt == null ) n = err_ctrl2("Missing stmt after assigning field '."+fld+"'");
@@ -681,7 +681,7 @@ public class Parse {
     // privilege (really: casting to a lower field-access-mod) then insert a
     // MeetNode to lower precision.
     TypeMemPtr tmp;
-    if( !t.isa(_gvn.type(x))  && t instanceof TypeMemPtr &&
+    if( t instanceof TypeMemPtr &&
         (tmp=((TypeMemPtr)t))._obj instanceof TypeStruct ) {
       TypeStruct ts = ((TypeStruct)tmp._obj).make_fmod_bot();
       if( ts != null )
@@ -903,6 +903,13 @@ public class Parse {
     if(  peek_noWS(s.charAt(1)) ) return true ;
     _x--;
     return false;
+  }
+  // Peek 'c' and NOT followed by 'no'
+  private boolean peek_not( char c, char no ) {
+    byte c0 = skipWS();
+    if( c0 != c || (_x+1 < _buf.length && _buf[_x+1] == no) ) return false;
+    _x++;
+    return true;
   }
 
   /** Advance parse pointer to the first non-whitespace character, and return
