@@ -29,19 +29,15 @@ public class ParmNode extends PhiNode {
     assert fun._defs._len==_defs._len;
     // Arg-check before folding up
     if( _idx >= 0 ) {                         // Skip RPC and memory
-      assert fun.targ(_idx) == _default_type;
       for( int i=1; i<_defs._len; i++  )      // For all arguments
         if( gvn.type(fun.in(i))==Type.CTRL && // Path is alive
             in(i)!=this &&                    // Can ignore self- only other inputs will determine arg-check
-            !gvn.type(in(i)).isa(_default_type) ) // Arg is NOT correct type
+            !gvn.type(in(i)).isa(fun.targ(_idx)) ) // Arg is NOT correct type
           return null;          // Not correct arg-type; refuse to collapse
     }
     return super.ideal(gvn); // Let PhiNode collapse 
   }
 
-  @Override public Type value( GVNGCM gvn) {
-    return in(0) instanceof FunNode ? super.value(gvn) : _default_type.dual(); // Dying returns default.dual
-  }
   @Override public String err( GVNGCM gvn ) {
     if( !(in(0) instanceof FunNode) ) return null; // Dead, report elsewhere
     FunNode fun = (FunNode) in(0);

@@ -33,9 +33,11 @@ public class TypeNode extends Node {
       args[1] = arg;            // Call function is the argument being function-type-checked here
       args[2] = gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM),null));
       Node rpc= gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
-      for( int i=0; i<targs.length; i++ )
+      for( int i=0; i<targs.length; i++ ) {
         // All the parms, with types
-        args[i+3] = gvn.xform(new ParmNode(i,"arg"+i,fun,gvn.con(targs[i]),null));
+        Node parm = gvn.xform(new ParmNode(i,"arg"+i,fun,gvn.con(Type.SCALAR),null));
+        args[i+3] = gvn.xform(new TypeNode(targs[i],parm,_error_parse));
+      }
       Node call = gvn.xform(new CallNode(true,_error_parse,args));
       Node cepi = gvn.xform(new CallEpiNode(call));
       Node ctl  = gvn.xform(new CProjNode(cepi,0));

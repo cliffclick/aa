@@ -45,7 +45,7 @@ public class MemMergeNode extends Node {
     Type mem = gvn.type(mem());
     Type obj = gvn.type(obj());
     if( !(mem instanceof TypeMem) || !(obj instanceof TypeObj) )
-      return TypeMem.MEM;
+      return mem.above_center() ? TypeMem.XMEM : TypeMem.MEM;
     TypeMem wm2 = (TypeMem)mem;
     TypeObj nm2 = (TypeObj)obj;
     return wm2.update(nm2);

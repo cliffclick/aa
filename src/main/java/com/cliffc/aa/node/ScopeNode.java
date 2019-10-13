@@ -226,7 +226,7 @@ public class ScopeNode extends Node {
       return;
     }
 
-    update(name,tn==fn ? fn : P.gvn(new PhiNode(phi_errmsg, gvn.type(tn).meet(gvn.type(fn)), P.ctrl(),tn,fn)),gvn,t_is_mutable);
+    update(name,tn==fn ? fn : P.gvn(new PhiNode(phi_errmsg, P.ctrl(),tn,fn)),gvn,t_is_mutable);
   }
   
   // Replace uses of dull with sharp, used after an IfNode test

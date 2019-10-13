@@ -314,7 +314,7 @@ public class FunNode extends RegionNode {
       for( ParmNode parm : parms )
         if( parm != null ) {    // Some can be dead
           Type t = gvn.type(parm.in(i));
-          if( !t.isa(parm._default_type) ) // Path is in-error?
+          if( !t.isa(targ(parm._idx)) ) // Path is in-error?
             { ncon = -2; break; } // This path is in-error, cannot inline even if small & constants
           if( t.is_con() ) ncon++; // Count constants along each path
         }
@@ -450,7 +450,6 @@ public class FunNode extends RegionNode {
       if( nn instanceof ParmNode && nn.in(0) == fun ) {  // Leading edge ParmNodes
         int idx = ((ParmNode)nn)._idx; // Update default type to match signature
         if( idx == -1 ) ot = nn.all_type(); // Except the new RPC, which has new callers
-        else if( idx >= 0 ) ((ParmNode)nn)._default_type = fun.targ(idx);
       } else if( nn == new_funptr ) {
         ot = fun._tf;           // New TFP for the new FunPtr
       } else if( nn instanceof CallEpiNode ) { // Old calls might be wired, new calls need to re-wire
@@ -477,7 +476,7 @@ public class FunNode extends RegionNode {
             if( !tp.isa(fun.targ(parm._idx)) || // If this path cannot use the sharper sig
                 tp.above_center() )             // Or path is in-error
               { fp = old_funptr; break; } // Take the old, more generic version
-            if( tp.widen() != parm._default_type ) // Even widened, path is more specific than the generic
+            if( tp.widen() != targ(parm._idx) ) // Even widened, path is more specific than the generic
               fp = new_funptr;  // Then take it, but check remaining paths
           }
       } else {                  // Fixed inline path, choice already made

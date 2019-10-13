@@ -21,7 +21,7 @@ public class TestNode {
 
   // Types being used for testing
   private Type[] _alltypes;
-  
+
   // A sparse list of all subtypes.  The outer array is the index into
   // Type._alltypes(), and the inner array is the set of immediate sub-Types
   // (again as indices into _alltypes).  Numbers are sorted.
@@ -169,7 +169,7 @@ public class TestNode {
     //  for( int j=i+1; j<ts.length; j++ )
     //    if( ts[j].isa(ts[i]) ) { Type tmp = ts[i]; ts[i] = ts[j]; ts[j] = tmp; }
     //_alltypes = ts;
-    
+
     // All The Types we care to reason about.  There's an infinite number of
     // Types, but mostly are extremely similar - so we limit ourselves to a
     // subset which has at least one of unique subtype, plus some variations
@@ -221,8 +221,8 @@ public class TestNode {
     // Number ^ *[4] ==> ~nScalar   // nil isa Number, but *[0+4] !isa! ~nScalar
     //
     // PLAN B: nil isa many_things, nothing isa nil because its supposed to be
-    // outside the lattice.  Just weaken asserts around nil?  
-    
+    // outside the lattice.  Just weaken asserts around nil?
+
     // All the Nodes, all Values, all Types
     test1monotonic(new   CallNode(false,null,_ins[0],  unr  ,mem,_ins[2],_ins[3]));
     test1monotonic(new   CallNode(false,null,_ins[0],_ins[1],mem,_ins[2],_ins[3]));
@@ -252,7 +252,7 @@ public class TestNode {
     test1monotonic(new    NewNode(new Node[]{null,_ins[1],_ins[2]},TypeStruct.POINT));
     test1monotonic(new    NewNode(new Node[]{null,_ins[1],_ins[2]},TypeName.TEST_STRUCT));
     ((ConNode<Type>)_ins[1])._t = Type.SCALAR; // ParmNode reads this for _alltype
-    test1monotonic(new   ParmNode( 1, "x",_ins[0],(ConNode)_ins[1],"badgc"));
+    test1monotonic(new   ParmNode( 1, "x",_ins[0],(ConNode)_ins[1],"badgc").add_def(_ins[2]));
     test1monotonic(new    PhiNode("badgc",_ins[0],_ins[1],_ins[2]));
     for( PrimNode prim : PrimNode.PRIMS )
       test1monotonic_prim(prim);
@@ -266,7 +266,7 @@ public class TestNode {
     test1monotonic(new   TypeNode(TypeInt.FALSE,_ins[1],null));
     test1monotonic(new   TypeNode(TypeMemPtr.ABCPTR,_ins[1],null));
     test1monotonic(new   TypeNode(TypeFlt.FLT64,_ins[1],null));
-    
+
     assertEquals(0,_errs);
   }
 
@@ -281,7 +281,7 @@ public class TestNode {
     _gvn.setype(_ins[3],((ConNode)_ins[3])._t = t3);
     return n.value(_gvn);
   }
-  
+
   private void test1monotonic(Node n) {
     assert n._defs._len>0;
     test1monotonic_init(n);
@@ -317,7 +317,7 @@ public class TestNode {
 
     put(0,Type.ANY);            // First args are all ANY, so is result
     push(0);                    // Init worklist
-    
+
     Type[] all = _alltypes;
     long t0 = System.currentTimeMillis(), t2=t0;
     long nprobes = 0, nprobes1=0;
@@ -346,7 +346,7 @@ public class TestNode {
       for( int y2 : stx2 )
         set_value_type(n, vn, xx, xx(x0,x1,y2,x3), 2, y2, all );
       set_type(2,all[x2]);
-      
+
       int[] stx3 = stx(n,xx,3);
       for( int y3 : stx3 )
         set_value_type(n, vn, xx, xx(x0,x1,x2,y3), 3, y3, all );
@@ -398,12 +398,12 @@ public class TestNode {
   // Number-JOIN-*[4]str yields ~nScalar (because the Cast is in-error, mixing
   // numbers and pointers).  Since NIL-isa-Number, we expect
   // *[0+4+]str?-isa-~nScalar (via basic distributivity property).
-  // 
+  //
   private boolean special_cast_exception(Node n, int x1, int y1, Type[] all ) {
     //return n instanceof CastNode && (all[x1]==Type.NIL || all[y1]==Type.NIL);
     return false;
   }
-  
+
   @SuppressWarnings("unchecked")
   private void set_type(int idx, Type tyx) {
     if( idx > 0 ) ((ConNode)_ins[idx])._t = tyx;

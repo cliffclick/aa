@@ -3,19 +3,15 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeMem;
 
 // Merge results; extended by ParmNode
 public class PhiNode extends Node {
   final String _badgc;
-  Type _default_type;
-  public PhiNode( String badgc, Node... vals) { this(badgc,Type.SCALAR,vals); }
-  PhiNode( String badgc, Type defalt, Node... vals ) {
+  public PhiNode( String badgc, Node... vals ) {
     super(OP_PHI,vals);
-    _default_type = defalt instanceof TypeMem ? TypeMem.MEM : defalt;
     _badgc = badgc;
   }
-  PhiNode( byte op, Node fun, ConNode defalt, String badgc ) { super(op,fun,defalt); _badgc = badgc; _default_type = defalt._t; } // For ParmNodes
+  PhiNode( byte op, Node fun, ConNode defalt, String badgc ) { super(op,fun,defalt); _badgc = badgc; } // For ParmNodes
   @Override public Node ideal(GVNGCM gvn) {
     if( gvn.type(in(0)) == Type.XCTRL ) return null;
     RegionNode r = (RegionNode) in(0);
@@ -34,14 +30,14 @@ public class PhiNode extends Node {
   }
   @Override public Type value(GVNGCM gvn) {
     Type ctl = gvn.type(in(0));
-    if( ctl != Type.CTRL ) return ctl.above_center() ? _default_type.dual() : _default_type;
+    if( ctl != Type.CTRL ) return ctl.above_center() ? Type.ANY : Type.ALL;
     RegionNode r = (RegionNode) in(0);
     assert r._defs._len==_defs._len;
-    Type t = _default_type.dual();
+    Type t = Type.ANY;
     for( int i=1; i<_defs._len; i++ )
       if( gvn.type(r.in(i))==Type.CTRL ) // Only meet alive paths
         t = t.meet(gvn.type(in(i)));
-    return t.bound(_default_type); // Limit to sane results
+    return t;                   // Limit to sane results
   }
-  @Override public Type all_type() { return _default_type; }
+  @Override public Type all_type() { return Type.ALL; }
 }

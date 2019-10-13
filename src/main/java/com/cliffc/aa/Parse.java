@@ -442,7 +442,7 @@ public class Parse {
         String fld = token();   // Field name
         int fnum = fld==null ? field_number() : -1;
         if( fld==null && fnum==-1 ) n = err_ctrl2("Missing field name after '.'");
-        else if( peek(":=") || peek_not('=','=')) {                                        
+        else if( peek(":=") || peek_not('=','=')) {
           byte fin = _buf[_x-2]==':' ? TypeStruct.frw() : TypeStruct.ffinal();
           Node stmt = stmt();
           if( stmt == null ) n = err_ctrl2("Missing stmt after assigning field '."+fld+"'");
@@ -597,7 +597,7 @@ public class Parse {
       String errmsg = errMsg("Cannot mix GC and non-GC types");
       int cnt=0;                // Add parameters to local environment
       for( int i=0; i<ids._len; i++ ) {
-        Node parm = gvn(new ParmNode(cnt++,ids.at(i),fun,con(ts.at(i)),errmsg));
+        Node parm = gvn(new ParmNode(cnt++,ids.at(i),fun,con(Type.SCALAR),errmsg));
         Node mt = typechk(parm,ts.at(i));
         _e.update(ids.at(i),mt,null, args_are_mutable);
       }

@@ -198,18 +198,18 @@ public class TestParse {
     testerr("1:str", "1 is not a *[$]str",5);
 
     test   ("{x:int -> x*2}(1)", TypeInt.con(2)); // Types on parms
-    testerr("{x:str -> x}(1)", "1 is not a *[$]str", 15);
+    testerr("{x:str -> x}(1)", "1 is not a *[$]str", 9);
 
     // Type annotations on dead args are ignored
     test   ("fun:{int str -> int}={x y -> x+2}; fun(2,3)", TypeInt.con(4));
-    testerr("fun:{int str -> int}={x y -> x+y}; fun(2,3)", "3 is not a *[$]str",43);
+    testerr("fun:{int str -> int}={x y -> x+y}; fun(2,3)", "3 is not a *[$]str",33);
     // Test that the type-check is on the variable and not the function.
     test_ptr("fun={x y -> x*2}; bar:{int str -> int} = fun; baz:{int @{x,y} -> int} = fun; (fun(2,3),bar(2,\"abc\"))",
             (alias -> TypeMemPtr.make(alias,TypeStruct.make_tuple(alias,TypeInt.con(4),TypeInt.con(4)))) );
     testerr("fun={x y -> x+y}; baz:{int @{x,y} -> int} = fun; (fun(2,3), baz(2,3))",
-            "3 is not a *[$]@{x=,y=}", 68);
+            "3 is not a *[$]@{x=,y=}", 47);
 
-    testerr("x=3; fun:{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int64",40);
+    testerr("x=3; fun:{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int64",30);
     test("x=3; fun:{real->real}={x -> x*2}; fun(2.1)+fun(x)", TypeFlt.con(2.1*2+3*2)); // Mix of types to fun()
     test("fun:{real->flt32}={x -> x}; fun(123 )", TypeInt.con(123 ));
     test("fun:{real->flt32}={x -> x}; fun(0.125)", TypeFlt.con(0.125));
@@ -522,13 +522,6 @@ public class TestParse {
     test    ("ptr=@{a:=1}; val=ptr.a; ptr.a=2; val",TypeInt.con(1));
     // Allowed to build final pointer cycles
     test    ("ptr0=@{p:=0,v:=1}; ptr1=@{p=ptr0,v:=2}; ptr0.p=ptr1; ptr0.p.v+ptr1.p.v+(ptr0.p==ptr1)", TypeInt.con(4)); // final pointer-cycle is ok
-
-
-    // THINK: Drop the default value on phi/parm?  Goal: no inlining if args
-    // are in-error.  Actual goal: keep arg-casts as *casts*, and check
-    // validity; errors reported as-if no inline.  Add TypeNodes whenever a
-    // Parm declares a type (and MeetNode?).  Note relation between default on
-    // parm vs function type, and the fun()._tf value.
   }
 
   /*

@@ -244,7 +244,7 @@ Nilable and not-nil modeled after Kotlin | ---
 `"abc"!=0`        | `1:int` Compare vs nil
 `nil=0; "abc"!=nil` | `1:int` Another name for 0/nil
 `a = math_rand(1) ? 0 : @{x=1}; b = math_rand(1) ? 0 : @{c=a}; b ? (b.c ? b.c.x : 0) : 0` | `int1` Nested nilable structs
-Recursive types | ---
+Recursive types   | ---
 `A= :(A?, int); A((0,2))`|`A:(nil,2)` Simple recursive tuple
 `A= :(A?, int); A(0,2)`|`A:(nil,2)` Same thing using explicit args
 `A= :(A?, int); A(A(0,2),3)`|`A:(A:(nil,2),3)` Simple recursive tuple
@@ -255,6 +255,20 @@ Recursive types | ---
 `List=:@{next:List?,val}` | `List` Linked-list type
 `List(List(0,1.2),2.3)` | `List:@{next:List:@{next:nil,val:1.2},val:2.3}` Sample linked-list, with all types shown
 `map_sq={x -> x ? (map_sq(x.0),x.1*x.1) : 0}; map_sq((0,1.2))` | `(nil,1.44)` Strongly typed `map_sq` with a simple tuple
+`map={tree fun -> tree ? @{l=map(tree.l,fun),r=map(tree.r,fun),v=fun(tree.v)} : 0}` | Map a function over a tree in postfix order
+Final fields are made with a final store not a final declaration | ---
+`x=1`             | `1:int` Final local variable
+`x:=1`            | `1:int` Non-final local variable
+`x:=0; a=x; x:=1; (a,x)` | `(0,1)` Reassign local variable
+`x=1; x:=2`       | `Cannot re-assignal final val 'x'`
+`math_rand(1)?(x:=4):(x:=3);x:=x+1` | `int`  x mutable on both arms, so mutable after
+`x:=0; 1?(x=4):; x` | `4` x final on 1 arm, dead on other arm
+`x:=0; math_rand(1) ? (x =4):3; x` | `'x' not final on false arm of trinary` Must be marked final on both arms, or dead on one.
+`x=@{n:=1,v:=2}`  | `@{n:=1,v:=2` Mutable field declaration and initial writes
+`x=@{n =1,v:=2}; x.n=3` | `Cannot re-assign read-only field '.n'` Field initialized as final/read-only, cannot be changed
+`ptr0=@{p:=0,v:=1}; ptr1=@{p=ptr0,v:=2}; ptr0.p=ptr1; ptr0.p.v+ptr1.p.v` | `3:int` final pointer-cycle is ok
+`ptr2rw = @{f:=1}; ptr2final:@{f==} = ptr2rw; ptr2final` |  `*@{f:=1} is not a *{f==}`  Cannot cast-to-final, can only make finals with a store
+
 
 LARGER EXAMPLES:
 ----------------
@@ -269,7 +283,8 @@ Done Stuff
 * Static typing; types optional & fully inferred at every place.
 * Nil-ptr distinguished; nil/notnil types (e.g. Kotlin)
 * Duck-typing.  Interfaces.
-* Functional; 1st class functions.
+* Anonymous (and named) structure types.
+* Functional; 1st class functions.  All functions are anonymous.
 * REPL
 * Dynamic code-gen; no seperate compilation step.  Load Source & Go.
 * Limited overloads.
@@ -277,6 +292,7 @@ Done Stuff
 * By default multi-arg ops are overloaded.
 * Direct SSA style code writing; no 'let' keyword.
 * default "x=1" makes a "val" until scope runs out (cannot re-assign)
+* Reassignment "x:=1" for mutable variables
 * Primitive values; int overflow OK;
 * Sub-byte ranges.  Julia-like math typing.
 * Can type-name primitives, but no e.g. physical-unit-type math
