@@ -52,16 +52,17 @@ BNF                           | Comment
 `prog = stmts END`            |
 `stmts= [tstmt or stmt][; stmts]*[;]?` | multiple statments; final ';' is optional
 `tstmt= tvar = :type`         | type variable assignment
-`stmt = [id[:type]? [:]=]* ifex` | ids are (re-)assigned, and are available in later statements.  
-`stmt = ifex.field[:type] [:]= ifex` | Field assignment
-`ifex = expr ? expr [: expr]` | trinary logic; the else-clause will default to 0
+`stmt = [id[:type] [:]=]* ifex` | ids are (re-)assigned, and are available in later statements.  
+`ifex = expr [? expr [: expr]]` | trinary logic; the else-clause will default to 0
 `expr = term [binop term]*`   | gather all the binops and sort by prec
+`term = id++ | id--`          | post-inc/dec operators
 `term = tfact post`           | A term is a tfact and some more stuff...
 `post = empty`                | A term can be just a plain 'tfact'
 `post = (tuple) post`         | Application argument list
 `post = tfact post`           | Application as adjacent value
 `post = .field post`          | Field and tuple lookup
-`post = .field [:]= post`     | Field (re)assignment.  Plain '=' is a final assignment
+`post = .field [:]= stmt`     | Field (re)assignment.  Plain '=' is a final assignment
+`post = .field++ OR .field--` | Field reassignment.
 `tfact= fact[:type]`          | Optionally typed fact
 `fact = id`                   | variable lookup
 `fact = num`                  | number
@@ -69,21 +70,21 @@ BNF                           | Comment
 `fact = (stmts)`              | General statements parsed recursively
 `fact = tuple`                | Tuple builder
 `fact = func`                 | Anonymous function declaration
-`fact = @{ [id[:type]?[=stmt]?,]* }` | Anonymous struct declaration; optional type, optional initial value, optional final comma
+`fact = @{ [id[:type][=stmt],]* }` | Anonymous struct declaration; optional type, optional initial value, optional final comma
 `fact = {binop}`              | Special syntactic form of binop; no spaces allowed; returns function constant
 `fact = {uniop}`              | Special syntactic form of uniop; no spaces allowed; returns function constant
 `tuple= (stmts,[stmts,])`     | Tuple; final comma is optional
-`binop= +-*%&/<>!=`           | etc; primitive lookup; can determine infix binop at parse-time, also pipe but GFM screws up
-`uniop= -!~`                  | etc; primitive lookup; can determine infix uniop at parse-time
-`func = { [[id[:type]*]* ->]? stmts}` | Anonymous function declaration
+`binop= +-*%&/<>!= [] ]=`     | etc; primitive lookup; can determine infix binop at parse-time, also pipe but GFM screws up
+`uniop= -!~ []`               | etc; primitive lookup; can determine infix uniop at parse-time
+`func = { [id[:type]* ->]? stmts}` | Anonymous function declaration, if no args then the -> is optional
 `str  = [.\%]*`               | String contents; \t\n\r\% standard escapes
 `str  = %[num]?[.num]?fact`   | Percent escape embeds a 'fact' in a string; "name=%name\n"
-`type = tcon OR tfun OR tstruct OR ttuple OR tvar` | Types are a tcon or a tfun or a tstruct or a ttuple or a type variable
-`tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str` | Primitive types
+`type = tcon OR tvar OR tfun[?] OR tstruct[?] OR ttuple[?]` | // Types are a tcon or a tfun or a tstruct or a type variable.  A trailing ? means 'nilable'
+`tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str[?]` | Primitive types
 `tfun = {[[type]* ->]? type }` | Function types mirror func decls
-`tmod = = | := | ==  `        | '=' is r/only, ':=' is r/w, '==' is final
+`ttuple = ([[type],]* )`      | Tuple types are just a list of optional types; the count of commas dictates the length, zero commas is zero length.  Tuples are always final.
+`tmod = = | := | ==`          | '=' is r/only, ':=' is r/w, '==' is final
 `tstruct = @{ [id [tmod [type?]],]*}` | Struct types are field names with optional access and optional types.  Spaces not allowed
-`ttuple = ([type][,[type]]* )` | Tuple types are just a list of optional types; the count of commas dictates the length, zero commas is zero length.  Tuples are always final.
 `tvar = id`                   | Type variable lookup 
 
 SIMPLE EXAMPLES
@@ -146,6 +147,9 @@ Syntax for variable assignment | ---
 `1+(x=2*3)+x*x` | `43:int` Re-use ref immediately after def; parses as: `x=(2*3); 1+x+x*x`
 `x=(1+(x=2)+x)` | `Cannot re-assign ref 'x'`
 `x=(1+(x:=2)+x)` | `5:int` RHS executes first, so parses as: `x:=2; x=1+x+x`
+`x++`           | `0:int` Define new variable as 0, and return it before the addition
+`x:=0; x++; x`  | `1:int` Define new variable as 0, then add 1 to it, then return it
+`x++ + x--`     | `1:int` Can be used in expressions
 Conditionals    | ---
 `0 ?    2  : 3` | `3:int` Zero is false
 `2 ?    2  : 3` | `2:int` Any non-zero is true; "truthy"
@@ -154,6 +158,8 @@ Conditionals    | ---
 `math_rand(1)?(y=2;x=y*y):(x=3);x` | `:int8` x defined on both arms, so available after, while y is not
 `math_rand(1)?(x=2):   3 ;x` | `'x' not defined on false arm of trinary` No partial-defs
 `math_rand(1)?(x=2):   3 ;y=x+2;y` | `'x' not defined on false arm of trinary` More complicated partial-def
+`math_rand(1)?1` | `:int1` Can skip last arm, will default to 0
+`x:=0; math_rand(1) ? x++; x` | `:int1` Side effects in the one arm
 `0 ? (x=2) : 3;x` | `'x' not defined on false arm of trinary`
 `2 ? (x=2) : 3;x` | `2:int` Off-side is constant-dead, so missing x-assign is ignored
 `2 ? (x=2) : y  ` | `2:int` Off-side is constant-dead, so `"Unknown ref 'y'"` is ignored

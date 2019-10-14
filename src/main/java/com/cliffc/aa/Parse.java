@@ -10,72 +10,49 @@ import java.text.NumberFormat;
 import java.text.ParsePosition;
 import java.util.BitSet;
 
-/*
-  x++;  // post-fix (only) increment & decrement.  executes immediately; "x++ + x" == 2x+1
-  ifex = expr ? ^expr // conditional early function return.  The fall-thru value is nil.
-
-  Array creation: just [7] where '[' is a unary prefix, and ']' is a unary postfix.
-  ary = [7]; // untyped, will infer
-  ary = [7]:int; // typed as array of int
-  #ary == 7 // array length
-
-  Index: "ary [ int" with '[' as an infix operator.
-  Yields a "fat pointer".
-  Get: ']' postfix operator.  Example: ary[3] looks up item #3
-  Put: ']='  infix operator.  Example: ary[2]=5;
-
-  Parallel map on arrays; yields a new array
-    ary.{e idx -> fun e}
-  Parallel map/reduce
-    (ary2, reduction) = ary.{e -> fun e}.{b1 b2 -> b1+b2 }
-  For loop, serial order
-    ary.for({e idx -> .... })
-  For loop, no array
-    for( i:=0; i<#ary; i++ ) ...
-
- */
-
 /** an implementation of language AA
  *
  *  GRAMMAR:
  *  prog = stmts END
  *  stmts= [tstmt|stmt][; stmts]*[;]? // multiple statements; final ';' is optional
  *  tstmt= tvar = :type            // type variable assignment
- *  stmt = [id[:type]? [:]=]* ifex // ids are (re-)assigned, and are available in later statements
- *  ifex = expr ? expr [: expr]    // trinary logic; the ":expr" will default to 0
+ *  stmt = [id[:type] [:]=]* ifex  // ids are (re-)assigned, and are available in later statements
+ *  ifex = expr [? expr [: expr]]  // trinary logic; the ":expr" will default to 0
  *  expr = term [binop term]*      // gather all the binops and sort by precedence
+ *  term = id++ | id--             //
  *  term = tfact post              // A term is a tfact and some more stuff...
  *  post = empty                   // A term can be just a plain 'tfact'
  *  post = (tuple) post            // Application argument list
  *  post = tfact post              // Application as adjacent value
  *  post = .field post             // Field and tuple lookup
- *  post = .field [:]= post        // Field (re)assignment.  Plain '=' is a final assignment
+ *  post = .field [:]= stmt        // Field (re)assignment.  Plain '=' is a final assignment
+ *  post = .field++ | .field--     // Allowed anytime a := is allowed
  *  tfact= fact[:type]             // Typed fact
  *  fact = id                      // variable lookup
  *  fact = num                     // number
- *  fact = "str"                   // string
+ *  fact = "string"                // string
  *  fact = (stmts)                 // General statements parsed recursively
  *  fact = tuple                   // Tuple builder
  *  fact = func                    // Anonymous function declaration
- *  fact = @{ [id[:type]?[=stmt]?,]* } // Anonymous struct declaration; optional type, optional initial value, optional final comma
+ *  fact = @{ [id[:type][=stmt],]* } // Anonymous struct declaration; optional type, optional initial value, optional final comma
  *  fact = {binop}                 // Special syntactic form of binop; no spaces allowed; returns function constant
  *  fact = {uniop}                 // Special syntactic form of uniop; no spaces allowed; returns function constant
  *  tuple= (stmts,[stmts,])        // Tuple; final comma is optional, first comma is required
  *  binop= +-*%&|/<>!= [] ]=       // etc; primitive lookup; can determine infix binop at parse-time
  *  uniop= -!~ []                  // etc; primitive lookup; can determine infix uniop at parse-time
- *  func = { [[id[:type]?]* ->]? stmts} // Anonymous function declaration
+ *  func = { [id[:type]* ->]? stmts} // Anonymous function declaration, if no args then the -> is optional
  *                                 // Pattern matching: 1 arg is the arg; 2+ args break down a (required) tuple
  *  str  = [.\%]*                  // String contents; \t\n\r\% standard escapes
  *  str  = %[num]?[.num]?fact      // Percent escape embeds a 'fact' in a string; "name=%name\n"
  *  type = tcon | tvar | tfun[?] | tstruct[?] | ttuple[?] // Types are a tcon or a tfun or a tstruct or a type variable.  A trailing ? means 'nilable'
  *  tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str[?]
  *  tfun = {[[type]* ->]? type }   // Function types mirror func declarations
- *  ttuple = ( [:type]?,* )        // Tuple types are just a list of optional types;
+ *  ttuple = ( [[type],]* )        // Tuple types are just a list of optional types;
                                    // the count of commas dictates the length, zero commas is zero length.
                                    // Tuples are always final.
- *  tmod = = | := | ==  // '=' is r/only, ':=' is r/w, '==' is final
+ *  tmod = = | := | ==             // '=' is r/only, ':=' is r/w, '==' is final
  *  tstruct = @{ [id [tmod [type?]],]*}  // Struct types are field names with optional types.  Spaces not allowed
-
+ *  tvar = id                      // Type variable lookup
  */
 
 public class Parse {
@@ -213,7 +190,7 @@ public class Parse {
       if( stmt == null ) stmt = stmt();
       if( stmt == null ) {
         if( peek(';') ) { _x--; stmt=last; }   // Ignore empty statement
-      } else if( !last.is_dead() ) kill(last); // prior expression result no longer alive in parser
+      } else if( !last.is_dead() && stmt != last) kill(last); // prior expression result no longer alive in parser
     }
     return last;
   }
@@ -349,7 +326,7 @@ public class Parse {
   /** Parse an if-expression, with lazy eval on the branches.  Assignments to
    *  new variables are allowed in either arm (as-if each arm is in a mini
    *  scope), and variables assigned on all live arms are available afterwards.
-   *  ifex = expr ? expr [: expr]
+   *  ifex = expr [? expr [: expr]]
    */
   private Node ifex() {
     Node expr = expr(), res=null;
@@ -430,7 +407,8 @@ public class Parse {
   }
 
   /** Parse a term, either an optional application or a field lookup
-   *    term = tfact [tuple | fact | .field]* // application (includes uniop) or field (and tuple) lookup
+   *    term = id++ | id--
+   *    term = tfact [tuple | fact | .field | .field[:]=stmt]* // application (includes uniop) or field (and tuple) lookup
    *  An alternative expression of the same grammar is:
    *    term = tfact post
    *    post = empty | (tuple) post | tfact post | .field post
@@ -438,6 +416,16 @@ public class Parse {
    *    post = .field [:]= stmt
    */
   private Node term() {
+    // Check for id++ / id--
+    int oldx = _x;
+    String tok = token();
+    if( tok != null ) {
+      Node n;
+      if( peek("++") && (n=inc(tok, 1))!=null ) return n;
+      if( peek("--") && (n=inc(tok,-1))!=null ) return n;
+    }
+    _x = oldx;
+    // Normal term expansion
     Node n = tfact();
     if( n == null ) return null;
     while( true ) {             // Repeated application or field lookup is fine
@@ -458,7 +446,7 @@ public class Parse {
 
       } else {                  // Attempt a function-call
         boolean arglist = peek('(');
-        int oldx = _x;
+        oldx = _x;
         Node arg = arglist ? tuple(stmts()) : tfact(); // Start of an argument list?
         if( arg == null )       // tfact but no arg is just the tfact
           break;
@@ -482,6 +470,22 @@ public class Parse {
       }
     } // Else no trailing arg, just return value
     return n;                   // No more terms
+  }
+
+  private Node inc(String tok, int d) {
+    Node n = lookup(tok);              // Prior value of token
+    if( n==null ) n = con(Type.NIL);   // Token not already bound to a value
+    else {                             // Check existing token for mutable
+      if( n.is_forward_ref() )         // Prior is actually a forward-ref
+        return err_ctrl2(forward_ref_err(((FunPtrNode)n).fun()));
+      if( !_e.is_mutable(tok) )
+        return err_ctrl2("Cannot re-assign final val '"+tok+"'");
+    }
+    n.keep();
+    Node plus = _e.lookup_filter("+",_gvn,2);
+    Node sum = do_call(new CallNode(true,errMsg(),ctrl(),plus,mem(),n,con(TypeInt.con(d))));
+    _e.update(tok,sum,_gvn,true);
+    return n.unhook();
   }
 
   /** Parse an optional type

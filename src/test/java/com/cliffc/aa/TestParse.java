@@ -107,6 +107,10 @@ public class TestParse {
     // Re-use ref immediately after def; parses as: x=(2*3); 1+x+x*x
     test("1+(x=2*3)+x*x", TypeInt.con(1+6+6*6));
     testerr("x=(1+(x=2)+x)", "Cannot re-assign final val 'x'",13);
+    test("x:=1;x++"  ,TypeInt.con(1));
+    test("x:=1;x++;x",TypeInt.con(2));
+    test("x:=1;x++ + x--",TypeInt.con(3));
+    test("x++",TypeInt.con(0));
 
     // Conditional:
     test   ("0 ?    2  : 3", TypeInt.con(3)); // false
@@ -534,6 +538,8 @@ public class TestParse {
   // sequential iteration.  Using a 2-ascii-char keyword, because sequential
   // iteration cannot be parallelized.  Also looking at 'while'.
   //
+  // ^expr // early function return
+  //
   // 'do' becomes a 2-arg function taking a boolean (with side-effects) and a
   // no-arg function.  In this case, the iterator is outside the do-scope.
   //     sum:=0; i:=0; do (i++ < 100) {sum+=i}
@@ -548,9 +554,7 @@ public class TestParse {
   //     sum := 0;
   //     i := 0;
   //     while( i++ < 100 ) {
-  //       if( sum > 1000 ) ^sum; // early function exit with value, same as "return sum;"
-  //       sum > 1000 ? ^sum;     // ?: syntax, no colon, break in the 'then' clause
-  //       sum += i;
+  //       (sum+=i) > 1000 ? ^sum;     // ?: syntax, no colon, break in the 'then' clause
   //     }
   //
   //
@@ -561,6 +565,28 @@ public class TestParse {
     test("for (init;pred;post) no-arg-func",Type.ALL);
     test("{init do (pred) {no-arg-func;post}}",Type.ALL);
   }
+
+/*
+  Array creation: just [7] where '[' is a unary prefix, and ']' is a unary postfix.
+  ary = [7]; // untyped, will infer
+  ary = [7]:int; // typed as array of int
+  #ary == 7 // array length
+
+  Index: "ary [ int" with '[' as an infix operator.
+  Yields a "fat pointer".
+  Get: ']' postfix operator.  Example: ary[3] looks up item #3
+  Put: ']='  infix operator.  Example: ary[2]=5;
+
+  Parallel map on arrays; yields a new array
+    ary.{e idx -> fun e}
+  Parallel map/reduce
+    (ary2, reduction) = ary.{e -> fun e}.{b1 b2 -> b1+b2 }
+  For loop, serial order
+    ary.for({e idx -> .... })
+  For loop, no array
+    for( i:=0; i<#ary; i++ ) ...
+
+ */
 
   // Array syntax examples
   @Ignore
