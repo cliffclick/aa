@@ -2,6 +2,7 @@ package com.cliffc.aa;
 
 import com.cliffc.aa.type.*;
 import org.junit.Assert;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.HashMap;
@@ -124,6 +125,9 @@ public class TestParse {
     testerr("math_rand(1)?1: :2:int","missing expr after ':'",16); // missing type
     testerr("math_rand(1)?1::2:int","missing expr after ':'",15); // missing type
     testerr("math_rand(1)?1:\"a\"", "Cannot mix GC and non-GC types",18);
+    test   ("math_rand(1)?1",TypeInt.BOOL);
+    test   ("math_rand(1)?\"abc\"",TypeMemPtr.ABC0);
+    test   ("x:=0;math_rand(1)?(x:=1);x",TypeInt.BOOL);
     testerr("a.b.c();","Unknown ref 'a'",1);
   }
 
@@ -474,7 +478,6 @@ public class TestParse {
     testerr("x:=0; math_rand(1) ? (x =4):3; x", "'x' not final on false arm of trinary",29); // x mutable ahead; ok to mutate on 1 arm and later
   }
 
-
   // Finals are declared with an assignment.  This is to avoid the C++/Java
   // problem of making final-field cycles.  Java requires final fields to be
   // only assigned in constructors before the value escapes, which prevents any
@@ -485,10 +488,13 @@ public class TestParse {
   //                                                   unknown
   // Field mod status makes a small lattice:      final       read/write
   //                                                  read-only
-  // Type-error if a final assignment does not fold into a New.
-  // Cannot cast final to r/w, nor r/w to final.
-  // Can cast both to r/o.
 
+  // Type-error if a final assignment does not fold into a New.  Cannot cast
+  // final to r/w, nor r/w to final.  Can cast both to r/o.  The reason you
+  // cannot cast to a final, is that some other caller/thread with some other
+  // r/w copy of the same pointer you have, can modify the supposedly final
+  // object.  Hence you cannot cast to "final", but you can cast to "read-only"
+  // which only applies to you, and not to other r/w pointers.
   @Test public void testParse10() {
     // Test re-assignment in struct
     Type[] ts = TypeStruct.ts(TypeInt.con(1), TypeInt.con(2));
@@ -522,6 +528,51 @@ public class TestParse {
     test    ("ptr=@{a:=1}; val=ptr.a; ptr.a=2; val",TypeInt.con(1));
     // Allowed to build final pointer cycles
     test    ("ptr0=@{p:=0,v:=1}; ptr1=@{p=ptr0,v:=2}; ptr0.p=ptr1; ptr0.p.v+ptr1.p.v+(ptr0.p==ptr1)", TypeInt.con(4)); // final pointer-cycle is ok
+  }
+
+  // Sequential looping constructs, not recursion.  Pondering keyword 'do' for
+  // sequential iteration.  Using a 2-ascii-char keyword, because sequential
+  // iteration cannot be parallelized.  Also looking at 'while'.
+  //
+  // 'do' becomes a 2-arg function taking a boolean (with side-effects) and a
+  // no-arg function.  In this case, the iterator is outside the do-scope.
+  //     sum:=0; i:=0; do (i++ < 100) {sum+=i}
+  //     sum:=0; i:=0; do(i++ < 100,{sum+=i})
+  //     sum:=0; do { i:=0; i++ < 100; {sum+=i} }
+  //
+  // Python uses "iteratables" for tight syntax on for-loops.
+  // Still has while loops, which do not introduce a scope.
+  //     sum:=0; i:=0; while( i++ < 100 ) { sum+=i }; sum
+  //
+  // No 'break' but early function exit ^.
+  //     sum := 0;
+  //     i := 0;
+  //     while( i++ < 100 ) {
+  //       if( sum > 1000 ) ^sum; // early function exit with value, same as "return sum;"
+  //       sum > 1000 ? ^sum;     // ?: syntax, no colon, break in the 'then' clause
+  //       sum += i;
+  //     }
+  //
+  //
+  @Ignore
+  @Test public void testParse11() {
+    test("do pred no-arg-func",Type.ALL);
+    test("sum:=0; i:=0; do (i++ < 100) {sum+=i}",Type.ALL);
+    test("for (init;pred;post) no-arg-func",Type.ALL);
+    test("{init do (pred) {no-arg-func;post}}",Type.ALL);
+  }
+
+  // Array syntax examples
+  @Ignore
+  @Test public void testParse12() {
+    test("[3]:int", Type.ALL);      // Array of 3 ints, all zeroed.  Notice ambiguity with array-of-1 element being a 3.
+    test("ary = [3]; ary[0]:=0; ary[1]:=1; ary[2]:=2; (ary[0],ary[1],ary[2])", Type.ALL); // array create, array storing
+    test("[0,1,2]", Type.ALL); // array create syntax, notice ambiguity with making a new sized array.
+    testerr("ary=[3]; ary[3]",null,0); // AIOOBE
+    testerr("ary=[3]; ary[-1]",null,0); // AIOOBE vs end-of-array math
+    test("ary=[3];#ary",Type.ALL); // Array length
+
+    test("ary=[99]; i:=0; do (i++ < #ary) {ary[i]=i*i}", Type.ALL); // sequential iteration over array
   }
 
   /*

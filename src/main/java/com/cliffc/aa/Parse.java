@@ -11,9 +11,13 @@ import java.text.ParsePosition;
 import java.util.BitSet;
 
 /*
+  x++;  // post-fix (only) increment & decrement.  executes immediately; "x++ + x" == 2x+1
+  ifex = expr ? ^expr // conditional early function return.  The fall-thru value is nil.
+
   Array creation: just [7] where '[' is a unary prefix, and ']' is a unary postfix.
   ary = [7]; // untyped, will infer
   ary = [7]:int; // typed as array of int
+  #ary == 7 // array length
 
   Index: "ary [ int" with '[' as an infix operator.
   Yields a "fat pointer".
@@ -27,7 +31,7 @@ import java.util.BitSet;
   For loop, serial order
     ary.for({e idx -> .... })
   For loop, no array
-    for( i=0; i<ary.len; i++ ) ...
+    for( i:=0; i<#ary; i++ ) ...
 
  */
 
@@ -38,7 +42,7 @@ import java.util.BitSet;
  *  stmts= [tstmt|stmt][; stmts]*[;]? // multiple statements; final ';' is optional
  *  tstmt= tvar = :type            // type variable assignment
  *  stmt = [id[:type]? [:]=]* ifex // ids are (re-)assigned, and are available in later statements
- *  ifex = expr ? expr : expr      // trinary logic
+ *  ifex = expr ? expr [: expr]    // trinary logic; the ":expr" will default to 0
  *  expr = term [binop term]*      // gather all the binops and sort by precedence
  *  term = tfact post              // A term is a tfact and some more stuff...
  *  post = empty                   // A term can be just a plain 'tfact'
@@ -56,9 +60,9 @@ import java.util.BitSet;
  *  fact = @{ [id[:type]?[=stmt]?,]* } // Anonymous struct declaration; optional type, optional initial value, optional final comma
  *  fact = {binop}                 // Special syntactic form of binop; no spaces allowed; returns function constant
  *  fact = {uniop}                 // Special syntactic form of uniop; no spaces allowed; returns function constant
- *  tuple= (stmts,[stmts,])        // Tuple; final comma is optional
- *  binop= +-*%&|/<>!=             // etc; primitive lookup; can determine infix binop at parse-time
- *  uniop=  -!~                    // etc; primitive lookup; can determine infix uniop at parse-time
+ *  tuple= (stmts,[stmts,])        // Tuple; final comma is optional, first comma is required
+ *  binop= +-*%&|/<>!= [] ]=       // etc; primitive lookup; can determine infix binop at parse-time
+ *  uniop= -!~ []                  // etc; primitive lookup; can determine infix uniop at parse-time
  *  func = { [[id[:type]?]* ->]? stmts} // Anonymous function declaration
  *                                 // Pattern matching: 1 arg is the arg; 2+ args break down a (required) tuple
  *  str  = [.\%]*                  // String contents; \t\n\r\% standard escapes
@@ -345,7 +349,7 @@ public class Parse {
   /** Parse an if-expression, with lazy eval on the branches.  Assignments to
    *  new variables are allowed in either arm (as-if each arm is in a mini
    *  scope), and variables assigned on all live arms are available afterwards.
-   *  ifex = expr ? expr : expr
+   *  ifex = expr ? expr [: expr]
    */
   private Node ifex() {
     Node expr = expr(), res=null;
@@ -362,11 +366,10 @@ public class Parse {
       Node tex = expr();
       ctrls.add_def(tex==null ? err_ctrl2("missing expr after '?'") : tex);
       ctrls.add_def(ctrl()); // 2 - hook true-side control
-      require(':');
       ScopeNode f_scope = (_e = new Env(e_if))._scope; // Push new scope for false arm
       set_ctrl(gvn(new CProjNode(ifex,0))); // Control for true branch, and sharpen tested value
       Node f_sharp = ctrl().sharpen(_gvn,if_scope,f_scope).keep();
-      Node fex = expr();
+      Node fex = peek(':') ? expr() : con(Type.NIL);
       ctrls.add_def(fex==null ? err_ctrl2("missing expr after ':'") : fex);
       ctrls.add_def(ctrl()); // 4 - hook false-side control
       _e = e_if;             // Pop the arms scope

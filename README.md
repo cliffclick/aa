@@ -35,7 +35,10 @@ Part of modern coding is the use Garbage Collection and the structured use of
 malloc/free - so I intend to add Rust-style memory management.
 
 Part of modern coding is the use of multiple cores, so I intend to explore a
-couple of different concurrency models.
+couple of different concurrency models.  A notion of a true 'final' field, made
+with a final-store (as opposed to declared as a final type) - you can make
+cyclic final structures, and once final all future reads will see the final
+value.  No odd exceptions for "early publishing" a pointer.
 
 And of course, this is a Work-In-Progress!!!!
 
@@ -51,7 +54,7 @@ BNF                           | Comment
 `tstmt= tvar = :type`         | type variable assignment
 `stmt = [id[:type]? [:]=]* ifex` | ids are (re-)assigned, and are available in later statements.  
 `stmt = ifex.field[:type] [:]= ifex` | Field assignment
-`ifex = expr ? expr : expr`   | trinary logic
+`ifex = expr ? expr [: expr]` | trinary logic; the else-clause will default to 0
 `expr = term [binop term]*`   | gather all the binops and sort by prec
 `term = tfact post`           | A term is a tfact and some more stuff...
 `post = empty`                | A term can be just a plain 'tfact'
