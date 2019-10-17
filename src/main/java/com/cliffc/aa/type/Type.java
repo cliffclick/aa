@@ -15,10 +15,12 @@ import java.util.function.Predicate;
 /** an implementation of language AA
  */
 
-// C2-style type system, with Meet & Dual.  This is a distributed complete
-// bounded lattice.  See https://en.wikipedia.org/wiki/Complete_lattice.
+// C2-style type system, with Meet & Dual.
 
-// Symmetric around the centerline of constants.  Fixed height, so a finite
+// This is a complemented distributed complete bounded (ranked) lattice.
+// See https://en.wikipedia.org/wiki/Lattice.
+
+// Complemented around the centerline of constants.  Fixed height, so a finite
 // count of Meet stabilizes; a unique All (Bottom; no known value) and due to
 // symmetry a unique Any (Top, all values simultaneously).  Support function
 // types, various kinds of numeric ranges, nil, tuples and structs, and named

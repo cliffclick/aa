@@ -534,17 +534,19 @@ public class TestParse {
     test    ("ptr0=@{p:=0,v:=1}; ptr1=@{p=ptr0,v:=2}; ptr0.p=ptr1; ptr0.p.v+ptr1.p.v+(ptr0.p==ptr1)", TypeInt.con(4)); // final pointer-cycle is ok
   }
 
-  // Sequential looping constructs, not recursion.  Pondering keyword 'do' for
-  // sequential iteration.  Using a 2-ascii-char keyword, because sequential
-  // iteration cannot be parallelized.  Also looking at 'while'.
+  // Sequential looping constructs, not recursion.  Pondering keyword 'for' for
+  // sequential iteration.  Using a 3-ascii-char keyword, because sequential
+  // iteration cannot be parallelized.
   //
-  // ^expr // early function return
+  // ^expr // early function return, can be used instead of 'break'
   //
-  // 'do' becomes a 2-arg function taking a boolean (with side-effects) and a
-  // no-arg function.  In this case, the iterator is outside the do-scope.
-  //     sum:=0; i:=0; do (i++ < 100) {sum+=i}
-  //     sum:=0; i:=0; do(i++ < 100,{sum+=i})
-  //     sum:=0; do { i:=0; i++ < 100; {sum+=i} }
+  // 'for' becomes a 2-arg function taking a boolean (with side-effects) and a
+  // no-arg function.  In this case, the iterator is outside the for-scope.
+  //     sum:=0; i:=0; for (i++ < 100) {sum+=i}
+  //     sum:=0; i:=0; for(i++ < 100,{sum+=i})
+  //     sum:=0; for { i:=0; i++ < 100; {sum+=i} }
+  //     for( i++ < 100, sum += i )
+  //     sum:=0; i:=0; for{i++<100}{sum+=i;} // this version takes 2 functions
   //
   // Python uses "iteratables" for tight syntax on for-loops.
   // Still has while loops, which do not introduce a scope.
@@ -553,7 +555,7 @@ public class TestParse {
   // No 'break' but early function exit ^.
   //     sum := 0;
   //     i := 0;
-  //     while( i++ < 100 ) {
+  //     for {i++ < 100 } {
   //       (sum+=i) > 1000 ? ^sum;     // ?: syntax, no colon, break in the 'then' clause
   //     }
   //
