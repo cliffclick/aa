@@ -41,6 +41,7 @@ public class FunNode extends RegionNode {
   // Operator precedence; only set on top-level primitive wrappers.
   // -1 for normal non-operator functions and -2 for forward_decls.
   private final byte _op_prec;  // Operator precedence; only set on top-level primitive wrappers
+  private byte _cnt_size_inlines; // Count of size-based inlines
 
   // Used to make the primitives at boot time
   public  FunNode(PrimNode prim) { this(prim._name,TypeFunPtr.make_new(prim._targs,prim._ret),prim.op_prec()); }
@@ -169,9 +170,11 @@ public class FunNode extends RegionNode {
     int path = -1;              // Paths will split according to type
     if( args == null ) {        // No type-specialization to do
       args = _tf._args;         // Use old args
+      if( _cnt_size_inlines >= 10 ) return null;
       // Large code-expansion allowed; can inline for other reasons
       path = split_size(gvn,ret,parms);
       if( path == -1 ) return null;
+      _cnt_size_inlines++;
     }
     // Split the callers according to the new 'fun'.
     FunNode fun = make_new_fun(gvn, ret, args);
