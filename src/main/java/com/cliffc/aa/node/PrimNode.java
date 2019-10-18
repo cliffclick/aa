@@ -44,7 +44,7 @@ public abstract class PrimNode extends Node {
 
     new MinusF64(),
     new MinusI64(),
-    new   NotI64(),
+    new Not(),
 
     new   AddF64(),
     new   SubF64(),
@@ -212,11 +212,6 @@ static class MinusI64 extends Prim1OpI64 {
   @Override long op( long x ) { return -x; }
 }
 
-static class NotI64 extends PrimNode {
-  NotI64() { super("!",ARGS1,TypeTuple.INT64,TypeInt.BOOL); }
-  @Override public Type apply( Type[] args ) { return args[1].getl()==0?TypeInt.TRUE:TypeInt.FALSE; }
-}
-
 // 2Ops have uniform input/output types, so take a shortcut on name printing
 abstract static class Prim2OpF64 extends PrimNode {
   Prim2OpF64( String name ) { super(name,ARGS2,TypeTuple.FLT64_FLT64,TypeFlt.FLT64); }
@@ -360,6 +355,20 @@ static class NE_OOP extends PrimNode {
   }
   @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
   @Override public byte op_prec() { return 4; }
+}
+
+  
+static class Not extends PrimNode {
+  // Rare function which takes a Scalar (works for both ints and ptrs)
+  Not() { super("!",ARGS1,TypeTuple.SCALAR1,TypeInt.BOOL); }
+  @Override public Type value(GVNGCM gvn) {
+    Type t = gvn.type(in(1));
+    if( t== Type.NIL ) return TypeInt.TRUE;
+    if( t. may_nil() ) return TypeInt.BOOL.dual();
+    if( t.must_nil() ) return TypeInt.BOOL;
+    return TypeInt.FALSE;       // Cannot be a nil
+  }
+  @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
 }
 
 

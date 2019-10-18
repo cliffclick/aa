@@ -315,6 +315,7 @@ public abstract class Node implements Cloneable {
     bs.set(_uid);               // Only walk once
     if( is_uncalled(gvn) ) return; // FunPtr is a constant, but never executed, do not check for errors
     if( this instanceof PhiNode &&
+        !(in(0) instanceof FunNode && ((FunNode)in(0))._name.equals("!") ) && // Specifically "!" takes a Scalar
         (gvn.type(this).contains(Type.SCALAR) ||
          gvn.type(this).contains(Type.NSCALR)) ) // Cannot have code that deals with unknown-GC-state
       errs.add(((PhiNode)this)._badgc);
