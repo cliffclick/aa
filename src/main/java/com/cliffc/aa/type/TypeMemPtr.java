@@ -59,7 +59,9 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     // Check that a pointer-to-struct does not include more structs than what
     // is pointed at.
     Type a2 = obj.base();       // Strip off any 'Names'
-    assert !(a2 instanceof TypeStruct) || aliases.strip_nil()==((TypeStruct)a2)._news;  // Pointing at same set
+    assert !(a2 instanceof TypeStruct)
+      || aliases.strip_nil()==((TypeStruct)a2)._news  // Pointing at same set
+      || aliases.strip_nil()==((TypeStruct)a2)._news.dual();  // Pointing at same set
 
     TypeMemPtr t1 = FREE;
     if( t1 == null ) t1 = new TypeMemPtr(aliases,obj);
