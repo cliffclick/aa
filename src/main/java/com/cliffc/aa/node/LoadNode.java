@@ -9,15 +9,12 @@ import com.cliffc.aa.type.*;
 public class LoadNode extends Node {
   private final String _fld;
   private final int _fld_num;
-  private final String _badfld;
-  private final String _badnil;
+  final Parse _bad;
   private LoadNode( Node ctrl, Node mem, Node adr, String fld, int fld_num, Parse bad ) {
     super(OP_LOAD,ctrl,mem,adr);
     _fld = fld;
     _fld_num = fld_num;
-    // Tests can pass a null, but nobody else does
-    _badfld = bad==null ? null : bad.errMsg("Unknown field '."+(fld==null ? fld_num : fld)+"'");
-    _badnil = bad==null ? null : bad.errMsg("Struct might be nil when reading field '."+fld+"'");
+    _bad = bad;
   }
   public LoadNode( Node ctrl, Node mem, Node adr, String fld , Parse bad ) { this(ctrl,mem,adr,fld,-1,bad); }
   public LoadNode( Node ctrl, Node mem, Node adr, int fld_num, Parse bad ) { this(ctrl,mem,adr,null,fld_num,bad); }
@@ -115,9 +112,9 @@ public class LoadNode extends Node {
   @Override public String err(GVNGCM gvn) {
     Type t = gvn.type(adr());
     while( t instanceof TypeName ) t = ((TypeName)t)._t;
-    if( t.must_nil() ) return _badnil;
+    if( t.must_nil() ) return bad("Struct might be nil when reading");
     if( !(t instanceof TypeMemPtr) )
-      return _badfld; // Not a pointer, cannot load a field
+      return bad("Unknown"); // Not a pointer, cannot load a field
     TypeMemPtr t3 = (TypeMemPtr)t;
     TypeMem t4 = (TypeMem)gvn.type(mem()); // Should be memory
     Type t5 = t4.ld(t3);                   // Meets of all aliases
@@ -126,12 +123,16 @@ public class LoadNode extends Node {
       if( t6 instanceof TypeStruct ) {
         t5 = t6;
       } else {
-        return _badfld;
+        return bad("Unknown");
       }
     }
     if( ((TypeStruct)t5).find(_fld,_fld_num) == -1 )
-      return _badfld;
+      return bad("Unknown");
     return null;
+  }
+  private String bad( String msg ) {
+    String f = _fld==null ? ""+_fld_num : _fld;
+    return _bad.errMsg(msg+" field '."+f+"'");
   }
   @Override public Type all_type() { return Type.SCALAR; }
   @Override public int hashCode() { return super.hashCode()+(_fld==null ? _fld_num : _fld.hashCode()); }
