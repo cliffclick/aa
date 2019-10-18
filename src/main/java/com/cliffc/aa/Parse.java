@@ -17,8 +17,9 @@ import java.util.BitSet;
  *  stmts= [tstmt|stmt][; stmts]*[;]? // multiple statements; final ';' is optional
  *  tstmt= tvar = :type            // type variable assignment
  *  stmt = [id[:type] [:]=]* ifex  // ids are (re-)assigned, and are available in later statements
- *  ifex = expr [? expr [: expr]]  // trinary logic; the ":expr" will default to 0
+ *  ifex = expr [? expr [: expr]]  // trinary short-circuit logic; missing ":expr" will default to 0
  *  expr = term [binop term]*      // gather all the binops and sort by precedence
+ *  expr = ^term                   // Early function exit
  *  term = id++ | id--             //
  *  term = tfact post              // A term is a tfact and some more stuff...
  *  post = empty                   // A term can be just a plain 'tfact'
@@ -337,13 +338,13 @@ public class Parse {
       ctrls.add_def(ifex); // Keep alive, even if 1st Proj kills last use, so 2nd Proj can hook
       Env e_if = _e;       // Environment for 'if'
       ScopeNode if_scope = e_if._scope;
-      ScopeNode t_scope = (_e = new Env(e_if))._scope; // Push new scope for true arm
+      ScopeNode t_scope = (_e = new Env(e_if,false))._scope; // Push new scope for true arm
       set_ctrl(gvn(new CProjNode(ifex,1))); // Control for true branch, and sharpen tested value
       Node t_sharp = ctrl().sharpen(_gvn,if_scope,t_scope).keep();
       Node tex = expr();
       ctrls.add_def(tex==null ? err_ctrl2("missing expr after '?'") : tex);
       ctrls.add_def(ctrl()); // 2 - hook true-side control
-      ScopeNode f_scope = (_e = new Env(e_if))._scope; // Push new scope for false arm
+      ScopeNode f_scope = (_e = new Env(e_if,false))._scope; // Push new scope for false arm
       set_ctrl(gvn(new CProjNode(ifex,0))); // Control for true branch, and sharpen tested value
       Node f_sharp = ctrl().sharpen(_gvn,if_scope,f_scope).keep();
       Node fex = peek(':') ? expr() : con(Type.NIL);
@@ -351,7 +352,7 @@ public class Parse {
       ctrls.add_def(ctrl()); // 4 - hook false-side control
       _e = e_if;             // Pop the arms scope
       set_ctrl(init(new RegionNode(null,ctrls.in(2),ctrls.in(4))));
-      String phi_errmsg = errMsg("Cannot mix GC and non-GC types");
+      String phi_errmsg = phi_errmsg();
       if_scope.common(this,_gvn,phi_errmsg,t_scope,f_scope,expr,t_sharp,f_sharp); // Add a PhiNode for all commonly defined variables
       res = gvn(new PhiNode(phi_errmsg,ctrl(),ctrls.in(1),ctrls.in(3))).keep(); // Add a PhiNode for the result, hook to prevent deletion
       t_sharp.unkeep(_gvn);
@@ -365,8 +366,14 @@ public class Parse {
   /** Parse an expression, a list of terms and infix operators.  The whole list
    *  is broken up into a tree based on operator precedence.
    *  expr = term [binop term]*
+   *  expr = ^term
    */
   private Node expr() {
+    if( peek('^') ) {           // Early function exit
+      Node term = term();
+      return term == null ? err_ctrl2("Missing term after ^") : _e.early_exit(this,term);
+    }
+    // term [binop term]*
     Node term = term();
     if( term == null ) return null; // Term is required, so missing term implies not any expr
     // Collect 1st fcn/arg pair
@@ -408,7 +415,7 @@ public class Parse {
 
   /** Parse a term, either an optional application or a field lookup
    *    term = id++ | id--
-   *    term = tfact [tuple | fact | .field | .field[:]=stmt]* // application (includes uniop) or field (and tuple) lookup
+   *    term = tfact [tuple | tfact | .field | .field[:]=stmt]* // application (includes uniop) or field (and tuple) lookup
    *  An alternative expression of the same grammar is:
    *    term = tfact post
    *    post = empty | (tuple) post | tfact post | .field post
@@ -572,7 +579,7 @@ public class Parse {
    *  number of statements separated by ';'.
    *  func = { [[id]* ->]? stmts }
    */
-  private static final boolean args_are_mutable=false;
+  private static final boolean args_are_mutable=false; // Args mutable or r/only by default
   private Node func() {
     int oldx = _x;
     Ary<String> ids = new Ary<>(new String[1],0);
@@ -598,7 +605,7 @@ public class Parse {
     Node old_ctrl = ctrl();
     Node old_mem  = mem ();
     FunNode fun = (FunNode)init(new FunNode(ts.asAry()).add_def(Env.ALL_CTRL));
-    try( Env e = new Env(_e) ) {// Nest an environment for the local vars
+    try( Env e = new Env(_e,true) ) {// Nest an environment for the local vars
       _e = e;                   // Push nested environment
       set_ctrl(fun);            // New control is function head
       String errmsg = errMsg("Cannot mix GC and non-GC types");
@@ -614,7 +621,16 @@ public class Parse {
       Node rez = stmts();       // Parse function body
       if( rez == null ) rez = err_ctrl2("Missing function body");
       require('}');             //
-      RetNode ret = (RetNode)gvn(new RetNode(ctrl(),mem(),rez,rpc,fun));
+      // Merge normal exit into all early-exit paths
+      Node ctrl = ctrl();
+      mem = mem();
+      if( e._early_ctrl != null ) {
+        e.early_exit(this,rez);
+        ctrl= e._early_ctrl;
+        mem = e._early_mem ;
+        rez = e._early_val ;
+      }
+      RetNode ret = (RetNode)gvn(new RetNode(ctrl,mem,rez,rpc,fun));
       Node fptr = gvn(new FunPtrNode(ret));
       _e = _e._par;             // Pop nested environment
       set_ctrl(old_ctrl);       // Back to the pre-function-def control
@@ -630,7 +646,7 @@ public class Parse {
    *  \@{ [id[:type]?[=stmt]?,]* }
    */
   private Node struct() {
-    try( Env e = new Env(_e) ) {// Nest an environment for the local vars
+    try( Env e = new Env(_e,false) ) {// Nest an environment for the local vars
       _e = e;                   // Push nested environment
       Ary<String> toks = new Ary<>(new String[1],0);
       BitSet fs = new BitSet();
@@ -948,7 +964,7 @@ public class Parse {
   private static boolean isDigit (byte c) { return '0' <= c && c <= '9'; }
 
   public Node gvn (Node n) { return n==null ? null : _gvn.xform(n); }
-  private <N extends Node> N init( N n ) { return n==null ? null : _gvn.init (n); }
+  <N extends Node> N init( N n ) { return n==null ? null : _gvn.init (n); }
   private void kill( Node n ) { if( n._uses._len==0 ) _gvn.kill(n); }
   public Node ctrl() { return _e._scope.get(" control "); }
   public Node mem () { return _e._scope.get(" memory " ); }
@@ -981,6 +997,17 @@ public class Parse {
     return ptr;
   }
 
+  // Merge this early exit path into all early exit paths being recorded in the
+  // current Env/Scope.
+  Node do_exit(RegionNode r, PhiNode mem, PhiNode val, Node rez) {
+    r  .add_def(ctrl());
+    mem.add_def(mem());
+    val.add_def(rez);
+    set_ctrl(con(Type.XCTRL));
+    set_mem (con(TypeMem.XMEM));
+    return   con(Type.NIL);
+  }
+
   // Whack current control with a syntax error
   private ErrNode err_ctrl2( String s ) { return err_ctrl1(s,Type.SCALAR); }
   public  ErrNode err_ctrl1(String s, Type t) { return init(new ErrNode(Env.START,errMsg(s),t)); }
@@ -1011,6 +1038,7 @@ public class Parse {
     String name = fun._name;
     return errMsg("Unknown ref '"+name+"'");
   }
+  String phi_errmsg() { return errMsg("Cannot mix GC and non-GC types"); }
 
   // Build a string of the given message, the current line being parsed,
   // and line of the pointer to the current index.

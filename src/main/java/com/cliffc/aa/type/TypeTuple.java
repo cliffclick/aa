@@ -96,7 +96,7 @@ public class TypeTuple extends Type<TypeTuple> {
   // Most primitive function call argument type lists are 0-based
           static final TypeTuple ALL_ARGS= make0(/*QQQfalse*/false); // Zero args and high
   private static final TypeTuple SCALAR0 = make_args();
-  private static final TypeTuple SCALAR1 = make_args(SCALAR);
+  public  static final TypeTuple SCALAR1 = make_args(SCALAR);
   public  static final TypeTuple SCALAR2 = make_args(SCALAR, SCALAR);
   private static final TypeTuple INT32   = make_args(TypeInt.INT32 );
   public  static final TypeTuple INT64   = make_args(TypeInt.INT64 );

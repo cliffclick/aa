@@ -562,7 +562,9 @@ public class TestParse {
   //
   @Ignore
   @Test public void testParse11() {
-    test("do pred no-arg-func",Type.ALL);
+    test("{ ^3; 5}()",TypeInt.con(3)); // early exit
+    // Find: returns 0 if not found, or first element which passes predicate.
+    test("find={list pred -> !list ? ^0; pred(list.1) ? ^list.1; find(list.0,pred)}; find(((0,3),2),{e -> e&1})", TypeInt.con(3));
     test("sum:=0; i:=0; do (i++ < 100) {sum+=i}",Type.ALL);
     test("for (init;pred;post) no-arg-func",Type.ALL);
     test("{init do (pred) {no-arg-func;post}}",Type.ALL);

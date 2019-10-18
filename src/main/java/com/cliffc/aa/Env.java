@@ -6,8 +6,12 @@ import com.cliffc.aa.type.*;
 public class Env implements AutoCloseable {
   final Env _par;
   ScopeNode _scope; // Lexical anchor; goes when this environment leaves scope
-  Env( Env par ) {
+  boolean _early ;  // Supports early-exit or not
+  RegionNode _early_ctrl;         // Early-function-exit control
+  PhiNode _early_val, _early_mem; // Early-function-exit value & memory
+  Env( Env par, boolean early ) {
     _par = par;
+    _early = early;
     ScopeNode scope = new ScopeNode();
     if( par != null ) {
       scope.update(" control ",par._scope.get(" control "), GVN,true);
@@ -31,7 +35,7 @@ public class Env implements AutoCloseable {
     CTL_0 = GVN.init(new CProjNode(START,0));
     MEM_0 = GVN.init(new MProjNode(START,1));
     ALL_CTRL = GVN.init(new ConNode<>(Type.CTRL));
-    TOP    = new Env(null);        // Top-most lexical Environment
+    TOP    = new Env(null,false); // Top-most lexical Environment
     TOP.install_primitives();
     NINIT_CONS = START._uses._len;
   }
@@ -59,12 +63,25 @@ public class Env implements AutoCloseable {
   }
   
   // A new top-level Env, above this is the basic public Env with all the primitives
-  public static Env top() { return new Env(TOP); }
-  
-  Node update( String name, Node val, GVNGCM gvn, boolean mutable ) { return _scope.update(name,val,gvn,mutable); }
-  Node add_fun( String name, Node val ) { return _scope.add_fun(name,(FunPtrNode)val); }
+  public static Env top() { return new Env(TOP,true); }
 
+  // Update variable id token to Node mapping
+  Node update( String name, Node val, GVNGCM gvn, boolean mutable ) { return _scope.update(name,val,gvn,mutable); }
+  // Update function name token to Node mapping
+  Node add_fun( String name, Node val ) { return _scope.add_fun(name,(FunPtrNode)val); }
+  // Update type name token to type mapping
   void add_type( String name, Type t ) { _scope.add_type(name,t); }
+
+  Node early_exit( Parse P, Node val ) {
+    if( !_early ) return _par.early_exit(P,val);
+    if( _early_ctrl == null ) {
+      String phi_errmsg = P.phi_errmsg();
+      _early_ctrl = new RegionNode((Node)null);
+      _early_val  = new PhiNode(phi_errmsg,_early_ctrl);
+      _early_mem  = new PhiNode(phi_errmsg,_early_ctrl);
+    }
+    return P.do_exit(_early_ctrl,_early_mem,_early_val,val);
+  }
   
   // Close the current Env, making its lexical scope dead (and making dead
   // anything only pointed at by this scope).
@@ -74,18 +91,7 @@ public class Env implements AutoCloseable {
     if( _scope.is_dead() ) return;
     // Closing top-most scope (exiting compilation unit)?
     if( _par._par == null ) {   // Then reset global statics to allow another compilation unit
-      _scope.unkeep(GVN);
-      BitsAlias.reset_to_init0(); // Done with adding primitives
-      BitsFun  .reset_to_init0(); // Done with adding primitives
-      BitsRPC  .reset_to_init0(); // Done with adding primitives
-      FunNode  .reset_to_init0(); // Done with adding primitives
-      GVN      .reset_to_init0(); // Done with adding primitives
-      // StartNode is used by global constants, which in turn are only used by
-      // dead cycles.
-      while( START._uses._len > NINIT_CONS ) {
-        Node x = START._uses.pop();
-        assert !GVN.touched(x); // Uses are all dead (but not reclaimed because in a cycle)
-      }
+      top_scope_close();
       return;
     }
     // Whats left is function-ref generic entry points which promote to next
@@ -98,6 +104,21 @@ public class Env implements AutoCloseable {
     }
     _scope.unkeep(GVN);
     assert _scope.is_dead();
+  }
+  
+  public void top_scope_close() {
+    _scope.unkeep(GVN);
+    BitsAlias.reset_to_init0(); // Done with adding primitives
+    BitsFun  .reset_to_init0(); // Done with adding primitives
+    BitsRPC  .reset_to_init0(); // Done with adding primitives
+    FunNode  .reset_to_init0(); // Done with adding primitives
+    GVN      .reset_to_init0(); // Done with adding primitives
+    // StartNode is used by global constants, which in turn are only used by
+    // dead cycles.
+    while( START._uses._len > NINIT_CONS ) {
+      Node x = START._uses.pop();
+      assert !GVN.touched(x); // Uses are all dead (but not reclaimed because in a cycle)
+    }
   }
 
   // Test support, return top-level token type
