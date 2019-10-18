@@ -75,9 +75,10 @@ public final class CallEpiNode extends Node {
     // Single choice; check no conversions needed
     TypeTuple formals = fun._tf._args;
     for( int i=0; i<call.nargs(); i++ ) {
-      if( fun.parm(i)==null )   // Argument is dead and can be dropped?
-        call.set_arg_reg(i,gvn.con(Type.XSCALAR),gvn); // Replace with some generic placeholder
-      else {
+      if( fun.parm(i)==null ) { // Argument is dead and can be dropped?
+        if( gvn.type(call.arg(i)) != Type.XSCALAR )
+          call.set_arg_reg(i,gvn.con(Type.XSCALAR),gvn); // Replace with some generic placeholder
+      } else {
         Type formal = formals.at(i);
         Type actual = gvn.type(call.arg(i));
         if( actual.isBitShape(formal) == 99 ) return null; // Requires user-specified conversion
@@ -189,7 +190,7 @@ public final class CallEpiNode extends Node {
     for( int fidx = bs.nextSetBit(0); fidx >= 0; fidx = bs.nextSetBit(fidx+1) ) {
       if( tree.is_parent(fidx) ) continue;   // Will be covered by children
       FunNode fun = FunNode.find_fidx(fidx); // Lookup, even if not wired
-      if( fun.is_dead() )
+      if( fun==null || fun.is_dead() )
         continue; // Can be dead, if the news has not traveled yet
       RetNode ret = fun.ret();
       Type tret = gvn.type(ret); // Type of the return
