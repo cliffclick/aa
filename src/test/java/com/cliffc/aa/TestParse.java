@@ -534,6 +534,17 @@ public class TestParse {
     test    ("ptr0=@{p:=0,v:=1}; ptr1=@{p=ptr0,v:=2}; ptr0.p=ptr1; ptr0.p.v+ptr1.p.v+(ptr0.p==ptr1)", TypeInt.con(4)); // final pointer-cycle is ok
   }
 
+  // Early function exit
+  @Test public void testParse11() {
+    //test("{ ^3; 5}()",TypeInt.con(3)); // early exit
+    test("x:=0; {^3; x++}(); x",TypeInt.con(0));  // Following statement is ignored
+    test("x:=0; {^1 ? (x=1); x=3}(); x",TypeInt.con(1));  // Return of an ifex
+    test("x:=0; {^1 ?  x=1 ; x=3}(); x",TypeInt.con(1));  // Return of an ifex
+    // Find: returns 0 if not found, or first element which passes predicate.
+    test("find={list pred -> !list ? ^0; pred(list.1) ? ^list.1; find(list.0,pred)}; find(((0,3),2),{e -> e&1})", TypeInt.con(3));
+    //test("x:=0; {1 ? ^2; x=3}(); x",TypeInt.con(0));  // Following statement is ignored
+  }
+
   // Sequential looping constructs, not recursion.  Pondering keyword 'for' for
   // sequential iteration.  Using a 3-ascii-char keyword, because sequential
   // iteration cannot be parallelized.
@@ -561,7 +572,7 @@ public class TestParse {
   //
   //
   @Ignore
-  @Test public void testParse11() {
+  @Test public void testParse12() {
     test("{ ^3; 5}()",TypeInt.con(3)); // early exit
     // Find: returns 0 if not found, or first element which passes predicate.
     test("find={list pred -> !list ? ^0; pred(list.1) ? ^list.1; find(list.0,pred)}; find(((0,3),2),{e -> e&1})", TypeInt.con(3));
@@ -594,7 +605,7 @@ public class TestParse {
 
   // Array syntax examples
   @Ignore
-  @Test public void testParse12() {
+  @Test public void testParse13() {
     test("[3]:int", Type.ALL);      // Array of 3 ints, all zeroed.  Notice ambiguity with array-of-1 element being a 3.
     test("ary = [3]; ary[0]:=0; ary[1]:=1; ary[2]:=2; (ary[0],ary[1],ary[2])", Type.ALL); // array create, array storing
     test("[0,1,2]", Type.ALL); // array create syntax, notice ambiguity with making a new sized array.

@@ -5,13 +5,15 @@ import com.cliffc.aa.type.*;
 
 public class Env implements AutoCloseable {
   final Env _par;
-  ScopeNode _scope; // Lexical anchor; goes when this environment leaves scope
-  boolean _early ;  // Supports early-exit or not
+  ScopeNode _scope;  // Lexical anchor; goes when this environment leaves scope
+  private boolean _if;            // If-scopes stop update propagation
+  private boolean _early;         // Supports early-exit or not
   RegionNode _early_ctrl;         // Early-function-exit control
   PhiNode _early_val, _early_mem; // Early-function-exit value & memory
-  Env( Env par, boolean early ) {
+  Env( Env par, boolean early, boolean ifscope ) {
     _par = par;
     _early = early;
+    _if = ifscope;
     ScopeNode scope = new ScopeNode();
     if( par != null ) {
       scope.update(" control ",par._scope.get(" control "), GVN,true);
@@ -35,7 +37,7 @@ public class Env implements AutoCloseable {
     CTL_0 = GVN.init(new CProjNode(START,0));
     MEM_0 = GVN.init(new MProjNode(START,1));
     ALL_CTRL = GVN.init(new ConNode<>(Type.CTRL));
-    TOP    = new Env(null,false); // Top-most lexical Environment
+    TOP    = new Env(null,false,false); // Top-most lexical Environment
     TOP.install_primitives();
     NINIT_CONS = START._uses._len;
   }
@@ -61,12 +63,17 @@ public class Env implements AutoCloseable {
     FunNode  .init0(); // Done with adding primitives
     GVN      .init0(); // Done with adding primitives
   }
-  
-  // A new top-level Env, above this is the basic public Env with all the primitives
-  public static Env top() { return new Env(TOP,true); }
 
-  // Update variable id token to Node mapping
-  Node update( String name, Node val, GVNGCM gvn, boolean mutable ) { return _scope.update(name,val,gvn,mutable); }
+  // A new top-level Env, above this is the basic public Env with all the primitives
+  public static Env top() { return new Env(TOP,true,false); }
+
+  // Update variable id token to Node mapping, mutable flag to allow stores.
+  // GVN used for change worklist.  Search & replace vs put in current scope.
+  public Node update( String name, Node val, GVNGCM gvn, boolean mutable, boolean search ) {
+    if( search && !_if && _scope.get_idx(name) == null )
+      return _par.update(name,val,gvn,mutable,search);
+    return _scope.update(name,val,gvn,mutable);
+  }
   // Update function name token to Node mapping
   Node add_fun( String name, Node val ) { return _scope.add_fun(name,(FunPtrNode)val); }
   // Update type name token to type mapping
@@ -77,12 +84,12 @@ public class Env implements AutoCloseable {
     if( _early_ctrl == null ) {
       String phi_errmsg = P.phi_errmsg();
       _early_ctrl = new RegionNode((Node)null);
-      _early_val  = new PhiNode(phi_errmsg,_early_ctrl);
-      _early_mem  = new PhiNode(phi_errmsg,_early_ctrl);
+      _early_val  = new PhiNode(phi_errmsg,(Node)null);
+      _early_mem  = new PhiNode(phi_errmsg,(Node)null);
     }
     return P.do_exit(_early_ctrl,_early_mem,_early_val,val);
   }
-  
+
   // Close the current Env, making its lexical scope dead (and making dead
   // anything only pointed at by this scope).
   @Override public void close() {
@@ -105,8 +112,8 @@ public class Env implements AutoCloseable {
     _scope.unkeep(GVN);
     assert _scope.is_dead();
   }
-  
-  public void top_scope_close() {
+
+  private void top_scope_close() {
     _scope.unkeep(GVN);
     BitsAlias.reset_to_init0(); // Done with adding primitives
     BitsFun  .reset_to_init0(); // Done with adding primitives

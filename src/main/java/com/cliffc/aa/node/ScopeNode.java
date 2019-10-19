@@ -1,8 +1,6 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.AA;
-import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.Parse;
+import com.cliffc.aa.*;
 import com.cliffc.aa.type.Type;
 
 import java.util.BitSet;
@@ -28,7 +26,7 @@ public class ScopeNode extends Node {
     return ii==null ? null : _defs.at(ii);
   }
   public Integer get_idx(String name) { return _vals.get(name); }
-  
+
   // Add a Node to an UnresolvedNode.  Must be a function ptr.
   public FunPtrNode add_fun( String name, FunPtrNode ptr) {
     Integer ii = _vals.get(name);
@@ -41,8 +39,9 @@ public class ScopeNode extends Node {
     }
     return ptr;
   }
-  
-  // Add or update the scope with a name
+
+  // Add or Update variable id token to Node mapping, mutable flag to allow
+  // stores.  GVN used for change worklist.
   public Node update( String name, Node val, GVNGCM gvn, boolean mutable ) {
     Integer ii = _vals.get(name);
     if( ii==null ) {
@@ -70,7 +69,7 @@ public class ScopeNode extends Node {
 
   // Name must exist
   public boolean is_mutable( Integer ii ) { return _ms.get(ii); }
-  
+
   // The current local scope ends; delete local var refs.  Forward refs first
   // found in this scope are assumed to be defined in some outer scope and get
   // promoted.
@@ -87,20 +86,20 @@ public class ScopeNode extends Node {
       if( is_dead() ) return;
     }
   }
-  
+
   // Add base types on startup
   public void init0() { Type.init0(_types); }
-  
+
   // Name to type lookup, or null
   public Type get_type(String name) { return _types.get(name);  }
   public HashMap<String,Type> types() { return _types; }
-  
+
   // Extend the current Scope with a new type; cannot override existing name.
   public void add_type( String name, Type t ) {
     assert _types.get(name)==null;
     _types.put( name, t );
   }
-  
+
   /** Return a ScopeNode with all the variable indices at or past the idx;
    *  remove them from 'this' ScopeNode.
    *  @param idx index to split on
@@ -115,7 +114,7 @@ public class ScopeNode extends Node {
         set_def(i,tmp.in(i),gvn);
       }
     }
-    
+
     int oldlen = _defs._len;
     if( idx == oldlen ) return null; // No vars, no return
     ScopeNode s = new ScopeNode();
@@ -171,12 +170,13 @@ public class ScopeNode extends Node {
     int xii = x._vals.get(name);
     boolean x_is_mutable = x._ms.get(xii);
     Node xn = x.in(xii), yn;
+    boolean search = P.lookup(name)!=null;
 
     // Forward refs are not really a def, but produce a trackable definition
     // that must be immutable, and will eventually get promoted until it
     // reaches a scope where it gets defined.
     if( xn.is_forward_ref() ) { assert !x_is_mutable; update(name,xn,gvn,false); return; }
-        
+
     // Check for mixed-mode updates.  'name' must be either fully mutable or
     // fully immutable at the merge point (or dead afterwards).  Since x was
     // updated on this branch, the variable was mutable beforehand.  Since it
@@ -185,15 +185,14 @@ public class ScopeNode extends Node {
       yn = fail(name,P,gvn,arm,xn,"defined");
     else if( !x_is_mutable )        // x-side is final but y-side is mutable.
       yn = fail(name,P,gvn,arm,xn,"final");
-    
-    // Mutably updated on one side, and remains mutable.
-    update(name,xn==yn ? xn : P.gvn(new PhiNode(phi_errmsg, P.ctrl(),xn,yn)),gvn,true);
+
+    P.update(name,xn==yn ? xn : P.gvn(new PhiNode(phi_errmsg, P.ctrl(),xn,yn)),gvn,x_is_mutable,search);
   }
 
   private Node fail(String name, Parse P, GVNGCM gvn, boolean arm, Node xn, String msg) {
     return P.err_ctrl1("'"+name+"' not "+msg+" on "+!arm+" arm of trinary",gvn.type(xn).widen());
   }
-  
+
   // Called per name defined on both arms of a trinary.
   // Produces the merge result.
   private void do_both_sides(String name, Parse P, GVNGCM gvn, String phi_errmsg, ScopeNode t, ScopeNode f) {
@@ -228,7 +227,7 @@ public class ScopeNode extends Node {
 
     update(name,tn==fn ? fn : P.gvn(new PhiNode(phi_errmsg, P.ctrl(),tn,fn)),gvn,t_is_mutable);
   }
-  
+
   // Replace uses of dull with sharp, used after an IfNode test
   void sharpen( Node dull, Node sharp, ScopeNode arm ) {
     assert dull != sharp;
@@ -245,7 +244,7 @@ public class ScopeNode extends Node {
       }
     }
   }
-  
+
   @Override public Node ideal(GVNGCM gvn) { return null; }
   @Override public Type value(GVNGCM gvn) { return all_type(); }
   @Override public Type all_type() { return Type.ALL; }

@@ -17,9 +17,9 @@ import java.util.BitSet;
  *  stmts= [tstmt|stmt][; stmts]*[;]? // multiple statements; final ';' is optional
  *  tstmt= tvar = :type            // type variable assignment
  *  stmt = [id[:type] [:]=]* ifex  // ids are (re-)assigned, and are available in later statements
- *  ifex = expr [? expr [: expr]]  // trinary short-circuit logic; missing ":expr" will default to 0
+ *  stmt = ^ifex                   // Early function exit
+ *  ifex = expr [? stmt [: stmt]]  // trinary short-circuit logic; missing ":stmt" will default to 0
  *  expr = term [binop term]*      // gather all the binops and sort by precedence
- *  expr = ^term                   // Early function exit
  *  term = id++ | id--             //
  *  term = tfact post              // A term is a tfact and some more stuff...
  *  post = empty                   // A term can be just a plain 'tfact'
@@ -258,11 +258,10 @@ public class Parse {
   /** A statement is a list of variables to final-assign or re-assign, and an
    *  ifex for the value.  The variables must not be forward refs and are
    *  available in all later statements.  Final-assigned variables can never be
-   *  assigned again.  All type annotations on a variable always apply to all
-   *  assignments (final or not); a variable cannot be "loosened" during a
-   *  reassignment.
+   *  assigned again.
    *
-   *  stmt = [[id or ifex.field][:type] [:]=]* ifex //
+   *  stmt = [[id or ifex.field][:type] [:]=]* ifex
+   *  stmt = ^ifex  // Early function exit
    *
    *  Note the syntax difference between:
    *    stmt = id := val  //    re-assignment
@@ -277,6 +276,11 @@ public class Parse {
    *    x = y = z = fcn(arg0,arg1).fld1.fld2 = some_more_ifex;
    */
   private Node stmt() {
+    if( peek('^') ) {           // Early function exit
+      Node ifex = ifex();
+      return ifex == null ? err_ctrl2("Missing term after ^") : _e.early_exit(this,ifex);
+    }
+
     Ary<String> toks = new Ary<>(new String[1],0);
     Ary<Type  > ts   = new Ary<>(new Type  [1],0);
     BitSet rs = new BitSet();
@@ -308,7 +312,7 @@ public class Parse {
       Node n = lookup(tok);        // Prior value of token
       if( n==null ) {              // Token not already bound to a value
         if( !ifex.is_forward_ref() ) { // Do not assign unknown refs to another name
-          _e.update(tok,ifex,null,mutable); // Bind token to a value
+          update(tok,ifex,null,mutable,false); // Bind token to a value
           if( ifex instanceof FunPtrNode ) ((FunPtrNode)ifex).fun().bind(tok); // Debug only: give name to function
         }
       } else { // Handle re-assignments and forward referenced function definitions
@@ -316,7 +320,7 @@ public class Parse {
           assert !_e.is_mutable(tok);
           ((FunPtrNode)n).merge_ref_def(_gvn,tok,(FunPtrNode)ifex);
         } else if( _e.is_mutable(tok) )
-          _e.update(tok,ifex,_gvn,mutable);
+          update(tok,ifex,_gvn,mutable,true);
         else
           err_ctrl0("Cannot re-assign final val '"+tok+"'");
       }
@@ -327,7 +331,7 @@ public class Parse {
   /** Parse an if-expression, with lazy eval on the branches.  Assignments to
    *  new variables are allowed in either arm (as-if each arm is in a mini
    *  scope), and variables assigned on all live arms are available afterwards.
-   *  ifex = expr [? expr [: expr]]
+   *  ifex = expr [? stmt [: stmt]]
    */
   private Node ifex() {
     Node expr = expr(), res=null;
@@ -338,22 +342,22 @@ public class Parse {
       ctrls.add_def(ifex); // Keep alive, even if 1st Proj kills last use, so 2nd Proj can hook
       Env e_if = _e;       // Environment for 'if'
       ScopeNode if_scope = e_if._scope;
-      ScopeNode t_scope = (_e = new Env(e_if,false))._scope; // Push new scope for true arm
+      ScopeNode t_scope = (_e = new Env(e_if,false,true))._scope; // Push new scope for true arm
       set_ctrl(gvn(new CProjNode(ifex,1))); // Control for true branch, and sharpen tested value
       Node t_sharp = ctrl().sharpen(_gvn,if_scope,t_scope).keep();
-      Node tex = expr();
+      Node tex = stmt();
       ctrls.add_def(tex==null ? err_ctrl2("missing expr after '?'") : tex);
       ctrls.add_def(ctrl()); // 2 - hook true-side control
-      ScopeNode f_scope = (_e = new Env(e_if,false))._scope; // Push new scope for false arm
+      ScopeNode f_scope = (_e = new Env(e_if,false,true))._scope; // Push new scope for false arm
       set_ctrl(gvn(new CProjNode(ifex,0))); // Control for true branch, and sharpen tested value
       Node f_sharp = ctrl().sharpen(_gvn,if_scope,f_scope).keep();
-      Node fex = peek(':') ? expr() : con(Type.NIL);
+      Node fex = peek(':') ? stmt() : con(Type.NIL);
       ctrls.add_def(fex==null ? err_ctrl2("missing expr after ':'") : fex);
       ctrls.add_def(ctrl()); // 4 - hook false-side control
       _e = e_if;             // Pop the arms scope
       set_ctrl(init(new RegionNode(null,ctrls.in(2),ctrls.in(4))));
       String phi_errmsg = phi_errmsg();
-      if_scope.common(this,_gvn,phi_errmsg,t_scope,f_scope,expr,t_sharp,f_sharp); // Add a PhiNode for all commonly defined variables
+      if_scope.common(this, _gvn,phi_errmsg,t_scope,f_scope,expr,t_sharp,f_sharp); // Add a PhiNode for all commonly defined variables
       res = gvn(new PhiNode(phi_errmsg,ctrl(),ctrls.in(1),ctrls.in(3))).keep(); // Add a PhiNode for the result, hook to prevent deletion
       t_sharp.unkeep(_gvn);
       f_sharp.unkeep(_gvn);
@@ -369,10 +373,6 @@ public class Parse {
    *  expr = ^term
    */
   private Node expr() {
-    if( peek('^') ) {           // Early function exit
-      Node term = term();
-      return term == null ? err_ctrl2("Missing term after ^") : _e.early_exit(this,term);
-    }
     // term [binop term]*
     Node term = term();
     if( term == null ) return null; // Term is required, so missing term implies not any expr
@@ -491,7 +491,7 @@ public class Parse {
     n.keep();
     Node plus = _e.lookup_filter("+",_gvn,2);
     Node sum = do_call(new CallNode(true,errMsg(),ctrl(),plus,mem(),n,con(TypeInt.con(d))));
-    _e.update(tok,sum,_gvn,true);
+    update(tok,sum,_gvn,true,false);
     return n.unhook();
   }
 
@@ -550,10 +550,11 @@ public class Parse {
 
     // Check for a valid 'id'
     String tok = token0();
-    if( tok == null ) return null;
+    if( tok == null || tok.equals("=") || tok.equals("^")) 
+      { _x = oldx; return null; } // Disallow '=' as a fact, too easy to make mistakes
     Node var = lookup(tok);
     if( var == null ) // Assume any unknown ref is a forward-ref of a recursive function
-      return _e.update(tok,gvn(FunPtrNode.forward_ref(_gvn,tok,this)),null,false);
+      return update(tok,gvn(FunPtrNode.forward_ref(_gvn,tok,this)),null,false,false);
     // Disallow uniop and binop functions as factors.
     if( var.op_prec() > 0 ) { _x = oldx; return null; }
     return var;
@@ -588,7 +589,7 @@ public class Parse {
 
     while( true ) {
       String tok = token();
-      if( tok == null ) { ids.clear(); _x=oldx; break; } // not a "[id]* ->"
+      if( tok == null ) { ids.clear(); ts.clear(); _x=oldx; break; } // not a "[id]* ->"
       if( tok.equals("->") ) break;
       Type t = Type.SCALAR;    // Untyped, most generic type
       Parse bad = errMsg();    // Capture location in case of type error
@@ -605,7 +606,7 @@ public class Parse {
     Node old_ctrl = ctrl();
     Node old_mem  = mem ();
     FunNode fun = (FunNode)init(new FunNode(ts.asAry()).add_def(Env.ALL_CTRL));
-    try( Env e = new Env(_e,true) ) {// Nest an environment for the local vars
+    try( Env e = new Env(_e,true,false) ) {// Nest an environment for the local vars
       _e = e;                   // Push nested environment
       set_ctrl(fun);            // New control is function head
       String errmsg = errMsg("Cannot mix GC and non-GC types");
@@ -613,7 +614,7 @@ public class Parse {
       for( int i=0; i<ids._len; i++ ) {
         Node parm = gvn(new ParmNode(cnt++,ids.at(i),fun,con(Type.SCALAR),errmsg));
         Node mt = typechk(parm,ts.at(i));
-        _e.update(ids.at(i),mt,null, args_are_mutable);
+        update(ids.at(i),mt,null, args_are_mutable,false);
       }
       Node rpc = gvn(new ParmNode(-1,"rpc",fun,con(TypeRPC.ALL_CALL),null));
       Node mem = gvn(new ParmNode(-2,"mem",fun,con(TypeMem.MEM),null));
@@ -622,21 +623,25 @@ public class Parse {
       if( rez == null ) rez = err_ctrl2("Missing function body");
       require('}');             //
       // Merge normal exit into all early-exit paths
-      Node ctrl = ctrl();
-      mem = mem();
-      if( e._early_ctrl != null ) {
-        e.early_exit(this,rez);
-        ctrl= e._early_ctrl;
-        mem = e._early_mem ;
-        rez = e._early_val ;
-      }
-      RetNode ret = (RetNode)gvn(new RetNode(ctrl,mem,rez,rpc,fun));
+      if( e._early_ctrl != null ) rez = merge_exits(rez);
+      RetNode ret = (RetNode)gvn(new RetNode(ctrl(),mem(),rez,rpc,fun));
       Node fptr = gvn(new FunPtrNode(ret));
       _e = _e._par;             // Pop nested environment
       set_ctrl(old_ctrl);       // Back to the pre-function-def control
       set_mem (old_mem );
       return fptr;              // Return function; close-out and DCE 'e'
     }
+  }
+
+  private Node merge_exits(Node rez) {
+    _e.early_exit(this,rez);
+    Node ctrl = init(_e._early_ctrl).keep();
+    _e._early_mem.set_def(0,ctrl,_gvn);
+    _e._early_val.set_def(0,ctrl,_gvn);
+    set_mem(gvn(_e._early_mem));
+    rez = gvn(_e._early_val);
+    set_ctrl(ctrl.unhook());
+    return rez;
   }
 
   /** Parse anonymous struct; the opening "@{" already parsed.  Next comes
@@ -646,7 +651,7 @@ public class Parse {
    *  \@{ [id[:type]?[=stmt]?,]* }
    */
   private Node struct() {
-    try( Env e = new Env(_e,false) ) {// Nest an environment for the local vars
+    try( Env e = new Env(_e,false,false) ) {// Nest an environment for the local vars
       _e = e;                   // Push nested environment
       Ary<String> toks = new Ary<>(new String[1],0);
       BitSet fs = new BitSet();
@@ -675,7 +680,7 @@ public class Parse {
         // Add type-check into graph
         if( t != null )  stmt = typechk(stmt,t);
         // Add field into lexical scope, field is usable after initial set
-        e.update(tok,stmt,_gvn,false); // Field now available 'bare' inside rest of scope
+        e.update(tok,stmt,_gvn,false,false); // Field now available 'bare' inside rest of scope
         if( is_final ) fs.set(toks._len);
         toks.add(tok);          // Gather for final type
         if( !peek(',') ) break; // Final comma is optional
@@ -964,7 +969,7 @@ public class Parse {
   private static boolean isDigit (byte c) { return '0' <= c && c <= '9'; }
 
   public Node gvn (Node n) { return n==null ? null : _gvn.xform(n); }
-  <N extends Node> N init( N n ) { return n==null ? null : _gvn.init (n); }
+  private <N extends Node> N init( N n ) { return n==null ? null : _gvn.init (n); }
   private void kill( Node n ) { if( n._uses._len==0 ) _gvn.kill(n); }
   public Node ctrl() { return _e._scope.get(" control "); }
   public Node mem () { return _e._scope.get(" memory " ); }
@@ -975,6 +980,7 @@ public class Parse {
   private @NotNull ConNode con( Type t ) { return _gvn.con(t); }
 
   public Node lookup( String tok ) { return _e.lookup(tok); }
+  public Node update( String name, Node val, GVNGCM gvn, boolean mutable, boolean search ) { return _e.update(name,val,gvn,mutable,search); }
 
   private Node do_call( CallNode call0 ) {
     Node call = gvn(call0.keep());

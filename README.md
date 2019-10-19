@@ -53,9 +53,9 @@ BNF                           | Comment
 `stmts= [tstmt or stmt][; stmts]*[;]?` | multiple statments; final ';' is optional
 `tstmt= tvar = :type`         | type variable assignment
 `stmt = [id[:type] [:]=]* ifex` | ids are (re-)assigned, and are available in later statements.  
-`ifex = expr [? expr [: expr]]` | trinary logic; the else-clause will default to 0
+`stmt = ^ifex`                | Early function exit
+`ifex = expr [? stmt [: stmt]]` | trinary logic; the else-clause will default to 0
 `expr = term [binop term]*`   | gather all the binops and sort by prec
-`expr = ^term`                | Early function exit
 `term = id++ | id--`          | post-inc/dec operators
 `term = tfact post`           | A term is a tfact and some more stuff...
 `post = empty`                | A term can be just a plain 'tfact'
