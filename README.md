@@ -315,7 +315,7 @@ map = { list fun ->                // map is a 2-arg function
 
 Double the list elements:
 ```C
-map(lst,{x -> x+x}
+map(lst,{x -> x+x})
 ```
 Returns `(2,(4,(6,0)))`.
 
