@@ -283,8 +283,47 @@ Final fields are made with a final store not a final declaration | ---
 LARGER EXAMPLES:
 ----------------
 
+Build a list from tuples; first element is payload and second element is the rest of the list, with nil terminating the list:
+```C
+  lst = (1,(2,(3,0)))
+```
+
+Find and return the first element of a list passing a predicate:
+```C
+find = { list pred ->     // find is a 2-arg function
+  !list ? ^0;             // if list is nil, return nil
+  pred(list.0) ? ^list.0; // if the 0-element passes the predicate, return it
+  find(list.1,pred);      // otherwise, recursively find on the rest of the list
+}
+```
+
+Find the first odd element:
+```C
+find(lst,{e -> e&1})
+```
+...which returns `1`.
 
 
+Here is a simple `map` call, mapping `fun` over the list elements:
+```C
+map = { list fun ->                // map is a 2-arg function
+  list                             // list is nil-checked
+  ? (map(fun,list.1),fun(list.0))  // return a list (tuple) composed of apply map to the 1-element and fun to the 0-element
+  : 0                              // return a nil
+}
+```
+
+Double the list elements:
+```C
+map(lst,{x -> x+x}
+```
+Returns `(2,(4,(6,0)))`.
+
+Both `map` and `+` calls are generic, so a list of strings work as well:
+```C
+map( ("abc", ("def", 0)), {x -> x+x} )
+```
+Returns `("abcabc",("defdef",0))`.
 
 
 Done Stuff
