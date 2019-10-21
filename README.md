@@ -323,7 +323,7 @@ Both `map` and `+` calls are generic, so a list of strings work as well:
 ```C
 map( ("abc", ("def", 0)), {x -> x+x} )
 ```
-Returns `("abcabc",("defdef",0))`.
+Returns `("abcabc", ("defdef", 0))`.
 
 
 Done Stuff

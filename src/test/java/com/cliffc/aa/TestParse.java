@@ -545,32 +545,52 @@ public class TestParse {
     //test("x:=0; {1 ? ^2; x=3}(); x",TypeInt.con(0));  // Following statement is ignored
   }
 
-  // Sequential looping constructs, not recursion.  Pondering keyword 'for' for
-  // sequential iteration.  Using a 3-ascii-char keyword, because sequential
-  // iteration cannot be parallelized.
-  //
-  // ^expr // early function return, can be used instead of 'break'
-  //
-  // 'for' becomes a 2-arg function taking a boolean (with side-effects) and a
-  // no-arg function.  In this case, the iterator is outside the for-scope.
-  //     sum:=0; i:=0; for (i++ < 100) {sum+=i}
-  //     sum:=0; i:=0; for(i++ < 100,{sum+=i})
-  //     sum:=0; for { i:=0; i++ < 100; {sum+=i} }
-  //     for( i++ < 100, sum += i )
-  //     sum:=0; i:=0; for{i++<100}{sum+=i;} // this version takes 2 functions
-  //
-  // Python uses "iteratables" for tight syntax on for-loops.
-  // Still has while loops, which do not introduce a scope.
-  //     sum:=0; i:=0; while( i++ < 100 ) { sum+=i }; sum
-  //
-  // No 'break' but early function exit ^.
-  //     sum := 0;
-  //     i := 0;
-  //     for {i++ < 100 } {
-  //       (sum+=i) > 1000 ? ^sum;     // ?: syntax, no colon, break in the 'then' clause
-  //     }
-  //
-  //
+  /** Closures
+  
+Hidden variable 'cnt' inside outer closure.
+Return two functions in a tuple, one increments cnt, the other gets it.
+    > (inc, get) = { cnt=0; ({cnt++;0},{cnt}) }()
+    > inc()
+    0
+    > get()
+    1
+    > inc()
+    0
+    > get()
+    2
+The outer anon fcn returns and exits, but the storage for 'cnt' remains.
+'inc' and 'get' can read & write 'cnt', but 'cnt' is otherwise private.
+
+
+
+
+
+----
+Sequential looping constructs, not recursion.  Pondering keyword 'for' for
+sequential iteration.  Using a 3-ascii-char keyword, because sequential
+iteration cannot be parallelized.
+
+^expr // early function return, can be used instead of 'break'
+
+'for' becomes a 2-arg function taking a boolean (with side-effects) and a
+no-arg function.  In this case, the iterator is outside the for-scope.
+    sum:=0; i:=0; for (i++ < 100) {sum+=i}
+    sum:=0; i:=0; for(i++ < 100,{sum+=i})
+    sum:=0; for { i:=0; i++ < 100; {sum+=i} }
+    for( i++ < 100, sum += i )
+    sum:=0; i:=0; for{i++<100}{sum+=i;} // this version takes 2 functions
+
+Python uses "iteratables" for tight syntax on for-loops.
+Still has while loops, which do not introduce a scope.
+    sum:=0; i:=0; while( i++ < 100 ) { sum+=i }; sum
+
+No 'break' but early function exit ^.
+    sum := 0;
+    i := 0;
+    for {i++ < 100 } {
+      (sum+=i) > 1000 ? ^sum;     // ?: syntax, no colon, break in the 'then' clause
+    }
+  */
   @Ignore
   @Test public void testParse12() {
     test("{ ^3; 5}()",TypeInt.con(3)); // early exit
