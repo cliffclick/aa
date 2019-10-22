@@ -561,6 +561,20 @@ Return two functions in a tuple, one increments cnt, the other gets it.
 The outer anon fcn returns and exits, but the storage for 'cnt' remains.
 'inc' and 'get' can read & write 'cnt', but 'cnt' is otherwise private.
 
+Every ScopeNode turns into a NewNode with variable mappings via TypeStruct,
+which grows as new var names appear.  Every fcn call passes in a display with
+all parent scopes (the Env).  All var refs become lds/sts against the NewNode/
+ScopeNode.  Standard ld/st ops apply, and a NewNode goes dead the normal way-
+no other uses.  Last "normal" use goes away when fcn exits, but display based
+uses from nested fcns (i.e., a REAL closure usage) might keep alive.
+
+Can I do this without going the ld/st route?  What's so special about threading
+memory thru-out?  Or even threading just the NewNode, no aliasing issues... i
+think.  In the above inc/get I can call it 3 times, get 3 unrelated counters.
+Pass the fcns along, and get them inlined.  So inc1 bumps cnt1, inc2 bumps
+cnt2, and inlined side-by-side.  So cnt1,cnt2 memory ops come from the same
+anon fcn.  Can call in a loop, have millions of ctrs from the same anon fcn -
+which must therefore be the same alias, therefore ld/st required.
 
 
 
