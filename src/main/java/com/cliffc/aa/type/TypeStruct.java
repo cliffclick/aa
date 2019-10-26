@@ -248,6 +248,28 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // Make a TypeStruct with a given 'news' from the original
   TypeStruct make(BitsAlias news) { return make(_flds,_ts,_finals,news);  }
 
+  // Extend the current struct with a new named field
+  public TypeStruct add_fld( String name, Type t, boolean mutable ) {
+    assert t.isa(SCALAR) && (name==null || find(name,-1)==-1);
+    
+    Type  []   ts = Arrays.copyOfRange(_ts    ,0,_ts    .length+1);
+    String[] flds = Arrays.copyOfRange(_flds  ,0,_flds  .length+1);
+    byte[] finals = Arrays.copyOfRange(_finals,0,_finals.length+1);
+    ts    [_ts.length] = t;
+    flds  [_ts.length] = name==null ? "." : name;
+    finals[_ts.length] = mutable ? frw() : ffinal();
+    return make(flds,ts,finals,_news);
+  }
+  public TypeStruct set_fld( int idx, Type t, boolean mutable ) {
+    byte ff = mutable ? frw() : ffinal();
+    Type[] ts = _ts.clone();
+    ts[idx] = t;
+    byte[] ffs = _finals;
+    if( _finals[idx] != ff )
+      (ffs = _finals.clone())[idx]=ff;
+    return make(_flds,ts,ffs,_news);
+  }
+
   // Dual the flds, dual the tuple.
   @Override protected TypeStruct xdual() {
     String[] as = new String[_flds.length];

@@ -7,25 +7,24 @@ public class Env implements AutoCloseable {
   final Env _par;
   ScopeNode _scope;  // Lexical anchor; goes when this environment leaves scope
   private boolean _if;            // If-scopes stop update propagation
-  private boolean _early;         // Supports early-exit or not
-  RegionNode _early_ctrl;         // Early-function-exit control
-  PhiNode _early_val, _early_mem; // Early-function-exit value & memory
   Env( Env par, boolean early, boolean ifscope ) {
     _par = par;
-    _early = early;
     _if = ifscope;
-    ScopeNode scope = new ScopeNode();
+    ScopeNode scope = new ScopeNode(early);
     if( par != null ) {
-      scope.update(" control ",par._scope.get(" control "), GVN,true);
-      scope.update(" memory " ,par._scope.get(" memory " ), GVN,true);
+      scope.set_ctrl(par._scope.ctrl(),GVN);
+      scope.set_mem (par._scope.mem (),GVN);
+      scope.set_stk (new NewNode(),GVN);
     }
     _scope = GVN.init(scope);
   }
 
-  public final static GVNGCM GVN; // Initial GVN, defaults to ALL, lifts towards ANY
-  public final static StartNode START; // Program start values (control, empty memory, cmd-line args)
-         final static CProjNode CTL_0; // Program start value control
-         final static MProjNode MEM_0; // Program start value memory
+  public  final static GVNGCM GVN; // Initial GVN, defaults to ALL, lifts towards ANY
+  public  final static StartNode START; // Program start values (control, empty memory, cmd-line args)
+          final static CProjNode CTL_0; // Program start value control
+          final static MProjNode MEM_0; // Program start value memory
+  private final static   NewNode STK_0; // Program start stack frame (has primitive names)
+
   public final static   ConNode ALL_CTRL;
   private final static int NINIT_CONS;
   private final static Env TOP; // Top-most lexical Environment, has all primitives, unable to be removed
@@ -36,25 +35,29 @@ public class Env implements AutoCloseable {
     assert START._uid==0;
     CTL_0 = GVN.init(new CProjNode(START,0));
     MEM_0 = GVN.init(new MProjNode(START,1));
+    STK_0 = GVN.init(new NewNode());
     ALL_CTRL = GVN.init(new ConNode<>(Type.CTRL));
     TOP    = new Env(null,false,false); // Top-most lexical Environment
     TOP.install_primitives();
     NINIT_CONS = START._uses._len;
   }
   private void install_primitives() {
-    _scope.add_def(_scope); // Self-hook to prevent deletion
-    _scope  .init0(); // Add base types
-    _scope.update(" control ", CTL_0, GVN,true);
-    _scope.update(" memory " , MEM_0, GVN,true);
+    _scope.keep();              // do not delete
+    _scope.init0();             // Add base types
+    GVN.unreg(STK_0);
     for( PrimNode prim : PrimNode.PRIMS )
-      _scope.add_fun(prim._name,(FunPtrNode) GVN.xform(prim.as_fun(GVN)));
+      STK_0.add_fun(prim._name,(FunPtrNode) GVN.xform(prim.as_fun(GVN)));
     for( IntrinsicNewNode lib : IntrinsicNewNode.INTRINSICS )
-      _scope.add_fun(lib ._name,(FunPtrNode) GVN.xform(lib .as_fun(GVN)));
+      STK_0.add_fun(lib ._name,(FunPtrNode) GVN.xform(lib .as_fun(GVN)));
+    // Top-level constants
+    STK_0.add_fld("math_pi", TypeFlt.PI, GVN.con(TypeFlt.PI),false);
     // Now that all the UnresolvedNodes have all possible hits for a name,
     // register them with GVN.
-    for( Node val : _scope._defs )  GVN.init0(val);
-    // Top-level constants
-    _scope.update("math_pi", GVN.con(TypeFlt.PI),null,false);
+    for( Node val : STK_0._defs )  if( val instanceof UnresolvedNode ) GVN.init0(val);
+    _scope.set_ctrl(CTL_0, GVN);
+    _scope.set_mem (MEM_0, GVN);
+    _scope.set_stk (STK_0, GVN);
+    GVN.rereg(STK_0,STK_0.all_type());
     // Run the worklist dry
     GVN.iter();
     BitsAlias.init0(); // Done with adding primitives
@@ -67,34 +70,17 @@ public class Env implements AutoCloseable {
   // A new top-level Env, above this is the basic public Env with all the primitives
   public static Env top() { return new Env(TOP,true,false); }
 
-  // Update variable id token to Node mapping, mutable flag to allow stores.
-  // GVN used for change worklist.  Search & replace vs put in current scope.
-  public Node update( String name, Node val, GVNGCM gvn, boolean mutable, boolean search ) {
-    if( search && !_if && _scope.get_idx(name) == null )
-      return _par.update(name,val,gvn,mutable,search);
-    return _scope.update(name,val,gvn,mutable);
-  }
-  // Update function name token to Node mapping
-  Node add_fun( String name, Node val ) { return _scope.add_fun(name,(FunPtrNode)val); }
-  // Update type name token to type mapping
-  void add_type( String name, Type t ) { _scope.add_type(name,t); }
-
+  // Wire up an early function exit
   Node early_exit( Parse P, Node val ) {
-    if( !_early ) return _par.early_exit(P,val);
-    if( _early_ctrl == null ) {
-      String phi_errmsg = P.phi_errmsg();
-      _early_ctrl = new RegionNode((Node)null);
-      _early_val  = new PhiNode(phi_errmsg,(Node)null);
-      _early_mem  = new PhiNode(phi_errmsg,(Node)null);
-    }
-    return P.do_exit(_early_ctrl,_early_mem,_early_val,val);
+    return _scope.early() ? _scope.early_exit(P,val) : _par.early_exit(P,val);
   }
 
-  // Close the current Env, making its lexical scope dead (and making dead
-  // anything only pointed at by this scope).
+  // Close the current Env and lexical scope.
   @Override public void close() {
     ScopeNode pscope = _par._scope;
-    _scope.promote_forward_del_locals(GVN,_par._par == null ? null : pscope);
+    // Promote forward refs to the next outer scope
+    if( pscope != null && pscope != TOP._scope)
+      _scope.stk().promote_forward(GVN,pscope.stk());
     if( _scope.is_dead() ) return;
     // Closing top-most scope (exiting compilation unit)?
     if( _par._par == null ) {   // Then reset global statics to allow another compilation unit
@@ -107,7 +93,7 @@ public class Env implements AutoCloseable {
       Node use = _scope._uses.at(0);
       assert use != pscope;
       int idx = use._defs.find(_scope);
-      GVN.set_def_reg(use,idx, idx==0 ? pscope.get(" control ") : pscope);
+      GVN.set_def_reg(use,idx, idx==0 ? pscope.ctrl() : pscope);
     }
     _scope.unkeep(GVN);
     assert _scope.is_dead();
@@ -128,51 +114,46 @@ public class Env implements AutoCloseable {
     }
   }
 
-  // Test support, return top-level token type
-  static Type lookup_valtype( String token ) { return lookup_valtype(TOP.lookup(token)); }
-  // Top-level exit type lookup
-  private static Type lookup_valtype( Node n ) {
-    Type t = GVN.type(n);
-    if( t != Type.CTRL ) return t;
-  //  if( n instanceof ProjNode ) // Get function type when returning a function
-  //    return ((FunNode)(n.in(0).in(2)))._tf;
-    throw AA.unimpl();
+  // Return Scope for a name, so can be used to determine e.g. mutability
+  ScopeNode lookup_scope( String name ) {
+    if( name == null ) return null; // Handle null here, easier on parser
+    if( _scope.stk().exists(name) ) return _scope;
+    return _par == null ? null : _par.lookup_scope(name);
+  }
+  // Lookup, stopping at an If mini-scope
+  ScopeNode lookup_if( String name ) {
+    if( _if || _scope.stk().exists(name) ) return _scope;
+    return _par == null ? null : _par.lookup_scope(name);
   }
 
   // Name lookup is the same for all variables, including function defs (which
-  // are literally assigning a lambda to a ref).  Refs and Vars have a fixed
-  // type (so can, for instance, assign a new function to a var as long as the
-  // type signatures match).  Cannot re-assign to a ref, only var; vars only
-  // available in loops.  Only returns nodes registered with GVN.
-  public Node lookup( String token ) {
-    if( token == null ) return null; // Handle null here, easier on parser
-    // Lookup
-    Node n = _scope.get(token);
-    // Lookups stop at 1st hit - because shadowing is rare, and so will be
-    // handled when it happens and not on every lookup.  Shadowing is supported
-    // at name-insertion time, where all shadowed Nodes are inserted into the
-    // local ScopeNode first, and then new shadowing Nodes will replace
-    // shadowed nodes on a case-by-case basis.
-    if( n != null ) return n;
-    return _par == null ? null : _par.lookup(token);
+  // are literally assigning a lambda to a ref).  Only returns nodes registered
+  // with GVN.
+  public Node lookup( String name ) {
+    ScopeNode scope = lookup_scope(name);
+    return scope==null ? null : scope.get(name);
   }
+  // Test support, return top-level name type
+  static Type lookup_valtype( String name ) { return GVN.type(TOP.lookup(name)); }
 
   // Lookup the name.  If the result is an UnresolvedNode of functions, filter out all
   // the wrong-arg-count functions.  Only returns nodes registered with GVN.
-  Node lookup_filter( String token, GVNGCM gvn, int nargs ) {
-    Node n = lookup(token);
+  Node lookup_filter( String name, GVNGCM gvn, int nargs ) {
+    Node n = lookup(name);
     return n == null ? null : (n instanceof UnresolvedNode ? ((UnresolvedNode)n).filter(gvn,nargs) : n);
   }
 
-  // Type lookup
-  Type lookup_type( String token ) {
-    Type t = _scope.get_type(token);
+  // Update function name token to Node mapping in the current scope
+  Node add_fun( String name, Node val ) { return _scope.add_fun(name,(FunPtrNode)val); }
+
+
+  // Type lookup in any scope
+  Type lookup_type( String name ) {
+    Type t = _scope.get_type(name);
     if( t != null ) return t;
-    return _par == null ? null : _par.lookup_type(token);
+    return _par == null ? null : _par.lookup_type(name);
   }
-  boolean is_mutable( String name ) {
-    Integer ii = _scope.get_idx(name);
-    return ii == null ? _par.is_mutable(name) : _scope.is_mutable(ii);
-  }
+  // Update type name token to type mapping in the current scope
+  void add_type( String name, Type t ) { _scope.add_type(name,t); }
 
 }

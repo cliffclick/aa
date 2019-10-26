@@ -26,11 +26,11 @@ public class CProjNode extends ProjNode {
   // Return the op_prec of the returned value.  Not sensible except
   // when call on primitives.
   @Override public byte op_prec() { return _defs.at(0).op_prec(); }
-  
+
   // Used in Parser just after an if-test to sharpen the tested variables.
   // This is a mild optimization, since e.g. follow-on Loads which require a
   // non-nil check will hash to the pre-test Load, and so bypass this
-  // sharpening.  
+  // sharpening.
   @Override public Node sharpen( GVNGCM gvn, ScopeNode scope, ScopeNode arm ) {
     Node iff = in(0);
     if( !(iff instanceof IfNode) ) return this; // Already collapsed IfNode, no sharpen
@@ -39,7 +39,7 @@ public class CProjNode extends ProjNode {
     Node sharp = _idx==1
       ? gvn.xform(new CastNode(this,test,Type.NSCALR))
       : gvn.con(Type.NIL);
-    scope.sharpen(test,sharp,arm);
+    scope.stk().sharpen(test,sharp,arm.stk());
     unkeep(gvn);                // Remove self-hook
     return sharp;
   }

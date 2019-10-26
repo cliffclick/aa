@@ -249,8 +249,15 @@ public class TestNode {
     test1monotonic(new IntrinsicNode.ConvertPtrTypeName("test",from_ptr,to_ptr,null,_ins[1],_ins[2]));
     test1monotonic(new   LoadNode(_ins[0],_ins[1],_ins[2],0,null));
     test1monotonic(new MemMergeNode(_ins[1],_ins[2]));
-    test1monotonic(new    NewNode(new Node[]{null,_ins[1],_ins[2]},TypeStruct.POINT));
-    test1monotonic(new    NewNode(new Node[]{null,_ins[1],_ins[2]},TypeName.TEST_STRUCT));
+    NewNode nnn1 = new NewNode();
+    nnn1.add_fld("x",TypeFlt.FLT64,_ins[1],false);
+    nnn1.add_fld("y",TypeFlt.FLT64,_ins[2],false);
+    test1monotonic(nnn1);
+    NewNode nnn2 = new NewNode();
+    nnn2.add_fld("x",TypeFlt.FLT64,_ins[1],false);
+    nnn2.add_fld("y",TypeFlt.FLT64,_ins[2],false);
+    nnn2.set_name(_gvn,TypeName.TEST_STRUCT);
+    test1monotonic(nnn2);
     ((ConNode<Type>)_ins[1])._t = Type.SCALAR; // ParmNode reads this for _alltype
     test1monotonic(new   ParmNode( 1, "x",_ins[0],(ConNode)_ins[1],"badgc").add_def(_ins[2]));
     test1monotonic(new    PhiNode("badgc",_ins[0],_ins[1],_ins[2]));

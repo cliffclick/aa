@@ -577,6 +577,50 @@ anon fcn.  Can call in a loop, have millions of ctrs from the same anon fcn -
 which must therefore be the same alias, therefore ld/st required.
 
 
+Plan B:
+
+Keep ScopeNode, but remove most everything from it.  NewNode makes a Struct
+which includes finalness and field names.  But need to allow more fields like
+Scope does.  At Scope exit, NewNode allowed to be dead.
+
+NewNode produces a Tuple of TMP+field for every field.  Each ProjNode can go
+dead independently, matching dead field goes to XSCALAR.  When all proj fields
+die, NewNode goes to XMEM (even with MemMerge use).
+
+Phat memory useage "forgets" fields.  To remove single unused fields, need to
+explode out of phat memory.
+
+MemMerge takes a set of alias#s that are disjoint on input, in any order.
+Makes a full memory (all alias) cut.
+
+MemSplit - used to make the network cut obvious.  Tuples out various TypeStruct
+aliases.  Might as well be '_news' moved into TypeObj, since TypeArys also.
+Always keep the network split obvious.  Someway to say "all but these" or
+better "all but anti-list"; but a late-arriving NewNode has to be able to find
+the "all but" and add itself to the anti-list.  Maybe can do it in the Parser.
+
+For closures, all local vars actually talk to the scope-local NewNode, which
+can grow fields for a time.  Stops growing fields at scope exit.  Local var
+uses do Load & Store, which collapse against any NewNode including the scope-
+local one.  Scope-local NewNode available for inner scopes - this is the
+closure usage, and therefore serialize later stores against inner fun calls.
+Requires inner calls always take outer scope NewNode, and later optimize.
+
+MemMerge only used before calls to flatten everything.  Wired calls can switch
+to using some aliases instead of all, with the alts aliases going around the
+call.
+
+Calls not wired take all of memory, including scope-local News.  Can optimize
+against non-escaping aliases.  Wired calls can be more exact.
+
+Funs & Mem Parm - split into separate aliases by usage (not defs).  Pass-thru
+memories can be optimized by wired calls: direct from Ret/MemMerge/PhatMemParm.
+Bypass in the CallEpi Ideal.  Flag the bypassed aliases in the MemMerge... but
+somewhere else, perhaps the FunNode, for better assertions.
+
+Root Scope becomes Root New.  Fields are primitive names.  All "final", except
+can replace a prim funptr value with a Unresolved of the same name.
+
 
 
 ----

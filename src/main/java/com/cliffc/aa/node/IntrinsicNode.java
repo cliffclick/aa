@@ -153,8 +153,9 @@ public abstract class IntrinsicNode extends Node {
   // Default name constructor using expanded args list.  Just a NewNode but the
   // result is a named type.  Same as convertTypeName on an unaliased NewNode.
   public static FunPtrNode convertTypeNameStruct( TypeStruct from, TypeName to, GVNGCM gvn ) {
-    NewNode nnn = new NewNode(new Node[1],to);
-    TypeFunPtr tf = TypeFunPtr.make_new(TypeTuple.make(from._ts),nnn._ptr);
+    NewNode nnn = new NewNode();
+    nnn.set_name(gvn,to);
+    TypeFunPtr tf = TypeFunPtr.make_new(TypeTuple.make(from._ts),nnn.ptr());
     FunNode fun = (FunNode) gvn.xform(new FunNode(to._name,tf).add_def(Env.ALL_CTRL));
     Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
     Node memp= gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM     ),null));
@@ -162,7 +163,9 @@ public abstract class IntrinsicNode extends Node {
     for( int i=0; i<from._ts.length; i++ ) {
       String argx = from._flds[i];
       String argy = argx.equals(".") ? "arg"+i : argx;
-      nnn.add_def(gvn.xform(new ParmNode(i,argy,fun, gvn.con(from._ts[i]),null)));
+      Type t = from._ts[i];
+      boolean mutable = from._finals[i]==TypeStruct.frw();
+      nnn.add_fld(argy,t,gvn.xform(new ParmNode(i,argy,fun, gvn.con(t),null)),mutable);
     }
     Node nnn2 = gvn.xform(nnn);
     Node obj = gvn.xform(new OProjNode(nnn2,0));

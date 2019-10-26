@@ -7,88 +7,42 @@ import java.util.BitSet;
 import java.util.HashMap;
 import java.util.function.Predicate;
 
-// Lexical-Scope Node.  Maps defs to uses both via offset and name.  No (real)
-// uses, it's just a mapping function that keeps it's defs alive.
+// Lexical-Scope Node.  Tracks control & phat memory, plus a stack frame (which
+// is just a NewNode).  The stack frame maps local variable names to Nodes and
+// is modeled as a true memory indirection - for true closures.  Unless there
+// is an upwards funarg the stack frame will optimize away.
 public class ScopeNode extends Node {
-  // Mapping from names to def indices.  Named defs are added upfront and some
-  // unnamed defs are added & removed as part of parsing.  Named function defs
-  // point to ConNodes with a TypeFun constant (a single function), or maybe
-  // an Unresolved collection of overloaded functions.
-  private final HashMap<String, Integer> _vals;
-  private final BitSet _ms;     // True if mutable, indexed with input#
+
   // Mapping from type-variables to Types.  Types have a scope lifetime like values.
   private final HashMap<String,Type> _types; // user-typing type names
-  public ScopeNode() { super(OP_SCOPE); _vals = new HashMap<>(); _types = new HashMap<>(); _ms = new BitSet(); keep(); }
 
-  // Name to node lookup, or null
-  public Node get(String name) {
-    Integer ii = _vals.get(name);
-    return ii==null ? null : _defs.at(ii);
-  }
-  public Integer get_idx(String name) { return _vals.get(name); }
-
-  // Add a Node to an UnresolvedNode.  Must be a function ptr.
-  public FunPtrNode add_fun( String name, FunPtrNode ptr) {
-    Integer ii = _vals.get(name);
-    if( ii==null ) {
-      update(name,ptr,null,false);
-    } else {
-      Node n = _defs.at(ii);
-      if( n instanceof UnresolvedNode ) n.add_def(ptr);
-      else set_def(ii,new UnresolvedNode(n,ptr),null);
-    }
-    return ptr;
-  }
-
-  // Add or Update variable id token to Node mapping, mutable flag to allow
-  // stores.  GVN used for change worklist.
-  public Node update( String name, Node val, GVNGCM gvn, boolean mutable ) {
-    Integer ii = _vals.get(name);
-    if( ii==null ) {
-      int i=_defs._len;
-      _vals.put( name, i );
-      add_def(val);
-      if( mutable ) _ms.set(i);
-    } else {
-      int i=ii;
-      assert _ms.get(i) || val instanceof ErrNode;
-      set_def(i,val,gvn);
-      if( !mutable ) _ms.clear(i);
-    }
-    return val;
-  }
-
-  // Set value to null and return it, without deleting node
-  public Node remove( String name ) {
-    int idx = _vals.get(name); // NPE if name does not exist
-    Node n = in(idx);          // Get existing value
-    _defs.set(idx,null);       // Set to null, without deleting old
-    n._uses.del(n._uses.find(this));
-    return n;
-  }
-
-  // Name must exist
-  public boolean is_mutable( Integer ii ) { return _ms.get(ii); }
-
-  // The current local scope ends; delete local var refs.  Forward refs first
-  // found in this scope are assumed to be defined in some outer scope and get
-  // promoted.
-  public void promote_forward_del_locals(GVNGCM gvn, ScopeNode parent) {
-    for( String name : _vals.keySet() ) {
-      // control & memory & io survive alive to next outer scope
-      if( name.charAt(0)==' ' ) continue;
-      int idx = _vals.get(name);
-      Node n = in(idx);
-      if( n != null && parent != null && n.is_forward_ref() )
-        parent.update(name,n,null,false);
-      if( n != null ) gvn.add_work(n);
-      set_def(idx, null, gvn);
-      if( is_dead() ) return;
-    }
+  public ScopeNode(boolean early) {
+    super(OP_SCOPE,null,null,null);
+    if( early ) { add_def(null); add_def(null); add_def(null); }
+    _types = new HashMap<>();
+    keep();
   }
 
   // Add base types on startup
   public void init0() { Type.init0(_types); }
+
+  public    Node ctrl() { return in(0); }
+  public    Node mem () { return in(1); }
+  public NewNode stk () { return (NewNode)in(2); }
+  public void set_ctrl(   Node n, GVNGCM gvn) { set_def(0,n,gvn); }
+  public void set_mem (   Node n, GVNGCM gvn) { set_def(1,n,gvn); }
+  public void set_stk (NewNode n, GVNGCM gvn) { set_def(2,n,gvn); }
+
+  public Node get(String name) { return stk().get(name); }
+  public boolean exists(String name) { return get(name)!=null; }
+  public boolean is_mutable(String name) { return stk().is_mutable(name); }
+
+  public RegionNode early_ctrl() { return (RegionNode)in(3); }
+  public    PhiNode early_mem () { return (   PhiNode)in(4); }
+  public    PhiNode early_val () { return (   PhiNode)in(5); }
+
+  // Add a Node to an UnresolvedNode.
+  public FunPtrNode add_fun( String name, FunPtrNode ptr) { return stk().add_fun(name,ptr); }
 
   // Name to type lookup, or null
   public Type get_type(String name) { return _types.get(name);  }
@@ -100,150 +54,55 @@ public class ScopeNode extends Node {
     _types.put( name, t );
   }
 
-  /** Return a ScopeNode with all the variable indices at or past the idx;
-   *  remove them from 'this' ScopeNode.
-   *  @param idx index to split on
-   *  @param tmp A list of dull nodes, used to reverse sharpening after the if arm closes
-   *  @return a ScopeNode with the higher indices; 'this' has the lower indices.  null if no new vars
-   */
-  public ScopeNode split( int idx, TmpNode tmp, GVNGCM gvn ) {
-    // Recover old 'dull' values after a sharpening if-test ends.
-    for( int i=0; i<tmp._defs._len; i++ ) {
-      if( tmp.in(i) != null ) {
-        assert in(i) != tmp.in(i) && in(i) != null;
-        set_def(i,tmp.in(i),gvn);
-      }
-    }
-
-    int oldlen = _defs._len;
-    if( idx == oldlen ) return null; // No vars, no return
-    ScopeNode s = new ScopeNode();
-    while( _defs._len > idx ) {
-      int lidx = _defs._len-1;
-      for( String name : _vals.keySet() )
-        if( _vals.get(name)==lidx ) {
-          s.update(name,pop(),null,_ms.get(lidx));
-          _vals.remove(name);
-          _ms.clear(lidx);
-          break;
-        }
-    }
-    assert _defs._len+s._defs._len==oldlen;
-    return s;
-  }
-
-  // Add PhiNodes and variable mappings for common definitions merging at the
-  // end of an IfNode split.
-  // - Errors are ignored for dead vars (ErrNode inserted into graph as instead
-  //   of a syntax error)
-  // - Unknown forward refs must be unknown on both branches and be immutable
-  //   and will promote to the next outer scope.
-  // - First-time defs on either branch must be defined on both branches.
-  // - Both branches must agree on mutability
-  // - Ok to be mutably updated on only one arm
+  ///** Return a ScopeNode with all the variable indices at or past the idx;
+  // *  remove them from 'this' ScopeNode.
+  // *  @param idx index to split on
+  // *  @param tmp A list of dull nodes, used to reverse sharpening after the if arm closes
+  // *  @return a ScopeNode with the higher indices; 'this' has the lower indices.  null if no new vars
+  // */
+  //public ScopeNode split( int idx, TmpNode tmp, GVNGCM gvn ) {
+  //  // Recover old 'dull' values after a sharpening if-test ends.
+  //  for( int i=0; i<tmp._defs._len; i++ ) {
+  //    if( tmp.in(i) != null ) {
+  //      assert in(i) != tmp.in(i) && in(i) != null;
+  //      set_def(i,tmp.in(i),gvn);
+  //    }
+  //  }
+  //
+  //  int oldlen = _defs._len;
+  //  if( idx == oldlen ) return null; // No vars, no return
+  //  ScopeNode s = new ScopeNode();
+  //  while( _defs._len > idx ) {
+  //    int lidx = _defs._len-1;
+  //    for( String name : _vals.keySet() )
+  //      if( _vals.get(name)==lidx ) {
+  //        s.update(name,pop(),null,_ms.get(lidx));
+  //        _vals.remove(name);
+  //        _ms.clear(lidx);
+  //        break;
+  //      }
+  //  }
+  //  assert _defs._len+s._defs._len==oldlen;
+  //  return s;
+  //}
+  
   public void common( Parse P, GVNGCM gvn, String phi_errmsg, ScopeNode t, ScopeNode f, Node dull, Node t_sharp, Node f_sharp ) {
-    // Unwind the sharpening
-    for( String name : _vals.keySet() ) {
-      int idx = _vals.get(name);
-      if( in(idx)==dull && t.in(idx)==t_sharp ) t._vals.remove(name);
-      if( in(idx)==dull && f.in(idx)==f_sharp ) f._vals.remove(name);
-    }
-    for( int i=1; i<_defs._len; i++ ) {
-      if( in(i)==dull && t.in(i)==t_sharp ) t.set_def(i,null,gvn);
-      if( in(i)==dull && f.in(i)==f_sharp ) f.set_def(i,null,gvn);
-    }
-    // Look for updates on either arm
-    for( String name : t._vals.keySet() )
-      if( f._vals.get(name) == null ) // If not on false side
-        do_one_side(name,P,gvn,phi_errmsg,t,true);
-      else
-        do_both_sides(name,P,gvn,phi_errmsg,t,f);
-    for( String name : f._vals.keySet() )
-      if( t._vals.get(name) == null ) // If not on true side
-        do_one_side(name,P,gvn,phi_errmsg,f,false);
+    stk().common(P,gvn,phi_errmsg,t.stk(),f.stk(),dull,t_sharp,f_sharp);
+    set_mem(gvn.xform(new PhiNode(null,P.ctrl(),t.mem(),f.mem())),gvn);
   }
 
-
-  // Called per name defined on only one arm of a trinary.
-  // Produces the merge result.
-  private void do_one_side(String name, Parse P, GVNGCM gvn, String phi_errmsg, ScopeNode x, boolean arm) {
-    int xii = x._vals.get(name);
-    boolean x_is_mutable = x._ms.get(xii);
-    Node xn = x.in(xii), yn;
-    boolean search = P.lookup(name)!=null;
-
-    // Forward refs are not really a def, but produce a trackable definition
-    // that must be immutable, and will eventually get promoted until it
-    // reaches a scope where it gets defined.
-    if( xn.is_forward_ref() ) { assert !x_is_mutable; update(name,xn,gvn,false); return; }
-
-    // Check for mixed-mode updates.  'name' must be either fully mutable or
-    // fully immutable at the merge point (or dead afterwards).  Since x was
-    // updated on this branch, the variable was mutable beforehand.  Since it
-    // was mutable and not changed on the other side, it remains mutable.
-    if( (yn = P.lookup(name)) == null ) // Find the prior definition.
-      yn = fail(name,P,gvn,arm,xn,"defined");
-    else if( !x_is_mutable )        // x-side is final but y-side is mutable.
-      yn = fail(name,P,gvn,arm,xn,"final");
-
-    P.update(name,xn==yn ? xn : P.gvn(new PhiNode(phi_errmsg, P.ctrl(),xn,yn)),gvn,x_is_mutable,search);
-  }
-
-  private Node fail(String name, Parse P, GVNGCM gvn, boolean arm, Node xn, String msg) {
-    return P.err_ctrl1("'"+name+"' not "+msg+" on "+!arm+" arm of trinary",gvn.type(xn).widen());
-  }
-
-  // Called per name defined on both arms of a trinary.
-  // Produces the merge result.
-  private void do_both_sides(String name, Parse P, GVNGCM gvn, String phi_errmsg, ScopeNode t, ScopeNode f) {
-    int tii = t._vals.get(name);
-    int fii = f._vals.get(name);
-    if( tii==0 && fii==0 ) return; // Control handled differently
-    boolean t_is_mutable = t._ms.get(tii);
-    boolean f_is_mutable = f._ms.get(fii);
-    Node tn = t.in(tii);
-    Node fn = f.in(fii);
-
-    if( tn != null && tn.is_forward_ref() ) {
-      assert !t_is_mutable;
-      if( fn.is_forward_ref() ) {
-        assert !f_is_mutable;
-        throw AA.unimpl(); // Merge/U-F two forward refs
-      }
-      update(name,P.err_ctrl1("'"+name+"' not defined on "+true+" arm of trinary",gvn.type(fn).widen()),gvn,false);
-      return;
+  // Wire up an early-function-exit path
+  public Node early_exit( Parse P, Node val ) {
+    assert early();
+    if( early_ctrl() == null ) {
+      String phi_errmsg = P.phi_errmsg();
+      set_def(3,new RegionNode        ((Node)null),P._gvn);
+      set_def(4,new PhiNode(phi_errmsg,(Node)null),P._gvn);
+      set_def(5,new PhiNode(phi_errmsg,(Node)null),P._gvn);
     }
-    if( fn != null && fn.is_forward_ref() ) {
-      update(name,P.err_ctrl1("'"+name+"' not defined on "+false+" arm of trinary",gvn.type(tn).widen()),gvn,false);
-      return;
-    }
-
-    // Check for mixed-mode updates.  'name' must be either fully mutable
-    // or fully immutable at the merge point (or dead afterwards).
-    if( t_is_mutable != f_is_mutable ) {
-      update(name,P.err_ctrl1(" is only partially mutable",gvn.type(tn).widen()),gvn,false);
-      return;
-    }
-
-    update(name,tn==fn ? fn : P.gvn(new PhiNode(phi_errmsg, P.ctrl(),tn,fn)),gvn,t_is_mutable);
+    return P.do_exit(early_ctrl(),early_mem(),early_val(),val);
   }
-
-  // Replace uses of dull with sharp, used after an IfNode test
-  void sharpen( Node dull, Node sharp, ScopeNode arm ) {
-    assert dull != sharp;
-    // CNC: New scopes now come with 2 pre-cooked inputs, up from 1.
-    // Not the right invariant, need to lose the "2".
-    for( int i=2; i<_defs._len; i++ ) // Fill in all fields
-      arm.add_def(in(i)==dull ? sharp : null);
-    // Update sharpen value lookup
-    for( String name : _vals.keySet() ) {
-      int idx = _vals.get(name);
-      if( in(idx)==dull ) {
-        arm._vals.put(name,idx);
-        if( _ms.get(idx) ) arm._ms.set(idx);
-      }
-    }
-  }
+  public boolean early() { return _defs._len==6; }
 
   @Override public Node ideal(GVNGCM gvn) { return null; }
   @Override public Type value(GVNGCM gvn) { return all_type(); }
