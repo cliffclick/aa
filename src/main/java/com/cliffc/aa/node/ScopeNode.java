@@ -18,7 +18,7 @@ public class ScopeNode extends Node {
 
   public ScopeNode(boolean early) {
     super(OP_SCOPE,null,null,null);
-    if( early ) { add_def(null); add_def(null); add_def(null); }
+    if( early ) { add_def(null); add_def(null); add_def(null); } // Wire up an early-function-exit path
     _types = new HashMap<>();
     keep();
   }
@@ -40,6 +40,7 @@ public class ScopeNode extends Node {
   public RegionNode early_ctrl() { return (RegionNode)in(3); }
   public    PhiNode early_mem () { return (   PhiNode)in(4); }
   public    PhiNode early_val () { return (   PhiNode)in(5); }
+  public void       early_kill() { pop(); pop(); pop(); }
 
   // Add a Node to an UnresolvedNode.
   public FunPtrNode add_fun( String name, FunPtrNode ptr) { return stk().add_fun(name,ptr); }
@@ -85,23 +86,12 @@ public class ScopeNode extends Node {
   //  assert _defs._len+s._defs._len==oldlen;
   //  return s;
   //}
-  
-  public void common( Parse P, GVNGCM gvn, String phi_errmsg, ScopeNode t, ScopeNode f, Node dull, Node t_sharp, Node f_sharp ) {
+
+  public void common( Parse P, GVNGCM gvn, Parse phi_errmsg, ScopeNode t, ScopeNode f, Node dull, Node t_sharp, Node f_sharp ) {
     stk().common(P,gvn,phi_errmsg,t.stk(),f.stk(),dull,t_sharp,f_sharp);
     set_mem(gvn.xform(new PhiNode(null,P.ctrl(),t.mem(),f.mem())),gvn);
   }
 
-  // Wire up an early-function-exit path
-  public Node early_exit( Parse P, Node val ) {
-    assert early();
-    if( early_ctrl() == null ) {
-      String phi_errmsg = P.phi_errmsg();
-      set_def(3,new RegionNode        ((Node)null),P._gvn);
-      set_def(4,new PhiNode(phi_errmsg,(Node)null),P._gvn);
-      set_def(5,new PhiNode(phi_errmsg,(Node)null),P._gvn);
-    }
-    return P.do_exit(early_ctrl(),early_mem(),early_val(),val);
-  }
   public boolean early() { return _defs._len==6; }
 
   @Override public Node ideal(GVNGCM gvn) { return null; }

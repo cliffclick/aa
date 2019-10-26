@@ -259,8 +259,8 @@ public class TestNode {
     nnn2.set_name(_gvn,TypeName.TEST_STRUCT);
     test1monotonic(nnn2);
     ((ConNode<Type>)_ins[1])._t = Type.SCALAR; // ParmNode reads this for _alltype
-    test1monotonic(new   ParmNode( 1, "x",_ins[0],(ConNode)_ins[1],"badgc").add_def(_ins[2]));
-    test1monotonic(new    PhiNode("badgc",_ins[0],_ins[1],_ins[2]));
+    test1monotonic(new   ParmNode( 1, "x",_ins[0],(ConNode)_ins[1],null).add_def(_ins[2]));
+    test1monotonic(new    PhiNode(null,_ins[0],_ins[1],_ins[2]));
     for( PrimNode prim : PrimNode.PRIMS )
       test1monotonic_prim(prim);
     test1monotonic(new   ProjNode(_ins[0],1));

@@ -2,16 +2,17 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.Type;
 
 // Merge results; extended by ParmNode
 public class PhiNode extends Node {
-  final String _badgc;
-  public PhiNode( String badgc, Node... vals ) {
+  final Parse _badgc;
+  public PhiNode( Parse badgc, Node... vals ) {
     super(OP_PHI,vals);
     _badgc = badgc;
   }
-  PhiNode( byte op, Node fun, ConNode defalt, String badgc ) { super(op,fun,defalt); _badgc = badgc; } // For ParmNodes
+  PhiNode( byte op, Node fun, ConNode defalt, Parse badgc ) { super(op,fun,defalt); _badgc = badgc; } // For ParmNodes
   @Override public Node ideal(GVNGCM gvn) {
     if( gvn.type(in(0)) == Type.XCTRL ) return null;
     RegionNode r = (RegionNode) in(0);
@@ -40,4 +41,11 @@ public class PhiNode extends Node {
     return t;                   // Limit to sane results
   }
   @Override public Type all_type() { return Type.ALL; }
+  @Override public String err(GVNGCM gvn) {
+    if( !(in(0) instanceof FunNode && ((FunNode)in(0))._name.equals("!") ) && // Specifically "!" takes a Scalar
+        (gvn.type(this).contains(Type.SCALAR) ||
+         gvn.type(this).contains(Type.NSCALR)) ) // Cannot have code that deals with unknown-GC-state
+      return _badgc.errMsg("Cannot mix GC and non-GC types");
+    return null;
+  }
 }

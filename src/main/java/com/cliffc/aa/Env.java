@@ -72,7 +72,7 @@ public class Env implements AutoCloseable {
 
   // Wire up an early function exit
   Node early_exit( Parse P, Node val ) {
-    return _scope.early() ? _scope.early_exit(P,val) : _par.early_exit(P,val);
+    return _scope.early() ? P.do_exit(_scope,val) : _par.early_exit(P,val); // Hunt for an early-exit-enabled scope
   }
 
   // Close the current Env and lexical scope.

@@ -171,6 +171,7 @@ public class Parse {
     _gvn._opt_mode = 0;
     Node res = stmts();
     if( res == null ) res = con(Type.ANY);
+    res = merge_exits(res);
     _e._scope.add_def(res);       // Hook result
   }
 
@@ -355,7 +356,7 @@ public class Parse {
       ctrls.add_def(ctrl()); // 4 - hook false-side control
       _e = e_if;             // Pop the arms scope
       set_ctrl(init(new RegionNode(null,ctrls.in(2),ctrls.in(4))));
-      String phi_errmsg = phi_errmsg();
+      Parse phi_errmsg = errMsg();
       if_scope.common(this, _gvn,phi_errmsg,t_scope,f_scope,expr,t_sharp,f_sharp); // Add a PhiNode for all commonly defined variables
       res = gvn(new PhiNode(phi_errmsg,ctrl(),ctrls.in(1),ctrls.in(3))).keep(); // Add a PhiNode for the result, hook to prevent deletion
       t_sharp.unkeep(_gvn);
@@ -610,7 +611,7 @@ public class Parse {
     try( Env e = new Env(_e,true,false) ) {// Nest an environment for the local vars
       _e = e;                   // Push nested environment
       set_ctrl(fun);            // New control is function head
-      String errmsg = errMsg("Cannot mix GC and non-GC types");
+      Parse errmsg = errMsg();  // Lazy error message
       int cnt=0;                // Add parameters to local environment
       for( int i=0; i<ids._len; i++ ) {
         Node parm = gvn(new ParmNode(cnt++,ids.at(i),fun,con(Type.SCALAR),errmsg));
@@ -636,17 +637,35 @@ public class Parse {
 
   private Node merge_exits(Node rez) {
     ScopeNode s = _e._scope;
-    assert s.early();
-    s.early_exit(this,rez);
-    Node ctrl = init(s.early_ctrl()).keep();
-    Node mem  = s.early_mem();
-    Node val  = s.early_val();
-    mem.set_def(0,ctrl,_gvn);
-    val.set_def(0,ctrl,_gvn);
-    set_mem(gvn(mem));
-    rez = gvn(val);
-    set_ctrl(ctrl.unhook());
-    return rez;
+    Node ctrl = s.early_ctrl();
+    Node mem  = s.early_mem ();
+    Node val  = s.early_val ();
+    s.early_kill();
+    if( ctrl == null ) return rez; // No other exits to merge into
+    set_ctrl(ctrl=init(ctrl.add_def(ctrl())));
+    mem.set_def(0,ctrl,null);
+    val.set_def(0,ctrl,null);
+    set_mem (gvn(mem.add_def(mem())));
+    return   gvn(val.add_def(rez  )) ;
+  }
+
+  // Merge this early exit path into all early exit paths being recorded in the
+  // current Env/Scope.
+  Node do_exit( ScopeNode s, Node rez ) {
+    Node ctrl = s.early_ctrl();
+    Node mem  = s.early_mem ();
+    Node val  = s.early_val ();
+    if( ctrl == null ) {
+      s.set_def(3,ctrl=new RegionNode(  (Node)null),null);
+      s.set_def(4,mem =new PhiNode(null,(Node)null),null);
+      s.set_def(5,val =new PhiNode(null,(Node)null),null);
+    }
+    ctrl.add_def(ctrl());
+    mem .add_def(mem ());
+    val .add_def(rez   );
+    set_ctrl(con(Type.XCTRL  ));
+    set_mem (con(TypeMem.XMEM));
+    return   con(Type.NIL    ) ;
   }
 
   /** Parse anonymous struct; the opening "@{" already parsed.  Next comes
@@ -1001,17 +1020,6 @@ public class Parse {
     return ptr;
   }
 
-  // Merge this early exit path into all early exit paths being recorded in the
-  // current Env/Scope.
-  public Node do_exit(RegionNode r, PhiNode mem, PhiNode val, Node rez) {
-    r  .add_def(ctrl());
-    mem.add_def(mem());
-    val.add_def(rez);
-    set_ctrl(con(Type.XCTRL));
-    set_mem (con(TypeMem.XMEM));
-    return   con(Type.NIL);
-  }
-
   // Whack current control with a syntax error
   private ErrNode err_ctrl2( String s ) { return err_ctrl1(s,Type.SCALAR); }
   public  ErrNode err_ctrl1(String s, Type t) { return init(new ErrNode(Env.START,errMsg(s),t)); }
@@ -1042,7 +1050,6 @@ public class Parse {
     String name = fun._name;
     return errMsg("Unknown ref '"+name+"'");
   }
-  public String phi_errmsg() { return errMsg("Cannot mix GC and non-GC types"); }
 
   // Build a string of the given message, the current line being parsed,
   // and line of the pointer to the current index.

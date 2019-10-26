@@ -134,7 +134,7 @@ public class NewNode extends Node {
   // - First-time defs on either branch must be defined on both branches.
   // - Both branches must agree on mutability
   // - Ok to be mutably updated on only one arm
-  public void common( Parse P, GVNGCM gvn, String phi_errmsg, NewNode t, NewNode f, Node dull, Node t_sharp, Node f_sharp ) {
+  public void common( Parse P, GVNGCM gvn, Parse phi_errmsg, NewNode t, NewNode f, Node dull, Node t_sharp, Node f_sharp ) {
     // Unwind the sharpening
     for( int i=1; i<_defs._len; i++ ) {
       if( in(i)==dull && t.in(i)==t_sharp ) t.set_def(i,null,gvn);
@@ -161,7 +161,7 @@ public class NewNode extends Node {
 
   // Called per name defined on only one arm of a trinary.
   // Produces the merge result.
-  private void do_one_side(String name, Parse P, GVNGCM gvn, String phi_errmsg, NewNode x, boolean arm) {
+  private void do_one_side(String name, Parse P, GVNGCM gvn, Parse phi_errmsg, NewNode x, boolean arm) {
     int xii = x._ts.find(name,-1);
     boolean x_is_mutable = x._ts._finals[xii] == TypeStruct.frw();
     Node xn = x.in(def_idx(xii)), yn;
@@ -191,7 +191,7 @@ public class NewNode extends Node {
 
   // Called per name defined on both arms of a trinary.
   // Produces the merge result.
-  private void do_both_sides(String name, Parse P, GVNGCM gvn, String phi_errmsg, NewNode t, NewNode f) {
+  private void do_both_sides(String name, Parse P, GVNGCM gvn, Parse phi_errmsg, NewNode t, NewNode f) {
     int tii = t._ts.find(name,-1);
     int fii = f._ts.find(name,-1);
     boolean t_is_mutable = t._ts._finals[tii] == TypeStruct.frw();

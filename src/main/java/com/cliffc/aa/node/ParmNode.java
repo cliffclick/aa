@@ -1,13 +1,14 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.Type;
 
 // Function parameter node; just a Phi with a name
 public class ParmNode extends PhiNode {
   final int _idx;             // Parameter index, zero-based; -1 reserved for RPC, -2 for mem
   private final String _name; // Parameter name
-  public ParmNode( int idx, String name, Node fun, ConNode defalt, String badgc) {
+  public ParmNode( int idx, String name, Node fun, ConNode defalt, Parse badgc) {
     super(OP_PARM,fun,defalt,badgc);
     _idx=idx;
     _name=name;

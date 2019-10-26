@@ -310,15 +310,13 @@ public abstract class Node implements Cloneable {
   }
 
   // Gather errors; forwards reachable data uses only
+  // TODO: Moved error to PhiNode.err
   public void walkerr_gc( Ary<String> errs, BitSet bs, GVNGCM gvn ) {
     if( bs.get(_uid) ) return;  // Been there, done that
     bs.set(_uid);               // Only walk once
     if( is_uncalled(gvn) ) return; // FunPtr is a constant, but never executed, do not check for errors
-    if( this instanceof PhiNode &&
-        !(in(0) instanceof FunNode && ((FunNode)in(0))._name.equals("!") ) && // Specifically "!" takes a Scalar
-        (gvn.type(this).contains(Type.SCALAR) ||
-         gvn.type(this).contains(Type.NSCALR)) ) // Cannot have code that deals with unknown-GC-state
-      errs.add(((PhiNode)this)._badgc);
+    String msg = this instanceof PhiNode ? err(gvn) : null;
+    if( msg != null ) errs.add(msg);
     for( int i=0; i<_defs._len; i++ )
       if( in(i) != null ) in(i).walkerr_gc(errs,bs,gvn);
   }

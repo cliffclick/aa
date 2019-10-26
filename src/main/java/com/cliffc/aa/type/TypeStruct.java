@@ -251,7 +251,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // Extend the current struct with a new named field
   public TypeStruct add_fld( String name, Type t, boolean mutable ) {
     assert t.isa(SCALAR) && (name==null || find(name,-1)==-1);
-    
+
     Type  []   ts = Arrays.copyOfRange(_ts    ,0,_ts    .length+1);
     String[] flds = Arrays.copyOfRange(_flds  ,0,_flds  .length+1);
     byte[] finals = Arrays.copyOfRange(_finals,0,_finals.length+1);
