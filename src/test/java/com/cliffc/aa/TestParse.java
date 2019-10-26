@@ -16,6 +16,8 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
     Object dummy = Env.GVN; // Force class loading cycle
+    test_ptr("(0,1,2)",
+            (alias)-> TypeMemPtr.make(alias,TypeStruct.make_tuple(alias,Type.NIL,TypeInt.con(1),TypeInt.con(2))));
 
     // A collection of tests which like to fail easily
     testerr ("Point=:@{x,y}; Point((0,1))", "*[$](nil,1) is not a *[$]@{x=,y=}",27);
@@ -161,7 +163,7 @@ public class TestParse {
     test("x=3; mul2={x -> x*2}; mul2(2.1)", TypeFlt.con(2.1*2.0)); // must inline to resolve overload {*}:Flt with I->F conversion
     test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
     test("sq={x -> x*x}; sq 2.1", TypeFlt.con(4.41)); // No () required for single args
-    testerr("sq={x -> x&x}; sq(\"abc\")", "*[$]\"abc\" is not a int64",12);
+    testerr("sq={x -> x&x}; sq(\"abc\")", "*[$]\"abc\" is not a int64",24);
     testerr("sq={x -> x*x}; sq(\"abc\")", "*[$]\"abc\" is not a flt64",12);
     testerr("f0 = { f x -> f0(x-1) }; f0({+},2)", "Passing 1 arguments to f0={->} which takes 2 arguments",21);
     // Recursive:
@@ -546,7 +548,7 @@ public class TestParse {
   }
 
   /** Closures
-  
+
 Hidden variable 'cnt' inside outer closure.
 Return two functions in a tuple, one increments cnt, the other gets it.
     > (inc, get) = { cnt=0; ({cnt++;0},{cnt}) }()
@@ -587,17 +589,18 @@ NewNode produces a Tuple of TMP+field for every field.  Each ProjNode can go
 dead independently, matching dead field goes to XSCALAR.  When all proj fields
 die, NewNode goes to XMEM (even with MemMerge use).
 
-Phat memory useage "forgets" fields.  To remove single unused fields, need to
+Phat memory usage "forgets" fields.  To remove single unused fields, need to
 explode out of phat memory.
 
-MemMerge takes a set of alias#s that are disjoint on input, in any order.
-Makes a full memory (all alias) cut.
+(more precise memory handling: 2 layer split/join)
+MemSplit - tuples out whole aliases#s using a AliasProj.  Can be bulk (BitsAlias).
+FldSplit - tuples out fields from an alias; uses FieldProj.  Has a bulk field variant.
+FldMerge - collects complete field updates to form a complete alias type.
+MemMerge - collects complere alias updates to form total memory.
 
-MemSplit - used to make the network cut obvious.  Tuples out various TypeStruct
-aliases.  Might as well be '_news' moved into TypeObj, since TypeArys also.
-Always keep the network split obvious.  Someway to say "all but these" or
-better "all but anti-list"; but a late-arriving NewNode has to be able to find
-the "all but" and add itself to the anti-list.  Maybe can do it in the Parser.
+NewNode - produces alias# that is further exactly not any other instance of the same alias#.
+MemMerge - can accept a NewNode input that overlaps with same alias#; NewNode is now "confused".
+
 
 For closures, all local vars actually talk to the scope-local NewNode, which
 can grow fields for a time.  Stops growing fields at scope exit.  Local var

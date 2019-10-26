@@ -39,7 +39,7 @@ public class CProjNode extends ProjNode {
     Node sharp = _idx==1
       ? gvn.xform(new CastNode(this,test,Type.NSCALR))
       : gvn.con(Type.NIL);
-    scope.stk().sharpen(test,sharp,arm.stk());
+    scope.stk().sharpen(gvn,test,sharp,arm.stk());
     unkeep(gvn);                // Remove self-hook
     return sharp;
   }

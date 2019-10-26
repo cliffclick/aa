@@ -328,11 +328,14 @@ public class GVNGCM {
   public void replace( Node old, Node nnn ) {
     while( old._uses._len > 0 ) {
       Node u = old._uses.del(0);  // Old use
-      _vals.remove(u); // Use is about to change edges; remove from type table
-      u._defs.set(u._defs.find(old),nnn); // was old now nnn
+      boolean was = touched(u);
+      _vals.remove(u);  // Use is about to change edges; remove from type table
+      u._defs.replace(old,nnn); // was old now nnn
       nnn._uses.add(u);
-      _vals.put(u,u);        // Back in the table, since its still in the graph
-      add_work(u);           // And put on worklist, to get re-visited
+      if( was ) {            // If was in GVN
+        _vals.put(u,u);      // Back in the table, since its still in the graph
+        add_work(u);         // And put on worklist, to get re-visited
+      }
     }
   }
 

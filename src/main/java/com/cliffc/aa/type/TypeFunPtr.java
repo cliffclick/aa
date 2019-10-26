@@ -30,7 +30,7 @@ import com.cliffc.aa.util.VBitSet;
 //         Type of Epilog is a Code-pointer (a TFP no sig).
 //         CallNodes need to get arg types from the fidx->FunNode path.
 // Probably unwind most changes, get back to parse1-6 working.
-// 
+//
 public final class TypeFunPtr extends Type<TypeFunPtr> {
   // List of known functions in set, or 'flip' for choice-of-functions.
   private BitsFun _fidxs;       // Known function bits
@@ -74,7 +74,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   private static final TypeFunPtr TEST_INEG = make(BitsFun.make0(2),TypeTuple.INT64,TypeInt.INT64);
   public  static final TypeFunPtr EMPTY = make(BitsFun.EMPTY,TypeTuple.ALL_ARGS,Type.XSCALAR);
   static final TypeFunPtr[] TYPES = new TypeFunPtr[]{GENERIC_FUNPTR,TEST_INEG};
-  
+
   @Override protected TypeFunPtr xdual() { return new TypeFunPtr(_fidxs.dual(),_args.dual(),_ret.dual()); }
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
@@ -102,7 +102,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public int fidx() { return _fidxs.getbit(); } // Asserts internally single-bit
   public Type arg(int idx) { return _args.at(idx); }
   public boolean is_class() { return _fidxs.is_class(); }
-  
+
   // QQQ - Function args below center when the TFP is above center.
   @Override public boolean above_center() { return /*QQQ*/_args.above_center(); }
   @Override public boolean may_be_con()   { return above_center() || is_con(); }

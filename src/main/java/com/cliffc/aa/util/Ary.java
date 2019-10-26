@@ -71,6 +71,20 @@ public class Ary<E> implements Iterable<E> {
     return tmp;
   }
 
+  /** Element removal, using '=='.  Does not preserve order.
+   *  @param e element to be removed
+   *  @return element removed */
+  public E del( E e ) {
+    for( int i=0; i<_len; i++ ) {
+      E tmp = _es[i];
+      if( tmp==e ) {
+        _es[i]=_es[--_len];
+        return tmp;
+      }
+    }
+    return null;
+  }
+
   /** Slow, linear-time, element removal.  Preserves order.
    *  @param i element to be removed 
    *  @return element removed */
@@ -160,6 +174,15 @@ public class Ary<E> implements Iterable<E> {
     for( int i=0; i<_len; i++ )  if( P.test(_es[i]) )  return i;
     return -1;
   }
+  /** Find and replace the first matching element using ==.
+   *  @param old Element to find
+   *  @param nnn Element replacing old
+   *  @return true if replacement happened */
+  public boolean replace( E old, E nnn ) {
+    for( int i=0; i<_len; i++ )  if( _es[i]==old )  { _es[i]=nnn; return true; }
+    return false;
+  }
+
 
   /** Merge-Or.  Merge 2 sorted Arys, tossing out duplicates.  Return a new
    *  sorted Ary with the merged list.  Undefined if the original arrays are

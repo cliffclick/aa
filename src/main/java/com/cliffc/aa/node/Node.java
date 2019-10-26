@@ -60,7 +60,7 @@ public abstract class Node implements Cloneable {
   }
   private Node unuse( Node old, GVNGCM gvn ) {
     if( old != null ) {
-      old._uses.del(old._uses.find(this));
+      old._uses.del(this);
       if( old._uses._len==0 && old._keep==0 ) gvn.kill(old); // Recursively begin deleting
       if( (!old.is_dead() && old.is_multi_head() && is_multi_tail()) ||
           old.ideal_impacted_by_losing_uses() )
@@ -76,7 +76,7 @@ public abstract class Node implements Cloneable {
   // NOT preserve order.
   public Node del( int idx ) {
     Node n = _defs.del(idx);
-    if( n != null ) n._uses.del(n._uses.find(this));
+    if( n != null ) n._uses.del(this);
     return n;
   }
   public Node pop( ) { return del(_defs._len-1); }

@@ -174,6 +174,9 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   int getbit() { assert _bits==null; return _con; }
   public int abit() { return _bits==null ? _con : -1; }
   public boolean above_center() { return _con<0; }
+  public boolean is_con() {
+    return _bits==null || (_bits.length==1 && _bits[0]==0);
+  }
   boolean may_nil() { return _con==0 || (_con==-1 && _bits != null && ((_bits[0]&1) == 1)); }
   // Add a nil
   @SuppressWarnings("unchecked")

@@ -316,7 +316,7 @@ public class Parse {
         Node n = scope.stk().get(tok);     // Get prior binding
         boolean is_mutable = scope.stk().is_mutable(tok);
         if( n.is_forward_ref() ) { // Prior is actually a forward-ref, so this is the def
-          assert !is_mutable;
+          assert !is_mutable && scope == _e._scope;
           ((FunPtrNode)n).merge_ref_def(_gvn,tok,(FunPtrNode)ifex);
         } else if( is_mutable ) { // Mutate if mutable
           ScopeNode scope_if = _e.lookup_if(tok);  // (re-)assign in scope or enclosing If mini-scope

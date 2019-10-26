@@ -227,21 +227,11 @@ public class NewNode extends Node {
   }
 
   // Replace uses of dull with sharp, used after an IfNode test
-  void sharpen( Node dull, Node sharp, NewNode arm ) {
+  void sharpen( GVNGCM gvn, Node dull, Node sharp, NewNode arm ) {
     assert dull != sharp;
-    for( int i=1; i<_defs._len; i++ ) // Fill in all fields
-      if( in(i)==dull )
-        throw AA.unimpl();
-      //arm.add_fld
-      //arm.add_def(in(i)==dull ? sharp : null);
-    // Update sharpen value lookup
-    //for( String name : _vals.keySet() ) {
-    //  int idx = _vals.get(name);
-    //  if( in(idx)==dull ) {
-    //    arm._vals.put(name,idx);
-    //    if( _ms.get(idx) ) arm._ms.set(idx);
-    //  }
-    //}
+    for( int i=0; i<_ts._ts.length; i++ ) // Fill in all fields
+      if( in(def_idx(i))==dull )
+        arm.add_fld(_ts._flds[i],gvn.type(sharp),sharp,_ts._finals[i]==TypeStruct.frw());
   }
 
   @Override public Node ideal(GVNGCM gvn) { return null; }
@@ -252,7 +242,7 @@ public class NewNode extends Node {
     Type[] ts = new Type[_ts._ts.length];
     for( int i=0; i<_ts._ts.length; i++ ) {
       Type t = ts[i] = gvn.type(fld(i));
-      assert _ts.at(i).dual().isa(t) && t.isa(_ts.at(i));
+      assert _ts.at(i)==t || (_ts.at(i).dual().isa(t) && t.isa(_ts.at(i)));
     }
     TypeStruct newt = TypeStruct.make(_ts._flds,ts,_ts._finals,_alias);
 
