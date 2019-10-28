@@ -69,7 +69,8 @@ public abstract class Node implements Cloneable {
     return this;
   }
   public Node   keep(          ) { _keep++;  return this; }
-  public Node unhook(          ) { _keep--;  return this; }
+  @SuppressWarnings("unchecked")
+  public <N extends Node> N unhook() { _keep--;  return (N)this; }
   public void unkeep(GVNGCM gvn) { _keep--;  if( _keep==0 && _uses._len==0 ) gvn.kill(this); }
   // Return Node at idx, withOUT auto-deleting it, even if this is the last
   // use.  Used by the parser to retrieve final Nodes from tmp holders.  Does

@@ -89,7 +89,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     BitsAlias a0 = aliases.strip_nil();
     if( a0 == ts._news ) return obj; // All good
     assert aliases.is_contained(ts._news); // narrow pointer, pointing at wide structure.
-    TypeStruct nts = ts.make(a0); // Make a narrower structure
+    TypeStruct nts = ts.make(ts._any,a0); // Make a narrower structure
     return obj.make_base(nts);    // Rewrap with any 'Name' wrappers
   }
 
@@ -178,6 +178,16 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   @Override boolean contains( Type t, VBitSet bs ) { return _obj == t || _obj.contains(t, bs); }
   @SuppressWarnings("unchecked")
   @Override int depth( NonBlockingHashMapLong<Integer> ds ) { return _obj.depth(ds); }
+  // Lattice of conversions:
+  // -1 unknown; top; might fail, might be free (Scalar->Int); Scalar might lift
+  //    to e.g. Float and require a user-provided rounding conversion from F64->Int.
+  //  0 requires no/free conversion (Int8->Int64, F32->F64)
+  // +1 requires a bit-changing conversion (Int->Flt)
+  // 99 Bottom; No free converts; e.g. Flt->Int requires explicit rounding
+  public byte isBitShape(Type t) {
+    if( t instanceof TypeMemPtr ) return _obj.isBitShape(((TypeMemPtr)t)._obj);
+    return -99;                              // Mixing TMP and a non-ptr
+  }
   @SuppressWarnings("unchecked")
   @Override void walk( Predicate<Type> p ) { if( p.test(this) ) _obj.walk(p); }
   @Override TypeStruct repeats_in_cycles(TypeStruct head, VBitSet bs) { return _cyclic ? _obj.repeats_in_cycles(head,bs) : null; }

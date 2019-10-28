@@ -10,12 +10,10 @@ import java.util.function.Predicate;
 // should be replaced with a named Array.
 public class TypeStr extends TypeObj<TypeStr> {
   private String _con;          //
-  private int _alias;           // 
-  private TypeStr  (boolean any, String con, int alias ) { super(TSTR,any); init(any,con,alias); }
-  private void init(boolean any, String con, int alias ) {
-    super.init(TSTR,any);
+  private TypeStr  (boolean any, String con, BitsAlias news ) { super(TSTR,any, news); init(any,con,news); }
+  private void init(boolean any, String con, BitsAlias news ) {
+    super.init(TSTR,any,news);
     _con = con;
-    _alias=alias;
   }
   @Override int compute_hash() { return super.compute_hash() + (_con==null ? 0 : _con.hashCode());  }
   @Override public boolean equals( Object o ) {
@@ -34,39 +32,41 @@ public class TypeStr extends TypeObj<TypeStr> {
   }
   private static TypeStr FREE=null;
   @Override protected TypeStr free( TypeStr ret ) { FREE=this; return ret; }
-  public static TypeStr make( boolean any, String con, int alias ) {
-    assert con==null || !any;
+  public static TypeStr make( boolean any, String con, BitsAlias news ) {
+    if( con!=null ) any = false; // "any" is ignored for constants
     TypeStr t1 = FREE;
-    if( t1 == null ) t1 = new TypeStr(any,con,alias);
-    else { FREE = null; t1.init(any,con,alias); }
+    if( t1 == null ) t1 = new TypeStr(any,con,news);
+    else { FREE = null; t1.init(any,con,news); }
     TypeStr t2 = (TypeStr)t1.hashcons();
-    TypeStr rez = t1==t2 ? t1 : t1.free(t2);
-    // Monotonically set alias from zero to non-zero
-    if( rez._alias==0 ) rez._alias = alias;
-    else assert alias == 0 || rez._alias == alias;
-    return rez;
+    if( t1!=t2 ) return t1.free(t2);
+    // Constant strings are made with a null _news, so they can hash-cons to
+    // each other - they are all made pre-compilation and exist in the original
+    // program image.  If we decide to keep the constant, we'll give it a
+    // unique alias.
+    if( t1._news==null ) {
+      assert t1._con != null;
+      t1._news = BitsAlias.make0(BitsAlias.new_alias(BitsAlias.STR));
+    }
+    return t1;
   }
-  public static TypeStr con(String con) { return make(false,con,0); }
+  @Override public TypeStr make( boolean any, BitsAlias news ) { return make(any,_con,news); }
+  public static TypeStr con(String con) { return make(false,con,null); }
   public static void init() {} // Used to force class init
 
   // Get the alias for string constants.  Since string constants are interned,
   // so are the aliases.
-  public int get_alias() {
-    if( _alias ==0 ) _alias = BitsAlias.new_alias(BitsAlias.STR);
-    return _alias;
-  }
-
+  //public int get_alias() { return _news.getbit(); }
   
-  public  static final TypeStr  STR = make(false,null,BitsAlias.STR); // not null
-  public  static final TypeStr XSTR = make(true ,null,BitsAlias.STR); // choice string
-  public  static final TypeStr  ABC = make(false,"abc",BitsAlias.ABC); // a string constant
+  public  static final TypeStr  STR = make(false,null,BitsAlias.STRBITS); // not null
+  public  static final TypeStr XSTR = make(true ,null,BitsAlias.STRBITS); // choice string
+  public  static final TypeStr  ABC = make(false,"abc",BitsAlias.ABCBITS); // a string constant
   private static final TypeStr  DEF = con("def"); // a string constant
   static final TypeStr[] TYPES = new TypeStr[]{STR,XSTR,ABC,DEF};
   static void init1( HashMap<String,Type> types ) { types.put("str",STR); }
   // Return a String from a TypeStr constant; assert otherwise.
   @Override public String getstr() { assert is_con(); return _con; }
 
-  @Override protected TypeStr xdual() { return _con==null ? new TypeStr(!_any,_con,_alias) : this; }
+  @Override protected TypeStr xdual() { return _con==null ? new TypeStr(!_any,_con,_news.dual()) : this; }
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TSTR:     break;
@@ -96,7 +96,6 @@ public class TypeStr extends TypeObj<TypeStr> {
   @Override public TypeObj update(byte fin, String fld, int fld_num, Type val) { return STR; }
   @Override public TypeObj st    (byte fin, String fld, int fld_num, Type val) { return STR; }
   @Override BitsAlias aliases() { return BitsAlias.STRBITS; }
-  @Override public TypeObj realias(int alias) { return this; }
   @Override public TypeObj lift_final() { return this; }
   @Override public boolean may_be_con() { return super.may_be_con() || _con != null; }
   @Override public boolean is_con() { return _con!=null; }

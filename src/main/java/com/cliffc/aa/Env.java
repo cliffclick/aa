@@ -50,7 +50,7 @@ public class Env implements AutoCloseable {
     for( IntrinsicNewNode lib : IntrinsicNewNode.INTRINSICS )
       STK_0.add_fun(lib ._name,(FunPtrNode) GVN.xform(lib .as_fun(GVN)));
     // Top-level constants
-    STK_0.add_fld("math_pi", TypeFlt.PI, GVN.con(TypeFlt.PI),false);
+    STK_0.add_fld("math_pi", TypeFlt.PI, GVN.con(TypeFlt.PI),TypeStruct.ffinal());
     // Now that all the UnresolvedNodes have all possible hits for a name,
     // register them with GVN.
     for( Node val : STK_0._defs )  if( val instanceof UnresolvedNode ) GVN.init0(val);

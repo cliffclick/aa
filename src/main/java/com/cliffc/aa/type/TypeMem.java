@@ -178,7 +178,7 @@ public class TypeMem extends Type<TypeMem> {
     XMEM = make(xobjs);         // Every alias filled with anything
     EMPTY_MEM = XMEM; //make(new TypeObj[0]); // Tried no-memory-vs-XOBJ-memory
 
-    MEM_ABC = make(TypeStr.ABC.get_alias(),TypeStr.ABC);
+    MEM_ABC = make(TypeStr.ABC._news.getbit(),TypeStr.ABC);
     MEM_NAME = make(BitsAlias.RECBITS,TypeName.TEST_STRUCT);
   }
   static final TypeMem[] TYPES = new TypeMem[]{MEM,MEM_ABC,MEM_NAME};

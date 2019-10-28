@@ -320,7 +320,7 @@ public class Parse {
           ((FunPtrNode)n).merge_ref_def(_gvn,tok,(FunPtrNode)ifex);
         } else if( is_mutable ) { // Mutate if mutable
           ScopeNode scope_if = _e.lookup_if(tok);  // (re-)assign in scope or enclosing If mini-scope
-          scope_if.stk().update(tok,-1,ifex,_gvn,mutable);
+          scope_if.stk().update(tok,-1,ifex,_gvn,ts_mutable(mutable));
         } else
           err_ctrl0("Cannot re-assign final val '"+tok+"'");
       }
@@ -493,7 +493,7 @@ public class Parse {
     n.keep();
     Node plus = _e.lookup_filter("+",_gvn,2);
     Node sum = do_call(new CallNode(true,errMsg(),ctrl(),plus,mem(),n,con(TypeInt.con(d))));
-    scope.stk().update(tok,-1,sum,_gvn,true);
+    scope.stk().update(tok,-1,sum,_gvn,TypeStruct.frw());
     return n.unhook();
   }
 
@@ -569,7 +569,7 @@ public class Parse {
     NewNode nn = new NewNode();
     int cnt=0;
     while( s!=null ) {
-      nn.update(null,cnt++,s,_gvn,false);
+      nn.update(null,cnt++,s,_gvn,TypeStruct.ffinal());
       if( !peek(',') ) break;   // Final comma is optional
       s=stmts();
     }
@@ -675,6 +675,7 @@ public class Parse {
    *  \@{ [id[:type]?[=stmt]?,]* }
    */
   private Node struct() {
+    Node nnn;
     try( Env e = new Env(_e,false,false) ) {// Nest an environment for the local vars
       _e = e;                   // Push nested environment
       while( true ) {
@@ -707,14 +708,14 @@ public class Parse {
         if( !peek(',') ) break; // Final comma is optional
       }
       require('}');
-      NewNode nnn = e._scope.stk(); // The constructed object
+      nnn = e._scope.stk().keep(); // The constructed object
       Node ctl = ctrl(), mem = mem();
       assert ctl != e._scope;
       _e = e._par;             // Pop nested environment
       set_ctrl(ctl);           // Carry any control changes back to outer scope
-      set_mem (mem);           // Carry any memroy  changes back to outer scope
-      return do_mem(nnn);
-    } // Pop lexical scope around struct
+      set_mem (mem);           // Carry any memory  changes back to outer scope
+    } // Pop lexical scope around struct, and also last use on nnn
+    return do_mem(nnn.unhook());
   }
 
   // Add a typecheck into the graph, with a shortcut if trivially ok.
@@ -787,7 +788,7 @@ public class Parse {
     }
     TypeStr ts = TypeStr.con(new String(_buf,oldx,_x-oldx-1));
     // Convert to ptr-to-constant-memory-string
-    TypeMemPtr ptr = TypeMemPtr.make(ts.get_alias(),ts);
+    TypeMemPtr ptr = TypeMemPtr.make(ts._news,ts);
     // Store the constant string to memory
     set_mem(gvn(new MemMergeNode(mem(),con(ts))));
     return ptr;
@@ -997,7 +998,8 @@ public class Parse {
 
   public Node lookup( String tok ) { return _e.lookup(tok); }
   public ScopeNode lookup_scope( String tok ) { return _e.lookup_scope(tok); }
-  private Node update( String tok, Node n, boolean mutable ) { _e._scope.stk().update(tok,-1,n,_gvn,mutable); return n; }
+  private Node update( String tok, Node n, boolean mutable ) { _e._scope.stk().update(tok,-1,n,_gvn,ts_mutable(mutable)); return n; }
+  private byte ts_mutable(boolean mutable) { return mutable ? TypeStruct.frw() : TypeStruct.ffinal(); }
 
   private Node do_call( CallNode call0 ) {
     Node call = gvn(call0.keep());

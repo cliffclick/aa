@@ -40,8 +40,11 @@ public class TypeName extends TypeObj<TypeName> {
   public  Type _t;                   // Named type
   public  short _depth;              // Nested depth of TypeNames
   // Named type variable
-  private TypeName ( String name, HashMap<String,Type> lex, Type t, short depth ) { super(TNAME,false); init(name,lex,t,depth); }
-  private void init( String name, HashMap<String,Type> lex, Type t, short depth ) { super.init(TNAME,false); assert name!=null && lex !=null; _name=name; _lex=lex; _t=t; _depth = depth; assert depth >= -1; }
+  private TypeName ( String name, HashMap<String,Type> lex, Type t, short depth ) {
+    super(TNAME,false,t instanceof TypeObj ? ((TypeObj)t)._news : null); init(name,lex,t,depth); }
+  private void init( String name, HashMap<String,Type> lex, Type t, short depth ) {
+    super.init(TNAME,false,t instanceof TypeObj ? ((TypeObj)t)._news : null);
+    assert name!=null && lex !=null; _name=name; _lex=lex; _t=t; _depth = depth; assert depth >= -1; }
   private static short depth( Type t ) { return(short)(t instanceof TypeName ? ((TypeName)t)._depth+1 : 0); }
   int pdepth() { return Math.max(0,_depth); }
   // Hash does not depend on other types.
@@ -81,8 +84,14 @@ public class TypeName extends TypeObj<TypeName> {
     throw AA.unimpl();
   }
   public TypeName make( Type t) { return make0(_name,_lex,t,_depth); }
+  @Override public Type make( boolean any, BitsAlias news ) {
+    Type t = _t instanceof TypeObj ? ((TypeObj)_t).make(any,news) : _t;
+    return t instanceof TypeObj ? make(t) : ALL;
+  }
   public static TypeName make_forward_def_type( String name, HashMap<String,Type> lex ) { return make0(name,lex,TypeStruct.ALLSTRUCT,(short)-1); }
-
+  
+  @Override public TypeName add_fld( String name, Type t, byte mutable ) { return make(((TypeObj)_t).add_fld(name,t,mutable)); }
+  @Override public TypeName set_fld( int idx, Type t, byte ff )          { return make(((TypeObj)_t).set_fld(idx ,t,ff     )); }
           static final HashMap<String,Type> TEST_SCOPE = new HashMap<>();
           static final TypeName TEST_ENUM = make("__test_enum",TEST_SCOPE,TypeInt.INT8);
           static final TypeName TEST_FLT  = make("__test_flt" ,TEST_SCOPE,TypeFlt.FLT32);
@@ -179,7 +188,6 @@ public class TypeName extends TypeObj<TypeName> {
   }
 
   @Override BitsAlias aliases() { return _t instanceof TypeObj ? ((TypeObj)_t).aliases() : BitsAlias.NIL; }
-  @Override public TypeObj realias(int alias) { return _t instanceof TypeObj ? make(((TypeObj)_t).realias(alias)) : this; }
   @Override public TypeObj lift_final() { return _t instanceof TypeObj ? make(((TypeObj)_t).lift_final()) : this; }
   @Override public boolean above_center() { return _t.above_center(); }
   @Override public boolean may_be_con() { return _t.may_be_con(); }

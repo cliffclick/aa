@@ -400,7 +400,7 @@ public class Type<T extends Type<T>> implements Cloneable {
     if( is_simple() && !t.is_simple() ) return true; // By design, flipped the only allowed order
     Type mt2 = t.xmeet(this);   // Reverse args and try again
     if( mt==mt2 ) return true;
-    System.out.println("Meet not commutative: "+this+".meet("+t+")="+mt+", but "+t+".meet("+this+")="+mt2);
+    System.out.println("Meet not commutative: "+this+".meet("+t+")="+mt+",\n but "+t+".meet("+this+")="+mt2);
     return false;
   }
   private boolean check_symmetric( Type t, Type mt ) {

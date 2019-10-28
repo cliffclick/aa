@@ -41,22 +41,20 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public @NotNull String @NotNull[] _flds;  // The field names
   public Type[] _ts;            // Matching field types
   public byte[] _finals;        // Fields that are final; see fmeet, fdual, fstr
-  public BitsAlias _news;       // NewNode aliases that make this type
   private TypeStruct _uf;       // Tarjan Union-Find, used during cyclic meet
-  private TypeStruct     ( boolean any, String[] flds, Type[] ts, byte[] finals, BitsAlias news) { super(TSTRUCT, any); init(any,flds,ts,finals,news); }
+  private TypeStruct     ( boolean any, String[] flds, Type[] ts, byte[] finals, BitsAlias news) { super(TSTRUCT, any, news); init(any,flds,ts,finals, news); }
   private TypeStruct init( boolean any, String[] flds, Type[] ts, byte[] finals, BitsAlias news) {
-    super.init(TSTRUCT, any);
+    super.init(TSTRUCT, any, news);
     _flds  = flds;
     _ts    = ts;
     _finals= finals;
-    _news  = news;
     _uf    = null;
     return this;
   }
   // Precomputed hash code.  Note that it can NOT depend on the field types -
   // because during recursive construction the types are not available.
   @Override int compute_hash() {
-    int hash = super.compute_hash() + _news.hashCode(), hash1=hash;
+    int hash = super.compute_hash(), hash1=hash;
     for( int i=0; i<_flds.length; i++ ) hash += _flds[i].hashCode()+_finals[i];
     return hash == 0 ? hash1 : hash;
   }
@@ -246,22 +244,21 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   static final TypeStruct[] TYPES = new TypeStruct[]{ALLSTRUCT,POINT,X,A,C0,D1,ARW};
 
   // Make a TypeStruct with a given 'news' from the original
-  TypeStruct make(BitsAlias news) { return make(_flds,_ts,_finals,news);  }
+  @Override public TypeStruct make(boolean any, BitsAlias news) { return malloc(any,_flds,_ts,_finals,news).hashcons_free();  }
 
   // Extend the current struct with a new named field
-  public TypeStruct add_fld( String name, Type t, boolean mutable ) {
-    assert t.isa(SCALAR) && (name==null || find(name,-1)==-1);
+  @Override public TypeStruct add_fld( String name, Type t, byte mutable ) {
+    assert t.isa(SCALAR) && (name==null || fldBot(name) || find(name,-1)==-1);
 
     Type  []   ts = Arrays.copyOfRange(_ts    ,0,_ts    .length+1);
     String[] flds = Arrays.copyOfRange(_flds  ,0,_flds  .length+1);
     byte[] finals = Arrays.copyOfRange(_finals,0,_finals.length+1);
     ts    [_ts.length] = t;
     flds  [_ts.length] = name==null ? "." : name;
-    finals[_ts.length] = mutable ? frw() : ffinal();
+    finals[_ts.length] = mutable;
     return make(flds,ts,finals,_news);
   }
-  public TypeStruct set_fld( int idx, Type t, boolean mutable ) {
-    byte ff = mutable ? frw() : ffinal();
+  @Override public TypeStruct set_fld( int idx, Type t, byte ff ) {
     Type[] ts = _ts.clone();
     ts[idx] = t;
     byte[] ffs = _finals;
@@ -979,7 +976,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return _finals[idx] == frw() || _finals[idx] == funk();
   }
   @Override BitsAlias aliases() { return _news; }
-  @Override public TypeObj realias(int alias) { return make(_flds,_ts,_finals,alias); }
   @Override public TypeObj lift_final() {
     byte[] bs = new byte[_finals.length];
     for( int i=0; i<_finals.length; i++ )

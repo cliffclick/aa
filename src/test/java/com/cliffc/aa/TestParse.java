@@ -16,8 +16,6 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
     Object dummy = Env.GVN; // Force class loading cycle
-    test_ptr("(0,1,2)",
-            (alias)-> TypeMemPtr.make(alias,TypeStruct.make_tuple(alias,Type.NIL,TypeInt.con(1),TypeInt.con(2))));
 
     // A collection of tests which like to fail easily
     testerr ("Point=:@{x,y}; Point((0,1))", "*[$](nil,1) is not a *[$]@{x=,y=}",27);
@@ -592,16 +590,61 @@ die, NewNode goes to XMEM (even with MemMerge use).
 Phat memory usage "forgets" fields.  To remove single unused fields, need to
 explode out of phat memory.
 
-(more precise memory handling: 2 layer split/join)
-MemSplit - tuples out whole aliases#s using a AliasProj.  Can be bulk (BitsAlias).
-FldSplit - tuples out fields from an alias; uses FieldProj.  Has a bulk field variant.
+More precise memory handling: 2 layer split/join:
+
+AliasProj - can follow any whole memory.  Slices out a set of disjoint aliases.
+FieldProj - can follow any single alias.  Slices out a set of disjoint fields.
 FldMerge - collects complete field updates to form a complete alias type.
 MemMerge - collects complere alias updates to form total memory.
 
-NewNode - produces alias# that is further exactly not any other instance of the same alias#.
-MemMerge - can accept a NewNode input that overlaps with same alias#; NewNode is now "confused".
+NewNode - produces alias# that is further exactly not any other instance of the
+same alias#; can be followed by FldProj.
+MemMerge - can accept a NewNode input that overlaps with same alias#; NewNode
+is now "confused".
 
 
+Looking for a model where individual fields can go dead.
+Looking for a model where pre-wired calls can wire without memory (pure)
+or read-only memory (const).
+
+Graph rewrite opts: skinny memory reads from a phat memory: explodes it iff
+progress.  skinny write forces parser explosion & rejoin.  ScopeNode mem slot
+pts to a phat memory or a MemMerge, which pts to many FldMerges.  Leaves it
+exploded as parse rolls forward until sees a usage of phat memory.  Then leaves
+the Mem/Fld Merge in the graph, and starts anew after def of phat memory.
+
+Escaped ptrs: if at a phat memory usage we can see no instances of TMP alias#
+in the memory or values, we can declare "not escaped", and now remove an alias#
+from phat node usage.  To see field escapes, need a backwards prop of field
+usages.  Currently thinking has no way to detect lack-of-usage except via (lack
+of) graph node edges.  Have to "explode" in the graph all phat into alias#s
+into fields, and push the "inflated" graph all about, then do DCE.  Note:
+cannot remove dead field if ptr escapes at all, because later parser might use
+field.  Strictly ok after removing unknown callers.
+
+FunNode with mem Parm: can skip mem, if mem is not used (pure fcn, common on
+many operators).  Can cast TypeObj._news to a limit set, and then only takes
+that memory alias set and bypass the rest.  If purely reading memory, still
+take in that alias, but RetNode pts to the ParmNode directly.  The cast-to-str
+PrimNodes which alloc a new Str do not take memory, but the RetNode produces a
+brand new alias which needs to fold into a post-call MemMerge.
+
+Pure: RetNode has a null memory (no pre-call split, no post-call merge).  Parm is missing.
+Read subset:  RetNode can be equal to Parm, with subset in Parm type.
+Write subset: RetNode & Parm has some (not all alias#s), but not equal to Parm.
+All: RetNode has phat, so does Parm - and not equal to Parm.
+New: RetNode can include MORE alias#s than the Parm.  Needs a MemMerge.
+New factory: Parm is missing.  RetNode takes in some aliases.
+
+Plan B2:  No!
+
+Only keep all memory pre-exploded at the alias/field level.  Leads to huge
+count of graph nodes, esp for unrelated chunks of code that just "pass thru".
+
+
+
+
+---
 For closures, all local vars actually talk to the scope-local NewNode, which
 can grow fields for a time.  Stops growing fields at scope exit.  Local var
 uses do Load & Store, which collapse against any NewNode including the scope-
