@@ -19,9 +19,9 @@ import org.jetbrains.annotations.NotNull;
 public class NewNode extends Node {
   // Unique alias class, one class per unique memory allocation site.
   // Only effectively-final, because the copy/clone sets a new alias value.
-  public int _alias;            // Alias class
+  int _alias;                   // Alias class
   TypeStruct _ts;               // base Struct
-  TypeName _name;               // If named, this is the name and _ts is the base
+  private TypeName _name;       // If named, this is the name and _ts is the base
 
   // NewNodes can participate in cycles, where the same structure is appended
   // to in a loop until the size grows without bound.  If we detect this we
@@ -47,8 +47,9 @@ public class NewNode extends Node {
 
   // Called when folding a Named Constructor into this allocation site
   void set_name( GVNGCM gvn, TypeName name ) {
+    assert !name.above_center();
     // Name is a wrapper over _ts, except for alias because Name is probably a generic type.
-    TypeName n2 = (TypeName)name.make(name.above_center(),_ts._news);
+    TypeName n2 = name.make(xs());
     assert n2._t == xs();       // wrapping exactly once
     assert n2._news.abit() == _alias;
     if( gvn.touched(this) ) {
@@ -64,6 +65,7 @@ public class NewNode extends Node {
   public void add_fld( String name, Type t, Node n, byte mutable ) {
     assert !Env.GVN.touched(this);
     _ts = _ts.add_fld(name,t,mutable);
+    if( _name != null ) _name = _name.make(_ts); // Re-attach name as needed
     add_def(n);
   }
   // Update/modify a field
@@ -76,6 +78,7 @@ public class NewNode extends Node {
       add_fld(name,gvn.type(val),val,mutable);
     } else {                    // Overwrite in this scope
       _ts = _ts.set_fld(idx2,gvn.type(val),mutable);
+      if( _name != null ) _name = _name.make(_ts); // Re-attach name as needed
       set_def(def_idx(idx2),val,gvn);
     }
     return val;
@@ -91,6 +94,7 @@ public class NewNode extends Node {
       if( n instanceof UnresolvedNode ) n.add_def(ptr);
       else set_def(def_idx(idx),n=new UnresolvedNode(n,ptr),null);
       _ts = _ts.set_fld(idx,n.all_type(),TypeStruct.ffinal());
+      if( _name != null ) _name = _name.make(_ts); // Re-attach name as needed
     }
     return ptr;
   }
@@ -236,7 +240,7 @@ public class NewNode extends Node {
     // depth.  If this happens, the types become recursive with the
     // approximations happening at the deepest points.
     TypeStruct res = newt.approx(CUTOFF);
-    TypeObj xs = _name == null ? res : (_name = _name.make(res)); // Re-attach name as needed
+    TypeObj xs = _name == null ? res : _name.make(res); // Re-attach name as needed
     return TypeTuple.make(xs,TypeMemPtr.make(_alias,xs));
   }
 
