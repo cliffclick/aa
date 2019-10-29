@@ -33,7 +33,7 @@ public class LoadNode extends Node {
     // Loads against a NewNode cannot NPE, cannot fail, always return the input
     if( addr instanceof NewNode && mem instanceof MemMergeNode && mem.in(1)==addr ) {
       NewNode nnn = (NewNode)addr;
-      int idx = nnn.ts().find(_fld,_fld_num);  // Find the named field
+      int idx = nnn._ts.find(_fld,_fld_num);  // Find the named field
       if( idx != -1 ) return nnn.fld(idx);    // Field value
       // Broken load-vs-new
     }

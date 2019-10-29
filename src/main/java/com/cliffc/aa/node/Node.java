@@ -97,12 +97,15 @@ public abstract class Node implements Cloneable {
    }
 
   // Make a copy of the base node, with no defs nor uses and a new UID.
-  @NotNull Node copy( GVNGCM gvn) {
+  @NotNull Node copy( boolean copy_edges, GVNGCM gvn) {
     try {
       Node n = (Node)clone();
       n._uid = GVNGCM.uid();              // A new UID
       n._defs = new Ary<>(new Node[1],0); // New empty defs
       n._uses = new Ary<>(new Node[1],0); // New empty uses
+      if( copy_edges ) 
+        for( Node def : _defs )
+          n.add_def(def);
       return n;
     } catch( CloneNotSupportedException cns ) { throw new RuntimeException(cns); }
 

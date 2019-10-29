@@ -296,7 +296,7 @@ public class TestNode {
 
   // Fill a Node with {null,edge,edge} and start the search
   private void test1monotonic_prim(PrimNode prim) {
-    PrimNode n = (PrimNode)prim.copy(_gvn);
+    PrimNode n = (PrimNode)prim.copy(false,_gvn);
     assert n._defs._len==0;
     n.add_def( null  );
     n.add_def(_ins[1]);
@@ -306,7 +306,7 @@ public class TestNode {
 
   // Fill a Node with {null,edge,edge} and start the search
   private void test1monotonic_intrinsic(IntrinsicNewNode prim) {
-    IntrinsicNewNode n = prim.copy(_gvn);
+    IntrinsicNewNode n = prim.copy(false,_gvn);
     assert n._defs._len==0;
     n.add_def( null  );
     n.add_def(_ins[1]);         // memory

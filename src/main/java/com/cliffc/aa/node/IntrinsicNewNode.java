@@ -3,6 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
+import org.jetbrains.annotations.NotNull;
 
 // Known (intrinsic) library calls.  They typically have memory side effects,
 // or else they would be a PrimNode instead.  Like PrimNodes they are wrapped
@@ -34,8 +35,8 @@ public abstract class IntrinsicNewNode extends IntrinsicNode {
     new AddStrStr(BitsAlias.STR),
   };
   // Clones during inlining all become unique new sites
-  @Override IntrinsicNewNode copy(GVNGCM gvn) {
-    IntrinsicNewNode nnn = (IntrinsicNewNode)super.copy(gvn);
+  @Override @NotNull IntrinsicNewNode copy( boolean copy_edges, GVNGCM gvn) {
+    IntrinsicNewNode nnn = (IntrinsicNewNode)super.copy(copy_edges, gvn);
     return nnn.update_alias(BitsAlias.new_alias(_alias)); // Children alias classes
   }
   @Override public String xstr() { return _name+"*"+_alias; }

@@ -119,7 +119,7 @@ public class FunNode extends RegionNode {
     _name = tok;
   }
 
-  @Override Node copy(GVNGCM gvn) { throw AA.unimpl(); } // Gotta make a new FIDX
+  @Override Node copy(boolean copy_edges, GVNGCM gvn) { throw AA.unimpl(); } // Gotta make a new FIDX
 
   // True if may have future unknown callers.
   private boolean has_unknown_callers() { return _defs._len > 1 && in(1) == Env.ALL_CTRL; }
@@ -391,16 +391,16 @@ public class FunNode extends RegionNode {
       int op = n._op;                    // opcode
       if( op == OP_FUN  && n       != this ) continue; // Call to other function, not part of inlining
       if( op == OP_PARM && n.in(0) != this ) continue; // Arg  to other function, not part of inlining
-      map.put(n,n.copy(gvn)); // Make a blank copy with no edges and map from old to new
+      map.put(n,n.copy(false,gvn)); // Make a blank copy with no edges and map from old to new
       work.addAll(n._uses);   // Visit all uses also
     }
 
     // Collect the old/new funptrs and add to map also.
-    RetNode newret = (RetNode)oldret.copy(gvn);
+    RetNode newret = (RetNode)oldret.copy(false,gvn);
     newret._fidx = fun.fidx();
     map.put(oldret,newret);
     FunPtrNode old_funptr = oldret.funptr();
-    FunPtrNode new_funptr = (FunPtrNode)old_funptr.copy(gvn);
+    FunPtrNode new_funptr = (FunPtrNode)old_funptr.copy(false,gvn);
     new_funptr.add_def(newret);
     old_funptr.keep(); // Keep around; do not kill last use before the clone is done
 

@@ -20,7 +20,8 @@ public class NewNode extends Node {
   // Unique alias class, one class per unique memory allocation site.
   // Only effectively-final, because the copy/clone sets a new alias value.
   public int _alias;            // Alias class
-  TypeObj _ts;                  // Struct or Named Struct
+  TypeStruct _ts;               // base Struct
+  TypeName _name;               // If named, this is the name and _ts is the base
 
   // NewNodes can participate in cycles, where the same structure is appended
   // to in a loop until the size grows without bound.  If we detect this we
@@ -31,30 +32,31 @@ public class NewNode extends Node {
     super(OP_NEW,(Node)null);   // no ctrl field
     _alias = BitsAlias.new_alias(BitsAlias.REC);
     _ts = TypeStruct.make_alias(_alias); // No fields
-  }  
+    _name =null;
+  }
   String xstr() { return "New*"+_alias; } // Self short name
-  String  str() { return "New"+_ts; } // Inline less-short name
+  String  str() { return "New"+xs(); } // Inline less-short name
 
   private int def_idx(int fld) { return fld+1; } // Skip ctrl in slot 0
   Node fld(int fld) { return in(def_idx(fld)); } // Node for field#
-  TypeStruct ts() { return (TypeStruct)_ts.base(); }
+  private TypeObj xs() { return _name == null ? _ts : _name; }
 
-  public Node get(String name) { return in(def_idx(ts().find(name,-1))); }
-  public boolean exists(String name) { return ts().find(name,-1)!=-1; }
-  public boolean is_mutable(String name) { TypeStruct ts = ts(); return ts._finals[ts.find(name,-1)] == TypeStruct.frw(); }
+  public Node get(String name) { return in(def_idx(_ts.find(name,-1))); }
+  public boolean exists(String name) { return _ts.find(name,-1)!=-1; }
+  public boolean is_mutable(String name) { TypeStruct ts = _ts; return ts._finals[ts.find(name,-1)] == TypeStruct.frw(); }
 
   // Called when folding a Named Constructor into this allocation site
   void set_name( GVNGCM gvn, TypeName name ) {
     // Name is a wrapper over _ts, except for alias because Name is probably a generic type.
     TypeName n2 = (TypeName)name.make(name.above_center(),_ts._news);
-    assert n2._t == _ts;        // wrapping exactly once
+    assert n2._t == xs();       // wrapping exactly once
     assert n2._news.abit() == _alias;
     if( gvn.touched(this) ) {
       gvn.unreg(this);
-      _ts = n2;
+      _name = n2;
       gvn.rereg(this,value(gvn));
     } else {
-      _ts = n2;
+      _name = n2;
     }
   }
 
@@ -66,7 +68,7 @@ public class NewNode extends Node {
   }
   // Update/modify a field
   public Node update( String name, int idx, Node val, GVNGCM gvn, byte mutable  ) {
-    TypeStruct ts = ts();
+    TypeStruct ts = _ts;
     assert !Env.GVN.touched(this);
     assert def_idx(ts._ts.length)== _defs._len;
     int idx2 = ts.find(name,idx);
@@ -81,7 +83,7 @@ public class NewNode extends Node {
 
   // Add a named FunPtr to a New.  Auto-inflates to a Unresolved as needed.
   public FunPtrNode add_fun( String name, FunPtrNode ptr ) {
-    int idx = ts().find(name,-1);
+    int idx = _ts.find(name,-1);
     if( idx == -1 ) {
       add_fld(name,ptr._t,ptr,TypeStruct.ffinal());
     } else {
@@ -99,7 +101,7 @@ public class NewNode extends Node {
   // according to use.
   public void promote_forward(GVNGCM gvn, NewNode parent) {
     assert parent != null;
-    TypeStruct ts = ts();
+    TypeStruct ts = _ts;
     for( int i=0; i<ts._ts.length; i++ ) {
       Node n = fld(i);
       if( n != null && n.is_forward_ref() ) {
@@ -125,14 +127,12 @@ public class NewNode extends Node {
       if( in(i)==dull && f.in(i)==f_sharp ) f.set_def(i,null,gvn);
     }
     // Look for updates on either arm
-    TypeStruct ts = (TypeStruct)t._ts;
-    TypeStruct fs = (TypeStruct)f._ts;
-    String[] tflds = ts._flds;
-    String[] fflds = fs._flds;
+    String[] tflds = t._ts._flds;
+    String[] fflds = f._ts._flds;
     for( int idx=0; idx<tflds.length; idx++ ) {
       if( t.in(def_idx(idx))==null ) continue; // Unwound sharpening
       String name = tflds[idx];
-      if( fs.find(name,-1) == -1 ) // If not on false side
+      if( f._ts.find(name,-1) == -1 ) // If not on false side
         do_one_side(name,P,gvn,phi_errmsg,t,true);
       else
         do_both_sides(name,P,gvn,phi_errmsg,t,f);
@@ -140,7 +140,7 @@ public class NewNode extends Node {
     for( int idx=0; idx<fflds.length; idx++ ) {
       if( f.in(def_idx(idx))==null ) continue; // Unwound sharpening
       String name = fflds[idx];
-      if( ts.find(name,-1) == -1 ) // If not on true side
+      if( t._ts.find(name,-1) == -1 ) // If not on true side
         do_one_side(name,P,gvn,phi_errmsg,f,false);
     }
   }
@@ -148,9 +148,8 @@ public class NewNode extends Node {
   // Called per name defined on only one arm of a trinary.
   // Produces the merge result.
   private void do_one_side(String name, Parse P, GVNGCM gvn, Parse phi_errmsg, NewNode x, boolean arm) {
-    TypeStruct xts = (TypeStruct)x._ts;
-    int xii = xts.find(name,-1);
-    final byte xmut = xts._finals[xii];
+    int xii = x._ts.find(name,-1);
+    final byte xmut = x._ts._finals[xii];
     Node xn = x.in(def_idx(xii)), yn;
     ScopeNode scope = P.lookup_scope(name); // Find prior definition
 
@@ -179,14 +178,10 @@ public class NewNode extends Node {
   // Called per name defined on both arms of a trinary.
   // Produces the merge result.
   private void do_both_sides(String name, Parse P, GVNGCM gvn, Parse phi_errmsg, NewNode t, NewNode f) {
-    TypeStruct ts = (TypeStruct)t._ts;
-    TypeStruct fs = (TypeStruct)f._ts;
-    int tii = ts.find(name,-1);
-    int fii = fs.find(name,-1);
-    //boolean t_is_mutable = t._ts._finals[tii] == TypeStruct.frw();
-    //boolean f_is_mutable = f._ts._finals[fii] == TypeStruct.frw();
-    byte tmut = ts._finals[tii];
-    byte fmut = fs._finals[fii];
+    int tii = t._ts.find(name,-1);
+    int fii = f._ts.find(name,-1);
+    byte tmut = t._ts._finals[tii];
+    byte fmut = f._ts._finals[fii];
     Node tn = t.in(def_idx(tii));
     Node fn = f.in(def_idx(fii));
 
@@ -220,10 +215,9 @@ public class NewNode extends Node {
   // Replace uses of dull with sharp, used after an IfNode test
   void sharpen( GVNGCM gvn, Node dull, Node sharp, NewNode arm ) {
     assert dull != sharp;
-    TypeStruct ts = (TypeStruct)_ts;
-    for( int i=0; i<ts._ts.length; i++ ) // Fill in all fields
+    for( int i=0; i<_ts._ts.length; i++ ) // Fill in all fields
       if( in(def_idx(i))==dull )
-        arm.add_fld(ts._flds[i],gvn.type(sharp),sharp,ts._finals[i]);
+        arm._ts.set_fld(_ts.find(_ts._flds[i],-1),gvn.type(sharp),_ts._finals[i]);
   }
 
   @Override public Node ideal(GVNGCM gvn) { return null; }
@@ -231,38 +225,40 @@ public class NewNode extends Node {
   // Produces a TypeMemPtr
   @Override public Type value(GVNGCM gvn) {
     // Gather args and produce a TypeStruct
-    TypeStruct s = ts();
-    Type[] ts = new Type[s._ts.length];
+    Type[] ts = new Type[_ts._ts.length];
     for( int i=0; i<ts.length; i++ )
       // Limit type bounds, since error returns can be out-of-bounds
-      ts[i] = gvn.type(fld(i)).bound(s.at(i));
-    TypeStruct newt = TypeStruct.make(s._flds,ts,s._finals,_alias);
+      ts[i] = gvn.type(fld(i)).bound(_ts.at(i));
+    TypeStruct newt = TypeStruct.make(_ts._flds,ts,_ts._finals,_alias);
 
     // Check for TypeStructs with this same NewNode types occurring more than
     // CUTOFF deep, and fold the deepest ones onto themselves to limit the type
     // depth.  If this happens, the types become recursive with the
     // approximations happening at the deepest points.
     TypeStruct res = newt.approx(CUTOFF);
-    TypeObj res2 = _ts instanceof TypeName ? ((TypeName)_ts).make(res) : res; // Re-attach name, as needed
-    return TypeTuple.make(res2,TypeMemPtr.make(_alias,res2));
+    TypeObj xs = _name == null ? res : (_name = _name.make(res)); // Re-attach name as needed
+    return TypeTuple.make(xs,TypeMemPtr.make(_alias,xs));
   }
 
   @Override public Type all_type() {
-    return TypeTuple.make(_ts,TypeMemPtr.make(_alias,_ts));
+    return TypeTuple.make(xs(),TypeMemPtr.make(_alias,xs()));
   }
 
   // Clones during inlining all become unique new sites
-  @Override @NotNull NewNode copy( GVNGCM gvn) {
+  @Override @NotNull public NewNode copy( boolean copy_edges, GVNGCM gvn) {
+    assert !_ts.above_center(); // Never in GCP when types are high
     // Split the original '_alias' class into 2 sub-aliases
-    NewNode nnn = (NewNode)super.copy(gvn);
+    NewNode nnn = (NewNode)super.copy(copy_edges, gvn);
     nnn._alias = BitsAlias.new_alias(_alias); // Children alias classes, split from parent
-    nnn._ts = (TypeObj)_ts.make(_ts.above_center(),BitsAlias.make0(nnn._alias));
+    nnn._ts = _ts.make(false,BitsAlias.make0(nnn._alias));
+    if( _name != null ) nnn._name = _name.make(nnn._ts); // Re-attach name as needed
     // The original NewNode also splits from the parent alias
-    Type oldt = gvn.type(this);
-    gvn.unreg(this);
+    Type oldt = gvn.touched(this) ? gvn.type(this) : null;
+    if( oldt != null ) gvn.unreg(this);
     _alias = BitsAlias.new_alias(_alias);
-    _ts = (TypeObj)_ts.make(_ts.above_center(),BitsAlias.make0(_alias));
-    gvn.rereg(this,oldt);
+    _ts = _ts.make(false,BitsAlias.make0(_alias));
+    if( _name != null ) _name = _name.make(_ts); // Re-attach name as needed
+    if( oldt != null ) gvn.rereg(this,oldt);
     return nnn;
   }
 

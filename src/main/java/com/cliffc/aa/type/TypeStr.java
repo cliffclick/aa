@@ -56,7 +56,7 @@ public class TypeStr extends TypeObj<TypeStr> {
   // Get the alias for string constants.  Since string constants are interned,
   // so are the aliases.
   //public int get_alias() { return _news.getbit(); }
-  
+
   public  static final TypeStr  STR = make(false,null,BitsAlias.STRBITS); // not null
   public  static final TypeStr XSTR = make(true ,null,BitsAlias.STRBITS); // choice string
   public  static final TypeStr  ABC = make(false,"abc",BitsAlias.ABCBITS); // a string constant
@@ -74,7 +74,7 @@ public class TypeStr extends TypeObj<TypeStr> {
     case TSTRUCT:return OBJ;
     case TOBJ:   return t.above_center() ? this : t;
     case TNIL:
-    case TTUPLE: 
+    case TTUPLE:
     case TFUNPTR:
     case TMEMPTR:
     case TFLT:
@@ -100,7 +100,7 @@ public class TypeStr extends TypeObj<TypeStr> {
   @Override public boolean may_be_con() { return super.may_be_con() || _con != null; }
   @Override public boolean is_con() { return _con!=null; }
   @Override public Type meet_nil() { return this; }
-  
+
   // Lattice of conversions:
   // -1 unknown; top; might fail, might be free (Scalar->Str); Scalar might lift
   //    to e.g. Float and require a user-provided rounding conversion from F64->Str.
@@ -108,7 +108,7 @@ public class TypeStr extends TypeObj<TypeStr> {
   // +1 requires a bit-changing conversion; no auto-unboxing
   // 99 Bottom; No free converts; e.g. Flt->Str requires explicit rounding
   @Override public byte isBitShape(Type t) {
-    if( t._type==TNIL || t._type==Type.TSTR ) return 0;
+    if( t._type==TNIL || t._type==Type.TSTR || t._type == TOBJ ) return 0;
     return 99;
   }
   @Override public Type widen() { return STR; }
