@@ -118,6 +118,13 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
       return _fidxs.above_center() ? NIL : this;
     return make(_fidxs.meet(BitsFun.NIL),_args,_ret);
   }
+  // Keep the high parts
+  @Override public Type startype() {
+    BitsFun fidxs = _fidxs.above_center() ? _fidxs : _fidxs.dual();
+    TypeTuple args= _args.startype();
+    Type ret      = _ret .startype();
+    return make(fidxs,args,ret);
+  }
 
   // Generic functions
   public boolean is_forward_ref() {
