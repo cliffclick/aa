@@ -110,9 +110,13 @@ public class NewNode extends Node {
       Node n = fld(i);
       if( n != null && n.is_forward_ref() ) {
         parent.update(ts._flds[i],-1,n,gvn,ts._finals[i]);
-        set_def(def_idx(i),null,gvn);
+        remove(def_idx(i),gvn);
+        ts = ts.del_fld(i);
+        i--;
       }
     }
+    if( ts != _ts && _name != null ) _name = _name.make(ts); // Re-attach name as needed
+    _ts = ts;
   }
 
   // Add PhiNodes and variable mappings for common definitions merging at the
@@ -188,11 +192,14 @@ public class NewNode extends Node {
     byte fmut = f._ts._finals[fii];
     Node tn = t.in(def_idx(tii));
     Node fn = f.in(def_idx(fii));
+    byte mut_final= TypeStruct.ffinal();
+    byte mut_ro   = TypeStruct.fro();
+    byte mut_rw   = TypeStruct.frw();
 
     if( tn != null && tn.is_forward_ref() ) {
-      assert tmut == TypeStruct.ffinal();
+      assert tmut == mut_final;
       if( fn.is_forward_ref() ) {
-        assert fmut == TypeStruct.ffinal();
+        assert fmut == mut_final;
         throw AA.unimpl(); // Merge/U-F two forward refs
       }
       //update(name,P.err_ctrl1("'"+name+"' not defined on "+true+" arm of trinary",gvn.type(fn).widen()),gvn,TypeStruct.ffinal());
@@ -205,14 +212,11 @@ public class NewNode extends Node {
       throw AA.unimpl();
     }
 
-    // Check for mixed-mode updates.  'name' must be either fully mutable
-    // or fully immutable at the merge point (or dead afterwards).
-    if( tmut != fmut ) {
-      //update(name,P.err_ctrl1(" is only partially mutable",gvn.type(tn).widen()),gvn,false);
-      //return;
-      throw AA.unimpl();
-    }
-
+    // If either side does a final store, then the field is final afterwards
+    if( tmut == mut_final || fmut == mut_final ) tmut = mut_final;
+    else if( tmut == mut_ro || fmut == mut_ro ) tmut = mut_ro;
+    else tmut = mut_rw;
+    
     update(name,-1,tn==fn ? fn : P.gvn(new PhiNode(phi_errmsg, P.ctrl(),tn,fn)),gvn,tmut);
   }
 
@@ -220,8 +224,10 @@ public class NewNode extends Node {
   void sharpen( GVNGCM gvn, Node dull, Node sharp, NewNode arm ) {
     assert dull != sharp;
     for( int i=0; i<_ts._ts.length; i++ ) // Fill in all fields
-      if( in(def_idx(i))==dull )
+      if( in(def_idx(i))==dull ) {
+        arm.set_def(def_idx(i),sharp,gvn);
         arm._ts.set_fld(_ts.find(_ts._flds[i],-1),gvn.type(sharp),_ts._finals[i]);
+      }
   }
 
   @Override public Node ideal(GVNGCM gvn) { return null; }

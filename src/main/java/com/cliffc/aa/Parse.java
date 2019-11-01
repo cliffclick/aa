@@ -105,7 +105,8 @@ public class Parse {
   TypeEnv go_whole( ) {
     prog();                     // Parse a program
     // Delete names at the top scope before final optimization.
-    _gvn.rereg(_e._scope.stk(),Type.ALL); // have to register before deleting to keep asserts
+    if( !_gvn.touched(_e._scope.stk()) )
+      _gvn.rereg(_e._scope.stk(), Type.ALL); // have to register before deleting to keep asserts
     _e._scope.set_stk(null,_gvn);         // delete top-level names
     _gvn.iter();   // Pessimistic optimizations; might improve error situation
     remove_unknown_callers();
@@ -479,25 +480,26 @@ public class Parse {
     return n;                   // No more terms
   }
 
+  // Handle post-increment/post-decrement operator
   private Node inc(String tok, int d) {
     ScopeNode scope = lookup_scope(tok); // Find prior scope of token
     Node n;
     if( scope==null ) { scope = _e._scope; n = con(Type.NIL); }  // Token not already bound to a value
     else {                             // Check existing token for mutable
-      n = scope.get(tok);
-      if( n.is_forward_ref() )         // Prior is actually a forward-ref
-        return err_ctrl2(forward_ref_err(((FunPtrNode)n).fun()));
       if( !scope.is_mutable(tok) )
         return err_ctrl2("Cannot re-assign final val '"+tok+"'");
+      // Now properly load from the closure
+      n = gvn(new LoadNode(ctrl(),mem(),scope.stk(),tok,errMsg()));
+      if( n.is_forward_ref() )         // Prior is actually a forward-ref
+        return err_ctrl2(forward_ref_err(((FunPtrNode)n).fun()));
     }
-    n.keep();
     Node plus = _e.lookup_filter("+",_gvn,2);
     Node sum = do_call(new CallNode(true,errMsg(),ctrl(),plus,mem(),n,con(TypeInt.con(d))));
-    scope.stk().update(tok,-1,sum,_gvn,TypeStruct.frw());
-    return n.unhook();
+    set_mem(gvn(new StoreNode(ctrl(),mem(),scope.stk(),sum,TypeStruct.frw(),tok,errMsg())));
+    return sum;
   }
 
-  /** Parse an optional type
+  /** Parse an optionally typed factor
    *  tfact = fact[:type]
    */
   private Node tfact() {
@@ -636,17 +638,18 @@ public class Parse {
   }
 
   private Node merge_exits(Node rez) {
+    rez.keep();
     ScopeNode s = _e._scope;
     Node ctrl = s.early_ctrl();
     Node mem  = s.early_mem ();
     Node val  = s.early_val ();
     s.early_kill();
-    if( ctrl == null ) return rez; // No other exits to merge into
+    if( ctrl == null ) return rez.unhook(); // No other exits to merge into
     set_ctrl(ctrl=init(ctrl.add_def(ctrl())));
     mem.set_def(0,ctrl,null);
     val.set_def(0,ctrl,null);
     set_mem (gvn(mem.add_def(mem())));
-    return   gvn(val.add_def(rez  )) ;
+    return   gvn(val.add_def(rez.unhook())) ;
   }
 
   // Merge this early exit path into all early exit paths being recorded in the

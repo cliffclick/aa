@@ -11,7 +11,7 @@ public class StoreNode extends Node {
   final int _fld_num;
   private final byte _fin;    // TypeStruct.ffinal or TypeStruct.frw
   private final boolean _xmem;// True if TypeMem only, False if TypeObj only
-  final Parse _bad;
+  private final Parse _bad;
   private StoreNode( Node ctrl, Node mem, Node adr, Node val, byte fin, String fld, int fld_num, Parse bad, boolean xmem ) {
     super(OP_STORE,ctrl,mem,adr,val);
     _fld = fld;
@@ -46,7 +46,7 @@ public class StoreNode extends Node {
   @Override public Type value(GVNGCM gvn) {
     final Type  M = _xmem ? TypeMem. MEM : TypeObj. OBJ;
     final Type XM = _xmem ? TypeMem.XMEM : TypeObj.XOBJ;
-    
+
     Type adr = gvn.type(adr()).base();
     if( adr.isa(TypeMemPtr.OOP0.dual()) ) return XM; // Very high address; might fall to any valid address
     if( adr.must_nil() ) return M;           // Not provable not-nil, so fails

@@ -478,8 +478,7 @@ public class TestParse {
     test("math_rand(1)?(x:=4):(x:=3);x:=x+1", TypeInt.INT64); // x mutable on both arms, so mutable after
     test   ("x:=0; 1 ? (x:=4):; x:=x+1", TypeInt.con(5)); // x mutable ahead; ok to mutate on 1 arm and later
     test   ("x:=0; 1 ? (x =4):; x", TypeInt.con(4)); // x final on 1 arm, dead on other arm
-    // TODO: Allow? because just flag x as read-only past trinary
-    testerr("x:=0; math_rand(1) ? (x =4):3; x", "'x' not final on false arm of trinary",29); // x mutable ahead; ok to mutate on 1 arm and later
+    testerr("x:=0; math_rand(1) ? (x =4):3; x=2", "Cannot re-assign final val 'x'",34); 
   }
 
   // Finals are declared with an assignment.  This is to avoid the C++/Java

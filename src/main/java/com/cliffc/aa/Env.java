@@ -13,8 +13,9 @@ public class Env implements AutoCloseable {
     ScopeNode scope = new ScopeNode(early);
     if( par != null ) {
       NewNode nnn = ifscope ? par._scope.stk().copy(true,GVN) : new NewNode();
+      MemMergeNode mem = GVN.init(new MemMergeNode(par._scope.mem(),nnn));
       scope.set_ctrl(par._scope.ctrl(),GVN);
-      scope.set_mem (par._scope.mem (),GVN);
+      scope.set_mem (mem,GVN);
       scope.set_stk (nnn,GVN);
     }
     _scope = GVN.init(scope);

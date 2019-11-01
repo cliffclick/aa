@@ -247,7 +247,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   @Override public TypeStruct make(boolean any, BitsAlias news) { return malloc(any,_flds,_ts,_finals,news).hashcons_free();  }
 
   // Extend the current struct with a new named field
-  @Override public TypeStruct add_fld( String name, Type t, byte mutable ) {
+  public TypeStruct add_fld( String name, Type t, byte mutable ) {
     assert t.isa(SCALAR) && (name==null || fldBot(name) || find(name,-1)==-1);
 
     Type  []   ts = Arrays.copyOfRange(_ts    ,0,_ts    .length+1);
@@ -258,13 +258,25 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     finals[_ts.length] = mutable;
     return make(flds,ts,finals,_news);
   }
-  @Override public TypeStruct set_fld( int idx, Type t, byte ff ) {
+  public TypeStruct set_fld( int idx, Type t, byte ff ) {
     Type[] ts = _ts.clone();
     ts[idx] = t;
     byte[] ffs = _finals;
     if( _finals[idx] != ff )
       (ffs = _finals.clone())[idx]=ff;
     return make(_flds,ts,ffs,_news);
+  }
+  public TypeStruct del_fld( int idx ) {
+    Type[] ts = new Type[_ts.length-1];
+    for( int i=0; i<idx; i++ ) ts[i] = _ts[i];
+    for( int i=idx; i<ts.length; i++ ) ts[i] = _ts[i+1];
+    String[] flds = new String[_flds.length-1];
+    for( int i=0; i<idx; i++ ) flds[i] = _flds[i];
+    for( int i=idx; i<flds.length; i++ ) flds[i] = _flds[i+1];
+    byte[] finals = new byte[_finals.length-1];
+    for( int i=0; i<idx; i++ ) finals[i] = _finals[i];
+    for( int i=idx; i<finals.length; i++ ) finals[i] = _finals[i+1];
+    return make(flds,ts,finals,_news);
   }
 
   // Dual the flds, dual the tuple.

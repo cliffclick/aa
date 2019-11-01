@@ -90,8 +90,6 @@ public class TypeName extends TypeObj<TypeName> {
   }
   public static TypeName make_forward_def_type( String name, HashMap<String,Type> lex ) { return make0(name,lex,TypeStruct.ALLSTRUCT,(short)-1); }
   
-  @Override public TypeName add_fld( String name, Type t, byte mutable ) { return make(((TypeObj)_t).add_fld(name,t,mutable)); }
-  @Override public TypeName set_fld( int idx, Type t, byte ff )          { return make(((TypeObj)_t).set_fld(idx ,t,ff     )); }
           static final HashMap<String,Type> TEST_SCOPE = new HashMap<>();
           static final TypeName TEST_ENUM = make("__test_enum",TEST_SCOPE,TypeInt.INT8);
           static final TypeName TEST_FLT  = make("__test_flt" ,TEST_SCOPE,TypeFlt.FLT32);

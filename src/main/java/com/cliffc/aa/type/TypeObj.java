@@ -39,9 +39,6 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
   public static final TypeObj XOBJ = (TypeObj)OBJ.dual();
   static final TypeObj[] TYPES = new TypeObj[]{OBJ,XOBJ};
 
-  public TypeObj add_fld( String name, Type t, byte mutable ) { throw typerr(t); }
-  public TypeObj set_fld( int idx, Type t, byte ff ) { throw typerr(t); }
-  
   @SuppressWarnings("unchecked")
   @Override protected O xdual() { return (O)new TypeObj(TOBJ,!_any,_news.dual()); }
   @Override protected Type xmeet( Type t ) {
