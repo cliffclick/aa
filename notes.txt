@@ -1,4 +1,12 @@
 =======================================
+Notes from 11/4/2019
+
+Reached a point where need to split by aliases across phis ... during parsing,
+to keep precision enough for the nScalar tests.  Experimenting with running
+iter during Parse.  Works surprisingly well.
+
+
+=======================================
 Notes from 11/2/2019
 
 Missing an execution model for full closures.  Ignoring type-inference or exact

@@ -19,7 +19,7 @@ import java.util.BitSet;
  *  stmt = [id[:type] [:]=]* ifex  // ids are (re-)assigned, and are available in later statements
  *  stmt = ^ifex                   // Early function exit
  *  ifex = expr [? stmt [: stmt]]  // trinary short-circuit logic; missing ":stmt" will default to 0
- *  expr = term [binop term]*      // gather all the binops and sort by precedence
+ *  expr = [uniop] term [binop term]*  // gather all the binops and sort by precedence
  *  term = id++ | id--             //
  *  term = tfact post              // A term is a tfact and some more stuff...
  *  post = empty                   // A term can be just a plain 'tfact'
@@ -374,24 +374,32 @@ public class Parse {
    *  expr = term [binop term]*
    */
   private Node expr() {
-    // term [binop term]*
+    Node unifun=null;
+    int oldx = _x;
+    String uni = token();
+    if( uni!=null ) {
+      unifun = _e.lookup_filter(uni,_gvn,1); // UniOp, or null
+      if( unifun==null || unifun.op_prec() == -1 ) _x=oldx; // Not a uniop
+    }
+
+    // [unifun] term [binop term]*
     Node term = term();
-    if( term == null ) return null; // Term is required, so missing term implies not any expr
+    if( term == null ) return unifun; // Term is required, so missing term implies not any expr
     // Collect 1st fcn/arg pair
     Ary<Node> funs = new Ary<>(new Node[1],0);
     try( TmpNode args = new TmpNode() ) {
-      funs.add(null);   args.add_def(term);
+      funs.add(unifun);   args.add_def(term);
 
       // Now loop for binop/term pairs: parse Kleene star of [binop term]
       while( true ) {
-        int oldx = _x;
+        oldx = _x;
         String bin = token();
         if( bin==null ) break;    // Valid parse, but no more Kleene star
         Node binfun = _e.lookup_filter(bin,_gvn,2); // BinOp, or null
         if( binfun==null ) { _x=oldx; break; } // Not a binop, no more Kleene star
         term = term();
         if( term == null ) term = err_ctrl2("missing expr after binary op "+bin);
-        funs.add(binfun);  args.add_def(term);
+        funs.add(binfun.keep());  args.add_def(term);
       }
 
       // Have a list of interspersed operators and terms.
@@ -399,14 +407,21 @@ public class Parse {
       int max=-1;                 // First find max precedence.
       for( Node n : funs ) if( n != null ) max = Math.max(max,n.op_prec());
       // Now starting at max working down, group list by pairs into a tree
-      while( args._defs._len > 1 ) {
-        for( int i=1; i<funs.len(); i++ ) { // For all ops of this precedence level, left-to-right
+      while( max >= 0 && args._defs._len > 0 ) {
+        for( int i=0; i<funs.len(); i++ ) { // For all ops of this precedence level, left-to-right
           Node fun = funs.at(i);
+          if( fun==null ) continue;
           assert fun.op_prec() <= max;
           if( fun.op_prec() < max ) continue; // Not yet
-          Node call = do_call(new CallNode(true,errMsg(),ctrl(),fun,mem(),args.in(i-1),args.in(i)));
-          args.set_def(i-1,call,_gvn);
-          funs.remove(i);  args.remove(i);  i--;
+          if( i==0 ) {
+            Node call = do_call(new CallNode(true,errMsg(),ctrl(),fun.unhook(),mem(),args.in(0)));
+            args.set_def(0,call,_gvn);
+            funs.setX(0,null);
+          } else {
+            Node call = do_call(new CallNode(true,errMsg(),ctrl(),fun.unhook(),mem(),args.in(i-1),args.in(i)));
+            args.set_def(i-1,call,_gvn);
+            funs.remove(i);  args.remove(i);  i--;
+          }
         }
         max--;
       }
@@ -695,28 +710,29 @@ public class Parse {
         if( tok == null ) break; // end-of-struct-def
         Type t = null;           // Untyped, most generic type that fits in a field
         Node stmt = con(Type.SCALAR);
-        boolean is_final = true;
-        if( peek(":=") ) { is_final = false; _x--; } // Parse := re-assignable field token
+        boolean is_mut = false;
+        if( peek(":=") ) { is_mut = true; _x--; } // Parse := re-assignable field token
         if( peek(':') ) { // Has type annotation?
           if( (t=type())==null )
             stmt = err_ctrl2("Missing type after ':'");
-          if( peek(":=") ) { is_final = false; _x--; } // Parse := re-assignable field token
+          if( peek(":=") ) { is_mut = true; _x--; } // Parse := re-assignable field token
         }
         if( peek('=') ) {       // Parse field initial value
           if( (stmt=stmt())==null )
             stmt = err_ctrl2("Missing ifex after assignment of '"+tok+"'");
-        } //else is_final=false;  // No assignment at all, assume r/w
+        } //else is_mut=true;  // No assignment at all, assume r/w
 
         // Check for repeating a field name in current scope only
         if( e._scope.exists(tok) ) {
           kill(stmt);           // Kill assignment
           stmt = err_ctrl2("Cannot define field '." + tok + "' twice"); // Error is now the result
+          update(tok,stmt,is_mut); // Update field
+        } else {
+          // Add type-check into graph
+          if( t != null )  stmt = typechk(stmt,t);
+          // Add field into lexical scope, field is usable after initial set
+          create(tok,stmt,ts_mutable(is_mut)); // Field now available 'bare' inside rest of scope
         }
-        // Add type-check into graph
-        if( t != null )  stmt = typechk(stmt,t);
-        // Add field into lexical scope, field is usable after initial set
-        update(tok,stmt,!is_final); // Field now available 'bare' inside rest of scope
-
         if( !peek(',') ) break; // Final comma is optional
       }
       require('}');
@@ -1011,7 +1027,7 @@ public class Parse {
   public Node lookup( String tok ) { return _e.lookup(tok); }
   public ScopeNode lookup_scope( String tok ) { return _e.lookup_scope(tok); }
   private Node update( String tok, Node n, boolean mutable ) { return _e._scope.stk().update(tok,-1,n,_gvn,ts_mutable(mutable)); }
-  private Node create( String tok, Node n, byte    mutable ) { return _e._scope.stk().create(tok,   n,_gvn,           mutable); }
+  private Node create( String tok, Node n, byte    mutable ) { return _e._scope.stk().create(tok,   n,_gvn,           mutable ); }
   private static byte ts_mutable(boolean mutable) { return mutable ? TypeStruct.frw() : TypeStruct.ffinal(); }
 
   private Node do_call( CallNode call0 ) {

@@ -918,7 +918,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   private int len0( TypeStruct tmax ) { return _any ? tmax._ts.length : _ts.length; }
 
   static private boolean fldTop( String s ) { return s.charAt(0)=='^'; }
-  static private boolean fldBot( String s ) { return s.charAt(0)=='.'; }
+  static public  boolean fldBot( String s ) { return s.charAt(0)=='.'; }
   // String meet
   private static String smeet( @NotNull String s0, @NotNull String s1 ) {
     if( fldTop(s0) ) return s1;

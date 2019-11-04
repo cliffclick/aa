@@ -32,8 +32,7 @@ public class MemMergeNode extends Node {
     if( mem instanceof MemMergeNode ) {
       MemMergeNode mem2 = (MemMergeNode)mem;
       if( obj() == mem2.obj() )
-        //  return mem2;
-        throw com.cliffc.aa.AA.unimpl();
+        return mem2;
     }
     return null;
   }

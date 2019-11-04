@@ -371,6 +371,7 @@ static class Not extends PrimNode {
     return TypeInt.FALSE;       // Cannot be a nil
   }
   @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
+  @Override public byte op_prec() { return 9; }
 }
 
 

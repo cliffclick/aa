@@ -123,18 +123,20 @@ public class LoadNode extends Node {
     TypeMemPtr tadr = (TypeMemPtr)adr;
 
     Type mem = gvn.type(mem());     // Memory
-    if( !(mem instanceof TypeMem) ) // Nothing sane
-      return mem.above_center() ? Type.XSCALAR : Type.SCALAR;
-    TypeObj obj = ((TypeMem)mem).ld(tadr);
-    TypeObj obj2 = (TypeObj)obj.meet(tadr._obj); // Loaded obj is in expected type bounds of pointer?
-    Type base = obj2.base();
+    if( !(mem instanceof TypeStruct) ) {
+      if( !(mem instanceof TypeMem) ) // Nothing sane
+        return mem.above_center() ? Type.XSCALAR : Type.SCALAR;
+      TypeObj obj = ((TypeMem)mem).ld(tadr);
+      TypeObj obj2 = (TypeObj)obj.meet(tadr._obj); // Loaded obj is in expected type bounds of pointer?
+      mem = obj2.base();
+    }
 
-    if( base instanceof TypeStruct ) {
-      TypeStruct ts = (TypeStruct)base;
+    if( mem instanceof TypeStruct ) {
+      TypeStruct ts = (TypeStruct)mem;
       int idx = ts.find(_fld,_fld_num);  // Find the named field
       if( idx != -1 ) return ts.at(idx); // Field type
       // No such field
-      return base.above_center() ? Type.XSCALAR : Type.SCALAR;
+      return mem.above_center() ? Type.XSCALAR : Type.SCALAR;
     }
     return Type.SCALAR;        // No loading from e.g. Strings
   }
@@ -146,17 +148,20 @@ public class LoadNode extends Node {
     if( !(t instanceof TypeMemPtr) )
       return bad("Unknown"); // Not a pointer, cannot load a field
     TypeMemPtr t3 = (TypeMemPtr)t;
-    TypeMem t4 = (TypeMem)gvn.type(mem()); // Should be memory
-    Type t5 = t4.ld(t3);                   // Meets of all aliases
-    if( !(t5 instanceof TypeStruct) ) {    // No fields, so memory or ptr is in-error
-      Type t6 = t3._obj.base();
-      if( t6 instanceof TypeStruct ) {
-        t5 = t6;
-      } else {
-        return bad("Unknown");
-      }
+    Type t4 = gvn.type(mem());
+    if( t4 instanceof TypeMem ) {         // Memory or Struct, for various errors
+      TypeMem t5 = (TypeMem)t4;           // Should be memory
+      Type t6 = t5.ld(t3);                // General load from memory
+      if( !(t6 instanceof TypeStruct) ) { // No fields, so memory or ptr is in-error
+        Type t7 = t3._obj.base();
+        if( t7 instanceof TypeStruct ) {
+          t4 = t7;
+        } else {
+          return bad("Unknown");
+        }
+      } else t4 = t6;
     }
-    if( ((TypeStruct)t5).find(_fld,_fld_num) == -1 )
+    if( ((TypeStruct)t4).find(_fld,_fld_num) == -1 )
       return bad("Unknown");
     return null;
   }

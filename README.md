@@ -55,7 +55,7 @@ BNF                           | Comment
 `stmt = [id[:type] [:]=]* ifex` | ids are (re-)assigned, and are available in later statements.  
 `stmt = ^ifex`                | Early function exit
 `ifex = expr [? stmt [: stmt]]` | trinary logic; the else-clause will default to 0
-`expr = term [binop term]*`   | gather all the binops and sort by prec
+`expr = [uniop] term [binop term]*` | gather all the binops and sort by prec
 `term = id++ | id--`          | post-inc/dec operators
 `term = tfact post`           | A term is a tfact and some more stuff...
 `post = empty`                | A term can be just a plain 'tfact'
