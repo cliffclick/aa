@@ -68,8 +68,9 @@ public class GVNGCM {
     while( _work._len > 0 ) {   // Can be a few leftover dead bits...
       Node n = _work.pop();     // from top-level parse killing result...
       _wrk_bits.clear(n._uid);  // after getting type to return
+      if( n == Env.MEM_0 ) continue; // Do not nuke top-level frame with primitives
       // Unreachable loops can be dead; break the loop and delete
-      for( int i=0; !n.is_dead() && i<n._defs._len; i++ ) 
+      for( int i=0; !n.is_dead() && i<n._defs._len; i++ )
         if( n.in(i)!=null )     // Start breaking edges
           set_def_reg(n,i,null);
     }
@@ -175,6 +176,14 @@ public class GVNGCM {
   public void set_def_reg(Node n, int idx, Node def) {
     _vals.remove(n);            // Remove from GVN
     n.set_def(idx,def,this);    // Hack edge
+    if( n.is_dead() ) return;
+    assert !check_gvn(n,false); // Check not in GVN table after hack
+    _vals.put(n,n);             // Back in GVN table
+    add_work(n);
+  }
+  public void remove_reg(Node n, int idx) {
+    _vals.remove(n);            // Remove from GVN
+    n.remove(idx,this);         // Hack edge
     if( n.is_dead() ) return;
     assert !check_gvn(n,false); // Check not in GVN table after hack
     _vals.put(n,n);             // Back in GVN table
@@ -387,13 +396,8 @@ public class GVNGCM {
     _opt_mode = 2;
     // Set all types to null (except primitives); null is the visit flag when
     // setting types to their highest value.
+    Arrays.fill(_ts._es,0,Env.LAST_START_UID,null);
     Arrays.fill(_ts._es,_INIT0_CNT,_ts._len,null);
-    assert Env.START._uid==0;
-    assert Env.CTL_0._uid==1;
-    assert Env.MEM_0._uid==2;
-    _ts.setX(0,null);
-    _ts.setX(1,null);
-    _ts.setX(2,null);
     // Set all types to all_type().dual(), their most optimistic type,
     // and prime the worklist.
     walk_initype( Env.START);
@@ -410,7 +414,7 @@ public class GVNGCM {
         Node n = _work.pop();
         _wrk_bits.clear(n._uid);
         if( n.is_dead() ) continue; // Can be dead functions after removing ambiguous calls
-        if( 3 <= n._uid && n._uid < _INIT0_CNT ) continue; // Ignore primitives (type is unchanged and conservative)
+        if( Env.LAST_START_UID <= n._uid && n._uid < _INIT0_CNT ) continue; // Ignore primitives (type is unchanged and conservative)
         if( n instanceof CallNode ) {
           CallNode call = (CallNode)n;
           BitsFun fidxs = call.fidxs(this);
@@ -482,8 +486,8 @@ public class GVNGCM {
     if( n instanceof FunNode && n._uid >= _INIT0_CNT ) {
       FunNode fun = (FunNode)n;
       RetNode ret = fun.ret();
-      if( type(fun)==Type.CTRL && !fun.is_forward_ref() ) {
-        if( type(ret.ctl()) != Type.CTRL ) throw AA.unimpl(); // never-return function (maybe never called?)
+      if( type(fun)==Type.CTRL && !fun.is_forward_ref() &&
+          type(ret.ctl()) == Type.CTRL ) { // never-return function (maybe never called?)
         Type tret = ((TypeTuple)type(ret)).at(2);
         if( fun._tf._ret != tret && // can sharpen function return
             tret.isa(fun._tf._ret) ) { // Only if sharpened (might not be true for errors)

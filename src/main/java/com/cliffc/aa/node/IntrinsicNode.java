@@ -162,8 +162,8 @@ public abstract class IntrinsicNode extends Node {
     // Add input edges to the NewNode
     for( int i=0; i<from._ts.length; i++ ) {
       String argx = from._flds[i];
-      Type t = from._ts[i];
-      nnn.add_fld(argx,t,gvn.xform(new ParmNode(i,argx,fun, gvn.con(t),null)),from._finals[i]);
+      Node n = gvn.xform(new ParmNode(i,argx,fun, gvn.con(from._ts[i]),null));
+      nnn.create(argx,n,gvn,from._finals[i]);
     }
     nnn.set_name(gvn,to);
     Node nnn2 = gvn.xform(nnn);

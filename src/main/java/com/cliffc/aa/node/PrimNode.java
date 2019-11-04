@@ -198,6 +198,7 @@ abstract static class Prim1OpF64 extends PrimNode {
 static class MinusF64 extends Prim1OpF64 {
   MinusF64() { super("-"); }
   @Override double op( double d ) { return -d; }
+  @Override public byte op_prec() { return 9; }
 }
 
 // 1Ops have uniform input/output types, so take a shortcut on name printing
@@ -210,6 +211,7 @@ abstract static class Prim1OpI64 extends PrimNode {
 static class MinusI64 extends Prim1OpI64 {
   MinusI64() { super("-"); }
   @Override long op( long x ) { return -x; }
+  @Override public byte op_prec() { return 9; }
 }
 
 // 2Ops have uniform input/output types, so take a shortcut on name printing

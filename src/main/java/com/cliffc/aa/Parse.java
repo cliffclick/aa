@@ -105,9 +105,7 @@ public class Parse {
   TypeEnv go_whole( ) {
     prog();                     // Parse a program
     // Delete names at the top scope before final optimization.
-    if( !_gvn.touched(_e._scope.stk()) )
-      _gvn.rereg(_e._scope.stk(), Type.ALL); // have to register before deleting to keep asserts
-    _e._scope.set_stk(null,_gvn);         // delete top-level names
+    _e._scope.set_ptr(null,_gvn); // delete top-level names
     _gvn.iter();   // Pessimistic optimizations; might improve error situation
     remove_unknown_callers();
     _gvn.gcp(_e._scope); // Global Constant Propagation
@@ -279,17 +277,19 @@ public class Parse {
       return ifex == null ? err_ctrl2("Missing term after ^") : _e.early_exit(this,ifex);
     }
 
+    // Gather ids in x = y = z = ....
     Ary<String> toks = new Ary<>(new String[1],0);
     Ary<Type  > ts   = new Ary<>(new Type  [1],0);
     BitSet rs = new BitSet();
     while( true ) {
       int oldx = _x;
-      String tok = token();  // Scan for 'id = ...'
-      if( tok == null ) break;
+      String tok = token();     // Scan for 'id = ...'
+      if( tok == null ) break;  // Out of ids
       int oldx2 = _x;
       Type t = null;
       if( peek(':') && (t=type())==null ) _x = oldx2; // Grammar ambiguity, resolve p?a:b from a:int
-      if( peek(":=") ) rs.set(toks._len);   // Re-assignment parse
+      // Check for x := ... vs x = ...
+      if( peek(":=") ) rs.set(toks._len);             // Re-assignment parse
       else if( !peek('=') ) { _x = oldx; break; } // Unwind token parse, and not assignment
       toks.add(tok);
       ts  .add(t  );
@@ -300,18 +300,18 @@ public class Parse {
     if( ifex == null )          // No statement?
       return toks._len == 0 ? null
         : err_ctrl2("Missing ifex after assignment of '"+toks.last()+"'");
-    // Honor all type requests, all at once
+    // Honor all type requests, all at once, by inserting type checks on the ifex.
     for( Type t : ts )
       ifex = typechk(ifex,t);
     // Assign tokens to value
     for( int i=0; i<toks._len; i++ ) {
       String tok = toks.at(i);               // Token being assigned
-      boolean mutable = rs.get(i);           // Assignment is mutable or final
+      byte mutable = ts_mutable(rs.get(i));  // Assignment is mutable or final
       ScopeNode scope = lookup_scope(tok);   // Prior scope of token
       if( scope==null ) {                    // Token not already bound at any scope
         if( !ifex.is_forward_ref() ) {       // Do not assign unknown refs to another name
-          update(tok,ifex,mutable);          // Bind token to a value in this scope
           if( ifex instanceof FunPtrNode ) ((FunPtrNode)ifex).fun().bind(tok); // Debug only: give name to function
+          create(tok,ifex,mutable); // Bind token to a value in this scope
         }
       } else { // Handle re-assignments and forward referenced function definitions
         Node n = scope.stk().get(tok);     // Get prior binding
@@ -321,7 +321,8 @@ public class Parse {
           ((FunPtrNode)n).merge_ref_def(_gvn,tok,(FunPtrNode)ifex);
         } else if( is_mutable ) { // Mutate if mutable
           ScopeNode scope_if = _e.lookup_if(tok);  // (re-)assign in scope or enclosing If mini-scope
-          scope_if.stk().update(tok,-1,ifex,_gvn,ts_mutable(mutable));
+          if( scope_if._if ) scope_if.stk().make_fld(tok,ifex,_gvn,mutable);
+          else set_mem(gvn(new StoreNode(null,mem(),scope_if.ptr(),ifex,mutable,tok,errMsg())));
         } else
           err_ctrl0("Cannot re-assign final val '"+tok+"'");
       }
@@ -371,7 +372,6 @@ public class Parse {
   /** Parse an expression, a list of terms and infix operators.  The whole list
    *  is broken up into a tree based on operator precedence.
    *  expr = term [binop term]*
-   *  expr = ^term
    */
   private Node expr() {
     // term [binop term]*
@@ -484,19 +484,23 @@ public class Parse {
   private Node inc(String tok, int d) {
     ScopeNode scope = lookup_scope(tok); // Find prior scope of token
     Node n;
-    if( scope==null ) { scope = _e._scope; n = con(Type.NIL); }  // Token not already bound to a value
-    else {                             // Check existing token for mutable
+    if( scope==null ) {         // Token not already bound to a value
+      create(tok,n = con(Type.NIL),ts_mutable(true));
+      scope = _e._scope;
+    } else {                    // Check existing token for mutable
       if( !scope.is_mutable(tok) )
         return err_ctrl2("Cannot re-assign final val '"+tok+"'");
+      if( scope._if ) throw AA.unimpl();
       // Now properly load from the closure
-      n = gvn(new LoadNode(ctrl(),mem(),scope.stk(),tok,errMsg()));
+      n = gvn(new LoadNode(ctrl(),mem(),scope.ptr(),tok,errMsg()));
       if( n.is_forward_ref() )         // Prior is actually a forward-ref
         return err_ctrl2(forward_ref_err(((FunPtrNode)n).fun()));
     }
     Node plus = _e.lookup_filter("+",_gvn,2);
-    Node sum = do_call(new CallNode(true,errMsg(),ctrl(),plus,mem(),n,con(TypeInt.con(d))));
-    set_mem(gvn(new StoreNode(ctrl(),mem(),scope.stk(),sum,TypeStruct.frw(),tok,errMsg())));
-    return sum;
+    Node sum = do_call(new CallNode(true,errMsg(),ctrl(),plus,mem(),n.keep(),con(TypeInt.con(d))));
+    if( scope._if ) throw AA.unimpl();
+    set_mem(gvn(new StoreNode(null,mem(),scope.ptr(),sum,TypeStruct.frw(),tok,errMsg())));
+    return n.unhook();
   }
 
   /** Parse an optionally typed factor
@@ -556,22 +560,23 @@ public class Parse {
     String tok = token0();
     if( tok == null || tok.equals("=") || tok.equals("^"))
       { _x = oldx; return null; } // Disallow '=' as a fact, too easy to make mistakes
-    Node var = lookup(tok);
-    if( var == null ) // Assume any unknown ref is a forward-ref of a recursive function
-      return update(tok,gvn(FunPtrNode.forward_ref(_gvn,tok,this)),false);
+    ScopeNode scope = lookup_scope(tok);
+    if( scope == null ) // Assume any unknown ref is a forward-ref of a recursive function
+      return create(tok,gvn(FunPtrNode.forward_ref(_gvn,tok,this)),ts_mutable(false));
     // Disallow uniop and binop functions as factors.
-    if( var.op_prec() > 0 ) { _x = oldx; return null; }
-    return var;
+    if( scope.get(tok).op_prec() > 0 ) { _x = oldx; return null; }
+    // Load variable from scope.  If scopes use directly, closures must load
+    if( scope._if ) return scope.get(tok);
+    return gvn(new LoadNode(null,mem(),scope.ptr(),tok,null));
   }
 
   /** Parse a tuple; first stmt but not the ',' parsed.
    *  tuple= (stmts,[stmts,])     // Tuple; final comma is optional
    */
   private Node tuple(Node s) {
-    NewNode nn = new NewNode();
-    int cnt=0;
+    NewNode nn = init(new NewNode());
     while( s!=null ) {
-      nn.update(null,cnt++,s,_gvn,TypeStruct.ffinal());
+      nn.create(null,s,_gvn,TypeStruct.ffinal());
       if( !peek(',') ) break;   // Final comma is optional
       s=stmts();
     }
@@ -584,7 +589,7 @@ public class Parse {
    *  number of statements separated by ';'.
    *  func = { [[id]* ->]? stmts }
    */
-  private static final boolean args_are_mutable=false; // Args mutable or r/only by default
+  private static final byte args_are_mutable=ts_mutable(false); // Args mutable or r/only by default
   private Node func() {
     int oldx = _x;
     Ary<String> ids = new Ary<>(new String[1],0);
@@ -618,11 +623,15 @@ public class Parse {
       for( int i=0; i<ids._len; i++ ) {
         Node parm = gvn(new ParmNode(cnt++,ids.at(i),fun,con(Type.SCALAR),errmsg));
         Node mt = typechk(parm,ts.at(i));
-        update(ids.at(i),mt, args_are_mutable);
+        create(ids.at(i),mt, args_are_mutable);
       }
       Node rpc = gvn(new ParmNode(-1,"rpc",fun,con(TypeRPC.ALL_CALL),null));
       Node mem = gvn(new ParmNode(-2,"mem",fun,con(TypeMem.MEM),null));
-      set_mem(mem);
+      // Function memory is a merge of incoming wide memory, and the local
+      // closure implied by arguments.
+      assert mem() instanceof MemMergeNode && mem().in(1).in(0) == e._scope.stk();
+      _gvn.set_def_reg(mem(),0,mem);
+      // Parse function body
       Node rez = stmts();       // Parse function body
       if( rez == null ) rez = err_ctrl2("Missing function body");
       require('}');             //
@@ -1001,8 +1010,9 @@ public class Parse {
 
   public Node lookup( String tok ) { return _e.lookup(tok); }
   public ScopeNode lookup_scope( String tok ) { return _e.lookup_scope(tok); }
-  private Node update( String tok, Node n, boolean mutable ) { _e._scope.stk().update(tok,-1,n,_gvn,ts_mutable(mutable)); return n; }
-  private byte ts_mutable(boolean mutable) { return mutable ? TypeStruct.frw() : TypeStruct.ffinal(); }
+  private Node update( String tok, Node n, boolean mutable ) { return _e._scope.stk().update(tok,-1,n,_gvn,ts_mutable(mutable)); }
+  private Node create( String tok, Node n, byte    mutable ) { return _e._scope.stk().create(tok,   n,_gvn,           mutable); }
+  private static byte ts_mutable(boolean mutable) { return mutable ? TypeStruct.frw() : TypeStruct.ffinal(); }
 
   private Node do_call( CallNode call0 ) {
     Node call = gvn(call0.keep());
@@ -1018,9 +1028,8 @@ public class Parse {
   // NewNode updates merges the new allocation into all-of-memory and returns a
   // reference.
   private Node do_mem(NewNode nnn) {
-    Node nn  = gvn(nnn);
-    Node mem = gvn(new OProjNode(nn,0));
-    Node ptr = gvn(new  ProjNode(nn,1));
+    Node mem = gvn(new OProjNode(nnn,0));
+    Node ptr = gvn(new  ProjNode(nnn,1));
     set_mem(gvn(new MemMergeNode(mem(),mem)));
     return ptr;
   }

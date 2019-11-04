@@ -1,3 +1,337 @@
+=======================================
+Notes from 11/2/2019
+
+Missing an execution model for full closures.  Ignoring type-inference or exact
+syntax or even semantics, want to actually execute w/closures to try tiny
+examples on lifetime management.
+
+
+
+---
+Trying the impl...
+Need to load '-' from starting Scope; scope pts to:
+  ctrl,mem,New
+Missed; needs to point to:
+
+CTRL (start ctrl)
+ |  (start memory)  (primitives, stored as funptrs into closure)
+ |    XMEM            New
+ |      \        [OProj,DProj]
+  \      \          /
+   \-    Scope    -/
+
+Normal 'fact' lookup turns into:
+ - find Scope
+ - Issue Load for field against memory & address from Scope.
+
+Normal 'stmt' update inserts a Store:
+
+some               (closure#17)
+ctrl                  New#17
+  |    some_mem   [OProj#17,DProj#17]
+  |    [all-17]     |           /
+  |      |         .... (any number of stores, or Phis)
+   \     \         /          / 
+         Scope   -/ (#17)  --/ (the ptr-to-#17)
+
+
+Does Scope need "all the other memories"?  Or just the parser?
+Or is the parser using the Scope memory exactly for that...
+The stack of Scopes gives me a stack of memory... which is supposed
+to be serialized (except for implicit parallelism from unaliased closures).
+Which makes me suspicious that in fact can be aliased.
+
+   > (inc, get) = { cnt=0; ({cnt++},{cnt}) }()
+
+   Fun ParmMem[all-#17]
+      0
+      |
+     New#17 (cnt)
+     [OProj,DProj]
+                \
+get = Fun-Parm   \  <<-- requires #17 here on mem parm
+            |    | 
+             Load|  <<-- since uses #17
+           Ret   |
+                 |
+inc = Fun-Parm   |
+            |    | 
+            |Load|
+            |    \ +1
+            |     |
+             Store
+             /
+          Ret
+     (inc,get) <<-- closure memory always escapes on Ret, but can go dead later
+     Ret
+
+Called from Top-level:
+  Call
+  CallEpi
+  [ctrl,mem+#17,(inc,get)]
+  
+
+=======================================
+Notes from 11/1/2019
+
+
+Pondering making NewNode a single scalar field only.  Returns a TMP with single
+alias#, somehow attached to the user-notion of an allocation site (plus its
+clones when inlined).  Flattens the alias# space to remove the field-level
+alias.  Does not help arrays?  Allows fields to die independently.  Means
+I do not have to figure out any field-level opts, since the graph does it.
+NO: Does not help arrays... still need 2 levels of aliasing.
+
+
+  Call fcn-ptr,args
+  CallEpi: wired Funs
+  [Ctrl,AllMem,Val]
+
+Only 1 single "phat" memory in any network slice.
+
+Rules for MemMerge: All inputs are unaliased - but may share alias# if on right
+is a NewNode.  Far left is the "phat" memory (includes alias#1) and others are
+input in first alias# order? (so I can find easily, beats array by alias# I
+think).  Never same alias twice (unless a NewNode).
+
+Rules for StoreNode (which I highly suspect are not yet proper): Output Mem is
+same alias as Input Mem.  No bypassing phat-Store-by-phat-Store based on
+different alias# without direct replacement... because leaves 2 parallel "phat"
+memory.  Instead, request memory split and the independent alias#s float
+about.  If stores are on different skinny alias, then already bypassed.
+
+"Request Memory Split" - if this Node expects to use some sub-part of memory,
+but is given phat memory, pass the request "up hill".  If this Node expects to
+"root" "phat" memory, then insert the split: AliasProj's based on users;
+AliasProj's need some quick way to assert unrelated alias#s - all alias# splits
+listed on 'phat' memory AliasProj perhaps?  Or on the 'phat' producer?
+
+Means: can ask a using node for the set of aliass it uses (without regard to
+which input edge), and can insert graph widening Nodes.  Maybe do not need the
+field-level nodes because field aliasing info is "perfect".
+
+Phi with "Request memory split" - Shatter "phat" phi into alias Phis, but not
+for "has unknown callers".  Can further shatter alias#phis into field#phis.
+
+NewNode-as-closure; during Parsing can add_fld.  But cannot del_fld, even as it
+goes out of scope - because of closure can have live uses.  Out-of-scope means
+the variable lookup quits succeeding.
+
+Can we have a reachability-analysis for each TypeMem, based on the reaching
+TMP+fields, assuming all are read allows max reachability in alias class which
+allows max reading ptrs, recursively?
+If a alias#+fld doesn't appear in the max-reach, then its not needed in the TypeMem?
+Can be different if accessed from different TMPs?  If there is only one, can canonicalize!
+Can be ~Scalared in the type, does not show in the used-aliases-on-ask.
+Can be recorded as part of the canonicalization?
+
+
+-------------------------------------
+Example needed for updating closure fields directly, bleah.
+
+
+[Ctrl,AllMem,Val]
+ |
+ |   NewNode [TStruct,TMP]
+  \  [OProj#18,DProj]
+   \  |          |   3.1415
+   MemMerge[All] /  /
+      |         /  /
+      Store[#18]
+      |  <type is All,18>
+
+
+Store, direct to MemMerge, cannot bypass on #18 alone, can only bypass if
+address pts to prior generator of address.  Works in this case:
+
+[Ctrl,AllMem,Val]
+ |
+ |   NewNode [TStruct,TMP]
+ |   [OProj#18,DProj]    3.1415
+ |    |         /       /
+ |    Store[#18.z]     /
+ |    |  <type is 18>
+ |    |
+ MemMerge[All]
+     |       
+
+
+Store, direct to OProj,DProj,NewNode, and NO other same-field uses of OProj can
+fold; but want independent field folding, so request field split/merge.
+Multiple stores will stack back-to-back and serialize.  Probably do not need
+THIS level of precision, since field-name-alias is perfect.
+
+[Ctrl,AllMem,Val]
+ |
+ |   NewNode [TStruct,TMP]
+ |   [OProj#18,DProj]
+ |   [x][y][z]   |    3.1415
+ |    |  |  |    |   /
+ |    |  | Store[#18.z]
+ |    |  |  |
+ |   [FldMerge]
+ MemMerge[All]
+     |       
+
+
+Store of a FldProj - must be matching field and alias (or error).
+Can "peek" thru for opts.
+
+[Ctrl,AllMem,Val]  3.1415
+ |                /
+ |   NewNode [TStruct,TMP]
+ |   [OProj#18,DProj]
+ |   [x][y][z] 
+ |    |  |  |  
+ |    |  |  |
+ |   [FldMerge]
+ MemMerge[All]
+     |       
+
+"Junk" FldSplit/FldMerge rejoins:
+
+[Ctrl,AllMem,Val]  3.1415
+ |                /
+ |   NewNode [TStruct,TMP]
+ |   [OProj#18,DProj]
+ |       |    
+ MemMerge[All]
+     |       
+
+
+-------------------------------------
+
+
+
+
+=================================================================================
+
+Hidden variable 'cnt' inside outer closure.
+Return two functions in a tuple, one increments cnt, the other gets it.
+    > (inc, get) = { cnt=0; ({cnt++;0},{cnt}) }()
+    > inc()
+    0
+    > get()
+    1
+    > inc()
+    0
+    > get()
+    2
+The outer anon fcn returns and exits, but the storage for 'cnt' remains.
+'inc' and 'get' can read & write 'cnt', but 'cnt' is otherwise private.
+
+Every ScopeNode turns into a NewNode with variable mappings via TypeStruct,
+which grows as new var names appear.  Every fcn call passes in a display with
+all parent scopes (the Env).  All var refs become lds/sts against the NewNode/
+ScopeNode.  Standard ld/st ops apply, and a NewNode goes dead the normal way-
+no other uses.  Last "normal" use goes away when fcn exits, but display based
+uses from nested fcns (i.e., a REAL closure usage) might keep alive.
+
+Can I do this without going the ld/st route?  What's so special about threading
+memory thru-out?  Or even threading just the NewNode, no aliasing issues... i
+think.  In the above inc/get I can call it 3 times, get 3 unrelated counters.
+Pass the fcns along, and get them inlined.  So inc1 bumps cnt1, inc2 bumps
+cnt2, and inlined side-by-side.  So cnt1,cnt2 memory ops come from the same
+anon fcn.  Can call in a loop, have millions of ctrs from the same anon fcn -
+which must therefore be the same alias, therefore ld/st required.
+
+
+Plan B:
+
+Keep ScopeNode, but remove most everything from it.  NewNode makes a Struct
+which includes finalness and field names.  But need to allow more fields like
+Scope does.  At Scope exit, NewNode allowed to be dead.
+
+NewNode produces a Tuple of TMP+field for every field.  Each ProjNode can go
+dead independently, matching dead field goes to XSCALAR.  When all proj fields
+die, NewNode goes to XMEM (even with MemMerge use).
+
+Phat memory usage "forgets" fields.  To remove single unused fields, need to
+explode out of phat memory.
+
+More precise memory handling: 2 layer split/join:
+
+AliasProj - can follow any whole memory.  Slices out a set of disjoint aliases.
+FieldProj - can follow any single alias.  Slices out a set of disjoint fields.
+FldMerge - collects complete field updates to form a complete alias type.
+MemMerge - collects complere alias updates to form total memory.
+
+NewNode - produces alias# that is further exactly not any other instance of the
+same alias#; can be followed by FldProj.
+MemMerge - can accept a NewNode input that overlaps with same alias#; NewNode
+is now "confused".
+
+
+Looking for a model where individual fields can go dead.
+Looking for a model where pre-wired calls can wire without memory (pure)
+or read-only memory (const).
+
+Graph rewrite opts: skinny memory reads from a phat memory: explodes it iff
+progress.  skinny write forces parser explosion & rejoin.  ScopeNode mem slot
+pts to a phat memory or a MemMerge, which pts to many FldMerges.  Leaves it
+exploded as parse rolls forward until sees a usage of phat memory.  Then leaves
+the Mem/Fld Merge in the graph, and starts anew after def of phat memory.
+
+Escaped ptrs: if at a phat memory usage we can see no instances of TMP alias#
+in the memory or values, we can declare "not escaped", and now remove an alias#
+from phat node usage.  To see field escapes, need a backwards prop of field
+usages.  Currently thinking has no way to detect lack-of-usage except via (lack
+of) graph node edges.  Have to "explode" in the graph all phat into alias#s
+into fields, and push the "inflated" graph all about, then do DCE.  Note:
+cannot remove dead field if ptr escapes at all, because later parser might use
+field.  Strictly ok after removing unknown callers.
+
+FunNode with mem Parm: can skip mem, if mem is not used (pure fcn, common on
+many operators).  Can cast TypeObj._news to a limit set, and then only takes
+that memory alias set and bypass the rest.  If purely reading memory, still
+take in that alias, but RetNode pts to the ParmNode directly.  The cast-to-str
+PrimNodes which alloc a new Str do not take memory, but the RetNode produces a
+brand new alias which needs to fold into a post-call MemMerge.
+
+Pure: RetNode has a null memory (no pre-call split, no post-call merge).  Parm is missing.
+Read subset:  RetNode can be equal to Parm, with subset in Parm type.
+Write subset: RetNode & Parm has some (not all alias#s), but not equal to Parm.
+All: RetNode has phat, so does Parm - and not equal to Parm.
+New: RetNode can include MORE alias#s than the Parm.  Needs a MemMerge.
+New factory: Parm is missing.  RetNode takes in some aliases.
+
+Plan B2:  No!
+
+Only keep all memory pre-exploded at the alias/field level.  Leads to huge
+count of graph nodes, esp for unrelated chunks of code that just "pass thru".
+
+
+
+
+---
+For closures, all local vars actually talk to the scope-local NewNode, which
+can grow fields for a time.  Stops growing fields at scope exit.  Local var
+uses do Load & Store, which collapse against any NewNode including the scope-
+local one.  Scope-local NewNode available for inner scopes - this is the
+closure usage, and therefore serialize later stores against inner fun calls.
+Requires inner calls always take outer scope NewNode, and later optimize.
+
+MemMerge only used before calls to flatten everything.  Wired calls can switch
+to using some aliases instead of all, with the alts aliases going around the
+call.
+
+Calls not wired take all of memory, including scope-local News.  Can optimize
+against non-escaping aliases.  Wired calls can be more exact.
+
+Funs & Mem Parm - split into separate aliases by usage (not defs).  Pass-thru
+memories can be optimized by wired calls: direct from Ret/MemMerge/PhatMemParm.
+Bypass in the CallEpi Ideal.  Flag the bypassed aliases in the MemMerge... but
+somewhere else, perhaps the FunNode, for better assertions.
+
+Root Scope becomes Root New.  Fields are primitive names.  All "final", except
+can replace a prim funptr value with a Unresolved of the same name.
+
+
+
+
+=================================================================================
+Old notes from 7/6/2019
+
 Bits-split fail attempts
 
 - Plan A: split 6 into 9,10; remove all 6's via a read-barrier-before-use.

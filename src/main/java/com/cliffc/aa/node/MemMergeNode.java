@@ -23,15 +23,11 @@ public class MemMergeNode extends Node {
     if( _uses._len==1 && _uses.at(0) instanceof StoreNode )
       gvn.add_work(_uses.at(0));
 
-    // If merging from a NewNode, and the NewNode's address is not looked at
-    // then memory contents cannot be looked at and are also dead.
-    Node obj = obj(), nnew = obj.in(0), mem = mem();
-    if( obj instanceof OProjNode &&
-        nnew instanceof NewNode &&
-        nnew._uses._len==1  &&  // Nobody uses the pointer, except this
-        nnew._keep == 0 )       // Including future parser uses
-      return mem;               // Skinny object is dead, nothing to merge
-
+    // if Skinny memory is XMEM, then merging nothing and remove self
+    Node mem = mem();
+    if( gvn.type(obj())==TypeMem.XMEM )
+      return mem;
+    
     // Back-to-back merges collapse, same as back-to-back stores
     if( mem instanceof MemMergeNode ) {
       MemMergeNode mem2 = (MemMergeNode)mem;

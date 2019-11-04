@@ -1,5 +1,6 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.AA;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
@@ -220,6 +221,18 @@ public class TypeMem extends Type<TypeMem> {
       obj = (TypeObj)(any ? obj.join(x) : obj.meet(x));
     }
     return obj;
+  }
+
+  // Some overlap between the aliases - a May-Alias relationship.
+  public boolean contains( BitsAlias aliases ) {
+    if( aliases.above_center() ) return false;
+    BitSet bs = aliases.tree().plus_kids(aliases);
+    for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) ) {
+      TypeObj x = at(alias);
+      if( !x._news.above_center() )
+        return true;
+    }
+    return false;
   }
 
   // Meet of all possible storable values, after updates.  This updates a field

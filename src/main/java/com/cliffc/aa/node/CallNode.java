@@ -285,7 +285,8 @@ public class CallNode extends Node {
     Node xfp = fp instanceof UnresolvedNode ? fp.in(0) : fp;
     if( xfp instanceof FunPtrNode ) {
       FunPtrNode ptr = (FunPtrNode)xfp;
-      FunNode fun = ptr.fun();
+      int fidx = ptr.ret()._fidx;    // Reliably returns a fidx
+      FunNode fun = FunNode.find_fidx(fidx);
       if( fp.is_forward_ref() ) // Forward ref on incoming function
         return _badargs.forward_ref_err(fun);
 

@@ -15,23 +15,26 @@ public class ScopeNode extends Node {
 
   // Mapping from type-variables to Types.  Types have a scope lifetime like values.
   private final HashMap<String,Type> _types; // user-typing type names
+  public final boolean _if;                  // Mini-scope or not
 
-  public ScopeNode(boolean early) {
-    super(OP_SCOPE,null,null,null);
+  public ScopeNode(boolean early, boolean ifscope) {
+    super(OP_SCOPE,null,null,null,null);
     if( early ) { add_def(null); add_def(null); add_def(null); } // Wire up an early-function-exit path
     _types = new HashMap<>();
+    _if = ifscope;
     keep();
   }
 
   // Add base types on startup
   public void init0() { Type.init0(_types); }
 
-  public    Node ctrl() { return in(0); }
-  public    Node mem () { return in(1); }
-  public NewNode stk () { return (NewNode)in(2); }
-  public void set_ctrl(   Node n, GVNGCM gvn) { set_def(0,n,gvn); }
-  public void set_mem (   Node n, GVNGCM gvn) { set_def(1,n,gvn); }
-  public void set_stk (NewNode n, GVNGCM gvn) { set_def(2,n,gvn); }
+  public   Node ctrl() { return in(0); }
+  public   Node mem () { return in(1); }
+  public   Node ptr () { return in(2); }
+  public NewNode stk() { return (NewNode)ptr().in(0); }
+  public void set_ctrl( Node n, GVNGCM gvn) { set_def(0,n,gvn); }
+  public void set_mem ( Node n, GVNGCM gvn) { set_def(1,n,gvn); }
+  public void set_ptr ( Node n, GVNGCM gvn) { set_def(2,n,gvn); }
 
   public Node get(String name) { return stk().get(name); }
   public boolean exists(String name) { return get(name)!=null; }
@@ -43,7 +46,7 @@ public class ScopeNode extends Node {
   public void       early_kill() { pop(); pop(); pop(); }
 
   // Add a Node to an UnresolvedNode.
-  public FunPtrNode add_fun( String name, FunPtrNode ptr) { return stk().add_fun(name,ptr); }
+  public FunPtrNode add_fun( String name, FunPtrNode ptr, GVNGCM gvn) { return stk().add_fun(name,ptr,gvn); }
 
   // Name to type lookup, or null
   public Type get_type(String name) { return _types.get(name);  }

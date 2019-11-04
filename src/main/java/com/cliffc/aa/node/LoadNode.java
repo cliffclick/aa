@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.AA;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
@@ -24,19 +25,48 @@ public class LoadNode extends Node {
   private Node mem() { return in(1); }
   private Node adr() { return in(2); }
   private Node nil_ctl(GVNGCM gvn) { return set_def(0,null,gvn); }
+  private Node set_mem(Node a, GVNGCM gvn) { set_def(1,a,gvn); return this; }
   private void set_adr(Node a, GVNGCM gvn) { set_def(2,a,gvn); }
 
   @Override public Node ideal(GVNGCM gvn) {
     Node ctrl = ctl();
     Node mem  = mem();
     Node addr = adr();
+
     // Loads against a NewNode cannot NPE, cannot fail, always return the input
-    if( addr instanceof NewNode && mem instanceof MemMergeNode && mem.in(1)==addr ) {
-      NewNode nnn = (NewNode)addr;
+    if( addr instanceof ProjNode && mem instanceof OProjNode &&
+        addr.in(0) == mem.in(0) && addr.in(0) instanceof NewNode ) {
+      NewNode nnn = (NewNode)addr.in(0);
       int idx = nnn._ts.find(_fld,_fld_num);  // Find the named field
       if( idx != -1 ) return nnn.fld(idx);    // Field value
       // Broken load-vs-new
     }
+
+    Node wmem = mem.in(0);
+    Node nmem = mem._defs._len > 1 ? mem.in(1) : null;
+    Type tadr0= gvn.type(addr), twmem, tnmem;
+
+    // Memory comes from generic MemMerge; sharpen memory edge based on aliasing.
+    if( mem instanceof MemMergeNode && tadr0 instanceof TypeMemPtr &&
+        (twmem=gvn.type(wmem)) instanceof TypeMem && (tnmem=gvn.type(nmem)) instanceof TypeObj ) {
+      TypeMemPtr tadr1 = (TypeMemPtr)tadr0;
+      TypeMem twobj = (TypeMem)twmem;
+      TypeObj tnobj = (TypeObj)tnmem;
+      if( tadr1._aliases.isa(tnobj._news) || tnobj._news.isa(tadr1._aliases) ) { // Test if address is in narrow memory
+        if( twobj.contains(tadr1._aliases) ) {
+          // both, do nothing
+        } else {
+          return set_mem(nmem,gvn); // Tighten in on narrow memory
+        }
+      } else {
+        if( twobj.contains(tadr1._aliases) ) { // Not in narrow memory, test wide
+          return set_mem(wmem,gvn); // tighten on wide memory
+        } else {
+          throw AA.unimpl();    // neither, value must go XSCALAR
+        }
+      }
+    }
+
     // Loads against an equal store; cannot NPE since the Store did not.
     StoreNode st;
     if( mem instanceof StoreNode && addr == (st=((StoreNode)mem)).adr() ) {
@@ -45,7 +75,7 @@ public class LoadNode extends Node {
       // TODO: Else can use field-level aliasing to by pass.  Needs a
       // field-level alias notion on memory edges.
     }
-      
+
     if( ctrl==null || gvn.type(ctrl)!=Type.CTRL )
       return null;              // Dead load, or a no-control-no-fail load
     if( addr.is_forward_ref() ) return null;

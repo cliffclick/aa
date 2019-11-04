@@ -15,6 +15,12 @@ import org.jetbrains.annotations.NotNull;
 // NewNodes have a unique alias class - they do not alias with any other
 // NewNode, even if they have the same type.  Upon cloning both NewNodes get
 // new aliases that inherit (tree-like) from the original alias.
+//
+// During Parsing we construct closures whose field names are discovered as we
+// parse.  Hence we support a type which represents some concrete fields, and a
+// choice of all possible remaining fields.  The _any choice means we can add
+// fields, although the closure remains impossibly high until the lexical scope
+// ends and no more fields can appear.
 
 public class NewNode extends Node {
   // Unique alias class, one class per unique memory allocation site.
@@ -61,40 +67,46 @@ public class NewNode extends Node {
     }
   }
 
-  // Add a field to a New
-  public void add_fld( String name, Type t, Node n, byte mutable ) {
-    assert !Env.GVN.touched(this);
-    _ts = _ts.add_fld(name,t,mutable);
+  // Create a field from parser
+  public Node create( String name, Node val, GVNGCM gvn, byte mutable  ) {
+    assert def_idx(_ts._ts.length)== _defs._len;
+    assert _ts.find(name,-1) == -1;
+    gvn.unreg(this);
+    _ts = _ts.add_fld(name,gvn.type(val),mutable);
     if( _name != null ) _name = _name.make(_ts); // Re-attach name as needed
-    add_def(n);
+    add_def(val);
+    gvn.rereg(this,value(gvn));
+    return val;
   }
   // Update/modify a field
   public Node update( String name, int idx, Node val, GVNGCM gvn, byte mutable  ) {
-    TypeStruct ts = _ts;
-    assert !Env.GVN.touched(this);
-    assert def_idx(ts._ts.length)== _defs._len;
-    int idx2 = ts.find(name,idx);
-    if( idx2 == -1 ) {          // Insert in this scope
-      add_fld(name,gvn.type(val),val,mutable);
-    } else {                    // Overwrite in this scope
-      _ts = _ts.set_fld(idx2,gvn.type(val),mutable);
-      if( _name != null ) _name = _name.make(_ts); // Re-attach name as needed
-      set_def(def_idx(idx2),val,gvn);
-    }
+    assert def_idx(_ts._ts.length)== _defs._len;
+    int idx2 = _ts.find(name,idx);
+    assert idx2 != -1;
+    gvn.unreg(this);
+    _ts = _ts.set_fld(idx2,gvn.type(val),mutable);
+    if( _name != null ) _name = _name.make(_ts); // Re-attach name as needed
+    set_def(def_idx(idx2),val,gvn);
+    gvn.rereg(this,value(gvn));
     return val;
+  }
+  // Create or update as needed
+  public void make_fld( String name, Node val, GVNGCM gvn, byte mutable ) {
+    int idx = _ts.find(name,-1);
+    if( idx == -1 ) create(name,    val,gvn,mutable);
+    else            update(name,idx,val,gvn,mutable);
   }
 
   // Add a named FunPtr to a New.  Auto-inflates to a Unresolved as needed.
-  public FunPtrNode add_fun( String name, FunPtrNode ptr ) {
+  public FunPtrNode add_fun( String name, FunPtrNode ptr, GVNGCM gvn ) {
     int idx = _ts.find(name,-1);
     if( idx == -1 ) {
-      add_fld(name,ptr._t,ptr,TypeStruct.ffinal());
+      create(name,ptr,gvn,TypeStruct.ffinal());
     } else {
       Node n = _defs.at(def_idx(idx));
       if( n instanceof UnresolvedNode ) n.add_def(ptr);
-      else set_def(def_idx(idx),n=new UnresolvedNode(n,ptr),null);
-      _ts = _ts.set_fld(idx,n.all_type(),TypeStruct.ffinal());
-      if( _name != null ) _name = _name.make(_ts); // Re-attach name as needed
+      else n=new UnresolvedNode(n,ptr);
+      update(name,idx,n,gvn,TypeStruct.ffinal());
     }
     return ptr;
   }
@@ -109,8 +121,8 @@ public class NewNode extends Node {
     for( int i=0; i<ts._ts.length; i++ ) {
       Node n = fld(i);
       if( n != null && n.is_forward_ref() ) {
-        parent.update(ts._flds[i],-1,n,gvn,ts._finals[i]);
-        remove(def_idx(i),gvn);
+        parent.create(ts._flds[i],n,gvn,ts._finals[i]);
+        gvn.remove_reg(this,def_idx(i));
         ts = ts.del_fld(i);
         i--;
       }
@@ -164,7 +176,7 @@ public class NewNode extends Node {
     // Forward refs are not really a def, but produce a trackable definition
     // that must be immutable, and will eventually get promoted until it
     // reaches a scope where it gets defined.
-    if( xn.is_forward_ref() ) { assert xmut == TypeStruct.ffinal(); update(name,-1,xn,gvn,xmut); return; }
+    if( xn.is_forward_ref() ) { assert xmut == TypeStruct.ffinal(); create(name,xn,gvn,xmut); return; }
 
     // Check for mixed-mode updates.  'name' must be either fully mutable or
     // fully immutable at the merge point (or dead afterwards).  Since x was
@@ -176,7 +188,8 @@ public class NewNode extends Node {
       yn = fail(name,P,gvn,arm,xn,"final");
     else yn = scope.get(name);
 
-    (scope==null ? this : scope.stk()).update(name,-1,xn==yn ? xn : P.gvn(new PhiNode(phi_errmsg, P.ctrl(),xn,yn)),gvn,xmut);
+    Node n = xn==yn ? xn : P.gvn(new PhiNode(phi_errmsg, P.ctrl(),xn,yn));
+    (scope==null ? this : scope.stk()).make_fld(name,n,gvn,xmut);
   }
 
   private Node fail(String name, Parse P, GVNGCM gvn, boolean arm, Node xn, String msg) {
@@ -216,8 +229,9 @@ public class NewNode extends Node {
     if( tmut == mut_final || fmut == mut_final ) tmut = mut_final;
     else if( tmut == mut_ro || fmut == mut_ro ) tmut = mut_ro;
     else tmut = mut_rw;
-    
-    update(name,-1,tn==fn ? fn : P.gvn(new PhiNode(phi_errmsg, P.ctrl(),tn,fn)),gvn,tmut);
+
+    Node n = tn==fn ? fn : P.gvn(new PhiNode(phi_errmsg, P.ctrl(),tn,fn));
+    make_fld(name,n,gvn,tmut);
   }
 
   // Replace uses of dull with sharp, used after an IfNode test
@@ -230,10 +244,26 @@ public class NewNode extends Node {
       }
   }
 
-  @Override public Node ideal(GVNGCM gvn) { return null; }
+  @Override public Node ideal(GVNGCM gvn) {
+    // If the address is not looked at then memory contents cannot be looked at
+    // and is dead.
+    if( _uses._len==1 && _uses.at(0) instanceof OProjNode ) {
+      boolean progress=false;
+      for( int i=1; i<_defs._len; i++ )
+        if( in(i)!=null )
+          { set_def(i,null,gvn); progress=true; }
+      return progress ? this : null;
+    }
+    return null;
+  }
 
   // Produces a TypeMemPtr
   @Override public Type value(GVNGCM gvn) {
+    // If the address is not looked at then memory contents cannot be looked at
+    // and is dead.
+    if( _uses._len==1 && _uses.at(0) instanceof OProjNode )
+      return TypeTuple.make(TypeMem.XMEM,TypeMemPtr.OOP.dual());
+
     // Gather args and produce a TypeStruct
     Type[] ts = new Type[_ts._ts.length];
     for( int i=0; i<ts.length; i++ )

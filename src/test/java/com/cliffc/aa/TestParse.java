@@ -161,7 +161,7 @@ public class TestParse {
     test("x=3; mul2={x -> x*2}; mul2(2.1)", TypeFlt.con(2.1*2.0)); // must inline to resolve overload {*}:Flt with I->F conversion
     test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
     test("sq={x -> x*x}; sq 2.1", TypeFlt.con(4.41)); // No () required for single args
-    testerr("sq={x -> x&x}; sq(\"abc\")", "*[$]\"abc\" is not a int64",24);
+    testerr("sq={x -> x&x}; sq(\"abc\")", "*[$]\"abc\" is not a int64",12);
     testerr("sq={x -> x*x}; sq(\"abc\")", "*[$]\"abc\" is not a flt64",12);
     testerr("f0 = { f x -> f0(x-1) }; f0({+},2)", "Passing 1 arguments to f0={->} which takes 2 arguments",21);
     // Recursive:
@@ -478,7 +478,7 @@ public class TestParse {
     test("math_rand(1)?(x:=4):(x:=3);x:=x+1", TypeInt.INT64); // x mutable on both arms, so mutable after
     test   ("x:=0; 1 ? (x:=4):; x:=x+1", TypeInt.con(5)); // x mutable ahead; ok to mutate on 1 arm and later
     test   ("x:=0; 1 ? (x =4):; x", TypeInt.con(4)); // x final on 1 arm, dead on other arm
-    testerr("x:=0; math_rand(1) ? (x =4):3; x=2", "Cannot re-assign final val 'x'",34); 
+    testerr("x:=0; math_rand(1) ? (x =4):3; x=2", "Cannot re-assign final val 'x'",34);
   }
 
   // Finals are declared with an assignment.  This is to avoid the C++/Java
@@ -544,129 +544,7 @@ public class TestParse {
     //test("x:=0; {1 ? ^2; x=3}(); x",TypeInt.con(0));  // Following statement is ignored
   }
 
-  /** Closures
-
-Hidden variable 'cnt' inside outer closure.
-Return two functions in a tuple, one increments cnt, the other gets it.
-    > (inc, get) = { cnt=0; ({cnt++;0},{cnt}) }()
-    > inc()
-    0
-    > get()
-    1
-    > inc()
-    0
-    > get()
-    2
-The outer anon fcn returns and exits, but the storage for 'cnt' remains.
-'inc' and 'get' can read & write 'cnt', but 'cnt' is otherwise private.
-
-Every ScopeNode turns into a NewNode with variable mappings via TypeStruct,
-which grows as new var names appear.  Every fcn call passes in a display with
-all parent scopes (the Env).  All var refs become lds/sts against the NewNode/
-ScopeNode.  Standard ld/st ops apply, and a NewNode goes dead the normal way-
-no other uses.  Last "normal" use goes away when fcn exits, but display based
-uses from nested fcns (i.e., a REAL closure usage) might keep alive.
-
-Can I do this without going the ld/st route?  What's so special about threading
-memory thru-out?  Or even threading just the NewNode, no aliasing issues... i
-think.  In the above inc/get I can call it 3 times, get 3 unrelated counters.
-Pass the fcns along, and get them inlined.  So inc1 bumps cnt1, inc2 bumps
-cnt2, and inlined side-by-side.  So cnt1,cnt2 memory ops come from the same
-anon fcn.  Can call in a loop, have millions of ctrs from the same anon fcn -
-which must therefore be the same alias, therefore ld/st required.
-
-
-Plan B:
-
-Keep ScopeNode, but remove most everything from it.  NewNode makes a Struct
-which includes finalness and field names.  But need to allow more fields like
-Scope does.  At Scope exit, NewNode allowed to be dead.
-
-NewNode produces a Tuple of TMP+field for every field.  Each ProjNode can go
-dead independently, matching dead field goes to XSCALAR.  When all proj fields
-die, NewNode goes to XMEM (even with MemMerge use).
-
-Phat memory usage "forgets" fields.  To remove single unused fields, need to
-explode out of phat memory.
-
-More precise memory handling: 2 layer split/join:
-
-AliasProj - can follow any whole memory.  Slices out a set of disjoint aliases.
-FieldProj - can follow any single alias.  Slices out a set of disjoint fields.
-FldMerge - collects complete field updates to form a complete alias type.
-MemMerge - collects complere alias updates to form total memory.
-
-NewNode - produces alias# that is further exactly not any other instance of the
-same alias#; can be followed by FldProj.
-MemMerge - can accept a NewNode input that overlaps with same alias#; NewNode
-is now "confused".
-
-
-Looking for a model where individual fields can go dead.
-Looking for a model where pre-wired calls can wire without memory (pure)
-or read-only memory (const).
-
-Graph rewrite opts: skinny memory reads from a phat memory: explodes it iff
-progress.  skinny write forces parser explosion & rejoin.  ScopeNode mem slot
-pts to a phat memory or a MemMerge, which pts to many FldMerges.  Leaves it
-exploded as parse rolls forward until sees a usage of phat memory.  Then leaves
-the Mem/Fld Merge in the graph, and starts anew after def of phat memory.
-
-Escaped ptrs: if at a phat memory usage we can see no instances of TMP alias#
-in the memory or values, we can declare "not escaped", and now remove an alias#
-from phat node usage.  To see field escapes, need a backwards prop of field
-usages.  Currently thinking has no way to detect lack-of-usage except via (lack
-of) graph node edges.  Have to "explode" in the graph all phat into alias#s
-into fields, and push the "inflated" graph all about, then do DCE.  Note:
-cannot remove dead field if ptr escapes at all, because later parser might use
-field.  Strictly ok after removing unknown callers.
-
-FunNode with mem Parm: can skip mem, if mem is not used (pure fcn, common on
-many operators).  Can cast TypeObj._news to a limit set, and then only takes
-that memory alias set and bypass the rest.  If purely reading memory, still
-take in that alias, but RetNode pts to the ParmNode directly.  The cast-to-str
-PrimNodes which alloc a new Str do not take memory, but the RetNode produces a
-brand new alias which needs to fold into a post-call MemMerge.
-
-Pure: RetNode has a null memory (no pre-call split, no post-call merge).  Parm is missing.
-Read subset:  RetNode can be equal to Parm, with subset in Parm type.
-Write subset: RetNode & Parm has some (not all alias#s), but not equal to Parm.
-All: RetNode has phat, so does Parm - and not equal to Parm.
-New: RetNode can include MORE alias#s than the Parm.  Needs a MemMerge.
-New factory: Parm is missing.  RetNode takes in some aliases.
-
-Plan B2:  No!
-
-Only keep all memory pre-exploded at the alias/field level.  Leads to huge
-count of graph nodes, esp for unrelated chunks of code that just "pass thru".
-
-
-
-
----
-For closures, all local vars actually talk to the scope-local NewNode, which
-can grow fields for a time.  Stops growing fields at scope exit.  Local var
-uses do Load & Store, which collapse against any NewNode including the scope-
-local one.  Scope-local NewNode available for inner scopes - this is the
-closure usage, and therefore serialize later stores against inner fun calls.
-Requires inner calls always take outer scope NewNode, and later optimize.
-
-MemMerge only used before calls to flatten everything.  Wired calls can switch
-to using some aliases instead of all, with the alts aliases going around the
-call.
-
-Calls not wired take all of memory, including scope-local News.  Can optimize
-against non-escaping aliases.  Wired calls can be more exact.
-
-Funs & Mem Parm - split into separate aliases by usage (not defs).  Pass-thru
-memories can be optimized by wired calls: direct from Ret/MemMerge/PhatMemParm.
-Bypass in the CallEpi Ideal.  Flag the bypassed aliases in the MemMerge... but
-somewhere else, perhaps the FunNode, for better assertions.
-
-Root Scope becomes Root New.  Fields are primitive names.  All "final", except
-can replace a prim funptr value with a Unresolved of the same name.
-
-
+  /* Closures
 
 ----
 Sequential looping constructs, not recursion.  Pondering keyword 'for' for
