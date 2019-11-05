@@ -1,9 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeMem;
-import com.cliffc.aa.type.TypeTuple;
+import com.cliffc.aa.type.*;
 
 // Proj memory
 public class MProjNode extends ProjNode {
@@ -20,4 +18,7 @@ public class MProjNode extends ProjNode {
     return c.above_center() ? TypeMem.XMEM : TypeMem.MEM;
   }
   @Override public Type all_type() { return TypeMem.MEM; }
+  // Split this node into a set returning 'bits' and the original which now
+  // excludes 'bits'.  Return null if already making a subset of 'bits'.
+  Node split_memory_use( GVNGCM gvn, BitsAlias bits ) { return null; } // Inline call before splitting
 }

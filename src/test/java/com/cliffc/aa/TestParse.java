@@ -16,6 +16,7 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
     Object dummy = Env.GVN; // Force class loading cycle
+    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.TRUE );
 
     // A collection of tests which like to fail easily
     testerr ("Point=:@{x,y}; Point((0,1))", "*[$](nil,1) is not a *[$]@{x=,y=}",27);
@@ -57,6 +58,7 @@ public class TestParse {
     test(" 1+2 * 3+4 *5", TypeInt.con( 27));
     test("(1+2)*(3+4)*5", TypeInt.con(105));
     test("1// some comment\n+2", TypeInt.con(3)); // With bad comment
+    test("-1-2*3-4*5", TypeInt.con(-27));
 
     // Float
     test("1.2+3.4", TypeFlt.make(0,64,4.6));
@@ -80,7 +82,7 @@ public class TestParse {
     test("{-}(1,2)", TypeInt.con(-1)); // binary version
     test(" - (1  )", TypeInt.con(-1)); // unary version
     // error; mismatch arg count
-    testerr("!()       ", "Passing 0 arguments to !={->} which takes 1 arguments",3);
+    testerr("{!}()     ", "Passing 0 arguments to {!} which takes 1 arguments",5);
     testerr("math_pi(1)", "A function is being called, but 3.141592653589793 is not a function",10);
     testerr("{+}(1,2,3)", "Passing 3 arguments to {+} which takes 2 arguments",10);
 
@@ -237,7 +239,6 @@ public class TestParse {
 
   @Test public void testParse04() {
     // simple anon struct tests
-    test_ptr("@{x,y}", (alias -> TypeMemPtr.make(alias,TypeStruct.make(new String[]{"x","y"},TypeStruct.ts(2),TypeStruct.finals(2),alias)))); // simple anon struct decl
     testerr("a=@{x=1.2,y}; x", "Unknown ref 'x'",15);
     testerr("a=@{x=1,x=2}", "Cannot define field '.x' twice",11);
     test   ("a=@{x=1.2,y,}; a.x", TypeFlt.con(1.2)); // standard "." field naming; trailing comma optional
@@ -278,6 +279,9 @@ public class TestParse {
   }
 
   @Test public void testParse05() {
+    test   ("a = math_rand(1) ? 0 : @{x=1}; // a is null or a struct\n"+
+            "b = math_rand(1) ? 0 : @{c=a}; // b is null or a struct\n"+
+            "b ? (b.c ? b.c.x : 0) : 0      // Null-safe field load", TypeInt.BOOL); // Nested null-safe field load
     // nullable and not-null pointers
     test   ("x:str? = 0", Type.NIL); // question-type allows null or not; zero digit is null
     test   ("x:str? = \"abc\"", TypeMemPtr.ABCPTR); // question-type allows null or not

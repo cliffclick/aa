@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.AA;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
@@ -95,4 +96,23 @@ public class StoreNode extends Node {
   // total execution (require a store on some path it didn't happen).  Stores
   // that are common in local SESE regions can be optimized with local peepholes.
   @Override public boolean equals(Object o) { return this==o; }
+  // Split this node into a set returning 'bits' and the original which now
+  // excludes 'bits'.  Return null if already making a subset of 'bits'.
+  Node split_memory_use( GVNGCM gvn, BitsAlias bits ) {
+    TypeMemPtr tmp = (TypeMemPtr)gvn.type(adr());
+    if( tmp._aliases == bits ) return null; // No progress, got the right memory alias
+
+    // Special case of no overlap: both bits have only 1 bit, and neither is
+    // the parent of the other.  If either is the parent, the meet will be the
+    // parent.
+    int b0 = bits.abit();
+    int b1 = tmp._aliases.abit();
+    if( b0 != -1 && b1 != -1 ) {
+      BitsAlias bx = bits.meet(tmp._aliases);
+      if( bx.test(b0) && bx.test(b1) )
+        return mem();
+    }
+    
+    throw AA.unimpl();
+  }
 }

@@ -42,11 +42,20 @@ public class LoadNode extends Node {
       // Broken load-vs-new
     }
 
-    Node wmem = mem.in(0);
-    Node nmem = mem._defs._len > 1 ? mem.in(1) : null;
-    Type tadr0= gvn.type(addr), twmem, tnmem;
+    // Split aliases on inputs
+    Type tadr0= gvn.type(addr);
+    if( tadr0 instanceof TypeMemPtr ) {
+      Node nmem = mem.split_memory_use(gvn,((TypeMemPtr)tadr0)._aliases);
+      if( nmem != null ) {      // If progress
+        set_mem(nmem,gvn);      // Sharpen memory edge and try again
+        return this;
+      }
+    }
 
     // Memory comes from generic MemMerge; sharpen memory edge based on aliasing.
+    Node wmem = mem.in(0);
+    Node nmem = mem._defs._len > 1 ? mem.in(1) : null;
+    Type twmem, tnmem;
     if( mem instanceof MemMergeNode && tadr0 instanceof TypeMemPtr &&
         (twmem=gvn.type(wmem)) instanceof TypeMem && (tnmem=gvn.type(nmem)) instanceof TypeObj ) {
       TypeMemPtr tadr1 = (TypeMemPtr)tadr0;
@@ -56,11 +65,13 @@ public class LoadNode extends Node {
         if( twobj.contains(tadr1._aliases) ) {
           // both, do nothing
         } else {
-          return set_mem(nmem,gvn); // Tighten in on narrow memory
+          throw AA.unimpl();    // Should be split before
+          //return set_mem(nmem,gvn); // Tighten in on narrow memory
         }
       } else {
         if( twobj.contains(tadr1._aliases) ) { // Not in narrow memory, test wide
-          return set_mem(wmem,gvn); // tighten on wide memory
+          throw AA.unimpl();    // should be split before
+          //return set_mem(wmem,gvn); // tighten on wide memory
         } else {
           throw AA.unimpl();    // neither, value must go XSCALAR
         }

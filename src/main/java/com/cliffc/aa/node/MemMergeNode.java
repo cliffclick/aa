@@ -1,9 +1,8 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeMem;
-import com.cliffc.aa.type.TypeObj;
+import com.cliffc.aa.AA;
+import com.cliffc.aa.type.*;
 
 // Merge a TypeObj at address TypeMemPtr into a TypeMem.
 public class MemMergeNode extends Node {
@@ -52,5 +51,30 @@ public class MemMergeNode extends Node {
     return ptr.in(0)==obj().in(0) && ptr.in(0) instanceof NewNode ? (NewNode)ptr.in(0) : null;
   }
 
+  // Split this node into a set returning 'bits' and the original which now
+  // excludes 'bits'.  Return null if already making a subset of 'bits'.
+  Node split_memory_use( GVNGCM gvn, BitsAlias bits ) {
+    TypeMem t = (TypeMem)gvn.type(this);
+    Type tm2 = gvn.type(mem());
+    Type to2 = gvn.type(obj());
+    if( to2 == TypeMem.XMEM ) return null; // Happens when folding up dead NewNode in MemMerge
+    TypeMem tm= tm2==Type.ANY ? TypeMem.XMEM : (TypeMem)tm2;
+    TypeObj to= (TypeObj)to2;
+    assert t==TypeMem.XMEM || t.contains(bits);
+
+    if( bits.isa(to._news) || to._news.isa(bits) ) { // Test if bits is in narrow memory
+      if( tm.contains(bits) ) {
+        return null;            // Since it contains both, some stronger alias analysis is needed to bypass
+      } else {
+        return obj();           // Tighten in on narrow memory
+      }
+    } else {
+      if( tm.contains(bits) ) { // Not in narrow memory, test wide
+        return mem();           // tighten on wide memory
+      } else {
+        throw AA.unimpl();      // neither, value must go XSCALAR
+      }
+    }    
+  }
 }
 

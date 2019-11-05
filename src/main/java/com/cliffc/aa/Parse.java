@@ -580,8 +580,11 @@ public class Parse {
       return create(tok,gvn(FunPtrNode.forward_ref(_gvn,tok,this)),ts_mutable(false));
     // Disallow uniop and binop functions as factors.
     if( scope.get(tok).op_prec() > 0 ) { _x = oldx; return null; }
-    // Load variable from scope.  If scopes use directly, closures must load
+    // Load variable from scope.  If scopes used directly, closures must load
     if( scope._if ) return scope.get(tok);
+    // If immutable (or heck read-only
+    if( !scope.stk().is_mutable(tok) )
+      return scope.get(tok);
     return gvn(new LoadNode(null,mem(),scope.ptr(),tok,null));
   }
 

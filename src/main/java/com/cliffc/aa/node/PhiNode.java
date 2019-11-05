@@ -1,18 +1,21 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.Env;
-import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.Parse;
-import com.cliffc.aa.type.Type;
+import com.cliffc.aa.*;
+import com.cliffc.aa.type.*;
 
 // Merge results; extended by ParmNode
 public class PhiNode extends Node {
   final Parse _badgc;
-  public PhiNode( Parse badgc, Node... vals ) {
+  final BitsAlias _bits;
+  private PhiNode( byte op, Parse badgc, Node... vals ) {
     super(OP_PHI,vals);
     _badgc = badgc;
+    _bits = BitsAlias.NZERO;
   }
-  PhiNode( byte op, Node fun, ConNode defalt, Parse badgc ) { super(op,fun,defalt); _badgc = badgc; } // For ParmNodes
+  public PhiNode( Parse badgc, Node... vals ) { this(OP_PHI,badgc,vals); }
+  // For ParmNodes
+  PhiNode( byte op, Node fun, ConNode defalt, Parse badgc ) { this(op,badgc,fun,defalt); }
+  
   @Override public Node ideal(GVNGCM gvn) {
     if( gvn.type(in(0)) == Type.XCTRL ) return null;
     RegionNode r = (RegionNode) in(0);
@@ -48,4 +51,22 @@ public class PhiNode extends Node {
       return _badgc.errMsg("Cannot mix GC and non-GC types");
     return null;
   }
+
+  // Split this node into a set returning 'bits' and the original which now
+  // excludes 'bits'.  Return null if already making a subset of 'bits'.
+  Node split_memory_use( GVNGCM gvn, BitsAlias bits ) {
+    Type t = gvn.type(this);
+    if( !(t instanceof TypeMem) ) return null;
+    TypeMem tm = (TypeMem)t;
+    assert tm==TypeMem.XMEM || tm.contains(bits);
+    if( gvn.type(in(0)) == Type.XCTRL ) return null; // Will fold up elsewhere
+    if( _defs._len<=2 ) return null;                 // Will fold up elsewhere
+
+    // See if already split proper
+    if( bits.isa(_bits) ) return null;
+
+    
+    throw AA.unimpl();
+  }
+  
 }

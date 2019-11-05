@@ -2,6 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.type.BitsAlias;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
@@ -231,14 +232,20 @@ public abstract class Node implements Cloneable {
   // points have not all appeared).  Returns null if no-progress, or a better
   // version of 'this'.
   abstract public Node ideal(GVNGCM gvn);
+  // If an ideal() change breaks type monotonicity, the ideal() call knows this
+  // and assures monotonicity happens some other way.
+  public boolean monotonicity_assured() { return false; }
+  // Losing uses puts these on the worklist
   public boolean ideal_impacted_by_losing_uses() { return _op==OP_NEW || _op==OP_FUN || _op==OP_MERGE; }
 
   // Compute the current best Type for this Node, based on the types of its inputs.
   // May return the local "all_type()", especially if its inputs are in error.
   abstract public Type value(GVNGCM gvn);
-  // If an ideal() change breaks type monotonicity, the ideal() call knows this
-  // and assures monotonicity happens some other way.
-  public boolean monotonicity_assured() { return false; }
+
+  // Split this node into a set returning 'bits' and the original which now
+  // excludes 'bits'.  Return null if already making a subset of 'bits'.
+  // Overridden in memory subclasses, most Nodes do not implement.
+  Node split_memory_use( GVNGCM gvn, BitsAlias bits ) { throw com.cliffc.aa.AA.unimpl(); }
 
   // Return any type error message, or null if no error
   public String err(GVNGCM gvn) { return null; }

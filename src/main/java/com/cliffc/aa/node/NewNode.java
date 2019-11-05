@@ -50,6 +50,7 @@ public class NewNode extends Node {
   public Node get(String name) { return in(def_idx(_ts.find(name,-1))); }
   public boolean exists(String name) { return _ts.find(name,-1)!=-1; }
   public boolean is_mutable(String name) { TypeStruct ts = _ts; return ts._finals[ts.find(name,-1)] == TypeStruct.frw(); }
+  public boolean is_final  (String name) { TypeStruct ts = _ts; return ts._finals[ts.find(name,-1)] == TypeStruct.ffinal(); }
 
   // Called when folding a Named Constructor into this allocation site
   void set_name( GVNGCM gvn, TypeName name ) {
@@ -239,8 +240,10 @@ public class NewNode extends Node {
     assert dull != sharp;
     for( int i=0; i<_ts._ts.length; i++ ) // Fill in all fields
       if( in(def_idx(i))==dull ) {
-        arm.set_def(def_idx(i),sharp,gvn);
-        arm._ts.set_fld(_ts.find(_ts._flds[i],-1),gvn.type(sharp),_ts._finals[i]);
+        gvn.unreg(arm);
+        arm.add_def(sharp);
+        arm._ts = arm._ts.add_fld(_ts._flds[i],gvn.type(sharp),_ts._finals[i]);
+        gvn.rereg(arm,arm.value(gvn));
       }
   }
 
