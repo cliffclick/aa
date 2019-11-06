@@ -55,6 +55,7 @@ public class PhiNode extends Node {
   // Split this node into a set returning 'bits' and the original which now
   // excludes 'bits'.  Return null if already making a subset of 'bits'.
   Node split_memory_use( GVNGCM gvn, BitsAlias bits ) {
+    // Quick sanity checks for Phis that will collapse anyways.
     Type t = gvn.type(this);
     if( !(t instanceof TypeMem) ) return null;
     TypeMem tm = (TypeMem)t;
@@ -63,12 +64,28 @@ public class PhiNode extends Node {
     if( _defs._len<=2 ) return null;                 // Will fold up elsewhere
 
     // See if already split proper
+    bits = bits.strip_nil();
     if( bits.isa(_bits) ) return null;
 
+    // Splitting Parm memory like making a new wirable argument should work
+    // fine, but needs testing.
+    if( this instanceof ParmNode ) throw AA.unimpl();
+    
     // Split a Phi - enlarges the graph but sharpens the aliasing.  Look for an
     // already-split Phi with the proper aliasing (and also assert no duplicate
     // aliasing).
+    RegionNode r = (RegionNode)in(0);
+    PhiNode aphi = null;
+    for( Node use : r._uses ) {
+      if( use == this ) continue; // Already looked at self
+      if( use instanceof PhiNode ) {
+        PhiNode phi = (PhiNode)use;
+        throw AA.unimpl();
+        
+      }
+    }
     
+    // If did find the proper alias split, make it
     
     
     throw AA.unimpl();

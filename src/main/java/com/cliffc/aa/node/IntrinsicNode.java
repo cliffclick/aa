@@ -102,7 +102,7 @@ public abstract class IntrinsicNode extends Node {
           if( tnnn.at(1).isa(_targs.at(0)) ) {
             nnn.set_name(gvn,(TypeName)_funret._obj);
             gvn.add_work(nnn);
-            return nnn;
+            return ptr();
           }
         }
       }

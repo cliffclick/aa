@@ -224,7 +224,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   }
   // Remove the nil bit, but otherwise preserve the type
   @SuppressWarnings("unchecked")
-  B strip_nil() {
+  public B strip_nil() {
     if( _bits == null ) return (B)this; // Should not be a nil to remove
     if( (_bits[0] &1)==0 ) return (B) this; // No nil
     long[] bs = _bits.clone();

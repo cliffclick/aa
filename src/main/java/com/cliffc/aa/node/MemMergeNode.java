@@ -26,7 +26,11 @@ public class MemMergeNode extends Node {
     Node mem = mem();
     if( gvn.type(obj())==TypeMem.XMEM )
       return mem;
-    
+    // If skinny is a pointer and not memory, then this is a collapsing
+    // named-type-into-allocator.
+    if( gvn.type(obj()) instanceof TypeMemPtr )
+      return mem;
+
     // Back-to-back merges collapse, same as back-to-back stores
     if( mem instanceof MemMergeNode ) {
       MemMergeNode mem2 = (MemMergeNode)mem;
@@ -58,6 +62,7 @@ public class MemMergeNode extends Node {
     Type tm2 = gvn.type(mem());
     Type to2 = gvn.type(obj());
     if( to2 == TypeMem.XMEM ) return null; // Happens when folding up dead NewNode in MemMerge
+    if( !(to2 instanceof TypeObj) ) return null;
     TypeMem tm= tm2==Type.ANY ? TypeMem.XMEM : (TypeMem)tm2;
     TypeObj to= (TypeObj)to2;
     assert t==TypeMem.XMEM || t.contains(bits);
@@ -74,7 +79,7 @@ public class MemMergeNode extends Node {
       } else {
         throw AA.unimpl();      // neither, value must go XSCALAR
       }
-    }    
+    }
   }
 }
 
