@@ -866,8 +866,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     stack.pop();
     return bcs;
   }
-  private void mark_cyclic( BitSet bcs, Ary<Type> reachs ) {
-    for( Type t : reachs )
+  private void mark_cyclic( BitSet bcs, Ary<Type> reaches ) {
+    for( Type t : reaches )
       t._cyclic = bcs.get(t._uid);
   }
 

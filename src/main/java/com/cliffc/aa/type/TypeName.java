@@ -89,7 +89,7 @@ public class TypeName extends TypeObj<TypeName> {
     return t instanceof TypeObj ? make(t) : ALL;
   }
   public static TypeName make_forward_def_type( String name, HashMap<String,Type> lex ) { return make0(name,lex,TypeStruct.ALLSTRUCT,(short)-1); }
-  
+
           static final HashMap<String,Type> TEST_SCOPE = new HashMap<>();
           static final TypeName TEST_ENUM = make("__test_enum",TEST_SCOPE,TypeInt.INT8);
           static final TypeName TEST_FLT  = make("__test_flt" ,TEST_SCOPE,TypeFlt.FLT32);
@@ -136,7 +136,7 @@ public class TypeName extends TypeObj<TypeName> {
     }
   }
 
-  // Longer side is 'this'.  Shorter side is 'tn'.
+  // Longer side is 'this'.  Shorter side is 't'.
   private Type extend(Type t) {
     Type x = _t.meet(t); // Recursive, removing longer name
     int xnd = x instanceof TypeName ? ((TypeName)x)._depth : -1;
@@ -162,6 +162,8 @@ public class TypeName extends TypeObj<TypeName> {
       // property) but forces a move off the centerline.
       return mt.must_nil() ? TypeInt.BOOL : TypeInt.make(-1,1,1);
     case TNAME:
+      return mt;
+    case TSTRUCT:
       return mt;
     default: throw AA.unimpl();
     }

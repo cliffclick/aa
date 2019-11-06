@@ -299,17 +299,10 @@ public class Type<T extends Type<T>> implements Cloneable {
   T rdual() { assert _dual!=null; return _dual; }
 
   public final Type meet( Type t ) {
-    Type mt = xmeet0(t);
-    if( _cyclic && t._cyclic && !mt._cyclic ) {
-      assert !mt.interned();
-      mt._cyclic = true;
-    }
-    return mt;
-  }
-  private Type xmeet0( Type t ) {
     // Short cut for the self case
     if( t == this ) return this;
-    // Reverse; xmeet 2nd arg is never "is_simple" and never equal to "this"
+    // "Triangulate" the matrix and cut in half the number of cases.
+    // Reverse; xmeet 2nd arg is never "is_simple" and never equal to "this".
     return !is_simple() && t.is_simple() ? t.xmeet(this) : xmeet(t);
   }
 
@@ -405,8 +398,8 @@ public class Type<T extends Type<T>> implements Cloneable {
   }
   private boolean check_symmetric( Type t, Type mt ) {
     if( t==this ) return true;
-    Type ta = mt._dual.xmeet0(t._dual);
-    Type tb = mt._dual.xmeet0(  _dual);
+    Type ta = mt._dual.meet(t._dual);
+    Type tb = mt._dual.meet(  _dual);
     if( ta==t._dual && tb==_dual ) return true;
     System.err.print("("+this+" & "+t+")=="+mt+" but \n("+mt._dual+" & ");
     if( ta!=t._dual ) System.err.println(t._dual+")=="+ta+" \nwhich is not "+t._dual);

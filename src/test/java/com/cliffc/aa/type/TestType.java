@@ -442,6 +442,55 @@ public class TestType {
     assertEquals(T,mt0);
   }
 
+  // Test a cycle with two names on mismatched cycle boundaries
+  @Test public void testNameCycle() {
+    Type.init0(new HashMap<>());
+    Object dummy0 = TypeStruct.TYPES;
+    Object dummy1 = TypeMemPtr.TYPES;
+    // Make a cycle: 0_A: -> 1_(n=*,v=i64) -> 2_TMP -> 3_B: -> 4_(n=*,v=f64) -> 5_TMP ->
+    // Dual; then meet ~4_() and ~0_A
+    String[] flds = new String[]{"n","v"};
+    byte[] finals = TypeStruct.finals(2);
+    final int alias = BitsAlias.REC;
+
+    Type.RECURSIVE_MEET++;
+    TypeStruct as1 = TypeStruct.malloc(false,flds,new Type[2],finals,BitsAlias.RECBITS);
+    TypeStruct bs4 = TypeStruct.malloc(false,flds,new Type[2],finals,BitsAlias.RECBITS);
+    as1._hash = as1.compute_hash();  as1._cyclic = true;
+    bs4._hash = bs4.compute_hash();  bs4._cyclic = true;
+    TypeName an0 = TypeName.make("A",TypeName.TEST_SCOPE,as1);  an0._cyclic = true;
+    TypeName bn3 = TypeName.make("B",TypeName.TEST_SCOPE,bs4);  bn3._cyclic = true;
+    TypeMemPtr ap5 = TypeMemPtr.make(alias,an0);  ap5._cyclic = true;
+    TypeMemPtr bp2 = TypeMemPtr.make(alias,bn3);  bp2._cyclic = true;
+    as1._ts[0] = bp2;
+    as1._ts[1] = TypeInt.INT64;
+    bs4._ts[0] = ap5;
+    bs4._ts[1] = TypeFlt.FLT64;
+    Type.RECURSIVE_MEET--;
+    as1 = as1.install_cyclic(as1.reachable());
+    bp2 = (TypeMemPtr)as1._ts[0];
+    bn3 = (TypeName  )bp2._obj;
+    bs4 = (TypeStruct)bn3._t;
+    ap5 = (TypeMemPtr)bs4._ts[0];
+    an0 = (TypeName  )ap5._obj;
+
+    Type das1 = as1.dual();
+    Type dbs4 = bs4.dual();
+    Type mt = das1.meet(dbs4);
+    TypeStruct smt = (TypeStruct)mt;
+    assertEquals(TypeInt.INT32.dual(),smt._ts[1]);
+    assertEquals(BitsAlias.RECBITS.dual(),smt._news);
+    TypeMemPtr smp = (TypeMemPtr)smt._ts[0];
+    assertEquals(smt,smp._obj);
+    assertEquals(BitsAlias.RECBITS.dual(),smp._aliases);
+
+
+    Type mx = an0.dual().meet(dbs4);
+    TypeName nmx = (TypeName)mx;
+    assertEquals(smt,nmx._t);
+  }
+
+
   @Test public void testCommuteSymmetricAssociative() {
     Type.init0(new HashMap<>());
     BitsFun.make_new_fidx(BitsFun.ALL);

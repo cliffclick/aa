@@ -115,7 +115,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   }
   @Override TypeMemPtr rdual() {
     if( _dual != null ) return _dual;
-    TypeMemPtr dual = _dual = new TypeMemPtr(_aliases,(TypeObj)_obj.rdual());
+    TypeMemPtr dual = _dual = new TypeMemPtr(_aliases.dual(),(TypeObj)_obj.rdual());
     dual._dual = this;
     dual._hash = dual.compute_hash();
     dual._cyclic = true;
