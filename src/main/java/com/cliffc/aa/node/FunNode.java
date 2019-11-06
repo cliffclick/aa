@@ -6,8 +6,8 @@ import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
+import com.cliffc.aa.util.VBitSet;
 
-import java.util.BitSet;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -283,14 +283,17 @@ public class FunNode extends RegionNode {
   // call, possible with a single if.
   private int split_size( GVNGCM gvn, RetNode ret, ParmNode[] parms ) {
     if( _defs._len <= 1 ) return -1; // No need to split callers if only 2
+
+    // Count function body size.  Requires walking the function body and
+    // counting opcodes.  Some opcodes are ignored, because they manage
+    // dependencies but make no code.
     int[] cnts = new int[OP_MAX];
-    BitSet bs = new BitSet();
+    VBitSet bs = new VBitSet();
     Ary<Node> work = new Ary<>(new Node[1],0);
     work.add(this);             // Prime worklist
     while( work._len > 0 ) {    // While have work
       Node n = work.pop();      // Get work
-      if( bs.get(n._uid) ) continue; // Already visited?
-      bs.set(n._uid);           // Flag as visited
+      if( bs.tset(n._uid) ) continue; // Already visited?
       int op = n._op;           // opcode
       if( op == OP_FUN  && n       != this ) continue; // Call to other function, not part of inlining
       if( op == OP_PARM && n.in(0) != this ) continue; // Arg  to other function, not part of inlining
@@ -323,7 +326,7 @@ public class FunNode extends RegionNode {
         }
       if( ncon > mncons ) { mncons = ncon; m = i; }
     }
-    if( m == -1 )               // No paths are not in-error?
+    if( m == -1 )               // No paths are not in-error? (All paths have an error-parm)
       return -1;                // No inline
 
     // Specifically ignoring constants, parms, phis, rpcs, types,

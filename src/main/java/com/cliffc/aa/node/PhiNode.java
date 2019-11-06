@@ -8,7 +8,7 @@ public class PhiNode extends Node {
   final Parse _badgc;
   final BitsAlias _bits;
   private PhiNode( byte op, Parse badgc, Node... vals ) {
-    super(OP_PHI,vals);
+    super(op,vals);
     _badgc = badgc;
     _bits = BitsAlias.NZERO;
   }
@@ -65,6 +65,11 @@ public class PhiNode extends Node {
     // See if already split proper
     if( bits.isa(_bits) ) return null;
 
+    // Split a Phi - enlarges the graph but sharpens the aliasing.  Look for an
+    // already-split Phi with the proper aliasing (and also assert no duplicate
+    // aliasing).
+    
+    
     
     throw AA.unimpl();
   }

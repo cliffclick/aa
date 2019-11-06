@@ -49,8 +49,8 @@ public class NewNode extends Node {
 
   public Node get(String name) { return in(def_idx(_ts.find(name,-1))); }
   public boolean exists(String name) { return _ts.find(name,-1)!=-1; }
-  public boolean is_mutable(String name) { TypeStruct ts = _ts; return ts._finals[ts.find(name,-1)] == TypeStruct.frw(); }
-  public boolean is_final  (String name) { TypeStruct ts = _ts; return ts._finals[ts.find(name,-1)] == TypeStruct.ffinal(); }
+  public boolean is_mutable(String name) { return _ts._finals[_ts.find(name,-1)] == TypeStruct.frw(); }
+  public boolean is_final  (String name) { return _ts._finals[_ts.find(name,-1)] == TypeStruct.ffinal(); }
 
   // Called when folding a Named Constructor into this allocation site
   void set_name( GVNGCM gvn, TypeName name ) {
@@ -143,9 +143,15 @@ public class NewNode extends Node {
   // - Ok to be mutably updated on only one arm
   public void common( Parse P, GVNGCM gvn, Parse phi_errmsg, NewNode t, NewNode f, Node dull, Node t_sharp, Node f_sharp ) {
     // Unwind the sharpening
-    for( int i=1; i<_defs._len; i++ ) {
-      if( in(i)==dull && t.in(i)==t_sharp ) t.set_def(i,null,gvn);
-      if( in(i)==dull && f.in(i)==f_sharp ) f.set_def(i,null,gvn);
+    for( int i=0; i<_ts._ts.length; i++ ) {
+      if( in(def_idx(i))==dull ) {  // Found a use of 'dull'
+        String name = _ts._flds[i]; // Field name sharpened in test
+        // Find the matching field name in the true arm
+        int tidx = def_idx(t._ts.find(name,-1));
+        if( t.in(tidx)==t_sharp ) t.set_def(tidx,null,gvn);
+        int fidx = def_idx(f._ts.find(name,-1));
+        if( f.in(fidx)==f_sharp ) f.set_def(fidx,null,gvn);
+      }
     }
     // Look for updates on either arm
     String[] tflds = t._ts._flds;
