@@ -435,7 +435,7 @@ public class FunNode extends RegionNode {
     gvn.setype(new_funptr,new_funptr.value(gvn));
     UnresolvedNode new_unr = null;
     if( path < 0 ) {
-      new_unr = (UnresolvedNode)gvn.xform(new UnresolvedNode(old_funptr,new_funptr));
+      new_unr = (UnresolvedNode)gvn.xform(new UnresolvedNode(null,old_funptr,new_funptr));
       for( int i=0; i<old_funptr._uses._len; i++ ) {
         Node use = old_funptr._uses.at(i);
         if( use == new_unr ) continue;

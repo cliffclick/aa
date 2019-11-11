@@ -153,7 +153,7 @@ public abstract class IntrinsicNode extends Node {
   // Default name constructor using expanded args list.  Just a NewNode but the
   // result is a named type.  Same as convertTypeName on an unaliased NewNode.
   public static FunPtrNode convertTypeNameStruct( TypeStruct from, TypeName to, GVNGCM gvn ) {
-    NewNode nnn = gvn.init(new NewNode());
+    NewNode nnn = gvn.init(new NewNode(false));
     TypeMemPtr tmp = TypeMemPtr.make(nnn._alias,to);
     TypeFunPtr tf = TypeFunPtr.make_new(TypeTuple.make(from._ts),tmp);
     FunNode fun = (FunNode) gvn.xform(new FunNode(to._name,tf).add_def(Env.ALL_CTRL));

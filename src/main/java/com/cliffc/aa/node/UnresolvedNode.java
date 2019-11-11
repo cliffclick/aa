@@ -1,31 +1,42 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeFunPtr;
 
+import java.util.Arrays;
+
 public class UnresolvedNode extends Node {
-  UnresolvedNode( Node... funs ) { super(OP_UNR,funs); }
+  private Parse _bad;
+  UnresolvedNode( Parse bad, Node... funs ) { super(OP_UNR,funs); _bad = bad;}
   @Override String xstr() {
     if( is_dead() ) return "DEAD";
     if( in(0) instanceof FunPtrNode ) {
       FunPtrNode fptr = (FunPtrNode)in(0);
-      if( fptr.in(0) instanceof FunNode )
-        return "Unr:"+fptr.fun()._name;
+      return "Unr:"+fptr.fun().xstr();
     }
     return "Unr???";
   }
   @Override public Node ideal(GVNGCM gvn) {
     if( _defs._len < 2 )
-      //throw AA.unimpl(); // Should collapse
-      System.out.println("Should collapse");
+      throw com.cliffc.aa.AA.unimpl(); // Should collapse
     return null;
   }
   @Override public Type value(GVNGCM gvn) {
-    Type t = TypeFunPtr.GENERIC_FUNPTR;
-    for( Node def : _defs )
-      t = t.join(gvn.type(def)); // Join of incoming functions
-    return t.meet(TypeFunPtr.GENERIC_FUNPTR.dual());
+    if( gvn._opt_mode != 2 ) {
+      Type t = TypeFunPtr.GENERIC_FUNPTR.dual();
+      for( Node def : _defs )
+        t = t.meet(gvn.type(def));
+      return t;
+    } else {
+      // During GCP, Unresolved is a *choice* and thus a *join* until resolved.
+      Type t = TypeFunPtr.GENERIC_FUNPTR;
+      for( Node def : _defs )
+        t = t.join(gvn.type(def));
+      return t;
+    }
   }
   // Filter out all the wrong-arg-count functions
   public Node filter( GVNGCM gvn, int nargs ) {
@@ -35,13 +46,13 @@ public class UnresolvedNode extends Node {
       if( fun.nargs() != nargs ) continue;
       if( x == null ) x = epi;
       else if( x instanceof UnresolvedNode ) x.add_def(epi);
-      else x = new UnresolvedNode(x,epi);
+      else x = new UnresolvedNode(_bad,x,epi);
     }
     return x instanceof UnresolvedNode ? gvn.xform(x) : x;
   }
-  
+
   @Override public TypeFunPtr all_type() { return TypeFunPtr.GENERIC_FUNPTR; }
-  
+
   // Return the op_prec of the returned value.  Not sensible except when called
   // on primitives.  Should be the same across all defs.
   @Override public byte op_prec() {
@@ -56,12 +67,24 @@ public class UnresolvedNode extends Node {
     for( Node f : _defs ) if( (prec=f.op_prec()) >= 0 ) return prec;
     return prec;
   }
-  // Explicitly break monotonicity.  Happens because we are doing a *join*
-  // (choice) of functions, and if we inline any one of these choices the
-  // orginal FIDX becomes a class, and gets renumbered to a constant member of
-  // the class...  and the JOIN loses a choice (which is all members of the
-  // class).
-  @Override public boolean monotonicity_assured() {
-    return true;
+  @Override public int hashCode() { return super.hashCode()+(_bad==null ? 0 : _bad.hashCode()); }
+  @Override public boolean equals(Object o) {
+    if( !super.equals(o) ) return false;
+    return _bad==((UnresolvedNode)o)._bad;
+  }
+  // Make a copy with an error message
+  public UnresolvedNode copy(Parse bad) {
+    return new UnresolvedNode(bad,Arrays.copyOf(_defs._es,_defs._len));
+  }
+  // True if unresolved is uncalled (but possibly returned or stored as a
+  // constant).  Such code is not searched for errors.  Here we just check for
+  // being ONLY used by the initial environment; if this value is loaded from,
+  // it will have other uses.
+  @Override boolean is_uncalled(GVNGCM gvn) {
+    return _uses._len==0 || (_uses._len==1 && _uses.at(0)== Env.STK_0);
+  }
+  @Override public String err(GVNGCM gvn) {
+    String name = ((FunPtrNode)in(0)).fun().xstr();
+    return _bad==null ? null : _bad.errMsg("Unable to resolve "+name);
   }
 }

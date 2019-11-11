@@ -91,10 +91,9 @@ public final class CallEpiNode extends Node {
     Node ctl  = ret.ctl();      // Control being returned
     Node mem  = ret.mem();      // Memory  being returned
     Node rez = ret.val();       // Value   being returned
-    // This is due to a shortcut, where we do not modify the types of
-    // primitives so they can be reused in tests.  Instead, the primitive is
-    // "pure" and the memory is just a pass-through of the Call memory.
-    if( gvn.type(mem) == TypeMem.XMEM ) mem = cmem;
+    // If the function does nothing with memory, then use the call memory directly.
+    if( ret.mem() instanceof ParmNode && ret.mem().in(0) == fun )
+      mem = cmem;
 
     // Check for zero-op body (id function)
     if( rez instanceof ParmNode && rez.in(0) == fun && cmem == mem )
@@ -179,13 +178,17 @@ public final class CallEpiNode extends Node {
     BitsFun fidxs = funt.fidxs();
     if( gvn._opt_mode != 2 && fidxs.test(BitsFun.ALL) ) // All functions are possible?
       return TypeTuple.CALL;        // Worse-case result
+    // If we fall from choice-functions to the empty set of called functions, freeze our output.
+    // We might fall past empty and get a valid set.  Probably wrong; if we ever see a
+    // choice set of functions, we should not execute.
+    if( fidxs.is_empty() ) return gvn.self_type(this);
 
     // Merge returns from all fidxs, wired or not.  Required during GCP to keep
     // optimistic.  JOIN if above center, merge otherwise.  Wiring the calls
     // gives us a faster lookup, but need to be correct wired or not.
     Bits.Tree<BitsFun> tree = fidxs.tree();
     BitSet bs = tree.plus_kids(fidxs);
-    boolean lifting = gvn._opt_mode == 2 && fidxs.above_center();
+    boolean lifting = fidxs.above_center();
     Type t = lifting ? TypeTuple.CALL : TypeTuple.XCALL;
     for( int fidx = bs.nextSetBit(0); fidx >= 0; fidx = bs.nextSetBit(fidx+1) ) {
       if( tree.is_parent(fidx) ) continue;   // Will be covered by children

@@ -14,6 +14,9 @@ public class TestType {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testType() {
     Type.init0(new HashMap<>());
+    BitsFun foo = (BitsFun)BitsFun.make_new_fidx(1).join(BitsFun.make_new_fidx(1));
+    BitsFun bar = foo.meet(BitsFun.EMPTY);
+    assertEquals(BitsFun.EMPTY,bar);
   }
 
   @Test public void testNamesInts() {

@@ -122,7 +122,7 @@ public class Ary<E> implements Iterable<E> {
   }
   
   /** @param c Collection to be added */
-  public void addAll( Collection<? extends E> c ) { for( E e : c ) add(e); }
+  public Ary<E> addAll( Collection<? extends E> c ) { for( E e : c ) add(e); return this; }
     
   /** @param es Array to be added */
   public <F extends E> Ary<E> addAll( F[] es ) {

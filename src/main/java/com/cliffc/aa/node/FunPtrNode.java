@@ -46,13 +46,13 @@ public final class FunPtrNode extends ConNode<TypeFunPtr> {
   // Return the op_prec of the returned value.  Not sensible except when called
   // on primitives.
   @Override public byte op_prec() { return ret().op_prec(); }
-  
+
   // True if function is uncalled (but possibly returned or stored as
   // a constant).  Such code is not searched for errors.
   @Override boolean is_uncalled(GVNGCM gvn) {
     return !is_forward_ref() && ((TypeTuple)gvn.type(ret())).at(0)==Type.XCTRL;
   }
-  
+
   // A forward-ref is an assumed unknown-function being used before being
   // declared.  Hence we want a callable function pointer, but have no defined
   // body (yet).  Make a function pointer that takes/ignores all args, and
@@ -88,6 +88,6 @@ public final class FunPtrNode extends ConNode<TypeFunPtr> {
     dfun.bind(tok);
   }
 
-  
+
   @Override public String err(GVNGCM gvn) { return is_forward_ref() ? _referr : null; }
 }

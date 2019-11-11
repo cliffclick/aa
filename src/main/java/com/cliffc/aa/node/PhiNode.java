@@ -6,7 +6,7 @@ import com.cliffc.aa.type.*;
 // Merge results; extended by ParmNode
 public class PhiNode extends Node {
   final Parse _badgc;
-  final BitsAlias _bits;
+  private final BitsAlias _bits;
   private PhiNode( byte op, Parse badgc, Node... vals ) {
     super(op,vals);
     _badgc = badgc;
@@ -15,7 +15,7 @@ public class PhiNode extends Node {
   public PhiNode( Parse badgc, Node... vals ) { this(OP_PHI,badgc,vals); }
   // For ParmNodes
   PhiNode( byte op, Node fun, ConNode defalt, Parse badgc ) { this(op,badgc,fun,defalt); }
-  
+
   @Override public Node ideal(GVNGCM gvn) {
     if( gvn.type(in(0)) == Type.XCTRL ) return null;
     RegionNode r = (RegionNode) in(0);
@@ -28,9 +28,33 @@ public class PhiNode extends Node {
       if( gvn.type(r.in(i))==Type.XCTRL ) continue; // Ignore dead path
       if( in(i)==this || in(i)==live ) continue;    // Ignore self or duplicates
       if( live==null ) live = in(i);                // Found unique live input
-      else return null;         // Found 2nd live input, no collapse
+      else live=this;           // Found 2nd live input, no collapse
     }
-    return live;                // Single unique input
+    if( live != this ) return live; // Single unique input
+
+    // If this is a Phi of a bunch of MemMerges, pull them down.  This will
+    // 'widen' the separation of phat and skinny memory, generally giving more
+    // memory precision.
+    boolean all_merge=true;
+    for( int i=1; i<_defs._len; i++ )
+      if( !(in(i) instanceof MemMergeNode) )
+        { all_merge=false; break; }
+    if( all_merge &&
+        !(this instanceof ParmNode) ) { // TODO: Handle adding a new Parm to a FunNode; Call behavior has to update
+      Node phat = copy(false,gvn); // Copy parm/phi, alias bits, etc
+      Node skin = copy(false,gvn);
+      phat.add_def(r);
+      skin.add_def(r);
+      for( int i=1; i<_defs._len; i++ ) {
+        phat.add_def(in(i).in(0));
+        skin.add_def(in(i).in(1));
+      }
+      phat = gvn.xform(phat);
+      skin = gvn.xform(skin);
+      return new MemMergeNode(phat,skin);
+    }
+
+    return null;
   }
   @Override public Type value(GVNGCM gvn) {
     Type ctl = gvn.type(in(0));
@@ -70,7 +94,7 @@ public class PhiNode extends Node {
     // Splitting Parm memory like making a new wirable argument should work
     // fine, but needs testing.
     if( this instanceof ParmNode ) throw AA.unimpl();
-    
+
     // Split a Phi - enlarges the graph but sharpens the aliasing.  Look for an
     // already-split Phi with the proper aliasing (and also assert no duplicate
     // aliasing).
@@ -81,14 +105,14 @@ public class PhiNode extends Node {
       if( use instanceof PhiNode ) {
         PhiNode phi = (PhiNode)use;
         throw AA.unimpl();
-        
+
       }
     }
-    
+
     // If did find the proper alias split, make it
-    
-    
+
+
     throw AA.unimpl();
   }
-  
+
 }

@@ -31,16 +31,23 @@ public class CProjNode extends ProjNode {
   // This is a mild optimization, since e.g. follow-on Loads which require a
   // non-nil check will hash to the pre-test Load, and so bypass this
   // sharpening.
-  @Override public Node sharpen( GVNGCM gvn, ScopeNode scope, ScopeNode arm ) {
+  @Override public Node sharpen( GVNGCM gvn, Node mem ) {
     Node iff = in(0);
     if( !(iff instanceof IfNode) ) return this; // Already collapsed IfNode, no sharpen
     Node test = iff.in(1);
-    keep();                     // Self-hook to prevent accidental deletion
     Node sharp = _idx==1
       ? gvn.xform(new CastNode(this,test,Type.NSCALR))
       : gvn.con(Type.NIL);
-    scope.stk().sharpen(gvn,test,sharp,arm.stk());
-    unkeep(gvn);                // Remove self-hook
-    return sharp;
+    // If 'test' has an appearance under a name, then store the sharp value to
+    // that name.
+    Node x = mem;
+    while( x instanceof StoreNode ) {
+      StoreNode st = (StoreNode)x;
+      if( st.val()==test )
+        mem = gvn.xform(new StoreNode(st,this,mem,st.adr(),sharp,true));
+      x = st.mem();
+    }
+    gvn.add_work(sharp);
+    return mem;
   }
 }

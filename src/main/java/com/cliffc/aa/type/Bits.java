@@ -73,7 +73,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     if( _bits==null ) return _con >= 0 || is_class(-_con); // Must be a single constant bit#
     if( _con != 1 && _con != -1 ) return false;
     if( _bits.length==0 ) return false;  // Empty bits replaced by a con
-    if( _bits.length==1 && _bits[0]== 0) return true; // NO bits is OK
+    if( _bits.length==1 && _bits[0]== 0 && _con==1 ) return true; // NO bits is OK
     if( _bits[_bits.length-1]==0 ) return false; // Array is "tight"
     // No set bit has a parent bit set
     Tree<B> tree = tree();
@@ -86,7 +86,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   }
   private static boolean check_multi_bits( long[] bits) {
     int len = bits.length;
-    long b = bits[len-1];              // Last word
+    long b = bits[len-1];             // Last word
     if( (b & (b-1))!=0 ) return true; // Last word has multiple bits
     // Check multiple bits spread over multiple words
     for( int i=0; i<len-1; i++ ) if( bits[i] != 0 ) return true;
@@ -151,7 +151,10 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     if( bits.length != len ) bits = Arrays.copyOf(bits,len);
 
     // Check for a single bit or NO bits
-    if( check_multi_bits(bits) || (len==1 && bits[0]==0) ) return make_impl(any ? -1 : 1,bits);
+    if( check_multi_bits(bits) ) return make_impl(any ? -1 : 1,bits);
+    // Empty is self-dual, ignores 'any'
+    if( len==1 && bits[0]==0 ) return make_impl(1,bits);
+    // Single bit
     int bnum0 = 63 - Long.numberOfLeadingZeros(bits[len-1]);
     int bnum = bnum0 + ((len-1)<<6);
     if( any && is_class(bnum) ) bnum = -bnum;
@@ -177,13 +180,14 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   public boolean is_con() {
     return _bits==null || (_bits.length==1 && _bits[0]==0);
   }
+  public boolean is_empty() { return _bits!=null && _bits.length==1 && _bits[0]==0; }
   boolean may_nil() { return _con==0 || (_con==-1 && _bits != null && ((_bits[0]&1) == 1)); }
   // Add a nil
   @SuppressWarnings("unchecked")
   B meet_nil() {
     if( _con==0 ) return (B)this;// Already a nil constant
     long[] bs = _bits;
-    if( _con == -1 && (bs[0]&1)==1 ) // JOIN includes nil?
+    if( _con == -1 && bs!=null && (bs[0]&1)==1 ) // JOIN includes nil?
       return make(0);                // Return just NIL
     if( bs==null )              // Is a single compressed bit
       or(bs = bits(Math.abs(_con)),Math.abs(_con)); // Decompress single bit into array
@@ -263,6 +267,12 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     B any  = ANY();             // Subclass-specific version of any
     if( this==any ) return bs;
     if( bs  ==any ) return (B)this;
+    // Empty is a little odd; similar to meeting two JOIN sets with nothing in
+    // common - it is on the center, and forces above values to fall, and
+    // itself falls to below values.
+    if( is_empty() ) return bs.above_center() ? (B)this : bs;
+    if( bs.is_empty() ) return above_center() ? bs : (B)this;
+
     long[] bits0 = _bits, bits1 = bs._bits;
     int con0 = Math.abs(_con), con1 = Math.abs(bs._con);
     if( bits0==null && con0==0 ) return bs.meet_nil();
@@ -360,7 +370,10 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
 
   // Constants are self-dual; classes just flip the meet/join bit.
   @SuppressWarnings("unchecked")
-  public B dual() { return _bits==null && !is_class(Math.abs(_con)) ? (B)this : make_impl(-_con,_bits); }
+  public B dual() {
+    if( _bits!=null && _bits.length==1 && _bits[0]==0 ) return (B)this; // Empty is self-dual
+    return _bits==null && !is_class(Math.abs(_con)) ? (B)this : make_impl(-_con,_bits);
+  }
   // join is defined in terms of meet and dual
   public Bits<B> join(Bits<B> bs) { return dual().meet(bs.dual()).dual(); }
   // Note no special nil handling; both sides need to either handle nil or not

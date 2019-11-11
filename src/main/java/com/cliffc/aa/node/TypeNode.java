@@ -39,12 +39,12 @@ public class TypeNode extends Node {
         args[i+3] = gvn.xform(new TypeNode(targs[i],parm,_error_parse));
       }
       Node call = gvn.xform(new CallNode(true,_error_parse,args));
-      Node cepi = gvn.xform(new CallEpiNode(call));
+      Node cepi = gvn.xform(new CallEpiNode(call)).keep();
       Node ctl  = gvn.xform(new CProjNode(cepi,0));
-      Node mem  = gvn.xform(new MProjNode(cepi,1));
-      Node val  = gvn.xform(new  ProjNode(cepi,2));
+      Node mem  = gvn.xform(new MProjNode(cepi,1)).keep();
+      Node val  = gvn.xform(new  ProjNode(cepi.unhook(),2));
       Node chk  = gvn.xform(new  TypeNode(tfp._ret,val,_error_parse)); // Type-check the return also
-      RetNode ret = (RetNode)gvn.xform(new RetNode(ctl,mem,chk,rpc,fun));
+      RetNode ret = (RetNode)gvn.xform(new RetNode(ctl,mem.unhook(),chk,rpc,fun));
       return gvn.xform(new FunPtrNode(ret));
     }
 
@@ -54,7 +54,7 @@ public class TypeNode extends Node {
     if( arg instanceof PhiNode &&
         // Not allowed to push up the typing on the unknown arg... because
         // unknown new callers also need the check.
-        
+
         // TODO: Probably not legit for FunNodes ever, because have to match
         // the CallNode args with the FunNode args.  Or need to add the very
         // same node as the matching call arg.  Alternatively, simplify the

@@ -28,7 +28,7 @@ public class RegionNode extends Node {
             phi.remove(i,gvn);
             if( !phi.is_dead() ) gvn.rereg(phi,ot);
           }
-        remove(i,gvn);
+        if( !is_dead() ) remove(i,gvn);
         return this; // Progress
       }
 
@@ -50,7 +50,7 @@ public class RegionNode extends Node {
     }
     return Type.XCTRL;
   }
-  
+
   @Override public Type all_type() { return Type.CTRL; }
   // Complex dominator tree.  Ok to subset, attempt the easy walk
   @Override Node walk_dom_last(Predicate<Node> P) {

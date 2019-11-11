@@ -128,16 +128,10 @@ public abstract class PrimNode extends Node {
   public FunPtrNode as_fun( GVNGCM gvn ) {
     FunNode  fun = ( FunNode) gvn.xform(new  FunNode(this).add_def(Env.ALL_CTRL)); // Points to ScopeNode only
     ParmNode rpc = (ParmNode) gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
+    ParmNode mem = (ParmNode) gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM     ),null));
     add_def(null);              // Control for the primitive in slot 0
     for( int i=0; i<_args.length; i++ )
       add_def(gvn.init(new ParmNode(i,_args[i],fun, gvn.con(_targs.at(i)),null)));
-
-    // This is a funny short-cut approximation: really primitives should have a
-    // ParmNode of memory that merges all the incoming memories from all
-    // resolved call sites.  However, to speed up testing, we do not allow the
-    // primitive functions to be wired-up, and instead CallNode has special
-    // handling for the memory state of primitives.
-    Node mem = gvn.con(TypeMem.XMEM); // Primitives are pure
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mem,gvn.init(this),rpc,fun));
     return new FunPtrNode(ret);
   }

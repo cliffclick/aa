@@ -23,7 +23,7 @@ public class GVNGCM {
   private Ary<Node> _work = new Ary<>(new Node[1], 0);
   private BitSet _wrk_bits = new BitSet();
 
-  public void add_work( Node n ) { if( !_wrk_bits.get(n._uid) ) add_work0(n); }
+  public void add_work( Node n ) { if( !_wrk_bits.get(n._uid) && n._keep==0 ) add_work0(n); }
   private <N extends Node> N add_work0( N n ) {
     _work.add(n);               // These need to be visited later
     _wrk_bits.set(n._uid);
@@ -278,12 +278,8 @@ public class GVNGCM {
       add_work(old);            // Re-run old, until no progress
       return;
     }
-    if( check_new(nnn) ) {      // If new, replace back in GVN
-      //assert _ts.at(nnn._uid)==nnn.value(this);
-      setype(nnn,nnn.value(this));// Can compute a better value
-      _vals.put(nnn,nnn);
-      add_work0(nnn);
-    }
+    if( check_new(nnn) )        // If new, replace back in GVN
+      rereg(nnn,nnn.value(this));
     if( !old.is_dead() ) { // if old is being replaced, it got removed from GVN table and types table.
       assert !check_opt(old);
       subsume(old,nnn);
@@ -295,7 +291,7 @@ public class GVNGCM {
   // - Not an ErrNode AND
   // - Type isa Con
   private static boolean replace_con(Type t, Node n) {
-    if( n instanceof ConNode || n instanceof ErrNode || n instanceof FunPtrNode )
+    if( n instanceof ConNode || n instanceof ErrNode )
       return false; // Already a constant, or never touch an ErrNode
     return t.is_con(); // Replace with a ConNode
   }
@@ -369,8 +365,8 @@ public class GVNGCM {
     while( (_small_work=_work._len > 0) || _work2._len > 0 ) {
       Node n = (_small_work ? _work : _work2).pop(); // Pull from main worklist before functions
       (_small_work ? _wrk_bits : _wrk2_bits).clear(n._uid);
-      if( n.is_dead() ) continue;
-      if( n._uses._len==0 && n._keep==0 ) kill(n);
+      if( n.is_dead() || n._keep!=0 ) continue;
+      if( n._uses._len==0 ) kill(n);
       else xform_old(n);
       cnt++; assert cnt < 10000; // Catch infinite ideal-loops
     }
@@ -423,7 +419,7 @@ public class GVNGCM {
         }
         Type ot = type(n);       // Old type
         Type nt = n.value(this); // New type
-        assert ot.isa(nt) || n instanceof UnresolvedNode;       // Types only fall monotonically
+        assert ot.isa(nt);       // Types only fall monotonically
         if( ot != nt ) {         // Progress
           _ts.setX(n._uid,nt);   // Record progress
           for( Node use : n._uses ) {
@@ -500,8 +496,8 @@ public class GVNGCM {
     // All (live) Call ambiguity has been resolved
     if( n instanceof CallNode && type(n.in(0))==Type.CTRL ) {
       BitsFun fidxs = ((CallNode)n).fidxs(this);
-      assert fidxs==null || !fidxs.above_center() ||
-        n.err(this) != null; // Or else call is in-error
+      assert n.err(this) != null || // Call is in-error OR
+        !fidxs.above_center() || fidxs==BitsFun.EMPTY;
     }
 
     // Walk reachable graph

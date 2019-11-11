@@ -108,7 +108,7 @@ public class TestParse {
     test("x=2; y=x+1; x*y", TypeInt.con(6));
     // Re-use ref immediately after def; parses as: x=(2*3); 1+x+x*x
     test("1+(x=2*3)+x*x", TypeInt.con(1+6+6*6));
-    testerr("x=(1+(x=2)+x)", "Cannot re-assign final val 'x'",13);
+    testerr("x=(1+(x=2)+x); x", "Cannot re-assign final val 'x'",13);
     test("x:=1;x++"  ,TypeInt.con(1));
     test("x:=1;x++;x",TypeInt.con(2));
     test("x:=1;x++ + x--",TypeInt.con(3));
@@ -117,14 +117,14 @@ public class TestParse {
     // Conditional:
     test   ("0 ?    2  : 3", TypeInt.con(3)); // false
     test   ("2 ?    2  : 3", TypeInt.con(2)); // true
-    test   ("math_rand(1)?(x=4):(x=3);x", TypeInt.NINT8); // x defined on both arms, so available after
-    test   ("math_rand(1)?(x=2):   3 ;4", TypeInt.con(4)); // x-defined on 1 side only, but not used thereafter
-    test   ("math_rand(1)?(y=2;x=y*y):(x=3);x", TypeInt.NINT8); // x defined on both arms, so available after, while y is not
-    testerr("math_rand(1)?(x=2):   3 ;x", "'x' not defined on false arm of trinary",24);
-    testerr("math_rand(1)?(x=2):   3 ;y=x+2;y", "'x' not defined on false arm of trinary",24);
-    testerr("0 ? (x=2) : 3;x", "'x' not defined on false arm of trinary",13);
-    test   ("2 ? (x=2) : 3;x", TypeInt.con(2)); // off-side is constant-dead, so missing x-assign is ignored
-    test   ("2 ? (x=2) : y  ", TypeInt.con(2)); // off-side is constant-dead, so missing 'y'      is ignored
+    test   ("math_rand(1)?x=4:x=3;x", TypeInt.NINT8); // x defined on both arms, so available after
+    test   ("math_rand(1)?x=2:  3;4", TypeInt.con(4)); // x-defined on 1 side only, but not used thereafter
+    test   ("math_rand(1)?(y=2;x=y*y):x=3;x", TypeInt.NINT8); // x defined on both arms, so available after, while y is not
+    testerr("math_rand(1)?x=2: 3 ;x", "'x' not defined on false arm of trinary",20);
+    testerr("math_rand(1)?x=2: 3 ;y=x+2;y", "'x' not defined on false arm of trinary",20);
+    testerr("0 ? x=2 : 3;x", "'x' not defined on false arm of trinary",11);
+    test   ("2 ? x=2 : 3;x", TypeInt.con(2)); // off-side is constant-dead, so missing x-assign is ignored
+    test   ("2 ? x=2 : y  ", TypeInt.con(2)); // off-side is constant-dead, so missing 'y'      is ignored
     testerr("x=1;2?(x=2):(x=3);x", "Cannot re-assign final val 'x'",10);
     test   ("x=1;2?   2 :(x=3);x",TypeInt.con(1)); // Re-assigned allowed & ignored in dead branch
     test   ("math_rand(1)?1:int:2:int",TypeInt.NINT8); // no ambiguity between conditionals and type annotations
@@ -178,17 +178,8 @@ public class TestParse {
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.TRUE );
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(5)", Type.NIL  );
 
-    // Not currently inferring top-level function return very well.  Acting
-    // "as-if" called by Scalar, which pretty much guarantees a fail result.
-    // Note that this is correct scenario: the returned value is reporting that
-    // it might type-err on some future unknown call with Scalar args.  Would
-    // like to lift the type to (i64,i64->i64) and move that future maybe-error
-    // to the function args and away from the primitive call.
-    //test("{x y -> x & y}", TypeFun.make(TypeFunPtr.make(TypeTuple.INT64_INT64,TypeInt.INT64,Bits.FULL,2)));
-
-    // This test shows that I am passing a TypeFun to a CallNode, not a
-    // TypeFunPtr as the test merges 2 TypeFunPtrs in a Phi.
-    testerr("(math_rand(1) ? {+} : {*})(2,3)","An ambiguous function is being called"/*TypeInt.INT8*/,31); // either 2+3 or 2*3, or {5,6} which is INT8.
+    // This test merges 2 TypeFunPtrs in a Phi, and then fails to resolve.
+    testerr("(math_rand(1) ? {+} : {*})(2,3)","Unable to resolve {+}",19); // either 2+3 or 2*3, or {5,6} which is INT8.
   }
 
   @Test public void testParse03() {
@@ -243,7 +234,7 @@ public class TestParse {
     testerr("a=@{x=1,x=2}", "Cannot define field '.x' twice",11);
     test   ("a=@{x=1.2,y,}; a.x", TypeFlt.con(1.2)); // standard "." field naming; trailing comma optional
     testerr("(a=@{x,y}; a.)", "Missing field name after '.'",13);
-    testerr("a=@{x,y}; a.x=1","Cannot re-assign read-only field '.x'",15);
+    testerr("a=@{x,y}; a.x=1; a","Cannot re-assign read-only field '.x'",15);
     test   ("a=@{x=0,y=1}; b=@{x=2}  ; c=math_rand(1)?a:b; c.x", TypeInt.INT8); // either 0 or 2; structs can be partially merged
     testerr("a=@{x=0,y=1}; b=@{x=2}; c=math_rand(1)?a:b; c.y",  "Unknown field '.y'",47);
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'",20);
@@ -464,6 +455,7 @@ public class TestParse {
   }
 
   @Test public void testParse09() {
+    test_ptr("x:=0; a=x; x:=1; b=x; x:=2; (a,b,x)", (alias) -> TypeMemPtr.make(alias,TypeStruct.make_tuple(alias,Type.NIL,TypeInt.con(1),TypeInt.con(2))));
     // Test re-assignment
     test("x=1", TypeInt.TRUE);
     test("x=y=1", TypeInt.TRUE);

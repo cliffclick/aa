@@ -6,6 +6,7 @@ import com.cliffc.aa.type.BitsAlias;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
+import com.cliffc.aa.util.VBitSet;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.BitSet;
@@ -69,10 +70,15 @@ public abstract class Node implements Cloneable {
     }
     return this;
   }
-  public Node   keep(          ) { _keep++;  return this; }
+  @SuppressWarnings("unchecked")
+  public <N extends Node> N keep() { _keep++;  return (N)this; }
   @SuppressWarnings("unchecked")
   public <N extends Node> N unhook() { _keep--;  return (N)this; }
-  public void unkeep(GVNGCM gvn) { _keep--;  if( _keep==0 && _uses._len==0 ) gvn.kill(this); }
+  public void unkeep(GVNGCM gvn) {
+    _keep--;
+    if( _keep==0 && _uses._len==0 ) gvn.kill(this);
+    else gvn.add_work(this);
+  }
   // Return Node at idx, withOUT auto-deleting it, even if this is the last
   // use.  Used by the parser to retrieve final Nodes from tmp holders.  Does
   // NOT preserve order.
@@ -104,7 +110,7 @@ public abstract class Node implements Cloneable {
       n._uid = GVNGCM.uid();              // A new UID
       n._defs = new Ary<>(new Node[1],0); // New empty defs
       n._uses = new Ary<>(new Node[1],0); // New empty uses
-      if( copy_edges ) 
+      if( copy_edges )
         for( Node def : _defs )
           n.add_def(def);
       return n;
@@ -232,9 +238,6 @@ public abstract class Node implements Cloneable {
   // points have not all appeared).  Returns null if no-progress, or a better
   // version of 'this'.
   abstract public Node ideal(GVNGCM gvn);
-  // If an ideal() change breaks type monotonicity, the ideal() call knows this
-  // and assures monotonicity happens some other way.
-  public boolean monotonicity_assured() { return false; }
   // Losing uses puts these on the worklist
   public boolean ideal_impacted_by_losing_uses() { return _op==OP_NEW || _op==OP_FUN || _op==OP_MERGE; }
 
@@ -281,7 +284,7 @@ public abstract class Node implements Cloneable {
   // This is a mild optimization, since e.g. follow-on Loads which require a
   // non-null check will hash to the pre-test Load, and so bypass this
   // sharpening.
-  public Node sharpen( GVNGCM gvn, ScopeNode scope, ScopeNode arm ) { return this; }
+  public Node sharpen( GVNGCM gvn, Node mem ) { return mem; }
 
   // Gather errors; backwards reachable control uses only
   public void walkerr_use( Ary<String> errs, BitSet bs, GVNGCM gvn ) {
@@ -295,27 +298,27 @@ public abstract class Node implements Cloneable {
   }
 
   // Gather errors; forwards reachable data uses only.  This is an RPO walk.
-  public void walkerr_def( Ary<String> errs0, Ary<String> errs1, Ary<String> errs2, BitSet bs, GVNGCM gvn ) {
+  public void walkerr_def( Ary<String> errs0, Ary<String> errs1, Ary<String> errs2, Ary<String> errs3, VBitSet bs, GVNGCM gvn ) {
     assert !is_dead();
-    if( bs.get(_uid) ) return;  // Been there, done that
-    bs.set(_uid);               // Only walk once
+    if( bs.tset(_uid) ) return; // Been there, done that
     if( is_uncalled(gvn) ) return; // FunPtr is a constant, but never executed, do not check for errors
     // Reverse walk: start and exit/return of graph and walk towards root/start.
     for( int i=0; i<_defs._len; i++ ) {
       Node def = _defs.at(i);   // Walk data defs for more errors
       if( def == null || gvn.type(def) == Type.XCTRL ) continue;
-      def.walkerr_def(errs0,errs1,errs2,bs,gvn);
+      def.walkerr_def(errs0,errs1,errs2,errs3,bs,gvn);
     }
     // Post-Order walk: check after walking
     String msg = err(gvn);      // Get any error
     if( msg != null ) {         // Gather errors
       Ary<String> errs;
-      if( this instanceof ErrNode ) errs=errs0; // Report ErrNodes first
+      if( is_forward_ref() ) errs = errs0;      // Report unknown refs first
+      else if( this instanceof ErrNode ) errs=errs1; // Report ErrNodes next
       // Report bad parms/unresolved calls last, as some other error generally
       // triggered this one.
-      else if( this instanceof CallNode && in(1) instanceof UnresolvedNode ) errs=errs2;
-      else errs=errs1;          // Other errors (e.g. bad fields for Loads)
-      if( errs.find(msg::equals) == -1 ) // Filter dups; happens due to e.g. inlining replicating busted code
+      else if( this instanceof UnresolvedNode ) errs=errs3;
+      else errs=errs2;          // Other errors (e.g. bad fields for Loads)
+      if( errs.find(msg::equals) == -1 ) // Filter dups; happens due to e.g. inlining replicated busted code
         errs.add(msg);
     }
   }

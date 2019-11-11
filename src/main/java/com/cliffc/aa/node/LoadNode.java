@@ -1,6 +1,5 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.AA;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
@@ -10,7 +9,7 @@ import com.cliffc.aa.type.*;
 public class LoadNode extends Node {
   private final String _fld;
   private final int _fld_num;
-  final Parse _bad;
+  private final Parse _bad;
   private LoadNode( Node ctrl, Node mem, Node adr, String fld, int fld_num, Parse bad ) {
     super(OP_LOAD,ctrl,mem,adr);
     _fld = fld;
@@ -25,7 +24,7 @@ public class LoadNode extends Node {
   private Node mem() { return in(1); }
   private Node adr() { return in(2); }
   private Node nil_ctl(GVNGCM gvn) { return set_def(0,null,gvn); }
-  private Node set_mem(Node a, GVNGCM gvn) { set_def(1,a,gvn); return this; }
+  private void set_mem(Node a, GVNGCM gvn) { set_def(1,a,gvn); }
   private void set_adr(Node a, GVNGCM gvn) { set_def(2,a,gvn); }
 
   @Override public Node ideal(GVNGCM gvn) {
@@ -34,8 +33,11 @@ public class LoadNode extends Node {
     Node addr = adr();
 
     // Loads against a NewNode cannot NPE, cannot fail, always return the input
-    if( addr instanceof ProjNode && mem instanceof OProjNode &&
-        addr.in(0) == mem.in(0) && addr.in(0) instanceof NewNode ) {
+    if( mem instanceof MemMergeNode && addr.in(0) == mem.in(1).in(0) && addr.in(0) instanceof NewNode )
+      mem = mem.in(1);
+
+    // Loads against a NewNode cannot NPE, cannot fail, always return the input
+    if( addr.in(0) == mem.in(0) && addr.in(0) instanceof NewNode ) {
       NewNode nnn = (NewNode)addr.in(0);
       int idx = nnn._ts.find(_fld,_fld_num);  // Find the named field
       if( idx != -1 ) return nnn.fld(idx);    // Field value
@@ -52,29 +54,14 @@ public class LoadNode extends Node {
       }
     }
 
-    // Memory comes from generic MemMerge; sharpen memory edge based on aliasing.
-    Node wmem = mem.in(0);
-    Node nmem = mem._defs._len > 1 ? mem.in(1) : null;
-    Type twmem, tnmem;
-    if( mem instanceof MemMergeNode && tadr0 instanceof TypeMemPtr &&
-        (twmem=gvn.type(wmem)) instanceof TypeMem && (tnmem=gvn.type(nmem)) instanceof TypeObj ) {
-      TypeMemPtr tadr1 = (TypeMemPtr)tadr0;
-      TypeMem twobj = (TypeMem)twmem;
-      TypeObj tnobj = (TypeObj)tnmem;
-      if( tadr1._aliases.isa(tnobj._news) || tnobj._news.isa(tadr1._aliases) ) { // Test if address is in narrow memory
-        if( twobj.contains(tadr1._aliases) ) {
-          // both, do nothing
-        } else {
-          throw AA.unimpl();    // Should be split before
-          //return set_mem(nmem,gvn); // Tighten in on narrow memory
-        }
-      } else {
-        if( twobj.contains(tadr1._aliases) ) { // Not in narrow memory, test wide
-          throw AA.unimpl();    // should be split before
-          //return set_mem(wmem,gvn); // tighten on wide memory
-        } else {
-          throw AA.unimpl();    // neither, value must go XSCALAR
-        }
+    // Load from a memory Phi; split through in an effort to sharpen the memory.
+    if( mem instanceof PhiNode && ctrl == null && addr instanceof ProjNode && addr.in(0) instanceof NewNode ) {
+      // Only split thru function args if no unknown_callers, and must make a Parm not a Phi
+      if( !(mem instanceof ParmNode) ) {
+        Node lphi = new PhiNode(((PhiNode)mem)._badgc,mem.in(0));
+        for( int i=1; i<mem._defs._len; i++ )
+          lphi.add_def(gvn.xform(new LoadNode(null,mem.in(i),addr,_fld,_fld_num,_bad)));
+        return lphi;
       }
     }
 
@@ -172,13 +159,14 @@ public class LoadNode extends Node {
         }
       } else t4 = t6;
     }
-    if( ((TypeStruct)t4).find(_fld,_fld_num) == -1 )
+    if( !(t4 instanceof TypeStruct) || ((TypeStruct)t4).find(_fld,_fld_num) == -1 )
       return bad("Unknown");
     return null;
   }
   private String bad( String msg ) {
     String f = _fld==null ? ""+_fld_num : _fld;
-    return _bad.errMsg(msg+" field '."+f+"'");
+    String f2 = msg+" field '."+f+"'";
+    return _bad==null ? f2 : _bad.errMsg(f2);
   }
   @Override public Type all_type() { return Type.SCALAR; }
   @Override public int hashCode() { return super.hashCode()+(_fld==null ? _fld_num : _fld.hashCode()); }

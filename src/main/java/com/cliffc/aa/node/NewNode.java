@@ -27,6 +27,7 @@ public class NewNode extends Node {
   // Only effectively-final, because the copy/clone sets a new alias value.
   int _alias;                   // Alias class
   TypeStruct _ts;               // base Struct
+  boolean _is_closure;          // For error messages
   private TypeName _name;       // If named, this is the name and _ts is the base
 
   // NewNodes can participate in cycles, where the same structure is appended
@@ -34,11 +35,12 @@ public class NewNode extends Node {
   // need to approximate a new cyclic type.
   public final static int CUTOFF=2; // Depth of types before we start forcing approximations
 
-  public NewNode( ) {
+  public NewNode( boolean is_closure ) {
     super(OP_NEW,(Node)null);   // no ctrl field
     _alias = BitsAlias.new_alias(BitsAlias.REC);
     _ts = TypeStruct.make_alias(_alias); // No fields
     _name =null;
+    _is_closure = is_closure;
   }
   String xstr() { return "New*"+_alias; } // Self short name
   String  str() { return "New"+xs(); } // Inline less-short name
@@ -50,7 +52,6 @@ public class NewNode extends Node {
   public Node get(String name) { return in(def_idx(_ts.find(name,-1))); }
   public boolean exists(String name) { return _ts.find(name,-1)!=-1; }
   public boolean is_mutable(String name) { return _ts._finals[_ts.find(name,-1)] == TypeStruct.frw(); }
-  public boolean is_final  (String name) { return _ts._finals[_ts.find(name,-1)] == TypeStruct.ffinal(); }
 
   // Called when folding a Named Constructor into this allocation site
   void set_name( GVNGCM gvn, TypeName name ) {
@@ -69,26 +70,27 @@ public class NewNode extends Node {
   }
 
   // Create a field from parser
-  public Node create( String name, Node val, GVNGCM gvn, byte mutable  ) {
+  public void create( String name, Node val, GVNGCM gvn, byte mutable  ) {
     assert def_idx(_ts._ts.length)== _defs._len;
     assert _ts.find(name,-1) == -1;
+    Type oldt = gvn.type(this);
     gvn.unreg(this);
     _ts = _ts.add_fld(name,gvn.type(val),mutable);
     if( _name != null ) _name = _name.make(_ts); // Re-attach name as needed
     add_def(val);
-    gvn.rereg(this,value(gvn));
-    return val;
+    gvn.rereg(this,oldt);
   }
   // Update/modify a field
   public Node update( String name, int idx, Node val, GVNGCM gvn, byte mutable  ) {
     assert def_idx(_ts._ts.length)== _defs._len;
     int idx2 = _ts.find(name,idx);
     assert idx2 != -1;
+    Type oldt = gvn.type(this);
     gvn.unreg(this);
     _ts = _ts.set_fld(idx2,gvn.type(val),mutable);
     if( _name != null ) _name = _name.make(_ts); // Re-attach name as needed
     set_def(def_idx(idx2),val,gvn);
-    gvn.rereg(this,value(gvn));
+    gvn.rereg(this,oldt);
     return val;
   }
   // Create or update as needed
@@ -99,14 +101,14 @@ public class NewNode extends Node {
   }
 
   // Add a named FunPtr to a New.  Auto-inflates to a Unresolved as needed.
-  public FunPtrNode add_fun( String name, FunPtrNode ptr, GVNGCM gvn ) {
+  public FunPtrNode add_fun( Parse bad, String name, FunPtrNode ptr, GVNGCM gvn ) {
     int idx = _ts.find(name,-1);
     if( idx == -1 ) {
       create(name,ptr,gvn,TypeStruct.ffinal());
     } else {
       Node n = _defs.at(def_idx(idx));
       if( n instanceof UnresolvedNode ) n.add_def(ptr);
-      else n=new UnresolvedNode(n,ptr);
+      else n=new UnresolvedNode(bad,n,ptr);
       update(name,idx,n,gvn,TypeStruct.ffinal());
     }
     return ptr;
@@ -132,127 +134,6 @@ public class NewNode extends Node {
     _ts = ts;
   }
 
-  // Add PhiNodes and variable mappings for common definitions merging at the
-  // end of an IfNode split.
-  // - Errors are ignored for dead vars (ErrNode inserted into graph as instead
-  //   of a syntax error)
-  // - Unknown forward refs must be unknown on both branches and be immutable
-  //   and will promote to the next outer scope.
-  // - First-time defs on either branch must be defined on both branches.
-  // - Both branches must agree on mutability
-  // - Ok to be mutably updated on only one arm
-  public void common( Parse P, GVNGCM gvn, Parse phi_errmsg, NewNode t, NewNode f, Node dull, Node t_sharp, Node f_sharp ) {
-    // Unwind the sharpening
-    for( int i=0; i<_ts._ts.length; i++ ) {
-      if( in(def_idx(i))==dull ) {  // Found a use of 'dull'
-        String name = _ts._flds[i]; // Field name sharpened in test
-        // Find the matching field name in the true arm
-        int tidx = def_idx(t._ts.find(name,-1));
-        if( t.in(tidx)==t_sharp ) t.set_def(tidx,null,gvn);
-        int fidx = def_idx(f._ts.find(name,-1));
-        if( f.in(fidx)==f_sharp ) f.set_def(fidx,null,gvn);
-      }
-    }
-    // Look for updates on either arm
-    String[] tflds = t._ts._flds;
-    String[] fflds = f._ts._flds;
-    for( int idx=0; idx<tflds.length; idx++ ) {
-      if( t.in(def_idx(idx))==null ) continue; // Unwound sharpening
-      String name = tflds[idx];
-      if( f._ts.find(name,-1) == -1 ) // If not on false side
-        do_one_side(name,P,gvn,phi_errmsg,t,true);
-      else
-        do_both_sides(name,P,gvn,phi_errmsg,t,f);
-    }
-    for( int idx=0; idx<fflds.length; idx++ ) {
-      if( f.in(def_idx(idx))==null ) continue; // Unwound sharpening
-      String name = fflds[idx];
-      if( t._ts.find(name,-1) == -1 ) // If not on true side
-        do_one_side(name,P,gvn,phi_errmsg,f,false);
-    }
-  }
-
-  // Called per name defined on only one arm of a trinary.
-  // Produces the merge result.
-  private void do_one_side(String name, Parse P, GVNGCM gvn, Parse phi_errmsg, NewNode x, boolean arm) {
-    int xii = x._ts.find(name,-1);
-    final byte xmut = x._ts._finals[xii];
-    Node xn = x.in(def_idx(xii)), yn;
-    ScopeNode scope = P.lookup_scope(name); // Find prior definition
-
-    // Forward refs are not really a def, but produce a trackable definition
-    // that must be immutable, and will eventually get promoted until it
-    // reaches a scope where it gets defined.
-    if( xn.is_forward_ref() ) { assert xmut == TypeStruct.ffinal(); create(name,xn,gvn,xmut); return; }
-
-    // Check for mixed-mode updates.  'name' must be either fully mutable or
-    // fully immutable at the merge point (or dead afterwards).  Since x was
-    // updated on this branch, the variable was mutable beforehand.  Since it
-    // was mutable and not changed on the other side, it remains mutable.
-    if( scope == null )         // Found the prior definition.
-      yn = fail(name,P,gvn,arm,xn,"defined");
-    else if( xmut != TypeStruct.frw() )        // x-side is final but y-side is mutable.
-      yn = fail(name,P,gvn,arm,xn,"final");
-    else yn = scope.get(name);
-
-    Node n = xn==yn ? xn : P.gvn(new PhiNode(phi_errmsg, P.ctrl(),xn,yn));
-    (scope==null ? this : scope.stk()).make_fld(name,n,gvn,xmut);
-  }
-
-  private Node fail(String name, Parse P, GVNGCM gvn, boolean arm, Node xn, String msg) {
-    return P.err_ctrl1("'"+name+"' not "+msg+" on "+!arm+" arm of trinary",gvn.type(xn).widen());
-  }
-
-  // Called per name defined on both arms of a trinary.
-  // Produces the merge result.
-  private void do_both_sides(String name, Parse P, GVNGCM gvn, Parse phi_errmsg, NewNode t, NewNode f) {
-    int tii = t._ts.find(name,-1);
-    int fii = f._ts.find(name,-1);
-    byte tmut = t._ts._finals[tii];
-    byte fmut = f._ts._finals[fii];
-    Node tn = t.in(def_idx(tii));
-    Node fn = f.in(def_idx(fii));
-    byte mut_final= TypeStruct.ffinal();
-    byte mut_ro   = TypeStruct.fro();
-    byte mut_rw   = TypeStruct.frw();
-
-    if( tn != null && tn.is_forward_ref() ) {
-      assert tmut == mut_final;
-      if( fn.is_forward_ref() ) {
-        assert fmut == mut_final;
-        throw AA.unimpl(); // Merge/U-F two forward refs
-      }
-      //update(name,P.err_ctrl1("'"+name+"' not defined on "+true+" arm of trinary",gvn.type(fn).widen()),gvn,TypeStruct.ffinal());
-      //return;
-      throw AA.unimpl();
-    }
-    if( fn != null && fn.is_forward_ref() ) {
-      //update(name,P.err_ctrl1("'"+name+"' not defined on "+false+" arm of trinary",gvn.type(tn).widen()),gvn,TypeStruct.ffinal());
-      //return;
-      throw AA.unimpl();
-    }
-
-    // If either side does a final store, then the field is final afterwards
-    if( tmut == mut_final || fmut == mut_final ) tmut = mut_final;
-    else if( tmut == mut_ro || fmut == mut_ro ) tmut = mut_ro;
-    else tmut = mut_rw;
-
-    Node n = tn==fn ? fn : P.gvn(new PhiNode(phi_errmsg, P.ctrl(),tn,fn));
-    make_fld(name,n,gvn,tmut);
-  }
-
-  // Replace uses of dull with sharp, used after an IfNode test
-  void sharpen( GVNGCM gvn, Node dull, Node sharp, NewNode arm ) {
-    assert dull != sharp;
-    for( int i=0; i<_ts._ts.length; i++ ) // Fill in all fields
-      if( in(def_idx(i))==dull ) {
-        gvn.unreg(arm);
-        arm.add_def(sharp);
-        arm._ts = arm._ts.add_fld(_ts._flds[i],gvn.type(sharp),_ts._finals[i]);
-        gvn.rereg(arm,arm.value(gvn));
-      }
-  }
-
   @Override public Node ideal(GVNGCM gvn) {
     // If the address is not looked at then memory contents cannot be looked at
     // and is dead.
@@ -271,7 +152,7 @@ public class NewNode extends Node {
     // If the address is not looked at then memory contents cannot be looked at
     // and is dead.
     if( _uses._len==1 && _uses.at(0) instanceof OProjNode )
-      return TypeTuple.make(TypeMem.XMEM,TypeMemPtr.OOP.dual());
+      return all_type().dual();
 
     // Gather args and produce a TypeStruct
     Type[] ts = new Type[_ts._ts.length];

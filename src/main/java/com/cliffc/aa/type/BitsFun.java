@@ -34,7 +34,7 @@ public class BitsFun extends Bits<BitsFun> {
   public  static final BitsFun NZERO= make0(ALL);
   public  static final BitsFun ANY = FULL.dual();
   public  static final BitsFun NIL = make0(0);
-  static final BitsFun EMPTY = make0();
+  public  static final BitsFun EMPTY = make0();
   @Override public BitsFun ALL() { return FULL; }
   @Override public BitsFun ANY() { return ANY ; }
 

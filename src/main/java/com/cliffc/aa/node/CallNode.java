@@ -54,7 +54,6 @@ import java.util.BitSet;
 public class CallNode extends Node {
   int _rpc;                 // Call-site return PC
   private boolean _unpacked;// Call site allows unpacking a tuple (once)
-  private boolean _monotonicity_assured;
   Parse  _badargs;          // Error for e.g. wrong arg counts or incompatible args
   public CallNode( boolean unpacked, Parse badargs, Node... defs ) {
     super(OP_CALL,defs);
@@ -76,7 +75,7 @@ public class CallNode extends Node {
   public  Node fun() { return in(1); }
           Node mem() { return in(2); }
   //private void set_ctl    (Node ctl, GVNGCM gvn) {     set_def    (0,ctl,gvn); }
-  private void set_fun    (Node fun, GVNGCM gvn) {     set_def    (1,fun,gvn); }
+  private Node set_fun    (Node fun, GVNGCM gvn) { return set_def(1,fun,gvn); }
   public  void set_fun_reg(Node fun, GVNGCM gvn) { gvn.set_def_reg(this,1,fun); }
   public BitsFun fidxs(GVNGCM gvn) {
     Type tf = gvn.type(fun());
@@ -121,7 +120,7 @@ public class CallNode extends Node {
           int len = nnn._defs._len;
           for( int i=1; i<len; i++ ) // Push the args; unpacks the tuple
             add_def( nnn.in(i));
-          gvn.add_work(mem());
+          gvn.add_work(mem().in(1));
           _unpacked = true;     // Only do it once
           return this;
         }
@@ -133,13 +132,6 @@ public class CallNode extends Node {
         Type tx = ((TypeMem)tm).ld((TypeMemPtr)tn);
         if( tx instanceof TypeStruct && tx.is_con() ) {
           throw com.cliffc.aa.AA.unimpl(); // untested but probably correct
-          //TypeStruct tt = (TypeStruct)tx;
-          //int len = tt._ts.length;
-          //remove(_defs._len-1,gvn);  // Pop off the ConNode tuple
-          //for( int i=0; i<len; i++ ) // Push the args; unpacks the tuple
-          //  add_def( gvn.con(tt.at(i)) );
-          //_unpacked = true;     // Only do it once
-          //return this;
         }
       }
     }
@@ -148,19 +140,8 @@ public class CallNode extends Node {
     // If the function is unresolved, see if we can resolve it now
     if( unk instanceof UnresolvedNode ) {
       FunPtrNode fun = resolve(gvn);
-      if( fun != null ) {
-        // Replace the Unresolved with the resolved.
-        set_fun(fun,gvn);
-        // Resolving a Call typically lowers its type in the lattice.  Before
-        // resolving it is taking the JOIN of all potential calls but after
-        // resolving only 1 call is actually happening.  This blows the simple
-        // type monotonicity result in the iter() phase, but passes a more
-        // complex monotonicity test: a call only resolves once.  After
-        // resolving, types once again only fall.  Bypass the type-monotonicity
-        // asset in iter().
-        _monotonicity_assured = true;
-        return this;
-      }
+      if( fun != null )         // Replace the Unresolved with the resolved.
+        return set_fun(fun,gvn);
     }
 
     return null;
@@ -173,13 +154,6 @@ public class CallNode extends Node {
     ct = ct.above_center() ? Type.XCTRL : Type.CTRL;
     Type tf = gvn.type(fun());
     return TypeTuple.make(ct,tf.bound(TypeFunPtr.GENERIC_FUNPTR));
-  }
-  // One-shot toggle set after a successful resolve.  Bypasses type
-  // monotonicity assert in iter().
-  @Override public boolean monotonicity_assured() {
-    boolean m = _monotonicity_assured;
-    _monotonicity_assured = false;
-    return m;
   }
 
   // Given a list of actuals, apply them to each function choice.  If any
@@ -196,7 +170,7 @@ public class CallNode extends Node {
   public FunPtrNode resolve( GVNGCM gvn ) {
     BitsFun fidxs = fidxs(gvn);
     if( fidxs == null ) return null; // Might be e.g. ~Scalar
-    if( !fidxs.above_center() ) return null; // Sane as-is
+    if( !(fun() instanceof UnresolvedNode) ) return null; // Sane as-is, just has multiple choices
     if( fidxs.test(BitsFun.ALL) ) return null;
     // Any alias, plus all of its children, are meet/joined.  This does a
     // tree-based scan on the inner loop.
@@ -272,7 +246,6 @@ public class CallNode extends Node {
   }
 
   @Override public String err(GVNGCM gvn) {
-
     // Error#1: fail for passed-in unknown references
     for( int j=0; j<nargs(); j++ )
       if( arg(j).is_forward_ref() )
@@ -303,10 +276,6 @@ public class CallNode extends Node {
           return _badargs.typerr(actual,formal);
       }
     }
-
-    if( ((TypeFunPtr)tfp).fidxs().above_center() )
-      return _badargs.errMsg("An ambiguous function is being called");
-    // No more unresolved
 
     return null;
   }

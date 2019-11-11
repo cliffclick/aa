@@ -6,20 +6,14 @@ import com.cliffc.aa.type.*;
 public class Env implements AutoCloseable {
   final Env _par;
   ScopeNode _scope;  // Lexical anchor; goes when this environment leaves scope
-  private boolean _if;            // If-scopes stop update propagation
-  Env( Env par, boolean early, boolean ifscope ) {
+  Env( Env par, boolean closure ) {
     _par = par;
-    _if = ifscope;
-    ScopeNode scope = new ScopeNode(early,ifscope);
+    ScopeNode scope = new ScopeNode(closure);
     if( par != null ) {
-      NewNode nnn = GVN.init(new NewNode());
-      Node ptr = GVN.xform(new ProjNode(nnn,1));
-      Node mem = par._scope.mem();
-      if( !ifscope ) {          // If mini-scopes not a real closure, not exposed to memory
-        Node frm = GVN.xform(new OProjNode(nnn,0));
-        mem = GVN.xform(new MemMergeNode(mem,frm));
-      }
-
+      NewNode nnn = GVN.init(new NewNode(closure));
+      Node ptr = GVN.xform(new  ProjNode(nnn,1));
+      Node frm = GVN.xform(new OProjNode(nnn,0));
+      Node mem = GVN.xform(new MemMergeNode(par._scope.mem(),frm));
       scope.set_ctrl(par._scope.ctrl(),GVN);
       scope.set_mem (mem,GVN);  // Memory includes local stack frame
       scope.set_ptr (ptr,GVN);  // Address for 'nnn', the local stack frame
@@ -29,12 +23,12 @@ public class Env implements AutoCloseable {
 
   public  final static GVNGCM GVN; // Initial GVN, defaults to ALL, lifts towards ANY
   public  final static StartNode START; // Program start values (control, empty memory, cmd-line args)
-          final static CProjNode CTL_0; // Program start value control
+  public  final static CProjNode CTL_0; // Program start value control
           final static      Node MEM_0; // Program start value memory
   private final static      Node PTR_0; // Program start stack frame address
-  private final static   NewNode STK_0; // Program start stack frame (has primitives)
-  public final static    ConNode ALL_CTRL;
-  public final static int LAST_START_UID;
+  public  final static   NewNode STK_0; // Program start stack frame (has primitives)
+  public  final static   ConNode ALL_CTRL;
+          final static int LAST_START_UID;
   private final static int NINIT_CONS;
   private final static Env TOP; // Top-most lexical Environment, has all primitives, unable to be removed
   static {
@@ -43,14 +37,14 @@ public class Env implements AutoCloseable {
     START = new StartNode();
     assert START._uid==0;
     CTL_0 = GVN.init(new CProjNode(START,0));
-    STK_0 = GVN.init(new NewNode());
+    STK_0 = GVN.init(new NewNode(true));
     PTR_0 = GVN.init(new  ProjNode(STK_0,1));
     Node all_mem = GVN.init(new MProjNode(START,1));
     Node prims   = GVN.init(new OProjNode(STK_0,0));
     MEM_0 = GVN.init(new MemMergeNode(all_mem,prims));
     ALL_CTRL = GVN.init(new ConNode<>(Type.CTRL));
     LAST_START_UID = ALL_CTRL._uid;
-    TOP    = new Env(null,false,false); // Top-most lexical Environment
+    TOP    = new Env(null,true); // Top-most lexical Environment
     TOP.install_primitives();
     NINIT_CONS = START._uses._len;
   }
@@ -58,9 +52,9 @@ public class Env implements AutoCloseable {
     _scope.keep();              // do not delete
     _scope.init0();             // Add base types
     for( PrimNode prim : PrimNode.PRIMS )
-      STK_0.add_fun(prim._name,(FunPtrNode) GVN.xform(prim.as_fun(GVN)), GVN);
+      STK_0.add_fun(null,prim._name,(FunPtrNode) GVN.xform(prim.as_fun(GVN)), GVN);
     for( IntrinsicNewNode lib : IntrinsicNewNode.INTRINSICS )
-      STK_0.add_fun(lib ._name,(FunPtrNode) GVN.xform(lib .as_fun(GVN)), GVN);
+      STK_0.add_fun(null,lib ._name,(FunPtrNode) GVN.xform(lib .as_fun(GVN)), GVN);
     // Top-level constants
     STK_0.create("math_pi", GVN.con(TypeFlt.PI),GVN,TypeStruct.ffinal());
     // Now that all the UnresolvedNodes have all possible hits for a name,
@@ -79,7 +73,7 @@ public class Env implements AutoCloseable {
   }
 
   // A new top-level Env, above this is the basic public Env with all the primitives
-  public static Env top() { return new Env(TOP,true,false); }
+  public static Env top() { return new Env(TOP,true); }
 
   // Wire up an early function exit
   Node early_exit( Parse P, Node val ) {
@@ -131,11 +125,6 @@ public class Env implements AutoCloseable {
     if( _scope.stk().exists(name) ) return _scope;
     return _par == null ? null : _par.lookup_scope(name);
   }
-  // Lookup, stopping at an If mini-scope
-  ScopeNode lookup_if( String name ) {
-    if( _if || _scope.stk().exists(name) ) return _scope;
-    return _par == null ? null : _par.lookup_if(name);
-  }
 
   // Name lookup is the same for all variables, including function defs (which
   // are literally assigning a lambda to a ref).  Only returns nodes registered
@@ -155,7 +144,7 @@ public class Env implements AutoCloseable {
   }
 
   // Update function name token to Node mapping in the current scope
-  Node add_fun( String name, Node val ) { return _scope.add_fun(name,(FunPtrNode)val,GVN); }
+  Node add_fun( Parse bad, String name, Node val ) { return _scope.stk().add_fun(bad,name,(FunPtrNode)val,GVN); }
 
 
   // Type lookup in any scope
