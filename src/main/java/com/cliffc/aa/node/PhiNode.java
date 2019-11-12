@@ -32,28 +32,6 @@ public class PhiNode extends Node {
     }
     if( live != this ) return live; // Single unique input
 
-    // If this is a Phi of a bunch of MemMerges, pull them down.  This will
-    // 'widen' the separation of phat and skinny memory, generally giving more
-    // memory precision.
-    boolean all_merge=true;
-    for( int i=1; i<_defs._len; i++ )
-      if( !(in(i) instanceof MemMergeNode) )
-        { all_merge=false; break; }
-    if( all_merge &&
-        !(this instanceof ParmNode) ) { // TODO: Handle adding a new Parm to a FunNode; Call behavior has to update
-      Node phat = copy(false,gvn); // Copy parm/phi, alias bits, etc
-      Node skin = copy(false,gvn);
-      phat.add_def(r);
-      skin.add_def(r);
-      for( int i=1; i<_defs._len; i++ ) {
-        phat.add_def(in(i).in(0));
-        skin.add_def(in(i).in(1));
-      }
-      phat = gvn.xform(phat);
-      skin = gvn.xform(skin);
-      return new MemMergeNode(phat,skin);
-    }
-
     return null;
   }
   @Override public Type value(GVNGCM gvn) {

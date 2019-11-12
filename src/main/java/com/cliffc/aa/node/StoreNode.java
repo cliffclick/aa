@@ -114,6 +114,7 @@ public class StoreNode extends Node {
     if( !(t instanceof TypeMemPtr) ) return bad("Unknown"); // Too low, might not have any fields
     TypeMemPtr tptr = (TypeMemPtr)t;
     Type mem = gvn.type(mem());
+    if( mem == Type.ANY ) return null;
     TypeObj tobj = _xmem
       ? ((TypeMem)mem).ld(tptr) // Load object from generic pre-store memory
       : ((TypeObj)mem);         // Else handed object directly
@@ -151,7 +152,7 @@ public class StoreNode extends Node {
         // Just a bypass; 'this' continues to produce the full memory mem(),
         // although at least one user of alias 'bits' goes away.  No
         // implication that all users of 'bits' go away.
-        return mem(); 
+        return mem();
     }
 
     // TODO: A much stronger version is to check that 'tmp._aliases' and 'bits'
