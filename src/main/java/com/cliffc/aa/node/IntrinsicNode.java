@@ -167,8 +167,8 @@ public abstract class IntrinsicNode extends Node {
       nnn.create(argx,n,gvn,from._finals[i]);
     }
     nnn.set_name(gvn,to);
-    Node obj = gvn.xform(new OProjNode(nnn,0));
     Node ptr = gvn.xform(new  ProjNode(nnn,1));
+    Node obj = gvn.xform(new OProjNode(nnn,0));
     Node mmem= gvn.xform(new MemMergeNode(memp,obj));
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,ptr,rpc,fun));
     return (FunPtrNode)gvn.xform(new FunPtrNode(ret));

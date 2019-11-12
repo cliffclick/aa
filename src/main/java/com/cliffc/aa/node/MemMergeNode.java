@@ -22,9 +22,9 @@ public class MemMergeNode extends Node {
     if( _uses._len==1 && _uses.at(0) instanceof StoreNode )
       gvn.add_work(_uses.at(0));
 
-    // if Skinny memory is XMEM, then merging nothing and remove self
+    // if Skinny memory is XOBJ, then merging nothing and remove self
     Node mem = mem();
-    if( gvn.type(obj())==TypeMem.XMEM )
+    if( gvn.type(obj())==TypeObj.XOBJ )
       return mem;
     // If skinny is a pointer and not memory, then this is a collapsing
     // named-type-into-allocator.

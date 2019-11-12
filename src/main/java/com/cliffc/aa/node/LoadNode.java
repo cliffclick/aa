@@ -24,7 +24,7 @@ public class LoadNode extends Node {
   private Node mem() { return in(1); }
   private Node adr() { return in(2); }
   private Node nil_ctl(GVNGCM gvn) { return set_def(0,null,gvn); }
-  private void set_mem(Node a, GVNGCM gvn) { set_def(1,a,gvn); }
+  private Node set_mem(Node a, GVNGCM gvn) { return set_def(1,a,gvn); }
   private void set_adr(Node a, GVNGCM gvn) { set_def(2,a,gvn); }
 
   @Override public Node ideal(GVNGCM gvn) {
@@ -66,7 +66,7 @@ public class LoadNode extends Node {
     }
 
     // Loads against an equal store; cannot NPE since the Store did not.
-    StoreNode st;
+    StoreNode st=null;
     if( mem instanceof StoreNode && addr == (st=((StoreNode)mem)).adr() ) {
       if( _fld.equals(st._fld) && _fld_num == st._fld_num && st.err(gvn)==null )
         return st.val();
@@ -74,6 +74,11 @@ public class LoadNode extends Node {
       // field-level alias notion on memory edges.
     }
 
+    // Bypass unrelated Stores
+    if( st != null && st.err(gvn)==null &&
+        ( st._fld_num != _fld_num || (_fld != null && !_fld.equals(st._fld_num)) ))
+      return set_mem(st.mem(),gvn);
+    
     if( ctrl==null || gvn.type(ctrl)!=Type.CTRL )
       return null;              // Dead load, or a no-control-no-fail load
     if( addr.is_forward_ref() ) return null;
