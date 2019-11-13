@@ -27,27 +27,4 @@ public class CProjNode extends ProjNode {
   // when call on primitives.
   @Override public byte op_prec() { return _defs.at(0).op_prec(); }
 
-  // Used in Parser just after an if-test to sharpen the tested variables.
-  // This is a mild optimization, since e.g. follow-on Loads which require a
-  // non-nil check will hash to the pre-test Load, and so bypass this
-  // sharpening.
-  @Override public Node sharpen( GVNGCM gvn, Node mem ) {
-    Node iff = in(0);
-    if( !(iff instanceof IfNode) ) return this; // Already collapsed IfNode, no sharpen
-    Node test = iff.in(1);
-    Node sharp = _idx==1
-      ? gvn.xform(new CastNode(this,test,Type.NSCALR))
-      : gvn.con(Type.NIL);
-    // If 'test' has an appearance under a name, then store the sharp value to
-    // that name.
-    Node x = mem;
-    while( x instanceof StoreNode ) {
-      StoreNode st = (StoreNode)x;
-      if( st.val()==test )
-        mem = gvn.xform(new StoreNode(st,this,mem,st.adr(),sharp,true));
-      x = st.mem();
-    }
-    gvn.add_work(sharp);
-    return mem;
-  }
 }

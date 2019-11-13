@@ -353,7 +353,6 @@ public class Parse {
     Node ifex = init(new IfNode(ctrl(),expr)).keep();
     Node t0_ctrl = set_ctrl(gvn(new CProjNode(ifex,1))); // Control for true branch
     Node old_mem = mem().keep();    // Keep until parse false-side
-    set_mem(t0_ctrl.sharpen(_gvn,old_mem)); // Sharpened memory
     Node tex = stmt();                      // Parse true expression
     if( tex == null ) tex = err_ctrl2("missing expr after '?'");
     tex.keep();                 // Keep until merge point
@@ -363,7 +362,6 @@ public class Parse {
     _e._scope.flip_if();        // Flip side of tracking new defs
     Node f0_ctrl = set_ctrl(gvn(new CProjNode(ifex.unhook(),0))); // Control for false branch
     set_mem(old_mem.unhook());              // Reset memory to before the IF
-    set_mem(f0_ctrl.sharpen(_gvn,old_mem)); // Sharpened memory
     Node fex = peek(':') ? stmt() : con(Type.NIL);
     if( fex == null ) fex = err_ctrl2("missing expr after ':'");
     fex.keep();                 // Keep until merge point
@@ -599,7 +597,7 @@ public class Parse {
     // Forward refs always directly assigned into scope
     if( def.is_forward_ref() ) return def;
     // Else must load against most recent closure update
-    return gvn(new LoadNode(ctrl(),mem(),scope.ptr(),tok,null));
+    return gvn(new LoadNode(scope.ctrl(),scope.mem(),scope.ptr(),tok,null));
   }
 
   /** Parse a tuple; first stmt but not the ',' parsed.
@@ -646,7 +644,7 @@ public class Parse {
     }
     Node old_ctrl = ctrl();
     Node old_mem  = mem ();
-    FunNode fun = (FunNode)init(new FunNode(ts.asAry()).add_def(Env.ALL_CTRL)).keep();
+    FunNode fun = init(new FunNode(ts.asAry()).add_def(Env.ALL_CTRL)).keep();
     try( Env e = new Env(_e,true) ) {// Nest an environment for the local vars
       _e = e;                   // Push nested environment
       set_ctrl(fun);            // New control is function head

@@ -280,12 +280,6 @@ public abstract class Node implements Cloneable {
     return true;
   }
 
-  // Used in Parser just after an if-test to sharpen the tested variables.
-  // This is a mild optimization, since e.g. follow-on Loads which require a
-  // non-null check will hash to the pre-test Load, and so bypass this
-  // sharpening.
-  public Node sharpen( GVNGCM gvn, Node mem ) { return mem; }
-
   // Gather errors; backwards reachable control uses only
   public void walkerr_use( Ary<String> errs, BitSet bs, GVNGCM gvn ) {
     assert !is_dead();

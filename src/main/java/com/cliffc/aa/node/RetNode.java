@@ -36,8 +36,23 @@ public final class RetNode extends Node {
   // Inline longer name
   @Override public String str() { return in(4) instanceof FunNode ? "Ret"+fun().str() : xstr(); }
 
-  @Override public Node ideal(GVNGCM gvn) { return null; }
+  @Override public Node ideal(GVNGCM gvn) {
+    // If is_copy, wipe out inputs 3 & 4, but leave ctrl,mem,val for users to inline
+    if( is_copy() && in(4)!=null ) {
+      set_def(3,null,gvn);
+      set_def(4,null,gvn);
+      // If no users inlining, wipe out all edges
+      if( in(0)!=null && _uses._len==1 && _uses.at(0) instanceof FunPtrNode ) {
+        set_def(0,null,gvn);
+        set_def(1,null,gvn);
+        set_def(2,null,gvn);
+      }
+      return this;
+    }
+    return null;
+  }
   @Override public Type value(GVNGCM gvn) {
+    if( is_copy() ) return all_type();
     Type ctl = gvn.type(ctl()).bound(Type.CTRL);
     Type mem = gvn.type(mem()).bound(TypeMem.MEM);
     Type val = gvn.type(val()).bound(Type.SCALAR);

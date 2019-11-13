@@ -32,31 +32,37 @@ public class LoadNode extends Node {
     Node mem  = mem();
     Node addr = adr();
 
+    NewNode nnn = addr.in(0) instanceof NewNode ? (NewNode)addr.in(0) : null;
+    MemMergeNode mmem = mem instanceof MemMergeNode ? (MemMergeNode)mem : null;
+    // Loads against a skinny Merge of NewNode
+    if( mmem != null && nnn == mmem.obj().in(0) )
+      set_mem(mem = mmem.obj(),gvn);
     // Loads against a NewNode cannot NPE, cannot fail, always return the input
-    if( mem instanceof MemMergeNode && addr.in(0) == mem.in(1).in(0) && addr.in(0) instanceof NewNode )
-      mem = mem.in(1);
-
-    // Loads against a NewNode cannot NPE, cannot fail, always return the input
-    if( addr.in(0) == mem.in(0) && addr.in(0) instanceof NewNode ) {
-      NewNode nnn = (NewNode)addr.in(0);
-      int idx = nnn._ts.find(_fld,_fld_num);  // Find the named field
-      if( idx != -1 ) return nnn.fld(idx);    // Field value
-      // Broken load-vs-new
-    }
+    int idx;
+    if( nnn != null && (idx=nnn.find(_fld,_fld_num)) != -1 && nnn == mem.in(0) )
+      return nnn.fld(idx);      // Field value
 
     // Split aliases on inputs
     Type tadr0= gvn.type(addr);
     if( tadr0 instanceof TypeMemPtr ) {
       Node nmem = mem.split_memory_use(gvn,((TypeMemPtr)tadr0)._aliases);
-      if( nmem != null ) {      // If progress
-        set_mem(nmem,gvn);      // Sharpen memory edge and try again
-        return this;
-      }
+      if( nmem != null )           // If progress
+        return set_mem(nmem,gvn);  // Sharpen memory edge and try again
     }
 
+    // Loads against a Merge of wrong-field-name closure.  Note matching
+    // address already checked, so this is the wrong-address also.
+    // TODO: Probably suffices to check wrong-address, so address pre-dates
+    // merging-New, so can bypass.
+    if( mmem != null && mmem.obj() instanceof OProjNode && mmem.obj().in(0) instanceof NewNode ) {
+      idx = ((NewNode)mmem.obj().in(0)).find(_fld,_fld_num);
+      if( idx == -1 )           // No matching name, nor address
+        return set_mem(mmem.mem(),gvn);
+    }
+    
     // Load from a memory Phi; split through in an effort to sharpen the memory.
-    if( mem instanceof PhiNode && ctrl == null && addr instanceof ProjNode && addr.in(0) instanceof NewNode ) {
-      // Only split thru function args if no unknown_callers, and must make a Parm not a Phi
+    if( mem instanceof PhiNode && ctrl == null && nnn!=null ) {
+      // TODO: Only split thru function args if no unknown_callers, and must make a Parm not a Phi
       if( !(mem instanceof ParmNode) ) {
         Node lphi = new PhiNode(((PhiNode)mem)._badgc,mem.in(0));
         for( int i=1; i<mem._defs._len; i++ )
@@ -78,7 +84,7 @@ public class LoadNode extends Node {
     if( st != null && st.err(gvn)==null &&
         ( st._fld_num != _fld_num || (_fld != null && !_fld.equals(st._fld_num)) ))
       return set_mem(st.mem(),gvn);
-    
+
     if( ctrl==null || gvn.type(ctrl)!=Type.CTRL )
       return null;              // Dead load, or a no-control-no-fail load
     if( addr.is_forward_ref() ) return null;
@@ -118,12 +124,18 @@ public class LoadNode extends Node {
   @Override public Type value(GVNGCM gvn) {
     Type adr = gvn.type(adr()).base();
     if( adr.isa(TypeMemPtr.OOP0.dual()) ) return Type.XSCALAR;
-    if( adr.must_nil() ) return Type.SCALAR; // Not provable not-nil, so fails
     if( TypeMemPtr.OOP0.isa(adr) ) return Type.SCALAR; // Very low, might be any address
     if( adr.is_forward_ref() ) return Type.SCALAR;
     if( !(adr instanceof TypeMemPtr) )
       return adr.above_center() ? Type.XSCALAR : Type.SCALAR;
     TypeMemPtr tadr = (TypeMemPtr)adr;
+    // Check for nil-check not in the graph, but locally available.
+    if( tadr.must_nil() ) {
+      if( ctl() instanceof CProjNode && ((CProjNode)ctl())._idx==1 && ctl().in(0).in(1)==adr() )
+        tadr = (TypeMemPtr)tadr.join(TypeMemPtr.OOP);
+      else
+        return Type.SCALAR; // Not provable not-nil, so fails
+    }
 
     Type mem = gvn.type(mem());     // Memory
     if( !(mem instanceof TypeStruct) ) {

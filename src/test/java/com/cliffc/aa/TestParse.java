@@ -270,9 +270,6 @@ public class TestParse {
   }
 
   @Test public void testParse05() {
-    test   ("a = math_rand(1) ? 0 : @{x=1}; // a is null or a struct\n"+
-            "b = math_rand(1) ? 0 : @{c=a}; // b is null or a struct\n"+
-            "b ? (b.c ? b.c.x : 0) : 0      // Null-safe field load", TypeInt.BOOL); // Nested null-safe field load
     // nullable and not-null pointers
     test   ("x:str? = 0", Type.NIL); // question-type allows null or not; zero digit is null
     test   ("x:str? = \"abc\"", TypeMemPtr.ABCPTR); // question-type allows null or not

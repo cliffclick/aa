@@ -49,9 +49,11 @@ public class NewNode extends Node {
   Node fld(int fld) { return in(def_idx(fld)); } // Node for field#
   private TypeObj xs() { return _name == null ? _ts : _name; }
 
-  public Node get(String name) { return in(def_idx(_ts.find(name,-1))); }
+  public Node get(String name) { return fld(find(name,-1)); }
   public boolean exists(String name) { return _ts.find(name,-1)!=-1; }
-  public boolean is_mutable(String name) { return _ts._finals[_ts.find(name,-1)] == TypeStruct.frw(); }
+  public boolean is_mutable(String name) { return _ts._finals[find(name,-1)] == TypeStruct.frw(); }
+  public boolean is_final(int idx) { return _ts._finals[idx] == TypeStruct.ffinal(); }
+  public int find(String fld, int fld_num) { return _ts.find(fld,fld_num); }
 
   // Called when folding a Named Constructor into this allocation site
   void set_name( GVNGCM gvn, TypeName name ) {
