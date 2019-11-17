@@ -142,8 +142,11 @@ public class NewNode extends Node {
     if( _uses._len==1 && _uses.at(0) instanceof OProjNode ) {
       boolean progress=false;
       for( int i=1; i<_defs._len; i++ )
-        if( in(i)!=null )
-          { set_def(i,null,gvn); progress=true; }
+        if( in(i)!=null ) {
+          set_def(i,null,gvn);
+          progress=true;
+          if( is_dead() ) break;
+        }
       return progress ? this : null;
     }
     return null;

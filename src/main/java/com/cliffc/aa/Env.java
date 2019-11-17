@@ -77,7 +77,7 @@ public class Env implements AutoCloseable {
 
   // Wire up an early function exit
   Node early_exit( Parse P, Node val ) {
-    return _scope.early() ? P.do_exit(_scope,val) : _par.early_exit(P,val); // Hunt for an early-exit-enabled scope
+    return _scope.is_closure() ? P.do_exit(_scope,val) : _par.early_exit(P,val); // Hunt for an early-exit-enabled scope
   }
 
   // Close the current Env and lexical scope.
@@ -133,6 +133,9 @@ public class Env implements AutoCloseable {
     ScopeNode scope = lookup_scope(name);
     return scope==null ? null : scope.get(name);
   }
+  // Return nearest enclosing closure, for forward-ref placement.
+  // Struct-scopes do not count.
+  ScopeNode lookup_closure( ) { return _scope.is_closure() ? _scope : _par.lookup_closure(); }
   // Test support, return top-level name type
   static Type lookup_valtype( String name ) { return GVN.type(TOP.lookup(name)); }
 

@@ -8,7 +8,7 @@ import com.cliffc.aa.type.Type;
 public class MeetNode extends Node {
   public final Type _t;
   public MeetNode( Node val, Type t ) { super(OP_MEET,null,val); _t=t; }
-  @Override String xstr() { return "&"+_t; }
+  @Override String xstr() { return "MEET_"+_t; }
   @Override public Node ideal(GVNGCM gvn) { return null;  }
   @Override public Type value(GVNGCM gvn) { return _t.meet(gvn.type(in(1))); }
 }

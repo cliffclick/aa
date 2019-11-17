@@ -624,7 +624,7 @@ public class Type<T extends Type<T>> implements Cloneable {
     case TXCTRL: // Nonsense, only for IfNode.value test
     case TMEM:   // Nonsense, only for IfNode.value test
       return true;              // These all must include a nil
-    case TANY:
+    case TANY:                  // All above-center types are not required to include a nil
     case TXNUM:
     case TXREAL:
     case TXSCALAR:

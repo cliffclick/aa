@@ -211,6 +211,8 @@ public class TypeMem extends Type<TypeMem> {
 
   // Meet of all possible loadable values
   public TypeObj ld( TypeMemPtr ptr ) {
+    if( this== MEM ) return TypeObj. OBJ;
+    if( this==XMEM ) return TypeObj.XOBJ;
     boolean any = ptr.above_center();
     TypeObj obj = any ? TypeObj.OBJ : TypeObj.XOBJ;
     // Any alias, plus all of its children, are meet/joined.  This does a

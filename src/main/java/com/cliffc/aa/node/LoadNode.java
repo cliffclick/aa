@@ -38,7 +38,7 @@ public class LoadNode extends Node {
     if( mmem != null && nnn == mmem.obj().in(0) )
       set_mem(mem = mmem.obj(),gvn);
     // Loads against a NewNode cannot NPE, cannot fail, always return the input
-    int idx;
+    int idx=-1;
     if( nnn != null && (idx=nnn.find(_fld,_fld_num)) != -1 && nnn == mem.in(0) )
       return nnn.fld(idx);      // Field value
 
@@ -50,16 +50,6 @@ public class LoadNode extends Node {
         return set_mem(nmem,gvn);  // Sharpen memory edge and try again
     }
 
-    // Loads against a Merge of wrong-field-name closure.  Note matching
-    // address already checked, so this is the wrong-address also.
-    // TODO: Probably suffices to check wrong-address, so address pre-dates
-    // merging-New, so can bypass.
-    if( mmem != null && mmem.obj() instanceof OProjNode && mmem.obj().in(0) instanceof NewNode ) {
-      idx = ((NewNode)mmem.obj().in(0)).find(_fld,_fld_num);
-      if( idx == -1 )           // No matching name, nor address
-        return set_mem(mmem.mem(),gvn);
-    }
-    
     // Load from a memory Phi; split through in an effort to sharpen the memory.
     if( mem instanceof PhiNode && ctrl == null && nnn!=null ) {
       // TODO: Only split thru function args if no unknown_callers, and must make a Parm not a Phi
@@ -70,6 +60,10 @@ public class LoadNode extends Node {
         return lphi;
       }
     }
+
+    // Load of final field can bypass call
+    if( idx!=-1 && nnn != null && nnn.is_final(idx) && mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode )
+      return set_mem(((CallNode)mem.in(0).in(0)).mem(),gvn);
 
     // Loads against an equal store; cannot NPE since the Store did not.
     StoreNode st=null;
@@ -114,8 +108,6 @@ public class LoadNode extends Node {
     if( tru==null ) return null;
     assert !(tru==ctrl && addr != baseaddr) : "not the immediate location or we would be not-nil already";
 
-    if( !(t instanceof TypeMemPtr) )
-      return null; // below a nil (e.g. Scalar), do nothing yet
     Type tnz = t.join(TypeMemPtr.OOP); // Remove nil choice
     set_adr(gvn.xform(new CastNode(tru,baseaddr,tnz)),gvn);
     return nil_ctl(gvn);
@@ -129,31 +121,37 @@ public class LoadNode extends Node {
     if( !(adr instanceof TypeMemPtr) )
       return adr.above_center() ? Type.XSCALAR : Type.SCALAR;
     TypeMemPtr tadr = (TypeMemPtr)adr;
-    // Check for nil-check not in the graph, but locally available.
-    if( tadr.must_nil() ) {
-      if( ctl() instanceof CProjNode && ((CProjNode)ctl())._idx==1 && ctl().in(0).in(1)==adr() )
-        tadr = (TypeMemPtr)tadr.join(TypeMemPtr.OOP);
-      else
-        return Type.SCALAR; // Not provable not-nil, so fails
-    }
-
+    // Loading from TypeMem - will get a TypeObj out.
     Type mem = gvn.type(mem());     // Memory
+    Type badmemrez = mem.above_center() ? Type.XSCALAR : Type.SCALAR;
     if( !(mem instanceof TypeStruct) ) {
       if( !(mem instanceof TypeMem) ) // Nothing sane
-        return mem.above_center() ? Type.XSCALAR : Type.SCALAR;
+        return badmemrez;
       TypeObj obj = ((TypeMem)mem).ld(tadr);
-      TypeObj obj2 = (TypeObj)obj.meet(tadr._obj); // Loaded obj is in expected type bounds of pointer?
-      mem = obj2.base();
+      mem = obj.base();
     }
 
+    // Loading from TypeObj - hoping to get a field out
     if( mem instanceof TypeStruct ) {
       TypeStruct ts = (TypeStruct)mem;
       int idx = ts.find(_fld,_fld_num);  // Find the named field
-      if( idx != -1 ) return ts.at(idx); // Field type
+      if( idx != -1 ) {                  // Found a field
+
+        // Nil-check before allowing the load.
+        if( tadr.must_nil() ) {
+          // Check for nil-check not in the graph, but locally available.
+          if( !(ctl() instanceof CProjNode && ((CProjNode)ctl())._idx==1 && ctl().in(0).in(1)==adr()) ) {
+            // TODO: Need a type-flow in the graph for cycles...
+            return Type.SCALAR; // Not provable not-nil, so fails
+          }
+        }
+
+        return ts.at(idx); // Field type
+      }
       // No such field
-      return mem.above_center() ? Type.XSCALAR : Type.SCALAR;
+      return badmemrez;
     }
-    return Type.SCALAR;        // No loading from e.g. Strings
+    return badmemrez; // No loading from e.g. Strings
   }
 
   @Override public String err(GVNGCM gvn) {

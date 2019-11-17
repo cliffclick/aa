@@ -57,7 +57,7 @@ public class ScopeNode extends Node {
     _types.put( name, t );
   }
 
-  public boolean early() { return _defs._len==6; }
+  public boolean is_closure() { assert _defs._len==4 || _defs._len==7; return _defs._len==7; }
 
   @Override public Node ideal(GVNGCM gvn) { return null; }
   @Override public Type value(GVNGCM gvn) { return all_type(); }

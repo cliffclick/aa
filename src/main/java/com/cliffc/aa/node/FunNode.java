@@ -297,6 +297,7 @@ public class FunNode extends RegionNode {
       int op = n._op;           // opcode
       if( op == OP_FUN  && n       != this ) continue; // Call to other function, not part of inlining
       if( op == OP_PARM && n.in(0) != this ) continue; // Arg  to other function, not part of inlining
+      if( op == OP_RET && ((RetNode)n).is_copy() ) continue; // Dead function ptr
       if( n != ret )            // Except for the RetNode
         work.addAll(n._uses);   // Visit all uses also
       if( op == OP_CALL ) {     // Call-of-primitive?

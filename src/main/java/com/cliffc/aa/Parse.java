@@ -588,7 +588,10 @@ public class Parse {
     ScopeNode scope = lookup_scope(tok);
     if( scope == null ) { // Assume any unknown ref is a forward-ref of a recursive function
       Node fref = gvn(FunPtrNode.forward_ref(_gvn,tok,this));
-      create(tok,fref,TypeStruct.ffinal());
+      // Place in nearest enclosing closure, NOT as a field in a struct.
+      _e.lookup_closure().stk().create(tok,fref,_gvn,TypeStruct.ffinal());
+      // Force visibility to propagate.
+      _gvn.iter();
       return fref;
     }
     Node def = scope.get(tok);    // Get top-level value; only sane if no stores allowed to modify it
@@ -666,7 +669,7 @@ public class Parse {
       if( rez == null ) rez = err_ctrl2("Missing function body");
       require('}');             //
       // Merge normal exit into all early-exit paths
-      if( e._scope.early() ) rez = merge_exits(rez);
+      if( e._scope.is_closure() ) rez = merge_exits(rez);
       RetNode ret = (RetNode)gvn(new RetNode(ctrl(),mem(),rez,rpc.unhook(),fun.unhook()));
       Node fptr = gvn(new FunPtrNode(ret));
       _e = _e._par;             // Pop nested environment

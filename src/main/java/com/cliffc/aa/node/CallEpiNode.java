@@ -196,7 +196,9 @@ public final class CallEpiNode extends Node {
       if( fun==null || fun.is_dead() )
         continue; // Can be dead, if the news has not traveled yet
       RetNode ret = fun.ret();
-      Type tret = gvn.type(ret); // Type of the return
+      TypeTuple tret = (TypeTuple)gvn.type(ret); // Type of the return
+      if( ret.mem() instanceof ParmNode ) // Pure functions keep call memory state
+        tret = TypeTuple.make(tret.at(0),gvn.type(call.mem()),tret.at(2));
       t = lifting ? t.join(tret) : t.meet(tret);
 
       // Make real from virtual CG edges in GCP/Opto by wiring calls.
