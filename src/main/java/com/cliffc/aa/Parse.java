@@ -614,7 +614,12 @@ public class Parse {
       s=stmts();
     }
     require(')');
-    return do_mem(nn);
+    // NewNode updates merges the new allocation into all-of-memory and returns
+    // a reference.
+    Node ptr = gvn(new  ProjNode(nn,1));
+    Node mem = gvn(new OProjNode(nn,0));
+    set_mem(gvn(new MemMergeNode(mem(),mem)));
+    return ptr;
   }
 
   /** Parse an anonymous function; the opening '{' already parsed.  After the
@@ -720,7 +725,7 @@ public class Parse {
    *  \@{ [id[:type]?[=stmt]?,]* }
    */
   private Node struct() {
-    Node nnn;
+    Node ptr;
     try( Env e = new Env(_e,false) ) {// Nest an environment for the local vars
       _e = e;                   // Push nested environment
       while( true ) {
@@ -757,14 +762,13 @@ public class Parse {
         if( !peek(',') ) break; // Final comma is optional
       }
       require('}');
-      nnn = e._scope.stk().keep(); // The constructed object
-      Node ctl = ctrl(), mem = mem();
-      assert ctl != e._scope;
-      _e = e._par;             // Pop nested environment
-      set_ctrl(ctl);           // Carry any control changes back to outer scope
-      set_mem (mem);           // Carry any memory  changes back to outer scope
-    } // Pop lexical scope around struct, and also last use on nnn
-    return do_mem(nnn.unhook());
+      assert ctrl() != e._scope;
+      e._par._scope.set_ctrl(ctrl(),_gvn); // Carry any control changes back to outer scope
+      e._par._scope.set_mem (mem (),_gvn); // Carry any memory  changes back to outer scope
+      _e = e._par;                         // Pop nested environment
+      ptr = e._scope.ptr().keep();         // A pointer to the constructed object
+    } // Pop lexical scope around struct
+    return ptr.unhook();
   }
 
   // Add a typecheck into the graph, with a shortcut if trivially ok.
@@ -1064,15 +1068,6 @@ public class Parse {
     set_ctrl(  gvn(new CProjNode(callepi,0)));
     set_mem (  gvn(new MProjNode(callepi,1)));
     return     gvn(new  ProjNode(callepi.unhook(),2));
-  }
-
-  // NewNode updates merges the new allocation into all-of-memory and returns a
-  // reference.
-  private Node do_mem(NewNode nnn) {
-    Node ptr = gvn(new  ProjNode(nnn,1));
-    Node mem = gvn(new OProjNode(nnn,0));
-    set_mem(gvn(new MemMergeNode(mem(),mem)));
-    return ptr;
   }
 
   // Whack current control with a syntax error

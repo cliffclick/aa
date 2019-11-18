@@ -24,8 +24,7 @@ public class BitsAlias extends Bits<BitsAlias> {
           static final int ABC;
           static BitsAlias FULL, STRBITS, STRBITS0, ABCBITS, ABCBITS0;
           static BitsAlias RECBITS, NIL;
-  public  static BitsAlias NZERO, RECBITS0;
-  private static BitsAlias ANY;
+  public  static BitsAlias NZERO, RECBITS0, ANY;
 
   static {
     // The All-Memory alias class

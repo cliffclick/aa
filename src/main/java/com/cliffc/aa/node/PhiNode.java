@@ -57,6 +57,7 @@ public class PhiNode extends Node {
   // Split this node into a set returning 'bits' and the original which now
   // excludes 'bits'.  Return null if already making a subset of 'bits'.
   Node split_memory_use( GVNGCM gvn, BitsAlias bits ) {
+    if( bits==BitsAlias.ANY ) return null; // Dead bits
     // Quick sanity checks for Phis that will collapse anyways.
     Type t = gvn.type(this);
     if( !(t instanceof TypeMem) ) return null;

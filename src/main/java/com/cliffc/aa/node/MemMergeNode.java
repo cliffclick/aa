@@ -58,6 +58,7 @@ public class MemMergeNode extends Node {
   // Split this node into a set returning 'bits' and the original which now
   // excludes 'bits'.  Return null if already making a subset of 'bits'.
   Node split_memory_use( GVNGCM gvn, BitsAlias bits ) {
+    if( bits==BitsAlias.ANY ) return null; // Dead bits
     TypeMem t = (TypeMem)gvn.type(this);
     Type tm2 = gvn.type(mem());
     Type to2 = gvn.type(obj());

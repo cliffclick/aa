@@ -283,6 +283,7 @@ public class FunNode extends RegionNode {
   // call, possible with a single if.
   private int split_size( GVNGCM gvn, RetNode ret, ParmNode[] parms ) {
     if( _defs._len <= 1 ) return -1; // No need to split callers if only 2
+    Node recursive = null;    // Heuristic to limit unrolling recursive methods
 
     // Count function body size.  Requires walking the function body and
     // counting opcodes.  Some opcodes are ignored, because they manage
@@ -303,9 +304,13 @@ public class FunNode extends RegionNode {
       if( op == OP_CALL ) {     // Call-of-primitive?
         Node n1 = ((CallNode)n).fun();
         Node n2 = n1 instanceof UnresolvedNode ? n1.in(0) : n1;
-        if( n2 instanceof FunPtrNode &&
-            ((FunPtrNode)n2).ret().val() instanceof PrimNode )
-          op = OP_PRIM;         // Treat as primitive for inlining purposes
+        if( n2 instanceof FunPtrNode ) {
+          FunPtrNode fpn = (FunPtrNode)n2;
+          if( fpn.ret().val() instanceof PrimNode )
+            op = OP_PRIM;       // Treat as primitive for inlining purposes
+          if( fpn.fun() == this )
+            recursive=n.in(0);  // No self-recursive inlining till after parse
+        }
       }
       cnts[op]++;               // Histogram ops
     }
@@ -325,7 +330,8 @@ public class FunNode extends RegionNode {
             { ncon = -2; break; } // This path is in-error, cannot inline even if small & constants
           if( t.is_con() ) ncon++; // Count constants along each path
         }
-      if( ncon > mncons ) { mncons = ncon; m = i; }
+      if( ncon > mncons && in(i) != recursive )
+        { mncons = ncon; m = i; } // Path with the most constants
     }
     if( m == -1 )               // No paths are not in-error? (All paths have an error-parm)
       return -1;                // No inline

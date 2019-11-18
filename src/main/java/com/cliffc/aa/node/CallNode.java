@@ -170,7 +170,10 @@ public class CallNode extends Node {
   public FunPtrNode resolve( GVNGCM gvn ) {
     BitsFun fidxs = fidxs(gvn);
     if( fidxs == null ) return null; // Might be e.g. ~Scalar
-    if( !(fun() instanceof UnresolvedNode) ) return null; // Sane as-is, just has multiple choices
+    // Need to resolve if we have above-center choices (overload choices) or an
+    // Unresolved (which will be above-center during gcp()).
+    if( !(fun() instanceof UnresolvedNode) && !fidxs.above_center() )
+      return null;              // Sane as-is, just has multiple choices
     if( fidxs.test(BitsFun.ALL) ) return null;
     // Any alias, plus all of its children, are meet/joined.  This does a
     // tree-based scan on the inner loop.
