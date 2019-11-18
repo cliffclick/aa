@@ -1,6 +1,5 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.AA;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
@@ -241,6 +240,7 @@ public class TypeMem extends Type<TypeMem> {
   // in a TypeObj.
   public TypeMem update( byte fin, String fld, int fld_num, Type val, TypeMemPtr ptr ) {
     assert val.isa_scalar();
+    if( this==XMEM ) return this;
     // Any alias, plus all of its children, are meet/joined.  This does a
     // tree-based scan on the inner loop.
     Ary<TypeObj> objs = new Ary<>(_aliases.clone(),_aliases.length);

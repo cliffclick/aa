@@ -607,7 +607,7 @@ public class Parse {
    *  tuple= (stmts,[stmts,])     // Tuple; final comma is optional
    */
   private Node tuple(Node s) {
-    NewNode nn = init(new NewNode(false));
+    NewNode nn = init(new NewNode(false)).keep();
     while( s!=null ) {
       nn.create(null,s,_gvn,TypeStruct.ffinal());
       if( !peek(',') ) break;   // Final comma is optional
@@ -617,7 +617,7 @@ public class Parse {
     // NewNode updates merges the new allocation into all-of-memory and returns
     // a reference.
     Node ptr = gvn(new  ProjNode(nn,1));
-    Node mem = gvn(new OProjNode(nn,0));
+    Node mem = gvn(new OProjNode(nn.unhook(),0));
     set_mem(gvn(new MemMergeNode(mem(),mem)));
     return ptr;
   }

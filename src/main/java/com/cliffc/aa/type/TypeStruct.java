@@ -970,7 +970,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     assert val.isa_scalar();
     int idx = find(fld,fld_num);
     // No-such-field to update, so this is a program type-error.
-    if( idx==-1 ) return ALLSTRUCT;
+    if( idx==-1 )
+      return this==ALLSTRUCT.dual() ? this : ALLSTRUCT;
     // Pointers & Memory to a Store can fall during GCP, and go from r/w to r/o
     // and the StoreNode output must remain monotonic.  This means store
     // updates are allowed to proceed even if in-error.

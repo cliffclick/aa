@@ -52,8 +52,9 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
   public TypeObj update(byte fin, String fld, int fld_num, Type val) { return OBJ; }
   // Exact object update
   public TypeObj st    (byte fin, String fld, int fld_num, Type val) { return OBJ; }
-  // Allowed to update this field?
-  public boolean can_update(String fld, int fld_num) { return false; }
+  // Allowed to update this field?  No fields in an OBJ, but an XOBJ might fall
+  // to a struct with fields.
+  public boolean can_update(String fld, int fld_num) { return above_center(); }
   public TypeObj lift_final() { return this; }
   BitsAlias aliases() { return _news; }
   @Override public boolean above_center() { return _any; }
