@@ -18,7 +18,4 @@ public class MProjNode extends ProjNode {
     return c.above_center() ? TypeMem.XMEM : TypeMem.MEM;
   }
   @Override public Type all_type() { return TypeMem.MEM; }
-  // Split this node into a set returning 'bits' and the original which now
-  // excludes 'bits'.  Return null if already making a subset of 'bits'.
-  Node split_memory_use( GVNGCM gvn, BitsAlias bits ) { return null; } // Inline call before splitting
 }

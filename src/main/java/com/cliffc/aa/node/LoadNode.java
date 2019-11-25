@@ -1,25 +1,21 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.Parse;
+import com.cliffc.aa.*;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.Util;
 
 // Load a named field from a struct.  Does it's own nil-check testing.  Loaded
 // value depends on the struct typing.
 public class LoadNode extends Node {
   private final String _fld;
-  private final int _fld_num;
   private final Parse _bad;
-  private LoadNode( Node ctrl, Node mem, Node adr, String fld, int fld_num, Parse bad ) {
+  public LoadNode( Node ctrl, Node mem, Node adr, String fld, Parse bad ) {
     super(OP_LOAD,ctrl,mem,adr);
     _fld = fld;
-    _fld_num = fld_num;
     _bad = bad;
   }
-  public LoadNode( Node ctrl, Node mem, Node adr, String fld , Parse bad ) { this(ctrl,mem,adr,fld,-1,bad); }
-  public LoadNode( Node ctrl, Node mem, Node adr, int fld_num, Parse bad ) { this(ctrl,mem,adr,null,fld_num,bad); }
-  String xstr() { return "."+(_fld==null ? ""+_fld_num : _fld); } // Self short name
-  String  str() { return xstr(); }      // Inline short name
+  String xstr() { return _fld; }   // Self short name
+  String  str() { return xstr(); } // Inline short name
   private Node ctl() { return in(0); }
   private Node mem() { return in(1); }
   private Node adr() { return in(2); }
@@ -31,53 +27,50 @@ public class LoadNode extends Node {
     Node ctrl = ctl();
     Node mem  = mem();
     Node addr = adr();
+    // Top-most control gates nothing
+    if( ctrl== Env.CTL_0 ) return nil_ctl(gvn);
 
-    NewNode nnn = addr.in(0) instanceof NewNode ? (NewNode)addr.in(0) : null;
-    MemMergeNode mmem = mem instanceof MemMergeNode ? (MemMergeNode)mem : null;
-    // Loads against a skinny Merge of NewNode
-    if( mmem != null && nnn == mmem.obj().in(0) )
-      set_mem(mem = mmem.obj(),gvn);
+    // Load bypasses a MemMerge
+    Type tadr = gvn.type(addr);
+    if( tadr instanceof TypeMemPtr && mem instanceof MemMergeNode ) {
+      int alias = ((TypeMemPtr)tadr)._aliases.abit();
+      if( alias == -1 ) throw AA.unimpl(); // Handle multiple aliases, handle all/empty
+      Node obj = ((MemMergeNode)mem).obj(alias,gvn);
+      return set_mem(obj,gvn);
+    }
+
     // Loads against a NewNode cannot NPE, cannot fail, always return the input
+    NewNode nnn = addr.in(0) instanceof NewNode ? (NewNode)addr.in(0) : null;
     int idx=-1;
-    if( nnn != null && (idx=nnn.find(_fld,_fld_num)) != -1 && nnn == mem.in(0) )
+    if( nnn != null && nnn == mem.in(0) && (idx=nnn._ts.find(_fld)) != -1 )
       return nnn.fld(idx);      // Field value
 
-    // Split aliases on inputs
-    Type tadr0= gvn.type(addr);
-    if( tadr0 instanceof TypeMemPtr ) {
-      Node nmem = mem.split_memory_use(gvn,((TypeMemPtr)tadr0)._aliases);
-      if( nmem != null )           // If progress
-        return set_mem(nmem,gvn);  // Sharpen memory edge and try again
-    }
-
-    // Load from a memory Phi; split through in an effort to sharpen the memory.
-    if( mem instanceof PhiNode && ctrl == null && nnn!=null ) {
-      // TODO: Only split thru function args if no unknown_callers, and must make a Parm not a Phi
-      if( !(mem instanceof ParmNode) ) {
-        Node lphi = new PhiNode(((PhiNode)mem)._badgc,mem.in(0));
-        for( int i=1; i<mem._defs._len; i++ )
-          lphi.add_def(gvn.xform(new LoadNode(null,mem.in(i),addr,_fld,_fld_num,_bad)));
-        return lphi;
-      }
-    }
-
-    // Load of final field can bypass call
-    if( idx!=-1 && nnn != null && nnn.is_final(idx) && mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode )
-      return set_mem(((CallNode)mem.in(0).in(0)).mem(),gvn);
+    //// Load from a memory Phi; split through in an effort to sharpen the memory.
+    //if( mem instanceof PhiNode && ctrl == null && nnn!=null ) {
+    //  // TODO: Only split thru function args if no unknown_callers, and must make a Parm not a Phi
+    //  if( !(mem instanceof ParmNode) ) {
+    //    Node lphi = new PhiNode(((PhiNode)mem)._badgc,mem.in(0));
+    //    for( int i=1; i<mem._defs._len; i++ )
+    //      lphi.add_def(gvn.xform(new LoadNode(null,mem.in(i),addr,_fld,_fld_num,_bad)));
+    //    return lphi;
+    //  }
+    //}
+    //
+    //// Load of final field can bypass call
+    //if( idx!=-1 && nnn != null && nnn.is_final(idx) && mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode )
+    //  return set_mem(((CallNode)mem.in(0).in(0)).mem(),gvn);
 
     // Loads against an equal store; cannot NPE since the Store did not.
     StoreNode st=null;
     if( mem instanceof StoreNode && addr == (st=((StoreNode)mem)).adr() ) {
-      if( _fld.equals(st._fld) && _fld_num == st._fld_num && st.err(gvn)==null )
+      if( Util.eq(_fld,st._fld) && st.err(gvn)==null )
         return st.val();
-      // TODO: Else can use field-level aliasing to by pass.  Needs a
-      // field-level alias notion on memory edges.
     }
 
-    // Bypass unrelated Stores
-    if( st != null && st.err(gvn)==null &&
-        ( st._fld_num != _fld_num || (_fld != null && !_fld.equals(st._fld_num)) ))
-      return set_mem(st.mem(),gvn);
+    //// Bypass unrelated Stores
+    //if( st != null && st.err(gvn)==null &&
+    //    ( st._fld_num != _fld_num || (_fld != null && !_fld.equals(st._fld_num)) ))
+    //  return set_mem(st.mem(),gvn);
 
     if( ctrl==null || gvn.type(ctrl)!=Type.CTRL )
       return null;              // Dead load, or a no-control-no-fail load
@@ -134,9 +127,8 @@ public class LoadNode extends Node {
     // Loading from TypeObj - hoping to get a field out
     if( mem instanceof TypeStruct ) {
       TypeStruct ts = (TypeStruct)mem;
-      int idx = ts.find(_fld,_fld_num);  // Find the named field
-      if( idx != -1 ) {                  // Found a field
-
+      int idx = ts.find(_fld);  // Find the named field
+      if( idx != -1 ) {         // Found a field
         // Nil-check before allowing the load.
         if( tadr.must_nil() ) {
           // Check for nil-check not in the graph, but locally available.
@@ -144,52 +136,46 @@ public class LoadNode extends Node {
             // TODO: Need a type-flow in the graph for cycles...
             return Type.SCALAR; // Not provable not-nil, so fails
           }
-        }
-
+        }      
         return ts.at(idx); // Field type
       }
       // No such field
-      return badmemrez;
     }
     return badmemrez; // No loading from e.g. Strings
   }
 
   @Override public String err(GVNGCM gvn) {
-    Type t = gvn.type(adr());
-    while( t instanceof TypeName ) t = ((TypeName)t)._t;
+    Type t = gvn.type(adr()).base();
     if( t.must_nil() ) return bad("Struct might be nil when reading");
     if( !(t instanceof TypeMemPtr) )
       return bad("Unknown"); // Not a pointer, cannot load a field
     TypeMemPtr t3 = (TypeMemPtr)t;
     Type t4 = gvn.type(mem());
-    if( t4 instanceof TypeMem ) {         // Memory or Struct, for various errors
-      TypeMem t5 = (TypeMem)t4;           // Should be memory
-      Type t6 = t5.ld(t3);                // General load from memory
-      if( !(t6 instanceof TypeStruct) ) { // No fields, so memory or ptr is in-error
-        Type t7 = t3._obj.base();
-        if( t7 instanceof TypeStruct ) {
-          t4 = t7;
-        } else {
-          return bad("Unknown");
-        }
-      } else t4 = t6;
-    }
-    if( !(t4 instanceof TypeStruct) || ((TypeStruct)t4).find(_fld,_fld_num) == -1 )
+    //if( t4 instanceof TypeMem ) {         // Memory or Struct, for various errors
+    //  TypeMem t5 = (TypeMem)t4;           // Should be memory
+    //  Type t6 = t5.ld(t3);                // General load from memory
+    //  if( !(t6 instanceof TypeStruct) ) { // No fields, so memory or ptr is in-error
+    //    Type t7 = t3._obj.base();
+    //    if( t7 instanceof TypeStruct ) {
+    //      t4 = t7;
+    //    } else {
+    //      return bad("Unknown");
+    //    }
+    //  } else t4 = t6;
+    //}
+    if( !(t4 instanceof TypeStruct) || ((TypeStruct)t4).find(_fld) == -1 )
       return bad("Unknown");
     return null;
   }
   private String bad( String msg ) {
-    String f = _fld==null ? ""+_fld_num : _fld;
-    String f2 = msg+" field '."+f+"'";
-    return _bad==null ? f2 : _bad.errMsg(f2);
+    String f = msg+" field '."+_fld+"'";
+    return _bad==null ? f : _bad.errMsg(f);
   }
   @Override public Type all_type() { return Type.SCALAR; }
-  @Override public int hashCode() { return super.hashCode()+(_fld==null ? _fld_num : _fld.hashCode()); }
+  @Override public int hashCode() { return super.hashCode()+_fld.hashCode(); }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !super.equals(o) ) return false;
-    if( !(o instanceof LoadNode) ) return false;
-    LoadNode ld = (LoadNode)o;
-    return _fld_num == ld._fld_num && (_fld==null ? ld._fld==null : _fld.equals(ld._fld));
+    return (o instanceof LoadNode) && Util.eq(_fld,((LoadNode)o)._fld);
   }
 }

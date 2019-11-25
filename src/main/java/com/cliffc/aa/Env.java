@@ -13,10 +13,10 @@ public class Env implements AutoCloseable {
       NewNode nnn = GVN.init(new NewNode(closure));
       Node ptr = GVN.xform(new  ProjNode(nnn,1));
       Node frm = GVN.xform(new OProjNode(nnn,0));
-      Node mem = GVN.xform(new MemMergeNode(par._scope.mem(),frm));
       scope.set_ctrl(par._scope.ctrl(),GVN);
-      scope.set_mem (mem,GVN);  // Memory includes local stack frame
       scope.set_ptr (ptr,GVN);  // Address for 'nnn', the local stack frame
+      MemMergeNode mem = new MemMergeNode(par._scope.mem(),frm,nnn._alias);
+      scope.set_active_mem(mem,GVN);  // Memory includes local stack frame
     }
     _scope = GVN.init(scope);
   }
@@ -30,39 +30,45 @@ public class Env implements AutoCloseable {
   public  final static   ConNode ALL_CTRL;
           final static int LAST_START_UID;
   private final static int NINIT_CONS;
-  private final static Env TOP; // Top-most lexical Environment, has all primitives, unable to be removed
+          final static Env TOP; // Top-most lexical Environment, has all primitives, unable to be removed
   static {
-    GVN = new GVNGCM();     // Initial GVN, defaults to ALL, lifts towards ANY
-    // Initial control, memory, args, program state
-    START = new StartNode();
-    assert START._uid==0;
-    CTL_0 = GVN.init(new CProjNode(START,0));
-    STK_0 = GVN.init(new NewNode(true));
-    PTR_0 = GVN.init(new  ProjNode(STK_0,1));
+    GVN = new GVNGCM();      // Initial GVN, defaults to ALL, lifts towards ANY
+    // Initial control & memory
+    START        =          new StartNode(       ) ;
+    CTL_0        = GVN.init(new CProjNode(START,0));
     Node all_mem = GVN.init(new MProjNode(START,1));
+    // Top-level closure defining all primitives
+    STK_0        =          new   NewNode(true).keep();
+    PTR_0        = GVN.init(new  ProjNode(STK_0,1));
     Node prims   = GVN.init(new OProjNode(STK_0,0));
-    MEM_0 = GVN.init(new MemMergeNode(all_mem,prims));
+
+    MEM_0 = GVN.init(new MemMergeNode(all_mem,prims,STK_0._alias));
+    // Top-level default values; ALL_CTRL is used by declared functions to
+    // indicate that future not-yet-parsed code may call the function.
     ALL_CTRL = GVN.init(new ConNode<>(Type.CTRL));
+    // Used to reset between tests
     LAST_START_UID = ALL_CTRL._uid;
-    TOP    = new Env(null,true); // Top-most lexical Environment
+    // Top-most (file-scope) lexical environment
+    TOP    = new Env(null,true);
     TOP.install_primitives();
+    // Used to reset between tests
     NINIT_CONS = START._uses._len;
   }
   private void install_primitives() {
-    _scope.keep();              // do not delete
     _scope.init0();             // Add base types
     for( PrimNode prim : PrimNode.PRIMS )
       STK_0.add_fun(null,prim._name,(FunPtrNode) GVN.xform(prim.as_fun(GVN)), GVN);
     for( IntrinsicNewNode lib : IntrinsicNewNode.INTRINSICS )
       STK_0.add_fun(null,lib ._name,(FunPtrNode) GVN.xform(lib .as_fun(GVN)), GVN);
     // Top-level constants
-    STK_0.create("math_pi", GVN.con(TypeFlt.PI),GVN,TypeStruct.ffinal());
+    STK_0.create_active("math_pi", GVN.con(TypeFlt.PI),TypeStruct.ffinal(),GVN);
     // Now that all the UnresolvedNodes have all possible hits for a name,
     // register them with GVN.
     for( Node val : STK_0._defs )  if( val instanceof UnresolvedNode ) GVN.init0(val);
     _scope.set_ctrl(CTL_0, GVN);
     _scope.set_mem (MEM_0, GVN);
     _scope.set_ptr (PTR_0, GVN);
+    GVN.rereg(STK_0,STK_0.value(GVN));
     // Run the worklist dry
     GVN.iter();
     BitsAlias.init0(); // Done with adding primitives
@@ -86,26 +92,26 @@ public class Env implements AutoCloseable {
     // Promote forward refs to the next outer scope
     if( pscope != null && pscope != TOP._scope)
       _scope.stk().promote_forward(GVN,pscope.stk());
-    if( _scope.is_dead() ) return;
-    // Closing top-most scope (exiting compilation unit)?
-    if( _par._par == null ) {   // Then reset global statics to allow another compilation unit
-      top_scope_close();
-      return;
-    }
     // Whats left is function-ref generic entry points which promote to next
     // outer scope, and control-users which promote to the Scope's control.
     while( _scope._uses._len > 0 ) {
-      Node use = _scope._uses.at(0);
-      assert use != pscope;
-      int idx = use._defs.find(_scope);
-      GVN.set_def_reg(use,idx, idx==0 ? pscope.ctrl() : pscope);
+      //Node use = _scope._uses.at(0);
+      //assert use != pscope;
+      //int idx = use._defs.find(_scope);
+      //GVN.set_def_reg(use,idx, idx==0 ? pscope.ctrl() : pscope);
+      throw AA.unimpl();
     }
     _scope.unkeep(GVN);
     assert _scope.is_dead();
+    // Closing top-most scope (exiting compilation unit)?
+    if( _par._par == null ) {   // Then reset global statics to allow another compilation unit
+      top_scope_close();
+    }
   }
 
   private void top_scope_close() {
-    _scope.unkeep(GVN);
+    while( MEM_0._defs._len > 2 )
+      MEM_0.pop(GVN);           // Remove memory constants down to the primitives
     BitsAlias.reset_to_init0(); // Done with adding primitives
     BitsFun  .reset_to_init0(); // Done with adding primitives
     BitsRPC  .reset_to_init0(); // Done with adding primitives

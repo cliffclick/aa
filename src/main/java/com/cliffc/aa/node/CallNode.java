@@ -108,14 +108,18 @@ public class CallNode extends Node {
   @Override public Node ideal(GVNGCM gvn) {
     // Dead, do nothing
     if( gvn.type(ctl())==Type.XCTRL ) return null;
+    Node mem = mem();
 
-    // When do i do 'pattern matching'?  For the moment, right here: if not
+    // When do I do 'pattern matching'?  For the moment, right here: if not
     // already unpacked a tuple, and can see the NewNode, unpack it right now.
     if( !_unpacked ) { // Not yet unpacked a tuple
       assert nargs()==1;
-      if( mem() instanceof MemMergeNode ) {
-        NewNode nnn = ((MemMergeNode)mem()).exact(arg(0));
-        if( nnn != null ) {
+      Type tadr = gvn.type(arg(0));
+      if( mem instanceof MemMergeNode && tadr instanceof TypeMemPtr &&
+          arg(0) instanceof ProjNode && arg(0).in(0) instanceof NewNode ) {
+        NewNode nnn = (NewNode)arg(0).in(0);
+        Node obj = ((MemMergeNode)mem).obj((TypeMemPtr)tadr,gvn);
+        if( obj instanceof OProjNode && obj.in(0)==nnn ) {
           remove(_defs._len-1,gvn); // Pop off the NewNode tuple
           int len = nnn._defs._len;
           for( int i=1; i<len; i++ ) // Push the args; unpacks the tuple
@@ -123,15 +127,6 @@ public class CallNode extends Node {
           gvn.add_work(mem().in(1));
           _unpacked = true;     // Only do it once
           return this;
-        }
-      }
-      // Another version of structural unpacking: we can find a constant input tuple.
-      Type tm = gvn.type(mem());
-      Type tn = gvn.type(arg(0));
-      if( tn instanceof TypeMemPtr && tm instanceof TypeMem ) {
-        Type tx = ((TypeMem)tm).ld((TypeMemPtr)tn);
-        if( tx instanceof TypeStruct && tx.is_con() ) {
-          throw com.cliffc.aa.AA.unimpl(); // untested but probably correct
         }
       }
     }

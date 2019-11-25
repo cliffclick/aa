@@ -8,6 +8,7 @@ import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
 
+import java.util.BitSet;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -100,6 +101,8 @@ public class FunNode extends RegionNode {
       ? "?"+name
       : (_op_prec >= 0 ? "{"+name+"}" : name+"={->}");
   }
+  public boolean noinline() { return _name != null && _name.startsWith("noinline"); }
+  
   // Can return nothing, or "name" or "[name0,name1,name2...]" or "[35]"
   public static SB names(BitsFun fidxs, SB sb ) {
     int fidx = fidxs.abit();
@@ -174,6 +177,7 @@ public class FunNode extends RegionNode {
       // Large code-expansion allowed; can inline for other reasons
       path = split_size(gvn,ret,parms);
       if( path == -1 ) return null;
+      if( noinline() ) return null;
       _cnt_size_inlines++;
     }
     // Split the callers according to the new 'fun'.
@@ -283,7 +287,7 @@ public class FunNode extends RegionNode {
   // call, possible with a single if.
   private int split_size( GVNGCM gvn, RetNode ret, ParmNode[] parms ) {
     if( _defs._len <= 1 ) return -1; // No need to split callers if only 2
-    Node recursive = null;    // Heuristic to limit unrolling recursive methods
+    BitSet recursive = new BitSet();    // Heuristic to limit unrolling recursive methods
 
     // Count function body size.  Requires walking the function body and
     // counting opcodes.  Some opcodes are ignored, because they manage
@@ -309,7 +313,7 @@ public class FunNode extends RegionNode {
           if( fpn.ret().val() instanceof PrimNode )
             op = OP_PRIM;       // Treat as primitive for inlining purposes
           if( fpn.fun() == this )
-            recursive=n.in(0);  // No self-recursive inlining till after parse
+            recursive.set(n.in(0)._uid);  // No self-recursive inlining till after parse
         }
       }
       cnts[op]++;               // Histogram ops
@@ -330,7 +334,7 @@ public class FunNode extends RegionNode {
             { ncon = -2; break; } // This path is in-error, cannot inline even if small & constants
           if( t.is_con() ) ncon++; // Count constants along each path
         }
-      if( ncon > mncons && in(i) != recursive )
+      if( ncon > mncons && !recursive.get(in(i)._uid) )
         { mncons = ncon; m = i; } // Path with the most constants
     }
     if( m == -1 )               // No paths are not in-error? (All paths have an error-parm)

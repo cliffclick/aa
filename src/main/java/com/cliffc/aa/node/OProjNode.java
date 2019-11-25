@@ -20,7 +20,4 @@ public class OProjNode extends ProjNode {
     return c.above_center() ? TypeObj.XOBJ : TypeObj.OBJ;
   }
   @Override public Type all_type() { return TypeObj.OBJ; }
-  // Split this node into a set returning 'bits' and the original which now
-  // excludes 'bits'.  Return null if already making a subset of 'bits'.
-  Node split_memory_use( GVNGCM gvn, BitsAlias bits ) { return null; } // Happens when next to a New
 }

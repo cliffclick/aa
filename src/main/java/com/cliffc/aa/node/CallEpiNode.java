@@ -109,6 +109,7 @@ public final class CallEpiNode extends Node {
           !(parm instanceof ParmNode && parm.in(0) == fun) &&
           !(parm instanceof ConNode) )
         can_inline=false;       // Not trivial
+    if( fun.noinline() ) can_inline=false;
     if( can_inline ) {
       Node irez = rez.copy(false,gvn);// Copy the entire function body
       for( Node parm : rez._defs )

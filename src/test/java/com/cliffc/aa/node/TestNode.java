@@ -247,15 +247,15 @@ public class TestNode {
     for( IntrinsicNewNode prim : IntrinsicNewNode.INTRINSICS )
       test1monotonic_intrinsic(prim);
     test1monotonic(new IntrinsicNode.ConvertPtrTypeName("test",from_ptr,to_ptr,null,_ins[1],_ins[2]));
-    test1monotonic(new   LoadNode(_ins[0],_ins[1],_ins[2],0,null));
-    test1monotonic(new MemMergeNode(_ins[1],_ins[2]));
+    test1monotonic(new   LoadNode(_ins[0],_ins[1],_ins[2],"x",null));
+    test1monotonic(new MemMergeNode(_ins[1],_ins[2],BitsAlias.REC));
     NewNode nnn1 = new NewNode(false);
-    nnn1.create("x",_ins[1],_gvn,TypeStruct.ffinal());
-    nnn1.create("y",_ins[2],_gvn,TypeStruct.ffinal());
+    nnn1.create("x",_ins[1],TypeStruct.ffinal(),_gvn);
+    nnn1.create("y",_ins[2],TypeStruct.ffinal(),_gvn);
     test1monotonic(nnn1);
     NewNode nnn2 = new NewNode(false);
-    nnn2.create("x",_ins[1],_gvn,TypeStruct.ffinal());
-    nnn2.create("y",_ins[2],_gvn,TypeStruct.ffinal());
+    nnn2.create("x",_ins[1],TypeStruct.ffinal(),_gvn);
+    nnn2.create("y",_ins[2],TypeStruct.ffinal(),_gvn);
     nnn2.set_name(_gvn,TypeName.TEST_STRUCT);
     test1monotonic(nnn2);
     ((ConNode<Type>)_ins[1])._t = Type.SCALAR; // ParmNode reads this for _alltype
@@ -266,8 +266,8 @@ public class TestNode {
     test1monotonic(new   ProjNode(_ins[0],1));
     test1monotonic(new RegionNode(null,_ins[1],_ins[2]));
     test1monotonic(new    RetNode(_ins[0],mem,_ins[1],_ins[2],fun_plus)); // ctl,mem,val,rpc,fun
-    test1monotonic(new  StoreNode(_ins[0],_ins[1],_ins[2],_ins[3],(byte)0,0,null));
-    test1monotonic(new  StoreNode(_ins[0],_ins[1],_ins[2],_ins[3],(byte)1,0,null));
+    test1monotonic(new  StoreNode(_ins[0],_ins[1],_ins[2],_ins[3],(byte)0,"x",null));
+    test1monotonic(new  StoreNode(_ins[0],_ins[1],_ins[2],_ins[3],(byte)1,"x",null));
     //                  ScopeNode has no inputs, and value() call is monotonic
     //                    TmpNode has no inputs, and value() call is monotonic
     test1monotonic(new   TypeNode(TypeInt.FALSE,_ins[1],null));

@@ -48,13 +48,13 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
     BitsAlias news = to._news == null ? _news : _news.meet(to._news); // _news can be null for global constant strings
     return _any ? to.make(to._any,news) : make(_any,news);
   }
-  // Update (approximately) the current TypeObj
-  public TypeObj update(byte fin, String fld, int fld_num, Type val) { return OBJ; }
-  // Exact object update
-  public TypeObj st    (byte fin, String fld, int fld_num, Type val) { return OBJ; }
+  // Update (approximately) the current TypeObj.  Merges fields.
+  public TypeObj update(byte fin, String fld, Type val) { return this; }
+  // Exact object update.  Replaces fields.
+  public TypeObj st    (byte fin, String fld, Type val) { return this; }
   // Allowed to update this field?  No fields in an OBJ, but an XOBJ might fall
   // to a struct with fields.
-  public boolean can_update(String fld, int fld_num) { return above_center(); }
+  public boolean can_update(String fld) { return above_center(); }
   public TypeObj lift_final() { return this; }
   BitsAlias aliases() { return _news; }
   @Override public boolean above_center() { return _any; }

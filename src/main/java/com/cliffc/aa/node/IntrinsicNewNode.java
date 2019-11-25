@@ -20,19 +20,19 @@ import org.jetbrains.annotations.NotNull;
 // epilog.
 public abstract class IntrinsicNewNode extends IntrinsicNode {
   int _alias;                   // Alias class for new memory
-  IntrinsicNewNode( String name, String[] args, TypeTuple targs, TypeMemPtr funret, int alias ) {
-    super(name,args,targs,funret);
+  IntrinsicNewNode( String name, String[] args, TypeTuple targs, int alias ) {
+    super(name,args,targs,null);
     update_alias(alias);
   }
   private IntrinsicNewNode update_alias(int alias) {
     _alias = alias;
-    _funret = TypeMemPtr.make(alias,_funret._obj);
+    _funret = TypeMemPtr.make(alias,TypeStr.make(false,null,BitsAlias.make0(alias)));
     return this;
   }
   public static IntrinsicNewNode[] INTRINSICS = new IntrinsicNewNode[] {
     new ConvertI64Str(BitsAlias.I64),
     new ConvertF64Str(BitsAlias.F64),
-    new AddStrStr(BitsAlias.STR),
+    new AddStrStr(BitsAlias.STR_STR),
   };
   // Clones during inlining all become unique new sites
   @Override @NotNull IntrinsicNewNode copy( boolean copy_edges, GVNGCM gvn) {
@@ -55,30 +55,30 @@ public abstract class IntrinsicNewNode extends IntrinsicNode {
     Node rez = gvn.xform(this); // Returns a Tuple(mem,ptr)
     Node mem = gvn.xform(new OProjNode(rez,0));
     Node ptr = gvn.xform(new  ProjNode(rez,1));
-    Node mmem = gvn.xform(new MemMergeNode(memp,mem));
+    Node mmem = gvn.xform(new MemMergeNode(memp,mem,_alias));
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,ptr,rpc,fun));
     return new FunPtrNode(ret);
   }
 
   // --------------------------------------------------------------------------
   static class ConvertI64Str extends IntrinsicNewNode {
-    ConvertI64Str(int alias) { super("str",ARGS1,TypeTuple.INT64, TypeMemPtr.STRPTR,alias); }
+    ConvertI64Str(int alias) { super("str",ARGS1,TypeTuple.INT64,alias); }
     @Override public Type value(GVNGCM gvn) {
       Type t = gvn.type(in(2));
       if( t.above_center() ) return all_type().dual();
       if( !t.is_con() || !(t instanceof TypeInt) ) return all_type();
-      TypeStr str = TypeStr.con(Long.toString(t.getl()));
+      TypeStr str = TypeStr.make(false,Long.toString(t.getl()).intern(),_funret._obj._news);
       return TypeTuple.make(str,TypeMemPtr.make(_alias,str));
     }
   }
 
   static class ConvertF64Str extends IntrinsicNewNode {
-    ConvertF64Str(int alias) { super("str",ARGS1,TypeTuple.FLT64, TypeMemPtr.STRPTR, alias); }
+    ConvertF64Str(int alias) { super("str",ARGS1,TypeTuple.FLT64, alias); }
     @Override public Type value(GVNGCM gvn) {
       Type t = gvn.type(in(2));
       if( t.above_center() ) return all_type().dual();
       if( !t.is_con() || !(t instanceof TypeFlt) ) return all_type();
-      TypeStr str = TypeStr.con(Double.toString(t.getd()));
+      TypeStr str = TypeStr.make(false,Double.toString(t.getd()).intern(),_funret._obj._news);
       return TypeTuple.make(str,TypeMemPtr.make(_alias,str));
     }
   }
@@ -97,10 +97,7 @@ public abstract class IntrinsicNewNode extends IntrinsicNode {
     // Unresolved, all prims "look dead", including memory state.  Keep them
     // dead until resolving or not.
     //
-    // TODO: If fail to resolve during GCP, probably need to bail out there as
-    // a hard error.  All calls should resolve during GCP, or else cannot
-    // further propagate optimality.
-    AddStrStr(int alias) { super("+",ARGS2,TypeTuple.STR_STR, TypeMemPtr.STRPTR, alias); }
+    AddStrStr(int alias) { super("+",ARGS2,TypeTuple.STR_STR, alias); }
     @Override public Type value(GVNGCM gvn) {
       Type m   = gvn.type(in(1));
       Type sp0 = gvn.type(in(2));

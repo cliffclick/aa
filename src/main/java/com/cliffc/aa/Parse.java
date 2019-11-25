@@ -89,8 +89,8 @@ public class Parse {
 
   // Parse the string in the given lookup context, and return an executable
   // program.  Called in a partial-program context; passed in an existing
-  // ScopeNode with existing variables which survive to the next call.  Used by
-  // the REPL to do incremental typing.
+  // file-sized ScopeNode with existing variables which survive to the next call.
+  // Used by the REPL to do incremental typing.
   TypeEnv go_partial( ) {
     prog();        // Parse a program
     _gvn.iter();   // Pessimistic optimizations; might improve error situation
@@ -165,10 +165,8 @@ public class Parse {
     // errors... i.e., you get the errors in execution order.
 
     Type tres = _gvn.type(res);
-    TypeMem tmem = (TypeMem)_gvn.type(mem());
+    TypeMem tmem = (TypeMem)_gvn.type(all_mem());
     kill(res);       // Kill Node for returned Type result
-    set_ctrl(null);  // Kill control also
-    set_mem (null);  // Kill memory  also
     return new TypeEnv(tres,tmem,_e,errs0.isEmpty() ? null : errs0);
   }
 
@@ -180,6 +178,7 @@ public class Parse {
     if( res == null ) res = con(Type.ANY);
     res = merge_exits(res);
     _e._scope.add_def(res);       // Hook result
+    all_mem();                    // Close off top-level active memory
   }
 
   /** Parse a list of statements; final semi-colon is optional.
@@ -265,7 +264,8 @@ public class Parse {
    *  available in all later statements.  Final-assigned variables can never be
    *  assigned again.
    *
-   *  stmt = [[id or ifex.field][:type] [:]=]* ifex
+   *  stmt = [id[:type] [:]=]* ifex
+   *  stmt = id     // Implicit variable creation with nil
    *  stmt = ^ifex  // Early function exit
    *
    *  Note the syntax difference between:
@@ -274,11 +274,6 @@ public class Parse {
    *   tstmt = id =:type  // type variable decl, type assignment
    *
    *  The ':=' is the re-assignment token, no spaces allowed.
-   *  Variable assignment does not involve Memory and no State is changed.
-   *  Field    assignment does     involve Memory and    State is changed.
-   *
-   *  Both kinds of assignments are legal in the same stmt:
-   *    x = y = z = fcn(arg0,arg1).fld1.fld2 = some_more_ifex;
    */
   private Node stmt() {
     if( peek('^') ) {           // Early function exit
@@ -300,7 +295,7 @@ public class Parse {
       // Check for x := ... vs x = ...
       if( peek(":=") ) rs.set(toks._len);             // Re-assignment parse
       else if( !peek('=') ) { _x = oldx; break; } // Unwind token parse, and not assignment
-      toks.add(tok);
+      toks.add(tok.intern());
       ts  .add(t  );
     }
 
@@ -320,11 +315,9 @@ public class Parse {
       if( scope==null ) {                    // Token not already bound at any scope
         if( ifex instanceof FunPtrNode && !ifex.is_forward_ref() )
           ((FunPtrNode)ifex).fun().bind(tok); // Debug only: give name to function
-        ifex.keep();
-        create(tok,con(Type.NIL),ts_mutable(true)); // Make a partial-init error at top level
-        ifex.unhook();
-        scope = _e._scope;
-        scope.def(tok,mutable,true);
+        create(tok,con(Type.NIL),ts_mutable(true)); // Create at top of scope as nil.
+        scope = _e._scope;              // Scope is the current one
+        scope.def_if(tok,mutable,true); // Record if inside arm of if (partial def error check)
       }
       // Handle re-assignments and forward referenced function definitions.
       Node n = scope.stk().get(tok); // Get prior direct binding
@@ -332,8 +325,13 @@ public class Parse {
         assert !scope.stk().is_mutable(tok) && scope == _e._scope;
         ((FunPtrNode)n).merge_ref_def(_gvn,tok,(FunPtrNode)ifex);
       } else { // Store into scope/NewNode/closure
-        update(scope,tok,ifex,mutable);
-        scope.def(tok,mutable,false);
+        // Active (parser) memory state
+        MemMergeNode mmem = mem_active();
+        // Active object state
+        ObjMergeNode omem = mmem.active_obj(scope.stk()._alias,_gvn);
+        int idx = omem.fld_idx(tok);
+        omem.set_def(idx,gvn(new StoreNode(ctrl(),omem.in(idx),scope.ptr(),ifex,mutable,tok,errMsg())),_gvn);
+        scope.def_if(tok,mutable,false); // Note 1-side-of-if update
       }
     }
     return ifex;
@@ -351,22 +349,23 @@ public class Parse {
 
     _e._scope.push_if();            // Start if-expression tracking new defs
     Node ifex = init(new IfNode(ctrl(),expr)).keep();
-    Node t0_ctrl = set_ctrl(gvn(new CProjNode(ifex,1))); // Control for true branch
-    Node old_mem = mem().keep();    // Keep until parse false-side
-    Node tex = stmt();                      // Parse true expression
+    set_ctrl(gvn(new CProjNode(ifex,1))); // Control for true branch
+    Node old_mem = all_mem().keep();      // Keep until parse false-side
+    Node tex = stmt();                    // Parse true expression
     if( tex == null ) tex = err_ctrl2("missing expr after '?'");
-    tex.keep();                 // Keep until merge point
-    Node t_ctrl= ctrl().keep(); // Keep until merge point
-    Node t_mem = mem ().keep(); // Keep until merge point
+    tex.keep();                    // Keep until merge point
+    Node t_ctrl= ctrl().keep();    // Keep until merge point
+    Node t_mem = all_mem().keep(); // Keep until merge point
 
     _e._scope.flip_if();        // Flip side of tracking new defs
-    Node f0_ctrl = set_ctrl(gvn(new CProjNode(ifex.unhook(),0))); // Control for false branch
-    set_mem(old_mem.unhook());              // Reset memory to before the IF
+    set_ctrl(gvn(new CProjNode(ifex.unhook(),0))); // Control for false branch
+    set_mem(old_mem);           // Reset memory to before the IF
     Node fex = peek(':') ? stmt() : con(Type.NIL);
     if( fex == null ) fex = err_ctrl2("missing expr after ':'");
-    fex.keep();                 // Keep until merge point
-    Node f_ctrl= ctrl().keep(); // Keep until merge point
-    Node f_mem = mem ().keep(); // Keep until merge point
+    fex.keep();                    // Keep until merge point
+    Node f_ctrl= ctrl().keep();    // Keep until merge point
+    Node f_mem = all_mem().keep(); // Keep until merge point
+    old_mem.unkeep(_gvn);
 
     Parse bad = errMsg();
     t_mem = _e._scope.check_if(true ,bad,_gvn,t_ctrl,_e._scope.ptr(),t_mem); // Insert errors if created only 1 side
@@ -387,7 +386,7 @@ public class Parse {
     String uni = token();
     if( uni!=null ) {
       unifun = _e.lookup_filter(uni,_gvn,1); // UniOp, or null
-      if( unifun==null || unifun.op_prec() == -1 ) _x=oldx; // Not a uniop
+      if( unifun==null || unifun.op_prec() == -1 ) { unifun=null; _x=oldx; } // Not a uniop
     }
 
     // [unifun] term [binop term]*
@@ -396,7 +395,8 @@ public class Parse {
     // Collect 1st fcn/arg pair
     Ary<Node> funs = new Ary<>(new Node[1],0);
     try( TmpNode args = new TmpNode() ) {
-      funs.add(unifun);   args.add_def(term);
+      funs.add(unifun==null ? null : unifun.keep());
+      args.add_def(term);
 
       // Now loop for binop/term pairs: parse Kleene star of [binop term]
       while( true ) {
@@ -422,11 +422,11 @@ public class Parse {
           assert fun.op_prec() <= max;
           if( fun.op_prec() < max ) continue; // Not yet
           if( i==0 ) {
-            Node call = do_call(new CallNode(true,errMsg(),ctrl(),fun.unhook(),mem(),args.in(0)));
+            Node call = do_call(new CallNode(true,errMsg(),ctrl(),fun.unhook(),all_mem(),args.in(0)));
             args.set_def(0,call,_gvn);
             funs.setX(0,null);
           } else {
-            Node call = do_call(new CallNode(true,errMsg(),ctrl(),fun.unhook(),mem(),args.in(i-1),args.in(i)));
+            Node call = do_call(new CallNode(true,errMsg(),ctrl(),fun.unhook(),all_mem(),args.in(i-1),args.in(i)));
             args.set_def(i-1,call,_gvn);
             funs.remove(i);  args.remove(i);  i--;
           }
@@ -462,17 +462,33 @@ public class Parse {
     while( true ) {             // Repeated application or field lookup is fine
       if( peek('.') ) {         // Field?
         String fld = token();   // Field name
-        int fnum = fld==null ? field_number() : -1;
-        if( fld==null && fnum==-1 ) n = err_ctrl2("Missing field name after '.'");
+        if( fld == null ) {     // Not a token, check for a field number
+          int fldnum = field_number();
+          if( fldnum != -1 ) fld = ""+fldnum; // Convert to a field name
+        }
+
+        // If we have a precise alias, we can read/write "mem_active" directly.
+        // If not, we need to use the imprecise all_mem.  This is basically a
+        // parser speed hack, since the all_mem always works.
+        Node mem; ObjMergeNode omem; int alias, idx;
+        Type t = _gvn.type(n);
+        if( t instanceof TypeMemPtr && (alias=((TypeMemPtr)t)._aliases.abit()) != -1 ) {
+          mem = omem = mem_active().active_obj(alias,_gvn);
+          idx = omem.fld_idx(fld=fld.intern());
+        } else {            // Load/Store is from an unknown place
+          all_mem();        // Close off current memory for the generic memory op
+          mem = _e._scope;  // Load/Store will use all of memory
+          idx = 1;          // And use the scope index for all of memory
+        }
+        // Store or load against the chosen memory
+        if( fld == null ) n = err_ctrl2("Missing field name after '.'");
         else if( peek(":=") || peek_not('=','=')) {
           byte fin = _buf[_x-2]==':' ? TypeStruct.frw() : TypeStruct.ffinal();
           Node stmt = stmt();
           if( stmt == null ) n = err_ctrl2("Missing stmt after assigning field '."+fld+"'");
-          else if( fld != null ) set_mem(gvn(new StoreNode(ctrl(),mem(),n,n=stmt,fin,fld ,errMsg())));
-          else                   set_mem(gvn(new StoreNode(ctrl(),mem(),n,n=stmt,fin,fnum,errMsg())));
+          else mem.set_def(idx,gvn(new StoreNode(ctrl(),mem.in(idx),n,n=stmt,fin,fld ,errMsg())),_gvn);
         } else {
-          if( fld != null ) n = gvn(new LoadNode(ctrl(),mem(),n,fld ,errMsg()));
-          else              n = gvn(new LoadNode(ctrl(),mem(),n,fnum,errMsg()));
+          n = gvn(new LoadNode(ctrl(),mem.in(idx),n,fld ,errMsg()));
         }
 
       } else {                  // Attempt a function-call
@@ -496,7 +512,7 @@ public class Parse {
           kill(arg);
           n = err_ctrl2("A function is being called, but "+tn+" is not a function");
         } else {
-          n = do_call(new CallNode(!arglist,errMsg(),ctrl(),n,mem(),arg)); // Pass the 1 arg
+          n = do_call(new CallNode(!arglist,errMsg(),ctrl(),n,all_mem(),arg)); // Pass the 1 arg
         }
       }
     } // Else no trailing arg, just return value
@@ -505,7 +521,8 @@ public class Parse {
 
   // Handle post-increment/post-decrement operator
   private Node inc(String tok, int d) {
-    ScopeNode scope = lookup_scope(tok); // Find prior scope of token
+    ScopeNode scope = lookup_scope(tok=tok.intern()); // Find prior scope of token
+    // Need a load/call/store sensible options
     Node n;
     if( scope==null ) {         // Token not already bound to a value
       create(tok,n = con(Type.NIL),ts_mutable(true));
@@ -513,14 +530,22 @@ public class Parse {
     } else {                    // Check existing token for mutable
       if( !scope.is_mutable(tok) )
         return err_ctrl2("Cannot re-assign final val '"+tok+"'");
-      // Now properly load from the closure
-      n = gvn(new LoadNode(ctrl(),mem(),scope.ptr(),tok,errMsg()));
-      if( n.is_forward_ref() )         // Prior is actually a forward-ref
-        return err_ctrl2(forward_ref_err(((FunPtrNode)n).fun()));
     }
+    // Now properly load from the closure
+    MemMergeNode mmem = mem_active(scope); // Active memory for the chosen scope
+    ObjMergeNode omem = mmem.active_obj(scope.stk()._alias,_gvn);
+    int idx = omem.fld_idx(tok);
+    n = gvn(new LoadNode(scope.ctrl(),omem.in(idx),scope.ptr(),tok,null));
+    if( n.is_forward_ref() )         // Prior is actually a forward-ref
+      return err_ctrl2(forward_ref_err(((FunPtrNode)n).fun()));
+
     Node plus = _e.lookup_filter("+",_gvn,2);
-    Node sum = do_call(new CallNode(true,errMsg(),ctrl(),plus,mem(),n.keep(),con(TypeInt.con(d))));
-    update(scope,tok,sum,TypeStruct.frw());
+    Node sum = do_call(new CallNode(true,errMsg(),ctrl(),plus,all_mem(),n.keep(),con(TypeInt.con(d))));
+
+    MemMergeNode mmem2 = mem_active(scope); // Active memory for the chosen scope
+    ObjMergeNode omem2 = mmem2.active_obj(scope.stk()._alias,_gvn);
+    int idx2 = omem2.fld_idx(tok);
+    omem2.set_def(idx2,gvn(new StoreNode(ctrl(),omem2.in(idx2),scope.ptr(),sum,TypeStruct.frw(),tok,errMsg())),_gvn);
     return n.unhook();          // Return pre-increment value
   }
 
@@ -589,9 +614,7 @@ public class Parse {
     if( scope == null ) { // Assume any unknown ref is a forward-ref of a recursive function
       Node fref = gvn(FunPtrNode.forward_ref(_gvn,tok,this));
       // Place in nearest enclosing closure, NOT as a field in a struct.
-      _e.lookup_closure().stk().create(tok,fref,_gvn,TypeStruct.ffinal());
-      // Force visibility to propagate.
-      _gvn.iter();
+      _e.lookup_closure().stk().create(tok,fref,TypeStruct.ffinal(),_gvn);
       return fref;
     }
     Node def = scope.get(tok);    // Get top-level value; only sane if no stores allowed to modify it
@@ -599,26 +622,31 @@ public class Parse {
     if( def.op_prec() > 0 ) { _x = oldx; return null; }
     // Forward refs always directly assigned into scope
     if( def.is_forward_ref() ) return def;
-    // Else must load against most recent closure update
-    return gvn(new LoadNode(scope.ctrl(),scope.mem(),scope.ptr(),tok,null));
+    // Else must load against most recent closure update.
+    MemMergeNode mmem = mem_active(scope); // Active memory for the chosen scope
+    ObjMergeNode omem = mmem.active_obj(scope.stk()._alias,_gvn);
+    int idx = omem.fld_idx(tok=tok.intern());
+    return gvn(new LoadNode(scope.ctrl(),omem.in(idx),scope.ptr(),tok,null));
   }
 
   /** Parse a tuple; first stmt but not the ',' parsed.
    *  tuple= (stmts,[stmts,])     // Tuple; final comma is optional
    */
   private Node tuple(Node s) {
-    NewNode nn = init(new NewNode(false)).keep();
+    NewNode nn = new NewNode(false);
+    int fidx=0;
     while( s!=null ) {
-      nn.create(null,s,_gvn,TypeStruct.ffinal());
+      nn.create_active(""+fidx++,s,TypeStruct.ffinal(),_gvn);
       if( !peek(',') ) break;   // Final comma is optional
       s=stmts();
     }
     require(')');
     // NewNode updates merges the new allocation into all-of-memory and returns
     // a reference.
-    Node ptr = gvn(new  ProjNode(nn,1));
-    Node mem = gvn(new OProjNode(nn.unhook(),0));
-    set_mem(gvn(new MemMergeNode(mem(),mem)));
+    Node nnn = gvn(nn);
+    Node ptr = gvn(new  ProjNode(nnn,1));
+    Node mem = gvn(new OProjNode(nnn,0));
+    mem_active().create_alias_active(nn._alias,mem,_gvn);
     return ptr;
   }
 
@@ -651,7 +679,7 @@ public class Parse {
       bads.add(bad);
     }
     Node old_ctrl = ctrl();
-    Node old_mem  = mem ();
+    Node old_mem  = all_mem();
     FunNode fun = init(new FunNode(ts.asAry()).add_def(Env.ALL_CTRL)).keep();
     try( Env e = new Env(_e,true) ) {// Nest an environment for the local vars
       _e = e;                   // Push nested environment
@@ -667,20 +695,25 @@ public class Parse {
       Node mem = gvn(new ParmNode(-2,"mem",fun,con(TypeMem.MEM),null));
       // Function memory is a merge of incoming wide memory, and the local
       // closure implied by arguments.
-      assert mem() instanceof MemMergeNode && mem().in(1).in(0) == e._scope.stk();
-      _gvn.set_def_reg(mem(),0,mem);
-      // Parse function body
-      Node rez = stmts();       // Parse function body
-      if( rez == null ) rez = err_ctrl2("Missing function body");
-      require('}');             //
-      // Merge normal exit into all early-exit paths
-      if( e._scope.is_closure() ) rez = merge_exits(rez);
-      RetNode ret = (RetNode)gvn(new RetNode(ctrl(),mem(),rez,rpc.unhook(),fun.unhook()));
-      Node fptr = gvn(new FunPtrNode(ret));
-      _e = _e._par;             // Pop nested environment
-      set_ctrl(old_ctrl);       // Back to the pre-function-def control
-      set_mem (old_mem );
-      return fptr;              // Return function; close-out and DCE 'e'
+
+      // So just like a new tuple or struct, merge new alias into top-level mem,
+      // which in this case comes from ParmNode mem.
+      throw AA.unimpl();
+
+      //assert mem() instanceof MemMergeNode && mem().in(1).in(0) == e._scope.stk();
+      //_gvn.set_def_reg(mem(),0,mem);
+      //// Parse function body
+      //Node rez = stmts();       // Parse function body
+      //if( rez == null ) rez = err_ctrl2("Missing function body");
+      //require('}');             //
+      //// Merge normal exit into all early-exit paths
+      //if( e._scope.is_closure() ) rez = merge_exits(rez);
+      //RetNode ret = (RetNode)gvn(new RetNode(ctrl(),mem(),rez,rpc.unhook(),fun.unhook()));
+      //Node fptr = gvn(new FunPtrNode(ret));
+      //_e = _e._par;             // Pop nested environment
+      //set_ctrl(old_ctrl);       // Back to the pre-function-def control
+      //set_mem (old_mem );       // Back to the pre-function-def memory
+      //return fptr;              // Return function; close-out and DCE 'e'
     }
   }
 
@@ -695,7 +728,7 @@ public class Parse {
     set_ctrl(ctrl=init(ctrl.add_def(ctrl())));
     mem.set_def(0,ctrl,null);
     val.set_def(0,ctrl,null);
-    set_mem (gvn(mem.add_def(mem())));
+    set_mem (gvn(mem.add_def(all_mem())));
     return   gvn(val.add_def(rez.unhook())) ;
   }
 
@@ -711,64 +744,33 @@ public class Parse {
       s.set_def(5,val =new PhiNode(null,(Node)null),null);
     }
     ctrl.add_def(ctrl());
-    mem .add_def(mem ());
+    mem .add_def(all_mem());
     val .add_def(rez   );
     set_ctrl(con(Type.XCTRL  ));
     set_mem (con(TypeMem.XMEM));
     return   con(Type.NIL    ) ;
   }
 
-  /** Parse anonymous struct; the opening "@{" already parsed.  Next comes
-   *  statements, with each assigned value becoming a struct member.  A lexical
-   *  scope is made (non top-level assignments are removed at the end), then
-   *  the closing "}".
-   *  \@{ [id[:type]?[=stmt]?,]* }
+  /** Parse anonymous struct; the opening "@{" already parsed.  A lexical scope
+   *  is made and new variables are defined here.  Next comes statements, with
+   *  each assigned value becoming a struct member, then the closing "}".
+   *  \@{ stmts }
    */
   private Node struct() {
     Node ptr;
     try( Env e = new Env(_e,false) ) {// Nest an environment for the local vars
       _e = e;                   // Push nested environment
-      while( true ) {
-        String tok = token();    // Scan for 'id'
-        if( tok == null ) break; // end-of-struct-def
-        Type t = null;           // Untyped, most generic type that fits in a field
-        Node stmt = con(Type.NIL);
-        if( peek(":=") ) _x-=2;  // Distinguish ':=' from ':' type check
-        else if( peek(':') ) {   // Has type annotation?
-          if( (t=type())==null )
-            stmt = err_ctrl2("Missing type after ':'");
-        }
-        // Default mutability for a not-assigned field.
-        // Using either ":=" or "=" ignores the default and sets the mutability.
-        boolean is_mut = false, asgn=false; // Default is mutable, no assignment
-        if( peek(":=") )     { is_mut = true ; asgn = true; }
-        else if( peek('=') ) { is_mut = false; asgn = true; }
-        if( asgn ) {            // Parse field initial value
-          if( (stmt=stmt())==null )
-            stmt = err_ctrl2("Missing ifex after assignment of '"+tok+"'");
-        } // No assignment at all, take the default mutability
-
-        // Check for repeating a field name in current scope only
-        if( e._scope.exists(tok) ) {
-          kill(stmt);           // Kill assignment
-          stmt = err_ctrl2("Cannot define field '." + tok + "' twice"); // Error is now the result
-          update(tok,stmt,is_mut); // Update field
-        } else {
-          // Add type-check into graph
-          if( t != null )  stmt = typechk(stmt,t);
-          // Add field into lexical scope, field is usable after initial set
-          create(tok,stmt,ts_mutable(is_mut)); // Field now available 'bare' inside rest of scope
-        }
-        if( !peek(',') ) break; // Final comma is optional
-      }
+      stmts();                  // Create local vars-as-fields
       require('}');
       assert ctrl() != e._scope;
       e._par._scope.set_ctrl(ctrl(),_gvn); // Carry any control changes back to outer scope
-      e._par._scope.set_mem (mem (),_gvn); // Carry any memory  changes back to outer scope
-      _e = e._par;                         // Pop nested environment
-      ptr = e._scope.ptr().keep();         // A pointer to the constructed object
+      // Just all_mem again()?
+      throw AA.unimpl();
+      //e._par._scope.set_mem (mem (),_gvn); // Carry any memory  changes back to outer scope
+      //_e = e._par;                         // Pop nested environment
+      //ptr = e._scope.ptr().keep();         // A pointer to the constructed object
     } // Pop lexical scope around struct
-    return ptr.unhook();
+    //return ptr.unhook();
   }
 
   // Add a typecheck into the graph, with a shortcut if trivially ok.
@@ -839,11 +841,11 @@ public class Parse {
       if( c=='\\' ) throw AA.unimpl();
       if( _x == _buf.length ) return null;
     }
-    TypeStr ts = TypeStr.con(new String(_buf,oldx,_x-oldx-1));
+    TypeStr ts = TypeStr.con(new String(_buf,oldx,_x-oldx-1).intern());
     // Convert to ptr-to-constant-memory-string
     TypeMemPtr ptr = TypeMemPtr.make(ts._news,ts);
     // Store the constant string to memory
-    set_mem(gvn(new MemMergeNode(mem(),con(ts))));
+    ((MemMergeNode)Env.TOP._scope.mem()).create_alias(ts._news.getbit(),con(ts),_gvn);
     return ptr;
   }
 
@@ -1036,32 +1038,42 @@ public class Parse {
   private static boolean isAlpha1(byte c) { return isAlpha0(c) || ('0'<=c && c <= '9'); }
   private static boolean isOp0   (byte c) { return "!#$%*+,-.=<>@^[]~/&".indexOf(c) != -1; }
   private static boolean isOp1   (byte c) { return isOp0(c) || ":?".indexOf(c) != -1; }
-  private static boolean isDigit (byte c) { return '0' <= c && c <= '9'; }
+  public  static boolean isDigit (byte c) { return '0' <= c && c <= '9'; }
 
+  // Utilities to shorten code for common cases
   public Node gvn (Node n) { return n==null ? null : _gvn.xform(n); }
   private <N extends Node> N init( N n ) { return n==null ? null : _gvn.init(n); }
   private void kill( Node n ) { if( n._uses._len==0 ) _gvn.kill(n); }
   public Node ctrl() { return _e._scope.ctrl(); }
-  public Node mem () { return _e._scope.mem (); }
   // Set and return a new control
   private <N extends Node> N set_ctrl(N n) { return _e._scope.set_ctrl(n,_gvn); }
-  private void set_mem (Node n) { _e._scope.set_mem (n,_gvn); }
+  private Node set_mem(Node n) { return _e._scope.set_mem(n,_gvn); }
 
   private @NotNull ConNode con( Type t ) { return _gvn.con(t); }
 
+  // Lookup & extend scopes
   public  Node lookup( String tok ) { return _e.lookup(tok); }
   private ScopeNode lookup_scope( String tok ) { return _e.lookup_scope(tok); }
   public  ScopeNode scope( ) { return _e._scope; }
-  private void update( String tok, Node n, boolean mutable ) { _e._scope.stk().update(tok,-1,n,_gvn,ts_mutable(mutable)); _gvn.iter(); }
-  public  void create( String tok, Node n, byte    mutable ) { _e._scope.stk().create(tok,   n,_gvn,           mutable ); _gvn.iter(); }
+  private void create( String tok, Node n, byte mutable ) { _e._scope.stk().create(tok,n,mutable,_gvn ); }
   private static byte ts_mutable(boolean mutable) { return mutable ? TypeStruct.frw() : TypeStruct.ffinal(); }
 
-  // Update variable 'tok' in 'scope' to 'n' via a Store to the closure.
-  public void update(ScopeNode scope, String tok, Node n, byte mutable) {
-    set_mem(gvn(new StoreNode(ctrl(),mem(),scope.ptr(),n,mutable,tok,errMsg())));
+  // Close off active memory and return it.
+  private Node all_mem() { return _e._scope.all_mem(_gvn); }
+  // Expand default memory to support precise aliasing: an active MemMerge (not in GVN)
+  private MemMergeNode mem_active() { return mem_active(_e._scope); }
+  private MemMergeNode mem_active(ScopeNode scope) {
+    Node mem = _e._scope.mem();
+    if( _gvn.touched(mem) ) {
+      // If only used by the parser, just make it active.
+      if( mem instanceof MemMergeNode && mem._uses._len==1 && mem._keep == 0 ) _gvn.unreg(mem);
+      // Not active and has uses, so make a new active memory feeding from the old
+      else return scope.set_active_mem(new MemMergeNode(mem),_gvn);
+    }
+    return (MemMergeNode)mem;
   }
 
-
+  // Insert a call, with projections
   private Node do_call( CallNode call0 ) {
     Node call = gvn(call0.keep());
     Node callepi = gvn(new CallEpiNode(call.unhook())).keep();

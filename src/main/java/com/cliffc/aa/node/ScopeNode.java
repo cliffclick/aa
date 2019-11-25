@@ -3,6 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.type.TypeStruct;
 import com.cliffc.aa.util.Ary;
 
@@ -30,13 +31,35 @@ public class ScopeNode extends Node {
   // Add base types on startup
   public void init0() { Type.init0(_types); }
 
-  public   Node ctrl() { return in(0); }
-  public   Node mem () { return in(1); }
-  public   Node ptr () { return in(2); }
-  public NewNode stk() { return (NewNode)ptr().in(0); }
+  public   Node  ctrl() { return in(0); }
+  public   Node  ptr () { return in(2); }
+  public   Node  mem () { return in(1); }
+  public NewNode stk () { return (NewNode)ptr().in(0); }
   public <N extends Node> N set_ctrl( N n, GVNGCM gvn) { set_def(0,n,gvn); return n; }
-  public void set_mem ( Node n, GVNGCM gvn) { set_def(1,n,gvn); }
   public void set_ptr ( Node n, GVNGCM gvn) { set_def(2,n,gvn); }
+  // Set a new deactive GVNd memory, ready for nested Node.ideal() calls.
+  public Node set_mem( Node n, GVNGCM gvn) {
+    assert gvn.type(n) instanceof TypeMem;
+    assert gvn.touched(n);
+    set_def(1,n,gvn);
+    return n;
+  }
+  // Set a new active NOT-GVNd memory, ready for directly updating memory edges.
+  public MemMergeNode set_active_mem( MemMergeNode mmem, GVNGCM gvn) {
+    assert !gvn.touched(mmem);
+    set_def(1,mmem,gvn);
+    return mmem;
+  }
+  // Convert a possibly active memory to an inactive memory.
+  public Node all_mem( GVNGCM gvn ) {
+    Node mem = mem();
+    if( gvn.touched(mem) ) return mem; // Already not active
+    assert mem._uses._len==1;          // Only self usage
+    _defs.set(1,null);          // Remove this scope usage without deleting
+    mem._uses.del(this);
+    ((MemMergeNode)mem).deactive(gvn); // Nestedly, close off active objects
+    return set_mem(gvn.xform(mem),gvn);// Then xform like a new node
+  }
 
   public Node get(String name) { return stk().get(name); }
   public boolean exists(String name) { return get(name)!=null; }
@@ -79,12 +102,12 @@ public class ScopeNode extends Node {
   // Pop ifscope
   public void pop_if() { _ifs.pop(); }
 
-  public void def( String name, byte mutable, boolean create ) {
+  public void def_if( String name, byte mutable, boolean create ) {
     if( _ifs == null || _ifs._len==0 ) return; // Not inside an If
     _ifs.last().def(name,mutable,create);      // Var defined in arm of if
   }
 
-  public Node check_if( boolean arm, Parse bad, GVNGCM gvn, Node ctrl, Node ptr, Node mem ) { return _ifs.last().check(arm,bad,gvn,ctrl,ptr,mem); }
+  public Node check_if( boolean arm, Parse bad, GVNGCM gvn, Node ctrl, Node ptr, Node mem ) { return _ifs.last().check(this,arm,bad,gvn,ctrl,ptr,mem); }
 
   private static class IfScope {
     HashMap<String,Byte> _tvars, _fvars;
@@ -104,7 +127,7 @@ public class ScopeNode extends Node {
       }
     }
     // Check for balanced creation, and insert errors on unbalanced
-    Node check(boolean arm, Parse bad, GVNGCM gvn, Node ctrl, Node ptr, Node mem) {
+    Node check(ScopeNode scope, boolean arm, Parse bad, GVNGCM gvn, Node ctrl, Node ptr, Node mem) {
       if( _tvars == null ) return mem; // No new vars on either arm
       // Pull from both variable sets names that are common to both
       if( arm ) {               // Only do it first time
@@ -115,14 +138,18 @@ public class ScopeNode extends Node {
         }
       }
       // Everything in this set is a partially-created variable error
-      mem.unhook();
       HashMap<String,Byte> vars = arm ? _fvars : _tvars;
+      if( vars.isEmpty() ) return mem;
+      MemMergeNode mmem = new MemMergeNode(mem.unhook());
       for( String name : vars.keySet() ) {
         String msg = bad.errMsg("'"+name+"' not defined on "+arm+" arm of trinary");
         Node err = gvn.xform(new ErrNode(ptr,msg,Type.SCALAR));
-        mem = gvn.xform(new StoreNode(ctrl,mem,ptr,err,TypeStruct.ffinal(),name,bad));
+        // Exactly like a parser store of an error, on the missing side
+        ObjMergeNode omem = mmem.active_obj(scope.stk()._alias,gvn);
+        int idx = omem.fld_idx(name);
+        omem.set_def(idx,gvn.xform(new StoreNode(ctrl,omem.in(idx),scope.ptr(),err,TypeStruct.ffinal(),name,bad)),gvn);
       }
-      return mem.keep();
+      return gvn.xform(mmem.deactive(gvn)).keep();
     }
   }
 }

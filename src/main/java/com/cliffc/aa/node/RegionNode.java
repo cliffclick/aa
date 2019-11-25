@@ -37,6 +37,8 @@ public class RegionNode extends Node {
     if( in(1) == Env.ALL_CTRL ) return null; // Alive from unknown caller
     // If only 1 live path and no Phis then return 1 live path.
     for( Node phi : _uses ) if( phi instanceof PhiNode ) return null;
+    if( this instanceof FunNode && ((FunNode)this).noinline() )
+      return null;
     // Self-dead-cycle is dead in value() call
     return in(1)==this ? null : in(1);
   }

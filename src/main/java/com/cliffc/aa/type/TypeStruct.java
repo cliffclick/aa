@@ -139,6 +139,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   String str( VBitSet dups) {
     if( dups == null ) dups = new VBitSet();
     if( dups.tset(_uid) ) return "$"; // Break recursive printing cycle
+    if( find("!") != -1 && find("math_pi") != -1 )
+      return "{PRIMS}";
 
     SB sb = new SB();
     if( _uf!=null ) return "=>"+_uf;
@@ -163,6 +165,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     sb.p('_').p(_uid);
     if( dups == null ) dups = new VBitSet();
     if( dups.tset(_uid) ) return sb.p('$'); // Break recursive printing cycle
+    if( find("!") != -1 && find("math_pi") != -1 )
+      return sb.p("{PRIMS}");
 
     if( _uf!=null ) return _uf.dstr(sb.p("=>"),dups);
     _news.toString(sb);
@@ -248,7 +252,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
 
   // Extend the current struct with a new named field
   public TypeStruct add_fld( String name, Type t, byte mutable ) {
-    assert t.isa(SCALAR) && (name==null || fldBot(name) || find(name,-1)==-1);
+    assert t.isa(SCALAR) && (name==null || fldBot(name) || find(name)==-1);
 
     Type  []   ts = Arrays.copyOfRange(_ts    ,0,_ts    .length+1);
     String[] flds = Arrays.copyOfRange(_flds  ,0,_flds  .length+1);
@@ -942,6 +946,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   private static byte fdual( byte f ) { return f==funk() || f==fro() ? (byte)(3-f) : f; }
   // Shows as:  fld?=val, fld==val, fld:=val, fld=val
   private static String fstr( byte f ) { return new String[]{"?","=",":",""}[f]; }
+  public  static String fstring( byte f ) { return new String[]{"unknown","final","read-write","read-only"}[f]; }
 
   public static byte ftop()  { return funk(); }
   public static byte fbot()  { return fdual(ftop()); }
@@ -952,9 +957,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
 
   // Return the index of the matching field (or nth tuple), or -1 if not found
   // or field-num out-of-bounds.
-  public int find( String fld, int fld_num ) {
-    if( fld==null )
-      return fld_num < _ts.length ? fld_num : -1;
+  public int find( String fld ) {
     for( int i=0; i<_flds.length; i++ )
       if( fld.equals(_flds[i]) )
         return i;
@@ -964,11 +967,11 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public Type at( int idx ) { return _ts[idx]; }
 
   // Update (approximately) the current TypeObj.  Updates the named field.
-  @Override public TypeObj update(byte fin, String fld, int fld_num, Type val) { return update(fin,fld,fld_num,val,false); }
-  @Override public TypeObj st    (byte fin, String fld, int fld_num, Type val) { return update(fin,fld,fld_num,val,true ); }
-  private TypeObj update(byte fin, String fld, int fld_num, Type val, boolean precise) {
+  @Override public TypeObj update(byte fin, String fld, Type val) { return update(fin,fld,val,false); }
+  @Override public TypeObj st    (byte fin, String fld, Type val) { return update(fin,fld,val,true ); }
+  private TypeObj update(byte fin, String fld, Type val, boolean precise) {
     assert val.isa_scalar();
-    int idx = find(fld,fld_num);
+    int idx = find(fld);
     // No-such-field to update, so this is a program type-error.
     if( idx==-1 )
       return this==ALLSTRUCT.dual() ? this : ALLSTRUCT;
@@ -983,11 +986,11 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return malloc(_any,_flds,ts,finals,_news).hashcons_free();
   }
   // Allowed to update this field?
-  @Override public boolean can_update(String fld, int fld_num) {
-    int idx = find(fld,fld_num);
-    if( idx == -1 ) return false;
-    return _finals[idx] == frw() || _finals[idx] == funk();
+  @Override public boolean can_update(String fld) {
+    int idx = find(fld);
+    return idx != -1 && can_update(idx);
   }
+  public boolean can_update(int idx) { return _finals[idx] == frw() || _finals[idx] == funk(); }
   @Override BitsAlias aliases() { return _news; }
   @Override public TypeObj lift_final() {
     byte[] bs = new byte[_finals.length];
@@ -1013,7 +1016,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return eq ? this : make(_flds,ts);
   }
 
-  // Mark if part of a cycle
+ // Mark if part of a cycle
   @Override void mark_cycle( Type head, VBitSet visit, BitSet cycle ) {
     if( visit.tset(_uid) ) return;
     if( this==head ) { cycle.set(_uid); _cyclic=_dual._cyclic=true; }

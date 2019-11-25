@@ -174,7 +174,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   private static int  idx (long i) { return (int)(i>>6); }
   private static long mask(long i) { return 1L<<(i&63); }
 
-  int getbit() { assert _bits==null; return _con; }
+  public int getbit() { assert _bits==null; return _con; }
   public int abit() { return _bits==null ? _con : -1; }
   public boolean above_center() { return _con<0; }
   public boolean is_con() {
@@ -391,6 +391,13 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
 
     int parent( int kid ) { return _pars[kid]; }
     public boolean is_parent( int idx ) { return idx<_kids.length && _kids[idx]!=null &&_kids[idx][0]>1; }
+    // True if kid is a child or equal to parent
+    boolean is_parent( int par, int kid ) {
+      for( ; par <= kid; kid = parent(kid) )
+        if( par==kid ) return true;
+      return false;             // Kid will be a larger number
+    }
+
     @Override public String toString() { return toString(new SB(),1).toString(); }
     private SB toString(SB sb,int i) {
       sb.i().p(i).nl();

@@ -270,7 +270,7 @@ public class GVNGCM {
     }
   }
 
-  private void xform_old( Node old ) {
+  public void xform_old( Node old ) {
     Node nnn = xform_old0(old);
     if( nnn==null ) return;
     if( nnn == old ) {          // Progress, but not replacement
@@ -379,15 +379,19 @@ public class GVNGCM {
   // Besides the obvious GCP algorithm (and the type-precision that results
   // from the analysis), GCP does a few more things.
   //
-  // GCP builds an explicit Call-Graph.  Before GCP
-  // not all callers are known and this is approximated by being called by
-  // ALL_CTRL, a ConNode of Type CTRL, as a permanently available unknown
-  // caller.  If the whole program is available to us, the we can compute all
-  // callers conservatively and precisely - we may have extra never-taken
-  // caller/callee edges, but no missing caller/callee edges.  These edges are
-  // virtual going in (and represented by ALL_CTRL); we can remove the ALL_CTRL
-  // path and add in physical edges in the CallNode.value() call while whole-
-  // program GCP is active.
+  // GCP builds an explicit Call-Graph.  Before GCP not all callers are known
+  // and this is approximated by being called by ALL_CTRL, a ConNode of Type
+  // CTRL, as a permanently available unknown caller.  If the whole program is
+  // available to us then we can compute all callers conservatively and fairly
+  // precisely - we may have extra never-taken caller/callee edges, but no
+  // missing caller/callee edges.  These edges are virtual (represented by
+  // ALL_CTRL) before GCP.  Just before GCP we remove the ALL_CTRL path, and
+  // during GCP we add in physical CG edges as possible calls are discovered.
+  //
+  // GCP resolves all ambiguous (overloaded) calls, using the precise types
+  // first, and then inserting conversions using a greedy decision.  If this is
+  // not sufficient to resolve all calls, the program is ambiguous and wrong.
+  
   void gcp(ScopeNode rez ) {
     _opt_mode = 2;
     // Set all types to null (except primitives); null is the visit flag when
@@ -396,7 +400,7 @@ public class GVNGCM {
     Arrays.fill(_ts._es,_INIT0_CNT,_ts._len,null);
     // Set all types to all_type().dual(), their most optimistic type,
     // and prime the worklist.
-    walk_initype( Env.START);
+    walk_initype(Env.START);
 
     // Collect unresolved calls, and verify they get resolved.
     Ary<CallNode> ambi_calls = new Ary<>(new CallNode[1],0);

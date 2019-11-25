@@ -2,7 +2,6 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.type.BitsAlias;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
@@ -27,21 +26,22 @@ public abstract class Node implements Cloneable {
   static final byte OP_MEET   =11;
   static final byte OP_MERGE  =12;
   static final byte OP_NEW    =13;
-  static final byte OP_PARM   =14;
-  static final byte OP_PHI    =15;
-  static final byte OP_PRIM   =16;
-  static final byte OP_PROJ   =17;
-  static final byte OP_REGION =18;
-  static final byte OP_RET    =19;
-  static final byte OP_SCOPE  =20;
-  static final byte OP_START  =21;
-  static final byte OP_STORE  =22;
-  static final byte OP_TMP    =23;
-  static final byte OP_TYPE   =24;
-  static final byte OP_UNR    =25;
-  static final byte OP_MAX    =26;
+  static final byte OP_OBJ    =14;
+  static final byte OP_PARM   =15;
+  static final byte OP_PHI    =16;
+  static final byte OP_PRIM   =17;
+  static final byte OP_PROJ   =18;
+  static final byte OP_REGION =19;
+  static final byte OP_RET    =20;
+  static final byte OP_SCOPE  =21;
+  static final byte OP_START  =22;
+  static final byte OP_STORE  =23;
+  static final byte OP_TMP    =24;
+  static final byte OP_TYPE   =25;
+  static final byte OP_UNR    =26;
+  static final byte OP_MAX    =27;
 
-  private static final String[] STRS = new String[] { null, "Call", "CallEpi", "Cast", "Con", "Err", "Fun", "FunPtr", "If", "LibCall", "Load", "Meet", "Merge", "New", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Scope", "Start", "Store", "Tmp", "Type", "Unresolved" };
+  private static final String[] STRS = new String[] { null, "Call", "CallEpi", "Cast", "Con", "Err", "Fun", "FunPtr", "If", "LibCall", "Load", "Meet", "Merge", "New", "Obj", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Scope", "Start", "Store", "Tmp", "Type", "Unresolved" };
 
   public int _uid;  // Unique ID, will have gaps, used to give a dense numbering to nodes
   final byte _op;   // Opcode (besides the object class), used to avoid v-calls in some places
@@ -51,6 +51,7 @@ public abstract class Node implements Cloneable {
   public Ary<Node> _defs;
   // Add def/use edge
   public Node add_def(Node n) { _defs.add(n); if( n!=null ) n._uses.add(this); return this; }
+  public Node insert (int idx, Node n) { _defs.insert(idx,n); if( n!=null ) n._uses.add(this); return this; }
   public Node in( int i) { return _defs.at(i); }
   // Replace def/use edge
   public Node set_def( int idx, Node n, GVNGCM gvn ) {
@@ -73,9 +74,9 @@ public abstract class Node implements Cloneable {
   @SuppressWarnings("unchecked")
   public <N extends Node> N keep() { _keep++;  return (N)this; }
   @SuppressWarnings("unchecked")
-  public <N extends Node> N unhook() { _keep--;  return (N)this; }
+  public <N extends Node> N unhook() { assert _keep > 0; _keep--;  return (N)this; }
   public void unkeep(GVNGCM gvn) {
-    _keep--;
+    assert _keep > 0; _keep--;
     if( _keep==0 && _uses._len==0 ) gvn.kill(this);
     else gvn.add_work(this);
   }
@@ -88,6 +89,7 @@ public abstract class Node implements Cloneable {
     return n;
   }
   public Node pop( ) { return del(_defs._len-1); }
+  public void pop(GVNGCM gvn ) { unuse(_defs.pop(),gvn); }
   // Remove Node at idx, auto-delete and preserve order.
   public void remove(int idx, GVNGCM gvn) { unuse(_defs.remove(idx),gvn); }
 
@@ -244,11 +246,6 @@ public abstract class Node implements Cloneable {
   // Compute the current best Type for this Node, based on the types of its inputs.
   // May return the local "all_type()", especially if its inputs are in error.
   abstract public Type value(GVNGCM gvn);
-
-  // Split this node into a set returning 'bits' and the original which now
-  // excludes 'bits'.  Return null if already making a subset of 'bits'.
-  // Overridden in memory subclasses, most Nodes do not implement.
-  Node split_memory_use( GVNGCM gvn, BitsAlias bits ) { throw com.cliffc.aa.AA.unimpl(); }
 
   // Return any type error message, or null if no error
   public String err(GVNGCM gvn) { return null; }

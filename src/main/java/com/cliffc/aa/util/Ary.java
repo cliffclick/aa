@@ -12,7 +12,7 @@ public class Ary<E> implements Iterable<E> {
   public E[] _es;
   public int _len;
   public Ary(E[] es) { this(es,es.length); }
-  public Ary(E[] es, int len) { _es=es; _len=len; }
+  public Ary(E[] es, int len) { if( es.length==0 ) es=Arrays.copyOf(es,1); _es=es; _len=len; }
   @SuppressWarnings("unchecked")
   public Ary(Class<E> clazz) { this((E[]) Array.newInstance(clazz, 1),0); }
 
@@ -54,13 +54,24 @@ public class Ary<E> implements Iterable<E> {
 
   /** Add element in amortized constant time
    *  @param e Element to add at end of list
-   *  @return e for flow-coding */
-  public E push( E e ) {
+   **/
+  public void push( E e ) {
     if( _len >= _es.length ) _es = Arrays.copyOf(_es,Math.max(1,_es.length<<1));
     _es[_len++] = e;
-    return e;
   }
 
+  /** Slow, linear-time, element insert.  Preserves order.
+   *  @param i index to insert at, between 0 and _len inclusive.
+   *  @param e Element to insert
+   */
+  public void insert( int i, E e ) {
+    if( i < 0 || i>_len )
+      throw new ArrayIndexOutOfBoundsException(""+i+" >= "+_len);
+    if( _len >= _es.length ) _es = Arrays.copyOf(_es,Math.max(1,_es.length<<1));
+    System.arraycopy(_es,i,_es,i+1,(_len++)-i);
+    _es[i] = e;
+  }
+  
   /** Fast, constant-time, element removal.  Does not preserve order
    *  @param i element to be removed
    *  @return element removed */
@@ -113,7 +124,8 @@ public class Ary<E> implements Iterable<E> {
   
   public Ary<E> set_as( E e ) { _es[0] = e; _len=1; return this; }
   public Ary<E> set_len( int len ) {
-    if( len > _len ) throw new RuntimeException("unimpl");
+    if( len > _len )
+      while( len>= _es.length ) _es = Arrays.copyOf(_es,_es.length<<1);
     _len = len;
     while( _es.length > (len<<1) ) // Shrink if hugely too large
       _es = Arrays.copyOf(_es,_es.length>>1);

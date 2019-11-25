@@ -253,7 +253,8 @@ public class TypeMem extends Type<TypeMem> {
         objs.setX(alias, at(alias).lift_final());
     } else {
       for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) )
-        objs.setX(alias, at(alias).update(fin,fld,fld_num,val));
+        //objs.setX(alias, at(alias).update(fin,fld,fld_num,val));
+        throw com.cliffc.aa.AA.unimpl();
     }
     return make0(objs.asAry());
   }
@@ -269,17 +270,12 @@ public class TypeMem extends Type<TypeMem> {
       objs.setX(alias, (TypeObj)at(alias).meet(obj));
     return make0(objs.asAry());
   }
-
-  // Return is a Tuple of TypeMem's, all with unrelated aliases.  The slot0
-  // is the default and is same as this (except that the named _aliases
-  // are going to be overwritten).  All others are in alias order, but not
-  // matching alias#, and contain a TypeMem with just that alias.
-  public TypeTuple split(int[] aliases) {
-    TypeMem[] ts = new TypeMem[aliases.length+1];
-    ts[0] = this;
-    for( int i=0; i<aliases.length; i++ )
-      ts[i+1] = TypeMem.make(aliases[i],at(aliases[i]));
-    return TypeTuple.make0(false,ts);
+  // Exact alias update
+  public TypeMem st( int alias, TypeObj obj ) {
+    //assert !BitsAlias.TREE.is_parent(alias);
+    Ary<TypeObj> objs = new Ary<>(_aliases.clone(),_aliases.length);
+    objs.setX(alias,obj);
+    return make0(objs.asAry());
   }
 
   @Override public boolean above_center() { return this==XMEM; } // TODO: false?  Or really needs to be aliases[1]?  Or all aliases?

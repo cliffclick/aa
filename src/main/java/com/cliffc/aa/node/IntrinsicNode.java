@@ -70,7 +70,7 @@ public abstract class IntrinsicNode extends Node {
     Node mem = gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM     ),null));
     Node ptr = gvn.xform(new ParmNode( 0,"ptr",fun,gvn.con(from_ptr        ),null));
     Node cvt = gvn.xform(new ConvertPtrTypeName(to._name,from_ptr,to_ptr,badargs,mem,ptr));
-    Node mmem= gvn.xform(new MemMergeNode(mem,cvt));
+    Node mmem= gvn.xform(new MemMergeNode(mem,cvt,BitsAlias.REC));
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,cvt,rpc,fun));
     return (FunPtrNode)gvn.xform(new FunPtrNode(ret));
   }
@@ -153,7 +153,7 @@ public abstract class IntrinsicNode extends Node {
   // Default name constructor using expanded args list.  Just a NewNode but the
   // result is a named type.  Same as convertTypeName on an unaliased NewNode.
   public static FunPtrNode convertTypeNameStruct( TypeStruct from, TypeName to, GVNGCM gvn ) {
-    NewNode nnn = gvn.init(new NewNode(false));
+    NewNode nnn = new NewNode(false);
     TypeMemPtr tmp = TypeMemPtr.make(nnn._alias,to);
     TypeFunPtr tf = TypeFunPtr.make_new(TypeTuple.make(from._ts),tmp);
     FunNode fun = (FunNode) gvn.xform(new FunNode(to._name,tf).add_def(Env.ALL_CTRL));
@@ -164,12 +164,13 @@ public abstract class IntrinsicNode extends Node {
       String argx = from._flds[i];
       if( TypeStruct.fldBot(argx) ) argx = null;
       Node n = gvn.xform(new ParmNode(i,argx,fun, gvn.con(from._ts[i]),null));
-      nnn.create(argx,n,gvn,from._finals[i]);
+      nnn.create_active(argx,n,from._finals[i],gvn);
     }
     nnn.set_name(gvn,to);
+    gvn.init(nnn);
     Node ptr = gvn.xform(new  ProjNode(nnn,1));
     Node obj = gvn.xform(new OProjNode(nnn,0));
-    Node mmem= gvn.xform(new MemMergeNode(memp,obj));
+    Node mmem= gvn.xform(new MemMergeNode(memp,obj,nnn._alias));
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,ptr,rpc,fun));
     return (FunPtrNode)gvn.xform(new FunPtrNode(ret));
   }

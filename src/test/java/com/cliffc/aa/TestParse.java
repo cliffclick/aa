@@ -16,11 +16,10 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
     Object dummy = Env.GVN; // Force class loading cycle
-    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.TRUE );
 
     // A collection of tests which like to fail easily
     testerr ("Point=:@{x,y}; Point((0,1))", "*[$](nil,1) is not a *[$]@{x=,y=}",27);
-    test_ptr("x=@{n:=1,v:=2}; x.n := 3; x", "@{n:=3,v:=2}");
+    test_ptr("x=@{n:=1;v:=2}; x.n := 3; x", "@{n:=3,v:=2}");
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'",20);
     testerr("{+}(1,2,3)", "Passing 3 arguments to {+} which takes 2 arguments",10);
     test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
@@ -230,23 +229,23 @@ public class TestParse {
 
   @Test public void testParse04() {
     // simple anon struct tests
-    testerr("a=@{x=1.2,y}; x", "Unknown ref 'x'",15);
-    testerr("a=@{x=1,x=2}", "Cannot define field '.x' twice",11);
-    test   ("a=@{x=1.2,y,}; a.x", TypeFlt.con(1.2)); // standard "." field naming; trailing comma optional
-    testerr("(a=@{x,y}; a.)", "Missing field name after '.'",13);
-    testerr("a=@{x,y}; a.x=1; a","Cannot re-assign read-only field '.x'",15);
-    test   ("a=@{x=0,y=1}; b=@{x=2}  ; c=math_rand(1)?a:b; c.x", TypeInt.INT8); // either 0 or 2; structs can be partially merged
-    testerr("a=@{x=0,y=1}; b=@{x=2}; c=math_rand(1)?a:b; c.y",  "Unknown field '.y'",47);
+    testerr("a=@{x=1.2;y}; x", "Unknown ref 'x'",15);
+    testerr("a=@{x=1;x=2}.x", "Cannot re-assign final field '.x'",11);
+    test   ("a=@{x=1.2;y;}; a.x", TypeFlt.con(1.2)); // standard "." field naming; trailing comma optional
+    testerr("(a=@{x=0;y=0}; a.)", "Missing field name after '.'",17);
+    testerr("a=@{x=0;y=0}; a.x=1; a","Cannot re-assign final field '.x'",19);
+    test   ("a=@{x=0;y=1}; b=@{x=2}  ; c=math_rand(1)?a:b; c.x", TypeInt.INT8); // either 0 or 2; structs can be partially merged
+    testerr("a=@{x=0;y=1}; b=@{x=2}; c=math_rand(1)?a:b; c.y",  "Unknown field '.y'",47);
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'",20);
-    test   ("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1,y=2})", TypeInt.con(5));     // passed in to func
-    test   ("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1,y=2,z=3})", TypeInt.con(5)); // extra fields OK
-    test   ("dist={p:@{x,y} -> p.x*p.x+p.y*p.y}; dist(@{x=1,y=2})", TypeInt.con(5)); // Typed func arg
-    test   ("a=@{x=(b=1.2)*b,y=b}; a.y", TypeFlt.con(1.2 )); // ok to use temp defs
-    test   ("a=@{x=(b=1.2)*b,y=x}; a.y", TypeFlt.con(1.44)); // ok to use early fields in later defs
-    testerr("a=@{x=(b=1.2)*b,y=b}; b", "Unknown ref 'b'",23);
-    test   ("t=@{n=0,val=1.2}; u=math_rand(1) ? t : @{n=t,val=2.3}; u.val", TypeFlt.NFLT64); // structs merge field-by-field
+    test   ("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1;y=2})", TypeInt.con(5));     // passed in to func
+    test   ("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1;y=2;z=3})", TypeInt.con(5)); // extra fields OK
+    test   ("dist={p:@{x,y} -> p.x*p.x+p.y*p.y}; dist(@{x=1;y=2})", TypeInt.con(5)); // Typed func arg
+    test   ("a=@{x=(b=1.2)*b;y=b}; a.y", TypeFlt.con(1.2 )); // ok to use temp defs
+    test   ("a=@{x=(b=1.2)*b;y=x}; a.y", TypeFlt.con(1.44)); // ok to use early fields in later defs
+    testerr("a=@{x=(b=1.2)*b;y=b}; b", "Unknown ref 'b'",23);
+    test   ("t=@{n=0;val=1.2}; u=math_rand(1) ? t : @{n=t;val=2.3}; u.val", TypeFlt.NFLT64); // structs merge field-by-field
     // Comments in the middle of a struct decl
-    test   ("dist={p->p//qqq\n.//qqq\nx*p.x+p.y*p.y}; dist(//qqq\n@{x//qqq\n=1,y=2})", TypeInt.con(5));
+    test   ("dist={p->p//qqq\n.//qqq\nx*p.x+p.y*p.y}; dist(//qqq\n@{x//qqq\n=1;y=2})", TypeInt.con(5));
 
     // Tuple
     test_ptr("(0,\"abc\")", (alias -> TypeMemPtr.make(alias,TypeStruct.make_tuple(alias,Type.NIL,TypeMemPtr.ABCPTR))));

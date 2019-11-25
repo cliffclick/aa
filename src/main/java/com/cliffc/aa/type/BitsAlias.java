@@ -20,7 +20,7 @@ public class BitsAlias extends Bits<BitsAlias> {
 
   static final Bits.Tree<BitsAlias> TREE = new Bits.Tree<>();
   @Override public Tree<BitsAlias> tree() { return TREE; } 
-  public  static final int ALL, REC, ARY, I64, F64, STR;
+  public  static final int ALL, REC, ARY, I64, F64, STR, STR_STR;
           static final int ABC;
           static BitsAlias FULL, STRBITS, STRBITS0, ABCBITS, ABCBITS0;
           static BitsAlias RECBITS, NIL;
@@ -43,13 +43,16 @@ public class BitsAlias extends Bits<BitsAlias> {
     STRBITS = make0(STR = new_alias(ARY));
     STRBITS0 = STRBITS.meet_nil();
     // LibCall conversion string aliases
-    I64 = new_alias(STR);
-    F64 = new_alias(STR);
+    I64   = new_alias(STR);
+    F64   = new_alias(STR);
+    STR_STR=new_alias(STR);      // String concat
     // A sample test string
     ABCBITS = make0(ABC = new_alias(STR));
     ABCBITS0 = ABCBITS.meet_nil();
   }
   public static int new_alias(int par) { return TREE.split(par); }
+  // True if kid is a child or equal to parent
+  public static boolean is_parent( int par, int kid ) { return TREE.is_parent(par,kid); }
   // Fast reset of parser state between calls to Exec
   public static void init0() { TREE.init0(); }
   public static void reset_to_init0() { TREE.reset_to_init0();}

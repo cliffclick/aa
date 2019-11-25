@@ -25,10 +25,10 @@ import org.jetbrains.annotations.NotNull;
 public class NewNode extends Node {
   // Unique alias class, one class per unique memory allocation site.
   // Only effectively-final, because the copy/clone sets a new alias value.
-  int _alias;                   // Alias class
-  TypeStruct _ts;               // base Struct
-  boolean _is_closure;          // For error messages
-  private TypeName _name;       // If named, this is the name and _ts is the base
+  public int _alias;          // Alias class
+  TypeStruct _ts;             // base Struct
+  boolean _is_closure;        // For error messages
+  private TypeName _name;     // If named, this is the name and _ts is the base
 
   // NewNodes can participate in cycles, where the same structure is appended
   // to in a loop until the size grows without bound.  If we detect this we
@@ -49,11 +49,10 @@ public class NewNode extends Node {
   Node fld(int fld) { return in(def_idx(fld)); } // Node for field#
   private TypeObj xs() { return _name == null ? _ts : _name; }
 
-  public Node get(String name) { return fld(find(name,-1)); }
-  public boolean exists(String name) { return _ts.find(name,-1)!=-1; }
-  public boolean is_mutable(String name) { return _ts._finals[find(name,-1)] == TypeStruct.frw(); }
+  public Node get(String name) { return fld(_ts.find(name)); }
+  public boolean exists(String name) { return _ts.find(name)!=-1; }
+  public boolean is_mutable(String name) { return _ts._finals[_ts.find(name)] == TypeStruct.frw(); }
   public boolean is_final(int idx) { return _ts._finals[idx] == TypeStruct.ffinal(); }
-  public int find(String fld, int fld_num) { return _ts.find(fld,fld_num); }
 
   // Called when folding a Named Constructor into this allocation site
   void set_name( GVNGCM gvn, TypeName name ) {
@@ -71,47 +70,51 @@ public class NewNode extends Node {
     }
   }
 
-  // Create a field from parser
-  public void create( String name, Node val, GVNGCM gvn, byte mutable  ) {
-    assert def_idx(_ts._ts.length)== _defs._len;
-    assert _ts.find(name,-1) == -1;
-    Type oldt = gvn.type(this);
+  // Create a field from parser for an inactive this
+  public void create( String name, Node val, byte mutable, GVNGCM gvn  ) {
     gvn.unreg(this);
+    create_active(name,val,mutable,gvn);
+    for( Node use : _uses )
+      gvn.setype(use,use.value(gvn));
+    assert gvn.touched(this);
+  }
+
+  // Create a field from parser for an active this
+  public void create_active( String name, Node val, byte mutable, GVNGCM gvn  ) {
+    assert !gvn.touched(this);
+    assert def_idx(_ts._ts.length)== _defs._len;
+    assert _ts.find(name) == -1; // No dups
     _ts = _ts.add_fld(name,gvn.type(val),mutable);
     if( _name != null ) _name = _name.make(_ts); // Re-attach name as needed
     add_def(val);
-    gvn.rereg(this,oldt);
   }
-  // Update/modify a field
-  public Node update( String name, int idx, Node val, GVNGCM gvn, byte mutable  ) {
-    assert def_idx(_ts._ts.length)== _defs._len;
-    int idx2 = _ts.find(name,idx);
-    assert idx2 != -1;
+  // Update/modify a field, by field number
+  public Node update( int fidx , Node val, byte mutable, GVNGCM gvn  ) {
     Type oldt = gvn.type(this);
     gvn.unreg(this);
-    _ts = _ts.set_fld(idx2,gvn.type(val),mutable);
-    if( _name != null ) _name = _name.make(_ts); // Re-attach name as needed
-    set_def(def_idx(idx2),val,gvn);
+    update_active(fidx,val,mutable,gvn);
     gvn.rereg(this,oldt);
     return val;
   }
-  // Create or update as needed
-  public void make_fld( String name, Node val, GVNGCM gvn, byte mutable ) {
-    int idx = _ts.find(name,-1);
-    if( idx == -1 ) create(name,    val,gvn,mutable);
-    else            update(name,idx,val,gvn,mutable);
+  // Update/modify a field, by field number for an active this
+  private void update_active( int fidx , Node val, byte mutable, GVNGCM gvn  ) {
+    assert def_idx(_ts._ts.length)== _defs._len;
+    assert fidx != -1;
+    _ts = _ts.set_fld(fidx,gvn.type(val),mutable);
+    if( _name != null ) _name = _name.make(_ts); // Re-attach name as needed
+    set_def(def_idx(fidx),val,gvn);
   }
 
   // Add a named FunPtr to a New.  Auto-inflates to a Unresolved as needed.
   public FunPtrNode add_fun( Parse bad, String name, FunPtrNode ptr, GVNGCM gvn ) {
-    int idx = _ts.find(name,-1);
-    if( idx == -1 ) {
-      create(name,ptr,gvn,TypeStruct.ffinal());
+    int fidx = _ts.find(name);
+    if( fidx == -1 ) {
+      create_active(name,ptr,TypeStruct.ffinal(),gvn);
     } else {
-      Node n = _defs.at(def_idx(idx));
+      Node n = _defs.at(def_idx(fidx));
       if( n instanceof UnresolvedNode ) n.add_def(ptr);
-      else n=new UnresolvedNode(bad,n,ptr);
-      update(name,idx,n,gvn,TypeStruct.ffinal());
+      else n = new UnresolvedNode(bad,n,ptr);
+      update_active(fidx,n,TypeStruct.ffinal(),gvn);
     }
     return ptr;
   }
@@ -126,7 +129,7 @@ public class NewNode extends Node {
     for( int i=0; i<ts._ts.length; i++ ) {
       Node n = fld(i);
       if( n != null && n.is_forward_ref() ) {
-        parent.create(ts._flds[i],n,gvn,ts._finals[i]);
+        parent.create(ts._flds[i],n,ts._finals[i],gvn);
         gvn.remove_reg(this,def_idx(i));
         ts = ts.del_fld(i);
         i--;
