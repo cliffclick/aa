@@ -10,10 +10,10 @@ public class Env implements AutoCloseable {
     _par = par;
     ScopeNode scope = new ScopeNode(closure);
     if( par != null ) {
-      NewNode nnn = GVN.init(new NewNode(closure));
+      scope.set_ctrl(par._scope.ctrl(),GVN);
+      NewNode nnn = GVN.init(new NewNode(scope.ctrl(),closure));
       Node ptr = GVN.xform(new  ProjNode(nnn,1));
       Node frm = GVN.xform(new OProjNode(nnn,0));
-      scope.set_ctrl(par._scope.ctrl(),GVN);
       scope.set_ptr (ptr,GVN);  // Address for 'nnn', the local stack frame
       MemMergeNode mem = new MemMergeNode(par._scope.mem(),frm,nnn._alias);
       scope.set_active_mem(mem,GVN);  // Memory includes local stack frame
@@ -38,7 +38,7 @@ public class Env implements AutoCloseable {
     CTL_0        = GVN.init(new CProjNode(START,0));
     Node all_mem = GVN.init(new MProjNode(START,1));
     // Top-level closure defining all primitives
-    STK_0        =          new   NewNode(true).keep();
+    STK_0        =          new   NewNode(CTL_0,true).keep();
     PTR_0        = GVN.init(new  ProjNode(STK_0,1));
     Node prims   = GVN.init(new OProjNode(STK_0,0));
 

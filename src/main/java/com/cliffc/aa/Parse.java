@@ -633,7 +633,7 @@ public class Parse {
    *  tuple= (stmts,[stmts,])     // Tuple; final comma is optional
    */
   private Node tuple(Node s) {
-    NewNode nn = new NewNode(false);
+    NewNode nn = new NewNode(ctrl(),false);
     int fidx=0;
     while( s!=null ) {
       nn.create_active(""+fidx++,s,TypeStruct.ffinal(),_gvn);
@@ -683,6 +683,7 @@ public class Parse {
     FunNode fun = init(new FunNode(ts.asAry()).add_def(Env.ALL_CTRL)).keep();
     try( Env e = new Env(_e,true) ) {// Nest an environment for the local vars
       _e = e;                   // Push nested environment
+      _gvn.set_def_reg(e._scope.stk(),0,fun); // Closure creation control defaults to function entry
       set_ctrl(fun);            // New control is function head
       Parse errmsg = errMsg();  // Lazy error message
       int cnt=0;                // Add parameters to local environment
@@ -694,26 +695,23 @@ public class Parse {
       Node rpc = gvn(new ParmNode(-1,"rpc",fun,con(TypeRPC.ALL_CALL),null)).keep();
       Node mem = gvn(new ParmNode(-2,"mem",fun,con(TypeMem.MEM),null));
       // Function memory is a merge of incoming wide memory, and the local
-      // closure implied by arguments.
-
-      // So just like a new tuple or struct, merge new alias into top-level mem,
-      // which in this case comes from ParmNode mem.
-      throw AA.unimpl();
-
-      //assert mem() instanceof MemMergeNode && mem().in(1).in(0) == e._scope.stk();
-      //_gvn.set_def_reg(mem(),0,mem);
-      //// Parse function body
-      //Node rez = stmts();       // Parse function body
-      //if( rez == null ) rez = err_ctrl2("Missing function body");
-      //require('}');             //
-      //// Merge normal exit into all early-exit paths
-      //if( e._scope.is_closure() ) rez = merge_exits(rez);
-      //RetNode ret = (RetNode)gvn(new RetNode(ctrl(),mem(),rez,rpc.unhook(),fun.unhook()));
-      //Node fptr = gvn(new FunPtrNode(ret));
-      //_e = _e._par;             // Pop nested environment
-      //set_ctrl(old_ctrl);       // Back to the pre-function-def control
-      //set_mem (old_mem );       // Back to the pre-function-def memory
-      //return fptr;              // Return function; close-out and DCE 'e'
+      // closure implied by arguments.  Starts merging in parent scope, but
+      // this is incorrect - should start from the incoming function memory.
+      MemMergeNode amem = mem_active();
+      assert amem.in(1).in(0) == e._scope.stk();
+      amem.set_def(0,mem,_gvn);
+      // Parse function body
+      Node rez = stmts();       // Parse function body
+      if( rez == null ) rez = err_ctrl2("Missing function body");
+      require('}');             //
+      // Merge normal exit into all early-exit paths
+      if( e._scope.is_closure() ) rez = merge_exits(rez);
+      RetNode ret = (RetNode)gvn(new RetNode(ctrl(),all_mem(),rez,rpc.unhook(),fun.unhook()));
+      Node fptr = gvn(new FunPtrNode(ret));
+      _e = _e._par;             // Pop nested environment
+      set_ctrl(old_ctrl);       // Back to the pre-function-def control
+      set_mem (old_mem );       // Back to the pre-function-def memory
+      return fptr;              // Return function; close-out and DCE 'e'
     }
   }
 

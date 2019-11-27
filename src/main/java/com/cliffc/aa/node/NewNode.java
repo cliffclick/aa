@@ -35,8 +35,10 @@ public class NewNode extends Node {
   // need to approximate a new cyclic type.
   public final static int CUTOFF=2; // Depth of types before we start forcing approximations
 
-  public NewNode( boolean is_closure ) {
-    super(OP_NEW,(Node)null);   // no ctrl field
+  // NewNodes do not really need a ctrl; useful to bind the upward motion of
+  // closures so variable stores can more easily fold into them.
+  public NewNode( Node ctrl, boolean is_closure ) {
+    super(OP_NEW,ctrl);
     _alias = BitsAlias.new_alias(BitsAlias.REC);
     _ts = TypeStruct.make_alias(_alias); // No fields
     _name =null;

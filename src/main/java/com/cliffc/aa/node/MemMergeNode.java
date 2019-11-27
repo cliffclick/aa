@@ -5,6 +5,7 @@ import com.cliffc.aa.AA;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.AryInt;
 import com.cliffc.aa.util.SB;
+import org.jetbrains.annotations.NotNull;
 
 // Merge a lot of TypeObjs into a TypeMem.  Each input is from a different
 // alias.  Each collection represents the whole of memory, with missing parts
@@ -12,7 +13,7 @@ import com.cliffc.aa.util.SB;
 public class MemMergeNode extends Node {
   // Alias equivalence class matching each input.  No overlaps.
   // Phat memory always in slot 0.
-  private final AryInt _aliases;
+  private AryInt _aliases;
 
   public MemMergeNode( Node mem ) { super(OP_MERGE,mem);  _aliases = new AryInt(new int[]{BitsAlias.ALL}); }
   // A first alias
@@ -20,6 +21,7 @@ public class MemMergeNode extends Node {
     super(OP_MERGE,mem,obj);
     _aliases = new AryInt(new int[]{BitsAlias.ALL,alias});
   }
+  public void reset_to_init1() { _aliases.set_len(_defs._len); }
 
   @Override String str() {
     SB sb = new SB().p('[');
@@ -31,10 +33,19 @@ public class MemMergeNode extends Node {
 
   private Node mem() { return in(0); } // Phat/Wide mem
 
+  // Return the Node index that matches this alias, including parents of a
+  // split alias.
+  int afind( int alias ) {
+    for( int i=1; i<_aliases._len; i++ )
+      if( BitsAlias.is_parent(_aliases.at(i),alias) )
+        return i;
+    return -1;
+  }
+
   // Return an 'active' (not in GVN) object, for direct manipulation by the Parser.
   public ObjMergeNode active_obj(int alias, GVNGCM gvn) {
     assert !gvn.touched(this) && alias > 1;  // Only if this MemMerge is also active
-    int idx = _aliases.find(alias);
+    int idx = afind(alias);     // Find index of matching alias
     if( idx == -1 ) {           // Not split on this alias before
       idx = _defs._len;         // Just append; TODO: sort by alias
       add_def(null);            // No def yet
@@ -53,7 +64,7 @@ public class MemMergeNode extends Node {
   // Mid-iter call, will need to unreg/rereg
   public Node obj(int alias, GVNGCM gvn) {
     assert gvn.touched(this) && alias > 1; // Only if this MemMerge is not active
-    int idx = _aliases.find(alias);
+    int idx = afind(alias);     // Find index of matching alias
     if( idx == -1 ) {           // Not split on this alias before
       idx = _defs._len;         // Just append; TODO: sort by alias
       Type t = gvn.type(this);  gvn.unreg(this);
@@ -111,16 +122,19 @@ public class MemMergeNode extends Node {
 
   // Return the node for the alias, or the default if not overridden
   Node nfind( int alias ) {
-    int idx = _aliases.find(alias);
+    int idx = afind(alias);     // Find index of matching alias
     return in(idx==-1 ? 0 : idx);
   }
   int alias_at(int idx) { return _aliases.at(idx); }
 
   @Override public Node ideal(GVNGCM gvn) {
+    assert _defs._len==_aliases._len;
     // Dead & duplicate inputs can be removed.
     boolean progress = false;
     for( int i=1; i<_defs._len; i++ ) {
-      if( in(i)==in(0) || gvn.type(in(i))==TypeObj.XOBJ ) {
+      if( in(i)==in(0) || gvn.type(in(i))==TypeObj.XOBJ ||
+          // An ObjMerge, merging nothing and only existing to be a narrow slice
+          (in(i) instanceof ObjMergeNode && in(i)._defs._len==1 && in(i).in(0)==in(0) )) {
         remove(i,gvn);
         _aliases.remove(i);
         i--;
@@ -150,7 +164,7 @@ public class MemMergeNode extends Node {
         int alias = mem._aliases.at(i);
         // If alias is old, keep the original (it stomped over the incoming
         // memory).  If alias is new, use the new value.
-        if( _aliases.find(alias) == -1 )
+        if( afind(alias) == -1 )
           create_alias_active(alias,mem.in(i),gvn);
       }
       return set_def(0,mem.in(0),gvn); // Return improved self
@@ -183,6 +197,12 @@ public class MemMergeNode extends Node {
   NewNode exact( Node ptr ) {
     throw AA.unimpl();
     //return ptr.in(0)==obj().in(0) && ptr.in(0) instanceof NewNode ? (NewNode)ptr.in(0) : null;
+  }
+
+  @Override @NotNull public MemMergeNode copy( boolean copy_edges, GVNGCM gvn) {
+    MemMergeNode mmm = (MemMergeNode)super.copy(copy_edges, gvn);
+    mmm._aliases = new AryInt(_aliases._es.clone(),_aliases._len);
+    return mmm;
   }
 }
 

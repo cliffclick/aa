@@ -249,11 +249,11 @@ public class TestNode {
     test1monotonic(new IntrinsicNode.ConvertPtrTypeName("test",from_ptr,to_ptr,null,_ins[1],_ins[2]));
     test1monotonic(new   LoadNode(_ins[0],_ins[1],_ins[2],"x",null));
     test1monotonic(new MemMergeNode(_ins[1],_ins[2],BitsAlias.REC));
-    NewNode nnn1 = new NewNode(false);
+    NewNode nnn1 = new NewNode(_ins[0],false);
     nnn1.create("x",_ins[1],TypeStruct.ffinal(),_gvn);
     nnn1.create("y",_ins[2],TypeStruct.ffinal(),_gvn);
     test1monotonic(nnn1);
-    NewNode nnn2 = new NewNode(false);
+    NewNode nnn2 = new NewNode(_ins[0],false);
     nnn2.create("x",_ins[1],TypeStruct.ffinal(),_gvn);
     nnn2.create("y",_ins[2],TypeStruct.ffinal(),_gvn);
     nnn2.set_name(_gvn,TypeName.TEST_STRUCT);

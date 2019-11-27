@@ -1,12 +1,8 @@
 package com.cliffc.aa.util;
 
-import org.jetbrains.annotations.NotNull;
+import java.util.Arrays;
+import java.util.Collection;
 
-import java.lang.reflect.Array;
-import java.util.*;
-import java.util.function.Function;
-import java.util.function.Predicate;
-  
 // ArrayList with saner syntax
 public class AryInt {
   public int[] _es;
@@ -35,28 +31,20 @@ public class AryInt {
     range_check(0);
     return _es[_len-1];
   }
-  
+
   /** @return remove and return last element */
   public int pop( ) {
     range_check(0);
     return _es[--_len];
   }
-  
+
   /** Add element in amortized constant time
-   *  @param e intlement to add at end of list
+   *  @param e element to add at end of list
    *  @return 'this' for flow-coding */
-  public AryInt add( int e ) {
+  public AryInt push( int e ) {
     if( _len >= _es.length ) _es = Arrays.copyOf(_es,Math.max(1,_es.length<<1));
     _es[_len++] = e;
     return this;
-  }
-
-  /** Add element in amortized constant time
-   *  @param e intlement to add at end of list
-   **/
-  public void push( int e ) {
-    if( _len >= _es.length ) _es = Arrays.copyOf(_es,Math.max(1,_es.length<<1));
-    _es[_len++] = e;
   }
 
   /** Slow, linear-time, element insert.  Preserves order.
@@ -70,7 +58,7 @@ public class AryInt {
     System.arraycopy(_es,i,_es,i+1,(_len++)-i);
     _es[i] = e;
   }
-  
+
   /** Fast, constant-time, element removal.  Does not preserve order
    *  @param i element to be removed
    *  @return element removed */
@@ -82,7 +70,7 @@ public class AryInt {
   }
 
   /** Slow, linear-time, element removal.  Preserves order.
-   *  @param i element to be removed 
+   *  @param i element to be removed
    *  @return element removed */
   public int remove( int i ) {
     range_check(i);
@@ -90,7 +78,7 @@ public class AryInt {
     System.arraycopy(_es,i+1,_es,i,(--_len)-i);
     return e;
   }
-  
+
   /** Remove all elements */
   public void clear( ) { _len=0; }
 
@@ -100,12 +88,12 @@ public class AryInt {
     if( i >= _len ) _len = i+1;
     return (_es[i] = e);
   }
-  
+
   public int set( int i, int e ) {
     range_check(i);
     return (_es[i] = e);
   }
-  
+
   public AryInt set_as( int e ) { _es[0] = e; _len=1; return this; }
   public AryInt set_len( int len ) {
     if( len > _len )
@@ -115,10 +103,10 @@ public class AryInt {
       _es = Arrays.copyOf(_es,_es.length>>1);
     return this;
   }
-  
+
   /** @param c Collection to be added */
-  public AryInt addAll( Collection<? extends Integer> c ) { for( int e : c ) add(e); return this; }
-    
+  public AryInt addAll( Collection<? extends Integer> c ) { for( int e : c ) push(e); return this; }
+
   /** @param es Array to be added */
   public AryInt addAll( int[] es ) {
     if( es.length==0 ) return this;
@@ -127,7 +115,7 @@ public class AryInt {
     _len += es.length;
     return this;
   }
-    
+
   /** @return compact array version, using the internal base array where possible. */
   public int[] asAry() { return _len==_es.length ? _es : Arrays.copyOf(_es,_len); }
 

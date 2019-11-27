@@ -30,8 +30,6 @@ public class StoreNode extends Node {
     Node ctl = ctl();
     Node mem = mem();
     Node adr = adr();
-    // Top-level control can be ignored, as it gates nothing
-    if( ctl == Env.CTL_0 ) return set_def(0,null,gvn);
 
     // Stores bypass a Merge to the specific alias
     Type ta = gvn.type(adr);
@@ -41,7 +39,7 @@ public class StoreNode extends Node {
     // If Store is by a New, fold into the New.
     NewNode nnn;  int idx;
     if( mem instanceof OProjNode && mem.in(0) instanceof NewNode && (nnn=(NewNode)mem.in(0)) == adr.in(0) &&
-        ctl() == nnn.in(0) && !val().is_forward_ref() && (idx=nnn._ts.find(_fld))!= -1 && nnn._ts.can_update(idx) ) {
+        ctl == nnn.in(0) && !val().is_forward_ref() && (idx=nnn._ts.find(_fld))!= -1 && nnn._ts.can_update(idx) ) {
       // As part of the local xform rule, the memory & ptr outputs of the
       // NewNode need to update their types directly.  This Store pts at
       // the OProj, and when it folds it can set the NewNode mutable bit

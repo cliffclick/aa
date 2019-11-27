@@ -58,7 +58,6 @@ public class PhiNode extends Node {
         gvn.xform_old(in(i));
         if( in(i) instanceof MemMergeNode )
           has_mmem=true;
-        else throw AA.unimpl(); // Test that this happens
       }
     }
     if( !has_mmem ) return null;
@@ -81,11 +80,12 @@ public class PhiNode extends Node {
     for( int alias : phis.keySet() ) {
       PhiNode phi = phis.get(alias);
       for( int i=1; i<_defs._len; i++ ) {
+        // Take the matching narrow slice for the alias, except for alias ALL
+        // which can keep taking undistinguished memory.  The resulting memory
+        // is {ALL-aliases} but currently only represented as ALL.
         Node n = in(i) instanceof MemMergeNode
           ? ((MemMergeNode)in(i)).nfind(alias)
-          : gvn.xform(new ObjMergeNode(in(i),alias));
-        if( !(in(i) instanceof MemMergeNode) && !(n instanceof ObjMergeNode) )
-          throw AA.unimpl();
+          : (alias==BitsAlias.ALL ? in(i) : gvn.xform(new ObjMergeNode(in(i),alias)));
         phi.add_def(n);
       }
       Node obj = gvn.xform(phi);

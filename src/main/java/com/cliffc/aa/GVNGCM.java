@@ -86,6 +86,7 @@ public class GVNGCM {
         if( n._defs.at(i) != null && n._defs.at(i)._uid >= CNT )
           { assert n instanceof FunNode || n instanceof ParmNode; n._defs.del(i--); }
       assert !n.is_dead();
+      n.reset_to_init1();
       _vals.put(n,n);
     }
     for( Node n : _INIT0_NODES ) // Reset types

@@ -27,8 +27,6 @@ public class LoadNode extends Node {
     Node ctrl = ctl();
     Node mem  = mem();
     Node addr = adr();
-    // Top-most control gates nothing
-    if( ctrl== Env.CTL_0 ) return nil_ctl(gvn);
 
     // Load bypasses a MemMerge
     Type tadr = gvn.type(addr);
