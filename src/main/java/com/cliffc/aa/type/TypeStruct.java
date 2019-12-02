@@ -136,6 +136,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return null;
   }
 
+  private static boolean isDigit(char c) { return '0' <= c && c <= '9'; }
   String str( VBitSet dups) {
     if( dups == null ) dups = new VBitSet();
     if( dups.tset(_uid) ) return "$"; // Break recursive printing cycle
@@ -145,7 +146,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     SB sb = new SB();
     if( _uf!=null ) return "=>"+_uf;
     if( _any ) sb.p('~');
-    boolean is_tup = _flds.length==0 || fldTop(_flds[0]) || fldBot(_flds[0]);
+    boolean is_tup = _flds.length==0 || fldTop(_flds[0]) || fldBot(_flds[0]) || isDigit(_flds[0].charAt(0));
     if( !is_tup ) sb.p('@');    // Not a tuple
     sb.p(is_tup ? '(' : '{');
     for( int i=0; i<_flds.length; i++ ) {
@@ -171,7 +172,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     if( _uf!=null ) return _uf.dstr(sb.p("=>"),dups);
     _news.toString(sb);
     if( _any ) sb.p('~');
-    boolean is_tup = _flds.length==0 || fldTop(_flds[0]) || fldBot(_flds[0]);
+    boolean is_tup = _flds.length==0 || fldTop(_flds[0]) || fldBot(_flds[0]) || isDigit(_flds[0].charAt(0));
     if( !is_tup ) sb.p('@');    // Not a tuple
     sb.p(is_tup ? '(' : '{').nl().ii(1); // open struct, newline, increase_indent
     for( int i=0; i<_flds.length; i++ ) {

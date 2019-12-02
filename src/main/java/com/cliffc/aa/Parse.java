@@ -239,23 +239,27 @@ public class Parse {
     // Add a constructor function.  If this is a primitive, build a constructor
     // taking the primitive.
     Parse bad = errMsg();
+    Node rez, stk = _e._scope.stk();
+    _gvn.unreg(stk); // add_fun expects the closure is not in GVN
     if( !(t instanceof TypeObj) ) {
       PrimNode cvt = PrimNode.convertTypeName(t,tn,errMsg());
-      return _e.add_fun(bad,tvar,gvn(cvt.as_fun(_gvn))); // Return type-name constructor
+      rez = _e.add_fun(bad,tvar,gvn(cvt.as_fun(_gvn))); // Return type-name constructor
+    } else {
+      // If this is a TypeObj, build a constructor taking a pointer-to-TypeObj
+      // - and the associated memory state, i.e.  takes a ptr-to-@{x,y} and
+      // returns a ptr-to-Named:@{x,y}.  This stores a v-table ptr into an
+      // object.  The alias# does not change, but a TypeMem[alias#] would now
+      // map to the Named variant.
+      FunPtrNode epi1 = IntrinsicNode.convertTypeName((TypeObj)t,tn,errMsg(),_gvn);
+      rez = _e.add_fun(bad,tvar,epi1); // Return type-name constructor
+      // For Structs, add a second constructor taking an expanded arg list
+      if( t instanceof TypeStruct ) {   // Add struct types with expanded arg lists
+        FunPtrNode epi2 = IntrinsicNode.convertTypeNameStruct((TypeStruct)t,tn, _gvn);
+        Node rez2 = _e.add_fun(bad,tvar,epi2); // type-name constructor with expanded arg list
+        _gvn.init0(rez2._uses.at(0));      // Force init of Unresolved
+      }
     }
-    // If this is a TypeObj, build a constructor taking a pointer-to-TypeObj -
-    // and the associated memory state, i.e.  takes a ptr-to-@{x,y} and returns
-    // a ptr-to-Named:@{x,y}.  This stores a v-table ptr into an object.  The
-    // alias# does not change, but a TypeMem[alias#] would now map to the Named
-    // variant.
-    FunPtrNode epi1 = IntrinsicNode.convertTypeName((TypeObj)t,tn,errMsg(),_gvn);
-    Node rez = _e.add_fun(bad,tvar,epi1); // Return type-name constructor
-    // For Structs, add a second constructor taking an expanded arg list
-    if( t instanceof TypeStruct ) {   // Add struct types with expanded arg lists
-      FunPtrNode epi2 = IntrinsicNode.convertTypeNameStruct((TypeStruct)t,tn, _gvn);
-      Node rez2 = _e.add_fun(bad,tvar,epi2); // type-name constructor with expanded arg list
-      _gvn.init0(rez2._uses.at(0));      // Force init of Unresolved
-    }
+    _gvn.rereg(stk,stk.value(_gvn)); // Re-install closure in GVN
     // TODO: Add reverse cast-away
     return rez;
   }
