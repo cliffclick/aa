@@ -34,7 +34,8 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
     TypeObj t2 = (TypeObj)t1.hashcons();
     return t1==t2 ? t1 : t1.free(t2);
   }
-  public Type make( boolean any, BitsAlias news ) { return make_impl(any,news); }
+  public Type make( boolean any, BitsAlias news ) { return make0(any,news); }
+  public static Type make0( boolean any, BitsAlias news ) { return make_impl(any,news); }
   public static final TypeObj OBJ = make_impl(false,BitsAlias.NZERO);
   public static final TypeObj XOBJ = (TypeObj)OBJ.dual();
   static final TypeObj[] TYPES = new TypeObj[]{OBJ,XOBJ};

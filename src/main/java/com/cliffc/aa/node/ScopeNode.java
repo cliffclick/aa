@@ -39,8 +39,8 @@ public class ScopeNode extends Node {
   public void set_ptr ( Node n, GVNGCM gvn) { set_def(2,n,gvn); }
   // Set a new deactive GVNd memory, ready for nested Node.ideal() calls.
   public Node set_mem( Node n, GVNGCM gvn) {
-    assert gvn.type(n) instanceof TypeMem;
-    assert gvn.touched(n);
+    assert n==null || gvn.type(n) instanceof TypeMem;
+    assert n==null || gvn.touched(n);
     set_def(1,n,gvn);
     return n;
   }
@@ -146,7 +146,7 @@ public class ScopeNode extends Node {
         Node err = gvn.xform(new ErrNode(ptr,msg,Type.SCALAR));
         // Exactly like a parser store of an error, on the missing side
         ObjMergeNode omem = mmem.active_obj(scope.stk()._alias,gvn);
-        int idx = omem.fld_idx(name);
+        int idx = omem.fld_idx(name,gvn);
         omem.set_def(idx,gvn.xform(new StoreNode(ctrl,omem.in(idx),scope.ptr(),err,TypeStruct.ffinal(),name,bad)),gvn);
       }
       return gvn.xform(mmem.deactive(gvn)).keep();

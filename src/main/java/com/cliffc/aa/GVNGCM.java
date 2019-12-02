@@ -74,23 +74,25 @@ public class GVNGCM {
         if( n.in(i)!=null )     // Start breaking edges
           set_def_reg(n,i,null);
     }
-    CNT = _INIT0_CNT;
-    _live.clear();  _live.set(0,_INIT0_CNT);
-    _ts.set_len(_INIT0_CNT);
-    _vals.clear();
     for( Node n : _INIT0_NODES ) {
+      n.reset_to_init1(this);
       for( int i=0; i<n._uses._len; i++ )
         if( n._uses.at(i)._uid >= CNT )
           n._uses.del(i--);
       for( int i=0; i<n._defs._len; i++ )
         if( n._defs.at(i) != null && n._defs.at(i)._uid >= CNT )
-          { assert n instanceof FunNode || n instanceof ParmNode; n._defs.del(i--); }
+          n._defs.del(i--);
       assert !n.is_dead();
-      n.reset_to_init1();
-      _vals.put(n,n);
     }
-    for( Node n : _INIT0_NODES ) // Reset types
-      _ts.set(n._uid,n.value(this));
+    CNT = _INIT0_CNT;
+    _live.clear();  _live.set(0,_INIT0_CNT);
+    _ts.set_len(_INIT0_CNT);
+    _vals.clear();
+    for( Node n : _INIT0_NODES ) { // Reset types
+      _vals.put(n, n);
+      _ts.set(n._uid, n.value(this));
+    }
+    // Again, so derived types get something sane
     for( Node n : _INIT0_NODES ) // Reset types
       _ts.set(n._uid,n.value(this));
   }
@@ -283,7 +285,10 @@ public class GVNGCM {
       rereg(nnn,nnn.value(this));
     if( !old.is_dead() ) { // if old is being replaced, it got removed from GVN table and types table.
       assert !check_opt(old);
-      subsume(old,nnn);
+      replace(old,nnn);
+      nnn.keep();               // Keep-alive
+      kill0(old);               // Delete the old n, and anything it uses
+      nnn.unhook();             // Remove keep-alive
     }
   }
 
@@ -392,7 +397,7 @@ public class GVNGCM {
   // GCP resolves all ambiguous (overloaded) calls, using the precise types
   // first, and then inserting conversions using a greedy decision.  If this is
   // not sufficient to resolve all calls, the program is ambiguous and wrong.
-  
+
   void gcp(ScopeNode rez ) {
     _opt_mode = 2;
     // Set all types to null (except primitives); null is the visit flag when

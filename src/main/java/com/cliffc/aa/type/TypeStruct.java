@@ -220,9 +220,14 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public  static TypeStruct make(String[] flds, Type[] ts, byte[] finals) { return malloc(false,flds,ts,finals,BitsAlias.RECBITS).hashcons_free(); }
   public  static TypeStruct make(String[] flds, Type[] ts, byte[] finals, BitsAlias news) { return malloc(false,flds,ts,finals,news).hashcons_free(); }
   public  static TypeStruct make(String[] flds, Type[] ts, byte[] finals, int nnn) { return malloc(false,flds,ts,finals,BitsAlias.make0(nnn)).hashcons_free(); }
-  public  static TypeStruct make_tuple( int x ) { return make_tuple(ts(x)); }
+
+  private static final String[][] TFLDS={{},
+                                         {"0"},
+                                         {"0","1"},
+                                         {"0","1","2"}};
+          static String[] TFLDS( int len ) { return TFLDS[len]; }
   public  static TypeStruct make_tuple( Type[] ts ) { return make_tuple(BitsAlias.REC,ts); }
-  public  static TypeStruct make_tuple( int alias, Type... ts ) { return make(FLDS[ts.length],ts,finals(ts.length),alias); }
+  public  static TypeStruct make_tuple( int alias, Type... ts ) { return make(TFLDS[ts.length],ts,finals(ts.length),alias); }
   public  static TypeStruct make(String[] flds, byte[] finals) { return make(flds,ts(flds.length),finals); }
 
   // If has lattice-bottom field-mods (i.e. read-only), make a highest-possible
@@ -974,7 +979,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     int idx = find(fld);
     // No-such-field to update, so this is a program type-error.
     if( idx==-1 )
-      return this==ALLSTRUCT.dual() ? this : ALLSTRUCT;
+      return this;
     // Pointers & Memory to a Store can fall during GCP, and go from r/w to r/o
     // and the StoreNode output must remain monotonic.  This means store
     // updates are allowed to proceed even if in-error.

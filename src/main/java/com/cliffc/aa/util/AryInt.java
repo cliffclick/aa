@@ -2,6 +2,7 @@ package com.cliffc.aa.util;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.function.IntUnaryOperator;
 
 // ArrayList with saner syntax
 public class AryInt {
@@ -22,9 +23,9 @@ public class AryInt {
     return _es[i];
   }
   /** @param i element index
-   *  @return element being returned, or null if OOB */
+   *  @return element being returned, or 0 if OOB */
   public int atX( int i ) {
-    return i < _len ? _es[i] : null;
+    return i < _len ? _es[i] : 0;
   }
   /** @return last element */
   public int last( ) {
@@ -116,6 +117,8 @@ public class AryInt {
     return this;
   }
 
+  public AryInt map_update( IntUnaryOperator f ) { for( int i = 0; i<_len; i++ ) _es[i] = f.applyAsInt(_es[i]); return this; }
+  
   /** @return compact array version, using the internal base array where possible. */
   public int[] asAry() { return _len==_es.length ? _es : Arrays.copyOf(_es,_len); }
 
@@ -142,6 +145,27 @@ public class AryInt {
       throw new ArrayIndexOutOfBoundsException(""+i+" >= "+_len);
   }
 
+  // Binary search sorted _es.  Returns insertion point.
+  // Undefined results if _es is not sorted.
+  public int binary_search( int e ) {
+    int lo=0, hi=_len-1;
+    while( lo <= hi ) {
+      int mid = (hi + lo) >>> 1; // midpoint, rounded down
+      int mval = _es[mid];
+      if( e==mval ) {
+        // If dups, get to the first.
+        while( mid>0 && e==_es[mid-1] ) mid--;
+        return mid;
+      }
+      if( e >mval ) lo = mid+1;
+      else          hi = mid-1;
+    }
+    return lo;
+  }
+
+  // Note that the hashCode() and equals() are not invariant to changes in the
+  // underlying array.  If the hashCode() is used (e.g., inserting into a
+  // HashMap) and the then the array changes, the hashCode() will change also.
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof AryInt) ) return false;

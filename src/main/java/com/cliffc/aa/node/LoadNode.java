@@ -33,7 +33,8 @@ public class LoadNode extends Node {
     if( tadr instanceof TypeMemPtr && mem instanceof MemMergeNode ) {
       int alias = ((TypeMemPtr)tadr)._aliases.abit();
       if( alias == -1 ) throw AA.unimpl(); // Handle multiple aliases, handle all/empty
-      Node obj = ((MemMergeNode)mem).obj(alias,gvn);
+      // Find nearest alias parent
+      Node obj = ((MemMergeNode)mem).alias2node(alias);
       return set_mem(obj,gvn);
     }
 
@@ -43,23 +44,23 @@ public class LoadNode extends Node {
     if( nnn != null && nnn == mem.in(0) && (idx=nnn._ts.find(_fld)) != -1 )
       return nnn.fld(idx);      // Field value
 
-    //// Load from a memory Phi; split through in an effort to sharpen the memory.
-    //if( mem instanceof PhiNode && ctrl == null && nnn!=null ) {
-    //  // TODO: Only split thru function args if no unknown_callers, and must make a Parm not a Phi
-    //  if( !(mem instanceof ParmNode) ) {
-    //    Node lphi = new PhiNode(((PhiNode)mem)._badgc,mem.in(0));
-    //    for( int i=1; i<mem._defs._len; i++ )
-    //      lphi.add_def(gvn.xform(new LoadNode(null,mem.in(i),addr,_fld,_fld_num,_bad)));
-    //    return lphi;
-    //  }
-    //}
-    //
+    // Load from a memory Phi; split through in an effort to sharpen the memory.
+    if( mem instanceof PhiNode && ctrl == null && nnn!=null ) {
+      // TODO: Only split thru function args if no unknown_callers, and must make a Parm not a Phi
+      if( !(mem instanceof ParmNode) ) {
+        Node lphi = new PhiNode(((PhiNode)mem)._badgc,mem.in(0));
+        for( int i=1; i<mem._defs._len; i++ )
+          lphi.add_def(gvn.xform(new LoadNode(null,mem.in(i),addr,_fld,_bad)));
+        return lphi;
+      }
+    }
+
     //// Load of final field can bypass call
     //if( idx!=-1 && nnn != null && nnn.is_final(idx) && mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode )
     //  return set_mem(((CallNode)mem.in(0).in(0)).mem(),gvn);
 
     // Loads against an equal store; cannot NPE since the Store did not.
-    StoreNode st=null;
+    StoreNode st;
     if( mem instanceof StoreNode && addr == (st=((StoreNode)mem)).adr() ) {
       if( Util.eq(_fld,st._fld) && st.err(gvn)==null )
         return st.val();
@@ -134,7 +135,7 @@ public class LoadNode extends Node {
             // TODO: Need a type-flow in the graph for cycles...
             return Type.SCALAR; // Not provable not-nil, so fails
           }
-        }      
+        }
         return ts.at(idx); // Field type
       }
       // No such field

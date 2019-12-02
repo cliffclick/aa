@@ -167,6 +167,7 @@ public class Parse {
     Type tres = _gvn.type(res);
     TypeMem tmem = (TypeMem)_gvn.type(all_mem());
     kill(res);       // Kill Node for returned Type result
+    kill(all_mem());
     return new TypeEnv(tres,tmem,_e,errs0.isEmpty() ? null : errs0);
   }
 
@@ -329,7 +330,7 @@ public class Parse {
         MemMergeNode mmem = mem_active();
         // Active object state
         ObjMergeNode omem = mmem.active_obj(scope.stk()._alias,_gvn);
-        int idx = omem.fld_idx(tok);
+        int idx = omem.fld_idx(tok,_gvn);
         omem.set_def(idx,gvn(new StoreNode(ctrl(),omem.in(idx),scope.ptr(),ifex,mutable,tok,errMsg())),_gvn);
         scope.def_if(tok,mutable,false); // Note 1-side-of-if update
       }
@@ -474,7 +475,7 @@ public class Parse {
         Type t = _gvn.type(n);
         if( t instanceof TypeMemPtr && (alias=((TypeMemPtr)t)._aliases.abit()) != -1 ) {
           mem = omem = mem_active().active_obj(alias,_gvn);
-          idx = omem.fld_idx(fld=fld.intern());
+          idx = omem.fld_idx(fld=fld.intern(),_gvn);
         } else {            // Load/Store is from an unknown place
           all_mem();        // Close off current memory for the generic memory op
           mem = _e._scope;  // Load/Store will use all of memory
@@ -534,7 +535,7 @@ public class Parse {
     // Now properly load from the closure
     MemMergeNode mmem = mem_active(scope); // Active memory for the chosen scope
     ObjMergeNode omem = mmem.active_obj(scope.stk()._alias,_gvn);
-    int idx = omem.fld_idx(tok);
+    int idx = omem.fld_idx(tok,_gvn);
     n = gvn(new LoadNode(scope.ctrl(),omem.in(idx),scope.ptr(),tok,null));
     if( n.is_forward_ref() )         // Prior is actually a forward-ref
       return err_ctrl2(forward_ref_err(((FunPtrNode)n).fun()));
@@ -544,7 +545,7 @@ public class Parse {
 
     MemMergeNode mmem2 = mem_active(scope); // Active memory for the chosen scope
     ObjMergeNode omem2 = mmem2.active_obj(scope.stk()._alias,_gvn);
-    int idx2 = omem2.fld_idx(tok);
+    int idx2 = omem2.fld_idx(tok,_gvn);
     omem2.set_def(idx2,gvn(new StoreNode(ctrl(),omem2.in(idx2),scope.ptr(),sum,TypeStruct.frw(),tok,errMsg())),_gvn);
     return n.unhook();          // Return pre-increment value
   }
@@ -625,7 +626,7 @@ public class Parse {
     // Else must load against most recent closure update.
     MemMergeNode mmem = mem_active(scope); // Active memory for the chosen scope
     ObjMergeNode omem = mmem.active_obj(scope.stk()._alias,_gvn);
-    int idx = omem.fld_idx(tok=tok.intern());
+    int idx = omem.fld_idx(tok=tok.intern(),_gvn);
     return gvn(new LoadNode(scope.ctrl(),omem.in(idx),scope.ptr(),tok,null));
   }
 
@@ -679,7 +680,7 @@ public class Parse {
       bads.add(bad);
     }
     Node old_ctrl = ctrl();
-    Node old_mem  = all_mem();
+    Node old_mem  = all_mem().keep();
     FunNode fun = init(new FunNode(ts.asAry()).add_def(Env.ALL_CTRL)).keep();
     try( Env e = new Env(_e,true) ) {// Nest an environment for the local vars
       _e = e;                   // Push nested environment
@@ -710,7 +711,7 @@ public class Parse {
       Node fptr = gvn(new FunPtrNode(ret));
       _e = _e._par;             // Pop nested environment
       set_ctrl(old_ctrl);       // Back to the pre-function-def control
-      set_mem (old_mem );       // Back to the pre-function-def memory
+      set_mem (old_mem.unhook());// Back to the pre-function-def memory
       return fptr;              // Return function; close-out and DCE 'e'
     }
   }

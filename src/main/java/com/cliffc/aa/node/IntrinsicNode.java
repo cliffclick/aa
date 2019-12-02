@@ -93,7 +93,7 @@ public abstract class IntrinsicNode extends Node {
     @Override public Node ideal(GVNGCM gvn) {
       if( mem() instanceof MemMergeNode ) {
         MemMergeNode mem = (MemMergeNode)mem();
-        NewNode nnn = mem.exact(ptr());
+        NewNode nnn = exact(mem,ptr());
         if( mem._uses._len == 2 && // Use is 'this' and the MemMerge just after 'this'
             nnn != null ) {     // Un-aliased NewNode
           // NewNode is well-typed and producing a pointer to memory with the
@@ -107,6 +107,12 @@ public abstract class IntrinsicNode extends Node {
         }
       }
       return null;
+    }
+
+    // Return the exact NewNode, or null
+    NewNode exact( MemMergeNode mem, Node ptr ) {
+      throw com.cliffc.aa.AA.unimpl();
+      //  MemMergeNode:://return ptr.in(0)==obj().in(0) && ptr.in(0) instanceof NewNode ? (NewNode)ptr.in(0) : null;
     }
 
     // Semantics are to extract a TypeObj from mem and ptr, and if there is no

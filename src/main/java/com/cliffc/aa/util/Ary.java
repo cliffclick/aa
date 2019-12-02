@@ -265,6 +265,9 @@ public class Ary<E> implements Iterable<E> {
       throw new ArrayIndexOutOfBoundsException(""+i+" >= "+_len);
   }
 
+  // Note that the hashCode() and equals() are not invariant to changes in the
+  // underlying array.  If the hashCode() is used (e.g., inserting into a
+  // HashMap) and the then the array changes, the hashCode() will change also.
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof Ary) ) return false;

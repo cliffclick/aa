@@ -50,13 +50,14 @@ public class PhiNode extends Node {
   // of memory edges.
   private Node expand_memory(RegionNode r, GVNGCM gvn) {
     // Profit heuristic: all MemMerges are stable after xform and at least one
-    // exists.  This is an expanding xform, try not to expand dead nodes.
-    // Xform the inputs first, in case they just fold away.
+    // exists and the Phi is the sole user, so the input MemMerge will die
+    // after this xform.  This is an expanding xform: try not to expand dead
+    // nodes.  Xform the inputs first, in case they just fold away.
     boolean has_mmem=false;
     for( int i=1; i<_defs._len; i++ ) {
-      if( in(i) instanceof MemMergeNode ) {
+      if( in(i)._uses._len==1 && in(i) instanceof MemMergeNode ) {
         gvn.xform_old(in(i));
-        if( in(i) instanceof MemMergeNode )
+        if( in(i)._uses._len==1 && in(i) instanceof MemMergeNode )
           has_mmem=true;
       }
     }
@@ -84,8 +85,8 @@ public class PhiNode extends Node {
         // which can keep taking undistinguished memory.  The resulting memory
         // is {ALL-aliases} but currently only represented as ALL.
         Node n = in(i) instanceof MemMergeNode
-          ? ((MemMergeNode)in(i)).nfind(alias)
-          : (alias==BitsAlias.ALL ? in(i) : gvn.xform(new ObjMergeNode(in(i),alias)));
+          ? ((MemMergeNode)in(i)).alias2node(alias)
+          : (gvn.type(in(i)) instanceof TypeMem && alias != BitsAlias.ALL ? gvn.xform(new ObjMergeNode(in(i),alias)) : in(i));
         phi.add_def(n);
       }
       Node obj = gvn.xform(phi);

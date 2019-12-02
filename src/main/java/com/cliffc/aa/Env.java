@@ -26,6 +26,7 @@ public class Env implements AutoCloseable {
   public  final static CProjNode CTL_0; // Program start value control
           final static      Node MEM_0; // Program start value memory
   private final static      Node PTR_0; // Program start stack frame address
+  private final static      Node OBJ_0; // Program start stack frame memory
   public  final static   NewNode STK_0; // Program start stack frame (has primitives)
   public  final static   ConNode ALL_CTRL;
           final static int LAST_START_UID;
@@ -40,9 +41,9 @@ public class Env implements AutoCloseable {
     // Top-level closure defining all primitives
     STK_0        =          new   NewNode(CTL_0,true).keep();
     PTR_0        = GVN.init(new  ProjNode(STK_0,1));
-    Node prims   = GVN.init(new OProjNode(STK_0,0));
+    OBJ_0        =          new OProjNode(STK_0,0) ;
 
-    MEM_0 = GVN.init(new MemMergeNode(all_mem,prims,STK_0._alias));
+    MEM_0 = GVN.init(new MemMergeNode(all_mem,OBJ_0,STK_0._alias));
     // Top-level default values; ALL_CTRL is used by declared functions to
     // indicate that future not-yet-parsed code may call the function.
     ALL_CTRL = GVN.init(new ConNode<>(Type.CTRL));
@@ -69,6 +70,7 @@ public class Env implements AutoCloseable {
     _scope.set_mem (MEM_0, GVN);
     _scope.set_ptr (PTR_0, GVN);
     GVN.rereg(STK_0,STK_0.value(GVN));
+    GVN.rereg(OBJ_0,OBJ_0.value(GVN));
     // Run the worklist dry
     GVN.iter();
     BitsAlias.init0(); // Done with adding primitives
@@ -110,8 +112,6 @@ public class Env implements AutoCloseable {
   }
 
   private void top_scope_close() {
-    while( MEM_0._defs._len > 2 )
-      MEM_0.pop(GVN);           // Remove memory constants down to the primitives
     BitsAlias.reset_to_init0(); // Done with adding primitives
     BitsFun  .reset_to_init0(); // Done with adding primitives
     BitsRPC  .reset_to_init0(); // Done with adding primitives

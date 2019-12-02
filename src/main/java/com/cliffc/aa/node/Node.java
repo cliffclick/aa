@@ -235,7 +235,7 @@ public abstract class Node implements Cloneable {
   }
 
   // Cleanup, so can re-run in the same test harness iteration
-  public void reset_to_init1() { }
+  public void reset_to_init1(GVNGCM gvn) { }
   
   // Graph rewriting.  Can change defs, including making new nodes - but if it
   // does so, all new nodes will first call gvn.xform().  If gvn._opt if false,

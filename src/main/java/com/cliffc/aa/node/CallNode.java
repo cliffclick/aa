@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.AA;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
@@ -53,7 +54,7 @@ import java.util.BitSet;
 
 public class CallNode extends Node {
   int _rpc;                 // Call-site return PC
-  private boolean _unpacked;// Call site allows unpacking a tuple (once)
+  boolean _unpacked;        // Call site allows unpacking a tuple (once)
   Parse  _badargs;          // Error for e.g. wrong arg counts or incompatible args
   public CallNode( boolean unpacked, Parse badargs, Node... defs ) {
     super(OP_CALL,defs);
@@ -75,6 +76,7 @@ public class CallNode extends Node {
   public  Node fun() { return in(1); }
           Node mem() { return in(2); }
   //private void set_ctl    (Node ctl, GVNGCM gvn) {     set_def    (0,ctl,gvn); }
+  private Node set_mem    (Node mem, GVNGCM gvn) { return set_def(2,mem,gvn); }
   private Node set_fun    (Node fun, GVNGCM gvn) { return set_def(1,fun,gvn); }
   public  void set_fun_reg(Node fun, GVNGCM gvn) { gvn.set_def_reg(this,1,fun); }
   public BitsFun fidxs(GVNGCM gvn) {
@@ -115,11 +117,13 @@ public class CallNode extends Node {
     if( !_unpacked ) { // Not yet unpacked a tuple
       assert nargs()==1;
       Type tadr = gvn.type(arg(0));
-      if( mem instanceof MemMergeNode && tadr instanceof TypeMemPtr &&
-          arg(0) instanceof ProjNode && arg(0).in(0) instanceof NewNode ) {
-        NewNode nnn = (NewNode)arg(0).in(0);
-        Node obj = ((MemMergeNode)mem).obj((TypeMemPtr)tadr,gvn);
-        if( obj instanceof OProjNode && obj.in(0)==nnn ) {
+      // Bypass a merge on the 1-arg input during unpacking
+      if( tadr instanceof TypeMemPtr && mem instanceof MemMergeNode ) {
+        int alias = ((TypeMemPtr)tadr)._aliases.abit();
+        if( alias == -1 ) throw AA.unimpl(); // Handle multiple aliases, handle all/empty
+        Node obj = ((MemMergeNode)mem).alias2node(alias);
+        if( obj instanceof OProjNode && arg(0) instanceof ProjNode && arg(0).in(0) instanceof NewNode ) {
+          NewNode nnn = (NewNode)arg(0).in(0);
           remove(_defs._len-1,gvn); // Pop off the NewNode tuple
           int len = nnn._defs._len;
           for( int i=1; i<len; i++ ) // Push the args; unpacks the tuple

@@ -33,9 +33,21 @@ public class StoreNode extends Node {
 
     // Stores bypass a Merge to the specific alias
     Type ta = gvn.type(adr);
-    if( mem instanceof MemMergeNode && ta instanceof TypeMemPtr )
+    if( ta instanceof TypeMemPtr && mem instanceof MemMergeNode )
       return new StoreNode(this,((MemMergeNode)mem).obj((TypeMemPtr)ta,gvn),adr);
 
+    // Stores bypass a ObjMerge to the specific alias
+    if( ta instanceof TypeMemPtr && mem instanceof ObjMergeNode ) {
+      gvn.unreg(mem);        // Stretch the incoming ObjMerge for the new field
+      int idx = ((ObjMergeNode)mem).fld_idx(_fld,gvn);
+      // Store on the other side of ObjMerge
+      Node st = gvn.xform(new StoreNode(this,mem.in(idx),adr));
+      // Update and return ObjMerge
+      mem.set_def(idx,st,gvn);
+      gvn.rereg(mem,mem.value(gvn));
+      return mem;
+    }
+    
     // If Store is by a New, fold into the New.
     NewNode nnn;  int idx;
     if( mem instanceof OProjNode && mem.in(0) instanceof NewNode && (nnn=(NewNode)mem.in(0)) == adr.in(0) &&
@@ -62,6 +74,7 @@ public class StoreNode extends Node {
     if( TypeMemPtr.OOP0.isa(adr) ) return TypeObj.OBJ; // Very low, might be any address
     if( !(adr instanceof TypeMemPtr) )
       return adr.above_center() ? TypeObj.XOBJ : TypeObj.OBJ;
+    TypeMemPtr tmp = (TypeMemPtr)adr;
 
     Type val = gvn.type(val());     // Value
     if( !val.isa_scalar() )         // Nothing sane
@@ -71,12 +84,12 @@ public class StoreNode extends Node {
     Type tmem = gvn.type(mem());     // Memory
     // Not updating a struct?
     if( !(tmem instanceof TypeStruct) )
-      return tmem.above_center() ? TypeObj.XOBJ : TypeObj.OBJ;
+      return TypeObj.make0(tmem.above_center(),tmp._aliases);
     // Missing the field to update, or storing to a final?
     TypeStruct ts = (TypeStruct)tmem;
     int idx = ts.find(_fld);
     if( idx == -1 || (ts._finals[idx]==TypeStruct.ffinal() || ts._finals[idx]==TypeStruct.fro()) )
-      return tmem.above_center() ? TypeObj.XOBJ : TypeObj.OBJ;
+      return TypeObj.make0(tmem.above_center(),tmp._aliases);
     // Updates to a NewNode are precise, otherwise aliased updates
     if( mem().in(0) == adr().in(0) && mem().in(0) instanceof NewNode )
       // No aliasing, even if the NewNode is called repeatedly
