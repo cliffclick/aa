@@ -469,7 +469,8 @@ public class Parse {
         String fld = token();   // Field name
         if( fld == null ) {     // Not a token, check for a field number
           int fldnum = field_number();
-          if( fldnum != -1 ) fld = ""+fldnum; // Convert to a field name
+          if( fldnum == -1 ) return err_ctrl2("Missing field name after '.'");
+          fld = ""+fldnum;      // Convert to a field name
         }
 
         // If we have a precise alias, we can read/write "mem_active" directly.
@@ -486,8 +487,7 @@ public class Parse {
           idx = 1;          // And use the scope index for all of memory
         }
         // Store or load against the chosen memory
-        if( fld == null ) n = err_ctrl2("Missing field name after '.'");
-        else if( peek(":=") || peek_not('=','=')) {
+        if( peek(":=") || peek_not('=','=')) {
           byte fin = _buf[_x-2]==':' ? TypeStruct.frw() : TypeStruct.ffinal();
           Node stmt = stmt();
           if( stmt == null ) n = err_ctrl2("Missing stmt after assigning field '."+fld+"'");
@@ -761,19 +761,18 @@ public class Parse {
    */
   private Node struct() {
     Node ptr;
+    all_mem();
     try( Env e = new Env(_e,false) ) {// Nest an environment for the local vars
       _e = e;                   // Push nested environment
       stmts();                  // Create local vars-as-fields
       require('}');
       assert ctrl() != e._scope;
       e._par._scope.set_ctrl(ctrl(),_gvn); // Carry any control changes back to outer scope
-      // Just all_mem again()?
-      throw AA.unimpl();
-      //e._par._scope.set_mem (mem (),_gvn); // Carry any memory  changes back to outer scope
-      //_e = e._par;                         // Pop nested environment
-      //ptr = e._scope.ptr().keep();         // A pointer to the constructed object
+      e._par._scope.set_mem(all_mem(),_gvn); // Carry any memory changes back to outer scope
+      _e = e._par;                         // Pop nested environment
+      ptr = e._scope.ptr().keep();         // A pointer to the constructed object
     } // Pop lexical scope around struct
-    //return ptr.unhook();
+    return ptr.unhook();
   }
 
   // Add a typecheck into the graph, with a shortcut if trivially ok.
