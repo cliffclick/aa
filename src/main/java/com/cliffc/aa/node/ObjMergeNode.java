@@ -1,6 +1,5 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.AA;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
@@ -33,16 +32,15 @@ public class ObjMergeNode extends Node {
   // Return the index for a field.
   public int fld_idx(String tok, GVNGCM gvn) {
     // Search for the field by name, or if it is a number, use that number.
-    if( Parse.isDigit((byte)tok.charAt(0)) ) {
-      int idx = tok.charAt(0)-'0'+1;
-      if( idx >= _defs._len )
-        throw AA.unimpl();      // tuples need to extend to support the field number
-    }
-    // Search by name
     int idx;
-    for( idx=1; idx<_flds._len; idx++ )
-      if( Util.eq(tok,_flds.at(idx)) )
-        break;
+    if( Parse.isDigit((byte)tok.charAt(0)) ) {
+      idx = tok.charAt(0)-'0'+1;
+    } else {
+      // Search by name
+      for( idx=1; idx<_flds._len; idx++ )
+        if( Util.eq(tok,_flds.at(idx)) )
+          break;
+    }
     if( idx <_flds._len ) return idx;
     // Field does not exist, just append it.
     assert !gvn.touched(this);  // Not in GVN / HashMap

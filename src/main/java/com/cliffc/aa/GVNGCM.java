@@ -77,10 +77,10 @@ public class GVNGCM {
     for( Node n : _INIT0_NODES ) {
       n.reset_to_init1(this);
       for( int i=0; i<n._uses._len; i++ )
-        if( n._uses.at(i)._uid >= CNT )
+        if( n._uses.at(i)._uid >= _INIT0_CNT )
           n._uses.del(i--);
       for( int i=0; i<n._defs._len; i++ )
-        if( n._defs.at(i) != null && n._defs.at(i)._uid >= CNT )
+        if( n._defs.at(i) != null && n._defs.at(i)._uid >= _INIT0_CNT )
           n._defs.del(i--);
       assert !n.is_dead();
     }

@@ -36,7 +36,7 @@ import java.util.BitSet;
  *  fact = (stmts)                 // General statements parsed recursively
  *  fact = tuple                   // Tuple builder
  *  fact = func                    // Anonymous function declaration
- *  fact = @{ [id[:type][=stmt],]* } // Anonymous struct declaration; optional type, optional initial value, optional final comma
+ *  fact = @{ stmts }              // Anonymous struct declaration, assignments define fields
  *  fact = {binop}                 // Special syntactic form of binop; no spaces allowed; returns function constant
  *  fact = {uniop}                 // Special syntactic form of uniop; no spaces allowed; returns function constant
  *  tuple= (stmts,[stmts,])        // Tuple; final comma is optional, first comma is required
@@ -109,8 +109,10 @@ public class Parse {
     for( Node use : _e._scope.stk()._uses )
       _gvn.add_work(use);        // No more fields added; trailing DProj needs to sharpen
     _e._scope.set_ptr(null,_gvn); // delete top-level names
-    //_e._scope.set_mem(null,_gvn); // delete top-level memory
     _gvn.iter();   // Pessimistic optimizations; might improve error situation
+    // Attempt to remove memory state from top-level Scope, cannot use the
+    // normal gvn.iter() because Scope is _keep==1.
+    if( _e._scope.ideal(_gvn) != null ) _gvn.iter();
     remove_unknown_callers();
     _gvn.gcp(_e._scope); // Global Constant Propagation
     _gvn.iter();   // Re-check all ideal calls now that types have been maximally lifted
@@ -138,7 +140,7 @@ public class Parse {
 
   private TypeEnv gather_errors() {
     Node res = _e._scope.pop(); // New and improved result
-
+    Node mem = _e._scope.mem();
     // Hunt for typing errors in the alive code
     assert _e._par._par==null; // Top-level only
     VBitSet bs = new VBitSet();
@@ -151,8 +153,7 @@ public class Parse {
     Ary<String> errs3 = new Ary<>(new String[1],0);
     res   .walkerr_def(errs0,errs1,errs2,errs3,bs,_gvn);
     ctrl().walkerr_def(errs0,errs1,errs2,errs3,bs,_gvn);
-    // Do not walk memory for errors, as it is not part of the return state
-    //mem() .walkerr_def(errs0,errs1,errs2,errs3,bs,_gvn);
+    if( mem != null ) mem.walkerr_def(errs0,errs1,errs2,errs3,bs,_gvn);
     if( errs0.isEmpty() ) errs0.addAll(errs1);
     if( errs0.isEmpty() ) errs0.addAll(errs2);
     if( errs0.isEmpty() ) _e._scope.walkerr_use(errs0,new BitSet(),_gvn);
@@ -165,10 +166,9 @@ public class Parse {
     // errors... i.e., you get the errors in execution order.
 
     Type tres = _gvn.type(res);
-    TypeMem tmem = (TypeMem)_gvn.type(all_mem());
     kill(res);       // Kill Node for returned Type result
-    kill(all_mem());
-    return new TypeEnv(tres,tmem,_e,errs0.isEmpty() ? null : errs0);
+    TypeObj tobj = tres instanceof TypeMemPtr ? ((TypeMemPtr)tres)._obj : TypeObj.XOBJ;
+    return new TypeEnv(tres,tobj,_e,errs0.isEmpty() ? null : errs0);
   }
 
   /** Parse a top-level:
@@ -178,8 +178,8 @@ public class Parse {
     Node res = stmts();
     if( res == null ) res = con(Type.ANY);
     res = merge_exits(res);
-    _e._scope.add_def(res);       // Hook result
     all_mem();                    // Close off top-level active memory
+    _e._scope.add_def(res);       // Hook result
   }
 
   /** Parse a list of statements; final semi-colon is optional.
@@ -472,15 +472,16 @@ public class Parse {
           if( fldnum == -1 ) return err_ctrl2("Missing field name after '.'");
           fld = ""+fldnum;      // Convert to a field name
         }
+        fld=fld.intern();
 
         // If we have a precise alias, we can read/write "mem_active" directly.
         // If not, we need to use the imprecise all_mem.  This is basically a
         // parser speed hack, since the all_mem always works.
         Node mem; ObjMergeNode omem; int alias, idx;
         Type t = _gvn.type(n);
-        if( t instanceof TypeMemPtr && (alias=((TypeMemPtr)t)._aliases.abit()) != -1 ) {
+        if( t instanceof TypeMemPtr && (alias=((TypeMemPtr)t)._aliases.abit()) != -1 && !BitsAlias.is_parent(alias)  ) {
           mem = omem = mem_active().active_obj(alias,_gvn);
-          idx = omem.fld_idx(fld=fld.intern(),_gvn);
+          idx = omem.fld_idx(fld,_gvn);
         } else {            // Load/Store is from an unknown place
           all_mem();        // Close off current memory for the generic memory op
           mem = _e._scope;  // Load/Store will use all of memory
@@ -856,7 +857,7 @@ public class Parse {
    *  tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str[?]
    *  tfun = {[[type]* ->]? type } // Function types mirror func decls
    *  tmod = = | := | ==  // '=' is r/only, ':=' is r/w, '==' is final
-   *  tstruct = @{ [id [tmod [type?]],]*}  // Struct types are field names with optional types.  Spaces not allowed
+   *  tstruct = @{ [id [tmod [type?]];]*}  // Struct types are field names with optional types.  Spaces not allowed
    *  ttuple = ([type?] [,[type?]]*) // List of types, trailing comma optional
    *  tvar = A previously declared type variable
    *

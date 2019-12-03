@@ -28,14 +28,17 @@ public class LoadNode extends Node {
     Node mem  = mem();
     Node addr = adr();
 
-    // Load bypasses a MemMerge
+    // Load from a single alias bypasses a MemMerge
     Type tadr = gvn.type(addr);
     if( tadr instanceof TypeMemPtr && mem instanceof MemMergeNode ) {
       int alias = ((TypeMemPtr)tadr)._aliases.abit();
-      if( alias == -1 ) throw AA.unimpl(); // Handle multiple aliases, handle all/empty
-      // Find nearest alias parent
-      Node obj = ((MemMergeNode)mem).alias2node(alias);
-      return set_mem(obj,gvn);
+      // TODO: Actually if all bits subset a single entry, and no partial
+      // subsets, can bypass along the single entry.
+      if( alias != -1 ) {       // Single alias?
+        // Find nearest alias parent
+        Node obj = ((MemMergeNode)mem).alias2node(alias);
+        return set_mem(obj,gvn);
+      }
     }
 
     // Loads against a NewNode cannot NPE, cannot fail, always return the input
@@ -150,18 +153,18 @@ public class LoadNode extends Node {
       return bad("Unknown"); // Not a pointer, cannot load a field
     TypeMemPtr t3 = (TypeMemPtr)t;
     Type t4 = gvn.type(mem());
-    //if( t4 instanceof TypeMem ) {         // Memory or Struct, for various errors
-    //  TypeMem t5 = (TypeMem)t4;           // Should be memory
-    //  Type t6 = t5.ld(t3);                // General load from memory
-    //  if( !(t6 instanceof TypeStruct) ) { // No fields, so memory or ptr is in-error
-    //    Type t7 = t3._obj.base();
-    //    if( t7 instanceof TypeStruct ) {
-    //      t4 = t7;
-    //    } else {
-    //      return bad("Unknown");
-    //    }
-    //  } else t4 = t6;
-    //}
+    if( t4 instanceof TypeMem ) {         // Memory or Struct, for various errors
+      TypeMem t5 = (TypeMem)t4;           // Should be memory
+      Type t6 = t5.ld(t3);                // General load from memory
+      if( !(t6 instanceof TypeStruct) ) { // No fields, so memory or ptr is in-error
+        Type t7 = t3._obj.base();
+        if( t7 instanceof TypeStruct ) {
+          t4 = t7;
+        } else {
+          return bad("Unknown");
+        }
+      } else t4 = t6;
+    }
     if( !(t4 instanceof TypeStruct) || ((TypeStruct)t4).find(_fld) == -1 )
       return bad("Unknown");
     return null;

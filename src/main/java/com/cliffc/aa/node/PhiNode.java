@@ -81,13 +81,20 @@ public class PhiNode extends Node {
     for( int alias : phis.keySet() ) {
       PhiNode phi = phis.get(alias);
       for( int i=1; i<_defs._len; i++ ) {
+        Node n = in(i), m=n;
         // Take the matching narrow slice for the alias, except for alias ALL
         // which can keep taking undistinguished memory.  The resulting memory
         // is {ALL-aliases} but currently only represented as ALL.
-        Node n = in(i) instanceof MemMergeNode
-          ? ((MemMergeNode)in(i)).alias2node(alias)
-          : (gvn.type(in(i)) instanceof TypeMem && alias != BitsAlias.ALL ? gvn.xform(new ObjMergeNode(in(i),alias)) : in(i));
-        phi.add_def(n);
+        if( n instanceof MemMergeNode )
+          m = n = ((MemMergeNode)n).alias2node(alias);
+        if( alias==BitsAlias.ALL ) {
+          assert gvn.type(m) instanceof TypeMem;
+        } else {
+          if( gvn.type(m) instanceof TypeMem )
+            m = gvn.xform(new ObjMergeNode(n,alias));
+          assert gvn.type(m) instanceof TypeObj;
+        }
+        phi.add_def(m);
       }
       Node obj = gvn.xform(phi);
       if( alias==BitsAlias.ALL ) mmem.set_def(0,obj,gvn);
