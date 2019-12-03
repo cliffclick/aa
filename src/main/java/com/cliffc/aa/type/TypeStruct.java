@@ -249,7 +249,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   private static final TypeStruct D1    = make(flds("d"),ts(TypeInt.TRUE  )); // @{d:1}
   private static final TypeStruct ARW   = make(flds("a"),ts(TypeFlt.FLT64),new byte[]{frw()});
   public  static final TypeStruct GENERIC = malloc(true,FLD0,new Type[0],new byte[0],BitsAlias.RECBITS).hashcons_free();
-          static final TypeStruct ALLSTRUCT = make();
+  public  static final TypeStruct ALLSTRUCT = make();
 
   static final TypeStruct[] TYPES = new TypeStruct[]{ALLSTRUCT,POINT,X,A,C0,D1,ARW};
 

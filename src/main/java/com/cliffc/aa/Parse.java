@@ -296,8 +296,18 @@ public class Parse {
       if( tok == null ) break;  // Out of ids
       int oldx2 = _x;
       Type t = null;
-      if( peek(':') && (t=type())==null ) _x = oldx2; // Grammar ambiguity, resolve p?a:b from a:int
-      // Check for x := ... vs x = ...
+      // x  =: ... type  assignment, handled before we get here
+      // x  =  ... final assignment
+      // x :=  ... var   assignment
+      // x : type  = ... typed final assignment
+      // x : type := ... typed var   assignment
+      // x : nontype = ... error, missing type
+      // p? x : nontype ... part of trinary
+      if( peek(":=") ) _x=oldx2; // Avoid confusion with typed assignment test
+      else if( peek(':') && (t=type())==null ) { // Check for typed assignment
+        if( _e._scope.test_if() ) _x = oldx2; // Grammar ambiguity, resolve p?a:b from a:int
+        else                      err_ctrl0("Missing type after ':'");
+      }
       if( peek(":=") ) rs.set(toks._len);             // Re-assignment parse
       else if( !peek('=') ) { _x = oldx; break; } // Unwind token parse, and not assignment
       toks.add(tok.intern());
@@ -306,9 +316,10 @@ public class Parse {
 
     // Normal statement value parse
     Node ifex = ifex();         // Parse an expression for the statement value
-    if( ifex == null )          // No statement?
-      return toks._len == 0 ? null
-        : err_ctrl2("Missing ifex after assignment of '"+toks.last()+"'");
+    if( ifex == null ) {        // No statement?
+      if( toks._len == 0 ) return  null;
+      ifex = err_ctrl2("Missing ifex after assignment of '"+toks.last()+"'");
+    }
     // Honor all type requests, all at once, by inserting type checks on the ifex.
     for( Type t : ts )
       ifex = typechk(ifex,t);

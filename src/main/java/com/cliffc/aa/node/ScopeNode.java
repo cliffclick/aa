@@ -122,6 +122,9 @@ public class ScopeNode extends Node {
   // Pop ifscope
   public void pop_if() { _ifs.pop(); }
 
+  // Test for being inside a ?: expression
+  public boolean test_if() { return _ifs!=null && !_ifs.isEmpty(); }
+
   public void def_if( String name, byte mutable, boolean create ) {
     if( _ifs == null || _ifs._len==0 ) return; // Not inside an If
     _ifs.last().def(name,mutable,create);      // Var defined in arm of if

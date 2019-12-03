@@ -264,9 +264,9 @@ public class TestParse {
     test    ("Point=:@{x,y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
     testerr ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1;y=2}))", "*[$]@{x==1,y==2} is not a *[$]Point:@{x=,y=}",68);
     testerr ("Point=:@{x,y}; Point((0,1))", "*[$](nil,1) is not a *[$]@{x=,y=}",27);
-    testerr("x=@{n:;}","Missing type after ':'",6);
+    testerr("x=@{n: =1;}","Missing type after ':'",7);
     testerr("x=@{n=;}","Missing ifex after assignment of 'n'",6);
-    test_ptr("x=@{n}",(alias -> TypeMemPtr.make(alias,TypeStruct.make(new String[]{"n"}))));
+    test_ptr("x=@{n}",(alias -> TypeMemPtr.make(alias,TypeStruct.ALLSTRUCT)));
   }
 
   @Test public void testParse05() {
