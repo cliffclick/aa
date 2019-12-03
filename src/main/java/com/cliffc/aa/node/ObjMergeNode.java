@@ -29,26 +29,37 @@ public class ObjMergeNode extends Node {
     return sb.unchar().unchar().p('}').toString();
   }
 
+  // Search for the field by name, or if it is a number, use that number.
+  // If not found, max length.
+  private int fld_idx(String tok) {
+    if( Parse.isDigit((byte)tok.charAt(0)) )
+      return tok.charAt(0)-'0'+1;
+    // Search by name
+    for( int idx=1; idx<_flds._len; idx++ )
+      if( Util.eq(tok,_flds.at(idx)) )
+        return idx;
+    return _flds._len;
+  }
+
   // Return the index for a field.
   public int fld_idx(String tok, GVNGCM gvn) {
     // Search for the field by name, or if it is a number, use that number.
-    int idx;
-    if( Parse.isDigit((byte)tok.charAt(0)) ) {
-      idx = tok.charAt(0)-'0'+1;
-    } else {
-      // Search by name
-      for( idx=1; idx<_flds._len; idx++ )
-        if( Util.eq(tok,_flds.at(idx)) )
-          break;
-    }
+    int idx = fld_idx(tok);
     if( idx <_flds._len ) return idx;
+    if( idx >_flds._len ) throw com.cliffc.aa.AA.unimpl(); // Need to push extra fields for tuples
     // Field does not exist, just append it.
     assert !gvn.touched(this);  // Not in GVN / HashMap
     _flds.push(tok);
     add_def(in(0));             // Clone from base object
-    return _defs._len-1;
+    return idx;
   }
 
+  // Return the Node for a field, without extending the index
+  public Node fld2node(String tok) {
+    int idx = fld_idx(tok);
+    return in(idx<_defs._len ? idx : 0);
+  }
+  
   @Override public Node ideal(GVNGCM gvn) {
     assert !(in(0) instanceof ObjMergeNode) || ((ObjMergeNode)in(0))._alias==_alias; // Should not happen
     // Remove redundant and dead merges

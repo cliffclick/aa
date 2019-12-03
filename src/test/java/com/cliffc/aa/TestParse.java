@@ -295,7 +295,7 @@ public class TestParse {
     test_ptr("A= :(str?, int); A(0,2)","A:(nil,2)");
     // Named recursive types
     test_isa("A= :(A?, int); A(0,2)",Type.SCALAR);// No error casting (0,2) to an A
-    test    ("A= :@{n=A?, v=flt}; A(@{n=0,v=1.2}).v;", TypeFlt.con(1.2));
+    test    ("A= :@{n=A?, v=flt}; A(@{n=0;v=1.2}).v;", TypeFlt.con(1.2));
 
     // TODO: Needs a way to easily test simple recursive types
     TypeEnv te3 = Exec.go(Env.top(),"args","A= :@{n=A?, v=int}");

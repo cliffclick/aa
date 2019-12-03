@@ -28,17 +28,23 @@ public class LoadNode extends Node {
     Node mem  = mem();
     Node addr = adr();
 
-    // Load from a single alias bypasses a MemMerge
     Type tadr = gvn.type(addr);
-    if( tadr instanceof TypeMemPtr && mem instanceof MemMergeNode ) {
-      int alias = ((TypeMemPtr)tadr)._aliases.abit();
+    int alias = tadr instanceof TypeMemPtr ? ((TypeMemPtr)tadr)._aliases.abit() : -2;
+      
+    // Load from a single alias bypasses a MemMerge
+    if( mem instanceof MemMergeNode && alias != -1 ) {
       // TODO: Actually if all bits subset a single entry, and no partial
       // subsets, can bypass along the single entry.
-      if( alias != -1 ) {       // Single alias?
-        // Find nearest alias parent
-        Node obj = ((MemMergeNode)mem).alias2node(alias);
-        return set_mem(obj,gvn);
-      }
+      // Find nearest alias parent
+      Node obj = ((MemMergeNode)mem).alias2node(alias);
+      return set_mem(obj,gvn);
+    }
+    
+    // Load bypass ObjMerge
+    if( mem instanceof ObjMergeNode ) {
+      assert alias == ((ObjMergeNode)mem)._alias;
+      Node obj = ((ObjMergeNode)mem).fld2node(_fld);
+      return set_mem(obj,gvn);
     }
 
     // Loads against a NewNode cannot NPE, cannot fail, always return the input
