@@ -18,7 +18,7 @@ public class TestParse {
     Object dummy = Env.GVN; // Force class loading cycle
 
     // A collection of tests which like to fail easily
-    testerr ("Point=:@{x,y}; Point((0,1))", "*[$](nil,1) is not a *[$]@{x=,y=}",27);
+    testerr ("Point=:@{x;y}; Point((0,1))", "*[$](nil,1) is not a *[$]@{x=,y=}",27);
     test_ptr("x=@{n:=1;v:=2}; x.n := 3; x", "@{n:=3,v:=2}");
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'",20);
     testerr("{+}(1,2,3)", "Passing 3 arguments to {+} which takes 2 arguments",10);
@@ -204,9 +204,9 @@ public class TestParse {
     test   ("fun:{int str -> int}={x y -> x+2}; fun(2,3)", TypeInt.con(4));
     testerr("fun:{int str -> int}={x y -> x+y}; fun(2,3)", "3 is not a *[$]str",33);
     // Test that the type-check is on the variable and not the function.
-    test_ptr("fun={x y -> x*2}; bar:{int str -> int} = fun; baz:{int @{x,y} -> int} = fun; (fun(2,3),bar(2,\"abc\"))",
+    test_ptr("fun={x y -> x*2}; bar:{int str -> int} = fun; baz:{int @{x;y} -> int} = fun; (fun(2,3),bar(2,\"abc\"))",
             (alias -> TypeMemPtr.make(alias,TypeStruct.make_tuple(alias,TypeInt.con(4),TypeInt.con(4)))) );
-    testerr("fun={x y -> x+y}; baz:{int @{x,y} -> int} = fun; (fun(2,3), baz(2,3))",
+    testerr("fun={x y -> x+y}; baz:{int @{x;y} -> int} = fun; (fun(2,3), baz(2,3))",
             "3 is not a *[$]@{x=,y=}", 47);
 
     testerr("x=3; fun:{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int64",30);
@@ -239,7 +239,7 @@ public class TestParse {
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'",20);
     test   ("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1;y=2})", TypeInt.con(5));     // passed in to func
     test   ("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1;y=2;z=3})", TypeInt.con(5)); // extra fields OK
-    test   ("dist={p:@{x,y} -> p.x*p.x+p.y*p.y}; dist(@{x=1;y=2})", TypeInt.con(5)); // Typed func arg
+    test   ("dist={p:@{x;y} -> p.x*p.x+p.y*p.y}; dist(@{x=1;y=2})", TypeInt.con(5)); // Typed func arg
     test   ("a=@{x=(b=1.2)*b;y=b}; a.y", TypeFlt.con(1.2 )); // ok to use temp defs
     test   ("a=@{x=(b=1.2)*b;y=x}; a.y", TypeFlt.con(1.44)); // ok to use early fields in later defs
     testerr("a=@{x=(b=1.2)*b;y=b}; b", "Unknown ref 'b'",23);
@@ -260,10 +260,10 @@ public class TestParse {
     // test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: figure out if free cast for bare constants?
     testerr ("gal=:flt; tank:gal = gal(2)+1", "3 is not a gal:flt64",29);
 
-    test    ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
-    test    ("Point=:@{x,y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
-    testerr ("Point=:@{x,y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1;y=2}))", "*[$]@{x==1,y==2} is not a *[$]Point:@{x=,y=}",68);
-    testerr ("Point=:@{x,y}; Point((0,1))", "*[$](nil,1) is not a *[$]@{x=,y=}",27);
+    test    ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
+    test    ("Point=:@{x;y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
+    testerr ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1;y=2}))", "*[$]@{x==1,y==2} is not a *[$]Point:@{x=,y=}",68);
+    testerr ("Point=:@{x;y}; Point((0,1))", "*[$](nil,1) is not a *[$]@{x=,y=}",27);
     testerr("x=@{n: =1;}","Missing type after ':'",7);
     testerr("x=@{n=;}","Missing ifex after assignment of 'n'",6);
     test_ptr("x=@{n}",(alias -> TypeMemPtr.make(alias,TypeStruct.ALLSTRUCT)));
@@ -295,10 +295,10 @@ public class TestParse {
     test_ptr("A= :(str?, int); A(0,2)","A:(nil,2)");
     // Named recursive types
     test_isa("A= :(A?, int); A(0,2)",Type.SCALAR);// No error casting (0,2) to an A
-    test    ("A= :@{n=A?, v=flt}; A(@{n=0;v=1.2}).v;", TypeFlt.con(1.2));
+    test    ("A= :@{n=A?; v=flt}; A(@{n=0;v=1.2}).v;", TypeFlt.con(1.2));
 
     // TODO: Needs a way to easily test simple recursive types
-    TypeEnv te3 = Exec.go(Env.top(),"args","A= :@{n=A?, v=int}");
+    TypeEnv te3 = Exec.go(Env.top(),"args","A= :@{n=A?; v=int}");
     if( te3._errs != null ) System.err.println(te3._errs.toString());
     Assert.assertNull(te3._errs);
     TypeFunPtr tfp = (TypeFunPtr)te3._t;
@@ -313,22 +313,22 @@ public class TestParse {
     assertEquals("v",tt3._flds[1]);
 
     // Missing type B is also never worked on.
-    test_isa("A= :@{n=B?, v=int}", TypeFunPtr.GENERIC_FUNPTR);
-    test_isa("A= :@{n=B?, v=int}; a = A(0,2)", TypeMemPtr.OOP);
-    test_isa("A= :@{n=B?, v=int}; a = A(0,2); a.n", Type.NIL);
+    test_isa("A= :@{n=B?; v=int}", TypeFunPtr.GENERIC_FUNPTR);
+    test_isa("A= :@{n=B?; v=int}; a = A(0,2)", TypeMemPtr.OOP);
+    test_isa("A= :@{n=B?; v=int}; a = A(0,2); a.n", Type.NIL);
     // Mutually recursive type
-    test_isa("A= :@{n=B, v=int}; B= :@{n=A, v=flt}", TypeFunPtr.GENERIC_FUNPTR);
+    test_isa("A= :@{n=B; v=int}; B= :@{n=A; v=flt}", TypeFunPtr.GENERIC_FUNPTR);
   }
 
   @Test public void testParse07() {
     // Passing a function recursively
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({&},2)", TypeInt.FALSE);
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({+},2)", TypeInt.con(2));
-    test_isa("A= :@{n=A?, v=int}; f={x:A? -> x ? A(f(x.n),x.v*x.v) : 0}", TypeFunPtr.GENERIC_FUNPTR);
-    test    ("A= :@{n=A?, v=flt}; f={x:A? -> x ? A(f(x.n),x.v*x.v) : 0}; f(A(0,1.2)).v;", TypeFlt.con(1.2*1.2));
+    test_isa("A= :@{n=A?; v=int}; f={x:A? -> x ? A(f(x.n),x.v*x.v) : 0}", TypeFunPtr.GENERIC_FUNPTR);
+    test    ("A= :@{n=A?; v=flt}; f={x:A? -> x ? A(f(x.n),x.v*x.v) : 0}; f(A(0,1.2)).v;", TypeFlt.con(1.2*1.2));
 
     // User-defined linked list
-    String ll_def = "List=:@{next,val};";
+    String ll_def = "List=:@{next;val};";
     String ll_con = "tmp=List(List(0,1.2),2.3);";
     String ll_map = "map = {fun list -> list ? List(map(fun,list.next),fun(list.val)) : 0};";
     String ll_fun = "sq = {x -> x*x};";
@@ -361,18 +361,18 @@ public class TestParse {
 
     // Test inferring a recursive struct type, with a little help
     Type[] ts0 = new Type[]{Type.NIL,TypeFlt.con(1.2*1.2)};
-    test_ptr("map={x:@{n,v=flt}? -> x ? @{n=map(x.n),v=x.v*x.v} : 0}; map(@{n=0,v=1.2})",
+    test_ptr("map={x:@{n;v=flt}? -> x ? @{n=map(x.n);v=x.v*x.v} : 0}; map(@{n=0;v=1.2})",
              (alias) -> TypeMemPtr.make(alias,TypeStruct.make(FLDS,ts0,TypeStruct.finals(2),alias)));
 
     // Test inferring a recursive struct type, with less help.  This one
     // inlines so doesn't actually test inferring a recursive type.
-    test_ptr("map={x -> x ? @{n=map(x.n),v=x.v*x.v} : 0}; map(@{n=0,v=1.2})",
+    test_ptr("map={x -> x ? @{n=map(x.n);v=x.v*x.v} : 0}; map(@{n=0;v=1.2})",
              (alias) -> TypeMemPtr.make(alias,TypeStruct.make(FLDS,ts0,TypeStruct.finals(2),alias)));
 
     // Test inferring a recursive struct type, with less help. Too complex to
     // inline, so actual inference happens
-    test_ptr_isa("map={x -> x ? @{n=map(x.n),v=x.v*x.v} : 0};"+
-                 "map(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0,v=1.2},v=2.3},v=3.4},v=4.5})",
+    test_ptr_isa("map={x -> x ? @{n=map(x.n);v=x.v*x.v} : 0};"+
+                 "map(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0;v=1.2};v=2.3};v=3.4};v=4.5})",
                  (alias) -> TypeMemPtr.make(alias,TypeStruct.make(FLDS,TypeMemPtr.STRUCT0,TypeFlt.con(20.25))));
 
     // Test inferring a recursive tuple type, with less help.  This one
@@ -413,19 +413,19 @@ public class TestParse {
     // of bugs and error reporting issues, so keeping it as a regression test.
     testerr("tmp=@{"+
          "  l=@{"+
-         "    l=@{ l=0, r=0, v=3 },"+
-         "    l=@{ l=0, r=0, v=7 },"+
+         "    l=@{ l=0; r=0; v=3 };"+
+         "    l=@{ l=0; r=0; v=7 };"+
          "    v=5"+
-         "  },"+
+         "  };"+
          "  r=@{"+
-         "    l=@{ l=0, r=0, v=15 },"+
-         "    l=@{ l=0, r=0, v=22 },"+
+         "    l=@{ l=0; r=0; v=15 };"+
+         "    l=@{ l=0; r=0; v=22 };"+
          "    v=20"+
-         "  },"+
+         "  };"+
          "  v=12 "+
          "};"+
          "map={tree fun -> tree"+
-         "     ? @{l=map(tree.l,fun),r=map(tree.r,fun),v=fun(tree.v)}"+
+         "     ? @{l=map(tree.l;fun);r=map(tree.r,fun);v=fun(tree.v)}"+
          "     : 0};"+
          "map(tmp,{x->x+x})",
             "Cannot define field '.l' twice",61);
@@ -433,19 +433,19 @@ public class TestParse {
     // Good tree-structure inference test
     test_ptr("tmp=@{"+
          "  l=@{"+
-         "    l=@{ l=0, r=0, v=3 },"+
-         "    r=@{ l=0, r=0, v=7 },"+
+         "    l=@{ l=0; r=0; v=3 };"+
+         "    r=@{ l=0; r=0; v=7 };"+
          "    v=5"+
-         "  },"+
+         "  };"+
          "  r=@{"+
-         "    l=@{ l=0, r=0, v=15 },"+
-         "    r=@{ l=0, r=0, v=22 },"+
+         "    l=@{ l=0; r=0; v=15 };"+
+         "    r=@{ l=0; r=0; v=22 };"+
          "    v=20"+
-         "  },"+
+         "  };"+
          "  v=12 "+
          "};"+
          "map={tree fun -> tree"+
-         "     ? @{l=map(tree.l,fun),r=map(tree.r,fun),v=fun(tree.v)}"+
+         "     ? @{l=map(tree.l,fun);r=map(tree.r,fun);v=fun(tree.v)}"+
          "     : 0};"+
          "map(tmp,{x->x+x})",
          "@{l==*[$],r==*[$],v==int64}");
@@ -494,14 +494,14 @@ public class TestParse {
   @Test public void testParse10() {
     // Test re-assignment in struct
     Type[] ts = TypeStruct.ts(TypeInt.con(1), TypeInt.con(2));
-    test_ptr("x=@{n:=1,v:=2}", (alias) -> TypeMemPtr.make(alias,TypeStruct.make(FLDS, ts,TypeStruct.frws(2),alias)));
-    testerr ("x=@{n =1,v:=2}; x.n  = 3; ", "Cannot re-assign read-only field '.n'",24);
-    test    ("x=@{n:=1,v:=2}; x.n  = 3", TypeInt.con(3));
-    test_ptr("x=@{n:=1,v:=2}; x.n := 3; x", "@{n:=3,v:=2}");
-    testerr ("x=@{n:=1,v:=2}; x.n  = 3; x.v = 1; x.n = 4", "Cannot re-assign read-only field '.n'",42);
-    test    ("x=@{n:=1,v:=2}; y=@{n=3,v:=4}; tmp = math_rand(1) ? x : y; tmp.n", TypeInt.NINT8);
-    testerr ("x=@{n:=1,v:=2}; y=@{n=3,v:=4}; tmp = math_rand(1) ? x : y; tmp.n = 5", "Cannot re-assign read-only field '.n'",68);
-    test    ("x=@{n:=1,v:=2}; foo={q -> q.n=3}; foo(x); x.n",TypeInt.con(3)); // Side effects persist out of functions
+    test_ptr("x=@{n:=1;v:=2}", (alias) -> TypeMemPtr.make(alias,TypeStruct.make(FLDS, ts,TypeStruct.frws(2),alias)));
+    testerr ("x=@{n =1;v:=2}; x.n  = 3; ", "Cannot re-assign read-only field '.n'",24);
+    test    ("x=@{n:=1;v:=2}; x.n  = 3", TypeInt.con(3));
+    test_ptr("x=@{n:=1;v:=2}; x.n := 3; x", "@{n:=3,v:=2}");
+    testerr ("x=@{n:=1;v:=2}; x.n  = 3; x.v = 1; x.n = 4", "Cannot re-assign read-only field '.n'",42);
+    test    ("x=@{n:=1;v:=2}; y=@{n=3;v:=4}; tmp = math_rand(1) ? x : y; tmp.n", TypeInt.NINT8);
+    testerr ("x=@{n:=1;v:=2}; y=@{n=3;v:=4}; tmp = math_rand(1) ? x : y; tmp.n = 5", "Cannot re-assign read-only field '.n'",68);
+    test    ("x=@{n:=1;v:=2}; foo={q -> q.n=3}; foo(x); x.n",TypeInt.con(3)); // Side effects persist out of functions
     // Tuple assignment
     testerr ("x=(1,2); x.0=3; x", "Cannot re-assign read-only field '.0'",14);
     // Final-only and read-only type syntax.
@@ -510,20 +510,20 @@ public class TestParse {
              (alias) -> TypeMemPtr.make(alias,TypeStruct.make(new String[]{"f"},new Type[]{TypeInt.con(1)},TypeStruct.finals(1),alias)));
     testerr ("ptr=@{f=1}; ptr2rw:@{f:=} = ptr; ptr2rw", "*[$]@{f==1} is not a *[$]@{f:=}", 31); // Cannot cast-away final
     test    ("ptr=@{f=1}; ptr2rw:@{f:=} = ptr; 2", TypeInt.con(2)); // Dead cast-away of final
-    test    ("@{x:=1,y =2}:@{x,y==}.y", TypeInt.con(2)); // Allowed reading final field
-    testerr ("f={ptr2final:@{x,y==} -> ptr2final.y  }; f(@{x:=1,y:=2})", "*[$]@{x:=1,y:=2} is not a *[$]@{x=,y==}",56); // Another version of casting-to-final
-    testerr ("f={ptr2final:@{x,y==} -> ptr2final.y=3}; f(@{x =1,y =2})", "Cannot re-assign read-only field '.y'",38);
-    test    ("f={ptr:@{x= ,y:=} -> ptr.y=3; ptr}; f(@{x:=1,y:=2}).y", TypeInt.con(3)); // On field x, cast-away r/w for r/o
-    test    ("f={ptr:@{x==,y:=} -> ptr.y=3; ptr}; f(@{x =1,y:=2}).y", TypeInt.con(3)); // On field x, cast-up r/o for final but did not read
-    testerr ("f={ptr:@{x==,y:=} -> ptr.y=3; ptr}; f(@{x:=1,y:=2}).x", "*[$]@{x:=1,y:=2} is not a *[$]@{x==,y:=}",51); // On field x, cast-up r/w for final and read
-    test    ("f={ptr:@{x,y} -> ptr.y }; f(@{x:=1,y:=2}:@{x,y=})", TypeInt.con(2)); // cast r/w to r/o, and read
-    test    ("f={ptr:@{x,y} -> ptr }; f(@{x=1,y=2}).y", TypeInt.con(2)); // cast final to r/o and read
+    test    ("@{x:=1;y =2}:@{x;y==}.y", TypeInt.con(2)); // Allowed reading final field
+    testerr ("f={ptr2final:@{x;y==} -> ptr2final.y  }; f(@{x:=1;y:=2})", "*[$]@{x:=1,y:=2} is not a *[$]@{x=,y==}",56); // Another version of casting-to-final
+    testerr ("f={ptr2final:@{x,y==} -> ptr2final.y=3}; f(@{x =1;y =2})", "Cannot re-assign read-only field '.y'",38);
+    test    ("f={ptr:@{x= ;y:=} -> ptr.y=3; ptr}; f(@{x:=1;y:=2}).y", TypeInt.con(3)); // On field x, cast-away r/w for r/o
+    test    ("f={ptr:@{x==;y:=} -> ptr.y=3; ptr}; f(@{x =1;y:=2}).y", TypeInt.con(3)); // On field x, cast-up r/o for final but did not read
+    testerr ("f={ptr:@{x==;y:=} -> ptr.y=3; ptr}; f(@{x:=1;y:=2}).x", "*[$]@{x:=1,y:=2} is not a *[$]@{x==,y:=}",51); // On field x, cast-up r/w for final and read
+    test    ("f={ptr:@{x;y} -> ptr.y }; f(@{x:=1;y:=2}:@{x;y=})", TypeInt.con(2)); // cast r/w to r/o, and read
+    test    ("f={ptr:@{x;y} -> ptr }; f(@{x=1;y=2}).y", TypeInt.con(2)); // cast final to r/o and read
     testerr ("ptr=@{f:=1}; ptr:@{f=}.f=2","Cannot re-assign read-only field '.f'",26);
-    testerr ("f={ptr:@{x,y} -> ptr.y=3}; f(@{x:=1,y:=2});", "Cannot re-assign read-only field '.y'",24);
-    testerr ("f={ptr:@{x,y} -> ptr.y=3}; f(@{x:=1,y:=2}:@{x,y=})", "Cannot re-assign read-only field '.y'",24);
+    testerr ("f={ptr:@{x;y} -> ptr.y=3}; f(@{x:=1;y:=2});", "Cannot re-assign read-only field '.y'",24);
+    testerr ("f={ptr:@{x;y} -> ptr.y=3}; f(@{x:=1;y:=2}:@{x;y=})", "Cannot re-assign read-only field '.y'",24);
     test    ("ptr=@{a:=1}; val=ptr.a; ptr.a=2; val",TypeInt.con(1));
     // Allowed to build final pointer cycles
-    test    ("ptr0=@{p:=0,v:=1}; ptr1=@{p=ptr0,v:=2}; ptr0.p=ptr1; ptr0.p.v+ptr1.p.v+(ptr0.p==ptr1)", TypeInt.con(4)); // final pointer-cycle is ok
+    test    ("ptr0=@{p:=0;v:=1}; ptr1=@{p=ptr0;v:=2}; ptr0.p=ptr1; ptr0.p.v+ptr1.p.v+(ptr0.p==ptr1)", TypeInt.con(4)); // final pointer-cycle is ok
   }
 
   // Early function exit

@@ -46,11 +46,12 @@ public class ObjMergeNode extends Node {
     // Search for the field by name, or if it is a number, use that number.
     int idx = fld_idx(tok);
     if( idx <_flds._len ) return idx;
-    if( idx >_flds._len ) throw com.cliffc.aa.AA.unimpl(); // Need to push extra fields for tuples
-    // Field does not exist, just append it.
-    assert !gvn.touched(this);  // Not in GVN / HashMap
-    _flds.push(tok);
-    add_def(in(0));             // Clone from base object
+    while( idx >= _flds._len ) {
+      // Field does not exist, just append it.
+      assert !gvn.touched(this);  // Not in GVN / HashMap
+      _flds.push(tok);
+      add_def(in(0));             // Clone from base object
+    }
     return idx;
   }
 

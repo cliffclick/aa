@@ -943,7 +943,7 @@ public class Parse {
         flds  .add(tok);                 // Gather for final type
         ts    .add(t);
         mods  .add(tmodf);
-        if( !peek(',') ) break; // Final comma is optional
+        if( !peek(';') ) break; // Final semi-colon is optional
       }
       byte[] finals = new byte[mods._len];
       for( int i=0; i<mods._len; i++ )  finals[i] = mods.at(i);
