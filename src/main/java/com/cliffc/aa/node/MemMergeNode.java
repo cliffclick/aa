@@ -101,6 +101,17 @@ public class MemMergeNode extends Node {
   // Node for an alias, using the nearest enclosing parent alias as needed
   Node alias2node( int alias ) { return in(find_alias2idx(alias)); }
 
+  // Node for an alias, using the nearest enclosing parent alias as needed.
+  // Fails with NULL if there are any children of the parent.
+  // Used by Loads, which can bypass exact aliases.
+  Node alias2node_precise( int alias ) {
+    int idx = find_alias2idx(alias);
+    for( int j=idx+1; j<_defs._len; j++ )
+      if( BitsAlias.is_parent(alias,alias_at(j)) )
+        return null;
+    return in(idx);
+  }
+
   // Return an 'active' (not in GVN) object, for direct manipulation by the Parser.
   public ObjMergeNode active_obj(int alias, GVNGCM gvn) {
     assert !gvn.touched(this) && alias > 1;  // Only if this MemMerge is also active
