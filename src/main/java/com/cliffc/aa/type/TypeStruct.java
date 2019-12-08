@@ -743,12 +743,17 @@ public class TypeStruct extends TypeObj<TypeStruct> {
         case TMEMPTR:           // Update TypeMemPtr internal field
           TypeMemPtr tm = (TypeMemPtr)t0;
           TypeObj t4 = tm._obj;
-          TypeObj t5 = TypeMemPtr.narrow_obj(tm._aliases,ufind(uf,t4));
-          if( t4 != t5 ) {
-            tm._obj = t5;
+          TypeObj t5 = ufind(uf,t4);
+          TypeObj t6 = TypeMemPtr.narrow_obj(tm._aliases,t5);
+          if( t4 != t6 ) {
+            if( t5 != t6 ) union(uf,t5,t6);
+            tm._obj = t6;
             progress |= post_mod(tm,dups);
-            if( !t5.interned() )
-              reaches.push(t5);
+            while( true ) {
+              if( !t6.interned() )  reaches.push(t6);
+              if( !(t6 instanceof TypeName) ) break;
+              t6 = (TypeObj)((TypeName)t6)._t;
+            }
           }
           break;
         case TSTRUCT:           // Update all TypeStruct fields

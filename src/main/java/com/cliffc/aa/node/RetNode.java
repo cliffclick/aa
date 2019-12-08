@@ -36,18 +36,25 @@ public final class RetNode extends Node {
   // Inline longer name
   @Override public String str() { return in(4) instanceof FunNode ? "Ret"+fun().str() : xstr(); }
 
+  // RetNode lost a use.  If losing the last wired call, might disappear
+  // (degrade to a unique symbol supporting ld,st,equality but not execution).
+  @Override public boolean ideal_impacted_by_losing_uses(GVNGCM gvn, Node dead) {
+    return dead instanceof CallEpiNode;
+  }
+  
   @Override public Node ideal(GVNGCM gvn) {
-    // If is_copy, wipe out inputs 3 & 4, but leave ctrl,mem,val for users to inline
+    // If is_copy, wipe out inputs rpc & fun, but leave ctrl,mem,val for users to inline
     if( is_copy() && in(4)!=null ) {
-      set_def(3,null,gvn);
-      set_def(4,null,gvn);
-      // If no users inlining, wipe out all edges
-      if( in(0)!=null && _uses._len==1 && _uses.at(0) instanceof FunPtrNode ) {
-        set_def(0,null,gvn);
-        set_def(1,null,gvn);
-        set_def(2,null,gvn);
-      }
-      return this;
+      set_def(3,null,gvn);      // No rpc
+      set_def(4,null,gvn);      // No fun
+      return this;              // Progress
+    }
+    // If no users inlining, wipe out all edges
+    if( is_copy() && in(0)!=null && _uses._len==1 && _uses.at(0) instanceof FunPtrNode ) {
+      set_def(0,null,gvn);      // No ctrl
+      set_def(1,null,gvn);      // No mem
+      set_def(2,null,gvn);      // No val
+      return this;              // Progress
     }
     return null;
   }

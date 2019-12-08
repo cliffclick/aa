@@ -42,7 +42,7 @@ public class LoadNode extends Node {
 
     // Load bypass ObjMerge
     if( mem instanceof ObjMergeNode ) {
-      assert alias == ((ObjMergeNode)mem)._alias;
+      assert BitsAlias.is_parent(((ObjMergeNode)mem)._alias,alias);
       Node obj = ((ObjMergeNode)mem).fld2node(_fld);
       return set_mem(obj,gvn);
     }
