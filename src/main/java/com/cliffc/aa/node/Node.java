@@ -65,8 +65,9 @@ public abstract class Node implements Cloneable {
     if( old != null ) {
       old._uses.del(this);
       if( old._uses._len==0 && old._keep==0 ) gvn.kill(old); // Recursively begin deleting
-      if( (!old.is_dead() && old.is_multi_head() && is_multi_tail()) ||
-          old.ideal_impacted_by_losing_uses() )
+      if( !old.is_dead() &&
+          (old.is_multi_head() && is_multi_tail() ||
+           old.ideal_impacted_by_losing_uses(gvn,this)) )
         gvn.add_work(old);
     }
     return this;
@@ -244,7 +245,7 @@ public abstract class Node implements Cloneable {
   // version of 'this'.
   abstract public Node ideal(GVNGCM gvn);
   // Losing uses puts these on the worklist
-  public boolean ideal_impacted_by_losing_uses() { return _op==OP_NEW || _op==OP_FUN || _op==OP_MERGE; }
+  public boolean ideal_impacted_by_losing_uses(GVNGCM gvn, Node dead) { return false; }
 
   // Compute the current best Type for this Node, based on the types of its inputs.
   // May return the local "all_type()", especially if its inputs are in error.
@@ -280,11 +281,23 @@ public abstract class Node implements Cloneable {
     return true;
   }
 
+  // Assert all ideal calls are done
+  public final boolean more_ideal(GVNGCM gvn, VBitSet bs) {
+    if( bs.tset(_uid) ) return false; // Been there, done that
+    if( _keep == 0 ) {                // Only non-keeps, which is just top-level scope and prims
+      Node idl = ideal(gvn);
+      if( idl != null )
+        return true;            // Found an ideal call
+    }
+    for( Node def : _defs ) if( def != null && def.more_ideal(gvn,bs) ) return true;
+    for( Node use : _uses ) if( use != null && use.more_ideal(gvn,bs) ) return true;
+    return false;
+  }
+  
   // Gather errors; backwards reachable control uses only
-  public void walkerr_use( Ary<String> errs, BitSet bs, GVNGCM gvn ) {
+  public void walkerr_use( Ary<String> errs, VBitSet bs, GVNGCM gvn ) {
     assert !is_dead();
-    if( bs.get(_uid) ) return;  // Been there, done that
-    bs.set(_uid);               // Only walk once
+    if( bs.tset(_uid) ) return;  // Been there, done that
     if( gvn.type(this) != Type.CTRL ) return; // Ignore non-control
     if( this instanceof ErrNode ) errs.add(((ErrNode)this)._msg); // Gather errors
     for( Node use : _uses )     // Walk control users for more errors
@@ -319,9 +332,8 @@ public abstract class Node implements Cloneable {
 
   // Gather errors; forwards reachable data uses only
   // TODO: Moved error to PhiNode.err
-  public void walkerr_gc( Ary<String> errs, BitSet bs, GVNGCM gvn ) {
-    if( bs.get(_uid) ) return;  // Been there, done that
-    bs.set(_uid);               // Only walk once
+  public void walkerr_gc( Ary<String> errs, VBitSet bs, GVNGCM gvn ) {
+    if( bs.tset(_uid) ) return;  // Been there, done that
     if( is_uncalled(gvn) ) return; // FunPtr is a constant, but never executed, do not check for errors
     String msg = this instanceof PhiNode ? err(gvn) : null;
     if( msg != null ) errs.add(msg);

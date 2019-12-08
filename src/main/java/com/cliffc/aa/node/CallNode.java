@@ -146,13 +146,19 @@ public class CallNode extends Node {
     return null;
   }
 
-  // Gather only the control and function pointer; gathered so CallEpi will
-  // re-evaluate if the set of callable functions changes.
+  // Gather only control, function pointer and all args; gathered so CallEpi
+  // will re-evaluate if the set of callable functions changes, or the args
+  // change (might enable wiring).
   @Override public TypeTuple value(GVNGCM gvn) {
+    Type[] ts = new Type[nargs()+2];
     Type ct = gvn.type(ctl());
     ct = ct.above_center() ? Type.XCTRL : Type.CTRL;
+    ts[0] = ct;
     Type tf = gvn.type(fun());
-    return TypeTuple.make(ct,tf.bound(TypeFunPtr.GENERIC_FUNPTR));
+    ts[1] = tf.bound(TypeFunPtr.GENERIC_FUNPTR);
+    for( int i=0; i<nargs(); i++ )
+      ts[i+2] = gvn.type(arg(i));
+    return TypeTuple.make(ts);
   }
 
   // Given a list of actuals, apply them to each function choice.  If any

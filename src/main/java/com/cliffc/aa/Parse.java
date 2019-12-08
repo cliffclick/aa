@@ -156,9 +156,9 @@ public class Parse {
     if( mem != null ) mem.walkerr_def(errs0,errs1,errs2,errs3,bs,_gvn);
     if( errs0.isEmpty() ) errs0.addAll(errs1);
     if( errs0.isEmpty() ) errs0.addAll(errs2);
-    if( errs0.isEmpty() ) _e._scope.walkerr_use(errs0,new BitSet(),_gvn);
+    if( errs0.isEmpty() ) _e._scope.walkerr_use(errs0,new VBitSet(),_gvn);
     if( errs0.isEmpty() && skipWS() != -1 ) errs0.add(errMsg("Syntax error; trailing junk"));
-    if( errs0.isEmpty() ) res.walkerr_gc(errs0,new BitSet(),_gvn);
+    if( errs0.isEmpty() ) res.walkerr_gc(errs0,new VBitSet(),_gvn);
     // Most errors result in unresolved calls, so report others first.
     errs0.addAll(errs3);
     // Do not sort the errors, because they are reported in Reverse Post-Order

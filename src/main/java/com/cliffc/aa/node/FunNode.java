@@ -102,7 +102,7 @@ public class FunNode extends RegionNode {
       : (_op_prec >= 0 ? "{"+name+"}" : name+"={->}");
   }
   public boolean noinline() { return _name != null && _name.startsWith("noinline"); }
-  
+
   // Can return nothing, or "name" or "[name0,name1,name2...]" or "[35]"
   public static SB names(BitsFun fidxs, SB sb ) {
     int fidx = fidxs.abit();
@@ -132,6 +132,24 @@ public class FunNode extends RegionNode {
       (idx == -2 ? TypeMem.MEM : _tf.arg(idx));
   }
   int nargs() { return _tf._args._ts.length; }
+  // FunNode lost a use.  If lost a formal argument (a Parm), visit all wired
+  // Call nodes and drop the corresponding actual argument.  Visit all unwired
+  // calls to see if they will wire, now that an arg has died.
+  @Override public boolean ideal_impacted_by_losing_uses(GVNGCM gvn, Node dead) {
+    if( dead instanceof ParmNode ) {
+      RetNode ret = ret();
+      if( ret != null ) {
+        FunPtrNode fptr = ret.funptr();
+        if( fptr != null ) {
+          for( Node call : fptr._uses )
+            if( call instanceof CallNode )
+              for( Node cepi : call._uses )
+                gvn.add_work(cepi); // Might wire a call, the dead arg was in error
+        }
+      }
+    }
+    return true;
+  }
 
   // ----
   @Override public Node ideal(GVNGCM gvn) {

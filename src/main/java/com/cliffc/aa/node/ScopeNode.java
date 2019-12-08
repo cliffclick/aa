@@ -88,17 +88,19 @@ public class ScopeNode extends Node {
     // the memory state?
     if( gvn._opt_mode == 1 ) {
       Node rez = _defs.last();
-      Type trez = gvn.type(rez);
-      // CNC - Trying to sharpen the memory state on exit, to allow dropping of
-      // dead&broken memory state (e.g. dead double-update of finals).  This
-      // first-cut is very weak, I need some official language-standard strength
-      // of escape-analysis and dropping of dead.
+      if( rez != null ) {
+        Type trez = gvn.type(rez);
+        // CNC - Trying to sharpen the memory state on exit, to allow dropping of
+        // dead&broken memory state (e.g. dead double-update of finals).  This
+        // first-cut is very weak, I need some official language-standard strength
+        // of escape-analysis and dropping of dead.
 
-      // If type(rez) can never lift to any TMP, then we will not return a
-      // pointer, and do not need the memory state on exit.
-      if( !TypeMemPtr.OOP0.dual().isa(trez) ) {
-        set_mem(null,gvn);
-        return this;
+        // If type(rez) can never lift to any TMP, then we will not return a
+        // pointer, and do not need the memory state on exit.
+        if( !TypeMemPtr.OOP0.dual().isa(trez) ) {
+          set_mem(null, gvn);
+          return this;
+        }
       }
     }
     return null;

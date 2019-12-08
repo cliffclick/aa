@@ -3,6 +3,7 @@ package com.cliffc.aa;
 import com.cliffc.aa.node.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
+import com.cliffc.aa.util.VBitSet;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Arrays;
@@ -263,7 +264,7 @@ public class GVNGCM {
     assert n._uses._len==0 && n._keep==0;
     for( int i=0; i<n._defs._len; i++ ) {
       Node def = n._defs.at(i);
-      if( def != null && def.ideal_impacted_by_losing_uses() ) add_work(def);
+      if( def != null && def.ideal_impacted_by_losing_uses(this,n) ) add_work(def);
       n.set_def(i,null,this);   // Recursively destroy dead nodes
     }
     n.set_dead();               // n is officially dead now
@@ -376,6 +377,8 @@ public class GVNGCM {
       else xform_old(n);
       cnt++; assert cnt < 10000; // Catch infinite ideal-loops
     }
+    // No more ideal calls to apply
+    assert !Env.START.more_ideal(this,new VBitSet());
   }
 
   // Global Optimistic Constant Propagation.  Passed in the final program state
