@@ -39,9 +39,9 @@ public final class CallEpiNode extends Node {
     // The one allowed function is already wired?  Then directly inline.
     // Requires this calls 1 target, and the 1 target is only called by this.
     BitsFun fidxs = tfp.fidxs();
-    if( _defs._len==2 ) {
+    if( _defs._len==2 && fidxs.abit() != -1 ) {       // Wired to 1 target
       RetNode ret = (RetNode)in(1);
-      if( ret.is_copy() )       // FunNode already single-caller and collapsed
+      if( ret.is_copy() && ret._uses._len==2 ) // FunNode already single-caller and collapsed
         return inline(gvn, ret.ctl(), ret.mem(), ret.val(), ret);
     }
 
@@ -65,7 +65,7 @@ public final class CallEpiNode extends Node {
     // Call allows 1 function not yet wired, sanity check it.
     int fidx = tfp.fidx();
     FunNode fun = FunNode.find_fidx(fidx);
-    if( fun.is_forward_ref() ) return null;
+    if( fun.is_forward_ref() || fun.is_dead() ) return null;
     if( gvn.type(fun) == Type.XCTRL ) return null;
 
     // Arg counts must be compatible
