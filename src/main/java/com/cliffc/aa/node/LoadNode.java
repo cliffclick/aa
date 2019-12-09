@@ -9,22 +9,19 @@ import com.cliffc.aa.util.Util;
 public class LoadNode extends Node {
   private final String _fld;
   private final Parse _bad;
-  public LoadNode( Node ctrl, Node mem, Node adr, String fld, Parse bad ) {
-    super(OP_LOAD,ctrl,mem,adr);
+  public LoadNode( Node mem, Node adr, String fld, Parse bad ) {
+    super(OP_LOAD,null,mem,adr);
     _fld = fld;
     _bad = bad;
   }
   String xstr() { return _fld; }   // Self short name
   String  str() { return xstr(); } // Inline short name
-  private Node ctl() { return in(0); }
   private Node mem() { return in(1); }
   private Node adr() { return in(2); }
-  private Node nil_ctl(GVNGCM gvn) { return set_def(0,null,gvn); }
   private Node set_mem(Node a, GVNGCM gvn) { return set_def(1,a,gvn); }
   private void set_adr(Node a, GVNGCM gvn) { set_def(2,a,gvn); }
 
   @Override public Node ideal(GVNGCM gvn) {
-    Node ctrl = ctl();
     Node mem  = mem();
     Node addr = adr();
 
@@ -54,12 +51,12 @@ public class LoadNode extends Node {
       return nnn.fld(idx);      // Field value
 
     // Load from a memory Phi; split through in an effort to sharpen the memory.
-    if( mem instanceof PhiNode && ctrl == null && nnn!=null ) {
+    if( mem instanceof PhiNode && nnn!=null ) {
       // TODO: Only split thru function args if no unknown_callers, and must make a Parm not a Phi
       if( !(mem instanceof ParmNode) ) {
         Node lphi = new PhiNode(((PhiNode)mem)._badgc,mem.in(0));
         for( int i=1; i<mem._defs._len; i++ )
-          lphi.add_def(gvn.xform(new LoadNode(null,mem.in(i),addr,_fld,_bad)));
+          lphi.add_def(gvn.xform(new LoadNode(mem.in(i),addr,_fld,_bad)));
         return lphi;
       }
     }
@@ -79,39 +76,7 @@ public class LoadNode extends Node {
     //if( st != null && st.err(gvn)==null &&
     //    ( st._fld_num != _fld_num || (_fld != null && !_fld.equals(st._fld_num)) ))
     //  return set_mem(st.mem(),gvn);
-
-    if( ctrl==null || gvn.type(ctrl)!=Type.CTRL )
-      return null;              // Dead load, or a no-control-no-fail load
-    if( addr.is_forward_ref() ) return null;
-    Type t = gvn.type(addr);    // Address type
-
-    // Lift control on Loads as high as possible... and move them over
-    // to a CastNode (to remove nil-ness) and remove the control.
-    if( !t.must_nil() ) // No nil, no need for ctrl
-      // remove ctrl; address already casts-away-nil
-      return nil_ctl(gvn);
-
-    // Looking for a nil-check pattern:
-    //   this.0->dom*->True->If->addr
-    //   this.1->[Cast]*-------/   Cast(s) are optional
-    // If found, convert to this pattern:
-    //   this.0      ->True->If->addr
-    //   this.1->Cast/---------/
-    // Where the cast-away-nil is local and explicit
-    Node baseaddr = addr;
-    while( baseaddr instanceof CastNode ) baseaddr = baseaddr.in(1);
-    final Node fbaseaddr = baseaddr;
-
-    Node tru = ctrl.walk_dom_last(n ->
-                                  n instanceof CProjNode && ((CProjNode)n)._idx==1 &&
-                                  n.in(0) instanceof IfNode &&
-                                  n.in(0).in(1) == fbaseaddr );
-    if( tru==null ) return null;
-    assert !(tru==ctrl && addr != baseaddr) : "not the immediate location or we would be not-nil already";
-
-    Type tnz = t.join(TypeMemPtr.OOP); // Remove nil choice
-    set_adr(gvn.xform(new CastNode(tru,baseaddr,tnz)),gvn);
-    return nil_ctl(gvn);
+    return null;
   }
 
   @Override public Type value(GVNGCM gvn) {
@@ -133,20 +98,11 @@ public class LoadNode extends Node {
     }
 
     // Loading from TypeObj - hoping to get a field out
-    if( mem instanceof TypeStruct ) {
+    if( mem instanceof TypeStruct && !tadr.must_nil() ) {
       TypeStruct ts = (TypeStruct)mem;
       int idx = ts.find(_fld);  // Find the named field
-      if( idx != -1 ) {         // Found a field
-        // Nil-check before allowing the load.
-        if( tadr.must_nil() ) {
-          // Check for nil-check not in the graph, but locally available.
-          if( !(ctl() instanceof CProjNode && ((CProjNode)ctl())._idx==1 && ctl().in(0).in(1)==adr()) ) {
-            // TODO: Need a type-flow in the graph for cycles...
-            return Type.SCALAR; // Not provable not-nil, so fails
-          }
-        }
-        return ts.at(idx); // Field type
-      }
+      if( idx != -1 )           // Found a field
+        return ts.at(idx);      // Field type
       // No such field
     }
     return badmemrez; // No loading from e.g. Strings

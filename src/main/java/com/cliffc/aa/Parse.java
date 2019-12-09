@@ -499,13 +499,14 @@ public class Parse {
           idx = 1;          // And use the scope index for all of memory
         }
         // Store or load against the chosen memory
+        Node castnn = gvn(new CastNode(ctrl(),n,TypeMemPtr.OOP)); // Remove nil choice
         if( peek(":=") || peek_not('=','=')) {
           byte fin = _buf[_x-2]==':' ? TypeStruct.frw() : TypeStruct.ffinal();
           Node stmt = stmt();
           if( stmt == null ) n = err_ctrl2("Missing stmt after assigning field '."+fld+"'");
-          else mem.set_def(idx,gvn(new StoreNode(ctrl(),mem.in(idx),n,n=stmt,fin,fld ,errMsg())),_gvn);
+          else mem.set_def(idx,gvn(new StoreNode(ctrl(),mem.in(idx),castnn,n=stmt,fin,fld ,errMsg())),_gvn);
         } else {
-          n = gvn(new LoadNode(ctrl(),mem.in(idx),n,fld ,errMsg()));
+          n = gvn(new LoadNode(mem.in(idx),castnn,fld,errMsg()));
         }
 
       } else {                  // Attempt a function-call
@@ -552,7 +553,7 @@ public class Parse {
     MemMergeNode mmem = mem_active(scope); // Active memory for the chosen scope
     ObjMergeNode omem = mmem.active_obj(scope.stk()._alias,_gvn);
     int idx = omem.fld_idx(tok,_gvn);
-    n = gvn(new LoadNode(scope.ctrl(),omem.in(idx),scope.ptr(),tok,null));
+    n = gvn(new LoadNode(omem.in(idx),scope.ptr(),tok,null));
     if( n.is_forward_ref() )         // Prior is actually a forward-ref
       return err_ctrl2(forward_ref_err(((FunPtrNode)n).fun()));
 
@@ -643,7 +644,7 @@ public class Parse {
     MemMergeNode mmem = mem_active(scope); // Active memory for the chosen scope
     ObjMergeNode omem = mmem.active_obj(scope.stk()._alias,_gvn);
     int idx = omem.fld_idx(tok=tok.intern(),_gvn);
-    return gvn(new LoadNode(scope.ctrl(),omem.in(idx),scope.ptr(),tok,null));
+    return gvn(new LoadNode(omem.in(idx),scope.ptr(),tok,null));
   }
 
   /** Parse a tuple; first stmt but not the ',' parsed.

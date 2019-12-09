@@ -237,7 +237,7 @@ public class GVNGCM {
         n = x.unhook();         // Remove keep-alive
       }
       if( !check_new(n) ) return n; // If the replacement is old, no need to re-ideal
-      cnt++; assert cnt < 1000;     // Catch infinite ideal-loops
+      cnt++; assert cnt < 100;      // Catch infinite ideal-loops
     }
     // Compute a type for n
     Type t = n.value(this);              // Get best type
