@@ -6,7 +6,7 @@ import java.lang.reflect.Array;
 import java.util.*;
 import java.util.function.Function;
 import java.util.function.Predicate;
-  
+
 // ArrayList with saner syntax
 public class Ary<E> implements Iterable<E> {
   public E[] _es;
@@ -36,13 +36,13 @@ public class Ary<E> implements Iterable<E> {
     range_check(0);
     return _es[_len-1];
   }
-  
+
   /** @return remove and return last element */
   public E pop( ) {
     range_check(0);
     return _es[--_len];
   }
-  
+
   /** Add element in amortized constant time
    *  @param e Element to add at end of list
    *  @return 'this' for flow-coding */
@@ -71,7 +71,7 @@ public class Ary<E> implements Iterable<E> {
     System.arraycopy(_es,i,_es,i+1,(_len++)-i);
     _es[i] = e;
   }
-  
+
   /** Fast, constant-time, element removal.  Does not preserve order
    *  @param i element to be removed
    *  @return element removed */
@@ -97,7 +97,7 @@ public class Ary<E> implements Iterable<E> {
   }
 
   /** Slow, linear-time, element removal.  Preserves order.
-   *  @param i element to be removed 
+   *  @param i element to be removed
    *  @return element removed */
   public E remove( int i ) {
     range_check(i);
@@ -105,7 +105,7 @@ public class Ary<E> implements Iterable<E> {
     System.arraycopy(_es,i+1,_es,i,(--_len)-i);
     return e;
   }
-  
+
   /** Remove all elements */
   public void clear( ) { _len=0; }
 
@@ -116,13 +116,19 @@ public class Ary<E> implements Iterable<E> {
     if( i >= _len ) _len = i+1;
     return (_es[i] = e);
   }
-  
+
+  /** Set existing element
+   * @param i element to set
+   * @param e value to set
+   * @return old value
+   */
   public E set( int i, E e ) {
     range_check(i);
-    return (_es[i] = e);
+    E old = _es[i];
+    _es[i] = e;
+    return old;
   }
-  
-  public Ary<E> set_as( E e ) { _es[0] = e; _len=1; return this; }
+
   public Ary<E> set_len( int len ) {
     if( len > _len )
       while( len>= _es.length ) _es = Arrays.copyOf(_es,_es.length<<1);
@@ -132,10 +138,10 @@ public class Ary<E> implements Iterable<E> {
     Arrays.fill(_es,len,_es.length,null);
     return this;
   }
-  
+
   /** @param c Collection to be added */
   public Ary<E> addAll( Collection<? extends E> c ) { for( E e : c ) add(e); return this; }
-    
+
   /** @param es Array to be added */
   public <F extends E> Ary<E> addAll( F[] es ) {
     if( es.length==0 ) return this;
@@ -144,7 +150,7 @@ public class Ary<E> implements Iterable<E> {
     _len += es.length;
     return this;
   }
-    
+
   /** @param c Collection to be added */
   public void addAll( Ary<? extends E> c ) {
     if( c._len==0 ) return;
@@ -152,14 +158,14 @@ public class Ary<E> implements Iterable<E> {
     System.arraycopy(c._es,0,_es,_len,c._len);
     _len += c._len;
   }
-  
+
   /** @return compact array version, using the internal base array where possible. */
   public E[] asAry() { return _len==_es.length ? _es : Arrays.copyOf(_es,_len); }
 
   /** @param f function to apply to each element.  Updates in-place. */
   public Ary<E> map_update( Function<E,E> f ) { for( int i = 0; i<_len; i++ ) _es[i] = f.apply(_es[i]); return this; }
   /** @param P filter out elements failing to pass the predicate; updates in
-   *  place and shuffles list. 
+   *  place and shuffles list.
    *  @return this, for flow-coding */
   public Ary<E> filter_update( Predicate<E> P ) {
     for( int i=0; i<_len; i++ )
@@ -167,7 +173,7 @@ public class Ary<E> implements Iterable<E> {
         del(i--);
     return this;
   }
-  /** Sorts in-place 
+  /** Sorts in-place
    *  @param c Comparator to sort by */
   public void sort_update(Comparator<? super E> c ) { Arrays.sort(_es, 0, _len, c);  }
   /** Find the first matching element using ==, or -1 if none.  Note that
@@ -241,7 +247,7 @@ public class Ary<E> implements Iterable<E> {
     }
     return res;
   }
-  
+
   /** @return an iterator */
   @NotNull
   @Override public Iterator<E> iterator() { return new Iter(); }
@@ -250,7 +256,7 @@ public class Ary<E> implements Iterable<E> {
     @Override public boolean hasNext() { return _i<_len; }
     @Override public E next() { return _es[_i++]; }
   }
-  
+
   @Override public String toString() {
     SB sb = new SB().p('{');
     for( int i=0; i<_len; i++ ) {

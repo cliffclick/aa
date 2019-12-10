@@ -8,11 +8,9 @@ import java.util.HashMap;
 // Merge results; extended by ParmNode
 public class PhiNode extends Node {
   final Parse _badgc;
-  private final BitsAlias _bits;
   private PhiNode( byte op, Parse badgc, Node... vals ) {
     super(op,vals);
     _badgc = badgc;
-    _bits = BitsAlias.NZERO;
   }
   public PhiNode( Parse badgc, Node... vals ) { this(OP_PHI,badgc,vals); }
   // For ParmNodes

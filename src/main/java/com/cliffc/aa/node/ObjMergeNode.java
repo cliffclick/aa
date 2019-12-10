@@ -7,10 +7,11 @@ import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.Util;
 import org.jetbrains.annotations.NotNull;
+import java.util.BitSet;
 
 // Merge all the fields of an object.  Slot 0 is the base object, field-less.
 public class ObjMergeNode extends Node {
-  final int _alias;
+  int _alias;
   private Ary<String> _flds;
 
   ObjMergeNode( Node obj, int alias ) {
@@ -132,5 +133,13 @@ public class ObjMergeNode extends Node {
     obj._flds = new Ary<>(_flds._es.clone(),_flds._len);
     return obj;
   }
-
+  @Override void update_alias( Node copy, BitSet aliases, GVNGCM gvn ) {
+    if( !aliases.get(_alias) ) return;
+    int alias = BitsAlias.get_kid(_alias);
+    ((ObjMergeNode)copy)._alias = alias;
+    assert gvn.touched(this);
+    Type oldt = gvn.unreg(this);
+    _alias = alias+1;
+    gvn.rereg(this,oldt);
+  }
 }

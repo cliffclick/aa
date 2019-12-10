@@ -23,10 +23,9 @@ public class RegionNode extends Node {
         for( Node phi : _uses )
           if( phi instanceof PhiNode ) {
             assert !phi.is_dead();
-            Type ot = gvn.type(phi);
-            gvn.unreg(phi);
+            Type oldt = gvn.unreg(phi);
             phi.remove(i,gvn);
-            if( !phi.is_dead() ) gvn.rereg(phi,ot);
+            if( !phi.is_dead() ) gvn.rereg(phi,oldt);
           }
         if( !is_dead() ) remove(i,gvn);
         return this; // Progress
@@ -61,6 +60,12 @@ public class RegionNode extends Node {
         in(1).in(0) == in(2).in(0) ) {
       Node n = in(1).in(0).walk_dom_last(P);
       if( n != null ) return n;
+    }
+    // Experimental stronger version
+    if( _defs._len==3 && !(this instanceof FunNode) ) {
+      Node n1 = in(1).walk_dom_last(P);
+      Node n2 = in(2).walk_dom_last(P);
+      if( n1 != null && n1==n2 ) return n1;
     }
     return P.test(this) ? this : null;
   }

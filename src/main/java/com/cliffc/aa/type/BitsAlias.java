@@ -57,6 +57,8 @@ public class BitsAlias extends Bits<BitsAlias> {
   public static boolean is_parent( int idx ) { return TREE.is_parent(idx); }
   // Return parent alias from child alias.
   public static int parent( int kid ) { return TREE.parent(kid); }
+  // Return first child alias from parent, assert there is exactly 1 more child at +1
+  public static int get_kid( int par ) { return TREE.get_kid(par); }
   // Fast reset of parser state between calls to Exec
   public static void init0() { TREE.init0(); }
   public static void reset_to_init0() { TREE.reset_to_init0();}

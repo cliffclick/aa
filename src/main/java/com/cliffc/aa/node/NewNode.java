@@ -92,8 +92,7 @@ public class NewNode extends Node {
   }
   // Update/modify a field, by field number
   public Node update( int fidx , Node val, byte mutable, GVNGCM gvn  ) {
-    Type oldt = gvn.type(this);
-    gvn.unreg(this);
+    Type oldt = gvn.unreg(this);
     update_active(fidx,val,mutable,gvn);
     gvn.rereg(this,oldt);
     return val;
@@ -194,12 +193,12 @@ public class NewNode extends Node {
     nnn._ts = _ts.make(false,BitsAlias.make0(nnn._alias));
     if( _name != null ) nnn._name = _name.make(nnn._ts); // Re-attach name as needed
     // The original NewNode also splits from the parent alias
-    Type oldt = gvn.touched(this) ? gvn.type(this) : null;
-    if( oldt != null ) gvn.unreg(this);
+    assert gvn.touched(this);
+    Type oldt = gvn.unreg(this);
     _alias = BitsAlias.new_alias(_alias);
     _ts = _ts.make(false,BitsAlias.make0(_alias));
     if( _name != null ) _name = _name.make(_ts); // Re-attach name as needed
-    if( oldt != null ) gvn.rereg(this,oldt);
+    gvn.rereg(this,oldt);
     return nnn;
   }
 

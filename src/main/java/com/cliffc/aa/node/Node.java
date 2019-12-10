@@ -118,8 +118,9 @@ public abstract class Node implements Cloneable {
           n.add_def(def);
       return n;
     } catch( CloneNotSupportedException cns ) { throw new RuntimeException(cns); }
-
   }
+  // If this alias split, update in-node both old and new.
+  void update_alias( Node copy, BitSet aliases, GVNGCM gvn ) {}
 
   // Short string name
   String xstr() { return STRS[_op]; } // Self   short  name

@@ -393,6 +393,27 @@ public class FunNode extends RegionNode {
   // for the old and one for the new body.  The new function may have a more
   // refined signature, and perhaps no unknown callers.
   private Node split_callers( GVNGCM gvn, ParmNode[] parms, RetNode oldret, FunNode fun, CGEdge[] cgedges, int path) {
+    /*
+      Bug Fix: Every NewNode.copy() splits aliases.  This means the original
+      code makes e.g. [12] but either copy makes either just [19] or [20], and
+      needs to handle the other half.  Thinking I can just pass-thru all the
+      other halves in bulk, and merge at both function exits.
+
+      Example: recursive map call makes a [12] with lifetime inside whole fcn:
+         map {-> [12]...if/[use 12]map[use 12]region... [merge base,12][last 12]}
+
+      Inline:
+         map {-> [19]...if/[use 12]{-> [20]... if/[use 12]map[use 12]region...[last 20]}[use 12]region... [last 19]}
+
+      Alias [19] spans whole of inner inline, so inner inline needs to pass
+      thru 19, which needs to de-alias against all the inside [12]s.
+
+      Might ponder forcing all aliases [12] to become either [19/20].
+      Currently thinking lazy update 12->19 but could be bulk force update.
+      Want semantics to allow lazy update.
+
+
+     */
     // Strip out all wired calls to this function.  All will re-resolve later.
     for( CGEdge cg : cgedges )
       if( cg != null && cg._cepi != null )
@@ -403,8 +424,7 @@ public class FunNode extends RegionNode {
       pop();
       for( Node parm : _uses )
         if( parm instanceof ParmNode ) {
-          Type oldt = gvn.type(parm);
-          gvn.unreg(parm);
+          Type oldt = gvn.unreg(parm);
           parm.pop();
           gvn.rereg(parm,oldt);
         }
@@ -412,6 +432,8 @@ public class FunNode extends RegionNode {
 
     // Map from old to cloned function body
     HashMap<Node,Node> map = new HashMap<>();
+    // Collect aliases that are cloning.
+    BitSet aliases = new BitSet();
     // Clone the function body
     map.put(this,fun);
     Ary<Node> work = new Ary<>(new Node[1],0);
@@ -423,6 +445,7 @@ public class FunNode extends RegionNode {
       int op = n._op;                    // opcode
       if( op == OP_FUN  && n       != this ) continue; // Call to other function, not part of inlining
       if( op == OP_PARM && n.in(0) != this ) continue; // Arg  to other function, not part of inlining
+      if( n instanceof NewNode ) aliases.set(((NewNode)n)._alias);
       map.put(n,n.copy(false,gvn)); // Make a blank copy with no edges and map from old to new
       work.addAll(n._uses);   // Visit all uses also
     }
@@ -446,6 +469,10 @@ public class FunNode extends RegionNode {
         c.add_def(newdef==null ? def : newdef);
       }
     }
+    // For all aliases split in this pass, update in-node both old and new.
+    // This changes their hash, and afterwards the keys cannot be looked up.
+    for( Map.Entry<Node,Node> e : map.entrySet() )
+      e.getKey().update_alias(e.getValue(),aliases,gvn);
     // We kept the unknown caller path on 'this', and then copied it to 'fun'.
     // But if inlining along a specific path, only that path should be present.
     // Kill the unknown_caller path.

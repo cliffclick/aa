@@ -6,6 +6,7 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.AryInt;
 import com.cliffc.aa.util.SB;
 import org.jetbrains.annotations.NotNull;
+import java.util.BitSet;
 
 // Merge a lot of TypeObjs into a TypeMem.  Each input is from a different
 // alias.  Each collection represents the whole of memory, with missing parts
@@ -131,14 +132,14 @@ public class MemMergeNode extends Node {
   // Mid-iter call, will need to unreg/rereg
   public Node obj(int alias, GVNGCM gvn) {
     assert gvn.touched(this) && alias > 1; // Only if this MemMerge is not active
-    Type t = gvn.type(this);  gvn.unreg(this);
+    Type oldt = gvn.unreg(this);
     int idx = make_alias2idx(alias);         // Make a spot for this alias
     Node obj = in(idx);                      // Get current def
     if( obj == null ) {                      // No prior alias
       obj = in(find_alias2idx(BitsAlias.parent(alias)));
       set_def(idx, obj, null);  // Set in immediate alias parent
     }
-    gvn.rereg(this,t);
+    gvn.rereg(this,oldt);
     return obj;
   }
 
@@ -153,9 +154,9 @@ public class MemMergeNode extends Node {
   // Create a new alias with initial value for deactive/gvn-registered memory
   public void create_alias( int alias, Node n, GVNGCM gvn ) {
     assert gvn.touched(this);
-    Type t = gvn.type(this);  gvn.unreg(this);
+    Type oldt = gvn.unreg(this);
     create_alias_active(alias,n,gvn);
-    gvn.rereg(this,t);
+    gvn.rereg(this,oldt);
   }
   // Create a new alias with initial value for an active this
   public void create_alias_active( int alias, Node n, GVNGCM gvn ) {
@@ -268,7 +269,8 @@ public class MemMergeNode extends Node {
     Type t = gvn.type(in(idx));
     if( !(t instanceof TypeObj) ) return -1; // Types have not flowed yet
     TypeObj tobj = (TypeObj)t;
-    return Math.abs(tobj._news.getbit());
+    int alias = tobj._news.abit();
+    return alias == -1 ? -1 : Math.abs(alias);
   }
 
   @Override public Type value(GVNGCM gvn) {
@@ -285,7 +287,8 @@ public class MemMergeNode extends Node {
       Type ta = gvn.type(in(i));
       if( !(ta instanceof TypeObj) ) return tx;
       TypeObj tobj = (TypeObj)ta;
-      if( Math.abs(tobj._news.getbit())!=alias )
+      int alias2 = tobj._news.abit();
+      if( alias2 == -1 || Math.abs(alias2)!=alias )
         return tx; // Expecting an exact alias
       tm = tm.st(alias,tobj);
     }
@@ -298,6 +301,22 @@ public class MemMergeNode extends Node {
     mmm._aliases = new AryInt(_aliases._es.clone(),_aliases._len);
     mmm._aidxes  = new AryInt(_aidxes ._es.clone(),_aidxes ._len);
     return mmm;
+  }
+  @Override void update_alias( Node copy, BitSet aliases, GVNGCM gvn ) {
+    assert gvn.touched(this);
+    Type oldt = gvn.unreg(this);
+    for( int i=1; i<_aliases._len; i++ ) {
+      int mya = _aliases.at(i);
+      if( !aliases.get(mya) ) continue;
+      int kid0_alias = BitsAlias.get_kid(mya);
+      ((MemMergeNode)copy)._aliases.set(i,kid0_alias  );
+                           _aliases.set(i,kid0_alias+1);
+      ((MemMergeNode)copy)._aidxes.set(mya,0);
+                           _aidxes.set(mya,0);
+      ((MemMergeNode)copy)._aidxes.setX(kid0_alias  ,i);
+                           _aidxes.setX(kid0_alias+1,i);
+    }
+    gvn.rereg(this,oldt);
   }
 }
 

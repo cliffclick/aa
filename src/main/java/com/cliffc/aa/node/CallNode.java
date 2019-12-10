@@ -95,8 +95,7 @@ public class CallNode extends Node {
     if( olen==0 ) old_rpc=null;
     else assert olen==1;               // Exactly a wired callsite
     call._rpc = BitsRPC.new_rpc(_rpc); // Children RPC
-    Type oldt = gvn.type(this);        //
-    gvn.unreg(this);                   // Changes hash, so must remove from hash table
+    Type oldt = gvn.unreg(this);       // Changes hash, so must remove from hash table
     _rpc = BitsRPC.new_rpc(_rpc);      // New child RPC for 'this' as well.
     gvn.rereg(this,oldt);              // Back on list
     // Swap out the existing old rpc users for the new.

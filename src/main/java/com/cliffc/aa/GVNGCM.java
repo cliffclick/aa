@@ -160,12 +160,11 @@ public class GVNGCM {
   public boolean touched( Node n ) { return _ts.atX(n._uid)!=null; }
 
   // Remove from GVN structures.  Used rarely for whole-merge changes
-  public void unreg( Node n ) { assert !check_new(n); unreg0(n); }
-  private Node unreg0( Node n ) {
-    _ts.set(n._uid,null);       // Remove from type system
+  public Type unreg( Node n ) { assert !check_new(n); return unreg0(n); }
+  private Type unreg0( Node n ) {
+    Type t = _ts.set(n._uid,null); // Remove from type system
     _vals.remove(n);            // Remove from GVN
-    // TODO: Remove from worklist also
-    return n;
+    return t;
   }
 
   // Used rarely for whole-merge changes
@@ -257,7 +256,7 @@ public class GVNGCM {
   // go dead.  Since its new, no need to remove from GVN system.
   public void kill_new( Node n ) { assert check_new(n);  kill0(n); }
   // Recursively kill off a dead node, which might make lots of other nodes go dead
-  public void kill( Node n ) {  kill0(unreg0(n)); }
+  public void kill( Node n ) {  unreg0(n); kill0(n); }
   // Version for never-GVN'd; common for e.g. constants to die early or
   // RootNode, and some other make-and-toss Nodes.
   private void kill0( Node n ) {
