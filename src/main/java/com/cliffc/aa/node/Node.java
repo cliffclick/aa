@@ -126,9 +126,13 @@ public abstract class Node implements Cloneable {
   String xstr() { return STRS[_op]; } // Self   short  name
   String  str() { return xstr(); }    // Inline longer name
   @Override public String toString() { return dump(0,new SB(),null).toString(); }
+  // Dump without GVN for types
   public String dump( int max ) { return dump(max,null); }
+  // Dump with    GVN for types
   public String dump( int max, GVNGCM gvn ) { return dump(max,gvn,_uid<GVNGCM._INIT0_CNT);  }
-  public String dump( int max, GVNGCM gvn, boolean prims ) { return dump(0, new SB(),max,new BitSet(),gvn,prims).toString();  }
+  // Dump including primitives
+  public String dump( int max, GVNGCM gvn, boolean prims ) { return dump(0, new SB(),max,new VBitSet(),gvn,prims).toString();  }
+  // Dump one node, no recursion
   private SB dump( int d, SB sb, GVNGCM gvn ) {
     String xs = String.format("%4d: %-7.7s ",_uid,xstr());
     sb.i(d).p(xs);
@@ -144,15 +148,14 @@ public abstract class Node implements Cloneable {
     }
     return sb;
   }
-  private void dump(int d, SB sb, BitSet bs, GVNGCM gvn) {
-    if( bs.get(_uid) ) return;
-    bs.set(_uid);
+  // Dump one node IF not already dumped, no recursion
+  private void dump(int d, SB sb, VBitSet bs, GVNGCM gvn) {
+    if( bs.tset(_uid) ) return;
     dump(d,sb,gvn).nl();
   }
   // Recursively print, up to depth
-  private SB dump( int d, SB sb, int max, BitSet bs, GVNGCM gvn, boolean prims ) {
-    if( bs.get(_uid) ) return sb;
-    bs.set(_uid);
+  private SB dump( int d, SB sb, int max, VBitSet bs, GVNGCM gvn, boolean prims ) {
+    if( bs.tset(_uid) ) return sb;
     if( d < max ) {    // Limit at depth
       // Print parser scopes first (deepest)
       for( Node n : _defs ) if( n instanceof ScopeNode ) n.dump(d+1,sb,max,bs,gvn,prims);
@@ -160,7 +163,7 @@ public abstract class Node implements Cloneable {
       for( Node n : _defs ) if( n instanceof ConNode ) n.dump(d+1,sb,max,bs,gvn,prims);
       // Do not recursively print root Scope, nor Unresolved of primitives.
       // These are too common, and uninteresting.
-      for( Node n : _defs ) if( n != null && (!prims && n._uid < GVNGCM._INIT0_CNT) ) bs.set(n._uid);
+      for( Node n : _defs ) if( n != null && (!prims && n._uid < GVNGCM._INIT0_CNT && n._defs._len > 3) ) bs.set(n._uid);
       // Recursively print most of the rest, just not the multi-node combos and
       // Unresolve & FunPtrs.
       for( Node n : _defs )
@@ -172,6 +175,7 @@ public abstract class Node implements Cloneable {
         if( (n instanceof UnresolvedNode) || (n instanceof FunPtrNode) )
           n.dump(d+1,sb,max,bs,gvn,prims);
       // Print anything not yet printed, including multi-node combos
+      for( Node n : _defs ) if( n != null && !n.is_multi_head() ) n.dump(d+1,sb,max,bs,gvn,prims);
       for( Node n : _defs ) if( n != null ) n.dump(d+1,sb,max,bs,gvn,prims);
     }
     // Print multi-node combos all-at-once, including all tails even if they
@@ -183,7 +187,7 @@ public abstract class Node implements Cloneable {
       for( Node n : x._uses )
         if( n.is_multi_tail() )
           for( Node m : n._defs )
-            m.dump(dx+1,sb,max,bs,gvn,prims);
+            if( dx<max) m.dump(dx+1,sb,max,bs,gvn,prims);
       if( x==this ) bs.clear(_uid); // Reset for self, so prints right now
       x.dump(dx,sb,bs,gvn); // Conditionally print head of combo
       // Print all combo tails, if not already printed
@@ -226,13 +230,14 @@ public abstract class Node implements Cloneable {
     if( !is_multi_tail() ) nodes.push(this);
   }
 
-  public  Node find( int uid ) { return find(uid,new BitSet()); }
-  private Node find( int uid, BitSet bs ) {
+  // Utility during debugging to find a reachable Node by _uid
+  public  Node find( int uid ) { return find(uid,new VBitSet()); }
+  private Node find( int uid, VBitSet bs ) {
     if( _uid==uid ) return this;
-    if( bs.get(_uid) ) return null;
-    bs.set(_uid);
+    if( bs.tset(_uid) ) return null;
     Node m;
     for( Node n : _defs ) if( n!=null && (m=n.find(uid,bs)) !=null ) return m;
+    for( Node n : _uses ) if(            (m=n.find(uid,bs)) !=null ) return m;
     return null;
   }
 

@@ -184,6 +184,13 @@ public class MemMergeNode extends Node {
     return this;                // Ready for gvn.xform as a new node
   }
 
+  // MemMerge lost a use.  If it drops to 1 use of a Phi, the Phi will want to
+  // split through it.
+  @Override public boolean ideal_impacted_by_losing_uses(GVNGCM gvn, Node dead) {
+    if( _uses._len==1 && _uses.at(0) instanceof PhiNode ) gvn.add_work(_uses.at(0));
+    return false;
+  }
+  
   @Override public Node ideal(GVNGCM gvn) {
     assert _defs._len==_aliases._len;
     // Dead & duplicate inputs can be removed.
