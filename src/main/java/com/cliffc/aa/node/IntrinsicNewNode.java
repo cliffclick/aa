@@ -114,7 +114,7 @@ public abstract class IntrinsicNewNode extends IntrinsicNode {
       TypeStr str0 = (TypeStr)s0;
       TypeStr str1 = (TypeStr)s1;
       if( !str0.is_con() || !str1.is_con() ) return all_type();
-      TypeStr str = TypeStr.con(str0.getstr()+str1.getstr());
+      TypeStr str = TypeStr.con((str0.getstr()+str1.getstr()).intern());
       return TypeTuple.make(str,TypeMemPtr.make(_alias,str));
     }
     @Override public byte op_prec() { return 5; }

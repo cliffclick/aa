@@ -162,7 +162,7 @@ public class GVNGCM {
   // Remove from GVN structures.  Used rarely for whole-merge changes
   public Type unreg( Node n ) { assert !check_new(n); return unreg0(n); }
   private Type unreg0( Node n ) {
-    Type t = _ts.set(n._uid,null); // Remove from type system
+    Type t = n._uid < _ts._len ? _ts.set(n._uid,null) : null; // Remove from type system
     _vals.remove(n);            // Remove from GVN
     return t;
   }

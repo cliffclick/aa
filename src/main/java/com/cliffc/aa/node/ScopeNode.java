@@ -33,8 +33,8 @@ public class ScopeNode extends Node {
   public void init0() { Type.init0(_types); }
 
   public   Node  ctrl() { return in(0); }
-  public   Node  ptr () { return in(2); }
   public   Node  mem () { return in(1); }
+  public   Node  ptr () { return in(2); }
   public NewNode stk () { return (NewNode)ptr().in(0); }
   public <N extends Node> N set_ctrl( N n, GVNGCM gvn) { set_def(0,n,gvn); return n; }
   public void set_ptr ( Node n, GVNGCM gvn) { set_def(2,n,gvn); }

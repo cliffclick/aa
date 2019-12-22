@@ -167,7 +167,17 @@ public class Parse {
 
     Type tres = _gvn.type(res);
     kill(res);       // Kill Node for returned Type result
-    TypeObj tobj = tres instanceof TypeMemPtr ? ((TypeMemPtr)tres)._obj : TypeObj.XOBJ;
+    TypeObj tobj = TypeObj.XOBJ;
+    // If returning memory, return the (shallow) object pointed at
+    if( mem != null ) {
+      Type tmem = _gvn.type(mem);
+      kill(mem);       // Kill Node for returned Type result
+      if( tres instanceof TypeMemPtr ) {
+        TypeMemPtr tmp = (TypeMemPtr)tres;
+        tobj = ((TypeMem)tmem).ld(tmp);
+        tres = tmp.make(tobj);
+      }
+    }
     return new TypeEnv(tres,tobj,_e,errs0.isEmpty() ? null : errs0);
   }
 
@@ -179,6 +189,7 @@ public class Parse {
     if( res == null ) res = con(Type.ANY);
     res = merge_exits(res);
     all_mem();                    // Close off top-level active memory
+    _e._par._scope.all_mem(_gvn); // Loads against primitive scope will 'activate' memory, close it also
     _e._scope.add_def(res);       // Hook result
   }
 
@@ -860,7 +871,7 @@ public class Parse {
     // Convert to ptr-to-constant-memory-string
     TypeMemPtr ptr = TypeMemPtr.make(ts._news,ts);
     // Store the constant string to memory
-    ((MemMergeNode)Env.TOP._scope.mem()).create_alias(ts._news.getbit(),con(ts),_gvn);
+    mem_active().create_alias_active(ts._news.getbit(),con(ts),_gvn);
     return ptr;
   }
 
@@ -1078,7 +1089,7 @@ public class Parse {
   // Expand default memory to support precise aliasing: an active MemMerge (not in GVN)
   private MemMergeNode mem_active() { return mem_active(_e._scope); }
   private MemMergeNode mem_active(ScopeNode scope) {
-    Node mem = _e._scope.mem();
+    Node mem = scope.mem();
     if( _gvn.touched(mem) ) {
       // If only used by the parser, just make it active.
       if( mem instanceof MemMergeNode && mem._uses._len==1 && mem._keep == 0 ) _gvn.unreg(mem);

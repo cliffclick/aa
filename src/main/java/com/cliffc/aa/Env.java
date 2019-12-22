@@ -43,7 +43,7 @@ public class Env implements AutoCloseable {
     PTR_0        = GVN.init(new  ProjNode(STK_0,1));
     OBJ_0        =          new OProjNode(STK_0,0) ;
 
-    MEM_0 = GVN.init(new MemMergeNode(all_mem,OBJ_0,STK_0._alias));
+    MEM_0 = GVN.init(new MemMergeNode(all_mem,OBJ_0,STK_0._alias)).keep();
     // Top-level default values; ALL_CTRL is used by declared functions to
     // indicate that future not-yet-parsed code may call the function.
     ALL_CTRL = GVN.init(new ConNode<>(Type.CTRL));
