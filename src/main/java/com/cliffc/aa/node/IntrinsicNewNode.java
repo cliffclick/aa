@@ -34,7 +34,6 @@ public abstract class IntrinsicNewNode extends IntrinsicNode {
     new ConvertF64Str(),
     new AddStrStr(),
   };
-  private BitsAlias alias_bits() { return _funret._obj._news; }
   // Clones during inlining all become unique new sites
   @Override @NotNull IntrinsicNewNode copy( boolean copy_edges, GVNGCM gvn) {
     IntrinsicNewNode nnn = (IntrinsicNewNode)super.copy(copy_edges, gvn);
@@ -68,7 +67,7 @@ public abstract class IntrinsicNewNode extends IntrinsicNode {
       Type t = gvn.type(in(2));
       if( t.above_center() ) return all_type().dual();
       if( !t.is_con() || !(t instanceof TypeInt) ) return all_type();
-      TypeStr str = TypeStr.make(false,Long.toString(t.getl()).intern(),alias_bits());
+      TypeStr str = TypeStr.make(false,Long.toString(t.getl()).intern(),_funret._obj._news);
       return TypeTuple.make(str,TypeMemPtr.make(_alias,str));
     }
   }
@@ -79,7 +78,7 @@ public abstract class IntrinsicNewNode extends IntrinsicNode {
       Type t = gvn.type(in(2));
       if( t.above_center() ) return all_type().dual();
       if( !t.is_con() || !(t instanceof TypeFlt) ) return all_type();
-      TypeStr str = TypeStr.make(false,Double.toString(t.getd()).intern(),alias_bits());
+      TypeStr str = TypeStr.make(false,Double.toString(t.getd()).intern(),_funret._obj._news);
       return TypeTuple.make(str,TypeMemPtr.make(_alias,str));
     }
   }
@@ -115,7 +114,7 @@ public abstract class IntrinsicNewNode extends IntrinsicNode {
       TypeStr str0 = (TypeStr)s0;
       TypeStr str1 = (TypeStr)s1;
       if( !str0.is_con() || !str1.is_con() ) return all_type();
-      TypeStr str = TypeStr.make(false,(str0.getstr()+str1.getstr()).intern(),alias_bits());
+      TypeStr str = TypeStr.make(false,(str0.getstr()+str1.getstr()).intern(),_funret._obj._news);
       return TypeTuple.make(str,TypeMemPtr.make(_alias,str));
     }
     @Override public byte op_prec() { return 5; }
