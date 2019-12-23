@@ -30,10 +30,11 @@ public abstract class IntrinsicNewNode extends IntrinsicNode {
     return this;
   }
   public static IntrinsicNewNode[] INTRINSICS = new IntrinsicNewNode[] {
-    new ConvertI64Str(BitsAlias.I64),
-    new ConvertF64Str(BitsAlias.F64),
-    new AddStrStr(BitsAlias.STR_STR),
+    new ConvertI64Str(),
+    new ConvertF64Str(),
+    new AddStrStr(),
   };
+  private BitsAlias alias_bits() { return _funret._obj._news; }
   // Clones during inlining all become unique new sites
   @Override @NotNull IntrinsicNewNode copy( boolean copy_edges, GVNGCM gvn) {
     IntrinsicNewNode nnn = (IntrinsicNewNode)super.copy(copy_edges, gvn);
@@ -49,36 +50,36 @@ public abstract class IntrinsicNewNode extends IntrinsicNode {
     ParmNode memp= (ParmNode) gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM     ),null));
     // Add input edges to the intrinsic
     add_def(null);              // Control for the primitive in slot 0
-    add_def(memp);              // Control for the memory    in slot 1
+    add_def(memp);              // Memory  for the primitive in slot 1
     for( int i=0; i<_args.length; i++ ) // Args follow
-      add_def(gvn.xform(new ParmNode(i,_args[i],fun, gvn.con(_targs.at(i)),null)));
+      add_def( gvn.xform(new ParmNode(i,_args[i],fun, gvn.con(_targs.at(i)),null)));
     Node rez = gvn.xform(this); // Returns a Tuple(mem,ptr)
     Node mem = gvn.xform(new OProjNode(rez,0));
     Node ptr = gvn.xform(new  ProjNode(rez,1));
-    Node mmem = gvn.xform(new MemMergeNode(memp,mem,_alias));
+    Node mmem= gvn.xform(new MemMergeNode(memp,mem,_alias));
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,ptr,rpc,fun));
     return new FunPtrNode(ret);
   }
 
   // --------------------------------------------------------------------------
   static class ConvertI64Str extends IntrinsicNewNode {
-    ConvertI64Str(int alias) { super("str",ARGS1,TypeTuple.INT64,alias); }
+    ConvertI64Str() { super("str",ARGS1,TypeTuple.INT64,BitsAlias.I64); }
     @Override public Type value(GVNGCM gvn) {
       Type t = gvn.type(in(2));
       if( t.above_center() ) return all_type().dual();
       if( !t.is_con() || !(t instanceof TypeInt) ) return all_type();
-      TypeStr str = TypeStr.make(false,Long.toString(t.getl()).intern(),_funret._obj._news);
+      TypeStr str = TypeStr.make(false,Long.toString(t.getl()).intern(),alias_bits());
       return TypeTuple.make(str,TypeMemPtr.make(_alias,str));
     }
   }
 
   static class ConvertF64Str extends IntrinsicNewNode {
-    ConvertF64Str(int alias) { super("str",ARGS1,TypeTuple.FLT64, alias); }
+    ConvertF64Str() { super("str",ARGS1,TypeTuple.FLT64, BitsAlias.F64); }
     @Override public Type value(GVNGCM gvn) {
       Type t = gvn.type(in(2));
       if( t.above_center() ) return all_type().dual();
       if( !t.is_con() || !(t instanceof TypeFlt) ) return all_type();
-      TypeStr str = TypeStr.make(false,Double.toString(t.getd()).intern(),_funret._obj._news);
+      TypeStr str = TypeStr.make(false,Double.toString(t.getd()).intern(),alias_bits());
       return TypeTuple.make(str,TypeMemPtr.make(_alias,str));
     }
   }
@@ -97,7 +98,7 @@ public abstract class IntrinsicNewNode extends IntrinsicNode {
     // Unresolved, all prims "look dead", including memory state.  Keep them
     // dead until resolving or not.
     //
-    AddStrStr(int alias) { super("+",ARGS2,TypeTuple.STR_STR, alias); }
+    AddStrStr() { super("+",ARGS2,TypeTuple.STR_STR, BitsAlias.STR_STR); }
     @Override public Type value(GVNGCM gvn) {
       Type m   = gvn.type(in(1));
       Type sp0 = gvn.type(in(2));
@@ -114,7 +115,7 @@ public abstract class IntrinsicNewNode extends IntrinsicNode {
       TypeStr str0 = (TypeStr)s0;
       TypeStr str1 = (TypeStr)s1;
       if( !str0.is_con() || !str1.is_con() ) return all_type();
-      TypeStr str = TypeStr.make(false,(str0.getstr()+str1.getstr()).intern(),_funret._obj._news);
+      TypeStr str = TypeStr.make(false,(str0.getstr()+str1.getstr()).intern(),alias_bits());
       return TypeTuple.make(str,TypeMemPtr.make(_alias,str));
     }
     @Override public byte op_prec() { return 5; }

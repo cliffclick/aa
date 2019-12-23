@@ -17,7 +17,7 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     return o instanceof TypeObj &&
-      _any==((TypeObj)o)._any &&
+      _any ==((TypeObj)o)._any &&
       _type==((TypeObj)o)._type &&
       (_news == null || ((TypeObj)o)._news==null ||  _news==((TypeObj)o)._news);
   }

@@ -14,7 +14,7 @@ public class ConNode<T extends Type> extends Node {
   @Override public Type value(GVNGCM gvn) { return _t; }
   @Override public Type all_type() { return _t; }
   @Override public String toString() { return str(); }
-  @Override public int hashCode() { return _t.hashCode(); }// In theory also slot 0, but slot 0 is always Root
+  @Override public int hashCode() { return _t.hashCode(); }// In theory also slot 0, but slot 0 is always Start
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !(o instanceof ConNode) ) return false;
