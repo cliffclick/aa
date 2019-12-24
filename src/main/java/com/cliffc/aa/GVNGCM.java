@@ -172,7 +172,7 @@ public class GVNGCM {
     assert !check_opt(n);
     setype(n,oldt);
     _vals.put(n,n);
-    add_work0(n);
+    add_work(n);
   }
 
   // Hack an edge, updating GVN as needed
@@ -297,9 +297,14 @@ public class GVNGCM {
   // - Not an ErrNode AND
   // - Type isa Con
   private static boolean replace_con(Type t, Node n) {
-    if( n instanceof ConNode || n instanceof ErrNode )
+    if( n._keep >0 || n instanceof ConNode || n instanceof ErrNode )
       return false; // Already a constant, or never touch an ErrNode
-    return t.is_con(); // Replace with a ConNode
+    if( !t.is_con() ) return false;
+    if( t instanceof TypeFunPtr ) {
+      Node x = FunNode.find_fidx(((TypeFunPtr)t).fidx());
+      if( x==null || x.is_dead() ) return false;
+    }
+    return true; // Replace with a ConNode
   }
 
   /** Look for a better version of 'n'.  Can change n's defs via the ideal()
@@ -309,9 +314,13 @@ public class GVNGCM {
    *  @return null for no-change, or a better version of n, already in GVN */
   private Node xform_old0( Node n ) {
     assert touched(n);         // Node is in type tables, but might be already out of GVN
-    _vals.remove(n);           // Remove before modifying edges (and thus hash)
     Type oldt = type(n);       // Get old type
     _ts._es[n._uid] = null;    // Remove from types, mostly for asserts
+    Node x = _vals.remove(n);  // Remove before modifying edges (and thus hash)
+    if( x != null && x != n ) {// Found a prior existing hit
+      _vals.put(x,x);          // Put old hit back in table
+      return x;                // And use it instead
+    }
     assert !check_opt(n);      // Not in system now
     if( replace_con(oldt,n) )
       return con(oldt);        // Dead-on-Entry, common when called from GCP

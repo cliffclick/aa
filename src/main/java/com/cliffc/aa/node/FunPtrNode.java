@@ -15,6 +15,13 @@ public final class FunPtrNode extends ConNode<TypeFunPtr> {
     super(OP_FUNPTR,ret,ret.fun()._tf);
     _referr = referr;
   }
+  @Override public int hashCode() { return super.hashCode() ^ in(0)._uid; }// In theory also slot 0, but slot 0 is always Start
+  @Override public boolean equals(Object o) {
+    if( this==o ) return true;
+    if( !(o instanceof FunPtrNode) ) return false;
+    FunPtrNode fptr = (FunPtrNode)o;
+    return in(0)==fptr.in(0) && super.equals(fptr);
+  }
   public RetNode ret() { return (RetNode)in(0); }
   public FunNode fun() { return ret().fun(); }
   // Self   short  name

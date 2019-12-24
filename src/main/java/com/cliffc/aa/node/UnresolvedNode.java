@@ -22,7 +22,17 @@ public class UnresolvedNode extends Node {
   @Override public Node ideal(GVNGCM gvn) {
     if( _defs._len < 2 )
       throw com.cliffc.aa.AA.unimpl(); // Should collapse
-    return null;
+    boolean progress=false;
+    for( int i=0; i<_defs._len; i++ ) {
+      if( in(i) instanceof UnresolvedNode ) {
+        progress = true;
+        Node u = in(i);
+        for( int j=0; j<u._defs._len; j++ )
+          add_def(u.in(j));
+        set_def(i,pop(),gvn);
+      }
+    }
+    return progress ? this : null;
   }
   @Override public Type value(GVNGCM gvn) {
     if( gvn._opt_mode != 2 ) {
