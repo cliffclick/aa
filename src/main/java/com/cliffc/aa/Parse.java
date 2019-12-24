@@ -226,6 +226,7 @@ public class Parse {
     int oldx = _x;
     String tvar = token();      // Scan for tvar
     if( tvar == null ) return null;
+    tvar = tvar.intern();
     if( !peek('=') || !peek(':') ) { _x = oldx; return null; }
     // Must be a type-variable assignment
     Type t = typev();
@@ -643,7 +644,7 @@ public class Parse {
     if( scope == null ) { // Assume any unknown ref is a forward-ref of a recursive function
       Node fref = gvn(FunPtrNode.forward_ref(_gvn,tok,this));
       // Place in nearest enclosing closure, NOT as a field in a struct.
-      _e.lookup_closure().stk().create(tok,fref,TypeStruct.ffinal(),_gvn);
+      _e.lookup_closure().stk().create(tok.intern(),fref,TypeStruct.ffinal(),_gvn);
       return fref;
     }
     Node def = scope.get(tok);    // Get top-level value; only sane if no stores allowed to modify it
@@ -665,7 +666,7 @@ public class Parse {
     NewNode nn = new NewNode(ctrl(),false);
     int fidx=0;
     while( s!=null ) {
-      nn.create_active(""+fidx++,s,TypeStruct.ffinal(),_gvn);
+      nn.create_active((""+(fidx++)).intern(),s,TypeStruct.ffinal(),_gvn);
       if( !peek(',') ) break;   // Final comma is optional
       s=stmts();
     }
@@ -703,7 +704,7 @@ public class Parse {
           t = Type.SCALAR;
           skipNonWS();         // Skip possible type sig, looking for next arg
         }
-      ids .add(tok);
+      ids .add(tok.intern());
       ts  .add(t  );
       bads.add(bad);
     }
@@ -951,6 +952,7 @@ public class Parse {
         if( peek('=') &&                 // Has type annotation?
             (t=typep(type_var)) == null) // Parse type, wrap ptrs
           t = Type.SCALAR;               // No type found, assume default
+        tok = tok.intern();              // Only 1 copy
         if( flds.find(tok) != -1 ) throw AA.unimpl(); // cannot use same field name twice
         flds  .add(tok);                 // Gather for final type
         ts    .add(t);

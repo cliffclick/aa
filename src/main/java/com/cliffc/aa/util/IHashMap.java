@@ -10,4 +10,5 @@ public class IHashMap {
   public <T> T get(T key) { return (T)_map.get(key); }
   public void remove(Object key) { _map.remove(key); }
   public void clear() { _map.clear(); }
+  public boolean isEmpty() { return _map.isEmpty(); }
 }

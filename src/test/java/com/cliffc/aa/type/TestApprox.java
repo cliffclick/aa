@@ -1,7 +1,6 @@
 package com.cliffc.aa.type;
 
 import org.junit.Test;
-import org.junit.Ignore;
 
 import java.util.HashMap;
 
@@ -242,11 +241,13 @@ public class TestApprox {
     byte[] finals3 = new byte[]{1,1,1};
 
     // ......................................................... -> X5
-    TypeStruct  x5 = TypeStruct.make(flds3,new Type[]{TypeStr.con("X5"),Type.NIL,Type.NIL},finals3,alias1);
+    Type str_x5 = TypeStr.con("X5");
+    TypeStruct  x5 = TypeStruct.make(flds3,new Type[]{str_x5,Type.NIL,Type.NIL},finals3,alias1);
     TypeMemPtr px5 = TypeMemPtr.make(alias1,x5);
 
     // ................................................... -> A3 -> X5
-    TypeStruct  a3 = TypeStruct.make(flds2,new Type[]{TypeStr.con("A3"),px5},finals2,alias0);
+    TypeStr str_a3 = TypeStr.con("A3");
+    TypeStruct  a3 = TypeStruct.make(flds2,new Type[]{str_a3,px5},finals2,alias0);
     TypeMemPtr pa3 = TypeMemPtr.make(alias0,a3);
 
     // Build two structs pointing to each other
@@ -271,7 +272,8 @@ public class TestApprox {
     px3 = (TypeMemPtr)x4._ts[1];
 
     // ................................ A2 -> (X3 <-> X4 ) -> A3 -> X5
-    TypeStruct  a2 = TypeStruct.make(flds2,new Type[]{TypeStr.con("A2"),px3},finals2,alias0);
+    TypeStr str_a2 = TypeStr.con("A2");
+    TypeStruct  a2 = TypeStruct.make(flds2,new Type[]{str_a2,px3},finals2,alias0);
     TypeMemPtr pa2 = TypeMemPtr.make(alias0,a2);
 
     // Check sanity
@@ -350,17 +352,17 @@ public class TestApprox {
     TypeMemPtr zpa23= (TypeMemPtr)zsx2._ts[2];
 
     TypeStruct zsa23= (TypeStruct)zpa23._obj;
-    assertSame  (TypeStr.STR,     zsa23._ts[0]);
+    assertSame(str_a2.meet(str_a3), zsa23._ts[0]);
     TypeMemPtr zpx35= (TypeMemPtr)zsa23._ts[1];
 
     TypeStruct zsx35= (TypeStruct)zpx35._obj;
-    assertSame  (TypeStr.STR,     zsx35._ts[0]);
+    assertSame(str_x5.meet(i13),  zsx35._ts[0]);
     TypeMemPtr zpa4 = (TypeMemPtr)zsx35._ts[1] ;
     TypeMemPtr zpa23q=(TypeMemPtr)zsx35._ts[2] ;
     assertSame(zsa23,             zpa23q._obj);
 
     TypeStruct zsx4 = (TypeStruct)zpa4._obj;
-    assertSame(TypeStr.con("X4"), zsx4._ts[0]);
+    assertSame(i14,               zsx4._ts[0]);
     assertSame(zpx35,             zsx4._ts[1]);
     assertSame(zpa23q,            zsx4._ts[2]);
 

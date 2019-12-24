@@ -248,14 +248,14 @@ public class TestNode {
       test1monotonic_intrinsic(prim);
     test1monotonic(new IntrinsicNode.ConvertPtrTypeName("test",from_ptr,to_ptr,null,_ins[1],_ins[2]));
     test1monotonic(new   LoadNode(_ins[1],_ins[2],"x",null));
-    test1monotonic(new MemMergeNode(_ins[1],_ins[2],BitsAlias.REC));
+    test1monotonic(new MemMergeNode(_ins[1],_ins[2],BitsAlias.REC));    
     NewNode nnn1 = new NewNode(_ins[0],false);
-    nnn1.create("x",_ins[1],TypeStruct.ffinal(),_gvn);
-    nnn1.create("y",_ins[2],TypeStruct.ffinal(),_gvn);
+    set_type(1,Type.SCALAR);  nnn1.create("x",_ins[1],TypeStruct.ffinal(),_gvn);
+    set_type(2,Type.SCALAR);  nnn1.create("y",_ins[2],TypeStruct.ffinal(),_gvn);
     test1monotonic(nnn1);
     NewNode nnn2 = new NewNode(_ins[0],false);
-    nnn2.create("x",_ins[1],TypeStruct.ffinal(),_gvn);
-    nnn2.create("y",_ins[2],TypeStruct.ffinal(),_gvn);
+    set_type(1,Type.SCALAR);  nnn2.create("x",_ins[1],TypeStruct.ffinal(),_gvn);
+    set_type(2,Type.SCALAR);  nnn2.create("y",_ins[2],TypeStruct.ffinal(),_gvn);
     nnn2.set_name(_gvn,TypeName.TEST_STRUCT);
     test1monotonic(nnn2);
     ((ConNode<Type>)_ins[1])._t = Type.SCALAR; // ParmNode reads this for _alltype
@@ -392,7 +392,18 @@ public class TestNode {
       System.out.println(n.xstr()+"("+all[x0]+","+all[x1]+","+all[x2]+","+all[x3]+") = "+vn);
       System.out.println(n.xstr()+"("+all[idx==0?yx:x0]+","+all[idx==1?yx:x1]+","+all[idx==2?yx:x2]+","+all[idx==3?yx:x3]+") = "+vm);
       _errs++;
+      redo_(n,idx, xx(xx,idx),yx,all);
     }
+  }
+  // Stop in debugger and repeat as needed to debug
+  private void redo_(Node n, int idx, int xidx, int yx, Type[] all) {
+    set_type(idx,all[xidx]);
+    Type err_n = n.value(_gvn);
+
+    set_type(idx,all[yx]);
+    Type err_m = n.value(_gvn);
+
+    assert err_n.isa(err_m);
   }
 
   // CastNode does a JOIN, sometimes with NIL.  This leads to weird
