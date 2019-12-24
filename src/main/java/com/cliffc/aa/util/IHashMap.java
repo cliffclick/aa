@@ -1,6 +1,7 @@
 package com.cliffc.aa.util;
 
 import java.util.HashMap;
+import java.util.Set;
 
 @SuppressWarnings("unchecked")
 public class IHashMap {
@@ -11,4 +12,5 @@ public class IHashMap {
   public void remove(Object key) { _map.remove(key); }
   public void clear() { _map.clear(); }
   public boolean isEmpty() { return _map.isEmpty(); }
+  public <T> Set<T> keySet() { return _map.keySet(); }
 }

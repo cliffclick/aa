@@ -537,6 +537,11 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   private static NonBlockingHashMapLong<Type> UF = new NonBlockingHashMapLong<>();
   private static IHashMap OLD2APX = new IHashMap();
   public TypeStruct approx( int cutoff ) {
+    boolean shallow=true;
+    for( Type t : _ts )
+      if( t._type == TNAME || t._type == TMEMPTR ) { shallow=false; break; }
+    if( shallow ) return this;  // Fase cutout for boring structs
+    
     int alias = _news.getbit();   // Must only be 1 alias at top level
 
     // Scan the old copy for elements that are too deep.
@@ -688,31 +693,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     }
     return nt;
   }
-
-  // Clone everything in reaches.  Do not set the hashes in the clones, as they
-  // have their internal structures modified.
-  private void copy(Ary<Type> reaches ) {
-    // Clone all the types, making a mapping from the old to the clones.
-    for( Type t : reaches )
-      OLD2APX.put(t,t.clone());
-    // Clone all the edges
-    for( Type t : reaches ) {
-    switch( t._type ) {
-    case TNAME  : TypeName   tn = (TypeName  )t;  OLD2APX.get(tn)._t  = getx(tn._t  );  break;
-    case TMEMPTR: TypeMemPtr tm = (TypeMemPtr)t;  OLD2APX.get(tm)._obj= getx(tm._obj);  break;
-    case TSTRUCT:
-      TypeStruct ts = (TypeStruct)t, nts = OLD2APX.get(ts);
-      nts._flds   = ts._flds  .clone();
-      nts._finals = ts._finals.clone();
-      nts._ts     = new Type[ts._ts.length];
-      for( int i=0; i<ts._ts.length; i++ )
-        nts._ts[i] = getx(ts._ts[i]);
-      break;
-    default: throw AA.unimpl(); // Should not reach here
-    }
-    }
-  }
-  private <T> T getx(T t) { T x = OLD2APX.get(t); return x==null ? t : x; }
 
   // Walk an existing, not-interned, structure.  Stop at any interned leaves.
   // Check for duplicating an interned Type or a UF hit, and use that instead.

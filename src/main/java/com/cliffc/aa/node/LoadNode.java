@@ -88,7 +88,7 @@ public class LoadNode extends Node {
       return adr.above_center() ? Type.XSCALAR : Type.SCALAR;
     TypeMemPtr tadr = (TypeMemPtr)adr;
     // Loading from TypeMem - will get a TypeObj out.
-    Type mem = gvn.type(mem());     // Memory
+    Type mem = gvn.type(mem()).base();     // Memory
     Type badmemrez = mem.above_center() ? Type.XSCALAR : Type.SCALAR;
     if( !(mem instanceof TypeStruct) ) {
       if( !(mem instanceof TypeMem) ) // Nothing sane
