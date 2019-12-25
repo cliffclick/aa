@@ -307,12 +307,35 @@ public class Type<T extends Type<T>> implements Cloneable {
   }
   T rdual() { assert _dual!=null; return _dual; }
 
+  // Memoize meet results
+  private static class Key {
+    static Key K = new Key(null,null);
+    static ConcurrentHashMap<Key,Type> INTERN_MEET = new ConcurrentHashMap<>();
+    Key(Type a, Type b) { _a=a; _b=b; }
+    Type _a, _b;
+    @Override public int hashCode() { return _a._hash*_b._hash; }
+    @Override public boolean equals(Object o) { return _a==((Key)o)._a && _b==((Key)o)._b; }
+    static Type get(Type a, Type b) {
+      K._a=a;
+      K._b=b;
+      return INTERN_MEET.get(K);
+    }
+    static void put(Type a, Type b, Type mt) { INTERN_MEET.put(new Key(a,b),mt); }
+  }
+
+  // Compute the meet
   public final Type meet( Type t ) {
     // Short cut for the self case
     if( t == this ) return this;
+    Type mt = Key.get(this,t);
+    if( mt != null ) return mt;
+
     // "Triangulate" the matrix and cut in half the number of cases.
     // Reverse; xmeet 2nd arg is never "is_simple" and never equal to "this".
-    return !is_simple() && t.is_simple() ? t.xmeet(this) : xmeet(t);
+    mt = !is_simple() && t.is_simple() ? t.xmeet(this) : xmeet(t);
+
+    Key.put(this,t,mt);
+    return mt;
   }
 
   // Compute meet right now.  Overridden in subclasses.
