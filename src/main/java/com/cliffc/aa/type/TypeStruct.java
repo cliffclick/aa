@@ -55,7 +55,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // because during recursive construction the types are not available.
   @Override int compute_hash() {
     int hash = super.compute_hash(), hash1=hash;
-    for( int i=0; i<_flds.length; i++ ) hash += _flds[i].hashCode()+_finals[i];
+    for( int i=0; i<_flds.length; i++ ) hash = ((hash<<_finals[i])*_flds[i].hashCode())|(hash>>17);
     return hash == 0 ? hash1 : hash;
   }
 

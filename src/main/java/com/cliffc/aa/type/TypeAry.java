@@ -22,7 +22,6 @@ public class TypeAry {
     }
     @Override public int hashCode() { return _hash; }
     @Override public boolean equals(Object o) {
-      if( this==o ) return true;
       if( !(o instanceof Key) ) return false;
       Type[] ts = ((Key)o)._ts;
       if( _ts==ts ) return true;
