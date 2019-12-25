@@ -360,20 +360,21 @@ public class TestParse {
     assertEquals(Type.NIL,tt5.at(0));
 
     // Test inferring a recursive struct type, with a little help
-    Type[] ts0 = new Type[]{Type.NIL,TypeFlt.con(1.2*1.2)};
+    Type[] ts0 = TypeStruct.ts(Type.NIL,TypeFlt.con(1.2*1.2));
     test_ptr("map={x:@{n;v=flt}? -> x ? @{n=map(x.n);v=x.v*x.v} : 0}; map(@{n=0;v=1.2})",
              (alias) -> TypeMemPtr.make(alias,TypeStruct.make(FLDS,ts0,TypeStruct.finals(2),alias)));
 
     // Test inferring a recursive struct type, with less help.  This one
     // inlines so doesn't actually test inferring a recursive type.
+    Type[] ts1 = TypeStruct.ts(Type.NIL,TypeFlt.con(1.2*1.2));
     test_ptr("map={x -> x ? @{n=map(x.n);v=x.v*x.v} : 0}; map(@{n=0;v=1.2})",
-             (alias) -> TypeMemPtr.make(alias,TypeStruct.make(FLDS,ts0,TypeStruct.finals(2),alias)));
+             (alias) -> TypeMemPtr.make(alias,TypeStruct.make(FLDS,ts1,TypeStruct.finals(2),alias)));
 
     // Test inferring a recursive struct type, with less help. Too complex to
     // inline, so actual inference happens
     test_ptr_isa("map={x -> x ? @{n=map(x.n);v=x.v*x.v} : 0};"+
                  "map(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0;v=1.2};v=2.3};v=3.4};v=4.5})",
-                 (alias) -> TypeMemPtr.make(alias,TypeStruct.make(FLDS,TypeMemPtr.STRUCT0,TypeFlt.con(20.25))));
+                 (alias) -> TypeMemPtr.make(alias,TypeStruct.make(FLDS,TypeStruct.ts(TypeMemPtr.STRUCT0,TypeFlt.con(20.25)))));
 
     // Test inferring a recursive tuple type, with less help.  This one
     // inlines so doesn't actually test inferring a recursive type.

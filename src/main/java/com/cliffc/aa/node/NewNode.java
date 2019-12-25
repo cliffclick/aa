@@ -165,7 +165,7 @@ public class NewNode extends Node {
       return gvn.self_type(this);
 
     // Gather args and produce a TypeStruct
-    Type[] ts = new Type[_ts._ts.length];
+    Type[] ts = TypeAry.get(_ts._ts.length);
     for( int i=0; i<ts.length; i++ )
       // Limit type bounds, since error returns can be out-of-bounds
       ts[i] = gvn.type(fld(i)).bound(_ts.at(i));

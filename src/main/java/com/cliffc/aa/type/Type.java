@@ -193,6 +193,16 @@ public class Type<T extends Type<T>> implements Cloneable {
       if( k.intern_check0() ) return false;
     return true;
   }
+  static void intern_hash_quality() {
+    NonBlockingHashMapLong<Integer> hashs = new NonBlockingHashMapLong<>();
+    for( Type k : INTERN.keySet() ) {
+      Integer ii = hashs.get(k._hash);
+      hashs.put(k._hash,ii==null ? 1 : ii+1);
+    }
+    for( long l : hashs.keySet() ) {
+      System.out.println("hash "+l+" repeats "+hashs.get(l));
+    }
+  }
   private boolean intern_check0() {
     Type v = INTERN.get(this);
     if( this == v ) return false;

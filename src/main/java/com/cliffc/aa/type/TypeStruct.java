@@ -84,6 +84,10 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     if( this==o ) return true;
     if( !(o instanceof TypeStruct) ) return false;
     TypeStruct t = (TypeStruct)o;
+    // While we would like to use the notion of interned Type[] during the
+    // normal Type.INTERN check, we also get here during building of cyclic
+    // structures for which we'll fall into the cyclic check - as the Type[]s
+    // are not interned yet.
     int x = cmp(t);
     if( x != -1 ) return x == 1;
     // Unlike all other non-cyclic structures which are built bottom-up, cyclic
@@ -199,7 +203,11 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     TypeStruct t1 = FREE;  FREE = null;
     return t1.init(any,flds,ts,finals,news);
   }
-  private TypeStruct hashcons_free() { TypeStruct t2 = (TypeStruct)hashcons();  return this==t2 ? this : free(t2);  }
+  private TypeStruct hashcons_free() {
+    _ts = TypeAry.hash_cons(_ts);
+    TypeStruct t2 = (TypeStruct)hashcons();
+    return this==t2 ? this : free(t2);
+  }
 
   // Default tuple field names - all bottom-field names
   private static final String[] FLD0={};
@@ -209,15 +217,26 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   private static final String[][] FLDS={FLD0,FLD1,FLD2,FLD3};
           static String[] FLDS( int len ) { return FLDS[len]; }
   private static String[] flds(String... fs) { return fs; }
-  public  static Type[] ts(Type... ts) { return ts; }
-  public  static Type[] ts(int n) { Type[] ts = new Type[n]; Arrays.fill(ts,SCALAR); return ts; } // All Scalar fields
+  public  static Type[] ts() { return TypeAry.get(0); }
+  public  static Type[] ts(Type t0) { Type[] ts = TypeAry.get(1); ts[0]=t0; return ts;}
+  public  static Type[] ts(Type t0, Type t1) { Type[] ts = TypeAry.get(2); ts[0]=t0; ts[1]=t1; return ts;}
+  public  static Type[] ts(Type t0, Type t1, Type t2) { Type[] ts = TypeAry.get(3); ts[0]=t0; ts[1]=t1; ts[2]=t2; return ts;}
+  public  static Type[] ts(int n) { Type[] ts = TypeAry.get(n); Arrays.fill(ts,SCALAR); return ts; } // All Scalar fields
   public  static byte[] fbots (int n) { byte[] bs = new byte[n]; Arrays.fill(bs,fbot  ()); return bs; }
   public  static byte[] finals(int n) { byte[] bs = new byte[n]; Arrays.fill(bs,ffinal()); return bs; } // All read-only
   public  static byte[] frws  (int n) { byte[] bs = new byte[n]; Arrays.fill(bs,frw   ()); return bs; } // All read-write
 
-  public  static TypeStruct make(Type... ts) { return make_alias(BitsAlias.REC,ts); }
-  public  static TypeStruct make_alias(int nnn, Type... ts) { return malloc(false,FLDS[ts.length],ts,fbots(ts.length),BitsAlias.make0(nnn)).hashcons_free(); }
-  public  static TypeStruct make(String[] flds, Type... ts) { return malloc(false,flds,ts,fbots(ts.length),BitsAlias.RECBITS).hashcons_free(); }
+  public  static TypeStruct make() { return make_alias(BitsAlias.REC); }
+  public  static TypeStruct make(Type[] ts) { return make_alias(BitsAlias.REC,ts); }
+  public  static TypeStruct make(Type t0) { return make_alias(BitsAlias.REC,t0); }
+  public  static TypeStruct make(Type t0,Type t1) { return make_alias(BitsAlias.REC,t0,t1); }
+  public  static TypeStruct make_alias(int nnn, Type[] ts) {
+    return malloc(false,FLDS[ts.length],ts,fbots(ts.length),BitsAlias.make0(nnn)).hashcons_free();
+  }
+  public  static TypeStruct make_alias(int nnn) { return make_alias(nnn,TypeAry.get(0)); }
+  public  static TypeStruct make_alias(int nnn, Type t0) { return make_alias(nnn,ts(t0)); }
+  public  static TypeStruct make_alias(int nnn, Type t0, Type t1) { return make_alias(nnn,ts(t0,t1)); }
+  public  static TypeStruct make(String[] flds, Type[] ts) { return malloc(false,flds,ts,fbots(ts.length),BitsAlias.RECBITS).hashcons_free(); }
   public  static TypeStruct make(String[] flds, Type[] ts, byte[] finals) { return malloc(false,flds,ts,finals,BitsAlias.RECBITS).hashcons_free(); }
   public  static TypeStruct make(String[] flds, Type[] ts, byte[] finals, BitsAlias news) { return malloc(false,flds,ts,finals,news).hashcons_free(); }
   public  static TypeStruct make(String[] flds, Type[] ts, byte[] finals, int nnn) { return malloc(false,flds,ts,finals,BitsAlias.make0(nnn)).hashcons_free(); }
@@ -248,7 +267,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   private static final TypeStruct C0    = make(flds("c"),ts(TypeInt.FALSE )); // @{c:0}
   private static final TypeStruct D1    = make(flds("d"),ts(TypeInt.TRUE  )); // @{d:1}
   private static final TypeStruct ARW   = make(flds("a"),ts(TypeFlt.FLT64),new byte[]{frw()});
-  public  static final TypeStruct GENERIC = malloc(true,FLD0,new Type[0],new byte[0],BitsAlias.RECBITS).hashcons_free();
+  public  static final TypeStruct GENERIC = malloc(true,FLD0,TypeAry.get(0),new byte[0],BitsAlias.RECBITS).hashcons_free();
   public  static final TypeStruct ALLSTRUCT = make();
 
   static final TypeStruct[] TYPES = new TypeStruct[]{ALLSTRUCT,POINT,X,A,C0,D1,ARW};
@@ -269,7 +288,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return make(flds,ts,finals,_news);
   }
   public TypeStruct set_fld( int idx, Type t, byte ff ) {
-    Type[] ts = _ts.clone();
+    Type[] ts = TypeAry.clone(_ts);
     ts[idx] = t;
     byte[] ffs = _finals;
     if( _finals[idx] != ff )
@@ -277,7 +296,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return make(_flds,ts,ffs,_news);
   }
   public TypeStruct del_fld( int idx ) {
-    Type[] ts = new Type[_ts.length-1];
+    Type[] ts = TypeAry.get(_ts.length-1);
     for( int i=0; i<idx; i++ ) ts[i] = _ts[i];
     for( int i=idx; i<ts.length; i++ ) ts[i] = _ts[i+1];
     String[] flds = new String[_flds.length-1];
@@ -292,11 +311,12 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // Dual the flds, dual the tuple.
   @Override protected TypeStruct xdual() {
     String[] as = new String[_flds.length];
-    Type  [] ts = new Type  [_ts  .length];
+    Type  [] ts = TypeAry.get(_ts  .length);
     byte  [] bs = new byte  [_ts  .length];
     for( int i=0; i<as.length; i++ ) as[i] = sdual(_flds  [i]);
     for( int i=0; i<ts.length; i++ ) ts[i] = _ts[i].dual();
     for( int i=0; i<bs.length; i++ ) bs[i] = fdual(_finals[i]);
+    ts = TypeAry.hash_cons(ts);
     return new TypeStruct(!_any,as,ts,bs,_news.dual());
   }
 
@@ -304,7 +324,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   @Override TypeStruct rdual() {
     if( _dual != null ) return _dual;
     String[] as = new String[_flds.length];
-    Type  [] ts = new Type  [_ts  .length];
+    Type  [] ts = TypeAry.get(_ts.length);
     byte  [] bs = new byte  [_ts  .length];
     for( int i=0; i<as.length; i++ ) as[i]=sdual(_flds[i]);
     for( int i=0; i<bs.length; i++ ) bs[i]=fdual(_finals[i]);
@@ -368,7 +388,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     int len = _any ? tmax._ts.length : _ts.length;
     // Meet of common elements
     String[] as = new String[len];
-    Type  [] ts = new Type  [len];
+    Type  [] ts = TypeAry.get(len);
     byte  [] bs = new byte  [len];
     for( int i=0; i<_ts.length; i++ ) {
       as[i] = smeet(_flds  [i],     tmax._flds  [i]);
@@ -509,7 +529,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // Make a clone of this TypeStruct that is not interned.
   private TypeStruct shallow_clone() {
     assert _cyclic;
-    Type[] ts = new Type[_ts.length];
+    Type[] ts = TypeAry.get(_ts.length);
     Arrays.fill(ts,Type.ANY);
     TypeStruct tstr = malloc(_any,_flds.clone(),ts,_finals.clone(),_news);
     tstr._cyclic = true;
@@ -541,7 +561,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     for( Type t : _ts )
       if( t._type == TNAME || t._type == TMEMPTR ) { shallow=false; break; }
     if( shallow ) return this;  // Fase cutout for boring structs
-    
+
     int alias = _news.getbit();   // Must only be 1 alias at top level
 
     // Scan the old copy for elements that are too deep.
@@ -605,7 +625,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       TypeStruct nts = (TypeStruct)ots.clone();
       nts._flds   = ots._flds  .clone();
       nts._finals = ots._finals.clone();
-      nts._ts     = ots._ts    .clone();
+      nts._ts     = TypeAry.clone(ots._ts);
       for( int i=0; i<ots._ts.length; i++ )
         nts._ts[i] = Type.ANY;
       OLD2APX.put(ots,nts);
@@ -711,7 +731,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       if( !(t instanceof TypeStruct) )
         set_hash(t);
     }
-    
+
     // Need back-edges to do this iteratively in 1 pass.  This algo just sweeps
     // until no more progress, but with generic looping instead of recursion.
     boolean progress = true;
@@ -876,8 +896,13 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return bcs;
   }
   private void mark_cyclic( BitSet bcs, Ary<Type> reaches ) {
-    for( Type t : reaches )
+    for( Type t : reaches ) {
       t._cyclic = bcs.get(t._uid);
+      if( t instanceof TypeStruct ) {
+        TypeStruct ts = (TypeStruct)t;
+        ts._ts = TypeAry.hash_cons(ts._ts); // hashcons cyclic arrays
+      }
+    }
   }
 
   // Build a mapping from types to their depth in a shortest-path walk from the
@@ -987,7 +1012,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     byte[] finals = _finals;
     Type[] ts     = _ts;
     if( _finals[idx] != fin ) { finals = _finals.clone(); finals[idx] = fin; }
-    if( _ts    [idx] != val ) { ts     = _ts    .clone(); ts[idx] = precise ? val : ts[idx].meet(val); }
+    if( _ts    [idx] != val ) { ts  = TypeAry.clone(_ts); ts[idx] = precise ? val : ts[idx].meet(val); }
     return malloc(_any,_flds,ts,finals,_news).hashcons_free();
   }
   // Allowed to update this field?
@@ -1015,7 +1040,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     // Mid-construction recursive types are always self-type
     for( Type t : _ts )  if( t == null )  return this;
     boolean eq = true;
-    Type[] ts = new Type[_ts.length];
+    Type[] ts = TypeAry.get(_ts.length);
     for( int i=0; i<_ts.length; i++ )
       eq &= (ts[i] = _ts[i].make_recur(tn,d,bs))==_ts[i];
     return eq ? this : make(_flds,ts);
@@ -1062,7 +1087,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // Keep the high parts
   @Override public TypeObj startype() {
     String[] as = new String[_flds.length];
-    Type  [] ts = new Type  [_ts  .length];
+    Type  [] ts = TypeAry.get(_ts  .length);
     byte  [] bs = new byte  [_ts  .length];
     for( int i=0; i<as.length; i++ ) as[i] = fldBot(_flds[i]) ? "^" : _flds[i];
     for( int i=0; i<ts.length; i++ ) ts[i] = _ts[i].above_center() ? _ts[i] : _ts[i].dual();

@@ -189,7 +189,7 @@ public class TestType {
     Type tff = tsx.meet(tf);     //
     assertEquals(tf,tff);        // tsx.isa(tf)
     TypeStruct t0 = TypeStruct.make(nil); //  (nil)
-    TypeStruct ts0= TypeStruct.make(new String[]{"x"},nil);  // @{x:nil}
+    TypeStruct ts0= TypeStruct.make(new String[]{"x"},TypeStruct.ts(nil));  // @{x:nil}
     Type tss = ts0.meet(t0);
     assertEquals(t0,tss);      // t0.isa(ts0)
     byte[] finals = new byte[]{TypeStruct.ffinal()};
@@ -199,9 +199,9 @@ public class TestType {
     int alias1 = BitsAlias.new_alias(alias0);
     int alias2 = BitsAlias.new_alias(alias0);
     int alias3 = BitsAlias.new_alias(BitsAlias.REC);
-    TypeObj a1 = TypeStruct.make(new String[]{"c"},new Type[]{Type.NIL},finals,alias1 ); // @{c:nil}
-    TypeObj a2 = TypeStruct.make(new String[]{"c"},new Type[]{TypeMemPtr.make_nil(alias1,a1)},finals,alias2); // @{c:*{3#}?}
-    TypeObj a3 = TypeStruct.make(new String[]{"x"},new Type[]{TypeInt.TRUE},finals,alias3); // @{x: 1 }
+    TypeObj a1 = TypeStruct.make(new String[]{"c"},TypeStruct.ts(Type.NIL                      ),finals,alias1 ); // @{c:nil}
+    TypeObj a2 = TypeStruct.make(new String[]{"c"},TypeStruct.ts(TypeMemPtr.make_nil(alias1,a1)),finals,alias2); // @{c:*{3#}?}
+    TypeObj a3 = TypeStruct.make(new String[]{"x"},TypeStruct.ts(TypeInt.TRUE                  ),finals,alias3); // @{x: 1 }
     Ary<TypeObj> tos = new Ary<>(TypeObj.class);
     tos.setX(BitsAlias.REC,TypeObj.OBJ);
     tos.setX(alias1,a1);
@@ -212,7 +212,7 @@ public class TestType {
     Type ptr12 = Type.NIL.join(TypeMemPtr.make(-alias1,a1)).join( TypeMemPtr.make(-alias2,a2));
     // mem.ld(*[1+2]?) ==> @{c:0}
     Type ld = mem.ld((TypeMemPtr)ptr12);
-    TypeObj ax = TypeStruct.make(new String[]{"c"},new Type[]{Type.NIL},finals,BitsAlias.NZERO.make() ); // @{c:nil}
+    TypeObj ax = TypeStruct.make(new String[]{"c"},TypeStruct.ts(Type.NIL),finals,BitsAlias.NZERO.make() ); // @{c:nil}
     assertEquals(ax,ld);
   }
 
@@ -271,7 +271,7 @@ public class TestType {
     // Anonymous recursive structs -
     // - struct with pointer to self
     byte[] finals = new byte[]{TypeStruct.ffinal(),TypeStruct.ffinal()};
-    TypeStruct ts0 = TypeStruct.malloc(false,flds,new Type[2],finals,BitsAlias.RECBITS);
+    TypeStruct ts0 = TypeStruct.malloc(false,flds,TypeStruct.ts(2),finals,BitsAlias.RECBITS);
     ts0._hash = ts0.compute_hash();
     ts0._ts[0] = ts0ptr;    ts0._cyclic = true;
     ts0._ts[1] = TypeInt.INT64;
@@ -279,7 +279,7 @@ public class TestType {
     TypeMem ts0mem = TypeMem.make(alias1,ts0); // {1:@{n:*[1],v:int} }
 
     // - struct with pointer to self or nil
-    TypeStruct ts1 = TypeStruct.malloc(false,flds,new Type[2],finals,BitsAlias.RECBITS);
+    TypeStruct ts1 = TypeStruct.malloc(false,flds,TypeStruct.ts(2),finals,BitsAlias.RECBITS);
     ts1._hash = ts1.compute_hash();
     ts1._ts[0] = ts0ptr0;  ts1._cyclic = true;
     ts1._ts[1] = TypeInt.INT64;
@@ -296,20 +296,20 @@ public class TestType {
     // AS0AS0AS0AS0AS0AS0...
     final int alias2 = 2;
     TypeMemPtr tptr2= TypeMemPtr.make_nil(alias2,TypeObj.OBJ); // *[0,2]
-    TypeStruct ts2 = TypeStruct.make(flds,tptr2,TypeInt.INT64); // @{n:*[0,2],v:int}
+    TypeStruct ts2 = TypeStruct.make(flds,TypeStruct.ts(tptr2,TypeInt.INT64)); // @{n:*[0,2],v:int}
     TypeName ta2 = TypeName.make("A",TypeName.TEST_SCOPE,ts2);
 
     // Peel A once without the nil: Memory#3: A:@{n:*[2],v:int}
     // ASAS0AS0AS0AS0AS0AS0...
     final int alias3 = 3;
     TypeMemPtr tptr3= TypeMemPtr.make(alias3,TypeObj.OBJ); // *[3]
-    TypeStruct ts3 = TypeStruct.make(flds,tptr2,TypeInt.INT64); // @{n:*[2],v:int}
+    TypeStruct ts3 = TypeStruct.make(flds,TypeStruct.ts(tptr2,TypeInt.INT64)); // @{n:*[2],v:int}
     TypeName ta3 = TypeName.make("A",TypeName.TEST_SCOPE,ts3);
 
     // Peel A twice without the nil: Memory#4: A:@{n:*[3],v:int}
     // ASASAS0AS0AS0AS0AS0AS0...
     final int alias4 = 4;
-    TypeStruct ts4 = TypeStruct.make(flds,tptr3,TypeInt.INT64); // @{n:*[3],v:int}
+    TypeStruct ts4 = TypeStruct.make(flds,TypeStruct.ts(tptr3,TypeInt.INT64)); // @{n:*[3],v:int}
     TypeName ta4 = TypeName.make("A",TypeName.TEST_SCOPE,ts4);
 
     // Then make a MemPtr{3,4}, and ld - should be a PeelOnce
@@ -325,14 +325,14 @@ public class TestType {
     Type mta = mem234.ld(ptr34);
     //assertEquals(ta3,mta);
     TypeMemPtr ptr023 = (TypeMemPtr)TypeMemPtr.make_nil(2,TypeObj.OBJ).meet(TypeMemPtr.make(3,TypeObj.OBJ));
-    Type xta = TypeName.make("A",TypeName.TEST_SCOPE,TypeStruct.make(flds,ptr023,TypeInt.INT64));
+    Type xta = TypeName.make("A",TypeName.TEST_SCOPE,TypeStruct.make(flds,TypeStruct.ts(ptr023,TypeInt.INT64)));
     assertEquals(xta,mta);
 
 
 
     // Mismatched Names in a cycle; force a new cyclic type to appear
     final int alias5 = 5;
-    TypeStruct tsnb = TypeStruct.make(flds,TypeMemPtr.make_nil(alias5,TypeObj.OBJ),TypeFlt.FLT64);
+    TypeStruct tsnb = TypeStruct.make(flds,TypeStruct.ts(TypeMemPtr.make_nil(alias5,TypeObj.OBJ),TypeFlt.FLT64));
     TypeName tfb = TypeName.make("B",TypeName.TEST_SCOPE,tsnb);
     Type mtab = ta2.meet(tfb);
 
@@ -386,7 +386,7 @@ public class TestType {
 
     // T = :(T?,i64)
     int alias = BitsAlias.new_alias(BitsAlias.REC);
-    TypeStruct T = TypeStruct.malloc(false,flds,new Type[2],TypeStruct.fbots(2),BitsAlias.RECBITS);
+    TypeStruct T = TypeStruct.malloc(false,flds,TypeStruct.ts(2),TypeStruct.fbots(2),BitsAlias.make0(alias));
     T._hash = T.compute_hash();
     Type.RECURSIVE_MEET++;
     Type TN = TypeMemPtr.make_nil(alias,T);  TN._cyclic = true;
@@ -419,15 +419,15 @@ public class TestType {
     //   T         .meet( T        ) ==   T
     // T == T.  QED
 
-    TypeStruct Ts = TypeStruct.make(TN    ,TypeInt.INT64); //    (T,i64)
+    TypeStruct Ts = TypeStruct.make_alias(alias,TN,TypeInt.INT64); //    (T,i64)
 
     // Ugh: backwards from QED above; in fact Ts isa T since adding a Nil to a
     // Ts is strictly lower in the lattice... and immediately makes it a T.
     Type mt3 = T.meet(Ts);
     assertEquals(T,mt3);
 
-    Type Ts0     = TypeMemPtr.make_nil(alias,Ts);         //    (T,i64)?
-    TypeStruct Ts0s    = TypeStruct.make(Ts0   ,TypeInt.INT64); //   ((T,i64)?,i64)
+    Type Ts0 = TypeMemPtr.make_nil(alias,Ts);         //    (T,i64)?
+    TypeStruct Ts0s = TypeStruct.make_alias(alias,Ts0,TypeInt.INT64); //   ((T,i64)?,i64)
 
     // Ugh: backwards from QED above, same as above: adding any counts of
     // TypeNil clearly makes an unrolled T which rolls back up to a T.
@@ -436,7 +436,7 @@ public class TestType {
 
     TypeStruct Ts0ss   = TypeStruct.make(TypeMemPtr.make(alias,Ts0s),TypeInt.INT64); //  (((T,i64)?,i64),i64)
     Type Ts0ss0  = TypeMemPtr.make_nil(alias,Ts0ss);      //  (((T,i64)?,i64),i64)?
-    Type Ts0ss0s = TypeStruct.make(Ts0ss0,TypeInt.INT64); // ((((T,i64)?,i64),i64)?,i64)
+    Type Ts0ss0s = TypeStruct.make_alias(alias,Ts0ss0,TypeInt.INT64); // ((((T,i64)?,i64),i64)?,i64)
 
     Type mt1 = Ts0s.meet(Ts0ss0s); // Ts0s.isa(Ts0ss0s) ==> Ts0s.meet(Ts0ss0s) == Ts0ss0s
     assertEquals(Ts0s,mt1);
@@ -457,8 +457,8 @@ public class TestType {
     final int alias = BitsAlias.REC;
 
     Type.RECURSIVE_MEET++;
-    TypeStruct as1 = TypeStruct.malloc(false,flds,new Type[2],finals,BitsAlias.RECBITS);
-    TypeStruct bs4 = TypeStruct.malloc(false,flds,new Type[2],finals,BitsAlias.RECBITS);
+    TypeStruct as1 = TypeStruct.malloc(false,flds,TypeStruct.ts(2),finals,BitsAlias.RECBITS);
+    TypeStruct bs4 = TypeStruct.malloc(false,flds,TypeStruct.ts(2),finals,BitsAlias.RECBITS);
     as1._hash = as1.compute_hash();  as1._cyclic = true;
     bs4._hash = bs4.compute_hash();  bs4._cyclic = true;
     TypeName an0 = TypeName.make("A",TypeName.TEST_SCOPE,as1);  an0._cyclic = true;

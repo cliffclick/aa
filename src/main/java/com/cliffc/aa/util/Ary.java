@@ -159,8 +159,8 @@ public class Ary<E> implements Iterable<E> {
     _len += c._len;
   }
 
-  /** @return compact array version, using the internal base array where possible. */
-  public E[] asAry() { return _len==_es.length ? _es : Arrays.copyOf(_es,_len); }
+  /** @return compact array version */
+  public E[] asAry() { return Arrays.copyOf(_es,_len); }
 
   /** @param f function to apply to each element.  Updates in-place. */
   public Ary<E> map_update( Function<E,E> f ) { for( int i = 0; i<_len; i++ ) _es[i] = f.apply(_es[i]); return this; }

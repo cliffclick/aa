@@ -31,10 +31,7 @@ public class TypeTuple extends Type<TypeTuple> {
     TypeTuple t = (TypeTuple)o;
     if( _any!=t._any || _hash != t._hash || _ts.length != t._ts.length )
       return false;
-    if( _ts == t._ts ) return true;
-    for( int i=0; i<_ts.length; i++ )
-      if( _ts[i]!=t._ts[i] ) return false;
-    return true;
+    return TypeAry.eq(_ts,t._ts);
   }
   @Override public boolean cycle_equals( Type o ) {
     if( this==o ) return true;
@@ -68,20 +65,10 @@ public class TypeTuple extends Type<TypeTuple> {
   }
 
   private static TypeTuple FREE=null;
-  private static Type[] FREE3=null;
-  @Override protected TypeTuple free( TypeTuple ret ) {
-    if( _ts.length==3 ) FREE3=_ts;
-    FREE=this;
-    return ret;
-  }
-  private static Type[] make_ary(int len) {
-    Type[] ts = FREE3;
-    if( len!=3 || ts==null ) return new Type[len];
-    FREE3=null;
-    return ts;
-  }
+  @Override protected TypeTuple free( TypeTuple ret ) { FREE=this; return ret; }
   @SuppressWarnings("unchecked")
-  static TypeTuple make0( boolean any, Type... ts ) {
+  static TypeTuple make0( boolean any, Type[] ts ) {
+    ts = TypeAry.hash_cons(ts);
     TypeTuple t1 = FREE;
     if( t1 == null ) t1 = new TypeTuple(TTUPLE, any, ts);
     else { FREE = null; t1.init(TTUPLE, any, ts); }
@@ -89,12 +76,19 @@ public class TypeTuple extends Type<TypeTuple> {
     TypeTuple t2 = (TypeTuple)t1.hashcons();
     return t1==t2 ? t1 : t1.free(t2);
   }
-  public static TypeTuple make( Type... ts ) { return make0(false,ts); }
+  public static TypeTuple make( Type[] ts ) { return make0(false,ts); }
+  public static TypeTuple make( ) { Type[] ts = TypeAry.get(0);  return make0(false,ts); }
+  public static TypeTuple make( Type t0 ) { Type[] ts = TypeAry.get(1);  ts[0]=t0;  return make0(false,ts); }
+  public static TypeTuple make( Type t0, Type t1 ) { Type[] ts = TypeAry.get(2);  ts[0]=t0; ts[1]=t1; return make0(false,ts); }
+  public static TypeTuple make( Type t0, Type t1, Type t2 ) { Type[] ts = TypeAry.get(3); ts[0]=t0; ts[1]=t1; ts[2]=t2; return make0(false,ts); }
   // Arguments are infinitely-extended with ALL
-  public static TypeTuple make_args( Type... ts ) { return make0(/*QQQfalse*/false,ts); }
+  public static TypeTuple make_args( Type[] ts ) { return make(ts); }
+  public static TypeTuple make_args( ) { return make(); } // QQQfalse
+  public static TypeTuple make_args( Type t0 ) { return make(t0); } // QQQfalse
+  public static TypeTuple make_args( Type t0, Type t1 ) { return make(t0,t1); } // QQQfalse
 
   // Most primitive function call argument type lists are 0-based
-          static final TypeTuple ALL_ARGS= make0(/*QQQfalse*/false); // Zero args and high
+          static final TypeTuple ALL_ARGS= make0(/*QQQfalse*/false,TypeAry.get(0)); // Zero args and high
   private static final TypeTuple SCALAR0 = make_args();
   public  static final TypeTuple SCALAR1 = make_args(SCALAR);
   public  static final TypeTuple SCALAR2 = make_args(SCALAR, SCALAR);
@@ -123,8 +117,9 @@ public class TypeTuple extends Type<TypeTuple> {
   // just dual each element.  Also flip the infinitely extended tail type.
   @SuppressWarnings("unchecked")
   @Override protected TypeTuple xdual() {
-    Type[] ts = new Type[_ts.length];
+    Type[] ts = TypeAry.get(_ts.length);
     for( int i=0; i<_ts.length; i++ ) ts[i] = _ts[i].dual();
+    ts = TypeAry.hash_cons(ts);
     return new TypeTuple(TTUPLE, !_any, ts);
   }
   // Standard Meet.  Tuples have an infinite extent of 'ALL' for low, or 'ANY'
@@ -141,7 +136,7 @@ public class TypeTuple extends Type<TypeTuple> {
     // Short is low ; short extended by ALL so tail is ALL so trimmed to short.
     int len = _any ? tmax._ts.length : _ts.length;
     // Meet of common elements
-    Type[] ts = make_ary(len);
+    Type[] ts = TypeAry.get(len);
     for( int i=0; i<_ts.length; i++ )  ts[i] = _ts[i].meet(tmax._ts[i]);
     // Elements only in the longer tuple.
     for( int i=_ts.length; i<len; i++ )
@@ -198,7 +193,7 @@ public class TypeTuple extends Type<TypeTuple> {
 
   // Dual, except keep TypeMem.XOBJ as high for starting GVNGCM.opto() state.
   @Override public TypeTuple startype() {
-    Type[] ts = new Type[_ts.length];
+    Type[] ts = TypeAry.get(_ts.length);
     for( int i=0; i<_ts.length; i++ ) ts[i] = _ts[i].startype();
     return make0(!_any, ts);
   }

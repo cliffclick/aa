@@ -19,7 +19,7 @@ public class TypeUnion extends TypeTuple {
 
   private static TypeUnion FREE=null;
   protected TypeUnion free( TypeUnion ret ) { FREE=this; return ret; }
-  static TypeUnion make0( boolean any, Type... ts ) {
+  static TypeUnion make0( boolean any, Type[] ts ) {
     TypeUnion t1 = FREE;
     if( t1 == null ) t1 = new TypeUnion(any, ts);
     else { FREE = null; t1.init(any, ts); }

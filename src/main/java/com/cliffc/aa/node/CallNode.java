@@ -149,7 +149,7 @@ public class CallNode extends Node {
   // will re-evaluate if the set of callable functions changes, or the args
   // change (might enable wiring).
   @Override public TypeTuple value(GVNGCM gvn) {
-    Type[] ts = new Type[nargs()+2];
+    Type[] ts = TypeAry.get(nargs()+2);
     Type ct = gvn.type(ctl());
     ct = ct.above_center() ? Type.XCTRL : Type.CTRL;
     ts[0] = ct;
