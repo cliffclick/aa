@@ -78,7 +78,7 @@ public class MemMergeNode extends Node {
   }
 
   // Index# for Alias#, creating as needed.  If created the new slot will be null.
-  private int make_alias2idx( int alias ) {
+  public int make_alias2idx( int alias ) {
     // Insert in alias index order
     int iidx = _aliases.binary_search(alias);
     if( _aliases.atX(iidx)==alias ) return iidx; // Exact match
@@ -121,26 +121,24 @@ public class MemMergeNode extends Node {
 
   // Mid-iter call, will need to unreg/rereg
   public Node obj(int alias, GVNGCM gvn) {
-    //assert gvn.touched(this) && alias > 1; // Only if this MemMerge is not active
-    //Type oldt = gvn.unreg(this);
-    //int idx = make_alias2idx(alias);         // Make a spot for this alias
-    //Node obj = in(idx);                      // Get current def
-    //if( obj == null ) {                      // No prior alias
-    //  obj = in(find_alias2idx(BitsAlias.parent(alias)));
-    //  set_def(idx, obj, null);  // Set in immediate alias parent
-    //}
-    //gvn.rereg(this,oldt);
-    //return obj;
-    throw AA.unimpl();
+    assert gvn.touched(this) && alias > 1; // Only if this MemMerge is not active
+    Type oldt = gvn.unreg(this);
+    int idx = make_alias2idx(alias);         // Make a spot for this alias
+    Node obj = in(idx);                      // Get current def
+    if( obj == null ) {                      // No prior alias
+      obj = in(find_alias2idx(BitsAlias.parent(alias)));
+      set_def(idx, obj, null);  // Set in immediate alias parent
+    }
+    gvn.rereg(this,oldt);
+    return obj;
   }
 
   // Lookup a node index, given a TypeMemPtr.  Only works if the given alias
   // has not been split into parts
   Node obj( TypeMemPtr tmp, GVNGCM gvn ) {
-    //int alias = tmp._aliases.abit();
-    //if( alias == -1 ) throw AA.unimpl(); // Handle multiple aliases, handle all/empty
-    //return obj(alias,gvn);
-    throw AA.unimpl();
+    int alias = tmp._aliases.abit();
+    if( alias == -1 ) throw AA.unimpl(); // Handle multiple aliases, handle all/empty
+    return obj(alias,gvn);
   }
   //
   //// Create a new alias with initial value for deactive/gvn-registered memory

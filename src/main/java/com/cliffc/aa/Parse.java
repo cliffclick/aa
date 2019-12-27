@@ -350,15 +350,15 @@ public class Parse {
       if( n.is_forward_ref() ) { // Prior is actually a forward-ref, so this is the def
         assert !scope.stk().is_mutable(tok) && scope == _e._scope;
         ((FunPtrNode)n).merge_ref_def(_gvn,tok,(FunPtrNode)ifex);
-      } else { // Store into scope/NewNode/closure
+      } else { // Store into scope/NewObjNode/closure
         // Active (parser) memory state
         MemMergeNode mmem = mem_active();
-        // Active object state
-        //ObjMergeNode omem = mmem.active_obj(scope.stk()._alias,_gvn);
-        //int idx = omem.fld_idx(tok,_gvn);
-        //omem.set_def(idx,gvn(new StoreNode(ctrl(),omem.in(idx),scope.ptr(),ifex,mutable,tok,errMsg())),_gvn);
-        //scope.def_if(tok,mutable,false); // Note 1-side-of-if update
-        throw AA.unimpl();
+        int alias = scope.stk()._alias; // Alias for scope
+        Node omem = mmem.active_obj(alias);
+        Node st = gvn(new StoreNode(ctrl(),omem,scope.ptr(),ifex,mutable,tok,errMsg()));
+        int idx = mmem.make_alias2idx(alias); // Precise alias update
+        mmem.set_def(idx,st,_gvn);
+        scope.def_if(tok,mutable,false); // Note 1-side-of-if update
       }
     }
     return ifex;
@@ -496,30 +496,18 @@ public class Parse {
         }
         fld=fld.intern();
 
-        //// If we have a precise alias, we can read/write "mem_active" directly.
-        //// If not, we need to use the imprecise all_mem.  This is basically a
-        //// parser speed hack, since the all_mem always works.
-        //Node mem; ObjMergeNode omem; int alias, idx;
-        //Type t = _gvn.type(n);
-        //if( t instanceof TypeMemPtr && (alias=((TypeMemPtr)t)._aliases.abit()) != -1 && !BitsAlias.is_parent(alias)  ) {
-        //  mem = omem = mem_active().active_obj(alias,_gvn);
-        //  idx = omem.fld_idx(fld,_gvn);
-        //} else {            // Load/Store is from an unknown place
-        //  all_mem();        // Close off current memory for the generic memory op
-        //  mem = _e._scope;  // Load/Store will use all of memory
-        //  idx = 1;          // And use the scope index for all of memory
-        //}
-        //// Store or load against the chosen memory
-        //Node castnn = gvn(new CastNode(ctrl(),n,TypeMemPtr.OOP)); // Remove nil choice
-        //if( peek(":=") || peek_not('=','=')) {
-        //  byte fin = _buf[_x-2]==':' ? TypeStruct.frw() : TypeStruct.ffinal();
-        //  Node stmt = stmt();
-        //  if( stmt == null ) n = err_ctrl2("Missing stmt after assigning field '."+fld+"'");
-        //  else mem.set_def(idx,gvn(new StoreNode(ctrl(),mem.in(idx),castnn,n=stmt,fin,fld ,errMsg())),_gvn);
-        //} else {
-        //  n = gvn(new LoadNode(mem.in(idx),castnn,fld,errMsg()));
-        //}
-        throw AA.unimpl();
+        Node castnn = gvn(new CastNode(ctrl(),n,TypeMemPtr.OOP)); // Remove nil choice
+        Node mem = all_mem();
+
+        // Store or load against memory
+        if( peek(":=") || peek_not('=','=')) {
+          byte fin = _buf[_x-2]==':' ? TypeStruct.frw() : TypeStruct.ffinal();
+          Node stmt = stmt();
+          if( stmt == null ) n = err_ctrl2("Missing stmt after assigning field '."+fld+"'");
+          else _e._scope.set_mem(gvn(new StoreNode(ctrl(),mem,castnn,n=stmt,fin,fld ,errMsg())),_gvn);
+        } else {
+          n = gvn(new LoadNode(mem,castnn,fld,errMsg()));
+        }
 
       } else {                  // Attempt a function-call
         boolean arglist = peek('(');
@@ -563,21 +551,19 @@ public class Parse {
     }
     // Now properly load from the closure
     MemMergeNode mmem = mem_active(scope); // Active memory for the chosen scope
-    //ObjMergeNode omem = mmem.active_obj(scope.stk()._alias,_gvn);
-    //int idx = omem.fld_idx(tok,_gvn);
-    //n = gvn(new LoadNode(omem.in(idx),scope.ptr(),tok,null));
-    //if( n.is_forward_ref() )         // Prior is actually a forward-ref
-    //  return err_ctrl2(forward_ref_err(((FunPtrNode)n).fun()));
-    //
-    //Node plus = _e.lookup_filter("+",_gvn,2);
-    //Node sum = do_call(new CallNode(true,errMsg(),ctrl(),plus,all_mem(),n.keep(),con(TypeInt.con(d))));
-    //
-    //MemMergeNode mmem2 = mem_active(scope); // Active memory for the chosen scope
-    //ObjMergeNode omem2 = mmem2.active_obj(scope.stk()._alias,_gvn);
-    //int idx2 = omem2.fld_idx(tok,_gvn);
-    //omem2.set_def(idx2,gvn(new StoreNode(ctrl(),omem2.in(idx2),scope.ptr(),sum,TypeStruct.frw(),tok,errMsg())),_gvn);
-    //return n.unhook();          // Return pre-increment value
-    throw AA.unimpl();
+    int alias = scope.stk()._alias;        // Closure alias
+    n = gvn(new LoadNode(mmem.active_obj(alias),scope.ptr(),tok,null));
+    if( n.is_forward_ref() )    // Prior is actually a forward-ref
+      return err_ctrl2(forward_ref_err(((FunPtrNode)n).fun()));
+    // Do a full lookup on "+", and execute the function
+    Node plus = _e.lookup_filter("+",_gvn,2);
+    Node sum = do_call(new CallNode(true,errMsg(),ctrl(),plus,all_mem(),n.keep(),con(TypeInt.con(d))));
+
+    MemMergeNode mmem2 = mem_active(scope); // Active memory for the chosen scope, after the call to plus
+    Node st = gvn(new StoreNode(ctrl(),mmem.active_obj(alias),scope.ptr(),sum,TypeStruct.frw(),tok,errMsg()));
+    int idx = mmem2.make_alias2idx(alias); // Precise alias update
+    mmem2.set_def(idx,st,_gvn);
+    return n.unhook();          // Return pre-increment value
   }
 
   /** Parse an optionally typed factor
@@ -806,15 +792,16 @@ public class Parse {
     // Specifically if type is a pointer, and we are throwing away write-
     // privilege (really: casting to a lower field-access-mod) then insert a
     // MeetNode to lower precision.
-    TypeMemPtr tmp;
-    //if( t instanceof TypeMemPtr &&
-    //    (tmp=((TypeMemPtr)t))._obj instanceof TypeStruct ) {
-    //  TypeStruct ts = ((TypeStruct)tmp._obj).make_fmod_bot();
-    //  if( ts != null )
-    //    x = gvn(new MeetNode(x,TypeMemPtr.make(BitsAlias.RECBITS0.dual(),ts)));
-    //}
-    //return x;
-    throw AA.unimpl();
+    if( t instanceof TypeMemPtr ) {
+      // TODO: Actually, thinking TMP types will just use another alias#.
+      // TypeMemPtr tmp;
+      // TypeObj obj = _gvn.type(_e._scope.mem()).ld(tmp=(TypeMemPtr)t);
+      //  TypeStruct ts = ((TypeStruct)tmp._obj).make_fmod_bot();
+      //  if( ts != null )
+      //    x = gvn(new MeetNode(x,TypeMemPtr.make(BitsAlias.RECBITS0.dual(),ts)));
+      throw AA.unimpl();
+    }
+    return x;
   }
 
   private String token() { skipWS();  return token0(); }

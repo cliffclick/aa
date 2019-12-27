@@ -16,6 +16,7 @@ public abstract class NewNode<T extends TypeObj> extends Node {
   public int _alias;          // Alias class
   T _ts;                      // Base object type
   TypeName _name;             // If named, this is the name and _ts is the base
+  boolean _captured;          // False if escapes, monotonic transition to true upon capture
 
   // NewNodes do not really need a ctrl; useful to bind the upward motion of
   // closures so variable stores can more easily fold into them.
@@ -23,7 +24,7 @@ public abstract class NewNode<T extends TypeObj> extends Node {
     super(type,ctrl);
     _alias = alias;
     _ts = to;
-    _name =null;
+    _name = null;
   }
   String xstr() { return "New*"+_alias; } // Self short name
   String  str() { return "New"+xs(); } // Inline less-short name
@@ -50,7 +51,7 @@ public abstract class NewNode<T extends TypeObj> extends Node {
   @Override public Node ideal(GVNGCM gvn) {
     // If the address is not looked at then memory contents cannot be looked at
     // and is dead.
-    if( _uses._len==1 && _uses.at(0) instanceof OProjNode ) {
+    if( captured() ) {
       boolean progress=false;
       for( int i=1; i<_defs._len; i++ )
         if( in(i)!=null ) {
@@ -68,9 +69,34 @@ public abstract class NewNode<T extends TypeObj> extends Node {
     // If the address is not looked at then memory contents cannot be looked at
     // and is dead.  Since this can happen DURING opto (when a call resolves)
     // and during iter, "freeze" the value in-place.  It will DCE shortly.
-    if( _uses._len==1 && _uses.at(0) instanceof OProjNode )
-      return gvn.self_type(this);
-    return all_type();
+    return _captured ? gvn.self_type(this) : all_type();
+  }
+
+  // Basic escape analysis.  If no escapes and no loads this object is dead.
+  // TODO: A better answer is to put escape analysis into the type flows.
+  boolean captured( ) {
+    if( _keep > 0 ) return false;
+    if( _captured ) return true; // Already flagged
+    if( _uses._len==0 ) return false; // Dead or being created
+    Node ptr = _uses.at(0);
+    if( _uses._len==1 )
+      if( ptr instanceof OProjNode ) return (_captured = true);
+      else return false;   // ptr being used for eq equiv tests as a unique gensym, or dying
+    if( ptr instanceof OProjNode ) ptr = _uses.at(1); // Get ptr not mem
+    // Scan for pointer-escapes
+    for( Node use : ptr._uses ) {
+      if( use instanceof StoreNode ) {
+        if( ((StoreNode)use).val()==ptr ) return false; // Pointer stored; escapes
+      } else if( use instanceof LoadNode ||            // Load, direct use, treat as escape
+                 use instanceof CallNode ||            // Call arg
+                 use instanceof  RetNode ) {           // Returned
+        return false;                                   // Escaped
+      } else {
+        throw AA.unimpl();      // Unknown, sort it out
+      }
+    }
+    // No escape, no loads, so object is dead
+    return (_captured = true);
   }
 
   @Override public Type all_type() {

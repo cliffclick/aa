@@ -9,7 +9,7 @@ public class OProjNode extends ProjNode {
   @Override String xstr() { return "OProj_"+_idx; }
   @Override public Node ideal(GVNGCM gvn) { return in(0).is_copy(gvn,_idx); }
   @Override public Type value(GVNGCM gvn) {
-    if( in(0) instanceof NewNode && in(0)._uses._len==1 )
+    if( in(0) instanceof NewNode && ((NewNode)in(0))._captured )
       return TypeObj.XOBJ;
     Type c = gvn.type(in(0));
     if( c instanceof TypeTuple ) {

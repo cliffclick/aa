@@ -5,6 +5,7 @@ import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.type.TypeMemPtr;
+import com.cliffc.aa.type.TypeStruct;
 import com.cliffc.aa.util.Ary;
 
 import java.util.HashMap;
@@ -168,12 +169,13 @@ public class ScopeNode extends Node {
       MemMergeNode mmem = new MemMergeNode(mem.unhook());
       for( String name : vars.keySet() ) {
         String msg = bad.errMsg("'"+name+"' not defined on "+arm+" arm of trinary");
-        Node err = gvn.xform(new ErrNode(ptr,msg,Type.SCALAR));
+        Node err = gvn.xform(new ErrNode(ctrl,msg,Type.SCALAR));
         // Exactly like a parser store of an error, on the missing side
-        //ObjMergeNode omem = mmem.active_obj(scope.stk()._alias,gvn);
-        //int idx = omem.fld_idx(name,gvn);
-        //omem.set_def(idx,gvn.xform(new StoreNode(ctrl,omem.in(idx),scope.ptr(),err,TypeStruct.ffinal(),name,bad)),gvn);
-        throw com.cliffc.aa.AA.unimpl();
+        int alias = scope.stk()._alias; // Alias for scope
+        Node omem = mmem.active_obj(alias);
+        Node st = gvn.xform(new StoreNode(ctrl,omem,scope.ptr(),err,TypeStruct.ffinal(),name,bad));
+        int idx = mmem.make_alias2idx(alias); // Precise alias update
+        mmem.set_def(idx,st,gvn);
       }
       return gvn.xform(mmem.deactive(gvn)).keep();
     }

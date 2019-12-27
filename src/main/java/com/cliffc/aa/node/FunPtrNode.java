@@ -33,6 +33,7 @@ public final class FunPtrNode extends ConNode<TypeFunPtr> {
   }
   // Inline longer name
   @Override String  str() {
+    if( is_dead() ) return "DEAD";
     RetNode ret = ret();
     if( ret.is_copy() ) return "*!copy!{->}";
     FunNode fun = ret.fun();

@@ -66,15 +66,7 @@ public class GVNGCM {
   // state left alive.  NOT called after a line in the REPL or a user-call to
   // "eval" as user state carries on.
   void reset_to_init0() {
-    while( _work._len > 0 ) {   // Can be a few leftover dead bits...
-      Node n = _work.pop();     // from top-level parse killing result...
-      _wrk_bits.clear(n._uid);  // after getting type to return
-      if( n == Env.MEM_0 ) continue; // Do not nuke top-level frame with primitives
-      // Unreachable loops can be dead; break the loop and delete
-      for( int i=0; !n.is_dead() && i<n._defs._len; i++ )
-        if( n.in(i)!=null )     // Start breaking edges
-          set_def_reg(n,i,null);
-    }
+    iter(); // Clear worklist
     for( Node n : _INIT0_NODES ) {
       n.reset_to_init1(this);
       for( int i=0; i<n._uses._len; i++ )

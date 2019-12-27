@@ -202,28 +202,16 @@ public class TestNode {
     FunNode fun_plus = ((FunPtrNode)unr.in(1)).fun();
     RetNode ret = fun_plus.ret();
     CallNode call = new CallNode(false,null,unr);
-
-    TypeMemPtr from_ptr = TypeMemPtr.make(BitsAlias.REC,TypeStruct.POINT);
-    TypeMemPtr to_ptr   = TypeMemPtr.make(BitsAlias.REC,TypeName.TEST_STRUCT);
+    TypeName tname1 = TypeName.make("test",TypeStruct.POINT);
+    TypeName tname2 = TypeName.TEST_STRUCT;
 
     // Testing 1 set of types into a value call.
     // Comment out when not debugging.
     Type rez = test1jig(new CastNode(_ins[0],_ins[1],TypeMemPtr.STRPTR),
-            Type.CTRL,Type.NUM,Type.ANY,Type.ANY);
-
-    // Cast(flt) ==>
-    //   ~nScalar ^ flt = ~nScalar
-    //     nil    ^ flt =   0
-    // BUT ~nScalar isa nil, but ~nScalar !isa! 0
-    // WHY ~nScalar isa nil????  ... should fall to smallest value below nil... that still works for ints & ptrs
-    //
-    //   nil  ^ *[4] ==> *[+0+4]    // picks up nil choice
-    // Number ^ *[4] ==> ~nScalar   // nil isa Number, but *[0+4] !isa! ~nScalar
-    //
-    // PLAN B: nil isa many_things, nothing isa nil because its supposed to be
-    // outside the lattice.  Just weaken asserts around nil?
+                        Type.CTRL,Type.NUM,Type.ANY,Type.ANY);
 
     // All the Nodes, all Values, all Types
+
     test1monotonic(new   CallNode(false,null,_ins[0],  unr  ,mem,_ins[2],_ins[3]));
     test1monotonic(new   CallNode(false,null,_ins[0],_ins[1],mem,_ins[2],_ins[3]));
     test1monotonic(new CallEpiNode(call,ret,_ins[1])); // CallNode, then some count of RetNode
@@ -246,14 +234,15 @@ public class TestNode {
     test1monotonic(new     IfNode(_ins[0],_ins[1]));
     for( IntrinsicNewNode prim : IntrinsicNewNode.INTRINSICS )
       test1monotonic_intrinsic(prim);
-    test1monotonic(new IntrinsicNode.ConvertPtrTypeName("test",from_ptr,to_ptr,null,_ins[1],_ins[2]));
+    test1monotonic(new IntrinsicNode(tname2,null,mem,_ins[2]));
     test1monotonic(new   LoadNode(_ins[1],_ins[2],"x",null));
-    test1monotonic(new MemMergeNode(_ins[1],_ins[2],BitsAlias.REC));    
-    NewNode nnn1 = new NewNode(_ins[0],false);
+    test1monotonic(new MemMergeNode(_ins[1],_ins[2],BitsAlias.REC));
+
+    NewObjNode nnn1 = new NewObjNode(false,_ins[0]);
     set_type(1,Type.SCALAR);  nnn1.create("x",_ins[1],TypeStruct.ffinal(),_gvn);
     set_type(2,Type.SCALAR);  nnn1.create("y",_ins[2],TypeStruct.ffinal(),_gvn);
     test1monotonic(nnn1);
-    NewNode nnn2 = new NewNode(_ins[0],false);
+    NewObjNode nnn2 = new NewObjNode(false,_ins[0]);
     set_type(1,Type.SCALAR);  nnn2.create("x",_ins[1],TypeStruct.ffinal(),_gvn);
     set_type(2,Type.SCALAR);  nnn2.create("y",_ins[2],TypeStruct.ffinal(),_gvn);
     nnn2.set_name(_gvn,TypeName.TEST_STRUCT);
@@ -269,7 +258,6 @@ public class TestNode {
     test1monotonic(new  StoreNode(_ins[0],_ins[1],_ins[2],_ins[3],(byte)0,"x",null));
     test1monotonic(new  StoreNode(_ins[0],_ins[1],_ins[2],_ins[3],(byte)1,"x",null));
     //                  ScopeNode has no inputs, and value() call is monotonic
-    //                    TmpNode has no inputs, and value() call is monotonic
     test1monotonic(new   TypeNode(TypeInt.FALSE,_ins[1],null));
     test1monotonic(new   TypeNode(TypeMemPtr.ABCPTR,_ins[1],null));
     test1monotonic(new   TypeNode(TypeFlt.FLT64,_ins[1],null));
@@ -306,7 +294,7 @@ public class TestNode {
 
   // Fill a Node with {null,edge,edge} and start the search
   private void test1monotonic_intrinsic(IntrinsicNewNode prim) {
-    IntrinsicNewNode n = prim.copy(false,_gvn);
+    IntrinsicNewNode n = (IntrinsicNewNode)prim.copy(false,_gvn);
     assert n._defs._len==0;
     n.add_def( null  );
     n.add_def(_ins[1]);         // memory

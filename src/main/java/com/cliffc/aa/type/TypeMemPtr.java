@@ -59,7 +59,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   }
 
   public static TypeMemPtr make( int alias ) { return make(BitsAlias.make0(alias)); }
-  static TypeMemPtr make_nil( int alias ) { return make(BitsAlias.make0(alias).meet_nil()); }
+  public static TypeMemPtr make_nil( int alias ) { return make(BitsAlias.make0(alias).meet_nil()); }
 
   // Cannot have a NIL here, because a CastNode (JOIN) of a NIL to a "*[4]obj?"
   // yields a TypeMemPtr.NIL instead of a Type.NIL which confuses all ISA tests

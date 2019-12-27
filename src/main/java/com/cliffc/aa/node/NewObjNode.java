@@ -112,7 +112,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
     // If the address is not looked at then memory contents cannot be looked at
     // and is dead.  Since this can happen DURING opto (when a call resolves)
     // and during iter, "freeze" the value in-place.  It will DCE shortly.
-    if( _uses._len==1 && _uses.at(0) instanceof OProjNode )
+    if( _captured )
       return gvn.self_type(this);
 
     // Gather args and produce a TypeStruct

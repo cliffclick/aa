@@ -1,9 +1,11 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.*;
+import com.cliffc.aa.Env;
+import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
 
-import java.util.HashMap;
+import java.util.BitSet;
 
 // Merge results; extended by ParmNode
 public class PhiNode extends Node {
@@ -61,44 +63,39 @@ public class PhiNode extends Node {
     }
     if( !has_mmem ) return null;
 
-    // Do the expansion.  First: make all the Phis
-    HashMap<Integer,PhiNode> phis = new HashMap<>();
-    phis.put(BitsAlias.ALL,new PhiNode(_badgc,r));
+    // Do the expansion.  First: find all aliases
+    BitSet bs = new BitSet();
+    bs.set(BitsAlias.ALL);
     for( int i=1; i<_defs._len; i++ )
       if( in(i) instanceof MemMergeNode ) {
         MemMergeNode xmem = (MemMergeNode)in(i);
-        for( int j=0; j<xmem._defs._len; j++ ) {
-          int alias = xmem.alias_at(j);
-          PhiNode phi = phis.get(alias);
-          if( phi==null ) phis.put(alias,new PhiNode(_badgc,r));
-        }
+        for( int j=0; j<xmem._defs._len; j++ )
+          bs.set(xmem.alias_at(j));
       }
     // Now fill in all the phis, one by one, and plug into the giant MemMerge
     // at the end.
     MemMergeNode mmem = new MemMergeNode(null);
-    for( int alias : phis.keySet() ) {
-      PhiNode phi = phis.get(alias);
+    for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) ) {
+      PhiNode phi = new PhiNode(_badgc,r);
       for( int i=1; i<_defs._len; i++ ) {
-        Node n = in(i), m=n;
+        Node n = in(i);
         // Take the matching narrow slice for the alias, except for alias ALL
         // which can keep taking undistinguished memory.  The resulting memory
         // is {ALL-aliases} but currently only represented as ALL.
         if( n instanceof MemMergeNode )
-          m = n = ((MemMergeNode)n).alias2node(alias);
+          n = ((MemMergeNode)n).alias2node(alias);
         if( alias==BitsAlias.ALL ) {
-          assert gvn.type(m) instanceof TypeMem;
+          assert gvn.type(n) instanceof TypeMem;
         } else {
-          //if( gvn.type(m) instanceof TypeMem )
-          //  m = gvn.xform(new ObjMergeNode(n,alias));
-          //assert gvn.type(m) instanceof TypeObj;
-          throw AA.unimpl();
+          if( n == ((MemMergeNode)in(i)).alias2node(1) )
+            n = gvn.con(TypeObj.XOBJ);
+          assert gvn.type(n) instanceof TypeObj;
         }
-        phi.add_def(m);
+        phi.add_def(n);
       }
       Node obj = gvn.xform(phi);
-      //if( alias==BitsAlias.ALL ) mmem.set_def(0,obj,gvn);
-      //else       mmem.create_alias_active(alias,obj,gvn);
-      throw AA.unimpl();
+      if( alias==BitsAlias.ALL ) mmem.set_def(0,obj,gvn);
+      else       mmem.create_alias_active(alias,obj,gvn);
     }
     return mmem;
   }

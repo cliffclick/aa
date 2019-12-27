@@ -255,7 +255,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // Most primitive function call argument type lists are 0-based
   //private static final TypeStruct SCALAR0 = make_args();
   public  static final TypeStruct SCALAR1     = make(ARGS_X ,ts(SCALAR));
-  public  static final TypeStruct SCALAR2     = make(ARGS_XY,ts(SCALAR,SCALAR));
+  public  static final TypeStruct SCALAR2     = make(FLD2   ,ts(SCALAR,SCALAR));
   public  static final TypeStruct STRPTR      = make(ARGS_X ,ts(TypeMemPtr.STRPTR));
   public  static final TypeStruct OOP_OOP     = make(ARGS_XY,ts(TypeMemPtr.OOP0,TypeMemPtr.OOP0));
   public  static final TypeStruct INT64_INT64 = make(ARGS_XY,ts(TypeInt.INT64,TypeInt.INT64));

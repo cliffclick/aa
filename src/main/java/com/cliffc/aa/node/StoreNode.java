@@ -36,36 +36,23 @@ public class StoreNode extends Node {
     if( ta instanceof TypeMemPtr && mem instanceof MemMergeNode )
       return new StoreNode(this,((MemMergeNode)mem).obj((TypeMemPtr)ta,gvn),adr);
 
-    //// Stores bypass a ObjMerge to the specific alias
-    //if( ta instanceof TypeMemPtr && mem instanceof ObjMergeNode ) {
-    //  gvn.unreg(mem);        // Stretch the incoming ObjMerge for the new field
-    //  int idx = ((ObjMergeNode)mem).fld_idx(_fld,gvn);
-    //  // Store on the other side of ObjMerge
-    //  Node st = gvn.xform(new StoreNode(this,mem.in(idx),adr));
-    //  // Update and return ObjMerge
-    //  mem.set_def(idx,st,gvn);
-    //  gvn.rereg(mem,mem.value(gvn));
-    //  return mem;
-    //}
-    //
-    //// If Store is by a New, fold into the New.
-    //NewNode nnn;  int idx;
-    //if( mem instanceof OProjNode && mem.in(0) instanceof NewNode && (nnn=(NewNode)mem.in(0)) == adr.in(0) &&
-    //    ctl == nnn.in(0) && !val().is_forward_ref() && (idx=nnn._ts.find(_fld))!= -1 && nnn._ts.can_update(idx) ) {
-    //  // As part of the local xform rule, the memory & ptr outputs of the
-    //  // NewNode need to update their types directly.  This Store pts at
-    //  // the OProj, and when it folds it can set the NewNode mutable bit
-    //  // to e.g. final.  The OProj type needs to also reflect final.  This
-    //  // is because we have an Ideal rule allowing a Load to bypass a
-    //  // Store that is not in-error, but back-to-back final stores can
-    //  // temporarily be not-in-error if the OProj does not reflect final.
-    //  nnn.update(idx,val(),_fin,gvn);
-    //  gvn.setype(nnn,nnn.value(gvn));
-    //  for( Node use : nnn._uses ) gvn.setype(use,use.value(gvn));
-    //  return mem;
-    //}
-    //return null;
-    throw AA.unimpl();
+    // If Store is by a New, fold into the New.
+    NewObjNode nnn;  int idx;
+    if( mem instanceof OProjNode && mem.in(0) instanceof NewObjNode && (nnn=(NewObjNode)mem.in(0)) == adr.in(0) &&
+        ctl == nnn.in(0) && !val().is_forward_ref() && (idx=nnn._ts.find(_fld))!= -1 && nnn._ts.can_update(idx) ) {
+      // As part of the local xform rule, the memory & ptr outputs of the
+      // NewNode need to update their types directly.  This Store pts at
+      // the OProj, and when it folds it can set the NewNode mutable bit
+      // to e.g. final.  The OProj type needs to also reflect final.  This
+      // is because we have an Ideal rule allowing a Load to bypass a
+      // Store that is not in-error, but back-to-back final stores can
+      // temporarily be not-in-error if the OProj does not reflect final.
+      nnn.update(idx,val(),_fin,gvn);
+      gvn.setype(nnn,nnn.value(gvn));
+      for( Node use : nnn._uses ) gvn.setype(use,use.value(gvn));
+      return mem;
+    }
+    return null;
   }
 
   @Override public Type value(GVNGCM gvn) {

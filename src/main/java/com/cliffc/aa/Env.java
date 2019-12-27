@@ -11,11 +11,11 @@ public class Env implements AutoCloseable {
     ScopeNode scope = new ScopeNode(closure);
     if( par != null ) {
       scope.set_ctrl(par._scope.ctrl(),GVN);
-      NewObjNode nnn = GVN.init(new NewObjNode(closure,scope.ctrl()));
-      Node ptr = GVN.xform(new  ProjNode(nnn,1));
+      NewObjNode nnn = GVN.init(new NewObjNode(closure,scope.ctrl())).keep();
       Node frm = GVN.xform(new OProjNode(nnn,0));
+      Node ptr = GVN.xform(new  ProjNode(nnn,1));
       scope.set_ptr (ptr,GVN);  // Address for 'nnn', the local stack frame
-      MemMergeNode mem = new MemMergeNode(par._scope.mem(),frm,nnn._alias);
+      MemMergeNode mem = new MemMergeNode(par._scope.mem(),frm,nnn.<NewObjNode>unhook()._alias);
       scope.set_active_mem(mem,GVN);  // Memory includes local stack frame
     }
     _scope = GVN.init(scope);

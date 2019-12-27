@@ -17,7 +17,7 @@ public class LoadNode extends Node {
   String xstr() { return _fld; }   // Self short name
   String  str() { return xstr(); } // Inline short name
   private Node mem() { return in(1); }
-  private Node adr() { return in(2); }
+          Node adr() { return in(2); }
   private Node set_mem(Node a, GVNGCM gvn) { return set_def(1,a,gvn); }
   private void set_adr(Node a, GVNGCM gvn) { set_def(2,a,gvn); }
 

@@ -9,8 +9,30 @@ public class ProjNode extends Node {
   final int _idx;
   public ProjNode( Node ifn, int idx ) { super(OP_PROJ,ifn); _idx=idx; }
   @Override String xstr() { return "DProj_"+_idx; }
-  @Override public Node ideal(GVNGCM gvn) { return in(0).is_copy(gvn,_idx); }
+
+  @Override public Node ideal(GVNGCM gvn) {
+    // multi-head is collapsing?  Then follow suit.
+    Node cp = in(0).is_copy(gvn,_idx);
+    if( cp != null ) return cp;
+
+    // Basic escape analysis if DProj loses a use
+    if( in(0) instanceof NewNode && ((NewNode) in(0)).captured() )
+      gvn.add_work(in(0));
+
+    return null;
+  }
+
+  // If losing an escaping use, recheck escape analysis
+  @Override public boolean ideal_impacted_by_losing_uses(GVNGCM gvn, Node dead) {
+    return
+      dead instanceof  CallNode || // Call args escape
+      dead instanceof  LoadNode || // Direct usage
+      dead instanceof StoreNode;   // Store this-as-val escapes
+  }
+
   @Override public Type value(GVNGCM gvn) {
+    if( in(0) instanceof NewNode && ((NewNode)in(0))._captured )
+      return Type.XSCALAR;
     Type c = gvn.type(in(0));
     if( c instanceof TypeTuple ) {
       TypeTuple ct = (TypeTuple)c;
