@@ -33,17 +33,17 @@ public class TypeTuple extends Type<TypeTuple> {
       return false;
     return TypeAry.eq(_ts,t._ts);
   }
-  @Override public boolean cycle_equals( Type o ) {
-    if( this==o ) return true;
-    if( !(o instanceof TypeTuple) ) return false;
-    TypeTuple t = (TypeTuple)o;
-    if( _any!=t._any || _hash != t._hash || _ts.length != t._ts.length )
-      return false;
-    if( _ts == t._ts ) return true;
-    for( int i=0; i<_ts.length; i++ )
-      if( _ts[i]!=t._ts[i] && !_ts[i].cycle_equals(t._ts[i]) ) return false;
-    return true;
-  }
+  //@Override public boolean cycle_equals( Type o ) {
+  //  if( this==o ) return true;
+  //  if( !(o instanceof TypeTuple) ) return false;
+  //  TypeTuple t = (TypeTuple)o;
+  //  if( _any!=t._any || _hash != t._hash || _ts.length != t._ts.length )
+  //    return false;
+  //  if( _ts == t._ts ) return true;
+  //  for( int i=0; i<_ts.length; i++ )
+  //    if( _ts[i]!=t._ts[i] && !_ts[i].cycle_equals(t._ts[i]) ) return false;
+  //  return true;
+  //}
   String open_parens() { return "("; }
   String clos_parens() { return ")"; }
   @Override String str( VBitSet dups) {
@@ -81,27 +81,6 @@ public class TypeTuple extends Type<TypeTuple> {
   public static TypeTuple make( Type t0 ) { Type[] ts = TypeAry.get(1);  ts[0]=t0;  return make0(false,ts); }
   public static TypeTuple make( Type t0, Type t1 ) { Type[] ts = TypeAry.get(2);  ts[0]=t0; ts[1]=t1; return make0(false,ts); }
   public static TypeTuple make( Type t0, Type t1, Type t2 ) { Type[] ts = TypeAry.get(3); ts[0]=t0; ts[1]=t1; ts[2]=t2; return make0(false,ts); }
-  // Arguments are infinitely-extended with ALL
-  public static TypeTuple make_args( Type[] ts ) { return make(ts); }
-  public static TypeTuple make_args( ) { return make(); } // QQQfalse
-  public static TypeTuple make_args( Type t0 ) { return make(t0); } // QQQfalse
-  public static TypeTuple make_args( Type t0, Type t1 ) { return make(t0,t1); } // QQQfalse
-
-  // Most primitive function call argument type lists are 0-based
-          static final TypeTuple ALL_ARGS= make0(/*QQQfalse*/false,TypeAry.get(0)); // Zero args and high
-  private static final TypeTuple SCALAR0 = make_args();
-  public  static final TypeTuple SCALAR1 = make_args(SCALAR);
-  public  static final TypeTuple SCALAR2 = make_args(SCALAR, SCALAR);
-  private static final TypeTuple INT32   = make_args(TypeInt.INT32 );
-  public  static final TypeTuple INT64   = make_args(TypeInt.INT64 );
-  public  static final TypeTuple FLT64   = make_args(TypeFlt.FLT64 );
-  public  static final TypeTuple STRPTR  = make_args(TypeMemPtr.STRPTR);
-  public  static final TypeTuple OOP_OOP = make_args(TypeMemPtr.OOP0,TypeMemPtr.OOP0);
-  public  static final TypeTuple INT64_INT64 = make_args(TypeInt.INT64,TypeInt.INT64);
-  public  static final TypeTuple FLT64_FLT64 = make_args(TypeFlt.FLT64,TypeFlt.FLT64);
-  private static final TypeTuple FLT64_INT64 = make_args(TypeFlt.FLT64,TypeInt.INT64);
-  public  static final TypeTuple STR_STR     = make_args(TypeMemPtr.STRPTR,TypeMemPtr.STRPTR);
-
   public  static final TypeTuple IF_ANY  = make(XCTRL,XCTRL);
   public  static final TypeTuple IF_ALL  = make(CTRL ,CTRL );
   public  static final TypeTuple IF_TRUE = make(XCTRL,CTRL );
@@ -111,7 +90,7 @@ public class TypeTuple extends Type<TypeTuple> {
   public  static final TypeTuple START_STATE = make(CTRL, TypeMem.EMPTY_MEM);
   public  static final TypeTuple CALL  = make(CTRL, TypeMem.MEM, SCALAR);
   public  static final TypeTuple XCALL = CALL.dual();
-  static final TypeTuple[] TYPES = new TypeTuple[]{SCALAR0,SCALAR1,STRPTR,INT32,INT64,FLT64,INT64_INT64,FLT64_FLT64,FLT64_INT64, IF_ALL, IF_TRUE, IF_FALSE, OOP_OOP};
+  static final TypeTuple[] TYPES = new TypeTuple[]{CALL,START_STATE,IF_ALL, IF_TRUE, IF_FALSE};
 
   // The length of Tuples is a constant, and so is its own dual.  Otherwise
   // just dual each element.  Also flip the infinitely extended tail type.

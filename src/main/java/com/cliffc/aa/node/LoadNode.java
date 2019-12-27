@@ -37,15 +37,15 @@ public class LoadNode extends Node {
       if( obj != null ) return set_mem(obj,gvn);
     }
 
-    // Load bypass ObjMerge
-    if( mem instanceof ObjMergeNode ) {
-      assert BitsAlias.is_parent(((ObjMergeNode)mem)._alias,alias);
-      Node obj = ((ObjMergeNode)mem).fld2node(_fld);
-      return set_mem(obj,gvn);
-    }
+    //// Load bypass ObjMerge
+    //if( mem instanceof ObjMergeNode ) {
+    //  assert BitsAlias.is_parent(((ObjMergeNode)mem)._alias,alias);
+    //  Node obj = ((ObjMergeNode)mem).fld2node(_fld);
+    //  return set_mem(obj,gvn);
+    //}
 
     // Loads against a NewNode cannot NPE, cannot fail, always return the input
-    NewNode nnn = addr.in(0) instanceof NewNode ? (NewNode)addr.in(0) : null;
+    NewObjNode nnn = addr.in(0) instanceof NewObjNode ? (NewObjNode)addr.in(0) : null;
     int idx=-1;
     if( nnn != null && nnn == mem.in(0) && (idx=nnn._ts.find(_fld)) != -1 )
       return nnn.fld(idx);      // Field value
@@ -119,12 +119,13 @@ public class LoadNode extends Node {
       TypeMem t5 = (TypeMem)t4;           // Should be memory
       Type t6 = t5.ld(t3);                // General load from memory
       if( !(t6 instanceof TypeStruct) ) { // No fields, so memory or ptr is in-error
-        Type t7 = t3._obj.base();
-        if( t7 instanceof TypeStruct ) {
-          t4 = t7;
-        } else {
-          return bad("Unknown");
-        }
+        //Type t7 = t3._obj.base();
+        //if( t7 instanceof TypeStruct ) {
+        //  t4 = t7;
+        //} else {
+        //  return bad("Unknown");
+        //}
+        throw AA.unimpl();
       } else t4 = t6;
     }
     if( !(t4 instanceof TypeStruct) || ((TypeStruct)t4).find(_fld) == -1 )

@@ -73,7 +73,7 @@ public final class CallEpiNode extends Node {
       return null;
 
     // Single choice; check no conversions needed
-    TypeTuple formals = fun._tf._args;
+    TypeStruct formals = fun._tf._args;
     for( int i=0; i<call.nargs(); i++ ) {
       if( fun.parm(i)==null ) { // Argument is dead and can be dropped?
         if( gvn.type(call.arg(i)) != Type.XSCALAR )

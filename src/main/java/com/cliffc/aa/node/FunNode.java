@@ -50,7 +50,7 @@ public class FunNode extends RegionNode {
   // Used to make copies when inlining/cloning function bodies
           FunNode(String name,TypeFunPtr tf) { this(name,tf,-1); }
   // Used to start an anonymous function in the Parser
-  public  FunNode(Type[] ts) { this(null,TypeFunPtr.make_new(TypeTuple.make_args(ts),Type.SCALAR),-1); }
+  public  FunNode(Type[] ts) { this(null,TypeFunPtr.make_new(TypeStruct.make(ts),Type.SCALAR),-1); }
   // Used to forward-decl anon functions
           FunNode(String name) { this(name,TypeFunPtr.make_anon(),-2); add_def(Env.ALL_CTRL); }
   // Shared common constructor
@@ -187,7 +187,7 @@ public class FunNode extends RegionNode {
     }
 
     // Look for appropriate type-specialize callers
-    TypeTuple args = type_special(gvn, parms);
+    TypeStruct args = type_special(gvn, parms);
     int path = -1;              // Paths will split according to type
     if( args == null ) {        // No type-specialization to do
       args = _tf._args;         // Use old args
@@ -290,12 +290,12 @@ public class FunNode extends RegionNode {
   // on arguments that help immediately.
   //
   // Same argument for field Loads from unspecialized values.
-  private TypeTuple type_special( GVNGCM gvn, ParmNode[] parms ) {
+  private TypeStruct type_special( GVNGCM gvn, ParmNode[] parms ) {
     if( !has_unknown_callers() ) return null; // Only overly-wide calls.
     Type[] sig = find_type_split(gvn,parms);
     if( sig == null ) return null; // No unresolved calls; no point in type-specialization
     // Make a new function header with new signature
-    TypeTuple args = TypeTuple.make_args(sig);
+    TypeStruct args = TypeStruct.make(sig);
     assert args.isa(_tf._args);
     return args == _tf._args ? null : args; // Must see improvement
   }
@@ -369,7 +369,7 @@ public class FunNode extends RegionNode {
     return m;                   // Return path to split on
   }
 
-  private FunNode make_new_fun(GVNGCM gvn, RetNode ret, TypeTuple new_args) {
+  private FunNode make_new_fun(GVNGCM gvn, RetNode ret, TypeStruct new_args) {
     // Make a prototype new function header split from the original.
     int oldfidx = fidx();
     FunNode fun = new FunNode(_name,_tf.make_new_fidx(oldfidx,new_args));

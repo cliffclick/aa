@@ -96,7 +96,7 @@ public class TypeMem extends Type<TypeMem> {
     return true;
   }
   // Never part of a cycle, so the normal check works
-  @Override public boolean cycle_equals( Type o ) { return equals(o); }
+  //@Override public boolean cycle_equals( Type o ) { return equals(o); }
   @Override String str( VBitSet dups ) {
     if( this== MEM ) return "[mem]";
     if( this==XMEM ) return "[~mem]";
@@ -178,7 +178,7 @@ public class TypeMem extends Type<TypeMem> {
     XMEM = make(xobjs);         // Every alias filled with anything
     EMPTY_MEM = XMEM; //make(new TypeObj[0]); // Tried no-memory-vs-XOBJ-memory
 
-    MEM_ABC = make(TypeStr.ABC._news.getbit(),TypeStr.ABC);
+    MEM_ABC  = make(BitsAlias.ABCBITS,TypeStr.ABC);
     MEM_NAME = make(BitsAlias.RECBITS,TypeName.TEST_STRUCT);
   }
   static final TypeMem[] TYPES = new TypeMem[]{MEM,MEM_ABC,MEM_NAME};
@@ -224,18 +224,6 @@ public class TypeMem extends Type<TypeMem> {
     return obj;
   }
 
-  // Some overlap between the aliases - a May-Alias relationship.
-  public boolean contains( BitsAlias aliases ) {
-    if( aliases.above_center() ) return false;
-    BitSet bs = aliases.tree().plus_kids(aliases);
-    for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) ) {
-      TypeObj x = at(alias);
-      if( !x._news.above_center() )
-        return true;
-    }
-    return false;
-  }
-
   // Meet of all possible storable values, after updates.  This updates a field
   // in a TypeObj.
   public TypeMem update( byte fin, String fld, int fld_num, Type val, TypeMemPtr ptr ) {
@@ -260,10 +248,9 @@ public class TypeMem extends Type<TypeMem> {
   }
 
   // Meet of all possible storable values, after updates.  This is a whole-TypeObj update.
-  public TypeMem update( TypeObj obj ) {
+  public TypeMem update( BitsAlias aliases, TypeObj obj ) {
     // Any alias, plus all of its children, are meet.  This does a tree-based
     // scan on the inner loop.
-    BitsAlias aliases = obj.aliases();
     Ary<TypeObj> objs = new Ary<>(_aliases.clone(),_aliases.length);
     BitSet bs = aliases.tree().plus_kids(aliases);
     for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) )

@@ -88,15 +88,17 @@ public class PhiNode extends Node {
         if( alias==BitsAlias.ALL ) {
           assert gvn.type(m) instanceof TypeMem;
         } else {
-          if( gvn.type(m) instanceof TypeMem )
-            m = gvn.xform(new ObjMergeNode(n,alias));
-          assert gvn.type(m) instanceof TypeObj;
+          //if( gvn.type(m) instanceof TypeMem )
+          //  m = gvn.xform(new ObjMergeNode(n,alias));
+          //assert gvn.type(m) instanceof TypeObj;
+          throw AA.unimpl();
         }
         phi.add_def(m);
       }
       Node obj = gvn.xform(phi);
-      if( alias==BitsAlias.ALL ) mmem.set_def(0,obj,gvn);
-      else       mmem.create_alias_active(alias,obj,gvn);
+      //if( alias==BitsAlias.ALL ) mmem.set_def(0,obj,gvn);
+      //else       mmem.create_alias_active(alias,obj,gvn);
+      throw AA.unimpl();
     }
     return mmem;
   }

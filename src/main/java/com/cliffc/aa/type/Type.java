@@ -111,10 +111,10 @@ public class Type<T extends Type<T>> implements Cloneable {
     if( this == o ) return true;
     return (o instanceof Type) && _type==((Type)o)._type;
   }
-  public boolean cycle_equals( Type o ) {
-    assert is_simple();         // Overridden in subclasses
-    return _type==o._type;
-  }
+  //public boolean cycle_equals( Type o ) {
+  //  assert is_simple();         // Overridden in subclasses
+  //  return _type==o._type;
+  //}
 
   // In order to handle recursive printing, this is the only toString call in
   // the Type hierarchy.  Instead, subtypes override 'str(HashSet)' where the
@@ -610,8 +610,6 @@ public class Type<T extends Type<T>> implements Cloneable {
   }
   // Return true if this is a forward-ref function pointer (return type from EpilogNode)
   public boolean is_forward_ref() { return false; }
-  // Return the recursive type if this is a forward-ref type def, and null otherwise
-  public TypeName merge_recursive_type( Type t ) { return null; }
 
   // Return a long   from a TypeInt constant; assert otherwise.
   public long   getl() { if( _type==TNIL ) return 0; throw typerr(null); }
@@ -737,27 +735,27 @@ public class Type<T extends Type<T>> implements Cloneable {
   // unrolling of names by not allowing a named-type with depth >= D from
   // holding (recursively) the head of a named-type cycle.  We need to cap the
   // unroll, to prevent loops/recursion from infinitely unrolling.
-  Type make_recur(TypeName tn, int d, VBitSet bs ) { assert is_simple(); return this; }
+  //Type make_recur(TypeName tn, int d, VBitSet bs ) { assert is_simple(); return this; }
 
   // Is t type contained within this?  Short-circuits on a true
   public final boolean contains( Type t ) { return contains(t,null); }
   boolean contains( Type t, VBitSet bs ) { return this==t; }
-  // Deepest depth of nested TypeStructs; cycles at a base of 10000.
-  final int depth() { return depth(null); }
-  int depth( NonBlockingHashMapLong<Integer> ds ) { return 0; }
-  // Mark if part of a cycle
-  void mark_cycle( Type t, VBitSet visit, BitSet cycle ) { }
-
-  // Iterate over any nested child types.  Only side-effect results.
-  public void iter( Consumer<Type> c ) { /*None in the base class*/ }
+  //// Deepest depth of nested TypeStructs; cycles at a base of 10000.
+  //final int depth() { return depth(null); }
+  //int depth( NonBlockingHashMapLong<Integer> ds ) { return 0; }
+  //// Mark if part of a cycle
+  //void mark_cycle( Type t, VBitSet visit, BitSet cycle ) { }
+  //
+  //// Iterate over any nested child types.  Only side-effect results.
+  //public void iter( Consumer<Type> c ) { /*None in the base class*/ }
 
   // Apply the test(); if it returns true iterate over all nested child types.
   // If the test returns false, short-circuit the walk.  No attempt to guard
   // against recursive structure walks, so the 'test' must return false when
   // visiting the same Type again.
-  void walk( Predicate<Type> p ) { assert is_simple(); p.test(this); }
+  //void walk( Predicate<Type> p ) { assert is_simple(); p.test(this); }
 
-  TypeStruct repeats_in_cycles(TypeStruct head, VBitSet bs) { return null; }
+  //TypeStruct repeats_in_cycles(TypeStruct head, VBitSet bs) { return null; }
 
   // Dual, except keep TypeMem.XOBJ as high for starting GVNGCM.opto() state.
   public Type startype() {

@@ -36,11 +36,11 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   private BitsFun _fidxs;       // Known function bits
   // Union (or join) signature of said functions; depends on if _fidxs is
   // above_center() or not.
-  public TypeTuple _args;       // Standard args, zero-based, no memory
+  public TypeStruct _args;      // Standard args, zero-based, no memory
   public Type _ret;             // Standard formal return type.
 
-  private TypeFunPtr(BitsFun fidxs, TypeTuple args, Type ret ) { super(TFUNPTR); init(fidxs,args,ret); }
-  private void init (BitsFun fidxs, TypeTuple args, Type ret ) { _fidxs = fidxs; _args=args; _ret=ret; }
+  private TypeFunPtr(BitsFun fidxs, TypeStruct args, Type ret ) { super(TFUNPTR); init(fidxs,args,ret); }
+  private void init (BitsFun fidxs, TypeStruct args, Type ret ) { _fidxs = fidxs; _args=args; _ret=ret; }
   @Override int compute_hash() { return TFUNPTR + _fidxs._hash + _args._hash + _ret._hash; }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
@@ -49,15 +49,14 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     return _fidxs==tf._fidxs && _args==tf._args && _ret==tf._ret;
   }
   // Never part of a cycle, so the normal check works
-  @Override public boolean cycle_equals( Type o ) { return equals(o); }
+  //@Override public boolean cycle_equals( Type o ) { return equals(o); }
   @Override public String str( VBitSet dups) {
-    return "*"+names()+":{"+_args.str(dups)+"-> "+_ret.str(dups)+"}";
-  }
+    return "*"+names()+":{"+_args.str(dups)+"-> "+_ret.str(dups)+"}";}
   public String names() { return FunNode.names(_fidxs,new SB()).toString(); }
 
   private static TypeFunPtr FREE=null;
   @Override protected TypeFunPtr free( TypeFunPtr ret ) { FREE=this; return ret; }
-  public static TypeFunPtr make( BitsFun fidxs, TypeTuple args, Type ret ) {
+  public static TypeFunPtr make( BitsFun fidxs, TypeStruct args, Type ret ) {
     TypeFunPtr t1 = FREE;
     if( t1 == null ) t1 = new TypeFunPtr(fidxs,args,ret);
     else {   FREE = null;        t1.init(fidxs,args,ret); }
@@ -65,14 +64,14 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     return t1==t2 ? t1 : t1.free(t2);
   }
   // Used by testing only
-  public static TypeFunPtr make_new(TypeTuple args, Type ret) { return make(BitsFun.make_new_fidx(BitsFun.ALL),args,ret); }
+  public static TypeFunPtr make_new(TypeStruct args, Type ret) { return make(BitsFun.make_new_fidx(BitsFun.ALL),args,ret); }
   public TypeFunPtr make_fidx( int fidx ) { return make(BitsFun.make0(fidx),_args,_ret); }
-  public TypeFunPtr make_new_fidx( int parent, TypeTuple args ) { return make(BitsFun.make_new_fidx(parent),args,_ret); }
-  public static TypeFunPtr make_anon() { return make_new(TypeTuple.ALL_ARGS,Type.SCALAR); } // Make a new anonymous function ptr
+  public TypeFunPtr make_new_fidx( int parent, TypeStruct args ) { return make(BitsFun.make_new_fidx(parent),args,_ret); }
+  public static TypeFunPtr make_anon() { return make_new(TypeStruct.ALLSTRUCT,Type.SCALAR); } // Make a new anonymous function ptr
 
-  public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.NZERO,TypeTuple.ALL_ARGS,Type.SCALAR);
-  private static final TypeFunPtr TEST_INEG = make(BitsFun.make0(2),TypeTuple.INT64,TypeInt.INT64);
-  public  static final TypeFunPtr EMPTY = make(BitsFun.EMPTY,TypeTuple.ALL_ARGS,Type.XSCALAR);
+  public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.NZERO,TypeStruct.ALLSTRUCT,Type.SCALAR);
+  private static final TypeFunPtr TEST_INEG = make(BitsFun.make0(2),TypeStruct.INT64,TypeInt.INT64);
+  public  static final TypeFunPtr EMPTY = make(BitsFun.EMPTY,TypeStruct.ALLSTRUCT,Type.XSCALAR);
   static final TypeFunPtr[] TYPES = new TypeFunPtr[]{GENERIC_FUNPTR,TEST_INEG};
 
   @Override protected TypeFunPtr xdual() { return new TypeFunPtr(_fidxs.dual(),_args.dual(),_ret.dual()); }
@@ -95,7 +94,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     }
     TypeFunPtr tf = (TypeFunPtr)t;
     // QQQ - Function args are JOINed during the MEET.
-    return make(_fidxs.meet(tf._fidxs),(TypeTuple)_args/*QQQ.meet*/.meet(tf._args),_ret.meet(tf._ret));
+    return make(_fidxs.meet(tf._fidxs),(TypeStruct)_args/*QQQ.meet*/.meet(tf._args),_ret.meet(tf._ret));
   }
 
   public BitsFun fidxs() { return _fidxs; }
@@ -120,9 +119,9 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   }
   // Keep the high parts
   @Override public Type startype() {
-    BitsFun fidxs = _fidxs.above_center() ? _fidxs : _fidxs.dual();
-    TypeTuple args= _args.startype();
-    Type ret      = _ret .startype();
+    BitsFun fidxs  = _fidxs.above_center() ? _fidxs : _fidxs.dual();
+    TypeStruct args= _args.startype();
+    Type ret       = _ret .startype();
     return make(fidxs,args,ret);
   }
 

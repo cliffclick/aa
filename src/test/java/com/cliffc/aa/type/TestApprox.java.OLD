@@ -26,8 +26,8 @@ public class TestApprox {
     Object dummy0 = TypeStruct.TYPES;
     Object dummy1 = TypeMemPtr.TYPES;
     Type.RECURSIVE_MEET++;
-    TypeStruct t0 = TypeStruct.malloc(false,flds,TypeStruct.ts(2),finals,alias);
-    TypeStruct t1 = TypeStruct.malloc(false,flds,TypeStruct.ts(2),finals,alias);
+    TypeStruct t0 = TypeStruct.malloc(false,flds,TypeStruct.ts(2),finals);
+    TypeStruct t1 = TypeStruct.malloc(false,flds,TypeStruct.ts(2),finals);
     t0._hash = t0.compute_hash();  t0._cyclic = true;
     t1._hash = t1.compute_hash();  t1._cyclic = true;
     TypeMemPtr p0 = TypeMemPtr.make(alias0,t0);  p0._cyclic = true;

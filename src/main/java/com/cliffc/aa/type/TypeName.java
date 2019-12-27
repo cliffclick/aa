@@ -1,9 +1,7 @@
 package com.cliffc.aa.type;
 
 import com.cliffc.aa.AA;
-import com.cliffc.aa.util.SB;
-import com.cliffc.aa.util.VBitSet;
-import com.cliffc.aa.util.NonBlockingHashMapLong;
+import com.cliffc.aa.util.*;
 
 import java.util.BitSet;
 import java.util.HashMap;
@@ -35,40 +33,30 @@ import java.util.function.Predicate;
 // A.B.~int.meet(D.B.~int) == B.int // Nothing in common, fall to int
 
 public class TypeName extends TypeObj<TypeName> {
-  public  String _name;
-  public  HashMap<String,Type> _lex; // Lexical scope of this named type
-  public  Type _t;                   // Named type
-  public  short _depth;              // Nested depth of TypeNames
+  public  String _name;         // Name!
+  public  int _lex;            // Unique type-name number, which is also an alias so overloads TypeMemPtr
+  public  Type _t;              // Named type
+  public  short _depth;         // Nested depth of TypeNames
   // Named type variable
-  private TypeName ( String name, HashMap<String,Type> lex, Type t, short depth ) {
-    super(TNAME,false,t instanceof TypeObj ? ((TypeObj)t)._news : null); init(name,lex,t,depth); }
-  private void init( String name, HashMap<String,Type> lex, Type t, short depth ) {
-    super.init(TNAME,false,t instanceof TypeObj ? ((TypeObj)t)._news : null);
-    assert name!=null && lex !=null; _name=name; _lex=lex; _t=t; _depth = depth; assert depth >= -1; }
+  private TypeName ( String name, int lex, Type t, short depth ) { super(TNAME,false); init(name,lex,t,depth); }
+  private void init( String name, int lex, Type t, short depth ) {
+    super.init(TNAME,false);
+    assert name!=null; _name=name; _lex=lex; _t=t; _depth = depth; assert depth >= -1; }
   private static short depth( Type t ) { return(short)(t instanceof TypeName ? ((TypeName)t)._depth+1 : 0); }
   int pdepth() { return Math.max(0,_depth); }
-  // Hash does not depend on other types.
-  // No recursion on _t to break type cycles
-  @Override int compute_hash() { return super.compute_hash() + _name.hashCode(); }
+  @Override int compute_hash() { return super.compute_hash() + _name.hashCode() + _lex + _t._hash; }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeName) ) return false;
     TypeName t2 = (TypeName)o;
-    return _lex == t2._lex && _name.equals(t2._name) && _t==t2._t && _depth == t2._depth;
-  }
-  @Override public boolean cycle_equals( Type o ) {
-    if( this==o ) return true;
-    if( !(o instanceof TypeName) ) return false;
-    TypeName t2 = (TypeName)o;
-    if( _lex != t2._lex  || !_name.equals(t2._name) || _depth != t2._depth ) return false;
-    return _t==t2._t || _t.cycle_equals(t2._t);
+    return _lex == t2._lex && Util.eq(_name,t2._name) && _t==t2._t && _depth == t2._depth;
   }
   @Override String str( VBitSet dups) { return _name+":"+_t.str(dups); }
   @Override SB dstr( SB sb, VBitSet dups ) { return _t.dstr(sb.p('_').p(_uid).p(_name).p(':'),dups); }
 
   private static TypeName FREE=null;
   @Override protected TypeName free( TypeName ret ) { FREE=this; return ret; }
-  public static TypeName make0( String name, HashMap<String,Type> lex, Type t, short depth) {
+  public static TypeName make0( String name, int lex, Type t, short depth) {
     TypeName t1 = FREE;
     if( t1 == null ) t1 = new TypeName(name,lex,t,depth);
     else { FREE = null; t1.init(name,lex,t,depth); }
@@ -76,25 +64,15 @@ public class TypeName extends TypeObj<TypeName> {
     return t1==t2 ? t1 : t1.free(t2);
   }
 
-  public static TypeName make( String name, HashMap<String,Type> lex, Type t) {
-    TypeName tn0 = make0(name,lex,t,depth(t));
-    TypeName tn1 = (TypeName)lex.get(name);
-    if( tn1==null || tn0==tn1 || RECURSIVE_MEET>0 ) return tn0;
-    //return tn0.make_recur(tn1,0,new VBitSet());
-    throw AA.unimpl();
-  }
+  public static TypeName make( String name, Type t) { return make0(name,BitsAlias.new_alias(BitsAlias.REC),t,depth(t)); }
+  public static TypeName make( String name, int lex, Type t) { return make0(name,lex,t,depth(t)); }
+  public static TypeName make_forward_def_type( String name ) { return make0(name,BitsAlias.new_alias(BitsAlias.REC),TypeStruct.ALLSTRUCT,(short)-1); }
   public TypeName make( Type t) { return make0(_name,_lex,t,_depth); }
-  @Override public Type make( boolean any, BitsAlias news ) {
-    Type t = _t instanceof TypeObj ? ((TypeObj)_t).make(any,news) : _t;
-    return t instanceof TypeObj ? make(t) : ALL;
-  }
-  public static TypeName make_forward_def_type( String name, HashMap<String,Type> lex ) { return make0(name,lex,TypeStruct.ALLSTRUCT,(short)-1); }
 
-          static final HashMap<String,Type> TEST_SCOPE = new HashMap<>();
-          static final TypeName TEST_ENUM = make("__test_enum",TEST_SCOPE,TypeInt.INT8);
-          static final TypeName TEST_FLT  = make("__test_flt" ,TEST_SCOPE,TypeFlt.FLT32);
-          static final TypeName TEST_E2   = make("__test_e2"  ,TEST_SCOPE,TEST_ENUM);
-  public  static final TypeName TEST_STRUCT=make("__test_struct",TEST_SCOPE,TypeStruct.POINT);
+          static final TypeName TEST_ENUM = make("__test_enum"  ,TypeInt.INT8);
+          static final TypeName TEST_FLT  = make("__test_flt"   ,TypeFlt.FLT32);
+          static final TypeName TEST_E2   = make("__test_e2"    ,TEST_ENUM);
+  public  static final TypeName TEST_STRUCT=make("__test_struct",TypeStruct.POINT);
 
   static final TypeName[] TYPES = new TypeName[]{TEST_ENUM,TEST_FLT,TEST_E2,TEST_STRUCT};
 
@@ -171,7 +149,7 @@ public class TypeName extends TypeObj<TypeName> {
 
   // 'this' is a forward ref type definition; the actual type-def is 't' which
   // may include embedded references to 'this'
-  @Override public TypeName merge_recursive_type( Type t ) {
+  public TypeName merge_recursive_type( Type t ) {
     if( _depth >= 0 ) return null; // Not a recursive type-def
     assert _t==TypeStruct.ALLSTRUCT;
     // Remove from INTERN table, since hacking type will not match hash
@@ -179,15 +157,13 @@ public class TypeName extends TypeObj<TypeName> {
     // Hack type and it's dual.  Type is now recursive.
     _t = t;
     _dual._t = t._dual;
-    // Flag all as cyclic
-    t.mark_cycle(this,new VBitSet(),new BitSet());
+    _depth = depth(t);
     // Back into the INTERN table
     retern()._dual.retern();
-
+  
     return this;
   }
 
-  @Override BitsAlias aliases() { return _t instanceof TypeObj ? ((TypeObj)_t).aliases() : BitsAlias.NIL; }
   @Override public TypeObj lift_final() { return _t instanceof TypeObj ? make(((TypeObj)_t).lift_final()) : this; }
   @Override public boolean above_center() { return _t.above_center(); }
   @Override public boolean may_be_con() { return _t.may_be_con(); }
@@ -207,35 +183,35 @@ public class TypeName extends TypeObj<TypeName> {
     }
     return _t.isBitShape(t); // Strip name and try again
   }
-  @Override TypeName make_recur(TypeName tn, int d, VBitSet bs ) {
-    if( bs.get(_uid) ) return this; // Looping on some other recursive type
-    bs.set(_uid);
-    // Make a (possibly cyclic & infinite) named type.  Prevent the infinite
-    // unrolling of names by not allowing a named-type with depth >= D from
-    // holding (recursively) the head of a named-type cycle.  We need to cap the
-    // unroll, to prevent loops/recursion from infinitely unrolling.
-    int D = 5;
-    if( _lex==tn._lex && _name.equals(tn._name) && d++ == D )
-      return above_center() ? tn.dual() : tn;
-    Type t2 = _t.make_recur(tn,d,bs);
-    return t2==_t ? this : make(t2);
-  }
-  // Mark if part of a cycle
-  @Override void mark_cycle( Type head, VBitSet visit, BitSet cycle ) {
-    if( visit.tset(_uid) ) return;
-    if( this==head ) { cycle.set(_uid); _cyclic=_dual._cyclic=true; }
-    _t.mark_cycle(head,visit,cycle);
-    if( cycle.get(_t._uid) )
-      { cycle.set(_uid); _cyclic=_dual._cyclic=true; }
-  }
+  //@Override TypeName make_recur(TypeName tn, int d, VBitSet bs ) {
+  //  if( bs.get(_uid) ) return this; // Looping on some other recursive type
+  //  bs.set(_uid);
+  //  // Make a (possibly cyclic & infinite) named type.  Prevent the infinite
+  //  // unrolling of names by not allowing a named-type with depth >= D from
+  //  // holding (recursively) the head of a named-type cycle.  We need to cap the
+  //  // unroll, to prevent loops/recursion from infinitely unrolling.
+  //  int D = 5;
+  //  if( _lex==tn._lex && _name.equals(tn._name) && d++ == D )
+  //    return above_center() ? tn.dual() : tn;
+  //  Type t2 = _t.make_recur(tn,d,bs);
+  //  return t2==_t ? this : make(t2);
+  //}
+  //// Mark if part of a cycle
+  //@Override void mark_cycle( Type head, VBitSet visit, BitSet cycle ) {
+  //  if( visit.tset(_uid) ) return;
+  //  if( this==head ) { cycle.set(_uid); _cyclic=_dual._cyclic=true; }
+  //  _t.mark_cycle(head,visit,cycle);
+  //  if( cycle.get(_t._uid) )
+  //    { cycle.set(_uid); _cyclic=_dual._cyclic=true; }
+  //}
 
   // Iterate over any nested child types
-  @Override public void iter( Consumer<Type> c ) { c.accept(_t); }
+  //@Override public void iter( Consumer<Type> c ) { c.accept(_t); }
   @Override boolean contains( Type t, VBitSet bs ) { return _t == t || _t.contains(t, bs); }
-  @SuppressWarnings("unchecked")
-  @Override int depth( NonBlockingHashMapLong<Integer> ds ) { return _t.depth(ds); }
-  @SuppressWarnings("unchecked")
-  @Override void walk( Predicate<Type> p ) { if( p.test(this) ) _t.walk(p); }
-  @Override TypeStruct repeats_in_cycles(TypeStruct head, VBitSet bs) { return _cyclic ? _t.repeats_in_cycles(head,bs) : null; }
+  //@SuppressWarnings("unchecked")
+  //@Override int depth( NonBlockingHashMapLong<Integer> ds ) { return _t.depth(ds); }
+  //@SuppressWarnings("unchecked")
+  //@Override void walk( Predicate<Type> p ) { if( p.test(this) ) _t.walk(p); }
+  //@Override TypeStruct repeats_in_cycles(TypeStruct head, VBitSet bs) { return _cyclic ? _t.repeats_in_cycles(head,bs) : null; }
   @Override TypeObj make_base(TypeStruct obj) { return make(((TypeObj)_t).make_base(obj)); }
 }

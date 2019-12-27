@@ -11,9 +11,9 @@ import java.util.function.Predicate;
 // should be replaced with a named Array.
 public class TypeStr extends TypeObj<TypeStr> {
   private String _con;          //
-  private TypeStr  (boolean any, String con, BitsAlias news ) { super(TSTR,any, news); init(any,con,news); }
-  private void init(boolean any, String con, BitsAlias news ) {
-    super.init(TSTR,any,news);
+  private TypeStr  (boolean any, String con ) { super(TSTR,any); init(any,con); }
+  private void init(boolean any, String con ) {
+    super.init(TSTR,any);
     _con = con;
   }
   @Override int compute_hash() { return super.compute_hash() + (_con==null ? 0 : _con.hashCode());  }
@@ -22,7 +22,7 @@ public class TypeStr extends TypeObj<TypeStr> {
     if( !(o instanceof TypeStr) || !super.equals(o) ) return false;
     return Util.eq(_con,((TypeStr)o)._con);
   }
-  @Override public boolean cycle_equals( Type o ) { return equals(o); }
+  //@Override public boolean cycle_equals( Type o ) { return equals(o); }
   @Override String str( VBitSet dups) {
     SB sb = new SB();
     if( _any ) sb.p('~');
@@ -32,41 +32,32 @@ public class TypeStr extends TypeObj<TypeStr> {
   }
   private static TypeStr FREE=null;
   @Override protected TypeStr free( TypeStr ret ) { FREE=this; return ret; }
-  public static TypeStr make( boolean any, String con, BitsAlias news ) {
+  public static TypeStr make( boolean any, String con ) {
     if( con!=null ) any = false; // "any" is ignored for constants
     TypeStr t1 = FREE;
-    if( t1 == null ) t1 = new TypeStr(any,con,news);
-    else { FREE = null; t1.init(any,con,news); }
+    if( t1 == null ) t1 = new TypeStr(any,con);
+    else { FREE = null; t1.init(any,con); }
     TypeStr t2 = (TypeStr)t1.hashcons();
     if( t1!=t2 ) return t1.free(t2);
-    // Constant strings are made with a null _news, so they can hash-cons to
-    // each other - they are all made pre-compilation and exist in the original
-    // program image.  If we decide to keep the constant, we'll give it a
-    // unique alias.
-    if( t1._news==null ) {
-      assert t1._con != null;
-      t1._news = BitsAlias.make0(BitsAlias.new_alias(BitsAlias.STR));
-    }
     return t1;
   }
-  @Override public TypeStr make( boolean any, BitsAlias news ) { return make(any,_con,news); }
-  public static TypeStr con(String con) { return make(false,con,null); }
+  public static TypeStr con(String con) { return make(false,con); }
   public static void init() {} // Used to force class init
 
   // Get the alias for string constants.  Since string constants are interned,
   // so are the aliases.
   //public int get_alias() { return _news.getbit(); }
 
-  public  static final TypeStr  STR = make(false,null,BitsAlias.STRBITS); // not null
-  public  static final TypeStr XSTR = make(true ,null,BitsAlias.STRBITS.dual()); // choice string
-  public  static final TypeStr  ABC = make(false,"abc",BitsAlias.ABCBITS); // a string constant
+  public  static final TypeStr  STR = make(false,null); // not null
+  public  static final TypeStr XSTR = make(true ,null); // choice string
+  public  static final TypeStr  ABC = make(false,"abc"); // a string constant
   private static final TypeStr  DEF = con("def"); // a string constant
   static final TypeStr[] TYPES = new TypeStr[]{STR,XSTR,ABC,DEF};
   static void init1( HashMap<String,Type> types ) { types.put("str",STR); }
   // Return a String from a TypeStr constant; assert otherwise.
   @Override public String getstr() { assert is_con(); return _con; }
 
-  @Override protected TypeStr xdual() { return _con==null ? new TypeStr(!_any,null,_news.dual()) : this; }
+  @Override protected TypeStr xdual() { return _con==null ? new TypeStr(!_any,null) : this; }
   @Override TypeStr rdual() {
     if( _dual != null ) return _dual;
     TypeStr dual = _dual = xdual();
@@ -99,14 +90,13 @@ public class TypeStr extends TypeObj<TypeStr> {
     if( _any && ts._con != null ) con = ts._con;
     if( ts._any && _con != null ) con =    _con;
     if( Util.eq(_con,ts._con) ) con = _con;
-    return make(_any&ts._any,con,_news.meet(ts._news));
+    return make(_any&ts._any,con);
   }
 
   // Update (approximately) the current TypeObj.  Strings are not allowed to be
   // updated, so this is a program type-error.
   @Override public TypeObj update(byte fin, String fld, Type val) { return STR; }
   @Override public TypeObj st    (byte fin, String fld, Type val) { return STR; }
-  @Override BitsAlias aliases() { return BitsAlias.STRBITS; }
   @Override public TypeObj lift_final() { return this; }
   @Override public boolean may_be_con() { return super.may_be_con() || _con != null; }
   @Override public boolean is_con() { return _con!=null; }
@@ -123,7 +113,7 @@ public class TypeStr extends TypeObj<TypeStr> {
     return 99;
   }
   @Override public Type widen() { return STR; }
-  @Override void walk( Predicate<Type> p ) { p.test(this); }
+  //@Override void walk( Predicate<Type> p ) { p.test(this); }
   // Flip low to high
   @Override public TypeObj startype() { return above_center() ? this : dual(); }
 }

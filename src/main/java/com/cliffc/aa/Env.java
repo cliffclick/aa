@@ -11,7 +11,7 @@ public class Env implements AutoCloseable {
     ScopeNode scope = new ScopeNode(closure);
     if( par != null ) {
       scope.set_ctrl(par._scope.ctrl(),GVN);
-      NewNode nnn = GVN.init(new NewNode(scope.ctrl(),closure));
+      NewObjNode nnn = GVN.init(new NewObjNode(closure,scope.ctrl()));
       Node ptr = GVN.xform(new  ProjNode(nnn,1));
       Node frm = GVN.xform(new OProjNode(nnn,0));
       scope.set_ptr (ptr,GVN);  // Address for 'nnn', the local stack frame
@@ -22,26 +22,26 @@ public class Env implements AutoCloseable {
   }
 
   public  final static GVNGCM GVN; // Initial GVN, defaults to ALL, lifts towards ANY
-  public  final static StartNode START; // Program start values (control, empty memory, cmd-line args)
-  public  final static CProjNode CTL_0; // Program start value control
-          final static      Node MEM_0; // Program start value memory
-  private final static      Node PTR_0; // Program start stack frame address
-  private final static      Node OBJ_0; // Program start stack frame memory
-  public  final static   NewNode STK_0; // Program start stack frame (has primitives)
-  public  final static   ConNode ALL_CTRL;
+  public  final static  StartNode START; // Program start values (control, empty memory, cmd-line args)
+  public  final static  CProjNode CTL_0; // Program start value control
+          final static       Node MEM_0; // Program start value memory
+  private final static       Node PTR_0; // Program start stack frame address
+  private final static       Node OBJ_0; // Program start stack frame memory
+  public  final static NewObjNode STK_0; // Program start stack frame (has primitives)
+  public  final static    ConNode ALL_CTRL;
           final static int LAST_START_UID;
   private final static int NINIT_CONS;
           final static Env TOP; // Top-most lexical Environment, has all primitives, unable to be removed
   static {
     GVN = new GVNGCM();      // Initial GVN, defaults to ALL, lifts towards ANY
     // Initial control & memory
-    START        =          new StartNode(       ) ;
-    CTL_0        = GVN.init(new CProjNode(START,0));
-    Node all_mem = GVN.init(new MProjNode(START,1));
+    START        =          new  StartNode(       ) ;
+    CTL_0        = GVN.init(new  CProjNode(START,0));
+    Node all_mem = GVN.init(new  MProjNode(START,1));
     // Top-level closure defining all primitives
-    STK_0        =          new   NewNode(CTL_0,true).keep();
-    PTR_0        = GVN.init(new  ProjNode(STK_0,1));
-    OBJ_0        =          new OProjNode(STK_0,0) ;
+    STK_0        =          new NewObjNode(true,CTL_0).keep();
+    PTR_0        = GVN.init(new   ProjNode(STK_0,1));
+    OBJ_0        =          new  OProjNode(STK_0,0) ;
 
     MEM_0 = GVN.init(new MemMergeNode(all_mem,OBJ_0,STK_0._alias)).keep();
     // Top-level default values; ALL_CTRL is used by declared functions to

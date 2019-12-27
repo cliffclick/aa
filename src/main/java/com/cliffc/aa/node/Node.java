@@ -25,23 +25,24 @@ public abstract class Node implements Cloneable {
   static final byte OP_LOAD   =10;
   static final byte OP_MEET   =11;
   static final byte OP_MERGE  =12;
-  static final byte OP_NEW    =13;
-  static final byte OP_OBJ    =14;
-  static final byte OP_PARM   =15;
-  static final byte OP_PHI    =16;
-  static final byte OP_PRIM   =17;
-  static final byte OP_PROJ   =18;
-  static final byte OP_REGION =19;
-  static final byte OP_RET    =20;
-  static final byte OP_SCOPE  =21;
-  static final byte OP_START  =22;
-  static final byte OP_STORE  =23;
-  static final byte OP_TMP    =24;
-  static final byte OP_TYPE   =25;
-  static final byte OP_UNR    =26;
-  static final byte OP_MAX    =27;
+  static final byte OP_NAME   =13; // Cast a prior NewObj to have a runtime Name
+  static final byte OP_NEWOBJ =14; // Allocate a new struct
+  static final byte OP_NEWSTR =15; // Allocate a new string (array)
+  static final byte OP_PARM   =16;
+  static final byte OP_PHI    =17;
+  static final byte OP_PRIM   =18;
+  static final byte OP_PROJ   =19;
+  static final byte OP_REGION =20;
+  static final byte OP_RET    =21;
+  static final byte OP_SCOPE  =22;
+  static final byte OP_START  =23;
+  static final byte OP_STORE  =24;
+  static final byte OP_TMP    =25;
+  static final byte OP_TYPE   =26;
+  static final byte OP_UNR    =27;
+  static final byte OP_MAX    =28;
 
-  private static final String[] STRS = new String[] { null, "Call", "CallEpi", "Cast", "Con", "Err", "Fun", "FunPtr", "If", "LibCall", "Load", "Meet", "Merge", "New", "Obj", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Scope", "Start", "Store", "Tmp", "Type", "Unresolved" };
+  private static final String[] STRS = new String[] { null, "Call", "CallEpi", "Cast", "Con", "Err", "Fun", "FunPtr", "If", "LibCall", "Load", "Meet", "Merge", "Name", "NewObj", "NewStr", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Scope", "Start", "Store", "Tmp", "Type", "Unresolved" };
 
   public int _uid;  // Unique ID, will have gaps, used to give a dense numbering to nodes
   final byte _op;   // Opcode (besides the object class), used to avoid v-calls in some places
@@ -198,7 +199,7 @@ public abstract class Node implements Cloneable {
       return dump(d,sb,gvn).nl();
     }
   }
-  private boolean is_multi_head() { return _op==OP_CALLEPI || _op==OP_FUN || _op==OP_IF || _op==OP_LIBCALL || _op==OP_NEW || _op==OP_REGION || _op==OP_START; }
+  private boolean is_multi_head() { return _op==OP_CALLEPI || _op==OP_FUN || _op==OP_IF || _op==OP_LIBCALL || _op==OP_NEWOBJ || _op==OP_NEWSTR || _op==OP_REGION || _op==OP_START; }
   private boolean is_multi_tail() { return _op==OP_PARM || _op==OP_PHI || _op==OP_PROJ ; }
 
   public String dumprpo( GVNGCM gvn, boolean prims ) {

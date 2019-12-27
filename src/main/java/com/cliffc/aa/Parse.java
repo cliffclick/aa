@@ -175,7 +175,6 @@ public class Parse {
       if( tres instanceof TypeMemPtr ) {
         TypeMemPtr tmp = (TypeMemPtr)tres;
         tobj = ((TypeMem)tmem).ld(tmp);
-        tres = tmp.make(tobj);
       }
     }
     return new TypeEnv(tres,tobj,_e,errs0.isEmpty() ? null : errs0);
@@ -225,9 +224,8 @@ public class Parse {
   private Node tstmt() {
     int oldx = _x;
     String tvar = token();      // Scan for tvar
-    if( tvar == null ) return null;
+    if( tvar == null || !peek('=') || !peek(':') ) { _x = oldx; return null; }
     tvar = tvar.intern();
-    if( !peek('=') || !peek(':') ) { _x = oldx; return null; }
     // Must be a type-variable assignment
     Type t = typev();
     if( t==null ) return err_ctrl2("Missing type after ':'");
@@ -241,10 +239,10 @@ public class Parse {
     Type ot = _e.lookup_type(tvar);
     TypeName tn;
     if( ot == null ) {        // Name does not pre-exist
-      tn = TypeName.make(tvar,_e._scope.types(),t);
+      tn = TypeName.make(tvar,t);
       _e.add_type(tvar,tn);   // Assign type-name
     } else {
-      tn = ot.merge_recursive_type(t);
+      tn = ot instanceof TypeName ? ((TypeName)ot).merge_recursive_type(t) : null;
       if( tn == null ) return err_ctrl2("Cannot re-assign type '"+tvar+"'");
     }
 
@@ -262,11 +260,11 @@ public class Parse {
       // returns a ptr-to-Named:@{x,y}.  This stores a v-table ptr into an
       // object.  The alias# does not change, but a TypeMem[alias#] would now
       // map to the Named variant.
-      FunPtrNode epi1 = IntrinsicNode.convertTypeName((TypeObj)t,tn,errMsg(),_gvn);
+      FunPtrNode epi1 = IntrinsicNode.convertTypeName(tn,errMsg(),_gvn);
       rez = _e.add_fun(bad,tvar,epi1); // Return type-name constructor
       // For Structs, add a second constructor taking an expanded arg list
       if( t instanceof TypeStruct ) {   // Add struct types with expanded arg lists
-        FunPtrNode epi2 = IntrinsicNode.convertTypeNameStruct((TypeStruct)t,tn, _gvn);
+        FunPtrNode epi2 = IntrinsicNode.convertTypeNameStruct(tn, _gvn);
         Node rez2 = _e.add_fun(bad,tvar,epi2); // type-name constructor with expanded arg list
         _gvn.init0(rez2._uses.at(0));      // Force init of Unresolved
       }
@@ -356,10 +354,11 @@ public class Parse {
         // Active (parser) memory state
         MemMergeNode mmem = mem_active();
         // Active object state
-        ObjMergeNode omem = mmem.active_obj(scope.stk()._alias,_gvn);
-        int idx = omem.fld_idx(tok,_gvn);
-        omem.set_def(idx,gvn(new StoreNode(ctrl(),omem.in(idx),scope.ptr(),ifex,mutable,tok,errMsg())),_gvn);
-        scope.def_if(tok,mutable,false); // Note 1-side-of-if update
+        //ObjMergeNode omem = mmem.active_obj(scope.stk()._alias,_gvn);
+        //int idx = omem.fld_idx(tok,_gvn);
+        //omem.set_def(idx,gvn(new StoreNode(ctrl(),omem.in(idx),scope.ptr(),ifex,mutable,tok,errMsg())),_gvn);
+        //scope.def_if(tok,mutable,false); // Note 1-side-of-if update
+        throw AA.unimpl();
       }
     }
     return ifex;
@@ -497,29 +496,30 @@ public class Parse {
         }
         fld=fld.intern();
 
-        // If we have a precise alias, we can read/write "mem_active" directly.
-        // If not, we need to use the imprecise all_mem.  This is basically a
-        // parser speed hack, since the all_mem always works.
-        Node mem; ObjMergeNode omem; int alias, idx;
-        Type t = _gvn.type(n);
-        if( t instanceof TypeMemPtr && (alias=((TypeMemPtr)t)._aliases.abit()) != -1 && !BitsAlias.is_parent(alias)  ) {
-          mem = omem = mem_active().active_obj(alias,_gvn);
-          idx = omem.fld_idx(fld,_gvn);
-        } else {            // Load/Store is from an unknown place
-          all_mem();        // Close off current memory for the generic memory op
-          mem = _e._scope;  // Load/Store will use all of memory
-          idx = 1;          // And use the scope index for all of memory
-        }
-        // Store or load against the chosen memory
-        Node castnn = gvn(new CastNode(ctrl(),n,TypeMemPtr.OOP)); // Remove nil choice
-        if( peek(":=") || peek_not('=','=')) {
-          byte fin = _buf[_x-2]==':' ? TypeStruct.frw() : TypeStruct.ffinal();
-          Node stmt = stmt();
-          if( stmt == null ) n = err_ctrl2("Missing stmt after assigning field '."+fld+"'");
-          else mem.set_def(idx,gvn(new StoreNode(ctrl(),mem.in(idx),castnn,n=stmt,fin,fld ,errMsg())),_gvn);
-        } else {
-          n = gvn(new LoadNode(mem.in(idx),castnn,fld,errMsg()));
-        }
+        //// If we have a precise alias, we can read/write "mem_active" directly.
+        //// If not, we need to use the imprecise all_mem.  This is basically a
+        //// parser speed hack, since the all_mem always works.
+        //Node mem; ObjMergeNode omem; int alias, idx;
+        //Type t = _gvn.type(n);
+        //if( t instanceof TypeMemPtr && (alias=((TypeMemPtr)t)._aliases.abit()) != -1 && !BitsAlias.is_parent(alias)  ) {
+        //  mem = omem = mem_active().active_obj(alias,_gvn);
+        //  idx = omem.fld_idx(fld,_gvn);
+        //} else {            // Load/Store is from an unknown place
+        //  all_mem();        // Close off current memory for the generic memory op
+        //  mem = _e._scope;  // Load/Store will use all of memory
+        //  idx = 1;          // And use the scope index for all of memory
+        //}
+        //// Store or load against the chosen memory
+        //Node castnn = gvn(new CastNode(ctrl(),n,TypeMemPtr.OOP)); // Remove nil choice
+        //if( peek(":=") || peek_not('=','=')) {
+        //  byte fin = _buf[_x-2]==':' ? TypeStruct.frw() : TypeStruct.ffinal();
+        //  Node stmt = stmt();
+        //  if( stmt == null ) n = err_ctrl2("Missing stmt after assigning field '."+fld+"'");
+        //  else mem.set_def(idx,gvn(new StoreNode(ctrl(),mem.in(idx),castnn,n=stmt,fin,fld ,errMsg())),_gvn);
+        //} else {
+        //  n = gvn(new LoadNode(mem.in(idx),castnn,fld,errMsg()));
+        //}
+        throw AA.unimpl();
 
       } else {                  // Attempt a function-call
         boolean arglist = peek('(');
@@ -563,20 +563,21 @@ public class Parse {
     }
     // Now properly load from the closure
     MemMergeNode mmem = mem_active(scope); // Active memory for the chosen scope
-    ObjMergeNode omem = mmem.active_obj(scope.stk()._alias,_gvn);
-    int idx = omem.fld_idx(tok,_gvn);
-    n = gvn(new LoadNode(omem.in(idx),scope.ptr(),tok,null));
-    if( n.is_forward_ref() )         // Prior is actually a forward-ref
-      return err_ctrl2(forward_ref_err(((FunPtrNode)n).fun()));
-
-    Node plus = _e.lookup_filter("+",_gvn,2);
-    Node sum = do_call(new CallNode(true,errMsg(),ctrl(),plus,all_mem(),n.keep(),con(TypeInt.con(d))));
-
-    MemMergeNode mmem2 = mem_active(scope); // Active memory for the chosen scope
-    ObjMergeNode omem2 = mmem2.active_obj(scope.stk()._alias,_gvn);
-    int idx2 = omem2.fld_idx(tok,_gvn);
-    omem2.set_def(idx2,gvn(new StoreNode(ctrl(),omem2.in(idx2),scope.ptr(),sum,TypeStruct.frw(),tok,errMsg())),_gvn);
-    return n.unhook();          // Return pre-increment value
+    //ObjMergeNode omem = mmem.active_obj(scope.stk()._alias,_gvn);
+    //int idx = omem.fld_idx(tok,_gvn);
+    //n = gvn(new LoadNode(omem.in(idx),scope.ptr(),tok,null));
+    //if( n.is_forward_ref() )         // Prior is actually a forward-ref
+    //  return err_ctrl2(forward_ref_err(((FunPtrNode)n).fun()));
+    //
+    //Node plus = _e.lookup_filter("+",_gvn,2);
+    //Node sum = do_call(new CallNode(true,errMsg(),ctrl(),plus,all_mem(),n.keep(),con(TypeInt.con(d))));
+    //
+    //MemMergeNode mmem2 = mem_active(scope); // Active memory for the chosen scope
+    //ObjMergeNode omem2 = mmem2.active_obj(scope.stk()._alias,_gvn);
+    //int idx2 = omem2.fld_idx(tok,_gvn);
+    //omem2.set_def(idx2,gvn(new StoreNode(ctrl(),omem2.in(idx2),scope.ptr(),sum,TypeStruct.frw(),tok,errMsg())),_gvn);
+    //return n.unhook();          // Return pre-increment value
+    throw AA.unimpl();
   }
 
   /** Parse an optionally typed factor
@@ -607,8 +608,8 @@ public class Parse {
     byte c = _buf[_x];
     if( isDigit(c) ) return con(number());
     if( '"' == c ) {
-      Type ts = string();
-      return ts==null ? err_ctrl1("Unterminated string",TypeStr.XSTR) : con(ts);
+      Node str = string();
+      return str==null ? err_ctrl1("Unterminated string",TypeStr.XSTR) : str;
     }
     int oldx = _x;
     if( peek1(c,'(') ) {        // a nested statement or a tuple
@@ -654,16 +655,14 @@ public class Parse {
     if( def.is_forward_ref() ) return def;
     // Else must load against most recent closure update.
     MemMergeNode mmem = mem_active(scope); // Active memory for the chosen scope
-    ObjMergeNode omem = mmem.active_obj(scope.stk()._alias,_gvn);
-    int idx = omem.fld_idx(tok=tok.intern(),_gvn);
-    return gvn(new LoadNode(omem.in(idx),scope.ptr(),tok,null));
+    return gvn(new LoadNode(mmem.active_obj(scope.stk()._alias),scope.ptr(),tok.intern(),null));
   }
 
   /** Parse a tuple; first stmt but not the ',' parsed.
    *  tuple= (stmts,[stmts,])     // Tuple; final comma is optional
    */
   private Node tuple(Node s) {
-    NewNode nn = new NewNode(ctrl(),false);
+    NewObjNode nn = new NewObjNode(false,ctrl());
     int fidx=0;
     while( s!=null ) {
       nn.create_active((""+(fidx++)).intern(),s,TypeStruct.ffinal(),_gvn);
@@ -808,13 +807,14 @@ public class Parse {
     // privilege (really: casting to a lower field-access-mod) then insert a
     // MeetNode to lower precision.
     TypeMemPtr tmp;
-    if( t instanceof TypeMemPtr &&
-        (tmp=((TypeMemPtr)t))._obj instanceof TypeStruct ) {
-      TypeStruct ts = ((TypeStruct)tmp._obj).make_fmod_bot();
-      if( ts != null )
-        x = gvn(new MeetNode(x,TypeMemPtr.make(BitsAlias.RECBITS0.dual(),ts)));
-    }
-    return x;
+    //if( t instanceof TypeMemPtr &&
+    //    (tmp=((TypeMemPtr)t))._obj instanceof TypeStruct ) {
+    //  TypeStruct ts = ((TypeStruct)tmp._obj).make_fmod_bot();
+    //  if( ts != null )
+    //    x = gvn(new MeetNode(x,TypeMemPtr.make(BitsAlias.RECBITS0.dual(),ts)));
+    //}
+    //return x;
+    throw AA.unimpl();
   }
 
   private String token() { skipWS();  return token0(); }
@@ -860,7 +860,7 @@ public class Parse {
    *  str  = [.\%]*               // String contents; \t\n\r\% standard escapes
    *  str  = %[num]?[.num]?fact   // Percent escape embeds a 'fact' in a string; "name=%name\n"
    */
-  private Type string() {
+  private Node string() {
     int oldx = ++_x;
     byte c;
     while( (c=_buf[_x++]) != '"' ) {
@@ -870,9 +870,11 @@ public class Parse {
     }
     TypeStr ts = TypeStr.con(new String(_buf,oldx,_x-oldx-1).intern());
     // Convert to ptr-to-constant-memory-string
-    TypeMemPtr ptr = TypeMemPtr.make(ts._news,ts);
-    // Store the constant string to memory
-    mem_active().create_alias_active(ts._news.getbit(),con(ts),_gvn);
+    int alias = BitsAlias.new_alias(BitsAlias.STR);
+    NewNode nnn = (NewNode)gvn( new NewStrNode(alias,ts,ctrl(),con(ts)));
+    Node ptr = gvn( new  ProjNode(nnn,1));
+    Node mem = gvn( new OProjNode(nnn,0));
+    mem_active().create_alias_active(nnn._alias,mem,_gvn);
     return ptr;
   }
 
@@ -903,7 +905,7 @@ public class Parse {
     if( !(base instanceof TypeObj) ) return t;
     // Automatically convert to reference for fields.
     // Grab reasonably precise alias.
-    TypeMemPtr tmp = TypeMemPtr.make(base instanceof TypeStruct ? BitsAlias.REC : BitsAlias.ARY,(TypeObj)t);
+    TypeMemPtr tmp = TypeMemPtr.make(base instanceof TypeStruct ? BitsAlias.REC : BitsAlias.ARY);
     return typeq(tmp);          // And check for null-ness
   }
   // Wrap in a nullable if there is a trailing '?'.  No spaces allowed
@@ -935,7 +937,7 @@ public class Parse {
         if( ts._len != 1 ) return null; // should return TypeErr missing -> in tfun
         ret = ts.pop();         // Get single return type
       }
-      TypeTuple targs = TypeTuple.make(ts.asAry());
+      TypeStruct targs = TypeStruct.make(ts.asAry());
       if( !peek('}') ) return null;
       return typeq(TypeFunPtr.make(BitsFun.NZERO,targs,ret));
     }
@@ -996,7 +998,7 @@ public class Parse {
         _x = oldx;               // Unwind if not a known type var
         return null;             // Not a type
       }
-      _e.add_type(tok,t=TypeName.make_forward_def_type(tok,_e._scope.types()));
+      _e.add_type(tok,t=TypeName.make_forward_def_type(tok));
     }
     return t;
   }

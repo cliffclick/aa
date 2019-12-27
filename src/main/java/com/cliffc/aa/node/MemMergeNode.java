@@ -113,51 +113,43 @@ public class MemMergeNode extends Node {
     return in(idx);
   }
 
-  // Return an 'active' (not in GVN) object, for direct manipulation by the Parser.
-  public ObjMergeNode active_obj(int alias, GVNGCM gvn) {
-    assert !gvn.touched(this) && alias > 1;  // Only if this MemMerge is also active
-    assert !BitsAlias.is_parent(alias);      // No already-split aliases
-    int idx = make_alias2idx(alias);         // Make a spot for this alias
-    Node obj = in(idx);                      // Get current def
-    if( obj instanceof ObjMergeNode && obj._uses._len==1 ) { // Must be an ObjMerge, and if this is the only use, then just reactivate
-      if( gvn.touched(obj) ) gvn.unreg(obj); // Make active (out of GVN)
-      return (ObjMergeNode)obj;              // Active already, just return
-    }
-    int pidx = find_alias2idx(BitsAlias.parent(alias)); // Parent index
-    ObjMergeNode o = new ObjMergeNode(obj==null ? in(pidx) : obj, alias); // New ObjMerge from parent memory
-    set_def(idx,o,gvn);
-    return o;
+  // Precise alias input
+  public Node active_obj(int alias) {
+    assert alias > 1 && !BitsAlias.is_parent(alias); // No already-split aliases
+    return in(find_alias2idx(alias));        // Alias
   }
 
   // Mid-iter call, will need to unreg/rereg
   public Node obj(int alias, GVNGCM gvn) {
-    assert gvn.touched(this) && alias > 1; // Only if this MemMerge is not active
-    Type oldt = gvn.unreg(this);
-    int idx = make_alias2idx(alias);         // Make a spot for this alias
-    Node obj = in(idx);                      // Get current def
-    if( obj == null ) {                      // No prior alias
-      obj = in(find_alias2idx(BitsAlias.parent(alias)));
-      set_def(idx, obj, null);  // Set in immediate alias parent
-    }
-    gvn.rereg(this,oldt);
-    return obj;
+    //assert gvn.touched(this) && alias > 1; // Only if this MemMerge is not active
+    //Type oldt = gvn.unreg(this);
+    //int idx = make_alias2idx(alias);         // Make a spot for this alias
+    //Node obj = in(idx);                      // Get current def
+    //if( obj == null ) {                      // No prior alias
+    //  obj = in(find_alias2idx(BitsAlias.parent(alias)));
+    //  set_def(idx, obj, null);  // Set in immediate alias parent
+    //}
+    //gvn.rereg(this,oldt);
+    //return obj;
+    throw AA.unimpl();
   }
 
   // Lookup a node index, given a TypeMemPtr.  Only works if the given alias
   // has not been split into parts
   Node obj( TypeMemPtr tmp, GVNGCM gvn ) {
-    int alias = tmp._aliases.abit();
-    if( alias == -1 ) throw AA.unimpl(); // Handle multiple aliases, handle all/empty
-    return obj(alias,gvn);
+    //int alias = tmp._aliases.abit();
+    //if( alias == -1 ) throw AA.unimpl(); // Handle multiple aliases, handle all/empty
+    //return obj(alias,gvn);
+    throw AA.unimpl();
   }
-
-  // Create a new alias with initial value for deactive/gvn-registered memory
-  public void create_alias( int alias, Node n, GVNGCM gvn ) {
-    assert gvn.touched(this);
-    Type oldt = gvn.unreg(this);
-    create_alias_active(alias,n,gvn);
-    gvn.rereg(this,oldt);
-  }
+  //
+  //// Create a new alias with initial value for deactive/gvn-registered memory
+  //public void create_alias( int alias, Node n, GVNGCM gvn ) {
+  //  assert gvn.touched(this);
+  //  Type oldt = gvn.unreg(this);
+  //  create_alias_active(alias,n,gvn);
+  //  gvn.rereg(this,oldt);
+  //}
   // Create a new alias with initial value for an active this
   public void create_alias_active( int alias, Node n, GVNGCM gvn ) {
     assert gvn==null || (!gvn.touched(this) && gvn.type(n) instanceof TypeObj);
@@ -190,7 +182,7 @@ public class MemMergeNode extends Node {
     if( _uses._len==1 && _uses.at(0) instanceof PhiNode ) gvn.add_work(_uses.at(0));
     return false;
   }
-  
+
   @Override public Node ideal(GVNGCM gvn) {
     assert _defs._len==_aliases._len;
     // Dead & duplicate inputs can be removed.
@@ -199,9 +191,7 @@ public class MemMergeNode extends Node {
       if( in(i)==in(0) ||       // Dup of the main memory
           // Dup of immediate alias parent, the more general version of the prior test
           in(i)==alias2node(BitsAlias.parent(alias_at(i))) ||
-          gvn.type(in(i))==TypeObj.XOBJ || // Dead input
-          // An ObjMerge, merging nothing and only existing to be a narrow slice
-          (in(i) instanceof ObjMergeNode && in(i)._defs._len==1 && in(i).in(0)==in(0) ))
+          gvn.type(in(i))==TypeObj.XOBJ ) // Dead input
         { remove0(i--,gvn); progress = true; }
     if( _defs._len==1 ) return in(0); // Merging nothing
     if( progress ) return this;       // Removed some dead inputs
@@ -242,17 +232,6 @@ public class MemMergeNode extends Node {
       return set_def(0,mem.in(0),gvn); // Return improved self
     }
 
-    // If input sharpens, need to sharpen internal mappings
-    for( int i=1; i<_aliases._len; i++ ) {
-      int new_alias = in2alias(i,gvn);
-      int old_alias = alias_at(i);
-      if( new_alias != old_alias && BitsAlias.is_parent(old_alias,new_alias) ) { // Input alias sharpens?
-        set_alias2idx(old_alias,0); // Assume old alias goes dead here
-        _aliases.set(i,new_alias);
-        set_alias2idx(new_alias,i);
-      }
-    }
-
     // CNC - This stanza is here because of a flaw in unpacking Call args.
     //
     // If an input is an OProj and a use is a Call, put the Call on the
@@ -272,32 +251,18 @@ public class MemMergeNode extends Node {
     return null;
   }
 
-  int in2alias( int idx, GVNGCM gvn ) {
-    Type t = gvn.type(in(idx));
-    if( !(t instanceof TypeObj) ) return -1; // Types have not flowed yet
-    TypeObj tobj = (TypeObj)t;
-    int alias = tobj._news.abit();
-    return alias == -1 ? -1 : Math.abs(alias);
-  }
-
   @Override public Type value(GVNGCM gvn) {
     // Base type in slot 0
     Type t = gvn.type(in(0));
-    if( !(t instanceof TypeMem) )
-      return t.above_center() ? TypeMem.XMEM : TypeMem.MEM;
+    Type tx = t.above_center() ? TypeMem.XMEM : TypeMem.MEM;
+    if( !(t instanceof TypeMem) )  return tx;
     TypeMem tm = (TypeMem)t;
-    Type tx = gvn.self_type(this);
-    if( tx == null ) tx = t.above_center() ? TypeMem.XMEM : TypeMem.MEM;
     // We merge precise updates to the list of aliases
     for( int i=1; i<_defs._len; i++ ) {
       int alias = alias_at(i);
       Type ta = gvn.type(in(i));
       if( !(ta instanceof TypeObj) ) return tx;
-      TypeObj tobj = (TypeObj)ta;
-      int alias2 = tobj._news.abit();
-      if( alias2 == -1 || Math.abs(alias2)!=alias )
-        return tx; // Expecting an exact alias
-      tm = tm.st(alias,tobj);
+      tm = tm.st(alias,(TypeObj)ta);
     }
     return tm;
   }

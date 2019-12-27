@@ -5,7 +5,6 @@ import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.type.TypeMemPtr;
-import com.cliffc.aa.type.TypeStruct;
 import com.cliffc.aa.util.Ary;
 
 import java.util.HashMap;
@@ -35,7 +34,7 @@ public class ScopeNode extends Node {
   public   Node  ctrl() { return in(0); }
   public   Node  mem () { return in(1); }
   public   Node  ptr () { return in(2); }
-  public NewNode stk () { return (NewNode)ptr().in(0); }
+  public NewObjNode stk () { return (NewObjNode)ptr().in(0); }
   public <N extends Node> N set_ctrl( N n, GVNGCM gvn) { set_def(0,n,gvn); return n; }
   public void set_ptr ( Node n, GVNGCM gvn) { set_def(2,n,gvn); }
   // Set a new deactive GVNd memory, ready for nested Node.ideal() calls.
@@ -60,6 +59,7 @@ public class ScopeNode extends Node {
     mem._uses.del(this);
     ((MemMergeNode)mem).deactive(gvn); // Nestedly, close off active objects
     return set_mem(gvn.xform(mem),gvn);// Then xform like a new node
+
   }
 
   public Node get(String name) { return stk().get(name); }
@@ -170,9 +170,10 @@ public class ScopeNode extends Node {
         String msg = bad.errMsg("'"+name+"' not defined on "+arm+" arm of trinary");
         Node err = gvn.xform(new ErrNode(ptr,msg,Type.SCALAR));
         // Exactly like a parser store of an error, on the missing side
-        ObjMergeNode omem = mmem.active_obj(scope.stk()._alias,gvn);
-        int idx = omem.fld_idx(name,gvn);
-        omem.set_def(idx,gvn.xform(new StoreNode(ctrl,omem.in(idx),scope.ptr(),err,TypeStruct.ffinal(),name,bad)),gvn);
+        //ObjMergeNode omem = mmem.active_obj(scope.stk()._alias,gvn);
+        //int idx = omem.fld_idx(name,gvn);
+        //omem.set_def(idx,gvn.xform(new StoreNode(ctrl,omem.in(idx),scope.ptr(),err,TypeStruct.ffinal(),name,bad)),gvn);
+        throw com.cliffc.aa.AA.unimpl();
       }
       return gvn.xform(mmem.deactive(gvn)).keep();
     }

@@ -187,8 +187,8 @@ public class CallNode extends Node {
     class Data {
       private final int _xcvt, _fidx;
       private final boolean _unk;
-      private final TypeTuple _formals;
-      private Data( int x, boolean u, int f, TypeTuple ts ) { _xcvt = x; _unk=u; _fidx=f; _formals=ts; }
+      private final TypeStruct _formals;
+      private Data( int x, boolean u, int f, TypeStruct ts ) { _xcvt = x; _unk=u; _fidx=f; _formals=ts; }
     }
     Ary<Data> ds = new Ary<>(new Data[0]);
 
@@ -199,7 +199,7 @@ public class CallNode extends Node {
     for( int fidx = bs.nextSetBit(0); fidx >= 0; fidx = bs.nextSetBit(fidx+1) ) {
       FunNode fun = FunNode.find_fidx(fidx);
       if( fun.nargs() != nargs() ) continue; // Wrong arg count, toss out
-      TypeTuple formals = fun._tf._args;   // Type of each argument
+      TypeStruct formals = fun._tf._args;   // Type of each argument
 
       // Now check if the arguments are compatible at all, keeping lowest cost
       int xcvts = 0;             // Count of conversions required
@@ -234,10 +234,10 @@ public class CallNode extends Node {
     // toss this one out.
     for( int i=0; i<ds._len; i++ ) {
       if( ds.at(i)._unk ) continue;
-      TypeTuple ifs = ds.at(i)._formals;
+      TypeStruct ifs = ds.at(i)._formals;
       for( int j=i+1; j<ds._len; j++ ) {
         if( ds.at(j)._unk ) continue;
-        TypeTuple jfs = ds.at(j)._formals;
+        TypeStruct jfs = ds.at(j)._formals;
         if( ifs.isa(jfs) ) ds.del(j--); // Toss more expansive option j
         else if( jfs.isa(ifs) ) { ds.del(i--); break; } // Toss option i
       }
@@ -275,7 +275,7 @@ public class CallNode extends Node {
         return _badargs.errMsg("Passing "+nargs()+" arguments to "+(fun.xstr())+" which takes "+fun.nargs()+" arguments");
 
       // Error#3: Now do an arg-check
-      TypeTuple formals = fun._tf._args; // Type of each argument
+      TypeStruct formals = fun._tf._args; // Type of each argument
       for( int j=0; j<nargs(); j++ ) {
         Type actual = gvn.type(arg(j));
         Type formal = formals.at(j);

@@ -19,7 +19,7 @@ public class TypeInt extends Type<TypeInt> {
     TypeInt t2 = (TypeInt)o;
     return _x==t2._x && _z==t2._z && _con==t2._con;
   }
-  @Override public boolean cycle_equals( Type o ) { return equals(o); }
+  //@Override public boolean cycle_equals( Type o ) { return equals(o); }
   @Override String str( VBitSet dups) {
     if( _con != 0 ) return (_x<0 ? "&" : (_x>0 ? "+" : ""))+Long.toString(_con);
     if( _x==0 ) return Long.toString(_con);
@@ -192,6 +192,6 @@ public class TypeInt extends Type<TypeInt> {
     return this;
   }
   @Override public Type meet_nil() { return xmeet(ZERO); }
-  @Override Type make_recur(TypeName tn, int d, VBitSet bs ) { return this; }
-  @Override void walk( Predicate<Type> p ) { p.test(this); }
+  //@Override Type make_recur(TypeName tn, int d, VBitSet bs ) { return this; }
+  //@Override void walk( Predicate<Type> p ) { p.test(this); }
 }

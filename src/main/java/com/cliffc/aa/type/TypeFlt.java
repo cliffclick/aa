@@ -19,7 +19,7 @@ public class TypeFlt extends Type<TypeFlt> {
     TypeFlt t2 = (TypeFlt)o;
     return _x==t2._x && _z==t2._z && _con==t2._con;
   }
-  @Override public boolean cycle_equals( Type o ) { return equals(o); }
+  //@Override public boolean cycle_equals( Type o ) { return equals(o); }
   @Override String str( VBitSet dups) {
     if( _x==0 ) return Double.toString(_con);
     return (_x>0?"~":"")+(Math.abs(_x)==1?"n":"")+"flt"+Integer.toString(_z);
@@ -117,6 +117,6 @@ public class TypeFlt extends Type<TypeFlt> {
     assert _x <= 0;
     return FLT64;
   }
-  @Override Type make_recur(TypeName tn, int d, VBitSet bs ) { return this; }
-  @Override void walk( Predicate<Type> p ) { p.test(this); }
+  //@Override Type make_recur(TypeName tn, int d, VBitSet bs ) { return this; }
+  //@Override void walk( Predicate<Type> p ) { p.test(this); }
 }
