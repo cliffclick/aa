@@ -87,9 +87,10 @@ public abstract class NewNode<T extends TypeObj> extends Node {
     for( Node use : ptr._uses ) {
       if( use instanceof StoreNode ) {
         if( ((StoreNode)use).val()==ptr ) return false; // Pointer stored; escapes
-      } else if( use instanceof LoadNode ||            // Load, direct use, treat as escape
-                 use instanceof CallNode ||            // Call arg
-                 use instanceof  RetNode ) {           // Returned
+      } else if( use instanceof  LoadNode ||            // Load, direct use, treat as escape
+                 use instanceof  CallNode ||            // Call arg
+                 use instanceof ScopeNode ||            // Returned form top-level scope to REPL
+                 use instanceof   RetNode ) {           // Returned
         return false;                                   // Escaped
       } else {
         throw AA.unimpl();      // Unknown, sort it out

@@ -161,8 +161,8 @@ public class TestParse {
     test("x=3; mul2={x -> x*2}; mul2(2.1)", TypeFlt.con(2.1*2.0)); // must inline to resolve overload {*}:Flt with I->F conversion
     test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
     test("sq={x -> x*x}; sq 2.1", TypeFlt.con(4.41)); // No () required for single args
-    testerr("sq={x -> x&x}; sq(\"abc\")", "*[$]\"abc\" is not a int64",24);
-    testerr("sq={x -> x*x}; sq(\"abc\")", "*[$]\"abc\" is not a flt64",12);
+    testerr("sq={x -> x&x}; sq(\"abc\")", "*[$] is not a int64",24);
+    testerr("sq={x -> x*x}; sq(\"abc\")", "*[$] is not a flt64",12);
     testerr("f0 = { f x -> f0(x-1) }; f0({+},2)", "Passing 1 arguments to f0={->} which takes 2 arguments",21);
     // Recursive:
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
@@ -193,7 +193,7 @@ public class TestParse {
 
     test   (" -1 :int1", TypeInt.con(-1));
     testerr("(-1):int1", "-1 is not a int1",9);
-    testerr("\"abc\":int", "*[$]\"abc\" is not a int64",9);
+    testerr("\"abc\":int", "*[$] is not a int64",9);
     testerr("1:str", "1 is not a *[$]str",5);
 
     test   ("{x:int -> x*2}(1)", TypeInt.con(2)); // Types on parms
