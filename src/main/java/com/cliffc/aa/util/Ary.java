@@ -111,7 +111,7 @@ public class Ary<E> implements Iterable<E> {
 
   // Extend and set
   public E setX( int i, E e ) {
-    if( i >= _es.length ) Arrays.fill(_es,_len,_es.length,null);
+    if( i >= _len ) Arrays.fill(_es,_len,_es.length,null);
     while( i>= _es.length ) _es = Arrays.copyOf(_es,_es.length<<1);
     if( i >= _len ) _len = i+1;
     return (_es[i] = e);

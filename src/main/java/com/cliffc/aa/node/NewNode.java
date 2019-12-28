@@ -20,9 +20,9 @@ public abstract class NewNode<T extends TypeObj> extends Node {
 
   // NewNodes do not really need a ctrl; useful to bind the upward motion of
   // closures so variable stores can more easily fold into them.
-  public NewNode( byte type, int alias, T to, Node ctrl ) {
+  public NewNode( byte type, int parent_alias, T to, Node ctrl ) {
     super(type,ctrl);
-    _alias = alias;
+    _alias = BitsAlias.new_alias(parent_alias,this);
     _ts = to;
     _name = null;
   }
@@ -31,7 +31,7 @@ public abstract class NewNode<T extends TypeObj> extends Node {
 
   static int def_idx(int fld) { return fld+1; } // Skip ctrl in slot 0
   Node fld(int fld) { return in(def_idx(fld)); } // Node for field#
-  TypeObj xs() { return _name == null ? _ts : _name; }
+  public TypeObj xs() { return _name == null ? _ts : _name; }
 
   // Called when folding a Named Constructor into this allocation site
   void set_name( GVNGCM gvn, TypeName name ) {
@@ -111,11 +111,11 @@ public abstract class NewNode<T extends TypeObj> extends Node {
     assert !_ts.above_center(); // Never in GCP when types are high
     // Split the original '_alias' class into 2 sub-aliases
     NewNode nnn = (NewNode)super.copy(copy_edges, gvn);
-    nnn._alias = BitsAlias.new_alias(_alias); // Children alias classes, split from parent
+    nnn._alias = BitsAlias.new_alias(_alias,nnn); // Children alias classes, split from parent
     // The original NewNode also splits from the parent alias
     assert gvn.touched(this);
     Type oldt = gvn.unreg(this);
-    _alias = BitsAlias.new_alias(_alias);
+    _alias = BitsAlias.new_alias(_alias,this);
     gvn.rereg(this,oldt);
     return nnn;
   }

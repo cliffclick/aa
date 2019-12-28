@@ -58,13 +58,13 @@ public class TypeStr extends TypeObj<TypeStr> {
   @Override public String getstr() { assert is_con(); return _con; }
 
   @Override protected TypeStr xdual() { return _con==null ? new TypeStr(!_any,null) : this; }
-  @Override TypeStr rdual() {
-    if( _dual != null ) return _dual;
-    TypeStr dual = _dual = xdual();
-    dual._dual = this;
-    dual._hash = dual.compute_hash();
-    return dual;
-  }
+  //@Override TypeStr rdual() {
+  //  if( _dual != null ) return _dual;
+  //  TypeStr dual = _dual = xdual();
+  //  dual._dual = this;
+  //  dual._hash = dual.compute_hash();
+  //  return dual;
+  //}
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TSTR:   break;

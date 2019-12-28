@@ -130,7 +130,7 @@ public class TestParse {
     testerr("math_rand(1)?1::2:int","missing expr after ':'",15); // missing type
     testerr("math_rand(1)?1:\"a\"", "Cannot mix GC and non-GC types",18);
     test   ("math_rand(1)?1",TypeInt.BOOL); // Missing optional else defaults to nil
-    test_ptr0("math_rand(1)?\"abc\"",(alias)->TypeMemPtr.make_nil(alias));
+    test_ptr0("math_rand(1)?\"abc\"", TypeMemPtr::make_nil);
     test   ("x:=0;math_rand(1)?(x:=1);x",TypeInt.BOOL);
     testerr("a.b.c();","Unknown ref 'a'",1);
   }
@@ -161,8 +161,8 @@ public class TestParse {
     test("x=3; mul2={x -> x*2}; mul2(2.1)", TypeFlt.con(2.1*2.0)); // must inline to resolve overload {*}:Flt with I->F conversion
     test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
     test("sq={x -> x*x}; sq 2.1", TypeFlt.con(4.41)); // No () required for single args
-    testerr("sq={x -> x&x}; sq(\"abc\")", "*[$] is not a int64",24);
-    testerr("sq={x -> x*x}; sq(\"abc\")", "*[$] is not a flt64",12);
+    testerr("sq={x -> x&x}; sq(\"abc\")", "*[$]\"abc\" is not a int64",24);
+    testerr("sq={x -> x*x}; sq(\"abc\")", "*[$]\"abc\" is not a flt64",12);
     testerr("f0 = { f x -> f0(x-1) }; f0({+},2)", "Passing 1 arguments to f0={->} which takes 2 arguments",21);
     // Recursive:
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
@@ -193,20 +193,20 @@ public class TestParse {
 
     test   (" -1 :int1", TypeInt.con(-1));
     testerr("(-1):int1", "-1 is not a int1",9);
-    testerr("\"abc\":int", "\"abc\" is not a int64",9);
-    testerr("1:str", "1 is not a *[$]",5);
+    testerr("\"abc\":int", "*[$]\"abc\" is not a int64",9);
+    testerr("1:str", "1 is not a *[$]str",5);
 
     test   ("{x:int -> x*2}(1)", TypeInt.con(2)); // Types on parms
-    testerr("{x:str -> x}(1)", "1 is not a *[$]", 9);
+    testerr("{x:str -> x}(1)", "1 is not a *[$]str", 9);
 
     // Type annotations on dead args are ignored
     test   ("fun:{int str -> int}={x y -> x+2}; fun(2,3)", TypeInt.con(4));
-    testerr("fun:{int str -> int}={x y -> x+y}; fun(2,3)", "3 is not a *[$]",33);
+    testerr("fun:{int str -> int}={x y -> x+y}; fun(2,3)", "3 is not a *[$]str",33);
     // Test that the type-check is on the variable and not the function.
     test_obj("fun={x y -> x*2}; bar:{int str -> int} = fun; baz:{int @{x;y} -> int} = fun; (fun(2,3),bar(2,\"abc\"))",
             TypeStruct.make_tuple(TypeInt.con(4),TypeInt.con(4)));
     testerr("fun={x y -> x+y}; baz:{int @{x;y} -> int} = fun; (fun(2,3), baz(2,3))",
-            "3 is not a *[$]", 47);
+            "3 is not a *[$]@{x=;y=}", 47);
 
     testerr("x=3; fun:{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int64",30);
     test("x=3; fun:{real->real}={x -> x*2}; fun(2.1)+fun(x)", TypeFlt.con(2.1*2+3*2)); // Mix of types to fun()
@@ -253,10 +253,10 @@ public class TestParse {
     test_isa("(1,\"abc\").1", TypeMemPtr.STRPTR);
 
     // Named type variables
-    test_name("gal=:flt"     ,"gal", (lex -> TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make(TypeFlt.FLT64), TypeName.make0("gal",lex,TypeFlt.FLT64,(short)0))));
-    test_name("gal=:flt; gal","gal", (lex -> TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make(TypeFlt.FLT64), TypeName.make0("gal",lex,TypeFlt.FLT64,(short)0))));
+    test_name("gal=:flt"     ,"gal", (lex -> TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make(TypeFlt.FLT64), TypeName.make("gal",lex,TypeFlt.FLT64))));
+    test_name("gal=:flt; gal","gal", (lex -> TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make(TypeFlt.FLT64), TypeName.make("gal",lex,TypeFlt.FLT64))));
     test     ("gal=:flt; 3==gal(2)+1", TypeInt.TRUE);
-    test_name("gal=:flt; tank:gal = gal(2)", "gal", (lex -> TypeName.make0("gal",lex,TypeInt.con(2),(short)0)));
+    test_name("gal=:flt; tank:gal = gal(2)", "gal", (lex -> TypeName.make("gal",lex,TypeInt.con(2))));
     // test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: figure out if free cast for bare constants?
     testerr ("gal=:flt; tank:gal = gal(2)+1", "3 is not a gal:flt64",29);
 
@@ -272,18 +272,19 @@ public class TestParse {
   @Test public void testParse05() {
     // nullable and not-null pointers
     test   ("x:str? = 0", Type.NIL); // question-type allows null or not; zero digit is null
-    test   ("x:str? = \"abc\"", TypeMemPtr.ABCPTR); // question-type allows null or not
-    testerr("x:str  = 0", "nil is not a *[$]str", 10);
-    test   ("math_rand(1)?0:\"abc\"", TypeMemPtr.ABC0);
-    testerr("(math_rand(1)?0 : @{x=1}).x", "Struct might be nil when reading field '.x'", 27);
-    test   ("p=math_rand(1)?0:@{x=1}; p ? p.x : 0", TypeInt.BOOL); // not-null-ness after a null-check
-    test   ("x:int = y:str? = z:flt = 0", Type.NIL); // null/0 freely recasts
-    test   ("\"abc\"==0", TypeInt.FALSE ); // No type error, just not null
-    test   ("\"abc\"!=0", TypeInt.TRUE  ); // No type error, just not null
-    test   ("nil=0; \"abc\"!=nil", TypeInt.TRUE); // Another way to name null
-    test   ("a = math_rand(1) ? 0 : @{x=1}; // a is null or a struct\n"+
-            "b = math_rand(1) ? 0 : @{c=a}; // b is null or a struct\n"+
-            "b ? (b.c ? b.c.x : 0) : 0      // Null-safe field load", TypeInt.BOOL); // Nested null-safe field load
+    //test   ("x:str? = \"abc\"", TypeMemPtr.ABCPTR); // question-type allows null or not
+    //testerr("x:str  = 0", "nil is not a *[$]str", 10);
+    //test   ("math_rand(1)?0:\"abc\"", TypeMemPtr.ABC0);
+    //testerr("(math_rand(1)?0 : @{x=1}).x", "Struct might be nil when reading field '.x'", 27);
+    //test   ("p=math_rand(1)?0:@{x=1}; p ? p.x : 0", TypeInt.BOOL); // not-null-ness after a null-check
+    //test   ("x:int = y:str? = z:flt = 0", Type.NIL); // null/0 freely recasts
+    //test   ("\"abc\"==0", TypeInt.FALSE ); // No type error, just not null
+    //test   ("\"abc\"!=0", TypeInt.TRUE  ); // No type error, just not null
+    //test   ("nil=0; \"abc\"!=nil", TypeInt.TRUE); // Another way to name null
+    //test   ("a = math_rand(1) ? 0 : @{x=1}; // a is null or a struct\n"+
+    //        "b = math_rand(1) ? 0 : @{c=a}; // b is null or a struct\n"+
+    //        "b ? (b.c ? b.c.x : 0) : 0      // Null-safe field load", TypeInt.BOOL); // Nested null-safe field load
+    throw AA.unimpl();
   }
 
   @Test public void testParse06() {
@@ -689,16 +690,17 @@ strs:List(str?) = ... // List of null-or-strings
       assertTrue(te._t instanceof TypeFunPtr);
       TypeFunPtr actual = (TypeFunPtr)te._t;
       TypeStruct from = TypeStruct.make_tuple(args);
-      TypeName to = TypeName.make("A",from);
-      TypeMemPtr  inptr = TypeMemPtr.make(BitsAlias.REC);
-      TypeMemPtr outptr = TypeMemPtr.make(BitsAlias.REC);
-      TypeFunPtr expected = TypeFunPtr.make(actual.fidxs(),TypeStruct.make(inptr),outptr);
-      assertEquals(expected,actual);
+      //TypeName to = TypeName.make("A",from);
+      //TypeMemPtr  inptr = TypeMemPtr.make(BitsAlias.REC);
+      //TypeMemPtr outptr = TypeMemPtr.make(BitsAlias.REC);
+      //TypeFunPtr expected = TypeFunPtr.make(actual.fidxs(),TypeStruct.make(inptr),outptr);
+      //assertEquals(expected,actual);
+      throw AA.unimpl();
     }
   }
   static private void test_name( String program, String tname, Function<Integer,Type> expected ) {
     try( TypeEnv te = run(program) ) {
-      int lex = ((TypeName)te._types.get(tname))._lex;
+      int lex = BitsAlias.alias_for_typename(tname);
       Type t_expected = expected.apply(lex);
       assertEquals(t_expected,te._t);
     }

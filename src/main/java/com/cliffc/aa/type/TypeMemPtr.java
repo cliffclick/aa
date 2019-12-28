@@ -32,6 +32,8 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     if( dups.tset(_uid) ) return "$"; // Break recursive printing cycle
     SB sb = new SB().p('*');
     _aliases.toString(sb);
+    int alias = _aliases.abit();
+    if( alias > 0 ) sb.p(BitsAlias.type_for_alias2(alias).toString());
     if( _aliases.test(0) ) sb.p('?');
     return sb.toString();
   }
@@ -61,34 +63,28 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   public static TypeMemPtr make( int alias ) { return make(BitsAlias.make0(alias)); }
   public static TypeMemPtr make_nil( int alias ) { return make(BitsAlias.make0(alias).meet_nil()); }
 
-  // Cannot have a NIL here, because a CastNode (JOIN) of a NIL to a "*[4]obj?"
-  // yields a TypeMemPtr.NIL instead of a Type.NIL which confuses all ISA tests
-  // with embedded NILs.
-  //public  static final TypeMemPtr NIL    = (TypeMemPtr)(new TypeMemPtr(BitsAlias.NIL, TypeObj.XOBJ).hashcons());
   public  static final TypeMemPtr OOP0   = make(BitsAlias.FULL    ); // Includes nil
   public  static final TypeMemPtr OOP    = make(BitsAlias.NZERO   );// Excludes nil
   public  static final TypeMemPtr STRPTR = make(BitsAlias.STRBITS );
   public  static final TypeMemPtr STR0   = make(BitsAlias.STRBITS0);
-  public  static final TypeMemPtr ABCPTR = make(BitsAlias.ABCBITS );
-  public  static final TypeMemPtr ABC0   = make(BitsAlias.ABCBITS0);
+  public  static final TypeMemPtr ABCPTR = make(BitsAlias.type_alias(BitsAlias.STR,TypeStr.ABC));
+  public  static final TypeMemPtr ABC0   = (TypeMemPtr)ABCPTR.meet_nil();
           static final TypeMemPtr STRUCT = make(BitsAlias.RECBITS );
   public  static final TypeMemPtr STRUCT0= make(BitsAlias.RECBITS0);
-  private static final TypeMemPtr PNTPTR = make(BitsAlias.RECBITS );
-  private static final TypeMemPtr PNT0   = make(BitsAlias.RECBITS0);
-  static final TypeMemPtr[] TYPES = new TypeMemPtr[]{OOP0,STR0,STRPTR,ABCPTR,STRUCT,ABC0,PNTPTR,PNT0};
+  static final TypeMemPtr[] TYPES = new TypeMemPtr[]{OOP0,STR0,STRPTR,ABCPTR,STRUCT};
 
   @Override protected TypeMemPtr xdual() {
     if( _aliases==BitsAlias.NIL ) return this;
     return new TypeMemPtr(_aliases.dual());
   }
-  @Override TypeMemPtr rdual() {
-    if( _dual != null ) return _dual;
-    TypeMemPtr dual = _dual = new TypeMemPtr(_aliases.dual());
-    dual._dual = this;
-    dual._hash = dual.compute_hash();
-    dual._cyclic = true;
-    return dual;
-  }
+  //@Override TypeMemPtr rdual() {
+  //  if( _dual != null ) return _dual;
+  //  TypeMemPtr dual = _dual = new TypeMemPtr(_aliases.dual());
+  //  dual._dual = this;
+  //  dual._hash = dual.compute_hash();
+  //  dual._cyclic = true;
+  //  return dual;
+  //}
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TMEMPTR:break;

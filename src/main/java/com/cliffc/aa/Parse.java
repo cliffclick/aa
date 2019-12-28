@@ -10,7 +10,6 @@ import org.jetbrains.annotations.NotNull;
 import java.text.NumberFormat;
 import java.text.ParsePosition;
 import java.util.BitSet;
-import java.util.HashMap;
 
 /** an implementation of language AA
  *
@@ -142,7 +141,6 @@ public class Parse {
   private TypeEnv gather_errors() {
     Node res = _e._scope.pop(); // New and improved result
     Node mem = _e._scope.mem();
-    HashMap<String,Type> types = _e._scope.types();
     // Hunt for typing errors in the alive code
     assert _e._par._par==null; // Top-level only
     VBitSet bs = new VBitSet();
@@ -179,7 +177,7 @@ public class Parse {
         tobj = ((TypeMem)tmem).ld(tmp);
       }
     }
-    return new TypeEnv(tres,tobj,types,_e,errs0.isEmpty() ? null : errs0);
+    return new TypeEnv(tres,tobj,_e,errs0.isEmpty() ? null : errs0);
   }
 
   /** Parse a top-level:
@@ -241,7 +239,7 @@ public class Parse {
     Type ot = _e.lookup_type(tvar);
     TypeName tn;
     if( ot == null ) {        // Name does not pre-exist
-      tn = TypeName.make(tvar,t);
+      tn = TypeName.make_new_type(tvar,t);
       _e.add_type(tvar,tn);   // Assign type-name
     } else {
       tn = ot instanceof TypeName ? ((TypeName)ot).merge_recursive_type(t) : null;
@@ -254,7 +252,7 @@ public class Parse {
     Node rez, stk = _e._scope.stk();
     _gvn.unreg(stk); // add_fun expects the closure is not in GVN
     if( !(t instanceof TypeObj) ) {
-      PrimNode cvt = PrimNode.convertTypeName(t,tn,errMsg());
+      PrimNode cvt = PrimNode.convertTypeName(t,tn,bad);
       rez = _e.add_fun(bad,tvar,gvn(cvt.as_fun(_gvn))); // Return type-name constructor
     } else {
       // If this is a TypeObj, build a constructor taking a pointer-to-TypeObj
@@ -262,7 +260,7 @@ public class Parse {
       // returns a ptr-to-Named:@{x,y}.  This stores a v-table ptr into an
       // object.  The alias# does not change, but a TypeMem[alias#] would now
       // map to the Named variant.
-      FunPtrNode epi1 = IntrinsicNode.convertTypeName(tn,errMsg(),_gvn);
+      FunPtrNode epi1 = IntrinsicNode.convertTypeName(tn,bad,_gvn);
       rez = _e.add_fun(bad,tvar,epi1); // Return type-name constructor
       // For Structs, add a second constructor taking an expanded arg list
       if( t instanceof TypeStruct ) {   // Add struct types with expanded arg lists
@@ -792,8 +790,7 @@ public class Parse {
 
   // Add a typecheck into the graph, with a shortcut if trivially ok.
   private Node typechk(Node x, Type t, Node mem) {
-    return t == null || _gvn.type(x).isa(t) ? x
-            : gvn(new TypeNode(t,x,mem==null?all_mem():mem,errMsg()));
+    return t == null || _gvn.type(x).isa(t) ? x : gvn(new TypeNode(t,x,errMsg()));
   }
 
   private String token() { skipWS();  return token0(); }
@@ -849,8 +846,7 @@ public class Parse {
     }
     TypeStr ts = TypeStr.con(new String(_buf,oldx,_x-oldx-1).intern());
     // Convert to ptr-to-constant-memory-string
-    int alias = BitsAlias.new_alias(BitsAlias.STR);
-    NewNode nnn = (NewNode)gvn( new NewStrNode(alias,ts,ctrl(),con(ts)));
+    NewNode nnn = (NewNode)gvn( new NewStrNode(ts,ctrl(),con(ts)));
     Node ptr = gvn( new  ProjNode(nnn,1));
     Node mem = gvn( new OProjNode(nnn,0));
     mem_active().create_alias_active(nnn._alias,mem,_gvn);
@@ -883,8 +879,9 @@ public class Parse {
     Type base = t.base();
     if( !(base instanceof TypeObj) ) return t;
     // Automatically convert to reference for fields.
-    // Grab reasonably precise alias.
-    TypeMemPtr tmp = TypeMemPtr.make(base instanceof TypeStruct ? BitsAlias.REC : BitsAlias.ARY);
+    // Make a reasonably precise alias.
+    int type_alias = BitsAlias.type_alias(base instanceof TypeStruct ? BitsAlias.REC : BitsAlias.ARY,(TypeObj)t);
+    TypeMemPtr tmp = TypeMemPtr.make(type_alias);
     return typeq(tmp);          // And check for null-ness
   }
   // Wrap in a nullable if there is a trailing '?'.  No spaces allowed

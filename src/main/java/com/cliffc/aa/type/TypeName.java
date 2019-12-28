@@ -1,12 +1,9 @@
 package com.cliffc.aa.type;
 
 import com.cliffc.aa.AA;
-import com.cliffc.aa.util.*;
-
-import java.util.BitSet;
-import java.util.HashMap;
-import java.util.function.Consumer;
-import java.util.function.Predicate;
+import com.cliffc.aa.util.SB;
+import com.cliffc.aa.util.Util;
+import com.cliffc.aa.util.VBitSet;
 
 // Named types are essentially a subclass of the named type.
 // They also must be used to make recursive types.  Examples:
@@ -38,13 +35,15 @@ public class TypeName extends TypeObj<TypeName> {
   public  Type _t;              // Named type
   public  short _depth;         // Nested depth of TypeNames
   // Named type variable
-  private TypeName ( String name, int lex, Type t, short depth ) { super(TNAME,false); init(name,lex,t,depth); }
-  private void init( String name, int lex, Type t, short depth ) {
+  private TypeName ( String name, Type t, short depth ) { super(TNAME,false); init(name,t,depth); }
+  private void init( String name, Type t, short depth ) {
     super.init(TNAME,false);
-    assert name!=null; _name=name; _lex=lex; _t=t; _depth = depth; assert depth >= -1; }
+    assert name!=null;
+    _name=name; _lex = -99; _t=t; _depth = depth; assert depth >= -1;
+  }
   private static short depth( Type t ) { return(short)(t instanceof TypeName ? ((TypeName)t)._depth+1 : 0); }
   int pdepth() { return Math.max(0,_depth); }
-  @Override int compute_hash() { return super.compute_hash() + _name.hashCode() + _lex + _t._hash; }
+  @Override int compute_hash() { assert _lex != -99; return super.compute_hash() + _name.hashCode() + _lex + _t._hash; }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeName) ) return false;
@@ -56,35 +55,47 @@ public class TypeName extends TypeObj<TypeName> {
 
   private static TypeName FREE=null;
   @Override protected TypeName free( TypeName ret ) { FREE=this; return ret; }
-  public static TypeName make0( String name, int lex, Type t, short depth) {
+  private static TypeName malloc( String name, Type t, short depth) {
     TypeName t1 = FREE;
-    if( t1 == null ) t1 = new TypeName(name,lex,t,depth);
-    else { FREE = null; t1.init(name,lex,t,depth); }
-    TypeName t2 = (TypeName)t1.hashcons();
-    return t1==t2 ? t1 : t1.free(t2);
+    if( t1 == null ) t1 = new TypeName(name,t,depth);
+    else { FREE = null;        t1.init(name,t,depth); }
+    return t1;
   }
+  private TypeName hashcons(int lex) {
+    _lex = lex;
+    TypeName t2 = (TypeName)hashcons();
+    return this==t2 ? this : free(t2);
+  }
+  public static TypeName make( String name, int lex, Type t) { return malloc(name,t,depth(t)).hashcons(lex); }
+  public static TypeName make_new_type( String name, Type t) {
+    TypeName tn = malloc(name,t,depth(t));
+    return tn.hashcons(BitsAlias.type_alias(BitsAlias.REC,tn));
+  }
+ 
+  public static TypeName make_forward_def_type( String name ) {
+    //return make0(name,BitsAlias.new_alias(BitsAlias.REC),TypeStruct.ALLSTRUCT,(short)-1);
+    // Make anon type alias for this Name.
+    // Record the mapping.
+    throw AA.unimpl();
+  }
+  public TypeName make( Type t) { return malloc(_name,t,_depth).hashcons(_lex); }
 
-  public static TypeName make( String name, Type t) { return make0(name,BitsAlias.new_alias(BitsAlias.REC),t,depth(t)); }
-  public static TypeName make( String name, int lex, Type t) { return make0(name,lex,t,depth(t)); }
-  public static TypeName make_forward_def_type( String name ) { return make0(name,BitsAlias.new_alias(BitsAlias.REC),TypeStruct.ALLSTRUCT,(short)-1); }
-  public TypeName make( Type t) { return make0(_name,_lex,t,_depth); }
-
-          static final TypeName TEST_ENUM = make("__test_enum"  ,TypeInt.INT8);
-          static final TypeName TEST_FLT  = make("__test_flt"   ,TypeFlt.FLT32);
-          static final TypeName TEST_E2   = make("__test_e2"    ,TEST_ENUM);
-  public  static final TypeName TEST_STRUCT=make("__test_struct",TypeStruct.POINT);
+          static final TypeName TEST_ENUM = make_new_type("__test_enum"  ,TypeInt.INT8);
+          static final TypeName TEST_FLT  = make_new_type("__test_flt"   ,TypeFlt.FLT32);
+          static final TypeName TEST_E2   = make_new_type("__test_e2"    ,TEST_ENUM);
+  public  static final TypeName TEST_STRUCT=make_new_type("__test_struct",TypeStruct.POINT);
 
   static final TypeName[] TYPES = new TypeName[]{TEST_ENUM,TEST_FLT,TEST_E2,TEST_STRUCT};
 
-  @Override protected TypeName xdual() { return new TypeName(_name,_lex,_t. dual(),_depth); }
-  @Override TypeName rdual() {
-    if( _dual != null ) return _dual;
-    TypeName dual = _dual = new TypeName(_name,_lex,_t.rdual(),_depth);
-    dual._dual = this;
-    dual._hash = compute_hash();
-    dual._cyclic = true;
-    return dual;
-  }
+  @Override protected TypeName xdual() { TypeName tn = new TypeName(_name,_t. dual(),_depth); tn._lex = _lex; return tn; }
+  //@Override TypeName rdual() {
+  //  if( _dual != null ) return _dual;
+  //  TypeName dual = _dual = new TypeName(_name,_lex,_t.rdual(),_depth);
+  //  dual._dual = this;
+  //  dual._hash = compute_hash();
+  //  dual._cyclic = true;
+  //  return dual;
+  //}
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TNIL:
@@ -160,7 +171,7 @@ public class TypeName extends TypeObj<TypeName> {
     _depth = depth(t);
     // Back into the INTERN table
     retern()._dual.retern();
-  
+
     return this;
   }
 

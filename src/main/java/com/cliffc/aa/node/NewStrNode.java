@@ -7,8 +7,8 @@ import com.cliffc.aa.type.*;
 //
 // NewStrNode produces a Tuple type, with the TypeStr and a TypeMemPtr.
 public class NewStrNode extends NewNode<TypeStr> {
-  public NewStrNode( int alias, TypeStr ts, Node ctrl, Node str ) {
-    super(OP_NEWSTR,alias,ts,ctrl);
+  public NewStrNode( TypeStr ts, Node ctrl, Node str ) {
+    super(OP_NEWSTR,BitsAlias.STR,ts,ctrl);
     add_def(str);
   }
   @Override public Type value(GVNGCM gvn) {

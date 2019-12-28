@@ -1,8 +1,14 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.util.Ary;
+import com.cliffc.aa.util.Util;
+import com.cliffc.aa.node.NewNode;
 import java.util.HashMap;
 
 // Alias Bits supporting a lattice; immutable; hash-cons'd.
+//
+// Alias Bits map 1-to-1 with either allocation sites (NewNode) or an anonymous
+// type.
 public class BitsAlias extends Bits<BitsAlias> {
   // Intern: lookup and return an existing Bits or install in hashmap and
   // return a new Bits.  Overridden in subclasses to make type-specific Bits.
@@ -18,39 +24,31 @@ public class BitsAlias extends Bits<BitsAlias> {
     else { INTERN.put(b1,b1); return b1; }
   }
 
+  private static final Ary<Object> MAP = new Ary<>(Object.class);
   static final Bits.Tree<BitsAlias> TREE = new Bits.Tree<>();
-  @Override public Tree<BitsAlias> tree() { return TREE; } 
-  public  static final int ALL, REC, ARY, I64, F64, STR, STR_STR;
-          static final int ABC;
-          static BitsAlias FULL, STRBITS, STRBITS0, ABCBITS, ABCBITS0;
+  @Override public Tree<BitsAlias> tree() { return TREE; }
+  public  static final int ALL, REC, ARY, STR;
+          static BitsAlias FULL, STRBITS, STRBITS0;
           static BitsAlias RECBITS, NIL;
   public  static BitsAlias NZERO, RECBITS0, ANY;
 
   static {
     // The All-Memory alias class
-    ALL = new_alias(0);
+    ALL = TREE.split(0);        // Split from 0
     NZERO = new BitsAlias().make_impl(ALL,null);
     FULL = NZERO.meet_nil();    // All aliases, with a nil
     ANY = FULL.dual();          // Precompute dual
     NIL = make0(0);             // No need to dual; NIL is its own dual
     // Split All-Memory into Structs/Records and Arrays (including Strings).
     // Everything falls into one of these two camps.
-    RECBITS = make0(REC = new_alias(ALL));
+    RECBITS = make0(REC = type_alias(ALL,null));
     RECBITS0 = RECBITS.meet_nil();
     // Arrays
-    ARY = new_alias(ALL);
+    ARY = type_alias(ALL,null);
     // Split Arrays into Strings (and other arrays)
-    STRBITS = make0(STR = new_alias(ARY));
+    STRBITS = make0(STR = type_alias(ARY,null));
     STRBITS0 = STRBITS.meet_nil();
-    // LibCall conversion string aliases
-    I64   = new_alias(STR);
-    F64   = new_alias(STR);
-    STR_STR=new_alias(STR);      // String concat
-    // A sample test string
-    ABCBITS = make0(ABC = new_alias(STR));
-    ABCBITS0 = ABCBITS.meet_nil();
   }
-  public static int new_alias(int par) { return TREE.split(par); }
   // True if kid is a child or equal to parent
   public static boolean is_parent( int par, int kid ) { return TREE.is_parent(par,kid); }
   // True if this alias has been split thus has children
@@ -61,7 +59,13 @@ public class BitsAlias extends Bits<BitsAlias> {
   public static int get_kid( int par ) { return TREE.get_kid(par); }
   // Fast reset of parser state between calls to Exec
   public static void init0() { TREE.init0(); }
-  public static void reset_to_init0() { TREE.reset_to_init0();}
+  public static void reset_to_init0() {
+    TREE.reset_to_init0();
+    MAP.clear();
+    MAP.setX(REC,TypeStruct.ALLSTRUCT);
+    MAP.setX(ARY,TypeStr.STR);
+    MAP.setX(STR,TypeStr.STR);
+  }
 
   @Override boolean is_class(int fidx) { return fidx!=0; } // All bits are class of allocated objects, except nil alone
   @Override public BitsAlias ALL() { return FULL; }
@@ -69,4 +73,30 @@ public class BitsAlias extends Bits<BitsAlias> {
 
   public static BitsAlias make0( int bit ) { return NZERO.make(bit); }
 
+  public static int  new_alias(int par, NewNode nnn) { return set_alias(par,nnn); }
+  public static int type_alias(int par, TypeObj obj) { return set_alias(par,obj); }
+  private static int set_alias(int par, Object o ) {
+    int alias = TREE.split(par);
+    assert MAP.atX(alias)==null;
+    MAP.setX(alias,o);
+    return alias;
+  }
+  static NewNode new_for_alias(int alias) {
+    Object o = MAP.at(alias);
+    assert o instanceof NewNode;
+    return (NewNode)o;
+  }
+  static TypeObj type_for_alias1(int alias) {
+    Object o = MAP.at(alias);
+    assert o instanceof TypeObj;
+    return (TypeObj)o;
+  }
+  static TypeObj type_for_alias2(int alias) {
+    Object o = MAP.at(alias);
+    assert o != null;
+    return o instanceof TypeObj ? (TypeObj)o : ((NewNode)o).xs();
+  }
+  public static int alias_for_typename(String str) {
+    return MAP.find(obj -> obj instanceof TypeName && Util.eq(((TypeName)obj)._name,str));
+  }
 }

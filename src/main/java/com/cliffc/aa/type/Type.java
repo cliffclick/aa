@@ -95,11 +95,11 @@ public class Type<T extends Type<T>> implements Cloneable {
   int _uid=CNT++; // Unique ID, will have gaps, used to uniquely order Types in Unions
   public int _hash;      // Hash for this Type; built recursively
   byte _type;            // Simple types use a simple enum
-  boolean _cyclic;       // Part of a type cycle
+  //boolean _cyclic;       // Part of a type cycle
   T _dual;  // All types support a dual notion, lazily computed and cached here
 
   protected Type(byte type) { init(type); }
-  protected void init(byte type) { _type=type; _cyclic=false; }
+  protected void init(byte type) { _type=type; /*_cyclic=false;*/ }
   @Override public final int hashCode( ) { return _hash; }
   // Compute the hash and return it, with all child types already having their
   // hash computed.  Subclasses override this.
@@ -143,7 +143,7 @@ public class Type<T extends Type<T>> implements Cloneable {
   // check of a (possibly very large) Type is always a simple pointer-equality
   // check, except during construction and intern'ing.
   private static ConcurrentHashMap<Type,Type> INTERN = new ConcurrentHashMap<>();
-  static int RECURSIVE_MEET;    // Count of recursive meet depth
+  //static int RECURSIVE_MEET;    // Count of recursive meet depth
   @SuppressWarnings("unchecked")
   final Type hashcons() {
     _hash = compute_hash();     // Set hash
@@ -152,8 +152,8 @@ public class Type<T extends Type<T>> implements Cloneable {
       assert t2._dual != null;  // Prior is complete with dual
       return t2;                // Return prior
     }
-    if( RECURSIVE_MEET > 0 )    // Mid-building recursive types; do not intern
-      return this;
+    //if( RECURSIVE_MEET > 0 )    // Mid-building recursive types; do not intern
+    //  return this;
     // Not in type table
     _dual = null;                // No dual yet
     INTERN.put(this,this);       // Put in table without dual
@@ -305,7 +305,7 @@ public class Type<T extends Type<T>> implements Cloneable {
     if( _type==TNIL ) return (T)this; // NIL is a constant and thus self-dual
     return (T)new Type((byte)(_type^1));
   }
-  T rdual() { assert _dual!=null; return _dual; }
+  //T rdual() { assert _dual!=null; return _dual; }
 
   // Memoize meet results
   private static class Key {

@@ -1,8 +1,8 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.*;
+import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
-import org.jetbrains.annotations.NotNull;
 
 // Allocates a TypeStruct and produces a Tuple with the TypeStruct and a TypeMemPtr.
 //
@@ -17,7 +17,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
   // NewNodes do not really need a ctrl; useful to bind the upward motion of
   // closures so variable stores can more easily fold into them.
   public NewObjNode( boolean is_closure, Node ctrl ) {
-    super(OP_NEWOBJ,BitsAlias.new_alias(BitsAlias.REC),TypeStruct.ALLSTRUCT,ctrl);
+    super(OP_NEWOBJ,BitsAlias.REC,TypeStruct.ALLSTRUCT,ctrl);
     _is_closure = is_closure;
   }
   public Node get(String name) { return fld(_ts.find(name)); }

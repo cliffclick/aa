@@ -1,14 +1,12 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.AA;
-import com.cliffc.aa.util.*;
+import com.cliffc.aa.util.Ary;
+import com.cliffc.aa.util.SB;
+import com.cliffc.aa.util.Util;
+import com.cliffc.aa.util.VBitSet;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Arrays;
-import java.util.BitSet;
-import java.util.HashMap;
-import java.util.function.Consumer;
-import java.util.function.Predicate;
 
 /** A memory-based Tuple with optionally named fields.  This is a recursive
  *  type, only produced by NewNode and structure or tuple constants.  Fields
@@ -162,7 +160,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       else if( t==SCALAR ) ;    // Default answer, do not print
       else if( t instanceof TypeMemPtr ) sb.p("*"+((TypeMemPtr)t)._aliases); // Do not recurse here, gets too big too fast
       else sb.p(t.str(dups));   // Recursively print field type
-      if( i<_flds.length-1 ) sb.p(',');
+      if( i<_flds.length-1 ) sb.p(';');
     }
     sb.p(!is_tup ? '}' : ')');
     return sb.toString();
@@ -187,7 +185,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       if( t==null ) sb.p("!");  // Graceful with broken types
       else if( t==SCALAR ) ;    // Default answer, do not print
       else t.dstr(sb,dups);     // Recursively print field type
-      if( i<_flds.length-1 ) sb.p(',');
+      if( i<_flds.length-1 ) sb.p(';');
       sb.nl();                  // one field per line
     }
     return sb.di(1).i().p(!is_tup ? '}' : ')');
@@ -322,23 +320,23 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   }
 
   // Recursive dual
-  @Override TypeStruct rdual() {
-    if( _dual != null ) return _dual;
-    String[] as = new String[_flds.length];
-    Type  [] ts = TypeAry.get(_ts.length);
-    byte  [] bs = new byte  [_ts  .length];
-    for( int i=0; i<as.length; i++ ) as[i]=sdual(_flds[i]);
-    for( int i=0; i<bs.length; i++ ) bs[i]=fdual(_finals[i]);
-    TypeStruct dual = _dual = new TypeStruct(!_any,as,ts,bs);
-    dual._hash = dual.compute_hash(); // Compute hash before recursion
-    for( int i=0; i<ts.length; i++ ) ts[i] = _ts[i].rdual();
-    dual._dual = this;
-    dual._cyclic = _cyclic;
-    return dual;
-  }
+  //@Override TypeStruct rdual() {
+  //  if( _dual != null ) return _dual;
+  //  String[] as = new String[_flds.length];
+  //  Type  [] ts = TypeAry.get(_ts.length);
+  //  byte  [] bs = new byte  [_ts  .length];
+  //  for( int i=0; i<as.length; i++ ) as[i]=sdual(_flds[i]);
+  //  for( int i=0; i<bs.length; i++ ) bs[i]=fdual(_finals[i]);
+  //  TypeStruct dual = _dual = new TypeStruct(!_any,as,ts,bs);
+  //  dual._hash = dual.compute_hash(); // Compute hash before recursion
+  //  for( int i=0; i<ts.length; i++ ) ts[i] = _ts[i].rdual();
+  //  dual._dual = this;
+  //  dual._cyclic = _cyclic;
+  //  return dual;
+  //}
 
   // Recursive meet in progress
-  private static final HashMap<TypeStruct,TypeStruct> MEETS1 = new HashMap<>(), MEETS2 = new HashMap<>();
+  //private static final HashMap<TypeStruct,TypeStruct> MEETS1 = new HashMap<>(), MEETS2 = new HashMap<>();
 
   // Standard Meet.  Types-meet-Types and fld-meet-fld.  Fld strings can be
   // top/bottom for tuples.  Structs with fewer fields are virtually extended
@@ -368,10 +366,10 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     TypeStruct thsi = this;
     TypeStruct that = (TypeStruct)t;
     // INVARIANT: Both this and that are prior existing & interned.
-    assert RECURSIVE_MEET > 0 || (thsi.interned() && that.interned());
+    //assert RECURSIVE_MEET > 0 || (thsi.interned() && that.interned());
     // INVARIANT: Both MEETS are empty at the start.  Nothing involved in a
     // potential cycle is interned until the Meet completes.
-    assert RECURSIVE_MEET > 0 || (MEETS1.isEmpty() && MEETS2.isEmpty());
+    //assert RECURSIVE_MEET > 0 || (MEETS1.isEmpty() && MEETS2.isEmpty());
 
     //// If both are cyclic, we have to do the complicated cyclic-aware meet
     //if( _cyclic && that._cyclic )

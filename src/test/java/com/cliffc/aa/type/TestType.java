@@ -119,7 +119,7 @@ public class TestType {
 
     Type pabc0= TypeMemPtr.ABC0;    // *["abc"]?
     TypeMemPtr pabc = TypeMemPtr.ABCPTR; // *["abc"]
-    TypeMemPtr pzer = TypeMemPtr.make(BitsAlias.new_alias(BitsAlias.REC));// *[(0)]
+    TypeMemPtr pzer = TypeMemPtr.make(BitsAlias.type_alias(BitsAlias.REC,TypeStruct.ALLSTRUCT));// *[(0)]
     Type pzer0= pzer.meet_nil();  // *[(0)]?
     Type nil  = Type.NIL;
 
@@ -197,13 +197,14 @@ public class TestType {
     byte[] finals = new byte[]{TypeStruct.ffinal()};
 
     // meet @{c:0}? and @{c:@{x:1}?,}
-    int alias0 = BitsAlias.new_alias(BitsAlias.REC);
-    int alias1 = BitsAlias.new_alias(alias0);
-    int alias2 = BitsAlias.new_alias(alias0);
-    int alias3 = BitsAlias.new_alias(BitsAlias.REC);
+    int alias0 = BitsAlias.type_alias(BitsAlias.REC,TypeStruct.ALLSTRUCT);
+    
     TypeObj a1 = TypeStruct.make(new String[]{"c"},TypeStruct.ts(Type.NIL                   ),finals); // @{c:nil}
-    TypeObj a2 = TypeStruct.make(new String[]{"c"},TypeStruct.ts(TypeMemPtr.make_nil(alias3)),finals); // @{c:*{3#}?}
+    int alias1 = BitsAlias.type_alias(alias0,a1);
     TypeObj a3 = TypeStruct.make(new String[]{"x"},TypeStruct.ts(TypeInt.TRUE               ),finals); // @{x: 1 }
+    int alias3 = BitsAlias.type_alias(alias0,a3);
+    TypeObj a2 = TypeStruct.make(new String[]{"c"},TypeStruct.ts(TypeMemPtr.make_nil(alias3)),finals); // @{c:*{3#}?}
+    int alias2 = BitsAlias.type_alias(BitsAlias.REC,a2);
     Ary<TypeObj> tos = new Ary<>(TypeObj.class);
     tos.setX(BitsAlias.REC,TypeObj.OBJ);
     tos.setX(alias1,a1);
@@ -275,8 +276,8 @@ public class TestType {
     byte[] finals = new byte[]{TypeStruct.ffinal(),TypeStruct.ffinal()};
     TypeStruct ts0 = TypeStruct.malloc(false,flds,TypeStruct.ts(2),finals);
     ts0._hash = ts0.compute_hash();
-    ts0._ts[0] = ts0ptr;    ts0._cyclic = true;
-    ts0._ts[1] = TypeInt.INT64;
+    //ts0._ts[0] = ts0ptr;    ts0._cyclic = true;
+    //ts0._ts[1] = TypeInt.INT64;
     //ts0 = ts0.install_cyclic(ts0.reachable());
     //TypeMem ts0mem = TypeMem.make(alias1,ts0); // {1:@{n:*[1],v:int} }
     //
@@ -381,20 +382,20 @@ public class TestType {
     byte[] finals = TypeStruct.finals(2);
     final int alias = BitsAlias.REC;
 
-    Type.RECURSIVE_MEET++;
-    TypeStruct as1 = TypeStruct.malloc(false,flds,TypeStruct.ts(2),finals);
-    TypeStruct bs4 = TypeStruct.malloc(false,flds,TypeStruct.ts(2),finals);
-    as1._hash = as1.compute_hash();  as1._cyclic = true;
-    bs4._hash = bs4.compute_hash();  bs4._cyclic = true;
-    TypeName an0 = TypeName.make("A",BitsAlias.REC,as1);  an0._cyclic = true;
-    TypeName bn3 = TypeName.make("B",BitsAlias.REC,bs4);  bn3._cyclic = true;
-    TypeMemPtr ap5 = TypeMemPtr.make(alias/*,an0*/);  ap5._cyclic = true;
-    TypeMemPtr bp2 = TypeMemPtr.make(alias/*,bn3*/);  bp2._cyclic = true;
-    as1._ts[0] = bp2;
-    as1._ts[1] = TypeInt.INT64;
-    bs4._ts[0] = ap5;
-    bs4._ts[1] = TypeFlt.FLT64;
-    Type.RECURSIVE_MEET--;
+    //Type.RECURSIVE_MEET++;
+    //TypeStruct as1 = TypeStruct.malloc(false,flds,TypeStruct.ts(2),finals);
+    //TypeStruct bs4 = TypeStruct.malloc(false,flds,TypeStruct.ts(2),finals);
+    //as1._hash = as1.compute_hash();  as1._cyclic = true;
+    //bs4._hash = bs4.compute_hash();  bs4._cyclic = true;
+    //TypeName an0 = TypeName.make("A",BitsAlias.REC,as1);  an0._cyclic = true;
+    //TypeName bn3 = TypeName.make("B",BitsAlias.REC,bs4);  bn3._cyclic = true;
+    //TypeMemPtr ap5 = TypeMemPtr.make(alias/*,an0*/);  ap5._cyclic = true;
+    //TypeMemPtr bp2 = TypeMemPtr.make(alias/*,bn3*/);  bp2._cyclic = true;
+    //as1._ts[0] = bp2;
+    //as1._ts[1] = TypeInt.INT64;
+    //bs4._ts[0] = ap5;
+    //bs4._ts[1] = TypeFlt.FLT64;
+    //Type.RECURSIVE_MEET--;
     //as1 = as1.install_cyclic(as1.reachable());
     //bp2 = (TypeMemPtr)as1._ts[0];
     //bn3 = (TypeName  )bp2._obj;

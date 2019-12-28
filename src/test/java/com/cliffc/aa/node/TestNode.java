@@ -202,7 +202,7 @@ public class TestNode {
     FunNode fun_plus = ((FunPtrNode)unr.in(1)).fun();
     RetNode ret = fun_plus.ret();
     CallNode call = new CallNode(false,null,unr);
-    TypeName tname1 = TypeName.make("test",TypeStruct.POINT);
+    TypeName tname1 = TypeName.make_new_type("test",TypeStruct.POINT);
     TypeName tname2 = TypeName.TEST_STRUCT;
 
     // Testing 1 set of types into a value call.
@@ -258,9 +258,9 @@ public class TestNode {
     test1monotonic(new  StoreNode(_ins[0],_ins[1],_ins[2],_ins[3],(byte)0,"x",null));
     test1monotonic(new  StoreNode(_ins[0],_ins[1],_ins[2],_ins[3],(byte)1,"x",null));
     //                  ScopeNode has no inputs, and value() call is monotonic
-    test1monotonic(new   TypeNode(TypeInt.FALSE    ,_ins[1],null,null));
-    test1monotonic(new   TypeNode(TypeMemPtr.ABCPTR,_ins[1],null,null));
-    test1monotonic(new   TypeNode(TypeFlt.FLT64    ,_ins[1],null,null));
+    test1monotonic(new   TypeNode(TypeInt.FALSE    ,_ins[1],null));
+    test1monotonic(new   TypeNode(TypeMemPtr.STRPTR,_ins[1],null));
+    test1monotonic(new   TypeNode(TypeFlt.FLT64    ,_ins[1],null));
 
     assertEquals(0,_errs);
   }
