@@ -332,7 +332,7 @@ public class Parse {
     }
     // Honor all type requests, all at once, by inserting type checks on the ifex.
     for( Type t : ts )
-      ifex = typechk(ifex,t);
+      ifex = typechk(ifex,t,null);
     // Assign tokens to value
     for( int i=0; i<toks._len; i++ ) {
       String tok = toks.at(i);               // Token being assigned
@@ -576,7 +576,7 @@ public class Parse {
     if( !peek(':') ) { _x = oldx; return fact; }
     Type t = type();
     if( t==null ) { _x = oldx; return fact; } // No error for missing type, because can be ?: instead
-    return typechk(fact,t);
+    return typechk(fact,t,null);
   }
 
   /** Parse a factor, a leaf grammar token
@@ -700,21 +700,21 @@ public class Parse {
       _e = e;                   // Push nested environment
       _gvn.set_def_reg(e._scope.stk(),0,fun); // Closure creation control defaults to function entry
       set_ctrl(fun);            // New control is function head
+      Node rpc = gvn(new ParmNode(-1,"rpc",fun,con(TypeRPC.ALL_CALL),null)).keep();
+      Node mem = gvn(new ParmNode(-2,"mem",fun,con(TypeMem.MEM),null));
       Parse errmsg = errMsg();  // Lazy error message
       int cnt=0;                // Add parameters to local environment
       for( int i=0; i<ids._len; i++ ) {
         Node parm = gvn(new ParmNode(cnt++,ids.at(i),fun,con(Type.SCALAR),errmsg));
-        Node mt = typechk(parm,ts.at(i));
+        Node mt = typechk(parm,ts.at(i),mem);
         create(ids.at(i),mt, args_are_mutable);
       }
-      Node rpc = gvn(new ParmNode(-1,"rpc",fun,con(TypeRPC.ALL_CALL),null)).keep();
-      Node mem = gvn(new ParmNode(-2,"mem",fun,con(TypeMem.MEM),null));
       // Function memory is a merge of incoming wide memory, and the local
       // closure implied by arguments.  Starts merging in parent scope, but
       // this is incorrect - should start from the incoming function memory.
       MemMergeNode amem = mem_active();
-      assert amem.in(1).in(0) == e._scope.stk();
-      amem.set_def(0,mem,_gvn);
+      assert amem.in(1).in(0) == e._scope.stk(); // amem slot#1 is the closure
+      amem.set_def(0,mem,_gvn);                  // amem slot#0 was outer closure, should be function memory
       // Parse function body
       Node rez = stmts();       // Parse function body
       if( rez == null ) rez = err_ctrl2("Missing function body");
@@ -786,22 +786,9 @@ public class Parse {
   }
 
   // Add a typecheck into the graph, with a shortcut if trivially ok.
-  private Node typechk(Node x, Type t) {
-    if( t == null ) return x;
-    if( !_gvn.type(x).isa(t) ) x = gvn(new TypeNode(t,x,errMsg()));
-    // Specifically if type is a pointer, and we are throwing away write-
-    // privilege (really: casting to a lower field-access-mod) then insert a
-    // MeetNode to lower precision.
-    if( t instanceof TypeMemPtr ) {
-      // TODO: Actually, thinking TMP types will just use another alias#.
-      // TypeMemPtr tmp;
-      // TypeObj obj = _gvn.type(_e._scope.mem()).ld(tmp=(TypeMemPtr)t);
-      //  TypeStruct ts = ((TypeStruct)tmp._obj).make_fmod_bot();
-      //  if( ts != null )
-      //    x = gvn(new MeetNode(x,TypeMemPtr.make(BitsAlias.RECBITS0.dual(),ts)));
-      throw AA.unimpl();
-    }
-    return x;
+  private Node typechk(Node x, Type t, Node mem) {
+    return t == null || _gvn.type(x).isa(t) ? x
+            : gvn(new TypeNode(t,x,mem==null?all_mem():mem,errMsg()));
   }
 
   private String token() { skipWS();  return token0(); }

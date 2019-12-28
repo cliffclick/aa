@@ -193,28 +193,29 @@ public class TestParse {
 
     test   (" -1 :int1", TypeInt.con(-1));
     testerr("(-1):int1", "-1 is not a int1",9);
-    testerr("\"abc\":int", "*[$] is not a int64",9);
-    testerr("1:str", "1 is not a *[$]str",5);
+    testerr("\"abc\":int", "\"abc\" is not a int64",9);
+    testerr("1:str", "1 is not a *[$]",5);
 
     test   ("{x:int -> x*2}(1)", TypeInt.con(2)); // Types on parms
-    testerr("{x:str -> x}(1)", "1 is not a *[$]str", 9);
+    testerr("{x:str -> x}(1)", "1 is not a *[$]", 9);
 
     // Type annotations on dead args are ignored
     test   ("fun:{int str -> int}={x y -> x+2}; fun(2,3)", TypeInt.con(4));
-    testerr("fun:{int str -> int}={x y -> x+y}; fun(2,3)", "3 is not a *[$]str",33);
+    testerr("fun:{int str -> int}={x y -> x+y}; fun(2,3)", "3 is not a *[$]",33);
     // Test that the type-check is on the variable and not the function.
     test_obj("fun={x y -> x*2}; bar:{int str -> int} = fun; baz:{int @{x;y} -> int} = fun; (fun(2,3),bar(2,\"abc\"))",
             TypeStruct.make_tuple(TypeInt.con(4),TypeInt.con(4)));
     testerr("fun={x y -> x+y}; baz:{int @{x;y} -> int} = fun; (fun(2,3), baz(2,3))",
-            "3 is not a *[$]@{x=,y=}", 47);
+            "3 is not a *[$]", 47);
 
     testerr("x=3; fun:{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int64",30);
     test("x=3; fun:{real->real}={x -> x*2}; fun(2.1)+fun(x)", TypeFlt.con(2.1*2+3*2)); // Mix of types to fun()
     test("fun:{real->flt32}={x -> x}; fun(123 )", TypeInt.con(123 ));
     test("fun:{real->flt32}={x -> x}; fun(0.125)", TypeFlt.con(0.125));
     testerr("fun:{real->flt32}={x -> x}; fun(123456789)", "123456789 is not a flt32",26);
+    test("{x -> x&1}", TypeFunPtr.make(BitsFun.make0(35),TypeStruct.SCALAR1,Type.SCALAR)); // {Int -> Int}
 
-    // Tuple types
+    // Named types
     test_name("A= :(       )" ); // Zero-length tuple
     test_name("A= :(   ,   )", Type.SCALAR); // One-length tuple
     test_name("A= :(   ,  ,)", Type.SCALAR  ,Type.SCALAR  );
@@ -689,11 +690,10 @@ strs:List(str?) = ... // List of null-or-strings
       TypeFunPtr actual = (TypeFunPtr)te._t;
       TypeStruct from = TypeStruct.make_tuple(args);
       TypeName to = TypeName.make("A",from);
-      //TypeMemPtr  inptr = TypeMemPtr.make(BitsAlias.REC,from);
-      //TypeMemPtr outptr = TypeMemPtr.make(BitsAlias.REC,to);
-      //TypeFunPtr expected = TypeFunPtr.make(actual.fidxs(),TypeStruct.make(inptr),outptr);
-      //assertEquals(expected,actual);
-      throw AA.unimpl();
+      TypeMemPtr  inptr = TypeMemPtr.make(BitsAlias.REC);
+      TypeMemPtr outptr = TypeMemPtr.make(BitsAlias.REC);
+      TypeFunPtr expected = TypeFunPtr.make(actual.fidxs(),TypeStruct.make(inptr),outptr);
+      assertEquals(expected,actual);
     }
   }
   static private void test_ptr( String program, Function<Integer,Type> expected ) {

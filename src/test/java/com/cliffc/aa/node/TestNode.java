@@ -258,9 +258,9 @@ public class TestNode {
     test1monotonic(new  StoreNode(_ins[0],_ins[1],_ins[2],_ins[3],(byte)0,"x",null));
     test1monotonic(new  StoreNode(_ins[0],_ins[1],_ins[2],_ins[3],(byte)1,"x",null));
     //                  ScopeNode has no inputs, and value() call is monotonic
-    test1monotonic(new   TypeNode(TypeInt.FALSE,_ins[1],null));
-    test1monotonic(new   TypeNode(TypeMemPtr.ABCPTR,_ins[1],null));
-    test1monotonic(new   TypeNode(TypeFlt.FLT64,_ins[1],null));
+    test1monotonic(new   TypeNode(TypeInt.FALSE    ,_ins[1],null,null));
+    test1monotonic(new   TypeNode(TypeMemPtr.ABCPTR,_ins[1],null,null));
+    test1monotonic(new   TypeNode(TypeFlt.FLT64    ,_ins[1],null,null));
 
     assertEquals(0,_errs);
   }

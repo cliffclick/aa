@@ -66,7 +66,7 @@ public class MemMergeNode extends Node {
   int alias_at(int idx) { return _aliases.at(idx); }
 
   // Index# for Alias#.  Returns 0 if no exact match.
-  private int alias2idx( int alias ) { return _aidxes.atX(alias); }
+  public int alias2idx( int alias ) { return _aidxes.atX(alias); }
   private void set_alias2idx( int alias, int idx ) { _aidxes.setX(alias,idx); }
 
   // Index# for Alias#, or nearest enclosing alias parent
