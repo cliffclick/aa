@@ -10,6 +10,7 @@ import org.jetbrains.annotations.NotNull;
 import java.text.NumberFormat;
 import java.text.ParsePosition;
 import java.util.BitSet;
+import java.util.HashMap;
 
 /** an implementation of language AA
  *
@@ -141,6 +142,7 @@ public class Parse {
   private TypeEnv gather_errors() {
     Node res = _e._scope.pop(); // New and improved result
     Node mem = _e._scope.mem();
+    HashMap<String,Type> types = _e._scope.types();
     // Hunt for typing errors in the alive code
     assert _e._par._par==null; // Top-level only
     VBitSet bs = new VBitSet();
@@ -177,7 +179,7 @@ public class Parse {
         tobj = ((TypeMem)tmem).ld(tmp);
       }
     }
-    return new TypeEnv(tres,tobj,_e,errs0.isEmpty() ? null : errs0);
+    return new TypeEnv(tres,tobj,types,_e,errs0.isEmpty() ? null : errs0);
   }
 
   /** Parse a top-level:
@@ -504,7 +506,10 @@ public class Parse {
           byte fin = _buf[_x-2]==':' ? TypeStruct.frw() : TypeStruct.ffinal();
           Node stmt = stmt();
           if( stmt == null ) n = err_ctrl2("Missing stmt after assigning field '."+fld+"'");
-          else _e._scope.set_mem(gvn(new StoreNode(ctrl(),mem,castnn,n=stmt,fin,fld ,errMsg())),_gvn);
+          else {
+            Node st = gvn(new StoreNode(ctrl(),mem,castnn,n=stmt,fin,fld ,errMsg()));
+            mem_active().st((StoreNode)st,_gvn);
+          }
         } else {
           n = gvn(new LoadNode(mem,castnn,fld,errMsg()));
         }

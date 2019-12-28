@@ -228,21 +228,6 @@ public class TestParse {
   }
 
   @Test public void testParse04() {
-    // Fails when dup fields: l=...; l=...; v=5
-    // Fail appears to be TypeStruct from CallEpi 410 with memory having alias parts equal to prior values, not folded???
-    // Fails when semicolon (tree.l;fun) as arg
-    // Works if 'fun' is inlined
-    testerr("tmp=@{"+
-         "    l=@{ l=0; r=0; v=3 };"+
-         "    r=@{ l=0; r=0; v=7 };"+
-         "    v=5"+
-         "};"+
-         "map={tree fun -> tree"+
-         "     ? @{l=map(tree.l,fun);r=map(tree.r,fun);v=fun(tree.v)}"+
-         "     : 0};"+
-         "map(tmp,{x->x+x})",
-            "Cannot define field '.l' twice",61);
-
     // simple anon struct tests
     testerr("a=@{x=1.2;y}; x", "Unknown ref 'x'",15);
     testerr("a=@{x=1;x=2}.x", "Cannot re-assign final field '.x'",11);
@@ -263,15 +248,15 @@ public class TestParse {
     test   ("dist={p->p//qqq\n.//qqq\nx*p.x+p.y*p.y}; dist(//qqq\n@{x//qqq\n=1;y=2})", TypeInt.con(5));
 
     // Tuple
-    test_obj("(0,\"abc\")", TypeStruct.make_tuple(Type.NIL,TypeMemPtr.ABCPTR));
+    test_obj_isa("(0,\"abc\")", TypeStruct.make_tuple(Type.NIL,TypeMemPtr.STRPTR));
     test("(1,\"abc\").0", TypeInt.TRUE);
-    test("(1,\"abc\").1", TypeMemPtr.ABCPTR);
+    test_isa("(1,\"abc\").1", TypeMemPtr.STRPTR);
 
     // Named type variables
-    test("gal=:flt"     , (lex -> TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make(TypeFlt.FLT64), TypeName.make0("gal",lex,TypeFlt.FLT64,(short)0))));
-    test("gal=:flt; gal", (lex -> TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make(TypeFlt.FLT64), TypeName.make0("gal",lex,TypeFlt.FLT64,(short)0))));
-    test    ("gal=:flt; 3==gal(2)+1", TypeInt.TRUE);
-    test    ("gal=:flt; tank:gal = gal(2)", (lex -> TypeName.make0("gal",lex,TypeInt.con(2),(short)0)));
+    test_name("gal=:flt"     ,"gal", (lex -> TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make(TypeFlt.FLT64), TypeName.make0("gal",lex,TypeFlt.FLT64,(short)0))));
+    test_name("gal=:flt; gal","gal", (lex -> TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make(TypeFlt.FLT64), TypeName.make0("gal",lex,TypeFlt.FLT64,(short)0))));
+    test     ("gal=:flt; 3==gal(2)+1", TypeInt.TRUE);
+    test_name("gal=:flt; tank:gal = gal(2)", "gal", (lex -> TypeName.make0("gal",lex,TypeInt.con(2),(short)0)));
     // test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: figure out if free cast for bare constants?
     testerr ("gal=:flt; tank:gal = gal(2)+1", "3 is not a gal:flt64",29);
 
@@ -422,6 +407,21 @@ public class TestParse {
     String ll_fun2 = "plus = {x -> x+x};";
     String ll_apl2 = "map(plus,tmp);";
     // End type: ((((*?,scalar)?,str)?,int64),str)?
+
+    // Fails when dup fields: l=...; l=...; v=5
+    // Fail appears to be TypeStruct from CallEpi 410 with memory having alias parts equal to prior values, not folded???
+    // Fails when semicolon (tree.l;fun) as arg
+    // Works if 'fun' is inlined
+    testerr("tmp=@{"+
+         "    l=@{ l=0; r=0; v=3 };"+
+         "    r=@{ l=0; r=0; v=7 };"+
+         "    v=5"+
+         "};"+
+         "map={tree fun -> tree"+
+         "     ? @{l=map(tree.l,fun);r=map(tree.r,fun);v=fun(tree.v)}"+
+         "     : 0};"+
+         "map(tmp,{x->x+x})",
+            "Cannot define field '.l' twice",61);
 
     //// After inlining once, we become pair-aware.
     //test_isa(ll_cona+ll_conb+ll_conc+ll_cond+ll_cone+ll_cont+ll_map2+ll_fun2+ll_apl2,
@@ -696,6 +696,13 @@ strs:List(str?) = ... // List of null-or-strings
       assertEquals(expected,actual);
     }
   }
+  static private void test_name( String program, String tname, Function<Integer,Type> expected ) {
+    try( TypeEnv te = run(program) ) {
+      int lex = ((TypeName)te._types.get(tname))._lex;
+      Type t_expected = expected.apply(lex);
+      assertEquals(t_expected,te._t);
+    }
+  }
   static private void test_ptr( String program, Function<Integer,Type> expected ) {
     try( TypeEnv te = run(program) ) {
       assertTrue(te._t instanceof TypeMemPtr);
@@ -721,13 +728,11 @@ strs:List(str?) = ... // List of null-or-strings
       assertEquals(obj,te._tobj);
     }
   }
-  // Slightly weaker than test_ptr
-  static private void test_ptr_isa( String program, Function<Integer,Type> expected ) {
+  static private void test_obj_isa( String program, TypeObj obj) {
     try( TypeEnv te = run(program) ) {
       assertTrue(te._t instanceof TypeMemPtr);
       int alias = ((TypeMemPtr)te._t).getbit(); // internally asserts only 1 bit set
-      Type t_expected = expected.apply(alias);
-      assertTrue(te._t.isa(t_expected));
+      assertTrue(te._tobj.isa(obj));
     }
   }
   static private void test_ptr( String program, String expected ) {

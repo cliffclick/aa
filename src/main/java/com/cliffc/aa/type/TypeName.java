@@ -34,7 +34,7 @@ import java.util.function.Predicate;
 
 public class TypeName extends TypeObj<TypeName> {
   public  String _name;         // Name!
-  public  int _lex;            // Unique type-name number, which is also an alias so overloads TypeMemPtr
+  public  int _lex;             // Unique type-name number, which is also an alias so overloads TypeMemPtr
   public  Type _t;              // Named type
   public  short _depth;         // Nested depth of TypeNames
   // Named type variable

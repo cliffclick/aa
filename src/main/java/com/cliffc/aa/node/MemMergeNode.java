@@ -140,15 +140,8 @@ public class MemMergeNode extends Node {
     if( alias == -1 ) throw AA.unimpl(); // Handle multiple aliases, handle all/empty
     return obj(alias,gvn);
   }
-  //
-  //// Create a new alias with initial value for deactive/gvn-registered memory
-  //public void create_alias( int alias, Node n, GVNGCM gvn ) {
-  //  assert gvn.touched(this);
-  //  Type oldt = gvn.unreg(this);
-  //  create_alias_active(alias,n,gvn);
-  //  gvn.rereg(this,oldt);
-  //}
-  // Create a new alias with initial value for an active this
+  
+  // Create a new alias slot with initial value for an active this
   public void create_alias_active( int alias, Node n, GVNGCM gvn ) {
     assert gvn==null || (!gvn.touched(this) && gvn.type(n) instanceof TypeObj);
     assert alias2idx(alias) == 0;    // No dups
@@ -157,6 +150,18 @@ public class MemMergeNode extends Node {
     set_def(idx,n,null);             // No need for GVN since null
   }
 
+  // An imprecise store updates all aliases
+  public void st( StoreNode st, GVNGCM gvn ) {
+    assert !gvn.touched(this);
+    TypeMemPtr ptr = (TypeMemPtr)gvn.type(st.adr());
+    BitSet bs = ptr._aliases.tree().plus_kids(ptr._aliases);
+    for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) ) {
+      int idx = make_alias2idx(alias);
+      set_def(idx,st,gvn);
+    }
+  }
+
+  
   // This MemMerge is 'active': not installed in GVN and free to have its edges
   // changed (by the Parser as new variables are discovered).  Make it
   // 'inactive' and ready for nested Node.ideal() calls.
@@ -202,10 +207,6 @@ public class MemMergeNode extends Node {
     //    if( use instanceof IntrinsicNode.ConvertPtrTypeName )
     //      gvn.add_work(use);
     //
-    //// If skinny is a pointer and not memory, then this is a collapsing
-    //// named-type-into-allocator.
-    //if( gvn.type(obj()) instanceof TypeMemPtr )
-    //  return mem;
 
     // Back-to-back merges collapse
     if( mem() instanceof MemMergeNode ) {
