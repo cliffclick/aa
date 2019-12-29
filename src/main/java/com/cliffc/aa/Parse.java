@@ -866,21 +866,28 @@ public class Parse {
    *  true, unknown tokens are treated as a forward-ref new type.
    */
   private Type type() { return typep(false); }
-  // Returning a type variable assignment result.  Do not wrap TypeObj in a
-  // TypeMemPtr, return a bare TypeObj instead... so it can be Named by the
-  // type variable.  Flag to allow unknown type variables as forward-refs.
+  // Returning a type variable assignment result or null.  Flag to allow
+  // unknown type variables as forward-refs.
   private Type typev() {
     Type t = type0(true);
+    // Type.ANY is a flag for '->' which is not a type.
     return t==Type.ANY ? null : t;
   }
   private Type typep(boolean type_var) {
     Type t = type0(type_var);
     if( t==null ) return null;
     Type base = t.base();
-    if( !(base instanceof TypeObj) ) return t;
+    if( !(base instanceof TypeObj) ) return t; // Primitives are not wrapped
     // Automatically convert to reference for fields.
     // Make a reasonably precise alias.
-    int type_alias = BitsAlias.type_alias(base instanceof TypeStruct ? BitsAlias.REC : BitsAlias.ARY,(TypeObj)t);
+
+    // All TypeObjs are made somewhere and have an alias.  "str" is always the
+    // top-level (unless user-overrides) "str" type, with alias BitsAlias.STR.
+    // TypeStruct uses the top-level BitsAlias.STRUCT but makes a private
+    // version useful in errors.  TypeName has an internal alias upon creation.
+    int type_alias = t instanceof TypeName
+      ? ((TypeName)t)._lex
+      : (t instanceof TypeStruct ? BitsAlias.type_alias(BitsAlias.REC,(TypeObj)t) : BitsAlias.STR);
     TypeMemPtr tmp = TypeMemPtr.make(type_alias);
     return typeq(tmp);          // And check for null-ness
   }
@@ -899,7 +906,7 @@ public class Parse {
   // accept final-fields.  Using lattice bottom for the default.
   private byte tmod_default() { return TypeStruct.fro(); }
 
-  // Type or null or TypeErr.ANY for '->' token
+  // Type or null or Type.ANY for '->' token
   private Type type0(boolean type_var) {
     if( peek('{') ) {           // Function type
       Ary<Type> ts = new Ary<>(new Type[1],0);  Type t;

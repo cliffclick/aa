@@ -33,7 +33,10 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     SB sb = new SB().p('*');
     _aliases.toString(sb);
     int alias = _aliases.abit();
-    if( alias > 0 ) sb.p(BitsAlias.type_for_alias2(alias).toString());
+    if( alias > 0 ) {
+      TypeObj to = BitsAlias.type_for_alias2(alias);
+      if( to != null ) sb.p(to.toString());
+    }
     if( _aliases.test(0) ) sb.p('?');
     return sb.toString();
   }
@@ -69,7 +72,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   public  static final TypeMemPtr STR0   = make(BitsAlias.STRBITS0);
   public  static final TypeMemPtr ABCPTR = make(BitsAlias.type_alias(BitsAlias.STR,TypeStr.ABC));
   public  static final TypeMemPtr ABC0   = (TypeMemPtr)ABCPTR.meet_nil();
-          static final TypeMemPtr STRUCT = make(BitsAlias.RECBITS );
+  public  static final TypeMemPtr STRUCT = make(BitsAlias.RECBITS );
   public  static final TypeMemPtr STRUCT0= make(BitsAlias.RECBITS0);
   static final TypeMemPtr[] TYPES = new TypeMemPtr[]{OOP0,STR0,STRPTR,ABCPTR,STRUCT};
 

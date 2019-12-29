@@ -223,7 +223,7 @@ public class TestParse {
     test_name("A= :(flt,int)", TypeFlt.FLT64,TypeInt.INT64);
     test_name("A= :(   ,int)", Type.SCALAR  ,TypeInt.INT64);
 
-    test_ptr("A= :(str?, int); A( \"abc\",2 )","A:(*[$],2)");
+    test_ptr("A= :(str?, int); A( \"abc\",2 )","A:(*[$]\"abc\";2)");
     testerr("A= :(str?, int)?","Named types are never nil",16);
   }
 
@@ -689,13 +689,8 @@ strs:List(str?) = ... // List of null-or-strings
     try( TypeEnv te = run(program) ) {
       assertTrue(te._t instanceof TypeFunPtr);
       TypeFunPtr actual = (TypeFunPtr)te._t;
-      TypeStruct from = TypeStruct.make_tuple(args);
-      //TypeName to = TypeName.make("A",from);
-      //TypeMemPtr  inptr = TypeMemPtr.make(BitsAlias.REC);
-      //TypeMemPtr outptr = TypeMemPtr.make(BitsAlias.REC);
-      //TypeFunPtr expected = TypeFunPtr.make(actual.fidxs(),TypeStruct.make(inptr),outptr);
-      //assertEquals(expected,actual);
-      throw AA.unimpl();
+      TypeFunPtr expected = TypeFunPtr.make(actual.fidxs(),TypeStruct.make(TypeMemPtr.STRUCT),TypeMemPtr.STRUCT);
+      assertEquals(expected,actual);
     }
   }
   static private void test_name( String program, String tname, Function<Integer,Type> expected ) {

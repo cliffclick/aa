@@ -34,13 +34,13 @@ public class IntrinsicNode extends Node {
     // RTTI) the type is exact at that moment.  Super-type constructors are
     // possible but here the type is exact.
 
-    // So TypeFunPtr takes in a ptr-to-from and returns a ptr-to-to.
-    TypeMemPtr tptr = TypeMemPtr.make(BitsAlias.REC);
-    TypeFunPtr tf = TypeFunPtr.make_new(TypeStruct.make(tptr),tptr);
+    // This function call takes in and returns a plain ptr-to-object.
+    // Only after folding together does the name become apparent.
+    TypeFunPtr tf = TypeFunPtr.make_new(TypeStruct.make(TypeMemPtr.STRUCT),TypeMemPtr.STRUCT);
     FunNode fun = (FunNode) gvn.xform(new FunNode(tn._name,tf).add_def(Env.ALL_CTRL));
-    Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
-    Node mem = gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM     ),null));
-    Node ptr = gvn.xform(new ParmNode( 0,"ptr",fun,gvn.con(tptr            ),null));
+    Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL ),null));
+    Node mem = gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM      ),null));
+    Node ptr = gvn.xform(new ParmNode( 0,"ptr",fun,gvn.con(TypeMemPtr.STRUCT),null));
     Node cvt = gvn.xform(new IntrinsicNode(tn,badargs,fun,mem,ptr));
     Node mmem= gvn.xform(new MemMergeNode(mem,cvt,BitsAlias.REC));
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,cvt,rpc,fun));

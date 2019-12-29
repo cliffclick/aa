@@ -93,7 +93,7 @@ public class BitsAlias extends Bits<BitsAlias> {
   }
   static TypeObj type_for_alias2(int alias) {
     Object o = MAP.at(alias);
-    assert o != null;
+    if( o == null ) return null;
     return o instanceof TypeObj ? (TypeObj)o : ((NewNode)o).xs();
   }
   public static int alias_for_typename(String str) {

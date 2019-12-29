@@ -39,14 +39,14 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public @NotNull String @NotNull[] _flds;  // The field names
   public Type[] _ts;            // Matching field types
   public byte[] _finals;        // Fields that are final; see fmeet, fdual, fstr
-  private TypeStruct _uf;       // Tarjan Union-Find, used during cyclic meet
+  //private TypeStruct _uf;       // Tarjan Union-Find, used during cyclic meet
   private TypeStruct     ( boolean any, String[] flds, Type[] ts, byte[] finals) { super(TSTRUCT, any); init(any,flds,ts,finals); }
   private TypeStruct init( boolean any, String[] flds, Type[] ts, byte[] finals) {
     super.init(TSTRUCT, any);
     _flds  = flds;
     _ts    = ts;
     _finals= finals;
-    _uf    = null;
+    //_uf    = null;
     return this;
   }
   // Precomputed hash code.  Note that it can NOT depend on the field types -
@@ -144,25 +144,24 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     if( dups == null ) dups = new VBitSet();
     if( dups.tset(_uid) ) return "$"; // Break recursive printing cycle
     if( find("!") != -1 && find("math_pi") != -1 )
-      return "{PRIMS}";
+      return "{PRIMS}";         // Special shortcut for the all-prims closure type
 
     SB sb = new SB();
-    if( _uf!=null ) return "=>"+_uf;
+    //if( _uf!=null ) return "=>"+_uf; // Only used mid-recursion
     if( _any ) sb.p('~');
     boolean is_tup = _flds.length==0 || fldTop(_flds[0]) || fldBot(_flds[0]) || isDigit(_flds[0].charAt(0));
-    if( !is_tup ) sb.p('@');    // Not a tuple
-    sb.p(is_tup ? '(' : '{');
+    sb.p(is_tup ? "(" : "@{");
     for( int i=0; i<_flds.length; i++ ) {
       if( !is_tup )
         sb.p(_flds[i]).p(fstr(_finals[i])).p('='); // Field name, access mod
       Type t = at(i);
       if( t==null ) sb.p("!");  // Graceful with broken types
       else if( t==SCALAR ) ;    // Default answer, do not print
-      else if( t instanceof TypeMemPtr ) sb.p("*"+((TypeMemPtr)t)._aliases); // Do not recurse here, gets too big too fast
+      //else if( t instanceof TypeMemPtr ) sb.p("*"+((TypeMemPtr)t)._aliases); // Do not recurse here, gets too big too fast
       else sb.p(t.str(dups));   // Recursively print field type
       if( i<_flds.length-1 ) sb.p(';');
     }
-    sb.p(!is_tup ? '}' : ')');
+    sb.p(!is_tup ? "}" : ")");
     return sb.toString();
   }
   @Override SB dstr( SB sb, VBitSet dups ) {
@@ -172,7 +171,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     if( find("!") != -1 && find("math_pi") != -1 )
       return sb.p("{PRIMS}");
 
-    if( _uf!=null ) return _uf.dstr(sb.p("=>"),dups);
+    //if( _uf!=null ) return _uf.dstr(sb.p("=>"),dups);
     if( _any ) sb.p('~');
     boolean is_tup = _flds.length==0 || fldTop(_flds[0]) || fldBot(_flds[0]) || isDigit(_flds[0].charAt(0));
     if( !is_tup ) sb.p('@');    // Not a tuple
