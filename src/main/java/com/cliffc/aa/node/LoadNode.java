@@ -110,13 +110,14 @@ public class LoadNode extends Node {
 
   @Override public String err(GVNGCM gvn) {
     Type tadr = gvn.type(adr()).base();
-    Type tmem = gvn.type(mem());
     if( tadr.must_nil() ) return bad("Struct might be nil when reading");
-    if( !(tadr instanceof TypeMemPtr) || !(tmem instanceof TypeMem) )
+    if( !(tadr instanceof TypeMemPtr) )
       return bad("Unknown"); // Not a pointer nor memory, cannot load a field
     TypeMemPtr ptr = (TypeMemPtr)tadr;
-    TypeMem    mem = (TypeMem   )tmem;
-    Type objs = mem.ld(ptr);    // General load from memory
+    Type tmem = gvn.type(mem());
+    TypeObj objs = tmem instanceof TypeMem
+      ? ((TypeMem)tmem).ld(ptr) // General load from memory
+      : ((TypeObj)tmem);
     if( !(objs instanceof TypeStruct) || ((TypeStruct)objs).find(_fld) == -1 )
       return bad("Unknown");
     return null;

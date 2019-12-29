@@ -275,7 +275,7 @@ public class TestParse {
     test   ("x:str? = 0", Type.NIL); // question-type allows null or not; zero digit is null
     test_obj("x:str? = \"abc\"", TypeStr.ABC); // question-type allows null or not
     testerr("x:str  = 0", "nil is not a *[$]str", 10);
-    test   ("math_rand(1)?0:\"abc\"", TypeMemPtr.ABC0);
+    test_ptr0("math_rand(1)?0:\"abc\"", TypeMemPtr::make_nil);
     testerr("(math_rand(1)?0 : @{x=1}).x", "Struct might be nil when reading field '.x'", 27);
     test   ("p=math_rand(1)?0:@{x=1}; p ? p.x : 0", TypeInt.BOOL); // not-null-ness after a null-check
     test   ("x:int = y:str? = z:flt = 0", Type.NIL); // null/0 freely recasts
