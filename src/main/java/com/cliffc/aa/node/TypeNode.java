@@ -21,7 +21,16 @@ public class TypeNode extends Node {
     Node arg = arg();
     Type t = gvn.type(arg);
     if( t.isa(_t) )
-      return arg; // Typecheck must pass, remove
+      return arg;               // Typecheck must pass, remove
+    // If both are pointers, check memory content shape (not alias#)
+    if( t  instanceof TypeMemPtr &&
+        _t instanceof TypeMemPtr ) {
+      // Get memory content shape
+      TypeObj targ = BitsAlias.type_for_alias2(((TypeMemPtr) t)._aliases.getbit()); // TODO: handle more than one bit
+      TypeObj t_t  = BitsAlias.type_for_alias2(((TypeMemPtr)_t)._aliases.getbit());
+      if( targ != null && targ.isa(t_t) )
+        return arg;             // Typecheck passes, remove
+    }
     // If TypeNode check is for a function pointer, it will wrap any incoming
     // function with a new function which does the right arg-checks.  This
     // happens immediately in the Parser and is here to declutter the Parser.

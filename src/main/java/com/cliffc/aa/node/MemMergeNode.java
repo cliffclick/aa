@@ -267,8 +267,8 @@ public class MemMergeNode extends Node {
   }
   @Override public Type all_type() { return TypeMem.MEM; }
 
-  @Override @NotNull public MemMergeNode copy( boolean copy_edges, GVNGCM gvn) {
-    MemMergeNode mmm = (MemMergeNode)super.copy(copy_edges, gvn);
+  @Override @NotNull public MemMergeNode copy( boolean copy_edges, CallEpiNode unused, GVNGCM gvn) {
+    MemMergeNode mmm = (MemMergeNode)super.copy(copy_edges, unused, gvn);
     mmm._aliases = new AryInt(_aliases._es.clone(),_aliases._len);
     mmm._aidxes  = new AryInt(_aidxes ._es.clone(),_aidxes ._len);
     return mmm;

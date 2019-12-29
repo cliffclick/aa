@@ -111,7 +111,7 @@ public final class CallEpiNode extends Node {
         can_inline=false;       // Not trivial
     if( fun.noinline() ) can_inline=false;
     if( can_inline ) {
-      Node irez = rez.copy(false,gvn);// Copy the entire function body
+      Node irez = rez.copy(false,this,gvn);// Copy the entire function body
       for( Node parm : rez._defs )
         irez.add_def((parm instanceof ParmNode && parm.in(0) == fun) ? call.arg(((ParmNode)parm)._idx) : parm);
       if( irez instanceof PrimNode ) ((PrimNode)irez)._badargs = call._badargs;

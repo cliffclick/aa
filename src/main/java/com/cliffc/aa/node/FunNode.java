@@ -122,7 +122,8 @@ public class FunNode extends RegionNode {
     _name = tok;
   }
 
-  @Override Node copy(boolean copy_edges, GVNGCM gvn) { throw AA.unimpl(); } // Gotta make a new FIDX
+  // Never inline with a nested function
+  @Override Node copy(boolean copy_edges, CallEpiNode unused, GVNGCM gvn) { throw AA.unimpl(); }
 
   // True if may have future unknown callers.
   private boolean has_unknown_callers() { return _defs._len > 1 && in(1) == Env.ALL_CTRL; }
@@ -393,27 +394,6 @@ public class FunNode extends RegionNode {
   // for the old and one for the new body.  The new function may have a more
   // refined signature, and perhaps no unknown callers.
   private Node split_callers( GVNGCM gvn, ParmNode[] parms, RetNode oldret, FunNode fun, CGEdge[] cgedges, int path) {
-    /*
-      Bug Fix: Every NewNode.copy() splits aliases.  This means the original
-      code makes e.g. [12] but either copy makes either just [19] or [20], and
-      needs to handle the other half.  Thinking I can just pass-thru all the
-      other halves in bulk, and merge at both function exits.
-
-      Example: recursive map call makes a [12] with lifetime inside whole fcn:
-         map {-> [12]...if/[use 12]map[use 12]region... [merge base,12][last 12]}
-
-      Inline:
-         map {-> [19]...if/[use 12]{-> [20]... if/[use 12]map[use 12]region...[last 20]}[use 12]region... [last 19]}
-
-      Alias [19] spans whole of inner inline, so inner inline needs to pass
-      thru 19, which needs to de-alias against all the inside [12]s.
-
-      Might ponder forcing all aliases [12] to become either [19/20].
-      Currently thinking lazy update 12->19 but could be bulk force update.
-      Want semantics to allow lazy update.
-
-
-     */
     // Strip out all wired calls to this function.  All will re-resolve later.
     for( CGEdge cg : cgedges )
       if( cg != null && cg._cepi != null )
@@ -429,7 +409,9 @@ public class FunNode extends RegionNode {
           gvn.rereg(parm,oldt);
         }
     }
-
+    // If inlining into one path, get the CallEpi for the call site.  Used at
+    // least to get a better error message for trivial inlined constructors.
+    CallEpiNode cepi = path >= 0 ? cgedges[path]._cepi : null;
     // Map from old to cloned function body
     HashMap<Node,Node> map = new HashMap<>();
     // Collect aliases that are cloning.
@@ -446,16 +428,16 @@ public class FunNode extends RegionNode {
       if( op == OP_FUN  && n       != this ) continue; // Call to other function, not part of inlining
       if( op == OP_PARM && n.in(0) != this ) continue; // Arg  to other function, not part of inlining
       if( n instanceof NewNode ) aliases.set(((NewNode)n)._alias);
-      map.put(n,n.copy(false,gvn)); // Make a blank copy with no edges and map from old to new
+      map.put(n,n.copy(false,cepi,gvn)); // Make a blank copy with no edges and map from old to new
       work.addAll(n._uses);   // Visit all uses also
     }
 
     // Collect the old/new funptrs and add to map also.
-    RetNode newret = (RetNode)oldret.copy(false,gvn);
+    RetNode newret = (RetNode)oldret.copy(false,cepi,gvn);
     newret._fidx = fun.fidx();
     map.put(oldret,newret);
     FunPtrNode old_funptr = oldret.funptr();
-    FunPtrNode new_funptr = (FunPtrNode)old_funptr.copy(false,gvn);
+    FunPtrNode new_funptr = (FunPtrNode)old_funptr.copy(false,cepi,gvn);
     new_funptr.add_def(newret);
     old_funptr.keep(); // Keep around; do not kill last use before the clone is done
 

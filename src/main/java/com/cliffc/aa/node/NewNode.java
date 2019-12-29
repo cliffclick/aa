@@ -107,10 +107,10 @@ public abstract class NewNode<T extends TypeObj> extends Node {
   }
 
   // Clones during inlining all become unique new sites
-  @Override @NotNull public NewNode copy( boolean copy_edges, GVNGCM gvn) {
+  @Override @NotNull public NewNode copy( boolean copy_edges, CallEpiNode unused, GVNGCM gvn) {
     assert !_ts.above_center(); // Never in GCP when types are high
     // Split the original '_alias' class into 2 sub-aliases
-    NewNode nnn = (NewNode)super.copy(copy_edges, gvn);
+    NewNode nnn = (NewNode)super.copy(copy_edges, unused, gvn);
     nnn._alias = BitsAlias.new_alias(_alias,nnn); // Children alias classes, split from parent
     // The original NewNode also splits from the parent alias
     assert gvn.touched(this);

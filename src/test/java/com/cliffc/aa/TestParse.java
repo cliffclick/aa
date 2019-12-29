@@ -17,7 +17,7 @@ public class TestParse {
     Object dummy = Env.GVN; // Force class loading cycle
 
     // A collection of tests which like to fail easily
-    testerr ("Point=:@{x;y}; Point((0,1))", "*[$](nil,1) is not a *[$]@{x=,y=}",27);
+    testerr ("Point=:@{x;y}; Point((0,1))", "*[$](nil;1) is not a Point:@{x=;y=}",27);
     test_ptr("x=@{n:=1;v:=2}; x.n := 3; x", "@{n:=3,v:=2}");
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'",20);
     testerr("{+}(1,2,3)", "Passing 3 arguments to {+} which takes 2 arguments",10);
@@ -224,6 +224,7 @@ public class TestParse {
     test_name("A= :(   ,int)", Type.SCALAR  ,TypeInt.INT64);
 
     test_ptr("A= :(str?, int); A( \"abc\",2 )","A:(*[$]\"abc\";2)");
+    test_ptr("A= :(str?, int); A( (\"abc\",2) )","A:(*[$]\"abc\";2)");
     testerr("A= :(str?, int)?","Named types are never nil",16);
   }
 
@@ -262,8 +263,8 @@ public class TestParse {
 
     test    ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
     test    ("Point=:@{x;y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
-    testerr ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1;y=2}))", "*[$]@{x==1,y==2} is not a *[$]Point:@{x=,y=}",68);
-    testerr ("Point=:@{x;y}; Point((0,1))", "*[$](nil,1) is not a *[$]@{x=,y=}",27);
+    testerr ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1;y=2}))", "*[$]@{x==1;y==2} is not a *[$]Point:@{x=;y=}",68);
+    testerr ("Point=:@{x;y}; Point((0,1))", "*[$](nil;1) is not a Point:@{x=;y=}",27);
     testerr("x=@{n: =1;}","Missing type after ':'",7);
     testerr("x=@{n=;}","Missing ifex after assignment of 'n'",6);
     test_obj("x=@{n}",TypeStruct.ALLSTRUCT);
@@ -272,19 +273,18 @@ public class TestParse {
   @Test public void testParse05() {
     // nullable and not-null pointers
     test   ("x:str? = 0", Type.NIL); // question-type allows null or not; zero digit is null
-    //test   ("x:str? = \"abc\"", TypeMemPtr.ABCPTR); // question-type allows null or not
-    //testerr("x:str  = 0", "nil is not a *[$]str", 10);
-    //test   ("math_rand(1)?0:\"abc\"", TypeMemPtr.ABC0);
-    //testerr("(math_rand(1)?0 : @{x=1}).x", "Struct might be nil when reading field '.x'", 27);
-    //test   ("p=math_rand(1)?0:@{x=1}; p ? p.x : 0", TypeInt.BOOL); // not-null-ness after a null-check
-    //test   ("x:int = y:str? = z:flt = 0", Type.NIL); // null/0 freely recasts
-    //test   ("\"abc\"==0", TypeInt.FALSE ); // No type error, just not null
-    //test   ("\"abc\"!=0", TypeInt.TRUE  ); // No type error, just not null
-    //test   ("nil=0; \"abc\"!=nil", TypeInt.TRUE); // Another way to name null
-    //test   ("a = math_rand(1) ? 0 : @{x=1}; // a is null or a struct\n"+
-    //        "b = math_rand(1) ? 0 : @{c=a}; // b is null or a struct\n"+
-    //        "b ? (b.c ? b.c.x : 0) : 0      // Null-safe field load", TypeInt.BOOL); // Nested null-safe field load
-    throw AA.unimpl();
+    test_obj("x:str? = \"abc\"", TypeStr.ABC); // question-type allows null or not
+    testerr("x:str  = 0", "nil is not a *[$]str", 10);
+    test   ("math_rand(1)?0:\"abc\"", TypeMemPtr.ABC0);
+    testerr("(math_rand(1)?0 : @{x=1}).x", "Struct might be nil when reading field '.x'", 27);
+    test   ("p=math_rand(1)?0:@{x=1}; p ? p.x : 0", TypeInt.BOOL); // not-null-ness after a null-check
+    test   ("x:int = y:str? = z:flt = 0", Type.NIL); // null/0 freely recasts
+    test   ("\"abc\"==0", TypeInt.FALSE ); // No type error, just not null
+    test   ("\"abc\"!=0", TypeInt.TRUE  ); // No type error, just not null
+    test   ("nil=0; \"abc\"!=nil", TypeInt.TRUE); // Another way to name null
+    test   ("a = math_rand(1) ? 0 : @{x=1}; // a is null or a struct\n"+
+            "b = math_rand(1) ? 0 : @{c=a}; // b is null or a struct\n"+
+            "b ? (b.c ? b.c.x : 0) : 0      // Null-safe field load", TypeInt.BOOL); // Nested null-safe field load
   }
 
   @Test public void testParse06() {

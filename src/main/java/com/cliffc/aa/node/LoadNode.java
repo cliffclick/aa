@@ -109,26 +109,15 @@ public class LoadNode extends Node {
   }
 
   @Override public String err(GVNGCM gvn) {
-    Type t = gvn.type(adr()).base();
-    if( t.must_nil() ) return bad("Struct might be nil when reading");
-    if( !(t instanceof TypeMemPtr) )
-      return bad("Unknown"); // Not a pointer, cannot load a field
-    TypeMemPtr t3 = (TypeMemPtr)t;
-    Type t4 = gvn.type(mem());
-    if( t4 instanceof TypeMem ) {         // Memory or Struct, for various errors
-      TypeMem t5 = (TypeMem)t4;           // Should be memory
-      Type t6 = t5.ld(t3);                // General load from memory
-      if( !(t6 instanceof TypeStruct) ) { // No fields, so memory or ptr is in-error
-        //Type t7 = t3._obj.base();
-        //if( t7 instanceof TypeStruct ) {
-        //  t4 = t7;
-        //} else {
-        //  return bad("Unknown");
-        //}
-        throw AA.unimpl();
-      } else t4 = t6;
-    }
-    if( !(t4 instanceof TypeStruct) || ((TypeStruct)t4).find(_fld) == -1 )
+    Type tadr = gvn.type(adr()).base();
+    Type tmem = gvn.type(mem());
+    if( tadr.must_nil() ) return bad("Struct might be nil when reading");
+    if( !(tadr instanceof TypeMemPtr) || !(tmem instanceof TypeMem) )
+      return bad("Unknown"); // Not a pointer nor memory, cannot load a field
+    TypeMemPtr ptr = (TypeMemPtr)tadr;
+    TypeMem    mem = (TypeMem   )tmem;
+    Type objs = mem.ld(ptr);    // General load from memory
+    if( !(objs instanceof TypeStruct) || ((TypeStruct)objs).find(_fld) == -1 )
       return bad("Unknown");
     return null;
   }

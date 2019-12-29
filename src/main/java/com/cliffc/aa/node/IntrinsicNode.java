@@ -5,6 +5,7 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
+import org.jetbrains.annotations.NotNull;
 
 // Function to wrap another type in a Name, which typically involves setting a
 // vtable like field, i.e. memory updates.
@@ -42,8 +43,8 @@ public class IntrinsicNode extends Node {
     Node mem = gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM      ),null));
     Node ptr = gvn.xform(new ParmNode( 0,"ptr",fun,gvn.con(TypeMemPtr.STRUCT),null));
     Node cvt = gvn.xform(new IntrinsicNode(tn,badargs,fun,mem,ptr));
-    Node mmem= gvn.xform(new MemMergeNode(mem,cvt,BitsAlias.REC));
-    RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,cvt,rpc,fun));
+    Node mmem= gvn.xform(new MemMergeNode(mem,cvt,tn._lex));
+    RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,ptr,rpc,fun));
     return (FunPtrNode)gvn.xform(new FunPtrNode(ret));
   }
 
@@ -63,12 +64,11 @@ public class IntrinsicNode extends Node {
         // NewObjNode is well-typed and producing a pointer to memory with the
         // correct type?  Fold into the NewObjNode and remove this Convert.
         TypeTuple tnnn = (TypeTuple)gvn.type(nnn);
-        //if( tnnn.at(1).isa(_targs.at(0)) ) {
-        //  nnn.set_name(gvn,all_type());
-        //  gvn.add_work(nnn);
-        //  return ptr;
-        //}
-        throw AA.unimpl();
+        if( tnnn.at(0).isa(_tn._t) ) {
+          nnn.set_name(gvn,_tn);
+          gvn.add_work(nnn);
+          return opj;
+        }
       }
     }
     return null;
@@ -103,6 +103,13 @@ public class IntrinsicNode extends Node {
   @Override public String err(GVNGCM gvn) {
     Type ptr = gvn.type(ptr());
     return _badargs.typerr(ptr,_tn); // Did not remove the aliasing
+  }
+
+  // Clones during inlining all become unique new sites
+  @Override @NotNull public IntrinsicNode copy( boolean copy_edges, CallEpiNode cepi, GVNGCM gvn) {
+    IntrinsicNode nnn = (IntrinsicNode)super.copy(copy_edges, cepi, gvn);
+    nnn._badargs = cepi.call()._badargs;
+    return nnn;
   }
 
   // --------------------------------------------------------------------------
