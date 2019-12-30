@@ -101,10 +101,11 @@ public class PhiNode extends Node {
 
   @Override public Type value(GVNGCM gvn) {
     Type ctl = gvn.type(in(0));
-    if( ctl != Type.CTRL ) return ctl.above_center() ? Type.ANY : Type.ALL;
+    Type t = all_type();
+    if( ctl != Type.CTRL ) return ctl.above_center() ? t.dual() : t;
     RegionNode r = (RegionNode) in(0);
     assert r._defs._len==_defs._len;
-    Type t = Type.ANY;
+    t = t.dual();
     for( int i=1; i<_defs._len; i++ )
       if( gvn.type(r.in(i))==Type.CTRL ) // Only meet alive paths
         t = t.meet(gvn.type(in(i)));

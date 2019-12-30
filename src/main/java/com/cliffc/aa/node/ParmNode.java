@@ -3,6 +3,8 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeRPC;
+import com.cliffc.aa.type.TypeMem;
 
 // Function parameter node; just a Phi with a name
 public class ParmNode extends PhiNode {
@@ -68,4 +70,5 @@ public class ParmNode extends PhiNode {
     }
     return null;
   }
+  @Override public Type all_type() { return _idx==-1 ? TypeRPC.ALL_CALL : (_idx==-2 ? TypeMem.MEM : Type.SCALAR); }
 }
