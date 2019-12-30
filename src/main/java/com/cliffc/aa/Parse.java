@@ -507,7 +507,10 @@ public class Parse {
           if( stmt == null ) n = err_ctrl2("Missing stmt after assigning field '."+fld+"'");
           else {
             Node st = gvn(new StoreNode(ctrl(),mem,castnn,n=stmt,fin,fld ,errMsg()));
-            mem_active().st((StoreNode)st,_gvn);
+            // Set the store into active memory.  It might have collapsed into
+            // the local closure already, so already be in the active memory.
+            if( st instanceof StoreNode ) mem_active().st((StoreNode)st,_gvn);
+            else { assert st instanceof OProjNode; } 
           }
         } else {
           n = gvn(new LoadNode(mem,castnn,fld,errMsg()));

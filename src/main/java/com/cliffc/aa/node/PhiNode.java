@@ -49,19 +49,17 @@ public class PhiNode extends Node {
   // Phi of a MemMerge becomes a MemMerge of a Phi - increasing the precision
   // of memory edges.
   private Node expand_memory(RegionNode r, GVNGCM gvn) {
-    // Profit heuristic: all MemMerges are stable after xform and at least one
-    // exists and the Phi is the sole user, so the input MemMerge will die
-    // after this xform.  This is an expanding xform: try not to expand dead
-    // nodes.  Xform the inputs first, in case they just fold away.
-    boolean has_mmem=false;
+    // Profit heuristic: all MemMerges are stable after xform and are available
+    // on all paths and the Phi is the sole user, so the input MemMerges will
+    // die after this xform.  This is an expanding xform: try not to expand
+    // dead nodes.  Xform the inputs first, in case they just fold away.
     for( int i=1; i<_defs._len; i++ ) {
-      if( in(i)._uses._len==1 && in(i) instanceof MemMergeNode ) {
-        gvn.xform_old(in(i));
-        if( in(i)._uses._len==1 && in(i) instanceof MemMergeNode )
-          has_mmem=true;
-      }
+      if( in(i)._uses._len!=1 || !(in(i) instanceof MemMergeNode) )
+        return null;            // Not a self-single-user MemMerge
+      gvn.xform_old(in(i));
+      if( in(i)._uses._len!=1 || !(in(i) instanceof MemMergeNode) )
+        return null;            // Not a self-single-user MemMerge
     }
-    if( !has_mmem ) return null;
 
     // Do the expansion.  First: find all aliases
     BitSet bs = new BitSet();

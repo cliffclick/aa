@@ -279,13 +279,13 @@ public class MemMergeNode extends Node {
     for( int i=1; i<_aliases._len; i++ ) {
       int mya = _aliases.at(i);
       if( !aliases.get(mya) ) continue;
-      int kid0_alias = BitsAlias.get_kid(mya);
-      ((MemMergeNode)copy)._aliases.set(i,kid0_alias  );
-                           _aliases.set(i,kid0_alias+1);
+      int[] kid0_aliases = BitsAlias.get_kids(mya);
+      ((MemMergeNode)copy)._aliases.set(i,kid0_aliases[1]  );
+                           _aliases.set(i,kid0_aliases[2]);
       ((MemMergeNode)copy)._aidxes.set(mya,0);
                            _aidxes.set(mya,0);
-      ((MemMergeNode)copy)._aidxes.setX(kid0_alias  ,i);
-                           _aidxes.setX(kid0_alias+1,i);
+      ((MemMergeNode)copy)._aidxes.setX(kid0_aliases[1]  ,i);
+                           _aidxes.setX(kid0_aliases[2],i);
     }
     gvn.rereg(this,oldt);
   }

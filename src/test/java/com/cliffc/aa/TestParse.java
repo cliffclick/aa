@@ -18,7 +18,7 @@ public class TestParse {
 
     // A collection of tests which like to fail easily
     testerr ("Point=:@{x;y}; Point((0,1))", "*[$](nil;1) is not a Point:@{x=;y=}",27);
-    test_ptr("x=@{n:=1;v:=2}; x.n := 3; x", "@{n:=3,v:=2}");
+    test_ptr("x=@{n:=1;v:=2}; x.n := 3; x", "@{n:=3;v:=2}");
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'",20);
     testerr("{+}(1,2,3)", "Passing 3 arguments to {+} which takes 2 arguments",10);
     test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
@@ -232,7 +232,8 @@ public class TestParse {
     // simple anon struct tests
     testerr("a=@{x=1.2;y}; x", "Unknown ref 'x'",15);
     testerr("a=@{x=1;x=2}.x", "Cannot re-assign final field '.x'",11);
-    test   ("a=@{x=1.2;y;}; a.x", TypeFlt.con(1.2)); // standard "." field naming; trailing comma optional
+    test   ("a=@{x=1.2;y;}; a.x", TypeFlt.con(1.2)); // standard "." field naming; trailing semicolon optional
+    test_ptr("x=@{n:=1;v:=2}; x.n := 3; x", "@{n:=3;v:=2}");
     testerr("(a=@{x=0;y=0}; a.)", "Missing field name after '.'",17);
     testerr("a=@{x=0;y=0}; a.x=1; a","Cannot re-assign final field '.x'",19);
     test   ("a=@{x=0;y=1}; b=@{x=2}  ; c=math_rand(1)?a:b; c.x", TypeInt.INT8); // either 0 or 2; structs can be partially merged
@@ -309,7 +310,7 @@ public class TestParse {
     assertEquals(TypeInt.con(3),tt3.at(1));
     assertEquals("n",tt3._flds[0]);
     assertEquals("v",tt3._flds[1]);
-    
+
     // Missing type B is also never worked on.
     test_isa("A= :@{n=B?; v=int}", TypeFunPtr.GENERIC_FUNPTR);
     test_isa("A= :@{n=B?; v=int}; a = A(0,2)", TypeMemPtr.OOP);
@@ -341,27 +342,19 @@ public class TestParse {
     TypeEnv te4 = Exec.go(Env.top(),"args",ll_def+ll_con+ll_map+ll_fun+ll_apl);
     if( te4._errs != null ) System.err.println(te4._errs.toString());
     Assert.assertNull(te4._errs);
-    TypeMemPtr tmp4 = (TypeMemPtr)te4._t;
-    //TypeObj tobj4 = tmp4._obj;
-    //TypeName tname4 = (TypeName)tobj4;
-    //assertEquals("List", tname4._name);
-    //TypeStruct tt4 = (TypeStruct)tname4._t;
-    //TypeMemPtr tmp5 = (TypeMemPtr)tt4.at(0);
-    //TypeName tname5 = (TypeName)tmp5._obj;
-    //assertEquals(2.3*2.3,tt4.at(1).getd(),1e-6);
-    //assertEquals("next",tt4._flds[0]);
-    //assertEquals("val",tt4._flds[1]);
-    //
-    //assertEquals("List", tname5._name);
-    //TypeStruct tt5 = (TypeStruct)tname5._t;
-    //assertEquals(1.2*1.2,tt5.at(1).getd(),1e-6);
-    //assertEquals(Type.NIL,tt5.at(0));
-    //
-    //// Test inferring a recursive struct type, with a little help
-    //Type[] ts0 = TypeStruct.ts(Type.NIL,TypeFlt.con(1.2*1.2));
-    //test_ptr("map={x:@{n;v=flt}? -> x ? @{n=map(x.n);v=x.v*x.v} : 0}; map(@{n=0;v=1.2})",
-    //         (alias) -> TypeMemPtr.make(alias,TypeStruct.make(FLDS,ts0,TypeStruct.finals(2))));
-    //
+    TypeName tname4 = (TypeName)te4._tobj;
+    assertEquals("List", tname4._name);
+    TypeStruct tt4 = (TypeStruct)tname4._t;
+    TypeMemPtr tmp5 = (TypeMemPtr)tt4.at(0);
+    assertEquals(2.3*2.3,tt4.at(1).getd(),1e-6);
+    assertEquals("next",tt4._flds[0]);
+    assertEquals("val",tt4._flds[1]);
+
+    // Test inferring a recursive struct type, with a little help
+    Type[] ts0 = TypeStruct.ts(Type.NIL,TypeFlt.con(1.2*1.2));
+    test_obj("map={x:@{n;v=flt}? -> x ? @{n=map(x.n);v=x.v*x.v} : 0}; map(@{n=0;v=1.2})",
+             TypeStruct.make(FLDS,ts0,TypeStruct.finals(2)));
+    
     //// Test inferring a recursive struct type, with less help.  This one
     //// inlines so doesn't actually test inferring a recursive type.
     //Type[] ts1 = TypeStruct.ts(Type.NIL,TypeFlt.con(1.2*1.2));
@@ -382,12 +375,11 @@ public class TestParse {
     //test_ptr_isa("map={x -> x ? (map(x.0),x.1*x.1) : 0};"+
     //             "map((math_rand(1)?0: (math_rand(1)?0: (math_rand(1)?0: (0,1.2), 2.3), 3.4), 4.5))",
     //             (alias) -> TypeMemPtr.make(alias,TypeStruct.make(TypeMemPtr.STRUCT0,TypeFlt.con(20.25))));
-    //
-    //// TODO: Need real TypeVars for these
-    ////test("id:{A->A}"    , Env.lookup_valtype("id"));
-    ////test("id:{A:int->A}", Env.lookup_valtype("id"));
-    ////test("id:{int->int}", Env.lookup_valtype("id"));
-    throw AA.unimpl();
+    
+    // TODO: Need real TypeVars for these
+    //test("id:{A->A}"    , Env.lookup_valtype("id"));
+    //test("id:{A:int->A}", Env.lookup_valtype("id"));
+    //test("id:{int->int}", Env.lookup_valtype("id"));
   }
 
 

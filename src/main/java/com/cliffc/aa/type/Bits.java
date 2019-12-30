@@ -391,7 +391,8 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
 
     int parent( int kid ) { return _pars[kid]; }
     public boolean is_parent( int idx ) { return idx<_kids.length && _kids[idx]!=null &&_kids[idx][0]>1; }
-    public int get_kid( int par ) { assert _kids[par][0]==3 && _kids[par][1]+1==_kids[par][2]; return _kids[par][1]; }
+    // Return two kids at slots ary[1] and ary[2].
+    public int[] get_kids( int par ) { assert _kids[par][0]==3; return _kids[par]; }
     // True if kid is a child or equal to parent
     boolean is_parent( int par, int kid ) {
       for( ; par <= kid; kid = parent(kid) )

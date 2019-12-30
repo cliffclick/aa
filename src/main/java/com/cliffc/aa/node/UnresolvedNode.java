@@ -20,8 +20,9 @@ public class UnresolvedNode extends Node {
     return "Unr???";
   }
   @Override public Node ideal(GVNGCM gvn) {
-    if( _defs._len < 2 )
+    if( _defs._len < 2 )               // One function, consumer should treat as a copy
       throw com.cliffc.aa.AA.unimpl(); // Should collapse
+    // Back-to-back Unresolved collapse (happens due to inlining)
     boolean progress=false;
     for( int i=0; i<_defs._len; i++ ) {
       if( in(i) instanceof UnresolvedNode ) {
@@ -35,18 +36,11 @@ public class UnresolvedNode extends Node {
     return progress ? this : null;
   }
   @Override public Type value(GVNGCM gvn) {
-    if( gvn._opt_mode != 2 ) {
-      Type t = TypeFunPtr.GENERIC_FUNPTR.dual();
-      for( Node def : _defs )
-        t = t.meet(gvn.type(def));
-      return t;
-    } else {
-      // During GCP, Unresolved is a *choice* and thus a *join* until resolved.
-      Type t = TypeFunPtr.GENERIC_FUNPTR;
-      for( Node def : _defs )
-        t = t.join(gvn.type(def));
-      return t;
-    }
+    // Unresolved is a *choice* and thus a *join* until resolved.
+    Type t = TypeFunPtr.GENERIC_FUNPTR;
+    for( Node def : _defs )
+      t = t.join(gvn.type(def));
+    return t;
   }
   // Filter out all the wrong-arg-count functions
   public Node filter( GVNGCM gvn, int nargs ) {

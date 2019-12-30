@@ -189,7 +189,7 @@ public final class CallEpiNode extends Node {
     // gives us a faster lookup, but need to be correct wired or not.
     Bits.Tree<BitsFun> tree = fidxs.tree();
     BitSet bs = tree.plus_kids(fidxs);
-    boolean lifting = fidxs.above_center();
+    boolean lifting = gvn._opt_mode==2;
     Type t = lifting ? TypeTuple.CALL : TypeTuple.XCALL;
     for( int fidx = bs.nextSetBit(0); fidx >= 0; fidx = bs.nextSetBit(fidx+1) ) {
       if( tree.is_parent(fidx) ) continue;   // Will be covered by children
