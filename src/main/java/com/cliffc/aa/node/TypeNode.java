@@ -34,7 +34,7 @@ public class TypeNode extends Node {
       int bit_t     = (nil_t ? b_t.strip_nil() : b_t).getbit();
       TypeObj t_t   = BitsAlias.type_for_alias2(bit_t);
 
-      if( targ != null && (!nil_arg || !nil_t) && targ.isa(t_t) )
+      if( targ != null && (!nil_arg || nil_t) && targ.isa(t_t) )
         return true;             // Typecheck passes, remove
     }
     return false;
