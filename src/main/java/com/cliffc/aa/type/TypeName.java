@@ -43,7 +43,7 @@ public class TypeName extends TypeObj<TypeName> {
   }
   private static short depth( Type t ) { return(short)(t instanceof TypeName ? ((TypeName)t)._depth+1 : 0); }
   int pdepth() { return Math.max(0,_depth); }
-  @Override int compute_hash() { assert _lex != -99; return super.compute_hash() + _name.hashCode() + _lex + _t._hash; }
+  @Override int compute_hash() { assert _lex != -99 && _t._hash != 0; return super.compute_hash() + _name.hashCode() + _lex + _t._hash; }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeName) ) return false;
@@ -71,12 +71,14 @@ public class TypeName extends TypeObj<TypeName> {
     TypeName tn = malloc(name,t,depth(t));
     return tn.hashcons(BitsAlias.type_alias(BitsAlias.REC,tn));
   }
- 
+  // Make a duplicate with the new alias
+  public TypeName make(int alias) {
+    return make(_name,alias,_t);
+  }
+
   public static TypeName make_forward_def_type( String name ) {
-    //return make0(name,BitsAlias.new_alias(BitsAlias.REC),TypeStruct.ALLSTRUCT,(short)-1);
-    // Make anon type alias for this Name.
-    // Record the mapping.
-    throw AA.unimpl();
+    TypeName tn = malloc(name,TypeStruct.ALLSTRUCT,(short)-1);
+    return tn.hashcons(BitsAlias.type_alias(BitsAlias.REC,tn));
   }
   public TypeName make( Type t) { return malloc(_name,t,_depth).hashcons(_lex); }
 
@@ -167,8 +169,11 @@ public class TypeName extends TypeObj<TypeName> {
     untern()._dual.untern();
     // Hack type and it's dual.  Type is now recursive.
     _t = t;
+    _depth = _dual._depth = depth(t);
     _dual._t = t._dual;
-    _depth = depth(t);
+    _hash  = _dual._hash  = 0;  // Trigger any asserts
+    _hash = compute_hash();
+    _dual._hash = _dual.compute_hash();
     // Back into the INTERN table
     retern()._dual.retern();
 
@@ -224,5 +229,4 @@ public class TypeName extends TypeObj<TypeName> {
   //@SuppressWarnings("unchecked")
   //@Override void walk( Predicate<Type> p ) { if( p.test(this) ) _t.walk(p); }
   //@Override TypeStruct repeats_in_cycles(TypeStruct head, VBitSet bs) { return _cyclic ? _t.repeats_in_cycles(head,bs) : null; }
-  @Override TypeObj make_base(TypeStruct obj) { return make(((TypeObj)_t).make_base(obj)); }
 }

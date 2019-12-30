@@ -245,7 +245,7 @@ public class TestNode {
     NewObjNode nnn2 = new NewObjNode(false,_ins[0]);
     set_type(1,Type.SCALAR);  nnn2.create("x",_ins[1],TypeStruct.ffinal(),_gvn);
     set_type(2,Type.SCALAR);  nnn2.create("y",_ins[2],TypeStruct.ffinal(),_gvn);
-    nnn2.set_name(_gvn,TypeName.TEST_STRUCT);
+    nnn2.set_name(TypeName.TEST_STRUCT);
     test1monotonic(nnn2);
     ((ConNode<Type>)_ins[1])._t = Type.SCALAR; // ParmNode reads this for _alltype
     test1monotonic(new   ParmNode( 1, "x",_ins[0],(ConNode)_ins[1],null).add_def(_ins[2]));

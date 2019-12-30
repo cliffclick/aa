@@ -1089,5 +1089,4 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     for( int i=0; i<bs.length; i++ ) bs[i] = ftop(); // top of lattice
     return malloc(true,as,ts,bs).hashcons_free();
   }
-  @Override TypeStruct make_base(TypeStruct obj) { return obj; }
 }

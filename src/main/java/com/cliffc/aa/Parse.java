@@ -4,6 +4,7 @@ import com.cliffc.aa.node.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
+import com.cliffc.aa.util.Util;
 import com.cliffc.aa.util.VBitSet;
 import org.jetbrains.annotations.NotNull;
 
@@ -973,7 +974,8 @@ public class Parse {
     int oldx = _x;
     String tok = token();
     if( tok==null ) return null;
-    if( tok.equals("->") ) return Type.ANY; // Found -> return sentinel
+    tok = tok.intern();
+    if( Util.eq(tok,"->") ) return Type.ANY; // Found -> return sentinel
     Type t = _e.lookup_type(tok);
     if( t==null ) {              // Not a known type var
       if( lookup(tok) != null || // Yes a known normal var; resolve as a normal var

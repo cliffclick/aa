@@ -81,5 +81,4 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
   //@Override Type make_recur(TypeName tn, int d, VBitSet bs ) { return this; }
   // Dual, except keep TypeMem.XOBJ as high for starting GVNGCM.opto() state.
   @Override public TypeObj startype() { assert _type==TOBJ; return XOBJ; }
-  TypeObj make_base(TypeStruct obj) { throw com.cliffc.aa.AA.unimpl(); } // Only valid for TypeName,TypeStruct
 }

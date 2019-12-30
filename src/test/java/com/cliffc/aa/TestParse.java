@@ -288,38 +288,34 @@ public class TestParse {
   }
 
   @Test public void testParse06() {
-    test_ptr("A= :(A?, int); A(0,2)","A:(nil,2)");
-    test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*[$],3)");
+    test_ptr("A= :(A?, int); A(0,2)","A:(nil;2)");
+    test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*[$]A:(*[$]?;int64);3)");
 
     // Building recursive types
-    test_isa("A= :int; A(1)", (lex -> TypeName.make("A",lex,TypeInt.INT64)));
-    test_ptr("A= :(str?, int); A(0,2)","A:(nil,2)");
+    test_name("A= :int; A(1)", (lex -> TypeName.make("A",lex,TypeInt.TRUE)));
+    test_ptr("A= :(str?, int); A(0,2)","A:(nil;2)");
     // Named recursive types
     test_isa("A= :(A?, int); A(0,2)",Type.SCALAR);// No error casting (0,2) to an A
     test    ("A= :@{n=A?; v=flt}; A(@{n=0;v=1.2}).v;", TypeFlt.con(1.2));
 
     // TODO: Needs a way to easily test simple recursive types
-    TypeEnv te3 = Exec.go(Env.top(),"args","A= :@{n=A?; v=int}");
+    TypeEnv te3 = Exec.go(Env.top(),"args","A= :@{n=A?; v=int}; A(@{n=0;v=3})");
     if( te3._errs != null ) System.err.println(te3._errs.toString());
     Assert.assertNull(te3._errs);
-    TypeFunPtr tfp = (TypeFunPtr)te3._t;
-    TypeMemPtr ptr = (TypeMemPtr)tfp._ret;
-    //TypeName tname3 = (TypeName)ptr._obj;
-    //assertEquals("A", tname3._name);
-    //TypeStruct tt3 = (TypeStruct)tname3._t;
-    //TypeMemPtr tnil3 = (TypeMemPtr)tt3.at(0);
-    //assertSame(tnil3._obj , tname3);
-    //assertSame(tt3.at(1), TypeInt.INT64);
-    //assertEquals("n",tt3._flds[0]);
-    //assertEquals("v",tt3._flds[1]);
-    //
-    //// Missing type B is also never worked on.
-    //test_isa("A= :@{n=B?; v=int}", TypeFunPtr.GENERIC_FUNPTR);
-    //test_isa("A= :@{n=B?; v=int}; a = A(0,2)", TypeMemPtr.OOP);
-    //test_isa("A= :@{n=B?; v=int}; a = A(0,2); a.n", Type.NIL);
-    //// Mutually recursive type
-    //test_isa("A= :@{n=B; v=int}; B= :@{n=A; v=flt}", TypeFunPtr.GENERIC_FUNPTR);
-    throw AA.unimpl();
+    TypeName tname3 = (TypeName)te3._tobj;
+    assertEquals("A", tname3._name);
+    TypeStruct tt3 = (TypeStruct)tname3._t;
+    assertEquals(Type.NIL      ,tt3.at(0));
+    assertEquals(TypeInt.con(3),tt3.at(1));
+    assertEquals("n",tt3._flds[0]);
+    assertEquals("v",tt3._flds[1]);
+    
+    // Missing type B is also never worked on.
+    test_isa("A= :@{n=B?; v=int}", TypeFunPtr.GENERIC_FUNPTR);
+    test_isa("A= :@{n=B?; v=int}; a = A(0,2)", TypeMemPtr.OOP);
+    test_isa("A= :@{n=B?; v=int}; a = A(0,2); a.n", Type.NIL);
+    // Mutually recursive type
+    test_isa("A= :@{n=B; v=int}; B= :@{n=A; v=flt}", TypeFunPtr.GENERIC_FUNPTR);
   }
 
   @Test public void testParse07() {
@@ -749,9 +745,11 @@ strs:List(str?) = ... // List of null-or-strings
       assertTrue(te._t.isa(expected));
     }
   }
-  static private void test_isa( String program, Function<Integer,Type> expected ) {
+  static private void test_name( String program, Function<Integer,Type> expected ) {
     try( TypeEnv te = run(program) ) {
-      Type t_expected = expected.apply(-99); // unimpl
+      assertTrue(te._t instanceof TypeName);
+      int alias = ((TypeName)te._t)._lex;
+      Type t_expected = expected.apply(alias);
       assertTrue(te._t.isa(t_expected));
     }
   }

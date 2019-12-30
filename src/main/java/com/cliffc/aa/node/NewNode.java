@@ -34,18 +34,13 @@ public abstract class NewNode<T extends TypeObj> extends Node {
   public TypeObj xs() { return _name == null ? _ts : _name; }
 
   // Called when folding a Named Constructor into this allocation site
-  void set_name( GVNGCM gvn, TypeName name ) {
+  @SuppressWarnings("unchecked")
+  void set_name( TypeName name ) {
     assert !name.above_center();
-    // Name is a wrapper over _ts, except for alias because Name is probably a generic type.
-    TypeName n2 = name.make(xs());
-    assert n2._t == xs();       // wrapping exactly once
-    if( gvn.touched(this) ) {
-      gvn.unreg(this);
-      _name = n2;
-      gvn.rereg(this,value(gvn));
-    } else {
-      _name = n2;
-    }
+    // Name is a wrapper over _ts, except for alias because Name is probably a
+    // generic type.
+    _name = name.make(_alias);
+    _ts = (T)_name._t;
   }
 
   @Override public Node ideal(GVNGCM gvn) {
@@ -89,6 +84,7 @@ public abstract class NewNode<T extends TypeObj> extends Node {
         if( ((StoreNode)use).val()==ptr ) return false; // Pointer stored; escapes
       } else if( use instanceof  LoadNode ||            // Load, direct use, treat as escape
                  use instanceof  CallNode ||            // Call arg
+               use instanceof CallEpiNode ||            // CallEpi result during collapse
                  use instanceof   NewNode ||            // Same as a store escape, can be loaded from closure
                  use instanceof ScopeNode ||            // Returned form top-level scope to REPL
                  use instanceof   PhiNode ||            // TODO: scan past phi

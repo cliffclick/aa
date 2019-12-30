@@ -1,8 +1,8 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.*;
+import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.Util;
 
 // Store a value into a named struct field.  Does it's own nil-check and value
 // testing; also checks final field updates.
@@ -38,9 +38,9 @@ public class StoreNode extends Node {
       return new StoreNode(this,((MemMergeNode)mem).obj((TypeMemPtr)ta,gvn),adr);
 
     // Stores bypass stores to unrelated fields
-    if( mem instanceof StoreNode && !Util.eq(_fld,((StoreNode)mem)._fld) )
-      return set_def(1,((StoreNode)mem).mem(),gvn);
-    
+    //if( mem instanceof StoreNode && !Util.eq(_fld,((StoreNode)mem)._fld) )
+    //  return set_def(1,((StoreNode)mem).mem(),gvn);
+
     // If Store is by a New, fold into the New.
     NewObjNode nnn;  int idx;
     if( mem instanceof OProjNode && mem.in(0) instanceof NewObjNode && (nnn=(NewObjNode)mem.in(0)) == adr.in(0) &&

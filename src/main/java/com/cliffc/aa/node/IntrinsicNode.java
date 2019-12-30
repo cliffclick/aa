@@ -65,7 +65,7 @@ public class IntrinsicNode extends Node {
         // correct type?  Fold into the NewObjNode and remove this Convert.
         TypeTuple tnnn = (TypeTuple)gvn.type(nnn);
         if( tnnn.at(0).isa(_tn._t) ) {
-          nnn.set_name(gvn,_tn);
+          nnn.set_name(_tn);
           gvn.add_work(nnn);
           return opj;
         }
@@ -116,17 +116,16 @@ public class IntrinsicNode extends Node {
   // Default name constructor using expanded args list.  Just a NewObjNode but the
   // result is a named type.  Same as convertTypeName on an unaliased NewObjNode.
   public static FunPtrNode convertTypeNameStruct( TypeName to, GVNGCM gvn ) {
+    NewObjNode nnn = new NewObjNode(false,to._lex,null);
+    nnn.set_name(to);
     TypeStruct from = (TypeStruct)to._t;
-    NewObjNode nnn = new NewObjNode(false,null);
     TypeMemPtr tmp = TypeMemPtr.make(nnn._alias);
     TypeFunPtr tf = TypeFunPtr.make_new(from,tmp);
     FunNode fun = (FunNode) gvn.xform(new FunNode(to._name,tf).add_def(Env.ALL_CTRL));
-    nnn.set_def(0,fun,gvn);     // Set control to function start
     Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
     Node memp= gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM     ),null));
     // Add input edges to the NewNode
-    nnn._ts = from;             // Bulk set fields and types
-    nnn._name = to;             // Bulk set fields and types
+    nnn.set_def(0,fun,gvn);     // Set control to function start
     for( int i=0; i<from._ts.length; i++ ) {
       String argx = from._flds[i];
       if( TypeStruct.fldBot(argx) ) argx = null;

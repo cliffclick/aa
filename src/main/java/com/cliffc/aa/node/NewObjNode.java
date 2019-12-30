@@ -16,29 +16,15 @@ public class NewObjNode extends NewNode<TypeStruct> {
   boolean _is_closure;        // For error messages
   // NewNodes do not really need a ctrl; useful to bind the upward motion of
   // closures so variable stores can more easily fold into them.
-  public NewObjNode( boolean is_closure, Node ctrl ) {
-    super(OP_NEWOBJ,BitsAlias.REC,TypeStruct.ALLSTRUCT,ctrl);
+  public NewObjNode( boolean is_closure, Node ctrl ) { this(is_closure,BitsAlias.REC,ctrl); }
+  public NewObjNode( boolean is_closure, int par_alias, Node ctrl ) {
+    super(OP_NEWOBJ,par_alias,TypeStruct.ALLSTRUCT,ctrl);
     _is_closure = is_closure;
   }
   public Node get(String name) { return fld(_ts.find(name)); }
   public boolean exists(String name) { return _ts.find(name)!=-1; }
   public boolean is_mutable(String name) { return _ts._finals[_ts.find(name)] == TypeStruct.frw(); }
   public boolean is_final(int idx) { return _ts._finals[idx] == TypeStruct.ffinal(); }
-
-  // Called when folding a Named Constructor into this allocation site
-  void set_name( GVNGCM gvn, TypeName name ) {
-    assert !name.above_center();
-    // Name is a wrapper over _ts, except for alias because Name is probably a generic type.
-    TypeName n2 = name.make(xs());
-    assert n2._t == xs();       // wrapping exactly once
-    if( gvn.touched(this) ) {
-      gvn.unreg(this);
-      _name = n2;
-      gvn.rereg(this,value(gvn));
-    } else {
-      _name = n2;
-    }
-  }
 
   // Create a field from parser for an inactive this
   public void create( String name, Node val, byte mutable, GVNGCM gvn  ) {

@@ -1,15 +1,12 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.util.NonBlockingHashMapLong;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
-import com.cliffc.aa.util.NonBlockingHashMapLong;
 
 import java.util.Arrays;
-import java.util.BitSet;
 import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Consumer;
-import java.util.function.Predicate;
 
 /** an implementation of language AA
  */
@@ -103,7 +100,7 @@ public class Type<T extends Type<T>> implements Cloneable {
   @Override public final int hashCode( ) { return _hash; }
   // Compute the hash and return it, with all child types already having their
   // hash computed.  Subclasses override this.
-  int compute_hash() { assert is_simple(); return _type; }
+  int compute_hash() { assert is_simple(); return (_type<<1)|1; }
 
   // Is anything equals to this?
   @Override public boolean equals( Object o ) {
