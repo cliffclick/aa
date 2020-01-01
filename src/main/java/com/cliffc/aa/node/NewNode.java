@@ -36,15 +36,7 @@ public abstract class NewNode<T extends TypeObj> extends Node {
   Node fld(int fld) { return in(def_idx(fld)); } // Node for field#
   
   // Called when folding a Named Constructor into this allocation site
-  @SuppressWarnings("unchecked")
-  void set_name( String name ) {
-    //assert !name.above_center();
-    //// Name is a wrapper over _ts, except for alias because Name is probably a
-    //// generic type.
-    //_name = name.make(_alias);
-    //_ts = (T)_name._t;
-    throw AA.unimpl();
-  }
+  void set_name( T name ) { assert !name.above_center();  _ts = name; }
 
   @Override public Node ideal(GVNGCM gvn) {
     // If the address is not looked at then memory contents cannot be looked at

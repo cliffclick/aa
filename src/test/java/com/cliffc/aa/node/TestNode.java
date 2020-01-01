@@ -202,7 +202,7 @@ public class TestNode {
     FunNode fun_plus = ((FunPtrNode)unr.in(1)).fun();
     RetNode ret = fun_plus.ret();
     CallNode call = new CallNode(false,null,unr);
-    TypeObj tname2 = null; // TODO AA.unimpl()
+    TypeStruct tname2 = null; // TODO AA.unimpl()
 
     // Testing 1 set of types into a value call.
     // Comment out when not debugging.
@@ -244,7 +244,7 @@ public class TestNode {
     NewObjNode nnn2 = new NewObjNode(false,_ins[0]);
     set_type(1,Type.SCALAR);  nnn2.create("x",_ins[1],TypeStruct.ffinal(),_gvn);
     set_type(2,Type.SCALAR);  nnn2.create("y",_ins[2],TypeStruct.ffinal(),_gvn);
-    nnn2.set_name("__test_struct");
+    nnn2.set_name(tname2);
     test1monotonic(nnn2);
     ((ConNode<Type>)_ins[1])._t = Type.SCALAR; // ParmNode reads this for _alltype
     test1monotonic(new   ParmNode( 1, "x",_ins[0],(ConNode)_ins[1],null).add_def(_ins[2]));

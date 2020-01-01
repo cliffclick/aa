@@ -149,6 +149,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     SB sb = new SB();
     //if( _uf!=null ) return "=>"+_uf; // Only used mid-recursion
     if( _any ) sb.p('~');
+    sb.p(_name);
     boolean is_tup = _flds.length==0 || fldTop(_flds[0]) || fldBot(_flds[0]) || isDigit(_flds[0].charAt(0));
     sb.p(is_tup ? "(" : "@{");
     for( int i=0; i<_flds.length; i++ ) {
@@ -173,6 +174,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
 
     //if( _uf!=null ) return _uf.dstr(sb.p("=>"),dups);
     if( _any ) sb.p('~');
+    sb.p(_name);
     boolean is_tup = _flds.length==0 || fldTop(_flds[0]) || fldBot(_flds[0]) || isDigit(_flds[0].charAt(0));
     if( !is_tup ) sb.p('@');    // Not a tuple
     sb.p(is_tup ? '(' : '{').nl().ii(1); // open struct, newline, increase_indent
@@ -231,6 +233,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public  static TypeStruct make(Type t0, Type t1) { return make(ts(t0,t1)); }
   public  static TypeStruct make(String[] flds, Type[] ts) { return malloc("",false,flds,ts,fbots(ts.length)).hashcons_free(); }
   public  static TypeStruct make(String[] flds, Type[] ts, byte[] finals) { return malloc("",false,flds,ts,finals).hashcons_free(); }
+  public  static TypeStruct make(String name, String[] flds, Type[] ts, byte[] finals) { return malloc(name,false,flds,ts,finals).hashcons_free(); }
 
   private static final String[][] TFLDS={{},
                                          {"0"},
@@ -398,7 +401,9 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       ts[i] = tmax._ts    [i];
       bs[i] = tmax._finals[i];
     }
-    return malloc(mtname(tmax),_any&tmax._any,as,ts,bs).hashcons_free();
+    // Ignore name in the non-recursive meet, it will be computed by the outer
+    // 'meet' call anyways.
+    return malloc("",_any&tmax._any,as,ts,bs).hashcons_free();
   }
 
   // Both structures are cyclic.  The meet will be "as if" both structures are
@@ -454,6 +459,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       mt._flds[i] = smeet(mt._flds[i],mx._flds[i]); // Set the Meet of field names
       mt._finals[i] = fmeet(mt._finals[i],mx._finals[i]);
     }
+    mt._name = lf.mtname(rt);
     mt._hash = mt.compute_hash(); // Compute hash now that fields and finals are set
 
     // Since the result is cyclic, we cannot test the cyclic parts for

@@ -3,6 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.Util;
 
 // Allocates a TypeStruct and produces a Tuple with the TypeStruct and a TypeMemPtr.
 //
@@ -16,9 +17,9 @@ public class NewObjNode extends NewNode<TypeStruct> {
   boolean _is_closure;        // For error messages
   // NewNodes do not really need a ctrl; useful to bind the upward motion of
   // closures so variable stores can more easily fold into them.
-  public NewObjNode( boolean is_closure, Node ctrl ) { this(is_closure,BitsAlias.REC,ctrl); }
-  public NewObjNode( boolean is_closure, int par_alias, Node ctrl ) {
-    super(OP_NEWOBJ,par_alias,TypeStruct.ALLSTRUCT,ctrl);
+  public NewObjNode( boolean is_closure, Node ctrl ) { this(is_closure,BitsAlias.REC,TypeStruct.ALLSTRUCT,ctrl); }
+  public NewObjNode( boolean is_closure, int par_alias, TypeStruct ts, Node ctrl ) {
+    super(OP_NEWOBJ,par_alias,ts,ctrl);
     _is_closure = is_closure;
   }
   public Node get(String name) { return fld(_ts.find(name)); }
@@ -103,14 +104,14 @@ public class NewObjNode extends NewNode<TypeStruct> {
     for( int i=0; i<ts.length; i++ )
       // Limit type bounds, since error returns can be out-of-bounds
       ts[i] = gvn.type(fld(i)).bound(_ts.at(i));
-    TypeStruct newt = TypeStruct.make(_ts._flds,ts,_ts._finals);
+    TypeStruct newt = TypeStruct.make(_ts._name,_ts._flds,ts,_ts._finals);
 
     // Check for TypeStructs with this same NewNode types occurring more than
     // CUTOFF deep, and fold the deepest ones onto themselves to limit the type
     // depth.  If this happens, the types become recursive with the
     // approximations happening at the deepest points.
-    //TypeStruct res = newt.approx(CUTOFF);
-    TypeStruct xs = newt;
+    TypeStruct xs = newt.approx(CUTOFF,_alias);
+    assert Util.eq(xs._name,_ts._name);
     return TypeTuple.make(xs,TypeMemPtr.make(_alias,xs));
   }
 }

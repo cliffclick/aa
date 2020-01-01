@@ -240,7 +240,7 @@ public class Parse {
     Type ot = _e.lookup_type(tvar);
     Type tn;
     if( ot == null ) {        // Name does not pre-exist
-      tn = t.set_name(tvar+":");  // Add a name
+      tn = t.set_name((tvar+":").intern());  // Add a name
       _e.add_type(tvar,tn);   // Assign type-name
     } else {
       tn = ot.has_name() ? ot.merge_recursive_type(t) : null;
@@ -256,6 +256,9 @@ public class Parse {
       PrimNode cvt = PrimNode.convertTypeName(t,tn,bad);
       rez = _e.add_fun(bad,tvar,gvn(cvt.as_fun(_gvn))); // Return type-name constructor
     } else {
+      // Get the prefix type name; it must exist (and has an alias# already).
+      if( t.has_name() ) throw AA.unimpl();
+
       // If this is a TypeObj, build a constructor taking a pointer-to-TypeObj
       // - and the associated memory state, i.e.  takes a ptr-to-@{x,y} and
       // returns a ptr-to-Named:@{x,y}.  This stores a v-table ptr into an
@@ -265,7 +268,7 @@ public class Parse {
       rez = _e.add_fun(bad,tvar,epi1); // Return type-name constructor
       // For Structs, add a second constructor taking an expanded arg list
       if( t instanceof TypeStruct ) {   // Add struct types with expanded arg lists
-        FunPtrNode epi2 = IntrinsicNode.convertTypeNameStruct(tn, _gvn);
+        FunPtrNode epi2 = IntrinsicNode.convertTypeNameStruct((TypeStruct)tn, BitsAlias.REC, _gvn);
         Node rez2 = _e.add_fun(bad,tvar,epi2); // type-name constructor with expanded arg list
         _gvn.init0(rez2._uses.at(0));      // Force init of Unresolved
       }

@@ -492,7 +492,7 @@ public class Type<T extends Type<T>> implements Cloneable {
       if( c==':' ) x=i;
     }
     // If s0 is a prefix of s1, and s0 is high then it can cover s1.
-    if( i==s0.length() && above_center() )
+    if( i==s0.length() && t0.above_center() )
       return s1;
     // Keep the common prefix, which might be all of s0
     String s2 = i==s0.length() ? s0 : s0.substring(0, x).intern();
