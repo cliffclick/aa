@@ -11,9 +11,9 @@ import org.jetbrains.annotations.NotNull;
 // vtable like field, i.e. memory updates.
 // Names an unaliased memory.  Needs to collapse away, or else an error.
 public class IntrinsicNode extends Node {
-  public final Type _tn;        // Named type
+  public final TypeObj _tn;     // Named type
   Parse _badargs;               // Filled in when inlined in CallNode
-  IntrinsicNode( Type tn, Parse badargs, Node... ns ) {
+  IntrinsicNode( TypeObj tn, Parse badargs, Node... ns ) {
     super(OP_NAME,ns);
     _tn=tn;
     _badargs=badargs;
@@ -28,7 +28,7 @@ public class IntrinsicNode extends Node {
   // vtable name type in memory.  Unaliased, so the same memory cannot be
   // referred to without the Name.  Error if the memory cannot be proven
   // unaliased.  The Ideal call collapses the Name into the unaliased NewNode.
-  public static FunPtrNode convertTypeName( Type tn, Parse badargs, GVNGCM gvn ) {
+  public static FunPtrNode convertTypeName( TypeObj tn, Parse badargs, GVNGCM gvn ) {
     // The incoming memory type is *exact* and does not have any extra fields.
     // The usual duck typing is "this-or-below", which allows and ignores extra
     // fields.  For Naming - which involves installing a v-table (or any other
@@ -43,10 +43,9 @@ public class IntrinsicNode extends Node {
     Node mem = gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM      ),null));
     Node ptr = gvn.xform(new ParmNode( 0,"ptr",fun,gvn.con(TypeMemPtr.STRUCT),null));
     Node cvt = gvn.xform(new IntrinsicNode(tn,badargs,fun,mem,ptr));
-    //Node mmem= gvn.xform(new MemMergeNode(mem,cvt,tn._lex));
-    //RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,ptr,rpc,fun));
-    //return (FunPtrNode)gvn.xform(new FunPtrNode(ret));
-    throw AA.unimpl();
+    Node mmem= gvn.xform(new MemMergeNode(mem,cvt,BitsAlias.REC));
+    RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,ptr,rpc,fun));
+    return (FunPtrNode)gvn.xform(new FunPtrNode(ret));
   }
 
   @Override public Type all_type() { return _tn; }
@@ -91,9 +90,10 @@ public class IntrinsicNode extends Node {
     // Get the Obj from the pointer.  We are renaming it in-place, basically
     // changing the vtable.  We need the l-value.
     TypeObj obj = ((TypeMem)mem).ld((TypeMemPtr)ptr);
-    //if( !obj.isa(_tn._t       ) ) return _tn       ; // Inputs not correct from, and node is in-error
-    //if(  obj.isa(_tn._t.dual()) ) return _tn.dual();
-    //// Obj needs to share a common name hierarchy (same Name-depth) as 'from'
+    TypeObj tn = (TypeObj)_tn.remove_name();
+    if( !obj.isa(tn       ) ) return _tn       ; // Inputs not correct from, and node is in-error
+    if(  obj.isa(tn.dual()) ) return _tn.dual();
+    // Obj needs to share a common name hierarchy (same Name-depth) as 'from'
     //int fd = _tn._depth;
     //int od = obj instanceof TypeName ? ((TypeName)obj)._depth : -1;
     //if( fd-1 != od ) return obj.above_center() ? _tn.dual() : _tn; // Name-depth does not match, node is in-error

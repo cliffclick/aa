@@ -240,7 +240,7 @@ public class Parse {
     Type ot = _e.lookup_type(tvar);
     Type tn;
     if( ot == null ) {        // Name does not pre-exist
-      tn = t.set_name(tvar);  // Add a name
+      tn = t.set_name(tvar+":");  // Add a name
       _e.add_type(tvar,tn);   // Assign type-name
     } else {
       tn = ot.has_name() ? ot.merge_recursive_type(t) : null;
@@ -261,7 +261,7 @@ public class Parse {
       // returns a ptr-to-Named:@{x,y}.  This stores a v-table ptr into an
       // object.  The alias# does not change, but a TypeMem[alias#] would now
       // map to the Named variant.
-      FunPtrNode epi1 = IntrinsicNode.convertTypeName(tn,bad,_gvn);
+      FunPtrNode epi1 = IntrinsicNode.convertTypeName((TypeObj)tn,bad,_gvn);
       rez = _e.add_fun(bad,tvar,epi1); // Return type-name constructor
       // For Structs, add a second constructor taking an expanded arg list
       if( t instanceof TypeStruct ) {   // Add struct types with expanded arg lists
@@ -510,7 +510,7 @@ public class Parse {
             // Set the store into active memory.  It might have collapsed into
             // the local closure already, so already be in the active memory.
             if( st instanceof StoreNode ) mem_active().st((StoreNode)st,_gvn);
-            else { assert st instanceof OProjNode; } 
+            else { assert st instanceof OProjNode; }
           }
         } else {
           n = gvn(new LoadNode(mem,castnn,fld,errMsg()));

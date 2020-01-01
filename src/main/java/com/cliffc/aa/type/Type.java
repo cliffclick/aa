@@ -470,7 +470,7 @@ public class Type<T extends Type<T>> implements Cloneable {
   public final T remove_name() { // TODO: remove 1 layer of names
     if( !has_name() ) return (T)this;
     Type t1 = clone();
-    t1._name = null;
+    t1._name = "";
     Type t2 = t1.hashcons();
     return (T)(t1==t2 ? t1 : t1.free(t2));
   }

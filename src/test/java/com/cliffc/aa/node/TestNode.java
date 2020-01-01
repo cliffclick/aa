@@ -202,7 +202,7 @@ public class TestNode {
     FunNode fun_plus = ((FunPtrNode)unr.in(1)).fun();
     RetNode ret = fun_plus.ret();
     CallNode call = new CallNode(false,null,unr);
-    Type tname2 = null; // TODO AA.unimpl()
+    TypeObj tname2 = null; // TODO AA.unimpl()
 
     // Testing 1 set of types into a value call.
     // Comment out when not debugging.
