@@ -155,7 +155,8 @@ public class Type<T extends Type<T>> implements Cloneable {
     // Not in type table
     _dual = null;                // No dual yet
     INTERN.put(this,this);       // Put in table without dual
-    T d = xdual();               // Compute dual without requiring table lookup
+    T d = xdual();               // Compute dual without requiring table lookup, and not setting name
+    d._name = _name;             // xdual does not set name either
     d._hash = d.compute_hash();  // Set dual hash
     _dual = d;
     if( this==d ) return d;      // Self-symmetric?  Dual is self
@@ -320,19 +321,36 @@ public class Type<T extends Type<T>> implements Cloneable {
   public final Type meet( Type t ) {
     // Short cut for the self case
     if( t == this ) return this;
+    // Short-cut for seeing this meet before
     Type mt = Key.get(this,t);
     if( mt != null ) return mt;
 
     // "Triangulate" the matrix and cut in half the number of cases.
     // Reverse; xmeet 2nd arg is never "is_simple" and never equal to "this".
+    // This meet ignores the _name field, and can return any-old name it wants.
     mt = !is_simple() && t.is_simple() ? t.xmeet(this) : xmeet(t);
+
+    // Meet the names.  Subclasses basically ignore the names as they have
+    // their own complicated meets to perform, so we meet them here for all.
+    String n = mtname(t);
+    // If the names are incompatible and the meet remained high then the
+    // mismatched names force a drop.
+    if( n.length() < _name.length() && n.length() < t._name.length() && mt.above_center() ) {
+      if( mt.interned() ) // recursive type creation?
+        mt = mt.dual();           // Force low
+    }
+    // Inject the name
+    if( !Util.eq(mt._name,n) )  // Fast path cutout
+      mt = mt.set_name(n);
 
     // Quick check on NIL: if either argument is NIL the result is allowed to
     // be NIL...  but nobody in the lattice can make a NIL from whole cloth, or
     // we get the crossing-nil bug.
     assert mt != NIL || this==NIL || t==NIL;
 
-    Key.put(this,t,mt);
+    // Record this meet, to short-cut next time
+    if( RECURSIVE_MEET == 0 )   // Only not mid-building recursive types;
+      Key.put(this,t,mt);
     return mt;
   }
 
@@ -413,25 +431,6 @@ public class Type<T extends Type<T>> implements Cloneable {
     throw typerr(t);
   }
 
-  // Make a named variant of any type, by just adding a name.
-  @SuppressWarnings("unchecked")
-  public final T make_name(String name) {
-    assert !has_name() && name.charAt(name.length()-1)==':';
-    Type t1 = clone();
-    t1._name = name;
-    Type t2 = t1.hashcons();
-    return (T)(t1==t2 ? t1 : t1.free(t2));
-  }
-  public boolean has_name() { return !_name.isEmpty(); }
-  @SuppressWarnings("unchecked")
-  public final T remove_name() {
-    if( !has_name() ) return (T)this;
-    Type t1 = clone();
-    t1._name = null;
-    Type t2 = t1.hashcons();
-    return (T)(t1==t2 ? t1 : t1.free(t2));
-  }
-
   // Named types are essentially a subclass of any type.
   // Examples:
   //   B:A:int << B:int << int   // Subtypes
@@ -456,11 +455,32 @@ public class Type<T extends Type<T>> implements Cloneable {
   //
   // B:A:~int.meet(B:D:~int) == B:int // Nothing in common, fall to int
 
+  private static boolean check_name( String n ) { return n.isEmpty() || n.charAt(n.length()-1)==':'; }
+    // Make a named variant of any type, by just adding a name.
+  @SuppressWarnings("unchecked")
+  public final T set_name(String name) {
+    assert check_name(name);
+    Type t1 = clone();
+    t1._name = name;
+    Type t2 = t1.hashcons();
+    return (T)(t1==t2 ? t1 : t1.free(t2));
+  }
+  public boolean has_name() { return !_name.isEmpty(); }
+  @SuppressWarnings("unchecked")
+  public final T remove_name() { // TODO: remove 1 layer of names
+    if( !has_name() ) return (T)this;
+    Type t1 = clone();
+    t1._name = null;
+    Type t2 = t1.hashcons();
+    return (T)(t1==t2 ? t1 : t1.free(t2));
+  }
+
   // TODO: will also need a unique lexical numbering, not just a name, to
   // handle the case of the same name used in two different scopes.
   final String mtname(Type t) {
     Type   t0 = this,  t1 = t;
     String s0 = t0._name, s1 = t1._name;
+    assert check_name(s0) && check_name(s1);
     if( Util.eq(s0,s1) ) return s0;
     // Sort by name length
     if( s0.length() > s1.length() ) { t1=this; t0=t; s0=t0._name; s1=t1._name; }
@@ -476,11 +496,10 @@ public class Type<T extends Type<T>> implements Cloneable {
       return s1;
     // Keep the common prefix, which might be all of s0
     String s2 = i==s0.length() ? s0 : s0.substring(0, x).intern();
-    if( i!=s0.length() && t0.above_center() && t1.above_center() )
-      throw com.cliffc.aa.AA.unimpl(); // Must force the resulting meet to be low.
+    assert check_name(s2);
     return s2;
   }
-  
+
   public static Type make_forward_def_type(String tok) {
     throw com.cliffc.aa.AA.unimpl();
   }
@@ -798,7 +817,8 @@ public class Type<T extends Type<T>> implements Cloneable {
     case TANY:
     case TXNUM:
     case TXREAL:
-    case TXSCALAR:  return NIL;
+    case TXSCALAR:
+    case TNIL:    return NIL;
     case TXNNUM:
     case TXNREAL:
     case TXNSCALR:  return TypeInt.BOOL;

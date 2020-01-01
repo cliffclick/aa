@@ -4,6 +4,7 @@ import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.Util;
 import com.cliffc.aa.util.VBitSet;
 
+import java.util.function.Predicate;
 import java.util.HashMap;
 
 // Strings.  Just an alternative TypeObj to TypeStruct - but basically really
@@ -108,7 +109,7 @@ public class TypeStr extends TypeObj<TypeStr> {
     return 99;
   }
   @Override public Type widen() { return STR; }
-  //@Override void walk( Predicate<Type> p ) { p.test(this); }
+  @Override void walk( Predicate<Type> p ) { p.test(this); }
   // Flip low to high
   @Override public TypeObj startype() { return above_center() ? this : dual(); }
 }

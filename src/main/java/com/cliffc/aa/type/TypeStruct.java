@@ -563,7 +563,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     RECURSIVE_MEET++;
     assert UF.isEmpty();
     assert OLD2APX.isEmpty();
-    TypeStruct apx = (TypeStruct)ax_impl( alias, cutoff, null, 0, this, this );
+    TypeStruct apx = ax_impl_struct( alias, true, cutoff, null, 0, this, this );
     // Remove any leftover internal duplication
     apx = shrink(apx.reachable(),apx);
     RECURSIVE_MEET--;
@@ -580,134 +580,111 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return rez;
   }
 
-  private static Type ax_impl( int alias, int cutoff, Ary<TypeStruct> cutoffs, int d, TypeStruct dold, Type old ) {
+  private static TypeStruct ax_impl_struct( int alias, boolean isnews, int cutoff, Ary<TypeStruct> cutoffs, int d, TypeStruct dold, TypeStruct old ) {
     assert old.interned();
-    Type nt = OLD2APX.get(old);
-//    if( nt != null ) return ufind(nt);
-//
-//    // Walk internal structure, meeting into the approximation
-//    switch( old._type ) {
-//    case TNAME  :
-//      TypeName   ont = (TypeName  )old, nnt = (TypeName   )ont.clone();
-//      nnt._t = Type.ANY;
-//      OLD2APX.put(ont,nnt);
-//      nnt._t = ax_impl(alias,cutoff,cutoffs,d,dold,ont._t  );
-//      return nnt;
-//
-//    case TMEMPTR:
-//      TypeMemPtr omp = (TypeMemPtr)old, nmp = (TypeMemPtr)omp.clone();
-//      nmp._obj = TypeObj.XOBJ;
-//      OLD2APX.put(omp,nmp);
-//      nmp._obj=(TypeObj)ax_impl(alias,cutoff,cutoffs,d,dold,omp._obj);
-//      if( d+1==cutoff ) OLD2APX.put(omp,null); // Do not keep sharing the "tails"
-//      return nmp;
-//
-//    case TSTRUCT:
-//      TypeStruct ots = (TypeStruct)old;
-//      boolean isnews = BitsAlias.make0(alias).isa(ots._news);
-//      if( isnews ) {            // Depth-increasing struct?
-//        if( d==cutoff ) {       // Cannot increase depth any more
-//          cutoffs.push(ots);    // Save cutoff point for later MEET
-//          return OLD2APX.get(dold); // Return last valid depth - forces cycle
-//        } else {
-//          assert cutoffs == null;
-//          cutoffs = d+1==cutoff ? new Ary<>(TypeStruct.class) : null;
-//        }
-//        d++;              // Increase depth
-//        dold = ots;       // And this is the last TypeStruct seen at this depth
-//      }
-//      TypeStruct nts = (TypeStruct)ots.clone();
-//      nts._flds   = ots._flds  .clone();
-//      nts._finals = ots._finals.clone();
-//      nts._ts     = TypeAry.clone(ots._ts);
-//      for( int i=0; i<ots._ts.length; i++ )
-//        nts._ts[i] = Type.ANY;
-//      OLD2APX.put(ots,nts);
-//      for( int i=0; i<ots._ts.length; i++ )
-//        nts._ts[i] = ax_impl(alias,cutoff,cutoffs,d,dold,ots._ts[i]);
-//      if( isnews && d==cutoff ) {
-//        while( !cutoffs.isEmpty() ) {
-//          Type mt = ax_meet(new BitSetSparse(), nts,cutoffs.pop());
-//          assert mt==nts;
-//        }
-//      }
-//      if( d==cutoff ) OLD2APX.put(ots,null); // Do not keep sharing the "tails"
-//      return nts;
-//    default:
-//      return old;
-//    }
-    throw com.cliffc.aa.AA.unimpl();
+    TypeStruct nt = OLD2APX.get(old);
+    if( nt != null ) return ufind(nt);
+    
+    if( isnews ) {            // Depth-increasing struct?
+      if( d==cutoff ) {       // Cannot increase depth any more
+        cutoffs.push(old);    // Save cutoff point for later MEET
+        return OLD2APX.get(dold); // Return last valid depth - forces cycle
+      } else {                    
+        assert cutoffs == null; // Approaching max depth, make a place to record cutoffs
+        if( d+1==cutoff ) cutoffs = new Ary<>(TypeStruct.class);
+      }
+      d++;              // Increase depth
+      dold = old;       // And this is the last TypeStruct seen at this depth
+    }
+    // Clone the old, to make the approximation into
+    TypeStruct nts = (TypeStruct)old.clone();
+    nts._flds   = old._flds  .clone();
+    nts._finals = old._finals.clone();
+    nts._ts     = TypeAry.clone(old._ts);
+    OLD2APX.put(old,nts);
+    for( int i=0; i<old._ts.length; i++ ) // Fill clone with approximation
+      if( old._ts[i]._type == TMEMPTR )
+        nts._ts[i] = ax_impl_ptr(alias,cutoff,cutoffs,d,dold,(TypeMemPtr)old._ts[i]);
+    if( isnews && d==cutoff ) {
+      while( !cutoffs.isEmpty() ) { // At depth limit, meet with cutoff to make the approximation
+        Type mt = ax_meet(new BitSetSparse(), nts,cutoffs.pop());
+        assert mt==nts;
+      }
+    }
+    if( d==cutoff ) OLD2APX.put(old,null); // Do not keep sharing the "tails"
+    return nts;
+  }
+  
+  private static Type ax_impl_ptr( int alias, int cutoff, Ary<TypeStruct> cutoffs, int d, TypeStruct dold, TypeMemPtr old ) {
+    assert old.interned();
+    TypeMemPtr nt = OLD2APX.get(old);
+    if( nt != null ) return ufind(nt);
+
+    // Walk internal structure, meeting into the approximation
+    TypeMemPtr nmp = (TypeMemPtr)old.clone();
+    OLD2APX.put(old,nmp);
+    if( old._obj instanceof TypeStruct )
+      nmp._obj = ax_impl_struct(alias,nmp._aliases.test(alias),cutoff,cutoffs,d,dold,(TypeStruct)old._obj);
+    if( d+1==cutoff ) OLD2APX.put(old,null); // Do not keep sharing the "tails"
+    return nmp;
+  }
+  
+  // Update-in-place 'meet' of pre-allocated new types.  Walk all the old type
+  // and meet into the corresponding new type.  Changes the internal edges of
+  // the new types, so their hash remains undefined.
+  private static Type ax_meet( BitSetSparse bs, Type nt, Type old ) {
+    assert old.interned();
+    if( nt.interned() ) return nt.meet(old);
+    assert nt._hash==0;         // Not definable yet
+    nt = ufind(nt);
+    if( nt == old ) return old;
+    if( bs.tset(nt._uid,old._uid) ) return nt; // Been there, done that
+
+    // TODO: Make a non-recursive "meet into".
+    // Meet old into nt
+    switch( nt._type ) {
+    case TSCALAR: break; // Nothing to meet
+    case TMEMPTR: {
+      TypeMemPtr nptr = (TypeMemPtr)nt;
+      if( old == Type.NIL ) { nptr._aliases = nptr._aliases.meet_nil();  break; }
+      if( old == Type.SCALAR )
+        return union(nt,old); // Result is a scalar, which changes the structure of the new types.
+      if( old == Type.XSCALAR ) break; // Result is the nt unchanged
+      if( !(old instanceof TypeMemPtr) ) throw AA.unimpl();
+      TypeMemPtr optr = (TypeMemPtr)old;
+      BitsAlias mt_alias = nptr._aliases = nptr._aliases.meet(optr._aliases);
+      nptr._obj = (TypeObj)ax_meet(bs,nptr._obj,optr._obj);
+      break;
+    }
+    case TSTRUCT:
+      if( !(old instanceof TypeStruct) ) throw AA.unimpl();
+      TypeStruct ots = (TypeStruct)old, nts = (TypeStruct)nt;
+      assert nts._uf==null;     // Already handled by the caller
+      // Compute a new target length.  Generally size is unchanged, but will
+      // change if mixing structs.
+      int len = ots.len(nts);     // New length
+      if( len != nts._ts.length ) { // Grow/shrink as needed
+        nts._flds  = Arrays.copyOf(nts._flds  , len);
+        nts._ts    = Arrays.copyOf(nts._ts    , len);
+        nts._finals= Arrays.copyOf(nts._finals, len);
+      }
+      int clen = Math.min(len,ots._ts.length);
+      // Meet all the non-recursive parts
+      nts._any &= ots._any;
+      for( int i=0; i<clen; i++ ) {
+        nts._flds  [i] = smeet(nts._flds[i],ots._flds[i]); // Set the Meet of field names
+        nts._finals[i] = fmeet(nts._finals[i],ots._finals[i]);
+      }
+      if( clen != len ) throw AA.unimpl();
+      // Now recursively do all fields
+      for( int i=0; i<clen; i++ )
+        nts._ts[i] = ax_meet(bs,nts._ts[i],ots._ts[i]);
+      break;
+    default: throw AA.unimpl();
+    }
+    return nt;
   }
 
-//  // Update-in-place 'meet' of pre-allocated new types.  Walk all the old type
-//  // and meet into the corresponding new type.  Changes the internal edges of
-//  // the new types, so their hash remains undefined.
-//  private static Type ax_meet( BitSetSparse bs, Type nt, Type old ) {
-//    assert old.interned();
-//    if( nt.interned() ) return nt.meet(old);
-//    assert nt._hash==0;         // Not definable yet
-//    nt = ufind(nt);
-//    if( nt == old ) return old;
-//    if( bs.tset(nt._uid,old._uid) ) return nt; // Been there, done that
-//
-//    // TODO: Make a non-recursive "meet into".
-//    // Meet old into nt
-//    switch( nt._type ) {
-//    case TSCALAR: break; // Nothing to meet
-//    case TNAME: {
-//      if( !(old instanceof TypeName) ) throw AA.unimpl();
-//      TypeName on = (TypeName)old, nn = (TypeName)nt;
-//      Type mt = ax_meet(bs,nn._t,on._t);
-//      if( on.pdepth() == nn.pdepth() && !on._name.equals(nn._name) )
-//        return union(nn,mt); // No equal name, result drops the name
-//      if( !(on._name.equals(nn._name) &&
-//            on._depth ==    nn._depth &&
-//            on._lex   ==    nn._lex) )
-//        throw AA.unimpl();
-//      nn._t = mt;
-//      break;
-//    }
-//    case TMEMPTR: {
-//      TypeMemPtr nptr = (TypeMemPtr)nt;
-//      if( old == Type.NIL ) { nptr._aliases = nptr._aliases.meet_nil();  break; }
-//      if( old == Type.SCALAR )
-//        return union(nt,old); // Result is a scalar, which changes the structure of the new types.
-//      if( old == Type.XSCALAR ) break; // Result is the nt unchanged
-//      if( !(old instanceof TypeMemPtr) ) throw AA.unimpl();
-//      TypeMemPtr optr = (TypeMemPtr)old;
-//      BitsAlias mt_alias = nptr._aliases = nptr._aliases.meet(optr._aliases);
-//      nptr._obj = TypeMemPtr.narrow_obj(mt_alias,(TypeObj)ax_meet(bs,nptr._obj,optr._obj));
-//      break;
-//    }
-//    case TSTRUCT:
-//      if( !(old instanceof TypeStruct) ) throw AA.unimpl();
-//      TypeStruct ots = (TypeStruct)old, nts = (TypeStruct)nt;
-//      assert nts._uf==null;     // Already handled by the caller
-//      // Compute a new target length.  Generally size is unchanged, but will
-//      // change if mixing structs.
-//      int len = ots.len(nts);     // New length
-//      if( len != nts._ts.length ) { // Grow/shrink as needed
-//        nts._flds  = Arrays.copyOf(nts._flds  , len);
-//        nts._ts    = Arrays.copyOf(nts._ts    , len);
-//        nts._finals= Arrays.copyOf(nts._finals, len);
-//      }
-//      int clen = Math.min(len,ots._ts.length);
-//      // Meet all the non-recursive parts
-//      nts._any &= ots._any;
-//      for( int i=0; i<clen; i++ ) {
-//        nts._flds  [i] = smeet(nts._flds[i],ots._flds[i]); // Set the Meet of field names
-//        nts._finals[i] = fmeet(nts._finals[i],ots._finals[i]);
-//      }
-//      if( clen != len ) throw AA.unimpl();
-//      // Now recursively do all fields
-//      for( int i=0; i<clen; i++ )
-//        nts._ts[i] = ax_meet(bs,nts._ts[i],ots._ts[i]);
-//      break;
-//    default: throw AA.unimpl();
-//    }
-//    return nt;
-//  }
-//
   // Walk an existing, not-interned, structure.  Stop at any interned leaves.
   // Check for duplicating an interned Type or a UF hit, and use that instead.
   // Computes the final hash code.
@@ -721,12 +698,11 @@ public class TypeStruct extends TypeObj<TypeStruct> {
         t._hash = t.compute_hash();
     }
     for( int i=0; i<reaches._len; i++ ) {
-      Type t = reaches.at(i);// TypeName, TypeMemPtr hash changes based on field contents.
+      Type t = reaches.at(i);// TypeMemPtr hash changes based on field contents.
       if( !(t instanceof TypeStruct) ) {
-        assert t._hash != 0 && t instanceof TypeMemPtr;
-        //if( t._hash != 0 ) return;
-        //set_hash(((TypeMemPtr)t)._obj);
-        //t._hash = t.compute_hash();
+        assert t instanceof TypeMemPtr;
+        if( t._hash == 0 )
+          t._hash = t.compute_hash();
       }
     }
 
@@ -797,12 +773,13 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     while( (tu = (T)UF.get(t ._uid)) != null ) { assert t._uid != t0._uid; UF.put(t._uid,t0); t=tu; }
     return t0;
   }
-  private static <T extends Type> void union( T lost, T kept) {
-    if( lost == kept ) return;
+  private static <T extends Type> T union( T lost, T kept) {
+    if( lost == kept ) return kept;
     assert !lost.interned();
     assert UF.get(lost._uid)==null && UF.get(kept._uid)==null;
     assert lost._uid != kept._uid;
     UF.put(lost._uid,kept);
+    return kept;
   }
 
   // Walk, looking for prior interned
@@ -882,47 +859,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       }
     }
   }
-//
-//  // Build a mapping from types to their depth in a shortest-path walk from the
-//  // root.  Only counts depth on TypeStructs with the matching alias.
-//  HashMap<Type,Integer> depth(int alias) {
-//    HashMap<Type,Integer> ds = new HashMap<>();
-//    Ary<Type> t0 = new Ary<>(new Type[]{this});
-//    Ary<Type> t1 = new Ary<>(new Type[1],0);
-//    int d=0;                    // Current depth
-//    while( !t0.isEmpty() ) {
-//      while( !t0.isEmpty() ) {
-//        Type t = t0.pop();
-//        if( ds.get(t)!=null ) continue; // Been there, done that
-//        ds.put(t,d);            // Everything in t0 is in the current depth
-//        switch( t._type ) {
-//        case TNAME:    t0.push(((TypeName  )t)._t  ); break;
-//        case TMEMPTR:  t0.push(((TypeMemPtr)t)._obj); break;
-//        case TSTRUCT:
-//          TypeStruct ts = (TypeStruct)t;
-//          Ary<Type> tx = ts._news.test_recur(alias) ? t1 : t0;
-//          for( Type tf : ts._ts ) tx.push(tf);
-//          break;
-//        default: break;
-//        }
-//      }
-//      Ary<Type> tmp = t0; t0 = t1; t1 = tmp; // Swap t0,t1
-//      d++;                                   // Raise depth
-//    }
-//    return ds;
-//  }
-//
-//  static int max(int alias, HashMap<Type,Integer> ds) {
-//    int max = 0;
-//    for( Type t : ds.keySet() )
-//      if( filter(alias,t) )
-//        max = Math.max(max,ds.get(t));
-//    return max;
-//  }
-//  private static boolean filter( int alias, Type t ) {
-//    return (t instanceof TypeStruct) && ((TypeStruct)t)._news.test_recur(alias);
-//  }
-
 
   // If unequal length; then if short is low it "wins" (result is short) else
   // short is high and it "loses" (result is long).

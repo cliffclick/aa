@@ -9,8 +9,8 @@ public class TypeInt extends Type<TypeInt> {
   private byte _x;        // -2 bot, -1 not-null, 0 con, +1 not-null-top +2 top
   private byte _z;        // bitsiZe, one of: 1,8,16,32,64
   private long _con;      // hi or lo according to _x
-  private TypeInt ( String name, int x, int z, long con ) { super(TINT); init(name,x,z,con); }
-  private void init(String name, int x, int z, long con ) { _name=name; _x=(byte)x; _z=(byte)z; _con = con; }
+  private TypeInt ( int x, int z, long con ) { super(TINT); init(x,z,con); }
+  private void init(int x, int z, long con ) { _x=(byte)x; _z=(byte)z; _con = con; }
   // Hash does not depend on other types
   @Override int compute_hash() { return super.compute_hash()+_x+_z+(int)_con; }
   @Override public boolean equals( Object o ) {
@@ -21,18 +21,18 @@ public class TypeInt extends Type<TypeInt> {
   }
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
   @Override String str( VBitSet dups) {
-    if( _con != 0 ) return _name+(_x<0 ? "&" : (_x>0 ? "+" : ""))+Long.toString(_con);
-    if( _x==0 ) return _name+Long.toString(_con);
-    return _name+(_x>0?"~":"")+(Math.abs(_x)==1?"n":"")+"int"+Integer.toString(_z);
+    if( _con != 0 ) return _name+(_x<0 ? "&" : (_x>0 ? "+" : ""))+_con;
+    if( _x==0 ) return _name+_con;
+    return _name+(_x>0?"~":"")+(Math.abs(_x)==1?"n":"")+"int"+_z;
   }
   private static TypeInt FREE=null;
   @Override protected TypeInt free( TypeInt ret ) { FREE=this; return ret; }
-  public static Type make( int x, int z, long con ) { return make("",x,z,con); }
-  public static Type make( String name, int x, int z, long con ) {
+  public static Type make( int x, int z, long con ) {
+    if( x==0 && con==0 ) return NIL;
     if( Math.abs(x)==1 && z==1 && con==0) con=1; // not-null-bool is just a 1
     TypeInt t1 = FREE;
-    if( t1 == null ) t1 = new TypeInt(name,x,z,con);
-    else {  FREE = null;      t1.init(name,x,z,con); }
+    if( t1 == null ) t1 = new TypeInt(x,z,con);
+    else {  FREE = null;      t1.init(x,z,con); }
     TypeInt t2 = (TypeInt)t1.hashcons();
     return t1==t2 ? t1 : t1.free(t2);
   }
@@ -44,11 +44,11 @@ public class TypeInt extends Type<TypeInt> {
   static public  final TypeInt  INT8  = (TypeInt)make(-2, 8,0);
   static public  final TypeInt  BOOL  = (TypeInt)make(-2, 1,0);
   static public  final TypeInt TRUE   = (TypeInt)make( 0, 1,1);
-  static         final TypeInt ZERO   = (TypeInt)new TypeInt("",0,1,0).hashcons(); // Not exposed since not the canonical NIL
-  static public  final Type    FALSE  = ZERO;
+  static public  final Type    FALSE  = NIL;
   static public  final TypeInt XINT1  = (TypeInt)make( 2, 1,0);
   static public  final TypeInt NINT8  = (TypeInt)make(-1, 8,0);
   static private final TypeInt NINT64 = (TypeInt)make(-1,64,0);
+  static         final TypeInt ZERO   = (TypeInt)new TypeInt(0,1,0).hashcons(); // Not exposed since not the canonical NIL
   static final TypeInt[] TYPES = new TypeInt[]{INT64,INT32,INT16,BOOL,TRUE,XINT1,NINT64};
   static void init1( HashMap<String,Type> types ) {
     types.put("bool" ,BOOL);
@@ -63,19 +63,16 @@ public class TypeInt extends Type<TypeInt> {
   @Override public long   getl() { assert is_con(); return _con; }
   @Override public double getd() { assert is_con() && (long)((double)_con)==_con; return _con; }
 
-  @Override protected TypeInt xdual() { return _x==0 ? this : new TypeInt(_name,-_x,_z,_con); }
+  @Override protected TypeInt xdual() { return _x==0 ? this : new TypeInt(-_x,_z,_con); }
   @Override protected Type xmeet( Type t ) {
     assert t != this;
     switch( t._type ) {
     case TINT:   break;
     case TFLT:   return xmeetf((TypeFlt)t);
-    case TNIL:   {
-      Type tt0 = xmeet(ZERO); // NIL falls to the local zero
-      return tt0 == ZERO ? NIL : tt0; // But if used a NIL, can return a NIL
-    }
     case TFUNPTR:
     case TMEMPTR:
     case TRPC:   return cross_nil(t);
+    case TNIL:   return t.xmeet(this); // Let other side decide
     case TFUN:
     case TTUPLE:
     case TOBJ:
@@ -89,8 +86,8 @@ public class TypeInt extends Type<TypeInt> {
     int maxz = Math.max(_z,tt._z);
     int minz = Math.min(_z,tt._z);
     if( _x== 0 && tt._x== 0 && _con==tt._con ) return make(0,maxz,_con);
-    if( _x<= 0 && tt._x<= 0 ) return make(mtname(tt),Math.min(nn(),tt.nn()),maxz,0); // Both bottom, widen size
-    if( _x > 0 && tt._x > 0 ) return make(mtname(tt),Math.min(  _x,tt._x  ),minz,0); // Both top, narrow size
+    if( _x<= 0 && tt._x<= 0 ) return make(Math.min(nn(),tt.nn()),maxz,0); // Both bottom, widen size
+    if( _x > 0 && tt._x > 0 ) return make(Math.min(  _x,tt._x  ),minz,0); // Both top, narrow size
     if( _x==-2 && tt._x== 2 ) return this; // Top loses to other guy
     if( _x== 2 && tt._x==-2 ) return tt  ; // Top loses to other guy
 
@@ -99,8 +96,8 @@ public class TypeInt extends Type<TypeInt> {
     TypeInt ttop = _x>0 ? this : tt;
     if( that._x<0 ) return that; // Return low value
     if( log(that._con) <= ttop._z && (that._con!=0 || ttop._x==2) )
-      return that;                    // Keep a fitting constant
-    return make(mtname(tt),that.nn(),that._z,0); // No longer a constant
+      return that==ZERO ? NIL : that; // Keep a fitting constant
+    return make(that.nn(),that._z,0); // No longer a constant
   }
 
   private int nn() { assert _x <=0; return _con!=0 || _x== -1 ? -1 : -2; }
@@ -141,7 +138,7 @@ public class TypeInt extends Type<TypeInt> {
       // tf._x > 0 // Can a high float fall to the int constant?
       double dcon = tf._z==32 ? (float)_con : (double)_con;
       if( (long)dcon == _con && (_con!=0 || tf._x == 2) )
-        return this;
+        return this==ZERO ? NIL : this;
       tx = _con==0 ? -2 : -1; // Fall from constant
     } // Fall into the bottom-int case
 

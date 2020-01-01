@@ -240,7 +240,7 @@ public class Parse {
     Type ot = _e.lookup_type(tvar);
     Type tn;
     if( ot == null ) {        // Name does not pre-exist
-      tn = t.make_name(tvar); // Add a name
+      tn = t.set_name(tvar);  // Add a name
       _e.add_type(tvar,tn);   // Assign type-name
     } else {
       tn = ot.has_name() ? ot.merge_recursive_type(t) : null;

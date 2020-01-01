@@ -1,7 +1,9 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
+import java.util.HashMap;
 import java.util.function.Predicate;
 
 // Pointers-to-memory; these can be both the address and the value part of
@@ -123,6 +125,43 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
       return _aliases.above_center() ? NIL : this;
     BitsAlias aliases = _aliases.meet_nil();
     return aliases==BitsAlias.NIL ? NIL : make(aliases,_obj);
+  }
+
+  // Build a mapping from types to their depth in a shortest-path walk from the
+  // root.  Only counts depth on TypeStructs with the matching alias.  Only
+  // used for testing.
+  HashMap<Type,Integer> depth() {
+    int alias = _aliases.getbit();
+    HashMap<Type,Integer> ds = new HashMap<>();
+    Ary<TypeStruct> t0 = new Ary<>(new TypeStruct[]{(TypeStruct)_obj});
+    Ary<TypeStruct> t1 = new Ary<>(new TypeStruct[1],0);
+    int d=0;                    // Current depth
+    while( !t0.isEmpty() ) {
+      while( !t0.isEmpty() ) {
+        TypeStruct ts = t0.pop();
+        if( ds.putIfAbsent(ts,d) == null )
+          for( Type tf : ts._ts ) {
+            if( ds.putIfAbsent(tf,d) == null &&  // Everything in ts is in the current depth
+                tf instanceof TypeMemPtr ) {
+              TypeMemPtr tmp = (TypeMemPtr)tf;
+              if( tmp._obj instanceof TypeStruct )
+                (tmp._aliases.test(alias) ? t1 : t0).push((TypeStruct)tmp._obj);
+            }
+          }
+      }
+      Ary<TypeStruct> tmp = t0; t0 = t1; t1 = tmp; // Swap t0,t1
+      d++;                                         // Raise depth
+    }
+    return ds;
+  }
+
+  // Max depth of struct, with a matching alias TMP
+  static int max(int alias, HashMap<Type,Integer> ds) {
+    int max = -1;
+    for( Type t : ds.keySet() )
+      if( (t instanceof TypeMemPtr) && ((TypeMemPtr)t)._aliases.test(alias) )
+        max = Math.max(max,ds.get(t));
+    return max+1;               // Struct is 1 more depth than TMP
   }
 
   //// Build a depth-limited named type

@@ -1,6 +1,5 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.AA;
 import com.cliffc.aa.node.NewNode;
 import com.cliffc.aa.node.PrimNode;
 import com.cliffc.aa.util.Ary;
@@ -16,9 +15,10 @@ public class TestType {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testType() {
     Type.init0(new HashMap<>());
-    BitsFun foo = (BitsFun)BitsFun.make_new_fidx(1).join(BitsFun.make_new_fidx(1));
-    BitsFun bar = foo.meet(BitsFun.EMPTY);
-    assertEquals(BitsFun.EMPTY,bar);
+    Type t0 = TypeFlt.FLT64.dual(); // ~flt64
+    Type t1 = Type.NIL;             // nil
+    Type mt = t1.meet(t0);          // preserves nil
+    assertEquals(mt,Type.NIL);
   }
 
   @Test public void testNamesInts() {
@@ -43,10 +43,10 @@ public class TestType {
     // Lattice around n:int8 and n:0 is well formed; exactly 2 edges, 3 nodes
     // Confirm lattice: {N:~i8 -> N:1 -> N:i8}
     // Confirm lattice: {N:~i8 -> N:0 -> N:i8}
-    Type ni8 = TypeInt.INT8.make_name("__test_enum");
+    Type ni8 = TypeInt.INT8.set_name("__test_enum:");
     Type xni8= ni8.dual();      // dual name:int8
-    Type no  = o.make_name("__test_enum");
-    Type nz  = z.make_name("__test_enum");
+    Type no  = o.set_name("__test_enum:");
+    Type nz  = z.set_name("__test_enum:");
     assertEquals(no ,no .meet(xni8)); // N:~i8 -> N: 1
     assertEquals(ni8,ni8.meet(no  )); // N:  1 -> N:i8
     assertEquals(nz ,nz .meet(xni8)); // N:~i8 -> N:0
@@ -300,20 +300,20 @@ public class TestType {
     final int alias2 = BitsAlias.new_alias(BitsAlias.REC);
     TypeMemPtr tptr2= TypeMemPtr.make_nil(alias2,TypeObj.OBJ); // *[0,2]
     TypeStruct ts2 = TypeStruct.make(flds,TypeStruct.ts(tptr2,TypeInt.INT64)); // @{n:*[0,2],v:int}
-    TypeStruct ta2 = ts2.make_name("A:");
+    TypeStruct ta2 = ts2.set_name("A:");
 
     // Peel A once without the nil: Memory#3: A:@{n:*[2],v:int}
     // ASAS0AS0AS0AS0AS0AS0...
     final int alias3 = BitsAlias.new_alias(BitsAlias.REC);
     TypeMemPtr tptr3= TypeMemPtr.make(alias3,TypeObj.OBJ); // *[3]
     TypeStruct ts3 = TypeStruct.make(flds,TypeStruct.ts(tptr2,TypeInt.INT64)); // @{n:*[2],v:int}
-    TypeStruct ta3 = ts3.make_name("A:");
+    TypeStruct ta3 = ts3.set_name("A:");
 
     // Peel A twice without the nil: Memory#4: A:@{n:*[3],v:int}
     // ASASAS0AS0AS0AS0AS0AS0...
     final int alias4 = BitsAlias.new_alias(BitsAlias.REC);
     TypeStruct ts4 = TypeStruct.make(flds,TypeStruct.ts(tptr3,TypeInt.INT64)); // @{n:*[3],v:int}
-    TypeStruct ta4 = ts4.make_name("A:");
+    TypeStruct ta4 = ts4.set_name("A:");
 
     // Then make a MemPtr{3,4}, and ld - should be a PeelOnce
     // Starting with the Struct not the A we get:
@@ -335,13 +335,13 @@ public class TestType {
     //assertEquals(ta3,mta);
     TypeMemPtr ptr023 = (TypeMemPtr)TypeMemPtr.make_nil(alias2,TypeObj.OBJ).meet(TypeMemPtr.make(alias3,TypeObj.OBJ));
     TypeStruct xts = TypeStruct.make(flds,TypeStruct.ts(ptr023,TypeInt.INT64));
-    Type xta = xts.make_name("A:");
+    Type xta = xts.set_name("A:");
     assertEquals(xta,mta);
 
     // Mismatched Names in a cycle; force a new cyclic type to appear
     final int alias5 = BitsAlias.new_alias(BitsAlias.REC);
     TypeStruct tsnb = TypeStruct.make(flds,TypeStruct.ts(TypeMemPtr.make_nil(alias5,TypeObj.OBJ),TypeFlt.FLT64));
-    TypeStruct tfb = tsnb.make_name("B:");
+    TypeStruct tfb = tsnb.set_name("B:");
     Type mtab = ta2.meet(tfb);
 
     // TODO: Needs a way to easily test simple recursive types
@@ -371,9 +371,9 @@ public class TestType {
       TypeStruct approx = newt.approx(NewNode.CUTOFF,alias);
       phi = TypeMemPtr.make(alias,approx);
     }
-    //int d = phi.depth()-9999; // added +9999 for cycle
-    //assertTrue(0 <= d && d <10);
-    throw AA.unimpl();
+    HashMap<Type,Integer> ds = phi.depth();
+    int d = TypeMemPtr.max(alias,ds);
+    assertTrue(0 <= d && d <10);
   }
 
   // Test a cycle with two names on mismatched cycle boundaries
@@ -388,8 +388,8 @@ public class TestType {
     final int alias = BitsAlias.REC;
 
     Type.RECURSIVE_MEET++;
-    TypeStruct as1 = TypeStruct.malloc("",false,flds,TypeStruct.ts(2),finals).make_name("A");
-    TypeStruct bs4 = TypeStruct.malloc("",false,flds,TypeStruct.ts(2),finals).make_name("B");
+    TypeStruct as1 = TypeStruct.malloc("",false,flds,TypeStruct.ts(2),finals).set_name("A:");
+    TypeStruct bs4 = TypeStruct.malloc("",false,flds,TypeStruct.ts(2),finals).set_name("B:");
     as1._hash = as1.compute_hash();  as1._cyclic = true;
     bs4._hash = bs4.compute_hash();  bs4._cyclic = true;
     TypeMemPtr ap5 = TypeMemPtr.make(alias,as1);  ap5._cyclic = true;
@@ -404,18 +404,18 @@ public class TestType {
     bs4 = (TypeStruct)bp2._obj;
     ap5 = (TypeMemPtr)bs4._ts[0];
 
-    Type das1 = as1.dual();
-    Type dbs4 = bs4.dual();
-    Type mt = das1.meet(dbs4);
+    Type das1 = as1.dual();     // ~A:@{b,int}
+    Type dbs4 = bs4.dual();     // ~B:@{a,flt}
+    // Since names mismatch, but both as1 and bs4 are high... must fall hard.
+    Type mt = das1.meet(dbs4);  // ~ ~@{a join b, int join flt} ==> @{a join b, int32}
     TypeStruct smt = (TypeStruct)mt;
-    assertEquals(TypeInt.INT32.dual(),smt._ts[1]);
-    //assertEquals(BitsAlias.RECBITS.dual(),smt._news);
+    assertEquals(TypeInt.INT32,smt._ts[1]);
     TypeMemPtr smp = (TypeMemPtr)smt._ts[0];
     assertEquals(smt,smp._obj);
-    assertEquals(BitsAlias.RECBITS.dual(),smp._aliases);
+    assertEquals(BitsAlias.RECBITS,smp._aliases);
 
     Type mx = as1.dual().meet(dbs4);
-    assertEquals(smt,mx.remove_name());
+    assertEquals(smt,mx);
   }
 
 

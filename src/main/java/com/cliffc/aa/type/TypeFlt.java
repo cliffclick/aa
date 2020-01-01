@@ -9,8 +9,8 @@ public class TypeFlt extends Type<TypeFlt> {
   byte _x;                // -2 bot, -1 not-null, 0 con, +1 not-null-top +2 top
   byte _z;                // bitsiZe, one of: 32,64
   double _con;
-  private TypeFlt ( String name, int x, int z, double con ) { super(TFLT); init(name,x,z,con); }
-  private void init(String name, int x, int z, double con ) { _name=name; _x=(byte)x; _z=(byte)z; _con = con; }
+  private TypeFlt ( int x, int z, double con ) { super(TFLT); init(x,z,con); }
+  private void init(int x, int z, double con ) { _x=(byte)x; _z=(byte)z; _con = con; }
   // Hash does not depend on other types
   @Override int compute_hash() { return super.compute_hash()+_x+_z+(int)_con; }
   @Override public boolean equals( Object o ) {
@@ -21,27 +21,26 @@ public class TypeFlt extends Type<TypeFlt> {
   }
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
   @Override String str( VBitSet dups) {
-    if( _x==0 ) return _name+Double.toString(_con);
+    if( _x==0 ) return _name+_con;
     return _name+(_x>0?"~":"")+(Math.abs(_x)==1?"n":"")+"flt"+Integer.toString(_z);
   }
   private static TypeFlt FREE=null;
   @Override protected TypeFlt free( TypeFlt ret ) { FREE=this; return ret; }
-  public static Type make( int x, int z, double con ) { return make("",x,z,con); }
-  public static Type make( String name, int x, int z, double con ) {
+  public static Type make( int x, int z, double con ) { 
+    if( x==0 && con==0 ) return NIL;
     TypeFlt t1 = FREE;
-    if( t1 == null ) t1 = new TypeFlt(name,x,z,con);
-    else {  FREE = null;      t1.init(name,x,z,con); }
+    if( t1 == null ) t1 = new TypeFlt(x,z,con);
+    else {  FREE = null;      t1.init(x,z,con); }
     TypeFlt t2 = (TypeFlt)t1.hashcons();
     return t1==t2 ? t1 : t1.free(t2);
   }
   public static Type con(double con) { return make(0,log(con),con); }
-  
+
   public static final TypeFlt FLT64 = (TypeFlt)make(-2,64,0);
          static final TypeFlt FLT32 = (TypeFlt)make(-2,32,0);
   public static final TypeFlt PI    = (TypeFlt)con(Math.PI);
   public static final TypeFlt NFLT64= (TypeFlt)make(-1,64,0);
-         static final TypeFlt ZERO  = (TypeFlt)con(0);
-  public static final TypeFlt[] TYPES = new TypeFlt[]{FLT64,FLT32,PI,NFLT64,ZERO};
+  public static final TypeFlt[] TYPES = new TypeFlt[]{FLT64,FLT32,PI,NFLT64};
   static void init1( HashMap<String,Type> types ) {
     types.put("flt32",FLT32);
     types.put("flt64",FLT64);
@@ -51,19 +50,16 @@ public class TypeFlt extends Type<TypeFlt> {
   @Override public double getd() { assert is_con(); return _con; }
   @Override public long   getl() { assert is_con() && ((long)_con)==_con; return (long)_con; }
 
-  @Override protected TypeFlt xdual() { return _x==0 ? this : new TypeFlt(_name,-_x,_z,_con); }
+  @Override protected TypeFlt xdual() { return _x==0 ? this : new TypeFlt(-_x,_z,_con); }
   @Override protected Type xmeet( Type t ) {
     assert t != this;
     switch( t._type ) {
     case TFLT:   break;
     case TINT:   return ((TypeInt)t).xmeetf(this);
-    case TNIL:   {
-      Type tt0 = xmeet(ZERO);         // NIL falls to the local zero
-      return tt0 == ZERO ? NIL : tt0; // But if used a NIL, can return a NIL
-    }
     case TFUNPTR:
     case TMEMPTR:
     case TRPC:   return cross_nil(t);
+    case TNIL:   return t.xmeet(this); // Let other side decide
     case TFUN:
     case TTUPLE:
     case TOBJ:
@@ -92,15 +88,15 @@ public class TypeFlt extends Type<TypeFlt> {
   }
   private int nn() { assert _x <=0; return _con!=0 || _x== -1 ? -1 : -2; }
   static int log( double con ) { return ((double)(float)con)==con ? 32 : 64; }
-  
+
   @Override public boolean above_center() { return _x>0; }
   @Override public boolean may_be_con() { return _x>=0; }
   @Override public boolean is_con()   { return _x==0; }
-  @Override public boolean must_nil() { assert _x!=0||_con!=0; return _x==-2; }
-  @Override public boolean may_nil() { return _x>0 || (_x==0 && _con==0); }
+  @Override public boolean must_nil() { return _x==-2 || (_x==0 && _con==0); }
+  @Override public boolean  may_nil() { return _x > 0 || (_x==0 && _con==0); }
   @Override Type not_nil() { return _x==2 ? make(1,_z,_con) : this; }
-  @Override public Type meet_nil() { return xmeet(ZERO); }
-  
+  @Override public Type meet_nil() { return TypeInt.ZERO.xmeetf(this); }
+
   // Lattice of conversions:
   // -1 unknown; top; might fail, might be free (Scalar->Int); Scalar might lift
   //    to e.g. Float and require a user-provided rounding conversion from F64->Int.

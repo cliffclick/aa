@@ -23,15 +23,15 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
   private static TypeObj FREE=null;
   @Override protected O free( O ret ) { FREE=this; return ret; }
   @SuppressWarnings("unchecked")
-  private static TypeObj make_impl( String name, boolean any ) {
+  private static TypeObj make( String name, boolean any ) {
     TypeObj t1 = FREE;
     if( t1 == null ) t1 = new TypeObj(TOBJ,name,any);
     else {  FREE = null;      t1.init(TOBJ,name,any); }
     TypeObj t2 = (TypeObj)t1.hashcons();
     return t1==t2 ? t1 : t1.free(t2);
   }
-  public static Type make0( boolean any ) { return make_impl("",any); }
-  public static final TypeObj OBJ = make_impl("",false);
+  public static Type make0( boolean any ) { return make("",any); }
+  public static final TypeObj OBJ = make("",false);
   public static final TypeObj XOBJ = (TypeObj)OBJ.dual();
   static final TypeObj[] TYPES = new TypeObj[]{OBJ,XOBJ};
 
@@ -39,12 +39,7 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
   @Override protected O xdual() { return (O)new TypeObj(TOBJ,_name,!_any); }
   @Override protected Type xmeet( Type t ) {
     if( !(t instanceof TypeObj) ) return ALL;
-    String name = mtname(t);
-    if( name.isEmpty() ) return _any ? t : OBJ;
-    Type t2;
-    if( _any ) { t2 = t.clone(); t2._name=""; }
-    else t2 = OBJ;
-    return t2.make_name(name);
+    return _any ? t : OBJ;
   }
   // Update (approximately) the current TypeObj.  Merges fields.
   public TypeObj update(byte fin, String fld, Type val) { return this; }
