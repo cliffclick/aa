@@ -49,7 +49,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     return _fidxs==tf._fidxs && _args==tf._args && _ret==tf._ret;
   }
   // Never part of a cycle, so the normal check works
-  //@Override public boolean cycle_equals( Type o ) { return equals(o); }
+  @Override public boolean cycle_equals( Type o ) { return equals(o); }
   @Override public String str( VBitSet dups) {
     return "*"+names()+":{"+_args.str(dups)+"-> "+_ret.str(dups)+"}";}
   public String names() { return FunNode.names(_fidxs,new SB()).toString(); }
@@ -83,7 +83,6 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     case TMEMPTR:
     case TRPC:   return cross_nil(t);
     case TNIL:
-    case TNAME:  return t.xmeet(this); // Let other side decide
     case TFUN:
     case TTUPLE:
     case TOBJ:

@@ -41,7 +41,6 @@ public class NewObjNode extends NewNode<TypeStruct> {
     assert def_idx(_ts._ts.length)== _defs._len;
     assert _ts.find(name) == -1; // No dups
     _ts = _ts.add_fld(name,gvn.type(val),mutable);
-    if( _name != null ) _name = _name.make(_ts); // Re-attach name as needed
     add_def(val);
   }
   // Update/modify a field, by field number
@@ -56,7 +55,6 @@ public class NewObjNode extends NewNode<TypeStruct> {
     assert def_idx(_ts._ts.length)== _defs._len;
     assert fidx != -1;
     _ts = _ts.set_fld(fidx,gvn.type(val),mutable);
-    if( _name != null ) _name = _name.make(_ts); // Re-attach name as needed
     set_def(def_idx(fidx),val,gvn);
   }
 
@@ -90,7 +88,6 @@ public class NewObjNode extends NewNode<TypeStruct> {
         i--;
       }
     }
-    if( ts != _ts && _name != null ) _name = _name.make(ts); // Re-attach name as needed
     _ts = ts;
   }
 
@@ -108,7 +105,12 @@ public class NewObjNode extends NewNode<TypeStruct> {
       ts[i] = gvn.type(fld(i)).bound(_ts.at(i));
     TypeStruct newt = TypeStruct.make(_ts._flds,ts,_ts._finals);
 
-    TypeObj xs = _name == null ? newt : _name.make(newt); // Re-attach name as needed
-    return TypeTuple.make(xs,TypeMemPtr.make(_alias));
+    // Check for TypeStructs with this same NewNode types occurring more than
+    // CUTOFF deep, and fold the deepest ones onto themselves to limit the type
+    // depth.  If this happens, the types become recursive with the
+    // approximations happening at the deepest points.
+    //TypeStruct res = newt.approx(CUTOFF);
+    TypeStruct xs = newt;
+    return TypeTuple.make(xs,TypeMemPtr.make(_alias,xs));
   }
 }

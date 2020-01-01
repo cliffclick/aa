@@ -23,19 +23,20 @@ public class TypeNode extends Node {
     // If both are pointers, check memory content shape (not alias#)
     if( t  instanceof TypeMemPtr &&
         _t instanceof TypeMemPtr ) {
-      // Get memory content shape
-      BitsAlias barg  = ((TypeMemPtr) t)._aliases;
-      boolean nil_arg = barg.test(0);
-      int bit_arg     = (nil_arg ? barg.strip_nil() : barg).getbit();
-      TypeObj targ    = BitsAlias.type_for_alias2(bit_arg);
-
-      BitsAlias b_t = ((TypeMemPtr)_t)._aliases;
-      boolean nil_t = b_t.test(0);
-      int bit_t     = (nil_t ? b_t.strip_nil() : b_t).getbit();
-      TypeObj t_t   = BitsAlias.type_for_alias2(bit_t);
-
-      if( targ != null && (!nil_arg || nil_t) && targ.isa(t_t) )
-        return true;             // Typecheck passes, remove
+      //// Get memory content shape
+      //BitsAlias barg  = ((TypeMemPtr) t)._aliases;
+      //boolean nil_arg = barg.test(0);
+      //int bit_arg     = (nil_arg ? barg.strip_nil() : barg).getbit();
+      //TypeObj targ    = BitsAlias.type_for_alias2(bit_arg);
+      //
+      //BitsAlias b_t = ((TypeMemPtr)_t)._aliases;
+      //boolean nil_t = b_t.test(0);
+      //int bit_t     = (nil_t ? b_t.strip_nil() : b_t).getbit();
+      //TypeObj t_t   = BitsAlias.type_for_alias2(bit_t);
+      //
+      //if( targ != null && (!nil_arg || nil_t) && targ.isa(t_t) )
+      //  return true;             // Typecheck passes, remove
+      throw com.cliffc.aa.AA.unimpl();
     }
     return false;
   }

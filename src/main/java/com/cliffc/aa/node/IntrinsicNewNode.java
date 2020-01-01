@@ -38,7 +38,7 @@ public abstract class IntrinsicNewNode extends Node {
     // Make NewStrNode to get alias
     NewStrNode nnn = gvn.init(new NewStrNode(TypeStr.STR,null,null)).keep();
     _alias = nnn._alias;        // Record alias conveniently
-    FunNode  fun = ( FunNode) gvn.xform(new  FunNode(this,TypeMemPtr.make(_alias)).add_def(Env.ALL_CTRL));
+    FunNode  fun = ( FunNode) gvn.xform(new  FunNode(this,TypeMemPtr.make(_alias,TypeStr.STR)).add_def(Env.ALL_CTRL));
     ParmNode rpc = (ParmNode) gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
     ParmNode memp= (ParmNode) gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM     ),null));
     // Add input edges to the intrinsic

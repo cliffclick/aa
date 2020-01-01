@@ -1,8 +1,5 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.util.Ary;
-import com.cliffc.aa.util.Util;
-import com.cliffc.aa.node.NewNode;
 import java.util.HashMap;
 
 // Alias Bits supporting a lattice; immutable; hash-cons'd.
@@ -24,7 +21,6 @@ public class BitsAlias extends Bits<BitsAlias> {
     else { INTERN.put(b1,b1); return b1; }
   }
 
-  private static final Ary<Object> MAP = new Ary<>(Object.class);
   static final Bits.Tree<BitsAlias> TREE = new Bits.Tree<>();
   @Override public Tree<BitsAlias> tree() { return TREE; }
   public  static final int ALL, REC, ARY, STR;
@@ -41,12 +37,12 @@ public class BitsAlias extends Bits<BitsAlias> {
     NIL = make0(0);             // No need to dual; NIL is its own dual
     // Split All-Memory into Structs/Records and Arrays (including Strings).
     // Everything falls into one of these two camps.
-    RECBITS = make0(REC = type_alias(ALL,null));
+    RECBITS = make0(REC = type_alias(ALL));
     RECBITS0 = RECBITS.meet_nil();
     // Arrays
-    ARY = type_alias(ALL,null);
+    ARY = type_alias(ALL);
     // Split Arrays into Strings (and other arrays)
-    STRBITS = make0(STR = type_alias(ARY,null));
+    STRBITS = make0(STR = type_alias(ARY));
     STRBITS0 = STRBITS.meet_nil();
   }
   // True if kid is a child or equal to parent
@@ -61,10 +57,6 @@ public class BitsAlias extends Bits<BitsAlias> {
   public static void init0() { TREE.init0(); }
   public static void reset_to_init0() {
     TREE.reset_to_init0();
-    MAP.clear();
-    MAP.setX(REC,TypeStruct.ALLSTRUCT);
-    MAP.setX(ARY,TypeStr.STR);
-    MAP.setX(STR,TypeStr.STR);
   }
 
   @Override boolean is_class(int fidx) { return fidx!=0; } // All bits are class of allocated objects, except nil alone
@@ -73,30 +65,7 @@ public class BitsAlias extends Bits<BitsAlias> {
 
   public static BitsAlias make0( int bit ) { return NZERO.make(bit); }
 
-  public static int  new_alias(int par, NewNode nnn) { return set_alias(par,nnn); }
-  public static int type_alias(int par, TypeObj obj) { return set_alias(par,obj); }
-  private static int set_alias(int par, Object o ) {
-    int alias = TREE.split(par);
-    assert MAP.atX(alias)==null;
-    MAP.setX(alias,o);
-    return alias;
-  }
-  static NewNode new_for_alias(int alias) {
-    Object o = MAP.at(alias);
-    assert o instanceof NewNode;
-    return (NewNode)o;
-  }
-  static TypeObj type_for_alias1(int alias) {
-    Object o = MAP.at(alias);
-    assert o instanceof TypeObj;
-    return (TypeObj)o;
-  }
-  public static TypeObj type_for_alias2(int alias) {
-    Object o = MAP.atX(alias);
-    if( o == null ) return null;
-    return o instanceof TypeObj ? (TypeObj)o : ((NewNode)o).xs();
-  }
-  public static int alias_for_typename(String str) {
-    return MAP.find(obj -> obj instanceof TypeName && Util.eq(((TypeName)obj)._name,str));
-  }
+  public static int  new_alias(int par) { return set_alias(par); }
+  public static int type_alias(int par) { return set_alias(par); }
+  private static int set_alias(int par) { return TREE.split(par); }
 }

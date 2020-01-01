@@ -29,21 +29,10 @@ public class TypeTuple extends Type<TypeTuple> {
     if( this==o ) return true;
     if( !(o instanceof TypeTuple) ) return false;
     TypeTuple t = (TypeTuple)o;
-    if( _any!=t._any || _hash != t._hash || _ts.length != t._ts.length )
-      return false;
-    return TypeAry.eq(_ts,t._ts);
+    return _any==t._any && _hash == t._hash && TypeAry.eq(_ts,t._ts);
   }
-  //@Override public boolean cycle_equals( Type o ) {
-  //  if( this==o ) return true;
-  //  if( !(o instanceof TypeTuple) ) return false;
-  //  TypeTuple t = (TypeTuple)o;
-  //  if( _any!=t._any || _hash != t._hash || _ts.length != t._ts.length )
-  //    return false;
-  //  if( _ts == t._ts ) return true;
-  //  for( int i=0; i<_ts.length; i++ )
-  //    if( _ts[i]!=t._ts[i] && !_ts[i].cycle_equals(t._ts[i]) ) return false;
-  //  return true;
-  //}
+  // Never part of a cycle so the normal equals works
+  @Override public boolean cycle_equals( Type o ) { return equals(o); }
   String open_parens() { return "("; }
   String clos_parens() { return ")"; }
   @Override String str( VBitSet dups) {
@@ -156,7 +145,6 @@ public class TypeTuple extends Type<TypeTuple> {
   // True if isBitShape on all bits
   @Override public byte isBitShape(Type t) {
     if( isa(t) ) return 0; // Can choose compatible format
-    if( t instanceof TypeName ) return t.isBitShape(this);
     if( t instanceof TypeStruct ) return 99; // Not allowed to upcast a tuple to a struct
     if( t instanceof TypeTuple ) {
       TypeTuple tt = (TypeTuple)t;

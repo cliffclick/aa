@@ -2,41 +2,39 @@ package com.cliffc.aa.type;
 
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
+import java.util.function.Predicate;
 
 // Pointers-to-memory; these can be both the address and the value part of
 // Loads and Stores.  They carry a set of aliased TypeObjs.
 public final class TypeMemPtr extends Type<TypeMemPtr> {
   // List of known memory aliases.  Zero is nil.
   public BitsAlias _aliases;
+  public TypeObj _obj;          // Meet/join of aliases
 
-  private TypeMemPtr(BitsAlias aliases ) { super     (TMEMPTR); init(aliases); }
-  private void init (BitsAlias aliases ) { super.init(TMEMPTR); _aliases = aliases; }
+  private TypeMemPtr(BitsAlias aliases, TypeObj obj ) { super     (TMEMPTR); init(aliases,obj); }
+  private void init (BitsAlias aliases, TypeObj obj ) { super.init(TMEMPTR); _aliases = aliases; _obj=obj; }
   @Override int compute_hash() {
-    return TMEMPTR + _aliases._hash;
+    assert _obj._hash != 0;
+    return TMEMPTR + _aliases._hash + _obj._hash;
   }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeMemPtr) ) return false;
     TypeMemPtr tf = (TypeMemPtr)o;
-    return _aliases==tf._aliases;
+    return _aliases==tf._aliases && _obj==tf._obj;
   }
-  //@Override public boolean cycle_equals( Type o ) {
-  //  if( this==o ) return true;
-  //  if( !(o instanceof TypeMemPtr) ) return false;
-  //  TypeMemPtr t2 = (TypeMemPtr)o;
-  //  if( _aliases != t2._aliases ) return false;
-  //  return true;
-  //}
+  @Override public boolean cycle_equals( Type o ) {
+    if( this==o ) return true;
+    if( !(o instanceof TypeMemPtr) ) return false;
+    TypeMemPtr t2 = (TypeMemPtr)o;
+    if( _aliases != t2._aliases ) return false;
+    return _obj == t2._obj || _obj.cycle_equals(t2._obj);
+  }
   @Override String str( VBitSet dups) {
     if( dups == null ) dups = new VBitSet();
     if( dups.tset(_uid) ) return "$"; // Break recursive printing cycle
     SB sb = new SB().p('*');
-    _aliases.toString(sb);
-    int alias = _aliases.abit();
-    if( alias > 0 ) {
-      TypeObj to = BitsAlias.type_for_alias2(alias);
-      if( to != null ) sb.p(to.toString());
-    }
+    _aliases.toString(sb).p(_obj.str(dups));
     if( _aliases.test(0) ) sb.p('?');
     return sb.toString();
   }
@@ -45,49 +43,48 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     if( dups == null ) dups = new VBitSet();
     if( dups.tset(_uid) ) return sb.p('$'); // Break recursive printing cycle
     sb.p('*');
-    _aliases.toString(sb);
+    _obj.dstr(_aliases.toString(sb).p(" -> "),dups);
     return sb;
   }
 
   private static TypeMemPtr FREE=null;
   @Override protected TypeMemPtr free( TypeMemPtr ret ) { FREE=this; return ret; }
-  public static TypeMemPtr make(BitsAlias aliases ) {
+  public static TypeMemPtr make(BitsAlias aliases, TypeObj obj ) {
     // Canonical form: cannot have a pointer with only NIL allowed... instead
     // we only use NIL directly.
     assert aliases != BitsAlias.NIL;
-
     TypeMemPtr t1 = FREE;
-    if( t1 == null ) t1 = new TypeMemPtr(aliases);
-    else { FREE = null;          t1.init(aliases); }
+    if( t1 == null ) t1 = new TypeMemPtr(aliases,obj);
+    else { FREE = null;          t1.init(aliases,obj); }
     TypeMemPtr t2 = (TypeMemPtr)t1.hashcons();
     return t1==t2 ? t1 : t1.free(t2);
   }
 
-  public static TypeMemPtr make( int alias ) { return make(BitsAlias.make0(alias)); }
-  public static TypeMemPtr make_nil( int alias ) { return make(BitsAlias.make0(alias).meet_nil()); }
+  public static TypeMemPtr make( int alias, TypeObj obj ) { return make(BitsAlias.make0(alias),obj); }
+  public static TypeMemPtr make_nil( int alias, TypeObj obj ) { return make(BitsAlias.make0(alias).meet_nil(),obj); }
 
-  public  static final TypeMemPtr OOP0   = make(BitsAlias.FULL    ); // Includes nil
-  public  static final TypeMemPtr OOP    = make(BitsAlias.NZERO   );// Excludes nil
-  public  static final TypeMemPtr STRPTR = make(BitsAlias.STRBITS );
-  public  static final TypeMemPtr STR0   = make(BitsAlias.STRBITS0);
-  public  static final TypeMemPtr ABCPTR = make(BitsAlias.type_alias(BitsAlias.STR,TypeStr.ABC));
+  public  static final TypeMemPtr OOP0   = make(BitsAlias.FULL    ,TypeObj.OBJ); // Includes nil
+  public  static final TypeMemPtr OOP    = make(BitsAlias.NZERO   ,TypeObj.OBJ); // Excludes nil
+  public  static final TypeMemPtr STRPTR = make(BitsAlias.STRBITS ,TypeStr.STR);
+  public  static final TypeMemPtr STR0   = make(BitsAlias.STRBITS0,TypeStr.STR);
+  public  static final TypeMemPtr ABCPTR = make(BitsAlias.type_alias(BitsAlias.STR),TypeStr.ABC);
   public  static final TypeMemPtr ABC0   = (TypeMemPtr)ABCPTR.meet_nil();
-  public  static final TypeMemPtr STRUCT = make(BitsAlias.RECBITS );
-  public  static final TypeMemPtr STRUCT0= make(BitsAlias.RECBITS0);
+  public  static final TypeMemPtr STRUCT = make(BitsAlias.RECBITS ,TypeStruct.ALLSTRUCT);
+  public  static final TypeMemPtr STRUCT0= make(BitsAlias.RECBITS0,TypeStruct.ALLSTRUCT);
   static final TypeMemPtr[] TYPES = new TypeMemPtr[]{OOP0,STR0,STRPTR,ABCPTR,STRUCT};
 
   @Override protected TypeMemPtr xdual() {
-    if( _aliases==BitsAlias.NIL ) return this;
-    return new TypeMemPtr(_aliases.dual());
+    assert _aliases!=BitsAlias.NIL;
+    return new TypeMemPtr(_aliases.dual(),(TypeObj)_obj.dual());
   }
-  //@Override TypeMemPtr rdual() {
-  //  if( _dual != null ) return _dual;
-  //  TypeMemPtr dual = _dual = new TypeMemPtr(_aliases.dual());
-  //  dual._dual = this;
-  //  dual._hash = dual.compute_hash();
-  //  dual._cyclic = true;
-  //  return dual;
-  //}
+  @Override TypeMemPtr rdual() {
+    if( _dual != null ) return _dual;
+    TypeMemPtr dual = _dual = new TypeMemPtr(_aliases.dual(),(TypeObj)_obj.rdual());
+    dual._dual = this;
+    dual._hash = dual.compute_hash();
+    dual._cyclic = true;
+    return dual;
+  }
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TMEMPTR:break;
@@ -96,7 +93,6 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     case TFUNPTR:
     case TRPC:   return cross_nil(t);
     case TNIL:
-    case TNAME:  return t.xmeet(this); // Let other side decide
     case TOBJ:
     case TSTR:
     case TSTRUCT:
@@ -109,7 +105,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     TypeMemPtr ptr = (TypeMemPtr)t;
     BitsAlias aliases = _aliases.meet(ptr._aliases);
     if( aliases == BitsAlias.NIL ) return NIL;
-    return make(aliases);
+    return make(aliases,(TypeObj)_obj.meet(ptr._obj));
   }
   @Override public boolean above_center() { return _aliases.above_center(); }
   // Aliases represent *classes* of pointers and are thus never constants.
@@ -120,13 +116,13 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   @Override public boolean may_nil() { return _aliases.may_nil(); }
   @Override Type not_nil() {
     BitsAlias bits = _aliases.not_nil();
-    return bits==_aliases ? this : make(bits);
+    return bits==_aliases ? this : make(bits,_obj);
   }
   @Override public Type meet_nil() {
     if( _aliases.test(0) )      // Already has a nil?
       return _aliases.above_center() ? NIL : this;
     BitsAlias aliases = _aliases.meet_nil();
-    return aliases==BitsAlias.NIL ? NIL : make(aliases);
+    return aliases==BitsAlias.NIL ? NIL : make(aliases,_obj);
   }
 
   //// Build a depth-limited named type
@@ -152,12 +148,12 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   public byte isBitShape(Type t) {
     return (byte)(t instanceof TypeMemPtr ? 0 : -99);  // Mixing TMP and a non-ptr
   }
-  //@SuppressWarnings("unchecked")
-  //@Override void walk( Predicate<Type> p ) { if( p.test(this) ) _obj.walk(p); }
+  @SuppressWarnings("unchecked")
+  @Override void walk( Predicate<Type> p ) { if( p.test(this) ) _obj.walk(p); }
   //@Override TypeStruct repeats_in_cycles(TypeStruct head, VBitSet bs) { return _cyclic ? _obj.repeats_in_cycles(head,bs) : null; }
   public int getbit() { return _aliases.getbit(); }
   // Keep the high parts
   @Override public TypeMemPtr startype() {
-    return TypeMemPtr.make(_aliases.above_center() ? _aliases : _aliases.dual());
+    return TypeMemPtr.make(_aliases.above_center() ? _aliases : _aliases.dual(), _obj.startype());
   }
 }

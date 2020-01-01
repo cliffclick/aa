@@ -18,7 +18,7 @@ public class IfNode extends Node {
     if( ctrl!=Type.CTRL && ctrl != Type.ALL ) return TypeTuple.IF_ANY; // Test is dead
     if( in(0) instanceof ProjNode && in(0).in(0)==this )
       return TypeTuple.IF_ANY; // Test is dead cycle of self (during collapse of dead loops)
-    Type pred = gvn.type(in(1)).base();
+    Type pred = gvn.type(in(1));
     if( pred instanceof TypeTuple)return TypeTuple.IF_ANY;// Nonsense, so test is dead
     if( pred instanceof TypeObj ) return TypeTuple.IF_ANY;// Nonsense, so test is dead
     if( pred.isa(TypeInt.XINT1) ) return TypeTuple.IF_ANY; // Choice of {0,1}

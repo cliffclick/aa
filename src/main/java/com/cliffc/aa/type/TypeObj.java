@@ -1,28 +1,6 @@
 package com.cliffc.aa.type;
 
 import com.cliffc.aa.util.VBitSet;
-
-/*
-Theory: TypeObj have an alias#, never themselves have an aliasing issue.
-TypeMem merges unrelated TypeObjs as always.
-TypeMemPtr CAN have multi-aliases and CAN alias to different TO's.
-
-Problem is lack of canonicalization: TypeMem[#4:str,#7:str] - 4 is parent of 7
-and both are Str.  Should fold up, but [4]:str != [7]:str.
-
-So alias# in TypeObj can be removed / ignored?  Only for debug?
-
-TMP has a set of alias#s.  Maybe even remove/ignores TO.  A TMP means nothing
-without a TM?  Can I make a ptr-to-struct?  Or only a ptr-to-[17] and TM[17] is
-a struct?
-
-TM just indexes TOs by alias#.
-
-
-*/
-
-
-
 // Types which extend memory-based objects - currently Structs (which include
 // tuples but not TypeTuple) and Str (Strings); will include Arrays at some
 // point.  Structs have memory words addressed by a base-pointer and a field
@@ -30,40 +8,43 @@ TM just indexes TOs by alias#.
 // by a base-pointer and an index.
 public class TypeObj<O extends TypeObj<O>> extends Type<O> {
   boolean _any;                 // True=choice/join; False=all/meet
-  TypeObj(byte type, boolean any) { super(type); init(type,any); }
-  protected void init (byte type, boolean any) { super.init(type); _any=any;}
+  TypeObj             (byte type, String name, boolean any) { super(type); init(type,name,any); }
+  protected void init (byte type, String name, boolean any) { super.init(type, name); _any=any;}
   // Hash does not depend on other types, so never changes
-  @Override int compute_hash() { return _type+(_any?1:0); }
+  @Override int compute_hash() { return super.compute_hash()+(_any?1:0); }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
-    return o instanceof TypeObj &&
-      _any ==((TypeObj)o)._any &&
-      _type==((TypeObj)o)._type;
+    if( !(o instanceof TypeObj) || !super.equals(o) ) return false;
+    return _any ==((TypeObj)o)._any;
   }
-  //@Override public boolean cycle_equals( Type o ) { return equals(o); }
+  @Override public boolean cycle_equals( Type o ) { return equals(o); }
   @Override String str( VBitSet dups ) { return _any?"~obj":"obj"; }
 
   private static TypeObj FREE=null;
   @Override protected O free( O ret ) { FREE=this; return ret; }
   @SuppressWarnings("unchecked")
-  private static TypeObj make_impl( boolean any ) {
+  private static TypeObj make_impl( String name, boolean any ) {
     TypeObj t1 = FREE;
-    if( t1 == null ) t1 = new TypeObj(TOBJ,any);
-    else { FREE = null; t1.init(TOBJ,any); }
+    if( t1 == null ) t1 = new TypeObj(TOBJ,name,any);
+    else {  FREE = null;      t1.init(TOBJ,name,any); }
     TypeObj t2 = (TypeObj)t1.hashcons();
     return t1==t2 ? t1 : t1.free(t2);
   }
-  public static Type make0( boolean any ) { return make_impl(any); }
-  public static final TypeObj OBJ = make_impl(false);
+  public static Type make0( boolean any ) { return make_impl("",any); }
+  public static final TypeObj OBJ = make_impl("",false);
   public static final TypeObj XOBJ = (TypeObj)OBJ.dual();
   static final TypeObj[] TYPES = new TypeObj[]{OBJ,XOBJ};
 
   @SuppressWarnings("unchecked")
-  @Override protected O xdual() { return (O)new TypeObj(TOBJ,!_any); }
+  @Override protected O xdual() { return (O)new TypeObj(TOBJ,_name,!_any); }
   @Override protected Type xmeet( Type t ) {
     if( !(t instanceof TypeObj) ) return ALL;
-    if( t instanceof TypeName ) return t.xmeet(this); // Let TypeName sort it out (since Name::int8 should drop to ALL)
-    return _any ? t : OBJ;
+    String name = mtname(t);
+    if( name.isEmpty() ) return _any ? t : OBJ;
+    Type t2;
+    if( _any ) { t2 = t.clone(); t2._name=""; }
+    else t2 = OBJ;
+    return t2.make_name(name);
   }
   // Update (approximately) the current TypeObj.  Merges fields.
   public TypeObj update(byte fin, String fld, Type val) { return this; }

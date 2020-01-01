@@ -61,7 +61,7 @@ public class StoreNode extends Node {
   }
 
   @Override public Type value(GVNGCM gvn) {
-    Type adr = gvn.type(adr()).base();
+    Type adr = gvn.type(adr());
     if( adr.isa(TypeMemPtr.OOP0.dual()) ) return TypeObj.XOBJ; // Very high address; might fall to any valid address
     if( adr.must_nil() ) return TypeObj.OBJ;           // Not provable not-nil, so fails
     if( TypeMemPtr.OOP0.isa(adr) ) return TypeObj.OBJ; // Very low, might be any address
@@ -97,7 +97,6 @@ public class StoreNode extends Node {
   }
   private String err0(GVNGCM gvn) {
     Type t = gvn.type(adr());
-    while( t instanceof TypeName ) t = ((TypeName)t)._t;
     if( t.may_nil() ) return "Struct might be nil when writing";
     if( !(t instanceof TypeMemPtr) ) return "Unknown"; // Too low, might not have any fields
     Type mem = gvn.type(mem());

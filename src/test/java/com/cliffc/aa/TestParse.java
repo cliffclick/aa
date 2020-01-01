@@ -130,7 +130,7 @@ public class TestParse {
     testerr("math_rand(1)?1::2:int","missing expr after ':'",15); // missing type
     testerr("math_rand(1)?1:\"a\"", "Cannot mix GC and non-GC types",18);
     test   ("math_rand(1)?1",TypeInt.BOOL); // Missing optional else defaults to nil
-    test_ptr0("math_rand(1)?\"abc\"", TypeMemPtr::make_nil);
+    test_ptr0("math_rand(1)?\"abc\"", (alias)->TypeMemPtr.make_nil(alias,TypeStr.ABC));
     test   ("x:=0;math_rand(1)?(x:=1);x",TypeInt.BOOL);
     testerr("a.b.c();","Unknown ref 'a'",1);
   }
@@ -254,21 +254,22 @@ public class TestParse {
     test("(1,\"abc\").0", TypeInt.TRUE);
     test_isa("(1,\"abc\").1", TypeMemPtr.STRPTR);
 
-    // Named type variables
-    test_name("gal=:flt"     ,"gal", (lex -> TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make(TypeFlt.FLT64), TypeName.make("gal",lex,TypeFlt.FLT64))));
-    test_name("gal=:flt; gal","gal", (lex -> TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make(TypeFlt.FLT64), TypeName.make("gal",lex,TypeFlt.FLT64))));
-    test     ("gal=:flt; 3==gal(2)+1", TypeInt.TRUE);
-    test_name("gal=:flt; tank:gal = gal(2)", "gal", (lex -> TypeName.make("gal",lex,TypeInt.con(2))));
-    // test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: figure out if free cast for bare constants?
-    testerr ("gal=:flt; tank:gal = gal(2)+1", "3 is not a gal:flt64",29);
-
-    test    ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
-    test    ("Point=:@{x;y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
-    testerr ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1;y=2}))", "*[$]@{x==1;y==2} is not a *[$]Point:@{x=;y=}",68);
-    testerr ("Point=:@{x;y}; Point((0,1))", "*[$](nil;1) is not a Point:@{x=;y=}",27);
-    testerr("x=@{n: =1;}","Missing type after ':'",7);
-    testerr("x=@{n=;}","Missing ifex after assignment of 'n'",6);
-    test_obj("x=@{n}",TypeStruct.ALLSTRUCT);
+    throw AA.unimpl();
+    //// Named type variables
+    //test_name("gal=:flt"     ,"gal", (lex -> TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make(TypeFlt.FLT64), TypeName.make("gal",lex,TypeFlt.FLT64))));
+    //test_name("gal=:flt; gal","gal", (lex -> TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make(TypeFlt.FLT64), TypeName.make("gal",lex,TypeFlt.FLT64))));
+    //test     ("gal=:flt; 3==gal(2)+1", TypeInt.TRUE);
+    //test_name("gal=:flt; tank:gal = gal(2)", "gal", (lex -> TypeName.make("gal",lex,TypeInt.con(2))));
+    //// test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: figure out if free cast for bare constants?
+    //testerr ("gal=:flt; tank:gal = gal(2)+1", "3 is not a gal:flt64",29);
+    //
+    //test    ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
+    //test    ("Point=:@{x;y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
+    //testerr ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1;y=2}))", "*[$]@{x==1;y==2} is not a *[$]Point:@{x=;y=}",68);
+    //testerr ("Point=:@{x;y}; Point((0,1))", "*[$](nil;1) is not a Point:@{x=;y=}",27);
+    //testerr("x=@{n: =1;}","Missing type after ':'",7);
+    //testerr("x=@{n=;}","Missing ifex after assignment of 'n'",6);
+    //test_obj("x=@{n}",TypeStruct.ALLSTRUCT);
   }
 
   @Test public void testParse05() {
@@ -276,7 +277,7 @@ public class TestParse {
     test   ("x:str? = 0", Type.NIL); // question-type allows null or not; zero digit is null
     test_obj("x:str? = \"abc\"", TypeStr.ABC); // question-type allows null or not
     testerr("x:str  = 0", "nil is not a *[$]str", 10);
-    test_ptr0("math_rand(1)?0:\"abc\"", TypeMemPtr::make_nil);
+    test_ptr0("math_rand(1)?0:\"abc\"", (alias)->TypeMemPtr.make_nil(alias,TypeStr.ABC));
     testerr("(math_rand(1)?0 : @{x=1}).x", "Struct might be nil when reading field '.x'", 27);
     test   ("p=math_rand(1)?0:@{x=1}; p ? p.x : 0", TypeInt.BOOL); // not-null-ness after a null-check
     test   ("x:int = y:str? = z:flt = 0", Type.NIL); // null/0 freely recasts
@@ -292,31 +293,32 @@ public class TestParse {
     test_ptr("A= :(A?, int); A(0,2)","A:(nil;2)");
     test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*[$]A:(*[$]?;int64);3)");
 
-    // Building recursive types
-    test_name("A= :int; A(1)", (lex -> TypeName.make("A",lex,TypeInt.TRUE)));
-    test_ptr("A= :(str?, int); A(0,2)","A:(nil;2)");
-    // Named recursive types
-    test_isa("A= :(A?, int); A(0,2)",Type.SCALAR);// No error casting (0,2) to an A
-    test    ("A= :@{n=A?; v=flt}; A(@{n=0;v=1.2}).v;", TypeFlt.con(1.2));
-
-    // TODO: Needs a way to easily test simple recursive types
-    TypeEnv te3 = Exec.go(Env.top(),"args","A= :@{n=A?; v=int}; A(@{n=0;v=3})");
-    if( te3._errs != null ) System.err.println(te3._errs.toString());
-    Assert.assertNull(te3._errs);
-    TypeName tname3 = (TypeName)te3._tobj;
-    assertEquals("A", tname3._name);
-    TypeStruct tt3 = (TypeStruct)tname3._t;
-    assertEquals(Type.NIL      ,tt3.at(0));
-    assertEquals(TypeInt.con(3),tt3.at(1));
-    assertEquals("n",tt3._flds[0]);
-    assertEquals("v",tt3._flds[1]);
-
-    // Missing type B is also never worked on.
-    test_isa("A= :@{n=B?; v=int}", TypeFunPtr.GENERIC_FUNPTR);
-    test_isa("A= :@{n=B?; v=int}; a = A(0,2)", TypeMemPtr.OOP);
-    test_isa("A= :@{n=B?; v=int}; a = A(0,2); a.n", Type.NIL);
-    // Mutually recursive type
-    test_isa("A= :@{n=B; v=int}; B= :@{n=A; v=flt}", TypeFunPtr.GENERIC_FUNPTR);
+    //// Building recursive types
+    //test_name("A= :int; A(1)", (lex -> TypeName.make("A",lex,TypeInt.TRUE)));
+    //test_ptr("A= :(str?, int); A(0,2)","A:(nil;2)");
+    //// Named recursive types
+    //test_isa("A= :(A?, int); A(0,2)",Type.SCALAR);// No error casting (0,2) to an A
+    //test    ("A= :@{n=A?; v=flt}; A(@{n=0;v=1.2}).v;", TypeFlt.con(1.2));
+    //
+    //// TODO: Needs a way to easily test simple recursive types
+    //TypeEnv te3 = Exec.go(Env.top(),"args","A= :@{n=A?; v=int}; A(@{n=0;v=3})");
+    //if( te3._errs != null ) System.err.println(te3._errs.toString());
+    //Assert.assertNull(te3._errs);
+    //TypeName tname3 = (TypeName)te3._tobj;
+    //assertEquals("A", tname3._name);
+    //TypeStruct tt3 = (TypeStruct)tname3._t;
+    //assertEquals(Type.NIL      ,tt3.at(0));
+    //assertEquals(TypeInt.con(3),tt3.at(1));
+    //assertEquals("n",tt3._flds[0]);
+    //assertEquals("v",tt3._flds[1]);
+    //
+    //// Missing type B is also never worked on.
+    //test_isa("A= :@{n=B?; v=int}", TypeFunPtr.GENERIC_FUNPTR);
+    //test_isa("A= :@{n=B?; v=int}; a = A(0,2)", TypeMemPtr.OOP);
+    //test_isa("A= :@{n=B?; v=int}; a = A(0,2); a.n", Type.NIL);
+    //// Mutually recursive type
+    //test_isa("A= :@{n=B; v=int}; B= :@{n=A; v=flt}", TypeFunPtr.GENERIC_FUNPTR);
+    throw AA.unimpl();
   }
 
   @Test public void testParse07() {
@@ -342,19 +344,19 @@ public class TestParse {
     TypeEnv te4 = Exec.go(Env.top(),"args",ll_def+ll_con+ll_map+ll_fun+ll_apl);
     if( te4._errs != null ) System.err.println(te4._errs.toString());
     Assert.assertNull(te4._errs);
-    TypeName tname4 = (TypeName)te4._tobj;
-    assertEquals("List", tname4._name);
-    TypeStruct tt4 = (TypeStruct)tname4._t;
-    TypeMemPtr tmp5 = (TypeMemPtr)tt4.at(0);
-    assertEquals(2.3*2.3,tt4.at(1).getd(),1e-6);
-    assertEquals("next",tt4._flds[0]);
-    assertEquals("val",tt4._flds[1]);
-
-    // Test inferring a recursive struct type, with a little help
-    Type[] ts0 = TypeStruct.ts(Type.NIL,TypeFlt.con(1.2*1.2));
-    test_obj("map={x:@{n;v=flt}? -> x ? @{n=map(x.n);v=x.v*x.v} : 0}; map(@{n=0;v=1.2})",
-             TypeStruct.make(FLDS,ts0,TypeStruct.finals(2)));
-    
+    //TypeName tname4 = (TypeName)te4._tobj;
+    //assertEquals("List", tname4._name);
+    //TypeStruct tt4 = (TypeStruct)tname4._t;
+    //TypeMemPtr tmp5 = (TypeMemPtr)tt4.at(0);
+    //assertEquals(2.3*2.3,tt4.at(1).getd(),1e-6);
+    //assertEquals("next",tt4._flds[0]);
+    //assertEquals("val",tt4._flds[1]);
+    //
+    //// Test inferring a recursive struct type, with a little help
+    //Type[] ts0 = TypeStruct.ts(Type.NIL,TypeFlt.con(1.2*1.2));
+    //test_obj("map={x:@{n;v=flt}? -> x ? @{n=map(x.n);v=x.v*x.v} : 0}; map(@{n=0;v=1.2})",
+    //         TypeStruct.make(FLDS,ts0,TypeStruct.finals(2)));
+    //
     //// Test inferring a recursive struct type, with less help.  This one
     //// inlines so doesn't actually test inferring a recursive type.
     //Type[] ts1 = TypeStruct.ts(Type.NIL,TypeFlt.con(1.2*1.2));
@@ -380,6 +382,7 @@ public class TestParse {
     //test("id:{A->A}"    , Env.lookup_valtype("id"));
     //test("id:{A:int->A}", Env.lookup_valtype("id"));
     //test("id:{int->int}", Env.lookup_valtype("id"));
+    throw AA.unimpl();
   }
 
 
@@ -683,9 +686,10 @@ strs:List(str?) = ... // List of null-or-strings
   }
   static private void test_name( String program, String tname, Function<Integer,Type> expected ) {
     try( TypeEnv te = run(program) ) {
-      int lex = BitsAlias.alias_for_typename(tname);
-      Type t_expected = expected.apply(lex);
-      assertEquals(t_expected,te._t);
+      //int lex = BitsAlias.alias_for_typename(tname);
+      //Type t_expected = expected.apply(lex);
+      //assertEquals(t_expected,te._t);
+      throw AA.unimpl();
     }
   }
   static private void test_ptr( String program, Function<Integer,Type> expected ) {
@@ -739,10 +743,11 @@ strs:List(str?) = ... // List of null-or-strings
   }
   static private void test_name( String program, Function<Integer,Type> expected ) {
     try( TypeEnv te = run(program) ) {
-      assertTrue(te._t instanceof TypeName);
-      int alias = ((TypeName)te._t)._lex;
-      Type t_expected = expected.apply(alias);
-      assertTrue(te._t.isa(t_expected));
+      //assertTrue(te._t instanceof TypeName);
+      //int alias = ((TypeName)te._t)._lex;
+      //Type t_expected = expected.apply(alias);
+      //assertTrue(te._t.isa(t_expected));
+      throw AA.unimpl();
     }
   }
   static private void testerr( String program, String err, String cursor ) {

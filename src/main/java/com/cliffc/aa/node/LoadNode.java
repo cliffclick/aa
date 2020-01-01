@@ -80,7 +80,7 @@ public class LoadNode extends Node {
   }
 
   @Override public Type value(GVNGCM gvn) {
-    Type adr = gvn.type(adr()).base();
+    Type adr = gvn.type(adr());
     if( adr.isa(TypeMemPtr.OOP0.dual()) ) return Type.XSCALAR;
     if( TypeMemPtr.OOP0.isa(adr) ) return Type.SCALAR; // Very low, might be any address
     if( adr.is_forward_ref() ) return Type.SCALAR;
@@ -88,13 +88,13 @@ public class LoadNode extends Node {
       return adr.above_center() ? Type.XSCALAR : Type.SCALAR;
     TypeMemPtr tadr = (TypeMemPtr)adr;
     // Loading from TypeMem - will get a TypeObj out.
-    Type mem = gvn.type(mem()).base();     // Memory
+    Type mem = gvn.type(mem()); // Memory
     Type badmemrez = mem.above_center() ? Type.XSCALAR : Type.SCALAR;
     if( !(mem instanceof TypeStruct) ) {
       if( !(mem instanceof TypeMem) ) // Nothing sane
         return badmemrez;
       TypeObj obj = ((TypeMem)mem).ld(tadr);
-      mem = obj.base();
+      mem = obj;
     }
 
     // Loading from TypeObj - hoping to get a field out
@@ -109,7 +109,7 @@ public class LoadNode extends Node {
   }
 
   @Override public String err(GVNGCM gvn) {
-    Type tadr = gvn.type(adr()).base();
+    Type tadr = gvn.type(adr());
     if( tadr.must_nil() ) return bad("Struct might be nil when reading");
     if( !(tadr instanceof TypeMemPtr) )
       return bad("Unknown"); // Not a pointer nor memory, cannot load a field

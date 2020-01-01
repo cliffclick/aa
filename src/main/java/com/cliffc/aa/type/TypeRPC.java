@@ -17,7 +17,7 @@ public class TypeRPC extends Type<TypeRPC> {
     return _rpcs==tf._rpcs;
   }
   // Never part of a cycle, so the normal check works
-  //@Override public boolean cycle_equals( Type o ) { return equals(o); }
+  @Override public boolean cycle_equals( Type o ) { return equals(o); }
   @Override String str( VBitSet dups) {
     SB sb = new SB().p("#");
     return _rpcs.toString(sb).toString();
@@ -47,7 +47,6 @@ public class TypeRPC extends Type<TypeRPC> {
     case TFLT:
     case TINT:   return cross_nil(t);
     case TNIL:
-    case TNAME:  return t.xmeet(this); // Let other side decide
     case TTUPLE:
     case TFUN:
     case TOBJ:

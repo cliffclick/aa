@@ -238,12 +238,12 @@ public class Parse {
     // Which means TypeObj is named and not the pointer-to-TypeObj.
     // "Point= :@{x,y}" declares "Point" to be a type Name for "@{x,y}".
     Type ot = _e.lookup_type(tvar);
-    TypeName tn;
+    Type tn;
     if( ot == null ) {        // Name does not pre-exist
-      tn = TypeName.make_new_type(tvar,t);
+      tn = t.make_name(tvar); // Add a name
       _e.add_type(tvar,tn);   // Assign type-name
     } else {
-      tn = ot instanceof TypeName ? ((TypeName)ot).merge_recursive_type(t) : null;
+      tn = ot.has_name() ? ot.merge_recursive_type(t) : null;
       if( tn == null ) return err_ctrl2("Cannot re-assign type '"+tvar+"'");
     }
 
@@ -880,19 +880,11 @@ public class Parse {
   private Type typep(boolean type_var) {
     Type t = type0(type_var);
     if( t==null ) return null;
-    Type base = t.base();
-    if( !(base instanceof TypeObj) ) return t; // Primitives are not wrapped
+    if( !(t instanceof TypeObj) ) return t; // Primitives are not wrapped
     // Automatically convert to reference for fields.
     // Make a reasonably precise alias.
-
-    // All TypeObjs are made somewhere and have an alias.  "str" is always the
-    // top-level (unless user-overrides) "str" type, with alias BitsAlias.STR.
-    // TypeStruct uses the top-level BitsAlias.STRUCT but makes a private
-    // version useful in errors.  TypeName has an internal alias upon creation.
-    int type_alias = t instanceof TypeName
-      ? ((TypeName)t)._lex
-      : (t instanceof TypeStruct ? BitsAlias.type_alias(BitsAlias.REC,(TypeObj)t) : BitsAlias.STR);
-    TypeMemPtr tmp = TypeMemPtr.make(type_alias);
+    int type_alias = t instanceof TypeStruct ? BitsAlias.REC : BitsAlias.STR;
+    TypeMemPtr tmp = TypeMemPtr.make(BitsAlias.make0(type_alias),(TypeObj)t);
     return typeq(tmp);          // And check for null-ness
   }
   // Wrap in a nullable if there is a trailing '?'.  No spaces allowed
@@ -986,7 +978,7 @@ public class Parse {
         _x = oldx;               // Unwind if not a known type var
         return null;             // Not a type
       }
-      _e.add_type(tok,t=TypeName.make_forward_def_type(tok));
+      _e.add_type(tok,t=Type.make_forward_def_type(tok));
     }
     return t;
   }

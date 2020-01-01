@@ -1,12 +1,11 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.util.NonBlockingHashMapLong;
-import com.cliffc.aa.util.SB;
-import com.cliffc.aa.util.VBitSet;
+import com.cliffc.aa.util.*;
 
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Predicate;
 
 /** an implementation of language AA
  */
@@ -92,26 +91,28 @@ public class Type<T extends Type<T>> implements Cloneable {
   int _uid=CNT++; // Unique ID, will have gaps, used to uniquely order Types in Unions
   public int _hash;      // Hash for this Type; built recursively
   byte _type;            // Simple types use a simple enum
-  //boolean _cyclic;       // Part of a type cycle
-  T _dual;  // All types support a dual notion, lazily computed and cached here
+  public String _name;   // All types can be named
+  boolean _cyclic;       // Part of a type cycle
+  T _dual; // All types support a dual notion, eagerly computed and cached here
 
-  protected Type(byte type) { init(type); }
-  protected void init(byte type) { _type=type; /*_cyclic=false;*/ }
+  protected Type(byte type) { init(type,""); }
+  protected Type(byte type, String name) { init(type,name); }
+  protected void init(byte type) { init(type,""); }
+  protected void init(byte type, String name) { _type=type; _name=name; _cyclic=false; }
   @Override public final int hashCode( ) { return _hash; }
   // Compute the hash and return it, with all child types already having their
   // hash computed.  Subclasses override this.
-  int compute_hash() { assert is_simple(); return (_type<<1)|1; }
+  int compute_hash() { return (_type<<1)|1|_name.hashCode(); }
 
   // Is anything equals to this?
   @Override public boolean equals( Object o ) {
-    assert is_simple();         // Overridden in subclasses
     if( this == o ) return true;
-    return (o instanceof Type) && _type==((Type)o)._type;
+    return (o instanceof Type) && _type==((Type)o)._type && Util.eq(_name,((Type)o)._name);
   }
-  //public boolean cycle_equals( Type o ) {
-  //  assert is_simple();         // Overridden in subclasses
-  //  return _type==o._type;
-  //}
+  public boolean cycle_equals( Type o ) {
+    assert is_simple();         // Overridden in subclasses
+    return _type==o._type && Util.eq(_name,o._name);
+  }
 
   // In order to handle recursive printing, this is the only toString call in
   // the Type hierarchy.  Instead, subtypes override 'str(HashSet)' where the
@@ -120,7 +121,7 @@ public class Type<T extends Type<T>> implements Cloneable {
   // All other 'str()' callers just pass along.
   @Override public final String toString() { return str(null); }
   //@Override public final String toString() { return dstr(new SB(),null).toString(); }
-  String str( VBitSet dups ) { return STRS[_type]; }
+  String str( VBitSet dups ) { return _name+STRS[_type]; }
   SB dstr( SB sb, VBitSet dups ) { return sb.p(str(dups)); }
   String q() { return dstr(new SB(),null).toString(); }
 
@@ -131,8 +132,8 @@ public class Type<T extends Type<T>> implements Cloneable {
   @SuppressWarnings("unchecked")
   private static Type make( byte type ) {
     Type t1 = FREE;
-    if( t1 == null ) t1 = new Type(type);
-    else { FREE = null; t1.init(type); }
+    if( t1 == null ) t1 = new Type(type, "");
+    else { FREE = null; t1.init(type, ""); }
     Type t2 = t1.hashcons();
     return t1==t2 ? t1 : t1.free(t2);
   }
@@ -140,7 +141,7 @@ public class Type<T extends Type<T>> implements Cloneable {
   // check of a (possibly very large) Type is always a simple pointer-equality
   // check, except during construction and intern'ing.
   private static ConcurrentHashMap<Type,Type> INTERN = new ConcurrentHashMap<>();
-  //static int RECURSIVE_MEET;    // Count of recursive meet depth
+  static int RECURSIVE_MEET;    // Count of recursive meet depth
   @SuppressWarnings("unchecked")
   final Type hashcons() {
     _hash = compute_hash();     // Set hash
@@ -149,8 +150,8 @@ public class Type<T extends Type<T>> implements Cloneable {
       assert t2._dual != null;  // Prior is complete with dual
       return t2;                // Return prior
     }
-    //if( RECURSIVE_MEET > 0 )    // Mid-building recursive types; do not intern
-    //  return this;
+    if( RECURSIVE_MEET > 0 )    // Mid-building recursive types; do not intern
+      return this;
     // Not in type table
     _dual = null;                // No dual yet
     INTERN.put(this,this);       // Put in table without dual
@@ -240,16 +241,15 @@ public class Type<T extends Type<T>> implements Cloneable {
   static final byte TINT    =18; // All Integers, including signed/unsigned and various sizes; see TypeInt
   static final byte TFLT    =19; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
   static final byte TRPC    =20; // Return PCs; Continuations; call-site return points; see TypeRPC
-  static final byte TNAME   =21; // Named types; always a subtype of some other type
-  static final byte TTUPLE  =22; // Tuples; finite collections of unrelated Types, kept in parallel
-  static final byte TOBJ    =23; // Memory objects; arrays and structs and strings
-  static final byte TSTRUCT =24; // Memory Structs; tuples with named fields
-  static final byte TSTR    =25; // Memory String type; an array of chars
-  static final byte TMEM    =26; // Memory type; a map of Alias#s to TOBJs
-  static final byte TMEMPTR =27; // Memory pointer type; a collection of Alias#s
-  static final byte TFUNPTR =28; // Function pointer, refers to a collection of concrete functions
-  static final byte TFUN    =29; // A simple function signature, not a function nor function pointer
-  static final byte TLAST   =30; // Type check
+  static final byte TTUPLE  =21; // Tuples; finite collections of unrelated Types, kept in parallel
+  static final byte TOBJ    =22; // Memory objects; arrays and structs and strings
+  static final byte TSTRUCT =23; // Memory Structs; tuples with named fields
+  static final byte TSTR    =24; // Memory String type; an array of chars
+  static final byte TMEM    =25; // Memory type; a map of Alias#s to TOBJs
+  static final byte TMEMPTR =26; // Memory pointer type; a collection of Alias#s
+  static final byte TFUNPTR =27; // Function pointer, refers to a collection of concrete functions
+  static final byte TFUN    =28; // A simple function signature, not a function nor function pointer
+  static final byte TLAST   =29; // Type check
 
   public  static final Type ALL    = make( TALL   ); // Bottom
   public  static final Type ANY    = make( TANY   ); // Top
@@ -282,14 +282,10 @@ public class Type<T extends Type<T>> implements Cloneable {
   private static /*final*/ Type[] SCALAR_PRIMS;
 
   private boolean is_simple() { return _type < TSIMPLE; }
-  // Return base type of named types
-  public Type base() { Type t = this; while( t._type == TNAME ) t = ((TypeName)t)._t; return t; }
-  // Strip off any subclassing just for names
-  private byte simple_type() { return base()._type; }
-  private boolean is_ptr() { byte t = simple_type();  return t == TFUNPTR || t == TMEMPTR; }
-  private boolean is_num() { byte t = simple_type();  return t == TNUM || t == TXNUM || t == TNNUM || t == TXNNUM || t == TREAL || t == TXREAL || t == TNREAL || t == TXNREAL || t == TINT || t == TFLT; }
+  private boolean is_ptr() { byte t = _type;  return t == TFUNPTR || t == TMEMPTR; }
+  private boolean is_num() { byte t = _type;  return t == TNUM || t == TXNUM || t == TNNUM || t == TXNNUM || t == TREAL || t == TXREAL || t == TNREAL || t == TXNREAL || t == TINT || t == TFLT; }
   // True if 'this' isa SCALAR, without the cost of a full 'meet()'
-  private static final byte[] ISA_SCALAR = new byte[]{/*ALL-0*/0,0,0,0,1,1,1,1,1,1,/*TNNUM-10*/1,1,1,1,1,1,1,/*TSIMPLE-17*/0, 1,1,1,1,0,0,0,0,0,1,1,/*TFUN-29*/0}/*TLAST=30*/;
+  private static final byte[] ISA_SCALAR = new byte[]{/*ALL-0*/0,0,0,0,1,1,1,1,1,1,/*TNNUM-10*/1,1,1,1,1,1,1,/*TSIMPLE-17*/0, 1,1,1,0,0,0,0,0,1,1,/*TFUN-28*/0}/*TLAST=29*/;
   public final boolean isa_scalar() { assert ISA_SCALAR.length==TLAST; return ISA_SCALAR[_type]!=0; }
 
   // Return cached dual
@@ -302,7 +298,7 @@ public class Type<T extends Type<T>> implements Cloneable {
     if( _type==TNIL ) return (T)this; // NIL is a constant and thus self-dual
     return (T)new Type((byte)(_type^1));
   }
-  //T rdual() { assert _dual!=null; return _dual; }
+  T rdual() { assert _dual!=null; return _dual; }
 
   // Memoize meet results
   private static class Key {
@@ -331,6 +327,11 @@ public class Type<T extends Type<T>> implements Cloneable {
     // Reverse; xmeet 2nd arg is never "is_simple" and never equal to "this".
     mt = !is_simple() && t.is_simple() ? t.xmeet(this) : xmeet(t);
 
+    // Quick check on NIL: if either argument is NIL the result is allowed to
+    // be NIL...  but nobody in the lattice can make a NIL from whole cloth, or
+    // we get the crossing-nil bug.
+    assert mt != NIL || this==NIL || t==NIL;
+
     Key.put(this,t,mt);
     return mt;
   }
@@ -350,7 +351,7 @@ public class Type<T extends Type<T>> implements Cloneable {
     if( _type <= TXCTRL || t._type <= TXCTRL ) return ALL;
 
     // Meeting scalar and non-scalar falls to ALL.  Includes most Memory shapes.
-    if( isa_scalar() ^ t.base().isa_scalar() ) return ALL;
+    if( isa_scalar() ^ t.isa_scalar() ) return ALL;
 
     // Memory does something complex with memory
     if( t._type==TMEM ) return t.xmeet(this);
@@ -409,9 +410,97 @@ public class Type<T extends Type<T>> implements Cloneable {
         if( t._type == TXNREAL) return   not_nil();
       }
     }
-    // Named numbers or whatever: let name sort it out
-    if( t._type == TNAME  ) return t.xmeet(this);
     throw typerr(t);
+  }
+
+  // Make a named variant of any type, by just adding a name.
+  @SuppressWarnings("unchecked")
+  public final T make_name(String name) {
+    assert !has_name() && name.charAt(name.length()-1)==':';
+    Type t1 = clone();
+    t1._name = name;
+    Type t2 = t1.hashcons();
+    return (T)(t1==t2 ? t1 : t1.free(t2));
+  }
+  public boolean has_name() { return !_name.isEmpty(); }
+  @SuppressWarnings("unchecked")
+  public final T remove_name() {
+    if( !has_name() ) return (T)this;
+    Type t1 = clone();
+    t1._name = null;
+    Type t2 = t1.hashcons();
+    return (T)(t1==t2 ? t1 : t1.free(t2));
+  }
+
+  // Named types are essentially a subclass of any type.
+  // Examples:
+  //   B:A:int << B:int << int   // Subtypes
+  //     B:int.isa (int)
+  //   B:A:int.isa (B:int)
+  //     C:int.meet(B:int) == int
+  //   B:A:int.meet(C:int) == int
+  //
+  //   B:A:~int.join(B:~int) == B:A:~int
+  //     C:~int.join(B:~int) ==     ~int
+  //
+  //   B: int.meet(  ~int) == B:   int.meet(B:~int) == B:int
+  //   B:~int.meet(   int) ==      int
+  //   B:~int.meet(C: int) ==      int
+  //   B:~int.meet(B: int) == B:   int
+  //   B:~int.meet(C:~int) ==      int // Nothing in common, fall to int
+  //   B:~int.meet(  ~int) == B:  ~int
+  // B:A:~int.meet(B:~int) == B:A:~int // both high, keep long; short guy high, keep long
+  // B:A:~int.meet(B: int) == B:   int // one low, keep low   ; short guy  low, keep short
+  // B:A: int.meet(B:~int) == B:A: int // one low, keep low   ; short guy high, keep long
+  // B:A: int.meet(B: int) == B:   int // both low, keep short; short guy  low, keep short
+  //
+  // B:A:~int.meet(B:D:~int) == B:int // Nothing in common, fall to int
+
+  // TODO: will also need a unique lexical numbering, not just a name, to
+  // handle the case of the same name used in two different scopes.
+  final String mtname(Type t) {
+    Type   t0 = this,  t1 = t;
+    String s0 = t0._name, s1 = t1._name;
+    if( Util.eq(s0,s1) ) return s0;
+    // Sort by name length
+    if( s0.length() > s1.length() ) { t1=this; t0=t; s0=t0._name; s1=t1._name; }
+    int x = 0, i=0;  char c;    // Last colon seperator index
+    // Find split point
+    for( i = 0; i < s0.length(); i++ ) {
+      if( (c=s0.charAt(i)) != s1.charAt(i) )
+        break;
+      if( c==':' ) x=i;
+    }
+    // If s0 is a prefix of s1, and s0 is high then it can cover s1.
+    if( i==s0.length() && above_center() )
+      return s1;
+    // Keep the common prefix, which might be all of s0
+    String s2 = i==s0.length() ? s0 : s0.substring(0, x).intern();
+    if( i!=s0.length() && t0.above_center() && t1.above_center() )
+      throw com.cliffc.aa.AA.unimpl(); // Must force the resulting meet to be low.
+    return s2;
+  }
+  
+  public static Type make_forward_def_type(String tok) {
+    throw com.cliffc.aa.AA.unimpl();
+  }
+  public Type merge_recursive_type( Type t ) {
+    //if( _depth >= 0 ) return null; // Not a recursive type-def
+    //assert _t==TypeStruct.ALLSTRUCT;
+    //// Remove from INTERN table, since hacking type will not match hash
+    //untern()._dual.untern();
+    //// Hack type and it's dual.  Type is now recursive.
+    //_t = t;
+    //_depth = _dual._depth = depth(t);
+    //_dual._t = t._dual;
+    //_hash  = _dual._hash  = 0;  // Trigger any asserts
+    //_hash = compute_hash();
+    //_dual._hash = _dual.compute_hash();
+    //// Back into the INTERN table
+    //retern()._dual.retern();
+    //
+    //return this;
+    throw com.cliffc.aa.AA.unimpl();
   }
 
   // By design in meet, args are already flipped to order _type, which forces
@@ -465,7 +554,6 @@ public class Type<T extends Type<T>> implements Cloneable {
     ts = concat(ts,TypeInt   .TYPES);
     ts = concat(ts,TypeMem   .TYPES);
     ts = concat(ts,TypeMemPtr.TYPES);
-    ts = concat(ts,TypeName  .TYPES);
     ts = concat(ts,TypeObj   .TYPES);
     ts = concat(ts,TypeRPC   .TYPES);
     ts = concat(ts,TypeStr   .TYPES);
@@ -622,6 +710,7 @@ public class Type<T extends Type<T>> implements Cloneable {
   // +1 requires a bit-changing conversion (Int->Flt)
   // 99 Bottom; No free converts; e.g. Flt->Int requires explicit rounding
   public byte isBitShape(Type t) {
+    if( has_name() || t.has_name() ) throw com.cliffc.aa.AA.unimpl();
     if( _type == TNIL ) return 0; // Nil is free to convert always
     if( above_center() && isa(t) ) return 0; // Can choose compatible format
     if( _type == t._type ) return 0; // Same type is OK
@@ -740,7 +829,7 @@ public class Type<T extends Type<T>> implements Cloneable {
   //// Deepest depth of nested TypeStructs; cycles at a base of 10000.
   //final int depth() { return depth(null); }
   //int depth( NonBlockingHashMapLong<Integer> ds ) { return 0; }
-  //// Mark if part of a cycle
+  // Mark if part of a cycle
   //void mark_cycle( Type t, VBitSet visit, BitSet cycle ) { }
   //
   //// Iterate over any nested child types.  Only side-effect results.
@@ -750,9 +839,9 @@ public class Type<T extends Type<T>> implements Cloneable {
   // If the test returns false, short-circuit the walk.  No attempt to guard
   // against recursive structure walks, so the 'test' must return false when
   // visiting the same Type again.
-  //void walk( Predicate<Type> p ) { assert is_simple(); p.test(this); }
+  void walk( Predicate<Type> p ) { assert is_simple(); p.test(this); }
 
-  //TypeStruct repeats_in_cycles(TypeStruct head, VBitSet bs) { return null; }
+  TypeStruct repeats_in_cycles(TypeStruct head, VBitSet bs) { return null; }
 
   // Dual, except keep TypeMem.XOBJ as high for starting GVNGCM.opto() state.
   public Type startype() {

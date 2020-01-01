@@ -11,9 +11,9 @@ import org.jetbrains.annotations.NotNull;
 // vtable like field, i.e. memory updates.
 // Names an unaliased memory.  Needs to collapse away, or else an error.
 public class IntrinsicNode extends Node {
-  public final TypeName _tn;    // Unique name
+  public final Type _tn;        // Named type
   Parse _badargs;               // Filled in when inlined in CallNode
-  IntrinsicNode( TypeName tn, Parse badargs, Node... ns ) {
+  IntrinsicNode( Type tn, Parse badargs, Node... ns ) {
     super(OP_NAME,ns);
     _tn=tn;
     _badargs=badargs;
@@ -28,7 +28,7 @@ public class IntrinsicNode extends Node {
   // vtable name type in memory.  Unaliased, so the same memory cannot be
   // referred to without the Name.  Error if the memory cannot be proven
   // unaliased.  The Ideal call collapses the Name into the unaliased NewNode.
-  public static FunPtrNode convertTypeName( TypeName tn, Parse badargs, GVNGCM gvn ) {
+  public static FunPtrNode convertTypeName( Type tn, Parse badargs, GVNGCM gvn ) {
     // The incoming memory type is *exact* and does not have any extra fields.
     // The usual duck typing is "this-or-below", which allows and ignores extra
     // fields.  For Naming - which involves installing a v-table (or any other
@@ -43,12 +43,13 @@ public class IntrinsicNode extends Node {
     Node mem = gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM      ),null));
     Node ptr = gvn.xform(new ParmNode( 0,"ptr",fun,gvn.con(TypeMemPtr.STRUCT),null));
     Node cvt = gvn.xform(new IntrinsicNode(tn,badargs,fun,mem,ptr));
-    Node mmem= gvn.xform(new MemMergeNode(mem,cvt,tn._lex));
-    RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,ptr,rpc,fun));
-    return (FunPtrNode)gvn.xform(new FunPtrNode(ret));
+    //Node mmem= gvn.xform(new MemMergeNode(mem,cvt,tn._lex));
+    //RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,ptr,rpc,fun));
+    //return (FunPtrNode)gvn.xform(new FunPtrNode(ret));
+    throw AA.unimpl();
   }
 
-  @Override public TypeName all_type() { return _tn; }
+  @Override public Type all_type() { return _tn; }
 
   // If the input memory is unaliased, fold into the NewNode.
   // If this node does not fold away, the program is in error.
@@ -64,18 +65,19 @@ public class IntrinsicNode extends Node {
         // NewObjNode is well-typed and producing a pointer to memory with the
         // correct type?  Fold into the NewObjNode and remove this Convert.
         TypeTuple tnnn = (TypeTuple)gvn.type(nnn);
-        if( tnnn.at(0).isa(_tn._t) ) {
-          nnn.set_name(_tn);
-          gvn.add_work(nnn);
-          return opj;
-        }
+        //if( tnnn.at(0).isa(_tn._t) ) {
+        //  nnn.set_name(_tn);
+        //  gvn.add_work(nnn);
+        //  return opj;
+        //}
+        throw AA.unimpl();
       }
     }
     return null;
   }
 
   // Semantics are to extract a TypeObj from mem and ptr, and if there is no
-  // aliasing, sharpen the TypeObj to a TypeName.  We can be correct and
+  // aliasing, sharpen the TypeObj to a Type with a name.  We can be correct and
   // conservative by doing nothing.
 
   // The inputs are a TypeMem and a TypeMemPtr to an unnamed TypeObj.  If the
@@ -89,12 +91,12 @@ public class IntrinsicNode extends Node {
     // Get the Obj from the pointer.  We are renaming it in-place, basically
     // changing the vtable.  We need the l-value.
     TypeObj obj = ((TypeMem)mem).ld((TypeMemPtr)ptr);
-    if( !obj.isa(_tn._t       ) ) return _tn       ; // Inputs not correct from, and node is in-error
-    if(  obj.isa(_tn._t.dual()) ) return _tn.dual();
-    // Obj needs to share a common name hierarchy (same Name-depth) as 'from'
-    int fd = _tn._depth;
-    int od = obj instanceof TypeName ? ((TypeName)obj)._depth : -1;
-    if( fd-1 != od ) return obj.above_center() ? _tn.dual() : _tn; // Name-depth does not match, node is in-error
+    //if( !obj.isa(_tn._t       ) ) return _tn       ; // Inputs not correct from, and node is in-error
+    //if(  obj.isa(_tn._t.dual()) ) return _tn.dual();
+    //// Obj needs to share a common name hierarchy (same Name-depth) as 'from'
+    //int fd = _tn._depth;
+    //int od = obj instanceof TypeName ? ((TypeName)obj)._depth : -1;
+    //if( fd-1 != od ) return obj.above_center() ? _tn.dual() : _tn; // Name-depth does not match, node is in-error
     //
     //// Wrap result in 1 layer of Name
     //return tname.make(obj);
@@ -115,28 +117,29 @@ public class IntrinsicNode extends Node {
   // --------------------------------------------------------------------------
   // Default name constructor using expanded args list.  Just a NewObjNode but the
   // result is a named type.  Same as convertTypeName on an unaliased NewObjNode.
-  public static FunPtrNode convertTypeNameStruct( TypeName to, GVNGCM gvn ) {
-    NewObjNode nnn = new NewObjNode(false,to._lex,null);
-    nnn.set_name(to);
-    TypeStruct from = (TypeStruct)to._t;
-    TypeMemPtr tmp = TypeMemPtr.make(nnn._alias);
-    TypeFunPtr tf = TypeFunPtr.make_new(from,tmp);
-    FunNode fun = (FunNode) gvn.xform(new FunNode(to._name,tf).add_def(Env.ALL_CTRL));
-    Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
-    Node memp= gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM     ),null));
-    // Add input edges to the NewNode
-    nnn.set_def(0,fun,gvn);     // Set control to function start
-    for( int i=0; i<from._ts.length; i++ ) {
-      String argx = from._flds[i];
-      if( TypeStruct.fldBot(argx) ) argx = null;
-      nnn.add_def(gvn.xform(new ParmNode(i,argx,fun, gvn.con(from._ts[i]),null)));
-    }
-    gvn.init(nnn);
-    Node ptr = gvn.xform(new  ProjNode(nnn,1));
-    Node obj = gvn.xform(new OProjNode(nnn,0));
-    Node mmem= gvn.xform(new MemMergeNode(memp,obj,nnn._alias));
-    RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,ptr,rpc,fun));
-    return (FunPtrNode)gvn.xform(new FunPtrNode(ret));
+  public static FunPtrNode convertTypeNameStruct( Type to, GVNGCM gvn ) {
+    //NewObjNode nnn = new NewObjNode(false,to._lex,null);
+    //nnn.set_name(to);
+    //TypeStruct from = (TypeStruct)to._t;
+    //TypeMemPtr tmp = TypeMemPtr.make(nnn._alias);
+    //TypeFunPtr tf = TypeFunPtr.make_new(from,tmp);
+    //FunNode fun = (FunNode) gvn.xform(new FunNode(to._name,tf).add_def(Env.ALL_CTRL));
+    //Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
+    //Node memp= gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM     ),null));
+    //// Add input edges to the NewNode
+    //nnn.set_def(0,fun,gvn);     // Set control to function start
+    //for( int i=0; i<from._ts.length; i++ ) {
+    //  String argx = from._flds[i];
+    //  if( TypeStruct.fldBot(argx) ) argx = null;
+    //  nnn.add_def(gvn.xform(new ParmNode(i,argx,fun, gvn.con(from._ts[i]),null)));
+    //}
+    //gvn.init(nnn);
+    //Node ptr = gvn.xform(new  ProjNode(nnn,1));
+    //Node obj = gvn.xform(new OProjNode(nnn,0));
+    //Node mmem= gvn.xform(new MemMergeNode(memp,obj,nnn._alias));
+    //RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,ptr,rpc,fun));
+    //return (FunPtrNode)gvn.xform(new FunPtrNode(ret));
+    throw AA.unimpl();
   }
 
 }

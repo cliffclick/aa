@@ -96,7 +96,7 @@ public class TypeMem extends Type<TypeMem> {
     return true;
   }
   // Never part of a cycle, so the normal check works
-  //@Override public boolean cycle_equals( Type o ) { return equals(o); }
+  @Override public boolean cycle_equals( Type o ) { return equals(o); }
   @Override String str( VBitSet dups ) {
     if( this== MEM ) return "[mem]";
     if( this==XMEM ) return "[~mem]";
@@ -161,7 +161,6 @@ public class TypeMem extends Type<TypeMem> {
   public static final TypeMem XMEM; // Every alias filled with anything
          static final TypeMem EMPTY_MEM;
   public static final TypeMem MEM_ABC;
-  private static final TypeMem MEM_NAME;
   static {
     // All memory.  Includes breakouts for all structs and all strings.
     // Triggers BitsAlias.<clinit> which makes all the initial alias splits.
@@ -179,9 +178,8 @@ public class TypeMem extends Type<TypeMem> {
     EMPTY_MEM = XMEM; //make(new TypeObj[0]); // Tried no-memory-vs-XOBJ-memory
 
     MEM_ABC  = make(TypeMemPtr.ABCPTR.getbit(),TypeStr.ABC);
-    MEM_NAME = make(BitsAlias.RECBITS,TypeName.TEST_STRUCT);
   }
-  static final TypeMem[] TYPES = new TypeMem[]{MEM,MEM_ABC,MEM_NAME};
+  static final TypeMem[] TYPES = new TypeMem[]{MEM,MEM_ABC};
 
   // All mapped memories remain, but each memory flips internally.
   @Override protected TypeMem xdual() {

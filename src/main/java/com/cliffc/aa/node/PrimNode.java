@@ -69,7 +69,7 @@ public abstract class PrimNode extends Node {
     new   NE_OOP(),
   };
 
-  public static PrimNode convertTypeName( Type from, TypeName to, Parse badargs ) {
+  public static PrimNode convertTypeName( Type from, Type to, Parse badargs ) {
     return new ConvertTypeName(from,to,badargs);
   }
 
@@ -136,9 +136,10 @@ public abstract class PrimNode extends Node {
 // Default name constructor using a single tuple type
 static class ConvertTypeName extends PrimNode {
   private final Parse _badargs; // Only for converts
-  ConvertTypeName(Type from, TypeName to, Parse badargs) {
-    super(to._name,TypeStruct.make(to._t),to);
+  ConvertTypeName(Type from, Type to, Parse badargs) {
+    super(to._name,TypeStruct.make(from),to);
     _badargs=badargs;
+    throw AA.unimpl();
   }
   @Override public Type value(GVNGCM gvn) {
     Type[] ts = new Type[_defs._len];
@@ -147,9 +148,10 @@ static class ConvertTypeName extends PrimNode {
     return apply(ts);     // Apply (convert) even if some args are not constant
   }
   @Override public Type apply( Type[] args ) {
-    TypeName tn = ((TypeName)_ret).make(args[1]);
-    // If args are illegal, the output is still no worse than _ret in either direction
-    return _ret.dual().isa(tn) ? (tn.isa(_ret) ? tn : _ret) : _ret.dual();
+    //TypeName tn = ((TypeName)_ret).make(args[1]);
+    //// If args are illegal, the output is still no worse than _ret in either direction
+    //return _ret.dual().isa(tn) ? (tn.isa(_ret) ? tn : _ret) : _ret.dual();
+    throw AA.unimpl();
   }
   @Override public String err(GVNGCM gvn) {
     Type actual = gvn.type(in(1));

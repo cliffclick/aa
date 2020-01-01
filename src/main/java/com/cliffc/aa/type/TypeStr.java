@@ -5,15 +5,14 @@ import com.cliffc.aa.util.Util;
 import com.cliffc.aa.util.VBitSet;
 
 import java.util.HashMap;
-import java.util.function.Predicate;
 
 // Strings.  Just an alternative TypeObj to TypeStruct - but basically really
 // should be replaced with a named Array.
 public class TypeStr extends TypeObj<TypeStr> {
   private String _con;          //
-  private TypeStr  (boolean any, String con ) { super(TSTR,any); init(any,con); }
-  private void init(boolean any, String con ) {
-    super.init(TSTR,any);
+  private TypeStr  (String name, boolean any, String con ) { super(TSTR,name,any); init(name,any,con); }
+  private void init(String name, boolean any, String con ) {
+    super.init(TSTR,name,any);
     _con = con;
   }
   @Override int compute_hash() { return super.compute_hash() + (_con==null ? 0 : _con.hashCode());  }
@@ -22,7 +21,7 @@ public class TypeStr extends TypeObj<TypeStr> {
     if( !(o instanceof TypeStr) || !super.equals(o) ) return false;
     return Util.eq(_con,((TypeStr)o)._con);
   }
-  //@Override public boolean cycle_equals( Type o ) { return equals(o); }
+  @Override public boolean cycle_equals( Type o ) { return equals(o); }
   @Override String str( VBitSet dups) {
     SB sb = new SB();
     if( _any ) sb.p('~');
@@ -32,21 +31,18 @@ public class TypeStr extends TypeObj<TypeStr> {
   }
   private static TypeStr FREE=null;
   @Override protected TypeStr free( TypeStr ret ) { FREE=this; return ret; }
-  public static TypeStr make( boolean any, String con ) {
+  public static TypeStr make( boolean any, String con ) { return make("",any,con); }
+  public static TypeStr make( String name, boolean any, String con ) {
     if( con!=null ) any = false; // "any" is ignored for constants
     TypeStr t1 = FREE;
-    if( t1 == null ) t1 = new TypeStr(any,con);
-    else { FREE = null; t1.init(any,con); }
+    if( t1 == null ) t1 = new TypeStr(name,any,con);
+    else {   FREE = null;     t1.init(name,any,con); }
     TypeStr t2 = (TypeStr)t1.hashcons();
     if( t1!=t2 ) return t1.free(t2);
     return t1;
   }
   public static TypeStr con(String con) { return make(false,con); }
   public static void init() {} // Used to force class init
-
-  // Get the alias for string constants.  Since string constants are interned,
-  // so are the aliases.
-  //public int get_alias() { return _news.getbit(); }
 
   public  static final TypeStr  STR = make(false,null); // not null
   public  static final TypeStr XSTR = make(true ,null); // choice string
@@ -57,18 +53,17 @@ public class TypeStr extends TypeObj<TypeStr> {
   // Return a String from a TypeStr constant; assert otherwise.
   @Override public String getstr() { assert is_con(); return _con; }
 
-  @Override protected TypeStr xdual() { return _con==null ? new TypeStr(!_any,null) : this; }
-  //@Override TypeStr rdual() {
-  //  if( _dual != null ) return _dual;
-  //  TypeStr dual = _dual = xdual();
-  //  dual._dual = this;
-  //  dual._hash = dual.compute_hash();
-  //  return dual;
-  //}
+  @Override protected TypeStr xdual() { return _con==null ? new TypeStr(_name,!_any,null) : this; }
+  @Override TypeStr rdual() {
+    if( _dual != null ) return _dual;
+    TypeStr dual = _dual = xdual();
+    dual._dual = this;
+    dual._hash = dual.compute_hash();
+    return dual;
+  }
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TSTR:   break;
-    case TNAME:  return t.xmeet(this); // Let other side decide
     case TSTRUCT:return OBJ;
     case TOBJ:   return t.above_center() ? this : t;
     case TNIL:
