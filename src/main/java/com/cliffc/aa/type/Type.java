@@ -500,28 +500,6 @@ public class Type<T extends Type<T>> implements Cloneable {
     return s2;
   }
 
-  public static Type make_forward_def_type(String tok) {
-    throw com.cliffc.aa.AA.unimpl();
-  }
-  public Type merge_recursive_type( Type t ) {
-    //if( _depth >= 0 ) return null; // Not a recursive type-def
-    //assert _t==TypeStruct.ALLSTRUCT;
-    //// Remove from INTERN table, since hacking type will not match hash
-    //untern()._dual.untern();
-    //// Hack type and it's dual.  Type is now recursive.
-    //_t = t;
-    //_depth = _dual._depth = depth(t);
-    //_dual._t = t._dual;
-    //_hash  = _dual._hash  = 0;  // Trigger any asserts
-    //_hash = compute_hash();
-    //_dual._hash = _dual.compute_hash();
-    //// Back into the INTERN table
-    //retern()._dual.retern();
-    //
-    //return this;
-    throw com.cliffc.aa.AA.unimpl();
-  }
-
   // By design in meet, args are already flipped to order _type, which forces
   // symmetry for things with badly ordered _type fields.  The question is
   // still interesting for other orders.

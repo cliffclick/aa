@@ -238,12 +238,13 @@ public class Parse {
     // Which means TypeObj is named and not the pointer-to-TypeObj.
     // "Point= :@{x,y}" declares "Point" to be a type Name for "@{x,y}".
     Type ot = _e.lookup_type(tvar);
-    Type tn;
+    Type tn = null;
     if( ot == null ) {        // Name does not pre-exist
       tn = t.set_name((tvar+":").intern());  // Add a name
       _e.add_type(tvar,tn);   // Assign type-name
     } else {
-      tn = ot.has_name() ? ot.merge_recursive_type(t) : null;
+      if( ot instanceof TypeStruct && t instanceof TypeStruct )
+        tn = ot.has_name() ? ((TypeStruct)ot).merge_recursive_type((TypeStruct)t) : null;
       if( tn == null ) return err_ctrl2("Cannot re-assign type '"+tvar+"'");
     }
 
@@ -880,6 +881,7 @@ public class Parse {
     // Type.ANY is a flag for '->' which is not a type.
     return t==Type.ANY ? null : t;
   }
+  // TypeObjs get wrapped in a pointer, and the pointer is returned instead.
   private Type typep(boolean type_var) {
     Type t = type0(type_var);
     if( t==null ) return null;
@@ -981,7 +983,7 @@ public class Parse {
         _x = oldx;               // Unwind if not a known type var
         return null;             // Not a type
       }
-      _e.add_type(tok,t=Type.make_forward_def_type(tok));
+      _e.add_type(tok,t=TypeStruct.make_forward_def_type(tok));
     }
     return t;
   }

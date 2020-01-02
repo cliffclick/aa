@@ -290,11 +290,11 @@ public class TestParse {
 
   @Test public void testParse06() {
     test_ptr("A= :(A?, int); A(0,2)","A:(nil;2)");
-    test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*[$]A:(*[$]?;int64);3)");
+    test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*[$]A:(nil;2);3)");
 
-    //// Building recursive types
-    //test_name("A= :int; A(1)", (lex -> TypeName.make("A",lex,TypeInt.TRUE)));
-    //test_ptr("A= :(str?, int); A(0,2)","A:(nil;2)");
+    // Building recursive types
+    test("A= :int; A(1)", TypeInt.TRUE.set_name("A:"));
+    test_ptr("A= :(str?, int); A(0,2)","A:(nil;2)");
     //// Named recursive types
     //test_isa("A= :(A?, int); A(0,2)",Type.SCALAR);// No error casting (0,2) to an A
     //test    ("A= :@{n=A?; v=flt}; A(@{n=0;v=1.2}).v;", TypeFlt.con(1.2));
@@ -683,14 +683,6 @@ strs:List(str?) = ... // List of null-or-strings
       assertEquals(expected,actual);
     }
   }
-  static private void test_name( String program, String tname, Function<Integer,Type> expected ) {
-    try( TypeEnv te = run(program) ) {
-      //int lex = BitsAlias.alias_for_typename(tname);
-      //Type t_expected = expected.apply(lex);
-      //assertEquals(t_expected,te._t);
-      throw AA.unimpl();
-    }
-  }
   static private void test_ptr( String program, Function<Integer,Type> expected ) {
     try( TypeEnv te = run(program) ) {
       assertTrue(te._t instanceof TypeMemPtr);
@@ -738,15 +730,6 @@ strs:List(str?) = ... // List of null-or-strings
   static private void test_isa( String program, Type expected ) {
     try( TypeEnv te = run(program) ) {
       assertTrue(te._t.isa(expected));
-    }
-  }
-  static private void test_name( String program, Function<Integer,Type> expected ) {
-    try( TypeEnv te = run(program) ) {
-      //assertTrue(te._t instanceof TypeName);
-      //int alias = ((TypeName)te._t)._lex;
-      //Type t_expected = expected.apply(alias);
-      //assertTrue(te._t.isa(t_expected));
-      throw AA.unimpl();
     }
   }
   static private void testerr( String program, String err, String cursor ) {

@@ -309,6 +309,69 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return make(flds,ts,finals);
   }
 
+  // Make a type-variable with no definition - it is assumed to be a
+  // forward-reference, to be resolved before the end of parsing.
+  public static Type make_forward_def_type(String tok) {
+    return ALLSTRUCT.set_name((tok+":").intern());
+  }
+  public TypeStruct merge_recursive_type( TypeStruct t ) {
+    assert has_name() && TypeAry.eq(_ts,TypeStruct.ALLSTRUCT._ts);
+    // Remove from INTERN table, since hacking type will not match hash
+    untern()._dual.untern();
+    // Hack type and it's dual.  Type is now recursive.
+    _flds  = t._flds  ; _dual._flds  = t._dual._flds  ;
+    _ts    = t._ts    ; _dual._ts    = t._dual._ts    ;
+    _finals= t._finals; _dual._finals= t._dual._finals;
+    _cyclic= _dual._cyclic = true;
+    // Hash changes, e.g. field names.
+    _hash = compute_hash();  _dual._hash = _dual.compute_hash();
+    // Check for a prior.  This can ONLY happen during testing, because the
+    // same type name (different lexical scopes; name mangling) cannot be used
+    // twice.
+    TypeStruct old = (TypeStruct)intern_lookup();
+    if( old != null ) { free(null);  _dual.free(null);  return old; }
+
+    // 'this' hash changes and there is an arbitrary path from t->...->this all
+    // with hash now wrong.  As part of mark_cyclic, when the cycle is found
+    // flag all hashes as zero.  As part of unwind: (1) primitives assert
+    // hash!=0 (trivially correct), and (2) ptrs&structs assert either hash==0
+    // (and cyclic) or hash is correct, and if zero, compute it.  Walk the type
+    // cycle, flagging as cyclic, recomputing hashes and rehashing
+    mark_cyclic(new Ary<>(Type.class),this);
+    // Back into the INTERN table
+    retern()._dual.retern();
+    return this;
+  }
+  // Classic cycle-finding algorithm.
+  private void mark_cyclic(Ary<Type> stack, Type t ) {
+    if( stack._len > 0 && t==this ) {    // If visiting again... have found a cycle t->....->this
+      // All on the stack are flagged as being part of a cycle
+      Type st;
+      for( int i=stack._len-1; (st=stack.at(i))!=t; i-- ) {
+        assert st._type==TMEMPTR || st._type == TSTRUCT;
+        st.untern()._dual.untern(); // Wrong hash
+        st._cyclic = st._dual._cyclic = true;
+        st._hash = st._dual._hash = 0; // Clear.  Cannot compute until all children found/cycles walked.
+      }
+    } else {
+      if( t instanceof TypeMemPtr || t instanceof TypeStruct ) {
+        stack.push(t);              // Push on stack, in case a cycle is found
+        if( t instanceof TypeMemPtr )             mark_cyclic(stack,((TypeMemPtr)t)._obj);
+        else for( Type tf : ((TypeStruct)t)._ts ) mark_cyclic(stack, tf                 );
+        if( t._hash==0 ) {    // If part of a cycle, hash was cleared.  Rehash.
+          assert t._cyclic && t._dual._cyclic;
+          t      ._hash=t      .compute_hash();
+          t._dual._hash=t._dual.compute_hash();
+          t.retern()._dual.retern();
+        } else                  // Some other part, not part of cycle
+          assert t._hash==t.compute_hash();
+        stack.pop();            // Pop, not part of anothers cycle
+      } else {
+        assert t._hash != 0;    // Not part of any cycle, unchanged
+      }
+    }
+  }
+
   // Dual the flds, dual the tuple.
   @Override protected TypeStruct xdual() {
     String[] as = new String[_flds.length];
@@ -330,6 +393,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     for( int i=0; i<as.length; i++ ) as[i]=sdual(_flds[i]);
     for( int i=0; i<bs.length; i++ ) bs[i]=fdual(_finals[i]);
     TypeStruct dual = _dual = new TypeStruct(_name,!_any,as,ts,bs);
+    assert _hash == compute_hash();
     dual._hash = dual.compute_hash(); // Compute hash before recursion
     for( int i=0; i<ts.length; i++ ) ts[i] = _ts[i].rdual();
     dual._dual = this;
@@ -459,7 +523,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       mt._flds[i] = smeet(mt._flds[i],mx._flds[i]); // Set the Meet of field names
       mt._finals[i] = fmeet(mt._finals[i],mx._finals[i]);
     }
-    mt._name = lf.mtname(rt);
+    mt._name = mt.mtname(mx);
     mt._hash = mt.compute_hash(); // Compute hash now that fields and finals are set
 
     // Since the result is cyclic, we cannot test the cyclic parts for
@@ -590,12 +654,12 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     assert old.interned();
     TypeStruct nt = OLD2APX.get(old);
     if( nt != null ) return ufind(nt);
-    
+
     if( isnews ) {            // Depth-increasing struct?
       if( d==cutoff ) {       // Cannot increase depth any more
         cutoffs.push(old);    // Save cutoff point for later MEET
         return OLD2APX.get(dold); // Return last valid depth - forces cycle
-      } else {                    
+      } else {
         assert cutoffs == null; // Approaching max depth, make a place to record cutoffs
         if( d+1==cutoff ) cutoffs = new Ary<>(TypeStruct.class);
       }
@@ -620,7 +684,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     if( d==cutoff ) OLD2APX.put(old,null); // Do not keep sharing the "tails"
     return nts;
   }
-  
+
   private static Type ax_impl_ptr( int alias, int cutoff, Ary<TypeStruct> cutoffs, int d, TypeStruct dold, TypeMemPtr old ) {
     assert old.interned();
     TypeMemPtr nt = OLD2APX.get(old);
@@ -634,7 +698,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     if( d+1==cutoff ) OLD2APX.put(old,null); // Do not keep sharing the "tails"
     return nmp;
   }
-  
+
   // Update-in-place 'meet' of pre-allocated new types.  Walk all the old type
   // and meet into the corresponding new type.  Changes the internal edges of
   // the new types, so their hash remains undefined.
@@ -796,7 +860,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return false;
   }
 
-  // Reachable collection of TypeMemPtr, TypeName and TypeStruct.
+  // Reachable collection of TypeMemPtr and TypeStruct.
   // Optionally keep interned Types.  List is pre-order.
   Ary<Type> reachable() { return reachable(false); }
   private Ary<Type> reachable( boolean keep ) {
@@ -837,23 +901,25 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return err == 0;
   }
 
-  // Get BitSet of not-interned cyclic bits
+  // Get BitSet of not-interned cyclic bits.  Classic cycle-finding algorithm.
   private BitSet get_cyclic( ) {
     return get_cyclic(new BitSet(),new VBitSet(),new Ary<>(Type.class),this);
   }
   private static BitSet get_cyclic(BitSet bcs, VBitSet bs, Ary<Type> stack, Type t ) {
     if( t.interned() ) return bcs;
-    if( bs.tset(t._uid) ) {
-      for( int i=stack.find(t); i>=0 && i<stack._len; i++ )
+    if( bs.tset(t._uid) ) {     // If visiting again... have found a cycle t->....->t
+      // All on the stack are flagged as being part of a cycle
+      for( int i=stack._len-1; stack.at(i)!=t; i-- )
         bcs.set(stack.at(i)._uid);
+      bcs.set(t._uid);
       return bcs;
     }
-    stack.push(t);
+    stack.push(t);              // Push on stack, in case a cycle is found
     switch( t._type ) {
     case TMEMPTR: get_cyclic(bcs,bs,stack,((TypeMemPtr)t)._obj); break;
     case TSTRUCT: for( Type tf : ((TypeStruct)t)._ts ) get_cyclic(bcs,bs,stack,tf); break;
     }
-    stack.pop();
+    stack.pop();                // Pop, not part of anothers cycle
     return bcs;
   }
   private void mark_cyclic( BitSet bcs, Ary<Type> reaches ) {
