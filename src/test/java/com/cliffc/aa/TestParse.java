@@ -261,7 +261,7 @@ public class TestParse {
     test("gal=:flt; tank:gal = gal(2)", TypeInt.con(2).set_name("gal:"));
     // test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: figure out if free cast for bare constants?
     testerr ("gal=:flt; tank:gal = gal(2)+1", "3 is not a gal:flt64",29);
-    
+
     test    ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
     test    ("Point=:@{x;y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
     testerr ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1;y=2}))", "*[$]@{x==1;y==2} is not a *[$]Point:@{x=;y=}",68);
@@ -295,29 +295,27 @@ public class TestParse {
     // Building recursive types
     test("A= :int; A(1)", TypeInt.TRUE.set_name("A:"));
     test_ptr("A= :(str?, int); A(0,2)","A:(nil;2)");
-    //// Named recursive types
-    //test_isa("A= :(A?, int); A(0,2)",Type.SCALAR);// No error casting (0,2) to an A
-    //test    ("A= :@{n=A?; v=flt}; A(@{n=0;v=1.2}).v;", TypeFlt.con(1.2));
-    //
-    //// TODO: Needs a way to easily test simple recursive types
-    //TypeEnv te3 = Exec.go(Env.top(),"args","A= :@{n=A?; v=int}; A(@{n=0;v=3})");
-    //if( te3._errs != null ) System.err.println(te3._errs.toString());
-    //Assert.assertNull(te3._errs);
-    //TypeName tname3 = (TypeName)te3._tobj;
-    //assertEquals("A", tname3._name);
-    //TypeStruct tt3 = (TypeStruct)tname3._t;
-    //assertEquals(Type.NIL      ,tt3.at(0));
-    //assertEquals(TypeInt.con(3),tt3.at(1));
-    //assertEquals("n",tt3._flds[0]);
-    //assertEquals("v",tt3._flds[1]);
-    //
-    //// Missing type B is also never worked on.
-    //test_isa("A= :@{n=B?; v=int}", TypeFunPtr.GENERIC_FUNPTR);
-    //test_isa("A= :@{n=B?; v=int}; a = A(0,2)", TypeMemPtr.OOP);
-    //test_isa("A= :@{n=B?; v=int}; a = A(0,2); a.n", Type.NIL);
-    //// Mutually recursive type
-    //test_isa("A= :@{n=B; v=int}; B= :@{n=A; v=flt}", TypeFunPtr.GENERIC_FUNPTR);
-    throw AA.unimpl();
+    // Named recursive types
+    test_ptr("A= :(A?, int); A(0,2)",(alias) -> TypeMemPtr.make(alias,TypeStruct.make("A:",TypeStruct.TFLDS(2),TypeStruct.ts(Type.NIL,TypeInt.con(2)),TypeStruct.finals(2))));
+    test    ("A= :@{n=A?; v=flt}; A(@{n=0;v=1.2}).v;", TypeFlt.con(1.2));
+
+    // TODO: Needs a way to easily test simple recursive types
+    TypeEnv te3 = Exec.go(Env.top(),"args","A= :@{n=A?; v=int}; A(@{n=0;v=3})");
+    if( te3._errs != null ) System.err.println(te3._errs.toString());
+    Assert.assertNull(te3._errs);
+    TypeStruct tt3 = (TypeStruct)te3._tobj;
+    assertEquals("A:", tt3._name);
+    assertEquals(Type.NIL      ,tt3.at(0));
+    assertEquals(TypeInt.con(3),tt3.at(1));
+    assertEquals("n",tt3._flds[0]);
+    assertEquals("v",tt3._flds[1]);
+
+    // Missing type B is also never worked on.
+    test_isa("A= :@{n=B?; v=int}", TypeFunPtr.GENERIC_FUNPTR);
+    test_isa("A= :@{n=B?; v=int}; a = A(0,2)", TypeMemPtr.OOP);
+    test_isa("A= :@{n=B?; v=int}; a = A(0,2); a.n", Type.NIL);
+    // Mutually recursive type
+    test_isa("A= :@{n=B; v=int}; B= :@{n=A; v=flt}", TypeFunPtr.GENERIC_FUNPTR);
   }
 
   @Test public void testParse07() {

@@ -10,7 +10,7 @@ public class TypeInt extends Type<TypeInt> {
   private byte _z;        // bitsiZe, one of: 1,8,16,32,64
   private long _con;      // hi or lo according to _x
   private TypeInt ( int x, int z, long con ) { super(TINT); init(x,z,con); }
-  private void init(int x, int z, long con ) { _x=(byte)x; _z=(byte)z; _con = con; }
+  private void init(int x, int z, long con ) { super.init(TINT); _x=(byte)x; _z=(byte)z; _con = con; }
   // Hash does not depend on other types
   @Override int compute_hash() { return super.compute_hash()+_x+_z+(int)_con; }
   @Override public boolean equals( Object o ) {

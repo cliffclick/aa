@@ -197,6 +197,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   private static TypeStruct FREE=null;
   @Override protected TypeStruct free( TypeStruct ret ) { FREE=this; return ret; }
   static TypeStruct malloc( String name, boolean any, String[] flds, Type[] ts, byte[] finals ) {
+    assert check_name(name);
     if( FREE == null ) return new TypeStruct(name, any,flds,ts,finals);
     TypeStruct t1 = FREE;  FREE = null;
     return t1.init(name, any,flds,ts,finals);
@@ -213,7 +214,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   private static final String[] FLD2={".","."};
   private static final String[] FLD3={".",".","."};
   private static final String[][] FLDS={FLD0,FLD1,FLD2,FLD3};
-          static String[] FLDS( int len ) { return FLDS[len]; }
+  public  static String[] FLDS( int len ) { return FLDS[len]; }
   private static String[] flds(String... fs) { return fs; }
   private static final String[] ARGS_X  = flds("x");
           static final String[] ARGS_XY = flds("x","y");
@@ -239,7 +240,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
                                          {"0"},
                                          {"0","1"},
                                          {"0","1","2"}};
-          static String[] TFLDS( int len ) { return TFLDS[len]; }
+  public  static String[] TFLDS( int len ) { return TFLDS[len]; }
   public  static TypeStruct make_tuple( Type... ts ) { return make(TFLDS[ts.length],ts,finals(ts.length)); }
   public  static TypeStruct make(String[] flds, byte[] finals) { return make(flds,ts(flds.length),finals); }
 
@@ -312,38 +313,45 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // Make a type-variable with no definition - it is assumed to be a
   // forward-reference, to be resolved before the end of parsing.
   public static Type make_forward_def_type(String tok) {
-    return ALLSTRUCT.set_name((tok+":").intern());
+    return make((tok+":").intern(),flds("$fref"),ts(SCALAR),fbots(1));
   }
-  public TypeStruct merge_recursive_type( TypeStruct t ) {
-    assert has_name() && TypeAry.eq(_ts,TypeStruct.ALLSTRUCT._ts);
+  // We have a cycle because we are unioning {t,this} and we have a graph from
+  // t->...->this.  This cycle may pre-exist once closed and can be detected
+  // doing a lookup after setting this===t.  The new cycle members are in the
+  // INTERN table, but if a prior cycle version exists, we need to remove the
+  // new cycle and use the prior one.
+  public TypeStruct merge_recursive_type( TypeStruct ts ) {
+    assert has_name() && _flds[0]=="$fref";
     // Remove from INTERN table, since hacking type will not match hash
     untern()._dual.untern();
+    ts.untern().dual().untern();
     // Hack type and it's dual.  Type is now recursive.
-    _flds  = t._flds  ; _dual._flds  = t._dual._flds  ;
-    _ts    = t._ts    ; _dual._ts    = t._dual._ts    ;
-    _finals= t._finals; _dual._finals= t._dual._finals;
+    _flds  = ts._flds  ; _dual._flds  = ts._dual._flds  ;
+    _ts    = ts._ts    ; _dual._ts    = ts._dual._ts    ;
+    _finals= ts._finals; _dual._finals= ts._dual._finals;
     _cyclic= _dual._cyclic = true;
     // Hash changes, e.g. field names.
     _hash = compute_hash();  _dual._hash = _dual.compute_hash();
+
+    // Remove the entire new cycle members and recompute their hashes.
+    rehash_cyclic(new Ary<>(Type.class), this);
+
     // Check for a prior.  This can ONLY happen during testing, because the
     // same type name (different lexical scopes; name mangling) cannot be used
     // twice.
     TypeStruct old = (TypeStruct)intern_lookup();
     if( old != null ) { free(null);  _dual.free(null);  return old; }
 
-    // 'this' hash changes and there is an arbitrary path from t->...->this all
-    // with hash now wrong.  As part of mark_cyclic, when the cycle is found
-    // flag all hashes as zero.  As part of unwind: (1) primitives assert
-    // hash!=0 (trivially correct), and (2) ptrs&structs assert either hash==0
-    // (and cyclic) or hash is correct, and if zero, compute it.  Walk the type
-    // cycle, flagging as cyclic, recomputing hashes and rehashing
-    mark_cyclic(new Ary<>(Type.class),this);
-    // Back into the INTERN table
-    retern()._dual.retern();
+    // Insert all members of the cycle into the hashcons.  If self-symmetric,
+    // also replace entire cycle with self at each point.
+    if( equals(_dual) ) throw AA.unimpl();
+    walk( t -> { if( t.interned() ) return false;
+        t.retern()._dual.retern(); return true; });
+
     return this;
   }
   // Classic cycle-finding algorithm.
-  private void mark_cyclic(Ary<Type> stack, Type t ) {
+  private void rehash_cyclic(Ary<Type> stack, Type t ) {
     if( stack._len > 0 && t==this ) {    // If visiting again... have found a cycle t->....->this
       // All on the stack are flagged as being part of a cycle
       Type st;
@@ -356,13 +364,12 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     } else {
       if( t instanceof TypeMemPtr || t instanceof TypeStruct ) {
         stack.push(t);              // Push on stack, in case a cycle is found
-        if( t instanceof TypeMemPtr )             mark_cyclic(stack,((TypeMemPtr)t)._obj);
-        else for( Type tf : ((TypeStruct)t)._ts ) mark_cyclic(stack, tf                 );
+        if( t instanceof TypeMemPtr )             rehash_cyclic(stack,((TypeMemPtr)t)._obj);
+        else for( Type tf : ((TypeStruct)t)._ts ) rehash_cyclic(stack, tf                 );
         if( t._hash==0 ) {    // If part of a cycle, hash was cleared.  Rehash.
           assert t._cyclic && t._dual._cyclic;
           t      ._hash=t      .compute_hash();
           t._dual._hash=t._dual.compute_hash();
-          t.retern()._dual.retern();
         } else                  // Some other part, not part of cycle
           assert t._hash==t.compute_hash();
         stack.pop();            // Pop, not part of anothers cycle

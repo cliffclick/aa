@@ -172,14 +172,16 @@ public class Type<T extends Type<T>> implements Cloneable {
   @SuppressWarnings("unchecked")
   final T untern( ) {
     assert _hash != 0;
+    assert INTERN.get(this)==this;
     Type rez = INTERN.remove(this);
-    assert rez != null;
+    assert rez == this;
     return (T)this;
   }
   @SuppressWarnings("unchecked")
   final T retern( ) {
     assert _dual._dual == this;
     assert _hash != 0;
+    assert INTERN.get(this)==null;
     INTERN.put(this,this);
     assert INTERN.get(this)==this;
     return (T)this;
@@ -455,7 +457,7 @@ public class Type<T extends Type<T>> implements Cloneable {
   //
   // B:A:~int.meet(B:D:~int) == B:int // Nothing in common, fall to int
 
-  private static boolean check_name( String n ) { return n.isEmpty() || n.charAt(n.length()-1)==':'; }
+  static boolean check_name( String n ) { return n.isEmpty() || n.charAt(n.length()-1)==':'; }
     // Make a named variant of any type, by just adding a name.
   @SuppressWarnings("unchecked")
   public final T set_name(String name) {

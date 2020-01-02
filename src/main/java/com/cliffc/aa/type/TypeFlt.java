@@ -10,7 +10,7 @@ public class TypeFlt extends Type<TypeFlt> {
   byte _z;                // bitsiZe, one of: 32,64
   double _con;
   private TypeFlt ( int x, int z, double con ) { super(TFLT); init(x,z,con); }
-  private void init(int x, int z, double con ) { _x=(byte)x; _z=(byte)z; _con = con; }
+  private void init(int x, int z, double con ) { super.init(TFLT); _x=(byte)x; _z=(byte)z; _con = con; }
   // Hash does not depend on other types
   @Override int compute_hash() { return super.compute_hash()+_x+_z+(int)_con; }
   @Override public boolean equals( Object o ) {
