@@ -17,33 +17,10 @@ public class TypeNode extends Node {
   public TypeNode( Type t, Node a, Parse P ) { super(OP_TYPE,null,a); _t=t; _error_parse = P; }
   @Override String xstr() { return "assert:"+_t; }
   Node arg() { return in(1); }
-  private boolean passes(Node arg, Type t) {
-    if( t.isa(_t) )
-      return true;              // Typecheck must pass, remove
-    // If both are pointers, check memory content shape (not alias#)
-    if( t  instanceof TypeMemPtr &&
-        _t instanceof TypeMemPtr ) {
-      //// Get memory content shape
-      //BitsAlias barg  = ((TypeMemPtr) t)._aliases;
-      //boolean nil_arg = barg.test(0);
-      //int bit_arg     = (nil_arg ? barg.strip_nil() : barg).getbit();
-      //TypeObj targ    = BitsAlias.type_for_alias2(bit_arg);
-      //
-      //BitsAlias b_t = ((TypeMemPtr)_t)._aliases;
-      //boolean nil_t = b_t.test(0);
-      //int bit_t     = (nil_t ? b_t.strip_nil() : b_t).getbit();
-      //TypeObj t_t   = BitsAlias.type_for_alias2(bit_t);
-      //
-      //if( targ != null && (!nil_arg || nil_t) && targ.isa(t_t) )
-      //  return true;             // Typecheck passes, remove
-      throw com.cliffc.aa.AA.unimpl();
-    }
-    return false;
-  }
 
   @Override public Node ideal(GVNGCM gvn) {
     Node arg = arg();
-    if( passes(arg,gvn.type(arg)) ) return arg;
+    if( gvn.type(arg).isa(_t) ) return arg;
     // If TypeNode check is for a function pointer, it will wrap any incoming
     // function with a new function which does the right arg-checks.  This
     // happens immediately in the Parser and is here to declutter the Parser.
@@ -94,7 +71,7 @@ public class TypeNode extends Node {
   @Override public Type value(GVNGCM gvn) {
     Node arg = arg();
     Type t = gvn.type(arg);
-    return passes(arg,t) ? t.bound(Type.SCALAR) : Type.SCALAR;
+    return t.isa(_t) ? t.bound(Type.SCALAR) : Type.SCALAR;
   }
   @Override public Type all_type() { return Type.SCALAR; }
   // Check TypeNode for being in-error

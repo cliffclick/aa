@@ -6,8 +6,6 @@ import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
 
-import java.util.HashMap;
-
 // Primitives can be used as an internal operator (their apply() call does the
 // primitive operation).  Primitives are wrapped as functions when returned
 // from Env lookup, although the immediate lookup+apply is optimized to just
@@ -139,7 +137,6 @@ static class ConvertTypeName extends PrimNode {
   ConvertTypeName(Type from, Type to, Parse badargs) {
     super(to._name,TypeStruct.make(from),to);
     _badargs=badargs;
-    throw AA.unimpl();
   }
   @Override public Type value(GVNGCM gvn) {
     Type[] ts = new Type[_defs._len];
@@ -148,10 +145,12 @@ static class ConvertTypeName extends PrimNode {
     return apply(ts);     // Apply (convert) even if some args are not constant
   }
   @Override public Type apply( Type[] args ) {
-    //TypeName tn = ((TypeName)_ret).make(args[1]);
-    //// If args are illegal, the output is still no worse than _ret in either direction
-    //return _ret.dual().isa(tn) ? (tn.isa(_ret) ? tn : _ret) : _ret.dual();
-    throw AA.unimpl();
+    Type actual = args[1];
+    Type formal = _targs.at(0);
+    if( formal.dual().isa(actual) && actual.isa(formal) )
+      return actual.set_name(_ret._name);
+    // If args are illegal, the output is still no worse than _ret in either direction
+    return actual.bound(_ret);
   }
   @Override public String err(GVNGCM gvn) {
     Type actual = gvn.type(in(1));
@@ -346,7 +345,7 @@ static class NE_OOP extends PrimNode {
   @Override public byte op_prec() { return 4; }
 }
 
-  
+
 static class Not extends PrimNode {
   // Rare function which takes a Scalar (works for both ints and ptrs)
   Not() { super("!",TypeStruct.SCALAR1,TypeInt.BOOL); }

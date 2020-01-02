@@ -254,22 +254,21 @@ public class TestParse {
     test("(1,\"abc\").0", TypeInt.TRUE);
     test_isa("(1,\"abc\").1", TypeMemPtr.STRPTR);
 
-    throw AA.unimpl();
-    //// Named type variables
-    //test_name("gal=:flt"     ,"gal", (lex -> TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make(TypeFlt.FLT64), TypeName.make("gal",lex,TypeFlt.FLT64))));
-    //test_name("gal=:flt; gal","gal", (lex -> TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make(TypeFlt.FLT64), TypeName.make("gal",lex,TypeFlt.FLT64))));
-    //test     ("gal=:flt; 3==gal(2)+1", TypeInt.TRUE);
-    //test_name("gal=:flt; tank:gal = gal(2)", "gal", (lex -> TypeName.make("gal",lex,TypeInt.con(2))));
-    //// test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: figure out if free cast for bare constants?
-    //testerr ("gal=:flt; tank:gal = gal(2)+1", "3 is not a gal:flt64",29);
-    //
-    //test    ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
-    //test    ("Point=:@{x;y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
-    //testerr ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1;y=2}))", "*[$]@{x==1;y==2} is not a *[$]Point:@{x=;y=}",68);
-    //testerr ("Point=:@{x;y}; Point((0,1))", "*[$](nil;1) is not a Point:@{x=;y=}",27);
-    //testerr("x=@{n: =1;}","Missing type after ':'",7);
-    //testerr("x=@{n=;}","Missing ifex after assignment of 'n'",6);
-    //test_obj("x=@{n}",TypeStruct.ALLSTRUCT);
+    // Named type variables
+    test("gal=:flt"     , TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make(TypeFlt.FLT64), TypeFlt.FLT64.set_name("gal:")));
+    test("gal=:flt; gal", TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make(TypeFlt.FLT64), TypeFlt.FLT64.set_name("gal:")));
+    test("gal=:flt; 3==gal(2)+1", TypeInt.TRUE);
+    test("gal=:flt; tank:gal = gal(2)", TypeInt.con(2).set_name("gal:"));
+    // test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: figure out if free cast for bare constants?
+    testerr ("gal=:flt; tank:gal = gal(2)+1", "3 is not a gal:flt64",29);
+    
+    test    ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
+    test    ("Point=:@{x;y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
+    testerr ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1;y=2}))", "*[$]@{x==1;y==2} is not a *[$]Point:@{x=;y=}",68);
+    testerr ("Point=:@{x;y}; Point((0,1))", "*[$](nil;1) is not a Point:@{x=;y=}",27);
+    testerr("x=@{n: =1;}","Missing type after ':'",7);
+    testerr("x=@{n=;}","Missing ifex after assignment of 'n'",6);
+    test_obj("x=@{n}",TypeStruct.ALLSTRUCT);
   }
 
   @Test public void testParse05() {
@@ -377,7 +376,7 @@ public class TestParse {
     //test_ptr_isa("map={x -> x ? (map(x.0),x.1*x.1) : 0};"+
     //             "map((math_rand(1)?0: (math_rand(1)?0: (math_rand(1)?0: (0,1.2), 2.3), 3.4), 4.5))",
     //             (alias) -> TypeMemPtr.make(alias,TypeStruct.make(TypeMemPtr.STRUCT0,TypeFlt.con(20.25))));
-    
+
     // TODO: Need real TypeVars for these
     //test("id:{A->A}"    , Env.lookup_valtype("id"));
     //test("id:{A:int->A}", Env.lookup_valtype("id"));
