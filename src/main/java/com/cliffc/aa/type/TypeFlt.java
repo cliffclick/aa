@@ -37,7 +37,7 @@ public class TypeFlt extends Type<TypeFlt> {
   public static Type con(double con) { return make(0,log(con),con); }
 
   public static final TypeFlt FLT64 = (TypeFlt)make(-2,64,0);
-         static final TypeFlt FLT32 = (TypeFlt)make(-2,32,0);
+  public static final TypeFlt FLT32 = (TypeFlt)make(-2,32,0);
   public static final TypeFlt PI    = (TypeFlt)con(Math.PI);
   public static final TypeFlt NFLT64= (TypeFlt)make(-1,64,0);
   public static final TypeFlt[] TYPES = new TypeFlt[]{FLT64,FLT32,PI,NFLT64};

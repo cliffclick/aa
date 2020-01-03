@@ -81,7 +81,12 @@ public class ScopeNode extends Node {
     assert _types.get(name)==null;
     _types.put( name, t );
   }
-
+  // Replacing a recursive type with final definition
+  public void def_type( String name, Type t ) {
+    assert _types.get(name)!=null;
+    _types.put( name, t );
+  }
+  
   public boolean is_closure() { assert _defs._len==4 || _defs._len==7; return _defs._len==7; }
 
   @Override public Node ideal(GVNGCM gvn) {

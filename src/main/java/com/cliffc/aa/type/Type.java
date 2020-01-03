@@ -88,17 +88,20 @@ import java.util.function.Predicate;
 
 public class Type<T extends Type<T>> implements Cloneable {
   static private int CNT=1;
-  int _uid=CNT++; // Unique ID, will have gaps, used to uniquely order Types in Unions
+  int _uid;          // Unique ID, will have gaps, used to uniquely order Types
   public int _hash;      // Hash for this Type; built recursively
   byte _type;            // Simple types use a simple enum
   public String _name;   // All types can be named
   boolean _cyclic;       // Part of a type cycle
   T _dual; // All types support a dual notion, eagerly computed and cached here
 
-  protected Type(byte type) { init(type,""); }
-  protected Type(byte type, String name) { init(type,name); }
+  protected Type(byte type) { this(type,""); }
+  protected Type(byte type, String name) { _uid(); init(type,name); }
+  void _uid() {
+    _uid=CNT++;
+  }
   protected void init(byte type) { init(type,""); }
-  protected void init(byte type, String name) { _type=type; _name=name; _cyclic=false; }
+  protected void init(byte type, String name) { _type=type; _name=name;  _cyclic=false; }
   @Override public final int hashCode( ) { return _hash; }
   // Compute the hash and return it, with all child types already having their
   // hash computed.  Subclasses override this.
@@ -860,7 +863,7 @@ public class Type<T extends Type<T>> implements Cloneable {
   protected Type clone() {
     try {
       Type t = (Type)super.clone();
-      t._uid = CNT++;
+      t._uid();
       t._dual = null;
       t._hash = 0;
       return t;

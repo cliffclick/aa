@@ -341,45 +341,43 @@ public class TestParse {
     TypeEnv te4 = Exec.go(Env.top(),"args",ll_def+ll_con+ll_map+ll_fun+ll_apl);
     if( te4._errs != null ) System.err.println(te4._errs.toString());
     Assert.assertNull(te4._errs);
-    //TypeName tname4 = (TypeName)te4._tobj;
-    //assertEquals("List", tname4._name);
-    //TypeStruct tt4 = (TypeStruct)tname4._t;
-    //TypeMemPtr tmp5 = (TypeMemPtr)tt4.at(0);
-    //assertEquals(2.3*2.3,tt4.at(1).getd(),1e-6);
-    //assertEquals("next",tt4._flds[0]);
-    //assertEquals("val",tt4._flds[1]);
-    //
-    //// Test inferring a recursive struct type, with a little help
-    //Type[] ts0 = TypeStruct.ts(Type.NIL,TypeFlt.con(1.2*1.2));
-    //test_obj("map={x:@{n;v=flt}? -> x ? @{n=map(x.n);v=x.v*x.v} : 0}; map(@{n=0;v=1.2})",
-    //         TypeStruct.make(FLDS,ts0,TypeStruct.finals(2)));
-    //
-    //// Test inferring a recursive struct type, with less help.  This one
-    //// inlines so doesn't actually test inferring a recursive type.
-    //Type[] ts1 = TypeStruct.ts(Type.NIL,TypeFlt.con(1.2*1.2));
-    //test_ptr("map={x -> x ? @{n=map(x.n);v=x.v*x.v} : 0}; map(@{n=0;v=1.2})",
-    //         (alias) -> TypeMemPtr.make(alias,TypeStruct.make(FLDS,ts1,TypeStruct.finals(2))));
-    //
-    //// Test inferring a recursive struct type, with less help. Too complex to
-    //// inline, so actual inference happens
-    //test_ptr_isa("map={x -> x ? @{n=map(x.n);v=x.v*x.v} : 0};"+
-    //             "map(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0;v=1.2};v=2.3};v=3.4};v=4.5})",
-    //             (alias) -> TypeMemPtr.make(alias,TypeStruct.make(FLDS,TypeStruct.ts(TypeMemPtr.STRUCT0,TypeFlt.con(20.25)))));
-    //
-    //// Test inferring a recursive tuple type, with less help.  This one
-    //// inlines so doesn't actually test inferring a recursive type.
-    //test_ptr("map={x -> x ? (map(x.0),x.1*x.1) : 0}; map((0,1.2))",
-    //         (alias) -> TypeMemPtr.make(alias,TypeStruct.make_tuple(Type.NIL,TypeFlt.con(1.2*1.2))));
-    //
-    //test_ptr_isa("map={x -> x ? (map(x.0),x.1*x.1) : 0};"+
-    //             "map((math_rand(1)?0: (math_rand(1)?0: (math_rand(1)?0: (0,1.2), 2.3), 3.4), 4.5))",
-    //             (alias) -> TypeMemPtr.make(alias,TypeStruct.make(TypeMemPtr.STRUCT0,TypeFlt.con(20.25))));
+    TypeStruct tt4 = (TypeStruct)te4._tobj;
+    assertEquals("List:", tt4._name);
+    TypeMemPtr tmp5 = (TypeMemPtr)tt4.at(0);
+    assertEquals(2.3*2.3,tt4.at(1).getd(),1e-6);
+    assertEquals("next",tt4._flds[0]);
+    assertEquals("val",tt4._flds[1]);
+
+    // Test inferring a recursive struct type, with a little help
+    Type[] ts0 = TypeStruct.ts(Type.NIL,TypeFlt.con(1.2*1.2));
+    test_obj("map={x:@{n;v=flt}? -> x ? @{n=map(x.n);v=x.v*x.v} : 0}; map(@{n=0;v=1.2})",
+             TypeStruct.make(FLDS,ts0,TypeStruct.finals(2)));
+
+    // Test inferring a recursive struct type, with less help.  This one
+    // inlines so doesn't actually test inferring a recursive type.
+    Type[] ts1 = TypeStruct.ts(Type.NIL,TypeFlt.con(1.2*1.2));
+    test_ptr("map={x -> x ? @{n=map(x.n);v=x.v*x.v} : 0}; map(@{n=0;v=1.2})",
+             (alias) -> TypeMemPtr.make(alias,TypeStruct.make(FLDS,ts1,TypeStruct.finals(2))));
+
+    // Test inferring a recursive struct type, with less help. Too complex to
+    // inline, so actual inference happens
+    test_obj_isa("map={x -> x ? @{n=map(x.n);v=x.v*x.v} : 0};"+
+                 "map(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0;v=1.2};v=2.3};v=3.4};v=4.5})",
+                 TypeStruct.make(FLDS,TypeStruct.ts(TypeMemPtr.STRUCT0,TypeFlt.FLT32))); //con(20.25)
+
+    // Test inferring a recursive tuple type, with less help.  This one
+    // inlines so doesn't actually test inferring a recursive type.
+    test_ptr("map={x -> x ? (map(x.0),x.1*x.1) : 0}; map((0,1.2))",
+             (alias) -> TypeMemPtr.make(alias,TypeStruct.make_tuple(Type.NIL,TypeFlt.con(1.2*1.2))));
+
+    test_obj_isa("map={x -> x ? (map(x.0),x.1*x.1) : 0};"+
+                 "map((math_rand(1)?0: (math_rand(1)?0: (math_rand(1)?0: (0,1.2), 2.3), 3.4), 4.5))",
+                 TypeStruct.make(TypeMemPtr.STRUCT0,TypeFlt.con(20.25)));
 
     // TODO: Need real TypeVars for these
     //test("id:{A->A}"    , Env.lookup_valtype("id"));
     //test("id:{A:int->A}", Env.lookup_valtype("id"));
     //test("id:{int->int}", Env.lookup_valtype("id"));
-    throw AA.unimpl();
   }
 
 

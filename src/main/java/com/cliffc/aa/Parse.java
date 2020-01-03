@@ -246,6 +246,7 @@ public class Parse {
       if( ot instanceof TypeStruct && t instanceof TypeStruct )
         tn = ot.has_name() ? ((TypeStruct)ot).merge_recursive_type((TypeStruct)t) : null;
       if( tn == null ) return err_ctrl2("Cannot re-assign type '"+tvar+"'");
+      else _e.def_type(tvar,tn);
     }
 
     // Add a constructor function.  If this is a primitive, build a constructor
