@@ -8,7 +8,7 @@ import com.cliffc.aa.type.TypeTuple;
 public class CProjNode extends ProjNode {
   public CProjNode( Node ifn, int idx ) { super(ifn,idx); }
   @Override String xstr() {
-    if( in(0) instanceof IfNode )
+    if( !is_dead() && in(0) instanceof IfNode )
       return _idx==0 ? "False" : "True";
     return "CProj_"+_idx;
   }

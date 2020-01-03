@@ -66,7 +66,16 @@ public class GVNGCM {
   // state left alive.  NOT called after a line in the REPL or a user-call to
   // "eval" as user state carries on.
   void reset_to_init0() {
-    iter(); // Clear worklist
+    assert _work2._len==0;
+    _opt_mode = 1;
+    _small_work=true;
+    while( !_work.isEmpty() ) {
+      Node n = _work.pop();     // Pull from main worklist before functions
+      _wrk_bits.clear(n._uid);
+      if( n.is_dead() || n._keep!=0 ) continue;
+      if( n._uses._len==0 ) kill(n);
+      //System.out.println("On worklist during reset: "+n);
+    }
     for( Node n : _INIT0_NODES ) {
       n.reset_to_init1(this);
       for( int i=0; i<n._uses._len; i++ )
@@ -380,6 +389,7 @@ public class GVNGCM {
     // No more ideal calls to apply
     assert !Env.START.more_ideal(this,new VBitSet());
   }
+
 
   // Global Optimistic Constant Propagation.  Passed in the final program state
   // (including any return result, i/o & memory state).  Returns the most-precise

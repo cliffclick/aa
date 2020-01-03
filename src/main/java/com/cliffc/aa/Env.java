@@ -112,11 +112,11 @@ public class Env implements AutoCloseable {
   }
 
   private void top_scope_close() {
+    GVN      .reset_to_init0(); // Done with adding primitives
     BitsAlias.reset_to_init0(); // Done with adding primitives
     BitsFun  .reset_to_init0(); // Done with adding primitives
     BitsRPC  .reset_to_init0(); // Done with adding primitives
     FunNode  .reset_to_init0(); // Done with adding primitives
-    GVN      .reset_to_init0(); // Done with adding primitives
     // StartNode is used by global constants, which in turn are only used by
     // dead cycles.
     while( START._uses._len > NINIT_CONS ) {
