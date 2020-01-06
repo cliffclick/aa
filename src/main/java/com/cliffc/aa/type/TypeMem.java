@@ -259,7 +259,12 @@ public class TypeMem extends Type<TypeMem> {
   public TypeMem st( int alias, TypeObj obj ) {
     //assert !BitsAlias.TREE.is_parent(alias);
     Ary<TypeObj> objs = new Ary<>(_aliases.clone(),_aliases.length);
-    objs.setX(alias,(TypeObj)at(alias).meet(obj));
+    TypeObj rez = alias < _aliases.length && _aliases[alias] != null
+      // Merge into a prior sharp value
+      ? (TypeObj)_aliases[alias].meet(obj)
+      // Override a prior parent with sharper child
+      : obj;
+    objs.setX(alias,rez);
     return make0(objs.asAry());
   }
 

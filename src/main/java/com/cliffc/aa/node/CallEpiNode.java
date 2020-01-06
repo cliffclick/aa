@@ -4,12 +4,6 @@ import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 import java.util.BitSet;
 
-// TODO CNC NOTES
-//
-// Move Unresolved handling into CallEpi from Call, since it will not wire
-// but the result type is more precise.
-//
-// ----
 // See CallNode.  Slot 0 is the matching Call, which returns a type of its
 // input args and function pointer.  The remaining slots are Returns which are
 // typed as standard function returns: {Ctrl,Mem,Val}.  These Returns represent

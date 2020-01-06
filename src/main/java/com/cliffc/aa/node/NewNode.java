@@ -34,7 +34,7 @@ public abstract class NewNode<T extends TypeObj> extends Node {
 
   static int def_idx(int fld) { return fld+1; } // Skip ctrl in slot 0
   Node fld(int fld) { return in(def_idx(fld)); } // Node for field#
-  
+
   // Called when folding a Named Constructor into this allocation site
   void set_name( T name ) { assert !name.above_center();  _ts = name; }
 
@@ -90,6 +90,8 @@ public abstract class NewNode<T extends TypeObj> extends Node {
                  use instanceof   PhiNode ||            // TODO: scan past phi
                  use instanceof   RetNode ) {           // Returned
         return false;                                   // Escaped
+      } else if( use instanceof IfNode ) {
+        // Not escaped, test is non-zero and will fold shortly
       } else {
         throw AA.unimpl();      // Unknown, sort it out
       }
