@@ -112,11 +112,11 @@ public class Env implements AutoCloseable {
   }
 
   private void top_scope_close() {
+    FunNode  .reset_to_init0(); // Done with adding primitives
     GVN      .reset_to_init0(); // Done with adding primitives
     BitsAlias.reset_to_init0(); // Done with adding primitives
     BitsFun  .reset_to_init0(); // Done with adding primitives
     BitsRPC  .reset_to_init0(); // Done with adding primitives
-    FunNode  .reset_to_init0(); // Done with adding primitives
     // StartNode is used by global constants, which in turn are only used by
     // dead cycles.
     while( START._uses._len > NINIT_CONS ) {
@@ -126,17 +126,17 @@ public class Env implements AutoCloseable {
   }
 
   // Return Scope for a name, so can be used to determine e.g. mutability
-  ScopeNode lookup_scope( String name ) {
+  ScopeNode lookup_scope( String name, boolean lookup_current_scope_only ) {
     if( name == null ) return null; // Handle null here, easier on parser
     if( _scope.stk().exists(name) ) return _scope;
-    return _par == null ? null : _par.lookup_scope(name);
+    return _par == null || lookup_current_scope_only ? null : _par.lookup_scope(name,false);
   }
 
   // Name lookup is the same for all variables, including function defs (which
   // are literally assigning a lambda to a ref).  Only returns nodes registered
   // with GVN.
   public Node lookup( String name ) {
-    ScopeNode scope = lookup_scope(name);
+    ScopeNode scope = lookup_scope(name,false);
     return scope==null ? null : scope.get(name);
   }
   // Return nearest enclosing closure, for forward-ref placement.

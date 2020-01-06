@@ -141,7 +141,19 @@ public class Parse {
 
   private TypeEnv gather_errors() {
     Node res = _e._scope.pop(); // New and improved result
+    Type tres = _gvn.type(res);
+    TypeObj tobj = TypeObj.XOBJ;
     Node mem = _e._scope.mem();
+    // If returning a pointer, return the (shallow) object pointed at
+    if( tres instanceof TypeMemPtr ) {
+      Type tmem = _gvn.type(mem);
+      if( tmem instanceof TypeMem )
+        tobj = ((TypeMem)tmem).ld((TypeMemPtr)tres);
+    } else if( mem != null ) {
+      _e._scope.set_mem(null,_gvn); // Kill memory, not used for error checks
+      mem = null;
+    }
+
     // Hunt for typing errors in the alive code
     assert _e._par._par==null; // Top-level only
     VBitSet bs = new VBitSet();
@@ -166,18 +178,8 @@ public class Parse {
     // which means control-dependent errors are reported after earlier control
     // errors... i.e., you get the errors in execution order.
 
-    Type tres = _gvn.type(res);
     kill(res);       // Kill Node for returned Type result
-    TypeObj tobj = TypeObj.XOBJ;
-    // If returning memory, return the (shallow) object pointed at
-    if( mem != null ) {
-      Type tmem = _gvn.type(mem);
-      kill(mem);       // Kill Node for returned Type result
-      if( tres instanceof TypeMemPtr ) {
-        TypeMemPtr tmp = (TypeMemPtr)tres;
-        tobj = ((TypeMem)tmem).ld(tmp);
-      }
-    }
+
     return new TypeEnv(tres,tobj,_e,errs0.isEmpty() ? null : errs0);
   }
 
@@ -196,14 +198,15 @@ public class Parse {
   /** Parse a list of statements; final semi-colon is optional.
    *  stmts= [tstmt or stmt] [; stmts]*[;]?
    */
-  private Node stmts() {
+  private Node stmts() { return stmts(false); }
+  private Node stmts(boolean lookup_current_scope_only) {
     Node stmt = tstmt(), last = null;
-    if( stmt == null ) stmt = stmt();
+    if( stmt == null ) stmt = stmt(lookup_current_scope_only);
     while( stmt != null ) {
       if( !peek(';') ) return stmt;
       last = stmt;
       stmt = tstmt();
-      if( stmt == null ) stmt = stmt();
+      if( stmt == null ) stmt = stmt(lookup_current_scope_only);
       if( stmt == null ) {
         if( peek(';') ) { _x--; stmt=last; }   // Ignore empty statement
       } else if( !last.is_dead() && stmt != last) kill(last); // prior expression result no longer alive in parser
@@ -296,7 +299,8 @@ public class Parse {
    *
    *  The ':=' is the re-assignment token, no spaces allowed.
    */
-  private Node stmt() {
+  private Node stmt() { return stmt(false); }
+  private Node stmt(boolean lookup_current_scope_only) {
     if( peek('^') ) {           // Early function exit
       Node ifex = ifex();
       return ifex == null ? err_ctrl2("Missing term after ^") : _e.early_exit(this,ifex);
@@ -322,7 +326,7 @@ public class Parse {
       if( peek(":=") ) _x=oldx2; // Avoid confusion with typed assignment test
       else if( peek(':') && (t=type())==null ) { // Check for typed assignment
         if( _e._scope.test_if() ) _x = oldx2; // Grammar ambiguity, resolve p?a:b from a:int
-        else                      err_ctrl0("Missing type after ':'");
+        else                      err_ctrl0("Missing type after ':'",null);
       }
       if( peek(":=") ) rs.set(toks._len);             // Re-assignment parse
       else if( !peek('=') ) { _x = oldx; break; } // Unwind token parse, and not assignment
@@ -343,7 +347,9 @@ public class Parse {
     for( int i=0; i<toks._len; i++ ) {
       String tok = toks.at(i);               // Token being assigned
       byte mutable = ts_mutable(rs.get(i));  // Assignment is mutable or final
-      ScopeNode scope = lookup_scope(tok);   // Prior scope of token
+      // Find scope for token.  If not defining struct fields, look for any
+      // prior def.  If defining a struct, tokens define a new field in this scope.
+      ScopeNode scope = lookup_scope(tok,lookup_current_scope_only);
       if( scope==null ) {                    // Token not already bound at any scope
         if( ifex instanceof FunPtrNode && !ifex.is_forward_ref() )
           ((FunPtrNode)ifex).fun().bind(tok); // Debug only: give name to function
@@ -355,7 +361,9 @@ public class Parse {
       Node n = scope.stk().get(tok); // Get prior direct binding
       if( n.is_forward_ref() ) { // Prior is actually a forward-ref, so this is the def
         assert !scope.stk().is_mutable(tok) && scope == _e._scope;
-        ((FunPtrNode)n).merge_ref_def(_gvn,tok,(FunPtrNode)ifex);
+        if( ifex instanceof FunPtrNode )
+          ((FunPtrNode)n).merge_ref_def(_gvn,tok,(FunPtrNode)ifex);
+        else ; // Can be here if already in-error
       } else { // Store into scope/NewObjNode/closure
         // Active (parser) memory state
         MemMergeNode mmem = mem_active();
@@ -549,9 +557,10 @@ public class Parse {
     return n;                   // No more terms
   }
 
-  // Handle post-increment/post-decrement operator
+  // Handle post-increment/post-decrement operator.
+  // Does not define a field in structs: "@{ x++; y=2 }" - syntax error, no such field x
   private Node inc(String tok, int d) {
-    ScopeNode scope = lookup_scope(tok=tok.intern()); // Find prior scope of token
+    ScopeNode scope = lookup_scope(tok=tok.intern(),false); // Find prior scope of token
     // Need a load/call/store sensible options
     Node n;
     if( scope==null ) {         // Token not already bound to a value
@@ -639,7 +648,7 @@ public class Parse {
     String tok = token0();
     if( tok == null || tok.equals("=") || tok.equals("^"))
       { _x = oldx; return null; } // Disallow '=' as a fact, too easy to make mistakes
-    ScopeNode scope = lookup_scope(tok);
+    ScopeNode scope = lookup_scope(tok,false);
     if( scope == null ) { // Assume any unknown ref is a forward-ref of a recursive function
       Node fref = gvn(FunPtrNode.forward_ref(_gvn,tok,this));
       // Place in nearest enclosing closure, NOT as a field in a struct.
@@ -661,13 +670,13 @@ public class Parse {
    */
   private Node tuple(Node s) {
     NewObjNode nn = new NewObjNode(false,ctrl());
-    int fidx=0;
+    int fidx=0, oldx=_x-1; // Field name counter, mismatched parens balance point
     while( s!=null ) {
       nn.create_active((""+(fidx++)).intern(),s,TypeStruct.ffinal(),_gvn);
       if( !peek(',') ) break;   // Final comma is optional
       s=stmts();
     }
-    require(')');
+    require(')',oldx);
     // NewNode updates merges the new allocation into all-of-memory and returns
     // a reference.
     Node nnn = gvn(nn);
@@ -684,7 +693,7 @@ public class Parse {
    */
   private static final byte args_are_mutable=ts_mutable(false); // Args mutable or r/only by default
   private Node func() {
-    int oldx = _x;
+    int oldx = _x;              // Past openning '{'
     Ary<String> ids = new Ary<>(new String[1],0);
     Ary<Type  > ts  = new Ary<>(new Type  [1],0);
     Ary<Parse > bads= new Ary<>(new Parse [1],0);
@@ -697,7 +706,7 @@ public class Parse {
       Parse bad = errMsg();    // Capture location in case of type error
       if( peek(':') )          // Has type annotation?
         if( (t=type())==null ) {
-          err_ctrl0("Missing or bad type arg");
+          err_ctrl0("Missing or bad type arg",null);
           t = Type.SCALAR;
           skipNonWS();         // Skip possible type sig, looking for next arg
         }
@@ -730,7 +739,7 @@ public class Parse {
       // Parse function body
       Node rez = stmts();       // Parse function body
       if( rez == null ) rez = err_ctrl2("Missing function body");
-      require('}');             //
+      require('}',oldx-1);      // Matched with openning {}
       // Merge normal exit into all early-exit paths
       if( e._scope.is_closure() ) rez = merge_exits(rez);
       RetNode ret = (RetNode)gvn(new RetNode(ctrl(),all_mem(),rez,rpc.unhook(),fun.unhook()));
@@ -782,12 +791,12 @@ public class Parse {
    *  \@{ stmts }
    */
   private Node struct() {
-    Node ptr;
+    int oldx = _x-1; Node ptr;  // Openning @{
     all_mem();
     try( Env e = new Env(_e,false) ) {// Nest an environment for the local vars
       _e = e;                   // Push nested environment
-      stmts();                  // Create local vars-as-fields
-      require('}');
+      stmts(true);              // Create local vars-as-fields
+      require('}',oldx);        // Matched closing }
       assert ctrl() != e._scope;
       e._par._scope.set_ctrl(ctrl(),_gvn); // Carry any control changes back to outer scope
       e._par._scope.set_mem(all_mem(),_gvn); // Carry any memory changes back to outer scope
@@ -989,10 +998,12 @@ public class Parse {
     return t;
   }
 
-  // Require a specific character (after skipping WS) or polite error
-  private void require( char c ) {
+  // Require a closing character (after skipping WS) or polite error
+  private void require( char c, int oldx ) {
     if( peek(c) ) return;
-    err_ctrl0("Expected '"+c+"' but "+(_x>=_buf.length?"ran out of text":"found '"+(char)(_buf[_x])+"' instead"));
+    Parse bad = errMsg();       // Generic error
+    bad._x = oldx;              // Openning point
+    err_ctrl0("Expected closing '"+c+"' but "+(_x>=_buf.length?"ran out of text":"found '"+(char)(_buf[_x])+"' instead"),bad);
   }
 
   // Skip WS, return true&skip if match, false & do not skip if miss.
@@ -1069,7 +1080,7 @@ public class Parse {
 
   // Lookup & extend scopes
   public  Node lookup( String tok ) { return _e.lookup(tok); }
-  private ScopeNode lookup_scope( String tok ) { return _e.lookup_scope(tok); }
+  private ScopeNode lookup_scope( String tok, boolean lookup_current_scope_only ) { return _e.lookup_scope(tok,lookup_current_scope_only); }
   public  ScopeNode scope( ) { return _e._scope; }
   private void create( String tok, Node n, byte mutable ) { _e._scope.stk().create(tok,n,mutable,_gvn ); }
   private static byte ts_mutable(boolean mutable) { return mutable ? TypeStruct.frw() : TypeStruct.ffinal(); }
@@ -1100,9 +1111,9 @@ public class Parse {
 
   // Whack current control with a syntax error
   private ErrNode err_ctrl2( String s ) { return err_ctrl1(s,Type.SCALAR); }
-  private ErrNode err_ctrl1( String s, Type t ) { return init(new ErrNode(Env.START,errMsg(s),t)); }
-  private void err_ctrl0(String s) {
-    set_ctrl(gvn(new ErrNode(ctrl(),errMsg(s),Type.CTRL)));
+  private ErrNode err_ctrl1( String s, Type t ) { return init(new ErrNode(Env.START,errMsg(s),null,t)); }
+  private void err_ctrl0(String s, Parse bad) {
+    set_ctrl(gvn(new ErrNode(ctrl(),errMsg(s),bad,Type.CTRL)));
   }
 
   // Make a private clone just for delayed error messages

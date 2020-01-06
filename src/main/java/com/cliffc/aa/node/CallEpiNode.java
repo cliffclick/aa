@@ -196,6 +196,8 @@ public final class CallEpiNode extends Node {
       FunNode fun = FunNode.find_fidx(fidx); // Lookup, even if not wired
       if( fun==null || fun.is_dead() )
         continue; // Can be dead, if the news has not traveled yet
+      if( fun.nargs() != call.nargs() ) // This call-path has wrong args, is in-error
+        return TypeTuple.CALL;
       RetNode ret = fun.ret();
       TypeTuple tret = (TypeTuple)gvn.type(ret); // Type of the return
       if( ret.mem() instanceof ParmNode ) // Pure functions keep call memory state

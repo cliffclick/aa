@@ -259,7 +259,7 @@ public class TypeMem extends Type<TypeMem> {
   public TypeMem st( int alias, TypeObj obj ) {
     //assert !BitsAlias.TREE.is_parent(alias);
     Ary<TypeObj> objs = new Ary<>(_aliases.clone(),_aliases.length);
-    objs.setX(alias,obj);
+    objs.setX(alias,(TypeObj)at(alias).meet(obj));
     return make0(objs.asAry());
   }
 

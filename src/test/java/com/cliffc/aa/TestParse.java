@@ -161,7 +161,7 @@ public class TestParse {
     test("x=3; mul2={x -> x*2}; mul2(2.1)", TypeFlt.con(2.1*2.0)); // must inline to resolve overload {*}:Flt with I->F conversion
     test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
     test("sq={x -> x*x}; sq 2.1", TypeFlt.con(4.41)); // No () required for single args
-    testerr("sq={x -> x&x}; sq(\"abc\")", "*[$]\"abc\" is not a int64",24);
+    testerr("sq={x -> x&x}; sq(\"abc\")", "*[$]\"abc\" is not a int64",12);
     testerr("sq={x -> x*x}; sq(\"abc\")", "*[$]\"abc\" is not a flt64",12);
     testerr("f0 = { f x -> f0(x-1) }; f0({+},2)", "Passing 1 arguments to f0={->} which takes 2 arguments",21);
     // Recursive:
@@ -248,6 +248,11 @@ public class TestParse {
     test   ("t=@{n=0;val=1.2}; u=math_rand(1) ? t : @{n=t;val=2.3}; u.val", TypeFlt.NFLT64); // structs merge field-by-field
     // Comments in the middle of a struct decl
     test   ("dist={p->p//qqq\n.//qqq\nx*p.x+p.y*p.y}; dist(//qqq\n@{x//qqq\n=1;y=2})", TypeInt.con(5));
+
+    // Lexical scoping
+    test("x=@{a:=1;b=@{a=  2;b=@{a=3;b=0}}}; x.b.b.a",TypeInt.con(3));
+    test("x=@{a:=1;b=@{a=a+1;b=0}}; x.a*10+x.b.a",TypeInt.con(1*10+2));
+    test("x=@{a:=1;b= {a=a+1;b=0}}; x.b(); x.a",TypeInt.con(2));
 
     // Tuple
     test_obj_isa("(0,\"abc\")", TypeStruct.make_tuple(Type.NIL,TypeMemPtr.STRPTR));
@@ -382,6 +387,47 @@ public class TestParse {
 
 
   @Test public void testParse08() {
+    // Failed attempt at a Tree-structure inference test.  Triggered all sorts
+    // of bugs and error reporting issues, so keeping it as a regression test.
+    testerr("tmp=@{"+
+         "  l=@{"+
+         "    l=@{ l=0; r=0; v=3 };"+
+         "    l=@{ l=0; r=0; v=7 };"+
+         "    v=5"+
+         "  };"+
+         "  r=@{"+
+         "    l=@{ l=0; r=0; v=15 };"+
+         "    l=@{ l=0; r=0; v=22 };"+
+         "    v=20"+
+         "  };"+
+         "  v=12 "+
+         "};"+
+         "map={tree fun -> tree"+
+         "     ? @{l=map(tree.l,fun);r=map(tree.r,fun);v=fun(tree.v)}"+
+         "     : 0};"+
+         "map(tmp,{x->x+x})",
+            "Cannot re-assign final field '.l'",61);
+
+    // Good tree-structure inference test
+    test_ptr("tmp=@{"+
+         "  l=@{"+
+         "    l=@{ l=0; r=0; v=3 };"+
+         "    r=@{ l=0; r=0; v=7 };"+
+         "    v=5"+
+         "  };"+
+         "  r=@{"+
+         "    l=@{ l=0; r=0; v=15 };"+
+         "    r=@{ l=0; r=0; v=22 };"+
+         "    v=20"+
+         "  };"+
+         "  v=12 "+
+         "};"+
+         "map={tree fun -> tree"+
+         "     ? @{l=map(tree.l,fun);r=map(tree.r,fun);v=fun(tree.v)}"+
+         "     : 0};"+
+         "map(tmp,{x->x+x})",
+         "@{l==*[$],r==*[$],v==int64}");
+
     // A linked-list mixing ints and strings, always in pairs
     String ll_cona = "a=0; ";
     String ll_conb = "b=math_rand(1) ? ((a,1),\"abc\") : a; ";
@@ -395,65 +441,10 @@ public class TestParse {
     String ll_apl2 = "map(plus,tmp);";
     // End type: ((((*?,scalar)?,str)?,int64),str)?
 
-    // Fails when dup fields: l=...; l=...; v=5
-    // Fail appears to be TypeStruct from CallEpi 410 with memory having alias parts equal to prior values, not folded???
-    // Fails when semicolon (tree.l;fun) as arg
-    // Works if 'fun' is inlined
-    testerr("tmp=@{"+
-         "    l=@{ l=0; r=0; v=3 };"+
-         "    r=@{ l=0; r=0; v=7 };"+
-         "    v=5"+
-         "};"+
-         "map={tree fun -> tree"+
-         "     ? @{l=map(tree.l,fun);r=map(tree.r,fun);v=fun(tree.v)}"+
-         "     : 0};"+
-         "map(tmp,{x->x+x})",
-            "Cannot define field '.l' twice",61);
+    // After inlining once, we become pair-aware.
+    test_isa(ll_cona+ll_conb+ll_conc+ll_cond+ll_cone+ll_cont+ll_map2+ll_fun2+ll_apl2,
+             TypeMemPtr.make(BitsAlias.RECBITS0,TypeStruct.make(TypeMemPtr.make(BitsAlias.RECBITS0,TypeStruct.make(TypeMemPtr.STRUCT0,TypeInt.INT64)),TypeMemPtr.STRPTR)));
 
-    //// After inlining once, we become pair-aware.
-    //test_isa(ll_cona+ll_conb+ll_conc+ll_cond+ll_cone+ll_cont+ll_map2+ll_fun2+ll_apl2,
-    //         TypeMemPtr.make(BitsAlias.RECBITS0,TypeStruct.make(TypeMemPtr.make(BitsAlias.RECBITS0,TypeStruct.make(TypeMemPtr.STRUCT0,TypeInt.INT64)),TypeMemPtr.STRPTR)));
-    //
-    //// Failed attempt at a Tree-structure inference test.  Triggered all sorts
-    //// of bugs and error reporting issues, so keeping it as a regression test.
-    //testerr("tmp=@{"+
-    //     "  l=@{"+
-    //     "    l=@{ l=0; r=0; v=3 };"+
-    //     "    l=@{ l=0; r=0; v=7 };"+
-    //     "    v=5"+
-    //     "  };"+
-    //     "  r=@{"+
-    //     "    l=@{ l=0; r=0; v=15 };"+
-    //     "    l=@{ l=0; r=0; v=22 };"+
-    //     "    v=20"+
-    //     "  };"+
-    //     "  v=12 "+
-    //     "};"+
-    //     "map={tree fun -> tree"+
-    //     "     ? @{l=map(tree.l;fun);r=map(tree.r,fun);v=fun(tree.v)}"+
-    //     "     : 0};"+
-    //     "map(tmp,{x->x+x})",
-    //        "Cannot define field '.l' twice",61);
-    //
-    //// Good tree-structure inference test
-    //test_ptr("tmp=@{"+
-    //     "  l=@{"+
-    //     "    l=@{ l=0; r=0; v=3 };"+
-    //     "    r=@{ l=0; r=0; v=7 };"+
-    //     "    v=5"+
-    //     "  };"+
-    //     "  r=@{"+
-    //     "    l=@{ l=0; r=0; v=15 };"+
-    //     "    r=@{ l=0; r=0; v=22 };"+
-    //     "    v=20"+
-    //     "  };"+
-    //     "  v=12 "+
-    //     "};"+
-    //     "map={tree fun -> tree"+
-    //     "     ? @{l=map(tree.l,fun);r=map(tree.r,fun);v=fun(tree.v)}"+
-    //     "     : 0};"+
-    //     "map(tmp,{x->x+x})",
-    //     "@{l==*[$],r==*[$],v==int64}");
     throw AA.unimpl();
   }
 

@@ -22,7 +22,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
     super(OP_NEWOBJ,par_alias,ts,ctrl);
     _is_closure = is_closure;
   }
-  public Node get(String name) { return fld(_ts.find(name)); }
+  public Node get(String name) { int idx = _ts.find(name);  assert idx >= 0; return fld(idx); }
   public boolean exists(String name) { return _ts.find(name)!=-1; }
   public boolean is_mutable(String name) { return _ts._finals[_ts.find(name)] == TypeStruct.frw(); }
   public boolean is_final(int idx) { return _ts._finals[idx] == TypeStruct.ffinal(); }
@@ -41,15 +41,16 @@ public class NewObjNode extends NewNode<TypeStruct> {
     assert !gvn.touched(this);
     assert def_idx(_ts._ts.length)== _defs._len;
     assert _ts.find(name) == -1; // No dups
-    _ts = _ts.add_fld(name,gvn.type(val),mutable);
+    _ts = _ts.add_fld(name,Type.SCALAR,mutable);
     add_def(val);
   }
-  // Update/modify a field, by field number
-  public Node update( int fidx , Node val, byte mutable, GVNGCM gvn  ) {
-    Type oldt = gvn.unreg(this);
-    update_active(fidx,val,mutable,gvn);
-    gvn.rereg(this,oldt);
-    return val;
+  // Update the field mod
+  public void update_mod( int fidx, byte mutable, Node val, GVNGCM gvn  ) {
+    gvn.unreg(this);
+    if( _ts._finals[fidx] != mutable )
+      _ts = _ts.set_fld(fidx,_ts.at(fidx),mutable);
+    set_def(def_idx(fidx),val,gvn);
+    gvn.rereg(this,value(gvn));
   }
   // Update/modify a field, by field number for an active this
   private void update_active( int fidx , Node val, byte mutable, GVNGCM gvn  ) {

@@ -44,23 +44,33 @@ public class StoreNode extends Node {
     // If Store is by a New, fold into the New.
     NewObjNode nnn;  int idx;
     if( mem instanceof OProjNode && mem.in(0) instanceof NewObjNode && (nnn=(NewObjNode)mem.in(0)) == adr.in(0) &&
-        ctl == nnn.in(0) && !val().is_forward_ref() && (idx=nnn._ts.find(_fld))!= -1 && nnn._ts.can_update(idx) ) {
+        ctl == nnn.in(0) && !val().is_forward_ref() && !nnn._captured && (idx=nnn._ts.find(_fld))!= -1 && nnn._ts.can_update(idx) ) {
+      // The OProj type needs to reflect final.  This is because we have an
+      // Ideal rule allowing a Load to bypass a Store that is not in-error, but
+      // back-to-back final stores can temporarily be not-in-error if the OProj
+      // does not reflect final.
+
       // As part of the local xform rule, the memory & ptr outputs of the
-      // NewNode need to update their types directly.  This Store pts at
-      // the OProj, and when it folds it can set the NewNode mutable bit
-      // to e.g. final.  The OProj type needs to also reflect final.  This
-      // is because we have an Ideal rule allowing a Load to bypass a
-      // Store that is not in-error, but back-to-back final stores can
-      // temporarily be not-in-error if the OProj does not reflect final.
-      nnn.update(idx,val(),_fin,gvn);
-      gvn.setype(nnn,nnn.value(gvn));
-      for( Node use : nnn._uses ) gvn.setype(use,use.value(gvn));
+      // NewNode need to update their types directly.  This Store points at the
+      // OProj, and when it folds it can set the NewNode mutable bit to final -
+      // which strictly runs downhill.  However, iter() calls must strictly run
+      // uphill, so we have to expand the changed region to cover all the
+      // "downhilled" parts and "downhill" them to match.  Outside of the
+      // "downhilled" region, the types are unchanged.
+      nnn.update_mod(idx,_fin,val(),gvn); // Update final field, if needed.  Runs nnn "downhill"
+      for( Node use : nnn._uses ) {
+        gvn.setype(use,use.value(gvn)); // Record "downhill" type for OProj, DProj
+        gvn.add_work(use);              // After this is just the StoreNode, being replaced
+        for( Node useuse : use._uses ) gvn.add_work(useuse);
+      }
       return mem;
     }
     return null;
   }
 
   @Override public Type value(GVNGCM gvn) {
+    if( gvn.type(ctl()) != Type.CTRL ) return TypeObj.XOBJ; // Not executed
+    // Pointer is sane
     Type adr = gvn.type(adr());
     if( adr.isa(TypeMemPtr.OOP0.dual()) ) return TypeObj.XOBJ; // Very high address; might fall to any valid address
     if( adr.must_nil() ) return TypeObj.OBJ;           // Not provable not-nil, so fails
@@ -68,26 +78,34 @@ public class StoreNode extends Node {
     if( !(adr instanceof TypeMemPtr) )
       return adr.above_center() ? TypeObj.XOBJ : TypeObj.OBJ;
     TypeMemPtr tmp = (TypeMemPtr)adr;
-
+    // Value is sane
     Type val = gvn.type(val());     // Value
     if( !val.isa_scalar() )         // Nothing sane
       val = val.above_center() ? Type.XSCALAR : Type.SCALAR; // Pin to scalar for updates
-
-    // Compute an updated memory state
+    // Memory is sane
     Type tmem = gvn.type(mem());     // Memory
-    // Not updating a struct?
-    if( !(tmem instanceof TypeStruct) )
+    TypeObj tobj;
+    if( tmem instanceof TypeMem )
+      tobj = ((TypeMem)tmem).ld(tmp); // Get approx object being updated
+    else if( tmem instanceof TypeObj )
+      tobj = (TypeObj)tmem;   // Object being updated
+    else                      // Else dunno what is being updated
       return TypeObj.make0(tmem.above_center());
+
+    // Not updating a struct?
+    if( !(tobj instanceof TypeStruct) )
+      return TypeObj.make0(tmem.above_center());
+
     // Missing the field to update, or storing to a final?
-    TypeStruct ts = (TypeStruct)tmem;
+    TypeStruct ts = (TypeStruct)tobj;
     int idx = ts.find(_fld);
     if( idx == -1 || (ts._finals[idx]==TypeStruct.ffinal() || ts._finals[idx]==TypeStruct.fro()) )
-      return TypeObj.make0(tmem.above_center());
+      return TypeObj.make0(tobj.above_center());
     // Updates to a NewNode are precise, otherwise aliased updates
     if( mem().in(0) == adr().in(0) && mem().in(0) instanceof NewNode )
       // No aliasing, even if the NewNode is called repeatedly
-      return ((TypeObj)tmem).st(_fin, _fld, val);
-    return ((TypeObj)tmem).update(_fin, _fld, val);
+      return tobj.st(_fin, _fld, val);
+    return tobj.update(_fin, _fld, val);
   }
 
   @Override public String err(GVNGCM gvn) {

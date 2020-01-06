@@ -412,6 +412,13 @@ public class FunNode extends RegionNode {
     // If inlining into one path, get the CallEpi for the call site.  Used at
     // least to get a better error message for trivial inlined constructors.
     CallEpiNode cepi = path >= 0 ? cgedges[path]._cepi : null;
+    // If inlining inside another function, try to put that function on the
+    // worklist, to see if it inlines also.
+    if( cepi != null ) {
+      Node outer_fun = cepi.walk_dom_last(n -> n instanceof FunNode);
+      if( outer_fun != null ) gvn.add_work(outer_fun);
+    }
+    
     // Map from old to cloned function body
     HashMap<Node,Node> map = new HashMap<>();
     // Collect aliases that are cloning.

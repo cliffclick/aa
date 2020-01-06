@@ -253,14 +253,15 @@ public class MemMergeNode extends Node {
   @Override public Type value(GVNGCM gvn) {
     // Base type in slot 0
     Type t = gvn.type(in(0));
-    Type tx = t.above_center() ? TypeMem.XMEM : TypeMem.MEM;
-    if( !(t instanceof TypeMem) )  return tx;
+    if( !(t instanceof TypeMem) )
+      return t.above_center() ? TypeMem.XMEM : TypeMem.MEM;
     TypeMem tm = (TypeMem)t;
     // We merge precise updates to the list of aliases
     for( int i=1; i<_defs._len; i++ ) {
       int alias = alias_at(i);
       Type ta = gvn.type(in(i));
-      if( !(ta instanceof TypeObj) ) return tx;
+      if( !(ta instanceof TypeObj) ) // Handle ANY, ALL
+        ta = ta.above_center() ? TypeObj.XOBJ : TypeObj.OBJ;
       tm = tm.st(alias,(TypeObj)ta);
     }
     return tm;

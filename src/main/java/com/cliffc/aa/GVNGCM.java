@@ -269,6 +269,8 @@ public class GVNGCM {
     }
     n.set_dead();               // n is officially dead now
     _live.clear(n._uid);
+    _wrk_bits.clear(n._uid);
+    _wrk2_bits.clear(n._uid);
     if( n._uid==CNT-1 ) {       // Roll back unused node indices
       while( !_live.get(CNT-1) ) CNT--;
     }

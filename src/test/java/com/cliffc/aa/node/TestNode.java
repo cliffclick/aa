@@ -224,10 +224,10 @@ public class TestNode {
     test1monotonic(new   CastNode(_ins[0],_ins[1],TypeMemPtr.STRPTR));
     test1monotonic(new   CastNode(_ins[0],_ins[1],TypeMemPtr.STR0));
     test1monotonic(new  CProjNode(_ins[0],0));
-    test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  TypeInt.FALSE));
-    test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  TypeStr.ABC  ));
-    test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  TypeFlt.FLT64));
-    test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  Type   .CTRL ));
+    test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  null, TypeInt.FALSE));
+    test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  null, TypeStr.ABC  ));
+    test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  null, TypeFlt.FLT64));
+    test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  null, Type   .CTRL ));
     test1monotonic(new    FunNode(new Type[]{TypeInt.INT64}));
     test1monotonic(new FunPtrNode(ret));
     test1monotonic(new     IfNode(_ins[0],_ins[1]));

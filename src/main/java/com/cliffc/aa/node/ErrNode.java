@@ -7,8 +7,9 @@ import com.cliffc.aa.type.Type;
  *  is not well-typed. */
 public final class ErrNode extends Node {
   final String _msg;            // Error message
+  final Parse _bad;             // Optional open point for missing close
   public final Type _t;         // Default value if no error
-  public ErrNode( Node ctrl, String msg, Type t ) { super(OP_ERR,ctrl); _msg = msg; _t=t; }
+  public ErrNode( Node ctrl, String msg, Parse bad, Type t ) { super(OP_ERR,ctrl); _msg = msg; _bad = bad; _t=t; }
   @Override String xstr() { return _msg.split("\n")[1]; }
   @Override String str() { return "Err"; }
   @Override public Node ideal(GVNGCM gvn) { return null; }
@@ -16,7 +17,9 @@ public final class ErrNode extends Node {
     Type t = gvn.type(in(0));
     return t == Type.ANY || t == Type.XCTRL ? _t.dual() : _t; // For dead data errors return ANY (no error)
   }
-  @Override public String err(GVNGCM gvn) { return _msg; }
+  @Override public String err(GVNGCM gvn) {
+    return _bad == null ? _msg : _msg + _bad.errMsg("Missing close was openned here");
+  }
   @Override public Type all_type() { return _t; }
   @Override public int hashCode() { return super.hashCode()+_msg.hashCode()+_t.hashCode(); }
   @Override public boolean equals(Object o) {
