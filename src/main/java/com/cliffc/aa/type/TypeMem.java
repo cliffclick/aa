@@ -117,6 +117,25 @@ public class TypeMem extends Type<TypeMem> {
     }
   }
 
+  // Return set of aliases.  Not even sure if this is well-defined.
+  public BitsAlias aliases() {
+    if( this== MEM ) return BitsAlias.NZERO;
+    if( this==XMEM ) return BitsAlias.EMPTY;
+    throw com.cliffc.aa.AA.unimpl();
+  }
+  // Toss out memory state not visible from these aliases
+  public TypeMem trim_to_alias(BitsAlias bas) {
+    int alias = bas.abit();
+    if( alias == -1 )
+      throw com.cliffc.aa.AA.unimpl();
+    // Single alias from the state being trimmed, and all else is XOBJ
+    TypeObj[] objs = new TypeObj[alias+1];
+    objs[1] = TypeObj.XOBJ;
+    objs[alias] = at(alias);
+    return make(objs);
+  }
+
+
   private static TypeMem FREE=null;
   @Override protected TypeMem free( TypeMem ret ) { _aliases=null; FREE=this; return ret; }
   private static TypeMem make(TypeObj[] aliases) {

@@ -14,10 +14,14 @@ import com.cliffc.aa.util.Util;
 // ends and no more fields can appear.
 
 public class NewObjNode extends NewNode<TypeStruct> {
-  boolean _is_closure;        // For error messages
+  public final boolean _is_closure; // For error messages
   // NewNodes do not really need a ctrl; useful to bind the upward motion of
   // closures so variable stores can more easily fold into them.
-  public NewObjNode( boolean is_closure, Node ctrl ) { this(is_closure,BitsAlias.REC,TypeStruct.ALLSTRUCT,ctrl); }
+  public NewObjNode( boolean is_closure, Node ctrl ) {
+    this(is_closure,
+         is_closure ? BitsAlias.CLOSURE : BitsAlias.REC,
+         TypeStruct.ALLSTRUCT,ctrl);
+  }
   public NewObjNode( boolean is_closure, int par_alias, TypeStruct ts, Node ctrl ) {
     super(OP_NEWOBJ,par_alias,ts,ctrl);
     _is_closure = is_closure;

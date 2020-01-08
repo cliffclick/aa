@@ -107,9 +107,7 @@ public class Parse {
   TypeEnv go_whole( ) {
     prog();                     // Parse a program
     // Delete names at the top scope before final optimization.
-    for( Node use : _e._scope.stk()._uses )
-      _gvn.add_work(use);        // No more fields added; trailing DProj needs to sharpen
-    _e._scope.set_ptr(null,_gvn); // delete top-level names
+    _e.close_closure(_gvn);
     _gvn.iter();   // Pessimistic optimizations; might improve error situation
     // Attempt to remove memory state from top-level Scope, cannot use the
     // normal gvn.iter() because Scope is _keep==1.
@@ -1102,11 +1100,21 @@ public class Parse {
 
   // Insert a call, with projections
   private Node do_call( CallNode call0 ) {
-    Node call = gvn(call0.keep());
-    Node callepi = gvn(new CallEpiNode(call.unhook())).keep();
-    set_ctrl(  gvn(new CProjNode(callepi,0)));
-    set_mem (  gvn(new MProjNode(callepi,1)));
-    return     gvn(new  ProjNode(callepi.unhook(),2));
+    // CallNode has 3 following projections: ctrl, called function ptr, input
+    // memory.  Input memory is refined to only reachable-from-args memory.
+    Node call  = gvn(call0.keep());
+    Node cctrl = gvn(new CProjNode(call,0));
+    Node cfun  = gvn(new  ProjNode(call,1)); // Set of possible target functions
+    Node cmem  = gvn(new MProjNode(call,2)); // Set of aliases reachable from args
+    call.unhook();
+    // Call Epilog takes in the call projections which it uses to both track
+    // wirable functions, and also trim the result memory to passed-in aliases.
+    // CallEpi internally tracks all wired functions.
+    Node cepi  = gvn(new CallEpiNode(cctrl,cfun,cmem)).keep();
+    set_ctrl(    gvn(new CProjNode(cepi,0)));
+    Node postcall_memory = gvn(new MProjNode(cepi,1)); // Return memory from all called functions, trimmed to reachable aliases
+    set_mem( gvn(new MemMergeNode(postcall_memory)));
+    return   gvn(new  ProjNode(cepi.unhook(),2));
   }
 
   // Whack current control with a syntax error

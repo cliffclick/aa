@@ -226,6 +226,16 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     and(bs,0);                           // remove nil choice
     return make(true,bs);                // Choices without nil
   }
+  // Remove the named bit, but otherwise preserve the type
+  @SuppressWarnings("unchecked")
+  public B clear(int bit) {
+    assert test(bit);
+    if( _bits == null ) return ANY();
+    long[] bs = _bits.clone();
+    and(bs,bit);
+    return make(_con==-1,bs);
+  }
+  
   // Remove the nil bit, but otherwise preserve the type
   @SuppressWarnings("unchecked")
   public B strip_nil() {

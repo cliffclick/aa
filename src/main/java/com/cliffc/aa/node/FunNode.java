@@ -39,6 +39,7 @@ import java.util.Map;
 public class FunNode extends RegionNode {
   public String _name;          // Optional for anon functions; can be set later via bind()
   public TypeFunPtr _tf;        // FIDX, arg & ret types
+  public BitsAlias _closure_aliases;
   // Operator precedence; only set on top-level primitive wrappers.
   // -1 for normal non-operator functions and -2 for forward_decls.
   private final byte _op_prec;  // Operator precedence; only set on top-level primitive wrappers
@@ -63,6 +64,8 @@ public class FunNode extends RegionNode {
     _op_prec = (byte)op_prec;
     assert !tf.is_class();
     FUNS.setX(fidx(),this); // Track FunNode by fidx; assert single-bit fidxs
+    // Stack of active closures this function can reference.
+    _closure_aliases = Env.CLOSURES;
   }
 
   // Find FunNodes by fidx
@@ -418,7 +421,7 @@ public class FunNode extends RegionNode {
       Node outer_fun = cepi.walk_dom_last(n -> n instanceof FunNode);
       if( outer_fun != null ) gvn.add_work(outer_fun);
     }
-    
+
     // Map from old to cloned function body
     HashMap<Node,Node> map = new HashMap<>();
     // Collect aliases that are cloning.
@@ -611,7 +614,7 @@ public class FunNode extends RegionNode {
         int rpc = _trpc.rpc();    // The RPC#
         for( Node cepi : ret._uses ) {
           if( cepi instanceof CallEpiNode &&
-              ((CallNode)cepi.in(0))._rpc == rpc ) {
+              ((CallNode)cepi.in(0).in(0))._rpc == rpc ) {
             _cepi = (CallEpiNode)cepi;
             _ridx = cepi._defs.find(ret);
             assert _ridx != -1;       // Must find, since wired

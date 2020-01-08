@@ -1,6 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.AA;
+import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
@@ -30,28 +31,47 @@ import java.util.BitSet;
 // index is just like a ReturnPC value on a real machine; it dictates which of
 // several possible returns apply... and can be merged like a PhiNode.
 //
+// Memory into   a Call is limited to call-reachable read-write memory.
+// Memory out of a Call is limited to call-reachable writable   memory.
+//
 // ASCIIGram: Vertical   lines are part of the original graph.
 //            Horizontal lines are lazily wired during GCP.
 //
 // TFP&Math
-//    |  arg0 arg1
-//    \  |   /           Other Calls
-//     | |  /             /  |  \
-//     v v v             /   |   \
-//      Call            /    |    \
-//        +--------->------>------>             Wired during GCP
-//                 FUN0   FUN1   FUN2
-//                 +--+   +--+   +--+
-//                 |  |   |  |   |  |
-//                 |  |   |  |   |  |
-//                 +--+   +--+   +--+
-//            /-----Ret<---Ret<---Ret--\        Wired during GCP
-//     CallEpi     fptr   fptr   fptr  Other
-//      CProj         \    |    /       CallEpis
-//      MProj          \   |   /
-//      DProj           TFP&Math
+//  Memory: limited to reachable
+//  |  |  arg0 arg1
+//  |  \  |   /           Other Calls
+//  |   | |  /             /  |  \
+//  |   v v v             /   |   \
+//  |    Call            /    |    \
+//  |    C/M/Args       /     |     \
+//  |      +--------->------>------->            Wired during GCP
+//  |               FUN0   FUN1   FUN2
+//  |               +--+   +--+   +--+
+//  |               |  |   |  |   |  |
+//  |               |  |   |  |   |  |
+//  |               +--+   +--+   +--+
+//  |          /-----Ret<---Ret<---Ret--\        Wired during GCP
+//  |   CallEpi     fptr   fptr   fptr  Other
+//  |    CProj         \    |    /       CallEpis
+//  |    MProj          \   |   /
+//  |    DProj           TFP&Math
+//  \   / | \
+//  MemMerge: limited to reachable writable
+//
+// Basic escape analysis is used to prevent closures from escaping needlessly:
 
-
+// - The memory out of a call is limited to aliases reachable from the args.
+//   We compute a tighter memory choice here.
+// - The memory into a function is the merge from all call sites, and can use
+//   the normal Phi merge because Calls produce the more refined memory.
+// - The memory out of a function is limited to the modified input memory, plus
+//   what is reachable from the return pointer that was not passed in
+//   (i.e. function local closures that are escaping).
+// - The memory into a CallEpi is the merge from all function returns, limited
+//   to what was passed in on this path.
+// - The memory out of a CallEpi merges with all other memory which bypasses the Call.
+// 
 public class CallNode extends Node {
   int _rpc;                 // Call-site return PC
   boolean _unpacked;        // Call site allows unpacking a tuple (once)
@@ -74,7 +94,7 @@ public class CallNode extends Node {
 
           Node ctl() { return in(0); }
   public  Node fun() { return in(1); }
-          Node mem() { return in(2); }
+  public  Node mem() { return in(2); }
   //private void set_ctl    (Node ctl, GVNGCM gvn) {     set_def    (0,ctl,gvn); }
   private Node set_mem    (Node mem, GVNGCM gvn) { return set_def(2,mem,gvn); }
   private Node set_fun    (Node fun, GVNGCM gvn) { return set_def(1,fun,gvn); }
@@ -145,19 +165,55 @@ public class CallNode extends Node {
     return null;
   }
 
-  // Gather only control, function pointer and all args; gathered so CallEpi
-  // will re-evaluate if the set of callable functions changes, or the args
-  // change (might enable wiring).
+  // Pass thru all inputs directly - just a direct gather/scatter.  The gather
+  // enforces SESE which in turn allows more precise memory and aliasing.  The
+  // full scatter lets users decide the meaning; e.g. wired FunNodes will take
+  // the full arg set but if the call is not reachable the FunNode will not
+  // merge from that path.
+
+  // TODO: Only uses a reachable selection of memory, so want the memory usage
+  // to have a limited set of aliases.
   @Override public TypeTuple value(GVNGCM gvn) {
-    Type[] ts = TypeAry.get(nargs()+2);
-    Type ct = gvn.type(ctl());
-    ct = ct.above_center() ? Type.XCTRL : Type.CTRL;
-    ts[0] = ct;
-    Type tf = gvn.type(fun());
-    ts[1] = tf.bound(TypeFunPtr.GENERIC_FUNPTR);
-    for( int i=0; i<nargs(); i++ )
-      ts[i+2] = gvn.type(arg(i));
-    return TypeTuple.make(ts);
+    Type[] ts = TypeAry.get(_defs._len);
+    for( int i=0; i<_defs._len; i++ )
+      ts[i] = gvn.type(in(i));
+
+    // Compute a new Memory which is trimmed to everything recursively
+    // reachable from all active display alias#s plus all args.  First check
+    // that we can find our functions.
+    BitsFun fidxs = fidxs(gvn);
+    if( fidxs == null || // Might be e.g. ~Scalar
+        fidxs.test(BitsFun.ALL) )
+      return TypeTuple.make(ts);
+    // Any alias, plus all of its children, are meet/joined.  This does a
+    // tree-based scan on the inner loop.
+    BitSet bs = fidxs.tree().plus_kids(fidxs);
+
+    // Here, I start with all alias#s from TMP args plus all function
+    // closure#s and "close over" the set of possible aliases.
+    BitsAlias bas = BitsAlias.ANY;
+    for( int fidx = bs.nextSetBit(0); fidx >= 0; fidx = bs.nextSetBit(fidx+1) ) {
+      FunNode fun = FunNode.find_fidx(fidx);
+      bas = bas.meet(fun._closure_aliases);
+    }
+    for( int i=0; i<nargs(); i++ ) {
+      Type targ = gvn.type(arg(i));
+      if( targ instanceof TypeMemPtr )
+        bas = bas.meet(((TypeMemPtr)targ)._aliases);
+    }
+    // Shortcut for primitives.  They are common and typically are
+    // not passed any pointers, nor have any exciting closures.
+    // Look for a single closure of exactly the primitives.
+    if( bas.abit() == Env.STK_0._alias ) {
+      ts[2] = TypeMem.XMEM; // Nobody reads primitive memory.
+      return TypeTuple.make(ts);
+    }
+
+    // Add all the aliases which can be reached from objects at the existing
+    // aliases, recursively.
+    TypeMem tmem = (TypeMem)ts[2];
+
+    throw AA.unimpl();
   }
 
   // Given a list of actuals, apply them to each function choice.  If any
@@ -179,8 +235,8 @@ public class CallNode extends Node {
     if( !(fun() instanceof UnresolvedNode) && !fidxs.above_center() )
       return null;              // Sane as-is, just has multiple choices
     if( fidxs.test(BitsFun.ALL) ) return null;
-    // Any alias, plus all of its children, are meet/joined.  This does a
-    // tree-based scan on the inner loop.
+    // Any function ptr, plus all of its children, are meet/joined.  This does
+    // a tree-based scan on the inner loop.
     BitSet bs = fidxs.tree().plus_kids(fidxs);
 
     // Set of possible choices with fewest conversions

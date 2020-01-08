@@ -387,6 +387,53 @@ public class TestParse {
 
 
   @Test public void testParse08() {
+    /*
+      Final LL store into precise alias#19 is passed into 2nd recursive map
+      call.  Map now gets a merge of a final-LL-#19 and a NEW RECURSIVE 19#
+      with non-final LL - and falls to read-only.  Same exact LL store now goes
+      in-error attempting to store over a read-only.  
+
+      Real answer is #19 is local memory, and ptr does NOT escape recursively.
+      So do not merge #19 from recursive map entry with local gen #19.
+
+      PSUEDO-CODE
+      func map with parm mem
+          mem merges LL-non-final and LL-final once
+      if-tree-not-null
+      gen brand new #19 for result
+      call map(tree.l) with #19 mem but no ptr
+      store final LL into #19, making a LL-final flavor of #19
+      call map(tree.r) with final LL flavor #19 but not ptr
+
+      
+      CNC - like calls should not take #19 unless have a ptr-to-#19 in their escape set.
+      Optimistically, only pass in memory from reachable-arg-ptrs.
+      Imagine pre-split seperate nodes for all alias#s.
+      Then parm#19 dead on entry to call, made locally, not passed out.
+      OR: CallNode has some projections for func-entry - all arguments, plus
+          refined memory state from reachable args.
+
+
+     */
+    test_ptr("tmp=@{"+
+                    "  l=@{"+
+                    "    l=@{ l=0; r=0; v=3 };"+
+                    "    r=@{ l=0; r=0; v=7 };"+
+                    "    v=5"+
+                    "  };"+
+                    "  r=@{"+
+                    "    l=@{ l=0; r=0; v=15 };"+
+                    "    r=@{ l=0; r=0; v=22 };"+
+                    "    v=20"+
+                    "  };"+
+                    "  v=12 "+
+                    "};"+
+                    "map={tree fun -> tree"+
+                    "     ? @{ll=map(tree.l,fun);rr=map(tree.r,fun);vv=fun(tree.v)}"+
+                    "     : 0};"+
+                    "map(tmp,{x->x+x})",
+            "@{l==*[$],r==*[$],v==int64}");
+
     // Failed attempt at a Tree-structure inference test.  Triggered all sorts
     // of bugs and error reporting issues, so keeping it as a regression test.
     testerr("tmp=@{"+

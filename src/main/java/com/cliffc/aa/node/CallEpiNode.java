@@ -4,51 +4,57 @@ import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 import java.util.BitSet;
 
-// See CallNode.  Slot 0 is the matching Call, which returns a type of its
-// input args and function pointer.  The remaining slots are Returns which are
-// typed as standard function returns: {Ctrl,Mem,Val}.  These Returns represent
-// call-graph edges that are known to be possible, and thus their fidx appears
-// in the Call's BitsFun type.
+// See CallNode.  Slot 0 is call-control; slot 1 is call function pointer.  The
+// remaining slots are Returns which are typed as standard function returns:
+// {Ctrl,Mem,Val}.  These Returns represent call-graph edges that are known to
+// be possible and thus their fidx appears in the Call's BitsFun type.
 //
 // Pre-opto it is possible for the all-functions type to appear at a Call, and
 // in this case the CallEpi must assume all possible calls may happen, they are
 // just not wired up yet.
 
 public final class CallEpiNode extends Node {
-  public CallEpiNode( Node... rets ) { super(OP_CALLEPI,rets); }
+  public CallEpiNode( Node cctrl, Node cfunc, Node cmem ) { super(OP_CALLEPI,cctrl,cfunc,cmem); }
   String xstr() { return ((is_dead() || is_copy()) ? "x" : "C")+"allEpi"; } // Self short name
-  public CallNode call() { return (CallNode)in(0); }
+  public CallNode call() { return (CallNode)in(0).in(0); }
+  Node ctrl() { return in(0); }
+  Node fptr() { return in(1); }
+  Node mem () { return in(2); }
+  int nwired() { return _defs._len-3; }
+  int wire_num(int x) { return x+3; }
+  RetNode wired(int x) { return (RetNode)in(x+3); }
 
   @Override public Node ideal(GVNGCM gvn) {
     // If inlined, no further xforms.  The using Projs will fold up.
     if( is_copy() ) return null;
 
-    CallNode call = call();
-    Node cctl = call.ctl();
-    TypeTuple tcall = (TypeTuple)gvn.type(call);
-    if( tcall.at(0) != Type.CTRL ) return null; // Call not executable
-    if( !(tcall.at(1) instanceof TypeFunPtr) ) return null;
-    TypeFunPtr tfp = (TypeFunPtr)tcall.at(1);
+    Node ctrl = ctrl();
+    if( gvn.type(ctrl) != Type.CTRL ) return null; // Call not executable
+    Type tfptr = gvn.type(fptr());
+    if( !(tfptr instanceof TypeFunPtr) ) return null; // No known function pointer
+    TypeFunPtr tfp = (TypeFunPtr)tfptr;
 
     // The one allowed function is already wired?  Then directly inline.
     // Requires this calls 1 target, and the 1 target is only called by this.
     BitsFun fidxs = tfp.fidxs();
-    if( _defs._len==2 && fidxs.abit() != -1 ) {       // Wired to 1 target
-      RetNode ret = (RetNode)in(1);
-      if( ret.is_copy() && ret._uses._len==2 ) // FunNode already single-caller and collapsed
+    if( nwired()==1 && fidxs.abit() != -1 ) { // Wired to 1 target
+      RetNode ret = wired(0);                 // One wired return
+      if( ret.fun()._defs._len==2 ) {         // Function is only called by 1 (and not the unknown caller)
+        assert ret.fun().in(1)==in(0);        // Just called by us
         return inline(gvn, ret.ctl(), ret.mem(), ret.val(), ret);
+      }
     }
 
     // If the call's allowed functions excludes any wired, remove the extras
     BitSet bs = fidxs.tree().plus_kids(fidxs);
     if( !fidxs.test(BitsFun.ALL) ) {
-      for( int i = 1; i < _defs._len; i++ ) {
-        RetNode ret = (RetNode) in(i);
+      for( int i = 0; i < nwired(); i++ ) {
+        RetNode ret = wired(i);
         if( !bs.get(ret.fidx()) ) // Wired call is not actually executable?
           // Remove the edge.  Happens after e.g. cloning a function, where
           // both cloned and original versions are wired, but only one is
           // reachable.
-          del(i--);
+          del(wire_num(i--));
       }
     }
 
@@ -63,6 +69,7 @@ public final class CallEpiNode extends Node {
     if( gvn.type(fun) == Type.XCTRL ) return null;
 
     // Arg counts must be compatible
+    CallNode call = call();
     if( fun.nargs() != call.nargs() )
       return null;
 
@@ -80,33 +87,34 @@ public final class CallEpiNode extends Node {
     }
 
     // Check for several trivial cases that can be fully inlined immediately.
+    Node cctl = call.ctl();
     Node cmem = call.mem();
     RetNode ret = fun.ret();    // Return from function
-    Node ctl  = ret.ctl();      // Control being returned
-    Node mem  = ret.mem();      // Memory  being returned
-    Node rez = ret.val();       // Value   being returned
+    Node rctl = ret.ctl();      // Control being returned
+    Node rmem = ret.mem();      // Memory  being returned
+    Node rrez = ret.val();      // Value   being returned
     // If the function does nothing with memory, then use the call memory directly.
-    if( ret.mem() instanceof ParmNode && ret.mem().in(0) == fun )
-      mem = cmem;
+    if( rmem instanceof ParmNode && rmem.in(0) == fun )
+      rmem = cmem;
 
     // Check for zero-op body (id function)
-    if( rez instanceof ParmNode && rez.in(0) == fun && cmem == mem )
-      return inline(gvn,cctl,cmem,call.arg(((ParmNode)rez)._idx), ret);
+    if( rrez instanceof ParmNode && rrez.in(0) == fun && cmem == rmem )
+      return inline(gvn,ctrl,cmem,call.arg(((ParmNode)rrez)._idx), ret);
     // Check for constant body
-    if( gvn.type(rez).is_con() && ctl==fun && cmem == mem)
-      return inline(gvn,cctl,cmem,rez,ret);
+    if( gvn.type(rrez).is_con() && rctl==fun && cmem == rmem)
+      return inline(gvn,cctl,cmem,rrez,ret);
 
     // Check for a 1-op body using only constants or parameters and no memory effects
-    boolean can_inline=!(rez instanceof ParmNode) && mem==cmem;
-    for( Node parm : rez._defs )
+    boolean can_inline=!(rrez instanceof ParmNode) && rmem==cmem;
+    for( Node parm : rrez._defs )
       if( parm != null && parm != fun &&
           !(parm instanceof ParmNode && parm.in(0) == fun) &&
           !(parm instanceof ConNode) )
         can_inline=false;       // Not trivial
     if( fun.noinline() ) can_inline=false;
     if( can_inline ) {
-      Node irez = rez.copy(false,this,gvn);// Copy the entire function body
-      for( Node parm : rez._defs )
+      Node irez = rrez.copy(false,this,gvn);// Copy the entire function body
+      for( Node parm : rrez._defs )
         irez.add_def((parm instanceof ParmNode && parm.in(0) == fun) ? call.arg(((ParmNode)parm)._idx) : parm);
       if( irez instanceof PrimNode ) ((PrimNode)irez)._badargs = call._badargs;
       return inline(gvn,cctl,cmem,gvn.xform(irez),ret); // New exciting replacement for inlined call
@@ -118,13 +126,11 @@ public final class CallEpiNode extends Node {
 
   // Wire the call args to a known function, letting the function have precise
   // knowledge of its callers and arguments.  This adds an edge in the Call-Graph.
-  // TODO: Leaves the Call in the graph - making the graph "a little odd" - double
-  // CTRL users - once for the call, and once for the function being called.
   Node wire( GVNGCM gvn, CallNode call, FunNode fun, RetNode ret ) {
     assert _keep==0;            // not expecting this during calls
 
-    for( int i=1; i<_defs._len; i++ )
-      if( in(i) == ret )        // Look for same Ret
+    for( int i=0; i<nwired(); i++ )
+      if( wired(i) == ret )     // Look for same Ret
         return null;            // Already wired up
 
     // Make sure we have enough args before wiring up (makes later life easier
@@ -144,12 +150,12 @@ public final class CallEpiNode extends Node {
     for( Node arg : fun._uses ) {
       if( arg.in(0) == fun && arg instanceof ParmNode ) {
         int idx = ((ParmNode)arg)._idx; // Argument number, or -1 for rpc
-        Node actual = idx==-1 ? gvn.con(TypeRPC.make(call._rpc)) : (idx==-2 ? call.mem() : call.arg(idx));
+        Node actual = idx==-1 ? gvn.con(TypeRPC.make(call._rpc)) : gvn.xform(new ProjNode(call,idx==-2 ? 2/*memory*/ : idx+3));
         gvn.add_def(arg,actual);
       }
     }
-    // Add matching control
-    gvn.add_def(fun,call.ctl());
+    // Add matching control to function
+    gvn.add_def(fun,gvn.xform(new CProjNode(call,0)));
     // Add the CallEpi hook
     if( gvn._opt_mode == 2 ) gvn.add_def(this,ret);
     else                         add_def(     ret);
@@ -164,12 +170,11 @@ public final class CallEpiNode extends Node {
     if( is_copy() )             // Already collapsed?  Just echo inputs
       return TypeTuple.make(gvn.type(in(0)),gvn.type(in(1)),gvn.type(in(2)));
 
-    CallNode call = call();
-    TypeTuple ctt = (TypeTuple)gvn.type(call);
-    if( ctt.at(0) == Type.XCTRL ) return TypeTuple.XCALL;
-    if( !(ctt.at(1) instanceof TypeFunPtr) )
+    if( gvn.type(ctrl()) != Type.CTRL ) return TypeTuple.XCALL;
+    Type tfptr = gvn.type(fptr());
+    if( !(tfptr instanceof TypeFunPtr) )
       return TypeTuple.CALL;
-    TypeFunPtr funt = (TypeFunPtr)ctt.at(1);
+    TypeFunPtr funt = (TypeFunPtr)tfptr;
     BitsFun fidxs = funt.fidxs();
     if( gvn._opt_mode != 2 && fidxs.test(BitsFun.ALL) ) // All functions are possible?
       return TypeTuple.CALL;        // Worse-case result
@@ -181,6 +186,9 @@ public final class CallEpiNode extends Node {
     // Merge returns from all fidxs, wired or not.  Required during GCP to keep
     // optimistic.  JOIN if above center, merge otherwise.  Wiring the calls
     // gives us a faster lookup, but need to be correct wired or not.
+    TypeMem call_mem = (TypeMem)gvn.type(mem());
+    BitsAlias call_aliases = call_mem.aliases();
+    CallNode call = call();
     Bits.Tree<BitsFun> tree = fidxs.tree();
     BitSet bs = tree.plus_kids(fidxs);
     boolean lifting = gvn._opt_mode==2;
@@ -189,14 +197,31 @@ public final class CallEpiNode extends Node {
       if( tree.is_parent(fidx) ) continue;   // Will be covered by children
       FunNode fun = FunNode.find_fidx(fidx); // Lookup, even if not wired
       if( fun==null || fun.is_dead() )
-        continue; // Can be dead, if the news has not traveled yet
+        continue;              // Can be dead, if the news has not traveled yet
       if( fun.nargs() != call.nargs() ) // This call-path has wrong args, is in-error
-        return TypeTuple.CALL;
+        return TypeTuple.CALL; // No good result until the input function is sensible
       RetNode ret = fun.ret();
       TypeTuple tret = (TypeTuple)gvn.type(ret); // Type of the return
-      if( ret.mem() instanceof ParmNode ) // Pure functions keep call memory state
-        tret = TypeTuple.make(tret.at(0),gvn.type(call.mem()),tret.at(2));
-      t = lifting ? t.join(tret) : t.meet(tret);
+      // Lift the returned memory to be no more than what is available at the
+      // call entry plus the function closures - specifically not all the
+      // memory from unrelated calls to this same function.
+
+      // TODO: Functions only return *modified* memory state.
+
+      // Memmory from the function.  Includes memory from other call sites.
+      TypeMem ret_mem_untrimmed = ((TypeMem)tret.at(1));
+      BitsAlias ret_aliases = ret_mem_untrimmed.aliases();
+
+      // Trim to aliases available from this call path.
+      BitsAlias call_trimmed = (BitsAlias)ret_aliases.join(call_aliases);
+      // TODO: locals includes what is reachable from the return pointer not
+      // all local closures.
+      BitsAlias plus_local = call_trimmed.meet(fun._closure_aliases);
+      // Trim return memory to what is possible on this path.
+      TypeMem ret_mem_trimmed = ret_mem_untrimmed.trim_to_alias(plus_local);
+      // Build a full return type.
+      TypeTuple tret2 = TypeTuple.make(tret.at(0),ret_mem_trimmed,tret.at(2));
+      t = lifting ? t.join(tret2) : t.meet(tret2);
 
       // Make real from virtual CG edges in GCP/Opto by wiring calls.
       if( gvn._opt_mode==2 &&        // Manifesting optimistic virtual edges between caller and callee
@@ -212,22 +237,23 @@ public final class CallEpiNode extends Node {
   // Inline the CallNode.  Remove all edges except the results.  This triggers
   // "is_copy()", which in turn will trigger the following ProjNodes to inline.
   private Node inline( GVNGCM gvn, Node ctl, Node mem, Node rez, RetNode ret ) {
-    assert _defs._len == 1 || _defs._len==2;   // not wired to several choices
+    assert nwired()==0 || nwired()==1; // not wired to several choices
     // Unwire any wired called function
-    if( _defs._len == 2 && !ret.is_copy() ) {  // Wired, and called function not already collapsing
+    if( nwired() == 1 && !ret.is_copy() ) {  // Wired, and called function not already collapsing
       FunNode fun = ret.fun();
       for( int i=0; i<fun._defs._len; i++ ) // Unwire
         if( fun.in(i)==ctl ) gvn.set_def_reg(fun,i,gvn.con(Type.XCTRL));
     }
     // Remove all edges except the inlined results
-    add_def(ctl);
-    add_def(mem);
-    add_def(rez);
-    while( _defs._len > 3 ) remove(0,gvn);
+    ctl.keep();  mem.keep();  rez.keep();
+    while( _defs._len > 0 ) pop(gvn);
+    add_def(ctl.unhook());
+    add_def(mem.unhook());
+    add_def(rez.unhook());
     return this;
   }
   // If slot 0 is not a CallNode, we have been inlined.
-  private boolean is_copy() { return !(in(0) instanceof CallNode); }
+  private boolean is_copy() { return !(in(0) instanceof CProjNode) || !(in(0).in(0) instanceof CallNode); }
   @Override public Node is_copy(GVNGCM gvn, int idx) { return is_copy() ? in(idx) : null; }
   @Override public Type all_type() { return TypeTuple.CALL; }
 }

@@ -39,12 +39,17 @@ public class TypeNode extends Node {
         args[i+3] = gvn.xform(new TypeNode(targs[i],parm,_error_parse));
       }
       Node call = gvn.xform(new CallNode(true,_error_parse,args));
-      Node cepi = gvn.xform(new CallEpiNode(call)).keep();
+      Node cctrl= gvn.xform(new CProjNode(call,0));
+      Node cfun = gvn.xform(new  ProjNode(call,1)); // Set of possible target functions
+      Node cmem = gvn.xform(new MProjNode(call,2)); // Set of aliases reachable from args
+      Node cepi = gvn.xform(new CallEpiNode(cctrl,cfun,cmem)).keep();
       Node ctl  = gvn.xform(new CProjNode(cepi,0));
-      Node mem  = gvn.xform(new MProjNode(cepi,1)).keep();
+      Node postmem = gvn.xform(new MProjNode(cepi,1));
       Node val  = gvn.xform(new  ProjNode(cepi.unhook(),2));
       Node chk  = gvn.xform(new  TypeNode(tfp._ret,val,_error_parse)); // Type-check the return also
-      RetNode ret = (RetNode)gvn.xform(new RetNode(ctl,mem.unhook(),chk,rpc,fun));
+      Node premem = args[2];
+      Node mem = gvn.xform(new MemMergeNode(premem,postmem,1));
+      RetNode ret = (RetNode)gvn.xform(new RetNode(ctl,mem,chk,rpc,fun));
       return gvn.xform(new FunPtrNode(ret));
     }
 

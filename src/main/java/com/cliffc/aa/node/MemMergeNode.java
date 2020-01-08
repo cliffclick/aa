@@ -25,7 +25,10 @@ import java.util.BitSet;
 // (equivalence class).  Alias parents are typically assumed to have more
 // future unknown splits in them, so merges of all known children still expect
 // to have a parent merge.
-
+//
+// As a special case, MemMerge will take the results of an all-call-memory in
+// alias#1 slot 0 - and will gradually widen general memory around the call as
+// the call memory sharpens.  This is specifically for SESE call behavior.
 public class MemMergeNode extends Node {
 
   // Alias equivalence class matching each input.
@@ -199,6 +202,12 @@ public class MemMergeNode extends Node {
     if( _defs._len==1 ) return in(0); // Merging nothing
     if( progress ) return this;       // Removed some dead inputs
 
+    // If some inputs have sharper aliases, sharpen the merge.  Specifically
+    // route general memory around a call with specific aliases.
+    if( in(0) instanceof MProjNode && gvn.type(in(0)) != TypeMem.XMEM && gvn.type(in(0)) != TypeMem.MEM )
+      throw AA.unimpl();
+
+    
     //// If I have a Named Constructor usage, and have 2 uses (named constructor
     //// and the Merge following it), make sure the Named Constructor can run
     //// ideal() so it can fold away.

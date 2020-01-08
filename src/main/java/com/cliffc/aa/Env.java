@@ -17,6 +17,7 @@ public class Env implements AutoCloseable {
       scope.set_ptr (ptr,GVN);  // Address for 'nnn', the local stack frame
       MemMergeNode mem = new MemMergeNode(par._scope.mem(),frm,nnn.<NewObjNode>unhook()._alias);
       scope.set_active_mem(mem,GVN);  // Memory includes local stack frame
+      if( closure ) CLOSURES = CLOSURES.meet(BitsAlias.make0(nnn._alias));
     }
     _scope = GVN.init(scope);
   }
@@ -32,6 +33,8 @@ public class Env implements AutoCloseable {
           final static int LAST_START_UID;
   private final static int NINIT_CONS;
           final static Env TOP; // Top-most lexical Environment, has all primitives, unable to be removed
+  public        static BitsAlias CLOSURES;
+  
   static {
     GVN = new GVNGCM();      // Initial GVN, defaults to ALL, lifts towards ANY
     // Initial control & memory
@@ -42,6 +45,7 @@ public class Env implements AutoCloseable {
     STK_0        =          new NewObjNode(true,CTL_0).keep();
     PTR_0        = GVN.init(new   ProjNode(STK_0,1));
     OBJ_0        =          new  OProjNode(STK_0,0) ;
+    CLOSURES = BitsAlias.make0(STK_0._alias);
 
     MEM_0 = GVN.init(new MemMergeNode(all_mem,OBJ_0,STK_0._alias)).keep();
     // Top-level default values; ALL_CTRL is used by declared functions to
@@ -88,8 +92,24 @@ public class Env implements AutoCloseable {
     return _scope.is_closure() ? P.do_exit(_scope,val) : _par.early_exit(P,val); // Hunt for an early-exit-enabled scope
   }
 
+  // Close any currently open closure, and remove its alias from the set of
+  // active closure aliases (which are otherwise available to all function
+  // definitions getting parsed).  
+  public void close_closure( GVNGCM gvn ) {
+    Node ptr = _scope.ptr();
+    if( ptr == null ) return;   // Already done
+    NewObjNode stk = _scope.stk();
+    if( stk._is_closure )
+      CLOSURES = CLOSURES.clear(stk._alias);
+    for( Node use : stk._uses )
+      gvn.add_work(use);        // Scope object going dead, trigger following projs to cleanup
+    _scope.set_ptr(null,gvn);
+  }
+  
   // Close the current Env and lexical scope.
   @Override public void close() {
+    close_closure(GVN);
+        
     ScopeNode pscope = _par._scope;
     // Promote forward refs to the next outer scope
     if( pscope != null && pscope != TOP._scope)
