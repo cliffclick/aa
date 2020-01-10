@@ -35,7 +35,7 @@ public class BitsAlias extends Bits<BitsAlias> {
     FULL = NZERO.meet_nil();    // All aliases, with a nil
     ANY = FULL.dual();          // Precompute dual
     NIL = make0(0);             // No need to dual; NIL is its own dual
-    EMPTY =NZERO. make();       // No bits
+    EMPTY = NZERO.make();       // No bits
     // Split All-Memory into Structs/Records and Arrays (including Strings).
     // Everything falls into one of these two camps.
     RECBITS = make0(REC = type_alias(ALL));
@@ -68,6 +68,7 @@ public class BitsAlias extends Bits<BitsAlias> {
   @Override boolean is_class(int fidx) { return fidx!=0; } // All bits are class of allocated objects, except nil alone
   @Override public BitsAlias ALL() { return FULL; }
   @Override public BitsAlias ANY() { return ANY ; }
+  @Override public BitsAlias EMPTY() { return EMPTY ; }
 
   public static BitsAlias make0( int bit ) { return NZERO.make(bit); }
 

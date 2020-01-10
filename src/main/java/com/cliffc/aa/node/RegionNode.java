@@ -38,7 +38,7 @@ public class RegionNode extends Node {
     for( Node phi : _uses ) if( phi instanceof PhiNode ) return null;
     // Single input FunNodes can NOT inline to their one caller,
     // unless the one caller only also calls the one FunNode.
-    if( this instanceof FunNode )
+    if( this instanceof FunNode && ((FunNode)this).ret()!=null )
       return null;
     // Self-dead-cycle is dead in value() call
     return in(1)==this ? null : in(1);

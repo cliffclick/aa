@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 import java.util.BitSet;
@@ -33,6 +34,7 @@ public final class CallEpiNode extends Node {
     Type tfptr = gvn.type(fptr());
     if( !(tfptr instanceof TypeFunPtr) ) return null; // No known function pointer
     TypeFunPtr tfp = (TypeFunPtr)tfptr;
+    CallNode call = call();
 
     // The one allowed function is already wired?  Then directly inline.
     // Requires this calls 1 target, and the 1 target is only called by this.
@@ -41,7 +43,7 @@ public final class CallEpiNode extends Node {
       RetNode ret = wired(0);                 // One wired return
       if( ret.fun()._defs._len==2 ) {         // Function is only called by 1 (and not the unknown caller)
         assert ret.fun().in(1)==in(0);        // Just called by us
-        return inline(gvn, ret.ctl(), ret.mem(), ret.val(), ret);
+        return inline(gvn, call, ret.ctl(), ret.mem(), ret.val(), ret);
       }
     }
 
@@ -69,7 +71,6 @@ public final class CallEpiNode extends Node {
     if( gvn.type(fun) == Type.XCTRL ) return null;
 
     // Arg counts must be compatible
-    CallNode call = call();
     if( fun.nargs() != call.nargs() )
       return null;
 
@@ -99,10 +100,10 @@ public final class CallEpiNode extends Node {
 
     // Check for zero-op body (id function)
     if( rrez instanceof ParmNode && rrez.in(0) == fun && cmem == rmem )
-      return inline(gvn,ctrl,cmem,call.arg(((ParmNode)rrez)._idx), ret);
+      return inline(gvn,call,cctl,cmem,call.arg(((ParmNode)rrez)._idx), ret);
     // Check for constant body
     if( gvn.type(rrez).is_con() && rctl==fun && cmem == rmem)
-      return inline(gvn,cctl,cmem,rrez,ret);
+      return inline(gvn,call,cctl,cmem,rrez,ret);
 
     // Check for a 1-op body using only constants or parameters and no memory effects
     boolean can_inline=!(rrez instanceof ParmNode) && rmem==cmem;
@@ -117,7 +118,7 @@ public final class CallEpiNode extends Node {
       for( Node parm : rrez._defs )
         irez.add_def((parm instanceof ParmNode && parm.in(0) == fun) ? call.arg(((ParmNode)parm)._idx) : parm);
       if( irez instanceof PrimNode ) ((PrimNode)irez)._badargs = call._badargs;
-      return inline(gvn,cctl,cmem,gvn.xform(irez),ret); // New exciting replacement for inlined call
+      return inline(gvn,call,cctl,cmem,gvn.xform(irez),ret); // New exciting replacement for inlined call
     }
 
     // Always wire caller args into known functions
@@ -176,8 +177,8 @@ public final class CallEpiNode extends Node {
       return TypeTuple.CALL;
     TypeFunPtr funt = (TypeFunPtr)tfptr;
     BitsFun fidxs = funt.fidxs();
-    if( gvn._opt_mode != 2 && fidxs.test(BitsFun.ALL) ) // All functions are possible?
-      return TypeTuple.CALL;        // Worse-case result
+    if( fidxs.test(BitsFun.ALL) ) // All functions are possible?
+      return TypeTuple.CALL;      // Worse-case result
     // If we fall from choice-functions to the empty set of called functions, freeze our output.
     // We might fall past empty and get a valid set.  Probably wrong; if we ever see a
     // choice set of functions, we should not execute.
@@ -186,11 +187,16 @@ public final class CallEpiNode extends Node {
     // Merge returns from all fidxs, wired or not.  Required during GCP to keep
     // optimistic.  JOIN if above center, merge otherwise.  Wiring the calls
     // gives us a faster lookup, but need to be correct wired or not.
+
+    // Gather the set of aliases passed into the function.
     TypeMem call_mem = (TypeMem)gvn.type(mem());
     BitsAlias call_aliases = call_mem.aliases();
+    // Call args, to limit error calls
     CallNode call = call();
+    // Set of all possible target functions
     Bits.Tree<BitsFun> tree = fidxs.tree();
     BitSet bs = tree.plus_kids(fidxs);
+    // Lifting or dropping Unresolved calls
     boolean lifting = gvn._opt_mode==2;
     Type t = lifting ? TypeTuple.CALL : TypeTuple.XCALL;
     for( int fidx = bs.nextSetBit(0); fidx >= 0; fidx = bs.nextSetBit(fidx+1) ) {
@@ -198,25 +204,31 @@ public final class CallEpiNode extends Node {
       FunNode fun = FunNode.find_fidx(fidx); // Lookup, even if not wired
       if( fun==null || fun.is_dead() )
         continue;              // Can be dead, if the news has not traveled yet
-      if( fun.nargs() != call.nargs() ) // This call-path has wrong args, is in-error
+      if( fun.nargs() != call.nargs() ) // This call-path has wrong args, is in-error for this function
+        // Cannot just ignore/continue because the remaining functions might
+        // allow the call site to produce a constant and optimize away.
         return TypeTuple.CALL; // No good result until the input function is sensible
       RetNode ret = fun.ret();
       TypeTuple tret = (TypeTuple)gvn.type(ret); // Type of the return
       // Lift the returned memory to be no more than what is available at the
       // call entry plus the function closures - specifically not all the
       // memory from unrelated calls to this same function.
-
-      // TODO: Functions only return *modified* memory state.
-
-      // Memmory from the function.  Includes memory from other call sites.
       TypeMem ret_mem_untrimmed = ((TypeMem)tret.at(1));
-      BitsAlias ret_aliases = ret_mem_untrimmed.aliases();
 
-      // Trim to aliases available from this call path.
-      BitsAlias call_trimmed = (BitsAlias)ret_aliases.join(call_aliases);
+      BitsAlias call_trimmed = BitsAlias.EMPTY;
+      if( call_aliases!=BitsAlias.EMPTY ) { // Shortcut for no aliases
+        // Memory from the function.  Includes memory from other call sites.
+        BitsAlias ret_aliases = ret_mem_untrimmed.aliases();
+
+        // Trim to aliases available from this call path.
+        call_trimmed = (BitsAlias)ret_aliases.join(call_aliases);
+      }
       // TODO: locals includes what is reachable from the return pointer not
       // all local closures.
       BitsAlias plus_local = call_trimmed.meet(fun._closure_aliases);
+      // Strip out primitive memory, since it is never read nor written
+      plus_local = plus_local.clear(Env.STK_0._alias);
+
       // Trim return memory to what is possible on this path.
       TypeMem ret_mem_trimmed = ret_mem_untrimmed.trim_to_alias(plus_local);
       // Build a full return type.
@@ -236,17 +248,23 @@ public final class CallEpiNode extends Node {
 
   // Inline the CallNode.  Remove all edges except the results.  This triggers
   // "is_copy()", which in turn will trigger the following ProjNodes to inline.
-  private Node inline( GVNGCM gvn, Node ctl, Node mem, Node rez, RetNode ret ) {
+  private Node inline( GVNGCM gvn, CallNode call, Node ctl, Node mem, Node rez, RetNode ret ) {
     assert nwired()==0 || nwired()==1; // not wired to several choices
+    
     // Unwire any wired called function
     if( nwired() == 1 && !ret.is_copy() ) {  // Wired, and called function not already collapsing
       FunNode fun = ret.fun();
       for( int i=0; i<fun._defs._len; i++ ) // Unwire
         if( fun.in(i)==ctl ) gvn.set_def_reg(fun,i,gvn.con(Type.XCTRL));
     }
+    // Call is also is_copy and will need to collapse
+    call._is_copy = true;              // Call is also is-copy
+    gvn.add_work(call);
+    for( Node use : call._uses ) gvn.add_work(use);
     // Remove all edges except the inlined results
     ctl.keep();  mem.keep();  rez.keep();
     while( _defs._len > 0 ) pop(gvn);
+    // Put results back on, and trigger is_copy to collapse
     add_def(ctl.unhook());
     add_def(mem.unhook());
     add_def(rez.unhook());

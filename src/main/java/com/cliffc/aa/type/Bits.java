@@ -58,6 +58,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   abstract Tree<B> tree();
   public abstract B ALL();
   public abstract B ANY();
+  public abstract B EMPTY();
 
   // Common init
   void init(int con, long[] bits ) {
@@ -230,12 +231,12 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   @SuppressWarnings("unchecked")
   public B clear(int bit) {
     assert test(bit);
-    if( _bits == null ) return ANY();
+    if( _bits == null ) return EMPTY();
     long[] bs = _bits.clone();
     and(bs,bit);
     return make(_con==-1,bs);
   }
-  
+
   // Remove the nil bit, but otherwise preserve the type
   @SuppressWarnings("unchecked")
   public B strip_nil() {

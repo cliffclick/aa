@@ -1091,7 +1091,9 @@ public class Parse {
     Node mem = scope.mem();
     if( _gvn.touched(mem) ) {
       // If only used by the parser, just make it active.
-      if( mem instanceof MemMergeNode && mem._uses._len==1 && mem._keep == 0 ) _gvn.unreg(mem);
+      if( mem instanceof MemMergeNode && mem._uses._len==1 && mem._keep == 0 &&
+          !((MemMergeNode)mem).post_call_mem() )
+        _gvn.unreg(mem);
       // Not active and has uses, so make a new active memory feeding from the old
       else return scope.set_active_mem(new MemMergeNode(mem),_gvn);
     }

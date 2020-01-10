@@ -1,11 +1,9 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.AA;
-import com.cliffc.aa.Env;
-import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.Parse;
+import com.cliffc.aa.*;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.Ary;
+import com.cliffc.aa.util.*;
+
 import org.jetbrains.annotations.NotNull;
 
 import java.util.BitSet;
@@ -59,22 +57,53 @@ import java.util.BitSet;
 //  \   / | \
 //  MemMerge: limited to reachable writable
 //
-// Basic escape analysis is used to prevent closures from escaping needlessly:
+// Poster Child For Escape Analysis:   treemap = {t f -> t ? @{l=map(t.l,f);r=map(t.r,f);v=f(t.v)} : 0}
+// treemap = {tree fun ->
+//   new  = new struct{left,right,val}
+//   mem0 = merge(fun.mem,new)
+//   tmp1 = ld tree.left;
+//   tmp2 = treemap(mem0,tmp1,fun)
+//   mem3 = st mem0,new.left,tmp2
+//   tmp4 = ld tree.right;
+//   tmp5 = treemap(mem3,tmp4,fun)
+//   mem6 = st mem3,new.right,tmp5
+//   tmp7 = ld tree.val
+//   tmp8 = fun(tmp7)
+//   mem9 = st mem6,new.val,tmp8
+//   return mem9,new
+// }
+//
+// BUG:
+//   mem3 produces final left field memory
+//   tmp5 call push final left into treemap memory phi.  LEAKS NEW.
+//   mem0 merges final-left of leaked new with a recursive new.  NEW IS NOW APPROXIMATED WITH FINAL-LEFT
+//   mem3 IN ERROR storing final-left over final-left.
+//
+// This "escape" does not happen in the "value model" of the world, since there
+// is no memory merge after the new.  Parser needs a way to merge the memory
+// since it cannot track the pointer seperate from the memory... which means
+// the main iter/gcp needs to tease apart the escaping situation.
+//
+// THREE "escape analysis" plans:
+// - Local analysis only: post-memmerge/callepi/call/pre-memmerge; "new" not
+//   stored in this region, not passed as an argument, so does not escape.
+//   Bypass "new" around call.
+// - Local graph peek inside of treemap; see Ret->Merge->Parm_Mem->Fun.  All
+//   memories except "new" not modded, can bypass.  "tree" itself is loaded,
+//   must be passed in.  "new" is local, so also bypasses recursive calls.
+// - Forward flow analysis around any SESE region: tracks past uses & mods.
+//   Annotate memory type with 0/r/w/new per-field starting from Fun, and
+//   propagate to Ret.  Seperately CallEpi can observe memory is either not
+//   touched, or new, or read-only, vs write - and bypass.
 
-// - The memory out of a call is limited to aliases reachable from the args.
-//   We compute a tighter memory choice here.
-// - The memory into a function is the merge from all call sites, and can use
-//   the normal Phi merge because Calls produce the more refined memory.
-// - The memory out of a function is limited to the modified input memory, plus
-//   what is reachable from the return pointer that was not passed in
-//   (i.e. function local closures that are escaping).
-// - The memory into a CallEpi is the merge from all function returns, limited
-//   to what was passed in on this path.
-// - The memory out of a CallEpi merges with all other memory which bypasses the Call.
-// 
+
+
+
+
 public class CallNode extends Node {
   int _rpc;                 // Call-site return PC
   boolean _unpacked;        // Call site allows unpacking a tuple (once)
+  boolean _is_copy;         // One-shot flag set when inlining an entire single-caller-single-called 
   Parse  _badargs;          // Error for e.g. wrong arg counts or incompatible args
   public CallNode( boolean unpacked, Parse badargs, Node... defs ) {
     super(OP_CALL,defs);
@@ -83,7 +112,7 @@ public class CallNode extends Node {
     _badargs = badargs;
   }
 
-  String xstr() { return "Call#"+_rpc; } // Self short name
+  String xstr() { return ((is_dead() || is_copy()) ? "x" : "C")+"all#"+_rpc; } // Self short name
   String  str() { return xstr(); }       // Inline short name
 
   // Number of actual arguments
@@ -127,6 +156,8 @@ public class CallNode extends Node {
   }
 
   @Override public Node ideal(GVNGCM gvn) {
+    // If inlined, no further xforms.  The using Projs will fold up.
+    if( is_copy() ) return null;
     // Dead, do nothing
     if( gvn.type(ctl())==Type.XCTRL ) return null;
     Node mem = mem();
@@ -177,43 +208,52 @@ public class CallNode extends Node {
     Type[] ts = TypeAry.get(_defs._len);
     for( int i=0; i<_defs._len; i++ )
       ts[i] = gvn.type(in(i));
+    
 
     // Compute a new Memory which is trimmed to everything recursively
     // reachable from all active display alias#s plus all args.  First check
     // that we can find our functions.
     BitsFun fidxs = fidxs(gvn);
+    if( fidxs == null ) ts[1] = TypeFunPtr.GENERIC_FUNPTR;
     if( fidxs == null || // Might be e.g. ~Scalar
-        fidxs.test(BitsFun.ALL) )
+        fidxs.test(BitsFun.ALL) ||
+        is_copy() )
       return TypeTuple.make(ts);
-    // Any alias, plus all of its children, are meet/joined.  This does a
-    // tree-based scan on the inner loop.
-    BitSet bs = fidxs.tree().plus_kids(fidxs);
 
     // Here, I start with all alias#s from TMP args plus all function
     // closure#s and "close over" the set of possible aliases.
-    BitsAlias bas = BitsAlias.ANY;
+    TypeMem tmem = (TypeMem)ts[2];
+    if( tmem == TypeMem.XMEM || tmem == TypeMem.EMPTY_MEM ) return TypeTuple.make(ts);
+    // Set of aliases escaping into the function
+    VBitSet abs = new VBitSet();
+    // All fidxes in a flat iterable loop
+    BitSet bs = fidxs.tree().plus_kids(fidxs);
     for( int fidx = bs.nextSetBit(0); fidx >= 0; fidx = bs.nextSetBit(fidx+1) ) {
       FunNode fun = FunNode.find_fidx(fidx);
-      bas = bas.meet(fun._closure_aliases);
+      for( int alias : fun._closure_aliases )
+        tmem.recursive_aliases(abs,alias); // Function closures always escape
     }
+    // Now the set of pointers escaping via arguments
     for( int i=0; i<nargs(); i++ ) {
       Type targ = gvn.type(arg(i));
       if( targ instanceof TypeMemPtr )
-        bas = bas.meet(((TypeMemPtr)targ)._aliases);
+        for( int alias : ((TypeMemPtr)targ)._aliases )
+          tmem.recursive_aliases(abs,alias);
     }
-    // Shortcut for primitives.  They are common and typically are
-    // not passed any pointers, nor have any exciting closures.
-    // Look for a single closure of exactly the primitives.
-    if( bas.abit() == Env.STK_0._alias ) {
-      ts[2] = TypeMem.XMEM; // Nobody reads primitive memory.
+    // Shortcut for primitives.  They are common and typically are not passed
+    // any pointers, nor have any exciting closures.  Look for a single closure
+    // of exactly the primitives.
+    abs.clear(Env.STK_0._alias);
+    if( abs.length()==0 ) {      // Nothing left?
+      ts[2] = TypeMem.EMPTY_MEM; // Empty memory
       return TypeTuple.make(ts);
     }
 
     // Add all the aliases which can be reached from objects at the existing
     // aliases, recursively.
-    TypeMem tmem = (TypeMem)ts[2];
-
-    throw AA.unimpl();
+    TypeMem trez = tmem.trim_to_alias(abs);
+    ts[2] = trez;
+    return TypeTuple.make(ts);
   }
 
   // Given a list of actuals, apply them to each function choice.  If any
@@ -343,7 +383,12 @@ public class CallNode extends Node {
     return null;
   }
 
-  @Override public TypeTuple all_type() { return TypeTuple.make(Type.CTRL,TypeFunPtr.GENERIC_FUNPTR); }
+  @Override public TypeTuple all_type() {
+    return TypeTuple.make(Type.CTRL,
+                          TypeFunPtr.GENERIC_FUNPTR,
+                          TypeMem.ALL_MEM
+                          );
+  }
   @Override public int hashCode() { return super.hashCode()+_rpc; }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
@@ -352,5 +397,6 @@ public class CallNode extends Node {
     CallNode call = (CallNode)o;
     return _rpc==call._rpc;
   }
-
+  private boolean is_copy() { return _is_copy; }
+  @Override public Node is_copy(GVNGCM gvn, int idx) { return is_copy() ? in(idx) : null; }
 }

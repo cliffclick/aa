@@ -143,7 +143,7 @@ public class MemMergeNode extends Node {
     if( alias == -1 ) throw AA.unimpl(); // Handle multiple aliases, handle all/empty
     return obj(alias,gvn);
   }
-  
+
   // Create a new alias slot with initial value for an active this
   public void create_alias_active( int alias, Node n, GVNGCM gvn ) {
     assert gvn==null || (!gvn.touched(this) && gvn.type(n) instanceof TypeObj);
@@ -164,7 +164,7 @@ public class MemMergeNode extends Node {
     }
   }
 
-  
+
   // This MemMerge is 'active': not installed in GVN and free to have its edges
   // changed (by the Parser as new variables are discovered).  Make it
   // 'inactive' and ready for nested Node.ideal() calls.
@@ -189,6 +189,12 @@ public class MemMergeNode extends Node {
     return false;
   }
 
+  // Generally keep the post-call default memory, until we get enough escape
+  // analysis that the default memory bypasses an adjacent call.
+  public boolean post_call_mem() {
+    return in(0) instanceof MProjNode && in(0).in(0) instanceof CallEpiNode;
+  }
+
   @Override public Node ideal(GVNGCM gvn) {
     assert _defs._len==_aliases._len;
     // Dead & duplicate inputs can be removed.
@@ -199,23 +205,17 @@ public class MemMergeNode extends Node {
           in(i)==alias2node(BitsAlias.parent(alias_at(i))) ||
           gvn.type(in(i))==TypeObj.XOBJ ) // Dead input
         { remove0(i--,gvn); progress = true; }
-    if( _defs._len==1 ) return in(0); // Merging nothing
-    if( progress ) return this;       // Removed some dead inputs
+    if( _defs._len==1 &&        // Merging nothing
+        !post_call_mem() )      // Keep the post-call memory for escape analysis hook
+      return in(0);             // Merging nothing
+    if( progress ) return this; // Removed some dead inputs
 
     // If some inputs have sharper aliases, sharpen the merge.  Specifically
     // route general memory around a call with specific aliases.
-    if( in(0) instanceof MProjNode && gvn.type(in(0)) != TypeMem.XMEM && gvn.type(in(0)) != TypeMem.MEM )
+    TypeMem tmem = (TypeMem)gvn.type(in(0));
+    if( in(0) instanceof MProjNode && tmem != TypeMem.EMPTY_MEM && tmem != TypeMem.ALL_MEM )
       throw AA.unimpl();
 
-    
-    //// If I have a Named Constructor usage, and have 2 uses (named constructor
-    //// and the Merge following it), make sure the Named Constructor can run
-    //// ideal() so it can fold away.
-    //if( _uses._len==2 )
-    //  for( Node use : _uses )
-    //    if( use instanceof IntrinsicNode.ConvertPtrTypeName )
-    //      gvn.add_work(use);
-    //
 
     // Back-to-back merges collapse
     if( mem() instanceof MemMergeNode ) {
@@ -263,7 +263,7 @@ public class MemMergeNode extends Node {
     // Base type in slot 0
     Type t = gvn.type(in(0));
     if( !(t instanceof TypeMem) )
-      return t.above_center() ? TypeMem.XMEM : TypeMem.MEM;
+      return t.above_center() ? TypeMem.EMPTY_MEM : TypeMem.ALL_MEM;
     TypeMem tm = (TypeMem)t;
     // We merge precise updates to the list of aliases
     for( int i=1; i<_defs._len; i++ ) {
@@ -275,7 +275,7 @@ public class MemMergeNode extends Node {
     }
     return tm;
   }
-  @Override public Type all_type() { return TypeMem.MEM; }
+  @Override public Type all_type() { return TypeMem.ALL_MEM; }
 
   @Override @NotNull public MemMergeNode copy( boolean copy_edges, CallEpiNode unused, GVNGCM gvn) {
     MemMergeNode mmm = (MemMergeNode)super.copy(copy_edges, unused, gvn);

@@ -109,22 +109,26 @@ public class TypeMem extends Type<TypeMem> {
   }
 
   // Alias-at.  Out of bounds or null uses the parent value.
-  public TypeObj at(int alias) {
+  public TypeObj at(int alias) { return _aliases[at_idx(alias)]; }
+  // Alias-at index
+  public int at_idx(int alias) {
     while( true ) {
       if( alias < _aliases.length && _aliases[alias] != null )
-        return _aliases[alias];
+        return alias;
       alias = BitsAlias.TREE.parent(alias);
     }
   }
 
   // Return set of aliases.  Not even sure if this is well-defined.
   public BitsAlias aliases() {
-    if( this== MEM ) return BitsAlias.NZERO;
-    if( this==XMEM ) return BitsAlias.EMPTY;
+    if( this==  ALL_MEM ) return BitsAlias.NZERO;
+    if( this==EMPTY_MEM ) return BitsAlias.EMPTY;
     throw com.cliffc.aa.AA.unimpl();
   }
   // Toss out memory state not visible from these aliases
   public TypeMem trim_to_alias(BitsAlias bas) {
+    if( bas == BitsAlias.EMPTY )
+      return EMPTY_MEM;         // Shortcut
     int alias = bas.abit();
     if( alias == -1 )
       throw com.cliffc.aa.AA.unimpl();
@@ -133,6 +137,33 @@ public class TypeMem extends Type<TypeMem> {
     objs[1] = TypeObj.XOBJ;
     objs[alias] = at(alias);
     return make(objs);
+  }
+  public TypeMem trim_to_alias(BitSet bs) {
+    TypeObj[] objs = new TypeObj[bs.length()];
+    objs[1] = TypeObj.XOBJ;
+    for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) )
+      objs[alias] = _aliases[alias];
+    return make0(objs);
+  }
+
+  // Recursively explore reachable aliases
+  public void recursive_aliases( VBitSet abs, int idx ) {
+    if( abs.tset(idx) ) return;
+    int aidx = at_idx(idx);
+    if( abs.tset(idx) ) return;
+    TypeObj obj = _aliases[aidx];
+    if( obj instanceof TypeStruct ) {
+      TypeStruct ts = (TypeStruct)obj;
+      for( int i=0; i<ts._ts.length; i++ ) {
+        Type t = ts._ts[i];
+        if( t instanceof TypeMemPtr ) {
+          BitsAlias bas = ((TypeMemPtr)t)._aliases;
+          for( int alias : bas ) {
+            recursive_aliases(abs,alias);
+          }
+        }
+      }
+    }
   }
 
 
@@ -178,7 +209,7 @@ public class TypeMem extends Type<TypeMem> {
 
   public static final TypeMem  MEM; // Every alias filled with something
   public static final TypeMem XMEM; // Every alias filled with anything
-         static final TypeMem EMPTY_MEM;
+  public static final TypeMem ALL_MEM, EMPTY_MEM;
   public static final TypeMem MEM_ABC;
   static {
     // All memory.  Includes breakouts for all structs and all strings.
@@ -194,7 +225,9 @@ public class TypeMem extends Type<TypeMem> {
     xobjs[BitsAlias.REC] = TypeStruct.ALLSTRUCT.dual();
     xobjs[BitsAlias.STR] = TypeStr.XSTR;
     XMEM = make(xobjs);         // Every alias filled with anything
-    EMPTY_MEM = XMEM; //make(new TypeObj[0]); // Tried no-memory-vs-XOBJ-memory
+    
+    ALL_MEM   = make(new TypeObj[]{null,TypeObj.OBJ});
+    EMPTY_MEM = ALL_MEM.dual(); // Tried no-memory-vs-XOBJ-memory
 
     MEM_ABC  = make(TypeMemPtr.ABCPTR.getbit(),TypeStr.ABC);
   }

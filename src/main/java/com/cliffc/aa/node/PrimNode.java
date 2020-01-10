@@ -121,7 +121,7 @@ public abstract class PrimNode extends Node {
   public FunPtrNode as_fun( GVNGCM gvn ) {
     FunNode  fun = ( FunNode) gvn.xform(new  FunNode(this).add_def(Env.ALL_CTRL)); // Points to ScopeNode only
     ParmNode rpc = (ParmNode) gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
-    ParmNode mem = (ParmNode) gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM     ),null));
+    ParmNode mem = (ParmNode) gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.ALL_MEM ),null));
     add_def(null);              // Control for the primitive in slot 0
     for( int i=0; i<_targs._ts.length; i++ )
       add_def(gvn.init(new ParmNode(i,_targs._flds[i],fun, gvn.con(_targs.at(i)),null)));

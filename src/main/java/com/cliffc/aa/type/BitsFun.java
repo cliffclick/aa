@@ -37,6 +37,7 @@ public class BitsFun extends Bits<BitsFun> {
   public  static final BitsFun EMPTY = make0();
   @Override public BitsFun ALL() { return FULL; }
   @Override public BitsFun ANY() { return ANY ; }
+  @Override public BitsFun EMPTY() { return EMPTY ; }
 
   // Make a NEW fidx, with the given parent, and return the Bits with just it
   static BitsFun make_new_fidx( int parent_fidx ) { return make0(new_fidx(parent_fidx)); }
