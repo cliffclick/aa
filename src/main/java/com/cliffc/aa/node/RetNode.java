@@ -1,9 +1,8 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeMem;
-import com.cliffc.aa.type.TypeTuple;
+import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.VBitSet;
 
 // See CallNode comments.  The RetNode gathers {control (function exits or
 // not), memory, value, rpc, fun}, and sits at the end of a function.  The RPC
@@ -66,6 +65,29 @@ public final class RetNode extends Node {
     return TypeTuple.make(ctl,mem,val);
   }
   @Override public Type all_type() { return TypeTuple.CALL; }
+
+  // Set of used aliases across all inputs (not StoreNode value, but yes address)
+  @Override public VBitSet alias_uses(GVNGCM gvn) {
+    // Returns all modified reachable memories plus a return alias.
+    // Approximate as reachable from call input.
+    
+    // Get function input memory type, and reach from the return.
+    VBitSet abs = new VBitSet(); // Set of escaping aliases
+    TypeMem output_mem = (TypeMem)gvn.type(mem());
+
+    // Aliases reachable from output memory and return pointer
+    Type tval = gvn.type(val());
+    if( tval instanceof TypeMemPtr )
+      ((TypeMemPtr)tval).recursive_aliases(abs,output_mem);
+
+    // Aliases reachable from input arguments
+    for( Node use : fun()._uses ) {
+      Type t = gvn.type(use);
+      if( t instanceof TypeMemPtr )
+        ((TypeMemPtr)t).recursive_aliases(abs,output_mem);
+    }
+    return abs;
+  }
 
   @Override public Node is_copy(GVNGCM gvn, int idx) { throw com.cliffc.aa.AA.unimpl(); }
   boolean is_copy() { return !(in(4) instanceof FunNode) || fun()._tf.fidx() != _fidx; }

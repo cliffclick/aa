@@ -131,6 +131,16 @@ public class TypeMem extends Type<TypeMem> {
         bas = bas.set(i);
     return bas;
   }
+  public VBitSet aliases2() {
+    if( this==  ALL_MEM ) throw com.cliffc.aa.AA.unimpl();
+    if( this==EMPTY_MEM ) return null;
+    VBitSet bas = new VBitSet();
+    for( int i=0; i<_aliases.length; i++ )
+      if( _aliases[i]!=null && !_aliases[i].above_center() )
+        bas.set(i);
+    return bas;
+  }
+  
   // Toss out memory state not visible from these aliases
   public TypeMem trim_to_alias(BitsAlias bas) {
     if( bas == BitsAlias.EMPTY || this==EMPTY_MEM )

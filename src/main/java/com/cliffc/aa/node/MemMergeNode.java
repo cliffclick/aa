@@ -5,6 +5,7 @@ import com.cliffc.aa.AA;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.AryInt;
 import com.cliffc.aa.util.SB;
+import com.cliffc.aa.util.VBitSet;
 import org.jetbrains.annotations.NotNull;
 import java.util.BitSet;
 
@@ -182,12 +183,8 @@ public class MemMergeNode extends Node {
     return this;                // Ready for gvn.xform as a new node
   }
 
-  // MemMerge lost a use.  If it drops to 1 use of a Phi, the Phi will want to
-  // split through it.
-  @Override public boolean ideal_impacted_by_losing_uses(GVNGCM gvn, Node dead) {
-    if( _uses._len==1 && _uses.at(0) instanceof PhiNode ) gvn.add_work(_uses.at(0));
-    return false;
-  }
+  // MemMerge lost a use.  MemMerge should try to remove some aliases
+  @Override public boolean ideal_impacted_by_losing_uses(GVNGCM gvn, Node dead) { return true; }
 
   // Generally keep the post-call default memory, until we get enough escape
   // analysis that the default memory bypasses an adjacent call.
@@ -205,6 +202,9 @@ public class MemMergeNode extends Node {
           in(i)==alias2node(BitsAlias.parent(alias_at(i))) ||
           gvn.type(in(i))==TypeObj.XOBJ ) // Dead input
         { remove0(i--,gvn); progress = true; }
+    if( progress ) return this; // Removed some dead inputs
+
+    // Merge of nothing
     if( _defs._len==1 ) {       // Merging nothing
       if( post_call_mem() ) {   // Post-call memory for escape analysis hook
         // If the call produces NO memory out, guaranteed, then we take the
@@ -222,7 +222,6 @@ public class MemMergeNode extends Node {
         return in(0);           // Merging nothing
       }
     }
-    if( progress ) return this; // Removed some dead inputs
 
     // If some inputs have sharper aliases, sharpen the merge.  Specifically
     // route general memory around a call with specific aliases.
@@ -283,6 +282,20 @@ public class MemMergeNode extends Node {
         if( use instanceof CallNode && !((CallNode)use)._unpacked )
           gvn.add_work(use);
 
+    // Try to remove some unused aliases.  Gather alias uses from all users.
+    if( !_uses.isEmpty() ) {
+      VBitSet bas = new VBitSet();
+      for( Node use : _uses ) {
+        VBitSet rez = use.alias_uses(gvn);
+        if( rez != null ) bas.or(rez);
+      }
+      // Kill unused aliases
+      for( int i=1; i<_defs._len; i++ )
+        if( !bas.get(_aliases.at(i)) )
+          { remove0(i--,gvn); progress = true; }
+      if( progress ) return this;
+    }
+    
     return null;
   }
 

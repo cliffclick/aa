@@ -1,10 +1,10 @@
 package com.cliffc.aa.type;
 
 import com.cliffc.aa.util.SB;
+import com.cliffc.aa.util.VBitSet;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Arrays;
-import java.util.BitSet;
 import java.util.Iterator;
 
 // Bits supporting a lattice; immutable; hash-cons'd.  Bits can be *split* in
@@ -482,14 +482,14 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     int peek() { return _kids[1][_kids[1][0]]; } // for testing
     // Smear out the kids in a non-canonical representation, to allow the caller
     // to iterate more easily.
-    public BitSet plus_kids(Bits<B> bits) {
-      BitSet bs = new BitSet();
+    public VBitSet plus_kids(Bits<B> bits) {
+      VBitSet bs = new VBitSet();
       for( int i : bits )
         if( i != 0 )
           _plus_kids(bs,i);
       return bs;
     }
-    void _plus_kids(BitSet bs, int i) {
+    void _plus_kids(VBitSet bs, int i) {
       bs.set(i);
       int nkids = i >= _kids.length || _kids[i]==null ? 0 : _kids[i][0];
       for( int kid=1; kid<nkids; kid++ )

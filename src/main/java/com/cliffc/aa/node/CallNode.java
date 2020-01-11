@@ -194,6 +194,8 @@ public class CallNode extends Node {
         return set_fun(fun,gvn);
     }
 
+    // If a Merge is before the call memory, and the Merge carries more aliases
+    // than the call uses, make a trimmed Merge.
     return null;
   }
 
@@ -202,9 +204,6 @@ public class CallNode extends Node {
   // full scatter lets users decide the meaning; e.g. wired FunNodes will take
   // the full arg set but if the call is not reachable the FunNode will not
   // merge from that path.
-
-  // TODO: Only uses a reachable selection of memory, so want the memory usage
-  // to have a limited set of aliases.
   @Override public TypeTuple value(GVNGCM gvn) {
     Type[] ts = TypeAry.get(_defs._len);
     for( int i=0; i<_defs._len; i++ )
@@ -395,6 +394,12 @@ public class CallNode extends Node {
     ts[2] = TypeMem.ALL_MEM;
     return TypeTuple.make(ts);
   }
+  // Set of used aliases across all inputs (not StoreNode value, but yes address)
+  @Override public VBitSet alias_uses(GVNGCM gvn) {
+    TypeMem tmem = (TypeMem)((TypeTuple)gvn.type(this)).at(2);
+    return tmem.aliases2();
+  }
+  
   @Override public int hashCode() { return super.hashCode()+_rpc; }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;

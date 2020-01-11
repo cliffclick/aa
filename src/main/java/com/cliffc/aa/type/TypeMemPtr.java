@@ -127,6 +127,13 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     return aliases==BitsAlias.NIL ? NIL : make(aliases,_obj);
   }
 
+  // Recursively reachable aliases
+  public void recursive_aliases(VBitSet abs, TypeMem mem) {
+    VBitSet bs = _aliases.tree().plus_kids(_aliases);
+      for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) )
+        mem.recursive_aliases(abs,alias);
+  }
+  
   // Build a mapping from types to their depth in a shortest-path walk from the
   // root.  Only counts depth on TypeStructs with the matching alias.  Only
   // used for testing.
@@ -163,20 +170,6 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
         max = Math.max(max,ds.get(t));
     return max+1;               // Struct is 1 more depth than TMP
   }
-
-  //// Build a depth-limited named type
-  //@Override TypeMemPtr make_recur(TypeName tn, int d, VBitSet bs ) {
-  //  Type t2 = _obj.make_recur(tn,d,bs);
-  //  return t2==_obj ? this : make(_aliases,(TypeObj)t2);
-  //}
-  // Mark if part of a cycle
-  //@Override void mark_cycle( Type head, VBitSet visit, BitSet cycle ) {
-  //  if( visit.tset(_uid) ) return;
-  //  if( this==head ) { cycle.set(_uid); _cyclic=_dual._cyclic=true; }
-  //  _obj.mark_cycle(head,visit,cycle);
-  //  if( cycle.get(_obj._uid) )
-  //    { cycle.set(_uid); _cyclic=_dual._cyclic=true; }
-  //}
 
   // Lattice of conversions:
   // -1 unknown; top; might fail, might be free (Scalar->Int); Scalar might lift

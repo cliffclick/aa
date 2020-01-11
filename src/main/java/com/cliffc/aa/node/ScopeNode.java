@@ -2,11 +2,9 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeMem;
-import com.cliffc.aa.type.TypeMemPtr;
-import com.cliffc.aa.type.TypeStruct;
+import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
+import com.cliffc.aa.util.VBitSet;
 
 import java.util.HashMap;
 import java.util.function.Predicate;
@@ -113,6 +111,18 @@ public class ScopeNode extends Node {
   }
   @Override public Type value(GVNGCM gvn) { return all_type(); }
   @Override public Type all_type() { return Type.ALL; }
+  // Set of used aliases across all inputs (not StoreNode value, but yes address)
+  @Override public VBitSet alias_uses(GVNGCM gvn) {
+    Type tval = gvn.type(in(4));
+    if( tval instanceof TypeMemPtr ) {
+      VBitSet abs = new VBitSet(); // Set of escaping aliases
+      TypeMem tmem = (TypeMem)gvn.type(mem());
+      ((TypeMemPtr)tval).recursive_aliases(abs,tmem);
+      return abs;
+    }
+    
+    return null;
+  }
   @Override public int hashCode() { return 123456789; }
   // ScopeNodes are never equal
   @Override public boolean equals(Object o) { return this==o; }

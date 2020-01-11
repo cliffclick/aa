@@ -188,7 +188,7 @@ public class Parse {
     Node res = stmts();
     if( res == null ) res = con(Type.ANY);
     res = merge_exits(res);
-    all_mem();                    // Close off top-level active memory
+    _gvn.add_work(all_mem());   // Close off top-level active memory
     _e._par._scope.all_mem(_gvn); // Loads against primitive scope will 'activate' memory, close it also
     _e._scope.add_def(res);       // Hook result
   }

@@ -2,6 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.type.BitsAlias;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
@@ -269,6 +270,12 @@ public abstract class Node implements Cloneable {
   public byte  op_prec() { return -1; }
   public byte may_prec() { return -1; }
 
+  // Set of used aliases across all inputs (not StoreNode value, but yes address)
+  public VBitSet alias_uses(GVNGCM gvn) {
+    throw com.cliffc.aa.AA.unimpl(); // Overridden in subclasses
+    //return null;
+  }
+  
   // Hash is function+inputs, or opcode+input_uids, and is invariant over edge
   // order (so we can swap edges without rehashing)
   @Override public int hashCode() {
