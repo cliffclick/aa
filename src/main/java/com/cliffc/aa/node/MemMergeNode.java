@@ -205,20 +205,47 @@ public class MemMergeNode extends Node {
           in(i)==alias2node(BitsAlias.parent(alias_at(i))) ||
           gvn.type(in(i))==TypeObj.XOBJ ) // Dead input
         { remove0(i--,gvn); progress = true; }
-    if( _defs._len==1 &&        // Merging nothing
-        !post_call_mem() )      // Keep the post-call memory for escape analysis hook
-      return in(0);             // Merging nothing
+    if( _defs._len==1 ) {       // Merging nothing
+      if( post_call_mem() ) {   // Post-call memory for escape analysis hook
+        // If the call produces NO memory out, guaranteed, then we take the
+        // pre-call memory.  This is an incorrect graph shape, but it means the
+        // call is of a primitive which neither reads nor writes any memory.
+        if( gvn.type(in(0))==TypeMem.EMPTY_MEM ) {
+          MProjNode post_cepi = (MProjNode)in(0);
+          CallEpiNode cepi = (CallEpiNode)post_cepi.in(0);
+          CallNode call = cepi.call();
+          Node precall = call.mem();
+          return precall;
+        }
+        // Keep the post-call memory for escape analysis hook
+      } else {
+        return in(0);           // Merging nothing
+      }
+    }
     if( progress ) return this; // Removed some dead inputs
 
     // If some inputs have sharper aliases, sharpen the merge.  Specifically
     // route general memory around a call with specific aliases.
     TypeMem tmem = (TypeMem)gvn.type(in(0));
-    if( in(0) instanceof MProjNode && tmem != TypeMem.EMPTY_MEM && tmem != TypeMem.ALL_MEM )
-      throw AA.unimpl();
-
+    if( post_call_mem() && tmem != TypeMem.EMPTY_MEM && tmem != TypeMem.ALL_MEM ) {
+      assert _defs._len==1;     // Only pointing at call epilog memory
+      MProjNode post_cepi = in(0).keep();
+      CallEpiNode cepi = (CallEpiNode)post_cepi.in(0);
+      CallNode call = cepi.call();
+      Node precall = call.mem();
+      if( tmem.at(1) != TypeObj.XOBJ )
+        throw AA.unimpl();      // Probably should just wait until Call settles out
+      set_def(0,precall,gvn);
+      TypeObj[] aliases = tmem.alias2objs();
+      for( int i=2; i<aliases.length; i++ )
+        if( aliases[i]!=null )
+          set_def(make_alias2idx(i),post_cepi,gvn);
+      post_cepi.unkeep(gvn);
+      return this;
+    }
 
     // Back-to-back merges collapse
-    if( mem() instanceof MemMergeNode ) {
+    if( mem() instanceof MemMergeNode && !((MemMergeNode)mem()).post_call_mem() ) {
       MemMergeNode mem = (MemMergeNode)mem();
       for( int i=1; i<mem._defs._len; i++ ) {
         int alias = mem.alias_at(i);

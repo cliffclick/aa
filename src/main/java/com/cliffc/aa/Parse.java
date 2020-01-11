@@ -720,7 +720,7 @@ public class Parse {
       _gvn.set_def_reg(e._scope.stk(),0,fun); // Closure creation control defaults to function entry
       set_ctrl(fun);            // New control is function head
       Node rpc = gvn(new ParmNode(-1,"rpc",fun,con(TypeRPC.ALL_CALL),null)).keep();
-      Node mem = gvn(new ParmNode(-2,"mem",fun,con(TypeMem.MEM),null));
+      Node mem = gvn(new ParmNode(-2,"mem",fun,con(TypeMem.ALL_MEM ),null));
       Parse errmsg = errMsg();  // Lazy error message
       int cnt=0;                // Add parameters to local environment
       for( int i=0; i<ids._len; i++ ) {
@@ -737,7 +737,7 @@ public class Parse {
       // Parse function body
       Node rez = stmts();       // Parse function body
       if( rez == null ) rez = err_ctrl2("Missing function body");
-      require('}',oldx-1);      // Matched with openning {}
+      require('}',oldx-1);      // Matched with opening {}
       // Merge normal exit into all early-exit paths
       if( e._scope.is_closure() ) rez = merge_exits(rez);
       RetNode ret = (RetNode)gvn(new RetNode(ctrl(),all_mem(),rez,rpc.unhook(),fun.unhook()));
@@ -1104,15 +1104,11 @@ public class Parse {
   private Node do_call( CallNode call0 ) {
     // CallNode has 3 following projections: ctrl, called function ptr, input
     // memory.  Input memory is refined to only reachable-from-args memory.
-    Node call  = gvn(call0.keep());
-    Node cctrl = gvn(new CProjNode(call,0));
-    Node cfun  = gvn(new  ProjNode(call,1)); // Set of possible target functions
-    Node cmem  = gvn(new MProjNode(call,2)); // Set of aliases reachable from args
-    call.unhook();
+    CallNode call = (CallNode)gvn(call0);
     // Call Epilog takes in the call projections which it uses to both track
     // wirable functions, and also trim the result memory to passed-in aliases.
     // CallEpi internally tracks all wired functions.
-    Node cepi  = gvn(new CallEpiNode(cctrl,cfun,cmem)).keep();
+    Node cepi  = gvn(new CallEpiNode(call)).keep();
     set_ctrl(    gvn(new CProjNode(cepi,0)));
     Node postcall_memory = gvn(new MProjNode(cepi,1)); // Return memory from all called functions, trimmed to reachable aliases
     set_mem( gvn(new MemMergeNode(postcall_memory)));

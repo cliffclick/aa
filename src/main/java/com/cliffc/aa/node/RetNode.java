@@ -61,7 +61,7 @@ public final class RetNode extends Node {
   @Override public Type value(GVNGCM gvn) {
     if( is_copy() ) return all_type();
     Type ctl = gvn.type(ctl()).bound(Type.CTRL);
-    Type mem = gvn.type(mem()).bound(TypeMem.MEM);
+    Type mem = gvn.type(mem()).bound(TypeMem.ALL_MEM);
     Type val = gvn.type(val()).bound(Type.SCALAR);
     return TypeTuple.make(ctl,mem,val);
   }

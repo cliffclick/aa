@@ -70,5 +70,5 @@ public class ParmNode extends PhiNode {
     }
     return null;
   }
-  @Override public Type all_type() { return _idx==-1 ? TypeRPC.ALL_CALL : (_idx==-2 ? TypeMem.MEM : Type.SCALAR); }
+  @Override public Type all_type() { return _idx==-1 ? TypeRPC.ALL_CALL : (_idx==-2 ? TypeMem.ALL_MEM : Type.SCALAR); }
 }

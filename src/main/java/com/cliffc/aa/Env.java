@@ -108,21 +108,14 @@ public class Env implements AutoCloseable {
   
   // Close the current Env and lexical scope.
   @Override public void close() {
-    close_closure(GVN);
-        
     ScopeNode pscope = _par._scope;
     // Promote forward refs to the next outer scope
     if( pscope != null && pscope != TOP._scope)
       _scope.stk().promote_forward(GVN,pscope.stk());
+    close_closure(GVN);
     // Whats left is function-ref generic entry points which promote to next
     // outer scope, and control-users which promote to the Scope's control.
-    while( _scope._uses._len > 0 ) {
-      //Node use = _scope._uses.at(0);
-      //assert use != pscope;
-      //int idx = use._defs.find(_scope);
-      //GVN.set_def_reg(use,idx, idx==0 ? pscope.ctrl() : pscope);
-      throw AA.unimpl();
-    }
+    assert _scope._uses.isEmpty();
     _scope.unkeep(GVN);
     assert _scope.is_dead();
     // Closing top-most scope (exiting compilation unit)?

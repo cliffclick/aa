@@ -118,16 +118,22 @@ public class TypeMem extends Type<TypeMem> {
       alias = BitsAlias.TREE.parent(alias);
     }
   }
+  //
+  public TypeObj[] alias2objs() { return _aliases; }
 
   // Return set of aliases.  Not even sure if this is well-defined.
   public BitsAlias aliases() {
     if( this==  ALL_MEM ) return BitsAlias.NZERO;
     if( this==EMPTY_MEM ) return BitsAlias.EMPTY;
-    throw com.cliffc.aa.AA.unimpl();
+    BitsAlias bas = BitsAlias.EMPTY;
+    for( int i=0; i<_aliases.length; i++ )
+      if( _aliases[i]!=null && !_aliases[i].above_center() )
+        bas = bas.set(i);
+    return bas;
   }
   // Toss out memory state not visible from these aliases
   public TypeMem trim_to_alias(BitsAlias bas) {
-    if( bas == BitsAlias.EMPTY )
+    if( bas == BitsAlias.EMPTY || this==EMPTY_MEM )
       return EMPTY_MEM;         // Shortcut
     int alias = bas.abit();
     if( alias == -1 )
@@ -136,13 +142,13 @@ public class TypeMem extends Type<TypeMem> {
     TypeObj[] objs = new TypeObj[alias+1];
     objs[1] = TypeObj.XOBJ;
     objs[alias] = at(alias);
-    return make(objs);
+    return make0(objs);
   }
   public TypeMem trim_to_alias(BitSet bs) {
     TypeObj[] objs = new TypeObj[bs.length()];
     objs[1] = TypeObj.XOBJ;
     for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) )
-      objs[alias] = _aliases[alias];
+      objs[alias] = at(alias);
     return make0(objs);
   }
 
@@ -225,7 +231,7 @@ public class TypeMem extends Type<TypeMem> {
     xobjs[BitsAlias.REC] = TypeStruct.ALLSTRUCT.dual();
     xobjs[BitsAlias.STR] = TypeStr.XSTR;
     XMEM = make(xobjs);         // Every alias filled with anything
-    
+
     ALL_MEM   = make(new TypeObj[]{null,TypeObj.OBJ});
     EMPTY_MEM = ALL_MEM.dual(); // Tried no-memory-vs-XOBJ-memory
 

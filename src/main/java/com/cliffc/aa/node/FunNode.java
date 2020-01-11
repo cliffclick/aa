@@ -507,7 +507,7 @@ public class FunNode extends RegionNode {
       } else if( nn == new_funptr ) {
         ot = fun._tf;           // New TFP for the new FunPtr
       } else if( nn instanceof CallEpiNode ) { // Old calls might be wired, new calls need to re-wire
-        while( nn._defs._len > 1 ) nn.pop();
+        while( ((CallEpiNode)nn).nwired() > 0 ) nn.pop();
       }
       gvn.rereg(nn,ot);
     }
@@ -614,7 +614,7 @@ public class FunNode extends RegionNode {
         int rpc = _trpc.rpc();    // The RPC#
         for( Node cepi : ret._uses ) {
           if( cepi instanceof CallEpiNode &&
-              ((CallNode)cepi.in(0).in(0))._rpc == rpc ) {
+              ((CallEpiNode)cepi).call()._rpc == rpc ) {
             _cepi = (CallEpiNode)cepi;
             _ridx = cepi._defs.find(ret);
             assert _ridx != -1;       // Must find, since wired

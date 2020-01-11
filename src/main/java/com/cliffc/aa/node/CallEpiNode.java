@@ -15,26 +15,24 @@ import java.util.BitSet;
 // just not wired up yet.
 
 public final class CallEpiNode extends Node {
-  public CallEpiNode( Node cctrl, Node cfunc, Node cmem ) { super(OP_CALLEPI,cctrl,cfunc,cmem); }
+  public CallEpiNode( CallNode call ) { super(OP_CALLEPI,call); }
+  public CallEpiNode( Node... nodes ) { super(OP_CALLEPI,nodes); }
   String xstr() { return ((is_dead() || is_copy()) ? "x" : "C")+"allEpi"; } // Self short name
-  public CallNode call() { return (CallNode)in(0).in(0); }
-  Node ctrl() { return in(0); }
-  Node fptr() { return in(1); }
-  Node mem () { return in(2); }
-  int nwired() { return _defs._len-3; }
-  int wire_num(int x) { return x+3; }
-  RetNode wired(int x) { return (RetNode)in(x+3); }
+  public CallNode call() { return (CallNode)in(0); }
+  int nwired() { return _defs._len-1; }
+  int wire_num(int x) { return x+1; }
+  RetNode wired(int x) { return (RetNode)in(x+1); }
 
   @Override public Node ideal(GVNGCM gvn) {
     // If inlined, no further xforms.  The using Projs will fold up.
     if( is_copy() ) return null;
 
-    Node ctrl = ctrl();
-    if( gvn.type(ctrl) != Type.CTRL ) return null; // Call not executable
-    Type tfptr = gvn.type(fptr());
+    CallNode call = call();
+    TypeTuple tcall = (TypeTuple)gvn.type(call);
+    if( tcall.at(0) != Type.CTRL ) return null; // Call not executable
+    Type tfptr = tcall.at(1);
     if( !(tfptr instanceof TypeFunPtr) ) return null; // No known function pointer
     TypeFunPtr tfp = (TypeFunPtr)tfptr;
-    CallNode call = call();
 
     // The one allowed function is already wired?  Then directly inline.
     // Requires this calls 1 target, and the 1 target is only called by this.
@@ -42,7 +40,7 @@ public final class CallEpiNode extends Node {
     if( nwired()==1 && fidxs.abit() != -1 ) { // Wired to 1 target
       RetNode ret = wired(0);                 // One wired return
       if( ret.fun()._defs._len==2 ) {         // Function is only called by 1 (and not the unknown caller)
-        assert ret.fun().in(1)==in(0);        // Just called by us
+        assert ret.fun().in(1).in(0)==call;   // Just called by us
         return inline(gvn, call, ret.ctl(), ret.mem(), ret.val(), ret);
       }
     }
@@ -151,7 +149,8 @@ public final class CallEpiNode extends Node {
     for( Node arg : fun._uses ) {
       if( arg.in(0) == fun && arg instanceof ParmNode ) {
         int idx = ((ParmNode)arg)._idx; // Argument number, or -1 for rpc
-        Node actual = idx==-1 ? gvn.con(TypeRPC.make(call._rpc)) : gvn.xform(new ProjNode(call,idx==-2 ? 2/*memory*/ : idx+3));
+        Node actual = idx==-1 ? gvn.con(TypeRPC.make(call._rpc)) :
+          gvn.xform(idx==-2 ? new MProjNode(call,2) : new ProjNode(call,idx+3));
         gvn.add_def(arg,actual);
       }
     }
@@ -171,8 +170,11 @@ public final class CallEpiNode extends Node {
     if( is_copy() )             // Already collapsed?  Just echo inputs
       return TypeTuple.make(gvn.type(in(0)),gvn.type(in(1)),gvn.type(in(2)));
 
-    if( gvn.type(ctrl()) != Type.CTRL ) return TypeTuple.XCALL;
-    Type tfptr = gvn.type(fptr());
+    CallNode call = call();
+    TypeTuple tcall = (TypeTuple)gvn.type(call);
+    if( tcall.at(0) != Type.CTRL ) return TypeTuple.XCALL;
+    Type tfptr = tcall.at(1);
+    TypeMem call_mem = (TypeMem)tcall.at(2);
     if( !(tfptr instanceof TypeFunPtr) )
       return TypeTuple.CALL;
     TypeFunPtr funt = (TypeFunPtr)tfptr;
@@ -189,10 +191,7 @@ public final class CallEpiNode extends Node {
     // gives us a faster lookup, but need to be correct wired or not.
 
     // Gather the set of aliases passed into the function.
-    TypeMem call_mem = (TypeMem)gvn.type(mem());
     BitsAlias call_aliases = call_mem.aliases();
-    // Call args, to limit error calls
-    CallNode call = call();
     // Set of all possible target functions
     Bits.Tree<BitsFun> tree = fidxs.tree();
     BitSet bs = tree.plus_kids(fidxs);
@@ -215,22 +214,26 @@ public final class CallEpiNode extends Node {
       // memory from unrelated calls to this same function.
       TypeMem ret_mem_untrimmed = ((TypeMem)tret.at(1));
 
-      BitsAlias call_trimmed = BitsAlias.EMPTY;
-      if( call_aliases!=BitsAlias.EMPTY ) { // Shortcut for no aliases
-        // Memory from the function.  Includes memory from other call sites.
-        BitsAlias ret_aliases = ret_mem_untrimmed.aliases();
+      // Memory from the function.  Includes memory from other call sites.
+      BitsAlias ret_aliases = ret_mem_untrimmed.aliases();
 
-        // Trim to aliases available from this call path.
-        call_trimmed = (BitsAlias)ret_aliases.join(call_aliases);
-      }
+      // Trim to aliases available from this call path.
+      //BitsAlias call_trimmed = (BitsAlias)ret_aliases.join(call_aliases);
       // TODO: locals includes what is reachable from the return pointer not
       // all local closures.
-      BitsAlias plus_local = call_trimmed.meet(fun._closure_aliases);
+      //BitsAlias plus_local = call_trimmed.meet(fun._closure_aliases);
+      BitsAlias plus_local = ret_aliases;
       // Strip out primitive memory, since it is never read nor written
       plus_local = plus_local.clear(Env.STK_0._alias);
 
       // Trim return memory to what is possible on this path.
       TypeMem ret_mem_trimmed = ret_mem_untrimmed.trim_to_alias(plus_local);
+      // Because GCP does not reset primitive types, including primitive memory,
+      // if this is a primitive, act "as if" it defines the empty memory.
+      if( fidx < FunNode.PRIM_CNT ) {
+        ret_mem_trimmed = TypeMem.EMPTY_MEM;
+        System.out.println("x");
+      }
       // Build a full return type.
       TypeTuple tret2 = TypeTuple.make(tret.at(0),ret_mem_trimmed,tret.at(2));
       t = lifting ? t.join(tret2) : t.meet(tret2);
@@ -250,7 +253,7 @@ public final class CallEpiNode extends Node {
   // "is_copy()", which in turn will trigger the following ProjNodes to inline.
   private Node inline( GVNGCM gvn, CallNode call, Node ctl, Node mem, Node rez, RetNode ret ) {
     assert nwired()==0 || nwired()==1; // not wired to several choices
-    
+
     // Unwire any wired called function
     if( nwired() == 1 && !ret.is_copy() ) {  // Wired, and called function not already collapsing
       FunNode fun = ret.fun();
@@ -271,7 +274,7 @@ public final class CallEpiNode extends Node {
     return this;
   }
   // If slot 0 is not a CallNode, we have been inlined.
-  private boolean is_copy() { return !(in(0) instanceof CProjNode) || !(in(0).in(0) instanceof CallNode); }
+  private boolean is_copy() { return !(in(0) instanceof CallNode); }
   @Override public Node is_copy(GVNGCM gvn, int idx) { return is_copy() ? in(idx) : null; }
   @Override public Type all_type() { return TypeTuple.CALL; }
 }

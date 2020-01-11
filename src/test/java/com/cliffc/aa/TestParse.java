@@ -161,12 +161,12 @@ public class TestParse {
     test("x=3; mul2={x -> x*2}; mul2(2.1)", TypeFlt.con(2.1*2.0)); // must inline to resolve overload {*}:Flt with I->F conversion
     test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
     test("sq={x -> x*x}; sq 2.1", TypeFlt.con(4.41)); // No () required for single args
-    testerr("sq={x -> x&x}; sq(\"abc\")", "*[$]\"abc\" is not a int64",12);
+    testerr("sq={x -> x&x}; sq(\"abc\")", "*[$]\"abc\" is not a int64",24);
     testerr("sq={x -> x*x}; sq(\"abc\")", "*[$]\"abc\" is not a flt64",12);
     testerr("f0 = { f x -> f0(x-1) }; f0({+},2)", "Passing 1 arguments to f0={->} which takes 2 arguments",21);
     // Recursive:
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
-    test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)",TypeInt.con(5));
+    test("noinline_fib = { x -> x <= 1 ? 1 : noinline_fib(x-1)+noinline_fib(x-2) }; noinline_fib(4)",TypeInt.con(5));
     test("f0 = { x -> x ? {+}(f0(x-1),1) : 0 }; f0(2)", TypeInt.con(2));
     testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact()","Passing 0 arguments to fact={->} which takes 1 arguments",48);
     test_obj("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(0),fact(1),fact(2))",
@@ -391,7 +391,7 @@ public class TestParse {
       Final LL store into precise alias#19 is passed into 2nd recursive map
       call.  Map now gets a merge of a final-LL-#19 and a NEW RECURSIVE 19#
       with non-final LL - and falls to read-only.  Same exact LL store now goes
-      in-error attempting to store over a read-only.  
+      in-error attempting to store over a read-only.
 
       Real answer is #19 is local memory, and ptr does NOT escape recursively.
       So do not merge #19 from recursive map entry with local gen #19.
@@ -405,7 +405,7 @@ public class TestParse {
       store final LL into #19, making a LL-final flavor of #19
       call map(tree.r) with final LL flavor #19 but not ptr
 
-      
+
       CNC - like calls should not take #19 unless have a ptr-to-#19 in their escape set.
       Optimistically, only pass in memory from reachable-arg-ptrs.
       Imagine pre-split seperate nodes for all alias#s.

@@ -29,7 +29,7 @@ public class LoadNode extends Node {
     int alias = tadr instanceof TypeMemPtr ? ((TypeMemPtr)tadr)._aliases.abit() : -2;
 
     // Load from a single alias bypasses a MemMerge
-    if( mem instanceof MemMergeNode && alias >= 0 ) {
+    if( alias >= 0 && mem instanceof MemMergeNode && !(((MemMergeNode)mem).post_call_mem()) ) {
       // TODO: Actually if all bits subset a single entry, and no partial
       // subsets, can bypass along the single entry.
       // Find nearest alias parent
