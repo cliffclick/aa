@@ -19,7 +19,7 @@ public class Env implements AutoCloseable {
       scope.set_active_mem(mem,GVN);  // Memory includes local stack frame
       if( closure ) CLOSURES = CLOSURES.meet(BitsAlias.make0(nnn._alias));
     }
-    _scope = GVN.init(scope);
+    _scope = scope;
   }
 
   public  final static GVNGCM GVN; // Initial GVN, defaults to ALL, lifts towards ANY
@@ -34,7 +34,7 @@ public class Env implements AutoCloseable {
   private final static int NINIT_CONS;
           final static Env TOP; // Top-most lexical Environment, has all primitives, unable to be removed
   public        static BitsAlias CLOSURES;
-  
+
   static {
     GVN = new GVNGCM();      // Initial GVN, defaults to ALL, lifts towards ANY
     // Initial control & memory
@@ -94,7 +94,7 @@ public class Env implements AutoCloseable {
 
   // Close any currently open closure, and remove its alias from the set of
   // active closure aliases (which are otherwise available to all function
-  // definitions getting parsed).  
+  // definitions getting parsed).
   public void close_closure( GVNGCM gvn ) {
     Node ptr = _scope.ptr();
     if( ptr == null ) return;   // Already done
@@ -103,9 +103,9 @@ public class Env implements AutoCloseable {
       CLOSURES = CLOSURES.clear(stk._alias);
     for( Node use : stk._uses )
       gvn.add_work(use);        // Scope object going dead, trigger following projs to cleanup
-    _scope.set_ptr(null,gvn);
+    _scope.set_ptr(null,gvn);   // Clear pointer to closure
   }
-  
+
   // Close the current Env and lexical scope.
   @Override public void close() {
     ScopeNode pscope = _par._scope;

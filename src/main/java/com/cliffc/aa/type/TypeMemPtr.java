@@ -127,11 +127,13 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     return aliases==BitsAlias.NIL ? NIL : make(aliases,_obj);
   }
 
+  // Expanded alias bits in a mutable bitset
+  public VBitSet aliases0() { return _aliases.tree().plus_kids(_aliases); }
   // Recursively reachable aliases
   public void recursive_aliases(VBitSet abs, TypeMem mem) {
-    VBitSet bs = _aliases.tree().plus_kids(_aliases);
-      for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) )
-        mem.recursive_aliases(abs,alias);
+    VBitSet bs = aliases0();
+    for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) )
+      mem.recursive_aliases(abs,alias);
   }
   
   // Build a mapping from types to their depth in a shortest-path walk from the
@@ -182,7 +184,6 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   }
   @SuppressWarnings("unchecked")
   @Override void walk( Predicate<Type> p ) { if( p.test(this) ) _obj.walk(p); }
-  //@Override TypeStruct repeats_in_cycles(TypeStruct head, VBitSet bs) { return _cyclic ? _obj.repeats_in_cycles(head,bs) : null; }
   public int getbit() { return _aliases.getbit(); }
   // Keep the high parts
   @Override public TypeMemPtr startype() {

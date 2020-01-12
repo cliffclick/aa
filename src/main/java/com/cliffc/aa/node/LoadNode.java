@@ -3,6 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Util;
+import com.cliffc.aa.util.VBitSet;
 
 // Load a named field from a struct.  Does it's own nil-check testing.  Loaded
 // value depends on the struct typing.
@@ -108,6 +109,13 @@ public class LoadNode extends Node {
     return badmemrez; // No loading from e.g. Strings
   }
 
+  // Set of used aliases across all inputs (not StoreNode value, but yes address)
+  @Override public VBitSet alias_uses(GVNGCM gvn) {
+    Type t = gvn.type(adr());
+    if( !(t instanceof TypeMemPtr) ) return null;
+    TypeMemPtr tmp = (TypeMemPtr)t;
+    return tmp.aliases0();
+  }
   @Override public String err(GVNGCM gvn) {
     Type tadr = gvn.type(adr());
     if( tadr.must_nil() ) return bad("Struct might be nil when reading");

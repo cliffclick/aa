@@ -4,6 +4,7 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.VBitSet;
 
 import java.util.BitSet;
 
@@ -52,14 +53,10 @@ public class PhiNode extends Node {
     // Profit heuristic: all MemMerges are stable after xform and are available
     // on all paths and the Phi is the sole user, so the input MemMerges will
     // die after this xform.  This is an expanding xform: try not to expand
-    // dead nodes.  Xform the inputs first, in case they just fold away.
-    for( int i=1; i<_defs._len; i++ ) {
+    // dead nodes.
+    for( int i=1; i<_defs._len; i++ )
       if( in(i)._uses._len!=1 || !(in(i) instanceof MemMergeNode) )
         return null;            // Not a self-single-user MemMerge
-      gvn.xform_old(in(i));
-      if( in(i)._uses._len!=1 || !(in(i) instanceof MemMergeNode) )
-        return null;            // Not a self-single-user MemMerge
-    }
 
     // Do the expansion.  First: find all aliases
     BitSet bs = new BitSet();
@@ -112,6 +109,13 @@ public class PhiNode extends Node {
     return t;                   // Limit to sane results
   }
   @Override public Type all_type() { return Type.ALL; }
+  // Set of used aliases across all inputs (not StoreNode value, but yes address)
+  @Override public VBitSet alias_uses(GVNGCM gvn) {
+    if( _uses._len==0 ) return null; // During parsing, so assume uses all.  Or dead & will be removed shortly.
+    // TODO: Requires recursive search, handling cycles
+    if( _uses._len==1 ) return _uses.at(0).alias_uses(gvn);
+    throw com.cliffc.aa.AA.unimpl();
+  }
   @Override public String err(GVNGCM gvn) {
     if( !(in(0) instanceof FunNode && ((FunNode)in(0))._name.equals("!") ) && // Specifically "!" takes a Scalar
         (gvn.type(this).contains(Type.SCALAR) ||

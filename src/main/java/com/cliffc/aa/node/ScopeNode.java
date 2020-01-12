@@ -54,15 +54,14 @@ public class ScopeNode extends Node {
     Node mem = mem();
     if( gvn.touched(mem) ) return mem; // Already not active
     assert mem._uses._len==1;          // Only self usage
-    _defs.set(1,null);          // Remove this scope usage without deleting
-    mem._uses.del(this);
-    ((MemMergeNode)mem).deactive(gvn); // Nestedly, close off active objects
-    return set_mem(gvn.xform(mem),gvn);// Then xform like a new node
-
+    mem.keep();                 // Remove this scope usage without deleting
+    set_mem(null,gvn);          // Remove this scope usage
+    mem = gvn.xform(mem.unhook());// Then xform like a new node
+    set_mem(mem,gvn);           // Re-insert
+    return mem;                 // Return inactive memory
   }
 
   public Node get(String name) { return stk().get(name); }
-  public boolean exists(String name) { return get(name)!=null; }
   public boolean is_mutable(String name) { return stk().is_mutable(name); }
 
   public RegionNode early_ctrl() { return (RegionNode)in(3); }
@@ -84,7 +83,7 @@ public class ScopeNode extends Node {
     assert _types.get(name)!=null;
     _types.put( name, t );
   }
-  
+
   public boolean is_closure() { assert _defs._len==4 || _defs._len==7; return _defs._len==7; }
 
   @Override public Node ideal(GVNGCM gvn) {
@@ -113,15 +112,16 @@ public class ScopeNode extends Node {
   @Override public Type all_type() { return Type.ALL; }
   // Set of used aliases across all inputs (not StoreNode value, but yes address)
   @Override public VBitSet alias_uses(GVNGCM gvn) {
-    Type tval = gvn.type(in(4));
-    if( tval instanceof TypeMemPtr ) {
-      VBitSet abs = new VBitSet(); // Set of escaping aliases
-      TypeMem tmem = (TypeMem)gvn.type(mem());
-      ((TypeMemPtr)tval).recursive_aliases(abs,tmem);
-      return abs;
-    }
-    
-    return null;
+    Type mem = gvn.type(mem());
+    if( mem == Type.ALL ) return null; // All escaped
+    VBitSet abs = new VBitSet(); // Set of escaping aliases
+    Node rez = in(4);
+    if( rez == null ) return null;
+    Type tval = gvn.type(rez);
+    if( !(tval instanceof TypeMemPtr) ) return abs;
+    TypeMem tmem = (TypeMem)mem;
+    ((TypeMemPtr)tval).recursive_aliases(abs,tmem);
+    return abs;
   }
   @Override public int hashCode() { return 123456789; }
   // ScopeNodes are never equal

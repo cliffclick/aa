@@ -221,6 +221,7 @@ public class GVNGCM {
     assert found == expect || _wrk_bits.get(n._uid) : "Found but not expected: "+old.toString(); // Expected in table or on worklist
     return false;               // Not in table
   }
+  public boolean check_out( Node n) { return _vals.get(n)!=n; }
 
   // Apply graph-rewrite rules on new nodes (those with no users and kept alive
   // for the parser).  Return a node registered with GVN that is possibly "more
@@ -329,6 +330,7 @@ public class GVNGCM {
       return con(oldt);        // Dead-on-Entry, common when called from GCP
     // Try generic graph reshaping
     Node y = n.ideal(this);
+    assert y==null || y==n || n._keep==0;// Ideal calls need to not replace 'keep'rs
     if( y != null && y != n ) return y;  // Progress with some new node
     if( y != null && y.is_dead() ) return null;
     // Either no-progress, or progress and need to re-insert n back into system
@@ -383,8 +385,8 @@ public class GVNGCM {
     while( (_small_work=_work._len > 0) || _work2._len > 0 ) {
       Node n = (_small_work ? _work : _work2).pop(); // Pull from main worklist before functions
       (_small_work ? _wrk_bits : _wrk2_bits).clear(n._uid);
-      if( n.is_dead() || n._keep!=0 ) continue;
-      if( n._uses._len==0 ) kill(n);
+      if( n.is_dead() ) continue;
+      if( n._uses._len==0 && n._keep==0 ) kill(n);
       else xform_old(n);
       cnt++; assert cnt < 10000; // Catch infinite ideal-loops
     }

@@ -173,12 +173,13 @@ public class MemMergeNode extends Node {
     assert !gvn.touched(this) && _uses._len==0;
     for( int i=0; i<_defs._len; i++ ) {
       Node obj = in(i);
-      if( !gvn.touched(obj) ) { // Found active child ObjMerge
-        _defs.set(i,null);      // Unpoint to it
-        obj._uses.del(this);    // Keep sane asserts
-        assert obj._uses.isEmpty(); // Ready for gvn.xform as a new node
-        set_def(i,gvn.xform(obj),gvn); // Clean up child ObjMerge like normal
-      }
+      assert gvn.touched(obj); // No longer needed
+      //if( !gvn.touched(obj) ) { // Found active child ObjMerge
+      //  _defs.set(i,null);      // Unpoint to it
+      //  obj._uses.del(this);    // Keep sane asserts
+      //  assert obj._uses.isEmpty(); // Ready for gvn.xform as a new node
+      //  set_def(i,gvn.xform(obj),gvn); // Clean up child ObjMerge like normal
+      //}
     }
     return this;                // Ready for gvn.xform as a new node
   }
@@ -283,19 +284,24 @@ public class MemMergeNode extends Node {
           gvn.add_work(use);
 
     // Try to remove some unused aliases.  Gather alias uses from all users.
-    if( !_uses.isEmpty() ) {
+    if( !_uses.isEmpty() && gvn._opt_mode != 0 /*not during parsing, not all users available */) {
       VBitSet bas = new VBitSet();
+      boolean bad = false;
       for( Node use : _uses ) {
         VBitSet rez = use.alias_uses(gvn);
-        if( rez != null ) bas.or(rez);
+        if( rez == null )       // Some use uses all aliases
+          { bad = true; break; }
+        bas.or(rez);
       }
       // Kill unused aliases
-      for( int i=1; i<_defs._len; i++ )
-        if( !bas.get(_aliases.at(i)) )
-          { remove0(i--,gvn); progress = true; }
-      if( progress ) return this;
+      if( !bad ) {
+        for( int i=1; i<_defs._len; i++ )
+          if( !bas.get(_aliases.at(i)) )
+            { remove0(i--,gvn); progress = true; }
+        if( progress ) return this;
+      }
     }
-    
+
     return null;
   }
 
@@ -316,6 +322,10 @@ public class MemMergeNode extends Node {
     return tm;
   }
   @Override public Type all_type() { return TypeMem.ALL_MEM; }
+  // Set of used aliases across all inputs.  This is only called from another
+  // MemMerge, which means back-to-back MemMerge which will be cleared out
+  // eventually.  Ok to report super conservative here.
+  @Override public VBitSet alias_uses(GVNGCM gvn) { return null; }
 
   @Override @NotNull public MemMergeNode copy( boolean copy_edges, CallEpiNode unused, GVNGCM gvn) {
     MemMergeNode mmm = (MemMergeNode)super.copy(copy_edges, unused, gvn);

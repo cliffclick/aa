@@ -94,6 +94,8 @@ public class Parse {
   // Used by the REPL to do incremental typing.
   TypeEnv go_partial( ) {
     prog();        // Parse a program
+    _gvn.rereg(_e._scope,Type.ALL);
+    _gvn.rereg(_e._par._scope,Type.ALL);
     _gvn.iter();   // Pessimistic optimizations; might improve error situation
     _gvn.gcp(_e._scope); // Global Constant Propagation
     _gvn.iter();   // Re-check all ideal calls now that types have been maximally lifted
@@ -108,10 +110,9 @@ public class Parse {
     prog();                     // Parse a program
     // Delete names at the top scope before final optimization.
     _e.close_closure(_gvn);
+    _gvn.rereg(_e._scope,Type.ALL);
+    _gvn.rereg(_e._par._scope,Type.ALL);
     _gvn.iter();   // Pessimistic optimizations; might improve error situation
-    // Attempt to remove memory state from top-level Scope, cannot use the
-    // normal gvn.iter() because Scope is _keep==1.
-    if( _e._scope.ideal(_gvn) != null ) _gvn.iter();
     remove_unknown_callers();
     _gvn.gcp(_e._scope); // Global Constant Propagation
     _gvn.iter();   // Re-check all ideal calls now that types have been maximally lifted
@@ -129,15 +130,18 @@ public class Parse {
       if( use._uid >= GVNGCM._INIT0_CNT ) {
         assert use instanceof FunNode;
         assert use.in(1)==Env.ALL_CTRL;
-        _gvn.unreg(use);        // Changing edges, so unregister
-        use.set_def(1,con(Type.XCTRL),_gvn);
-        _gvn.rereg(use,Type.CTRL);
+        _gvn.set_def_reg(use,1,con(Type.XCTRL));
+        //_gvn.unreg(use);        // Changing edges, so unregister
+        //use.set_def(1,con(Type.XCTRL),_gvn);
+        //_gvn.rereg(use,Type.CTRL);
         i--;
       }
     }
   }
 
   private TypeEnv gather_errors() {
+    _gvn.unreg(_e._scope);
+    _gvn.unreg(_e._par._scope);
     Node res = _e._scope.pop(); // New and improved result
     Type tres = _gvn.type(res);
     TypeObj tobj = TypeObj.XOBJ;

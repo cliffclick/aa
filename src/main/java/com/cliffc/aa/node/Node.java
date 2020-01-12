@@ -2,7 +2,6 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.type.BitsAlias;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
@@ -24,26 +23,25 @@ public abstract class Node implements Cloneable {
   static final byte OP_IF     = 8;
   static final byte OP_LIBCALL= 9;
   static final byte OP_LOAD   =10;
-  static final byte OP_MEET   =11;
-  static final byte OP_MERGE  =12;
-  static final byte OP_NAME   =13; // Cast a prior NewObj to have a runtime Name
-  static final byte OP_NEWOBJ =14; // Allocate a new struct
-  static final byte OP_NEWSTR =15; // Allocate a new string (array)
-  static final byte OP_PARM   =16;
-  static final byte OP_PHI    =17;
-  static final byte OP_PRIM   =18;
-  static final byte OP_PROJ   =19;
-  static final byte OP_REGION =20;
-  static final byte OP_RET    =21;
-  static final byte OP_SCOPE  =22;
-  static final byte OP_START  =23;
-  static final byte OP_STORE  =24;
-  static final byte OP_TMP    =25;
-  static final byte OP_TYPE   =26;
-  static final byte OP_UNR    =27;
-  static final byte OP_MAX    =28;
+  static final byte OP_MERGE  =11;
+  static final byte OP_NAME   =12; // Cast a prior NewObj to have a runtime Name
+  static final byte OP_NEWOBJ =13; // Allocate a new struct
+  static final byte OP_NEWSTR =14; // Allocate a new string (array)
+  static final byte OP_PARM   =15;
+  static final byte OP_PHI    =16;
+  static final byte OP_PRIM   =17;
+  static final byte OP_PROJ   =18;
+  static final byte OP_REGION =19;
+  static final byte OP_RET    =20;
+  static final byte OP_SCOPE  =21;
+  static final byte OP_START  =22;
+  static final byte OP_STORE  =23;
+  static final byte OP_TMP    =24;
+  static final byte OP_TYPE   =25;
+  static final byte OP_UNR    =26;
+  static final byte OP_MAX    =27;
 
-  private static final String[] STRS = new String[] { null, "Call", "CallEpi", "Cast", "Con", "Err", "Fun", "FunPtr", "If", "LibCall", "Load", "Meet", "Merge", "Name", "NewObj", "NewStr", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Scope", "Start", "Store", "Tmp", "Type", "Unresolved" };
+  private static final String[] STRS = new String[] { null, "Call", "CallEpi", "Cast", "Con", "Err", "Fun", "FunPtr", "If", "LibCall", "Load", "Merge", "Name", "NewObj", "NewStr", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Scope", "Start", "Store", "Tmp", "Type", "Unresolved" };
 
   public int _uid;  // Unique ID, will have gaps, used to give a dense numbering to nodes
   final byte _op;   // Opcode (besides the object class), used to avoid v-calls in some places
@@ -57,6 +55,7 @@ public abstract class Node implements Cloneable {
   public Node in( int i) { return _defs.at(i); }
   // Replace def/use edge
   public Node set_def( int idx, Node n, GVNGCM gvn ) {
+    assert gvn==null || gvn.check_out(this);
     Node old = _defs.at(idx);  // Get old value
     // Add edge to new guy before deleting old, in case old goes dead and
     // recursively makes new guy go dead also
@@ -246,7 +245,7 @@ public abstract class Node implements Cloneable {
 
   // Cleanup, so can re-run in the same test harness iteration
   public void reset_to_init1(GVNGCM gvn) { }
-  
+
   // Graph rewriting.  Can change defs, including making new nodes - but if it
   // does so, all new nodes will first call gvn.xform().  If gvn._opt if false,
   // not allowed to remove CFG edges (loop backedges and function-call entry
@@ -270,12 +269,14 @@ public abstract class Node implements Cloneable {
   public byte  op_prec() { return -1; }
   public byte may_prec() { return -1; }
 
-  // Set of used aliases across all inputs (not StoreNode value, but yes address)
+  // Set of used aliases across all inputs (not StoreNode value, but yes
+  // address).  Returning null means "uses all aliases", generally because the
+  // analysis has to be conservative.
   public VBitSet alias_uses(GVNGCM gvn) {
     throw com.cliffc.aa.AA.unimpl(); // Overridden in subclasses
     //return null;
   }
-  
+
   // Hash is function+inputs, or opcode+input_uids, and is invariant over edge
   // order (so we can swap edges without rehashing)
   @Override public int hashCode() {
@@ -308,7 +309,7 @@ public abstract class Node implements Cloneable {
     for( Node use : _uses ) if( use != null && use.more_ideal(gvn,bs) ) return true;
     return false;
   }
-  
+
   // Gather errors; backwards reachable control uses only
   public void walkerr_use( Ary<String> errs, VBitSet bs, GVNGCM gvn ) {
     assert !is_dead();

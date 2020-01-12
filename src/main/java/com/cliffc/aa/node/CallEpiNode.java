@@ -228,12 +228,6 @@ public final class CallEpiNode extends Node {
 
       // Trim return memory to what is possible on this path.
       TypeMem ret_mem_trimmed = ret_mem_untrimmed.trim_to_alias(plus_local);
-      // Because GCP does not reset primitive types, including primitive memory,
-      // if this is a primitive, act "as if" it defines the empty memory.
-      if( fidx < FunNode.PRIM_CNT ) {
-        ret_mem_trimmed = TypeMem.EMPTY_MEM;
-        System.out.println("x");
-      }
       // Build a full return type.
       TypeTuple tret2 = TypeTuple.make(tret.at(0),ret_mem_trimmed,tret.at(2));
       t = lifting ? t.join(tret2) : t.meet(tret2);

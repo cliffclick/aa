@@ -3,6 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.VBitSet;
 
 // Store a value into a named struct field.  Does it's own nil-check and value
 // testing; also checks final field updates.
@@ -109,6 +110,11 @@ public class StoreNode extends Node {
     return tobj.update(_fin, _fld, val);
   }
 
+  // Set of used aliases across all inputs (not StoreNode value, but yes address)
+  @Override public VBitSet alias_uses(GVNGCM gvn) {
+    TypeMemPtr tmp = (TypeMemPtr)gvn.type(adr());
+    return tmp.aliases0();
+  }
   @Override public String err(GVNGCM gvn) {
     String msg = err0(gvn);
     if( msg == null ) return null;
