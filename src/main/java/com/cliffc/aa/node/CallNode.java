@@ -396,6 +396,14 @@ public class CallNode extends Node {
   }
   // Set of used aliases across all inputs (not StoreNode value, but yes address)
   @Override public VBitSet alias_uses(GVNGCM gvn) {
+    // If we are used by a post_call_mem merge, then we use all aliases.  If
+    // not, then we use what we passed in to the function body and all other
+    // aliases "went around" the call.
+    for( Node cepi : _uses )
+      if( cepi instanceof CallEpiNode )
+        for( Node mproj : cepi._uses )
+          if( mproj instanceof MProjNode && mproj._uses._len==1 && mproj._uses.at(0) instanceof MemMergeNode )
+            return null;        // Use all aliases after the call
     TypeMem tmem = (TypeMem)((TypeTuple)gvn.type(this)).at(2);
     return tmem.aliases2();
   }

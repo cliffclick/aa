@@ -3,6 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.VBitSet;
 import java.util.BitSet;
 
 // See CallNode.  Slot 0 is call-control; slot 1 is call function pointer.  The
@@ -243,6 +244,12 @@ public final class CallEpiNode extends Node {
     return t;
   }
 
+  // Set of used aliases across all inputs (not StoreNode value, but yes address)
+  @Override public VBitSet alias_uses(GVNGCM gvn) {
+    assert is_copy();
+    return null;                // Conservative do-nothing.  Since a copy, it will be removed shortly
+  }
+  
   // Inline the CallNode.  Remove all edges except the results.  This triggers
   // "is_copy()", which in turn will trigger the following ProjNodes to inline.
   private Node inline( GVNGCM gvn, CallNode call, Node ctl, Node mem, Node rez, RetNode ret ) {

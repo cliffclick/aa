@@ -73,7 +73,9 @@ public final class RetNode extends Node {
     
     // Get function input memory type, and reach from the return.
     VBitSet abs = new VBitSet(); // Set of escaping aliases
-    TypeMem output_mem = (TypeMem)gvn.type(mem());
+    Type omem = gvn.type(mem());
+    if( !(omem instanceof TypeMem) ) return null; // Wait until types fall
+    TypeMem output_mem = (TypeMem)omem;
 
     // Aliases reachable from output memory and return pointer
     Type tval = gvn.type(val());
