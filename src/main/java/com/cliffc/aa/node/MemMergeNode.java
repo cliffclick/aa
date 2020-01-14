@@ -223,6 +223,13 @@ public class MemMergeNode extends Node {
       return set_def(0,mem.in(0),gvn); // Return improved self
     }
 
+    // Back-to-back merges not in alias#1
+    for( int i=1; i<_defs._len; i++ )
+      if( in(i) instanceof MemMergeNode )
+        { set_def(i,((MemMergeNode)in(i)).alias2node(alias_at(i)),gvn); progress = true; }
+    if( progress ) return this; // Removed back-to-back merge
+    
+
     // CNC - This stanza is here because of a flaw in unpacking Call args.
     //
     // If an input is an OProj and a use is a Call, put the Call on the

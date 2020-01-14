@@ -396,16 +396,17 @@ public class CallNode extends Node {
   }
   // Set of used aliases across all inputs (not StoreNode value, but yes address)
   @Override public VBitSet alias_uses(GVNGCM gvn) {
-    // If we are used by a post_call_mem merge, then we use all aliases.  If
-    // not, then we use what we passed in to the function body and all other
-    // aliases "went around" the call.
-    for( Node cepi : _uses )
+    // We use all aliases we computed in our output type, plus all bypass aliases.
+    TypeMem fret_mem;
+    for( Node cepi : _uses )    // Find CallEpi for bypass aliases
       if( cepi instanceof CallEpiNode )
-        for( Node mproj : cepi._uses )
-          if( mproj instanceof MProjNode && mproj._uses._len==1 && mproj._uses.at(0) instanceof MemMergeNode )
+        for( Node mproj : cepi._uses ) // Find output memory
+          if( mproj instanceof MProjNode )
+            // TODO: Solve the forward-flow used_aliases problem incrementally.
+            // Here we just bail out.
             return null;        // Use all aliases after the call
-    TypeMem tmem = (TypeMem)((TypeTuple)gvn.type(this)).at(2);
-    return tmem.aliases2();
+    TypeMem all_called_function_uses = (TypeMem)((TypeTuple)gvn.type(this)).at(2);
+    return all_called_function_uses.aliases2();
   }
   
   @Override public int hashCode() { return super.hashCode()+_rpc; }

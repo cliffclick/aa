@@ -100,8 +100,9 @@ public class StoreNode extends Node {
     // Missing the field to update, or storing to a final?
     TypeStruct ts = (TypeStruct)tobj;
     int idx = ts.find(_fld);
-    if( idx == -1 || (ts._finals[idx]==TypeStruct.ffinal() || ts._finals[idx]==TypeStruct.fro()) )
-      return TypeObj.make0(tobj.above_center());
+    if( idx == -1 ) return tobj; // Missing field: assume not propagated yet.
+    if( ts._finals[idx]==TypeStruct.ffinal() || ts._finals[idx]==TypeStruct.fro() )
+      return TypeObj.make0(tobj.above_center()); // Illegal store
     // Updates to a NewNode are precise, otherwise aliased updates
     if( mem().in(0) == adr().in(0) && mem().in(0) instanceof NewNode )
       // No aliasing, even if the NewNode is called repeatedly

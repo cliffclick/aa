@@ -42,7 +42,35 @@ public final class CallEpiNode extends Node {
       RetNode ret = wired(0);                 // One wired return
       if( ret.fun()._defs._len==2 ) {         // Function is only called by 1 (and not the unknown caller)
         assert ret.fun().in(1).in(0)==call;   // Just called by us
-        return inline(gvn, call, ret.ctl(), ret.mem(), ret.val(), null/*do not unwire, because using the entire function body inplace*/);
+        // Merge call-bypass memory and function memory.  Every above-center
+        // alias "loses" to a below-center alias.  Below-center ties go to the
+        // last mutator which is the return, above-center ties to the call.
+        Node cmem = call.mem();
+        Node rmem =  ret.mem();
+        TypeMem call_mem = (TypeMem)gvn.type(cmem);
+        TypeMem  ret_mem = (TypeMem)gvn.type(rmem);
+        Node mem;
+        if( ret_mem==TypeMem.XMEM ) {
+          mem = cmem;           // Common shortcut for primitives
+        } else if( call_mem==TypeMem.XMEM ) {
+          mem = rmem;           // Common shortcut for simple calls
+        } else {
+          // Actually merge memories from call-bypass and post-call.  If one of
+          // cmem or rmem is itself a MemMerge we'll get stacked MemMerges
+          // which will clean out later.
+          TypeObj[]  ret_objs =  ret_mem.alias2objs();
+          TypeObj[] call_objs = call_mem.alias2objs();
+          int max = Math.max(ret_objs.length,call_objs.length);
+          // Alias#1 to make the merge
+          MemMergeNode mmem = new MemMergeNode(ret_objs[1].above_center() ? cmem : rmem);
+          // Merge all other aliases
+          for( int i=2; i<max; i++ )
+            if( (i<call_objs.length && call_objs[i] != null) ||
+                (i< ret_objs.length &&  ret_objs[i] != null) )
+              mmem.create_alias_active(i,ret_mem.at(i).above_center() ? cmem : rmem,null);
+          mem = gvn.xform(mmem);
+        }
+        return inline(gvn, call, ret.ctl(), mem, ret.val(), null/*do not unwire, because using the entire function body inplace*/);
       }
     }
 
@@ -237,19 +265,17 @@ public final class CallEpiNode extends Node {
           fidx >= FunNode.PRIM_CNT ) // Do not wire up primitives, but forever take their default inputs and outputs
         wire(gvn,call,fun,ret);
     }
-    // For every alias not produced on some path, merge in the callers memory.
-    TypeMem input_mem = (TypeMem)gvn.type(call.mem());
-    TypeTuple tt = (TypeTuple)t;
-    TypeMem tret3 = (TypeMem)tt.at(1);
-    if( tret3 == TypeMem.XMEM ) // Meet of XMEM and anything is anything
-      return TypeTuple.make(tt.at(0),input_mem,tt.at(2));
-    if( input_mem == TypeMem.XMEM ) // Meet of XMEM and anything is anything
-      return tt;
-
-    // Here I have to only implement pass-thru aliases, all others are crushed
-    // by the functions.
-    throw com.cliffc.aa.AA.unimpl();
-    //return t;
+    // Meet the call-bypass aliases with the function aliases.  If the function
+    // produces a new alias it might still have been called previously and thus
+    // the call-bypass aliases might be modified elsewhere.... so despite a
+    // function being the sole producing of an alias, we still have to MEET all
+    // aliases.  If the caller contains none of an alias so that the function
+    // precisely stomps all of it, the call needs to be reporting [1#:~obj] -
+    // in which case a normal MEET suffices.
+    TypeMem pre_call_memory = (TypeMem)gvn.type(call.mem());
+    TypeTuple call_effects = TypeTuple.make(Type.CTRL,pre_call_memory,Type.ANY);
+    Type rez = t.meet(call_effects);
+    return rez;
   }
 
   // Set of used aliases across all inputs (not StoreNode value, but yes address)
