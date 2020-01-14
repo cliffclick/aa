@@ -70,6 +70,7 @@ public class TypeTuple extends Type<TypeTuple> {
   public static TypeTuple make( Type t0 ) { Type[] ts = TypeAry.get(1);  ts[0]=t0;  return make0(false,ts); }
   public static TypeTuple make( Type t0, Type t1 ) { Type[] ts = TypeAry.get(2);  ts[0]=t0; ts[1]=t1; return make0(false,ts); }
   public static TypeTuple make( Type t0, Type t1, Type t2 ) { Type[] ts = TypeAry.get(3); ts[0]=t0; ts[1]=t1; ts[2]=t2; return make0(false,ts); }
+  public static TypeTuple make( Type t0, Type t1, Type t2, Type t3 ) { Type[] ts = TypeAry.get(4); ts[0]=t0; ts[1]=t1; ts[2]=t2; ts[3]=t3; return make0(false,ts); }
   public  static final TypeTuple IF_ANY  = make(XCTRL,XCTRL);
   public  static final TypeTuple IF_ALL  = make(CTRL ,CTRL );
   public  static final TypeTuple IF_TRUE = make(XCTRL,CTRL );
@@ -79,7 +80,8 @@ public class TypeTuple extends Type<TypeTuple> {
   public  static final TypeTuple START_STATE = make(CTRL, TypeMem.XMEM);
   public  static final TypeTuple CALL  = make(CTRL, TypeMem.MEM, SCALAR);
   public  static final TypeTuple XCALL = CALL.dual();
-  static final TypeTuple[] TYPES = new TypeTuple[]{CALL,START_STATE,IF_ALL, IF_TRUE, IF_FALSE};
+  public  static final TypeTuple CALLE = make(CTRL, TypeMem.MEM, SCALAR, TypeMem.MEM);
+  static final TypeTuple[] TYPES = new TypeTuple[]{CALL,CALLE,START_STATE,IF_ALL, IF_TRUE, IF_FALSE};
 
   // The length of Tuples is a constant, and so is its own dual.  Otherwise
   // just dual each element.  Also flip the infinitely extended tail type.

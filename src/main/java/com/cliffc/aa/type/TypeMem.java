@@ -154,6 +154,8 @@ public class TypeMem extends Type<TypeMem> {
     return make0(objs);
   }
   public TypeMem trim_to_alias(BitSet bs) {
+    if( bs == null ) return this; // All aliases, so no trimming
+    if( bs.isEmpty() || this==XMEM ) return XMEM; // Shortcut
     TypeObj[] objs = new TypeObj[bs.length()];
     objs[1] = TypeObj.XOBJ;
     for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) )

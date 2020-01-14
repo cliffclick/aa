@@ -59,9 +59,10 @@ public final class RetNode extends Node {
   }
   @Override public Type value(GVNGCM gvn) {
     if( is_copy() ) return all_type();
-    Type ctl = gvn.type(ctl()).bound(Type.CTRL);
-    Type mem = gvn.type(mem()).bound(TypeMem.MEM);
-    Type val = gvn.type(val()).bound(Type.SCALAR);
+    Type    ctl =          gvn.type(ctl()).bound(Type.CTRL);
+    Type    val =          gvn.type(val()).bound(Type.SCALAR);
+    TypeMem mem = (TypeMem)gvn.type(mem()).bound(TypeMem.MEM);
+    mem = mem.trim_to_alias(alias_uses(gvn));
     return TypeTuple.make(ctl,mem,val);
   }
   @Override public Type all_type() { return TypeTuple.CALL; }

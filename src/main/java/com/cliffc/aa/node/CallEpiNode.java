@@ -197,11 +197,11 @@ public final class CallEpiNode extends Node {
   // just meet the set of known functions.
   @Override public Type value(GVNGCM gvn) {
     if( is_copy() )             // Already collapsed?  Just echo inputs
-      return TypeTuple.make(gvn.type(in(0)),gvn.type(in(1)),gvn.type(in(2)));
+      return TypeTuple.make(gvn.type(in(0)),gvn.type(in(1)),gvn.type(in(2)),gvn.type(in(1)));
 
     CallNode call = call();
     TypeTuple tcall = (TypeTuple)gvn.type(call);
-    if( tcall.at(0) != Type.CTRL ) return TypeTuple.XCALL;
+    if( tcall.at(0) != Type.CTRL ) return TypeTuple.CALLE.dual();
     Type tfptr = tcall.at(1);
     TypeMem call_mem = (TypeMem)tcall.at(2);
     if( !(tfptr instanceof TypeFunPtr) )
@@ -232,11 +232,12 @@ public final class CallEpiNode extends Node {
       FunNode fun = FunNode.find_fidx(fidx); // Lookup, even if not wired
       if( fun==null || fun.is_dead() )
         continue;              // Can be dead, if the news has not traveled yet
+      RetNode ret = fun.ret();
+      if( ret == null ) continue; // Can be dead, if the news has not traveled yet
       if( fun.nargs() != call.nargs() ) // This call-path has wrong args, is in-error for this function
         // Cannot just ignore/continue because the remaining functions might
         // allow the call site to produce a constant and optimize away.
-        return TypeTuple.CALL; // No good result until the input function is sensible
-      RetNode ret = fun.ret();
+        return TypeTuple.CALLE; // No good result until the input function is sensible
       TypeTuple tret = (TypeTuple)gvn.type(ret); // Type of the return
       // TODO: Renable this.
       // Lift the returned memory to be no more than what is available at the
@@ -272,10 +273,13 @@ public final class CallEpiNode extends Node {
     // aliases.  If the caller contains none of an alias so that the function
     // precisely stomps all of it, the call needs to be reporting [1#:~obj] -
     // in which case a normal MEET suffices.
+    TypeTuple tt = (TypeTuple)t;
     TypeMem pre_call_memory = (TypeMem)gvn.type(call.mem());
-    TypeTuple call_effects = TypeTuple.make(Type.CTRL,pre_call_memory,Type.ANY);
-    Type rez = t.meet(call_effects);
-    return rez;
+    Type post_call_mem = tt.at(1).meet(pre_call_memory);
+    // Return a FOUR-tuple: standard call (control,memory,value) return, plus
+    // JUST the function return memories.  Loads and Stores can bypass the
+    // function call, if the aliasing allows.
+    return TypeTuple.make(tt.at(0),post_call_mem,tt.at(2),tt.at(1));
   }
 
   // Set of used aliases across all inputs (not StoreNode value, but yes address)
@@ -311,5 +315,5 @@ public final class CallEpiNode extends Node {
   // If slot 0 is not a CallNode, we have been inlined.
   private boolean is_copy() { return !(in(0) instanceof CallNode); }
   @Override public Node is_copy(GVNGCM gvn, int idx) { return is_copy() ? in(idx) : null; }
-  @Override public Type all_type() { return TypeTuple.CALL; }
+  @Override public Type all_type() { return TypeTuple.CALLE; }
 }

@@ -37,12 +37,13 @@ public class LoadNode extends Node {
       if( obj != null ) return set_mem(obj,gvn);
     }
 
-    //// Load bypass ObjMerge
-    //if( mem instanceof ObjMergeNode ) {
-    //  assert BitsAlias.is_parent(((ObjMergeNode)mem)._alias,alias);
-    //  Node obj = ((ObjMergeNode)mem).fld2node(_fld);
-    //  return set_mem(obj,gvn);
-    //}
+    // Loads can bypass a call, if the return memory does not stomp the alias.
+    if( alias >= 0 && mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode ) {
+      Node cepi = mem.in(0);
+      TypeMem retmem = (TypeMem)((TypeTuple)gvn.type(cepi)).at(3);
+      if( retmem.at(alias) == TypeObj.XOBJ )
+        return set_mem(((CallEpiNode)cepi).call().mem(),gvn);
+    }
 
     // Loads against a NewNode cannot NPE, cannot fail, always return the input
     NewObjNode nnn = addr.in(0) instanceof NewObjNode ? (NewObjNode)addr.in(0) : null;
@@ -60,10 +61,6 @@ public class LoadNode extends Node {
         return lphi;
       }
     }
-
-    //// Load of final field can bypass call
-    //if( idx!=-1 && nnn != null && nnn.is_final(idx) && mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode )
-    //  return set_mem(((CallNode)mem.in(0).in(0)).mem(),gvn);
 
     // Loads against an equal store; cannot NPE since the Store did not.
     StoreNode st;
