@@ -137,6 +137,7 @@ public class TestParse {
 
   @Test public void testParse02() {
     Object dummy = Env.GVN; // Force class loading cycle
+    test("noinline_fib = { x -> x <= 1 ? 1 : noinline_fib(x-1)+noinline_fib(x-2) }; noinline_fib(4)",TypeInt.con(5));
     // Anonymous function definition
     test_isa("{x y -> x+y}", TypeFunPtr.make(BitsFun.make0(35),TypeStruct.SCALAR2,Type.SCALAR)); // {Scalar Scalar -> Scalar}
     test("{5}()", TypeInt.con(5)); // No args nor -> required; this is simply a function returning 5, being executed
@@ -166,7 +167,7 @@ public class TestParse {
     testerr("f0 = { f x -> f0(x-1) }; f0({+},2)", "Passing 1 arguments to f0={->} which takes 2 arguments",21);
     // Recursive:
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
-    test("noinline_fib = { x -> x <= 1 ? 1 : noinline_fib(x-1)+noinline_fib(x-2) }; noinline_fib(4)",TypeInt.con(5));
+    test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)",TypeInt.con(5));
     test("f0 = { x -> x ? {+}(f0(x-1),1) : 0 }; f0(2)", TypeInt.con(2));
     testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact()","Passing 0 arguments to fact={->} which takes 1 arguments",48);
     test_obj("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(0),fact(1),fact(2))",

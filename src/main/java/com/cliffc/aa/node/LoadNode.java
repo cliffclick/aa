@@ -29,7 +29,7 @@ public class LoadNode extends Node {
     int alias = tadr instanceof TypeMemPtr ? ((TypeMemPtr)tadr)._aliases.abit() : -2;
 
     // Load from a single alias bypasses a MemMerge
-    if( alias >= 0 && mem instanceof MemMergeNode && !(((MemMergeNode)mem).post_call_mem()) ) {
+    if( alias >= 0 && mem instanceof MemMergeNode ) {
       // TODO: Actually if all bits subset a single entry, and no partial
       // subsets, can bypass along the single entry.
       // Find nearest alias parent
@@ -89,15 +89,17 @@ public class LoadNode extends Node {
     TypeMemPtr tadr = (TypeMemPtr)adr;
     // Loading from TypeMem - will get a TypeObj out.
     Type mem = gvn.type(mem()); // Memory
-    Type badmemrez = mem.above_center() ? Type.XSCALAR : Type.SCALAR;
     if( !(mem instanceof TypeStruct) ) {
       if( !(mem instanceof TypeMem) ) // Nothing sane
-        return badmemrez;
+        return mem.above_center() ? Type.XSCALAR : Type.SCALAR;
       TypeObj obj = ((TypeMem)mem).ld(tadr);
       mem = obj;
     }
 
     // Loading from TypeObj - hoping to get a field out
+    if( mem == TypeObj.XOBJ ) return Type.XSCALAR;
+    if( mem == TypeObj. OBJ ) return Type. SCALAR;
+    // Struct (and pointer is not nil)
     if( mem instanceof TypeStruct && !tadr.must_nil() ) {
       TypeStruct ts = (TypeStruct)mem;
       int idx = ts.find(_fld);  // Find the named field
@@ -105,7 +107,7 @@ public class LoadNode extends Node {
         return ts.at(idx);      // Field type
       // No such field
     }
-    return badmemrez; // No loading from e.g. Strings
+    return mem.above_center() ? Type.XSCALAR : Type.SCALAR; // No loading from e.g. Strings
   }
 
   // Set of used aliases across all inputs (not StoreNode value, but yes address)

@@ -35,8 +35,7 @@ public class StoreNode extends Node {
 
     // Stores bypass a Merge to the specific alias
     Type ta = gvn.type(adr);
-    if( ta instanceof TypeMemPtr && mem instanceof MemMergeNode &&
-        !((MemMergeNode)mem).post_call_mem() )
+    if( ta instanceof TypeMemPtr && mem instanceof MemMergeNode )
       return new StoreNode(this,((MemMergeNode)mem).obj((TypeMemPtr)ta,gvn),adr);
 
     // Stores bypass stores to unrelated fields

@@ -209,14 +209,14 @@ public class CallNode extends Node {
     for( int i=0; i<_defs._len; i++ )
       ts[i] = gvn.type(in(i));
     if( !(ts[2] instanceof TypeMem) )
-      ts[2] = ts[2].above_center() ? TypeMem.EMPTY_MEM : TypeMem.ALL_MEM;
+      ts[2] = ts[2].above_center() ? TypeMem.XMEM : TypeMem.MEM;
 
     // Compute a new Memory which is trimmed to everything recursively
     // reachable from all active display alias#s plus all args.  First check
     // that we can find our functions.
     BitsFun fidxs = fidxs(gvn);
     if( fidxs == null ) ts[1] = TypeFunPtr.GENERIC_FUNPTR;
-    if( ts[1].above_center() ) ts[2] = TypeMem.EMPTY_MEM; // No functions to call, so no escapes
+    if( ts[1].above_center() ) ts[2] = TypeMem.XMEM; // No functions to call, so no escapes
     if( fidxs == null || // Might be e.g. ~Scalar
         fidxs.test(BitsFun.ALL) ||
         is_copy() )
@@ -225,7 +225,7 @@ public class CallNode extends Node {
     // Here, I start with all alias#s from TMP args plus all function
     // closure#s and "close over" the set of possible aliases.
     TypeMem tmem = (TypeMem)ts[2];
-    if( tmem == TypeMem.EMPTY_MEM ) return TypeTuple.make(ts);
+    if( tmem == TypeMem.XMEM ) return TypeTuple.make(ts);
     
     // Set of aliases escaping into the function
     VBitSet abs = new VBitSet();
@@ -248,7 +248,7 @@ public class CallNode extends Node {
     // of exactly the primitives.
     abs.clear(Env.STK_0._alias);
     if( abs.length()==0 ) {      // Nothing left?
-      ts[2] = TypeMem.EMPTY_MEM; // Empty memory
+      ts[2] = TypeMem.XMEM;      // Empty memory
       return TypeTuple.make(ts);
     }
 
@@ -391,7 +391,7 @@ public class CallNode extends Node {
     Arrays.fill(ts,Type.ALL);
     ts[0] = Type.CTRL;
     ts[1] = TypeFunPtr.GENERIC_FUNPTR;
-    ts[2] = TypeMem.ALL_MEM;
+    ts[2] = TypeMem.XMEM;
     return TypeTuple.make(ts);
   }
   // Set of used aliases across all inputs (not StoreNode value, but yes address)

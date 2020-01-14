@@ -40,7 +40,7 @@ public abstract class IntrinsicNewNode extends Node {
     _alias = nnn._alias;        // Record alias conveniently
     FunNode  fun = ( FunNode) gvn.xform(new  FunNode(this,TypeMemPtr.make(_alias,TypeStr.STR)).add_def(Env.ALL_CTRL));
     ParmNode rpc = (ParmNode) gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
-    ParmNode memp= (ParmNode) gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.ALL_MEM ),null));
+    ParmNode memp= (ParmNode) gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM     ),null));
     // Add input edges to the intrinsic
     add_def(null);              // Control for the primitive in slot 0
     add_def(memp);              // Memory  for the primitive in slot 1

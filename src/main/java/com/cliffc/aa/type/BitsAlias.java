@@ -4,8 +4,7 @@ import java.util.HashMap;
 
 // Alias Bits supporting a lattice; immutable; hash-cons'd.
 //
-// Alias Bits map 1-to-1 with either allocation sites (NewNode) or an anonymous
-// type.
+// Alias Bits map 1-to-1 with allocation sites (NewNode)
 public class BitsAlias extends Bits<BitsAlias> {
   // Intern: lookup and return an existing Bits or install in hashmap and
   // return a new Bits.  Overridden in subclasses to make type-specific Bits.
@@ -24,9 +23,9 @@ public class BitsAlias extends Bits<BitsAlias> {
   static final Bits.Tree<BitsAlias> TREE = new Bits.Tree<>();
   @Override public Tree<BitsAlias> tree() { return TREE; }
   public  static final int ALL, REC, CLOSURE, ARY, STR;
-          static BitsAlias FULL, STRBITS, STRBITS0;
+          static BitsAlias STRBITS0;
           static BitsAlias RECBITS, NIL;
-  public  static BitsAlias NZERO, RECBITS0, ANY, CLOSURE_BITS, EMPTY;
+  public  static BitsAlias FULL, NZERO, RECBITS0, ANY, CLOSURE_BITS, EMPTY, STRBITS;
 
   static {
     // The All-Memory alias class

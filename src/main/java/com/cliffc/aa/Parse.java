@@ -131,9 +131,6 @@ public class Parse {
         assert use instanceof FunNode;
         assert use.in(1)==Env.ALL_CTRL;
         _gvn.set_def_reg(use,1,con(Type.XCTRL));
-        //_gvn.unreg(use);        // Changing edges, so unregister
-        //use.set_def(1,con(Type.XCTRL),_gvn);
-        //_gvn.rereg(use,Type.CTRL);
         i--;
       }
     }
@@ -724,7 +721,7 @@ public class Parse {
       _gvn.set_def_reg(e._scope.stk(),0,fun); // Closure creation control defaults to function entry
       set_ctrl(fun);            // New control is function head
       Node rpc = gvn(new ParmNode(-1,"rpc",fun,con(TypeRPC.ALL_CALL),null)).keep();
-      Node mem = gvn(new ParmNode(-2,"mem",fun,con(TypeMem.ALL_MEM ),null));
+      Node mem = gvn(new ParmNode(-2,"mem",fun,con(TypeMem.MEM     ),null));
       Parse errmsg = errMsg();  // Lazy error message
       int cnt=0;                // Add parameters to local environment
       for( int i=0; i<ids._len; i++ ) {
@@ -1095,9 +1092,7 @@ public class Parse {
     Node mem = scope.mem();
     if( _gvn.touched(mem) ) {
       // If only used by the parser, just make it active.
-      if( mem instanceof MemMergeNode && mem._uses._len==1 && mem._keep == 0 &&
-          !((MemMergeNode)mem).post_call_mem() )
-        _gvn.unreg(mem);
+      if( mem instanceof MemMergeNode && mem._uses._len==1 && mem._keep == 0 ) _gvn.unreg(mem);
       // Not active and has uses, so make a new active memory feeding from the old
       else return scope.set_active_mem(new MemMergeNode(mem),_gvn);
     }

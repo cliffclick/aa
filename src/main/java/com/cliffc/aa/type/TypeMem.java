@@ -123,8 +123,8 @@ public class TypeMem extends Type<TypeMem> {
 
   // Return set of aliases.  Not even sure if this is well-defined.
   public BitsAlias aliases() {
-    if( this==  ALL_MEM ) return BitsAlias.NZERO;
-    if( this==EMPTY_MEM ) return BitsAlias.EMPTY;
+    if( this== MEM ) return BitsAlias.NZERO;
+    if( this==XMEM ) return BitsAlias.EMPTY;
     BitsAlias bas = BitsAlias.EMPTY;
     for( int i=0; i<_aliases.length; i++ )
       if( _aliases[i]!=null && !_aliases[i].above_center() )
@@ -132,7 +132,7 @@ public class TypeMem extends Type<TypeMem> {
     return bas;
   }
   public VBitSet aliases2() {
-    if( this==  ALL_MEM ) return null; // All possible aliases
+    if( this == MEM ) return null; // All possible aliases
     VBitSet bas = new VBitSet();
     for( int i=1; i<_aliases.length; i++ )
       if( _aliases[i]!=null && !_aliases[i].above_center() )
@@ -142,8 +142,8 @@ public class TypeMem extends Type<TypeMem> {
 
   // Toss out memory state not visible from these aliases
   public TypeMem trim_to_alias(BitsAlias bas) {
-    if( bas == BitsAlias.EMPTY || this==EMPTY_MEM )
-      return EMPTY_MEM;         // Shortcut
+    if( bas == BitsAlias.EMPTY || this==XMEM )
+      return XMEM;              // Shortcut
     int alias = bas.abit();
     if( alias == -1 )
       throw com.cliffc.aa.AA.unimpl();
@@ -224,26 +224,14 @@ public class TypeMem extends Type<TypeMem> {
 
   public static final TypeMem  MEM; // Every alias filled with something
   public static final TypeMem XMEM; // Every alias filled with anything
-  public static final TypeMem ALL_MEM, EMPTY_MEM;
-  public static final TypeMem MEM_ABC;
+  public static final TypeMem MEM_ABC, MEM_STR;
   static {
     // All memory.  Includes breakouts for all structs and all strings.
     // Triggers BitsAlias.<clinit> which makes all the initial alias splits.
-    TypeObj[] objs = new TypeObj[BitsAlias.STR+1];
-    objs[BitsAlias.ALL] = TypeObj.OBJ;
-    objs[BitsAlias.REC] = TypeStruct.ALLSTRUCT;
-    objs[BitsAlias.STR] = TypeStr.STR;
-    MEM  = make(objs);          // Every alias filled with something
+    MEM  = make(new TypeObj[]{null,TypeObj.OBJ});
+    XMEM = MEM.dual();
 
-    TypeObj[] xobjs = new TypeObj[BitsAlias.STR+1];
-    xobjs[BitsAlias.ALL] = TypeObj.XOBJ;
-    xobjs[BitsAlias.REC] = TypeStruct.ALLSTRUCT.dual();
-    xobjs[BitsAlias.STR] = TypeStr.XSTR;
-    XMEM = make(xobjs);         // Every alias filled with anything
-
-    ALL_MEM   = make(new TypeObj[]{null,TypeObj.OBJ});
-    EMPTY_MEM = ALL_MEM.dual(); // Tried no-memory-vs-XOBJ-memory
-
+    MEM_STR  = make(TypeMemPtr.STRPTR.getbit(),TypeStr.STR);
     MEM_ABC  = make(TypeMemPtr.ABCPTR.getbit(),TypeStr.ABC);
   }
   static final TypeMem[] TYPES = new TypeMem[]{MEM,MEM_ABC};

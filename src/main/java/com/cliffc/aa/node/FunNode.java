@@ -16,7 +16,7 @@ import java.util.Map;
 // null, same as a C2 Region.  Args 1+ point to the callers control.  Before
 // GCP/opto arg 1 points to ALL_CTRL as the generic unknown worse-case caller.
 // ALL_CTRL is removed just prior to GCP, the precise call-graph is discovered,
-// and calls are directly wired to the FunNode as part of GCP.  After GPC the
+// and calls are directly wired to the FunNode as part of GCP.  After GCP the
 // call-graph is known precisely and is explicit in the graph.
 //
 // FunNodes are finite in count and are unique densely numbered, see BitsFun.
@@ -35,6 +35,14 @@ import java.util.Map;
 // points to the RetNode and is typed as a TypeFunPtr.  The TFP is used as a
 // 1st-class function pointer and is carried through the program like a normal
 // value.  Direct Calls will point to the Epilog directly.
+//
+// Memory both is and is-not treated special: the function body flows memory
+// through from the initial Parm to the Ret in the normal way.  However the
+// incoming memory argument is specifically trimmed by the Call to only those
+// aliases used by the function body (either read or write), and the Ret only
+// returns those memories explicitly written.  All the other aliases are
+// treated as "pass-through" and explicitly routed around the Fun/Ret by the
+// Call/CallEpi pair.
 //
 public class FunNode extends RegionNode {
   public String _name;          // Optional for anon functions; can be set later via bind()
@@ -200,7 +208,7 @@ public class FunNode extends RegionNode {
       path = split_size(gvn,ret,parms);
       if( path == -1 ) return null;
       if( noinline() ) return null;
-      _cnt_size_inlines++;
+      if( fidx() >= PRIM_CNT ) _cnt_size_inlines++; // Disallow infinite size-inlining of recursive non-primitives
     }
     // Split the callers according to the new 'fun'.
     FunNode fun = make_new_fun(gvn, ret, args);

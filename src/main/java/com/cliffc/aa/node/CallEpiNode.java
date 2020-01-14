@@ -1,9 +1,9 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.VBitSet;
+
 import java.util.BitSet;
 
 // See CallNode.  Slot 0 is call-control; slot 1 is call function pointer.  The
@@ -42,7 +42,7 @@ public final class CallEpiNode extends Node {
       RetNode ret = wired(0);                 // One wired return
       if( ret.fun()._defs._len==2 ) {         // Function is only called by 1 (and not the unknown caller)
         assert ret.fun().in(1).in(0)==call;   // Just called by us
-        return inline(gvn, call, ret.ctl(), ret.mem(), ret.val(), ret);
+        return inline(gvn, call, ret.ctl(), ret.mem(), ret.val(), null/*do not unwire, because using the entire function body inplace*/);
       }
     }
 
@@ -210,27 +210,24 @@ public final class CallEpiNode extends Node {
         return TypeTuple.CALL; // No good result until the input function is sensible
       RetNode ret = fun.ret();
       TypeTuple tret = (TypeTuple)gvn.type(ret); // Type of the return
+      // TODO: Renable this.
       // Lift the returned memory to be no more than what is available at the
       // call entry plus the function closures - specifically not all the
       // memory from unrelated calls to this same function.
-      TypeMem ret_mem_untrimmed = ((TypeMem)tret.at(1));
+      //TypeMem ret_mem_untrimmed = ((TypeMem)tret.at(1));
 
-      // Memory from the function.  Includes memory from other call sites.
-      BitsAlias ret_aliases = ret_mem_untrimmed.aliases();
-
+      // Aliases from the function.  Includes aliases passed in from other call sites.
+      //BitsAlias ret_aliases = ret_mem_untrimmed.aliases();
+      //
       // Trim to aliases available from this call path.
       //BitsAlias call_trimmed = (BitsAlias)ret_aliases.join(call_aliases);
-      // TODO: locals includes what is reachable from the return pointer not
-      // all local closures.
       //BitsAlias plus_local = call_trimmed.meet(fun._closure_aliases);
-      BitsAlias plus_local = ret_aliases;
-      // Strip out primitive memory, since it is never read nor written
-      plus_local = plus_local.clear(Env.STK_0._alias);
-
+      //
       // Trim return memory to what is possible on this path.
-      TypeMem ret_mem_trimmed = ret_mem_untrimmed.trim_to_alias(plus_local);
+      //TypeMem ret_mem_trimmed = ret_mem_untrimmed.trim_to_alias(plus_local);
       // Build a full return type.
-      TypeTuple tret2 = TypeTuple.make(tret.at(0),ret_mem_trimmed,tret.at(2));
+      //TypeTuple tret2 = TypeTuple.make(tret.at(0),ret_mem_trimmed,tret.at(2));
+      TypeTuple tret2 = tret;
       t = lifting ? t.join(tret2) : t.meet(tret2);
 
       // Make real from virtual CG edges in GCP/Opto by wiring calls.
@@ -240,8 +237,19 @@ public final class CallEpiNode extends Node {
           fidx >= FunNode.PRIM_CNT ) // Do not wire up primitives, but forever take their default inputs and outputs
         wire(gvn,call,fun,ret);
     }
+    // For every alias not produced on some path, merge in the callers memory.
+    TypeMem input_mem = (TypeMem)gvn.type(call.mem());
+    TypeTuple tt = (TypeTuple)t;
+    TypeMem tret3 = (TypeMem)tt.at(1);
+    if( tret3 == TypeMem.XMEM ) // Meet of XMEM and anything is anything
+      return TypeTuple.make(tt.at(0),input_mem,tt.at(2));
+    if( input_mem == TypeMem.XMEM ) // Meet of XMEM and anything is anything
+      return tt;
 
-    return t;
+    // Here I have to only implement pass-thru aliases, all others are crushed
+    // by the functions.
+    throw com.cliffc.aa.AA.unimpl();
+    //return t;
   }
 
   // Set of used aliases across all inputs (not StoreNode value, but yes address)
@@ -249,17 +257,17 @@ public final class CallEpiNode extends Node {
     assert is_copy();
     return null;                // Conservative do-nothing.  Since a copy, it will be removed shortly
   }
-  
+
   // Inline the CallNode.  Remove all edges except the results.  This triggers
   // "is_copy()", which in turn will trigger the following ProjNodes to inline.
   private Node inline( GVNGCM gvn, CallNode call, Node ctl, Node mem, Node rez, RetNode ret ) {
     assert nwired()==0 || nwired()==1; // not wired to several choices
 
     // Unwire any wired called function
-    if( nwired() == 1 && !ret.is_copy() ) {  // Wired, and called function not already collapsing
+    if( ret != null && nwired() == 1 && !ret.is_copy() ) {  // Wired, and called function not already collapsing
       FunNode fun = ret.fun();
-      for( int i=0; i<fun._defs._len; i++ ) // Unwire
-        if( fun.in(i)==ctl ) gvn.set_def_reg(fun,i,gvn.con(Type.XCTRL));
+      for( int i=1; i<fun._defs._len; i++ ) // Unwire
+        if( fun.in(i).in(0)==call ) gvn.set_def_reg(fun,i,gvn.con(Type.XCTRL));
     }
     // Call is also is_copy and will need to collapse
     call._is_copy = true;              // Call is also is-copy
