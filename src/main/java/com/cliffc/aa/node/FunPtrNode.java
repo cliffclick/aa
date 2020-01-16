@@ -40,7 +40,7 @@ public final class FunPtrNode extends ConNode<TypeFunPtr> {
     return fun==null ? xstr() : fun.str();
   }
 
-  @Override public Node ideal(GVNGCM gvn) { return null; }
+  @Override public Node ideal(GVNGCM gvn, int level) { return null; }
   @Override public Type value(GVNGCM gvn) {
     if( !(in(0) instanceof RetNode) )
       return TypeFunPtr.EMPTY;

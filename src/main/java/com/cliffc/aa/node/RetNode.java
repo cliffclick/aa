@@ -40,8 +40,8 @@ public final class RetNode extends Node {
   @Override public boolean ideal_impacted_by_losing_uses(GVNGCM gvn, Node dead) {
     return dead instanceof CallEpiNode;
   }
-  
-  @Override public Node ideal(GVNGCM gvn) {
+
+  @Override public Node ideal(GVNGCM gvn, int level) {
     // If is_copy, wipe out inputs rpc & fun, but leave ctrl,mem,val for users to inline
     if( is_copy() && in(4)!=null ) {
       set_def(3,null,gvn);      // No rpc
@@ -55,6 +55,14 @@ public final class RetNode extends Node {
       set_def(2,null,gvn);      // No val
       return this;              // Progress
     }
+    // Collapsed to a constant?  Remove any control interior.
+    if( gvn.type(val()).is_con() && ctl()!=fun() && // Profit: can change control and delete function interior
+        (gvn.type(mem())==TypeMem.XMEM || (mem() instanceof ParmNode && mem().in(0)==fun())) ) // Memory has to be trivial also
+      return set_def(0,fun(),gvn); // Gut function body
+    // Something changed (hence we got here), so all wired uses need to re-check.
+    // i.e., trivial functions (constant returns or 1-op) might now inline.
+    if( (level&1)==0 && (gvn.type(val()).is_con() || ctl()==fun()) )
+      for( Node use : _uses ) gvn.add_work(use);
     return null;
   }
   @Override public Type value(GVNGCM gvn) {
@@ -71,7 +79,7 @@ public final class RetNode extends Node {
   @Override public VBitSet alias_uses(GVNGCM gvn) {
     // Returns all modified reachable memories plus a return alias.
     // Approximate as reachable from call input.
-    
+
     // Get function input memory type, and reach from the return.
     VBitSet abs = new VBitSet(); // Set of escaping aliases
     Type omem = gvn.type(mem());

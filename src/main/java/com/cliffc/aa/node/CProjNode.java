@@ -12,7 +12,7 @@ public class CProjNode extends ProjNode {
       return _idx==0 ? "False" : "True";
     return "CProj_"+_idx;
   }
-  @Override public Node ideal(GVNGCM gvn) { return in(0).is_copy(gvn,_idx); }
+  @Override public Node ideal(GVNGCM gvn, int level) { return in(0).is_copy(gvn,_idx); }
   @Override public Type value(GVNGCM gvn) {
     Type c = gvn.type(in(0));  // our type is just the matching tuple slice
     if( c.isa(TypeTuple.IF_ANY) ) return Type.XCTRL;

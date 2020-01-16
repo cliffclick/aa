@@ -187,7 +187,7 @@ public class MemMergeNode extends Node {
   // MemMerge lost a use.  MemMerge should try to remove some aliases
   @Override public boolean ideal_impacted_by_losing_uses(GVNGCM gvn, Node dead) { return true; }
 
-  @Override public Node ideal(GVNGCM gvn) {
+  @Override public Node ideal(GVNGCM gvn, int level) {
     assert _defs._len==_aliases._len;
     // Dead & duplicate inputs can be removed.
     boolean progress = false;

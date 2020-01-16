@@ -63,7 +63,7 @@ public abstract class IntrinsicNewNode extends Node {
 // --------------------------------------------------------------------------
 class ConvertI64Str extends IntrinsicNewNode {
   ConvertI64Str() { super("str",TypeStruct.INT64); }
-  @Override public Node ideal(GVNGCM gvn) { return null; }
+  @Override public Node ideal(GVNGCM gvn, int level) { return null; }
   @Override public Type value(GVNGCM gvn) {
     Type t = gvn.type(in(2));
     if( t.above_center() ) return all_type().dual();
@@ -74,7 +74,7 @@ class ConvertI64Str extends IntrinsicNewNode {
 
 class ConvertF64Str extends IntrinsicNewNode {
   ConvertF64Str() { super("str",TypeStruct.FLT64); }
-  @Override public Node ideal(GVNGCM gvn) { return null; }
+  @Override public Node ideal(GVNGCM gvn, int level) { return null; }
   @Override public Type value(GVNGCM gvn) {
     Type t = gvn.type(in(2));
     if( t.above_center() ) return all_type().dual();
@@ -98,7 +98,7 @@ class AddStrStr extends IntrinsicNewNode {
   // dead until resolving or not.
   //
   AddStrStr() { super("+",TypeStruct.STR_STR); }
-  @Override public Node ideal(GVNGCM gvn) { return null; }
+  @Override public Node ideal(GVNGCM gvn, int level) { return null; }
   @Override public Type value(GVNGCM gvn) {
     Type m   = gvn.type(in(1));
     Type sp0 = gvn.type(in(2));

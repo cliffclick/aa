@@ -21,7 +21,7 @@ public class LoadNode extends Node {
           Node adr() { return in(2); }
   private Node set_mem(Node a, GVNGCM gvn) { return set_def(1,a,gvn); }
 
-  @Override public Node ideal(GVNGCM gvn) {
+  @Override public Node ideal(GVNGCM gvn, int level) {
     Node mem  = mem();
     Node addr = adr();
 

@@ -24,7 +24,7 @@ public final class CallEpiNode extends Node {
   int wire_num(int x) { return x+1; }
   RetNode wired(int x) { return (RetNode)in(x+1); }
 
-  @Override public Node ideal(GVNGCM gvn) {
+  @Override public Node ideal(GVNGCM gvn, int level) {
     // If inlined, no further xforms.  The using Projs will fold up.
     if( is_copy() ) return null;
 

@@ -28,7 +28,7 @@ public class StoreNode extends Node {
   Node adr() { return in(2); }
   Node val() { return in(3); }
 
-  @Override public Node ideal(GVNGCM gvn) {
+  @Override public Node ideal(GVNGCM gvn, int level) {
     Node ctl = ctl();
     Node mem = mem();
     Node adr = adr();

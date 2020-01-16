@@ -164,9 +164,9 @@ public class FunNode extends RegionNode {
   }
 
   // ----
-  @Override public Node ideal(GVNGCM gvn) {
+  @Override public Node ideal(GVNGCM gvn, int level) {
     // Generic Region ideal
-    Node n = super.ideal(gvn);
+    Node n = super.ideal(gvn, level);
     if( n!=null ) return n;
 
     // If no trailing RetNode and hence no FunPtr... function is uncallable
@@ -177,10 +177,11 @@ public class FunNode extends RegionNode {
       return this;
     }
 
-    if( gvn._small_work ) { // Only doing small-work now
-      gvn.add_work2(this);  // Maybe want to inline later
+    if( level <= 1 ) {          // Only doing small-work now
+      if( level==0 ) gvn.add_work2(this); // Maybe want to inline later, but not during asserts
       return null;
     }
+    // level 2 (or 3) work: inline
 
     // Type-specialize as-needed
     if( is_forward_ref() ) return null;
@@ -208,7 +209,7 @@ public class FunNode extends RegionNode {
       path = split_size(gvn,ret,parms);
       if( path == -1 ) return null;
       if( noinline() ) return null;
-      if( fidx() >= PRIM_CNT ) _cnt_size_inlines++; // Disallow infinite size-inlining of recursive non-primitives
+      if( _uid >= GVNGCM._INIT0_CNT ) _cnt_size_inlines++; // Disallow infinite size-inlining of recursive non-primitives
     }
     // Split the callers according to the new 'fun'.
     FunNode fun = make_new_fun(gvn, ret, args);
@@ -591,7 +592,7 @@ public class FunNode extends RegionNode {
   public ParmNode rpc() { return parm(-1); }
   public RetNode ret() {
     for( Node use : _uses )
-      if( use instanceof RetNode && !((RetNode)use).is_copy() )
+      if( use instanceof RetNode && !((RetNode)use).is_copy() && ((RetNode)use).fun()==this )
         return (RetNode)use;
     return null;
   }

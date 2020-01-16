@@ -19,7 +19,7 @@ public class UnresolvedNode extends Node {
     }
     return "Unr???";
   }
-  @Override public Node ideal(GVNGCM gvn) {
+  @Override public Node ideal(GVNGCM gvn, int level) {
     if( _defs._len < 2 )               // One function, consumer should treat as a copy
       throw com.cliffc.aa.AA.unimpl(); // Should collapse
     // Back-to-back Unresolved collapse (happens due to inlining)

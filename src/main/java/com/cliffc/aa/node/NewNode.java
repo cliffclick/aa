@@ -38,7 +38,7 @@ public abstract class NewNode<T extends TypeObj> extends Node {
   // Called when folding a Named Constructor into this allocation site
   void set_name( T name ) { assert !name.above_center();  _ts = name; }
 
-  @Override public Node ideal(GVNGCM gvn) {
+  @Override public Node ideal(GVNGCM gvn, int level) {
     // If the address is not looked at then memory contents cannot be looked at
     // and is dead.
     if( captured() ) {

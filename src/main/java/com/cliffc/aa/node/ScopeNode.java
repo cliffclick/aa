@@ -86,7 +86,7 @@ public class ScopeNode extends Node {
 
   public boolean is_closure() { assert _defs._len==4 || _defs._len==7; return _defs._len==7; }
 
-  @Override public Node ideal(GVNGCM gvn) {
+  @Override public Node ideal(GVNGCM gvn, int level) {
     // Past parsing, and know we have the single program result aligned with
     // the memory state?
     if( gvn._opt_mode == 1 ) {

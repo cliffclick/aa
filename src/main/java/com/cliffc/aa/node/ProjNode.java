@@ -10,7 +10,7 @@ public class ProjNode extends Node {
   public ProjNode( Node ifn, int idx ) { super(OP_PROJ,ifn); _idx=idx; }
   @Override String xstr() { return "DProj_"+_idx; }
 
-  @Override public Node ideal(GVNGCM gvn) {
+  @Override public Node ideal(GVNGCM gvn, int level) {
     // multi-head is collapsing?  Then follow suit.
     Node cp = in(0).is_copy(gvn,_idx);
     if( cp != null ) return cp;

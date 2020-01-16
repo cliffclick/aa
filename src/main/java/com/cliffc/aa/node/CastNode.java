@@ -8,7 +8,7 @@ public class CastNode extends Node {
   public final Type _t;                // TypeVar???
   public CastNode( Node ctrl, Node ret, Type t ) { super(OP_CAST,ctrl,ret); _t=t; }
   @Override String xstr() { return "("+_t+")"; }
-  @Override public Node ideal(GVNGCM gvn) {
+  @Override public Node ideal(GVNGCM gvn, int level) {
     // Cast is useless?  Remove same as a TypeNode
     Node ctrl = in(0), addr = in(1);
     Type c = gvn.type(ctrl), t = gvn.type(addr);

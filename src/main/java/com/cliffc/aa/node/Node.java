@@ -251,7 +251,7 @@ public abstract class Node implements Cloneable {
   // not allowed to remove CFG edges (loop backedges and function-call entry
   // points have not all appeared).  Returns null if no-progress, or a better
   // version of 'this'.
-  abstract public Node ideal(GVNGCM gvn);
+  abstract public Node ideal(GVNGCM gvn, int level);
   // Losing uses puts these on the worklist
   public boolean ideal_impacted_by_losing_uses(GVNGCM gvn, Node dead) { return false; }
 
@@ -298,15 +298,15 @@ public abstract class Node implements Cloneable {
   }
 
   // Assert all ideal calls are done
-  public final boolean more_ideal(GVNGCM gvn, VBitSet bs) {
+  public final boolean more_ideal(GVNGCM gvn, VBitSet bs, int level) {
     if( bs.tset(_uid) ) return false; // Been there, done that
     if( _keep == 0 ) {                // Only non-keeps, which is just top-level scope and prims
-      Node idl = ideal(gvn);
+      Node idl = ideal(gvn,level);
       if( idl != null )
         return true;            // Found an ideal call
     }
-    for( Node def : _defs ) if( def != null && def.more_ideal(gvn,bs) ) return true;
-    for( Node use : _uses ) if( use != null && use.more_ideal(gvn,bs) ) return true;
+    for( Node def : _defs ) if( def != null && def.more_ideal(gvn,bs,level) ) return true;
+    for( Node use : _uses ) if( use != null && use.more_ideal(gvn,bs,level) ) return true;
     return false;
   }
 

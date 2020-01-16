@@ -18,7 +18,7 @@ public class TypeNode extends Node {
   @Override String xstr() { return "assert:"+_t; }
   Node arg() { return in(1); }
 
-  @Override public Node ideal(GVNGCM gvn) {
+  @Override public Node ideal(GVNGCM gvn, int level) {
     Node arg = arg();
     if( gvn.type(arg).isa(_t) ) return arg;
     // If TypeNode check is for a function pointer, it will wrap any incoming

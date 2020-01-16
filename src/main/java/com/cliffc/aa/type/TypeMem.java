@@ -153,7 +153,7 @@ public class TypeMem extends Type<TypeMem> {
     objs[alias] = at(alias);
     return make0(objs);
   }
-  public TypeMem trim_to_alias(BitSet bs) {
+  public TypeMem trim_to_alias(VBitSet bs) {
     if( bs == null ) return this; // All aliases, so no trimming
     if( bs.isEmpty() || this==XMEM ) return XMEM; // Shortcut
     TypeObj[] objs = new TypeObj[bs.length()];

@@ -19,7 +19,7 @@ public class PhiNode extends Node {
   // For ParmNodes
   PhiNode( byte op, Node fun, ConNode defalt, Parse badgc ) { this(op,badgc,fun,defalt); }
 
-  @Override public Node ideal(GVNGCM gvn) {
+  @Override public Node ideal(GVNGCM gvn, int level) {
     if( gvn.type(in(0)) == Type.XCTRL ) return null;
     RegionNode r = (RegionNode) in(0);
     assert r._defs._len==_defs._len;

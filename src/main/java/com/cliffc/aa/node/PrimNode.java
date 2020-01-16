@@ -75,7 +75,7 @@ public abstract class PrimNode extends Node {
   // zero-based (not same as the _targs and _args fields).
   public abstract Type apply( Type[] args ); // Execute primitive
   @Override public String xstr() { return _name+"::"+_ret; }
-  @Override public Node ideal(GVNGCM gvn) { return null; }
+  @Override public Node ideal(GVNGCM gvn, int level) { return null; }
   @Override public Type value(GVNGCM gvn) {
     Type[] ts = new Type[_defs._len]; // 1-based
     // If the meet with _targs.dual stays above center for all inputs, then we
@@ -177,7 +177,7 @@ static class ConvertInt64F64 extends PrimNode {
   // TODO: Type-check strptr input args
 static class ConvertStrStr extends PrimNode {
   ConvertStrStr() { super("str",TypeStruct.STRPTR,TypeMemPtr.STRPTR); }
-  @Override public Node ideal(GVNGCM gvn) { return in(1); }
+  @Override public Node ideal(GVNGCM gvn, int level) { return in(1); }
   @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)).bound(_ret); }
   @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
 }
@@ -383,7 +383,7 @@ static class RandI64 extends PrimNode {
 
 static class Id extends PrimNode {
   Id(Type arg) { super("id",TypeStruct.make(arg),arg); }
-  @Override public Node ideal(GVNGCM gvn) { return in(1); }
+  @Override public Node ideal(GVNGCM gvn, int level) { return in(1); }
   @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)).bound(_ret); }
   @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
 }

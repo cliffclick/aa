@@ -25,7 +25,7 @@ public class ParmNode extends PhiNode {
     return _idx==parm._idx;
   }
   
-  @Override public Node ideal(GVNGCM gvn) {
+  @Override public Node ideal(GVNGCM gvn, int level) {
     if( !(in(0) instanceof FunNode) ) return null; // Dying
     FunNode fun = (FunNode) in(0);
     if( gvn.type(fun) == Type.XCTRL ) return null; // All dead, c-prop will fold up
@@ -38,7 +38,7 @@ public class ParmNode extends PhiNode {
             !gvn.type(in(i)).isa(fun.targ(_idx)) ) // Arg is NOT correct type
           return null;          // Not correct arg-type; refuse to collapse
     }
-    return super.ideal(gvn); // Let PhiNode collapse 
+    return super.ideal(gvn,level); // Let PhiNode collapse 
   }
 
   @Override public String err( GVNGCM gvn ) {

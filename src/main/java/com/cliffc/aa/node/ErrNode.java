@@ -12,7 +12,7 @@ public final class ErrNode extends Node {
   public ErrNode( Node ctrl, String msg, Parse bad, Type t ) { super(OP_ERR,ctrl); _msg = msg; _bad = bad; _t=t; }
   @Override String xstr() { return _msg.split("\n")[1]; }
   @Override String str() { return "Err"; }
-  @Override public Node ideal(GVNGCM gvn) { return null; }
+  @Override public Node ideal(GVNGCM gvn, int level) { return null; }
   @Override public Type value(GVNGCM gvn) {
     Type t = gvn.type(in(0));
     return t == Type.ANY || t == Type.XCTRL ? _t.dual() : _t; // For dead data errors return ANY (no error)

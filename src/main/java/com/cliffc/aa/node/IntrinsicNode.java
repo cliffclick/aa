@@ -50,7 +50,7 @@ public class IntrinsicNode extends Node {
 
   // If the input memory is unaliased, fold into the NewNode.
   // If this node does not fold away, the program is in error.
-  @Override public Node ideal(GVNGCM gvn) {
+  @Override public Node ideal(GVNGCM gvn, int level) {
     if( mem() instanceof MemMergeNode ) {
       MemMergeNode mem = (MemMergeNode)mem();
       Node ptr = ptr();
