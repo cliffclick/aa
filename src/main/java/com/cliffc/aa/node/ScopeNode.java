@@ -4,7 +4,6 @@ import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
-import com.cliffc.aa.util.VBitSet;
 
 import java.util.HashMap;
 import java.util.function.Predicate;
@@ -111,17 +110,15 @@ public class ScopeNode extends Node {
   @Override public Type value(GVNGCM gvn) { return all_type(); }
   @Override public Type all_type() { return Type.ALL; }
   // Set of used aliases across all inputs (not StoreNode value, but yes address)
-  @Override public VBitSet alias_uses(GVNGCM gvn) {
+  @Override public BitsAlias alias_uses(GVNGCM gvn) {
     Type mem = gvn.type(mem());
     if( mem == Type.ALL ) return null; // All escaped
-    VBitSet abs = new VBitSet(); // Set of escaping aliases
     Node rez = in(4);
-    if( rez == null ) return null;
+    if( rez == null ) return BitsAlias.NZERO;
     Type tval = gvn.type(rez);
-    if( !(tval instanceof TypeMemPtr) ) return abs;
-    TypeMem tmem = (TypeMem)mem;
-    ((TypeMemPtr)tval).recursive_aliases(abs,tmem);
-    return abs;
+    if( !(tval instanceof TypeMemPtr) ) return BitsAlias.EMPTY;
+    BitsAlias abs = ((TypeMemPtr)tval).recursive_aliases(BitsAlias.EMPTY,(TypeMem)mem);
+    return abs;                 // Set of escaping aliases
   }
   @Override public int hashCode() { return 123456789; }
   // ScopeNodes are never equal

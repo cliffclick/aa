@@ -1,9 +1,9 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.*;
+import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Util;
-import com.cliffc.aa.util.VBitSet;
 
 // Load a named field from a struct.  Does it's own nil-check testing.  Loaded
 // value depends on the struct typing.
@@ -108,11 +108,11 @@ public class LoadNode extends Node {
   }
 
   // Set of used aliases across all inputs (not StoreNode value, but yes address)
-  @Override public VBitSet alias_uses(GVNGCM gvn) {
+  @Override public BitsAlias alias_uses(GVNGCM gvn) {
     Type t = gvn.type(adr());
-    if( !(t instanceof TypeMemPtr) ) return null;
+    if( !(t instanceof TypeMemPtr) ) return BitsAlias.NZERO; // Wait until memory settles out
     TypeMemPtr tmp = (TypeMemPtr)t;
-    return tmp.aliases0();
+    return tmp.aliases();
   }
   @Override public String err(GVNGCM gvn) {
     Type tadr = gvn.type(adr());

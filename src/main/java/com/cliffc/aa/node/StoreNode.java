@@ -111,9 +111,9 @@ public class StoreNode extends Node {
   }
 
   // Set of used aliases across all inputs (not StoreNode value, but yes address)
-  @Override public VBitSet alias_uses(GVNGCM gvn) {
+  @Override public BitsAlias alias_uses(GVNGCM gvn) {
     TypeMemPtr tmp = (TypeMemPtr)gvn.type(adr());
-    return tmp.aliases0();
+    return tmp.aliases();
   }
   @Override public String err(GVNGCM gvn) {
     String msg = err0(gvn);

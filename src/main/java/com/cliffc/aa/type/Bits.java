@@ -206,7 +206,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     return idx < _bits.length && test(_bits, i);
   }
   // Test if this bit, or any parent of this bit, is set
-  boolean test_recur( int i ) {
+  public boolean test_recur( int i ) {
     if( test(i) ) return true;
     Tree<B> tree = tree();
     while( (i = tree.parent(i)) != 0 )

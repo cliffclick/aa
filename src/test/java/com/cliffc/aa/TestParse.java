@@ -186,33 +186,33 @@ public class TestParse {
     test("(1+2.3):flt", TypeFlt.make(0,64,3.3));
     test("x:int = 1", TypeInt.TRUE);
     test("x:flt = 1", TypeInt.TRUE); // casts for free to a float
-    testerr("x:flt32 = 123456789", "123456789 is not a flt32",19);
+    testerr("x:flt32 = 123456789", "123456789 is not a flt32",1);
     testerr("1:","Syntax error; trailing junk",1); // missing type
     testerr("2:x", "Syntax error; trailing junk", 1);
     testerr("(2:)", "Syntax error; trailing junk", 2);
 
     test   (" -1 :int1", TypeInt.con(-1));
-    testerr("(-1):int1", "-1 is not a int1",9);
-    testerr("\"abc\":int", "*[$]\"abc\" is not a int64",9);
-    testerr("1:str", "1 is not a *[$]str",5);
+    testerr("(-1):int1", "-1 is not a int1",4);
+    testerr("\"abc\":int", "*[$]\"abc\" is not a int64",5);
+    testerr("1:str", "1 is not a *[$]str",1);
 
     test   ("{x:int -> x*2}(1)", TypeInt.con(2)); // Types on parms
-    testerr("{x:str -> x}(1)", "1 is not a *[$]str", 9);
+    testerr("{x:str -> x}(1)", "1 is not a *[$]str", 2);
 
     // Type annotations on dead args are ignored
     test   ("fun:{int str -> int}={x y -> x+2}; fun(2,3)", TypeInt.con(4));
-    testerr("fun:{int str -> int}={x y -> x+y}; fun(2,3)", "3 is not a *[$]str",33);
+    testerr("fun:{int str -> int}={x y -> x+y}; fun(2,3)", "3 is not a *[$]str",3);
     // Test that the type-check is on the variable and not the function.
     test_obj("fun={x y -> x*2}; bar:{int str -> int} = fun; baz:{int @{x;y} -> int} = fun; (fun(2,3),bar(2,\"abc\"))",
             TypeStruct.make_tuple(TypeInt.con(4),TypeInt.con(4)));
     testerr("fun={x y -> x+y}; baz:{int @{x;y} -> int} = fun; (fun(2,3), baz(2,3))",
-            "3 is not a *[$]@{x=;y=}", 47);
+            "3 is not a *[$]@{x=;y=}", 21);
 
-    testerr("x=3; fun:{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int64",30);
+    testerr("x=3; fun:{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int64",8);
     test("x=3; fun:{real->real}={x -> x*2}; fun(2.1)+fun(x)", TypeFlt.con(2.1*2+3*2)); // Mix of types to fun()
     test("fun:{real->flt32}={x -> x}; fun(123 )", TypeInt.con(123 ));
     test("fun:{real->flt32}={x -> x}; fun(0.125)", TypeFlt.con(0.125));
-    testerr("fun:{real->flt32}={x -> x}; fun(123456789)", "123456789 is not a flt32",26);
+    testerr("fun:{real->flt32}={x -> x}; fun(123456789)", "123456789 is not a flt32",3);
     test("{x -> x&1}", TypeFunPtr.make(BitsFun.make0(35),TypeStruct.SCALAR1,Type.SCALAR)); // {Int -> Int}
 
     // Named types
@@ -249,9 +249,12 @@ public class TestParse {
     // Comments in the middle of a struct decl
     test   ("dist={p->p//qqq\n.//qqq\nx*p.x+p.y*p.y}; dist(//qqq\n@{x//qqq\n=1;y=2})", TypeInt.con(5));
 
-    // Lexical scoping
+    // Lexical scoping.  Struct assignments make new fields, shadowing external variables.
     test("x=@{a:=1;b=@{a=  2;b=@{a=3;b=0}}}; x.b.b.a",TypeInt.con(3));
-    test("x=@{a:=1;b=@{a=a+1;b=0}}; x.a*10+x.b.a",TypeInt.con(1*10+2));
+    // Lexical scoping.  Before a new field is created, the external variable is used.
+    // After the new field, the new field is used.
+    test("x=@{a:=1;b=@{a=a+1;c=a}}; x.a*10+x.b.c",TypeInt.con(1*10+2));
+    // Functions only make new fields if no prior one exists.
     test("x=@{a:=1;b= {a=a+1;b=0}}; x.b(); x.a",TypeInt.con(2));
 
     // Tuple
@@ -265,11 +268,11 @@ public class TestParse {
     test("gal=:flt; 3==gal(2)+1", TypeInt.TRUE);
     test("gal=:flt; tank:gal = gal(2)", TypeInt.con(2).set_name("gal:"));
     // test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: figure out if free cast for bare constants?
-    testerr ("gal=:flt; tank:gal = gal(2)+1", "3 is not a gal:flt64",29);
+    testerr ("gal=:flt; tank:gal = gal(2)+1", "3 is not a gal:flt64",14);
 
     test    ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
     test    ("Point=:@{x;y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
-    testerr ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1;y=2}))", "*[$]@{x==1;y==2} is not a *[$]Point:@{x=;y=}",68);
+    testerr ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1;y=2}))", "*[$]@{x==1;y==2} is not a *[$]Point:@{x=;y=}",22);
     testerr ("Point=:@{x;y}; Point((0,1))", "*[$](nil;1) is not a Point:@{x=;y=}",27);
     testerr("x=@{n: =1;}","Missing type after ':'",7);
     testerr("x=@{n=;}","Missing ifex after assignment of 'n'",6);
@@ -280,7 +283,7 @@ public class TestParse {
     // nullable and not-null pointers
     test   ("x:str? = 0", Type.NIL); // question-type allows null or not; zero digit is null
     test_obj("x:str? = \"abc\"", TypeStr.ABC); // question-type allows null or not
-    testerr("x:str  = 0", "nil is not a *[$]str", 10);
+    testerr("x:str  = 0", "nil is not a *[$]str", 1);
     test_ptr0("math_rand(1)?0:\"abc\"", (alias)->TypeMemPtr.make_nil(alias,TypeStr.ABC));
     testerr("(math_rand(1)?0 : @{x=1}).x", "Struct might be nil when reading field '.x'", 27);
     test   ("p=math_rand(1)?0:@{x=1}; p ? p.x : 0", TypeInt.BOOL); // not-null-ness after a null-check

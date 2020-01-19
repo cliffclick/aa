@@ -17,7 +17,7 @@ public class Env implements AutoCloseable {
       scope.set_ptr (ptr,GVN);  // Address for 'nnn', the local stack frame
       MemMergeNode mem = new MemMergeNode(par._scope.mem(),frm,nnn.<NewObjNode>unhook()._alias);
       scope.set_active_mem(mem,GVN);  // Memory includes local stack frame
-      if( closure ) CLOSURES = CLOSURES.meet(BitsAlias.make0(nnn._alias));
+      CLOSURES = CLOSURES.meet(BitsAlias.make0(nnn._alias));
     }
     _scope = scope;
   }
@@ -99,8 +99,7 @@ public class Env implements AutoCloseable {
     Node ptr = _scope.ptr();
     if( ptr == null ) return;   // Already done
     NewObjNode stk = _scope.stk();
-    if( stk._is_closure )
-      CLOSURES = CLOSURES.clear(stk._alias);
+    CLOSURES = CLOSURES.clear(stk._alias);
     for( Node use : stk._uses )
       gvn.add_work(use);        // Scope object going dead, trigger following projs to cleanup
     _scope.set_ptr(null,gvn);   // Clear pointer to closure

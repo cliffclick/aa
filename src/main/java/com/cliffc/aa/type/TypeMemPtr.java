@@ -127,15 +127,16 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     return aliases==BitsAlias.NIL ? NIL : make(aliases,_obj);
   }
 
-  // Expanded alias bits in a mutable bitset
-  public VBitSet aliases0() { return _aliases.tree().plus_kids(_aliases); }
+  public BitsAlias aliases() { return _aliases; }
+
   // Recursively reachable aliases
-  public void recursive_aliases(VBitSet abs, TypeMem mem) {
-    VBitSet bs = aliases0();
-    for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) )
-      mem.recursive_aliases(abs,alias);
+  public BitsAlias recursive_aliases(BitsAlias abs, TypeMem mem) {
+    for( int alias : _aliases )
+      if( alias != 0 )
+        abs = mem.recursive_aliases(abs,alias);
+    return abs;
   }
-  
+
   // Build a mapping from types to their depth in a shortest-path walk from the
   // root.  Only counts depth on TypeStructs with the matching alias.  Only
   // used for testing.

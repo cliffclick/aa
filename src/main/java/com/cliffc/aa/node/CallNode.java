@@ -232,26 +232,29 @@ public class CallNode extends Node {
     // If already dead, or calling everything then not much we can do
     if( is_copy() || fidxs.test(BitsFun.ALL) )
       return TypeTuple.make(ts);
-    
+
     // Trim unused aliases, specifically to prevent local closures from escaping.
     // Here, I start with all alias#s from TMP args plus all function
     // closure#s and "close over" the set of possible aliases.
 
     // Set of aliases escaping into the function
-    VBitSet abs = new VBitSet();
+    BitsAlias abs = BitsAlias.EMPTY;
     // All fidxes in a flat iterable loop
     BitSet bs = fidxs.tree().plus_kids(fidxs);
     for( int fidx = bs.nextSetBit(0); fidx >= 0; fidx = bs.nextSetBit(fidx+1) ) {
       FunNode fun = FunNode.find_fidx(fidx);
+      if( abs.test(1) ) break;  // Shortcut for already being full
       for( int alias : fun._closure_aliases )
-        tmem.recursive_aliases(abs,alias); // Function closures always escape
+        abs = tmem.recursive_aliases(abs,alias); // Function closures always escape
     }
     // Now the set of pointers escaping via arguments
     for( int i=0; i<nargs(); i++ ) {
+      if( abs.test(1) ) break;  // Shortcut for already being full
       Type targ = gvn.type(arg(i));
       if( targ instanceof TypeMemPtr )
         for( int alias : ((TypeMemPtr)targ)._aliases )
-          tmem.recursive_aliases(abs,alias);
+          if( alias != 0 )
+            abs = tmem.recursive_aliases(abs,alias);
     }
 
     // Add all the aliases which can be reached from objects at the existing
@@ -397,7 +400,7 @@ public class CallNode extends Node {
     return TypeTuple.make(ts);
   }
   // Set of used aliases across all inputs (not StoreNode value, but yes address)
-  @Override public VBitSet alias_uses(GVNGCM gvn) {
+  @Override public BitsAlias alias_uses(GVNGCM gvn) {
     // We use all aliases we computed in our output type, plus all bypass aliases.
     TypeMem fret_mem;
     for( Node cepi : _uses )    // Find CallEpi for bypass aliases
@@ -406,9 +409,9 @@ public class CallNode extends Node {
           if( mproj instanceof MProjNode )
             // TODO: Solve the forward-flow used_aliases problem incrementally.
             // Here we just bail out.
-            return null;        // Use all aliases after the call
+            return BitsAlias.NZERO; // Use all aliases after the call
     TypeMem all_called_function_uses = (TypeMem)((TypeTuple)gvn.type(this)).at(2);
-    return all_called_function_uses.aliases2();
+    return all_called_function_uses.aliases();
   }
 
   @Override public int hashCode() { return super.hashCode()+_rpc; }

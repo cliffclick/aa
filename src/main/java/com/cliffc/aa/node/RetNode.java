@@ -2,7 +2,6 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.VBitSet;
 
 // See CallNode comments.  The RetNode gathers {control (function exits or
 // not), memory, value, rpc, fun}, and sits at the end of a function.  The RPC
@@ -75,28 +74,44 @@ public final class RetNode extends Node {
   }
   @Override public Type all_type() { return TypeTuple.CALL; }
 
-  // Set of used aliases across all inputs (not StoreNode value, but yes address)
-  @Override public VBitSet alias_uses(GVNGCM gvn) {
-    // Returns all modified reachable memories plus a return alias.
-    // Approximate as reachable from call input.
-
-    // Get function input memory type, and reach from the return.
-    VBitSet abs = new VBitSet(); // Set of escaping aliases
+  // Only return memory of aliases that conservatively MAY have been modified
+  // and callers MAY be able to see.  This can be, e.g. ALL of memory, but we
+  // try to exclude both obviously not modified memory (which includes
+  // unreachable memory) and obviously not visible to caller (which includes
+  // our local closure if it does not escape).
+  @Override public BitsAlias alias_uses(GVNGCM gvn) {
+    // Return memory type
     Type omem = gvn.type(mem());
-    if( !(omem instanceof TypeMem) ) return null; // Wait until types fall
+    if( !(omem instanceof TypeMem) ) return BitsAlias.NZERO; // Wait until types get more stable
     TypeMem output_mem = (TypeMem)omem;
+
+    BitsAlias abs = BitsAlias.EMPTY; // Set of escaping aliases
+    // Closures reachable from this function escape, because we assume the
+    // function body modifies all closure variables.
+    FunNode fun = fun();
+    if( !fun.is_parm(mem()) ) {  // Shortcut: Skip if no memory effects at all
+      MemMergeNode mmem = mem() instanceof MemMergeNode ? ((MemMergeNode)mem()) : null;
+      for( int alias : fun._closure_aliases )
+        // If memory effect is strange, or this alias is not directly from the
+        // function entry, then assume it is modified and part of the result state.
+        if( mmem == null || !fun.is_parm(mmem.alias2node(alias)) )
+          abs = output_mem.recursive_aliases(abs,alias);
+      if( abs.test(1) ) return BitsAlias.NZERO; // Shortcut
+    }
 
     // Aliases reachable from output memory and return pointer
     Type tval = gvn.type(val());
     if( tval instanceof TypeMemPtr )
-      ((TypeMemPtr)tval).recursive_aliases(abs,output_mem);
+      abs = ((TypeMemPtr)tval).recursive_aliases(abs,output_mem);
+    if( abs.test(1) ) return BitsAlias.NZERO; // Shortcut
 
     // Aliases reachable from input arguments
     for( Node use : fun()._uses ) {
       Type t = gvn.type(use);
       if( t instanceof TypeMemPtr )
-        ((TypeMemPtr)t).recursive_aliases(abs,output_mem);
+        abs = ((TypeMemPtr)t).recursive_aliases(abs,output_mem);
     }
+
     return abs;
   }
 

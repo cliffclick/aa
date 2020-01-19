@@ -131,56 +131,30 @@ public class TypeMem extends Type<TypeMem> {
         bas = bas.set(i);
     return bas;
   }
-  public VBitSet aliases2() {
-    if( this == MEM ) return null; // All possible aliases
-    VBitSet bas = new VBitSet();
-    for( int i=1; i<_aliases.length; i++ )
-      if( _aliases[i]!=null && !_aliases[i].above_center() )
-        bas.set(i);
-    return bas;
-  }
-
   // Toss out memory state not visible from these aliases
   public TypeMem trim_to_alias(BitsAlias bas) {
     if( bas == BitsAlias.EMPTY || this==XMEM )
       return XMEM;              // Shortcut
-    int alias = bas.abit();
-    if( alias == -1 )
-      throw com.cliffc.aa.AA.unimpl();
-    // Single alias from the state being trimmed, and all else is XOBJ
-    TypeObj[] objs = new TypeObj[alias+1];
+    if( bas.test(1) ) return this; // Shortcut, all aliases used so no trimming
+    TypeObj[] objs = new TypeObj[bas.max()+1];
     objs[1] = TypeObj.XOBJ;
-    objs[alias] = at(alias);
-    return make0(objs);
-  }
-  public TypeMem trim_to_alias(VBitSet bs) {
-    if( bs == null ) return this; // All aliases, so no trimming
-    if( bs.isEmpty() || this==XMEM ) return XMEM; // Shortcut
-    TypeObj[] objs = new TypeObj[bs.length()];
-    objs[1] = TypeObj.XOBJ;
-    for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) )
+    for( int alias : bas )
       objs[alias] = at(alias);
     return make0(objs);
   }
 
-  // Recursively explore reachable aliases
-  public void recursive_aliases( VBitSet abs, int idx ) {
-    if( abs.tset(idx) ) return;
-    int aidx = at_idx(idx);
-    if( abs.tset(idx) ) return;
-    TypeObj obj = _aliases[aidx];
+  // Recursively explore reachable aliases.
+  public BitsAlias recursive_aliases( BitsAlias abs, int idx ) {
+    if( abs.test(idx) ) return abs;
+    abs = abs.or(idx);         // 'idx' is a reachable alias
+    TypeObj obj = at(idx);
     if( obj instanceof TypeStruct ) {
       TypeStruct ts = (TypeStruct)obj;
-      for( int i=0; i<ts._ts.length; i++ ) {
-        Type t = ts._ts[i];
-        if( t instanceof TypeMemPtr ) {
-          BitsAlias bas = ((TypeMemPtr)t)._aliases;
-          for( int alias : bas ) {
-            recursive_aliases(abs,alias);
-          }
-        }
-      }
+      for( int i=0; i<ts._ts.length; i++ )
+        if( ts._ts[i] instanceof TypeMemPtr )
+          abs = ((TypeMemPtr)ts._ts[i]).recursive_aliases(abs,this);
     }
+    return abs;
   }
 
 

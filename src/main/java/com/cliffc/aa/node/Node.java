@@ -2,6 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.type.BitsAlias;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
@@ -272,7 +273,7 @@ public abstract class Node implements Cloneable {
   // Set of used aliases across all inputs (not StoreNode value, but yes
   // address).  Returning null means "uses all aliases", generally because the
   // analysis has to be conservative.
-  public VBitSet alias_uses(GVNGCM gvn) {
+  public BitsAlias alias_uses(GVNGCM gvn) {
     throw com.cliffc.aa.AA.unimpl(); // Overridden in subclasses
     //return null;
   }

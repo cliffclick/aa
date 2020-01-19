@@ -386,6 +386,7 @@ public class FunNode extends RegionNode {
     // Make a prototype new function header split from the original.
     int oldfidx = fidx();
     FunNode fun = new FunNode(_name,_tf.make_new_fidx(oldfidx,new_args));
+    fun._closure_aliases = _closure_aliases;  // Copy as well
     fun.pop();                  // Remove null added by RegionNode, will be added later
     // Renumber the original as well; the original _fidx is now a *class* of 2
     // fidxs.  Each FunNode fidx is only ever a constant, so the original Fun
@@ -589,6 +590,7 @@ public class FunNode extends RegionNode {
         return (ParmNode)use;
     return null;
   }
+  boolean is_parm( Node n ) { return n instanceof ParmNode && n.in(0)==this; }
   public ParmNode rpc() { return parm(-1); }
   public RetNode ret() {
     for( Node use : _uses )

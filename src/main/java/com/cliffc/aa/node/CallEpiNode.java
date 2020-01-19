@@ -2,7 +2,6 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.VBitSet;
 
 import java.util.BitSet;
 
@@ -205,11 +204,11 @@ public final class CallEpiNode extends Node {
     Type tfptr = tcall.at(1);
     TypeMem call_mem = (TypeMem)tcall.at(2);
     if( !(tfptr instanceof TypeFunPtr) )
-      return TypeTuple.CALL;
+      return TypeTuple.CALLE;
     TypeFunPtr funt = (TypeFunPtr)tfptr;
     BitsFun fidxs = funt.fidxs();
     if( fidxs.test(BitsFun.ALL) ) // All functions are possible?
-      return TypeTuple.CALL;      // Worse-case result
+      return TypeTuple.CALLE;     // Worse-case result
     // If we fall from choice-functions to the empty set of called functions, freeze our output.
     // We might fall past empty and get a valid set.  Probably wrong; if we ever see a
     // choice set of functions, we should not execute.
@@ -283,9 +282,9 @@ public final class CallEpiNode extends Node {
   }
 
   // Set of used aliases across all inputs (not StoreNode value, but yes address)
-  @Override public VBitSet alias_uses(GVNGCM gvn) {
+  @Override public BitsAlias alias_uses(GVNGCM gvn) {
     assert is_copy();
-    return null;                // Conservative do-nothing.  Since a copy, it will be removed shortly
+    return BitsAlias.NZERO; // Conservative do-nothing.  Since a copy, it will be removed shortly
   }
 
   // Inline the CallNode.  Remove all edges except the results.  This triggers

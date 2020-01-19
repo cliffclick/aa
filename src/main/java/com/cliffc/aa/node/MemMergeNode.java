@@ -1,12 +1,12 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.AA;
+import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.AryInt;
 import com.cliffc.aa.util.SB;
-import com.cliffc.aa.util.VBitSet;
 import org.jetbrains.annotations.NotNull;
+
 import java.util.BitSet;
 
 // Merge a lot of TypeObjs into a TypeMem.  Each input is from a different
@@ -195,8 +195,11 @@ public class MemMergeNode extends Node {
       if( in(i)==in(0) ||       // Dup of the main memory
           // Dup of immediate alias parent, the more general version of the prior test
           in(i)==alias2node(BitsAlias.parent(alias_at(i))) ||
-          gvn.type(in(i))==TypeObj.XOBJ ) // Dead input
-        { remove0(i--,gvn); progress = true; }
+          gvn.type(in(i))==TypeObj.XOBJ ) { // Dead input
+        remove0(i--,gvn);
+        progress = true;
+        if( is_dead() ) return this; // Happens when cleaning out dead code
+      }
     if( _defs._len==1 ) return in(0); // Merging nothing
     if( progress ) return this;       // Removed some dead inputs
 
@@ -228,7 +231,7 @@ public class MemMergeNode extends Node {
       if( in(i) instanceof MemMergeNode )
         { set_def(i,((MemMergeNode)in(i)).alias2node(alias_at(i)),gvn); progress = true; }
     if( progress ) return this; // Removed back-to-back merge
-    
+
 
     // CNC - This stanza is here because of a flaw in unpacking Call args.
     //
@@ -248,18 +251,19 @@ public class MemMergeNode extends Node {
 
     // Try to remove some unused aliases.  Gather alias uses from all users.
     if( !_uses.isEmpty() && gvn._opt_mode != 0 /*not during parsing, not all users available */) {
-      VBitSet bas = new VBitSet();
-      boolean bad = false;
+      BitsAlias abs = BitsAlias.EMPTY;
       for( Node use : _uses ) {
-        VBitSet rez = use.alias_uses(gvn);
-        if( rez == null )       // Some use uses all aliases
-          { bad = true; break; }
-        bas.or(rez);
+        BitsAlias rez = use.alias_uses(gvn);
+        if( rez.test(1) ) { abs = BitsAlias.NZERO; break; } // Shortcut, some use uses all aliases
+        if( rez==BitsAlias.EMPTY ) ;
+        else if( abs==BitsAlias.EMPTY ) abs=rez;
+        else //abs = abs.or(rez);
+          throw AA.unimpl();
       }
       // Kill unused aliases
-      if( !bad ) {
+      if( !abs.test(1) ) {      // Shortcut
         for( int i=1; i<_defs._len; i++ )
-          if( !bas.get(_aliases.at(i)) )
+          if( !abs.test_recur(_aliases.at(i)) )
             { remove0(i--,gvn); progress = true; }
         if( progress ) return this;
       }
@@ -288,7 +292,7 @@ public class MemMergeNode extends Node {
   // Set of used aliases across all inputs.  This is only called from another
   // MemMerge, which means back-to-back MemMerge which will be cleared out
   // eventually.  Ok to report super conservative here.
-  @Override public VBitSet alias_uses(GVNGCM gvn) { return null; }
+  @Override public BitsAlias alias_uses(GVNGCM gvn) { return BitsAlias.NZERO; }
 
   @Override @NotNull public MemMergeNode copy( boolean copy_edges, CallEpiNode unused, GVNGCM gvn) {
     MemMergeNode mmm = (MemMergeNode)super.copy(copy_edges, unused, gvn);

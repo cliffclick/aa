@@ -308,6 +308,7 @@ public class Parse {
     // Gather ids in x = y = z = ....
     Ary<String> toks = new Ary<>(new String[1],0);
     Ary<Type  > ts   = new Ary<>(new Type  [1],0);
+    Ary<Parse > bads = new Ary<>(new Parse [1],0);
     BitSet rs = new BitSet();
     while( true ) {
       int oldx = _x;
@@ -322,6 +323,7 @@ public class Parse {
       // x : type := ... typed var   assignment
       // x : nontype = ... error, missing type
       // p? x : nontype ... part of trinary
+      Parse bad = errMsg();    // Capture location in case of type error
       if( peek(":=") ) _x=oldx2; // Avoid confusion with typed assignment test
       else if( peek(':') && (t=type())==null ) { // Check for typed assignment
         if( _e._scope.test_if() ) _x = oldx2; // Grammar ambiguity, resolve p?a:b from a:int
@@ -331,6 +333,7 @@ public class Parse {
       else if( !peek('=') ) { _x = oldx; break; } // Unwind token parse, and not assignment
       toks.add(tok.intern());
       ts  .add(t  );
+      bads.add(bad);
     }
 
     // Normal statement value parse
@@ -340,8 +343,8 @@ public class Parse {
       ifex = err_ctrl2("Missing ifex after assignment of '"+toks.last()+"'");
     }
     // Honor all type requests, all at once, by inserting type checks on the ifex.
-    for( Type t : ts )
-      ifex = typechk(ifex,t,null);
+    for( int i=0; i<ts._len; i++ )
+      ifex = typechk(ifex,ts.at(i),null,bads.at(i));
     // Assign tokens to value
     for( int i=0; i<toks._len; i++ ) {
       String tok = toks.at(i);               // Token being assigned
@@ -593,10 +596,11 @@ public class Parse {
     Node fact = fact();
     if( fact==null ) return null;
     int oldx = _x;
+    Parse bad = errMsg();
     if( !peek(':') ) { _x = oldx; return fact; }
     Type t = type();
     if( t==null ) { _x = oldx; return fact; } // No error for missing type, because can be ?: instead
-    return typechk(fact,t,null);
+    return typechk(fact,t,null,bad);
   }
 
   /** Parse a factor, a leaf grammar token
@@ -726,7 +730,7 @@ public class Parse {
       int cnt=0;                // Add parameters to local environment
       for( int i=0; i<ids._len; i++ ) {
         Node parm = gvn(new ParmNode(cnt++,ids.at(i),fun,con(Type.SCALAR),errmsg));
-        Node mt = typechk(parm,ts.at(i),mem);
+        Node mt = typechk(parm,ts.at(i),mem,bads.at(i));
         create(ids.at(i),mt, args_are_mutable);
       }
       // Function memory is a merge of incoming wide memory, and the local
@@ -806,8 +810,8 @@ public class Parse {
   }
 
   // Add a typecheck into the graph, with a shortcut if trivially ok.
-  private Node typechk(Node x, Type t, Node mem) {
-    return t == null || _gvn.type(x).isa(t) ? x : gvn(new TypeNode(t,x,errMsg()));
+  private Node typechk(Node x, Type t, Node mem, Parse bad) {
+    return t == null || _gvn.type(x).isa(t) ? x : gvn(new TypeNode(t,x,bad));
   }
 
   private String token() { skipWS();  return token0(); }

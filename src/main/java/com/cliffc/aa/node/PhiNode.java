@@ -3,8 +3,10 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.VBitSet;
+import com.cliffc.aa.type.BitsAlias;
+import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeMem;
+import com.cliffc.aa.type.TypeObj;
 
 import java.util.BitSet;
 
@@ -110,11 +112,11 @@ public class PhiNode extends Node {
   }
   @Override public Type all_type() { return Type.ALL; }
   // Set of used aliases across all inputs (not StoreNode value, but yes address)
-  @Override public VBitSet alias_uses(GVNGCM gvn) {
-    if( _uses._len==0 ) return null; // During parsing, so assume uses all.  Or dead & will be removed shortly.
-    // TODO: Requires recursive search, handling cycles
+  @Override public BitsAlias alias_uses(GVNGCM gvn) {
+    if( _uses._len==0 ) return BitsAlias.NZERO; // During parsing, so assume uses all.  Or dead & will be removed shortly.
     if( _uses._len==1 ) return _uses.at(0).alias_uses(gvn);
-    throw com.cliffc.aa.AA.unimpl();
+    // TODO: Requires recursive search, handling cycles
+    return BitsAlias.NZERO;
   }
   @Override public String err(GVNGCM gvn) {
     if( !(in(0) instanceof FunNode && ((FunNode)in(0))._name.equals("!") ) && // Specifically "!" takes a Scalar
