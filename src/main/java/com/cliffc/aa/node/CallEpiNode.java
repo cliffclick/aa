@@ -133,7 +133,7 @@ public final class CallEpiNode extends Node {
       return inline(gvn,call,cctl,cmem,rrez,ret);
 
     // Check for a 1-op body using only constants or parameters and no memory effects
-    boolean can_inline=!(rrez instanceof ParmNode) && rmem==cmem;
+    boolean can_inline=!(rrez instanceof ParmNode) && (rmem==cmem || gvn.type(rmem)==TypeMem.XMEM);
     for( Node parm : rrez._defs )
       if( parm != null && parm != fun &&
           !(parm instanceof ParmNode && parm.in(0) == fun) &&

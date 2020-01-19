@@ -31,7 +31,7 @@ public class TypeNode extends Node {
       FunNode fun = gvn.init((FunNode)(new FunNode(targs).add_def(Env.ALL_CTRL)));
       args[0] = fun;            // Call control
       args[1] = arg;            // Call function is the argument being function-type-checked here
-      args[2] = gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM),null));
+      Node mem = args[2] = gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM),null));
       Node rpc= gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
       for( int i=0; i<targs.length; i++ ) {
         // All the parms, with types
@@ -44,8 +44,6 @@ public class TypeNode extends Node {
       Node postmem = gvn.xform(new MProjNode(cepi,1));
       Node val  = gvn.xform(new  ProjNode(cepi.unhook(),2));
       Node chk  = gvn.xform(new  TypeNode(tfp._ret,val,_error_parse)); // Type-check the return also
-      Node premem = args[2];
-      Node mem = gvn.xform(new MemMergeNode(premem,postmem,1));
       RetNode ret = (RetNode)gvn.xform(new RetNode(ctl,mem,chk,rpc,fun));
       return gvn.xform(new FunPtrNode(ret));
     }
