@@ -24,11 +24,13 @@ public class ParmNode extends PhiNode {
     ParmNode parm = (ParmNode)o;
     return _idx==parm._idx;
   }
-  
+
   @Override public Node ideal(GVNGCM gvn, int level) {
     if( !(in(0) instanceof FunNode) ) return null; // Dying
     FunNode fun = (FunNode) in(0);
     if( gvn.type(fun) == Type.XCTRL ) return null; // All dead, c-prop will fold up
+    if( (level&1)==0 )          // Not doing asserts 
+      gvn.add_work2(fun);       // Something changed, re-check inlining chances
     assert fun._defs._len==_defs._len;
     // Arg-check before folding up
     if( _idx >= 0 ) {                         // Skip RPC and memory
@@ -38,7 +40,7 @@ public class ParmNode extends PhiNode {
             !gvn.type(in(i)).isa(fun.targ(_idx)) ) // Arg is NOT correct type
           return null;          // Not correct arg-type; refuse to collapse
     }
-    return super.ideal(gvn,level); // Let PhiNode collapse 
+    return super.ideal(gvn,level); // Let PhiNode collapse
   }
 
   @Override public String err( GVNGCM gvn ) {

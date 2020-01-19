@@ -193,8 +193,6 @@ public class MemMergeNode extends Node {
     boolean progress = false;
     for( int i=1; i<_defs._len; i++ )
       if( in(i)==in(0) ||       // Dup of the main memory
-          // Dup of immediate alias parent, the more general version of the prior test
-          in(i)==alias2node(BitsAlias.parent(alias_at(i))) ||
           gvn.type(in(i))==TypeObj.XOBJ ) { // Dead input
         remove0(i--,gvn);
         progress = true;

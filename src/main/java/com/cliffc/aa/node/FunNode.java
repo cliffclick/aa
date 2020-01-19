@@ -211,6 +211,7 @@ public class FunNode extends RegionNode {
       if( noinline() ) return null;
       if( _uid >= GVNGCM._INIT0_CNT ) _cnt_size_inlines++; // Disallow infinite size-inlining of recursive non-primitives
     }
+    assert level==2; // Do not actually inline, if just checking that all forward progress was found
     // Split the callers according to the new 'fun'.
     FunNode fun = make_new_fun(gvn, ret, args);
     return split_callers(gvn,parms,ret,fun,cgedges,path);
