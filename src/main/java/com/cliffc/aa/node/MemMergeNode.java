@@ -147,7 +147,7 @@ public class MemMergeNode extends Node {
 
   // Create a new alias slot with initial value for an active this
   public void create_alias_active( int alias, Node n, GVNGCM gvn ) {
-    assert gvn==null || (!gvn.touched(this) && gvn.type(n) instanceof TypeObj);
+    assert gvn==null || (!gvn.touched(this) && (gvn.type(n) instanceof TypeObj || gvn.type(n) instanceof TypeMem));
     assert alias2idx(alias) == 0;    // No dups
     int idx = make_alias2idx(alias); // Get the exact alias
     assert in(idx)==null;            // Must be newly created, so set to null

@@ -68,7 +68,6 @@ public class GVNGCM {
   void reset_to_init0() {
     assert _work2._len==0;
     _opt_mode = 1;
-    _small_work=true;
     while( !_work.isEmpty() ) {
       Node n = _work.pop();     // Pull from main worklist before functions
       _wrk_bits.clear(n._uid);
@@ -231,7 +230,7 @@ public class GVNGCM {
 
     // Try generic graph reshaping, looping till no-progress.
     int cnt=0;  Node x;        // Progress bit
-    while( (x = n.ideal(this)) != null ) {
+    while( (x = n.ideal(this,0)) != null ) {
       if( x != n ) {            // Different return, so delete original dead node
         x.keep();               // Keep alive during deletion of n
         kill_new(n); // n was new, replaced so immediately recycle n and dead subgraph
@@ -277,9 +276,10 @@ public class GVNGCM {
     }
   }
 
-  public void xform_old( Node old ) {
-    Node nnn = xform_old0(old);
+  public void xform_old( Node old, int level ) {
+    Node nnn = xform_old0(old,level);
     if( nnn==null ) return;
+    assert (level&1)==0;        // No changes during asserts
     if( nnn == old ) {          // Progress, but not replacement
       for( Node use : old._uses ) add_work(use);
       add_work(old);            // Re-run old, until no progress
@@ -316,7 +316,7 @@ public class GVNGCM {
    *  now pointing at the replacement.
    *  @param n Node to be idealized; already in GVN
    *  @return null for no-change, or a better version of n, already in GVN */
-  private Node xform_old0( Node n ) {
+  private Node xform_old0( Node n, int level ) {
     assert touched(n);         // Node is in type tables, but might be already out of GVN
     Type oldt = type(n);       // Get old type
     _ts._es[n._uid] = null;    // Remove from types, mostly for asserts
@@ -329,7 +329,7 @@ public class GVNGCM {
     if( replace_con(oldt,n) )
       return con(oldt);        // Dead-on-Entry, common when called from GCP
     // Try generic graph reshaping
-    Node y = n.ideal(this);
+    Node y = n.ideal(this,level);
     assert y==null || y==n || n._keep==0;// Ideal calls need to not replace 'keep'rs
     if( y != null && y != n ) return y;  // Progress with some new node
     if( y != null && y.is_dead() ) return null;
@@ -374,7 +374,6 @@ public class GVNGCM {
 
   // Once the program is complete, any time anything is on the worklist we can
   // always conservatively iterate on it.
-  public boolean _small_work;
   void iter() {
     _opt_mode = 1;
     // As a modest debugging convenience, avoid inlining (which blows up the
@@ -382,16 +381,18 @@ public class GVNGCM {
     // requests and set them aside until the main list is empty, then work down
     // the inline list.
     int cnt=0;
-    while( (_small_work=_work._len > 0) || _work2._len > 0 ) {
-      Node n = (_small_work ? _work : _work2).pop(); // Pull from main worklist before functions
-      (_small_work ? _wrk_bits : _wrk2_bits).clear(n._uid);
+    while( _work._len > 0 || _work2._len > 0 ) {
+      final boolean small_work = !_work.isEmpty();
+      assert small_work || !Env.START.more_ideal(this,new VBitSet(),1); // No more small-work ideal calls to apply
+      Node n = (small_work ? _work : _work2).pop(); // Pull from main worklist before functions
+      (small_work ? _wrk_bits : _wrk2_bits).clear(n._uid);
       if( n.is_dead() ) continue;
       if( n._uses._len==0 && n._keep==0 ) kill(n);
-      else xform_old(n);
+      else xform_old(n,small_work ? 0 : 2);
       cnt++; assert cnt < 10000; // Catch infinite ideal-loops
     }
-    // No more ideal calls to apply
-    assert !Env.START.more_ideal(this,new VBitSet());
+    // No more ideal calls, small or large, to apply
+    assert !Env.START.more_ideal(this,new VBitSet(),3);
   }
 
 

@@ -104,7 +104,7 @@ import java.util.BitSet;
 public class CallNode extends Node {
   int _rpc;                 // Call-site return PC
   boolean _unpacked;        // Call site allows unpacking a tuple (once)
-  boolean _is_copy;         // One-shot flag set when inlining an entire single-caller-single-called 
+  boolean _is_copy;         // One-shot flag set when inlining an entire single-caller-single-called
   Parse  _badargs;          // Error for e.g. wrong arg counts or incompatible args
   public CallNode( boolean unpacked, Parse badargs, Node... defs ) {
     super(OP_CALL,defs);
@@ -156,7 +156,7 @@ public class CallNode extends Node {
     return call;
   }
 
-  @Override public Node ideal(GVNGCM gvn) {
+  @Override public Node ideal(GVNGCM gvn, int level) {
     // If inlined, no further xforms.  The using Projs will fold up.
     if( is_copy() ) return null;
     // Dead, do nothing
@@ -208,25 +208,35 @@ public class CallNode extends Node {
     Type[] ts = TypeAry.get(_defs._len);
     for( int i=0; i<_defs._len; i++ )
       ts[i] = gvn.type(in(i));
+    // Not executed, then no function and no memory
+    if( ts[0] != Type.CTRL ) {
+      ts[1] = TypeFunPtr.GENERIC_FUNPTR.dual();
+      ts[2] = TypeMem.XMEM;
+      return TypeTuple.make(ts);
+    }
+    // Not a function to call?
+    if( !(ts[1] instanceof TypeFunPtr) )
+      ts[1] = ts[1].above_center() ? TypeFunPtr.GENERIC_FUNPTR.dual() : TypeFunPtr.GENERIC_FUNPTR;
+    TypeFunPtr tfp = (TypeFunPtr)ts[1];
+    BitsFun fidxs = tfp.fidxs();
+    if( tfp.above_center() || fidxs.above_center() ) { // Not a function to call
+      ts[2] = TypeMem.XMEM;                            // And thus no memory used
+      return TypeTuple.make(ts);
+    }
+    // Not a memory to the call?
     if( !(ts[2] instanceof TypeMem) )
       ts[2] = ts[2].above_center() ? TypeMem.XMEM : TypeMem.MEM;
-
-    // Compute a new Memory which is trimmed to everything recursively
-    // reachable from all active display alias#s plus all args.  First check
-    // that we can find our functions.
-    BitsFun fidxs = fidxs(gvn);
-    if( fidxs == null ) ts[1] = TypeFunPtr.GENERIC_FUNPTR;
-    if( ts[1].above_center() ) ts[2] = TypeMem.XMEM; // No functions to call, so no escapes
-    if( fidxs == null || // Might be e.g. ~Scalar
-        fidxs.test(BitsFun.ALL) ||
-        is_copy() )
+    TypeMem tmem = (TypeMem)ts[2];
+    if( tmem == TypeMem.XMEM )  // Nothing to trim
       return TypeTuple.make(ts);
-
+    // If already dead, or calling everything then not much we can do
+    if( is_copy() || fidxs.test(BitsFun.ALL) )
+      return TypeTuple.make(ts);
+    
+    // Trim unused aliases, specifically to prevent local closures from escaping.
     // Here, I start with all alias#s from TMP args plus all function
     // closure#s and "close over" the set of possible aliases.
-    TypeMem tmem = (TypeMem)ts[2];
-    if( tmem == TypeMem.XMEM ) return TypeTuple.make(ts);
-    
+
     // Set of aliases escaping into the function
     VBitSet abs = new VBitSet();
     // All fidxes in a flat iterable loop
@@ -242,14 +252,6 @@ public class CallNode extends Node {
       if( targ instanceof TypeMemPtr )
         for( int alias : ((TypeMemPtr)targ)._aliases )
           tmem.recursive_aliases(abs,alias);
-    }
-    // Shortcut for primitives.  They are common and typically are not passed
-    // any pointers, nor have any exciting closures.  Look for a single closure
-    // of exactly the primitives.
-    abs.clear(Env.STK_0._alias);
-    if( abs.length()==0 ) {      // Nothing left?
-      ts[2] = TypeMem.XMEM;      // Empty memory
-      return TypeTuple.make(ts);
     }
 
     // Add all the aliases which can be reached from objects at the existing
@@ -408,7 +410,7 @@ public class CallNode extends Node {
     TypeMem all_called_function_uses = (TypeMem)((TypeTuple)gvn.type(this)).at(2);
     return all_called_function_uses.aliases2();
   }
-  
+
   @Override public int hashCode() { return super.hashCode()+_rpc; }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
