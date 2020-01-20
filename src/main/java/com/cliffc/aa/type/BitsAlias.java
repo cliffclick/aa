@@ -70,7 +70,7 @@ public class BitsAlias extends Bits<BitsAlias> {
   @Override public BitsAlias EMPTY() { return EMPTY ; }
 
   public static BitsAlias make0( int bit ) { return NZERO.make(bit); }
-  public BitsAlias or( int bit ) { return meet(make0(bit)); }
+  public BitsAlias or( int bit ) { return set(bit); }
 
   public static int  new_alias(int par) { return set_alias(par); }
   public static int type_alias(int par) { return set_alias(par); }

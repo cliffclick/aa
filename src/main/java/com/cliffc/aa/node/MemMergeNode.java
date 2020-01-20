@@ -253,10 +253,7 @@ public class MemMergeNode extends Node {
       for( Node use : _uses ) {
         BitsAlias rez = use.alias_uses(gvn);
         if( rez.test(1) ) { abs = BitsAlias.NZERO; break; } // Shortcut, some use uses all aliases
-        if( rez==BitsAlias.EMPTY ) ;
-        else if( abs==BitsAlias.EMPTY ) abs=rez;
-        else //abs = abs.or(rez);
-          throw AA.unimpl();
+        abs = abs.meet(rez);
       }
       // Kill unused aliases
       if( !abs.test(1) ) {      // Shortcut

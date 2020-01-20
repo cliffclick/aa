@@ -239,7 +239,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   // Add the named bit, but otherwise preserve the type
   @SuppressWarnings("unchecked")
   public B set(int bit) {
-    assert !test(bit);
+    if( test(bit) ) return (B)this;
     B b = make(bit);
     if( this == EMPTY() ) return b;
     return meet(b);
@@ -261,7 +261,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     if( bs1.above_center() ) bs1 = bs1.dual();
     return bs0.isa(bs1);
   }
-
+  
   private static void or ( long[] bits, long con ) { bits[idx(con)] |=  mask(con); }
   private static void and( long[] bits, long con ) { bits[idx(con)] &= ~mask(con); }
   private static long[] bits( int b ) { return new long[idx(b)+1]; }
