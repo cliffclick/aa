@@ -274,7 +274,7 @@ public class MemMergeNode extends Node {
     // Base type in slot 0
     Type t = gvn.type(in(0));
     if( !(t instanceof TypeMem) )
-      return t.above_center() ? TypeMem.MEM : TypeMem.XMEM;
+      return t.above_center() ? TypeMem.XMEM : TypeMem.MEM;
     TypeMem tm = (TypeMem)t;
     // We merge precise updates to the list of aliases
     for( int i=1; i<_defs._len; i++ ) {

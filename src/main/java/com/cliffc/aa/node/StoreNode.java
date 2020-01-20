@@ -3,7 +3,6 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.VBitSet;
 
 // Store a value into a named struct field.  Does it's own nil-check and value
 // testing; also checks final field updates.
@@ -66,6 +65,37 @@ public class StoreNode extends Node {
       }
       return mem;
     }
+
+    // Store can bypass a Call, if the memory is not returned from the call,
+    // and the pointer predates the call, and is not-nil (the call is not doing
+    // the nil check).  This optimization is specifically targeting simple
+    // recursive functions.
+    if( ctl instanceof CProjNode && mem instanceof MProjNode &&
+        ctl.in(0) instanceof CallEpiNode ) {
+      Type tadr = gvn.type(adr());
+      int alias;
+      if( tadr instanceof TypeMemPtr && (alias=((TypeMemPtr)tadr).aliases().abit()) != -1 ) {  // Address not-nil already, and a single alias
+        CallEpiNode cepi = (CallEpiNode)ctl.in(0);
+        if( !cepi.is_copy() ) {
+          CallNode call = cepi.call();
+          TypeTuple tcall = (TypeTuple)gvn.type(call);
+          TypeMem tcm = (TypeMem)tcall.at(2);
+          if( tcm.at(alias).above_center() ) { // Call does not produce the memory
+            Node pctrl = adr;                  // Find address control
+            while( (tadr=gvn.type(pctrl)) != Type.CTRL && tadr!=Type.XCTRL )
+              pctrl = pctrl.in(0);
+            // Address control pre-dates call control
+            final Node fpctrl = pctrl;
+            if( call.walk_dom_last(n -> n==fpctrl) != null ) {
+              set_def(0,call.ctl(),gvn);
+              set_def(1,call.mem(),gvn);
+              return this;
+            }
+          }
+        }
+      }
+    }
+
     return null;
   }
 

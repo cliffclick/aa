@@ -273,7 +273,10 @@ public final class CallEpiNode extends Node {
     // precisely stomps all of it, the call needs to be reporting [1#:~obj] -
     // in which case a normal MEET suffices.
     TypeTuple tt = (TypeTuple)t;
-    TypeMem pre_call_memory = (TypeMem)gvn.type(call.mem());
+    Type pre_c_mem = gvn.type(call.mem());
+    TypeMem pre_call_memory = pre_c_mem instanceof TypeMem
+      ? (TypeMem)pre_c_mem
+      : (pre_c_mem.above_center() ? TypeMem.XMEM : TypeMem.MEM);
     Type post_call_mem = tt.at(1).meet(pre_call_memory);
     // Return a FOUR-tuple: standard call (control,memory,value) return, plus
     // JUST the function return memories.  Loads and Stores can bypass the
@@ -312,7 +315,7 @@ public final class CallEpiNode extends Node {
     return this;
   }
   // If slot 0 is not a CallNode, we have been inlined.
-  private boolean is_copy() { return !(in(0) instanceof CallNode); }
+  boolean is_copy() { return !(in(0) instanceof CallNode); }
   @Override public Node is_copy(GVNGCM gvn, int idx) { return is_copy() ? in(idx) : null; }
   @Override public Type all_type() { return TypeTuple.CALLE; }
 }

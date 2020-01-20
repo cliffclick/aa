@@ -442,7 +442,7 @@ public class GVNGCM {
         if( n instanceof CallNode ) {
           CallNode call = (CallNode)n;
           BitsFun fidxs = call.fidxs(this);
-          if( fidxs != null && fidxs.abit() == -1 && call.fun() instanceof UnresolvedNode && ambi_calls.find(call)== -1 )
+          if( fidxs != null && fidxs.above_center() && ambi_calls.find(call)== -1 )
             ambi_calls.add((CallNode)n); // Track ambiguous calls
         }
         Type ot = type(n);       // Old type
