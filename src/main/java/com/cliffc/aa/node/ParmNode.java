@@ -10,10 +10,12 @@ import com.cliffc.aa.type.TypeMem;
 public class ParmNode extends PhiNode {
   final int _idx;             // Parameter index, zero-based; -1 reserved for RPC, -2 for mem
   private final String _name; // Parameter name
+  private final Type _alltype;
   public ParmNode( int idx, String name, Node fun, ConNode defalt, Parse badgc) {
     super(OP_PARM,fun,defalt,badgc);
     _idx=idx;
     _name=name;
+    _alltype = defalt._t;
   }
   @Override String xstr() { return "Parm:"+_name; }
   @Override public int hashCode() { return super.hashCode()+_idx; }
@@ -75,5 +77,5 @@ public class ParmNode extends PhiNode {
     }
     return null;
   }
-  @Override public Type all_type() { return _idx==-1 ? TypeRPC.ALL_CALL : (_idx==-2 ? TypeMem.MEM : Type.SCALAR); }
+  @Override public Type all_type() { return _idx==-1 ? TypeRPC.ALL_CALL : (_idx==-2 ? TypeMem.MEM : _alltype); }
 }

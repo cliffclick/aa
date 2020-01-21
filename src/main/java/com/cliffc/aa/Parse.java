@@ -96,9 +96,9 @@ public class Parse {
     prog();        // Parse a program
     _gvn.rereg(_e._scope,Type.ALL);
     _gvn.rereg(_e._par._scope,Type.ALL);
-    _gvn.iter();   // Pessimistic optimizations; might improve error situation
+    _gvn.iter(1);   // Pessimistic optimizations; might improve error situation
     _gvn.gcp(_e._scope); // Global Constant Propagation
-    _gvn.iter();   // Re-check all ideal calls now that types have been maximally lifted
+    _gvn.iter(3);   // Re-check all ideal calls now that types have been maximally lifted
     return gather_errors();
   }
 
@@ -112,10 +112,10 @@ public class Parse {
     _e.close_closure(_gvn);
     _gvn.rereg(_e._scope,Type.ALL);
     _gvn.rereg(_e._par._scope,Type.ALL);
-    _gvn.iter();   // Pessimistic optimizations; might improve error situation
+    _gvn.iter(1);   // Pessimistic optimizations; might improve error situation
     remove_unknown_callers();
     _gvn.gcp(_e._scope); // Global Constant Propagation
-    _gvn.iter();   // Re-check all ideal calls now that types have been maximally lifted
+    _gvn.iter(3);   // Re-check all ideal calls now that types have been maximally lifted
     return gather_errors();
   }
 

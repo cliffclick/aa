@@ -71,12 +71,12 @@ public class Env implements AutoCloseable {
     // register them with GVN.
     for( Node val : STK_0._defs )  if( val instanceof UnresolvedNode ) GVN.init0(val);
     _scope.set_ctrl(CTL_0, GVN);
-    _scope.set_mem (MEM_0, GVN);
+    _scope.set_mem (MEM_0.unhook(), GVN);
     _scope.set_ptr (PTR_0, GVN);
-    GVN.rereg(STK_0,STK_0.value(GVN));
+    GVN.rereg(STK_0.unhook(),STK_0.value(GVN));
     GVN.rereg(OBJ_0,OBJ_0.value(GVN));
     // Run the worklist dry
-    GVN.iter();
+    GVN.iter(1);
     BitsAlias.init0(); // Done with adding primitives
     BitsFun  .init0(); // Done with adding primitives
     BitsRPC  .init0(); // Done with adding primitives
@@ -155,7 +155,17 @@ public class Env implements AutoCloseable {
   // Struct-scopes do not count.
   ScopeNode lookup_closure( ) { return _scope.is_closure() ? _scope : _par.lookup_closure(); }
   // Test support, return top-level name type
-  static Type lookup_valtype( String name ) { return GVN.type(TOP.lookup(name)); }
+  static Type lookup_valtype( String name ) {
+    Node n = TOP.lookup(name);
+    Type t = GVN.type(n);
+    if( !(n instanceof UnresolvedNode) ) return t;
+    // For unresolved, use the ambiguous type
+    assert GVN._opt_mode==0;
+    GVN._opt_mode=3;
+    t = n.value(GVN);
+    GVN._opt_mode=0;
+    return t;
+  }
 
   // Lookup the name.  If the result is an UnresolvedNode of functions, filter out all
   // the wrong-arg-count functions.  Only returns nodes registered with GVN.

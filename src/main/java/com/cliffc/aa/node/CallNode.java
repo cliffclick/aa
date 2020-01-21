@@ -229,8 +229,8 @@ public class CallNode extends Node {
     TypeMem tmem = (TypeMem)ts[2];
     if( tmem == TypeMem.XMEM )  // Nothing to trim
       return TypeTuple.make(ts);
-    // If already dead, or calling everything then not much we can do
-    if( is_copy() || fidxs.test(BitsFun.ALL) )
+    // If calling everything then not much we can do
+    if( fidxs.test(BitsFun.ALL) )
       return TypeTuple.make(ts);
 
     // Trim unused aliases, specifically to prevent local closures from escaping.
@@ -251,10 +251,12 @@ public class CallNode extends Node {
     for( int i=0; i<nargs(); i++ ) {
       if( abs.test(1) ) break;  // Shortcut for already being full
       Type targ = gvn.type(arg(i));
-      if( targ instanceof TypeMemPtr )
+      if( targ instanceof TypeMemPtr ) {
         for( int alias : ((TypeMemPtr)targ)._aliases )
           if( alias != 0 )
             abs = tmem.recursive_aliases(abs,alias);
+      } else if( TypeMemPtr.OOP.isa(targ) ) // Scalar is all pointers
+        abs = BitsAlias.NZERO;              // All aliases possible
     }
 
     // Add all the aliases which can be reached from objects at the existing
@@ -424,4 +426,10 @@ public class CallNode extends Node {
   }
   private boolean is_copy() { return _is_copy; }
   @Override public Node is_copy(GVNGCM gvn, int idx) { return is_copy() ? in(idx) : null; }
+  @Override public void ideal_impacted_by_changing_uses(GVNGCM gvn) {
+    // If just changed types, MemMerge use of Call might trigger alias filtering
+    for( Node def : _defs )
+      if( def instanceof MemMergeNode )
+        gvn.add_work(def);
+  }
 }

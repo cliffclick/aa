@@ -53,17 +53,19 @@ public class FunNode extends RegionNode {
   private final byte _op_prec;  // Operator precedence; only set on top-level primitive wrappers
   private byte _cnt_size_inlines; // Count of size-based inlines
 
-  // Used to make the primitives at boot time
-  public  FunNode(PrimNode prim) { this(prim._name,TypeFunPtr.make_new(prim._targs,prim._ret),prim.op_prec()); }
-  public  FunNode(IntrinsicNewNode prim, Type ret) { this(prim._name,TypeFunPtr.make_new(prim._targs,ret),-1); }
+  // Used to make the primitives at boot time.  Note the empty closures: in
+  // theory Primitives should get the top-level primitives-closure, but in
+  // practice most primtives neither read nor write their own scope.
+  public  FunNode(PrimNode prim) { this(prim._name,TypeFunPtr.make_new(prim._targs,prim._ret),prim.op_prec(),BitsAlias.EMPTY); }
+  public  FunNode(IntrinsicNewNode prim, Type ret) { this(prim._name,TypeFunPtr.make_new(prim._targs,ret),-1, BitsAlias.EMPTY); }
   // Used to make copies when inlining/cloning function bodies
-          FunNode(String name,TypeFunPtr tf) { this(name,tf,-1); }
+          FunNode(String name,TypeFunPtr tf, BitsAlias closure_aliases) { this(name,tf,-1,closure_aliases); }
   // Used to start an anonymous function in the Parser
-  public  FunNode(Type[] ts) { this(null,TypeFunPtr.make_new(TypeStruct.make(ts),Type.SCALAR),-1); }
+  public  FunNode(Type[] ts) { this(null,TypeFunPtr.make_new(TypeStruct.make(ts),Type.SCALAR),-1,Env.CLOSURES); }
   // Used to forward-decl anon functions
-          FunNode(String name) { this(name,TypeFunPtr.make_anon(),-2); add_def(Env.ALL_CTRL); }
+          FunNode(String name) { this(name,TypeFunPtr.make_anon(),-2,Env.CLOSURES); add_def(Env.ALL_CTRL); }
   // Shared common constructor
-  private FunNode(String name, TypeFunPtr tf, int op_prec) {
+  private FunNode(String name, TypeFunPtr tf, int op_prec, BitsAlias closure_aliases) {
     super(OP_FUN);
     _name = name;
     assert tf.isa(TypeFunPtr.GENERIC_FUNPTR);
@@ -73,7 +75,7 @@ public class FunNode extends RegionNode {
     assert !tf.is_class();
     FUNS.setX(fidx(),this); // Track FunNode by fidx; assert single-bit fidxs
     // Stack of active closures this function can reference.
-    _closure_aliases = Env.CLOSURES;
+    _closure_aliases = closure_aliases;
   }
 
   // Find FunNodes by fidx
@@ -172,7 +174,7 @@ public class FunNode extends RegionNode {
     // If no trailing RetNode and hence no FunPtr... function is uncallable
     // from the unknown caller.
     RetNode ret = ret();
-    if( has_unknown_callers() && ret == null && gvn._opt_mode == 1 ) { // Dead after construction?
+    if( has_unknown_callers() && ret == null && gvn._opt_mode != 0 ) { // Dead after construction?
       set_def(1,gvn.con(Type.XCTRL),gvn); // Kill unknown caller
       return this;
     }
@@ -386,8 +388,7 @@ public class FunNode extends RegionNode {
   private FunNode make_new_fun(GVNGCM gvn, RetNode ret, TypeStruct new_args) {
     // Make a prototype new function header split from the original.
     int oldfidx = fidx();
-    FunNode fun = new FunNode(_name,_tf.make_new_fidx(oldfidx,new_args));
-    fun._closure_aliases = _closure_aliases;  // Copy as well
+    FunNode fun = new FunNode(_name,_tf.make_new_fidx(oldfidx,new_args),_closure_aliases);
     fun.pop();                  // Remove null added by RegionNode, will be added later
     // Renumber the original as well; the original _fidx is now a *class* of 2
     // fidxs.  Each FunNode fidx is only ever a constant, so the original Fun

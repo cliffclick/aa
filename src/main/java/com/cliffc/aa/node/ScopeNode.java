@@ -88,7 +88,7 @@ public class ScopeNode extends Node {
   @Override public Node ideal(GVNGCM gvn, int level) {
     // Past parsing, and know we have the single program result aligned with
     // the memory state?
-    if( gvn._opt_mode == 1 ) {
+    if( gvn._opt_mode != 0 ) {
       Node rez = _defs.last();
       if( rez != null ) {
         Type trez = gvn.type(rez);

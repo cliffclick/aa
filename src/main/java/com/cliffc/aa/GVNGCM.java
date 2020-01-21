@@ -18,7 +18,7 @@ public class GVNGCM {
 
   public static int uid() { assert CNT < 100000 : "infinite node create loop"; _live.set(CNT);  return CNT++; }
 
-  public int _opt_mode;         // 0 - Parse (discovery), 1 - iter, 2 - gcp/opto
+  public int _opt_mode;         // 0 - Parse (discovery), 1 - iter (lifting), 2 - gcp/opto (falling)
 
   // Iterative worklist
   private Ary<Node> _work = new Ary<>(new Node[1], 0);
@@ -60,14 +60,14 @@ public class GVNGCM {
     assert _live.get(CNT-1) && !_live.get(CNT) && _work._len==0 && _wrk_bits.isEmpty() && _ts._len==CNT;
     _INIT0_CNT=CNT;
     _INIT0_NODES = _vals.keySet().toArray(new Node[0]);
-    for( Node n : _INIT0_NODES ) assert !n.is_dead();
+    for( Node n : _INIT0_NODES ) assert !n.is_dead() && n._keep==0;
   }
   // Reset is called after a top-level exec exits (e.g. junits) with no parse
   // state left alive.  NOT called after a line in the REPL or a user-call to
   // "eval" as user state carries on.
   void reset_to_init0() {
     assert _work2._len==0;
-    _opt_mode = 1;
+    _opt_mode = 0;
     while( !_work.isEmpty() ) {
       Node n = _work.pop();     // Pull from main worklist before functions
       _wrk_bits.clear(n._uid);
@@ -89,13 +89,21 @@ public class GVNGCM {
     _live.clear();  _live.set(0,_INIT0_CNT);
     _ts.set_len(_INIT0_CNT);
     _vals.clear();
-    for( Node n : _INIT0_NODES ) { // Reset types
-      _vals.put(n, n);
-      _ts.set(n._uid, n.value(this));
+    // Reset primitive types until fixed point.  Mostly cloned primitives
+    // changed function pointers (and sometimes string aliases) which are all
+    // getting reset - plus their Unresolved and Prim closure types.
+    for( Node n : _INIT0_NODES ) add_work(n);
+    while( !_work.isEmpty() ) {
+      Node n = _work.pop();
+      _wrk_bits.clear(n._uid);
+      _vals.put(n,n);           // Put in hash table
+      Type t = n.value(this);   // Current type
+      if( t != _ts.at(n._uid) ) { // Cached vs current
+        _ts.setX(n._uid,t);     // Reset cache to current
+        for( Node use : n._uses )
+          add_work(use);
+      }
     }
-    // Again, so derived types get something sane
-    for( Node n : _INIT0_NODES ) // Reset types
-      _ts.set(n._uid,n.value(this));
   }
 
   public Type type( Node n ) {
@@ -283,6 +291,7 @@ public class GVNGCM {
     if( nnn == old ) {          // Progress, but not replacement
       for( Node use : old._uses ) add_work(use);
       add_work(old);            // Re-run old, until no progress
+      nnn.ideal_impacted_by_changing_uses(this);
       return;
     }
     if( check_new(nnn) )        // If new, replace back in GVN
@@ -336,6 +345,7 @@ public class GVNGCM {
     // Either no-progress, or progress and need to re-insert n back into system
     _ts._es[n._uid] = oldt;     // Restore old type, in case we recursively ask for it
     Type t = n.value(this);     // Get best type
+    //assert t.isa(oldt);         // Monotonically improving
     _ts._es[n._uid] = null;     // Remove in case we replace it
     // Replace with a constant, if possible
     if( replace_con(t,n) )
@@ -374,8 +384,8 @@ public class GVNGCM {
 
   // Once the program is complete, any time anything is on the worklist we can
   // always conservatively iterate on it.
-  void iter() {
-    _opt_mode = 1;
+  void iter(int opt_mode) {
+    _opt_mode = opt_mode;
     // As a modest debugging convenience, avoid inlining (which blows up the
     // graph) until other optimizations are done.  Gather the possible inline
     // requests and set them aside until the main list is empty, then work down
@@ -383,7 +393,8 @@ public class GVNGCM {
     int cnt=0;
     while( _work._len > 0 || _work2._len > 0 ) {
       final boolean small_work = !_work.isEmpty();
-      assert small_work || !Env.START.more_ideal(this,new VBitSet(),1); // No more small-work ideal calls to apply
+      // Turned off, fairly expensive assert
+      //assert small_work || !Env.START.more_ideal(this,new VBitSet(),1); // No more small-work ideal calls to apply
       Node n = (small_work ? _work : _work2).pop(); // Pull from main worklist before functions
       (small_work ? _wrk_bits : _wrk2_bits).clear(n._uid);
       if( n.is_dead() ) continue;

@@ -36,11 +36,22 @@ public class UnresolvedNode extends Node {
     return progress ? this : null;
   }
   @Override public Type value(GVNGCM gvn) {
-    // Unresolved is a *choice* and thus a *join* until resolved.
-    Type t = TypeFunPtr.GENERIC_FUNPTR;
-    for( Node def : _defs )
-      t = t.join(gvn.type(def));
-    return t;
+    if( gvn._opt_mode < 2 ) { // parse or 1st iter: assume all can happen, and hope to resolve to lift
+      Type t = TypeFunPtr.GENERIC_FUNPTR.dual();
+      for( Node def : _defs )
+        t = t.meet(gvn.type(def));
+      return t;
+    } else {
+      // gcp - always a choice, as gcp starts highest and falls as required.
+      // preserve choice until GCP resolves.
+      // Post-GCP: never here unless in-error, or returning an ambiguous fun ptr
+      
+      // Unresolved is a *choice* and thus a *join* until resolved.
+      Type t = TypeFunPtr.GENERIC_FUNPTR;
+      for( Node def : _defs )
+        t = t.join(gvn.type(def));
+      return t;
+    }
   }
   // Filter out all the wrong-arg-count functions
   public Node filter( GVNGCM gvn, int nargs ) {

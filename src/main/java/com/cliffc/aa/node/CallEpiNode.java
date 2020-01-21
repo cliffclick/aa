@@ -195,16 +195,13 @@ public final class CallEpiNode extends Node {
   // unwired Returns may yet appear, and be conservative.  Otherwise it can
   // just meet the set of known functions.
   @Override public Type value(GVNGCM gvn) {
-    if( is_copy() )             // Already collapsed?  Just echo inputs
-      return TypeTuple.make(gvn.type(in(0)),gvn.type(in(1)),gvn.type(in(2)),gvn.type(in(1)));
-
-    CallNode call = call();
+    CallNode call = is_copy() ? ((CallNode)in(3)) : call();
     TypeTuple tcall = (TypeTuple)gvn.type(call);
     if( tcall.at(0) != Type.CTRL ) return TypeTuple.CALLE.dual();
     Type tfptr = tcall.at(1);
-    TypeMem call_mem = (TypeMem)tcall.at(2);
     if( !(tfptr instanceof TypeFunPtr) )
       return TypeTuple.CALLE;
+    //TypeMem call_mem = (TypeMem)tcall.at(2);
     TypeFunPtr funt = (TypeFunPtr)tfptr;
     BitsFun fidxs = funt.fidxs();
     if( fidxs.test(BitsFun.ALL) ) // All functions are possible?
@@ -219,12 +216,12 @@ public final class CallEpiNode extends Node {
     // gives us a faster lookup, but need to be correct wired or not.
 
     // Gather the set of aliases passed into the function.
-    BitsAlias call_aliases = call_mem.aliases();
+    //BitsAlias call_aliases = call_mem.aliases();
     // Set of all possible target functions
     Bits.Tree<BitsFun> tree = fidxs.tree();
     BitSet bs = tree.plus_kids(fidxs);
     // Lifting or dropping Unresolved calls
-    boolean lifting = gvn._opt_mode==2;
+    boolean lifting = /*gvn._opt_mode==2 &&*/ fidxs.above_center();
     Type t = lifting ? TypeTuple.CALL : TypeTuple.XCALL;
     for( int fidx = bs.nextSetBit(0); fidx >= 0; fidx = bs.nextSetBit(fidx+1) ) {
       if( tree.is_parent(fidx) ) continue;   // Will be covered by children
@@ -303,7 +300,7 @@ public final class CallEpiNode extends Node {
     }
     // Call is also is_copy and will need to collapse
     call._is_copy = true;              // Call is also is-copy
-    gvn.add_work(call);
+    gvn.add_work(call.keep());
     for( Node use : call._uses ) gvn.add_work(use);
     // Remove all edges except the inlined results
     ctl.keep();  mem.keep();  rez.keep();
@@ -312,6 +309,7 @@ public final class CallEpiNode extends Node {
     add_def(ctl.unhook());
     add_def(mem.unhook());
     add_def(rez.unhook());
+    add_def(call.unhook());         // Hook call, to get FIDX for value filtering.
     return this;
   }
   // If slot 0 is not a CallNode, we have been inlined.

@@ -103,14 +103,19 @@ public final class RetNode extends Node {
     Type tval = gvn.type(val());
     if( tval instanceof TypeMemPtr )
       abs = ((TypeMemPtr)tval).recursive_aliases(abs,output_mem);
+    else if( TypeMemPtr.OOP.isa(tval) ) // Scalar is all pointers
+      return BitsAlias.NZERO;           // All aliases possible
     if( abs.test(1) ) return BitsAlias.NZERO; // Shortcut
 
     // Aliases reachable from input arguments
-    for( Node use : fun()._uses ) {
-      Type t = gvn.type(use);
-      if( t instanceof TypeMemPtr )
-        abs = ((TypeMemPtr)t).recursive_aliases(abs,output_mem);
-    }
+    for( Node use : fun()._uses )
+      if( use instanceof ParmNode ) {
+        Type t = gvn.type(use);
+        if( t instanceof TypeMemPtr )
+          abs = ((TypeMemPtr)t).recursive_aliases(abs,output_mem);
+        else if( TypeMemPtr.OOP.isa(t) ) // Scalar is all pointers
+          return BitsAlias.NZERO;        // All aliases possible
+      }
 
     return abs;
   }

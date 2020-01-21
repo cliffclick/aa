@@ -279,7 +279,8 @@ public class MemMergeNode extends Node {
       Type ta = gvn.type(in(i));
       if( !(ta instanceof TypeObj) ) // Handle ANY, ALL
         ta = ta.above_center() ? TypeObj.XOBJ : TypeObj.OBJ;
-      tm = tm.st(alias,(TypeObj)ta);
+      Type prior = tm.at(alias);
+      tm = tm.st(alias,(TypeObj)(prior.meet(ta)));
     }
     return tm;
   }

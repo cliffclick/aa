@@ -255,6 +255,8 @@ public abstract class Node implements Cloneable {
   abstract public Node ideal(GVNGCM gvn, int level);
   // Losing uses puts these on the worklist
   public boolean ideal_impacted_by_losing_uses(GVNGCM gvn, Node dead) { return false; }
+  // Changing use types puts these on the worklist
+  public void ideal_impacted_by_changing_uses(GVNGCM gvn) { }
 
   // Compute the current best Type for this Node, based on the types of its inputs.
   // May return the local "all_type()", especially if its inputs are in error.

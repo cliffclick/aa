@@ -136,10 +136,16 @@ public class TypeMem extends Type<TypeMem> {
     if( bas == BitsAlias.EMPTY || this==XMEM )
       return XMEM;              // Shortcut
     if( bas.test(1) ) return this; // Shortcut, all aliases used so no trimming
-    TypeObj[] objs = new TypeObj[bas.max()+1];
+    TypeObj[] objs = new TypeObj[Math.max(bas.max()+1,_aliases.length)];
     objs[1] = TypeObj.XOBJ;
+    // For every alias in the included set, include in the result (perhaps
+    // reading from a parent alias).
     for( int alias : bas )
       objs[alias] = at(alias);
+    // Also include any children, whose parent is included.
+    for( int i=2; i<_aliases.length; i++ )
+      if( _aliases[i]!=null && bas.test_recur(i) )
+        { assert objs[i]==null || objs[i]==_aliases[i]; objs[i] = _aliases[i]; }
     return make0(objs);
   }
 
@@ -204,7 +210,11 @@ public class TypeMem extends Type<TypeMem> {
   static {
     // All memory.  Includes breakouts for all structs and all strings.
     // Triggers BitsAlias.<clinit> which makes all the initial alias splits.
-    MEM  = make(new TypeObj[]{null,TypeObj.OBJ});
+    TypeObj[] tos = new TypeObj[Math.max(BitsAlias.REC,BitsAlias.STR)+1];
+    tos[BitsAlias.ALL] = TypeObj.OBJ;
+    tos[BitsAlias.REC] = TypeStruct.ALLSTRUCT;
+    tos[BitsAlias.STR] = TypeStr.STR; // TODO: Proxy for all-arrays
+    MEM  = make(tos);
     XMEM = MEM.dual();
 
     MEM_STR  = make(TypeMemPtr.STRPTR.getbit(),TypeStr.STR);
