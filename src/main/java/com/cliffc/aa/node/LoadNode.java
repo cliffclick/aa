@@ -63,16 +63,16 @@ public class LoadNode extends Node {
     }
 
     // Loads against an equal store; cannot NPE since the Store did not.
-    StoreNode st;
+    StoreNode st=null;
     if( mem instanceof StoreNode && addr == (st=((StoreNode)mem)).adr() ) {
       if( Util.eq(_fld,st._fld) && st.err(gvn)==null )
         return st.val();
     }
 
-    //// Bypass unrelated Stores
-    //if( st != null && st.err(gvn)==null &&
-    //    ( st._fld_num != _fld_num || (_fld != null && !_fld.equals(st._fld_num)) ))
-    //  return set_mem(st.mem(),gvn);
+    // Bypass unrelated Stores
+    if( st != null && st.err(gvn)==null &&
+        !Util.eq(_fld,st._fld) )
+      return set_mem(st.mem(),gvn);
     return null;
   }
 

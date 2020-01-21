@@ -98,6 +98,8 @@ public class TypeMem extends Type<TypeMem> {
   // Never part of a cycle, so the normal check works
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
   @Override String str( VBitSet dups ) {
+    if( this==FULL ) return "[allmem]";
+    if( this==EMPTY) return "[]";
     if( this== MEM ) return "[mem]";
     if( this==XMEM ) return "[~mem]";
     SB sb = new SB();
@@ -123,8 +125,8 @@ public class TypeMem extends Type<TypeMem> {
 
   // Return set of aliases.  Not even sure if this is well-defined.
   public BitsAlias aliases() {
-    if( this== MEM ) return BitsAlias.NZERO;
-    if( this==XMEM ) return BitsAlias.EMPTY;
+    if( this== FULL ) return BitsAlias.NZERO;
+    if( this==EMPTY ) return BitsAlias.EMPTY;
     BitsAlias bas = BitsAlias.EMPTY;
     for( int i=0; i<_aliases.length; i++ )
       if( _aliases[i]!=null && !_aliases[i].above_center() )
@@ -133,8 +135,8 @@ public class TypeMem extends Type<TypeMem> {
   }
   // Toss out memory state not visible from these aliases
   public TypeMem trim_to_alias(BitsAlias bas) {
-    if( bas == BitsAlias.EMPTY || this==XMEM )
-      return XMEM;              // Shortcut
+    if( bas == BitsAlias.EMPTY || this==EMPTY )
+      return EMPTY;                // Shortcut
     if( bas.test(1) ) return this; // Shortcut, all aliases used so no trimming
     TypeObj[] objs = new TypeObj[Math.max(bas.max()+1,_aliases.length)];
     objs[1] = TypeObj.XOBJ;
@@ -204,10 +206,16 @@ public class TypeMem extends Type<TypeMem> {
     return make0(as);
   }
 
-  public static final TypeMem  MEM; // Every alias filled with something
-  public static final TypeMem XMEM; // Every alias filled with anything
+  public static final TypeMem FULL; // Every alias filled with something
+  public static final TypeMem EMPTY;// Every alias filled with anything
+  public static final TypeMem  MEM; // FULL, except lifts REC, arrays, STR
+  public static final TypeMem XMEM; //
   public static final TypeMem MEM_ABC, MEM_STR;
   static {
+    // All memory, all aliases, holding anything.
+    FULL = make(new TypeObj[]{null,TypeObj.OBJ});
+    EMPTY= FULL.dual();
+
     // All memory.  Includes breakouts for all structs and all strings.
     // Triggers BitsAlias.<clinit> which makes all the initial alias splits.
     TypeObj[] tos = new TypeObj[Math.max(BitsAlias.REC,BitsAlias.STR)+1];
@@ -220,7 +228,7 @@ public class TypeMem extends Type<TypeMem> {
     MEM_STR  = make(TypeMemPtr.STRPTR.getbit(),TypeStr.STR);
     MEM_ABC  = make(TypeMemPtr.ABCPTR.getbit(),TypeStr.ABC);
   }
-  static final TypeMem[] TYPES = new TypeMem[]{MEM,MEM_ABC};
+  static final TypeMem[] TYPES = new TypeMem[]{FULL,MEM,MEM_ABC};
 
   // All mapped memories remain, but each memory flips internally.
   @Override protected TypeMem xdual() {
@@ -234,9 +242,9 @@ public class TypeMem extends Type<TypeMem> {
     if( t._type != TMEM ) return ALL; //
     TypeMem tf = (TypeMem)t;
     // Shortcut common case
-    if( this==MEM || tf==MEM ) return MEM;
-    if( this==XMEM ) return t;
-    if( tf  ==XMEM ) return this;
+    if( this==FULL || tf==FULL ) return FULL;
+    if( this==EMPTY ) return t;
+    if( tf  ==EMPTY ) return this;
     // Meet of default values, meet of element-by-element.
     int  len = Math.max(_aliases.length,tf._aliases.length);
     int mlen = Math.min(_aliases.length,tf._aliases.length);
@@ -249,8 +257,8 @@ public class TypeMem extends Type<TypeMem> {
 
   // Meet of all possible loadable values
   public TypeObj ld( TypeMemPtr ptr ) {
-    if( this== MEM ) return TypeObj. OBJ;
-    if( this==XMEM ) return TypeObj.XOBJ;
+    if( this== FULL ) return TypeObj. OBJ;
+    if( this==EMPTY ) return TypeObj.XOBJ;
     boolean any = ptr.above_center();
     TypeObj obj = any ? TypeObj.OBJ : TypeObj.XOBJ;
     // Any alias, plus all of its children, are meet/joined.  This does a
@@ -267,7 +275,7 @@ public class TypeMem extends Type<TypeMem> {
   // in a TypeObj.
   public TypeMem update( byte fin, String fld, int fld_num, Type val, TypeMemPtr ptr ) {
     assert val.isa_scalar();
-    if( this==XMEM ) return this;
+    if( this==EMPTY ) return this;
     // Any alias, plus all of its children, are meet/joined.  This does a
     // tree-based scan on the inner loop.
     Ary<TypeObj> objs = new Ary<>(_aliases.clone(),_aliases.length);
@@ -309,14 +317,20 @@ public class TypeMem extends Type<TypeMem> {
     return make0(objs.asAry());
   }
 
-  @Override public boolean above_center() { return this==XMEM; } // TODO: false?  Or really needs to be aliases[1]?  Or all aliases?
+  @Override public boolean above_center() {
+    for( int i=0; i<_aliases.length; i++ )
+      if( _aliases[i]!=null && !_aliases[i].above_center() )
+        return false;
+    return true;
+  }
   @Override public boolean may_be_con()   { return false;}
   @Override public boolean is_con()       { return false;}
   @Override public boolean must_nil() { return false; } // never a nil
   @Override Type not_nil() { return this; }
   // Dual, except keep TypeMem.XOBJ as high for starting GVNGCM.opto() state.
   @Override public TypeMem startype() {
-    if( this==XMEM ) return XMEM;
+    if( this==EMPTY ) return EMPTY;
+    if( this== XMEM ) return  XMEM;
     TypeObj[] oops = new TypeObj[_aliases.length];
     for(int i=0; i<_aliases.length; i++ )
       if( _aliases[i] != null )

@@ -39,14 +39,14 @@ public class IntrinsicNode extends Node {
     TypeFunPtr tf = TypeFunPtr.make_new(TypeStruct.make(TypeMemPtr.STRUCT),TypeMemPtr.STRUCT);
     FunNode fun = (FunNode) gvn.xform(new FunNode(tn._name,tf,BitsAlias.EMPTY).add_def(Env.ALL_CTRL));
     Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL ),null));
-    Node mem = gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM      ),null));
+    Node mem = gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.FULL     ),null));
     Node ptr = gvn.xform(new ParmNode( 0,"ptr",fun,gvn.con(TypeMemPtr.STRUCT),null));
     Node cvt = gvn.xform(new IntrinsicNode(tn,badargs,fun,mem,ptr));
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,cvt,ptr,rpc,fun));
     return (FunPtrNode)gvn.xform(new FunPtrNode(ret));
   }
 
-  @Override public Type all_type() { return TypeMem.MEM; }
+  @Override public Type all_type() { return TypeMem.FULL; }
 
   // If the input memory is unaliased, fold into the NewNode.
   // If this node does not fold away, the program is in error.
@@ -86,7 +86,7 @@ public class IntrinsicNode extends Node {
     Type mem = gvn.type(mem());
     Type ptr = gvn.type(ptr());
     if( !(mem instanceof TypeMem && ptr instanceof TypeMemPtr) )
-      return TypeMem.MEM;       // Inputs are confused
+      return TypeMem.FULL;      // Inputs are confused
     // Get the Obj from the pointer.  
     int alias = ((TypeMemPtr)ptr)._aliases.abit();
     TypeObj obj = ((TypeMem)mem).ld((TypeMemPtr)ptr);
@@ -126,7 +126,7 @@ public class IntrinsicNode extends Node {
     TypeFunPtr tf = TypeFunPtr.make_new(from,tmp);
     FunNode fun = (FunNode) gvn.xform(new FunNode(to._name,tf,BitsAlias.EMPTY).add_def(Env.ALL_CTRL));
     Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
-    Node memp= gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM     ),null));
+    Node memp= gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.FULL    ),null));
     // Add input edges to the NewNode
     nnn.set_def(0,fun,gvn);     // Set control to function start
     for( int i=0; i<from._ts.length; i++ ) {

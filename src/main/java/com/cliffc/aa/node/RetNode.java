@@ -56,7 +56,7 @@ public final class RetNode extends Node {
     }
     // Collapsed to a constant?  Remove any control interior.
     if( gvn.type(val()).is_con() && ctl()!=fun() && // Profit: can change control and delete function interior
-        (gvn.type(mem())==TypeMem.XMEM || (mem() instanceof ParmNode && mem().in(0)==fun())) ) // Memory has to be trivial also
+        (gvn.type(mem())==TypeMem.EMPTY || (mem() instanceof ParmNode && mem().in(0)==fun())) ) // Memory has to be trivial also
       return set_def(0,fun(),gvn); // Gut function body
     // Something changed (hence we got here), so all wired uses need to re-check.
     // i.e., trivial functions (constant returns or 1-op) might now inline.
@@ -68,7 +68,7 @@ public final class RetNode extends Node {
     if( is_copy() ) return all_type();
     Type    ctl =          gvn.type(ctl()).bound(Type.CTRL);
     Type    val =          gvn.type(val()).bound(Type.SCALAR);
-    TypeMem mem = (TypeMem)gvn.type(mem()).bound(TypeMem.MEM);
+    TypeMem mem = (TypeMem)gvn.type(mem()).bound(TypeMem.FULL);
     mem = mem.trim_to_alias(alias_uses(gvn));
     return TypeTuple.make(ctl,mem,val);
   }

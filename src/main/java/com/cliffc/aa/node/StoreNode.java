@@ -113,8 +113,36 @@ public class StoreNode extends Node {
     Type val = gvn.type(val());     // Value
     if( !val.isa_scalar() )         // Nothing sane
       val = val.above_center() ? Type.XSCALAR : Type.SCALAR; // Pin to scalar for updates
-    // Memory is sane
-    Type tmem = gvn.type(mem());     // Memory
+
+    // Store can bypass a Call, if the memory is not returned from the call,
+    // and the pointer predates the call.  This optimization is specifically
+    // targeting simple recursive functions.
+    Node mem = mem();
+    if( mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode ) {
+      Node pctrl = adr();       // Find address control
+      Type tadr = gvn.type(pctrl);
+      int alias;
+      if( tadr instanceof TypeMemPtr && (alias=((TypeMemPtr)tadr).aliases().abit()) != -1 ) {  // Address not-nil already, and a single alias
+        CallEpiNode cepi = (CallEpiNode)mem.in(0);
+        if( !cepi.is_copy() ) {
+          CallNode call = cepi.call();
+          TypeTuple tcall = (TypeTuple)gvn.type(call);
+          TypeMem tcm = (TypeMem)tcall.at(2);
+          if( tcm.at(alias).above_center() ) { // Call does not produce the memory
+            while( (tadr=gvn.type(pctrl)) != Type.CTRL && tadr!=Type.XCTRL )
+              pctrl = pctrl.in(0);
+            // Address control pre-dates call control
+            final Node fpctrl = pctrl;
+            if( call.walk_dom_last(n -> n==fpctrl) != null ) {
+              mem = call.mem(); // Bypass the call for memory type
+            }
+          }
+        }
+      }
+    }
+
+    // Convert from memory to the struct being updated
+    Type tmem = gvn.type(mem);
     TypeObj tobj;
     if( tmem instanceof TypeMem )
       tobj = ((TypeMem)tmem).ld(tmp); // Get approx object being updated

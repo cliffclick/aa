@@ -433,6 +433,11 @@ public class GVNGCM {
     // setting types to their highest value.
     Arrays.fill(_ts._es,0,Env.LAST_START_UID,null);
     Arrays.fill(_ts._es,_INIT0_CNT,_ts._len,null);
+    // Unresolved, including primitives, uses a more optimistic type and so
+    // needs to be reset also.
+    for( Node n : _INIT0_NODES )
+      if( n instanceof UnresolvedNode )
+        _ts._es[n._uid]=null;   // Force recompute
     // Set all types to all_type().dual(), their most optimistic type,
     // and prime the worklist.
     walk_initype(Env.START);

@@ -271,7 +271,7 @@ public class MemMergeNode extends Node {
     // Base type in slot 0
     Type t = gvn.type(in(0));
     if( !(t instanceof TypeMem) )
-      return t.above_center() ? TypeMem.XMEM : TypeMem.MEM;
+      return t.above_center() ? TypeMem.EMPTY : TypeMem.FULL;
     TypeMem tm = (TypeMem)t;
     // We merge precise updates to the list of aliases
     for( int i=1; i<_defs._len; i++ ) {
@@ -280,11 +280,13 @@ public class MemMergeNode extends Node {
       if( !(ta instanceof TypeObj) ) // Handle ANY, ALL
         ta = ta.above_center() ? TypeObj.XOBJ : TypeObj.OBJ;
       Type prior = tm.at(alias);
-      tm = tm.st(alias,(TypeObj)(prior.meet(ta)));
+      //Type rez = prior.meet(ta);
+      Type rez = ta;
+      tm = tm.st(alias,(TypeObj)rez);
     }
     return tm;
   }
-  @Override public Type all_type() { return TypeMem.MEM; }
+  @Override public Type all_type() { return TypeMem.FULL; }
   // Set of used aliases across all inputs.  This is only called from another
   // MemMerge, which means back-to-back MemMerge which will be cleared out
   // eventually.  Ok to report super conservative here.

@@ -211,7 +211,7 @@ public class CallNode extends Node {
     // Not executed, then no function and no memory
     if( ts[0] != Type.CTRL ) {
       ts[1] = TypeFunPtr.GENERIC_FUNPTR.dual();
-      ts[2] = TypeMem.XMEM;
+      ts[2] = TypeMem.EMPTY;
       return TypeTuple.make(ts);
     }
     // Not a function to call?
@@ -220,14 +220,14 @@ public class CallNode extends Node {
     TypeFunPtr tfp = (TypeFunPtr)ts[1];
     BitsFun fidxs = tfp.fidxs();
     if( tfp.above_center() || fidxs.above_center() ) { // Not a function to call
-      ts[2] = TypeMem.XMEM;                            // And thus no memory used
+      ts[2] = TypeMem.EMPTY;                           // And thus no memory used
       return TypeTuple.make(ts);
     }
     // Not a memory to the call?
     if( !(ts[2] instanceof TypeMem) )
-      ts[2] = ts[2].above_center() ? TypeMem.XMEM : TypeMem.MEM;
+      ts[2] = ts[2].above_center() ? TypeMem.EMPTY : TypeMem.FULL;
     TypeMem tmem = (TypeMem)ts[2];
-    if( tmem == TypeMem.XMEM )  // Nothing to trim
+    if( tmem == TypeMem.EMPTY )  // Nothing to trim
       return TypeTuple.make(ts);
     // If calling everything then not much we can do
     if( fidxs.test(BitsFun.ALL) )
@@ -398,7 +398,7 @@ public class CallNode extends Node {
     Arrays.fill(ts,Type.ALL);
     ts[0] = Type.CTRL;
     ts[1] = TypeFunPtr.GENERIC_FUNPTR;
-    ts[2] = TypeMem.XMEM;
+    ts[2] = TypeMem.EMPTY;
     return TypeTuple.make(ts);
   }
   // Set of used aliases across all inputs (not StoreNode value, but yes address)
