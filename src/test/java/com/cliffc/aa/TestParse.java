@@ -11,14 +11,15 @@ import static org.junit.Assert.*;
 
 public class TestParse {
   private static String[] FLDS = new String[]{"n","v"};
+  private static String[] FLDS2= new String[]{"nn","vv"};
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
     Object dummy = Env.GVN; // Force class loading cycle
 
     // A collection of tests which like to fail easily
-    testerr ("Point=:@{x;y}; Point((0,1))", "*[$](nil;1) is not a Point:@{x=;y=}",27);
-    test_ptr("x=@{n:=1;v:=2}; x.n := 3; x", "@{n:=3;v:=2}");
+    testerr ("Point=:@{x;y}; Point((0,1))", "*[$](nil;1)! is not a Point:@{x=;y=}!",27);
+    test_ptr("x=@{n:=1;v:=2}; x.n := 3; x", "@{n:=3;v:=2}!");
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'",20);
     testerr("{+}(1,2,3)", "Passing 3 arguments to {+} which takes 2 arguments",10);
     test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
@@ -206,7 +207,7 @@ public class TestParse {
     test_obj("fun={x y -> x*2}; bar:{int str -> int} = fun; baz:{int @{x;y} -> int} = fun; (fun(2,3),bar(2,\"abc\"))",
             TypeStruct.make_tuple(TypeInt.con(4),TypeInt.con(4)));
     testerr("fun={x y -> x+y}; baz:{int @{x;y} -> int} = fun; (fun(2,3), baz(2,3))",
-            "3 is not a *[$]@{x=;y=}", 21);
+            "3 is not a *[$]@{x=;y=}!", 21);
 
     testerr("x=3; fun:{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int64",8);
     test("x=3; fun:{real->real}={x -> x*2}; fun(2.1)+fun(x)", TypeFlt.con(2.1*2+3*2)); // Mix of types to fun()
@@ -223,8 +224,8 @@ public class TestParse {
     test_name("A= :(flt,int)", TypeFlt.FLT64,TypeInt.INT64);
     test_name("A= :(   ,int)", Type.SCALAR  ,TypeInt.INT64);
 
-    test_ptr("A= :(str?, int); A( \"abc\",2 )","A:(*[$]\"abc\";2)");
-    test_ptr("A= :(str?, int); A( (\"abc\",2) )","A:(*[$]\"abc\";2)");
+    test_ptr("A= :(str?, int); A( \"abc\",2 )","A:(*[$]\"abc\";2)!");
+    test_ptr("A= :(str?, int); A( (\"abc\",2) )","A:(*[$]\"abc\";2)!");
     testerr("A= :(str?, int)?","Named types are never nil",16);
   }
 
@@ -233,7 +234,7 @@ public class TestParse {
     testerr("a=@{x=1.2;y}; x", "Unknown ref 'x'",15);
     testerr("a=@{x=1;x=2}.x", "Cannot re-assign final field '.x'",11);
     test   ("a=@{x=1.2;y;}; a.x", TypeFlt.con(1.2)); // standard "." field naming; trailing semicolon optional
-    test_ptr("x=@{n:=1;v:=2}; x.n := 3; x", "@{n:=3;v:=2}");
+    test_ptr("x=@{n:=1;v:=2}; x.n := 3; x", "@{n:=3;v:=2}!");
     testerr("(a=@{x=0;y=0}; a.)", "Missing field name after '.'",17);
     testerr("a=@{x=0;y=0}; a.x=1; a","Cannot re-assign final field '.x'",19);
     test   ("a=@{x=0;y=1}; b=@{x=2}  ; c=math_rand(1)?a:b; c.x", TypeInt.INT8); // either 0 or 2; structs can be partially merged
@@ -272,8 +273,8 @@ public class TestParse {
 
     test    ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
     test    ("Point=:@{x;y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
-    testerr ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1;y=2}))", "*[$]@{x==1;y==2} is not a *[$]Point:@{x=;y=}",22);
-    testerr ("Point=:@{x;y}; Point((0,1))", "*[$](nil;1) is not a Point:@{x=;y=}",27);
+    testerr ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1;y=2}))", "*[$]@{x==1;y==2} is not a *[$]Point:@{x=;y=}!",22);
+    testerr ("Point=:@{x;y}; Point((0,1))", "*[$](nil;1)! is not a Point:@{x=;y=}!",27);
     testerr("x=@{n: =1;}","Missing type after ':'",7);
     testerr("x=@{n=;}","Missing ifex after assignment of 'n'",6);
     test_obj("x=@{n}",TypeStruct.ALLSTRUCT);
@@ -297,12 +298,12 @@ public class TestParse {
   }
 
   @Test public void testParse06() {
-    test_ptr("A= :(A?, int); A(0,2)","A:(nil;2)");
-    test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*[$]A:(nil;2);3)");
+    test_ptr("A= :(A?, int); A(0,2)","A:(nil;2)!");
+    test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*[$]A:(nil;2)!;3)!");
 
     // Building recursive types
     test("A= :int; A(1)", TypeInt.TRUE.set_name("A:"));
-    test_ptr("A= :(str?, int); A(0,2)","A:(nil;2)");
+    test_ptr("A= :(str?, int); A(0,2)","A:(nil;2)!");
     // Named recursive types
     test_ptr("A= :(A?, int); A(0,2)",(alias) -> TypeMemPtr.make(alias,TypeStruct.make("A:",TypeStruct.TFLDS(2),TypeStruct.ts(Type.NIL,TypeInt.con(2)),TypeStruct.finals(2))));
     test    ("A= :@{n=A?; v=flt}; A(@{n=0;v=1.2}).v;", TypeFlt.con(1.2));
@@ -333,7 +334,18 @@ public class TestParse {
     test_isa("A= :@{n=A?; v=int}; f={x:A? -> x ? A(f(x.n),x.v*x.v) : 0}", TypeFunPtr.GENERIC_FUNPTR);
     test    ("A= :@{n=A?; v=flt}; f={x:A? -> x ? A(f(x.n),x.v*x.v) : 0}; f(A(0,1.2)).v;", TypeFlt.con(1.2*1.2));
 
-    // User-defined linked list
+    // Longer variable-length list (so no inline-to-trivial).  Pure integer
+    // ops, no overload resolution.  Does final stores into new objects
+    // interspersed with recursive computation calls.
+    test_obj_isa("map={x -> x ? @{nn=map(x.n);vv=x.v&x.v} : 0};"+
+                 "map(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0;v=1};v=2};v=3};v=4})",
+            TypeStruct.make(FLDS2,TypeStruct.ts(TypeMemPtr.STRUCT0,TypeFlt.FLT32))); //con(20.25)
+    // Test does loads after recursive call, which should be allowed to bypass.
+    test("sum={x -> x ? sum(x.n) & x.v : 0};"+
+         "sum(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0;v=1};v=2};v=3};v=4})",
+         TypeInt.INT64);
+
+    // User-defined linked list.
     String ll_def = "List=:@{next;val};";
     String ll_con = "tmp=List(List(0,1.2),2.3);";
     String ll_map = "map = {fun list -> list ? List(map(fun,list.next),fun(list.val)) : 0};";
@@ -390,34 +402,7 @@ public class TestParse {
 
 
   @Test public void testParse08() {
-    /*
-      Final LL store into precise alias#19 is passed into 2nd recursive map
-      call.  Map now gets a merge of a final-LL-#19 and a NEW RECURSIVE 19#
-      with non-final LL - and falls to read-only.  Same exact LL store now goes
-      in-error attempting to store over a read-only.
-
-      Real answer is #19 is local memory, and ptr does NOT escape recursively.
-      So do not merge #19 from recursive map entry with local gen #19.
-
-      PSUEDO-CODE
-      func map with parm mem
-          mem merges LL-non-final and LL-final once
-      if-tree-not-null
-      gen brand new #19 for result
-      call map(tree.l) with #19 mem but no ptr
-      store final LL into #19, making a LL-final flavor of #19
-      call map(tree.r) with final LL flavor #19 but not ptr
-
-
-      CNC - like calls should not take #19 unless have a ptr-to-#19 in their escape set.
-      Optimistically, only pass in memory from reachable-arg-ptrs.
-      Imagine pre-split seperate nodes for all alias#s.
-      Then parm#19 dead on entry to call, made locally, not passed out.
-      OR: CallNode has some projections for func-entry - all arguments, plus
-          refined memory state from reachable args.
-
-
-     */
+    // Recursive tree map function.
     test_ptr("tmp=@{"+
                     "  l=@{"+
                     "    l=@{ l=0; r=0; v=3 };"+
@@ -435,7 +420,7 @@ public class TestParse {
                     "     ? @{ll=map(tree.l,fun);rr=map(tree.r,fun);vv=fun(tree.v)}"+
                     "     : 0};"+
                     "map(tmp,{x->x+x})",
-            "@{l==*[$],r==*[$],v==int64}");
+            "@{ll==*[$],rr==*[$],vv==int64}");
 
     // Failed attempt at a Tree-structure inference test.  Triggered all sorts
     // of bugs and error reporting issues, so keeping it as a regression test.

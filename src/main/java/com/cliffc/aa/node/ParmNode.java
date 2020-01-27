@@ -44,6 +44,16 @@ public class ParmNode extends PhiNode {
     }
     return super.ideal(gvn,level); // Let PhiNode collapse
   }
+  
+  @Override public Type value(GVNGCM gvn) {
+    Type t = super.value(gvn);
+    // Memory tracks the notion of 'clean' or 'unwritten' since the function
+    // start.  Changed memory is returned at exit and unchanged memory is NOT
+    // returned - and CallEpis are aware of this behavior and do the correct
+    // merge-around.  This allows loads & stores below a call bypass the call.
+    t = t.clean();              // Mark all as clean
+    return t;
+  }
 
   @Override public String err( GVNGCM gvn ) {
     if( !(in(0) instanceof FunNode) ) return null; // Dead, report elsewhere

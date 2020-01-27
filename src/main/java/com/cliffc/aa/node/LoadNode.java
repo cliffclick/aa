@@ -26,7 +26,8 @@ public class LoadNode extends Node {
     Node addr = adr();
 
     Type tadr = gvn.type(addr);
-    int alias = tadr instanceof TypeMemPtr ? ((TypeMemPtr)tadr)._aliases.abit() : -2;
+    BitsAlias aliases = tadr instanceof TypeMemPtr ? ((TypeMemPtr)tadr)._aliases : null;
+    int alias = aliases == null ? -2 : aliases.strip_nil().abit();
 
     // Load from a single alias bypasses a MemMerge
     if( alias >= 0 && mem instanceof MemMergeNode ) {
@@ -38,11 +39,13 @@ public class LoadNode extends Node {
     }
 
     // Loads can bypass a call, if the return memory does not stomp the alias.
-    if( alias >= 0 && mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode ) {
-      Node cepi = mem.in(0);
+    if( aliases != null && mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode ) {
+      CallEpiNode cepi = (CallEpiNode)mem.in(0);
       TypeMem retmem = (TypeMem)((TypeTuple)gvn.type(cepi)).at(3);
-      if( retmem.at(alias) == TypeObj.XOBJ )
-        return set_mem(((CallEpiNode)cepi).call().mem(),gvn);
+      if( !cepi.is_copy() && retmem.is_clean(aliases,_fld) )
+        return set_mem(cepi.call().mem(),gvn);
+      if( alias > 0 && retmem.at(alias) == TypeObj.XOBJ )
+        return set_mem(cepi.call().mem(),gvn);
     }
 
     // Loads against a NewNode cannot NPE, cannot fail, always return the input
@@ -83,28 +86,42 @@ public class LoadNode extends Node {
     if( adr.is_forward_ref() ) return Type.SCALAR;
     if( !(adr instanceof TypeMemPtr) )
       return adr.above_center() ? Type.XSCALAR : Type.SCALAR;
-    TypeMemPtr tadr = (TypeMemPtr)adr;
+    TypeMemPtr tmp = (TypeMemPtr)adr;
+
+    // Load can bypass a Call, if the memory is not returned from the call.
+    // This optimization is specifically targeting simple recursive functions.
+    Node mem = mem();
+    if( mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode ) {
+      CallEpiNode cepi = (CallEpiNode)mem.in(0);
+      TypeMem retmem = (TypeMem)((TypeTuple)gvn.type(cepi)).at(3);
+      if( !cepi.is_copy() && retmem.is_clean(tmp.aliases(),_fld) )
+        mem = cepi.call().mem();
+      int alias = tmp.aliases().strip_nil().abit();
+      if( alias > 0 && retmem.at(alias) == TypeObj.XOBJ )
+        mem = cepi.call().mem();
+    }
+
     // Loading from TypeMem - will get a TypeObj out.
-    Type mem = gvn.type(mem()); // Memory
-    if( !(mem instanceof TypeStruct) ) {
-      if( !(mem instanceof TypeMem) ) // Nothing sane
-        return mem.above_center() ? Type.XSCALAR : Type.SCALAR;
-      TypeObj obj = ((TypeMem)mem).ld(tadr);
-      mem = obj;
+    Type tmem = gvn.type(mem); // Memory
+    if( !(tmem instanceof TypeStruct) ) {
+      if( !(tmem instanceof TypeMem) ) // Nothing sane
+        return tmem.above_center() ? Type.XSCALAR : Type.SCALAR;
+      TypeObj obj = ((TypeMem)tmem).ld(tmp);
+      tmem = obj;
     }
 
     // Loading from TypeObj - hoping to get a field out
-    if( mem == TypeObj.XOBJ ) return Type.XSCALAR;
-    if( mem == TypeObj. OBJ ) return Type. SCALAR;
+    if( tmem == TypeObj.XOBJ ) return Type.XSCALAR;
+    if( tmem == TypeObj. OBJ ) return Type. SCALAR;
     // Struct (and pointer is not nil)
-    if( mem instanceof TypeStruct && !tadr.must_nil() ) {
-      TypeStruct ts = (TypeStruct)mem;
+    if( tmem instanceof TypeStruct && !tmp.must_nil() ) {
+      TypeStruct ts = (TypeStruct)tmem;
       int idx = ts.find(_fld);  // Find the named field
       if( idx != -1 )           // Found a field
         return ts.at(idx);      // Field type
       // No such field
     }
-    return mem.above_center() ? Type.XSCALAR : Type.SCALAR; // No loading from e.g. Strings
+    return tmem.above_center() ? Type.XSCALAR : Type.SCALAR; // No loading from e.g. Strings
   }
 
   // Set of used aliases across all inputs (not StoreNode value, but yes address)

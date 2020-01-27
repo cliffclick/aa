@@ -205,7 +205,7 @@ public final class CallEpiNode extends Node {
     TypeFunPtr funt = (TypeFunPtr)tfptr;
     BitsFun fidxs = funt.fidxs();
     if( fidxs.test(BitsFun.ALL) ) // All functions are possible?
-      return TypeTuple.CALLE;     // Worse-case result
+      return fidxs.above_center() ? TypeTuple.CALLE.dual() : TypeTuple.CALLE;  // Worse-case result
     // If we fall from choice-functions to the empty set of called functions, freeze our output.
     // We might fall past empty and get a valid set.  Probably wrong; if we ever see a
     // choice set of functions, we should not execute.

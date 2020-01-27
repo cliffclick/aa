@@ -10,25 +10,23 @@ public class StoreNode extends Node {
   final String _fld;        // Field being updated
   private final byte _fin;  // TypeStruct.ffinal or TypeStruct.frw
   private final Parse _bad;
-  public StoreNode( Node ctrl, Node mem, Node adr, Node val, byte fin, String fld, Parse bad ) {
-    super(OP_STORE,ctrl,mem,adr,val);
+  public StoreNode( Node mem, Node adr, Node val, byte fin, String fld, Parse bad ) {
+    super(OP_STORE,null,mem,adr,val);
     _fld = fld;
     _fin = fin;
     _bad = bad;    // Tests can pass a null, but nobody else does
   }
-  private StoreNode( StoreNode st, Node mem, Node adr ) { this(st.in(0),mem,adr,st.val(),st._fin,st._fld,st._bad); }
+  private StoreNode( StoreNode st, Node mem, Node adr ) { this(mem,adr,st.val(),st._fin,st._fld,st._bad); }
   //public  StoreNode( StoreNode st, Node ctr, Node mem, Node adr, Node val ) { this(ctr,mem,adr,   val  ,st._fin,st._eqv,st._bad); }
 
   String xstr() { return _fld+"="; } // Self short name
   String  str() { return xstr(); }   // Inline short name
 
-  Node ctl() { return in(0); }
   Node mem() { return in(1); }
   Node adr() { return in(2); }
   Node val() { return in(3); }
 
   @Override public Node ideal(GVNGCM gvn, int level) {
-    Node ctl = ctl();
     Node mem = mem();
     Node adr = adr();
 
@@ -38,13 +36,16 @@ public class StoreNode extends Node {
       return new StoreNode(this,((MemMergeNode)mem).obj((TypeMemPtr)ta,gvn),adr);
 
     // Stores bypass stores to unrelated fields
+    // need parallel field updates.
     //if( mem instanceof StoreNode && !Util.eq(_fld,((StoreNode)mem)._fld) )
     //  return set_def(1,((StoreNode)mem).mem(),gvn);
 
-    // If Store is by a New, fold into the New.
+    // If Store is by a New and no other Stores, fold into the New.
     NewObjNode nnn;  int idx;
-    if( mem instanceof OProjNode && mem.in(0) instanceof NewObjNode && (nnn=(NewObjNode)mem.in(0)) == adr.in(0) &&
-        ctl == nnn.in(0) && !val().is_forward_ref() && !nnn._captured && (idx=nnn._ts.find(_fld))!= -1 && nnn._ts.can_update(idx) ) {
+    if( mem instanceof OProjNode &&
+        mem.in(0) instanceof NewObjNode && (nnn=(NewObjNode)mem.in(0)) == adr.in(0) &&
+        mem._uses._len==1 && !val().is_forward_ref() && !nnn._captured &&
+        (idx=nnn._ts.find(_fld))!= -1 && nnn._ts.can_update(idx) ) {
       // The OProj type needs to reflect final.  This is because we have an
       // Ideal rule allowing a Load to bypass a Store that is not in-error, but
       // back-to-back final stores can temporarily be not-in-error if the OProj
@@ -67,41 +68,26 @@ public class StoreNode extends Node {
     }
 
     // Store can bypass a Call, if the memory is not returned from the call,
-    // and the pointer predates the call, and is not-nil (the call is not doing
-    // the nil check).  This optimization is specifically targeting simple
-    // recursive functions.
-    if( ctl instanceof CProjNode && mem instanceof MProjNode &&
-        ctl.in(0) instanceof CallEpiNode ) {
-      Type tadr = gvn.type(adr());
-      int alias;
-      if( tadr instanceof TypeMemPtr && (alias=((TypeMemPtr)tadr).aliases().abit()) != -1 ) {  // Address not-nil already, and a single alias
-        CallEpiNode cepi = (CallEpiNode)ctl.in(0);
-        if( !cepi.is_copy() ) {
-          CallNode call = cepi.call();
-          TypeTuple tcall = (TypeTuple)gvn.type(call);
-          TypeMem tcm = (TypeMem)tcall.at(2);
-          if( tcm.at(alias).above_center() ) { // Call does not produce the memory
-            Node pctrl = adr;                  // Find address control
-            while( (tadr=gvn.type(pctrl)) != Type.CTRL && tadr!=Type.XCTRL )
-              pctrl = pctrl.in(0);
-            // Address control pre-dates call control
-            final Node fpctrl = pctrl;
-            if( call.walk_dom_last(n -> n==fpctrl) != null ) {
-              set_def(0,call.ctl(),gvn);
-              set_def(1,call.mem(),gvn);
-              return this;
-            }
-          }
-        }
-      }
+    // This optimization is specifically targeting simple recursive functions.
+    if( ta instanceof TypeMemPtr && mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode ) {
+      TypeMemPtr tmp = (TypeMemPtr)ta;
+      CallEpiNode cepi = (CallEpiNode)mem.in(0);
+      TypeMem retmem = (TypeMem)((TypeTuple)gvn.type(cepi)).at(3);
+      if( !cepi.is_copy() && retmem.is_clean(tmp.aliases(),_fld) )
+        return set_def(1,cepi.call().mem(),gvn);
     }
+
+    // Store can bypass a Call, if the memory is not returned from the call,
+    // and the pointer predates the call.  This optimization is specifically
+    // targeting simple recursive functions.
+    Node pre_call_mem = bypass_call(gvn);
+    if( pre_call_mem != null )  // Use memory before the call instead of after
+      return set_def(1,pre_call_mem,gvn);
 
     return null;
   }
 
   @Override public Type value(GVNGCM gvn) {
-    if( gvn.type(ctl()) != Type.CTRL ) return TypeObj.XOBJ; // Not executed
-    // Pointer is sane
     Type adr = gvn.type(adr());
     if( adr.isa(TypeMemPtr.OOP0.dual()) ) return TypeObj.XOBJ; // Very high address; might fall to any valid address
     if( adr.must_nil() ) return TypeObj.OBJ;           // Not provable not-nil, so fails
@@ -114,32 +100,21 @@ public class StoreNode extends Node {
     if( !val.isa_scalar() )         // Nothing sane
       val = val.above_center() ? Type.XSCALAR : Type.SCALAR; // Pin to scalar for updates
 
+    // Store can bypass a Call, if the memory is not returned from the call.
+    // This optimization is specifically targeting simple recursive functions.
+    Node mem = mem();
+    if( mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode ) {
+      CallEpiNode cepi = (CallEpiNode)mem.in(0);
+      TypeMem retmem = (TypeMem)((TypeTuple)gvn.type(cepi)).at(3);
+      if( !cepi.is_copy() && retmem.is_clean(tmp.aliases(),_fld) )
+        mem = cepi.call().mem();
+    }
     // Store can bypass a Call, if the memory is not returned from the call,
     // and the pointer predates the call.  This optimization is specifically
     // targeting simple recursive functions.
-    Node mem = mem();
-    if( mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode ) {
-      Node pctrl = adr();       // Find address control
-      Type tadr = gvn.type(pctrl);
-      int alias;
-      if( tadr instanceof TypeMemPtr && (alias=((TypeMemPtr)tadr).aliases().abit()) != -1 ) {  // Address not-nil already, and a single alias
-        CallEpiNode cepi = (CallEpiNode)mem.in(0);
-        if( !cepi.is_copy() ) {
-          CallNode call = cepi.call();
-          TypeTuple tcall = (TypeTuple)gvn.type(call);
-          TypeMem tcm = (TypeMem)tcall.at(2);
-          if( tcm.at(alias).above_center() ) { // Call does not produce the memory
-            while( (tadr=gvn.type(pctrl)) != Type.CTRL && tadr!=Type.XCTRL )
-              pctrl = pctrl.in(0);
-            // Address control pre-dates call control
-            final Node fpctrl = pctrl;
-            if( call.walk_dom_last(n -> n==fpctrl) != null ) {
-              mem = call.mem(); // Bypass the call for memory type
-            }
-          }
-        }
-      }
-    }
+    Node pre_call_mem = bypass_call(gvn);
+    if( pre_call_mem != null )  // Use memory before the call instead of after
+      mem = pre_call_mem;
 
     // Convert from memory to the struct being updated
     Type tmem = gvn.type(mem);
@@ -155,19 +130,54 @@ public class StoreNode extends Node {
     if( !(tobj instanceof TypeStruct) )
       return TypeObj.make0(tmem.above_center());
 
-    // Missing the field to update, or storing to a final?
+    // Update the field.  Illegal updates make no changes (except clear 'clean' bit).
     TypeStruct ts = (TypeStruct)tobj;
-    int idx = ts.find(_fld);
-    if( idx == -1 ) return tobj; // Missing field: assume not propagated yet.
-    if( ts._finals[idx]==TypeStruct.ffinal() || ts._finals[idx]==TypeStruct.fro() )
-      return TypeObj.make0(tobj.above_center()); // Illegal store
     // Updates to a NewNode are precise, otherwise aliased updates
     if( mem().in(0) == adr().in(0) && mem().in(0) instanceof NewNode )
       // No aliasing, even if the NewNode is called repeatedly
-      return tobj.st(_fin, _fld, val);
-    return tobj.update(_fin, _fld, val);
+      return ts.st(_fin, _fld, val);
+    return ts.update(_fin, _fld, val);
   }
 
+  // Returns pre_call_mem if Store can bypass Call memory.
+  private Node bypass_call(GVNGCM gvn) {
+    // Store can bypass a Call, if the memory is not returned from the call,
+    // and the pointer predates the call.  This optimization is specifically
+    // targeting simple recursive functions.
+
+    // Store memory not after a call
+    Node mem = mem();
+    if( !(mem instanceof MProjNode) || !(mem.in(0) instanceof CallEpiNode) ) return null;
+    CallEpiNode cepi = (CallEpiNode)mem.in(0);
+    if( cepi.is_copy() ) return null; // Call is collapsing
+    Type tadr = gvn.type(adr());
+    if( !(tadr instanceof TypeMemPtr) ) return null; // Address is bad
+    int alias = ((TypeMemPtr)tadr).aliases().abit();
+    if( alias == -1 ) return null;  // Address not-nil already, and a single alias
+    // Address must predate the call, and is not passed into the call, so the
+    // Store cannot be storing any Call result.
+    Node pctrl = adr();         // Find address control
+    while( (tadr=gvn.type(pctrl)) != Type.CTRL && tadr!=Type.XCTRL )
+      pctrl = pctrl.in(0);
+    // Address control dominates call control
+    CallNode call = cepi.call();
+    final Node fpctrl = pctrl;
+    if( call.walk_dom_last(n -> n==fpctrl) == null ) return null;
+    
+    TypeTuple tcall = (TypeTuple)gvn.type(call);
+    TypeMem tcm = (TypeMem)tcall.at(2);
+    Node pre_call_mem = call.mem();
+    if( tcm.at(alias).above_center() ) // Call does not produce the memory
+      return pre_call_mem;
+    if( pre_call_mem instanceof MemMergeNode &&
+        ((MemMergeNode)pre_call_mem).alias2idx(alias) != 0 )
+      return pre_call_mem;
+    // Call produces memory into function, or call-leading MemMerge not precise
+    // about alias... so we assume it goes into the call.
+    return null;
+  }
+
+  
   // Set of used aliases across all inputs (not StoreNode value, but yes address)
   @Override public BitsAlias alias_uses(GVNGCM gvn) {
     TypeMemPtr tmp = (TypeMemPtr)gvn.type(adr());

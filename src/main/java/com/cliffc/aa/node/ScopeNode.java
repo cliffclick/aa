@@ -112,7 +112,7 @@ public class ScopeNode extends Node {
   // Set of used aliases across all inputs (not StoreNode value, but yes address)
   @Override public BitsAlias alias_uses(GVNGCM gvn) {
     Type mem = gvn.type(mem());
-    if( mem == Type.ALL ) return null; // All escaped
+    if( mem == Type.ALL ) return BitsAlias.NZERO; // All escaped
     Node rez = in(4);
     if( rez == null ) return BitsAlias.NZERO;
     Type tval = gvn.type(rez);
@@ -185,7 +185,7 @@ public class ScopeNode extends Node {
         // Exactly like a parser store of an error, on the missing side
         int alias = scope.stk()._alias; // Alias for scope
         Node omem = mmem.active_obj(alias);
-        Node st = gvn.xform(new StoreNode(ctrl,omem,scope.ptr(),err,TypeStruct.ffinal(),name,bad));
+        Node st = gvn.xform(new StoreNode(omem,scope.ptr(),err,TypeStruct.ffinal(),name,bad));
         int idx = mmem.make_alias2idx(alias); // Precise alias update
         mmem.set_def(idx,st,gvn);
       }

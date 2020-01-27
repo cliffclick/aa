@@ -114,6 +114,7 @@ public class TypeMem extends Type<TypeMem> {
   public TypeObj at(int alias) { return _aliases[at_idx(alias)]; }
   // Alias-at index
   public int at_idx(int alias) {
+    assert alias != 0;
     while( true ) {
       if( alias < _aliases.length && _aliases[alias] != null )
         return alias;
@@ -154,17 +155,9 @@ public class TypeMem extends Type<TypeMem> {
   // Recursively explore reachable aliases.
   public BitsAlias recursive_aliases( BitsAlias abs, int idx ) {
     if( abs.test_recur(idx) ) return abs;
-    abs = abs.or(idx);         // 'idx' is a reachable alias
-    TypeObj obj = at(idx);
-    if( obj instanceof TypeStruct ) {
-      TypeStruct ts = (TypeStruct)obj;
-      for( int i=0; i<ts._ts.length; i++ )
-        if( ts._ts[i] instanceof TypeMemPtr )
-          abs = ((TypeMemPtr)ts._ts[i]).recursive_aliases(abs,this);
-    }
-    return abs;
+    abs = abs.or(idx);          // 'idx' is a reachable alias
+    return at(idx).recursive_aliases(abs,this);
   }
-
 
   private static TypeMem FREE=null;
   @Override protected TypeMem free( TypeMem ret ) { _aliases=null; FREE=this; return ret; }
@@ -210,6 +203,7 @@ public class TypeMem extends Type<TypeMem> {
   public static final TypeMem EMPTY;// Every alias filled with anything
   public static final TypeMem  MEM; // FULL, except lifts REC, arrays, STR
   public static final TypeMem XMEM; //
+  public static final TypeMem  MEM_CLN; // Clean (not modified) versions
   public static final TypeMem MEM_ABC, MEM_STR;
   static {
     // All memory, all aliases, holding anything.
@@ -224,6 +218,12 @@ public class TypeMem extends Type<TypeMem> {
     tos[BitsAlias.STR] = TypeStr.STR; // TODO: Proxy for all-arrays
     MEM  = make(tos);
     XMEM = MEM.dual();
+
+    TypeObj[] tcs = new TypeObj[Math.max(BitsAlias.REC,BitsAlias.STR)+1];
+    tcs[BitsAlias.ALL] = TypeObj.OBJ;
+    tcs[BitsAlias.REC] = TypeStruct.ALLSTRUCT_CLN;
+    tcs[BitsAlias.STR] = TypeStr.STR; // TODO: Proxy for all-arrays
+    MEM_CLN = make(tcs);
 
     MEM_STR  = make(TypeMemPtr.STRPTR.getbit(),TypeStr.STR);
     MEM_ABC  = make(TypeMemPtr.ABCPTR.getbit(),TypeStr.ABC);
@@ -273,37 +273,58 @@ public class TypeMem extends Type<TypeMem> {
 
   // Meet of all possible storable values, after updates.  This updates a field
   // in a TypeObj.
-  public TypeMem update( byte fin, String fld, int fld_num, Type val, TypeMemPtr ptr ) {
-    assert val.isa_scalar();
-    if( this==EMPTY ) return this;
-    // Any alias, plus all of its children, are meet/joined.  This does a
-    // tree-based scan on the inner loop.
-    Ary<TypeObj> objs = new Ary<>(_aliases.clone(),_aliases.length);
-    BitSet bs = ptr._aliases.tree().plus_kids(ptr._aliases);
-    // Choice store: something got stored into, but we can choose, and we
-    // choose nothing visible to anybody else.
-    if( ptr.above_center() ) {
-      if( fin != TypeStruct.ffinal() ) return this;
-      for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) )
-        objs.setX(alias, at(alias).lift_final());
-    } else {
-      for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) )
-        //objs.setX(alias, at(alias).update(fin,fld,fld_num,val));
-        throw com.cliffc.aa.AA.unimpl();
-    }
-    return make0(objs.asAry());
+  //public TypeMem update( byte fin, String fld, int fld_num, Type val, TypeMemPtr ptr ) {
+  //  assert val.isa_scalar();
+  //  if( this==EMPTY ) return this;
+  //  // Any alias, plus all of its children, are meet/joined.  This does a
+  //  // tree-based scan on the inner loop.
+  //  Ary<TypeObj> objs = new Ary<>(_aliases.clone(),_aliases.length);
+  //  BitSet bs = ptr._aliases.tree().plus_kids(ptr._aliases);
+  //  // Choice store: something got stored into, but we can choose, and we
+  //  // choose nothing visible to anybody else.
+  //  if( ptr.above_center() ) {
+  //    if( fin != TypeStruct.ffinal() ) return this;
+  //    for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) )
+  //      objs.setX(alias, at(alias).lift_final());
+  //  } else {
+  //    for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) )
+  //      //objs.setX(alias, at(alias).update(fin,fld,fld_num,val));
+  //      throw com.cliffc.aa.AA.unimpl();
+  //  }
+  //  return make0(objs.asAry());
+  //}
+  //
+  //// Meet of all possible storable values, after updates.  This is a whole-TypeObj update.
+  //public TypeMem update( BitsAlias aliases, TypeObj obj ) {
+  //  // Any alias, plus all of its children, are meet.  This does a tree-based
+  //  // scan on the inner loop.
+  //  Ary<TypeObj> objs = new Ary<>(_aliases.clone(),_aliases.length);
+  //  BitSet bs = aliases.tree().plus_kids(aliases);
+  //  for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) )
+  //    objs.setX(alias, (TypeObj)at(alias).meet(obj));
+  //  return make0(objs.asAry());
+  //}
+
+  // Mark all memory as being clean.
+  public TypeMem clean() {
+    if( this==MEM || this==MEM_CLN )
+      return MEM_CLN;           // Shortcut
+    if( this==XMEM ) return XMEM;
+    TypeObj[] ts = _aliases.clone();
+    for( int i=1; i<ts.length; i++ )
+      if( ts[i] != null )
+        ts[i] = (TypeObj)ts[i].clean();
+    return make0(ts);
   }
 
-  // Meet of all possible storable values, after updates.  This is a whole-TypeObj update.
-  public TypeMem update( BitsAlias aliases, TypeObj obj ) {
-    // Any alias, plus all of its children, are meet.  This does a tree-based
-    // scan on the inner loop.
-    Ary<TypeObj> objs = new Ary<>(_aliases.clone(),_aliases.length);
-    BitSet bs = aliases.tree().plus_kids(aliases);
-    for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) )
-      objs.setX(alias, (TypeObj)at(alias).meet(obj));
-    return make0(objs.asAry());
+  // True if all looked-at memory is clean.  Allows a Load to bypass.
+  public boolean is_clean( BitsAlias aliases, String fld ) {
+    for( int alias : aliases )
+      if( alias != 0 && !at(alias).is_clean(fld) )
+        return false;
+    return true;
   }
+
   // Exact alias update
   public TypeMem st( int alias, TypeObj obj ) {
     //assert !BitsAlias.TREE.is_parent(alias);
@@ -318,8 +339,8 @@ public class TypeMem extends Type<TypeMem> {
   }
 
   @Override public boolean above_center() {
-    for( int i=0; i<_aliases.length; i++ )
-      if( _aliases[i]!=null && !_aliases[i].above_center() )
+    for( TypeObj alias : _aliases )
+      if( alias != null && !alias.above_center() )
         return false;
     return true;
   }

@@ -26,8 +26,8 @@ public class TestApprox {
     Object dummy0 = TypeStruct.TYPES;
     Object dummy1 = TypeMemPtr.TYPES;
     Type.RECURSIVE_MEET++;
-    TypeStruct t0 = TypeStruct.malloc("",false,flds,TypeStruct.ts(2),finals);
-    TypeStruct t1 = TypeStruct.malloc("",false,flds,TypeStruct.ts(2),finals);
+    TypeStruct t0 = TypeStruct.malloc("",false,false,flds,TypeStruct.ts(2),finals);
+    TypeStruct t1 = TypeStruct.malloc("",false,false,flds,TypeStruct.ts(2),finals);
     t0._hash = t0.compute_hash();  t0._cyclic = true;
     t1._hash = t1.compute_hash();  t1._cyclic = true;
     TypeMemPtr p0 = TypeMemPtr.make(alias0,t0);  p0._cyclic = true;
@@ -137,8 +137,8 @@ public class TestApprox {
     Object dummy0 = TypeStruct.TYPES;
     Object dummy1 = TypeMemPtr.TYPES;
     Type.RECURSIVE_MEET++;
-    TypeStruct t0 = TypeStruct.malloc("",false,flds,TypeStruct.ts(2),finals);
-    TypeStruct t1 = TypeStruct.malloc("",false,flds,TypeStruct.ts(2),finals);
+    TypeStruct t0 = TypeStruct.malloc("",false,false,flds,TypeStruct.ts(2),finals);
+    TypeStruct t1 = TypeStruct.malloc("",false,false,flds,TypeStruct.ts(2),finals);
     t0._hash = t0.compute_hash();  t0._cyclic = true;
     t1._hash = t1.compute_hash();  t1._cyclic = true;
     TypeMemPtr p0 = TypeMemPtr.make(alias0,t0);  p0._cyclic = true;
@@ -260,8 +260,8 @@ public class TestApprox {
     Type i13 = TypeStr.con("X3");
     Type i14 = TypeStr.con("X4");
     Type.RECURSIVE_MEET++;
-    TypeStruct x3 = TypeStruct.malloc("",false,flds3,TypeStruct.ts(3),finals3);
-    TypeStruct x4 = TypeStruct.malloc("",false,flds3,TypeStruct.ts(3),finals3);
+    TypeStruct x3 = TypeStruct.malloc("",false,false,flds3,TypeStruct.ts(3),finals3);
+    TypeStruct x4 = TypeStruct.malloc("",false,false,flds3,TypeStruct.ts(3),finals3);
     x3._hash = x3.compute_hash();  x3._cyclic = true;
     x4._hash = x4.compute_hash();  x4._cyclic = true;
     TypeMemPtr px3 = TypeMemPtr.make(alias1,x3);  px3._cyclic = true;
@@ -300,8 +300,8 @@ public class TestApprox {
     Type i10 = TypeStr.con("X0");
     Type i11 = TypeStr.con("X1");
     Type.RECURSIVE_MEET++;
-    TypeStruct x0 = TypeStruct.malloc("",false,flds3,TypeStruct.ts(3),finals3);
-    TypeStruct x1 = TypeStruct.malloc("",false,flds3,TypeStruct.ts(3),finals3);
+    TypeStruct x0 = TypeStruct.malloc("",false,false,flds3,TypeStruct.ts(3),finals3);
+    TypeStruct x1 = TypeStruct.malloc("",false,false,flds3,TypeStruct.ts(3),finals3);
     x0._hash = x0.compute_hash();  x0._cyclic = true;
     x1._hash = x1.compute_hash();  x1._cyclic = true;
     TypeMemPtr px0 = TypeMemPtr.make(alias1,x0);  px0._cyclic = true;
@@ -552,7 +552,7 @@ public class TestApprox {
     Object dummy0 = TypeStruct.TYPES;
     Object dummy1 = TypeMemPtr.TYPES;
     Type.RECURSIVE_MEET++;
-    TypeStruct  x1 = TypeStruct.malloc("",false,flds,TypeStruct.ts(3),finals);
+    TypeStruct  x1 = TypeStruct.malloc("",false,false,flds,TypeStruct.ts(3),finals);
     x1._hash = x1.compute_hash();  x1._cyclic = true;
     TypeMemPtr px1 = TypeMemPtr.make_nil(alias,x1);  px1._cyclic = true;
     x1._ts[0] = Type.NIL;
@@ -570,7 +570,7 @@ public class TestApprox {
     TypeStruct z1 = z0.approx(CUTOFF,alias);
 
     Type.RECURSIVE_MEET++;
-    TypeStruct  x3 = TypeStruct.malloc("",false,flds,TypeStruct.ts(3),finals);
+    TypeStruct  x3 = TypeStruct.malloc("",false,false,flds,TypeStruct.ts(3),finals);
     x3._hash = x3.compute_hash();  x3._cyclic = true;
     TypeMemPtr px3 = TypeMemPtr.make_nil(alias,x3);  px3._cyclic = true;
     x3._ts[0] = px3;

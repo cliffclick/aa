@@ -131,11 +131,15 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
 
   // Recursively reachable aliases
   public BitsAlias recursive_aliases(BitsAlias abs, TypeMem mem) {
+    if( _aliases.above_center() )  return abs; // Above center, assume we reach nothing interesting
     for( int alias : _aliases )
       if( alias != 0 )
         abs = mem.recursive_aliases(abs,alias);
     return abs;
   }
+  
+  // Identical pointer but points to clean
+  @Override public TypeMemPtr clean() { return make(_aliases,(TypeObj)_obj.clean()); }
 
   // Build a mapping from types to their depth in a shortest-path walk from the
   // root.  Only counts depth on TypeStructs with the matching alias.  Only

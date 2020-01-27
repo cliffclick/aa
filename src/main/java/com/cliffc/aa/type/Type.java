@@ -102,7 +102,7 @@ public class Type<T extends Type<T>> implements Cloneable {
   }
   protected void init(byte type) { init(type,""); }
   protected void init(byte type, String name) { _type=type; _name=name;  _cyclic=false; }
-  @Override public final int hashCode( ) { return _hash; }
+  @Override public final int hashCode( ) { assert _hash!=0; return _hash; }
   // Compute the hash and return it, with all child types already having their
   // hash computed.  Subclasses override this.
   int compute_hash() { return (_type<<1)|1|_name.hashCode(); }
@@ -820,24 +820,13 @@ public class Type<T extends Type<T>> implements Cloneable {
   // Mismatched scalar types that can only cross-nils
   Type cross_nil(Type t) { return must_nil() || t.must_nil() ? SCALAR : NSCALR; }
 
-  // Make a (possibly cyclic & infinite) named type.  Prevent the infinite
-  // unrolling of names by not allowing a named-type with depth >= D from
-  // holding (recursively) the head of a named-type cycle.  We need to cap the
-  // unroll, to prevent loops/recursion from infinitely unrolling.
-  //Type make_recur(TypeName tn, int d, VBitSet bs ) { assert is_simple(); return this; }
-
   // Is t type contained within this?  Short-circuits on a true
   public final boolean contains( Type t ) { return contains(t,null); }
   boolean contains( Type t, VBitSet bs ) { return this==t; }
-  //// Deepest depth of nested TypeStructs; cycles at a base of 10000.
-  //final int depth() { return depth(null); }
-  //int depth( NonBlockingHashMapLong<Integer> ds ) { return 0; }
-  // Mark if part of a cycle
-  //void mark_cycle( Type t, VBitSet visit, BitSet cycle ) { }
-  //
-  //// Iterate over any nested child types.  Only side-effect results.
-  //public void iter( Consumer<Type> c ) { /*None in the base class*/ }
-
+  
+  // Mark (recursively) all memory as clean/unmodified
+  public Type clean() { return this; }
+  
   // Apply the test(); if it returns true iterate over all nested child types.
   // If the test returns false, short-circuit the walk.  No attempt to guard
   // against recursive structure walks, so the 'test' must return false when

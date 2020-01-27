@@ -249,6 +249,9 @@ public class MemMergeNode extends Node {
 
     // Try to remove some unused aliases.  Gather alias uses from all users.
     if( !_uses.isEmpty() && gvn._opt_mode != 0 /*not during parsing, not all users available */) {
+      // This is a forward-flow problem, make sure my type is improved before
+      // flowing forward.  Alas, computes value() twice in a row.
+      gvn.setype(this,value(gvn));
       BitsAlias abs = BitsAlias.EMPTY;
       for( Node use : _uses ) {
         BitsAlias rez = use.alias_uses(gvn);
@@ -279,10 +282,7 @@ public class MemMergeNode extends Node {
       Type ta = gvn.type(in(i));
       if( !(ta instanceof TypeObj) ) // Handle ANY, ALL
         ta = ta.above_center() ? TypeObj.XOBJ : TypeObj.OBJ;
-      Type prior = tm.at(alias);
-      //Type rez = prior.meet(ta);
-      Type rez = ta;
-      tm = tm.st(alias,(TypeObj)rez);
+      tm = tm.st(alias,(TypeObj)ta);
     }
     return tm;
   }

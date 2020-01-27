@@ -371,7 +371,7 @@ public class Parse {
         MemMergeNode mmem = mem_active();
         int alias = scope.stk()._alias; // Alias for scope
         Node omem = mmem.active_obj(alias);
-        Node st = gvn(new StoreNode(ctrl(),omem,scope.ptr(),ifex,mutable,tok,errMsg()));
+        Node st = gvn(new StoreNode(omem,scope.ptr(),ifex,mutable,tok,errMsg()));
         int idx = mmem.make_alias2idx(alias); // Precise alias update
         mmem.set_def(idx,st,_gvn);
         scope.def_if(tok,mutable,false); // Note 1-side-of-if update
@@ -521,7 +521,7 @@ public class Parse {
           Node stmt = stmt();
           if( stmt == null ) n = err_ctrl2("Missing stmt after assigning field '."+fld+"'");
           else {
-            Node st = gvn(new StoreNode(ctrl(),mem,castnn,n=stmt,fin,fld ,errMsg()));
+            Node st = gvn(new StoreNode(mem,castnn,n=stmt,fin,fld ,errMsg()));
             // Set the store into active memory.  It might have collapsed into
             // the local closure already, so already be in the active memory.
             if( st instanceof StoreNode ) mem_active().st((StoreNode)st,_gvn);
@@ -583,7 +583,7 @@ public class Parse {
     Node sum = do_call(new CallNode(true,errMsg(),ctrl(),plus,all_mem(),n.keep(),con(TypeInt.con(d))));
 
     MemMergeNode mmem2 = mem_active(scope); // Active memory for the chosen scope, after the call to plus
-    Node st = gvn(new StoreNode(ctrl(),mmem.active_obj(alias),scope.ptr(),sum,TypeStruct.frw(),tok,errMsg()));
+    Node st = gvn(new StoreNode(mmem.active_obj(alias),scope.ptr(),sum,TypeStruct.frw(),tok,errMsg()));
     int idx = mmem2.make_alias2idx(alias); // Precise alias update
     mmem2.set_def(idx,st,_gvn);
     return n.unhook();          // Return pre-increment value

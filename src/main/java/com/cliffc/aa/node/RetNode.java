@@ -101,22 +101,25 @@ public final class RetNode extends Node {
 
     // Aliases reachable from output memory and return pointer
     Type tval = gvn.type(val());
-    if( tval instanceof TypeMemPtr )
+    if( tval instanceof TypeMemPtr ) {
+      abs = abs.meet(((TypeMemPtr)tval).aliases().strip_nil()); // Returned ptr in the output set
+      // Everything modifiable and reachable from output
       abs = ((TypeMemPtr)tval).recursive_aliases(abs,output_mem);
-    else if( TypeMemPtr.OOP.isa(tval) ) // Scalar is all pointers
+    } else if( TypeMemPtr.OOP.isa(tval) ) // Scalar is all pointers
       return BitsAlias.NZERO;           // All aliases possible
     if( abs.test(1) ) return BitsAlias.NZERO; // Shortcut
 
-    // Aliases reachable from input arguments
+    // Aliases reachable from input arguments, and are modified.
     for( Node use : fun()._uses )
       if( use instanceof ParmNode ) {
         Type t = gvn.type(use);
-        if( t instanceof TypeMemPtr )
+        if( TypeMemPtr.OOP.isa(t) ) // Scalar is all pointers
+          return BitsAlias.NZERO;   // All aliases possible
+        // Pointer or not?
+        if( t instanceof TypeMemPtr ) // Track reaching and modifiable
           abs = ((TypeMemPtr)t).recursive_aliases(abs,output_mem);
-        else if( TypeMemPtr.OOP.isa(t) ) // Scalar is all pointers
-          return BitsAlias.NZERO;        // All aliases possible
       }
-
+    assert !abs.test(0);
     return abs;
   }
 

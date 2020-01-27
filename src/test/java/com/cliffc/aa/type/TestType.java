@@ -274,7 +274,7 @@ public class TestType {
     // Anonymous recursive structs -
     // - struct with pointer to self
     byte[] finals = new byte[]{TypeStruct.ffinal(),TypeStruct.ffinal()};
-    TypeStruct ts0 = TypeStruct.malloc("",false,flds,TypeStruct.ts(2),finals);
+    TypeStruct ts0 = TypeStruct.malloc("",false,false,flds,TypeStruct.ts(2),finals);
     ts0._hash = ts0.compute_hash();
     ts0._ts[0] = ts0ptr;    ts0._cyclic = true;
     ts0._ts[1] = TypeInt.INT64;
@@ -282,7 +282,7 @@ public class TestType {
     TypeMem ts0mem = TypeMem.make(alias1,ts0); // {1:@{n:*[1],v:int} }
 
     // - struct with pointer to self or nil
-    TypeStruct ts1 = TypeStruct.malloc("",false,flds,TypeStruct.ts(2),finals);
+    TypeStruct ts1 = TypeStruct.malloc("",false,false,flds,TypeStruct.ts(2),finals);
     ts1._hash = ts1.compute_hash();
     ts1._ts[0] = ts0ptr0;  ts1._cyclic = true;
     ts1._ts[1] = TypeInt.INT64;
@@ -388,8 +388,8 @@ public class TestType {
     final int alias = BitsAlias.REC;
 
     Type.RECURSIVE_MEET++;
-    TypeStruct as1 = TypeStruct.malloc("",false,flds,TypeStruct.ts(2),finals).set_name("A:");
-    TypeStruct bs4 = TypeStruct.malloc("",false,flds,TypeStruct.ts(2),finals).set_name("B:");
+    TypeStruct as1 = TypeStruct.malloc("",false,false,flds,TypeStruct.ts(2),finals).set_name("A:");
+    TypeStruct bs4 = TypeStruct.malloc("",false,false,flds,TypeStruct.ts(2),finals).set_name("B:");
     as1._hash = as1.compute_hash();  as1._cyclic = true;
     bs4._hash = bs4.compute_hash();  bs4._cyclic = true;
     TypeMemPtr ap5 = TypeMemPtr.make(alias,as1);  ap5._cyclic = true;

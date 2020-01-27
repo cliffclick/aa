@@ -301,7 +301,7 @@ public class GVNGCM {
       replace(old,nnn);
       nnn.keep();               // Keep-alive
       kill0(old);               // Delete the old n, and anything it uses
-      nnn.unhook();             // Remove keep-alive
+      add_work(nnn.unhook());   // Remove keep-alive and be sure to visit
     }
   }
 
@@ -437,7 +437,7 @@ public class GVNGCM {
     // needs to be reset also.
     for( Node n : _INIT0_NODES )
       if( n instanceof UnresolvedNode )
-        _ts._es[n._uid]=null;   // Force recompute
+        _ts._es[n._uid]=n.value(this);   // Force recompute
     // Set all types to all_type().dual(), their most optimistic type,
     // and prime the worklist.
     walk_initype(Env.START);
@@ -474,6 +474,11 @@ public class GVNGCM {
             // same type (Ctrl) but the Phis must merge new values.
             if( use instanceof RegionNode )
               for( Node phi : use._uses ) if( phi != n ) add_work(phi);
+            // When new memory appears on Calls, memory ops just after the Call
+            // might be bypassing and need to pick up the new memory.
+            if( use instanceof CallNode )
+              for( Node cepi : use._uses ) if( cepi instanceof CallEpiNode )
+                                             add_work(cepi);
           }
         }
       }

@@ -47,8 +47,15 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
   public TypeObj st    (byte fin, String fld, Type val) { return this; }
   // Allowed to update this field?  No fields in an OBJ, but an XOBJ might fall
   // to a struct with fields.
-  public boolean can_update(String fld) { return above_center(); }
-  public TypeObj lift_final() { return this; }
+  //public boolean can_update(String fld) { return above_center(); }
+  //public TypeObj lift_final() { return this; }
+  // True if this field is not modified.  Allows a Load to bypass.
+  boolean is_clean(String fld) { return _any; }
+
+  public BitsAlias recursive_aliases(BitsAlias abs, TypeMem mem) {
+    return above_center() ? abs : BitsAlias.NZERO; // Assume worse-case struct contains all aliases
+  }
+
   @Override public boolean above_center() { return _any; }
   @Override public boolean may_be_con() { return _any; }
   @Override public boolean is_con() { return false; }
