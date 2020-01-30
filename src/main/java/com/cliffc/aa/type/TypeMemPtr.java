@@ -36,7 +36,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     if( dups == null ) dups = new VBitSet();
     if( dups.tset(_uid) ) return "$"; // Break recursive printing cycle
     SB sb = new SB().p('*');
-    _aliases.toString(sb).p(_obj.str(dups));
+    _aliases.toString(sb); //.p(_obj.str(dups));
     if( _aliases.test(0) ) sb.p('?');
     return sb.toString();
   }
@@ -45,8 +45,22 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     if( dups == null ) dups = new VBitSet();
     if( dups.tset(_uid) ) return sb.p('$'); // Break recursive printing cycle
     sb.p('*');
-    _obj.dstr(_aliases.toString(sb).p(" -> "),dups);
+    //_obj.dstr(_aliases.toString(sb).p(" -> "),dups);
+    _aliases.toString(sb);
     return sb;
+  }
+  public String str(VBitSet dups, TypeMem mem) {
+    if( dups == null ) dups = new VBitSet();
+    if( dups.tset(_uid) ) return "$"; // Break recursive printing cycle
+    SB sb = new SB().p('*');
+    TypeObj to = _obj;
+    if( mem != null ) {
+      TypeObj to2 = mem.ld(this);
+      if( !to2.above_center() ) to = to2;
+    }
+    _aliases.toString(sb).p( to.str(dups));
+    if( _aliases.test(0) ) sb.p('?');
+    return sb.toString();
   }
 
   private static TypeMemPtr FREE=null;

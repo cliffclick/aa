@@ -143,7 +143,7 @@ public class FunNode extends RegionNode {
   // Argument type
   Type targ(int idx) {
     return idx == -1 ? TypeRPC.ALL_CALL :
-      (idx == -2 ? TypeMem.MEM : _tf.arg(idx));
+      (idx == -2 ? TypeMem.FULL : _tf.arg(idx));
   }
   int nargs() { return _tf._args._ts.length; }
   // FunNode lost a use.  If lost a formal argument (a Parm), visit all wired

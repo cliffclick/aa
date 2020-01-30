@@ -32,7 +32,7 @@ import java.util.BitSet;
 // the call memory sharpens.  This is specifically for SESE call behavior.
 public class MemMergeNode extends Node {
 
-  // Alias equivalence class matching each input.
+  // Alias equivalence class matching each input.  Sorted.
   // A map from idx# to Alias, aligned with the Nodes.
   private AryInt _aliases;
 
@@ -81,8 +81,16 @@ public class MemMergeNode extends Node {
     return idx;
   }
 
+  private boolean check() {
+    for( int i=1; i<_aliases._len; i++ )
+      if( _aliases.at(i-1) >= _aliases.at(i) )
+        return false;
+    return true;
+  }
+
   // Index# for Alias#, creating as needed.  If created the new slot will be null.
   public int make_alias2idx( int alias ) {
+    assert check();
     // Insert in alias index order
     int iidx = _aliases.binary_search(alias);
     if( _aliases.atX(iidx)==alias ) return iidx; // Exact match
@@ -91,11 +99,13 @@ public class MemMergeNode extends Node {
     // Every alias after the insertion point has its index upped by 1
     _aidxes.map_update(i -> i >= iidx ? i+1 : i);
     set_alias2idx(alias,iidx);// Reverse map alias# to idx#
+    assert check();
     return iidx;
   }
 
   // Remove a DEF, and update everything
   private void remove0( int xidx, GVNGCM gvn ) {
+    assert check();
     remove(xidx,gvn);                  // Remove def, preserving order
     int alias = _aliases.remove(xidx); // Remove alias mapping, preserving order
     // Every alias after the removal point has its index downed by 1
@@ -189,15 +199,31 @@ public class MemMergeNode extends Node {
 
   @Override public Node ideal(GVNGCM gvn, int level) {
     assert _defs._len==_aliases._len;
+    // Get TypeObj of default alias
+    Type tp = gvn.type(in(0));
+    if( tp instanceof TypeMem ) // Might be 'any' from Phi
+      tp = ((TypeMem)tp).at(1);
     // Dead & duplicate inputs can be removed.
     boolean progress = false;
-    for( int i=1; i<_defs._len; i++ )
-      if( in(i)==in(0) ||       // Dup of the main memory
-          gvn.type(in(i))==TypeObj.XOBJ ) { // Dead input
-        remove0(i--,gvn);
+    for( int i=1; i<_defs._len; i++ ) {
+      int alias = alias_at(i);
+      // Get TypeObj of this slice
+      Type ti = gvn.type(in(i));
+      if( ti instanceof TypeMem )
+        ti = ((TypeMem)ti).at(alias);
+      assert ti instanceof TypeObj || ti==Type.ANY;
+      // Check for incoming alias slice is dead, from a alive memmerge
+      if( ti==TypeObj.XOBJ && !(in(i) instanceof ConNode) )
+        { set_def(i,gvn.con(TypeObj.XOBJ),gvn); progress = true; }
+      // Check the incoming alias matches his parent
+      int par_idx = find_alias2idx(BitsAlias.parent(alias));
+      // Alias slice is exactly his parent, both are XOBJ?
+      if( in(par_idx)==in(i) || (par_idx==0 && ti==TypeObj.XOBJ && tp==TypeObj.XOBJ) ) {
+        remove0(i--,gvn);     // Fold into parent
         progress = true;
         if( is_dead() ) return this; // Happens when cleaning out dead code
       }
+    }
     if( _defs._len==1 ) return in(0); // Merging nothing
     if( progress ) return this;       // Removed some dead inputs
 
@@ -209,17 +235,9 @@ public class MemMergeNode extends Node {
         // If alias is old, keep the original (it stomped over the incoming
         // memory).  If alias is new, use the new value.
         int idx = alias2idx(alias);
-        if( idx != 0 ) { // 'this' has an exact update, so the prior alias got stomped
-          // But need to make sure no children, since all children got stomped.
-          // All child aliases are strictly larger than parents, and since
-          // sorted by alias# can just look after the current point.
-          for( int j=i+1; j<mem._defs._len; j++ )
-            if( BitsAlias.is_parent(alias,mem.alias_at(j)) )
-              throw AA.unimpl(); // Need to crush all children, since parent got crushed
-        } else {
+        if( idx == 0 )
           // Create alias slice from nearest alias parent
           create_alias_active(alias,mem.in(i),gvn);
-        }
       }
       return set_def(0,mem.in(0),gvn); // Return improved self
     }
@@ -247,6 +265,10 @@ public class MemMergeNode extends Node {
         if( use instanceof CallNode && !((CallNode)use)._unpacked )
           gvn.add_work(use);
 
+    // If down to a single Phi use, see if Phi wants to split.
+    if( _uses._len==1 && _uses.at(0) instanceof PhiNode )
+      gvn.add_work(_uses.at(0));
+
     // Try to remove some unused aliases.  Gather alias uses from all users.
     if( !_uses.isEmpty() && gvn._opt_mode != 0 /*not during parsing, not all users available */) {
       // This is a forward-flow problem, make sure my type is improved before
@@ -261,8 +283,9 @@ public class MemMergeNode extends Node {
       // Kill unused aliases
       if( !abs.test(1) ) {      // Shortcut
         for( int i=1; i<_defs._len; i++ )
-          if( !abs.test_recur(_aliases.at(i)) )
-            { remove0(i--,gvn); progress = true; }
+          if( !abs.test_recur(_aliases.at(i)))
+            if( gvn.type(in(i)) != TypeObj.XOBJ || !(in(i) instanceof ConNode) )
+              { set_def(i,gvn.con(TypeObj.XOBJ),gvn); progress = true; }
         if( progress ) return this;
       }
     }
@@ -299,20 +322,24 @@ public class MemMergeNode extends Node {
     return mmm;
   }
   @Override void update_alias( Node copy, BitSet aliases, GVNGCM gvn ) {
+    MemMergeNode cmem = (MemMergeNode)copy;
     assert gvn.touched(this);
+    Node xobj = gvn.con(TypeObj.XOBJ);
     Type oldt = gvn.unreg(this);
     for( int i=1; i<_aliases._len; i++ ) {
       int mya = _aliases.at(i);
       if( !aliases.get(mya) ) continue;
       int[] kid0_aliases = BitsAlias.get_kids(mya);
-      ((MemMergeNode)copy)._aliases.set(i,kid0_aliases[1]  );
-                           _aliases.set(i,kid0_aliases[2]);
-      ((MemMergeNode)copy)._aidxes.set(mya,0);
-                           _aidxes.set(mya,0);
-      ((MemMergeNode)copy)._aidxes.setX(kid0_aliases[1]  ,i);
-                           _aidxes.setX(kid0_aliases[2],i);
+      cmem._update(gvn,xobj,i,kid0_aliases[1]);
+      this._update(gvn,xobj,i,kid0_aliases[2]);
     }
+    assert check() && cmem.check();
     gvn.rereg(this,oldt);
+  }
+  private void _update(GVNGCM gvn, Node xobj, int oidx, int newalias) {
+    int nidx = make_alias2idx(newalias);
+    set_def(nidx,in(oidx),null);
+    set_def(oidx, xobj   ,gvn );
   }
 }
 

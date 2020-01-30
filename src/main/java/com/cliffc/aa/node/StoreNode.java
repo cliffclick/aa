@@ -35,7 +35,7 @@ public class StoreNode extends Node {
     if( ta instanceof TypeMemPtr && mem instanceof MemMergeNode )
       return new StoreNode(this,((MemMergeNode)mem).obj((TypeMemPtr)ta,gvn),adr);
 
-    // Stores bypass stores to unrelated fields
+    // Stores bypass stores to unrelated fields.  TODO: Cannot really do this -
     // need parallel field updates.
     //if( mem instanceof StoreNode && !Util.eq(_fld,((StoreNode)mem)._fld) )
     //  return set_def(1,((StoreNode)mem).mem(),gvn);

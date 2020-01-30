@@ -41,11 +41,13 @@ public class LoadNode extends Node {
     // Loads can bypass a call, if the return memory does not stomp the alias.
     if( aliases != null && mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode ) {
       CallEpiNode cepi = (CallEpiNode)mem.in(0);
-      TypeMem retmem = (TypeMem)((TypeTuple)gvn.type(cepi)).at(3);
-      if( !cepi.is_copy() && retmem.is_clean(aliases,_fld) )
-        return set_mem(cepi.call().mem(),gvn);
-      if( alias > 0 && retmem.at(alias) == TypeObj.XOBJ )
-        return set_mem(cepi.call().mem(),gvn);
+      if( !cepi.is_copy() ) {
+        TypeMem retmem = (TypeMem)((TypeTuple)gvn.type(cepi)).at(3);
+        if( retmem.is_clean(aliases,_fld) )
+          return set_mem(cepi.call().mem(),gvn);
+        if( alias > 0 && retmem.at(alias) == TypeObj.XOBJ )
+          return set_mem(cepi.call().mem(),gvn);
+      }
     }
 
     // Loads against a NewNode cannot NPE, cannot fail, always return the input
@@ -93,12 +95,14 @@ public class LoadNode extends Node {
     Node mem = mem();
     if( mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode ) {
       CallEpiNode cepi = (CallEpiNode)mem.in(0);
-      TypeMem retmem = (TypeMem)((TypeTuple)gvn.type(cepi)).at(3);
-      if( !cepi.is_copy() && retmem.is_clean(tmp.aliases(),_fld) )
-        mem = cepi.call().mem();
-      int alias = tmp.aliases().strip_nil().abit();
-      if( alias > 0 && retmem.at(alias) == TypeObj.XOBJ )
-        mem = cepi.call().mem();
+      if( !cepi.is_copy() ) {
+        TypeMem retmem = (TypeMem)((TypeTuple)gvn.type(cepi)).at(3);
+        if( retmem.is_clean(tmp.aliases(),_fld) )
+          mem = cepi.call().mem();
+        int alias = tmp.aliases().strip_nil().abit();
+        if( alias > 0 && retmem.at(alias) == TypeObj.XOBJ )
+          mem = cepi.call().mem();
+      }
     }
 
     // Loading from TypeMem - will get a TypeObj out.

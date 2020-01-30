@@ -77,7 +77,7 @@ public class ParmNode extends PhiNode {
               CallNode call = (CallNode)use;
               Type argc = gvn.type(call.arg(_idx)); // Call arg type
               if( !argc.isa(formal) )
-                return call._badargs.typerr(argc,formal);
+                return call._badargs.typerr(argc,formal,call.mem());
               // Must be a different call that is in-error
             }
           }

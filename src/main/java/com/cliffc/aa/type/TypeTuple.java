@@ -77,7 +77,7 @@ public class TypeTuple extends Type<TypeTuple> {
   public  static final TypeTuple IF_FALSE= make(CTRL ,XCTRL);
 
   // This is the starting state of the program; CTRL is active and memory is empty.
-  public  static final TypeTuple START_STATE = make(CTRL, TypeMem.XMEM);
+  public  static final TypeTuple START_STATE = make(CTRL, TypeMem.EMPTY);
   public  static final TypeTuple CALL  = make(CTRL, TypeMem.FULL, SCALAR);
   public  static final TypeTuple XCALL = CALL.dual();
   public  static final TypeTuple CALLE = make(CTRL, TypeMem.FULL, SCALAR, TypeMem.FULL);

@@ -104,7 +104,7 @@ public class IntrinsicNode extends Node {
   }
   @Override public String err(GVNGCM gvn) {
     Type ptr = gvn.type(ptr());
-    return _badargs.typerr(ptr,_tn); // Did not remove the aliasing
+    return _badargs.typerr(ptr,_tn,mem()); // Did not remove the aliasing
   }
 
   // Clones during inlining all become unique new sites

@@ -41,13 +41,14 @@ public abstract class NewNode<T extends TypeObj> extends Node {
   @Override public Node ideal(GVNGCM gvn, int level) {
     // If the address is not looked at then memory contents cannot be looked at
     // and is dead.
+    boolean old = _captured;
     if( captured() ) {
-      boolean progress=false;
+      boolean progress=!old;    // Progress if 1st time captured
       for( int i=1; i<_defs._len; i++ )
         if( in(i)!=null ) {
           set_def(i,null,gvn);
           progress=true;
-          if( is_dead() ) break;
+          if( is_dead() ) break; // Progress if any edge removed
         }
       return progress ? this : null;
     }

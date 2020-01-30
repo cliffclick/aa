@@ -273,11 +273,10 @@ public abstract class Node implements Cloneable {
   public byte may_prec() { return -1; }
 
   // Set of used aliases across all inputs (not StoreNode value, but yes
-  // address).  Returning null means "uses all aliases", generally because the
-  // analysis has to be conservative.
+  // address).  
   public BitsAlias alias_uses(GVNGCM gvn) {
     throw com.cliffc.aa.AA.unimpl(); // Overridden in subclasses
-    //return null;
+    //return BitsAlias.NZERO;
   }
 
   // Hash is function+inputs, or opcode+input_uids, and is invariant over edge

@@ -79,6 +79,9 @@ public final class RetNode extends Node {
   // try to exclude both obviously not modified memory (which includes
   // unreachable memory) and obviously not visible to caller (which includes
   // our local closure if it does not escape).
+  //
+  // Depends on the returned value type and memory type, and the structure of
+  // the Parms to the Function.
   @Override public BitsAlias alias_uses(GVNGCM gvn) {
     // Return memory type
     Type omem = gvn.type(mem());
@@ -102,7 +105,7 @@ public final class RetNode extends Node {
     // Aliases reachable from output memory and return pointer
     Type tval = gvn.type(val());
     if( tval instanceof TypeMemPtr ) {
-      abs = abs.meet(((TypeMemPtr)tval).aliases().strip_nil()); // Returned ptr in the output set
+      //abs = abs.meet(((TypeMemPtr)tval).aliases().strip_nil()); // Returned ptr in the output set
       // Everything modifiable and reachable from output
       abs = ((TypeMemPtr)tval).recursive_aliases(abs,output_mem);
     } else if( TypeMemPtr.OOP.isa(tval) ) // Scalar is all pointers

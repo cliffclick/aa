@@ -97,7 +97,7 @@ public abstract class PrimNode extends Node {
       Type tactual = gvn.type(in(i));
       Type tformal = _targs.at(i-1);
       if( !tactual.isa(tformal) )
-        return _badargs==null ? "bad arguments" : _badargs.typerr(tactual,tformal);
+        return _badargs==null ? "bad arguments" : _badargs.typerr(tactual,tformal,null);
     }
     return null;
   }
@@ -164,7 +164,7 @@ static class ConvertTypeName extends PrimNode {
     Type actual = gvn.type(in(1));
     Type formal = _targs.at(0);
     if( !actual.isa(formal) ) // Actual is not a formal
-      return _badargs.typerr(actual,formal);
+      return _badargs.typerr(actual,formal,null);
     return null;
   }
 }

@@ -344,7 +344,7 @@ public class Parse {
     }
     // Honor all type requests, all at once, by inserting type checks on the ifex.
     for( int i=0; i<ts._len; i++ )
-      ifex = typechk(ifex,ts.at(i),null,bads.at(i));
+      ifex = typechk(ifex,ts.at(i),all_mem(),bads.at(i));
     // Assign tokens to value
     for( int i=0; i<toks._len; i++ ) {
       String tok = toks.at(i);               // Token being assigned
@@ -600,7 +600,7 @@ public class Parse {
     if( !peek(':') ) { _x = oldx; return fact; }
     Type t = type();
     if( t==null ) { _x = oldx; return fact; } // No error for missing type, because can be ?: instead
-    return typechk(fact,t,null,bad);
+    return typechk(fact,t,all_mem(),bad);
   }
 
   /** Parse a factor, a leaf grammar token
@@ -725,7 +725,7 @@ public class Parse {
       _gvn.set_def_reg(e._scope.stk(),0,fun); // Closure creation control defaults to function entry
       set_ctrl(fun);            // New control is function head
       Node rpc = gvn(new ParmNode(-1,"rpc",fun,con(TypeRPC.ALL_CALL),null)).keep();
-      Node mem = gvn(new ParmNode(-2,"mem",fun,con(TypeMem.MEM     ),null));
+      Node mem = gvn(new ParmNode(-2,"mem",fun,con(TypeMem.FULL    ),null));
       Parse errmsg = errMsg();  // Lazy error message
       int cnt=0;                // Add parameters to local environment
       for( int i=0; i<ids._len; i++ ) {
@@ -811,7 +811,7 @@ public class Parse {
 
   // Add a typecheck into the graph, with a shortcut if trivially ok.
   private Node typechk(Node x, Type t, Node mem, Parse bad) {
-    return t == null || _gvn.type(x).isa(t) ? x : gvn(new TypeNode(t,x,bad));
+    return t == null || _gvn.type(x).isa(t) ? x : gvn(new TypeNode(t,x,mem,bad));
   }
 
   private String token() { skipWS();  return token0(); }
@@ -1131,15 +1131,26 @@ public class Parse {
     _buf = P._buf;
     _x   = P._x;
     _line= P._line;
-    _e   = null;  _gvn = null;  _nf  = null;  _pp  = null;  _str = null;
+    _gvn = P._gvn;
+    _e   = null;  _nf  = null;  _pp  = null;  _str = null;
   }
   // Delayed error message, just record line/char index and share code buffer
   private Parse errMsg() { return new Parse(this); }
 
   // Polite error message for mismatched types
-  public String typerr( Type t0, Type t1 ) {
-    String s = t0.is_forward_ref() ? ((TypeFunPtr)t0).names() : t0.toString();
-    return errMsg(s+" is not a "+t1);
+  public String typerr( Type t0, Type t1, Node mem ) {
+    Type t = mem==null ? null : _gvn.type(mem);
+    TypeMem tmem = t instanceof TypeMem ? (TypeMem)t : null;
+    String s0 = typerr(t0,tmem);
+    String s1 = typerr(t1,tmem); 
+    return errMsg(s0+" is not a "+s1);
+  }
+  private static String typerr( Type t, TypeMem tmem ) {
+    return t.is_forward_ref()
+      ? ((TypeFunPtr)t).names()
+      : (t instanceof TypeMemPtr
+         ? ((TypeMemPtr)t).str(null, tmem)
+         : t.toString());
   }
 
   // Standard mis-use of a forward-ref error (assumed to be a forward-decl of a

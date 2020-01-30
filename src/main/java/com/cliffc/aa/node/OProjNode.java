@@ -14,6 +14,8 @@ public class OProjNode extends ProjNode {
     // If Store is by a New and no other Stores, trigger Store to fold into New
     if( _uses._len==1 && _uses.at(0) instanceof StoreNode )
       gvn.add_work(_uses.at(0));
+    if( in(0) instanceof NewNode && ((NewNode)in(0))._captured )
+      return gvn.con(TypeObj.XOBJ);
     
     return null;
   }

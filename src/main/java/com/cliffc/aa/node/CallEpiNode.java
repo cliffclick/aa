@@ -221,7 +221,7 @@ public final class CallEpiNode extends Node {
     Bits.Tree<BitsFun> tree = fidxs.tree();
     BitSet bs = tree.plus_kids(fidxs);
     // Lifting or dropping Unresolved calls
-    boolean lifting = /*gvn._opt_mode==2 &&*/ fidxs.above_center();
+    boolean lifting = fidxs.above_center();
     Type t = lifting ? TypeTuple.CALL : TypeTuple.XCALL;
     for( int fidx = bs.nextSetBit(0); fidx >= 0; fidx = bs.nextSetBit(fidx+1) ) {
       if( tree.is_parent(fidx) ) continue;   // Will be covered by children

@@ -1,7 +1,10 @@
 package com.cliffc.aa;
 
 import com.cliffc.aa.node.*;
-import com.cliffc.aa.type.*;
+import com.cliffc.aa.type.BitsFun;
+import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeFunPtr;
+import com.cliffc.aa.type.TypeTuple;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.VBitSet;
 import org.jetbrains.annotations.NotNull;
@@ -168,7 +171,7 @@ public class GVNGCM {
   public boolean touched( Node n ) { return _ts.atX(n._uid)!=null; }
 
   // Remove from GVN structures.  Used rarely for whole-merge changes
-  public Type unreg( Node n ) { assert !check_new(n); return unreg0(n); }
+  public Type unreg( Node n ) { assert check_opt(n); return unreg0(n); }
   private Type unreg0( Node n ) {
     Type t = n._uid < _ts._len ? _ts.set(n._uid,null) : null; // Remove from type system
     _vals.remove(n);            // Remove from GVN
@@ -179,7 +182,7 @@ public class GVNGCM {
   public void rereg( Node n, Type oldt ) {
     assert !check_opt(n);
     setype(n,oldt);
-    _vals.put(n,n);
+    _vals.putIfAbsent(n,n);     // 'n' will not go back if it hits a prior
     add_work(n);
   }
 
@@ -345,7 +348,10 @@ public class GVNGCM {
     // Either no-progress, or progress and need to re-insert n back into system
     _ts._es[n._uid] = oldt;     // Restore old type, in case we recursively ask for it
     Type t = n.value(this);     // Get best type
+    //if( !t.isa(oldt) ) {
+    //  System.out.println("Backwards to: "+t+"\nfrom: "+n.dump(0,this));
     //assert t.isa(oldt);         // Monotonically improving
+    }
     _ts._es[n._uid] = null;     // Remove in case we replace it
     // Replace with a constant, if possible
     if( replace_con(t,n) )
