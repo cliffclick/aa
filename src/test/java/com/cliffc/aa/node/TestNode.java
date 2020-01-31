@@ -201,8 +201,8 @@ public class TestNode {
     Node unr = Env.top().lookup("+"); // All the "+" functions
     FunNode fun_plus = ((FunPtrNode)unr.in(1)).fun();
     RetNode ret = fun_plus.ret();
-    CallNode call = new CallNode(false,null,unr);
-    TypeStruct tname2 = null; // TODO AA.unimpl()
+    CallNode call = new CallNode(false,null,_ins[0],unr,mem);
+    TypeStruct tname = TypeStruct.NAMEPT;
 
     // Testing 1 set of types into a value call.
     // Comment out when not debugging.
@@ -210,6 +210,31 @@ public class TestNode {
                         Type.CTRL,Type.NUM,Type.ANY,Type.ANY);
 
     // All the Nodes, all Values, all Types
+
+    test1monotonic(new MemMergeNode(_ins[1],_ins[2],BitsAlias.RECORD));
+    NewObjNode nnn1 = new NewObjNode(false,_ins[0]);
+    set_type(1,Type.SCALAR);  nnn1.create("x",_ins[1],TypeStruct.ffinal(),_gvn);
+    set_type(2,Type.SCALAR);  nnn1.create("y",_ins[2],TypeStruct.ffinal(),_gvn);
+    test1monotonic(nnn1);
+    NewObjNode nnn2 = new NewObjNode(false,_ins[0]);
+    set_type(1,Type.SCALAR);  nnn2.create("x",_ins[1],TypeStruct.ffinal(),_gvn);
+    set_type(2,Type.SCALAR);  nnn2.create("y",_ins[2],TypeStruct.ffinal(),_gvn);
+    nnn2.set_name(tname);
+    test1monotonic(nnn2);
+    ((ConNode<Type>)_ins[1])._t = Type.SCALAR; // ParmNode reads this for _alltype
+    test1monotonic(new   ParmNode( 1, "x",_ins[0],(ConNode)_ins[1],null).add_def(_ins[2]));
+    test1monotonic(new    PhiNode(null,_ins[0],_ins[1],_ins[2]));
+    for( PrimNode prim : PrimNode.PRIMS )
+      test1monotonic_prim(prim);
+    test1monotonic(new   ProjNode(_ins[0],1));
+    test1monotonic(new RegionNode(null,_ins[1],_ins[2]));
+    test1monotonic(new    RetNode(_ins[0],mem,_ins[1],_ins[2],fun_plus)); // ctl,mem,val,rpc,fun
+    test1monotonic(new  StoreNode(_ins[1],_ins[2],_ins[3],(byte)0,"x",null));
+    test1monotonic(new  StoreNode(_ins[1],_ins[2],_ins[3],(byte)1,"x",null));
+    //                  ScopeNode has no inputs, and value() call is monotonic
+    test1monotonic(new   TypeNode(TypeInt.FALSE    ,_ins[1],null,null));
+    test1monotonic(new   TypeNode(TypeMemPtr.STRPTR,_ins[1],null,null));
+    test1monotonic(new   TypeNode(TypeFlt.FLT64    ,_ins[1],null,null));
 
     test1monotonic(new   CallNode(false,null,_ins[0],  unr  ,mem,_ins[2],_ins[3]));
     test1monotonic(new   CallNode(false,null,_ins[0],_ins[1],mem,_ins[2],_ins[3]));
@@ -233,33 +258,8 @@ public class TestNode {
     test1monotonic(new     IfNode(_ins[0],_ins[1]));
     for( IntrinsicNewNode prim : IntrinsicNewNode.INTRINSICS )
       test1monotonic_intrinsic(prim);
-    test1monotonic(new IntrinsicNode(tname2,null,mem,_ins[2]));
+    test1monotonic(new IntrinsicNode(tname,null,null,mem,_ins[2]));
     test1monotonic(new   LoadNode(_ins[1],_ins[2],"x",null));
-    test1monotonic(new MemMergeNode(_ins[1],_ins[2],BitsAlias.REC));
-
-    NewObjNode nnn1 = new NewObjNode(false,_ins[0]);
-    set_type(1,Type.SCALAR);  nnn1.create("x",_ins[1],TypeStruct.ffinal(),_gvn);
-    set_type(2,Type.SCALAR);  nnn1.create("y",_ins[2],TypeStruct.ffinal(),_gvn);
-    test1monotonic(nnn1);
-    NewObjNode nnn2 = new NewObjNode(false,_ins[0]);
-    set_type(1,Type.SCALAR);  nnn2.create("x",_ins[1],TypeStruct.ffinal(),_gvn);
-    set_type(2,Type.SCALAR);  nnn2.create("y",_ins[2],TypeStruct.ffinal(),_gvn);
-    nnn2.set_name(tname2);
-    test1monotonic(nnn2);
-    ((ConNode<Type>)_ins[1])._t = Type.SCALAR; // ParmNode reads this for _alltype
-    test1monotonic(new   ParmNode( 1, "x",_ins[0],(ConNode)_ins[1],null).add_def(_ins[2]));
-    test1monotonic(new    PhiNode(null,_ins[0],_ins[1],_ins[2]));
-    for( PrimNode prim : PrimNode.PRIMS )
-      test1monotonic_prim(prim);
-    test1monotonic(new   ProjNode(_ins[0],1));
-    test1monotonic(new RegionNode(null,_ins[1],_ins[2]));
-    test1monotonic(new    RetNode(_ins[0],mem,_ins[1],_ins[2],fun_plus)); // ctl,mem,val,rpc,fun
-    test1monotonic(new  StoreNode(_ins[1],_ins[2],_ins[3],(byte)0,"x",null));
-    test1monotonic(new  StoreNode(_ins[1],_ins[2],_ins[3],(byte)1,"x",null));
-    //                  ScopeNode has no inputs, and value() call is monotonic
-    test1monotonic(new   TypeNode(TypeInt.FALSE    ,_ins[1],null,null));
-    test1monotonic(new   TypeNode(TypeMemPtr.STRPTR,_ins[1],null,null));
-    test1monotonic(new   TypeNode(TypeFlt.FLT64    ,_ins[1],null,null));
 
     assertEquals(0,_errs);
   }
@@ -365,8 +365,12 @@ public class TestNode {
       set_type(idx,all[yx]);
       vm = n.value(_gvn);
       // Assert the alltype() bounds any value() call result.
-      assert vm.isa(_alltype);
-      assert _alltype.dual().isa(vm);
+      if( !(_alltype.dual().isa(vm) && vm.isa(_alltype)) ) {
+        _errs++;
+        System.out.println("Not in alltype bounds");
+        vm = n.value(_gvn);
+        assert _alltype.dual().isa(vm) && vm.isa(_alltype);
+      }
       Type old = put(xxx,vm);
       assert old==null;
       push(xxx);            // Now visit all children
@@ -374,7 +378,7 @@ public class TestNode {
     // The major monotonicity assert
     int x1 = xx(xx,1);
     int y1 = idx==1 ? yx : x1;
-    if( vn!= vm && !vn.isa(vm) && !special_cast_exception(n,x1,y1,all) ) {
+    if( vn!= vm && !vn.isa(vm) ) {
       int x0 = xx(xx,0), x2 = xx(xx,2), x3 = xx(xx,3);
       System.out.println(n.xstr()+"("+all[x0]+","+all[x1]+","+all[x2]+","+all[x3]+") = "+vn);
       System.out.println(n.xstr()+"("+all[idx==0?yx:x0]+","+all[idx==1?yx:x1]+","+all[idx==2?yx:x2]+","+all[idx==3?yx:x3]+") = "+vm);
@@ -391,22 +395,6 @@ public class TestNode {
     Type err_m = n.value(_gvn);
 
     assert err_n.isa(err_m);
-  }
-
-  // CastNode does a JOIN, sometimes with NIL.  This leads to weird
-  // crossing-nil cases that we end up checking for, which should not matter
-  // For Real.  Example: Cast to a "str" which is really a *[4]str.  Argument
-  // is either a NIL or a Number.  This is a basic distributivity property:
-  // If A-isa-B, then A.join(C) -isa- B.join(C).
-  //  NIL-isa-Number.  Thus NIL.join(str) -isa- Number.join(str).
-  // NIL-JOIN-*[4]str yields *[0+4+]str? (high string-or-NIL choice).
-  // Number-JOIN-*[4]str yields ~nScalar (because the Cast is in-error, mixing
-  // numbers and pointers).  Since NIL-isa-Number, we expect
-  // *[0+4+]str?-isa-~nScalar (via basic distributivity property).
-  //
-  private boolean special_cast_exception(Node n, int x1, int y1, Type[] all ) {
-    //return n instanceof CastNode && (all[x1]==Type.NIL || all[y1]==Type.NIL);
-    return false;
   }
 
   @SuppressWarnings("unchecked")

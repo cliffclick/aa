@@ -18,7 +18,7 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
     return _any ==((TypeObj)o)._any;
   }
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
-  @Override String str( VBitSet dups ) { return _any?"~obj":"obj"; }
+  @Override String str( VBitSet dups ) { return _name+(_any?"~obj":"obj"); }
 
   private static TypeObj FREE=null;
   @Override protected O free( O ret ) { FREE=this; return ret; }

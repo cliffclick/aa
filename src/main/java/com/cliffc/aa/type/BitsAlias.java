@@ -22,10 +22,9 @@ public class BitsAlias extends Bits<BitsAlias> {
 
   static final Bits.Tree<BitsAlias> TREE = new Bits.Tree<>();
   @Override public Tree<BitsAlias> tree() { return TREE; }
-  public  static final int ALL, REC, CLOSURE, ARY, STR;
-          static BitsAlias STRBITS0;
-          static BitsAlias RECBITS, NIL;
-  public  static BitsAlias FULL, NZERO, RECBITS0, ANY, CLOSURE_BITS, EMPTY, STRBITS;
+  public  static final int ALL, TUPLE, CLOSURE, ARY, STR, RECORD;
+          static BitsAlias NIL, RECORD_BITS, RECORD_BITS0, TUPLE_BITS, STRBITS0;
+  public  static BitsAlias FULL, NZERO, ANY, TUPLE_BITS0, CLOSURE_BITS, EMPTY, STRBITS;
 
   static {
     // The All-Memory alias class
@@ -35,18 +34,21 @@ public class BitsAlias extends Bits<BitsAlias> {
     ANY = FULL.dual();          // Precompute dual
     NIL = make0(0);             // No need to dual; NIL is its own dual
     EMPTY = NZERO.make();       // No bits
-    // Split All-Memory into Structs/Records and Arrays (including Strings).
+    // Split All-Memory into Records/Tuples/Structs and Arrays (including Strings).
     // Everything falls into one of these two camps.
-    RECBITS = make0(REC = type_alias(ALL));
-    RECBITS0 = RECBITS.meet_nil();
+    RECORD_BITS = make0(RECORD = type_alias(ALL));
+    RECORD_BITS0 = RECORD_BITS.meet_nil();
+    // Split Records into Tuple/Structs vs Closures
+    TUPLE_BITS = make0(TUPLE = type_alias(RECORD));
+    TUPLE_BITS0 = TUPLE_BITS.meet_nil();
     // Closures are just like structs/records except they are made on function
     // entry to hold arguments.  They typically have a stack-like lifetime, but
     // they are full closures and lifetime can be indefinite.
-    CLOSURE_BITS = make0(CLOSURE = type_alias(REC));
+    CLOSURE_BITS = make0(CLOSURE = type_alias(RECORD));
     
     // Arrays
     ARY = type_alias(ALL);
-    // Split Arrays into Strings (and other arrays)
+    // Split Arrays into Strings (vs other arrays)
     STRBITS = make0(STR = type_alias(ARY));
     STRBITS0 = STRBITS.meet_nil();
   }

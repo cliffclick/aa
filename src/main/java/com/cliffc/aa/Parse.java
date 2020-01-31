@@ -272,7 +272,7 @@ public class Parse {
       rez = _e.add_fun(bad,tvar,epi1); // Return type-name constructor
       // For Structs, add a second constructor taking an expanded arg list
       if( t instanceof TypeStruct ) {   // Add struct types with expanded arg lists
-        FunPtrNode epi2 = IntrinsicNode.convertTypeNameStruct((TypeStruct)tn, BitsAlias.REC, _gvn);
+        FunPtrNode epi2 = IntrinsicNode.convertTypeNameStruct((TypeStruct)tn, BitsAlias.TUPLE, _gvn);
         Node rez2 = _e.add_fun(bad,tvar,epi2); // type-name constructor with expanded arg list
         _gvn.init0(rez2._uses.at(0));      // Force init of Unresolved
       }
@@ -901,7 +901,7 @@ public class Parse {
     if( !(t instanceof TypeObj) ) return t; // Primitives are not wrapped
     // Automatically convert to reference for fields.
     // Make a reasonably precise alias.
-    int type_alias = t instanceof TypeStruct ? BitsAlias.REC : BitsAlias.STR;
+    int type_alias = t instanceof TypeStruct ? BitsAlias.TUPLE : BitsAlias.STR;
     TypeMemPtr tmp = TypeMemPtr.make(BitsAlias.make0(type_alias),(TypeObj)t);
     return typeq(tmp);          // And check for null-ness
   }

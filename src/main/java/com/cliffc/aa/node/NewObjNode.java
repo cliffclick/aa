@@ -19,7 +19,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
   // closures so variable stores can more easily fold into them.
   public NewObjNode( boolean is_closure, Node ctrl ) {
     this(is_closure,
-         is_closure ? BitsAlias.CLOSURE : BitsAlias.REC,
+         is_closure ? BitsAlias.CLOSURE : BitsAlias.TUPLE,
          TypeStruct.ALLSTRUCT,ctrl);
   }
   public NewObjNode( boolean is_closure, int par_alias, TypeStruct ts, Node ctrl ) {

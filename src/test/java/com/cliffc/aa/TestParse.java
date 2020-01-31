@@ -162,7 +162,7 @@ public class TestParse {
     test("x=3; mul2={x -> x*2}; mul2(2.1)", TypeFlt.con(2.1*2.0)); // must inline to resolve overload {*}:Flt with I->F conversion
     test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
     test("sq={x -> x*x}; sq 2.1", TypeFlt.con(4.41)); // No () required for single args
-    testerr("sq={x -> x&x}; sq(\"abc\")", "*[$]\"abc\" is not a int64",24);
+    testerr("sq={x -> x&x}; sq(\"abc\")", "*[$]\"abc\" is not a int64",12);
     testerr("sq={x -> x*x}; sq(\"abc\")", "*[$]\"abc\" is not a flt64",12);
     testerr("f0 = { f x -> f0(x-1) }; f0({+},2)", "Passing 1 arguments to f0={->} which takes 2 arguments",21);
     // Recursive:
@@ -403,6 +403,20 @@ public class TestParse {
 
   @Test public void testParse08() {
     // Recursive tree map function.
+    // Pulled call to 'fun' in inner - and hit infinite iter loop.
+    // Once this gets to end, expect 'l unknown field' bug.
+    // So next step is to simplify one tree layer but keep 'fun'.
+
+    // Asking self "why TMP._obj?" which basically is "why do ptrs carry structure info in addition to alias#?"
+    // It seems to be related to presence of correct fields?
+    // But these are carried in the alias#->TypeMem->TypeStruct.
+    //
+    // So remember I yanked TMP._obj and recursive Types, and then brought it
+    // back.  Not sure why I need it still.  And: is there a bug where I'm
+    // using tmp._obj instead of pulling from the TypeMem?- No, just looked,
+    // no real uses.  I believe I can pull recursive types again.
+    //
+    //
     test_ptr("tmp=@{"+
                     "  l=@{"+
                     "    l=@{ l=0; r=0; v=3 };"+
@@ -417,10 +431,38 @@ public class TestParse {
                     "  v=12 "+
                     "};"+
                     "map={tree fun -> tree"+
-                    "     ? @{ll=map(tree.l,fun);rr=map(tree.r,fun);vv=fun(tree.v)}"+
+                    "     ? @{ll=map(tree.l,fun);rr=map(tree.r,fun);vv=tree.v&tree.v}"+
                     "     : 0};"+
-                    "map(tmp,{x->x+x})",
+                    "map(tmp,{x->x&x})",
             "@{ll==*[$],rr==*[$],vv==int64}");
+    // WORKS (probably via complete unroll)
+    test_ptr("tmp=@{ l=@{l=0;r=0;v= 5};"+
+                    "r=@{l=0;r=0;v=20};"+
+                    "v=12};"+
+                    "map={tree -> tree"+
+                    "     ? @{ll=map(tree.l);rr=map(tree.r);vv=tree.v&tree.v}"+
+                    "     : 0};"+
+                    "map(tmp)",
+            "@{ll==*[$]@{ll==nil;rr==nil;vv==5}!;rr==*[$]@{ll==nil;rr==nil;vv==20}!;vv==12}!");
+    // WORKS.  Printout is poor, ignore _obj field except for struct fields.
+    test_ptr("tmp=@{"+
+                    "  l=@{"+
+                    "    l=@{ l=0; r=0; v=3 };"+
+                    "    r=@{ l=0; r=0; v=7 };"+
+                    "    v=5"+
+                    "  };"+
+                    "  r=@{"+
+                    "    l=@{ l=0; r=0; v=15 };"+
+                    "    r=@{ l=0; r=0; v=22 };"+
+                    "    v=20"+
+                    "  };"+
+                    "  v=12 "+
+                    "};"+
+                    "map={tree -> tree"+
+                    "     ? @{ll=map(tree.l);rr=map(tree.r);vv=tree.v&tree.v}"+
+                    "     : 0};"+
+                    "map(tmp)",
+            "@{ll=*[$]@{ll:=nil;rr:=nil;vv:=nil}!?;rr=$;vv=int8}!");
 
     // Failed attempt at a Tree-structure inference test.  Triggered all sorts
     // of bugs and error reporting issues, so keeping it as a regression test.
@@ -478,7 +520,7 @@ public class TestParse {
 
     // After inlining once, we become pair-aware.
     test_isa(ll_cona+ll_conb+ll_conc+ll_cond+ll_cone+ll_cont+ll_map2+ll_fun2+ll_apl2,
-             TypeMemPtr.make(BitsAlias.RECBITS0,TypeStruct.make(TypeMemPtr.make(BitsAlias.RECBITS0,TypeStruct.make(TypeMemPtr.STRUCT0,TypeInt.INT64)),TypeMemPtr.STRPTR)));
+             TypeMemPtr.make(BitsAlias.TUPLE_BITS0,TypeStruct.make(TypeMemPtr.make(BitsAlias.TUPLE_BITS0,TypeStruct.make(TypeMemPtr.STRUCT0,TypeInt.INT64)),TypeMemPtr.STRPTR)));
 
     throw AA.unimpl();
   }

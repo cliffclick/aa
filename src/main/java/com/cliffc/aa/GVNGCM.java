@@ -351,7 +351,7 @@ public class GVNGCM {
     //if( !t.isa(oldt) ) {
     //  System.out.println("Backwards to: "+t+"\nfrom: "+n.dump(0,this));
     //assert t.isa(oldt);         // Monotonically improving
-    }
+    //}
     _ts._es[n._uid] = null;     // Remove in case we replace it
     // Replace with a constant, if possible
     if( replace_con(t,n) )

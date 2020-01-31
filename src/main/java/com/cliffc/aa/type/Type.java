@@ -337,25 +337,33 @@ public class Type<T extends Type<T>> implements Cloneable {
 
     // Meet the names.  Subclasses basically ignore the names as they have
     // their own complicated meets to perform, so we meet them here for all.
-    String n = mtname(t);
-    // If the names are incompatible and the meet remained high then the
-    // mismatched names force a drop.
-    if( n.length() < _name.length() && n.length() < t._name.length() && mt.above_center() ) {
-      if( mt.interned() ) // recursive type creation?
-        mt = mt.dual();           // Force low
-    }
-    // Inject the name
-    if( !Util.eq(mt._name,n) )  // Fast path cutout
-      mt = mt.set_name(n);
+    Type nmt = xmt_name(t,mt);
 
     // Quick check on NIL: if either argument is NIL the result is allowed to
     // be NIL...  but nobody in the lattice can make a NIL from whole cloth, or
     // we get the crossing-nil bug.
-    assert mt != NIL || this==NIL || t==NIL;
+    assert nmt != NIL || this==NIL || t==NIL;
 
     // Record this meet, to short-cut next time
     if( RECURSIVE_MEET == 0 )   // Only not mid-building recursive types;
-      Key.put(this,t,mt);
+      Key.put(this,t,nmt);
+    return nmt;
+  }
+
+  // Meet the names.  Subclasses basically ignore the names as they have
+  // their own complicated meets to perform, so we meet them here for all.
+  private Type xmt_name(Type t, Type mt) {
+    String n = mtname(t,mt);    // Meet name strings
+    // If the names are incompatible and the meet remained high then the
+    // mismatched names force a drop.
+    if( n.length() < _name.length() && n.length() < t._name.length() && mt.above_center() ) {
+      if( mt.interned() ) // recursive type creation?
+        mt = mt.dual();   // Force low
+    }
+    if( mt._type==TALL || mt._type==TANY ) n = ""; // No named ANY,ALL
+    // Inject the name
+    if( !Util.eq(mt._name,n) )  // Fast path cutout
+      mt = mt.set_name(n);
     return mt;
   }
 
@@ -365,8 +373,8 @@ public class Type<T extends Type<T>> implements Cloneable {
   protected Type xmeet(Type t) {
     assert is_simple(); // Should be overridden in subclass
     // ANY meet anything is thing; thing meet ALL is ALL
-    if( this==ALL || t==ANY ) return this;
-    if( this==ANY || t==ALL ) return    t;
+    if( _type==TALL || t._type==TANY ) return this;
+    if( _type==TANY || t._type==TALL ) return    t;
 
     // Ctrl can only meet Ctrl, XCtrl or Top
     byte type = (byte)(_type|t._type); // the OR is low if both are low
@@ -482,7 +490,7 @@ public class Type<T extends Type<T>> implements Cloneable {
 
   // TODO: will also need a unique lexical numbering, not just a name, to
   // handle the case of the same name used in two different scopes.
-  final String mtname(Type t) {
+  final String mtname(Type t, Type mt) {
     Type   t0 = this,  t1 = t;
     String s0 = t0._name, s1 = t1._name;
     assert check_name(s0) && check_name(s1);
@@ -497,7 +505,7 @@ public class Type<T extends Type<T>> implements Cloneable {
       if( c==':' ) x=i;
     }
     // If s0 is a prefix of s1, and s0 is high then it can cover s1.
-    if( i==s0.length() && t0.above_center() )
+    if( i==s0.length() && t0.above_center() && (!t1.above_center() || mt.above_center()) )
       return s1;
     // Keep the common prefix, which might be all of s0
     String s2 = i==s0.length() ? s0 : s0.substring(0, x).intern();
@@ -512,8 +520,12 @@ public class Type<T extends Type<T>> implements Cloneable {
     if( t==this ) return true;
     if( is_simple() && !t.is_simple() ) return true; // By design, flipped the only allowed order
     Type mt2 = t.xmeet(this);   // Reverse args and try again
-    if( mt==mt2 ) return true;
-    System.out.println("Meet not commutative: "+this+".meet("+t+")="+mt+",\n but "+t+".meet("+this+")="+mt2);
+
+    // Also reverse names.
+    Type nmt2 = t.xmt_name(this,mt);
+
+    if( mt==nmt2 ) return true;
+    System.out.println("Meet not commutative: "+this+".meet("+t+")="+mt+",\n but "+t+".meet("+this+")="+nmt2);
     return false;
   }
   private boolean check_symmetric( Type t, Type mt ) {
@@ -823,10 +835,10 @@ public class Type<T extends Type<T>> implements Cloneable {
   // Is t type contained within this?  Short-circuits on a true
   public final boolean contains( Type t ) { return contains(t,null); }
   boolean contains( Type t, VBitSet bs ) { return this==t; }
-  
+
   // Mark (recursively) all memory as clean/unmodified
   public Type clean() { return this; }
-  
+
   // Apply the test(); if it returns true iterate over all nested child types.
   // If the test returns false, short-circuit the walk.  No attempt to guard
   // against recursive structure walks, so the 'test' must return false when

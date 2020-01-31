@@ -206,33 +206,43 @@ public class CallNode extends Node {
   // merge from that path.
   @Override public TypeTuple value(GVNGCM gvn) {
     Type[] ts = TypeAry.get(_defs._len);
-    for( int i=0; i<_defs._len; i++ )
-      ts[i] = gvn.type(in(i));
-    // Not executed, then no function and no memory
-    if( ts[0] != Type.CTRL ) {
-      ts[1] = TypeFunPtr.GENERIC_FUNPTR.dual();
-      ts[2] = TypeMem.EMPTY;
-      return TypeTuple.make(ts);
-    }
-    // Not a function to call?
-    if( !(ts[1] instanceof TypeFunPtr) )
-      ts[1] = ts[1].above_center() ? TypeFunPtr.GENERIC_FUNPTR.dual() : TypeFunPtr.GENERIC_FUNPTR;
-    TypeFunPtr tfp = (TypeFunPtr)ts[1];
-    BitsFun fidxs = tfp.fidxs();
-    if( tfp.above_center() || fidxs.above_center() ) { // Not a function to call
-      ts[2] = TypeMem.EMPTY;                           // And thus no memory used
-      return TypeTuple.make(ts);
-    }
-    // Not a memory to the call?
-    if( !(ts[2] instanceof TypeMem) )
-      ts[2] = ts[2].above_center() ? TypeMem.EMPTY : TypeMem.FULL;
-    TypeMem tmem = (TypeMem)ts[2];
-    if( tmem == TypeMem.EMPTY )  // Nothing to trim
-      return TypeTuple.make(ts);
-    // If calling everything then not much we can do
-    if( fidxs.test(BitsFun.ALL) )
-      return TypeTuple.make(ts);
 
+    // Pinch to XCTRL/CTRL
+    Type ctl = gvn.type(ctl());
+    if( ctl == Type.ALL  ) ctl = Type. CTRL;
+    if( ctl != Type.CTRL ) ctl = Type.XCTRL;
+    ts[0] = ctl;
+
+    // Not a function to call?
+    Type tfx = gvn.type(fun());
+    if( !(tfx instanceof TypeFunPtr) )
+      tfx = tfx.above_center() ? TypeFunPtr.GENERIC_FUNPTR.dual() : TypeFunPtr.GENERIC_FUNPTR;
+    TypeFunPtr tfp = (TypeFunPtr)(ts[1] = tfx);
+    BitsFun fidxs = tfp.fidxs();
+    // Can we call this function pointer?
+    boolean callable = !(tfp.above_center() || fidxs.above_center());
+
+    // Not a memory to the call?
+    Type mem = gvn.type(mem());
+    if( !(mem instanceof TypeMem) )
+      mem = mem.above_center() ? TypeMem.EMPTY : TypeMem.FULL;
+    TypeMem tmem = (TypeMem)(ts[2] = mem);
+    // If not callable, do not call
+    if( !callable ) { ts[0] = ctl = Type.XCTRL; }
+    // If not called, then no memory to functions
+    if( ctl == Type.XCTRL ) { ts[2] = tmem = TypeMem.EMPTY; }
+
+    // Copy args for called functions
+    for( int i=3; i<_defs._len; i++ )
+      ts[i] = gvn.type(in(i));
+    
+    // Quick exit if cannot further trim memory
+    if( ctl == Type.XCTRL ||     // Not calling
+        tmem == TypeMem.EMPTY || // Nothing to trim
+        // If calling everything then not much we can do
+        fidxs.test(BitsFun.ALL) )
+      return TypeTuple.make(ts);
+    
     // Trim unused aliases, specifically to prevent local closures from escaping.
     // Here, I start with all alias#s from TMP args plus all function
     // closure#s and "close over" the set of possible aliases.
@@ -261,8 +271,7 @@ public class CallNode extends Node {
 
     // Add all the aliases which can be reached from objects at the existing
     // aliases, recursively.
-    TypeMem trez = tmem.trim_to_alias(abs);
-    ts[2] = trez;
+    ts[2] = tmem.trim_to_alias(abs);
     return TypeTuple.make(ts);
   }
 
@@ -398,7 +407,7 @@ public class CallNode extends Node {
     Arrays.fill(ts,Type.ALL);
     ts[0] = Type.CTRL;
     ts[1] = TypeFunPtr.GENERIC_FUNPTR;
-    ts[2] = TypeMem.EMPTY;
+    ts[2] = TypeMem.FULL;
     return TypeTuple.make(ts);
   }
   // Set of used aliases across all inputs (not StoreNode value, but yes address)

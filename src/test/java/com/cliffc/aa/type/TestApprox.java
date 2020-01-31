@@ -16,7 +16,7 @@ public class TestApprox {
   // Check TypeStruct.meet for a more complex recursive case
   @Test public void testTSMeet() {
     Type.init0(new HashMap<>());
-    int alias0 = BitsAlias.new_alias(BitsAlias.REC);
+    int alias0 = BitsAlias.new_alias(BitsAlias.TUPLE);
     BitsAlias alias = BitsAlias.make0(alias0);
     String[] flds = new String[]{"a","b"};
     byte[] finals = new byte[]{1,1};
@@ -56,7 +56,7 @@ public class TestApprox {
   @Test public void testApprox1() {
     Type.init0(new HashMap<>());
     final int CUTOFF = 3;
-    int alias0 = BitsAlias.new_alias(BitsAlias.REC);
+    int alias0 = BitsAlias.new_alias(BitsAlias.TUPLE);
     String[] flds = new String[]{"a","b"};
     byte[] finals = new byte[]{1,1};
 
@@ -126,7 +126,7 @@ public class TestApprox {
   @Test public void testApprox2() {
     Type.init0(new HashMap<>());
     final int CUTOFF = 3;
-    int alias0 = BitsAlias.new_alias(BitsAlias.REC);
+    int alias0 = BitsAlias.new_alias(BitsAlias.TUPLE);
     BitsAlias alias = BitsAlias.make0(alias0);
     String[] flds = new String[]{"a","b"};
     byte[] finals = new byte[]{1,1};
@@ -236,8 +236,8 @@ public class TestApprox {
   @Test public void testApprox3() {
     Type.init0(new HashMap<>());
     final int CUTOFF = 3;
-    int alias0 = BitsAlias.new_alias(BitsAlias.REC);
-    int alias1 = BitsAlias.new_alias(BitsAlias.REC);
+    int alias0 = BitsAlias.new_alias(BitsAlias.TUPLE);
+    int alias1 = BitsAlias.new_alias(BitsAlias.TUPLE);
     BitsAlias ba0 = BitsAlias.make0(alias0);
     BitsAlias ba1 = BitsAlias.make0(alias1);
     String[] flds2 = new String[]{"v","x"};
@@ -401,7 +401,7 @@ public class TestApprox {
   @Test public void testApprox4() {
     Type.init0(new HashMap<>());
     final int CUTOFF = 3;
-    int alias = BitsAlias.new_alias(BitsAlias.REC);
+    int alias = BitsAlias.new_alias(BitsAlias.TUPLE);
     String[] flds = new String[]{"v","l","r"};
     byte[] finals = new byte[]{1,1,1};
     Type nil = Type.NIL;
@@ -507,7 +507,7 @@ public class TestApprox {
   @Test public void testApprox5() {
     Type.init0(new HashMap<>());
     final int CUTOFF = 2;
-    int alias = BitsAlias.new_alias(BitsAlias.REC);
+    int alias = BitsAlias.new_alias(BitsAlias.TUPLE);
     String[] flds = new String[]{"l","r","v"};
     byte[] finals = new byte[]{1,1,1};
 
@@ -544,7 +544,7 @@ public class TestApprox {
   @Test public void testApprox6() {
     Type.init0(new HashMap<>());
     final int CUTOFF = 2;
-    int alias = BitsAlias.new_alias(BitsAlias.REC);
+    int alias = BitsAlias.new_alias(BitsAlias.TUPLE);
     BitsAlias ba = BitsAlias.make0(alias);
     String[] flds = new String[]{"l","r","v"};
     byte[] finals = new byte[]{1,1,1};

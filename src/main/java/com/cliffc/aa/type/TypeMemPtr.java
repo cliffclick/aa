@@ -85,8 +85,8 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   public  static final TypeMemPtr STR0   = make(BitsAlias.STRBITS0,TypeStr.STR);
   public  static final TypeMemPtr ABCPTR = make(BitsAlias.type_alias(BitsAlias.STR),TypeStr.ABC);
   public  static final TypeMemPtr ABC0   = (TypeMemPtr)ABCPTR.meet_nil();
-  public  static final TypeMemPtr STRUCT = make(BitsAlias.RECBITS ,TypeStruct.ALLSTRUCT);
-  public  static final TypeMemPtr STRUCT0= make(BitsAlias.RECBITS0,TypeStruct.ALLSTRUCT);
+  public  static final TypeMemPtr STRUCT = make(BitsAlias.RECORD_BITS ,TypeStruct.ALLSTRUCT);
+  public  static final TypeMemPtr STRUCT0= make(BitsAlias.RECORD_BITS0,TypeStruct.ALLSTRUCT);
   static final TypeMemPtr[] TYPES = new TypeMemPtr[]{OOP0,STR0,STRPTR,ABCPTR,STRUCT};
 
   @Override protected TypeMemPtr xdual() {

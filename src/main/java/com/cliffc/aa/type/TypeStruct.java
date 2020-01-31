@@ -271,6 +271,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public  static final TypeStruct INT64       = make(ARGS_X ,ts(TypeInt.INT64)); // @{x:int}
 
   // A bunch of types for tests
+  public  static final TypeStruct NAMEPT= make("Point:",flds("x","y"),ts(TypeFlt.FLT64,TypeFlt.FLT64),finals(2));
   public  static final TypeStruct POINT = make(flds("x","y"),ts(TypeFlt.FLT64,TypeFlt.FLT64));
           static final TypeStruct TFLT64= make(          ts(TypeFlt.FLT64 )); //  (  flt)
   public  static final TypeStruct A     = make(flds("a"),ts(TypeFlt.FLT64 ));
@@ -278,7 +279,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   private static final TypeStruct D1    = make(flds("d"),ts(TypeInt.TRUE  )); // @{d:1}
   private static final TypeStruct ARW   = make(flds("a"),ts(TypeFlt.FLT64),new byte[]{frw()});
 
-  static final TypeStruct[] TYPES = new TypeStruct[]{ALLSTRUCT,STR_STR,FLT64,POINT,A,C0,D1,ARW};
+  static final TypeStruct[] TYPES = new TypeStruct[]{ALLSTRUCT,STR_STR,FLT64,POINT,NAMEPT,A,C0,D1,ARW};
 
   // Extend the current struct with a new named field
   public TypeStruct add_fld( String name, Type t, byte mutable ) {
@@ -534,7 +535,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       mt._flds  [i] = smeet(mt._flds  [i],mx._flds  [i]); // Set the Meet of field names
       mt._finals[i] = fmeet(mt._finals[i],mx._finals[i]); // Set the Meet of field access
     }
-    mt._name = mt.mtname(mx);
+    mt._name = mt.mtname(mx,mt);
     mt._hash = mt.compute_hash(); // Compute hash now that fields and finals are set
 
     // Since the result is cyclic, we cannot test the cyclic parts for
