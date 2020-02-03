@@ -47,6 +47,7 @@ public class ParmNode extends PhiNode {
   
   @Override public Type value(GVNGCM gvn) {
     Type t = super.value(gvn);
+    t = t.bound(_alltype);
     // Memory tracks the notion of 'clean' or 'unwritten' since the function
     // start.  Changed memory is returned at exit and unchanged memory is NOT
     // returned - and CallEpis are aware of this behavior and do the correct

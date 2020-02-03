@@ -14,10 +14,9 @@ import com.cliffc.aa.type.*;
 public class TypeNode extends Node {
   private final Type _t;            // Asserted type
   private final Parse _error_parse; // Used for error messages
-  public TypeNode( Type t, Node a, Node emem, Parse P ) { super(OP_TYPE,null,a,emem); _t=t; _error_parse = P; }
+  public TypeNode( Type t, Node a, Parse P ) { super(OP_TYPE,null,a); _t=t; _error_parse = P; }
   @Override String xstr() { return "assert:"+_t; }
   Node arg() { return in(1); }
-  Node mem() { return in(2); }  // Only for errors
 
   @Override public Node ideal(GVNGCM gvn, int level) {
     Node arg = arg();
@@ -37,15 +36,15 @@ public class TypeNode extends Node {
       for( int i=0; i<targs.length; i++ ) {
         // All the parms, with types
         Node parm = gvn.xform(new ParmNode(i,"arg"+i,fun,gvn.con(Type.SCALAR),null));
-        args[i+3] = gvn.xform(new TypeNode(targs[i],parm,args[2],_error_parse));
+        args[i+3] = gvn.xform(new TypeNode(targs[i],parm,_error_parse));
       }
       CallNode call = (CallNode)gvn.xform(new CallNode(true,_error_parse,args));
-      Node cepi = gvn.xform(new CallEpiNode(call)).keep();
-      Node ctl  = gvn.xform(new CProjNode(cepi,0));
-      Node postmem = gvn.xform(new MProjNode(cepi,1));
-      Node val  = gvn.xform(new  ProjNode(cepi.unhook(),2));
-      Node chk  = gvn.xform(new  TypeNode(tfp._ret,val,postmem,_error_parse)); // Type-check the return also
-      RetNode ret = (RetNode)gvn.xform(new RetNode(ctl,postmem,chk,rpc,fun));
+      Node cepi   = gvn.xform(new CallEpiNode(call)).keep();
+      Node ctl    = gvn.xform(new CProjNode(cepi,0));
+      Node postmem= gvn.xform(new MProjNode(cepi,1)).keep();
+      Node val    = gvn.xform(new  ProjNode(cepi.unhook(),2));
+      Node chk    = gvn.xform(new  TypeNode(tfp._ret,val,_error_parse)); // Type-check the return also
+      RetNode ret = (RetNode)gvn.xform(new RetNode(ctl,postmem.unhook(),chk,rpc,fun));
       return gvn.xform(new FunPtrNode(ret));
     }
 
@@ -63,7 +62,7 @@ public class TypeNode extends Node {
         //(!(fun instanceof FunNode) || !((FunNode)fun).has_unknown_callers()) ) {
         fun.getClass() == RegionNode.class ) {
       for( int i=1; i<arg._defs._len; i++ )
-        gvn.set_def_reg(arg,i,gvn.xform(new TypeNode(_t,arg.in(i),mem(),_error_parse)));
+        gvn.set_def_reg(arg,i,gvn.xform(new TypeNode(_t,arg.in(i),_error_parse)));
       return arg;               // Remove TypeNode, since completely replaced
     }
 
@@ -76,6 +75,6 @@ public class TypeNode extends Node {
   }
   @Override public Type all_type() { return Type.SCALAR; }
   // Check TypeNode for being in-error
-  @Override public String err(GVNGCM gvn) { return _error_parse.typerr(gvn.type(arg()),_t,mem()); }
+  @Override public String err(GVNGCM gvn) { return _error_parse.typerr(gvn.type(arg()),_t,null); }
   @Override public BitsAlias alias_uses(GVNGCM gvn) { return BitsAlias.EMPTY; }
 }

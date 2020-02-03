@@ -1,6 +1,5 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
 
@@ -272,41 +271,58 @@ public class TypeMem extends Type<TypeMem> {
     return obj;
   }
 
-  // Meet of all possible storable values, after updates.  This updates a field
-  // in a TypeObj.
-  //public TypeMem update( byte fin, String fld, int fld_num, Type val, TypeMemPtr ptr ) {
-  //  assert val.isa_scalar();
-  //  if( this==EMPTY ) return this;
-  //  // Any alias, plus all of its children, are meet/joined.  This does a
-  //  // tree-based scan on the inner loop.
-  //  Ary<TypeObj> objs = new Ary<>(_aliases.clone(),_aliases.length);
-  //  BitSet bs = ptr._aliases.tree().plus_kids(ptr._aliases);
-  //  // Choice store: something got stored into, but we can choose, and we
-  //  // choose nothing visible to anybody else.
-  //  if( ptr.above_center() ) {
-  //    if( fin != TypeStruct.ffinal() ) return this;
-  //    for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) )
-  //      objs.setX(alias, at(alias).lift_final());
-  //  } else {
-  //    for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) )
-  //      //objs.setX(alias, at(alias).update(fin,fld,fld_num,val));
-  //      throw com.cliffc.aa.AA.unimpl();
-  //  }
-  //  return make0(objs.asAry());
-  //}
-  //
-  //// Meet of all possible storable values, after updates.  This is a whole-TypeObj update.
-  //public TypeMem update( BitsAlias aliases, TypeObj obj ) {
-  //  // Any alias, plus all of its children, are meet.  This does a tree-based
-  //  // scan on the inner loop.
-  //  Ary<TypeObj> objs = new Ary<>(_aliases.clone(),_aliases.length);
-  //  BitSet bs = aliases.tree().plus_kids(aliases);
-  //  for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) )
-  //    objs.setX(alias, (TypeObj)at(alias).meet(obj));
-  //  return make0(objs.asAry());
-  //}
+  // Imprecise store at an alias.  This alias has escaped and versions of it
+  // are available under alias#1.  Thus it merges with its parent alias# which
+  // has already been merged with its' parent, recursively, up to alias#1.  If
+  // alias#1 is obj (common pre-gcp) then all information is lost.  If alias#1
+  // is ~obj (common from the program start) then some precision is kept, but
+  // can be lost at each alias layer.  Since the store is imprecise, all
+  // children aliases are 'meet' as well which typically wipes out any detail.
+  public TypeMem st( int alias, TypeObj obj ) {
+    //// Must be monotonic up the alias layer#s to do an imprecise store here.
+    //// If some higher layer did an precise store and thus was not monotonic
+    //// with ITS parent, I would not expect to lose that precision later.
+    //int kid = at_idx(alias);
+    //while( kid > 1 ) {          // Test for monotonic up to alias#1
+    //  int par = at_idx(BitsAlias.TREE.parent(kid));
+    //  assert _aliases[par].isa(_aliases[kid]);
+    //  kid = par;
+    //  throw com.cliffc.aa.AA.unimpl(); // untested
+    //}
+    //// Test for children being monotonic also.
+    //for( int i=alias+1; i<_aliases.length; i++ )
+    //  if( BitsAlias.TREE.is_parent(alias,i) ) {
+    //    int j = i;
+    //    while( j > alias ) {    // Test for monotonic up to alias#
+    //      int par = at_idx(BitsAlias.TREE.parent(j));
+    //      assert _aliases[par].isa(_aliases[j]);
+    //      j = par;
+    //      throw com.cliffc.aa.AA.unimpl(); // untested
+    //    }
+    //    assert j==alias;
+    //  }
+    //
+    //// In theory, i need to meet 'obj' with all child alias#s, and the line
+    //// from here up to the alias#1.  Once i lower a parent (could e.g. lower
+    //// alias#1), unrelated siblings need to be lower than their parent also.
+    //// This drops the entire tree, pretty much - unless i hit no-change places,
+    //// and a common one is if the tree is already at bottom/obj.  Exception is
+    //// if i had a *precise* update some time prior, so the tree is no longer
+    //// monotonic.  Precise sibling updates are not stomped by this store.
+    //// TODO: CNC
+    //// Means TypeMem needs to track precise updates???
 
-  // Mark all memory as being clean.
+
+    TypeObj[] ts = Arrays.copyOf(_aliases,Math.max(alias+1,_aliases.length));
+    ts[alias] = (TypeObj)at(alias).meet(obj); // Set parent with meet
+    // Now update all children as well.
+    for( int i=alias+1; i<ts.length; i++ )
+      if( ts[i] != null && BitsAlias.is_parent(alias,i) )
+        ts[i] = (TypeObj)ts[i].meet(obj);
+    return make0(ts);
+  }
+
+  // Mark all memory as being clean.  Recursive.
   public TypeMem clean() {
     if( this==MEM || this==MEM_CLN )
       return MEM_CLN;           // Shortcut
@@ -324,19 +340,6 @@ public class TypeMem extends Type<TypeMem> {
       if( alias != 0 && !at(alias).is_clean(fld) )
         return false;
     return true;
-  }
-
-  // Exact alias update
-  public TypeMem st( int alias, TypeObj obj ) {
-    //assert !BitsAlias.TREE.is_parent(alias);
-    Ary<TypeObj> objs = new Ary<>(_aliases.clone(),_aliases.length);
-    TypeObj rez = alias < _aliases.length && _aliases[alias] != null
-      // Merge into a prior sharp value
-      ? (TypeObj)_aliases[alias].meet(obj)
-      // Override a prior parent with sharper child
-      : obj;
-    objs.setX(alias,rez);
-    return make0(objs.asAry());
   }
 
   @Override public boolean above_center() {

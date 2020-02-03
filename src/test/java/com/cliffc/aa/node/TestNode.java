@@ -210,17 +210,8 @@ public class TestNode {
                         Type.CTRL,Type.NUM,Type.ANY,Type.ANY);
 
     // All the Nodes, all Values, all Types
-
     test1monotonic(new MemMergeNode(_ins[1],_ins[2],BitsAlias.RECORD));
-    NewObjNode nnn1 = new NewObjNode(false,_ins[0]);
-    set_type(1,Type.SCALAR);  nnn1.create("x",_ins[1],TypeStruct.ffinal(),_gvn);
-    set_type(2,Type.SCALAR);  nnn1.create("y",_ins[2],TypeStruct.ffinal(),_gvn);
-    test1monotonic(nnn1);
-    NewObjNode nnn2 = new NewObjNode(false,_ins[0]);
-    set_type(1,Type.SCALAR);  nnn2.create("x",_ins[1],TypeStruct.ffinal(),_gvn);
-    set_type(2,Type.SCALAR);  nnn2.create("y",_ins[2],TypeStruct.ffinal(),_gvn);
-    nnn2.set_name(tname);
-    test1monotonic(nnn2);
+
     ((ConNode<Type>)_ins[1])._t = Type.SCALAR; // ParmNode reads this for _alltype
     test1monotonic(new   ParmNode( 1, "x",_ins[0],(ConNode)_ins[1],null).add_def(_ins[2]));
     test1monotonic(new    PhiNode(null,_ins[0],_ins[1],_ins[2]));
@@ -232,9 +223,9 @@ public class TestNode {
     test1monotonic(new  StoreNode(_ins[1],_ins[2],_ins[3],(byte)0,"x",null));
     test1monotonic(new  StoreNode(_ins[1],_ins[2],_ins[3],(byte)1,"x",null));
     //                  ScopeNode has no inputs, and value() call is monotonic
-    test1monotonic(new   TypeNode(TypeInt.FALSE    ,_ins[1],null,null));
-    test1monotonic(new   TypeNode(TypeMemPtr.STRPTR,_ins[1],null,null));
-    test1monotonic(new   TypeNode(TypeFlt.FLT64    ,_ins[1],null,null));
+    test1monotonic(new   TypeNode(TypeInt.FALSE    ,_ins[1],null));
+    test1monotonic(new   TypeNode(TypeMemPtr.STRPTR,_ins[1],null));
+    test1monotonic(new   TypeNode(TypeFlt.FLT64    ,_ins[1],null));
 
     test1monotonic(new   CallNode(false,null,_ins[0],  unr  ,mem,_ins[2],_ins[3]));
     test1monotonic(new   CallNode(false,null,_ins[0],_ins[1],mem,_ins[2],_ins[3]));
@@ -260,6 +251,16 @@ public class TestNode {
       test1monotonic_intrinsic(prim);
     test1monotonic(new IntrinsicNode(tname,null,null,mem,_ins[2]));
     test1monotonic(new   LoadNode(_ins[1],_ins[2],"x",null));
+    test1monotonic(new MemMergeNode(_ins[1],_ins[2],BitsAlias.RECORD));
+    NewObjNode nnn1 = new NewObjNode(false,_ins[0]);
+    set_type(1,Type.SCALAR);  nnn1.create_active("x",_ins[1],TypeStruct.ffinal(),_gvn);
+    set_type(2,Type.SCALAR);  nnn1.create_active("y",_ins[2],TypeStruct.ffinal(),_gvn);
+    test1monotonic(nnn1);
+    NewObjNode nnn2 = new NewObjNode(false,_ins[0]);
+    set_type(1,Type.SCALAR);  nnn2.create_active("x",_ins[1],TypeStruct.ffinal(),_gvn);
+    set_type(2,Type.SCALAR);  nnn2.create_active("y",_ins[2],TypeStruct.ffinal(),_gvn);
+    nnn2.set_name(tname);
+    test1monotonic(nnn2);
 
     assertEquals(0,_errs);
   }

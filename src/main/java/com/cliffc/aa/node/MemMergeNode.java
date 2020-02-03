@@ -293,8 +293,18 @@ public class MemMergeNode extends Node {
     return null;
   }
 
+  // MemMerge value() is subtle.  Inputs are at a given alias# or below (some
+  // child alias#).  They are generally not-precise - meaning the same New
+  // producing the same alias# has been called many times in a loop, and these
+  // prior instances have 'escaped' and folded into some parent alias# or this
+  // alias#.  If the input is an escaped 'New' then they escaped all the way
+  // back to alias#1, and this input has to 'meet' alias#1.  If alias#1 is
+  // 'obj' we lose all precision.  If the input is a captured 'New' then this
+  // input is precise, asserted has no children, and replaces the parent for
+  // this alias.
+  
   @Override public Type value(GVNGCM gvn) {
-    // Base type in slot 0
+    // Base memory type in slot 0
     Type t = gvn.type(in(0));
     if( !(t instanceof TypeMem) )
       return t.above_center() ? TypeMem.EMPTY : TypeMem.FULL;
@@ -305,7 +315,11 @@ public class MemMergeNode extends Node {
       Type ta = gvn.type(in(i));
       if( !(ta instanceof TypeObj) ) // Handle ANY, ALL
         ta = ta.above_center() ? TypeObj.XOBJ : TypeObj.OBJ;
-      tm = tm.st(alias,(TypeObj)ta);
+      if( in(i) instanceof OProjNode && in(i).in(0) instanceof NewNode &&
+          ((NewNode)in(i).in(0))._captured )
+        throw com.cliffc.aa.AA.unimpl();
+      else                      // Imprecise memory update
+        tm = tm.st(alias,(TypeObj)ta);
     }
     return tm;
   }

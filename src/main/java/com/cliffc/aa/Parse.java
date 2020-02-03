@@ -140,18 +140,9 @@ public class Parse {
     _gvn.unreg(_e._scope);
     _gvn.unreg(_e._par._scope);
     Node res = _e._scope.pop(); // New and improved result
-    Type tres = _gvn.type(res);
-    TypeObj tobj = TypeObj.XOBJ;
     Node mem = _e._scope.mem();
-    // If returning a pointer, return the (shallow) object pointed at
-    if( tres instanceof TypeMemPtr ) {
-      Type tmem = _gvn.type(mem);
-      if( tmem instanceof TypeMem )
-        tobj = ((TypeMem)tmem).ld((TypeMemPtr)tres);
-    } else if( mem != null ) {
-      _e._scope.set_mem(null,_gvn); // Kill memory, not used for error checks
-      mem = null;
-    }
+    Type tres = _gvn.type(res);
+    TypeMem tmem = (TypeMem)_gvn.type(mem);
 
     // Hunt for typing errors in the alive code
     assert _e._par._par==null; // Top-level only
@@ -165,7 +156,7 @@ public class Parse {
     Ary<String> errs3 = new Ary<>(new String[1],0);
     res   .walkerr_def(errs0,errs1,errs2,errs3,bs,_gvn);
     ctrl().walkerr_def(errs0,errs1,errs2,errs3,bs,_gvn);
-    if( mem != null ) mem.walkerr_def(errs0,errs1,errs2,errs3,bs,_gvn);
+    mem   .walkerr_def(errs0,errs1,errs2,errs3,bs,_gvn);
     if( errs0.isEmpty() ) errs0.addAll(errs1);
     if( errs0.isEmpty() ) errs0.addAll(errs2);
     if( errs0.isEmpty() ) _e._scope.walkerr_use(errs0,new VBitSet(),_gvn);
@@ -179,7 +170,7 @@ public class Parse {
 
     kill(res);       // Kill Node for returned Type result
 
-    return new TypeEnv(tres,tobj,_e,errs0.isEmpty() ? null : errs0);
+    return new TypeEnv(tres,tmem,_e,errs0.isEmpty() ? null : errs0);
   }
 
   /** Parse a top-level:
@@ -811,7 +802,7 @@ public class Parse {
 
   // Add a typecheck into the graph, with a shortcut if trivially ok.
   private Node typechk(Node x, Type t, Node mem, Parse bad) {
-    return t == null || _gvn.type(x).isa(t) ? x : gvn(new TypeNode(t,x,mem,bad));
+    return t == null || _gvn.type(x).isa(t) ? x : gvn(new TypeNode(t,x,bad));
   }
 
   private String token() { skipWS();  return token0(); }
@@ -1142,14 +1133,14 @@ public class Parse {
     Type t = mem==null ? null : _gvn.type(mem);
     TypeMem tmem = t instanceof TypeMem ? (TypeMem)t : null;
     String s0 = typerr(t0,tmem);
-    String s1 = typerr(t1,tmem); 
+    String s1 = typerr(t1,tmem);
     return errMsg(s0+" is not a "+s1);
   }
   private static String typerr( Type t, TypeMem tmem ) {
     return t.is_forward_ref()
       ? ((TypeFunPtr)t).names()
       : (t instanceof TypeMemPtr
-         ? ((TypeMemPtr)t).str(null, tmem)
+         ? ((TypeMemPtr)t).str(new SB(), tmem).toString()
          : t.toString());
   }
 

@@ -87,8 +87,8 @@ public class TypeAry {
   public static boolean eq( Type[] ts0, Type[] ts1 ) {
     if( ts0==ts1 ) return true;
     if( ts0==null || ts1==null ) return false;
-    assert                             tary(ts0.length).check().check_(ts0);
-    assert ts0.length == ts1.length || tary(ts1.length).check().check_(ts1);
+    //assert                             tary(ts0.length).check().check_(ts0);
+    //assert ts0.length == ts1.length || tary(ts1.length).check().check_(ts1);
     return false;               // No need for deep check, since interned
   }
 }

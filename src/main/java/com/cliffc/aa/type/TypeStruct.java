@@ -193,7 +193,28 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     }
     return sb.di(1).i().p(!is_tup ? '}' : ')').p(_cln ?"":"!");
   }
-
+  // Print with memory instead of recursion
+  @Override public SB str(SB sb, TypeMem mem) {
+    if( find("!") != -1 && find("math_pi") != -1 )
+      return sb.p("{PRIMS}");
+    if( _uf!=null ) return _uf.str(sb.p("=>"),mem);
+    if( _any ) sb.p('~');
+    sb.p(_name);
+    boolean is_tup = _flds.length==0 || fldTop(_flds[0]) || fldBot(_flds[0]) || isDigit(_flds[0].charAt(0));
+    if( !is_tup ) sb.p('@');    // Not a tuple
+    sb.p(is_tup ? '(' : '{');
+    for( int i=0; i<_flds.length; i++ ) {
+      Type t = at(i);
+      if( !is_tup )
+        sb.p(_flds[i]).p(fstr(_finals[i])).p('='); // Field name, access mod
+      if( t==null ) sb.p("!");  // Graceful with broken types
+      else if( t==SCALAR ) ;    // Default answer, do not print
+      else t.str(sb,mem);       // Recursively print field type
+      if( i<_flds.length-1 ) sb.p(';');
+    }
+    return sb.p(!is_tup ? '}' : ')').p(_cln ?"":"!");
+  }
+  
   // Unlike other types, TypeStruct never makes dups - instead it might make
   // cyclic types for which a DAG-like bottom-up-remove-dups approach cannot work.
   private static TypeStruct FREE=null;

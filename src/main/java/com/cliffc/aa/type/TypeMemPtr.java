@@ -49,18 +49,12 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     _aliases.toString(sb);
     return sb;
   }
-  public String str(VBitSet dups, TypeMem mem) {
-    if( dups == null ) dups = new VBitSet();
-    if( dups.tset(_uid) ) return "$"; // Break recursive printing cycle
-    SB sb = new SB().p('*');
-    TypeObj to = _obj;
-    if( mem != null ) {
-      TypeObj to2 = mem.ld(this);
-      if( !to2.above_center() ) to = to2;
-    }
-    _aliases.toString(sb).p( to.str(dups));
+  @Override public SB str(SB sb, TypeMem mem) {
+    TypeObj to = mem == null ? _obj : mem.ld(this);
+    if( to == TypeObj.XOBJ ) to = _obj;
+    to.str(_aliases.toString(sb.p('*')),mem);
     if( _aliases.test(0) ) sb.p('?');
-    return sb.toString();
+    return sb;
   }
 
   private static TypeMemPtr FREE=null;
@@ -151,7 +145,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
         abs = mem.recursive_aliases(abs,alias);
     return abs;
   }
-  
+
   // Identical pointer but points to clean
   @Override public TypeMemPtr clean() { return make(_aliases,(TypeObj)_obj.clean()); }
 

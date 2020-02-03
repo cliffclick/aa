@@ -261,7 +261,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     if( bs1.above_center() ) bs1 = bs1.dual();
     return bs0.isa(bs1);
   }
-  
+
   private static void or ( long[] bits, long con ) { bits[idx(con)] |=  mask(con); }
   private static void and( long[] bits, long con ) { bits[idx(con)] &= ~mask(con); }
   private static long[] bits( int b ) { return new long[idx(b)+1]; }
@@ -471,7 +471,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     void init0() {
       _init = new int[_kids.length];
       for( int i=0; i<_kids.length; i++ )
-        _init[i] = _kids[i]==null ? 0 : _kids[i][0];
+        _init[i] = _kids[i]==null ? 1 : _kids[i][0];
     }
     // Chop back alias tree to only those types recorded during 'init0'
     void reset_to_init0() {
