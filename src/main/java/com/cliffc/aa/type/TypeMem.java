@@ -7,6 +7,8 @@ import java.util.Arrays;
 import java.util.BitSet;
 
 /**
+   See also node/MemMerge.java
+
    Memory type; the state of all of memory; memory edges order memory ops.
    Produced at the program start, consumed by all function calls, consumed be
    Loads, consumed and produced by Stores.  Can be broken out in the "equiv-
@@ -22,26 +24,35 @@ import java.util.BitSet;
    alias#s instead of 1 everywhere - we've just explicitly named the next layer
    in the tree-of-sets.
 
-   Split an existing alias# in half, such that some ptrs point to one half or
-   the other, and most point to either (or both).  Basically find all
-   references to alias#X and add a new alias#Y paired with X - making all
-   alias types use both equally.  Leave the base constructor of an X alias
-   (some NewNode) alone - it still produces just an X.  The Node calling
-   split_alias gets Y alone, and the system as a whole makes a conservative
-   approximation that {XY} are always confused.  Afterwards we can lift the
-   types to refine as needed.
+   Splitting happens during code-cloning (inlining) where we make a copy of an
+   alias generator (NewNode).  Both copies are alias renumbered to child alias
+   numbers from the parent.  The IR will be holding on to some copies of the
+   original alias#, which is now confused with both children.  After a full
+   round of gcp() this confusion will be removed.  While the confusion is not
+   (yet) removed, we will have to deal with this mixture of the left child,
+   right child, and parent.
 
-   During iter()/pessimistic-GVN we'll have ptrs to a single New which splits -
-   and this splits the aliases; repeated splitting induces a tree.  Some ptrs
-   to the tree-root will remain, and represent conservative approximation as
-   updates to outputs from all News.  We'll also have sharper direct ptrs
-   flowing out, pointing to only results from a single New.  At the opto()
-   point we'll not have any more confused types.
+   We use an "all-memory" notion to handle the worse-case from e.g. all unknown
+   calls.  Really the worse a Call can be is to "leak" all aliases that come in
+   to the the call (and are reachable from those) - but we need a convenient
+   Bottom type.  Missing aliases default to TypeObj.
 
-   Memory is supposed to be everywhere precise - but an "all-memory" notion is
-   used to handle the worse-case from e.g. all unknown calls.  Really the worse
-   a Call can be is to "leak" all aliases that come in to the the call - but we
-   need a convenient Bottom type.  Missing aliases default to TypeObj.
+   The representation is a collection of TypeObjs indexed by alias#.  Missing
+   aliases are always equal to their nearest present parent.  The root at
+   alias#1 is only either OBJ or XOBJ.  Alias#0 is nil and is always missing.
+   The structure is canonicalized; if a child is a dup of a parent it is
+   removed (since an ask will yield the correct value from the parent).
+
+   Child classes also contain a 'lost' bit, set if more than one instance of a
+   child class can be alive at once.  It is usually set for a parent (both
+   children alive at once) unless a child later dies.  It is typically set for
+   NewNodes that are called repeatedly and have a long lifetime.  It is
+   typically clear for closures (which are just NewNodes) which have a stack
+   lifetime.  Long-lived closures will again have the bit set.  This bit
+   inverts for inverted TypeObjs.
+
+   There is no meet/join relationship between parent and child; a child can be
+   precisely updated independently from the parent and other sibilings.
 
    CNC - Observe that the alias Trees on Fields applies to Indices on arrays as
    well - if we can group indices in a tree-like access pattern (obvious one
@@ -54,10 +65,18 @@ public class TypeMem extends Type<TypeMem> {
   // canonicalization.
   private TypeObj[] _aliases;
 
-  private TypeMem  (TypeObj[] aliases) { super(TMEM); init(aliases); }
-  private void init(TypeObj[] aliases) {
+  // An alias is "lost" (or "escaped") then there may be more than 1 instance
+  // alive at any one time.  There can be many instances over time (e.g.
+  // standard closure stack lifetime) that are not lost and many more
+  // optimizations apply.  If an alias is not lost ("captured") then it has no
+  // children or is dead/~obj.  This bit inverts with inverted TypeObj.
+  private TypeBits _losts;
+
+  private TypeMem  (TypeObj[] aliases, TypeBits losts) { super(TMEM); init(aliases,losts); }
+  private void init(TypeObj[] aliases, TypeBits losts) {
     super.init(TMEM);
     _aliases = aliases;
+    _losts  = losts;
     assert check();
   }
   // False if not 'tight' (no trailing null pairs) or any matching pairs (should
@@ -71,16 +90,24 @@ public class TypeMem extends Type<TypeMem> {
     if( as.length==2 ) return true; // Trivial all of memory
     // "tight" - something in the last slot
     if( _aliases[_aliases.length-1] == null ) return false;
-    // No dups of a parent
-    for( int i=1; i<as.length; i++ )
-      if( as[i] != null )
+    // No dups of any parent
+    for( int i=2; i<as.length; i++ ) {
+      Type asi = as[i];
+      if( asi != null ) {
         for( int par = BitsAlias.TREE.parent(i); par!=0; par = BitsAlias.TREE.parent(par) )
-          if( as[par] == as[i] )
-            return false;
+          if( as[par] == asi )
+            return false;       // Dup of a parent
+        // Parents are always lost (since the parent & all children co-exist).
+        // Bit is inverted for inverted types.
+        if( BitsAlias.is_parent(i) && (_losts.test(i) ^ !asi.above_center()) )
+          return false;         // Precise, below center and has children
+      }
+    }
+
     return true;
   }
   @Override int compute_hash() {
-    int sum=TMEM;
+    int sum=TMEM+_losts.hashCode();
     for( TypeObj obj : _aliases ) sum += obj==null ? 0 : obj._hash;
     return sum;
   }
@@ -89,6 +116,7 @@ public class TypeMem extends Type<TypeMem> {
     if( !(o instanceof TypeMem) ) return false;
     TypeMem tf = (TypeMem)o;
     if( _aliases.length != tf._aliases.length ) return false;
+    if( _losts != tf._losts ) return false;
     for( int i=0; i<_aliases.length; i++ )
       if( _aliases[i] != tf._aliases[i] ) // note '==' and NOT '.equals()'
         return false;
@@ -105,7 +133,7 @@ public class TypeMem extends Type<TypeMem> {
     sb.p('[');
     for( int i=1; i<_aliases.length; i++ )
       if( _aliases[i] != null )
-        sb.p(i).p("#:").p(_aliases[i].toString()).p(",");
+        sb.p(i).p(_losts.test(i)?'+':'#').p(':').p(_aliases[i].toString()).p(",");
     return sb.p(']').toString();
   }
 
@@ -122,6 +150,7 @@ public class TypeMem extends Type<TypeMem> {
   }
   //
   public TypeObj[] alias2objs() { return _aliases; }
+  public TypeBits losts() { return _losts; }
 
   // Return set of aliases.  Not even sure if this is well-defined.
   public BitsAlias aliases() {
@@ -148,7 +177,7 @@ public class TypeMem extends Type<TypeMem> {
     for( int i=2; i<_aliases.length; i++ )
       if( _aliases[i]!=null && bas.test_recur(i) )
         { assert objs[i]==null || objs[i]==_aliases[i]; objs[i] = _aliases[i]; }
-    return make0(objs);
+    return make0(objs,_losts);
   }
 
   // Recursively explore reachable aliases.
@@ -160,19 +189,19 @@ public class TypeMem extends Type<TypeMem> {
 
   private static TypeMem FREE=null;
   @Override protected TypeMem free( TypeMem ret ) { _aliases=null; FREE=this; return ret; }
-  private static TypeMem make(TypeObj[] aliases) {
+  private static TypeMem make(TypeObj[] aliases, TypeBits losts) {
     TypeMem t1 = FREE;
-    if( t1 == null ) t1 = new TypeMem(aliases);
-    else { FREE = null;       t1.init(aliases); }
+    if( t1 == null ) t1 = new TypeMem(aliases,losts);
+    else { FREE = null;       t1.init(aliases,losts); }
     TypeMem t2 = (TypeMem)t1.hashcons();
     return t1==t2 ? t1 : t1.free(t2);
   }
 
   // Canonicalize memory before making.  Unless specified, the default memory is "dont care"
-  static TypeMem make0( TypeObj[] as ) {
+  public static TypeMem make0( TypeObj[] as, TypeBits losts ) {
     if( as[1]==null ) as[1] = TypeObj.XOBJ; // Default memory is "dont care"
     int len = as.length;
-    if( len == 2 ) return make(as);
+    if( len == 2 ) return make(as,losts);
     // No dups of a parent
     for( int i=1; i<as.length; i++ )
       if( as[i] != null )
@@ -182,21 +211,30 @@ public class TypeMem extends Type<TypeMem> {
     // Remove trailing nulls; make the array "tight"
     while( as[len-1] == null ) len--;
     if( as.length!=len ) as = Arrays.copyOf(as,len);
+    
+    // Parents are always lost (since the parent & all children co-exist).
+    // Bit is inverted for inverted types.
+    for( int i=1; i<as.length; i++ )
+      if( as[i] != null )
+        if( BitsAlias.is_parent(i) )
+          losts = as[i].above_center() ? losts.clr(i) : losts.set(i);
 
-    return make(as);
+    return make(as,losts);
   }
 
   // Precise single alias.  Other aliases are "dont care".  Nil not allowed.
+  // Both "dont care" and this alias are exact.
   public static TypeMem make(int alias, TypeObj oop ) {
-    TypeObj[] as = Arrays.copyOf(MEM._aliases,Math.max(MEM._aliases.length,alias+1));
+    TypeObj[] as = new TypeObj[alias+1];
+    as[1] = TypeObj.XOBJ;
     as[alias] = oop;
-    return make0(as);
+    return make0(as,TypeBits.EMPTY);
   }
-  public static TypeMem make(BitsAlias bits, TypeObj oop ) {
-    TypeObj[] as = Arrays.copyOf(MEM._aliases,Math.max(MEM._aliases.length,bits.max()+1));
-    for( int b : bits )  as[b] = oop;
-    return make0(as);
-  }
+  //public static TypeMem make(BitsAlias bits, TypeObj oop ) {
+  //  TypeObj[] as = Arrays.copyOf(MEM._aliases,Math.max(MEM._aliases.length,bits.max()+1));
+  //  for( int b : bits )  as[b] = oop;
+  //  return make0(as);
+  //}
 
   public static final TypeMem FULL; // Every alias filled with something
   public static final TypeMem EMPTY;// Every alias filled with anything
@@ -206,7 +244,7 @@ public class TypeMem extends Type<TypeMem> {
   public static final TypeMem MEM_ABC, MEM_STR;
   static {
     // All memory, all aliases, holding anything.
-    FULL = make(new TypeObj[]{null,TypeObj.OBJ});
+    FULL = make(new TypeObj[]{null,TypeObj.OBJ},TypeBits.FULL);
     EMPTY= FULL.dual();
 
     // All memory.  Includes breakouts for all structs and all strings.
@@ -216,16 +254,19 @@ public class TypeMem extends Type<TypeMem> {
     tos[BitsAlias.ALL] = TypeObj.OBJ;
     tos[BitsAlias.TUPLE]=TypeStruct.ALLSTRUCT;
     tos[BitsAlias.STR] = TypeStr.STR; // TODO: Proxy for all-arrays
-    MEM  = make(tos);
+    MEM  = make(tos,TypeBits.FULL);
     XMEM = MEM.dual();
 
     TypeObj[] tcs = new TypeObj[Math.max(BitsAlias.TUPLE,BitsAlias.STR)+1];
     tcs[BitsAlias.ALL] = TypeObj.OBJ;
     tcs[BitsAlias.TUPLE]=TypeStruct.ALLSTRUCT_CLN;
     tcs[BitsAlias.STR] = TypeStr.STR; // TODO: Proxy for all-arrays
-    MEM_CLN = make(tcs);
+    MEM_CLN = make(tcs,TypeBits.FULL);
 
-    MEM_STR  = make(TypeMemPtr.STRPTR.getbit(),TypeStr.STR);
+    TypeObj[] tss = new TypeObj[BitsAlias.STR+1];
+    tss[1] = TypeObj.XOBJ;
+    tss[BitsAlias.STR] = TypeStr.STR;
+    MEM_STR  = make(tss,TypeBits.make(BitsAlias.STR));
     MEM_ABC  = make(TypeMemPtr.ABCPTR.getbit(),TypeStr.ABC);
   }
   static final TypeMem[] TYPES = new TypeMem[]{FULL,MEM,MEM_ABC};
@@ -236,7 +277,7 @@ public class TypeMem extends Type<TypeMem> {
     for(int i=0; i<_aliases.length; i++ )
       if( _aliases[i] != null )
         oops[i] = (TypeObj)_aliases[i].dual();
-    return new TypeMem(oops);
+    return new TypeMem(oops,_losts.dual());
   }
   @Override protected Type xmeet( Type t ) {
     if( t._type != TMEM ) return ALL; //
@@ -252,7 +293,8 @@ public class TypeMem extends Type<TypeMem> {
     for( int i=1; i<len; i++ )
       objs[i] = i<mlen && _aliases[i]==null && tf._aliases[i]==null // Shortcut null-vs-null
         ? null : (TypeObj)at(i).meet(tf.at(i)); // meet element-by-element
-    return make0(objs);
+    TypeBits losts = (TypeBits)_losts.meet(tf._losts); // Being lost propagates
+    return make0(objs,losts);
   }
 
   // Meet of all possible loadable values
@@ -271,58 +313,18 @@ public class TypeMem extends Type<TypeMem> {
     return obj;
   }
 
-  // Imprecise store at an alias.  This alias has escaped and versions of it
-  // are available under alias#1.  Thus it merges with its parent alias# which
-  // has already been merged with its' parent, recursively, up to alias#1.  If
-  // alias#1 is obj (common pre-gcp) then all information is lost.  If alias#1
-  // is ~obj (common from the program start) then some precision is kept, but
-  // can be lost at each alias layer.  Since the store is imprecise, all
-  // children aliases are 'meet' as well which typically wipes out any detail.
+  // Whole object Store at an alias.  Just merge with the parent.
   public TypeMem st( int alias, TypeObj obj ) {
-    //// Must be monotonic up the alias layer#s to do an imprecise store here.
-    //// If some higher layer did an precise store and thus was not monotonic
-    //// with ITS parent, I would not expect to lose that precision later.
-    //int kid = at_idx(alias);
-    //while( kid > 1 ) {          // Test for monotonic up to alias#1
-    //  int par = at_idx(BitsAlias.TREE.parent(kid));
-    //  assert _aliases[par].isa(_aliases[kid]);
-    //  kid = par;
-    //  throw com.cliffc.aa.AA.unimpl(); // untested
-    //}
-    //// Test for children being monotonic also.
-    //for( int i=alias+1; i<_aliases.length; i++ )
-    //  if( BitsAlias.TREE.is_parent(alias,i) ) {
-    //    int j = i;
-    //    while( j > alias ) {    // Test for monotonic up to alias#
-    //      int par = at_idx(BitsAlias.TREE.parent(j));
-    //      assert _aliases[par].isa(_aliases[j]);
-    //      j = par;
-    //      throw com.cliffc.aa.AA.unimpl(); // untested
-    //    }
-    //    assert j==alias;
-    //  }
-    //
-    //// In theory, i need to meet 'obj' with all child alias#s, and the line
-    //// from here up to the alias#1.  Once i lower a parent (could e.g. lower
-    //// alias#1), unrelated siblings need to be lower than their parent also.
-    //// This drops the entire tree, pretty much - unless i hit no-change places,
-    //// and a common one is if the tree is already at bottom/obj.  Exception is
-    //// if i had a *precise* update some time prior, so the tree is no longer
-    //// monotonic.  Precise sibling updates are not stomped by this store.
-    //// TODO: CNC
-    //// Means TypeMem needs to track precise updates???
-
-
-    TypeObj[] ts = Arrays.copyOf(_aliases,Math.max(alias+1,_aliases.length));
-    ts[alias] = (TypeObj)at(alias).meet(obj); // Set parent with meet
-    // Now update all children as well.
-    for( int i=alias+1; i<ts.length; i++ )
-      if( ts[i] != null && BitsAlias.is_parent(alias,i) )
-        ts[i] = (TypeObj)ts[i].meet(obj);
-    return make0(ts);
+    TypeObj to = at(alias);     // Current value for alias
+    int max = Math.max(_aliases.length,alias+1);
+    TypeObj[] tos = Arrays.copyOf(_aliases,max);
+    tos[alias] = (TypeObj)to.meet(obj);
+    TypeBits los = to.above_center() ? _losts : _losts.set(alias);
+    return TypeMem.make0(tos,los);
   }
 
-  // Mark all memory as being clean.  Recursive.
+  // Mark all memory as being clean (not modified in this function).
+  // Recursive.
   public TypeMem clean() {
     if( this==MEM || this==MEM_CLN )
       return MEM_CLN;           // Shortcut
@@ -331,10 +333,10 @@ public class TypeMem extends Type<TypeMem> {
     for( int i=1; i<ts.length; i++ )
       if( ts[i] != null )
         ts[i] = (TypeObj)ts[i].clean();
-    return make0(ts);
+    return make0(ts,_losts);
   }
 
-  // True if all looked-at memory is clean.  Allows a Load to bypass.
+  // True if all looked-at memory is clean.  Allows a Load to bypass calls.
   public boolean is_clean( BitsAlias aliases, String fld ) {
     for( int alias : aliases )
       if( alias != 0 && !at(alias).is_clean(fld) )
@@ -352,7 +354,7 @@ public class TypeMem extends Type<TypeMem> {
   @Override public boolean is_con()       { return false;}
   @Override public boolean must_nil() { return false; } // never a nil
   @Override Type not_nil() { return this; }
-  // Dual, except keep TypeMem.XOBJ as high for starting GVNGCM.opto() state.
+  // Dual, except keep TypeMem.XOBJ as high for starting GVNGCM.gcp() state.
   @Override public TypeMem startype() {
     if( this==EMPTY ) return EMPTY;
     if( this== XMEM ) return  XMEM;
@@ -360,6 +362,6 @@ public class TypeMem extends Type<TypeMem> {
     for(int i=0; i<_aliases.length; i++ )
       if( _aliases[i] != null )
         oops[i] = _aliases[i].startype();
-    return make0(oops);
+    return make0(oops,TypeBits.EMPTY);
   }
 }

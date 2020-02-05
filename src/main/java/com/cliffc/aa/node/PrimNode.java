@@ -121,19 +121,13 @@ public abstract class PrimNode extends Node {
   public FunPtrNode as_fun( GVNGCM gvn ) {
     FunNode  fun = ( FunNode) gvn.xform(new  FunNode(this).add_def(Env.ALL_CTRL)); // Points to ScopeNode only
     ParmNode rpc = (ParmNode) gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
-    TypeMem tmem = TypeMem.XMEM;
-    if( _targs.at(0) instanceof TypeMemPtr ) {
-      BitsAlias bas = ((TypeMemPtr)_targs.at(0))._aliases;
-      if( bas == BitsAlias.NZERO || bas == BitsAlias.FULL ) tmem = TypeMem.MEM;
-      else if( bas == BitsAlias.STRBITS ) tmem = TypeMem.MEM_STR;
-      else throw AA.unimpl();
-    }
-    Node mem = tmem == TypeMem.XMEM ? gvn.con(TypeMem.XMEM)
-      : gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(tmem),null));
     add_def(null);              // Control for the primitive in slot 0
     for( int i=0; i<_targs._ts.length; i++ )
       add_def(gvn.init(new ParmNode(i,_targs._flds[i],fun, gvn.con(_targs.at(i)),null)));
-    RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mem,gvn.init(this),rpc,fun));
+    // Functions return the set of *modified* memory.  PrimNodes never *modify*
+    // memory (see Intrinsic*Node for some primitives that *modify* memory).
+    Node xmem = gvn.con(TypeMem.EMPTY); // Set of modified memory
+    RetNode ret = (RetNode)gvn.xform(new RetNode(fun,xmem,gvn.init(this),rpc,fun));
     return new FunPtrNode(ret);
   }
 

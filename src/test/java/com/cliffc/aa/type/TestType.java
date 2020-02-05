@@ -207,11 +207,11 @@ public class TestType {
     TypeObj a3 = TypeStruct.make(new String[]{"x"},TypeStruct.ts(TypeInt.TRUE               ),finals); // @{x: 1 }
     TypeObj a2 = TypeStruct.make(new String[]{"c"},TypeStruct.ts(TypeMemPtr.make_nil(alias3,a3)),finals); // @{c:*{3#}?}
     Ary<TypeObj> tos = new Ary<>(TypeObj.class);
-    tos.setX(BitsAlias.TUPLE,TypeObj.OBJ);
+    tos.setX(BitsAlias.ALL,TypeObj.OBJ);
     tos.setX(alias1,a1);
     tos.setX(alias2,a2);
     tos.setX(alias3,a3);
-    TypeMem mem = TypeMem.make0(tos.asAry());
+    TypeMem mem = TypeMem.make0(tos.asAry(),TypeBits.make(BitsAlias.ALL,alias0));
     // *[1]? join *[2] ==> *[1+2]?
     Type ptr12 = Type.NIL.join(TypeMemPtr.make(-alias1,a1)).join( TypeMemPtr.make(-alias2,a2));
     // mem.ld(*[1+2]?) ==> @{c:0}
@@ -268,7 +268,7 @@ public class TestType {
 
     // Recursive types no longer cyclic in the concrete definition?  Because
     // TypeObj can contain TypeMemPtrs but not another nested TypeObj...
-    final int alias1 = BitsAlias.TUPLE;
+    final int alias1 = BitsAlias.new_alias(BitsAlias.TUPLE);
     final TypeMemPtr ts0ptr = TypeMemPtr.make    (alias1,TypeStruct.ALLSTRUCT);
     final TypeMemPtr ts0ptr0= TypeMemPtr.make_nil(alias1,TypeStruct.ALLSTRUCT);
 
@@ -324,11 +324,11 @@ public class TestType {
     // which is the Once yet again
     TypeObj[] tos = new TypeObj[alias4+1];
     tos[0]=null;
-    tos[1]=TypeObj.OBJ;
+    tos[1]=TypeObj.XOBJ;
     tos[alias2]=ta2;
     tos[alias3]=ta3;
     tos[alias4]=ta4;
-    TypeMem mem234 = TypeMem.make0(tos);
+    TypeMem mem234 = TypeMem.make0(tos,TypeBits.EMPTY);
     TypeMemPtr ptr34 = (TypeMemPtr)TypeMemPtr.make(alias3,TypeObj.OBJ).meet(TypeMemPtr.make(alias4,TypeObj.OBJ));
 
     // Since hacking ptrs about from mem values, no cycles so instead...

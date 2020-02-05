@@ -7,6 +7,7 @@ import com.cliffc.aa.util.AryInt;
 import com.cliffc.aa.util.SB;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.Arrays;
 import java.util.BitSet;
 
 // Merge a lot of TypeObjs into a TypeMem.  Each input is from a different
@@ -293,35 +294,34 @@ public class MemMergeNode extends Node {
     return null;
   }
 
-  // MemMerge value() is subtle.  Inputs are at a given alias# or below (some
-  // child alias#).  They are generally not-precise - meaning the same New
-  // producing the same alias# has been called many times in a loop, and these
-  // prior instances have 'escaped' and folded into some parent alias# or this
-  // alias#.  If the input is an escaped 'New' then they escaped all the way
-  // back to alias#1, and this input has to 'meet' alias#1.  If alias#1 is
-  // 'obj' we lose all precision.  If the input is a captured 'New' then this
-  // input is precise, asserted has no children, and replaces the parent for
-  // this alias.
-  
+
+  // Base memory (alias#1) comes in input#0.  Other inputs refer to other
+  // aliases (see _aliases) and children follow parents (since alias#s are
+  // sorted).  Each input replaces (not merges) their parent in just that
+  // subtree.
   @Override public Type value(GVNGCM gvn) {
     // Base memory type in slot 0
     Type t = gvn.type(in(0));
     if( !(t instanceof TypeMem) )
       return t.above_center() ? TypeMem.EMPTY : TypeMem.FULL;
     TypeMem tm = (TypeMem)t;
-    // We merge precise updates to the list of aliases
+
+    // Merge with parent.
+    int max = Math.max(tm.alias2objs().length,_aliases.last()+1);
+    TypeObj[] tos = Arrays.copyOf(tm.alias2objs(),max);
+    TypeBits los = tm.losts();
     for( int i=1; i<_defs._len; i++ ) {
       int alias = alias_at(i);
       Type ta = gvn.type(in(i));
-      if( !(ta instanceof TypeObj) ) // Handle ANY, ALL
-        ta = ta.above_center() ? TypeObj.XOBJ : TypeObj.OBJ;
-      if( in(i) instanceof OProjNode && in(i).in(0) instanceof NewNode &&
-          ((NewNode)in(i).in(0))._captured )
-        throw com.cliffc.aa.AA.unimpl();
-      else                      // Imprecise memory update
-        tm = tm.st(alias,(TypeObj)ta);
+      if( ta instanceof TypeMem )
+        ta = ((TypeMem)ta).at(alias);
+      TypeObj tao = ta instanceof TypeObj ? (TypeObj)ta
+        : (ta.above_center() ? TypeObj.XOBJ : TypeObj.OBJ); // Handle ANY, ALL
+      TypeObj to = tm.at(alias);
+      tos[alias] = (TypeObj)to.meet(tao);
+      if( !to.above_center() ) los = los.set(alias);
     }
-    return tm;
+    return TypeMem.make0(tos,los);
   }
   @Override public Type all_type() { return TypeMem.FULL; }
   // Set of used aliases across all inputs.  This is only called from another

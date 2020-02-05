@@ -256,7 +256,8 @@ public class Type<T extends Type<T>> implements Cloneable {
   static final byte TMEMPTR =26; // Memory pointer type; a collection of Alias#s
   static final byte TFUNPTR =27; // Function pointer, refers to a collection of concrete functions
   static final byte TFUN    =28; // A simple function signature, not a function nor function pointer
-  static final byte TLAST   =29; // Type check
+  static final byte TBITS   =29; // Collection of bits
+  static final byte TLAST   =30; // Type check
 
   public  static final Type ALL    = make( TALL   ); // Bottom
   public  static final Type ANY    = make( TANY   ); // Top
@@ -292,7 +293,7 @@ public class Type<T extends Type<T>> implements Cloneable {
   private boolean is_ptr() { byte t = _type;  return t == TFUNPTR || t == TMEMPTR; }
   private boolean is_num() { byte t = _type;  return t == TNUM || t == TXNUM || t == TNNUM || t == TXNNUM || t == TREAL || t == TXREAL || t == TNREAL || t == TXNREAL || t == TINT || t == TFLT; }
   // True if 'this' isa SCALAR, without the cost of a full 'meet()'
-  private static final byte[] ISA_SCALAR = new byte[]{/*ALL-0*/0,0,0,0,1,1,1,1,1,1,/*TNNUM-10*/1,1,1,1,1,1,1,/*TSIMPLE-17*/0, 1,1,1,0,0,0,0,0,1,1,/*TFUN-28*/0}/*TLAST=29*/;
+  private static final byte[] ISA_SCALAR = new byte[]{/*ALL-0*/0,0,0,0,1,1,1,1,1,1,/*TNNUM-10*/1,1,1,1,1,1,1,/*TSIMPLE-17*/0, 1,1,1,0,0,0,0,0,1,1,/*TFUN-28*/0,/*TBITS-29*/0}/*TLAST=30*/;
   public final boolean isa_scalar() { assert ISA_SCALAR.length==TLAST; return ISA_SCALAR[_type]!=0; }
 
   // Return cached dual

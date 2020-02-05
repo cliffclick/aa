@@ -8,13 +8,11 @@ import java.util.Arrays;
 import java.util.Iterator;
 
 // Bits supporting a lattice; immutable; hash-cons'd.  Bits can be *split* in
-// twain, are everywhere immediately updated (ala Smalltalk "becomes") to the
-// pair.  To keep the hash-cons working, the hash code of the original and the
-// pair are kept the same, but the "equals" call works as normal.
+// twain.
 //
-// Splitting is useful during e.g. inlining, where a single Call is duplicated
-// and RPCs to the original one might return to either of of the inlines.  Same
-// for internal functions and allocation sites - after the inline, pointers &
+// Splitting is useful during inlining, where a single Call is duplicated and
+// RPCs to the original one might return to either of of the inlines.  Same for
+// internal functions and allocation sites - after the inline, pointers &
 // references to the original might now refer to either copy.  Each copy only
 // refers to itself, so after some optimizations the ambiguious bits can be
 // optimized away.  i.e., its useful to make the distinction between the cloned

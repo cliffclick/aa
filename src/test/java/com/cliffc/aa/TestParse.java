@@ -1,6 +1,7 @@
 package com.cliffc.aa;
 
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.SB;
 import org.junit.Assert;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -214,7 +215,7 @@ public class TestParse {
     test("fun:{real->flt32}={x -> x}; fun(123 )", TypeInt.con(123 ));
     test("fun:{real->flt32}={x -> x}; fun(0.125)", TypeFlt.con(0.125));
     testerr("fun:{real->flt32}={x -> x}; fun(123456789)", "123456789 is not a flt32",3);
-    test("{x -> x&1}", TypeFunPtr.make(BitsFun.make0(35),TypeStruct.SCALAR1,Type.SCALAR)); // {Int -> Int}
+    test("{x -> x&1}", TypeFunPtr.make(BitsFun.make0(39),TypeStruct.SCALAR1,Type.SCALAR)); // {Int -> Int}
 
     // Named types
     test_name("A= :(       )" ); // Zero-length tuple
@@ -269,7 +270,7 @@ public class TestParse {
     test("gal=:flt; 3==gal(2)+1", TypeInt.TRUE);
     test("gal=:flt; tank:gal = gal(2)", TypeInt.con(2).set_name("gal:"));
     // test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: figure out if free cast for bare constants?
-    testerr ("gal=:flt; tank:gal = gal(2)+1", "3 is not a gal:flt64",14);
+    testerr ("gal=:flt; tank:gal = gal(2)+1", "3.0 is not a gal:flt64",14);
 
     test    ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
     test    ("Point=:@{x;y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
@@ -312,7 +313,7 @@ public class TestParse {
     TypeEnv te3 = Exec.go(Env.top(),"args","A= :@{n=A?; v=int}; A(@{n=0;v=3})");
     if( te3._errs != null ) System.err.println(te3._errs.toString());
     Assert.assertNull(te3._errs);
-    TypeStruct tt3 = (TypeStruct)te3._tobj;
+    TypeStruct tt3 = (TypeStruct)te3._tmem.ld((TypeMemPtr)te3._t);
     assertEquals("A:", tt3._name);
     assertEquals(Type.NIL      ,tt3.at(0));
     assertEquals(TypeInt.con(3),tt3.at(1));
@@ -361,7 +362,7 @@ public class TestParse {
     TypeEnv te4 = Exec.go(Env.top(),"args",ll_def+ll_con+ll_map+ll_fun+ll_apl);
     if( te4._errs != null ) System.err.println(te4._errs.toString());
     Assert.assertNull(te4._errs);
-    TypeStruct tt4 = (TypeStruct)te4._tobj;
+    TypeStruct tt4 = (TypeStruct)te4._tmem.ld((TypeMemPtr)te4._t);
     assertEquals("List:", tt4._name);
     TypeMemPtr tmp5 = (TypeMemPtr)tt4.at(0);
     assertEquals(2.3*2.3,tt4.at(1).getd(),1e-6);
@@ -769,20 +770,22 @@ strs:List(str?) = ... // List of null-or-strings
     try( TypeEnv te = run(program) ) {
       assertTrue(te._t instanceof TypeMemPtr);
       int alias = ((TypeMemPtr)te._t).getbit(); // internally asserts only 1 bit set
-      assertEquals(obj,te._tobj);
+      assertEquals(obj,te._tmem.ld((TypeMemPtr)te._t));
     }
   }
   static private void test_obj_isa( String program, TypeObj obj) {
     try( TypeEnv te = run(program) ) {
       assertTrue(te._t instanceof TypeMemPtr);
       int alias = ((TypeMemPtr)te._t).getbit(); // internally asserts only 1 bit set
-      assertTrue(te._tobj.isa(obj));
+      assertTrue(te._tmem.ld((TypeMemPtr)te._t).isa(obj));
     }
   }
   static private void test_ptr( String program, String expected ) {
     try( TypeEnv te = run(program) ) {
       assertTrue(te._t instanceof TypeMemPtr);
-      assertEquals(expected,strip_alias_numbers(te._tobj.toString()));
+      TypeObj to = te._tmem.ld((TypeMemPtr)te._t); // Peek thru pointer
+      SB sb = to.str(new SB(),te._tmem);          // Print what we see, with memory
+      assertEquals(expected,strip_alias_numbers(sb.toString()));
     }
   }
   static private void test( String program, Function<Integer,Type> expected ) {
