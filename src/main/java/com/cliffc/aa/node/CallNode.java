@@ -218,8 +218,6 @@ public class CallNode extends Node {
     Type tfx = gvn.type(fun());
     if( !(tfx instanceof TypeFunPtr) )
       tfx = tfx.above_center() ? TypeFunPtr.GENERIC_FUNPTR.dual() : TypeFunPtr.GENERIC_FUNPTR;
-    if( dead )
-      tfx = TypeFunPtr.GENERIC_FUNPTR.dual(); // No CallEpi user; call is dead from below
     TypeFunPtr tfp = (TypeFunPtr)(ts[1] = tfx);
     BitsFun fidxs = tfp.fidxs();
     // Can we call this function pointer?
