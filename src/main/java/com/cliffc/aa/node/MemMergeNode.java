@@ -335,25 +335,29 @@ public class MemMergeNode extends Node {
     mmm._aidxes  = new AryInt(_aidxes ._es.clone(),_aidxes ._len);
     return mmm;
   }
-  @Override void update_alias( Node copy, BitSet aliases, GVNGCM gvn ) {
+  void update_alias( Node copy, BitSet aliases, GVNGCM gvn ) {
     MemMergeNode cmem = (MemMergeNode)copy;
     assert gvn.touched(this);
     Node xobj = gvn.con(TypeObj.XOBJ);
     Type oldt = gvn.unreg(this);
     for( int i=1; i<_aliases._len; i++ ) {
       int mya = _aliases.at(i);
-      if( !aliases.get(mya) ) continue;
+      if( !aliases.get(mya) ) continue; // Alias not split here
       int[] kid0_aliases = BitsAlias.get_kids(mya);
-      cmem._update(gvn,xobj,i,kid0_aliases[1]);
-      this._update(gvn,xobj,i,kid0_aliases[2]);
+      int newalias1 = kid0_aliases[1];
+      int newalias2 = kid0_aliases[2];
+      cmem._update(gvn,xobj,i,newalias1,newalias2);
+      this._update(gvn,xobj,i,newalias2,newalias1);
     }
     assert check() && cmem.check();
     gvn.rereg(this,oldt);
   }
-  private void _update(GVNGCM gvn, Node xobj, int oidx, int newalias) {
-    int nidx = make_alias2idx(newalias);
-    set_def(nidx,in(oidx),null);
-    set_def(oidx, xobj   ,gvn );
+  private void _update(GVNGCM gvn, Node xobj, int oidx, int newalias1, int newalias2) {
+    int nidx1 = make_alias2idx(newalias1);
+    set_def(nidx1,in(oidx),null); // My alias comes from the original
+    int nidx2 = make_alias2idx(newalias2);
+    set_def(nidx2,in( 0  ),null); // The other alias comes from default
+    set_def(oidx , xobj   ,gvn ); // The original goes dead
   }
 }
 

@@ -109,12 +109,9 @@ public class TypeBits extends Type<TypeBits> {
 
   public TypeBits set(int bit) {
     if( test(bit) ) return this;
-    if( idx(bit+1/*do not flip sign bit*/) < _bits.length ) {
-      long[] bits = _bits.clone();
-      bits[idx(bit)] |= mask(bit);
-      return make(bits);
-    }
-    throw com.cliffc.aa.AA.unimpl();
+    long[] bits = Arrays.copyOf(_bits,idx(bit+1/*do not flip sign bit*/)+1);
+    bits[idx(bit)] |= mask(bit);
+    return make(bits);
   }
   public TypeBits clr(int bit) {
     if( !test(bit) ) return this;

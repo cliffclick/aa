@@ -15,7 +15,7 @@ public class LoadNode extends Node {
     _fld = fld;
     _bad = bad;
   }
-  String xstr() { return _fld; }   // Self short name
+  String xstr() { return "."+_fld; }   // Self short name
   String  str() { return xstr(); } // Inline short name
   private Node mem() { return in(1); }
           Node adr() { return in(2); }

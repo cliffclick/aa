@@ -476,7 +476,8 @@ public class FunNode extends RegionNode {
     // For all aliases split in this pass, update in-node both old and new.
     // This changes their hash, and afterwards the keys cannot be looked up.
     for( Map.Entry<Node,Node> e : map.entrySet() )
-      e.getKey().update_alias(e.getValue(),aliases,gvn);
+      if( e.getKey() instanceof MemMergeNode )
+        ((MemMergeNode)e.getKey()).update_alias(e.getValue(),aliases,gvn);
     // We kept the unknown caller path on 'this', and then copied it to 'fun'.
     // But if inlining along a specific path, only that path should be present.
     // Kill the unknown_caller path.

@@ -215,7 +215,7 @@ public class TestParse {
     test("fun:{real->flt32}={x -> x}; fun(123 )", TypeInt.con(123 ));
     test("fun:{real->flt32}={x -> x}; fun(0.125)", TypeFlt.con(0.125));
     testerr("fun:{real->flt32}={x -> x}; fun(123456789)", "123456789 is not a flt32",3);
-    test("{x -> x&1}", TypeFunPtr.make(BitsFun.make0(39),TypeStruct.SCALAR1,Type.SCALAR)); // {Int -> Int}
+    test("{x -> x&1}", TypeFunPtr.make(BitsFun.make0(35),TypeStruct.SCALAR1,Type.SCALAR)); // {Int -> Int}
 
     // Named types
     test_name("A= :(       )" ); // Zero-length tuple
@@ -367,7 +367,7 @@ public class TestParse {
     TypeMemPtr tmp5 = (TypeMemPtr)tt4.at(0);
     assertEquals(2.3*2.3,tt4.at(1).getd(),1e-6);
     assertEquals("next",tt4._flds[0]);
-    assertEquals("val",tt4._flds[1]);
+    assertEquals("val" ,tt4._flds[1]);
 
     // Test inferring a recursive struct type, with a little help
     Type[] ts0 = TypeStruct.ts(Type.NIL,TypeFlt.con(1.2*1.2));

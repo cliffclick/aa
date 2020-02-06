@@ -84,6 +84,7 @@ public abstract class NewNode<T extends TypeObj> extends Node {
       if( use instanceof StoreNode ) {
         if( ((StoreNode)use).val()==ptr ) return false; // Pointer stored; escapes
       } else if( use instanceof  LoadNode ||            // Load, direct use, treat as escape
+                 use instanceof  CastNode ||            // TODO: scan past, although should go dead shortly
                  use instanceof  CallNode ||            // Call arg
                use instanceof CallEpiNode ||            // CallEpi result during collapse
                  use instanceof   NewNode ||            // Same as a store escape, can be loaded from closure

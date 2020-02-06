@@ -205,7 +205,8 @@ public class CallNode extends Node {
   // the full arg set but if the call is not reachable the FunNode will not
   // merge from that path.
   @Override public TypeTuple value(GVNGCM gvn) {
-    Type[] ts = TypeAry.get(_defs._len);
+    final Type[] ts = TypeAry.get(_defs._len);
+    final boolean dead = !_is_copy && gvn._opt_mode>0 && cepi()==null; // Dead from below
 
     // Pinch to XCTRL/CTRL
     Type ctl = gvn.type(ctl());
@@ -217,6 +218,8 @@ public class CallNode extends Node {
     Type tfx = gvn.type(fun());
     if( !(tfx instanceof TypeFunPtr) )
       tfx = tfx.above_center() ? TypeFunPtr.GENERIC_FUNPTR.dual() : TypeFunPtr.GENERIC_FUNPTR;
+    if( dead )
+      tfx = TypeFunPtr.GENERIC_FUNPTR.dual(); // No CallEpi user; call is dead from below
     TypeFunPtr tfp = (TypeFunPtr)(ts[1] = tfx);
     BitsFun fidxs = tfp.fidxs();
     // Can we call this function pointer?
@@ -232,17 +235,18 @@ public class CallNode extends Node {
     // If not called, then no memory to functions
     if( ctl == Type.XCTRL ) { ts[2] = tmem = TypeMem.EMPTY; }
 
-    // Copy args for called functions
+    // Copy args for called functions.
+    // If call is dead, then so are args.
     for( int i=3; i<_defs._len; i++ )
-      ts[i] = gvn.type(in(i));
-    
+      ts[i] = dead ? Type.XSCALAR : gvn.type(in(i));
+
     // Quick exit if cannot further trim memory
     if( ctl == Type.XCTRL ||     // Not calling
         tmem == TypeMem.EMPTY || // Nothing to trim
         // If calling everything then not much we can do
         fidxs.test(BitsFun.ALL) )
       return TypeTuple.make(ts);
-    
+
     // Trim unused aliases, specifically to prevent local closures from escaping.
     // Here, I start with all alias#s from TMP args plus all function
     // closure#s and "close over" the set of possible aliases.
@@ -414,17 +418,23 @@ public class CallNode extends Node {
   @Override public BitsAlias alias_uses(GVNGCM gvn) {
     // We use all aliases we computed in our output type, plus all bypass aliases.
     TypeMem fret_mem;
-    for( Node cepi : _uses )    // Find CallEpi for bypass aliases
-      if( cepi instanceof CallEpiNode )
-        for( Node mproj : cepi._uses ) // Find output memory
-          if( mproj instanceof MProjNode )
-            // TODO: Solve the forward-flow used_aliases problem incrementally.
-            // Here we just bail out.
-            return BitsAlias.NZERO; // Use all aliases after the call
+    CallEpiNode cepi = cepi();// Find CallEpi for bypass aliases
+    if( cepi != null )
+      for( Node mproj : cepi._uses ) // Find output memory
+        if( mproj instanceof MProjNode )
+          // TODO: Solve the forward-flow used_aliases problem incrementally.
+          // Here we just bail out.
+          return BitsAlias.NZERO; // Use all aliases after the call
     TypeMem all_called_function_uses = (TypeMem)((TypeTuple)gvn.type(this)).at(2);
     return all_called_function_uses.aliases();
   }
 
+  CallEpiNode cepi() {
+    for( Node cepi : _uses )    // Find CallEpi for bypass aliases
+      if( cepi instanceof CallEpiNode )
+        return (CallEpiNode)cepi;
+    return null;
+  }
   @Override public int hashCode() { return super.hashCode()+_rpc; }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
@@ -440,5 +450,9 @@ public class CallNode extends Node {
     for( Node def : _defs )
       if( def instanceof MemMergeNode )
         gvn.add_work(def);
+  }
+  // If losing the CallEpi, call does dead.
+  @Override public boolean ideal_impacted_by_losing_uses(GVNGCM gvn, Node dead) {
+    return cepi()==null;
   }
 }
