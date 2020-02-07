@@ -1140,7 +1140,7 @@ public class Parse {
     return t.is_forward_ref()
       ? ((TypeFunPtr)t).names()
       : (t instanceof TypeMemPtr
-         ? ((TypeMemPtr)t).str(new SB(), tmem).toString()
+         ? ((TypeMemPtr)t).str(new SB(), null, tmem).toString()
          : t.toString());
   }
 

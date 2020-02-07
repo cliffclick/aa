@@ -160,7 +160,10 @@ public class CallNode extends Node {
     // If inlined, no further xforms.  The using Projs will fold up.
     if( is_copy() ) return null;
     // Dead, do nothing
-    if( gvn.type(ctl())==Type.XCTRL ) return null;
+    if( gvn.type(ctl())==Type.XCTRL ) {
+      if( (ctl() instanceof ConNode) ) return null;
+      return set_def(0,gvn.con(Type.XCTRL),gvn); // Do chop off control usage
+    }
     Node mem = mem();
 
     // When do I do 'pattern matching'?  For the moment, right here: if not

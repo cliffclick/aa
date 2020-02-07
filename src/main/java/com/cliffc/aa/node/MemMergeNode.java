@@ -214,8 +214,11 @@ public class MemMergeNode extends Node {
         ti = ((TypeMem)ti).at(alias);
       assert ti instanceof TypeObj || ti==Type.ANY;
       // Check for incoming alias slice is dead, from a alive memmerge
-      if( ti==TypeObj.XOBJ && !(in(i) instanceof ConNode) )
-        { set_def(i,gvn.con(TypeObj.XOBJ),gvn); progress = true; }
+      if( ti==TypeObj.XOBJ && !(in(i) instanceof ConNode) ) {
+        set_def(i,gvn.con(TypeObj.XOBJ),gvn);
+        if( is_dead() ) return this; // Happens cleaning out dead code
+        progress = true;
+      }
       // Check the incoming alias matches his parent
       int par_idx = find_alias2idx(BitsAlias.parent(alias));
       // Alias slice is exactly his parent, both are XOBJ?

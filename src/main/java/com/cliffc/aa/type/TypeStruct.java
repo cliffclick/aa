@@ -194,10 +194,12 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return sb.di(1).i().p(!is_tup ? '}' : ')').p(_cln ?"":"!");
   }
   // Print with memory instead of recursion
-  @Override public SB str(SB sb, TypeMem mem) {
+  @Override public SB str(SB sb, VBitSet dups, TypeMem mem) {
+    if( dups == null ) dups = new VBitSet();
+    if( dups.tset(_uid) ) return sb.p('$'); // Break recursive printing cycle
     if( find("!") != -1 && find("math_pi") != -1 )
       return sb.p("{PRIMS}");
-    if( _uf!=null ) return _uf.str(sb.p("=>"),mem);
+    if( _uf!=null ) return _uf.str(sb.p("=>"),dups,mem);
     if( _any ) sb.p('~');
     sb.p(_name);
     boolean is_tup = _flds.length==0 || fldTop(_flds[0]) || fldBot(_flds[0]) || isDigit(_flds[0].charAt(0));
@@ -209,7 +211,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
         sb.p(_flds[i]).p(fstr(_finals[i])).p('='); // Field name, access mod
       if( t==null ) sb.p("!");  // Graceful with broken types
       else if( t==SCALAR ) ;    // Default answer, do not print
-      else t.str(sb,mem);       // Recursively print field type
+      else t.str(sb,dups,mem);  // Recursively print field type
       if( i<_flds.length-1 ) sb.p(';');
     }
     return sb.p(!is_tup ? '}' : ')').p(_cln ?"":"!");

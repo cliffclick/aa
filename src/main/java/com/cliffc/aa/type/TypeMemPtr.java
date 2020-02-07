@@ -49,10 +49,10 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     _aliases.toString(sb);
     return sb;
   }
-  @Override public SB str(SB sb, TypeMem mem) {
+  @Override public SB str(SB sb, VBitSet dups, TypeMem mem) {
     TypeObj to = mem == null ? _obj : mem.ld(this);
     if( to == TypeObj.XOBJ ) to = _obj;
-    to.str(_aliases.toString(sb.p('*')),mem);
+    to.str(_aliases.toString(sb.p('*')),dups,mem);
     if( _aliases.test(0) ) sb.p('?');
     return sb;
   }

@@ -258,8 +258,7 @@ public final class CallEpiNode extends Node {
       // Make real from virtual CG edges in GCP/Opto by wiring calls.
       if( gvn._opt_mode==2 &&        // Manifesting optimistic virtual edges between caller and callee
           !fidxs.above_center() &&   // Still settling down to possibilities
-          !fun.is_forward_ref() &&   // Call is in-error
-          fidx >= FunNode.PRIM_CNT ) // Do not wire up primitives, but forever take their default inputs and outputs
+          !fun.is_forward_ref() )    // Call is in-error
         wire(gvn,call,fun,ret);
     }
     // Meet the call-bypass aliases with the function aliases.  If the function

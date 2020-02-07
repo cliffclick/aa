@@ -417,34 +417,8 @@ public class TestParse {
     // using tmp._obj instead of pulling from the TypeMem?- No, just looked,
     // no real uses.  I believe I can pull recursive types again.
     //
-    //
-    test_ptr("tmp=@{"+
-                    "  l=@{"+
-                    "    l=@{ l=0; r=0; v=3 };"+
-                    "    r=@{ l=0; r=0; v=7 };"+
-                    "    v=5"+
-                    "  };"+
-                    "  r=@{"+
-                    "    l=@{ l=0; r=0; v=15 };"+
-                    "    r=@{ l=0; r=0; v=22 };"+
-                    "    v=20"+
-                    "  };"+
-                    "  v=12 "+
-                    "};"+
-                    "map={tree fun -> tree"+
-                    "     ? @{ll=map(tree.l,fun);rr=map(tree.r,fun);vv=tree.v&tree.v}"+
-                    "     : 0};"+
-                    "map(tmp,{x->x&x})",
-            "@{ll==*[$],rr==*[$],vv==int64}");
-    // WORKS (probably via complete unroll)
-    test_ptr("tmp=@{ l=@{l=0;r=0;v= 5};"+
-                    "r=@{l=0;r=0;v=20};"+
-                    "v=12};"+
-                    "map={tree -> tree"+
-                    "     ? @{ll=map(tree.l);rr=map(tree.r);vv=tree.v&tree.v}"+
-                    "     : 0};"+
-                    "map(tmp)",
-            "@{ll==*[$]@{ll==nil;rr==nil;vv==5}!;rr==*[$]@{ll==nil;rr==nil;vv==20}!;vv==12}!");
+    // Currently using TMP._obj for user-defined types
+
     // WORKS.  Printout is poor, ignore _obj field except for struct fields.
     test_ptr("tmp=@{"+
                     "  l=@{"+
@@ -784,7 +758,7 @@ strs:List(str?) = ... // List of null-or-strings
     try( TypeEnv te = run(program) ) {
       assertTrue(te._t instanceof TypeMemPtr);
       TypeObj to = te._tmem.ld((TypeMemPtr)te._t); // Peek thru pointer
-      SB sb = to.str(new SB(),te._tmem);          // Print what we see, with memory
+      SB sb = to.str(new SB(),null,te._tmem);      // Print what we see, with memory
       assertEquals(expected,strip_alias_numbers(sb.toString()));
     }
   }

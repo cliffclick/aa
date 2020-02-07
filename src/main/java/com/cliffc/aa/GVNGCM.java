@@ -565,7 +565,6 @@ public class GVNGCM {
   private void walk_dead( Node n ) {
     assert !n.is_dead();
     if( _wrk_bits.get(n._uid) ) return; // Been there, done that
-    if( n._uid != 0 && n._uid <= _INIT0_CNT ) return;  // Not primitives
     add_work(n);                        // Only walk once
     for( Node use : n._uses ) walk_dead(use);
   }

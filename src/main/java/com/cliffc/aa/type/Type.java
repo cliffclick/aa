@@ -124,7 +124,7 @@ public class Type<T extends Type<T>> implements Cloneable {
   // All other 'str()' callers just pass along.
   @Override public final String toString() { return str(null); }
   //@Override public final String toString() { return dstr(new SB(),null).toString(); }
-  public SB str( SB sb, TypeMem mem ) { return sb.p(str(null)); }
+  public SB str( SB sb, VBitSet dups, TypeMem mem ) { return sb.p(str(dups)); }
   String str( VBitSet dups ) { return _name+STRS[_type]; }
   SB dstr( SB sb, VBitSet dups ) { return sb.p(str(dups)); }
   String q() { return dstr(new SB(),null).toString(); }
