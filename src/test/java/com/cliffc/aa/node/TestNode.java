@@ -210,6 +210,17 @@ public class TestNode {
                         Type.CTRL,Type.NUM,Type.ANY,Type.ANY);
 
     // All the Nodes, all Values, all Types
+    test1monotonic(new   LoadNode(_ins[1],_ins[2],"x",null));
+    test1monotonic(new MemMergeNode(_ins[1],_ins[2],BitsAlias.RECORD));
+    NewObjNode nnn1 = new NewObjNode(false,_ins[0]);
+    set_type(1,Type.SCALAR);  nnn1.create_active("x",_ins[1],TypeStruct.ffinal(),_gvn);
+    set_type(2,Type.SCALAR);  nnn1.create_active("y",_ins[2],TypeStruct.ffinal(),_gvn);
+    test1monotonic(nnn1);
+    NewObjNode nnn2 = new NewObjNode(false,_ins[0]);
+    set_type(1,Type.SCALAR);  nnn2.create_active("x",_ins[1],TypeStruct.ffinal(),_gvn);
+    set_type(2,Type.SCALAR);  nnn2.create_active("y",_ins[2],TypeStruct.ffinal(),_gvn);
+    nnn2.set_name(tname);
+    test1monotonic(nnn2);
     test1monotonic(new MemMergeNode(_ins[1],_ins[2],BitsAlias.RECORD));
 
     ((ConNode<Type>)_ins[1])._t = Type.SCALAR; // ParmNode reads this for _alltype
@@ -250,17 +261,6 @@ public class TestNode {
     for( IntrinsicNewNode prim : IntrinsicNewNode.INTRINSICS )
       test1monotonic_intrinsic(prim);
     test1monotonic(new IntrinsicNode(tname,null,null,mem,_ins[2]));
-    test1monotonic(new   LoadNode(_ins[1],_ins[2],"x",null));
-    test1monotonic(new MemMergeNode(_ins[1],_ins[2],BitsAlias.RECORD));
-    NewObjNode nnn1 = new NewObjNode(false,_ins[0]);
-    set_type(1,Type.SCALAR);  nnn1.create_active("x",_ins[1],TypeStruct.ffinal(),_gvn);
-    set_type(2,Type.SCALAR);  nnn1.create_active("y",_ins[2],TypeStruct.ffinal(),_gvn);
-    test1monotonic(nnn1);
-    NewObjNode nnn2 = new NewObjNode(false,_ins[0]);
-    set_type(1,Type.SCALAR);  nnn2.create_active("x",_ins[1],TypeStruct.ffinal(),_gvn);
-    set_type(2,Type.SCALAR);  nnn2.create_active("y",_ins[2],TypeStruct.ffinal(),_gvn);
-    nnn2.set_name(tname);
-    test1monotonic(nnn2);
 
     assertEquals(0,_errs);
   }

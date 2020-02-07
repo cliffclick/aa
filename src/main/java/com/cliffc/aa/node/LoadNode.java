@@ -117,12 +117,16 @@ public class LoadNode extends Node {
     // Loading from TypeObj - hoping to get a field out
     if( tmem == TypeObj.XOBJ ) return Type.XSCALAR;
     if( tmem == TypeObj. OBJ ) return Type. SCALAR;
-    // Struct (and pointer is not nil)
-    if( tmem instanceof TypeStruct && !tmp.must_nil() ) {
+    // Struct; check for field
+    if( tmem instanceof TypeStruct ) {
       TypeStruct ts = (TypeStruct)tmem;
       int idx = ts.find(_fld);  // Find the named field
-      if( idx != -1 )           // Found a field
+      if( idx != -1 ) {         // Found a field
+        Type t = ts.at(idx);
+        if( tmp.must_nil() )    // Might be in-error, but might fall to correct
+          return t.widen();     // Return conservative but sane answer
         return ts.at(idx);      // Field type
+      }
       // No such field
     }
     return tmem.above_center() ? Type.XSCALAR : Type.SCALAR; // No loading from e.g. Strings

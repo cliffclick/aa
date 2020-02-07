@@ -88,10 +88,12 @@ public class TypeBits extends Type<TypeBits> {
     if( this== FULL || t == FULL ) return FULL;
     if( this==EMPTY ) return t   ;
     if( t   ==EMPTY ) return this;
-    TypeBits ts = (TypeBits)t;
-    long[] bits = new long[_bits.length];
-    for( int i=0; i<_bits.length; i++ )
-      bits[i] = _bits[i] | ts._bits[i];
+    TypeBits tmin = this;
+    TypeBits tmax = (TypeBits)t;
+    if( tmin._bits.length > tmax._bits.length ) { tmin = tmax; tmax = this; }
+    long[] bits = tmax._bits.clone();
+    for( int i=0; i<tmin._bits.length; i++ )
+      bits[i] = tmin._bits[i] | tmax._bits[i];
     return make(bits);
   }
 

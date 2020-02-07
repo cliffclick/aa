@@ -270,7 +270,7 @@ public class TestParse {
     test("gal=:flt; 3==gal(2)+1", TypeInt.TRUE);
     test("gal=:flt; tank:gal = gal(2)", TypeInt.con(2).set_name("gal:"));
     // test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: figure out if free cast for bare constants?
-    testerr ("gal=:flt; tank:gal = gal(2)+1", "3.0 is not a gal:flt64",14);
+    testerr ("gal=:flt; tank:gal = gal(2)+1", "3 is not a gal:flt64",14);
 
     test    ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
     test    ("Point=:@{x;y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
@@ -342,7 +342,7 @@ public class TestParse {
                  "map(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0;v=1};v=2};v=3};v=4})",
             TypeStruct.make(FLDS2,TypeStruct.ts(TypeMemPtr.STRUCT0,TypeFlt.FLT32))); //con(20.25)
     // Test does loads after recursive call, which should be allowed to bypass.
-    test("sum={x -> x ? sum(x.n) & x.v : 0};"+
+    test("sum={x -> x ? sum(x.n) + x.v : 0};"+
          "sum(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0;v=1};v=2};v=3};v=4})",
          TypeInt.INT64);
 
@@ -403,23 +403,42 @@ public class TestParse {
 
 
   @Test public void testParse08() {
-    // Recursive tree map function.
-    // Pulled call to 'fun' in inner - and hit infinite iter loop.
-    // Once this gets to end, expect 'l unknown field' bug.
-    // So next step is to simplify one tree layer but keep 'fun'.
+    // Failed attempt at a Tree-structure inference test.  Triggered all sorts
+    // of bugs and error reporting issues, so keeping it as a regression test.
+    testerr("tmp=@{"+
+         "  l=@{"+
+         "    l=@{ l=0; r=0; v=3 };"+
+         "    l=@{ l=0; r=0; v=7 };"+
+         "    v=5"+
+         "  };"+
+         "  r=@{"+
+         "    l=@{ l=0; r=0; v=15 };"+
+         "    l=@{ l=0; r=0; v=22 };"+
+         "    v=20"+
+         "  };"+
+         "  v=12 "+
+         "};"+
+         "map={tree fun -> tree"+
+         "     ? @{l=map(tree.l,fun);r=map(tree.r,fun);v=fun(tree.v)}"+
+         "     : 0};"+
+         "map(tmp,{x->x+x})",
+            "Cannot re-assign final field '.l'",61);
 
-    // Asking self "why TMP._obj?" which basically is "why do ptrs carry structure info in addition to alias#?"
+
+
+
+    // Asking self "why TMP._obj?" which basically is "why do ptrs carry
+    // structure info in addition to alias#?"
     // It seems to be related to presence of correct fields?
     // But these are carried in the alias#->TypeMem->TypeStruct.
     //
     // So remember I yanked TMP._obj and recursive Types, and then brought it
     // back.  Not sure why I need it still.  And: is there a bug where I'm
-    // using tmp._obj instead of pulling from the TypeMem?- No, just looked,
+    // using tmp._obj instead of pulling from the TypeMem? - No, just looked,
     // no real uses.  I believe I can pull recursive types again.
     //
     // Currently using TMP._obj for user-defined types
 
-    // WORKS.  Printout is poor, ignore _obj field except for struct fields.
     test_ptr("tmp=@{"+
                     "  l=@{"+
                     "    l=@{ l=0; r=0; v=3 };"+
@@ -437,7 +456,7 @@ public class TestParse {
                     "     ? @{ll=map(tree.l);rr=map(tree.r);vv=tree.v&tree.v}"+
                     "     : 0};"+
                     "map(tmp)",
-            "@{ll=*[$]@{ll:=nil;rr:=nil;vv:=nil}!?;rr=$;vv=int8}!");
+             "@{ll=*[$]@{ll=*[$]$?;rr=$;vv=int8}!?;rr=$;vv=int8}!");
 
     // Failed attempt at a Tree-structure inference test.  Triggered all sorts
     // of bugs and error reporting issues, so keeping it as a regression test.

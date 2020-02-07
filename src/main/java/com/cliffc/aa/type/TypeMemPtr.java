@@ -50,6 +50,8 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     return sb;
   }
   @Override public SB str(SB sb, VBitSet dups, TypeMem mem) {
+    if( dups == null ) dups = new VBitSet();
+    if( dups.tset(_uid) ) return sb.p('$'); // Break recursive printing cycle
     TypeObj to = mem == null ? _obj : mem.ld(this);
     if( to == TypeObj.XOBJ ) to = _obj;
     to.str(_aliases.toString(sb.p('*')),dups,mem);

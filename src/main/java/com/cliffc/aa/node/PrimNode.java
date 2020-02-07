@@ -270,6 +270,23 @@ static class MulI64 extends Prim2OpI64 {
 
 static class AndI64 extends Prim2OpI64 {
   AndI64() { super("&"); }
+  // And can preserve bit-width
+  @Override public Type value(GVNGCM gvn) {
+    Type t1 = gvn.type(in(1)), t2 = gvn.type(in(2));
+    // 0 AND anything is 0
+    if( t1 == Type.NIL || t2 == Type.NIL ) return Type.NIL;
+    // If either is high - results might fall to something reasonable
+    if( t1.above_center() || t2.above_center() )
+      return TypeInt.INT64.dual();
+    // Both are low-or-constant, and one is not valid - return bottom result
+    if( !t1.isa(TypeInt.INT64) || !t2.isa(TypeInt.INT64) )
+      return TypeInt.INT64;
+    // If both are constant ints, return the constant math.
+    if( t1.is_con() && t2.is_con() )
+      return TypeInt.con(t1.getl() & t2.getl());
+    // Preserve width by doing a MEET
+    return t1.meet(t2);
+  }
   @Override long op( long l, long r ) { return l&r; }
   @Override public byte op_prec() { return 7; }
 }

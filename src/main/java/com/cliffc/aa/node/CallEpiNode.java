@@ -132,7 +132,7 @@ public final class CallEpiNode extends Node {
       return inline(gvn,call,cctl,cmem,rrez,ret);
 
     // Check for a 1-op body using only constants or parameters and no memory effects
-    boolean can_inline=!(rrez instanceof ParmNode) && (rmem==cmem || gvn.type(rmem)==TypeMem.XMEM);
+    boolean can_inline=!(rrez instanceof ParmNode) && (rmem==cmem || gvn.type(rmem)==TypeMem.EMPTY);
     for( Node parm : rrez._defs )
       if( parm != null && parm != fun &&
           !(parm instanceof ParmNode && parm.in(0) == fun) &&
@@ -196,12 +196,17 @@ public final class CallEpiNode extends Node {
   // just meet the set of known functions.
   @Override public Type value(GVNGCM gvn) {
     CallNode call = is_copy() ? ((CallNode)in(3)) : call();
+    if( gvn.type(call.ctl()) != Type.CTRL ) // Call is not called
+      return TypeTuple.CALLE.dual();
+    // Get Call result.  If the Call args are in-error, then the Call is called
+    // and we flow types to the post-call.... BUT the bad args are NOT passed
+    // along to the function being called.
     TypeTuple tcall = (TypeTuple)gvn.type(call);
-    if( tcall.at(0) != Type.CTRL ) return TypeTuple.CALLE.dual();
+    // Call is in-error?
+    boolean call_err_args = tcall.at(0) != Type.CTRL;
     Type tfptr = tcall.at(1);
-    if( !(tfptr instanceof TypeFunPtr) )
+    if( !(tfptr instanceof TypeFunPtr) ) // Call does not know what it is calling?
       return TypeTuple.CALLE;
-    //TypeMem call_mem = (TypeMem)tcall.at(2);
     TypeFunPtr funt = (TypeFunPtr)tfptr;
     BitsFun fidxs = funt.fidxs();
     if( fidxs.test(BitsFun.ALL) ) // All functions are possible?
@@ -258,7 +263,8 @@ public final class CallEpiNode extends Node {
       // Make real from virtual CG edges in GCP/Opto by wiring calls.
       if( gvn._opt_mode==2 &&        // Manifesting optimistic virtual edges between caller and callee
           !fidxs.above_center() &&   // Still settling down to possibilities
-          !fun.is_forward_ref() )    // Call is in-error
+          !fun.is_forward_ref() &&   // Call target is undefined
+          tcall.at(0)==Type.CTRL )   // Call args are not in error
         wire(gvn,call,fun,ret);
     }
     // Meet the call-bypass aliases with the function aliases.  If the function
