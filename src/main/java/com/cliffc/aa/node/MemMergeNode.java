@@ -285,8 +285,11 @@ public class MemMergeNode extends Node {
       if( !abs.test(1) ) {      // Shortcut
         for( int i=1; i<_defs._len; i++ )
           if( !abs.test_recur(_aliases.at(i)))
-            if( gvn.type(in(i)) != TypeObj.XOBJ || !(in(i) instanceof ConNode) )
-              { set_def(i,gvn.con(TypeObj.XOBJ),gvn); progress = true; }
+            if( gvn.type(in(i)) != TypeObj.XOBJ || !(in(i) instanceof ConNode) ) {
+              set_def(i,gvn.con(TypeObj.XOBJ),gvn);
+              if( is_dead() ) return this; // Happens when cleaning out dead code
+              progress = true;
+            }
         if( progress ) return this;
       }
     }

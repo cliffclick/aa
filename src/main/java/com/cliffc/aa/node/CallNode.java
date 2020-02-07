@@ -221,7 +221,7 @@ public class CallNode extends Node {
     TypeFunPtr tfp = (TypeFunPtr)(ts[1] = tfx);
     BitsFun fidxs = tfp.fidxs();
     // Can we call this function pointer?
-    boolean callable = !(tfp.above_center() || fidxs.above_center());
+    boolean callable = !dead && !(tfp.above_center() || fidxs.above_center());
 
     // Not a memory to the call?
     Type mem = gvn.type(mem());
@@ -451,6 +451,6 @@ public class CallNode extends Node {
   }
   // If losing the CallEpi, call does dead.
   @Override public boolean ideal_impacted_by_losing_uses(GVNGCM gvn, Node dead) {
-    return cepi()==null;
+    return dead instanceof CallEpiNode;
   }
 }
