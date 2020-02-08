@@ -403,30 +403,6 @@ public class TestParse {
 
 
   @Test public void testParse08() {
-    // Failed attempt at a Tree-structure inference test.  Triggered all sorts
-    // of bugs and error reporting issues, so keeping it as a regression test.
-    testerr("tmp=@{"+
-         "  l=@{"+
-         "    l=@{ l=0; r=0; v=3 };"+
-         "    l=@{ l=0; r=0; v=7 };"+
-         "    v=5"+
-         "  };"+
-         "  r=@{"+
-         "    l=@{ l=0; r=0; v=15 };"+
-         "    l=@{ l=0; r=0; v=22 };"+
-         "    v=20"+
-         "  };"+
-         "  v=12 "+
-         "};"+
-         "map={tree fun -> tree"+
-         "     ? @{l=map(tree.l,fun);r=map(tree.r,fun);v=fun(tree.v)}"+
-         "     : 0};"+
-         "map(tmp,{x->x+x})",
-            "Cannot re-assign final field '.l'",61);
-
-
-
-
     // Asking self "why TMP._obj?" which basically is "why do ptrs carry
     // structure info in addition to alias#?"
     // It seems to be related to presence of correct fields?
@@ -462,22 +438,17 @@ public class TestParse {
     // of bugs and error reporting issues, so keeping it as a regression test.
     testerr("tmp=@{"+
          "  l=@{"+
-         "    l=@{ l=0; r=0; v=3 };"+
-         "    l=@{ l=0; r=0; v=7 };"+
+         "    l=@{ l=0; v=3 };"+
+         "    l=0;"+
          "    v=5"+
-         "  };"+
-         "  r=@{"+
-         "    l=@{ l=0; r=0; v=15 };"+
-         "    l=@{ l=0; r=0; v=22 };"+
-         "    v=20"+
          "  };"+
          "  v=12 "+
          "};"+
-         "map={tree fun -> tree"+
-         "     ? @{l=map(tree.l,fun);r=map(tree.r,fun);v=fun(tree.v)}"+
+         "map={tree -> tree"+
+         "     ? @{ll=map(tree.l);vv=tree.v}"+
          "     : 0};"+
-         "map(tmp,{x->x+x})",
-            "Cannot re-assign final field '.l'",61);
+         "map(tmp)",
+            "Cannot re-assign final field '.l'",39);
 
     // Good tree-structure inference test
     test_ptr("tmp=@{"+
@@ -497,7 +468,7 @@ public class TestParse {
          "     ? @{l=map(tree.l,fun);r=map(tree.r,fun);v=fun(tree.v)}"+
          "     : 0};"+
          "map(tmp,{x->x+x})",
-         "@{l==*[$],r==*[$],v==int64}");
+         "@{l=*[$]$?;r=$;v=int64}!");
 
     // A linked-list mixing ints and strings, always in pairs
     String ll_cona = "a=0; ";
@@ -516,7 +487,6 @@ public class TestParse {
     test_isa(ll_cona+ll_conb+ll_conc+ll_cond+ll_cone+ll_cont+ll_map2+ll_fun2+ll_apl2,
              TypeMemPtr.make(BitsAlias.TUPLE_BITS0,TypeStruct.make(TypeMemPtr.make(BitsAlias.TUPLE_BITS0,TypeStruct.make(TypeMemPtr.STRUCT0,TypeInt.INT64)),TypeMemPtr.STRPTR)));
 
-    throw AA.unimpl();
   }
 
   @Test public void testParse09() {
@@ -531,15 +501,15 @@ public class TestParse {
     test("x:=1", TypeInt.TRUE);
     test_obj("x:=0; a=x; x:=1; b=x; x:=2; (a,b,x)", TypeStruct.make_tuple(Type.NIL,TypeInt.con(1),TypeInt.con(2)));
 
-    testerr("x=1; x:=2", "Cannot re-assign final val 'x'", 9);
-    testerr("x=1; x=2", "Cannot re-assign final val 'x'", 8);
+    testerr("x=1; x:=2; x", "Cannot re-assign final val 'x'", 9);
+    testerr("x=1; x=2; x", "Cannot re-assign final val 'x'", 8);
 
     test("math_rand(1)?(x=4):(x=3);x", TypeInt.NINT8); // x defined on both arms, so available after
     test("math_rand(1)?(x:=4):(x:=3);x", TypeInt.NINT8); // x defined on both arms, so available after
     test("math_rand(1)?(x:=4):(x:=3);x:=x+1", TypeInt.INT64); // x mutable on both arms, so mutable after
     test   ("x:=0; 1 ? (x:=4):; x:=x+1", TypeInt.con(5)); // x mutable ahead; ok to mutate on 1 arm and later
     test   ("x:=0; 1 ? (x =4):; x", TypeInt.con(4)); // x final on 1 arm, dead on other arm
-    testerr("x:=0; math_rand(1) ? (x =4):3; x=2", "Cannot re-assign final val 'x'",34);
+    testerr("x:=0; math_rand(1) ? (x =4):3; x=2; x", "Cannot re-assign read-only val 'x'",34);
   }
 
   // Finals are declared with an assignment.  This is to avoid the C++/Java
@@ -563,10 +533,10 @@ public class TestParse {
     // Test re-assignment in struct
     Type[] ts = TypeStruct.ts(TypeInt.con(1), TypeInt.con(2));
     test_obj("x=@{n:=1;v:=2}", TypeStruct.make(FLDS, ts,TypeStruct.frws(2)));
-    testerr ("x=@{n =1;v:=2}; x.n  = 3; ", "Cannot re-assign read-only field '.n'",24);
+    testerr ("x=@{n =1;v:=2}; x.n  = 3; x.n", "Cannot re-assign read-only field '.n'",24);
     test    ("x=@{n:=1;v:=2}; x.n  = 3", TypeInt.con(3));
     test_ptr("x=@{n:=1;v:=2}; x.n := 3; x", "@{n:=3,v:=2}");
-    testerr ("x=@{n:=1;v:=2}; x.n  = 3; x.v = 1; x.n = 4", "Cannot re-assign read-only field '.n'",42);
+    testerr ("x=@{n:=1;v:=2}; x.n  = 3; x.v = 1; x.n = 4; x.n", "Cannot re-assign read-only field '.n'",42);
     test    ("x=@{n:=1;v:=2}; y=@{n=3;v:=4}; tmp = math_rand(1) ? x : y; tmp.n", TypeInt.NINT8);
     testerr ("x=@{n:=1;v:=2}; y=@{n=3;v:=4}; tmp = math_rand(1) ? x : y; tmp.n = 5", "Cannot re-assign read-only field '.n'",68);
     test    ("x=@{n:=1;v:=2}; foo={q -> q.n=3}; foo(x); x.n",TypeInt.con(3)); // Side effects persist out of functions

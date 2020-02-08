@@ -63,9 +63,14 @@ public class PhiNode extends Node {
     // on all paths and the Phi is the sole user, so the input MemMerges will
     // die after this xform.  This is an expanding xform: try not to expand
     // dead nodes.
-    for( int i=1; i<_defs._len; i++ )
-      if( in(i)._uses._len!=1 || !(in(i) instanceof MemMergeNode) )
+    for( int i=1; i<_defs._len; i++ ) {
+      Node mem = in(i);
+      if( mem._uses._len!=1 || !(mem instanceof MemMergeNode) )
         return null;            // Not a self-single-user MemMerge
+      for( int j=1; j<mem._defs._len; j++ )
+        if( !(gvn.type(mem.in(j)) instanceof TypeObj) )
+          return null;          // MemMerge is filtering a generic memory down to a single alias
+    }
 
     // Do the expansion.  First: find all aliases
     BitSet bs = new BitSet();
@@ -82,12 +87,10 @@ public class PhiNode extends Node {
     for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) ) {
       PhiNode phi = new PhiNode(_badgc,r);
       for( int i=1; i<_defs._len; i++ ) {
-        Node n = in(i);
         // Take the matching narrow slice for the alias, except for alias ALL
         // which can keep taking undistinguished memory.  The resulting memory
         // is {ALL-aliases} but currently only represented as ALL.
-        if( n instanceof MemMergeNode )
-          n = ((MemMergeNode)n).alias2node(alias);
+        Node n = ((MemMergeNode)in(i)).alias2node(alias);
         if( alias==BitsAlias.ALL ) {
           assert gvn.type(n) instanceof TypeMem;
         } else {

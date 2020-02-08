@@ -23,7 +23,7 @@ public class TypeTuple extends Type<TypeTuple> {
   @Override public int compute_hash( ) {
     int hash = TTUPLE+(_any?0:1);
     for( Type t : _ts ) hash += t._hash;
-    return hash;
+    return hash|1;
   }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;

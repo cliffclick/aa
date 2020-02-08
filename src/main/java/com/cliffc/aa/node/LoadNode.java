@@ -110,8 +110,7 @@ public class LoadNode extends Node {
     if( !(tmem instanceof TypeStruct) ) {
       if( !(tmem instanceof TypeMem) ) // Nothing sane
         return tmem.above_center() ? Type.XSCALAR : Type.SCALAR;
-      TypeObj obj = ((TypeMem)tmem).ld(tmp);
-      tmem = obj;
+      tmem = ((TypeMem)tmem).ld(tmp);
     }
 
     // Loading from TypeObj - hoping to get a field out

@@ -216,7 +216,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     }
     return sb.p(!is_tup ? '}' : ')').p(_cln ?"":"!");
   }
-  
+
   // Unlike other types, TypeStruct never makes dups - instead it might make
   // cyclic types for which a DAG-like bottom-up-remove-dups approach cannot work.
   private static TypeStruct FREE=null;
@@ -1050,7 +1050,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   }
   private static void _update( byte[] finals, Type[] ts, byte fin, int idx, Type val, boolean precise ) {
     if( finals[idx]==ffinal() || finals[idx]==fro() )
-      val = Type.SCALAR;      // Illegal store into final/r-o field
+      precise=false;      // Illegal store into final/r-o field
     ts[idx] =  precise ? val : ts[idx].meet(val);
     finals[idx] = fin;
   }
