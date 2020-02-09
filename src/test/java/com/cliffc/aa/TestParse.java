@@ -551,15 +551,19 @@ public class TestParse {
     test    ("ptr=@{f=1}; ptr2rw:@{f:=} = ptr; 2", TypeInt.con(2)); // Dead cast-away of final
     test    ("@{x:=1;y =2}:@{x;y==}.y", TypeInt.con(2)); // Allowed reading final field
     testerr ("f={ptr2final:@{x;y==} -> ptr2final.y  }; f(@{x:=1;y:=2})", "*[$]@{x:=1;y:=2} is not a *[$]@{x=;y==}!",12); // Another version of casting-to-final
-    testerr ("f={ptr2final:@{x,y==} -> ptr2final.y=3}; f(@{x =1;y =2})", "Cannot re-assign read-only field '.y'",38);
+    testerr ("f={ptr2final:@{x;y==} -> ptr2final.y=3; ptr2final}; f(@{x =1;y =2})", "Cannot re-assign final field '.y'",38);
     test    ("f={ptr:@{x= ;y:=} -> ptr.y=3; ptr}; f(@{x:=1;y:=2}).y", TypeInt.con(3)); // On field x, cast-away r/w for r/o
     test    ("f={ptr:@{x==;y:=} -> ptr.y=3; ptr}; f(@{x =1;y:=2}).y", TypeInt.con(3)); // On field x, cast-up r/o for final but did not read
-    testerr ("f={ptr:@{x==;y:=} -> ptr.y=3; ptr}; f(@{x:=1;y:=2}).x", "*[$]@{x:=1,y:=2} is not a *[$]@{x==,y:=}",51); // On field x, cast-up r/w for final and read
+    testerr ("f={ptr:@{x==;y:=} -> ptr.y=3; ptr}; f(@{x:=1;y:=2}).x", "*[$]@{x:=1;y:=2} is not a *[$]@{x==;y:=}!",6); // On field x, cast-up r/w for final and read
     test    ("f={ptr:@{x;y} -> ptr.y }; f(@{x:=1;y:=2}:@{x;y=})", TypeInt.con(2)); // cast r/w to r/o, and read
     test    ("f={ptr:@{x;y} -> ptr }; f(@{x=1;y=2}).y", TypeInt.con(2)); // cast final to r/o and read
-    testerr ("ptr=@{f:=1}; ptr:@{f=}.f=2","Cannot re-assign read-only field '.f'",26);
-    testerr ("f={ptr:@{x;y} -> ptr.y=3}; f(@{x:=1;y:=2});", "Cannot re-assign read-only field '.y'",24);
-    testerr ("f={ptr:@{x;y} -> ptr.y=3}; f(@{x:=1;y:=2}:@{x;y=})", "Cannot re-assign read-only field '.y'",24);
+    test    ("ptr=@{f:=1}; ptr:@{f=}.f=2",TypeInt.con(2)); // Checking that it is-a final does not make it final
+    // In general for these next two, want a 'MEET' style type assertion where
+    // locally at the function parm we "finalize" ptr.y, so the function body
+    // cannot modify it.  However, no final store occurs so after the function,
+    // ptr.y remains writable.
+    //testerr ("f={ptr:@{x;y} -> ptr.y=3}; f(@{x:=1;y:=2});", "Cannot re-assign read-only field '.y'",24);
+    //testerr ("f={ptr:@{x;y} -> ptr.y=3}; f(@{x:=1;y:=2}:@{x;y=})", "Cannot re-assign read-only field '.y'",24);
     test    ("ptr=@{a:=1}; val=ptr.a; ptr.a=2; val",TypeInt.con(1));
     // Allowed to build final pointer cycles
     test    ("ptr0=@{p:=0;v:=1}; ptr1=@{p=ptr0;v:=2}; ptr0.p=ptr1; ptr0.p.v+ptr1.p.v+(ptr0.p==ptr1)", TypeInt.con(4)); // final pointer-cycle is ok

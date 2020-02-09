@@ -509,7 +509,6 @@ public class Parse {
         fld=fld.intern();
 
         Node castnn = gvn(new CastNode(ctrl(),n,TypeMemPtr.OOP)); // Remove nil choice
-        Node mem = all_mem();
 
         // Store or load against memory
         if( peek(":=") || peek_not('=','=')) {
@@ -517,14 +516,14 @@ public class Parse {
           Node stmt = stmt();
           if( stmt == null ) n = err_ctrl2("Missing stmt after assigning field '."+fld+"'");
           else {
-            Node st = gvn(new StoreNode(mem,castnn,n=stmt,fin,fld ,errMsg()));
+            Node st = gvn(new StoreNode(all_mem(),castnn,n=stmt,fin,fld ,errMsg()));
             // Set the store into active memory.  It might have collapsed into
             // the local closure already, so already be in the active memory.
             if( st instanceof StoreNode ) mem_active().st((StoreNode)st,_gvn);
             else { assert st instanceof OProjNode; }
           }
         } else {
-          n = gvn(new LoadNode(mem,castnn,fld,errMsg()));
+          n = gvn(new LoadNode(all_mem(),castnn,fld,errMsg()));
         }
 
       } else {                  // Attempt a function-call
@@ -708,7 +707,7 @@ public class Parse {
       Parse bad = errMsg();    // Capture location in case of type error
       if( peek(':') )          // Has type annotation?
         if( (t=type())==null ) {
-          err_ctrl0("Missing or bad type arg",null);
+          err_ctrl0(peek(',') ? "Bad type arg, found a ',' did you mean to use a ';'?" : "Missing or bad type arg",null);
           t = Type.SCALAR;
           skipNonWS();         // Skip possible type sig, looking for next arg
         }

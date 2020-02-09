@@ -336,8 +336,9 @@ public class MemMergeNode extends Node {
     TypeMem tm = (TypeMem)t;
 
     // Merge with parent.
-    int max = Math.max(tm.alias2objs().length,_aliases.last()+1);
-    TypeObj[] tos = Arrays.copyOf(tm.alias2objs(),max);
+    TypeObj[] tms = tm.alias2objs();
+    int max = Math.max(tms.length,_aliases.last()+1);
+    TypeObj[] tos = Arrays.copyOf(tms,max);
     TypeBits los = tm.losts();
     for( int i=1; i<_defs._len; i++ ) {
       int alias = alias_at(i);
@@ -348,6 +349,12 @@ public class MemMergeNode extends Node {
         : (ta.above_center() ? TypeObj.XOBJ : TypeObj.OBJ); // Handle ANY, ALL
       TypeObj to = tm.at(alias);
       tos[alias] = (TypeObj)to.meet(tao);
+      // All child aliases alive in the base type get stomped.  Aliases from
+      // following inputs do not get stomped, and get set in in later iterations.
+      for( int j = alias+1; j<tms.length; j++ )
+        if( tos[j] != null && BitsAlias.is_parent(alias,j) )
+          tos[j] = (TypeObj)tos[j].meet(tao);
+      
       if( !to.above_center() ) los = los.set(alias);
     }
     return TypeMem.make0(tos,los);
