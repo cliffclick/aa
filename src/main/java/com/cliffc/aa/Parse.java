@@ -361,8 +361,13 @@ public class Parse {
         // Active (parser) memory state
         MemMergeNode mmem = mem_active();
         int alias = scope.stk()._alias; // Alias for scope
-        Node omem = mmem.active_obj(alias);
-        Node st = gvn(new StoreNode(omem,scope.ptr(),ifex,mutable,tok,errMsg()));
+        Node objmem = mmem.active_obj(alias).keep();
+        int midx = mmem.alias2idx(alias);
+        // Briefly remove the active-memory use from a NewObj, allowing this
+        // store to immediately fold against it.  This is an optional early
+        // optimization.
+        if( midx>0 && objmem.in(0) instanceof NewObjNode ) mmem.remove0(midx,_gvn);
+        Node st = gvn(new StoreNode(objmem.unhook(),scope.ptr(),ifex,mutable,tok,errMsg()));
         int idx = mmem.make_alias2idx(alias); // Precise alias update
         mmem.set_def(idx,st,_gvn);
         scope.def_if(tok,mutable,false); // Note 1-side-of-if update
@@ -564,9 +569,10 @@ public class Parse {
         return err_ctrl2("Cannot re-assign final val '"+tok+"'");
     }
     // Now properly load from the closure
-    MemMergeNode mmem = mem_active(scope); // Active memory for the chosen scope
     int alias = scope.stk()._alias;        // Closure alias
-    n = gvn(new LoadNode(mmem.active_obj(alias),scope.ptr(),tok,null));
+    MemMergeNode mmem = mem_active(scope); // Active memory for the chosen scope
+    Node objmem = mmem.active_obj(alias);
+    n = gvn(new LoadNode(objmem,scope.ptr(),tok,null));
     if( n.is_forward_ref() )    // Prior is actually a forward-ref
       return err_ctrl2(forward_ref_err(((FunPtrNode)n).fun()));
     // Do a full lookup on "+", and execute the function
@@ -574,7 +580,7 @@ public class Parse {
     Node sum = do_call(new CallNode(true,errMsg(),ctrl(),plus,all_mem(),n.keep(),con(TypeInt.con(d))));
 
     MemMergeNode mmem2 = mem_active(scope); // Active memory for the chosen scope, after the call to plus
-    Node st = gvn(new StoreNode(mmem.active_obj(alias),scope.ptr(),sum,TypeStruct.frw(),tok,errMsg()));
+    Node st = gvn(new StoreNode(objmem,scope.ptr(),sum,TypeStruct.frw(),tok,errMsg()));
     int idx = mmem2.make_alias2idx(alias); // Precise alias update
     mmem2.set_def(idx,st,_gvn);
     return n.unhook();          // Return pre-increment value
@@ -655,8 +661,10 @@ public class Parse {
     // Forward refs always directly assigned into scope
     if( def.is_forward_ref() ) return def;
     // Else must load against most recent closure update.
+    int alias = scope.stk()._alias;        // Closure alias
     MemMergeNode mmem = mem_active(scope); // Active memory for the chosen scope
-    return gvn(new LoadNode(mmem.active_obj(scope.stk()._alias),scope.ptr(),tok.intern(),null));
+    Node objmem = mmem.active_obj(alias);
+    return gvn(new LoadNode(objmem,scope.ptr(),tok.intern(),null));
   }
 
   /** Parse a tuple; first stmt but not the ',' parsed.

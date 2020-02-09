@@ -105,7 +105,7 @@ public class MemMergeNode extends Node {
   }
 
   // Remove a DEF, and update everything
-  private void remove0( int xidx, GVNGCM gvn ) {
+  public void remove0( int xidx, GVNGCM gvn ) {
     assert check();
     remove(xidx,gvn);                  // Remove def, preserving order
     int alias = _aliases.remove(xidx); // Remove alias mapping, preserving order
