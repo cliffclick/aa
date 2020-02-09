@@ -12,7 +12,6 @@ public class RegionNode extends Node {
   RegionNode( byte op ) { super(op); add_def(null); } // For FunNodes
   @Override public Node ideal(GVNGCM gvn, int level) {
     // TODO: The unzip xform, especially for funnodes doing type-specialization
-    // TODO: Check for dead-diamond merges
     // TODO: treat _cidx like U/F and skip_dead it also
 
     // Look for dead paths.  If found, cut dead path out of all Phis and this
@@ -31,17 +30,30 @@ public class RegionNode extends Node {
         return this; // Progress
       }
 
-    if( dlen>2 ) return null; // Multiple live paths
     if( dlen == 1 ) return null; // No live inputs; dead in value() call
     if( in(1) == Env.ALL_CTRL ) return null; // Alive from unknown caller
-    // If only 1 live path and no Phis then return 1 live path.
-    for( Node phi : _uses ) if( phi instanceof PhiNode ) return null;
-    // Single input FunNodes can NOT inline to their one caller,
-    // unless the one caller only also calls the one FunNode.
-    if( this instanceof FunNode && ((FunNode)this).ret()!=null )
-      return null;
-    // Self-dead-cycle is dead in value() call
-    return in(1)==this ? null : in(1);
+    if( dlen==2 ) {                          // Exactly 1 live path
+      // If only 1 live path and no Phis then return 1 live path.
+      for( Node phi : _uses ) if( phi instanceof PhiNode ) return null;
+      // Single input FunNodes can NOT inline to their one caller,
+      // unless the one caller only also calls the one FunNode.
+      if( this instanceof FunNode && ((FunNode)this).ret()!=null )
+        return null;
+      // Self-dead-cycle is dead in value() call
+      return in(1)==this ? null : in(1);
+    }
+    // Check for empty diamond
+    if( dlen==3 ) {             // Exactly 2 live paths
+      Node nif = in(1).in(0);
+      if( in(1) instanceof CProjNode && nif==in(2).in(0) ) {
+        assert nif instanceof IfNode;
+        // Must have no phi uses
+        for( Node phi : _uses ) if( phi instanceof PhiNode ) return null;
+        return nif.in(0);
+      }
+    }
+
+    return null;
   }
 
   @Override public Type value(GVNGCM gvn) {

@@ -83,8 +83,18 @@ public final class RetNode extends Node {
   // Depends on the returned value type and memory type, and the structure of
   // the Parms to the Function.
   @Override public BitsAlias alias_uses(GVNGCM gvn) {
-    // Return memory type
-    Type omem = gvn.type(mem());
+    // Walk up a chain of pure functions, to see if we see any modifications to
+    // memory.  Allows to skip a chain of primitives.
+    Node mem = mem();    // Return memory
+    Node cepi;  Type tcepi;
+    while( mem instanceof MProjNode && (cepi=mem.in(0)) instanceof CallEpiNode &&
+           (tcepi=gvn.type(cepi)) instanceof TypeTuple &&
+           ((TypeTuple)tcepi).at(3)==TypeMem.EMPTY &&
+            !((CallEpiNode)cepi).is_copy() )
+            mem = ((CallNode)cepi.in(0)).mem();
+
+    // Get reasonable memory type
+    Type omem = gvn.type(mem);
     if( !(omem instanceof TypeMem) ) return BitsAlias.NZERO; // Wait until types get more stable
     TypeMem output_mem = (TypeMem)omem;
 
@@ -92,8 +102,8 @@ public final class RetNode extends Node {
     // Closures reachable from this function escape, because we assume the
     // function body modifies all closure variables.
     FunNode fun = fun();
-    if( !fun.is_parm(mem()) ) {  // Shortcut: Skip if no memory effects at all
-      MemMergeNode mmem = mem() instanceof MemMergeNode ? ((MemMergeNode)mem()) : null;
+    if( !fun.is_parm(mem) ) {  // Shortcut: Skip if no memory effects at all
+      MemMergeNode mmem = mem instanceof MemMergeNode ? ((MemMergeNode)mem) : null;
       for( int alias : fun._closure_aliases )
         // If memory effect is strange, or this alias is not directly from the
         // function entry, then assume it is modified and part of the result state.
