@@ -1,7 +1,6 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.Parse;
+import com.cliffc.aa.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Util;
 
@@ -52,7 +51,7 @@ public class LoadNode extends Node {
 
     // Loads against a NewNode cannot NPE, cannot fail, always return the input
     NewObjNode nnn = addr.in(0) instanceof NewObjNode ? (NewObjNode)addr.in(0) : null;
-    int idx=-1;
+    int idx;
     if( nnn != null && nnn == mem.in(0) && (idx=nnn._ts.find(_fld)) != -1 )
       return nnn.fld(idx);      // Field value
 
@@ -74,9 +73,8 @@ public class LoadNode extends Node {
         return st.val();
     }
 
-    // Bypass unrelated Stores
-    if( st != null && st.err(gvn)==null &&
-        !Util.eq(_fld,st._fld) )
+    // Bypass unrelated Stores.  Since unrelated, can bypass in-error stores.
+    if( st != null && !Util.eq(_fld,st._fld) )
       return set_mem(st.mem(),gvn);
     return null;
   }

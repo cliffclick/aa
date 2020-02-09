@@ -22,4 +22,10 @@ public abstract class AA {
     if( args.length > 0 ) System.out.println(Exec.go(top,"args",String.join(" ",args))._t.toString());
     else REPL.go(top);
   }
+  public static boolean DEBUG = true;
+  public static <T> T p(T x, String s) {
+    if( !AA.DEBUG ) return x;
+    System.err.println(s);
+    return x;
+  }
 }

@@ -168,11 +168,26 @@ public class MemMergeNode extends Node {
   // An imprecise store updates all aliases
   public void st( StoreNode st, GVNGCM gvn ) {
     assert !gvn.touched(this);
-    TypeMemPtr ptr = (TypeMemPtr)gvn.type(st.adr());
-    BitSet bs = ptr._aliases.tree().plus_kids(ptr._aliases);
-    for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) ) {
-      int idx = make_alias2idx(alias);
-      set_def(idx,st,gvn);
+    Type tadr = gvn.type(st.adr());
+    if( tadr instanceof TypeMemPtr ) {
+      TypeMemPtr ptr = (TypeMemPtr)tadr;
+      BitSet bs = ptr._aliases.tree().plus_kids(ptr._aliases);
+      for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) ) {
+        int idx = make_alias2idx(alias);
+        set_def(idx,st,gvn);
+      }
+    } else {
+      if( tadr.above_center() ) return; // Assume nothing is being stored into
+      assert TypeMemPtr.OOP.isa(tadr);  // Address might lift to a valid ptr
+      // Assume all RECORD aliases are stomped over.  Very conservative.
+      // Reset this MemMerge to having just the 'st' in slot#1, alias#2.
+      while( _defs._len > 1 ) pop(gvn);
+      _aliases.set_len(1);
+      _aidxes .set_len(BitsAlias.RECORD+1);
+      add_def(st);
+      _aliases.push(BitsAlias.RECORD);
+      _aidxes .setX(BitsAlias.RECORD,1);
+      assert check();
     }
   }
 
@@ -184,13 +199,7 @@ public class MemMergeNode extends Node {
     assert !gvn.touched(this) && _uses._len==0;
     for( int i=0; i<_defs._len; i++ ) {
       Node obj = in(i);
-      assert gvn.touched(obj); // No longer needed
-      //if( !gvn.touched(obj) ) { // Found active child ObjMerge
-      //  _defs.set(i,null);      // Unpoint to it
-      //  obj._uses.del(this);    // Keep sane asserts
-      //  assert obj._uses.isEmpty(); // Ready for gvn.xform as a new node
-      //  set_def(i,gvn.xform(obj),gvn); // Clean up child ObjMerge like normal
-      //}
+      assert gvn.touched(obj);  // No longer needed
     }
     return this;                // Ready for gvn.xform as a new node
   }
@@ -234,11 +243,15 @@ public class MemMergeNode extends Node {
     // Back-to-back merges collapse
     if( mem() instanceof MemMergeNode ) {
       MemMergeNode mem = (MemMergeNode)mem();
-      for( int i=1; i<mem._defs._len; i++ ) {
+      // Walk in reverse order, because original 'mem' aliases includes some
+      // parent-defs and some child-overrides-of-parent.  If we insert the
+      // parent first, it looks like the 'this' MemMerge has a stomp of the
+      // parent which overrides the later walked children.
+      for( int i=mem._defs._len-1; i>=1; i-- ) {
         int alias = mem.alias_at(i);
         // If alias is old, keep the original (it stomped over the incoming
         // memory).  If alias is new, use the new value.
-        int idx = alias2idx(alias);
+        int idx = find_alias2idx(alias);
         if( idx == 0 )
           // Create alias slice from nearest alias parent
           create_alias_active(alias,mem.in(i),gvn);
@@ -286,13 +299,23 @@ public class MemMergeNode extends Node {
       }
       // Kill unused aliases
       if( !abs.test(1) ) {      // Shortcut
+        // Used aliases might be defined by a higher alias#.  These higher
+        // alias numbers are therefore also used.
+        BitsAlias abs2 = abs;
+        for( int alias : abs ) {
+          int idx = find_alias2idx(alias);
+          if( idx != 0 )
+            abs2 = abs2.set(_aliases.at(idx));
+        }
+        // Find defined (leaf) aliases with no uses.
         for( int i=1; i<_defs._len; i++ )
-          if( !abs.test_recur(_aliases.at(i)))
+          if( !abs2.test_recur(_aliases.at(i))) {
             if( gvn.type(in(i)) != TypeObj.XOBJ || !(in(i) instanceof ConNode) ) {
               set_def(i,gvn.con(TypeObj.XOBJ),gvn);
               if( is_dead() ) return this; // Happens when cleaning out dead code
               progress = true;
             }
+          }
         if( progress ) return this;
       }
     }

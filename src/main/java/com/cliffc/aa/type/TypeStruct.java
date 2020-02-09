@@ -1052,7 +1052,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     if( finals[idx]==ffinal() || finals[idx]==fro() )
       precise=false;      // Illegal store into final/r-o field
     ts[idx] =  precise ? val : ts[idx].meet(val);
-    finals[idx] = fin;
+    finals[idx] = precise ? fin : fmeet(fin,finals[idx]);
   }
 
   // Allowed to update this field?

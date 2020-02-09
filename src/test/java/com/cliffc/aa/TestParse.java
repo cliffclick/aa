@@ -533,15 +533,15 @@ public class TestParse {
     // Test re-assignment in struct
     Type[] ts = TypeStruct.ts(TypeInt.con(1), TypeInt.con(2));
     test_obj("x=@{n:=1;v:=2}", TypeStruct.make(FLDS, ts,TypeStruct.frws(2)));
-    testerr ("x=@{n =1;v:=2}; x.n  = 3; x.n", "Cannot re-assign read-only field '.n'",24);
+    testerr ("x=@{n =1;v:=2}; x.n  = 3; x.n", "Cannot re-assign final field '.n'",24);
     test    ("x=@{n:=1;v:=2}; x.n  = 3", TypeInt.con(3));
-    test_ptr("x=@{n:=1;v:=2}; x.n := 3; x", "@{n:=3,v:=2}");
-    testerr ("x=@{n:=1;v:=2}; x.n  = 3; x.v = 1; x.n = 4; x.n", "Cannot re-assign read-only field '.n'",42);
+    test_ptr("x=@{n:=1;v:=2}; x.n := 3; x", "@{n:=3;v:=2}!");
+    testerr ("x=@{n:=1;v:=2}; x.n  = 3; x.v = 1; x.n = 4; x.n", "Cannot re-assign final field '.n'",42);
     test    ("x=@{n:=1;v:=2}; y=@{n=3;v:=4}; tmp = math_rand(1) ? x : y; tmp.n", TypeInt.NINT8);
-    testerr ("x=@{n:=1;v:=2}; y=@{n=3;v:=4}; tmp = math_rand(1) ? x : y; tmp.n = 5", "Cannot re-assign read-only field '.n'",68);
+    testerr ("x=@{n:=1;v:=2}; y=@{n=3;v:=4}; tmp = math_rand(1) ? x : y; tmp.n = 5; tmp.n", "Cannot re-assign read-only field '.n'",68);
     test    ("x=@{n:=1;v:=2}; foo={q -> q.n=3}; foo(x); x.n",TypeInt.con(3)); // Side effects persist out of functions
     // Tuple assignment
-    testerr ("x=(1,2); x.0=3; x", "Cannot re-assign read-only field '.0'",14);
+    testerr ("x=(1,2); x.0=3; x", "Cannot re-assign final field '.0'",14);
     // Final-only and read-only type syntax.
     testerr ("ptr2rw = @{f:=1}; ptr2final:@{f==} = ptr2rw; ptr2final", "*[$]@{f:=1} is not a *[$]@{f==}",43); // Cannot cast-to-final
     test_obj("ptr2   = @{f =1}; ptr2final:@{f==} = ptr2  ; ptr2final", // Good cast

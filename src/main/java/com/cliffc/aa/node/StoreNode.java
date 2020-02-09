@@ -32,7 +32,7 @@ public class StoreNode extends Node {
 
     // Stores bypass a Merge to the specific alias
     Type ta = gvn.type(adr);
-    if( ta instanceof TypeMemPtr && mem instanceof MemMergeNode )
+    if( ta instanceof TypeMemPtr && mem instanceof MemMergeNode && ((TypeMemPtr)ta)._aliases.abit() != -1)
       return new StoreNode(this,((MemMergeNode)mem).obj((TypeMemPtr)ta,gvn),adr);
 
     // Stores bypass stores to unrelated fields.  TODO: Cannot really do this -
@@ -163,7 +163,7 @@ public class StoreNode extends Node {
     CallNode call = cepi.call();
     final Node fpctrl = pctrl;
     if( call.walk_dom_last(n -> n==fpctrl) == null ) return null;
-    
+
     TypeTuple tcall = (TypeTuple)gvn.type(call);
     TypeMem tcm = (TypeMem)tcall.at(2);
     Node pre_call_mem = call.mem();
@@ -177,11 +177,17 @@ public class StoreNode extends Node {
     return null;
   }
 
-  
+
   // Set of used aliases across all inputs (not StoreNode value, but yes address)
   @Override public BitsAlias alias_uses(GVNGCM gvn) {
-    TypeMemPtr tmp = (TypeMemPtr)gvn.type(adr());
-    return tmp.aliases();
+    Type tadr = gvn.type(adr());
+    if( !(tadr instanceof TypeMemPtr) ) return BitsAlias.NZERO; // Very low address, might point to anything
+    // TODO: Be smarter about forward flow here
+    if( _uses._len > 1 ) return BitsAlias.NZERO; // All uses of StoreNode ALSO must be accounted for
+    // My uses, plus my users uses.
+    BitsAlias bas = ((TypeMemPtr)tadr).aliases();
+    // TODO: Be smarter if single user is a MemMerge.
+    return bas.meet(_uses.at(0).alias_uses(gvn));
   }
   @Override public String err(GVNGCM gvn) {
     String msg = err0(gvn);
@@ -194,6 +200,8 @@ public class StoreNode extends Node {
     if( !(t instanceof TypeMemPtr) ) return "Unknown"; // Too low, might not have any fields
     Type mem = gvn.type(mem());
     if( mem == Type.ANY ) return null;
+    if( mem instanceof TypeMem )
+      mem = ((TypeMem)mem).ld((TypeMemPtr)t);
     if( !(mem instanceof TypeStruct) ) return "No such field '";
     TypeStruct ts = (TypeStruct)mem;
     int idx = ts.find(_fld);
