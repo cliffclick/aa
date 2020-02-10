@@ -571,13 +571,14 @@ public class TestParse {
 
   // Early function exit
   @Test public void testParse11() {
-    //test("{ ^3; 5}()",TypeInt.con(3)); // early exit
+    test("x:=0; {1 ? ^2; x=3}(); x",TypeInt.con(0));  // Following statement is ignored
+    test("{ ^3; 5}()",TypeInt.con(3)); // early exit
     test("x:=0; {^3; x++}(); x",TypeInt.con(0));  // Following statement is ignored
     test("x:=0; {^1 ? (x=1); x=3}(); x",TypeInt.con(1));  // Return of an ifex
     test("x:=0; {^1 ?  x=1 ; x=3}(); x",TypeInt.con(1));  // Return of an ifex
     // Find: returns 0 if not found, or first element which passes predicate.
     test("find={list pred -> !list ? ^0; pred(list.1) ? ^list.1; find(list.0,pred)}; find(((0,3),2),{e -> e&1})", TypeInt.con(3));
-    //test("x:=0; {1 ? ^2; x=3}(); x",TypeInt.con(0));  // Following statement is ignored
+    test("x:=0; {1 ? ^2; x=3}(); x",TypeInt.con(0));  // Following statement is ignored
   }
 
   /* Closures

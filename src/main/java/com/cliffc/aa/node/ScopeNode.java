@@ -32,6 +32,7 @@ public class ScopeNode extends Node {
   public   Node  ctrl() { return in(0); }
   public   Node  mem () { return in(1); }
   public   Node  ptr () { return in(2); }
+  public   Node  rez () { return in(3); }
   public NewObjNode stk () { return (NewObjNode)ptr().in(0); }
   public <N extends Node> N set_ctrl( N n, GVNGCM gvn) { set_def(0,n,gvn); return n; }
   public void set_ptr ( Node n, GVNGCM gvn) { set_def(2,n,gvn); }
@@ -63,9 +64,9 @@ public class ScopeNode extends Node {
   public Node get(String name) { return stk().get(name); }
   public boolean is_mutable(String name) { return stk().is_mutable(name); }
 
-  public RegionNode early_ctrl() { return (RegionNode)in(3); }
-  public    PhiNode early_mem () { return (   PhiNode)in(4); }
-  public    PhiNode early_val () { return (   PhiNode)in(5); }
+  public RegionNode early_ctrl() { return (RegionNode)in(4); }
+  public    PhiNode early_mem () { return (   PhiNode)in(5); }
+  public    PhiNode early_val () { return (   PhiNode)in(6); }
   public void       early_kill() { pop(); pop(); pop(); }
 
   // Name to type lookup, or null
@@ -113,7 +114,7 @@ public class ScopeNode extends Node {
   @Override public BitsAlias alias_uses(GVNGCM gvn) {
     Type mem = gvn.type(mem());
     if( mem == Type.ALL ) return BitsAlias.NZERO; // All escaped
-    Node rez = in(4);
+    Node rez = rez();
     if( rez == null ) return BitsAlias.NZERO;
     Type tval = gvn.type(rez);
     if( !(tval instanceof TypeMemPtr) ) return BitsAlias.EMPTY;

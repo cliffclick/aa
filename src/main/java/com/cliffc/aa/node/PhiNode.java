@@ -67,12 +67,8 @@ public class PhiNode extends Node {
       Node mem = in(i);
       if( mem._uses._len!=1 || !(mem instanceof MemMergeNode) )
         return null;            // Not a self-single-user MemMerge
-      for( int j=1; j<mem._defs._len; j++ )
-        if( !(gvn.type(mem.in(j)) instanceof TypeObj) )
-          return null;          // MemMerge is filtering a generic memory down to a single alias
     }
-
-    // Do the expansion.  First: find all aliases
+    // Find all aliases
     BitSet bs = new BitSet();
     bs.set(BitsAlias.ALL);
     for( int i=1; i<_defs._len; i++ )
@@ -81,8 +77,22 @@ public class PhiNode extends Node {
         for( int j=0; j<xmem._defs._len; j++ )
           bs.set(xmem.alias_at(j));
       }
-    // Now fill in all the phis, one by one, and plug into the giant MemMerge
-    // at the end.
+
+    // Make sure each alias merged is skinny
+    for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) )
+      if( alias > 1 ) 
+        for( int i=1; i<_defs._len; i++ ) {
+          MemMergeNode mmem = (MemMergeNode)in(i);
+          Node nalias = mmem.alias2node(alias);
+          Type tnalias = gvn.type(nalias);
+          if( !(tnalias instanceof TypeObj) )
+            return null;        // MemMerge is being used to filter fat memory
+          if( !(gvn.type(((MemMergeNode)in(i)).alias2node(alias)) instanceof TypeObj) )
+            return null;
+        }
+    
+    // Do the expansion.  Fill in all the phis, one by one, and plug into the
+    // giant MemMerge at the end.
     MemMergeNode mmem = new MemMergeNode(null);
     for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) ) {
       PhiNode phi = new PhiNode(_badgc,r);
@@ -94,7 +104,7 @@ public class PhiNode extends Node {
         if( alias==BitsAlias.ALL ) {
           assert gvn.type(n) instanceof TypeMem;
         } else {
-          if( n == ((MemMergeNode)in(i)).alias2node(1) )
+          if( gvn.type(n) == TypeObj.XOBJ && !(n instanceof ConNode) )
             n = gvn.con(TypeObj.XOBJ);
           assert gvn.type(n) instanceof TypeObj;
         }

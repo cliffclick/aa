@@ -336,6 +336,7 @@ public class Parse {
     // Honor all type requests, all at once, by inserting type checks on the ifex.
     for( int i=0; i<ts._len; i++ )
       ifex = typechk(ifex,ts.at(i),all_mem(),bads.at(i));
+    ifex.keep();
     // Assign tokens to value
     for( int i=0; i<toks._len; i++ ) {
       String tok = toks.at(i);               // Token being assigned
@@ -373,7 +374,7 @@ public class Parse {
         scope.def_if(tok,mutable,false); // Note 1-side-of-if update
       }
     }
-    return ifex;
+    return ifex.unhook();
   }
 
   /** Parse an if-expression, with lazy eval on the branches.  Assignments to
@@ -774,9 +775,9 @@ public class Parse {
     Node mem  = s.early_mem ();
     Node val  = s.early_val ();
     if( ctrl == null ) {
-      s.set_def(3,ctrl=new RegionNode(  (Node)null),null);
-      s.set_def(4,mem =new PhiNode(null,(Node)null),null);
-      s.set_def(5,val =new PhiNode(null,(Node)null),null);
+      s.set_def(4,ctrl=new RegionNode(  (Node)null),null);
+      s.set_def(5,mem =new PhiNode(null,(Node)null),null);
+      s.set_def(6,val =new PhiNode(null,(Node)null),null);
     }
     ctrl.add_def(ctrl());
     mem .add_def(all_mem());
@@ -792,7 +793,7 @@ public class Parse {
    *  \@{ stmts }
    */
   private Node struct() {
-    int oldx = _x-1; Node ptr;  // Openning @{
+    int oldx = _x-1; Node ptr;  // Opening @{
     all_mem();
     try( Env e = new Env(_e,false) ) {// Nest an environment for the local vars
       _e = e;                   // Push nested environment
