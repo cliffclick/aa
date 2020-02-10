@@ -1,6 +1,7 @@
 package com.cliffc.aa.type;
 
 import com.cliffc.aa.AA;
+import com.cliffc.aa.node.FunNode;
 import com.cliffc.aa.util.*;
 import org.jetbrains.annotations.NotNull;
 
@@ -1126,6 +1127,19 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     for( Type t : _ts )
       if( t instanceof TypeMemPtr )
         abs = ((TypeMemPtr) t).recursive_aliases(abs, mem);
+      else if( t instanceof TypeFunPtr ) {
+        BitsFun fidxs = ((TypeFunPtr)t).fidxs();
+        if( fidxs.test(1) ) return BitsAlias.NZERO; // All functions, all closures
+        if( !fidxs.above_center() ) {
+          for( int fidx : fidxs ) {
+            if( fidx != 0 ) {
+              BitsAlias cls = FunNode.find_fidx(fidx)._closure_aliases;
+              if( cls != BitsAlias.EMPTY && abs != cls )
+                abs = abs.meet(cls);
+            }
+          }
+        }
+      }
     return abs;
   }
 

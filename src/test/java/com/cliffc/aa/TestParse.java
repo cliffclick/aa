@@ -433,7 +433,7 @@ public class TestParse {
                     "     ? @{ll=map(tree.l);rr=map(tree.r);vv=tree.v&tree.v}"+
                     "     : 0};"+
                     "map(tmp)",
-             "@{ll=*[$]@{ll=*[$]$?;rr=$;vv=int8}!?;rr=$;vv=int8}!");
+             "@{ll=*[$]@{ll=*[$]@{ll=$;rr=$;vv=int64}!?;rr=$;vv=int64}!?;rr=$;vv=int8}!");
 
     // Failed attempt at a Tree-structure inference test.  Triggered all sorts
     // of bugs and error reporting issues, so keeping it as a regression test.
@@ -581,6 +581,17 @@ public class TestParse {
     test("x:=0; {1 ? ^2; x=3}(); x",TypeInt.con(0));  // Following statement is ignored
   }
 
+  // Upwards exposed closure tests
+  @Test public void testParse12() {
+    test("incA= {cnt:=0; {cnt++}       }(); incA();incA()",TypeInt.con(1));
+
+    test("cnt:=0; incA={cnt++}; incA();incA()+cnt",TypeInt.con(1+2));
+    test("incA= {cnt:=0; {cnt++}       }();                      incA()       ",TypeInt.con(0));
+    test("incA= {cnt:=0; {cnt++}       }();                      incA();incA()",TypeInt.con(1));
+    test("tmp = {cnt:=0;({cnt++},{cnt})}();incA=tmp.0;getA=tmp.1;incA();incA()+getA()",TypeInt.con(1+2));
+  }
+
+
   /* Closures
 
 ----
@@ -608,12 +619,34 @@ No 'break' but early function exit ^.
     for {i++ < 100 } {
       (sum+=i) > 1000 ? ^sum;     // ?: syntax, no colon, break in the 'then' clause
     }
+
+Hiding the scope of 'i' via burying in another function:
+    { i:=0; do {i++ < 100} { sum+=i; sum > 1000 ? ^0; } }()
+
+Defining 'for' as a function; exit from the body with truthy continues loop (but
+exits body early) - same as a continue.  Falling off bottom defaults to true???
+Exit with false exits loop - same as break.
+
+    for = { pred body -> pred && !body ? for pred body }
+Using:
+    sum:=0;i:=0; for {i++<100} {sum+=i; sum > 1000}; sys.p(sum);
+
+Other forms of for:
+x:=0; for {
+  !(x < 10) ? ^0;
+  ! x%2 ? ^1;
+  sys.p(x)
+  ++x
+}
+x:=0; for {x<10} {x++} {
+  ! x%2 ? ^1;
+  sys.p(x)
+}
+
+
   */
   @Ignore
-  @Test public void testParse12() {
-    test("{ ^3; 5}()",TypeInt.con(3)); // early exit
-    // Find: returns 0 if not found, or first element which passes predicate.
-    test("find={list pred -> !list ? ^0; pred(list.1) ? ^list.1; find(list.0,pred)}; find(((0,3),2),{e -> e&1})", TypeInt.con(3));
+  @Test public void testParse13() {
     test("sum:=0; i:=0; do (i++ < 100) {sum+=i}",Type.ALL);
     test("for (init;pred;post) no-arg-func",Type.ALL);
     test("{init do (pred) {no-arg-func;post}}",Type.ALL);
@@ -643,7 +676,7 @@ No 'break' but early function exit ^.
 
   // Array syntax examples
   @Ignore
-  @Test public void testParse13() {
+  @Test public void testParse14() {
     test("[3]:int", Type.ALL);      // Array of 3 ints, all zeroed.  Notice ambiguity with array-of-1 element being a 3.
     test("ary = [3]; ary[0]:=0; ary[1]:=1; ary[2]:=2; (ary[0],ary[1],ary[2])", Type.ALL); // array create, array storing
     test("[0,1,2]", Type.ALL); // array create syntax, notice ambiguity with making a new sized array.

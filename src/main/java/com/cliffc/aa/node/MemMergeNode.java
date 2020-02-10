@@ -303,9 +303,11 @@ public class MemMergeNode extends Node {
         // alias numbers are therefore also used.
         BitsAlias abs2 = abs;
         for( int alias : abs ) {
-          int idx = find_alias2idx(alias);
-          if( idx != 0 )
-            abs2 = abs2.set(_aliases.at(idx));
+          if( alias > 0 ) {
+            int idx = find_alias2idx(alias);
+            if( idx != 0 )
+              abs2 = abs2.set(_aliases.at(idx));
+          }
         }
         // Find defined (leaf) aliases with no uses.
         for( int i=1; i<_defs._len; i++ )
@@ -354,7 +356,7 @@ public class MemMergeNode extends Node {
       for( int j = alias+1; j<tms.length; j++ )
         if( tos[j] != null && BitsAlias.is_parent(alias,j) )
           tos[j] = (TypeObj)tos[j].meet(tao);
-      
+
       if( !to.above_center() ) los = los.set(alias);
     }
     return TypeMem.make0(tos,los);

@@ -115,7 +115,6 @@ public final class RetNode extends Node {
     // Aliases reachable from output memory and return pointer
     Type tval = gvn.type(val());
     if( tval instanceof TypeMemPtr ) {
-      //abs = abs.meet(((TypeMemPtr)tval).aliases().strip_nil()); // Returned ptr in the output set
       // Everything modifiable and reachable from output
       abs = ((TypeMemPtr)tval).recursive_aliases(abs,output_mem);
     } else if( TypeMemPtr.OOP.isa(tval) ) // Scalar is all pointers

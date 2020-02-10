@@ -363,10 +363,10 @@ public class Parse {
         MemMergeNode mmem = mem_active();
         int alias = scope.stk()._alias; // Alias for scope
         Node objmem = mmem.active_obj(alias).keep();
-        int midx = mmem.alias2idx(alias);
         // Briefly remove the active-memory use from a NewObj, allowing this
         // store to immediately fold against it.  This is an optional early
         // optimization.
+        int midx = mmem.alias2idx(alias);
         if( midx>0 && objmem.in(0) instanceof NewObjNode ) mmem.remove0(midx,_gvn);
         Node st = gvn(new StoreNode(objmem.unhook(),scope.ptr(),ifex,mutable,tok,errMsg()));
         int idx = mmem.make_alias2idx(alias); // Precise alias update
@@ -562,7 +562,7 @@ public class Parse {
     // Need a load/call/store sensible options
     Node n;
     if( scope==null ) {         // Token not already bound to a value
-      create(tok,n = con(Type.NIL),ts_mutable(true));
+      create(tok,con(Type.NIL),ts_mutable(true));
       scope = _e._scope;
     } else {                    // Check existing token for mutable
       if( !scope.is_mutable(tok) )
@@ -570,7 +570,7 @@ public class Parse {
     }
     // Now properly load from the closure
     int alias = scope.stk()._alias;        // Closure alias
-    MemMergeNode mmem = mem_active(scope); // Active memory for the chosen scope
+    MemMergeNode mmem = mem_active();      // Active memory
     Node objmem = mmem.active_obj(alias);
     n = gvn(new LoadNode(objmem,scope.ptr(),tok,null));
     if( n.is_forward_ref() )    // Prior is actually a forward-ref
@@ -579,8 +579,9 @@ public class Parse {
     Node plus = _e.lookup_filter("+",_gvn,2);
     Node sum = do_call(new CallNode(true,errMsg(),ctrl(),plus,all_mem(),n.keep(),con(TypeInt.con(d))));
 
-    MemMergeNode mmem2 = mem_active(scope); // Active memory for the chosen scope, after the call to plus
-    Node st = gvn(new StoreNode(objmem,scope.ptr(),sum,TypeStruct.frw(),tok,errMsg()));
+    MemMergeNode mmem2 = mem_active(); // Active memory for the chosen scope, after the call to plus
+    Node objmem2 = mmem2.active_obj(alias);
+    Node st = gvn(new StoreNode(objmem2,scope.ptr(),sum,TypeStruct.frw(),tok,errMsg()));
     int idx = mmem2.make_alias2idx(alias); // Precise alias update
     mmem2.set_def(idx,st,_gvn);
     return n.unhook();          // Return pre-increment value
@@ -661,8 +662,8 @@ public class Parse {
     // Forward refs always directly assigned into scope
     if( def.is_forward_ref() ) return def;
     // Else must load against most recent closure update.
-    int alias = scope.stk()._alias;        // Closure alias
-    MemMergeNode mmem = mem_active(scope); // Active memory for the chosen scope
+    int alias = scope.stk()._alias;   // Closure alias
+    MemMergeNode mmem = mem_active(); // Active memory
     Node objmem = mmem.active_obj(alias);
     return gvn(new LoadNode(objmem,scope.ptr(),tok.intern(),null));
   }
@@ -706,12 +707,18 @@ public class Parse {
       if( tok.equals("->") ) break;
       Type t = Type.SCALAR;    // Untyped, most generic type
       Parse bad = errMsg();    // Capture location in case of type error
-      if( peek(':') )          // Has type annotation?
-        if( (t=type())==null ) {
+      if( peek(':') &&         // Has type annotation?
+          (t=type())==null ) { // Get type
+        // If no type, might be "x := ..." which is a stmt, hence this is a no-arg function
+        if( ids._len <= 2 ) { ids.clear(); _x=oldx; break; }
+        else {
+          // Might be: "{ x y z:bad -> body }" which cannot be any stmt this is
+          // an error in any case.  Treat as a bad type on a valid function.
           err_ctrl0(peek(',') ? "Bad type arg, found a ',' did you mean to use a ';'?" : "Missing or bad type arg",null);
           t = Type.SCALAR;
           skipNonWS();         // Skip possible type sig, looking for next arg
         }
+      }
       ids .add(tok.intern());
       ts  .add(t  );
       bads.add(bad);
@@ -738,6 +745,7 @@ public class Parse {
       MemMergeNode amem = mem_active();
       assert amem.in(1).in(0) == e._scope.stk(); // amem slot#1 is the closure
       amem.set_def(0,mem,_gvn);                  // amem slot#0 was outer closure, should be function memory
+      set_mem(amem);
       // Parse function body
       Node rez = stmts();       // Parse function body
       if( rez == null ) rez = err_ctrl2("Missing function body");

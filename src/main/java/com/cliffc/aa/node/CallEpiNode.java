@@ -171,19 +171,31 @@ public final class CallEpiNode extends Node {
           ((ParmNode)arg)._idx >= nargs )
         return null;            // Wrong arg-count
 
+    // Wire.  During GCP, cannot call "xform" since e.g. types are not final
+    // nor constant yet - and need to add all new nodes to the GCP worklist.
+    // During iter(), must call xform() to register all new nodes.
+
     // Add an input path to all incoming arg ParmNodes from the Call.  Cannot
     // assert finding all args, because dead args may already be removed - and
     // so there's no Parm/Phi to attach the incoming arg to.
     for( Node arg : fun._uses ) {
       if( arg.in(0) == fun && arg instanceof ParmNode ) {
         int idx = ((ParmNode)arg)._idx; // Argument number, or -1 for rpc
-        Node actual = idx==-1 ? gvn.con(TypeRPC.make(call._rpc)) :
-          gvn.xform(idx==-2 ? new MProjNode(call,2) : new ProjNode(call,idx+3));
+        Node actual = idx==-1 ? new ConNode<>(TypeRPC.make(call._rpc)) :
+          (idx==-2 ? new MProjNode(call,2) : new ProjNode(call,idx+3));
+        if( gvn._opt_mode == 2 ) {
+          gvn.setype(actual,actual.all_type().startype());
+          gvn.add_work(actual);
+        }
+        else actual = gvn.xform(actual);
         gvn.add_def(arg,actual);
       }
     }
+
     // Add matching control to function
-    gvn.add_def(fun,gvn.xform(new CProjNode(call,0)));
+    Node cproj = new CProjNode(call,0);
+    cproj = gvn._opt_mode == 2 ? gvn.add_work(cproj) : gvn.xform(cproj);
+    gvn.add_def(fun,cproj);
     // Add the CallEpi hook
     if( gvn._opt_mode == 2 ) gvn.add_def(this,ret);
     else                         add_def(     ret);
@@ -235,10 +247,13 @@ public final class CallEpiNode extends Node {
         continue;              // Can be dead, if the news has not traveled yet
       RetNode ret = fun.ret();
       if( ret == null ) continue; // Can be dead, if the news has not traveled yet
-      if( fun.nargs() != call.nargs() ) // This call-path has wrong args, is in-error for this function
+      if( fun.nargs() != call.nargs() ) { // This call-path has wrong args, is in-error for this function
+        // If lifting, we choose not to call this variant.
+        if( lifting ) continue;
         // Cannot just ignore/continue because the remaining functions might
         // allow the call site to produce a constant and optimize away.
-        return TypeTuple.CALLE; // No good result until the input function is sensible
+        else return TypeTuple.CALLE; // No good result until the input function is sensible
+      }
       TypeTuple tret = (TypeTuple)gvn.type(ret); // Type of the return
       // TODO: Renable this.
       // Lift the returned memory to be no more than what is available at the
