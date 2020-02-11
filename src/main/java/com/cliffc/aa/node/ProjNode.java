@@ -7,7 +7,8 @@ import com.cliffc.aa.type.TypeTuple;
 // Proj data
 public class ProjNode extends Node {
   final int _idx;
-  public ProjNode( Node ifn, int idx ) { super(OP_PROJ,ifn); _idx=idx; }
+  public ProjNode( Node ifn, int idx ) { this(OP_PROJ,ifn,idx); }
+  ProjNode( byte op, Node ifn, int idx ) { super(op,ifn); _idx=idx; }
   @Override String xstr() { return "DProj_"+_idx; }
 
   @Override public Node ideal(GVNGCM gvn, int level) {

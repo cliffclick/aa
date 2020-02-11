@@ -28,4 +28,5 @@ public abstract class AA {
     System.err.println(s);
     return x;
   }
+  public static String p() { return Env.START.dumprpo(Env.GVN,false); } // Debugging hook
 }

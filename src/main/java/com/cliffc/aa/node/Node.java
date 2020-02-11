@@ -9,7 +9,6 @@ import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.BitSet;
 import java.util.function.Predicate;
 
 // Sea-of-Nodes
@@ -18,31 +17,32 @@ public abstract class Node implements Cloneable {
   static final byte OP_CALLEPI= 2;
   static final byte OP_CAST   = 3;
   static final byte OP_CON    = 4;
-  static final byte OP_ERR    = 5;
-  static final byte OP_FUN    = 6;
-  static final byte OP_FUNPTR = 7;
-  static final byte OP_IF     = 8;
-  static final byte OP_LIBCALL= 9;
-  static final byte OP_LOAD   =10;
-  static final byte OP_MERGE  =11;
-  static final byte OP_NAME   =12; // Cast a prior NewObj to have a runtime Name
-  static final byte OP_NEWOBJ =13; // Allocate a new struct
-  static final byte OP_NEWSTR =14; // Allocate a new string (array)
-  static final byte OP_PARM   =15;
-  static final byte OP_PHI    =16;
-  static final byte OP_PRIM   =17;
-  static final byte OP_PROJ   =18;
-  static final byte OP_REGION =19;
-  static final byte OP_RET    =20;
-  static final byte OP_SCOPE  =21;
-  static final byte OP_START  =22;
-  static final byte OP_STORE  =23;
-  static final byte OP_TMP    =24;
-  static final byte OP_TYPE   =25;
-  static final byte OP_UNR    =26;
-  static final byte OP_MAX    =27;
+  static final byte OP_CPROJ  = 5;
+  static final byte OP_ERR    = 6;
+  static final byte OP_FUN    = 7;
+  static final byte OP_FUNPTR = 8;
+  static final byte OP_IF     = 9;
+  static final byte OP_LIBCALL=10;
+  static final byte OP_LOAD   =11;
+  static final byte OP_MERGE  =12;
+  static final byte OP_NAME   =13; // Cast a prior NewObj to have a runtime Name
+  static final byte OP_NEWOBJ =14; // Allocate a new struct
+  static final byte OP_NEWSTR =15; // Allocate a new string (array)
+  static final byte OP_PARM   =16;
+  static final byte OP_PHI    =17;
+  static final byte OP_PRIM   =18;
+  static final byte OP_PROJ   =19;
+  static final byte OP_REGION =20;
+  static final byte OP_RET    =21;
+  static final byte OP_SCOPE  =22;
+  static final byte OP_START  =23;
+  static final byte OP_STORE  =24;
+  static final byte OP_TMP    =25;
+  static final byte OP_TYPE   =26;
+  static final byte OP_UNR    =27;
+  static final byte OP_MAX    =28;
 
-  private static final String[] STRS = new String[] { null, "Call", "CallEpi", "Cast", "Con", "Err", "Fun", "FunPtr", "If", "LibCall", "Load", "Merge", "Name", "NewObj", "NewStr", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Scope", "Start", "Store", "Tmp", "Type", "Unresolved" };
+  private static final String[] STRS = new String[] { null, "Call", "CallEpi", "Cast", "Con", "CProj", "Err", "Fun", "FunPtr", "If", "LibCall", "Load", "Merge", "Name", "NewObj", "NewStr", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Scope", "Start", "Store", "Tmp", "Type", "Unresolved" };
 
   public int _uid;  // Unique ID, will have gaps, used to give a dense numbering to nodes
   final byte _op;   // Opcode (besides the object class), used to avoid v-calls in some places
@@ -200,29 +200,60 @@ public abstract class Node implements Cloneable {
     }
   }
   private boolean is_multi_head() { return _op==OP_CALL || _op==OP_CALLEPI || _op==OP_FUN || _op==OP_IF || _op==OP_LIBCALL || _op==OP_NEWOBJ || _op==OP_NEWSTR || _op==OP_REGION || _op==OP_START; }
-  private boolean is_multi_tail() { return _op==OP_PARM || _op==OP_PHI || _op==OP_PROJ ; }
+  private boolean is_multi_tail() { return _op==OP_PARM || _op==OP_PHI || _op==OP_PROJ || _op==OP_CPROJ; }
+  private boolean is_CFG()        { return _op==OP_CALL || _op==OP_CALLEPI || _op==OP_FUN || _op==OP_RET || _op==OP_IF || _op==OP_REGION || _op==OP_START || _op==OP_CPROJ || _op==OP_SCOPE; } 
 
   public String dumprpo( GVNGCM gvn, boolean prims ) {
     Ary<Node> nodes = new Ary<>(new Node[1],0);
-    postorder(nodes,new BitSet());
+    postorder(nodes,new VBitSet());
     // Dump in reverse post order
     SB sb = new SB();
+    Node prior = null;
     for( int i=nodes._len-1; i>=0; i-- ) {
       Node n = nodes.at(i);
-      if( n._uid <= Env.ALL_CTRL._uid || n._uid >= GVNGCM._INIT0_CNT || prims )
-        n.dump(0,sb,gvn).nl();
+      if( !(n._uid <= Env.ALL_CTRL._uid || n._uid >= GVNGCM._INIT0_CNT || prims) )
+        continue;               // Visited, but do not print
+      // Add a nl after the last of a multi-tail sequence.
+      if( (prior != null && prior.is_multi_tail() && !n.is_multi_tail()) ||
+          // Add a nl before the start of a multi-head sequence.
+          n.is_multi_head() )
+        sb.nl();
+      if( n._op==OP_FUN ) _header((FunNode)n,sb);
+      n.dump(0,sb,gvn).nl();
+      if( n._op==OP_RET ) _header(((RetNode)n).fun(),sb);
+      prior = n;
     }
     return sb.toString();
   }
-  private void postorder( Ary<Node> nodes, BitSet bs ) {
-    bs.set(_uid);
-    for( Node use : _uses ) {
-      //if color.get(succ) == 'grey':
-      //  print 'CYCLE: {0}-->{1}'.format(node, succ)
-      if( !bs.get(use._uid) )
-        use.postorder(nodes,bs);
-      //color[node] = 'black'
+  private static void _header(FunNode fun, SB sb) {
+    sb.p("============ ").p(fun.name()).p(" ============").nl();
+  }
+  private void postorder( Ary<Node> nodes, VBitSet bs ) {
+    if( bs.tset(_uid) ) return;
+    // If CFG, walk the CFG first.  Do not walk thru Returns (into Calls) as
+    // this breaks up the whole- functions-at-once.
+    if( is_CFG() && _op!=OP_RET ) {
+      // Walk any CProj first.
+      for( Node use : _uses )
+        if( use._op == OP_CPROJ )
+          use.postorder(nodes,bs);
+      // Walk the CFG, walking a CallEpi very last
+      Node cepi = null;
+      for( Node use : _uses )
+        if( use instanceof CallEpiNode ) cepi = use;
+        else if( use.is_CFG() ) use.postorder(nodes,bs);
+      if( cepi != null ) cepi.postorder(nodes,bs);
     }
+  
+    // Walk the rest (especially data).  Since visit bit set on the CFGs its OK
+    // to walk them also.  Calls are special, since their Proj's feed into a
+    // Fun's Parms.  We want the Fun to walk its own Parms, in order so ignore
+    // these edges.  Since the Parms are all reachable from the Fun they get
+    // walked eventually.
+    if( _op != OP_CALL && _op!=OP_RET )
+      for( Node use : _uses )
+        use.postorder(nodes,bs);
+    
     // Slight PO tweak: heads and tails together.
     if( is_multi_head() )
       for( Node use : _uses )
@@ -271,7 +302,7 @@ public abstract class Node implements Cloneable {
   public byte may_prec() { return -1; }
 
   // Set of used aliases across all inputs (not StoreNode value, but yes
-  // address).  
+  // address).
   public BitsAlias alias_uses(GVNGCM gvn) {
     throw com.cliffc.aa.AA.unimpl(); // Overridden in subclasses
     //return BitsAlias.NZERO;
