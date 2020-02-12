@@ -204,12 +204,13 @@ public class FunNode extends RegionNode {
 
     // Look for appropriate type-specialize callers
     TypeStruct args = type_special(gvn, parms);
+    Ary<Node> body = find_body(gvn,ret);
     int path = -1;              // Paths will split according to type
     if( args == null ) {        // No type-specialization to do
       args = _tf._args;         // Use old args
       if( _cnt_size_inlines >= 10 ) return null;
       // Large code-expansion allowed; can inline for other reasons
-      path = split_size(gvn,ret,parms);
+      path = split_size(gvn,body,parms);
       if( path == -1 ) return null;
       if( noinline() ) return null;
       if( _uid >= GVNGCM._INIT0_CNT ) _cnt_size_inlines++; // Disallow infinite size-inlining of recursive non-primitives
@@ -217,7 +218,7 @@ public class FunNode extends RegionNode {
     assert level==2; // Do not actually inline, if just checking that all forward progress was found
     // Split the callers according to the new 'fun'.
     FunNode fun = make_new_fun(gvn, ret, args);
-    return split_callers(gvn,parms,ret,fun,cgedges,path);
+    return split_callers(gvn,parms,ret,fun,body,cgedges,path);
   }
 
   // Gather the ParmNodes into an array.  Return null if any input path is dead
@@ -317,10 +318,53 @@ public class FunNode extends RegionNode {
     return args == _tf._args ? null : args; // Must see improvement
   }
 
+
+  // Return the function body.
+  private Ary<Node> find_body( GVNGCM gvn, RetNode ret ) {
+    // Find the function body.  Do a forwards walk first, stopping at the
+    // obvious function exit.  If function does not expose its closure then
+    // this is the complete function body with nothing extra walked.  If it has
+    // a nested function or returns a nested function then its closure is may
+    // be reached by loads & stores from outside the function.
+    //
+    // Then do a backwards walk, intersecting with the forwards walk.  A
+    // backwards walk will find upwards-exposed values, typically constants and
+    // closure references - could be a lot of them.  Minor opt to do the
+    // forward walk first.
+    VBitSet freached = new VBitSet(); // Forwards reached
+    Ary<Node> work = new Ary<>(new Node[1],0);
+    work.add(this);             // Prime worklist
+    while( !work.isEmpty() ) {  // While have work
+      Node n = work.pop();      // Get work
+      if( freached.tset(n._uid) ) continue; // Already visited?
+      int op = n._op;           // opcode
+      if( op == OP_FUN  && n       != this ) continue; // Call to other function, not part of inlining
+      if( op == OP_PARM && n.in(0) != this ) continue; // Arg  to other function, not part of inlining
+      if( op == OP_RET ) continue;                     // Return (of this or other function)
+      work.addAll(n._uses);   // Visit all uses
+    }
+
+    // Backwards walk, trimmed to reachable from forwards
+    VBitSet breached = new VBitSet(); // Backwards and forwards reached
+    Ary<Node> body = new Ary<>(new Node[1],0);
+    work.add(ret);
+    while( !work.isEmpty() ) {  // While have work
+      Node n = work.pop();      // Get work
+      if( n==null ) continue;   // Defs can be null
+      if( !freached.get (n._uid) ) continue; // Not reached from fcn top
+      if(  breached.tset(n._uid) ) continue; // Already visited?
+      body.push(n);                          // Part of body
+      work.addAll(n._defs);                  // Visit all defs
+      if( n.is_multi_head() )                // Multi-head?
+        work.addAll(n._uses);                // All uses are ALSO part, even if not reachable in this fcn
+    }
+    return body;
+  }
+  
   // Split a single-use copy (e.g. fully inline) if the function is "small
   // enough".  Include anything with just a handful of primitives, or a single
   // call, possible with a single if.
-  private int split_size( GVNGCM gvn, RetNode ret, ParmNode[] parms ) {
+  private int split_size( GVNGCM gvn, Ary<Node> body, ParmNode[] parms ) {
     if( _defs._len <= 1 ) return -1; // No need to split callers if only 2
     BitSet recursive = new BitSet();    // Heuristic to limit unrolling recursive methods
 
@@ -328,18 +372,8 @@ public class FunNode extends RegionNode {
     // counting opcodes.  Some opcodes are ignored, because they manage
     // dependencies but make no code.
     int[] cnts = new int[OP_MAX];
-    VBitSet bs = new VBitSet();
-    Ary<Node> work = new Ary<>(new Node[1],0);
-    work.add(this);             // Prime worklist
-    while( work._len > 0 ) {    // While have work
-      Node n = work.pop();      // Get work
-      if( bs.tset(n._uid) ) continue; // Already visited?
+    for( Node n : body ) {
       int op = n._op;           // opcode
-      if( op == OP_FUN  && n       != this ) continue; // Call to other function, not part of inlining
-      if( op == OP_PARM && n.in(0) != this ) continue; // Arg  to other function, not part of inlining
-      if( op == OP_RET && ((RetNode)n).is_copy() ) continue; // Dead function ptr
-      if( n != ret )            // Except for the RetNode
-        work.addAll(n._uses);   // Visit all uses also
       if( op == OP_CALL ) {     // Call-of-primitive?
         Node n1 = ((CallNode)n).fun();
         Node n2 = n1 instanceof UnresolvedNode ? n1.in(0) : n1;
@@ -409,7 +443,7 @@ public class FunNode extends RegionNode {
   // Clone the function body, and split the callers of 'this' into 2 sets; one
   // for the old and one for the new body.  The new function may have a more
   // refined signature, and perhaps no unknown callers.
-  private Node split_callers( GVNGCM gvn, ParmNode[] parms, RetNode oldret, FunNode fun, CGEdge[] cgedges, int path) {
+  private Node split_callers( GVNGCM gvn, ParmNode[] parms, RetNode oldret, FunNode fun, Ary<Node> body, CGEdge[] cgedges, int path) {
     // Strip out all wired calls to this function.  All will re-resolve later.
     for( CGEdge cg : cgedges )
       if( cg != null && cg._cepi != null )
@@ -435,26 +469,25 @@ public class FunNode extends RegionNode {
       if( outer_fun != null ) gvn.add_work(outer_fun);
     }
 
-    // Map from old to cloned function body
-    HashMap<Node,Node> map = new HashMap<>();
     // Collect aliases that are cloning.
     BitSet aliases = new BitSet();
+    // Map from old to cloned function body
+    HashMap<Node,Node> map = new HashMap<>();
     // Clone the function body
     map.put(this,fun);
-    Ary<Node> work = new Ary<>(new Node[1],0);
-    work.addAll(_uses);                  // Prime worklist
-    while( work._len > 0 ) {             // While have work
-      Node n = work.pop();               // Get work
-      if( map.get(n) != null ) continue; // Already visited?
-      if( n == oldret ) continue;        // Do not walk past the RetNode
-      int op = n._op;                    // opcode
-      if( op == OP_FUN  && n       != this ) continue; // Call to other function, not part of inlining
-      if( op == OP_PARM && n.in(0) != this ) continue; // Arg  to other function, not part of inlining
-      if( n instanceof NewNode ) aliases.set(((NewNode)n)._alias);
-      map.put(n,n.copy(false,cepi,gvn)); // Make a blank copy with no edges and map from old to new
-      work.addAll(n._uses);   // Visit all uses also
+    for( Node n : body ) {
+      if( n==this ) continue;   // Already cloned the FunNode
+      int old_alias = n instanceof NewNode ? ((NewNode)n)._alias : -1;
+      Node c = n.copy(false,cepi,gvn); // Make a blank copy with no edges
+      map.put(n,c);                    // Map from old to new
+      if( old_alias != -1 ) {          // Was a NewNode?
+        aliases.set(old_alias);        // Record old alias before copy/split
+        // Update the local closures
+        this._my_closure_alias = ((NewNode)n)._alias;
+        fun ._my_closure_alias = ((NewNode)c)._alias;
+      }
     }
-
+    
     // Collect the old/new funptrs and add to map also.
     RetNode newret = (RetNode)oldret.copy(false,cepi,gvn);
     newret._fidx = fun.fidx();
