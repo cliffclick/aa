@@ -252,26 +252,13 @@ public class CallNode extends Node {
     // Here, I start with all alias#s from TMP args plus all function
     // closure#s and "close over" the set of possible aliases.
 
-    // Set of aliases escaping into the function
-    BitsAlias abs = BitsAlias.EMPTY;
-    // All fidxes in a flat iterable loop
-    BitSet bs = fidxs.tree().plus_kids(fidxs);
-    for( int fidx = bs.nextSetBit(0); fidx >= 0; fidx = bs.nextSetBit(fidx+1) ) {
-      FunNode fun = FunNode.find_fidx(fidx);
-      if( abs.test(1) ) break;  // Shortcut for already being full
-      for( int alias : fun._closure_aliases )
-        abs = tmem.recursive_aliases(abs,alias); // Function closures always escape
-    }
+    // Set of aliases escaping into the function.  Includes everything in the
+    // function closures.
+    BitsAlias abs = tfp.recursive_aliases(BitsAlias.EMPTY,tmem);
     // Now the set of pointers escaping via arguments
     for( int i=0; i<nargs(); i++ ) {
       if( abs.test(1) ) break;  // Shortcut for already being full
-      Type targ = gvn.type(arg(i));
-      if( targ instanceof TypeMemPtr ) {
-        for( int alias : ((TypeMemPtr)targ)._aliases )
-          if( alias != 0 )
-            abs = tmem.recursive_aliases(abs,alias);
-      } else if( TypeMemPtr.OOP.isa(targ) ) // Scalar is all pointers
-        abs = BitsAlias.NZERO;              // All aliases possible
+      abs = gvn.type(arg(i)).recursive_aliases(abs,tmem);
     }
 
     // Add all the aliases which can be reached from objects at the existing

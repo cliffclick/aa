@@ -52,10 +52,6 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
   // True if this field is not modified.  Allows a Load to bypass.
   boolean is_clean(String fld) { return _any; }
 
-  public BitsAlias recursive_aliases(BitsAlias abs, TypeMem mem) {
-    return above_center() ? abs : BitsAlias.NZERO; // Assume worse-case struct contains all aliases
-  }
-
   @Override public boolean above_center() { return _any; }
   @Override public boolean may_be_con() { return _any; }
   @Override public boolean is_con() { return false; }

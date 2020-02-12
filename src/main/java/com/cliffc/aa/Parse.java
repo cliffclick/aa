@@ -727,6 +727,7 @@ public class Parse {
     Node old_mem  = all_mem().keep();
     FunNode fun = init(new FunNode(ts.asAry()).add_def(Env.ALL_CTRL)).keep();
     try( Env e = new Env(_e,true) ) {// Nest an environment for the local vars
+      fun._my_closure_alias = e._closure_alias;
       _e = e;                   // Push nested environment
       _gvn.set_def_reg(e._scope.stk(),0,fun); // Closure creation control defaults to function entry
       set_ctrl(fun);            // New control is function head

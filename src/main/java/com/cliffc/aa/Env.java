@@ -6,20 +6,20 @@ import com.cliffc.aa.type.*;
 public class Env implements AutoCloseable {
   final Env _par;
   ScopeNode _scope;  // Lexical anchor; goes when this environment leaves scope
+  int _closure_alias;           // Local closure alias
   Env( Env par, boolean closure ) {
     _par = par;
-    ScopeNode scope = new ScopeNode(closure);
-    if( par != null ) {
-      scope.set_ctrl(par._scope.ctrl(),GVN);
-      NewObjNode nnn = GVN.init(new NewObjNode(closure,scope.ctrl())).keep();
-      Node frm = GVN.xform(new OProjNode(nnn,0));
-      Node ptr = GVN.xform(new  ProjNode(nnn,1));
-      scope.set_ptr (ptr,GVN);  // Address for 'nnn', the local stack frame
-      MemMergeNode mem = new MemMergeNode(par._scope.mem(),frm,nnn.<NewObjNode>unhook()._alias);
-      scope.set_active_mem(mem,GVN);  // Memory includes local stack frame
-      CLOSURES = CLOSURES.meet(BitsAlias.make0(nnn._alias));
-    }
-    _scope = scope;
+    ScopeNode scope = _scope = new ScopeNode(closure);
+    if( par == null ) return;
+    scope.set_ctrl(par._scope.ctrl(),GVN);
+    NewObjNode nnn = GVN.init(new NewObjNode(closure,scope.ctrl())).keep();
+    Node frm = GVN.xform(new OProjNode(nnn,0));
+    Node ptr = GVN.xform(new  ProjNode(nnn,1));
+    scope.set_ptr (ptr,GVN);  // Address for 'nnn', the local stack frame
+    MemMergeNode mem = new MemMergeNode(par._scope.mem(),frm,nnn.<NewObjNode>unhook()._alias);
+    scope.set_active_mem(mem,GVN);  // Memory includes local stack frame
+    _closure_alias = nnn._alias;
+    CLOSURES = CLOSURES.meet(BitsAlias.make0(_closure_alias));
   }
 
   public  final static GVNGCM GVN; // Initial GVN, defaults to ALL, lifts towards ANY

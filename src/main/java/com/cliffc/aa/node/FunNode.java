@@ -47,7 +47,8 @@ import java.util.Map;
 public class FunNode extends RegionNode {
   public String _name;          // Optional for anon functions; can be set later via bind()
   public TypeFunPtr _tf;        // FIDX, arg & ret types
-  public BitsAlias _closure_aliases;
+  public BitsAlias _closure_aliases; // All available aliases in parent closures
+  public int _my_closure_alias;      // My self closure alias
   // Operator precedence; only set on top-level primitive wrappers.
   // -1 for normal non-operator functions and -2 for forward_decls.
   private final byte _op_prec;  // Operator precedence; only set on top-level primitive wrappers

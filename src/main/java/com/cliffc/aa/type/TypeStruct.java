@@ -1124,31 +1124,10 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   boolean is_clean(String fld) { return _cln; }
 
   @Override public BitsAlias recursive_aliases(BitsAlias abs, TypeMem mem) {
-    for( Type t : _ts )
-      if( t instanceof TypeMemPtr )
-        abs = ((TypeMemPtr) t).recursive_aliases(abs, mem);
-      else if( t instanceof TypeFunPtr ) {
-        BitsFun fidxs = ((TypeFunPtr)t).fidxs();
-        if( fidxs.test(1) ) return BitsAlias.NZERO; // All functions, all closures
-        if( !fidxs.above_center() ) {
-          for( int fidx : fidxs ) {
-            if( fidx != 0 ) {
-              BitsAlias cls = FunNode.find_fidx(fidx)._closure_aliases;
-              if( cls != BitsAlias.EMPTY && abs != cls )
-                abs = abs.meet(cls);
-            }
-          }
-        }
-      }
+    for( Type t : _ts ) abs = t.recursive_aliases(abs, mem);
     return abs;
   }
 
-  //@Override public TypeObj lift_final() {
-  //  byte[] bs = new byte[_finals.length];
-  //  for( int i=0; i<_finals.length; i++ )
-  //    bs[i] = _finals[i] == frw() ? funk() : _finals[i];
-  //  return malloc(_name,_any,_flds,_ts,bs).hashcons_free();
-  //}
   // True if isBitShape on all bits
   @Override public byte isBitShape(Type t) {
     if( isa(t) ) return 0; // Can choose compatible format

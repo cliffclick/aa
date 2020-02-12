@@ -3,6 +3,7 @@ package com.cliffc.aa.type;
 import com.cliffc.aa.node.FunNode;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
+import java.util.BitSet;
 
 // Function indices or function pointers; a single instance can include all
 // possible aliased function pointers.  Function pointers can be executed, are
@@ -92,8 +93,8 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     default: throw typerr(t);   // All else should not happen
     }
     TypeFunPtr tf = (TypeFunPtr)t;
-    // QQQ - Function args are JOINed during the MEET.
-    return make(_fidxs.meet(tf._fidxs),(TypeStruct)_args/*QQQ.meet*/.meet(tf._args),_ret.meet(tf._ret));
+    // Function args are MEET during MEET
+    return make(_fidxs.meet(tf._fidxs),(TypeStruct)_args.meet(tf._args),_ret.meet(tf._ret));
   }
 
   public BitsFun fidxs() { return _fidxs; }
@@ -101,8 +102,21 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public Type arg(int idx) { return _args.at(idx); }
   public boolean is_class() { return _fidxs.is_class(); }
 
-  // QQQ - Function args below center when the TFP is above center.
-  @Override public boolean above_center() { return /*QQQ*/_args.above_center(); }
+  @Override public BitsAlias recursive_aliases(BitsAlias abs, TypeMem mem) {
+    if( _fidxs.test(1) ) return BitsAlias.NZERO; // All functions, all closures
+    if( _fidxs.above_center() ) return abs;      // Choosing functions with no aliases
+    BitSet bs = _fidxs.tree().plus_kids(_fidxs);
+    for( int fidx = bs.nextSetBit(1); fidx >= 0; fidx = bs.nextSetBit(fidx+1) ) {
+      BitsAlias cls = FunNode.find_fidx(fidx)._closure_aliases;
+      for( int alias : cls )
+        abs = mem.recursive_aliases(abs,alias);
+      if( abs.test(1) ) return abs; // Shortcut for already being full
+    }
+    return abs;
+  }
+
+  // Function args below center when the TFP is above center.
+  @Override public boolean above_center() { return _args.above_center(); }
   @Override public boolean may_be_con()   { return above_center() || is_con(); }
   @Override public boolean is_con()       { return _fidxs.abit() != -1 && !is_class(); }
   @Override public boolean must_nil() { return _fidxs.test(0) && !above_center(); }

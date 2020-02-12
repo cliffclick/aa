@@ -140,7 +140,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   public BitsAlias aliases() { return _aliases; }
 
   // Recursively reachable aliases
-  public BitsAlias recursive_aliases(BitsAlias abs, TypeMem mem) {
+  @Override public BitsAlias recursive_aliases(BitsAlias abs, TypeMem mem) {
     if( _aliases.above_center() )  return abs; // Above center, assume we reach nothing interesting
     for( int alias : _aliases )
       if( alias != 0 )

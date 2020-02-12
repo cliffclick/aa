@@ -841,6 +841,13 @@ public class Type<T extends Type<T>> implements Cloneable {
   // Mark (recursively) all memory as clean/unmodified
   public Type clean() { return this; }
 
+  // Accumulate escaping/reachable aliases
+  public BitsAlias recursive_aliases(BitsAlias abs, TypeMem mem) {
+    return _type==TSCALAR || _type==TALL // Scalar is all pointers
+      ? BitsAlias.NZERO         // All aliases possible
+      : abs;                    // Could be e.g. int,flt,number
+  }
+
   // Apply the test(); if it returns true iterate over all nested child types.
   // If the test returns false, short-circuit the walk.  No attempt to guard
   // against recursive structure walks, so the 'test' must return false when

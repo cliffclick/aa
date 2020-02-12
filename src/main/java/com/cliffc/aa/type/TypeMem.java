@@ -181,10 +181,10 @@ public class TypeMem extends Type<TypeMem> {
   }
 
   // Recursively explore reachable aliases.
-  public BitsAlias recursive_aliases( BitsAlias abs, int idx ) {
-    if( abs.test_recur(idx) ) return abs;
-    abs = abs.or(idx);          // 'idx' is a reachable alias
-    return at(idx).recursive_aliases(abs,this);
+  public BitsAlias recursive_aliases( BitsAlias abs, int alias ) {
+    if( abs.test_recur(alias) ) return abs; // Already walked
+    abs = abs.or(alias);        // 'alias' is a reachable alias
+    return at(alias).recursive_aliases(abs,this); // Plus what can be reached from the alias
   }
 
   private static TypeMem FREE=null;

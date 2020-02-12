@@ -117,9 +117,7 @@ public class ScopeNode extends Node {
     Node rez = rez();
     if( rez == null ) return BitsAlias.NZERO;
     Type tval = gvn.type(rez);
-    if( !(tval instanceof TypeMemPtr) ) return BitsAlias.EMPTY;
-    BitsAlias abs = ((TypeMemPtr)tval).recursive_aliases(BitsAlias.EMPTY,(TypeMem)mem);
-    return abs;                 // Set of escaping aliases
+    return tval.recursive_aliases(BitsAlias.EMPTY,(TypeMem)mem);
   }
   @Override public int hashCode() { return 123456789; }
   // ScopeNodes are never equal

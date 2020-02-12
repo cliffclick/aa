@@ -341,7 +341,7 @@ public class TestParse {
     // interspersed with recursive computation calls.
     test_obj_isa("map={x -> x ? @{nn=map(x.n);vv=x.v&x.v} : 0};"+
                  "map(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0;v=1};v=2};v=3};v=4})",
-            TypeStruct.make(FLDS2,TypeStruct.ts(TypeMemPtr.STRUCT0,TypeFlt.FLT32))); //con(20.25)
+            TypeStruct.make(FLDS2,TypeStruct.ts(TypeMemPtr.STRUCT0,TypeInt.INT8))); //con(20.25)
     // Test does loads after recursive call, which should be allowed to bypass.
     test("sum={x -> x ? sum(x.n) + x.v : 0};"+
          "sum(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0;v=1};v=2};v=3};v=4})",
