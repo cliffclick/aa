@@ -341,7 +341,6 @@ public class MemMergeNode extends Node {
     TypeObj[] tms = tm.alias2objs();
     int max = Math.max(tms.length,_aliases.last()+1);
     TypeObj[] tos = Arrays.copyOf(tms,max);
-    TypeBits los = tm.losts();
     for( int i=1; i<_defs._len; i++ ) {
       int alias = alias_at(i);
       Type ta = gvn.type(in(i));
@@ -356,10 +355,8 @@ public class MemMergeNode extends Node {
       for( int j = alias+1; j<tms.length; j++ )
         if( tos[j] != null && BitsAlias.is_parent(alias,j) )
           tos[j] = (TypeObj)tos[j].meet(tao);
-
-      if( !to.above_center() ) los = los.set(alias);
     }
-    return TypeMem.make0(tos,los);
+    return TypeMem.make0(tos);
   }
   @Override public Type all_type() { return TypeMem.FULL; }
   // Set of used aliases across all inputs.  This is only called from another

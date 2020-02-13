@@ -65,18 +65,10 @@ public class TypeMem extends Type<TypeMem> {
   // canonicalization.
   private TypeObj[] _aliases;
 
-  // An alias is "lost" (or "escaped") then there may be more than 1 instance
-  // alive at any one time.  There can be many instances over time (e.g.
-  // standard closure stack lifetime) that are not lost and many more
-  // optimizations apply.  If an alias is not lost ("captured") then it has no
-  // children or is dead/~obj.  This bit inverts with inverted TypeObj.
-  private TypeBits _losts;
-
-  private TypeMem  (TypeObj[] aliases, TypeBits losts) { super(TMEM); init(aliases,losts); }
-  private void init(TypeObj[] aliases, TypeBits losts) {
+  private TypeMem  (TypeObj[] aliases) { super(TMEM); init(aliases); }
+  private void init(TypeObj[] aliases) {
     super.init(TMEM);
     _aliases = aliases;
-    _losts  = losts;
     assert check();
   }
   // False if not 'tight' (no trailing null pairs) or any matching pairs (should
@@ -91,23 +83,15 @@ public class TypeMem extends Type<TypeMem> {
     // "tight" - something in the last slot
     if( _aliases[_aliases.length-1] == null ) return false;
     // No dups of any parent
-    for( int i=2; i<as.length; i++ ) {
-      Type asi = as[i];
-      if( asi != null ) {
+    for( int i=2; i<as.length; i++ )
+      if( as[i] != null )
         for( int par = BitsAlias.TREE.parent(i); par!=0; par = BitsAlias.TREE.parent(par) )
-          if( as[par] == asi )
+          if( as[par] == as[i] )
             return false;       // Dup of a parent
-        // Parents are always lost (since the parent & all children co-exist).
-        // Bit is inverted for inverted types.
-        if( BitsAlias.is_parent(i) && (_losts.test(i) ^ !asi.above_center()) )
-          return false;         // Precise, below center and has children
-      }
-    }
-
     return true;
   }
   @Override int compute_hash() {
-    int sum=TMEM+_losts.hashCode();
+    int sum=TMEM;
     for( TypeObj obj : _aliases ) sum += obj==null ? 0 : obj._hash;
     return sum;
   }
@@ -116,7 +100,6 @@ public class TypeMem extends Type<TypeMem> {
     if( !(o instanceof TypeMem) ) return false;
     TypeMem tf = (TypeMem)o;
     if( _aliases.length != tf._aliases.length ) return false;
-    if( _losts != tf._losts ) return false;
     for( int i=0; i<_aliases.length; i++ )
       if( _aliases[i] != tf._aliases[i] ) // note '==' and NOT '.equals()'
         return false;
@@ -133,7 +116,7 @@ public class TypeMem extends Type<TypeMem> {
     sb.p('[');
     for( int i=1; i<_aliases.length; i++ )
       if( _aliases[i] != null )
-        sb.p(i).p(_losts.test(i)?'+':'#').p(':').p(_aliases[i].toString()).p(",");
+        sb.p(i).p(':').p(_aliases[i].toString()).p(",");
     return sb.p(']').toString();
   }
 
@@ -150,7 +133,6 @@ public class TypeMem extends Type<TypeMem> {
   }
   //
   public TypeObj[] alias2objs() { return _aliases; }
-  public TypeBits losts() { return _losts; }
 
   // Return set of aliases.  Not even sure if this is well-defined.
   public BitsAlias aliases() {
@@ -177,31 +159,31 @@ public class TypeMem extends Type<TypeMem> {
     for( int i=2; i<_aliases.length; i++ )
       if( _aliases[i]!=null && bas.test_recur(i) )
         { assert objs[i]==null || objs[i]==_aliases[i]; objs[i] = _aliases[i]; }
-    return make0(objs,_losts);
+    return make0(objs);
   }
 
   // Recursively explore reachable aliases.
   public BitsAlias recursive_aliases( BitsAlias abs, int alias ) {
-    if( abs.test_recur(alias) ) return abs; // Already walked
+    if( alias==0 || abs.test_recur(alias) ) return abs; // Already walked
     abs = abs.or(alias);        // 'alias' is a reachable alias
     return at(alias).recursive_aliases(abs,this); // Plus what can be reached from the alias
   }
 
   private static TypeMem FREE=null;
   @Override protected TypeMem free( TypeMem ret ) { _aliases=null; FREE=this; return ret; }
-  private static TypeMem make(TypeObj[] aliases, TypeBits losts) {
+  private static TypeMem make(TypeObj[] aliases) {
     TypeMem t1 = FREE;
-    if( t1 == null ) t1 = new TypeMem(aliases,losts);
-    else { FREE = null;       t1.init(aliases,losts); }
+    if( t1 == null ) t1 = new TypeMem(aliases);
+    else { FREE = null;       t1.init(aliases); }
     TypeMem t2 = (TypeMem)t1.hashcons();
     return t1==t2 ? t1 : t1.free(t2);
   }
 
   // Canonicalize memory before making.  Unless specified, the default memory is "dont care"
-  public static TypeMem make0( TypeObj[] as, TypeBits losts ) {
+  public static TypeMem make0( TypeObj[] as ) {
     if( as[1]==null ) as[1] = TypeObj.XOBJ; // Default memory is "dont care"
     int len = as.length;
-    if( len == 2 ) return make(as,losts);
+    if( len == 2 ) return make(as);
     // No dups of a parent
     for( int i=1; i<as.length; i++ )
       if( as[i] != null )
@@ -211,15 +193,7 @@ public class TypeMem extends Type<TypeMem> {
     // Remove trailing nulls; make the array "tight"
     while( as[len-1] == null ) len--;
     if( as.length!=len ) as = Arrays.copyOf(as,len);
-    
-    // Parents are always lost (since the parent & all children co-exist).
-    // Bit is inverted for inverted types.
-    for( int i=1; i<as.length; i++ )
-      if( as[i] != null )
-        if( BitsAlias.is_parent(i) )
-          losts = as[i].above_center() ? losts.clr(i) : losts.set(i);
-
-    return make(as,losts);
+    return make(as);
   }
 
   // Precise single alias.  Other aliases are "dont care".  Nil not allowed.
@@ -228,13 +202,8 @@ public class TypeMem extends Type<TypeMem> {
     TypeObj[] as = new TypeObj[alias+1];
     as[1] = TypeObj.XOBJ;
     as[alias] = oop;
-    return make0(as,TypeBits.EMPTY);
+    return make0(as);
   }
-  //public static TypeMem make(BitsAlias bits, TypeObj oop ) {
-  //  TypeObj[] as = Arrays.copyOf(MEM._aliases,Math.max(MEM._aliases.length,bits.max()+1));
-  //  for( int b : bits )  as[b] = oop;
-  //  return make0(as);
-  //}
 
   public static final TypeMem FULL; // Every alias filled with something
   public static final TypeMem EMPTY;// Every alias filled with anything
@@ -244,7 +213,7 @@ public class TypeMem extends Type<TypeMem> {
   public static final TypeMem MEM_ABC, MEM_STR;
   static {
     // All memory, all aliases, holding anything.
-    FULL = make(new TypeObj[]{null,TypeObj.OBJ},TypeBits.FULL);
+    FULL = make(new TypeObj[]{null,TypeObj.OBJ});
     EMPTY= FULL.dual();
 
     // All memory.  Includes breakouts for all structs and all strings.
@@ -254,19 +223,19 @@ public class TypeMem extends Type<TypeMem> {
     tos[BitsAlias.ALL] = TypeObj.OBJ;
     tos[BitsAlias.TUPLE]=TypeStruct.ALLSTRUCT;
     tos[BitsAlias.STR] = TypeStr.STR; // TODO: Proxy for all-arrays
-    MEM  = make(tos,TypeBits.FULL);
+    MEM  = make(tos);
     XMEM = MEM.dual();
 
     TypeObj[] tcs = new TypeObj[Math.max(BitsAlias.TUPLE,BitsAlias.STR)+1];
     tcs[BitsAlias.ALL] = TypeObj.OBJ;
     tcs[BitsAlias.TUPLE]=TypeStruct.ALLSTRUCT_CLN;
     tcs[BitsAlias.STR] = TypeStr.STR; // TODO: Proxy for all-arrays
-    MEM_CLN = make(tcs,TypeBits.FULL);
+    MEM_CLN = make(tcs);
 
     TypeObj[] tss = new TypeObj[BitsAlias.STR+1];
     tss[1] = TypeObj.XOBJ;
     tss[BitsAlias.STR] = TypeStr.STR;
-    MEM_STR  = make(tss,TypeBits.make(BitsAlias.STR));
+    MEM_STR  = make(tss);
     MEM_ABC  = make(TypeMemPtr.ABCPTR.getbit(),TypeStr.ABC);
   }
   static final TypeMem[] TYPES = new TypeMem[]{FULL,MEM,MEM_ABC};
@@ -277,7 +246,7 @@ public class TypeMem extends Type<TypeMem> {
     for(int i=0; i<_aliases.length; i++ )
       if( _aliases[i] != null )
         oops[i] = (TypeObj)_aliases[i].dual();
-    return new TypeMem(oops,_losts.dual());
+    return new TypeMem(oops);
   }
   @Override protected Type xmeet( Type t ) {
     if( t._type != TMEM ) return ALL; //
@@ -293,8 +262,7 @@ public class TypeMem extends Type<TypeMem> {
     for( int i=1; i<len; i++ )
       objs[i] = i<mlen && _aliases[i]==null && tf._aliases[i]==null // Shortcut null-vs-null
         ? null : (TypeObj)at(i).meet(tf.at(i)); // meet element-by-element
-    TypeBits losts = (TypeBits)_losts.meet(tf._losts); // Being lost propagates
-    return make0(objs,losts);
+    return make0(objs);
   }
 
   // Meet of all possible loadable values
@@ -319,8 +287,7 @@ public class TypeMem extends Type<TypeMem> {
     int max = Math.max(_aliases.length,alias+1);
     TypeObj[] tos = Arrays.copyOf(_aliases,max);
     tos[alias] = (TypeObj)to.meet(obj);
-    TypeBits los = to.above_center() ? _losts : _losts.set(alias);
-    return TypeMem.make0(tos,los);
+    return TypeMem.make0(tos);
   }
 
   // Mark all memory as being clean (not modified in this function).
@@ -333,7 +300,7 @@ public class TypeMem extends Type<TypeMem> {
     for( int i=1; i<ts.length; i++ )
       if( ts[i] != null )
         ts[i] = (TypeObj)ts[i].clean();
-    return make0(ts,_losts);
+    return make0(ts);
   }
 
   // True if all looked-at memory is clean.  Allows a Load to bypass calls.
@@ -362,6 +329,6 @@ public class TypeMem extends Type<TypeMem> {
     for(int i=0; i<_aliases.length; i++ )
       if( _aliases[i] != null )
         oops[i] = _aliases[i].startype();
-    return make0(oops,TypeBits.EMPTY);
+    return make0(oops);
   }
 }

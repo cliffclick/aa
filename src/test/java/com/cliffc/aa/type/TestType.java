@@ -211,7 +211,7 @@ public class TestType {
     tos.setX(alias1,a1);
     tos.setX(alias2,a2);
     tos.setX(alias3,a3);
-    TypeMem mem = TypeMem.make0(tos.asAry(),TypeBits.make(BitsAlias.ALL,alias0));
+    TypeMem mem = TypeMem.make0(tos.asAry());
     // *[1]? join *[2] ==> *[1+2]?
     Type ptr12 = Type.NIL.join(TypeMemPtr.make(-alias1,a1)).join( TypeMemPtr.make(-alias2,a2));
     // mem.ld(*[1+2]?) ==> @{c:0}
@@ -328,7 +328,7 @@ public class TestType {
     tos[alias2]=ta2;
     tos[alias3]=ta3;
     tos[alias4]=ta4;
-    TypeMem mem234 = TypeMem.make0(tos,TypeBits.EMPTY);
+    TypeMem mem234 = TypeMem.make0(tos);
     TypeMemPtr ptr34 = (TypeMemPtr)TypeMemPtr.make(alias3,TypeObj.OBJ).meet(TypeMemPtr.make(alias4,TypeObj.OBJ));
 
     // Since hacking ptrs about from mem values, no cycles so instead...

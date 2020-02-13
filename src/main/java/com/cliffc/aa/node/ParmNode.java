@@ -6,7 +6,10 @@ import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeRPC;
 import com.cliffc.aa.type.TypeMem;
 
-// Function parameter node; just a Phi with a name
+// Function parameter node; almost just a Phi with a name.  There is a dense
+// numbering matching function arguments, with -1 reserved for the RPC and -2
+// for memory.  Indices -3 and below are used to pass in locally used lexically
+// scoped closures; basically its a hidden struct pointer.
 public class ParmNode extends PhiNode {
   final int _idx;             // Parameter index, zero-based; -1 reserved for RPC, -2 for mem
   private final String _name; // Parameter name
