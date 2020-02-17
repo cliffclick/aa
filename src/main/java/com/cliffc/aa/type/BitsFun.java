@@ -26,8 +26,7 @@ public class BitsFun extends Bits<BitsFun> {
   // Fast reset of parser state between calls0 to Exec
   public static void init0() { TREE.init0(); }
   public static void reset_to_init0() { TREE.reset_to_init0(); }
-  // Always a class, since we can clone a function.
-  @Override public boolean is_class(int fidx) { return fidx!=0; }
+  @Override public boolean is_class(int fidx) { return fidx==ALL || TREE.is_parent(fidx); }
 
   // Have to make a first BitsFun here; thereafter the v-call to make_impl
   // will make more on demand.  But need the first one to make a v-call.

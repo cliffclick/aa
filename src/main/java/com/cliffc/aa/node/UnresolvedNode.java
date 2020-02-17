@@ -45,7 +45,7 @@ public class UnresolvedNode extends Node {
       // gcp - always a choice, as gcp starts highest and falls as required.
       // preserve choice until GCP resolves.
       // Post-GCP: never here unless in-error, or returning an ambiguous fun ptr
-      
+
       // Unresolved is a *choice* and thus a *join* until resolved.
       Type t = TypeFunPtr.GENERIC_FUNPTR;
       for( Node def : _defs )
@@ -58,7 +58,7 @@ public class UnresolvedNode extends Node {
     Node x = null;
     for( Node epi : _defs ) {
       FunNode fun =  ((FunPtrNode)epi).fun();
-      if( fun.nargs() != nargs ) continue;
+      if( fun.nargs() != nargs+1 ) continue;
       if( x == null ) x = epi;
       else if( x instanceof UnresolvedNode ) x.add_def(epi);
       else x = new UnresolvedNode(_bad,x,epi);

@@ -254,7 +254,7 @@ public class CallNode extends Node {
 
     // Add all the aliases which can be reached from objects at the existing
     // aliases, recursively.
-    ts[2] = tmem.trim_to_alias(abs);
+    ts[3] = tmem.trim_to_alias(abs);
     return TypeTuple.make(ts);
   }
 
@@ -368,7 +368,7 @@ public class CallNode extends Node {
 
     // bad-arg-count
     if( tfp.nargs() != nargs() )
-      return _badargs.errMsg("Passing "+nargs()+" arguments to "+tfp+" which takes "+tfp.nargs()+" arguments");
+      return _badargs.errMsg("Passing "+(nargs()-1)+" arguments to "+tfp.names()+" which takes "+(tfp.nargs()-1)+" arguments");
 
     // Now do an arg-check
     TypeStruct formals = tfp._args; // Type of each argument
@@ -421,7 +421,12 @@ public class CallNode extends Node {
     return _rpc==call._rpc;
   }
   private boolean is_copy() { return _is_copy; }
-  @Override public Node is_copy(GVNGCM gvn, int idx) { return is_copy() ? in(idx) : null; }
+  // Funny mapping on Calls that are collapsing.
+  // in(0) -> Ctrl -> CProj_0
+  // in(1) -> Mem  -> MProj_3 // filtered memory becomes full memory
+  // in(2) -> TFP  ->  Proj_4 // closure becomes TFP
+  // in(3) -> Arg1 ->  Proj_5 // first normal argument
+  @Override public Node is_copy(GVNGCM gvn, int idx) { return is_copy() ? in((idx==0?0:(idx-2))) : null; }
   //@Override public void ideal_impacted_by_changing_uses(GVNGCM gvn) {
   //  // If just changed types, MemMerge use of Call might trigger alias filtering
   //  for( Node def : _defs )

@@ -34,7 +34,7 @@ public class ParmNode extends PhiNode {
     if( !(in(0) instanceof FunNode) ) return null; // Dying
     FunNode fun = (FunNode) in(0);
     if( gvn.type(fun) == Type.XCTRL ) return null; // All dead, c-prop will fold up
-    if( (level&1)==0 )          // Not doing asserts 
+    if( (level&1)==0 )          // Not doing asserts
       gvn.add_work2(fun);       // Something changed, re-check inlining chances
     assert fun._defs._len==_defs._len;
     // Arg-check before folding up
@@ -47,7 +47,7 @@ public class ParmNode extends PhiNode {
     }
     return super.ideal(gvn,level); // Let PhiNode collapse
   }
-  
+
   @Override public Type value(GVNGCM gvn) {
     Type t = super.value(gvn);
     t = t.bound(_alltype);
@@ -63,7 +63,7 @@ public class ParmNode extends PhiNode {
     if( !(in(0) instanceof FunNode) ) return null; // Dead, report elsewhere
     FunNode fun = (FunNode) in(0);
     assert fun._defs._len==_defs._len;
-    if( _idx < 0 ) return null;                                 // No arg check on RPC
+    if( _idx < 0 ) return null;                    // No arg check on RPC or Mem
     Type formal = fun.targ(_idx);
     for( int i=1; i<_defs._len; i++ ) {
       Type argt = gvn.type(in(i)); // Arg type for this incoming path

@@ -30,7 +30,7 @@ public final class CallEpiNode extends Node {
     CallNode call = call();
     TypeTuple tcall = (TypeTuple)gvn.type(call);
     if( tcall.at(0) != Type.CTRL ) return null; // Call not executable
-    Type tfptr = tcall.at(1);
+    Type tfptr = tcall.at(2);
     if( !(tfptr instanceof TypeFunPtr) ) return null; // No known function pointer
     TypeFunPtr tfp = (TypeFunPtr)tfptr;
 
@@ -103,7 +103,7 @@ public final class CallEpiNode extends Node {
 
     // Single choice; check no conversions needed
     TypeStruct formals = fun._tf._args;
-    for( int i=0; i<cnargs; i++ ) {
+    for( int i=1; i<cnargs; i++ ) { // Start at 1 to skip closure hidden arg
       if( fun.parm(i)==null ) { // Argument is dead and can be dropped?
         if( gvn.type(call.arg(i)) != Type.XSCALAR )
           call.set_arg_reg(i,gvn.con(Type.XSCALAR),gvn); // Replace with some generic placeholder
@@ -183,7 +183,7 @@ public final class CallEpiNode extends Node {
       if( arg.in(0) == fun && arg instanceof ParmNode ) {
         int idx = ((ParmNode)arg)._idx; // Argument number, or -1 for rpc
         Node actual = idx==-1 ? new ConNode<>(TypeRPC.make(call._rpc)) :
-          (idx==-2 ? new MProjNode(call,2) : new ProjNode(call,idx+3));
+          (idx==-2 ? new MProjNode(call,3) : new ProjNode(call,idx+4));
         if( gvn._opt_mode == 2 ) {
           gvn.setype(actual,actual.all_type().startype());
           gvn.add_work(actual);
@@ -213,7 +213,7 @@ public final class CallEpiNode extends Node {
     if( ctl != Type.CTRL && ctl != Type.ALL )
       return TypeTuple.CALLE.dual();
     int cnargs = call.nargs();
-    
+
     // Get Call result.  If the Call args are in-error, then the Call is called
     // and we flow types to the post-call.... BUT the bad args are NOT passed
     // along to the function being called.

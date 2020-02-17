@@ -16,7 +16,7 @@ public final class FunPtrNode extends ConNode<TypeFunPtr> {
     _referr = referr;
     assert closure==null || (closure instanceof ProjNode && closure.in(0) instanceof NewObjNode);
   }
-  @Override public int hashCode() { return super.hashCode() ^ in(0)._uid; }
+  @Override public int hashCode() { return super.hashCode() ^ (in(0)==null ? 0 : in(0)._uid); }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !(o instanceof FunPtrNode) ) return false;

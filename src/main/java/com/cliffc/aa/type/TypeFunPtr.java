@@ -95,7 +95,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public BitsFun fidxs() { return _fidxs; }
   public int fidx() { return _fidxs.getbit(); } // Asserts internally single-bit
   public Type arg(int idx) { return _args.at(idx); }
-  public TypeMemPtr arg0() { return (TypeMemPtr)_args.at(0); } // Always a Closure pointer.
+  public Type arg0() { return _args.at(0); } // Always a Closure pointer or NIL
   public boolean is_class() { return _fidxs.is_class(); }
 
   @Override public BitsAlias recursive_aliases(BitsAlias abs, TypeMem mem) {

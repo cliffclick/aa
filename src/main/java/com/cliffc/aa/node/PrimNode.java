@@ -124,7 +124,7 @@ public abstract class PrimNode extends Node {
     ParmNode rpc = (ParmNode) gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
     add_def(null);              // Control for the primitive in slot 0
     for( int i=1; i<_targs._ts.length; i++ )
-      add_def(gvn.init(new ParmNode(i-1,_targs._flds[i],fun, gvn.con(_targs.at(i)),null)));
+      add_def(gvn.init(new ParmNode(i,_targs._flds[i],fun, gvn.con(_targs.at(i)),null)));
     // Functions return the set of *modified* memory.  PrimNodes never *modify*
     // memory (see Intrinsic*Node for some primitives that *modify* memory).
     Node xmem = gvn.con(TypeMem.EMPTY); // Set of modified memory

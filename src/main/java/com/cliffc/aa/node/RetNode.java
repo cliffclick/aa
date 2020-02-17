@@ -28,7 +28,7 @@ public final class RetNode extends Node {
         assert fpn==null;
         fpn = (FunPtrNode)use;
       }
-    assert fpn==null || fpn._defs._len==1;   // Then RetNode but no closures
+    assert fpn==null || fpn.in(1)==null;   // Then RetNode but no closures
     return fpn;
   }
   public int fidx() { return _fidx; }

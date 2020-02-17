@@ -44,11 +44,11 @@ public abstract class IntrinsicNewNode extends Node {
     ParmNode rpc = (ParmNode) gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
     ConNode emem = gvn.con(_mem);
     Node memp= _mem==TypeMem.EMPTY ? emem : gvn.xform(new ParmNode(-2,"mem",fun,emem,null));
-    
+
     // Add input edges to the intrinsic
     add_def(null);              // Control for the primitive in slot 0
     add_def(memp);              // Memory  for the primitive in slot 1
-    for( int i=0; i<_targs._ts.length; i++ ) // Args follow
+    for( int i=0; i<_targs._ts.length; i++ ) // Args follow, closure in slot 0
       add_def( gvn.xform(new ParmNode(i,_targs._flds[i],fun, gvn.con(_targs.at(i)),null)));
     Node rez = gvn.xform(this); // Returns a TypeObj
     // Fill in NewStrNode inputs, now that we have them.
@@ -69,7 +69,7 @@ class ConvertI64Str extends IntrinsicNewNode {
   ConvertI64Str() { super("str",TypeMem.EMPTY,TypeStruct.INT64); }
   @Override public Node ideal(GVNGCM gvn, int level) { return null; }
   @Override public Type value(GVNGCM gvn) {
-    Type t = gvn.type(in(2));
+    Type t = gvn.type(in(3));
     if( t.above_center() ) return all_type().dual();
     if( !t.is_con() || !(t instanceof TypeInt) ) return all_type();
     return TypeStr.make(false,Long.toString(t.getl()).intern());
@@ -80,7 +80,7 @@ class ConvertF64Str extends IntrinsicNewNode {
   ConvertF64Str() { super("str",TypeMem.EMPTY,TypeStruct.FLT64); }
   @Override public Node ideal(GVNGCM gvn, int level) { return null; }
   @Override public Type value(GVNGCM gvn) {
-    Type t = gvn.type(in(2));
+    Type t = gvn.type(in(3));
     if( t.above_center() ) return all_type().dual();
     if( !t.is_con() || !(t instanceof TypeFlt) ) return all_type();
     return TypeStr.make(false,Double.toString(t.getd()).intern());
@@ -96,8 +96,8 @@ class AddStrStr extends IntrinsicNewNode {
   @Override public Node ideal(GVNGCM gvn, int level) { return null; }
   @Override public Type value(GVNGCM gvn) {
     Type m   = gvn.type(in(1));
-    Type sp0 = gvn.type(in(2));
-    Type sp1 = gvn.type(in(3));
+    Type sp0 = gvn.type(in(3));
+    Type sp1 = gvn.type(in(4));
     if( m.above_center() || sp0.above_center() || sp1.above_center() ) return all_type().dual();
     if( !(m instanceof TypeMem) ) return all_type();
     if( !sp0.isa(TypeMemPtr.STRPTR) || !sp1.isa(TypeMemPtr.STRPTR) ) return all_type();
@@ -115,7 +115,7 @@ class AddStrStr extends IntrinsicNewNode {
   @Override public byte op_prec() { return 5; }
   @Override public BitsAlias alias_uses(GVNGCM gvn) {
     // We use all aliases in our inputs
-    Type t2 = gvn.type(in(2)), t3 = gvn.type(in(3));
+    Type t2 = gvn.type(in(3)), t3 = gvn.type(in(4));
     if( !(t2 instanceof TypeMemPtr) ||
         !(t3 instanceof TypeMemPtr) ) return BitsAlias.NZERO; // Wait until memory settles out
     TypeMemPtr tmp2 = (TypeMemPtr)t2, tmp3 = (TypeMemPtr)t3;

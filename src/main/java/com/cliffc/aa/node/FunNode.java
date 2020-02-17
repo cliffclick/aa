@@ -68,7 +68,7 @@ public class FunNode extends RegionNode {
   // theory Primitives should get the top-level primitives-closure, but in
   // practice most primitives neither read nor write their own scope.
   public  FunNode(PrimNode prim) { this(prim._name,TypeFunPtr.make_new(prim._targs,prim._ret),prim.op_prec(),BitsAlias.EMPTY); }
-  public  FunNode(IntrinsicNewNode prim, Type ret) { this(prim._name,TypeFunPtr.make_new(prim._targs,ret),-1, BitsAlias.EMPTY); }
+  public  FunNode(IntrinsicNewNode prim, Type ret) { this(prim._name,TypeFunPtr.make_new(prim._targs,ret),prim.op_prec(), BitsAlias.EMPTY); }
   // Used to make copies when inlining/cloning function bodies
           FunNode(String name,TypeFunPtr tf, BitsAlias closure_aliases) { this(name,tf,-1,closure_aliases); }
   // Used to start an anonymous function in the Parser
@@ -131,13 +131,23 @@ public class FunNode extends RegionNode {
   public static SB names(BitsFun fidxs, SB sb ) {
     int fidx = fidxs.abit();
     if( fidx >= 0 ) return sb.p(name(fidx));
+    // See if this is just one common name, common for overloaded functions
+    String s=null;
+    for( Integer ii : fidxs )
+      if( s==null ) s = name(ii);
+      else if( !s.equals(name(ii)) )
+        { s=null; break; }
+    if( s!=null ) return sb.p(s);
+    // Make a list of the names
     int cnt=0;
+    sb.p('[');
     for( Integer ii : fidxs ) {
       if( ++cnt==5 ) break;
       sb.p(name(ii)).p(fidxs.above_center()?'+':',');
     }
     if( cnt>=5 ) sb.p("...");
-    return sb;
+    else sb.unchar();
+    return sb.p(']');
   }
 
   // Debug only: make an attempt to bind name to a function
@@ -506,6 +516,7 @@ public class FunNode extends RegionNode {
     FunPtrNode old_funptr = oldret.funptr();
     FunPtrNode new_funptr = (FunPtrNode)old_funptr.copy(false,cepi,gvn);
     new_funptr.add_def(newret);
+    new_funptr.add_def(old_funptr.in(1)); // Share same closure
     old_funptr.keep(); // Keep around; do not kill last use before the clone is done
 
     // Fill in edges.  New Nodes point to New instead of Old; everybody
