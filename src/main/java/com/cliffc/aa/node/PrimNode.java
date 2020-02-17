@@ -130,7 +130,7 @@ public abstract class PrimNode extends Node {
     Node xmem = gvn.con(TypeMem.EMPTY); // Set of modified memory
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,xmem,gvn.init(this),rpc,fun));
     // No closures are added to primitives
-    return new FunPtrNode(ret);
+    return new FunPtrNode(ret,null);
   }
 
 

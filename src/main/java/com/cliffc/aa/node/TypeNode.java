@@ -30,14 +30,14 @@ public class TypeNode extends Node {
       Node[] args = new Node[targs.length+3];
       FunNode fun = gvn.init((FunNode)(new FunNode(targs).add_def(Env.ALL_CTRL)));
       args[0] = fun;            // Call control
-      args[1] = arg;            // Call function is the argument being function-type-checked here
-      args[2] = gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM     ),null));
-      Node rpc= gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
-      for( int i=0; i<targs.length; i++ ) {
+      args[1] = gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM     ),null));
+      args[2] = gvn.xform(new ParmNode( 0,"^",fun,gvn.con(TypeMemPtr.DISPLAY_PTR),null));
+      for( int i=1; i<targs.length; i++ ) {
         // All the parms, with types
         Node parm = gvn.xform(new ParmNode(i,"arg"+i,fun,gvn.con(Type.SCALAR),null));
-        args[i+3] = gvn.xform(new TypeNode(targs[i],parm,_error_parse));
+        args[i+2] = gvn.xform(new TypeNode(targs[i],parm,_error_parse));
       }
+      Node rpc= gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
       CallNode call = (CallNode)gvn.xform(new CallNode(true,_error_parse,args));
       Node cepi   = gvn.xform(new CallEpiNode(call)).keep();
       Node ctl    = gvn.xform(new CProjNode(cepi,0));
@@ -45,7 +45,7 @@ public class TypeNode extends Node {
       Node val    = gvn.xform(new  ProjNode(cepi.unhook(),2));
       Node chk    = gvn.xform(new  TypeNode(tfp._ret,val,_error_parse)); // Type-check the return also
       RetNode ret = (RetNode)gvn.xform(new RetNode(ctl,postmem.unhook(),chk,rpc,fun));
-      return gvn.xform(new FunPtrNode(ret));
+      return gvn.xform(new FunPtrNode(ret,args[2])); // 
     }
 
     // Push TypeNodes 'up' to widen the space they apply to, and hopefully push

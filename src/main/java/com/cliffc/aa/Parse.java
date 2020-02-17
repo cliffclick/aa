@@ -781,17 +781,7 @@ public class Parse {
       // to the function for faster access.
       RetNode ret = (RetNode)gvn(new RetNode(ctrl(),all_mem(),rez,rpc.unhook(),fun.unhook()));
       // The FunPtr builds a real closure; any up-scope references are passed in now.
-      Node fptr = new FunPtrNode(ret);
-      TypeStruct args = fun._tf._args;
-      for( int i=ts._len; i<args._ts.length; i++ ) {
-        assert args._flds[i].charAt(0)=='^';
-        int closure_alias = ((TypeMemPtr)args._ts[i]).aliases().getbit();
-        Env e2 = e._par;
-        while( e2._closure_alias != closure_alias ) e2 = e2._par;
-        Node xarg = e2._scope.ptr();
-        fptr.add_def(xarg);
-      }
-      fptr = gvn(fptr);
+      Node fptr = gvn(new FunPtrNode(ret,e._par._scope.ptr()));
       _e = _e._par;             // Pop nested environment
       set_ctrl(old_ctrl);       // Back to the pre-function-def control
       set_mem (old_mem.unhook());// Back to the pre-function-def memory

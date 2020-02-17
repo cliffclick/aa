@@ -10,13 +10,13 @@ import com.cliffc.aa.type.*;
 // class functions to be passed about.
 public final class FunPtrNode extends ConNode<TypeFunPtr> {
   private final String _referr;
-  public  FunPtrNode( RetNode ret, Node closure ) { this(ret,closure,null); }
-  private FunPtrNode( RetNode ret, Node closure, String referr ) {
+  public  FunPtrNode( RetNode ret, Node closure ) { this(null,ret,closure); }
+  private FunPtrNode( String referr, RetNode ret, Node closure ) {
     super(OP_FUNPTR,ret.fun()._tf,ret,closure);
     _referr = referr;
-    assert closure instanceof ProjNode && closure.in(0) instanceof NewObjNode;
+    assert closure==null || (closure instanceof ProjNode && closure.in(0) instanceof NewObjNode);
   }
-  @Override public int hashCode() { return super.hashCode() ^ in(0)._uid ^ in(1)._uid; }
+  @Override public int hashCode() { return super.hashCode() ^ in(0)._uid; }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !(o instanceof FunPtrNode) ) return false;
@@ -69,7 +69,7 @@ public final class FunPtrNode extends ConNode<TypeFunPtr> {
   public static FunPtrNode forward_ref( GVNGCM gvn, String name, Parse unkref ) {
     FunNode fun = gvn.init(new FunNode(name));
     RetNode ret = gvn.init(new RetNode(fun,gvn.con(TypeMem.MEM),gvn.con(Type.SCALAR),gvn.con(TypeRPC.ALL_CALL),fun));
-    return new FunPtrNode(unkref.forward_ref_err(fun),ret);
+    return new FunPtrNode(unkref.forward_ref_err(fun),ret,null);
   }
 
   // True if this is a forward_ref

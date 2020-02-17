@@ -3,13 +3,12 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeFunPtr;
 
 public class ConNode<T extends Type> extends Node {
   T _t;
   public ConNode( T t ) { super(OP_CON,Env.START); _t=t; }
   // Used by FunPtrNode
-  ConNode( byte type, T tfp, RetNode ret, Node closure ) { super(type,ret,closures); _t = tfp; }
+  ConNode( byte type, T tfp, RetNode ret, Node closure ) { super(type,ret,closure); _t = tfp; }
   @Override String xstr() { return Env.ALL_CTRL == this ? "ALL_CTL" : _t.toString(); }
   @Override public Node ideal(GVNGCM gvn, int level) { return null; }
   @Override public Type value(GVNGCM gvn) { return _t; }
@@ -23,6 +22,6 @@ public class ConNode<T extends Type> extends Node {
     return _t==con._t;
   }
   @Override public byte op_prec() { return _t.op_prec(); }
-  
+
 }
 
