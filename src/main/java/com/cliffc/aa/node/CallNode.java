@@ -18,6 +18,11 @@ import java.util.BitSet;
 //
 // When the function type simplifies to a single TypeFunPtr, the Call can inline.
 //
+// TFPs are actually Closures and include an extra argument for the enclosed
+// environment (actually expanded out to one arg-per-used-scope).  These extra
+// arguments are part of the function signature but are not direct inputs into
+// the call.
+//
 // The Call-graph is lazily discovered during GCP/opto.  Before then all
 // functions are kept alive with a special control (see FunNode), and all Calls
 // are assumed to call all functions... unless their fun() input is a trival
@@ -58,49 +63,6 @@ import java.util.BitSet;
 //  \   / | \
 //  MemMerge: limited to reachable writable
 //
-// Poster Child For Escape Analysis:   treemap = {t f -> t ? @{l=map(t.l,f);r=map(t.r,f);v=f(t.v)} : 0}
-// treemap = {tree fun ->
-//   new  = new struct{left,right,val}
-//   mem0 = merge(fun.mem,new)
-//   tmp1 = ld tree.left;
-//   tmp2 = treemap(mem0,tmp1,fun)
-//   mem3 = st mem0,new.left,tmp2
-//   tmp4 = ld tree.right;
-//   tmp5 = treemap(mem3,tmp4,fun)
-//   mem6 = st mem3,new.right,tmp5
-//   tmp7 = ld tree.val
-//   tmp8 = fun(tmp7)
-//   mem9 = st mem6,new.val,tmp8
-//   return mem9,new
-// }
-//
-// BUG:
-//   mem3 produces final left field memory
-//   tmp5 call push final left into treemap memory phi.  LEAKS NEW.
-//   mem0 merges final-left of leaked new with a recursive new.  NEW IS NOW APPROXIMATED WITH FINAL-LEFT
-//   mem3 IN ERROR storing final-left over final-left.
-//
-// This "escape" does not happen in the "value model" of the world, since there
-// is no memory merge after the new.  Parser needs a way to merge the memory
-// since it cannot track the pointer seperate from the memory... which means
-// the main iter/gcp needs to tease apart the escaping situation.
-//
-// THREE "escape analysis" plans:
-// - Local analysis only: post-memmerge/callepi/call/pre-memmerge; "new" not
-//   stored in this region, not passed as an argument, so does not escape.
-//   Bypass "new" around call.
-// - Local graph peek inside of treemap; see Ret->Merge->Parm_Mem->Fun.  All
-//   memories except "new" not modded, can bypass.  "tree" itself is loaded,
-//   must be passed in.  "new" is local, so also bypasses recursive calls.
-// - Forward flow analysis around any SESE region: tracks past uses & mods.
-//   Annotate memory type with 0/r/w/new per-field starting from Fun, and
-//   propagate to Ret.  Seperately CallEpi can observe memory is either not
-//   touched, or new, or read-only, vs write - and bypass.
-
-
-
-
-
 public class CallNode extends Node {
   int _rpc;                 // Call-site return PC
   boolean _unpacked;        // Call site allows unpacking a tuple (once)
@@ -116,19 +78,35 @@ public class CallNode extends Node {
   String xstr() { return ((is_dead() || is_copy()) ? "x" : "C")+"all#"+_rpc; } // Self short name
   String  str() { return xstr(); }       // Inline short name
 
-  // Number of actual arguments
-  int nargs() { return _defs._len-3; }
-  // Actual arguments.
-  Node arg( int x ) { return _defs.at(x+3); }
-  void set_arg_reg(int idx, Node arg, GVNGCM gvn) { gvn.set_def_reg(this,idx+3,arg); }
+  // Call arguments:
+  // 0 - Control.  If XCTRL, call is not reached.
+  // 1 - Memory.  This is memory into the call.  The following MProj is memory
+  //     passed to the called function - which is generally trimmed to just
+  //     what the function can use.  The unused memory bypasses to the CallEpi.
+  // 2 - Function pointer, typed as a TypeFunPtr.  Might be a FunPtrNode, might
+  //     be e.g. a Phi or a Load.  This is argument 0, both as the Closure AND
+  //     as the Code pointer.
+  // 3+  Other "normal" arguments.
+
+  // Number of actual arguments, including the closure/code ptr.
+  int nargs() { return _defs._len-2; }
+  // Argument type
+  Type targ( GVNGCM gvn, int x ) {
+    Type t = gvn.type(arg(x));
+    if( x>0 ) return t;         // Normal argument type
+    if( !(t instanceof TypeFunPtr) ) return Type.SCALAR;
+    return ((TypeFunPtr)t).arg0(); // Extract Closure type from TFP
+  }
+  // Actual arguments.  Arg(0) is allowed and refers to the Closure not the Code.
+  Node arg( int x ) { assert x>=0; return _defs.at(x+2); }
+  // Set an argument.  Use 'set_fun' to set the Closure/Code.
+  void set_arg_reg(int idx, Node arg, GVNGCM gvn) { assert idx>0; gvn.set_def_reg(this,idx+2,arg); }
 
           Node ctl() { return in(0); }
-  public  Node fun() { return in(1); }
-  public  Node mem() { return in(2); }
-  //private void set_ctl    (Node ctl, GVNGCM gvn) {     set_def    (0,ctl,gvn); }
-  private Node set_mem    (Node mem, GVNGCM gvn) { return set_def(2,mem,gvn); }
-  private Node set_fun    (Node fun, GVNGCM gvn) { return set_def(1,fun,gvn); }
-  public  void set_fun_reg(Node fun, GVNGCM gvn) { gvn.set_def_reg(this,1,fun); }
+  public  Node mem() { return in(1); }
+  public  Node fun() { return in(2); }
+  private Node set_fun    (Node fun, GVNGCM gvn) { return set_def(2,fun,gvn); }
+  public  void set_fun_reg(Node fun, GVNGCM gvn) { gvn.set_def_reg(this,2,fun); }
   public BitsFun fidxs(GVNGCM gvn) {
     Type tf = gvn.type(fun());
     return tf instanceof TypeFunPtr ? ((TypeFunPtr)tf).fidxs() : null;
@@ -169,15 +147,16 @@ public class CallNode extends Node {
     // When do I do 'pattern matching'?  For the moment, right here: if not
     // already unpacked a tuple, and can see the NewNode, unpack it right now.
     if( !_unpacked ) { // Not yet unpacked a tuple
-      assert nargs()==1;
-      Type tadr = gvn.type(arg(0));
-      // Bypass a merge on the 1-arg input during unpacking
+      assert nargs()==2;        // The Closure plus the arg tuple
+      Node arg1 = arg(1);
+      Type tadr = gvn.type(arg1);
+      // Bypass a merge on the 2-arg input during unpacking
       if( tadr instanceof TypeMemPtr && mem instanceof MemMergeNode ) {
         int alias = ((TypeMemPtr)tadr)._aliases.abit();
         if( alias == -1 ) throw AA.unimpl(); // Handle multiple aliases, handle all/empty
         Node obj = ((MemMergeNode)mem).alias2node(alias);
-        if( obj instanceof OProjNode && arg(0) instanceof ProjNode && arg(0).in(0) instanceof NewNode ) {
-          NewNode nnn = (NewNode)arg(0).in(0);
+        if( obj instanceof OProjNode && arg1 instanceof ProjNode && arg1.in(0) instanceof NewNode ) {
+          NewNode nnn = (NewNode)arg1.in(0);
           remove(_defs._len-1,gvn); // Pop off the NewNode tuple
           int len = nnn._defs._len;
           for( int i=1; i<len; i++ ) // Push the args; unpacks the tuple
@@ -206,9 +185,19 @@ public class CallNode extends Node {
   // enforces SESE which in turn allows more precise memory and aliasing.  The
   // full scatter lets users decide the meaning; e.g. wired FunNodes will take
   // the full arg set but if the call is not reachable the FunNode will not
-  // merge from that path.
+  // merge from that path.  Result tuple type:
+
+  // 0 - Ctrl - whether or not the function is called.  False if call not
+  //     reached or args are in-error.
+  // 1 - Full memory; just a copy of gvn.type(mem())
+  // 2 - TypeFunPtr ; just a copy of gvn.type(fun())
+  // 3 - Memory passed to the function, generally trimmed down from the full
+  //     available memory.
+  // 4 - Closure
+  // 5+  Normal argument types
+  
   @Override public TypeTuple value(GVNGCM gvn) {
-    final Type[] ts = TypeAry.get(_defs._len);
+    final Type[] ts = TypeAry.get(_defs._len+2);
     final boolean dead = !_is_copy && gvn._opt_mode>0 && cepi()==null; // Dead from below
 
     // Pinch to XCTRL/CTRL
@@ -217,29 +206,31 @@ public class CallNode extends Node {
     if( ctl != Type.CTRL ) ctl = Type.XCTRL;
     ts[0] = ctl;
 
-    // Not a function to call?
-    Type tfx = gvn.type(fun());
-    if( !(tfx instanceof TypeFunPtr) )
-      tfx = tfx.above_center() ? TypeFunPtr.GENERIC_FUNPTR.dual() : TypeFunPtr.GENERIC_FUNPTR;
-    TypeFunPtr tfp = (TypeFunPtr)(ts[1] = tfx);
-    BitsFun fidxs = tfp.fidxs();
-    // Can we call this function pointer?
-    boolean callable = !dead && !(tfp.above_center() || fidxs.above_center());
-
     // Not a memory to the call?
     Type mem = gvn.type(mem());
     if( !(mem instanceof TypeMem) )
       mem = mem.above_center() ? TypeMem.EMPTY : TypeMem.FULL;
-    TypeMem tmem = (TypeMem)(ts[2] = mem);
+    TypeMem tmem = (TypeMem)(ts[1] = ts[3] = mem);
+    
+    // Not a function to call?
+    Type tfx = gvn.type(fun());
+    if( !(tfx instanceof TypeFunPtr) )
+      tfx = tfx.above_center() ? TypeFunPtr.GENERIC_FUNPTR.dual() : TypeFunPtr.GENERIC_FUNPTR;
+    TypeFunPtr tfp = (TypeFunPtr)(ts[2] = tfx);
+    BitsFun fidxs = tfp.fidxs();
+    // Can we call this function pointer?
+    boolean callable = !dead && !(tfp.above_center() || fidxs.above_center());
+
     // If not callable, do not call
     if( !callable ) { ts[0] = ctl = Type.XCTRL; }
     // If not called, then no memory to functions
-    if( ctl == Type.XCTRL ) { ts[2] = tmem = TypeMem.EMPTY; }
+    if( ctl == Type.XCTRL ) { ts[1] = ts[3] = tmem = TypeMem.EMPTY; }
 
     // Copy args for called functions.
     // If call is dead, then so are args.
-    for( int i=3; i<_defs._len; i++ )
-      ts[i] = dead ? Type.XSCALAR : gvn.type(in(i));
+    ts[4] = dead ? Type.XSCALAR : targ(gvn,0).bound(TypeMemPtr.DISPLAY_PTR);
+    for( int i=1; i<nargs(); i++ )
+      ts[i+4] = dead ? Type.XSCALAR : targ(gvn,i).bound(Type.SCALAR);
 
     // Quick exit if cannot further trim memory
     if( ctl == Type.XCTRL ||     // Not calling
@@ -258,7 +249,7 @@ public class CallNode extends Node {
     // Now the set of pointers escaping via arguments
     for( int i=0; i<nargs(); i++ ) {
       if( abs.test(1) ) break;  // Shortcut for already being full
-      abs = gvn.type(arg(i)).recursive_aliases(abs,tmem);
+      abs = ts[i+2].recursive_aliases(abs,tmem);
     }
 
     // Add all the aliases which can be reached from objects at the existing
@@ -306,13 +297,13 @@ public class CallNode extends Node {
     for( int fidx = bs.nextSetBit(0); fidx >= 0; fidx = bs.nextSetBit(fidx+1) ) {
       FunNode fun = FunNode.find_fidx(fidx);
       if( fun.nargs() != nargs() ) continue; // Wrong arg count, toss out
-      TypeStruct formals = fun._tf._args;   // Type of each argument
+      TypeStruct formals = fun._tf._args;    // Type of each argument
 
       // Now check if the arguments are compatible at all, keeping lowest cost
       int xcvts = 0;             // Count of conversions required
       boolean unk = false;       // Unknown arg might be incompatible or free to convert
-      for( int j=0; j<nargs(); j++ ) {
-        Type actual = gvn.type(arg(j));
+      for( int j=0; j<fun.nargs(); j++ ) {
+        Type actual = targ(gvn,j);
         Type tx = actual.join(formals.at(j));
         if( tx != actual && tx.above_center() ) // Actual and formal have values in common?
           continue outerloop;   // No, this function will never work; e.g. cannot cast 1.2 as any integer
@@ -360,52 +351,50 @@ public class CallNode extends Node {
   }
 
   @Override public String err(GVNGCM gvn) {
-    // Error#1: fail for passed-in unknown references
+    // Fail for passed-in unknown references directly.
     for( int j=0; j<nargs(); j++ )
       if( arg(j).is_forward_ref() )
         return _badargs.forward_ref_err(((FunPtrNode)arg(j)).fun());
 
-    Node fp = fun();      // Either function pointer, or unresolved list of them
-    Type tfp = gvn.type(fp);
-    if( !(tfp instanceof TypeFunPtr) )
-      return _badargs.errMsg("A function is being called, but "+tfp+" is not a function type");
-    Node xfp = fp instanceof UnresolvedNode ? fp.in(0) : fp;
-    if( xfp instanceof FunPtrNode ) {
-      FunPtrNode ptr = (FunPtrNode)xfp;
-      int fidx = ptr.ret()._fidx;    // Reliably returns a fidx
-      FunNode fun = FunNode.find_fidx(fidx);
-      if( fp.is_forward_ref() ) // Forward ref on incoming function
-        return _badargs.forward_ref_err(fun);
+    // Expect a function pointer
+    Type tfun = gvn.type(fun());
+    if( !(tfun instanceof TypeFunPtr) )
+      return _badargs.errMsg("A function is being called, but "+tfun+" is not a function type");
+    TypeFunPtr tfp = (TypeFunPtr)tfun;
 
-      // Error#2: bad-arg-count
-      if( fun.nargs() != nargs() )
-        return _badargs.errMsg("Passing "+nargs()+" arguments to "+(fun.xstr())+" which takes "+fun.nargs()+" arguments");
+    // Indirectly, forward-ref for function type
+    if( tfp.is_forward_ref() ) // Forward ref on incoming function
+      return _badargs.forward_ref_err(FunNode.find_fidx(tfp.fidx()));
 
-      // Error#3: Now do an arg-check
-      TypeStruct formals = fun._tf._args; // Type of each argument
-      for( int j=0; j<nargs(); j++ ) {
-        Type actual = gvn.type(arg(j));
-        Type formal = formals.at(j);
-        if( !actual.isa(formal) ) // Actual is not a formal
-          return _badargs.typerr(actual,formal,mem());
-      }
+    // bad-arg-count
+    if( tfp.nargs() != nargs() )
+      return _badargs.errMsg("Passing "+nargs()+" arguments to "+tfp+" which takes "+tfp.nargs()+" arguments");
+
+    // Now do an arg-check
+    TypeStruct formals = tfp._args; // Type of each argument
+    for( int j=0; j<formals._ts.length; j++ ) {
+      Type actual = targ(gvn,j);
+      Type formal = formals.at(j);
+      if( !actual.isa(formal) ) // Actual is not a formal
+        return _badargs.typerr(actual,formal,mem());
     }
 
     return null;
   }
 
   @Override public TypeTuple all_type() {
-    Type[] ts = TypeAry.get(_defs._len);
-    Arrays.fill(ts,Type.ALL);
+    Type[] ts = TypeAry.get(_defs._len+2);
+    Arrays.fill(ts,Type.SCALAR);
     ts[0] = Type.CTRL;
-    ts[1] = TypeFunPtr.GENERIC_FUNPTR;
-    ts[2] = TypeMem.FULL;
+    ts[1] = TypeMem.FULL;
+    ts[2] = TypeFunPtr.GENERIC_FUNPTR;
+    ts[3] = TypeMem.FULL;
+    ts[4] = TypeMemPtr.DISPLAY_PTR;
     return TypeTuple.make(ts);
   }
   // Set of used aliases across all inputs (not StoreNode value, but yes address)
   @Override public BitsAlias alias_uses(GVNGCM gvn) {
     // We use all aliases we computed in our output type, plus all bypass aliases.
-    TypeMem fret_mem;
     CallEpiNode cepi = cepi();// Find CallEpi for bypass aliases
     if( cepi != null )
       for( Node mproj : cepi._uses ) // Find output memory
@@ -433,12 +422,12 @@ public class CallNode extends Node {
   }
   private boolean is_copy() { return _is_copy; }
   @Override public Node is_copy(GVNGCM gvn, int idx) { return is_copy() ? in(idx) : null; }
-  @Override public void ideal_impacted_by_changing_uses(GVNGCM gvn) {
-    // If just changed types, MemMerge use of Call might trigger alias filtering
-    for( Node def : _defs )
-      if( def instanceof MemMergeNode )
-        gvn.add_work(def);
-  }
+  //@Override public void ideal_impacted_by_changing_uses(GVNGCM gvn) {
+  //  // If just changed types, MemMerge use of Call might trigger alias filtering
+  //  for( Node def : _defs )
+  //    if( def instanceof MemMergeNode )
+  //      gvn.add_work(def);
+  //}
   // If losing the CallEpi, call does dead.
   @Override public boolean ideal_impacted_by_losing_uses(GVNGCM gvn, Node dead) {
     return dead instanceof CallEpiNode;

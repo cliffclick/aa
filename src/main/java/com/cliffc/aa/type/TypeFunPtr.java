@@ -8,35 +8,28 @@ import java.util.BitSet;
 // Function indices or function pointers; a single instance can include all
 // possible aliased function pointers.  Function pointers can be executed, are
 // not GC'd, and cannot be Loaded or Stored through (although they can be
-// loaded & stored).  Each function index (or fidx) is a constant value, a
-// classic code pointer.  Cloning the code immediately also clones the fidx
-// with a new fidx bit for the new cloned copy.
+// loaded & stored).
 //
-// The formal function signature is included.  This is the type of EpilogNodes,
-// and is included in FunNodes (FunNodes type is same as a RegionNode; simply
-// Control or not).
-
-// CallNodes use this type to check their incoming arguments.  CallNodes get
-// their return values (including memory) from the Epilog itself, not the
-// FunNode and not this type.
-
-
-// CNC!!!!  TFP represents code-pointers, and can be constants.  The signature
-// is not needed.... can be built from the union of FunNode sigs from the
-// fidxs.  Perhaps: allow TFP to be constants but the dual does not flip
-// signature bits.  Handle meet-vs-join of code-pointers by meet/join sigs from
-// FunNode.  Doesn't work...
-// Plan B: no sig in TFP, just a collection of code-pointer bits.
-//         FunNode has args & ret seperately.  Epilog might also.
-//         Type of Epilog is a Code-pointer (a TFP no sig).
-//         CallNodes need to get arg types from the fidx->FunNode path.
-// Probably unwind most changes, get back to parse1-6 working.
+// A TypeFunPtr includes a set of function indices, plus the formal argument
+// types.  Included in the formal arguments are pointers to all upwards exposed
+// closures.  These have special names to indicate they are not part of the
+// user-defined arguments.
 //
+// Each function index (or fidx) is a constant value, a classic code pointer.
+// Cloning the code immediately also splits the fidx with a new fidx bit for
+// both the original and the new code.
+//
+// The formal function signature is used to e.g. check formal call args, during
+// call resolution, and on TypeNodes for function arg types.  CallNodes use
+// this type to check their incoming arguments, although their return values
+// (including memory) come from the Ret itself, not the Fun and not this type.
+
 public final class TypeFunPtr extends Type<TypeFunPtr> {
   // List of known functions in set, or 'flip' for choice-of-functions.
   private BitsFun _fidxs;       // Known function bits
   // Union (or join) signature of said functions; depends on if _fidxs is
-  // above_center() or not.
+  // above_center() or not.  Slot 0 is for the closure type, and so is always a
+  // TypeMemPtr.
   public TypeStruct _args;      // Standard args, zero-based, no memory
   public Type _ret;             // Standard formal return type.
 
@@ -54,10 +47,12 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   @Override public String str( VBitSet dups) {
     return "*"+names()+":{"+_args.str(dups)+"-> "+_ret.str(dups)+"}";}
   public String names() { return FunNode.names(_fidxs,new SB()).toString(); }
+  public int nargs() { return _args._ts.length; }
 
   private static TypeFunPtr FREE=null;
   @Override protected TypeFunPtr free( TypeFunPtr ret ) { FREE=this; return ret; }
   public static TypeFunPtr make( BitsFun fidxs, TypeStruct args, Type ret ) {
+    assert args.at(0) instanceof TypeMemPtr || args.at(0) == Type.NIL;
     TypeFunPtr t1 = FREE;
     if( t1 == null ) t1 = new TypeFunPtr(fidxs,args,ret);
     else {   FREE = null;        t1.init(fidxs,args,ret); }
@@ -68,11 +63,11 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public static TypeFunPtr make_new(TypeStruct args, Type ret) { return make(BitsFun.make_new_fidx(BitsFun.ALL),args,ret); }
   public TypeFunPtr make_fidx( int fidx ) { return make(BitsFun.make0(fidx),_args,_ret); }
   public TypeFunPtr make_new_fidx( int parent, TypeStruct args ) { return make(BitsFun.make_new_fidx(parent),args,_ret); }
-  public static TypeFunPtr make_anon() { return make_new(TypeStruct.ALLSTRUCT,Type.SCALAR); } // Make a new anonymous function ptr
+  public static TypeFunPtr make_anon() { return make_new(TypeStruct.DISPLAY,Type.SCALAR); } // Make a new anonymous function ptr
 
-  public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.NZERO,TypeStruct.ALLSTRUCT,Type.SCALAR);
+  public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.NZERO,TypeStruct.DISPLAY,Type.SCALAR);
   private static final TypeFunPtr TEST_INEG = make(BitsFun.make0(2),TypeStruct.INT64,TypeInt.INT64);
-  public  static final TypeFunPtr EMPTY = make(BitsFun.EMPTY,TypeStruct.ALLSTRUCT,Type.XSCALAR);
+  public  static final TypeFunPtr EMPTY = make(BitsFun.EMPTY,TypeStruct.DISPLAY,Type.XSCALAR);
   static final TypeFunPtr[] TYPES = new TypeFunPtr[]{GENERIC_FUNPTR,TEST_INEG};
 
   @Override protected TypeFunPtr xdual() { return new TypeFunPtr(_fidxs.dual(),_args.dual(),_ret.dual()); }
@@ -100,6 +95,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public BitsFun fidxs() { return _fidxs; }
   public int fidx() { return _fidxs.getbit(); } // Asserts internally single-bit
   public Type arg(int idx) { return _args.at(idx); }
+  public TypeMemPtr arg0() { return (TypeMemPtr)_args.at(0); } // Always a Closure pointer.
   public boolean is_class() { return _fidxs.is_class(); }
 
   @Override public BitsAlias recursive_aliases(BitsAlias abs, TypeMem mem) {
@@ -115,10 +111,18 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     return abs;
   }
 
-  // Function args below center when the TFP is above center.
   @Override public boolean above_center() { return _args.above_center(); }
   @Override public boolean may_be_con()   { return above_center() || is_con(); }
-  @Override public boolean is_con()       { return _fidxs.abit() != -1 && !is_class(); }
+  @Override public boolean is_con()       {
+    // More than 1 function being referred to
+    if( _fidxs.abit() == -1 || is_class() ) return false;
+    // All closure bits have to be constants also
+    for( int i=0; i<_args._ts.length; i++ )
+      if( _args.lexical_depth(i) > 0 &&
+          !_args._ts[i].is_con() )
+        return false;
+    return true;
+  }
   @Override public boolean must_nil() { return _fidxs.test(0) && !above_center(); }
   @Override public boolean may_nil() { return _fidxs.may_nil(); }
   @Override Type not_nil() {

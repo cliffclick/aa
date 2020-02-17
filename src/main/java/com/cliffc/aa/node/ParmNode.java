@@ -12,7 +12,7 @@ import com.cliffc.aa.type.TypeMem;
 // scoped closures; basically its a hidden struct pointer.
 public class ParmNode extends PhiNode {
   final int _idx;             // Parameter index, zero-based; -1 reserved for RPC, -2 for mem
-  private final String _name; // Parameter name
+  final String _name;         // Parameter name
   private final Type _alltype;
   public ParmNode( int idx, String name, Node fun, ConNode defalt, Parse badgc) {
     super(OP_PARM,fun,defalt,badgc);

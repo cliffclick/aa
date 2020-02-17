@@ -1,7 +1,6 @@
 package com.cliffc.aa.type;
 
 import com.cliffc.aa.AA;
-import com.cliffc.aa.node.FunNode;
 import com.cliffc.aa.util.*;
 import org.jetbrains.annotations.NotNull;
 
@@ -36,7 +35,7 @@ import java.util.function.Predicate;
  */
 public class TypeStruct extends TypeObj<TypeStruct> {
   // Fields are named in-order and aligned with the Tuple values.  Field names
-  // are never null, and never zero-length.  If the 1st char is a '^' the field
+  // are never null, and never zero-length.  If the 1st char is a '*' the field
   // is Top; a '.' is Bot; all other values are valid field names.
   public @NotNull String @NotNull[] _flds;  // The field names
   public boolean _cln;          // Clean: not modified since last function
@@ -242,8 +241,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   private static final String[][] FLDS={FLD0,FLD1,FLD2,FLD3};
   public  static String[] FLDS( int len ) { return FLDS[len]; }
   private static String[] flds(String... fs) { return fs; }
-  private static final String[] ARGS_X  = flds("x");
-          static final String[] ARGS_XY = flds("x","y");
+  public  static final String[] ARGS_X  = flds("^","x");
+          static final String[] ARGS_XY = flds("^","x","y");
   public  static Type[] ts() { return TypeAry.get(0); }
   public  static Type[] ts(Type t0) { Type[] ts = TypeAry.get(1); ts[0]=t0; return ts;}
   public  static Type[] ts(Type t0, Type t1) { Type[] ts = TypeAry.get(2); ts[0]=t0; ts[1]=t1; return ts;}
@@ -255,6 +254,13 @@ public class TypeStruct extends TypeObj<TypeStruct> {
 
   public  static TypeStruct make(Type[] ts) {
     return malloc("",false,false,FLDS[ts.length],ts,fbots(ts.length)).hashcons_free();
+  }
+  // Generic function arguments.  Slot 0 is the closure and has a fixed name.
+  public  static TypeStruct make_args(Type[] ts) {
+    String[] args = new String[ts.length];
+    Arrays.fill(args,".");
+    args[0] = "^";
+    return malloc("",false,false,args,ts,fbots(ts.length)).hashcons_free();
   }
   public  static TypeStruct make(Type t0         ) { return make(ts(t0   )); }
   public  static TypeStruct make(Type t0, Type t1) { return make(ts(t0,t1)); }
@@ -279,31 +285,42 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return false;
   }
 
+  // The display is a self-recursive structure: slot 0 is a ptr to a Display.
+  public  static final TypeStruct DISPLAY = malloc("",false,false,new String[]{"^"},ts(Type.NIL),fbots(1));
+  static { DISPLAY._hash = DISPLAY.compute_hash(); }
   // Most primitive function call argument type lists are 0-based
   public  static final TypeStruct GENERIC = malloc("",true,true,FLD0,TypeAry.get(0),new byte[0]).hashcons_free();
   public  static final TypeStruct ALLSTRUCT = make(ts());
   public  static final TypeStruct ALLSTRUCT_CLN = malloc("",false,true,FLDS[0],TypeAry.get(0),fbots(0)).hashcons_free();
   //private static final TypeStruct SCALAR0 = make_args();
-  public  static final TypeStruct SCALAR1     = make(FLD1   ,ts(SCALAR));
-  public  static final TypeStruct SCALAR2     = make(FLD2   ,ts(SCALAR,SCALAR));
-  public  static final TypeStruct STRPTR      = make(ARGS_X ,ts(TypeMemPtr.STRPTR));
-  public  static final TypeStruct OOP_OOP     = make(ARGS_XY,ts(TypeMemPtr.OOP0,TypeMemPtr.OOP0));
-  public  static final TypeStruct INT64_INT64 = make(ARGS_XY,ts(TypeInt.INT64,TypeInt.INT64));
-  public  static final TypeStruct FLT64_FLT64 = make(ARGS_XY,ts(TypeFlt.FLT64,TypeFlt.FLT64));
-  public  static final TypeStruct STR_STR     = make(ARGS_XY,ts(TypeMemPtr.STRPTR,TypeMemPtr.STRPTR));
-  public  static final TypeStruct FLT64       = make(ARGS_X ,ts(TypeFlt.FLT64)); // @{x:flt}
-  public  static final TypeStruct INT64       = make(ARGS_X ,ts(TypeInt.INT64)); // @{x:int}
+  public  static final TypeStruct SCALAR1     = make(ARGS_X ,ts(Type.NIL,SCALAR));
+  public  static final TypeStruct SCALAR2     = make(ARGS_XY,ts(Type.NIL,SCALAR,SCALAR));
+  public  static final TypeStruct STRPTR      = make(ARGS_X ,ts(Type.NIL,TypeMemPtr.STRPTR));
+  public  static final TypeStruct OOP_OOP     = make(ARGS_XY,ts(Type.NIL,TypeMemPtr.OOP0,TypeMemPtr.OOP0));
+  public  static final TypeStruct INT64_INT64 = make(ARGS_XY,ts(Type.NIL,TypeInt.INT64,TypeInt.INT64));
+  public  static final TypeStruct FLT64_FLT64 = make(ARGS_XY,ts(Type.NIL,TypeFlt.FLT64,TypeFlt.FLT64));
+  public  static final TypeStruct STR_STR     = make(ARGS_XY,ts(Type.NIL,TypeMemPtr.STRPTR,TypeMemPtr.STRPTR));
+  public  static final TypeStruct FLT64       = make(ARGS_X ,ts(Type.NIL,TypeFlt.FLT64)); // @{x:flt}
+  public  static final TypeStruct INT64       = make(ARGS_X ,ts(Type.NIL,TypeInt.INT64)); // @{x:int}
 
   // A bunch of types for tests
-  public  static final TypeStruct NAMEPT= make("Point:",flds("x","y"),ts(TypeFlt.FLT64,TypeFlt.FLT64),finals(2));
-  public  static final TypeStruct POINT = make(flds("x","y"),ts(TypeFlt.FLT64,TypeFlt.FLT64));
+  public  static final TypeStruct NAMEPT= make("Point:",ARGS_XY,ts(Type.NIL,TypeFlt.FLT64,TypeFlt.FLT64),finals(3));
+  public  static final TypeStruct POINT = make(ARGS_XY,ts(Type.NIL,TypeFlt.FLT64,TypeFlt.FLT64));
           static final TypeStruct TFLT64= make(          ts(TypeFlt.FLT64 )); //  (  flt)
-  public  static final TypeStruct A     = make(flds("a"),ts(TypeFlt.FLT64 ));
-  private static final TypeStruct C0    = make(flds("c"),ts(TypeInt.FALSE )); // @{c:0}
-  private static final TypeStruct D1    = make(flds("d"),ts(TypeInt.TRUE  )); // @{d:1}
-  private static final TypeStruct ARW   = make(flds("a"),ts(TypeFlt.FLT64),new byte[]{frw()});
+  public  static final TypeStruct A     = make(flds("^","a"),ts(Type.NIL,TypeFlt.FLT64 ));
+  private static final TypeStruct C0    = make(flds("^","c"),ts(Type.NIL,TypeInt.FALSE )); // @{c:0}
+  private static final TypeStruct D1    = make(flds("^","d"),ts(Type.NIL,TypeInt.TRUE  )); // @{d:1}
+  private static final TypeStruct ARW   = make(flds("^","a"),ts(Type.NIL,TypeFlt.FLT64),new byte[]{frw(),frw()});
 
-  static final TypeStruct[] TYPES = new TypeStruct[]{ALLSTRUCT,STR_STR,FLT64,POINT,NAMEPT,A,C0,D1,ARW};
+  // Called during init to break the cycle making DISPLAY
+  static void init1() {
+    if( DISPLAY._ts[0] == Type.NIL ) {
+      DISPLAY._ts = ts(TypeMemPtr.DISPLAY_PTR);
+      DISPLAY.install_cyclic(new Ary<>(ts(DISPLAY, TypeMemPtr.DISPLAY_PTR)));
+    }
+  }
+
+  static final TypeStruct[] TYPES = new TypeStruct[]{ALLSTRUCT,STR_STR,FLT64,POINT,NAMEPT,A,C0,D1,ARW,DISPLAY};
 
   // Extend the current struct with a new named field
   public TypeStruct add_fld( String name, Type t, byte mutable ) {
@@ -431,6 +448,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     assert _hash == compute_hash();
     dual._hash = dual.compute_hash(); // Compute hash before recursion
     for( int i=0; i<ts.length; i++ ) ts[i] = _ts[i].rdual();
+    dual._ts = TypeAry.hash_cons(ts); // hashcons cyclic arrays
     dual._dual = this;
     dual._cyclic = _cyclic;
     return dual;
@@ -986,7 +1004,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   private int len( TypeStruct tt ) { return _ts.length <= tt._ts.length ? len0(tt) : tt.len0(this); }
   private int len0( TypeStruct tmax ) { return _any ? tmax._ts.length : _ts.length; }
 
-  static private boolean fldTop( String s ) { return s.charAt(0)=='^'; }
+  static private boolean fldTop( String s ) { return s.charAt(0)=='*'; }
   static public  boolean fldBot( String s ) { return s.charAt(0)=='.'; }
   // String meet
   private static String smeet( @NotNull String s0, @NotNull String s1 ) {
@@ -999,9 +1017,18 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   }
   private static String sdual( String s ) {
     if( fldTop(s) ) return ".";
-    if( fldBot(s) ) return "^";
+    if( fldBot(s) ) return "*";
     return s;
   }
+
+  // Returns the lexical depth of the named field by counting leading "^"
+  // characters.  Typically 0 as most fields are purely local.
+  private static int lexical_depth( String s ) {
+    for( int i=0; i<s.length(); i++ )
+      if( s.charAt(i)!='^' ) return i;
+    throw com.cliffc.aa.AA.unimpl(); // Field name error
+  }
+  int lexical_depth( int fldnum ) { return lexical_depth(_flds[fldnum]); }
 
   // Field modifiers make a tiny non-obvious lattice:
   //           0unknown
@@ -1155,7 +1182,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     String[] as = new String[_flds.length];
     Type  [] ts = TypeAry.get(_ts  .length);
     byte  [] bs = new byte  [_ts  .length];
-    for( int i=0; i<as.length; i++ ) as[i] = fldBot(_flds[i]) ? "^" : _flds[i];
+    for( int i=0; i<as.length; i++ ) as[i] = fldBot(_flds[i]) ? "*" : _flds[i];
     for( int i=0; i<ts.length; i++ ) ts[i] = _ts[i].above_center() ? _ts[i] : _ts[i].dual();
     for( int i=0; i<bs.length; i++ ) bs[i] = ftop(); // top of lattice
     return malloc(_name,true,true,as,ts,bs).hashcons_free();

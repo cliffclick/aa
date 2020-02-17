@@ -179,7 +179,6 @@ public class Parse {
     _gvn._opt_mode = 0;
     Node res = stmts();
     if( res == null ) res = con(Type.ANY);
-    res = merge_exits(res);
     _gvn.add_work(all_mem());   // Close off top-level active memory
     _e._par._scope.all_mem(_gvn); // Loads against primitive scope will 'activate' memory, close it also
     _e._scope.add_def(res);       // Hook result
@@ -359,18 +358,20 @@ public class Parse {
           ((FunPtrNode)n).merge_ref_def(_gvn,tok,(FunPtrNode)ifex);
         else ; // Can be here if already in-error
       } else { // Store into scope/NewObjNode/closure
-        // Active (parser) memory state
-        MemMergeNode mmem = mem_active();
-        int alias = scope.stk()._alias; // Alias for scope
-        Node objmem = mmem.active_obj(alias).keep();
-        // Briefly remove the active-memory use from a NewObj, allowing this
-        // store to immediately fold against it.  This is an optional early
-        // optimization.
-        int midx = mmem.alias2idx(alias);
-        if( midx>0 && objmem.in(0) instanceof NewObjNode ) mmem.remove0(midx,_gvn);
-        Node st = gvn(new StoreNode(objmem.unhook(),scope.ptr(),ifex,mutable,tok,errMsg()));
-        int idx = mmem.make_alias2idx(alias); // Precise alias update
-        mmem.set_def(idx,st,_gvn);
+        
+        // Active (parser) memory state.
+        int alias = scope.stk()._alias;        // Alias for closure/object
+        MemMergeNode mmem = mem_active();      // Parser memory, ready for modification
+        Node objmem = mmem.active_obj(alias);  // Struct memory
+        Node ptr = get_closure_ptr(scope,tok); // Pointer, possibly loaded up the closure-display
+        // If the active state is directly a NewObj, update-in-place.  This is
+        // an early optimization.
+        if( objmem.in(0) instanceof NewObjNode ) {
+          throw com.cliffc.aa.AA.unimpl();
+        } else {
+          StoreNode st = (StoreNode)gvn(new StoreNode(objmem,ptr,ifex,mutable,tok,errMsg()));
+          mmem.st(st,_gvn);     // Update active memory
+        }
         scope.def_if(tok,mutable,false); // Note 1-side-of-if update
       }
     }
@@ -462,11 +463,11 @@ public class Parse {
           assert fun.op_prec() <= max;
           if( fun.op_prec() < max ) continue; // Not yet
           if( i==0 ) {
-            Node call = do_call(new CallNode(true,errMsg(),ctrl(),fun.unhook(),all_mem(),args.in(0)));
+            Node call = do_call(new CallNode(true,errMsg(),ctrl(),all_mem(),fun.unhook(),args.in(0)));
             args.set_def(0,call,_gvn);
             funs.setX(0,null);
           } else {
-            Node call = do_call(new CallNode(true,errMsg(),ctrl(),fun.unhook(),all_mem(),args.in(i-1),args.in(i)));
+            Node call = do_call(new CallNode(true,errMsg(),ctrl(),all_mem(),fun.unhook(),args.in(i-1),args.in(i)));
             args.set_def(i-1,call,_gvn);
             funs.remove(i);  args.remove(i);  i--;
           }
@@ -548,7 +549,7 @@ public class Parse {
           kill(arg);
           n = err_ctrl2("A function is being called, but "+tn+" is not a function");
         } else {
-          n = do_call(new CallNode(!arglist,errMsg(),ctrl(),n,all_mem(),arg)); // Pass the 1 arg
+          n = do_call(new CallNode(!arglist,errMsg(),ctrl(),all_mem(),n,arg)); // Pass the 1 arg
         }
       }
     } // Else no trailing arg, just return value
@@ -572,18 +573,18 @@ public class Parse {
     int alias = scope.stk()._alias;        // Closure alias
     MemMergeNode mmem = mem_active();      // Active memory
     Node objmem = mmem.active_obj(alias);
-    n = gvn(new LoadNode(objmem,scope.ptr(),tok,null));
+    Node ptr = get_closure_ptr(scope,tok);
+    n = gvn(new LoadNode(objmem,ptr,tok,null));
     if( n.is_forward_ref() )    // Prior is actually a forward-ref
       return err_ctrl2(forward_ref_err(((FunPtrNode)n).fun()));
     // Do a full lookup on "+", and execute the function
     Node plus = _e.lookup_filter("+",_gvn,2);
-    Node sum = do_call(new CallNode(true,errMsg(),ctrl(),plus,all_mem(),n.keep(),con(TypeInt.con(d))));
-
-    MemMergeNode mmem2 = mem_active(); // Active memory for the chosen scope, after the call to plus
+    Node sum = do_call(new CallNode(true,errMsg(),ctrl(),all_mem(),plus,n.keep(),con(TypeInt.con(d))));
+    // Active memory for the chosen scope, after the call to plus
+    MemMergeNode mmem2 = mem_active(); 
     Node objmem2 = mmem2.active_obj(alias);
-    Node st = gvn(new StoreNode(objmem2,scope.ptr(),sum,TypeStruct.frw(),tok,errMsg()));
-    int idx = mmem2.make_alias2idx(alias); // Precise alias update
-    mmem2.set_def(idx,st,_gvn);
+    StoreNode st = (StoreNode)gvn(new StoreNode(objmem2,ptr,sum,TypeStruct.frw(),tok,errMsg()));
+    mmem2.st(st,_gvn);
     return n.unhook();          // Return pre-increment value
   }
 
@@ -652,20 +653,25 @@ public class Parse {
     ScopeNode scope = lookup_scope(tok,false);
     if( scope == null ) { // Assume any unknown ref is a forward-ref of a recursive function
       Node fref = gvn(FunPtrNode.forward_ref(_gvn,tok,this));
-      // Place in nearest enclosing closure, NOT as a field in a struct.
-      _e.lookup_closure().stk().create(tok.intern(),fref,TypeStruct.ffinal(),_gvn);
+      // Place in nearest enclosing scope
+      _e._scope.stk().create(tok.intern(),fref,TypeStruct.ffinal(),_gvn);
       return fref;
     }
     Node def = scope.get(tok);    // Get top-level value; only sane if no stores allowed to modify it
-    // Disallow uniop and binop functions as factors.
+    // Disallow uniop and binop functions as factors.  Only possible if trying
+    // to use an operator as a factor, such as "plus = +" or "f(1,+,2)".
     if( def.op_prec() > 0 ) { _x = oldx; return null; }
-    // Forward refs always directly assigned into scope
+    // Forward refs always directly assigned into scope and never updated.
     if( def.is_forward_ref() ) return def;
-    // Else must load against most recent closure update.
+
+    // Else must load against most recent closure update.  Get the closure to
+    // load against.  If the scope is local, we load against it directly,
+    // otherwise the closure is passed in as a hidden argument.
     int alias = scope.stk()._alias;   // Closure alias
     MemMergeNode mmem = mem_active(); // Active memory
     Node objmem = mmem.active_obj(alias);
-    return gvn(new LoadNode(objmem,scope.ptr(),tok.intern(),null));
+    Node ptr = get_closure_ptr(scope,tok);
+    return gvn(new LoadNode(objmem,ptr,tok.intern(),null));
   }
 
   /** Parse a tuple; first stmt but not the ',' parsed.
@@ -696,50 +702,68 @@ public class Parse {
    */
   private static final byte args_are_mutable=ts_mutable(false); // Args mutable or r/only by default
   private Node func() {
-    int oldx = _x;              // Past openning '{'
+    int oldx = _x;              // Past opening '{'
     Ary<String> ids = new Ary<>(new String[1],0);
     Ary<Type  > ts  = new Ary<>(new Type  [1],0);
     Ary<Parse > bads= new Ary<>(new Parse [1],0);
 
+    // Push an extra hidden closure argument.  Similar to java inner-class ptr
+    // or when inside of a struct definition: 'this'.
+    ids .push("^");
+    ts  .push(TypeMemPtr.DISPLAY_PTR);
+    bads.push(null);
+
+    // Parse arguments
     while( true ) {
       String tok = token();
-      if( tok == null ) { ids.clear(); ts.clear(); _x=oldx; break; } // not a "[id]* ->"
-      if( tok.equals("->") ) break;
+      if( tok == null ) { _x=oldx; break; } // not a "[id]* ->"
+      if( tok.equals("->") ) break; // End of argument list
       Type t = Type.SCALAR;    // Untyped, most generic type
       Parse bad = errMsg();    // Capture location in case of type error
       if( peek(':') &&         // Has type annotation?
           (t=type())==null ) { // Get type
-        // If no type, might be "x := ..." which is a stmt, hence this is a no-arg function
-        if( ids._len <= 2 ) { ids.clear(); _x=oldx; break; }
+        // If no type, might be "{ x := ...}" or "{ fun arg := ...}" which can
+        // be valid stmts, hence this may be a no-arg function.
+        if( ids._len-1 <= 2 ) { _x=oldx; break; }
         else {
-          // Might be: "{ x y z:bad -> body }" which cannot be any stmt this is
-          // an error in any case.  Treat as a bad type on a valid function.
+          // Might be: "{ x y z:bad -> body }" which cannot be any stmt.  This
+          // is an error in any case.  Treat as a bad type on a valid function.
           err_ctrl0(peek(',') ? "Bad type arg, found a ',' did you mean to use a ';'?" : "Missing or bad type arg",null);
           t = Type.SCALAR;
           skipNonWS();         // Skip possible type sig, looking for next arg
         }
       }
-      ids .add(tok.intern());
+      ids .add(tok.intern());   // Accumulate args
       ts  .add(t  );
       bads.add(bad);
     }
+    // If this is a no-arg function, we may have parsed 1 or 2 tokens as-if
+    // args, and then reset.  Also reset to just the closure arg.
+    if( _x == oldx ) { ids.set_len(1); ts.set_len(1); bads.set_len(1);  }
+
+    // Build the FunNode header
     Node old_ctrl = ctrl();
     Node old_mem  = all_mem().keep();
     FunNode fun = init(new FunNode(ts.asAry()).add_def(Env.ALL_CTRL)).keep();
-    try( Env e = new Env(_e,true) ) {// Nest an environment for the local vars
+
+    // Increase scope depth for function body.
+    try( Env e = new Env(_e,errMsg(oldx-1),fun) ) { // Nest an environment for the local vars
       fun._my_closure_alias = e._closure_alias;
       _e = e;                   // Push nested environment
       _gvn.set_def_reg(e._scope.stk(),0,fun); // Closure creation control defaults to function entry
       set_ctrl(fun);            // New control is function head
+      // Build Parms for all incoming values
       Node rpc = gvn(new ParmNode(-1,"rpc",fun,con(TypeRPC.ALL_CALL),null)).keep();
       Node mem = gvn(new ParmNode(-2,"mem",fun,con(TypeMem.FULL    ),null));
       Parse errmsg = errMsg();  // Lazy error message
-      int cnt=0;                // Add parameters to local environment
       for( int i=0; i<ids._len; i++ ) {
-        Node parm = gvn(new ParmNode(cnt++,ids.at(i),fun,con(Type.SCALAR),errmsg));
+        // Parms for all arguments, including the hidden closure ptr
+        Node parm = gvn(new ParmNode(i,ids.at(i),fun,con(i==0?TypeMemPtr.DISPLAY_PTR:Type.SCALAR),errmsg));
+        // Type-check arguments
         Node mt = typechk(parm,ts.at(i),mem,bads.at(i));
         create(ids.at(i),mt, args_are_mutable);
       }
+
       // Function memory is a merge of incoming wide memory, and the local
       // closure implied by arguments.  Starts merging in parent scope, but
       // this is incorrect - should start from the incoming function memory.
@@ -753,8 +777,21 @@ public class Parse {
       require('}',oldx-1);      // Matched with opening {}
       // Merge normal exit into all early-exit paths
       if( e._scope.is_closure() ) rez = merge_exits(rez);
+      // Standard return; function control, memory, result, RPC.  Plus a hook
+      // to the function for faster access.
       RetNode ret = (RetNode)gvn(new RetNode(ctrl(),all_mem(),rez,rpc.unhook(),fun.unhook()));
-      Node fptr = gvn(new FunPtrNode(ret));
+      // The FunPtr builds a real closure; any up-scope references are passed in now.
+      Node fptr = new FunPtrNode(ret);
+      TypeStruct args = fun._tf._args;
+      for( int i=ts._len; i<args._ts.length; i++ ) {
+        assert args._flds[i].charAt(0)=='^';
+        int closure_alias = ((TypeMemPtr)args._ts[i]).aliases().getbit();
+        Env e2 = e._par;
+        while( e2._closure_alias != closure_alias ) e2 = e2._par;
+        Node xarg = e2._scope.ptr();
+        fptr.add_def(xarg);
+      }
+      fptr = gvn(fptr);
       _e = _e._par;             // Pop nested environment
       set_ctrl(old_ctrl);       // Back to the pre-function-def control
       set_mem (old_mem.unhook());// Back to the pre-function-def memory
@@ -804,7 +841,7 @@ public class Parse {
   private Node struct() {
     int oldx = _x-1; Node ptr;  // Opening @{
     all_mem();
-    try( Env e = new Env(_e,false) ) {// Nest an environment for the local vars
+    try( Env e = new Env(_e,errMsg(oldx-1),null) ) { // Nest an environment for the local vars
       _e = e;                   // Push nested environment
       stmts(true);              // Create local vars-as-fields
       require('}',oldx);        // Matched closing }
@@ -1098,9 +1135,10 @@ public class Parse {
 
   // Close off active memory and return it.
   private Node all_mem() { return _e._scope.all_mem(_gvn); }
-  // Expand default memory to support precise aliasing: an active MemMerge (not in GVN)
-  private MemMergeNode mem_active() { return mem_active(_e._scope); }
-  private MemMergeNode mem_active(ScopeNode scope) {
+  // Expand default memory to support precise aliasing: an active MemMerge (not
+  // in GVN)
+  private MemMergeNode mem_active() {
+    ScopeNode scope = _e._scope;
     Node mem = scope.mem();
     if( _gvn.touched(mem) ) {
       // If only used by the parser, just make it active.
@@ -1111,13 +1149,34 @@ public class Parse {
     return (MemMergeNode)mem;
   }
 
+  // Get the closure pointer.  If this is the local scope, then it directly
+  // refers to the correct closure.  If 'tok' is final in the closure then
+  // again we can load from the closure directly.  Otherwise the function call
+  // passed in the closure as a hidden argument which we return here.
+  private Node get_closure_ptr(ScopeNode scope, String tok) {
+    if( !scope.is_mutable(tok) ) // Field is immutable (common for primitive closure)
+      return scope.ptr();        // Directly reference
+
+    // Issue Loads against the Display, until we get the correct scope.  The
+    // Display is a linked list of closures, and we already checked that token
+    // exists at scope up in the display.
+    Env e = _e;
+    Node ptr = e._scope.ptr();
+    MemMergeNode mmem = mem_active();
+    while( true ) {
+      if( scope == e._scope ) return ptr;
+      ptr = gvn(new LoadNode(mmem,ptr,"0",null)); // Gen linked-list walk code, walking slot 0.
+      e = e._par;                                 // Walk linked-list in parser also
+    }
+  }
+
   // Insert a call, with projections
   private Node do_call( CallNode call0 ) {
     // CallNode has 3 following projections: ctrl, called function ptr, input
     // memory.  Input memory is refined to only reachable-from-args memory.
     CallNode call = (CallNode)gvn(call0);
     // Call Epilog takes in the call projections which it uses to both track
-    // wirable functions, and also trim the result memory to passed-in aliases.
+    // wireable functions, and also trim the result memory to passed-in aliases.
     // CallEpi internally tracks all wired functions.
     Node cepi  = gvn(new CallEpiNode(call)).keep();
     set_ctrl(    gvn(new CProjNode(cepi,0)));
@@ -1142,8 +1201,9 @@ public class Parse {
     _gvn = P._gvn;
     _e   = null;  _nf  = null;  _pp  = null;  _str = null;
   }
-  // Delayed error message, just record line/char index and share code buffer
-  private Parse errMsg() { return new Parse(this); }
+  // Delayed error message, just record line/char index and share 697code buffer
+  Parse errMsg() { return errMsg(_x); }
+  Parse errMsg(int x) { Parse P = new Parse(this); P._x=x; return P; }
 
   // Polite error message for mismatched types
   public String typerr( Type t0, Type t1, Node mem ) {

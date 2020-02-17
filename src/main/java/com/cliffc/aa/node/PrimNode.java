@@ -21,6 +21,7 @@ public abstract class PrimNode extends Node {
   PrimNode( String name, TypeStruct targs, Type ret ) {
     super(OP_PRIM);
     _name=name;
+    assert targs.at(0)==Type.NIL; // Room for no closure
     _targs=targs;
     _ret=ret;
     _badargs=null;
@@ -85,7 +86,7 @@ public abstract class PrimNode extends Node {
     boolean is_con = true;
     for( int i=1; i<_defs._len; i++ ) { // i=1, skip control
       Type tactual = gvn.type(in(i));
-      Type tformal = _targs.at(i-1);
+      Type tformal = _targs.at(i);
       Type t = tformal.dual().meet(ts[i] = tactual);
       if( t.above_center() ) is_con = false;  // Not a constant
       else if( !t.is_con() ) return _ret;     // Some input is too low
@@ -95,7 +96,7 @@ public abstract class PrimNode extends Node {
   @Override public String err(GVNGCM gvn) {
     for( int i=1; i<_defs._len; i++ ) { // i=1, skip control
       Type tactual = gvn.type(in(i));
-      Type tformal = _targs.at(i-1);
+      Type tformal = _targs.at(i);
       if( !tactual.isa(tformal) )
         return _badargs==null ? "bad arguments" : _badargs.typerr(tactual,tformal,null);
     }
@@ -122,12 +123,13 @@ public abstract class PrimNode extends Node {
     FunNode  fun = ( FunNode) gvn.xform(new  FunNode(this).add_def(Env.ALL_CTRL)); // Points to ScopeNode only
     ParmNode rpc = (ParmNode) gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
     add_def(null);              // Control for the primitive in slot 0
-    for( int i=0; i<_targs._ts.length; i++ )
-      add_def(gvn.init(new ParmNode(i,_targs._flds[i],fun, gvn.con(_targs.at(i)),null)));
+    for( int i=1; i<_targs._ts.length; i++ )
+      add_def(gvn.init(new ParmNode(i-1,_targs._flds[i],fun, gvn.con(_targs.at(i)),null)));
     // Functions return the set of *modified* memory.  PrimNodes never *modify*
     // memory (see Intrinsic*Node for some primitives that *modify* memory).
     Node xmem = gvn.con(TypeMem.EMPTY); // Set of modified memory
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,xmem,gvn.init(this),rpc,fun));
+    // No closures are added to primitives
     return new FunPtrNode(ret);
   }
 
@@ -393,7 +395,7 @@ static class RandI64 extends PrimNode {
 }
 
 static class Id extends PrimNode {
-  Id(Type arg) { super("id",TypeStruct.make(arg),arg); }
+  Id(Type arg) { super("id",TypeStruct.make(TypeStruct.ARGS_X,TypeStruct.ts(Type.NIL,arg)),arg); }
   @Override public Node ideal(GVNGCM gvn, int level) { return in(1); }
   @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)).bound(_ret); }
   @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }

@@ -71,6 +71,11 @@ public class TypeTuple extends Type<TypeTuple> {
   public static TypeTuple make( Type t0, Type t1 ) { Type[] ts = TypeAry.get(2);  ts[0]=t0; ts[1]=t1; return make0(false,ts); }
   public static TypeTuple make( Type t0, Type t1, Type t2 ) { Type[] ts = TypeAry.get(3); ts[0]=t0; ts[1]=t1; ts[2]=t2; return make0(false,ts); }
   public static TypeTuple make( Type t0, Type t1, Type t2, Type t3 ) { Type[] ts = TypeAry.get(4); ts[0]=t0; ts[1]=t1; ts[2]=t2; ts[3]=t3; return make0(false,ts); }
+  public static TypeTuple make( Type t0, Type t1, Type t2, Type t3, Type t4 ) {
+    Type[] ts = TypeAry.get(5);
+    ts[0]=t0; ts[1]=t1; ts[2]=t2; ts[3]=t3; ts[4]=t4;
+    return make0(false,ts);
+  }
   public  static final TypeTuple IF_ANY  = make(XCTRL,XCTRL);
   public  static final TypeTuple IF_ALL  = make(CTRL ,CTRL );
   public  static final TypeTuple IF_TRUE = make(XCTRL,CTRL );
@@ -78,10 +83,11 @@ public class TypeTuple extends Type<TypeTuple> {
 
   // This is the starting state of the program; CTRL is active and memory is empty.
   public  static final TypeTuple START_STATE = make(CTRL, TypeMem.EMPTY);
-  public  static final TypeTuple CALL  = make(CTRL, TypeMem.FULL, SCALAR);
-  public  static final TypeTuple XCALL = CALL.dual();
-  public  static final TypeTuple CALLE = make(CTRL, TypeMem.FULL, SCALAR, TypeMem.FULL);
-  static final TypeTuple[] TYPES = new TypeTuple[]{CALL,CALLE,START_STATE,IF_ALL, IF_TRUE, IF_FALSE};
+  public  static final TypeTuple CALL = make(CTRL, TypeMem.FULL, TypeFunPtr.GENERIC_FUNPTR, TypeMem.FULL, TypeMemPtr.DISPLAY_PTR);
+  public  static final TypeTuple  RET = make(CTRL, TypeMem.FULL, SCALAR); // Type of RetNodes
+  public  static final TypeTuple XRET = RET.dual();
+  public  static final TypeTuple CALLE = make(CTRL, TypeMem.FULL, SCALAR, TypeMem.FULL); // Type of CallEpiNodes
+  static final TypeTuple[] TYPES = new TypeTuple[]{RET,CALL,CALLE,START_STATE,IF_ALL, IF_TRUE, IF_FALSE};
 
   // The length of Tuples is a constant, and so is its own dual.  Otherwise
   // just dual each element.  Also flip the infinitely extended tail type.

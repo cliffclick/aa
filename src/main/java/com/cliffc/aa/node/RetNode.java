@@ -18,11 +18,18 @@ public final class RetNode extends Node {
   public Node val() { return in(2); }
   public Node rpc() { return in(3); }
   public FunNode fun() { return (FunNode)in(4); }
+  // If this function is not using any closures, then there is a single unique
+  // FunPtr.  Otherwise this call is ambiguous, as each execution of the
+  // FunPtrNode makes a new closure.
   public FunPtrNode funptr() {
+    FunPtrNode fpn=null;
     for( Node use : _uses )
-      if( use instanceof FunPtrNode )
-        return (FunPtrNode)use;
-    return null;
+      if( use instanceof FunPtrNode ) {
+        assert fpn==null;
+        fpn = (FunPtrNode)use;
+      }
+    assert fpn==null || fpn._defs._len==1;   // Then RetNode but no closures
+    return fpn;
   }
   public int fidx() { return _fidx; }
   // Short self name
@@ -66,13 +73,18 @@ public final class RetNode extends Node {
   }
   @Override public Type value(GVNGCM gvn) {
     if( is_copy() ) return all_type();
-    Type    ctl =          gvn.type(ctl()).bound(Type.CTRL);
-    Type    val =          gvn.type(val()).bound(Type.SCALAR);
-    TypeMem mem = (TypeMem)gvn.type(mem()).bound(TypeMem.FULL);
-    mem = mem.trim_to_alias(alias_uses(gvn));
+    Type ctl = gvn.type(ctl());
+    if( ctl != Type.CTRL ) return ctl.above_center() ? TypeTuple.XRET : TypeTuple.RET;
+    Type mem = gvn.type(mem());
+    if( mem.above(TypeMem.FULL.dual()) ) return TypeTuple.XRET;
+    if( !(mem.isa(TypeMem.FULL      )) ) return TypeTuple. RET;
+    Type val = gvn.type(val());
+    if( val.above(Type.XSCALAR) ) return TypeTuple.XRET;
+    if( !(val.isa(Type. SCALAR))) return TypeTuple. RET;
+    mem = ((TypeMem)mem).trim_to_alias(alias_uses(gvn));
     return TypeTuple.make(ctl,mem,val);
   }
-  @Override public Type all_type() { return TypeTuple.CALL; }
+  @Override public Type all_type() { return TypeTuple.RET; }
 
   // Only return memory of aliases that conservatively MAY have been modified
   // and callers MAY be able to see.  This can be, e.g. ALL of memory, but we

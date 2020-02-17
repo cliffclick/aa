@@ -24,7 +24,7 @@ public class BitsAlias extends Bits<BitsAlias> {
   @Override public Tree<BitsAlias> tree() { return TREE; }
   public static final int ALL, TUPLE, CLOSURE, ARY, STR, RECORD;
          static BitsAlias NIL, RECORD_BITS, RECORD_BITS0, TUPLE_BITS, STRBITS0;
-  public static BitsAlias FULL, NZERO, ANY, TUPLE_BITS0, CLOSURE_BITS, EMPTY, STRBITS;
+  public static BitsAlias FULL, NZERO, ANY, TUPLE_BITS0, CLOSURE_BITS, CLOSURE_BITS0, EMPTY, STRBITS;
 
   static {
     // The All-Memory alias class
@@ -45,6 +45,7 @@ public class BitsAlias extends Bits<BitsAlias> {
     // entry to hold arguments.  They typically have a stack-like lifetime, but
     // they are full closures and lifetime can be indefinite.
     CLOSURE_BITS = make0(CLOSURE = type_alias(RECORD));
+    CLOSURE_BITS0 = CLOSURE_BITS.meet_nil();
 
     // Arrays
     ARY = type_alias(ALL);

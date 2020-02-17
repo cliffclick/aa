@@ -87,22 +87,23 @@ public final class CallEpiNode extends Node {
     }
 
     // If call allows many functions, bail out.
-    if( fidxs.is_class() )
+    int fidx = fidxs.abit();
+    if( fidx == -1 || BitsFun.is_parent(fidx) )
       return null; // Multiple fidxs
 
     // Call allows 1 function not yet wired, sanity check it.
-    int fidx = tfp.fidx();
     FunNode fun = FunNode.find_fidx(fidx);
     if( fun.is_forward_ref() || fun.is_dead() ) return null;
     if( gvn.type(fun) == Type.XCTRL ) return null;
 
     // Arg counts must be compatible
-    if( fun.nargs() != call.nargs() )
+    int cnargs = call.nargs();
+    if( fun.nargs() != cnargs )
       return null;
 
     // Single choice; check no conversions needed
     TypeStruct formals = fun._tf._args;
-    for( int i=0; i<call.nargs(); i++ ) {
+    for( int i=0; i<cnargs; i++ ) {
       if( fun.parm(i)==null ) { // Argument is dead and can be dropped?
         if( gvn.type(call.arg(i)) != Type.XSCALAR )
           call.set_arg_reg(i,gvn.con(Type.XSCALAR),gvn); // Replace with some generic placeholder
@@ -208,15 +209,16 @@ public final class CallEpiNode extends Node {
   // just meet the set of known functions.
   @Override public Type value(GVNGCM gvn) {
     CallNode call = is_copy() ? ((CallNode)in(3)) : call();
-    if( gvn.type(call.ctl()) != Type.CTRL ) // Call is not called
+    Type ctl = gvn.type(call.ctl()); // Call is reached or not?
+    if( ctl != Type.CTRL && ctl != Type.ALL )
       return TypeTuple.CALLE.dual();
+    int cnargs = call.nargs();
+    
     // Get Call result.  If the Call args are in-error, then the Call is called
     // and we flow types to the post-call.... BUT the bad args are NOT passed
     // along to the function being called.
     TypeTuple tcall = (TypeTuple)gvn.type(call);
-    // Call is in-error?
-    boolean call_err_args = tcall.at(0) != Type.CTRL;
-    Type tfptr = tcall.at(1);
+    Type tfptr = tcall.at(2);
     if( !(tfptr instanceof TypeFunPtr) ) // Call does not know what it is calling?
       return TypeTuple.CALLE;
     TypeFunPtr funt = (TypeFunPtr)tfptr;
@@ -239,7 +241,7 @@ public final class CallEpiNode extends Node {
     BitSet bs = tree.plus_kids(fidxs);
     // Lifting or dropping Unresolved calls
     boolean lifting = fidxs.above_center();
-    Type t = lifting ? TypeTuple.CALL : TypeTuple.XCALL;
+    Type t = lifting ? TypeTuple.RET : TypeTuple.XRET;
     for( int fidx = bs.nextSetBit(0); fidx >= 0; fidx = bs.nextSetBit(fidx+1) ) {
       if( tree.is_parent(fidx) ) continue;   // Will be covered by children
       FunNode fun = FunNode.find_fidx(fidx); // Lookup, even if not wired
@@ -247,7 +249,7 @@ public final class CallEpiNode extends Node {
         continue;              // Can be dead, if the news has not traveled yet
       RetNode ret = fun.ret();
       if( ret == null ) continue; // Can be dead, if the news has not traveled yet
-      if( fun.nargs() != call.nargs() ) { // This call-path has wrong args, is in-error for this function
+      if( fun.nargs() != cnargs ) { // This call-path has wrong args, is in-error for this function
         // If lifting, we choose not to call this variant.
         if( lifting ) continue;
         // Cannot just ignore/continue because the remaining functions might

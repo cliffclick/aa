@@ -5,26 +5,27 @@ import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
 
-// See CallNode comments.  The FunPtrNode converts a RetNode into a constant
-// TypeFunPtr with the constant fidx.  Used to allow 1st class functions to be
-// passed about.
+// See CallNode and FunNode comments. The FunPtrNode converts a RetNode into a
+// TypeFunPtr with a constant fidx and variable closures.  Used to allow 1st
+// class functions to be passed about.
 public final class FunPtrNode extends ConNode<TypeFunPtr> {
   private final String _referr;
-  public  FunPtrNode( RetNode ret ) { this(ret,null); }
-  private FunPtrNode( RetNode ret, String referr ) {
-    super(OP_FUNPTR,ret,ret.fun()._tf);
+  public  FunPtrNode( RetNode ret, Node closure ) { this(ret,closure,null); }
+  private FunPtrNode( RetNode ret, Node closure, String referr ) {
+    super(OP_FUNPTR,ret.fun()._tf,ret,closure);
     _referr = referr;
+    assert closure instanceof ProjNode && closure.in(0) instanceof NewObjNode;
   }
-  @Override public int hashCode() { return super.hashCode() ^ in(0)._uid; }// In theory also slot 0, but slot 0 is always Start
+  @Override public int hashCode() { return super.hashCode() ^ in(0)._uid ^ in(1)._uid; }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !(o instanceof FunPtrNode) ) return false;
     FunPtrNode fptr = (FunPtrNode)o;
-    return in(0)==fptr.in(0) && super.equals(fptr);
+    return in(0)==fptr.in(0) && in(1)==fptr.in(1) && super.equals(fptr);
   }
   public RetNode ret() { return (RetNode)in(0); }
   public FunNode fun() { return ret().fun(); }
-  // Self   short  name
+  // Self short name
   @Override String xstr() {
     if( is_dead() ) return "*fun";
     int fidx = ret()._fidx;    // Reliably returns a fidx
@@ -32,7 +33,7 @@ public final class FunPtrNode extends ConNode<TypeFunPtr> {
     return "*"+(fun==null ? ""+fidx : fun.name());
   }
   // Inline longer name
-  @Override String  str() {
+  @Override String str() {
     if( is_dead() ) return "DEAD";
     RetNode ret = ret();
     if( ret.is_copy() ) return "*!copy!{->}";
@@ -49,7 +50,7 @@ public final class FunPtrNode extends ConNode<TypeFunPtr> {
       return FunNode.find_fidx(ret._fidx)._tf;
     return ret.fun()._tf;
   }
-  @Override public Type all_type() { return TypeFunPtr.GENERIC_FUNPTR; }
+  @Override public Type all_type() { return _t; }
   @Override public String toString() { return super.toString(); }
   // Return the op_prec of the returned value.  Not sensible except when called
   // on primitives.
@@ -68,7 +69,7 @@ public final class FunPtrNode extends ConNode<TypeFunPtr> {
   public static FunPtrNode forward_ref( GVNGCM gvn, String name, Parse unkref ) {
     FunNode fun = gvn.init(new FunNode(name));
     RetNode ret = gvn.init(new RetNode(fun,gvn.con(TypeMem.MEM),gvn.con(Type.SCALAR),gvn.con(TypeRPC.ALL_CALL),fun));
-    return new FunPtrNode(ret,unkref.forward_ref_err(fun));
+    return new FunPtrNode(unkref.forward_ref_err(fun),ret);
   }
 
   // True if this is a forward_ref
@@ -89,6 +90,7 @@ public final class FunPtrNode extends ConNode<TypeFunPtr> {
     TypeFunPtr tfp = TypeFunPtr.make(rfun._tf.fidxs(),dfun._tf._args,dfun._tf._ret);
     gvn.setype(def,tfp);
     gvn.unreg(dfun);  dfun._tf = tfp;  gvn.rereg(dfun,Type.CTRL);
+    gvn.unreg(def );  def ._t  = tfp;  gvn.rereg(def ,tfp);
     int fidx = def.ret()._fidx = rfun._tf.fidx();
     FunNode.FUNS.setX(fidx,dfun);     // Track FunNode by fidx
 

@@ -5,14 +5,18 @@ import com.cliffc.aa.type.*;
 
 public class Env implements AutoCloseable {
   final Env _par;
-  ScopeNode _scope;  // Lexical anchor; goes when this environment leaves scope
-  int _closure_alias;           // Local closure alias
-  Env( Env par, boolean closure ) {
+  Parse _P;          // Used to get debug info
+  FunNode _fun;      // Start of closure scope, or null for structs
+  ScopeNode _scope;  // Lexical anchor; "end of closure"; goes when this environment leaves scope
+  int _closure_alias;// Local closure alias
+  Env( Env par, Parse P, FunNode fun ) {
+    _P = P;
     _par = par;
-    ScopeNode scope = _scope = new ScopeNode(closure);
+    _fun = fun;
+    ScopeNode scope = _scope = new ScopeNode(P==null ? null : P.errMsg(),fun!=null);
     if( par == null ) return;
     scope.set_ctrl(par._scope.ctrl(),GVN);
-    NewObjNode nnn = GVN.init(new NewObjNode(closure,scope.ctrl())).keep();
+    NewObjNode nnn = GVN.init(new NewObjNode(fun!=null,scope.ctrl())).keep();
     Node frm = GVN.xform(new OProjNode(nnn,0));
     Node ptr = GVN.xform(new  ProjNode(nnn,1));
     scope.set_ptr (ptr,GVN);  // Address for 'nnn', the local stack frame
@@ -54,7 +58,7 @@ public class Env implements AutoCloseable {
     // Used to reset between tests
     LAST_START_UID = ALL_CTRL._uid;
     // Top-most (file-scope) lexical environment
-    TOP    = new Env(null,true);
+    TOP    = new Env(null,null,null);
     TOP.install_primitives();
     // Used to reset between tests
     NINIT_CONS = START._uses._len;
@@ -85,7 +89,7 @@ public class Env implements AutoCloseable {
   }
 
   // A new top-level Env, above this is the basic public Env with all the primitives
-  public static Env top() { return new Env(TOP,true); }
+  public static Env top() { return new Env(TOP,null,null); }
 
   // Wire up an early function exit
   Node early_exit( Parse P, Node val ) {
@@ -107,6 +111,7 @@ public class Env implements AutoCloseable {
 
   // Close the current Env and lexical scope.
   @Override public void close() {
+    if( _P != null ) { _scope._debug_close = _P.errMsg(); _P = null; }
     ScopeNode pscope = _par._scope;
     // Promote forward refs to the next outer scope
     if( pscope != null && pscope != TOP._scope)
@@ -153,7 +158,7 @@ public class Env implements AutoCloseable {
   }
   // Return nearest enclosing closure, for forward-ref placement.
   // Struct-scopes do not count.
-  ScopeNode lookup_closure( ) { return _scope.is_closure() ? _scope : _par.lookup_closure(); }
+  ScopeNode lookup_closure( ) { return _scope.is_closure() || _par == null ? _scope : _par.lookup_closure(); }
   // Test support, return top-level name type
   static Type lookup_valtype( String name ) {
     Node n = TOP.lookup(name);

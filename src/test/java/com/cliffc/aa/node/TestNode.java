@@ -210,6 +210,29 @@ public class TestNode {
                         Type.CTRL,Type.NUM,Type.ANY,Type.ANY);
 
     // All the Nodes, all Values, all Types
+    test1monotonic(new   CallNode(false,null,_ins[0],  unr  ,mem,_ins[2],_ins[3]));
+    test1monotonic(new   CallNode(false,null,_ins[0],_ins[1],mem,_ins[2],_ins[3]));
+    test1monotonic(new CallEpiNode(call,ret,_ins[1])); // CallNode, then some count of RetNode
+    test1monotonic(new    ConNode<Type>(          TypeInt.FALSE));
+    test1monotonic(new    ConNode<Type>(          TypeStr.ABC  ));
+    test1monotonic(new    ConNode<Type>(          TypeFlt.FLT64));
+    // Cannot cast-to-NIL - can only move away from NIL
+    //test1monotonic(new   CastNode(_ins[0],_ins[1],TypeInt.FALSE));
+    test1monotonic(new   CastNode(_ins[0],_ins[1],Type.NSCALR));
+    test1monotonic(new   CastNode(_ins[0],_ins[1],TypeFlt.FLT64));
+    test1monotonic(new   CastNode(_ins[0],_ins[1],TypeMemPtr.STRPTR));
+    test1monotonic(new   CastNode(_ins[0],_ins[1],TypeMemPtr.STR0));
+    test1monotonic(new  CProjNode(_ins[0],0));
+    test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  null, TypeInt.FALSE));
+    test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  null, TypeStr.ABC  ));
+    test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  null, TypeFlt.FLT64));
+    test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  null, Type   .CTRL ));
+    test1monotonic(new    FunNode(new Type[]{TypeMemPtr.DISPLAY_PTR,TypeInt.INT64}));
+    test1monotonic(new FunPtrNode(ret));
+    test1monotonic(new     IfNode(_ins[0],_ins[1]));
+    for( IntrinsicNewNode prim : IntrinsicNewNode.INTRINSICS )
+      test1monotonic_intrinsic(prim);
+    test1monotonic(new IntrinsicNode(tname,null,null,mem,_ins[2]));
     test1monotonic(new   LoadNode(_ins[1],_ins[2],"x",null));
     test1monotonic(new MemMergeNode(_ins[1],_ins[2],BitsAlias.RECORD));
     NewObjNode nnn1 = new NewObjNode(false,_ins[0]);
@@ -217,8 +240,9 @@ public class TestNode {
     set_type(2,Type.SCALAR);  nnn1.create_active("y",_ins[2],TypeStruct.ffinal(),_gvn);
     test1monotonic(nnn1);
     NewObjNode nnn2 = new NewObjNode(false,_ins[0]);
-    set_type(1,Type.SCALAR);  nnn2.create_active("x",_ins[1],TypeStruct.ffinal(),_gvn);
-    set_type(2,Type.SCALAR);  nnn2.create_active("y",_ins[2],TypeStruct.ffinal(),_gvn);
+    set_type(1,Type.NIL   );  nnn2.create_active("^",_ins[1],TypeStruct.ffinal(),_gvn);
+    set_type(2,Type.SCALAR);  nnn2.create_active("x",_ins[2],TypeStruct.ffinal(),_gvn);
+    set_type(3,Type.SCALAR);  nnn2.create_active("y",_ins[3],TypeStruct.ffinal(),_gvn);
     nnn2.set_name(tname);
     test1monotonic(nnn2);
     test1monotonic(new MemMergeNode(_ins[1],_ins[2],BitsAlias.RECORD));
@@ -237,31 +261,7 @@ public class TestNode {
     test1monotonic(new   TypeNode(TypeInt.FALSE    ,_ins[1],null));
     test1monotonic(new   TypeNode(TypeMemPtr.STRPTR,_ins[1],null));
     test1monotonic(new   TypeNode(TypeFlt.FLT64    ,_ins[1],null));
-
-    test1monotonic(new   CallNode(false,null,_ins[0],  unr  ,mem,_ins[2],_ins[3]));
-    test1monotonic(new   CallNode(false,null,_ins[0],_ins[1],mem,_ins[2],_ins[3]));
-    test1monotonic(new CallEpiNode(call,ret,_ins[1])); // CallNode, then some count of RetNode
-    test1monotonic(new    ConNode<Type>(          TypeInt.FALSE));
-    test1monotonic(new    ConNode<Type>(          TypeStr.ABC  ));
-    test1monotonic(new    ConNode<Type>(          TypeFlt.FLT64));
-    // Cannot cast-to-NIL - can only move away from NIL
-    //test1monotonic(new   CastNode(_ins[0],_ins[1],TypeInt.FALSE));
-    test1monotonic(new   CastNode(_ins[0],_ins[1],Type.NSCALR));
-    test1monotonic(new   CastNode(_ins[0],_ins[1],TypeFlt.FLT64));
-    test1monotonic(new   CastNode(_ins[0],_ins[1],TypeMemPtr.STRPTR));
-    test1monotonic(new   CastNode(_ins[0],_ins[1],TypeMemPtr.STR0));
-    test1monotonic(new  CProjNode(_ins[0],0));
-    test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  null, TypeInt.FALSE));
-    test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  null, TypeStr.ABC  ));
-    test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  null, TypeFlt.FLT64));
-    test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  null, Type   .CTRL ));
-    test1monotonic(new    FunNode(new Type[]{TypeInt.INT64}));
-    test1monotonic(new FunPtrNode(ret));
-    test1monotonic(new     IfNode(_ins[0],_ins[1]));
-    for( IntrinsicNewNode prim : IntrinsicNewNode.INTRINSICS )
-      test1monotonic_intrinsic(prim);
-    test1monotonic(new IntrinsicNode(tname,null,null,mem,_ins[2]));
-
+    
     assertEquals(0,_errs);
   }
 
@@ -288,7 +288,7 @@ public class TestNode {
     assert n._defs._len==0;
     n.add_def( null  );
     n.add_def(_ins[1]);
-    if( n._targs._ts.length >= 2 ) n.add_def(_ins[2]);
+    if( n._targs._ts.length >= 3 ) n.add_def(_ins[2]);
     test1monotonic_init(n);
   }
 

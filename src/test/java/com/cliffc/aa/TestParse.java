@@ -108,7 +108,7 @@ public class TestParse {
     test("x=2; y=x+1; x*y", TypeInt.con(6));
     // Re-use ref immediately after def; parses as: x=(2*3); 1+x+x*x
     test("1+(x=2*3)+x*x", TypeInt.con(1+6+6*6));
-    testerr("x=(1+(x=2)+x); x", "Cannot re-assign final val 'x'",13);
+    testerr("x=(1+(x=2)+x); x", "Cannot re-assign final field '.x'",13);
     test("x:=1;x++"  ,TypeInt.con(1));
     test("x:=1;x++;x",TypeInt.con(2));
     test("x:=1;x++ + x--",TypeInt.con(3));
@@ -125,7 +125,7 @@ public class TestParse {
     testerr("0 ? x=2 : 3;x", "'x' not defined on false arm of trinary",11);
     test   ("2 ? x=2 : 3;x", TypeInt.con(2)); // off-side is constant-dead, so missing x-assign is ignored
     test   ("2 ? x=2 : y  ", TypeInt.con(2)); // off-side is constant-dead, so missing 'y'      is ignored
-    testerr("x=1;2?(x=2):(x=3);x", "Cannot re-assign final val 'x'",10);
+    testerr("x=1;2?(x=2):(x=3);x", "Cannot re-assign final field '.x'",10);
     test   ("x=1;2?   2 :(x=3);x",TypeInt.con(1)); // Re-assigned allowed & ignored in dead branch
     test   ("math_rand(1)?1:int:2:int",TypeInt.NINT8); // no ambiguity between conditionals and type annotations
     testerr("math_rand(1)?1: :2:int","missing expr after ':'",16); // missing type

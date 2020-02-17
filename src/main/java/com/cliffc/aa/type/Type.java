@@ -546,6 +546,9 @@ public class Type<T extends Type<T>> implements Cloneable {
   // True if 'this' isa/subtypes 't'.  E.g. Int32-isa-Int64, but not vice-versa
   // E.g. ANY-isa-XSCALAR; XSCALAR-isa-XREAL; XREAL-isa-Int(Any); Int(Any)-isa-Int(3)
   public boolean isa( Type t ) { return meet(t)==t; }
+  // True if 'this' isa 't' but is not equal to 't'
+  public boolean above( Type t ) { return t != this && meet(t)==t; }
+
 
   // Trim 'this' to being within lower bound 't' and upper bound 't.dual'
   public Type bound( Type t ) {
@@ -559,6 +562,7 @@ public class Type<T extends Type<T>> implements Cloneable {
     TypeInt.init1(types);
     TypeFlt.init1(types);
     TypeStr.init1(types);
+    TypeStruct.init1();
   }
 
   private static Type[] ALL_TYPES; // Used for tests
@@ -843,7 +847,7 @@ public class Type<T extends Type<T>> implements Cloneable {
 
   // Accumulate escaping/reachable aliases
   public BitsAlias recursive_aliases(BitsAlias abs, TypeMem mem) {
-    return _type==TSCALAR || _type==TALL // Scalar is all pointers
+    return _type==TSCALAR || _type==TNSCALR || _type==TALL // Scalar is all pointers
       ? BitsAlias.NZERO         // All aliases possible
       : abs;                    // Could be e.g. int,flt,number
   }

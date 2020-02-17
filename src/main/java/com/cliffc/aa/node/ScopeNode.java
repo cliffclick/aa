@@ -17,10 +17,13 @@ public class ScopeNode extends Node {
   // Mapping from type-variables to Types.  Types have a scope lifetime like values.
   private final HashMap<String,Type> _types; // user-typing type names
   private Ary<IfScope> _ifs;                 // Nested set of IF-exprs used to track balanced new-refs
+  public final Parse _debug_open;
+  public Parse _debug_close;
 
-  public ScopeNode(boolean closure) {
+  public ScopeNode(Parse open, boolean closure) {
     super(OP_SCOPE,null,null,null,null);
     if( closure ) { add_def(null); add_def(null); add_def(null); } // Wire up an early-function-exit path
+    _debug_open = open;
     _types = new HashMap<>();
     _ifs = null;
     keep();
