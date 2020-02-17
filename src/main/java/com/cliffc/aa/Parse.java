@@ -358,7 +358,7 @@ public class Parse {
           ((FunPtrNode)n).merge_ref_def(_gvn,tok,(FunPtrNode)ifex);
         else ; // Can be here if already in-error
       } else { // Store into scope/NewObjNode/closure
-        
+
         // Active (parser) memory state.
         int alias = scope.stk()._alias;        // Alias for closure/object
         MemMergeNode mmem = mem_active();      // Parser memory, ready for modification
@@ -366,8 +366,10 @@ public class Parse {
         Node ptr = get_closure_ptr(scope,tok); // Pointer, possibly loaded up the closure-display
         // If the active state is directly a NewObj, update-in-place.  This is
         // an early optimization.
-        if( objmem.in(0) instanceof NewObjNode ) {
-          throw com.cliffc.aa.AA.unimpl();
+        if( objmem.in(0) instanceof NewObjNode &&
+            !ifex.is_forward_ref() &&
+            ((NewObjNode)objmem.in(0)).is_mutable(tok) ) {
+          ((NewObjNode)objmem.in(0)).update(tok,ifex,mutable,_gvn);
         } else {
           StoreNode st = (StoreNode)gvn(new StoreNode(objmem,ptr,ifex,mutable,tok,errMsg()));
           mmem.st(st,_gvn);     // Update active memory
@@ -581,7 +583,7 @@ public class Parse {
     Node plus = _e.lookup_filter("+",_gvn,2);
     Node sum = do_call(new CallNode(true,errMsg(),ctrl(),all_mem(),plus,n.keep(),con(TypeInt.con(d))));
     // Active memory for the chosen scope, after the call to plus
-    MemMergeNode mmem2 = mem_active(); 
+    MemMergeNode mmem2 = mem_active();
     Node objmem2 = mmem2.active_obj(alias);
     StoreNode st = (StoreNode)gvn(new StoreNode(objmem2,ptr,sum,TypeStruct.frw(),tok,errMsg()));
     mmem2.st(st,_gvn);

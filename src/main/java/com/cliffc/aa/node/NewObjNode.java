@@ -29,7 +29,6 @@ public class NewObjNode extends NewNode<TypeStruct> {
   public Node get(String name) { int idx = _ts.find(name);  assert idx >= 0; return fld(idx); }
   public boolean exists(String name) { return _ts.find(name)!=-1; }
   public boolean is_mutable(String name) { return _ts._finals[_ts.find(name)] == TypeStruct.frw(); }
-  public boolean is_final(int idx) { return _ts._finals[idx] == TypeStruct.ffinal(); }
 
   // Create a field from parser for an inactive this
   public void create( String name, Node val, byte mutable, GVNGCM gvn  ) {
@@ -57,7 +56,15 @@ public class NewObjNode extends NewNode<TypeStruct> {
     gvn.rereg(this,value(gvn));
   }
   // Update/modify a field, by field number for an active this
-  private void update_active( int fidx , Node val, byte mutable, GVNGCM gvn  ) {
+  public void update( String tok, Node val, byte mutable, GVNGCM gvn  ) {
+    gvn.unreg(this);
+    update_active(_ts.find(tok),val,mutable,gvn);
+    for( Node use : _uses )
+      gvn.setype(use,use.value(gvn));
+    assert gvn.touched(this);
+  }
+  // Update/modify a field, by field number for an active this
+  private void update_active( int fidx, Node val, byte mutable, GVNGCM gvn  ) {
     assert def_idx(_ts._ts.length)== _defs._len;
     assert fidx != -1;
     _ts = _ts.set_fld(fidx,gvn.type(val),mutable);
