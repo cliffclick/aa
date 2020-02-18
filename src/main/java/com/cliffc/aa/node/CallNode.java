@@ -195,7 +195,7 @@ public class CallNode extends Node {
   //     available memory.
   // 4 - Closure
   // 5+  Normal argument types
-  
+
   @Override public TypeTuple value(GVNGCM gvn) {
     final Type[] ts = TypeAry.get(_defs._len+2);
     final boolean dead = !_is_copy && gvn._opt_mode>0 && cepi()==null; // Dead from below
@@ -211,7 +211,7 @@ public class CallNode extends Node {
     if( !(mem instanceof TypeMem) )
       mem = mem.above_center() ? TypeMem.EMPTY : TypeMem.FULL;
     TypeMem tmem = (TypeMem)(ts[1] = ts[3] = mem);
-    
+
     // Not a function to call?
     Type tfx = gvn.type(fun());
     if( !(tfx instanceof TypeFunPtr) )
@@ -402,7 +402,7 @@ public class CallNode extends Node {
           // TODO: Solve the forward-flow used_aliases problem incrementally.
           // Here we just bail out.
           return BitsAlias.NZERO; // Use all aliases after the call
-    TypeMem all_called_function_uses = (TypeMem)((TypeTuple)gvn.type(this)).at(2);
+    TypeMem all_called_function_uses = (TypeMem)((TypeTuple)gvn.type(this)).at(3);
     return all_called_function_uses.aliases();
   }
 

@@ -242,7 +242,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public  static String[] FLDS( int len ) { return FLDS[len]; }
   private static String[] flds(String... fs) { return fs; }
   public  static final String[] ARGS_X  = flds("^","x");
-          static final String[] ARGS_XY = flds("^","x","y");
+  public  static final String[] ARGS_XY = flds("^","x","y");
   public  static Type[] ts() { return TypeAry.get(0); }
   public  static Type[] ts(Type t0) { Type[] ts = TypeAry.get(1); ts[0]=t0; return ts;}
   public  static Type[] ts(Type t0, Type t1) { Type[] ts = TypeAry.get(2); ts[0]=t0; ts[1]=t1; return ts;}

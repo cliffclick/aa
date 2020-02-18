@@ -288,7 +288,7 @@ public class FunNode extends RegionNode {
     if( idx != -1 ) {           // Found; split along a specific input path using widened types
       Type[] sig = new Type[parms.length];
       for( int i=0; i<parms.length; i++ )
-        sig[i] = parms[i]==null ? Type.SCALAR : gvn.type(parms[i].in(idx)).widen();
+        sig[i] = parms[i]==null ? (i==0 ? Type.NIL : Type.SCALAR) : gvn.type(parms[i].in(idx)).widen();
       return sig;
     }
 
@@ -333,7 +333,7 @@ public class FunNode extends RegionNode {
     Type[] sig = find_type_split(gvn,parms);
     if( sig == null ) return null; // No unresolved calls; no point in type-specialization
     // Make a new function header with new signature
-    TypeStruct args = TypeStruct.make(sig);
+    TypeStruct args = TypeStruct.make_args(sig);
     assert args.isa(_tf._args);
     return args == _tf._args ? null : args; // Must see improvement
   }
@@ -454,7 +454,9 @@ public class FunNode extends RegionNode {
     FUNS.setX(newfidx,this);    // Track FunNode by fidx
     ret._fidx = newfidx;        // Renumber in the old RetNode
     FunPtrNode old_fptr = ret.funptr();
-    gvn.setype(old_fptr,_tf);   // Renumber in old FunPtrNode
+    gvn.unreg(old_fptr);
+    old_fptr._t = _tf;
+    gvn.rereg(old_fptr,_tf);   // Renumber in old FunPtrNode
     gvn.add_work(ret);
     gvn.add_work(old_fptr);
     return fun;
@@ -517,6 +519,7 @@ public class FunNode extends RegionNode {
     FunPtrNode new_funptr = (FunPtrNode)old_funptr.copy(false,cepi,gvn);
     new_funptr.add_def(newret);
     new_funptr.add_def(old_funptr.in(1)); // Share same closure
+    new_funptr._t = fun._tf;
     old_funptr.keep(); // Keep around; do not kill last use before the clone is done
 
     // Fill in edges.  New Nodes point to New instead of Old; everybody
@@ -549,7 +552,7 @@ public class FunNode extends RegionNode {
     // Make an Unresolved choice of the old and new functions, to be used by
     // non-application uses.  E.g., passing a unresolved function pointer to a
     // 'map()' call.
-    gvn.setype(new_funptr,new_funptr.value(gvn));
+    gvn.rereg(new_funptr,new_funptr.value(gvn));
     UnresolvedNode new_unr = null;
     if( path < 0 ) {
       new_unr = (UnresolvedNode)gvn.xform(new UnresolvedNode(null,old_funptr,new_funptr));
@@ -559,7 +562,7 @@ public class FunNode extends RegionNode {
         // Find the use idx; skip CallNode.fun() uses as these will be wired
         // correctly shortly.
         for( int idx=0; idx < use._defs._len; idx++ )
-          if( use.in(idx) == old_funptr && !(use instanceof CallNode && idx==1) )
+          if( use.in(idx) == old_funptr && !(use instanceof CallNode && idx==2) )
             { gvn.set_def_reg(use,idx,new_unr); i--; break; }
       }
       gvn.add_work(new_unr);
