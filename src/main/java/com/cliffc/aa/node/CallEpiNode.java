@@ -183,7 +183,7 @@ public final class CallEpiNode extends Node {
       if( arg.in(0) == fun && arg instanceof ParmNode ) {
         int idx = ((ParmNode)arg)._idx; // Argument number, or -1 for rpc
         Node actual = idx==-1 ? new ConNode<>(TypeRPC.make(call._rpc)) :
-          (idx==-2 ? new MProjNode(call,3) : new ProjNode(call,idx+4));
+          (idx==-2 ? new MProjNode(call,1) : new ProjNode(call,idx+2));
         if( gvn._opt_mode == 2 ) {
           gvn.setype(actual,actual.all_type().startype());
           gvn.add_work(actual);

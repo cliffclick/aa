@@ -292,7 +292,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public  static final TypeStruct GENERIC = malloc("",true,true,FLD0,TypeAry.get(0),new byte[0]).hashcons_free();
   public  static final TypeStruct ALLSTRUCT = make(ts());
   public  static final TypeStruct ALLSTRUCT_CLN = malloc("",false,true,FLDS[0],TypeAry.get(0),fbots(0)).hashcons_free();
-  //private static final TypeStruct SCALAR0 = make_args();
+  public  static final TypeStruct SCALAR0     = make_args(ts(Type.NIL));
   public  static final TypeStruct SCALAR1     = make(ARGS_X ,ts(Type.NIL,SCALAR));
   public  static final TypeStruct SCALAR2     = make(ARGS_XY,ts(Type.NIL,SCALAR,SCALAR));
   public  static final TypeStruct STRPTR      = make(ARGS_X ,ts(Type.NIL,TypeMemPtr.STRPTR));
@@ -315,8 +315,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // Called during init to break the cycle making DISPLAY
   static void init1() {
     if( DISPLAY._ts[0] == Type.NIL ) {
-      DISPLAY._ts = ts(TypeMemPtr.DISPLAY_PTR);
-      DISPLAY.install_cyclic(new Ary<>(ts(DISPLAY, TypeMemPtr.DISPLAY_PTR)));
+      DISPLAY._ts = ts(TypeFunPtr.GENERIC_FUNPTR);
+      DISPLAY.install_cyclic(new Ary<>(ts(DISPLAY,TypeFunPtr.GENERIC_FUNPTR)));
     }
   }
 
@@ -983,7 +983,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     }
     stack.push(t);              // Push on stack, in case a cycle is found
     switch( t._type ) {
-    case TMEMPTR: get_cyclic(bcs,bs,stack,((TypeMemPtr)t)._obj); break;
+    case TMEMPTR: get_cyclic(bcs,bs,stack,((TypeMemPtr)t)._obj ); break;
+    case TFUNPTR: get_cyclic(bcs,bs,stack,((TypeFunPtr)t)._args); break;
     case TSTRUCT: for( Type tf : ((TypeStruct)t)._ts ) get_cyclic(bcs,bs,stack,tf); break;
     }
     stack.pop();                // Pop, not part of anothers cycle
@@ -1020,15 +1021,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     if( fldBot(s) ) return "*";
     return s;
   }
-
-  // Returns the lexical depth of the named field by counting leading "^"
-  // characters.  Typically 0 as most fields are purely local.
-  private static int lexical_depth( String s ) {
-    for( int i=0; i<s.length(); i++ )
-      if( s.charAt(i)!='^' ) return i;
-    throw com.cliffc.aa.AA.unimpl(); // Field name error
-  }
-  int lexical_depth( int fldnum ) { return lexical_depth(_flds[fldnum]); }
 
   // Field modifiers make a tiny non-obvious lattice:
   //           0unknown

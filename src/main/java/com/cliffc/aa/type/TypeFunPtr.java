@@ -4,6 +4,7 @@ import com.cliffc.aa.node.FunNode;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
 import java.util.BitSet;
+import java.util.function.Predicate;
 
 // Function indices or function pointers; a single instance can include all
 // possible aliased function pointers.  Function pointers can be executed, are
@@ -42,8 +43,13 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     TypeFunPtr tf = (TypeFunPtr)o;
     return _fidxs==tf._fidxs && _args==tf._args && _ret==tf._ret;
   }
-  // Never part of a cycle, so the normal check works
-  @Override public boolean cycle_equals( Type o ) { return equals(o); }
+  @Override public boolean cycle_equals( Type o ) {
+    if( this==o ) return true;
+    if( !(o instanceof TypeFunPtr) ) return false;
+    TypeFunPtr tfp = (TypeFunPtr)o;
+    if( _fidxs != tfp._fidxs  || _ret != tfp._ret ) return false;
+    return _args == tfp._args || _args.cycle_equals(tfp._args);
+  }
   @Override public String str( VBitSet dups) {
     return "*"+names()+":{"+_args.str(dups)+"-> "+_ret.str(dups)+"}";}
   public String names() { return FunNode.names(_fidxs,new SB()).toString(); }
@@ -52,7 +58,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   private static TypeFunPtr FREE=null;
   @Override protected TypeFunPtr free( TypeFunPtr ret ) { FREE=this; return ret; }
   public static TypeFunPtr make( BitsFun fidxs, TypeStruct args, Type ret ) {
-    assert args.at(0) instanceof TypeMemPtr || args.at(0) == Type.NIL;
+    assert args.at(0) instanceof TypeFunPtr || args.at(0) == Type.NIL || args.at(0)==Type.ANY;
     TypeFunPtr t1 = FREE;
     if( t1 == null ) t1 = new TypeFunPtr(fidxs,args,ret);
     else {   FREE = null;        t1.init(fidxs,args,ret); }
@@ -65,12 +71,21 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public TypeFunPtr make_new_fidx( int parent, TypeStruct args ) { return make(BitsFun.make_new_fidx(parent),args,_ret); }
   public static TypeFunPtr make_anon() { return make_new(TypeStruct.DISPLAY,Type.SCALAR); } // Make a new anonymous function ptr
 
-  public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.NZERO,TypeStruct.DISPLAY,Type.SCALAR);
+  public  static final TypeFunPtr GENERIC_FUNPTR = new TypeFunPtr(BitsFun.FULL,TypeStruct.DISPLAY,Type.SCALAR);
+  static { GENERIC_FUNPTR._hash = GENERIC_FUNPTR.compute_hash(); } // Filled in during DISPLAY.install_cyclic
   private static final TypeFunPtr TEST_INEG = make(BitsFun.make0(2),TypeStruct.INT64,TypeInt.INT64);
-  public  static final TypeFunPtr EMPTY = make(BitsFun.EMPTY,TypeStruct.DISPLAY,Type.XSCALAR);
+  public  static final TypeFunPtr EMPTY = make(BitsFun.EMPTY,TypeStruct.SCALAR0,Type.XSCALAR);
   static final TypeFunPtr[] TYPES = new TypeFunPtr[]{GENERIC_FUNPTR,TEST_INEG};
 
   @Override protected TypeFunPtr xdual() { return new TypeFunPtr(_fidxs.dual(),_args.dual(),_ret.dual()); }
+  @Override TypeFunPtr rdual() {
+    if( _dual != null ) return _dual;
+    TypeFunPtr dual = _dual = new TypeFunPtr(_fidxs.dual(),_args.rdual(),_ret.dual());
+    dual._dual = this;
+    dual._hash = dual.compute_hash();
+    dual._cyclic = true;
+    return dual;
+  }
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TFUNPTR:break;
@@ -118,8 +133,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     if( _fidxs.abit() == -1 || is_class() ) return false;
     // All closure bits have to be constants also
     for( int i=0; i<_args._ts.length; i++ )
-      if( _args.lexical_depth(i) > 0 &&
-          !_args._ts[i].is_con() )
+      if( !_args._ts[i].is_con() )
         return false;
     return true;
   }
@@ -134,6 +148,18 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
       return _fidxs.above_center() ? NIL : this;
     return make(_fidxs.meet(BitsFun.NIL),_args,_ret);
   }
+  // Lattice of conversions:
+  // -1 unknown; top; might fail, might be free (Scalar->Int); Scalar might lift
+  //    to e.g. Float and require a user-provided rounding conversion from F64->Int.
+  //  0 requires no/free conversion (Int8->Int64, F32->F64)
+  // +1 requires a bit-changing conversion (Int->Flt)
+  // 99 Bottom; No free converts; e.g. Flt->Int requires explicit rounding
+  @Override public byte isBitShape(Type t) {
+    if( t._type == TNIL ) return 0;                   // Dead arg is free
+    return (byte)(t instanceof TypeFunPtr ? 0 : -99); // Mixing TFP and a non-ptr
+  }
+  @SuppressWarnings("unchecked")
+  @Override void walk( Predicate<Type> p ) { if( p.test(this) ) { _args.walk(p); _ret.walk(p); } }
   // Keep the high parts
   @Override public Type startype() {
     BitsFun fidxs  = _fidxs.above_center() ? _fidxs : _fidxs.dual();

@@ -97,7 +97,7 @@ public class CallNode extends Node {
     if( !(t instanceof TypeFunPtr) ) return Type.SCALAR;
     return ((TypeFunPtr)t).arg0(); // Extract Closure type from TFP
   }
-  // Actual arguments.  Arg(0) is allowed and refers to the Closure not the Code.
+  // Actual arguments.  Arg(0) is allowed and refers to the Closure/TFP.
   Node arg( int x ) { assert x>=0; return _defs.at(x+2); }
   // Set an argument.  Use 'set_fun' to set the Closure/Code.
   void set_arg_reg(int idx, Node arg, GVNGCM gvn) { assert idx>0; gvn.set_def_reg(this,idx+2,arg); }
@@ -189,15 +189,13 @@ public class CallNode extends Node {
 
   // 0 - Ctrl - whether or not the function is called.  False if call not
   //     reached or args are in-error.
-  // 1 - Full memory; just a copy of gvn.type(mem())
-  // 2 - TypeFunPtr ; just a copy of gvn.type(fun())
-  // 3 - Memory passed to the function, generally trimmed down from the full
+  // 1 - Memory passed to the function, generally trimmed down from the full
   //     available memory.
-  // 4 - Closure
-  // 5+  Normal argument types
+  // 2 - TypeFunPtr ; just a copy of gvn.type(fun())
+  // 3+  Normal argument types
 
   @Override public TypeTuple value(GVNGCM gvn) {
-    final Type[] ts = TypeAry.get(_defs._len+2);
+    final Type[] ts = TypeAry.get(_defs._len);
     final boolean dead = !_is_copy && gvn._opt_mode>0 && cepi()==null; // Dead from below
 
     // Pinch to XCTRL/CTRL
@@ -210,7 +208,7 @@ public class CallNode extends Node {
     Type mem = gvn.type(mem());
     if( !(mem instanceof TypeMem) )
       mem = mem.above_center() ? TypeMem.EMPTY : TypeMem.FULL;
-    TypeMem tmem = (TypeMem)(ts[1] = ts[3] = mem);
+    TypeMem tmem = (TypeMem)(ts[1] = mem);
 
     // Not a function to call?
     Type tfx = gvn.type(fun());
@@ -224,13 +222,12 @@ public class CallNode extends Node {
     // If not callable, do not call
     if( !callable ) { ts[0] = ctl = Type.XCTRL; }
     // If not called, then no memory to functions
-    if( ctl == Type.XCTRL ) { ts[1] = ts[3] = tmem = TypeMem.EMPTY; }
+    if( ctl == Type.XCTRL ) { ts[1] = tmem = TypeMem.EMPTY; }
 
     // Copy args for called functions.
     // If call is dead, then so are args.
-    ts[4] = dead ? Type.XSCALAR : targ(gvn,0).bound(TypeMemPtr.DISPLAY_PTR);
     for( int i=1; i<nargs(); i++ )
-      ts[i+4] = dead ? Type.XSCALAR : targ(gvn,i).bound(Type.SCALAR);
+      ts[i+2] = dead ? Type.XSCALAR : targ(gvn,i).bound(Type.SCALAR);
 
     // Quick exit if cannot further trim memory
     if( ctl == Type.XCTRL ||     // Not calling
@@ -254,7 +251,7 @@ public class CallNode extends Node {
 
     // Add all the aliases which can be reached from objects at the existing
     // aliases, recursively.
-    ts[3] = tmem.trim_to_alias(abs);
+    ts[1] = tmem.trim_to_alias(abs);
     return TypeTuple.make(ts);
   }
 
@@ -304,7 +301,8 @@ public class CallNode extends Node {
       boolean unk = false;       // Unknown arg might be incompatible or free to convert
       for( int j=0; j<fun.nargs(); j++ ) {
         Type actual = targ(gvn,j);
-        Type tx = actual.join(formals.at(j));
+        Type formal = formals.at(j);
+        Type tx = actual.join(formal);
         if( tx != actual && tx.above_center() ) // Actual and formal have values in common?
           continue outerloop;   // No, this function will never work; e.g. cannot cast 1.2 as any integer
         byte cvt = actual.isBitShape(formals.at(j)); // +1 needs convert, 0 no-cost convert, -1 unknown, 99 never
@@ -383,13 +381,11 @@ public class CallNode extends Node {
   }
 
   @Override public TypeTuple all_type() {
-    Type[] ts = TypeAry.get(_defs._len+2);
+    Type[] ts = TypeAry.get(_defs._len);
     Arrays.fill(ts,Type.SCALAR);
     ts[0] = Type.CTRL;
     ts[1] = TypeMem.FULL;
     ts[2] = TypeFunPtr.GENERIC_FUNPTR;
-    ts[3] = TypeMem.FULL;
-    ts[4] = TypeMemPtr.DISPLAY_PTR;
     return TypeTuple.make(ts);
   }
   // Set of used aliases across all inputs (not StoreNode value, but yes address)
@@ -402,7 +398,7 @@ public class CallNode extends Node {
           // TODO: Solve the forward-flow used_aliases problem incrementally.
           // Here we just bail out.
           return BitsAlias.NZERO; // Use all aliases after the call
-    TypeMem all_called_function_uses = (TypeMem)((TypeTuple)gvn.type(this)).at(3);
+    TypeMem all_called_function_uses = (TypeMem)((TypeTuple)gvn.type(this)).at(1);
     return all_called_function_uses.aliases();
   }
 
@@ -421,18 +417,13 @@ public class CallNode extends Node {
     return _rpc==call._rpc;
   }
   private boolean is_copy() { return _is_copy; }
-  // Funny mapping on Calls that are collapsing.
-  // in(0) -> Ctrl -> CProj_0
-  // in(1) -> Mem  -> MProj_3 // filtered memory becomes full memory
-  // in(2) -> TFP  ->  Proj_4 // closure becomes TFP
-  // in(3) -> Arg1 ->  Proj_5 // first normal argument
-  @Override public Node is_copy(GVNGCM gvn, int idx) { return is_copy() ? in((idx==0?0:(idx-2))) : null; }
-  //@Override public void ideal_impacted_by_changing_uses(GVNGCM gvn) {
-  //  // If just changed types, MemMerge use of Call might trigger alias filtering
-  //  for( Node def : _defs )
-  //    if( def instanceof MemMergeNode )
-  //      gvn.add_work(def);
-  //}
+  @Override public Node is_copy(GVNGCM gvn, int idx) { return is_copy() ? in(idx) : null; }
+  @Override public void ideal_impacted_by_changing_uses(GVNGCM gvn) {
+    // If just changed types, MemMerge use of Call might trigger alias filtering
+    for( Node def : _defs )
+      if( def instanceof MemMergeNode )
+        gvn.add_work(def);
+  }
   // If losing the CallEpi, call does dead.
   @Override public boolean ideal_impacted_by_losing_uses(GVNGCM gvn, Node dead) {
     return dead instanceof CallEpiNode;

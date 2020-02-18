@@ -83,11 +83,10 @@ public class TypeTuple extends Type<TypeTuple> {
 
   // This is the starting state of the program; CTRL is active and memory is empty.
   public  static final TypeTuple START_STATE = make(CTRL, TypeMem.EMPTY);
-  public  static final TypeTuple CALL = make(CTRL, TypeMem.FULL, TypeFunPtr.GENERIC_FUNPTR, TypeMem.FULL, TypeMemPtr.DISPLAY_PTR);
   public  static final TypeTuple  RET = make(CTRL, TypeMem.FULL, SCALAR); // Type of RetNodes
   public  static final TypeTuple XRET = RET.dual();
   public  static final TypeTuple CALLE = make(CTRL, TypeMem.FULL, SCALAR, TypeMem.FULL); // Type of CallEpiNodes
-  static final TypeTuple[] TYPES = new TypeTuple[]{RET,CALL,CALLE,START_STATE,IF_ALL, IF_TRUE, IF_FALSE};
+  static final TypeTuple[] TYPES = new TypeTuple[]{RET,CALLE,START_STATE,IF_ALL, IF_TRUE, IF_FALSE};
 
   // The length of Tuples is a constant, and so is its own dual.  Otherwise
   // just dual each element.  Also flip the infinitely extended tail type.

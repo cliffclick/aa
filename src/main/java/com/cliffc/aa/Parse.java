@@ -712,7 +712,7 @@ public class Parse {
     // Push an extra hidden closure argument.  Similar to java inner-class ptr
     // or when inside of a struct definition: 'this'.
     ids .push("^");
-    ts  .push(TypeMemPtr.DISPLAY_PTR);
+    ts  .push(TypeFunPtr.GENERIC_FUNPTR);
     bads.push(null);
 
     // Parse arguments
@@ -760,7 +760,7 @@ public class Parse {
       Parse errmsg = errMsg();  // Lazy error message
       for( int i=0; i<ids._len; i++ ) {
         // Parms for all arguments, including the hidden closure ptr
-        Node parm = gvn(new ParmNode(i,ids.at(i),fun,con(i==0?TypeMemPtr.DISPLAY_PTR:Type.SCALAR),errmsg));
+        Node parm = gvn(new ParmNode(i,ids.at(i),fun,con(i==0?fun._tf:Type.SCALAR),errmsg));
         // Type-check arguments
         Node mt = typechk(parm,ts.at(i),mem,bads.at(i));
         create(ids.at(i),mt, args_are_mutable);

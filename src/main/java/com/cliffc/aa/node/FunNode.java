@@ -224,7 +224,7 @@ public class FunNode extends RegionNode {
 
     // Look for appropriate type-specialize callers
     TypeStruct args = type_special(gvn, parms);
-    Ary<Node> body = find_body(gvn,ret);
+    Ary<Node> body = find_body(ret);
     int path = -1;              // Paths will split according to type
     if( args == null ) {        // No type-specialization to do
       args = _tf._args;         // Use old args
@@ -340,7 +340,7 @@ public class FunNode extends RegionNode {
 
 
   // Return the function body.
-  private Ary<Node> find_body( GVNGCM gvn, RetNode ret ) {
+  private Ary<Node> find_body( RetNode ret ) {
     // Find the function body.  Do a forwards walk first, stopping at the
     // obvious function exit.  If function does not expose its closure then
     // this is the complete function body with nothing extra walked.  If it has

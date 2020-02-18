@@ -552,6 +552,7 @@ public class Type<T extends Type<T>> implements Cloneable {
 
   // Trim 'this' to being within lower bound 't' and upper bound 't.dual'
   public Type bound( Type t ) {
+    if( this==t || this==t.dual() ) return this; // Shortcut for being at the bounds already
     if( t.dual().isa(this) && this.isa(t) ) return this;
     return above_center() ? t.dual() : t;
   }

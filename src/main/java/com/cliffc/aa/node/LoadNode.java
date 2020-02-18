@@ -9,10 +9,22 @@ import com.cliffc.aa.util.Util;
 public class LoadNode extends Node {
   private final String _fld;
   private final Parse _bad;
-  public LoadNode( Node mem, Node adr, String fld, Parse bad ) {
+  // TRUE if either the address or value must be a TFP.
+  // Address: means loading from a closure.
+  // Value  : means loading      a closure.
+  // Both: this is a linked-list display walk, finding the closure at the proper lexical depth.
+  // Just address: this is loading a local variable at this closure.
+  // Neither: this is a normal field load from a non-closure structure.
+  // Just value: not allowed.
+  private final boolean _closure_adr, _closure_val;
+  public LoadNode( Node mem, Node adr, String fld, Parse bad ) { this(mem,adr,fld,bad,false,false); }
+  public LoadNode( Node mem, Node adr, String fld, Parse bad, boolean closure_adr, boolean closure_val ) {
     super(OP_LOAD,null,mem,adr);
     _fld = fld;
     _bad = bad;
+    assert (closure_adr || !closure_val); // Just value: not allowed
+    _closure_adr = closure_adr;
+    _closure_val = closure_val;
   }
   String xstr() { return "."+_fld; }   // Self short name
   String  str() { return xstr(); } // Inline short name
@@ -84,6 +96,8 @@ public class LoadNode extends Node {
     if( adr.isa(TypeMemPtr.OOP0.dual()) ) return Type.XSCALAR;
     if( TypeMemPtr.OOP0.isa(adr) ) return Type.SCALAR; // Very low, might be any address
     if( adr.is_forward_ref() ) return Type.SCALAR;
+    if( adr instanceof TypeFunPtr )
+      throw AA.unimpl();
     if( !(adr instanceof TypeMemPtr) )
       return adr.above_center() ? Type.XSCALAR : Type.SCALAR;
     TypeMemPtr tmp = (TypeMemPtr)adr;

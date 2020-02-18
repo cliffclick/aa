@@ -31,7 +31,7 @@ public class TypeNode extends Node {
       FunNode fun = gvn.init((FunNode)(new FunNode(targs).add_def(Env.ALL_CTRL)));
       args[0] = fun;            // Call control
       args[1] = gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM     ),null));
-      args[2] = gvn.xform(new ParmNode( 0,"^",fun,gvn.con(TypeMemPtr.DISPLAY_PTR),null));
+      args[2] = gvn.xform(new ParmNode( 0,"^",fun,gvn.con(TypeFunPtr.GENERIC_FUNPTR),null));
       for( int i=1; i<targs.length; i++ ) {
         // All the parms, with types
         Node parm = gvn.xform(new ParmNode(i,"arg"+i,fun,gvn.con(Type.SCALAR),null));
