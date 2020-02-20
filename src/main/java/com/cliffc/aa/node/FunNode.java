@@ -56,7 +56,7 @@ import java.util.Map;
 
 public class FunNode extends RegionNode {
   public String _name;          // Optional for anon functions; can be set later via bind()
-  public TypeFunPtr _tf;        // FIDX, arg & ret types
+  public TypeFunPtr _tf;        // FIDX, arg & ret types.  Closure type is slot 0 argument.
   public BitsAlias _closure_aliases; // All available aliases in parent closures
   public int _my_closure_alias;      // My self closure alias
   // Operator precedence; only set on top-level primitive wrappers.

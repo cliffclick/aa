@@ -27,7 +27,9 @@ import java.util.function.Predicate;
 
 public final class TypeFunPtr extends Type<TypeFunPtr> {
   // List of known functions in set, or 'flip' for choice-of-functions.
+  // A single bit is a classic code pointer.
   private BitsFun _fidxs;       // Known function bits
+
   // Union (or join) signature of said functions; depends on if _fidxs is
   // above_center() or not.  Slot 0 is for the closure type, and so is always a
   // TypeMemPtr.
@@ -37,19 +39,16 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   private TypeFunPtr(BitsFun fidxs, TypeStruct args, Type ret ) { super(TFUNPTR); init(fidxs,args,ret); }
   private void init (BitsFun fidxs, TypeStruct args, Type ret ) { _fidxs = fidxs; _args=args; _ret=ret; }
   @Override int compute_hash() { return TFUNPTR + _fidxs._hash + _args._hash + _ret._hash; }
+
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeFunPtr) ) return false;
     TypeFunPtr tf = (TypeFunPtr)o;
     return _fidxs==tf._fidxs && _args==tf._args && _ret==tf._ret;
   }
-  @Override public boolean cycle_equals( Type o ) {
-    if( this==o ) return true;
-    if( !(o instanceof TypeFunPtr) ) return false;
-    TypeFunPtr tfp = (TypeFunPtr)o;
-    if( _fidxs != tfp._fidxs  || _ret != tfp._ret ) return false;
-    return _args == tfp._args || _args.cycle_equals(tfp._args);
-  }
+  // Structs can contain TFPs in fields, and TFPs contain a Struct, but never
+  // in a cycle.
+  @Override public boolean cycle_equals( Type o ) { return equals(o); }
   @Override public String str( VBitSet dups) {
     return "*"+names()+":{"+_args.str(dups)+"-> "+_ret.str(dups)+"}";}
   public String names() { return FunNode.names(_fidxs,new SB()).toString(); }
@@ -58,34 +57,28 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   private static TypeFunPtr FREE=null;
   @Override protected TypeFunPtr free( TypeFunPtr ret ) { FREE=this; return ret; }
   public static TypeFunPtr make( BitsFun fidxs, TypeStruct args, Type ret ) {
-    assert args.at(0) instanceof TypeFunPtr || args.at(0) == Type.NIL || args.at(0)==Type.ANY;
+    assert args.at(0)==Type.NIL || ((TypeMemPtr)args.at(0)).is_closure();
+    assert fidxs.is_con() || fidxs.above_center()==args.above_center();
     TypeFunPtr t1 = FREE;
     if( t1 == null ) t1 = new TypeFunPtr(fidxs,args,ret);
     else {   FREE = null;        t1.init(fidxs,args,ret); }
     TypeFunPtr t2 = (TypeFunPtr)t1.hashcons();
     return t1==t2 ? t1 : t1.free(t2);
   }
+
   // Used by testing only
   public static TypeFunPtr make_new(TypeStruct args, Type ret) { return make(BitsFun.make_new_fidx(BitsFun.ALL),args,ret); }
   public TypeFunPtr make_fidx( int fidx ) { return make(BitsFun.make0(fidx),_args,_ret); }
   public TypeFunPtr make_new_fidx( int parent, TypeStruct args ) { return make(BitsFun.make_new_fidx(parent),args,_ret); }
-  public static TypeFunPtr make_anon() { return make_new(TypeStruct.DISPLAY,Type.SCALAR); } // Make a new anonymous function ptr
+  private static TypeStruct ARGS = TypeStruct.make_args(TypeStruct.ts(TypeMemPtr.CLOSURE_PTR));
+  public static TypeFunPtr make_anon() { return make_new(ARGS,Type.SCALAR); } // Make a new anonymous function ptr
 
-  public  static final TypeFunPtr GENERIC_FUNPTR = new TypeFunPtr(BitsFun.FULL,TypeStruct.DISPLAY,Type.SCALAR);
-  static { GENERIC_FUNPTR._hash = GENERIC_FUNPTR.compute_hash(); } // Filled in during DISPLAY.install_cyclic
+  public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.FULL,ARGS,Type.SCALAR);
   private static final TypeFunPtr TEST_INEG = make(BitsFun.make0(2),TypeStruct.INT64,TypeInt.INT64);
   public  static final TypeFunPtr EMPTY = make(BitsFun.EMPTY,TypeStruct.SCALAR0,Type.XSCALAR);
   static final TypeFunPtr[] TYPES = new TypeFunPtr[]{GENERIC_FUNPTR,TEST_INEG};
 
   @Override protected TypeFunPtr xdual() { return new TypeFunPtr(_fidxs.dual(),_args.dual(),_ret.dual()); }
-  @Override TypeFunPtr rdual() {
-    if( _dual != null ) return _dual;
-    TypeFunPtr dual = _dual = new TypeFunPtr(_fidxs.dual(),_args.rdual(),_ret.dual());
-    dual._dual = this;
-    dual._hash = dual.compute_hash();
-    dual._cyclic = true;
-    return dual;
-  }
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TFUNPTR:break;
@@ -93,13 +86,13 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     case TINT:
     case TMEMPTR:
     case TRPC:   return cross_nil(t);
-    case TNIL:
     case TFUN:
     case TTUPLE:
     case TOBJ:
     case TSTR:
     case TSTRUCT:
     case TMEM:   return ALL;
+    case TNIL:                  // TODO: Meet-with-NIL can return NIL is some cases
     default: throw typerr(t);   // All else should not happen
     }
     TypeFunPtr tf = (TypeFunPtr)t;
@@ -110,7 +103,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public BitsFun fidxs() { return _fidxs; }
   public int fidx() { return _fidxs.getbit(); } // Asserts internally single-bit
   public Type arg(int idx) { return _args.at(idx); }
-  public Type arg0() { return _args.at(0); } // Always a Closure pointer or NIL
+  public TypeMemPtr closure() { return (TypeMemPtr)_args.at(0); } // Always a Closure pointer or NIL
   public boolean is_class() { return _fidxs.is_class(); }
 
   @Override public BitsAlias recursive_aliases(BitsAlias abs, TypeMem mem) {

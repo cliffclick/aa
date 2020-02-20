@@ -75,6 +75,8 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   public static TypeMemPtr make( int alias, TypeObj obj ) { return make(BitsAlias.make0(alias),obj); }
   public static TypeMemPtr make_nil( int alias, TypeObj obj ) { return make(BitsAlias.make0(alias).meet_nil(),obj); }
 
+  public  static final TypeMemPtr CLOSURE_PTR= new TypeMemPtr(BitsAlias.CLOSURE_BITS0,TypeStruct.CLOSURE);
+  static { CLOSURE_PTR._hash = CLOSURE_PTR.compute_hash(); } // Filled in during CLOSURE.install_cyclic
   public  static final TypeMemPtr OOP0   = make(BitsAlias.FULL    ,TypeObj.OBJ); // Includes nil
   public  static final TypeMemPtr OOP    = make(BitsAlias.NZERO   ,TypeObj.OBJ); // Excludes nil
   public  static final TypeMemPtr STRPTR = make(BitsAlias.STRBITS ,TypeStr.STR);
@@ -84,6 +86,11 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   public  static final TypeMemPtr STRUCT = make(BitsAlias.RECORD_BITS ,TypeStruct.ALLSTRUCT);
   public  static final TypeMemPtr STRUCT0= make(BitsAlias.RECORD_BITS0,TypeStruct.ALLSTRUCT);
   static final TypeMemPtr[] TYPES = new TypeMemPtr[]{OOP0,STR0,STRPTR,ABCPTR,STRUCT};
+
+  boolean is_closure() {
+    if( this==CLOSURE_PTR || this==CLOSURE_PTR._dual ) return true;
+    return (_obj instanceof TypeStruct && ((TypeStruct)_obj).is_closure());
+  }
 
   @Override protected TypeMemPtr xdual() {
     assert _aliases!=BitsAlias.NIL;

@@ -95,7 +95,7 @@ public class CallNode extends Node {
     Type t = gvn.type(arg(x));
     if( x>0 ) return t;         // Normal argument type
     if( !(t instanceof TypeFunPtr) ) return Type.SCALAR;
-    return ((TypeFunPtr)t).arg0(); // Extract Closure type from TFP
+    return ((TypeFunPtr)t).closure(); // Extract Closure type from TFP
   }
   // Actual arguments.  Arg(0) is allowed and refers to the Closure/TFP.
   Node arg( int x ) { assert x>=0; return _defs.at(x+2); }

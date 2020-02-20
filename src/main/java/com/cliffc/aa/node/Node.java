@@ -19,30 +19,31 @@ public abstract class Node implements Cloneable {
   static final byte OP_CON    = 4;
   static final byte OP_CPROJ  = 5;
   static final byte OP_ERR    = 6;
-  static final byte OP_FUN    = 7;
-  static final byte OP_FUNPTR = 8;
-  static final byte OP_IF     = 9;
-  static final byte OP_LIBCALL=10;
-  static final byte OP_LOAD   =11;
-  static final byte OP_MERGE  =12;
-  static final byte OP_NAME   =13; // Cast a prior NewObj to have a runtime Name
-  static final byte OP_NEWOBJ =14; // Allocate a new struct
-  static final byte OP_NEWSTR =15; // Allocate a new string (array)
-  static final byte OP_PARM   =16;
-  static final byte OP_PHI    =17;
-  static final byte OP_PRIM   =18;
-  static final byte OP_PROJ   =19;
-  static final byte OP_REGION =20;
-  static final byte OP_RET    =21;
-  static final byte OP_SCOPE  =22;
-  static final byte OP_START  =23;
-  static final byte OP_STORE  =24;
-  static final byte OP_TMP    =25;
-  static final byte OP_TYPE   =26;
-  static final byte OP_UNR    =27;
-  static final byte OP_MAX    =28;
+  static final byte OP_FP2CLO = 7;
+  static final byte OP_FUN    = 8;
+  static final byte OP_FUNPTR = 9;
+  static final byte OP_IF     =10;
+  static final byte OP_LIBCALL=11;
+  static final byte OP_LOAD   =12;
+  static final byte OP_MERGE  =13;
+  static final byte OP_NAME   =14; // Cast a prior NewObj to have a runtime Name
+  static final byte OP_NEWOBJ =15; // Allocate a new struct
+  static final byte OP_NEWSTR =16; // Allocate a new string (array)
+  static final byte OP_PARM   =17;
+  static final byte OP_PHI    =18;
+  static final byte OP_PRIM   =19;
+  static final byte OP_PROJ   =20;
+  static final byte OP_REGION =21;
+  static final byte OP_RET    =22;
+  static final byte OP_SCOPE  =23;
+  static final byte OP_START  =24;
+  static final byte OP_STORE  =25;
+  static final byte OP_TMP    =26;
+  static final byte OP_TYPE   =27;
+  static final byte OP_UNR    =28;
+  static final byte OP_MAX    =29;
 
-  private static final String[] STRS = new String[] { null, "Call", "CallEpi", "Cast", "Con", "CProj", "Err", "Fun", "FunPtr", "If", "LibCall", "Load", "Merge", "Name", "NewObj", "NewStr", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Scope", "Start", "Store", "Tmp", "Type", "Unresolved" };
+  private static final String[] STRS = new String[] { null, "Call", "CallEpi", "Cast", "Con", "CProj", "Err", "FP2Clo", "Fun", "FunPtr", "If", "LibCall", "Load", "Merge", "Name", "NewObj", "NewStr", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Scope", "Start", "Store", "Tmp", "Type", "Unresolved" };
 
   public int _uid;  // Unique ID, will have gaps, used to give a dense numbering to nodes
   final byte _op;   // Opcode (besides the object class), used to avoid v-calls in some places

@@ -760,10 +760,11 @@ public class Parse {
       Parse errmsg = errMsg();  // Lazy error message
       for( int i=0; i<ids._len; i++ ) {
         // Parms for all arguments, including the hidden closure ptr
-        Node parm = gvn(new ParmNode(i,ids.at(i),fun,con(i==0?fun._tf:Type.SCALAR),errmsg));
+        Node parm = gvn(new ParmNode(i,ids.at(i),fun,con(ts.at(i)),errmsg));
+        if( i==0 ) parm = gvn(new FP2ClosureNode(parm));
         // Type-check arguments
-        Node mt = typechk(parm,ts.at(i),mem,bads.at(i));
-        create(ids.at(i),mt, args_are_mutable);
+        else parm = typechk(parm,ts.at(i),mem,bads.at(i));
+        create(ids.at(i),parm, args_are_mutable);
       }
 
       // Function memory is a merge of incoming wide memory, and the local

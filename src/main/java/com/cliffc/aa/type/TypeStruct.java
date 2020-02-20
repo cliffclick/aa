@@ -18,14 +18,13 @@ import java.util.function.Predicate;
  *
  *  The recursive type poses some interesting challenges.  It is represented as
  *  literally a cycle of pointers which must include a TypeStruct (and not a
- *  TypeTuple which only roots Types) and a TypeMemPtr (edge), and possibly
- *  some TypeNames.  Type inference involves finding the Meet of two cyclic
- *  structures.  The cycles will not generally be of the same length.  However,
- *  each field Meets independently (and fields in one structure but not the
- *  other are not in the final Meet).  This means we are NOT trying to solve
- *  the general problem of graph-equivalence (a known NP hard problem).
- *  Instead we can solve each field independently and also intersect across
- *  common fields.
+ *  TypeTuple which only roots Types) and a TypeMemPtr (edge).  Type inference
+ *  involves finding the Meet of two cyclic structures.  The cycles will not
+ *  generally be of the same length.  However, each field Meets independently
+ *  (and fields in one structure but not the other are not in the final Meet).
+ *  This means we are NOT trying to solve the general problem of graph-
+ *  equivalence (a known NP hard problem).  Instead we can solve each field
+ *  independently and also intersect across common fields.
  *
  *  When solving across a single field, we will find some prefix and then
  *  possibly a cycle - conceptually the type unrolls forever.  When doing the
@@ -38,9 +37,9 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // are never null, and never zero-length.  If the 1st char is a '*' the field
   // is Top; a '.' is Bot; all other values are valid field names.
   public @NotNull String @NotNull[] _flds;  // The field names
-  public boolean _cln;          // Clean: not modified since last function
   public Type[] _ts;            // Matching field types
   public byte[] _finals;        // Fields that are final; see fmeet, fdual, fstr
+  public boolean _cln;          // Clean: not modified since last function
   private TypeStruct _uf;       // Tarjan Union-Find, used during cyclic meet
   private TypeStruct     ( String name, boolean any, boolean cln, String[] flds, Type[] ts, byte[] finals) { super(TSTRUCT, name, any); init(name, any,cln, flds,ts,finals); }
   private TypeStruct init( String name, boolean any, boolean cln, String[] flds, Type[] ts, byte[] finals) {
@@ -257,6 +256,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   }
   // Generic function arguments.  Slot 0 is the closure and has a fixed name.
   public  static TypeStruct make_args(Type[] ts) {
+    assert ts[0]==TypeMemPtr.CLOSURE_PTR || ts[0]==Type.NIL;
     String[] args = new String[ts.length];
     Arrays.fill(args,".");
     args[0] = "^";
@@ -286,13 +286,13 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   }
 
   // The display is a self-recursive structure: slot 0 is a ptr to a Display.
-  public  static final TypeStruct DISPLAY = malloc("",false,false,new String[]{"^"},ts(Type.NIL),fbots(1));
-  static { DISPLAY._hash = DISPLAY.compute_hash(); }
+  public  static final TypeStruct CLOSURE = malloc("",false,false,new String[]{"^"},ts(Type.NIL),fbots(1));
+  static { CLOSURE._hash = CLOSURE.compute_hash(); }
   // Most primitive function call argument type lists are 0-based
   public  static final TypeStruct GENERIC = malloc("",true,true,FLD0,TypeAry.get(0),new byte[0]).hashcons_free();
   public  static final TypeStruct ALLSTRUCT = make(ts());
   public  static final TypeStruct ALLSTRUCT_CLN = malloc("",false,true,FLDS[0],TypeAry.get(0),fbots(0)).hashcons_free();
-  public  static final TypeStruct SCALAR0     = make_args(ts(Type.NIL));
+  public  static final TypeStruct SCALAR0     = make_args   (ts(Type.NIL));
   public  static final TypeStruct SCALAR1     = make(ARGS_X ,ts(Type.NIL,SCALAR));
   public  static final TypeStruct SCALAR2     = make(ARGS_XY,ts(Type.NIL,SCALAR,SCALAR));
   public  static final TypeStruct STRPTR      = make(ARGS_X ,ts(Type.NIL,TypeMemPtr.STRPTR));
@@ -312,15 +312,20 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   private static final TypeStruct D1    = make(flds("^","d"),ts(Type.NIL,TypeInt.TRUE  )); // @{d:1}
   private static final TypeStruct ARW   = make(flds("^","a"),ts(Type.NIL,TypeFlt.FLT64),new byte[]{frw(),frw()});
 
-  // Called during init to break the cycle making DISPLAY
+  // Called during init to break the cycle making CLOSURE
   static void init1() {
-    if( DISPLAY._ts[0] == Type.NIL ) {
-      DISPLAY._ts = ts(TypeFunPtr.GENERIC_FUNPTR);
-      DISPLAY.install_cyclic(new Ary<>(ts(DISPLAY,TypeFunPtr.GENERIC_FUNPTR)));
+    if( CLOSURE._ts[0] == Type.NIL ) {
+      CLOSURE._ts = ts(TypeMemPtr.CLOSURE_PTR);
+      CLOSURE.install_cyclic(new Ary<>(ts(CLOSURE,TypeMemPtr.CLOSURE_PTR)));
     }
+    assert CLOSURE.is_closure();
+  }
+  boolean is_closure() {
+    if( this==CLOSURE || this==CLOSURE._dual ) return true;
+    return _ts.length >= 1 && _ts[0] instanceof TypeMemPtr && ((TypeMemPtr)_ts[0]).is_closure();
   }
 
-  static final TypeStruct[] TYPES = new TypeStruct[]{ALLSTRUCT,STR_STR,FLT64,POINT,NAMEPT,A,C0,D1,ARW,DISPLAY};
+  static final TypeStruct[] TYPES = new TypeStruct[]{ALLSTRUCT,STR_STR,FLT64,POINT,NAMEPT,A,C0,D1,ARW,CLOSURE};
 
   // Extend the current struct with a new named field
   public TypeStruct add_fld( String name, Type t, byte mutable ) {
@@ -971,6 +976,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   private static BitSet get_cyclic(BitSet bcs, VBitSet bs, Ary<Type> stack, Type t ) {
     if( t.interned() ) return bcs;
     if( bs.tset(t._uid) ) {     // If visiting again... have found a cycle t->....->t
+      assert !(t instanceof TypeFunPtr); // Never part of a cycle
       // All on the stack are flagged as being part of a cycle
       int i;
       i=stack._len-1;
@@ -984,7 +990,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     stack.push(t);              // Push on stack, in case a cycle is found
     switch( t._type ) {
     case TMEMPTR: get_cyclic(bcs,bs,stack,((TypeMemPtr)t)._obj ); break;
-    case TFUNPTR: get_cyclic(bcs,bs,stack,((TypeFunPtr)t)._args); break;
     case TSTRUCT: for( Type tf : ((TypeStruct)t)._ts ) get_cyclic(bcs,bs,stack,tf); break;
     }
     stack.pop();                // Pop, not part of anothers cycle

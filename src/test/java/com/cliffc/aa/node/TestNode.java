@@ -227,7 +227,7 @@ public class TestNode {
     test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  null, TypeStr.ABC  ));
     test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  null, TypeFlt.FLT64));
     test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  null, Type   .CTRL ));
-    test1monotonic(new    FunNode(new Type[]{TypeFunPtr.GENERIC_FUNPTR,TypeInt.INT64}));
+    test1monotonic(new    FunNode(new Type[]{TypeMemPtr.CLOSURE_PTR,TypeInt.INT64}));
     test1monotonic(new FunPtrNode(ret,null));
     test1monotonic(new     IfNode(_ins[0],_ins[1]));
     for( IntrinsicNewNode prim : IntrinsicNewNode.INTRINSICS )
@@ -298,6 +298,7 @@ public class TestNode {
     assert n._defs._len==0;
     n.add_def( null  );
     n.add_def(_ins[1]);         // memory
+    n.add_def(null);            // closure
     n.add_def(_ins[2]);         // arg
     if( n._targs._ts.length >= 2 ) n.add_def(_ins[3]);
     test1monotonic_init(n);
