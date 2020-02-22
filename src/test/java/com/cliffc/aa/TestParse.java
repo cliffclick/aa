@@ -215,7 +215,7 @@ public class TestParse {
     test("fun:{real->flt32}={x -> x}; fun(123 )", TypeInt.con(123 ));
     test("fun:{real->flt32}={x -> x}; fun(0.125)", TypeFlt.con(0.125));
     testerr("fun:{real->flt32}={x -> x}; fun(123456789)", "123456789 is not a flt32",3);
-    test("{x -> x&1}", TypeFunPtr.make(BitsFun.make0(35),TypeStruct.SCALAR1,Type.SCALAR)); // {Int -> Int}
+    test("{x -> x&1}", TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make_args(TypeStruct.ts(TypeMemPtr.CLOSURE_PTR,Type.SCALAR)),Type.SCALAR)); // {Int -> Int}
 
     // Named types
     test_name("A= :(       )" ); // Zero-length tuple
@@ -746,7 +746,7 @@ strs:List(str?) = ... // List of null-or-strings
     try( TypeEnv te = run(program) ) {
       assertTrue(te._t instanceof TypeFunPtr);
       TypeFunPtr actual = (TypeFunPtr)te._t;
-      TypeFunPtr expected = TypeFunPtr.make(actual.fidxs(),TypeStruct.make(TypeMemPtr.STRUCT),TypeMemPtr.STRUCT);
+      TypeFunPtr expected = TypeFunPtr.make(actual.fidxs(),TypeStruct.make_args(TypeStruct.ts(TypeMemPtr.CLOSURE_PTR,TypeMemPtr.STRUCT)),TypeMemPtr.STRUCT);
       assertEquals(expected,actual);
     }
   }

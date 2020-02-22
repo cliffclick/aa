@@ -14,7 +14,9 @@ public final class FunPtrNode extends ConNode<TypeFunPtr> {
   private FunPtrNode( String referr, RetNode ret, Node closure ) {
     super(OP_FUNPTR,ret.fun()._tf,ret,closure);
     _referr = referr;
-    assert closure==null || (closure instanceof ProjNode && closure.in(0) instanceof NewObjNode);
+    assert closure==null ||
+            (closure instanceof ProjNode && closure.in(0) instanceof NewObjNode) || // Standard local closure
+            closure instanceof ParmNode; // Closure is passed-thru from FunNode without making a lexical scope
   }
   @Override public int hashCode() { return super.hashCode() ^ ((_defs._len==0 || in(0)==null) ? 0 : in(0)._uid); }
   @Override public boolean equals(Object o) {

@@ -760,7 +760,7 @@ public class Parse {
       Parse errmsg = errMsg();  // Lazy error message
       for( int i=0; i<ids._len; i++ ) {
         // Parms for all arguments, including the hidden closure ptr
-        Node parm = gvn(new ParmNode(i,ids.at(i),fun,con(ts.at(i)),errmsg));
+        Node parm = gvn(new ParmNode(i,ids.at(i),fun,con(i==0?ts.at(0):Type.SCALAR),errmsg));
         // Type-check arguments
         Node mt = typechk(parm,ts.at(i),mem,bads.at(i));
         create(ids.at(i),mt, args_are_mutable);
@@ -960,7 +960,7 @@ public class Parse {
   // Type or null or Type.ANY for '->' token
   private Type type0(boolean type_var) {
     if( peek('{') ) {           // Function type
-      Ary<Type> ts = new Ary<>(new Type[1],0);  Type t;
+      Ary<Type> ts = new Ary<>(new Type[]{TypeMemPtr.CLOSURE_PTR});  Type t;
       while( (t=typep(type_var)) != null && t != Type.ANY  )
         ts.add(t);              // Collect arg types
       Type ret;
@@ -971,7 +971,7 @@ public class Parse {
         if( ts._len != 1 ) return null; // should return TypeErr missing -> in tfun
         ret = ts.pop();         // Get single return type
       }
-      TypeStruct targs = TypeStruct.make(ts.asAry());
+      TypeStruct targs = TypeStruct.make_args(ts.asAry());
       if( !peek('}') ) return null;
       return typeq(TypeFunPtr.make(BitsFun.NZERO,targs,ret));
     }

@@ -545,7 +545,6 @@ public class GVNGCM {
           unreg(fun);
           fun._tf = TypeFunPtr.make(fun._tf.fidxs(),fun._tf._args,tret);
           rereg(fun,Type.CTRL);
-          throw AA.unimpl();    // Untested
         }
       }
     }

@@ -36,11 +36,11 @@ public class IntrinsicNode extends Node {
 
     // This function call takes in and returns a plain ptr-to-object.
     // Only after folding together does the name become apparent.
-    TypeFunPtr tf = TypeFunPtr.make_new(TypeStruct.make(TypeMemPtr.STRUCT),TypeMemPtr.STRUCT);
+    TypeFunPtr tf = TypeFunPtr.make_new(TypeStruct.make_args(TypeStruct.ts(TypeMemPtr.CLOSURE_PTR,TypeMemPtr.STRUCT)),TypeMemPtr.STRUCT);
     FunNode fun = (FunNode) gvn.xform(new FunNode(tn._name,tf,BitsAlias.EMPTY).add_def(Env.ALL_CTRL));
     Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL ),null));
     Node mem = gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.FULL     ),null));
-    Node ptr = gvn.xform(new ParmNode( 0,"ptr",fun,gvn.con(TypeMemPtr.STRUCT),null));
+    Node ptr = gvn.xform(new ParmNode( 1,"ptr",fun,gvn.con(TypeMemPtr.STRUCT),null));
     Node cvt = gvn.xform(new IntrinsicNode(tn,badargs,fun,mem,ptr));
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,cvt,ptr,rpc,fun));
     return (FunPtrNode)gvn.xform(new FunPtrNode(ret,null));
@@ -87,12 +87,12 @@ public class IntrinsicNode extends Node {
     Type ptr = gvn.type(ptr());
     if( !(mem instanceof TypeMem) ) return TypeMem.FULL; // Inputs are confused
     if( !(ptr instanceof TypeMemPtr) ) return mem;       // Inputs are confused
-    // Get the Obj from the pointer.  
+    // Get the Obj from the pointer.
     int alias = ((TypeMemPtr)ptr)._aliases.abit();
     TypeObj obj = ((TypeMem)mem).ld((TypeMemPtr)ptr);
     TypeObj tn = (TypeObj)_tn.remove_name();
     if( !obj.isa(tn       ) ) return mem; // Inputs not correct from, and node is in-error
-    if(  obj.isa(tn.dual()) ) return mem; 
+    if(  obj.isa(tn.dual()) ) return mem;
     // Wrap result in Name
     TypeObj rez = (TypeObj)obj.set_name(_tn._name);
     TypeMem rezmem = ((TypeMem)mem).st(alias,rez);
@@ -122,8 +122,12 @@ public class IntrinsicNode extends Node {
     assert to.has_name();
     NewObjNode nnn = new NewObjNode(false,alias,to,null);
     TypeStruct from = to.remove_name();
-    TypeMemPtr tmp = TypeMemPtr.make(alias,to);
-    TypeFunPtr tf = TypeFunPtr.make_new(from,tmp);
+    TypeMemPtr tmp = TypeMemPtr.make(alias,to); // Return type
+    // Add a standard closure up-front to the function.
+    Type[] ts = TypeAry.get(from._ts.length+1); // Space for the extra arg
+    ts[0] = Type.NIL;                           // No actual closure needed
+    System.arraycopy(from._ts, 0, ts, 1, from._ts.length); // Copy fields
+    TypeFunPtr tf = TypeFunPtr.make_new(TypeStruct.make_args(ts),tmp);
     FunNode fun = (FunNode) gvn.xform(new FunNode(to._name,tf,BitsAlias.EMPTY).add_def(Env.ALL_CTRL));
     Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
     Node memp= gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.FULL    ),null));
@@ -132,7 +136,7 @@ public class IntrinsicNode extends Node {
     for( int i=0; i<from._ts.length; i++ ) {
       String argx = from._flds[i];
       if( TypeStruct.fldBot(argx) ) argx = null;
-      nnn.add_def(gvn.xform(new ParmNode(i,argx,fun, gvn.con(from._ts[i]),null)));
+      nnn.add_def(gvn.xform(new ParmNode(i+1,argx,fun, gvn.con(from._ts[i]),null)));
     }
     gvn.init(nnn);
     Node ptr = gvn.xform(new  ProjNode(nnn,1));

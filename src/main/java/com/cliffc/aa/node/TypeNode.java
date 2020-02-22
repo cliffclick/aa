@@ -27,11 +27,13 @@ public class TypeNode extends Node {
     if( _t instanceof TypeFunPtr/*signature not fidxs*/ ) {
       TypeFunPtr tfp = (TypeFunPtr)_t;
       Type[] targs = tfp._args._ts;
-      Node[] args = new Node[targs.length+3];
+      Node[] args = new Node[targs.length+2];
       FunNode fun = gvn.init((FunNode)(new FunNode(targs).add_def(Env.ALL_CTRL)));
       args[0] = fun;            // Call control
       args[1] = gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM     ),null));
-      args[2] = gvn.xform(new ParmNode( 0,"^",fun,gvn.con(TypeFunPtr.GENERIC_FUNPTR),null));
+      args[2] = arg;            // The whole TFP to the call
+      // Just the Closure when we make a new TFP
+      Node clos = gvn.xform(new FP2ClosureNode(arg));
       for( int i=1; i<targs.length; i++ ) {
         // All the parms, with types
         Node parm = gvn.xform(new ParmNode(i,"arg"+i,fun,gvn.con(Type.SCALAR),null));
@@ -45,7 +47,7 @@ public class TypeNode extends Node {
       Node val    = gvn.xform(new  ProjNode(cepi.unhook(),2));
       Node chk    = gvn.xform(new  TypeNode(tfp._ret,val,_error_parse)); // Type-check the return also
       RetNode ret = (RetNode)gvn.xform(new RetNode(ctl,postmem.unhook(),chk,rpc,fun));
-      return gvn.xform(new FunPtrNode(ret,args[2])); // 
+      return gvn.xform(new FunPtrNode(ret,clos)); //
     }
 
     // Push TypeNodes 'up' to widen the space they apply to, and hopefully push
