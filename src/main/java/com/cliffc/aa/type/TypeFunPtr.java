@@ -58,7 +58,6 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   @Override protected TypeFunPtr free( TypeFunPtr ret ) { FREE=this; return ret; }
   public static TypeFunPtr make( BitsFun fidxs, TypeStruct args, Type ret ) {
     assert args.at(0)==Type.NIL || ((TypeMemPtr)args.at(0)).is_closure();
-    assert fidxs.is_con() || fidxs.above_center()==args.above_center();
     TypeFunPtr t1 = FREE;
     if( t1 == null ) t1 = new TypeFunPtr(fidxs,args,ret);
     else {   FREE = null;        t1.init(fidxs,args,ret); }
@@ -103,7 +102,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public BitsFun fidxs() { return _fidxs; }
   public int fidx() { return _fidxs.getbit(); } // Asserts internally single-bit
   public Type arg(int idx) { return _args.at(idx); }
-  public TypeMemPtr closure() { return (TypeMemPtr)_args.at(0); } // Always a Closure pointer or NIL
+  public Type closure() { return _args.at(0); } // Always a Closure pointer or NIL
   public boolean is_class() { return _fidxs.is_class(); }
 
   @Override public BitsAlias recursive_aliases(BitsAlias abs, TypeMem mem) {

@@ -51,19 +51,30 @@ public abstract class Node implements Cloneable {
 
   // Defs.  Generally fixed length, ordered, nulls allowed, no unused trailing space.  Zero is Control.
   public Ary<Node> _defs;
+  private void _chk() { assert Env.GVN.check_out(this); }
   // Add def/use edge
-  public Node add_def(Node n) { _defs.add(n); if( n!=null ) n._uses.add(this); return this; }
-  public Node insert (int idx, Node n) { _defs.insert(idx,n); if( n!=null ) n._uses.add(this); return this; }
-  public Node in( int i) { return _defs.at(i); }
+  public Node add_def(Node n) { _chk(); _defs.add(n); if( n!=null ) n._uses.add(this); return this; }
   // Replace def/use edge
   public Node set_def( int idx, Node n, GVNGCM gvn ) {
-    assert gvn==null || gvn.check_out(this);
+    _chk();
     Node old = _defs.at(idx);  // Get old value
     // Add edge to new guy before deleting old, in case old goes dead and
     // recursively makes new guy go dead also
     if( (_defs._es[idx] = n) != null ) n._uses.add(this);
     return unuse(old, gvn);
   }
+  
+  public Node insert (int idx, Node n) { _chk(); _defs.insert(idx,n); if( n!=null ) n._uses.add(this); return this; }
+  // Return Node at idx, withOUT auto-deleting it, even if this is the last
+  // use.  Used by the parser to retrieve final Nodes from tmp holders.  Does
+  // NOT preserve order.
+  public Node del( int idx ) {
+    _chk();
+    Node n = _defs.del(idx);
+    if( n != null ) n._uses.del(this);
+    return n;
+  }
+  public Node in( int i) { return _defs.at(i); }
   private Node unuse( Node old, GVNGCM gvn ) {
     if( old != null ) {
       old._uses.del(this);
@@ -84,18 +95,10 @@ public abstract class Node implements Cloneable {
     if( _keep==0 && _uses._len==0 ) gvn.kill(this);
     else gvn.add_work(this);
   }
-  // Return Node at idx, withOUT auto-deleting it, even if this is the last
-  // use.  Used by the parser to retrieve final Nodes from tmp holders.  Does
-  // NOT preserve order.
-  public Node del( int idx ) {
-    Node n = _defs.del(idx);
-    if( n != null ) n._uses.del(this);
-    return n;
-  }
   public Node pop( ) { return del(_defs._len-1); }
-  public void pop(GVNGCM gvn ) { unuse(_defs.pop(),gvn); }
+  public void pop(GVNGCM gvn ) { _chk(); unuse(_defs.pop(),gvn); }
   // Remove Node at idx, auto-delete and preserve order.
-  public void remove(int idx, GVNGCM gvn) { unuse(_defs.remove(idx),gvn); }
+  public void remove(int idx, GVNGCM gvn) { _chk(); unuse(_defs.remove(idx),gvn); }
 
   // Uses.  Generally variable length; unordered, no nulls, compressed, unused trailing space
   public Ary<Node> _uses;

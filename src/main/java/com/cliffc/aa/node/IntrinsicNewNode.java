@@ -48,7 +48,8 @@ public abstract class IntrinsicNewNode extends Node {
     // Add input edges to the intrinsic
     add_def(null);              // Control for the primitive in slot 0
     add_def(memp);              // Memory  for the primitive in slot 1
-    for( int i=0; i<_targs._ts.length; i++ ) // Args follow, closure in slot 0
+    add_def(null);              // Closure for the primitive in slot 2
+    for( int i=1; i<_targs._ts.length; i++ ) // Args follow, closure in slot 0
       add_def( gvn.xform(new ParmNode(i,_targs._flds[i],fun, gvn.con(_targs.at(i)),null)));
     Node rez = gvn.xform(this); // Returns a TypeObj
     // Fill in NewStrNode inputs, now that we have them.

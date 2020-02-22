@@ -2,9 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeRPC;
-import com.cliffc.aa.type.TypeMem;
+import com.cliffc.aa.type.*;
 
 // Function parameter node; almost just a Phi with a name.  There is a dense
 // numbering matching function arguments, with -1 reserved for the RPC and -2

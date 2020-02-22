@@ -9,7 +9,7 @@ import java.util.function.Predicate;
 // Merge results
 public class RegionNode extends Node {
   public RegionNode( Node... ctrls) { super(OP_REGION,ctrls); }
-  RegionNode( byte op ) { super(op); add_def(null); } // For FunNodes
+  RegionNode( byte op ) { super(op,(Node)null); } // For FunNodes
   @Override public Node ideal(GVNGCM gvn, int level) {
     // TODO: The unzip xform, especially for funnodes doing type-specialization
     // TODO: treat _cidx like U/F and skip_dead it also

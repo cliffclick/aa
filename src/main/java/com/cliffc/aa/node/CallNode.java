@@ -168,7 +168,7 @@ public class CallNode extends Node {
       }
     }
 
-    Node unk  = fun();          // Function epilog/function pointer
+    Node unk = fun();           // Function epilog/function pointer
     // If the function is unresolved, see if we can resolve it now
     if( unk instanceof UnresolvedNode ) {
       FunPtrNode fun = resolve(gvn);

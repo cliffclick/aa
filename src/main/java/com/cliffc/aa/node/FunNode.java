@@ -264,7 +264,7 @@ public class FunNode extends RegionNode {
   private int find_type_split_index( GVNGCM gvn, ParmNode[] parms ) {
     assert has_unknown_callers(); // Only overly-wide calls.
     for( ParmNode parm : parms ) // For all parms
-      if( parm != null )         //   (some can be dead)
+      if( parm != null && parm._idx > 0 ) // (some can be dead) and skipping the closure
         for( Node call : parm._uses ) // See if a parm-user needs a type-specialization split
           if( call instanceof CallNode &&
               ((CallNode)call).fun() instanceof UnresolvedNode ) { // Call overload not resolved
@@ -289,6 +289,7 @@ public class FunNode extends RegionNode {
       Type[] sig = new Type[parms.length];
       for( int i=0; i<parms.length; i++ )
         sig[i] = parms[i]==null ? (i==0 ? Type.NIL : Type.SCALAR) : gvn.type(parms[i].in(idx)).widen();
+      assert !(sig[0] instanceof TypeFunPtr);
       return sig;
     }
 
@@ -562,7 +563,7 @@ public class FunNode extends RegionNode {
         // Find the use idx; skip CallNode.fun() uses as these will be wired
         // correctly shortly.
         for( int idx=0; idx < use._defs._len; idx++ )
-          if( use.in(idx) == old_funptr && !(use instanceof CallNode && idx==2) )
+          if( use.in(idx) == old_funptr && !(use instanceof CallNode && ((CallNode)use).fun()==old_funptr) )
             { gvn.set_def_reg(use,idx,new_unr); i--; break; }
       }
       gvn.add_work(new_unr);
@@ -599,6 +600,7 @@ public class FunNode extends RegionNode {
         for( ParmNode parm : parms ) // For all parms
           if( parm != null ) {       //   (some can be dead)
             Type tp = gvn.type(call.arg(parm._idx)); // Specific path type
+            if( parm._idx==0 ) tp = ((TypeFunPtr)tp).closure();
             if( !tp.isa(fun.targ(parm._idx)) || // If this path cannot use the sharper sig
                 tp.above_center() )             // Or path is in-error
               { fp = old_funptr; break; } // Take the old, more generic version

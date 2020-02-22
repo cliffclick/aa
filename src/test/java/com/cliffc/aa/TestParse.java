@@ -139,9 +139,8 @@ public class TestParse {
 
   @Test public void testParse02() {
     Object dummy = Env.GVN; // Force class loading cycle
-    test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)",TypeInt.con(5));
     // Anonymous function definition
-    test_isa("{x y -> x+y}", TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make_args(TypeStruct.ts(TypeFunPtr.GENERIC_FUNPTR,Type.SCALAR,Type.SCALAR)),Type.SCALAR)); // {Scalar Scalar -> Scalar}
+    test_isa("{x y -> x+y}", TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make_args(TypeStruct.ts(TypeMemPtr.CLOSURE_PTR,Type.SCALAR,Type.SCALAR)),Type.SCALAR)); // {Scalar Scalar -> Scalar}
     test("{5}()", TypeInt.con(5)); // No args nor -> required; this is simply a function returning 5, being executed
 
     // ID in different contexts; in general requires a new TypeVar per use; for

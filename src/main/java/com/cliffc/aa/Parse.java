@@ -712,7 +712,7 @@ public class Parse {
     // Push an extra hidden closure argument.  Similar to java inner-class ptr
     // or when inside of a struct definition: 'this'.
     ids .push("^");
-    ts  .push(TypeFunPtr.GENERIC_FUNPTR);
+    ts  .push(TypeMemPtr.CLOSURE_PTR);
     bads.push(null);
 
     // Parse arguments
@@ -761,10 +761,9 @@ public class Parse {
       for( int i=0; i<ids._len; i++ ) {
         // Parms for all arguments, including the hidden closure ptr
         Node parm = gvn(new ParmNode(i,ids.at(i),fun,con(ts.at(i)),errmsg));
-        if( i==0 ) parm = gvn(new FP2ClosureNode(parm));
         // Type-check arguments
-        else parm = typechk(parm,ts.at(i),mem,bads.at(i));
-        create(ids.at(i),parm, args_are_mutable);
+        Node mt = typechk(parm,ts.at(i),mem,bads.at(i));
+        create(ids.at(i),mt, args_are_mutable);
       }
 
       // Function memory is a merge of incoming wide memory, and the local
