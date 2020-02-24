@@ -46,25 +46,9 @@ public class StoreNode extends Node {
         mem.in(0) instanceof NewObjNode && (nnn=(NewObjNode)mem.in(0)) == adr.in(0) &&
         mem._uses._len==1 && !val().is_forward_ref() && !nnn._captured &&
         (idx=nnn._ts.find(_fld))!= -1 && nnn._ts.can_update(idx) ) {
-      // The OProj type needs to reflect final.  This is because we have an
-      // Ideal rule allowing a Load to bypass a Store that is not in-error, but
-      // back-to-back final stores can temporarily be not-in-error if the OProj
-      // does not reflect final.
-
-      // As part of the local xform rule, the memory & ptr outputs of the
-      // NewNode need to update their types directly.  This Store points at the
-      // OProj, and when it folds it can set the NewNode mutable bit to final -
-      // which strictly runs downhill.  However, iter() calls must strictly run
-      // uphill, so we have to expand the changed region to cover all the
-      // "downhilled" parts and "downhill" them to match.  Outside of the
-      // "downhilled" region, the types are unchanged.
-      nnn.update_mod(idx,_fin,val(),gvn); // Update final field, if needed.  Runs nnn "downhill"
-      for( Node use : nnn._uses ) {
-        gvn.setype(use,use.value(gvn)); // Record "downhill" type for OProj, DProj
-        gvn.add_work(use);              // After this is just the StoreNode, being replaced
-        for( Node useuse : use._uses ) gvn.add_work(useuse);
-      }
-      return mem;
+      // Update the value, and perhaps the final field
+      nnn.update(idx,_fin,val(),gvn);
+      return mem;               // Store is replaced by using the New directly.
     }
 
     // Store can bypass a Call, if the memory is not returned from the call,

@@ -17,13 +17,14 @@ public class NewObjNode extends NewNode<TypeStruct> {
   public final boolean _is_closure; // For error messages
   // NewNodes do not really need a ctrl; useful to bind the upward motion of
   // closures so variable stores can more easily fold into them.
-  public NewObjNode( boolean is_closure, Node ctrl ) {
+  public NewObjNode( boolean is_closure, Node ctrl, Node clo ) {
     this(is_closure,
          is_closure ? BitsAlias.CLOSURE : BitsAlias.TUPLE,
-         TypeStruct.ALLSTRUCT,ctrl);
+         TypeStruct.CLOSURE,ctrl,clo);
   }
-  public NewObjNode( boolean is_closure, int par_alias, TypeStruct ts, Node ctrl ) {
-    super(OP_NEWOBJ,par_alias,ts,ctrl);
+  // Called by IntrinsicNode.convertTypeNameStruct
+  public NewObjNode( boolean is_closure, int par_alias, TypeStruct ts, Node ctrl, Node clo ) {
+    super(OP_NEWOBJ,par_alias,ts,ctrl,clo);
     _is_closure = is_closure;
   }
   public Node get(String name) { int idx = _ts.find(name);  assert idx >= 0; return fld(idx); }
@@ -32,6 +33,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
 
   // Create a field from parser for an inactive this
   public void create( String name, Node val, byte mutable, GVNGCM gvn  ) {
+    assert !Util.eq(name,"^"); // Closure field created on init
     gvn.unreg(this);
     create_active(name,val,mutable,gvn);
     for( Node use : _uses )
@@ -47,29 +49,34 @@ public class NewObjNode extends NewNode<TypeStruct> {
     _ts = _ts.add_fld(name,Type.SCALAR,mutable);
     add_def(val);
   }
-  // Update the field mod
-  public void update_mod( int fidx, byte mutable, Node val, GVNGCM gvn  ) {
+  public void update( String tok, byte mutable, Node val, GVNGCM gvn  ) { update(_ts.find(tok),mutable,val,gvn); }
+  // Update the field & mod
+  public void update( int fidx, byte mutable, Node val, GVNGCM gvn  ) {
     gvn.unreg(this);
-    if( _ts._finals[fidx] != mutable )
+    boolean update_final = update_active(fidx,mutable,val,gvn);
+    gvn.rereg(this,value(gvn));
+    // As part of the local xform rule, the memory & ptr outputs of the NewNode
+    // need to update their types directly.  The NewNode mutable bit can be set
+    // to final - which strictly runs downhill.  However, iter() calls must
+    // strictly run uphill, so we have to expand the changed region to cover
+    // all the "downhilled" parts and "downhill" them to match.  Outside of the
+    // "downhilled" region, the types are unchanged.
+    if( update_final )
+      for( Node use : _uses ) {
+        gvn.setype(use,use.value(gvn)); // Record "downhill" type for OProj, DProj
+        gvn.add_work_uses(use);         // Neighbors on worklist
+      }
+  }
+  public boolean update_active( int fidx, byte mutable, Node val, GVNGCM gvn  ) {
+    assert !gvn.touched(this);
+    assert def_idx(_ts._ts.length)== _defs._len;
+    boolean update_final = _ts._finals[fidx] != mutable;
+    if( update_final )
       _ts = _ts.set_fld(fidx,_ts.at(fidx),mutable);
     set_def(def_idx(fidx),val,gvn);
-    gvn.rereg(this,value(gvn));
+    return update_final;
   }
-  // Update/modify a field, by field number for an active this
-  public void update( String tok, Node val, byte mutable, GVNGCM gvn  ) {
-    gvn.unreg(this);
-    update_active(_ts.find(tok),val,mutable,gvn);
-    for( Node use : _uses )
-      gvn.setype(use,use.value(gvn));
-    assert gvn.touched(this);
-  }
-  // Update/modify a field, by field number for an active this
-  private void update_active( int fidx, Node val, byte mutable, GVNGCM gvn  ) {
-    assert def_idx(_ts._ts.length)== _defs._len;
-    assert fidx != -1;
-    _ts = _ts.set_fld(fidx,gvn.type(val),mutable);
-    set_def(def_idx(fidx),val,gvn);
-  }
+
 
   // Add a named FunPtr to a New.  Auto-inflates to a Unresolved as needed.
   public FunPtrNode add_fun( Parse bad, String name, FunPtrNode ptr, GVNGCM gvn ) {
@@ -80,7 +87,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
       Node n = _defs.at(def_idx(fidx));
       if( n instanceof UnresolvedNode ) n.add_def(ptr);
       else n = new UnresolvedNode(bad,n,ptr);
-      update_active(fidx,n,TypeStruct.ffinal(),gvn);
+      update_active(fidx,TypeStruct.ffinal(),n,gvn);
     }
     return ptr;
   }

@@ -269,9 +269,10 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public  static TypeStruct make(String name, String[] flds, Type[] ts, byte[] finals) { return malloc(name,false,false,flds,ts,finals).hashcons_free(); }
 
   private static final String[][] TFLDS={{},
-                                         {"0"},
-                                         {"0","1"},
-                                         {"0","1","2"}};
+                                         {"^"},
+                                         {"^","0"},
+                                         {"^","0","1"},
+                                         {"^","0","1","2"}};
   public  static String[] TFLDS( int len ) { return TFLDS[len]; }
   public  static TypeStruct make_tuple( Type... ts ) { return make(TFLDS[ts.length],ts,finals(ts.length)); }
   public  static TypeStruct make(String[] flds, byte[] finals) { return make(flds,ts(flds.length),finals); }
@@ -286,7 +287,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   }
 
   // The display is a self-recursive structure: slot 0 is a ptr to a Display.
-  public  static final TypeStruct CLOSURE = malloc("",false,false,new String[]{"^"},ts(Type.NIL),fbots(1));
+  public  static final TypeStruct CLOSURE = malloc("",false,false,new String[]{"^"},ts(Type.NIL),finals(1));
   static { CLOSURE._hash = CLOSURE.compute_hash(); }
   // Most primitive function call argument type lists are 0-based
   public  static final TypeStruct GENERIC = malloc("",true,true,FLD0,TypeAry.get(0),new byte[0]).hashcons_free();
@@ -313,7 +314,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   private static final TypeStruct ARW   = make(flds("^","a"),ts(Type.NIL,TypeFlt.FLT64),new byte[]{frw(),frw()});
 
   // Called during init to break the cycle making CLOSURE
-  static void init1() {
+  public static void init1() {
     if( CLOSURE._ts[0] == Type.NIL ) {
       CLOSURE._ts = ts(TypeMemPtr.CLOSURE_PTR);
       CLOSURE.install_cyclic(new Ary<>(ts(CLOSURE,TypeMemPtr.CLOSURE_PTR)));

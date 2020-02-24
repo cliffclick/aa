@@ -30,7 +30,7 @@ public final class CallEpiNode extends Node {
     CallNode call = call();
     TypeTuple tcall = (TypeTuple)gvn.type(call);
     if( tcall.at(0) != Type.CTRL ) return null; // Call not executable
-    Type tfptr = tcall.at(2);
+    Type tfptr = tcall.at(3);
     if( !(tfptr instanceof TypeFunPtr) ) return null; // No known function pointer
     TypeFunPtr tfp = (TypeFunPtr)tfptr;
 
@@ -122,7 +122,7 @@ public final class CallEpiNode extends Node {
     Node rmem = ret.mem();      // Memory  being returned
     Node rrez = ret.val();      // Value   being returned
     // If the function does nothing with memory, then use the call memory directly.
-    if( rmem instanceof ParmNode && rmem.in(0) == fun )
+    if( (rmem instanceof ParmNode && rmem.in(0) == fun) || gvn.type(rmem)==TypeMem.EMPTY )
       rmem = cmem;
 
     // Check for zero-op body (id function)
@@ -133,7 +133,7 @@ public final class CallEpiNode extends Node {
       return inline(gvn,call,cctl,cmem,rrez,ret);
 
     // Check for a 1-op body using only constants or parameters and no memory effects
-    boolean can_inline=!(rrez instanceof ParmNode) && (rmem==cmem || gvn.type(rmem)==TypeMem.EMPTY);
+    boolean can_inline=!(rrez instanceof ParmNode) && rmem==cmem;
     for( Node parm : rrez._defs )
       if( parm != null && parm != fun &&
           !(parm instanceof ParmNode && parm.in(0) == fun) &&
@@ -181,9 +181,10 @@ public final class CallEpiNode extends Node {
     // so there's no Parm/Phi to attach the incoming arg to.
     for( Node arg : fun._uses ) {
       if( arg.in(0) == fun && arg instanceof ParmNode ) {
+        // See CallNode output tuple type for what these horrible magic numbers are.
         int idx = ((ParmNode)arg)._idx; // Argument number, or -1 for rpc
         Node actual = idx==-1 ? new ConNode<>(TypeRPC.make(call._rpc)) :
-          (idx==-2 ? new MProjNode(call,1) : new ProjNode(call,idx+2));
+          (idx==-2 ? new MProjNode(call,2) : new ProjNode(call,idx+3));
         if( idx==0 )
           actual = new FP2ClosureNode(gvn.xform(actual));
         if( gvn._opt_mode == 2 ) {
@@ -219,8 +220,13 @@ public final class CallEpiNode extends Node {
     // Get Call result.  If the Call args are in-error, then the Call is called
     // and we flow types to the post-call.... BUT the bad args are NOT passed
     // along to the function being called.
+    // tcall[0] = Control
+    // tcall[1] = Full available memory
+    // tcall[2] = Memory slice passed to function
+    // tcall[3] = TypeFunPtr passed to FP2Closure
+    // tcall[4+]= Arg types
     TypeTuple tcall = (TypeTuple)gvn.type(call);
-    Type tfptr = tcall.at(2);
+    Type tfptr = tcall.at(3);
     if( !(tfptr instanceof TypeFunPtr) ) // Call does not know what it is calling?
       return TypeTuple.CALLE;
     TypeFunPtr funt = (TypeFunPtr)tfptr;
@@ -294,7 +300,7 @@ public final class CallEpiNode extends Node {
     // precisely stomps all of it, the call needs to be reporting [1#:~obj] -
     // in which case a normal MEET suffices.
     TypeTuple tt = (TypeTuple)t;
-    Type pre_c_mem = gvn.type(call.mem());
+    Type pre_c_mem = tcall.at(1);
     TypeMem pre_call_memory = pre_c_mem instanceof TypeMem
       ? (TypeMem)pre_c_mem
       : (pre_c_mem.above_center() ? TypeMem.XMEM : TypeMem.MEM);
@@ -324,8 +330,7 @@ public final class CallEpiNode extends Node {
     }
     // Call is also is_copy and will need to collapse
     call._is_copy = true;              // Call is also is-copy
-    gvn.add_work(call.keep());
-    for( Node use : call._uses ) gvn.add_work(use);
+    gvn.add_work_uses(call.keep());
     // Remove all edges except the inlined results
     ctl.keep();  mem.keep();  rez.keep();
     while( _defs._len > 0 ) pop(gvn);

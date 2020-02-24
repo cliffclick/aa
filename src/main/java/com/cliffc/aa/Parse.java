@@ -181,7 +181,7 @@ public class Parse {
     if( res == null ) res = con(Type.ANY);
     _gvn.add_work(all_mem());   // Close off top-level active memory
     _e._par._scope.all_mem(_gvn); // Loads against primitive scope will 'activate' memory, close it also
-    _e._scope.add_def(res);       // Hook result
+    _e._scope.set_rez(res,_gvn);  // Hook result
   }
 
   /** Parse a list of statements; final semi-colon is optional.
@@ -369,7 +369,7 @@ public class Parse {
         if( objmem.in(0) instanceof NewObjNode &&
             !ifex.is_forward_ref() &&
             ((NewObjNode)objmem.in(0)).is_mutable(tok) ) {
-          ((NewObjNode)objmem.in(0)).update(tok,ifex,mutable,_gvn);
+          ((NewObjNode)objmem.in(0)).update(tok,mutable,ifex,_gvn);
         } else {
           StoreNode st = (StoreNode)gvn(new StoreNode(objmem,ptr,ifex,mutable,tok,errMsg()));
           mmem.st(st,_gvn);     // Update active memory
@@ -680,7 +680,7 @@ public class Parse {
    *  tuple= (stmts,[stmts,])     // Tuple; final comma is optional
    */
   private Node tuple(Node s) {
-    NewObjNode nn = new NewObjNode(false,ctrl());
+    NewObjNode nn = new NewObjNode(false,ctrl(),con(Type.NIL));
     int fidx=0, oldx=_x-1; // Field name counter, mismatched parens balance point
     while( s!=null ) {
       nn.create_active((""+(fidx++)).intern(),s,TypeStruct.ffinal(),_gvn);
@@ -690,10 +690,10 @@ public class Parse {
     require(')',oldx);
     // NewNode updates merges the new allocation into all-of-memory and returns
     // a reference.
-    Node nnn = gvn(nn);
+    Node nnn = gvn(nn).keep();
     Node ptr = gvn(new  ProjNode(nnn,1));
     Node mem = gvn(new OProjNode(nnn,0));
-    mem_active().create_alias_active(nn._alias,mem,_gvn);
+    mem_active().create_alias_active(nn.<NewObjNode>unhook()._alias,mem,_gvn);
     return ptr;
   }
 
@@ -757,10 +757,15 @@ public class Parse {
       // Build Parms for all incoming values
       Node rpc = gvn(new ParmNode(-1,"rpc",fun,con(TypeRPC.ALL_CALL),null)).keep();
       Node mem = gvn(new ParmNode(-2,"mem",fun,con(TypeMem.FULL    ),null));
+      Node clo = gvn(new ParmNode( 0,"^"  ,fun,con(TypeMemPtr.CLOSURE_PTR),null));
+      // Closure is special: the default is simple the outer lexical scope.
+      // But here, in a function, the closure is actually passed in as a hidden
+      // extra argument and replaces the default.
+      e._scope.stk().update(0,ts_mutable(false),clo,_gvn);
+      // Parms for all arguments
       Parse errmsg = errMsg();  // Lazy error message
-      for( int i=0; i<ids._len; i++ ) {
-        // Parms for all arguments, including the hidden closure ptr
-        Node parm = gvn(new ParmNode(i,ids.at(i),fun,con(i==0?ts.at(0):Type.SCALAR),errmsg));
+      for( int i=1; i<ids._len; i++ ) {
+        Node parm = gvn(new ParmNode(i,ids.at(i),fun,con(Type.SCALAR),errmsg));
         // Type-check arguments
         Node mt = typechk(parm,ts.at(i),mem,bads.at(i));
         create(ids.at(i),mt, args_are_mutable);
@@ -904,10 +909,10 @@ public class Parse {
     }
     TypeStr ts = TypeStr.con(new String(_buf,oldx,_x-oldx-1).intern());
     // Convert to ptr-to-constant-memory-string
-    NewNode nnn = (NewNode)gvn( new NewStrNode(ts,ctrl(),con(ts)));
+    NewStrNode nnn = init( new NewStrNode(ts,ctrl(),con(ts))).keep();
     Node ptr = gvn( new  ProjNode(nnn,1));
     Node mem = gvn( new OProjNode(nnn,0));
-    mem_active().create_alias_active(nnn._alias,mem,_gvn);
+    mem_active().create_alias_active(nnn.<NewStrNode>unhook()._alias,mem,_gvn);
     return ptr;
   }
 
@@ -968,7 +973,7 @@ public class Parse {
         ret = typep(type_var);
         if( ret == null ) return null; // should return TypeErr missing type after ->
       } else {                  // Allow no-args and simple return type
-        if( ts._len != 1 ) return null; // should return TypeErr missing -> in tfun
+        if( ts._len != 2 ) return null; // should return TypeErr missing -> in tfun
         ret = ts.pop();         // Get single return type
       }
       TypeStruct targs = TypeStruct.make_args(ts.asAry());
@@ -1157,7 +1162,7 @@ public class Parse {
     MemMergeNode mmem = mem_active();
     while( true ) {
       if( scope == e._scope ) return ptr;
-      ptr = gvn(new LoadNode(mmem,ptr,"0",null)); // Gen linked-list walk code, walking slot 0.
+      ptr = gvn(new LoadNode(mmem,ptr,"^",null)); // Gen linked-list walk code, walking closure slot
       e = e._par;                                 // Walk linked-list in parser also
     }
   }

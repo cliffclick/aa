@@ -39,6 +39,7 @@ public class ScopeNode extends Node {
   public NewObjNode stk () { return (NewObjNode)ptr().in(0); }
   public <N extends Node> N set_ctrl( N n, GVNGCM gvn) { set_def(0,n,gvn); return n; }
   public void set_ptr ( Node n, GVNGCM gvn) { set_def(2,n,gvn); }
+  public void set_rez ( Node n, GVNGCM gvn) { set_def(3,n,gvn); }
   // Set a new deactive GVNd memory, ready for nested Node.ideal() calls.
   public Node set_mem( Node n, GVNGCM gvn) {
     assert n==null || gvn.type(n) instanceof TypeMem;

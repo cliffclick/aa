@@ -63,7 +63,7 @@ public abstract class Node implements Cloneable {
     if( (_defs._es[idx] = n) != null ) n._uses.add(this);
     return unuse(old, gvn);
   }
-  
+
   public Node insert (int idx, Node n) { _chk(); _defs.insert(idx,n); if( n!=null ) n._uses.add(this); return this; }
   // Return Node at idx, withOUT auto-deleting it, even if this is the last
   // use.  Used by the parser to retrieve final Nodes from tmp holders.  Does
@@ -205,7 +205,7 @@ public abstract class Node implements Cloneable {
   }
   boolean is_multi_head() { return _op==OP_CALL || _op==OP_CALLEPI || _op==OP_FUN || _op==OP_IF || _op==OP_LIBCALL || _op==OP_NEWOBJ || _op==OP_NEWSTR || _op==OP_REGION || _op==OP_START; }
   private boolean is_multi_tail() { return _op==OP_PARM || _op==OP_PHI || _op==OP_PROJ || _op==OP_CPROJ; }
-  private boolean is_CFG()        { return _op==OP_CALL || _op==OP_CALLEPI || _op==OP_FUN || _op==OP_RET || _op==OP_IF || _op==OP_REGION || _op==OP_START || _op==OP_CPROJ || _op==OP_SCOPE; } 
+  private boolean is_CFG()        { return _op==OP_CALL || _op==OP_CALLEPI || _op==OP_FUN || _op==OP_RET || _op==OP_IF || _op==OP_REGION || _op==OP_START || _op==OP_CPROJ || _op==OP_SCOPE; }
 
   public String dumprpo( GVNGCM gvn, boolean prims ) {
     Ary<Node> nodes = new Ary<>(new Node[1],0);
@@ -248,7 +248,7 @@ public abstract class Node implements Cloneable {
         else if( use.is_CFG() ) use.postorder(nodes,bs);
       if( cepi != null ) cepi.postorder(nodes,bs);
     }
-  
+
     // Walk the rest (especially data).  Since visit bit set on the CFGs its OK
     // to walk them also.  Calls are special, since their Proj's feed into a
     // Fun's Parms.  We want the Fun to walk its own Parms, in order so ignore
@@ -257,7 +257,7 @@ public abstract class Node implements Cloneable {
     if( _op != OP_CALL && _op!=OP_RET )
       for( Node use : _uses )
         use.postorder(nodes,bs);
-    
+
     // Slight PO tweak: heads and tails together.
     if( is_multi_head() )
       for( Node use : _uses )
@@ -339,6 +339,9 @@ public abstract class Node implements Cloneable {
       Node idl = ideal(gvn,level);
       if( idl != null )
         return true;            // Found an ideal call
+      Type t = value(gvn);
+      if( gvn.type(this) != t )
+        return true;            // Found a value improvement
     }
     for( Node def : _defs ) if( def != null && def.more_ideal(gvn,bs,level) ) return true;
     for( Node use : _uses ) if( use != null && use.more_ideal(gvn,bs,level) ) return true;

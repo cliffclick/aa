@@ -52,7 +52,7 @@ public class TypeStr extends TypeObj<TypeStr> {
   static final TypeStr[] TYPES = new TypeStr[]{STR,XSTR,ABC,DEF};
   static void init1( HashMap<String,Type> types ) { types.put("str",STR); }
   // Return a String from a TypeStr constant; assert otherwise.
-  @Override public String getstr() { assert is_con(); return _con; }
+  @Override public String getstr() { assert _con!=null; return _con; }
 
   @Override protected TypeStr xdual() { return _con==null ? new TypeStr(_name,!_any,null) : this; }
   @Override TypeStr rdual() {
@@ -96,7 +96,7 @@ public class TypeStr extends TypeObj<TypeStr> {
   //@Override public TypeObj lift_final() { return this; }
   @Override public BitsAlias recursive_aliases(BitsAlias abs, TypeMem mem) { return abs; }
   @Override public boolean may_be_con() { return super.may_be_con() || _con != null; }
-  @Override public boolean is_con() { return _con!=null; }
+  //@Override public boolean is_con() { return _con!=null; }
   @Override public Type meet_nil() { return this; }
 
   // Lattice of conversions:

@@ -13,25 +13,25 @@ public class Env implements AutoCloseable {
     _P = P;
     _par = par;
     _fun = fun;
-    ScopeNode scope = _scope = new ScopeNode(P==null ? null : P.errMsg(),fun!=null);
-    if( par == null ) return;
-    scope.set_ctrl(par._scope.ctrl(),GVN);
-    NewObjNode nnn = GVN.init(new NewObjNode(fun!=null,scope.ctrl())).keep();
+    Node ctl = par == null ? CTL_0 : par._scope.ctrl();
+    Node clo = par == null ? GVN.con(Type.NIL) : par._scope.ptr ();
+    Node mem = par == null ? MEM_0 : par._scope.mem ();
+    NewObjNode nnn = GVN.init(new NewObjNode(fun!=null,ctl,clo)).keep();
     Node frm = GVN.xform(new OProjNode(nnn,0));
     Node ptr = GVN.xform(new  ProjNode(nnn,1));
+    BitsAlias bits_clo = BitsAlias.make0(_closure_alias = nnn._alias);
+    CLOSURES = par == null ? bits_clo : CLOSURES.meet(bits_clo);
+    MemMergeNode mmem = new MemMergeNode(mem,frm,nnn.<NewObjNode>unhook()._alias);
+    ScopeNode scope = _scope = new ScopeNode(P==null ? null : P.errMsg(),fun!=null);
+    scope.set_ctrl(ctl,GVN);
     scope.set_ptr (ptr,GVN);  // Address for 'nnn', the local stack frame
-    MemMergeNode mem = new MemMergeNode(par._scope.mem(),frm,nnn.<NewObjNode>unhook()._alias);
-    scope.set_active_mem(mem,GVN);  // Memory includes local stack frame
-    _closure_alias = nnn._alias;
-    CLOSURES = CLOSURES.meet(BitsAlias.make0(_closure_alias));
+    scope.set_active_mem(mmem,GVN);  // Memory includes local stack frame
   }
 
   public  final static GVNGCM GVN; // Initial GVN, defaults to ALL, lifts towards ANY
   public  final static  StartNode START; // Program start values (control, empty memory, cmd-line args)
   public  final static  CProjNode CTL_0; // Program start value control
-          final static       Node MEM_0; // Program start value memory
-  private final static       Node PTR_0; // Program start stack frame address
-  private final static       Node OBJ_0; // Program start stack frame memory
+  public  final static  MProjNode MEM_0; // Program start value memory
   public  final static NewObjNode STK_0; // Program start stack frame (has primitives)
   public  final static    ConNode ALL_CTRL;
           final static int LAST_START_UID;
@@ -40,31 +40,32 @@ public class Env implements AutoCloseable {
   public        static BitsAlias CLOSURES;
 
   static {
+    // Add base types on startup
+    TypeStruct.init1();
     GVN = new GVNGCM();      // Initial GVN, defaults to ALL, lifts towards ANY
-    // Initial control & memory
-    START        =          new  StartNode(       ) ;
-    CTL_0        = GVN.init(new  CProjNode(START,0));
-    Node all_mem = GVN.init(new  MProjNode(START,1));
-    // Top-level closure defining all primitives
-    STK_0        =          new NewObjNode(true,CTL_0).keep();
-    PTR_0        = GVN.init(new   ProjNode(STK_0,1));
-    OBJ_0        =          new  OProjNode(STK_0,0) ;
-    CLOSURES = BitsAlias.make0(STK_0._alias);
 
-    MEM_0 = GVN.init(new MemMergeNode(all_mem,OBJ_0,STK_0._alias)).keep();
+    // Initial control & memory
+    START  =          new StartNode(       ) ;
+    CTL_0  = GVN.init(new CProjNode(START,0));
+    MEM_0  = GVN.init(new MProjNode(START,1));
+    // Top-most (file-scope) lexical environment
+    TOP = new Env(null,null,null);
+    // Top-level closure defining all primitives
+    STK_0  = TOP._scope.stk();
+
     // Top-level default values; ALL_CTRL is used by declared functions to
     // indicate that future not-yet-parsed code may call the function.
     ALL_CTRL = GVN.init(new ConNode<>(Type.CTRL));
     // Used to reset between tests
     LAST_START_UID = ALL_CTRL._uid;
-    // Top-most (file-scope) lexical environment
-    TOP    = new Env(null,null,null);
+    // Install primitives.  :-)
     TOP.install_primitives();
     // Used to reset between tests
     NINIT_CONS = START._uses._len;
   }
   private void install_primitives() {
     _scope.init0();             // Add base types
+    GVN.unreg(STK_0);           // Make STK_0 active, to cheaply add primitives
     for( PrimNode prim : PrimNode.PRIMS )
       STK_0.add_fun(null,prim._name,(FunPtrNode) GVN.xform(prim.as_fun(GVN)), GVN);
     for( IntrinsicNewNode lib : IntrinsicNewNode.INTRINSICS )
@@ -74,11 +75,8 @@ public class Env implements AutoCloseable {
     // Now that all the UnresolvedNodes have all possible hits for a name,
     // register them with GVN.
     for( Node val : STK_0._defs )  if( val instanceof UnresolvedNode ) GVN.init0(val);
-    _scope.set_ctrl(CTL_0, GVN);
-    _scope.set_mem (MEM_0.unhook(), GVN);
-    _scope.set_ptr (PTR_0, GVN);
-    GVN.rereg(STK_0.unhook(),STK_0.value(GVN));
-    GVN.rereg(OBJ_0,OBJ_0.value(GVN));
+    GVN.rereg(_scope.mem(),TypeMem.FULL);
+    GVN.rereg(STK_0,STK_0.all_type());
     // Run the worklist dry
     GVN.iter(1);
     BitsAlias.init0(); // Done with adding primitives
@@ -88,7 +86,8 @@ public class Env implements AutoCloseable {
     GVN      .init0(); // Done with adding primitives
   }
 
-  // A new top-level Env, above this is the basic public Env with all the primitives
+  // A new Env for the current Parse scope (generally a file-scope or a
+  // test-scope), above this is the basic public Env with all the primitives
   public static Env top() { return new Env(TOP,null,null); }
 
   // Wire up an early function exit
@@ -104,8 +103,7 @@ public class Env implements AutoCloseable {
     if( ptr == null ) return;   // Already done
     NewObjNode stk = _scope.stk();
     CLOSURES = CLOSURES.clear(stk._alias);
-    for( Node use : stk._uses )
-      gvn.add_work(use);        // Scope object going dead, trigger following projs to cleanup
+    gvn.add_work_uses(stk);     // Scope object going dead, trigger following projs to cleanup
     _scope.set_ptr(null,gvn);   // Clear pointer to closure
   }
 

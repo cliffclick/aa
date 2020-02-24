@@ -172,8 +172,8 @@ public class TestParse {
     test("f0 = { x -> x ? {+}(f0(x-1),1) : 0 }; f0(2)", TypeInt.con(2));
     testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact()","Passing 0 arguments to fact={->} which takes 1 arguments",48);
     test_obj("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(0),fact(1),fact(2))",
-             TypeStruct.make_tuple(Type.NIL,TypeInt.con(1),TypeInt.con(2)));
-
+             TypeStruct.make_tuple(Type.NIL,Type.NIL,TypeInt.con(1),TypeInt.con(2)));
+    
     // Co-recursion requires parallel assignment & type inference across a lexical scope
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.TRUE );
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(5)", Type.NIL  );
@@ -206,7 +206,7 @@ public class TestParse {
     testerr("fun:{int str -> int}={x y -> x+y}; fun(2,3)", "3 is not a *[$]str",3);
     // Test that the type-check is on the variable and not the function.
     test_obj("fun={x y -> x*2}; bar:{int str -> int} = fun; baz:{int @{x;y} -> int} = fun; (fun(2,3),bar(2,\"abc\"))",
-            TypeStruct.make_tuple(TypeInt.con(4),TypeInt.con(4)));
+             TypeStruct.make_tuple(Type.NIL,TypeInt.con(4),TypeInt.con(4)));
     testerr("fun={x y -> x+y}; baz:{int @{x;y} -> int} = fun; (fun(2,3), baz(2,3))",
             "3 is not a *[$]@{x=;y=}!", 21);
 
@@ -260,7 +260,7 @@ public class TestParse {
     test("x=@{a:=1;b= {a=a+1;b=0}}; x.b(); x.a",TypeInt.con(2));
 
     // Tuple
-    test_obj_isa("(0,\"abc\")", TypeStruct.make_tuple(Type.NIL,TypeMemPtr.STRPTR));
+    test_obj_isa("(0,\"abc\")", TypeStruct.make_tuple(Type.NIL,Type.NIL,TypeMemPtr.STRPTR));
     test("(1,\"abc\").0", TypeInt.TRUE);
     test_isa("(1,\"abc\").1", TypeMemPtr.STRPTR);
 
@@ -390,7 +390,7 @@ public class TestParse {
     // Test inferring a recursive tuple type, with less help.  This one
     // inlines so doesn't actually test inferring a recursive type.
     test_ptr("map={x -> x ? (map(x.0),x.1*x.1) : 0}; map((0,1.2))",
-             (alias) -> TypeMemPtr.make(alias,TypeStruct.make_tuple(Type.NIL,TypeFlt.con(1.2*1.2))));
+             (alias) -> TypeMemPtr.make(alias,TypeStruct.make_tuple(Type.NIL,Type.NIL,TypeFlt.con(1.2*1.2))));
 
     test_obj_isa("map={x -> x ? (map(x.0),x.1*x.1) : 0};"+
                  "map((math_rand(1)?0: (math_rand(1)?0: (math_rand(1)?0: (0,1.2), 2.3), 3.4), 4.5))",
@@ -491,7 +491,7 @@ public class TestParse {
   }
 
   @Test public void testParse09() {
-    test_obj("x:=0; a=x; x:=1; b=x; x:=2; (a,b,x)", TypeStruct.make_tuple(Type.NIL,TypeInt.con(1),TypeInt.con(2)));
+    test_obj("x:=0; a=x; x:=1; b=x; x:=2; (a,b,x)", TypeStruct.make_tuple(Type.NIL,Type.NIL,TypeInt.con(1),TypeInt.con(2)));
     // Test re-assignment
     test("x=1", TypeInt.TRUE);
     test("x=y=1", TypeInt.TRUE);
@@ -500,7 +500,7 @@ public class TestParse {
     testerr("x=1+y","Unknown ref 'y'",5);
 
     test("x:=1", TypeInt.TRUE);
-    test_obj("x:=0; a=x; x:=1; b=x; x:=2; (a,b,x)", TypeStruct.make_tuple(Type.NIL,TypeInt.con(1),TypeInt.con(2)));
+    test_obj("x:=0; a=x; x:=1; b=x; x:=2; (a,b,x)", TypeStruct.make_tuple(Type.NIL,Type.NIL,TypeInt.con(1),TypeInt.con(2)));
 
     testerr("x=1; x:=2; x", "Cannot re-assign final val 'x'", 9);
     testerr("x=1; x=2; x", "Cannot re-assign final val 'x'", 8);

@@ -17,7 +17,7 @@ public class ProjNode extends Node {
     if( cp != null ) return cp;
 
     // Basic escape analysis if DProj loses a use
-    if( in(0) instanceof NewNode && ((NewNode) in(0)).captured() )
+    if( in(0) instanceof NewNode && ((NewNode) in(0)).captured(gvn) )
       gvn.add_work(in(0));
 
     return null;

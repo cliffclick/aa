@@ -33,6 +33,11 @@ public class GVNGCM {
     _wrk_bits.set(n._uid);
     return n;
   }
+  // Add all uses as well
+  public void add_work_uses( Node n ) {
+    if( touched(n)  ) add_work(n); // DO not re-add if mid-ideal-call
+    for( Node use : n._uses )  add_work(use);
+  }
 
   // A second worklist, for code-expanding and thus lower priority work.
   // Inlining happens off this worklist, once the main worklist runs dry.
@@ -103,8 +108,7 @@ public class GVNGCM {
       Type t = n.value(this);   // Current type
       if( t != _ts.at(n._uid) ) { // Cached vs current
         _ts.setX(n._uid,t);     // Reset cache to current
-        for( Node use : n._uses )
-          add_work(use);
+        add_work_uses(n);
       }
     }
   }
@@ -183,7 +187,7 @@ public class GVNGCM {
     assert !check_opt(n);
     setype(n,oldt);
     _vals.putIfAbsent(n,n);     // 'n' will not go back if it hits a prior
-    add_work(n);
+    add_work_uses(n);
   }
 
   // Hack an edge, updating GVN as needed
@@ -292,8 +296,7 @@ public class GVNGCM {
     if( nnn==null ) return;
     assert (level&1)==0;        // No changes during asserts
     if( nnn == old ) {          // Progress, but not replacement
-      for( Node use : old._uses ) add_work(use);
-      add_work(old);            // Re-run old, until no progress
+      add_work_uses(old);       // Re-run old, until no progress
       nnn.ideal_impacted_by_changing_uses(this);
       return;
     }
@@ -348,9 +351,15 @@ public class GVNGCM {
     // Either no-progress, or progress and need to re-insert n back into system
     _ts._es[n._uid] = oldt;     // Restore old type, in case we recursively ask for it
     Type t = n.value(this);     // Get best type
+    // To turn this on:
+    //   A Call will refine memory into a Fun body.
+    //   A Phi in the Fun body will hold the refined memory.
+    //   When inlined, the memory Phi gets the full Call memory, not the refined.
+    //   The Phi then 'sinks'... but only to a value that a following CallEpi will
+    //   have been sunk to already.
     //if( !t.isa(oldt) ) {
     //  System.out.println("Backwards to: "+t+"\nfrom: "+n.dump(0,this));
-    //assert t.isa(oldt);         // Monotonically improving
+    //  assert t.isa(oldt);         // Monotonically improving
     //}
     _ts._es[n._uid] = null;     // Remove in case we replace it
     // Replace with a constant, if possible
@@ -479,12 +488,14 @@ public class GVNGCM {
             // When new control paths appear on Regions, the Region stays the
             // same type (Ctrl) but the Phis must merge new values.
             if( use instanceof RegionNode )
-              for( Node phi : use._uses ) if( phi != n ) add_work(phi);
+              //for( Node phi : use._uses ) if( phi != n ) add_work(phi);
+              add_work_uses(use);
             // When new memory appears on Calls, memory ops just after the Call
             // might be bypassing and need to pick up the new memory.
             if( use instanceof CallNode )
-              for( Node cepi : use._uses ) if( cepi instanceof CallEpiNode )
-                                             add_work(cepi);
+              for( Node cepi : use._uses )
+                if( cepi instanceof CallEpiNode )
+                  add_work(cepi);
           }
         }
       }

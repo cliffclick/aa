@@ -160,7 +160,7 @@ public class FunNode extends RegionNode {
   @Override Node copy(boolean copy_edges, CallEpiNode unused, GVNGCM gvn) { throw AA.unimpl(); }
 
   // True if may have future unknown callers.
-  private boolean has_unknown_callers() { return _defs._len > 1 && in(1) == Env.ALL_CTRL; }
+  boolean has_unknown_callers() { return _defs._len > 1 && in(1) == Env.ALL_CTRL; }
   // Argument type
   Type targ(int idx) {
     return idx == -1 ? TypeRPC.ALL_CALL :
@@ -174,6 +174,7 @@ public class FunNode extends RegionNode {
     if( dead instanceof ParmNode ) {
       RetNode ret = ret();
       if( ret != null ) {
+        gvn.add_work(ret); // Losing a Parm might reduce alias uses in ret
         FunPtrNode fptr = ret.funptr();
         if( fptr != null ) {
           for( Node call : fptr._uses )
@@ -459,7 +460,7 @@ public class FunNode extends RegionNode {
     old_fptr._t = _tf;
     gvn.rereg(old_fptr,_tf);   // Renumber in old FunPtrNode
     gvn.add_work(ret);
-    gvn.add_work(old_fptr);
+    gvn.add_work_uses(old_fptr);
     return fun;
   }
 
@@ -611,8 +612,9 @@ public class FunNode extends RegionNode {
         fp = path==e ? new_funptr : old_funptr;
       }
       // Rewire all previously wired calls
-      call.set_fun_reg(fp,gvn);
-      gvn.setype(call,call.value(gvn));
+      gvn.unreg(call);
+      call.set_fun(fp,gvn);
+      gvn.rereg(call,call.value(gvn));
       gvn.unreg(cg._cepi);
       cg._cepi.wire(gvn,call,fp == old_funptr ? this : fun, fp == old_funptr ? oldret : newret);
       gvn.rereg(cg._cepi,cg._cepi.value(gvn));

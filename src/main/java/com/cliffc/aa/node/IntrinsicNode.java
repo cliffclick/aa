@@ -4,6 +4,7 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.Util;
 import org.jetbrains.annotations.NotNull;
 
 // Function to wrap another type in a Name, which typically involves setting a
@@ -120,23 +121,18 @@ public class IntrinsicNode extends Node {
   // Passed in a named TypeStruct, and the parent alias.
   public static FunPtrNode convertTypeNameStruct( TypeStruct to, int alias, GVNGCM gvn ) {
     assert to.has_name();
-    NewObjNode nnn = new NewObjNode(false,alias,to,null);
-    TypeStruct from = to.remove_name();
-    TypeMemPtr tmp = TypeMemPtr.make(alias,to); // Return type
-    // Add a standard closure up-front to the function.
-    Type[] ts = TypeAry.get(from._ts.length+1); // Space for the extra arg
-    ts[0] = Type.NIL;                           // No actual closure needed
-    System.arraycopy(from._ts, 0, ts, 1, from._ts.length); // Copy fields
-    TypeFunPtr tf = TypeFunPtr.make_new(TypeStruct.make_args(ts),tmp);
+    assert Util.eq(to._flds[0],"^"); // Closure already
+    NewObjNode nnn = new NewObjNode(false,alias,to,null,gvn.con(Type.NIL));
+    TypeFunPtr tf = TypeFunPtr.make_new(to.remove_name(),TypeMemPtr.make(alias,to));
     FunNode fun = (FunNode) gvn.xform(new FunNode(to._name,tf,BitsAlias.EMPTY).add_def(Env.ALL_CTRL));
     Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
     Node memp= gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.FULL    ),null));
     // Add input edges to the NewNode
     nnn.set_def(0,fun,gvn);     // Set control to function start
-    for( int i=0; i<from._ts.length; i++ ) {
-      String argx = from._flds[i];
+    for( int i=0; i<to._ts.length; i++ ) {
+      String argx = to._flds[i];
       if( TypeStruct.fldBot(argx) ) argx = null;
-      nnn.add_def(gvn.xform(new ParmNode(i+1,argx,fun, gvn.con(from._ts[i]),null)));
+      nnn.add_def(gvn.xform(new ParmNode(i+1,argx,fun, gvn.con(to._ts[i]),null)));
     }
     gvn.init(nnn);
     Node ptr = gvn.xform(new  ProjNode(nnn,1));

@@ -29,6 +29,11 @@ public abstract class NewNode<T extends TypeObj> extends Node {
     _alias = BitsAlias.new_alias(parent_alias);
     _ts = to;
   }
+  public NewNode( byte type, int parent_alias, T to, Node ctrl, Node fld ) {
+    super(type,ctrl,fld);
+    _alias = BitsAlias.new_alias(parent_alias);
+    _ts = to;
+  }
   String xstr() { return "New*"+_alias; } // Self short name
   String  str() { return "New"+_ts; } // Inline less-short name
 
@@ -39,10 +44,11 @@ public abstract class NewNode<T extends TypeObj> extends Node {
   void set_name( T name ) { assert !name.above_center();  _ts = name; }
 
   @Override public Node ideal(GVNGCM gvn, int level) {
-    // If the address is not looked at then memory contents cannot be looked at
-    // and is dead.
+    // If either the address or memory is not looked at then the memory
+    // contents are dead.  The object might remain as a 'gensym' or 'sentinel'
+    // for identity tests.
     boolean old = _captured;
-    if( captured() ) {
+    if( captured(gvn) ) {
       boolean progress=!old;    // Progress if 1st time captured
       for( int i=1; i<_defs._len; i++ )
         if( in(i)!=null ) {
@@ -70,37 +76,19 @@ public abstract class NewNode<T extends TypeObj> extends Node {
 
   // Basic escape analysis.  If no escapes and no loads this object is dead.
   // TODO: A better answer is to put escape analysis into the type flows.
-  boolean captured( ) {
+  boolean captured( GVNGCM gvn ) {
     if( _keep > 0 ) return false;
     if( _captured ) return true; // Already flagged
     if( _uses._len==0 ) return false; // Dead or being created
     Node ptr = _uses.at(0);
-    if( _uses._len==1 )
-      if( ptr instanceof OProjNode ) return (_captured = true);
-      else return false;   // ptr being used for eq equiv tests as a unique gensym, or dying
+    // If only either address or memory remains, then memory contents are dead
+    if( _uses._len==1 && !(gvn.type(in(1)) instanceof TypeStr) ) 
+      return (_captured = true);
     if( ptr instanceof OProjNode ) ptr = _uses.at(1); // Get ptr not mem
-    // Scan for pointer-escapes
-    for( Node use : ptr._uses ) {
-      if( use instanceof StoreNode ) {
-        if( ((StoreNode)use).val()==ptr ) return false; // Pointer stored; escapes
-      } else if( use instanceof  LoadNode ||            // Load, direct use, treat as escape
-                 use instanceof  CastNode ||            // TODO: scan past, although should go dead shortly
-                 use instanceof  CallNode ||            // Call arg
-               use instanceof CallEpiNode ||            // CallEpi result during collapse
-                use instanceof FunPtrNode ||            // Hidden argument to a closure
-             use instanceof IntrinsicNode ||            // Alive
-                 use instanceof   NewNode ||            // Same as a store escape, can be loaded from closure
-                 use instanceof ScopeNode ||            // Returned form top-level scope to REPL
-                  use instanceof TypeNode ||            // Wait for TypeNode to disappear
-                 use instanceof   PhiNode ||            // TODO: scan past phi
-                 use instanceof   RetNode ) {           // Returned
-        return false;                                   // Escaped
-      } else if( use instanceof IfNode ) {
-        // Not escaped, test is non-zero and will fold shortly
-      } else {
-        throw AA.unimpl();      // Unknown, sort it out
-      }
-    }
+    // Scan for pointer-escapes.  Really stupid: allow if-nil-check and if-eq-check only.
+    for( Node use : ptr._uses )
+      if( !(use instanceof IfNode) )
+        return false;
     // No escape, no loads, so object is dead
     return (_captured = true);
   }

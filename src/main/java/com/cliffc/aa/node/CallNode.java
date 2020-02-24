@@ -105,7 +105,7 @@ public class CallNode extends Node {
           Node ctl() { return in(0); }
   public  Node mem() { return in(1); }
   public  Node fun() { return in(2); }
-  private Node set_fun    (Node fun, GVNGCM gvn) { return set_def(2,fun,gvn); }
+          Node set_fun    (Node fun, GVNGCM gvn) { return set_def(2,fun,gvn); }
   public  void set_fun_reg(Node fun, GVNGCM gvn) { gvn.set_def_reg(this,2,fun); }
   public BitsFun fidxs(GVNGCM gvn) {
     Type tf = gvn.type(fun());
@@ -159,9 +159,8 @@ public class CallNode extends Node {
           NewNode nnn = (NewNode)arg1.in(0);
           remove(_defs._len-1,gvn); // Pop off the NewNode tuple
           int len = nnn._defs._len;
-          for( int i=1; i<len; i++ ) // Push the args; unpacks the tuple
+          for( int i=2; i<len; i++ ) // Push the args; unpacks the tuple
             add_def( nnn.in(i));
-          gvn.add_work(mem().in(1));
           _unpacked = true;     // Only do it once
           return this;
         }
@@ -189,13 +188,14 @@ public class CallNode extends Node {
 
   // 0 - Ctrl - whether or not the function is called.  False if call not
   //     reached or args are in-error.
-  // 1 - Memory passed to the function, generally trimmed down from the full
+  // 1 - Full available memory, here for CallEpi
+  // 2 - Memory passed to the function, generally trimmed down from the full
   //     available memory.
-  // 2 - TypeFunPtr ; just a copy of gvn.type(fun())
-  // 3+  Normal argument types
+  // 3 - TypeFunPtr ; just a copy of gvn.type(fun())
+  // 4+  Normal argument types
 
   @Override public TypeTuple value(GVNGCM gvn) {
-    final Type[] ts = TypeAry.get(_defs._len);
+    final Type[] ts = TypeAry.get(_defs._len+1);
     final boolean dead = !_is_copy && gvn._opt_mode>0 && cepi()==null; // Dead from below
 
     // Pinch to XCTRL/CTRL
@@ -208,13 +208,13 @@ public class CallNode extends Node {
     Type mem = gvn.type(mem());
     if( !(mem instanceof TypeMem) )
       mem = mem.above_center() ? TypeMem.EMPTY : TypeMem.FULL;
-    TypeMem tmem = (TypeMem)(ts[1] = mem);
+    TypeMem tmem = (TypeMem)(ts[1] = ts[2] = mem);
 
     // Not a function to call?
     Type tfx = gvn.type(fun());
     if( !(tfx instanceof TypeFunPtr) )
       tfx = tfx.above_center() ? TypeFunPtr.GENERIC_FUNPTR.dual() : TypeFunPtr.GENERIC_FUNPTR;
-    TypeFunPtr tfp = (TypeFunPtr)(ts[2] = tfx);
+    TypeFunPtr tfp = (TypeFunPtr)(ts[3] = tfx);
     BitsFun fidxs = tfp.fidxs();
     // Can we call this function pointer?
     boolean callable = !dead && !(tfp.above_center() || fidxs.above_center());
@@ -222,12 +222,12 @@ public class CallNode extends Node {
     // If not callable, do not call
     if( !callable ) { ts[0] = ctl = Type.XCTRL; }
     // If not called, then no memory to functions
-    if( ctl == Type.XCTRL ) { ts[1] = tmem = TypeMem.EMPTY; }
+    if( ctl == Type.XCTRL ) { ts[1] = ts[2] = tmem = TypeMem.EMPTY; }
 
     // Copy args for called functions.
     // If call is dead, then so are args.
     for( int i=1; i<nargs(); i++ )
-      ts[i+2] = dead ? Type.XSCALAR : targ(gvn,i).bound(Type.SCALAR);
+      ts[i+3] = dead ? Type.XSCALAR : targ(gvn,i).bound(Type.SCALAR);
 
     // Quick exit if cannot further trim memory
     if( ctl == Type.XCTRL ||     // Not calling
@@ -246,12 +246,12 @@ public class CallNode extends Node {
     // Now the set of pointers escaping via arguments
     for( int i=0; i<nargs(); i++ ) {
       if( abs.test(1) ) break;  // Shortcut for already being full
-      abs = ts[i+2].recursive_aliases(abs,tmem);
+      abs = ts[i+3].recursive_aliases(abs,tmem);
     }
 
     // Add all the aliases which can be reached from objects at the existing
     // aliases, recursively.
-    ts[1] = tmem.trim_to_alias(abs);
+    ts[2] = tmem.trim_to_alias(abs);
     return TypeTuple.make(ts);
   }
 
@@ -381,11 +381,12 @@ public class CallNode extends Node {
   }
 
   @Override public TypeTuple all_type() {
-    Type[] ts = TypeAry.get(_defs._len);
+    Type[] ts = TypeAry.get(_defs._len+1);
     Arrays.fill(ts,Type.SCALAR);
     ts[0] = Type.CTRL;
     ts[1] = TypeMem.FULL;
-    ts[2] = TypeFunPtr.GENERIC_FUNPTR;
+    ts[2] = TypeMem.FULL;
+    ts[3] = TypeFunPtr.GENERIC_FUNPTR;
     return TypeTuple.make(ts);
   }
   // Set of used aliases across all inputs (not StoreNode value, but yes address)
@@ -417,7 +418,12 @@ public class CallNode extends Node {
     return _rpc==call._rpc;
   }
   private boolean is_copy() { return _is_copy; }
-  @Override public Node is_copy(GVNGCM gvn, int idx) { return is_copy() ? in(idx) : null; }
+  @Override public Node is_copy(GVNGCM gvn, int idx) {
+    if( !_is_copy ) return null;
+    if( idx==0 ) return in(idx);
+    assert idx!=1;              // No one points to pre-call memory
+    return in(idx-1);           // Remove extra pre-call type from numbering
+  }
   @Override public void ideal_impacted_by_changing_uses(GVNGCM gvn) {
     // If just changed types, MemMerge use of Call might trigger alias filtering
     for( Node def : _defs )

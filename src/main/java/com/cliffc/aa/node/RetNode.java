@@ -67,7 +67,7 @@ public final class RetNode extends Node {
     // Something changed (hence we got here), so all wired uses need to re-check.
     // i.e., trivial functions (constant returns or 1-op) might now inline.
     if( (level&1)==0 && (gvn.type(val()).is_con() || ctl()==fun()) )
-      for( Node use : _uses ) gvn.add_work(use);
+      gvn.add_work_uses(this);
     return null;
   }
   @Override public Type value(GVNGCM gvn) {
@@ -80,6 +80,11 @@ public final class RetNode extends Node {
     Type val = gvn.type(val());
     if( val.above(Type.XSCALAR) ) return TypeTuple.XRET;
     if( !(val.isa(Type. SCALAR))) return TypeTuple. RET;
+    // If function is collapsing, do not change types (yet).  The Parm Memory
+    // might be gone, and the trimming gets confused.
+    FunNode fun = fun();
+    if( !fun.has_unknown_callers() && fun._defs._len==2 && !fun.is_forward_ref() )
+      return gvn.self_type(this);
     mem = ((TypeMem)mem).trim_to_alias(alias_uses(gvn));
     return TypeTuple.make(ctl,mem,val);
   }
@@ -136,7 +141,7 @@ public final class RetNode extends Node {
     for( Node use : fun()._uses )
       if( use instanceof ParmNode )
         abs = gvn.type(use).recursive_aliases(abs,output_mem);
-    assert !abs.test(0);
+     assert !abs.test(0);
     return abs;
   }
 

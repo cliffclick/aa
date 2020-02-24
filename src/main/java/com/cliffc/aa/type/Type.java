@@ -563,7 +563,6 @@ public class Type<T extends Type<T>> implements Cloneable {
     TypeInt.init1(types);
     TypeFlt.init1(types);
     TypeStr.init1(types);
-    TypeStruct.init1();
   }
 
   private static Type[] ALL_TYPES; // Used for tests
