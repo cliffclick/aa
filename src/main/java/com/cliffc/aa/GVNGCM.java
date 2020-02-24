@@ -293,11 +293,11 @@ public class GVNGCM {
 
   public void xform_old( Node old, int level ) {
     Node nnn = xform_old0(old,level);
-    if( nnn==null ) return;
+    if( nnn==null ) return;     // No progress
     assert (level&1)==0;        // No changes during asserts
     if( nnn == old ) {          // Progress, but not replacement
       add_work_uses(old);       // Re-run old, until no progress
-      nnn.ideal_impacted_by_changing_uses(this);
+      old.ideal_impacted_by_changing_uses(this);
       return;
     }
     if( check_new(nnn) )        // If new, replace back in GVN

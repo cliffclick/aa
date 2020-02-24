@@ -40,8 +40,6 @@ public class Env implements AutoCloseable {
   public        static BitsAlias CLOSURES;
 
   static {
-    // Add base types on startup
-    TypeStruct.init1();
     GVN = new GVNGCM();      // Initial GVN, defaults to ALL, lifts towards ANY
 
     // Initial control & memory

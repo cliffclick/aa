@@ -982,9 +982,9 @@ public class Parse {
     }
 
     if( peek("@{") ) {          // Struct type
-      Ary<String> flds = new Ary<>(new String[1],0);
-      Ary<Type  > ts   = new Ary<>(new Type  [1],0);
-      Ary<Byte  > mods = new Ary<>(new Byte  [1],0);
+      Ary<String> flds = new Ary<>(new String[]{"^"});
+      Ary<Type  > ts   = new Ary<>(new Type  []{TypeMemPtr.CLOSURE_PTR});
+      Ary<Byte  > mods = new Ary<>(new Byte  []{TypeStruct.ffinal()});
       while( true ) {
         String tok = token();            // Scan for 'id'
         if( tok == null ) break;         // end-of-struct-def
@@ -1013,7 +1013,7 @@ public class Parse {
     // "(, , )" is a 2-entry tuple
     if( peek('(') ) { // Tuple type
       byte c;
-      Ary<Type> ts = new Ary<>(new Type[1],0);
+      Ary<Type> ts = new Ary<>(new Type[]{TypeMemPtr.CLOSURE_PTR});
       while( (c=skipWS()) != ')' ) { // No more types...
         Type t = Type.SCALAR;    // Untyped, most generic field type
         if( c!=',' &&            // Has type annotation?
@@ -1214,7 +1214,7 @@ public class Parse {
     return t.is_forward_ref()
       ? ((TypeFunPtr)t).names()
       : (t instanceof TypeMemPtr
-         ? ((TypeMemPtr)t).str(new SB(), null, tmem).toString()
+         ? t.str(new SB(), null, tmem).toString()
          : t.toString());
   }
 

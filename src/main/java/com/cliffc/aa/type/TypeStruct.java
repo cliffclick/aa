@@ -201,10 +201,11 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     if( _uf!=null ) return _uf.str(sb.p("=>"),dups,mem);
     if( _any ) sb.p('~');
     sb.p(_name);
-    boolean is_tup = _flds.length==0 || fldTop(_flds[0]) || fldBot(_flds[0]) || isDigit(_flds[0].charAt(0));
+    boolean is_tup = _flds.length<=1 || fldTop(_flds[1]) || fldBot(_flds[1]) || isDigit(_flds[1].charAt(0));
     if( !is_tup ) sb.p('@');    // Not a tuple
     sb.p(is_tup ? '(' : '{');
     for( int i=0; i<_flds.length; i++ ) {
+      if( Util.eq(_flds[i],"^") ) continue; // Do not print the ever-present closure
       Type t = at(i);
       if( !is_tup )
         sb.p(_flds[i]).p(fstr(_finals[i])).p('='); // Field name, access mod
@@ -287,6 +288,9 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   }
 
   // The display is a self-recursive structure: slot 0 is a ptr to a Display.
+  // To break class-init cycle, this is partially made here, now.
+  // Then we touch TypeMemPtr, which uses this field.
+  // Then we finish making CLOSURE.
   public  static final TypeStruct CLOSURE = malloc("",false,false,new String[]{"^"},ts(Type.NIL),finals(1));
   static { CLOSURE._hash = CLOSURE.compute_hash(); }
   // Most primitive function call argument type lists are 0-based
@@ -313,12 +317,16 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   private static final TypeStruct D1    = make(flds("^","d"),ts(Type.NIL,TypeInt.TRUE  )); // @{d:1}
   private static final TypeStruct ARW   = make(flds("^","a"),ts(Type.NIL,TypeFlt.FLT64),new byte[]{frw(),frw()});
 
-  // Called during init to break the cycle making CLOSURE
-  public static void init1() {
-    if( CLOSURE._ts[0] == Type.NIL ) {
-      CLOSURE._ts = ts(TypeMemPtr.CLOSURE_PTR);
-      CLOSURE.install_cyclic(new Ary<>(ts(CLOSURE,TypeMemPtr.CLOSURE_PTR)));
-    }
+  // Recursive meet in progress.
+  // Called during class-init.
+  private static final HashMap<TypeStruct,TypeStruct> MEETS1 = new HashMap<>(), MEETS2 = new HashMap<>();
+
+  // Called during init to break the cycle making CLOSURE.
+  // TypeMemPtr uses CLOSURE, defined above, which in turn is used here.
+  static {
+    assert CLOSURE._ts[0] == Type.NIL;
+    CLOSURE._ts = ts(TypeMemPtr.CLOSURE_PTR);
+    CLOSURE.install_cyclic(new Ary<>(ts(CLOSURE,TypeMemPtr.CLOSURE_PTR)));
     assert CLOSURE.is_closure();
   }
   boolean is_closure() {
@@ -459,9 +467,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     dual._cyclic = _cyclic;
     return dual;
   }
-
-  // Recursive meet in progress
-  private static final HashMap<TypeStruct,TypeStruct> MEETS1 = new HashMap<>(), MEETS2 = new HashMap<>();
 
   // Standard Meet.  Types-meet-Types and fld-meet-fld.  Fld strings can be
   // top/bottom for tuples.  Structs with fewer fields are virtually extended

@@ -122,22 +122,22 @@ public class IntrinsicNode extends Node {
   public static FunPtrNode convertTypeNameStruct( TypeStruct to, int alias, GVNGCM gvn ) {
     assert to.has_name();
     assert Util.eq(to._flds[0],"^"); // Closure already
-    NewObjNode nnn = new NewObjNode(false,alias,to,null,gvn.con(Type.NIL));
+    NewObjNode nnn = new NewObjNode(false,alias,to,null,gvn.con(Type.NIL)).keep();
     TypeFunPtr tf = TypeFunPtr.make_new(to.remove_name(),TypeMemPtr.make(alias,to));
     FunNode fun = (FunNode) gvn.xform(new FunNode(to._name,tf,BitsAlias.EMPTY).add_def(Env.ALL_CTRL));
     Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
     Node memp= gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.FULL    ),null));
     // Add input edges to the NewNode
     nnn.set_def(0,fun,gvn);     // Set control to function start
-    for( int i=0; i<to._ts.length; i++ ) {
+    for( int i=1; i<to._ts.length; i++ ) {
       String argx = to._flds[i];
       if( TypeStruct.fldBot(argx) ) argx = null;
-      nnn.add_def(gvn.xform(new ParmNode(i+1,argx,fun, gvn.con(to._ts[i]),null)));
+      nnn.add_def(gvn.xform(new ParmNode(i,argx,fun, gvn.con(to._ts[i]),null)));
     }
     gvn.init(nnn);
     Node ptr = gvn.xform(new  ProjNode(nnn,1));
     Node obj = gvn.xform(new OProjNode(nnn,0));
-    Node mmem= gvn.xform(new MemMergeNode(memp,obj,nnn._alias));
+    Node mmem= gvn.xform(new MemMergeNode(memp,obj,nnn.<NewObjNode>unhook()._alias));
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,ptr,rpc,fun));
     return (FunPtrNode)gvn.xform(new FunPtrNode(ret,null));
   }

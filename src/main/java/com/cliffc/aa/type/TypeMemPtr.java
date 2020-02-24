@@ -62,9 +62,6 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   private static TypeMemPtr FREE=null;
   @Override protected TypeMemPtr free( TypeMemPtr ret ) { FREE=this; return ret; }
   public static TypeMemPtr make(BitsAlias aliases, TypeObj obj ) {
-    // Canonical form: cannot have a pointer with only NIL allowed... instead
-    // we only use NIL directly.
-    assert aliases != BitsAlias.NIL;
     TypeMemPtr t1 = FREE;
     if( t1 == null ) t1 = new TypeMemPtr(aliases,obj);
     else { FREE = null;          t1.init(aliases,obj); }
@@ -93,7 +90,6 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   }
 
   @Override protected TypeMemPtr xdual() {
-    assert _aliases!=BitsAlias.NIL;
     return new TypeMemPtr(_aliases.dual(),(TypeObj)_obj.dual());
   }
   @Override TypeMemPtr rdual() {
@@ -123,8 +119,8 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     // Meet of aliases
     TypeMemPtr ptr = (TypeMemPtr)t;
     BitsAlias aliases = _aliases.meet(ptr._aliases);
-    if( aliases == BitsAlias.NIL ) return NIL;
-    return make(aliases,(TypeObj)_obj.meet(ptr._obj));
+    // Do not return a NIL (makes crossing-NIL bug).
+    return make(aliases, aliases == BitsAlias.NIL ? TypeObj.XOBJ : (TypeObj)_obj.meet(ptr._obj));
   }
   @Override public boolean above_center() { return _aliases.above_center(); }
   // Aliases represent *classes* of pointers and are thus never constants.
