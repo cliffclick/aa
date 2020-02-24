@@ -23,6 +23,7 @@ public final class FunPtrNode extends ConNode<TypeFunPtr> {
     if( this==o ) return true;
     if( !(o instanceof FunPtrNode) ) return false;
     FunPtrNode fptr = (FunPtrNode)o;
+    if( _defs._len!=2 ) return false;
     return in(0)==fptr.in(0) && in(1)==fptr.in(1) && super.equals(fptr);
   }
   public RetNode ret() { return (RetNode)in(0); }

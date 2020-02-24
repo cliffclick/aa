@@ -82,6 +82,7 @@ public abstract class NewNode<T extends TypeObj> extends Node {
     if( _uses._len==0 ) return false; // Dead or being created
     Node ptr = _uses.at(0);
     // If only either address or memory remains, then memory contents are dead
+    if( _uses._len==1 && ptr instanceof OProjNode ) return (_captured = true);
     if( _uses._len==1 && !(gvn.type(in(1)) instanceof TypeStr) ) 
       return (_captured = true);
     if( ptr instanceof OProjNode ) ptr = _uses.at(1); // Get ptr not mem

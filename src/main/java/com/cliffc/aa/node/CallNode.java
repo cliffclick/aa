@@ -119,18 +119,13 @@ public class CallNode extends Node {
   @Override @NotNull CallNode copy( boolean copy_edges, CallEpiNode unused, GVNGCM gvn) {
     CallNode call = (CallNode)super.copy(copy_edges,unused,gvn);
     ConNode old_rpc = gvn.con(TypeRPC.make(_rpc));
-    int olen = old_rpc._uses._len;
-    if( olen==0 ) old_rpc=null;
-    else assert olen==1;               // Exactly a wired callsite
     call._rpc = BitsRPC.new_rpc(_rpc); // Children RPC
     Type oldt = gvn.unreg(this);       // Changes hash, so must remove from hash table
     _rpc = BitsRPC.new_rpc(_rpc);      // New child RPC for 'this' as well.
     gvn.rereg(this,oldt);              // Back on list
     // Swap out the existing old rpc users for the new.
-    if( old_rpc != null ) {
-      ConNode new_rpc = gvn.con(TypeRPC.make(_rpc));
-      gvn.subsume(old_rpc,new_rpc);
-    }
+    ConNode new_rpc = gvn.con(TypeRPC.make(_rpc));
+    gvn.subsume(old_rpc,new_rpc);
     return call;
   }
 

@@ -274,7 +274,7 @@ public class FunNode extends RegionNode {
               Type tp = gvn.type(parm.in(i));
               if( tp.above_center() ) continue;        // This parm input is in-error
               Type ti = tp.widen();                    // Get the widen'd type
-              assert ti.isa(t0);                       // Must be isa-generic type, or else type-error
+              if( !ti.isa(t0) ) continue; // Must be isa-generic type, or else type-error
               if( ti != t0 ) return i; // Sharpens?  Then splitting here should help
             }
             // Else no split will help this call, look for other calls to help
@@ -418,6 +418,12 @@ public class FunNode extends RegionNode {
     // right now.
     int m=-1, mncons = -1;
     for( int i=has_unknown_callers() ? 2 : 1; i<_defs._len; i++ ) {
+      Node call = in(i).in(0);
+      if( !(call instanceof CallNode) ) continue; // Not well formed
+      Type fidxs = ((TypeTuple)gvn.type(call)).at(3);
+      if( !(fidxs instanceof TypeFunPtr) ) continue;
+      if( ((TypeFunPtr)fidxs).fidxs().abit() == -1 )
+        continue;
       int ncon=0;
       for( ParmNode parm : parms )
         if( parm != null ) {    // Some can be dead

@@ -78,11 +78,13 @@ public final class CallEpiNode extends Node {
     if( !fidxs.test(BitsFun.ALL) ) {
       for( int i = 0; i < nwired(); i++ ) {
         RetNode ret = wired(i);
-        if( !bs.get(ret.fidx()) ) // Wired call is not actually executable?
+        if( !bs.get(ret.fidx()) ) { // Wired call is not actually executable?
           // Remove the edge.  Happens after e.g. cloning a function, where
           // both cloned and original versions are wired, but only one is
           // reachable.
+          unwire(gvn,call,ret);
           del(wire_num(i--));
+        }
       }
     }
 
@@ -286,7 +288,9 @@ public final class CallEpiNode extends Node {
       t = lifting ? t.join(tret2) : t.meet(tret2);
 
       // Make real from virtual CG edges in GCP/Opto by wiring calls.
-      if( gvn._opt_mode==2 &&        // Manifesting optimistic virtual edges between caller and callee
+      if( gvn._opt_mode==0 ) gvn.add_work(this); // Not during parsing, but check afterwards
+      if( gvn._opt_mode!=0 &&        // Not during parsing
+          !is_copy() &&              // Not if collapsing
           !fidxs.above_center() &&   // Still settling down to possibilities
           !fun.is_forward_ref() &&   // Call target is undefined
           tcall.at(0)==Type.CTRL )   // Call args are not in error
@@ -323,11 +327,8 @@ public final class CallEpiNode extends Node {
     assert nwired()==0 || nwired()==1; // not wired to several choices
 
     // Unwire any wired called function
-    if( ret != null && nwired() == 1 && !ret.is_copy() ) {  // Wired, and called function not already collapsing
-      FunNode fun = ret.fun();
-      for( int i=1; i<fun._defs._len; i++ ) // Unwire
-        if( fun.in(i).in(0)==call ) gvn.set_def_reg(fun,i,gvn.con(Type.XCTRL));
-    }
+    if( ret != null && nwired() == 1 && !ret.is_copy() ) // Wired, and called function not already collapsing
+      unwire(gvn,call,ret);
     // Call is also is_copy and will need to collapse
     call._is_copy = true;              // Call is also is-copy
     gvn.add_work_uses(call.keep());
@@ -340,6 +341,13 @@ public final class CallEpiNode extends Node {
     add_def(rez.unhook());
     add_def(call.unhook());         // Hook call, to get FIDX for value filtering.
     return this;
+  }
+
+  private void unwire(GVNGCM gvn, CallNode call, RetNode ret) {
+    if( ret.is_copy() ) return;
+    FunNode fun = ret.fun();
+    for( int i=1; i<fun._defs._len; i++ ) // Unwire
+      if( fun.in(i).in(0)==call ) gvn.set_def_reg(fun,i,gvn.con(Type.XCTRL));
   }
   // If slot 0 is not a CallNode, we have been inlined.
   boolean is_copy() { return !(in(0) instanceof CallNode); }
