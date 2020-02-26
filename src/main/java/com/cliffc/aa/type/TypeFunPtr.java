@@ -31,7 +31,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   private BitsFun _fidxs;       // Known function bits
 
   // Union (or join) signature of said functions; depends on if _fidxs is
-  // above_center() or not.  Slot 0 is for the closure type, and so is always a
+  // above_center() or not.  Slot 0 is for the display type, and so is always a
   // TypeMemPtr.
   public TypeStruct _args;      // Standard args, zero-based, no memory
   public Type _ret;             // Standard formal return type.
@@ -57,7 +57,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   private static TypeFunPtr FREE=null;
   @Override protected TypeFunPtr free( TypeFunPtr ret ) { FREE=this; return ret; }
   public static TypeFunPtr make( BitsFun fidxs, TypeStruct args, Type ret ) {
-    assert args.at(0)==Type.NIL || ((TypeMemPtr)args.at(0)).is_closure();
+    assert args.at(0)==Type.NIL || ((TypeMemPtr)args.at(0)).is_display();
     TypeFunPtr t1 = FREE;
     if( t1 == null ) t1 = new TypeFunPtr(fidxs,args,ret);
     else {   FREE = null;        t1.init(fidxs,args,ret); }
@@ -69,7 +69,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public static TypeFunPtr make_new(TypeStruct args, Type ret) { return make(BitsFun.make_new_fidx(BitsFun.ALL),args,ret); }
   public TypeFunPtr make_fidx( int fidx ) { return make(BitsFun.make0(fidx),_args,_ret); }
   public TypeFunPtr make_new_fidx( int parent, TypeStruct args ) { return make(BitsFun.make_new_fidx(parent),args,_ret); }
-  private static TypeStruct ARGS = TypeStruct.make_args(TypeStruct.ts(TypeMemPtr.CLOSURE_PTR));
+  private static TypeStruct ARGS = TypeStruct.make_args(TypeStruct.ts(TypeMemPtr.DISPLAY_PTR));
   public static TypeFunPtr make_anon() { return make_new(ARGS,Type.SCALAR); } // Make a new anonymous function ptr
 
   public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.FULL,ARGS,Type.SCALAR);
@@ -102,15 +102,15 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public BitsFun fidxs() { return _fidxs; }
   public int fidx() { return _fidxs.getbit(); } // Asserts internally single-bit
   public Type arg(int idx) { return _args.at(idx); }
-  public Type closure() { return _args.at(0); } // Always a Closure pointer or NIL
+  public Type display() { return _args.at(0); } // Always a Display pointer or NIL
   public boolean is_class() { return _fidxs.is_class(); }
 
   @Override public BitsAlias recursive_aliases(BitsAlias abs, TypeMem mem) {
-    if( _fidxs.test(1) ) return BitsAlias.NZERO; // All functions, all closures
+    if( _fidxs.test(1) ) return BitsAlias.NZERO; // All functions, all displays
     if( _fidxs.above_center() ) return abs;      // Choosing functions with no aliases
     BitSet bs = _fidxs.tree().plus_kids(_fidxs);
     for( int fidx = bs.nextSetBit(1); fidx >= 0; fidx = bs.nextSetBit(fidx+1) ) {
-      BitsAlias cls = FunNode.find_fidx(fidx)._closure_aliases;
+      BitsAlias cls = FunNode.find_fidx(fidx)._display_aliases;
       for( int alias : cls )
         abs = mem.recursive_aliases(abs,alias);
       if( abs.test(1) ) return abs; // Shortcut for already being full
@@ -123,7 +123,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   @Override public boolean is_con()       {
     // More than 1 function being referred to
     if( _fidxs.abit() == -1 || is_class() ) return false;
-    // All closure bits have to be constants also
+    // All display bits have to be constants also
     for( int i=0; i<_args._ts.length; i++ )
       if( !_args._ts[i].is_con() )
         return false;

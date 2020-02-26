@@ -39,37 +39,46 @@ public final class CallEpiNode extends Node {
     BitsFun fidxs = tfp.fidxs();
     if( nwired()==1 && fidxs.abit() != -1 ) { // Wired to 1 target
       RetNode ret = wired(0);                 // One wired return
-      if( ret.fun()._defs._len==2 ) {         // Function is only called by 1 (and not the unknown caller)
-        assert ret.fun().in(1).in(0)==call;   // Just called by us
-        // Merge call-bypass memory and function memory.  Every above-center
-        // alias "loses" to a below-center alias.  Below-center ties go to the
-        // last mutator which is the return, above-center ties to the call.
-        Node cmem = call.mem();
-        Node rmem =  ret.mem();
-        TypeMem call_mem = (TypeMem)gvn.type(cmem);
-        TypeMem  ret_mem = (TypeMem)gvn.type(rmem);
-        Node mem;
-        if( ret_mem==TypeMem.XMEM ) {
-          mem = cmem;           // Common shortcut for primitives
-        } else if( call_mem==TypeMem.XMEM ) {
-          mem = rmem;           // Common shortcut for simple calls
-        } else {
-          // Actually merge memories from call-bypass and post-call.  If one of
-          // cmem or rmem is itself a MemMerge we'll get stacked MemMerges
-          // which will clean out later.
-          TypeObj[]  ret_objs =  ret_mem.alias2objs();
-          TypeObj[] call_objs = call_mem.alias2objs();
-          int max = Math.max(ret_objs.length,call_objs.length);
-          // Alias#1 to make the merge
-          MemMergeNode mmem = new MemMergeNode(ret_objs[1].above_center() ? cmem : rmem);
-          // Merge all other aliases
-          for( int i=2; i<max; i++ )
-            if( (i<call_objs.length && call_objs[i] != null) ||
-                (i< ret_objs.length &&  ret_objs[i] != null) )
-              mmem.create_alias_active(i,ret_mem.at(i).above_center() ? cmem : rmem,null);
-          mem = gvn.xform(mmem);
+      FunNode fun = ret.fun();
+      if( fun._defs._len==2 ) { // Function is only called by 1 (and not the unknown caller)
+        assert fun.in(1).in(0)==call;   // Just called by us
+        // Check the args
+        int idx=0;
+        for( Node parm : fun._uses )
+          if( parm instanceof ParmNode && (idx=((ParmNode)parm)._idx) >= 1 &&
+              !gvn.type(parm).isa(fun.targ(idx)) )
+            { idx=-99; break; } // Arg failed check
+        if( idx!=-99 ) {        // Do not inline
+          // Merge call-bypass memory and function memory.  Every above-center
+          // alias "loses" to a below-center alias.  Below-center ties go to the
+          // last mutator which is the return, above-center ties to the call.
+          Node cmem = call.mem();
+          Node rmem =  ret.mem();
+          TypeMem call_mem = (TypeMem)gvn.type(cmem);
+          TypeMem  ret_mem = (TypeMem)gvn.type(rmem);
+          Node mem;
+          if( ret_mem==TypeMem.XMEM ) {
+            mem = cmem;           // Common shortcut for primitives
+          } else if( call_mem==TypeMem.XMEM ) {
+            mem = rmem;           // Common shortcut for simple calls
+          } else {
+            // Actually merge memories from call-bypass and post-call.  If one of
+            // cmem or rmem is itself a MemMerge we'll get stacked MemMerges
+            // which will clean out later.
+            TypeObj[]  ret_objs =  ret_mem.alias2objs();
+            TypeObj[] call_objs = call_mem.alias2objs();
+            int max = Math.max(ret_objs.length,call_objs.length);
+            // Alias#1 to make the merge
+            MemMergeNode mmem = new MemMergeNode(ret_objs[1].above_center() ? cmem : rmem);
+            // Merge all other aliases
+            for( int i=2; i<max; i++ )
+              if( (i<call_objs.length && call_objs[i] != null) ||
+                  (i< ret_objs.length &&  ret_objs[i] != null) )
+                mmem.create_alias_active(i,ret_mem.at(i).above_center() ? cmem : rmem,null);
+            mem = gvn.xform(mmem);
+          }
+          return inline(gvn, call, ret.ctl(), mem, ret.val(), null/*do not unwire, because using the entire function body inplace*/);
         }
-        return inline(gvn, call, ret.ctl(), mem, ret.val(), null/*do not unwire, because using the entire function body inplace*/);
       }
     }
 
@@ -317,8 +326,17 @@ public final class CallEpiNode extends Node {
 
   // Set of used aliases across all inputs (not StoreNode value, but yes address)
   @Override public BitsAlias alias_uses(GVNGCM gvn) {
-    assert is_copy();
-    return BitsAlias.NZERO; // Conservative do-nothing.  Since a copy, it will be removed shortly
+    for( Node mproj : _uses ) // Find output memory
+      if( mproj instanceof MProjNode )
+        // TODO: Solve the forward-flow used_aliases problem incrementally.
+        // Here we just bail out.
+        return BitsAlias.NZERO; // Use all aliases after the call
+    return BitsAlias.EMPTY;     // No memory usage
+  }
+  @Override public boolean ideal_impacted_by_losing_uses(GVNGCM gvn, Node dead) {
+    if( is_copy() || !(dead instanceof MProjNode) ) return false; // Triggers improved alias uses
+    gvn.add_work(call().mem());
+    return true;
   }
 
   // Inline the CallNode.  Remove all edges except the results.  This triggers
@@ -353,4 +371,5 @@ public final class CallEpiNode extends Node {
   boolean is_copy() { return !(in(0) instanceof CallNode); }
   @Override public Node is_copy(GVNGCM gvn, int idx) { return is_copy() ? in(idx) : null; }
   @Override public Type all_type() { return TypeTuple.CALLE; }
+  // If losing the MProj,
 }

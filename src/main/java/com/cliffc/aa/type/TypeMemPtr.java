@@ -45,14 +45,14 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     if( dups == null ) dups = new VBitSet();
     if( dups.tset(_uid) ) return sb.p('$'); // Break recursive printing cycle
     sb.p('*');
-    //_obj.dstr(_aliases.toString(sb).p(" -> "),dups);
-    _aliases.toString(sb);
+    _obj.dstr(_aliases.toString(sb).p(" -> "),dups);
+    //_aliases.toString(sb);
     return sb;
   }
   @Override public SB str(SB sb, VBitSet dups, TypeMem mem) {
     if( dups == null ) dups = new VBitSet();
     if( dups.tset(_uid) ) return sb.p('$'); // Break recursive printing cycle
-    TypeObj to = mem == null ? _obj : mem.ld(this);
+    TypeObj to = (mem == null || _aliases==BitsAlias.RECORD_BITS) ? _obj : mem.ld(this);
     if( to == TypeObj.XOBJ ) to = _obj;
     to.str(_aliases.toString(sb.p('*')),dups,mem);
     if( _aliases.test(0) ) sb.p('?');
@@ -72,8 +72,8 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   public static TypeMemPtr make( int alias, TypeObj obj ) { return make(BitsAlias.make0(alias),obj); }
   public static TypeMemPtr make_nil( int alias, TypeObj obj ) { return make(BitsAlias.make0(alias).meet_nil(),obj); }
 
-  public  static final TypeMemPtr CLOSURE_PTR= new TypeMemPtr(BitsAlias.CLOSURE_BITS0,TypeStruct.CLOSURE);
-  static { CLOSURE_PTR._hash = CLOSURE_PTR.compute_hash(); } // Filled in during CLOSURE.install_cyclic
+  public  static final TypeMemPtr DISPLAY_PTR= new TypeMemPtr(BitsAlias.RECORD_BITS0,TypeStruct.DISPLAY);
+  static { DISPLAY_PTR._hash = DISPLAY_PTR.compute_hash(); } // Filled in during DISPLAY.install_cyclic
   public  static final TypeMemPtr OOP0   = make(BitsAlias.FULL    ,TypeObj.OBJ); // Includes nil
   public  static final TypeMemPtr OOP    = make(BitsAlias.NZERO   ,TypeObj.OBJ); // Excludes nil
   public  static final TypeMemPtr STRPTR = make(BitsAlias.STRBITS ,TypeStr.STR);
@@ -84,9 +84,9 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   public  static final TypeMemPtr STRUCT0= make(BitsAlias.RECORD_BITS0,TypeStruct.ALLSTRUCT);
   static final TypeMemPtr[] TYPES = new TypeMemPtr[]{OOP0,STR0,STRPTR,ABCPTR,STRUCT};
 
-  boolean is_closure() {
-    if( this==CLOSURE_PTR || this==CLOSURE_PTR._dual ) return true;
-    return (_obj instanceof TypeStruct && ((TypeStruct)_obj).is_closure());
+  boolean is_display() {
+    if( this==DISPLAY_PTR || this==DISPLAY_PTR._dual ) return true;
+    return (_obj instanceof TypeStruct && ((TypeStruct)_obj).is_display());
   }
 
   @Override protected TypeMemPtr xdual() {

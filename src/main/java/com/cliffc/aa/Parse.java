@@ -109,7 +109,7 @@ public class Parse {
   TypeEnv go_whole( ) {
     prog();                     // Parse a program
     // Delete names at the top scope before final optimization.
-    _e.close_closure(_gvn);
+    _e.close_display(_gvn);
     _gvn.rereg(_e._scope,Type.ALL);
     _gvn.rereg(_e._par._scope,Type.ALL);
     _gvn.iter(1);   // Pessimistic optimizations; might improve error situation
@@ -245,7 +245,7 @@ public class Parse {
     // taking the primitive.
     Parse bad = errMsg();
     Node rez, stk = _e._scope.stk();
-    _gvn.unreg(stk); // add_fun expects the closure is not in GVN
+    _gvn.unreg(stk); // add_fun expects the display is not in GVN
     if( !(t instanceof TypeObj) ) {
       PrimNode cvt = PrimNode.convertTypeName(t,tn,bad);
       rez = _e.add_fun(bad,tvar,gvn(cvt.as_fun(_gvn))); // Return type-name constructor
@@ -262,12 +262,12 @@ public class Parse {
       rez = _e.add_fun(bad,tvar,epi1); // Return type-name constructor
       // For Structs, add a second constructor taking an expanded arg list
       if( t instanceof TypeStruct ) {   // Add struct types with expanded arg lists
-        FunPtrNode epi2 = IntrinsicNode.convertTypeNameStruct((TypeStruct)tn, BitsAlias.TUPLE, _gvn);
+        FunPtrNode epi2 = IntrinsicNode.convertTypeNameStruct((TypeStruct)tn, BitsAlias.RECORD, _gvn);
         Node rez2 = _e.add_fun(bad,tvar,epi2); // type-name constructor with expanded arg list
         _gvn.init0(rez2._uses.at(0));      // Force init of Unresolved
       }
     }
-    _gvn.rereg(stk,stk.value(_gvn)); // Re-install closure in GVN
+    _gvn.rereg(stk,stk.value(_gvn)); // Re-install display in GVN
     // TODO: Add reverse cast-away
     return rez;
   }
@@ -300,6 +300,7 @@ public class Parse {
     Ary<Type  > ts   = new Ary<>(new Type  [1],0);
     Ary<Parse > bads = new Ary<>(new Parse [1],0);
     BitSet rs = new BitSet();
+    boolean default_nil = false;
     while( true ) {
       int oldx = _x;
       String tok = token();     // Scan for 'id = ...'
@@ -319,15 +320,24 @@ public class Parse {
         if( _e._scope.test_if() ) _x = oldx2; // Grammar ambiguity, resolve p?a:b from a:int
         else                      err_ctrl0("Missing type after ':'",null);
       }
-      if( peek(":=") ) rs.set(toks._len);             // Re-assignment parse
-      else if( !peek('=') ) { _x = oldx; break; } // Unwind token parse, and not assignment
+      if( peek(":=") ) rs.set(toks._len);              // Re-assignment parse
+      else if( !peek('=') ) {                          // Not any assignment
+        // For structs, allow a bare id as a default def of nil
+        if( lookup_current_scope_only && ts.isEmpty() && (peek(';') || peek('}') )){
+          _x--;                                        // Push back statement end
+          default_nil=true;                            // Shortcut def of nil
+        } else {
+          _x = oldx; // Unwind the token parse, and try an expression parse
+          break;     // Done parsing assignment tokens
+        }
+      }
       toks.add(tok.intern());
       ts  .add(t  );
       bads.add(bad);
     }
 
     // Normal statement value parse
-    Node ifex = ifex();         // Parse an expression for the statement value
+    Node ifex = default_nil ? con(Type.NIL) : ifex(); // Parse an expression for the statement value
     if( ifex == null ) {        // No statement?
       if( toks._len == 0 ) return  null;
       ifex = err_ctrl2("Missing ifex after assignment of '"+toks.last()+"'");
@@ -357,13 +367,13 @@ public class Parse {
         if( ifex instanceof FunPtrNode )
           ((FunPtrNode)n).merge_ref_def(_gvn,tok,(FunPtrNode)ifex);
         else ; // Can be here if already in-error
-      } else { // Store into scope/NewObjNode/closure
+      } else { // Store into scope/NewObjNode/display
 
         // Active (parser) memory state.
-        int alias = scope.stk()._alias;        // Alias for closure/object
+        int alias = scope.stk()._alias;        // Alias for display/object
         MemMergeNode mmem = mem_active();      // Parser memory, ready for modification
         Node objmem = mmem.active_obj(alias);  // Struct memory
-        Node ptr = get_closure_ptr(scope,tok); // Pointer, possibly loaded up the closure-display
+        Node ptr = get_display_ptr(scope,tok); // Pointer, possibly loaded up the display-display
         // If the active state is directly a NewObj, update-in-place.  This is
         // an early optimization.
         if( objmem.in(0) instanceof NewObjNode &&
@@ -522,7 +532,7 @@ public class Parse {
           else {
             Node st = gvn(new StoreNode(all_mem(),castnn,n=stmt,fin,fld ,errMsg()));
             // Set the store into active memory.  It might have collapsed into
-            // the local closure already, so already be in the active memory.
+            // the local display already, so already be in the active memory.
             if( st instanceof StoreNode ) mem_active().st((StoreNode)st,_gvn);
             else { assert st instanceof OProjNode; }
           }
@@ -571,11 +581,11 @@ public class Parse {
       if( !scope.is_mutable(tok) )
         return err_ctrl2("Cannot re-assign final val '"+tok+"'");
     }
-    // Now properly load from the closure
-    int alias = scope.stk()._alias;        // Closure alias
+    // Now properly load from the display
+    int alias = scope.stk()._alias;        // Display alias
     MemMergeNode mmem = mem_active();      // Active memory
     Node objmem = mmem.active_obj(alias);
-    Node ptr = get_closure_ptr(scope,tok);
+    Node ptr = get_display_ptr(scope,tok);
     n = gvn(new LoadNode(objmem,ptr,tok,null));
     if( n.is_forward_ref() )    // Prior is actually a forward-ref
       return err_ctrl2(forward_ref_err(((FunPtrNode)n).fun()));
@@ -666,13 +676,13 @@ public class Parse {
     // Forward refs always directly assigned into scope and never updated.
     if( def.is_forward_ref() ) return def;
 
-    // Else must load against most recent closure update.  Get the closure to
+    // Else must load against most recent display update.  Get the display to
     // load against.  If the scope is local, we load against it directly,
-    // otherwise the closure is passed in as a hidden argument.
-    int alias = scope.stk()._alias;   // Closure alias
+    // otherwise the display is passed in as a hidden argument.
+    int alias = scope.stk()._alias;   // Display alias
     MemMergeNode mmem = mem_active(); // Active memory
     Node objmem = mmem.active_obj(alias);
-    Node ptr = get_closure_ptr(scope,tok);
+    Node ptr = get_display_ptr(scope,tok);
     return gvn(new LoadNode(objmem,ptr,tok.intern(),null));
   }
 
@@ -709,10 +719,10 @@ public class Parse {
     Ary<Type  > ts  = new Ary<>(new Type  [1],0);
     Ary<Parse > bads= new Ary<>(new Parse [1],0);
 
-    // Push an extra hidden closure argument.  Similar to java inner-class ptr
+    // Push an extra hidden display argument.  Similar to java inner-class ptr
     // or when inside of a struct definition: 'this'.
     ids .push("^");
-    ts  .push(TypeMemPtr.CLOSURE_PTR);
+    ts  .push(TypeMemPtr.DISPLAY_PTR);
     bads.push(null);
 
     // Parse arguments
@@ -740,7 +750,7 @@ public class Parse {
       bads.add(bad);
     }
     // If this is a no-arg function, we may have parsed 1 or 2 tokens as-if
-    // args, and then reset.  Also reset to just the closure arg.
+    // args, and then reset.  Also reset to just the display arg.
     if( _x == oldx ) { ids.set_len(1); ts.set_len(1); bads.set_len(1);  }
 
     // Build the FunNode header
@@ -749,17 +759,17 @@ public class Parse {
     FunNode fun = init(new FunNode(ts.asAry()).add_def(Env.ALL_CTRL)).keep();
 
     // Increase scope depth for function body.
-    try( Env e = new Env(_e,errMsg(oldx-1),fun) ) { // Nest an environment for the local vars
-      fun._my_closure_alias = e._closure_alias;
+    try( Env e = new Env(_e,errMsg(oldx-1),fun,true) ) { // Nest an environment for the local vars
+      fun._my_display_alias = e._display_alias;
       _e = e;                   // Push nested environment
-      _gvn.set_def_reg(e._scope.stk(),0,fun); // Closure creation control defaults to function entry
+      _gvn.set_def_reg(e._scope.stk(),0,fun); // Display creation control defaults to function entry
       set_ctrl(fun);            // New control is function head
       // Build Parms for all incoming values
       Node rpc = gvn(new ParmNode(-1,"rpc",fun,con(TypeRPC.ALL_CALL),null)).keep();
       Node mem = gvn(new ParmNode(-2,"mem",fun,con(TypeMem.FULL    ),null));
-      Node clo = gvn(new ParmNode( 0,"^"  ,fun,con(TypeMemPtr.CLOSURE_PTR),null));
-      // Closure is special: the default is simple the outer lexical scope.
-      // But here, in a function, the closure is actually passed in as a hidden
+      Node clo = gvn(new ParmNode( 0,"^"  ,fun,con(TypeMemPtr.DISPLAY_PTR),null));
+      // Display is special: the default is simple the outer lexical scope.
+      // But here, in a function, the display is actually passed in as a hidden
       // extra argument and replaces the default.
       e._scope.stk().update(0,ts_mutable(false),clo,_gvn);
       // Parms for all arguments
@@ -772,11 +782,11 @@ public class Parse {
       }
 
       // Function memory is a merge of incoming wide memory, and the local
-      // closure implied by arguments.  Starts merging in parent scope, but
+      // display implied by arguments.  Starts merging in parent scope, but
       // this is incorrect - should start from the incoming function memory.
       MemMergeNode amem = mem_active();
-      assert amem.in(1).in(0) == e._scope.stk(); // amem slot#1 is the closure
-      amem.set_def(0,mem,_gvn);                  // amem slot#0 was outer closure, should be function memory
+      assert amem.in(1).in(0) == e._scope.stk(); // amem slot#1 is the display
+      amem.set_def(0,mem,_gvn);                  // amem slot#0 was outer display, should be function memory
       set_mem(amem);
       // Parse function body
       Node rez = stmts();       // Parse function body
@@ -787,7 +797,7 @@ public class Parse {
       // Standard return; function control, memory, result, RPC.  Plus a hook
       // to the function for faster access.
       RetNode ret = (RetNode)gvn(new RetNode(ctrl(),all_mem(),rez,rpc.unhook(),fun.unhook()));
-      // The FunPtr builds a real closure; any up-scope references are passed in now.
+      // The FunPtr builds a real display; any up-scope references are passed in now.
       Node fptr = gvn(new FunPtrNode(ret,e._par._scope.ptr()));
       _e = _e._par;             // Pop nested environment
       set_ctrl(old_ctrl);       // Back to the pre-function-def control
@@ -838,7 +848,7 @@ public class Parse {
   private Node struct() {
     int oldx = _x-1; Node ptr;  // Opening @{
     all_mem();
-    try( Env e = new Env(_e,errMsg(oldx-1),null) ) { // Nest an environment for the local vars
+    try( Env e = new Env(_e,errMsg(oldx-1),null,false) ) { // Nest an environment for the local vars
       _e = e;                   // Push nested environment
       stmts(true);              // Create local vars-as-fields
       require('}',oldx);        // Matched closing }
@@ -943,7 +953,7 @@ public class Parse {
     if( !(t instanceof TypeObj) ) return t; // Primitives are not wrapped
     // Automatically convert to reference for fields.
     // Make a reasonably precise alias.
-    int type_alias = t instanceof TypeStruct ? BitsAlias.TUPLE : BitsAlias.STR;
+    int type_alias = t instanceof TypeStruct ? BitsAlias.RECORD : BitsAlias.STR;
     TypeMemPtr tmp = TypeMemPtr.make(BitsAlias.make0(type_alias),(TypeObj)t);
     return typeq(tmp);          // And check for null-ness
   }
@@ -965,7 +975,7 @@ public class Parse {
   // Type or null or Type.ANY for '->' token
   private Type type0(boolean type_var) {
     if( peek('{') ) {           // Function type
-      Ary<Type> ts = new Ary<>(new Type[]{TypeMemPtr.CLOSURE_PTR});  Type t;
+      Ary<Type> ts = new Ary<>(new Type[]{TypeMemPtr.DISPLAY_PTR});  Type t;
       while( (t=typep(type_var)) != null && t != Type.ANY  )
         ts.add(t);              // Collect arg types
       Type ret;
@@ -983,7 +993,7 @@ public class Parse {
 
     if( peek("@{") ) {          // Struct type
       Ary<String> flds = new Ary<>(new String[]{"^"});
-      Ary<Type  > ts   = new Ary<>(new Type  []{TypeMemPtr.CLOSURE_PTR});
+      Ary<Type  > ts   = new Ary<>(new Type  []{TypeMemPtr.DISPLAY_PTR});
       Ary<Byte  > mods = new Ary<>(new Byte  []{TypeStruct.ffinal()});
       while( true ) {
         String tok = token();            // Scan for 'id'
@@ -1013,7 +1023,7 @@ public class Parse {
     // "(, , )" is a 2-entry tuple
     if( peek('(') ) { // Tuple type
       byte c;
-      Ary<Type> ts = new Ary<>(new Type[]{TypeMemPtr.CLOSURE_PTR});
+      Ary<Type> ts = new Ary<>(new Type[]{TypeMemPtr.DISPLAY_PTR});
       while( (c=skipWS()) != ')' ) { // No more types...
         Type t = Type.SCALAR;    // Untyped, most generic field type
         if( c!=',' &&            // Has type annotation?
@@ -1108,7 +1118,7 @@ public class Parse {
   private static boolean isWS    (byte c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r'; }
   private static boolean isAlpha0(byte c) { return ('a'<=c && c <= 'z') || ('A'<=c && c <= 'Z') || (c=='_'); }
   private static boolean isAlpha1(byte c) { return isAlpha0(c) || ('0'<=c && c <= '9'); }
-  private static boolean isOp0   (byte c) { return "!#$%*+,-.=<>@^[]~/&".indexOf(c) != -1; }
+  private static boolean isOp0   (byte c) { return "!#$%*+,-.=<>^[]~/&".indexOf(c) != -1; }
   private static boolean isOp1   (byte c) { return isOp0(c) || ":?".indexOf(c) != -1; }
   public  static boolean isDigit (byte c) { return '0' <= c && c <= '9'; }
 
@@ -1146,23 +1156,23 @@ public class Parse {
     return (MemMergeNode)mem;
   }
 
-  // Get the closure pointer.  If this is the local scope, then it directly
-  // refers to the correct closure.  If 'tok' is final in the closure then
-  // again we can load from the closure directly.  Otherwise the function call
-  // passed in the closure as a hidden argument which we return here.
-  private Node get_closure_ptr(ScopeNode scope, String tok) {
-    if( !scope.is_mutable(tok) ) // Field is immutable (common for primitive closure)
+  // Get the display pointer.  If this is the local scope, then it directly
+  // refers to the correct display.  If 'tok' is final in the display then
+  // again we can load from the display directly.  Otherwise the function call
+  // passed in the display as a hidden argument which we return here.
+  private Node get_display_ptr(ScopeNode scope, String tok) {
+    if( !scope.is_mutable(tok) ) // Field is immutable (common for primitive display)
       return scope.ptr();        // Directly reference
 
     // Issue Loads against the Display, until we get the correct scope.  The
-    // Display is a linked list of closures, and we already checked that token
+    // Display is a linked list of displays, and we already checked that token
     // exists at scope up in the display.
     Env e = _e;
     Node ptr = e._scope.ptr();
     MemMergeNode mmem = mem_active();
     while( true ) {
       if( scope == e._scope ) return ptr;
-      ptr = gvn(new LoadNode(mmem,ptr,"^",null)); // Gen linked-list walk code, walking closure slot
+      ptr = gvn(new LoadNode(mmem,ptr,"^",null)); // Gen linked-list walk code, walking display slot
       e = e._par;                                 // Walk linked-list in parser also
     }
   }

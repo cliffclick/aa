@@ -6,23 +6,23 @@ import com.cliffc.aa.type.*;
 public class Env implements AutoCloseable {
   final Env _par;
   Parse _P;          // Used to get debug info
-  FunNode _fun;      // Start of closure scope, or null for structs
-  ScopeNode _scope;  // Lexical anchor; "end of closure"; goes when this environment leaves scope
-  int _closure_alias;// Local closure alias
-  Env( Env par, Parse P, FunNode fun ) {
+  FunNode _fun;      // Start of display scope, or null for structs
+  ScopeNode _scope;  // Lexical anchor; "end of display"; goes when this environment leaves scope
+  int _display_alias;// Local display alias
+  Env( Env par, Parse P, FunNode fun, boolean is_closure ) {
     _P = P;
     _par = par;
     _fun = fun;
     Node ctl = par == null ? CTL_0 : par._scope.ctrl();
     Node clo = par == null ? GVN.con(Type.NIL) : par._scope.ptr ();
     Node mem = par == null ? MEM_0 : par._scope.mem ();
-    NewObjNode nnn = GVN.init(new NewObjNode(fun!=null,ctl,clo)).keep();
+    NewObjNode nnn = GVN.init(new NewObjNode(is_closure,ctl,clo)).keep();
     Node frm = GVN.xform(new OProjNode(nnn,0));
     Node ptr = GVN.xform(new  ProjNode(nnn,1));
-    BitsAlias bits_clo = BitsAlias.make0(_closure_alias = nnn._alias);
-    CLOSURES = par == null ? bits_clo : CLOSURES.meet(bits_clo);
+    BitsAlias bits_clo = BitsAlias.make0(_display_alias = nnn._alias);
+    DISPLAY = DISPLAY.meet(bits_clo);
     MemMergeNode mmem = new MemMergeNode(mem,frm,nnn.<NewObjNode>unhook()._alias);
-    ScopeNode scope = _scope = new ScopeNode(P==null ? null : P.errMsg(),fun!=null);
+    ScopeNode scope = _scope = new ScopeNode(P==null ? null : P.errMsg(),is_closure);
     scope.set_ctrl(ctl,GVN);
     scope.set_ptr (ptr,GVN);  // Address for 'nnn', the local stack frame
     scope.set_active_mem(mmem,GVN);  // Memory includes local stack frame
@@ -37,18 +37,20 @@ public class Env implements AutoCloseable {
           final static int LAST_START_UID;
   private final static int NINIT_CONS;
           final static Env TOP; // Top-most lexical Environment, has all primitives, unable to be removed
-  public        static BitsAlias CLOSURES;
+  public        static BitsAlias DISPLAY;
 
   static {
     GVN = new GVNGCM();      // Initial GVN, defaults to ALL, lifts towards ANY
+    //DISPLAY = BitsAlias.RECORD_BITS;
+    DISPLAY = BitsAlias.EMPTY;
 
     // Initial control & memory
     START  =          new StartNode(       ) ;
     CTL_0  = GVN.init(new CProjNode(START,0));
     MEM_0  = GVN.init(new MProjNode(START,1));
     // Top-most (file-scope) lexical environment
-    TOP = new Env(null,null,null);
-    // Top-level closure defining all primitives
+    TOP = new Env(null,null,null,true);
+    // Top-level display defining all primitives
     STK_0  = TOP._scope.stk();
 
     // Top-level default values; ALL_CTRL is used by declared functions to
@@ -86,23 +88,23 @@ public class Env implements AutoCloseable {
 
   // A new Env for the current Parse scope (generally a file-scope or a
   // test-scope), above this is the basic public Env with all the primitives
-  public static Env top() { return new Env(TOP,null,null); }
+  public static Env top() { return new Env(TOP,null,null,false); }
 
   // Wire up an early function exit
   Node early_exit( Parse P, Node val ) {
     return _scope.is_closure() ? P.do_exit(_scope,val) : _par.early_exit(P,val); // Hunt for an early-exit-enabled scope
   }
 
-  // Close any currently open closure, and remove its alias from the set of
-  // active closure aliases (which are otherwise available to all function
+  // Close any currently open display, and remove its alias from the set of
+  // active display aliases (which are otherwise available to all function
   // definitions getting parsed).
-  public void close_closure( GVNGCM gvn ) {
+  public void close_display( GVNGCM gvn ) {
     Node ptr = _scope.ptr();
     if( ptr == null ) return;   // Already done
     NewObjNode stk = _scope.stk();
-    CLOSURES = CLOSURES.clear(stk._alias);
+    DISPLAY = DISPLAY.clear(stk._alias);
     gvn.add_work_uses(stk);     // Scope object going dead, trigger following projs to cleanup
-    _scope.set_ptr(null,gvn);   // Clear pointer to closure
+    _scope.set_ptr(null,gvn);   // Clear pointer to display
   }
 
   // Close the current Env and lexical scope.
@@ -112,7 +114,7 @@ public class Env implements AutoCloseable {
     // Promote forward refs to the next outer scope
     if( pscope != null && pscope != TOP._scope)
       _scope.stk().promote_forward(GVN,pscope.stk());
-    close_closure(GVN);
+    close_display(GVN);
     // Whats left is function-ref generic entry points which promote to next
     // outer scope, and control-users which promote to the Scope's control.
     assert _scope._uses.isEmpty();

@@ -57,26 +57,26 @@ import java.util.Map;
 public class FunNode extends RegionNode {
   public String _name;          // Optional for anon functions; can be set later via bind()
   public TypeFunPtr _tf;        // FIDX, arg & ret types.  Closure type is slot 0 argument.
-  public BitsAlias _closure_aliases; // All available aliases in parent closures
-  public int _my_closure_alias;      // My self closure alias
+  public BitsAlias _display_aliases; // All available aliases in parent displays
+  public int _my_display_alias;      // My self display alias
   // Operator precedence; only set on top-level primitive wrappers.
   // -1 for normal non-operator functions and -2 for forward_decls.
   private final byte _op_prec;  // Operator precedence; only set on top-level primitive wrappers
   private byte _cnt_size_inlines; // Count of size-based inlines
 
-  // Used to make the primitives at boot time.  Note the empty closures: in
-  // theory Primitives should get the top-level primitives-closure, but in
+  // Used to make the primitives at boot time.  Note the empty displays: in
+  // theory Primitives should get the top-level primitives-display, but in
   // practice most primitives neither read nor write their own scope.
   public  FunNode(PrimNode prim) { this(prim._name,TypeFunPtr.make_new(prim._targs,prim._ret),prim.op_prec(),BitsAlias.EMPTY); }
   public  FunNode(IntrinsicNewNode prim, Type ret) { this(prim._name,TypeFunPtr.make_new(prim._targs,ret),prim.op_prec(), BitsAlias.EMPTY); }
   // Used to make copies when inlining/cloning function bodies
-          FunNode(String name,TypeFunPtr tf, BitsAlias closure_aliases) { this(name,tf,-1,closure_aliases); }
+          FunNode(String name,TypeFunPtr tf, BitsAlias display_aliases) { this(name,tf,-1,display_aliases); }
   // Used to start an anonymous function in the Parser
-  public  FunNode(Type[] ts) { this(null,TypeFunPtr.make_new(TypeStruct.make_args(ts),Type.SCALAR),-1,Env.CLOSURES); }
+  public  FunNode(Type[] ts) { this(null,TypeFunPtr.make_new(TypeStruct.make_args(ts),Type.SCALAR),-1,Env.DISPLAY); }
   // Used to forward-decl anon functions
-          FunNode(String name) { this(name,TypeFunPtr.make_anon(),-2,Env.CLOSURES); add_def(Env.ALL_CTRL); }
+          FunNode(String name) { this(name,TypeFunPtr.make_anon(),-2,Env.DISPLAY); add_def(Env.ALL_CTRL); }
   // Shared common constructor
-  private FunNode(String name, TypeFunPtr tf, int op_prec, BitsAlias closure_aliases) {
+  private FunNode(String name, TypeFunPtr tf, int op_prec, BitsAlias display_aliases) {
     super(OP_FUN);
     assert tf.isa(TypeFunPtr.GENERIC_FUNPTR);
     assert TypeFunPtr.GENERIC_FUNPTR.dual().isa(tf);
@@ -85,8 +85,8 @@ public class FunNode extends RegionNode {
     _tf = tf;
     _op_prec = (byte)op_prec;
     FUNS.setX(fidx(),this); // Track FunNode by fidx; assert single-bit fidxs
-    // Stack of active closures this function can reference.
-    _closure_aliases = closure_aliases;
+    // Stack of active displays this function can reference.
+    _display_aliases = display_aliases;
   }
 
   // Find FunNodes by fidx
@@ -265,7 +265,7 @@ public class FunNode extends RegionNode {
   private int find_type_split_index( GVNGCM gvn, ParmNode[] parms ) {
     assert has_unknown_callers(); // Only overly-wide calls.
     for( ParmNode parm : parms ) // For all parms
-      if( parm != null && parm._idx > 0 ) // (some can be dead) and skipping the closure
+      if( parm != null && parm._idx > 0 ) // (some can be dead) and skipping the display
         for( Node call : parm._uses ) // See if a parm-user needs a type-specialization split
           if( call instanceof CallNode &&
               ((CallNode)call).fun() instanceof UnresolvedNode ) { // Call overload not resolved
@@ -344,14 +344,14 @@ public class FunNode extends RegionNode {
   // Return the function body.
   private Ary<Node> find_body( RetNode ret ) {
     // Find the function body.  Do a forwards walk first, stopping at the
-    // obvious function exit.  If function does not expose its closure then
+    // obvious function exit.  If function does not expose its display then
     // this is the complete function body with nothing extra walked.  If it has
-    // a nested function or returns a nested function then its closure is may
+    // a nested function or returns a nested function then its display is may
     // be reached by loads & stores from outside the function.
     //
     // Then do a backwards walk, intersecting with the forwards walk.  A
     // backwards walk will find upwards-exposed values, typically constants and
-    // closure references - could be a lot of them.  Minor opt to do the
+    // display references - could be a lot of them.  Minor opt to do the
     // forward walk first.
     VBitSet freached = new VBitSet(); // Forwards reached
     Ary<Node> work = new Ary<>(new Node[1],0);
@@ -452,7 +452,7 @@ public class FunNode extends RegionNode {
   private FunNode make_new_fun(GVNGCM gvn, RetNode ret, TypeStruct new_args) {
     // Make a prototype new function header split from the original.
     int oldfidx = fidx();
-    FunNode fun = new FunNode(_name,_tf.make_new_fidx(oldfidx,new_args),_closure_aliases);
+    FunNode fun = new FunNode(_name,_tf.make_new_fidx(oldfidx,new_args),_display_aliases);
     fun.pop();                  // Remove null added by RegionNode, will be added later
     // Renumber the original as well; the original _fidx is now a *class* of 2
     // fidxs.  Each FunNode fidx is only ever a constant, so the original Fun
@@ -513,9 +513,9 @@ public class FunNode extends RegionNode {
       map.put(n,c);                    // Map from old to new
       if( old_alias != -1 ) {          // Was a NewNode?
         aliases.set(old_alias);        // Record old alias before copy/split
-        // Update the local closures
-        this._my_closure_alias = ((NewNode)n)._alias;
-        fun ._my_closure_alias = ((NewNode)c)._alias;
+        // Update the local displays
+        this._my_display_alias = ((NewNode)n)._alias;
+        fun ._my_display_alias = ((NewNode)c)._alias;
       }
     }
 
@@ -526,7 +526,7 @@ public class FunNode extends RegionNode {
     FunPtrNode old_funptr = oldret.funptr();
     FunPtrNode new_funptr = (FunPtrNode)old_funptr.copy(false,cepi,gvn);
     new_funptr.add_def(newret);
-    new_funptr.add_def(old_funptr.in(1)); // Share same closure
+    new_funptr.add_def(old_funptr.in(1)); // Share same display
     new_funptr._t = fun._tf;
     old_funptr.keep(); // Keep around; do not kill last use before the clone is done
 
@@ -607,7 +607,7 @@ public class FunNode extends RegionNode {
         for( ParmNode parm : parms ) // For all parms
           if( parm != null ) {       //   (some can be dead)
             Type tp = gvn.type(call.arg(parm._idx)); // Specific path type
-            if( parm._idx==0 ) tp = ((TypeFunPtr)tp).closure();
+            if( parm._idx==0 ) tp = ((TypeFunPtr)tp).display();
             if( !tp.isa(fun.targ(parm._idx)) || // If this path cannot use the sharper sig
                 tp.above_center() )             // Or path is in-error
               { fp = old_funptr; break; } // Take the old, more generic version

@@ -18,9 +18,9 @@ public final class RetNode extends Node {
   public Node val() { return in(2); }
   public Node rpc() { return in(3); }
   public FunNode fun() { return (FunNode)in(4); }
-  // If this function is not using any closures, then there is a single unique
+  // If this function is not using any displays, then there is a single unique
   // FunPtr.  Otherwise this call is ambiguous, as each execution of the
-  // FunPtrNode makes a new closure.
+  // FunPtrNode makes a new display.
   public FunPtrNode funptr() {
     FunPtrNode fpn=null;
     for( Node use : _uses )
@@ -94,7 +94,7 @@ public final class RetNode extends Node {
   // and callers MAY be able to see.  This can be, e.g. ALL of memory, but we
   // try to exclude both obviously not modified memory (which includes
   // unreachable memory) and obviously not visible to caller (which includes
-  // our local closure if it does not escape).
+  // our local display if it does not escape).
   //
   // Depends on the returned value type and memory type, and the structure of
   // the Parms to the Function.
@@ -115,12 +115,12 @@ public final class RetNode extends Node {
     TypeMem output_mem = (TypeMem)omem;
 
     BitsAlias abs = BitsAlias.EMPTY; // Set of escaping aliases
-    // Closures reachable from this function escape, because we assume the
-    // function body modifies all closure variables.
+    // Displays reachable from this function escape, because we assume the
+    // function body modifies all display variables.
     FunNode fun = fun();
     if( !fun.is_parm(mem) ) {  // Shortcut: Skip if no memory effects at all
       MemMergeNode mmem = mem instanceof MemMergeNode ? ((MemMergeNode)mem) : null;
-      for( int alias : fun._closure_aliases )
+      for( int alias : fun._display_aliases )
         // If memory effect is strange, or this alias is not directly from the
         // function entry, then assume it is modified and part of the result state.
         if( mmem == null || !fun.is_parm(mmem.alias2node(alias)) )
@@ -132,10 +132,10 @@ public final class RetNode extends Node {
     Type tval = gvn.type(val());
     abs = tval.recursive_aliases(abs,output_mem);
     if( abs.test(1) ) return BitsAlias.NZERO; // Shortcut
-    // Check for escaping the local closure up and out.
+    // Check for escaping the local display up and out.
     // TODO: Only escape if function ptrs are from interior functions.
     if( tval.isa(TypeFunPtr.GENERIC_FUNPTR) )
-      abs = output_mem.recursive_aliases(abs,fun._my_closure_alias);
+      abs = output_mem.recursive_aliases(abs,fun._my_display_alias);
 
     // Aliases reachable from input arguments, and are modified.
     for( Node use : fun()._uses )

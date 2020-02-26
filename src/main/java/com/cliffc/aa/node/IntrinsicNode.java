@@ -37,7 +37,7 @@ public class IntrinsicNode extends Node {
 
     // This function call takes in and returns a plain ptr-to-object.
     // Only after folding together does the name become apparent.
-    TypeFunPtr tf = TypeFunPtr.make_new(TypeStruct.make_args(TypeStruct.ts(TypeMemPtr.CLOSURE_PTR,TypeMemPtr.STRUCT)),TypeMemPtr.STRUCT);
+    TypeFunPtr tf = TypeFunPtr.make_new(TypeStruct.make_args(TypeStruct.ts(TypeMemPtr.DISPLAY_PTR,TypeMemPtr.STRUCT)),TypeMemPtr.STRUCT);
     FunNode fun = (FunNode) gvn.xform(new FunNode(tn._name,tf,BitsAlias.EMPTY).add_def(Env.ALL_CTRL));
     Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL ),null));
     Node mem = gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.FULL     ),null));
@@ -105,7 +105,7 @@ public class IntrinsicNode extends Node {
   }
   @Override public String err(GVNGCM gvn) {
     Type ptr = gvn.type(ptr());
-    return _badargs.typerr(ptr,_tn,mem()); // Did not remove the aliasing
+    return _badargs.typerr(ptr,TypeMemPtr.make(BitsAlias.RECORD,_tn),mem()); // Did not remove the aliasing
   }
 
   // Clones during inlining all become unique new sites
@@ -121,7 +121,7 @@ public class IntrinsicNode extends Node {
   // Passed in a named TypeStruct, and the parent alias.
   public static FunPtrNode convertTypeNameStruct( TypeStruct to, int alias, GVNGCM gvn ) {
     assert to.has_name();
-    assert Util.eq(to._flds[0],"^"); // Closure already
+    assert Util.eq(to._flds[0],"^"); // Display already
     NewObjNode nnn = new NewObjNode(false,alias,to,null,gvn.con(Type.NIL)).keep();
     TypeFunPtr tf = TypeFunPtr.make_new(to.remove_name(),TypeMemPtr.make(alias,to));
     FunNode fun = (FunNode) gvn.xform(new FunNode(to._name,tf,BitsAlias.EMPTY).add_def(Env.ALL_CTRL));

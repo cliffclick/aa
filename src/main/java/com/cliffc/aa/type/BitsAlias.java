@@ -22,9 +22,9 @@ public class BitsAlias extends Bits<BitsAlias> {
 
   static final Bits.Tree<BitsAlias> TREE = new Bits.Tree<>();
   @Override public Tree<BitsAlias> tree() { return TREE; }
-  public static final int ALL, TUPLE, CLOSURE, ARY, STR, RECORD;
-         static BitsAlias NIL, RECORD_BITS, RECORD_BITS0, TUPLE_BITS, STRBITS0;
-  public static BitsAlias FULL, NZERO, ANY, TUPLE_BITS0, CLOSURE_BITS, CLOSURE_BITS0, EMPTY, STRBITS;
+  public static final int ALL, ARY, STR, RECORD;
+         static BitsAlias NIL, RECORD_BITS, STRBITS0;
+  public static BitsAlias FULL, NZERO, ANY, EMPTY, STRBITS, RECORD_BITS0;
 
   static {
     // The All-Memory alias class
@@ -38,14 +38,6 @@ public class BitsAlias extends Bits<BitsAlias> {
     // Everything falls into one of these two camps.
     RECORD_BITS = make0(RECORD = type_alias(ALL));
     RECORD_BITS0 = RECORD_BITS.meet_nil();
-    // Split Records into Tuple/Structs vs Closures
-    TUPLE_BITS = make0(TUPLE = type_alias(RECORD));
-    TUPLE_BITS0 = TUPLE_BITS.meet_nil();
-    // Closures are just like structs/records except they are made on function
-    // entry to hold arguments.  They typically have a stack-like lifetime, but
-    // they are full closures and lifetime can be indefinite.
-    CLOSURE_BITS = make0(CLOSURE = type_alias(RECORD));
-    CLOSURE_BITS0 = CLOSURE_BITS.meet_nil();
 
     // Arrays
     ARY = type_alias(ALL);

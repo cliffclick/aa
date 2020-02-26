@@ -145,7 +145,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     if( dups == null ) dups = new VBitSet();
     if( dups.tset(_uid) ) return "$"; // Break recursive printing cycle
     if( find("!") != -1 && find("math_pi") != -1 )
-      return "{PRIMS}";         // Special shortcut for the all-prims closure type
+      return "{PRIMS}";         // Special shortcut for the all-prims display type
 
     SB sb = new SB();
     if( _uf!=null ) return "=>"+_uf; // Only used mid-recursion
@@ -176,7 +176,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     if( _uf!=null ) return _uf.dstr(sb.p("=>"),dups);
     if( _any ) sb.p('~');
     sb.p(_name);
-    boolean is_tup = _flds.length==0 || fldTop(_flds[0]) || fldBot(_flds[0]) || isDigit(_flds[0].charAt(0));
+    boolean is_tup = _flds.length<=1 || fldTop(_flds[1]) || fldBot(_flds[1]) || isDigit(_flds[1].charAt(0));
     if( !is_tup ) sb.p('@');    // Not a tuple
     sb.p(is_tup ? '(' : '{').nl().ii(1); // open struct, newline, increase_indent
     for( int i=0; i<_flds.length; i++ ) {
@@ -205,7 +205,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     if( !is_tup ) sb.p('@');    // Not a tuple
     sb.p(is_tup ? '(' : '{');
     for( int i=0; i<_flds.length; i++ ) {
-      if( Util.eq(_flds[i],"^") ) continue; // Do not print the ever-present closure
+      if( Util.eq(_flds[i],"^") ) continue; // Do not print the ever-present display
       Type t = at(i);
       if( !is_tup )
         sb.p(_flds[i]).p(fstr(_finals[i])).p('='); // Field name, access mod
@@ -255,9 +255,9 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public  static TypeStruct make(Type[] ts) {
     return malloc("",false,false,FLDS[ts.length],ts,fbots(ts.length)).hashcons_free();
   }
-  // Generic function arguments.  Slot 0 is the closure and has a fixed name.
+  // Generic function arguments.  Slot 0 is the display and has a fixed name.
   public  static TypeStruct make_args(Type[] ts) {
-    assert ts[0]==TypeMemPtr.CLOSURE_PTR || ts[0]==Type.NIL;
+    assert ts[0]==TypeMemPtr.DISPLAY_PTR || ts[0]==Type.NIL;
     String[] args = new String[ts.length];
     Arrays.fill(args,".");
     args[0] = "^";
@@ -290,9 +290,9 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // The display is a self-recursive structure: slot 0 is a ptr to a Display.
   // To break class-init cycle, this is partially made here, now.
   // Then we touch TypeMemPtr, which uses this field.
-  // Then we finish making CLOSURE.
-  public  static final TypeStruct CLOSURE = malloc("",false,false,new String[]{"^"},ts(Type.NIL),finals(1));
-  static { CLOSURE._hash = CLOSURE.compute_hash(); }
+  // Then we finish making DISPLAY.
+  public  static final TypeStruct DISPLAY = malloc("",false,false,new String[]{"^"},ts(Type.NIL),finals(1));
+  static { DISPLAY._hash = DISPLAY.compute_hash(); }
   // Most primitive function call argument type lists are 0-based
   public  static final TypeStruct GENERIC = malloc("",true,true,FLD0,TypeAry.get(0),new byte[0]).hashcons_free();
   public  static final TypeStruct ALLSTRUCT = make(ts());
@@ -321,20 +321,20 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // Called during class-init.
   private static final HashMap<TypeStruct,TypeStruct> MEETS1 = new HashMap<>(), MEETS2 = new HashMap<>();
 
-  // Called during init to break the cycle making CLOSURE.
-  // TypeMemPtr uses CLOSURE, defined above, which in turn is used here.
+  // Called during init to break the cycle making DISPLAY.
+  // TypeMemPtr uses DISPLAY, defined above, which in turn is used here.
   static {
-    assert CLOSURE._ts[0] == Type.NIL;
-    CLOSURE._ts = ts(TypeMemPtr.CLOSURE_PTR);
-    CLOSURE.install_cyclic(new Ary<>(ts(CLOSURE,TypeMemPtr.CLOSURE_PTR)));
-    assert CLOSURE.is_closure();
+    assert DISPLAY._ts[0] == Type.NIL;
+    DISPLAY._ts = ts(TypeMemPtr.DISPLAY_PTR);
+    DISPLAY.install_cyclic(new Ary<>(ts(DISPLAY,TypeMemPtr.DISPLAY_PTR)));
+    assert DISPLAY.is_display();
   }
-  boolean is_closure() {
-    if( this==CLOSURE || this==CLOSURE._dual ) return true;
-    return _ts.length >= 1 && _ts[0] instanceof TypeMemPtr && ((TypeMemPtr)_ts[0]).is_closure();
+  boolean is_display() {
+    if( this==DISPLAY || this==DISPLAY._dual ) return true;
+    return _ts.length >= 1 && _ts[0] instanceof TypeMemPtr && ((TypeMemPtr)_ts[0]).is_display();
   }
 
-  static final TypeStruct[] TYPES = new TypeStruct[]{ALLSTRUCT,STR_STR,FLT64,POINT,NAMEPT,A,C0,D1,ARW,CLOSURE};
+  static final TypeStruct[] TYPES = new TypeStruct[]{ALLSTRUCT,STR_STR,FLT64,POINT,NAMEPT,A,C0,D1,ARW,DISPLAY};
 
   // Extend the current struct with a new named field
   public TypeStruct add_fld( String name, Type t, byte mutable ) {
@@ -583,10 +583,13 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     }
     if( mt._any && !mx._any ) mt._any=false;
     if( mt._cln && !mx._cln ) mt._cln=false;
-    len = Math.min(len,mx._ts.length);
     for( int i=0; i<len; i++ ) {
-      mt._flds  [i] = smeet(mt._flds  [i],mx._flds  [i]); // Set the Meet of field names
-      mt._finals[i] = fmeet(mt._finals[i],mx._finals[i]); // Set the Meet of field access
+      String s0 = mt._flds[i];
+      String s1 = i<mx._flds.length ? mx._flds[i] : null;
+      mt._flds  [i] = smeet(s0,s1); // Set the Meet of field names
+      byte b0 = mt._finals[i];
+      byte b1 = i<mx._finals.length ? mx._finals[i] : 0;
+      mt._finals[i] = fmeet(b0,b1); // Set the Meet of field access
     }
     mt._name = mt.mtname(mx,mt);
     mt._hash = mt.compute_hash(); // Compute hash now that fields and finals are set
@@ -601,15 +604,14 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     // For-all _ts edges do the Meet.  Some are not-recursive and mapped, some
     // are part of the cycle and mapped, some
     for( int i=0; i<len; i++ ) {
-      Type lfi = this._ts[i];
-      Type rti = that._ts[i];
-      Type mti = lfi.meet(rti); // Recursively meet, can update 'mt'
+      Type lfi = i<this._ts.length ? this._ts[i] : null;
+      Type rti = i<that._ts.length ? that._ts[i] : null;
+      Type mti = (lfi==null) ? rti : (rti==null ? lfi : lfi.meet(rti));
       Type mtx = mt._ts[i];     // Prior value, perhaps updated recursively
-      Type mts = mtx.meet(mti); // Meet again
+      Type mts = mtx==null ? mti : mtx.meet(mti); // Meet again
       assert mt._uf==null;      // writing results but value is ignored
       mt._ts[i] = mts;          // Finally update
     }
-
     // Check for repeats right now
     for( TypeStruct ts : MEETS1.values() )
       if( ts!=mt && ts.equals(mt) )
@@ -722,6 +724,10 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // the too-deep parts merged into shallower parts.
   private static TypeStruct ax_impl_struct( int alias, boolean isnews, int cutoff, Ary<TypeStruct> cutoffs, int d, TypeStruct dold, TypeStruct old ) {
     assert old.interned();
+    // TODO: If past depth, never use OLD, forces maximal cloning for the
+    // last step, as the last step will be MEET with an arbitrary structure.
+    // Use alternative OLD past depth, to keep looping unrelated types
+    // folding up.  Otherwise unrelated types might expand endlessly.
     TypeStruct nt = OLD2APX.get(old);
     if( nt != null ) return ufind(nt);
 
@@ -751,12 +757,17 @@ public class TypeStruct extends TypeObj<TypeStruct> {
         assert mt==nts;
       }
     }
-    if( d==cutoff ) OLD2APX.put(old,null); // Do not keep sharing the "tails"
+    /*if( d==cutoff )*/ OLD2APX.put(old,null); // Do not keep sharing the "tails"
+    // CNC Never remove...
     return nts;
   }
 
   private static Type ax_impl_ptr( int alias, int cutoff, Ary<TypeStruct> cutoffs, int d, TypeStruct dold, TypeMemPtr old ) {
     assert old.interned();
+    // TODO: If past depth, never use OLD, forces maximal cloning for the
+    // last step, as the last step will be MEET with an arbitrary structure.
+    // Use alternative OLD past depth, to keep looping unrelated types
+    // folding up.  Otherwise unrelated types might expand endlessly.
     TypeMemPtr nt = OLD2APX.get(old);
     if( nt != null ) return ufind(nt);
 
@@ -765,7 +776,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     OLD2APX.put(old,nmp);
     if( old._obj instanceof TypeStruct )
       nmp._obj = ax_impl_struct(alias,nmp._aliases.test(alias),cutoff,cutoffs,d,dold,(TypeStruct)old._obj);
-    if( d+1==cutoff ) OLD2APX.put(old,null); // Do not keep sharing the "tails"
+    /*if( d+1==cutoff )*/ OLD2APX.put(old,null); // Do not keep sharing the "tails"
+    // CNC Never remove...
     return nmp;
   }
 
@@ -790,7 +802,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       if( old == Type.SCALAR )
         return union(nt,old); // Result is a scalar, which changes the structure of the new types.
       if( old == Type.XSCALAR ) break; // Result is the nt unchanged
-      if( !(old instanceof TypeMemPtr) ) throw AA.unimpl();
+      if( !(old instanceof TypeMemPtr) ) throw AA.unimpl(); // Not a xscalar, not a memptr, probably falls to scalar
       TypeMemPtr optr = (TypeMemPtr)old;
       nptr._aliases = nptr._aliases.meet(optr._aliases);
       nptr._obj = (TypeObj)ax_meet(bs,nptr._obj,optr._obj);
@@ -816,8 +828,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
         nts._flds  [i] = smeet(nts._flds  [i],ots._flds  [i]); // Set the Meet of field names
         nts._finals[i] = fmeet(nts._finals[i],ots._finals[i]);
       }
-      if( clen != len ) throw AA.unimpl();
-      // Now recursively do all fields
+      // Now recursively do all common fields
       for( int i=0; i<clen; i++ )
         nts._ts[i] = ax_meet(bs,nts._ts[i],ots._ts[i]);
       break;
@@ -1019,12 +1030,12 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   static private boolean fldTop( String s ) { return s.charAt(0)=='*'; }
   static public  boolean fldBot( String s ) { return s.charAt(0)=='.'; }
   // String meet
-  private static String smeet( @NotNull String s0, @NotNull String s1 ) {
-    if( fldTop(s0) ) return s1;
-    if( fldTop(s1) ) return s0;
+  private static String smeet( String s0, String s1 ) {
+    if( s0==null || fldTop(s0) ) return s1;
+    if( s1==null || fldTop(s1) ) return s0;
     if( fldBot(s0) ) return s0;
     if( fldBot(s1) ) return s1;
-    if( s0.equals(s1) ) return s0;
+    if( Util.eq(s0,s1) ) return s0;
     return "."; // fldBot
   }
   private static String sdual( String s ) {

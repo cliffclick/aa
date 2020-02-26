@@ -19,14 +19,14 @@ public class TestParse {
     Object dummy = Env.GVN; // Force class loading cycle
 
     // A collection of tests which like to fail easily
-    testerr ("Point=:@{x;y}; Point((0,1))", "*[$](nil;1)! is not a Point:@{x=;y=}!",27);
+    testerr ("Point=:@{x;y}; Point((0,1))", "*[$](nil;1)! is not a *[$]Point:@{x=;y=}!",27);
     test_ptr("x=@{n:=1;v:=2}; x.n := 3; x", "@{n:=3;v:=2}!");
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'",20);
     testerr("{+}(1,2,3)", "Passing 3 arguments to {+} which takes 2 arguments",10);
     test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
     testerr("x=1+y","Unknown ref 'y'",5);
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
-    test_isa("{x y -> x+y}", TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make_args(TypeStruct.ts(TypeFunPtr.GENERIC_FUNPTR,Type.SCALAR,Type.SCALAR)),Type.SCALAR)); // {Scalar Scalar -> Scalar}
+    test_isa("{x y -> x+y}", TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make_args(TypeStruct.ts(TypeMemPtr.DISPLAY_PTR,Type.SCALAR,Type.SCALAR)),Type.SCALAR)); // {Scalar Scalar -> Scalar}
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.TRUE );
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({&},2)", TypeInt.FALSE);
   }
@@ -140,7 +140,7 @@ public class TestParse {
   @Test public void testParse02() {
     Object dummy = Env.GVN; // Force class loading cycle
     // Anonymous function definition
-    test_isa("{x y -> x+y}", TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make_args(TypeStruct.ts(TypeMemPtr.CLOSURE_PTR,Type.SCALAR,Type.SCALAR)),Type.SCALAR)); // {Scalar Scalar -> Scalar}
+    test_isa("{x y -> x+y}", TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make_args(TypeStruct.ts(TypeMemPtr.DISPLAY_PTR,Type.SCALAR,Type.SCALAR)),Type.SCALAR)); // {Scalar Scalar -> Scalar}
     test("{5}()", TypeInt.con(5)); // No args nor -> required; this is simply a function returning 5, being executed
 
     // ID in different contexts; in general requires a new TypeVar per use; for
@@ -173,7 +173,7 @@ public class TestParse {
     testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact()","Passing 0 arguments to fact={->} which takes 1 arguments",48);
     test_obj("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(0),fact(1),fact(2))",
              TypeStruct.make_tuple(Type.NIL,Type.NIL,TypeInt.con(1),TypeInt.con(2)));
-    
+
     // Co-recursion requires parallel assignment & type inference across a lexical scope
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.TRUE );
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(5)", Type.NIL  );
@@ -215,7 +215,7 @@ public class TestParse {
     test("fun:{real->flt32}={x -> x}; fun(123 )", TypeInt.con(123 ));
     test("fun:{real->flt32}={x -> x}; fun(0.125)", TypeFlt.con(0.125));
     testerr("fun:{real->flt32}={x -> x}; fun(123456789)", "123456789 is not a flt32",3);
-    test("{x -> x&1}", TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make_args(TypeStruct.ts(TypeMemPtr.CLOSURE_PTR,Type.SCALAR)),Type.SCALAR)); // {Int -> Int}
+    test("{x -> x&1}", TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make_args(TypeStruct.ts(TypeMemPtr.DISPLAY_PTR,Type.SCALAR)),Type.SCALAR)); // {Int -> Int}
 
     // Named types
     test_name("A= :(       )" ); // Zero-length tuple
@@ -265,8 +265,8 @@ public class TestParse {
     test_isa("(1,\"abc\").1", TypeMemPtr.STRPTR);
 
     // Named type variables
-    test("gal=:flt"     , TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make(TypeFlt.FLT64), TypeFlt.FLT64.set_name("gal:")));
-    test("gal=:flt; gal", TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make(TypeFlt.FLT64), TypeFlt.FLT64.set_name("gal:")));
+    test("gal=:flt"     , TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make_args(TypeStruct.ts(Type.NIL,TypeFlt.FLT64)), TypeFlt.FLT64.set_name("gal:")));
+    test("gal=:flt; gal", TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make_args(TypeStruct.ts(Type.NIL,TypeFlt.FLT64)), TypeFlt.FLT64.set_name("gal:")));
     test("gal=:flt; 3==gal(2)+1", TypeInt.TRUE);
     test("gal=:flt; tank:gal = gal(2)", TypeInt.con(2).set_name("gal:"));
     // test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: figure out if free cast for bare constants?
@@ -274,11 +274,11 @@ public class TestParse {
 
     test    ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
     test    ("Point=:@{x;y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
-    testerr ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1;y=2}))", "*[$]@{x==1;y==2} is not a *[$]Point:@{x=;y=}!",22);
-    testerr ("Point=:@{x;y}; Point((0,1))", "*[$](nil;1)! is not a Point:@{x=;y=}!",27);
+    testerr ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1;y=2}))", "*[$]@{x==1;y==2}! is not a *[$]Point:@{x=;y=}!",68);
+    testerr ("Point=:@{x;y}; Point((0,1))", "*[$](nil;1)! is not a *[$]Point:@{x=;y=}!",27);
     testerr("x=@{n: =1;}","Missing type after ':'",7);
     testerr("x=@{n=;}","Missing ifex after assignment of 'n'",6);
-    test_obj("x=@{n}",TypeStruct.ALLSTRUCT);
+    test_obj_isa("x=@{n}",TypeStruct.make(new String[]{"^","n"},TypeStruct.ts(TypeMemPtr.DISPLAY_PTR,Type.NIL),TypeStruct.finals(2)));
   }
 
   @Test public void testParse05() {
@@ -486,7 +486,7 @@ public class TestParse {
 
     // After inlining once, we become pair-aware.
     test_isa(ll_cona+ll_conb+ll_conc+ll_cond+ll_cone+ll_cont+ll_map2+ll_fun2+ll_apl2,
-             TypeMemPtr.make(BitsAlias.TUPLE_BITS0,TypeStruct.make(TypeMemPtr.make(BitsAlias.TUPLE_BITS0,TypeStruct.make(TypeMemPtr.STRUCT0,TypeInt.INT64)),TypeMemPtr.STRPTR)));
+             TypeMemPtr.make(BitsAlias.RECORD_BITS0,TypeStruct.make(TypeMemPtr.make(BitsAlias.RECORD_BITS0,TypeStruct.make(TypeMemPtr.STRUCT0,TypeInt.INT64)),TypeMemPtr.STRPTR)));
 
   }
 
@@ -746,7 +746,7 @@ strs:List(str?) = ... // List of null-or-strings
     try( TypeEnv te = run(program) ) {
       assertTrue(te._t instanceof TypeFunPtr);
       TypeFunPtr actual = (TypeFunPtr)te._t;
-      TypeFunPtr expected = TypeFunPtr.make(actual.fidxs(),TypeStruct.make_args(TypeStruct.ts(TypeMemPtr.CLOSURE_PTR,TypeMemPtr.STRUCT)),TypeMemPtr.STRUCT);
+      TypeFunPtr expected = TypeFunPtr.make(actual.fidxs(),TypeStruct.make_args(TypeStruct.ts(TypeMemPtr.DISPLAY_PTR,TypeMemPtr.STRUCT)),TypeMemPtr.STRUCT);
       assertEquals(expected,actual);
     }
   }
@@ -772,14 +772,16 @@ strs:List(str?) = ... // List of null-or-strings
     try( TypeEnv te = run(program) ) {
       assertTrue(te._t instanceof TypeMemPtr);
       int alias = ((TypeMemPtr)te._t).getbit(); // internally asserts only 1 bit set
-      assertEquals(obj,te._tmem.ld((TypeMemPtr)te._t));
+      TypeObj to = te._tmem.ld((TypeMemPtr)te._t);
+      assertEquals(obj,to);
     }
   }
   static private void test_obj_isa( String program, TypeObj obj) {
     try( TypeEnv te = run(program) ) {
       assertTrue(te._t instanceof TypeMemPtr);
       int alias = ((TypeMemPtr)te._t).getbit(); // internally asserts only 1 bit set
-      assertTrue(te._tmem.ld((TypeMemPtr)te._t).isa(obj));
+      TypeObj to = te._tmem.ld((TypeMemPtr)te._t);
+      assertTrue(to.isa(obj));
     }
   }
   static private void test_ptr( String program, String expected ) {

@@ -95,11 +95,11 @@ public class CallNode extends Node {
     Type t = gvn.type(arg(x));
     if( x>0 ) return t;         // Normal argument type
     if( !(t instanceof TypeFunPtr) ) return Type.SCALAR;
-    return ((TypeFunPtr)t).closure(); // Extract Closure type from TFP
+    return ((TypeFunPtr)t).display(); // Extract Display type from TFP
   }
-  // Actual arguments.  Arg(0) is allowed and refers to the Closure/TFP.
+  // Actual arguments.  Arg(0) is allowed and refers to the Display/TFP.
   Node arg( int x ) { assert x>=0; return _defs.at(x+2); }
-  // Set an argument.  Use 'set_fun' to set the Closure/Code.
+  // Set an argument.  Use 'set_fun' to set the Display/Code.
   void set_arg_reg(int idx, Node arg, GVNGCM gvn) { assert idx>0; gvn.set_def_reg(this,idx+2,arg); }
 
           Node ctl() { return in(0); }
@@ -142,7 +142,7 @@ public class CallNode extends Node {
     // When do I do 'pattern matching'?  For the moment, right here: if not
     // already unpacked a tuple, and can see the NewNode, unpack it right now.
     if( !_unpacked ) { // Not yet unpacked a tuple
-      assert nargs()==2;        // The Closure plus the arg tuple
+      assert nargs()==2;        // The Display plus the arg tuple
       Node arg1 = arg(1);
       Type tadr = gvn.type(arg1);
       // Bypass a merge on the 2-arg input during unpacking
@@ -231,12 +231,12 @@ public class CallNode extends Node {
         fidxs.test(BitsFun.ALL) )
       return TypeTuple.make(ts);
 
-    // Trim unused aliases, specifically to prevent local closures from escaping.
+    // Trim unused aliases, specifically to prevent local displays from escaping.
     // Here, I start with all alias#s from TMP args plus all function
-    // closure#s and "close over" the set of possible aliases.
+    // display#s and "close over" the set of possible aliases.
 
     // Set of aliases escaping into the function.  Includes everything in the
-    // function closures.
+    // function displays.
     BitsAlias abs = tfp.recursive_aliases(BitsAlias.EMPTY,tmem);
     // Now the set of pointers escaping via arguments
     for( int i=0; i<nargs(); i++ ) {
@@ -388,14 +388,13 @@ public class CallNode extends Node {
   @Override public BitsAlias alias_uses(GVNGCM gvn) {
     // We use all aliases we computed in our output type, plus all bypass aliases.
     CallEpiNode cepi = cepi();// Find CallEpi for bypass aliases
-    if( cepi != null )
-      for( Node mproj : cepi._uses ) // Find output memory
-        if( mproj instanceof MProjNode )
-          // TODO: Solve the forward-flow used_aliases problem incrementally.
-          // Here we just bail out.
-          return BitsAlias.NZERO; // Use all aliases after the call
+    BitsAlias bs = BitsAlias.EMPTY;
+    if( cepi != null ) {
+      bs = cepi.alias_uses(gvn);
+      if( bs==BitsAlias.NZERO ) return bs; // Shortcut
+    }
     TypeMem all_called_function_uses = (TypeMem)((TypeTuple)gvn.type(this)).at(1);
-    return all_called_function_uses.aliases();
+    return all_called_function_uses.aliases().meet(bs);
   }
 
   CallEpiNode cepi() {

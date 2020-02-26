@@ -139,7 +139,7 @@ public abstract class PrimNode extends Node {
 static class ConvertTypeName extends PrimNode {
   private final Parse _badargs; // Only for converts
   ConvertTypeName(Type from, Type to, Parse badargs) {
-    super(to._name,TypeStruct.make(from),to);
+    super(to._name,TypeStruct.make_args(TypeStruct.ts(Type.NIL,from)),to);
     _badargs=badargs;
   }
   @Override public Type value(GVNGCM gvn) {
@@ -150,7 +150,7 @@ static class ConvertTypeName extends PrimNode {
   }
   @Override public Type apply( Type[] args ) {
     Type actual = args[1];
-    Type formal = _targs.at(0);
+    Type formal = _targs.at(1);
     if( formal.dual().isa(actual) && actual.isa(formal) )
       return actual.set_name(_ret._name);
     // If args are illegal, the output is still no worse than _ret in either direction
@@ -158,7 +158,7 @@ static class ConvertTypeName extends PrimNode {
   }
   @Override public String err(GVNGCM gvn) {
     Type actual = gvn.type(in(1));
-    Type formal = _targs.at(0);
+    Type formal = _targs.at(1);
     if( !actual.isa(formal) ) // Actual is not a formal
       return _badargs.typerr(actual,formal,null);
     return null;
