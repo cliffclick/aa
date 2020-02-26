@@ -299,6 +299,7 @@ public class TestParse {
   }
 
   @Test public void testParse06() {
+    Object dummy = Env.GVN; // Force class loading cycle
     test_ptr("A= :(A?, int); A(0,2)","A:(nil;2)!");
     test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*[$]A:(nil;2)!;3)!");
 
@@ -306,7 +307,7 @@ public class TestParse {
     test("A= :int; A(1)", TypeInt.TRUE.set_name("A:"));
     test_ptr("A= :(str?, int); A(0,2)","A:(nil;2)!");
     // Named recursive types
-    test_ptr("A= :(A?, int); A(0,2)",(alias) -> TypeMemPtr.make(alias,TypeStruct.make("A:",TypeStruct.TFLDS(2),TypeStruct.ts(Type.NIL,TypeInt.con(2)),TypeStruct.finals(2))));
+    test_ptr("A= :(A?, int); A(0,2)",(alias) -> TypeMemPtr.make(alias,TypeStruct.make("A:",TypeStruct.TFLDS(3),TypeStruct.ts(Type.NIL,Type.NIL,TypeInt.con(2)),TypeStruct.finals(3))));
     test    ("A= :@{n=A?; v=flt}; A(@{n=0;v=1.2}).v;", TypeFlt.con(1.2));
 
     // TODO: Needs a way to easily test simple recursive types
@@ -316,9 +317,10 @@ public class TestParse {
     TypeStruct tt3 = (TypeStruct)te3._tmem.ld((TypeMemPtr)te3._t);
     assertEquals("A:", tt3._name);
     assertEquals(Type.NIL      ,tt3.at(0));
-    assertEquals(TypeInt.con(3),tt3.at(1));
-    assertEquals("n",tt3._flds[0]);
-    assertEquals("v",tt3._flds[1]);
+    assertEquals(Type.NIL      ,tt3.at(1));
+    assertEquals(TypeInt.con(3),tt3.at(2));
+    assertEquals("n",tt3._flds[1]);
+    assertEquals("v",tt3._flds[2]);
 
     // Missing type B is also never worked on.
     test_isa("A= :@{n=B?; v=int}", TypeFunPtr.GENERIC_FUNPTR);

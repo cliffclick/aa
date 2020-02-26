@@ -23,7 +23,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     if( this==o ) return true;
     if( !(o instanceof TypeMemPtr) ) return false;
     TypeMemPtr tf = (TypeMemPtr)o;
-    return _aliases==tf._aliases && _obj==tf._obj;
+    return cycle_equals(tf);
   }
   @Override public boolean cycle_equals( Type o ) {
     if( this==o ) return true;

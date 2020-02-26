@@ -380,7 +380,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // INTERN table, but if a prior cycle version exists, we need to remove the
   // new cycle and use the prior one.
   public TypeStruct merge_recursive_type( TypeStruct ts ) {
-    assert has_name() && _flds[0]=="$fref";
+    assert has_name() && Util.eq(_flds[0],"$fref");
     // Remove from INTERN table, since hacking type will not match hash
     untern()._dual.untern();
     ts.untern().dual().untern();
@@ -423,8 +423,10 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     } else {
       if( t instanceof TypeMemPtr || t instanceof TypeStruct ) {
         stack.push(t);              // Push on stack, in case a cycle is found
-        if( t instanceof TypeMemPtr )             rehash_cyclic(stack,((TypeMemPtr)t)._obj);
-        else for( Type tf : ((TypeStruct)t)._ts ) rehash_cyclic(stack, tf                 );
+        if( t instanceof TypeMemPtr ) rehash_cyclic(stack,((TypeMemPtr)t)._obj);
+        else
+          for( int i=1; i<((TypeStruct)t)._ts.length; i++ )
+            rehash_cyclic(stack, ((TypeStruct)t)._ts[i]);
         if( t._hash==0 ) {    // If part of a cycle, hash was cleared.  Rehash.
           assert t._cyclic && t._dual._cyclic;
           t      ._hash=t      .compute_hash();
@@ -1142,7 +1144,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     if( dirty._cln ) throw com.cliffc.aa.AA.unimpl(); // Return the clean copy
     ts = dirty.shallow_clone();
     ts._cln = true;
-    ts._hash = ts.compute_hash();
+    ts._hash = ts.compute_hash(); // Hash does not depend on _ts, which are not set yet
     OLD2APX.put(dirty,ts);
     for( int i=0; i<ts._ts.length; i++ ) {
       Type td = dirty._ts[i];
@@ -1154,11 +1156,14 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     TypeMemPtr nmp = OLD2APX.get(dirty);
     if( nmp != null ) return nmp;
     nmp = (TypeMemPtr)dirty.clone();
+    OLD2APX.put(dirty,nmp);
     if( dirty._obj instanceof TypeStruct )
       nmp._obj = clone_clean_str((TypeStruct)dirty._obj);
     nmp._hash = nmp.compute_hash();
-    OLD2APX.put(dirty,nmp);
-    return nmp;
+    TypeMemPtr x = (TypeMemPtr)nmp.intern_lookup(); // Check for prior hit
+    if( x==null ) return nmp;
+    OLD2APX.put(dirty,x);    
+    return nmp.free(x);
   }
 
   // True if this field is not modified.  Allows a Load to bypass.

@@ -852,6 +852,8 @@ public class Parse {
       _e = e;                   // Push nested environment
       stmts(true);              // Create local vars-as-fields
       require('}',oldx);        // Matched closing }
+      // Clean out lexical scope afterwards.
+      e._scope.stk().update(0,TypeStruct.ffinal(),con(Type.NIL),_gvn);
       assert ctrl() != e._scope;
       e._par._scope.set_ctrl(ctrl(),_gvn); // Carry any control changes back to outer scope
       e._par._scope.set_mem(all_mem(),_gvn); // Carry any memory changes back to outer scope
