@@ -32,8 +32,6 @@ public class ProjNode extends Node {
   }
 
   @Override public Type value(GVNGCM gvn) {
-    if( in(0) instanceof NewNode && ((NewNode)in(0))._captured )
-      return Type.XSCALAR;
     Type c = gvn.type(in(0));
     if( c instanceof TypeTuple ) {
       TypeTuple ct = (TypeTuple)c;

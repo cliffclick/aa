@@ -50,9 +50,10 @@ public abstract class NewNode<T extends TypeObj> extends Node {
     boolean old = _captured;
     if( captured(gvn) ) {
       boolean progress=!old;    // Progress if 1st time captured
+      Node x = gvn.con(Type.XSCALAR);
       for( int i=1; i<_defs._len; i++ )
-        if( in(i)!=null ) {
-          set_def(i,null,gvn);
+        if( in(i)!=x ) {
+          set_def(i,x,gvn);
           progress=true;
           if( is_dead() ) break; // Progress if any edge removed
         }
@@ -68,10 +69,11 @@ public abstract class NewNode<T extends TypeObj> extends Node {
 
   // Produces a TypeMemPtr
   @Override public Type value(GVNGCM gvn) {
-    // If the address is not looked at then memory contents cannot be looked at
-    // and is dead.  Since this can happen DURING opto (when a call resolves)
-    // and during iter, "freeze" the value in-place.  It will DCE shortly.
-    return _captured ? gvn.self_type(this) : all_type();
+    Type[] ts = TypeAry.get(_defs._len-1);
+    for( int i=0; i<ts.length; i++ )
+      ts[i] = gvn.type(fld(i));
+    TypeStruct t = TypeStruct.make_args(ts);
+    return TypeTuple.make(t,TypeMemPtr.make(_alias,t));
   }
 
   // Basic escape analysis.  If no escapes and no loads this object is dead.
