@@ -1,4 +1,69 @@
 =======================================
+Nodes from 02/27/2020
+
+A lot of troubles arise because need dead bad code to actually get removed from
+the graph.  Currently no notion of removing dead fields, so built a lot of
+complex flow pushing 'not so near' neighbors on worklists to propagate enough
+info to let fields go dead.
+
+Add a reverse-flow 'dead' notion, only useful for fields and during OPTIMISTIC
+analysis.  Useful for fields because I'm not slicing seperate nodes per-field,
+so there's no per-field notion of deleting dead nodes.  Useful during opto()
+because a dead field does not need to be computed, so its inputs are also dead,
+recursively.  There's a classic feedback path here, with monotontically
+improving results.
+
+The base iter/opto algo can work in both directions (and iter() totally does
+now), just not in the base implementation: several ideal() calls push nodes
+from the reverse direction).
+
+TypeStruct:
+Remove 'clean' per struct, no need after this.
+Add a 'dead'  bit to TypeStruct fields.  This is a reverse-flow field.
+Add a 'clean' bit to TypeStruct fields.  This is a forward-flow field.
+Defaults to 'alive'.  Alive if any use is alive.  Dead otherwise.
+Roll-up 'dead'  bit to all Types as well - for use during opto.
+
+
+Node: Reverse flow alias_uses can be removed.
+Remove 'not so near' add-to-worklist.
+
+CallNode: Remove filter memory into FunNode.  Just pass it all.  It will be
+discovered 'clean' in the function and the original value used at CallEpi.
+
+Parse: Do not clear out user-struct closure field; it will go dead.
+
+Opto init: defaults to dead.  Exit Scope is alive, and thus its defs are alive,
+recursively.  A Node is dead if all using nodes are marked dead.  Only
+interesting during opto, because during iter() dead nodes are deleted.
+
+Dead Nodes only compute their startype.
+
+SESE Call/Fun precision improvements.  Ret starts with all memory as dead, and
+this pushes uphill to Fun.  Call gets a set of alive memory from CallEpi and
+from Fun - but Fun/Ret does NOT get alive memory from all CallEpis.  Removes
+the classic merge approx on function exit.
+
+SESE Call/Fun precision improvents: Fun starts with all memory fields as clean.
+On exit, can be used to improve precision of merged memory results passed to
+callers: CallEpi on clean fields takes Call-input type.
+
+
+New map_closure
+Merge Parm_mem & New map_closure
+... ld map_closure.x
+Call [allmem+map_closure is available]
+  Fun: 
+  Parm mem: [allmem+map_closure]
+  ... allmem is unchanged; map_closure is also clean?
+  Ret 
+Call_Epi: takes from pre-call memory for map_closure
+... ld map_closure: mem from Call_epi, can bypass clean, gets to Merge, bypasses...
+
+
+
+
+=======================================
 Notes from 11/4/2019
 
 Reached a point where need to split by aliases across phis ... during parsing,
