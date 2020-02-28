@@ -51,7 +51,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
   // Update the field & mod
   public void update( int fidx, byte mutable, Node val, GVNGCM gvn  ) {
     gvn.unreg(this);
-    boolean update_final = update_active(fidx,mutable,val,gvn);
+    boolean can_update = update_active(fidx,mutable,val,gvn);
     gvn.rereg(this,value(gvn));
     // As part of the local xform rule, the memory & ptr outputs of the NewNode
     // need to update their types directly.  The NewNode mutable bit can be set
@@ -59,7 +59,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
     // strictly run uphill, so we have to expand the changed region to cover
     // all the "downhilled" parts and "downhill" them to match.  Outside of the
     // "downhilled" region, the types are unchanged.
-    if( update_final )
+    if( !can_update )
       for( Node use : _uses ) {
         gvn.setype(use,use.value(gvn)); // Record "downhill" type for OProj, DProj
         gvn.add_work_uses(use);         // Neighbors on worklist
@@ -68,11 +68,11 @@ public class NewObjNode extends NewNode<TypeStruct> {
   public boolean update_active( int fidx, byte mutable, Node val, GVNGCM gvn  ) {
     assert !gvn.touched(this);
     assert def_idx(_ts._ts.length)== _defs._len;
-    boolean update_final = _ts._finals[fidx] != mutable;
-    if( update_final )
+    boolean can_update = _ts.can_update(fidx);
+    if( _ts._finals[fidx] != mutable ) // Changed field modifier
       _ts = _ts.set_fld(fidx,_ts.at(fidx),mutable);
     set_def(def_idx(fidx),val,gvn);
-    return update_final;
+    return can_update;
   }
 
 
@@ -96,17 +96,28 @@ public class NewObjNode extends NewNode<TypeStruct> {
   // according to use.
   public void promote_forward(GVNGCM gvn, NewObjNode parent) {
     assert parent != null;
+    boolean progress=false;
     TypeStruct ts = _ts;
     for( int i=0; i<ts._ts.length; i++ ) {
       Node n = fld(i);
       if( n != null && n.is_forward_ref() ) {
+        if( !progress ) { progress=true; gvn.unreg(this); }
         parent.create(ts._flds[i],n,ts._finals[i],gvn);
-        gvn.remove_reg(this,def_idx(i));
+        remove(def_idx(i),gvn);  // Hack edge
         ts = ts.del_fld(i);
         i--;
       }
     }
-    _ts = ts;
+    // Promoted anything?
+    if( progress ) {
+      _ts = ts;
+      // Reset types on this and children, so show the removed extra field
+      gvn.rereg(this,value(gvn));
+      for( Node use : _uses ) {
+        gvn.setype(use,use.value(gvn)); // Record "downhill" type for OProj, DProj
+        gvn.add_work_uses(use);         // Neighbors on worklist
+      }
+    }
   }
 
   @Override public Type value(GVNGCM gvn) {

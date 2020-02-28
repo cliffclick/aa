@@ -198,10 +198,8 @@ public final class CallEpiNode extends Node {
           (idx==-2 ? new MProjNode(call,2) : new ProjNode(call,idx+3));
         if( idx==0 )
           actual = new FP2ClosureNode(gvn.xform(actual));
-        if( gvn._opt_mode == 2 ) {
-          gvn.setype(actual,actual.all_type().startype());
-          gvn.add_work(actual);
-        }
+        if( gvn._opt_mode == 2 )
+          gvn.rereg(actual,actual.all_type().startype());
         else actual = gvn.xform(actual);
         gvn.add_def(arg,actual);
       }

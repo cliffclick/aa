@@ -238,8 +238,9 @@ public class FunNode extends RegionNode {
     }
     assert level==2; // Do not actually inline, if just checking that all forward progress was found
     // Split the callers according to the new 'fun'.
+    TypeFunPtr original_tfp = (TypeFunPtr)gvn.type(ret.funptr());
     FunNode fun = make_new_fun(gvn, ret, args);
-    return split_callers(gvn,parms,ret,fun,body,cgedges,path);
+    return split_callers(gvn,parms,ret,fun,body,cgedges,path,original_tfp);
   }
 
   // Gather the ParmNodes into an array.  Return null if any input path is dead
@@ -474,7 +475,7 @@ public class FunNode extends RegionNode {
   // Clone the function body, and split the callers of 'this' into 2 sets; one
   // for the old and one for the new body.  The new function may have a more
   // refined signature, and perhaps no unknown callers.
-  private Node split_callers( GVNGCM gvn, ParmNode[] parms, RetNode oldret, FunNode fun, Ary<Node> body, CGEdge[] cgedges, int path) {
+  private Node split_callers( GVNGCM gvn, ParmNode[] parms, RetNode oldret, FunNode fun, Ary<Node> body, CGEdge[] cgedges, int path, TypeFunPtr original_tfp) {
     // Strip out all wired calls to this function.  All will re-resolve later.
     for( CGEdge cg : cgedges )
       if( cg != null && cg._cepi != null )
@@ -560,7 +561,7 @@ public class FunNode extends RegionNode {
     // Make an Unresolved choice of the old and new functions, to be used by
     // non-application uses.  E.g., passing a unresolved function pointer to a
     // 'map()' call.
-    gvn.rereg(new_funptr,new_funptr.value(gvn));
+    gvn.rereg(new_funptr,original_tfp);
     UnresolvedNode new_unr = null;
     if( path < 0 ) {
       new_unr = (UnresolvedNode)gvn.xform(new UnresolvedNode(null,old_funptr,new_funptr));

@@ -6,17 +6,18 @@ import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
 
 // See CallNode and FunNode comments. The FunPtrNode converts a RetNode into a
-// TypeFunPtr with a constant fidx and variable closures.  Used to allow 1st
+// TypeFunPtr with a constant fidx and variable displays.  Used to allow 1st
 // class functions to be passed about.
 public final class FunPtrNode extends ConNode<TypeFunPtr> {
   private final String _referr;
-  public  FunPtrNode( RetNode ret, Node closure ) { this(null,ret,closure); }
-  private FunPtrNode( String referr, RetNode ret, Node closure ) {
-    super(OP_FUNPTR,ret.fun()._tf,ret,closure);
+  public  FunPtrNode( RetNode ret, Node display ) { this(null,ret,display); }
+  private FunPtrNode( String referr, RetNode ret, Node display ) {
+    super(OP_FUNPTR,ret.fun()._tf,ret,display);
     _referr = referr;
-    assert closure==null ||
-            (closure instanceof ProjNode && closure.in(0) instanceof NewObjNode) || // Standard local closure
-            closure instanceof ParmNode; // Closure is passed-thru from FunNode without making a lexical scope
+    assert display==null || // Many primitives do not use a display
+            (display instanceof ProjNode && display.in(0) instanceof NewObjNode) || // Standard local display/closure
+            display instanceof ConNode || // Generic display from a forward-ref
+            display instanceof ParmNode; // Display is passed-thru from FunNode without making a lexical scope
   }
   @Override public int hashCode() { return super.hashCode() ^ ((_defs._len==0 || in(0)==null) ? 0 : in(0)._uid); }
   @Override public boolean equals(Object o) {
@@ -27,6 +28,7 @@ public final class FunPtrNode extends ConNode<TypeFunPtr> {
     return in(0)==fptr.in(0) && in(1)==fptr.in(1) && super.equals(fptr);
   }
   public RetNode ret() { return (RetNode)in(0); }
+  public Node display(){ return in(1); }
   public FunNode fun() { return ret().fun(); }
   // Self short name
   @Override String xstr() {
@@ -49,9 +51,10 @@ public final class FunPtrNode extends ConNode<TypeFunPtr> {
     if( !(in(0) instanceof RetNode) )
       return TypeFunPtr.EMPTY;
     RetNode ret = ret();
-    if( ret.is_copy() )
-      return FunNode.find_fidx(ret._fidx)._tf;
-    return ret.fun()._tf;
+    FunNode fun = ret.is_copy() ? FunNode.find_fidx(ret._fidx) : ret.fun();
+    TypeTuple tret = (TypeTuple)gvn.type(ret);
+    Type tdisplay = display()==null ? Type.NIL : gvn.type(display());
+    return fun._tf.make(tdisplay,tret.at(2));
   }
   @Override public Type all_type() { return _t; }
   @Override public String toString() { return super.toString(); }
@@ -72,7 +75,7 @@ public final class FunPtrNode extends ConNode<TypeFunPtr> {
   public static FunPtrNode forward_ref( GVNGCM gvn, String name, Parse unkref ) {
     FunNode fun = gvn.init(new FunNode(name));
     RetNode ret = gvn.init(new RetNode(fun,gvn.con(TypeMem.MEM),gvn.con(Type.SCALAR),gvn.con(TypeRPC.ALL_CALL),fun));
-    return new FunPtrNode(unkref.forward_ref_err(fun),ret,null);
+    return new FunPtrNode(unkref.forward_ref_err(fun),ret,gvn.con(TypeMemPtr.DISPLAY_PTR));
   }
 
   // True if this is a forward_ref

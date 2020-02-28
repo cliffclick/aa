@@ -331,7 +331,9 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   }
   boolean is_display() {
     if( this==DISPLAY || this==DISPLAY._dual ) return true;
-    return _ts.length >= 1 && _ts[0] instanceof TypeMemPtr && ((TypeMemPtr)_ts[0]).is_display();
+    return _ts.length >= 1 &&
+      ((_ts[0] instanceof TypeMemPtr && ((TypeMemPtr)_ts[0]).is_display()) ||
+       (_ts[0] == Type.NIL));
   }
 
   static final TypeStruct[] TYPES = new TypeStruct[]{ALLSTRUCT,STR_STR,FLT64,POINT,NAMEPT,A,C0,D1,ARW,DISPLAY};

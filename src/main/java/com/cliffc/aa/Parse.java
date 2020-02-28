@@ -110,12 +110,14 @@ public class Parse {
     prog();                     // Parse a program
     // Delete names at the top scope before final optimization.
     _e.close_display(_gvn);
-    _gvn.rereg(_e._scope,Type.ALL);
+    _e._scope._uses.add(_e._scope); // Self-hook to keep alive, when unhooked & on worklist
+    _gvn.rereg(_e._scope.unhook(),Type.ALL);
     _gvn.rereg(_e._par._scope,Type.ALL);
     _gvn.iter(1);   // Pessimistic optimizations; might improve error situation
     remove_unknown_callers();
     _gvn.gcp(_e._scope); // Global Constant Propagation
     _gvn.iter(3);   // Re-check all ideal calls now that types have been maximally lifted
+    _e._scope.keep()._uses.pop(); // Remove self-hook, and rehook normally.
     return gather_errors();
   }
 
@@ -492,7 +494,7 @@ public class Parse {
 
   /** Parse a term, either an optional application or a field lookup
    *    term = id++ | id--
-   *    term = tfact [tuple | tfact | .field | .field[:]=stmt]* // application (includes uniop) or field (and tuple) lookup
+   *    term = tfact [tuple | term | .field | .field[:]=stmt]* // application (includes uniop) or field (and tuple) lookup
    *  An alternative expression of the same grammar is:
    *    term = tfact post
    *    post = empty | (tuple) post | tfact post | .field post
@@ -543,7 +545,7 @@ public class Parse {
       } else {                  // Attempt a function-call
         boolean arglist = peek('(');
         oldx = _x;
-        Node arg = arglist ? tuple(stmts()) : tfact(); // Start of an argument list?
+        Node arg = arglist ? tuple(stmts()) : term(); // Start of an argument list?
         if( arg == null )       // tfact but no arg is just the tfact
           break;
         Type tn = _gvn.type(n);
@@ -665,7 +667,7 @@ public class Parse {
     ScopeNode scope = lookup_scope(tok,false);
     if( scope == null ) { // Assume any unknown ref is a forward-ref of a recursive function
       Node fref = gvn(FunPtrNode.forward_ref(_gvn,tok,this));
-      // Place in nearest enclosing scope
+      // Place in nearest enclosing closure scope
       _e._scope.stk().create(tok.intern(),fref,TypeStruct.ffinal(),_gvn);
       return fref;
     }
@@ -852,8 +854,6 @@ public class Parse {
       _e = e;                   // Push nested environment
       stmts(true);              // Create local vars-as-fields
       require('}',oldx);        // Matched closing }
-      // Clean out lexical scope afterwards.
-      e._scope.stk().update(0,TypeStruct.ffinal(),con(Type.NIL),_gvn);
       assert ctrl() != e._scope;
       e._par._scope.set_ctrl(ctrl(),_gvn); // Carry any control changes back to outer scope
       e._par._scope.set_mem(all_mem(),_gvn); // Carry any memory changes back to outer scope

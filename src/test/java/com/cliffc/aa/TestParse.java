@@ -331,19 +331,23 @@ public class TestParse {
   }
 
   @Test public void testParse07() {
-    test("tmp=((0,1.2),2.3); sq={x->x*x}; map={f t -> t ? (map(f,t.0),f(t.1)) : 0}; map(sq,tmp).1",TypeFlt.con(2.3*2.3));
+    Object dummy = Env.GVN; // Force class loading cycle
+    test_obj_isa("noinline_map={x -> x ? @{nn=noinline_map(x.n);vv=x.v&x.v} : 0};"+
+                    "noinline_map(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0;v=1};v=2};v=3};v=4})",
+            TypeStruct.make(FLDS2,TypeStruct.ts(Type.NIL,TypeMemPtr.STRUCT0,TypeInt.INT8))); //con(20.25)
     // Passing a function recursively
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({&},2)", TypeInt.FALSE);
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({+},2)", TypeInt.con(2));
     test_isa("A= :@{n=A?; v=int}; f={x:A? -> x ? A(f(x.n),x.v*x.v) : 0}", TypeFunPtr.GENERIC_FUNPTR);
     test    ("A= :@{n=A?; v=flt}; f={x:A? -> x ? A(f(x.n),x.v*x.v) : 0}; f(A(0,1.2)).v;", TypeFlt.con(1.2*1.2));
+    test("tmp=((0,1.2),2.3); sq={x->x*x}; map={f t -> t ? (map(f,t.0),f t.1) : 0}; map(sq,tmp).1",TypeFlt.con(2.3*2.3));
 
     // Longer variable-length list (so no inline-to-trivial).  Pure integer
     // ops, no overload resolution.  Does final stores into new objects
     // interspersed with recursive computation calls.
     test_obj_isa("map={x -> x ? @{nn=map(x.n);vv=x.v&x.v} : 0};"+
                  "map(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0;v=1};v=2};v=3};v=4})",
-            TypeStruct.make(FLDS2,TypeStruct.ts(TypeMemPtr.STRUCT0,TypeInt.INT8))); //con(20.25)
+            TypeStruct.make(FLDS2,TypeStruct.ts(Type.NIL,TypeMemPtr.STRUCT0,TypeInt.INT8))); //con(20.25)
     // Test does loads after recursive call, which should be allowed to bypass.
     test("sum={x -> x ? sum(x.n) + x.v : 0};"+
          "sum(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0;v=1};v=2};v=3};v=4})",

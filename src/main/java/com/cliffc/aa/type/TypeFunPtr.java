@@ -71,6 +71,12 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public TypeFunPtr make_new_fidx( int parent, TypeStruct args ) { return make(BitsFun.make_new_fidx(parent),args,_ret); }
   private static TypeStruct ARGS = TypeStruct.make_args(TypeStruct.ts(TypeMemPtr.DISPLAY_PTR));
   public static TypeFunPtr make_anon() { return make_new(ARGS,Type.SCALAR); } // Make a new anonymous function ptr
+  // Make a TFP with a new display and return value, used by FunPtrNode
+  public TypeFunPtr make(Type display, Type ret) {
+    assert _args.is_display();
+    assert display==Type.NIL || ((TypeMemPtr)display).is_display();
+    return make(_fidxs,_args.set_fld(0,display,_args._finals[0]),ret);
+  }
 
   public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.FULL,ARGS,Type.SCALAR);
   private static final TypeFunPtr TEST_INEG = make(BitsFun.make0(2),TypeStruct.INT64,TypeInt.INT64);

@@ -94,7 +94,7 @@ public class ScopeNode extends Node {
     // Past parsing, and know we have the single program result aligned with
     // the memory state?
     if( gvn._opt_mode != 0 ) {
-      Node rez = _defs.last();
+      Node rez = rez();
       if( rez != null ) {
         Type trez = gvn.type(rez);
         // CNC - Trying to sharpen the memory state on exit, to allow dropping of
@@ -104,8 +104,14 @@ public class ScopeNode extends Node {
 
         // If type(rez) can never lift to any TMP, then we will not return a
         // pointer, and do not need the memory state on exit.
-        if( !TypeMemPtr.OOP0.dual().isa(trez) ) {
-          set_mem(null, gvn);
+        if( !TypeMemPtr.OOP0.dual().isa(trez) && !(mem() instanceof ConNode && gvn.type(mem())==TypeMem.EMPTY) ) {
+          set_mem(gvn.con(TypeMem.EMPTY), gvn);
+          return this;
+        }
+        // If returning a function pointer, we do not need the closure
+        if( rez instanceof FunPtrNode && rez.in(1) != null && rez._uses._len==1 ) {
+          Node x = gvn.xform(new FunPtrNode(((FunPtrNode)rez).ret(),null));
+          set_rez(x,gvn);
           return this;
         }
       }
