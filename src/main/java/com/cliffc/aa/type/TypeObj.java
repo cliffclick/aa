@@ -57,7 +57,6 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
   @Override public boolean is_con() { return false; }
   @Override public boolean must_nil() { return false; }
   @Override public boolean  may_nil() { return false; }
-  //@Override Type make_recur(TypeName tn, int d, VBitSet bs ) { return this; }
   // Dual, except keep TypeMem.XOBJ as high for starting GVNGCM.opto() state.
   @Override public TypeObj startype() { assert _type==TOBJ; return XOBJ; }
 }

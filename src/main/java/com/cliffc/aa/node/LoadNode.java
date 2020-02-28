@@ -141,13 +141,6 @@ public class LoadNode extends Node {
     return tmem.above_center() ? Type.XSCALAR : Type.SCALAR; // No loading from e.g. Strings
   }
 
-  // Set of used aliases across all inputs (not StoreNode value, but yes address)
-  @Override public BitsAlias alias_uses(GVNGCM gvn) {
-    Type t = gvn.type(adr());
-    if( !(t instanceof TypeMemPtr) ) return BitsAlias.NZERO; // Wait until memory settles out
-    TypeMemPtr tmp = (TypeMemPtr)t;
-    return tmp.aliases();
-  }
   @Override public String err(GVNGCM gvn) {
     Type tadr = gvn.type(adr());
     if( tadr.must_nil() ) return bad("Struct might be nil when reading");

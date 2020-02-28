@@ -33,8 +33,8 @@ public class ParmNode extends PhiNode {
     if( !(in(0) instanceof FunNode) ) return null; // Dying
     FunNode fun = fun();
     if( gvn.type(fun) == Type.XCTRL ) return null; // All dead, c-prop will fold up
-    if( (level&1)==0 )          // Not doing asserts
-      gvn.add_work2(fun);       // Something changed, re-check inlining chances
+    //if( (level&1)==0 )          // Not doing asserts
+    //  gvn.add_work2(fun);       // Something changed, re-check inlining chances
     assert fun._defs._len==_defs._len;
     // Arg-check before folding up
     if( _idx >= 0 ) {                         // Skip RPC and memory
@@ -58,12 +58,6 @@ public class ParmNode extends PhiNode {
     return t;
   }
 
-  @Override public void ideal_impacted_by_changing_uses(GVNGCM gvn) {
-    RetNode ret = fun().ret();
-    if( ret != null )
-      gvn.add_work(ret); // Parm sharpening might allow a Ret to sharpen aliasing
-  }
-    
   @Override public String err( GVNGCM gvn ) {
     if( !(in(0) instanceof FunNode) ) return null; // Dead, report elsewhere
     FunNode fun = fun();

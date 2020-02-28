@@ -48,6 +48,7 @@ public abstract class Node implements Cloneable {
   public int _uid;  // Unique ID, will have gaps, used to give a dense numbering to nodes
   final byte _op;   // Opcode (besides the object class), used to avoid v-calls in some places
   public byte _keep;// Keep-alive in parser, even as last use goes away
+  public boolean _live;         // Liveness; assumed live in gvn.iter(), assumed dead in gvn.gcp().
 
   // Defs.  Generally fixed length, ordered, nulls allowed, no unused trailing space.  Zero is Control.
   public Ary<Node> _defs;
@@ -79,9 +80,7 @@ public abstract class Node implements Cloneable {
     if( old != null ) {
       old._uses.del(this);
       if( old._uses._len==0 && old._keep==0 ) gvn.kill(old); // Recursively begin deleting
-      if( !old.is_dead() &&
-          (old.is_multi_head() && is_multi_tail() ||
-           old.ideal_impacted_by_losing_uses(gvn,this)) )
+      if( !old.is_dead() && (old.is_multi_head() && is_multi_tail()) )
         gvn.add_work(old);
     }
     return this;
@@ -110,6 +109,7 @@ public abstract class Node implements Cloneable {
     _defs = new Ary<>(defs);
     _uses = new Ary<>(new Node[1],0);
     for( Node def : defs ) if( def != null ) def._uses.add(this);
+    _live = true;
    }
 
   // Make a copy of the base node, with no defs nor uses and a new UID.
@@ -286,15 +286,22 @@ public abstract class Node implements Cloneable {
   // points have not all appeared).  Returns null if no-progress, or a better
   // version of 'this'.
   abstract public Node ideal(GVNGCM gvn, int level);
-  // Losing uses puts these on the worklist
-  public boolean ideal_impacted_by_losing_uses(GVNGCM gvn, Node dead) { return false; }
-  // Changing use types puts these on the worklist
-  public void ideal_impacted_by_changing_uses(GVNGCM gvn) { }
 
   // Compute the current best Type for this Node, based on the types of its inputs.
   // May return the local "all_type()", especially if its inputs are in error.
+  // This is a forwards-flow computation.
   abstract public Type value(GVNGCM gvn);
 
+  // Compute local liveness, based on outputs.  Scopes and _keep are always
+  // alive, but other nodes are only alive if their outputs are alive.  This is
+  // a reverse-flow computation.
+  public boolean compute_live(GVNGCM gvn) {
+    if( _keep>0 ) return true;
+    if( this instanceof ScopeNode ) return true;
+    for( Node use : _uses ) if( use._live ) return true;
+    return false;
+  }
+  
   // Return any type error message, or null if no error
   public String err(GVNGCM gvn) { return null; }
 
@@ -304,13 +311,6 @@ public abstract class Node implements Cloneable {
   // Operator precedence is only valid for ConNode of binary functions
   public byte  op_prec() { return -1; }
   public byte may_prec() { return -1; }
-
-  // Set of used aliases across all inputs (not StoreNode value, but yes
-  // address).
-  public BitsAlias alias_uses(GVNGCM gvn) {
-    throw com.cliffc.aa.AA.unimpl(); // Overridden in subclasses
-    //return BitsAlias.NZERO;
-  }
 
   // Hash is function+inputs, or opcode+input_uids, and is invariant over edge
   // order (so we can swap edges without rehashing)

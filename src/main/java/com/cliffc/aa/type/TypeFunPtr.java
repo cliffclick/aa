@@ -75,7 +75,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public TypeFunPtr make(Type display, Type ret) {
     assert _args.is_display();
     assert display==Type.NIL || ((TypeMemPtr)display).is_display();
-    return make(_fidxs,_args.set_fld(0,display,_args._finals[0]),ret);
+    return make(_fidxs,_args.set_fld(0,display,_args.flags(0)),ret);
   }
 
   public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.FULL,ARGS,Type.SCALAR);
@@ -160,9 +160,9 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   @Override void walk( Predicate<Type> p ) { if( p.test(this) ) { _args.walk(p); _ret.walk(p); } }
   // Keep the high parts
   @Override public Type startype() {
-    BitsFun fidxs  = _fidxs.above_center() ? _fidxs : _fidxs.dual();
-    TypeStruct args= _args.startype();
-    Type ret       = _ret .startype();
+    BitsFun fidxs  = _fidxs.startype();
+    TypeStruct args= _args .startype();
+    Type ret       = _ret  .startype();
     return make(fidxs,args,ret);
   }
 

@@ -114,13 +114,4 @@ class AddStrStr extends IntrinsicNewNode {
     return TypeStr.make(false,(str0.getstr()+str1.getstr()).intern());
   }
   @Override public byte op_prec() { return 5; }
-  @Override public BitsAlias alias_uses(GVNGCM gvn) {
-    // We use all aliases in our inputs
-    Type t2 = gvn.type(in(3)), t3 = gvn.type(in(4));
-    if( !(t2 instanceof TypeMemPtr) ||
-        !(t3 instanceof TypeMemPtr) ) return BitsAlias.NZERO; // Wait until memory settles out
-    TypeMemPtr tmp2 = (TypeMemPtr)t2, tmp3 = (TypeMemPtr)t3;
-    return tmp2.aliases().meet(tmp3.aliases());
-  }
-
 }

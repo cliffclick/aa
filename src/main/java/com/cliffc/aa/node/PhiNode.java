@@ -131,13 +131,6 @@ public class PhiNode extends Node {
     return t;                   // Limit to sane results
   }
   @Override public Type all_type() { return Type.ALL; }
-  // Set of used aliases across all inputs (not StoreNode value, but yes address)
-  @Override public BitsAlias alias_uses(GVNGCM gvn) {
-    if( _uses._len==0 ) return BitsAlias.NZERO; // During parsing, so assume uses all.  Or dead & will be removed shortly.
-    if( _uses._len==1 ) return _uses.at(0).alias_uses(gvn);
-    // TODO: Requires recursive search, handling cycles
-    return BitsAlias.NZERO;
-  }
   @Override public String err(GVNGCM gvn) {
     if( !(in(0) instanceof FunNode && ((FunNode)in(0))._name.equals("!") ) && // Specifically "!" takes a Scalar
         (gvn.type(this).contains(Type.SCALAR) ||

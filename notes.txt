@@ -18,26 +18,26 @@ now), just not in the base implementation: several ideal() calls push nodes
 from the reverse direction).
 
 TypeStruct:
-Remove 'clean' per struct, no need after this.
-Add a 'dead'  bit to TypeStruct fields.  This is a reverse-flow field.
-Add a 'clean' bit to TypeStruct fields.  This is a forward-flow field.
-Defaults to 'alive'.  Alive if any use is alive.  Dead otherwise.
-Roll-up 'dead'  bit to all Types as well - for use during opto.
+*Remove 'clean' per struct, no need after this.
+*Add a 'dead'  bit to TypeStruct fields.  This is a reverse-flow field.
+*Add a 'clean' bit to TypeStruct fields.  This is a forward-flow field.
+*Defaults to 'alive'.  Alive if any use is alive.  Dead otherwise.
+*Roll-up 'dead'  bit to all Types as well - for use during opto.
 
 
-Node: Reverse flow alias_uses can be removed.
-Remove 'not so near' add-to-worklist.
+*Node: Reverse flow alias_uses can be removed.
+*Remove 'not so near' add-to-worklist.
 
-CallNode: Remove filter memory into FunNode.  Just pass it all.  It will be
-discovered 'clean' in the function and the original value used at CallEpi.
+*CallNode: Remove filter memory into FunNode.  Just pass it all.  It will be
+*discovered 'clean' in the function and the original value used at CallEpi.
 
-Parse: Do not clear out user-struct closure field; it will go dead.
+*Parse: Do not clear out user-struct closure field; it will go dead.
 
-Opto init: defaults to dead.  Exit Scope is alive, and thus its defs are alive,
-recursively.  A Node is dead if all using nodes are marked dead.  Only
-interesting during opto, because during iter() dead nodes are deleted.
+*Opto init: defaults to dead.  Exit Scope is alive, and thus its defs are alive,
+*recursively.  A Node is dead if all using nodes are marked dead.  Only
+*interesting during opto, because during iter() dead nodes are deleted.
 
-Dead Nodes only compute their startype.
+*Dead Nodes only compute their startype.
 
 SESE Call/Fun precision improvements.  Ret starts with all memory as dead, and
 this pushes uphill to Fun.  Call gets a set of alive memory from CallEpi and

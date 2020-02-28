@@ -30,7 +30,7 @@ public final class CallEpiNode extends Node {
     CallNode call = call();
     TypeTuple tcall = (TypeTuple)gvn.type(call);
     if( tcall.at(0) != Type.CTRL ) return null; // Call not executable
-    Type tfptr = tcall.at(3);
+    Type tfptr = tcall.at(2);
     if( !(tfptr instanceof TypeFunPtr) ) return null; // No known function pointer
     TypeFunPtr tfp = (TypeFunPtr)tfptr;
 
@@ -231,11 +231,10 @@ public final class CallEpiNode extends Node {
     // along to the function being called.
     // tcall[0] = Control
     // tcall[1] = Full available memory
-    // tcall[2] = Memory slice passed to function
-    // tcall[3] = TypeFunPtr passed to FP2Closure
-    // tcall[4+]= Arg types
+    // tcall[2] = TypeFunPtr passed to FP2Closure
+    // tcall[3+]= Arg types
     TypeTuple tcall = (TypeTuple)gvn.type(call);
-    Type tfptr = tcall.at(3);
+    Type tfptr = tcall.at(2);
     if( !(tfptr instanceof TypeFunPtr) ) // Call does not know what it is calling?
       return TypeTuple.CALLE;
     TypeFunPtr funt = (TypeFunPtr)tfptr;
@@ -320,21 +319,6 @@ public final class CallEpiNode extends Node {
     // JUST the function return memories.  Loads and Stores can bypass the
     // function call, if the aliasing allows.
     return TypeTuple.make(tt.at(0),post_call_mem,tt.at(2),tt.at(1));
-  }
-
-  // Set of used aliases across all inputs (not StoreNode value, but yes address)
-  @Override public BitsAlias alias_uses(GVNGCM gvn) {
-    for( Node mproj : _uses ) // Find output memory
-      if( mproj instanceof MProjNode )
-        // TODO: Solve the forward-flow used_aliases problem incrementally.
-        // Here we just bail out.
-        return BitsAlias.NZERO; // Use all aliases after the call
-    return BitsAlias.EMPTY;     // No memory usage
-  }
-  @Override public boolean ideal_impacted_by_losing_uses(GVNGCM gvn, Node dead) {
-    if( is_copy() || !(dead instanceof MProjNode) ) return false; // Triggers improved alias uses
-    gvn.add_work(call().mem());
-    return true;
   }
 
   // Inline the CallNode.  Remove all edges except the results.  This triggers

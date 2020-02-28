@@ -162,17 +162,6 @@ public class StoreNode extends Node {
   }
 
 
-  // Set of used aliases across all inputs (not StoreNode value, but yes address)
-  @Override public BitsAlias alias_uses(GVNGCM gvn) {
-    Type tadr = gvn.type(adr());
-    if( !(tadr instanceof TypeMemPtr) ) return BitsAlias.NZERO; // Very low address, might point to anything
-    // TODO: Be smarter about forward flow here
-    if( _uses._len > 1 ) return BitsAlias.NZERO; // All uses of StoreNode ALSO must be accounted for
-    // My uses, plus my users uses.
-    BitsAlias bas = ((TypeMemPtr)tadr).aliases();
-    // TODO: Be smarter if single user is a MemMerge.
-    return bas.meet(_uses.at(0).alias_uses(gvn));
-  }
   @Override public String err(GVNGCM gvn) {
     String msg = err0(gvn);
     if( msg == null ) return null;
@@ -190,8 +179,8 @@ public class StoreNode extends Node {
     TypeStruct ts = (TypeStruct)mem;
     int idx = ts.find(_fld);
     if( idx == -1 )  return "No such field '";
-    if( ts._finals[idx]==TypeStruct.ffinal() || ts._finals[idx]==TypeStruct.fro() ) {
-      String fstr = TypeStruct.fstring(ts._finals[idx]);
+    if( !ts.can_update(idx) ) {
+      String fstr = TypeStruct.fstring(ts.fmod(idx));
       String ftype = adr() instanceof ProjNode && adr().in(0) instanceof NewObjNode && ((NewObjNode)adr().in(0))._is_closure ? "val '" : "field '.";
       return "Cannot re-assign "+fstr+" "+ftype;
     }

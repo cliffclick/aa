@@ -17,18 +17,10 @@ public class ProjNode extends Node {
     if( cp != null ) return cp;
 
     // Basic escape analysis if DProj loses a use
-    if( in(0) instanceof NewNode && ((NewNode) in(0)).captured(gvn) )
-      gvn.add_work(in(0));
+    //if( in(0) instanceof NewNode && ((NewNode) in(0)).captured(gvn) )
+    //  gvn.add_work(in(0));
 
     return null;
-  }
-
-  // If losing an escaping use, recheck escape analysis
-  @Override public boolean ideal_impacted_by_losing_uses(GVNGCM gvn, Node dead) {
-    return
-      dead instanceof  CallNode || // Call args escape
-      dead instanceof  LoadNode || // Direct usage
-      dead instanceof StoreNode;   // Store this-as-val escapes
   }
 
   @Override public Type value(GVNGCM gvn) {

@@ -62,11 +62,6 @@ public abstract class NewNode<T extends TypeObj> extends Node {
     return null;
   }
 
-  // If losing an escaping use, recheck escape analysis
-  @Override public boolean ideal_impacted_by_losing_uses(GVNGCM gvn, Node dead) {
-    return !(dead instanceof OProjNode);
-  }
-
   // Produces a TypeMemPtr
   @Override public Type value(GVNGCM gvn) {
     Type[] ts = TypeAry.get(_defs._len-1);

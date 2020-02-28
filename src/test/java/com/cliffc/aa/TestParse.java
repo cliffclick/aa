@@ -278,7 +278,7 @@ public class TestParse {
     testerr ("Point=:@{x;y}; Point((0,1))", "*[$](nil;1)! is not a *[$]Point:@{x=;y=}!",27);
     testerr("x=@{n: =1;}","Missing type after ':'",7);
     testerr("x=@{n=;}","Missing ifex after assignment of 'n'",6);
-    test_obj_isa("x=@{n}",TypeStruct.make(new String[]{"^","n"},TypeStruct.ts(TypeMemPtr.DISPLAY_PTR,Type.NIL),TypeStruct.finals(2)));
+    test_obj_isa("x=@{n}",TypeStruct.make(new String[]{"^","n"},TypeStruct.ts(TypeMemPtr.DISPLAY_PTR,Type.NIL),TypeStruct.ffnls(2)));
   }
 
   @Test public void testParse05() {
@@ -307,7 +307,7 @@ public class TestParse {
     test("A= :int; A(1)", TypeInt.TRUE.set_name("A:"));
     test_ptr("A= :(str?, int); A(0,2)","A:(nil;2)!");
     // Named recursive types
-    test_ptr("A= :(A?, int); A(0,2)",(alias) -> TypeMemPtr.make(alias,TypeStruct.make("A:",TypeStruct.TFLDS(3),TypeStruct.ts(Type.NIL,Type.NIL,TypeInt.con(2)),TypeStruct.finals(3))));
+    test_ptr("A= :(A?, int); A(0,2)",(alias) -> TypeMemPtr.make(alias,TypeStruct.make("A:",TypeStruct.TFLDS(3),TypeStruct.ts(Type.NIL,Type.NIL,TypeInt.con(2)),TypeStruct.ffnls(3))));
     test    ("A= :@{n=A?; v=flt}; A(@{n=0;v=1.2}).v;", TypeFlt.con(1.2));
 
     // TODO: Needs a way to easily test simple recursive types
@@ -379,13 +379,13 @@ public class TestParse {
     // Test inferring a recursive struct type, with a little help
     Type[] ts0 = TypeStruct.ts(Type.NIL,TypeFlt.con(1.2*1.2));
     test_obj("map={x:@{n;v=flt}? -> x ? @{n=map(x.n);v=x.v*x.v} : 0}; map(@{n=0;v=1.2})",
-             TypeStruct.make(FLDS,ts0,TypeStruct.finals(2)));
+             TypeStruct.make(FLDS,ts0,TypeStruct.ffnls(2)));
 
     // Test inferring a recursive struct type, with less help.  This one
     // inlines so doesn't actually test inferring a recursive type.
     Type[] ts1 = TypeStruct.ts(Type.NIL,TypeFlt.con(1.2*1.2));
     test_ptr("map={x -> x ? @{n=map(x.n);v=x.v*x.v} : 0}; map(@{n=0;v=1.2})",
-             (alias) -> TypeMemPtr.make(alias,TypeStruct.make(FLDS,ts1,TypeStruct.finals(2))));
+             (alias) -> TypeMemPtr.make(alias,TypeStruct.make(FLDS,ts1,TypeStruct.ffnls(2))));
 
     // Test inferring a recursive struct type, with less help. Too complex to
     // inline, so actual inference happens
@@ -519,7 +519,7 @@ public class TestParse {
     testerr("x:=0; math_rand(1) ? (x =4):3; x=2; x", "Cannot re-assign read-only val 'x'",34);
   }
 
-  // Finals are declared with an assignment.  This is to avoid the C++/Java
+  // Ffnls are declared with an assignment.  This is to avoid the C++/Java
   // problem of making final-field cycles.  Java requires final fields to be
   // only assigned in constructors before the value escapes, which prevents any
   // final-cyclic structures.  Final assignments have to be unambiguous - they
@@ -552,7 +552,7 @@ public class TestParse {
     // Final-only and read-only type syntax.
     testerr ("ptr2rw = @{f:=1}; ptr2final:@{f==} = ptr2rw; ptr2final", "*[$]@{f:=1}! is not a *[$]@{f==}!",27); // Cannot cast-to-final
     test_obj("ptr2   = @{f =1}; ptr2final:@{f==} = ptr2  ; ptr2final", // Good cast
-             TypeStruct.make(new String[]{"f"},new Type[]{TypeInt.con(1)},TypeStruct.finals(1)));
+             TypeStruct.make(new String[]{"f"},new Type[]{TypeInt.con(1)},TypeStruct.ffnls(1)));
     testerr ("ptr=@{f=1}; ptr2rw:@{f:=} = ptr; ptr2rw", "*[$]@{f==1}! is not a *[$]@{f:=}!", 18); // Cannot cast-away final
     test    ("ptr=@{f=1}; ptr2rw:@{f:=} = ptr; 2", TypeInt.con(2)); // Dead cast-away of final
     test    ("@{x:=1;y =2}:@{x;y==}.y", TypeInt.con(2)); // Allowed reading final field

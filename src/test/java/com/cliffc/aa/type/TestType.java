@@ -15,7 +15,7 @@ public class TestType {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testType() {
     Type.init0(new HashMap<>());
-    // Both high, but falling hard, so names have to fall ahrd too
+    // Both high, but falling hard, so names have to fall hard too
     Type t0 = TypeStruct.NAMEPT.dual();
     Type t1 = TypeStr.STR.dual();
     Type mt = t1.meet(t0);
@@ -196,7 +196,7 @@ public class TestType {
     TypeStruct ts0= TypeStruct.make(new String[]{"x"},TypeStruct.ts(nil));  // @{x:nil}
     Type tss = ts0.meet(t0);
     assertEquals(t0,tss);      // t0.isa(ts0)
-    byte[] finals = new byte[]{TypeStruct.ffinal()};
+    byte[] finals = new byte[]{TypeStruct.FFNL};
 
     // meet @{c:0}? and @{c:@{x:1}?,}
     int alias0 = BitsAlias.type_alias(BitsAlias.RECORD);
@@ -242,7 +242,6 @@ public class TestType {
     // thus the result is a copy of F1I2I.
     assertTrue(gf.dual().isa(f1i2i)); // To be short result, short must be low
 
-
     assertTrue(f1i2i.isa(gf));
     TypeFunPtr f1f2f = TypeFunPtr.make_new(TypeStruct.FLT64_FLT64,TypeFlt.FLT64);
     assertTrue(f1f2f.isa(gf));
@@ -274,8 +273,8 @@ public class TestType {
 
     // Anonymous recursive structs -
     // - struct with pointer to self
-    byte[] finals = new byte[]{TypeStruct.ffinal(),TypeStruct.ffinal()};
-    TypeStruct ts0 = TypeStruct.malloc("",false,false,flds,TypeStruct.ts(2),finals);
+    byte[] finals = TypeStruct.ffnls(2);
+    TypeStruct ts0 = TypeStruct.malloc("",false,flds,TypeStruct.ts(2),finals);
     ts0._hash = ts0.compute_hash();
     ts0._ts[0] = ts0ptr;    ts0._cyclic = true;
     ts0._ts[1] = TypeInt.INT64;
@@ -283,7 +282,7 @@ public class TestType {
     TypeMem ts0mem = TypeMem.make(alias1,ts0); // {1:@{n:*[1],v:int} }
 
     // - struct with pointer to self or nil
-    TypeStruct ts1 = TypeStruct.malloc("",false,false,flds,TypeStruct.ts(2),finals);
+    TypeStruct ts1 = TypeStruct.malloc("",false,flds,TypeStruct.ts(2),finals);
     ts1._hash = ts1.compute_hash();
     ts1._ts[0] = ts0ptr0;  ts1._cyclic = true;
     ts1._ts[1] = TypeInt.INT64;
@@ -385,12 +384,12 @@ public class TestType {
     // Make a cycle: 0_A: -> 1_(n=*,v=i64) -> 2_TMP -> 3_B: -> 4_(n=*,v=f64) -> 5_TMP ->
     // Dual; then meet ~4_() and ~0_A
     String[] flds = new String[]{"n","v"};
-    byte[] finals = TypeStruct.finals(2);
+    byte[] finals = TypeStruct.ffnls(2);
     final int alias = BitsAlias.RECORD;
 
     Type.RECURSIVE_MEET++;
-    TypeStruct as1 = TypeStruct.malloc("",false,false,flds,TypeStruct.ts(2),finals).set_name("A:");
-    TypeStruct bs4 = TypeStruct.malloc("",false,false,flds,TypeStruct.ts(2),finals).set_name("B:");
+    TypeStruct as1 = TypeStruct.malloc("",false,flds,TypeStruct.ts(2),finals).set_name("A:");
+    TypeStruct bs4 = TypeStruct.malloc("",false,flds,TypeStruct.ts(2),finals).set_name("B:");
     as1._hash = as1.compute_hash();  as1._cyclic = true;
     bs4._hash = bs4.compute_hash();  bs4._cyclic = true;
     TypeMemPtr ap5 = TypeMemPtr.make(alias,as1);  ap5._cyclic = true;

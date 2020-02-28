@@ -78,5 +78,4 @@ public class TypeNode extends Node {
   @Override public Type all_type() { return Type.SCALAR; }
   // Check TypeNode for being in-error
   @Override public String err(GVNGCM gvn) { return _error_parse.typerr(gvn.type(arg()),_t,null); }
-  @Override public BitsAlias alias_uses(GVNGCM gvn) { return BitsAlias.EMPTY; }
 }

@@ -92,7 +92,6 @@ public class Type<T extends Type<T>> implements Cloneable {
   public int _hash;      // Hash for this Type; built recursively
   byte _type;            // Simple types use a simple enum
   public String _name;   // All types can be named
-  boolean _cyclic;       // Part of a type cycle
   T _dual; // All types support a dual notion, eagerly computed and cached here
 
   protected Type(byte type) { this(type,""); }
@@ -101,7 +100,7 @@ public class Type<T extends Type<T>> implements Cloneable {
     _uid=CNT++;
   }
   protected void init(byte type) { init(type,""); }
-  protected void init(byte type, String name) { _type=type; _name=name;  _cyclic=false; }
+  protected void init(byte type, String name) { _type=type; _name=name; }
   @Override public final int hashCode( ) { assert _hash!=0; return _hash; }
   // Compute the hash and return it, with all child types already having their
   // hash computed.  Subclasses override this.
@@ -110,11 +109,13 @@ public class Type<T extends Type<T>> implements Cloneable {
   // Is anything equals to this?
   @Override public boolean equals( Object o ) {
     if( this == o ) return true;
-    return (o instanceof Type) && _type==((Type)o)._type && Util.eq(_name,((Type)o)._name);
+    if( !(o instanceof Type) ) return false;
+    Type t = (Type)o;
+    return _type==t._type && Util.eq(_name,t._name);
   }
-  public boolean cycle_equals( Type o ) {
+  public boolean cycle_equals( Type t ) {
     assert is_simple();         // Overridden in subclasses
-    return _type==o._type && Util.eq(_name,o._name);
+    return _type==t._type && Util.eq(_name,t._name);
   }
 
   // In order to handle recursive printing, this is the only toString call in
@@ -862,11 +863,7 @@ public class Type<T extends Type<T>> implements Cloneable {
 
   // Dual, except keep TypeMem.XOBJ as high for starting GVNGCM.opto() state.
   public Type startype() {
-    if( is_con() ) {
-      assert dual()==this;
-      return dual();
-    }
-    // Various error codes start high
+    assert !is_con() || dual()==this;
     return above_center() ? this : dual();
   }
 

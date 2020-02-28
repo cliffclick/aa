@@ -133,6 +133,4 @@ public class TypeBits extends Type<TypeBits> {
   @Override public byte isBitShape(Type t) { throw com.cliffc.aa.AA.unimpl(); }
   @Override public Type widen() { throw com.cliffc.aa.AA.unimpl(); }
   @Override void walk( Predicate<Type> p ) { p.test(this); }
-  // Flip low to high
-  @Override public TypeBits startype() { return above_center() ? this : dual(); }
 }

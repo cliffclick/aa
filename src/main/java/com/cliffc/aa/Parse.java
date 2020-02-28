@@ -528,7 +528,7 @@ public class Parse {
 
         // Store or load against memory
         if( peek(":=") || peek_not('=','=')) {
-          byte fin = _buf[_x-2]==':' ? TypeStruct.frw() : TypeStruct.ffinal();
+          byte fin = _buf[_x-2]==':' ? TypeStruct.FRW : TypeStruct.FFNL;
           Node stmt = stmt();
           if( stmt == null ) n = err_ctrl2("Missing stmt after assigning field '."+fld+"'");
           else {
@@ -597,7 +597,7 @@ public class Parse {
     // Active memory for the chosen scope, after the call to plus
     MemMergeNode mmem2 = mem_active();
     Node objmem2 = mmem2.active_obj(alias);
-    StoreNode st = (StoreNode)gvn(new StoreNode(objmem2,ptr,sum,TypeStruct.frw(),tok,errMsg()));
+    StoreNode st = (StoreNode)gvn(new StoreNode(objmem2,ptr,sum,TypeStruct.FRW,tok,errMsg()));
     mmem2.st(st,_gvn);
     return n.unhook();          // Return pre-increment value
   }
@@ -668,7 +668,7 @@ public class Parse {
     if( scope == null ) { // Assume any unknown ref is a forward-ref of a recursive function
       Node fref = gvn(FunPtrNode.forward_ref(_gvn,tok,this));
       // Place in nearest enclosing closure scope
-      _e._scope.stk().create(tok.intern(),fref,TypeStruct.ffinal(),_gvn);
+      _e._scope.stk().create(tok.intern(),fref,TypeStruct.FFNL,_gvn);
       return fref;
     }
     Node def = scope.get(tok);    // Get top-level value; only sane if no stores allowed to modify it
@@ -695,7 +695,7 @@ public class Parse {
     NewObjNode nn = new NewObjNode(false,ctrl(),con(Type.NIL));
     int fidx=0, oldx=_x-1; // Field name counter, mismatched parens balance point
     while( s!=null ) {
-      nn.create_active((""+(fidx++)).intern(),s,TypeStruct.ffinal(),_gvn);
+      nn.create_active((""+(fidx++)).intern(),s,TypeStruct.FFNL,_gvn);
       if( !peek(',') ) break;   // Final comma is optional
       s=stmts();
     }
@@ -965,14 +965,14 @@ public class Parse {
   // No mod is r/o, the default and lattice bottom.  ':' is read-write, '=' is
   // final.  Currently '-' is ambiguous with function arrow ->.
   private byte tmod() {
-    if( peek("==") ) { _x--; return TypeStruct.ffinal(); } // final     , leaving trailing '='
-    if( peek(":=") ) { _x--; return TypeStruct.frw();    } // read-write, leaving trailing '='
+    if( peek("==") ) { _x--; return TypeStruct.FFNL; } // final     , leaving trailing '='
+    if( peek(":=") ) { _x--; return TypeStruct.FRW;  } // read-write, leaving trailing '='
     return tmod_default();
   }
   // Experimenting, would like to default to most unconstrained type: r/w.  But
   // r/o is the lattice bottom, and defaulting to r/w means the default cannot
   // accept final-fields.  Using lattice bottom for the default.
-  private byte tmod_default() { return TypeStruct.fro(); }
+  private byte tmod_default() { return TypeStruct.FRO; }
 
   // Type or null or Type.ANY for '->' token
   private Type type0(boolean type_var) {
@@ -996,7 +996,7 @@ public class Parse {
     if( peek("@{") ) {          // Struct type
       Ary<String> flds = new Ary<>(new String[]{"^"});
       Ary<Type  > ts   = new Ary<>(new Type  []{TypeMemPtr.DISPLAY_PTR});
-      Ary<Byte  > mods = new Ary<>(new Byte  []{TypeStruct.ffinal()});
+      Ary<Byte  > mods = new Ary<>(new Byte  []{TypeStruct.FFNL});
       while( true ) {
         String tok = token();            // Scan for 'id'
         if( tok == null ) break;         // end-of-struct-def
@@ -1140,7 +1140,7 @@ public class Parse {
   private ScopeNode lookup_scope( String tok, boolean lookup_current_scope_only ) { return _e.lookup_scope(tok,lookup_current_scope_only); }
   public  ScopeNode scope( ) { return _e._scope; }
   private void create( String tok, Node n, byte mutable ) { _e._scope.stk().create(tok,n,mutable,_gvn ); }
-  private static byte ts_mutable(boolean mutable) { return mutable ? TypeStruct.frw() : TypeStruct.ffinal(); }
+  private static byte ts_mutable(boolean mutable) { return mutable ? TypeStruct.FRW : TypeStruct.FFNL; }
 
   // Close off active memory and return it.
   private Node all_mem() { return _e._scope.all_mem(_gvn); }

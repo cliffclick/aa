@@ -204,9 +204,6 @@ public class MemMergeNode extends Node {
     return this;                // Ready for gvn.xform as a new node
   }
 
-  // MemMerge lost a use.  MemMerge should try to remove some aliases
-  @Override public boolean ideal_impacted_by_losing_uses(GVNGCM gvn, Node dead) { return true; }
-
   @Override public Node ideal(GVNGCM gvn, int level) {
     assert _defs._len==_aliases._len;
     // Get TypeObj of default alias
@@ -273,53 +270,54 @@ public class MemMergeNode extends Node {
     // for an OProj in order to unpack arguments, and the OProj might have just
     // appeared.  The Call cannot step-through the Merge, because after
     // unpacking the same Merge is also the Calls normal memory.
-    boolean has_oproj=false;
-    for( int i=1; i<_aliases._len; i++ )
-      if( in(i) instanceof OProjNode )
-        { has_oproj=true; break; }
-    if( has_oproj )
-      for( Node use : _uses )
-        if( use instanceof CallNode && !((CallNode)use)._unpacked )
-          gvn.add_work(use);
+    //boolean has_oproj=false;
+    //for( int i=1; i<_aliases._len; i++ )
+    //  if( in(i) instanceof OProjNode )
+    //    { has_oproj=true; break; }
+    //if( has_oproj )
+    //  for( Node use : _uses )
+    //    if( use instanceof CallNode && !((CallNode)use)._unpacked )
+    //      gvn.add_work(use);
 
     // If down to a single Phi use, see if Phi wants to split.
-    if( _uses._len==1 && _uses.at(0) instanceof PhiNode )
-      gvn.add_work(_uses.at(0));
+    //if( _uses._len==1 && _uses.at(0) instanceof PhiNode )
+    //  gvn.add_work(_uses.at(0));
 
     // Try to remove some unused aliases.  Gather alias uses from all users.
-    if( !_uses.isEmpty() && gvn._opt_mode != 0 /*not during parsing, not all users available */) {
-      // This is a forward-flow problem, make sure my type is improved before
-      // flowing forward.  Alas, computes value() twice in a row.
-      gvn.setype(this,value(gvn));
-      BitsAlias abs = BitsAlias.EMPTY;
-      for( Node use : _uses ) {
-        BitsAlias rez = use.alias_uses(gvn);
-        if( rez.test(1) ) { abs = BitsAlias.NZERO; break; } // Shortcut, some use uses all aliases
-        abs = abs.meet(rez);
-      }
-      // Kill unused aliases
-      if( !abs.test(1) ) {      // Shortcut
-        // Used aliases might be defined by a higher alias#.  These higher
-        // alias numbers are therefore also used.
-        BitsAlias abs2 = abs;
-        for( int alias : abs ) {
-          if( alias > 0 ) {
-            int idx = find_alias2idx(alias);
-            if( idx != 0 )
-              abs2 = abs2.set(_aliases.at(idx));
-          }
-        }
-        // Find defined (leaf) aliases with no uses.
-        for( int i=1; i<_defs._len; i++ )
-          if( !abs2.test_recur(_aliases.at(i))) {
-            if( gvn.type(in(i)) != TypeObj.XOBJ || !(in(i) instanceof ConNode) ) {
-              set_def(i,gvn.con(TypeObj.XOBJ),gvn);
-              if( is_dead() ) return this; // Happens when cleaning out dead code
-              progress = true;
-            }
-          }
-        if( progress ) return this;
-      }
+    if( gvn._opt_mode != 0 /*not during parsing, not all users available */) {
+      throw com.cliffc.aa.AA.unimpl();
+      //// This is a forward-flow problem, make sure my type is improved before
+      //// flowing forward.  Alas, computes value() twice in a row.
+      //gvn.setype(this,value(gvn));
+      //BitsAlias abs = BitsAlias.EMPTY;
+      //for( Node use : _uses ) {
+      //  BitsAlias rez = use.alias_uses(gvn);
+      //  if( rez.test(1) ) { abs = BitsAlias.NZERO; break; } // Shortcut, some use uses all aliases
+      //  abs = abs.meet(rez);
+      //}
+      //// Kill unused aliases
+      //if( !abs.test(1) ) {      // Shortcut
+      //  // Used aliases might be defined by a higher alias#.  These higher
+      //  // alias numbers are therefore also used.
+      //  BitsAlias abs2 = abs;
+      //  for( int alias : abs ) {
+      //    if( alias > 0 ) {
+      //      int idx = find_alias2idx(alias);
+      //      if( idx != 0 )
+      //        abs2 = abs2.set(_aliases.at(idx));
+      //    }
+      //  }
+      //  // Find defined (leaf) aliases with no uses.
+      //  for( int i=1; i<_defs._len; i++ )
+      //    if( !abs2.test_recur(_aliases.at(i))) {
+      //      if( gvn.type(in(i)) != TypeObj.XOBJ || !(in(i) instanceof ConNode) ) {
+      //        set_def(i,gvn.con(TypeObj.XOBJ),gvn);
+      //        if( is_dead() ) return this; // Happens when cleaning out dead code
+      //        progress = true;
+      //      }
+      //    }
+      //  if( progress ) return this;
+      //}
     }
 
     return null;
@@ -359,10 +357,6 @@ public class MemMergeNode extends Node {
     return TypeMem.make0(tos);
   }
   @Override public Type all_type() { return TypeMem.FULL; }
-  // Set of used aliases across all inputs.  This is only called from another
-  // MemMerge, which means back-to-back MemMerge which will be cleared out
-  // eventually.  Ok to report super conservative here.
-  @Override public BitsAlias alias_uses(GVNGCM gvn) { return BitsAlias.NZERO; }
 
   @Override @NotNull public MemMergeNode copy( boolean copy_edges, CallEpiNode unused, GVNGCM gvn) {
     MemMergeNode mmm = (MemMergeNode)super.copy(copy_edges, unused, gvn);

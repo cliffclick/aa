@@ -27,7 +27,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
   }
   public Node get(String name) { int idx = _ts.find(name);  assert idx >= 0; return fld(idx); }
   public boolean exists(String name) { return _ts.find(name)!=-1; }
-  public boolean is_mutable(String name) { return _ts._finals[_ts.find(name)] == TypeStruct.frw(); }
+  public boolean is_mutable(String name) { return _ts.fmod(_ts.find(name)) == TypeStruct.FRW; }
 
   // Create a field from parser for an inactive this
   public void create( String name, Node val, byte mutable, GVNGCM gvn  ) {
@@ -69,7 +69,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
     assert !gvn.touched(this);
     assert def_idx(_ts._ts.length)== _defs._len;
     boolean can_update = _ts.can_update(fidx);
-    if( _ts._finals[fidx] != mutable ) // Changed field modifier
+    if( _ts.fmod(fidx) != mutable ) // Changed field modifier
       _ts = _ts.set_fld(fidx,_ts.at(fidx),mutable);
     set_def(def_idx(fidx),val,gvn);
     return can_update;
@@ -80,12 +80,12 @@ public class NewObjNode extends NewNode<TypeStruct> {
   public FunPtrNode add_fun( Parse bad, String name, FunPtrNode ptr, GVNGCM gvn ) {
     int fidx = _ts.find(name);
     if( fidx == -1 ) {
-      create_active(name,ptr,TypeStruct.ffinal(),gvn);
+      create_active(name,ptr,TypeStruct.FFNL,gvn);
     } else {
       Node n = _defs.at(def_idx(fidx));
       if( n instanceof UnresolvedNode ) n.add_def(ptr);
       else n = new UnresolvedNode(bad,n,ptr);
-      update_active(fidx,TypeStruct.ffinal(),n,gvn);
+      update_active(fidx,TypeStruct.FFNL,n,gvn);
     }
     return ptr;
   }
@@ -102,7 +102,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
       Node n = fld(i);
       if( n != null && n.is_forward_ref() ) {
         if( !progress ) { progress=true; gvn.unreg(this); }
-        parent.create(ts._flds[i],n,ts._finals[i],gvn);
+        parent.create(ts._flds[i],n,ts.flags(i),gvn);
         remove(def_idx(i),gvn);  // Hack edge
         ts = ts.del_fld(i);
         i--;
@@ -132,7 +132,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
     for( int i=0; i<ts.length; i++ )
       // Limit type bounds, since error returns can be out-of-bounds
       ts[i] = gvn.type(fld(i)).bound(_ts.at(i));
-    TypeStruct newt = TypeStruct.make(_ts._name,_ts._flds,ts,_ts._finals);
+    TypeStruct newt = _ts.make_from(ts);
 
     // Check for TypeStructs with this same NewNode types occurring more than
     // CUTOFF deep, and fold the deepest ones onto themselves to limit the type

@@ -279,7 +279,6 @@ public class GVNGCM {
     assert n._uses._len==0 && n._keep==0;
     for( int i=0; i<n._defs._len; i++ ) {
       Node def = n._defs.at(i);
-      if( def != null && def.ideal_impacted_by_losing_uses(this,n) ) add_work(def);
       n.set_def(i,null,this);   // Recursively destroy dead nodes
     }
     n.set_dead();               // n is officially dead now
@@ -297,7 +296,6 @@ public class GVNGCM {
     assert (level&1)==0;        // No changes during asserts
     if( nnn == old ) {          // Progress, but not replacement
       add_work_uses(old);       // Re-run old, until no progress
-      old.ideal_impacted_by_changing_uses(this);
       return;
     }
     if( check_new(nnn) )        // If new, replace back in GVN
@@ -341,8 +339,8 @@ public class GVNGCM {
       return x;                // And use it instead
     }
     assert !check_opt(n);      // Not in system now
-    if( replace_con(oldt,n) )
-      return con(oldt);        // Dead-on-Entry, common when called from GCP
+    //if( replace_con(oldt,n) )
+    //  return con(oldt);        // Dead-on-Entry, common when called after GCP
     // Try generic graph reshaping
     Node y = n.ideal(this,level);
     assert y==null || y==n || n._keep==0;// Ideal calls need to not replace 'keep'rs
@@ -357,10 +355,10 @@ public class GVNGCM {
     //   When inlined, the memory Phi gets the full Call memory, not the refined.
     //   The Phi then 'sinks'... but only to a value that a following CallEpi will
     //   have been sunk to already.
-    //if( !t.isa(oldt) ) {
-    //  System.out.println("Backwards to: "+t+"\nfrom: "+n.dump(0,this));
-    //  assert t.isa(oldt);         // Monotonically improving
-    //}
+    if( !t.isa(oldt) ) {
+      System.out.println("Backwards to: "+t+"\nfrom: "+n.dump(0,this));
+      assert t.isa(oldt);       // Monotonically improving
+    }
     _ts._es[n._uid] = null;     // Remove in case we replace it
     // Replace with a constant, if possible
     if( replace_con(t,n) )
@@ -370,7 +368,7 @@ public class GVNGCM {
     if( z != null ) return z;
     // Record type for n; n is "in the system" now
     setype(n,t);                // Set it in
-    // TODO: If x is a TypeNode, capture any more-precise type permanently into Node
+    assert n._live;             // Everything is live at this point, because we eagerly strip dead
     return oldt == t && y==null ? null : n; // Progress if types improved
   }
 
@@ -390,11 +388,11 @@ public class GVNGCM {
   }
 
   // Complete replacement; point uses to 'nnn'.  The goal is to completely replace 'old'.
-  public void subsume( Node old, Node nnn ) {
+  public Node subsume( Node old, Node nnn ) {
     replace(old,nnn);
     nnn.keep();                 // Keep-alive
     kill(old);                  // Delete the old n, and anything it uses
-    nnn.unhook();               // Remove keep-alive
+    return nnn.unhook();        // Remove keep-alive
   }
 
   // Once the program is complete, any time anything is on the worklist we can
@@ -409,7 +407,7 @@ public class GVNGCM {
     while( _work._len > 0 || _work2._len > 0 ) {
       final boolean small_work = !_work.isEmpty();
       // Turned off, fairly expensive assert
-      //assert small_work || !Env.START.more_ideal(this,new VBitSet(),1); // No more small-work ideal calls to apply
+      assert small_work || !Env.START.more_ideal(this,new VBitSet(),1); // No more small-work ideal calls to apply
       Node n = (small_work ? _work : _work2).pop(); // Pull from main worklist before functions
       (small_work ? _wrk_bits : _wrk2_bits).clear(n._uid);
       if( n.is_dead() ) continue;
@@ -453,12 +451,17 @@ public class GVNGCM {
     for( Node n : _INIT0_NODES )
       if( n instanceof UnresolvedNode )
         _ts._es[n._uid]=n.value(this);   // Force recompute
-    // Set all types to all_type().dual(), their most optimistic type,
-    // and prime the worklist.
+    // Set all types to all_type().startype(), their most optimistic type.
+    // This is mostly the dual(), except a the Start memory is always XOBJ.
     walk_initype(Env.START);
-
+    // The exit Scope is live for both iter() and gcp()
+    setype(rez,rez.all_type());
+    rez._live = true;
+    // Prime the worklist
+    add_work(rez);              // The one live starting point
     // Collect unresolved calls, and verify they get resolved.
     Ary<CallNode> ambi_calls = new Ary<>(new CallNode[1],0);
+    int major_work=0, minor_opt=0;
 
     // Repeat, if we remove some ambiguous choices, and keep falling until the
     // graph stabilizes without ambiguity.
@@ -476,26 +479,39 @@ public class GVNGCM {
           if( fidxs != null && fidxs.above_center() && ambi_calls.find(call)== -1 )
             ambi_calls.add((CallNode)n); // Track ambiguous calls
         }
+        major_work++;
+        // Check liveness first
+        if( n._live ) {                // Alive already?
+          assert n.compute_live(this); // Monotonic - stays alive
+        } else {                       // Not alive
+          if( n.compute_live(this) ) { // See if transitioning to live
+            // Classic reverse flow on liveness change:
+            for( Node def : n._defs )
+              if( def != null && def != n )
+                add_work(def);  // Make all defs live
+          } else {              // Not alive, so always computes startype
+            assert type(n)==n.all_type().startype();
+            continue;           // And thus no forwards flow
+          }
+        }
+
+        // Forwards flow
         Type ot = type(n);       // Old type
         Type nt = n.value(this); // New type
         assert ot.isa(nt);       // Types only fall monotonically
         if( ot != nt ) {         // Progress
           _ts.setX(n._uid,nt);   // Record progress
+          // Classic forwards flow on change:
           for( Node use : n._uses ) {
             if( use==n ) continue;        // Stop self-cycle (not legit, but happens during debugging)
-            if( use.all_type() != type(use)) // Minor optimization: If not already at bottom
+            if( use.all_type() != type(use)) { // Minor optimization: If not already at bottom
               add_work(use); // Re-run users to check for progress
+              minor_opt++;
+            }
             // When new control paths appear on Regions, the Region stays the
             // same type (Ctrl) but the Phis must merge new values.
             if( use instanceof RegionNode )
-              //for( Node phi : use._uses ) if( phi != n ) add_work(phi);
               add_work_uses(use);
-            // When new memory appears on Calls, memory ops just after the Call
-            // might be bypassing and need to pick up the new memory.
-            if( use instanceof CallNode )
-              for( Node cepi : use._uses )
-                if( cepi instanceof CallEpiNode )
-                  add_work(cepi);
           }
         }
       }
@@ -520,13 +536,13 @@ public class GVNGCM {
     walk_dead(Env.START);
   }
 
-  // Forward reachable walk, setting all_type.dual (except Start) and priming
-  // the worklist for nodes that are not above centerline.
+  // Forward reachable walk, setting types to all_type().startype() (basically
+  // dual) and making all dead.
   private void walk_initype( Node n ) {
     if( n==null || touched(n) ) return; // Been there, done that
     Type startype = n.all_type().startype();
     setype(n,startype);
-    add_work(n);
+    n._live = false;
     // Walk reachable graph
     for( Node use : n._uses ) walk_initype(use);
     for( Node def : n._defs ) walk_initype(def);
@@ -538,14 +554,14 @@ public class GVNGCM {
     if( _wrk_bits.get(n._uid) ) return; // Been there, done that
     if( n==Env.START ) return;          // Top-level scope
     add_work(n);                        // Only walk once
+    Type t = type(n);                   // Get optimistic computed type
     // Replace with a constant, if possible
-    Type t = type(n);
     if( replace_con(t,n) ) {
-      subsume(n,con(t));        // Constant replacement
-      return;
-    }
+      n=subsume(n,con(t));      // Constant replacement
+      
+      
     // Functions can sharpen return value
-    if( n instanceof FunNode && n._uid >= _INIT0_CNT ) {
+    } else if( n instanceof FunNode && n._uid >= _INIT0_CNT ) {
       FunNode fun = (FunNode)n;
       RetNode ret = fun.ret();
       if( type(fun)==Type.CTRL && !fun.is_forward_ref() &&
@@ -558,13 +574,15 @@ public class GVNGCM {
           rereg(fun,Type.CTRL);
         }
       }
-    }
-    // All (live) Call ambiguity has been resolved
-    if( n instanceof CallNode && type(n.in(0))==Type.CTRL ) {
+
+      // All (live) Call ambiguity has been resolved
+    } else if( n instanceof CallNode && type(n.in(0))==Type.CTRL ) {
       BitsFun fidxs = ((CallNode)n).fidxs(this);
       assert n.err(this) != null || // Call is in-error OR
         !fidxs.above_center() || fidxs==BitsFun.EMPTY;
     }
+    assert n.value(this)==t; // Hit the fixed point, despite any immediate updates
+    assert n._live;
 
     // Walk reachable graph
     for( Node def : n._defs )

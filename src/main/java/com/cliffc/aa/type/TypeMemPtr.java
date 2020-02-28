@@ -12,6 +12,8 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   // List of known memory aliases.  Zero is nil.
   public BitsAlias _aliases;
   public TypeObj _obj;          // Meet/join of aliases
+  
+  boolean _cyclic; // Type is cyclic.  This is a summary property, not a description of value sets, hence is not in the equals or hash
 
   private TypeMemPtr(BitsAlias aliases, TypeObj obj ) { super     (TMEMPTR); init(aliases,obj); }
   private void init (BitsAlias aliases, TypeObj obj ) { super.init(TMEMPTR); _aliases = aliases; _obj=obj; }
@@ -205,6 +207,6 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   public int getbit() { return _aliases.getbit(); }
   // Keep the high parts
   @Override public TypeMemPtr startype() {
-    return TypeMemPtr.make(_aliases.above_center() ? _aliases : _aliases.dual(), _obj.startype());
+    return TypeMemPtr.make(_aliases.startype(), _obj.startype());
   }
 }

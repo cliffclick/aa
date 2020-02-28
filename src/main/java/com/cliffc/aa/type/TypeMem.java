@@ -209,7 +209,6 @@ public class TypeMem extends Type<TypeMem> {
   public static final TypeMem EMPTY;// Every alias filled with anything
   public static final TypeMem  MEM; // FULL, except lifts REC, arrays, STR
   public static final TypeMem XMEM; //
-  public static final TypeMem  MEM_CLN; // Clean (not modified) versions
   public static final TypeMem MEM_ABC, MEM_STR;
   static {
     // All memory, all aliases, holding anything.
@@ -225,12 +224,6 @@ public class TypeMem extends Type<TypeMem> {
     tos[BitsAlias.STR] = TypeStr.STR; // TODO: Proxy for all-arrays
     MEM  = make(tos);
     XMEM = MEM.dual();
-
-    TypeObj[] tcs = new TypeObj[Math.max(BitsAlias.RECORD,BitsAlias.STR)+1];
-    tcs[BitsAlias.ALL] = TypeObj.OBJ;
-    tcs[BitsAlias.RECORD]=TypeStruct.ALLSTRUCT_CLN;
-    tcs[BitsAlias.STR] = TypeStr.STR; // TODO: Proxy for all-arrays
-    MEM_CLN = make(tcs);
 
     TypeObj[] tss = new TypeObj[BitsAlias.STR+1];
     tss[1] = TypeObj.XOBJ;
@@ -293,8 +286,6 @@ public class TypeMem extends Type<TypeMem> {
   // Mark all memory as being clean (not modified in this function).
   // Recursive.
   public TypeMem clean() {
-    if( this==MEM || this==MEM_CLN )
-      return MEM_CLN;           // Shortcut
     if( this==XMEM ) return XMEM;
     TypeObj[] ts = _aliases.clone();
     for( int i=1; i<ts.length; i++ )

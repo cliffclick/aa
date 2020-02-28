@@ -167,25 +167,6 @@ public class FunNode extends RegionNode {
       (idx == -2 ? TypeMem.FULL : _tf.arg(idx));
   }
   int nargs() { return _tf._args._ts.length; }
-  // FunNode lost a use.  If lost a formal argument (a Parm), visit all wired
-  // Call nodes and drop the corresponding actual argument.  Visit all unwired
-  // calls to see if they will wire, now that an arg has died.
-  @Override public boolean ideal_impacted_by_losing_uses(GVNGCM gvn, Node dead) {
-    if( dead instanceof ParmNode ) {
-      RetNode ret = ret();
-      if( ret != null ) {
-        gvn.add_work(ret); // Losing a Parm might reduce alias uses in ret
-        FunPtrNode fptr = ret.funptr();
-        if( fptr != null ) {
-          for( Node call : fptr._uses )
-            if( call instanceof CallNode )
-              for( Node cepi : call._uses )
-                gvn.add_work(cepi); // Might wire a call, the dead arg was in error
-        }
-      }
-    }
-    return true;
-  }
 
   // ----
   @Override public Node ideal(GVNGCM gvn, int level) {

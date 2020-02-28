@@ -99,10 +99,6 @@ public class IntrinsicNode extends Node {
     TypeMem rezmem = ((TypeMem)mem).st(alias,rez);
     return rezmem;
   }
-  // Set of used aliases across all inputs (not StoreNode value, but yes address)
-  @Override public BitsAlias alias_uses(GVNGCM gvn) {
-    return BitsAlias.NZERO; // Conservative do-nothing.  Since in-error if it does not fold.
-  }
   @Override public String err(GVNGCM gvn) {
     Type ptr = gvn.type(ptr());
     return _badargs.typerr(ptr,TypeMemPtr.make(BitsAlias.RECORD,_tn),mem()); // Did not remove the aliasing
