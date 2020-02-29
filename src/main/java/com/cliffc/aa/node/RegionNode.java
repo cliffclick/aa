@@ -18,7 +18,7 @@ public class RegionNode extends Node {
     // Node, and return-for-progress.
     int dlen = _defs.len();
     for( int i=1; i<dlen; i++ )
-      if( gvn.type(in(i))==Type.XCTRL ) { // Found dead path; cut out
+      if( gvn.type(in(i))==Type.XCTRL && !in(i).is_prim() ) { // Found dead path; cut out
         for( Node phi : _uses )
           if( phi instanceof PhiNode ) {
             assert !phi.is_dead();

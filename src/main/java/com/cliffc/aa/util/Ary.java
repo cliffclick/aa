@@ -109,6 +109,8 @@ public class Ary<E> implements Iterable<E> {
   /** Remove all elements */
   public void clear( ) { _len=0; }
 
+  public void fill( E e ) { Arrays.fill(_es,0,_len,e); }
+  
   // Extend and set
   public E setX( int i, E e ) {
     if( i >= _len ) Arrays.fill(_es,_len,_es.length,null);

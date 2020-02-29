@@ -9,7 +9,6 @@ import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.VBitSet;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.Arrays;
 import java.util.BitSet;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -85,11 +84,12 @@ public class GVNGCM {
     }
     for( Node n : _INIT0_NODES ) {
       n.reset_to_init1(this);
+      n._live = true;
       for( int i=0; i<n._uses._len; i++ )
-        if( n._uses.at(i)._uid >= _INIT0_CNT )
+        if( !n._uses.at(i).is_prim() )
           n._uses.del(i--);
       for( int i=0; i<n._defs._len; i++ )
-        if( n._defs.at(i) != null && n._defs.at(i)._uid >= _INIT0_CNT )
+        if( n.in(i) != null && !n.in(i).is_prim() )
           n._defs.del(i--);
       assert !n.is_dead();
     }
@@ -275,12 +275,11 @@ public class GVNGCM {
   public void kill( Node n ) {  unreg0(n); kill0(n); }
   // Version for never-GVN'd; common for e.g. constants to die early or
   // RootNode, and some other make-and-toss Nodes.
+
   private void kill0( Node n ) {
     assert n._uses._len==0 && n._keep==0;
-    for( int i=0; i<n._defs._len; i++ ) {
-      Node def = n._defs.at(i);
+    for( int i=0; i<n._defs._len; i++ )
       n.set_def(i,null,this);   // Recursively destroy dead nodes
-    }
     n.set_dead();               // n is officially dead now
     _live.clear(n._uid);
     _wrk_bits.clear(n._uid);
@@ -355,7 +354,7 @@ public class GVNGCM {
     //   When inlined, the memory Phi gets the full Call memory, not the refined.
     //   The Phi then 'sinks'... but only to a value that a following CallEpi will
     //   have been sunk to already.
-    if( !t.isa(oldt) ) {
+    if( !t.isa(oldt) && !n.is_prim() ) {
       System.out.println("Backwards to: "+t+"\nfrom: "+n.dump(0,this));
       assert t.isa(oldt);       // Monotonically improving
     }
@@ -368,7 +367,7 @@ public class GVNGCM {
     if( z != null ) return z;
     // Record type for n; n is "in the system" now
     setype(n,t);                // Set it in
-    assert n._live;             // Everything is live at this point, because we eagerly strip dead
+    assert n._live || n.is_prim(); // Everything is live at this point, because we eagerly strip dead
     return oldt == t && y==null ? null : n; // Progress if types improved
   }
 
@@ -444,19 +443,10 @@ public class GVNGCM {
     _opt_mode = 2;
     // Set all types to null (except primitives); null is the visit flag when
     // setting types to their highest value.
-    Arrays.fill(_ts._es,0,Env.LAST_START_UID,null);
-    Arrays.fill(_ts._es,_INIT0_CNT,_ts._len,null);
-    // Unresolved, including primitives, uses a more optimistic type and so
-    // needs to be reset also.
-    for( Node n : _INIT0_NODES )
-      if( n instanceof UnresolvedNode )
-        _ts._es[n._uid]=n.value(this);   // Force recompute
+    _ts.fill(null);
     // Set all types to all_type().startype(), their most optimistic type.
     // This is mostly the dual(), except a the Start memory is always XOBJ.
     walk_initype(Env.START);
-    // The exit Scope is live for both iter() and gcp()
-    setype(rez,rez.all_type());
-    rez._live = true;
     // Prime the worklist
     add_work(rez);              // The one live starting point
     // Collect unresolved calls, and verify they get resolved.
@@ -472,7 +462,6 @@ public class GVNGCM {
         Node n = _work.pop();
         _wrk_bits.clear(n._uid);
         if( n.is_dead() ) continue; // Can be dead functions after removing ambiguous calls
-        if( Env.LAST_START_UID <= n._uid && n._uid < _INIT0_CNT ) continue; // Ignore primitives (type is unchanged and conservative)
         if( n instanceof CallNode ) {
           CallNode call = (CallNode)n;
           BitsFun fidxs = call.fidxs(this);
@@ -485,6 +474,7 @@ public class GVNGCM {
           assert n.compute_live(this); // Monotonic - stays alive
         } else {                       // Not alive
           if( n.compute_live(this) ) { // See if transitioning to live
+            n._live = true;
             // Classic reverse flow on liveness change:
             for( Node def : n._defs )
               if( def != null && def != n )
@@ -532,6 +522,7 @@ public class GVNGCM {
 
     // Revisit the entire reachable program, as ideal calls may do something
     // with the maximally lifted types.
+    System.out.println("Major work: "+major_work+", minor opt: "+minor_opt+", CNT: "+CNT);
     walk_opt(rez);
     walk_dead(Env.START);
   }
@@ -558,10 +549,9 @@ public class GVNGCM {
     // Replace with a constant, if possible
     if( replace_con(t,n) ) {
       n=subsume(n,con(t));      // Constant replacement
-      
-      
+
     // Functions can sharpen return value
-    } else if( n instanceof FunNode && n._uid >= _INIT0_CNT ) {
+    } else if( n instanceof FunNode && !n.is_prim() ) {
       FunNode fun = (FunNode)n;
       RetNode ret = fun.ret();
       if( type(fun)==Type.CTRL && !fun.is_forward_ref() &&
@@ -581,7 +571,9 @@ public class GVNGCM {
       assert n.err(this) != null || // Call is in-error OR
         !fidxs.above_center() || fidxs==BitsFun.EMPTY;
     }
-    assert n.value(this)==t; // Hit the fixed point, despite any immediate updates
+    // Hit the fixed point, despite any immediate updates.  All prims are live,
+    // even if unused so they might not have been computed
+    assert n.is_prim() || n.value(this)==t;
     assert n._live;
 
     // Walk reachable graph

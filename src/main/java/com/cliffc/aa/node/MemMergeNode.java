@@ -55,8 +55,9 @@ public class MemMergeNode extends Node {
     create_alias_active(alias,obj,null);
   }
   @Override public void reset_to_init1(GVNGCM gvn) {
+    gvn.unreg(this);
     for( int i=1; i<_defs._len; i++ )
-      if( in(i)._uid >= GVNGCM._INIT0_CNT )
+      if( !in(i).is_prim() )
         remove0(i,gvn);
     _aliases.set_len(_defs._len);
   }
@@ -206,6 +207,7 @@ public class MemMergeNode extends Node {
   }
 
   @Override public Node ideal(GVNGCM gvn, int level) {
+    if( is_prim() ) return null;
     assert _defs._len==_aliases._len;
     // Get TypeObj of default alias
     Type tp = gvn.type(in(0));
@@ -287,7 +289,11 @@ public class MemMergeNode extends Node {
     // Try to remove some unused aliases.  Gather alias uses from all users.
     if( gvn._opt_mode != 0 /*not during parsing, not all users available */) {
       if( Env.MEM_0 == mem() ) return null;
-      throw com.cliffc.aa.AA.unimpl();
+      for( int i=1; i<_defs._len; i++ ) {
+        TypeObj to = (TypeObj)gvn.type(in(i));
+        if( to instanceof TypeStruct ) {
+          throw com.cliffc.aa.AA.unimpl();
+        }
       //// This is a forward-flow problem, make sure my type is improved before
       //// flowing forward.  Alas, computes value() twice in a row.
       //gvn.setype(this,value(gvn));
@@ -319,7 +325,7 @@ public class MemMergeNode extends Node {
       //      }
       //    }
       //  if( progress ) return this;
-      //}
+      }
     }
 
     return null;

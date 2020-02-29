@@ -102,9 +102,10 @@ public class FunNode extends RegionNode {
     for( int i=2; i<PRIM_CNT; i++ ) {
       FunNode fun = FUNS.at(i);
       if( fun != null && fun.fidx() != i ) { // Cloned primitives get renumbered, so renumber back
-        RetNode ret = fun.ret();
+        RetNode ret = fun.ret(); // Done before flipping fidx, because of asserts
         fun._tf = fun._tf.make_fidx(i);
         ret._fidx = i;
+        ret.funptr()._t = fun._tf;
       }
     }
   }
@@ -215,7 +216,7 @@ public class FunNode extends RegionNode {
       path = split_size(gvn,body,parms);
       if( path == -1 ) return null;
       if( noinline() ) return null;
-      if( _uid >= GVNGCM._INIT0_CNT ) _cnt_size_inlines++; // Disallow infinite size-inlining of recursive non-primitives
+      if( !is_prim() ) _cnt_size_inlines++; // Disallow infinite size-inlining of recursive non-primitives
     }
     assert level==2; // Do not actually inline, if just checking that all forward progress was found
     // Split the callers according to the new 'fun'.
@@ -402,7 +403,7 @@ public class FunNode extends RegionNode {
     for( int i=has_unknown_callers() ? 2 : 1; i<_defs._len; i++ ) {
       Node call = in(i).in(0);
       if( !(call instanceof CallNode) ) continue; // Not well formed
-      Type fidxs = ((TypeTuple)gvn.type(call)).at(3);
+      Type fidxs = ((TypeTuple)gvn.type(call)).at(2);
       if( !(fidxs instanceof TypeFunPtr) ) continue;
       if( ((TypeFunPtr)fidxs).fidxs().abit() == -1 )
         continue;

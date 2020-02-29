@@ -195,7 +195,7 @@ public final class CallEpiNode extends Node {
         // See CallNode output tuple type for what these horrible magic numbers are.
         int idx = ((ParmNode)arg)._idx; // Argument number, or -1 for rpc
         Node actual = idx==-1 ? new ConNode<>(TypeRPC.make(call._rpc)) :
-          (idx==-2 ? new MProjNode(call,2) : new ProjNode(call,idx+3));
+          (idx==-2 ? new MProjNode(call,1) : new ProjNode(call,idx+2));
         if( idx==0 )
           actual = new FP2ClosureNode(gvn.xform(actual));
         if( gvn._opt_mode == 2 )

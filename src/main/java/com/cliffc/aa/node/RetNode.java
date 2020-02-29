@@ -74,10 +74,6 @@ public final class RetNode extends Node {
     Type val = gvn.type(val());
     if( val.above(Type.XSCALAR) ) return TypeTuple.XRET;
     if( !(val.isa(Type. SCALAR))) return TypeTuple. RET;
-    // Check situation if function is collapsing.
-    FunNode fun = fun();
-    if( !fun.has_unknown_callers() && fun._defs._len==2 && !fun.is_forward_ref() )
-      throw com.cliffc.aa.AA.unimpl();
     return TypeTuple.make(ctl,mem,val);
   }
   @Override public Type all_type() { return TypeTuple.RET; }
@@ -87,7 +83,7 @@ public final class RetNode extends Node {
   // Return the op_prec of the returned value.  Not sensible except when called
   // on primitives.
   @Override public byte op_prec() {
-    return val()._uid < GVNGCM._INIT0_CNT ? val().op_prec() : -1;
+    return val().is_prim() ? val().op_prec() : -1;
   }
 
   @Override public boolean is_forward_ref() { return fun().is_forward_ref(); }

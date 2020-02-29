@@ -1253,8 +1253,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     Type  [] ts = TypeAry.get(_ts  .length);
     byte  [] fs = new byte  [_ts  .length];
     for( int i=0; i<as.length; i++ ) as[i] = fldBot(_flds[i]) ? "*" : _flds[i];
-    for( int i=0; i<ts.length; i++ ) ts[i] = _ts[i].startype();
-    for( int i=0; i<fs.length; i++ ) fs[i] = flag_top();
+    for( int i=0; i<ts.length; i++ ) ts[i] = _ts[i].above_center() ? _ts[i] : _ts[i].dual();
+    Arrays.fill(fs, flag_top());
     return malloc(_name,true,as,ts,fs).hashcons_free();
   }
 }

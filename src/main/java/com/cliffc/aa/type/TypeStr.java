@@ -110,4 +110,6 @@ public class TypeStr extends TypeObj<TypeStr> {
   }
   @Override public Type widen() { return STR; }
   @Override void walk( Predicate<Type> p ) { p.test(this); }
+  // Flip low to high
+  @Override public TypeObj startype() { return above_center() ? this : dual(); }
 }

@@ -129,7 +129,7 @@ public class Parse {
     // actual call-graph edges and install them directly on the FunNodes.
     for( int i=0; i<uses._len; i++ ) {
       Node use = uses.at(i);
-      if( use._uid >= GVNGCM._INIT0_CNT ) {
+      if( !use.is_prim() ) {
         assert use instanceof FunNode;
         assert use.in(1)==Env.ALL_CTRL;
         _gvn.set_def_reg(use,1,con(Type.XCTRL));

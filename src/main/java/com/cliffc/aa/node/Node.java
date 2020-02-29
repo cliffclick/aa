@@ -2,7 +2,6 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.type.BitsAlias;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
@@ -112,6 +111,9 @@ public abstract class Node implements Cloneable {
     _live = true;
    }
 
+  // Is a primitive
+  public boolean is_prim() { return _uid<GVNGCM._INIT0_CNT; }
+  
   // Make a copy of the base node, with no defs nor uses and a new UID.
   // Some variations will use the CallEpi for e.g. better error messages.
   @NotNull Node copy( boolean copy_edges, CallEpiNode unused, GVNGCM gvn) {
@@ -134,12 +136,12 @@ public abstract class Node implements Cloneable {
   // Dump without GVN for types
   public String dump( int max ) { return dump(max,null); }
   // Dump with    GVN for types
-  public String dump( int max, GVNGCM gvn ) { return dump(max,gvn,_uid<GVNGCM._INIT0_CNT);  }
+  public String dump( int max, GVNGCM gvn ) { return dump(max,gvn,is_prim());  }
   // Dump including primitives
   public String dump( int max, GVNGCM gvn, boolean prims ) { return dump(0, new SB(),max,new VBitSet(),gvn,prims).toString();  }
   // Dump one node, no recursion
   private SB dump( int d, SB sb, GVNGCM gvn ) {
-    String xs = String.format("%4d: %-7.7s ",_uid,xstr());
+    String xs = String.format("%c%4d: %-7.7s ",_live?' ':'X',_uid,xstr());
     sb.i(d).p(xs);
     if( is_dead() ) return sb.p("DEAD");
     for( Node n : _defs ) sb.p(n == null ? "____ " : String.format("%4d ",n._uid));
@@ -168,7 +170,7 @@ public abstract class Node implements Cloneable {
       for( Node n : _defs ) if( n instanceof ConNode ) n.dump(d+1,sb,max,bs,gvn,prims);
       // Do not recursively print root Scope, nor Unresolved of primitives.
       // These are too common, and uninteresting.
-      for( Node n : _defs ) if( n != null && (!prims && n._uid < GVNGCM._INIT0_CNT && n._defs._len > 3) ) bs.set(n._uid);
+      for( Node n : _defs ) if( n != null && (!prims && n.is_prim() && n._defs._len > 3) ) bs.set(n._uid);
       // Recursively print most of the rest, just not the multi-node combos and
       // Unresolve & FunPtrs.
       for( Node n : _defs )
@@ -215,7 +217,7 @@ public abstract class Node implements Cloneable {
     Node prior = null;
     for( int i=nodes._len-1; i>=0; i-- ) {
       Node n = nodes.at(i);
-      if( !(n._uid <= Env.ALL_CTRL._uid || n._uid >= GVNGCM._INIT0_CNT || prims) )
+      if( !(n._uid <= Env.ALL_CTRL._uid || !n.is_prim() || prims) )
         continue;               // Visited, but do not print
       // Add a nl after the last of a multi-tail sequence.
       if( (prior != null && prior.is_multi_tail() && !n.is_multi_tail()) ||
@@ -296,12 +298,12 @@ public abstract class Node implements Cloneable {
   // alive, but other nodes are only alive if their outputs are alive.  This is
   // a reverse-flow computation.
   public boolean compute_live(GVNGCM gvn) {
-    if( _keep>0 ) return true;
-    if( this instanceof ScopeNode ) return true;
-    for( Node use : _uses ) if( use._live ) return true;
-    return false;
+    if( _keep>0 ) return true;  // Somebody is forcing this live
+    if( this instanceof ScopeNode ) return true; // The exit scope is alive
+    for( Node use : _uses ) if( use._live ) return true; // Alive if any use is alive
+    return false;                                        // Not alive
   }
-  
+
   // Return any type error message, or null if no error
   public String err(GVNGCM gvn) { return null; }
 
@@ -335,7 +337,7 @@ public abstract class Node implements Cloneable {
   // Assert all ideal calls are done
   public final boolean more_ideal(GVNGCM gvn, VBitSet bs, int level) {
     if( bs.tset(_uid) ) return false; // Been there, done that
-    if( _keep == 0 ) {                // Only non-keeps, which is just top-level scope and prims
+    if( _keep == 0 && _live ) {       // Only non-keeps, which is just top-level scope and prims
       Node idl = ideal(gvn,level);
       if( idl != null )
         return true;            // Found an ideal call
