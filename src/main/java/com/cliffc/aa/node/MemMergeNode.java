@@ -1,6 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.AA;
+import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.AryInt;
@@ -285,6 +286,7 @@ public class MemMergeNode extends Node {
 
     // Try to remove some unused aliases.  Gather alias uses from all users.
     if( gvn._opt_mode != 0 /*not during parsing, not all users available */) {
+      if( Env.MEM_0 == mem() ) return null;
       throw com.cliffc.aa.AA.unimpl();
       //// This is a forward-flow problem, make sure my type is improved before
       //// flowing forward.  Alas, computes value() twice in a row.

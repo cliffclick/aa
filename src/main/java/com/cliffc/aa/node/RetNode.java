@@ -74,14 +74,11 @@ public final class RetNode extends Node {
     Type val = gvn.type(val());
     if( val.above(Type.XSCALAR) ) return TypeTuple.XRET;
     if( !(val.isa(Type. SCALAR))) return TypeTuple. RET;
-    // If function is collapsing, do not change types (yet).  The Parm Memory
-    // might be gone, and the trimming gets confused.
+    // Check situation if function is collapsing.
     FunNode fun = fun();
     if( !fun.has_unknown_callers() && fun._defs._len==2 && !fun.is_forward_ref() )
-      return gvn.self_type(this);
-    throw com.cliffc.aa.AA.unimpl();
-    //mem = ((TypeMem)mem).trim_to_alias(alias_uses(gvn));
-    //return TypeTuple.make(ctl,mem,val);
+      throw com.cliffc.aa.AA.unimpl();
+    return TypeTuple.make(ctl,mem,val);
   }
   @Override public Type all_type() { return TypeTuple.RET; }
 

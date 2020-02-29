@@ -312,10 +312,10 @@ public class Type<T extends Type<T>> implements Cloneable {
   // Memoize meet results
   private static class Key {
     static Key K = new Key(null,null);
-    static ConcurrentHashMap<Key,Type> INTERN_MEET = new ConcurrentHashMap<>();
+    static NonBlockingHashMap<Key,Type> INTERN_MEET = new NonBlockingHashMap<>();
     Key(Type a, Type b) { _a=a; _b=b; }
     Type _a, _b;
-    @Override public int hashCode() { return _a._hash*_b._hash; }
+    @Override public int hashCode() { return (_a._hash<<17)|(_a._hash>>15)|_b._hash; }
     @Override public boolean equals(Object o) { return _a==((Key)o)._a && _b==((Key)o)._b; }
     static Type get(Type a, Type b) {
       K._a=a;

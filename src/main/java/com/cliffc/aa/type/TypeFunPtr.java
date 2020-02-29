@@ -75,7 +75,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public TypeFunPtr make(Type display, Type ret) {
     assert _args.is_display();
     assert display==Type.NIL || ((TypeMemPtr)display).is_display();
-    return make(_fidxs,_args.set_fld(0,display,_args.flags(0)),ret);
+    return make(_fidxs,_args.set_fld(0,display,_args.fmod(0)),ret);
   }
 
   public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.FULL,ARGS,Type.SCALAR);

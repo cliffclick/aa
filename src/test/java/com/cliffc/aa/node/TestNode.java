@@ -246,7 +246,6 @@ public class TestNode {
     nnn2.set_name(tname);
     test1monotonic(nnn2);
     test1monotonic(new MemMergeNode(_ins[1],_ins[2],BitsAlias.RECORD));
-
     ((ConNode<Type>)_ins[1])._t = Type.SCALAR; // ParmNode reads this for _alltype
     test1monotonic(new   ParmNode( 1, "x",_ins[0],(ConNode)_ins[1],null).add_def(_ins[2]));
     test1monotonic(new    PhiNode(null,_ins[0],_ins[1],_ins[2]));
@@ -255,8 +254,8 @@ public class TestNode {
     test1monotonic(new   ProjNode(_ins[0],1));
     test1monotonic(new RegionNode(null,_ins[1],_ins[2]));
     test1monotonic(new    RetNode(_ins[0],mem,_ins[1],_ins[2],fun_plus)); // ctl,mem,val,rpc,fun
-    test1monotonic(new  StoreNode(_ins[1],_ins[2],_ins[3],(byte)0,"x",null));
-    test1monotonic(new  StoreNode(_ins[1],_ins[2],_ins[3],(byte)1,"x",null));
+    test1monotonic(new  StoreNode(_ins[1],_ins[2],_ins[3],TypeStruct.FRW,"x",null));
+    test1monotonic(new  StoreNode(_ins[1],_ins[2],_ins[3],TypeStruct.FRO,"x",null));
     //                  ScopeNode has no inputs, and value() call is monotonic
     test1monotonic(new   TypeNode(TypeInt.FALSE    ,_ins[1],null));
     test1monotonic(new   TypeNode(TypeMemPtr.STRPTR,_ins[1],null));

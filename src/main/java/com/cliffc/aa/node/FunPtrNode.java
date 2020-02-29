@@ -54,7 +54,8 @@ public final class FunPtrNode extends ConNode<TypeFunPtr> {
     FunNode fun = ret.is_copy() ? FunNode.find_fidx(ret._fidx) : ret.fun();
     TypeTuple tret = (TypeTuple)gvn.type(ret);
     Type tdisplay = display()==null ? Type.NIL : gvn.type(display());
-    return fun._tf.make(tdisplay,tret.at(2));
+    Type rez = tret.at(2).bound(fun._tf._ret);
+    return fun._tf.make(tdisplay,rez);
   }
   @Override public Type all_type() { return _t; }
   @Override public String toString() { return super.toString(); }

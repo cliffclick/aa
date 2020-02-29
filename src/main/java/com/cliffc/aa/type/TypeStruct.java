@@ -56,7 +56,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // because during recursive construction the types are not available.
   @Override int compute_hash() {
     int hash = super.compute_hash(), hash1=hash;
-    for( int i=0; i<_flds.length; i++ ) hash = ((hash+_flags[i])*_flds[i].hashCode())|(hash>>17);
+    for( int i=0; i<_flds.length; i++ ) hash = ((hash+(_flags[i]<<5))*_flds[i].hashCode())|(hash>>17);
     return hash == 0 ? hash1 : hash;
   }
 
@@ -110,8 +110,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     int len = CYCLES._len;
     CYCLES.add(this).add(t);
     boolean eq=cycle_equals0(t);
-    CYCLES.remove(len);
-    CYCLES.remove(len);
+    assert CYCLES._len==len+2;
+    CYCLES._len=len;
     return eq;
   }
   private boolean cycle_equals0( TypeStruct t ) {
@@ -903,7 +903,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
           TypeMemPtr tm = (TypeMemPtr)t0;
           TypeObj t4 = tm._obj;
           TypeObj t5 = ufind(t4);
-          TypeObj t6 = t5;
           if( t4 != t5 ) {
             tm._obj = t5;
             progress |= post_mod(tm);
@@ -1082,7 +1081,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public byte fmod( int idx ) { return fmod(_flags[idx]); }
 
   // Setters
-  public static byte set_fmod ( byte flags, byte mod     ) { assert 0<=mod && mod <=3; return (byte)((flags&3)|mod); }
+  public static byte set_fmod ( byte flags, byte mod     ) { assert 0<=mod && mod <=3; return (byte)((flags&~3)|mod); }
   public static byte set_live ( byte flags, boolean live ) { return (byte)((flags&4)|(live ?1:0)); }
   public static byte set_dirty( byte flags, boolean dirty) { return (byte)((flags&8)|(dirty?1:0)); }
   public static byte make_flag( byte mod, boolean live, boolean dirty ) { assert 0<=mod && mod <=3; return (byte)(mod|(live?4:0)|(dirty?8:0)); }
@@ -1096,6 +1095,21 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return (byte)(flag&15);                     // Mask back to the 4 bits
   }
   private static byte flag_top() { return 0; }
+  // Return flags cleaned
+  private byte[] clean_flags() {
+    if( !is_dirty() ) return _flags; // Already clean
+    byte[] flags = _flags.clone();   // Clone flags
+    for( int i=0; i<_flags.length; i++ ) // And mark clone all clean
+      flags[i] = set_dirty(_flags[i],false);
+    return flags;
+  }
+  // Return true if any flag is dirty
+  private boolean is_dirty() {
+    for( int i=0; i<_flags.length; i++ )
+      if( dirty(_flags[i]) )
+        return false;
+    return true;
+  }
   // Get whole flags, only suitable for copying to a constructor as-is.
   public byte flags(int idx) { return _flags[idx]; }
 
@@ -1120,7 +1134,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     // and the StoreNode output must remain monotonic.  This means store
     // updates are allowed to proceed even if in-error.
     byte[] flags = _flags.clone();
-    Type[] ts     = TypeAry.clone(_ts);
+    Type[] ts    = TypeAry.clone(_ts);
     int idx = find(fld);
     if( idx == -1 )             // Unknown field, might change all fields
       for( int i=0; i<_flags.length; i++ )
@@ -1146,24 +1160,25 @@ public class TypeStruct extends TypeObj<TypeStruct> {
 
   // Identical struct but clean.  Complicated because has to do a recursive update.
   @Override public TypeStruct clean() {
-    //if( this==ALLSTRUCT || this==ALLSTRUCT_CLN )
-    //  return ALLSTRUCT_CLN;     // Shortcut
-    //if( this==GENERIC ) return GENERIC;
-    //if( !_cyclic ) {            // Not cyclic, normal recursive walk
-    //  Type[] ts = TypeAry.clone(_ts);
-    //  for( int i=0; i<ts.length; i++ )
-    //    if( ts[i] != null )
-    //      ts[i] = ts[i].clean();
-    //  return malloc(_name,_any,true,_flds,ts,_flags).hashcons_free();
-    //}
-    //// Cyclic, but perhaps already clean
-    //Ary<Type> reaches = reachable(true);
-    //boolean clean = true;
-    //for( Type t : reaches )
-    //  if( t instanceof TypeStruct && !((TypeStruct)t)._cln )
-    //    { clean=false; break; }
-    //if( clean ) return this;    // Already clean.
-    //
+    if( this==ALLSTRUCT )       // Infinitely extended extra fields are bottom & dirty.
+      return ALLSTRUCT;         // TODO: Think this is wrong
+      //return ALLSTRUCT; // Shortcut
+    if( this==GENERIC   ) return GENERIC;
+    if( !_cyclic ) {            // Not cyclic, normal recursive walk
+      Type[] ts = TypeAry.clone(_ts);
+      for( int i=0; i<ts.length; i++ )
+        if( ts[i] != null )
+          ts[i] = ts[i].clean();
+      return malloc(_name,_any,_flds,ts,clean_flags()).hashcons_free();
+    }
+    // Cyclic, but perhaps already clean
+    Ary<Type> reaches = reachable(true);
+    boolean dirty = false;
+    for( Type t : reaches )
+      if( t instanceof TypeStruct && ((TypeStruct)t).is_dirty() )
+        { dirty=true; break; }
+    if( !dirty ) return this;   // Already clean.
+
     //// Need to clone the existing structure, then make it clean
     //RECURSIVE_MEET++;
     //assert OLD2APX.isEmpty();
