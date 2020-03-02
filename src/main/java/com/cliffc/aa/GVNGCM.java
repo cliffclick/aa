@@ -339,21 +339,24 @@ public class GVNGCM {
     Node x = _vals.get(n);      // Check prior hit
     if( x != null && x != n ) return untype(n,x); // Was not in vals, remove from types also & return prior
 
-    // [ts!,vals?] Compute best type, and type is IN ts
+    // [ts+,vals?] Remove before ideal or value-wiring hacks edges & changes hash
+    _vals.remove(n);
+    
+    // [ts!] Compute best type, and type is IN ts
     Type t = n.value(this);     // Get best type
     if( !t.isa(oldt) && !n.is_prim() ) { // Strong assert that we only lift types
       System.out.println("Backwards to: "+t+"\nfrom: "+n.dump(0,this));
       assert t.isa(oldt);       // Monotonically improving
     }
 
-    // [ts!,vals?] Replace with a constant, if possible.  This is also very cheap
+    // [ts!] Replace with a constant, if possible.  This is also very cheap
     // (once we expensively computed best value) and makes the best forward
     // progress.
     if( replace_con(t,n) ) { unreg0(n); return con(t); }
-    // [ts!,vals?] Put updated types into table for use by ideal()
+    // [ts!] Put updated types into table for use by ideal()
     setype(n,t);
 
-    // [ts!,vals?] Compute uses & live bits.  If progress, push the defs on the
+    // [ts!] Compute uses & live bits.  If progress, push the defs on the
     // worklist.  This is a reverse flow computation.
     TypeMem old = n._live;
     TypeMem nnn = n.compute_live(this);
@@ -364,8 +367,6 @@ public class GVNGCM {
         if( def != null && def != n )
           add_work(def);        // Reverse flow: do work on defs not uses
     }
-    // [ts+,vals?] Remove before ideal hacks edges & changes hash
-    _vals.remove(n);
 
     // [ts+] If completely dead, replace with a high constant
     if( !nnn.is_live() && !(n instanceof ConNode) )  return untype(n,con(n.all_type().startype()));

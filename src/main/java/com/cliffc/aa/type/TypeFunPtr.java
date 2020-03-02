@@ -57,7 +57,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   private static TypeFunPtr FREE=null;
   @Override protected TypeFunPtr free( TypeFunPtr ret ) { FREE=this; return ret; }
   public static TypeFunPtr make( BitsFun fidxs, TypeStruct args, Type ret ) {
-    assert args.at(0)==Type.NIL || ((TypeMemPtr)args.at(0)).is_display();
+    assert args.at(0).isa(Type.NIL) || ((TypeMemPtr)args.at(0)).is_display();
     TypeFunPtr t1 = FREE;
     if( t1 == null ) t1 = new TypeFunPtr(fidxs,args,ret);
     else {   FREE = null;        t1.init(fidxs,args,ret); }
@@ -74,7 +74,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   // Make a TFP with a new display and return value, used by FunPtrNode
   public TypeFunPtr make(Type display, Type ret) {
     assert _args.is_display();
-    assert display==Type.NIL || ((TypeMemPtr)display).is_display();
+    assert display.isa(Type.NIL) || ((TypeMemPtr)display).is_display();
     return make(_fidxs,_args.set_fld(0,display,_args.fmod(0)),ret);
   }
 

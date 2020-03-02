@@ -34,7 +34,7 @@ public class ProjNode extends Node {
     }
     return c.above_center() ? Type.XSCALAR : Type.SCALAR;
   }
-  @Override public Type all_type() { return Type.SCALAR; }
+  @Override public Type all_type() { return ((TypeTuple)in(0).all_type()).at(_idx); }
 
   @Override public int hashCode() { return super.hashCode()+_idx; }
   @Override public boolean equals(Object o) {

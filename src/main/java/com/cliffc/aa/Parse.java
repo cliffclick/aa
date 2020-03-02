@@ -389,7 +389,8 @@ public class Parse {
         scope.def_if(tok,mutable,false); // Note 1-side-of-if update
       }
     }
-    return ifex.unhook();
+    // Too much excitement happens while ifex hooked; put on worklist
+    return _gvn.add_work(ifex.unhook()); 
   }
 
   /** Parse an if-expression, with lazy eval on the branches.  Assignments to
@@ -789,7 +790,6 @@ public class Parse {
       MemMergeNode amem = mem_active();
       assert amem.in(1).in(0) == e._scope.stk(); // amem slot#1 is the display
       amem.set_def(0,mem,_gvn);                  // amem slot#0 was outer display, should be function memory
-      set_mem(amem);
       // Parse function body
       Node rez = stmts();       // Parse function body
       if( rez == null ) rez = err_ctrl2("Missing function body");

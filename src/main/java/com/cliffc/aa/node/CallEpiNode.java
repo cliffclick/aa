@@ -77,6 +77,7 @@ public final class CallEpiNode extends Node {
                 mmem.create_alias_active(i,ret_mem.at(i).above_center() ? cmem : rmem,null);
             mem = gvn.xform(mmem);
           }
+          fun.set_is_copy(gvn);
           return inline(gvn, call, ret.ctl(), mem, ret.val(), null/*do not unwire, because using the entire function body inplace*/);
         }
       }
@@ -209,8 +210,11 @@ public final class CallEpiNode extends Node {
     Node cproj = new CProjNode(call,0);
     cproj = gvn._opt_mode == 2 ? gvn.add_work(cproj) : gvn.xform(cproj);
     gvn.add_def(fun,cproj);
-    // Add the CallEpi hook during a value call
-    gvn.add_def(this,ret);
+    // Add the CallEpi hook.  Sometimes in or out of _vals.  Called by early
+    // ideal during parsing (0,out), value() during gcp (2,in), value() during
+    // iter (1,3,out).
+    if( gvn._opt_mode == 2 ) gvn.add_def(this,ret);
+    else                         add_def(     ret);
     return this;
   }
 

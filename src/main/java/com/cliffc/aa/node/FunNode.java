@@ -168,6 +168,7 @@ public class FunNode extends RegionNode {
       (idx == -2 ? TypeMem.FULL : _tf.arg(idx));
   }
   int nargs() { return _tf._args._ts.length; }
+  void set_is_copy(GVNGCM gvn) { gvn.set_def_reg(this,0,this); }
 
   // ----
   @Override public Node ideal(GVNGCM gvn, int level) {
@@ -604,9 +605,9 @@ public class FunNode extends RegionNode {
       gvn.unreg(call);
       call.set_fun(fp,gvn);
       gvn.rereg(call,call.value(gvn));
-      gvn.unreg(cg._cepi);
+      Type tcepi = gvn.unreg(cg._cepi);
       cg._cepi.wire(gvn,call,fp == old_funptr ? this : fun, fp == old_funptr ? oldret : newret);
-      gvn.rereg(cg._cepi,cg._cepi.value(gvn));
+      gvn.setype(cg._cepi,tcepi);
       // If we cloned a recursive call, it also needs updating but can resolve
       // and wire like any other new call.
       if( newcall != null ) {

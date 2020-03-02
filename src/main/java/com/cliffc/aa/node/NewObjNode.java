@@ -34,8 +34,10 @@ public class NewObjNode extends NewNode<TypeStruct> {
     assert !Util.eq(name,"^"); // Closure field created on init
     gvn.unreg(this);
     create_active(name,val,mutable,gvn);
-    for( Node use : _uses )
-      gvn.setype(use,use.value(gvn));
+    for( Node use : _uses ) {
+      gvn.setype(use,use.value(gvn)); // Record "downhill" type for OProj, DProj
+      gvn.add_work_uses(use);         // Neighbors on worklist
+    }
     assert gvn.touched(this);
   }
 

@@ -1251,7 +1251,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     byte  [] fs = new byte  [_ts  .length];
     for( int i=0; i<as.length; i++ ) as[i] = fldBot(_flds[i]) ? "*" : _flds[i];
     for( int i=0; i<ts.length; i++ ) ts[i] = _ts[i].above_center() ? _ts[i] : _ts[i].dual();
-    Arrays.fill(fs, flag_top());
+    for( int i=0; i<fs.length; i++ ) fs[i] = fdual(flags(i)); // Really: mod ro goes to unk.  Centerline final/rw stay put.
     return malloc(_name,true,as,ts,fs).hashcons_free();
   }
 }

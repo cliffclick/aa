@@ -1,7 +1,6 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.AA;
-import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.AryInt;
@@ -287,13 +286,13 @@ public class MemMergeNode extends Node {
     //  gvn.add_work(_uses.at(0));
 
     // Try to remove some unused aliases.  Gather alias uses from all users.
-    if( gvn._opt_mode != 0 /*not during parsing, not all users available */) {
-      for( int i=1; i<_defs._len; i++ ) {
-        if( in(1).in(0) == Env.STK_0 ) continue; // Primitive memory is always alive
-        TypeObj to = (TypeObj)gvn.type(in(i));
-        if( to instanceof TypeStruct ) {
-          throw com.cliffc.aa.AA.unimpl();
-        }
+    //if( gvn._opt_mode != 0 /*not during parsing, not all users available */) {
+    //  for( int i=1; i<_defs._len; i++ ) {
+    //    if( in(1).in(0) == Env.STK_0 ) continue; // Primitive memory is always alive
+    //    TypeObj to = (TypeObj)gvn.type(in(i));
+    //    if( to instanceof TypeStruct ) {
+    //      throw com.cliffc.aa.AA.unimpl();
+    //    }
       //// This is a forward-flow problem, make sure my type is improved before
       //// flowing forward.  Alas, computes value() twice in a row.
       //gvn.setype(this,value(gvn));
@@ -325,8 +324,8 @@ public class MemMergeNode extends Node {
       //      }
       //    }
       //  if( progress ) return this;
-      }
-    }
+    //  }
+    //}
 
     return null;
   }

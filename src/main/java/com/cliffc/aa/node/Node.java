@@ -4,6 +4,7 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
+import com.cliffc.aa.type.TypeObj;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
@@ -298,6 +299,8 @@ public abstract class Node implements Cloneable {
   // Compute live across uses
   public final TypeMem compute_live(GVNGCM gvn) {
     if( is_prim() ) return TypeMem.FULL;      // Prims always alive
+    if( gvn.type(this)==TypeObj.XOBJ && this instanceof ConNode )
+      return TypeMem.FULL;        // Constant XOBJ gets used by many aliases
     TypeMem live = TypeMem.EMPTY;             // Start at lattice top
     for( Node use : _uses )                   // Computed across all uses
       live = use.compute_live(gvn,live,this); // Make alive used fields
