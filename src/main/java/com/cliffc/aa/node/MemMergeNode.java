@@ -288,8 +288,8 @@ public class MemMergeNode extends Node {
 
     // Try to remove some unused aliases.  Gather alias uses from all users.
     if( gvn._opt_mode != 0 /*not during parsing, not all users available */) {
-      if( Env.MEM_0 == mem() ) return null;
       for( int i=1; i<_defs._len; i++ ) {
+        if( in(1).in(0) == Env.STK_0 ) continue; // Primitive memory is always alive
         TypeObj to = (TypeObj)gvn.type(in(i));
         if( to instanceof TypeStruct ) {
           throw com.cliffc.aa.AA.unimpl();
@@ -364,6 +364,18 @@ public class MemMergeNode extends Node {
     }
     return TypeMem.make0(tos);
   }
+
+
+  // Compute the liveness local contribution to def's liveness.
+  @Override public TypeMem compute_live(GVNGCM gvn, TypeMem live, Node def) {
+    if( is_prim() ) return TypeMem.FULL; // All prims left alive
+    int idx = _defs.find(def);  // The input node index
+    int alias = alias_at(idx);  // Corresponding alias
+
+    // The def alias slice ONLY is added to the live set
+    return live.meet_alias(_live,alias);
+  }
+
   @Override public Type all_type() { return TypeMem.FULL; }
 
   @Override @NotNull public MemMergeNode copy( boolean copy_edges, CallEpiNode unused, GVNGCM gvn) {

@@ -322,4 +322,36 @@ public class TypeMem extends Type<TypeMem> {
         oops[i] = _aliases[i].startype();
     return make0(oops);
   }
+
+  // For node liveness, anything alive means the node is alive
+  public boolean is_live() { return this!=TypeMem.EMPTY; }
+
+  // Find the alias slice out of 'live' and 'meet' it into 'this'.
+  public TypeMem meet_alias(TypeMem live, int alias) {
+    if( this==FULL ) return FULL; // Already maxed out
+    if( live==EMPTY) return live; // Nothing to add
+    if( live==this ) return live; // No change
+    TypeObj flds = live.at(alias); // Get the alive fields for this alias
+    TypeObj olds =      at(alias); // Get current field state
+    if( flds == TypeObj.XOBJ ) return this; // No fields alive in live alias
+    if( olds == TypeObj. OBJ ) return this; // All fields already set, no change
+    if( flds == olds ) return this; // No change
+
+    // Have to make a new result.
+    TypeObj[] ts = Arrays.copyOf(_aliases,Math.max(_aliases.length,alias+1));
+    ts[alias] = (TypeObj)flds.meet(olds); // Add new fields to the live set
+    return make0(ts);
+  }
+
+  // Bulk meet all these aliases all fields into 'this'
+  public TypeMem meet_alias(BitsAlias aliases) {
+    if( this==FULL ) return FULL; // Already maxed out
+
+    // Have to make a new result.
+    TypeObj[] ts = Arrays.copyOf(_aliases,Math.max(_aliases.length,aliases.max()+1));
+    for( int alias : aliases )
+      ts[alias] = TypeObj.OBJ;  // All fields
+    return make0(ts);
+  }
+
 }

@@ -427,8 +427,8 @@ public class Parse {
     f_mem = _e._scope.check_if(false,bad,_gvn,f_ctrl,_e._scope.ptr(),f_mem); // Insert errors if created only 1 side
     _e._scope.pop_if();         // Pop the if-scope
     RegionNode r = set_ctrl(init(new RegionNode(null,t_ctrl.unhook(),f_ctrl.unhook())).keep());
-    set_mem(gvn(new PhiNode(bad,r       ,t_mem.unhook(),f_mem.unhook())));
-    return  gvn(new PhiNode(bad,r.unhook(),tex.unhook(),  fex.unhook())) ; // Ifex result
+    set_mem(gvn(new PhiNode(TypeMem.MEM,bad,r       ,t_mem.unhook(),f_mem.unhook())));
+    return  gvn(new PhiNode(Type.SCALAR,bad,r.unhook(),tex.unhook(),  fex.unhook())) ; // Ifex result
   }
 
   /** Parse an expression, a list of terms and infix operators.  The whole list
@@ -831,8 +831,8 @@ public class Parse {
     Node val  = s.early_val ();
     if( ctrl == null ) {
       s.set_def(4,ctrl=new RegionNode(  (Node)null),null);
-      s.set_def(5,mem =new PhiNode(null,(Node)null),null);
-      s.set_def(6,val =new PhiNode(null,(Node)null),null);
+      s.set_def(5,mem =new PhiNode(TypeMem.MEM, null,(Node)null),null);
+      s.set_def(6,val =new PhiNode(Type.SCALAR, null,(Node)null),null);
     }
     ctrl.add_def(ctrl());
     mem .add_def(all_mem());

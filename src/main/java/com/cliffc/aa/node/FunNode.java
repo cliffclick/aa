@@ -614,9 +614,6 @@ public class FunNode extends RegionNode {
         gvn.setype(newcall,newcall.value(gvn));
       }
     }
-    // 'this' gets re-registered during the re-wiring process, blowing the
-    // standard ideal() invariant.
-    gvn.unreg(this);
 
     if( new_unr != null ) new_unr.unkeep(gvn);
     old_funptr.unkeep(gvn);

@@ -50,29 +50,28 @@ public class NewObjNode extends NewNode<TypeStruct> {
   public void update( String tok, byte mutable, Node val, GVNGCM gvn  ) { update(_ts.find(tok),mutable,val,gvn); }
   // Update the field & mod
   public void update( int fidx, byte mutable, Node val, GVNGCM gvn  ) {
-    gvn.unreg(this);
-    boolean can_update = update_active(fidx,mutable,val,gvn);
-    gvn.rereg(this,value(gvn));
+    Type oldt = gvn.unreg(this);
+    update_active(fidx,mutable,val,gvn);
+    Type newt = value(gvn);
+    gvn.rereg(this,newt);
     // As part of the local xform rule, the memory & ptr outputs of the NewNode
     // need to update their types directly.  The NewNode mutable bit can be set
     // to final - which strictly runs downhill.  However, iter() calls must
     // strictly run uphill, so we have to expand the changed region to cover
     // all the "downhilled" parts and "downhill" them to match.  Outside of the
     // "downhilled" region, the types are unchanged.
-    if( !can_update )
+    if( newt!=oldt )
       for( Node use : _uses ) {
         gvn.setype(use,use.value(gvn)); // Record "downhill" type for OProj, DProj
         gvn.add_work_uses(use);         // Neighbors on worklist
       }
   }
-  public boolean update_active( int fidx, byte mutable, Node val, GVNGCM gvn  ) {
+  public void update_active( int fidx, byte mutable, Node val, GVNGCM gvn  ) {
     assert !gvn.touched(this);
     assert def_idx(_ts._ts.length)== _defs._len;
-    boolean can_update = _ts.can_update(fidx);
     if( _ts.fmod(fidx) != mutable ) // Changed field modifier
       _ts = _ts.set_fld(fidx,_ts.at(fidx),mutable);
     set_def(def_idx(fidx),val,gvn);
-    return can_update;
   }
 
 

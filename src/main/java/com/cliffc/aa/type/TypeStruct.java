@@ -38,8 +38,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // are never null, and never zero-length.  If the 1st char is a '*' the field
   // is Top; a '.' is Bot; all other values are valid field names.
   public @NotNull String @NotNull[] _flds;  // The field names
-  public Type[] _ts;            // Matching field types
-  private byte[] _flags; // Fields that are final; see fmeet, fdual, fstr.  Live. Clean.
+  public Type[] _ts;                        // Matching field types
+  private byte[] _flags; // Field mod types; see fmeet, fdual, fstr.  Clean.
 
   boolean _cyclic; // Type is cyclic.  This is a summary property, not a description of value sets, hence is not in the equals or hash
   private TypeStruct _uf;       // Tarjan Union-Find, used during cyclic meet
@@ -155,7 +155,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     boolean is_tup = _flds.length==0 || fldTop(_flds[0]) || fldBot(_flds[0]) || isDigit(_flds[0].charAt(0));
     sb.p(is_tup ? "(" : "@{");
     for( int i=0; i<_flds.length; i++ ) {
-      if( !live(_flags[i]) ) sb.p("X "); // Dead field
       if( dirty(_flags[i]) ) sb.p("!"); // Dirty field
       if( !is_tup )
         sb.p(_flds[i]).p(fstr(fmod(i))).p('='); // Field name, access mod
@@ -183,7 +182,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     sb.p(is_tup ? '(' : '{').nl().ii(1); // open struct, newline, increase_indent
     for( int i=0; i<_flds.length; i++ ) {
       sb.i();                   // indent, 1 field per line
-      if( !live(_flags[i]) ) sb.p("X "); // Dead field
       if( dirty(_flags[i]) ) sb.p("!"); // Dirty field
       Type t = at(i);
       if( !is_tup )
@@ -210,7 +208,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     sb.p(is_tup ? '(' : '{');
     for( int i=0; i<_flds.length; i++ ) {
       if( Util.eq(_flds[i],"^") ) continue; // Do not print the ever-present display
-      if( !live(_flags[i]) ) sb.p("X "); // Dead field
       if( dirty(_flags[i]) ) sb.p("!"); // Dirty field
       Type t = at(i);
       if( !is_tup )
@@ -268,15 +265,15 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public static final byte FRW  = 2; // centerline
   public static final byte FRO  = 3; // bottom
   // Some precooked flags
-  private static final byte fbot_flag = make_flag(FRO ,true,true); // Field bottom
-  private static final byte  fnl_flag = make_flag(FFNL,true,true); // Field final
-  private static final byte  frw_flag = make_flag(FRW ,true,true); // Field final
+  private static final byte fbot_flag = make_flag(FRO ,true); // Field bottom
+  private static final byte  fnl_flag = make_flag(FFNL,true); // Field final
+  private static final byte  frw_flag = make_flag(FRW ,true); // Field final
 
-  // Field bottom, plus live & dirty flags
+  // Field bottom, plus dirty flags
   public  static byte[] fbots(int n) { byte[] bs = new byte[n]; Arrays.fill(bs,fbot_flag); return bs; }
-  // Field final, plus live & dirty flags
+  // Field final, plus dirty flags
   public  static byte[] ffnls(int n) { byte[] bs = new byte[n]; Arrays.fill(bs, fnl_flag); return bs; }
-  // Field r/w, plus live & dirty flags
+  // Field r/w, plus dirty flags
   public  static byte[] frws (int n) { byte[] bs = new byte[n]; Arrays.fill(bs, frw_flag); return bs; }
 
   public  static TypeStruct make(Type[] ts) {
@@ -306,6 +303,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public  static TypeStruct make(String[] flds, byte[] flags) { return make(flds,ts(flds.length),flags); }
   // Make from prior, just updating field types
   public TypeStruct make_from( Type[] ts ) { return make(_name,_flds,ts,_flags); }
+  // Make from prior, just updating flags
+  public TypeStruct make_from( byte[] flags ) { return make(_name,_flds,_ts,flags); }
 
   // The display is a self-recursive structure: slot 0 is a ptr to a Display.
   // To break class-init cycle, this is partially made here, now.
@@ -366,7 +365,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     byte[]  flags = Arrays.copyOfRange(_flags,0,_flags.length+1);
     ts   [_ts.length] = t;
     flds [_ts.length] = name==null ? "." : name;
-    flags[_ts.length] = make_flag(mutable,true,true);
+    flags[_ts.length] = make_flag(mutable,true);
     return make(flds,ts,flags);
   }
   public TypeStruct set_fld( int idx, Type t, byte ff ) {
@@ -1072,27 +1071,25 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return s;
   }
 
-  // ------ Flags lattice: 2 bits field mod, 1 bit live, 1 bit dirty ------
+  // ------ Flags lattice: 2 bits field mod, 1 bit dirty ------
 
   // Accessors
   public static byte    fmod ( byte f ) { return (byte)(f&3); }
-  public static boolean live ( byte f ) { return 0 !=  (f&4); } // Set bit is live
-  public static boolean dirty( byte f ) { return 0 !=  (f&8); } // Set bit is dirty
+  public static boolean dirty( byte f ) { return 0 !=  (f&4); } // Set bit is dirty
   public byte fmod( int idx ) { return fmod(_flags[idx]); }
 
   // Setters
   public static byte set_fmod ( byte flags, byte mod     ) { assert 0<=mod && mod <=3; return (byte)((flags&~3)|mod); }
-  public static byte set_live ( byte flags, boolean live ) { return (byte)((flags&4)|(live ?1:0)); }
-  public static byte set_dirty( byte flags, boolean dirty) { return (byte)((flags&8)|(dirty?1:0)); }
-  public static byte make_flag( byte mod, boolean live, boolean dirty ) { assert 0<=mod && mod <=3; return (byte)(mod|(live?4:0)|(dirty?8:0)); }
+  public static byte set_dirty( byte flags, boolean dirty) { return (byte)(dirty? (flags|4) : (flags&~4)); }
+  public static byte make_flag( byte mod, boolean dirty ) { assert 0<=mod && mod <=3; return (byte)(mod|(dirty?4:0)); }
 
-  // OR bits: If either is dirty, then dirty.  If either live then live.
+  // OR bits: If either is dirty, then dirty.
   // Similarly for field mods.
   public  static byte fmeet( byte f0, byte f1 ) { return (byte)(f0|f1); }
   private static byte fdual( byte f ) {
     int flag = ~f;                              // Dual all the bits
     if( (flag&3)==1 || (flag&3)==2 ) flag ^= 3; // Recover final & r/w dual
-    return (byte)(flag&15);                     // Mask back to the 4 bits
+    return (byte)(flag&7);                      // Mask back to the 3 bits
   }
   private static byte flag_top() { return 0; }
   // Return flags cleaned

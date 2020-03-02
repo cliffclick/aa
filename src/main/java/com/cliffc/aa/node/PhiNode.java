@@ -3,23 +3,22 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.type.BitsAlias;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeMem;
-import com.cliffc.aa.type.TypeObj;
+import com.cliffc.aa.type.*;
 
 import java.util.BitSet;
 
 // Merge results; extended by ParmNode
 public class PhiNode extends Node {
   final Parse _badgc;
-  private PhiNode( byte op, Parse badgc, Node... vals ) {
+  final Type _t;               // all_type is either TypeMem.MEM or Type.SCALAR or TypeStruct.ALLSTRUCT
+  private PhiNode( byte op, Type t, Parse badgc, Node... vals ) {
     super(op,vals);
     _badgc = badgc;
+    _t = t;
   }
-  public PhiNode( Parse badgc, Node... vals ) { this(OP_PHI,badgc,vals); }
+  public PhiNode( Type t, Parse badgc, Node... vals ) { this(OP_PHI,t,badgc,vals); }
   // For ParmNodes
-  PhiNode( byte op, Node fun, ConNode defalt, Parse badgc ) { this(op,badgc,fun,defalt); }
+  PhiNode( byte op, Node fun, ConNode defalt, Parse badgc ) { this(op,defalt._t,badgc, fun,defalt); }
 
   @Override public Node ideal(GVNGCM gvn, int level) {
     if( gvn.type(in(0)) == Type.XCTRL ) return null;
@@ -80,7 +79,7 @@ public class PhiNode extends Node {
 
     // Make sure each alias merged is skinny
     for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) )
-      if( alias > 1 ) 
+      if( alias > 1 )
         for( int i=1; i<_defs._len; i++ ) {
           MemMergeNode mmem = (MemMergeNode)in(i);
           Node nalias = mmem.alias2node(alias);
@@ -90,12 +89,12 @@ public class PhiNode extends Node {
           if( !(gvn.type(((MemMergeNode)in(i)).alias2node(alias)) instanceof TypeObj) )
             return null;
         }
-    
+
     // Do the expansion.  Fill in all the phis, one by one, and plug into the
     // giant MemMerge at the end.
     MemMergeNode mmem = new MemMergeNode(null);
     for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) ) {
-      PhiNode phi = new PhiNode(_badgc,r);
+      PhiNode phi = new PhiNode(TypeStruct.ALLSTRUCT,_badgc,r);
       for( int i=1; i<_defs._len; i++ ) {
         // Take the matching narrow slice for the alias, except for alias ALL
         // which can keep taking undistinguished memory.  The resulting memory
@@ -130,7 +129,7 @@ public class PhiNode extends Node {
         t = t.meet(gvn.type(in(i)));
     return t;                   // Limit to sane results
   }
-  @Override public Type all_type() { return Type.ALL; }
+  @Override public Type all_type() { return _t; }
   @Override public String err(GVNGCM gvn) {
     if( !(in(0) instanceof FunNode && ((FunNode)in(0))._name.equals("!") ) && // Specifically "!" takes a Scalar
         (gvn.type(this).contains(Type.SCALAR) ||

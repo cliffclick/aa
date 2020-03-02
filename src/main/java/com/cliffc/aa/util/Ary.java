@@ -119,6 +119,12 @@ public class Ary<E> implements Iterable<E> {
     return (_es[i] = e);
   }
 
+  /** Clear element.  Does nothing if element is OOB, since these are clear by
+   *  default.
+   *  @param i element to clear
+   */
+  public void clear( int i ) {  if( i<_len ) _es[i]=null; }
+
   /** Set existing element
    * @param i element to set
    * @param e value to set

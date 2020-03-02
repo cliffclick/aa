@@ -248,7 +248,7 @@ public class TestNode {
     test1monotonic(new MemMergeNode(_ins[1],_ins[2],BitsAlias.RECORD));
     ((ConNode<Type>)_ins[1])._t = Type.SCALAR; // ParmNode reads this for _alltype
     test1monotonic(new   ParmNode( 1, "x",_ins[0],(ConNode)_ins[1],null).add_def(_ins[2]));
-    test1monotonic(new    PhiNode(null,_ins[0],_ins[1],_ins[2]));
+    test1monotonic(new    PhiNode(Type.SCALAR,null,_ins[0],_ins[1],_ins[2]));
     for( PrimNode prim : PrimNode.PRIMS )
       test1monotonic_prim(prim);
     test1monotonic(new   ProjNode(_ins[0],1));

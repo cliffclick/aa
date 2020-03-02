@@ -45,7 +45,7 @@ public class ScopeNode extends Node {
     assert n==null || gvn.type(n) instanceof TypeMem;
     assert n==null || gvn.touched(n);
     set_def(1,n,gvn);
-    return n;
+    return this;
   }
   // Set a new active NOT-GVNd memory, ready for directly updating memory edges.
   public MemMergeNode set_active_mem( MemMergeNode mmem, GVNGCM gvn) {
@@ -91,34 +91,34 @@ public class ScopeNode extends Node {
   public boolean is_closure() { assert _defs._len==4 || _defs._len==7; return _defs._len==7; }
 
   @Override public Node ideal(GVNGCM gvn, int level) {
-    // Past parsing, and know we have the single program result aligned with
-    // the memory state?
-    if( gvn._opt_mode != 0 ) {
-      Node rez = rez();
-      if( rez != null ) {
-        Type trez = gvn.type(rez);
-        // CNC - Trying to sharpen the memory state on exit, to allow dropping of
-        // dead&broken memory state (e.g. dead double-update of finals).  This
-        // first-cut is very weak, I need some official language-standard strength
-        // of escape-analysis and dropping of dead.
-
+    if( gvn._opt_mode != 0 &&   // Past parsing
+        rez() != null &&        // Have a return result
         // If type(rez) can never lift to any TMP, then we will not return a
         // pointer, and do not need the memory state on exit.
-        if( !TypeMemPtr.OOP0.dual().isa(trez) && !(mem() instanceof ConNode && gvn.type(mem())==TypeMem.EMPTY) ) {
-          set_mem(gvn.con(TypeMem.EMPTY), gvn);
-          return this;
-        }
-        // If returning a function pointer, we do not need the closure
-        if( rez instanceof FunPtrNode && rez.in(1) != null && rez._uses._len==1 ) {
-          Node x = gvn.xform(new FunPtrNode(((FunPtrNode)rez).ret(),null));
-          set_rez(x,gvn);
-          return this;
-        }
-      }
-    }
+        !TypeMemPtr.OOP0.dual().isa(gvn.type(rez())) &&
+        // And not already wiped it out
+        !(mem() instanceof ConNode && gvn.type(mem())==TypeMem.EMPTY) )
+      // Wipe out return memory
+      return set_mem(gvn.con(TypeMem.EMPTY), gvn);
     return null;
   }
   @Override public Type value(GVNGCM gvn) { return all_type(); }
+
+
+  @Override public TypeMem compute_live(GVNGCM gvn, TypeMem live, Node def) {
+    if( mem()!=def ) return TypeMem.FULL;  // Other non-memory uses are alive
+    if( rez() == null ) return live;    // No return result, nothing extra is alive.
+    if( live == TypeMem.FULL) return live; // Already all is live
+    // All fields in all reachable pointers from rez() will be marked live
+    Type tmem = gvn.type(mem());
+    Type trez = gvn.type(rez());
+    if( !(tmem instanceof TypeMem   ) ) return live; // Not a memory
+    if( !(trez instanceof TypeMemPtr) ) return live; // Not a pointer
+    // Find limit of reachable aliases starting from this one
+    BitsAlias aliases = trez.recursive_aliases(BitsAlias.EMPTY,((TypeMem)tmem));
+    return live.meet_alias(aliases);
+  }
+
   @Override public Type all_type() { return Type.ALL; }
   @Override public int hashCode() { return 123456789; }
   // ScopeNodes are never equal

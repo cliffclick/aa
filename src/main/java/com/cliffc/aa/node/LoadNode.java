@@ -71,7 +71,7 @@ public class LoadNode extends Node {
     if( mem instanceof PhiNode && nnn!=null ) {
       // TODO: Only split thru function args if no unknown_callers, and must make a Parm not a Phi
       if( !(mem instanceof ParmNode) ) {
-        Node lphi = new PhiNode(((PhiNode)mem)._badgc,mem.in(0));
+        Node lphi = new PhiNode(Type.SCALAR,((PhiNode)mem)._badgc,mem.in(0));
         for( int i=1; i<mem._defs._len; i++ )
           lphi.add_def(gvn.xform(new LoadNode(mem.in(i),addr,_fld,_bad)));
         return lphi;

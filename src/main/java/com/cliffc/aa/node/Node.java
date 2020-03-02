@@ -3,6 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
@@ -47,7 +48,7 @@ public abstract class Node implements Cloneable {
   public int _uid;  // Unique ID, will have gaps, used to give a dense numbering to nodes
   final byte _op;   // Opcode (besides the object class), used to avoid v-calls in some places
   public byte _keep;// Keep-alive in parser, even as last use goes away
-  public boolean _live;         // Liveness; assumed live in gvn.iter(), assumed dead in gvn.gcp().
+  public TypeMem _live; // Liveness; assumed live in gvn.iter(), assumed dead in gvn.gcp().
 
   // Defs.  Generally fixed length, ordered, nulls allowed, no unused trailing space.  Zero is Control.
   public Ary<Node> _defs;
@@ -108,12 +109,12 @@ public abstract class Node implements Cloneable {
     _defs = new Ary<>(defs);
     _uses = new Ary<>(new Node[1],0);
     for( Node def : defs ) if( def != null ) def._uses.add(this);
-    _live = true;
+    _live = TypeMem.FULL;
    }
 
   // Is a primitive
-  public boolean is_prim() { return _uid<GVNGCM._INIT0_CNT; }
-  
+  public boolean is_prim() { return GVNGCM._INIT0_CNT==0 || _uid<GVNGCM._INIT0_CNT; }
+
   // Make a copy of the base node, with no defs nor uses and a new UID.
   // Some variations will use the CallEpi for e.g. better error messages.
   @NotNull Node copy( boolean copy_edges, CallEpiNode unused, GVNGCM gvn) {
@@ -141,7 +142,7 @@ public abstract class Node implements Cloneable {
   public String dump( int max, GVNGCM gvn, boolean prims ) { return dump(0, new SB(),max,new VBitSet(),gvn,prims).toString();  }
   // Dump one node, no recursion
   private SB dump( int d, SB sb, GVNGCM gvn ) {
-    String xs = String.format("%c%4d: %-7.7s ",_live?' ':'X',_uid,xstr());
+    String xs = String.format("%c%4d: %-7.7s ",_live.is_live()?' ':'X',_uid,xstr());
     sb.i(d).p(xs);
     if( is_dead() ) return sb.p("DEAD");
     for( Node n : _defs ) sb.p(n == null ? "____ " : String.format("%4d ",n._uid));
@@ -294,14 +295,19 @@ public abstract class Node implements Cloneable {
   // This is a forwards-flow computation.
   abstract public Type value(GVNGCM gvn);
 
-  // Compute local liveness, based on outputs.  Scopes and _keep are always
-  // alive, but other nodes are only alive if their outputs are alive.  This is
-  // a reverse-flow computation.
-  public boolean compute_live(GVNGCM gvn) {
-    if( _keep>0 ) return true;  // Somebody is forcing this live
-    if( this instanceof ScopeNode ) return true; // The exit scope is alive
-    for( Node use : _uses ) if( use._live ) return true; // Alive if any use is alive
-    return false;                                        // Not alive
+  // Compute live across uses
+  public final TypeMem compute_live(GVNGCM gvn) {
+    if( is_prim() ) return TypeMem.FULL;      // Prims always alive
+    TypeMem live = TypeMem.EMPTY;             // Start at lattice top
+    for( Node use : _uses )                   // Computed across all uses
+      live = use.compute_live(gvn,live,this); // Make alive used fields
+    return live;
+  }
+  // Compute local contribution of use liveness to this def.
+  // Overridden in subclasses that do field-liveness.
+  public TypeMem compute_live(GVNGCM gvn, TypeMem live, Node def) {
+    if( _keep>0 ) return TypeMem.FULL;  // Somebody is forcing this live
+    return (TypeMem)live.meet(_live);   // If any use is alive, so is the def
   }
 
   // Return any type error message, or null if no error
@@ -337,7 +343,7 @@ public abstract class Node implements Cloneable {
   // Assert all ideal calls are done
   public final boolean more_ideal(GVNGCM gvn, VBitSet bs, int level) {
     if( bs.tset(_uid) ) return false; // Been there, done that
-    if( _keep == 0 && _live ) {       // Only non-keeps, which is just top-level scope and prims
+    if( _keep == 0 && _live.is_live() ) { // Only non-keeps, which is just top-level scope and prims
       Node idl = ideal(gvn,level);
       if( idl != null )
         return true;            // Found an ideal call

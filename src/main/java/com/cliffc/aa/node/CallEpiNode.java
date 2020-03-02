@@ -209,9 +209,8 @@ public final class CallEpiNode extends Node {
     Node cproj = new CProjNode(call,0);
     cproj = gvn._opt_mode == 2 ? gvn.add_work(cproj) : gvn.xform(cproj);
     gvn.add_def(fun,cproj);
-    // Add the CallEpi hook
-    if( gvn._opt_mode == 2 ) gvn.add_def(this,ret);
-    else                         add_def(     ret);
+    // Add the CallEpi hook during a value call
+    gvn.add_def(this,ret);
     return this;
   }
 

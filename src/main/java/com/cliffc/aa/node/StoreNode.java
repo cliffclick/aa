@@ -114,7 +114,7 @@ public class StoreNode extends Node {
     if( !(tobj instanceof TypeStruct) )
       // Updating XOBJ means updating any choice, and we choose no-change.
       // Updating  OBJ means we're already as low as we can go.
-      return tobj; 
+      return tobj;
 
     // Update the field.  Illegal updates make no changes (except clear 'clean' bit).
     TypeStruct ts = (TypeStruct)tobj;
@@ -151,7 +151,7 @@ public class StoreNode extends Node {
     if( call.walk_dom_last(n -> n==fpctrl) == null ) return null;
 
     TypeTuple tcall = (TypeTuple)gvn.type(call);
-    TypeMem tcm = (TypeMem)tcall.at(2);
+    TypeMem tcm = (TypeMem)tcall.at(1);
     Node pre_call_mem = call.mem();
     if( tcm.at(alias).above_center() ) // Call does not produce the memory
       return pre_call_mem;

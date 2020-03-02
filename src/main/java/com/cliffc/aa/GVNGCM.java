@@ -1,10 +1,7 @@
 package com.cliffc.aa;
 
 import com.cliffc.aa.node.*;
-import com.cliffc.aa.type.BitsFun;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeFunPtr;
-import com.cliffc.aa.type.TypeTuple;
+import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.VBitSet;
 import org.jetbrains.annotations.NotNull;
@@ -84,7 +81,7 @@ public class GVNGCM {
     }
     for( Node n : _INIT0_NODES ) {
       n.reset_to_init1(this);
-      n._live = true;
+      n._live = TypeMem.FULL;
       for( int i=0; i<n._uses._len; i++ )
         if( !n._uses.at(i).is_prim() )
           n._uses.del(i--);
@@ -289,6 +286,21 @@ public class GVNGCM {
     }
   }
 
+  // Replace with a ConNode iff
+  // - Not already a ConNode AND
+  // - Not an ErrNode AND
+  // - Type.is_con()
+  private static boolean replace_con(Type t, Node n) {
+    if( n._keep >0 || n instanceof ConNode || n instanceof ErrNode )
+      return false; // Already a constant, or never touch an ErrNode
+    if( !t.is_con() ) return false;
+    if( t instanceof TypeFunPtr ) {
+      Node x = FunNode.find_fidx(((TypeFunPtr)t).fidx());
+      if( x==null || x.is_dead() ) return false;
+    }
+    return true; // Replace with a ConNode
+  }
+
   public void xform_old( Node old, int level ) {
     Node nnn = xform_old0(old,level);
     if( nnn==null ) return;     // No progress
@@ -308,68 +320,72 @@ public class GVNGCM {
     }
   }
 
-  // Replace with a ConNode iff
-  // - Not already a ConNode AND
-  // - Not an ErrNode AND
-  // - Type.is_con()
-  private static boolean replace_con(Type t, Node n) {
-    if( n._keep >0 || n instanceof ConNode || n instanceof ErrNode )
-      return false; // Already a constant, or never touch an ErrNode
-    if( !t.is_con() ) return false;
-    if( t instanceof TypeFunPtr ) {
-      Node x = FunNode.find_fidx(((TypeFunPtr)t).fidx());
-      if( x==null || x.is_dead() ) return false;
-    }
-    return true; // Replace with a ConNode
-  }
-
   /** Look for a better version of 'n'.  Can change n's defs via the ideal()
    *  call, including making new nodes.  Can replace 'n' wholly, with n's uses
    *  now pointing at the replacement.
    *  @param n Node to be idealized; already in GVN
    *  @return null for no-change, or a better version of n, already in GVN */
   private Node xform_old0( Node n, int level ) {
-    assert touched(n);         // Node is in type tables, but might be already out of GVN
-    Type oldt = type(n);       // Get old type
-    _ts._es[n._uid] = null;    // Remove from types, mostly for asserts
-    Node x = _vals.remove(n);  // Remove before modifying edges (and thus hash)
-    if( x != null && x != n ) {// Found a prior existing hit
-      _vals.put(x,x);          // Put old hit back in table
-      return x;                // And use it instead
-    }
-    assert !check_opt(n);      // Not in system now
-    //if( replace_con(oldt,n) )
-    //  return con(oldt);        // Dead-on-Entry, common when called after GCP
-    // Try generic graph reshaping
-    Node y = n.ideal(this,level);
-    assert y==null || y==n || n._keep==0;// Ideal calls need to not replace 'keep'rs
-    if( y != null && y != n ) return y;  // Progress with some new node
-    if( y != null && y.is_dead() ) return null;
-    // Either no-progress, or progress and need to re-insert n back into system
-    _ts._es[n._uid] = oldt;     // Restore old type, in case we recursively ask for it
+    assert touched(n);          // Node is in type tables, but might be already out of GVN
+    Type oldt = type(n);        // Get old type
+
+    // Must exit either with the (old node or null) and the old node in both types
+    // and vals tables, OR exit with a new node and the old node in neither table.
+    // [ts!] - Definitely in types table, [ts+] updated value in types
+    // [vals?] - Maybe in vals table
+
+    // [ts!,vals?] Check GVN tables first, because this is very fast and makes
+    // good forward progress in computing value 'n'
+    Node x = _vals.get(n);      // Check prior hit
+    if( x != null && x != n ) return untype(n,x); // Was not in vals, remove from types also & return prior
+
+    // [ts!,vals?] Compute best type, and type is IN ts
     Type t = n.value(this);     // Get best type
-    // To turn this on:
-    //   A Call will refine memory into a Fun body.
-    //   A Phi in the Fun body will hold the refined memory.
-    //   When inlined, the memory Phi gets the full Call memory, not the refined.
-    //   The Phi then 'sinks'... but only to a value that a following CallEpi will
-    //   have been sunk to already.
-    if( !t.isa(oldt) && !n.is_prim() ) {
+    if( !t.isa(oldt) && !n.is_prim() ) { // Strong assert that we only lift types
       System.out.println("Backwards to: "+t+"\nfrom: "+n.dump(0,this));
       assert t.isa(oldt);       // Monotonically improving
     }
-    _ts._es[n._uid] = null;     // Remove in case we replace it
-    // Replace with a constant, if possible
-    if( replace_con(t,n) )
-      return con(t);            // Constant replacement
-    // Global Value Numbering
+
+    // [ts!,vals?] Replace with a constant, if possible.  This is also very cheap
+    // (once we expensively computed best value) and makes the best forward
+    // progress.
+    if( replace_con(t,n) ) { unreg0(n); return con(t); }
+    // [ts!,vals?] Put updated types into table for use by ideal()
+    setype(n,t);
+
+    // [ts!,vals?] Compute uses & live bits.  If progress, push the defs on the
+    // worklist.  This is a reverse flow computation.
+    TypeMem old = n._live;
+    TypeMem nnn = n.compute_live(this);
+    if( old != nnn ) {  // Progress?
+      assert nnn.isa(old); // Monotonically improving
+      n._live = nnn;        // Mark progress
+      for( Node def : n._defs ) // Put defs on worklist... liveness flows uphill
+        if( def != null && def != n )
+          add_work(def);        // Reverse flow: do work on defs not uses
+    }
+    // [ts+,vals?] Remove before ideal hacks edges & changes hash
+    _vals.remove(n);
+
+    // [ts+] If completely dead, replace with a high constant
+    if( !nnn.is_live() && !(n instanceof ConNode) )  return untype(n,con(n.all_type().startype()));
+
+    // [ts+] Try generic graph reshaping using updated types
+    Node y = n.ideal(this,level);
+    assert y==null || y==n || n._keep==0;// Ideal calls need to not replace 'keep'rs
+    if( y != null && y != n      ) return untype(n, y  );  // Progress with some new node
+    if( y != null && y.is_dead() ) return untype(n,null);
+
+    // [ts+,vals?] Reinsert in GVN
     Node z = _vals.putIfAbsent(n,n);
-    if( z != null ) return z;
-    // Record type for n; n is "in the system" now
-    setype(n,t);                // Set it in
-    assert n._live || n.is_prim(); // Everything is live at this point, because we eagerly strip dead
+    if( z != null && z != n ) return untype(n,z); // Ideal mods triggered hit, remove from types & return prior
+    // [ts+,vals!]
+    assert check_opt(n);
     return oldt == t && y==null ? null : n; // Progress if types improved
   }
+
+  // Utility
+  private Node untype( Node old, Node nnn ) { _ts.clear(old._uid); return nnn; }
 
   // Replace, but do not delete old.  Really used to insert a node in front of old.
   public void replace( Node old, Node nnn ) {
@@ -470,19 +486,19 @@ public class GVNGCM {
         }
         major_work++;
         // Check liveness first
-        if( n._live ) {                // Alive already?
-          assert n.compute_live(this); // Monotonic - stays alive
-        } else {                       // Not alive
-          if( n.compute_live(this) ) { // See if transitioning to live
-            n._live = true;
-            // Classic reverse flow on liveness change:
-            for( Node def : n._defs )
-              if( def != null && def != n )
-                add_work(def);  // Make all defs live
-          } else {              // Not alive, so always computes startype
-            assert type(n)==n.all_type().startype();
-            continue;           // And thus no forwards flow
-          }
+        TypeMem old = n._live;
+        TypeMem nnn = n.compute_live(this);
+        if( old != nnn ) {
+          assert old.isa(nnn); // Monotonically improving
+          n._live = nnn;
+          for( Node def : n._defs ) // Put defs on worklist... liveness flows uphill
+            if( def != null && def != n )
+              add_work(def);        // Reverse flow: do work on defs not uses
+        }
+        if( !nnn.is_live() ) {
+          // Not alive, so always computes startype
+          assert type(n)==n.all_type().startype();
+          continue;           // And thus no forwards flow
         }
 
         // Forwards flow
@@ -494,10 +510,11 @@ public class GVNGCM {
           // Classic forwards flow on change:
           for( Node use : n._uses ) {
             if( use==n ) continue;        // Stop self-cycle (not legit, but happens during debugging)
-            if( use.all_type() != type(use)) { // Minor optimization: If not already at bottom
-              add_work(use); // Re-run users to check for progress
-              minor_opt++;
-            }
+            if( use.all_type() != type(use)) // Minor optimization: If not already at bottom
+              add_work(use);    // Re-run users to check for progress
+            else
+              minor_opt++;      // Count minor opt effectiveness
+
             // When new control paths appear on Regions, the Region stays the
             // same type (Ctrl) but the Phis must merge new values.
             if( use instanceof RegionNode )
@@ -533,7 +550,7 @@ public class GVNGCM {
     if( n==null || touched(n) ) return; // Been there, done that
     Type startype = n.all_type().startype();
     setype(n,startype);
-    n._live = false;
+    n._live = TypeMem.EMPTY;
     // Walk reachable graph
     for( Node use : n._uses ) walk_initype(use);
     for( Node def : n._defs ) walk_initype(def);
@@ -574,7 +591,6 @@ public class GVNGCM {
     // Hit the fixed point, despite any immediate updates.  All prims are live,
     // even if unused so they might not have been computed
     assert n.is_prim() || n.value(this)==t;
-    assert n._live;
 
     // Walk reachable graph
     for( Node def : n._defs )
