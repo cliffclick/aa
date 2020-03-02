@@ -281,7 +281,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   }
   // Generic function arguments.  Slot 0 is the display and has a fixed name.
   public  static TypeStruct make_args(Type[] ts) {
-    assert ts[0]==TypeMemPtr.DISPLAY_PTR || ts[0]==Type.NIL;
+    assert ts[0]==Type.XSCALAR || ((TypeMemPtr)ts[0]).is_display();
     String[] args = new String[ts.length];
     Arrays.fill(args,".");
     args[0] = "^";
@@ -306,42 +306,19 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // Make from prior, just updating flags
   public TypeStruct make_from( byte[] flags ) { return make(_name,_flds,_ts,flags); }
 
+  // Recursive meet in progress.
+  // Called during class-init.
+  private static final HashMap<TypeStruct,TypeStruct> MEETS1 = new HashMap<>(), MEETS2 = new HashMap<>();
+
   // The display is a self-recursive structure: slot 0 is a ptr to a Display.
   // To break class-init cycle, this is partially made here, now.
   // Then we touch TypeMemPtr, which uses this field.
   // Then we finish making DISPLAY.
   public  static final TypeStruct DISPLAY = malloc("",false,new String[]{"^"},ts(Type.NIL),ffnls(1));
-  static { DISPLAY._hash = DISPLAY.compute_hash(); }
-
-  public  static final TypeStruct GENERIC = malloc("",true,FLD0,TypeAry.get(0),new byte[0]).hashcons_free();
-  public  static final TypeStruct ALLSTRUCT = make(ts());
-  public  static final TypeStruct SCALAR0     = make_args   (ts(Type.NIL));
-  public  static final TypeStruct SCALAR1     = make(ARGS_X ,ts(Type.NIL,SCALAR));
-  public  static final TypeStruct SCALAR2     = make(ARGS_XY,ts(Type.NIL,SCALAR,SCALAR));
-  public  static final TypeStruct STRPTR      = make(ARGS_X ,ts(Type.NIL,TypeMemPtr.STRPTR));
-  public  static final TypeStruct OOP_OOP     = make(ARGS_XY,ts(Type.NIL,TypeMemPtr.OOP0,TypeMemPtr.OOP0));
-  public  static final TypeStruct INT64_INT64 = make(ARGS_XY,ts(Type.NIL,TypeInt.INT64,TypeInt.INT64));
-  public  static final TypeStruct FLT64_FLT64 = make(ARGS_XY,ts(Type.NIL,TypeFlt.FLT64,TypeFlt.FLT64));
-  public  static final TypeStruct STR_STR     = make(ARGS_XY,ts(Type.NIL,TypeMemPtr.STRPTR,TypeMemPtr.STRPTR));
-  public  static final TypeStruct FLT64       = make(ARGS_X ,ts(Type.NIL,TypeFlt.FLT64)); // @{x:flt}
-  public  static final TypeStruct INT64       = make(ARGS_X ,ts(Type.NIL,TypeInt.INT64)); // @{x:int}
-
-  // A bunch of types for tests
-  public  static final TypeStruct NAMEPT= make("Point:",ARGS_XY,ts(Type.NIL,TypeFlt.FLT64,TypeFlt.FLT64),ffnls(3));
-  public  static final TypeStruct POINT = make(ARGS_XY,ts(Type.NIL,TypeFlt.FLT64,TypeFlt.FLT64));
-          static final TypeStruct TFLT64= make(          ts(TypeFlt.FLT64 )); //  (  flt)
-  public  static final TypeStruct A     = make(flds("^","a"),ts(Type.NIL,TypeFlt.FLT64 ));
-  private static final TypeStruct C0    = make(flds("^","c"),ts(Type.NIL,TypeInt.FALSE )); // @{c:0}
-  private static final TypeStruct D1    = make(flds("^","d"),ts(Type.NIL,TypeInt.TRUE  )); // @{d:1}
-  private static final TypeStruct ARW   = make(flds("^","a"),ts(Type.NIL,TypeFlt.FLT64),new byte[]{FRW,FRW});
-
-  // Recursive meet in progress.
-  // Called during class-init.
-  private static final HashMap<TypeStruct,TypeStruct> MEETS1 = new HashMap<>(), MEETS2 = new HashMap<>();
-
-  // Called during init to break the cycle making DISPLAY.
-  // TypeMemPtr uses DISPLAY, defined above, which in turn is used here.
   static {
+    DISPLAY._hash = DISPLAY.compute_hash();
+    ALLSTRUCT = make(ts());
+    Type dummy = TypeMemPtr.STRPTR; // Force TypeMemPtr
     assert DISPLAY._ts[0] == Type.NIL;
     DISPLAY._ts = ts(TypeMemPtr.DISPLAY_PTR);
     DISPLAY.install_cyclic(new Ary<>(ts(DISPLAY,TypeMemPtr.DISPLAY_PTR)));
@@ -353,6 +330,29 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       ((_ts[0] instanceof TypeMemPtr && ((TypeMemPtr)_ts[0]).is_display()) ||
        (_ts[0] == Type.NIL));
   }
+  public  static final TypeMemPtr NO_DISP = TypeMemPtr.DISPLAY_PTR.dual();
+
+  public  static final TypeStruct GENERIC = malloc("",true,FLD0,TypeAry.get(0),new byte[0]).hashcons_free();
+  public  static final TypeStruct ALLSTRUCT;
+  public  static final TypeStruct SCALAR0     = make_args   (ts(NO_DISP));
+  public  static final TypeStruct SCALAR1     = make(ARGS_X ,ts(NO_DISP,SCALAR));
+  public  static final TypeStruct SCALAR2     = make(ARGS_XY,ts(NO_DISP,SCALAR,SCALAR));
+  public  static final TypeStruct STRPTR      = make(ARGS_X ,ts(NO_DISP,TypeMemPtr.STRPTR));
+  public  static final TypeStruct OOP_OOP     = make(ARGS_XY,ts(NO_DISP,TypeMemPtr.OOP0,TypeMemPtr.OOP0));
+  public  static final TypeStruct INT64_INT64 = make(ARGS_XY,ts(NO_DISP,TypeInt.INT64,TypeInt.INT64));
+  public  static final TypeStruct FLT64_FLT64 = make(ARGS_XY,ts(NO_DISP,TypeFlt.FLT64,TypeFlt.FLT64));
+  public  static final TypeStruct STR_STR     = make(ARGS_XY,ts(NO_DISP,TypeMemPtr.STRPTR,TypeMemPtr.STRPTR));
+  public  static final TypeStruct FLT64       = make(ARGS_X ,ts(NO_DISP,TypeFlt.FLT64)); // @{x:flt}
+  public  static final TypeStruct INT64       = make(ARGS_X ,ts(NO_DISP,TypeInt.INT64)); // @{x:int}
+
+  // A bunch of types for tests
+  public  static final TypeStruct NAMEPT= make("Point:",ARGS_XY,ts(NO_DISP,TypeFlt.FLT64,TypeFlt.FLT64),ffnls(3));
+  public  static final TypeStruct POINT = make(ARGS_XY,ts(NO_DISP,TypeFlt.FLT64,TypeFlt.FLT64));
+          static final TypeStruct TFLT64= make(          ts(TypeFlt.FLT64 )); //  (  flt)
+  public  static final TypeStruct A     = make(flds("^","a"),ts(NO_DISP,TypeFlt.FLT64 ));
+  private static final TypeStruct C0    = make(flds("^","c"),ts(NO_DISP,TypeInt.FALSE )); // @{c:0}
+  private static final TypeStruct D1    = make(flds("^","d"),ts(NO_DISP,TypeInt.TRUE  )); // @{d:1}
+  private static final TypeStruct ARW   = make(flds("^","a"),ts(NO_DISP,TypeFlt.FLT64),new byte[]{FRW,FRW});
 
   static final TypeStruct[] TYPES = new TypeStruct[]{ALLSTRUCT,STR_STR,FLT64,POINT,NAMEPT,A,C0,D1,ARW,DISPLAY};
 
@@ -405,9 +405,9 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     untern()._dual.untern();
     ts.untern().dual().untern();
     // Hack type and it's dual.  Type is now recursive.
-    _flds  = ts._flds  ; _dual._flds  = ts._dual._flds  ;
-    _ts    = ts._ts    ; _dual._ts    = ts._dual._ts    ;
-    _flags= ts._flags; _dual._flags= ts._dual._flags;
+    _flds  = ts._flds ; _dual._flds = ts._dual._flds ;
+    _ts    = ts._ts   ; _dual._ts   = ts._dual._ts   ;
+    _flags = ts._flags; _dual._flags= ts._dual._flags;
     _cyclic= _dual._cyclic = true;
     // Hash changes, e.g. field names.
     _hash = compute_hash();  _dual._hash = _dual.compute_hash();
@@ -437,15 +437,19 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       for( int i=stack._len-1; (st=stack.at(i))!=t; i-- ) {
         st.untern()._dual.untern(); // Wrong hash
         if( st._type==TMEMPTR ) ((TypeMemPtr)st)._cyclic = ((TypeMemPtr)st)._dual._cyclic = true;
+        else if( st._type==TFUNPTR ) ((TypeFunPtr)st)._cyclic = ((TypeFunPtr)st)._dual._cyclic = true;
         else ((TypeStruct)st)._cyclic = ((TypeStruct)st)._dual._cyclic = true;
         st._hash = st._dual._hash = 0; // Clear.  Cannot compute until all children found/cycles walked.
       }
     } else {
-      if( t instanceof TypeMemPtr || t instanceof TypeStruct ) {
+      if( t instanceof TypeMemPtr || t instanceof TypeFunPtr || t instanceof TypeStruct ) {
         stack.push(t);              // Push on stack, in case a cycle is found
         if( t instanceof TypeMemPtr ) {
           rehash_cyclic(stack,((TypeMemPtr)t)._obj);
           assert ((TypeMemPtr)t)._cyclic;
+        } else if( t instanceof TypeFunPtr ) {
+          rehash_cyclic(stack,((TypeFunPtr)t)._args);
+          assert ((TypeFunPtr)t)._cyclic;
         } else {
           for( int i=1; i<((TypeStruct)t)._ts.length; i++ )
             rehash_cyclic(stack, ((TypeStruct)t)._ts[i]);
@@ -769,13 +773,15 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     }
     // Clone the old, to make the approximation into
     TypeStruct nts = (TypeStruct)old.clone();
-    nts._flds   = old._flds  .clone();
+    nts._flds  = old._flds .clone();
     nts._flags = old._flags.clone();
-    nts._ts     = TypeAry.clone(old._ts);
+    nts._ts    = TypeAry.clone(old._ts);
     OLD2APX.put(old,nts);
     for( int i=0; i<old._ts.length; i++ ) // Fill clone with approximation
       if( old._ts[i]._type == TMEMPTR )
-        nts._ts[i] = ax_impl_ptr(alias,cutoff,cutoffs,d,dold,(TypeMemPtr)old._ts[i]);
+        nts._ts[i] = ax_impl_ptr (alias,cutoff,cutoffs,d,dold,(TypeMemPtr)old._ts[i]);
+      else if( old._ts[i]._type == TFUNPTR )
+        nts._ts[i] = ax_impl_fptr(alias,cutoff,cutoffs,d,dold,(TypeFunPtr)old._ts[i]);
     if( isnews && d==cutoff ) {
       while( !cutoffs.isEmpty() ) { // At depth limit, meet with cutoff to make the approximation
         Type mt = ax_meet(new BitSetSparse(), nts,cutoffs.pop());
@@ -783,7 +789,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       }
     }
     /*if( d==cutoff )*/ OLD2APX.put(old,null); // Do not keep sharing the "tails"
-    // CNC Never remove...
     return nts;
   }
 
@@ -801,8 +806,23 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     OLD2APX.put(old,nmp);
     if( old._obj instanceof TypeStruct )
       nmp._obj = ax_impl_struct(alias,nmp._aliases.test(alias),cutoff,cutoffs,d,dold,(TypeStruct)old._obj);
-    /*if( d+1==cutoff )*/ OLD2APX.put(old,null); // Do not keep sharing the "tails"
-    // CNC Never remove...
+    OLD2APX.put(old,null);      // Do not keep sharing the "tails"
+    return nmp;
+  }
+  private static Type ax_impl_fptr( int alias, int cutoff, Ary<TypeStruct> cutoffs, int d, TypeStruct dold, TypeFunPtr old ) {
+    assert old.interned();
+    // TODO: If past depth, never use OLD, forces maximal cloning for the
+    // last step, as the last step will be MEET with an arbitrary structure.
+    // Use alternative OLD past depth, to keep looping unrelated types
+    // folding up.  Otherwise unrelated types might expand endlessly.
+    TypeFunPtr nt = OLD2APX.get(old);
+    if( nt != null ) return ufind(nt);
+
+    // Walk internal structure, meeting into the approximation
+    TypeFunPtr nmp = (TypeFunPtr)old.clone();
+    OLD2APX.put(old,nmp);
+    nmp._args = ax_impl_struct(alias,false,cutoff,cutoffs,d,dold,old._args);
+    OLD2APX.put(old,null);      // Do not keep sharing the "tails"
     return nmp;
   }
 
@@ -821,6 +841,19 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     // Meet old into nt
     switch( nt._type ) {
     case TSCALAR: break; // Nothing to meet
+    case TFUNPTR: {
+      TypeFunPtr nptr = (TypeFunPtr)nt;
+      if( old == Type.NIL ) { nptr._fidxs = nptr._fidxs.meet_nil();  break; }
+      if( old == Type.SCALAR )
+        return union(nt,old); // Result is a scalar, which changes the structure of the new types.
+      if( old == Type.XSCALAR ) break; // Result is the nt unchanged
+      if( !(old instanceof TypeFunPtr) ) throw AA.unimpl(); // Not a xscalar, not a funptr, probably falls to scalar
+      TypeFunPtr optr = (TypeFunPtr)old;
+      nptr._fidxs = nptr._fidxs.meet(optr._fidxs);
+      nptr._ret   = nptr._ret  .meet(optr._ret  );
+      nptr._args = (TypeStruct)ax_meet(bs,nptr._args,optr._args);
+      break;
+    }
     case TMEMPTR: {
       TypeMemPtr nptr = (TypeMemPtr)nt;
       if( old == Type.NIL ) { nptr._aliases = nptr._aliases.meet_nil();  break; }
@@ -841,8 +874,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       // change if mixing structs.
       int len = ots.len(nts);     // New length
       if( len != nts._ts.length ) { // Grow/shrink as needed
-        nts._flds  = Arrays.copyOf(nts._flds  , len);
-        nts._ts    = Arrays.copyOf(nts._ts    , len);
+        nts._flds = Arrays.copyOf(nts._flds , len);
+        nts._ts   = Arrays.copyOf(nts._ts   , len);
         nts._flags= Arrays.copyOf(nts._flags, len);
       }
       int clen = Math.min(len,ots._ts.length);
@@ -876,7 +909,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     for( int i=0; i<reaches._len; i++ ) {
       Type t = reaches.at(i);// TypeMemPtr hash changes based on field contents.
       if( !(t instanceof TypeStruct) ) {
-        assert t instanceof TypeMemPtr;
+        assert t instanceof TypeMemPtr || t instanceof TypeFunPtr;
         if( t._hash == 0 )
           t._hash = t.compute_hash();
       }
@@ -908,11 +941,21 @@ public class TypeStruct extends TypeObj<TypeStruct> {
             if( !t5.interned() ) reaches.push(t5);
           }
           break;
+        case TFUNPTR:           // Update TypeFunPtr internal field
+          TypeFunPtr tfptr = (TypeFunPtr)t0;
+          TypeStruct t6 = tfptr._args;
+          TypeStruct t7 = ufind(t6);
+          if( t6 != t7 ) {
+            tfptr._args = t7;
+            progress |= post_mod(tfptr);
+            if( !t7.interned() ) reaches.push(t7);
+          }
+          break;
         case TSTRUCT:           // Update all TypeStruct fields
           TypeStruct ts = (TypeStruct)t0;
           for( int i=0; i<ts._ts.length; i++ ) {
-            Type tf = ts._ts[i];
-            progress |= (tf != (ts._ts[i] = ufind(tf)));
+            Type tfld = ts._ts[i];
+            progress |= (tfld != (ts._ts[i] = ufind(tfld)));
           }
           break;
         default: break;
@@ -976,6 +1019,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       Type t = work.at(idx++);
       switch( t._type ) {
       case TMEMPTR:  push(work, keep, ((TypeMemPtr)t)._obj); break;
+      case TFUNPTR:  push(work, keep, ((TypeFunPtr)t)._args); break;
       case TSTRUCT:  for( Type tf : ((TypeStruct)t)._ts ) push(work, keep, tf); break;
       default: break;
       }
@@ -984,7 +1028,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   }
   private void push( Ary<Type> work, boolean keep, Type t ) {
     int y = t._type;
-    if( (y==TMEMPTR || y==TSTRUCT) &&
+    if( (y==TMEMPTR || y==TFUNPTR || y==TSTRUCT) &&
         (keep || t._hash==0 || !t.interned()) && work.find(t)==-1 )
       work.push(t);
   }
@@ -1030,6 +1074,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     stack.push(t);              // Push on stack, in case a cycle is found
     switch( t._type ) {
     case TMEMPTR: get_cyclic(bcs,bs,stack,((TypeMemPtr)t)._obj ); break;
+    case TFUNPTR: get_cyclic(bcs,bs,stack,((TypeFunPtr)t)._args); break;
     case TSTRUCT: for( Type tf : ((TypeStruct)t)._ts ) get_cyclic(bcs,bs,stack,tf); break;
     }
     stack.pop();                // Pop, not part of anothers cycle
@@ -1041,8 +1086,10 @@ public class TypeStruct extends TypeObj<TypeStruct> {
         ((TypeStruct)t)._cyclic = bcs.get(t._uid);
         TypeStruct ts = (TypeStruct)t;
         ts._ts = TypeAry.hash_cons(ts._ts); // hashcons cyclic arrays
-      } else {
+      } else if( t instanceof TypeMemPtr ) {
         ((TypeMemPtr)t)._cyclic = bcs.get(t._uid);
+      } else {
+        ((TypeFunPtr)t)._cyclic = bcs.get(t._uid);
       }
     }
   }

@@ -390,7 +390,7 @@ public class Parse {
       }
     }
     // Too much excitement happens while ifex hooked; put on worklist
-    return _gvn.add_work(ifex.unhook()); 
+    return _gvn.add_work(ifex.unhook());
   }
 
   /** Parse an if-expression, with lazy eval on the branches.  Assignments to
@@ -725,7 +725,7 @@ public class Parse {
     // Push an extra hidden display argument.  Similar to java inner-class ptr
     // or when inside of a struct definition: 'this'.
     ids .push("^");
-    ts  .push(TypeMemPtr.DISPLAY_PTR);
+    ts  .push(_gvn.type(_e._scope.ptr()));
     bads.push(null);
 
     // Parse arguments
@@ -759,7 +759,7 @@ public class Parse {
     // Build the FunNode header
     Node old_ctrl = ctrl();
     Node old_mem  = all_mem().keep();
-    FunNode fun = init(new FunNode(ts.asAry()).add_def(Env.ALL_CTRL)).keep();
+    FunNode fun = init(new FunNode(ids.asAry(),ts.asAry()).add_def(Env.ALL_CTRL)).keep();
 
     // Increase scope depth for function body.
     try( Env e = new Env(_e,errMsg(oldx-1),fun,true) ) { // Nest an environment for the local vars
@@ -799,6 +799,10 @@ public class Parse {
       // Standard return; function control, memory, result, RPC.  Plus a hook
       // to the function for faster access.
       RetNode ret = (RetNode)gvn(new RetNode(ctrl(),all_mem(),rez,rpc.unhook(),fun.unhook()));
+      // Update the function type for the current return value
+      Type tret = ((TypeTuple)_gvn.type(ret)).at(2);
+      Type tdisp = _gvn.type(e._par._scope.ptr());
+      fun.sharpen(_gvn,fun._tf.make(tdisp,tret)); // Sharpen alltype return, equal to what parser already knowns
       // The FunPtr builds a real display; any up-scope references are passed in now.
       Node fptr = gvn(new FunPtrNode(ret,e._par._scope.ptr()));
       _e = _e._par;             // Pop nested environment
@@ -830,7 +834,7 @@ public class Parse {
     Node mem  = s.early_mem ();
     Node val  = s.early_val ();
     if( ctrl == null ) {
-      s.set_def(4,ctrl=new RegionNode(  (Node)null),null);
+      s.set_def(4,ctrl=new RegionNode((Node)null),null);
       s.set_def(5,mem =new PhiNode(TypeMem.MEM, null,(Node)null),null);
       s.set_def(6,val =new PhiNode(Type.SCALAR, null,(Node)null),null);
     }

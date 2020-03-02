@@ -103,7 +103,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
       Node n = fld(i);
       if( n != null && n.is_forward_ref() ) {
         if( !progress ) { progress=true; gvn.unreg(this); }
-        parent.create(ts._flds[i],n,ts.flags(i),gvn);
+        parent.create(ts._flds[i],n,TypeStruct.fmod(ts.flags(i)),gvn);
         remove(def_idx(i),gvn);  // Hack edge
         ts = ts.del_fld(i);
         i--;

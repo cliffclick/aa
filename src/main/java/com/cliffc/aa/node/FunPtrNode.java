@@ -12,7 +12,7 @@ public final class FunPtrNode extends ConNode<TypeFunPtr> {
   private final String _referr;
   public  FunPtrNode( RetNode ret, Node display ) { this(null,ret,display); }
   private FunPtrNode( String referr, RetNode ret, Node display ) {
-    super(OP_FUNPTR,ret.fun()._tf,ret,display);
+    super(OP_FUNPTR,TypeFunPtr.GENERIC_FUNPTR,ret,display);
     _referr = referr;
     assert display==null || // Many primitives do not use a display
             (display instanceof ProjNode && display.in(0) instanceof NewObjNode) || // Standard local display/closure
@@ -46,19 +46,24 @@ public final class FunPtrNode extends ConNode<TypeFunPtr> {
     return fun==null ? xstr() : fun.str();
   }
 
-  @Override public Node ideal(GVNGCM gvn, int level) { return null; }
+  @Override public Node ideal(GVNGCM gvn, int level) {
+    if( is_forward_ref() ) return null;
+    RetNode ret = ret();
+    FunNode fun = ret.is_copy() ? FunNode.find_fidx(ret._fidx) : ret.fun();
+    if( in(1)!=null && fun._tf.arg(0)==TypeStruct.NO_DISP )
+      { set_def(1,null,gvn); return this; }
+    return null;
+  }
   @Override public Type value(GVNGCM gvn) {
-    if( is_forward_ref() ) return _t;
     if( !(in(0) instanceof RetNode) )
       return TypeFunPtr.EMPTY;
     RetNode ret = ret();
     FunNode fun = ret.is_copy() ? FunNode.find_fidx(ret._fidx) : ret.fun();
-    TypeTuple tret = (TypeTuple)gvn.type(ret);
-    Type tdisplay = display()==null ? Type.NIL : gvn.type(display());
-    Type rez = tret.at(2).bound(fun._tf._ret);
-    return fun._tf.make(tdisplay,rez);
+    if( is_forward_ref() ) return fun._tf;
+    Type tret = gvn.type(ret);
+    Type tdisp = display()==null ? TypeStruct.NO_DISP : gvn.type(display());
+    return fun._tf.make(tdisp,((TypeTuple)tret).at(2));
   }
-  @Override public Type all_type() { return _t; }
   @Override public String toString() { return super.toString(); }
   // Return the op_prec of the returned value.  Not sensible except when called
   // on primitives.

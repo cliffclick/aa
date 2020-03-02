@@ -28,7 +28,7 @@ public class TypeNode extends Node {
       TypeFunPtr tfp = (TypeFunPtr)_t;
       Type[] targs = tfp._args._ts;
       Node[] args = new Node[targs.length+2];
-      FunNode fun = gvn.init((FunNode)(new FunNode(targs).add_def(Env.ALL_CTRL)));
+      FunNode fun = gvn.init((FunNode)(new FunNode(tfp._args._flds,targs).add_def(Env.ALL_CTRL)));
       args[0] = fun;            // Call control
       args[1] = gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM     ),null));
       args[2] = arg;            // The whole TFP to the call

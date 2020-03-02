@@ -64,19 +64,20 @@ public final class RetNode extends Node {
     //  gvn.add_work_uses(this);
     return null;
   }
-  @Override public Type value(GVNGCM gvn) {
-    if( is_copy() ) return all_type();
+  @Override public TypeTuple value(GVNGCM gvn) {
+    TypeTuple TALL = all_type();
+    if( is_copy() ) return TALL;
     Type ctl = gvn.type(ctl());
-    if( ctl != Type.CTRL ) return ctl.above_center() ? TypeTuple.XRET : TypeTuple.RET;
+    if( ctl != Type.CTRL ) return ctl.above_center() ? TALL.dual() : TALL;
     Type mem = gvn.type(mem());
-    if( mem.above(TypeMem.FULL.dual()) ) return TypeTuple.XRET;
-    if( !(mem.isa(TypeMem.FULL      )) ) return TypeTuple. RET;
+    if( mem.above(TypeMem.FULL.dual()) ) return TALL.dual();
+    if( !(mem.isa(TypeMem.FULL      )) ) return TALL;
     Type val = gvn.type(val());
-    if( val.above(Type.XSCALAR) ) return TypeTuple.XRET;
-    if( !(val.isa(Type. SCALAR))) return TypeTuple. RET;
+    if( val.above(Type.XSCALAR) ) return TALL.dual();
+    if( !(val.isa(Type. SCALAR))) return TALL;
     return TypeTuple.make(ctl,mem,val);
   }
-  @Override public Type all_type() { return TypeTuple.RET; }
+  @Override public TypeTuple all_type() { return TypeTuple.make(Type.CTRL,TypeMem.FULL,fun()._tf._ret); }
 
   @Override public Node is_copy(GVNGCM gvn, int idx) { throw com.cliffc.aa.AA.unimpl(); }
   boolean is_copy() { return !(in(4) instanceof FunNode) || fun()._tf.fidx() != _fidx; }

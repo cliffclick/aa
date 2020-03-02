@@ -227,7 +227,7 @@ public class TestNode {
     test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  null, TypeStr.ABC  ));
     test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  null, TypeFlt.FLT64));
     test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  null, Type   .CTRL ));
-    test1monotonic(new    FunNode(new Type[]{TypeMemPtr.DISPLAY_PTR,TypeInt.INT64}));
+    test1monotonic(new    FunNode(new String[]{"^","x"},new Type[]{TypeMemPtr.DISPLAY_PTR,TypeInt.INT64}));
     test1monotonic(new FunPtrNode(ret,null));
     test1monotonic(new     IfNode(_ins[0],_ins[1]));
     for( IntrinsicNewNode prim : IntrinsicNewNode.INTRINSICS )

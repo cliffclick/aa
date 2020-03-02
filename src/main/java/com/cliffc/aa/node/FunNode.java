@@ -72,7 +72,7 @@ public class FunNode extends RegionNode {
   // Used to make copies when inlining/cloning function bodies
           FunNode(String name,TypeFunPtr tf, BitsAlias display_aliases) { this(name,tf,-1,display_aliases); }
   // Used to start an anonymous function in the Parser
-  public  FunNode(Type[] ts) { this(null,TypeFunPtr.make_new(TypeStruct.make_args(ts),Type.SCALAR),-1,Env.DISPLAY); }
+  public  FunNode(String[] flds, Type[] ts) { this(null,TypeFunPtr.make_new(TypeStruct.make(flds,ts),Type.SCALAR),-1,Env.DISPLAY); }
   // Used to forward-decl anon functions
           FunNode(String name) { this(name,TypeFunPtr.make_anon(),-2,Env.DISPLAY); add_def(Env.ALL_CTRL); }
   // Shared common constructor
@@ -184,18 +184,37 @@ public class FunNode extends RegionNode {
       return this;
     }
 
+    if( is_forward_ref() ) return null; // No mods on a forward ref
+    ParmNode rpc_parm = rpc();
+    if( rpc_parm == null ) return null; // Single caller const-folds the RPC, but also inlines in CallNode
+    ParmNode[] parms = new ParmNode[nargs()];
+    if( split_callers_gather(gvn,parms) == null ) return null;
+
+    // See if we can make the function signature more precise.  When building
+    // type-split signatures, we'd like this to be as precise as all unsplit
+    // inputs.
+    boolean progress=false;
+    for( int i=0; i<parms.length; i++ ) {
+      Type t = parms[i]==null ? (i==0 ? TypeStruct.NO_DISP : Type.XSCALAR) : gvn.type(parms[i]);
+      if( t != _tf.arg(i) ) { progress=true; break; }
+    }
+    if( progress ) {
+      Type[] ts = TypeAry.get(parms.length);
+      for( int i=0; i<parms.length; i++ )
+        ts[i] = parms[i]==null ? (i==0 ? TypeStruct.NO_DISP : Type.XSCALAR) : gvn.type(parms[i]);
+      TypeFunPtr tf = TypeFunPtr.make(_tf.fidxs(),_tf._args.make_from(ts),_tf._ret);
+      assert tf.isa(_tf) && _tf != tf;
+      _tf = tf;
+      gvn.add_work_uses(ret);  // Changing the sig can drop display closures
+      return this;
+    }
+
+    //----------------
     if( level <= 1 ) {          // Only doing small-work now
       if( level==0 ) gvn.add_work2(this); // Maybe want to inline later, but not during asserts
       return null;
     }
     // level 2 (or 3) work: inline
-
-    // Type-specialize as-needed
-    if( is_forward_ref() ) return null;
-    ParmNode rpc_parm = rpc();
-    if( rpc_parm == null ) return null; // Single caller const-folds the RPC, but also inlines in CallNode
-    ParmNode[] parms = new ParmNode[nargs()];
-    if( split_callers_gather(gvn,parms) == null ) return null;
 
     // Gather callers of this function being cloned.  Also does a decent sanity
     // check, so done before the split-choice heuristics.
@@ -271,9 +290,9 @@ public class FunNode extends RegionNode {
     // Look for splitting to help an Unresolved Call.
     int idx = find_type_split_index(gvn,parms);
     if( idx != -1 ) {           // Found; split along a specific input path using widened types
-      Type[] sig = new Type[parms.length];
+      Type[] sig = TypeAry.get(parms.length);
       for( int i=0; i<parms.length; i++ )
-        sig[i] = parms[i]==null ? (i==0 ? Type.NIL : Type.SCALAR) : gvn.type(parms[i].in(idx)).widen();
+        sig[i] = parms[i]==null ? (i==0 ? TypeStruct.NO_DISP : Type.XSCALAR) : gvn.type(parms[i].in(idx)).widen();
       assert !(sig[0] instanceof TypeFunPtr);
       return sig;
     }
@@ -319,7 +338,7 @@ public class FunNode extends RegionNode {
     Type[] sig = find_type_split(gvn,parms);
     if( sig == null ) return null; // No unresolved calls; no point in type-specialization
     // Make a new function header with new signature
-    TypeStruct args = TypeStruct.make_args(sig);
+    TypeStruct args = TypeStruct.make(_tf._args._flds,sig);
     assert args.isa(_tf._args);
     return args == _tf._args ? null : args; // Must see improvement
   }
@@ -567,7 +586,7 @@ public class FunNode extends RegionNode {
       Type ot = gvn.type(e.getKey()); // Generally just copy type from original nodes
       if( nn instanceof ParmNode && nn.in(0) == fun ) {  // Leading edge ParmNodes
         int idx = ((ParmNode)nn)._idx; // Update default type to match signature
-        if( idx == -1 ) ot = nn.all_type(); // Except the new RPC, which has new callers
+        ot = fun.targ(idx);
       } else if( nn == new_funptr ) {
         ot = fun._tf;           // New TFP for the new FunPtr
       } else if( nn instanceof CallEpiNode ) { // Old calls might be wired, new calls need to re-wire
@@ -652,6 +671,12 @@ public class FunNode extends RegionNode {
     return null;
   }
 
+  public void sharpen( GVNGCM gvn, TypeFunPtr tfp ) {
+    if( _tf == tfp ) return;
+    Type t = gvn.unreg(this);  // Must unreg before changing hash
+    _tf = tfp;
+    gvn.rereg(this,t);
+  }
   @Override public int hashCode() { return super.hashCode()+_tf.hashCode(); }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;

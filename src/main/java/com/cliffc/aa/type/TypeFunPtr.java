@@ -28,7 +28,7 @@ import java.util.function.Predicate;
 public final class TypeFunPtr extends Type<TypeFunPtr> {
   // List of known functions in set, or 'flip' for choice-of-functions.
   // A single bit is a classic code pointer.
-  private BitsFun _fidxs;       // Known function bits
+  BitsFun _fidxs;       // Known function bits
 
   // Union (or join) signature of said functions; depends on if _fidxs is
   // above_center() or not.  Slot 0 is for the display type, and so is always a
@@ -36,9 +36,11 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public TypeStruct _args;      // Standard args, zero-based, no memory
   public Type _ret;             // Standard formal return type.
 
+  boolean _cyclic; // Type is cyclic.  This is a summary property, not a description of value sets, hence is not in the equals or hash
+
   private TypeFunPtr(BitsFun fidxs, TypeStruct args, Type ret ) { super(TFUNPTR); init(fidxs,args,ret); }
   private void init (BitsFun fidxs, TypeStruct args, Type ret ) { _fidxs = fidxs; _args=args; _ret=ret; }
-  @Override int compute_hash() { return TFUNPTR + _fidxs._hash + _args._hash + _ret._hash; }
+  @Override int compute_hash() { assert _args._hash != 0;  return TFUNPTR + _fidxs._hash + _args._hash + _ret._hash; }
 
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
@@ -48,16 +50,34 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   }
   // Structs can contain TFPs in fields, and TFPs contain a Struct, but never
   // in a cycle.
-  @Override public boolean cycle_equals( Type o ) { return equals(o); }
+  @Override public boolean cycle_equals( Type o ) {
+    if( this==o ) return true;
+    if( !(o instanceof TypeFunPtr) ) return false;
+    TypeFunPtr tf = (TypeFunPtr)o;
+    if( _fidxs!=tf._fidxs || _ret!=tf._ret ) return false;
+    return _args==tf._args || _args.cycle_equals(tf._args);
+  }
   @Override public String str( VBitSet dups) {
-    return "*"+names()+":{"+_args.str(dups)+"-> "+_ret.str(dups)+"}";}
+    if( dups == null ) dups = new VBitSet();
+    if( dups.tset(_uid) ) return "$"; // Break recursive printing cycle
+    return "*"+names()+":{"+_args.str(dups)+"-> "+_ret.str(dups)+"}";
+  }
+  @Override SB dstr( SB sb, VBitSet dups ) {
+    sb.p('_').p(_uid);
+    if( dups == null ) dups = new VBitSet();
+    if( dups.tset(_uid) ) return sb.p('$'); // Break recursive printing cycle
+    sb.p('*').p(names()).p(":{");
+    _args.dstr(sb,dups).p("-> ");
+    _ret.dstr(sb,dups);
+    return sb.p("}");
+  }
   public String names() { return FunNode.names(_fidxs,new SB()).toString(); }
   public int nargs() { return _args._ts.length; }
 
   private static TypeFunPtr FREE=null;
   @Override protected TypeFunPtr free( TypeFunPtr ret ) { FREE=this; return ret; }
   public static TypeFunPtr make( BitsFun fidxs, TypeStruct args, Type ret ) {
-    assert args.at(0).isa(Type.NIL) || ((TypeMemPtr)args.at(0)).is_display();
+    assert args.at(0).isa(Type.XSCALAR) || ((TypeMemPtr)args.at(0)).is_display();
     TypeFunPtr t1 = FREE;
     if( t1 == null ) t1 = new TypeFunPtr(fidxs,args,ret);
     else {   FREE = null;        t1.init(fidxs,args,ret); }
@@ -74,7 +94,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   // Make a TFP with a new display and return value, used by FunPtrNode
   public TypeFunPtr make(Type display, Type ret) {
     assert _args.is_display();
-    assert display.isa(Type.NIL) || ((TypeMemPtr)display).is_display();
+    assert ((TypeMemPtr)display).is_display();
     return make(_fidxs,_args.set_fld(0,display,_args.fmod(0)),ret);
   }
 
@@ -84,6 +104,14 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   static final TypeFunPtr[] TYPES = new TypeFunPtr[]{GENERIC_FUNPTR,TEST_INEG};
 
   @Override protected TypeFunPtr xdual() { return new TypeFunPtr(_fidxs.dual(),_args.dual(),_ret.dual()); }
+  @Override protected TypeFunPtr rdual() {
+    if( _dual != null ) return _dual;
+    TypeFunPtr dual = _dual = new TypeFunPtr(_fidxs.dual(),_args.rdual(),_ret.dual());
+    dual._dual = this;
+    dual._hash = dual.compute_hash();
+    dual._cyclic = true;
+    return dual;
+  }
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TFUNPTR:break;

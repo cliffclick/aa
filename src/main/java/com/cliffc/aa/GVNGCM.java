@@ -569,17 +569,15 @@ public class GVNGCM {
       n=subsume(n,con(t));      // Constant replacement
 
     // Functions can sharpen return value
-    } else if( n instanceof FunNode && !n.is_prim() ) {
-      FunNode fun = (FunNode)n;
-      RetNode ret = fun.ret();
-      if( type(fun)==Type.CTRL && !fun.is_forward_ref() &&
-          type(ret.ctl()) == Type.CTRL ) { // never-return function (maybe never called?)
-        Type tret = ((TypeTuple)type(ret)).at(2);
-        if( fun._tf._ret != tret && // can sharpen function return
-            tret.isa(fun._tf._ret) ) { // Only if sharpened (might not be true for errors)
-          unreg(fun);
-          fun._tf = TypeFunPtr.make(fun._tf.fidxs(),fun._tf._args,tret);
-          rereg(fun,Type.CTRL);
+    } else if( n instanceof FunPtrNode && !n.is_prim() && !n.is_forward_ref() ) {
+      FunPtrNode fptr = (FunPtrNode)n;
+      RetNode ret = fptr.ret();
+      FunNode fun = ret.fun();
+      if( type(fun)==Type.CTRL && type(ret.ctl()) == Type.CTRL ) { // never-return function (maybe never called?)
+        TypeFunPtr tfp = (TypeFunPtr)type(fptr);
+        if( tfp != fun._tf && tfp.isa(fun._tf) ) {
+          throw com.cliffc.aa.AA.unimpl();
+          //fun.sharpen(this,tfp);
         }
       }
 
