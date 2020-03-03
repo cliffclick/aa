@@ -11,12 +11,10 @@ import com.cliffc.aa.type.*;
 public class ParmNode extends PhiNode {
   final int _idx;             // Parameter index, zero-based; -1 reserved for RPC, -2 for mem
   final String _name;         // Parameter name
-  private final Type _alltype;
   public ParmNode( int idx, String name, Node fun, ConNode defalt, Parse badgc) {
     super(OP_PARM,fun,defalt,badgc);
     _idx=idx;
     _name=name;
-    _alltype = defalt._t;
   }
   FunNode fun() { return (FunNode) in(0); }
   @Override String xstr() { return "Parm:"+_name; }
@@ -49,7 +47,7 @@ public class ParmNode extends PhiNode {
 
   @Override public Type value(GVNGCM gvn) {
     Type t = super.value(gvn);
-    t = t.bound(_alltype);
+    t = t.bound(all_type());
     // Memory tracks the notion of 'clean' or 'unwritten' since the function
     // start.  Changed memory is returned at exit and unchanged memory is NOT
     // returned - and CallEpis are aware of this behavior and do the correct
@@ -90,5 +88,5 @@ public class ParmNode extends PhiNode {
     }
     return null;
   }
-  @Override public Type all_type() { return _idx==-1 ? TypeRPC.ALL_CALL : (_idx==-2 ? TypeMem.MEM : _alltype); }
+  @Override public Type all_type() { return fun().targ(_idx); }
 }

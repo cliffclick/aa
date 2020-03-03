@@ -54,6 +54,7 @@ public final class RetNode extends Node {
       set_def(2,null,gvn);      // No val
       return this;              // Progress
     }
+    if( is_copy() ) return null;
     // Collapsed to a constant?  Remove any control interior.
     if( gvn.type(val()).is_con() && ctl()!=fun() && // Profit: can change control and delete function interior
         (gvn.type(mem())==TypeMem.EMPTY || (mem() instanceof ParmNode && mem().in(0)==fun())) ) // Memory has to be trivial also
@@ -64,9 +65,9 @@ public final class RetNode extends Node {
     //  gvn.add_work_uses(this);
     return null;
   }
-  @Override public TypeTuple value(GVNGCM gvn) {
+  @Override public Type value(GVNGCM gvn) {
+    if( is_copy() ) return gvn.self_type(this); // No change if a copy
     TypeTuple TALL = all_type();
-    if( is_copy() ) return TALL;
     Type ctl = gvn.type(ctl());
     if( ctl != Type.CTRL ) return ctl.above_center() ? TALL.dual() : TALL;
     Type mem = gvn.type(mem());

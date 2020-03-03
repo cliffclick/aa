@@ -316,7 +316,7 @@ public final class CallEpiNode extends Node {
     Type pre_c_mem = tcall.at(1);
     TypeMem pre_call_memory = pre_c_mem instanceof TypeMem
       ? (TypeMem)pre_c_mem
-      : (pre_c_mem.above_center() ? TypeMem.XMEM : TypeMem.MEM);
+      : (pre_c_mem.above_center() ? TypeMem.EMPTY : TypeMem.FULL);
     Type post_call_mem = tt.at(1).meet(pre_call_memory);
     // Return a FOUR-tuple: standard call (control,memory,value) return, plus
     // JUST the function return memories.  Loads and Stores can bypass the
