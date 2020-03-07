@@ -17,8 +17,8 @@ public class NewObjNode extends NewNode<TypeStruct> {
   public final boolean _is_closure; // For error messages
   // NewNodes do not really need a ctrl; useful to bind the upward motion of
   // closures so variable stores can more easily fold into them.
-  public NewObjNode( boolean is_closure, Node ctrl, Node clo ) {
-    this(is_closure, BitsAlias.RECORD, TypeStruct.DISPLAY,ctrl,clo);
+  public NewObjNode( boolean is_closure, TypeStruct disp, Node ctrl, Node clo ) {
+    this(is_closure, BitsAlias.RECORD, disp, ctrl,clo);
   }
   // Called by IntrinsicNode.convertTypeNameStruct
   public NewObjNode( boolean is_closure, int par_alias, TypeStruct ts, Node ctrl, Node clo ) {
@@ -132,7 +132,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
     Type[] ts = TypeAry.get(_ts._ts.length);
     for( int i=0; i<ts.length; i++ )
       // Limit type bounds, since error returns can be out-of-bounds
-      ts[i] = gvn.type(fld(i)).bound(_ts.at(i));
+      ts[i] = gvn.type(fld(i));
     TypeStruct newt = _ts.make_from(ts);
 
     // Check for TypeStructs with this same NewNode types occurring more than

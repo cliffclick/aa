@@ -12,7 +12,10 @@ public class ParmNode extends PhiNode {
   final int _idx;             // Parameter index, zero-based; -1 reserved for RPC, -2 for mem
   final String _name;         // Parameter name
   public ParmNode( int idx, String name, Node fun, ConNode defalt, Parse badgc) {
-    super(OP_PARM,fun,defalt,badgc);
+    this(idx,name,fun,defalt._t,defalt,badgc);
+  }
+  public ParmNode( int idx, String name, Node fun, Type tdef, Node defalt, Parse badgc) {
+    super(OP_PARM,fun,tdef,defalt,badgc);
     _idx=idx;
     _name=name;
   }
@@ -46,13 +49,20 @@ public class ParmNode extends PhiNode {
   }
 
   @Override public Type value(GVNGCM gvn) {
+    Type oldt = gvn.self_type(this);
     Type t = super.value(gvn);
-    t = t.bound(all_type());
+    // Bound all input types to the matching function argument type, so sane
+    // arguments flow into the function... even if bad arguments are being
+    // passed.  This limits forward error flow, and enables better error
+    // messages.  Not done during or after GCP, as we are past error prop.
+    if( gvn._opt_mode<2 ) t = t.bound(all_type());
     // Memory tracks the notion of 'clean' or 'unwritten' since the function
     // start.  Changed memory is returned at exit and unchanged memory is NOT
     // returned - and CallEpis are aware of this behavior and do the correct
     // merge-around.  This allows loads & stores below a call bypass the call.
     t = t.clean();              // Mark all as clean
+    // If ParmNode makes progress, the FunNode can sharpen internal _tf type
+    if( t!=oldt && gvn._opt_mode!=2 ) gvn.add_work(fun());
     return t;
   }
 
@@ -88,5 +98,4 @@ public class ParmNode extends PhiNode {
     }
     return null;
   }
-  @Override public Type all_type() { return fun().targ(_idx); }
 }

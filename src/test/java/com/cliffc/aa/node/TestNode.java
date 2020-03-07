@@ -229,20 +229,20 @@ public class TestNode {
     test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  null, Type   .CTRL ));
     test1monotonic(new    FunNode(new String[]{"^","x"},new Type[]{TypeMemPtr.DISPLAY_PTR,TypeInt.INT64}));
     test1monotonic(new FunPtrNode(ret,null));
+    test1monotonic(new FP2ClosureNode(_ins[1])); // Only takes in a TFP
     test1monotonic(new     IfNode(_ins[0],_ins[1]));
     for( IntrinsicNewNode prim : IntrinsicNewNode.INTRINSICS )
       test1monotonic_intrinsic(prim);
     test1monotonic(new IntrinsicNode(tname,null,null,mem,_ins[2]));
     test1monotonic(new   LoadNode(_ins[1],_ins[2],"x",null));
     test1monotonic(new MemMergeNode(_ins[1],_ins[2],BitsAlias.RECORD));
-    NewObjNode nnn1 = new NewObjNode(false,_ins[0],_gvn.con(Type.NIL));
+    NewObjNode nnn1 = new NewObjNode(false,TypeStruct.DISPLAY,_ins[0],_gvn.con(Type.NIL));
     set_type(1,Type.SCALAR);  nnn1.create_active("x",_ins[1],TypeStruct.FFNL,_gvn);
     set_type(2,Type.SCALAR);  nnn1.create_active("y",_ins[2],TypeStruct.FFNL,_gvn);
     test1monotonic(nnn1);
-    NewObjNode nnn2 = new NewObjNode(false,_ins[0],_gvn.con(Type.NIL));
-    set_type(1,Type.NIL   );  nnn2.create_active("^",_ins[1],TypeStruct.FFNL,_gvn);
-    set_type(2,Type.SCALAR);  nnn2.create_active("x",_ins[2],TypeStruct.FFNL,_gvn);
-    set_type(3,Type.SCALAR);  nnn2.create_active("y",_ins[3],TypeStruct.FFNL,_gvn);
+    NewObjNode nnn2 = new NewObjNode(false,TypeStruct.DISPLAY,_ins[0],_gvn.con(Type.NIL));
+    set_type(1,Type.SCALAR);  nnn2.create_active("x",_ins[2],TypeStruct.FFNL,_gvn);
+    set_type(2,Type.SCALAR);  nnn2.create_active("y",_ins[3],TypeStruct.FFNL,_gvn);
     nnn2.set_name(tname);
     test1monotonic(nnn2);
     test1monotonic(new MemMergeNode(_ins[1],_ins[2],BitsAlias.RECORD));

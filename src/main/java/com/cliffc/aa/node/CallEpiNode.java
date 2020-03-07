@@ -93,7 +93,8 @@ public final class CallEpiNode extends Node {
           // both cloned and original versions are wired, but only one is
           // reachable.
           unwire(gvn,call,ret);
-          del(wire_num(i--));
+          del(wire_num(i));
+          return this; // Return with progress
         }
       }
     }
@@ -117,7 +118,7 @@ public final class CallEpiNode extends Node {
     TypeStruct formals = fun._tf._args;
     for( int i=1; i<cnargs; i++ ) { // Start at 1 to skip closure hidden arg
       if( fun.parm(i)==null ) { // Argument is dead and can be dropped?
-        if( gvn.type(call.arg(i)) != Type.XSCALAR )
+        if( gvn.type(call.arg(i)) != Type.XSCALAR && call.proj(i)==null )
           call.set_arg_reg(i,gvn.con(Type.XSCALAR),gvn); // Replace with some generic placeholder
       } else {
         Type formal = formals.at(i);
@@ -299,6 +300,7 @@ public final class CallEpiNode extends Node {
       // Make real from virtual CG edges in GCP/Opto by wiring calls.
       if( gvn._opt_mode==0 ) gvn.add_work(this); // Not during parsing, but check afterwards
       if( gvn._opt_mode!=0 &&        // Not during parsing
+          !(gvn._opt_mode==1 && call.fun() instanceof UnresolvedNode) &&
           !is_copy() &&              // Not if collapsing
           !fidxs.above_center() &&   // Still settling down to possibilities
           !fun.is_forward_ref() &&   // Call target is undefined
@@ -352,6 +354,20 @@ public final class CallEpiNode extends Node {
     for( int i=1; i<fun._defs._len; i++ ) // Unwire
       if( fun.in(i).in(0)==call ) gvn.set_def_reg(fun,i,gvn.con(Type.XCTRL));
   }
+  
+  // Compute local contribution of use liveness to this def.  If the call is
+  // Unresolved, then none of CallEpi targets are (yet) alive.
+  public TypeMem compute_live(GVNGCM gvn, TypeMem live, Node def) {
+    if( _keep>0 ) return TypeMem.FULL;  // Somebody is forcing this live
+
+    // If we are not sure which of the many targets will eventually be alive,
+    // then none are.  Once the call resolves, the chosen target will be alive.
+    if( in(0) instanceof CallNode && def != call() && call().fun() instanceof UnresolvedNode )
+      return live;              // Not sure, so def is not more alive (yet)
+    // 
+    return (TypeMem)live.meet(_live);   // If any use is alive, so is the def
+  }
+  
   // If slot 0 is not a CallNode, we have been inlined.
   boolean is_copy() { return !(in(0) instanceof CallNode); }
   @Override public Node is_copy(GVNGCM gvn, int idx) { return is_copy() ? in(idx) : null; }

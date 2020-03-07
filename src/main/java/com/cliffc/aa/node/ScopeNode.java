@@ -105,7 +105,7 @@ public class ScopeNode extends Node {
 
 
   @Override public TypeMem compute_live(GVNGCM gvn, TypeMem live, Node def) {
-    if( mem()!=def ) return TypeMem.FULL;  // Other non-memory uses are alive
+    if( !is_prim() && mem()!=def ) return TypeMem.FULL;  // Other non-memory uses are alive
     if( rez() == null ) return live;    // No return result, nothing extra is alive.
     if( live == TypeMem.FULL) return live; // Already all is live
     // All fields in all reachable pointers from rez() will be marked live

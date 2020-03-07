@@ -395,7 +395,7 @@ static class RandI64 extends PrimNode {
 }
 
 static class Id extends PrimNode {
-  Id(Type arg) { super("id",TypeStruct.make(TypeStruct.ARGS_X,TypeStruct.ts(TypeStruct.NO_DISP,arg)),arg); }
+  Id(Type arg) { super("id",TypeStruct.make_args(TypeStruct.ARGS_X,TypeStruct.ts(TypeStruct.NO_DISP,arg)),arg); }
   @Override public Node ideal(GVNGCM gvn, int level) { return in(1); }
   @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)).bound(_ret); }
   @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }

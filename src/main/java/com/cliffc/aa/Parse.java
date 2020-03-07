@@ -693,7 +693,7 @@ public class Parse {
    *  tuple= (stmts,[stmts,])     // Tuple; final comma is optional
    */
   private Node tuple(Node s) {
-    NewObjNode nn = new NewObjNode(false,ctrl(),con(Type.NIL));
+    NewObjNode nn = new NewObjNode(false,BitsAlias.RECORD,TypeStruct.DISPLAY,ctrl(),con(Type.NIL));
     int fidx=0, oldx=_x-1; // Field name counter, mismatched parens balance point
     while( s!=null ) {
       nn.create_active((""+(fidx++)).intern(),s,TypeStruct.FFNL,_gvn);
@@ -724,8 +724,9 @@ public class Parse {
 
     // Push an extra hidden display argument.  Similar to java inner-class ptr
     // or when inside of a struct definition: 'this'.
+    Node parent_display = _e._scope.ptr();
     ids .push("^");
-    ts  .push(_gvn.type(_e._scope.ptr()));
+    ts  .push(TypeMemPtr.DISPLAY_PTR);
     bads.push(null);
 
     // Parse arguments
@@ -770,15 +771,15 @@ public class Parse {
       // Build Parms for all incoming values
       Node rpc = gvn(new ParmNode(-1,"rpc",fun,con(TypeRPC.ALL_CALL),null)).keep();
       Node mem = gvn(new ParmNode(-2,"mem",fun,con(TypeMem.FULL    ),null));
-      Node clo = gvn(new ParmNode( 0,"^"  ,fun,con(TypeMemPtr.DISPLAY_PTR),null));
-      // Display is special: the default is simple the outer lexical scope.
+      Node clo = gvn(new ParmNode( 0,"^"  ,fun,TypeMemPtr.DISPLAY_PTR,parent_display,null));
+      // Display is special: the default is simply the outer lexical scope.
       // But here, in a function, the display is actually passed in as a hidden
       // extra argument and replaces the default.
       e._scope.stk().update(0,ts_mutable(false),clo,_gvn);
       // Parms for all arguments
       Parse errmsg = errMsg();  // Lazy error message
       for( int i=1; i<ids._len; i++ ) {
-        Node parm = gvn(new ParmNode(i,ids.at(i),fun,con(Type.SCALAR),errmsg));
+        Node parm = gvn(new ParmNode(i,ids.at(i),fun,con(ts.at(i)),errmsg));
         // Type-check arguments
         Node mt = typechk(parm,ts.at(i),mem,bads.at(i));
         create(ids.at(i),mt, args_are_mutable);
@@ -801,8 +802,7 @@ public class Parse {
       RetNode ret = (RetNode)gvn(new RetNode(ctrl(),all_mem(),rez,rpc.unhook(),fun.unhook()));
       // Update the function type for the current return value
       Type tret = ((TypeTuple)_gvn.type(ret)).at(2);
-      Type tdisp = _gvn.type(e._par._scope.ptr());
-      fun.sharpen(_gvn,fun._tf.make(tdisp,tret)); // Sharpen alltype return, equal to what parser already knowns
+      fun.sharpen(_gvn,fun._tf.make(TypeMemPtr.DISPLAY_PTR,tret)); // Sharpen alltype return, equal to what parser already knowns
       // The FunPtr builds a real display; any up-scope references are passed in now.
       Node fptr = gvn(new FunPtrNode(ret,e._par._scope.ptr()));
       _e = _e._par;             // Pop nested environment

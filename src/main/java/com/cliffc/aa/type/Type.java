@@ -866,6 +866,9 @@ public class Type<T extends Type<T>> implements Cloneable {
     assert !is_con() || dual()==this;
     return above_center() ? this : dual();
   }
+  // Display might be Scalar or ~Scalar due to startype
+  boolean is_display_ptr() { return _type==TSCALAR || _type==TXSCALAR || _type==TNIL || _type==TANY; }
+  boolean is_display() { return false; }
 
   RuntimeException typerr(Type t) {
     throw new RuntimeException("Should not reach here: internal type system error with "+this+(t==null?"":(" and "+t)));

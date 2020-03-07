@@ -86,9 +86,8 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   public  static final TypeMemPtr STRUCT0= make(BitsAlias.RECORD_BITS0,TypeStruct.ALLSTRUCT);
   static final TypeMemPtr[] TYPES = new TypeMemPtr[]{OOP0,STR0,STRPTR,ABCPTR,STRUCT};
 
-  boolean is_display() {
-    if( this==DISPLAY_PTR || this==DISPLAY_PTR._dual ) return true;
-    return (_obj instanceof TypeStruct && ((TypeStruct)_obj).is_display());
+  @Override public boolean is_display_ptr() {
+    return this==DISPLAY_PTR || this==DISPLAY_PTR._dual || _obj.is_display();
   }
 
   @Override protected TypeMemPtr xdual() {

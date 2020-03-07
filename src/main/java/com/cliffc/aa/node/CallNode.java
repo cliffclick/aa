@@ -101,6 +101,13 @@ public class CallNode extends Node {
   Node arg( int x ) { assert x>=0; return _defs.at(x+2); }
   // Set an argument.  Use 'set_fun' to set the Display/Code.
   void set_arg_reg(int idx, Node arg, GVNGCM gvn) { assert idx>0; gvn.set_def_reg(this,idx+2,arg); }
+  // Find output Proj for an argument
+  ProjNode proj(int x) {
+    for( Node use : _uses )
+      if( use instanceof ProjNode && ((ProjNode)use)._idx==x+2 )
+        return (ProjNode)use;
+    return null;
+  }
 
           Node ctl() { return in(0); }
   public  Node mem() { return in(1); }
@@ -222,20 +229,19 @@ public class CallNode extends Node {
         // If calling everything then not much we can do
         fidxs.test(BitsFun.ALL) )
       return TypeTuple.make(ts);
-
-    // Trim unused aliases, specifically to prevent local displays from escaping.
-    // Here, I start with all alias#s from TMP args plus all function
-    // display#s and "close over" the set of possible aliases.
-
-    // Set of aliases escaping into the function.  Includes everything in the
-    // function displays.
-    BitsAlias abs = tfp.recursive_aliases(BitsAlias.EMPTY,tmem);
-    // Now the set of pointers escaping via arguments
-    for( int i=0; i<nargs(); i++ ) {
-      if( abs.test(1) ) break;  // Shortcut for already being full
-      abs = ts[i+2].recursive_aliases(abs,tmem);
-    }
-
+    
+    //// Trim unused aliases, specifically to prevent local displays from escaping.
+    //// Here, I start with all alias#s from TMP args plus all function
+    //// display#s and "close over" the set of possible aliases.
+    //
+    //// Set of aliases escaping into the function.  Includes everything in the
+    //// function displays.
+    //BitsAlias abs = tfp.recursive_aliases(BitsAlias.EMPTY,tmem);
+    //// Now the set of pointers escaping via arguments
+    //for( int i=0; i<nargs(); i++ ) {
+    //  if( abs.test(1) ) break;  // Shortcut for already being full
+    //  abs = ts[i+2].recursive_aliases(abs,tmem);
+    //}
     return TypeTuple.make(ts);
   }
 

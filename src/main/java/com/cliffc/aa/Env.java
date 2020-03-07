@@ -16,7 +16,8 @@ public class Env implements AutoCloseable {
     Node ctl = par == null ? CTL_0 : par._scope.ctrl();
     Node clo = par == null ? GVN.con(Type.NIL) : par._scope.ptr ();
     Node mem = par == null ? MEM_0 : par._scope.mem ();
-    NewObjNode nnn = GVN.init(new NewObjNode(is_closure,ctl,clo)).keep();
+    TypeStruct tdisp = par == null ? TypeStruct.DISPLAY : TypeStruct.make_args(TypeStruct.ts(GVN.type(par._scope.ptr())));
+    NewObjNode nnn = GVN.init(new NewObjNode(is_closure,tdisp,ctl,clo)).keep();
     Node frm = GVN.xform(new OProjNode(nnn,0));
     Node ptr = GVN.xform(new  ProjNode(nnn,1));
     BitsAlias bits_clo = BitsAlias.make0(_display_alias = nnn._alias);
@@ -45,7 +46,7 @@ public class Env implements AutoCloseable {
     DISPLAY = BitsAlias.EMPTY;
 
     // Initial control & memory
-    START  =          new StartNode(       ) ;
+    START  = GVN.init(new StartNode(       ));
     CTL_0  = GVN.init(new CProjNode(START,0));
     MEM_0  = GVN.init(new MProjNode(START,1));
     // Top-most (file-scope) lexical environment

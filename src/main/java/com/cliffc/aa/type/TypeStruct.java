@@ -145,8 +145,10 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   String str( VBitSet dups) {
     if( dups == null ) dups = new VBitSet();
     if( dups.tset(_uid) ) return "$"; // Break recursive printing cycle
-    if( find("!") != -1 && find("math_pi") != -1 )
-      return "{PRIMS}";         // Special shortcut for the all-prims display type
+    // Special shortcut for the all-prims display type
+    if( find("!") != -1 && find("math_pi") != -1 && _ts[1] instanceof TypeFunPtr )
+      return ((TypeFunPtr)_ts[1])._args._ts[0].above_center()
+        ? "{PRIMS}" : "{LOW_PRIMS}"; 
 
     SB sb = new SB();
     if( _uf!=null ) return "=>"+_uf; // Only used mid-recursion
@@ -171,8 +173,10 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     sb.p('_').p(_uid);
     if( dups == null ) dups = new VBitSet();
     if( dups.tset(_uid) ) return sb.p('$'); // Break recursive printing cycle
-    if( find("!") != -1 && find("math_pi") != -1 )
-      return sb.p("{PRIMS}");
+    // Special shortcut for the all-prims display type
+    if( find("!") != -1 && find("math_pi") != -1 && _ts[1] instanceof TypeFunPtr )
+      return sb.p(((TypeFunPtr)_ts[1])._args._ts[0].above_center()
+                  ? "{PRIMS}" : "{LOW_PRIMS}");
 
     if( _uf!=null ) return _uf.dstr(sb.p("=>"),dups);
     if( _any ) sb.p('~');
@@ -198,8 +202,10 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   @Override public SB str(SB sb, VBitSet dups, TypeMem mem) {
     if( dups == null ) dups = new VBitSet();
     if( dups.tset(_uid) ) return sb.p('$'); // Break recursive printing cycle
-    if( find("!") != -1 && find("math_pi") != -1 )
-      return sb.p("{PRIMS}");
+    // Special shortcut for the all-prims display type
+    if( find("!") != -1 && find("math_pi") != -1 && _ts[1] instanceof TypeFunPtr )
+      return sb.p(((TypeFunPtr)_ts[1])._args._ts[0].above_center()
+                  ? "{PRIMS}" : "{LOW_PRIMS}");
     if( _uf!=null ) return _uf.str(sb.p("=>"),dups,mem);
     if( _any ) sb.p('~');
     sb.p(_name);
@@ -264,9 +270,10 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public static final byte FFNL = 1; // centerline
   public static final byte FRW  = 2; // centerline
   public static final byte FRO  = 3; // bottom
+
   // Some precooked flags
-  private static final byte fbot_flag = make_flag(FRO ,true); // Field bottom
-  private static final byte  fnl_flag = make_flag(FFNL,true); // Field final
+  private static final byte fbot_flag = make_flag(FRO ,false); // Field bottom
+  private static final byte  fnl_flag = make_flag(FFNL,false); // Field final
   private static final byte  frw_flag = make_flag(FRW ,true); // Field final
 
   // Field bottom, plus dirty flags
@@ -281,11 +288,18 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   }
   // Generic function arguments.  Slot 0 is the display and has a fixed name.
   public  static TypeStruct make_args(Type[] ts) {
-    assert ts[0]==Type.XSCALAR || ((TypeMemPtr)ts[0]).is_display();
+    assert ts[0].is_display_ptr();
     String[] args = new String[ts.length];
     Arrays.fill(args,".");
     args[0] = "^";
-    return malloc("",false,args,ts,fbots(ts.length)).hashcons_free();
+    byte[] fs = fbots(ts.length);  fs[0] = FFNL;
+    return malloc("",false,args,ts,fs).hashcons_free();
+  }
+  public  static TypeStruct make_args(String[] flds, Type[] ts) {
+    assert ts[0].is_display_ptr();
+    assert Util.eq(flds[0],"^");
+    byte[] fs = fbots(ts.length);  fs[0] = FFNL;
+    return malloc("",false,flds,ts,fs).hashcons_free();
   }
   public  static TypeStruct make(Type t0         ) { return make(ts(t0   )); }
   public  static TypeStruct make(Type t0, Type t1) { return make(ts(t0,t1)); }
@@ -324,31 +338,29 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     DISPLAY.install_cyclic(new Ary<>(ts(DISPLAY,TypeMemPtr.DISPLAY_PTR)));
     assert DISPLAY.is_display();
   }
-  boolean is_display() {
-    if( this==DISPLAY || this==DISPLAY._dual ) return true;
-    return _ts.length >= 1 &&
-      ((_ts[0] instanceof TypeMemPtr && ((TypeMemPtr)_ts[0]).is_display()) ||
-       (_ts[0] == Type.NIL));
+  @Override boolean is_display() {
+    return this==DISPLAY || this==DISPLAY._dual
+      || (_ts.length >= 1 && _ts[0].is_display_ptr());
   }
-  public  static final TypeMemPtr NO_DISP = TypeMemPtr.DISPLAY_PTR.dual();
+  public  static final Type NO_DISP = TypeMemPtr.DISPLAY_PTR.dual();
 
   public  static final TypeStruct GENERIC = malloc("",true,FLD0,TypeAry.get(0),new byte[0]).hashcons_free();
   public  static final TypeStruct ALLSTRUCT;
-  public  static final TypeStruct SCALAR0     = make_args   (ts(NO_DISP));
-  public  static final TypeStruct SCALAR1     = make(ARGS_X ,ts(NO_DISP,SCALAR));
-  public  static final TypeStruct SCALAR2     = make(ARGS_XY,ts(NO_DISP,SCALAR,SCALAR));
-  public  static final TypeStruct STRPTR      = make(ARGS_X ,ts(NO_DISP,TypeMemPtr.STRPTR));
-  public  static final TypeStruct OOP_OOP     = make(ARGS_XY,ts(NO_DISP,TypeMemPtr.OOP0,TypeMemPtr.OOP0));
-  public  static final TypeStruct INT64_INT64 = make(ARGS_XY,ts(NO_DISP,TypeInt.INT64,TypeInt.INT64));
-  public  static final TypeStruct FLT64_FLT64 = make(ARGS_XY,ts(NO_DISP,TypeFlt.FLT64,TypeFlt.FLT64));
-  public  static final TypeStruct STR_STR     = make(ARGS_XY,ts(NO_DISP,TypeMemPtr.STRPTR,TypeMemPtr.STRPTR));
-  public  static final TypeStruct FLT64       = make(ARGS_X ,ts(NO_DISP,TypeFlt.FLT64)); // @{x:flt}
-  public  static final TypeStruct INT64       = make(ARGS_X ,ts(NO_DISP,TypeInt.INT64)); // @{x:int}
+  public  static final TypeStruct SCALAR0     = make_args(        ts(NO_DISP));
+  public  static final TypeStruct SCALAR1     = make_args(ARGS_X ,ts(NO_DISP,SCALAR));
+  public  static final TypeStruct SCALAR2     = make_args(ARGS_XY,ts(NO_DISP,SCALAR,SCALAR));
+  public  static final TypeStruct STRPTR      = make_args(ARGS_X ,ts(NO_DISP,TypeMemPtr.STRPTR));
+  public  static final TypeStruct OOP_OOP     = make_args(ARGS_XY,ts(NO_DISP,TypeMemPtr.OOP0,TypeMemPtr.OOP0));
+  public  static final TypeStruct INT64_INT64 = make_args(ARGS_XY,ts(NO_DISP,TypeInt.INT64,TypeInt.INT64));
+  public  static final TypeStruct FLT64_FLT64 = make_args(ARGS_XY,ts(NO_DISP,TypeFlt.FLT64,TypeFlt.FLT64));
+  public  static final TypeStruct STR_STR     = make_args(ARGS_XY,ts(NO_DISP,TypeMemPtr.STRPTR,TypeMemPtr.STRPTR));
+  public  static final TypeStruct FLT64       = make_args(ARGS_X ,ts(NO_DISP,TypeFlt.FLT64)); // @{x:flt}
+  public  static final TypeStruct INT64       = make_args(ARGS_X ,ts(NO_DISP,TypeInt.INT64)); // @{x:int}
 
   // A bunch of types for tests
   public  static final TypeStruct NAMEPT= make("Point:",ARGS_XY,ts(NO_DISP,TypeFlt.FLT64,TypeFlt.FLT64),ffnls(3));
   public  static final TypeStruct POINT = make(ARGS_XY,ts(NO_DISP,TypeFlt.FLT64,TypeFlt.FLT64));
-          static final TypeStruct TFLT64= make(          ts(TypeFlt.FLT64 )); //  (  flt)
+          static final TypeStruct TFLT64= make_args( ts(NO_DISP,TypeFlt.FLT64 )); //  (  flt)
   public  static final TypeStruct A     = make(flds("^","a"),ts(NO_DISP,TypeFlt.FLT64 ));
   private static final TypeStruct C0    = make(flds("^","c"),ts(NO_DISP,TypeInt.FALSE )); // @{c:0}
   private static final TypeStruct D1    = make(flds("^","d"),ts(NO_DISP,TypeInt.TRUE  )); // @{d:1}
@@ -1119,41 +1131,46 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   }
 
   // ------ Flags lattice: 2 bits field mod, 1 bit dirty ------
-
   // Accessors
   public static byte    fmod ( byte f ) { return (byte)(f&3); }
-  public static boolean dirty( byte f ) { return 0 !=  (f&4); } // Set bit is dirty
+  //public static boolean dirty( byte f ) { return 0 !=  (f&4); } // Set bit is dirty
+  public static boolean dirty( byte f ) { return false; } // Turned off for now
   public byte fmod( int idx ) { return fmod(_flags[idx]); }
 
   // Setters
   public static byte set_fmod ( byte flags, byte mod     ) { assert 0<=mod && mod <=3; return (byte)((flags&~3)|mod); }
-  public static byte set_dirty( byte flags, boolean dirty) { return (byte)(dirty? (flags|4) : (flags&~4)); }
-  public static byte make_flag( byte mod, boolean dirty ) { assert 0<=mod && mod <=3; return (byte)(mod|(dirty?4:0)); }
+  //public static byte set_dirty( byte flags, boolean dirty) { assert !dirty || (flags&3)==FRW; return (byte)(dirty? (flags|4) : (flags&~4)); }
+  public static byte make_flag( byte mod , boolean dirty ) {
+    assert 0<=mod && mod <=3;
+    if( mod != FRW ) dirty=false;
+    //return (byte)(mod|(dirty?4:0));
+    return mod;
+  }
 
   // OR bits: If either is dirty, then dirty.
   // Similarly for field mods.
   public  static byte fmeet( byte f0, byte f1 ) { return (byte)(f0|f1); }
   private static byte fdual( byte f ) {
-    int flag = ~f;                              // Dual all the bits
-    if( (flag&3)==1 || (flag&3)==2 ) flag ^= 3; // Recover final & r/w dual
-    return (byte)(flag&7);                      // Mask back to the 3 bits
+    int flag = (~f)&3;                  // Dual all the bits
+    if( flag==1 || flag==2 ) flag ^= 3; // Recover final & r/w dual
+    return (byte)flag;
   }
   private static byte flag_top() { return 0; }
-  // Return flags cleaned
-  private byte[] clean_flags() {
-    if( !is_dirty() ) return _flags; // Already clean
-    byte[] flags = _flags.clone();   // Clone flags
-    for( int i=0; i<_flags.length; i++ ) // And mark clone all clean
-      flags[i] = set_dirty(_flags[i],false);
-    return flags;
-  }
-  // Return true if any flag is dirty
-  private boolean is_dirty() {
-    for( int i=0; i<_flags.length; i++ )
-      if( dirty(_flags[i]) )
-        return false;
-    return true;
-  }
+  //// Return flags cleaned
+  //private byte[] clean_flags() {
+  //  if( !is_dirty() ) return _flags; // Already clean
+  //  byte[] flags = _flags.clone();   // Clone flags
+  //  for( int i=0; i<_flags.length; i++ ) // And mark clone all clean
+  //    flags[i] = set_dirty(_flags[i],false);
+  //  return flags;
+  //}
+  //// Return true if any flag is dirty
+  //private boolean is_dirty() {
+  //  for( int i=0; i<_flags.length; i++ )
+  //    if( dirty(_flags[i]) )
+  //      return false;
+  //  return true;
+  //}
   // Get whole flags, only suitable for copying to a constructor as-is.
   public byte flags(int idx) { return _flags[idx]; }
 
@@ -1202,39 +1219,39 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   //}
   public boolean can_update(int idx) { return fmod(_flags[idx]) == FRW || fmod(_flags[idx]) == FUNK; }
 
-  // Identical struct but clean.  Complicated because has to do a recursive update.
-  @Override public TypeStruct clean() {
-    if( this==ALLSTRUCT )       // Infinitely extended extra fields are bottom & dirty.
-      return ALLSTRUCT;         // TODO: Think this is wrong
-      //return ALLSTRUCT; // Shortcut
-    if( this==GENERIC   ) return GENERIC;
-    if( !_cyclic ) {            // Not cyclic, normal recursive walk
-      Type[] ts = TypeAry.clone(_ts);
-      for( int i=0; i<ts.length; i++ )
-        if( ts[i] != null )
-          ts[i] = ts[i].clean();
-      return malloc(_name,_any,_flds,ts,clean_flags()).hashcons_free();
-    }
-    // Cyclic, but perhaps already clean
-    Ary<Type> reaches = reachable(true);
-    boolean dirty = false;
-    for( Type t : reaches )
-      if( t instanceof TypeStruct && ((TypeStruct)t).is_dirty() )
-        { dirty=true; break; }
-    if( !dirty ) return this;   // Already clean.
-
-    //// Need to clone the existing structure, then make it clean
-    //RECURSIVE_MEET++;
-    //assert OLD2APX.isEmpty();
-    //TypeStruct cln = clone_clean_str(this);
-    //RECURSIVE_MEET--;
-    //reaches = cln.reachable();  // Recompute on the new types
-    //TypeStruct cln2 = cln.install_cyclic(reaches);
-    //assert cln2.isa(this);
-    //OLD2APX.clear();
-    //return cln2;
-    throw com.cliffc.aa.AA.unimpl();
-  }
+  //// Identical struct but clean.  Complicated because has to do a recursive update.
+  //@Override public TypeStruct clean() {
+  //  if( this==ALLSTRUCT )       // Infinitely extended extra fields are bottom & dirty.
+  //    return ALLSTRUCT;         // TODO: Think this is wrong
+  //    //return ALLSTRUCT; // Shortcut
+  //  if( this==GENERIC   ) return GENERIC;
+  //  if( !_cyclic ) {            // Not cyclic, normal recursive walk
+  //    Type[] ts = TypeAry.clone(_ts);
+  //    for( int i=0; i<ts.length; i++ )
+  //      if( ts[i] != null )
+  //        ts[i] = ts[i].clean();
+  //    return malloc(_name,_any,_flds,ts,clean_flags()).hashcons_free();
+  //  }
+  //  // Cyclic, but perhaps already clean
+  //  Ary<Type> reaches = reachable(true);
+  //  boolean dirty = false;
+  //  for( Type t : reaches )
+  //    if( t instanceof TypeStruct && ((TypeStruct)t).is_dirty() )
+  //      { dirty=true; break; }
+  //  if( !dirty ) return this;   // Already clean.
+  //
+  //  //// Need to clone the existing structure, then make it clean
+  //  //RECURSIVE_MEET++;
+  //  //assert OLD2APX.isEmpty();
+  //  //TypeStruct cln = clone_clean_str(this);
+  //  //RECURSIVE_MEET--;
+  //  //reaches = cln.reachable();  // Recompute on the new types
+  //  //TypeStruct cln2 = cln.install_cyclic(reaches);
+  //  //assert cln2.isa(this);
+  //  //OLD2APX.clear();
+  //  //return cln2;
+  //  throw com.cliffc.aa.AA.unimpl();
+  //}
 
   //private static TypeStruct clone_clean_str(TypeStruct dirty) {
   //  TypeStruct ts = OLD2APX.get(dirty);
@@ -1291,14 +1308,79 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       for( Type _t : _ts ) _t.walk(p);
   }
 
-  // Keep the high parts
+  // Make all parts high, for GCP.  In the worst case must make a new cyclic
+  // structure.  The {PRIMS} structure is a low display, but has TFPs with
+  // NO_DISP parts.  Just calling dual() gives a high display, but with TFPs
+  // with DISPLAY parts... which have fallen too far for GCP.
   @Override public TypeStruct startype() {
-    String[] as = new String[_flds.length];
-    Type  [] ts = TypeAry.get(_ts  .length);
-    byte  [] fs = new byte  [_ts  .length];
-    for( int i=0; i<as.length; i++ ) as[i] = fldBot(_flds[i]) ? "*" : _flds[i];
-    for( int i=0; i<ts.length; i++ ) ts[i] = _ts[i].above_center() ? _ts[i] : _ts[i].dual();
-    for( int i=0; i<fs.length; i++ ) fs[i] = fdual(flags(i)); // Really: mod ro goes to unk.  Centerline final/rw stay put.
-    return malloc(_name,true,as,ts,fs).hashcons_free();
+
+    //if( !_cyclic ) {            // Not cyclic, normal recursive walk
+      String[] as = new String[_flds.length];
+      Type  [] ts = TypeAry.get(_ts  .length);
+      byte  [] fs = new byte  [_ts  .length];
+      for( int i=0; i<as.length; i++ ) as[i] = fldBot(_flds[i]) ? "*" : _flds[i];
+      //for( int i=0; i<ts.length; i++ ) ts[i] = _ts[i].startype();
+      for( int i=0; i<ts.length; i++ ) ts[i] = Type.XSCALAR;
+      for( int i=0; i<fs.length; i++ ) fs[i] = fdual(flags(i)); // Really: mod ro goes to unk.  Centerline final/rw stay put.
+      return malloc(_name,true,as,ts,fs).hashcons_free();
+      //}
+    //if( this==DISPLAY || this==DISPLAY.dual() ) return DISPLAY.dual(); // Shortcut
+    //
+    //// Cyclic; need to clone the existing structure, then lift it
+    //RECURSIVE_MEET++;
+    //assert OLD2APX.isEmpty();
+    //TypeStruct lift = lift_str(this); // Clone which lifting parts
+    //RECURSIVE_MEET--;
+    //Ary<Type> reaches = lift.reachable();  // Recompute on the new types
+    //TypeStruct lift2 = lift.install_cyclic(reaches);
+    //assert lift2.isa(this);
+    //OLD2APX.clear();
+    //return lift2;
+  }
+
+  private static TypeStruct lift_str(TypeStruct low) {
+    TypeStruct ts = OLD2APX.get(low);
+    if( ts != null ) return ts;
+    ts = low.shallow_clone();
+    ts._any=true;
+    for( int i=0; i<ts._flds .length; i++ ) ts._flds [i] = fldBot(low._flds[i]) ? "*" : low._flds[i];
+    for( int i=0; i<ts._flags.length; i++ ) ts._flags[i] = fdual(low.flags(i)); // Really: mod ro goes to unk.  Centerline final/rw stay put.
+
+    ts._hash = ts.compute_hash(); // Hash does not depend on _ts, which are not set yet
+    OLD2APX.put(low,ts);
+    for( int i=0; i<ts._ts.length; i++ ) {
+      Type td = low._ts[i];
+      ts._ts[i] = td instanceof TypeMemPtr ? lift_ptr((TypeMemPtr)td)
+        : (td instanceof TypeFunPtr ? lift_fun((TypeFunPtr)td) : td);
+    }
+    return ts;
+  }
+  private static Type lift_ptr(TypeMemPtr low) {
+    TypeMemPtr nmp = OLD2APX.get(low);
+    if( nmp != null ) return nmp;
+    nmp = (TypeMemPtr)low.clone(); // Shallow clone
+    OLD2APX.put(low,nmp);     // Must go in before recursion
+    nmp._aliases = low._aliases.startype();
+    Type td = low._obj;
+    nmp._obj = td instanceof TypeStruct ? lift_str((TypeStruct)td) : (TypeObj)td.startype();
+    nmp._hash = nmp.compute_hash();
+    TypeMemPtr x = (TypeMemPtr)nmp.intern_lookup(); // Check for prior hit
+    if( x==null ) return nmp;
+    OLD2APX.put(low,x);         // Replace hit with prior
+    return nmp.free(x);
+  }
+  private static Type lift_fun(TypeFunPtr low) {
+    TypeFunPtr nmp = OLD2APX.get(low);
+    if( nmp != null ) return nmp;
+    nmp = (TypeFunPtr)low.clone(); // Shallow clone
+    OLD2APX.put(low,nmp);     // Must go in before recursion
+    nmp._fidxs = low._fidxs.startype();
+    nmp._ret   = low._ret  .startype();
+    nmp._args  = lift_str(low._args);
+    nmp._hash  = nmp.compute_hash();
+    TypeFunPtr x = (TypeFunPtr)nmp.intern_lookup(); // Check for prior hit
+    if( x==null ) return nmp;
+    OLD2APX.put(low,x);         // Replace hit with prior
+    return nmp.free(x);
   }
 }

@@ -25,7 +25,7 @@ public final class FunPtrNode extends ConNode<TypeFunPtr> {
     if( !(o instanceof FunPtrNode) ) return false;
     FunPtrNode fptr = (FunPtrNode)o;
     if( _defs._len!=2 ) return false;
-    return in(0)==fptr.in(0) && in(1)==fptr.in(1) && super.equals(fptr);
+    return _t==fptr._t && in(0)==fptr.in(0) && in(1)==fptr.in(1) && super.equals(fptr);
   }
   public RetNode ret() { return (RetNode)in(0); }
   public Node display(){ return in(1); }
@@ -103,7 +103,6 @@ public final class FunPtrNode extends ConNode<TypeFunPtr> {
     TypeFunPtr tfp = TypeFunPtr.make(rfun._tf.fidxs(),dfun._tf._args,dfun._tf._ret);
     gvn.setype(def,tfp);
     gvn.unreg(dfun);  dfun._tf = tfp;  gvn.rereg(dfun,Type.CTRL);
-    gvn.unreg(def );  def ._t  = tfp;  gvn.rereg(def ,tfp);
     int fidx = def.ret()._fidx = rfun._tf.fidx();
     FunNode.FUNS.setX(fidx,dfun);     // Track FunNode by fidx
 

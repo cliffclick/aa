@@ -72,7 +72,7 @@ public class FunNode extends RegionNode {
   // Used to make copies when inlining/cloning function bodies
           FunNode(String name,TypeFunPtr tf, BitsAlias display_aliases) { this(name,tf,-1,display_aliases); }
   // Used to start an anonymous function in the Parser
-  public  FunNode(String[] flds, Type[] ts) { this(null,TypeFunPtr.make_new(TypeStruct.make(flds,ts),Type.SCALAR),-1,Env.DISPLAY); }
+  public  FunNode(String[] flds, Type[] ts) { this(null,TypeFunPtr.make_new(TypeStruct.make_args(flds,ts),Type.SCALAR),-1,Env.DISPLAY); }
   // Used to forward-decl anon functions
           FunNode(String name) { this(name,TypeFunPtr.make_anon(),-2,Env.DISPLAY); add_def(Env.ALL_CTRL); }
   // Shared common constructor
@@ -105,7 +105,6 @@ public class FunNode extends RegionNode {
         RetNode ret = fun.ret(); // Done before flipping fidx, because of asserts
         fun._tf = fun._tf.make_fidx(i);
         ret._fidx = i;
-        ret.funptr()._t = fun._tf;
       }
     }
   }
@@ -193,15 +192,16 @@ public class FunNode extends RegionNode {
     // See if we can make the function signature more precise.  When building
     // type-split signatures, we'd like this to be as precise as all unsplit
     // inputs.
-    boolean progress=false;
-    for( int i=0; i<parms.length; i++ ) {
-      Type t = parms[i]==null ? (i==0 ? TypeStruct.NO_DISP : Type.XSCALAR) : gvn.type(parms[i]);
-      if( t != _tf.arg(i) ) { progress=true; break; }
+    boolean progress= (parms[0]==null ? TypeStruct.NO_DISP :  gvn.type(parms[0])) != targ(0);
+    for( int i=1; i<parms.length; i++ ) {
+      Type t = parms[i]==null ? Type.XSCALAR : gvn.type(parms[i]);
+      if( t != targ(i) ) { progress=true; break; }
     }
-    if( progress ) {
+    if( progress && !is_prim() ) {
       Type[] ts = TypeAry.get(parms.length);
-      for( int i=0; i<parms.length; i++ )
-        ts[i] = parms[i]==null ? (i==0 ? TypeStruct.NO_DISP : Type.XSCALAR) : gvn.type(parms[i]);
+      ts[0] = parms[0]==null ? TypeStruct.NO_DISP : gvn.type(parms[0]);
+      for( int i=1; i<parms.length; i++ )
+        ts[i] = parms[i]==null ? Type.XSCALAR : gvn.type(parms[i]);
       TypeFunPtr tf = TypeFunPtr.make(_tf.fidxs(),_tf._args.make_from(ts),_tf._ret);
       assert tf.isa(_tf) && _tf != tf;
       _tf = tf;
@@ -231,7 +231,7 @@ public class FunNode extends RegionNode {
     int path = -1;              // Paths will split according to type
     if( args == null ) {        // No type-specialization to do
       args = _tf._args;         // Use old args
-      if( _cnt_size_inlines >= 10 ) return null;
+      if( _cnt_size_inlines >= 10 && !is_prim() ) return null;
       // Large code-expansion allowed; can inline for other reasons
       path = split_size(gvn,body,parms);
       if( path == -1 ) return null;
@@ -277,6 +277,7 @@ public class FunNode extends RegionNode {
               Type tp = gvn.type(parm.in(i));
               if( tp.above_center() ) continue;        // This parm input is in-error
               Type ti = tp.widen();                    // Get the widen'd type
+              if( ti == tp ) continue;    // No progress
               if( !ti.isa(t0) ) continue; // Must be isa-generic type, or else type-error
               if( ti != t0 ) return i; // Sharpens?  Then splitting here should help
             }
@@ -292,7 +293,8 @@ public class FunNode extends RegionNode {
     if( idx != -1 ) {           // Found; split along a specific input path using widened types
       Type[] sig = TypeAry.get(parms.length);
       for( int i=0; i<parms.length; i++ )
-        sig[i] = parms[i]==null ? (i==0 ? TypeStruct.NO_DISP : Type.XSCALAR) : gvn.type(parms[i].in(idx)).widen();
+        sig[i] = parms[i]==null ? Type.XSCALAR : gvn.type(parms[i].in(idx)).widen();
+      if( parms[0]==null ) sig[0] = TypeStruct.NO_DISP;
       assert !(sig[0] instanceof TypeFunPtr);
       return sig;
     }
@@ -338,7 +340,7 @@ public class FunNode extends RegionNode {
     Type[] sig = find_type_split(gvn,parms);
     if( sig == null ) return null; // No unresolved calls; no point in type-specialization
     // Make a new function header with new signature
-    TypeStruct args = TypeStruct.make(_tf._args._flds,sig);
+    TypeStruct args = TypeStruct.make_args(_tf._args._flds,sig);
     assert args.isa(_tf._args);
     return args == _tf._args ? null : args; // Must see improvement
   }
@@ -465,11 +467,14 @@ public class FunNode extends RegionNode {
     FUNS.setX(newfidx,this);    // Track FunNode by fidx
     ret._fidx = newfidx;        // Renumber in the old RetNode
     FunPtrNode old_fptr = ret.funptr();
-    gvn.unreg(old_fptr);
-    old_fptr._t = _tf;
-    gvn.rereg(old_fptr,_tf);   // Renumber in old FunPtrNode
     gvn.add_work(ret);
     gvn.add_work_uses(old_fptr);
+    // Right now, force the type upgrade on old_fptr.  old_fptr carries the old
+    // parent FIDX and is on the worklist.  Eventually, it comes off and the
+    // value() call lifts to the child fidx.  Meanwhile its value can be used
+    // to wire a size-split to itself (e.g. fib()), which defeats the purpose
+    // of a size-split (single caller only, so inlines).
+    gvn.setype(old_fptr,old_fptr.value(gvn));
     return fun;
   }
 
@@ -530,7 +535,6 @@ public class FunNode extends RegionNode {
     FunPtrNode new_funptr = (FunPtrNode)old_funptr.copy(false,cepi,gvn);
     new_funptr.add_def(newret);
     new_funptr.add_def(old_funptr.in(1)); // Share same display
-    new_funptr._t = fun._tf;
     old_funptr.keep(); // Keep around; do not kill last use before the clone is done
 
     // Fill in edges.  New Nodes point to New instead of Old; everybody
@@ -557,7 +561,8 @@ public class FunNode extends RegionNode {
       // Change the unknown caller parm types to match the new sig
       for( Node parm : fun._uses )
         if( parm instanceof ParmNode )
-          parm.set_def(1,gvn.con(fun.targ(((ParmNode)parm)._idx)),gvn);
+          if( ((ParmNode)parm)._idx != 0 )
+            parm.set_def(1,gvn.con(fun.targ(((ParmNode)parm)._idx)),gvn);
     }
 
     // Make an Unresolved choice of the old and new functions, to be used by
@@ -585,8 +590,8 @@ public class FunNode extends RegionNode {
       Node nn = e.getValue();         // New node
       Type ot = gvn.type(e.getKey()); // Generally just copy type from original nodes
       if( nn instanceof ParmNode && nn.in(0) == fun ) {  // Leading edge ParmNodes
-        int idx = ((ParmNode)nn)._idx; // Update default type to match signature
-        ot = fun.targ(idx);
+        int idx = ((ParmNode)nn)._idx; // Update non-display type to match new signature
+        if( idx > 0 ) ((ParmNode)nn)._t = ot = fun.targ(idx); // Upgrade new Parm default type
       } else if( nn == new_funptr ) {
         ot = fun._tf;           // New TFP for the new FunPtr
       } else if( nn instanceof CallEpiNode ) { // Old calls might be wired, new calls need to re-wire

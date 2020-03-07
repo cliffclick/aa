@@ -61,11 +61,12 @@ public class GVNGCM {
   public static int _INIT0_CNT;
   private static Node[] _INIT0_NODES;
   void init0() {
+    _work.clear();  _wrk_bits.clear();
     assert _live.get(CNT-1) && !_live.get(CNT) && _work._len==0 && _wrk_bits.isEmpty() && _ts._len==CNT;
     _INIT0_CNT=CNT;
     _INIT0_NODES = _vals.keySet().toArray(new Node[0]);
-    for( Node n : _INIT0_NODES ) assert !n.is_dead() && n._keep==0;
-  }
+    for( Node n : _INIT0_NODES ) { assert !n.is_dead() && n._keep==0;  n._live = TypeMem.FULL; add_work(n); }
+    }
   // Reset is called after a top-level exec exits (e.g. junits) with no parse
   // state left alive.  NOT called after a line in the REPL or a user-call to
   // "eval" as user state carries on.
@@ -77,7 +78,6 @@ public class GVNGCM {
       _wrk_bits.clear(n._uid);
       if( n.is_dead() || n._keep!=0 ) continue;
       if( n._uses._len==0 ) kill(n);
-      //System.out.println("On worklist during reset: "+n);
     }
     for( Node n : _INIT0_NODES ) {
       n.reset_to_init1(this);
@@ -252,7 +252,7 @@ public class GVNGCM {
       cnt++; assert cnt < 100;      // Catch infinite ideal-loops
     }
     // Compute a type for n
-    Type t = n.value(this);              // Get best type
+    Type t = n.value(this);     // Get best type
     // Replace with a constant, if possible
     if( replace_con(t,n) )
       { kill_new(n); return con(t); }
@@ -260,7 +260,7 @@ public class GVNGCM {
     x = _vals.putIfAbsent(n,n);
     if( x != null ) { kill_new(n); return x; }
     // Record type for n; n is "in the system" now
-    setype(n,t);                         // Set it in
+    setype(n,t);                // Set it in
     // TODO: If x is a TypeNode, capture any more-precise type permanently into Node
     return n;
   }
@@ -272,7 +272,6 @@ public class GVNGCM {
   public void kill( Node n ) {  unreg0(n); kill0(n); }
   // Version for never-GVN'd; common for e.g. constants to die early or
   // RootNode, and some other make-and-toss Nodes.
-
   private void kill0( Node n ) {
     assert n._uses._len==0 && n._keep==0;
     for( int i=0; i<n._defs._len; i++ )
@@ -329,7 +328,7 @@ public class GVNGCM {
     assert touched(n);          // Node is in type tables, but might be already out of GVN
     Type oldt = type(n);        // Get old type
 
-    // Must exit either with the (old node or null) and the old node in both types
+    // Must exit either with {old node | null} and the old node in both types
     // and vals tables, OR exit with a new node and the old node in neither table.
     // [ts!] - Definitely in types table, [ts+] updated value in types
     // [vals?] - Maybe in vals table
@@ -337,24 +336,10 @@ public class GVNGCM {
     // [ts!,vals?] Check GVN tables first, because this is very fast and makes
     // good forward progress in computing value 'n'
     Node x = _vals.get(n);      // Check prior hit
-    if( x != null && x != n ) return untype(n,x); // Was not in vals, remove from types also & return prior
+    if( x != null && x != n ) return merge(n,x); // Keep merge
 
-    // [ts+,vals?] Remove before ideal or value-wiring hacks edges & changes hash
+    // [ts!,vals?] Remove before ideal or value-wiring hacks edges & changes hash
     _vals.remove(n);
-    
-    // [ts!] Compute best type, and type is IN ts
-    Type t = n.value(this);     // Get best type
-    if( !t.isa(oldt) && !n.is_prim() ) { // Strong assert that we only lift types
-      System.out.println("Backwards to: "+t+"\nfrom: "+n.dump(0,this));
-      assert t.isa(oldt);       // Monotonically improving
-    }
-
-    // [ts!] Replace with a constant, if possible.  This is also very cheap
-    // (once we expensively computed best value) and makes the best forward
-    // progress.
-    if( replace_con(t,n) ) { unreg0(n); return con(t); }
-    // [ts!] Put updated types into table for use by ideal()
-    setype(n,t);
 
     // [ts!] Compute uses & live bits.  If progress, push the defs on the
     // worklist.  This is a reverse flow computation.
@@ -362,14 +347,32 @@ public class GVNGCM {
     TypeMem nnn = n.compute_live(this);
     if( old != nnn ) {  // Progress?
       assert nnn.isa(old); // Monotonically improving
-      n._live = nnn;        // Mark progress
+      n._live = nnn;       // Mark progress
       for( Node def : n._defs ) // Put defs on worklist... liveness flows uphill
         if( def != null && def != n )
           add_work(def);        // Reverse flow: do work on defs not uses
     }
 
-    // [ts+] If completely dead, replace with a high constant
-    if( !nnn.is_live() && !(n instanceof ConNode) )  return untype(n,con(n.all_type().startype()));
+    // [ts!] If completely dead, exit now.
+    if( !nnn.is_live() ) {
+      if( n.is_prim() ) {      // Yanked n, but always keeping primitives in table
+        _vals.put(n,n);        // Put it back
+        return null;
+      }
+      return (n instanceof ConNode) ? null
+        : untype(n, con(n.all_type().startype())); // Replace non-constants with high (dead) constants
+    }
+
+    // [ts!] Compute best type, and type is IN ts
+    Type t = n.value(this);     // Get best type
+    assert t.isa(oldt);         // Monotonically improving
+
+    // [ts!] Replace with a constant, if possible.  This is also very cheap
+    // (once we expensively computed best value) and makes the best forward
+    // progress.
+    if( replace_con(t,n) ) { unreg0(n); return con(t); }
+    // [ts!] Put updated types into table for use by ideal()
+    if( t!=oldt ) setype(n,t);
 
     // [ts+] Try generic graph reshaping using updated types
     Node y = n.ideal(this,level);
@@ -379,13 +382,30 @@ public class GVNGCM {
 
     // [ts+,vals?] Reinsert in GVN
     Node z = _vals.putIfAbsent(n,n);
-    if( z != null && z != n ) return untype(n,z); // Ideal mods triggered hit, remove from types & return prior
+    if( z != null && z != n ) return merge(n,z); // Keep merge
+
     // [ts+,vals!]
     assert check_opt(n);
     return oldt == t && y==null ? null : n; // Progress if types improved
   }
 
-  // Utility
+  // Utility: Merge old and new, returning node with the merged liveness.
+  // Returns something monotonically 'more alive' than either.  Old is in the
+  // type table and not in the vals table.  NNN is in both.  Returned might be
+  // either old or nnn or something newer.
+  private Node merge( Node old, Node nnn ) {
+    if( old._live.isa(nnn._live) ) // nnn is 'more alive' than old
+      return untype(old,nnn);      // Just toss old, keep nnn.
+    if( nnn._live.isa(old._live) ){// old is 'more alive' than nnn
+      _vals.put(old,old);          // Replace 'nnn' with 'old'
+      _ts.clear(nnn._uid);         // Clear nnn from types also
+      return subsume(nnn,old);     // Replace nnn in graph with old
+    }
+    // Need to build a new node that has the combined 'live'
+    throw com.cliffc.aa.AA.unimpl();
+  }
+
+  // Utility: remove old from type table, return new
   private Node untype( Node old, Node nnn ) { _ts.clear(old._uid); return nnn; }
 
   // Replace, but do not delete old.  Really used to insert a node in front of old.
@@ -397,7 +417,7 @@ public class GVNGCM {
       u._defs.replace(old,nnn); // was old now nnn
       nnn._uses.add(u);
       if( was ) {            // If was in GVN
-        _vals.put(u,u);      // Back in the table, since its still in the graph
+        _vals.putIfAbsent(u,u);// Back in the table, since its still in the graph
         add_work(u);         // And put on worklist, to get re-visited
       }
     }
@@ -541,7 +561,9 @@ public class GVNGCM {
     // Revisit the entire reachable program, as ideal calls may do something
     // with the maximally lifted types.
     System.out.println("Major work: "+major_work+", minor opt: "+minor_opt+", CNT: "+CNT);
+    assert _wrk2_bits.isEmpty();
     walk_opt(rez);
+    _wrk2_bits.clear();
     walk_dead(Env.START);
   }
 
@@ -560,7 +582,8 @@ public class GVNGCM {
   // GCP optimizations on the live subgraph
   private void walk_opt( Node n ) {
     assert !n.is_dead();
-    if( _wrk_bits.get(n._uid) ) return; // Been there, done that
+    if( _wrk2_bits.get(n._uid) ) return; // Been there, done that
+    _wrk2_bits.set(n._uid);              // Mark the visit
     if( n==Env.START ) return;          // Top-level scope
     add_work(n);                        // Only walk once
     Type t = type(n);                   // Get optimistic computed type
@@ -575,10 +598,8 @@ public class GVNGCM {
       FunNode fun = ret.fun();
       if( type(fun)==Type.CTRL && type(ret.ctl()) == Type.CTRL ) { // never-return function (maybe never called?)
         TypeFunPtr tfp = (TypeFunPtr)type(fptr);
-        if( tfp != fun._tf && tfp.isa(fun._tf) ) {
-          throw com.cliffc.aa.AA.unimpl();
-          //fun.sharpen(this,tfp);
-        }
+        if( tfp != fun._tf && tfp.isa(fun._tf) )
+          fun.sharpen(this,tfp);
       }
 
       // All (live) Call ambiguity has been resolved

@@ -10,7 +10,7 @@ import java.util.BitSet;
 // Merge results; extended by ParmNode
 public class PhiNode extends Node {
   final Parse _badgc;
-  final Type _t;               // all_type is either TypeMem.MEM or Type.SCALAR or TypeStruct.ALLSTRUCT
+  Type _t; // all_type is either TypeMem.MEM or Type.SCALAR or TypeStruct.ALLSTRUCT
   private PhiNode( byte op, Type t, Parse badgc, Node... vals ) {
     super(op,vals);
     _badgc = badgc;
@@ -18,7 +18,7 @@ public class PhiNode extends Node {
   }
   public PhiNode( Type t, Parse badgc, Node... vals ) { this(OP_PHI,t,badgc,vals); }
   // For ParmNodes
-  PhiNode( byte op, Node fun, ConNode defalt, Parse badgc ) { this(op,defalt._t,badgc, fun,defalt); }
+  PhiNode( byte op, Node fun, Type tdef, Node defalt, Parse badgc ) { this(op,tdef,badgc, fun,defalt); }
 
   @Override public Node ideal(GVNGCM gvn, int level) {
     if( gvn.type(in(0)) == Type.XCTRL ) return null;

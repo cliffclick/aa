@@ -78,7 +78,9 @@ public final class RetNode extends Node {
     if( !(val.isa(Type. SCALAR))) return TALL;
     return TypeTuple.make(ctl,mem,val);
   }
-  @Override public TypeTuple all_type() { return TypeTuple.make(Type.CTRL,TypeMem.FULL,fun()._tf._ret); }
+  @Override public TypeTuple all_type() {
+    return TypeTuple.make(Type.CTRL,TypeMem.FULL,is_copy() ? TypeFunPtr.GENERIC_FUNPTR : fun()._tf._ret);
+  }
 
   @Override public Node is_copy(GVNGCM gvn, int idx) { throw com.cliffc.aa.AA.unimpl(); }
   boolean is_copy() { return !(in(4) instanceof FunNode) || fun()._tf.fidx() != _fidx; }

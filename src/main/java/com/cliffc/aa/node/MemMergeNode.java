@@ -367,7 +367,6 @@ public class MemMergeNode extends Node {
 
   // Compute the liveness local contribution to def's liveness.
   @Override public TypeMem compute_live(GVNGCM gvn, TypeMem live, Node def) {
-    if( is_prim() ) return TypeMem.FULL; // All prims left alive
     int idx = _defs.find(def);  // The input node index
     int alias = alias_at(idx);  // Corresponding alias
 

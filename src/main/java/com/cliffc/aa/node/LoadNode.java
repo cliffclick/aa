@@ -53,11 +53,14 @@ public class LoadNode extends Node {
     if( aliases != null && mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode ) {
       CallEpiNode cepi = (CallEpiNode)mem.in(0);
       if( !cepi.is_copy() ) {
-        TypeMem retmem = (TypeMem)((TypeTuple)gvn.type(cepi)).at(3);
-        if( retmem.is_clean(aliases,_fld) )
-          return set_mem(cepi.call().mem(),gvn);
-        if( alias > 0 && retmem.at(alias) == TypeObj.XOBJ )
-          return set_mem(cepi.call().mem(),gvn);
+        TypeTuple ttcepi = (TypeTuple)gvn.type(cepi);
+        if( ttcepi.at(0)==Type.CTRL ) {
+          TypeMem retmem = (TypeMem)ttcepi.at(3);
+          //if( retmem.is_clean(aliases,_fld) )
+          //  return set_mem(cepi.call().mem(),gvn);
+          //if( alias > 0 && retmem.at(alias) == TypeObj.XOBJ )
+          //  return set_mem(cepi.call().mem(),gvn);
+        }
       }
     }
 

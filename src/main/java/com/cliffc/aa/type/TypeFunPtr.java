@@ -77,7 +77,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   private static TypeFunPtr FREE=null;
   @Override protected TypeFunPtr free( TypeFunPtr ret ) { FREE=this; return ret; }
   public static TypeFunPtr make( BitsFun fidxs, TypeStruct args, Type ret ) {
-    assert args.at(0).isa(Type.XSCALAR) || ((TypeMemPtr)args.at(0)).is_display();
+    assert args.at(0).is_display_ptr();
     TypeFunPtr t1 = FREE;
     if( t1 == null ) t1 = new TypeFunPtr(fidxs,args,ret);
     else {   FREE = null;        t1.init(fidxs,args,ret); }
@@ -92,10 +92,9 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   private static TypeStruct ARGS = TypeStruct.make_args(TypeStruct.ts(TypeMemPtr.DISPLAY_PTR));
   public static TypeFunPtr make_anon() { return make_new(ARGS,Type.SCALAR); } // Make a new anonymous function ptr
   // Make a TFP with a new display and return value, used by FunPtrNode
-  public TypeFunPtr make(Type display, Type ret) {
-    assert _args.is_display();
-    assert ((TypeMemPtr)display).is_display();
-    return make(_fidxs,_args.set_fld(0,display,_args.fmod(0)),ret);
+  public TypeFunPtr make(Type display_ptr, Type ret) {
+    assert _args.is_display() && display_ptr.is_display_ptr();
+    return make(_fidxs,_args.set_fld(0,display_ptr,_args.fmod(0)),ret);
   }
 
   public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.FULL,ARGS,Type.SCALAR);
