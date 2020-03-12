@@ -64,6 +64,18 @@ public final class FunPtrNode extends ConNode<TypeFunPtr> {
     Type tdisp = display()==null ? TypeStruct.NO_DISP : gvn.type(display());
     return fun._tf.make(tdisp,((TypeTuple)tret).at(2));
   }
+  
+  @Override public TypeMem compute_live(GVNGCM gvn) {
+    // Pre-GCP, if the function is anywhere alive it might be used in a call
+    // and thus demands all the memory that the CallEpi demands.
+    // Post-GCP, all things are resolved and normal liveness flows.
+    return gvn._opt_mode < 2 ? TypeMem.FULL : super.compute_live(gvn);
+  }
+  // A function pointer can be applied at a Call, in which case the associated
+  // Ret demands everything the CallEpi demands.  Until GCP we assume this
+  // FunPtr might end up at any Call.
+  @Override public boolean basic_liveness() { return false; }
+
   @Override public String toString() { return super.toString(); }
   // Return the op_prec of the returned value.  Not sensible except when called
   // on primitives.

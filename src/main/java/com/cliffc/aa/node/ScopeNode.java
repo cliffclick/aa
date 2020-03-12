@@ -1,7 +1,6 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.Parse;
+import com.cliffc.aa.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 
@@ -103,20 +102,45 @@ public class ScopeNode extends Node {
   }
   @Override public Type value(GVNGCM gvn) { return all_type(); }
 
-
-  @Override public TypeMem compute_live(GVNGCM gvn, TypeMem live, Node def) {
-    if( !is_prim() && mem()!=def ) return TypeMem.FULL;  // Other non-memory uses are alive
-    if( rez() == null ) return live;    // No return result, nothing extra is alive.
-    if( live == TypeMem.FULL) return live; // Already all is live
-    // All fields in all reachable pointers from rez() will be marked live
-    Type tmem = gvn.type(mem());
-    Type trez = gvn.type(rez());
+  // From a memory and a possible pointer-to-memory, find all the reachable
+  // aliases and fold them into 'live'.  This is unlike other compute_live_use
+  // because this "turns around" the incoming live memory to also be the
+  // demanded/used memory.
+  static TypeMem compute_live_mem(GVNGCM gvn, TypeMem live, Node mem, Node rez) {
+    assert live==TypeMem.DEAD || live==TypeMem.EMPTY; // really a boolean flag
+    Type tmem = gvn.type(mem);
+    Type trez = gvn.type(rez);
     if( !(tmem instanceof TypeMem   ) ) return live; // Not a memory
+    if( TypeMemPtr.OOP.isa(trez) ) return (TypeMem)tmem; // All possible pointers
     if( !(trez instanceof TypeMemPtr) ) return live; // Not a pointer
-    // Find limit of reachable aliases starting from this one
-    BitsAlias aliases = trez.recursive_aliases(BitsAlias.EMPTY,((TypeMem)tmem));
-    return live.meet_alias(aliases);
+    TypeMem live2 = ((TypeMem)tmem).slice_all_aliases_plus_children(((TypeMemPtr)trez)._aliases);
+    if( live2==TypeMem.DEAD ) return live; // Minimal liveness
+    return live2;
   }
+  @Override public TypeMem compute_live(GVNGCM gvn) {
+    // The top scope is always alive, and represents what all future unparsed
+    // code MIGHT do.
+    if( this==Env.TOP._scope ) return TypeMem.FULL;
+    assert _uses._len==0;
+    // All fields in all reachable pointers from rez() will be marked live
+    return compute_live_mem(gvn,TypeMem.EMPTY,mem(),rez());
+  }
+
+  @Override public TypeMem compute_live_use( GVNGCM gvn, Node def ) {
+    // The top scope is always alive, and represents what all future unparsed
+    // code MIGHT do.
+    if( this==Env.TOP._scope ) return TypeMem.FULL;
+    // If asking about mem() liveness, start with 'DEAD'.  If mem() and rez()
+    // are not a valid ptr-to-memory, then the memory input is dead.  However,
+    // rez() might be e.g., 3.1415, and be alive independent of memory.
+    TypeMem live = TypeMem.DEAD;
+    if( mem()!=def ) live = TypeMem.EMPTY;
+    // If asking about ctrl() liveness, then only return the basic yes/no alive.
+    if( ctrl() == def ) return live;
+    // If asking either mem() or rez(), report back all used aliases & memory.
+    return compute_live_mem(gvn,live,mem(),rez());
+  }
+  @Override public boolean basic_liveness() { return false; }
 
   @Override public Type all_type() { return Type.ALL; }
   @Override public int hashCode() { return 123456789; }

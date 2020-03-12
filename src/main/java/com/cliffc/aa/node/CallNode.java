@@ -177,8 +177,6 @@ public class CallNode extends Node {
         return set_fun(fun,gvn);
     }
 
-    // If a Merge is before the call memory, and the Merge carries more aliases
-    // than the call uses, make a trimmed Merge.
     return null;
   }
 
@@ -229,7 +227,7 @@ public class CallNode extends Node {
         // If calling everything then not much we can do
         fidxs.test(BitsFun.ALL) )
       return TypeTuple.make(ts);
-    
+
     //// Trim unused aliases, specifically to prevent local displays from escaping.
     //// Here, I start with all alias#s from TMP args plus all function
     //// display#s and "close over" the set of possible aliases.
@@ -244,6 +242,26 @@ public class CallNode extends Node {
     //}
     return TypeTuple.make(ts);
   }
+
+  // Compute live across uses.  If pre-GCP, then we may not be wired and thus
+  // have not seen all possible function-body uses.  Check for #FIDXs == nwired().
+  @Override public TypeMem compute_live(GVNGCM gvn) {
+    if( gvn._opt_mode >= 2 ) return super.compute_live(gvn);
+
+    BitsFun fidxs = fidxs(gvn);
+    if( fidxs == null ) return TypeMem.FULL; // Assume Something Good will yet happen
+    if( fidxs.above_center() ) return TypeMem.FULL; // Got choices, dunno which one will stick
+    CallEpiNode cepi = cepi();
+    if( cepi==null ) return TypeMem.FULL; // Collapsing
+    // Expand (actually fail) if any parents
+    BitSet bs = fidxs.tree().plus_kids(fidxs);
+    if( bs.cardinality() > cepi.nwired() ) // More things to call
+      return TypeMem.FULL;
+    // All choices known
+    return super.compute_live(gvn);
+  }
+  @Override public boolean basic_liveness() { return false; }
+
 
   // Given a list of actuals, apply them to each function choice.  If any
   // (!actual-isa-formal), then that function does not work and supplies an
@@ -298,6 +316,8 @@ public class CallNode extends Node {
         byte cvt = actual.isBitShape(formals.at(j)); // +1 needs convert, 0 no-cost convert, -1 unknown, 99 never
         if( cvt == 99 )         // Happens if actual is e.g. TypeErr
           continue outerloop;   // No, this function will never work
+        if( cvt == 9 )          // Requires auto-boxing, not implemented
+          continue outerloop;   // So function does not work for now
         if( cvt == -1 ) unk = true; // Unknown yet
         else xcvts += cvt;          // Count conversions
       }

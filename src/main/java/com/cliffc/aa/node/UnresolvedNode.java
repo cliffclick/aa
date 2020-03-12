@@ -4,6 +4,7 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.type.TypeFunPtr;
 
 import java.util.Arrays;
@@ -66,6 +67,14 @@ public class UnresolvedNode extends Node {
     return x instanceof UnresolvedNode ? gvn.xform(x) : x;
   }
 
+  // Compute local contribution of use liveness to this def.
+  // If pre-GCP, same as value() above, use the conservative answer.
+  // During GCP, this will resolve so use the optimistic answer.
+  @Override public TypeMem compute_live_use( GVNGCM gvn, Node def ) {
+    return gvn._opt_mode < 2
+      ? super.compute_live_use(gvn,def)
+      : TypeMem.DEAD;
+  }
   @Override public TypeFunPtr all_type() { return TypeFunPtr.GENERIC_FUNPTR; }
 
   // Return the op_prec of the returned value.  Not sensible except when called

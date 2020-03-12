@@ -1,5 +1,6 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.util.AryInt;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
 
@@ -77,6 +78,7 @@ public class TypeMem extends Type<TypeMem> {
     TypeObj[] as = _aliases;
     if( as.length == 0 ) return true;
     if( as[0]!=null ) return false;          // Slot 0 reserved
+    if( as.length == 1 ) return true;
     if( as[1]!=TypeObj.OBJ && as[1]!=TypeObj.XOBJ && as[1] != null )
       return false;             // Only 2 choices
     if( as.length==2 ) return true; // Trivial all of memory
@@ -108,10 +110,11 @@ public class TypeMem extends Type<TypeMem> {
   // Never part of a cycle, so the normal check works
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
   @Override String str( VBitSet dups ) {
-    if( this==FULL ) return "[allmem]";
-    if( this==EMPTY) return "[]";
-    if( this== MEM ) return "[mem]";
+    if( this==FULL ) return "[all ]";
+    if( this==EMPTY) return "[____]";
+    if( this== MEM ) return "[ mem]";
     if( this==XMEM ) return "[~mem]";
+    if( this==DEAD ) return "[dead]";
     SB sb = new SB();
     sb.p('[');
     for( int i=1; i<_aliases.length; i++ )
@@ -124,8 +127,8 @@ public class TypeMem extends Type<TypeMem> {
   public TypeObj at(int alias) { return _aliases[at_idx(alias)]; }
   // Alias-at index
   public int at_idx(int alias) {
-    assert alias != 0;
     while( true ) {
+      if( alias==0 ) return 0;
       if( alias < _aliases.length && _aliases[alias] != null )
         return alias;
       alias = BitsAlias.TREE.parent(alias);
@@ -162,11 +165,38 @@ public class TypeMem extends Type<TypeMem> {
     return make0(objs);
   }
 
-  // Recursively explore reachable aliases.
-  public BitsAlias recursive_aliases( BitsAlias abs, int alias ) {
-    if( alias==0 || abs.test_recur(alias) ) return abs; // Already walked
-    abs = abs.or(alias);        // 'alias' is a reachable alias
-    return at(alias).recursive_aliases(abs,this); // Plus what can be reached from the alias
+  private TypeObj[] _slice_all_aliases_plus_children(BitsAlias aliases) {
+    BitSet bs = aliases.tree().plus_kids(aliases);
+    TypeObj[] tos = new TypeObj[bs.length()];
+    tos[1] = TypeObj.XOBJ;
+    for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) )
+      tos[alias] = at(alias);
+    return tos;
+  }
+
+  // Report back just the given aliases (plus children)
+  public TypeMem slice_all_aliases_plus_children(BitsAlias aliases) {
+    return make0(_slice_all_aliases_plus_children(aliases));
+  }
+
+  // Same as the above, except starts with just 1 alias instead of a list.
+  // Then removes the other aliases.
+  public TypeMem slice_1_alias_plus_children_minus_provides(int alias, AryInt aliases) {
+    if( this==TypeMem.DEAD ) return this; // Short cut
+
+    // A slice of the alias, plus its children.
+    TypeObj[] tos = _slice_all_aliases_plus_children(BitsAlias.make0(alias));
+    // We are making a liveness for MemMerge along one alias; MemMerge gets
+    // provided many aliases from other paths - these aliases are not demanded
+    // from this path.
+    for( int i = 0; i<aliases._len; i++ ) {
+      int ax = aliases.at(i);
+      if( ax != alias ) {
+        if( ax < tos.length )  tos[ax] = TypeObj.XOBJ;
+        else assert tos[1]==TypeObj.XOBJ; // Otherwise need to extend tos?
+      }
+    }
+    return make0(tos);
   }
 
   private static TypeMem FREE=null;
@@ -209,11 +239,15 @@ public class TypeMem extends Type<TypeMem> {
   public static final TypeMem EMPTY;// Every alias filled with anything
   public static final TypeMem  MEM; // FULL, except lifts REC, arrays, STR
   public static final TypeMem XMEM; //
+  public static final TypeMem DEAD; // Sentinel for liveness flow; top of lattice
   public static final TypeMem MEM_ABC, MEM_STR;
   static {
     // All memory, all aliases, holding anything.
     FULL = make(new TypeObj[]{null,TypeObj.OBJ});
     EMPTY= FULL.dual();
+
+    // Sentinel for liveness flow; top of lattice
+    DEAD = make(new TypeObj[1]);
 
     // All memory.  Includes breakouts for all structs and all strings.
     // Triggers BitsAlias.<clinit> which makes all the initial alias splits.
@@ -246,6 +280,8 @@ public class TypeMem extends Type<TypeMem> {
     TypeMem tf = (TypeMem)t;
     // Shortcut common case
     if( this==FULL || tf==FULL ) return FULL;
+    if( this==DEAD ) return t;
+    if( tf  ==DEAD ) return this;
     if( this==EMPTY ) return t;
     if( tf  ==EMPTY ) return this;
     // Meet of default values, meet of element-by-element.
@@ -324,11 +360,12 @@ public class TypeMem extends Type<TypeMem> {
   }
 
   // For node liveness, anything alive means the node is alive
-  public boolean is_live() { return this!=TypeMem.EMPTY; }
+  public boolean is_live() { return this!=TypeMem.DEAD; }
 
   // Find the alias slice out of 'live' and 'meet' it into 'this'.
   public TypeMem meet_alias(TypeMem live, int alias) {
     if( this==FULL ) return FULL; // Already maxed out
+    if( live==DEAD ) return live; // Nothing to add
     if( live==EMPTY) return live; // Nothing to add
     if( live==this ) return live; // No change
     TypeObj flds = live.at(alias); // Get the alive fields for this alias
@@ -336,6 +373,7 @@ public class TypeMem extends Type<TypeMem> {
     if( flds == TypeObj.XOBJ ) return this; // No fields alive in live alias
     if( olds == TypeObj. OBJ ) return this; // All fields already set, no change
     if( flds == olds ) return this; // No change
+    if( olds == null ) olds = TypeObj.XOBJ; // Happens if 'this' is 'DEAD'
 
     // Have to make a new result.
     TypeObj[] ts = Arrays.copyOf(_aliases,Math.max(_aliases.length,alias+1));
@@ -345,7 +383,8 @@ public class TypeMem extends Type<TypeMem> {
 
   // Bulk meet all these aliases all fields into 'this'
   public TypeMem meet_alias(BitsAlias aliases) {
-    if( this==FULL ) return FULL; // Already maxed out
+    if( this==FULL ) return this; // Already maxed out
+    if( aliases.is_empty() ) return this;
 
     // Have to make a new result.
     TypeObj[] ts = Arrays.copyOf(_aliases,Math.max(_aliases.length,aliases.max()+1));

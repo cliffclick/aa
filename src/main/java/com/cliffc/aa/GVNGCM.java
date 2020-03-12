@@ -29,10 +29,12 @@ public class GVNGCM {
     _wrk_bits.set(n._uid);
     return n;
   }
+  public boolean on_work( Node n ) { return _wrk_bits.get(n._uid); }
   // Add all uses as well
   public void add_work_uses( Node n ) {
-    if( touched(n)  ) add_work(n); // DO not re-add if mid-ideal-call
     for( Node use : n._uses )  add_work(use);
+    // Add self at the end, so the work loops pull it off again.
+    if( touched(n)  ) add_work(n); // Do not re-add if mid-ideal-call.
   }
 
   // A second worklist, for code-expanding and thus lower priority work.
@@ -65,7 +67,7 @@ public class GVNGCM {
     assert _live.get(CNT-1) && !_live.get(CNT) && _work._len==0 && _wrk_bits.isEmpty() && _ts._len==CNT;
     _INIT0_CNT=CNT;
     _INIT0_NODES = _vals.keySet().toArray(new Node[0]);
-    for( Node n : _INIT0_NODES ) { assert !n.is_dead() && n._keep==0;  n._live = TypeMem.FULL; add_work(n); }
+    for( Node n : _INIT0_NODES ) { assert !n.is_dead();  n._live = TypeMem.FULL; add_work(n); }
     }
   // Reset is called after a top-level exec exits (e.g. junits) with no parse
   // state left alive.  NOT called after a line in the REPL or a user-call to
@@ -81,7 +83,7 @@ public class GVNGCM {
     }
     for( Node n : _INIT0_NODES ) {
       n.reset_to_init1(this);
-      n._live = TypeMem.FULL;
+      n._live = n.basic_liveness() ? TypeMem.EMPTY : TypeMem.FULL;
       for( int i=0; i<n._uses._len; i++ )
         if( !n._uses.at(i).is_prim() )
           n._uses.del(i--);
@@ -97,15 +99,22 @@ public class GVNGCM {
     // Reset primitive types until fixed point.  Mostly cloned primitives
     // changed function pointers (and sometimes string aliases) which are all
     // getting reset - plus their Unresolved and Prim closure types.
-    for( Node n : _INIT0_NODES ) add_work(n);
+    for( Node n : _INIT0_NODES ) add_work0(n);
     while( !_work.isEmpty() ) {
       Node n = _work.pop();
       _wrk_bits.clear(n._uid);
       _vals.put(n,n);           // Put in hash table
       Type t = n.value(this);   // Current type
-      if( t != _ts.at(n._uid) ) { // Cached vs current
+      if( t != _ts.at(n._uid) ){// Cached vs current
         _ts.setX(n._uid,t);     // Reset cache to current
         add_work_uses(n);
+      }
+      TypeMem live = n.compute_live(this);
+      if( live != n._live ) {
+        n._live = live;         // Reset cache to current
+        for( Node def : n._defs ) // Put defs on worklist... liveness flows uphill
+          if( def != null && def != n )
+            add_work(def);
       }
     }
   }
@@ -133,7 +142,12 @@ public class GVNGCM {
       return FunNode.find_fidx(((TypeFunPtr)t).fidx()).ret().funptr();
     ConNode con = new ConNode<>(t);
     Node con2 = _vals.get(con);
-    if( con2 != null ) { kill0(con); return (ConNode)con2; } // TODO: con goes dead, should be recycled
+    if( con2 != null ) {           // Found a prior constant
+      kill0(con);                  // Kill the just-made one
+      con2._live = (TypeMem)con2._live.meet(TypeMem.EMPTY);  // Prior constant is now alive; might have been either dead or alive before
+      return (ConNode)con2;
+    }
+    con._live = TypeMem.EMPTY;  // Alive, but demands no memory
     setype(con,t);
     _vals.put(con,con);
     return con;
@@ -249,6 +263,7 @@ public class GVNGCM {
         n = x.unhook();         // Remove keep-alive
       }
       if( !check_new(n) ) return n; // If the replacement is old, no need to re-ideal
+      for( Node def : n._defs )  if( def != null )  add_work(def); // Force live-ness rechecking
       cnt++; assert cnt < 100;      // Catch infinite ideal-loops
     }
     // Compute a type for n
@@ -273,7 +288,7 @@ public class GVNGCM {
   // Version for never-GVN'd; common for e.g. constants to die early or
   // RootNode, and some other make-and-toss Nodes.
   private void kill0( Node n ) {
-    assert n._uses._len==0 && n._keep==0;
+    assert n._uses._len==0 && n._keep==0 && (_INIT0_CNT==0 || !n.is_prim());
     for( int i=0; i<n._defs._len; i++ )
       n.set_def(i,null,this);   // Recursively destroy dead nodes
     n.set_dead();               // n is officially dead now
@@ -354,7 +369,7 @@ public class GVNGCM {
     }
 
     // [ts!] If completely dead, exit now.
-    if( !nnn.is_live() ) {
+    if( !nnn.is_live() && !n.is_prim() ) {
       if( n.is_prim() ) {      // Yanked n, but always keeping primitives in table
         _vals.put(n,n);        // Put it back
         return null;
@@ -391,18 +406,10 @@ public class GVNGCM {
 
   // Utility: Merge old and new, returning node with the merged liveness.
   // Returns something monotonically 'more alive' than either.  Old is in the
-  // type table and not in the vals table.  NNN is in both.  Returned might be
-  // either old or nnn or something newer.
+  // type table and not in the vals table.  NNN is in both.
   private Node merge( Node old, Node nnn ) {
-    if( old._live.isa(nnn._live) ) // nnn is 'more alive' than old
-      return untype(old,nnn);      // Just toss old, keep nnn.
-    if( nnn._live.isa(old._live) ){// old is 'more alive' than nnn
-      _vals.put(old,old);          // Replace 'nnn' with 'old'
-      _ts.clear(nnn._uid);         // Clear nnn from types also
-      return subsume(nnn,old);     // Replace nnn in graph with old
-    }
-    // Need to build a new node that has the combined 'live'
-    throw com.cliffc.aa.AA.unimpl();
+    nnn._live = (TypeMem)nnn._live.meet(old._live);
+    return untype(old,nnn);      // Just toss old, keep nnn.
   }
 
   // Utility: remove old from type table, return new
@@ -435,6 +442,7 @@ public class GVNGCM {
   // always conservatively iterate on it.
   void iter(int opt_mode) {
     _opt_mode = opt_mode;
+    assert !Env.START.more_flow(this,new VBitSet(),true); // Initial conditions are correct
     // As a modest debugging convenience, avoid inlining (which blows up the
     // graph) until other optimizations are done.  Gather the possible inline
     // requests and set them aside until the main list is empty, then work down
@@ -483,12 +491,15 @@ public class GVNGCM {
     _ts.fill(null);
     // Set all types to all_type().startype(), their most optimistic type.
     // This is mostly the dual(), except a the Start memory is always XOBJ.
+    // Set all liveness to TypeMem.DEAD, their most optimistic type.
     walk_initype(Env.START);
+    Env.TOP._scope._live = TypeMem.FULL; // Keep the pre-parse primitive hook alive
+    assert !Env.START.more_flow(this,new VBitSet(),false); // Initial conditions are correct
     // Prime the worklist
-    add_work(rez);              // The one live starting point
+    rez.unhook(); // Must be unhooked to hit worklist
+    add_work(rez);
     // Collect unresolved calls, and verify they get resolved.
     Ary<CallNode> ambi_calls = new Ary<>(new CallNode[1],0);
-    int major_work=0, minor_opt=0;
 
     // Repeat, if we remove some ambiguous choices, and keep falling until the
     // graph stabilizes without ambiguity.
@@ -505,36 +516,26 @@ public class GVNGCM {
           if( fidxs != null && fidxs.above_center() && ambi_calls.find(call)== -1 )
             ambi_calls.add((CallNode)n); // Track ambiguous calls
         }
-        major_work++;
-        // Check liveness first
-        TypeMem old = n._live;
-        TypeMem nnn = n.compute_live(this);
-        if( old != nnn ) {
-          assert old.isa(nnn); // Monotonically improving
-          n._live = nnn;
-          for( Node def : n._defs ) // Put defs on worklist... liveness flows uphill
-            if( def != null && def != n )
-              add_work(def);        // Reverse flow: do work on defs not uses
-        }
-        if( !nnn.is_live() ) {
-          // Not alive, so always computes startype
-          assert type(n)==n.all_type().startype();
-          continue;           // And thus no forwards flow
-        }
 
         // Forwards flow
         Type ot = type(n);       // Old type
         Type nt = n.value(this); // New type
-        assert ot.isa(nt);       // Types only fall monotonically
         if( ot != nt ) {         // Progress
+          assert ot.isa(nt);     // Types only fall monotonically
           _ts.setX(n._uid,nt);   // Record progress
           // Classic forwards flow on change:
           for( Node use : n._uses ) {
-            if( use==n ) continue;        // Stop self-cycle (not legit, but happens during debugging)
-            if( use.all_type() != type(use)) // Minor optimization: If not already at bottom
-              add_work(use);    // Re-run users to check for progress
-            else
-              minor_opt++;      // Count minor opt effectiveness
+            assert use!=n; // Stop self-cycle (not legit, but happens during debugging)
+            add_work(use); // Re-run users to check for progress
+            // We may have a 'crossing optimization' point: changing the
+            // pointer input to a Load or a Scope changes the memory demanded
+            // by the Load or Scope.  This in turn changes the liveness fed
+            // into the Load.  This might also be viewed as a "turn around"
+            // point, where available value memory becomes demanded liveness.
+            if( use.input_value_changes_live() )
+              for( Node def : use._defs )
+                if( def != null && def != n )
+                  add_work(def);
 
             // When new control paths appear on Regions, the Region stays the
             // same type (Ctrl) but the Phis must merge new values.
@@ -542,6 +543,18 @@ public class GVNGCM {
               add_work_uses(use);
           }
         }
+
+        // Reverse flow
+        TypeMem old = n._live;
+        TypeMem nnn = n.compute_live(this);
+        if( old != nnn ) {      // Liveness progress
+          assert old.isa(nnn);  // Monotonically improving
+          n._live = nnn;
+          for( Node def : n._defs ) // Put defs on worklist... liveness flows uphill
+            if( def != null && def != n )
+              add_work(def);        // Reverse flow: do work on defs not uses
+        }
+
       }
 
       // Remove CallNode ambiguity after worklist runs dry
@@ -551,8 +564,9 @@ public class GVNGCM {
         else {
           FunPtrNode fun = call.resolve(this);
           if( fun != null ) {          // Unresolved gets left on worklist
-            call.set_fun_reg(fun,this); // Set resolved edge
+            call.set_fun_reg(fun,this);// Set resolved edge
             ambi_calls.del(i--);       // Remove from worklist
+            add_work(fun);             // Unresolved is now resolved and live
           }
         }
       }
@@ -560,11 +574,12 @@ public class GVNGCM {
 
     // Revisit the entire reachable program, as ideal calls may do something
     // with the maximally lifted types.
-    System.out.println("Major work: "+major_work+", minor opt: "+minor_opt+", CNT: "+CNT);
     assert _wrk2_bits.isEmpty();
     walk_opt(rez);
     _wrk2_bits.clear();
+    rez.keep();
     walk_dead(Env.START);
+    assert !Env.START.more_flow(this,new VBitSet(),false); // Post conditions are correct
   }
 
   // Forward reachable walk, setting types to all_type().startype() (basically
@@ -573,7 +588,7 @@ public class GVNGCM {
     if( n==null || touched(n) ) return; // Been there, done that
     Type startype = n.all_type().startype();
     setype(n,startype);
-    n._live = TypeMem.EMPTY;
+    n._live = TypeMem.DEAD;     // Not alive
     // Walk reachable graph
     for( Node use : n._uses ) walk_initype(use);
     for( Node def : n._defs ) walk_initype(def);
@@ -610,7 +625,8 @@ public class GVNGCM {
     }
     // Hit the fixed point, despite any immediate updates.  All prims are live,
     // even if unused so they might not have been computed
-    assert n.is_prim() || n.value(this)==t;
+    assert n.value(this)==t;
+    assert n.compute_live(this)==n._live;
 
     // Walk reachable graph
     for( Node def : n._defs )

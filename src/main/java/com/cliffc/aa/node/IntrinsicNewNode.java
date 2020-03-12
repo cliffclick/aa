@@ -44,6 +44,7 @@ public abstract class IntrinsicNewNode extends Node {
     ParmNode rpc = (ParmNode) gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
     ConNode emem = gvn.con(_mem);
     Node memp= _mem==TypeMem.EMPTY ? emem : gvn.xform(new ParmNode(-2,"mem",fun,emem,null));
+    gvn.add_work(memp);         // This may refine more later
 
     // Add input edges to the intrinsic
     add_def(null);              // Control for the primitive in slot 0
@@ -60,6 +61,7 @@ public abstract class IntrinsicNewNode extends Node {
     nnn.unhook();
     Node mmem= gvn.xform(new MemMergeNode(memp,mem,_alias));
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,ptr,rpc,fun));
+    mmem._live = mmem.compute_live(gvn); // Refine initial memory
     return new FunPtrNode(ret,null);
   }
 

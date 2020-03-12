@@ -7,7 +7,7 @@ public class Env implements AutoCloseable {
   final Env _par;
   Parse _P;          // Used to get debug info
   FunNode _fun;      // Start of display scope, or null for structs
-  ScopeNode _scope;  // Lexical anchor; "end of display"; goes when this environment leaves scope
+  public final ScopeNode _scope;  // Lexical anchor; "end of display"; goes when this environment leaves scope
   int _display_alias;// Local display alias
   Env( Env par, Parse P, FunNode fun, boolean is_closure ) {
     _P = P;
@@ -27,6 +27,7 @@ public class Env implements AutoCloseable {
     scope.set_ctrl(ctl,GVN);
     scope.set_ptr (ptr,GVN);  // Address for 'nnn', the local stack frame
     scope.set_active_mem(mmem,GVN);  // Memory includes local stack frame
+    scope.set_rez (GVN.con(Type.SCALAR),GVN);
   }
 
   public  final static GVNGCM GVN; // Initial GVN, defaults to ALL, lifts towards ANY
@@ -37,18 +38,17 @@ public class Env implements AutoCloseable {
   public  final static    ConNode ALL_CTRL;
           final static int LAST_START_UID;
   private final static int NINIT_CONS;
-          final static Env TOP; // Top-most lexical Environment, has all primitives, unable to be removed
+  public  final static Env TOP; // Top-most lexical Environment, has all primitives, unable to be removed
   public        static BitsAlias DISPLAY;
 
   static {
     GVN = new GVNGCM();      // Initial GVN, defaults to ALL, lifts towards ANY
-    //DISPLAY = BitsAlias.RECORD_BITS;
     DISPLAY = BitsAlias.EMPTY;
 
     // Initial control & memory
     START  = GVN.init(new StartNode(       ));
-    CTL_0  = GVN.init(new CProjNode(START,0));
-    MEM_0  = GVN.init(new MProjNode(START,1));
+    CTL_0  = (CProjNode)GVN.xform(new CProjNode(START,0));
+    MEM_0  = (MProjNode)GVN.xform(new MProjNode(START,1));
     // Top-most (file-scope) lexical environment
     TOP = new Env(null,null,null,true);
     // Top-level display defining all primitives
@@ -76,8 +76,11 @@ public class Env implements AutoCloseable {
     // Now that all the UnresolvedNodes have all possible hits for a name,
     // register them with GVN.
     for( Node val : STK_0._defs )  if( val instanceof UnresolvedNode ) GVN.init0(val);
-    GVN.rereg(_scope.mem(),TypeMem.FULL);
     GVN.rereg(STK_0,STK_0.all_type());
+    GVN.rereg(_scope.mem(),_scope.mem().value(GVN));
+    _scope._live = TypeMem.EMPTY;
+    GVN.rereg(_scope,_scope.value(GVN));
+    GVN.add_work(MEM_0);
     // Run the worklist dry
     GVN.iter(1);
     BitsAlias.init0(); // Done with adding primitives

@@ -138,29 +138,14 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public Type display() { return _args.at(0); } // Always a Display pointer or NIL
   public boolean is_class() { return _fidxs.is_class(); }
 
-  @Override public BitsAlias recursive_aliases(BitsAlias abs, TypeMem mem) {
-    if( _fidxs.test(1) ) return BitsAlias.NZERO; // All functions, all displays
-    if( _fidxs.above_center() ) return abs;      // Choosing functions with no aliases
-    BitSet bs = _fidxs.tree().plus_kids(_fidxs);
-    for( int fidx = bs.nextSetBit(1); fidx >= 0; fidx = bs.nextSetBit(fidx+1) ) {
-      BitsAlias cls = FunNode.find_fidx(fidx)._display_aliases;
-      for( int alias : cls )
-        abs = mem.recursive_aliases(abs,alias);
-      if( abs.test(1) ) return abs; // Shortcut for already being full
-    }
-    return abs;
-  }
-
   @Override public boolean above_center() { return _args.above_center(); }
   @Override public boolean may_be_con()   { return above_center() || is_con(); }
   @Override public boolean is_con()       {
     // More than 1 function being referred to
     if( _fidxs.abit() == -1 || is_class() ) return false;
-    // All display bits have to be constants also
-    for( int i=0; i<_args._ts.length; i++ )
-      if( !_args._ts[i].is_con() )
-        return false;
-    return true;
+    // Displays are bundled with the code pointer to make a closure.
+    // All display bits have to be constants also.
+    return display()==TypeStruct.NO_DISP || display().is_con();
   }
   @Override public boolean must_nil() { return _fidxs.test(0) && !above_center(); }
   @Override public boolean may_nil() { return _fidxs.may_nil(); }

@@ -1,8 +1,8 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeTuple;
-import com.cliffc.aa.GVNGCM;
 
 // Program execution start
 public class StartNode extends Node {

@@ -17,5 +17,7 @@ public class MProjNode extends ProjNode {
     }
     return c.above_center() ? TypeMem.EMPTY : TypeMem.FULL;
   }
+  // Memory need precise liveness
+  @Override public boolean basic_liveness() { return false; }
   @Override public Type all_type() { return TypeMem.FULL; }
 }

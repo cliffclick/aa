@@ -82,6 +82,12 @@ public final class RetNode extends Node {
     return TypeTuple.make(Type.CTRL,TypeMem.FULL,is_copy() ? TypeFunPtr.GENERIC_FUNPTR : fun()._tf._ret);
   }
 
+
+  @Override public TypeMem compute_live_use( GVNGCM gvn, Node def ) {
+    return def == mem() ? _live : TypeMem.EMPTY; // Basic liveness for non-memory defs
+  }
+  @Override public boolean basic_liveness() { return false; }
+
   @Override public Node is_copy(GVNGCM gvn, int idx) { throw com.cliffc.aa.AA.unimpl(); }
   boolean is_copy() { return !(in(4) instanceof FunNode) || fun()._tf.fidx() != _fidx; }
   // Return the op_prec of the returned value.  Not sensible except when called

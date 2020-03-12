@@ -110,14 +110,11 @@ public class Parse {
     prog();                     // Parse a program
     // Delete names at the top scope before final optimization.
     _e.close_display(_gvn);
-    _e._scope._uses.add(_e._scope); // Self-hook to keep alive, when unhooked & on worklist
-    _gvn.rereg(_e._scope.unhook(),Type.ALL);
-    _gvn.rereg(_e._par._scope,Type.ALL);
+    _gvn.rereg(_e._scope     ,Type.ALL); _e._scope._live = _e._scope.compute_live(_gvn);
     _gvn.iter(1);   // Pessimistic optimizations; might improve error situation
     remove_unknown_callers();
     _gvn.gcp(_e._scope); // Global Constant Propagation
     _gvn.iter(3);   // Re-check all ideal calls now that types have been maximally lifted
-    _e._scope.keep()._uses.pop(); // Remove self-hook, and rehook normally.
     return gather_errors();
   }
 
@@ -428,8 +425,8 @@ public class Parse {
     f_mem = _e._scope.check_if(false,bad,_gvn,f_ctrl,_e._scope.ptr(),f_mem); // Insert errors if created only 1 side
     _e._scope.pop_if();         // Pop the if-scope
     RegionNode r = set_ctrl(init(new RegionNode(null,t_ctrl.unhook(),f_ctrl.unhook())).keep());
-    set_mem(gvn(new PhiNode(TypeMem.MEM,bad,r       ,t_mem.unhook(),f_mem.unhook())));
-    return  gvn(new PhiNode(Type.SCALAR,bad,r.unhook(),tex.unhook(),  fex.unhook())) ; // Ifex result
+    set_mem(gvn(new PhiNode(TypeMem.FULL,bad,r       ,t_mem.unhook(),f_mem.unhook())));
+    return  gvn(new PhiNode(Type.SCALAR ,bad,r.unhook(),tex.unhook(),  fex.unhook())) ; // Ifex result
   }
 
   /** Parse an expression, a list of terms and infix operators.  The whole list
@@ -651,7 +648,7 @@ public class Parse {
       Node op = tok == null ? null : _e.lookup_filter(tok,_gvn,2); // TODO: filter by >2 not ==3
       if( peek('}') && op != null && op.op_prec() > 0 ) {
         // If a primitive unresolved, clone to give a proper error message.
-        if( op instanceof UnresolvedNode )
+        if( op instanceof UnresolvedNode && op.is_prim() )
           op = gvn(((UnresolvedNode)op).copy(errMsg()));
         return op;              // Return operator as a function constant
       }

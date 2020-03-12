@@ -97,26 +97,12 @@ public class NewObjNode extends NewNode<TypeStruct> {
   // according to use.
   public void promote_forward(GVNGCM gvn, NewObjNode parent) {
     assert parent != null;
-    boolean progress=false;
     TypeStruct ts = _ts;
     for( int i=0; i<ts._ts.length; i++ ) {
       Node n = fld(i);
       if( n != null && n.is_forward_ref() ) {
-        if( !progress ) { progress=true; gvn.unreg(this); }
         parent.create(ts._flds[i],n,TypeStruct.fmod(ts.flags(i)),gvn);
-        remove(def_idx(i),gvn);  // Hack edge
-        ts = ts.del_fld(i);
-        i--;
-      }
-    }
-    // Promoted anything?
-    if( progress ) {
-      _ts = ts;
-      // Reset types on this and children, so show the removed extra field
-      gvn.rereg(this,value(gvn));
-      for( Node use : _uses ) {
-        gvn.setype(use,use.value(gvn)); // Record "downhill" type for OProj, DProj
-        gvn.add_work_uses(use);         // Neighbors on worklist
+        gvn.set_def_reg(this,def_idx(i),gvn.con(Type.XSCALAR));
       }
     }
   }

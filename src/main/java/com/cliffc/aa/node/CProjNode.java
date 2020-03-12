@@ -22,6 +22,7 @@ public class CProjNode extends ProjNode {
     Type res = ct.at(_idx);
     return res==Type.XCTRL ? Type.XCTRL : Type.CTRL;
   }
+  @Override public boolean basic_liveness() { return true; }
   @Override public Type all_type() { return Type.CTRL; }
   // Return the op_prec of the returned value.  Not sensible except
   // when call on primitives.

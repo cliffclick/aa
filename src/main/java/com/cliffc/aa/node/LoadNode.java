@@ -144,6 +144,13 @@ public class LoadNode extends Node {
     return tmem.above_center() ? Type.XSCALAR : Type.SCALAR; // No loading from e.g. Strings
   }
 
+  @Override public TypeMem compute_live_use( GVNGCM gvn, Node def ) {
+    if( _live == TypeMem.DEAD ) return TypeMem.DEAD; // Am dead, so nothing extra is alive.
+    // Alive (like normal liveness), plus the address, plus whatever can be
+    // reached from the address.
+    return ScopeNode.compute_live_mem(gvn,TypeMem.EMPTY,mem(),adr());
+  }
+  
   @Override public String err(GVNGCM gvn) {
     Type tadr = gvn.type(adr());
     if( tadr.must_nil() ) return bad("Struct might be nil when reading");

@@ -148,7 +148,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     // Special shortcut for the all-prims display type
     if( find("!") != -1 && find("math_pi") != -1 && _ts[1] instanceof TypeFunPtr )
       return ((TypeFunPtr)_ts[1])._args._ts[0].above_center()
-        ? "{PRIMS}" : "{LOW_PRIMS}"; 
+        ? "{PRIMS}" : "{LOW_PRIMS}";
 
     SB sb = new SB();
     if( _uf!=null ) return "=>"+_uf; // Only used mid-recursion
@@ -1280,11 +1280,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   //  OLD2APX.put(dirty,x);
   //  return nmp.free(x);
   //}
-
-  @Override public BitsAlias recursive_aliases(BitsAlias abs, TypeMem mem) {
-    for( Type t : _ts ) abs = t.recursive_aliases(abs, mem);
-    return abs;
-  }
 
   // True if isBitShape on all bits
   @Override public byte isBitShape(Type t) {

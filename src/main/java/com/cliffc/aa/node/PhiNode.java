@@ -15,6 +15,8 @@ public class PhiNode extends Node {
     super(op,vals);
     _badgc = badgc;
     _t = t;
+    // Recompute, since _t was null inside of Node.Node calling basic_liveness.
+    _live = basic_liveness() ? TypeMem.EMPTY : TypeMem.FULL;
   }
   public PhiNode( Type t, Parse badgc, Node... vals ) { this(OP_PHI,t,badgc,vals); }
   // For ParmNodes
@@ -129,6 +131,9 @@ public class PhiNode extends Node {
         t = t.meet(gvn.type(in(i)));
     return t;                   // Limit to sane results
   }
+  // Only interested in memory aliases, if merging memory
+  @Override public boolean basic_liveness() {  return !(_t instanceof TypeMem); }
+
   @Override public Type all_type() { return _t; }
   @Override public String err(GVNGCM gvn) {
     if( !(in(0) instanceof FunNode && ((FunNode)in(0))._name.equals("!") ) && // Specifically "!" takes a Scalar

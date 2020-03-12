@@ -143,15 +143,6 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
 
   public BitsAlias aliases() { return _aliases; }
 
-  // Recursively reachable aliases
-  @Override public BitsAlias recursive_aliases(BitsAlias abs, TypeMem mem) {
-    if( _aliases.above_center() )  return abs; // Above center, assume we reach nothing interesting
-    for( int alias : _aliases )
-      if( alias != 0 )
-        abs = mem.recursive_aliases(abs,alias);
-    return abs;
-  }
-
   // Identical pointer but points to clean
   @Override public TypeMemPtr clean() { return make(_aliases,(TypeObj)_obj.clean()); }
 

@@ -3,6 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeMem;
 
 public class ConNode<T extends Type> extends Node {
   T _t;
@@ -13,6 +14,14 @@ public class ConNode<T extends Type> extends Node {
   @Override public Node ideal(GVNGCM gvn, int level) { return null; }
   @Override public Type value(GVNGCM gvn) { return _t; }
   @Override public Type all_type() { return _t; }
+  @Override public TypeMem compute_live(GVNGCM gvn) {
+    // If any use is alive, the Con is alive... but it never demands memory.
+    // Indeed, it may supply memory.
+    for( Node use : _uses )
+      if( use.compute_live_use(gvn, this) != TypeMem.DEAD )
+        return TypeMem.EMPTY;
+    return TypeMem.DEAD;
+  }
   @Override public String toString() { return str(); }
   @Override public int hashCode() { return _t.hashCode(); }// In theory also slot 0, but slot 0 is always Start
   @Override public boolean equals(Object o) {

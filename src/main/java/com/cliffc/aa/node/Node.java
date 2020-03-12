@@ -4,7 +4,6 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
-import com.cliffc.aa.type.TypeObj;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
@@ -110,7 +109,7 @@ public abstract class Node implements Cloneable {
     _defs = new Ary<>(defs);
     _uses = new Ary<>(new Node[1],0);
     for( Node def : defs ) if( def != null ) def._uses.add(this);
-    _live = TypeMem.FULL;
+    _live = basic_liveness() ? TypeMem.EMPTY : TypeMem.FULL;
    }
 
   // Is a primitive
@@ -143,7 +142,7 @@ public abstract class Node implements Cloneable {
   public String dump( int max, GVNGCM gvn, boolean prims ) { return dump(0, new SB(),max,new VBitSet(),gvn,prims).toString();  }
   // Dump one node, no recursion
   private SB dump( int d, SB sb, GVNGCM gvn ) {
-    String xs = String.format("%c%4d: %-7.7s ",_live.is_live()?' ':'X',_uid,xstr());
+    String xs = String.format("%s%4d: %-7.7s ",_live,_uid,xstr());
     sb.i(d).p(xs);
     if( is_dead() ) return sb.p("DEAD");
     for( Node n : _defs ) sb.p(n == null ? "____ " : String.format("%4d ",n._uid));
@@ -297,20 +296,29 @@ public abstract class Node implements Cloneable {
   abstract public Type value(GVNGCM gvn);
 
   // Compute live across uses
-  public final TypeMem compute_live(GVNGCM gvn) {
-    TypeMem live = TypeMem.EMPTY;             // Start at lattice top
-    for( Node use : _uses )                   // Computed across all uses
-      live = use.compute_live(gvn,live,this); // Make alive used fields
-    if( gvn.type(this)== TypeObj.XOBJ && this instanceof ConNode && live != TypeMem.EMPTY )
-      return TypeMem.FULL;        // Constant XOBJ gets used by many aliases
+  public TypeMem compute_live(GVNGCM gvn) {
+    if( basic_liveness() ) {    // Basic liveness only; e.g. primitive math ops
+      for( Node use : _uses )   // Computed across all uses
+        if( use._live != TypeMem.DEAD )
+          return TypeMem.EMPTY; // Report basic liveness only
+      return TypeMem.DEAD;
+    }
+    // Compute meet/union of all use livenesses
+    TypeMem live = TypeMem.DEAD; // Start at lattice top
+    for( Node use : _uses )      // Computed across all uses
+      live = (TypeMem)live.meet(use.compute_live_use(gvn, this)); // Make alive used fields
     return live;
   }
   // Compute local contribution of use liveness to this def.
   // Overridden in subclasses that do field-liveness.
-  public TypeMem compute_live(GVNGCM gvn, TypeMem live, Node def) {
-    if( _keep>0 ) return TypeMem.FULL;  // Somebody is forcing this live
-    return (TypeMem)live.meet(_live);   // If any use is alive, so is the def
+  public TypeMem compute_live_use( GVNGCM gvn, Node def ) {
+    return _keep>0 ? TypeMem.FULL : _live;
   }
+  // Compute basic liveness only
+  public boolean basic_liveness() { return true; }
+  // We may have a 'crossing optimization' point: changing the pointer input to
+  // a Load or a Scope changes the memory demanded by the Load or Scope.
+  public boolean input_value_changes_live() { return _op==OP_SCOPE || _op==OP_LOAD; }
 
   // Return any type error message, or null if no error
   public String err(GVNGCM gvn) { return null; }
@@ -342,7 +350,7 @@ public abstract class Node implements Cloneable {
     return true;
   }
 
-  // Assert all ideal calls are done
+  // Assert all ideal, value and liveness calls are done
   public final boolean more_ideal(GVNGCM gvn, VBitSet bs, int level) {
     if( bs.tset(_uid) ) return false; // Been there, done that
     if( _keep == 0 && _live.is_live() ) { // Only non-keeps, which is just top-level scope and prims
@@ -352,9 +360,27 @@ public abstract class Node implements Cloneable {
       Type t = value(gvn);
       if( gvn.type(this) != t )
         return true;            // Found a value improvement
+      TypeMem live = compute_live(gvn);
+      if( _live != live )
+        return true;            // Found a liveness improvement
     }
     for( Node def : _defs ) if( def != null && def.more_ideal(gvn,bs,level) ) return true;
     for( Node use : _uses ) if( use != null && use.more_ideal(gvn,bs,level) ) return true;
+    return false;
+  }
+  // Assert all value and liveness calls only go forwards.  Returns true for failure.
+  public final boolean more_flow(GVNGCM gvn, VBitSet bs, boolean lifting) {
+    if( bs.tset(_uid) ) return false; // Been there, done that
+    if( _keep == 0 && _live.is_live() && !gvn.on_work(this) ) { // Only non-keeps, which is just top-level scope and prims
+      Type t = value(gvn);
+      if( t != gvn.type(this) && t.isa(gvn.type(this))!=lifting )
+        return true;            // Rolling backwards not allowed
+      TypeMem live = compute_live(gvn);
+      if( live != _live       && live.isa(_live)      !=lifting )
+        return true;            // Found a liveness improvement
+    }
+    for( Node def : _defs ) if( def != null && def.more_flow(gvn,bs,lifting) ) return true;
+    for( Node use : _uses ) if( use != null && use.more_flow(gvn,bs,lifting) ) return true;
     return false;
   }
 

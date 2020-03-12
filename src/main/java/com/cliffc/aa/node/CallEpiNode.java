@@ -155,6 +155,7 @@ public final class CallEpiNode extends Node {
     if( fun.noinline() ) can_inline=false;
     if( can_inline ) {
       Node irez = rrez.copy(false,this,gvn);// Copy the entire function body
+      irez._live = _live; // Keep liveness from CallEpi, as the original might be dead.
       for( Node parm : rrez._defs )
         irez.add_def((parm instanceof ParmNode && parm.in(0) == fun) ? call.arg(((ParmNode)parm)._idx) : parm);
       if( irez instanceof PrimNode ) ((PrimNode)irez)._badargs = call._badargs;
@@ -198,8 +199,11 @@ public final class CallEpiNode extends Node {
         int idx = ((ParmNode)arg)._idx; // Argument number, or -1 for rpc
         Node actual = idx==-1 ? new ConNode<>(TypeRPC.make(call._rpc)) :
           (idx==-2 ? new MProjNode(call,1) : new ProjNode(call,idx+2));
-        if( idx==0 )
+        if( gvn._opt_mode==2 ) actual._live = TypeMem.DEAD; // During GCP, set new wirings very optimistic.
+        if( idx==0 ) {
           actual = new FP2ClosureNode(gvn.xform(actual));
+          if( gvn._opt_mode==2 ) actual._live = TypeMem.DEAD; // During GCP, set new wirings very optimistic.
+        }
         if( gvn._opt_mode == 2 )
           gvn.rereg(actual,actual.all_type().startype());
         else actual = gvn.xform(actual);
@@ -259,8 +263,11 @@ public final class CallEpiNode extends Node {
     // Set of all possible target functions
     Bits.Tree<BitsFun> tree = fidxs.tree();
     BitSet bs = tree.plus_kids(fidxs);
+    boolean has_unresolve=false;
+    for( int fidx : fidxs )
+      if( tree.is_parent(fidx) ) {has_unresolve=true; break; }
     // Lifting or dropping Unresolved calls
-    boolean lifting = fidxs.above_center();
+    final boolean lifting = fidxs.above_center();
     Type t = lifting ? TypeTuple.RET : TypeTuple.XRET;
     for( int fidx = bs.nextSetBit(0); fidx >= 0; fidx = bs.nextSetBit(fidx+1) ) {
       if( tree.is_parent(fidx) ) continue;   // Will be covered by children
@@ -301,11 +308,13 @@ public final class CallEpiNode extends Node {
       if( gvn._opt_mode==0 ) gvn.add_work(this); // Not during parsing, but check afterwards
       if( gvn._opt_mode!=0 &&        // Not during parsing
           !(gvn._opt_mode==1 && call.fun() instanceof UnresolvedNode) &&
+          !(gvn._opt_mode==1 && has_unresolve) &&
           !is_copy() &&              // Not if collapsing
-          !fidxs.above_center() &&   // Still settling down to possibilities
+          !lifting &&                // Still settling down to possibilities
           !fun.is_forward_ref() &&   // Call target is undefined
-          tcall.at(0)==Type.CTRL )   // Call args are not in error
-        wire(gvn,call,fun,ret);
+          tcall.at(0)==Type.CTRL ) { // Call args are not in error
+          wire(gvn,call,fun,ret);
+      }
     }
     // Meet the call-bypass aliases with the function aliases.  If the function
     // produces a new alias it might still have been called previously and thus
@@ -354,23 +363,37 @@ public final class CallEpiNode extends Node {
     for( int i=1; i<fun._defs._len; i++ ) // Unwire
       if( fun.in(i).in(0)==call ) gvn.set_def_reg(fun,i,gvn.con(Type.XCTRL));
   }
-  
+
   // Compute local contribution of use liveness to this def.  If the call is
   // Unresolved, then none of CallEpi targets are (yet) alive.
-  public TypeMem compute_live(GVNGCM gvn, TypeMem live, Node def) {
+  @Override public TypeMem compute_live_use( GVNGCM gvn, Node def ) {
+    assert _keep==0;
     if( _keep>0 ) return TypeMem.FULL;  // Somebody is forcing this live
 
     // If we are not sure which of the many targets will eventually be alive,
     // then none are.  Once the call resolves, the chosen target will be alive.
-    if( in(0) instanceof CallNode && def != call() && call().fun() instanceof UnresolvedNode )
-      return live;              // Not sure, so def is not more alive (yet)
-    // 
-    return (TypeMem)live.meet(_live);   // If any use is alive, so is the def
+    if( !is_copy() ) {
+      if( def != call() && call().fun() instanceof UnresolvedNode )
+        return TypeMem.DEAD; // Not sure, so def is not more alive (yet)
+      // If not a copy, behaves pretty normal except that only alias=1 gets
+      // propagated into a Call def; other aliases might be provided by the
+      // called function and never make it to the Call.  Alias#1 is not ever
+      // satisfied but only appears before GCP.
+      if( def != call() ) return super.compute_live_use(gvn, def);
+      return _live.at(1) == TypeObj.OBJ ? TypeMem.make(1,TypeObj.OBJ) : TypeMem.EMPTY;
+    }
+
+    // If is_copy, then basically acting like pass-thru.  Similar layout to
+    // RetNode, ScopeNode: there is mem & rez; if rez isa ptr, then pass mem
+    // thru to mem & rez.  If rez is not a ptr, just basic liveness.
+    TypeMem live = TypeMem.DEAD;
+    if( in(1)!=def ) live = TypeMem.EMPTY;
+    return ScopeNode.compute_live_mem(gvn,live,in(1),in(2));
   }
-  
+  @Override public boolean basic_liveness() { return false; }
+
   // If slot 0 is not a CallNode, we have been inlined.
   boolean is_copy() { return !(in(0) instanceof CallNode); }
   @Override public Node is_copy(GVNGCM gvn, int idx) { return is_copy() ? in(idx) : null; }
   @Override public Type all_type() { return TypeTuple.CALLE; }
-  // If losing the MProj,
 }
