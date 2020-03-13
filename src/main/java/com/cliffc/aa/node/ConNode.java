@@ -14,11 +14,11 @@ public class ConNode<T extends Type> extends Node {
   @Override public Node ideal(GVNGCM gvn, int level) { return null; }
   @Override public Type value(GVNGCM gvn) { return _t; }
   @Override public Type all_type() { return _t; }
-  @Override public TypeMem compute_live(GVNGCM gvn) {
+  @Override public TypeMem live( GVNGCM gvn) {
     // If any use is alive, the Con is alive... but it never demands memory.
     // Indeed, it may supply memory.
     for( Node use : _uses )
-      if( use.compute_live_use(gvn, this) != TypeMem.DEAD )
+      if( use.live_use(gvn, this) != TypeMem.DEAD )
         return TypeMem.EMPTY;
     return TypeMem.DEAD;
   }

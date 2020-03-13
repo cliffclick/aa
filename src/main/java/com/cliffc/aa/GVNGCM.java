@@ -109,7 +109,7 @@ public class GVNGCM {
         _ts.setX(n._uid,t);     // Reset cache to current
         add_work_uses(n);
       }
-      TypeMem live = n.compute_live(this);
+      TypeMem live = n.live(this);
       if( live != n._live ) {
         n._live = live;         // Reset cache to current
         for( Node def : n._defs ) // Put defs on worklist... liveness flows uphill
@@ -359,7 +359,7 @@ public class GVNGCM {
     // [ts!] Compute uses & live bits.  If progress, push the defs on the
     // worklist.  This is a reverse flow computation.
     TypeMem old = n._live;
-    TypeMem nnn = n.compute_live(this);
+    TypeMem nnn = n.live(this);
     if( old != nnn ) {  // Progress?
       assert nnn.isa(old); // Monotonically improving
       n._live = nnn;       // Mark progress
@@ -546,7 +546,7 @@ public class GVNGCM {
 
         // Reverse flow
         TypeMem old = n._live;
-        TypeMem nnn = n.compute_live(this);
+        TypeMem nnn = n.live(this);
         if( old != nnn ) {      // Liveness progress
           assert old.isa(nnn);  // Monotonically improving
           n._live = nnn;
@@ -626,7 +626,7 @@ public class GVNGCM {
     // Hit the fixed point, despite any immediate updates.  All prims are live,
     // even if unused so they might not have been computed
     assert n.value(this)==t;
-    assert n.compute_live(this)==n._live;
+    assert n.live(this)==n._live;
 
     // Walk reachable graph
     for( Node def : n._defs )

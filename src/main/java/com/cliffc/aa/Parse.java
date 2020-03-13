@@ -110,7 +110,7 @@ public class Parse {
     prog();                     // Parse a program
     // Delete names at the top scope before final optimization.
     _e.close_display(_gvn);
-    _gvn.rereg(_e._scope     ,Type.ALL); _e._scope._live = _e._scope.compute_live(_gvn);
+    _gvn.rereg(_e._scope     ,Type.ALL); _e._scope._live = _e._scope.live(_gvn);
     _gvn.iter(1);   // Pessimistic optimizations; might improve error situation
     remove_unknown_callers();
     _gvn.gcp(_e._scope); // Global Constant Propagation
@@ -787,7 +787,8 @@ public class Parse {
       // this is incorrect - should start from the incoming function memory.
       MemMergeNode amem = mem_active();
       assert amem.in(1).in(0) == e._scope.stk(); // amem slot#1 is the display
-      amem.set_def(0,mem,_gvn);                  // amem slot#0 was outer display, should be function memory
+      // Adding mem to worklist, because its liveness now changes
+      amem.set_def(0,_gvn.add_work(mem),_gvn); // amem slot#0 was outer display, should be function memory
       // Parse function body
       Node rez = stmts();       // Parse function body
       if( rez == null ) rez = err_ctrl2("Missing function body");

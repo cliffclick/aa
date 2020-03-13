@@ -41,7 +41,7 @@ public final class FunPtrNode extends ConNode<TypeFunPtr> {
   @Override String str() {
     if( is_dead() ) return "DEAD";
     RetNode ret = ret();
-    if( ret.is_copy() ) return "*!copy!{->}";
+    if( ret.is_copy() ) return "gensym:"+xstr();
     FunNode fun = ret.fun();
     return fun==null ? xstr() : fun.str();
   }
@@ -50,7 +50,7 @@ public final class FunPtrNode extends ConNode<TypeFunPtr> {
     if( is_forward_ref() ) return null;
     RetNode ret = ret();
     FunNode fun = ret.is_copy() ? FunNode.find_fidx(ret._fidx) : ret.fun();
-    if( in(1)!=null && fun._tf.arg(0)==TypeStruct.NO_DISP )
+    if( display()!=null && (ret.is_copy() || fun._tf.arg(0)==TypeStruct.NO_DISP) )
       { set_def(1,null,gvn); return this; }
     return null;
   }
@@ -64,12 +64,12 @@ public final class FunPtrNode extends ConNode<TypeFunPtr> {
     Type tdisp = display()==null ? TypeStruct.NO_DISP : gvn.type(display());
     return fun._tf.make(tdisp,((TypeTuple)tret).at(2));
   }
-  
-  @Override public TypeMem compute_live(GVNGCM gvn) {
+
+  @Override public TypeMem live( GVNGCM gvn) {
     // Pre-GCP, if the function is anywhere alive it might be used in a call
     // and thus demands all the memory that the CallEpi demands.
     // Post-GCP, all things are resolved and normal liveness flows.
-    return gvn._opt_mode < 2 ? TypeMem.FULL : super.compute_live(gvn);
+    return gvn._opt_mode < 2 ? TypeMem.FULL : super.live(gvn);
   }
   // A function pointer can be applied at a Call, in which case the associated
   // Ret demands everything the CallEpi demands.  Until GCP we assume this

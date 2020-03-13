@@ -22,11 +22,11 @@ public class TestLive {
     scope.set_rez(rez,gvn);
 
     // Check liveness base case
-    scope._live = scope.compute_live(gvn);
+    scope._live = scope.live(gvn);
     assertEquals(scope._live,TypeMem.EMPTY);
 
     // Check liveness recursive back one step
-    rez._live = rez.compute_live(gvn);
+    rez._live = rez.live(gvn);
     assertEquals(rez._live,TypeMem.EMPTY);
   }
 
@@ -74,29 +74,29 @@ public class TestLive {
     // Value was computed in a forwards flow.
     for( Node n : new Node[]{ctl,fdx,fdy,nnn,mem,ptr,fullmem,mmm,scope} ) {
       if( n != mmm && n != scope )
-        assertEquals(n._live,n.compute_live(gvn));
+        assertEquals(n._live,n.live(gvn));
       assertEquals(gvn.type(n),n.value(gvn));
     }
 
     // Check liveness base case
-    scope._live = scope.compute_live(gvn);
+    scope._live = scope.live(gvn);
     // Since simple forwards-flow, the default memory is known dead/XOBJ.
     // However, we got provided at least one object.
     TypeMem expected_live = TypeMem.make(nnn._alias,(TypeObj)gvn.type(mem));
     assertEquals(scope._live,expected_live);
 
     // Check liveness recursive back one step
-    ptr._live = ptr.compute_live(gvn);
+    ptr._live = ptr.live(gvn);
     assertEquals(ptr._live,TypeMem.EMPTY); // Ptr is all_type, conservative so all memory alive
-    mmm._live = mmm.compute_live(gvn);
+    mmm._live = mmm.live(gvn);
     assertEquals(mmm._live,expected_live);
-    mem._live = mem.compute_live(gvn);
+    mem._live = mem.live(gvn);
     assertEquals(mem._live,TypeMem.EMPTY);
-    nnn._live = nnn.compute_live(gvn);
+    nnn._live = nnn.live(gvn);
     assertEquals(nnn._live,TypeMem.EMPTY); // Since ptr is scalar, all memory is alive
-    ctl._live = ctl.compute_live(gvn);
+    ctl._live = ctl.live(gvn);
     assertEquals(ctl._live,TypeMem.EMPTY); // Since ptr is scalar, all memory is alive
-    fdx._live = fdx.compute_live(gvn);
+    fdx._live = fdx.live(gvn);
     assertEquals(fdx._live,TypeMem.EMPTY); // Since ptr is scalar, all memory is alive
 
   }

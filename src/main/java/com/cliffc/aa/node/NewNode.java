@@ -49,14 +49,20 @@ public abstract class NewNode<T extends TypeObj> extends Node {
     // for identity tests.
     boolean old = _captured;
     if( captured(gvn) ) {
-      boolean progress=!old;    // Progress if 1st time captured
-      Node x = gvn.con(Type.XSCALAR);
-      for( int i=1; i<_defs._len; i++ )
-        if( in(i)!=x ) {
+      boolean progress = !old;  // Progress if 1st time captured in any case
+      if( gvn.type(in(1))!=TypeStruct.NO_DISP || !(in(1) instanceof ConNode) ) {
+        set_def(1,gvn.con(TypeStruct.NO_DISP),gvn);
+        progress=true;         // Progress!
+      }
+      Node x = null;
+      for( int i=2; i<_defs._len; i++ ) {
+        if( gvn.type(in(i))!=Type.XSCALAR || !(in(i) instanceof ConNode) ) {
+          if( x == null ) x=gvn.con(Type.XSCALAR);
           set_def(i,x,gvn);
-          progress=true;
+          progress=true;         // Progress!
           if( is_dead() ) break; // Progress if any edge removed
         }
+      }
       return progress ? this : null;
     }
     return null;

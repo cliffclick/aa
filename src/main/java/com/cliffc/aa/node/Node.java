@@ -80,8 +80,7 @@ public abstract class Node implements Cloneable {
     if( old != null ) {
       old._uses.del(this);
       if( old._uses._len==0 && old._keep==0 ) gvn.kill(old); // Recursively begin deleting
-      if( !old.is_dead() && (old.is_multi_head() && is_multi_tail()) )
-        gvn.add_work(old);
+      if( !old.is_dead() ) gvn.add_work(old);  // Lost a use, so recompute live
     }
     return this;
   }
@@ -233,7 +232,7 @@ public abstract class Node implements Cloneable {
     return sb.toString();
   }
   private static void _header(FunNode fun, SB sb) {
-    sb.p("============ ").p(fun.name()).p(" ============").nl();
+    sb.p("============ ").p(fun==null?"null":fun.name()).p(" ============").nl();
   }
   private void postorder( Ary<Node> nodes, VBitSet bs ) {
     if( bs.tset(_uid) ) return;
@@ -287,16 +286,19 @@ public abstract class Node implements Cloneable {
   // does so, all new nodes will first call gvn.xform().  If gvn._opt if false,
   // not allowed to remove CFG edges (loop backedges and function-call entry
   // points have not all appeared).  Returns null if no-progress, or a better
-  // version of 'this'.
+  // version of 'this'.  The transformed graph must remain monotonic in both
+  // value() and live().
   abstract public Node ideal(GVNGCM gvn, int level);
 
   // Compute the current best Type for this Node, based on the types of its inputs.
-  // May return the local "all_type()", especially if its inputs are in error.
-  // This is a forwards-flow computation.
+  // May return the local "all_type()", especially if its inputs are in error.  It
+  // must be monotonic.  This is a forwards-flow transfer-function computation.
   abstract public Type value(GVNGCM gvn);
 
-  // Compute live across uses
-  public TypeMem compute_live(GVNGCM gvn) {
+  // Compute the current best liveness for this Node, based on the liveness of its uses.
+  // May return TypeMem.FULL, especially if its uses are of unwired functions.  It
+  // must be monotonic.  This is a reverse-flow transfer-function computation.
+  public TypeMem live( GVNGCM gvn) {
     if( basic_liveness() ) {    // Basic liveness only; e.g. primitive math ops
       for( Node use : _uses )   // Computed across all uses
         if( use._live != TypeMem.DEAD )
@@ -306,18 +308,20 @@ public abstract class Node implements Cloneable {
     // Compute meet/union of all use livenesses
     TypeMem live = TypeMem.DEAD; // Start at lattice top
     for( Node use : _uses )      // Computed across all uses
-      live = (TypeMem)live.meet(use.compute_live_use(gvn, this)); // Make alive used fields
+      live = (TypeMem)live.meet(use.live_use(gvn, this)); // Make alive used fields
     return live;
   }
   // Compute local contribution of use liveness to this def.
-  // Overridden in subclasses that do field-liveness.
-  public TypeMem compute_live_use( GVNGCM gvn, Node def ) {
+  // Overridden in subclasses that do per-def liveness.
+  public TypeMem live_use( GVNGCM gvn, Node def ) {
     return _keep>0 ? TypeMem.FULL : _live;
   }
   // Compute basic liveness only
   public boolean basic_liveness() { return true; }
-  // We may have a 'crossing optimization' point: changing the pointer input to
-  // a Load or a Scope changes the memory demanded by the Load or Scope.
+  // We have a 'crossing optimization' point: changing the pointer input to a
+  // Load or a Scope changes the memory demanded by the Load or Scope.  Same:
+  // changing a def._type changes the use._live, requiring other defs to be
+  // revisited.
   public boolean input_value_changes_live() { return _op==OP_SCOPE || _op==OP_LOAD; }
 
   // Return any type error message, or null if no error
@@ -360,7 +364,7 @@ public abstract class Node implements Cloneable {
       Type t = value(gvn);
       if( gvn.type(this) != t )
         return true;            // Found a value improvement
-      TypeMem live = compute_live(gvn);
+      TypeMem live = live(gvn);
       if( _live != live )
         return true;            // Found a liveness improvement
     }
@@ -371,11 +375,11 @@ public abstract class Node implements Cloneable {
   // Assert all value and liveness calls only go forwards.  Returns true for failure.
   public final boolean more_flow(GVNGCM gvn, VBitSet bs, boolean lifting) {
     if( bs.tset(_uid) ) return false; // Been there, done that
-    if( _keep == 0 && _live.is_live() && !gvn.on_work(this) ) { // Only non-keeps, which is just top-level scope and prims
+    if( _keep == 0 && _live.is_live() ) {
       Type t = value(gvn);
       if( t != gvn.type(this) && t.isa(gvn.type(this))!=lifting )
         return true;            // Rolling backwards not allowed
-      TypeMem live = compute_live(gvn);
+      TypeMem live = live(gvn);
       if( live != _live       && live.isa(_live)      !=lifting )
         return true;            // Found a liveness improvement
     }

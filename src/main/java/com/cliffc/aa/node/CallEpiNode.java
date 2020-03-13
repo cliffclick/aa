@@ -366,7 +366,7 @@ public final class CallEpiNode extends Node {
 
   // Compute local contribution of use liveness to this def.  If the call is
   // Unresolved, then none of CallEpi targets are (yet) alive.
-  @Override public TypeMem compute_live_use( GVNGCM gvn, Node def ) {
+  @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
     assert _keep==0;
     if( _keep>0 ) return TypeMem.FULL;  // Somebody is forcing this live
 
@@ -379,7 +379,7 @@ public final class CallEpiNode extends Node {
       // propagated into a Call def; other aliases might be provided by the
       // called function and never make it to the Call.  Alias#1 is not ever
       // satisfied but only appears before GCP.
-      if( def != call() ) return super.compute_live_use(gvn, def);
+      if( def != call() ) return super.live_use(gvn, def);
       return _live.at(1) == TypeObj.OBJ ? TypeMem.make(1,TypeObj.OBJ) : TypeMem.EMPTY;
     }
 

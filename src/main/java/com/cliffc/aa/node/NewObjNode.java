@@ -108,12 +108,6 @@ public class NewObjNode extends NewNode<TypeStruct> {
   }
 
   @Override public Type value(GVNGCM gvn) {
-    // If the address is not looked at then memory contents cannot be looked at
-    // and is dead.  Since this can happen DURING opto (when a call resolves)
-    // and during iter, "freeze" the value in-place.  It will DCE shortly.
-    if( _captured )
-      return gvn.self_type(this);
-
     // Gather args and produce a TypeStruct
     Type[] ts = TypeAry.get(_ts._ts.length);
     for( int i=0; i<ts.length; i++ )

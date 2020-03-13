@@ -70,9 +70,9 @@ public class UnresolvedNode extends Node {
   // Compute local contribution of use liveness to this def.
   // If pre-GCP, same as value() above, use the conservative answer.
   // During GCP, this will resolve so use the optimistic answer.
-  @Override public TypeMem compute_live_use( GVNGCM gvn, Node def ) {
+  @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
     return gvn._opt_mode < 2
-      ? super.compute_live_use(gvn,def)
+      ? super.live_use(gvn,def)
       : TypeMem.DEAD;
   }
   @Override public TypeFunPtr all_type() { return TypeFunPtr.GENERIC_FUNPTR; }

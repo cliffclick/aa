@@ -245,8 +245,8 @@ public class CallNode extends Node {
 
   // Compute live across uses.  If pre-GCP, then we may not be wired and thus
   // have not seen all possible function-body uses.  Check for #FIDXs == nwired().
-  @Override public TypeMem compute_live(GVNGCM gvn) {
-    if( gvn._opt_mode >= 2 ) return super.compute_live(gvn);
+  @Override public TypeMem live( GVNGCM gvn) {
+    if( gvn._opt_mode >= 2 ) return super.live(gvn);
 
     BitsFun fidxs = fidxs(gvn);
     if( fidxs == null ) return TypeMem.FULL; // Assume Something Good will yet happen
@@ -258,7 +258,7 @@ public class CallNode extends Node {
     if( bs.cardinality() > cepi.nwired() ) // More things to call
       return TypeMem.FULL;
     // All choices known
-    return super.compute_live(gvn);
+    return super.live(gvn);
   }
   @Override public boolean basic_liveness() { return false; }
 

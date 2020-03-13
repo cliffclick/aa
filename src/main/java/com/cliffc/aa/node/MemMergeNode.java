@@ -386,7 +386,7 @@ public class MemMergeNode extends Node {
   // Compute the liveness local contribution to def's liveness.  Ignores the
   // incoming memory types, as this is a backwards propagation of demanded
   // memory.
-  @Override public TypeMem compute_live_use( GVNGCM gvn, Node def ) {
+  @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
     int idx = _defs.find(def);  // The input node index
     int alias = alias_at(idx);  // Corresponding alias
     // For this def, _live for just the one alias.  Includes all children of
