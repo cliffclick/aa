@@ -860,7 +860,7 @@ public class Type<T extends Type<T>> implements Cloneable {
     return above_center() ? this : dual();
   }
   // Display might be Scalar or ~Scalar due to startype
-  boolean is_display_ptr() { return _type==TSCALAR || _type==TXSCALAR || _type==TNIL || _type==TANY; }
+  public boolean is_display_ptr() { return _type==TSCALAR || _type==TXSCALAR || _type==TNIL || _type==TANY; }
   boolean is_display() { return false; }
 
   RuntimeException typerr(Type t) {

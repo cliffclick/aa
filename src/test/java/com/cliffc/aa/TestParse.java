@@ -139,6 +139,7 @@ public class TestParse {
 
   @Test public void testParse02() {
     Object dummy = Env.GVN; // Force class loading cycle
+    testerr("f0 = { f x -> f0(x-1) }; f0({+},2)", "Passing 1 arguments to f0={->} which takes 2 arguments",21);
     // Anonymous function definition
     test_isa("{x y -> x+y}", TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make_args(TypeStruct.ts(TypeMemPtr.DISPLAY_PTR,Type.SCALAR,Type.SCALAR)),Type.SCALAR)); // {Scalar Scalar -> Scalar}
     test("{5}()", TypeInt.con(5)); // No args nor -> required; this is simply a function returning 5, being executed

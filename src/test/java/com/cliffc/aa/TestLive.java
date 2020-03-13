@@ -38,7 +38,7 @@ public class TestLive {
     gvn.setype(ctl,ctl.all_type());
 
     // Fields
-    ConNode<Type<TypeInt>> fdx = new ConNode<>(TypeInt.con(5));
+    ConNode fdx = new ConNode(TypeInt.con(5));
     gvn.setype(fdx,fdx.all_type());
     ConNode<Type> fdy = new ConNode<>(TypeInt.con(9));
     gvn.setype(fdy,fdy.all_type());

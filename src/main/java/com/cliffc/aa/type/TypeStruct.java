@@ -1309,17 +1309,16 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // with DISPLAY parts... which have fallen too far for GCP.
   @Override public TypeStruct startype() {
 
-    //if( !_cyclic ) {            // Not cyclic, normal recursive walk
+    if( !_cyclic ) {            // Not cyclic, normal recursive walk
       String[] as = new String[_flds.length];
       Type  [] ts = TypeAry.get(_ts  .length);
       byte  [] fs = new byte  [_ts  .length];
       for( int i=0; i<as.length; i++ ) as[i] = fldBot(_flds[i]) ? "*" : _flds[i];
-      //for( int i=0; i<ts.length; i++ ) ts[i] = _ts[i].startype();
-      for( int i=0; i<ts.length; i++ ) ts[i] = Type.XSCALAR;
+      for( int i=0; i<ts.length; i++ ) ts[i] = _ts[i].startype();
       for( int i=0; i<fs.length; i++ ) fs[i] = fdual(flags(i)); // Really: mod ro goes to unk.  Centerline final/rw stay put.
       return malloc(_name,true,as,ts,fs).hashcons_free();
-      //}
-    //if( this==DISPLAY || this==DISPLAY.dual() ) return DISPLAY.dual(); // Shortcut
+    }
+    if( this==DISPLAY || this==DISPLAY.dual() ) return DISPLAY.dual(); // Shortcut
     //
     //// Cyclic; need to clone the existing structure, then lift it
     //RECURSIVE_MEET++;
@@ -1331,6 +1330,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     //assert lift2.isa(this);
     //OLD2APX.clear();
     //return lift2;
+    throw AA.unimpl();
   }
 
   private static TypeStruct lift_str(TypeStruct low) {

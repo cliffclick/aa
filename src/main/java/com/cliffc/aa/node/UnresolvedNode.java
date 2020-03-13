@@ -11,7 +11,7 @@ import java.util.Arrays;
 
 public class UnresolvedNode extends Node {
   private Parse _bad;
-  UnresolvedNode( Parse bad, Node... funs ) { super(OP_UNR,funs); _bad = bad;}
+  UnresolvedNode( Parse bad, Node... funs ) { super(OP_UNR,funs); _bad = bad; }
   @Override String xstr() {
     if( is_dead() ) return "DEAD";
     if( in(0) instanceof FunPtrNode ) {
@@ -75,7 +75,16 @@ public class UnresolvedNode extends Node {
       ? super.live_use(gvn,def)
       : TypeMem.DEAD;
   }
-  @Override public TypeFunPtr all_type() { return TypeFunPtr.GENERIC_FUNPTR; }
+  // Too preserve the sharp display pointer types, this has to be as sharp as
+  // the meet of its all_type inputs.  This can be cached locally here after
+  // inputs stop changing... which is really just after we initialize all the
+  // primitives.  Simpler to just recompute, which doesn't happen very often.
+  @Override public TypeFunPtr all_type() {
+    Type t = TypeFunPtr.GENERIC_FUNPTR.dual();
+    for( Node def : _defs )
+      t = t.meet(((FunPtrNode)def)._t);
+    return (TypeFunPtr)t;
+  }
 
   // Return the op_prec of the returned value.  Not sensible except when called
   // on primitives.  Should be the same across all defs.

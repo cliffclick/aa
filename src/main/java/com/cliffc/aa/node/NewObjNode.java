@@ -22,7 +22,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
   }
   // Called by IntrinsicNode.convertTypeNameStruct
   public NewObjNode( boolean is_closure, int par_alias, TypeStruct ts, Node ctrl, Node clo ) {
-    super(OP_NEWOBJ,par_alias,ts,ctrl,clo);
+    super(OP_NEWOBJ,par_alias,ts.set_fld(0,TypeMemPtr.DISPLAY_PTR,TypeStruct.FFNL),ctrl,clo);
     _is_closure = is_closure;
   }
   public Node get(String name) { int idx = _ts.find(name);  assert idx >= 0; return fld(idx); }
@@ -111,7 +111,6 @@ public class NewObjNode extends NewNode<TypeStruct> {
     // Gather args and produce a TypeStruct
     Type[] ts = TypeAry.get(_ts._ts.length);
     for( int i=0; i<ts.length; i++ )
-      // Limit type bounds, since error returns can be out-of-bounds
       ts[i] = gvn.type(fld(i));
     TypeStruct newt = _ts.make_from(ts);
 

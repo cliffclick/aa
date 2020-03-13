@@ -723,7 +723,7 @@ public class Parse {
     // or when inside of a struct definition: 'this'.
     Node parent_display = _e._scope.ptr();
     ids .push("^");
-    ts  .push(TypeMemPtr.DISPLAY_PTR);
+    ts  .push(_gvn.type(parent_display));
     bads.push(null);
 
     // Parse arguments
@@ -768,7 +768,7 @@ public class Parse {
       // Build Parms for all incoming values
       Node rpc = gvn(new ParmNode(-1,"rpc",fun,con(TypeRPC.ALL_CALL),null)).keep();
       Node mem = gvn(new ParmNode(-2,"mem",fun,con(TypeMem.FULL    ),null));
-      Node clo = gvn(new ParmNode( 0,"^"  ,fun,TypeMemPtr.DISPLAY_PTR,parent_display,null));
+      Node clo = gvn(new ParmNode( 0,"^"  ,fun,ts.at(0),parent_display,null));
       // Display is special: the default is simply the outer lexical scope.
       // But here, in a function, the display is actually passed in as a hidden
       // extra argument and replaces the default.
@@ -800,9 +800,9 @@ public class Parse {
       RetNode ret = (RetNode)gvn(new RetNode(ctrl(),all_mem(),rez,rpc.unhook(),fun.unhook()));
       // Update the function type for the current return value
       Type tret = ((TypeTuple)_gvn.type(ret)).at(2);
-      fun.sharpen(_gvn,fun._tf.make(TypeMemPtr.DISPLAY_PTR,tret)); // Sharpen alltype return, equal to what parser already knowns
+      fun.sharpen(_gvn,fun._tf.make(ts.at(0),tret)); // Sharpen alltype return, equal to what parser already knowns
       // The FunPtr builds a real display; any up-scope references are passed in now.
-      Node fptr = gvn(new FunPtrNode(ret,e._par._scope.ptr()));
+      Node fptr = gvn(new FunPtrNode(ret,e._par._scope.ptr(),fun._tf));
       _e = _e._par;             // Pop nested environment
       set_ctrl(old_ctrl);       // Back to the pre-function-def control
       set_mem (old_mem.unhook());// Back to the pre-function-def memory

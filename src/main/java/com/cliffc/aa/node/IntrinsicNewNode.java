@@ -62,7 +62,7 @@ public abstract class IntrinsicNewNode extends Node {
     Node mmem= gvn.xform(new MemMergeNode(memp,mem,_alias));
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,ptr,rpc,fun));
     mmem._live = mmem.live(gvn); // Refine initial memory
-    return new FunPtrNode(ret,null);
+    return new FunPtrNode(ret,null,fun._tf);
   }
 
 }

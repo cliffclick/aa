@@ -10,14 +10,14 @@ import com.cliffc.aa.type.*;
 // class functions to be passed about.
 public final class FunPtrNode extends ConNode<TypeFunPtr> {
   private final String _referr;
-  public  FunPtrNode( RetNode ret, Node display ) { this(null,ret,display); }
+  public  FunPtrNode( RetNode ret, Node display, TypeFunPtr tfp ) {
+    super(OP_FUNPTR,tfp,ret,display);
+    _referr = null;
+  }
+  // For forward-refs only; super weak display & function.
   private FunPtrNode( String referr, RetNode ret, Node display ) {
     super(OP_FUNPTR,TypeFunPtr.GENERIC_FUNPTR,ret,display);
     _referr = referr;
-    assert display==null || // Many primitives do not use a display
-            (display instanceof ProjNode && display.in(0) instanceof NewObjNode) || // Standard local display/closure
-            display instanceof ConNode || // Generic display from a forward-ref
-            display instanceof ParmNode; // Display is passed-thru from FunNode without making a lexical scope
   }
   @Override public int hashCode() { return super.hashCode() ^ ((_defs._len==0 || in(0)==null) ? 0 : in(0)._uid); }
   @Override public boolean equals(Object o) {
@@ -55,6 +55,9 @@ public final class FunPtrNode extends ConNode<TypeFunPtr> {
     return null;
   }
   @Override public Type value(GVNGCM gvn) {
+    // Always the display is better than the default, since it comes from some
+    // real function.
+    assert display()==null || is_forward_ref() || ((TypeFunPtr)gvn.self_type(this)).display() != TypeMemPtr.DISPLAY_PTR;
     if( !(in(0) instanceof RetNode) )
       return TypeFunPtr.EMPTY;
     RetNode ret = ret();
@@ -62,6 +65,7 @@ public final class FunPtrNode extends ConNode<TypeFunPtr> {
     if( is_forward_ref() ) return fun._tf;
     Type tret = gvn.type(ret);
     Type tdisp = display()==null ? TypeStruct.NO_DISP : gvn.type(display());
+    assert tdisp != TypeMemPtr.DISPLAY_PTR;
     return fun._tf.make(tdisp,((TypeTuple)tret).at(2));
   }
 
