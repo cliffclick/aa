@@ -131,8 +131,9 @@ public class CallNode extends Node {
     _rpc = BitsRPC.new_rpc(_rpc);      // New child RPC for 'this' as well.
     gvn.rereg(this,oldt);              // Back on list
     // Swap out the existing old rpc users for the new.
+    // Might be no users of either.
     ConNode new_rpc = gvn.con(TypeRPC.make(_rpc));
-    gvn.subsume(old_rpc,new_rpc);
+    gvn.add_work(gvn.subsume(old_rpc,new_rpc));
     return call;
   }
 

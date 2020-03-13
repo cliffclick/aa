@@ -272,7 +272,7 @@ public abstract class Node implements Cloneable {
   public  Node find( int uid ) { return find(uid,new VBitSet()); }
   private Node find( int uid, VBitSet bs ) {
     if( _uid==uid ) return this;
-    if( bs.tset(_uid) ) return null;
+    if( bs.tset(_uid) || is_dead() ) return null;
     Node m;
     for( Node n : _defs ) if( n!=null && (m=n.find(uid,bs)) !=null ) return m;
     for( Node n : _uses ) if(            (m=n.find(uid,bs)) !=null ) return m;
@@ -376,12 +376,11 @@ public abstract class Node implements Cloneable {
   public final boolean more_flow(GVNGCM gvn, VBitSet bs, boolean lifting) {
     if( bs.tset(_uid) ) return false; // Been there, done that
     if( _keep == 0 && _live.is_live() ) {
-      Type t = value(gvn);
-      if( t != gvn.type(this) && t.isa(gvn.type(this))!=lifting )
+      Type    nval = value(gvn), oval=gvn.type(this);
+      TypeMem nliv = live (gvn), oliv=_live;
+      if( (nval != oval && nval.isa(oval)!=lifting) ||
+          (nliv != oliv && nliv.isa(oliv)!=lifting) )
         return true;            // Rolling backwards not allowed
-      TypeMem live = live(gvn);
-      if( live != _live       && live.isa(_live)      !=lifting )
-        return true;            // Found a liveness improvement
     }
     for( Node def : _defs ) if( def != null && def.more_flow(gvn,bs,lifting) ) return true;
     for( Node use : _uses ) if( use != null && use.more_flow(gvn,bs,lifting) ) return true;

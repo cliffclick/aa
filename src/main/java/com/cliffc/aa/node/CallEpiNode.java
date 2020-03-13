@@ -368,27 +368,18 @@ public final class CallEpiNode extends Node {
   // Unresolved, then none of CallEpi targets are (yet) alive.
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
     assert _keep==0;
-    if( _keep>0 ) return TypeMem.FULL;  // Somebody is forcing this live
-
+    // If is_copy, then basically acting like pass-thru.
+    if( is_copy() ) return super.live_use(gvn,def);
     // If we are not sure which of the many targets will eventually be alive,
     // then none are.  Once the call resolves, the chosen target will be alive.
-    if( !is_copy() ) {
-      if( def != call() && call().fun() instanceof UnresolvedNode )
-        return TypeMem.DEAD; // Not sure, so def is not more alive (yet)
-      // If not a copy, behaves pretty normal except that only alias=1 gets
-      // propagated into a Call def; other aliases might be provided by the
-      // called function and never make it to the Call.  Alias#1 is not ever
-      // satisfied but only appears before GCP.
-      if( def != call() ) return super.live_use(gvn, def);
-      return _live.at(1) == TypeObj.OBJ ? TypeMem.make(1,TypeObj.OBJ) : TypeMem.EMPTY;
-    }
-
-    // If is_copy, then basically acting like pass-thru.  Similar layout to
-    // RetNode, ScopeNode: there is mem & rez; if rez isa ptr, then pass mem
-    // thru to mem & rez.  If rez is not a ptr, just basic liveness.
-    TypeMem live = TypeMem.DEAD;
-    if( in(1)!=def ) live = TypeMem.EMPTY;
-    return ScopeNode.compute_live_mem(gvn,live,in(1),in(2));
+    if( def != call() && call().fun() instanceof UnresolvedNode )
+      return TypeMem.DEAD; // Not sure, so def is not more alive (yet)
+    // If not a copy, behaves pretty normal except that only alias=1 gets
+    // propagated into a Call def; other aliases might be provided by the
+    // called function and never make it to the Call.  Alias#1 is not ever
+    // satisfied but only appears before GCP.
+    if( def != call() ) return super.live_use(gvn, def);
+    return _live.at(1) == TypeObj.OBJ ? TypeMem.make(1,TypeObj.OBJ) : TypeMem.EMPTY;
   }
   @Override public boolean basic_liveness() { return false; }
 
