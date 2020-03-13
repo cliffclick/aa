@@ -1,6 +1,5 @@
 package com.cliffc.aa;
 
-import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.node.*;
 import com.cliffc.aa.type.*;
 import org.junit.Test;
@@ -39,21 +38,22 @@ public class TestLive {
     gvn.setype(ctl,ctl.all_type());
 
     // Fields
-    ConNode<TypeInt> fdx = new ConNode<>(TypeInt.con(5));
+    ConNode<Type<TypeInt>> fdx = new ConNode<>(TypeInt.con(5));
     gvn.setype(fdx,fdx.all_type());
-    ConNode<TypeInt> fdy = new ConNode<>(TypeInt.con(9));
+    ConNode<Type> fdy = new ConNode<>(TypeInt.con(9));
     gvn.setype(fdy,fdy.all_type());
 
     // New object, fields x,y holding ints
     NewObjNode nnn = new NewObjNode(false,TypeStruct.DISPLAY,ctl,gvn.con(Type.NIL));
     nnn.create_active("x",fdx,TypeStruct.FFNL,gvn);
     nnn.create_active("y",fdy,TypeStruct.FFNL,gvn);
+    gvn.setype(nnn,nnn.value(gvn));
 
     // Proj, OProj
     Node mem = new OProjNode(nnn,0);
-    gvn.setype(mem,mem.all_type());
+    gvn.setype(mem,mem.value(gvn));
     Node ptr = new  ProjNode(nnn,1);
-    gvn.setype(ptr,ptr.all_type());
+    gvn.setype(ptr,ptr.value(gvn));
 
     // Starting full memory
     Node fullmem = new ConNode<>(TypeMem.FULL);
@@ -61,49 +61,43 @@ public class TestLive {
 
     // MemMerge object with all memory
     MemMergeNode mmm = new MemMergeNode(fullmem,mem,nnn._alias);
-    gvn.setype(mmm,mmm.all_type());
+    gvn.setype(mmm,mmm.value(gvn));
 
     // Use the object for scope exit
     ScopeNode scope = new ScopeNode(null,false);
     scope.set_mem(mmm,gvn);
     scope.set_rez(ptr,gvn);
+    gvn.setype(scope,scope.all_type());
+
+    // Check 'live' is stable on creation, except for mmm & scope
+    // which are 'turning around' liveness.
+    // Value was computed in a forwards flow.
+    for( Node n : new Node[]{ctl,fdx,fdy,nnn,mem,ptr,fullmem,mmm,scope} ) {
+      if( n != mmm && n != scope )
+        assertEquals(n._live,n.compute_live(gvn));
+      assertEquals(gvn.type(n),n.value(gvn));
+    }
 
     // Check liveness base case
     scope._live = scope.compute_live(gvn);
-    assertEquals(scope._live,TypeMem.EMPTY);
+    // Since simple forwards-flow, the default memory is known dead/XOBJ.
+    // However, we got provided at least one object.
+    TypeMem expected_live = TypeMem.make(nnn._alias,(TypeObj)gvn.type(mem));
+    assertEquals(scope._live,expected_live);
 
     // Check liveness recursive back one step
     ptr._live = ptr.compute_live(gvn);
-    assertEquals(ptr._live,TypeMem.FULL); // Ptr is all_type, conservative so all memory alive
+    assertEquals(ptr._live,TypeMem.EMPTY); // Ptr is all_type, conservative so all memory alive
     mmm._live = mmm.compute_live(gvn);
-    assertEquals(mmm._live,TypeMem.FULL);
+    assertEquals(mmm._live,expected_live);
     mem._live = mem.compute_live(gvn);
-    assertEquals(mem._live,TypeMem.make(nnn._alias,TypeObj.OBJ));
-    nnn._live = nnn.compute_live(gvn);
-    assertEquals(nnn._live,TypeMem.FULL); // Since ptr is scalar, all memory is alive
-    ctl._live = ctl.compute_live(gvn);
-    assertEquals(ctl._live,TypeMem.FULL); // Since ptr is scalar, all memory is alive
-    fdx._live = fdx.compute_live(gvn);
-    assertEquals(fdx._live,TypeMem.FULL); // Since ptr is scalar, all memory is alive
-
-    // Now flow types forward.
-    gvn.setype(nnn,nnn.value(gvn));
-    gvn.setype(mem,mem.value(gvn));
-    gvn.setype(ptr,ptr.value(gvn));
-    gvn.setype(mmm,mmm.value(gvn));
-
-    // Check liveness again, but with refined types
-    ptr._live = ptr.compute_live(gvn);
-    assertEquals(ptr._live,TypeMem.EMPTY);
-    mem._live = mem.compute_live(gvn);
-    assertEquals(mem._live,TypeMem.make(nnn._alias,TypeObj.OBJ));
+    assertEquals(mem._live,TypeMem.EMPTY);
     nnn._live = nnn.compute_live(gvn);
     assertEquals(nnn._live,TypeMem.EMPTY); // Since ptr is scalar, all memory is alive
     ctl._live = ctl.compute_live(gvn);
     assertEquals(ctl._live,TypeMem.EMPTY); // Since ptr is scalar, all memory is alive
     fdx._live = fdx.compute_live(gvn);
     assertEquals(fdx._live,TypeMem.EMPTY); // Since ptr is scalar, all memory is alive
-
 
   }
 }
