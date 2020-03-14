@@ -34,7 +34,7 @@ public class BitsRPC extends Bits<BitsRPC> {
   private static final BitsRPC ANY = FULL.dual();
   public  static final BitsRPC NIL = make0(0);
   private static final BitsRPC EMPTY = FULL.make(); // No bits
-  @Override boolean is_class(int fidx) { return ALL==fidx; } // All bits are constants, except the first "ALL" bit
+  @Override boolean is_class(int fidx) { return fidx!=0; } // All bits are constants, except they get cloned
   @Override public BitsRPC ALL() { return FULL; }
   @Override public BitsRPC ANY() { return ANY ; }
   @Override public BitsRPC EMPTY() { return EMPTY ; }

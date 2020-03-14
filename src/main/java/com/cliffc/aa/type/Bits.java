@@ -303,13 +303,6 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
 
     // Bigger in bits0
     if( bits0.length < bits1.length ) { long[] tmp=bits0; bits0=bits1; bits1=tmp; int t=con0; con0=con1; con1=t; }
-    // Both meets?  Set-union
-    if( con0 == 1 && con1 == 1 ) {
-      long[] bits = bits0.clone();        // Clone larger
-      for( int i=0; i<bits1.length; i++ ) // OR in smaller bits
-        bits[i] |= bits1[i];
-      return make(false,bits);  // This will remove parent/child dups
-    }
     // Both joins?  Set-intersection
     Tree<B> tree = tree();
     if( con0 == -1 && con1 == -1 ) {
@@ -318,7 +311,18 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
       join(tree,bits1,bits0,bits);         // Merge right into left
       // Nil is not part of the parent tree, so needs to be set explicitly
       if( (bits0[0]&1)==1 && (bits1[0]&1)==1 )  bits[0]|=1;
-      return make(true,bits);
+      // If all bits are zero (the empty meet), we can fall below zero and do a meet.
+      // This is the moral equivalent of mismatched high types having to fall hard.
+      if( bits[0]!=0 )
+        return make(true,bits);
+      con0 = con1 = 1; // force a meet
+    }
+    // Both meets?  Set-union
+    if( con0 == 1 && con1 == 1 ) {
+      long[] bits = bits0.clone();        // Clone larger
+      for( int i=0; i<bits1.length; i++ ) // OR in smaller bits
+        bits[i] |= bits1[i];
+      return make(false,bits);  // This will remove parent/child dups
     }
 
     // Mixed meet/join.  Find any bit in the join that is also in the meet.  If

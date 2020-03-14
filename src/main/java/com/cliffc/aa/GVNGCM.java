@@ -493,7 +493,6 @@ public class GVNGCM {
     // This is mostly the dual(), except a the Start memory is always XOBJ.
     // Set all liveness to TypeMem.DEAD, their most optimistic type.
     walk_initype(Env.START);
-    Env.TOP._scope._live = TypeMem.FULL; // Keep the pre-parse primitive hook alive
     assert !Env.START.more_flow(this,new VBitSet(),false); // Initial conditions are correct
     // Prime the worklist
     rez.unhook(); // Must be unhooked to hit worklist
