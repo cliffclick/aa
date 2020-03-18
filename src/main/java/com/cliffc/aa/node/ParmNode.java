@@ -55,7 +55,7 @@ public class ParmNode extends PhiNode {
     // arguments flow into the function... even if bad arguments are being
     // passed.  This limits forward error flow, and enables better error
     // messages.  Not done during or after GCP, as we are past error prop.
-    if( gvn._opt_mode<2 ) t = t.bound(all_type());
+    if( gvn._opt_mode<2 ) t = t.bound(all_type().startype().dual());
     // Memory tracks the notion of 'clean' or 'unwritten' since the function
     // start.  Changed memory is returned at exit and unchanged memory is NOT
     // returned - and CallEpis are aware of this behavior and do the correct

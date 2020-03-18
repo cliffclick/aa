@@ -59,7 +59,6 @@ public class BitsAlias extends Bits<BitsAlias> {
     TREE.reset_to_init0();
   }
 
-  @Override boolean is_class(int fidx) { return fidx!=0; } // All bits are class of allocated objects, except nil alone
   @Override public BitsAlias ALL() { return FULL; }
   @Override public BitsAlias ANY() { return ANY ; }
   @Override public BitsAlias EMPTY() { return EMPTY ; }

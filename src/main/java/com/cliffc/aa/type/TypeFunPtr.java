@@ -3,7 +3,7 @@ package com.cliffc.aa.type;
 import com.cliffc.aa.node.FunNode;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
-import java.util.BitSet;
+
 import java.util.function.Predicate;
 
 // Function indices or function pointers; a single instance can include all
@@ -96,6 +96,10 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     assert _args.is_display() && display_ptr.is_display_ptr();
     return make(_fidxs,_args.set_fld(0,display_ptr,_args.fmod(0)),ret);
   }
+  public TypeFunPtr make_high_fidx() {
+    if( _fidxs.above_center() ) return this;
+    return make(_fidxs.dual(),_args,_ret);
+  }
 
   public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.FULL,ARGS,Type.SCALAR);
   private static final TypeFunPtr TEST_INEG = make(BitsFun.make0(2),TypeStruct.INT64,TypeInt.INT64);
@@ -136,17 +140,11 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public int fidx() { return _fidxs.getbit(); } // Asserts internally single-bit
   public Type arg(int idx) { return _args.at(idx); }
   public Type display() { return _args.at(0); } // Always a Display pointer or NIL
-  public boolean is_class() { return _fidxs.is_class(); }
 
   @Override public boolean above_center() { return _args.above_center(); }
-  @Override public boolean may_be_con()   { return above_center() || is_con(); }
-  @Override public boolean is_con()       {
-    // More than 1 function being referred to
-    if( _fidxs.abit() == -1 || is_class() ) return false;
-    // Displays are bundled with the code pointer to make a closure.
-    // All display bits have to be constants also.
-    return display()==TypeStruct.NO_DISP || display().is_con();
-  }
+  @Override public boolean may_be_con()   { return above_center(); }
+  // Since fidxs may split, never a constant.
+  @Override public boolean is_con()       { return false; }
   @Override public boolean must_nil() { return _fidxs.test(0) && !above_center(); }
   @Override public boolean may_nil() { return _fidxs.may_nil(); }
   @Override Type not_nil() {

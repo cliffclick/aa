@@ -312,9 +312,9 @@ public class CallNode extends Node {
         Type actual = targ(gvn,j);
         Type formal = formals.at(j);
         Type tx = actual.join(formal);
-        if( tx != actual && tx.above_center() ) // Actual and formal have values in common?
+        if( tx != actual && tx.above_center() && !formal.above_center() ) // Actual and formal have values in common?
           continue outerloop;   // No, this function will never work; e.g. cannot cast 1.2 as any integer
-        byte cvt = actual.isBitShape(formals.at(j)); // +1 needs convert, 0 no-cost convert, -1 unknown, 99 never
+        byte cvt = actual.isBitShape(formal); // +1 needs convert, 0 no-cost convert, -1 unknown, 99 never
         if( cvt == 99 )         // Happens if actual is e.g. TypeErr
           continue outerloop;   // No, this function will never work
         if( cvt == 9 )          // Requires auto-boxing, not implemented

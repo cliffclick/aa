@@ -47,7 +47,7 @@ public class TypeNode extends Node {
       Node val    = gvn.xform(new  ProjNode(cepi.unhook(),2));
       Node chk    = gvn.xform(new  TypeNode(tfp._ret,val,_error_parse)); // Type-check the return also
       RetNode ret = (RetNode)gvn.xform(new RetNode(ctl,postmem.unhook(),chk,rpc,fun));
-      return gvn.xform(new FunPtrNode(ret,clos,fun._tf)); //
+      return gvn.xform(new FunPtrNode(ret,clos));
     }
 
     // Push TypeNodes 'up' to widen the space they apply to, and hopefully push

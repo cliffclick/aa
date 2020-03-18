@@ -7,7 +7,12 @@ import com.cliffc.aa.type.*;
 public class MProjNode extends ProjNode {
   public MProjNode( Node ifn, int idx ) { super(ifn,idx); }
   @Override String xstr() { return "MProj_"+_idx; }
-  @Override public Node ideal(GVNGCM gvn, int level) { return in(0).is_copy(gvn,_idx); }
+  @Override public Node ideal(GVNGCM gvn, int level) {
+    Node x = in(0).is_copy(gvn,_idx);
+    if( x == null ) return null;
+    if( x != this ) return x;
+    return gvn.con(TypeMem.EMPTY);// Happens in dead self-recursive functions
+  }
   @Override public Type value(GVNGCM gvn) {
     Type c = gvn.type(in(0));
     if( c instanceof TypeTuple ) {

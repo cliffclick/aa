@@ -802,7 +802,7 @@ public class Parse {
       Type tret = ((TypeTuple)_gvn.type(ret)).at(2);
       fun.sharpen(_gvn,fun._tf.make(ts.at(0),tret)); // Sharpen alltype return, equal to what parser already knowns
       // The FunPtr builds a real display; any up-scope references are passed in now.
-      Node fptr = gvn(new FunPtrNode(ret,e._par._scope.ptr(),fun._tf));
+      Node fptr = gvn(new FunPtrNode(ret,e._par._scope.ptr()));
       _e = _e._par;             // Pop nested environment
       set_ctrl(old_ctrl);       // Back to the pre-function-def control
       set_mem (old_mem.unhook());// Back to the pre-function-def memory

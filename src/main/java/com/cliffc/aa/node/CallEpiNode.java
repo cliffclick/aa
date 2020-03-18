@@ -220,6 +220,7 @@ public final class CallEpiNode extends Node {
     // iter (1,3,out).
     if( gvn._opt_mode == 2 ) gvn.add_def(this,ret);
     else                         add_def(     ret);
+    gvn.add_work(ret);          // Ret is now alive
     return this;
   }
 
@@ -308,12 +309,12 @@ public final class CallEpiNode extends Node {
       if( gvn._opt_mode==0 ) gvn.add_work(this); // Not during parsing, but check afterwards
       if( gvn._opt_mode!=0 &&        // Not during parsing
           !(gvn._opt_mode==1 && call.fun() instanceof UnresolvedNode) &&
-          !(gvn._opt_mode==1 && has_unresolve) &&
+          !((gvn._opt_mode==1 || gvn._opt_mode==3) && has_unresolve) &&
           !is_copy() &&              // Not if collapsing
           !lifting &&                // Still settling down to possibilities
           !fun.is_forward_ref() &&   // Call target is undefined
           tcall.at(0)==Type.CTRL ) { // Call args are not in error
-          wire(gvn,call,fun,ret);
+        wire(gvn,call,fun,ret);
       }
     }
     // Meet the call-bypass aliases with the function aliases.  If the function

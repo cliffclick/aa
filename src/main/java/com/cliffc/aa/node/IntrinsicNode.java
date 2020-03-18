@@ -44,7 +44,7 @@ public class IntrinsicNode extends Node {
     Node ptr = gvn.xform(new ParmNode( 1,"ptr",fun,gvn.con(TypeMemPtr.STRUCT),null));
     Node cvt = gvn.xform(new IntrinsicNode(tn,badargs,fun,mem,ptr));
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,cvt,ptr,rpc,fun));
-    return (FunPtrNode)gvn.xform(new FunPtrNode(ret,null,fun._tf));
+    return (FunPtrNode)gvn.xform(new FunPtrNode(ret,null));
   }
 
   @Override public Type all_type() { return TypeMem.FULL; }
@@ -135,7 +135,7 @@ public class IntrinsicNode extends Node {
     Node obj = gvn.xform(new OProjNode(nnn,0));
     Node mmem= gvn.xform(new MemMergeNode(memp,obj,nnn.<NewObjNode>unhook()._alias));
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,ptr,rpc,fun));
-    return (FunPtrNode)gvn.xform(new FunPtrNode(ret,null,fun._tf));
+    return (FunPtrNode)gvn.xform(new FunPtrNode(ret,null));
   }
 
 }

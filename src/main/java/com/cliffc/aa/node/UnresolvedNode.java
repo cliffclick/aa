@@ -49,8 +49,12 @@ public class UnresolvedNode extends Node {
 
       // Unresolved is a *choice* and thus a *join* until resolved.
       Type t = TypeFunPtr.GENERIC_FUNPTR;
-      for( Node def : _defs )
-        t = t.join(gvn.type(def));
+      for( Node def : _defs ) {
+        Type tf = gvn.type(def);
+        if( tf instanceof TypeFunPtr )
+          tf = ((TypeFunPtr)tf).make_high_fidx();
+        t = t.join(tf);
+      }
       return t;
     }
   }

@@ -17,7 +17,7 @@ public class Env implements AutoCloseable {
     Node clo = par == null ? GVN.con(Type.NIL) : par._scope.ptr ();
     Node mem = par == null ? MEM_0 : par._scope.mem ();
     TypeStruct tdisp = par == null ? TypeStruct.DISPLAY : TypeStruct.make_args(TypeStruct.ts(GVN.type(par._scope.ptr())));
-    NewObjNode nnn = GVN.init(new NewObjNode(is_closure,tdisp,ctl,clo)).keep();
+    NewObjNode nnn = (NewObjNode)GVN.xform(new NewObjNode(is_closure,tdisp,ctl,clo).keep());
     Node frm = GVN.xform(new OProjNode(nnn,0));
     Node ptr = GVN.xform(new  ProjNode(nnn,1));
     BitsAlias bits_clo = BitsAlias.make0(_display_alias = nnn._alias);
@@ -67,6 +67,7 @@ public class Env implements AutoCloseable {
   private void install_primitives() {
     _scope.init0();             // Add base types
     GVN.unreg(STK_0);           // Make STK_0 active, to cheaply add primitives
+    for( Node use : STK_0._uses ) GVN.unreg(use); // Also the OProj,DProj will rapidly change types
     for( PrimNode prim : PrimNode.PRIMS )
       STK_0.add_fun(null,prim._name,(FunPtrNode) GVN.xform(prim.as_fun(GVN)), GVN);
     for( IntrinsicNewNode lib : IntrinsicNewNode.INTRINSICS )
@@ -76,9 +77,10 @@ public class Env implements AutoCloseable {
     // Now that all the UnresolvedNodes have all possible hits for a name,
     // register them with GVN.
     for( Node val : STK_0._defs )  if( val instanceof UnresolvedNode ) GVN.init0(val);
-    GVN.rereg(STK_0,STK_0.all_type());
+    GVN.rereg(STK_0,STK_0.value(GVN));
+    for( Node use : STK_0._uses ) GVN.rereg(use,use.value(GVN));
     GVN.rereg(_scope.mem(),_scope.mem().value(GVN));
-    _scope._live = TypeMem.EMPTY;
+    _scope._live = TypeMem.FULL;
     GVN.rereg(_scope,_scope.value(GVN));
     GVN.add_work(MEM_0);
     // Run the worklist dry

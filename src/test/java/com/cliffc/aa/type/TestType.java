@@ -22,6 +22,50 @@ public class TestType {
     assertEquals(TypeObj.OBJ,mt);
   }
 
+
+  // Want Bits to support meet/join of fidxs for Unresolved:
+  //     4.join.5.join.6 == {+4+5+6}
+  //     4.meet.5.meet.6 == { 4&5&6}
+  // Need to support 'splitting' bits for inlining, so all these bits are
+  // *classes* not *constants.  Hence there is no '4' bit, only '+4' and '&4'.
+  // Need the basic invariants: complete, distributed, commutative, associative.
+  @Test public void testBits() {
+    Type.init0(new HashMap<>());
+    Object dummy0 = TypeStruct.TYPES;
+    Object dummy1 = TypeMemPtr.TYPES;
+    // 1 - obj
+    //   2 - tuples & structs
+    //   3 - arrays
+    //     4 - strings
+    //       5 - "abc"
+
+    // Distributivity
+    // t0 = *[5] -> "abc"
+    // t1 = *[4] -> str
+    // t2 = *[2] -> ()
+    // Since t0.isa(t1) then   t0.join(t2) .isa(   t1.join(t2) )
+    TypeMemPtr t0 = TypeMemPtr.ABCPTR;
+    TypeMemPtr t1 = TypeMemPtr.STRPTR;
+    TypeMemPtr t2 = TypeMemPtr.STRUCT;
+    assertTrue(t0.isa(t1));
+    Type t02,t12,mt;
+
+    t02 = t0.join(t2);          // join of unrelated bits2&5 []
+    t12 = t1.join(t2);          // join of unrelated bits2&4 []
+    mt  = t02.meet(t12);
+    assertEquals(t12,mt);
+    // also: (t0.meet(t1)).join(t2) == mt
+    // but since t0 isa t1,
+    // also:  t1.join(t2) ==  mt
+    //       [4] join [2] ==> [~2 + ~4]
+
+    t1 = TypeMemPtr.STR0;     // Same with nil
+    t02 = t0.join(t2);        // join of unrelated bits2&5 []
+    t12 = t1.join(t2);        // join of unrelated bits2&4 []
+    mt  = t02.meet(t12);
+    assertEquals(t12,mt);
+  }
+
   @Test public void testNamesInts() {
     Type.init0(new HashMap<>());
 

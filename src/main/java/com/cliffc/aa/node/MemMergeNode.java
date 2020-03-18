@@ -230,7 +230,7 @@ public class MemMergeNode extends Node {
       // Check the incoming alias matches his parent
       int par_idx = find_alias2idx(BitsAlias.parent(alias));
       // Alias slice is exactly his parent, both are XOBJ?
-      if( in(par_idx)==in(i) || (par_idx==0 && ti==TypeObj.XOBJ && tp==TypeObj.XOBJ) ) {
+      if( in(par_idx)==in(i) || this==in(i) || (par_idx==0 && ti==TypeObj.XOBJ && tp==TypeObj.XOBJ) ) {
         if( _live.isa(in(0)._live) ) { // Alias inputs used for liveness, cannot remove until in alignment
           remove0(i--,gvn);            // Fold into parent
           progress = true;

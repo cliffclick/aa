@@ -10,10 +10,7 @@ import com.cliffc.aa.type.*;
 // class functions to be passed about.
 public final class FunPtrNode extends ConNode<TypeFunPtr> {
   private final String _referr;
-  public  FunPtrNode( RetNode ret, Node display, TypeFunPtr tfp ) {
-    super(OP_FUNPTR,tfp,ret,display);
-    _referr = null;
-  }
+  public  FunPtrNode( RetNode ret, Node display ) { this(null,ret,display); }
   // For forward-refs only; super weak display & function.
   private FunPtrNode( String referr, RetNode ret, Node display ) {
     super(OP_FUNPTR,TypeFunPtr.GENERIC_FUNPTR,ret,display);
@@ -50,14 +47,16 @@ public final class FunPtrNode extends ConNode<TypeFunPtr> {
     if( is_forward_ref() ) return null;
     RetNode ret = ret();
     FunNode fun = ret.is_copy() ? FunNode.find_fidx(ret._fidx) : ret.fun();
-    if( display()!=null && (ret.is_copy() || fun._tf.arg(0)==TypeStruct.NO_DISP) )
-      { set_def(1,null,gvn); return this; }
+    if( display()!=null && (ret.is_copy() || fun._tf.arg(0)==TypeStruct.NO_DISP) ) {
+      set_def(1,null,gvn);
+      // value() call now uses NO_DISP, change default type to match.  To lift
+      // the return type permanently, have to lift it here, and in fun._tf both.
+      _t = fun._tf.make(TypeStruct.NO_DISP,fun._tf._ret);
+      return this;
+    }
     return null;
   }
   @Override public Type value(GVNGCM gvn) {
-    // Always the display is better than the default, since it comes from some
-    // real function.
-    assert display()==null || is_forward_ref() || ((TypeFunPtr)gvn.self_type(this)).display() != TypeMemPtr.DISPLAY_PTR;
     if( !(in(0) instanceof RetNode) )
       return TypeFunPtr.EMPTY;
     RetNode ret = ret();
@@ -121,9 +120,22 @@ public final class FunPtrNode extends ConNode<TypeFunPtr> {
     gvn.unreg(dfun);  dfun._tf = tfp;  gvn.rereg(dfun,Type.CTRL);
     int fidx = def.ret()._fidx = rfun._tf.fidx();
     FunNode.FUNS.setX(fidx,dfun);     // Track FunNode by fidx
-
+    // Replace the forward_ref with the def.
     gvn.subsume(this,def);
     dfun.bind(tok);
+
+    // Update types: all users of the forward_ref where using the generic
+    // DISPLAY_PTR.  Now they can use the known actual display.  While in
+    // theory original DISPLAY_PTR may have spread far, it suffices to update
+    // the local closure which already "knows" what the def "knows" about the
+    // display pointer - to keep the local closure from rolling backwards.
+    for( Node use : def._uses ) {
+      gvn.setype(use,use.value(gvn));
+      if( use instanceof NewObjNode )
+        for( Node useuse : use._uses )
+          gvn.setype(useuse,useuse.value(gvn));
+    }
+
   }
 
 

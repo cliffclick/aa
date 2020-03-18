@@ -8,11 +8,11 @@ import java.util.Arrays;
 import java.util.Iterator;
 
 // Bits supporting a lattice; immutable; hash-cons'd.  Bits can be *split* in
-// twain.
+// twain, basically a single Bit is really set of all possible future splits.
 //
 // Splitting is useful during inlining, where a single Call is duplicated and
 // RPCs to the original one might return to either of of the inlines.  Same for
-// internal functions and allocation sites - after the inline, pointers &
+// internal functions and allocation sites - after the inline, pointers and
 // references to the original might now refer to either copy.  Each copy only
 // refers to itself, so after some optimizations the ambiguious bits can be
 // optimized away.  i.e., its useful to make the distinction between the cloned
@@ -25,26 +25,23 @@ import java.util.Iterator;
 // Bit 1 - is the first "real" bit, and represents all-of-a-class.
 // Other bits always split from bit 1, and can split in any pattern.
 //
-// Individual bits can be considered either constants (on the centerline) or a
-// class of things that are either meet'd or join'd (above or below the
-// centerline).  Aliases are usually classes because a single NewNode can be
-// executed in a loop, producing many objects with the same alias#.  FIDXs and
-// RPCs are always constants, as there is a single instance of a function or a
-// return-point.  Code-cloning (i.e. inlining) splits the constant instantly
-// into 2 new values which are both constants; i.e. single FIDX#s and RPC#s are
-// never *classes*.
+// Individual bits are never constants (due to possible future splits), and
+// instead are a class of things that are either meet'd or join'd (above or
+// below the centerline).  Aliases are usually classes because a single NewNode
+// can be executed in a loop, producing many objects with the same alias#.
+// FIDXs and RPCs would be constants, as there is a single instance of a
+// function or a return-point, except for code-cloning (i.e. inlining).
 //
-// Constant-or-class is on a per-bit basis, as some NewNodes are known to
-// execute once (hence produce a constant alias class or a Singleton) and
-// others execute many times.  This is handled by the subclasses; BitsAlias may
-// track singletons at some future date.
-//
+// The tree-structure really defines a basic set-inclusion property which is
+// trivially a lattice; see https://en.wikipedia.org/wiki/Lattice_(order) pic#1.
+// However to get a lattice AND a dual we MUST have the empty element in the
+// middle.  The meet of +2 and +5 is... [], the empty set, and NOT [2&5].
+
 public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   // Holds a set of bits meet'd together, or join'd together, along
-  // with a single bit choice as a constant.
+  // with a single bit choice.
   // If _bits is NULL and _con is 0, this is nil and a constant.
-  // If _bits is NULL, then _con is a single class bit and is +/- for
-  // meet/join, OR "is_class()" is false and _con is a single constant.
+  // If _bits is NULL, then _con is a single bit and is +/- for meet/join.
   // If _bits is not-null, then _con is +1 for meet, and -1 for join.
   long[] _bits;   // Bits set or null for a single bit
   int _con;       // value of single bit
@@ -52,7 +49,6 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   // Intern: lookup and return an existing Bits or install in hashmap and
   // return a new Bits.  Overridden in subclasses to make type-specific Bits.
   abstract B make_impl(int con, long[] bits );
-  abstract boolean is_class(int idx); // This bit is a class all by itself
   abstract Tree<B> tree();
   public abstract B ALL();
   public abstract B ANY();
@@ -69,7 +65,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     assert check();
   }
   private boolean check() {
-    if( _bits==null ) return _con >= 0 || is_class(-_con); // Must be a single constant bit#
+    if( _bits==null ) return true;  // Must be a single bit#
     if( _con != 1 && _con != -1 ) return false;
     if( _bits.length==0 ) return false;  // Empty bits replaced by a con
     if( _bits.length==1 && _bits[0]== 0 && _con==1 ) return true; // NO bits is OK
@@ -116,13 +112,6 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     }
     return sb.p(']');
   }
-  // This bit set contains more than 1 concrete element type
-  public boolean is_class() {
-    return
-      _bits!=null ||            // many bits are set
-      _con<0 ||                 // or JOIN of set of bits
-      is_class(_con);           // or single bit is a class not a constant
-  }
 
   // Constructor taking an array of bits, and allowing join/meet selection.
   // Canonicalizes the bits.  The 'this' pointer is only used to clone the class.
@@ -156,7 +145,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     // Single bit
     int bnum0 = 63 - Long.numberOfLeadingZeros(bits[len-1]);
     int bnum = bnum0 + ((len-1)<<6);
-    if( any && is_class(bnum) ) bnum = -bnum;
+    if( any ) bnum = -bnum;
     return make_impl(bnum,null);
   }
   // Constructor taking a single bit
@@ -176,8 +165,9 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   public int getbit() { assert _bits==null; return _con; }
   public int abit() { return _bits==null ? _con : -1; }
   public boolean above_center() { return _con<0; }
+  // Only empty and nil.  Other bits represent sets (possibly unsplit).
   public boolean is_con() {
-    return _bits==null || (_bits.length==1 && _bits[0]==0);
+    return (_bits==null && _con==0) ||  is_empty();
   }
   public boolean is_empty() { return _bits!=null && _bits.length==1 && _bits[0]==0; }
   boolean may_nil() { return _con==0 || (_con==-1 && _bits != null && ((_bits[0]&1) == 1)); }
@@ -303,6 +293,14 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
 
     // Bigger in bits0
     if( bits0.length < bits1.length ) { long[] tmp=bits0; bits0=bits1; bits1=tmp; int t=con0; con0=con1; con1=t; }
+    // Both meets?  Set-union
+    if( con0 == 1 && con1 == 1 ) {
+      long[] bits = bits0.clone();        // Clone larger
+      for( int i=0; i<bits1.length; i++ ) // OR in smaller bits
+        bits[i] |= bits1[i];
+      return make(false,bits);  // This will remove parent/child dups
+    }
+
     // Both joins?  Set-intersection
     Tree<B> tree = tree();
     if( con0 == -1 && con1 == -1 ) {
@@ -311,18 +309,8 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
       join(tree,bits1,bits0,bits);         // Merge right into left
       // Nil is not part of the parent tree, so needs to be set explicitly
       if( (bits0[0]&1)==1 && (bits1[0]&1)==1 )  bits[0]|=1;
-      // If all bits are zero (the empty meet), we can fall below zero and do a meet.
-      // This is the moral equivalent of mismatched high types having to fall hard.
-      if( bits[0]!=0 )
-        return make(true,bits);
-      con0 = con1 = 1; // force a meet
-    }
-    // Both meets?  Set-union
-    if( con0 == 1 && con1 == 1 ) {
-      long[] bits = bits0.clone();        // Clone larger
-      for( int i=0; i<bits1.length; i++ ) // OR in smaller bits
-        bits[i] |= bits1[i];
-      return make(false,bits);  // This will remove parent/child dups
+      // Just the interesection, which may be empty.
+      return make(true,bits);
     }
 
     // Mixed meet/join.  Find any bit in the join that is also in the meet.  If
@@ -353,7 +341,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
 
   // Virtually expand all bits in both arrays to cover all children,
   // then AND the bits, then re-pack.  However, we do it tree-by-tree
-  // keep from doing the full expansion costs.
+  // to keep from doing the full expansion costs.
   private static void join( Tree tree, long[] bits0, long[] bits1, long[] bits2 ) {
     // If a 'parent' bit is set, then no need to have any child bits set.
     for( int i=0; i<bits0.length; i++ ) { // For all words
@@ -392,8 +380,8 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   // Constants are self-dual; classes just flip the meet/join bit.
   @SuppressWarnings("unchecked")
   public B dual() {
-    if( _bits!=null && _bits.length==1 && _bits[0]==0 ) return (B)this; // Empty is self-dual
-    return _bits==null && !is_class(Math.abs(_con)) ? (B)this : make_impl(-_con,_bits);
+    if( is_empty() ) return (B)this; // Empty is self-dual
+    return make_impl(-_con,_bits);
   }
   // join is defined in terms of meet and dual
   public Bits<B> join(Bits<B> bs) { return dual().meet(bs.dual()).dual(); }

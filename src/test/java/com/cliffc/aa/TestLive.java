@@ -30,6 +30,7 @@ public class TestLive {
     assertEquals(rez._live,TypeMem.EMPTY);
   }
 
+  @SuppressWarnings("unchecked")
   @Test public void testNewObj() {
     GVNGCM gvn = new GVNGCM();
     GVNGCM._INIT0_CNT = 1; // No prims

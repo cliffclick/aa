@@ -200,11 +200,8 @@ public class FunNode extends RegionNode {
     if( progress && !is_prim() ) {
       Type[] ts = TypeAry.get(parms.length);
       ts[0] = parms[0]==null ? TypeStruct.NO_DISP : gvn.type(parms[0]);
-      assert !has_unknown_callers() || parms[0]==null || gvn.type(parms[0].in(1))==ts[0];
-      for( int i=1; i<parms.length; i++ ) {
+      for( int i=1; i<parms.length; i++ )
         ts[i] = parms[i] == null ? Type.XSCALAR : gvn.type(parms[i]);
-        assert !has_unknown_callers() || parms[i]==null || gvn.type(parms[i].in(1))==ts[i];
-      }
       TypeFunPtr tf = TypeFunPtr.make(_tf.fidxs(),_tf._args.make_from(ts),_tf._ret);
       assert tf.isa(_tf) && _tf != tf;
       _tf = tf;

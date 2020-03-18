@@ -34,6 +34,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
     assert !Util.eq(name,"^"); // Closure field created on init
     gvn.unreg(this);
     create_active(name,val,mutable,gvn);
+    gvn.rereg(this,value(gvn)); // Re-insert with field added
     for( Node use : _uses ) {
       gvn.setype(use,use.value(gvn)); // Record "downhill" type for OProj, DProj
       gvn.add_work_uses(use);         // Neighbors on worklist
@@ -57,16 +58,16 @@ public class NewObjNode extends NewNode<TypeStruct> {
     Type newt = value(gvn);
     gvn.rereg(this,newt);
     // As part of the local xform rule, the memory & ptr outputs of the NewNode
-    // need to update their types directly.  The NewNode mutable bit can be set
-    // to final - which strictly runs downhill.  However, iter() calls must
-    // strictly run uphill, so we have to expand the changed region to cover
-    // all the "downhilled" parts and "downhill" them to match.  Outside of the
-    // "downhilled" region, the types are unchanged.
+    // need to update their types directly.  This is a sideways (or perhaps
+    // downhill) move of the NewNode type - which must run strictly uphill
+    // during iter().  Calling update() here assumes that the type being
+    // replaced has not "escaped" past the immediate OProj/Proj.  Hence it is
+    // safe to "move them sideways" without blowing the always-uphill
+    // invariant.  This is generally only true in the Parser, making this a
+    // small parse-time optimization.
     if( newt!=oldt )
-      for( Node use : _uses ) {
+      for( Node use : _uses )
         gvn.setype(use,use.value(gvn)); // Record "downhill" type for OProj, DProj
-        gvn.add_work_uses(use);         // Neighbors on worklist
-      }
   }
   public void update_active( int fidx, byte mutable, Node val, GVNGCM gvn  ) {
     assert !gvn.touched(this);

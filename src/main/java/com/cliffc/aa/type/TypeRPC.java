@@ -9,7 +9,7 @@ public class TypeRPC extends Type<TypeRPC> {
 
   private TypeRPC( BitsRPC rpcs ) { super(TRPC); init(rpcs); }
   private void init( BitsRPC rpcs ) { _rpcs = rpcs; }
-  @Override public int compute_hash( ) { return TRPC + _rpcs._hash; }
+  @Override public int compute_hash( ) { return ((TRPC + _rpcs._hash)<<1)|1; }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeRPC) ) return false;

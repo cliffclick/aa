@@ -23,7 +23,7 @@ public class GVNGCM {
   private Ary<Node> _work = new Ary<>(new Node[1], 0);
   private BitSet _wrk_bits = new BitSet();
 
-  public Node add_work( Node n ) { if( !_wrk_bits.get(n._uid) && n._keep==0 ) add_work0(n); return n;}
+  public Node add_work( Node n ) { if( !_wrk_bits.get(n._uid) ) add_work0(n); return n;}
   private <N extends Node> N add_work0( N n ) {
     _work.add(n);               // These need to be visited later
     _wrk_bits.set(n._uid);
@@ -361,7 +361,7 @@ public class GVNGCM {
     TypeMem old = n._live;
     TypeMem nnn = n.live(this);
     if( old != nnn ) {  // Progress?
-      assert nnn.isa(old); // Monotonically improving
+        assert nnn.isa(old); // Monotonically improving
       n._live = nnn;       // Mark progress
       for( Node def : n._defs ) // Put defs on worklist... liveness flows uphill
         if( def != null && def != n )
@@ -441,8 +441,8 @@ public class GVNGCM {
   // Once the program is complete, any time anything is on the worklist we can
   // always conservatively iterate on it.
   void iter(int opt_mode) {
-    _opt_mode = opt_mode;
     assert !Env.START.more_flow(this,new VBitSet(),true); // Initial conditions are correct
+    _opt_mode = opt_mode;
     // As a modest debugging convenience, avoid inlining (which blows up the
     // graph) until other optimizations are done.  Gather the possible inline
     // requests and set them aside until the main list is empty, then work down

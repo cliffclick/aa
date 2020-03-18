@@ -13,7 +13,8 @@ import java.util.function.Predicate;
 // C2-style type system, with Meet & Dual.
 
 // This is a complemented distributed complete bounded (ranked) lattice.
-// See https://en.wikipedia.org/wiki/Lattice.
+// Also the meet is commutative and associative.
+// See https://en.wikipedia.org/wiki/Lattice_(order).
 
 // Complemented around the centerline of constants.  Fixed height, so a finite
 // count of Meet stabilizes; a unique All (Bottom; no known value) and due to
@@ -214,6 +215,13 @@ public class Type<T extends Type<T>> implements Cloneable {
     if( this == v ) return false;
     System.out.println("INTERN_CHECK FAIL: "+_uid+":"+this+" vs "+v._uid+":"+v);
     return true;
+  }
+  // Debugging helper
+  static Type intern_find(int uid) {
+    for( Type k : INTERN.keySet() )
+      if( k._uid==uid )
+        return k;
+    return null;
   }
 
   // Simple types are implemented fully here.  "Simple" means: the code and
