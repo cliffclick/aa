@@ -88,8 +88,10 @@ public class TypeMem extends Type<TypeMem> {
     for( int i=2; i<as.length; i++ )
       if( as[i] != null )
         for( int par = BitsAlias.TREE.parent(i); par!=0; par = BitsAlias.TREE.parent(par) )
-          if( as[par] == as[i] )
-            return false;       // Dup of a parent
+          if( as[par] != null ) {
+            if( as[par] == as[i] ) return false; // Dup of a parent
+            break;
+          }
     return true;
   }
   @Override int compute_hash() {
@@ -209,17 +211,19 @@ public class TypeMem extends Type<TypeMem> {
     return t1==t2 ? t1 : t1.free(t2);
   }
 
-  // Canonicalize memory before making.  Unless specified, the default memory is "dont care"
+  // Canonicalize memory before making.  Unless specified, the default memory is "do not care"
   public static TypeMem make0( TypeObj[] as ) {
-    if( as[1]==null ) as[1] = TypeObj.XOBJ; // Default memory is "dont care"
+    if( as[1]==null ) as[1] = TypeObj.XOBJ; // Default memory is "do not care"
     int len = as.length;
     if( len == 2 ) return make(as);
     // No dups of a parent
     for( int i=1; i<as.length; i++ )
       if( as[i] != null )
         for( int par = BitsAlias.TREE.parent(i); par!=0; par = BitsAlias.TREE.parent(par) )
-          if( as[par] == as[i] )
-            { as[i] = null; break; }
+          if( as[par] != null ) {
+            if( as[par] == as[i] ) as[i] = null;
+            break;
+          }
     // Remove trailing nulls; make the array "tight"
     while( as[len-1] == null ) len--;
     if( as.length!=len ) as = Arrays.copyOf(as,len);
@@ -319,6 +323,14 @@ public class TypeMem extends Type<TypeMem> {
     return TypeMem.make0(tos);
   }
 
+  // Whole object Set at an alias.
+  public TypeMem set( int alias, TypeObj obj ) {
+    int max = Math.max(_aliases.length,alias+1);
+    TypeObj[] tos = Arrays.copyOf(_aliases,max);
+    tos[alias] = obj;
+    return TypeMem.make0(tos);
+  }
+  
   // Mark all memory as being clean (not modified in this function).
   // Recursive.
   public TypeMem clean() {

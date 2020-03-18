@@ -376,8 +376,8 @@ public class MemMergeNode extends Node {
       // All child aliases alive in the base type get stomped.  Aliases from
       // following inputs do not get stomped, and get set in in later iterations.
       for( int j = alias+1; j<tms.length; j++ )
-        if( tos[j] != null && BitsAlias.is_parent(alias,j) )
-          tos[j] = (TypeObj)tos[j].meet(tao);
+        if( BitsAlias.is_parent(alias,j) )
+          tos[j] = tao;
     }
     return TypeMem.make0(tos);
   }
@@ -387,11 +387,18 @@ public class MemMergeNode extends Node {
   // incoming memory types, as this is a backwards propagation of demanded
   // memory.
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
-    int idx = _defs.find(def);  // The input node index
-    int alias = alias_at(idx);  // Corresponding alias
-    // For this def, _live for just the one alias.  Includes all children of
-    // alias and removes what is provided on other input edges.
-    return _live.slice_1_alias_plus_children_minus_provides(alias,_aliases);
+    TypeObj[] tos = new TypeObj[_aliases.last()+1];
+    tos[1] = in(0)==def ? _live.at(1) : TypeObj.XOBJ;
+    for( int alias=2; alias<tos.length; alias++ ) {
+      if( _aidxes.at(alias)==0 ) { // No special overrides for this alias
+        // Then in-or-out according to parent
+        tos[alias] = tos[BitsAlias.parent(alias)];
+      } else {          // This alias (and all children ) overridden here
+        // Either Def or some other node must supply this value
+        tos[alias] = in(_aidxes.at(alias))==def ? _live.at(alias) : TypeObj.XOBJ; 
+      }
+    }
+    return TypeMem.make0(tos);
   }
   @Override public boolean basic_liveness() { return false; }
 
@@ -427,5 +434,14 @@ public class MemMergeNode extends Node {
     set_def(nidx2,in( 0  ),null); // The other alias comes from default
     set_def(oidx , xobj   ,gvn ); // The original goes dead
   }
+  @Override public int hashCode() { return super.hashCode()+_aliases.hashCode(); }
+  @Override public boolean equals(Object o) {
+    if( this==o ) return true;
+    if( !super.equals(o) ) return false;
+    if( !(o instanceof MemMergeNode) ) return false;
+    MemMergeNode mem = (MemMergeNode)o;
+    return _aliases.equals(mem._aliases);
+  }
+
 }
 

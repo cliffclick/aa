@@ -257,7 +257,7 @@ public class CallNode extends Node {
     // Expand (actually fail) if any parents
     BitSet bs = fidxs.tree().plus_kids(fidxs);
     if( bs.cardinality() > cepi.nwired() ) // More things to call
-      return TypeMem.FULL;
+      return _live; // Cannot improve
     // All choices known
     return super.live(gvn);
   }

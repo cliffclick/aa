@@ -372,19 +372,21 @@ public abstract class Node implements Cloneable {
     for( Node use : _uses ) if( use != null && use.more_ideal(gvn,bs,level) ) return true;
     return false;
   }
-  // Assert all value and liveness calls only go forwards.  Returns true for failure.
-  public final boolean more_flow(GVNGCM gvn, VBitSet bs, boolean lifting) {
-    if( bs.tset(_uid) ) return false; // Been there, done that
+  // Assert all value and liveness calls only go forwards.  Returns >0 for failures.
+  public final int more_flow(GVNGCM gvn, VBitSet bs, boolean lifting, int errs) {
+    if( bs.tset(_uid) ) return errs; // Been there, done that
     if( _keep == 0 && _live.is_live() ) {
       Type    nval = value(gvn), oval=gvn.type(this);
       TypeMem nliv = live (gvn), oliv=_live;
       if( (nval != oval && nval.isa(oval)!=lifting) ||
-          (nliv != oliv && nliv.isa(oliv)!=lifting) )
-        return true;            // Rolling backwards not allowed
+          (nliv != oliv && nliv.isa(oliv)!=lifting) ) {
+        System.err.println(dump(0,new SB(),gvn)); // Rolling backwards not allowed
+        errs++;
+      }
     }
-    for( Node def : _defs ) if( def != null && def.more_flow(gvn,bs,lifting) ) return true;
-    for( Node use : _uses ) if( use != null && use.more_flow(gvn,bs,lifting) ) return true;
-    return false;
+    for( Node def : _defs ) if( def != null ) errs = def.more_flow(gvn,bs,lifting,errs);
+    for( Node use : _uses ) if( use != null ) errs = use.more_flow(gvn,bs,lifting,errs);
+    return errs;
   }
 
   // Gather errors; backwards reachable control uses only

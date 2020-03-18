@@ -307,10 +307,7 @@ public final class CallEpiNode extends Node {
 
       // Make real from virtual CG edges in GCP/Opto by wiring calls.
       if( gvn._opt_mode==0 ) gvn.add_work(this); // Not during parsing, but check afterwards
-      if( gvn._opt_mode!=0 &&        // Not during parsing
-          !(gvn._opt_mode==1 && call.fun() instanceof UnresolvedNode) &&
-          !((gvn._opt_mode==1 || gvn._opt_mode==3) && has_unresolve) &&
-          !is_copy() &&              // Not if collapsing
+      if( gvn._opt_mode==2 &&        // Only during GCP
           !lifting &&                // Still settling down to possibilities
           !fun.is_forward_ref() &&   // Call target is undefined
           tcall.at(0)==Type.CTRL ) { // Call args are not in error

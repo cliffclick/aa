@@ -242,7 +242,9 @@ public class FunNode extends RegionNode {
     // Split the callers according to the new 'fun'.
     TypeFunPtr original_tfp = (TypeFunPtr)gvn.type(ret.funptr());
     FunNode fun = make_new_fun(gvn, ret, args);
-    return split_callers(gvn,parms,ret,fun,body,cgedges,path,original_tfp);
+    split_callers(gvn,parms,ret,fun,body,cgedges,path,original_tfp);
+    assert Env.START.more_flow(gvn,new VBitSet(),true,0)==0; // Initial conditions are correct
+    return this;
   }
 
   // Gather the ParmNodes into an array.  Return null if any input path is dead
@@ -510,6 +512,11 @@ public class FunNode extends RegionNode {
 
     // Collect aliases that are cloning.
     BitSet aliases = new BitSet();
+    // New default memory: contains the pre-split base types of every splitting
+    // New.  One of the split versions is generated in each clone, and the
+    // other is available on the default input path - in case one version calls
+    // the other recursively.
+    TypeMem def_mem = (TypeMem)gvn.type(parm(-2).in(1));
     // Map from old to cloned function body
     HashMap<Node,Node> map = new HashMap<>();
     // Clone the function body
@@ -521,9 +528,13 @@ public class FunNode extends RegionNode {
       map.put(n,c);                    // Map from old to new
       if( old_alias != -1 ) {          // Was a NewNode?
         aliases.set(old_alias);        // Record old alias before copy/split
+        TypeObj nto = (TypeObj)((TypeTuple)gvn.type(n)).at(0);
+        def_mem = def_mem.set( old_alias, nto);
         // Update the local displays
-        this._my_display_alias = ((NewNode)n)._alias;
-        fun ._my_display_alias = ((NewNode)c)._alias;
+        if( _my_display_alias == old_alias ) {
+          this._my_display_alias = ((NewNode)n)._alias;
+          fun ._my_display_alias = ((NewNode)c)._alias;
+        }
       }
     }
 
@@ -555,14 +566,31 @@ public class FunNode extends RegionNode {
     // We kept the unknown caller path on 'this', and then copied it to 'fun'.
     // But if inlining along a specific path, only that path should be present.
     // Kill the unknown_caller path.
-    if( path >= 0 && has_unknown_callers() )
+    if( path >= 0 && has_unknown_callers() ) {
       fun.set_def(1,gvn.con(Type.XCTRL),gvn);
-    else if( path < 0 && has_unknown_callers() ) {
-      // Change the unknown caller parm types to match the new sig
-      for( Node parm : fun._uses )
-        if( parm instanceof ParmNode )
-          if( ((ParmNode)parm)._idx != 0 )
-            parm.set_def(1,gvn.con(fun.targ(((ParmNode)parm)._idx)),gvn);
+
+    } else if( path < 0 && has_unknown_callers() ) {
+      // Change the unknown caller parm types to match the new sig.  Default
+      // memory includes the other half of alias splits, which might be passed
+      // in from recursive calls.
+      assert fun.targ(-2)==TypeMem.FULL;
+      ParmNode parm;
+      for( Node p : fun._uses )
+        if( p instanceof ParmNode && (parm=(ParmNode)p)._idx != 0 )
+          parm.set_def(1,gvn.con(parm._idx==-2 ? def_mem : fun.targ(parm._idx)),gvn);
+      // Everything demanded before, plus also the splits
+      ParmNode oldparm = parm(-2);
+      parm = fun.parm(-2);
+      for( int alias = aliases.nextSetBit(0); alias >= 0; alias = aliases.nextSetBit(alias+1) ) {
+           parm._live =    parm._live.set(alias,TypeObj.OBJ);
+        oldparm._live = oldparm._live.set(alias,TypeObj.OBJ);
+      }
+
+      // Same hack for the original memory parm: lift his default memory to
+      // include both halves of alias splits, in case the original code gets
+      // called from the new split.
+      gvn.set_def_reg(oldparm,1,gvn.con(def_mem));
+      gvn.setype(oldparm,def_mem);
     }
 
     // Make an Unresolved choice of the old and new functions, to be used by
@@ -587,17 +615,19 @@ public class FunNode extends RegionNode {
 
     // Put all new nodes into the GVN tables and worklist
     for( Map.Entry<Node,Node> e : map.entrySet() ) {
+      Node oo = e.getKey();           // Old node
       Node nn = e.getValue();         // New node
-      Type ot = gvn.type(e.getKey()); // Generally just copy type from original nodes
+      Type nt = gvn.type(oo);   // Generally just copy type from original nodes
       if( nn instanceof ParmNode && nn.in(0) == fun ) {  // Leading edge ParmNodes
-        int idx = ((ParmNode)nn)._idx; // Update non-display type to match new signature
-        if( idx > 0 ) ((ParmNode)nn)._t = ot = fun.targ(idx); // Upgrade new Parm default type
+        ParmNode pnn = (ParmNode)nn; // Update non-display type to match new signature
+        if( pnn._idx > 0 ) pnn._t = nt = fun.targ(pnn._idx); // Upgrade new Parm default type
+        else if( pnn._idx == -2 ) nt = def_mem;
       } else if( nn == new_funptr ) {
-        ot = fun._tf;           // New TFP for the new FunPtr
+        nt = fun._tf;           // New TFP for the new FunPtr
       } else if( nn instanceof CallEpiNode ) { // Old calls might be wired, new calls need to re-wire
         while( ((CallEpiNode)nn).nwired() > 0 ) nn.pop();
       }
-      gvn.rereg(nn,ot);
+      gvn.rereg(nn,nt);
     }
     gvn.add_work(this);
     gvn.add_work(fun );

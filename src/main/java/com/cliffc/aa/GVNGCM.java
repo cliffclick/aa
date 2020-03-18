@@ -360,9 +360,9 @@ public class GVNGCM {
     // worklist.  This is a reverse flow computation.
     TypeMem old = n._live;
     TypeMem nnn = n.live(this);
-    if( old != nnn ) {  // Progress?
-        assert nnn.isa(old); // Monotonically improving
-      n._live = nnn;       // Mark progress
+    if( old != nnn ) {          // Progress?
+      assert nnn.isa(old);      // Monotonically improving
+      n._live = nnn;            // Mark progress
       for( Node def : n._defs ) // Put defs on worklist... liveness flows uphill
         if( def != null && def != n )
           add_work(def);        // Reverse flow: do work on defs not uses
@@ -441,7 +441,7 @@ public class GVNGCM {
   // Once the program is complete, any time anything is on the worklist we can
   // always conservatively iterate on it.
   void iter(int opt_mode) {
-    assert !Env.START.more_flow(this,new VBitSet(),true); // Initial conditions are correct
+    assert Env.START.more_flow(this,new VBitSet(),true,0)==0; // Initial conditions are correct
     _opt_mode = opt_mode;
     // As a modest debugging convenience, avoid inlining (which blows up the
     // graph) until other optimizations are done.  Gather the possible inline
@@ -493,7 +493,7 @@ public class GVNGCM {
     // This is mostly the dual(), except a the Start memory is always XOBJ.
     // Set all liveness to TypeMem.DEAD, their most optimistic type.
     walk_initype(Env.START);
-    assert !Env.START.more_flow(this,new VBitSet(),false); // Initial conditions are correct
+    assert Env.START.more_flow(this,new VBitSet(),false,0)==0; // Initial conditions are correct
     // Prime the worklist
     rez.unhook(); // Must be unhooked to hit worklist
     add_work(rez);
@@ -578,7 +578,7 @@ public class GVNGCM {
     _wrk2_bits.clear();
     rez.keep();
     walk_dead(Env.START);
-    assert !Env.START.more_flow(this,new VBitSet(),false); // Post conditions are correct
+    assert Env.START.more_flow(this,new VBitSet(),false,0)==0; // Post conditions are correct
   }
 
   // Forward reachable walk, setting types to all_type().startype() (basically
