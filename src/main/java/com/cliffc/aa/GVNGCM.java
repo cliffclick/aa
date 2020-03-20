@@ -75,12 +75,6 @@ public class GVNGCM {
   void reset_to_init0() {
     assert _work2._len==0;
     _opt_mode = 0;
-    while( !_work.isEmpty() ) {
-      Node n = _work.pop();     // Pull from main worklist before functions
-      _wrk_bits.clear(n._uid);
-      if( n.is_dead() || n._keep!=0 ) continue;
-      if( n._uses._len==0 ) kill(n);
-    }
     for( Node n : _INIT0_NODES ) {
       n.reset_to_init1(this);
       n._live = n.basic_liveness() ? TypeMem.EMPTY : TypeMem.FULL;
@@ -91,6 +85,12 @@ public class GVNGCM {
         if( n.in(i) != null && !n.in(i).is_prim() )
           n._defs.del(i--);
       assert !n.is_dead();
+    }
+    while( !_work.isEmpty() ) {
+      Node n = _work.pop();     // Pull from main worklist before functions
+      _wrk_bits.clear(n._uid);
+      if( n.is_dead() || n._keep!=0 ) continue;
+      if( n._uses._len==0 ) kill(n);
     }
     CNT = _INIT0_CNT;
     _live.clear();  _live.set(0,_INIT0_CNT);
@@ -320,7 +320,16 @@ public class GVNGCM {
     if( nnn==null ) return;     // No progress
     assert (level&1)==0;        // No changes during asserts
     if( nnn == old ) {          // Progress, but not replacement
-      add_work_uses(old);       // Re-run old, until no progress
+      // If a Parm child, put FunNode on worklist for _tf improvement.
+      if( old instanceof ParmNode ) add_work(old.in(0));
+      // All users on worklist
+      for( Node use : old._uses ) {
+        add_work(use);
+        if( use instanceof RegionNode ) // Region users need to recheck PhiNode
+          add_work_uses(use);
+      }
+      // Add self at the end, so the work loops pull it off again.
+      add_work(old);
       return;
     }
     if( check_new(nnn) )        // If new, replace back in GVN
@@ -380,14 +389,16 @@ public class GVNGCM {
 
     // [ts!] Compute best type, and type is IN ts
     Type t = n.value(this);     // Get best type
-    assert t.isa(oldt);         // Monotonically improving
 
-    // [ts!] Replace with a constant, if possible.  This is also very cheap
-    // (once we expensively computed best value) and makes the best forward
-    // progress.
-    if( replace_con(t,n) ) { unreg0(n); return con(t); }
     // [ts!] Put updated types into table for use by ideal()
-    if( t!=oldt ) setype(n,t);
+    if( t!=oldt ) {
+      assert t.isa(oldt);       // Monotonically improving
+      // [ts!] Replace with a constant, if possible.  This is also very cheap
+      // (once we expensively computed best value) and makes the best forward
+      // progress.
+      if( replace_con(t,n) ) { unreg0(n); return con(t); }
+      setype(n,t);
+    }
 
     // [ts+] Try generic graph reshaping using updated types
     Node y = n.ideal(this,level);
@@ -450,7 +461,7 @@ public class GVNGCM {
     int cnt=0;
     while( _work._len > 0 || _work2._len > 0 ) {
       final boolean small_work = !_work.isEmpty();
-      // Turned off, fairly expensive assert
+      // Turned on, fairly expensive assert
       assert small_work || !Env.START.more_ideal(this,new VBitSet(),1); // No more small-work ideal calls to apply
       Node n = (small_work ? _work : _work2).pop(); // Pull from main worklist before functions
       (small_work ? _wrk_bits : _wrk2_bits).clear(n._uid);
@@ -458,6 +469,8 @@ public class GVNGCM {
       if( n._uses._len==0 && n._keep==0 ) kill(n);
       else xform_old(n,small_work ? 0 : 2);
       cnt++; assert cnt < 10000; // Catch infinite ideal-loops
+      // VERY EXPENSIVE ASSERT
+      assert Env.START.more_flow(this,new VBitSet(),true,0)==0; // Initial conditions are correct
     }
     // No more ideal calls, small or large, to apply
     assert !Env.START.more_ideal(this,new VBitSet(),3);

@@ -253,11 +253,11 @@ public class CallNode extends Node {
     if( fidxs == null ) return TypeMem.FULL; // Assume Something Good will yet happen
     if( fidxs.above_center() ) return TypeMem.FULL; // Got choices, dunno which one will stick
     CallEpiNode cepi = cepi();
-    if( cepi==null ) return TypeMem.FULL; // Collapsing
+    if( cepi==null ) return _live; // Collapsing
     // Expand (actually fail) if any parents
     BitSet bs = fidxs.tree().plus_kids(fidxs);
     if( bs.cardinality() > cepi.nwired() ) // More things to call
-      return _live; // Cannot improve
+      return TypeMem.FULL; // Cannot improve
     // All choices known
     return super.live(gvn);
   }

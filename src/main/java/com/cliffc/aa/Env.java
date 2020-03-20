@@ -170,7 +170,7 @@ public class Env implements AutoCloseable {
     if( !(n instanceof UnresolvedNode) ) return t;
     // For unresolved, use the ambiguous type
     assert GVN._opt_mode==0;
-    GVN._opt_mode=3;
+    GVN._opt_mode=2;
     t = n.value(GVN);
     GVN._opt_mode=0;
     return t;

@@ -18,17 +18,12 @@ public final class FP2ClosureNode extends Node {
     return null;
   }
   @Override public Type value(GVNGCM gvn) {
-    Type tdisp = convert(gvn.type(in(0)),gvn);
+    Type tdisp = convert(gvn.type(in(0)));
     assert tdisp.is_display_ptr();
     return tdisp;
   }
-  // This is too high, to support TypeFunPtr closure 'startype' being '~Scalar'
-  // instead of TypeMemPtr.DISPLAY_PTR.dual().  OTHERWISE I need to build a
-  // recursive version of 'startype'
-
-  //@Override public Type all_type() { return Type.SCALAR; }
   @Override public TypeMemPtr all_type() { return TypeMemPtr.DISPLAY_PTR; }
-  static public Type convert( Type t, GVNGCM gvn ) {
+  static public Type convert( Type t ) {
     if( !(t instanceof TypeFunPtr) )
       return t.above_center() ? TypeMemPtr.DISPLAY_PTR.dual() : TypeMemPtr.DISPLAY_PTR;
     TypeFunPtr tfp = (TypeFunPtr)t;

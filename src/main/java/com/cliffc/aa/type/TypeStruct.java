@@ -667,7 +667,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     // Do not install until the cycle is complete.
     RECURSIVE_MEET++;
     Ary<Type> reaches = mt.reachable();
-    UF.isEmpty();
     mt = shrink(mt.reachable(),mt);
     assert check_uf(reaches = mt.reachable());
     UF.clear();

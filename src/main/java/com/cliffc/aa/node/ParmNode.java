@@ -61,8 +61,6 @@ public class ParmNode extends PhiNode {
     // returned - and CallEpis are aware of this behavior and do the correct
     // merge-around.  This allows loads & stores below a call bypass the call.
     t = t.clean();              // Mark all as clean
-    // If ParmNode makes progress, the FunNode can sharpen internal _tf type
-    if( t!=oldt && gvn._opt_mode!=2 ) gvn.add_work(fun());
     return t;
   }
 

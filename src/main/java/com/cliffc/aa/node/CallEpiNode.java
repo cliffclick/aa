@@ -75,7 +75,7 @@ public final class CallEpiNode extends Node {
               if( (i<call_objs.length && call_objs[i] != null) ||
                   (i< ret_objs.length &&  ret_objs[i] != null) )
                 mmem.create_alias_active(i,ret_mem.at(i).above_center() ? cmem : rmem,null);
-            mem = gvn.xform(mmem);
+            mem = gvn.add_work(gvn.xform(mmem));
           }
           fun.set_is_copy(gvn);
           return inline(gvn, call, ret.ctl(), mem, ret.val(), null/*do not unwire, because using the entire function body inplace*/);
@@ -114,18 +114,28 @@ public final class CallEpiNode extends Node {
     if( fun.nargs() != cnargs )
       return null;
 
-    // Single choice; check no conversions needed
+    // Single choice; check compatible args and no conversions needed.
     TypeStruct formals = fun._tf._args;
-    for( int i=1; i<cnargs; i++ ) { // Start at 1 to skip closure hidden arg
-      if( fun.parm(i)==null ) { // Argument is dead and can be dropped?
-        if( gvn.type(call.arg(i)) != Type.XSCALAR && call.proj(i)==null )
-          call.set_arg_reg(i,gvn.con(Type.XSCALAR),gvn); // Replace with some generic placeholder
-      } else {
-        Type formal = formals.at(i);
-        Type actual = gvn.type(call.arg(i));
-        if( actual.isBitShape(formal) == 99 ) return null; // Requires user-specified conversion
+    for( Node parm : fun._uses ) {
+      if( parm instanceof ParmNode && parm.in(0)==fun ) {
+        int idx = ((ParmNode)parm)._idx;
+        if( idx == -1 ) continue; // RPC not an arg
+        Node arg = idx==-2 ? call.mem() : call.arg(idx);
+        Type actual = gvn.type(arg);
+        // Display arg comes from function pointer
+        if( idx==0 ) actual = (actual instanceof TypeFunPtr) ? ((TypeFunPtr)actual).display() : Type.SCALAR;
+        Type tparm = gvn.type(parm); // Pre-GCP this should be the default type
+        if( !actual.isa(tparm) ) return null; // Not compatible
+        if( idx >= 0 && actual.isBitShape(formals.at(idx)) == 99 )
+          return null; // Requires user-specified conversion
       }
     }
+    // Zap dead arguments
+    for( int i=1; i<cnargs; i++ ) // Start at 1 to skip closure hidden arg
+      if( fun.parm(i)==null &&    // Argument is dead and can be dropped?
+          gvn.type(call.arg(i)) != Type.XSCALAR && // But not yet dropped
+          call.proj(i)==null )    // Also dropped from after call
+        call.set_arg_reg(i,gvn.con(Type.XSCALAR),gvn); // Replace with some generic placeholder
 
     // Check for several trivial cases that can be fully inlined immediately.
     Node cctl = call.ctl();
@@ -159,7 +169,7 @@ public final class CallEpiNode extends Node {
       for( Node parm : rrez._defs )
         irez.add_def((parm instanceof ParmNode && parm.in(0) == fun) ? call.arg(((ParmNode)parm)._idx) : parm);
       if( irez instanceof PrimNode ) ((PrimNode)irez)._badargs = call._badargs;
-      return inline(gvn,call,cctl,cmem,gvn.xform(irez),ret); // New exciting replacement for inlined call
+      return inline(gvn,call,cctl,cmem,gvn.add_work(gvn.xform(irez)),ret); // New exciting replacement for inlined call
     }
 
     // Always wire caller args into known functions
@@ -207,7 +217,7 @@ public final class CallEpiNode extends Node {
         if( gvn._opt_mode == 2 )
           gvn.rereg(actual,actual.all_type().startype());
         else actual = gvn.xform(actual);
-        gvn.add_def(arg,actual);
+        gvn.add_def(arg,gvn.add_work(actual));
       }
     }
 
@@ -229,12 +239,6 @@ public final class CallEpiNode extends Node {
   // unwired Returns may yet appear, and be conservative.  Otherwise it can
   // just meet the set of known functions.
   @Override public Type value(GVNGCM gvn) {
-    CallNode call = is_copy() ? ((CallNode)in(3)) : call();
-    Type ctl = gvn.type(call.ctl()); // Call is reached or not?
-    if( ctl != Type.CTRL && ctl != Type.ALL )
-      return TypeTuple.CALLE.dual();
-    int cnargs = call.nargs();
-
     // Get Call result.  If the Call args are in-error, then the Call is called
     // and we flow types to the post-call.... BUT the bad args are NOT passed
     // along to the function being called.
@@ -242,7 +246,12 @@ public final class CallEpiNode extends Node {
     // tcall[1] = Full available memory
     // tcall[2] = TypeFunPtr passed to FP2Closure
     // tcall[3+]= Arg types
+    CallNode call = is_copy() ? ((CallNode)in(3)) : call();
     TypeTuple tcall = (TypeTuple)gvn.type(call);
+    Type ctl = tcall.at(0); // Call is reached or not?
+    if( ctl != Type.CTRL && ctl != Type.ALL )
+      return TypeTuple.CALLE.dual();
+
     Type tfptr = tcall.at(2);
     if( !(tfptr instanceof TypeFunPtr) ) // Call does not know what it is calling?
       return TypeTuple.CALLE;
@@ -259,9 +268,8 @@ public final class CallEpiNode extends Node {
     // optimistic.  JOIN if above center, merge otherwise.  Wiring the calls
     // gives us a faster lookup, but need to be correct wired or not.
 
-    // Gather the set of aliases passed into the function.
-    //BitsAlias call_aliases = call_mem.aliases();
     // Set of all possible target functions
+    int cnargs = call.nargs();
     Bits.Tree<BitsFun> tree = fidxs.tree();
     BitSet bs = tree.plus_kids(fidxs);
     boolean has_unresolve=false;
@@ -285,23 +293,6 @@ public final class CallEpiNode extends Node {
         else return TypeTuple.CALLE; // No good result until the input function is sensible
       }
       TypeTuple tret = (TypeTuple)gvn.type(ret); // Type of the return
-      // TODO: Renable this.
-      // Lift the returned memory to be no more than what is available at the
-      // call entry plus the function closures - specifically not all the
-      // memory from unrelated calls to this same function.
-      //TypeMem ret_mem_untrimmed = ((TypeMem)tret.at(1));
-
-      // Aliases from the function.  Includes aliases passed in from other call sites.
-      //BitsAlias ret_aliases = ret_mem_untrimmed.aliases();
-      //
-      // Trim to aliases available from this call path.
-      //BitsAlias call_trimmed = (BitsAlias)ret_aliases.join(call_aliases);
-      //BitsAlias plus_local = call_trimmed.meet(fun._closure_aliases);
-      //
-      // Trim return memory to what is possible on this path.
-      //TypeMem ret_mem_trimmed = ret_mem_untrimmed.trim_to_alias(plus_local);
-      // Build a full return type.
-      //TypeTuple tret2 = TypeTuple.make(tret.at(0),ret_mem_trimmed,tret.at(2));
       TypeTuple tret2 = tret;
       t = lifting ? t.join(tret2) : t.meet(tret2);
 
@@ -360,6 +351,7 @@ public final class CallEpiNode extends Node {
     FunNode fun = ret.fun();
     for( int i=1; i<fun._defs._len; i++ ) // Unwire
       if( fun.in(i).in(0)==call ) gvn.set_def_reg(fun,i,gvn.con(Type.XCTRL));
+    gvn.add_work_uses(fun);
   }
 
   // Compute local contribution of use liveness to this def.  If the call is
@@ -367,16 +359,17 @@ public final class CallEpiNode extends Node {
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
     assert _keep==0;
     // If is_copy, then basically acting like pass-thru.
-    if( is_copy() ) return super.live_use(gvn,def);
-    // If we are not sure which of the many targets will eventually be alive,
-    // then none are.  Once the call resolves, the chosen target will be alive.
-    if( def != call() && call().fun() instanceof UnresolvedNode )
-      return TypeMem.DEAD; // Not sure, so def is not more alive (yet)
-    // If not a copy, behaves pretty normal except that only alias=1 gets
-    // propagated into a Call def; other aliases might be provided by the
-    // called function and never make it to the Call.  Alias#1 is not ever
-    // satisfied but only appears before GCP.
-    if( def != call() ) return super.live_use(gvn, def);
+    if( !is_copy() && def != call() ) { // Not a copy, check call site
+      // If we are not sure which of the many targets will eventually be alive,
+      // then none are.  Once the call resolves, the chosen target will be alive.
+      if( call().fun() instanceof UnresolvedNode )
+        return TypeMem.DEAD; // Not sure, so def is not more alive (yet)
+      // If not a copy, behaves pretty normal except that only alias=1 gets
+      // propagated into a Call def; other aliases might be provided by the
+      // called function and never make it to the Call.  Alias#1 is not ever
+      // satisfied but only appears before GCP.
+      return super.live_use(gvn, def);
+    }
     return _live.at(1) == TypeObj.OBJ ? TypeMem.make(1,TypeObj.OBJ) : TypeMem.EMPTY;
   }
   @Override public boolean basic_liveness() { return false; }

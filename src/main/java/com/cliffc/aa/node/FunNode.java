@@ -516,7 +516,8 @@ public class FunNode extends RegionNode {
     // New.  One of the split versions is generated in each clone, and the
     // other is available on the default input path - in case one version calls
     // the other recursively.
-    TypeMem def_mem = (TypeMem)gvn.type(parm(-2).in(1));
+    ParmNode mparm = parm(-2);
+    TypeMem def_mem = mparm==null ? TypeMem.EMPTY : (TypeMem)gvn.type(mparm.in(1));
     // Map from old to cloned function body
     HashMap<Node,Node> map = new HashMap<>();
     // Clone the function body
@@ -578,25 +579,14 @@ public class FunNode extends RegionNode {
       for( Node p : fun._uses )
         if( p instanceof ParmNode && (parm=(ParmNode)p)._idx != 0 )
           parm.set_def(1,gvn.con(parm._idx==-2 ? def_mem : fun.targ(parm._idx)),gvn);
-      // Everything demanded before, plus also the splits
-      ParmNode oldparm = parm(-2);
-      parm = fun.parm(-2);
-      for( int alias = aliases.nextSetBit(0); alias >= 0; alias = aliases.nextSetBit(alias+1) ) {
-           parm._live =    parm._live.set(alias,TypeObj.OBJ);
-        oldparm._live = oldparm._live.set(alias,TypeObj.OBJ);
-      }
-
-      // Same hack for the original memory parm: lift his default memory to
-      // include both halves of alias splits, in case the original code gets
-      // called from the new split.
-      gvn.set_def_reg(oldparm,1,gvn.con(def_mem));
-      gvn.setype(oldparm,def_mem);
     }
 
     // Make an Unresolved choice of the old and new functions, to be used by
     // non-application uses.  E.g., passing a unresolved function pointer to a
     // 'map()' call.
-    gvn.rereg(new_funptr,original_tfp);
+    TypeFunPtr ofptr = (TypeFunPtr)gvn.type(old_funptr);
+    TypeTuple oret = (TypeTuple)gvn.type(oldret);
+    gvn.rereg(new_funptr,fun._tf.make(ofptr.display(),oret.at(2)));
     UnresolvedNode new_unr = null;
     if( path < 0 ) {
       new_unr = (UnresolvedNode)gvn.xform(new UnresolvedNode(null,old_funptr,new_funptr));
@@ -622,8 +612,6 @@ public class FunNode extends RegionNode {
         ParmNode pnn = (ParmNode)nn; // Update non-display type to match new signature
         if( pnn._idx > 0 ) pnn._t = nt = fun.targ(pnn._idx); // Upgrade new Parm default type
         else if( pnn._idx == -2 ) nt = def_mem;
-      } else if( nn == new_funptr ) {
-        nt = fun._tf;           // New TFP for the new FunPtr
       } else if( nn instanceof CallEpiNode ) { // Old calls might be wired, new calls need to re-wire
         while( ((CallEpiNode)nn).nwired() > 0 ) nn.pop();
       }

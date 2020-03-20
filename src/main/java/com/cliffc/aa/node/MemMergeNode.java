@@ -57,7 +57,7 @@ public class MemMergeNode extends Node {
     gvn.unreg(this);
     for( int i=1; i<_defs._len; i++ )
       if( !in(i).is_prim() )
-        remove0(i,gvn);
+        remove0(i--,gvn);
     _aliases.set_len(_defs._len);
   }
 
@@ -208,10 +208,10 @@ public class MemMergeNode extends Node {
   @Override public Node ideal(GVNGCM gvn, int level) {
     if( is_prim() ) return null;
     assert _defs._len==_aliases._len;
+    boolean live_stable = _live.isa(in(0)._live);
     // Get TypeObj of default alias
-    Type tp = gvn.type(in(0));
-    if( tp instanceof TypeMem ) // Might be 'any' from Phi
-      tp = ((TypeMem)tp).at(1);
+    Type t0x = gvn.type(in(0));
+    TypeMem t0mem = t0x instanceof TypeMem ? (TypeMem)t0x : TypeMem.FULL; // Might be 'any' from Phi
     // Dead & duplicate inputs can be removed.
     boolean progress = false;
     for( int i=1; i<_defs._len; i++ ) {
@@ -228,17 +228,19 @@ public class MemMergeNode extends Node {
         progress = true;
       }
       // Check the incoming alias matches his parent
-      int par_idx = find_alias2idx(BitsAlias.parent(alias));
-      // Alias slice is exactly his parent, both are XOBJ?
-      if( in(par_idx)==in(i) || this==in(i) || (par_idx==0 && ti==TypeObj.XOBJ && tp==TypeObj.XOBJ) ) {
-        if( _live.isa(in(0)._live) ) { // Alias inputs used for liveness, cannot remove until in alignment
+      if( live_stable ) {       // Liveness stable (as we are changing liveness demands)?
+        int par_idx = find_alias2idx(BitsAlias.parent(alias));
+        if( in(par_idx)==in(i) || // Already covered by parent?
+            this==in(i) ||        // Dead loop cycle?
+            // Using bulk memory, and both are dead
+            (par_idx==0 && ti==TypeObj.XOBJ && t0mem.at(alias)==TypeObj.XOBJ) ) {
           remove0(i--,gvn);            // Fold into parent
-          progress = true;
           if( is_dead() ) return this; // Happens when cleaning out dead code
+          progress = true;
         }
       }
     }
-    if( _defs._len==1 ) {
+    if( _defs._len==1 )
       // Much pondering: MemMerge can filter liveness on slot0 (because some
       // closure goes dead so the alias for it is XOBJ).  This knowledge has
       // flowed "uphill": no one needs to provide this alias.  But also, the
@@ -246,10 +248,7 @@ public class MemMergeNode extends Node {
       // simplify to a single input edge, merging nothing.  But we cannot
       // collapse lest we list "lower" liveness by making the unused alias used
       // again.
-      if( _live.isa(in(0)._live) )
-        return in(0); // Merging nothing
-      return null;
-    }
+      return live_stable ? in(0) : null; // Merging nothing
     if( progress ) return this;       // Removed some dead inputs
 
     // Back-to-back merges collapse
@@ -276,69 +275,6 @@ public class MemMergeNode extends Node {
       if( in(i) instanceof MemMergeNode )
         { set_def(i,((MemMergeNode)in(i)).alias2node(alias_at(i)),gvn); progress = true; }
     if( progress ) return this; // Removed back-to-back merge
-
-
-    // CNC - This stanza is here because of a flaw in unpacking Call args.
-    //
-    // If an input is an OProj and a use is a Call, put the Call on the
-    // worklist.  This is because the Call "peeks through" this Merge looking
-    // for an OProj in order to unpack arguments, and the OProj might have just
-    // appeared.  The Call cannot step-through the Merge, because after
-    // unpacking the same Merge is also the Calls normal memory.
-    //boolean has_oproj=false;
-    //for( int i=1; i<_aliases._len; i++ )
-    //  if( in(i) instanceof OProjNode )
-    //    { has_oproj=true; break; }
-    //if( has_oproj )
-    //  for( Node use : _uses )
-    //    if( use instanceof CallNode && !((CallNode)use)._unpacked )
-    //      gvn.add_work(use);
-
-    // If down to a single Phi use, see if Phi wants to split.
-    //if( _uses._len==1 && _uses.at(0) instanceof PhiNode )
-    //  gvn.add_work(_uses.at(0));
-
-    // Try to remove some unused aliases.  Gather alias uses from all users.
-    //if( gvn._opt_mode != 0 /*not during parsing, not all users available */) {
-    //  for( int i=1; i<_defs._len; i++ ) {
-    //    if( in(1).in(0) == Env.STK_0 ) continue; // Primitive memory is always alive
-    //    TypeObj to = (TypeObj)gvn.type(in(i));
-    //    if( to instanceof TypeStruct ) {
-    //      throw com.cliffc.aa.AA.unimpl();
-    //    }
-      //// This is a forward-flow problem, make sure my type is improved before
-      //// flowing forward.  Alas, computes value() twice in a row.
-      //gvn.setype(this,value(gvn));
-      //BitsAlias abs = BitsAlias.EMPTY;
-      //for( Node use : _uses ) {
-      //  BitsAlias rez = use.alias_uses(gvn);
-      //  if( rez.test(1) ) { abs = BitsAlias.NZERO; break; } // Shortcut, some use uses all aliases
-      //  abs = abs.meet(rez);
-      //}
-      //// Kill unused aliases
-      //if( !abs.test(1) ) {      // Shortcut
-      //  // Used aliases might be defined by a higher alias#.  These higher
-      //  // alias numbers are therefore also used.
-      //  BitsAlias abs2 = abs;
-      //  for( int alias : abs ) {
-      //    if( alias > 0 ) {
-      //      int idx = find_alias2idx(alias);
-      //      if( idx != 0 )
-      //        abs2 = abs2.set(_aliases.at(idx));
-      //    }
-      //  }
-      //  // Find defined (leaf) aliases with no uses.
-      //  for( int i=1; i<_defs._len; i++ )
-      //    if( !abs2.test_recur(_aliases.at(i))) {
-      //      if( gvn.type(in(i)) != TypeObj.XOBJ || !(in(i) instanceof ConNode) ) {
-      //        set_def(i,gvn.con(TypeObj.XOBJ),gvn);
-      //        if( is_dead() ) return this; // Happens when cleaning out dead code
-      //        progress = true;
-      //      }
-      //    }
-      //  if( progress ) return this;
-    //  }
-    //}
 
     return null;
   }
@@ -395,7 +331,7 @@ public class MemMergeNode extends Node {
         tos[alias] = tos[BitsAlias.parent(alias)];
       } else {          // This alias (and all children ) overridden here
         // Either Def or some other node must supply this value
-        tos[alias] = in(_aidxes.at(alias))==def ? _live.at(alias) : TypeObj.XOBJ; 
+        tos[alias] = in(_aidxes.at(alias))==def ? _live.at(alias) : TypeObj.XOBJ;
       }
     }
     return TypeMem.make0(tos);
@@ -421,17 +357,21 @@ public class MemMergeNode extends Node {
       int[] kid0_aliases = BitsAlias.get_kids(mya);
       int newalias1 = kid0_aliases[1];
       int newalias2 = kid0_aliases[2];
-      cmem._update(gvn,xobj,i,newalias1,newalias2);
-      this._update(gvn,xobj,i,newalias2,newalias1);
+      cmem._update(gvn,xobj,i,mya,newalias1,newalias2);
+      this._update(gvn,xobj,i,mya,newalias2,newalias1);
     }
     assert check() && cmem.check();
     gvn.rereg(this,oldt);
   }
-  private void _update(GVNGCM gvn, Node xobj, int oidx, int newalias1, int newalias2) {
+  private void _update(GVNGCM gvn, Node xobj, int oidx, int oldalias, int newalias1, int newalias2) {
     int nidx1 = make_alias2idx(newalias1);
     set_def(nidx1,in(oidx),null); // My alias comes from the original
     int nidx2 = make_alias2idx(newalias2);
-    set_def(nidx2,in( 0  ),null); // The other alias comes from default
+    // The other alias either comes from the default (if the original also came
+    // from the default, in addition to the immediate local set), or else the
+    // original never escaped and the other alias is dead.
+    Node other = in(0)._live.at(oldalias)==TypeObj.XOBJ ? xobj : in(0);
+    set_def(nidx2, other  ,gvn ); // The other alias comes from default
     set_def(oidx , xobj   ,gvn ); // The original goes dead
   }
   @Override public int hashCode() { return super.hashCode()+_aliases.hashCode(); }

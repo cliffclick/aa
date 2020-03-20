@@ -19,12 +19,10 @@ import com.cliffc.aa.type.*;
 public abstract class IntrinsicNewNode extends Node {
   public final String _name;    // Unique library call name
   int _alias;                   // Main alias
-  final TypeMem _mem;           // Conservative memory *read*
   final TypeStruct _targs;      // Arguments
-  IntrinsicNewNode( String name, TypeMem mem, TypeStruct targs ) {
+  IntrinsicNewNode( String name, TypeStruct targs ) {
     super(OP_LIBCALL);
     _name = name;
-    _mem = mem;
     _targs = targs;
   }
   public static IntrinsicNewNode[] INTRINSICS = new IntrinsicNewNode[] {
@@ -42,8 +40,7 @@ public abstract class IntrinsicNewNode extends Node {
     _alias = nnn._alias;        // Record alias conveniently
     FunNode  fun = ( FunNode) gvn.xform(new  FunNode(this,TypeMemPtr.make(_alias,TypeStr.STR)).add_def(Env.ALL_CTRL));
     ParmNode rpc = (ParmNode) gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
-    ConNode emem = gvn.con(_mem);
-    Node memp= _mem==TypeMem.EMPTY ? emem : gvn.xform(new ParmNode(-2,"mem",fun,emem,null));
+    Node memp= gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.FULL),null));
     gvn.add_work(memp);         // This may refine more later
 
     // Add input edges to the intrinsic
@@ -69,7 +66,7 @@ public abstract class IntrinsicNewNode extends Node {
 
 // --------------------------------------------------------------------------
 class ConvertI64Str extends IntrinsicNewNode {
-  ConvertI64Str() { super("str",TypeMem.EMPTY,TypeStruct.INT64); }
+  ConvertI64Str() { super("str",TypeStruct.INT64); }
   @Override public Node ideal(GVNGCM gvn, int level) { return null; }
   @Override public Type value(GVNGCM gvn) {
     Type t = gvn.type(in(3));
@@ -80,7 +77,7 @@ class ConvertI64Str extends IntrinsicNewNode {
 }
 
 class ConvertF64Str extends IntrinsicNewNode {
-  ConvertF64Str() { super("str",TypeMem.EMPTY,TypeStruct.FLT64); }
+  ConvertF64Str() { super("str",TypeStruct.FLT64); }
   @Override public Node ideal(GVNGCM gvn, int level) { return null; }
   @Override public Type value(GVNGCM gvn) {
     Type t = gvn.type(in(3));
@@ -95,7 +92,7 @@ class ConvertF64Str extends IntrinsicNewNode {
 // If one  argument  is  NIL, the other non-nil argument is returned.
 // If neither argument is NIL, the two strings are concatenated into a new third string.
 class AddStrStr extends IntrinsicNewNode {
-  AddStrStr() { super("+",TypeMem.FULL,TypeStruct.STR_STR); }
+  AddStrStr() { super("+",TypeStruct.STR_STR); }
   @Override public Node ideal(GVNGCM gvn, int level) { return null; }
   @Override public Type value(GVNGCM gvn) {
     Type m   = gvn.type(in(1));
