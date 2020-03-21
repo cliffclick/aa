@@ -118,6 +118,7 @@ public final class FunPtrNode extends ConNode<TypeFunPtr> {
     TypeFunPtr tfp = TypeFunPtr.make(rfun._tf.fidxs(),dfun._tf._args,dfun._tf._ret);
     gvn.setype(def,tfp);
     gvn.unreg(dfun);  dfun._tf = tfp;  gvn.rereg(dfun,Type.CTRL);
+    gvn.unreg(def.ret());
     int fidx = def.ret()._fidx = rfun._tf.fidx();
     FunNode.FUNS.setX(fidx,dfun);     // Track FunNode by fidx
     // Replace the forward_ref with the def.

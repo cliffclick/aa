@@ -11,7 +11,7 @@ import com.cliffc.aa.type.*;
 // point to a Ret representing wired calls.
 
 public final class RetNode extends Node {
-  int _fidx;                    // Shortcut to fidx when the FunNode has collapsed
+  int _fidx;                 // Shortcut to fidx when the FunNode has collapsed
   public RetNode( Node ctrl, Node mem, Node val, Node rpc, FunNode fun ) { super(OP_RET,ctrl,mem,val,rpc,fun); _fidx = fun.fidx();}
   public Node ctl() { return in(0); }
   public Node mem() { return in(1); }
@@ -31,6 +31,12 @@ public final class RetNode extends Node {
     return fpn;
   }
   public int fidx() { return _fidx; }
+  @Override public int hashCode() { return super.hashCode()+_fidx; }
+  @Override public boolean equals(Object o) {
+    if( !super.equals(o) ) return false;
+    return _fidx==((RetNode)o)._fidx;
+  }
+  
   // Short self name
   @Override String xstr() {
     if( is_dead() ) return "Ret";

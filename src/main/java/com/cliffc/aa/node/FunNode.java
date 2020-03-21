@@ -467,6 +467,7 @@ public class FunNode extends RegionNode {
     _tf = _tf.make_new_fidx(oldfidx,_tf._args);
     int newfidx = fidx();       // New fidx for 'this'
     FUNS.setX(newfidx,this);    // Track FunNode by fidx
+    gvn.unreg(ret);             // Remove before renumbering
     ret._fidx = newfidx;        // Renumber in the old RetNode
     FunPtrNode old_fptr = ret.funptr();
     gvn.add_work(ret);

@@ -16,7 +16,8 @@ public class UnresolvedNode extends Node {
     if( is_dead() ) return "DEAD";
     if( in(0) instanceof FunPtrNode ) {
       FunPtrNode fptr = (FunPtrNode)in(0);
-      return "Unr:"+fptr.fun().xstr();
+      FunNode fun = fptr.fun();
+      return "Unr:"+(fun==null ? "null" : fun.xstr());
     }
     return "Unr???";
   }
