@@ -94,7 +94,6 @@ public class TypeAry {
     int minlen = Math.min(len,ts.length);
     System.arraycopy(ts,0,ts2,0,minlen);
     Arrays.fill(ts2,minlen,len,null);
-    tary(ts.length)._free.push(ts);
     return ts2;
   }
   public static boolean eq( Type[] ts0, Type[] ts1 ) {
