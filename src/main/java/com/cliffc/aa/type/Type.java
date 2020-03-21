@@ -337,6 +337,8 @@ public class Type<T extends Type<T>> implements Cloneable {
   public final Type meet( Type t ) {
     // Short cut for the self case
     if( t == this ) return this;
+    if( _dual==t )
+      return above_center() ? t : this;
     // Short-cut for seeing this meet before
     Type mt = Key.get(this,t);
     if( mt != null ) return mt;
@@ -533,7 +535,7 @@ public class Type<T extends Type<T>> implements Cloneable {
     Type mt2 = t.xmeet(this);   // Reverse args and try again
 
     // Also reverse names.
-    Type nmt2 = t.xmt_name(this,mt);
+    Type nmt2 = t.xmt_name(this,mt2);
 
     if( mt==nmt2 ) return true;
     System.out.println("Meet not commutative: "+this+".meet("+t+")="+mt+",\n but "+t+".meet("+this+")="+nmt2);

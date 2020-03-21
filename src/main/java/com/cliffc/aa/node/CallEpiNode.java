@@ -40,7 +40,7 @@ public final class CallEpiNode extends Node {
     if( nwired()==1 && fidxs.abit() != -1 ) { // Wired to 1 target
       RetNode ret = wired(0);                 // One wired return
       FunNode fun = ret.fun();
-      if( fun._defs._len==2 ) { // Function is only called by 1 (and not the unknown caller)
+      if( fun != null && fun._defs._len==2 ) { // Function is only called by 1 (and not the unknown caller)
         assert fun.in(1).in(0)==call;   // Just called by us
         // Check the args
         int idx=0;

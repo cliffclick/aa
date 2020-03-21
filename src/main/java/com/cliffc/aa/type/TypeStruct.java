@@ -249,7 +249,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   private static final String[] FLD3={".",".","."};
   private static final String[][] FLDS={FLD0,FLD1,FLD2,FLD3};
   public  static String[] FLDS( int len ) { return FLDS[len]; }
-  private static String[] flds(String... fs) { return fs; }
+          static String[] flds(String... fs) { return fs; }
   public  static final String[] ARGS_X  = flds("^","x");
   public  static final String[] ARGS_XY = flds("^","x","y");
   public  static Type[] ts() { return TypeAry.get(0); }
@@ -272,8 +272,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public static final byte FRO  = 3; // bottom
 
   // Some precooked flags
-  private static final byte fbot_flag = make_flag(FRO ,false); // Field bottom
-  private static final byte  fnl_flag = make_flag(FFNL,false); // Field final
+          static final byte fbot_flag = make_flag(FRO ,false); // Field bottom
+          static final byte  fnl_flag = make_flag(FFNL,false); // Field final
   private static final byte  frw_flag = make_flag(FRW ,true); // Field final
 
   // Field bottom, plus dirty flags
@@ -322,7 +322,17 @@ public class TypeStruct extends TypeObj<TypeStruct> {
 
   // Recursive meet in progress.
   // Called during class-init.
-  private static final HashMap<TypeStruct,TypeStruct> MEETS1 = new HashMap<>(), MEETS2 = new HashMap<>();
+  private static class TPair {
+    TypeStruct _ts0, _ts1;
+    private static TPair KEY = new TPair(null,null);
+    static TPair set(TypeStruct ts0, TypeStruct ts1) {KEY._ts0=ts0; KEY._ts1=ts1; return KEY; }
+    TPair(TypeStruct ts0, TypeStruct ts1) { _ts0=ts0; _ts1=ts1; }
+    @Override public int hashCode() { return (_ts0.hashCode()<<17) | _ts1.hashCode(); }
+    @Override public boolean equals(Object o) {
+      return _ts0.equals(((TPair)o)._ts0) && _ts1.equals(((TPair)o)._ts1);
+    } 
+  }
+  private static final HashMap<TPair,TypeStruct> MEETS0 = new HashMap<>();
 
   // The display is a self-recursive structure: slot 0 is a ptr to a Display.
   // To break class-init cycle, this is partially made here, now.
@@ -342,7 +352,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return this==DISPLAY || this==DISPLAY._dual
       || (_ts.length >= 1 && _ts[0].is_display_ptr());
   }
-  public  static final Type NO_DISP = TypeMemPtr.DISPLAY_PTR.dual();
+  public  static final TypeMemPtr NO_DISP = TypeMemPtr.DISPLAY_PTR.dual();
 
   public  static final TypeStruct GENERIC = malloc("",true,FLD0,TypeAry.get(0),new byte[0]).hashcons_free();
   public  static final TypeStruct ALLSTRUCT;
@@ -372,9 +382,9 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public TypeStruct add_fld( String name, Type t, byte mutable ) {
     assert t.isa(SCALAR) && (name==null || fldBot(name) || find(name)==-1);
 
-    Type  []   ts = Arrays.copyOfRange(_ts   ,0,_ts   .length+1);
-    String[] flds = Arrays.copyOfRange(_flds ,0,_flds .length+1);
-    byte[]  flags = Arrays.copyOfRange(_flags,0,_flags.length+1);
+    Type  []   ts = TypeAry.copyOf(_ts   ,_ts   .length+1);
+    String[] flds = Arrays .copyOf(_flds ,_flds .length+1);
+    byte[]  flags = Arrays .copyOf(_flags,_flags.length+1);
     ts   [_ts.length] = t;
     flds [_ts.length] = name==null ? "." : name;
     flags[_ts.length] = make_flag(mutable,true);
@@ -539,7 +549,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     assert RECURSIVE_MEET > 0 || (thsi.interned() && that.interned());
     // INVARIANT: Both MEETS are empty at the start.  Nothing involved in a
     // potential cycle is interned until the Meet completes.
-    assert RECURSIVE_MEET > 0 || (MEETS1.isEmpty() && MEETS2.isEmpty());
+    assert RECURSIVE_MEET > 0 || (MEETS0.isEmpty());
 
     // If both are cyclic, we have to do the complicated cyclic-aware meet
     if( _cyclic && that._cyclic )
@@ -580,47 +590,30 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // infinitely unrolled, Meeted, and then re-rolled.  If cycles are of uneven
   // length, the end result will be the cyclic GCD length.
   private TypeStruct cyclic_meet( TypeStruct that ) {
-    // Walk 'this' and 'that' and map them both (via MEETS1 and MEETS2) to a
-    // shared common Meet result.  Only walk the cyclic parts... cyclically.
-    // When visiting a finite-sized part we use the normal recursive Meet.
-    // When doing the cyclic part, we use the normal Meet except we need to use
-    // the mapped Meet types.  As part of these Meet operations we can end up
-    // Meeting Meet types with each other more than once, or more than once
-    // from each side - which means already visited Types might need to Meet
-    // again, even as they are embedded in other Types - which leads to the
-    // need to use Tarjan U-F to union Types on the fly.
+    // Walk 'this' and 'that' and map them both (via MEETS0) to a shared common
+    // Meet result.  Only walk the cyclic parts... cyclically.  When visiting a
+    // finite-sized part we use the normal recursive Meet.  When doing the
+    // cyclic part, we use the normal Meet except we need to use the mapped
+    // Meet types.  As part of these Meet operations we can end up Meeting Meet
+    // types with each other more than once, or more than once from each side -
+    // which means already visited Types might need to Meet again, even as they
+    // are embedded in other Types - which leads to the need to use Tarjan U-F
+    // to union Types on the fly.
 
-    // There are 4 choices here: this, that the existing MEETs from either
-    // side.  U-F all choices together.  Some or all may be missing and can
-    // be assumed equal to the final MEET.
-    TypeStruct lf = MEETS1.get(this);
-    TypeStruct rt = MEETS2.get(that);
-    if( lf != null ) { lf = lf.ufind(); assert lf._cyclic && !lf.interned(); }
-    if( rt != null ) { rt = rt.ufind(); assert rt._cyclic && !rt.interned(); }
-    if( lf == rt && lf != null ) return lf; // Cycle has been closed
-
-    // Take for the starting point MEET either already-mapped type.  If neither
-    // is mapped, clone one (to make a new space to put new types into) and
-    // simply point at the other - it will only be used for the len() and _any
-    // fields.  If both are mapped, union together and pick one arbitrarily
-    // (here always picked left).
-    TypeStruct mt, mx;
-    if( lf == null ) {
-      if( rt == null ) { mt = this.shallow_clone(); mx = that; }
-      else             { mt = rt;                   mx = this; }
-    } else {
-      if( rt == null ) { mt = lf;                   mx = that; }
-      else             { mt = lf;  rt.union(lf);    mx = rt  ; }
-    }
-    MEETS1.put(this,mt);
-    MEETS2.put(that,mt);
+    // See if we have worked on this unique pair before.  If so, the cycle has
+    // been closed and just return that prior (unfinished) result.
+    TypeStruct mt = MEETS0.get(TPair.set(this,that));
+    if( mt != null ) return mt; // Cycle has been closed
+    mt = this.shallow_clone();
+    TypeStruct mx = that;
+    MEETS0.put(new TPair(this,that),mt);
 
     // Do a shallow MEET: meet of field names and _any and _ts sizes - all
     // things that can be computed without the cycle.  _ts not filled in yet.
     int len = mt.len(mx); // Length depends on all the Structs Meet'ing here
     if( len != mt._ts.length ) {
       mt._flds = Arrays.copyOf(mt._flds , len);
-      mt._ts   = Arrays.copyOf(mt._ts   , len);
+      mt._ts   = Arrays.copyOf(mt._ts   , len);// escaped a _ts
       mt._flags= Arrays.copyOf(mt._flags, len);
     }
     if( mt._any && !mx._any ) mt._any=false;
@@ -654,7 +647,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       mt._ts[i] = mts;          // Finally update
     }
     // Check for repeats right now
-    for( TypeStruct ts : MEETS1.values() )
+    for( TypeStruct ts : MEETS0.values() )
       if( ts!=mt && ts.equals(mt) )
         { mt.union(ts); mt = ts; break; } // Union together
 
@@ -697,8 +690,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       assert _ts[0].interned();
       old = this;
     }
-    MEETS1.clear();
-    MEETS2.clear();
+    MEETS0.clear();
     return old;
   }
 

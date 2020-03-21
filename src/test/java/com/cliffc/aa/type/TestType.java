@@ -16,10 +16,10 @@ public class TestType {
   @Test public void testType() {
     Type.init0(new HashMap<>());
     // Both high, but falling hard, so names have to fall hard too
-    Type t0 = TypeStruct.NAMEPT.dual();
-    Type t1 = TypeStr.STR.dual();
-    Type mt = t1.meet(t0);
-    assertEquals(TypeObj.OBJ,mt);
+    Type t0 = TypeTuple.CALLE;
+    Type t1 = null;
+    //Type mt = t1.meet(t0);
+    //assertEquals(TypeObj.OBJ,mt);
   }
 
 
@@ -465,6 +465,7 @@ public class TestType {
 
   @Test public void testCommuteSymmetricAssociative() {
     Type.init0(new HashMap<>());
+    Object dummy0 = TypeStruct.TYPES;
     BitsFun.make_new_fidx(BitsFun.ALL);
 
     assertTrue(Type.check_startup());

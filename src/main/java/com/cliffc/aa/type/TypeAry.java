@@ -2,6 +2,7 @@ package com.cliffc.aa.type;
 
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.IHashMap;
+import java.util.Arrays;
 
 // Class to make hashcons Type[].
 // Bug to change after interning.
@@ -79,9 +80,21 @@ public class TypeAry {
 
   public static Type[] get(int len) { return tary(len).check().get(); }
   public static Type[] hash_cons(Type[] ts) { return tary(ts.length).check().hash_cons_(ts); }
+  // Result not interned; suitable for direct hacking.
+  // Original assumed in-use, not freed.
   public static Type[] clone(Type[] ts) {
     Type[] ts2 = tary(ts.length).check().get();
     System.arraycopy(ts,0,ts2,0,ts.length);
+    return ts2;
+  }
+  // Result not interned; suitable for direct hacking.
+  // Original assumed in-use, not freed.
+  public static Type[] copyOf(Type[] ts, int len) {
+    Type[] ts2 = tary(len).check().get();
+    int minlen = Math.min(len,ts.length);
+    System.arraycopy(ts,0,ts2,0,minlen);
+    Arrays.fill(ts2,minlen,len,null);
+    tary(ts.length)._free.push(ts);
     return ts2;
   }
   public static boolean eq( Type[] ts0, Type[] ts1 ) {

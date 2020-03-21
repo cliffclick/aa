@@ -693,4 +693,66 @@ public class TestApprox {
     assertEquals(CUTOFF,cnt);
 
   }
+
+  @Test public void testApprox8() {
+    Object dummy0 = TypeStruct.TYPES;
+    Object dummy1 = TypeFunPtr.TYPES;
+    final int CUTOFF=2;
+    final String[] fflds = TypeStruct.flds("^","fib");
+    final String[] xflds = TypeStruct.flds("^","x");
+    final byte[] fmods = new byte[]{TypeStruct.fnl_flag,TypeStruct.fnl_flag };
+    final byte[] xmods = new byte[]{TypeStruct.fnl_flag,TypeStruct.fbot_flag};
+    final int fidx = BitsFun.new_fidx(1), fidx0 = BitsFun.new_fidx(fidx), fidx1 = BitsFun.new_fidx(fidx);
+    final BitsFun fidxs = BitsFun.make0(fidx0,fidx1).dual();
+    final int alias = BitsAlias.new_alias(BitsAlias.RECORD);
+
+    Type tY = TypeMemPtr.DISPLAY_PTR;
+
+    TypeFunPtr tfp0 = TypeFunPtr.make(BitsFun.ANY,(TypeStruct)TypeStruct.NO_DISP._obj,Type.XSCALAR);
+    TypeStruct dsp0 = TypeStruct.make(fflds,TypeStruct.ts(tY,tfp0),fmods);
+    TypeMemPtr ptr0 = TypeMemPtr.make(alias,dsp0);
+    TypeStruct arg0 = TypeStruct.make(xflds,TypeStruct.ts(ptr0,TypeInt.INT64),xmods);
+
+    TypeFunPtr tfp1 = TypeFunPtr.make(fidxs,arg0,Type.XSCALAR);
+    TypeStruct dsp1 = TypeStruct.make(fflds,TypeStruct.ts(tY,tfp1),fmods);
+    TypeMemPtr ptr1 = TypeMemPtr.make(alias,dsp1);
+    TypeStruct arg1 = TypeStruct.make(xflds,TypeStruct.ts(ptr1,TypeInt.INT64),xmods);
+
+    TypeFunPtr tfp2 = TypeFunPtr.make(fidxs,arg1,Type.XSCALAR);
+    TypeStruct dsp2 = TypeStruct.make(fflds,TypeStruct.ts(tY,tfp2),fmods);
+
+    // The approx that gets built.
+    //
+    Type.RECURSIVE_MEET++;
+    TypeStruct dsp3 = TypeStruct.malloc("",false,fflds,TypeStruct.ts(2),fmods);
+    dsp3._hash = dsp3.compute_hash();  dsp3._cyclic = true;
+    TypeMemPtr ptr3 = TypeMemPtr.make(alias,dsp3);
+    TypeStruct arg3 = TypeStruct.make(xflds,TypeStruct.ts(ptr3,TypeInt.INT64),xmods);
+    TypeFunPtr tfp3 = TypeFunPtr.make(fidxs,arg3,Type.XSCALAR);
+    dsp3._ts[0] = tY;
+    dsp3._ts[1] = tfp3;
+    Type.RECURSIVE_MEET--;
+    dsp3 = dsp3.install_cyclic(dsp3.reachable());
+
+
+    // This should pass an isa-test (was crashing)
+    Type mt0 = dsp0.meet(dsp3);
+
+    // This should pass an isa-test (was crashing)
+    Type mt1 = dsp1.meet(dsp3);
+
+
+    // Currently fails: the meet of a cycle of length 1 (struct->ptr->$) and
+    // length 2 (struct->fptr->struct->ptr->$) and collapses to (struct->fptr->
+    // struct->ptr->$)
+    //
+
+    // Check the isa
+    Type mt = dsp2.meet(dsp3);
+    assertEquals(dsp3,mt);
+
+    // Build the approx
+    TypeStruct rez = dsp2.approx(CUTOFF,alias);
+    assertEquals(dsp3,rez);
+  }
 }
