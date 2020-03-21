@@ -213,8 +213,14 @@ public class TypeMem extends Type<TypeMem> {
 
   // Canonicalize memory before making.  Unless specified, the default memory is "do not care"
   public static TypeMem make0( TypeObj[] as ) {
-    if( as[1]==null ) as[1] = TypeObj.XOBJ; // Default memory is "do not care"
     int len = as.length;
+    if( as[1]==null ) {
+      int i; for( i=2; i<len; i++ )
+        if( as[i]!=null && as[i] != TypeObj.XOBJ )
+          break;
+      if( i==len ) return DEAD; // All things are dead, so dead
+      as[1] = TypeObj.XOBJ;     // Default memory is "do not care"
+    }
     if( len == 2 ) return make(as);
     // No dups of a parent
     for( int i=1; i<as.length; i++ )
@@ -330,7 +336,7 @@ public class TypeMem extends Type<TypeMem> {
     tos[alias] = obj;
     return TypeMem.make0(tos);
   }
-  
+
   // Mark all memory as being clean (not modified in this function).
   // Recursive.
   public TypeMem clean() {

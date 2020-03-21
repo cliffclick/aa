@@ -133,12 +133,9 @@ public class ScopeNode extends Node {
     // If asking about mem() liveness, start with 'DEAD'.  If mem() and rez()
     // are not a valid ptr-to-memory, then the memory input is dead.  However,
     // rez() might be e.g., 3.1415, and be alive independent of memory.
-    TypeMem live = TypeMem.DEAD;
-    if( mem()!=def ) live = TypeMem.EMPTY;
+    // If mem() and rez() are a valid ptr-to-memory, then _live has all used aliases.
     // If asking about ctrl() liveness, then only return the basic yes/no alive.
-    if( ctrl() == def ) return live;
-    // If asking either mem() or rez(), report back all used aliases & memory.
-    return compute_live_mem(gvn,live,mem(),rez());
+    return ctrl() == def ? (mem()==def ? TypeMem.DEAD : TypeMem.EMPTY) : _live;
   }
   @Override public boolean basic_liveness() { return false; }
 
