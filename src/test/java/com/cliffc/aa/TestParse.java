@@ -199,7 +199,7 @@ public class TestParse {
     testerr("1:str", "1 is not a *[$]str",1);
 
     test   ("{x:int -> x*2}(1)", TypeInt.con(2)); // Types on parms
-    testerr("{x:str -> x}(1)", "1 is not a *[$]str", 2);
+    testerr("{x:str -> x}(1)", "1 is not a *[$]str", 15);
 
     // Type annotations on dead args are ignored
     test   ("fun:{int str -> int}={x y -> x+2}; fun(2,3)", TypeInt.con(4));

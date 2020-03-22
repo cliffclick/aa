@@ -197,6 +197,7 @@ public final class CallEpiNode extends Node {
 
     // Add matching control to function
     Node cproj = new CProjNode(call,0);
+    if( gvn._opt_mode == 2 ) cproj._live = TypeMem.DEAD;
     cproj = gvn._opt_mode == 2 ? gvn.add_work(cproj) : gvn.xform(cproj);
     gvn.add_def(fun,cproj);
     // Add the CallEpi hook.  Sometimes in or out of _vals.  Called by early
@@ -267,8 +268,7 @@ public final class CallEpiNode extends Node {
         else return TypeTuple.CALLE; // No good result until the input function is sensible
       }
       TypeTuple tret = (TypeTuple)gvn.type(ret); // Type of the return
-      TypeTuple tret2 = tret;
-      t = lifting ? t.join(tret2) : t.meet(tret2);
+      t = lifting ? t.join(tret) : t.meet(tret);
 
       // Make real from virtual CG edges in GCP/Opto by wiring calls.
       if( gvn._opt_mode==0 ) gvn.add_work(this); // Not during parsing, but check afterwards

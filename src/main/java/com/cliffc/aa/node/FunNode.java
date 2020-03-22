@@ -192,12 +192,13 @@ public class FunNode extends RegionNode {
     // See if we can make the function signature more precise.  When building
     // type-split signatures, we'd like this to be as precise as all unsplit
     // inputs.
-    boolean progress= (parms[0]==null ? TypeStruct.NO_DISP :  gvn.type(parms[0])) != targ(0);
-    for( int i=1; i<parms.length; i++ ) {
-      Type t = parms[i]==null ? Type.XSCALAR : gvn.type(parms[i]);
-      if( t != targ(i) ) { progress=true; break; }
+    boolean progress= false, anti=false;
+    for( int i=0; i<parms.length; i++ ) {
+      Type t = parms[i]==null ? (i==0 ? TypeStruct.NO_DISP : Type.XSCALAR) : gvn.type(parms[i]);
+      if( t != targ(i) )
+        if( t.isa(targ(i)) ) progress=true; else anti=true;
     }
-    if( progress && !is_prim() ) {
+    if( progress && !anti && !is_prim() ) {
       Type[] ts = TypeAry.get(parms.length);
       ts[0] = parms[0]==null ? TypeStruct.NO_DISP : gvn.type(parms[0]);
       for( int i=1; i<parms.length; i++ )
@@ -258,7 +259,7 @@ public class FunNode extends RegionNode {
       }
     }
   }
-  
+
   // Gather the ParmNodes into an array.  Return null if any input path is dead
   // (would rather fold away dead paths before inlining).  Return null if there
   // is only 1 path.  Return null if any actuals are not formals.
@@ -646,7 +647,7 @@ public class FunNode extends RegionNode {
         rewire(gvn,oldcall, path==e ? new_funptr : old_funptr, path!=e ? oldret : null, fun, path==e ? newret : null);
         rewire(gvn,newcall,old_funptr, oldret, fun, null  );
       }
-      
+
     }
 
     if( new_unr != null ) new_unr.unkeep(gvn);

@@ -330,7 +330,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     @Override public int hashCode() { return (_ts0.hashCode()<<17) | _ts1.hashCode(); }
     @Override public boolean equals(Object o) {
       return _ts0.equals(((TPair)o)._ts0) && _ts1.equals(((TPair)o)._ts1);
-    } 
+    }
   }
   private static final HashMap<TPair,TypeStruct> MEETS0 = new HashMap<>();
 
@@ -1063,7 +1063,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   private static BitSet get_cyclic(BitSet bcs, VBitSet bs, Ary<Type> stack, Type t ) {
     if( t.interned() ) return bcs;
     if( bs.tset(t._uid) ) {     // If visiting again... have found a cycle t->....->t
-      assert !(t instanceof TypeFunPtr); // Never part of a cycle
       // All on the stack are flagged as being part of a cycle
       int i;
       i=stack._len-1;
