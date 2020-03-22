@@ -247,6 +247,18 @@ public class FunNode extends RegionNode {
     return this;
   }
 
+  @Override void unwire(GVNGCM gvn,int idx) {
+    Node ctl = in(idx);
+    if( !(ctl instanceof ConNode) ) {
+      CallNode call = (CallNode)ctl.in(0);
+      CallEpiNode cepi = call.cepi();
+      if( cepi != null ) {
+        int ridx = cepi._defs.find(ret());
+        gvn.remove_reg(cepi,ridx);
+      }
+    }
+  }
+  
   // Gather the ParmNodes into an array.  Return null if any input path is dead
   // (would rather fold away dead paths before inlining).  Return null if there
   // is only 1 path.  Return null if any actuals are not formals.
@@ -467,8 +479,9 @@ public class FunNode extends RegionNode {
     _tf = _tf.make_new_fidx(oldfidx,_tf._args);
     int newfidx = fidx();       // New fidx for 'this'
     FUNS.setX(newfidx,this);    // Track FunNode by fidx
-    gvn.unreg(ret);             // Remove before renumbering
+    Type toldret = gvn.unreg(ret);// Remove before renumbering
     ret._fidx = newfidx;        // Renumber in the old RetNode
+    gvn.rereg(ret,toldret);
     FunPtrNode old_fptr = ret.funptr();
     gvn.add_work(ret);
     gvn.add_work_uses(old_fptr);
@@ -530,8 +543,6 @@ public class FunNode extends RegionNode {
       map.put(n,c);                    // Map from old to new
       if( old_alias != -1 ) {          // Was a NewNode?
         aliases.set(old_alias);        // Record old alias before copy/split
-        TypeObj nto = (TypeObj)((TypeTuple)gvn.type(n)).at(0);
-        def_mem = def_mem.set( old_alias, nto);
         // Update the local displays
         if( _my_display_alias == old_alias ) {
           this._my_display_alias = ((NewNode)n)._alias;
@@ -621,42 +632,21 @@ public class FunNode extends RegionNode {
     gvn.add_work(this);
     gvn.add_work(fun );
 
-    // Rewire all previously wired calls.  Required to preserve monotonic types
+    // Rewire all previously wired calls.  Required to preserve type and
+    // liveness monotonicity.  If type-split, wire to BOTH targets as
+    // we're not sure which one we'll get.
     for( int e=has_unknown_callers() ? 2 : 1; e<cgedges.length; e++ ) {
       CGEdge cg = cgedges[e];
-      CallNode call = cg.call();
-      CallNode newcall = (CallNode)map.get(call); // Fetch before changing edges, hence map hash
-      FunPtrNode fp;
+      CallNode oldcall = cg.call();
+      CallNode newcall = (CallNode)map.get(oldcall); // Fetch before changing edges, hence map hash
       if( path < 0 ) {          // Type-split, each call site resolves left or right
-        call.set_fun_reg(new_unr,gvn); // Unresolved; need to resolve
-        fp = old_funptr;
-        // Recompute path choice, as when we computed the new type sig.
-        for( ParmNode parm : parms ) // For all parms
-          if( parm != null ) {       //   (some can be dead)
-            Type tp = gvn.type(call.arg(parm._idx)); // Specific path type
-            if( parm._idx==0 ) tp = ((TypeFunPtr)tp).display();
-            if( !tp.isa(fun.targ(parm._idx)) || // If this path cannot use the sharper sig
-                tp.above_center() )             // Or path is in-error
-              { fp = old_funptr; break; } // Take the old, more generic version
-            if( tp.widen() != targ(parm._idx) ) // Even widened, path is more specific than the generic
-              fp = new_funptr;  // Then take it, but check remaining paths
-          }
+        rewire(gvn,oldcall,new_unr   , oldret, fun, newret);
+        rewire(gvn,newcall,new_unr   , oldret, fun, newret);
       } else {                  // Fixed inline path, choice already made
-        fp = path==e ? new_funptr : old_funptr;
+        rewire(gvn,oldcall, path==e ? new_funptr : old_funptr, path!=e ? oldret : null, fun, path==e ? newret : null);
+        rewire(gvn,newcall,old_funptr, oldret, fun, null  );
       }
-      // Rewire all previously wired calls
-      gvn.unreg(call);
-      call.set_fun(fp,gvn);
-      gvn.rereg(call,call.value(gvn));
-      Type tcepi = gvn.unreg(cg._cepi);
-      cg._cepi.wire(gvn,call,fp == old_funptr ? this : fun, fp == old_funptr ? oldret : newret);
-      gvn.setype(cg._cepi,tcepi);
-      // If we cloned a recursive call, it also needs updating but can resolve
-      // and wire like any other new call.
-      if( newcall != null ) {
-        newcall.set_fun_reg(path < 0 ? new_unr : old_funptr, gvn);
-        gvn.setype(newcall,newcall.value(gvn));
-      }
+      
     }
 
     if( new_unr != null ) new_unr.unkeep(gvn);
@@ -668,6 +658,19 @@ public class FunNode extends RegionNode {
       set_def(1,gvn.con(Type.XCTRL),gvn);
 
     return this;
+  }
+
+  void rewire(GVNGCM gvn, CallNode call, Node funptr, RetNode oldret, FunNode fun, RetNode newret) {
+    if( call==null ) return;
+    Type tcall = gvn.unreg(call);
+    call.set_fun(funptr,gvn);
+    gvn.rereg(call,tcall);
+    assert call.value(gvn).isa(tcall); // Always uphill
+    CallEpiNode xcepi = call.cepi();
+    Type tcepi = gvn.unreg(xcepi);
+    if( oldret != null ) xcepi.wire(gvn,call,this,oldret); // Wire both choices, extra unwires later
+    if( newret != null ) xcepi.wire(gvn,call,fun ,newret); // Wire both choices, extra unwires later
+    gvn.setype(xcepi,tcepi);
   }
 
   // Compute value from inputs.  Simple meet over inputs.

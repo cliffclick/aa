@@ -55,9 +55,9 @@ public class BitsAlias extends Bits<BitsAlias> {
   public static int[] get_kids( int par ) { return TREE.get_kids(par); }
   // Fast reset of parser state between calls to Exec
   public static void init0() { TREE.init0(); }
-  public static void reset_to_init0() {
-    TREE.reset_to_init0();
-  }
+  public static void reset_to_init0() { TREE.reset_to_init0(); }
+  // Iterate over children
+  public static int next_kid( int alias, int kid ) { return TREE.next_kid(alias,kid); }
 
   @Override public BitsAlias ALL() { return FULL; }
   @Override public BitsAlias ANY() { return ANY ; }

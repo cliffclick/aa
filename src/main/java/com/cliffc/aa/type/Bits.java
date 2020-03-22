@@ -487,6 +487,30 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
       for( int kid=1; kid<nkids; kid++ )
         _plus_kids(bs,_kids[i][kid]);
     }
+
+    // Return next child of alias; repeated calls iterate over all the children
+    // of alias including itself.  When out of children returns 0.  Usage:
+    // for( int kid=alias; kid!=0; kid=BitsAlias.next_kid(alias,kid) ) {...kid... }
+    public int next_kid( int alias, int kid ) {
+      if( kid==0 ) return 0;
+      boolean is_par = is_parent(kid);
+      if( kid==alias && !is_par ) return 0; // Singleton bit
+      // Find kid in the alias-tree
+      if( is_par ) {            // Go deeper
+        return _kids[kid][1];   // First child one layer deeper
+      } else {                  // Leaf, unwind & find sibling
+        while(kid!=alias) {
+          int par = _pars[kid];    // Parent
+          int[] kids = _kids[par]; // All the parents' children
+          for( int i=1; i<kids[0]-1; i++ )
+            if( kids[i]==kid )
+              return kids[i+1]; // Return sibling
+          kid=par;              // Up-parent & go again
+        }
+        return 0;               // Last child visited
+      }
+    }
+    
   }
 
   /** @return an iterator */
@@ -508,5 +532,4 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
       throw new java.util.NoSuchElementException();
     }
   }
-
 }

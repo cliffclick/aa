@@ -56,7 +56,7 @@ public class TypeTuple extends Type<TypeTuple> {
   private static TypeTuple FREE=null;
   @Override protected TypeTuple free( TypeTuple ret ) { FREE=this; return ret; }
   @SuppressWarnings("unchecked")
-  static TypeTuple make0( boolean any, Type[] ts ) {
+  public static TypeTuple make0( boolean any, Type[] ts ) {
     ts = TypeAry.hash_cons(ts);
     TypeTuple t1 = FREE;
     if( t1 == null ) t1 = new TypeTuple(TTUPLE, any, ts);
@@ -76,8 +76,8 @@ public class TypeTuple extends Type<TypeTuple> {
     ts[0]=t0; ts[1]=t1; ts[2]=t2; ts[3]=t3; ts[4]=t4;
     return make0(false,ts);
   }
-  public  static final TypeTuple IF_ANY  = make(XCTRL,XCTRL);
   public  static final TypeTuple IF_ALL  = make(CTRL ,CTRL );
+  public  static final TypeTuple IF_ANY  = IF_ALL.dual();
   public  static final TypeTuple IF_TRUE = make(XCTRL,CTRL );
   public  static final TypeTuple IF_FALSE= make(CTRL ,XCTRL);
 
@@ -169,6 +169,6 @@ public class TypeTuple extends Type<TypeTuple> {
   @Override public TypeTuple startype() {
     Type[] ts = TypeAry.get(_ts.length);
     for( int i=0; i<_ts.length; i++ ) ts[i] = _ts[i].startype();
-    return make0(!_any, ts);
+    return make0(true, ts);
   }
 }

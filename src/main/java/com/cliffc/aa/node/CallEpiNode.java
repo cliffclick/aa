@@ -114,6 +114,7 @@ public final class CallEpiNode extends Node {
     Node cctl = call.ctl();
     Node cmem = call.mem();
     RetNode ret = fun.ret();    // Return from function
+    if( ret==null ) return null;
     Node rctl = ret.ctl();      // Control being returned
     Node rmem = ret.mem();      // Memory  being returned
     Node rrez = ret.val();      // Value   being returned
@@ -312,14 +313,14 @@ public final class CallEpiNode extends Node {
     ctl.keep();  mem.keep();  rez.keep();
     while( _defs._len > 0 ) pop(gvn);
     // Put results back on, and trigger is_copy to collapse
-    add_def(ctl.unhook());
-    add_def(mem.unhook());
-    add_def(rez.unhook());
-    add_def(call.unhook());         // Hook call, to get FIDX for value filtering.
+    add_def(ctl .unhook());
+    add_def(mem .unhook());
+    add_def(rez .unhook());
+    add_def(call.unhook());     // Hook call, to get FIDX for value filtering.
     return this;
   }
 
-  private void unwire(GVNGCM gvn, CallNode call, RetNode ret) {
+  void unwire(GVNGCM gvn, CallNode call, RetNode ret) {
     if( ret.is_copy() ) return;
     FunNode fun = ret.fun();
     for( int i=1; i<fun._defs._len; i++ ) // Unwire
@@ -341,8 +342,9 @@ public final class CallEpiNode extends Node {
       // propagated into a Call def; other aliases might be provided by the
       // called function and never make it to the Call.  Alias#1 is not ever
       // satisfied but only appears before GCP.
-      return super.live_use(gvn, def);
+      return _live;
     }
+    if( _live==TypeMem.DEAD ) return TypeMem.DEAD;
     return _live.at(1) == TypeObj.OBJ ? TypeMem.make(1,TypeObj.OBJ) : TypeMem.EMPTY;
   }
   @Override public boolean basic_liveness() { return false; }

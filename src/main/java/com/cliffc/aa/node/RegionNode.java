@@ -26,7 +26,7 @@ public class RegionNode extends Node {
             phi.remove(i,gvn);
             if( !phi.is_dead() ) gvn.rereg(phi,oldt);
           }
-        if( !is_dead() ) remove(i,gvn);
+        if( !is_dead() ) { unwire(gvn,i);  remove(i,gvn); }
         return this; // Progress
       }
 
@@ -57,6 +57,8 @@ public class RegionNode extends Node {
     return null;
   }
 
+  void unwire(GVNGCM gvn, int idx) { }
+  
   @Override public Type value(GVNGCM gvn) {
     if( _defs._len==2 && in(1)==this ) return Type.XCTRL; // Dead self-loop
     for( int i=1; i<_defs._len; i++ ) {

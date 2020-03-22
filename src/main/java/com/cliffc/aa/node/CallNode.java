@@ -220,27 +220,8 @@ public class CallNode extends Node {
     // Copy args for called functions.
     // If call is dead, then so are args.
     for( int i=1; i<nargs(); i++ )
-      ts[i+2] = dead ? Type.XSCALAR : targ(gvn,i).bound(Type.SCALAR);
+      ts[i+2] = ctl==Type.XCTRL ? Type.XSCALAR : targ(gvn,i).bound(Type.SCALAR);
 
-    // Quick exit if cannot further trim memory
-    if( ctl == Type.XCTRL ||     // Not calling
-        tmem == TypeMem.EMPTY || // Nothing to trim
-        // If calling everything then not much we can do
-        fidxs.test(BitsFun.ALL) )
-      return TypeTuple.make(ts);
-
-    //// Trim unused aliases, specifically to prevent local displays from escaping.
-    //// Here, I start with all alias#s from TMP args plus all function
-    //// display#s and "close over" the set of possible aliases.
-    //
-    //// Set of aliases escaping into the function.  Includes everything in the
-    //// function displays.
-    //BitsAlias abs = tfp.recursive_aliases(BitsAlias.EMPTY,tmem);
-    //// Now the set of pointers escaping via arguments
-    //for( int i=0; i<nargs(); i++ ) {
-    //  if( abs.test(1) ) break;  // Shortcut for already being full
-    //  abs = ts[i+2].recursive_aliases(abs,tmem);
-    //}
     return TypeTuple.make(ts);
   }
 
@@ -253,19 +234,16 @@ public class CallNode extends Node {
       if( fidxs.above_center() ) return TypeMem.FULL; // Got choices, dunno which one will stick
       CallEpiNode cepi = cepi();
       if( cepi==null ) return _live; // Collapsing
+      if( gvn.type(ctl()) == Type.XCTRL ) return _live; // Unreachable
       // Expand (actually fail) if any parents
       BitSet bs = fidxs.tree().plus_kids(fidxs);
       if( bs.cardinality() > cepi.nwired() ) // More things to call
         return TypeMem.FULL; // Cannot improve
     }
-    // All choices discovered during GCP.  Just get from the called functions,
-    // not the CallEpi, other than basic liveness.  If the call is in-error it
-    // may not resolve and so will have no uses other than the CallEpi - which
-    // is good enough to declare this live, so it exists for errors.
-    TypeMem live = TypeMem.DEAD; // Start at lattice top
-    for( Node use : _uses )      // Computed across all uses
-      live = (TypeMem)live.meet(use instanceof CallEpiNode ? TypeMem.EMPTY : use.live_use(gvn, this));
-    return live;
+    // All choices discovered during GCP.  If the call is in-error it may not
+    // resolve and so will have no uses other than the CallEpi - which is good
+    // enough to declare this live, so it exists for errors.
+    return super.live(gvn);
   }
   @Override public boolean basic_liveness() { return false; }
 

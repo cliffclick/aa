@@ -277,7 +277,7 @@ public class GVNGCM {
     // Record type for n; n is "in the system" now
     setype(n,t);                // Set it in
     // TODO: If x is a TypeNode, capture any more-precise type permanently into Node
-    return n;
+    return add_work(n);
   }
 
   // Recursively kill off a new dead node, which might make lots of other nodes
@@ -603,6 +603,7 @@ public class GVNGCM {
     setype(n,startype);
     n._live = TypeMem.DEAD;     // Not alive
     // Walk reachable graph
+    add_work(n);
     for( Node use : n._uses ) walk_initype(use);
     for( Node def : n._defs ) walk_initype(def);
   }
@@ -624,7 +625,7 @@ public class GVNGCM {
       FunPtrNode fptr = (FunPtrNode)n;
       RetNode ret = fptr.ret();
       FunNode fun = ret.fun();
-      if( type(fun)==Type.CTRL && type(ret.ctl()) == Type.CTRL ) { // never-return function (maybe never called?)
+      if( fun != null && type(fun)==Type.CTRL && type(ret.ctl()) == Type.CTRL ) { // never-return function (maybe never called?)
         TypeFunPtr tfp = (TypeFunPtr)type(fptr);
         if( tfp != fun._tf && tfp.isa(fun._tf) )
           fun.sharpen(this,tfp);
