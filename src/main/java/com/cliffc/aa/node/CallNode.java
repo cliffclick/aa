@@ -247,19 +247,25 @@ public class CallNode extends Node {
   // Compute live across uses.  If pre-GCP, then we may not be wired and thus
   // have not seen all possible function-body uses.  Check for #FIDXs == nwired().
   @Override public TypeMem live( GVNGCM gvn) {
-    if( gvn._opt_mode >= 2 ) return super.live(gvn);
-
-    BitsFun fidxs = fidxs(gvn);
-    if( fidxs == null ) return TypeMem.FULL; // Assume Something Good will yet happen
-    if( fidxs.above_center() ) return TypeMem.FULL; // Got choices, dunno which one will stick
-    CallEpiNode cepi = cepi();
-    if( cepi==null ) return _live; // Collapsing
-    // Expand (actually fail) if any parents
-    BitSet bs = fidxs.tree().plus_kids(fidxs);
-    if( bs.cardinality() > cepi.nwired() ) // More things to call
-      return TypeMem.FULL; // Cannot improve
-    // All choices known
-    return super.live(gvn);
+    if( gvn._opt_mode < 2 ) {
+      BitsFun fidxs = fidxs(gvn);
+      if( fidxs == null ) return TypeMem.FULL; // Assume Something Good will yet happen
+      if( fidxs.above_center() ) return TypeMem.FULL; // Got choices, dunno which one will stick
+      CallEpiNode cepi = cepi();
+      if( cepi==null ) return _live; // Collapsing
+      // Expand (actually fail) if any parents
+      BitSet bs = fidxs.tree().plus_kids(fidxs);
+      if( bs.cardinality() > cepi.nwired() ) // More things to call
+        return TypeMem.FULL; // Cannot improve
+    }
+    // All choices discovered during GCP.  Just get from the called functions,
+    // not the CallEpi, other than basic liveness.  If the call is in-error it
+    // may not resolve and so will have no uses other than the CallEpi - which
+    // is good enough to declare this live, so it exists for errors.
+    TypeMem live = TypeMem.DEAD; // Start at lattice top
+    for( Node use : _uses )      // Computed across all uses
+      live = (TypeMem)live.meet(use instanceof CallEpiNode ? TypeMem.EMPTY : use.live_use(gvn, this));
+    return live;
   }
   @Override public boolean basic_liveness() { return false; }
 
@@ -363,7 +369,7 @@ public class CallNode extends Node {
     // Fail for passed-in unknown references directly.
     for( int j=0; j<nargs(); j++ )
       if( arg(j).is_forward_ref() )
-        return _badargs.forward_ref_err(((FunPtrNode)arg(j)).fun());
+        return _badargs.forward_ref_err( FunNode.find_fidx(((FunPtrNode)arg(j)).ret()._fidx) );
 
     // Expect a function pointer
     Type tfun = gvn.type(fun());

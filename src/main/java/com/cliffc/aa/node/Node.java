@@ -52,7 +52,7 @@ public abstract class Node implements Cloneable {
 
   // Defs.  Generally fixed length, ordered, nulls allowed, no unused trailing space.  Zero is Control.
   public Ary<Node> _defs;
-  private void _chk() { assert Env.GVN.check_out(this); }
+  public void _chk() { assert Env.GVN.check_out(this); }
   // Add def/use edge
   public Node add_def(Node n) { _chk(); _defs.add(n); if( n!=null ) n._uses.add(this); return this; }
   // Replace def/use edge

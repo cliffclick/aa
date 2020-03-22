@@ -49,36 +49,9 @@ public final class CallEpiNode extends Node {
               !gvn.type(parm).isa(fun.targ(idx)) )
             { idx=-99; break; } // Arg failed check
         if( idx!=-99 ) {        // Do not inline
-          // Merge call-bypass memory and function memory.  Every above-center
-          // alias "loses" to a below-center alias.  Below-center ties go to the
-          // last mutator which is the return, above-center ties to the call.
-          Node cmem = call.mem();
-          Node rmem =  ret.mem();
-          TypeMem call_mem = (TypeMem)gvn.type(cmem);
-          TypeMem  ret_mem = (TypeMem)gvn.type(rmem);
-          Node mem;
-          if( ret_mem==TypeMem.XMEM ) {
-            mem = cmem;           // Common shortcut for primitives
-          } else if( call_mem==TypeMem.XMEM ) {
-            mem = rmem;           // Common shortcut for simple calls
-          } else {
-            // Actually merge memories from call-bypass and post-call.  If one of
-            // cmem or rmem is itself a MemMerge we'll get stacked MemMerges
-            // which will clean out later.
-            TypeObj[]  ret_objs =  ret_mem.alias2objs();
-            TypeObj[] call_objs = call_mem.alias2objs();
-            int max = Math.max(ret_objs.length,call_objs.length);
-            // Alias#1 to make the merge
-            MemMergeNode mmem = new MemMergeNode(ret_objs[1].above_center() ? cmem : rmem);
-            // Merge all other aliases
-            for( int i=2; i<max; i++ )
-              if( (i<call_objs.length && call_objs[i] != null) ||
-                  (i< ret_objs.length &&  ret_objs[i] != null) )
-                mmem.create_alias_active(i,ret_mem.at(i).above_center() ? cmem : rmem,null);
-            mem = gvn.add_work(gvn.xform(mmem));
-          }
+          // TODO: Bring back SESE opts
           fun.set_is_copy(gvn);
-          return inline(gvn, call, ret.ctl(), mem, ret.val(), null/*do not unwire, because using the entire function body inplace*/);
+          return inline(gvn, call, ret.ctl(), ret.mem(), ret.val(), null/*do not unwire, because using the entire function body inplace*/);
         }
       }
     }

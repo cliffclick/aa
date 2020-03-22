@@ -246,8 +246,7 @@ public class MemMergeNode extends Node {
       // flowed "uphill": no one needs to provide this alias.  But also, the
       // value()s can flow downhill and the slot0 might also be XOBJ.  Then we
       // simplify to a single input edge, merging nothing.  But we cannot
-      // collapse lest we list "lower" liveness by making the unused alias used
-      // again.
+      // collapse lest we "lower" liveness by making the unused alias used again.
       return live_stable ? in(0) : null; // Merging nothing
     if( progress ) return this;       // Removed some dead inputs
 
@@ -327,8 +326,8 @@ public class MemMergeNode extends Node {
     tos[1] = in(0)==def ? _live.at(1) : TypeObj.XOBJ;
     for( int alias=2; alias<tos.length; alias++ ) {
       if( _aidxes.at(alias)==0 ) { // No special overrides for this alias
-        // Then in-or-out according to parent
-        tos[alias] = tos[BitsAlias.parent(alias)];
+        // Then in-or-out according to current liveness
+        tos[alias] =  _live.at(alias);
       } else {          // This alias (and all children ) overridden here
         // Either Def or some other node must supply this value
         tos[alias] = in(_aidxes.at(alias))==def ? _live.at(alias) : TypeObj.XOBJ;

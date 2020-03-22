@@ -378,11 +378,10 @@ public class GVNGCM {
     }
 
     // [ts!] If completely dead, exit now.
-    if( !nnn.is_live() && !n.is_prim() ) {
-      if( n.is_prim() ) {      // Yanked n, but always keeping primitives in table
-        _vals.put(n,n);        // Put it back
-        return null;
-      }
+    if( !nnn.is_live() && !n.is_prim() && n.err(this)==null &&
+        !(n instanceof CallNode) &&       // Keep for proper errors
+        !(n instanceof UnresolvedNode) && // Keep for proper errors
+        !(n instanceof RetNode) ) {       // Keep for proper errors
       return (n instanceof ConNode) ? null
         : untype(n, con(n.all_type().startype())); // Replace non-constants with high (dead) constants
     }
@@ -432,6 +431,7 @@ public class GVNGCM {
       Node u = old._uses.del(0);  // Old use
       boolean was = touched(u);
       _vals.remove(u);  // Use is about to change edges; remove from type table
+      u._chk();
       u._defs.replace(old,nnn); // was old now nnn
       nnn._uses.add(u);
       if( was ) {            // If was in GVN
@@ -510,6 +510,7 @@ public class GVNGCM {
     // Prime the worklist
     rez.unhook(); // Must be unhooked to hit worklist
     add_work(rez);
+    for( Node n : _INIT0_NODES ) add_work(n);
     // Collect unresolved calls, and verify they get resolved.
     Ary<CallNode> ambi_calls = new Ary<>(new CallNode[1],0);
 
