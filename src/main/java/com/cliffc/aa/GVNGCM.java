@@ -423,7 +423,7 @@ public class GVNGCM {
   }
 
   // Utility: remove old from type table, return new
-  private Node untype( Node old, Node nnn ) { _ts.clear(old._uid); return nnn; }
+  public Node untype( Node old, Node nnn ) { _ts.clear(old._uid); return nnn; }
 
   // Replace, but do not delete old.  Really used to insert a node in front of old.
   public void replace( Node old, Node nnn ) {
@@ -554,6 +554,10 @@ public class GVNGCM {
             // same type (Ctrl) but the Phis must merge new values.
             if( use instanceof RegionNode )
               add_work_uses(use);
+            // Optimistic Call-Graph discovery.  If the funptr input lowers
+            // to where a new FIDX might be possible, wire the CG edge.
+            if( use instanceof CallNode )
+              ((CallNode)use).check_wire(this);
           }
         }
 

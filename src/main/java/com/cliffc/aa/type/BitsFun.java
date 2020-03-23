@@ -45,4 +45,6 @@ public class BitsFun extends Bits<BitsFun> {
   public static int peek() { return TREE.peek(); }
   // True if this fidx has been split thus has children
   public static boolean is_parent( int idx ) { return TREE.is_parent(idx); }
+  // Iterate over children
+  public static int next_kid( int alias, int kid ) { return TREE.next_kid(alias,kid); }
 }

@@ -301,8 +301,8 @@ public class CallNode extends Node {
         byte cvt = actual.isBitShape(formal); // +1 needs convert, 0 no-cost convert, -1 unknown, 99 never
         if( cvt == 99 )         // Happens if actual is e.g. TypeErr
           continue outerloop;   // No, this function will never work
-        if( cvt == 9 )          // Requires auto-boxing, not implemented
-          continue outerloop;   // So function does not work for now
+        //if( cvt == 9 )          // Requires auto-boxing, not implemented
+        //  continue outerloop;   // So function does not work for now
         if( cvt == -1 ) unk = true; // Unknown yet
         else xcvts += cvt;          // Count conversions
       }
@@ -341,6 +341,27 @@ public class CallNode extends Node {
     // TODO: return shrunk list
     //return gvn.xform(new UnresolvedNode(ns.asAry())); // return shrunk choice list
     return null;
+  }
+
+  // Used during GCP and Ideal calls to see if wiring is appropriate.
+  public void check_wire( GVNGCM gvn ) {
+    TypeTuple tcall = (TypeTuple)gvn.type(this);
+    if( tcall.at(0)!=Type.CTRL ) return; // Call not executable
+    if( !(tcall.at(2) instanceof TypeFunPtr) ) return; // No functions being called yet
+    BitsFun fidxs = ((TypeFunPtr)tcall.at(2)).fidxs();
+    if( fidxs.above_center() ) return; // Still settling down to possibilities.
+    CallEpiNode cepi = cepi();
+    if( cepi==null ) return;    // Collapsing
+
+    // Check all fidxs for being wirable
+    for( int fidx : fidxs ) {                 // For all fidxs
+      if( BitsFun.is_parent(fidx) ) continue; // Will be covered by children
+      FunNode fun = FunNode.find_fidx(fidx);  // Lookup, even if not wired
+      if( fun.is_forward_ref() ) continue;    // Not forward refs, which at GCP just means a syntax error
+      RetNode ret = fun.ret();
+      // Internally wire() checks for dups and proper arg counts.
+      cepi.wire(gvn,this,fun,ret);
+    }
   }
 
   @Override public String err(GVNGCM gvn) {

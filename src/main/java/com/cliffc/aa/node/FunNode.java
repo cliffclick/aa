@@ -572,6 +572,7 @@ public class FunNode extends RegionNode {
         c.add_def(newdef==null ? def : newdef);
       }
     }
+
     // For all aliases split in this pass, update in-node both old and new.
     // This changes their hash, and afterwards the keys cannot be looked up.
     for( Map.Entry<Node,Node> e : map.entrySet() )
@@ -625,14 +626,26 @@ public class FunNode extends RegionNode {
         ParmNode pnn = (ParmNode)nn; // Update non-display type to match new signature
         if( pnn._idx > 0 ) pnn._t = nt = fun.targ(pnn._idx); // Upgrade new Parm default type
         else if( pnn._idx == -2 ) nt = def_mem;
-      } else if( nn instanceof CallEpiNode ) { // Old calls might be wired, new calls need to re-wire
-        while( ((CallEpiNode)nn).nwired() > 0 ) nn.pop();
       }
       gvn.rereg(nn,nt);
     }
     gvn.add_work(this);
     gvn.add_work(fun );
 
+    // The only normal way a value exits a function is via the return... except
+    // for wired call arguments.  The prior edge-copy takes advantage of this,
+    // using a super-simple copy technique.  This misses the outgoing arguments
+    // which we copy here.
+    for( Node nn : map.values() ) {
+      if( !(nn instanceof CallEpiNode) ) continue; // Old calls might be wired, new calls need to re-wire
+      // New CallEpis cloned wiring edges, but the matching input paths are not
+      // wired... so basically they are half-wired.  Finish the wiring.  None
+      // of these calls refer to the cloning method, as those got special
+      // treatment already.
+      CallEpiNode ncepi = (CallEpiNode)nn;
+      for( int i=0; i<ncepi.nwired(); i++ )
+        ncepi.wire0(gvn, ncepi.call(), ncepi.wired(i).fun());
+    }
     // Rewire all previously wired calls.  Required to preserve type and
     // liveness monotonicity.  If type-split, wire to BOTH targets as
     // we're not sure which one we'll get.

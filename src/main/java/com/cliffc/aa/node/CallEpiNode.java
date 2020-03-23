@@ -170,6 +170,18 @@ public final class CallEpiNode extends Node {
           ((ParmNode)arg)._idx >= nargs )
         return null;            // Wrong arg-count
 
+    wire0(gvn,call,fun);
+    // Add the CallEpi hook.  Sometimes in or out of _vals.  Called by early
+    // ideal during parsing (0,out), value() during gcp (2,in), value() during
+    // iter (1,3,out).
+    if( gvn._opt_mode == 2 ) gvn.add_def(this,ret);
+    else                         add_def(     ret);
+    gvn.add_work(ret);          // Ret is now alive
+    return this;
+  }
+
+  // Wire without the redundancy check, or adding to the CallEpi
+  void wire0( GVNGCM gvn, CallNode call, FunNode fun ) {
     // Wire.  During GCP, cannot call "xform" since e.g. types are not final
     // nor constant yet - and need to add all new nodes to the GCP worklist.
     // During iter(), must call xform() to register all new nodes.
@@ -200,28 +212,24 @@ public final class CallEpiNode extends Node {
     if( gvn._opt_mode == 2 ) cproj._live = TypeMem.DEAD;
     cproj = gvn._opt_mode == 2 ? gvn.add_work(cproj) : gvn.xform(cproj);
     gvn.add_def(fun,cproj);
-    // Add the CallEpi hook.  Sometimes in or out of _vals.  Called by early
-    // ideal during parsing (0,out), value() during gcp (2,in), value() during
-    // iter (1,3,out).
-    if( gvn._opt_mode == 2 ) gvn.add_def(this,ret);
-    else                         add_def(     ret);
-    gvn.add_work(ret);          // Ret is now alive
-    return this;
   }
 
   // Merge call-graph edges, but the call-graph is not discovered prior to GCP.
   // If the Call's type includes all-functions, then the CallEpi must assume
   // unwired Returns may yet appear, and be conservative.  Otherwise it can
   // just meet the set of known functions.
-  @Override public Type value(GVNGCM gvn) {
+  @Override public TypeTuple value(GVNGCM gvn) {
+
+    if( is_copy() )
+      return TypeTuple.make(gvn.type(in(0)),gvn.type(in(1)),gvn.type(in(2)));
     // Get Call result.  If the Call args are in-error, then the Call is called
     // and we flow types to the post-call.... BUT the bad args are NOT passed
     // along to the function being called.
     // tcall[0] = Control
-    // tcall[1] = Full available memory
+    // tcall[1] = Memory passed into the functions.
     // tcall[2] = TypeFunPtr passed to FP2Closure
     // tcall[3+]= Arg types
-    CallNode call = is_copy() ? ((CallNode)in(3)) : call();
+    CallNode call = call();
     TypeTuple tcall = (TypeTuple)gvn.type(call);
     Type ctl = tcall.at(0); // Call is reached or not?
     if( ctl != Type.CTRL && ctl != Type.ALL )
@@ -230,72 +238,18 @@ public final class CallEpiNode extends Node {
     Type tfptr = tcall.at(2);
     if( !(tfptr instanceof TypeFunPtr) ) // Call does not know what it is calling?
       return TypeTuple.CALLE;
-    TypeFunPtr funt = (TypeFunPtr)tfptr;
-    BitsFun fidxs = funt.fidxs();
-    if( fidxs.test(BitsFun.ALL) ) // All functions are possible?
-      return fidxs.above_center() ? TypeTuple.CALLE.dual() : TypeTuple.CALLE;  // Worse-case result
-    // If we fall from choice-functions to the empty set of called functions, freeze our output.
-    // We might fall past empty and get a valid set.  Probably wrong; if we ever see a
-    // choice set of functions, we should not execute.
-    if( fidxs.is_empty() ) return gvn.self_type(this);
 
-    // Merge returns from all fidxs, wired or not.  Required during GCP to keep
-    // optimistic.  JOIN if above center, merge otherwise.  Wiring the calls
-    // gives us a faster lookup, but need to be correct wired or not.
+    // If pre-gcp, we may have unknown callers.  Be very conservative until we
+    // have wired all callers.
+    if( gvn._opt_mode < 2 && 
+        ((TypeFunPtr)tfptr).fidxs().bitCount() > nwired() )
+      return TypeTuple.CALLE;
 
-    // Set of all possible target functions
-    int cnargs = call.nargs();
-    Bits.Tree<BitsFun> tree = fidxs.tree();
-    BitSet bs = tree.plus_kids(fidxs);
-    boolean has_unresolve=false;
-    for( int fidx : fidxs )
-      if( tree.is_parent(fidx) ) {has_unresolve=true; break; }
-    // Lifting or dropping Unresolved calls
-    final boolean lifting = fidxs.above_center();
-    Type t = lifting ? TypeTuple.RET : TypeTuple.XRET;
-    for( int fidx = bs.nextSetBit(0); fidx >= 0; fidx = bs.nextSetBit(fidx+1) ) {
-      if( tree.is_parent(fidx) ) continue;   // Will be covered by children
-      FunNode fun = FunNode.find_fidx(fidx); // Lookup, even if not wired
-      if( fun==null || fun.is_dead() )
-        continue;              // Can be dead, if the news has not traveled yet
-      RetNode ret = fun.ret();
-      if( ret == null ) continue; // Can be dead, if the news has not traveled yet
-      if( fun.nargs() != cnargs ) { // This call-path has wrong args, is in-error for this function
-        // If lifting, we choose not to call this variant.
-        if( lifting ) continue;
-        // Cannot just ignore/continue because the remaining functions might
-        // allow the call site to produce a constant and optimize away.
-        else return TypeTuple.CALLE; // No good result until the input function is sensible
-      }
-      TypeTuple tret = (TypeTuple)gvn.type(ret); // Type of the return
-      t = lifting ? t.join(tret) : t.meet(tret);
-
-      // Make real from virtual CG edges in GCP/Opto by wiring calls.
-      if( gvn._opt_mode==0 ) gvn.add_work(this); // Not during parsing, but check afterwards
-      if( gvn._opt_mode==2 &&        // Only during GCP
-          !lifting &&                // Still settling down to possibilities
-          !fun.is_forward_ref() &&   // Call target is undefined
-          tcall.at(0)==Type.CTRL ) { // Call args are not in error
-        wire(gvn,call,fun,ret);
-      }
-    }
-    // Meet the call-bypass aliases with the function aliases.  If the function
-    // produces a new alias it might still have been called previously and thus
-    // the call-bypass aliases might be modified elsewhere.... so despite a
-    // function being the sole producing of an alias, we still have to MEET all
-    // aliases.  If the caller contains none of an alias so that the function
-    // precisely stomps all of it, the call needs to be reporting [1#:~obj] -
-    // in which case a normal MEET suffices.
-    TypeTuple tt = (TypeTuple)t;
-    Type pre_c_mem = tcall.at(1);
-    TypeMem pre_call_memory = pre_c_mem instanceof TypeMem
-      ? (TypeMem)pre_c_mem
-      : (pre_c_mem.above_center() ? TypeMem.EMPTY : TypeMem.FULL);
-    Type post_call_mem = tt.at(1).meet(pre_call_memory);
-    // Return a FOUR-tuple: standard call (control,memory,value) return, plus
-    // JUST the function return memories.  Loads and Stores can bypass the
-    // function call, if the aliasing allows.
-    return TypeTuple.make(tt.at(0),post_call_mem,tt.at(2),tt.at(1));
+    // Meet across wired callers
+    TypeTuple tt = TypeTuple.XRET;
+    for( int i=1; i<_defs._len; i++ )
+      tt = (TypeTuple)tt.meet(gvn.type(in(i)));
+    return tt;
   }
 
   // Inline the CallNode.  Remove all edges except the results.  This triggers

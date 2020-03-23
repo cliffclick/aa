@@ -87,6 +87,13 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     for( int i=0; i<len-1; i++ ) if( bits[i] != 0 ) return true;
     return false;                // Found a single bit in last word
   }
+  public int bitCount() {
+    if( _bits==null ) return 1;
+    int sum=0;
+    for( long b : _bits )
+      sum += Long.bitCount(b);
+    return sum;
+  }
   @Override public int hashCode( ) { return _hash; }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;

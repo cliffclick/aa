@@ -73,7 +73,7 @@ public class TypeNode extends Node {
   @Override public Type value(GVNGCM gvn) {
     Node arg = arg();
     Type t = gvn.type(arg);
-    return t.isa(_t) ? t.bound(Type.SCALAR) : Type.SCALAR;
+    return t.isa(_t) ? t : _t;
   }
   @Override public Type all_type() { return Type.SCALAR; }
   // Check TypeNode for being in-error

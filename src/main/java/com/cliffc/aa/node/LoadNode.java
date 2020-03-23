@@ -55,7 +55,7 @@ public class LoadNode extends Node {
       if( !cepi.is_copy() ) {
         TypeTuple ttcepi = (TypeTuple)gvn.type(cepi);
         if( ttcepi.at(0)==Type.CTRL ) {
-          TypeMem retmem = (TypeMem)ttcepi.at(3);
+          //TypeMem retmem = (TypeMem)ttcepi.at(3);
           // TODO: Turned off all SESE opts for now.
           //if( retmem.is_clean(aliases,_fld) )
           //  return set_mem(cepi.call().mem(),gvn);
@@ -110,7 +110,7 @@ public class LoadNode extends Node {
     if( mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode ) {
       CallEpiNode cepi = (CallEpiNode)mem.in(0);
       if( !cepi.is_copy() ) {
-        TypeMem retmem = (TypeMem)((TypeTuple)gvn.type(cepi)).at(3);
+        //TypeMem retmem = (TypeMem)((TypeTuple)gvn.type(cepi)).at(3);
         // TODO: Turned off all SESE opts for now.
         //if( retmem.is_clean(tmp.aliases(),_fld) )
         //  mem = cepi.call().mem();

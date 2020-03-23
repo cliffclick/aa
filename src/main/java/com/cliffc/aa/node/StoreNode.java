@@ -53,20 +53,20 @@ public class StoreNode extends Node {
 
     // Store can bypass a Call, if the memory is not returned from the call,
     // This optimization is specifically targeting simple recursive functions.
-    if( ta instanceof TypeMemPtr && mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode ) {
-      TypeMemPtr tmp = (TypeMemPtr)ta;
-      CallEpiNode cepi = (CallEpiNode)mem.in(0);
-      TypeMem retmem = (TypeMem)((TypeTuple)gvn.type(cepi)).at(3);
-      if( !cepi.is_copy() && retmem.is_clean(tmp.aliases(),_fld) )
-        return set_def(1,cepi.call().mem(),gvn);
-    }
+    //if( ta instanceof TypeMemPtr && mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode ) {
+    //  TypeMemPtr tmp = (TypeMemPtr)ta;
+    //  CallEpiNode cepi = (CallEpiNode)mem.in(0);
+    //  TypeMem retmem = (TypeMem)((TypeTuple)gvn.type(cepi)).at(3);
+    //  if( !cepi.is_copy() && retmem.is_clean(tmp.aliases(),_fld) )
+    //    return set_def(1,cepi.call().mem(),gvn);
+    //}
 
     // Store can bypass a Call, if the memory is not returned from the call,
     // and the pointer predates the call.  This optimization is specifically
     // targeting simple recursive functions.
-    Node pre_call_mem = bypass_call(gvn);
-    if( pre_call_mem != null )  // Use memory before the call instead of after
-      return set_def(1,pre_call_mem,gvn);
+    //Node pre_call_mem = bypass_call(gvn);
+    //if( pre_call_mem != null )  // Use memory before the call instead of after
+    //  return set_def(1,pre_call_mem,gvn);
 
     return null;
   }
@@ -87,18 +87,18 @@ public class StoreNode extends Node {
     // Store can bypass a Call, if the memory is not returned from the call.
     // This optimization is specifically targeting simple recursive functions.
     Node mem = mem();
-    if( mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode ) {
-      CallEpiNode cepi = (CallEpiNode)mem.in(0);
-      TypeMem retmem = (TypeMem)((TypeTuple)gvn.type(cepi)).at(3);
-      if( !cepi.is_copy() && retmem.is_clean(tmp.aliases(),_fld) )
-        mem = cepi.call().mem();
-    }
+    //if( mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode ) {
+    //  CallEpiNode cepi = (CallEpiNode)mem.in(0);
+    //  TypeMem retmem = (TypeMem)((TypeTuple)gvn.type(cepi)).at(3);
+    //  if( !cepi.is_copy() && retmem.is_clean(tmp.aliases(),_fld) )
+    //    mem = cepi.call().mem();
+    //}
     // Store can bypass a Call, if the memory is not returned from the call,
     // and the pointer predates the call.  This optimization is specifically
     // targeting simple recursive functions.
-    Node pre_call_mem = bypass_call(gvn);
-    if( pre_call_mem != null )  // Use memory before the call instead of after
-      mem = pre_call_mem;
+    //Node pre_call_mem = bypass_call(gvn);
+    //if( pre_call_mem != null )  // Use memory before the call instead of after
+    //  mem = pre_call_mem;
 
     // Convert from memory to the struct being updated
     Type tmem = gvn.type(mem);
