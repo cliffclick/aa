@@ -49,22 +49,12 @@ public class LoadNode extends Node {
       if( obj != null ) return set_mem(obj,gvn);
     }
 
-    // Loads can bypass a call, if the return memory does not stomp the alias.
-    if( aliases != null && mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode ) {
-      CallEpiNode cepi = (CallEpiNode)mem.in(0);
-      if( !cepi.is_copy() ) {
-        TypeTuple ttcepi = (TypeTuple)gvn.type(cepi);
-        if( ttcepi.at(0)==Type.CTRL ) {
-          //TypeMem retmem = (TypeMem)ttcepi.at(3);
-          // TODO: Turned off all SESE opts for now.
-          //if( retmem.is_clean(aliases,_fld) )
-          //  return set_mem(cepi.call().mem(),gvn);
-          //if( alias > 0 && retmem.at(alias) == TypeObj.XOBJ )
-          //  return set_mem(cepi.call().mem(),gvn);
-        }
-      }
-    }
-
+    // Load can move out of a Call, if the function has no Parm:mem - happens
+    // for single target calls that do not (have not yet) inlined.
+    CallNode call;
+    if( mem instanceof MProjNode && mem.in(0) instanceof CallNode && !(call=(CallNode)mem.in(0)).is_copy() )
+      return set_mem(call.mem(),gvn);
+    
     // Loads against a NewNode cannot NPE, cannot fail, always return the input
     NewObjNode nnn = addr.in(0) instanceof NewObjNode ? (NewObjNode)addr.in(0) : null;
     int idx;
@@ -104,23 +94,8 @@ public class LoadNode extends Node {
       return adr.above_center() ? Type.XSCALAR : Type.SCALAR;
     TypeMemPtr tmp = (TypeMemPtr)adr;
 
-    // Load can bypass a Call, if the memory is not returned from the call.
-    // This optimization is specifically targeting simple recursive functions.
-    Node mem = mem();
-    if( mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode ) {
-      CallEpiNode cepi = (CallEpiNode)mem.in(0);
-      if( !cepi.is_copy() ) {
-        //TypeMem retmem = (TypeMem)((TypeTuple)gvn.type(cepi)).at(3);
-        // TODO: Turned off all SESE opts for now.
-        //if( retmem.is_clean(tmp.aliases(),_fld) )
-        //  mem = cepi.call().mem();
-        //int alias = tmp.aliases().strip_nil().abit();
-        //if( alias > 0 && retmem.at(alias) == TypeObj.XOBJ )
-        //  mem = cepi.call().mem();
-      }
-    }
-
     // Loading from TypeMem - will get a TypeObj out.
+    Node mem = mem();
     Type tmem = gvn.type(mem); // Memory
     if( !(tmem instanceof TypeStruct) ) {
       if( !(tmem instanceof TypeMem) ) // Nothing sane

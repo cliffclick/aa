@@ -139,6 +139,8 @@ public class TestParse {
 
   @Test public void testParse02() {
     Object dummy = Env.GVN; // Force class loading cycle
+    test_obj("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(0),fact(1),fact(2))",
+            TypeStruct.make_tuple(Type.NIL,Type.NIL,TypeInt.con(1),TypeInt.con(2)));
     // Anonymous function definition
     test_isa("{x y -> x+y}", TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make_args(TypeStruct.ts(TypeMemPtr.DISPLAY_PTR,Type.SCALAR,Type.SCALAR)),Type.SCALAR)); // {Scalar Scalar -> Scalar}
     test("{5}()", TypeInt.con(5)); // No args nor -> required; this is simply a function returning 5, being executed
@@ -183,7 +185,6 @@ public class TestParse {
   }
 
   @Test public void testParse03() {
-    testerr("x=3; fun:{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int64",8);
     // Type annotations
     test("-1:int", TypeInt.con( -1));
     test("(1+2.3):flt", TypeFlt.make(0,64,3.3));
@@ -210,13 +211,21 @@ public class TestParse {
              TypeStruct.make_tuple(Type.NIL,TypeInt.con(4),TypeInt.con(4)));
     testerr("fun={x y -> x+y}; baz:{int @{x;y} -> int} = fun; (fun(2,3), baz(2,3))",
             "3 is not a *[$]@{x=;y=}", 21);
+    testerr("fun={x y -> x+y}; baz={x:int y:@{x;y} -> foo(x,y)}; (fun(2,3), baz(2,3))",
+            "Unknown ref 'foo'", 44);
+    // This test fails because the inner fun does not inline until GCP,
+    // and then it resolves and lifts the DISPLAY (which after resolution
+    // is no longer needed).  Means: cannot resolve during GCP and preserve
+    // monotonicity.  Would like '.fun' to load BEFORE GCP.
+    //testerr("fun={x y -> x+y}; baz={x:int y:@{x;y} -> fun(x,y)}; (fun(2,3), baz(2,3))",
+    //        "3 is not a *[$]@{x=;y=}", 21);
 
     testerr("x=3; fun:{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int64",8);
     test("x=3; fun:{real->real}={x -> x*2}; fun(2.1)+fun(x)", TypeFlt.con(2.1*2+3*2)); // Mix of types to fun()
     test("fun:{real->flt32}={x -> x}; fun(123 )", TypeInt.con(123 ));
     test("fun:{real->flt32}={x -> x}; fun(0.125)", TypeFlt.con(0.125));
     testerr("fun:{real->flt32}={x -> x}; fun(123456789)", "123456789 is not a flt32",3);
-    test("{x -> x&1}", TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make_args(TypeStruct.ts(TypeMemPtr.DISPLAY_PTR,Type.SCALAR)),Type.SCALAR)); // {Int -> Int}
+    test("{x -> x&1}", TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make_args(TypeStruct.ARGS_X,TypeStruct.ts(TypeStruct.NO_DISP,Type.SCALAR)),TypeInt.INT64.dual())); // {Int -> Int}
 
     // Named types
     test_name("A= :(       )" ); // Zero-length tuple

@@ -379,9 +379,10 @@ public abstract class Node implements Cloneable {
       Type    nval = value(gvn), oval=gvn.type(this);
       TypeMem nliv = live (gvn), oliv=_live;
       if( nval != oval || nliv != oliv ) {
-        if( nval.isa(oval)!=lifting || // Backwards?
-            nliv.isa(oliv)!=lifting || // Backwards?
-            !gvn.on_work(this) ) {     // Still-to-be-computed?
+        boolean ok = lifting
+          ? nval.isa(oval) && nliv.isa(oliv)
+          : oval.isa(nval) && oliv.isa(nliv);
+        if( !ok || !gvn.on_work(this) ) {     // Still-to-be-computed?
           System.err.println(dump(0,new SB(),gvn)); // Rolling backwards not allowed
           errs++;
         }

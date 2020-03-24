@@ -88,7 +88,9 @@ public final class CallEpiNode extends Node {
       return null;
 
     // Single choice; check compatible args and no conversions needed.
+    // If this fails, we still wire the single target, just no inline.
     TypeStruct formals = fun._tf._args;
+    RetNode ret = fun.ret();    // Return from function
     for( Node parm : fun._uses ) {
       if( parm instanceof ParmNode && parm.in(0)==fun ) {
         int idx = ((ParmNode)parm)._idx;
@@ -98,9 +100,11 @@ public final class CallEpiNode extends Node {
         // Display arg comes from function pointer
         if( idx==0 ) actual = (actual instanceof TypeFunPtr) ? ((TypeFunPtr)actual).display() : Type.SCALAR;
         Type tparm = gvn.type(parm); // Pre-GCP this should be the default type
-        if( !actual.isa(tparm) ) return null; // Not compatible
-        if( idx >= 0 && actual.isBitShape(formals.at(idx)) == 99 )
-          return null; // Requires user-specified conversion
+        if( !actual.isa(tparm) ||  // Not compatible
+            (idx >= 0 && actual.isBitShape(formals.at(idx)) == 99) ) { // Requires user-specified conversion
+          // Just wire, no inline check
+          return ret == null || idx==0 ? null : wire(gvn, call, fun, ret);
+        }
       }
     }
     // Zap dead arguments
@@ -113,7 +117,6 @@ public final class CallEpiNode extends Node {
     // Check for several trivial cases that can be fully inlined immediately.
     Node cctl = call.ctl();
     Node cmem = call.mem();
-    RetNode ret = fun.ret();    // Return from function
     if( ret==null ) return null;
     Node rctl = ret.ctl();      // Control being returned
     Node rmem = ret.mem();      // Memory  being returned
@@ -241,7 +244,7 @@ public final class CallEpiNode extends Node {
 
     // If pre-gcp, we may have unknown callers.  Be very conservative until we
     // have wired all callers.
-    if( gvn._opt_mode < 2 && 
+    if( gvn._opt_mode < 2 &&
         ((TypeFunPtr)tfptr).fidxs().bitCount() > nwired() )
       return TypeTuple.CALLE;
 

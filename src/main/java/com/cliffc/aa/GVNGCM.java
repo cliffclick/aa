@@ -496,7 +496,6 @@ public class GVNGCM {
   // GCP resolves all ambiguous (overloaded) calls, using the precise types
   // first, and then inserting conversions using a greedy decision.  If this is
   // not sufficient to resolve all calls, the program is ambiguous and wrong.
-
   void gcp(ScopeNode rez ) {
     _opt_mode = 2;
     // Set all types to null (except primitives); null is the visit flag when
@@ -554,11 +553,11 @@ public class GVNGCM {
             // same type (Ctrl) but the Phis must merge new values.
             if( use instanceof RegionNode )
               add_work_uses(use);
-            // Optimistic Call-Graph discovery.  If the funptr input lowers
-            // to where a new FIDX might be possible, wire the CG edge.
-            if( use instanceof CallNode )
-              ((CallNode)use).check_wire(this);
           }
+          // Optimistic Call-Graph discovery.  If the funptr input lowers
+          // to where a new FIDX might be possible, wire the CG edge.
+          if( n instanceof CallNode )
+            ((CallNode)n).check_wire(this);
         }
 
         // Reverse flow
@@ -584,6 +583,7 @@ public class GVNGCM {
             call.set_fun_reg(fun,this);// Set resolved edge
             ambi_calls.del(i--);       // Remove from worklist
             add_work(fun);             // Unresolved is now resolved and live
+            assert Env.START.more_flow(this,new VBitSet(),false,0)==0; // Post conditions are correct
           }
         }
       }

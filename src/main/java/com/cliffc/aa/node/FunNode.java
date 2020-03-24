@@ -532,7 +532,8 @@ public class FunNode extends RegionNode {
     // other is available on the default input path - in case one version calls
     // the other recursively.
     ParmNode mparm = parm(-2);
-    TypeMem def_mem = mparm==null ? TypeMem.EMPTY : (TypeMem)gvn.type(mparm.in(1));
+    TypeMem def_mem = mparm==null ? TypeMem.EMPTY
+      : (TypeMem)gvn.type(has_unknown_callers() ? mparm.in(1) : mparm);
     // Map from old to cloned function body
     HashMap<Node,Node> map = new HashMap<>();
     // Clone the function body
@@ -581,18 +582,20 @@ public class FunNode extends RegionNode {
     // We kept the unknown caller path on 'this', and then copied it to 'fun'.
     // But if inlining along a specific path, only that path should be present.
     // Kill the unknown_caller path.
-    if( path >= 0 && has_unknown_callers() ) {
-      fun.set_def(1,gvn.con(Type.XCTRL),gvn);
+    if( has_unknown_callers() ) {
+      if( path >= 0 ) {
+        fun.set_def(1,gvn.con(Type.XCTRL),gvn);
 
-    } else if( path < 0 && has_unknown_callers() ) {
-      // Change the unknown caller parm types to match the new sig.  Default
-      // memory includes the other half of alias splits, which might be passed
-      // in from recursive calls.
-      assert fun.targ(-2)==TypeMem.FULL;
-      ParmNode parm;
-      for( Node p : fun._uses )
-        if( p instanceof ParmNode && (parm=(ParmNode)p)._idx != 0 )
-          parm.set_def(1,gvn.con(parm._idx==-2 ? def_mem : fun.targ(parm._idx)),gvn);
+      } else {
+        // Change the unknown caller parm types to match the new sig.  Default
+        // memory includes the other half of alias splits, which might be
+        // passed in from recursive calls.
+        assert fun.targ(-2)==TypeMem.FULL;
+        ParmNode parm;
+        for( Node p : fun._uses )
+          if( p instanceof ParmNode && (parm=(ParmNode)p)._idx != 0 )
+            parm.set_def(1,gvn.con(parm._idx==-2 ? def_mem : fun.targ(parm._idx)),gvn);
+      }
     }
 
     // Make an Unresolved choice of the old and new functions, to be used by

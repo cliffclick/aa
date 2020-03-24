@@ -122,13 +122,13 @@ public abstract class PrimNode extends Node {
   public FunPtrNode as_fun( GVNGCM gvn ) {
     FunNode  fun = ( FunNode) gvn.xform(new  FunNode(this).add_def(Env.ALL_CTRL)); // Points to ScopeNode only
     ParmNode rpc = (ParmNode) gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
+    ParmNode mem = (ParmNode) gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.FULL    ),null));
     add_def(null);              // Control for the primitive in slot 0
     for( int i=1; i<_targs._ts.length; i++ )
       add_def(gvn.init(new ParmNode(i,_targs._flds[i],fun, gvn.con(_targs.at(i)),null)));
     // Functions return the set of *modified* memory.  PrimNodes never *modify*
     // memory (see Intrinsic*Node for some primitives that *modify* memory).
-    Node xmem = gvn.con(TypeMem.EMPTY); // Set of modified memory
-    RetNode ret = (RetNode)gvn.xform(new RetNode(fun,xmem,gvn.init(this),rpc,fun));
+    RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mem,gvn.init(this),rpc,fun));
     // No closures are added to primitives
     return new FunPtrNode(ret,null);
   }

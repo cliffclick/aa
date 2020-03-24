@@ -296,8 +296,9 @@ public class CallNode extends Node {
         Type actual = targ(gvn,j);
         Type formal = formals.at(j);
         Type tx = actual.join(formal);
-        if( tx != actual && tx.above_center() && !formal.above_center() ) // Actual and formal have values in common?
-          continue outerloop;   // No, this function will never work; e.g. cannot cast 1.2 as any integer
+        if( (gvn._opt_mode==2 && !actual.isa(formal)) || // During gcp, actuals only fall.  If not -isa- then it never will be
+            (gvn._opt_mode!=2 &&  tx != actual && tx.above_center() && !formal.above_center() )) // Actual and formal have values in common?
+          continue outerloop;   // No, this function will never work; e.g. cannot cast str as any integer
         byte cvt = actual.isBitShape(formal); // +1 needs convert, 0 no-cost convert, -1 unknown, 99 never
         if( cvt == 99 )         // Happens if actual is e.g. TypeErr
           continue outerloop;   // No, this function will never work
@@ -335,7 +336,7 @@ public class CallNode extends Node {
     }
 
     if( ds._len==0 ) return null;   // No choices apply?  No changes.
-    if( ds._len==1 )                // Return the one choice
+    if( ds._len==1 && !ds.at(0)._unk ) // Return the one choice
       return FunNode.find_fidx(ds.pop()._fidx).ret().funptr();
     if( ds._len==fun()._defs._len ) return null; // No improvement
     // TODO: return shrunk list
@@ -418,6 +419,6 @@ public class CallNode extends Node {
     CallNode call = (CallNode)o;
     return _rpc==call._rpc;
   }
-  private boolean is_copy() { return _is_copy; }
+  boolean is_copy() { return _is_copy; }
   @Override public Node is_copy(GVNGCM gvn, int idx) { return _is_copy  ? in(idx) : null; }
 }
