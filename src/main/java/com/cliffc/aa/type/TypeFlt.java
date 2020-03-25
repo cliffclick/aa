@@ -26,8 +26,8 @@ public class TypeFlt extends Type<TypeFlt> {
   }
   private static TypeFlt FREE=null;
   @Override protected TypeFlt free( TypeFlt ret ) { FREE=this; return ret; }
-  public static Type make( int x, int z, double con ) { 
-    if( x==0 && con==0 ) return NIL;
+  public static Type make( int x, int z, double con ) {
+    if( x==0 && (double)((long)con)==con ) return TypeInt.con((long)con);
     TypeFlt t1 = FREE;
     if( t1 == null ) t1 = new TypeFlt(x,z,con);
     else {  FREE = null;      t1.init(x,z,con); }
@@ -108,6 +108,7 @@ public class TypeFlt extends Type<TypeFlt> {
     if( t._type == Type.TFLT ) return (byte)(_z<=((TypeFlt)t)._z ? 0 : 99);
     if( t._type == Type.TINT ) return 99; // Flt->Int always requires user intervention
     if( t._type == Type.TMEMPTR ) return 99; // No flt->ptr conversion
+    if( t._type == Type.TFUNPTR ) return 99; // No flt->ptr conversion
     if( t._type == Type.TREAL ) return 1;
     if( t._type == TSCALAR ) return 9; // Might have to autobox
     throw com.cliffc.aa.AA.unimpl();

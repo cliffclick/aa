@@ -1,4 +1,24 @@
 =======================================
+Nodes from 03/24/2020
+MAIN ISSUE
+
+Add to Function Default Memory, a Merge with the incoming Display.  Always
+guarentees minimal display.  The Loads from external displays can optimize away
+- or at least see a Phi/Parm of 2 Merges with the same memory at the Loads'
+alias.
+
+Very similar: split Memory into Display memory and Heap memory.  Force the
+split to all things.  The local-var-loads can have a pre-sharpened memory.
+Bigger change, and (perhaps) a easier guarantee.  "Should be the same".
+
+---
+
+Other bug: cannot add type-annot after a function call, and no error.
+Easy parse grammer bug to fix.  See TODO in Parse main comment.
+
+
+
+=======================================
 Nodes from 02/27/2020
 
 A lot of troubles arise because need dead bad code to actually get removed from

@@ -8,21 +8,23 @@ import com.cliffc.aa.type.*;
 // See CallNode and FunNode comments. The FunPtrNode converts a RetNode into a
 // TypeFunPtr with a constant fidx and variable displays.  Used to allow 1st
 // class functions to be passed about.
-public final class FunPtrNode extends ConNode<TypeFunPtr> {
+public final class FunPtrNode extends Node {
+  TypeFunPtr _t;
   private final String _referr;
   public  FunPtrNode( RetNode ret, Node display ) { this(null,ret,display); }
   // For forward-refs only; super weak display & function.
   private FunPtrNode( String referr, RetNode ret, Node display ) {
-    super(OP_FUNPTR,TypeFunPtr.GENERIC_FUNPTR,ret,display);
+    super(OP_FUNPTR,ret,display);
+    _t = TypeFunPtr.GENERIC_FUNPTR;
     _referr = referr;
   }
-  @Override public int hashCode() { return super.hashCode() ^ ((_defs._len==0 || in(0)==null) ? 0 : in(0)._uid); }
+  @Override public int hashCode() { return _t.hashCode() ^ ((_defs._len==0 || in(0)==null) ? 0 : in(0)._uid); }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !(o instanceof FunPtrNode) ) return false;
     FunPtrNode fptr = (FunPtrNode)o;
     if( _defs._len!=2 ) return false;
-    return _t==fptr._t && in(0)==fptr.in(0) && in(1)==fptr.in(1) && super.equals(fptr);
+    return _t==fptr._t && in(0)==fptr.in(0) && in(1)==fptr.in(1);
   }
   public RetNode ret() { return (RetNode)in(0); }
   public Node display(){ return in(1); }
@@ -79,6 +81,7 @@ public final class FunPtrNode extends ConNode<TypeFunPtr> {
   // FunPtr might end up at any Call.
   @Override public boolean basic_liveness() { return false; }
 
+  @Override public Type all_type() { return _t; }
   @Override public String toString() { return super.toString(); }
   // Return the op_prec of the returned value.  Not sensible except when called
   // on primitives.

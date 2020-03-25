@@ -47,22 +47,13 @@ public final class RetNode extends Node {
   @Override public String str() { return in(4) instanceof FunNode ? "Ret"+fun().str() : xstr(); }
 
   @Override public Node ideal(GVNGCM gvn, int level) {
-    if( in(4)!=null &&          // Not wiped out
-        (is_copy() ||           // But is_copy: function is dead
-         // If control is dead, gut function but leave Ret - it might be part of a
-         // "gensym", a unique constant used by a FunPtr strictly for equals tests.
-         // But usually, its just dead and mid-collapse.
-         (ctl() != null && gvn.type(ctl())==Type.XCTRL)) ) {
-      // wipe out inputs rpc & fun, but leave ctrl,mem,val for users to inline
-      set_def(3,null,gvn);      // No rpc
-      set_def(4,null,gvn);      // No fun
-      return this;              // Progress
-    }
     // If no users inlining, wipe out all edges
     if( is_copy() && in(0)!=null && _uses._len==1 && _uses.at(0) instanceof FunPtrNode ) {
       set_def(0,null,gvn);      // No ctrl
       set_def(1,null,gvn);      // No mem
-      if( !is_dead() ) set_def(2,null,gvn);  // No val
+      set_def(2,null,gvn);      // No val
+      set_def(3,null,gvn);      // No rpc
+      set_def(4,null,gvn);      // No fun
       return this;              // Progress
     }
     if( is_copy() ) return null;

@@ -375,7 +375,7 @@ public abstract class Node implements Cloneable {
   // Assert all value and liveness calls only go forwards.  Returns >0 for failures.
   public final int more_flow(GVNGCM gvn, VBitSet bs, boolean lifting, int errs) {
     if( bs.tset(_uid) ) return errs; // Been there, done that
-    if( _keep == 0 && _live.is_live() ) {
+    if( _keep == 0 ) {
       Type    nval = value(gvn), oval=gvn.type(this);
       TypeMem nliv = live (gvn), oliv=_live;
       if( nval != oval || nliv != oliv ) {

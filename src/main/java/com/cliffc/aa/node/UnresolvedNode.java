@@ -3,9 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeMem;
-import com.cliffc.aa.type.TypeFunPtr;
+import com.cliffc.aa.type.*;
 
 import java.util.Arrays;
 
@@ -81,9 +79,19 @@ public class UnresolvedNode extends Node {
   // If pre-GCP, same as value() above, use the conservative answer.
   // During GCP, this will resolve so use the optimistic answer.
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
-    return gvn._opt_mode < 2
-      ? super.live_use(gvn,def)
-      : TypeMem.DEAD;
+    if( gvn._opt_mode < 2 ) return super.live_use(gvn,def);
+    if( !(def instanceof FunPtrNode) ) return _live;
+    // If any Call has resolved to this def, its alive.
+    int dfidx = ((FunPtrNode)def).ret()._fidx;
+    for( Node call : _uses )
+      if( call instanceof CallNode ) {
+        Type tfx = ((TypeTuple)gvn.type(call)).at(2);
+        if( tfx instanceof TypeFunPtr &&
+            ((TypeFunPtr)tfx).fidxs().abit() == dfidx )
+          return _live;
+      }
+    // No call wants this def
+    return TypeMem.DEAD;
   }
   // Too preserve the sharp display pointer types, this has to be as sharp as
   // the meet of its all_type inputs.  This can be cached locally here after

@@ -483,15 +483,15 @@ public class FunNode extends RegionNode {
     Type toldret = gvn.unreg(ret);// Remove before renumbering
     ret._fidx = newfidx;        // Renumber in the old RetNode
     gvn.rereg(ret,toldret);
-    FunPtrNode old_fptr = ret.funptr();
-    gvn.add_work(ret);
-    gvn.add_work_uses(old_fptr);
     // Right now, force the type upgrade on old_fptr.  old_fptr carries the old
     // parent FIDX and is on the worklist.  Eventually, it comes off and the
     // value() call lifts to the child fidx.  Meanwhile its value can be used
     // to wire a size-split to itself (e.g. fib()), which defeats the purpose
     // of a size-split (single caller only, so inlines).
-    gvn.setype(old_fptr,old_fptr.value(gvn));
+    FunPtrNode old_fptr = ret.funptr();
+    old_fptr._t = old_fptr._t.make_fidx(newfidx);
+    TypeFunPtr toldfptr = (TypeFunPtr)gvn.unreg(old_fptr);
+    gvn.rereg(old_fptr,toldfptr.make_fidx(newfidx));
     return fun;
   }
 

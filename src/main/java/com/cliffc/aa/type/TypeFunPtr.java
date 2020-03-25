@@ -89,7 +89,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public static TypeFunPtr make_new(TypeStruct args, Type ret) { return make(BitsFun.make_new_fidx(BitsFun.ALL),args,ret); }
   public TypeFunPtr make_fidx( int fidx ) { return make(BitsFun.make0(fidx),_args,_ret); }
   public TypeFunPtr make_new_fidx( int parent, TypeStruct args ) { return make(BitsFun.make_new_fidx(parent),args,_ret); }
-  private static TypeStruct ARGS = TypeStruct.make_args(TypeStruct.ts(TypeMemPtr.DISPLAY_PTR));
+  public static TypeStruct ARGS = TypeStruct.make_args(TypeStruct.ts(TypeMemPtr.DISPLAY_PTR));
   public static TypeFunPtr make_anon() { return make_new(ARGS,Type.SCALAR); } // Make a new anonymous function ptr
   // Make a TFP with a new display and return value, used by FunPtrNode
   public TypeFunPtr make(Type display_ptr, Type ret) {
@@ -180,7 +180,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public boolean is_forward_ref() {
     if( _fidxs.abit() == -1 ) return false; // Multiple fidxs
     if( _fidxs.getbit() == 1 ) return false; // Thats the generic function ptr
-    FunNode fun = FunNode.find_fidx(fidx());
+    FunNode fun = FunNode.find_fidx(Math.abs(fidx()));
     return fun != null && fun.is_forward_ref();
   }
 }

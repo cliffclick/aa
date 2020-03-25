@@ -30,6 +30,7 @@ import java.util.BitSet;
  *  post = .field post             // Field and tuple lookup
  *  post = .field [:]= stmt        // Field (re)assignment.  Plain '=' is a final assignment
  *  post = .field++ | .field--     // Allowed anytime a := is allowed
+ *  post = :type post              // TODO: Add this, remove 'tfact'
  *  tfact= fact[:type]             // Typed fact
  *  fact = id                      // variable lookup
  *  fact = num                     // number

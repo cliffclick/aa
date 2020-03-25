@@ -1,9 +1,9 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.*;
+import com.cliffc.aa.AA;
+import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.*;
-
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Arrays;
@@ -173,9 +173,17 @@ public class CallNode extends Node {
     Node unk = fun();           // Function epilog/function pointer
     // If the function is unresolved, see if we can resolve it now
     if( unk instanceof UnresolvedNode ) {
-      FunPtrNode fun = resolve(gvn);
-      if( fun != null )         // Replace the Unresolved with the resolved.
-        return set_fun(fun,gvn);
+      PickRes pr = resolve(gvn,fidxs(gvn));
+      if( pr._fidxs==BitsFun.EMPTY ) // TODO: zap function to empty function constant
+        return null;                 // Zero choices
+      FunPtrNode fptr;
+      int fidx = pr._fidxs.abit();
+      if( fidx == -1 ) {           // 2+ choices 
+        if( pr._oob ) return null; // 2+ choices & OOB, no change
+        fptr = least_cost(gvn,pr._fidxs);
+        if( fptr == null ) return null;
+      } else fptr = FunNode.find_fidx(fidx).ret().funptr();
+      return set_fun(fptr,gvn);
     }
 
     return null;
@@ -186,22 +194,21 @@ public class CallNode extends Node {
   // full scatter lets users decide the meaning; e.g. wired FunNodes will take
   // the full arg set but if the call is not reachable the FunNode will not
   // merge from that path.  Result tuple type:
-
   @Override public TypeTuple value(GVNGCM gvn) {
     final Type[] ts = TypeAry.get(_defs._len);
-    final boolean dead = !_is_copy && gvn._opt_mode>0 && cepi()==null; // Dead from below
 
     // Pinch to XCTRL/CTRL
     Type ctl = gvn.type(ctl());
     if( ctl == Type.ALL  ) ctl = Type. CTRL;
     if( ctl != Type.CTRL ) ctl = Type.XCTRL;
+    if( !_is_copy && gvn._opt_mode>0 && cepi()==null ) ctl = Type.XCTRL; // Dead from below
     ts[0] = ctl;
 
     // Not a memory to the call?
     Type mem = gvn.type(mem());
     if( !(mem instanceof TypeMem) )
       mem = mem.above_center() ? TypeMem.EMPTY : TypeMem.FULL;
-    TypeMem tmem = (TypeMem)(ts[1] = mem);
+    ts[1] = mem;
 
     // Not a function to call?
     Type tfx = gvn.type(fun());
@@ -209,13 +216,17 @@ public class CallNode extends Node {
       tfx = tfx.above_center() ? TypeFunPtr.GENERIC_FUNPTR.dual() : TypeFunPtr.GENERIC_FUNPTR;
     TypeFunPtr tfp = (TypeFunPtr)(ts[2] = tfx);
     BitsFun fidxs = tfp.fidxs();
-    // Can we call this function pointer?
-    boolean callable = !dead && !(tfp.above_center() || fidxs.above_center());
+    PickRes pr = resolve(gvn,fidxs);
+    if( pr._fidxs==BitsFun.EMPTY ||  // Nothing matches
+        pr._fidxs.abit() != -1 ) {   // Single target
+      tfp = TypeFunPtr.make(pr._fidxs,tfp._args,tfp._ret); // Narrow function choices
+    } else if( pr._fidxs.above_center() ) { // During opto, still falling
+      ts[0] = ctl = Type.XCTRL; // During iter, no options work (error)
+    }                           // Multi real functions possible
+    ts[2] = tfp;
 
-    // If not callable, do not call
-    if( !callable ) { ts[0] = ctl = Type.XCTRL; }
     // If not called, then no memory to functions
-    if( ctl == Type.XCTRL ) { ts[1] = tmem = TypeMem.EMPTY; }
+    if( ctl == Type.XCTRL ) { ts[1] = TypeMem.EMPTY; }
 
     // Copy args for called functions.
     // If call is dead, then so are args.
@@ -248,115 +259,153 @@ public class CallNode extends Node {
   @Override public boolean basic_liveness() { return false; }
 
 
-  // Given a list of actuals, apply them to each function choice.  If any
-  // (!actual-isa-formal), then that function does not work and supplies an
-  // ALL to the JOIN.  This is common for non-inlined calls where the unknown
-  // arguments are approximated as SCALAR.  Lossless conversions are allowed as
-  // part of a valid isa test.  As soon as some function returns something
-  // other than ALL (because args apply), it supersedes other choices- which
-  // can be dropped.
+  // Resolve an Unresolved, Optimistically during GCP.  Called in value() and
+  // so must be monotonic.  Strictly looks at arguments, and the list of
+  // functions.
+  //
+  // GCP: fidx choices are above-center and get removed as args fall.  Resolve
+  // keeps all fidx choices where the arguments are too-high (might fall to Ok)
+  // or Ok: "actual.isa(formal)".  While there are choices, value() call uses
+  // XCTRL instead of CTRL, to not enable functions which ultimately do not get
+  // called.  At one choice, CTRL is on.  To maintain monotonicity this implies
+  // that if there are ZERO choices (at least 1 arg is sideways or low for
+  // every fidx) CTRL is ON, and bad args get passed to the ParmNodes.
+  //
+  // After args have fallen as far as they can, if we still have choices in GCP
+  // we now pick based on the cost model (adding "nearly free" casts from e.g.
+  // int->flt) to resolve.  This removes a choice, and we start falling again.
+  //
+  // After GCP, choices get locked in: Calls with a single fidx in their Type
+  // upgrade their function input to the function constant.
+  //
+  // ITER: fidx choices are below-center, and get removed as args lift.
+  // Resolve keeps all fidx choices where the arguments are too-low (might lift
+  // to Ok) or Ok: "formal.dual().isa(actual)".  Where there are choices,
+  // value() call uses CTRL - one or more of these choices WILL get called.
+  // Only when the choice count drops to zero is CTRL turned off.
+  //
+  // If we run out of arg-too-low choices, and only have OK-args choices do we
+  // use the cost model to pick amongst choices.  Choices with high-typed args
+  // are always cheaper (int beats Scalar), so if the args later lift about the
+  // choice's formals the other choices are also in-error.
+  //
+  // Given: BitsFun of choices, GVN _opt_mode and argument types.
+  // Returns: set of choices where args match formals, and a flag is any are not OK.
+  private static class PickRes { boolean _oob; BitsFun _fidxs; PickRes(boolean oob,BitsFun fidxs){_oob=oob;_fidxs=fidxs;}}
+  PickRes resolve(GVNGCM gvn, BitsFun fidxs) {
 
-  // If more than one choice applies, then the choice with fewest costly
-  // conversions are kept; if there is more than one then the join of them is
-  // kept - and the program is not-yet type correct (ambiguous choices).
-  public FunPtrNode resolve( GVNGCM gvn ) {
-    BitsFun fidxs = fidxs(gvn);
-    if( fidxs == null ) return null; // Might be e.g. ~Scalar
-    // Need to resolve if we have above-center choices (overload choices) or an
-    // Unresolved (which will be above-center during gcp()).
-    if( !(fun() instanceof UnresolvedNode) && !fidxs.above_center() )
-      return null;              // Sane as-is, just has multiple choices
-    if( fidxs.test(BitsFun.ALL) ) return null;
-    // Any function ptr, plus all of its children, are meet/joined.  This does
-    // a tree-based scan on the inner loop.
-    BitSet bs = fidxs.tree().plus_kids(fidxs);
+    if( fidxs==BitsFun.ANY ) return new PickRes(true,fidxs);
+    if( fidxs==BitsFun.FULL) return new PickRes(true,fidxs);
 
-    // Set of possible choices with fewest conversions
-    class Data {
-      private final int _xcvt, _fidx;
-      private final boolean _unk;
-      private final TypeStruct _formals;
-      private Data( int x, boolean u, int f, TypeStruct ts ) { _xcvt = x; _unk=u; _fidx=f; _formals=ts; }
-    }
-    Ary<Data> ds = new Ary<>(new Data[0]);
+    if( gvn._opt_mode==2 && fidxs.abit()==-1 && !fidxs.above_center() )
+      return new PickRes(true,fidxs); // Lots of below-center choices, nothing to resolve
 
-    // For each function, see if the actual args isa the formal args.  If not,
-    // toss it out.  Also count conversions, and keep the minimal conversion
-    // function with all arguments known.
+    if( gvn._opt_mode!=2 && fidxs.abit()==-1 &&  fidxs.above_center() )
+      return new PickRes(true,fidxs); // Lots of above-center choices, nothing to resolve
+
+    assert fidxs.abit()!= -1 || // Either 1 bit, or above-in-GCP and below-in-iter
+      (gvn._opt_mode!=2 ^ fidxs.above_center());
+
+    BitsFun choices = BitsFun.EMPTY;
+    boolean oob=false;    // No fidxs have potentially ok (but not yet ok) args
     outerloop:
-    for( int fidx = bs.nextSetBit(0); fidx >= 0; fidx = bs.nextSetBit(fidx+1) ) {
-      FunNode fun = FunNode.find_fidx(fidx);
-      if( fun.nargs() != nargs() ) continue; // Wrong arg count, toss out
-      TypeStruct formals = fun._tf._args;    // Type of each argument
+    for( int fidx : fidxs ) {
+      if( BitsFun.is_parent(fidx) ) { // Parent is never a real choice
+        if( !fidxs.above_center() ) continue; // Child will cover for the parent
+        // Might fall to any of its children
+        throw com.cliffc.aa.AA.unimpl();
+      }
 
-      // Now check if the arguments are compatible at all, keeping lowest cost
-      int xcvts = 0;             // Count of conversions required
-      boolean unk = false;       // Unknown arg might be incompatible or free to convert
+      FunNode fun = FunNode.find_fidx(fidx);
+      // Forward refs are only during parsing; assume they fit the bill
+      if( fun.is_forward_ref() ) { choices = choices.set(fidx); oob = true; continue; }
+      if( fun==null || fun.is_dead() ) continue; // Stale fidx leading to dead fun
+      if( fun.nargs() != nargs() ) continue; // Wrong arg count, toss out
+      if( fun.ret() == null ) throw com.cliffc.aa.AA.unimpl();
+      TypeStruct formals = fun._tf._args; // Type of each argument
+      boolean oob0=false;                 // This function has OOB args
       for( int j=0; j<fun.nargs(); j++ ) {
         Type actual = targ(gvn,j);
         Type formal = formals.at(j);
-        Type tx = actual.join(formal);
-        if( (gvn._opt_mode==2 && !actual.isa(formal)) || // During gcp, actuals only fall.  If not -isa- then it never will be
-            (gvn._opt_mode!=2 &&  tx != actual && tx.above_center() && !formal.above_center() )) // Actual and formal have values in common?
-          continue outerloop;   // No, this function will never work; e.g. cannot cast str as any integer
+        if( actual==formal ) continue; // Arg is fine.  Covers NO_DISP which can be a high formal.
         byte cvt = actual.isBitShape(formal); // +1 needs convert, 0 no-cost convert, -1 unknown, 99 never
-        if( cvt == 99 )         // Happens if actual is e.g. TypeErr
-          continue outerloop;   // No, this function will never work
-        //if( cvt == 9 )          // Requires auto-boxing, not implemented
-        //  continue outerloop;   // So function does not work for now
-        if( cvt == -1 ) unk = true; // Unknown yet
-        else xcvts += cvt;          // Count conversions
+        if( cvt == 99 ) continue outerloop;   // Needs user-specified conversion
+        if( formal.above_center() ) continue; // Formal allows all args
+
+        Type C = gvn._opt_mode==2 ? actual : formal.dual();
+        Type D = gvn._opt_mode==2 ? formal : actual       ;
+        if( !C.isa(D) ) continue outerloop; // Argument never works
+
+        Type A = gvn._opt_mode==2 ? actual        : formal;
+        Type B = gvn._opt_mode==2 ? formal.dual() : actual;
+        oob0 |= A!=B && A.isa(B);  // Argument out of bounds, but might move into bounds
+      }
+      choices = choices.set(fidx); // Another choice
+      oob |= oob0;                 // And some choices might be out-of-bounds
+    }
+    return new PickRes(oob,choices);
+  }
+
+
+
+  // Amongst these choices return the least-cost.  Some or all might be
+  // invalid.
+  public FunPtrNode least_cost(GVNGCM gvn, BitsFun choices) {
+    assert choices.bitCount() > 0; // Must be some choices
+    int best_cvts=99999;           // Too expensive
+    FunPtrNode best_fptr=null;     //
+    TypeStruct best_formals=null;  // 
+    boolean tied=false;            // Ties not allowed
+    for( int fidx : choices ) {
+      if( BitsFun.is_parent(fidx) ) throw com.cliffc.aa.AA.unimpl();
+
+      FunNode fun = FunNode.find_fidx(fidx);
+      assert fun.nargs()==nargs() && fun.ret() != null;
+      TypeStruct formals = fun._tf._args; // Type of each argument
+      int cvts=0;                         // Arg conversion cost
+      for( int j=0; j<fun.nargs(); j++ ) {
+        Type actual = targ(gvn,j);
+        Type formal = formals.at(j);
+        if( actual==formal ) continue;
+        byte cvt = actual.isBitShape(formal); // +1 needs convert, 0 no-cost convert, -1 unknown, 99 never
+        cvts += cvt;
       }
 
-      Data d = new Data(xcvts,unk,fidx,formals);
-      ds.push(d);
-    }
-
-    // Toss out choices with strictly more conversions than the minimal
-    int min = 999;              // Required conversions
-    for( Data d : ds )          // Find minimal conversions
-      if( !d._unk && d._xcvt < min ) // If unknown, might need more converts
-        min = d._xcvt;
-    for( int i=0; i<ds._len; i++ ) // Toss out more expensive options
-      if( ds.at(i)._xcvt > min )   // Including unknown... which might need more converts
-        ds.del(i--);
-
-    // If this set of formals is strictly less than a prior acceptable set,
-    // replace the prior set.  Similarly, if strictly greater than a prior set,
-    // toss this one out.
-    for( int i=0; i<ds._len; i++ ) {
-      if( ds.at(i)._unk ) continue;
-      TypeStruct ifs = ds.at(i)._formals;
-      for( int j=i+1; j<ds._len; j++ ) {
-        if( ds.at(j)._unk ) continue;
-        TypeStruct jfs = ds.at(j)._formals;
-        if( ifs.isa(jfs) ) ds.del(j--); // Toss more expansive option j
-        else if( jfs.isa(ifs) ) { ds.del(i--); break; } // Toss option i
+      if( cvts < best_cvts ) {
+        best_cvts = cvts;
+        best_fptr = fun.ret().funptr();
+        best_formals = formals;
+        tied=false;
+      } else if( cvts==best_cvts ) {
+        // Look for monotonic formals
+        int fcnt=0, bcnt=0;
+        for( int i=1; i<formals._ts.length; i++ ) {
+          Type ff = formals.at(i), bf = best_formals.at(i);
+          if( ff!=bf )
+            if( ff.isa(bf) ) fcnt++; // New  formal is higher than best
+            else             bcnt++; // Best formal is higher than new
+        }
+        // If one is monotonically higher than the other, take it
+        if( fcnt > 0 && bcnt==0 ) { best_fptr = fun.ret().funptr(); best_formals = formals; }
+        else if( fcnt==0 && bcnt > 0 ) {} // Keep current
+        else tied=true;                   // Tied, ambiguous
       }
     }
-
-    if( ds._len==0 ) return null;   // No choices apply?  No changes.
-    if( ds._len==1 && !ds.at(0)._unk ) // Return the one choice
-      return FunNode.find_fidx(ds.pop()._fidx).ret().funptr();
-    if( ds._len==fun()._defs._len ) return null; // No improvement
-    // TODO: return shrunk list
-    //return gvn.xform(new UnresolvedNode(ns.asAry())); // return shrunk choice list
-    return null;
+    return tied ? null : best_fptr; // Ties need to have the ambiguity broken another way
   }
 
   // Used during GCP and Ideal calls to see if wiring is appropriate.
   public void check_wire( GVNGCM gvn ) {
-    TypeTuple tcall = (TypeTuple)gvn.type(this);
-    if( tcall.at(0)!=Type.CTRL ) return; // Call not executable
-    if( !(tcall.at(2) instanceof TypeFunPtr) ) return; // No functions being called yet
-    BitsFun fidxs = ((TypeFunPtr)tcall.at(2)).fidxs();
-    if( fidxs.above_center() ) return; // Still settling down to possibilities.
     CallEpiNode cepi = cepi();
-    if( cepi==null ) return;    // Collapsing
+    assert cepi!=null;
+    Type tfptr = ((TypeTuple)gvn.type(this)).at(2);
+    if( !(tfptr instanceof TypeFunPtr) ) return; // No functions being called yet
+    BitsFun fidxs = ((TypeFunPtr)tfptr).fidxs();
+    if( fidxs.above_center() )  return; // Still choices to be made
 
     // Check all fidxs for being wirable
     for( int fidx : fidxs ) {                 // For all fidxs
-      if( BitsFun.is_parent(fidx) ) continue; // Will be covered by children
+      if( BitsFun.is_parent(fidx) ) continue; // Do not wire parents, as they will eventually settle out
       FunNode fun = FunNode.find_fidx(fidx);  // Lookup, even if not wired
       if( fun.is_forward_ref() ) continue;    // Not forward refs, which at GCP just means a syntax error
       RetNode ret = fun.ret();

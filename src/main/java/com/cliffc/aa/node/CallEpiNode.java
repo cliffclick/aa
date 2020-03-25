@@ -213,7 +213,8 @@ public final class CallEpiNode extends Node {
     // Add matching control to function
     Node cproj = new CProjNode(call,0);
     if( gvn._opt_mode == 2 ) cproj._live = TypeMem.DEAD;
-    cproj = gvn._opt_mode == 2 ? gvn.add_work(cproj) : gvn.xform(cproj);
+    if( gvn._opt_mode == 2 ) gvn.rereg(cproj,Type.XCTRL);
+    else cproj = gvn.xform(cproj);
     gvn.add_def(fun,cproj);
   }
 
@@ -224,7 +225,9 @@ public final class CallEpiNode extends Node {
   @Override public TypeTuple value(GVNGCM gvn) {
 
     if( is_copy() )
-      return TypeTuple.make(gvn.type(in(0)),gvn.type(in(1)),gvn.type(in(2)));
+      return gvn.type(in(0))!=Type.CTRL
+        ? TypeTuple.CALLE.dual()
+        : TypeTuple.make(gvn.type(in(0)),gvn.type(in(1)),gvn.type(in(2)));
     // Get Call result.  If the Call args are in-error, then the Call is called
     // and we flow types to the post-call.... BUT the bad args are NOT passed
     // along to the function being called.

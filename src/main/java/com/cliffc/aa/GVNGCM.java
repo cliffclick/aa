@@ -138,8 +138,7 @@ public class GVNGCM {
   public @NotNull ConNode con( Type t ) {
     // Check for a function constant, and return the globally shared common
     // FunPtrNode instead.  This only works for FunPtrs with no closures.
-    if( t instanceof TypeFunPtr && t.is_con() )
-      return FunNode.find_fidx(((TypeFunPtr)t).fidx()).ret().funptr();
+    assert !(t instanceof TypeFunPtr && t.is_con()); // Does not work for function constants
     ConNode con = new ConNode<>(t);
     Node con2 = _vals.get(con);
     if( con2 != null ) {           // Found a prior constant
@@ -522,9 +521,10 @@ public class GVNGCM {
         Node n = _work.pop();
         _wrk_bits.clear(n._uid);
         if( n.is_dead() ) continue; // Can be dead functions after removing ambiguous calls
-        if( n instanceof CallNode ) {
+        if( n instanceof CallNode && n._live != TypeMem.DEAD ) {
           CallNode call = (CallNode)n;
-          BitsFun fidxs = call.fidxs(this);
+          TypeFunPtr tfp = (TypeFunPtr)((TypeTuple)type(call)).at(2);
+          BitsFun fidxs = tfp.fidxs();
           if( fidxs != null && fidxs.above_center() && ambi_calls.find(call)== -1 )
             ambi_calls.add((CallNode)n); // Track ambiguous calls
         }
@@ -570,22 +570,20 @@ public class GVNGCM {
             if( def != null && def != n )
               add_work(def);        // Reverse flow: do work on defs not uses
         }
-
       }
 
       // Remove CallNode ambiguity after worklist runs dry
-      for( int i=0; i<ambi_calls.len(); i++ ) {
-        CallNode call = ambi_calls.at(i);
-        if( call.is_dead() ) ambi_calls.del(i--); // Remove from worklist
-        else {
-          FunPtrNode fun = call.resolve(this);
-          if( fun != null ) {          // Unresolved gets left on worklist
-            call.set_fun_reg(fun,this);// Set resolved edge
-            ambi_calls.del(i--);       // Remove from worklist
-            add_work(fun);             // Unresolved is now resolved and live
-            assert Env.START.more_flow(this,new VBitSet(),false,0)==0; // Post conditions are correct
-          }
-        }
+      while( !ambi_calls.isEmpty() ) {
+        CallNode call = ambi_calls.pop();
+        TypeFunPtr tfp = (TypeFunPtr)((TypeTuple)type(call)).at(2);
+        BitsFun fidxs = tfp.fidxs();
+        if( fidxs.abit() != -1    ) continue; // resolved to one
+        if( !fidxs.above_center() ) continue; // resolved to many
+        FunPtrNode fptr = call.least_cost(this,fidxs);
+        if( fptr==null ) continue;  // declared ambiguous, will be an error later
+        call.set_fun_reg(fptr,this);// Set resolved edge
+        add_work(fptr);             // Unresolved is now resolved and live
+        assert Env.START.more_flow(this,new VBitSet(),false,0)==0; // Post conditions are correct
       }
     }
 
@@ -637,9 +635,18 @@ public class GVNGCM {
 
       // All (live) Call ambiguity has been resolved
     } else if( n instanceof CallNode && type(n.in(0))==Type.CTRL ) {
-      BitsFun fidxs = ((CallNode)n).fidxs(this);
-      assert n.err(this) != null || // Call is in-error OR
-        !fidxs.above_center() || fidxs==BitsFun.EMPTY;
+      CallNode call = (CallNode)n;
+      BitsFun fidxs = call.fidxs(this);
+      if( fidxs != null ) {     // If not a TypeFunPtr, then definitely in-error
+        int fidx = fidxs.abit();
+        if( fidx != -1 ) {
+          FunPtrNode fptr = FunNode.find_fidx(fidx).ret().funptr();
+          if( fptr != call.fun() ) // Upgraded unresolved during GCP
+            call.set_fun_reg(fptr,this);
+        }
+        assert call.err(this) != null || // Call is in-error OR
+          !fidxs.above_center() || fidxs==BitsFun.EMPTY; // Or multi-targets
+      }
     }
     // Hit the fixed point, despite any immediate updates.  All prims are live,
     // even if unused so they might not have been computed
