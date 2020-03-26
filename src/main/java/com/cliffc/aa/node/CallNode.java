@@ -176,10 +176,10 @@ public class CallNode extends Node {
       PickRes pr = resolve(gvn,fidxs(gvn));
       if( pr._fidxs==BitsFun.EMPTY ) // TODO: zap function to empty function constant
         return null;                 // Zero choices
+      if( pr._oob ) return null;     // Some OOB choices, no change
       FunPtrNode fptr;
       int fidx = pr._fidxs.abit();
-      if( fidx == -1 ) {           // 2+ choices 
-        if( pr._oob ) return null; // 2+ choices & OOB, no change
+      if( fidx == -1 ) {           // 2+ choices
         fptr = least_cost(gvn,pr._fidxs);
         if( fptr == null ) return null;
       } else fptr = FunNode.find_fidx(fidx).ret().funptr();
@@ -318,8 +318,8 @@ public class CallNode extends Node {
 
       FunNode fun = FunNode.find_fidx(fidx);
       // Forward refs are only during parsing; assume they fit the bill
-      if( fun.is_forward_ref() ) { choices = choices.set(fidx); oob = true; continue; }
       if( fun==null || fun.is_dead() ) continue; // Stale fidx leading to dead fun
+      if( fun.is_forward_ref() ) return new PickRes(true,fidxs);
       if( fun.nargs() != nargs() ) continue; // Wrong arg count, toss out
       if( fun.ret() == null ) throw com.cliffc.aa.AA.unimpl();
       TypeStruct formals = fun._tf._args; // Type of each argument
@@ -331,6 +331,7 @@ public class CallNode extends Node {
         byte cvt = actual.isBitShape(formal); // +1 needs convert, 0 no-cost convert, -1 unknown, 99 never
         if( cvt == 99 ) continue outerloop;   // Needs user-specified conversion
         if( formal.above_center() ) continue; // Formal allows all args
+        if( actual==Type.XSCALAR ) continue;  // Dead args always work
 
         Type C = gvn._opt_mode==2 ? actual : formal.dual();
         Type D = gvn._opt_mode==2 ? formal : actual       ;
@@ -343,7 +344,7 @@ public class CallNode extends Node {
       choices = choices.set(fidx); // Another choice
       oob |= oob0;                 // And some choices might be out-of-bounds
     }
-    return new PickRes(oob,choices);
+    return new PickRes(oob,gvn._opt_mode==2 ? choices.dual() : choices);
   }
 
 
@@ -354,7 +355,7 @@ public class CallNode extends Node {
     assert choices.bitCount() > 0; // Must be some choices
     int best_cvts=99999;           // Too expensive
     FunPtrNode best_fptr=null;     //
-    TypeStruct best_formals=null;  // 
+    TypeStruct best_formals=null;  //
     boolean tied=false;            // Ties not allowed
     for( int fidx : choices ) {
       if( BitsFun.is_parent(fidx) ) throw com.cliffc.aa.AA.unimpl();
@@ -381,9 +382,11 @@ public class CallNode extends Node {
         int fcnt=0, bcnt=0;
         for( int i=1; i<formals._ts.length; i++ ) {
           Type ff = formals.at(i), bf = best_formals.at(i);
-          if( ff!=bf )
-            if( ff.isa(bf) ) fcnt++; // New  formal is higher than best
-            else             bcnt++; // Best formal is higher than new
+          if( ff==bf ) continue;
+          Type mt = ff.meet(bf);
+          if( ff==mt ) bcnt++;       // Best formal is higher than new
+          else if( bf==mt ) fcnt++;  // New  formal is higher than best
+          else { fcnt=bcnt=-1; break; } // Not monotonic, no obvious winner
         }
         // If one is monotonically higher than the other, take it
         if( fcnt > 0 && bcnt==0 ) { best_fptr = fun.ret().funptr(); best_formals = formals; }
@@ -398,6 +401,8 @@ public class CallNode extends Node {
   public void check_wire( GVNGCM gvn ) {
     CallEpiNode cepi = cepi();
     assert cepi!=null;
+    // Take the set of resolved call targets (from self type), not the
+    // available targets (from the fun() type).
     Type tfptr = ((TypeTuple)gvn.type(this)).at(2);
     if( !(tfptr instanceof TypeFunPtr) ) return; // No functions being called yet
     BitsFun fidxs = ((TypeFunPtr)tfptr).fidxs();

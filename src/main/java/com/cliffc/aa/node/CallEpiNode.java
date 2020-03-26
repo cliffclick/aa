@@ -30,7 +30,10 @@ public final class CallEpiNode extends Node {
     CallNode call = call();
     TypeTuple tcall = (TypeTuple)gvn.type(call);
     if( tcall.at(0) != Type.CTRL ) return null; // Call not executable
-    Type tfptr = tcall.at(2);
+    // Get the arg type to the call... not the call's resolved version.
+    // Resolving tosses out functions with bad args, and here we might unwire
+    // bad args or kill dead bad args.
+    Type tfptr = gvn.type(call.fun());
     if( !(tfptr instanceof TypeFunPtr) ) return null; // No known function pointer
     TypeFunPtr tfp = (TypeFunPtr)tfptr;
 

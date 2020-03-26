@@ -489,8 +489,8 @@ public class FunNode extends RegionNode {
     // to wire a size-split to itself (e.g. fib()), which defeats the purpose
     // of a size-split (single caller only, so inlines).
     FunPtrNode old_fptr = ret.funptr();
+    TypeFunPtr toldfptr = (TypeFunPtr)gvn.unreg(old_fptr); // Unreg before changing hash
     old_fptr._t = old_fptr._t.make_fidx(newfidx);
-    TypeFunPtr toldfptr = (TypeFunPtr)gvn.unreg(old_fptr);
     gvn.rereg(old_fptr,toldfptr.make_fidx(newfidx));
     return fun;
   }

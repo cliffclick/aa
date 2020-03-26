@@ -638,12 +638,12 @@ public class GVNGCM {
       CallNode call = (CallNode)n;
       BitsFun fidxs = call.fidxs(this);
       if( fidxs != null ) {     // If not a TypeFunPtr, then definitely in-error
-        int fidx = fidxs.abit();
-        if( fidx != -1 ) {
-          FunPtrNode fptr = FunNode.find_fidx(fidx).ret().funptr();
-          if( fptr != call.fun() ) // Upgraded unresolved during GCP
-            call.set_fun_reg(fptr,this);
-        }
+        //int fidx = fidxs.abit();
+        //if( fidx != -1 && fidx < 0 ) {
+        //  FunPtrNode fptr = FunNode.find_fidx(fidx).ret().funptr();
+        //  if( fptr != call.fun() ) // Upgraded unresolved during GCP
+        //    call.set_fun_reg(fptr,this);
+        //}
         assert call.err(this) != null || // Call is in-error OR
           !fidxs.above_center() || fidxs==BitsFun.EMPTY; // Or multi-targets
       }
