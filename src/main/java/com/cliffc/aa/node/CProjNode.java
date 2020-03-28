@@ -6,7 +6,8 @@ import com.cliffc.aa.type.TypeTuple;
 
 // Proj control
 public class CProjNode extends ProjNode {
-  public CProjNode( Node ifn, int idx ) { super(OP_CPROJ,ifn,idx); }
+  public CProjNode( Node ifn, int idx ) { this(OP_CPROJ,ifn,idx); }
+  public CProjNode( byte op, Node ifn, int idx ) { super(op,ifn,idx); }
   @Override String xstr() {
     if( !is_dead() && in(0) instanceof IfNode )
       return _idx==0 ? "False" : "True";

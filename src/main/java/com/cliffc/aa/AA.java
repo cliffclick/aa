@@ -5,7 +5,8 @@ package com.cliffc.aa;
 
 @SuppressWarnings("unchecked")
 public abstract class AA {
-  public static RuntimeException unimpl() { throw new RuntimeException("unimplemented"); }
+  public static RuntimeException unimpl() { return unimpl("unimplemented"); }
+  public static RuntimeException unimpl(String msg) { throw new RuntimeException(msg); }
   private static final AbstractBuildVersion ABV;
   static {
     AbstractBuildVersion abv = null;

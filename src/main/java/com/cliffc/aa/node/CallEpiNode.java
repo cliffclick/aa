@@ -3,8 +3,6 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 
-import java.util.BitSet;
-
 // See CallNode.  Slot 0 is call-control; slot 1 is call function pointer.  The
 // remaining slots are Returns which are typed as standard function returns:
 // {Ctrl,Mem,Val}.  These Returns represent call-graph edges that are known to
@@ -30,12 +28,9 @@ public final class CallEpiNode extends Node {
     CallNode call = call();
     TypeTuple tcall = (TypeTuple)gvn.type(call);
     if( tcall.at(0) != Type.CTRL ) return null; // Call not executable
-    // Get the arg type to the call... not the call's resolved version.
-    // Resolving tosses out functions with bad args, and here we might unwire
-    // bad args or kill dead bad args.
-    Type tfptr = gvn.type(call.fun());
-    if( !(tfptr instanceof TypeFunPtr) ) return null; // No known function pointer
-    TypeFunPtr tfp = (TypeFunPtr)tfptr;
+    // Get calls resolved function.
+    if( !(tcall.at(2) instanceof TypeFunPtr) ) return null; // No known function pointer
+    TypeFunPtr tfp = (TypeFunPtr)tcall.at(2);
 
     // The one allowed function is already wired?  Then directly inline.
     // Requires this calls 1 target, and the 1 target is only called by this.
@@ -60,14 +55,16 @@ public final class CallEpiNode extends Node {
     }
 
     // If the call's allowed functions excludes any wired, remove the extras
-    BitSet bs = fidxs.tree().plus_kids(fidxs);
     if( !fidxs.test(BitsFun.ALL) ) {
       for( int i = 0; i < nwired(); i++ ) {
         RetNode ret = wired(i);
-        if( !bs.get(ret.fidx()) ) { // Wired call is not actually executable?
-          // Remove the edge.  Happens after e.g. cloning a function, where
-          // both cloned and original versions are wired, but only one is
-          // reachable.
+        if( !fidxs.test(ret.fidx()) ) { // Wired call not in execution set?
+          assert !BitsFun.is_parent(ret.fidx());
+          // Remove the edge.  Pre-GCP all CG edges are virtual, and are lazily
+          // and pessimistically filled in by ideal calls.  During the course
+          // of lifting types some of the manifested CG edges are killed.
+          // Post-GCP all CG edges are manifest, but types can keep lifting
+          // and so CG edges can still be killed.
           unwire(gvn,call,ret);
           del(wire_num(i));
           return this; // Return with progress
@@ -75,25 +72,23 @@ public final class CallEpiNode extends Node {
       }
     }
 
-    // If call allows many functions, bail out.
-    int fidx = fidxs.abit();
-    if( fidx == -1 || BitsFun.is_parent(fidx) )
-      return null; // Multiple fidxs
+    // Only inline wired single-target function with valid args.  CallNode wires.
+    if( nwired()!=1 ) return null;
+    assert !fidxs.above_center(); // Since wired, not above center
+    int fidx = fidxs.abit();      // Could be 1 or multi
+    if( fidx == -1 ) return null; // Multi choices, only 1 wired at the moment.
 
     // Call allows 1 function not yet wired, sanity check it.
     FunNode fun = FunNode.find_fidx(fidx);
     if( fun.is_forward_ref() || fun.is_dead() ) return null;
-    if( gvn.type(fun) == Type.XCTRL ) return null;
-
-    // Arg counts must be compatible
+    if( gvn.type(fun) != Type.CTRL ) return null;
     int cnargs = call.nargs();
-    if( fun.nargs() != cnargs )
-      return null;
+    assert fun.nargs() == cnargs; // Arg counts must be compatible to be wired
+    RetNode ret = fun.ret();      // Return from function
+    if( ret==null ) return null;
 
     // Single choice; check compatible args and no conversions needed.
-    // If this fails, we still wire the single target, just no inline.
     TypeStruct formals = fun._tf._args;
-    RetNode ret = fun.ret();    // Return from function
     for( Node parm : fun._uses ) {
       if( parm instanceof ParmNode && parm.in(0)==fun ) {
         int idx = ((ParmNode)parm)._idx;
@@ -105,22 +100,15 @@ public final class CallEpiNode extends Node {
         Type tparm = gvn.type(parm); // Pre-GCP this should be the default type
         if( !actual.isa(tparm) ||  // Not compatible
             (idx >= 0 && actual.isBitShape(formals.at(idx)) == 99) ) { // Requires user-specified conversion
-          // Just wire, no inline check
-          return ret == null || idx==0 ? null : wire(gvn, call, fun, ret);
+          return null;
         }
       }
     }
-    // Zap dead arguments
-    for( int i=1; i<cnargs; i++ ) // Start at 1 to skip closure hidden arg
-      if( fun.parm(i)==null &&    // Argument is dead and can be dropped?
-          gvn.type(call.arg(i)) != Type.XSCALAR && // But not yet dropped
-          call.proj(i)==null )    // Also dropped from after call
-        call.set_arg_reg(i,gvn.con(Type.XSCALAR),gvn); // Replace with some generic placeholder
+
 
     // Check for several trivial cases that can be fully inlined immediately.
     Node cctl = call.ctl();
     Node cmem = call.mem();
-    if( ret==null ) return null;
     Node rctl = ret.ctl();      // Control being returned
     Node rmem = ret.mem();      // Memory  being returned
     Node rrez = ret.val();      // Value   being returned
@@ -152,38 +140,29 @@ public final class CallEpiNode extends Node {
       return inline(gvn,call,cctl,cmem,gvn.add_work(gvn.xform(irez)),ret); // New exciting replacement for inlined call
     }
 
-    // Always wire caller args into known functions
-    return wire(gvn,call,fun,ret);
+    return null;
   }
 
   // Wire the call args to a known function, letting the function have precise
   // knowledge of its callers and arguments.  This adds an edge in the Call-Graph.
-  Node wire( GVNGCM gvn, CallNode call, FunNode fun, RetNode ret ) {
+  boolean wire( GVNGCM gvn, CallNode call, FunNode fun, RetNode ret ) {
     assert _keep==0;            // not expecting this during calls
 
     for( int i=0; i<nwired(); i++ )
       if( wired(i) == ret )     // Look for same Ret
-        return null;            // Already wired up
+        return false;           // Already wired up
 
     // Make sure we have enough args before wiring up (makes later life easier
     // to assume correct arg counts).  Note that we cannot, in general,
     // type-check the args during GCP, as they will start out too-high and pass
     // any isa-check.  Later, after wiring up in GCP they might fall to an
     // error state - so we have to support having error args coming in.
-    int nargs = call.nargs();
-    for( Node arg : fun._uses )
-      if( arg.in(0) == fun && arg instanceof ParmNode &&
-          ((ParmNode)arg)._idx >= nargs )
-        return null;            // Wrong arg-count
+    if( fun._tf.nargs() !=call.nargs() ) return false;
 
     wire0(gvn,call,fun);
-    // Add the CallEpi hook.  Sometimes in or out of _vals.  Called by early
-    // ideal during parsing (0,out), value() during gcp (2,in), value() during
-    // iter (1,3,out).
-    if( gvn._opt_mode == 2 ) gvn.add_def(this,ret);
-    else                         add_def(     ret);
-    gvn.add_work(ret);          // Ret is now alive
-    return this;
+    gvn.add_def(this,ret);
+    gvn.add_work(ret);
+    return true;
   }
 
   // Wire without the redundancy check, or adding to the CallEpi
@@ -196,29 +175,24 @@ public final class CallEpiNode extends Node {
     // assert finding all args, because dead args may already be removed - and
     // so there's no Parm/Phi to attach the incoming arg to.
     for( Node arg : fun._uses ) {
-      if( arg.in(0) == fun && arg instanceof ParmNode ) {
-        // See CallNode output tuple type for what these horrible magic numbers are.
-        int idx = ((ParmNode)arg)._idx; // Argument number, or -1 for rpc
-        Node actual = idx==-1 ? new ConNode<>(TypeRPC.make(call._rpc)) :
-          (idx==-2 ? new MProjNode(call,1) : new ProjNode(call,idx+2));
-        if( gvn._opt_mode==2 ) actual._live = TypeMem.DEAD; // During GCP, set new wirings very optimistic.
-        if( idx==0 ) {
-          actual = new FP2ClosureNode(gvn.xform(actual));
-          if( gvn._opt_mode==2 ) actual._live = TypeMem.DEAD; // During GCP, set new wirings very optimistic.
-        }
-        if( gvn._opt_mode == 2 )
-          gvn.rereg(actual,actual.all_type().startype());
-        else actual = gvn.xform(actual);
-        gvn.add_def(arg,gvn.add_work(actual));
+      if( arg.in(0) != fun || !(arg instanceof ParmNode) ) continue;
+      // See CallNode output tuple type for what these horrible magic numbers are.
+      Node actual;
+      int idx = ((ParmNode)arg)._idx;
+      switch( idx ) {
+      case  0: actual = new FP2ClosureNode(call); break; // Filter Function Pointer to Closure
+      case -1: actual = new ConNode<>(TypeRPC.make(call._rpc)); break; // Always RPC is a constant
+      case -2: actual = new MProjNode(call,1); break;    // Memory
+      default: actual = new ProjNode(call,idx+2); break; // Normal args
       }
+      actual = gvn._opt_mode == 2 ? gvn.new_gcp(actual) : gvn.xform(actual);
+      gvn.add_def(arg,actual);
     }
 
-    // Add matching control to function
-    Node cproj = new CProjNode(call,0);
-    if( gvn._opt_mode == 2 ) cproj._live = TypeMem.DEAD;
-    if( gvn._opt_mode == 2 ) gvn.rereg(cproj,Type.XCTRL);
-    else cproj = gvn.xform(cproj);
-    gvn.add_def(fun,cproj);
+    // Add matching control to function via a CallGraph edge.
+    Node callgrf = new CGNode(call);
+    callgrf = gvn._opt_mode == 2 ? gvn.new_gcp(callgrf) : gvn.xform(callgrf);
+    gvn.add_def(fun,callgrf);
   }
 
   // Merge call-graph edges, but the call-graph is not discovered prior to GCP.
@@ -250,8 +224,8 @@ public final class CallEpiNode extends Node {
 
     // If pre-gcp, we may have unknown callers.  Be very conservative until we
     // have wired all callers.
-    if( gvn._opt_mode < 2 &&
-        ((TypeFunPtr)tfptr).fidxs().bitCount() > nwired() )
+    BitsFun fidxs = ((TypeFunPtr)tfptr).fidxs();
+    if( gvn._opt_mode < 2 && fidxs.bitCount() > nwired() )
       return TypeTuple.CALLE;
 
     // Meet across wired callers

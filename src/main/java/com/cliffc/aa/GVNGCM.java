@@ -129,6 +129,8 @@ public class GVNGCM {
     assert t != null;
     _ts.setX(n._uid,t);
   }
+  // Utility: remove old from type table, return new
+  public Node untype( Node old, Node nnn ) { _ts.clear(old._uid); return nnn; }
   // Return the prior self_type during the value() call, without installing a
   // new type.
   public Type self_type( Node n ) {
@@ -254,28 +256,28 @@ public class GVNGCM {
     assert check_new(n);
 
     // Try generic graph reshaping, looping till no-progress.
-    int cnt=0;  Node x;        // Progress bit
-    while( (x = n.ideal(this,0)) != null ) {
-      if( x != n ) {            // Different return, so delete original dead node
-        x.keep();               // Keep alive during deletion of n
-        kill_new(n); // n was new, replaced so immediately recycle n and dead subgraph
-        n = x.unhook();         // Remove keep-alive
+    int cnt=0;                  // Progress bit
+    while( true ) {
+      // Compute a type for n
+      Type t = n.value(this);   // Get best type
+      // Replace with a constant, if possible
+      if( replace_con(t,n) )
+        { kill_new(n); return con(t); }
+      setype(n,t);              // Set it in for ideal
+      Node x = n.ideal(this,0);
+      if( x == null ) break;
+      if( x != n ) {          // Different return, so delete original dead node
+        x.keep();             // Keep alive during deletion of n
+        kill(n);              // replace so immediately recycle n and dead subgraph
+        n = x.unhook();       // Remove keep-alive
+        if( !check_new(x) ) return x; // If the replacement is old, no need to re-ideal
+        for( Node def : n._defs )  if( def != null )  add_work(def); // Force live-ness rechecking
       }
-      if( !check_new(n) ) return n; // If the replacement is old, no need to re-ideal
-      for( Node def : n._defs )  if( def != null )  add_work(def); // Force live-ness rechecking
       cnt++; assert cnt < 100;      // Catch infinite ideal-loops
     }
-    // Compute a type for n
-    Type t = n.value(this);     // Get best type
-    // Replace with a constant, if possible
-    if( replace_con(t,n) )
-      { kill_new(n); return con(t); }
-    // Global Value Numbering
-    x = _vals.putIfAbsent(n,n);
-    if( x != null ) { kill_new(n); return x; }
-    // Record type for n; n is "in the system" now
-    setype(n,t);                // Set it in
-    // TODO: If x is a TypeNode, capture any more-precise type permanently into Node
+    // Global Value Numbering; n is "in the system" now
+    Node x = _vals.putIfAbsent(n,n);
+    if( x != null ) { untype(n,null); kill_new(n); return x; }
     return add_work(n);
   }
 
@@ -420,9 +422,6 @@ public class GVNGCM {
     nnn._live = (TypeMem)nnn._live.meet(old._live);
     return untype(old,nnn);      // Just toss old, keep nnn.
   }
-
-  // Utility: remove old from type table, return new
-  public Node untype( Node old, Node nnn ) { _ts.clear(old._uid); return nnn; }
 
   // Replace, but do not delete old.  Really used to insert a node in front of old.
   public void replace( Node old, Node nnn ) {
@@ -579,6 +578,7 @@ public class GVNGCM {
         BitsFun fidxs = tfp.fidxs();
         if( fidxs.abit() != -1    ) continue; // resolved to one
         if( !fidxs.above_center() ) continue; // resolved to many
+        if( fidxs==BitsFun.ANY )    continue; // no choices, must be error
         FunPtrNode fptr = call.least_cost(this,fidxs);
         if( fptr==null ) continue;  // declared ambiguous, will be an error later
         call.set_fun_reg(fptr,this);// Set resolved edge
@@ -609,6 +609,18 @@ public class GVNGCM {
     for( Node use : n._uses ) walk_initype(use);
     for( Node def : n._defs ) walk_initype(def);
   }
+
+  // Node n is new during GCP
+  public Node new_gcp( Node n ) {
+    Node x = _vals.get(n);
+    if( x!=null ) return x;
+    _vals.put(n,n);
+    n._live = TypeMem.DEAD;
+    setype(n,n.value(this));
+    add_work(n);
+    return n;
+  }
+
 
   // GCP optimizations on the live subgraph
   private void walk_opt( Node n ) {

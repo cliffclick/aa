@@ -35,6 +35,12 @@ public class ProjNode extends Node {
     return c.above_center() ? Type.XSCALAR : Type.SCALAR;
   }
   @Override public Type all_type() { return ((TypeTuple)in(0).all_type()).at(_idx); }
+  static ProjNode proj( Node head, int idx ) {
+    for( Node use : head._uses )
+      if( use instanceof ProjNode && ((ProjNode)use)._idx==idx )
+        return (ProjNode)use;
+    return null;
+  }
 
   @Override public int hashCode() { return super.hashCode()+_idx; }
   @Override public boolean equals(Object o) {
