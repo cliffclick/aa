@@ -212,7 +212,7 @@ public class FunNode extends RegionNode {
       gvn.add_work_uses(ret);
       for( Node cg : _defs )
         if( cg instanceof CGNode )
-          gvn.add_work(cg.in(0));
+          { gvn.add_work(cg); gvn.add_work(cg.in(0)); }
       return this;
     }
 
@@ -264,6 +264,9 @@ public class FunNode extends RegionNode {
         gvn.remove_reg(cepi,ridx);
       }
     }
+    // Single-target CallEpi can now inline
+    RetNode ret = ret();
+    if( _defs._len==3 && ret != null ) gvn.add_work_uses(ret);
   }
 
   // Gather the ParmNodes into an array.  Return null if any input path is dead
@@ -505,7 +508,7 @@ public class FunNode extends RegionNode {
   // Clone the function body, and split the callers of 'this' into 2 sets; one
   // for the old and one for the new body.  The new function may have a more
   // refined signature, and perhaps no unknown callers.
-  private Node split_callers( GVNGCM gvn, ParmNode[] parms, RetNode oldret, FunNode fun, Ary<Node> body, CGEdge[] cgedges, int path, TypeFunPtr original_tfp) {
+  private void split_callers( GVNGCM gvn, ParmNode[] parms, RetNode oldret, FunNode fun, Ary<Node> body, CGEdge[] cgedges, int path, TypeFunPtr original_tfp) {
     // Strip out all wired calls to this function.  All will re-resolve later.
     for( CGEdge cg : cgedges )
       if( cg != null && cg._cepi != null )
@@ -680,7 +683,6 @@ public class FunNode extends RegionNode {
     if( old_funptr.is_dead() && !is_dead() && has_unknown_callers() )
       set_def(1,gvn.con(Type.XCTRL),gvn);
 
-    return this;
   }
 
   void rewire(GVNGCM gvn, CallNode call, Node funptr, RetNode oldret, FunNode fun, RetNode newret) {

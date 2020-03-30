@@ -147,9 +147,15 @@ public class CallNode extends Node {
     TypeTuple tcall = (TypeTuple)gvn.type(this);
     Type tctl = tcall.at(0);
     Type tfp  = tcall.at(2);
-    if( tctl!=Type.CTRL ) {
+    if( tctl!=Type.CTRL ) {     // Dead?
       if( (ctl() instanceof ConNode) ) return null;
-      return set_def(0,gvn.con(Type.XCTRL),gvn); // Do chop off control usage
+      // Kill all inputs with type-safe dead constants
+      set_def(1,gvn.con(TypeMem.EMPTY),gvn);
+      set_def(2,gvn.con(TypeFunPtr.GENERIC_FUNPTR.dual()),gvn);
+      if( is_dead() ) return this;
+      for( int i=3; i<_defs._len; i++ )
+        set_def(i,gvn.con(Type.XSCALAR),gvn);
+      return set_def(0,gvn.con(Type.XCTRL),gvn);
     }
 
     // When do I do 'pattern matching'?  For the moment, right here: if not
@@ -247,16 +253,10 @@ public class CallNode extends Node {
       tfx = tfx.above_center() ? TypeFunPtr.GENERIC_FUNPTR.dual() : TypeFunPtr.GENERIC_FUNPTR;
     TypeFunPtr tfp = (TypeFunPtr)(ts[2] = tfx);
     BitsFun fidxs = tfp.fidxs();
-    // Specifically unwind Unresolved reporting low in ITER, and that low
-    // report is so if we inline, Unresolved remains monotonic (it will lose
-    // one of the inline requires vs losing an inline choice).  This means if
-    // get some unresolved fptrs via some complex path we'll have to wait until
-    // GCP to start resolving.
-    BitsFun fidxs2 = fun() instanceof UnresolvedNode && gvn._opt_mode<2 ? fidxs.dual() : fidxs;
     // Resolve; keep choices with sane arguments.  If Resolve returns high,
     // then we have real choices and JOIN them.  If Resolve returns low, then
     // we have to handle all of them and we MEET them.
-    BitsFun rfidxs = resolve(gvn,fidxs2,ts);
+    BitsFun rfidxs = resolve(fidxs,ts);
     if( !rfidxs.test(1) ) // Neither ANY nor ALL
       tfp = TypeFunPtr.make(rfidxs,tfp._args,tfp._ret);
     ts[2] = tfp;
@@ -319,14 +319,14 @@ public class CallNode extends Node {
   //
   // Given: BitsFun of choices, GVN _opt_mode and argument types.
   // Returns: set of choices where args match formals, and a flag is any are not OK.
-  BitsFun resolve(GVNGCM gvn, BitsFun fidxs, Type[] targs) {
+  BitsFun resolve( BitsFun fidxs, Type[] targs ) {
     if( fidxs==BitsFun.ANY ) return fidxs; // No point in attempting to resolve all things
     if( fidxs==BitsFun.FULL) return fidxs; // No point in attempting to resolve all things
 
-    int hi = 1;
+    int hi = 2;
     BitsFun choices = BitsFun.EMPTY;
     for( int fidx : fidxs ) {
-      int cmp = resolve(gvn,fidx,targs);
+      int cmp = resolve(fidx,targs);
       // If any args are side, this is neither valid nor a choice.
       if( cmp==0 ) continue;
       // If any arg is eqv/good/low, this is a valid fun.
@@ -334,23 +334,24 @@ public class CallNode extends Node {
       choices = choices.set(fidx);
       hi |= cmp;     // -1 (low) sticks; any low choice and all choices are low
     }
-    return hi==1 ? choices.dual() : choices;
+    if( hi==-1 ) return choices;        // Some low, low response
+    if( hi== 2 ) return choices.dual(); // All high, high response
+    assert hi==3;                       // Some good, use fidxs sign
+    return fidxs.above_center() ? choices.dual() : choices;
   }
 
-  // Return 0 for not-a-choice, +1 for high choice, -1 for low choice.
-  int resolve( GVNGCM gvn, int fidx, Type[] targs ) {
+  // Return 0 for not-a-choice, +2 for high choice, +1 for good choice, -1 for low choice.
+  int resolve( int fidx, Type[] targs ) {
     if( BitsFun.is_parent(fidx) ) // Parent is never a real choice.  See these during inlining.
       throw com.cliffc.aa.AA.unimpl();
 
     FunNode fun = FunNode.find_fidx(fidx);
-    if( fun==null || fun.is_dead() ) return 0; // Stale fidx leading to dead fun
+    if( fun==null || fun.is_dead() ) return 2; // Stale fidx leading to dead fun
     // Forward refs are only during parsing; assume they fit the bill
-    if( fun.is_forward_ref() ) return 1;   // High choice
+    if( fun.is_forward_ref() ) return 2;   // High choice
     if( fun.nargs() != nargs() ) return 0; // Wrong arg count, toss out
-    if( fun.ret() == null ) throw com.cliffc.aa.AA.unimpl();
     TypeStruct formals = fun._tf._args; // Type of each argument
-    //int low=0, good=0, high=0, side=0, eqv=0;
-    boolean low_good=false,high=false;
+    boolean low=false,good=false,high=false;
     for( int j=0; j<fun.nargs(); j++ ) {
       Type actual = targs[j+2];
       if( j==0 && actual instanceof TypeFunPtr )
@@ -358,22 +359,23 @@ public class CallNode extends Node {
       Type formal = formals.at(j);
       // actual is below a formal, above a formal, above a formal-dual, or
       // besides a formal.
-      //if( actual==formal ) eqv++; // Arg is fine.  Covers NO_DISP which can be a high formal.
-      //else if( formal.isa(actual) ) low++;
-      //else if( formal.dual().meet(actual) ) good++;
-      //else if( actual.meet(formal.dual()) ) high++;
-      //else return 0;            // Side-ways not allowed
-
-      if( actual==formal ) continue; // Arg is fine.  Covers NO_DISP which can be a high formal.
-      Type mt = actual.meet(formal.dual());
-      if( formal.isa(actual) || mt==actual ) low_good=true; // Low or Good
-      else if( mt==formal.dual() ) high=true;
+      if( formal.above_center() ) continue; // Arg is ignored
+      if( actual==formal ) { good=true; continue; } // Arg is fine.  Covers NO_DISP which can be a high formal.
+      Type mt_lo = actual.meet(formal       );
+      Type mt_hi = actual.meet(formal.dual());
+      if( mt_lo==actual ) low=true;       // Low
+      else if( mt_hi==actual ) good=true; // Good
+      else if( mt_hi==formal.dual() ) high=true;
+      else if( mt_lo==formal ) good=true; // handles some display cases with prims hi/lo inverted
       else return 0;            // Side-ways not allowed
     }
 
     // If any arg is low/good, this is a low choice.
     // If all args are high, this is a high choice.
-    return low_good || !high ? -1 : 1;
+    if( low  )   return -1;
+    if( good )   return  1;
+    if( high )   return  2;
+    return 1; // No args (paid attention to)
   }
 
 

@@ -54,7 +54,7 @@ public class LoadNode extends Node {
     CallNode call;
     if( mem instanceof MProjNode && mem.in(0) instanceof CallNode && !(call=(CallNode)mem.in(0)).is_copy() )
       return set_mem(call.mem(),gvn);
-    
+
     // Loads against a NewNode cannot NPE, cannot fail, always return the input
     NewObjNode nnn = addr.in(0) instanceof NewObjNode ? (NewObjNode)addr.in(0) : null;
     int idx;
@@ -114,7 +114,7 @@ public class LoadNode extends Node {
         Type t = ts.at(idx);
         if( tmp.must_nil() )    // Might be in-error, but might fall to correct
           return t.widen();     // Return conservative but sane answer
-        return ts.at(idx);      // Field type
+        return t;               // Field type
       }
       // No such field
     }

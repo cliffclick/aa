@@ -49,7 +49,7 @@ public final class CallEpiNode extends Node {
         if( idx!=-99 ) {        // Do not inline
           // TODO: Bring back SESE opts
           fun.set_is_copy(gvn);
-          return inline(gvn, call, ret.ctl(), ret.mem(), ret.val(), null/*do not unwire, because using the entire function body inplace*/);
+          return inline(gvn,level, call, ret.ctl(), ret.mem(), ret.val(), null/*do not unwire, because using the entire function body inplace*/);
         }
       }
     }
@@ -58,7 +58,7 @@ public final class CallEpiNode extends Node {
     if( !fidxs.test(BitsFun.ALL) ) {
       for( int i = 0; i < nwired(); i++ ) {
         RetNode ret = wired(i);
-        if( !fidxs.test(ret.fidx()) ) { // Wired call not in execution set?
+        if( !fidxs.test_recur(ret.fidx()) ) { // Wired call not in execution set?
           assert !BitsFun.is_parent(ret.fidx());
           // Remove the edge.  Pre-GCP all CG edges are virtual, and are lazily
           // and pessimistically filled in by ideal calls.  During the course
@@ -120,10 +120,10 @@ public final class CallEpiNode extends Node {
 
     // Check for zero-op body (id function)
     if( rrez instanceof ParmNode && rrez.in(0) == fun && cmem == rmem )
-      return inline(gvn,call,cctl,cmem,call.arg(((ParmNode)rrez)._idx), ret);
+      return inline(gvn,level,call,cctl,cmem,call.arg(((ParmNode)rrez)._idx), ret);
     // Check for constant body
     if( gvn.type(rrez).is_con() && rctl==fun && cmem == rmem)
-      return inline(gvn,call,cctl,cmem,rrez,ret);
+      return inline(gvn,level,call,cctl,cmem,rrez,ret);
 
     // Check for a 1-op body using only constants or parameters and no memory effects
     boolean can_inline=!(rrez instanceof ParmNode) && rmem==cmem;
@@ -139,7 +139,7 @@ public final class CallEpiNode extends Node {
       for( Node parm : rrez._defs )
         irez.add_def((parm instanceof ParmNode && parm.in(0) == fun) ? call.arg(((ParmNode)parm)._idx) : parm);
       if( irez instanceof PrimNode ) ((PrimNode)irez)._badargs = call._badargs;
-      return inline(gvn,call,cctl,cmem,gvn.add_work(gvn.xform(irez)),ret); // New exciting replacement for inlined call
+      return inline(gvn,level,call,cctl,cmem,gvn.add_work(gvn.xform(irez)),ret); // New exciting replacement for inlined call
     }
 
     return null;
@@ -231,16 +231,26 @@ public final class CallEpiNode extends Node {
       return TypeTuple.CALLE;
     // NO fidxs, means we're not calling anything.
     if( fidxs==BitsFun.EMPTY ) return TypeTuple.CALLE.dual();
-    // Meet across wired callers
+    // Meet across wired callers.  Only take from called functions.
+    // Same as CGNode only passes values into called functions.
     TypeTuple tt = TypeTuple.XRET;
-    for( int i=1; i<_defs._len; i++ )
-      tt = (TypeTuple)tt.meet(gvn.type(in(i)));
+    for( int i=0; i<nwired(); i++ ) {
+      RetNode ret = wired(i);
+      if( ret.is_copy() ) continue; // Dying, not called, not returning here
+      Node fun = ret.fun(), cuse0=null;
+      for( Node cuse : call._uses ) // O(n^2) with a small 'n', can be linear with a smarter lookup
+        if( cuse._uses.atX(0)==fun )
+          { cuse0=cuse; break; }
+      if( gvn.type(cuse0)==Type.CTRL )
+        tt = (TypeTuple)tt.meet(gvn.type(ret));
+    }
     return tt;
   }
 
   // Inline the CallNode.  Remove all edges except the results.  This triggers
   // "is_copy()", which in turn will trigger the following ProjNodes to inline.
-  private Node inline( GVNGCM gvn, CallNode call, Node ctl, Node mem, Node rez, RetNode ret ) {
+  private Node inline( GVNGCM gvn, int level, CallNode call, Node ctl, Node mem, Node rez, RetNode ret ) {
+    assert (level&1)==0; // Do not actually inline, if just checking that all forward progress was found
     assert nwired()==0 || nwired()==1; // not wired to several choices
 
     // Unwire any wired called function

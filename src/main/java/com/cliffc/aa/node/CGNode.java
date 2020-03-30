@@ -16,9 +16,10 @@ public final class CGNode extends CProjNode {
     FunNode fun = (FunNode)_uses.at(0);
     CallNode call = (CallNode)in(0);
     TypeTuple tcall = (TypeTuple)gvn.type(call);
+    if( tcall.at(0) != Type.CTRL ) return Type.XCTRL;
     int fidx = fun._tf.fidx();
-    int cmp = call.resolve(gvn,fidx,tcall._ts);
-    return cmp == -1 ? Type.CTRL : Type.XCTRL; // Low resolve is alive, illegal/high is not
+    int cmp = call.resolve(fidx,tcall._ts);
+    return cmp == -1 || cmp == 1 ? Type.CTRL : Type.XCTRL; // Low/good resolve is alive, illegal/high is not
   }
   @Override public int hashCode() { return super.hashCode()+_idx; }
   // CGNodes are never equal, as they are a variant of an edge label.

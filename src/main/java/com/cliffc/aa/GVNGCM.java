@@ -368,6 +368,8 @@ public class GVNGCM {
     // [ts!,vals?] Remove before ideal or value-wiring hacks edges & changes hash
     _vals.remove(n);
 
+    assert n._uses._len>0 || n instanceof ScopeNode;
+
     // [ts!] Compute uses & live bits.  If progress, push the defs on the
     // worklist.  This is a reverse flow computation.
     TypeMem old = n._live;
@@ -382,10 +384,9 @@ public class GVNGCM {
     if( !nnn.is_live() && !n.is_prim() && n.err(this)==null &&
         !(n instanceof CallNode) &&       // Keep for proper errors
         !(n instanceof UnresolvedNode) && // Keep for proper errors
-        !(n instanceof RetNode) ) {       // Keep for proper errors
-      return (n instanceof ConNode) ? null
-        : untype(n, con(n.all_type().startype())); // Replace non-constants with high (dead) constants
-    }
+        !(n instanceof RetNode) &&        // Keep for proper errors
+        !(n instanceof ConNode) )         // Already a constant
+      return untype(n, con(n.all_type().startype())); // Replace non-constants with high (dead) constants
 
     // [ts!] Compute best type, and type is IN ts
     Type t = n.value(this);     // Get best type

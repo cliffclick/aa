@@ -34,8 +34,6 @@ public class ParmNode extends PhiNode {
     if( !(in(0) instanceof FunNode) ) return null; // Dying
     FunNode fun = fun();
     if( gvn.type(fun) == Type.XCTRL ) return null; // All dead, c-prop will fold up
-    //if( (level&1)==0 )          // Not doing asserts
-    //  gvn.add_work2(fun);       // Something changed, re-check inlining chances
     assert fun._defs._len==_defs._len;
     // Arg-check before folding up
     if( _idx >= 0 ) {                         // Skip RPC and memory
@@ -45,17 +43,25 @@ public class ParmNode extends PhiNode {
             !gvn.type(in(i)).isa(fun.targ(_idx)) ) // Arg is NOT correct type
           return null;          // Not correct arg-type; refuse to collapse
     }
+    // Tighten the internal bounds, if possible.  Required for Display parm,
+    // which does not have the final Display until Parse is done.
+    Type unk = gvn.type(in(1));
+    if( _idx==0 && fun.has_unknown_callers() && gvn.type(fun.in(1))==Type.CTRL &&
+        unk != _t ) {
+      assert unk.isa(_t);
+      _t = unk;
+      return this;
+    }
     return super.ideal(gvn,level); // Let PhiNode collapse
   }
 
   @Override public Type value(GVNGCM gvn) {
-    Type oldt = gvn.self_type(this);
     Type t = super.value(gvn);
     // Bound all input types to the matching function argument type, so sane
     // arguments flow into the function... even if bad arguments are being
     // passed.  This limits forward error flow, and enables better error
     // messages.  Not done during or after GCP, as we are past error prop.
-    if( gvn._opt_mode<2 ) t = t.bound(all_type().startype().dual());
+    if( gvn._opt_mode<2 ) t = t.bound(_t);
     // Memory tracks the notion of 'clean' or 'unwritten' since the function
     // start.  Changed memory is returned at exit and unchanged memory is NOT
     // returned - and CallEpis are aware of this behavior and do the correct

@@ -231,7 +231,7 @@ public abstract class Node implements Cloneable {
         sb.nl();
       if( n._op==OP_FUN ) _header((FunNode)n,sb);
       n.dump(0,sb,gvn).nl();
-      if( n._op==OP_RET ) _header(((RetNode)n).fun(),sb);
+      if( n._op==OP_RET && n.in(4) instanceof FunNode ) _header((FunNode)n.in(4),sb);
       prior = n;
     }
     return sb.toString();
@@ -327,7 +327,7 @@ public abstract class Node implements Cloneable {
   // Load or a Scope changes the memory demanded by the Load or Scope.  Same:
   // changing a def._type changes the use._live, requiring other defs to be
   // revisited.
-  public boolean input_value_changes_live() { return _op==OP_SCOPE || _op==OP_LOAD; }
+  public boolean input_value_changes_live() { return _op==OP_SCOPE || _op==OP_LOAD || _op==OP_CALLEPI; }
   public boolean live_changes_value() { return _op==OP_CALLGRF; }
 
   // Return any type error message, or null if no error

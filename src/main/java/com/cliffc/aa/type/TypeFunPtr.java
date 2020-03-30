@@ -60,8 +60,12 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   @Override public String str( VBitSet dups) {
     if( dups == null ) dups = new VBitSet();
     if( dups.tset(_uid) ) return "$"; // Break recursive printing cycle
-    return "*"+names()+":{"+_args.str(dups)+"-> "+_ret.str(dups)+"}";
+    String s = "*"+names()+":{";
+    for( int i=0; i<_args._ts.length; i++ )
+      s += _args._flds[i]+":"+_args._ts[i].str(dups)+" ";
+    return s+"-> "+_ret.str(dups)+"}";
   }
+  
   @Override SB dstr( SB sb, VBitSet dups ) {
     sb.p('_').p(_uid);
     if( dups == null ) dups = new VBitSet();

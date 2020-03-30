@@ -148,7 +148,7 @@ public class TestNodeSmall {
       TypeTuple.make( txctl, tfull, tfp_mul2, t2   , txscl), // Both work, can fall to either, no resolve
       TypeTuple.make( txctl, tfull, tfp_mul2, txscl, txscl), // Both work, ambiguous, choose neither. {int+flt}
     };
-    _testMonotonicChain(ins,call,argss_mul2);
+    _testMonotonicChain(ins,call,argss_mul2x);
 
     // Test this chain of types is monotonic
     call.set_fun(ins[2]=fp_add,gvn);
