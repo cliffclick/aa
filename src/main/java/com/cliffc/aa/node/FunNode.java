@@ -206,7 +206,13 @@ public class FunNode extends RegionNode {
       TypeFunPtr tf = TypeFunPtr.make(_tf.fidxs(),_tf._args.make_from(ts),_tf._ret);
       assert tf.isa(_tf) && _tf != tf;
       _tf = tf;
-      gvn.add_work_uses(ret);  // Changing the sig can drop display closures
+      // Changing the sig can drop display closures and other parms, and enable
+      // FP2Closure to drop the display, and/or CallNodes to resolve.  These
+      // are "not quite neighbors" and need to be hand-loaded onto worklist.
+      gvn.add_work_uses(ret);
+      for( Node cg : _defs )
+        if( cg instanceof CGNode )
+          gvn.add_work(cg.in(0));
       return this;
     }
 

@@ -36,16 +36,20 @@ public class GVNGCM {
     // Add self at the end, so the work loops pull it off again.
     if( touched(n)  ) add_work(n); // Do not re-add if mid-ideal-call.
   }
+  // All defs on worklist - liveness flows uphill
+  public void add_work_defs( Node n ) {
+    for( Node def : n._defs ) // Put defs on worklist... liveness flows uphill
+      if( def != null && def != n )
+        add_work(def);
+  }
 
   // A second worklist, for code-expanding and thus lower priority work.
   // Inlining happens off this worklist, once the main worklist runs dry.
   private Ary<Node> _work2 = new Ary<>(new Node[1], 0);
-  private BitSet _wrk2_bits = new BitSet();
+  private VBitSet _wrk2_bits = new VBitSet();
   public void add_work2( Node n ) {
-    if( !_wrk2_bits.get(n._uid) ) {
+    if( !_wrk2_bits.tset(n._uid) )
       _work2.add(n);
-      _wrk2_bits.set(n._uid);
-    }
   }
 
   // Array of types representing current node types.  Essentially a throw-away
@@ -68,7 +72,7 @@ public class GVNGCM {
     _INIT0_CNT=CNT;
     _INIT0_NODES = _vals.keySet().toArray(new Node[0]);
     for( Node n : _INIT0_NODES ) { assert !n.is_dead();  n._live = TypeMem.FULL; add_work(n); }
-    }
+  }
   // Reset is called after a top-level exec exits (e.g. junits) with no parse
   // state left alive.  NOT called after a line in the REPL or a user-call to
   // "eval" as user state carries on.
@@ -111,10 +115,8 @@ public class GVNGCM {
       }
       TypeMem live = n.live(this);
       if( live != n._live ) {
-        n._live = live;         // Reset cache to current
-        for( Node def : n._defs ) // Put defs on worklist... liveness flows uphill
-          if( def != null && def != n )
-            add_work(def);
+        n._live = live;        // Reset cache to current
+        add_work_defs(n);      // Put defs on worklist... liveness flows uphill
       }
     }
   }
@@ -271,9 +273,9 @@ public class GVNGCM {
         kill(n);              // replace so immediately recycle n and dead subgraph
         n = x.unhook();       // Remove keep-alive
         if( !check_new(x) ) return x; // If the replacement is old, no need to re-ideal
-        for( Node def : n._defs )  if( def != null )  add_work(def); // Force live-ness rechecking
+        add_work_defs(n);       // Force live-ness rechecking
       }
-      cnt++; assert cnt < 100;      // Catch infinite ideal-loops
+      cnt++; assert cnt < 100;  // Catch infinite ideal-loops
     }
     // Global Value Numbering; n is "in the system" now
     Node x = _vals.putIfAbsent(n,n);
@@ -373,9 +375,7 @@ public class GVNGCM {
     if( old != nnn ) {          // Progress?
       assert nnn.isa(old);      // Monotonically improving
       n._live = nnn;            // Mark progress
-      for( Node def : n._defs ) // Put defs on worklist... liveness flows uphill
-        if( def != null && def != n )
-          add_work(def);        // Reverse flow: do work on defs not uses
+      add_work_defs(n);         // Put defs on worklist... liveness flows uphill
     }
 
     // [ts!] If completely dead, exit now.
@@ -544,9 +544,7 @@ public class GVNGCM {
             // into the Load.  This might also be viewed as a "turn around"
             // point, where available value memory becomes demanded liveness.
             if( use.input_value_changes_live() )
-              for( Node def : use._defs )
-                if( def != null && def != n )
-                  add_work(def);
+              add_work_defs(use);
 
             // When new control paths appear on Regions, the Region stays the
             // same type (Ctrl) but the Phis must merge new values.
@@ -565,9 +563,9 @@ public class GVNGCM {
         if( old != nnn ) {      // Liveness progress
           assert old.isa(nnn);  // Monotonically improving
           n._live = nnn;
-          for( Node def : n._defs ) // Put defs on worklist... liveness flows uphill
-            if( def != null && def != n )
-              add_work(def);        // Reverse flow: do work on defs not uses
+          add_work_defs(n);    // Put defs on worklist... liveness flows uphill
+          if( n.live_changes_value() )
+            add_work(n);
         }
       }
 
@@ -583,6 +581,10 @@ public class GVNGCM {
         if( fptr==null ) continue;  // declared ambiguous, will be an error later
         call.set_fun_reg(fptr,this);// Set resolved edge
         add_work(fptr);             // Unresolved is now resolved and live
+        // If this call is wired, a CallEpi will 'peek thru' an Unresolved to
+        // pass liveness to a Ret.  Since 1-step removed from neighbor, have to
+        // add_work 1-step further afield.
+        add_work(fptr.in(0));
         assert Env.START.more_flow(this,new VBitSet(),false,0)==0; // Post conditions are correct
       }
     }

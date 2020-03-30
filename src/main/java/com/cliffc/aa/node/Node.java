@@ -81,7 +81,11 @@ public abstract class Node implements Cloneable {
     if( old != null ) {
       old._uses.del(this);
       if( old._uses._len==0 && old._keep==0 ) gvn.kill(old); // Recursively begin deleting
-      if( !old.is_dead() ) gvn.add_work(old);  // Lost a use, so recompute live
+      if( !old.is_dead() ) {
+        gvn.add_work(old);      // Lost a use, so recompute live
+        if( old instanceof UnresolvedNode )
+          gvn.add_work_defs(old);
+      }
     }
     return this;
   }
@@ -207,7 +211,7 @@ public abstract class Node implements Cloneable {
     }
   }
   boolean is_multi_head() { return _op==OP_CALL || _op==OP_CALLEPI || _op==OP_FUN || _op==OP_IF || _op==OP_LIBCALL || _op==OP_NEWOBJ || _op==OP_NEWSTR || _op==OP_REGION || _op==OP_START; }
-  private boolean is_multi_tail() { return _op==OP_PARM || _op==OP_PHI || _op==OP_PROJ || _op==OP_CPROJ || _op==OP_CALLGRF; }
+  private boolean is_multi_tail() { return _op==OP_PARM || _op==OP_PHI || _op==OP_PROJ || _op==OP_CPROJ || _op==OP_CALLGRF || _op==OP_FP2CLO; }
   private boolean is_CFG()        { return _op==OP_CALL || _op==OP_CALLEPI || _op==OP_FUN || _op==OP_RET || _op==OP_IF || _op==OP_REGION || _op==OP_START || _op==OP_CPROJ || _op==OP_SCOPE; }
 
   public String dumprpo( GVNGCM gvn, boolean prims ) {
@@ -324,6 +328,7 @@ public abstract class Node implements Cloneable {
   // changing a def._type changes the use._live, requiring other defs to be
   // revisited.
   public boolean input_value_changes_live() { return _op==OP_SCOPE || _op==OP_LOAD; }
+  public boolean live_changes_value() { return _op==OP_CALLGRF; }
 
   // Return any type error message, or null if no error
   public String err(GVNGCM gvn) { return null; }

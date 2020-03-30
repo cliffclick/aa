@@ -146,18 +146,17 @@ public class CallNode extends Node {
     // Dead, do nothing
     TypeTuple tcall = (TypeTuple)gvn.type(this);
     Type tctl = tcall.at(0);
-    Type tmem = tcall.at(1);
     Type tfp  = tcall.at(2);
     if( tctl!=Type.CTRL ) {
       if( (ctl() instanceof ConNode) ) return null;
       return set_def(0,gvn.con(Type.XCTRL),gvn); // Do chop off control usage
     }
-    Node mem = mem();
 
     // When do I do 'pattern matching'?  For the moment, right here: if not
     // already unpacked a tuple, and can see the NewNode, unpack it right now.
     if( !_unpacked ) { // Not yet unpacked a tuple
       assert nargs()==2;        // The Display plus the arg tuple
+      Node mem = mem();
       Node arg1 = arg(1);
       Type tadr = gvn.type(arg1);
       // Bypass a merge on the 2-arg input during unpacking
@@ -182,23 +181,26 @@ public class CallNode extends Node {
     if( fidxs==BitsFun.EMPTY ) // TODO: zap function to empty function constant
       return null;             // Zero choices
 
-    // If the function is unresolved, see if we can resolve it now
+    // If we have a single function allowed, force the function constant.
     Node unk = fun();           // Function epilog/function pointer
-    if( unk instanceof UnresolvedNode && !fidxs.above_center() ) { // Something valid and choicy?
-      int fidx = fidxs.abit();      // Check for single target
-      if( fidx != -1 ) return set_fun(FunNode.find_fidx(fidx).ret().funptr(),gvn);
-      else {
-        FunPtrNode fptr = least_cost(gvn, fidxs);     // Check for least-cost target
-        if( fptr != null ) return set_fun(fptr, gvn); // Resolve to 1 choice
-      }
+    int fidx = fidxs.abit();    // Check for single target
+    if( fidx != -1 && !(unk instanceof FunPtrNode) )
+      return set_fun(FunNode.find_fidx(fidx).ret().funptr(),gvn);
+
+    // If the function is unresolved, see if we can resolve it now
+    if( unk instanceof UnresolvedNode && // Unresolved
+        !fidxs.above_center() ) {        // Only high if not executable/dying
+      FunPtrNode fptr = least_cost(gvn, fidxs.dual()); // Check for least-cost target
+      if( fptr != null ) return set_fun(fptr, gvn); // Resolve to 1 choice
     }
 
     // Wire targets that are not choices (1 or multi) with matching nargs even
-    // with bad args.  CallEpi will inline wired functions with good args.
+    // with bad/low args; they may lift to good.  CallEpi will inline wired functions with good args.
     if( check_wire(gvn,fidxs) )
       return this;              // Some wiring happened
 
-    // Check for dead args and trim; must be after all wiring is done.
+    // Check for dead args and trim; must be after all wiring is done because unknown
+    // call targets can appear during GCP and use the args.
     if( gvn._opt_mode > 2 && err(gvn)==null ) {
       Node progress = null;
       for( int i=1; i<nargs(); i++ ) // Skip the FP/DISPLAY arg, as its useful for error messages
@@ -231,6 +233,14 @@ public class CallNode extends Node {
       mem = mem.above_center() ? TypeMem.EMPTY : TypeMem.FULL;
     ts[1] = mem;
 
+    // If not called, then no memory to functions
+    if( ctl == Type.XCTRL ) { ts[1] = TypeMem.EMPTY; }
+
+    // Copy args for called functions.
+    // If call is dead, then so are args.
+    for( int i=0; i<nargs(); i++ )
+      ts[i+2] = ctl==Type.XCTRL ? Type.XSCALAR : targ(gvn,i);
+
     // Not a function to call?
     Type tfx = gvn.type(fun());
     if( !(tfx instanceof TypeFunPtr) )
@@ -246,30 +256,10 @@ public class CallNode extends Node {
     // Resolve; keep choices with sane arguments.  If Resolve returns high,
     // then we have real choices and JOIN them.  If Resolve returns low, then
     // we have to handle all of them and we MEET them.
-    BitsFun rfidxs = resolve(gvn,fidxs2);
-    if( fidxs != rfidxs ) {     // Fast-path shortcut
-      Type mt = rfidxs.above_center() ? TypeFunPtr.GENERIC_FUNPTR : TypeFunPtr.GENERIC_FUNPTR.dual();
-      if( rfidxs.above_center() ) { // JOIN choices, args, ret.
-        for( int fidx : rfidxs ) {  // 
-          TypeFunPtr tp = FunNode.find_fidx(fidx)._tf;
-          // This is always a low-bit.  Flip to high for join, or else our choices go to empty.
-          TypeFunPtr tp2 = TypeFunPtr.make(tp.fidxs().dual(),tp._args,tp._ret);
-          mt = mt.join(tp2);
-        }
-      } else {                  // MEET of low bits, args, ret.
-        for( int fidx : rfidxs ) mt = mt.meet(FunNode.find_fidx(fidx)._tf);
-      }
-      tfp = (TypeFunPtr)mt;
-    }
+    BitsFun rfidxs = resolve(gvn,fidxs2,ts);
+    if( !rfidxs.test(1) ) // Neither ANY nor ALL
+      tfp = TypeFunPtr.make(rfidxs,tfp._args,tfp._ret);
     ts[2] = tfp;
-
-    // If not called, then no memory to functions
-    if( ctl == Type.XCTRL ) { ts[1] = TypeMem.EMPTY; }
-
-    // Copy args for called functions.
-    // If call is dead, then so are args.
-    for( int i=1; i<nargs(); i++ )
-      ts[i+2] = ctl==Type.XCTRL ? Type.XSCALAR : targ(gvn,i);
 
     return TypeTuple.make(ts);
   }
@@ -329,57 +319,68 @@ public class CallNode extends Node {
   //
   // Given: BitsFun of choices, GVN _opt_mode and argument types.
   // Returns: set of choices where args match formals, and a flag is any are not OK.
-  BitsFun resolve(GVNGCM gvn, BitsFun fidxs) {
-    if( !fidxs.above_center() ) return fidxs;
+  BitsFun resolve(GVNGCM gvn, BitsFun fidxs, Type[] targs) {
     if( fidxs==BitsFun.ANY ) return fidxs; // No point in attempting to resolve all things
+    if( fidxs==BitsFun.FULL) return fidxs; // No point in attempting to resolve all things
 
+    int hi = 1;
     BitsFun choices = BitsFun.EMPTY;
-    BitsFun valids  = BitsFun.EMPTY;
-    outerloop:
     for( int fidx : fidxs ) {
-      if( BitsFun.is_parent(fidx) ) // Parent is never a real choice.  See these during inlining.
-        throw com.cliffc.aa.AA.unimpl();
-
-      FunNode fun = FunNode.find_fidx(fidx);
-      if( fun==null || fun.is_dead() ) continue; // Stale fidx leading to dead fun
-      // Forward refs are only during parsing; assume they fit the bill
-      if( fun.is_forward_ref() ) throw com.cliffc.aa.AA.unimpl("add to choice set and continue");
-      if( fun.nargs() != nargs() ) continue; // Wrong arg count, toss out
-      if( fun.ret() == null ) throw com.cliffc.aa.AA.unimpl();
-      TypeStruct formals = fun._tf._args; // Type of each argument
-      int low=0, good=0, high=0, side=0, eqv=0;
-      for( int j=0; j<fun.nargs(); j++ ) {
-        Type actual = targ(gvn,j);
-        Type formal = formals.at(j);
-        if( formal.above_center() ) continue; // Formal allows all args (not quite dead?)
-        // actual is below a formal, above a formal, above a formal-dual, or
-        // besides a formal.
-        if( actual==formal ) eqv++; // Arg is fine.  Covers NO_DISP which can be a high formal.
-        else if( formal.isa(actual) ) low++;
-        else {
-          Type mt = formal.dual().meet(actual);
-          if( mt==actual ) good++;
-          else if( formal.dual()==mt ) high++;
-          else side++;
-        }
-      }
-
+      int cmp = resolve(gvn,fidx,targs);
       // If any args are side, this is neither valid nor a choice.
+      if( cmp==0 ) continue;
       // If any arg is eqv/good/low, this is a valid fun.
       // If all args are high, this is a choice fun.
-      if( side > 0 ) ;
-      else if( low > 0 || good > 0 || eqv > 0 ) valids = valids.set(fidx);
-      else choices = choices.set(fidx);
+      choices = choices.set(fidx);
+      hi |= cmp;     // -1 (low) sticks; any low choice and all choices are low
     }
-    assert valids==BitsFun.EMPTY || choices==BitsFun.EMPTY;
-    return valids==BitsFun.EMPTY ? choices.dual() : valids;
+    return hi==1 ? choices.dual() : choices;
   }
 
+  // Return 0 for not-a-choice, +1 for high choice, -1 for low choice.
+  int resolve( GVNGCM gvn, int fidx, Type[] targs ) {
+    if( BitsFun.is_parent(fidx) ) // Parent is never a real choice.  See these during inlining.
+      throw com.cliffc.aa.AA.unimpl();
+
+    FunNode fun = FunNode.find_fidx(fidx);
+    if( fun==null || fun.is_dead() ) return 0; // Stale fidx leading to dead fun
+    // Forward refs are only during parsing; assume they fit the bill
+    if( fun.is_forward_ref() ) return 1;   // High choice
+    if( fun.nargs() != nargs() ) return 0; // Wrong arg count, toss out
+    if( fun.ret() == null ) throw com.cliffc.aa.AA.unimpl();
+    TypeStruct formals = fun._tf._args; // Type of each argument
+    //int low=0, good=0, high=0, side=0, eqv=0;
+    boolean low_good=false,high=false;
+    for( int j=0; j<fun.nargs(); j++ ) {
+      Type actual = targs[j+2];
+      if( j==0 && actual instanceof TypeFunPtr )
+        actual = ((TypeFunPtr)actual).display(); // Extract Display type from TFP
+      Type formal = formals.at(j);
+      // actual is below a formal, above a formal, above a formal-dual, or
+      // besides a formal.
+      //if( actual==formal ) eqv++; // Arg is fine.  Covers NO_DISP which can be a high formal.
+      //else if( formal.isa(actual) ) low++;
+      //else if( formal.dual().meet(actual) ) good++;
+      //else if( actual.meet(formal.dual()) ) high++;
+      //else return 0;            // Side-ways not allowed
+
+      if( actual==formal ) continue; // Arg is fine.  Covers NO_DISP which can be a high formal.
+      Type mt = actual.meet(formal.dual());
+      if( formal.isa(actual) || mt==actual ) low_good=true; // Low or Good
+      else if( mt==formal.dual() ) high=true;
+      else return 0;            // Side-ways not allowed
+    }
+
+    // If any arg is low/good, this is a low choice.
+    // If all args are high, this is a high choice.
+    return low_good || !high ? -1 : 1;
+  }
 
 
   // Amongst these choices return the least-cost.  Some or all might be
   // invalid.
   public FunPtrNode least_cost(GVNGCM gvn, BitsFun choices) {
+    assert choices.above_center(); // Must be some choices
     assert choices.bitCount() > 0; // Must be some choices
     int best_cvts=99999;           // Too expensive
     FunPtrNode best_fptr=null;     //
@@ -397,6 +398,7 @@ public class CallNode extends Node {
         Type formal = formals.at(j);
         if( actual==formal ) continue;
         byte cvt = actual.isBitShape(formal); // +1 needs convert, 0 no-cost convert, -1 unknown, 99 never
+        if( cvt == -1 ) return null; // Might be the best choice, or only choice, dunno
         cvts += cvt;
       }
 
@@ -422,15 +424,17 @@ public class CallNode extends Node {
         else tied=true;                   // Tied, ambiguous
       }
     }
+    assert best_cvts < 99;
     return tied ? null : best_fptr; // Ties need to have the ambiguity broken another way
   }
 
-  public boolean check_wire( GVNGCM gvn) {
+  // Called from GCP, using the optimistic type.
+  public void check_wire( GVNGCM gvn) {
     TypeTuple tcall = (TypeTuple)gvn.type(this);
     Type tfp  = tcall.at(2);
-    if( !(tfp instanceof TypeFunPtr) ) return false;
+    if( !(tfp instanceof TypeFunPtr) ) return;
     BitsFun fidxs = ((TypeFunPtr)tfp).fidxs();
-    return check_wire(gvn,fidxs);
+    check_wire(gvn, fidxs);
   }
   // Used during GCP and Ideal calls to see if wiring is appropriate.
   public boolean check_wire( GVNGCM gvn, BitsFun fidxs ) {
@@ -473,10 +477,15 @@ public class CallNode extends Node {
     if( tfp.nargs() != nargs() )
       return _badargs.errMsg("Passing "+(nargs()-1)+" arguments to "+tfp.names()+" which takes "+(tfp.nargs()-1)+" arguments");
 
-    // Now do an arg-check
+    // Now do an arg-check.
+    // Use self-type not input type, so that we do not depend on a neighbors
+    // type.  Neighbors of us can then not depend on a neighbor's neighbor.
+    TypeTuple tcall = (TypeTuple)gvn.type(this);
     TypeStruct formals = tfp._args; // Type of each argument
     for( int j=0; j<formals._ts.length; j++ ) {
-      Type actual = targ(gvn,j);
+      Type actual = tcall.at(j+2);
+      if( j==0 && actual instanceof TypeFunPtr )
+        actual = ((TypeFunPtr)actual).display(); // Extract Display type from TFP
       Type formal = formals.at(j);
       if( !actual.isa(formal) ) // Actual is not a formal
         return _badargs.typerr(actual,formal,mem());

@@ -76,22 +76,16 @@ public class ParmNode extends PhiNode {
         // The merge of all incoming calls for this argument is not legal.
         // Find the call bringing the broken args, and use it for error
         // reporting - it MUST exist, or we have a really weird situation
-        RetNode ret = fun.ret();
-        if( ret != null ) {
-          FunPtrNode fptr=ret.funptr();  // Only 1 FunPtr per fun
-          for( Node use : fptr._uses ) {
-            if( use instanceof UnresolvedNode )
-              use = use._uses.at(0); // TODO: Need to loop over the tree of uses
-            if( use instanceof CallNode ) {
-              CallNode call = (CallNode)use;
-              Type argc = gvn.type(call.arg(_idx)); // Call arg type
-              if( !argc.isa(formal) )
-                return call._badargs.typerr(argc,formal,call.mem());
-              // Must be a different call that is in-error
-            }
+        for( Node def : fun._defs ) {
+          if( def instanceof CGNode ) {
+            CallNode call = (CallNode)def.in(0);
+            Type argc = gvn.type(call.arg(_idx)); // Call arg type
+            if( !argc.isa(formal) )
+              return call._badargs.typerr(argc,formal,call.mem());
+            // Must be a different call that is in-error
           }
-          throw com.cliffc.aa.AA.unimpl(); // meet of args is not the formal, but no single arg is not the formal?
         }
+        throw com.cliffc.aa.AA.unimpl(); // meet of args is not the formal, but no single arg is not the formal?
       }
     }
     return null;

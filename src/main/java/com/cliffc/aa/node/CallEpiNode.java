@@ -74,9 +74,11 @@ public final class CallEpiNode extends Node {
 
     // Only inline wired single-target function with valid args.  CallNode wires.
     if( nwired()!=1 ) return null;
-    assert !fidxs.above_center(); // Since wired, not above center
     int fidx = fidxs.abit();      // Could be 1 or multi
     if( fidx == -1 ) return null; // Multi choices, only 1 wired at the moment.
+    //assert !fidxs.above_center(); // Since wired, not above center
+    if( fidxs.above_center() )
+      return null;
 
     // Call allows 1 function not yet wired, sanity check it.
     FunNode fun = FunNode.find_fidx(fidx);
@@ -227,7 +229,8 @@ public final class CallEpiNode extends Node {
     BitsFun fidxs = ((TypeFunPtr)tfptr).fidxs();
     if( gvn._opt_mode < 2 && fidxs.bitCount() > nwired() )
       return TypeTuple.CALLE;
-
+    // NO fidxs, means we're not calling anything.
+    if( fidxs==BitsFun.EMPTY ) return TypeTuple.CALLE.dual();
     // Meet across wired callers
     TypeTuple tt = TypeTuple.XRET;
     for( int i=1; i<_defs._len; i++ )
@@ -271,16 +274,18 @@ public final class CallEpiNode extends Node {
     assert _keep==0;
     // If is_copy, then basically acting like pass-thru.
     if( !is_copy() && def != call() ) { // Not a copy, check call site
-      // If we are not sure which of the many targets will eventually be alive,
-      // then none are.  Once the call resolves, the chosen target will be alive.
-      if( call().fun() instanceof UnresolvedNode )
-        return TypeMem.DEAD; // Not sure, so def is not more alive (yet)
-      // If not a copy, behaves pretty normal except that only alias=1 gets
-      // propagated into a Call def; other aliases might be provided by the
-      // called function and never make it to the Call.  Alias#1 is not ever
-      // satisfied but only appears before GCP.
+      // The given function is alive, only if the Call will Call it.
+      TypeTuple tcall = (TypeTuple)gvn.type(call());
+      BitsFun fidxs = ((TypeFunPtr)tcall.at(2)).fidxs();
+      int fidx = ((RetNode)def).fidx();
+      if( fidxs.above_center() || !fidxs.test(fidx) )
+        return TypeMem.DEAD;    // Call does not call this, so not alive.
+      // Target is as alive as we are.
       return _live;
     }
+    // Call is as alive as we are, demanding what we demand.  Since Call is
+    // alive, the FunPtr to the Call is also alive, even if the targets are not
+    // alive (because the FunPtr has XSCALAR value).
     if( _live==TypeMem.DEAD ) return TypeMem.DEAD;
     return _live.at(1) == TypeObj.OBJ ? TypeMem.make(1,TypeObj.OBJ) : TypeMem.EMPTY;
   }
