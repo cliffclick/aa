@@ -24,10 +24,10 @@ public final class FP2ClosureNode extends Node {
     return c==null ? null : this;
   }
   @Override public Type value(GVNGCM gvn) {
-    TypeTuple tcall = (TypeTuple)gvn.type(in(0));
-    Type tdisp = convert(tcall.at(2));
-    assert tdisp.is_display_ptr();
-    return tdisp;
+    // Expect either a TFP from a FunPtrNode, or a TypeTuple from a CallNode.
+    Type t0 = gvn.type(in(0));
+    Type tfp = t0 instanceof TypeTuple ? ((TypeTuple)t0).at(2) : t0;
+    return convert(tfp);
   }
   @Override public TypeMemPtr all_type() { return TypeMemPtr.DISPLAY_PTR; }
   static public Type convert( Type t ) {

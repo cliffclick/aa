@@ -10,14 +10,13 @@ public final class CGNode extends CProjNode {
   @Override String xstr() { return "CG"; }
   @Override public Node ideal(GVNGCM gvn, int level) { return super.ideal(gvn,level); }
   @Override public Type value(GVNGCM gvn) {
-    if( _uses._len==0 ) return Type.CTRL;
     if( _live==TypeMem.DEAD ) return Type.XCTRL; // Dead, kill control
+    if( _uses._len==0 ) return Type.CTRL;
     assert _uses._len==1;
-    FunNode fun = (FunNode)_uses.at(0);
+    int fidx = ((FunNode)_uses.at(0))._tf.fidx();
     CallNode call = (CallNode)in(0);
     TypeTuple tcall = (TypeTuple)gvn.type(call);
     if( tcall.at(0) != Type.CTRL ) return Type.XCTRL;
-    int fidx = fun._tf.fidx();
     int cmp = call.resolve(fidx,tcall._ts);
     return cmp == -1 || cmp == 1 ? Type.CTRL : Type.XCTRL; // Low/good resolve is alive, illegal/high is not
   }

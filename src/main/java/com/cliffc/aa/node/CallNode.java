@@ -433,6 +433,7 @@ public class CallNode extends Node {
   // Called from GCP, using the optimistic type.
   public void check_wire( GVNGCM gvn) {
     TypeTuple tcall = (TypeTuple)gvn.type(this);
+    if( tcall.at(0) != Type.CTRL ) return;
     Type tfp  = tcall.at(2);
     if( !(tfp instanceof TypeFunPtr) ) return;
     BitsFun fidxs = ((TypeFunPtr)tfp).fidxs();

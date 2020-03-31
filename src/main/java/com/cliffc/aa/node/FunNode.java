@@ -192,17 +192,19 @@ public class FunNode extends RegionNode {
     // See if we can make the function signature more precise.  When building
     // type-split signatures, we'd like this to be as precise as all unsplit
     // inputs.
-    boolean progress= false, anti=false;
+    boolean progress= false;
     for( int i=0; i<parms.length; i++ ) {
       Type t = parms[i]==null ? (i==0 ? TypeStruct.NO_DISP : Type.XSCALAR) : gvn.type(parms[i]);
-      if( t != targ(i) )
-        if( t.isa(targ(i)) ) progress=true; else anti=true;
+      if( t != targ(i) && t.isa(targ(i)) ) progress=true;
     }
-    if( progress && !anti && !is_prim() ) {
+    if( progress && !is_prim() ) {
       Type[] ts = TypeAry.get(parms.length);
       ts[0] = parms[0]==null ? TypeStruct.NO_DISP : gvn.type(parms[0]);
-      for( int i=1; i<parms.length; i++ )
+      if( !ts[0].isa(targ(0)) ) ts[0] = targ(0);
+      for( int i=1; i<parms.length; i++ ) {
         ts[i] = parms[i] == null ? Type.XSCALAR : gvn.type(parms[i]);
+        if( !ts[i].isa(targ(i)) ) ts[i] = targ(i);
+      }
       TypeFunPtr tf = TypeFunPtr.make(_tf.fidxs(),_tf._args.make_from(ts),_tf._ret);
       assert tf.isa(_tf) && _tf != tf;
       _tf = tf;
@@ -215,6 +217,7 @@ public class FunNode extends RegionNode {
           { gvn.add_work(cg); gvn.add_work(cg.in(0)); }
       return this;
     }
+    if( _defs._len <= 2 ) return null; // No need to split callers if only 1
 
     //----------------
     if( level <= 1 ) {          // Only doing small-work now
@@ -270,11 +273,9 @@ public class FunNode extends RegionNode {
   }
 
   // Gather the ParmNodes into an array.  Return null if any input path is dead
-  // (would rather fold away dead paths before inlining).  Return null if there
-  // is only 1 path.  Return null if any actuals are not formals.
+  // (would rather fold away dead paths before inlining).
   private RetNode split_callers_gather( GVNGCM gvn, ParmNode[] parms ) {
     for( int i=1; i<_defs._len; i++ ) if( gvn.type(in(i))==Type.XCTRL ) return null;
-    if( _defs._len <= 2 ) return null; // No need to split callers if only 1
 
     // Gather the ParmNodes and the RetNode.  Ignore other (control) uses
     RetNode ret = null;
