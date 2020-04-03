@@ -190,7 +190,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   // +1 requires a bit-changing conversion (Int->Flt)
   // 99 Bottom; No free converts; e.g. Flt->Int requires explicit rounding
   @Override public byte isBitShape(Type t) {
-    return (byte)(t instanceof TypeMemPtr ? 0 : -99);  // Mixing TMP and a non-ptr
+    return (byte)(t instanceof TypeMemPtr ? 0 : 99);  // Mixing TMP and a non-ptr
   }
   @SuppressWarnings("unchecked")
   @Override void walk( Predicate<Type> p ) { if( p.test(this) ) _obj.walk(p); }

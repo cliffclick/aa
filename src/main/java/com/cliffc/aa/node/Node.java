@@ -16,35 +16,34 @@ public abstract class Node implements Cloneable {
   static final byte OP_CALL   = 1;
   static final byte OP_CALLEPI= 2;
   static final byte OP_CAST   = 3;
-  static final byte OP_CALLGRF= 4;
-  static final byte OP_CON    = 5;
-  static final byte OP_CPROJ  = 6;
-  static final byte OP_ERR    = 7;
-  static final byte OP_FP2CLO = 8;
-  static final byte OP_FUN    = 9;
-  static final byte OP_FUNPTR =10;
-  static final byte OP_IF     =11;
-  static final byte OP_LIBCALL=12;
-  static final byte OP_LOAD   =13;
-  static final byte OP_MERGE  =14;
-  static final byte OP_NAME   =15; // Cast a prior NewObj to have a runtime Name
-  static final byte OP_NEWOBJ =16; // Allocate a new struct
-  static final byte OP_NEWSTR =17; // Allocate a new string (array)
-  static final byte OP_PARM   =18;
-  static final byte OP_PHI    =19;
-  static final byte OP_PRIM   =20;
-  static final byte OP_PROJ   =21;
-  static final byte OP_REGION =22;
-  static final byte OP_RET    =23;
-  static final byte OP_SCOPE  =24;
-  static final byte OP_START  =25;
-  static final byte OP_STORE  =26;
-  static final byte OP_TMP    =27;
-  static final byte OP_TYPE   =28;
-  static final byte OP_UNR    =29;
-  static final byte OP_MAX    =30;
+  static final byte OP_CON    = 4;
+  static final byte OP_CPROJ  = 5;
+  static final byte OP_ERR    = 6;
+  static final byte OP_FP2CLO = 7;
+  static final byte OP_FUN    = 8;
+  static final byte OP_FUNPTR = 9;
+  static final byte OP_IF     =10;
+  static final byte OP_LIBCALL=11;
+  static final byte OP_LOAD   =12;
+  static final byte OP_MERGE  =13;
+  static final byte OP_NAME   =14; // Cast a prior NewObj to have a runtime Name
+  static final byte OP_NEWOBJ =15; // Allocate a new struct
+  static final byte OP_NEWSTR =16; // Allocate a new string (array)
+  static final byte OP_PARM   =17;
+  static final byte OP_PHI    =18;
+  static final byte OP_PRIM   =19;
+  static final byte OP_PROJ   =20;
+  static final byte OP_REGION =21;
+  static final byte OP_RET    =22;
+  static final byte OP_SCOPE  =23;
+  static final byte OP_START  =24;
+  static final byte OP_STORE  =25;
+  static final byte OP_TMP    =26;
+  static final byte OP_TYPE   =27;
+  static final byte OP_UNR    =28;
+  static final byte OP_MAX    =29;
 
-  private static final String[] STRS = new String[] { null, "Call", "CallEpi", "Cast", "CallGrf", "Con", "CProj", "Err", "FP2Clo", "Fun", "FunPtr", "If", "LibCall", "Load", "Merge", "Name", "NewObj", "NewStr", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Scope", "Start", "Store", "Tmp", "Type", "Unresolved" };
+  private static final String[] STRS = new String[] { null, "Call", "CallEpi", "Cast", "Con", "CProj", "Err", "FP2Clo", "Fun", "FunPtr", "If", "LibCall", "Load", "Merge", "Name", "NewObj", "NewStr", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Scope", "Start", "Store", "Tmp", "Type", "Unresolved" };
 
   public int _uid;  // Unique ID, will have gaps, used to give a dense numbering to nodes
   final byte _op;   // Opcode (besides the object class), used to avoid v-calls in some places
@@ -211,7 +210,7 @@ public abstract class Node implements Cloneable {
     }
   }
   boolean is_multi_head() { return _op==OP_CALL || _op==OP_CALLEPI || _op==OP_FUN || _op==OP_IF || _op==OP_LIBCALL || _op==OP_NEWOBJ || _op==OP_NEWSTR || _op==OP_REGION || _op==OP_START; }
-  private boolean is_multi_tail() { return _op==OP_PARM || _op==OP_PHI || _op==OP_PROJ || _op==OP_CPROJ || _op==OP_CALLGRF || _op==OP_FP2CLO; }
+  private boolean is_multi_tail() { return _op==OP_PARM || _op==OP_PHI || _op==OP_PROJ || _op==OP_CPROJ || _op==OP_FP2CLO; }
   private boolean is_CFG()        { return _op==OP_CALL || _op==OP_CALLEPI || _op==OP_FUN || _op==OP_RET || _op==OP_IF || _op==OP_REGION || _op==OP_START || _op==OP_CPROJ || _op==OP_SCOPE; }
 
   public String dumprpo( GVNGCM gvn, boolean prims ) {
@@ -328,7 +327,7 @@ public abstract class Node implements Cloneable {
   // changing a def._type changes the use._live, requiring other defs to be
   // revisited.
   public boolean input_value_changes_live() { return _op==OP_SCOPE || _op==OP_LOAD || _op==OP_CALLEPI; }
-  public boolean live_changes_value() { return _op==OP_CALLGRF; }
+  public boolean live_changes_value() { return false; }
 
   // Return any type error message, or null if no error
   public String err(GVNGCM gvn) { return null; }

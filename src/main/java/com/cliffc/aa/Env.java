@@ -16,7 +16,7 @@ public class Env implements AutoCloseable {
     Node ctl = par == null ? CTL_0 : par._scope.ctrl();
     Node clo = par == null ? GVN.con(Type.NIL) : par._scope.ptr ();
     Node mem = par == null ? MEM_0 : par._scope.mem ();
-    TypeStruct tdisp = par == null ? TypeStruct.DISPLAY : TypeStruct.make_args(TypeStruct.ts(GVN.type(par._scope.ptr())));
+    TypeStruct tdisp = par == null ? TypeStruct.NO_DISP2 : TypeStruct.make_args(TypeStruct.ts(GVN.type(par._scope.ptr())));
     NewObjNode nnn = (NewObjNode)GVN.xform(new NewObjNode(is_closure,tdisp,ctl,clo).keep());
     Node frm = GVN.xform(new OProjNode(nnn,0));
     Node ptr = GVN.xform(new  ProjNode(nnn,1));

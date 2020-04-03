@@ -192,7 +192,7 @@ public final class CallEpiNode extends Node {
     }
 
     // Add matching control to function via a CallGraph edge.
-    Node callgrf = new CGNode(call);
+    Node callgrf = new CProjNode(call,0);
     callgrf = gvn._opt_mode == 2 ? gvn.new_gcp(callgrf) : gvn.xform(callgrf);
     gvn.add_def(fun,callgrf);
   }
@@ -231,18 +231,13 @@ public final class CallEpiNode extends Node {
       return TypeTuple.CALLE;
     // NO fidxs, means we're not calling anything.
     if( fidxs==BitsFun.EMPTY ) return TypeTuple.CALLE.dual();
-    // Meet across wired callers.  Only take from called functions.
-    // Same as CGNode only passes values into called functions.
+    if( fidxs.above_center() ) return TypeTuple.CALLE.dual();
+    // Meet across wired callers.
     TypeTuple tt = TypeTuple.XRET;
     for( int i=0; i<nwired(); i++ ) {
       RetNode ret = wired(i);
       if( ret.is_copy() ) continue; // Dying, not called, not returning here
-      Node fun = ret.fun(), cuse0=null;
-      for( Node cuse : call._uses ) // O(n^2) with a small 'n', can be linear with a smarter lookup
-        if( cuse._uses.atX(0)==fun )
-          { cuse0=cuse; break; }
-      if( gvn.type(cuse0)==Type.CTRL )
-        tt = (TypeTuple)tt.meet(gvn.type(ret));
+      tt = (TypeTuple)tt.meet(gvn.type(ret));
     }
     return tt;
   }

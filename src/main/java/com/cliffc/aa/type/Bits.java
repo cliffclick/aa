@@ -274,7 +274,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   //
 
   @SuppressWarnings("unchecked")
-  public B meet( B bs ) {
+  public B meet( final B bs ) {
     if( this==bs ) return (B)this;
     B full = ALL();             // Subclass-specific version of full
     if( this==full || bs==full ) return full;
@@ -316,27 +316,12 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
       join(tree,bits1,bits0,bits);         // Merge right into left
       // Nil is not part of the parent tree, so needs to be set explicitly
       if( (bits0[0]&1)==1 && (bits1[0]&1)==1 )  bits[0]|=1;
-      // Just the interesection, which may be empty.
+      // Just the intersection, which may be empty.
       return make(true,bits);
     }
 
-    // Mixed meet/join.  Find any bit in the join that is also in the meet.  If
-    // found, we do not need to expand the meet - return it as-is.
-    for( int i=0; i<Math.min(bits0.length,bits1.length); i++ )
-      if( (bits0[i]&bits1[i]) != 0 )
-        return make(false,con0== 1 ? bits0 : bits1);
-
-    // Walk all the meet bits; if any are in the join we're done.  This is a
-    // more exact version of the above any-bits-in-common test.
-    if( (con0==1 ? test(tree,bits0,bits1) : test(tree,bits1,bits0)) )
-      return make(false,con0== 1 ? bits0 : bits1);
-
-    // Mixed meet/join.  Need to expand the meet with the smallest bit from the join.
-    int bnum = find_smallest_bit(con0==-1 ? bits0 : bits1);
-    long[] mbits = con0==1 ? bits0 : bits1; // Meet bits
-    mbits = Arrays.copyOfRange(mbits,0,Math.max(mbits.length,idx(bnum)+1));
-    if( bnum != -1) or(mbits,bnum); // Add a bit in.  Could make a dup bit
-    return make(false,mbits);   // This will remove parent/child dups
+    // Mixed meet/join.  Toss away the join, keep only the meet bits.
+    return above_center() ? bs : (B)this;
   }
 
   private static int find_smallest_bit(long[] bits) {
@@ -517,7 +502,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
         return 0;               // Last child visited
       }
     }
-    
+
   }
 
   /** @return an iterator */

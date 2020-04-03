@@ -21,6 +21,14 @@ public class PhiNode extends Node {
   public PhiNode( Type t, Parse badgc, Node... vals ) { this(OP_PHI,t,badgc,vals); }
   // For ParmNodes
   PhiNode( byte op, Node fun, Type tdef, Node defalt, Parse badgc ) { this(op,tdef,badgc, fun,defalt); }
+  @Override public int hashCode() { return super.hashCode()+_t.hashCode(); }
+  @Override public boolean equals(Object o) {
+    if( this==o ) return true;
+    if( !super.equals(o) ) return false;
+    if( !(o instanceof PhiNode) ) return false;
+    PhiNode phi = (PhiNode)o;
+    return _t==phi._t;
+  }
 
   @Override public Node ideal(GVNGCM gvn, int level) {
     if( gvn.type(in(0)) == Type.XCTRL ) return null;

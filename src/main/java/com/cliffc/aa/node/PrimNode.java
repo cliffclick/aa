@@ -21,7 +21,7 @@ public abstract class PrimNode extends Node {
   PrimNode( String name, TypeStruct targs, Type ret ) {
     super(OP_PRIM);
     _name=name;
-    assert targs.at(0)==TypeStruct.NO_DISP; // Room for no closure
+    assert targs.at(0)==Type.NIL; // Room for no closure
     _targs=targs;
     _ret=ret;
     _badargs=null;
@@ -395,7 +395,7 @@ static class RandI64 extends PrimNode {
 }
 
 static class Id extends PrimNode {
-  Id(Type arg) { super("id",TypeStruct.make_args(TypeStruct.ARGS_X,TypeStruct.ts(TypeStruct.NO_DISP,arg)),arg); }
+  Id(Type arg) { super("id",TypeStruct.make_args(TypeStruct.ARGS_X,TypeStruct.ts(Type.NIL,arg)),arg); }
   @Override public Node ideal(GVNGCM gvn, int level) { return in(1); }
   @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)).bound(_ret); }
   @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }

@@ -293,7 +293,7 @@ public class TestType {
     int fidx0 = f1i2i.fidx();
     int fidx1 = f1f2f.fidx();
     BitsFun funs = BitsFun.make0(fidx0).meet(BitsFun.make0(fidx1));
-    TypeFunPtr f3i2r = TypeFunPtr.make(funs,TypeStruct.make_args(TypeStruct.ARGS_XY,TypeStruct.ts(TypeStruct.NO_DISP,Type.REAL,Type.REAL)),Type.REAL);
+    TypeFunPtr f3i2r = TypeFunPtr.make(funs,TypeStruct.make_args(TypeStruct.ARGS_XY,TypeStruct.ts(Type.NIL,Type.REAL,Type.REAL)),Type.REAL);
     assertEquals(f3i2r,mt);
     assertTrue(f3i2r.isa(gf));
     assertTrue(f1i2i.isa(f3i2r));

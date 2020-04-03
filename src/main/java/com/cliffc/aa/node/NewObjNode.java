@@ -22,7 +22,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
   }
   // Called by IntrinsicNode.convertTypeNameStruct
   public NewObjNode( boolean is_closure, int par_alias, TypeStruct ts, Node ctrl, Node clo ) {
-    super(OP_NEWOBJ,par_alias,ts.set_fld(0,TypeMemPtr.DISPLAY_PTR,TypeStruct.FFNL),ctrl,clo);
+    super(OP_NEWOBJ,par_alias,ts,ctrl,clo);
     _is_closure = is_closure;
   }
   public Node get(String name) { int idx = _ts.find(name);  assert idx >= 0; return fld(idx); }
@@ -47,7 +47,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
     assert !gvn.touched(this);
     assert def_idx(_ts._ts.length)== _defs._len;
     assert _ts.find(name) == -1; // No dups
-    _ts = _ts.add_fld(name,Type.SCALAR,mutable);
+    _ts = _ts.add_fld(name,gvn.type(val),mutable);
     add_def(val);
   }
   public void update( String tok, byte mutable, Node val, GVNGCM gvn  ) { update(_ts.find(tok),mutable,val,gvn); }
@@ -72,8 +72,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
   public void update_active( int fidx, byte mutable, Node val, GVNGCM gvn  ) {
     assert !gvn.touched(this);
     assert def_idx(_ts._ts.length)== _defs._len;
-    if( _ts.fmod(fidx) != mutable ) // Changed field modifier
-      _ts = _ts.set_fld(fidx,_ts.at(fidx),mutable);
+    _ts = _ts.set_fld(fidx,gvn.type(val),mutable);
     set_def(def_idx(fidx),val,gvn);
   }
 
@@ -87,6 +86,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
       Node n = _defs.at(def_idx(fidx));
       if( n instanceof UnresolvedNode ) n.add_def(ptr);
       else n = new UnresolvedNode(bad,n,ptr);
+      gvn.setype(n,n.value(gvn)); // Update the input type, so the _ts field updates
       update_active(fidx,TypeStruct.FFNL,n,gvn);
     }
     return ptr;

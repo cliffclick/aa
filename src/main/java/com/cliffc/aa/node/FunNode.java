@@ -103,7 +103,8 @@ public class FunNode extends RegionNode {
       FunNode fun = FUNS.at(i);
       if( fun != null && fun.fidx() != i ) { // Cloned primitives get renumbered, so renumber back
         RetNode ret = fun.ret(); // Done before flipping fidx, because of asserts
-        fun._tf = fun._tf.make_fidx(i);
+        FunPtrNode fptr = ret.funptr();
+        fptr._tf = fun._tf = fun._tf.make_fidx(i);
         ret._fidx = i;
       }
     }
@@ -213,7 +214,7 @@ public class FunNode extends RegionNode {
       // are "not quite neighbors" and need to be hand-loaded onto worklist.
       gvn.add_work_uses(ret);
       for( Node cg : _defs )
-        if( cg instanceof CGNode )
+        if( cg instanceof CProjNode )
           { gvn.add_work(cg); gvn.add_work(cg.in(0)); }
       return this;
     }
@@ -500,7 +501,7 @@ public class FunNode extends RegionNode {
     // of a size-split (single caller only, so inlines).
     FunPtrNode old_fptr = ret.funptr();
     TypeFunPtr toldfptr = (TypeFunPtr)gvn.unreg(old_fptr); // Unreg before changing hash
-    old_fptr._t = old_fptr._t.make_fidx(newfidx);
+    old_fptr._tf = old_fptr._tf.make_fidx(newfidx);
     gvn.rereg(old_fptr,toldfptr.make_fidx(newfidx));
     return fun;
   }

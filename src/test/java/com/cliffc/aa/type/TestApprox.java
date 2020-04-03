@@ -708,7 +708,7 @@ public class TestApprox {
 
     Type tY = TypeMemPtr.DISPLAY_PTR;
 
-    TypeFunPtr tfp0 = TypeFunPtr.make(BitsFun.ANY,(TypeStruct)TypeStruct.NO_DISP._obj,Type.XSCALAR);
+    TypeFunPtr tfp0 = TypeFunPtr.make(BitsFun.ANY,TypeStruct.DISPLAY.dual(),Type.XSCALAR);
     TypeStruct dsp0 = TypeStruct.make(fflds,TypeStruct.ts(tY,tfp0),fmods);
     TypeMemPtr ptr0 = TypeMemPtr.make(alias,dsp0);
     TypeStruct arg0 = TypeStruct.make(xflds,TypeStruct.ts(ptr0,TypeInt.INT64),xmods);

@@ -76,6 +76,11 @@ public class TypeTuple extends Type<TypeTuple> {
     ts[0]=t0; ts[1]=t1; ts[2]=t2; ts[3]=t3; ts[4]=t4;
     return make0(false,ts);
   }
+  public static TypeTuple make( Type t0, Type t1, Type t2, Type t3, Type t4, Type t5 ) {
+    Type[] ts = TypeAry.get(6);
+    ts[0]=t0; ts[1]=t1; ts[2]=t2; ts[3]=t3; ts[4]=t4; ts[5]=t5;
+    return make0(false,ts);
+  }
   public  static final TypeTuple IF_ALL  = make(CTRL ,CTRL );
   public  static final TypeTuple IF_ANY  = IF_ALL.dual();
   public  static final TypeTuple IF_TRUE = make(XCTRL,CTRL );

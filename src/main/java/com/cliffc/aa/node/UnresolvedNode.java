@@ -50,6 +50,7 @@ public class UnresolvedNode extends Node {
       Type t = TypeFunPtr.GENERIC_FUNPTR;
       for( Node def : _defs ) {
         Type tf = gvn.type(def);
+        // From FunPtrs the fidxs are always low; joining a low fidx makes the empty set.
         if( tf instanceof TypeFunPtr )
           tf = ((TypeFunPtr)tf).make_high_fidx();
         t = t.join(tf);
@@ -100,7 +101,7 @@ public class UnresolvedNode extends Node {
   @Override public TypeFunPtr all_type() {
     Type t = TypeFunPtr.GENERIC_FUNPTR.dual();
     for( Node def : _defs )
-      t = t.meet(((FunPtrNode)def)._t);
+      t = t.meet(((FunPtrNode)def)._tf);
     return (TypeFunPtr)t;
   }
 

@@ -145,7 +145,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public Type arg(int idx) { return _args.at(idx); }
   public Type display() { return _args.at(0); } // Always a Display pointer or NIL
 
-  @Override public boolean above_center() { return _args.above_center(); }
+  @Override public boolean above_center() { return _fidxs.above_center(); }
   @Override public boolean may_be_con()   { return above_center(); }
   // Since fidxs may split, never a constant.
   @Override public boolean is_con()       { return false; }
@@ -167,8 +167,9 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   // +1 requires a bit-changing conversion (Int->Flt)
   // 99 Bottom; No free converts; e.g. Flt->Int requires explicit rounding
   @Override public byte isBitShape(Type t) {
-    if( t._type == TNIL ) return 0;                   // Dead arg is free
-    return (byte)(t instanceof TypeFunPtr ? 0 : -99); // Mixing TFP and a non-ptr
+    if( t._type == TNIL ) return 0;                  // Dead arg is free
+    if( t._type == TSCALAR ) return 0;               // Scalar is OK
+    return (byte)(t instanceof TypeFunPtr ? 0 : 99); // Mixing TFP and a non-ptr
   }
   @SuppressWarnings("unchecked")
   @Override void walk( Predicate<Type> p ) { if( p.test(this) ) { _args.walk(p); _ret.walk(p); } }

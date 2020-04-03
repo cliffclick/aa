@@ -356,25 +356,26 @@ public class TypeStruct extends TypeObj<TypeStruct> {
 
   public  static final TypeStruct GENERIC = malloc("",true,FLD0,TypeAry.get(0),new byte[0]).hashcons_free();
   public  static final TypeStruct ALLSTRUCT;
-  public  static final TypeStruct SCALAR0     = make_args(        ts(NO_DISP));
-  public  static final TypeStruct SCALAR1     = make_args(ARGS_X ,ts(NO_DISP,SCALAR));
-  public  static final TypeStruct SCALAR2     = make_args(ARGS_XY,ts(NO_DISP,SCALAR,SCALAR));
-  public  static final TypeStruct STRPTR      = make_args(ARGS_X ,ts(NO_DISP,TypeMemPtr.STRPTR));
-  public  static final TypeStruct OOP_OOP     = make_args(ARGS_XY,ts(NO_DISP,TypeMemPtr.OOP0,TypeMemPtr.OOP0));
-  public  static final TypeStruct INT64_INT64 = make_args(ARGS_XY,ts(NO_DISP,TypeInt.INT64,TypeInt.INT64));
-  public  static final TypeStruct FLT64_FLT64 = make_args(ARGS_XY,ts(NO_DISP,TypeFlt.FLT64,TypeFlt.FLT64));
-  public  static final TypeStruct STR_STR     = make_args(ARGS_XY,ts(NO_DISP,TypeMemPtr.STRPTR,TypeMemPtr.STRPTR));
-  public  static final TypeStruct FLT64       = make_args(ARGS_X ,ts(NO_DISP,TypeFlt.FLT64)); // @{x:flt}
-  public  static final TypeStruct INT64       = make_args(ARGS_X ,ts(NO_DISP,TypeInt.INT64)); // @{x:int}
+  public  static final TypeStruct SCALAR0     = make_args(        ts(NIL));
+  public  static final TypeStruct SCALAR1     = make_args(ARGS_X ,ts(NIL,SCALAR));
+  public  static final TypeStruct SCALAR2     = make_args(ARGS_XY,ts(NIL,SCALAR,SCALAR));
+  public  static final TypeStruct STRPTR      = make_args(ARGS_X ,ts(NIL,TypeMemPtr.STRPTR));
+  public  static final TypeStruct OOP_OOP     = make_args(ARGS_XY,ts(NIL,TypeMemPtr.OOP0,TypeMemPtr.OOP0));
+  public  static final TypeStruct INT64_INT64 = make_args(ARGS_XY,ts(NIL,TypeInt.INT64,TypeInt.INT64));
+  public  static final TypeStruct FLT64_FLT64 = make_args(ARGS_XY,ts(NIL,TypeFlt.FLT64,TypeFlt.FLT64));
+  public  static final TypeStruct STR_STR     = make_args(ARGS_XY,ts(NIL,TypeMemPtr.STRPTR,TypeMemPtr.STRPTR));
+  public  static final TypeStruct FLT64       = make_args(ARGS_X ,ts(NIL,TypeFlt.FLT64)); // @{x:flt}
+  public  static final TypeStruct INT64       = make_args(ARGS_X ,ts(NIL,TypeInt.INT64)); // @{x:int}
+  public  static final TypeStruct NO_DISP2 = SCALAR0;
 
   // A bunch of types for tests
-  public  static final TypeStruct NAMEPT= make("Point:",ARGS_XY,ts(NO_DISP,TypeFlt.FLT64,TypeFlt.FLT64),ffnls(3));
-  public  static final TypeStruct POINT = make(ARGS_XY,ts(NO_DISP,TypeFlt.FLT64,TypeFlt.FLT64));
-          static final TypeStruct TFLT64= make_args( ts(NO_DISP,TypeFlt.FLT64 )); //  (  flt)
-  public  static final TypeStruct A     = make(flds("^","a"),ts(NO_DISP,TypeFlt.FLT64 ));
-  private static final TypeStruct C0    = make(flds("^","c"),ts(NO_DISP,TypeInt.FALSE )); // @{c:0}
-  private static final TypeStruct D1    = make(flds("^","d"),ts(NO_DISP,TypeInt.TRUE  )); // @{d:1}
-  private static final TypeStruct ARW   = make(flds("^","a"),ts(NO_DISP,TypeFlt.FLT64),new byte[]{FRW,FRW});
+  public  static final TypeStruct NAMEPT= make("Point:",ARGS_XY,ts(NIL,TypeFlt.FLT64,TypeFlt.FLT64),ffnls(3));
+  public  static final TypeStruct POINT = make(ARGS_XY,ts(NIL,TypeFlt.FLT64,TypeFlt.FLT64));
+          static final TypeStruct TFLT64= make_args( ts(NIL,TypeFlt.FLT64 )); //  (  flt)
+  public  static final TypeStruct A     = make(flds("^","a"),ts(NIL,TypeFlt.FLT64 ));
+  private static final TypeStruct C0    = make(flds("^","c"),ts(NIL,TypeInt.FALSE )); // @{c:0}
+  private static final TypeStruct D1    = make(flds("^","d"),ts(NIL,TypeInt.TRUE  )); // @{d:1}
+  private static final TypeStruct ARW   = make(flds("^","a"),ts(NIL,TypeFlt.FLT64),new byte[]{FRW,FRW});
 
   static final TypeStruct[] TYPES = new TypeStruct[]{ALLSTRUCT,STR_STR,FLT64,POINT,NAMEPT,A,C0,D1,ARW,DISPLAY};
 

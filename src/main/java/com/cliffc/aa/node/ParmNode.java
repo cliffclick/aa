@@ -60,8 +60,8 @@ public class ParmNode extends PhiNode {
     // Bound all input types to the matching function argument type, so sane
     // arguments flow into the function... even if bad arguments are being
     // passed.  This limits forward error flow, and enables better error
-    // messages.  Not done during or after GCP, as we are past error prop.
-    if( gvn._opt_mode<2 ) t = t.bound(_t);
+    // messages.
+    t = t.bound(_t);
     // Memory tracks the notion of 'clean' or 'unwritten' since the function
     // start.  Changed memory is returned at exit and unchanged memory is NOT
     // returned - and CallEpis are aware of this behavior and do the correct
@@ -83,7 +83,7 @@ public class ParmNode extends PhiNode {
         // Find the call bringing the broken args, and use it for error
         // reporting - it MUST exist, or we have a really weird situation
         for( Node def : fun._defs ) {
-          if( def instanceof CGNode ) {
+          if( def instanceof CProjNode ) {
             CallNode call = (CallNode)def.in(0);
             Type argc = gvn.type(call.arg(_idx)); // Call arg type
             if( !argc.isa(formal) )
