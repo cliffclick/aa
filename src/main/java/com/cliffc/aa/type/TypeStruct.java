@@ -147,7 +147,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     if( dups.tset(_uid) ) return "$"; // Break recursive printing cycle
     // Special shortcut for the all-prims display type
     if( find("!") != -1 && find("math_pi") != -1 && _ts[1] instanceof TypeFunPtr )
-      return ((TypeFunPtr)_ts[1])._args._ts[0].above_center()
+      return ((TypeFunPtr)_ts[1])._fidxs.above_center()
         ? "{PRIMS}" : "{LOW_PRIMS}";
 
     SB sb = new SB();
@@ -175,7 +175,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     if( dups.tset(_uid) ) return sb.p('$'); // Break recursive printing cycle
     // Special shortcut for the all-prims display type
     if( find("!") != -1 && find("math_pi") != -1 && _ts[1] instanceof TypeFunPtr )
-      return sb.p(((TypeFunPtr)_ts[1])._args._ts[0].above_center()
+      return sb.p(((TypeFunPtr)_ts[1])._fidxs.above_center()
                   ? "{PRIMS}" : "{LOW_PRIMS}");
 
     if( _uf!=null ) return _uf.dstr(sb.p("=>"),dups);
@@ -243,19 +243,14 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   }
 
   // Default tuple field names - all bottom-field names
-  private static final String[] FLD0={};
-  private static final String[] FLD1={"."};
-  private static final String[] FLD2={".","."};
-  private static final String[] FLD3={".",".","."};
-  private static final String[][] FLDS={FLD0,FLD1,FLD2,FLD3};
-  public  static String[] FLDS( int len ) { return FLDS[len]; }
-          static String[] flds(String... fs) { return fs; }
-  public  static final String[] ARGS_X  = flds("^","x");
-  public  static final String[] ARGS_XY = flds("^","x","y");
+  static String[] flds(String... fs) { return fs; }
+  public  static final String[] ARGS_X  = flds("->","^","x"); // Used for functions of 1 arg
+  public  static final String[] ARGS_XY = flds("->","^","x","y"); // Used for functions of 2 args
   public  static Type[] ts() { return TypeAry.get(0); }
   public  static Type[] ts(Type t0) { Type[] ts = TypeAry.get(1); ts[0]=t0; return ts;}
   public  static Type[] ts(Type t0, Type t1) { Type[] ts = TypeAry.get(2); ts[0]=t0; ts[1]=t1; return ts;}
   public  static Type[] ts(Type t0, Type t1, Type t2) { Type[] ts = TypeAry.get(3); ts[0]=t0; ts[1]=t1; ts[2]=t2; return ts;}
+  public  static Type[] ts(Type t0, Type t1, Type t2, Type t3) { Type[] ts = TypeAry.get(4); ts[0]=t0; ts[1]=t1; ts[2]=t2; ts[3]=t3; return ts;}
   public  static Type[] ts(int n) { Type[] ts = TypeAry.get(n); Arrays.fill(ts,SCALAR); return ts; } // All Scalar fields
 
   // Field modifiers make a tiny non-obvious lattice:
@@ -284,29 +279,32 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public  static byte[] frws (int n) { byte[] bs = new byte[n]; Arrays.fill(bs, frw_flag); return bs; }
 
   public  static TypeStruct make(Type[] ts) {
-    return malloc("",false,FLDS[ts.length],ts,fbots(ts.length)).hashcons_free();
+    String[] flds = new String[ts.length];
+    Arrays.fill(flds,".");
+    return malloc("",false,flds,ts,fbots(ts.length)).hashcons_free();
   }
-  // Generic function arguments.  Slot 0 is the display and has a fixed name.
-  public  static TypeStruct make_args(Type[] ts) {
-    assert ts[0].is_display_ptr();
+  // Generic function arguments.  Slot 0 is the return, and slot 1 is the
+  // display and both fixed names.
+  public static TypeStruct make_args(Type[] ts) {
     String[] args = new String[ts.length];
     Arrays.fill(args,".");
-    args[0] = "^";
-    byte[] fs = fbots(ts.length);  fs[0] = FFNL;
-    return malloc("",false,args,ts,fs).hashcons_free();
+    args[0] = "->";
+    args[1] = "^";
+    return make_args(args,ts);
   }
-  public  static TypeStruct make_args(String[] flds, Type[] ts) {
-    assert ts[0].is_display_ptr();
-    assert Util.eq(flds[0],"^");
+  // First two fields are the return and the display
+  public static TypeStruct make_args(String[] flds, Type[] ts) {
+    assert Util.eq(flds[0],"->");
+    assert Util.eq(flds[1],"^");
+    assert ts[1].is_display_ptr();
     byte[] fs = fbots(ts.length);  fs[0] = FFNL;
     return malloc("",false,flds,ts,fs).hashcons_free();
   }
-  public  static TypeStruct make(Type t0         ) { return make(ts(t0   )); }
-  public  static TypeStruct make(Type t0, Type t1) { return make(ts(t0,t1)); }
   public  static TypeStruct make(String[] flds, Type[] ts) { return malloc("",false,flds,ts,fbots(ts.length)).hashcons_free(); }
   public  static TypeStruct make(String[] flds, Type[] ts, byte[] flags) { return malloc("",false,flds,ts,flags).hashcons_free(); }
   public  static TypeStruct make(String name, String[] flds, Type[] ts, byte[] flags) { return malloc(name,false,flds,ts,flags).hashcons_free(); }
 
+  // Generic parser struct object, slot 0 is the display and is NO_DISP post-parse.
   private static final String[][] TFLDS={{},
                                          {"^"},
                                          {"^","0"},
@@ -314,6 +312,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
                                          {"^","0","1","2"}};
   public  static String[] TFLDS( int len ) { return TFLDS[len]; }
   public  static TypeStruct make_tuple( Type... ts ) { return make(TFLDS[ts.length],ts,ffnls(ts.length)); }
+  public static TypeStruct make_tuple(Type t1) { return make_tuple(ts(NO_DISP,t1)); }
+
   public  static TypeStruct make(String[] flds, byte[] flags) { return make(flds,ts(flds.length),flags); }
   // Make from prior, just updating field types
   public TypeStruct make_from( Type[] ts ) { return make(_name,_flds,ts,_flags); }
@@ -338,65 +338,75 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // To break class-init cycle, this is partially made here, now.
   // Then we touch TypeMemPtr, which uses this field.
   // Then we finish making DISPLAY.
-  public  static final TypeStruct DISPLAY = malloc("",false,new String[]{"^"},ts(Type.NIL),ffnls(1));
+  public static final TypeStruct DISPLAY = malloc("",false,new String[]{"^"},ts(NIL),ffnls(1));
+  public static final TypeStruct DISPLAY0= malloc("",false,new String[]{"^"},ts(NIL),ffnls(1));
   static {
-    DISPLAY._hash = DISPLAY.compute_hash();
-    ALLSTRUCT = make(ts());
+    DISPLAY ._hash = DISPLAY .compute_hash();
+    DISPLAY0._hash = DISPLAY0.compute_hash();
+    ALLSTRUCT = malloc("",false,new String[0],TypeAry.get(0),fbots(0)).hashcons_free();
     Type dummy = TypeMemPtr.STRPTR; // Force TypeMemPtr
-    assert DISPLAY._ts[0] == Type.NIL;
-    DISPLAY._ts = ts(TypeMemPtr.DISPLAY_PTR);
-    DISPLAY.install_cyclic(new Ary<>(ts(DISPLAY,TypeMemPtr.DISPLAY_PTR)));
-    assert DISPLAY.is_display();
+    assert DISPLAY ._ts[0] == Type.NIL;
+    assert DISPLAY0._ts[0] == Type.NIL;
+    DISPLAY ._ts = ts(TypeMemPtr.DISPLAY_PTR);
+    DISPLAY0._ts = ts(TypeMemPtr.NIL_DISPLAY);
+    DISPLAY .install_cyclic(new Ary<>(ts(DISPLAY ,TypeMemPtr.DISPLAY_PTR)));
+    DISPLAY0.install_cyclic(new Ary<>(ts(DISPLAY0,TypeMemPtr.NIL_DISPLAY)));
+    assert DISPLAY .is_display();
+    assert DISPLAY0.is_display();
   }
   @Override boolean is_display() {
-    return this==DISPLAY || this==DISPLAY._dual
-      || (_ts.length >= 1 && _ts[0].is_display_ptr());
+    return
+      this==DISPLAY || this==DISPLAY._dual ||
+      this==DISPLAY0 || this==DISPLAY0._dual ||
+      // Functions have their display in _ts[1] (_ts[0] reserved for the return
+      // value) but displays have the linked-list pointer in _ts[0].
+      (_ts.length >= 1 && _ts[0].is_display_ptr());
   }
-  public  static final TypeMemPtr NO_DISP = TypeMemPtr.DISPLAY_PTR.dual();
+  public static final TypeMemPtr NO_DISP= TypeMemPtr.NIL_DISPLAY;
 
-  public  static final TypeStruct GENERIC = malloc("",true,FLD0,TypeAry.get(0),new byte[0]).hashcons_free();
+  public  static final TypeStruct GENERIC = malloc("",true,new String[0],TypeAry.get(0),new byte[0]).hashcons_free();
   public  static final TypeStruct ALLSTRUCT;
-  public  static final TypeStruct SCALAR0     = make_args(        ts(NIL));
-  public  static final TypeStruct SCALAR1     = make_args(ARGS_X ,ts(NIL,SCALAR));
-  public  static final TypeStruct SCALAR2     = make_args(ARGS_XY,ts(NIL,SCALAR,SCALAR));
-  public  static final TypeStruct STRPTR      = make_args(ARGS_X ,ts(NIL,TypeMemPtr.STRPTR));
-  public  static final TypeStruct OOP_OOP     = make_args(ARGS_XY,ts(NIL,TypeMemPtr.OOP0,TypeMemPtr.OOP0));
-  public  static final TypeStruct INT64_INT64 = make_args(ARGS_XY,ts(NIL,TypeInt.INT64,TypeInt.INT64));
-  public  static final TypeStruct FLT64_FLT64 = make_args(ARGS_XY,ts(NIL,TypeFlt.FLT64,TypeFlt.FLT64));
-  public  static final TypeStruct STR_STR     = make_args(ARGS_XY,ts(NIL,TypeMemPtr.STRPTR,TypeMemPtr.STRPTR));
-  public  static final TypeStruct FLT64       = make_args(ARGS_X ,ts(NIL,TypeFlt.FLT64)); // @{x:flt}
-  public  static final TypeStruct INT64       = make_args(ARGS_X ,ts(NIL,TypeInt.INT64)); // @{x:int}
-  public  static final TypeStruct NO_DISP2 = SCALAR0;
+  public  static final TypeStruct INT64__INT64= make_args(ARGS_X ,ts(TypeInt.INT64,NO_DISP,TypeInt.INT64)); // {int->int}
+  public  static final TypeStruct INT64__FLT64= make_args(ARGS_X ,ts(TypeFlt.FLT64,NO_DISP,TypeInt.INT64)); // {int->flt}
+  public  static final TypeStruct FLT64__FLT64= make_args(ARGS_X ,ts(TypeFlt.FLT64,NO_DISP,TypeFlt.FLT64)); // {flt->flt}
+  public  static final TypeStruct STRPTR__STRPTR    = make_args(ARGS_X ,ts(TypeMemPtr.STRPTR,NO_DISP,TypeMemPtr.STRPTR));
+  public  static final TypeStruct INT64_INT64__INT64= make_args(ARGS_XY,ts(TypeInt.INT64,NO_DISP,TypeInt.INT64,TypeInt.INT64)); // {int int->int }
+  public  static final TypeStruct INT64_INT64__BOOL = make_args(ARGS_XY,ts(TypeInt.BOOL ,NO_DISP,TypeInt.INT64,TypeInt.INT64)); // {int int->bool}
+  public  static final TypeStruct FLT64_FLT64__FLT64= make_args(ARGS_XY,ts(TypeFlt.FLT64,NO_DISP,TypeFlt.FLT64,TypeFlt.FLT64)); // {flt flt->flt }
+  public  static final TypeStruct FLT64_FLT64__BOOL = make_args(ARGS_XY,ts(TypeInt.BOOL ,NO_DISP,TypeFlt.FLT64,TypeFlt.FLT64)); // {flt flt->bool}
+  public  static final TypeStruct OOP_OOP__BOOL     = make_args(ARGS_XY,ts(TypeInt.BOOL,NO_DISP,TypeMemPtr.OOP0,TypeMemPtr.OOP0));
+  public  static final TypeStruct SCALAR1__BOOL     = make_args(ARGS_X ,ts(TypeInt.BOOL,NO_DISP,SCALAR));
 
   // A bunch of types for tests
-  public  static final TypeStruct NAMEPT= make("Point:",ARGS_XY,ts(NIL,TypeFlt.FLT64,TypeFlt.FLT64),ffnls(3));
-  public  static final TypeStruct POINT = make(ARGS_XY,ts(NIL,TypeFlt.FLT64,TypeFlt.FLT64));
-          static final TypeStruct TFLT64= make_args( ts(NIL,TypeFlt.FLT64 )); //  (  flt)
-  public  static final TypeStruct A     = make(flds("^","a"),ts(NIL,TypeFlt.FLT64 ));
-  private static final TypeStruct C0    = make(flds("^","c"),ts(NIL,TypeInt.FALSE )); // @{c:0}
-  private static final TypeStruct D1    = make(flds("^","d"),ts(NIL,TypeInt.TRUE  )); // @{d:1}
-  private static final TypeStruct ARW   = make(flds("^","a"),ts(NIL,TypeFlt.FLT64),new byte[]{FRW,FRW});
+  public  static final TypeStruct NAMEPT= make("Point:",flds("^","x","y"),ts(NO_DISP,TypeFlt.FLT64,TypeFlt.FLT64),ffnls(3));
+  public  static final TypeStruct POINT = make(flds("^","x","y"),ts(NO_DISP,TypeFlt.FLT64,TypeFlt.FLT64));
+  public  static final TypeStruct FLT64 = make(flds("^","x"),ts(NO_DISP,TypeFlt.FLT64)); // @{x:flt}
+          static final TypeStruct TFLT64= make(flds("^","."),ts(NO_DISP,TypeFlt.FLT64 )); //  (  flt)
+  public  static final TypeStruct A     = make(flds("^","a"),ts(NO_DISP,TypeFlt.FLT64 ));
+  private static final TypeStruct C0    = make(flds("^","c"),ts(NO_DISP,TypeInt.FALSE )); // @{c:0}
+  private static final TypeStruct D1    = make(flds("^","d"),ts(NO_DISP,TypeInt.TRUE  )); // @{d:1}
+  private static final TypeStruct ARW   = make(flds("^","a"),ts(NO_DISP,TypeFlt.FLT64),new byte[]{FRW,FRW});
 
-  static final TypeStruct[] TYPES = new TypeStruct[]{ALLSTRUCT,STR_STR,FLT64,POINT,NAMEPT,A,C0,D1,ARW,DISPLAY};
+  static final TypeStruct[] TYPES = new TypeStruct[]{ALLSTRUCT,STRPTR__STRPTR,FLT64,POINT,NAMEPT,A,C0,D1,ARW,DISPLAY};
 
   // Extend the current struct with a new named field
-  public TypeStruct add_fld( String name, Type t, byte mutable ) {
-    assert t.isa(SCALAR) && (name==null || fldBot(name) || find(name)==-1);
+  public TypeStruct add_fld( String name, byte mutable ) { return add_fld(name,mutable,Type.SCALAR); }
+  public TypeStruct add_fld( String name, byte mutable, Type tfld ) {
+    assert name==null || fldBot(name) || find(name)==-1;
 
     Type  []   ts = TypeAry.copyOf(_ts   ,_ts   .length+1);
     String[] flds = Arrays .copyOf(_flds ,_flds .length+1);
     byte[]  flags = Arrays .copyOf(_flags,_flags.length+1);
-    ts   [_ts.length] = t;
+    ts   [_ts.length] = tfld;
     flds [_ts.length] = name==null ? "." : name;
     flags[_ts.length] = make_flag(mutable,true);
     return make(flds,ts,flags);
   }
   public TypeStruct set_fld( int idx, Type t, byte ff ) {
-    Type[] ts = TypeAry.clone(_ts);
-    ts[idx] = t;
+    Type[] ts  = _ts;
     byte[] ffs = _flags;
-    if( fmod(idx) != ff )
-      (ffs = _flags.clone())[idx] = set_fmod(_flags[idx],ff);
+    if( ts  [idx] != t  ) ( ts = TypeAry.clone(_ts))[idx] = t;
+    if( fmod(idx) != ff ) (ffs = _flags .clone(   ))[idx] = set_fmod(_flags[idx],ff);
     return make(_flds,ts,ffs);
   }
   public TypeStruct del_fld( int idx ) {
@@ -411,6 +421,12 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     for( int i=idx; i<flags.length; i++ ) flags[i] = _flags[i+1];
     return make(flds,ts,flags);
   }
+
+  //
+  public TypeFunPtr make_recursive(BitsFun fidxs, TypeStruct fun_args, String fun_name) {
+    throw com.cliffc.aa.AA.unimpl();
+  }
+
 
   // Make a type-variable with no definition - it is assumed to be a
   // forward-reference, to be resolved before the end of parsing.
@@ -535,13 +551,13 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     case TOBJ:   return t.above_center() ? this : t;
     case TFLT:
     case TINT:
-    case TNIL:
     case TTUPLE :
     case TFUNPTR:
     case TMEMPTR:
     case TRPC:
     case TFUN:
     case TMEM:   return ALL;
+    case TNIL:
     default: throw typerr(t);   // All else should not happen
     }
     TypeStruct thsi = this;
@@ -847,20 +863,24 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     case TSCALAR: break; // Nothing to meet
     case TFUNPTR: {
       TypeFunPtr nptr = (TypeFunPtr)nt;
-      if( old == Type.NIL ) { nptr._fidxs = nptr._fidxs.meet_nil();  break; }
+      if( old == Type.NIL ) { nt = nptr.meet_nil(); break; }
       if( old == Type.SCALAR )
         return union(nt,old); // Result is a scalar, which changes the structure of the new types.
       if( old == Type.XSCALAR ) break; // Result is the nt unchanged
       if( !(old instanceof TypeFunPtr) ) throw AA.unimpl(); // Not a xscalar, not a funptr, probably falls to scalar
       TypeFunPtr optr = (TypeFunPtr)old;
       nptr._fidxs = nptr._fidxs.meet(optr._fidxs);
-      nptr._ret   = nptr._ret  .meet(optr._ret  );
       nptr._args = (TypeStruct)ax_meet(bs,nptr._args,optr._args);
       break;
     }
     case TMEMPTR: {
       TypeMemPtr nptr = (TypeMemPtr)nt;
-      if( old == Type.NIL ) { nptr._aliases = nptr._aliases.meet_nil();  break; }
+      if( old == Type.NIL ) {
+        nt = nptr.meet_nil();
+        assert !nt.interned(); // Premature hashing, but i suspect assert needs to be an if
+        nt._hash = 0;
+        break;
+      }
       if( old == Type.SCALAR )
         return union(nt,old); // Result is a scalar, which changes the structure of the new types.
       if( old == Type.XSCALAR ) break; // Result is the nt unchanged
@@ -871,6 +891,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       break;
     }
     case TSTRUCT:
+      if( old == TypeObj.OBJ ) { nt = TypeObj.OBJ; break; }
       if( !(old instanceof TypeStruct) ) throw AA.unimpl();
       TypeStruct ots = (TypeStruct)old, nts = (TypeStruct)nt;
       assert nts._uf==null;     // Already handled by the caller
@@ -1176,6 +1197,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   }
 
   public Type at( int idx ) { return _ts[idx]; }
+  public Type last() { return _ts[_ts.length-1]; }
+  public String last_fld() { return _flds[_flds.length-1]; }
 
   // Update (approximately) the current TypeObj.  Updates the named field.
   @Override public TypeObj update(byte fin, String fld, Type val) { return update(fin,fld,val,false); }
@@ -1309,7 +1332,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       for( int i=0; i<fs.length; i++ ) fs[i] = fdual(flags(i)); // Really: mod ro goes to unk.  Centerline final/rw stay put.
       return malloc(_name,true,as,ts,fs).hashcons_free();
     }
-    if( this==DISPLAY || this==DISPLAY.dual() ) return DISPLAY.dual(); // Shortcut
+    if( this==DISPLAY  || this==DISPLAY .dual() ) return DISPLAY .dual(); // Shortcut
+    if( this==DISPLAY0 || this==DISPLAY0.dual() ) return DISPLAY0.dual(); // Shortcut)
     //
     //// Cyclic; need to clone the existing structure, then lift it
     //RECURSIVE_MEET++;
@@ -1361,7 +1385,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     nmp = (TypeFunPtr)low.clone(); // Shallow clone
     OLD2APX.put(low,nmp);     // Must go in before recursion
     nmp._fidxs = low._fidxs.startype();
-    nmp._ret   = low._ret  .startype();
     nmp._args  = lift_str(low._args);
     nmp._hash  = nmp.compute_hash();
     TypeFunPtr x = (TypeFunPtr)nmp.intern_lookup(); // Check for prior hit

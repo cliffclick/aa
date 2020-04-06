@@ -365,7 +365,7 @@ public class Parse {
       if( n.is_forward_ref() ) { // Prior is actually a forward-ref, so this is the def
         assert !scope.stk().is_mutable(tok) && scope == _e._scope;
         if( ifex instanceof FunPtrNode )
-          ((FunPtrNode)n).merge_ref_def(_gvn,tok,(FunPtrNode)ifex);
+          ((FunPtrNode)n).merge_ref_def(_gvn,tok,(FunPtrNode)ifex,(TypeMemPtr)_gvn.type(scope.ptr()));
         else ; // Can be here if already in-error
       } else { // Store into scope/NewObjNode/display
 
@@ -691,7 +691,8 @@ public class Parse {
    *  tuple= (stmts,[stmts,])     // Tuple; final comma is optional
    */
   private Node tuple(Node s) {
-    NewObjNode nn = new NewObjNode(false,BitsAlias.RECORD,TypeStruct.DISPLAY,ctrl(),con(Type.NIL));
+    TypeStruct mt_tuple = TypeStruct.make(new String[]{"^"},TypeStruct.ts(Type.NIL));
+    NewObjNode nn = new NewObjNode(false,BitsAlias.RECORD,mt_tuple,ctrl(),con(Type.NIL));
     int fidx=0, oldx=_x-1; // Field name counter, mismatched parens balance point
     while( s!=null ) {
       nn.create_active((""+(fidx++)).intern(),s,TypeStruct.FFNL,_gvn);
@@ -720,11 +721,15 @@ public class Parse {
     Ary<Type  > ts  = new Ary<>(new Type  [1],0);
     Ary<Parse > bads= new Ary<>(new Parse [1],0);
 
+    // Push the return type first
+    ids .push("->");
+    ts  .push(Type.SCALAR);
+    bads.push(null);
     // Push an extra hidden display argument.  Similar to java inner-class ptr
     // or when inside of a struct definition: 'this'.
     Node parent_display = _e._scope.ptr();
     ids .push("^");
-    ts  .push(_gvn.type(parent_display));
+    ts  .push(_gvn.type(parent_display).meet_nil());
     bads.push(null);
 
     // Parse arguments
@@ -752,8 +757,8 @@ public class Parse {
       bads.add(bad);
     }
     // If this is a no-arg function, we may have parsed 1 or 2 tokens as-if
-    // args, and then reset.  Also reset to just the display arg.
-    if( _x == oldx ) { ids.set_len(1); ts.set_len(1); bads.set_len(1);  }
+    // args, and then reset.  Also reset to just the return & display arg.
+    if( _x == oldx ) { ids.set_len(2); ts.set_len(2); bads.set_len(2);  }
 
     // Build the FunNode header
     Node old_ctrl = ctrl();
@@ -769,14 +774,14 @@ public class Parse {
       // Build Parms for all incoming values
       Node rpc = gvn(new ParmNode(-1,"rpc",fun,con(TypeRPC.ALL_CALL),null)).keep();
       Node mem = gvn(new ParmNode(-2,"mem",fun,con(TypeMem.FULL    ),null));
-      Node clo = gvn(new ParmNode( 0,"^"  ,fun,ts.at(0),parent_display,null));
+      Node clo = gvn(new ParmNode( 1,"^"  ,fun,ts.at(1),parent_display,null));
       // Display is special: the default is simply the outer lexical scope.
       // But here, in a function, the display is actually passed in as a hidden
       // extra argument and replaces the default.
       e._scope.stk().update(0,ts_mutable(false),clo,_gvn);
       // Parms for all arguments
       Parse errmsg = errMsg();  // Lazy error message
-      for( int i=1; i<ids._len; i++ ) {
+      for( int i=2; i<ids._len; i++ ) { // User parms start at#2
         Node parm = gvn(new ParmNode(i,ids.at(i),fun,con(ts.at(i)),errmsg));
         // Type-check arguments
         Node mt = typechk(parm,ts.at(i),mem,bads.at(i));
@@ -991,9 +996,10 @@ public class Parse {
         if( ts._len != 2 ) return null; // should return TypeErr missing -> in tfun
         ret = ts.pop();         // Get single return type
       }
+      ts.push(ret);             // Last arg is return
       TypeStruct targs = TypeStruct.make_args(ts.asAry());
       if( !peek('}') ) return null;
-      return typeq(TypeFunPtr.make(BitsFun.NZERO,targs,ret));
+      return typeq(TypeFunPtr.make(BitsFun.NZERO,targs));
     }
 
     if( peek("@{") ) {          // Struct type

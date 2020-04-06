@@ -9,22 +9,12 @@ import com.cliffc.aa.type.*;
 // TypeFunPtr with a constant fidx and variable displays.  Used to allow 1st
 // class functions to be passed about.
 public final class FunPtrNode extends Node {
-  TypeFunPtr _tf;
   private final String _referr;
   public  FunPtrNode( RetNode ret, Node display ) { this(null,ret,display); }
   // For forward-refs only; super weak display & function.
   private FunPtrNode( String referr, RetNode ret, Node display ) {
     super(OP_FUNPTR,ret,display);
-    _tf = ret.fun()._tf;
     _referr = referr;
-  }
-  @Override public int hashCode() { return _tf.hashCode() ^ ((_defs._len==0 || in(0)==null) ? 0 : in(0)._uid); }
-  @Override public boolean equals(Object o) {
-    if( this==o ) return true;
-    if( !(o instanceof FunPtrNode) ) return false;
-    FunPtrNode fptr = (FunPtrNode)o;
-    if( _defs._len!=2 ) return false;
-    return _tf ==fptr._tf && in(0)==fptr.in(0) && in(1)==fptr.in(1);
   }
   public RetNode ret() { return (RetNode)in(0); }
   public Node display(){ return in(1); }
@@ -49,11 +39,8 @@ public final class FunPtrNode extends Node {
     if( is_forward_ref() ) return null;
     RetNode ret = ret();
     FunNode fun = ret.is_copy() ? FunNode.find_fidx(ret._fidx) : ret.fun();
-    if( display()!=null && (ret.is_copy() || fun._tf.arg(0)==TypeStruct.NO_DISP) ) {
-      set_def(1,null,gvn);
-      // value() call now uses NO_DISP, change default type to match.  To lift
-      // the return type permanently, have to lift it here, and in fun._tf both.
-      _tf = fun._tf.make(TypeStruct.NO_DISP,fun._tf._ret);
+    if( !(display() instanceof ConNode) && (ret.is_copy() || fun._tf.arg(1)==TypeStruct.NO_DISP) ) {
+      set_def(1,gvn.con(TypeStruct.NO_DISP),gvn);
       return this;
     }
     return null;
@@ -65,8 +52,7 @@ public final class FunPtrNode extends Node {
     FunNode fun = ret.is_copy() ? FunNode.find_fidx(ret._fidx) : ret.fun();
     if( is_forward_ref() ) return fun._tf;
     Type tret = gvn.type(ret);
-    Type tdisp = display()==null ? Type.NIL : gvn.type(display());
-    assert tdisp != TypeMemPtr.DISPLAY_PTR;
+    Type tdisp = gvn.type(display());
     return fun._tf.make(tdisp,((TypeTuple)tret).at(2));
   }
 
@@ -81,7 +67,8 @@ public final class FunPtrNode extends Node {
   // FunPtr might end up at any Call.
   @Override public boolean basic_liveness() { return false; }
 
-  @Override public Type all_type() { return _tf; }
+  // Note: graph structure must be in place before calling
+  @Override public Type all_type() { return ret().fun()._tf; }
   @Override public String toString() { return super.toString(); }
   // Return the op_prec of the returned value.  Not sensible except when called
   // on primitives.
@@ -109,16 +96,28 @@ public final class FunPtrNode extends Node {
   // 'this' is a forward reference, probably with multiple uses (and no inlined
   // callers).  Passed in the matching function definition, which is brand new
   // and has no uses.  Merge the two.
-  public void merge_ref_def( GVNGCM gvn, String tok, FunPtrNode def ) {
+  public void merge_ref_def( GVNGCM gvn, String tok, FunPtrNode def, TypeMemPtr disp_ptr ) {
     FunNode rfun = fun();
     FunNode dfun = def.fun();
     assert rfun._defs._len==2 && rfun.in(0)==null && rfun.in(1) == Env.ALL_CTRL; // Forward ref has no callers
     assert dfun._defs._len==2 && dfun.in(0)==null;
     assert def ._uses._len==0;  // Def is brand new, no uses
+    TypeStruct disp = (TypeStruct)disp_ptr._obj;
+
+    // Make a cyclic type which loops the TypeFunPtr.display as the current
+    // display, and the current display refers to this TFP.
+    // Update, all at once:
+    //   dfun._tf
+    //   gvn.type of scope.ptr(), scope.stk(), scope.obj, def, ParmNode:^
+    TypeFunPtr rtfp = disp.make_recursive(rfun._tf.fidxs(),dfun._tf._args,rfun._name);
+    
+
+
+    
     // Make a function pointer based on the original forward-ref fidx, but with
     // the known types.
     FunNode.FUNS.setX(dfun.fidx(),null); // Track FunNode by fidx
-    TypeFunPtr tfp = TypeFunPtr.make(rfun._tf.fidxs(),dfun._tf._args,dfun._tf._ret);
+    TypeFunPtr tfp = TypeFunPtr.make(rfun._tf.fidxs(),dfun._tf._args);
     gvn.setype(def,tfp);
     gvn.unreg(dfun);  dfun._tf = tfp;  gvn.rereg(dfun,Type.CTRL);
     gvn.unreg(def.ret());

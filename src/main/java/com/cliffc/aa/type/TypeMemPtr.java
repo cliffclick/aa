@@ -12,7 +12,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   // List of known memory aliases.  Zero is nil.
   public BitsAlias _aliases;
   public TypeObj _obj;          // Meet/join of aliases
-  
+
   boolean _cyclic; // Type is cyclic.  This is a summary property, not a description of value sets, hence is not in the equals or hash
 
   private TypeMemPtr(BitsAlias aliases, TypeObj obj ) { super     (TMEMPTR); init(aliases,obj); }
@@ -74,20 +74,28 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   public static TypeMemPtr make( int alias, TypeObj obj ) { return make(BitsAlias.make0(alias),obj); }
   public static TypeMemPtr make_nil( int alias, TypeObj obj ) { return make(BitsAlias.make0(alias).meet_nil(),obj); }
 
-  public  static final TypeMemPtr DISPLAY_PTR= new TypeMemPtr(BitsAlias.RECORD_BITS0,TypeStruct.DISPLAY);
-  static { DISPLAY_PTR._hash = DISPLAY_PTR.compute_hash(); } // Filled in during DISPLAY.install_cyclic
+  public  static final TypeMemPtr DISPLAY_PTR= new TypeMemPtr(BitsAlias.RECORD_BITS0,TypeStruct.DISPLAY );
+  public  static final TypeMemPtr NIL_DISPLAY= new TypeMemPtr(BitsAlias.NIL         ,TypeStruct.DISPLAY0);
+  static {
+    DISPLAY_PTR._hash = DISPLAY_PTR.compute_hash(); // Filled in during DISPLAY.install_cyclic
+    NIL_DISPLAY._hash = NIL_DISPLAY.compute_hash(); // Filled in during DISPLAY.install_cyclic
+  }    
   public  static final TypeMemPtr OOP0   = make(BitsAlias.FULL    ,TypeObj.OBJ); // Includes nil
   public  static final TypeMemPtr OOP    = make(BitsAlias.NZERO   ,TypeObj.OBJ); // Excludes nil
   public  static final TypeMemPtr STRPTR = make(BitsAlias.STRBITS ,TypeStr.STR);
   public  static final TypeMemPtr STR0   = make(BitsAlias.STRBITS0,TypeStr.STR);
   public  static final TypeMemPtr ABCPTR = make(BitsAlias.type_alias(BitsAlias.STR),TypeStr.ABC);
-  public  static final TypeMemPtr ABC0   = (TypeMemPtr)ABCPTR.meet_nil();
+  public  static final TypeMemPtr ABC0   = make(ABCPTR._aliases.meet_nil(),TypeStr.ABC);
   public  static final TypeMemPtr STRUCT = make(BitsAlias.RECORD_BITS ,TypeStruct.ALLSTRUCT);
   public  static final TypeMemPtr STRUCT0= make(BitsAlias.RECORD_BITS0,TypeStruct.ALLSTRUCT);
-  static final TypeMemPtr[] TYPES = new TypeMemPtr[]{OOP0,STR0,STRPTR,ABCPTR,STRUCT};
+  public  static final TypeMemPtr NILPTR = make(BitsAlias.NIL,TypeObj.OBJ);
+  static final TypeMemPtr[] TYPES = new TypeMemPtr[]{OOP0,STR0,STRPTR,ABCPTR,STRUCT,NILPTR};
 
   @Override public boolean is_display_ptr() {
-    return this==DISPLAY_PTR || this==DISPLAY_PTR._dual || _obj.is_display();
+    return
+      this==DISPLAY_PTR || this==DISPLAY_PTR._dual ||
+      this==NIL_DISPLAY || this==NIL_DISPLAY._dual ||
+      _obj.is_display();
   }
 
   @Override protected TypeMemPtr xdual() {
@@ -108,20 +116,20 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     case TINT:
     case TFUNPTR:
     case TRPC:   return cross_nil(t);
-    case TNIL:
     case TOBJ:
     case TSTR:
     case TSTRUCT:
     case TTUPLE:
     case TFUN:
     case TMEM:   return ALL;
+    case TNIL:                  // Handled by Type.xmeet as meet_nil
     default: throw typerr(t);   // All else should not happen
     }
     // Meet of aliases
     TypeMemPtr ptr = (TypeMemPtr)t;
     BitsAlias aliases = _aliases.meet(ptr._aliases);
-    // Do not return a NIL (makes crossing-NIL bug).
-    return make(aliases, aliases == BitsAlias.NIL ? TypeObj.XOBJ : (TypeObj)_obj.meet(ptr._obj));
+    TypeObj to = (TypeObj)_obj.meet(ptr._obj);
+    return make(aliases, to);
   }
   @Override public boolean above_center() { return _aliases.above_center(); }
   // Aliases represent *classes* of pointers and are thus never constants.
@@ -135,10 +143,11 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     return bits==_aliases ? this : make(bits,_obj);
   }
   @Override public Type meet_nil() {
-    if( _aliases.test(0) )      // Already has a nil?
-      return _aliases.above_center() ? NIL : this;
-    BitsAlias aliases = _aliases.meet_nil();
-    return aliases==BitsAlias.NIL ? NIL : make(aliases,_obj);
+    // See testLattice15.
+    // Tested as Lattice: [~0]->~obj  ==>  NIL  ==>  [0]-> obj
+    return _aliases.isa(BitsAlias.NIL.dual()) && _obj==TypeObj.XOBJ
+      ? NIL
+      : make(_aliases.meet_nil(),TypeObj.OBJ);
   }
 
   public BitsAlias aliases() { return _aliases; }

@@ -80,6 +80,20 @@ public class TypeAry {
 
   public static Type[] get(int len) { return tary(len).check().get(); }
   public static Type[] hash_cons(Type[] ts) { return tary(ts.length).check().hash_cons_(ts); }
+  public static Type[] ts(Type t0) {
+    TypeAry t1 = tary(1).check(); 
+    Type[] ts = t1.get();
+    ts[0] = t0;
+    return ts;
+  }
+  public static Type[] ts(Type t0, Type t1) {
+    TypeAry t2 = tary(2).check(); 
+    Type[] ts = t2.get();
+    ts[0] = t0;
+    ts[1] = t1;
+    return ts;
+  }
+  
   // Result not interned; suitable for direct hacking.
   // Original assumed in-use, not freed.
   public static Type[] clone(Type[] ts) {

@@ -1,6 +1,8 @@
 package com.cliffc.aa.type;
 
 import com.cliffc.aa.util.VBitSet;
+import java.util.function.Predicate;
+
 // Types which extend memory-based objects - currently Structs (which include
 // tuples but not TypeTuple) and Str (Strings); will include Arrays at some
 // point.  Structs have memory words addressed by a base-pointer and a field
@@ -53,6 +55,7 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
   @Override public boolean is_con() { return false; }
   @Override public boolean must_nil() { return false; }
   @Override public boolean  may_nil() { return false; }
+  @Override void walk( Predicate<Type> p ) { p.test(this); }
   // Dual, except keep TypeMem.XOBJ as high for starting GVNGCM.opto() state.
   @Override public TypeObj startype() { assert _type==TOBJ; return XOBJ; }
 }

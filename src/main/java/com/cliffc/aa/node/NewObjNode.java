@@ -10,7 +10,7 @@ import com.cliffc.aa.util.Util;
 // During Parsing we construct closures whose field names are discovered as we
 // parse.  Hence we support a type which represents some concrete fields, and a
 // choice of all possible remaining fields.  The _any choice means we can add
-// fields, although the closure remains impossibly high until the lexical scope
+// fields, although the closure remains impossibly low until the lexical scope
 // ends and no more fields can appear.
 
 public class NewObjNode extends NewNode<TypeStruct> {
@@ -24,10 +24,14 @@ public class NewObjNode extends NewNode<TypeStruct> {
   public NewObjNode( boolean is_closure, int par_alias, TypeStruct ts, Node ctrl, Node clo ) {
     super(OP_NEWOBJ,par_alias,ts,ctrl,clo);
     _is_closure = is_closure;
+    assert ts._ts[0].is_display_ptr();
+    for( int i=1; i<ts._ts.length; i++ )
+      assert ts._ts[i]==Type.SCALAR; // Field contents not specified, ever
   }
   public Node get(String name) { int idx = _ts.find(name);  assert idx >= 0; return fld(idx); }
   public boolean exists(String name) { return _ts.find(name)!=-1; }
   public boolean is_mutable(String name) { return _ts.fmod(_ts.find(name)) == TypeStruct.FRW; }
+  public TypeMemPtr tptr() { return TypeMemPtr.make(_alias,_ts); }
 
   // Create a field from parser for an inactive this
   public void create( String name, Node val, byte mutable, GVNGCM gvn  ) {
@@ -47,7 +51,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
     assert !gvn.touched(this);
     assert def_idx(_ts._ts.length)== _defs._len;
     assert _ts.find(name) == -1; // No dups
-    _ts = _ts.add_fld(name,gvn.type(val),mutable);
+    _ts = _ts.add_fld(name,mutable);
     add_def(val);
   }
   public void update( String tok, byte mutable, Node val, GVNGCM gvn  ) { update(_ts.find(tok),mutable,val,gvn); }
@@ -69,10 +73,13 @@ public class NewObjNode extends NewNode<TypeStruct> {
       for( Node use : _uses )
         gvn.setype(use,use.value(gvn)); // Record "downhill" type for OProj, DProj
   }
+  // Update default value.  Used by StoreNode folding into a NewObj initial
+  // state.  Used by the Parser when updating local variables... basically
+  // another store.
   public void update_active( int fidx, byte mutable, Node val, GVNGCM gvn  ) {
     assert !gvn.touched(this);
     assert def_idx(_ts._ts.length)== _defs._len;
-    _ts = _ts.set_fld(fidx,gvn.type(val),mutable);
+    _ts = _ts.set_fld(fidx,Type.SCALAR,mutable);
     set_def(def_idx(fidx),val,gvn);
   }
 

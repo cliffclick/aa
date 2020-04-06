@@ -32,8 +32,8 @@ public class BitsAlias extends Bits<BitsAlias> {
     NZERO = new BitsAlias().make_impl(ALL,null);
     FULL = NZERO.meet_nil();    // All aliases, with a nil
     ANY = FULL.dual();          // Precompute dual
-    NIL = make0(0);             // No need to dual; NIL is its own dual
-    EMPTY = NZERO.make();       // No bits
+    NIL = make0(0);             // Ugly but NIL has a dual, and this is "low" NIL
+    EMPTY = NZERO.make();       // No bits; its its own dual
     // Split All-Memory into Records/Tuples/Structs and Arrays (including Strings).
     // Everything falls into one of these two camps.
     RECORD_BITS = make0(RECORD = type_alias(ALL));

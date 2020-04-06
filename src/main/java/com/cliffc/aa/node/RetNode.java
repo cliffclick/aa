@@ -77,7 +77,7 @@ public final class RetNode extends Node {
     return TypeTuple.make(ctl,mem,val);
   }
   @Override public TypeTuple all_type() {
-    return TypeTuple.make(Type.CTRL,TypeMem.FULL,is_copy() ? TypeFunPtr.GENERIC_FUNPTR : fun()._tf._ret);
+    return TypeTuple.make(Type.CTRL,TypeMem.FULL,is_copy() ? TypeFunPtr.GENERIC_FUNPTR : fun()._tf.ret());
   }
 
 

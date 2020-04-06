@@ -32,7 +32,7 @@ public class TypeNode extends Node {
       args[0] = fun;            // Call control
       args[1] = gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM     ),null));
       args[2] = arg;            // The whole TFP to the call
-      for( int i=1; i<targs.length; i++ ) {
+      for( int i=2; i<targs.length; i++ ) { // First is return, 2nd is display
         // All the parms, with types
         Node parm = gvn.xform(new ParmNode(i,"arg"+i,fun,gvn.con(Type.SCALAR),null));
         args[i+2] = gvn.xform(new TypeNode(targs[i],parm,_error_parse));
@@ -43,7 +43,7 @@ public class TypeNode extends Node {
       Node ctl    = gvn.xform(new CProjNode(cepi,0));
       Node postmem= gvn.xform(new MProjNode(cepi,1)).keep();
       Node val    = gvn.xform(new  ProjNode(cepi.unhook(),2));
-      Node chk    = gvn.xform(new  TypeNode(tfp._ret,val,_error_parse)); // Type-check the return also
+      Node chk    = gvn.xform(new  TypeNode(tfp.ret(),val,_error_parse)); // Type-check the return also
       RetNode ret = (RetNode)gvn.xform(new RetNode(ctl,postmem.unhook(),chk,rpc,fun));
       // Just the Closure when we make a new TFP
       Node clos = gvn.xform(new FP2ClosureNode(arg));

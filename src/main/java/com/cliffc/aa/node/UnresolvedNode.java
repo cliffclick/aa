@@ -68,7 +68,9 @@ public class UnresolvedNode extends Node {
     Node x = null;
     for( Node epi : _defs ) {
       FunNode fun =  ((FunPtrNode)epi).fun();
-      if( fun.nargs() != nargs+1 ) continue;
+      // User-nargs are user-visible #arguments.
+      // Fun-nargs include the return and the display, hence the +2.
+      if( fun.nargs() != nargs+2 ) continue;
       if( x == null ) x = epi;
       else if( x instanceof UnresolvedNode ) x.add_def(epi);
       else x = new UnresolvedNode(_bad,x,epi);
@@ -101,7 +103,7 @@ public class UnresolvedNode extends Node {
   @Override public TypeFunPtr all_type() {
     Type t = TypeFunPtr.GENERIC_FUNPTR.dual();
     for( Node def : _defs )
-      t = t.meet(((FunPtrNode)def)._tf);
+      t = t.meet(def.all_type());
     return (TypeFunPtr)t;
   }
 

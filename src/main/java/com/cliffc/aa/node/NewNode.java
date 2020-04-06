@@ -50,15 +50,9 @@ public abstract class NewNode<T extends TypeObj> extends Node {
     boolean old = _captured;
     if( captured(gvn) ) {
       boolean progress = !old;  // Progress if 1st time captured in any case
-      if( gvn.type(in(1))!=TypeStruct.NO_DISP || !(in(1) instanceof ConNode) ) {
-        set_def(1,gvn.con(TypeStruct.NO_DISP),gvn);
-        progress=true;         // Progress!
-      }
-      Node x = null;
       for( int i=2; i<_defs._len; i++ ) {
         if( gvn.type(in(i))!=Type.XSCALAR || !(in(i) instanceof ConNode) ) {
-          if( x == null ) x=gvn.con(Type.XSCALAR);
-          set_def(i,x,gvn);
+          set_def(i,gvn.con(Type.XSCALAR),gvn);
           progress=true;         // Progress!
           if( is_dead() ) break; // Progress if any edge removed
         }
@@ -103,7 +97,6 @@ public abstract class NewNode<T extends TypeObj> extends Node {
 
   // Clones during inlining all become unique new sites
   @Override @NotNull public NewNode copy( boolean copy_edges, CallEpiNode unused, GVNGCM gvn) {
-    assert !_ts.above_center(); // Never in GCP when types are high
     // Split the original '_alias' class into 2 sub-aliases
     NewNode nnn = (NewNode)super.copy(copy_edges, unused, gvn);
     nnn._alias = BitsAlias.new_alias(_alias); // Children alias classes, split from parent

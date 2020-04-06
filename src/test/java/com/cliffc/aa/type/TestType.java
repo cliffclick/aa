@@ -7,21 +7,51 @@ import org.junit.Test;
 
 import java.util.HashMap;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 
 public class TestType {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testType() {
     Type.init0(new HashMap<>());
-    // Both high, but falling hard, so names have to fall hard too
-    Type t0 = TypeTuple.CALLE;
-    Type t1 = null;
-    //Type mt = t1.meet(t0);
-    //assertEquals(TypeObj.OBJ,mt);
+    Object dummy0 = TypeStruct.TYPES;
+    Object dummy1 = TypeMemPtr.TYPES;
+
+    TypeMemPtr txnil = TypeMemPtr.NILPTR .dual(); // [~0  ]->~obj
+    TypeMemPtr txrec = TypeMemPtr.STRUCT0.dual(); // [~0+2]->~obj
+    Type mt = txnil.meet(txrec);
+    //assertEquals(txnil,mt);
+
   }
 
+  @Test public void testBits0() {
+    Type.init0(new HashMap<>());
+    Object dummy0 = TypeStruct.TYPES;
+    Object dummy1 = TypeMemPtr.TYPES;
+
+    // This looks like a crossing-nil bug, but it is not quite.
+    // What is "nil join *[4]->str"?
+    // Inverting, what is "nil meet *[~4]->str"?
+    // The issue is that 'nil' says nothing about what to do with the '->str'
+    // part of the structural meet breakdown.  See testLattice14 & 15.
+    //
+    // Tested as Lattice: [0]-> obj  ==>  NIL  ==>  [~0]->~obj
+    //
+    // If NIL is 'signed', and effectively either '[0]->obj' or '[~0]->~obj'
+    // then this test works.  Either [0]->obj:
+    //   If "[0]-> obj is [0,2]->rec" Then A^C isa B^C.  Fails, !A->B
+    //   If "[0]->~obj is [0,2]->rec" Then A^C isa B^C.  Works:
+    //       [0  ]->~obj ^ [4]->str => [~0+4]->~obj
+    //       [0,2]-> rec ^ [4]->str => [~0+4]->~obj
+    //
+    // nil.isa(*rec?) so nil.join(*str) isa (*rec?).join(*str)
+    Type t0 = Type.NIL;          // [0  ] -> obj
+    Type t1 = TypeMemPtr.STRUCT0;// [0,2] -> rec
+    assertFalse(t0.isa(t1));     // [0,2] -> obj -- meet is not t1
+    Type t2 = TypeMemPtr.OOP0;   // [0,2] -> obj
+    assertTrue(t0.isa(t2));      //
+
+  }
 
   // Want Bits to support meet/join of fidxs for Unresolved:
   //     4.join.5.join.6 == {+4+5+6}
@@ -127,7 +157,7 @@ public class TestType {
 
     Type abc = TypeStr  .ABC;   // String constant
     Type zer = TypeInt  .FALSE;
-    Type tp0 = TypeStruct.make(zer);  // tuple of a '0'
+    Type tp0 = TypeStruct.make_tuple(zer);  // tuple of a '0'
 
     Type tupX= tup.dual();
     Type strX= str.dual();
@@ -166,7 +196,7 @@ public class TestType {
     Type pabc0= TypeMemPtr.ABC0;    // *["abc"]?
     TypeMemPtr pabc = TypeMemPtr.ABCPTR; // *["abc"]
     TypeMemPtr pzer = TypeMemPtr.make(BitsAlias.type_alias(BitsAlias.RECORD),TypeStruct.ALLSTRUCT);// *[(0)]
-    Type pzer0= pzer.meet_nil();  // *[(0)]?
+    TypeMemPtr pzer0= TypeMemPtr.make(pzer._aliases.meet_nil(),TypeStruct.ALLSTRUCT);  // *[(0)]?
     Type nil  = Type.NIL;
 
     Type xtup = ptup .dual();
@@ -186,7 +216,7 @@ public class TestType {
 
     // "~str?" or "*[~0+4+]~str?" includes a nil, but nothing can fall to a nil
     // (breaks lattice)... instead they fall to their appropriate nil-type.
-    assertEquals(TypeMemPtr.NIL,xstr0.meet( nil ));
+    assertEquals(TypeMemPtr.NILPTR,xstr0.meet( nil ));
 
     // This is a choice ptr-to-alias#1, vs a nil-able ptr-to-alias#2.  Since
     // they are from different alias classes, they are NEVER equal (unless both
@@ -199,22 +229,21 @@ public class TestType {
 
     // "~@{}?" or "*[~0+2+]~@{}?" includes a nil, but nothing can fall to a nil
     // (breaks lattice)... instead they fall to their appropriate nil-type.
-    assertEquals(TypeMemPtr.NIL,xtup0.meet( nil ));
+    assertEquals(TypeMemPtr.NILPTR,xtup0.meet( nil ));
     assertTrue (xtup0.isa(pzer0));
     assertTrue (xtup .isa(pzer ));
     //assertTrue(TypeMem.MEM_TUP.dual().ld(xstr).isa(TypeMem.MEM_ZER.ld(pabc)));
 
-    assertTrue ( nil .isa(pabc0));
-    assertTrue ( nil .isa(pzer0));
+    assertFalse( nil .isa(pabc0)); // nil expands as [0]->obj so !isa [2]->"abc"
+    assertFalse( nil .isa(pstr0)); // nil expands as [0]->obj so !isa [4]->str
+    assertFalse( nil .isa(ptup0)); // nil expands as [0]->obj so !isa [2]->()
+    assertFalse( nil .isa(pzer0)); // nil expands as [0]->obj so !isa [2]->@{}
 
-    assertTrue ( nil .isa(pstr0));
     assertTrue (pabc0.isa(pstr0));
     assertTrue (pabc .isa(pstr ));
     assertTrue (TypeMem.MEM_ABC.ld(pabc).isa(TypeMem.MEM.ld(pstr)));
-    assertTrue ( nil .isa(ptup0));
     assertTrue (pzer0.isa(ptup0));
     assertTrue (pzer .isa(ptup ));
-    //assertTrue(TypeMem.MEM_TUP.dual().ld(xstr).isa(TypeMem.MEM_ZER.ld(pabc)));
     assertTrue (ptup0.isa(pmem0));
     assertTrue (ptup .isa(pmem ));
 
@@ -236,8 +265,8 @@ public class TestType {
     Type tsx= TypeStruct. FLT64; // @{x:flt64}; fixed  leading field name
     Type tff = tsx.meet(tf);     //
     assertEquals(tf,tff);        // tsx.isa(tf)
-    TypeStruct t0 = TypeStruct.make(nil); //  (nil)
-    TypeStruct ts0= TypeStruct.make(new String[]{"x"},TypeStruct.ts(nil));  // @{x:nil}
+    TypeStruct t0 = TypeStruct.make(TypeAry.ts(nil)); //  (nil)
+    TypeStruct ts0= TypeStruct.make(new String[]{"x"},TypeAry.ts(nil));  // @{x:nil}
     Type tss = ts0.meet(t0);
     assertEquals(t0,tss);      // t0.isa(ts0)
     byte[] finals = new byte[]{TypeStruct.FFNL};
@@ -260,7 +289,7 @@ public class TestType {
     Type ptr12 = Type.NIL.join(TypeMemPtr.make(-alias1,a1)).join( TypeMemPtr.make(-alias2,a2));
     // mem.ld(*[1+2]?) ==> @{c:0}
     Type ld = mem.ld((TypeMemPtr)ptr12);
-    TypeObj ax = TypeStruct.make(new String[]{"c"},TypeStruct.ts(Type.NIL),finals ); // @{c:nil}
+    TypeObj ax = TypeStruct.make(new String[]{"c"},TypeStruct.ts(TypeMemPtr.NILPTR.dual()),finals ); // @{c:nil}
     assertEquals(ax,ld);
   }
 
@@ -277,7 +306,7 @@ public class TestType {
 
     // TypeTuple structure demands the shortest Tuple wins the "length
     // war" (determines the length of the result based on short's any/all flag).
-    TypeFunPtr f1i2i = TypeFunPtr.make_new(TypeStruct.INT64_INT64,TypeInt.INT64);
+    TypeFunPtr f1i2i = TypeFunPtr.make_new(TypeStruct.INT64_INT64__INT64);
     // To be a GF result, GF has to be shorter and high; the isa does a meet of
     // TypeFunPtrs which does a *join* of args, which duals the GF args down
     // low.  GF is zero length and low, and wins the meet.
@@ -287,19 +316,19 @@ public class TestType {
     assertTrue(gf.dual().isa(f1i2i)); // To be short result, short must be low
 
     assertTrue(f1i2i.isa(gf));
-    TypeFunPtr f1f2f = TypeFunPtr.make_new(TypeStruct.FLT64_FLT64,TypeFlt.FLT64);
+    TypeFunPtr f1f2f = TypeFunPtr.make_new(TypeStruct.FLT64_FLT64__FLT64);
     assertTrue(f1f2f.isa(gf));
     TypeFunPtr mt = (TypeFunPtr)f1i2i.meet(f1f2f);
     int fidx0 = f1i2i.fidx();
     int fidx1 = f1f2f.fidx();
     BitsFun funs = BitsFun.make0(fidx0).meet(BitsFun.make0(fidx1));
-    TypeFunPtr f3i2r = TypeFunPtr.make(funs,TypeStruct.make_args(TypeStruct.ARGS_XY,TypeStruct.ts(Type.NIL,Type.REAL,Type.REAL)),Type.REAL);
+    TypeFunPtr f3i2r = TypeFunPtr.make(funs,TypeStruct.make_args(TypeStruct.ARGS_XY,TypeStruct.ts(Type.REAL,TypeStruct.NO_DISP,Type.REAL,Type.REAL)));
     assertEquals(f3i2r,mt);
     assertTrue(f3i2r.isa(gf));
     assertTrue(f1i2i.isa(f3i2r));
     assertTrue(f1f2f.isa(f3i2r));
 
-    TypeFunPtr f2 = TypeFunPtr.make(BitsFun.make0(fidx1),TypeStruct.INT64_INT64,TypeInt.INT64); // Some generic function (happens to be #23, '&')
+    TypeFunPtr f2 = TypeFunPtr.make(BitsFun.make0(fidx1),TypeStruct.INT64_INT64__INT64); // Some generic function (happens to be #23, '&')
     assertTrue(f2.isa(gf));
   }
 
@@ -406,12 +435,13 @@ public class TestType {
     // less than 5.  Any data loop must contain a Phi; if structures are
     // nesting infinitely deep, then it must contain a NewNode also.
     int alias = BitsAlias.new_alias(BitsAlias.RECORD);
-    Type[] tts = TypeStruct.ts(Type.NIL,TypeInt.con(0));
-    TypeStruct ts = TypeStruct.make(TypeStruct.FLDS(2),tts,finals);
+    Type[] tts = TypeAry.ts(Type.NIL,TypeInt.con(0));
+    String[] flds2 = new String[]{".","."};
+    TypeStruct ts = TypeStruct.make(flds2,tts,finals);
     TypeMemPtr phi = TypeMemPtr.make(alias,ts);
     for( int i=1; i<20; i++ ) {
       Type[] ntts = TypeStruct.ts(phi,TypeInt.con(i));
-      TypeStruct newt = TypeStruct.make(TypeStruct.FLDS(2),ntts,finals);
+      TypeStruct newt = TypeStruct.make(flds2,ntts,finals);
       TypeStruct approx = newt.approx(NewNode.CUTOFF,alias);
       phi = TypeMemPtr.make(alias,approx);
     }

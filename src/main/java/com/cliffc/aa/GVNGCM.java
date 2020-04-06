@@ -467,9 +467,9 @@ public class GVNGCM {
       if( n.is_dead() ) continue;
       if( n._uses._len==0 && n._keep==0 ) kill(n);
       else xform_old(n,small_work ? 0 : 2);
-      cnt++; assert cnt < 10000; // Catch infinite ideal-loops
       // VERY EXPENSIVE ASSERT
       assert Env.START.more_flow(this,new VBitSet(),true,0)==0; // Initial conditions are correct
+      cnt++; assert cnt < 10000; // Catch infinite ideal-loops
     }
     // No more ideal calls, small or large, to apply
     assert !Env.START.more_ideal(this,new VBitSet(),3);
@@ -495,7 +495,7 @@ public class GVNGCM {
   // GCP resolves all ambiguous (overloaded) calls, using the precise types
   // first, and then inserting conversions using a greedy decision.  If this is
   // not sufficient to resolve all calls, the program is ambiguous and wrong.
-  void gcp(ScopeNode rez ) {
+  public void gcp(ScopeNode rez ) {
     _opt_mode = 2;
     // Set all types to null (except primitives); null is the visit flag when
     // setting types to their highest value.

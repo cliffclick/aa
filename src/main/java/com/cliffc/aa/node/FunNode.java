@@ -67,12 +67,12 @@ public class FunNode extends RegionNode {
   // Used to make the primitives at boot time.  Note the empty displays: in
   // theory Primitives should get the top-level primitives-display, but in
   // practice most primitives neither read nor write their own scope.
-  public  FunNode(PrimNode prim) { this(prim._name,TypeFunPtr.make_new(prim._targs,prim._ret),prim.op_prec(),BitsAlias.EMPTY); }
-  public  FunNode(IntrinsicNewNode prim, Type ret) { this(prim._name,TypeFunPtr.make_new(prim._targs,ret),prim.op_prec(), BitsAlias.EMPTY); }
+  public  FunNode(PrimNode prim) { this(prim._name,TypeFunPtr.make_new(prim._targs),prim.op_prec(),BitsAlias.EMPTY); }
+  public  FunNode(IntrinsicNewNode prim) { this(prim._name,TypeFunPtr.make_new(prim._targs),prim.op_prec(), BitsAlias.EMPTY); }
   // Used to make copies when inlining/cloning function bodies
           FunNode(String name,TypeFunPtr tf, BitsAlias display_aliases) { this(name,tf,-1,display_aliases); }
   // Used to start an anonymous function in the Parser
-  public  FunNode(String[] flds, Type[] ts) { this(null,TypeFunPtr.make_new(TypeStruct.make_args(flds,ts),Type.SCALAR),-1,Env.DISPLAY); }
+  public  FunNode(String[] flds, Type[] ts) { this(null,TypeFunPtr.make_new(TypeStruct.make_args(flds,ts)),-1,Env.DISPLAY); }
   // Used to forward-decl anon functions
           FunNode(String name) { this(name,TypeFunPtr.make_anon(),-2,Env.DISPLAY); add_def(Env.ALL_CTRL); }
   // Shared common constructor
@@ -80,6 +80,7 @@ public class FunNode extends RegionNode {
     super(OP_FUN);
     assert tf.isa(TypeFunPtr.GENERIC_FUNPTR);
     assert TypeFunPtr.GENERIC_FUNPTR.dual().isa(tf);
+    assert tf._args._ts[1].is_display_ptr();
     assert !BitsFun.is_parent(tf.fidx());
     _name = name;
     _tf = tf;
@@ -103,8 +104,7 @@ public class FunNode extends RegionNode {
       FunNode fun = FUNS.at(i);
       if( fun != null && fun.fidx() != i ) { // Cloned primitives get renumbered, so renumber back
         RetNode ret = fun.ret(); // Done before flipping fidx, because of asserts
-        FunPtrNode fptr = ret.funptr();
-        fptr._tf = fun._tf = fun._tf.make_fidx(i);
+        fun._tf = fun._tf.make_fidx(i);
         ret._fidx = i;
       }
     }
@@ -162,12 +162,12 @@ public class FunNode extends RegionNode {
 
   // True if may have future unknown callers.
   boolean has_unknown_callers() { return _defs._len > 1 && in(1) == Env.ALL_CTRL; }
-  // Argument type
+  // Argument type.  0 is the return, 1 is the display.
   Type targ(int idx) {
     return idx == -1 ? TypeRPC.ALL_CALL :
       (idx == -2 ? TypeMem.FULL : _tf.arg(idx));
   }
-  int nargs() { return _tf._args._ts.length; }
+  int nargs() { return _tf._args._ts.length; } // Slot 0 is the return and not an arg, and is included in the length
   void set_is_copy(GVNGCM gvn) { gvn.set_def_reg(this,0,this); }
 
   // ----
@@ -195,18 +195,16 @@ public class FunNode extends RegionNode {
     // inputs.
     boolean progress= false;
     for( int i=0; i<parms.length; i++ ) {
-      Type t = parms[i]==null ? (i==0 ? TypeStruct.NO_DISP : Type.XSCALAR) : gvn.type(parms[i]);
-      if( t != targ(i) && t.isa(targ(i)) ) progress=true;
+      Type t = i==0 ? gvn.type(ret) : (parms[i]==null ? (i==1 ? TypeStruct.NO_DISP : Type.XSCALAR) : gvn.type(parms[i]));
+      if( t != targ(i) && t.isa(targ(i)) ) { progress=true; break; }
     }
     if( progress && !is_prim() ) {
       Type[] ts = TypeAry.get(parms.length);
-      ts[0] = parms[0]==null ? TypeStruct.NO_DISP : gvn.type(parms[0]);
-      if( !ts[0].isa(targ(0)) ) ts[0] = targ(0);
-      for( int i=1; i<parms.length; i++ ) {
-        ts[i] = parms[i] == null ? Type.XSCALAR : gvn.type(parms[i]);
+      for( int i=0; i<parms.length; i++ ) {
+        ts[i] = i==0 ? gvn.type(ret) : (parms[i]==null ? (i==1 ? TypeStruct.NO_DISP : Type.XSCALAR) : gvn.type(parms[i]));
         if( !ts[i].isa(targ(i)) ) ts[i] = targ(i);
       }
-      TypeFunPtr tf = TypeFunPtr.make(_tf.fidxs(),_tf._args.make_from(ts),_tf._ret);
+      TypeFunPtr tf = TypeFunPtr.make(_tf.fidxs(),_tf._args.make_from(ts));
       assert tf.isa(_tf) && _tf != tf;
       _tf = tf;
       // Changing the sig can drop display closures and other parms, and enable
@@ -303,7 +301,6 @@ public class FunNode extends RegionNode {
               Type tp = gvn.type(parm.in(i));
               if( tp.above_center() ) continue;        // This parm input is in-error
               Type ti = tp.widen();                    // Get the widen'd type
-              if( ti == tp ) continue;    // No progress
               if( !ti.isa(t0) ) continue; // Must be isa-generic type, or else type-error
               if( ti != t0 ) return i; // Sharpens?  Then splitting here should help
             }
@@ -318,9 +315,9 @@ public class FunNode extends RegionNode {
     int idx = find_type_split_index(gvn,parms);
     if( idx != -1 ) {           // Found; split along a specific input path using widened types
       Type[] sig = TypeAry.get(parms.length);
-      for( int i=0; i<parms.length; i++ )
+      sig[0] = parms[0]==null ? TypeStruct.NO_DISP : gvn.type(parms[0].in(idx)).meet_nil();
+      for( int i=1; i<parms.length; i++ )
         sig[i] = parms[i]==null ? Type.XSCALAR : gvn.type(parms[i].in(idx)).widen();
-      if( parms[0]==null ) sig[0] = TypeStruct.NO_DISP;
       assert !(sig[0] instanceof TypeFunPtr);
       return sig;
     }
@@ -500,9 +497,8 @@ public class FunNode extends RegionNode {
     // to wire a size-split to itself (e.g. fib()), which defeats the purpose
     // of a size-split (single caller only, so inlines).
     FunPtrNode old_fptr = ret.funptr();
-    TypeFunPtr toldfptr = (TypeFunPtr)gvn.unreg(old_fptr); // Unreg before changing hash
-    old_fptr._tf = old_fptr._tf.make_fidx(newfidx);
-    gvn.rereg(old_fptr,toldfptr.make_fidx(newfidx));
+    gvn.setype(old_fptr,old_fptr.value(gvn));
+    gvn.add_work_uses(old_fptr);
     return fun;
   }
 

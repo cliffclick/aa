@@ -782,6 +782,9 @@ public class Type<T extends Type<T>> implements Cloneable {
     default: throw typerr(null); // Overridden in subclass
     }
   }
+  // Mismatched scalar types that can only cross-nils
+  Type cross_nil(Type t) { return must_nil() || t.must_nil() ? SCALAR : NSCALR; }
+
   // True if type may include a nil (as opposed to must-nil).
   // True for many above-center or zero values.
   public boolean may_nil() {
@@ -845,9 +848,6 @@ public class Type<T extends Type<T>> implements Cloneable {
     default:        throw typerr(null); // Overridden in subclass
     }
   }
-
-  // Mismatched scalar types that can only cross-nils
-  Type cross_nil(Type t) { return must_nil() || t.must_nil() ? SCALAR : NSCALR; }
 
   // Is t type contained within this?  Short-circuits on a true
   public final boolean contains( Type t ) { return contains(t,null); }

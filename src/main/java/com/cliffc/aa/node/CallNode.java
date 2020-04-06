@@ -86,12 +86,13 @@ public class CallNode extends Node {
   //     passed to the called function - which is generally trimmed to just
   //     what the function can use.  The unused memory bypasses to the CallEpi.
   // 2 - Function pointer, typed as a TypeFunPtr.  Might be a FunPtrNode, might
-  //     be e.g. a Phi or a Load.  This is argument 0, both as the Closure AND
+  //     be e.g. a Phi or a Load.  This is argument#1, both as the Closure AND
   //     as the Code pointer.
-  // 3+  Other "normal" arguments.
+  // 3+  Other "normal" arguments, numbered#2 and up.
 
-  // Number of actual arguments, including the closure/code ptr.
-  int nargs() { return _defs._len-2; }
+  // Number of actual arguments, including the closure/code ptr AND return.
+  // This is 2 higher than the user-visible arg count.
+  int nargs() { return _defs._len-1; }
   // Argument type
   Type targ( GVNGCM gvn, int x ) {
     Type t = gvn.type(arg(x));
@@ -99,18 +100,12 @@ public class CallNode extends Node {
     if( !(t instanceof TypeFunPtr) ) return Type.SCALAR;
     return ((TypeFunPtr)t).display(); // Extract Display type from TFP
   }
-  // Actual arguments.  Arg(0) is allowed and refers to the Display/TFP.
-  Node arg( int x ) { assert x>=0; return _defs.at(x+2); }
+  // Actual arguments.  Arg(1) is allowed and refers to the Display/TFP.
+  // Arg(0) is the return and is not allowed.
+  Node arg( int x ) { assert x>=1; return _defs.at(x+1); }
   // Set an argument.  Use 'set_fun' to set the Display/Code.
-  Node set_arg    (int idx, Node arg, GVNGCM gvn) { assert idx>0; return set_def(idx+2,arg,gvn); }
-  void set_arg_reg(int idx, Node arg, GVNGCM gvn) { assert idx>0; gvn.set_def_reg(this,idx+2,arg); }
-  // Find output Proj for an argument
-  ProjNode proj(int x) {
-    for( Node use : _uses )
-      if( use instanceof ProjNode && ((ProjNode)use)._idx==x+2 )
-        return (ProjNode)use;
-    return null;
-  }
+  Node set_arg    (int idx, Node arg, GVNGCM gvn) { assert idx>1; return set_def(idx+1,arg,gvn); }
+  void set_arg_reg(int idx, Node arg, GVNGCM gvn) { assert idx>1; gvn.set_def_reg(this,idx+1,arg); }
 
           Node ctl() { return in(0); }
   public  Node mem() { return in(1); }
@@ -160,18 +155,18 @@ public class CallNode extends Node {
 
     // When do I do 'pattern matching'?  For the moment, right here: if not
     // already unpacked a tuple, and can see the NewNode, unpack it right now.
-    if( !_unpacked ) { // Not yet unpacked a tuple
-      assert nargs()==2;        // The Display plus the arg tuple
+    if( !_unpacked ) {          // Not yet unpacked a tuple
+      assert nargs()==3;        // The return, Display plus the arg tuple
       Node mem = mem();
-      Node arg1 = arg(1);
-      Type tadr = gvn.type(arg1);
+      Node arg2 = arg(2);
+      Type tadr = gvn.type(arg2);
       // Bypass a merge on the 2-arg input during unpacking
       if( tadr instanceof TypeMemPtr && mem instanceof MemMergeNode ) {
         int alias = ((TypeMemPtr)tadr)._aliases.abit();
         if( alias == -1 ) throw AA.unimpl(); // Handle multiple aliases, handle all/empty
         Node obj = ((MemMergeNode)mem).alias2node(alias);
-        if( obj instanceof OProjNode && arg1 instanceof ProjNode && arg1.in(0) instanceof NewNode ) {
-          NewNode nnn = (NewNode)arg1.in(0);
+        if( obj instanceof OProjNode && arg2 instanceof ProjNode && arg2.in(0) instanceof NewNode ) {
+          NewNode nnn = (NewNode)arg2.in(0);
           remove(_defs._len-1,gvn); // Pop off the NewNode tuple
           int len = nnn._defs._len;
           for( int i=2; i<len; i++ ) // Push the args; unpacks the tuple
@@ -203,7 +198,8 @@ public class CallNode extends Node {
     }
 
     // Wire targets that are not choices (1 or multi) with matching nargs even
-    // with bad/low args; they may lift to good.  CallEpi will inline wired functions with good args.
+    // with bad/low args; they may lift to good.  CallEpi will inline wired
+    // functions with good args.
     if( check_wire(gvn,fidxs) )
       return this;              // Some wiring happened
 
@@ -211,7 +207,7 @@ public class CallNode extends Node {
     // call targets can appear during GCP and use the args.
     if( gvn._opt_mode > 2 && err(gvn)==null ) {
       Node progress = null;
-      for( int i=1; i<nargs(); i++ ) // Skip the FP/DISPLAY arg, as its useful for error messages
+      for( int i=2; i<nargs(); i++ ) // Skip the FP/DISPLAY arg, as its useful for error messages
         if( ProjNode.proj(this,i)==null && !(arg(i) instanceof ConNode && targ(gvn,i)==Type.XSCALAR) )
           progress = set_arg(i,gvn.con(Type.XSCALAR),gvn); // Kill dead arg
       if( progress != null ) return this;
@@ -245,8 +241,8 @@ public class CallNode extends Node {
     if( ctl == Type.XCTRL ) { ts[1] = TypeMem.EMPTY; }
 
     // Copy args for called functions.
-    for( int i=0; i<nargs(); i++ )
-      ts[i+2] = targ(gvn,i);
+    for( int i=1; i<nargs(); i++ )
+      ts[i+1] = targ(gvn,i);
 
     // Not a function to call?
     Type tfx = gvn.type(fun());
@@ -257,7 +253,7 @@ public class CallNode extends Node {
     // Resolve; only keep choices with sane arguments during GCP
     BitsFun rfidxs = resolve(fidxs,ts);
     if( !rfidxs.test(1) ) // Neither ANY nor ALL
-      tfp = TypeFunPtr.make(rfidxs,tfp._args,tfp._ret);
+      tfp = TypeFunPtr.make(rfidxs,tfp._args);
     ts[2] = tfp;
 
     return TypeTuple.make(ts);
@@ -342,13 +338,13 @@ public class CallNode extends Node {
     // Forward refs are only during parsing; assume they fit the bill
     if( fun.is_forward_ref() ) return HIGH;    // Assume they work
     if( fun.nargs() != nargs() ) return BAD;   // Wrong arg count, toss out
-    TypeStruct formals = fun._tf._args; // Type of each argument
+    TypeStruct formals = fun._tf._args;        // Type of each argument
     int flags=0;
-    for( int j=0; j<fun.nargs(); j++ ) {
+    for( int j=1; j<nargs(); j++ ) {        // Skip 0, the function return
       Type formal = formals.at(j);
       if( formal.above_center() ) continue; // Arg is ignored
-      Type actual = targs[j+2];
-      if( j==0 && actual instanceof TypeFunPtr )
+      Type actual = targs[j+1];             // Calls skip ctrl & mem
+      if( j==1 && actual instanceof TypeFunPtr )
         actual = ((TypeFunPtr)actual).display(); // Extract Display type from TFP
       if( actual==formal ) { flags|=GOOD; continue; } // Arg is fine.  Covers NO_DISP which can be a high formal.
       Type mt_lo = actual.meet(formal       );
@@ -381,7 +377,7 @@ public class CallNode extends Node {
       if( fun.nargs()!=nargs() || fun.ret() == null ) continue; // BAD/dead
       TypeStruct formals = fun._tf._args; // Type of each argument
       int cvts=0;                         // Arg conversion cost
-      for( int j=0; j<fun.nargs(); j++ ) {
+      for( int j=2; j<nargs(); j++ ) {    // Skip arg#0, the return and #1 the display
         Type actual = targ(gvn,j);
         Type formal = formals.at(j);
         if( actual==formal ) continue;
@@ -399,7 +395,7 @@ public class CallNode extends Node {
       } else if( cvts==best_cvts ) {
         // Look for monotonic formals
         int fcnt=0, bcnt=0;
-        for( int i=1; i<formals._ts.length; i++ ) {
+        for( int i=0; i<formals._ts.length; i++ ) {
           Type ff = formals.at(i), bf = best_formals.at(i);
           if( ff==bf ) continue;
           Type mt = ff.meet(bf);
@@ -449,7 +445,7 @@ public class CallNode extends Node {
 
   @Override public String err(GVNGCM gvn) {
     // Fail for passed-in unknown references directly.
-    for( int j=0; j<nargs(); j++ )
+    for( int j=1; j<nargs(); j++ )
       if( arg(j).is_forward_ref() )
         return _badargs.forward_ref_err( FunNode.find_fidx(((FunPtrNode)arg(j)).ret()._fidx) );
 
@@ -465,11 +461,11 @@ public class CallNode extends Node {
 
     // bad-arg-count
     if( tfp.nargs() != nargs() )
-      return _badargs.errMsg("Passing "+(nargs()-1)+" arguments to "+tfp.names()+" which takes "+(tfp.nargs()-1)+" arguments");
+      return _badargs.errMsg("Passing "+(nargs()-2)+" arguments to "+tfp.names()+" which takes "+(tfp.nargs()-2)+" arguments");
 
     // Now do an arg-check.
     TypeStruct formals = tfp._args; // Type of each argument
-    for( int j=0; j<formals._ts.length; j++ ) {
+    for( int j=1; j<nargs(); j++ ) {
       Type actual = targ(gvn,j);
       Type formal = formals.at(j);
       if( !actual.isa(formal) ) // Actual is not a formal

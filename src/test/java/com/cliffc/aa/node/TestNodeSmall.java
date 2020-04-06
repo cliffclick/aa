@@ -5,6 +5,7 @@ import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 import org.junit.Test;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 public class TestNodeSmall {
@@ -235,4 +236,94 @@ public class TestNodeSmall {
     _testMonotonicChain(ins,call,argss_add2);
   }
 
+
+
+  // When making a recursive function, we get a pointer cycle with the display
+  // and function arguments.  Validate that we can re-discover this closed
+  // cycle during GCP from whole cloth.
+
+  // Code: "fact={ x -> x>1 ? fact(x-1)*x : 1 }"
+  // tfp = [36]{^:[*10] x:int -> Scalar}   // Function def, with standard display.  Note the display is dead here.
+  // *[10] -> {^:[*6] fact:tfp}            // File-level scope
+  // *[6] -> { ^:nil PRIMS...}             // Prim-level scope
+  //
+  // Here's an example where the display is not dead-by-default:
+  // Code: "gen_ctr={cnt;{cnt++}}; ctrA=gen_ctr(); ctrB=gen_ctr(); ctrA(); ctrB(); ctrB()"
+  //
+  @Test public void testRecursiveDisplay() {
+    GVNGCM gvn = Env.GVN;
+
+    // Build the graph for the "fact" example:
+    // NewObj (display); inputs are prior display and FunPtr
+    //   OProj
+    //   DProj
+    //   MemMerge; default mem and OProj
+    // Fun (and Fun._tf) - Just default control and some other control
+    //   Parm:^ - Default display and DProj
+    //   Parm:mem - Default mem and the MemMerge of OProj
+    //   Ret - {Fun,Mem,Parm:^} - Not really fact() nor gen_ctr() code but upwards exposed closure
+    //   FunPtr - Ret
+    gvn._opt_mode=0;
+    ConNode ctl = (ConNode) gvn.xform(new ConNode<>(Type.CTRL));
+    ConNode mem = gvn.init(new ConNode<>(TypeMem.FULL));
+    ConNode rpc = gvn.init(new ConNode<>(TypeRPC.ALL_CALL));
+    ConNode dsp_prims = (ConNode) gvn.xform(new ConNode<>(TypeMemPtr.DISPLAY_PTR));
+    // The file-scope display closing the graph-cycle.  Needs the FunPtr, not
+    // yet built.
+    NewObjNode dsp_file = gvn.init(new NewObjNode(true,TypeStruct.DISPLAY,ctl,dsp_prims));
+    OProjNode dsp_file_obj = gvn.init(new OProjNode(dsp_file,0));
+    ProjNode  dsp_file_ptr = gvn.init(new  ProjNode(dsp_file,1));
+    MemMergeNode dsp_merge = gvn.init(new MemMergeNode(mem,dsp_file_obj,dsp_file._alias));
+    // The Fun and Fun._tf:
+    Type[] args = TypeAry.get(3);
+    args[0] = Type.SCALAR;            // Return
+    args[1] = gvn.type(dsp_file_ptr); // File-scope display as arg0
+    args[2] = Type.SCALAR;            // Some scalar arg1
+    TypeFunPtr tf = TypeFunPtr.make_new(TypeStruct.make_args(new String[]{"->","^","x"},args));
+    FunNode fun = new FunNode("fact",tf,BitsAlias.make0(dsp_file._alias));
+    gvn.init(fun.add_def(ctl).add_def(ctl));
+    // Parms for the Fun.  Note that the default type is "weak" because the
+    // file-level display can not yet know about "fact".
+    ParmNode parm_mem = new ParmNode(-2,"mem",fun,mem,null);
+    ParmNode parm_dsp = new ParmNode( 0,"^"  ,fun,TypeMemPtr.DISPLAY_PTR,dsp_file_ptr,null);
+    gvn.init(parm_mem.add_def(dsp_merge));
+    gvn.init(parm_dsp.add_def(dsp_file_ptr));
+    // Close the function up
+    RetNode ret = gvn.init(new RetNode(fun,parm_mem,parm_dsp,rpc,fun));
+    FunPtrNode fptr = gvn.init(new FunPtrNode(ret,dsp_file_ptr));
+    // Close the cycle
+    dsp_file.create("fact",fptr,TypeStruct.FFNL,gvn);
+    // Return the fptr to keep all alive
+    ScopeNode env = new ScopeNode(null,true);
+    env.set_ctrl(ctl,gvn);
+    env.set_ptr (dsp_file_ptr,gvn);
+    env.set_mem (dsp_merge,gvn);
+    env.set_rez (fptr,gvn);
+    gvn.init(env);
+
+    Node[] nodes = new Node[]{ctl,mem,rpc,dsp_prims,dsp_file,dsp_file_obj,dsp_file_ptr,dsp_merge,fun,parm_mem,parm_dsp,ret,fptr,env};
+
+    // Validate graph initial conditions.  No optimizations, as this
+    // pile-o-bits is all dead and will vaporize if the optimizer is turned
+    // loose on it.  Just check the types flow correctly.
+    gvn._opt_mode=1;
+    for( Node n : nodes ) {
+      Type old = gvn.type(n);
+      Type nnn = n.value(gvn);
+      assert nnn.isa(old);
+    }
+
+    // Now run GCP to closure.  This is the key call being tested.
+    gvn.gcp(env);
+
+    // Validate cyclic display/function type
+    TypeFunPtr tfptr0 = (TypeFunPtr)gvn.type(fptr);
+    TypeMemPtr tdptr0 = tfptr0.display();
+    assertEquals(tfptr0.ret(),tdptr0); // Returning the display
+    // Display contains 'fact' pointing to self
+    TypeStruct tdisp0 = (TypeStruct)tdptr0._obj;
+    assertEquals(tfptr0,tdisp0.at(tdisp0.find("fact")));
+
+
+  }
 }
