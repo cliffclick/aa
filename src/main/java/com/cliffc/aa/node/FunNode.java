@@ -315,10 +315,11 @@ public class FunNode extends RegionNode {
     int idx = find_type_split_index(gvn,parms);
     if( idx != -1 ) {           // Found; split along a specific input path using widened types
       Type[] sig = TypeAry.get(parms.length);
-      sig[0] = parms[0]==null ? TypeStruct.NO_DISP : gvn.type(parms[0].in(idx)).meet_nil();
-      for( int i=1; i<parms.length; i++ )
+      sig[0] = _tf.ret();
+      sig[1] = parms[1]==null ? TypeStruct.NO_DISP : gvn.type(parms[1].in(idx));
+      for( int i=2; i<parms.length; i++ ) // 0 for return, 1 for display
         sig[i] = parms[i]==null ? Type.XSCALAR : gvn.type(parms[i].in(idx)).widen();
-      assert !(sig[0] instanceof TypeFunPtr);
+      assert !(sig[1] instanceof TypeFunPtr);
       return sig;
     }
 

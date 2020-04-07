@@ -76,8 +76,10 @@ public class TypeRPC extends Type<TypeRPC> {
     return bits==_rpcs ? this : make(bits);
   }
   @Override public Type meet_nil() {
-    if( _rpcs.test(0) )      // Already has a nil?
-      return _rpcs.above_center() ? NIL : this;
-    return make(_rpcs.meet(BitsRPC.NIL));
+    //if( _rpcs.test(0) )      // Already has a nil?
+    //  return _rpcs.above_center() ? NIL : this;
+    //return make(_rpcs.meet(BitsRPC.NIL));
+    if( may_nil() ) return NIL;// Already has a nil?
+    return make(_rpcs.meet_nil());
   }
 }

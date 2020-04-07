@@ -39,8 +39,8 @@ public class TestNodeSmall {
       tns[i] = (TypeTuple)n.value(gvn);
     }
     // Equals check after computing them all
-    //for( int i=0; i<argss.length; i++ )
-    //  assertEquals(tns[i].at(2),argss[i].at(ins.length));
+    for( int i=0; i<argss.length; i++ )
+      assertEquals(argss[i].at(ins.length),tns[i].at(2));
     return tns;
   }
 
@@ -108,6 +108,7 @@ public class TestNodeSmall {
     // valid, but e.g. a 2:int will never lift to a str.
     gvn._opt_mode=1;
 
+    // The various kinds of results we expect
     TypeFunPtr tmul = (TypeFunPtr)fp_mul.value(gvn);
     TypeFunPtr tadd = (TypeFunPtr)fp_add.value(gvn);
     TypeFunPtr tmulX= tmul.dual();  assert tmulX.fidxs().above_center();
@@ -119,6 +120,7 @@ public class TestNodeSmall {
     TypeFunPtr tstr  = tstrX.dual();
     TypeFunPtr tflt_intX = (TypeFunPtr)tfltX.join(tintX);       assert tflt_intX.fidxs().above_center();
     TypeFunPtr tflt_int  = tflt_intX.dual();
+    TypeFunPtr tmulE = TypeFunPtr.make(BitsFun.EMPTY,TypeStruct.make_args(TypeStruct.ts(Type.SCALAR,TypeStruct.NO_DISP,Type.NIL,Type.NIL))); // All bad choices
     assert taddX.isa(tflt_intX) && tflt_intX.isa(tfltX) && tfltX.isa(tflt_int) && tflt_int.isa(tadd);
 
 
@@ -131,8 +133,9 @@ public class TestNodeSmall {
       TypeTuple.make( tctl, tfull, tmul, t2   , tscl , tmul ), //   2     S   [ int,flt] ; low+good
       TypeTuple.make( tctl, tfull, tmul, tscl , tscl , tmul ), //   S     S   [ int,flt] ; low
       TypeTuple.make( tctl, tfull, tmul, txscl, tscl , tmul ), //  ~S     S   [ int,flt] ; low     +high
-      TypeTuple.make( tctl, tfull, tmul, txscl, tabc , tmul ), //  ~S    str  [ int,flt] ; bad      high
-      TypeTuple.make( tctl, tfull, tmul, t2   , tabc , tmul ), //   2    str  [ int,flt] ; bad+good
+      TypeTuple.make( tctl, tfull, tmul, txscl, tabc , tmulX), //  ~S    str  [ int,flt] ; bad      high
+      TypeTuple.make( tctl, tfull, tmul, tabc , tabc , tmulE), //  str   str  [        ] ; bad
+      TypeTuple.make( tctl, tfull, tmul, t2   , tabc , tmulE), //   2    str  [ int,flt] ; bad+good
     };
     _testMonotonicChain(ins,call,argss_mul1);
 
@@ -143,8 +146,8 @@ public class TestNodeSmall {
       TypeTuple.make( txctl, tfull, tmul, t2   , t3   , tmul ), //   2     3   [ int,flt]
       TypeTuple.make( txctl, tfull, tmul, t2   , tscl , tmul ), //   2     S   [ int,flt]
       TypeTuple.make( txctl, tfull, tmul, tscl , tscl , tmul ), //   S     S   [ int,flt]
-      TypeTuple.make( txctl, tfull, tmul, txscl, tabc , tmul ), //  ~S    str  [ int,flt]
-      TypeTuple.make( txctl, tfull, tmul, t2   , tabc , tmul ), //   2    str  [ int,flt]
+      TypeTuple.make( txctl, tfull, tmul, txscl, tabc , tmulX), //  ~S    str  [ int,flt]
+      TypeTuple.make( txctl, tfull, tmul, t2   , tabc , tmulE), //   2    str  [ int,flt]
     };
     _testMonotonicChain(ins,call,argss_mul1x);
 
@@ -166,7 +169,7 @@ public class TestNodeSmall {
       TypeTuple.make( tctl, tfull, tadd, tnil , tscl , tadd ), //   0     S   [ int,flt,str] (LG_,LG_,LG_) ; Some low , keep all, meet
       TypeTuple.make( tctl, tfull, tadd, t2   , txscl, taddX), //   2    ~S   [+int+flt+str] (_GH,_GH,B_H) ; Some high, keep all, join
       TypeTuple.make( tctl, tfull, tadd, t2   , t3, tflt_int), //   2     3   [ int,flt    ] (_G_,_G_,B__) ; Some good, drop bad, fidx/meet
-      TypeTuple.make( tctl, tfull, tadd, t2   , tabc , tadd ), //   2    str  [ int,flt,str] (BG_,BG_,BG_) ; All  bad , keep all, meet
+      TypeTuple.make( tctl, tfull, tadd, t2   , tabc , tmulE), //   2    str  [ int,flt,str] (BG_,BG_,BG_) ; All  bad , keep all, meet
       TypeTuple.make( tctl, tfull, tadd, t2   , tscl , tadd ), //   2     S   [ int,flt,str] (LG_,LG_,B__) ; Some low , keep all, meet
       TypeTuple.make( tctl, tfull, tadd, tabc , tabc , tstr ), //  str   str  [         str] (B__,B__,_G_) ; Some good, drop bad, fidx/meet
       TypeTuple.make( tctl, tfull, tadd, tscl , tscl , tadd ), //   S     S   [ int,flt,str] (L__,L__,L__) ; All  low , keep all, meet
@@ -180,14 +183,15 @@ public class TestNodeSmall {
 
     tmulX= (TypeFunPtr)fp_mul.value(gvn); assert tmulX.fidxs().above_center();
     taddX= (TypeFunPtr)fp_add.value(gvn);
-    //tmul = tmulX.dual();
-    //tadd = taddX.dual();
+    tmul = tmulX.dual();
+    tadd = taddX.dual();
     // Same math as Unresolved
-    tintX = tintX.dual().make_high_fidx();
-    tfltX = tfltX.dual().make_high_fidx();
-    tstrX = tstrX.dual().make_high_fidx();
-    tflt_intX = (TypeFunPtr)tfltX.join(tintX);
 
+    // bugz... this assert fails.
+    // tmulX is join of low args with high fidxs: [~11+22] but args int32,int32->int32.
+    // Means EMPTY is not "in between" tmulX and tmulX.dual().  Probably required
+    // for monotonicity here.
+    // Perhaps GCP Unresolved should meet, then dual.
     assert taddX.isa(tflt_intX) && tflt_intX.isa(tfltX) && tfltX.isa(tflt_int) && tflt_int.isa(tadd);
 
     // Check the fptr {+int+flt} choices
@@ -198,9 +202,9 @@ public class TestNodeSmall {
       TypeTuple.make( tctl, tfull, tmulX, t2   , t3   , tmulX), //   2     3   [ int,flt]
       TypeTuple.make( tctl, tfull, tmulX, t2   , tscl , tmul ), //   2     S   [ int,flt]
       TypeTuple.make( tctl, tfull, tmulX, tscl , tscl , tmul ), //   S     S   [ int,flt]
-      TypeTuple.make( tctl, tfull, tmulX, txscl, tscl , tmul ), //  ~S     S   [ int,flt]
-      TypeTuple.make( tctl, tfull, tmulX, txscl, tabc , tmul ), //  ~S    str  [ int,flt]
-      TypeTuple.make( tctl, tfull, tmulX, t2   , tabc , tmul ), //   2    str  [ int,flt]
+      TypeTuple.make( tctl, tfull, tmulX, txscl, tscl , tmulX), //  ~S     S   [ int,flt]
+      TypeTuple.make( tctl, tfull, tmulX, txscl, tabc , tmulX), //  ~S    str  [ int,flt]
+      TypeTuple.make( tctl, tfull, tmulX, t2   , tabc , tmulE), //   2    str  [ int,flt]
     };
     _testMonotonicChain(ins,call,argss_mul2);
 
@@ -211,8 +215,8 @@ public class TestNodeSmall {
       TypeTuple.make( txctl, tfull, tmulX, t2   , t3   , tmulX), //   2     3   [ int,flt]
       TypeTuple.make( txctl, tfull, tmulX, t2   , tscl , tmul ), //   2     S   [ int,flt]
       TypeTuple.make( txctl, tfull, tmulX, tscl , tscl , tmul ), //   S     S   [ int,flt]
-      TypeTuple.make( txctl, tfull, tmulX, txscl, tabc , tmul ), //  ~S    str  [ int,flt]
-      TypeTuple.make( txctl, tfull, tmulX, t2   , tabc , tmul ), //   2    str  [ int,flt]
+      TypeTuple.make( txctl, tfull, tmulX, txscl, tabc , tmulX), //  ~S    str  [ int,flt]
+      TypeTuple.make( txctl, tfull, tmulX, t2   , tabc , tmulE), //   2    str  [ int,flt]
     };
     _testMonotonicChain(ins,call,argss_mul2x);
 
@@ -318,10 +322,10 @@ public class TestNodeSmall {
 
     // Validate cyclic display/function type
     TypeFunPtr tfptr0 = (TypeFunPtr)gvn.type(fptr);
-    TypeMemPtr tdptr0 = tfptr0.display();
+    Type tdptr0 = tfptr0.display();
     assertEquals(tfptr0.ret(),tdptr0); // Returning the display
     // Display contains 'fact' pointing to self
-    TypeStruct tdisp0 = (TypeStruct)tdptr0._obj;
+    TypeStruct tdisp0 = (TypeStruct)((TypeMemPtr)tdptr0)._obj;
     assertEquals(tfptr0,tdisp0.at(tdisp0.find("fact")));
 
 

@@ -94,7 +94,7 @@ class ConvertF64Str extends IntrinsicNewNode {
 // If one  argument  is  NIL, the other non-nil argument is returned.
 // If neither argument is NIL, the two strings are concatenated into a new third string.
 class AddStrStr extends IntrinsicNewNode {
-  AddStrStr() { super("+",TypeStruct.ts(null,null,TypeMemPtr.STRPTR,TypeMemPtr.STRPTR)); }
+  AddStrStr() { super("+",TypeStruct.ts(null,null,TypeMemPtr.STR0,TypeMemPtr.STR0)); }
   @Override public Node ideal(GVNGCM gvn, int level) { return null; }
   @Override public Type value(GVNGCM gvn) {
     Type m   = gvn.type(in(1));

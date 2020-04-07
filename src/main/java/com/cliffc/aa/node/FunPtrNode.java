@@ -68,7 +68,10 @@ public final class FunPtrNode extends Node {
   @Override public boolean basic_liveness() { return false; }
 
   // Note: graph structure must be in place before calling
-  @Override public Type all_type() { return ret().fun()._tf; }
+  @Override public Type all_type() {
+    TypeFunPtr tf = fun()._tf;
+    return tf.make(TypeMemPtr.DISPLAY_PTR,tf.ret());
+  }
   @Override public String toString() { return super.toString(); }
   // Return the op_prec of the returned value.  Not sensible except when called
   // on primitives.
@@ -109,11 +112,11 @@ public final class FunPtrNode extends Node {
     // Update, all at once:
     //   dfun._tf
     //   gvn.type of scope.ptr(), scope.stk(), scope.obj, def, ParmNode:^
-    TypeFunPtr rtfp = disp.make_recursive(rfun._tf.fidxs(),dfun._tf._args,rfun._name);
-    
+    //TypeFunPtr rtfp = disp.make_recursive(rfun._tf.fidxs(),dfun._tf._args,rfun._name);
 
 
-    
+
+
     // Make a function pointer based on the original forward-ref fidx, but with
     // the known types.
     FunNode.FUNS.setX(dfun.fidx(),null); // Track FunNode by fidx

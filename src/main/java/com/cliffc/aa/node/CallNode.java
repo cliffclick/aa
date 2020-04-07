@@ -252,8 +252,24 @@ public class CallNode extends Node {
     BitsFun fidxs = tfp.fidxs();
     // Resolve; only keep choices with sane arguments during GCP
     BitsFun rfidxs = resolve(fidxs,ts);
-    if( !rfidxs.test(1) ) // Neither ANY nor ALL
-      tfp = TypeFunPtr.make(rfidxs,tfp._args);
+    if( !rfidxs.test(1) ) { // Neither ANY nor ALL
+      TypeStruct args = tfp._args;
+      if( rfidxs.bitCount() != fidxs.bitCount() ) {
+        if( rfidxs == BitsFun.EMPTY ) {
+          // Has to be all NIL args to preserve monotonicity
+          Type[] ats = TypeStruct.ts(args._ts.length);
+          Arrays.fill(ats,Type.NIL);
+          ats[0]= Type.SCALAR;
+          args = TypeStruct.make_args(ats);
+        } else {                // Meet of remaining function arg types
+          args = TypeFunPtr.ARGS.dual();
+          for( int fidx : rfidxs )
+            args = (TypeStruct)args.meet(FunNode.find_fidx(fidx)._tf._args);
+        }
+      }
+      if( rfidxs.above_center() != fidxs.above_center() && rfidxs!=BitsFun.EMPTY ) args = args.dual();
+      tfp = TypeFunPtr.make(rfidxs,args);
+    }
     ts[2] = tfp;
 
     return TypeTuple.make(ts);
@@ -310,13 +326,14 @@ public class CallNode extends Node {
     // - Mix High/Low, keep all & fidx (ignore Good,Bad)
     if(  x(flags,HIGH) &&  x(flags,LOW) ) return fidxs;
     // - All Bad, like Low: keep all & meet
-    if( !x(flags,HIGH) && !x(flags,LOW) && !x(flags,GOOD) ) return sgn(fidxs,false);
+    if( !x(flags,HIGH) && !x(flags,LOW) && !x(flags,GOOD) )
+      return sgn(fidxs,false);
     // All thats left is the no-args case (all formals ignoring), no high/low
     // and some good and maybe bad.  Toss out the bad & return the remaining
     // fidxs with the same sign.
     BitsFun choices = BitsFun.EMPTY;
     for( int fidx : fidxs )
-      if( x(resolve(fidx,targs),GOOD) )
+      if( !x(resolve(fidx,targs),BAD) )
         choices = choices.set(fidx);
     return sgn(choices,fidxs.above_center());
   }
@@ -465,7 +482,7 @@ public class CallNode extends Node {
 
     // Now do an arg-check.
     TypeStruct formals = tfp._args; // Type of each argument
-    for( int j=1; j<nargs(); j++ ) {
+    for( int j=2; j<nargs(); j++ ) {
       Type actual = targ(gvn,j);
       Type formal = formals.at(j);
       if( !actual.isa(formal) ) // Actual is not a formal

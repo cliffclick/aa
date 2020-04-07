@@ -147,7 +147,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public int fidx() { return _fidxs.getbit(); } // Asserts internally single-bit
   public Type arg(int idx) { return _args.at(idx); }
   public Type ret() { return _args.at(0); }
-  public TypeMemPtr display() { return (TypeMemPtr)_args.at(1); } // Always a Display pointer or NIL
+  public Type display() { return _args.at(1); } // Always a Display pointer or NIL
 
   @Override public boolean above_center() { return _fidxs.above_center(); }
   @Override public boolean may_be_con()   { return above_center(); }
@@ -160,9 +160,8 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     return bits==_fidxs ? this : make(bits,_args);
   }
   @Override public Type meet_nil() {
-    if( _fidxs.test(0) )      // Already has a nil?
-      return _fidxs.above_center() ? NIL : this;
-    return make(_fidxs.meet(BitsFun.NIL),_args);
+    if( may_nil() ) return NIL; // Above and contains NIL?
+    return make(_fidxs.meet_nil(),_args);
   }
   // Lattice of conversions:
   // -1 unknown; top; might fail, might be free (Scalar->Int); Scalar might lift

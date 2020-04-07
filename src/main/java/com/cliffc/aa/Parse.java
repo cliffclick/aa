@@ -729,7 +729,7 @@ public class Parse {
     // or when inside of a struct definition: 'this'.
     Node parent_display = _e._scope.ptr();
     ids .push("^");
-    ts  .push(_gvn.type(parent_display).meet_nil());
+    ts  .push(_gvn.type(parent_display));
     bads.push(null);
 
     // Parse arguments
@@ -806,7 +806,7 @@ public class Parse {
       RetNode ret = (RetNode)gvn(new RetNode(ctrl(),all_mem(),rez,rpc.unhook(),fun.unhook()));
       // Update the function type for the current return value
       Type tret = ((TypeTuple)_gvn.type(ret)).at(2);
-      fun.sharpen(_gvn,fun._tf.make(ts.at(0),tret)); // Sharpen alltype return, equal to what parser already knowns
+      fun.sharpen(_gvn,fun._tf.make(ts.at(1),tret)); // Sharpen alltype return, equal to what parser already knowns
       // The FunPtr builds a real display; any up-scope references are passed in now.
       Node fptr = gvn(new FunPtrNode(ret,e._par._scope.ptr()));
       _e = _e._par;             // Pop nested environment

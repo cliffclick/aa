@@ -75,7 +75,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   public static TypeMemPtr make_nil( int alias, TypeObj obj ) { return make(BitsAlias.make0(alias).meet_nil(),obj); }
 
   public  static final TypeMemPtr DISPLAY_PTR= new TypeMemPtr(BitsAlias.RECORD_BITS0,TypeStruct.DISPLAY );
-  public  static final TypeMemPtr NIL_DISPLAY= new TypeMemPtr(BitsAlias.NIL         ,TypeStruct.DISPLAY0);
+  public  static final TypeMemPtr NIL_DISPLAY= new TypeMemPtr(BitsAlias.EMPTY       ,TypeStruct.DISPLAY0);
   static {
     DISPLAY_PTR._hash = DISPLAY_PTR.compute_hash(); // Filled in during DISPLAY.install_cyclic
     NIL_DISPLAY._hash = NIL_DISPLAY.compute_hash(); // Filled in during DISPLAY.install_cyclic
@@ -131,7 +131,10 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     TypeObj to = (TypeObj)_obj.meet(ptr._obj);
     return make(aliases, to);
   }
-  @Override public boolean above_center() { return _aliases.above_center(); }
+  @Override public boolean above_center() {
+    // Aliases first, but if on the centerline (strictly EMPTY) then tie-break with _obj
+    return _aliases.above_center() || (_aliases==BitsAlias.EMPTY && _obj.above_center());
+  }
   // Aliases represent *classes* of pointers and are thus never constants.
   // nil is a constant.
   @Override public boolean may_be_con()   { return may_nil(); }
@@ -143,11 +146,13 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     return bits==_aliases ? this : make(bits,_obj);
   }
   @Override public Type meet_nil() {
-    // See testLattice15.
-    // Tested as Lattice: [~0]->~obj  ==>  NIL  ==>  [0]-> obj
-    return _aliases.isa(BitsAlias.NIL.dual()) && _obj==TypeObj.XOBJ
-      ? NIL
-      : make(_aliases.meet_nil(),TypeObj.OBJ);
+    //// See testLattice15.
+    //// Tested as Lattice: [~0]->~obj  ==>  NIL  ==>  [0]-> obj
+    //return _aliases.isa(BitsAlias.NIL.dual()) && _obj==TypeObj.XOBJ
+    //  ? NIL
+    //  : make(_aliases.meet_nil(),TypeObj.OBJ);
+    if( may_nil() ) return NIL;
+    return make(_aliases.meet_nil(),_obj);
   }
 
   public BitsAlias aliases() { return _aliases; }

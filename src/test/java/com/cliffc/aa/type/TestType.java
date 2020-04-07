@@ -47,7 +47,7 @@ public class TestType {
     // nil.isa(*rec?) so nil.join(*str) isa (*rec?).join(*str)
     Type t0 = Type.NIL;          // [0  ] -> obj
     Type t1 = TypeMemPtr.STRUCT0;// [0,2] -> rec
-    assertFalse(t0.isa(t1));     // [0,2] -> obj -- meet is not t1
+    assertTrue(t0.isa(t1));     // [0,2] -> obj -- meet is not t1
     Type t2 = TypeMemPtr.OOP0;   // [0,2] -> obj
     assertTrue(t0.isa(t2));      //
 
@@ -216,7 +216,7 @@ public class TestType {
 
     // "~str?" or "*[~0+4+]~str?" includes a nil, but nothing can fall to a nil
     // (breaks lattice)... instead they fall to their appropriate nil-type.
-    assertEquals(TypeMemPtr.NILPTR,xstr0.meet( nil ));
+    assertEquals(Type.NIL,xstr0.meet( nil ));
 
     // This is a choice ptr-to-alias#1, vs a nil-able ptr-to-alias#2.  Since
     // they are from different alias classes, they are NEVER equal (unless both
@@ -229,15 +229,15 @@ public class TestType {
 
     // "~@{}?" or "*[~0+2+]~@{}?" includes a nil, but nothing can fall to a nil
     // (breaks lattice)... instead they fall to their appropriate nil-type.
-    assertEquals(TypeMemPtr.NILPTR,xtup0.meet( nil ));
+    assertEquals(TypeMemPtr.NIL,xtup0.meet( nil ));
     assertTrue (xtup0.isa(pzer0));
     assertTrue (xtup .isa(pzer ));
     //assertTrue(TypeMem.MEM_TUP.dual().ld(xstr).isa(TypeMem.MEM_ZER.ld(pabc)));
 
-    assertFalse( nil .isa(pabc0)); // nil expands as [0]->obj so !isa [2]->"abc"
-    assertFalse( nil .isa(pstr0)); // nil expands as [0]->obj so !isa [4]->str
-    assertFalse( nil .isa(ptup0)); // nil expands as [0]->obj so !isa [2]->()
-    assertFalse( nil .isa(pzer0)); // nil expands as [0]->obj so !isa [2]->@{}
+    assertTrue( nil .isa(pabc0)); // nil expands as [0]->obj so !isa [2]->"abc"
+    assertTrue( nil .isa(pstr0)); // nil expands as [0]->obj so !isa [4]->str
+    assertTrue( nil .isa(ptup0)); // nil expands as [0]->obj so !isa [2]->()
+    assertTrue( nil .isa(pzer0)); // nil expands as [0]->obj so !isa [2]->@{}
 
     assertTrue (pabc0.isa(pstr0));
     assertTrue (pabc .isa(pstr ));
@@ -289,7 +289,7 @@ public class TestType {
     Type ptr12 = Type.NIL.join(TypeMemPtr.make(-alias1,a1)).join( TypeMemPtr.make(-alias2,a2));
     // mem.ld(*[1+2]?) ==> @{c:0}
     Type ld = mem.ld((TypeMemPtr)ptr12);
-    TypeObj ax = TypeStruct.make(new String[]{"c"},TypeStruct.ts(TypeMemPtr.NILPTR.dual()),finals ); // @{c:nil}
+    TypeObj ax = TypeStruct.make(new String[]{"c"},TypeStruct.ts(Type.NIL),finals ); // @{c:nil}
     assertEquals(ax,ld);
   }
 

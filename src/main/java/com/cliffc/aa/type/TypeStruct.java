@@ -362,7 +362,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       // value) but displays have the linked-list pointer in _ts[0].
       (_ts.length >= 1 && _ts[0].is_display_ptr());
   }
-  public static final TypeMemPtr NO_DISP= TypeMemPtr.NIL_DISPLAY;
+  public static final Type NO_DISP= Type.NIL; //TypeMemPtr.NIL_DISPLAY.dual();
 
   public  static final TypeStruct GENERIC = malloc("",true,new String[0],TypeAry.get(0),new byte[0]).hashcons_free();
   public  static final TypeStruct ALLSTRUCT;
@@ -863,7 +863,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     case TSCALAR: break; // Nothing to meet
     case TFUNPTR: {
       TypeFunPtr nptr = (TypeFunPtr)nt;
-      if( old == Type.NIL ) { nt = nptr.meet_nil(); break; }
+      if( old == Type.NIL ) { nptr._fidxs = nptr._fidxs.meet_nil();  break; }
       if( old == Type.SCALAR )
         return union(nt,old); // Result is a scalar, which changes the structure of the new types.
       if( old == Type.XSCALAR ) break; // Result is the nt unchanged
@@ -875,12 +875,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     }
     case TMEMPTR: {
       TypeMemPtr nptr = (TypeMemPtr)nt;
-      if( old == Type.NIL ) {
-        nt = nptr.meet_nil();
-        assert !nt.interned(); // Premature hashing, but i suspect assert needs to be an if
-        nt._hash = 0;
-        break;
-      }
+      if( old == Type.NIL ) { nptr._aliases = nptr._aliases.meet_nil();  break; }
       if( old == Type.SCALAR )
         return union(nt,old); // Result is a scalar, which changes the structure of the new types.
       if( old == Type.XSCALAR ) break; // Result is the nt unchanged

@@ -117,8 +117,8 @@ public class TestApprox {
     TypeMemPtr txp3 = (TypeMemPtr)txs2.at(0);
     assertEquals(2,(int)ds2.get(txp3));
     // Weakened expected results after NIL expands to [0]->obj
-    //assertEquals(txs2,txp3._obj);
-    assertEquals(TypeObj.OBJ,txp3._obj);
+    assertEquals(txs2,txp3._obj);
+    //assertEquals(TypeObj.OBJ,txp3._obj);
 
     assertTrue(t3.isa(tax));
   }
@@ -368,12 +368,12 @@ public class TestApprox {
     TypeMemPtr zpa4 = (TypeMemPtr)zsx35._ts[1] ;
     TypeMemPtr zpa23q=(TypeMemPtr)zsx35._ts[2] ;
     // Weakened expected results after NIL expands to [0]->obj
-    //assertSame(zsa23,             zpa23q._obj);
-    assertSame(TypeObj.OBJ,       zpa23q._obj);
-    //TypeStruct zsx4 = (TypeStruct)zpa4._obj;
-    //assertSame(i14,               zsx4._ts[0]);
-    //assertSame(zpx35,             zsx4._ts[1]);
-    //assertSame(zpa23,             zsx4._ts[2]);
+    assertSame(zsa23,             zpa23q._obj);
+    //assertSame(TypeObj.OBJ,       zpa23q._obj);
+    TypeStruct zsx4 = (TypeStruct)zpa4._obj;
+    assertSame(i14,               zsx4._ts[0]);
+    assertSame(zpx35,             zsx4._ts[1]);
+    assertSame(zpa23,             zsx4._ts[2]);
 
     depths = pzsa0.depth();
     assertEquals(0,(int)depths.get(zsa0));
@@ -575,7 +575,7 @@ public class TestApprox {
     TypeStruct  x3 = TypeStruct.malloc("",false,flds,TypeStruct.ts(3),finals);
     x3._hash = x3.compute_hash();  x3._cyclic = true;
     TypeMemPtr px3 = TypeMemPtr.make_nil(alias,x3);  px3._cyclic = true;
-    x3._ts[0] = TypeMemPtr.make_nil(alias,TypeObj.OBJ);
+    x3._ts[0] = px3;//TypeMemPtr.make_nil(alias,TypeObj.OBJ);
     x3._ts[1] = px3;
     x3._ts[2] = Type.SCALAR;
     Type.RECURSIVE_MEET--;
