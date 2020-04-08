@@ -68,7 +68,7 @@ public final class FunPtrNode extends Node {
   @Override public boolean basic_liveness() { return false; }
 
   // Note: graph structure must be in place before calling
-  @Override public Type all_type() {
+  @Override public TypeFunPtr all_type() {
     TypeFunPtr tf = fun()._tf;
     return tf.make(TypeMemPtr.DISPLAY_PTR,tf.ret());
   }
