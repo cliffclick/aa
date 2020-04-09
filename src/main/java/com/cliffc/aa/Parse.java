@@ -968,7 +968,7 @@ public class Parse {
     return typeq(tmp);          // And check for null-ness
   }
   // Wrap in a nullable if there is a trailing '?'.  No spaces allowed
-  private Type typeq(Type t) { return peek_noWS('?') ? t.meet_nil() : t; }
+  private Type typeq(Type t) { return peek_noWS('?') ? t.meet_nil(Type.NIL) : t; }
 
   // No mod is r/o, the default and lattice bottom.  ':' is read-write, '=' is
   // final.  Currently '-' is ambiguous with function arrow ->.

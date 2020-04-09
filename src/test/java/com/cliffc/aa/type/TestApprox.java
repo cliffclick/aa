@@ -61,7 +61,7 @@ public class TestApprox {
     byte[] finals = new byte[]{1,1};
 
     // Build a depth-CUTOFF linked list chain
-    TypeStruct t0 = TypeStruct.make(flds,TypeStruct.ts(Type.NIL,TypeInt.con(99)),finals);
+    TypeStruct t0 = TypeStruct.make(flds,TypeStruct.ts(Type.XNIL,TypeInt.con(99)),finals);
     TypeMemPtr p0 = TypeMemPtr.make(alias0,t0);
     HashMap<Type,Integer> ds = p0.depth();
     assertEquals(0,(int)ds.get(t0));
@@ -249,7 +249,7 @@ public class TestApprox {
 
     // ......................................................... -> X5
     Type str_x5 = TypeStr.con("X5");
-    TypeStruct  x5 = TypeStruct.make(flds3,TypeStruct.ts(str_x5,Type.NIL,Type.NIL),finals3);
+    TypeStruct  x5 = TypeStruct.make(flds3,TypeStruct.ts(str_x5,Type.XNIL,Type.XNIL),finals3);
     TypeMemPtr px5 = TypeMemPtr.make(alias1,x5);
 
     // ................................................... -> A3 -> X5
@@ -557,7 +557,7 @@ public class TestApprox {
     TypeStruct  x1 = TypeStruct.malloc("",false,flds,TypeStruct.ts(3),finals);
     x1._hash = x1.compute_hash();  x1._cyclic = true;
     TypeMemPtr px1 = TypeMemPtr.make_nil(alias,x1);  px1._cyclic = true;
-    x1._ts[0] = Type.NIL;
+    x1._ts[0] = Type.XNIL;
     x1._ts[1] = px1;
     x1._ts[2] = Type.SCALAR;
     Type.RECURSIVE_MEET--;
@@ -708,24 +708,26 @@ public class TestApprox {
     final BitsFun fidxs = BitsFun.make0(fidx0,fidx1).dual();
     final int alias = BitsAlias.new_alias(BitsAlias.RECORD);
 
+    // Args for the forward-ref fib(^ ->Scalar)
     Type tY = TypeMemPtr.DISPLAY_PTR;
-    TypeStruct tfp0_args = TypeStruct.make_args(TypeAry.ts(Type.SCALAR,tY));
+    TypeStruct tfp0_args = TypeStruct.make_args(TypeAry.ts(Type.XSCALAR,tY));
 
-    TypeFunPtr tfp0 = TypeFunPtr.make(BitsFun.ANY,tfp0_args.dual());
-    TypeStruct dsp0 = TypeStruct.make(fflds,TypeStruct.ts(tY,tfp0),fmods);
+    TypeFunPtr tfp0 = TypeFunPtr.make(BitsFun.ANY,tfp0_args); // fib with generic display
+    TypeStruct dsp0 = TypeStruct.make(fflds,TypeStruct.ts(tY,tfp0),fmods); // The display with weak fib-type
     TypeMemPtr ptr0 = TypeMemPtr.make(alias,dsp0);
+    // Args for a strong fib: { ^:ptr0 x:int64 -> ~Scalar } // LOW
     TypeStruct arg0 = TypeStruct.make(xflds,TypeStruct.ts(Type.XSCALAR,ptr0,TypeInt.INT64),xmods);
 
-    TypeFunPtr tfp1 = TypeFunPtr.make(fidxs,arg0);
-    TypeStruct dsp1 = TypeStruct.make(fflds,TypeStruct.ts(tY,tfp1),fmods);
+    TypeFunPtr tfp1 = TypeFunPtr.make(fidxs,arg0); // FIB with weak display
+    TypeStruct dsp1 = TypeStruct.make(fflds,TypeStruct.ts(tY,tfp1),fmods); // Display with stronger FIB-type
     TypeMemPtr ptr1 = TypeMemPtr.make(alias,dsp1);
+    // Args for a strong fib: { ^:ptr x:int -> ~Scalar } // LOW.  Display still not recursive.
     TypeStruct arg1 = TypeStruct.make(xflds,TypeStruct.ts(Type.XSCALAR,ptr1,TypeInt.INT64),xmods);
 
-    TypeFunPtr tfp2 = TypeFunPtr.make(fidxs,arg1);
-    TypeStruct dsp2 = TypeStruct.make(fflds,TypeStruct.ts(tY,tfp2),fmods);
+    TypeFunPtr tfp2 = TypeFunPtr.make(fidxs,arg1); // fib2->dsp1->fib1->dsp0->fib0->generic_display
+    TypeStruct dsp2 = TypeStruct.make(fflds,TypeStruct.ts(tY,tfp2),fmods); // dsp2->fib2->dsp1->fib1->dsp0->fib0->generic_display
 
-    // The approx that gets built.
-    //
+    // The approx that gets built: fib3->dsp3->fib3->dsp3->...
     Type.RECURSIVE_MEET++;
     TypeStruct dsp3 = TypeStruct.malloc("",false,fflds,TypeStruct.ts(2),fmods);
     dsp3._hash = dsp3.compute_hash();  dsp3._cyclic = true;
@@ -743,12 +745,6 @@ public class TestApprox {
 
     // This should pass an isa-test (was crashing)
     Type mt1 = dsp1.meet(dsp3);
-
-
-    // Currently fails: the meet of a cycle of length 1 (struct->ptr->$) and
-    // length 2 (struct->fptr->struct->ptr->$) and collapses to (struct->fptr->
-    // struct->ptr->$)
-    //
 
     // Check the isa
     Type mt = dsp2.meet(dsp3);

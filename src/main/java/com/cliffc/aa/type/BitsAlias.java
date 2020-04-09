@@ -30,7 +30,7 @@ public class BitsAlias extends Bits<BitsAlias> {
     // The All-Memory alias class
     ALL = TREE.split(0);        // Split from 0
     NZERO = new BitsAlias().make_impl(ALL,null);
-    FULL = NZERO.meet_nil();    // All aliases, with a nil
+    FULL = NZERO.meet_nil();    // All aliases, with a low nil
     ANY = FULL.dual();          // Precompute dual
     NIL = make0(0);             // Ugly but NIL has a dual, and this is "low" NIL
     EMPTY = NZERO.make();       // No bits; its its own dual

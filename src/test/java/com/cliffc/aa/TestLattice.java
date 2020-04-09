@@ -1157,15 +1157,21 @@ public class TestLattice {
     N n_mtxstr = new N("n_mtxstr",n_mt_str         ,n_0_xstr,n__4xstr);
     N n_mtxobj = new N("n_mtxobj",n_mtxrec,n_mtxstr,n_0_xobj,n__4xobj);
 
-    N NIL = new N("NIL",n_0__obj); // [0]->obj  <==  NIL  <==  [~0]->~obj
+    // An UNSIGNED NIL works IFF NIL expands as-if "[0]->obj", which means
+    // meeting with NIL loses the base type of a pointer.  But it remains a
+    // lattice.
+
+    // Signed Nil works, and is a lattice.
+    N NIL = new N(" NIL",n_0__obj);
+    N XNIL= new N("XNIL",n_0_xobj);
 
     // Layer [~0  ] -> {~obj,~rec,~str,str,rec,obj}
-    N nx0__obj = new N("nx0__obj"                  ,n_mt_obj);
+    N nx0__obj = new N("nx0__obj"                  ,n_mt_obj, NIL);
     N nx0__rec = new N("nx0__rec",nx0__obj         ,n_mt_rec);
     N nx0__str = new N("nx0__str",nx0__obj         ,n_mt_str);
     N nx0_xrec = new N("nx0_xrec",nx0__rec         ,n_mtxrec);
     N nx0_xstr = new N("nx0_xstr",nx0__str         ,n_mtxstr);
-    N nx0_xobj = new N("nx0_xobj",nx0_xrec,nx0_xstr,n_mtxobj, NIL);
+    N nx0_xobj = new N("nx0_xobj",nx0_xrec,nx0_xstr,n_mtxobj, XNIL);
 
     // Layer [~4  ] -> {~obj,~rec,~str,str,rec,obj}
     N nx_4_obj = new N("nx_4_obj"                  ,n_mt_obj);
@@ -1210,7 +1216,8 @@ public class TestLattice {
     n_mt_rec.set_dual(n_mtxrec);
     n_mt_str.set_dual(n_mtxstr);
 
-
+    NIL.set_dual(XNIL);
+    
     test(nx04xobj);
   }
 

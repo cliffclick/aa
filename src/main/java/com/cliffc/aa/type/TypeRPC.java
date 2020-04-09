@@ -46,9 +46,7 @@ public class TypeRPC extends Type<TypeRPC> {
     case TMEMPTR:
     case TFLT:
     case TINT:   return cross_nil(t);
-    case TNIL:
     case TTUPLE:
-    case TFUN:
     case TOBJ:
     case TSTR:
     case TSTRUCT:
@@ -75,11 +73,19 @@ public class TypeRPC extends Type<TypeRPC> {
     BitsRPC bits = _rpcs.not_nil();
     return bits==_rpcs ? this : make(bits);
   }
-  @Override public Type meet_nil() {
-    //if( _rpcs.test(0) )      // Already has a nil?
-    //  return _rpcs.above_center() ? NIL : this;
-    //return make(_rpcs.meet(BitsRPC.NIL));
-    if( may_nil() ) return NIL;// Already has a nil?
-    return make(_rpcs.meet_nil());
+  @Override public Type meet_nil(Type t) {
+    // See testLattice15.  The UNSIGNED NIL tests as a lattice:
+    //    [~0]->~obj  ==>  NIL  ==>  [0]-> obj
+    // But loses the pointed-at type down to OBJ.
+    // So using SIGNED NIL, which also tests as a lattice:
+    //    [~0]->~obj ==>  XNIL  ==>  [0]->~obj 
+    //    [~0]-> obj ==>   NIL  ==>  [0]-> obj
+    
+    //if( _fidxs.isa(BitsFun.NIL.dual()) ) {
+    //  if( _obj==TypeObj.XOBJ && nil==XNIL )  return XNIL;
+    //  if( nil==NIL ) return NIL;
+    //}
+    //return make(_fidxs.meet(BitsFun.NIL),nil==NIL ? TypeObj.OBJ : _obj);
+    throw com.cliffc.aa.AA.unimpl();
   }
 }

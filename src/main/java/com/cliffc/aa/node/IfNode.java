@@ -35,7 +35,7 @@ public class IfNode extends Node {
     if( pred.above_center() ) return TypeTuple.IF_ANY;
     // If meeting a nil changes things, then the original excluded nil and so
     // was always true.
-    if( pred.meet_nil() != pred ) return TypeTuple.IF_TRUE;
+    if( pred.meet_nil(Type.NIL) != pred ) return TypeTuple.IF_TRUE;
     
     throw AA.unimpl(); // Dunno what test this is?
   }

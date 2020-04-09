@@ -251,22 +251,21 @@ public class Type<T extends Type<T>> implements Cloneable {
   static final byte TNREAL  =14; // Numbers-not-nil
   static final byte TXNREAL =15; // Invert Numbers-not-nil
   static final byte TNIL    =16; // The Nil-type
-  static final byte TSIMPLE =17; // End of the Simple Types
-  private static final String[] STRS = new String[]{"all","any","Ctrl","~Ctrl","Scalar","~Scalar","nScalar","~nScalar","Number","~Number","nNumber","~nNumber","Real","~Real","nReal","~nReal","nil"};
+  static final byte TXNIL   =17; // NIL.dual
+  static final byte TSIMPLE =18; // End of the Simple Types
+  private static final String[] STRS = new String[]{"all","any","Ctrl","~Ctrl","Scalar","~Scalar","nScalar","~nScalar","Number","~Number","nNumber","~nNumber","Real","~Real","nReal","~nReal","nil","~nil"};
   // Complex types - Implemented in subclasses
-  static final byte TINT    =18; // All Integers, including signed/unsigned and various sizes; see TypeInt
-  static final byte TFLT    =19; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
-  static final byte TRPC    =20; // Return PCs; Continuations; call-site return points; see TypeRPC
-  static final byte TTUPLE  =21; // Tuples; finite collections of unrelated Types, kept in parallel
-  static final byte TOBJ    =22; // Memory objects; arrays and structs and strings
-  static final byte TSTRUCT =23; // Memory Structs; tuples with named fields
-  static final byte TSTR    =24; // Memory String type; an array of chars
-  static final byte TMEM    =25; // Memory type; a map of Alias#s to TOBJs
-  static final byte TMEMPTR =26; // Memory pointer type; a collection of Alias#s
-  static final byte TFUNPTR =27; // Function pointer, refers to a collection of concrete functions
-  static final byte TFUN    =28; // A simple function signature, not a function nor function pointer
-  static final byte TBITS   =29; // Collection of bits
-  static final byte TLAST   =30; // Type check
+  static final byte TINT    =19; // All Integers, including signed/unsigned and various sizes; see TypeInt
+  static final byte TFLT    =20; // All IEEE754 Float Numbers; 32- & 64-bit, and constants and duals; see TypeFlt
+  static final byte TRPC    =21; // Return PCs; Continuations; call-site return points; see TypeRPC
+  static final byte TTUPLE  =22; // Tuples; finite collections of unrelated Types, kept in parallel
+  static final byte TOBJ    =23; // Memory objects; arrays and structs and strings
+  static final byte TSTRUCT =24; // Memory Structs; tuples with named fields
+  static final byte TSTR    =25; // Memory String type; an array of chars
+  static final byte TMEM    =26; // Memory type; a map of Alias#s to TOBJs
+  static final byte TMEMPTR =27; // Memory pointer type; a collection of Alias#s
+  static final byte TFUNPTR =28; // Function pointer, refers to a collection of concrete functions
+  static final byte TLAST   =29; // Type check
 
   public  static final Type ALL    = make( TALL   ); // Bottom
   public  static final Type ANY    = make( TANY   ); // Top
@@ -277,6 +276,7 @@ public class Type<T extends Type<T>> implements Cloneable {
   public  static final Type  NSCALR= make( TNSCALR); // Scalars-not-nil
   public  static final Type XNSCALR= make(TXNSCALR); // Scalars-not-nil
   public  static final Type   NIL  = make( TNIL   ); // The Nil.
+  public  static final Type  XNIL  = make(TXNIL   ); // The ~Nil.
   public  static final Type   NUM  = make( TNUM   );
   public  static final Type  XNUM  = make(TXNUM   );
   public  static final Type  NNUM  = make( TNNUM  );
@@ -302,7 +302,7 @@ public class Type<T extends Type<T>> implements Cloneable {
   private boolean is_ptr() { byte t = _type;  return t == TFUNPTR || t == TMEMPTR; }
   private boolean is_num() { byte t = _type;  return t == TNUM || t == TXNUM || t == TNNUM || t == TXNNUM || t == TREAL || t == TXREAL || t == TNREAL || t == TXNREAL || t == TINT || t == TFLT; }
   // True if 'this' isa SCALAR, without the cost of a full 'meet()'
-  private static final byte[] ISA_SCALAR = new byte[]{/*ALL-0*/0,0,0,0,1,1,1,1,1,1,/*TNNUM-10*/1,1,1,1,1,1,1,/*TSIMPLE-17*/0, 1,1,1,0,0,0,0,0,1,1,/*TFUN-28*/0,/*TBITS-29*/0}/*TLAST=30*/;
+  private static final byte[] ISA_SCALAR = new byte[]{/*ALL-0*/0,0,0,0,1,1,1,1,1,1,/*TNNUM-10*/1,1,1,1,1,1,1,1,/*TSIMPLE-18*/0, 1,1,1,0,0,0,0,0,1,/*TFUNPTR-28*/1}/*TLAST=29*/;
   public final boolean isa_scalar() { assert ISA_SCALAR.length==TLAST; return ISA_SCALAR[_type]!=0; }
 
   // Return cached dual
@@ -312,7 +312,6 @@ public class Type<T extends Type<T>> implements Cloneable {
   @SuppressWarnings("unchecked")
   T xdual() {
     assert is_simple();
-    if( _type==TNIL ) return (T)this; // NIL is a constant and thus self-dual
     return (T)new Type((byte)(_type^1));
   }
   T rdual() { assert _dual!=null; return _dual; }
@@ -355,7 +354,7 @@ public class Type<T extends Type<T>> implements Cloneable {
     // Quick check on NIL: if either argument is NIL the result is allowed to
     // be NIL...  but nobody in the lattice can make a NIL from whole cloth, or
     // we get the crossing-nil bug.
-    assert nmt != NIL || this==NIL || t==NIL;
+    assert (nmt != NIL && nmt!=XNIL) || this==NIL || this==XNIL || t==NIL || t==XNIL;
 
     // Record this meet, to short-cut next time
     if( RECURSIVE_MEET == 0 )   // Only not mid-building recursive types;
@@ -414,7 +413,7 @@ public class Type<T extends Type<T>> implements Cloneable {
     if(   _type == TXNSCALR) return t.not_nil();
     if( t._type == TXNSCALR) return   not_nil();
 
-    if( _type == TNIL   ) return t.meet_nil();
+    if( _type == TNIL || _type == TXNIL ) return t.meet_nil(this);
 
     // Scalar values break out into: nums(reals (int,flt)), GC-ptrs (structs(tuples), arrays(strings)), fun-ptrs, RPC
     if( t._type == TFUNPTR ||
@@ -827,12 +826,13 @@ public class Type<T extends Type<T>> implements Cloneable {
     default: throw typerr(null); // Overridden in subclass
     }
   }
-  public Type meet_nil() {
+  public Type meet_nil(Type nil) {
     switch( _type ) {
     case TANY:
     case TXNUM:
     case TXREAL:
     case TXSCALAR:
+    case TXNIL:   return nil; // Preserve high/low flavor
     case TNIL:    return NIL;
     case TXNNUM:
     case TXNREAL:
@@ -870,7 +870,7 @@ public class Type<T extends Type<T>> implements Cloneable {
     return above_center() ? this : dual();
   }
   // Display might be Scalar or ~Scalar due to startype
-  public boolean is_display_ptr() { return _type==TSCALAR || _type==TXSCALAR || _type==TNIL || _type==TANY; }
+  public boolean is_display_ptr() { return _type==TSCALAR || _type==TXSCALAR || _type==TNIL || _type==TXNIL || _type==TANY; }
   boolean is_display() { return false; }
 
   RuntimeException typerr(Type t) {

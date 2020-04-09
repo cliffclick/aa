@@ -139,7 +139,7 @@ public class TypeTuple extends Type<TypeTuple> {
   }
   @Override public boolean must_nil() { return false; }
   @Override Type not_nil() { return this; }
-  @Override public Type meet_nil() { throw AA.unimpl(); }
+  @Override public Type meet_nil(Type t) { throw AA.unimpl(); }
 
   // Return true if this is a function pointer (return type from EpilogNode)
   // 0 - Control for the function

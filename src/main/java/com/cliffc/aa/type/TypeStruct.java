@@ -181,7 +181,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     if( _uf!=null ) return _uf.dstr(sb.p("=>"),dups);
     if( _any ) sb.p('~');
     sb.p(_name);
-    boolean is_tup = _flds.length<=1 || fldTop(_flds[1]) || fldBot(_flds[1]) || isDigit(_flds[1].charAt(0));
+    boolean is_tup = _flds.length<=0 || fldTop(_flds[0]) || fldBot(_flds[0]) || isDigit(_flds[0].charAt(0));
     if( !is_tup ) sb.p('@');    // Not a tuple
     sb.p(is_tup ? '(' : '{').nl().ii(1); // open struct, newline, increase_indent
     for( int i=0; i<_flds.length; i++ ) {
@@ -209,7 +209,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     if( _uf!=null ) return _uf.str(sb.p("=>"),dups,mem);
     if( _any ) sb.p('~');
     sb.p(_name);
-    boolean is_tup = _flds.length<=1 || fldTop(_flds[1]) || fldBot(_flds[1]) || isDigit(_flds[1].charAt(0));
+    boolean is_tup = _flds.length<=0 || fldTop(_flds[0]) || fldBot(_flds[0]) || isDigit(_flds[0].charAt(0));
     if( !is_tup ) sb.p('@');    // Not a tuple
     sb.p(is_tup ? '(' : '{');
     for( int i=0; i<_flds.length; i++ ) {
@@ -303,6 +303,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public  static TypeStruct make(String[] flds, Type[] ts) { return malloc("",false,flds,ts,fbots(ts.length)).hashcons_free(); }
   public  static TypeStruct make(String[] flds, Type[] ts, byte[] flags) { return malloc("",false,flds,ts,flags).hashcons_free(); }
   public  static TypeStruct make(String name, String[] flds, Type[] ts, byte[] flags) { return malloc(name,false,flds,ts,flags).hashcons_free(); }
+  public  static TypeStruct make(boolean any, String[] flds, Type[] ts, byte[] flags) { return malloc("",any,flds,ts,flags).hashcons_free(); }
 
   // Generic parser struct object, slot 0 is the display and is NO_DISP post-parse.
   private static final String[][] TFLDS={{},
@@ -316,9 +317,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
 
   public  static TypeStruct make(String[] flds, byte[] flags) { return make(flds,ts(flds.length),flags); }
   // Make from prior, just updating field types
-  public TypeStruct make_from( Type[] ts ) { return make(_name,_flds,ts,_flags); }
-  // Make from prior, just updating flags
-  public TypeStruct make_from( byte[] flags ) { return make(_name,_flds,_ts,flags); }
+  public TypeStruct make_from( Type[] ts ) { return malloc(_name,_any,_flds,ts,_flags).hashcons_free(); }
 
   // Recursive meet in progress.
   // Called during class-init.
@@ -362,7 +361,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       // value) but displays have the linked-list pointer in _ts[0].
       (_ts.length >= 1 && _ts[0].is_display_ptr());
   }
-  public static final Type NO_DISP= Type.NIL; //TypeMemPtr.NIL_DISPLAY.dual();
+  public static final Type NO_DISP= TypeMemPtr.NIL_DISPLAY.dual();
 
   public  static final TypeStruct GENERIC = malloc("",true,new String[0],TypeAry.get(0),new byte[0]).hashcons_free();
   public  static final TypeStruct ALLSTRUCT;
@@ -555,9 +554,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     case TFUNPTR:
     case TMEMPTR:
     case TRPC:
-    case TFUN:
     case TMEM:   return ALL;
-    case TNIL:
     default: throw typerr(t);   // All else should not happen
     }
     TypeStruct thsi = this;
@@ -863,19 +860,20 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     case TSCALAR: break; // Nothing to meet
     case TFUNPTR: {
       TypeFunPtr nptr = (TypeFunPtr)nt;
-      if( old == Type.NIL ) { nptr._fidxs = nptr._fidxs.meet_nil();  break; }
+      if( old == Type.NIL || old == Type.XNIL ) return nptr.ax_meet_nil(old);
       if( old == Type.SCALAR )
         return union(nt,old); // Result is a scalar, which changes the structure of the new types.
       if( old == Type.XSCALAR ) break; // Result is the nt unchanged
       if( !(old instanceof TypeFunPtr) ) throw AA.unimpl(); // Not a xscalar, not a funptr, probably falls to scalar
       TypeFunPtr optr = (TypeFunPtr)old;
       nptr._fidxs = nptr._fidxs.meet(optr._fidxs);
+      // While structs normally meet, function args *join*.
       nptr._args = (TypeStruct)ax_meet(bs,nptr._args,optr._args);
       break;
     }
     case TMEMPTR: {
       TypeMemPtr nptr = (TypeMemPtr)nt;
-      if( old == Type.NIL ) { nptr._aliases = nptr._aliases.meet_nil();  break; }
+      if( old == Type.NIL || old == Type.XNIL ) return nptr.ax_meet_nil(old);
       if( old == Type.SCALAR )
         return union(nt,old); // Result is a scalar, which changes the structure of the new types.
       if( old == Type.XSCALAR ) break; // Result is the nt unchanged
@@ -1297,7 +1295,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return 99;
   }
 
-  @Override public Type meet_nil() { return this; }
+  @Override public Type meet_nil(Type nil) { return this; }
 
   @Override boolean contains( Type t, VBitSet bs ) {
     if( bs==null ) bs=new VBitSet();

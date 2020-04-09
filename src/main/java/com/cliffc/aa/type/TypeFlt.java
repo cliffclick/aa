@@ -59,8 +59,6 @@ public class TypeFlt extends Type<TypeFlt> {
     case TFUNPTR:
     case TMEMPTR:
     case TRPC:   return cross_nil(t);
-    case TNIL:   return t.xmeet(this); // Let other side decide
-    case TFUN:
     case TTUPLE:
     case TOBJ:
     case TSTR:
@@ -95,7 +93,11 @@ public class TypeFlt extends Type<TypeFlt> {
   @Override public boolean must_nil() { return _x==-2 || (_x==0 && _con==0); }
   @Override public boolean  may_nil() { return _x > 0 || (_x==0 && _con==0); }
   @Override Type not_nil() { return _x==2 ? make(1,_z,_con) : this; }
-  @Override public Type meet_nil() { return TypeInt.ZERO.xmeetf(this); }
+  @Override public Type meet_nil(Type nil) {
+    if( _x==2 ) return nil;
+    if( _x==0 && _con==0 ) return nil==Type.XNIL ? this : Type.NIL;
+    return TypeFlt.make(-2,_z,0);
+  }
 
   // Lattice of conversions:
   // -1 unknown; top; might fail, might be free (Scalar->Int); Scalar might lift

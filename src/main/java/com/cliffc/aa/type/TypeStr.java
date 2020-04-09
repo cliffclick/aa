@@ -67,13 +67,11 @@ public class TypeStr extends TypeObj<TypeStr> {
     case TSTR:   break;
     case TSTRUCT:return OBJ;
     case TOBJ:   return t.above_center() ? this : t;
-    case TNIL:
     case TTUPLE:
     case TFUNPTR:
     case TMEMPTR:
     case TFLT:
     case TINT:
-    case TFUN:
     case TRPC:
     case TMEM:   return ALL;
     default: throw typerr(t);
@@ -94,7 +92,7 @@ public class TypeStr extends TypeObj<TypeStr> {
   @Override public TypeObj update(byte fin, String fld, Type val) { return STR; }
   @Override public TypeObj st    (byte fin, String fld, Type val) { return STR; }
   @Override public boolean may_be_con() { return super.may_be_con() || _con != null; }
-  @Override public Type meet_nil() { return this; }
+  @Override public Type meet_nil(Type t) { return this; }
 
   // Lattice of conversions:
   // -1 unknown; top; might fail, might be free (Scalar->Str); Scalar might lift

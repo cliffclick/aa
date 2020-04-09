@@ -333,7 +333,7 @@ static class EQ_OOP extends PrimNode {
   @Override public byte op_prec() { return 4; }
   static Type vs_nil( Type tx, Type t, Type f ) {
     if( tx==Type.NIL ) return t;
-    if( tx.above_center() ) return tx.meet_nil()==Type.NIL ? TypeInt.BOOL.dual() : f;
+    if( tx.above_center() ) return tx.isa(Type.NIL) ? TypeInt.BOOL.dual() : f;
     return tx.must_nil() ? TypeInt.BOOL : f;
   }
 }

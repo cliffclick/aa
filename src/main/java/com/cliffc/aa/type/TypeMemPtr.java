@@ -75,11 +75,11 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   public static TypeMemPtr make_nil( int alias, TypeObj obj ) { return make(BitsAlias.make0(alias).meet_nil(),obj); }
 
   public  static final TypeMemPtr DISPLAY_PTR= new TypeMemPtr(BitsAlias.RECORD_BITS0,TypeStruct.DISPLAY );
-  public  static final TypeMemPtr NIL_DISPLAY= new TypeMemPtr(BitsAlias.EMPTY       ,TypeStruct.DISPLAY0);
+  public  static final TypeMemPtr NIL_DISPLAY= new TypeMemPtr(BitsAlias.NIL         ,TypeStruct.DISPLAY0);
   static {
     DISPLAY_PTR._hash = DISPLAY_PTR.compute_hash(); // Filled in during DISPLAY.install_cyclic
     NIL_DISPLAY._hash = NIL_DISPLAY.compute_hash(); // Filled in during DISPLAY.install_cyclic
-  }    
+  }
   public  static final TypeMemPtr OOP0   = make(BitsAlias.FULL    ,TypeObj.OBJ); // Includes nil
   public  static final TypeMemPtr OOP    = make(BitsAlias.NZERO   ,TypeObj.OBJ); // Excludes nil
   public  static final TypeMemPtr STRPTR = make(BitsAlias.STRBITS ,TypeStr.STR);
@@ -120,9 +120,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     case TSTR:
     case TSTRUCT:
     case TTUPLE:
-    case TFUN:
     case TMEM:   return ALL;
-    case TNIL:                  // Handled by Type.xmeet as meet_nil
     default: throw typerr(t);   // All else should not happen
     }
     // Meet of aliases
@@ -145,16 +143,32 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     BitsAlias bits = _aliases.not_nil();
     return bits==_aliases ? this : make(bits,_obj);
   }
-  @Override public Type meet_nil() {
-    //// See testLattice15.
-    //// Tested as Lattice: [~0]->~obj  ==>  NIL  ==>  [0]-> obj
-    //return _aliases.isa(BitsAlias.NIL.dual()) && _obj==TypeObj.XOBJ
-    //  ? NIL
-    //  : make(_aliases.meet_nil(),TypeObj.OBJ);
-    if( may_nil() ) return NIL;
-    return make(_aliases.meet_nil(),_obj);
-  }
+  @Override public Type meet_nil(Type nil) {
+    // See testLattice15.  The UNSIGNED NIL tests as a lattice:
+    //    [~0]->~obj  ==>  NIL  ==>  [0]-> obj
+    // But loses the pointed-at type down to OBJ.
+    // So using SIGNED NIL, which also tests as a lattice:
+    //    [~0]->~obj ==>  XNIL  ==>  [0]->~obj
+    //    [~0]-> obj ==>   NIL  ==>  [0]-> obj
 
+    if( _aliases.isa(BitsAlias.NIL.dual()) ) {
+      if( _obj==TypeObj.XOBJ && nil==XNIL )  return XNIL;
+      if( nil==NIL ) return NIL;
+    }
+    return make(_aliases.meet(BitsAlias.NIL),nil==NIL ? TypeObj.OBJ : _obj);
+  }
+  // Used during approximations, with a not-interned 'this'.
+  // Updates-in-place.
+  public Type ax_meet_nil(Type nil) {
+    if( _aliases.isa(BitsAlias.NIL.dual()) ) {
+      if( _obj==TypeObj.XOBJ && nil==XNIL )  return XNIL;
+      if( nil==NIL ) return NIL;
+    }
+    _aliases = _aliases.meet(BitsAlias.NIL);
+    if( nil==NIL ) _obj = TypeObj.OBJ;
+    return this;
+  }
+  
   public BitsAlias aliases() { return _aliases; }
 
   // Identical pointer but points to clean

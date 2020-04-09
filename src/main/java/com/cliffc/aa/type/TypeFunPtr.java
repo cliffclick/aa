@@ -94,7 +94,11 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public static TypeFunPtr make_new(TypeStruct args) { return make(BitsFun.make_new_fidx(BitsFun.ALL),args); }
   public TypeFunPtr make_fidx( int fidx ) { return make(BitsFun.make0(fidx),_args); }
   public TypeFunPtr make_new_fidx( int parent, TypeStruct args ) { return make(BitsFun.make_new_fidx(parent),args); }
-  public static TypeStruct ARGS = TypeStruct.make_args(TypeAry.ts(Type.SCALAR,TypeMemPtr.DISPLAY_PTR));
+  public static TypeStruct ARGS =
+    TypeStruct.make(true,       // High, so extra args are all XSCALAR
+                    new String[]{"->","^"}, // First two args normal for a function
+                    TypeAry.ts(Type.SCALAR,TypeMemPtr.DISPLAY_PTR.dual()),
+                    new byte[]{TypeStruct.FFNL,TypeStruct.FUNK});
   public static TypeFunPtr make_anon() { return make_new(ARGS); } // Make a new anonymous function ptr
   // Make a TFP with a new display and return value, used by FunPtrNode
   public TypeFunPtr make(Type display_ptr, Type ret) {
@@ -102,10 +106,6 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     TypeStruct args = _args.set_fld(0,ret        ,_args.fmod(0));
     args            =  args.set_fld(1,display_ptr,_args.fmod(1));
     return make(_fidxs,args);
-  }
-  public TypeFunPtr make_high_fidx() {
-    if( _fidxs.above_center() ) return this;
-    return make(_fidxs.dual(),_args);
   }
 
   public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.FULL,ARGS);
@@ -129,18 +129,24 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     case TINT:
     case TMEMPTR:
     case TRPC:   return cross_nil(t);
-    case TFUN:
     case TTUPLE:
     case TOBJ:
     case TSTR:
     case TSTRUCT:
     case TMEM:   return ALL;
-    case TNIL:                  // TODO: Meet-with-NIL can return NIL is some cases
     default: throw typerr(t);   // All else should not happen
     }
     TypeFunPtr tf = (TypeFunPtr)t;
-    // Function args are MEET during MEET
-    return make(_fidxs.meet(tf._fidxs),(TypeStruct)_args.meet(tf._args));
+    // Contra-variant args, co-variant return.
+    // Function args are JOIN, return is MEET.
+    // Args turn into *constraints* on a valid typing, whereas the return
+    // turns into a real value.
+
+    TypeStruct jargs = (TypeStruct)_args.join(tf._args);
+    Type ret = ret().meet(tf.ret());
+    Type[] ts = TypeAry.clone(jargs._ts);
+    ts[0] = ret;
+    return make(_fidxs.meet(tf._fidxs),jargs.make_from(ts));
   }
 
   public BitsFun fidxs() { return _fidxs; }
@@ -149,20 +155,39 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public Type ret() { return _args.at(0); }
   public Type display() { return _args.at(1); } // Always a Display pointer or NIL
 
-  @Override public boolean above_center() { return _fidxs.above_center(); }
+  @Override public boolean above_center() { return _args.above_center(); }
   @Override public boolean may_be_con()   { return above_center(); }
   // Since fidxs may split, never a constant.
   @Override public boolean is_con()       { return false; }
-  @Override public boolean must_nil() { return _fidxs.test(0) && !above_center(); }
+  @Override public boolean must_nil() { return _fidxs.test(0) && !_fidxs.above_center(); }
   @Override public boolean may_nil() { return _fidxs.may_nil(); }
   @Override Type not_nil() {
     BitsFun bits = _fidxs.not_nil();
     return bits==_fidxs ? this : make(bits,_args);
   }
-  @Override public Type meet_nil() {
-    if( may_nil() ) return NIL; // Above and contains NIL?
-    return make(_fidxs.meet_nil(),_args);
+  @Override public Type meet_nil(Type nil) {
+    // See testLattice15.  The UNSIGNED NIL tests as a lattice:
+    //    [~0]->~obj  ==>  NIL  ==>  [0]-> obj
+    // But loses the pointed-at type down to OBJ.
+    // So using SIGNED NIL, which also tests as a lattice:
+    //    [~0]->~obj ==>  XNIL  ==>  [0]->~obj
+    //    [~0]-> obj ==>   NIL  ==>  [0]-> obj
+
+    //if( _fidxs.isa(BitsFun.NIL.dual()) ) {
+    //  if( _obj==TypeObj.XOBJ && nil==XNIL )  return XNIL;
+    //  if( nil==NIL ) return NIL;
+    //}
+    //return make(_fidxs.meet(BitsFun.NIL),nil==NIL ? TypeObj.OBJ : _obj);
+    throw com.cliffc.aa.AA.unimpl();
+    //if( may_nil() ) return NIL; // Above and contains NIL?
+    //return make(_fidxs.meet_nil(),_args);
   }
+  // Used during approximations, with a not-interned 'this'.
+  // Updates-in-place.
+  public Type ax_meet_nil(Type nil) {
+    throw com.cliffc.aa.AA.unimpl();
+  }
+  
   // Lattice of conversions:
   // -1 unknown; top; might fail, might be free (Scalar->Int); Scalar might lift
   //    to e.g. Float and require a user-provided rounding conversion from F64->Int.

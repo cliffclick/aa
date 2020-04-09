@@ -28,7 +28,6 @@ public class TypeInt extends Type<TypeInt> {
   private static TypeInt FREE=null;
   @Override protected TypeInt free( TypeInt ret ) { FREE=this; return ret; }
   public static Type make( int x, int z, long con ) {
-    if( x==0 && con==0 ) return NIL;
     if( Math.abs(x)==1 && z==1 && con==0) con=1; // not-null-bool is just a 1
     TypeInt t1 = FREE;
     if( t1 == null ) t1 = new TypeInt(x,z,con);
@@ -44,7 +43,7 @@ public class TypeInt extends Type<TypeInt> {
   static public  final TypeInt  INT8  = (TypeInt)make(-2, 8,0);
   static public  final TypeInt  BOOL  = (TypeInt)make(-2, 1,0);
   static public  final TypeInt TRUE   = (TypeInt)make( 0, 1,1);
-  static public  final Type    FALSE  = NIL;
+  static public  final Type    FALSE  = (TypeInt)make( 0, 1,0);
   static public  final TypeInt XINT1  = (TypeInt)make( 2, 1,0);
   static public  final TypeInt NINT8  = (TypeInt)make(-1, 8,0);
   static private final TypeInt NINT64 = (TypeInt)make(-1,64,0);
@@ -72,8 +71,6 @@ public class TypeInt extends Type<TypeInt> {
     case TFUNPTR:
     case TMEMPTR:
     case TRPC:   return cross_nil(t);
-    case TNIL:   return t.xmeet(this); // Let other side decide
-    case TFUN:
     case TTUPLE:
     case TOBJ:
     case TSTR:
@@ -96,7 +93,7 @@ public class TypeInt extends Type<TypeInt> {
     TypeInt ttop = _x>0 ? this : tt;
     if( that._x<0 ) return that; // Return low value
     if( log(that._con) <= ttop._z && (that._con!=0 || ttop._x==2) )
-      return that==ZERO ? NIL : that; // Keep a fitting constant
+      return that;                    // Keep a fitting constant
     return make(that.nn(),that._z,0); // No longer a constant
   }
 
@@ -138,7 +135,7 @@ public class TypeInt extends Type<TypeInt> {
       // tf._x > 0 // Can a high float fall to the int constant?
       double dcon = tf._z==32 ? (float)_con : (double)_con;
       if( (long)dcon == _con && (_con!=0 || tf._x == 2) )
-        return this==ZERO ? NIL : this;
+        return this;
       tx = _con==0 ? -2 : -1; // Fall from constant
     } // Fall into the bottom-int case
 
@@ -191,7 +188,10 @@ public class TypeInt extends Type<TypeInt> {
     // Never had a nil choice
     return this;
   }
-  @Override public Type meet_nil() { return xmeet(ZERO); }
-  //@Override Type make_recur(TypeName tn, int d, VBitSet bs ) { return this; }
+  @Override public Type meet_nil(Type nil) {
+    if( _x==2 ) return nil;
+    if( _x==0 && _con==0 ) return nil==Type.XNIL ? this : Type.NIL;
+    return TypeInt.make(-2,_z,0);
+  }
   @Override void walk( Predicate<Type> p ) { p.test(this); }
 }

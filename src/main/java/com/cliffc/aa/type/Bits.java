@@ -185,7 +185,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   public boolean is_empty() { return _bits==null && _con==0; }
   public boolean is_nil() { return _bits!=null && _bits.length==1 && _bits[0]==1; }
   boolean may_nil() { return _con==-1 && _bits != null && ((_bits[0]&1) == 1); }
-  // Add a nil.  This is Type.NIL, which expands to a low [0]
+  // Add a low nil.
   @SuppressWarnings("unchecked")
   B meet_nil() {
     if( above_center() ) return make(0); // Crossing centerline, drop all above bits, just [0]
@@ -222,7 +222,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   // nil-choice (might be a must-nil but not a choice-nil), so can return this.
   @SuppressWarnings("unchecked")
   B not_nil() {
-    if( _con != -1 || _bits == null ) return (B)this; // Below or at center
+    if( !above_center() || _bits == null ) return (B)this;  // Some constant not-nil
     if( !test(_bits,0) ) return (B)this; // No nil choice
     long[] bs = _bits.clone();           // Keep all other bits
     and(bs,0);                           // remove nil choice
@@ -295,8 +295,6 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
 
     long[] bits0 = _bits, bits1 = bs._bits;
     int con0 = Math.abs(_con), con1 = Math.abs(bs._con);
-    if( bits0==null && con0==0 ) return bs.meet_nil();
-    if( bits1==null && con1==0 ) return    meet_nil();
 
     // Expand any single bits
     if( bits0==null ) or(bits0=bits(con0), con0);

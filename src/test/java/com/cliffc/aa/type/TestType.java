@@ -17,10 +17,10 @@ public class TestType {
     Object dummy0 = TypeStruct.TYPES;
     Object dummy1 = TypeMemPtr.TYPES;
 
-    TypeMemPtr txnil = TypeMemPtr.NILPTR .dual(); // [~0  ]->~obj
-    TypeMemPtr txrec = TypeMemPtr.STRUCT0.dual(); // [~0+2]->~obj
-    Type mt = txnil.meet(txrec);
-    //assertEquals(txnil,mt);
+    Type tnil = Type.NIL; // 0
+    Type tstr = TypeMemPtr.STRPTR; // [4]->str
+    Type mt = tnil.join(tstr);
+    //assertEquals(TypeMemPtr.NILPTR.dual(),mt);
 
   }
 
@@ -45,9 +45,9 @@ public class TestType {
     //       [0,2]-> rec ^ [4]->str => [~0+4]->~obj
     //
     // nil.isa(*rec?) so nil.join(*str) isa (*rec?).join(*str)
-    Type t0 = Type.NIL;          // [0  ] -> obj
+    Type t0 = Type.XNIL;         // [0  ] -> obj
     Type t1 = TypeMemPtr.STRUCT0;// [0,2] -> rec
-    assertTrue(t0.isa(t1));     // [0,2] -> obj -- meet is not t1
+    assertTrue(t0.isa(t1));      // [0,2] -> obj -- meet is not t1
     Type t2 = TypeMemPtr.OOP0;   // [0,2] -> obj
     assertTrue(t0.isa(t2));      //
 
@@ -197,7 +197,7 @@ public class TestType {
     TypeMemPtr pabc = TypeMemPtr.ABCPTR; // *["abc"]
     TypeMemPtr pzer = TypeMemPtr.make(BitsAlias.type_alias(BitsAlias.RECORD),TypeStruct.ALLSTRUCT);// *[(0)]
     TypeMemPtr pzer0= TypeMemPtr.make(pzer._aliases.meet_nil(),TypeStruct.ALLSTRUCT);  // *[(0)]?
-    Type nil  = Type.NIL;
+    Type nil  = Type.NIL, xnil=Type.XNIL;
 
     Type xtup = ptup .dual();
     Type xtup0= ptup0.dual();
@@ -234,10 +234,10 @@ public class TestType {
     assertTrue (xtup .isa(pzer ));
     //assertTrue(TypeMem.MEM_TUP.dual().ld(xstr).isa(TypeMem.MEM_ZER.ld(pabc)));
 
-    assertTrue( nil .isa(pabc0)); // nil expands as [0]->obj so !isa [2]->"abc"
-    assertTrue( nil .isa(pstr0)); // nil expands as [0]->obj so !isa [4]->str
-    assertTrue( nil .isa(ptup0)); // nil expands as [0]->obj so !isa [2]->()
-    assertTrue( nil .isa(pzer0)); // nil expands as [0]->obj so !isa [2]->@{}
+    assertTrue(xnil .isa(pabc0)); // nil expands as [0]->obj so !isa [2]->"abc"
+    assertTrue(xnil .isa(pstr0)); // nil expands as [0]->obj so !isa [4]->str
+    assertTrue(xnil .isa(ptup0)); // nil expands as [0]->obj so !isa [2]->()
+    assertTrue(xnil .isa(pzer0)); // nil expands as [0]->obj so !isa [2]->@{}
 
     assertTrue (pabc0.isa(pstr0));
     assertTrue (pabc .isa(pstr ));
@@ -284,13 +284,15 @@ public class TestType {
     tos.setX(alias1,a1);
     tos.setX(alias2,a2);
     tos.setX(alias3,a3);
-    TypeMem mem = TypeMem.make0(tos.asAry());
+    TypeMem mem = TypeMem.make0(tos.asAry()); // [7:@{c==nil},8:{c=*[0,9]},9:@{x==1}]
     // *[1]? join *[2] ==> *[1+2]?
+    // {~0+7+8} -> @{ c== [~0] -> @{x==1}} // Retain precision after nil
     Type ptr12 = Type.NIL.join(TypeMemPtr.make(-alias1,a1)).join( TypeMemPtr.make(-alias2,a2));
     // mem.ld(*[1+2]?) ==> @{c:0}
+    // Currently retaining precision after nil: [~0] -> @{ x==1}
     Type ld = mem.ld((TypeMemPtr)ptr12);
     TypeObj ax = TypeStruct.make(new String[]{"c"},TypeStruct.ts(Type.NIL),finals ); // @{c:nil}
-    assertEquals(ax,ld);
+    assertTrue(ld.isa(ax));
   }
 
   // meet of functions: arguments *join*, fidxes union (meet), and return types
@@ -322,7 +324,7 @@ public class TestType {
     int fidx0 = f1i2i.fidx();
     int fidx1 = f1f2f.fidx();
     BitsFun funs = BitsFun.make0(fidx0).meet(BitsFun.make0(fidx1));
-    TypeFunPtr f3i2r = TypeFunPtr.make(funs,TypeStruct.make_args(TypeStruct.ARGS_XY,TypeStruct.ts(Type.REAL,TypeStruct.NO_DISP,Type.REAL,Type.REAL)));
+    TypeFunPtr f3i2r = TypeFunPtr.make(funs,TypeStruct.make_args(TypeStruct.ARGS_XY,TypeStruct.ts(Type.REAL,TypeStruct.NO_DISP,TypeInt.INT32,TypeInt.INT32)));
     assertEquals(f3i2r,mt);
     assertTrue(f3i2r.isa(gf));
     assertTrue(f1i2i.isa(f3i2r));
