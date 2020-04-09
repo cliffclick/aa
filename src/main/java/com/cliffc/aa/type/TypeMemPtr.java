@@ -105,7 +105,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     if( _dual != null ) return _dual;
     TypeMemPtr dual = _dual = new TypeMemPtr(_aliases.dual(),(TypeObj)_obj.rdual());
     dual._dual = this;
-    dual._hash = dual.compute_hash();
+    if( _hash != 0 ) dual._hash = dual.compute_hash();
     dual._cyclic = true;
     return dual;
   }
@@ -168,7 +168,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     if( nil==NIL ) _obj = TypeObj.OBJ;
     return this;
   }
-  
+
   public BitsAlias aliases() { return _aliases; }
 
   // Identical pointer but points to clean

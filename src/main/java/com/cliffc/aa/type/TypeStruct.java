@@ -526,8 +526,10 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     for( int i=0; i<as.length; i++ ) as[i]=sdual(_flds[i]);
     for( int i=0; i<bs.length; i++ ) bs[i]=fdual(_flags[i]);
     TypeStruct dual = _dual = new TypeStruct(_name,!_any,as,ts,bs);
-    assert _hash == compute_hash();
-    dual._hash = dual.compute_hash(); // Compute hash before recursion
+    if( _hash != 0 ) {
+      assert _hash == compute_hash();
+      dual._hash = dual.compute_hash(); // Compute hash before recursion
+    }
     for( int i=0; i<ts.length; i++ ) ts[i] = _ts[i].rdual();
     dual._ts = TypeAry.hash_cons(ts); // hashcons cyclic arrays
     dual._dual = this;
@@ -867,8 +869,12 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       if( !(old instanceof TypeFunPtr) ) throw AA.unimpl(); // Not a xscalar, not a funptr, probably falls to scalar
       TypeFunPtr optr = (TypeFunPtr)old;
       nptr._fidxs = nptr._fidxs.meet(optr._fidxs);
-      // While structs normally meet, function args *join*.
-      nptr._args = (TypeStruct)ax_meet(bs,nptr._args,optr._args);
+      // While structs normally meet, function args *join*, although the return still meets.
+      Type ret = ax_meet(bs,nptr._args._ts[0],optr._args._ts[0]);
+      TypeStruct nxargs = nptr._args.rdual();
+      TypeStruct oxargs = optr._args.rdual();
+      nptr._args = (TypeStruct)ax_meet(bs,nxargs,oxargs).rdual();
+      nptr._args._ts[0] = ret;
       break;
     }
     case TMEMPTR: {
@@ -1108,6 +1114,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       } else {
         ((TypeFunPtr)t)._cyclic = bcs.get(t._uid);
       }
+      t._dual=null;
     }
   }
 

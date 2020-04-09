@@ -118,7 +118,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     if( _dual != null ) return _dual;
     TypeFunPtr dual = _dual = new TypeFunPtr(_fidxs.dual(),_args.rdual());
     dual._dual = this;
-    dual._hash = dual.compute_hash();
+    if( _hash != 0 ) dual._hash = dual.compute_hash();
     dual._cyclic = true;
     return dual;
   }
@@ -187,7 +187,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public Type ax_meet_nil(Type nil) {
     throw com.cliffc.aa.AA.unimpl();
   }
-  
+
   // Lattice of conversions:
   // -1 unknown; top; might fail, might be free (Scalar->Int); Scalar might lift
   //    to e.g. Float and require a user-provided rounding conversion from F64->Int.

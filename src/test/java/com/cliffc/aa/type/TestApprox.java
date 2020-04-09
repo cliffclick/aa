@@ -739,7 +739,6 @@ public class TestApprox {
     Type.RECURSIVE_MEET--;
     dsp3 = dsp3.install_cyclic(dsp3.reachable());
 
-
     // This should pass an isa-test (was crashing)
     Type mt0 = dsp0.meet(dsp3);
 
