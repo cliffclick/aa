@@ -155,7 +155,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public Type ret() { return _args.at(0); }
   public Type display() { return _args.at(1); } // Always a Display pointer or NIL
 
-  @Override public boolean above_center() { return _args.above_center(); }
+  @Override public boolean above_center() { return _fidxs.above_center(); }
   @Override public boolean may_be_con()   { return above_center(); }
   // Since fidxs may split, never a constant.
   @Override public boolean is_con()       { return false; }
@@ -173,14 +173,11 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     //    [~0]->~obj ==>  XNIL  ==>  [0]->~obj
     //    [~0]-> obj ==>   NIL  ==>  [0]-> obj
 
-    //if( _fidxs.isa(BitsFun.NIL.dual()) ) {
-    //  if( _obj==TypeObj.XOBJ && nil==XNIL )  return XNIL;
-    //  if( nil==NIL ) return NIL;
-    //}
-    //return make(_fidxs.meet(BitsFun.NIL),nil==NIL ? TypeObj.OBJ : _obj);
-    throw com.cliffc.aa.AA.unimpl();
-    //if( may_nil() ) return NIL; // Above and contains NIL?
-    //return make(_fidxs.meet_nil(),_args);
+    if( _fidxs.isa(BitsFun.NIL.dual()) ) {
+      if( _args==ARGS.dual() && nil==XNIL )  return XNIL;
+      if( nil==NIL ) return NIL;
+    }
+    return make(_fidxs.meet(BitsFun.NIL),nil==NIL ? ARGS : _args);
   }
   // Used during approximations, with a not-interned 'this'.
   // Updates-in-place.

@@ -34,7 +34,10 @@ public class ProjNode extends Node {
     }
     return c.above_center() ? Type.XSCALAR : Type.SCALAR;
   }
-  @Override public Type all_type() { return ((TypeTuple)in(0).all_type()).at(_idx); }
+  @Override public Type all_type() {
+    Type tall = in(0).all_type();
+    return tall instanceof TypeTuple ? ((TypeTuple)tall).at(_idx) : Type.ALL; // Only fails during TestNode
+  }
   static ProjNode proj( Node head, int idx ) {
     for( Node use : head._uses )
       if( use instanceof ProjNode && ((ProjNode)use)._idx==idx )

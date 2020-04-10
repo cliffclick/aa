@@ -319,7 +319,7 @@ public class TestParse {
     test("A= :int; A(1)", TypeInt.TRUE.set_name("A:"));
     test_ptr("A= :(str?, int); A(0,2)","A:(nil;2)!");
     // Named recursive types
-    test_ptr("A= :(A?, int); A(0,2)",(alias) -> TypeMemPtr.make(alias,TypeStruct.make("A:",TypeStruct.TFLDS(3),TypeStruct.ts(Type.NIL,Type.NIL,TypeInt.con(2)),TypeStruct.ffnls(3))));
+    test_ptr("A= :(A?, int); A(0,2)",(alias) -> TypeMemPtr.make(alias,TypeStruct.make(new String[]{"A:0","A:1","A:2"},TypeStruct.ts(Type.NIL,Type.NIL,TypeInt.con(2)),TypeStruct.ffnls(3))));
     test    ("A= :@{n=A?; v=flt}; A(@{n=0;v=1.2}).v;", TypeFlt.con(1.2));
 
     // TODO: Needs a way to easily test simple recursive types

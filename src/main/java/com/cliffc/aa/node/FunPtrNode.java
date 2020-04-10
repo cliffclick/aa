@@ -69,8 +69,7 @@ public final class FunPtrNode extends Node {
 
   // Note: graph structure must be in place before calling
   @Override public TypeFunPtr all_type() {
-    TypeFunPtr tf = fun()._tf;
-    return tf.make(TypeMemPtr.DISPLAY_PTR,tf.ret());
+    return fun()._tf;
   }
   @Override public String toString() { return super.toString(); }
   // Return the op_prec of the returned value.  Not sensible except when called

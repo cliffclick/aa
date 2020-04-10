@@ -17,10 +17,10 @@ public class TestType {
     Object dummy0 = TypeStruct.TYPES;
     Object dummy1 = TypeMemPtr.TYPES;
 
-    Type tnil = Type.NIL; // 0
-    Type tstr = TypeMemPtr.STRPTR; // [4]->str
-    Type mt = tnil.join(tstr);
-    //assertEquals(TypeMemPtr.NILPTR.dual(),mt);
+    Type xstr = TypeStr.XSTR;   // ~str isa Point:~str
+    Type npt  = TypeStruct.NAMEPT; // Point:{fields}
+    Type mt = xstr.meet(npt);   // Meet falls hard, loses name
+    assertEquals(TypeObj.OBJ,mt);
 
   }
 

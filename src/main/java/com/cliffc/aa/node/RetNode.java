@@ -71,9 +71,7 @@ public final class RetNode extends Node {
     Type mem = gvn.type(mem());
     if( mem.above(TypeMem.FULL.dual()) ) return TALL.dual();
     if( !(mem.isa(TypeMem.FULL      )) ) return TALL;
-    Type val = gvn.type(val());
-    if( val.above(Type.XSCALAR) ) return TALL.dual();
-    if( !(val.isa(Type. SCALAR))) return TALL;
+    Type val = gvn.type(val()).bound(TALL.at(2));
     return TypeTuple.make(ctl,mem,val);
   }
   @Override public TypeTuple all_type() {

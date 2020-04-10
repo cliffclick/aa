@@ -56,7 +56,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // because during recursive construction the types are not available.
   @Override int compute_hash() {
     int hash = super.compute_hash(), hash1=hash;
-    for( int i=0; i<_flds.length; i++ ) hash = ((hash+(_flags[i]<<5))*_flds[i].hashCode())|(hash>>17);
+    for( int i=0; i<_flds.length; i++ ) hash = ((hash+(_flags[i]<<5))*_flds[i].hashCode())|(hash>>>17);
     return hash == 0 ? hash1 : hash;
   }
 
@@ -377,16 +377,17 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public  static final TypeStruct SCALAR1__BOOL     = make_args(ARGS_X ,ts(TypeInt.BOOL,NO_DISP,SCALAR));
 
   // A bunch of types for tests
-  public  static final TypeStruct NAMEPT= make("Point:",flds("^","x","y"),ts(NO_DISP,TypeFlt.FLT64,TypeFlt.FLT64),ffnls(3));
-  public  static final TypeStruct POINT = make(flds("^","x","y"),ts(NO_DISP,TypeFlt.FLT64,TypeFlt.FLT64));
-  public  static final TypeStruct FLT64 = make(flds("^","x"),ts(NO_DISP,TypeFlt.FLT64)); // @{x:flt}
-          static final TypeStruct TFLT64= make(flds("^","."),ts(NO_DISP,TypeFlt.FLT64 )); //  (  flt)
-  public  static final TypeStruct A     = make(flds("^","a"),ts(NO_DISP,TypeFlt.FLT64 ));
-  private static final TypeStruct C0    = make(flds("^","c"),ts(NO_DISP,TypeInt.FALSE )); // @{c:0}
-  private static final TypeStruct D1    = make(flds("^","d"),ts(NO_DISP,TypeInt.TRUE  )); // @{d:1}
-  private static final TypeStruct ARW   = make(flds("^","a"),ts(NO_DISP,TypeFlt.FLT64),new byte[]{FRW,FRW});
+  public static final Type NO_DISP2 = TypeMemPtr.NIL_DISPLAY;  // NIL for *structs* not *function args*
+  public  static final TypeStruct NAMEPT= make("Point:",flds("^","x","y"),ts(NO_DISP2,TypeFlt.FLT64,TypeFlt.FLT64),ffnls(3));
+  public  static final TypeStruct POINT = make(flds("^","x","y"),ts(NO_DISP2,TypeFlt.FLT64,TypeFlt.FLT64));
+  public  static final TypeStruct FLT64 = make(flds("^","x"),ts(NO_DISP2,TypeFlt.FLT64)); // @{x:flt}
+          static final TypeStruct TFLT64= make(flds("^","."),ts(NO_DISP2,TypeFlt.FLT64 )); //  (  flt)
+  public  static final TypeStruct A     = make(flds("^","a"),ts(NO_DISP2,TypeFlt.FLT64 ));
+  private static final TypeStruct C0    = make(flds("^","c"),ts(NO_DISP2,TypeInt.FALSE )); // @{c:0}
+  private static final TypeStruct D1    = make(flds("^","d"),ts(NO_DISP2,TypeInt.TRUE  )); // @{d:1}
+  private static final TypeStruct ARW   = make(flds("^","a"),ts(NO_DISP2,TypeFlt.FLT64),new byte[]{FRW,FRW});
 
-  static final TypeStruct[] TYPES = new TypeStruct[]{ALLSTRUCT,STRPTR__STRPTR,FLT64,POINT,NAMEPT,A,C0,D1,ARW,DISPLAY};
+  static final TypeStruct[] TYPES = new TypeStruct[]{ALLSTRUCT,STRPTR__STRPTR,FLT64,POINT,NAMEPT,A,C0,D1,ARW,DISPLAY,INT64_INT64__INT64,GENERIC};
 
   // Extend the current struct with a new named field
   public TypeStruct add_fld( String name, byte mutable ) { return add_fld(name,mutable,Type.SCALAR); }
@@ -1103,6 +1104,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     stack.pop();                // Pop, not part of anothers cycle
     return bcs;
   }
+  @SuppressWarnings("unchecked")
   private void mark_cyclic( BitSet bcs, Ary<Type> reaches ) {
     for( Type t : reaches ) {
       if( t instanceof TypeStruct ) {
@@ -1114,7 +1116,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       } else {
         ((TypeFunPtr)t)._cyclic = bcs.get(t._uid);
       }
-      t._dual=null;
+      t._dual=null;             // Remove any duals, so re-inserted clean
     }
   }
 
@@ -1198,7 +1200,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
 
   public Type at( int idx ) { return _ts[idx]; }
   public Type last() { return _ts[_ts.length-1]; }
-  public String last_fld() { return _flds[_flds.length-1]; }
 
   // Update (approximately) the current TypeObj.  Updates the named field.
   @Override public TypeObj update(byte fin, String fld, Type val) { return update(fin,fld,val,false); }

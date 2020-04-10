@@ -136,7 +136,7 @@ public class PhiNode extends Node {
     for( int i=1; i<_defs._len; i++ )
       if( gvn.type(r.in(i))==Type.CTRL ) // Only meet alive paths
         t = t.meet(gvn.type(in(i)));
-    return t;                   // Limit to sane results
+    return t.bound(_t);                  // Limit to sane results
   }
   // Only interested in memory aliases, if merging memory
   @Override public boolean basic_liveness() {  return !(_t instanceof TypeMem); }

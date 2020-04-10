@@ -372,7 +372,9 @@ public class Type<T extends Type<T>> implements Cloneable {
       if( mt.interned() ) // recursive type creation?
         mt = mt.dual();   // Force low
     }
-    if( mt._type==TALL || mt._type==TANY ) n = ""; // No named ANY,ALL
+    if( mt.is_simple() ) n=""; // No named simple types
+    if( mt._type==TOBJ ) n=""; // OBJ splits into strings (arrays) and structs, which can keep their names
+    
     // Inject the name
     if( !Util.eq(mt._name,n) )  // Fast path cutout
       mt = mt.set_name(n);
@@ -509,7 +511,7 @@ public class Type<T extends Type<T>> implements Cloneable {
     if( Util.eq(s0,s1) ) return s0;
     // Sort by name length
     if( s0.length() > s1.length() ) { t1=this; t0=t; s0=t0._name; s1=t1._name; }
-    int x = 0, i=0;  char c;    // Last colon separator index
+    int x = 0, i;  char c;    // Last colon separator index
     // Find split point
     for( i = 0; i < s0.length(); i++ ) {
       if( (c=s0.charAt(i)) != s1.charAt(i) )

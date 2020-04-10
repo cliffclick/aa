@@ -73,19 +73,9 @@ public class TypeRPC extends Type<TypeRPC> {
     BitsRPC bits = _rpcs.not_nil();
     return bits==_rpcs ? this : make(bits);
   }
-  @Override public Type meet_nil(Type t) {
-    // See testLattice15.  The UNSIGNED NIL tests as a lattice:
-    //    [~0]->~obj  ==>  NIL  ==>  [0]-> obj
-    // But loses the pointed-at type down to OBJ.
-    // So using SIGNED NIL, which also tests as a lattice:
-    //    [~0]->~obj ==>  XNIL  ==>  [0]->~obj 
-    //    [~0]-> obj ==>   NIL  ==>  [0]-> obj
-    
-    //if( _fidxs.isa(BitsFun.NIL.dual()) ) {
-    //  if( _obj==TypeObj.XOBJ && nil==XNIL )  return XNIL;
-    //  if( nil==NIL ) return NIL;
-    //}
-    //return make(_fidxs.meet(BitsFun.NIL),nil==NIL ? TypeObj.OBJ : _obj);
-    throw com.cliffc.aa.AA.unimpl();
+  @Override public Type meet_nil(Type nil) {
+    // See testLattice15.
+    if( _rpcs.isa(BitsRPC.NIL.dual()) ) return nil;
+    return make(_rpcs.meet(BitsRPC.NIL));
   }
 }

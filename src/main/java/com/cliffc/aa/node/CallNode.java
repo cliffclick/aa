@@ -242,7 +242,7 @@ public class CallNode extends Node {
 
     // Copy args for called functions.
     for( int i=1; i<nargs(); i++ )
-      ts[i+1] = targ(gvn,i);
+      ts[i+1] = targ(gvn,i).bound(Type.SCALAR);
 
     // Not a function to call?
     Type tfx = gvn.type(fun());

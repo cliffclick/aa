@@ -13,6 +13,69 @@ import static org.junit.Assert.assertTrue;
 // The core Type system is a distributive complete bounded lattice.
 // See: https://en.wikipedia.org/wiki/Lattice_(order)
 
+// This is a series of tests to validate various structures as lattices with
+// the right properties, or not.  A lot of "obvious" structures fail to be
+// lattices, and that has led to a lot of failed attempts at type-inference via
+// finding the stable meet over a "Sea of Nodes" graph.
+
+// While some structures are lattices and some are not, we can envision graph
+// combinators that preserve the right properties when mixing two lattices.
+// Mixing a non-lattice & a lattice with a combinator generally keeps the
+// non-lattice property.
+
+// An example combinator is multiplying two lattices; if {A} and {B} are
+// lattices then we can make a lattice by simple pairs of A & B elements:
+// {(A,B)}.  This happens in lots of places, e.g. structure fields or mixing
+// fidxs (code constants) and arguments to function pointers.
+//
+// If {A} is a lattice, and we clone A and rename all the elements as AA, then
+// {AA} is a lattice (simple rename).  If we add edges from all the high
+// elements of {A} to the high elements of {AA}, and low-{AA} to low-{A}, then
+// again we have a lattice.  Notice the inside-out-edge ordering.  We can
+// repeat this process to get a "chain" of lattices going however deep down the
+// "AAAA...."  rabbit-hole we like.  The integers use this process for types
+// int64,int32,int16,int8,int1.
+//
+// However! If we clone lattice {A} into two lattices {A0} and {A1}, each being
+// a simple rename, and we add all the inside-out edges from {A} elements to
+// the corresponding {A0} and seperately to {A1} - the combination is NOT a
+// lattice.  This implies, e.g. we cannot simply add "names" to a lattice and
+// have the result be a lattice.
+//
+// Two make the simple-renamed-clones work, we can use a simple nested
+// combinator: A_top >> AA_top >> AAA_top... and A_bot << AA_bot << AAA_bot but
+// NO interior edges.  Basically we can "insert" a lattice "inside" another one
+// via taking any two symmetric elements from the "outer" lattice as having
+// edges to the top/bot of the inner lattice.  This implies that mixing
+// elements from 2 different "inserted" lattices - even if they have a common
+// parent insertion point - always must fall to the "bot" parent point.  There
+// cannot be any interior crossing edges!  This is too weak for "names".
+//
+// NIL: Generally speaking we cannot have a common center constant suggestively
+// called "nil" that is in the center of two multiplied lattices - this leads
+// to the "crossing nil" bug referred to in the code.  We CAN inject the NIL in
+// a few places - but using it typically requires losing all the structure of
+// one of the two multiplied lattices.  We can "sign" a NIL and do a little
+// better; the "~NIL" variant can keep structure in the "off-side" lattice.
+// (and obviously for symmetry on "NIL" going "up" the lattice).
+
+// ------------
+// So here's a thought about "names": use the pair-wise (multiplicative)
+// combinator, and a "name" is associated with a set of fields.  There is no
+// "real" subtyping, but instead multiplicative addition of more named types
+// and their matching fields - more like mixins than subtyping.
+//
+// Means there's names for ints & flts, like now.  And names for "chunks" of a
+// struct, which could be flattened - rolling the "name" into the fields.
+// E.g. java
+//    class Point2D { int x,y; };  class Point3D extends Point 2D { int z; }
+//
+// Short hand Point2D:@{x;y} is syntatic sugar for: @{ Point2D:x; Point2D:y }
+// Short hand Point3D:Point2D:@{z} is syntatic sugar for:
+//      @{ Point2D:x; Point2D:y; Point3D:z; }
+
+
+
 public class TestLattice {
   private static class N {
     private static int ID=0;
@@ -1221,6 +1284,149 @@ public class TestLattice {
     test(nx04xobj);
   }
 
+  // Named subtypes, plus array (subtype string), tuple (subtype rec).
+  // NOT A LATTICE as soon as you have more than 1 name.
+  //
+  //        ~obj             And named subtypes A, B
+  //    ~ary    ~tup            ~obj ==> A:~obj ==> A:~tup  ==> A:~rec ==> A:rec ==> A:tup ==> A:obj ==> obj
+  //  ~str        ~rec
+  //   str         rec
+  //     ary     tup
+  //         obj
+  //
+  // This IS a lattice for a single name (and nested names), but not for
+  // multiple names.
+  // 
+  @Ignore @Test public void testLattice16() {
+    N.reset();
+
+    N __obj = new N("__obj");
+    N A_obj = new N("A_obj",__obj);
+    N B_obj = new N("B_obj",__obj);
+    
+    N __ary =   new N("__ary",__obj);
+    N A_ary =     new N("A_ary",__ary,A_obj);
+    N B_ary =     new N("B_ary",__ary,B_obj);
+    N __tup =   new N("__tup",__obj);
+    N A_tup =     new N("A_tup",__tup,A_obj);
+    N B_tup =     new N("B_tup",__tup,B_obj);
+
+    N __str =     new N("__str",__ary);
+    N A_str =       new N("A_str",__str,A_ary);
+    N B_str =       new N("B_str",__str,B_ary);
+    N __rec =     new N("__rec",__tup);
+    N A_rec =       new N("A_rec",__rec,A_tup);
+    N B_rec =       new N("B_rec",__rec,B_tup);
+
+    N Axrec =       new N("A~rec",A_rec);
+    N Bxrec =       new N("B~rec",B_rec);
+    N _xrec =     new N("_~rec",Axrec,Bxrec);
+    N Axstr =       new N("A~str",A_str);
+    N Bxstr =       new N("B~str",B_str);
+    N _xstr =     new N("_~str",Axstr,Bxstr);
+
+    N Axtup =     new N("A~tup",Axrec);
+    N Bxtup =     new N("B~tup",Bxrec);
+    N _xtup =   new N("_~tup",_xrec,Axtup,Bxtup);
+    N Axary =     new N("A~ary",Axstr);
+    N Bxary =     new N("B~ary",Bxstr);
+    N _xary =   new N("_~ary",_xstr,Axary,Bxary);
+
+    N Axobj = new N("A~obj",Axary,Axtup);
+    N Bxobj = new N("B~obj",Bxary,Bxtup);
+    N _xobj = new N("_~obj",_xtup,_xary,Axobj,Bxobj);
+
+    __obj.set_dual(_xobj);
+    __ary  .set_dual(_xary);
+    __str    .set_dual(_xstr);
+    __tup  .set_dual(_xtup);
+    __rec    .set_dual(_xrec);
+    A_obj  .set_dual(Axobj);
+    A_ary    .set_dual(Axary);
+    A_str      .set_dual(Axstr);
+    A_tup    .set_dual(Axtup);
+    A_rec    .set_dual(Axrec);
+    B_obj  .set_dual(Bxobj);
+    B_ary    .set_dual(Bxary);
+    B_str      .set_dual(Bxstr);
+    B_tup    .set_dual(Bxtup);
+    B_rec    .set_dual(Bxrec);
+
+    test(_xobj);    
+  }
+
+  // Named subtypes, plus array (subtype string), tuple (subtype rec).  Similar
+  // to the testLattice6 case, only pick up names at the outermost level.
+  //
+  //        ~obj             And named subtypes A, B
+  //    ~ary    ~tup            ~obj ==> A:~obj ==> A:~tup  ==> A:~rec ==> A:rec ==> A:tup ==> A:obj ==> obj
+  //  ~str        ~rec          ~obj ==> B:~obj ==> B:~tup  ==> B:~rec ==> B:rec ==> B:tup ==> B:obj ==> obj
+  //   str         rec       NO INNER EDGES, e.g. A:rec ==> rec !!!
+  //     ary     tup
+  //         obj
+  //
+  // This IS a lattice for a single name (and nested names), but not for
+  // multiple names.
+  // 
+  @Test public void testLattice17() {
+    N.reset();
+
+    N __obj = new N("__obj");
+    N A_obj = new N("A_obj",__obj);
+    N B_obj = new N("B_obj",__obj);
+    
+    N __ary =   new N("__ary",__obj);
+    N A_ary =     new N("A_ary",A_obj);
+    N B_ary =     new N("B_ary",B_obj);
+    N __tup =   new N("__tup",__obj);
+    N A_tup =     new N("A_tup",A_obj);
+    N B_tup =     new N("B_tup",B_obj);
+
+    N __str =     new N("__str",__ary);
+    N A_str =       new N("A_str",A_ary);
+    N B_str =       new N("B_str",B_ary);
+    N __rec =     new N("__rec",__tup);
+    N A_rec =       new N("A_rec",A_tup);
+    N B_rec =       new N("B_rec",B_tup);
+
+    N Axrec =       new N("A~rec",A_rec);
+    N Bxrec =       new N("B~rec",B_rec);
+    N _xrec =     new N("_~rec",__rec);
+    N Axstr =       new N("A~str",A_str);
+    N Bxstr =       new N("B~str",B_str);
+    N _xstr =     new N("_~str",__str);
+
+    N Axtup =     new N("A~tup",Axrec);
+    N Bxtup =     new N("B~tup",Bxrec);
+    N _xtup =   new N("_~tup",_xrec);
+    N Axary =     new N("A~ary",Axstr);
+    N Bxary =     new N("B~ary",Bxstr);
+    N _xary =   new N("_~ary",_xstr);
+
+    N Axobj = new N("A~obj",Axary,Axtup);
+    N Bxobj = new N("B~obj",Bxary,Bxtup);
+    N _xobj = new N("_~obj",_xtup,_xary,Axobj,Bxobj);
+
+    __obj.set_dual(_xobj);
+    __ary  .set_dual(_xary);
+    __str    .set_dual(_xstr);
+    __tup  .set_dual(_xtup);
+    __rec    .set_dual(_xrec);
+    A_obj  .set_dual(Axobj);
+    A_ary    .set_dual(Axary);
+    A_str      .set_dual(Axstr);
+    A_tup    .set_dual(Axtup);
+    A_rec    .set_dual(Axrec);
+    B_obj  .set_dual(Bxobj);
+    B_ary    .set_dual(Bxary);
+    B_str      .set_dual(Bxstr);
+    B_tup    .set_dual(Bxtup);
+    B_rec    .set_dual(Bxrec);
+
+    test(_xobj);
+    
+  }
+  
   // Open question for a future testLattice test:
   //
   //    Under what circumstances can 'meet' return a NIL?

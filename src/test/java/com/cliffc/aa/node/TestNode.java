@@ -228,7 +228,7 @@ public class TestNode {
     test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  null, TypeFlt.FLT64));
     test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  null, Type   .CTRL ));
     test1monotonic(new    FunNode(new String[]{"^","x"},new Type[]{TypeMemPtr.DISPLAY_PTR,TypeInt.INT64}));
-    test1monotonic(new FunPtrNode(ret,null));
+    test1monotonic(new FunPtrNode(ret,_gvn.con(TypeStruct.NO_DISP)));
     test1monotonic(new FP2ClosureNode(_ins[1])); // Only takes in a TFP
     test1monotonic(new     IfNode(_ins[0],_ins[1]));
     for( IntrinsicNewNode prim : IntrinsicNewNode.INTRINSICS )
@@ -245,7 +245,6 @@ public class TestNode {
     set_type(2,Type.SCALAR);  nnn2.create_active("y",_ins[3],TypeStruct.FFNL,_gvn);
     nnn2.set_name(tname);
     test1monotonic(nnn2);
-    test1monotonic(new MemMergeNode(_ins[1],_ins[2],BitsAlias.RECORD));
     ((ConNode<Type>)_ins[1])._t = Type.SCALAR; // ParmNode reads this for _alltype
     test1monotonic(new   ParmNode( 1, "x",_ins[0],(ConNode)_ins[1],null).add_def(_ins[2]));
     test1monotonic(new    PhiNode(Type.SCALAR,null,_ins[0],_ins[1],_ins[2]));
@@ -287,7 +286,7 @@ public class TestNode {
     assert n._defs._len==0;
     n.add_def( null  );
     n.add_def(_ins[1]);
-    if( n._targs._ts.length >= 3 ) n.add_def(_ins[2]);
+    if( n._targs._ts.length >= 4 ) n.add_def(_ins[2]);
     test1monotonic_init(n);
   }
 
