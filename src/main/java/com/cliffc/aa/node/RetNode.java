@@ -65,18 +65,16 @@ public final class RetNode extends Node {
   }
   @Override public Type value(GVNGCM gvn) {
     if( is_copy() ) return gvn.self_type(this); // No change if a copy
-    TypeTuple TALL = all_type();
+    TypeTuple TALL = TypeTuple.RET;
     Type ctl = gvn.type(ctl());
     if( ctl != Type.CTRL ) return ctl.above_center() ? TALL.dual() : TALL;
     Type mem = gvn.type(mem());
     if( mem.above(TypeMem.FULL.dual()) ) return TALL.dual();
     if( !(mem.isa(TypeMem.FULL      )) ) return TALL;
-    Type val = gvn.type(val()).bound(TALL.at(2));
+    Type val = gvn.type(val()).bound(Type.SCALAR);
     return TypeTuple.make(ctl,mem,val);
   }
-  @Override public TypeTuple all_type() {
-    return TypeTuple.make(Type.CTRL,TypeMem.FULL,is_copy() ? TypeFunPtr.GENERIC_FUNPTR : fun()._tf.ret());
-  }
+  @Override public TypeTuple all_type() { return TypeTuple.RET; }
 
 
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {

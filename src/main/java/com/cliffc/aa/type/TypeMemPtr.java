@@ -223,8 +223,4 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   @SuppressWarnings("unchecked")
   @Override void walk( Predicate<Type> p ) { if( p.test(this) ) _obj.walk(p); }
   public int getbit() { return _aliases.getbit(); }
-  // Keep the high parts
-  @Override public TypeMemPtr startype() {
-    return TypeMemPtr.make(_aliases.startype(), _obj.startype());
-  }
 }

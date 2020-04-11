@@ -366,16 +366,6 @@ public class TypeMem extends Type<TypeMem> {
   @Override public boolean is_con()       { return false;}
   @Override public boolean must_nil() { return false; } // never a nil
   @Override Type not_nil() { return this; }
-  // Dual, except keep TypeMem.XOBJ as high for starting GVNGCM.gcp() state.
-  @Override public TypeMem startype() {
-    if( this==EMPTY ) return EMPTY;
-    if( this== XMEM ) return  XMEM;
-    TypeObj[] oops = new TypeObj[_aliases.length];
-    for(int i=0; i<_aliases.length; i++ )
-      if( _aliases[i] != null )
-        oops[i] = _aliases[i].startype();
-    return make0(oops);
-  }
 
   // For node liveness, anything alive means the node is alive
   public boolean is_live() { return this!=TypeMem.DEAD; }

@@ -41,7 +41,7 @@ public abstract class IntrinsicNewNode extends Node {
     // Make NewStrNode to get alias
     NewStrNode nnn = gvn.init(_nstr).keep();
     FunNode  fun = ( FunNode) gvn.xform(new  FunNode(this).add_def(Env.ALL_CTRL));
-    ParmNode rpc = (ParmNode) gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
+    ParmNode rpc = (ParmNode) gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(Type.SCALAR),null));
     Node memp= gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.FULL),null));
     gvn.add_work(memp);         // This may refine more later
 
@@ -50,7 +50,7 @@ public abstract class IntrinsicNewNode extends Node {
     add_def(memp);              // Memory  for the primitive in slot 1
     add_def(null);              // Closure for the primitive in slot 2
     for( int i=2; i<_targs._ts.length; i++ ) // Args follow, return in targ 0, closure in targ 1
-      add_def( gvn.xform(new ParmNode(i,_targs._flds[i],fun, gvn.con(_targs.at(i)),null)));
+      add_def( gvn.xform(new ParmNode(i,_targs._flds[i],fun, gvn.con(Type.SCALAR),null)));
     Node rez = gvn.xform(this); // Returns a TypeObj
     // Fill in NewStrNode inputs, now that we have them.
     gvn.set_def_reg(nnn,0,fun);

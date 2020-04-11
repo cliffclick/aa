@@ -90,7 +90,8 @@ public class TypeTuple extends Type<TypeTuple> {
   public  static final TypeTuple START_STATE = make(CTRL, TypeMem.EMPTY);
   public  static final TypeTuple  RET = make(CTRL, TypeMem.FULL, SCALAR); // Type of RetNodes
   public  static final TypeTuple XRET = RET.dual();
-  public  static final TypeTuple CALLE = make(CTRL, TypeMem.FULL, SCALAR); // Type of CallEpiNodes
+  public  static final TypeTuple CALLE= make(CTRL, TypeMem.FULL, SCALAR); // Type of CallEpiNodes
+  public  static final TypeTuple NEW  = make(TypeObj.OBJ,TypeMemPtr.OBJ); // Type of NewNode
   static final TypeTuple[] TYPES = new TypeTuple[]{RET,CALLE,START_STATE,IF_ALL, IF_TRUE, IF_FALSE};
 
   // The length of Tuples is a constant, and so is its own dual.  Otherwise
@@ -168,12 +169,5 @@ public class TypeTuple extends Type<TypeTuple> {
     }
 
     throw AA.unimpl();
-  }
-
-  // Dual, except keep TypeMem.XOBJ as high for starting GVNGCM.opto() state.
-  @Override public TypeTuple startype() {
-    Type[] ts = TypeAry.get(_ts.length);
-    for( int i=0; i<_ts.length; i++ ) ts[i] = _ts[i].startype();
-    return make0(true, ts);
   }
 }

@@ -47,11 +47,11 @@ public class TestNodeSmall {
 
 
     // Compute Node.all_type() and all_type.startype()
-    TypeFunPtr uaddALL = uadd.all_type(), uaddSTART = (TypeFunPtr)uaddALL.startype();
-    TypeFunPtr anumALL = anum.all_type(), anumSTART = (TypeFunPtr)anumALL.startype();
-    TypeFunPtr afltALL = aflt.all_type(), afltSTART = (TypeFunPtr)afltALL.startype();
-    TypeFunPtr aintALL = aint.all_type(), aintSTART = (TypeFunPtr)aintALL.startype();
-    TypeFunPtr astrALL = astr.all_type(), astrSTART = (TypeFunPtr)astrALL.startype();
+    TypeFunPtr uaddALL = uadd.all_type(), uaddSTART = uaddALL.dual();
+    TypeFunPtr anumALL = anum.all_type(), anumSTART = anumALL.dual();
+    TypeFunPtr afltALL = aflt.all_type(), afltSTART = afltALL.dual();
+    TypeFunPtr aintALL = aint.all_type(), aintSTART = aintALL.dual();
+    TypeFunPtr astrALL = astr.all_type(), astrSTART = astrALL.dual();
 
     // Compute Node.value() where initial GVN is startype()
     gvn.setype(uadd,uaddSTART);
@@ -421,14 +421,14 @@ public class TestNodeSmall {
     ConNode dsp_prims = (ConNode) gvn.xform(new ConNode<>(TypeMemPtr.DISPLAY_PTR));
     // The file-scope display closing the graph-cycle.  Needs the FunPtr, not
     // yet built.
-    NewObjNode dsp_file = gvn.init(new NewObjNode(true,TypeStruct.DISPLAY,ctl,dsp_prims));
-    OProjNode dsp_file_obj = gvn.init(new OProjNode(dsp_file,0));
-    ProjNode  dsp_file_ptr = gvn.init(new  ProjNode(dsp_file,1));
+    NewObjNode dsp_file = (NewObjNode)gvn.xform(new NewObjNode(true,TypeStruct.DISPLAY,ctl,dsp_prims));
+    OProjNode dsp_file_obj = (OProjNode)gvn.xform(new OProjNode(dsp_file,0));
+    ProjNode  dsp_file_ptr = ( ProjNode)gvn.xform(new  ProjNode(dsp_file,1));
     MemMergeNode dsp_merge = gvn.init(new MemMergeNode(mem,dsp_file_obj,dsp_file._alias));
     // The Fun and Fun._tf:
     Type[] args = TypeAry.get(3);
     args[0] = Type.SCALAR;            // Return
-    args[1] = gvn.type(dsp_file_ptr); // File-scope display as arg0
+    args[1] = gvn.type(dsp_file_ptr).dual(); // File-scope display as arg0
     args[2] = Type.SCALAR;            // Some scalar arg1
     TypeFunPtr tf = TypeFunPtr.make_new(TypeStruct.make_args(new String[]{"->","^","x"},args));
     FunNode fun = new FunNode("fact",tf,BitsAlias.make0(dsp_file._alias));
@@ -436,7 +436,7 @@ public class TestNodeSmall {
     // Parms for the Fun.  Note that the default type is "weak" because the
     // file-level display can not yet know about "fact".
     ParmNode parm_mem = new ParmNode(-2,"mem",fun,mem,null);
-    ParmNode parm_dsp = new ParmNode( 0,"^"  ,fun,TypeMemPtr.DISPLAY_PTR,dsp_file_ptr,null);
+    ParmNode parm_dsp = new ParmNode( 0,"^"  ,fun,Type.SCALAR,dsp_file_ptr,null);
     gvn.init(parm_mem.add_def(dsp_merge));
     gvn.init(parm_dsp.add_def(dsp_file_ptr));
     // Close the function up

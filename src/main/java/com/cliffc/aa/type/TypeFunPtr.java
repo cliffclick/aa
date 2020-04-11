@@ -97,7 +97,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public static TypeStruct ARGS =
     TypeStruct.make(true,       // High, so extra args are all XSCALAR
                     new String[]{"->","^"}, // First two args normal for a function
-                    TypeAry.ts(Type.SCALAR,TypeMemPtr.DISPLAY_PTR.dual()),
+                    TypeAry.ts(Type.SCALAR,Type.XSCALAR),
                     new byte[]{TypeStruct.FFNL,TypeStruct.FUNK});
   public static TypeFunPtr make_anon() { return make_new(ARGS); } // Make a new anonymous function ptr
   // Make a TFP with a new display and return value, used by FunPtrNode
@@ -198,12 +198,6 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   }
   @SuppressWarnings("unchecked")
   @Override void walk( Predicate<Type> p ) { if( p.test(this) ) { _args.walk(p); } }
-  // Keep the high parts
-  @Override public Type startype() {
-    BitsFun fidxs  = _fidxs.startype();
-    TypeStruct args= _args .startype();
-    return make(fidxs,args);
-  }
 
   // Generic functions
   public boolean is_forward_ref() {

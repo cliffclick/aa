@@ -10,9 +10,10 @@ import java.util.BitSet;
 // Merge results; extended by ParmNode
 public class PhiNode extends Node {
   final Parse _badgc;
-  Type _t; // all_type is either TypeMem.MEM or Type.SCALAR or TypeStruct.ALLSTRUCT
+  final Type _t; // all_type is either TypeMem.MEM or Type.SCALAR or TypeStruct.ALLSTRUCT
   private PhiNode( byte op, Type t, Parse badgc, Node... vals ) {
     super(op,vals);
+    assert t==TypeMem.FULL || t==Type.SCALAR || t==TypeObj.OBJ;
     _badgc = badgc;
     _t = t;
     // Recompute, since _t was null inside of Node.Node calling basic_liveness.
@@ -129,7 +130,7 @@ public class PhiNode extends Node {
 
   @Override public Type value(GVNGCM gvn) {
     Type ctl = gvn.type(in(0));
-    Type t = all_type().startype();
+    Type t = all_type().dual();
     if( ctl != Type.CTRL ) return ctl.above_center() ? t : t.dual();
     RegionNode r = (RegionNode) in(0);
     assert r._defs._len==_defs._len;

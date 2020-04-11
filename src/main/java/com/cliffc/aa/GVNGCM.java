@@ -60,8 +60,6 @@ public class GVNGCM {
   // Global expressions, to remove redundant Nodes
   private ConcurrentHashMap<Node,Node> _vals = new ConcurrentHashMap<>();
 
-  public String dump( Node n, int max ) { return n.dump(max,this); }
-
   // Initial state after loading e.g. primitives & boot libs.  Record state
   // here, so can reset to here cheaply and parse again.
   public static int _INIT0_CNT;
@@ -386,7 +384,7 @@ public class GVNGCM {
         !(n instanceof UnresolvedNode) && // Keep for proper errors
         !(n instanceof RetNode) &&        // Keep for proper errors
         !(n instanceof ConNode) )         // Already a constant
-      return untype(n, con(n.all_type().startype())); // Replace non-constants with high (dead) constants
+      return untype(n, con(n.all_type().dual())); // Replace non-constants with high (dead) constants
 
     // [ts!] Compute best type, and type is IN ts
     Type t = n.value(this);     // Get best type
@@ -533,7 +531,7 @@ public class GVNGCM {
         Type ot = type(n);       // Old type
         Type nt = n.value(this); // New type
         if( ot != nt ) {         // Progress
-          assert ot.isa(nt);     // Types only fall monotonically
+          if( !check_monotonicity(n,ot,nt) ) continue; // Debugging hook
           _ts.setX(n._uid,nt);   // Record progress
           // Classic forwards flow on change:
           for( Node use : n._uses ) {
@@ -599,12 +597,20 @@ public class GVNGCM {
     walk_dead(Env.START);
     assert Env.START.more_flow(this,new VBitSet(),false,0)==0; // Post conditions are correct
   }
+  // Debugging hook
+  private boolean check_monotonicity(Node n, Type ot, Type nt) {
+    if( ot.isa(nt) ) return true;  // No bug
+    add_work(n);                   // Setup for a re-run
+    System.out.println("Not monotonic");
+    //assert ot.isa(nt);             // Types only fall monotonically
+    return false;
+  }
 
-  // Forward reachable walk, setting types to all_type().startype() (basically
-  // dual) and making all dead.
+  // Forward reachable walk, setting types to all_type().dual() and making all dead.
   private void walk_initype( Node n ) {
     if( n==null || touched(n) ) return; // Been there, done that
-    Type startype = n.all_type().startype();
+    Type all_type = n.all_type();
+    Type startype = all_type.above_center() ? all_type : all_type.dual();
     setype(n,startype);
     n._live = TypeMem.DEAD;     // Not alive
     // Walk reachable graph

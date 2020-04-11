@@ -16,15 +16,14 @@ public class TestApprox {
   // Check TypeStruct.meet for a more complex recursive case
   @Test public void testTSMeet() {
     Type.init0(new HashMap<>());
+    Object dummy0 = TypeStruct.TYPES;
+    Object dummy1 = TypeMemPtr.TYPES;
     int alias0 = BitsAlias.new_alias(BitsAlias.RECORD);
-    BitsAlias alias = BitsAlias.make0(alias0);
     String[] flds = new String[]{"a","b"};
     byte[] finals = new byte[]{1,1};
 
     // Build two structs pointing to each other.
     //   -> [,int] -> * -> [,flt] -> * ->
-    Object dummy0 = TypeStruct.TYPES;
-    Object dummy1 = TypeMemPtr.TYPES;
     Type.RECURSIVE_MEET++;
     TypeStruct t0 = TypeStruct.malloc("",false,flds,TypeStruct.ts(2),finals);
     TypeStruct t1 = TypeStruct.malloc("",false,flds,TypeStruct.ts(2),finals);
@@ -237,11 +236,8 @@ public class TestApprox {
   // A0 -> (X0 <-> X1) -> A1 -> X2 -> A23-> (X35<-> X45) -> A23
   @Test public void testApprox3() {
     Type.init0(new HashMap<>());
-    final int CUTOFF = 3;
     int alias0 = BitsAlias.new_alias(BitsAlias.RECORD);
     int alias1 = BitsAlias.new_alias(BitsAlias.RECORD);
-    BitsAlias ba0 = BitsAlias.make0(alias0);
-    BitsAlias ba1 = BitsAlias.make0(alias1);
     String[] flds2 = new String[]{"v","x"};
     String[] flds3 = new String[]{"v","x","a"};
     byte[] finals2 = new byte[]{1,1};
@@ -644,7 +640,6 @@ public class TestApprox {
     TypeStruct ts8 = TypeStruct.make(args1,TypeStruct.ts(tmp7),fs1);
     TypeStruct ts8x = ts8.approx(CUTOFF,alias8);
     assertEquals(ts8,ts8x);
-    TypeMemPtr tmp8 = TypeMemPtr.make(ba80,ts8);
 
 
     // Start with short cycle:

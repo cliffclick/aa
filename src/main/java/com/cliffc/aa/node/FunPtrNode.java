@@ -52,7 +52,7 @@ public final class FunPtrNode extends Node {
     FunNode fun = ret.is_copy() ? FunNode.find_fidx(ret._fidx) : ret.fun();
     if( is_forward_ref() ) return fun._tf;
     Type tret = gvn.type(ret);
-    Type tdisp = gvn.type(display());
+    Type tdisp = gvn.type(display()).dual();
     return fun._tf.make(tdisp,((TypeTuple)tret).at(2));
   }
 
@@ -68,9 +68,7 @@ public final class FunPtrNode extends Node {
   @Override public boolean basic_liveness() { return false; }
 
   // Note: graph structure must be in place before calling
-  @Override public TypeFunPtr all_type() {
-    return fun()._tf;
-  }
+  @Override public TypeFunPtr all_type() { return TypeFunPtr.GENERIC_FUNPTR; }
   @Override public String toString() { return super.toString(); }
   // Return the op_prec of the returned value.  Not sensible except when called
   // on primitives.
@@ -113,9 +111,6 @@ public final class FunPtrNode extends Node {
     //   gvn.type of scope.ptr(), scope.stk(), scope.obj, def, ParmNode:^
     //TypeFunPtr rtfp = disp.make_recursive(rfun._tf.fidxs(),dfun._tf._args,rfun._name);
 
-
-
-
     // Make a function pointer based on the original forward-ref fidx, but with
     // the known types.
     FunNode.FUNS.setX(dfun.fidx(),null); // Track FunNode by fidx
@@ -140,9 +135,7 @@ public final class FunPtrNode extends Node {
         for( Node useuse : use._uses )
           gvn.setype(useuse,useuse.value(gvn));
     }
-
   }
-
 
   @Override public String err(GVNGCM gvn) { return is_forward_ref() ? _referr : null; }
 }

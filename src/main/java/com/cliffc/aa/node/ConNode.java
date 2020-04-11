@@ -6,7 +6,7 @@ import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
 
 public class ConNode<T extends Type> extends Node {
-  T _t;
+  T _t;                         // Not final for testing
   public ConNode( T t ) { super(OP_CON,Env.START); _t=t; }
   // Used by FunPtrNode
   ConNode( byte type, T tfp, RetNode ret, Node closure ) { super(type,ret,closure); _t = tfp; }

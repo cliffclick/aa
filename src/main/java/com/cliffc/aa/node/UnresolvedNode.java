@@ -103,16 +103,8 @@ public class UnresolvedNode extends Node {
     // No call wants this def
     return TypeMem.DEAD;
   }
-  // Too preserve the sharp display pointer types, this has to be as sharp as
-  // the meet of its all_type inputs.  This can be cached locally here after
-  // inputs stop changing... which is really just after we initialize all the
-  // primitives.  Simpler to just recompute, which doesn't happen very often.
-  @Override public TypeFunPtr all_type() {
-    Type t = TypeFunPtr.GENERIC_FUNPTR.dual();
-    for( Node def : _defs )
-      t = t.meet(def.all_type());
-    return (TypeFunPtr)t;
-  }
+  
+  @Override public TypeFunPtr all_type() { return TypeFunPtr.GENERIC_FUNPTR; }
 
   // Return the op_prec of the returned value.  Not sensible except when called
   // on primitives.  Should be the same across all defs.

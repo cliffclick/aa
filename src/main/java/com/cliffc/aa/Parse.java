@@ -86,8 +86,8 @@ public class Parse {
     _str = str;          // Keep a complete string copy for java number parsing
     _gvn = Env.GVN;      // Pessimistic during parsing
   }
-  String dump() { return _e._scope.dump(99,_gvn); }// debugging hook
-  String dumprpo() { return Env.START.dumprpo(_gvn,false); }// debugging hook
+  String dump() { return _e._scope.dump(99); }// debugging hook
+  String dumprpo() { return Env.START.dumprpo(false); }// debugging hook
 
   // Parse the string in the given lookup context, and return an executable
   // program.  Called in a partial-program context; passed in an existing

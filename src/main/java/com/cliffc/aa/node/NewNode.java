@@ -91,9 +91,7 @@ public abstract class NewNode<T extends TypeObj> extends Node {
     return (_captured = true);
   }
 
-  @Override public Type all_type() {
-    return TypeTuple.make(_ts,TypeMemPtr.make(_alias,_ts));
-  }
+  @Override public Type all_type() { return TypeTuple.NEW; }
 
   // Clones during inlining all become unique new sites
   @Override @NotNull public NewNode copy( boolean copy_edges, CallEpiNode unused, GVNGCM gvn) {
