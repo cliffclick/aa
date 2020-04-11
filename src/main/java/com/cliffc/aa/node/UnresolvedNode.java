@@ -41,26 +41,22 @@ public class UnresolvedNode extends Node {
       Type t = TypeFunPtr.GENERIC_FUNPTR.dual();
       for( Node def : _defs )
         t = t.meet(gvn.type(def));
-      return t;
+      return t.bound(all_type());
     } else if( gvn._opt_mode == 2 ) {
       // See testUnresolvedAdd.
       // gcp - always a choice, as gcp starts highest and falls as required.
       // preserve choice until GCP resolves.
       // Post-GCP: never here unless in-error, or returning an ambiguous fun ptr
 
-      // Unresolved is a *choice* and thus a *join* until resolved.
-      //Type t = TypeFunPtr.GENERIC_FUNPTR;
-      //for( Node def : _defs ) {
-      //  Type tf = gvn.type(def);
-      //  // From FunPtrs the fidxs are always low; joining a low fidx makes the empty set.
-      //  if( tf instanceof TypeFunPtr )
-      //    tf = ((TypeFunPtr)tf).make_high_fidx();
-      //  t = t.join(tf);
-      //}
-      Type t = TypeFunPtr.GENERIC_FUNPTR.dual();
-      for( Node def : _defs )
-        t = t.meet(gvn.type(def));
-      t = t.dual();
+      // Ignores incoming types, as they are function pointers (code pointer
+      // plus display) and goes straight to the FunNode._tf.
+      Type t = TypeFunPtr.GENERIC_FUNPTR;
+      for( Node def : _defs ) {
+        if( !(def instanceof FunPtrNode) ) return all_type().dual(); // Only during testing
+        TypeFunPtr tf = ((FunPtrNode)def).fun()._tf;
+        tf = tf.dual();
+        t = t.join(tf);
+      }
       return t;
     } else {
       // Post-GCP.  Should be dead, except for primitive hooks.  If we inline,

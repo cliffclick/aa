@@ -52,7 +52,7 @@ public final class FunPtrNode extends Node {
     FunNode fun = ret.is_copy() ? FunNode.find_fidx(ret._fidx) : ret.fun();
     if( is_forward_ref() ) return fun._tf;
     Type tret = gvn.type(ret);
-    Type tdisp = gvn.type(display()).dual();
+    Type tdisp = gvn.type(display());
     return fun._tf.make(tdisp,((TypeTuple)tret).at(2));
   }
 

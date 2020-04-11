@@ -285,20 +285,22 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   }
   // Generic function arguments.  Slot 0 is the return, and slot 1 is the
   // display and both fixed names.
-  public static TypeStruct make_args(Type[] ts) {
+  public static TypeStruct make_args(Type[] ts) { return make_x_args(false,ts); }
+  public static TypeStruct make_x_args(boolean any, Type[] ts) {
     String[] args = new String[ts.length];
     Arrays.fill(args,".");
     args[0] = "->";
     args[1] = "^";
-    return make_args(args,ts);
+    return make_args(any,args,ts);
   }
+  public static TypeStruct make_args(String[] flds, Type[] ts) { return make_args(false,flds,ts); }
   // First two fields are the return and the display
-  public static TypeStruct make_args(String[] flds, Type[] ts) {
+  public static TypeStruct make_args(boolean any, String[] flds, Type[] ts) {
     assert Util.eq(flds[0],"->");
     assert Util.eq(flds[1],"^");
     assert ts[1].is_display_ptr();
     byte[] fs = fbots(ts.length);  fs[0] = FFNL;
-    return malloc("",false,flds,ts,fs).hashcons_free();
+    return malloc("",any,flds,ts,fs).hashcons_free();
   }
   public  static TypeStruct make(String[] flds, Type[] ts) { return malloc("",false,flds,ts,fbots(ts.length)).hashcons_free(); }
   public  static TypeStruct make(String[] flds, Type[] ts, byte[] flags) { return malloc("",false,flds,ts,flags).hashcons_free(); }
@@ -828,10 +830,10 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     OLD2APX.put(old,nmp);
     if( old._obj instanceof TypeStruct )
       nmp._obj = ax_impl_struct(alias,nmp._aliases.test(alias),cutoff,cutoffs,d,dold,(TypeStruct)old._obj);
-    else if( old._obj == TypeObj.OBJ )
-      nmp._obj = TypeObj.OBJ;
-    else if( old._obj == TypeObj.XOBJ )
+    else if( old._obj == TypeObj.XOBJ || old._obj==nmp._obj )
       ; // No change to nmp._obj
+    else if( old._obj == TypeObj.OBJ )
+      nmp._obj = TypeObj.OBJ;   // Falls hard
     else
       throw com.cliffc.aa.AA.unimpl();
     OLD2APX.put(old,null);      // Do not keep sharing the "tails"
@@ -849,7 +851,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     // Walk internal structure, meeting into the approximation
     TypeFunPtr nmp = (TypeFunPtr)old.clone();
     OLD2APX.put(old,nmp);
-    // For function pointers, args *join*, except the return.
     nmp._args = ax_impl_struct(alias,false,cutoff,cutoffs,d,dold,old._args);
     OLD2APX.put(old,null);      // Do not keep sharing the "tails"
     return nmp;
@@ -880,11 +881,12 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       TypeFunPtr optr = (TypeFunPtr)old;
       nptr._fidxs = nptr._fidxs.meet(optr._fidxs);
       // While structs normally meet, function args *join*, although the return still meets.
-      Type ret = ax_meet(bs,nptr._args._ts[0],optr._args._ts[0]);
-      TypeStruct nxargs = nptr._args.rdual();
-      TypeStruct oxargs = optr._args.rdual();
-      nptr._args = (TypeStruct)ax_meet(bs,nxargs,oxargs).rdual();
-      nptr._args._ts[0] = ret;
+      nptr._args = (TypeStruct)ax_meet(bs,nptr._args,optr._args);
+      //Type ret = ax_meet(bs,nptr._args._ts[0],optr._args._ts[0]);
+      //TypeStruct nxargs = nptr._args.rdual();
+      //TypeStruct oxargs = optr._args.rdual();
+      //nptr._args = (TypeStruct)ax_meet(bs,nxargs,oxargs).rdual();
+      //nptr._args._ts[0] = ret;
       break;
     }
     case TMEMPTR: {

@@ -86,8 +86,9 @@ public abstract class PrimNode extends Node {
       Type tactual = gvn.type(in(i));
       Type tformal = _targs.at(i+1); // Return in 0, display in 1
       Type t = tformal.dual().meet(ts[i] = tactual);
-      if( t.above_center() ) is_con = false;  // Not a constant
-      else if( !t.is_con() ) return _targs.at(0); // Some input is too low
+      if( t.is_con() ) ;                          // All constants, will fold
+      else if( t.above_center() ) is_con = false; // Not a constant
+      else return _targs.at(0);                   // Some input is too low
     }
     return is_con ? apply(ts) : _targs.at(0).dual();
   }
@@ -119,11 +120,11 @@ public abstract class PrimNode extends Node {
   // assigned to variables.
   public FunPtrNode as_fun( GVNGCM gvn ) {
     FunNode  fun = ( FunNode) gvn.xform(new  FunNode(this).add_def(Env.ALL_CTRL)); // Points to ScopeNode only
-    ParmNode rpc = (ParmNode) gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(Type.SCALAR ),null));
+    ParmNode rpc = (ParmNode) gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
     ParmNode mem = (ParmNode) gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.FULL),null));
     add_def(null);              // Control for the primitive in slot 0
     for( int i=2; i<_targs._ts.length; i++ ) // First is return, next is display
-      add_def(gvn.init(new ParmNode(i,_targs._flds[i],fun, gvn.con(Type.SCALAR),null)));
+      add_def(gvn.init(new ParmNode(i,_targs._flds[i],fun, gvn.con(_targs._ts[i]),null)));
     // Functions return the set of *modified* memory.  PrimNodes never *modify*
     // memory (see Intrinsic*Node for some primitives that *modify* memory).
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mem,gvn.init(this),rpc,fun));

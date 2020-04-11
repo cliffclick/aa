@@ -259,6 +259,8 @@ public class TestNode {
     test1monotonic(new   TypeNode(TypeInt.FALSE    ,_ins[1],null));
     test1monotonic(new   TypeNode(TypeMemPtr.STRPTR,_ins[1],null));
     test1monotonic(new   TypeNode(TypeFlt.FLT64    ,_ins[1],null));
+    _gvn._opt_mode=1;  test1monotonic(new UnresolvedNode(null,_ins[1],_ins[2]));  _gvn._opt_mode=0;
+    _gvn._opt_mode=2;  test1monotonic(new UnresolvedNode(null,_ins[1],_ins[2]));  _gvn._opt_mode=0;
 
     assertEquals(0,_errs);
   }

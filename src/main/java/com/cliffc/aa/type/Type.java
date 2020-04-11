@@ -374,7 +374,7 @@ public class Type<T extends Type<T>> implements Cloneable {
     }
     if( mt.is_simple() ) n=""; // No named simple types
     if( mt._type==TOBJ ) n=""; // OBJ splits into strings (arrays) and structs, which can keep their names
-    
+
     // Inject the name
     if( !Util.eq(mt._name,n) )  // Fast path cutout
       mt = mt.set_name(n);
@@ -669,14 +669,14 @@ public class Type<T extends Type<T>> implements Cloneable {
     case TNUM:    case TNNUM:
     case TREAL:   case TNREAL:
     case TSCALAR: case TNSCALR:
-      return false;             // These are all below center
     case TNIL:
-      return false;             // At center, not above
+      return false;             // These are all below center
     case TANY:
     case TXCTRL:
     case TXNUM:    case TXNNUM:
     case TXREAL:   case TXNREAL:
     case TXSCALAR: case TXNSCALR:
+    case TXNIL:
       return true;              // These are all above center
     default: throw typerr(null);// Overridden in subclass
     }
@@ -695,7 +695,7 @@ public class Type<T extends Type<T>> implements Cloneable {
     case TXNUM:    case TXNNUM:
     case TXSCALAR: case TXNSCALR:
     case TXCTRL:
-    case TNIL:
+    case TNIL:     case TXNIL:
       return true;              // These all include some constants
     default: throw typerr(null);
     }
@@ -720,7 +720,7 @@ public class Type<T extends Type<T>> implements Cloneable {
     case TXNSCALR:
     case TXSCALAR:
       return false;             // Not exactly a constant
-    case TNIL:
+    case TNIL: case TXNIL:
       return true;
     default: throw typerr(null);// Overridden in subclass
     }
@@ -729,9 +729,9 @@ public class Type<T extends Type<T>> implements Cloneable {
   public boolean is_forward_ref() { return false; }
 
   // Return a long   from a TypeInt constant; assert otherwise.
-  public long   getl() { if( _type==TNIL ) return 0; throw typerr(null); }
+  public long   getl() { if( _type==TNIL || _type==TXNIL ) return 0; throw typerr(null); }
   // Return a double from a TypeFlt constant; assert otherwise.
-  public double getd() { if( _type==TNIL ) return 0.0; throw typerr(null); }
+  public double getd() { if( _type==TNIL || _type==TXNIL ) return 0.0; throw typerr(null); }
   // Return a String from a TypeStr constant; assert otherwise.
   public String getstr() { throw typerr(null); }
 
@@ -743,7 +743,7 @@ public class Type<T extends Type<T>> implements Cloneable {
   // 99 Bottom; No free converts; e.g. Flt->Int requires explicit rounding
   public byte isBitShape(Type t) {
     if( has_name() || t.has_name() ) throw com.cliffc.aa.AA.unimpl();
-    if( _type == TNIL ) return 0; // Nil is free to convert always
+    if( _type == TNIL || _type==TXNIL ) return 0; // Nil is free to convert always
     if( above_center() && isa(t) ) return 0; // Can choose compatible format
     if( _type == t._type ) return 0; // Same type is OK
     if( t._type==TSCALAR ) return 0; // Generic function arg never requires a conversion

@@ -99,6 +99,7 @@ public class TestParse {
   }
 
   @Test public void testParse01() {
+    test("x++;x",TypeInt.con(1));
     // Syntax for variable assignment
     test("x=1", TypeInt.TRUE);
     test("x=y=1", TypeInt.TRUE);
@@ -113,7 +114,8 @@ public class TestParse {
     test("x:=1;x++"  ,TypeInt.con(1));
     test("x:=1;x++;x",TypeInt.con(2));
     test("x:=1;x++ + x--",TypeInt.con(3));
-    test("x++",TypeInt.con(0));
+    test("x++",Type.XNIL);
+    test("x++;x",TypeInt.con(1));
 
     // Conditional:
     test   ("0 ?    2  : 3", TypeInt.con(3)); // false

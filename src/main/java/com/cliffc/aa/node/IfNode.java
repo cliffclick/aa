@@ -23,9 +23,9 @@ public class IfNode extends Node {
     if( pred instanceof TypeObj ) return TypeTuple.IF_ANY;// Nonsense, so test is dead
     if( pred.isa(TypeInt.XINT1) ) return TypeTuple.IF_ANY; // Choice of {0,1}
     if( TypeInt.BOOL.isa(pred)  ) return TypeTuple.IF_ALL; // Can be either
-    if( pred == TypeInt.FALSE || pred == Type.NIL )
+    if( pred == TypeInt.FALSE || pred == Type.NIL || pred==Type.XNIL )
       return TypeTuple.IF_FALSE;   // False only
-    
+
     // Already checked for exactly NIL.
     // If pred maybe a nil, then we can choose nil or something else
     if( pred. may_nil() ) return TypeTuple.IF_ANY;
@@ -36,7 +36,7 @@ public class IfNode extends Node {
     // If meeting a nil changes things, then the original excluded nil and so
     // was always true.
     if( pred.meet_nil(Type.NIL) != pred ) return TypeTuple.IF_TRUE;
-    
+
     throw AA.unimpl(); // Dunno what test this is?
   }
   @Override public Type all_type() { return TypeTuple.IF_ALL; }

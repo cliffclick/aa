@@ -337,7 +337,7 @@ public class Parse {
     }
 
     // Normal statement value parse
-    Node ifex = default_nil ? con(Type.NIL) : ifex(); // Parse an expression for the statement value
+    Node ifex = default_nil ? con(Type.XNIL) : ifex(); // Parse an expression for the statement value
     if( ifex == null ) {        // No statement?
       if( toks._len == 0 ) return  null;
       ifex = err_ctrl2("Missing ifex after assignment of '"+toks.last()+"'");
@@ -356,7 +356,7 @@ public class Parse {
       if( scope==null ) {                    // Token not already bound at any scope
         if( ifex instanceof FunPtrNode && !ifex.is_forward_ref() )
           ((FunPtrNode)ifex).fun().bind(tok); // Debug only: give name to function
-        create(tok,con(Type.NIL),ts_mutable(true)); // Create at top of scope as nil.
+        create(tok,con(Type.XNIL),ts_mutable(true)); // Create at top of scope as nil.
         scope = _e._scope;              // Scope is the current one
         scope.def_if(tok,mutable,true); // Record if inside arm of if (partial def error check)
       }
@@ -414,7 +414,7 @@ public class Parse {
     _e._scope.flip_if();        // Flip side of tracking new defs
     set_ctrl(gvn(new CProjNode(ifex.unhook(),0))); // Control for false branch
     set_mem(old_mem);           // Reset memory to before the IF
-    Node fex = peek(':') ? stmt() : con(Type.NIL);
+    Node fex = peek(':') ? stmt() : con(Type.XNIL);
     if( fex == null ) fex = err_ctrl2("missing expr after ':'");
     fex.keep();                    // Keep until merge point
     Node f_ctrl= ctrl().keep();    // Keep until merge point
@@ -576,7 +576,7 @@ public class Parse {
     // Need a load/call/store sensible options
     Node n;
     if( scope==null ) {         // Token not already bound to a value
-      create(tok,con(Type.NIL),ts_mutable(true));
+      create(tok,con(Type.XNIL),ts_mutable(true));
       scope = _e._scope;
     } else {                    // Check existing token for mutable
       if( !scope.is_mutable(tok) )
@@ -691,8 +691,8 @@ public class Parse {
    *  tuple= (stmts,[stmts,])     // Tuple; final comma is optional
    */
   private Node tuple(Node s) {
-    TypeStruct mt_tuple = TypeStruct.make(new String[]{"^"},TypeStruct.ts(Type.NIL));
-    NewObjNode nn = new NewObjNode(false,BitsAlias.RECORD,mt_tuple,ctrl(),con(Type.NIL));
+    TypeStruct mt_tuple = TypeStruct.make(new String[]{"^"},TypeStruct.ts(Type.XNIL));
+    NewObjNode nn = new NewObjNode(false,BitsAlias.RECORD,mt_tuple,ctrl(),con(Type.XNIL));
     int fidx=0, oldx=_x-1; // Field name counter, mismatched parens balance point
     while( s!=null ) {
       nn.create_active((""+(fidx++)).intern(),s,TypeStruct.FFNL,_gvn);
@@ -847,7 +847,7 @@ public class Parse {
     val .add_def(rez   );
     set_ctrl(con(Type.XCTRL  ));
     set_mem (con(TypeMem.XMEM));
-    return   con(Type.NIL    ) ;
+    return   con(Type.XNIL   ) ;
   }
 
   /** Parse anonymous struct; the opening "@{" already parsed.  A lexical scope
@@ -898,7 +898,7 @@ public class Parse {
     _pp.setIndex(_x);
     Number n = _nf.parse(_str,_pp);
     _x = _pp.getIndex();
-    if( n instanceof Long   ) return n.longValue()==0 ? Type.NIL : TypeInt.con(n.  longValue());
+    if( n instanceof Long   ) return n.longValue()==0 ? Type.XNIL : TypeInt.con(n.  longValue());
     if( n instanceof Double ) return TypeFlt.con(n.doubleValue());
     throw new RuntimeException(n.getClass().toString()); // Should not happen
   }
@@ -968,7 +968,7 @@ public class Parse {
     return typeq(tmp);          // And check for null-ness
   }
   // Wrap in a nullable if there is a trailing '?'.  No spaces allowed
-  private Type typeq(Type t) { return peek_noWS('?') ? t.meet_nil(Type.NIL) : t; }
+  private Type typeq(Type t) { return peek_noWS('?') ? t.meet_nil(Type.XNIL) : t; }
 
   // No mod is r/o, the default and lattice bottom.  ':' is read-write, '=' is
   // final.  Currently '-' is ambiguous with function arrow ->.
