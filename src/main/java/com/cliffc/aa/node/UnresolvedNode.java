@@ -3,7 +3,10 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.type.*;
+import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeFunPtr;
+import com.cliffc.aa.type.TypeMem;
+import com.cliffc.aa.type.TypeTuple;
 
 import java.util.Arrays;
 
@@ -35,14 +38,19 @@ public class UnresolvedNode extends Node {
     }
     return progress ? this : null;
   }
-  
-  @Override public Type value(GVNGCM gvn) {
+
+  @Override public TypeFunPtr value(GVNGCM gvn) {
+    final TypeFunPtr GF = TypeFunPtr.GENERIC_FUNPTR;
     if( gvn._opt_mode < 2 ) { // parse or 1st iter: assume all can happen, and hope to resolve to lift
-      Type t = TypeFunPtr.GENERIC_FUNPTR.dual();
-      for( Node def : _defs )
-        t = t.meet(gvn.type(def));
-      return t.bound(all_type());
-    } else if( gvn._opt_mode == 2 ) {
+      TypeFunPtr t = GF.dual();
+      for( Node def : _defs ) {
+        Type td = gvn.type(def);
+        if( !(td instanceof TypeFunPtr) ) return GF; // Only fails during testing
+        t = (TypeFunPtr)t.meet(td);
+      }
+      return t;
+    }
+    if( gvn._opt_mode == 2 ) {
       // See testUnresolvedAdd.
       // gcp - always a choice, as gcp starts highest and falls as required.
       // preserve choice until GCP resolves.
@@ -50,22 +58,21 @@ public class UnresolvedNode extends Node {
 
       // Ignores incoming types, as they are function pointers (code pointer
       // plus display) and goes straight to the FunNode._tf.
-      Type t = TypeFunPtr.GENERIC_FUNPTR;
+      TypeFunPtr t = GF;
       for( Node def : _defs ) {
-        if( !(def instanceof FunPtrNode) ) return all_type().dual(); // Only during testing
+        if( !(def instanceof FunPtrNode) ) return GF.dual(); // Only fails during testing
         TypeFunPtr tf = ((FunPtrNode)def).fun()._tf;
         tf = tf.dual();
-        t = t.join(tf);
+        t = (TypeFunPtr)t.join(tf);
       }
       return t;
-    } else {
-      // Post-GCP.  Should be dead, except for primitive hooks.  If we inline,
-      // we split a fidx and the Unresolved does not get both options... so it
-      // runs "downhill" during iter.  Not useful, since dead.  Leave it set.
-      return gvn.self_type(this);
     }
+    // Post-GCP.  Should be dead, except for primitive hooks.  If we inline,
+    // we split a fidx and the Unresolved does not get both options... so it
+    // runs "downhill" during iter.  Not useful, since dead.  Leave it set.
+    return GF.dual();
   }
-  
+
   // Filter out all the wrong-arg-count functions
   public Node filter( GVNGCM gvn, int nargs ) {
     Node x = null;
@@ -99,7 +106,7 @@ public class UnresolvedNode extends Node {
     // No call wants this def
     return TypeMem.DEAD;
   }
-  
+
   @Override public TypeFunPtr all_type() { return TypeFunPtr.GENERIC_FUNPTR; }
 
   // Return the op_prec of the returned value.  Not sensible except when called

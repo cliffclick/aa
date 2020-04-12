@@ -95,10 +95,10 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public TypeFunPtr make_fidx( int fidx ) { return make(BitsFun.make0(fidx),_args); }
   public TypeFunPtr make_new_fidx( int parent, TypeStruct args ) { return make(BitsFun.make_new_fidx(parent),args); }
   public static TypeStruct ARGS =
-    TypeStruct.make(true,       // High, so extra args are all XSCALAR
+    TypeStruct.make(false,     // Low, so extra args are all SCALAR
                     new String[]{"->","^"}, // First two args normal for a function
-                    TypeAry.ts(Type.SCALAR,Type.XSCALAR),
-                    new byte[]{TypeStruct.FFNL,TypeStruct.FUNK});
+                    TypeAry.ts(Type.SCALAR,Type.SCALAR),
+                    new byte[]{TypeStruct.FFNL,TypeStruct.FRO});
   public static TypeFunPtr make_anon() { return make_new(ARGS); } // Make a new anonymous function ptr
   // Make a TFP with a new display and return value, used by FunPtrNode
   public TypeFunPtr make(Type display_ptr, Type ret) {
@@ -137,16 +137,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     default: throw typerr(t);   // All else should not happen
     }
     TypeFunPtr tf = (TypeFunPtr)t;
-    // Contra-variant args, co-variant return.
-    // Function args are JOIN, return is MEET.
-    // Args turn into *constraints* on a valid typing, whereas the return
-    // turns into a real value.
-
-    TypeStruct jargs = (TypeStruct)_args.join(tf._args);
-    Type ret = ret().meet(tf.ret());
-    Type[] ts = TypeAry.clone(jargs._ts);
-    ts[0] = ret;
-    return make(_fidxs.meet(tf._fidxs),jargs.make_from(ts));
+    return make(_fidxs.meet(tf._fidxs),(TypeStruct)_args.meet(tf._args));
   }
 
   public BitsFun fidxs() { return _fidxs; }

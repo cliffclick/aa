@@ -92,6 +92,7 @@ public class TypeStr extends TypeObj<TypeStr> {
   @Override public TypeObj update(byte fin, String fld, Type val) { return STR; }
   @Override public TypeObj st    (byte fin, String fld, Type val) { return STR; }
   @Override public boolean may_be_con() { return super.may_be_con() || _con != null; }
+  @Override public boolean is_con() { return _con != null; }
   @Override public Type meet_nil(Type t) { return this; }
 
   // Lattice of conversions:

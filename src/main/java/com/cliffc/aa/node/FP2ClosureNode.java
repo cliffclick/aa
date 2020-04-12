@@ -29,7 +29,7 @@ public final class FP2ClosureNode extends Node {
     Type tfp = t0 instanceof TypeTuple ? ((TypeTuple)t0).at(2) : t0;
     return convert(tfp);
   }
-  @Override public TypeMemPtr all_type() { return TypeMemPtr.DISPLAY_PTR; }
+  @Override public Type all_type() { return Type.SCALAR; }
   static public Type convert( Type t ) {
     if( !(t instanceof TypeFunPtr) )
       return t.above_center() ? TypeMemPtr.DISPLAY_PTR.dual() : TypeMemPtr.DISPLAY_PTR;

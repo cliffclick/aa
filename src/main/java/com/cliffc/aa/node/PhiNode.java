@@ -10,7 +10,7 @@ import java.util.BitSet;
 // Merge results; extended by ParmNode
 public class PhiNode extends Node {
   final Parse _badgc;
-  final Type _t;
+  Type _t;
   private PhiNode( byte op, Type t, Parse badgc, Node... vals ) {
     super(op,vals);
     _badgc = badgc;
@@ -46,11 +46,14 @@ public class PhiNode extends Node {
       if( n==this || n==live ) continue; // Ignore self or duplicates
       if( live==null ) live = n;         // Found unique live input
       else {
-        Type tn = gvn.type(n);
-        Type tl = gvn.type(live);
-        if( live   instanceof ConNode && tl.above_center() && tl.isa(tn) ) live = n; // Keep non-constant
-        else if( n instanceof ConNode && tn.above_center() && tn.isa(tl) ) ; // keep live, the constant does not add anything
-        else live=this;         // Found 2nd live input, no collapse
+        // Interesting optimization added for handling odd-ball above-center displays.
+        // Removed, as incorrect for XNIL.
+        //Type tn = gvn.type(n);
+        //Type tl = gvn.type(live);
+        //if( live   instanceof ConNode && tl.above_center() && tl.isa(tn) ) live = n; // Keep non-constant
+        //else if( n instanceof ConNode && tn.above_center() && tn.isa(tl) ) ; // keep live, the constant does not add anything
+        //else live=this;         // Found 2nd live input, no collapse
+        live=this;              // Found 2nd live input, no collapse
       }
     }
     if( live != this ) return live; // Single unique input

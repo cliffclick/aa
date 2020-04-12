@@ -45,7 +45,7 @@ public final class FunPtrNode extends Node {
     }
     return null;
   }
-  @Override public Type value(GVNGCM gvn) {
+  @Override public TypeFunPtr value(GVNGCM gvn) {
     if( !(in(0) instanceof RetNode) )
       return TypeFunPtr.EMPTY;
     RetNode ret = ret();

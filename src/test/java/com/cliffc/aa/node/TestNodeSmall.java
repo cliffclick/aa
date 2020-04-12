@@ -60,17 +60,17 @@ public class TestNodeSmall {
     gvn.setype(aint,aintSTART);
     gvn.setype(astr,astrSTART);
     gvn._opt_mode=1;
-    TypeFunPtr uaddVAL1START = (TypeFunPtr)uadd.value(gvn);
-    TypeFunPtr anumVAL1START = (TypeFunPtr)anum.value(gvn);
-    TypeFunPtr afltVAL1START = (TypeFunPtr)aflt.value(gvn);
-    TypeFunPtr aintVAL1START = (TypeFunPtr)aint.value(gvn);
-    TypeFunPtr astrVAL1START = (TypeFunPtr)astr.value(gvn);
+    TypeFunPtr uaddVAL1START = uadd.value(gvn);
+    TypeFunPtr anumVAL1START = anum.value(gvn);
+    TypeFunPtr afltVAL1START = aflt.value(gvn);
+    TypeFunPtr aintVAL1START = aint.value(gvn);
+    TypeFunPtr astrVAL1START = astr.value(gvn);
     gvn._opt_mode=2;
-    TypeFunPtr uaddVAL2START = (TypeFunPtr)uadd.value(gvn);
-    TypeFunPtr anumVAL2START = (TypeFunPtr)anum.value(gvn);
-    TypeFunPtr afltVAL2START = (TypeFunPtr)aflt.value(gvn);
-    TypeFunPtr aintVAL2START = (TypeFunPtr)aint.value(gvn);
-    TypeFunPtr astrVAL2START = (TypeFunPtr)astr.value(gvn);
+    TypeFunPtr uaddVAL2START = uadd.value(gvn);
+    TypeFunPtr anumVAL2START = anum.value(gvn);
+    TypeFunPtr afltVAL2START = aflt.value(gvn);
+    TypeFunPtr aintVAL2START = aint.value(gvn);
+    TypeFunPtr astrVAL2START = astr.value(gvn);
 
     // Compute Node.value() where initial GVN is all_type.dual()
     gvn.setype(uadd,uaddALL.dual());
@@ -79,17 +79,17 @@ public class TestNodeSmall {
     gvn.setype(aint,aintALL.dual());
     gvn.setype(astr,astrALL.dual());
     gvn._opt_mode=1;
-    TypeFunPtr uaddVAL1XALL = (TypeFunPtr)uadd.value(gvn);
-    TypeFunPtr anumVAL1XALL = (TypeFunPtr)anum.value(gvn);
-    TypeFunPtr afltVAL1XALL = (TypeFunPtr)aflt.value(gvn);
-    TypeFunPtr aintVAL1XALL = (TypeFunPtr)aint.value(gvn);
-    TypeFunPtr astrVAL1XALL = (TypeFunPtr)astr.value(gvn);
+    TypeFunPtr uaddVAL1XALL = uadd.value(gvn);
+    TypeFunPtr anumVAL1XALL = anum.value(gvn);
+    TypeFunPtr afltVAL1XALL = aflt.value(gvn);
+    TypeFunPtr aintVAL1XALL = aint.value(gvn);
+    TypeFunPtr astrVAL1XALL = astr.value(gvn);
     gvn._opt_mode=2;
-    TypeFunPtr uaddVAL2XALL = (TypeFunPtr)uadd.value(gvn);
-    TypeFunPtr anumVAL2XALL = (TypeFunPtr)anum.value(gvn);
-    TypeFunPtr afltVAL2XALL = (TypeFunPtr)aflt.value(gvn);
-    TypeFunPtr aintVAL2XALL = (TypeFunPtr)aint.value(gvn);
-    TypeFunPtr astrVAL2XALL = (TypeFunPtr)astr.value(gvn);
+    TypeFunPtr uaddVAL2XALL = uadd.value(gvn);
+    TypeFunPtr anumVAL2XALL = anum.value(gvn);
+    TypeFunPtr afltVAL2XALL = aflt.value(gvn);
+    TypeFunPtr aintVAL2XALL = aint.value(gvn);
+    TypeFunPtr astrVAL2XALL = astr.value(gvn);
 
     // Compute Node.value() where initial GVN is all_type()
     gvn.setype(uadd,uaddALL);
@@ -98,17 +98,17 @@ public class TestNodeSmall {
     gvn.setype(aint,aintALL);
     gvn.setype(astr,astrALL);
     gvn._opt_mode=1;
-    TypeFunPtr uaddVAL1ALL = (TypeFunPtr)uadd.value(gvn);
-    TypeFunPtr anumVAL1ALL = (TypeFunPtr)anum.value(gvn);
-    TypeFunPtr afltVAL1ALL = (TypeFunPtr)aflt.value(gvn);
-    TypeFunPtr aintVAL1ALL = (TypeFunPtr)aint.value(gvn);
-    TypeFunPtr astrVAL1ALL = (TypeFunPtr)astr.value(gvn);
+    TypeFunPtr uaddVAL1ALL = uadd.value(gvn);
+    TypeFunPtr anumVAL1ALL = anum.value(gvn);
+    TypeFunPtr afltVAL1ALL = aflt.value(gvn);
+    TypeFunPtr aintVAL1ALL = aint.value(gvn);
+    TypeFunPtr astrVAL1ALL = astr.value(gvn);
     gvn._opt_mode=2;
-    TypeFunPtr uaddVAL2ALL = (TypeFunPtr)uadd.value(gvn);
-    TypeFunPtr anumVAL2ALL = (TypeFunPtr)anum.value(gvn);
-    TypeFunPtr afltVAL2ALL = (TypeFunPtr)aflt.value(gvn);
-    TypeFunPtr aintVAL2ALL = (TypeFunPtr)aint.value(gvn);
-    TypeFunPtr astrVAL2ALL = (TypeFunPtr)astr.value(gvn);
+    TypeFunPtr uaddVAL2ALL = uadd.value(gvn);
+    TypeFunPtr anumVAL2ALL = anum.value(gvn);
+    TypeFunPtr afltVAL2ALL = aflt.value(gvn);
+    TypeFunPtr aintVAL2ALL = aint.value(gvn);
+    TypeFunPtr astrVAL2ALL = astr.value(gvn);
 
     TypeFunPtr[] uadds = new TypeFunPtr[]{uaddSTART,uaddALL.dual(),uaddVAL1START,uaddVAL2START,uaddVAL1XALL,uaddVAL2XALL,uaddVAL1ALL,uaddVAL2ALL,uaddALL};
     TypeFunPtr[] anums = new TypeFunPtr[]{anumSTART,anumALL.dual(),anumVAL1START,anumVAL2START,anumVAL1XALL,anumVAL2XALL,anumVAL1ALL,anumVAL2ALL,anumALL};
@@ -178,8 +178,11 @@ public class TestNodeSmall {
       tns[i] = (TypeTuple)n.value(gvn);
     }
     // Equals check after computing them all
-    for( int i=0; i<argss.length; i++ )
-      assertEquals(argss[i].at(ins.length),tns[i].at(2));
+    for( int i=0; i<argss.length; i++ ) {
+      Type expect = argss[i].at(ins.length);
+      Type actual = tns[i].at(2); // Looking at the TFP from the Call, ignore ctrl,memory,args
+      assertEquals(expect,actual);
+    }
     return tns;
   }
 

@@ -235,9 +235,14 @@ public final class CallEpiNode extends Node {
     // Meet across wired callers.
     TypeTuple tt = TypeTuple.XRET;
     for( int i=0; i<nwired(); i++ ) {
-      RetNode ret = wired(i);
-      if( ret.is_copy() ) continue; // Dying, not called, not returning here
-      tt = (TypeTuple)tt.meet(gvn.type(ret));
+      Node ret = in(wire_num(i));
+      if( ret instanceof RetNode &&            // Only fails during testing
+          ((RetNode)ret).is_copy() ) continue; // Dying, not called, not returning here
+      Type tr = gvn.type(ret);
+      if( !(tr instanceof TypeTuple) || // Only fails during testing
+          ((TypeTuple)tr)._ts.length != TypeTuple.XRET._ts.length )
+        continue;               // Only fails during testing
+      tt = (TypeTuple)tt.meet(tr);
     }
     return tt;
   }

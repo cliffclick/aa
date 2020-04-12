@@ -252,26 +252,30 @@ public class CallNode extends Node {
     BitsFun fidxs = tfp.fidxs();
     // Resolve; only keep choices with sane arguments during GCP
     BitsFun rfidxs = resolve(fidxs,ts);
-    if( !rfidxs.test(1) ) { // Neither ANY nor ALL
+    if( rfidxs.test(1) || rfidxs==fidxs ) { // Neither ANY nor ALL, or no-change
+      // No change
+    } else {
       TypeStruct args = tfp._args;
-      if( rfidxs.bitCount() != fidxs.bitCount() ) {
-        if( rfidxs == BitsFun.EMPTY ) {
-          // Has to be all NIL args to preserve monotonicity
-          Type[] ats = TypeStruct.ts(args._ts.length);
-          Arrays.fill(ats,Type.NIL);
-          ats[0]= Type.SCALAR;
-          args = TypeStruct.make_args(ats);
-        } else {                // Meet of remaining function arg types
-          args = TypeFunPtr.ARGS.dual();
-          for( int fidx : rfidxs )
-            args = (TypeStruct)args.meet(FunNode.find_fidx(fidx)._tf._args);
-        }
+      if( rfidxs == BitsFun.EMPTY ) { // No choices (error)
+        // Has to be all NIL args to preserve monotonicity
+        Type[] ats = TypeStruct.ts(args._ts.length);
+        Arrays.fill(ats,Type.NIL);
+        ats[0]= Type.SCALAR;
+        ats[1]= TypeStruct.NO_DISP;
+        args = TypeStruct.make_args(ats);
+      } else if( rfidxs.bitCount() != fidxs.bitCount() ) { // Unequal function sets; recompute tighter args bounds
+        // Meet of remaining function arg types
+        args = TypeFunPtr.ARGS.dual();
+        for( int fidx : rfidxs )
+          args = (TypeStruct)args.meet(FunNode.find_fidx(fidx)._tf._args);
+        if( rfidxs.above_center() )
+          args = args.dual();     // Args sign needs to match rfidxs sign
+      } else {                    // Same function sets; fast-path cutout, keep already computed args
+        if( rfidxs.above_center() != fidxs.above_center() )
+          args = args.dual();     // FPtrs sign flipped, and args sign needs to match
       }
-      if( rfidxs.above_center() != fidxs.above_center() && rfidxs!=BitsFun.EMPTY ) args = args.dual();
-      tfp = TypeFunPtr.make(rfidxs,args);
+      ts[2] = TypeFunPtr.make(rfidxs,args);
     }
-    ts[2] = tfp;
-
     return TypeTuple.make(ts);
   }
 

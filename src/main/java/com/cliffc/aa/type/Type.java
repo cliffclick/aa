@@ -431,7 +431,7 @@ public class Type<T extends Type<T>> implements Cloneable {
     if( is_num() ) {
       // May be OOP0 or STR or STRUCT or TUPLE
       if( that_oop ) return (must_nil() || t.must_nil()) ? SCALAR : NSCALR;
-      if( that_num || t==NIL ) {
+      if( that_num || t==NIL || t==XNIL ) {
         // Numeric; same pattern as ANY/ALL, or SCALAR/XSCALAR
         if( _type == TNUM || t._type == TNUM ) return NUM;
         if(   _type == TXNUM ) return t   ;

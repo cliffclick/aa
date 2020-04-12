@@ -364,7 +364,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       // value) but displays have the linked-list pointer in _ts[0].
       (_ts.length >= 1 && _ts[0].is_display_ptr());
   }
-  public static final Type NO_DISP= TypeMemPtr.NIL_DISPLAY.dual();
+  public static final Type NO_DISP= TypeMemPtr.NIL_DISPLAY;
 
   public  static final TypeStruct GENERIC = malloc("",true,new String[0],TypeAry.get(0),new byte[0]).hashcons_free();
   public  static final TypeStruct ALLSTRUCT;
@@ -381,7 +381,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public  static final TypeStruct SCALAR1__BOOL     = make_args(ARGS_X ,ts(TypeInt.BOOL,NO_DISP,SCALAR));
 
   // A bunch of types for tests
-  public static final Type NO_DISP2 = TypeMemPtr.NIL_DISPLAY;  // NIL for *structs* not *function args*
+  public static final Type NO_DISP2 = TypeMemPtr.NIL_DISPLAY;  // NIL display for *structs* not *function args*
   public  static final TypeStruct NAMEPT= make("Point:",flds("^","x","y"),ts(NO_DISP2,TypeFlt.FLT64,TypeFlt.FLT64),ffnls(3));
   public  static final TypeStruct POINT = make(flds("^","x","y"),ts(NO_DISP2,TypeFlt.FLT64,TypeFlt.FLT64));
   public  static final TypeStruct FLT64 = make(flds("^","x"),ts(NO_DISP2,TypeFlt.FLT64)); // @{x:flt}
