@@ -194,14 +194,15 @@ public class FunNode extends RegionNode {
     // type-split signatures, we'd like this to be as precise as all unsplit
     // inputs.
     boolean progress= false;
+    TypeTuple tret = (TypeTuple)gvn.type(ret);
     for( int i=0; i<parms.length; i++ ) {
-      Type t = i==0 ? gvn.type(ret) : (parms[i]==null ? (i==1 ? TypeStruct.NO_DISP : Type.XSCALAR) : gvn.type(parms[i]));
+      Type t = i==0 ? tret.at(2) : (parms[i]==null ? Type.XSCALAR : gvn.type(parms[i]));
       if( t != targ(i) && t.isa(targ(i)) ) { progress=true; break; }
     }
     if( progress && !is_prim() ) {
       Type[] ts = TypeAry.get(parms.length);
       for( int i=0; i<parms.length; i++ ) {
-        ts[i] = i==0 ? gvn.type(ret) : (parms[i]==null ? (i==1 ? TypeStruct.NO_DISP : Type.XSCALAR) : gvn.type(parms[i]));
+        ts[i] = i==0 ? tret.at(2) : (parms[i]==null ? Type.XSCALAR : gvn.type(parms[i]));
         if( !ts[i].isa(targ(i)) ) ts[i] = targ(i);
       }
       TypeFunPtr tf = TypeFunPtr.make(_tf.fidxs(),_tf._args.make_from(ts));
@@ -316,7 +317,7 @@ public class FunNode extends RegionNode {
     if( idx != -1 ) {           // Found; split along a specific input path using widened types
       Type[] sig = TypeAry.get(parms.length);
       sig[0] = _tf.ret();
-      sig[1] = parms[1]==null ? TypeStruct.NO_DISP : gvn.type(parms[1].in(idx));
+      sig[1] = parms[1]==null ? Type.XSCALAR : gvn.type(parms[1].in(idx));
       for( int i=2; i<parms.length; i++ ) // 0 for return, 1 for display
         sig[i] = parms[i]==null ? Type.XSCALAR : gvn.type(parms[i].in(idx)).widen();
       assert !(sig[1] instanceof TypeFunPtr);

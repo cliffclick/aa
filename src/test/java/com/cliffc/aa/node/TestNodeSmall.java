@@ -268,7 +268,7 @@ public class TestNodeSmall {
     TypeFunPtr tint1 = v(aint,gvn), tint1X = tint1.dual();
     TypeFunPtr tstr1 = v(astr,gvn), tstr1X = tstr1.dual();
 
-    TypeFunPtr tmul1E = TypeFunPtr.make(BitsFun.EMPTY,TypeStruct.make_args(TypeStruct.ts(Type.SCALAR,TypeStruct.NO_DISP,Type.NIL,Type.NIL))); // All bad choices
+    TypeFunPtr tmul1E = TypeFunPtr.make(BitsFun.EMPTY,tmul1._args.make_from_empty()); // All bad choices
 
     assert tadd1X.isa(tnum1X) && tnum1X.isa(tflt1X) && tflt1X.isa(tnum1) && tnum1.isa(tadd1);
 
@@ -339,7 +339,7 @@ public class TestNodeSmall {
     TypeFunPtr tint2  = v(aint,gvn), tint2X= tint2 .dual();
     TypeFunPtr tstr2  = v(astr,gvn), tstr2X= tstr2 .dual();
 
-    TypeFunPtr tmul2E = TypeFunPtr.make(BitsFun.EMPTY,TypeStruct.make_args(TypeStruct.ts(Type.SCALAR,TypeStruct.NO_DISP,Type.NIL,Type.NIL))); // All bad choices
+    TypeFunPtr tmul2E = tmul1E;
 
     assert tadd2X.isa(tnum2X) && tnum2X.isa(tflt2X) && tflt2X.isa(tnum2) && tnum2.isa(tadd2);
 

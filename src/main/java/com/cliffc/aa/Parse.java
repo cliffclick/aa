@@ -691,7 +691,7 @@ public class Parse {
    *  tuple= (stmts,[stmts,])     // Tuple; final comma is optional
    */
   private Node tuple(Node s) {
-    TypeStruct mt_tuple = TypeStruct.make(new String[]{"^"},TypeStruct.ts(Type.XNIL));
+    TypeStruct mt_tuple = TypeStruct.make(new String[]{"^"},TypeStruct.ts(Type.XNIL),new byte[]{TypeStruct.FFNL});
     NewObjNode nn = new NewObjNode(false,BitsAlias.RECORD,mt_tuple,ctrl(),con(Type.XNIL));
     int fidx=0, oldx=_x-1; // Field name counter, mismatched parens balance point
     while( s!=null ) {
@@ -774,7 +774,7 @@ public class Parse {
       // Build Parms for all incoming values
       Node rpc = gvn(new ParmNode(-1,"rpc",fun,con(TypeRPC.ALL_CALL),null)).keep();
       Node mem = gvn(new ParmNode(-2,"mem",fun,con(TypeMem.FULL    ),null));
-      Node clo = gvn(new ParmNode( 1,"^"  ,fun,ts.at(1),parent_display,null));
+      Node clo = gvn(new ParmNode( 1,"^"  ,fun,con(ts.at(1)),null));
       // Display is special: the default is simply the outer lexical scope.
       // But here, in a function, the display is actually passed in as a hidden
       // extra argument and replaces the default.
@@ -1230,6 +1230,13 @@ public class Parse {
     String s0 = typerr(t0,tmem);
     String s1 = typerr(t1,tmem);
     return errMsg(s0+" is not a "+s1);
+  }
+  public String typerr( Type t0, Type[] t1s, Node mem ) {
+    Type t = mem==null ? null : _gvn.type(mem);
+    TypeMem tmem = t instanceof TypeMem ? (TypeMem)t : null;
+    SB sb = new SB().p(typerr(t0,tmem)).p(" is none of (");
+    for( Type t1 : t1s ) sb.p(typerr(t1,tmem)).p(',');
+    return errMsg(sb.unchar().p(")").toString());
   }
   private static String typerr( Type t, TypeMem tmem ) {
     return t.is_forward_ref()

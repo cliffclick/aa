@@ -50,7 +50,7 @@ public abstract class NewNode<T extends TypeObj> extends Node {
     boolean old = _captured;
     if( captured(gvn) ) {
       boolean progress = !old;  // Progress if 1st time captured in any case
-      for( int i=2; i<_defs._len; i++ ) {
+      for( int i=1; i<_defs._len; i++ ) {
         if( gvn.type(in(i))!=Type.XSCALAR || !(in(i) instanceof ConNode) ) {
           set_def(i,gvn.con(Type.XSCALAR),gvn);
           progress=true;         // Progress!

@@ -42,25 +42,11 @@ public class ParmNode extends PhiNode {
             !gvn.type(in(i)).isa(fun.targ(_idx)) ) // Arg is NOT correct type
           return null;          // Not correct arg-type; refuse to collapse
     }
-    // Tighten the internal bounds, if possible.  Required for Display parm,
-    // which does not have the final Display until Parse is done.
-    Type unk = gvn.type(in(1));
-    if( _idx==0 && fun.has_unknown_callers() && gvn.type(fun.in(1))==Type.CTRL &&
-        unk != _t ) {
-      assert unk.isa(_t);
-      _t = unk;
-      return this;
-    }
     return super.ideal(gvn,level); // Let PhiNode collapse
   }
 
   @Override public Type value(GVNGCM gvn) {
     Type t = super.value(gvn);
-    // Bound all input types to the matching function argument type, so sane
-    // arguments flow into the function... even if bad arguments are being
-    // passed.  This limits forward error flow, and enables better error
-    // messages.
-    t = t.bound(_t);
     // Memory tracks the notion of 'clean' or 'unwritten' since the function
     // start.  Changed memory is returned at exit and unchanged memory is NOT
     // returned - and CallEpis are aware of this behavior and do the correct

@@ -321,8 +321,9 @@ public class GVNGCM {
     if( nnn==null ) return;     // No progress
     assert (level&1)==0;        // No changes during asserts
     if( nnn == old ) {          // Progress, but not replacement
-      // If a Parm child, put FunNode on worklist for _tf improvement.
+      // If a Parm or Ret child, put FunNode on worklist for _tf improvement.
       if( old instanceof ParmNode ) add_work(old.in(0));
+      if( old instanceof RetNode && old.in(4)!=null ) add_work(old.in(4));
       // All users on worklist
       for( Node use : old._uses ) {
         add_work(use);

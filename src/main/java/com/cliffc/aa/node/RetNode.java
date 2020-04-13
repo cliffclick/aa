@@ -36,7 +36,7 @@ public final class RetNode extends Node {
     if( !super.equals(o) ) return false;
     return _fidx==((RetNode)o)._fidx;
   }
-  
+
   // Short self name
   @Override String xstr() {
     if( is_dead() ) return "Ret";

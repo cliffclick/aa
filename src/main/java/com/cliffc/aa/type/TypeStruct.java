@@ -280,7 +280,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
 
   public  static TypeStruct make(Type[] ts) {
     String[] flds = new String[ts.length];
-    Arrays.fill(flds,".");
+    Arrays.fill(flds,fldBot());
     return malloc("",false,flds,ts,fbots(ts.length)).hashcons_free();
   }
   // Generic function arguments.  Slot 0 is the return, and slot 1 is the
@@ -288,7 +288,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public static TypeStruct make_args(Type[] ts) { return make_x_args(false,ts); }
   public static TypeStruct make_x_args(boolean any, Type[] ts) {
     String[] args = new String[ts.length];
-    Arrays.fill(args,".");
+    Arrays.fill(args,any ? fldTop() : fldBot());
     args[0] = "->";
     args[1] = "^";
     return make_args(any,args,ts);
@@ -313,14 +313,22 @@ public class TypeStruct extends TypeObj<TypeStruct> {
                                          {"^","0"},
                                          {"^","0","1"},
                                          {"^","0","1","2"}};
-  public  static String[] TFLDS( int len ) { return TFLDS[len]; }
   public  static TypeStruct make_tuple( Type... ts ) { return make(TFLDS[ts.length],ts,ffnls(ts.length)); }
   public static TypeStruct make_tuple(Type t1) { return make_tuple(ts(NO_DISP,t1)); }
 
   public  static TypeStruct make(String[] flds, byte[] flags) { return make(flds,ts(flds.length),flags); }
   // Make from prior, just updating field types
-  public TypeStruct make_from( Type[] ts ) { return malloc(_name,_any,_flds,ts,_flags).hashcons_free(); }
+  public TypeStruct make_from( Type[] ts ) { return make_from(_any,ts,_flags); }
   public TypeStruct make_from( boolean any, Type[] ts, byte[] bs ) { return malloc(_name,any,_flds,ts,bs).hashcons_free(); }
+  // Make a call TFP with the empty set of fidxs
+  public TypeStruct make_from_empty( ) {
+    Type[] ets = ts(_ts.length);
+    Arrays.fill(ets,Type.NIL); // Has to be all NIL args to preserve monotonicity
+    ets[0] = Type.XNIL;        // Function return type
+    ets[1] = TypeStruct.NO_DISP; // Display type
+    return make_from(true,ets,ffnls(_ts.length));
+  }
+  
 
   // Recursive meet in progress.
   // Called during class-init.
@@ -402,7 +410,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     String[] flds = Arrays .copyOf(_flds ,_flds .length+1);
     byte[]  flags = Arrays .copyOf(_flags,_flags.length+1);
     ts   [_ts.length] = tfld;
-    flds [_ts.length] = name==null ? "." : name;
+    flds [_ts.length] = name==null ? fldBot() : name;
     flags[_ts.length] = make_flag(mutable,true);
     return make(flds,ts,flags);
   }
@@ -1141,6 +1149,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // ------ String field name lattice ------
   static private boolean fldTop( String s ) { return s.charAt(0)=='*'; }
   static public  boolean fldBot( String s ) { return s.charAt(0)=='.'; }
+  static public  String fldTop( ) { return "*"; }
+  static public  String fldBot( ) { return "."; }
   // String meet
   private static String smeet( String s0, String s1 ) {
     if( s0==null || fldTop(s0) ) return s1;
@@ -1148,11 +1158,11 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     if( fldBot(s0) ) return s0;
     if( fldBot(s1) ) return s1;
     if( Util.eq(s0,s1) ) return s0;
-    return "."; // fldBot
+    return fldBot(); // fldBot
   }
   private static String sdual( String s ) {
-    if( fldTop(s) ) return ".";
-    if( fldBot(s) ) return "*";
+    if( fldTop(s) ) return fldBot();
+    if( fldBot(s) ) return fldTop();
     return s;
   }
 

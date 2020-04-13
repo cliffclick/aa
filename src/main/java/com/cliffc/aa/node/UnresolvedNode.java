@@ -70,7 +70,7 @@ public class UnresolvedNode extends Node {
     // Post-GCP.  Should be dead, except for primitive hooks.  If we inline,
     // we split a fidx and the Unresolved does not get both options... so it
     // runs "downhill" during iter.  Not useful, since dead.  Leave it set.
-    return GF.dual();
+    return (TypeFunPtr)gvn.self_type(this);
   }
 
   // Filter out all the wrong-arg-count functions

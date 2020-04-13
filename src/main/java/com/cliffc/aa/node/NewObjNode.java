@@ -119,7 +119,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
     // Gather args and produce a TypeStruct
     Type[] ts = TypeAry.get(_ts._ts.length);
     for( int i=0; i<ts.length; i++ )
-      ts[i] = gvn.type(fld(i)).bound(_ts._ts[i]);
+      ts[i] = gvn.type(fld(i)); //Turned off bound for HIGH _ts like XNIL
     TypeStruct newt = _ts.make_from(ts);
 
     // Check for TypeStructs with this same NewNode types occurring more than

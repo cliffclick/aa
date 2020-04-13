@@ -26,7 +26,7 @@ public abstract class IntrinsicNewNode extends Node {
     _nstr = new NewStrNode(TypeStr.STR,null,null);
     ts[0] = TypeMemPtr.make(_nstr._alias,TypeStr.STR);
     ts[1] = TypeStruct.NO_DISP; // No display
-    _targs = TypeStruct.make_args(ts);
+    _targs = TypeStruct.make_args(ts.length==3 ? TypeStruct.ARGS_X : TypeStruct.ARGS_XY,ts);
   }
   public static IntrinsicNewNode[] INTRINSICS = new IntrinsicNewNode[] {
     new ConvertI64Str(),

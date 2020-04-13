@@ -193,6 +193,7 @@ public class CallNode extends Node {
     // iter post-GCP on error calls where nothing resolves.
     if( unk instanceof UnresolvedNode && !fidxs.above_center() ) {
       BitsFun rfidxs = resolve(fidxs,tcall._ts);
+      if( rfidxs==null ) return null;            // Dead function, stall for time
       FunPtrNode fptr = least_cost(gvn, rfidxs); // Check for least-cost target
       if( fptr != null ) return set_fun(fptr, gvn); // Resolve to 1 choice
     }
@@ -252,27 +253,21 @@ public class CallNode extends Node {
     BitsFun fidxs = tfp.fidxs();
     // Resolve; only keep choices with sane arguments during GCP
     BitsFun rfidxs = resolve(fidxs,ts);
+    if( rfidxs==null ) return (TypeTuple)gvn.self_type(this); // Dead function input, stall until this dies
     if( rfidxs.test(1) || rfidxs==fidxs ) { // Neither ANY nor ALL, or no-change
       // No change
     } else {
       TypeStruct args = tfp._args;
       if( rfidxs == BitsFun.EMPTY ) { // No choices (error)
-        // Has to be all NIL args to preserve monotonicity
-        Type[] ats = TypeStruct.ts(args._ts.length);
-        Arrays.fill(ats,Type.NIL);
-        ats[0]= Type.SCALAR;
-        ats[1]= TypeStruct.NO_DISP;
-        args = TypeStruct.make_args(ats);
-      } else if( rfidxs.bitCount() != fidxs.bitCount() ) { // Unequal function sets; recompute tighter args bounds
+        if( fidxs.is_empty() ) throw com.cliffc.aa.AA.unimpl(); // Probably fine to ignore
+        args = args.make_from_empty();
+      } else { // Unequal function sets; recompute tighter args bounds
         // Meet of remaining function arg types
         args = TypeFunPtr.ARGS.dual();
         for( int fidx : rfidxs )
           args = (TypeStruct)args.meet(FunNode.find_fidx(fidx)._tf._args);
         if( rfidxs.above_center() )
           args = args.dual();     // Args sign needs to match rfidxs sign
-      } else {                    // Same function sets; fast-path cutout, keep already computed args
-        if( rfidxs.above_center() != fidxs.above_center() )
-          args = args.dual();     // FPtrs sign flipped, and args sign needs to match
       }
       ts[2] = TypeFunPtr.make(rfidxs,args);
     }
@@ -314,15 +309,17 @@ public class CallNode extends Node {
   // - Mix High/Low & no Good , keep all
   // - Some Good, no Low, no High, drop Bad & fidx?join:meet
   // - All Bad, like Low: keep all & meet
-  private static final int BAD=1, GOOD=2, LOW=4, HIGH=8;
+  private static final int BAD=1, GOOD=2, LOW=4, HIGH=8, DEAD=16;
 
   BitsFun resolve( BitsFun fidxs, Type[] targs ) {
-    if( fidxs==BitsFun.ANY ) return fidxs; // No point in attempting to resolve all things
-    if( fidxs==BitsFun.FULL) return fidxs; // No point in attempting to resolve all things
+    if( fidxs==BitsFun.EMPTY) return fidxs; // Nothing to resolve
+    if( fidxs==BitsFun.ANY  ) return fidxs; // No point in attempting to resolve all things
+    if( fidxs==BitsFun.FULL ) return fidxs; // No point in attempting to resolve all things
 
     int flags = 0;
     for( int fidx : fidxs )
       flags |= resolve(fidx,targs);
+    if( x(flags,DEAD) ) return null; // Caller should stall for time, till dead folds up
     // - Some args High & no Low, keep all & join (ignore Good,Bad)
     if(  x(flags,HIGH) && !x(flags,LOW) ) return sgn(fidxs,true);
     // - Some args Low & no High, keep all & meet (ignore Good,Bad)
@@ -355,7 +352,7 @@ public class CallNode extends Node {
       throw com.cliffc.aa.AA.unimpl();
 
     FunNode fun = FunNode.find_fidx(fidx);
-    if( fun==null || fun.is_dead() ) return BAD; // Stale fidx leading to dead fun
+    if( fun==null || fun.is_dead() ) return DEAD; // Stale fidx leading to dead fun
     // Forward refs are only during parsing; assume they fit the bill
     if( fun.is_forward_ref() ) return HIGH;    // Assume they work
     if( fun.nargs() != nargs() ) return BAD;   // Wrong arg count, toss out
@@ -479,6 +476,8 @@ public class CallNode extends Node {
     // Indirectly, forward-ref for function type
     if( tfp.is_forward_ref() ) // Forward ref on incoming function
       return _badargs.forward_ref_err(FunNode.find_fidx(tfp.fidx()));
+    if( tfp.fidxs().is_empty() )
+      return null; // This is an unresolved call, and that error is reported elsewhere
 
     // bad-arg-count
     if( tfp.nargs() != nargs() )
@@ -489,8 +488,18 @@ public class CallNode extends Node {
     for( int j=2; j<nargs(); j++ ) {
       Type actual = targ(gvn,j);
       Type formal = formals.at(j);
-      if( !actual.isa(formal) ) // Actual is not a formal
-        return _badargs.typerr(actual,formal,mem());
+      if( !actual.isa(formal) ) { // Actual is not a formal
+        if( tfp.fidxs().abit() != -1 )
+          return _badargs.typerr(actual,formal,mem());
+        // Multiple fails.  Try for a better error message.
+        Type[] ts = new Type[tfp.fidxs().bitCount()];
+        int i=0;
+        for( int fidx : tfp.fidxs() ) {
+          FunNode fun = FunNode.find_fidx(fidx);
+          ts[i++] = fun.targ(j);
+        }
+        return _badargs.typerr(actual,ts,mem());
+      }
     }
 
     return null;
