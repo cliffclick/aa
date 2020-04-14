@@ -27,7 +27,7 @@ public class TypeNode extends Node {
     if( _t instanceof TypeFunPtr/*signature not fidxs*/ ) {
       TypeFunPtr tfp = (TypeFunPtr)_t;
       Type[] targs = tfp._args._ts;
-      Node[] args = new Node[targs.length+2];
+      Node[] args = new Node[targs.length-2/*not return nor display*/+/*+ctrl+mem+tfp+all args*/3];
       FunNode fun = gvn.init((FunNode)(new FunNode(tfp._args._flds,targs).add_def(Env.ALL_CTRL)));
       args[0] = fun;            // Call control
       args[1] = gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM     ),null));
@@ -35,7 +35,7 @@ public class TypeNode extends Node {
       for( int i=2; i<targs.length; i++ ) { // First is return, 2nd is display
         // All the parms, with types
         Node parm = gvn.xform(new ParmNode(i,"arg"+i,fun,gvn.con(Type.SCALAR),null));
-        args[i+2] = gvn.xform(new TypeNode(targs[i],parm,_error_parse));
+        args[i+1] = gvn.xform(new TypeNode(targs[i],parm,_error_parse));
       }
       Node rpc= gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
       CallNode call = (CallNode)gvn.xform(new CallNode(true,_error_parse,args));

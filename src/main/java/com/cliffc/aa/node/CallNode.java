@@ -326,10 +326,17 @@ public class CallNode extends Node {
     if( !x(flags,HIGH) &&  x(flags,LOW) ) return sgn(fidxs,false);
     // - Mix High/Low, keep all & fidx (ignore Good,Bad)
     if(  x(flags,HIGH) &&  x(flags,LOW) ) return fidxs;
-    // - All Bad, like Low: keep all & meet
+    // - All Bad, like Low: keep all & meet.  Bad args can go dead, effectively lifting.
     if( !x(flags,HIGH) && !x(flags,LOW) && !x(flags,GOOD) )
       return sgn(fidxs,false);
-    // All thats left is the no-args case (all formals ignoring), no high/low
+    // If BAD args can die (false in primitives, and false in UnresolvedNodes
+    // where the BAD arg is required to make the signature unambiguous) then
+    // return all the fidxs, and wait for some arg to die (or else the program
+    // is in-error).
+    if( fidxs.abit() != -1 )    // Single target, BAD arg can die
+      return fidxs;
+
+    // All that is left is the no-args case (all formals ignoring), no high/low
     // and some good and maybe bad.  Toss out the bad & return the remaining
     // fidxs with the same sign.
     BitsFun choices = BitsFun.EMPTY;

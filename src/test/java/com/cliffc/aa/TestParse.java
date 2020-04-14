@@ -142,9 +142,6 @@ public class TestParse {
 
   @Test public void testParse02() {
     Object dummy = Env.GVN; // Force class loading cycle
-    testerr("sq={x -> x&x}; sq(\"abc\")", "*[$]\"abc\" is not a int64",12);
-    testerr("sq={x -> x*x}; sq(\"abc\")", "*[$]\"abc\" is none of (flt64,int64)",12);
-
     // Anonymous function definition
     test_isa("{x y -> x+y}", TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make_args(TypeStruct.ts(TypeMemPtr.DISPLAY_PTR,Type.SCALAR,Type.SCALAR,Type.SCALAR)))); // {Scalar Scalar -> Scalar}
     test("{5}()", TypeInt.con(5)); // No args nor -> required; this is simply a function returning 5, being executed
@@ -189,8 +186,6 @@ public class TestParse {
   }
 
   @Test public void testParse03() {
-    test   ("fun:{int str -> int}={x y -> x+2}; fun(2,3)", TypeInt.con(4));
-    testerr("fun:{int str -> int}={x y -> x+y}; fun(2,3)", "3 is not a *[$]str",3);
     // Type annotations
     test("-1:int", TypeInt.con( -1));
     test("(1+2.3):flt", TypeFlt.make(0,64,3.3));
@@ -211,12 +206,12 @@ public class TestParse {
 
     // Type annotations on dead args are ignored
     test   ("fun:{int str -> int}={x y -> x+2}; fun(2,3)", TypeInt.con(4));
-    testerr("fun:{int str -> int}={x y -> x+y}; fun(2,3)", "3 is not a *[$]str",3);
+    testerr("fun:{int str -> int}={x y -> x+y}; fun(2,3)", "3 is not a *[$]str",43);
     // Test that the type-check is on the variable and not the function.
     test_obj("fun={x y -> x*2}; bar:{int str -> int} = fun; baz:{int @{x;y} -> int} = fun; (fun(2,3),bar(2,\"abc\"))",
-             TypeStruct.make_tuple(Type.NIL,TypeInt.con(4),TypeInt.con(4)));
+             TypeStruct.make_tuple(Type.XNIL,TypeInt.con(4),TypeInt.con(4)));
     testerr("fun={x y -> x+y}; baz:{int @{x;y} -> int} = fun; (fun(2,3), baz(2,3))",
-            "3 is not a *[$]@{x=;y=}", 21);
+            "3 is not a *[$]@{x=;y=}", 68);
     testerr("fun={x y -> x+y}; baz={x:int y:@{x;y} -> foo(x,y)}; (fun(2,3), baz(2,3))",
             "Unknown ref 'foo'", 44);
     // This test fails because the inner fun does not inline until GCP,

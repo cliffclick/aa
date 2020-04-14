@@ -305,7 +305,7 @@ public class GVNGCM {
   // - Not already a ConNode AND
   // - Not an ErrNode AND
   // - Type.is_con()
-  private static boolean replace_con(Type t, Node n) {
+  private boolean replace_con(Type t, Node n) {
     if( n._keep >0 || n instanceof ConNode || n instanceof ErrNode )
       return false; // Already a constant, or never touch an ErrNode
     if( !t.is_con() ) return false;
@@ -313,6 +313,8 @@ public class GVNGCM {
       Node x = FunNode.find_fidx(((TypeFunPtr)t).fidx());
       if( x==null || x.is_dead() ) return false;
     }
+    if( n instanceof ParmNode && n.err(this) != null )
+      return false;
     return true; // Replace with a ConNode
   }
 

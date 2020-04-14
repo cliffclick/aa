@@ -782,7 +782,7 @@ public class Parse {
       // Parms for all arguments
       Parse errmsg = errMsg();  // Lazy error message
       for( int i=2; i<ids._len; i++ ) { // User parms start at#2
-        Node parm = gvn(new ParmNode(i,ids.at(i),fun,con(ts.at(i)),errmsg));
+        Node parm = gvn(new ParmNode(i,ids.at(i),fun,con(Type.SCALAR),errmsg));
         // Type-check arguments
         Node mt = typechk(parm,ts.at(i),mem,bads.at(i));
         create(ids.at(i),mt, args_are_mutable);
@@ -985,7 +985,7 @@ public class Parse {
   // Type or null or Type.ANY for '->' token
   private Type type0(boolean type_var) {
     if( peek('{') ) {           // Function type
-      Ary<Type> ts = new Ary<>(new Type[]{TypeMemPtr.DISPLAY_PTR});  Type t;
+      Ary<Type> ts = new Ary<>(new Type[]{Type.SCALAR,TypeMemPtr.DISPLAY_PTR});  Type t;
       while( (t=typep(type_var)) != null && t != Type.ANY  )
         ts.add(t);              // Collect arg types
       Type ret;
@@ -993,10 +993,10 @@ public class Parse {
         ret = typep(type_var);
         if( ret == null ) return null; // should return TypeErr missing type after ->
       } else {                  // Allow no-args and simple return type
-        if( ts._len != 2 ) return null; // should return TypeErr missing -> in tfun
+        if( ts._len != 3 ) return null; // should return TypeErr missing -> in tfun
         ret = ts.pop();         // Get single return type
       }
-      ts.push(ret);             // Last arg is return
+      ts.setX(0,ret);           // 1st arg is return
       TypeStruct targs = TypeStruct.make_args(ts.asAry());
       if( !peek('}') ) return null;
       return typeq(TypeFunPtr.make(BitsFun.NZERO,targs));
