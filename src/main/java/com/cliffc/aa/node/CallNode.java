@@ -205,13 +205,22 @@ public class CallNode extends Node {
     if( check_wire(gvn,fidxs) )
       return this;              // Some wiring happened
 
-    // Check for dead args and trim; must be after all wiring is done because unknown
-    // call targets can appear during GCP and use the args.
+    // Check for dead args and trim; must be after all wiring is done because
+    // unknown call targets can appear during GCP and use the args.  After GCP,
+    // still must verify all called functions have the arg as dead, because
+    // alive args still need to resolve.  Constants are an issue, because they
+    // fold into the Parm and the Call can lose the matching DProj while the
+    // arg is still alive.
     if( gvn._opt_mode > 2 && err(gvn)==null ) {
       Node progress = null;
+      outer_loop:
       for( int i=2; i<nargs(); i++ ) // Skip the FP/DISPLAY arg, as its useful for error messages
-        if( ProjNode.proj(this,i+1)==null && !(arg(i) instanceof ConNode && targ(gvn,i)==Type.XSCALAR) )
+        if( !(arg(i) instanceof ConNode && targ(gvn,i)==Type.XSCALAR) ) { // Not already folded
+          for( int fidx2 : fidxs )
+            if( FunNode.find_fidx(fidx2).targ(i)!=Type.XSCALAR )
+              continue outer_loop; // Fail this arg, as is alive on at least one called function
           progress = set_arg(i,gvn.con(Type.XSCALAR),gvn); // Kill dead arg
+        }
       if( progress != null ) return this;
     }
 
