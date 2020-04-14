@@ -120,11 +120,12 @@ public class GVNGCM {
   }
 
   public Type type( Node n ) {
-    Type t = n._uid < _ts._len ? _ts._es[n._uid] : null;
+    Type t = _ts.atX(n._uid);
     if( t != null ) return t;
     t = n.all_type();       // If no type yet, defaults to the pessimistic type
     return _ts.setX(n._uid,t);
   }
+  public Type raw_type( int uid ) { return _ts.atX(uid); }
   public void setype( Node n, Type t ) {
     assert t != null;
     _ts.setX(n._uid,t);
@@ -553,6 +554,7 @@ public class GVNGCM {
             if( use instanceof RegionNode )
               add_work_uses(use);
           }
+          if( n.value_changes_live() )  add_work_defs(n);
           // Optimistic Call-Graph discovery.  If the funptr input lowers
           // to where a new FIDX might be possible, wire the CG edge.
           if( n instanceof CallNode )
@@ -569,6 +571,8 @@ public class GVNGCM {
           if( n.live_changes_value() )
             add_work(n);
         }
+        // Very expensive assert
+        //assert Env.START.more_flow(this,new VBitSet(),false,0)==0; // Initial conditions are correct
       }
 
       // Remove CallNode ambiguity after worklist runs dry
@@ -645,32 +649,6 @@ public class GVNGCM {
     // Replace with a constant, if possible
     if( replace_con(t,n) ) {
       n=subsume(n,con(t));      // Constant replacement
-
-    // Functions can sharpen return value
-    } else if( n instanceof FunPtrNode && !n.is_prim() && !n.is_forward_ref() ) {
-      FunPtrNode fptr = (FunPtrNode)n;
-      RetNode ret = fptr.ret();
-      FunNode fun = ret.fun();
-      if( fun != null && type(fun)==Type.CTRL && type(ret.ctl()) == Type.CTRL ) { // never-return function (maybe never called?)
-        TypeFunPtr tfp = (TypeFunPtr)type(fptr);
-        if( tfp != fun._tf && tfp.isa(fun._tf) )
-          fun.sharpen(this,tfp);
-      }
-
-      // All (live) Call ambiguity has been resolved
-    } else if( n instanceof CallNode && type(n.in(0))==Type.CTRL ) {
-      CallNode call = (CallNode)n;
-      BitsFun fidxs = call.fidxs(this);
-      if( fidxs != null ) {     // If not a TypeFunPtr, then definitely in-error
-        //int fidx = fidxs.abit();
-        //if( fidx != -1 && fidx < 0 ) {
-        //  FunPtrNode fptr = FunNode.find_fidx(fidx).ret().funptr();
-        //  if( fptr != call.fun() ) // Upgraded unresolved during GCP
-        //    call.set_fun_reg(fptr,this);
-        //}
-        assert call.err(this) != null || // Call is in-error OR
-          !fidxs.above_center() || fidxs==BitsFun.EMPTY; // Or multi-targets
-      }
     }
     // Hit the fixed point, despite any immediate updates.  All prims are live,
     // even if unused so they might not have been computed

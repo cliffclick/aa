@@ -1,5 +1,8 @@
 package com.cliffc.aa;
 
+import com.cliffc.aa.node.Node;
+import com.cliffc.aa.type.Type;
+
 /** an implementation of language AA
  */
 
@@ -30,4 +33,6 @@ public abstract class AA {
     return x;
   }
   public static String p() { return Env.START.dumprpo(false); } // Debugging hook
+  public static Node f(int uid) { return Env.START.find(uid); }        // Debugging hook
+  public static Type t(int uid) { return Env.GVN.raw_type(uid); }      // Debugging hook
 }

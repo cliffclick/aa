@@ -6,7 +6,6 @@ import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeFunPtr;
 import com.cliffc.aa.type.TypeMem;
-import com.cliffc.aa.type.TypeTuple;
 
 import java.util.Arrays;
 
@@ -95,15 +94,13 @@ public class UnresolvedNode extends Node {
     if( gvn._opt_mode < 2 ) return super.live_use(gvn,def);
     if( !(def instanceof FunPtrNode) ) return _live;
     // If any Call has resolved to this def, its alive.
+    // If not a Call, must assume it props to some unknown Call and is alive.
     int dfidx = ((FunPtrNode)def).ret()._fidx;
     for( Node call : _uses )
-      if( call instanceof CallNode ) {
-        Type tfx = ((TypeTuple)gvn.type(call)).at(2);
-        if( tfx instanceof TypeFunPtr &&
-            ((TypeFunPtr)tfx).fidxs().abit() == dfidx )
-          return _live;
-      }
-    // No call wants this def
+      if( !(call instanceof CallNode) ||
+          ((CallNode)call).live_use_call(gvn,dfidx) != TypeMem.DEAD )
+        return _live;
+    // Only call users, and no call wants this def.
     return TypeMem.DEAD;
   }
 
@@ -140,7 +137,8 @@ public class UnresolvedNode extends Node {
     return _uses._len==0 || (_uses._len==1 && _uses.at(0)== Env.STK_0);
   }
   @Override public String err(GVNGCM gvn) {
-    String name = ((FunPtrNode)in(0)).fun().xstr();
+    FunNode fun = ((FunPtrNode)in(0)).fun();
+    String name = fun==null ? null : fun.xstr();
     return _bad==null ? null : _bad.errMsg("Unable to resolve "+name);
   }
 }

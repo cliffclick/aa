@@ -197,13 +197,13 @@ public class FunNode extends RegionNode {
     TypeTuple tret = (TypeTuple)gvn.type(ret);
     for( int i=0; i<parms.length; i++ ) {
       Type t = i==0 ? tret.at(2) : (parms[i]==null ? Type.XSCALAR : gvn.type(parms[i]));
-      if( t != targ(i) && t.isa(targ(i)) ) { progress=true; break; }
+      if( t != targ(i) && t.isa(targ(i)) && !t.above_center() ) { progress=true; break; }
     }
     if( progress && !is_prim() ) {
       Type[] ts = TypeAry.get(parms.length);
       for( int i=0; i<parms.length; i++ ) {
         ts[i] = i==0 ? tret.at(2) : (parms[i]==null ? Type.XSCALAR : gvn.type(parms[i]));
-        if( !ts[i].isa(targ(i)) ) ts[i] = targ(i);
+        if( ts[i].above_center() || !ts[i].isa(targ(i)) ) ts[i] = targ(i);
       }
       TypeFunPtr tf = TypeFunPtr.make(_tf.fidxs(),_tf._args.make_from(ts));
       assert tf.isa(_tf) && _tf != tf;

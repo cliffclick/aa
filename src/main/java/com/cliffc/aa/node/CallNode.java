@@ -150,6 +150,7 @@ public class CallNode extends Node {
       if( is_dead() ) return this;
       for( int i=3; i<_defs._len; i++ )
         set_def(i,gvn.con(Type.XSCALAR),gvn);
+      gvn.add_work_defs(this);
       return set_def(0,gvn.con(Type.XCTRL),gvn);
     }
 
@@ -186,7 +187,7 @@ public class CallNode extends Node {
     Node unk = fun();           // Function epilog/function pointer
     int fidx = fidxs.abit();    // Check for single target
     if( fidx != -1 && !(unk instanceof FunPtrNode) )
-      return set_fun(FunNode.find_fidx(fidx).ret().funptr(),gvn);
+      return set_fun(FunNode.find_fidx(Math.abs(fidx)).ret().funptr(),gvn);
 
     // If the function is unresolved, see if we can resolve it now.
     // Fidxs are typically low during iter, but can be high during
@@ -209,7 +210,7 @@ public class CallNode extends Node {
     if( gvn._opt_mode > 2 && err(gvn)==null ) {
       Node progress = null;
       for( int i=2; i<nargs(); i++ ) // Skip the FP/DISPLAY arg, as its useful for error messages
-        if( ProjNode.proj(this,i)==null && !(arg(i) instanceof ConNode && targ(gvn,i)==Type.XSCALAR) )
+        if( ProjNode.proj(this,i+1)==null && !(arg(i) instanceof ConNode && targ(gvn,i)==Type.XSCALAR) )
           progress = set_arg(i,gvn.con(Type.XSCALAR),gvn); // Kill dead arg
       if( progress != null ) return this;
     }
@@ -223,6 +224,11 @@ public class CallNode extends Node {
   // the full arg set but if the call is not reachable the FunNode will not
   // merge from that path.  Result tuple type:
   @Override public TypeTuple value(GVNGCM gvn) {
+    // ts[0] = Ctrl = in(0)
+    // ts[1] = Mem into the call = in(1)
+    // ts[2] = Function pointer (code ptr + display) == in(2) == arg(1)
+    // ts[3] = in(3) == arg(2)
+    // ts[4]...
     final Type[] ts = TypeAry.get(_defs._len);
 
     // Pinch to XCTRL/CTRL
@@ -254,12 +260,9 @@ public class CallNode extends Node {
     // Resolve; only keep choices with sane arguments during GCP
     BitsFun rfidxs = resolve(fidxs,ts);
     if( rfidxs==null ) return (TypeTuple)gvn.self_type(this); // Dead function input, stall until this dies
-    if( rfidxs.test(1) || rfidxs==fidxs ) { // Neither ANY nor ALL, or no-change
-      // No change
-    } else {
+    if( !rfidxs.test(1) ) { // Neither ANY nor ALL,
       TypeStruct args = tfp._args;
       if( rfidxs == BitsFun.EMPTY ) { // No choices (error)
-        if( fidxs.is_empty() ) throw com.cliffc.aa.AA.unimpl(); // Probably fine to ignore
         args = args.make_from_empty();
       } else { // Unequal function sets; recompute tighter args bounds
         // Meet of remaining function arg types
@@ -295,6 +298,18 @@ public class CallNode extends Node {
     return super.live(gvn);
   }
   @Override public boolean basic_liveness() { return false; }
+  @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
+    if( gvn._opt_mode < 2 ) return super.live_use(gvn,def);
+    if( !(def instanceof FunPtrNode) ) return _live;
+    int dfidx = ((FunPtrNode)def).ret()._fidx;
+    return live_use_call(gvn,dfidx);
+  }
+  TypeMem live_use_call( GVNGCM gvn, int dfidx ) {
+    Type tfx = ((TypeTuple)gvn.type(this)).at(2);
+    // If resolve has chosen this dfidx, then the FunPtr is alive.
+    return tfx instanceof TypeFunPtr && ((TypeFunPtr)tfx).fidxs().abit() == dfidx
+      ? _live : TypeMem.DEAD;
+  }
 
 
   // Resolve an Unresolved.  Called in value() and so must be monotonic.
@@ -329,11 +344,12 @@ public class CallNode extends Node {
     // - All Bad, like Low: keep all & meet.  Bad args can go dead, effectively lifting.
     if( !x(flags,HIGH) && !x(flags,LOW) && !x(flags,GOOD) )
       return sgn(fidxs,false);
-    // If BAD args can die (false in primitives, and false in UnresolvedNodes
-    // where the BAD arg is required to make the signature unambiguous) then
-    // return all the fidxs, and wait for some arg to die (or else the program
-    // is in-error).
-    if( fidxs.abit() != -1 )    // Single target, BAD arg can die
+    // Only had a single target coming in.
+    if( fidxs.abit() != -1 ) // Single target
+      // If BAD args can die (false in primitives, and false in UnresolvedNodes
+      // where the BAD arg is required to make the signature unambiguous) then
+      // return all the fidxs, and wait for some arg to die (or else the
+      // program is in-error).
       return fidxs;
 
     // All that is left is the no-args case (all formals ignoring), no high/low
@@ -343,6 +359,8 @@ public class CallNode extends Node {
     for( int fidx : fidxs )
       if( !x(resolve(fidx,targs),BAD) )
         choices = choices.set(fidx);
+    if( choices.abit() != -1 )  // Single choice with all good, no high, no low, no bad
+      return choices;           // Report it low
     return sgn(choices,fidxs.above_center());
   }
 
