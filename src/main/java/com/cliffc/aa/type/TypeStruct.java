@@ -1148,9 +1148,9 @@ public class TypeStruct extends TypeObj<TypeStruct> {
 
 
   // ------ String field name lattice ------
-  static private boolean fldTop( String s ) { return s.charAt(0)=='*'; }
+  static private boolean fldTop( String s ) { return s.charAt(0)=='\\'; }
   static public  boolean fldBot( String s ) { return s.charAt(0)=='.'; }
-  static public  String fldTop( ) { return "*"; }
+  static public  String fldTop( ) { return "\\"; }
   static public  String fldBot( ) { return "."; }
   // String meet
   private static String smeet( String s0, String s1 ) {

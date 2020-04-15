@@ -25,6 +25,8 @@ public class NewObjNode extends NewNode<TypeStruct> {
     super(OP_NEWOBJ,par_alias,ts,ctrl,clo);
     _is_closure = is_closure;
     assert ts._ts[0].is_display_ptr();
+    for( int i=1; i<ts._ts.length; i++ )
+      assert ts._ts[i]==Type.SCALAR; // Field contents not specified, ever
   }
   public Node get(String name) { int idx = _ts.find(name);  assert idx >= 0; return fld(idx); }
   public boolean exists(String name) { return _ts.find(name)!=-1; }
@@ -126,6 +128,6 @@ public class NewObjNode extends NewNode<TypeStruct> {
     // approximations happening at the deepest points.
     TypeStruct xs = newt.approx(CUTOFF,_alias);
     assert Util.eq(xs._name,_ts._name);
-    return TypeTuple.make(xs,TypeMemPtr.make(_alias,xs));
+    return TypeTuple.make(xs,TypeMemPtr.make(_alias,_ts));
   }
 }

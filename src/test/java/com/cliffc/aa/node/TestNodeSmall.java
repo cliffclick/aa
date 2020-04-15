@@ -476,8 +476,11 @@ public class TestNodeSmall {
     assertEquals(tfptr0.ret(),tdptr0); // Returning the display
     // Display contains 'fact' pointing to self
     TypeStruct tdisp0 = (TypeStruct)((TypeMemPtr)tdptr0)._obj;
-    assertEquals(tfptr0,tdisp0.at(tdisp0.find("fact")));
-
-
+    // If NewObj *pointers* carry no deep info, then this assert is useless:
+    //assertEquals(tfptr0,tdisp0.at(tdisp0.find("fact")));
+    // Happens because if NewObj pointers carry deep info, then I cannot fold
+    // Stores into them, because the store moves the memory state sideways and
+    // the pointer then does not move monontonically.
+    assertEquals(Type.SCALAR,tdisp0.at(tdisp0.find("fact"))); // Boring!
   }
 }

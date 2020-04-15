@@ -120,7 +120,9 @@ public class IntrinsicNode extends Node {
   public static FunPtrNode convertTypeNameStruct( TypeStruct to, int alias, GVNGCM gvn ) {
     assert to.has_name();
     assert Util.eq(to._flds[0],"^"); // Display already
-    NewObjNode nnn = new NewObjNode(false,alias,to,null,gvn.con(Type.NIL)).keep();
+    Type[] tsclr = TypeStruct.ts(to._ts.length);
+    tsclr[0] = Type.XSCALAR;       // No display, but all other fields SCALAR
+    NewObjNode nnn = new NewObjNode(false,alias,to.make_from(tsclr),null,gvn.con(Type.NIL)).keep();
     Type[] ts = TypeAry.get(to._ts.length+1);
     ts[0] = TypeMemPtr.make(alias,to); // Return
     ts[1] = Type.XSCALAR;              // Display

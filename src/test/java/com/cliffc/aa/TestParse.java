@@ -249,7 +249,7 @@ public class TestParse {
     testerr("a=@{x=1.2;y}; x", "Unknown ref 'x'",15);
     testerr("a=@{x=1;x=2}.x", "Cannot re-assign final field '.x'",11);
     test   ("a=@{x=1.2;y;}; a.x", TypeFlt.con(1.2)); // standard "." field naming; trailing semicolon optional
-    test_ptr("x=@{n:=1;v:=2}; x.n := 3; x", "@{n:=3;v:=2}!");
+    test_ptr("x=@{n:=1;v:=2}; x.n := 3; x", "@{n:=3;v:=2}");
     testerr("(a=@{x=0;y=0}; a.)", "Missing field name after '.'",17);
     testerr("a=@{x=0;y=0}; a.x=1; a","Cannot re-assign final field '.x'",19);
     test   ("a=@{x=0;y=1}; b=@{x=2}  ; c=math_rand(1)?a:b; c.x", TypeInt.INT8); // either 0 or 2; structs can be partially merged
