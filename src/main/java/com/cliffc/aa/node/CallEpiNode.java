@@ -157,6 +157,7 @@ public final class CallEpiNode extends Node {
     wire0(gvn,call,fun);
     gvn.add_def(this,ret);
     gvn.add_work(ret);
+    gvn.add_work(ret.funptr());
     return true;
   }
 

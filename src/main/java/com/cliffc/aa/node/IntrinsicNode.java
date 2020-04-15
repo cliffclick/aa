@@ -37,14 +37,14 @@ public class IntrinsicNode extends Node {
 
     // This function call takes in and returns a plain ptr-to-object.
     // Only after folding together does the name become apparent.
-    TypeFunPtr tf = TypeFunPtr.make_new(TypeStruct.make_args(TypeStruct.ts(TypeMemPtr.DISPLAY_PTR,TypeMemPtr.STRUCT,TypeMemPtr.STRUCT)));
+    TypeFunPtr tf = TypeFunPtr.make_new(TypeStruct.make_args(TypeStruct.ts(TypeMemPtr.STRUCT,Type.XSCALAR,TypeMemPtr.STRUCT)));
     FunNode fun = (FunNode) gvn.xform(new FunNode(tn._name,tf,BitsAlias.EMPTY).add_def(Env.ALL_CTRL));
     Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL ),null));
     Node mem = gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.FULL     ),null));
-    Node ptr = gvn.xform(new ParmNode( 1,"ptr",fun,gvn.con(TypeMemPtr.STRUCT),null));
+    Node ptr = gvn.xform(new ParmNode( 2,"ptr",fun,gvn.con(TypeMemPtr.STRUCT),null));
     Node cvt = gvn.xform(new IntrinsicNode(tn,badargs,fun,mem,ptr));
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,cvt,ptr,rpc,fun));
-    return (FunPtrNode)gvn.xform(new FunPtrNode(ret,null));
+    return (FunPtrNode)gvn.xform(new FunPtrNode(ret,gvn.con(Type.XSCALAR)));
   }
 
   @Override public Type all_type() { return TypeMem.FULL; }
@@ -99,6 +99,8 @@ public class IntrinsicNode extends Node {
     TypeMem rezmem = ((TypeMem)mem).st(alias,rez);
     return rezmem;
   }
+  // 
+  @Override public boolean basic_liveness() { return false; }
   @Override public String err(GVNGCM gvn) {
     Type ptr = gvn.type(ptr());
     return _badargs.typerr(ptr,TypeMemPtr.make(BitsAlias.RECORD,_tn),mem()); // Did not remove the aliasing
@@ -119,23 +121,28 @@ public class IntrinsicNode extends Node {
     assert to.has_name();
     assert Util.eq(to._flds[0],"^"); // Display already
     NewObjNode nnn = new NewObjNode(false,alias,to,null,gvn.con(Type.NIL)).keep();
-    TypeFunPtr tf = TypeFunPtr.make_new(to.remove_name().add_fld("->",TypeStruct.FFNL,TypeMemPtr.make(alias,to)));
+    Type[] ts = TypeAry.get(to._ts.length+1);
+    ts[0] = TypeMemPtr.make(alias,to); // Return
+    ts[1] = Type.XSCALAR;              // Display
+    System.arraycopy(to._ts,1,ts,2,to._ts.length-1);
+    TypeStruct args = TypeStruct.make_args(ts);
+    TypeFunPtr tf = TypeFunPtr.make_new(args);
     FunNode fun = (FunNode) gvn.xform(new FunNode(to._name,tf,BitsAlias.EMPTY).add_def(Env.ALL_CTRL));
     Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
     Node memp= gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.FULL    ),null));
     // Add input edges to the NewNode
     nnn.set_def(0,fun,gvn);     // Set control to function start
-    for( int i=1; i<to._ts.length; i++ ) {
+    for( int i=1; i<to._ts.length; i++ ) { // Display in 0, fields in 1+
       String argx = to._flds[i];
       if( TypeStruct.fldBot(argx) ) argx = null;
-      nnn.add_def(gvn.xform(new ParmNode(i,argx,fun, gvn.con(to._ts[i]),null)));
+      nnn.add_def(gvn.xform(new ParmNode(i+1,argx,fun, gvn.con(to._ts[i]),null)));
     }
     gvn.init(nnn);
     Node ptr = gvn.xform(new  ProjNode(nnn,1));
     Node obj = gvn.xform(new OProjNode(nnn,0));
     Node mmem= gvn.xform(new MemMergeNode(memp,obj,nnn.<NewObjNode>unhook()._alias));
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,ptr,rpc,fun));
-    return (FunPtrNode)gvn.xform(new FunPtrNode(ret,null));
+    return (FunPtrNode)gvn.xform(new FunPtrNode(ret,gvn.con(Type.XSCALAR)));
   }
 
 }

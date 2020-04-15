@@ -239,8 +239,8 @@ public class TestParse {
     test_name("A= :(flt,int)", TypeFlt.FLT64,TypeInt.INT64);
     test_name("A= :(   ,int)", Type.SCALAR  ,TypeInt.INT64);
 
-    test_ptr("A= :(str?, int); A( \"abc\",2 )","A:(*[$]\"abc\";2)!");
-    test_ptr("A= :(str?, int); A( (\"abc\",2) )","A:(*[$]\"abc\";2)!");
+    test_ptr("A= :(str?, int); A( \"abc\",2 )","A:(*[$]\"abc\";2)");
+    test_ptr("A= :(str?, int); A( (\"abc\",2) )","A:(*[$]\"abc\";2)");
     testerr("A= :(str?, int)?","Named types are never nil",16);
   }
 
@@ -766,7 +766,7 @@ strs:List(str?) = ... // List of null-or-strings
     try( TypeEnv te = run(program) ) {
       assertTrue(te._t instanceof TypeFunPtr);
       TypeFunPtr actual = (TypeFunPtr)te._t;
-      TypeFunPtr expected = TypeFunPtr.make(actual.fidxs(),TypeStruct.make_args(TypeStruct.ts(TypeMemPtr.DISPLAY_PTR,TypeMemPtr.STRUCT,TypeMemPtr.STRUCT)));
+      TypeFunPtr expected = TypeFunPtr.make(actual.fidxs(),TypeStruct.make_args(TypeStruct.ts(Type.XSCALAR,Type.XSCALAR,TypeMemPtr.STRUCT)));
       assertEquals(expected,actual);
     }
   }

@@ -103,7 +103,7 @@ public class ScopeNode extends Node {
   @Override public Type value(GVNGCM gvn) { return all_type(); }
 
   // From a memory and a possible pointer-to-memory, find all the reachable
-  // aliases and fold them into 'live'.  This is unlike other compute_live_use
+  // aliases and fold them into 'live'.  This is unlike other live_use
   // because this "turns around" the incoming live memory to also be the
   // demanded/used memory.
   static TypeMem compute_live_mem(GVNGCM gvn, TypeMem live, Node mem, Node rez) {
@@ -130,12 +130,13 @@ public class ScopeNode extends Node {
     // The top scope is always alive, and represents what all future unparsed
     // code MIGHT do.
     if( this==Env.TOP._scope ) return TypeMem.FULL;
-    // If asking about mem() liveness, start with 'DEAD'.  If mem() and rez()
-    // are not a valid ptr-to-memory, then the memory input is dead.  However,
-    // rez() might be e.g., 3.1415, and be alive independent of memory.
-    // If mem() and rez() are a valid ptr-to-memory, then _live has all used aliases.
-    // If asking about ctrl() liveness, then only return the basic yes/no alive.
-    return ctrl() == def ? (mem()==def ? TypeMem.DEAD : TypeMem.EMPTY) : _live;
+    // Basic liveness ("You are Alive!") for control and returned value
+    if( def == ctrl() ) return TypeMem.EMPTY;
+    if( def == rez () ) return TypeMem.EMPTY;
+    // Memory returns the compute_live_mem state in _live.  If rez() is a
+    // pointer, this will include the memory slice.
+    assert def == mem();
+    return _live;
   }
   @Override public boolean basic_liveness() { return false; }
 

@@ -142,6 +142,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   }
 
   private static boolean isDigit(char c) { return '0' <= c && c <= '9'; }
+  private boolean is_tup() { return _flds.length<=1 || fldTop(_flds[1]) || fldBot(_flds[1]) || isDigit(_flds[1].charAt(0)); }
   String str( VBitSet dups) {
     if( dups == null ) dups = new VBitSet();
     if( dups.tset(_uid) ) return "$"; // Break recursive printing cycle
@@ -154,7 +155,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     if( _uf!=null ) return "=>"+_uf; // Only used mid-recursion
     if( _any ) sb.p('~');
     sb.p(_name);
-    boolean is_tup = _flds.length==0 || fldTop(_flds[0]) || fldBot(_flds[0]) || isDigit(_flds[0].charAt(0));
+    boolean is_tup = is_tup();
     sb.p(is_tup ? "(" : "@{");
     for( int i=0; i<_flds.length; i++ ) {
       if( dirty(_flags[i]) ) sb.p("!"); // Dirty field
@@ -181,7 +182,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     if( _uf!=null ) return _uf.dstr(sb.p("=>"),dups);
     if( _any ) sb.p('~');
     sb.p(_name);
-    boolean is_tup = _flds.length<=0 || fldTop(_flds[0]) || fldBot(_flds[0]) || isDigit(_flds[0].charAt(0));
+    boolean is_tup = is_tup();
     if( !is_tup ) sb.p('@');    // Not a tuple
     sb.p(is_tup ? '(' : '{').nl().ii(1); // open struct, newline, increase_indent
     for( int i=0; i<_flds.length; i++ ) {
@@ -209,7 +210,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     if( _uf!=null ) return _uf.str(sb.p("=>"),dups,mem);
     if( _any ) sb.p('~');
     sb.p(_name);
-    boolean is_tup = _flds.length<=0 || fldTop(_flds[0]) || fldBot(_flds[0]) || isDigit(_flds[0].charAt(0));
+    boolean is_tup = is_tup();
     if( !is_tup ) sb.p('@');    // Not a tuple
     sb.p(is_tup ? '(' : '{');
     for( int i=0; i<_flds.length; i++ ) {

@@ -192,7 +192,7 @@ public class CallNode extends Node {
     // If the function is unresolved, see if we can resolve it now.
     // Fidxs are typically low during iter, but can be high during
     // iter post-GCP on error calls where nothing resolves.
-    if( unk instanceof UnresolvedNode && !fidxs.above_center() ) {
+    if( unk instanceof UnresolvedNode && !fidxs.above_center() && !fidxs.test(1)) {
       BitsFun rfidxs = resolve(fidxs,tcall._ts);
       if( rfidxs==null ) return null;            // Dead function, stall for time
       FunPtrNode fptr = least_cost(gvn, rfidxs); // Check for least-cost target

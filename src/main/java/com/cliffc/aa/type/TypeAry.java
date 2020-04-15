@@ -94,6 +94,14 @@ public class TypeAry {
     ts[1] = t1;
     return ts;
   }
+  public static Type[] ts(Type t0, Type t1, Type t2) {
+    TypeAry t3 = tary(3).check(); 
+    Type[] ts = t3.get();
+    ts[0] = t0;
+    ts[1] = t1;
+    ts[2] = t2;
+    return ts;
+  }
   
   // Result not interned; suitable for direct hacking.
   // Original assumed in-use, not freed.
