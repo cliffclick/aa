@@ -192,19 +192,21 @@ public class FunNode extends RegionNode {
 
     // See if we can make the function signature more precise.  When building
     // type-split signatures, we'd like this to be as precise as all unsplit
-    // inputs.
+    // inputs.  Lift, but never above the centerline so dualing TFPs works.
     boolean progress= false;
     TypeTuple tret = (TypeTuple)gvn.type(ret);
+    Type[] ts = TypeAry.clone(_tf._args._ts);
     for( int i=0; i<parms.length; i++ ) {
-      Type t = i==0 ? tret.at(2) : (parms[i]==null ? Type.XSCALAR : gvn.type(parms[i]));
-      if( t != targ(i) && t.isa(targ(i)) && !t.above_center() ) { progress=true; break; }
+      Type t = ts[i];
+      if( i==0 ) t = tret.at(2);              // Return uses RET.val
+      else if( parms[i]==null ) t = Type.XSCALAR; // Dead
+      else if( _defs._len>1 )   // If have any args (no change if no args)
+        t = gvn.type(parms[i]); // Get the parm type directly
+      if( t.isa(ts[i]) && !t.above_center() ) // Fails isa in error cases
+        progress |= (ts[i]=t) != targ(i);     // Assign & check progress
     }
+    // If progress, update _tf
     if( progress && !is_prim() ) {
-      Type[] ts = TypeAry.get(parms.length);
-      for( int i=0; i<parms.length; i++ ) {
-        ts[i] = i==0 ? tret.at(2) : (parms[i]==null ? Type.XSCALAR : gvn.type(parms[i]));
-        if( ts[i].above_center() || !ts[i].isa(targ(i)) ) ts[i] = targ(i);
-      }
       TypeFunPtr tf = TypeFunPtr.make(_tf.fidxs(),_tf._args.make_from(ts));
       assert tf.isa(_tf) && _tf != tf;
       _tf = tf;
@@ -216,7 +218,8 @@ public class FunNode extends RegionNode {
         if( cg instanceof CProjNode )
           { gvn.add_work(cg); gvn.add_work(cg.in(0)); }
       return this;
-    }
+    } else TypeAry.free(ts);    // Else free unused clone
+
     if( _defs._len <= 2 ) return null; // No need to split callers if only 1
 
     //----------------
@@ -395,6 +398,7 @@ public class FunNode extends RegionNode {
       if( op == OP_PARM && n.in(0) != this ) continue; // Arg  to other function, not part of inlining
       body.push(n);                                    // Part of body
       if( op == OP_RET ) continue;                     // Return (of this or other function)
+      if( n instanceof ProjNode && n.in(0) instanceof CallNode ) continue; // Wired call; all projs lead to other functions
       work.addAll(n._uses);   // Visit all uses
     }
 
@@ -482,7 +486,7 @@ public class FunNode extends RegionNode {
   private FunNode make_new_fun(GVNGCM gvn, RetNode ret, TypeStruct new_args) {
     // Make a prototype new function header split from the original.
     int oldfidx = fidx();
-    FunNode fun = new FunNode(_name,_tf.make_new_fidx(oldfidx,new_args),_display_aliases);
+    FunNode fun = new FunNode(_name,_tf.make_new_fidx(oldfidx,new_args),_op_prec,_display_aliases);
     fun.pop();                  // Remove null added by RegionNode, will be added later
     // Renumber the original as well; the original _fidx is now a *class* of 2
     // fidxs.  Each FunNode fidx is only ever a constant, so the original Fun

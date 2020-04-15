@@ -38,7 +38,7 @@ public final class CallEpiNode extends Node {
     if( nwired()==1 && fidxs.abit() != -1 ) { // Wired to 1 target
       RetNode ret = wired(0);                 // One wired return
       FunNode fun = ret.fun();
-      if( fun != null && fun._defs._len==2 ) { // Function is only called by 1 (and not the unknown caller)
+      if( fun != null && fun._defs._len==2 && fun.nargs()==call.nargs() ) { // Function is only called by 1 (and not the unknown caller)
         assert fun.in(1).in(0)==call;   // Just called by us
         // Check the args
         int idx=0;
@@ -85,9 +85,9 @@ public final class CallEpiNode extends Node {
     if( fun.is_forward_ref() || fun.is_dead() ) return null;
     if( gvn.type(fun) != Type.CTRL ) return null;
     int cnargs = call.nargs();
-    assert fun.nargs() == cnargs; // Arg counts must be compatible to be wired
+    if( fun.nargs() != cnargs ) return null; // Arg counts must be compatible to be inline
     RetNode ret = fun.ret();      // Return from function
-    if( ret==null ) return null;
+    if( ret==null ) return null;  // Dying function
 
     // Single choice; check compatible args and no conversions needed.
     TypeStruct formals = fun._tf._args;
@@ -154,13 +154,6 @@ public final class CallEpiNode extends Node {
       if( wired(i) == ret )     // Look for same Ret
         return false;           // Already wired up
 
-    // Make sure we have enough args before wiring up (makes later life easier
-    // to assume correct arg counts).  Note that we cannot, in general,
-    // type-check the args during GCP, as they will start out too-high and pass
-    // any isa-check.  Later, after wiring up in GCP they might fall to an
-    // error state - so we have to support having error args coming in.
-    if( fun.nargs() != call.nargs() ) return false;
-
     wire0(gvn,call,fun);
     gvn.add_def(this,ret);
     gvn.add_work(ret);
@@ -185,7 +178,10 @@ public final class CallEpiNode extends Node {
       case  1: actual = new FP2ClosureNode(call); break; // Filter Function Pointer to Closure
       case -1: actual = new ConNode<>(TypeRPC.make(call._rpc)); break; // Always RPC is a constant
       case -2: actual = new MProjNode(call,1); break;    // Memory
-      default: actual = new ProjNode(call,idx+1); break; // Normal args
+      default: actual = idx >= call.nargs()              // Check for args present
+          ? new ConNode<>(Type.XSCALAR) // Missing args, still wire (to keep FunNode neighbors) but will error out later.
+          : new ProjNode(call,idx+1);   // Normal args
+        break;
       }
       actual = gvn._opt_mode == 2 ? gvn.new_gcp(actual) : gvn.xform(actual);
       gvn.add_def(arg,actual);

@@ -488,7 +488,7 @@ public class CallNode extends Node {
       FunNode fun = FunNode.find_fidx(fidx);  // Lookup, even if not wired
       if( fun.is_forward_ref() ) continue;    // Not forward refs, which at GCP just means a syntax error
       RetNode ret = fun.ret();
-      // Internally wire() checks for dups and proper arg counts.
+      // Internally wire() checks for already wired.
       progress |= cepi.wire(gvn,this,fun,ret);
     }
     assert !progress || Env.START.more_flow(gvn,new VBitSet(),gvn._opt_mode!=2,0)==0; // Post conditions are correct

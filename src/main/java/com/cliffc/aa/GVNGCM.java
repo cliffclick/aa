@@ -332,6 +332,8 @@ public class GVNGCM {
         add_work(use);
         if( use instanceof RegionNode ) // Region users need to recheck PhiNode
           add_work_uses(use);
+        if( use.input_value_changes_live() )
+          add_work_defs(use);
       }
       // Add self at the end, so the work loops pull it off again.
       add_work(old);
@@ -470,7 +472,7 @@ public class GVNGCM {
       if( n._uses._len==0 && n._keep==0 ) kill(n);
       else xform_old(n,small_work ? 0 : 2);
       // VERY EXPENSIVE ASSERT
-      //assert Env.START.more_flow(this,new VBitSet(),true,0)==0; // Initial conditions are correct
+      assert Env.START.more_flow(this,new VBitSet(),true,0)==0; // Initial conditions are correct
       cnt++; assert cnt < 10000; // Catch infinite ideal-loops
     }
     // No more ideal calls, small or large, to apply

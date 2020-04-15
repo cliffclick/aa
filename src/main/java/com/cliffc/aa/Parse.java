@@ -111,7 +111,8 @@ public class Parse {
     prog();                     // Parse a program
     // Delete names at the top scope before final optimization.
     _e.close_display(_gvn);
-    _gvn.rereg(_e._scope     ,Type.ALL); _e._scope._live = _e._scope.live(_gvn);
+    _gvn.rereg(_e._scope,Type.ALL);
+    _e._scope._live = _e._scope.live(_gvn);
     _gvn.iter(1);   // Pessimistic optimizations; might improve error situation
     remove_unknown_callers();
     _gvn.gcp(_e._scope); // Global Constant Propagation

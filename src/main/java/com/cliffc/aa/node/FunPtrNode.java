@@ -39,7 +39,7 @@ public final class FunPtrNode extends Node {
     if( is_forward_ref() ) return null;
     RetNode ret = ret();
     FunNode fun = ret.is_copy() ? FunNode.find_fidx(ret._fidx) : ret.fun();
-    if( !(display() instanceof ConNode) && (ret.is_copy() || fun._tf.arg(1)==Type.XSCALAR) ) {
+    if( !(display() instanceof ConNode) && (ret.is_copy() || fun._tf.display()==Type.XSCALAR) ) {
       set_def(1,gvn.con(Type.XSCALAR),gvn);
       return this;
     }

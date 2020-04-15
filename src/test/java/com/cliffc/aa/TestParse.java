@@ -143,7 +143,11 @@ public class TestParse {
   @Test public void testParse02() {
     Object dummy = Env.GVN; // Force class loading cycle
     // Anonymous function definition
-    test_isa("{x y -> x+y}", TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make_args(TypeStruct.ts(TypeMemPtr.DISPLAY_PTR,Type.SCALAR,Type.SCALAR,Type.SCALAR)))); // {Scalar Scalar -> Scalar}
+    test_isa("{x y -> x+y}", TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make_args(TypeStruct.ARGS_XY,TypeStruct.ts(Type.XSCALAR,TypeMemPtr.DISPLAY_PTR,Type.SCALAR,Type.SCALAR)))); // {Scalar Scalar -> Scalar}
+    // Since call not-taken, post GCP Parms not loaded from _tf, limited to ~Scalar.  The
+    // hidden internal call from {&} to the primitive is never inlined (has ~Scalar args)
+    // so 'x&1' never sees the TypeInt return from primitive AND.
+    test_isa("{x -> x&1}", TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make_args(TypeStruct.ARGS_X,TypeStruct.ts(Type.XSCALAR,TypeMemPtr.DISPLAY_PTR,Type.SCALAR)))); // {Int -> Int}
     test("{5}()", TypeInt.con(5)); // No args nor -> required; this is simply a function returning 5, being executed
 
     // ID in different contexts; in general requires a new TypeVar per use; for
@@ -214,7 +218,7 @@ public class TestParse {
             "3 is not a *[$]@{x=;y=}", 68);
     testerr("fun={x y -> x+y}; baz={x:int y:@{x;y} -> foo(x,y)}; (fun(2,3), baz(2,3))",
             "Unknown ref 'foo'", 44);
-    // This test fails because the inner fun does not inline until GCP,
+    // This test failed because the inner fun does not inline until GCP,
     // and then it resolves and lifts the DISPLAY (which after resolution
     // is no longer needed).  Means: cannot resolve during GCP and preserve
     // monotonicity.  Would like '.fun' to load BEFORE GCP.
@@ -226,10 +230,6 @@ public class TestParse {
     test("fun:{real->flt32}={x -> x}; fun(123 )", TypeInt.con(123 ));
     test("fun:{real->flt32}={x -> x}; fun(0.125)", TypeFlt.con(0.125));
     testerr("fun:{real->flt32}={x -> x}; fun(123456789)", "123456789 is not a flt32",3);
-    // Since call not-taken, post GCP Parms not loaded from _tf, limited to ~Scalar.  The
-    // hidden internal call from {&} to the primitive is never inlined (has ~Scalar args)
-    // so 'x&1' never sees the TypeInt return from primitive AND.
-    test("{x -> x&1}", TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make_args(TypeStruct.ARGS_X,TypeStruct.ts(Type.XSCALAR,TypeStruct.NO_DISP,Type.SCALAR)))); // {Int -> Int}
 
     // Named types
     test_name("A= :(       )" ); // Zero-length tuple

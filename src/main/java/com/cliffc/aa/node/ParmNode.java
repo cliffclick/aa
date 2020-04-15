@@ -70,6 +70,8 @@ public class ParmNode extends PhiNode {
         for( Node def : fun._defs ) {
           if( def instanceof CProjNode ) {
             CallNode call = (CallNode)def.in(0);
+            if( call.nargs() != fun.nargs() )
+              return null;                        // #args errors reported before bad-args
             Type argc = gvn.type(call.arg(_idx)); // Call arg type
             if( !argc.isa(formal) )
               return call._badargs.typerr(argc,formal,call.mem());

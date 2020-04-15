@@ -79,6 +79,7 @@ public class TypeAry {
   }
 
   public static Type[] get(int len) { return tary(len).check().get(); }
+  public static void free(Type[] ts) { tary(ts.length)._free.push(ts); }
   public static Type[] hash_cons(Type[] ts) { return tary(ts.length).check().hash_cons_(ts); }
   public static Type[] ts(Type t0) {
     TypeAry t1 = tary(1).check(); 
