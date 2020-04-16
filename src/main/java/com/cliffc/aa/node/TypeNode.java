@@ -5,6 +5,8 @@ import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
 
+import java.util.Arrays;
+
 // Assert the matching type.  Parse-time error if it does not remove.  Note the
 // difference with CastNode: both Nodes always join their input with their
 // constant but a TypeNode has to be proven useless and removed before the
@@ -37,8 +39,10 @@ public class TypeNode extends Node {
         Node parm = gvn.xform(new ParmNode(i,"arg"+i,fun,gvn.con(Type.SCALAR),null));
         args[i+1] = gvn.xform(new TypeNode(targs[i],parm,_error_parse));
       }
+      Parse[] badargs = new Parse[targs.length];
+      Arrays.fill(badargs,_error_parse);
       Node rpc= gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
-      CallNode call = (CallNode)gvn.xform(new CallNode(true,_error_parse,args));
+      CallNode call = (CallNode)gvn.xform(new CallNode(true,badargs,args));
       Node cepi   = gvn.xform(new CallEpiNode(call)).keep();
       Node ctl    = gvn.xform(new CProjNode(cepi,0));
       Node postmem= gvn.xform(new MProjNode(cepi,1)).keep();

@@ -16,7 +16,7 @@ import com.cliffc.aa.type.*;
 public abstract class PrimNode extends Node {
   public final String _name;    // Unique name (and program bits)
   final TypeStruct _targs;      // Argument types, 0-based
-  Parse _badargs;               // Filled in when inlined in CallNode
+  Parse[] _badargs;             // Filled in when inlined in CallNode
   PrimNode( String name, TypeStruct targs ) {
     super(OP_PRIM);
     _name=name;
@@ -97,7 +97,7 @@ public abstract class PrimNode extends Node {
       Type tactual = gvn.type(in(i));
       Type tformal = _targs.at(i+1); // Skip leading return
       if( !tactual.isa(tformal) )
-        return _badargs==null ? "bad arguments" : _badargs.typerr(tactual,tformal,null);
+        return _badargs==null ? "bad arguments" : _badargs[i].typerr(tactual,tformal,null);
     }
     return null;
   }
@@ -275,7 +275,8 @@ static class AndI64 extends Prim2OpI64 {
   @Override public Type value(GVNGCM gvn) {
     Type t1 = gvn.type(in(1)), t2 = gvn.type(in(2));
     // 0 AND anything is 0
-    if( t1 == Type.NIL || t2 == Type.NIL ) return Type.NIL;
+    if( t1 == Type. NIL || t2 == Type. NIL ) return Type. NIL;
+    if( t1 == Type.XNIL || t2 == Type.XNIL ) return Type.XNIL;
     // If either is high - results might fall to something reasonable
     if( t1.above_center() || t2.above_center() )
       return TypeInt.INT64.dual();

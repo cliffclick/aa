@@ -69,8 +69,11 @@ public class CallNode extends Node {
   int _rpc;                 // Call-site return PC
   boolean _unpacked;        // Call site allows unpacking a tuple (once)
   boolean _is_copy;         // One-shot flag set when inlining an entire single-caller-single-called
-  Parse  _badargs;          // Error for e.g. wrong arg counts or incompatible args
-  public CallNode( boolean unpacked, Parse badargs, Node... defs ) {
+  // Example: call(arg1,arg2)
+  // _badargs[1] points to the openning paren.
+  // _badargs[2] points to the start of arg1, same for arg2, etc.
+  Parse[] _badargs;         // Errors for e.g. wrong arg counts or incompatible args; one error point per arg. 
+  public CallNode( boolean unpacked, Parse[] badargs, Node... defs ) {
     super(OP_CALL,defs);
     _rpc = BitsRPC.new_rpc(BitsRPC.ALL); // Unique call-site index
     _unpacked=unpacked;         // Arguments are typically packed into a tuple and need unpacking, but not always
@@ -499,23 +502,23 @@ public class CallNode extends Node {
     // Fail for passed-in unknown references directly.
     for( int j=1; j<nargs(); j++ )
       if( arg(j).is_forward_ref() )
-        return _badargs.forward_ref_err( FunNode.find_fidx(((FunPtrNode)arg(j)).ret()._fidx) );
+        return _badargs[j].forward_ref_err( FunNode.find_fidx(((FunPtrNode)arg(j)).ret()._fidx) );
 
     // Expect a function pointer
     Type tfun = gvn.type(fun());
     if( !(tfun instanceof TypeFunPtr) )
-      return _badargs.errMsg("A function is being called, but "+tfun+" is not a function type");
+      return _badargs[1].errMsg("A function is being called, but "+tfun+" is not a function type");
     TypeFunPtr tfp = (TypeFunPtr)tfun;
 
     // Indirectly, forward-ref for function type
     if( tfp.is_forward_ref() ) // Forward ref on incoming function
-      return _badargs.forward_ref_err(FunNode.find_fidx(tfp.fidx()));
+      return _badargs[1].forward_ref_err(FunNode.find_fidx(tfp.fidx()));
     if( tfp.fidxs().is_empty() )
       return null; // This is an unresolved call, and that error is reported elsewhere
 
     // bad-arg-count
     if( tfp.nargs() != nargs() )
-      return _badargs.errMsg("Passing "+(nargs()-2)+" arguments to "+tfp.names()+" which takes "+(tfp.nargs()-2)+" arguments");
+      return _badargs[1].errMsg("Passing "+(nargs()-2)+" arguments to "+tfp.names()+" which takes "+(tfp.nargs()-2)+" arguments");
 
     // Now do an arg-check.
     TypeStruct formals = tfp._args; // Type of each argument
@@ -524,7 +527,7 @@ public class CallNode extends Node {
       Type formal = formals.at(j);
       if( !actual.isa(formal) ) { // Actual is not a formal
         if( tfp.fidxs().abit() != -1 )
-          return _badargs.typerr(actual,formal,mem());
+          return _badargs[j].typerr(actual,formal,mem());
         // Multiple fails.  Try for a better error message.
         Type[] ts = new Type[tfp.fidxs().bitCount()];
         int i=0;
@@ -532,7 +535,7 @@ public class CallNode extends Node {
           FunNode fun = FunNode.find_fidx(fidx);
           ts[i++] = fun.targ(j);
         }
-        return _badargs.typerr(actual,ts,mem());
+        return _badargs[j].typerr(actual,ts,mem());
       }
     }
 

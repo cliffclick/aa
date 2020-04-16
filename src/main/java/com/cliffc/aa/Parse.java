@@ -444,13 +444,17 @@ public class Parse {
     }
 
     // [unifun] term [binop term]*
+    skipWS();
+    oldx = _x;
     Node term = term();
     if( term == null ) return unifun; // Term is required, so missing term implies not any expr
     // Collect 1st fcn/arg pair
-    Ary<Node> funs = new Ary<>(new Node[1],0);
+    Ary<Node > funs = new Ary<>(new Node [1],0);
+    Ary<Parse> bads = new Ary<>(new Parse[1],0);
     try( TmpNode args = new TmpNode() ) {
       funs.add(unifun==null ? null : unifun.keep());
       args.add_def(term);
+      bads.add(errMsg(oldx));
 
       // Now loop for binop/term pairs: parse Kleene star of [binop term]
       while( true ) {
@@ -459,9 +463,10 @@ public class Parse {
         if( bin==null ) break;    // Valid parse, but no more Kleene star
         Node binfun = _e.lookup_filter(bin,_gvn,2); // BinOp, or null
         if( binfun==null ) { _x=oldx; break; } // Not a binop, no more Kleene star
+        skipWS();  oldx = _x;
         term = term();
         if( term == null ) term = err_ctrl2("missing expr after binary op "+bin);
-        funs.add(binfun.keep());  args.add_def(term);
+        funs.add(binfun.keep());  args.add_def(term);  bads.add(errMsg(oldx));
       }
 
       // Have a list of interspersed operators and terms.
@@ -471,18 +476,21 @@ public class Parse {
       // Now starting at max working down, group list by pairs into a tree
       while( max >= 0 && args._defs._len > 0 ) {
         for( int i=0; i<funs.len(); i++ ) { // For all ops of this precedence level, left-to-right
-          Node fun = funs.at(i);
+          Node  fun = funs.at(i);
+          Parse bad = bads.at(i);
           if( fun==null ) continue;
           assert fun.op_prec() <= max;
           if( fun.op_prec() < max ) continue; // Not yet
           if( i==0 ) {
-            Node call = do_call(new CallNode(true,errMsg(),ctrl(),all_mem(),fun.unhook(),args.in(0)));
+            Node call = do_call(new CallNode(true,new Parse[]{null,bad,bad},ctrl(),all_mem(),fun.unhook(),args.in(0)));
             args.set_def(0,call,_gvn);
             funs.setX(0,null);
+            bads.setX(0,null);
           } else {
-            Node call = do_call(new CallNode(true,errMsg(),ctrl(),all_mem(),fun.unhook(),args.in(i-1),args.in(i)));
+            Parse bad1 = bads.at(i-1);
+            Node call = do_call(new CallNode(true,new Parse[]{null,bad1,bad1,bad},ctrl(),all_mem(),fun.unhook(),args.in(i-1),args.in(i)));
             args.set_def(i-1,call,_gvn);
-            funs.remove(i);  args.remove(i);  i--;
+            funs.remove(i);  args.remove(i);  bads.remove(i);  i--;
           }
         }
         max--;
@@ -544,7 +552,9 @@ public class Parse {
       } else {                  // Attempt a function-call
         boolean arglist = peek('(');
         oldx = _x;
-        Node arg = arglist ? tuple(stmts()) : term(); // Start of an argument list?
+        skipWS();               // Skip to start of 1st arg
+        int first_arg_start = _x; // For the non-arg-list case
+        Node arg = arglist ? tuple(stmts(),first_arg_start) : term(); // Start of an argument list?
         if( arg == null )       // tfact but no arg is just the tfact
           break;
         Type tn = _gvn.type(n);
@@ -562,7 +572,11 @@ public class Parse {
           kill(arg);
           n = err_ctrl2("A function is being called, but "+tn+" is not a function");
         } else {
-          n = do_call(new CallNode(!arglist,errMsg(),ctrl(),all_mem(),n,arg)); // Pass the 1 arg
+          Parse[] badargs = arglist
+            ? ((NewObjNode)arg.in(0))._fld_starts        // Args from tuple
+            : new Parse[]{null,null,errMsg(first_arg_start)}; // The one arg start
+          badargs[1] = errMsg(oldx-1); // Base call error reported at the openning paren
+          n = do_call(new CallNode(!arglist,badargs,ctrl(),all_mem(),n,arg)); // Pass the 1 arg
         }
       }
     } // Else no trailing arg, just return value
@@ -592,7 +606,7 @@ public class Parse {
       return err_ctrl2(forward_ref_err(((FunPtrNode)n).fun()));
     // Do a full lookup on "+", and execute the function
     Node plus = _e.lookup_filter("+",_gvn,2);
-    Node sum = do_call(new CallNode(true,errMsg(),ctrl(),all_mem(),plus,n.keep(),con(TypeInt.con(d))));
+    Node sum = do_call(new CallNode(true,errMsgs(2),ctrl(),all_mem(),plus,n.keep(),con(TypeInt.con(d))));
     // Active memory for the chosen scope, after the call to plus
     MemMergeNode mmem2 = mem_active();
     Node objmem2 = mmem2.active_obj(alias);
@@ -635,13 +649,13 @@ public class Parse {
     }
     int oldx = _x;
     if( peek1(c,'(') ) {        // a nested statement or a tuple
+      int first_arg_start = _x;
       Node s = stmts();
       if( s==null ) { _x = oldx; return null; } // A bare "()" pair is not a statement
       if( peek(')') ) return s;                 // A (grouped) statement
-      oldx = _x;
       if( !peek(',') ) return s;                // Not a tuple, probably a syntax error
-      _x = oldx;                                // Reparse the ',' in tuple
-      return tuple(s);                          // Parse a tuple
+      _x --;                                    // Reparse the ',' in tuple
+      return tuple(s,first_arg_start);          // Parse a tuple
     }
     // Anonymous function or operator
     if( peek1(c,'{') ) {
@@ -690,18 +704,21 @@ public class Parse {
   /** Parse a tuple; first stmt but not the ',' parsed.
    *  tuple= (stmts,[stmts,])     // Tuple; final comma is optional
    */
-  private Node tuple(Node s) {
+  private Node tuple(Node s, int first_arg_start) {
     TypeStruct mt_tuple = TypeStruct.make(new String[]{"^"},TypeStruct.ts(Type.XNIL),new byte[]{TypeStruct.FFNL});
     NewObjNode nn = new NewObjNode(false,BitsAlias.RECORD,mt_tuple,ctrl(),con(Type.XNIL));
+    Ary<Parse> args = new Ary<>(new Parse[]{null,null,errMsg(first_arg_start)});
     int fidx=0, oldx=_x-1; // Field name counter, mismatched parens balance point
     while( s!=null ) {
       nn.create_active((""+(fidx++)).intern(),s,TypeStruct.FFNL,_gvn);
       if( !peek(',') ) break;   // Final comma is optional
-      s=stmts();
+      skipWS();                 // Skip to arg start before recording arg start
+      args.push(errMsg());      // Record arg start
+      s=stmts();                // Parse arg
     }
     require(')',oldx);
-    // NewNode updates merges the new allocation into all-of-memory and returns
-    // a reference.
+    nn._fld_starts = args.asAry();
+    // NewNode returns a TypeObj and a TypeMemPtr (the reference).
     Node nnn = gvn(nn).keep();
     Node ptr = gvn(new  ProjNode(nnn,1));
     Node mem = gvn(new OProjNode(nnn,0));
@@ -1222,6 +1239,10 @@ public class Parse {
   // Delayed error message, just record line/char index and share 697code buffer
   Parse errMsg() { return errMsg(_x); }
   Parse errMsg(int x) { Parse P = new Parse(this); P._x=x; return P; }
+  Parse[] errMsgs(int n) {      // n==1 or 2 arg operator
+    Parse e = errMsg();
+    return n==1 ? new Parse[]{null,e,e} : new Parse[]{null,e,e,e};
+  }
 
   // Polite error message for mismatched types
   public String typerr( Type t0, Type t1, Node mem ) {

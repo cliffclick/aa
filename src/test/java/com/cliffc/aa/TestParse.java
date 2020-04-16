@@ -20,15 +20,15 @@ public class TestParse {
 
     // A collection of tests which like to fail easily
     testerr("math_rand(1)?x=2: 3 ;y=x+2;y", "'x' not defined on false arm of trinary",20);
-    testerr("{+}(1,2,3)", "Passing 3 arguments to {+} which takes 2 arguments",10);
+    testerr("{+}(1,2,3)", "Passing 3 arguments to {+} which takes 2 arguments",3);
     test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
     testerr("x=1+y","Unknown ref 'y'",5);
     test_isa("{x y -> x+y}", TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make_args(TypeStruct.ts(TypeMemPtr.DISPLAY_PTR,Type.SCALAR,Type.SCALAR,Type.SCALAR)))); // {Scalar Scalar -> Scalar}
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.TRUE );
-    testerr ("Point=:@{x;y}; Point((0,1))", "*[$](nil;1)! is not a *[$]Point:@{x=;y=}!",27);
-    test_ptr("x=@{n:=1;v:=2}; x.n := 3; x", "@{n:=3;v:=2}!");
+    testerr ("Point=:@{x;y}; Point((0,1))", "*[$](~nil;1) is not a *[$]Point:@{x=;y=}",20);
+    test_ptr("x=@{n:=1;v:=2}; x.n := 3; x", "@{n:=3;v:=2}");
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'",20);
-    test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({&},2)", TypeInt.FALSE);
+    test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({&},2)", Type.XNIL);
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
   }
 
@@ -83,9 +83,9 @@ public class TestParse {
     test("{-}(1,2)", TypeInt.con(-1)); // binary version
     test(" - (1  )", TypeInt.con(-1)); // unary version
     // error; mismatch arg count
-    testerr("{!}()     ", "Passing 0 arguments to {!} which takes 1 arguments",5);
+    testerr("{!}()     ", "Passing 0 arguments to {!} which takes 1 arguments",3);
     testerr("math_pi(1)", "A function is being called, but 3.141592653589793 is not a function",10);
-    testerr("{+}(1,2,3)", "Passing 3 arguments to {+} which takes 2 arguments",10);
+    testerr("{+}(1,2,3)", "Passing 3 arguments to {+} which takes 2 arguments",3);
 
     // Parsed as +(1,(2*3))
     test("{+}(1, 2 * 3) ", TypeInt.con(7));
@@ -170,14 +170,14 @@ public class TestParse {
     test("x=3; mul2={x -> x*2}; mul2(2.1)", TypeFlt.con(2.1*2.0)); // must inline to resolve overload {*}:Flt with I->F conversion
     test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
     test("sq={x -> x*x}; sq 2.1", TypeFlt.con(4.41)); // No () required for single args
-    testerr("sq={x -> x&x}; sq(\"abc\")", "*[$]\"abc\" is not a int64",12);
-    testerr("sq={x -> x*x}; sq(\"abc\")", "*[$]\"abc\" is none of (flt64,int64)",12);
-    testerr("f0 = { f x -> f0(x-1) }; f0({+},2)", "Passing 1 arguments to f0={->} which takes 2 arguments",21);
+    testerr("sq={x -> x&x}; sq(\"abc\")", "*[$]\"abc\" is not a int64",9);
+    testerr("sq={x -> x*x}; sq(\"abc\")", "*[$]\"abc\" is none of (flt64,int64)",9);
+    testerr("f0 = { f x -> f0(x-1) }; f0({+},2)", "Passing 1 arguments to f0={->} which takes 2 arguments",16);
     // Recursive:
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
     test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)",TypeInt.con(5));
     test("f0 = { x -> x ? {+}(f0(x-1),1) : 0 }; f0(2)", TypeInt.con(2));
-    testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact()","Passing 0 arguments to fact={->} which takes 1 arguments",48);
+    testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact()","Passing 0 arguments to fact={->} which takes 1 arguments",46);
     test_obj("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(0),fact(1),fact(2))",
              TypeStruct.make_tuple(Type.XNIL,Type.XNIL,TypeInt.con(1),TypeInt.con(2)));
 
@@ -210,12 +210,12 @@ public class TestParse {
 
     // Type annotations on dead args are ignored
     test   ("fun:{int str -> int}={x y -> x+2}; fun(2,3)", TypeInt.con(4));
-    testerr("fun:{int str -> int}={x y -> x+y}; fun(2,3)", "3 is not a *[$]str",43);
+    testerr("fun:{int str -> int}={x y -> x+y}; fun(2,3)", "3 is not a *[$]str",41);
     // Test that the type-check is on the variable and not the function.
     test_obj("fun={x y -> x*2}; bar:{int str -> int} = fun; baz:{int @{x;y} -> int} = fun; (fun(2,3),bar(2,\"abc\"))",
              TypeStruct.make_tuple(Type.XNIL,TypeInt.con(4),TypeInt.con(4)));
     testerr("fun={x y -> x+y}; baz:{int @{x;y} -> int} = fun; (fun(2,3), baz(2,3))",
-            "3 is not a *[$]@{x=;y=}", 68);
+            "3 is not a *[$]@{x=;y=}", 66);
     testerr("fun={x y -> x+y}; baz={x:int y:@{x;y} -> foo(x,y)}; (fun(2,3), baz(2,3))",
             "Unknown ref 'foo'", 44);
     // This test failed because the inner fun does not inline until GCP,
@@ -223,7 +223,7 @@ public class TestParse {
     // is no longer needed).  Means: cannot resolve during GCP and preserve
     // monotonicity.  Would like '.fun' to load BEFORE GCP.
     testerr("fun={x y -> x+y}; baz={x:int y:@{x;y} -> fun(x,y)}; (fun(2,3), baz(2,3))",
-            "3 is not a *[$]@{x=;y=}", 71);
+            "3 is not a *[$]@{x=;y=}", 69);
 
     testerr("x=3; fun:{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int64",8);
     test("x=3; fun:{real->real}={x -> x*2}; fun(2.1)+fun(x)", TypeFlt.con(2.1*2+3*2)); // Mix of types to fun()
@@ -288,7 +288,7 @@ public class TestParse {
     test    ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
     test    ("Point=:@{x;y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
     testerr ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1;y=2}))", "*[$]@{x==;y==} is not a *[$]Point:@{x=;y=}",22);
-    testerr ("Point=:@{x;y}; Point((0,1))", "*[$](~nil;1) is not a *[$]Point:@{x=;y=}",27);
+    testerr ("Point=:@{x;y}; Point((0,1))", "*[$](~nil;1) is not a *[$]Point:@{x=;y=}",20);
     testerr("x=@{n: =1;}","Missing type after ':'",7);
     testerr("x=@{n=;}","Missing ifex after assignment of 'n'",6);
     test_obj_isa("x=@{n}",TypeStruct.make(new String[]{"^","n"},TypeStruct.ts(TypeMemPtr.DISPLAY_PTR,Type.NIL),TypeStruct.ffnls(2)));

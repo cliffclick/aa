@@ -15,6 +15,7 @@ import com.cliffc.aa.util.Util;
 
 public class NewObjNode extends NewNode<TypeStruct> {
   public final boolean _is_closure; // For error messages
+  public       Parse[] _fld_starts; // Start of each tuple member
   // NewNodes do not really need a ctrl; useful to bind the upward motion of
   // closures so variable stores can more easily fold into them.
   public NewObjNode( boolean is_closure, TypeStruct disp, Node ctrl, Node clo ) {

@@ -110,7 +110,7 @@ public class IntrinsicNode extends Node {
   // Clones during inlining all become unique new sites
   @Override @NotNull public IntrinsicNode copy( boolean copy_edges, CallEpiNode cepi, GVNGCM gvn) {
     IntrinsicNode nnn = (IntrinsicNode)super.copy(copy_edges, cepi, gvn);
-    nnn._badargs = cepi.call()._badargs;
+    nnn._badargs = cepi.call()._badargs[1];
     return nnn;
   }
 
