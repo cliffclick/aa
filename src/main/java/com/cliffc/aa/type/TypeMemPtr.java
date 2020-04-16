@@ -37,6 +37,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   @Override String str( VBitSet dups) {
     if( dups == null ) dups = new VBitSet();
     if( dups.tset(_uid) ) return "$"; // Break recursive printing cycle
+    if( _aliases==BitsAlias.NIL || _aliases==BitsAlias.NIL.dual() ) return "*0";
     SB sb = new SB().p('*');
     _aliases.toString(sb); //.p(_obj.str(dups));
     if( _aliases.test(0) ) sb.p('?');
@@ -54,6 +55,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   @Override public SB str(SB sb, VBitSet dups, TypeMem mem) {
     if( dups == null ) dups = new VBitSet();
     if( dups.tset(_uid) ) return sb.p('$'); // Break recursive printing cycle
+    if( _aliases==BitsAlias.NIL || _aliases==BitsAlias.NIL.dual() ) return sb.p("*0");
     TypeObj to = (mem == null || _aliases==BitsAlias.RECORD_BITS) ? _obj : mem.ld(this);
     if( to == TypeObj.XOBJ ) to = _obj;
     to.str(_aliases.toString(sb.p('*')),dups,mem);

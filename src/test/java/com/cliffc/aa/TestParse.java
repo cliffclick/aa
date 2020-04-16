@@ -313,12 +313,12 @@ public class TestParse {
 
   @Test public void testParse06() {
     Object dummy = Env.GVN; // Force class loading cycle
-    test_ptr("A= :(A?, int); A(0,2)","A:(nil;2)!");
-    test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*[$]A:(nil;2)!;3)!");
+    test_ptr("A= :(A?, int); A(0,2)","A:(*0;2)");
+    test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*[$]A:(nil;2);3)");
 
     // Building recursive types
     test("A= :int; A(1)", TypeInt.TRUE.set_name("A:"));
-    test_ptr("A= :(str?, int); A(0,2)","A:(nil;2)!");
+    test_ptr("A= :(str?, int); A(0,2)","A:(nil;2)");
     // Named recursive types
     test_ptr("A= :(A?, int); A(0,2)",(alias) -> TypeMemPtr.make(alias,TypeStruct.make(new String[]{"A:0","A:1","A:2"},TypeStruct.ts(Type.NIL,Type.NIL,TypeInt.con(2)),TypeStruct.ffnls(3))));
     test    ("A= :@{n=A?; v=flt}; A(@{n=0;v=1.2}).v;", TypeFlt.con(1.2));
