@@ -295,20 +295,20 @@ public class TestParse {
   }
 
   @Test public void testParse05() {
-    // nullable and not-null pointers
-    test   ("x:str? = 0", Type.NIL); // question-type allows null or not; zero digit is null
-    test_obj("x:str? = \"abc\"", TypeStr.ABC); // question-type allows null or not
-    testerr("x:str  = 0", "nil is not a *[$]str", 1);
+    // nilable and not-nil pointers
+    test   ("x:str? = 0", Type.XNIL); // question-type allows nil or not; zero digit is nil
+    test_obj("x:str? = \"abc\"", TypeStr.ABC); // question-type allows nil or not
+    testerr("x:str  = 0", "~nil is not a *[$]str", 1);
     test_ptr0("math_rand(1)?0:\"abc\"", (alias)->TypeMemPtr.make_nil(alias,TypeStr.ABC));
     testerr("(math_rand(1)?0 : @{x=1}).x", "Struct might be nil when reading field '.x'", 27);
-    test   ("p=math_rand(1)?0:@{x=1}; p ? p.x : 0", TypeInt.BOOL); // not-null-ness after a null-check
-    test   ("x:int = y:str? = z:flt = 0", Type.NIL); // null/0 freely recasts
-    test   ("\"abc\"==0", TypeInt.FALSE ); // No type error, just not null
-    test   ("\"abc\"!=0", TypeInt.TRUE  ); // No type error, just not null
-    test   ("nil=0; \"abc\"!=nil", TypeInt.TRUE); // Another way to name null
-    test   ("a = math_rand(1) ? 0 : @{x=1}; // a is null or a struct\n"+
-            "b = math_rand(1) ? 0 : @{c=a}; // b is null or a struct\n"+
-            "b ? (b.c ? b.c.x : 0) : 0      // Null-safe field load", TypeInt.BOOL); // Nested null-safe field load
+    test   ("p=math_rand(1)?0:@{x=1}; p ? p.x : 0", TypeInt.BOOL); // not-nil-ness after a nil-check
+    test   ("x:int = y:str? = z:flt = 0", Type.XNIL); // nil/0 freely recasts
+    test   ("\"abc\"==0", TypeInt.FALSE ); // No type error, just not nil
+    test   ("\"abc\"!=0", TypeInt.TRUE  ); // No type error, just not nil
+    test   ("nil=0; \"abc\"!=nil", TypeInt.TRUE); // Another way to name nil
+    test   ("a = math_rand(1) ? 0 : @{x=1}; // a is nil or a struct\n"+
+            "b = math_rand(1) ? 0 : @{c=a}; // b is nil or a struct\n"+
+            "b ? (b.c ? b.c.x : 0) : 0      // Nil-safe field load", TypeInt.BOOL); // Nested nil-safe field load
   }
 
   @Test public void testParse06() {

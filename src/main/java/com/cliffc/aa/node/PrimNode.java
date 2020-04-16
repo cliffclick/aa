@@ -318,23 +318,24 @@ static class EQ_OOP extends PrimNode {
     // input is 2 different NewNodes (or casts of NewNodes).  Otherwise you
     // have to do the runtime test.
     if( in(1)==in(2) ) return TypeInt.TRUE;
-    if( in(1) instanceof NewNode &&
-        in(2) instanceof NewNode &&
-        in(1) != in(2) ) return TypeInt.FALSE;
+    Node nn1 = in(1).in(0), nn2 = in(2).in(0);
+    if( nn1 instanceof NewNode &&
+        nn2 instanceof NewNode &&
+        nn1 != nn2 ) return TypeInt.FALSE;
     // Constants can only do nil-vs-not-nil, since e.g. two strings "abc" and
     // "abc" are equal constants in the type system but can be two different
     // string pointers.
     Type t1 = gvn.type(in(1));
     Type t2 = gvn.type(in(2));
+    if( t1==Type.NIL || t1==Type.XNIL ) return vs_nil(t2,TypeInt.TRUE,TypeInt.FALSE);
+    if( t2==Type.NIL || t2==Type.XNIL ) return vs_nil(t1,TypeInt.TRUE,TypeInt.FALSE);
     if( t1.above_center() || t2.above_center() ) return TypeInt.BOOL.dual();
-    if( t1==Type.NIL ) return vs_nil(t2,TypeInt.TRUE,TypeInt.FALSE);
-    if( t2==Type.NIL ) return vs_nil(t1,TypeInt.TRUE,TypeInt.FALSE);
     return TypeInt.BOOL;
   }
   @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
   @Override public byte op_prec() { return 4; }
   static Type vs_nil( Type tx, Type t, Type f ) {
-    if( tx==Type.NIL ) return t;
+    if( tx==Type.NIL || tx==Type.XNIL ) return t;
     if( tx.above_center() ) return tx.isa(Type.NIL) ? TypeInt.BOOL.dual() : f;
     return tx.must_nil() ? TypeInt.BOOL : f;
   }
@@ -349,17 +350,18 @@ static class NE_OOP extends PrimNode {
     // input is 2 different NewNodes (or casts of NewNodes).  Otherwise you
     // have to do the runtime test.
     if( in(1)==in(2) ) return TypeInt.FALSE;
-    if( in(1) instanceof NewNode &&
-        in(2) instanceof NewNode &&
-        in(1) != in(2) ) return TypeInt.TRUE;
+    Node nn1 = in(1).in(0), nn2 = in(2).in(0);
+    if( nn1 instanceof NewNode &&
+            nn2 instanceof NewNode &&
+            nn1 != nn2 ) return TypeInt.TRUE;
     // Constants can only do nil-vs-not-nil, since e.g. two strings "abc" and
     // "abc" are equal constants in the type system but can be two different
     // string pointers.
     Type t1 = gvn.type(in(1));
     Type t2 = gvn.type(in(2));
+    if( t1==Type.NIL || t1==Type.XNIL ) return EQ_OOP.vs_nil(t2,TypeInt.FALSE,TypeInt.TRUE);
+    if( t2==Type.NIL || t2==Type.XNIL ) return EQ_OOP.vs_nil(t1,TypeInt.FALSE,TypeInt.TRUE);
     if( t1.above_center() || t2.above_center() ) return TypeInt.BOOL.dual();
-    if( t1==Type.NIL ) return EQ_OOP.vs_nil(t2,TypeInt.FALSE,TypeInt.TRUE);
-    if( t2==Type.NIL ) return EQ_OOP.vs_nil(t1,TypeInt.FALSE,TypeInt.TRUE);
     return TypeInt.BOOL;
   }
   @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
