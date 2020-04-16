@@ -426,7 +426,7 @@ public abstract class Node implements Cloneable {
       else if( this instanceof ErrNode ) errs=errs1; // Report ErrNodes next
       // Report bad parms/unresolved calls last, as some other error generally
       // triggered this one.
-      else if( this instanceof UnresolvedNode ) errs=errs3;
+      else if( this instanceof UnresolvedNode || this instanceof ParmNode ) errs=errs3;
       else errs=errs2;          // Other errors (e.g. bad fields for Loads)
       if( errs.find(msg::equals) == -1 ) // Filter dups; happens due to e.g. inlining replicated busted code
         errs.add(msg);

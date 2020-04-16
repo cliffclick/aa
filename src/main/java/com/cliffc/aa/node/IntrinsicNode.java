@@ -67,7 +67,8 @@ public class IntrinsicNode extends Node {
         // correct type?  Fold into the NewObjNode and remove this Convert.
         TypeTuple tnnn = (TypeTuple)gvn.type(nnn);
         if( tnnn.at(0).isa(_tn.remove_name()) ) {
-          nnn.set_name((TypeStruct) _tn);
+          TypeStruct tn = TypeStruct.make(_tn._name,nnn._ts._flds,nnn._ts._ts,nnn._ts.flags_clone());
+          nnn.set_name(tn);
           gvn.add_work(nnn);
           return new MemMergeNode(mem,opj,alias);
         }

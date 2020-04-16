@@ -372,8 +372,7 @@ public class Parse {
 
         // Active (parser) memory state.
         int alias = scope.stk()._alias;        // Alias for display/object
-        MemMergeNode mmem = mem_active();      // Parser memory, ready for modification
-        Node objmem = mmem.active_obj(alias);  // Struct memory
+        Node objmem = mem_active().active_obj(alias);  // Active struct memory
         Node ptr = get_display_ptr(scope,tok); // Pointer, possibly loaded up the display-display
         // If the active state is directly a NewObj, update-in-place.  This is
         // an early optimization.
@@ -383,7 +382,7 @@ public class Parse {
           ((NewObjNode)objmem.in(0)).update(tok,mutable,ifex,_gvn);
         } else {
           StoreNode st = (StoreNode)gvn(new StoreNode(objmem,ptr,ifex,mutable,tok,errMsg()));
-          mmem.st(st,_gvn);     // Update active memory
+          mem_active().st(st,_gvn);     // Update active memory
         }
         scope.def_if(tok,mutable,false); // Note 1-side-of-if update
       }

@@ -206,7 +206,7 @@ public class TestParse {
     testerr("1:str", "1 is not a *[$]str",1);
 
     test   ("{x:int -> x*2}(1)", TypeInt.con(2)); // Types on parms
-    testerr("{x:str -> x}(1)", "1 is not a *[$]str", 15);
+    testerr("{x:str -> x}(1)", "1 is not a *[$]str", 2);
 
     // Type annotations on dead args are ignored
     test   ("fun:{int str -> int}={x y -> x+2}; fun(2,3)", TypeInt.con(4));
@@ -225,7 +225,7 @@ public class TestParse {
     testerr("fun={x y -> x+y}; baz={x:int y:@{x;y} -> fun(x,y)}; (fun(2,3), baz(2,3))",
             "3 is not a *[$]@{x=;y=}", 71);
 
-    testerr("x=3; fun:{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int64",40);
+    testerr("x=3; fun:{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int64",8);
     test("x=3; fun:{real->real}={x -> x*2}; fun(2.1)+fun(x)", TypeFlt.con(2.1*2+3*2)); // Mix of types to fun()
     test("fun:{real->flt32}={x -> x}; fun(123 )", TypeInt.con(123 ));
     test("fun:{real->flt32}={x -> x}; fun(0.125)", TypeFlt.con(0.125));
@@ -279,8 +279,7 @@ public class TestParse {
     test_isa("(1,\"abc\").1", TypeMemPtr.STRPTR);
 
     // Named type variables
-    test("gal=:flt"     , TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make_args(TypeStruct.ts(Type.NIL,TypeFlt.FLT64, TypeFlt.FLT64.set_name("gal:")))));
-    test("gal=:flt; gal", TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make_args(TypeStruct.ts(Type.NIL,TypeFlt.FLT64, TypeFlt.FLT64.set_name("gal:")))));
+    test("gal=:flt; gal", TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make_args(TypeStruct.ts(Type.XSCALAR, TypeStruct.NO_DISP,TypeFlt.FLT64))));
     test("gal=:flt; 3==gal(2)+1", TypeInt.TRUE);
     test("gal=:flt; tank:gal = gal(2)", TypeInt.con(2).set_name("gal:"));
     // test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: figure out if free cast for bare constants?
@@ -288,8 +287,8 @@ public class TestParse {
 
     test    ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
     test    ("Point=:@{x;y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
-    testerr ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1;y=2}))", "*[$]@{x==1;y==2}! is not a *[$]Point:@{x=;y=}!",68);
-    testerr ("Point=:@{x;y}; Point((0,1))", "*[$](nil;1)! is not a *[$]Point:@{x=;y=}!",27);
+    testerr ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1;y=2}))", "*[$]@{x==;y==} is not a *[$]Point:@{x=;y=}",22);
+    testerr ("Point=:@{x;y}; Point((0,1))", "*[$](~nil;1) is not a *[$]Point:@{x=;y=}",27);
     testerr("x=@{n: =1;}","Missing type after ':'",7);
     testerr("x=@{n=;}","Missing ifex after assignment of 'n'",6);
     test_obj_isa("x=@{n}",TypeStruct.make(new String[]{"^","n"},TypeStruct.ts(TypeMemPtr.DISPLAY_PTR,Type.NIL),TypeStruct.ffnls(2)));
