@@ -746,7 +746,7 @@ public class Parse {
     // or when inside of a struct definition: 'this'.
     Node parent_display = _e._scope.ptr();
     ids .push("^");
-    ts  .push(_gvn.type(parent_display));
+    ts  .push(_gvn.type(parent_display).meet_nil(Type.NIL));
     bads.push(null);
 
     // Parse arguments
@@ -790,8 +790,8 @@ public class Parse {
       set_ctrl(fun);            // New control is function head
       // Build Parms for all incoming values
       Node rpc = gvn(new ParmNode(-1,"rpc",fun,con(TypeRPC.ALL_CALL),null)).keep();
-      Node mem = gvn(new ParmNode(-2,"mem",fun,con(TypeMem.FULL    ),null));
-      Node clo = gvn(new ParmNode( 1,"^"  ,fun,con(ts.at(1)),null));
+      Node mem = gvn(new ParmNode(-2,"mem",fun,con(TypeMem.MEM     ),null)).keep();
+      Node clo = gvn(new ParmNode( 1,"^"  ,fun,con(ts.at(1)        ),null));
       // Display is special: the default is simply the outer lexical scope.
       // But here, in a function, the display is actually passed in as a hidden
       // extra argument and replaces the default.
@@ -811,7 +811,7 @@ public class Parse {
       MemMergeNode amem = mem_active();
       assert amem.in(1).in(0) == e._scope.stk(); // amem slot#1 is the display
       // Adding mem to worklist, because its liveness now changes
-      amem.set_def(0,_gvn.add_work(mem),_gvn); // amem slot#0 was outer display, should be function memory
+      amem.set_def(0,_gvn.add_work(mem.unhook()),_gvn); // amem slot#0 was outer display, should be function memory
       // Parse function body
       Node rez = stmts();       // Parse function body
       if( rez == null ) rez = err_ctrl2("Missing function body");
@@ -890,7 +890,7 @@ public class Parse {
 
   // Add a typecheck into the graph, with a shortcut if trivially ok.
   private Node typechk(Node x, Type t, Node mem, Parse bad) {
-    return t == null || _gvn.type(x).isa(t) ? x : gvn(new TypeNode(t,x,bad));
+    return t == null || _gvn.type(x).isa(t) ? x : gvn(new TypeNode(mem,x,t,bad));
   }
 
   private String token() { skipWS();  return token0(); }
@@ -1002,7 +1002,7 @@ public class Parse {
   // Type or null or Type.ANY for '->' token
   private Type type0(boolean type_var) {
     if( peek('{') ) {           // Function type
-      Ary<Type> ts = new Ary<>(new Type[]{Type.SCALAR,TypeMemPtr.DISPLAY_PTR});  Type t;
+      Ary<Type> ts = new Ary<>(new Type[]{Type.SCALAR,TypeStruct.NO_DISP_SIMPLE});  Type t;
       while( (t=typep(type_var)) != null && t != Type.ANY  )
         ts.add(t);              // Collect arg types
       Type ret;
@@ -1021,7 +1021,7 @@ public class Parse {
 
     if( peek("@{") ) {          // Struct type
       Ary<String> flds = new Ary<>(new String[]{"^"});
-      Ary<Type  > ts   = new Ary<>(new Type  []{TypeMemPtr.DISPLAY_PTR});
+      Ary<Type  > ts   = new Ary<>(new Type  []{Type.XNIL});
       Ary<Byte  > mods = new Ary<>(new Byte  []{TypeStruct.FFNL});
       while( true ) {
         String tok = token();            // Scan for 'id'
@@ -1051,7 +1051,7 @@ public class Parse {
     // "(, , )" is a 2-entry tuple
     if( peek('(') ) { // Tuple type
       byte c;
-      Ary<Type> ts = new Ary<>(new Type[]{TypeMemPtr.DISPLAY_PTR});
+      Ary<Type> ts = new Ary<>(new Type[]{Type.XNIL});
       while( (c=skipWS()) != ')' ) { // No more types...
         Type t = Type.SCALAR;    // Untyped, most generic field type
         if( c!=',' &&            // Has type annotation?
@@ -1245,18 +1245,18 @@ public class Parse {
   }
 
   // Polite error message for mismatched types
-  public String typerr( Type t0, Type t1, Node mem ) {
+  public String typerr( Type actual, Node mem, Type expected ) {
     Type t = mem==null ? null : _gvn.type(mem);
     TypeMem tmem = t instanceof TypeMem ? (TypeMem)t : null;
-    String s0 = typerr(t0,tmem);
-    String s1 = typerr(t1,tmem);
+    String s0 = typerr(actual  ,tmem);
+    String s1 = typerr(expected,null); // Expected is already a complex ptr, does not depend on memory
     return errMsg(s0+" is not a "+s1);
   }
-  public String typerr( Type t0, Type[] t1s, Node mem ) {
+  public String typerr( Type actual, Node mem, Type[] expecteds ) {
     Type t = mem==null ? null : _gvn.type(mem);
     TypeMem tmem = t instanceof TypeMem ? (TypeMem)t : null;
-    SB sb = new SB().p(typerr(t0,tmem)).p(" is none of (");
-    for( Type t1 : t1s ) sb.p(typerr(t1,tmem)).p(',');
+    SB sb = new SB().p(typerr(actual,tmem)).p(" is none of (");
+    for( Type expect : expecteds ) sb.p(typerr(expect,null)).p(',');
     return errMsg(sb.unchar().p(")").toString());
   }
   private static String typerr( Type t, TypeMem tmem ) {

@@ -82,7 +82,8 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   @Override protected TypeFunPtr free( TypeFunPtr ret ) { FREE=this; return ret; }
   public static TypeFunPtr make( BitsFun fidxs, TypeStruct args ) {
     assert Util.eq(args._flds[0],"->"); // First is return
-    assert args.at(1).is_display_ptr(); // Second is the display
+    assert args.at(1) instanceof TypeMemPtr &&
+      args.at(1)==args.at(1).simple_ptr(); // Simple display ptr.  Just the alias.
     TypeFunPtr t1 = FREE;
     if( t1 == null ) t1 = new TypeFunPtr(fidxs,args);
     else {   FREE = null;        t1.init(fidxs,args); }
@@ -97,12 +98,12 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public static TypeStruct ARGS =
     TypeStruct.make(false,     // Low, so extra args are all SCALAR
                     new String[]{"->","^"}, // First two args normal for a function
-                    TypeAry.ts(Type.SCALAR,Type.SCALAR),
+                    TypeAry.ts(Type.SCALAR,TypeMemPtr.DISP_SIMPLE),
                     new byte[]{TypeStruct.FFNL,TypeStruct.FRO});
   public static TypeFunPtr make_anon() { return make_new(ARGS); } // Make a new anonymous function ptr
   // Make a TFP with a new display and return value, used by FunPtrNode
   public TypeFunPtr make(Type display_ptr, Type ret) {
-    assert _args.at(1).is_display_ptr() && display_ptr.is_display_ptr();
+    assert display_ptr==display_ptr.simple_ptr();
     TypeStruct args = _args.set_fld(0,ret        ,_args.fmod(0));
     args            =  args.set_fld(1,display_ptr,_args.fmod(1));
     return make(_fidxs,args);

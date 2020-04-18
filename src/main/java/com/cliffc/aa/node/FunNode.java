@@ -80,7 +80,6 @@ public class FunNode extends RegionNode {
     super(OP_FUN);
     assert tf.isa(TypeFunPtr.GENERIC_FUNPTR);
     assert TypeFunPtr.GENERIC_FUNPTR.dual().isa(tf);
-    assert tf._args._ts[1].is_display_ptr();
     assert !BitsFun.is_parent(tf.fidx());
     _name = name;
     _tf = tf;
@@ -165,7 +164,7 @@ public class FunNode extends RegionNode {
   // Argument type.  0 is the return, 1 is the display.
   Type targ(int idx) {
     return idx == -1 ? TypeRPC.ALL_CALL :
-      (idx == -2 ? TypeMem.FULL : _tf.arg(idx));
+      (idx == -2 ? TypeMem.MEM : _tf.arg(idx));
   }
   int nargs() { return _tf._args._ts.length; } // Slot 0 is the return and not an arg, and is included in the length
   void set_is_copy(GVNGCM gvn) { gvn.set_def_reg(this,0,this); }
@@ -185,6 +184,7 @@ public class FunNode extends RegionNode {
     }
 
     if( is_forward_ref() ) return null; // No mods on a forward ref
+    if( _defs._len <= 1 ) return null; // Not even the unknown caller
     ParmNode rpc_parm = rpc();
     if( rpc_parm == null ) return null; // Single caller const-folds the RPC, but also inlines in CallNode
     ParmNode[] parms = new ParmNode[nargs()];
@@ -199,10 +199,10 @@ public class FunNode extends RegionNode {
     for( int i=0; i<parms.length; i++ ) {
       Type t = ts[i];
       if( i==0 ) t = tret.at(2);              // Return uses RET.val
-      else if( parms[i]==null ) t = Type.XSCALAR; // Dead
+      else if( parms[i]==null ) t = (i==1 ? TypeStruct.NO_DISP_SIMPLE : Type.XSCALAR); // Dead
       else if( _defs._len>1 )   // If have any args (no change if no args)
         t = gvn.type(parms[i]); // Get the parm type directly
-      if( t.isa(ts[i]) && !t.above_center() ) // Fails isa in error cases
+      if( t.isa(ts[i]) && (!t.above_center() || parms[i]==null) ) // Fails isa in error cases
         progress |= (ts[i]=t) != targ(i);     // Assign & check progress
     }
     // If progress, update _tf
@@ -320,7 +320,7 @@ public class FunNode extends RegionNode {
     if( idx != -1 ) {           // Found; split along a specific input path using widened types
       Type[] sig = TypeAry.get(parms.length);
       sig[0] = _tf.ret();
-      sig[1] = parms[1]==null ? Type.XSCALAR : gvn.type(parms[1].in(idx));
+      sig[1] = parms[1]==null ? TypeStruct.NO_DISP_SIMPLE : gvn.type(parms[1].in(idx));
       for( int i=2; i<parms.length; i++ ) // 0 for return, 1 for display
         sig[i] = parms[i]==null ? Type.XSCALAR : gvn.type(parms[i].in(idx)).widen();
       assert !(sig[1] instanceof TypeFunPtr);
@@ -369,7 +369,7 @@ public class FunNode extends RegionNode {
     if( sig == null ) return null; // No unresolved calls; no point in type-specialization
     // Make a new function header with new signature
     TypeStruct args = TypeStruct.make_args(_tf._args._flds,sig);
-    assert args.isa(_tf._args);
+    if( !args.isa(_tf._args) ) return null; // Fails in error cases
     return args == _tf._args ? null : args; // Must see improvement
   }
 
@@ -450,6 +450,7 @@ public class FunNode extends RegionNode {
 
     // Pick which input to inline.  Only based on having some constant inputs
     // right now.
+    Node mem = parm(-2);        // Memory, used to sharpen input ptrs
     int m=-1, mncons = -1;
     for( int i=has_unknown_callers() ? 2 : 1; i<_defs._len; i++ ) {
       Node call = in(i).in(0);
@@ -461,7 +462,7 @@ public class FunNode extends RegionNode {
       int ncon=0;
       for( ParmNode parm : parms )
         if( parm != null ) {    // Some can be dead
-          Type t = gvn.type(parm.in(i));
+          Type t = gvn.sharptr(parm.in(i),mem.in(i));
           if( !t.isa(targ(parm._idx)) ) // Path is in-error?
             { ncon = -2; break; } // This path is in-error, cannot inline even if small & constants
           if( t.is_con() ) ncon++; // Count constants along each path
@@ -603,7 +604,7 @@ public class FunNode extends RegionNode {
         // Change the unknown caller parm types to match the new sig.  Default
         // memory includes the other half of alias splits, which might be
         // passed in from recursive calls.
-        assert fun.targ(-2)==TypeMem.FULL;
+        assert fun.targ(-2)==TypeMem.MEM;
         ParmNode parm;
         for( Node p : fun._uses )
           if( p instanceof ParmNode && (parm=(ParmNode)p)._idx != 0 )
@@ -640,7 +641,7 @@ public class FunNode extends RegionNode {
       Type nt = gvn.type(oo);   // Generally just copy type from original nodes
       if( nn instanceof ParmNode && nn.in(0) == fun ) {  // Leading edge ParmNodes
         ParmNode pnn = (ParmNode)nn; // Update non-display type to match new signature
-        if( pnn._idx > 0 ) pnn._t = nt = fun.targ(pnn._idx); // Upgrade new Parm default type
+        if( pnn._idx > 0 ) nt = fun.targ(pnn._idx).simple_ptr(); // Upgrade new Parm default type
         else if( pnn._idx == -2 ) nt = def_mem;
       }
       gvn.rereg(nn,nt);

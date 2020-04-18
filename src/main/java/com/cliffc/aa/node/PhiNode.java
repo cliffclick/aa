@@ -10,12 +10,13 @@ import java.util.BitSet;
 // Merge results; extended by ParmNode
 public class PhiNode extends Node {
   final Parse _badgc;
-  Type _t;
+  final Type _t;
   private PhiNode( byte op, Type t, Parse badgc, Node... vals ) {
     super(op,vals);
+    if( t instanceof TypeMem ) _t = TypeMem.MEM;
+    else if( t instanceof TypeObj ) _t = TypeObj.OBJ; // Need to check liveness
+    else { assert t.isa(Type.SCALAR); _t = Type.SCALAR; }
     _badgc = badgc;
-    _t = t;
-    // Recompute, since _t was null inside of Node.Node calling basic_liveness.
     _live = basic_liveness() ? TypeMem.EMPTY : TypeMem.FULL;
   }
   public PhiNode( Type t, Parse badgc, Node... vals ) { this(OP_PHI,t,badgc,vals); }
@@ -45,16 +46,7 @@ public class PhiNode extends Node {
       Node n = in(i);
       if( n==this || n==live ) continue; // Ignore self or duplicates
       if( live==null ) live = n;         // Found unique live input
-      else {
-        // Interesting optimization added for handling odd-ball above-center displays.
-        // Removed, as incorrect for XNIL.
-        //Type tn = gvn.type(n);
-        //Type tl = gvn.type(live);
-        //if( live   instanceof ConNode && tl.above_center() && tl.isa(tn) ) live = n; // Keep non-constant
-        //else if( n instanceof ConNode && tn.above_center() && tn.isa(tl) ) ; // keep live, the constant does not add anything
-        //else live=this;         // Found 2nd live input, no collapse
-        live=this;              // Found 2nd live input, no collapse
-      }
+      else live=this;                    // Found 2nd live input, no collapse
     }
     if( live != this ) return live; // Single unique input
 
@@ -139,12 +131,14 @@ public class PhiNode extends Node {
     for( int i=1; i<_defs._len; i++ )
       if( gvn.type(r.in(i))==Type.CTRL ) // Only meet alive paths
         t = t.meet(gvn.type(in(i)));
-    return t.bound(_t);                  // Limit to sane results
+    return t;
   }
   // Only interested in memory aliases, if merging memory
-  @Override public boolean basic_liveness() {  return !(_t instanceof TypeMem); }
+  @Override public boolean basic_liveness() {
+    return _t==Type.SCALAR;
+  }
 
-  @Override public Type all_type() { return _t; }
+  @Override public Type all_type() { return Type.ALL; } // Might need something here for Scalar vs Memory
   @Override public String err(GVNGCM gvn) {
     if( !(in(0) instanceof FunNode && ((FunNode)in(0))._name.equals("!") ) && // Specifically "!" takes a Scalar
         (gvn.type(this).contains(Type.SCALAR) ||

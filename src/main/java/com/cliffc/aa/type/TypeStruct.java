@@ -299,7 +299,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public static TypeStruct make_args(boolean any, String[] flds, Type[] ts) {
     assert Util.eq(flds[0],"->");
     assert Util.eq(flds[1],"^");
-    assert ts[1].is_display_ptr();
+    assert ts[1] instanceof TypeMemPtr && ts[1]==ts[1].simple_ptr(); // Simple display ptrs only
     byte[] fs = fbots(ts.length);  fs[0] = FFNL;
     return malloc("",any,flds,ts,fs).hashcons_free();
   }
@@ -326,10 +326,10 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     Type[] ets = ts(_ts.length);
     Arrays.fill(ets,Type.NIL); // Has to be all NIL args to preserve monotonicity
     ets[0] = Type.XNIL;        // Function return type
-    ets[1] = TypeStruct.NO_DISP; // Display type
+    ets[1] = NO_DISP_SIMPLE;   // Display type
     return make_from(true,ets,ffnls(_ts.length));
   }
-  
+
 
   // Recursive meet in progress.
   // Called during class-init.
@@ -373,21 +373,25 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       // value) but displays have the linked-list pointer in _ts[0].
       (_ts.length >= 1 && _ts[0].is_display_ptr());
   }
+
+  // Used for marking "no/dead display" in FunNode._tf (function signatures).
   public static final Type NO_DISP= TypeMemPtr.NIL_DISPLAY;
+  // Used to pass around a no/dead display in GVN Nodes.
+  public static final Type NO_DISP_SIMPLE= NO_DISP.simple_ptr();
 
   public  static final TypeStruct GENERIC = malloc("",true,new String[0],TypeAry.get(0),new byte[0]).hashcons_free();
   public  static final TypeStruct ALLSTRUCT;
-  public  static final TypeStruct INT64__INT64= make_args(ARGS_X ,ts(TypeInt.INT64,NO_DISP,TypeInt.INT64)); // {int->int}
-  public  static final TypeStruct INT64__FLT64= make_args(ARGS_X ,ts(TypeFlt.FLT64,NO_DISP,TypeInt.INT64)); // {int->flt}
-  public  static final TypeStruct FLT64__FLT64= make_args(ARGS_X ,ts(TypeFlt.FLT64,NO_DISP,TypeFlt.FLT64)); // {flt->flt}
-  public  static final TypeStruct STRPTR__STRPTR    = make_args(ARGS_X ,ts(TypeMemPtr.STRPTR,NO_DISP,TypeMemPtr.STRPTR));
-  public  static final TypeStruct STRPTR__SCALAR    = make_args(ARGS_X ,ts(Type.SCALAR,NO_DISP,TypeMemPtr.STRPTR));
-  public  static final TypeStruct INT64_INT64__INT64= make_args(ARGS_XY,ts(TypeInt.INT64,NO_DISP,TypeInt.INT64,TypeInt.INT64)); // {int int->int }
-  public  static final TypeStruct INT64_INT64__BOOL = make_args(ARGS_XY,ts(TypeInt.BOOL ,NO_DISP,TypeInt.INT64,TypeInt.INT64)); // {int int->bool}
-  public  static final TypeStruct FLT64_FLT64__FLT64= make_args(ARGS_XY,ts(TypeFlt.FLT64,NO_DISP,TypeFlt.FLT64,TypeFlt.FLT64)); // {flt flt->flt }
-  public  static final TypeStruct FLT64_FLT64__BOOL = make_args(ARGS_XY,ts(TypeInt.BOOL ,NO_DISP,TypeFlt.FLT64,TypeFlt.FLT64)); // {flt flt->bool}
-  public  static final TypeStruct OOP_OOP__BOOL     = make_args(ARGS_XY,ts(TypeInt.BOOL,NO_DISP,TypeMemPtr.OOP0,TypeMemPtr.OOP0));
-  public  static final TypeStruct SCALAR1__BOOL     = make_args(ARGS_X ,ts(TypeInt.BOOL,NO_DISP,SCALAR));
+  public  static final TypeStruct INT64__INT64= make_args(ARGS_X ,ts(TypeInt.INT64,NO_DISP_SIMPLE,TypeInt.INT64)); // {int->int}
+  public  static final TypeStruct INT64__FLT64= make_args(ARGS_X ,ts(TypeFlt.FLT64,NO_DISP_SIMPLE,TypeInt.INT64)); // {int->flt}
+  public  static final TypeStruct FLT64__FLT64= make_args(ARGS_X ,ts(TypeFlt.FLT64,NO_DISP_SIMPLE,TypeFlt.FLT64)); // {flt->flt}
+  public  static final TypeStruct STRPTR__STRPTR    = make_args(ARGS_X ,ts(TypeMemPtr.STRPTR,NO_DISP_SIMPLE,TypeMemPtr.STRPTR));
+  public  static final TypeStruct STRPTR__SCALAR    = make_args(ARGS_X ,ts(Type.SCALAR,NO_DISP_SIMPLE,TypeMemPtr.STRPTR));
+  public  static final TypeStruct INT64_INT64__INT64= make_args(ARGS_XY,ts(TypeInt.INT64,NO_DISP_SIMPLE,TypeInt.INT64,TypeInt.INT64)); // {int int->int }
+  public  static final TypeStruct INT64_INT64__BOOL = make_args(ARGS_XY,ts(TypeInt.BOOL ,NO_DISP_SIMPLE,TypeInt.INT64,TypeInt.INT64)); // {int int->bool}
+  public  static final TypeStruct FLT64_FLT64__FLT64= make_args(ARGS_XY,ts(TypeFlt.FLT64,NO_DISP_SIMPLE,TypeFlt.FLT64,TypeFlt.FLT64)); // {flt flt->flt }
+  public  static final TypeStruct FLT64_FLT64__BOOL = make_args(ARGS_XY,ts(TypeInt.BOOL ,NO_DISP_SIMPLE,TypeFlt.FLT64,TypeFlt.FLT64)); // {flt flt->bool}
+  public  static final TypeStruct OOP_OOP__BOOL     = make_args(ARGS_XY,ts(TypeInt.BOOL ,NO_DISP_SIMPLE,TypeMemPtr.OOP0,TypeMemPtr.OOP0));
+  public  static final TypeStruct SCALAR1__BOOL     = make_args(ARGS_X ,ts(TypeInt.BOOL ,NO_DISP_SIMPLE,SCALAR));
 
   // A bunch of types for tests
   public static final Type NO_DISP2 = TypeMemPtr.NIL_DISPLAY;  // NIL display for *structs* not *function args*
@@ -1340,5 +1344,15 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   @Override void walk( Predicate<Type> p ) {
     if( p.test(this) )
       for( Type _t : _ts ) _t.walk(p);
+  }
+  
+  // Sharpen a TypeMemPtr with a TypeMem
+  @Override public Type sharpen( Type tmem ) {
+    if( !(tmem instanceof TypeMem) ) return this;
+    // TODO: Needs the cyclic touch
+    Type[] ts = TypeAry.get(_ts.length);
+    for( int i=0; i<ts.length; i++ )
+      ts[i] = _ts[i].sharpen(tmem);
+    return make_from(ts);
   }
 }

@@ -304,20 +304,20 @@ public class TypeMem extends Type<TypeMem> {
     return make0(objs);
   }
 
-  // Meet of all possible loadable values
+  // Shallow meet of all possible loadable values
   public TypeObj ld( TypeMemPtr ptr ) {
     if( this== FULL ) return TypeObj. OBJ;
     if( this==EMPTY ) return TypeObj.XOBJ;
     boolean any = ptr.above_center();
-    TypeObj obj = any ? TypeObj.OBJ : TypeObj.XOBJ;
     // Any alias, plus all of its children, are meet/joined.  This does a
     // tree-based scan on the inner loop.
-    BitSet bs = ptr._aliases.tree().plus_kids(ptr._aliases);
-    for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) ) {
-      TypeObj x = at(alias);
-      obj = (TypeObj)(any ? obj.join(x) : obj.meet(x));
-    }
-    return obj;
+    TypeObj obj1 = any ? TypeObj.OBJ : TypeObj.XOBJ;
+    for( int alias : ptr._aliases )
+      for( int kid=alias; kid!=0; kid=BitsAlias.next_kid(alias,kid) ) {
+        TypeObj x = at(kid);
+        obj1 = (TypeObj)(any ? obj1.join(x) : obj1.meet(x));
+      }
+    return obj1;
   }
 
   // Whole object Store at an alias.  Just merge with the parent.

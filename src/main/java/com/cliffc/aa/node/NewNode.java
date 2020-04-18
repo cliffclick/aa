@@ -14,7 +14,7 @@ public abstract class NewNode<T extends TypeObj> extends Node {
   // Unique alias class, one class per unique memory allocation site.
   // Only effectively-final, because the copy/clone sets a new alias value.
   public int _alias;          // Alias class
-  T _ts;                      // Base object type
+  T _ts;                      // Base object type.  Can contain complex ptr types.
   boolean _captured;          // False if escapes, monotonic transition to true upon capture
 
   // NewNodes can participate in cycles, where the same structure is appended
@@ -62,15 +62,6 @@ public abstract class NewNode<T extends TypeObj> extends Node {
     return null;
   }
 
-  // Produces a TypeMemPtr
-  @Override public Type value(GVNGCM gvn) {
-    Type[] ts = TypeAry.get(_defs._len-1);
-    for( int i=0; i<ts.length; i++ )
-      ts[i] = gvn.type(fld(i));
-    TypeStruct t = TypeStruct.make_args(ts);
-    return TypeTuple.make(t,TypeMemPtr.make(_alias,t));
-  }
-
   // Basic escape analysis.  If no escapes and no loads this object is dead.
   // TODO: A better answer is to put escape analysis into the type flows.
   boolean captured( GVNGCM gvn ) {
@@ -90,8 +81,6 @@ public abstract class NewNode<T extends TypeObj> extends Node {
     // No escape, no loads, so object is dead
     return (_captured = true);
   }
-
-  @Override public Type all_type() { return TypeTuple.NEW; }
 
   // Clones during inlining all become unique new sites
   @Override @NotNull public NewNode copy( boolean copy_edges, CallEpiNode unused, GVNGCM gvn) {

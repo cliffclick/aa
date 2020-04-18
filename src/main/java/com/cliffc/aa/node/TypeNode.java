@@ -10,19 +10,20 @@ import java.util.Arrays;
 // Assert the matching type.  Parse-time error if it does not remove.  Note the
 // difference with CastNode: both Nodes always join their input with their
 // constant but a TypeNode has to be proven useless and removed before the
-// program is type-correct.  A CastNode is always correct from call/return
-// semantics, but the join is not-locally-obviously-correct.  The Cast makes it
-// locally obvious.
+// program is type-correct.  A CastNode is always correct from local semantics,
+// and the join is non-trivial.
 public class TypeNode extends Node {
   private final Type _t;            // Asserted type
   private final Parse _error_parse; // Used for error messages
-  public TypeNode( Type t, Node a, Parse P ) { super(OP_TYPE,null,a); _t=t; _error_parse = P; }
+  public TypeNode( Node mem, Node a, Type t, Parse P ) { super(OP_TYPE,null,mem,a); _t=t; _error_parse = P; }
   @Override String xstr() { return "assert:"+_t; }
-  Node arg() { return in(1); }
+  Node mem() { return in(1); }
+  Node arg() { return in(2); }
 
   @Override public Node ideal(GVNGCM gvn, int level) {
-    Node arg = arg();
-    if( gvn.type(arg).isa(_t) ) return arg;
+    Node arg = arg(), mem;
+    Type at = gvn.sharptr(arg,mem());
+    if( at.isa(_t) ) return arg;
     // If TypeNode check is for a function pointer, it will wrap any incoming
     // function with a new function which does the right arg-checks.  This
     // happens immediately in the Parser and is here to declutter the Parser.
@@ -32,12 +33,12 @@ public class TypeNode extends Node {
       Node[] args = new Node[targs.length-2/*not return nor display*/+/*+ctrl+mem+tfp+all args*/3];
       FunNode fun = gvn.init((FunNode)(new FunNode(tfp._args._flds,targs).add_def(Env.ALL_CTRL)));
       args[0] = fun;            // Call control
-      args[1] = gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM     ),null));
+      args[1] = mem = gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM),null)).keep();
       args[2] = arg;            // The whole TFP to the call
       for( int i=2; i<targs.length; i++ ) { // First is return, 2nd is display
         // All the parms, with types
         Node parm = gvn.xform(new ParmNode(i,"arg"+i,fun,gvn.con(Type.SCALAR),null));
-        args[i+1] = gvn.xform(new TypeNode(targs[i],parm,_error_parse));
+        args[i+1] = gvn.xform(new TypeNode(mem,parm,targs[i],_error_parse));
       }
       Parse[] badargs = new Parse[targs.length];
       Arrays.fill(badargs,_error_parse);
@@ -47,7 +48,7 @@ public class TypeNode extends Node {
       Node ctl    = gvn.xform(new CProjNode(cepi,0));
       Node postmem= gvn.xform(new MProjNode(cepi,1)).keep();
       Node val    = gvn.xform(new  ProjNode(cepi.unhook(),2));
-      Node chk    = gvn.xform(new  TypeNode(tfp.ret(),val,_error_parse)); // Type-check the return also
+      Node chk    = gvn.xform(new  TypeNode(mem.unhook(),val,tfp.ret(),_error_parse)); // Type-check the return also
       RetNode ret = (RetNode)gvn.xform(new RetNode(ctl,postmem.unhook(),chk,rpc,fun));
       // Just the Closure when we make a new TFP
       Node clos = gvn.xform(new FP2ClosureNode(arg));
@@ -67,9 +68,10 @@ public class TypeNode extends Node {
         // double-edge game going on with CG edges.
         //(!(fun instanceof FunNode) || !((FunNode)fun).has_unknown_callers()) ) {
         fun.getClass() == RegionNode.class ) {
-      for( int i=1; i<arg._defs._len; i++ )
-        gvn.set_def_reg(arg,i,gvn.xform(new TypeNode(_t,arg.in(i),_error_parse)));
-      return arg;               // Remove TypeNode, since completely replaced
+      //for( int i=1; i<arg._defs._len; i++ )
+      //  gvn.set_def_reg(arg,i,gvn.xform(new TypeNode(_t,arg.in(i),_error_parse)));
+      //return arg;               // Remove TypeNode, since completely replaced
+      throw com.cliffc.aa.AA.unimpl("untested");
     }
 
     return null;
@@ -77,9 +79,14 @@ public class TypeNode extends Node {
   @Override public Type value(GVNGCM gvn) {
     Node arg = arg();
     Type t = gvn.type(arg);
-    return t.isa(_t) ? t : _t;
+    if( mem() == null || !(t instanceof TypeMemPtr) || !(_t instanceof TypeMemPtr) )
+      return t.bound(_t).simple_ptr();
+    Type tmem = gvn.type(mem());
+    Type t2 = t.sharpen(tmem);
+    if( _t.dual().isa(t2) && t2.isa(_t) ) return t.simple_ptr();
+    return (tmem.above_center() ? _t.dual() : _t).simple_ptr();
   }
   @Override public Type all_type() { return Type.SCALAR; }
   // Check TypeNode for being in-error
-  @Override public String err(GVNGCM gvn) { return _error_parse.typerr(gvn.type(arg()),_t,null); }
+  @Override public String err(GVNGCM gvn) { return _error_parse.typerr(gvn.type(arg()),mem(),_t); }
 }

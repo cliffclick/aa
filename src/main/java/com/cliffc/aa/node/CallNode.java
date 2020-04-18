@@ -72,7 +72,7 @@ public class CallNode extends Node {
   // Example: call(arg1,arg2)
   // _badargs[1] points to the openning paren.
   // _badargs[2] points to the start of arg1, same for arg2, etc.
-  Parse[] _badargs;         // Errors for e.g. wrong arg counts or incompatible args; one error point per arg. 
+  Parse[] _badargs;         // Errors for e.g. wrong arg counts or incompatible args; one error point per arg.
   public CallNode( boolean unpacked, Parse[] badargs, Node... defs ) {
     super(OP_CALL,defs);
     _rpc = BitsRPC.new_rpc(BitsRPC.ALL); // Unique call-site index
@@ -148,7 +148,7 @@ public class CallNode extends Node {
     if( tctl!=Type.CTRL ) {     // Dead?
       if( (ctl() instanceof ConNode) ) return null;
       // Kill all inputs with type-safe dead constants
-      set_def(1,gvn.con(TypeMem.EMPTY),gvn);
+      set_def(1,gvn.con(TypeMem.XMEM),gvn);
       set_def(2,gvn.con(TypeFunPtr.GENERIC_FUNPTR.dual()),gvn);
       if( is_dead() ) return this;
       for( int i=3; i<_defs._len; i++ )
@@ -253,11 +253,11 @@ public class CallNode extends Node {
     // Not a memory to the call?
     Type mem = gvn.type(mem());
     if( !(mem instanceof TypeMem) )
-      mem = mem.above_center() ? TypeMem.EMPTY : TypeMem.FULL;
+      mem = mem.above_center() ? TypeMem.XMEM : TypeMem.MEM;
     ts[1] = mem;
 
     // If not called, then no memory to functions
-    if( ctl == Type.XCTRL ) { ts[1] = TypeMem.EMPTY; }
+    if( ctl == Type.XCTRL ) { ts[1] = TypeMem.XMEM; }
 
     // Copy args for called functions.
     for( int i=1; i<nargs(); i++ )
@@ -354,7 +354,7 @@ public class CallNode extends Node {
     // - Mix High/Low, keep all & fidx (ignore Good,Bad)
     if(  x(flags,HIGH) &&  x(flags,LOW) ) return fidxs;
     // - All Bad, like Low: keep all & meet.  Bad args can go dead, effectively lifting.
-    if( !x(flags,HIGH) && !x(flags,LOW) && !x(flags,GOOD) )
+    if( !x(flags,HIGH) && !x(flags,LOW) && !x(flags,GOOD) && flags!=0 )
       return sgn(fidxs,false);
     // Only had a single target coming in.
     if( fidxs.abit() != -1 ) // Single target
@@ -388,6 +388,7 @@ public class CallNode extends Node {
     if( BitsFun.is_parent(fidx) ) // Parent is never a real choice.  See these during inlining.
       throw com.cliffc.aa.AA.unimpl();
 
+    TypeMem tmem = (TypeMem)targs[1]; // Call Memory
     FunNode fun = FunNode.find_fidx(fidx);
     if( fun==null || fun.is_dead() ) return DEAD; // Stale fidx leading to dead fun
     // Forward refs are only during parsing; assume they fit the bill
@@ -401,6 +402,9 @@ public class CallNode extends Node {
       Type actual = targs[j+1];             // Calls skip ctrl & mem
       if( j==1 && actual instanceof TypeFunPtr )
         actual = ((TypeFunPtr)actual).display(); // Extract Display type from TFP
+      assert actual==actual.simple_ptr();        // Only simple ptrs from nodes
+      actual = actual.sharpen(tmem);             // Sharpen actual pointers before checking vs formals
+
       if( actual==formal ) { flags|=GOOD; continue; } // Arg is fine.  Covers NO_DISP which can be a high formal.
       Type mt_lo = actual.meet(formal       );
       Type mt_hi = actual.meet(formal.dual());
@@ -498,16 +502,17 @@ public class CallNode extends Node {
     return progress;
   }
 
-  @Override public String err(GVNGCM gvn) {
+  @Override public String err(GVNGCM gvn) { return err(gvn,false); }
+  String err(GVNGCM gvn, boolean fast) {
     // Fail for passed-in unknown references directly.
     for( int j=1; j<nargs(); j++ )
       if( arg(j).is_forward_ref() )
-        return _badargs[j].forward_ref_err( FunNode.find_fidx(((FunPtrNode)arg(j)).ret()._fidx) );
+        return fast ? "" : _badargs[j].forward_ref_err( FunNode.find_fidx(((FunPtrNode)arg(j)).ret()._fidx) );
 
     // Expect a function pointer
     Type tfun = gvn.type(fun());
     if( !(tfun instanceof TypeFunPtr) )
-      return _badargs[1].errMsg("A function is being called, but "+tfun+" is not a function type");
+      return fast ? "" : _badargs[1].errMsg("A function is being called, but "+tfun+" is not a function type");
     TypeFunPtr tfp = (TypeFunPtr)tfun;
 
     // Indirectly, forward-ref for function type
@@ -518,16 +523,18 @@ public class CallNode extends Node {
 
     // bad-arg-count
     if( tfp.nargs() != nargs() )
-      return _badargs[1].errMsg("Passing "+(nargs()-2)+" arguments to "+tfp.names()+" which takes "+(tfp.nargs()-2)+" arguments");
+      return fast ? "" : _badargs[1].errMsg("Passing "+(nargs()-2)+" arguments to "+tfp.names()+" which takes "+(tfp.nargs()-2)+" arguments");
 
     // Now do an arg-check.
     TypeStruct formals = tfp._args; // Type of each argument
     for( int j=2; j<nargs(); j++ ) {
-      Type actual = targ(gvn,j);
+      Type actual = gvn.sharptr(arg(j),mem());
       Type formal = formals.at(j);
+      if( formal==Type.XSCALAR ) continue; // Formal is dead
       if( !actual.isa(formal) ) { // Actual is not a formal
+        if( fast ) return "";
         if( tfp.fidxs().abit() != -1 )
-          return _badargs[j].typerr(actual,formal,mem());
+          return _badargs[j].typerr(actual,null,formal);
         // Multiple fails.  Try for a better error message.
         Type[] ts = new Type[tfp.fidxs().bitCount()];
         int i=0;
@@ -535,7 +542,7 @@ public class CallNode extends Node {
           FunNode fun = FunNode.find_fidx(fidx);
           ts[i++] = fun.targ(j);
         }
-        return _badargs[j].typerr(actual,ts,mem());
+        return _badargs[j].typerr(actual,null,ts);
       }
     }
 
@@ -546,7 +553,7 @@ public class CallNode extends Node {
     Type[] ts = TypeAry.get(_defs._len);
     Arrays.fill(ts,Type.SCALAR);
     ts[0] = Type.CTRL;
-    ts[1] = TypeMem.FULL;
+    ts[1] = TypeMem.MEM;
     ts[2] = TypeFunPtr.GENERIC_FUNPTR;
     return TypeTuple.make(ts);
   }

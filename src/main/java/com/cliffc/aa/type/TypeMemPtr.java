@@ -91,6 +91,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   public  static final TypeMemPtr STRUCT = make(BitsAlias.RECORD_BITS ,TypeStruct.ALLSTRUCT);
   public  static final TypeMemPtr STRUCT0= make(BitsAlias.RECORD_BITS0,TypeStruct.ALLSTRUCT);
   public  static final TypeMemPtr NILPTR = make(BitsAlias.NIL,TypeObj.OBJ);
+  public  static final TypeMemPtr DISP_SIMPLE= make(BitsAlias.RECORD_BITS0,TypeObj.OBJ);
   static final TypeMemPtr[] TYPES = new TypeMemPtr[]{OOP0,STR0,STRPTR,ABCPTR,STRUCT,NILPTR};
 
   @Override public boolean is_display_ptr() {
@@ -130,6 +131,11 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     BitsAlias aliases = _aliases.meet(ptr._aliases);
     TypeObj to = (TypeObj)_obj.meet(ptr._obj);
     return make(aliases, to);
+  }
+  // Widens, not lowers.
+  @Override public Type simple_ptr() {
+    if( _obj==TypeObj.OBJ || _obj==TypeObj.XOBJ ) return this;
+    return make(_aliases,above_center() ? TypeObj.XOBJ : TypeObj.OBJ);
   }
   @Override public boolean above_center() {
     // Aliases first, but if on the centerline (strictly EMPTY) then tie-break with _obj
@@ -225,4 +231,10 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   @SuppressWarnings("unchecked")
   @Override void walk( Predicate<Type> p ) { if( p.test(this) ) _obj.walk(p); }
   public int getbit() { return _aliases.getbit(); }
+  // Sharpen a TypeMemPtr with a TypeMem
+  @Override public Type sharpen( Type tmem ) {
+    if( !(tmem instanceof TypeMem) ) return this;
+    assert this==simple_ptr();
+    return make(_aliases,((TypeMem)tmem).ld(this));
+  }
 }

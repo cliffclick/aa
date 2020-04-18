@@ -120,15 +120,17 @@ public class NewObjNode extends NewNode<TypeStruct> {
     // Gather args and produce a TypeStruct
     Type[] ts = TypeAry.get(_ts._ts.length);
     for( int i=0; i<ts.length; i++ )
-      ts[i] = gvn.type(fld(i)); //Turned off bound for HIGH _ts like XNIL
+      ts[i] = gvn.type(fld(i));
     TypeStruct newt = _ts.make_from(ts);
-
-    // Check for TypeStructs with this same NewNode types occurring more than
-    // CUTOFF deep, and fold the deepest ones onto themselves to limit the type
-    // depth.  If this happens, the types become recursive with the
-    // approximations happening at the deepest points.
-    TypeStruct xs = newt.approx(CUTOFF,_alias);
-    assert Util.eq(xs._name,_ts._name);
-    return TypeTuple.make(xs,TypeMemPtr.make(_alias,_ts));
+  
+    //// Check for TypeStructs with this same NewNode types occurring more than
+    //// CUTOFF deep, and fold the deepest ones onto themselves to limit the type
+    //// depth.  If this happens, the types become recursive with the
+    //// approximations happening at the deepest points.
+    //TypeStruct xs = newt.approx(CUTOFF,_alias);
+    //assert Util.eq(xs._name,_ts._name);
+    //return TypeTuple.make(xs,TypeMemPtr.make(_alias,_ts));
+    return TypeTuple.make(newt,TypeMemPtr.make(_alias,TypeObj.OBJ)); // Complex obj, simple ptr.
   }
+  @Override public Type all_type() { return TypeTuple.NEWOBJ; }
 }

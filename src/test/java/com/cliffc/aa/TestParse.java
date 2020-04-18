@@ -99,7 +99,6 @@ public class TestParse {
   }
 
   @Test public void testParse01() {
-    test("x++;x",TypeInt.con(1));
     // Syntax for variable assignment
     test("x=1", TypeInt.TRUE);
     test("x=y=1", TypeInt.TRUE);
@@ -143,11 +142,11 @@ public class TestParse {
   @Test public void testParse02() {
     Object dummy = Env.GVN; // Force class loading cycle
     // Anonymous function definition
-    test_isa("{x y -> x+y}", TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make_args(TypeStruct.ARGS_XY,TypeStruct.ts(Type.XSCALAR,TypeMemPtr.DISPLAY_PTR,Type.SCALAR,Type.SCALAR)))); // {Scalar Scalar -> Scalar}
+    test_isa("{x y -> x+y}", TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make_args(TypeStruct.ARGS_XY,TypeStruct.ts(Type.XSCALAR,TypeStruct.NO_DISP_SIMPLE,Type.SCALAR,Type.SCALAR)))); // {Scalar Scalar -> Scalar}
     // Since call not-taken, post GCP Parms not loaded from _tf, limited to ~Scalar.  The
     // hidden internal call from {&} to the primitive is never inlined (has ~Scalar args)
     // so 'x&1' never sees the TypeInt return from primitive AND.
-    test_isa("{x -> x&1}", TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make_args(TypeStruct.ARGS_X,TypeStruct.ts(Type.XSCALAR,TypeMemPtr.DISPLAY_PTR,Type.SCALAR)))); // {Int -> Int}
+    test_isa("{x -> x&1}", TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make_args(TypeStruct.ARGS_X,TypeStruct.ts(Type.XSCALAR,TypeStruct.NO_DISP_SIMPLE,Type.SCALAR)))); // {Int -> Int}
     test("{5}()", TypeInt.con(5)); // No args nor -> required; this is simply a function returning 5, being executed
 
     // ID in different contexts; in general requires a new TypeVar per use; for
@@ -190,6 +189,7 @@ public class TestParse {
   }
 
   @Test public void testParse03() {
+    test_ptr("A= :(str?, int); A( (\"abc\",2) )","A:(*[$]\"abc\";2)");
     // Type annotations
     test("-1:int", TypeInt.con( -1));
     test("(1+2.3):flt", TypeFlt.make(0,64,3.3));
@@ -206,7 +206,7 @@ public class TestParse {
     testerr("1:str", "1 is not a *[$]str",1);
 
     test   ("{x:int -> x*2}(1)", TypeInt.con(2)); // Types on parms
-    testerr("{x:str -> x}(1)", "1 is not a *[$]str", 2);
+    testerr("{x:str -> x}(1)", "1 is not a *[$]str", 13);
 
     // Type annotations on dead args are ignored
     test   ("fun:{int str -> int}={x y -> x+2}; fun(2,3)", TypeInt.con(4));
@@ -225,7 +225,7 @@ public class TestParse {
     testerr("fun={x y -> x+y}; baz={x:int y:@{x;y} -> fun(x,y)}; (fun(2,3), baz(2,3))",
             "3 is not a *[$]@{x=;y=}", 69);
 
-    testerr("x=3; fun:{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int64",8);
+    testerr("x=3; fun:{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int64",36);
     test("x=3; fun:{real->real}={x -> x*2}; fun(2.1)+fun(x)", TypeFlt.con(2.1*2+3*2)); // Mix of types to fun()
     test("fun:{real->flt32}={x -> x}; fun(123 )", TypeInt.con(123 ));
     test("fun:{real->flt32}={x -> x}; fun(0.125)", TypeFlt.con(0.125));
@@ -313,8 +313,8 @@ public class TestParse {
 
   @Test public void testParse06() {
     Object dummy = Env.GVN; // Force class loading cycle
-    test_ptr("A= :(A?, int); A(0,2)","A:(*0;2)");
     test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*[$]A:(nil;2);3)");
+    test_ptr("A= :(A?, int); A(0,2)","A:(*0;2)");
 
     // Building recursive types
     test("A= :int; A(1)", TypeInt.TRUE.set_name("A:"));
@@ -765,7 +765,7 @@ strs:List(str?) = ... // List of null-or-strings
     try( TypeEnv te = run(program) ) {
       assertTrue(te._t instanceof TypeFunPtr);
       TypeFunPtr actual = (TypeFunPtr)te._t;
-      TypeFunPtr expected = TypeFunPtr.make(actual.fidxs(),TypeStruct.make_args(TypeStruct.ts(Type.XSCALAR,Type.XSCALAR,TypeMemPtr.STRUCT)));
+      TypeFunPtr expected = TypeFunPtr.make(actual.fidxs(),TypeStruct.make_args(TypeStruct.ts(Type.XSCALAR,TypeStruct.NO_DISP_SIMPLE,TypeMemPtr.STRUCT)));
       assertEquals(expected,actual);
     }
   }
@@ -780,11 +780,12 @@ strs:List(str?) = ... // List of null-or-strings
   static private void test_ptr0( String program, Function<Integer,Type> expected ) {
     try( TypeEnv te = run(program) ) {
       assertTrue(te._t instanceof TypeMemPtr);
-      BitsAlias bits = ((TypeMemPtr)te._t)._aliases;
+      TypeMemPtr tmp = (TypeMemPtr)(te._t.sharpen(te._tmem));
+      BitsAlias bits = tmp._aliases;
       assertTrue(bits.test(0));
       int alias = bits.strip_nil().getbit(); // internally asserts only 1 bit set
       Type t_expected = expected.apply(alias);
-      assertEquals(t_expected,te._t);
+      assertEquals(t_expected,tmp);
     }
   }
   static private void test_obj( String program, TypeObj obj) {

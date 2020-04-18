@@ -39,8 +39,8 @@ public final class FunPtrNode extends Node {
     if( is_forward_ref() ) return null;
     RetNode ret = ret();
     FunNode fun = ret.is_copy() ? FunNode.find_fidx(ret._fidx) : ret.fun();
-    if( !(display() instanceof ConNode) && (ret.is_copy() || fun._tf.display()==Type.XSCALAR) ) {
-      set_def(1,gvn.con(Type.XSCALAR),gvn);
+    if( !(display() instanceof ConNode) && (ret.is_copy() || fun._tf.display()==TypeStruct.NO_DISP_SIMPLE) ) {
+      set_def(1,gvn.con(TypeStruct.NO_DISP_SIMPLE),gvn);
       return this;
     }
     return null;
@@ -52,7 +52,9 @@ public final class FunPtrNode extends Node {
     FunNode fun = ret.is_copy() ? FunNode.find_fidx(ret._fidx) : ret.fun();
     if( is_forward_ref() ) return fun._tf;
     Type tret = gvn.type(ret);
-    Type tdisp = gvn.type(display());
+    Type tdisp = gvn.type(display()).meet_nil(Type.NIL);
+    if( fun._tf.display()==TypeStruct.NO_DISP_SIMPLE )
+      tdisp = TypeStruct.NO_DISP_SIMPLE;
     return fun._tf.make(tdisp,((TypeTuple)tret).at(2));
   }
 
@@ -87,7 +89,7 @@ public final class FunPtrNode extends Node {
   public static FunPtrNode forward_ref( GVNGCM gvn, String name, Parse unkref ) {
     FunNode fun = gvn.init(new FunNode(name));
     RetNode ret = gvn.init(new RetNode(fun,gvn.con(TypeMem.MEM),gvn.con(Type.SCALAR),gvn.con(TypeRPC.ALL_CALL),fun));
-    return new FunPtrNode(unkref.forward_ref_err(fun),ret,gvn.con(TypeMemPtr.DISPLAY_PTR));
+    return new FunPtrNode(unkref.forward_ref_err(fun),ret,gvn.con(TypeMemPtr.DISP_SIMPLE));
   }
 
   // True if this is a forward_ref
@@ -102,14 +104,6 @@ public final class FunPtrNode extends Node {
     assert rfun._defs._len==2 && rfun.in(0)==null && rfun.in(1) == Env.ALL_CTRL; // Forward ref has no callers
     assert dfun._defs._len==2 && dfun.in(0)==null;
     assert def ._uses._len==0;  // Def is brand new, no uses
-    TypeStruct disp = (TypeStruct)disp_ptr._obj;
-
-    // Make a cyclic type which loops the TypeFunPtr.display as the current
-    // display, and the current display refers to this TFP.
-    // Update, all at once:
-    //   dfun._tf
-    //   gvn.type of scope.ptr(), scope.stk(), scope.obj, def, ParmNode:^
-    //TypeFunPtr rtfp = disp.make_recursive(rfun._tf.fidxs(),dfun._tf._args,rfun._name);
 
     // Make a function pointer based on the original forward-ref fidx, but with
     // the known types.

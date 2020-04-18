@@ -21,6 +21,7 @@ public class NewStrNode extends NewNode<TypeStr> {
     // Gather args and produce a TypeStruct
     Type xs = gvn.type(fld(0));
     if( !(xs instanceof TypeObj) ) return all_type();
-    return TypeTuple.make(xs,TypeMemPtr.make(_alias,_ts));
+    return TypeTuple.make(xs,TypeMemPtr.make(_alias,TypeObj.OBJ));
   }
+  @Override public Type all_type() { return TypeTuple.NEWSTR; }
 }

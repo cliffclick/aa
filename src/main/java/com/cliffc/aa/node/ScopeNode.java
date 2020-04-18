@@ -113,6 +113,8 @@ public class ScopeNode extends Node {
     if( !(tmem instanceof TypeMem   ) ) return live; // Not a memory
     if( TypeMemPtr.OOP.isa(trez) ) return (TypeMem)tmem; // All possible pointers
     if( !(trez instanceof TypeMemPtr) ) return live; // Not a pointer
+    if( tmem.above_center() || trez.above_center() ) return live; // Have infinite choices still, report basic live only
+    // Find everything reachable from the pointer and memory, and report it all
     TypeMem live2 = ((TypeMem)tmem).slice_all_aliases_plus_children(((TypeMemPtr)trez)._aliases);
     if( live2==TypeMem.DEAD ) return live; // Minimal liveness
     return live2;

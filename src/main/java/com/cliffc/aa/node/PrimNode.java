@@ -20,7 +20,7 @@ public abstract class PrimNode extends Node {
   PrimNode( String name, TypeStruct targs ) {
     super(OP_PRIM);
     _name=name;
-    assert targs.at(1)==TypeStruct.NO_DISP; // Room for no closure
+    assert targs.at(1)==TypeStruct.NO_DISP_SIMPLE; // Room for no closure
     _targs=targs;
     _badargs=null;
   }
@@ -97,7 +97,7 @@ public abstract class PrimNode extends Node {
       Type tactual = gvn.type(in(i));
       Type tformal = _targs.at(i+1); // Skip leading return
       if( !tactual.isa(tformal) )
-        return _badargs==null ? "bad arguments" : _badargs[i].typerr(tactual,tformal,null);
+        return _badargs==null ? "bad arguments" : _badargs[i].typerr(tactual,null,tformal);
     }
     return null;
   }
@@ -121,15 +121,15 @@ public abstract class PrimNode extends Node {
   public FunPtrNode as_fun( GVNGCM gvn ) {
     FunNode  fun = ( FunNode) gvn.xform(new  FunNode(this).add_def(Env.ALL_CTRL)); // Points to ScopeNode only
     ParmNode rpc = (ParmNode) gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
-    ParmNode mem = (ParmNode) gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.FULL),null));
+    ParmNode mem = (ParmNode) gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM),null));
     add_def(null);              // Control for the primitive in slot 0
     for( int i=2; i<_targs._ts.length; i++ ) // First is return, next is display
-      add_def(gvn.init(new ParmNode(i,_targs._flds[i],fun, gvn.con(_targs._ts[i]),null)));
+      add_def(gvn.init(new ParmNode(i,_targs._flds[i],fun, gvn.con(_targs._ts[i].simple_ptr()),null)));
     // Functions return the set of *modified* memory.  PrimNodes never *modify*
     // memory (see Intrinsic*Node for some primitives that *modify* memory).
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mem,gvn.init(this),rpc,fun));
     // No closures are added to primitives
-    return new FunPtrNode(ret,gvn.con(TypeStruct.NO_DISP));
+    return new FunPtrNode(ret,gvn.con(TypeStruct.NO_DISP_SIMPLE));
   }
 
 
@@ -159,7 +159,7 @@ static class ConvertTypeName extends PrimNode {
     Type actual = gvn.type(in(1));
     Type formal = _targs.at(2);
     if( !actual.isa(formal) ) // Actual is not a formal
-      return _badargs.typerr(actual,formal,null);
+      return _badargs.typerr(actual,null,formal);
     return null;
   }
 }
@@ -397,7 +397,7 @@ static class RandI64 extends PrimNode {
 }
 
 static class Id extends PrimNode {
-  Id(Type arg) { super("id",TypeStruct.make_args(TypeStruct.ARGS_X,TypeStruct.ts(Type.SCALAR,TypeStruct.NO_DISP,arg))); }
+  Id(Type arg) { super("id",TypeStruct.make_args(TypeStruct.ARGS_X,TypeStruct.ts(Type.SCALAR,TypeStruct.NO_DISP_SIMPLE,arg))); }
   @Override public Node ideal(GVNGCM gvn, int level) { return in(1); }
   @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)).bound(_targs.last()); }
   @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }

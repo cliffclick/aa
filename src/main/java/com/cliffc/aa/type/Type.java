@@ -304,6 +304,7 @@ public class Type<T extends Type<T>> implements Cloneable {
   // True if 'this' isa SCALAR, without the cost of a full 'meet()'
   private static final byte[] ISA_SCALAR = new byte[]{/*ALL-0*/0,0,0,0,1,1,1,1,1,1,/*TNNUM-10*/1,1,1,1,1,1,1,1,/*TSIMPLE-18*/0, 1,1,1,0,0,0,0,0,1,/*TFUNPTR-28*/1}/*TLAST=29*/;
   public final boolean isa_scalar() { assert ISA_SCALAR.length==TLAST; return ISA_SCALAR[_type]!=0; }
+  public Type simple_ptr() { return this; }
 
   // Return cached dual
   public final T dual() { return _dual; }
@@ -870,6 +871,9 @@ public class Type<T extends Type<T>> implements Cloneable {
   public boolean is_display_ptr() { return _type==TSCALAR || _type==TXSCALAR || _type==TNIL || _type==TXNIL || _type==TANY; }
   boolean is_display() { return false; }
 
+  // Sharpen a TypeMemPtr with a TypeMem
+  public Type sharpen( Type tmem ) { return this; }
+  
   RuntimeException typerr(Type t) {
     throw new RuntimeException("Should not reach here: internal type system error with "+this+(t==null?"":(" and "+t)));
   }

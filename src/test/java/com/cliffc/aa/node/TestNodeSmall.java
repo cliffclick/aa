@@ -237,7 +237,7 @@ public class TestNodeSmall {
     FunPtrNode astr = (FunPtrNode)fp_add.in(2);
     // Make a flt/int combo, drops off string.
     UnresolvedNode anum = new UnresolvedNode(null,aflt,aint);
-    ConNode mem  = gvn.init(new ConNode<>(TypeMem.FULL));
+    ConNode mem  = gvn.init(new ConNode<>(TypeMem.MEM));
     ConNode arg1 = gvn.init(new ConNode<>(Type.SCALAR));
     ConNode arg2 = gvn.init(new ConNode<>(Type.SCALAR));
     CallNode call = (CallNode)gvn.xform(new CallNode(true, null, ctrl, mem, fp_mul, arg1, arg2));
@@ -250,10 +250,10 @@ public class TestNodeSmall {
     Type tctl = Type.CTRL, txctl = Type.XCTRL;
     Type tscl = Type.SCALAR, txscl = Type.XSCALAR;
     Type tnil = Type.NIL;
-    TypeMem tfull = TypeMem.FULL;
+    TypeMem tfull = TypeMem.MEM;
     Type t2 = TypeInt.con(2);
     Type t3 = TypeInt.con(3);
-    Type tabc=TypeMemPtr.ABCPTR;
+    Type tabc=TypeMemPtr.ABCPTR.simple_ptr();
 
     // iter(), not gcp().  Types always rise.  Very low types might lift to be
     // valid, but e.g. a 2:int will never lift to a str.
@@ -419,9 +419,9 @@ public class TestNodeSmall {
     //   FunPtr - Ret
     gvn._opt_mode=0;
     ConNode ctl = (ConNode) gvn.xform(new ConNode<>(Type.CTRL));
-    ConNode mem = gvn.init(new ConNode<>(TypeMem.FULL));
+    ConNode mem = gvn.init(new ConNode<>(TypeMem.MEM.dual()));
     ConNode rpc = gvn.init(new ConNode<>(TypeRPC.ALL_CALL));
-    ConNode dsp_prims = (ConNode) gvn.xform(new ConNode<>(TypeMemPtr.DISPLAY_PTR));
+    ConNode dsp_prims = (ConNode) gvn.xform(new ConNode<>(TypeMemPtr.DISP_SIMPLE));
     // The file-scope display closing the graph-cycle.  Needs the FunPtr, not
     // yet built.
     NewObjNode dsp_file = (NewObjNode)gvn.xform(new NewObjNode(true,TypeStruct.DISPLAY,ctl,dsp_prims));
@@ -473,14 +473,10 @@ public class TestNodeSmall {
     // Validate cyclic display/function type
     TypeFunPtr tfptr0 = (TypeFunPtr)gvn.type(fptr);
     Type tdptr0 = tfptr0.display();
-    assertEquals(tfptr0.ret(),tdptr0); // Returning the display
+    assertEquals(tfptr0.ret().meet_nil(Type.NIL),tdptr0); // Returning the display
     // Display contains 'fact' pointing to self
-    TypeStruct tdisp0 = (TypeStruct)((TypeMemPtr)tdptr0)._obj;
-    // If NewObj *pointers* carry no deep info, then this assert is useless:
-    //assertEquals(tfptr0,tdisp0.at(tdisp0.find("fact")));
-    // Happens because if NewObj pointers carry deep info, then I cannot fold
-    // Stores into them, because the store moves the memory state sideways and
-    // the pointer then does not move monontonically.
-    assertEquals(Type.SCALAR,tdisp0.at(tdisp0.find("fact"))); // Boring!
+    TypeMem tmem = (TypeMem)gvn.type(dsp_merge);
+    TypeStruct tdisp0 = (TypeStruct)tmem.ld((TypeMemPtr)tdptr0);
+    assertEquals(tfptr0,tdisp0.at(tdisp0.find("fact")));
   }
 }

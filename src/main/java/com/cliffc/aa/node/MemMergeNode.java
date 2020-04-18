@@ -229,7 +229,7 @@ public class MemMergeNode extends Node {
     // Base memory type in slot 0
     Type t = gvn.type(in(0));
     if( !(t instanceof TypeMem) )
-      return t.above_center() ? TypeMem.EMPTY : TypeMem.FULL;
+      return t.above_center() ? TypeMem.XMEM : TypeMem.MEM;
     TypeMem tm = (TypeMem)t;
 
     // Merge inputs with parent.
@@ -271,7 +271,7 @@ public class MemMergeNode extends Node {
   }
   @Override public boolean basic_liveness() { return false; }
 
-  @Override public Type all_type() { return TypeMem.FULL; }
+  @Override public Type all_type() { return TypeMem.MEM; }
 
   @Override @NotNull public MemMergeNode copy( boolean copy_edges, CallEpiNode unused, GVNGCM gvn) {
     MemMergeNode mmm = (MemMergeNode)super.copy(copy_edges, unused, gvn);

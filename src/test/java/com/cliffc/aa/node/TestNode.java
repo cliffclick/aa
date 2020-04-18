@@ -64,6 +64,12 @@ public class TestNode {
   // (again as indices into _alltypes).  _alltypes is sorted by 'isa'.  Numbers
   // in subs[i] are sorted and always greater than 'i'.
   private int[][] make_subtypes() {
+    // First simplify alltype ptrs - nodes can only produce and consume simple ptr types.
+    for( int i=0; i<_alltypes.length; i++ ) {
+      _alltypes[i] = _alltypes[i].simple_ptr();
+      assert i==0 || _alltypes[i] != _alltypes[i-1]; // Quick check for dups
+    }
+
     int[][] subs = new int[_alltypes.length][];
     int[] tmp = new int[_alltypes.length];
     for( int i=0; i<subs.length; i++ ) {
@@ -227,8 +233,8 @@ public class TestNode {
     test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  null, TypeStr.ABC  ));
     test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  null, TypeFlt.FLT64));
     test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  null, Type   .CTRL ));
-    test1monotonic(new    FunNode(new String[]{"->","^","x"},new Type[]{TypeInt.INT64,TypeMemPtr.DISPLAY_PTR,TypeInt.INT64}));
-    test1monotonic(new FunPtrNode(ret,_gvn.con(TypeStruct.NO_DISP)));
+    test1monotonic(new    FunNode(new String[]{"->","^","x"},new Type[]{TypeInt.INT64,TypeMemPtr.DISP_SIMPLE,TypeInt.INT64}));
+    test1monotonic(new FunPtrNode(ret,_gvn.con(TypeStruct.NO_DISP_SIMPLE)));
     test1monotonic(new FP2ClosureNode(_ins[1])); // Only takes in a TFP
     test1monotonic(new     IfNode(_ins[0],_ins[1]));
     for( IntrinsicNewNode prim : IntrinsicNewNode.INTRINSICS )
@@ -256,12 +262,11 @@ public class TestNode {
     test1monotonic(new  StoreNode(_ins[1],_ins[2],_ins[3],TypeStruct.FRW,"x",null));
     test1monotonic(new  StoreNode(_ins[1],_ins[2],_ins[3],TypeStruct.FRO,"x",null));
     //                  ScopeNode has no inputs, and value() call is monotonic
-    test1monotonic(new   TypeNode(TypeInt.FALSE    ,_ins[1],null));
-    test1monotonic(new   TypeNode(TypeMemPtr.STRPTR,_ins[1],null));
-    test1monotonic(new   TypeNode(TypeFlt.FLT64    ,_ins[1],null));
+    test1monotonic(new   TypeNode(_ins[1],_ins[2],TypeInt.FALSE    ,null));
+    test1monotonic(new   TypeNode(_ins[1],_ins[2],TypeMemPtr.STRPTR,null));
+    test1monotonic(new   TypeNode(_ins[1],_ins[2],TypeFlt.FLT64    ,null));
     _gvn._opt_mode=1;  test1monotonic(new UnresolvedNode(null,_ins[1],_ins[2]));  _gvn._opt_mode=0;
     _gvn._opt_mode=2;  test1monotonic(new UnresolvedNode(null,_ins[1],_ins[2]));  _gvn._opt_mode=0;
-
 
     assertEquals(0,_errs);
   }

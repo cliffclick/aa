@@ -87,13 +87,14 @@ public class TypeTuple extends Type<TypeTuple> {
   public  static final TypeTuple IF_FALSE= make(CTRL ,XCTRL);
 
   // This is the starting state of the program; CTRL is active and memory is empty.
-  public  static final TypeTuple START_STATE = make(CTRL, TypeMem.EMPTY);
-  public  static final TypeTuple START = make(CTRL, TypeMem.FULL);
-  public  static final TypeTuple  RET = make(CTRL, TypeMem.FULL, SCALAR); // Type of RetNodes
+  public  static final TypeTuple START_STATE = make(CTRL, TypeMem.XMEM);
+  public  static final TypeTuple START = make(CTRL, TypeMem.MEM);
+  public  static final TypeTuple  RET = make(CTRL, TypeMem.MEM, SCALAR); // Type of RetNodes
   public  static final TypeTuple XRET = RET.dual();
-  public  static final TypeTuple CALLE= make(CTRL, TypeMem.FULL, SCALAR); // Type of CallEpiNodes
-  public  static final TypeTuple NEW  = make(TypeObj.OBJ,TypeMemPtr.OOP); // Type of NewNode
-  static final TypeTuple[] TYPES = new TypeTuple[]{RET,CALLE,START_STATE,IF_ALL, IF_TRUE, IF_FALSE};
+  public  static final TypeTuple CALLE= make(CTRL, TypeMem.MEM, SCALAR); // Type of CallEpiNodes
+  public  static final TypeTuple NEWSTR= make(TypeStr.STR,TypeMemPtr.STRPTR.simple_ptr()); // Type of NewStrNode
+  public  static final TypeTuple NEWOBJ= make(TypeStruct.ALLSTRUCT,TypeMemPtr.STRUCT.simple_ptr()); // Type of NewObjNode
+  static final TypeTuple[] TYPES = new TypeTuple[]{CALLE,START_STATE,IF_ALL, IF_TRUE, IF_FALSE};
 
   // The length of Tuples is a constant, and so is its own dual.  Otherwise
   // just dual each element.  Also flip the infinitely extended tail type.

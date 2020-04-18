@@ -38,19 +38,12 @@ public final class CallEpiNode extends Node {
     if( nwired()==1 && fidxs.abit() != -1 ) { // Wired to 1 target
       RetNode ret = wired(0);                 // One wired return
       FunNode fun = ret.fun();
-      if( fun != null && fun._defs._len==2 && fun.nargs()==call.nargs() ) { // Function is only called by 1 (and not the unknown caller)
+      if( fun != null && fun._defs._len==2 && // Function is only called by 1 (and not the unknown caller)
+          call.err(gvn,true)==null ) {  // And args are ok
         assert fun.in(1).in(0)==call;   // Just called by us
-        // Check the args
-        int idx=0;
-        for( Node parm : fun._uses )
-          if( parm instanceof ParmNode && (idx=((ParmNode)parm)._idx) >= 1 &&
-              !gvn.type(parm).isa(fun.targ(idx)) )
-            { idx=-99; break; } // Arg failed check
-        if( idx!=-99 ) {        // Do not inline
           // TODO: Bring back SESE opts
-          fun.set_is_copy(gvn);
-          return inline(gvn,level, call, ret.ctl(), ret.mem(), ret.val(), null/*do not unwire, because using the entire function body inplace*/);
-        }
+        fun.set_is_copy(gvn);
+        return inline(gvn,level, call, ret.ctl(), ret.mem(), ret.val(), null/*do not unwire, because using the entire function body inplace*/);
       }
     }
 
@@ -80,14 +73,16 @@ public final class CallEpiNode extends Node {
     if( fidxs.above_center() )
       return null;
 
+    if( call.err(gvn,true)!=null ) return null; // CallNode claims args in-error, do not inline
+
     // Call allows 1 function not yet wired, sanity check it.
-    FunNode fun = FunNode.find_fidx(fidx);
-    if( fun.is_forward_ref() || fun.is_dead() ) return null;
-    if( gvn.type(fun) != Type.CTRL ) return null;
     int cnargs = call.nargs();
-    if( fun.nargs() != cnargs ) return null; // Arg counts must be compatible to be inline
-    RetNode ret = fun.ret();      // Return from function
-    if( ret==null ) return null;  // Dying function
+    FunNode fun = FunNode.find_fidx(fidx);
+    assert !fun.is_forward_ref() && !fun.is_dead()
+      && gvn.type(fun) == Type.CTRL
+      && fun.nargs() == cnargs; // All checked by call.err
+    RetNode ret = fun.ret();    // Return from function
+    assert ret!=null;
 
     // Single choice; check compatible args and no conversions needed.
     TypeStruct formals = fun._tf._args;
@@ -115,7 +110,7 @@ public final class CallEpiNode extends Node {
     Node rmem = ret.mem();      // Memory  being returned
     Node rrez = ret.val();      // Value   being returned
     // If the function does nothing with memory, then use the call memory directly.
-    if( (rmem instanceof ParmNode && rmem.in(0) == fun) || gvn.type(rmem)==TypeMem.EMPTY )
+    if( (rmem instanceof ParmNode && rmem.in(0) == fun) || gvn.type(rmem)==TypeMem.XMEM )
       rmem = cmem;
 
     // Check for zero-op body (id function)

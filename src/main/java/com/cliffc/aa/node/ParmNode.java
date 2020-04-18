@@ -32,6 +32,7 @@ public class ParmNode extends PhiNode {
   @Override public Node ideal(GVNGCM gvn, int level) {
     if( !(in(0) instanceof FunNode) ) return null; // Dying
     FunNode fun = fun();
+    Node mem = fun.parm(-2);
     if( gvn.type(fun) == Type.XCTRL ) return null; // All dead, c-prop will fold up
     assert fun._defs._len==_defs._len;
     // Arg-check before folding up
@@ -39,14 +40,24 @@ public class ParmNode extends PhiNode {
       for( int i=1; i<_defs._len; i++  )      // For all arguments
         if( gvn.type(fun.in(i))==Type.CTRL && // Path is alive
             in(i)!=this &&                    // Can ignore self- only other inputs will determine arg-check
-            !gvn.type(in(i)).isa(fun.targ(_idx)) ) // Arg is NOT correct type
+            !gvn.sharptr(in(i),mem.in(i)).isa(fun.targ(_idx)) ) // Arg is NOT correct type
           return null;          // Not correct arg-type; refuse to collapse
+    } else if( _idx== -2 ) {
+      for( Node use : fun._uses )
+        if( use instanceof ParmNode && use != this )
+          // TODO: Relax this
+          return null; // Never collapse memory phi, used for error reporting by other parms
     }
     return super.ideal(gvn,level); // Let PhiNode collapse
   }
 
   @Override public Type value(GVNGCM gvn) {
     Type t = super.value(gvn);
+    // Bound results by simple Fun argument types.  This keeps errors from
+    // spreading past function call boundaries.
+    if( in(0) instanceof FunNode )
+      t = t.bound(fun().targ(_idx).simple_ptr());
+
     // Memory tracks the notion of 'clean' or 'unwritten' since the function
     // start.  Changed memory is returned at exit and unchanged memory is NOT
     // returned - and CallEpis are aware of this behavior and do the correct
@@ -60,9 +71,11 @@ public class ParmNode extends PhiNode {
     FunNode fun = fun();
     assert fun._defs._len==_defs._len;
     if( _idx < 0 ) return null;                    // No arg check on RPC or Mem
+    Node mem = fun.parm(-2);
     Type formal = fun.targ(_idx);
     for( int i=1; i<_defs._len; i++ ) {
-      Type argt = gvn.type(in(i)); // Arg type for this incoming path
+      if( gvn.type(fun.in(i))!=Type.CTRL ) continue; // Ignore dead paths
+      Type argt = gvn.sharptr(in(i),mem); // Arg type for this incoming path
       if( !argt.isa(formal) ) {    // Argument is legal?
         // The merge of all incoming calls for this argument is not legal.
         // Find the call bringing the broken args, and use it for error
@@ -72,9 +85,9 @@ public class ParmNode extends PhiNode {
             CallNode call = (CallNode)def.in(0);
             if( call.nargs() != fun.nargs() )
               return null;                        // #args errors reported before bad-args
-            Type argc = gvn.type(call.arg(_idx)); // Call arg type
-            if( !argc.isa(formal) )
-              return call._badargs[_idx].typerr(argc,formal,call.mem());
+            Type argc = gvn.sharptr(call.arg(_idx),call.mem()); // Call arg type
+            if( !argc.isa(formal) ) // Check this call
+              return call._badargs[_idx].typerr(argc,call.mem(),formal);
             // Must be a different call that is in-error
           }
         }

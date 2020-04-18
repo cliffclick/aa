@@ -27,7 +27,7 @@ public final class FP2ClosureNode extends Node {
     // Expect either a TFP from a FunPtrNode, or a TypeTuple from a CallNode.
     Type t0 = gvn.type(in(0));
     Type tfp = t0 instanceof TypeTuple ? ((TypeTuple)t0).at(2) : t0;
-    return convert(tfp);
+    return convert(tfp).simple_ptr();
   }
   @Override public Type all_type() { return Type.SCALAR; }
   static public Type convert( Type t ) {

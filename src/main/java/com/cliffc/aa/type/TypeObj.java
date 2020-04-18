@@ -37,7 +37,7 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
   public static final TypeObj XOBJ = (TypeObj)OBJ.dual();
   static final TypeObj[] TYPES = new TypeObj[]{OBJ,XOBJ};
 
-  @Override boolean is_display() { return true; } // XOBJ might fall to a display
+  @Override boolean is_display() { return false; }
   @SuppressWarnings("unchecked")
   @Override protected O xdual() { return (O)new TypeObj(TOBJ,_name,!_any); }
   @Override protected Type xmeet( Type t ) {

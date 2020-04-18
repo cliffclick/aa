@@ -707,19 +707,19 @@ public class TestApprox {
     // for this test, as the cyclic approx is supposed to be low - and it has
     // args known post-parse but not pre-parse.
     Type tY = TypeMemPtr.DISPLAY_PTR;
-    TypeStruct tfp0_args = TypeStruct.make_x_args(true,TypeAry.ts(Type.XSCALAR,tY.dual()));
+    TypeStruct tfp0_args = TypeStruct.make_x_args(true,TypeAry.ts(Type.XSCALAR,tY.simple_ptr()));
 
     TypeFunPtr tfp0 = TypeFunPtr.make(BitsFun.ANY,tfp0_args); // fib with generic display
     TypeStruct dsp0 = TypeStruct.make(fflds,TypeStruct.ts(tY,tfp0),fmods); // The display with weak fib-type
     TypeMemPtr ptr0 = TypeMemPtr.make(alias,dsp0);
     // Args for a strong fib: { ^:ptr0 x:int64 -> ~Scalar } // LOW
-    TypeStruct arg0 = TypeStruct.make(xflds,TypeStruct.ts(Type.SCALAR,ptr0,TypeInt.INT64),xmods);
+    TypeStruct arg0 = TypeStruct.make(xflds,TypeStruct.ts(Type.SCALAR,ptr0.simple_ptr(),TypeInt.INT64),xmods);
 
     TypeFunPtr tfp1 = TypeFunPtr.make(fidxs,arg0); // FIB with weak display
     TypeStruct dsp1 = TypeStruct.make(fflds,TypeStruct.ts(tY,tfp1),fmods); // Display with stronger FIB-type
     TypeMemPtr ptr1 = TypeMemPtr.make(alias,dsp1);
     // Args for a strong fib: { ^:ptr x:int -> ~Scalar } // LOW.  Display still not recursive.
-    TypeStruct arg1 = TypeStruct.make(xflds,TypeStruct.ts(Type.SCALAR,ptr1,TypeInt.INT64),xmods);
+    TypeStruct arg1 = TypeStruct.make(xflds,TypeStruct.ts(Type.SCALAR,ptr1.simple_ptr(),TypeInt.INT64),xmods);
 
     TypeFunPtr tfp2 = TypeFunPtr.make(fidxs,arg1); // fib2->dsp1->fib1->dsp0->fib0->generic_display
     TypeStruct dsp2 = TypeStruct.make(fflds,TypeStruct.ts(tY,tfp2),fmods); // dsp2->fib2->dsp1->fib1->dsp0->fib0->generic_display
@@ -729,7 +729,7 @@ public class TestApprox {
     TypeStruct dsp3 = TypeStruct.malloc("",false,fflds,TypeStruct.ts(2),fmods);
     dsp3._hash = dsp3.compute_hash();  dsp3._cyclic = true;
     TypeMemPtr ptr3 = TypeMemPtr.make(alias,dsp3);
-    TypeStruct arg3 = TypeStruct.make(xflds,TypeStruct.ts(Type.SCALAR,ptr3,TypeInt.INT64),xmods);
+    TypeStruct arg3 = TypeStruct.make(xflds,TypeStruct.ts(Type.SCALAR,ptr3.simple_ptr(),TypeInt.INT64),xmods);
     TypeFunPtr tfp3 = TypeFunPtr.make(fidxs,arg3);
     dsp3._ts[0] = tY;
     dsp3._ts[1] = tfp3;

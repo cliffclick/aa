@@ -127,7 +127,7 @@ public class GVNGCM {
   }
   public Type raw_type( int uid ) { return _ts.atX(uid); }
   public void setype( Node n, Type t ) {
-    assert t != null;
+    assert t==t.simple_ptr(); // No null, no complex pointers
     _ts.setX(n._uid,t);
   }
   // Utility: remove old from type table, return new
@@ -608,11 +608,11 @@ public class GVNGCM {
   }
   // Debugging hook
   private boolean check_monotonicity(Node n, Type ot, Type nt) {
-    if( ot.isa(nt) ) return true;  // No bug
-    add_work(n);                   // Setup for a re-run
+    assert nt==nt.simple_ptr();   // Only simple pointers in node types
+    if( ot.isa(nt) ) return true; // No bug
+    add_work(n);                  // Setup for a re-run
     System.out.println("Not monotonic");
-    //assert ot.isa(nt);             // Types only fall monotonically
-    return false;
+    return false;    // Just single-step forward in debugging to re-run n.value
   }
 
   // Forward reachable walk, setting types to all_type().dual() and making all dead.
@@ -670,4 +670,11 @@ public class GVNGCM {
     add_work(n);                        // Only walk once
     for( Node use : n._uses ) walk_dead(use);
   }
+
+  public Type sharptr( Node ptr, Node mem ) {
+    Type t = type(ptr);
+    Type tmem = type(mem);
+    return t.sharpen(tmem);
+  }
+  
 }
