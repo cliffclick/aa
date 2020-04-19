@@ -713,7 +713,7 @@ public class FunNode extends RegionNode {
 
   // True if this is a forward_ref
   @Override public boolean is_forward_ref() { return _op_prec==-2; }
-  ParmNode parm( int idx ) {
+  public ParmNode parm( int idx ) {
     for( Node use : _uses )
       if( use instanceof ParmNode && ((ParmNode)use)._idx==idx )
         return (ParmNode)use;

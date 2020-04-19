@@ -107,7 +107,6 @@ public class ScopeNode extends Node {
   // because this "turns around" the incoming live memory to also be the
   // demanded/used memory.
   static TypeMem compute_live_mem(GVNGCM gvn, TypeMem live, Node mem, Node rez) {
-    assert live==TypeMem.DEAD || live==TypeMem.EMPTY; // really a boolean flag
     Type tmem = gvn.type(mem);
     Type trez = gvn.type(rez);
     if( !(tmem instanceof TypeMem   ) ) return live; // Not a memory

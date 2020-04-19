@@ -217,6 +217,36 @@ public class MemMergeNode extends Node {
       // simplify to a single input edge, merging nothing.  But we cannot
       // collapse lest we "lower" liveness by making the unused alias used again.
       return live_stable ? in(0) : null; // Merging nothing
+
+    // Remove child instances of the parent
+    boolean progress = false;
+    for( int i=_defs._len-1; i>=1; i-- ) {
+      int alias = alias_at(i);
+      int par = BitsAlias.parent(alias);
+      int pidx = find_alias2idx(par);
+      if( in(i)==in(pidx) )
+        { progress=true; remove0(i,gvn); }
+    }
+    if( progress )
+      return this;
+
+    // Collapse back-to-back MemMerge
+    if( in(0) instanceof MemMergeNode ) {
+      MemMergeNode mmm = (MemMergeNode)in(0);
+      int max_alias = Math.max(_aliases.last(),mmm._aliases.last());
+      for( int alias=2; alias<=max_alias; alias++ ) {
+        int xidx =     alias2idx(alias);
+        int midx = mmm.alias2idx(alias);
+        // Not set here, and yes set on coming?
+        if( xidx==0 && midx!=0 ) // Then set it here, instead of taking from base
+          create_alias_active(alias,mmm.in(midx),gvn);
+        else if( xidx > 0 && in(xidx)==mmm ) // Just gets from base?
+          set_def(xidx,mmm.in(midx),gvn); // Then get from where base gets it from
+      }
+      set_def(0,mmm.in(0),gvn);
+      return this;
+    }
+
     return null;
   }
 

@@ -100,6 +100,7 @@ public class PhiNode extends Node {
     MemMergeNode mmem = new MemMergeNode(null);
     for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) ) {
       PhiNode phi = new PhiNode(TypeStruct.ALLSTRUCT,_badgc,r);
+      phi._live = TypeMem.make(alias,_live.at(alias));
       for( int i=1; i<_defs._len; i++ ) {
         // Take the matching narrow slice for the alias, except for alias ALL
         // which can keep taking undistinguished memory.  The resulting memory

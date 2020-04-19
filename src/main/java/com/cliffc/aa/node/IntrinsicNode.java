@@ -125,7 +125,7 @@ public class IntrinsicNode extends Node {
     assert Util.eq(to._flds[0],"^"); // Display already
     Type[] tsclr = TypeStruct.ts(to._ts.length);
     tsclr[0] = Type.XSCALAR;       // No display, but all other fields SCALAR
-    NewObjNode nnn = new NewObjNode(false,alias,to.make_from(tsclr),null,gvn.con(Type.NIL)).keep();
+    NewObjNode nnn = new NewObjNode(false,alias,to.make_from(tsclr),null,gvn.con(Type.XNIL)).keep();
     // Tacky conversion from struct fields to function call args.
     Type[] ts = TypeAry.get(to._ts.length+1);
     ts[0] = TypeMemPtr.make(alias,to); // Return

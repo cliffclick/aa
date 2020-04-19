@@ -314,7 +314,12 @@ public class TypeStruct extends TypeObj<TypeStruct> {
                                          {"^","0"},
                                          {"^","0","1"},
                                          {"^","0","1","2"}};
-  public  static TypeStruct make_tuple( Type... ts ) { return make(TFLDS[ts.length],ts,ffnls(ts.length)); }
+  public  static TypeStruct make_tuple( Type... ts ) { return make_tuple(true,ts); }
+  public  static TypeStruct make_tuple( boolean is_closure, Type... ts ) {
+    byte[] bs = ffnls(ts.length);
+    if( !is_closure ) bs[0] = frw_flag; // standard struct (not closure) sets display field to nil after parse
+    return make(TFLDS[ts.length],ts,bs);
+  }
   public static TypeStruct make_tuple(Type t1) { return make_tuple(ts(NO_DISP,t1)); }
 
   public  static TypeStruct make(String[] flds, byte[] flags) { return make(flds,ts(flds.length),flags); }

@@ -874,16 +874,19 @@ public class Parse {
    */
   private Node struct() {
     int oldx = _x-1; Node ptr;  // Opening @{
-    all_mem();
+    all_mem();                  // Close active memory
     try( Env e = new Env(_e,errMsg(oldx-1),null,false) ) { // Nest an environment for the local vars
       _e = e;                   // Push nested environment
       stmts(true);              // Create local vars-as-fields
       require('}',oldx);        // Matched closing }
       assert ctrl() != e._scope;
+      // Zap the display to nil, not needed after construction
+      ptr = e._scope.ptr().keep();         // A pointer to the constructed object
+      StoreNode st = (StoreNode)gvn(new StoreNode(all_mem(),ptr,con(Type.XNIL),TypeStruct.FFNL,"^",null));
+      mem_active().st(st,_gvn);     // Update active memory
       e._par._scope.set_ctrl(ctrl(),_gvn); // Carry any control changes back to outer scope
       e._par._scope.set_mem(all_mem(),_gvn); // Carry any memory changes back to outer scope
       _e = e._par;                         // Pop nested environment
-      ptr = e._scope.ptr().keep();         // A pointer to the constructed object
     } // Pop lexical scope around struct
     return ptr.unhook();
   }

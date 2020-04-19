@@ -342,6 +342,8 @@ public class GVNGCM {
     if( check_new(nnn) )        // If new, replace back in GVN
       rereg(nnn,nnn.value(this));
     if( !old.is_dead() ) { // if old is being replaced, it got removed from GVN table and types table.
+      if( old instanceof ParmNode && ((ParmNode)old)._idx != -2 )
+        add_work(((FunNode)old.in(0)).parm(-2)); // Dropping a Parm, check Parm:Mem
       assert !check_opt(old);
       replace(old,nnn);
       nnn.keep();               // Keep-alive
@@ -676,5 +678,5 @@ public class GVNGCM {
     Type tmem = type(mem);
     return t.sharpen(tmem);
   }
-  
+
 }

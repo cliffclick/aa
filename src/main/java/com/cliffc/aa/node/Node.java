@@ -84,6 +84,9 @@ public abstract class Node implements Cloneable {
         gvn.add_work(old);      // Lost a use, so recompute live
         if( old instanceof UnresolvedNode )
           gvn.add_work_defs(old);
+        // Fold stores into NewNodes, requires no extra uses
+        if( old instanceof OProjNode && old.in(0) instanceof NewNode && old._uses._len==1 )
+          gvn.add_work_uses(old);
       }
     }
     return this;

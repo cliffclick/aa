@@ -8,7 +8,7 @@ import com.cliffc.aa.type.*;
 // numbering matching function arguments, with -1 reserved for the RPC and -2
 // for memory.
 public class ParmNode extends PhiNode {
-  final int _idx;             // Parameter index, zero-based; -1 reserved for RPC, -2 for mem
+  public final int _idx; // Parameter index, zero-based; -1 reserved for RPC, -2 for mem
   final String _name;         // Parameter name
   public ParmNode( int idx, String name, Node fun, ConNode defalt, Parse badgc) {
     this(idx,name,fun,defalt._t,defalt,badgc);

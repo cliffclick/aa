@@ -189,7 +189,6 @@ public class TestParse {
   }
 
   @Test public void testParse03() {
-    test_ptr("A= :(str?, int); A( (\"abc\",2) )","A:(*[$]\"abc\";2)");
     // Type annotations
     test("-1:int", TypeInt.con( -1));
     test("(1+2.3):flt", TypeFlt.make(0,64,3.3));
@@ -245,6 +244,7 @@ public class TestParse {
   }
 
   @Test public void testParse04() {
+    test("x=@{a:=1;b= {a=a+1;b=0}}; x.b(); x.a",TypeInt.con(2));
     // simple anon struct tests
     testerr("a=@{x=1.2;y}; x", "Unknown ref 'x'",15);
     testerr("a=@{x=1;x=2}.x", "Cannot re-assign final field '.x'",11);
@@ -313,15 +313,16 @@ public class TestParse {
 
   @Test public void testParse06() {
     Object dummy = Env.GVN; // Force class loading cycle
-    test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*[$]A:(nil;2);3)");
-    test_ptr("A= :(A?, int); A(0,2)","A:(*0;2)");
+    test_isa("A= :@{n=B?; v=int}; a = A(0,2)", TypeMemPtr.OOP);
 
     // Building recursive types
     test("A= :int; A(1)", TypeInt.TRUE.set_name("A:"));
-    test_ptr("A= :(str?, int); A(0,2)","A:(nil;2)");
+    test_ptr("A= :(str?, int); A(0,2)","A:(~nil;2)");
     // Named recursive types
-    test_ptr("A= :(A?, int); A(0,2)",(alias) -> TypeMemPtr.make(alias,TypeStruct.make(new String[]{"A:0","A:1","A:2"},TypeStruct.ts(Type.NIL,Type.NIL,TypeInt.con(2)),TypeStruct.ffnls(3))));
+    test_ptr("A= :(A?, int); A(0,2)",(alias) -> TypeMemPtr.make(alias,TypeStruct.make_tuple(TypeStruct.ts(Type.XNIL,Type.XNIL,TypeInt.con(2))).set_name("A:")));
+    test_ptr("A= :(A?, int); A(0,2)","A:(~nil;2)");
     test    ("A= :@{n=A?; v=flt}; A(@{n=0;v=1.2}).v;", TypeFlt.con(1.2));
+    test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*[$]A:(~nil;2);3)");
 
     // TODO: Needs a way to easily test simple recursive types
     TypeEnv te3 = Exec.go(Env.top(),"args","A= :@{n=A?; v=int}; A(@{n=0;v=3})");
@@ -329,8 +330,8 @@ public class TestParse {
     Assert.assertNull(te3._errs);
     TypeStruct tt3 = (TypeStruct)te3._tmem.ld((TypeMemPtr)te3._t);
     assertEquals("A:", tt3._name);
-    assertEquals(Type.NIL      ,tt3.at(0));
-    assertEquals(Type.NIL      ,tt3.at(1));
+    assertEquals(Type.XNIL     ,tt3.at(0));
+    assertEquals(Type.XNIL     ,tt3.at(1));
     assertEquals(TypeInt.con(3),tt3.at(2));
     assertEquals("n",tt3._flds[1]);
     assertEquals("v",tt3._flds[2]);
@@ -772,9 +773,10 @@ strs:List(str?) = ... // List of null-or-strings
   static private void test_ptr( String program, Function<Integer,Type> expected ) {
     try( TypeEnv te = run(program) ) {
       assertTrue(te._t instanceof TypeMemPtr);
-      int alias = ((TypeMemPtr)te._t).getbit(); // internally asserts only 1 bit set
+      TypeMemPtr tmp = (TypeMemPtr)(te._t.sharpen(te._tmem));
+      int alias = tmp.getbit(); // internally asserts only 1 bit set
       Type t_expected = expected.apply(alias);
-      assertEquals(t_expected,te._t);
+      assertEquals(t_expected,tmp);
     }
   }
   static private void test_ptr0( String program, Function<Integer,Type> expected ) {

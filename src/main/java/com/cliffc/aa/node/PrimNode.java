@@ -138,7 +138,7 @@ public abstract class PrimNode extends Node {
 static class ConvertTypeName extends PrimNode {
   private final Parse _badargs; // Only for converts
   ConvertTypeName(Type from, Type to, Parse badargs) {
-    super(to._name,TypeStruct.make_args(TypeStruct.ts(to,TypeStruct.NO_DISP,from)));
+    super(to._name,TypeStruct.make_args(TypeStruct.ts(to,TypeStruct.NO_DISP_SIMPLE,from)));
     _badargs=badargs;
   }
   @Override public Type value(GVNGCM gvn) {

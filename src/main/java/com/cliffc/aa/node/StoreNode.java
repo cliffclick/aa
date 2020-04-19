@@ -74,7 +74,6 @@ public class StoreNode extends Node {
   @Override public Type value(GVNGCM gvn) {
     Type adr = gvn.type(adr());
     if( adr.isa(TypeMemPtr.OOP0.dual()) ) return TypeObj.XOBJ; // Very high address; might fall to any valid address
-    if( adr.must_nil() ) return TypeObj.OBJ;           // Not provable not-nil, so fails
     if( TypeMemPtr.OOP0.isa(adr) ) return TypeObj.OBJ; // Very low, might be any address
     if( !(adr instanceof TypeMemPtr) )
       return adr.above_center() ? TypeObj.XOBJ : TypeObj.OBJ;
@@ -119,9 +118,10 @@ public class StoreNode extends Node {
     // Update the field.  Illegal updates make no changes (except clear 'clean' bit).
     TypeStruct ts = (TypeStruct)tobj;
     // Updates to a NewNode are precise, otherwise aliased updates
-    if( mem().in(0) == adr().in(0) && mem().in(0) instanceof NewNode )
+    if( mem().in(0) == adr().in(0) && mem().in(0) instanceof NewNode && !adr.must_nil())
       // No aliasing, even if the NewNode is called repeatedly
       return ts.st(_fin, _fld, val);
+    // Imprecise update
     return ts.update(_fin, _fld, val);
   }
 
@@ -164,6 +164,21 @@ public class StoreNode extends Node {
   }
 
 
+  // Compute the liveness local contribution to def's liveness.  Ignores the
+  // incoming memory types, as this is a backwards propagation of demanded
+  // memory.
+  @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
+    if( mem()!=def ) return _live == TypeMem.DEAD ? TypeMem.DEAD : TypeMem.EMPTY; // Non-memory use basic liveness
+    // Alive (like normal liveness), plus the address, plus whatever can be
+    // reached from the address.
+    TypeMem live1 = ScopeNode.compute_live_mem(gvn,TypeMem.EMPTY,mem(),adr());
+    // PLUS whatever can be reached from a pointer being stored
+    TypeMem live2 = ScopeNode.compute_live_mem(gvn,live1,mem(),val());
+    return live2;
+  }
+  // Liveness is specific to the stored-aliases
+  @Override public boolean basic_liveness() { return false; }
+  
   @Override public String err(GVNGCM gvn) {
     String msg = err0(gvn);
     if( msg == null ) return null;
