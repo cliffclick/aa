@@ -281,6 +281,13 @@ public class CallNode extends Node {
         args = TypeFunPtr.ARGS.dual();
         for( int fidx : rfidxs )
           args = (TypeStruct)args.meet(FunNode.find_fidx(fidx)._tf._args);
+        // Function types always allow nil, so the display can monotonically
+        // fall to nil when unused.  If unused, then a nil is passed in and
+        // dead in the function.  To preserve monotonicity FPtr, Call and
+        // FP2Closure never report a nil possibility.
+        TypeMemPtr disp = (TypeMemPtr)args.at(1);
+        BitsAlias disp_alias = disp._aliases;
+        args = args.set_fld(1,TypeMemPtr.make(disp_alias.strip_nil(),disp._obj),TypeStruct.FFNL);
         if( rfidxs.above_center() )
           args = args.dual();     // Args sign needs to match rfidxs sign
       }

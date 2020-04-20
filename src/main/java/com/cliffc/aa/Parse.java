@@ -730,6 +730,27 @@ public class Parse {
     return ptr;
   }
 
+  /** Parse anonymous struct; the opening "@{" already parsed.  A lexical scope
+   *  is made and new variables are defined here.  Next comes statements, with
+   *  each assigned value becoming a struct member, then the closing "}".
+   *  struct = \@{ stmts }
+   */
+  private Node struct() {
+    int oldx = _x-1; Node ptr;  // Opening @{
+    all_mem();                  // Close active memory
+    try( Env e = new Env(_e,errMsg(oldx-1), false) ) { // Nest an environment for the local vars
+      _e = e;                   // Push nested environment
+      stmts(true);              // Create local vars-as-fields
+      require('}',oldx);        // Matched closing }
+      assert ctrl() != e._scope;
+      ptr = e._scope.ptr().keep();           // A pointer to the constructed object
+      e._par._scope.set_ctrl(ctrl(),_gvn);   // Carry any control changes back to outer scope
+      e._par._scope.set_mem(all_mem(),_gvn); // Carry any memory  changes back to outer scope
+      _e = e._par;                           // Pop nested environment
+    } // Pop lexical scope around struct
+    return ptr.unhook();
+  }
+
   /** Parse an anonymous function; the opening '{' already parsed.  After the
    *  '{' comes an optional list of arguments and a '->' token, and then any
    *  number of statements separated by ';'.
@@ -749,8 +770,9 @@ public class Parse {
     // Push an extra hidden display argument.  Similar to java inner-class ptr
     // or when inside of a struct definition: 'this'.
     Node parent_display = _e._scope.ptr();
+    TypeMemPtr tpar_disp = (TypeMemPtr)_gvn.type(parent_display); // Just a TMP of the right alias
     ids .push("^");
-    ts  .push(_gvn.type(parent_display).meet_nil(Type.NIL));
+    ts  .push(tpar_disp.meet_nil(Type.NIL)); // Functions allow a NIL display
     bads.push(null);
 
     // Parse arguments
@@ -787,7 +809,7 @@ public class Parse {
     FunNode fun = init(new FunNode(ids.asAry(),ts.asAry()).add_def(Env.ALL_CTRL)).keep();
 
     // Increase scope depth for function body.
-    try( Env e = new Env(_e,errMsg(oldx-1),fun,true) ) { // Nest an environment for the local vars
+    try( Env e = new Env(_e,errMsg(oldx-1), true) ) { // Nest an environment for the local vars
       fun._my_display_alias = e._display_alias;
       _e = e;                   // Push nested environment
       _gvn.set_def_reg(e._scope.stk(),0,fun); // Display creation control defaults to function entry
@@ -795,7 +817,7 @@ public class Parse {
       // Build Parms for all incoming values
       Node rpc = gvn(new ParmNode(-1,"rpc",fun,con(TypeRPC.ALL_CALL),null)).keep();
       Node mem = gvn(new ParmNode(-2,"mem",fun,con(TypeMem.MEM     ),null)).keep();
-      Node clo = gvn(new ParmNode( 1,"^"  ,fun,con(ts.at(1)        ),null));
+      Node clo = gvn(new ParmNode( 1,"^"  ,fun,con(tpar_disp       ),null));
       // Display is special: the default is simply the outer lexical scope.
       // But here, in a function, the display is actually passed in as a hidden
       // extra argument and replaces the default.
@@ -814,8 +836,9 @@ public class Parse {
       // this is incorrect - should start from the incoming function memory.
       MemMergeNode amem = mem_active();
       assert amem.in(1).in(0) == e._scope.stk(); // amem slot#1 is the display
+      // amem slot#0 was outer display, should be function memory
       // Adding mem to worklist, because its liveness now changes
-      amem.set_def(0,_gvn.add_work(mem.unhook()),_gvn); // amem slot#0 was outer display, should be function memory
+      amem.set_def(0,_gvn.add_work(mem.unhook()),_gvn);
       // Parse function body
       Node rez = stmts();       // Parse function body
       if( rez == null ) rez = err_ctrl2("Missing function body");
@@ -827,9 +850,9 @@ public class Parse {
       RetNode ret = (RetNode)gvn(new RetNode(ctrl(),all_mem(),rez,rpc.unhook(),fun.unhook()));
       // Update the function type for the current return value
       Type tret = ((TypeTuple)_gvn.type(ret)).at(2);
-      fun.sharpen(_gvn,fun._tf.make(ts.at(1),tret)); // Sharpen alltype return, equal to what parser already knowns
+      fun.sharpen(_gvn,fun._tf.make(tpar_disp.meet_nil(Type.NIL),tret)); // Sharpen alltype return, equal to what parser already knowns
       // The FunPtr builds a real display; any up-scope references are passed in now.
-      Node fptr = gvn(new FunPtrNode(ret,e._par._scope.ptr()));
+      Node fptr = gvn(new FunPtrNode(ret,e._par._scope.ptr(),tpar_disp));
       _e = _e._par;             // Pop nested environment
       set_ctrl(old_ctrl);       // Back to the pre-function-def control
       set_mem (old_mem.unhook());// Back to the pre-function-def memory
@@ -869,30 +892,6 @@ public class Parse {
     set_ctrl(con(Type.XCTRL  ));
     set_mem (con(TypeMem.XMEM));
     return   con(Type.XNIL   ) ;
-  }
-
-  /** Parse anonymous struct; the opening "@{" already parsed.  A lexical scope
-   *  is made and new variables are defined here.  Next comes statements, with
-   *  each assigned value becoming a struct member, then the closing "}".
-   *  \@{ stmts }
-   */
-  private Node struct() {
-    int oldx = _x-1; Node ptr;  // Opening @{
-    all_mem();                  // Close active memory
-    try( Env e = new Env(_e,errMsg(oldx-1),null,false) ) { // Nest an environment for the local vars
-      _e = e;                   // Push nested environment
-      stmts(true);              // Create local vars-as-fields
-      require('}',oldx);        // Matched closing }
-      assert ctrl() != e._scope;
-      // Zap the display to nil, not needed after construction
-      ptr = e._scope.ptr().keep();         // A pointer to the constructed object
-      StoreNode st = (StoreNode)gvn(new StoreNode(all_mem(),ptr,con(Type.XNIL),TypeStruct.FFNL,"^",null));
-      mem_active().st(st,_gvn);     // Update active memory
-      e._par._scope.set_ctrl(ctrl(),_gvn); // Carry any control changes back to outer scope
-      e._par._scope.set_mem(all_mem(),_gvn); // Carry any memory changes back to outer scope
-      _e = e._par;                         // Pop nested environment
-    } // Pop lexical scope around struct
-    return ptr.unhook();
   }
 
   // Add a typecheck into the graph, with a shortcut if trivially ok.

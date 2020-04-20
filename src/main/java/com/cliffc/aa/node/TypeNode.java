@@ -52,7 +52,7 @@ public class TypeNode extends Node {
       RetNode ret = (RetNode)gvn.xform(new RetNode(ctl,postmem.unhook(),chk,rpc,fun));
       // Just the Closure when we make a new TFP
       Node clos = gvn.xform(new FP2ClosureNode(arg));
-      return gvn.xform(new FunPtrNode(ret,clos));
+      return gvn.xform(new FunPtrNode(ret,clos,(TypeMemPtr)gvn.type(clos)));
     }
 
     // Push TypeNodes 'up' to widen the space they apply to, and hopefully push

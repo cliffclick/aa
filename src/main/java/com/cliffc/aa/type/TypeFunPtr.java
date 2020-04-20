@@ -145,7 +145,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public int fidx() { return _fidxs.getbit(); } // Asserts internally single-bit
   public Type arg(int idx) { return _args.at(idx); }
   public Type ret() { return _args.at(0); }
-  public Type display() { return _args.at(1); } // Always a Display pointer or NIL
+  public TypeMemPtr display() { return (TypeMemPtr)_args.at(1); } // Always a Display pointer
 
   @Override public boolean above_center() { return _fidxs.above_center(); }
   @Override public boolean may_be_con()   { return above_center(); }

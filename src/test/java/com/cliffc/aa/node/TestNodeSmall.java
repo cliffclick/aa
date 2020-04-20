@@ -444,7 +444,7 @@ public class TestNodeSmall {
     gvn.init(parm_dsp.add_def(dsp_file_ptr));
     // Close the function up
     RetNode ret = gvn.init(new RetNode(fun,parm_mem,parm_dsp,rpc,fun));
-    FunPtrNode fptr = gvn.init(new FunPtrNode(ret,dsp_file_ptr));
+    FunPtrNode fptr = gvn.init(new FunPtrNode(ret,dsp_file_ptr,(TypeMemPtr)gvn.type(dsp_file_ptr)));
     // Close the cycle
     dsp_file.create("fact",fptr,TypeStruct.FFNL,gvn);
     // Return the fptr to keep all alive

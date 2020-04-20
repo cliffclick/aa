@@ -10,11 +10,13 @@ import com.cliffc.aa.type.*;
 // class functions to be passed about.
 public final class FunPtrNode extends Node {
   private final String _referr;
-  public  FunPtrNode( RetNode ret, Node display ) { this(null,ret,display); }
+  private final TypeMemPtr _display_ptr; // Display alias type
+  public  FunPtrNode( RetNode ret, Node display, TypeMemPtr tdisp ) { this(null,ret,display,tdisp); }
   // For forward-refs only; super weak display & function.
-  private FunPtrNode( String referr, RetNode ret, Node display ) {
+  private FunPtrNode( String referr, RetNode ret, Node display, TypeMemPtr tdisp ) {
     super(OP_FUNPTR,ret,display);
     _referr = referr;
+    _display_ptr = tdisp;
   }
   public RetNode ret() { return (RetNode)in(0); }
   public Node display(){ return in(1); }
@@ -39,8 +41,8 @@ public final class FunPtrNode extends Node {
     if( is_forward_ref() ) return null;
     RetNode ret = ret();
     FunNode fun = ret.is_copy() ? FunNode.find_fidx(ret._fidx) : ret.fun();
-    if( !(display() instanceof ConNode) && (ret.is_copy() || fun._tf.display()==TypeStruct.NO_DISP_SIMPLE) ) {
-      set_def(1,gvn.con(TypeStruct.NO_DISP_SIMPLE),gvn);
+    if( display() !=null && (ret.is_copy() || fun._tf.display()==TypeStruct.NO_DISP_SIMPLE) ) {
+      set_def(1,null,gvn);      // No display needed
       return this;
     }
     return null;
@@ -52,10 +54,10 @@ public final class FunPtrNode extends Node {
     FunNode fun = ret.is_copy() ? FunNode.find_fidx(ret._fidx) : ret.fun();
     if( is_forward_ref() ) return fun._tf;
     Type tret = gvn.type(ret);
-    Type tdisp = gvn.type(display()).meet_nil(Type.NIL);
-    if( fun._tf.display()==TypeStruct.NO_DISP_SIMPLE )
-      tdisp = TypeStruct.NO_DISP_SIMPLE;
-    return fun._tf.make(tdisp,((TypeTuple)tret).at(2));
+    // Value of display never changes: always a non-nil ptr-to-alias.  The
+    // display CAN go unused though, if its not needed; then the graph for the
+    // display is set to null.
+    return fun._tf.make(_display_ptr,((TypeTuple)tret).at(2));
   }
 
   @Override public TypeMem live( GVNGCM gvn) {
@@ -89,7 +91,7 @@ public final class FunPtrNode extends Node {
   public static FunPtrNode forward_ref( GVNGCM gvn, String name, Parse unkref ) {
     FunNode fun = gvn.init(new FunNode(name));
     RetNode ret = gvn.init(new RetNode(fun,gvn.con(TypeMem.MEM),gvn.con(Type.SCALAR),gvn.con(TypeRPC.ALL_CALL),fun));
-    return new FunPtrNode(unkref.forward_ref_err(fun),ret,gvn.con(TypeMemPtr.DISP_SIMPLE));
+    return new FunPtrNode(unkref.forward_ref_err(fun),ret,gvn.con(TypeMemPtr.DISP_SIMPLE),TypeMemPtr.DISP_SIMPLE);
   }
 
   // True if this is a forward_ref

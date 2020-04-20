@@ -142,12 +142,13 @@ public class TestParse {
 
   @Test public void testParse02() {
     Object dummy = Env.GVN; // Force class loading cycle
+    TypeMemPtr tdisp = TypeMemPtr.make(10,TypeObj.OBJ);
     // Anonymous function definition
-    test_isa("{x y -> x+y}", TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make_args(TypeStruct.ARGS_XY,TypeStruct.ts(Type.XSCALAR,TypeStruct.NO_DISP_SIMPLE,Type.SCALAR,Type.SCALAR)))); // {Scalar Scalar -> Scalar}
+    test_isa("{x y -> x+y}", TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make_args(TypeStruct.ARGS_XY,TypeStruct.ts(Type.XSCALAR,tdisp,Type.SCALAR,Type.SCALAR)))); // {Scalar Scalar -> Scalar}
     // Since call not-taken, post GCP Parms not loaded from _tf, limited to ~Scalar.  The
     // hidden internal call from {&} to the primitive is never inlined (has ~Scalar args)
     // so 'x&1' never sees the TypeInt return from primitive AND.
-    test_isa("{x -> x&1}", TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make_args(TypeStruct.ARGS_X,TypeStruct.ts(Type.XSCALAR,TypeStruct.NO_DISP_SIMPLE,Type.SCALAR)))); // {Int -> Int}
+    test_isa("{x -> x&1}", TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make_args(TypeStruct.ARGS_X,TypeStruct.ts(Type.XSCALAR,tdisp,Type.SCALAR)))); // {Int -> Int}
     test("{5}()", TypeInt.con(5)); // No args nor -> required; this is simply a function returning 5, being executed
 
     // ID in different contexts; in general requires a new TypeVar per use; for

@@ -314,12 +314,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
                                          {"^","0"},
                                          {"^","0","1"},
                                          {"^","0","1","2"}};
-  public  static TypeStruct make_tuple( Type... ts ) { return make_tuple(true,ts); }
-  public  static TypeStruct make_tuple( boolean is_closure, Type... ts ) {
-    byte[] bs = ffnls(ts.length);
-    if( !is_closure ) bs[0] = frw_flag; // standard struct (not closure) sets display field to nil after parse
-    return make(TFLDS[ts.length],ts,bs);
-  }
+  public static TypeStruct make_tuple( Type... ts ) { return make(TFLDS[ts.length],ts,ffnls(ts.length)); }
   public static TypeStruct make_tuple(Type t1) { return make_tuple(ts(NO_DISP,t1)); }
 
   public  static TypeStruct make(String[] flds, byte[] flags) { return make(flds,ts(flds.length),flags); }
@@ -331,7 +326,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     Type[] ets = ts(_ts.length);
     Arrays.fill(ets,Type.NIL); // Has to be all NIL args to preserve monotonicity
     ets[0] = Type.XNIL;        // Function return type
-    ets[1] = NO_DISP_SIMPLE;   // Display type
+    ets[1] = TypeMemPtr.make(BitsAlias.EMPTY,TypeObj.OBJ);   // Display type
     return make_from(true,ets,ffnls(_ts.length));
   }
 
@@ -380,9 +375,9 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   }
 
   // Used for marking "no/dead display" in FunNode._tf (function signatures).
-  public static final Type NO_DISP= TypeMemPtr.NIL_DISPLAY;
+  public static final TypeMemPtr NO_DISP= TypeMemPtr.NIL_DISPLAY;
   // Used to pass around a no/dead display in GVN Nodes.
-  public static final Type NO_DISP_SIMPLE= NO_DISP.simple_ptr();
+  public static final TypeMemPtr NO_DISP_SIMPLE= (TypeMemPtr)NO_DISP.simple_ptr();
 
   public  static final TypeStruct GENERIC = malloc("",true,new String[0],TypeAry.get(0),new byte[0]).hashcons_free();
   public  static final TypeStruct ALLSTRUCT;
@@ -1350,7 +1345,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     if( p.test(this) )
       for( Type _t : _ts ) _t.walk(p);
   }
-  
+
   // Sharpen a TypeMemPtr with a TypeMem
   @Override public Type sharpen( Type tmem ) {
     if( !(tmem instanceof TypeMem) ) return this;

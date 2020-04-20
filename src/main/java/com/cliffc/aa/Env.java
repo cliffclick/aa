@@ -6,17 +6,15 @@ import com.cliffc.aa.type.*;
 public class Env implements AutoCloseable {
   final Env _par;
   Parse _P;          // Used to get debug info
-  FunNode _fun;      // Start of display scope, or null for structs
   public final ScopeNode _scope;  // Lexical anchor; "end of display"; goes when this environment leaves scope
   int _display_alias;// Local display alias
-  Env( Env par, Parse P, FunNode fun, boolean is_closure ) {
+  Env( Env par, Parse P, boolean is_closure ) {
     _P = P;
     _par = par;
-    _fun = fun;
     Node ctl = par == null ? CTL_0 : par._scope.ctrl();
     Node clo = par == null ? GVN.con(TypeStruct.NO_DISP_SIMPLE) : par._scope.ptr();
     Node mem = par == null ? MEM_0 : par._scope.mem ();
-    TypeStruct tdisp = TypeStruct.make_tuple(is_closure,TypeStruct.ts(par == null ? TypeStruct.NO_DISP : par._scope.stk().tptr()));
+    TypeStruct tdisp = TypeStruct.make_tuple(TypeStruct.ts(par == null ? TypeStruct.NO_DISP : par._scope.stk().tptr()));
     NewObjNode nnn = (NewObjNode)GVN.xform(new NewObjNode(is_closure,tdisp,ctl,clo).keep());
     Node frm = GVN.xform(new OProjNode(nnn,0));
     Node ptr = GVN.xform(new  ProjNode(nnn,1));
@@ -50,7 +48,7 @@ public class Env implements AutoCloseable {
     CTL_0  = (CProjNode)GVN.xform(new CProjNode(START,0));
     MEM_0  = (MProjNode)GVN.xform(new MProjNode(START,1));
     // Top-most (file-scope) lexical environment
-    TOP = new Env(null,null,null,true);
+    TOP = new Env(null,null, true);
     // Top-level display defining all primitives
     STK_0  = TOP._scope.stk();
 
@@ -94,7 +92,7 @@ public class Env implements AutoCloseable {
 
   // A new Env for the current Parse scope (generally a file-scope or a
   // test-scope), above this is the basic public Env with all the primitives
-  public static Env top() { return new Env(TOP,null,null,false); }
+  public static Env top() { return new Env(TOP,null, false); }
 
   // Wire up an early function exit
   Node early_exit( Parse P, Node val ) {
