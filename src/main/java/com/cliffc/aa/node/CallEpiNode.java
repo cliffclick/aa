@@ -39,7 +39,8 @@ public final class CallEpiNode extends Node {
       RetNode ret = wired(0);                 // One wired return
       FunNode fun = ret.fun();
       if( fun != null && fun._defs._len==2 && // Function is only called by 1 (and not the unknown caller)
-          call.err(gvn,true)==null ) {  // And args are ok
+          call.err(gvn,true)==null &&   // And args are ok
+          !fun.noinline() ) {           // And not turned off
         assert fun.in(1).in(0)==call;   // Just called by us
           // TODO: Bring back SESE opts
         fun.set_is_copy(gvn);

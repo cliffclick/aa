@@ -32,8 +32,10 @@ public class StoreNode extends Node {
 
     // Stores bypass a Merge to the specific alias
     Type ta = gvn.type(adr);
-    if( ta instanceof TypeMemPtr && mem instanceof MemMergeNode && ((TypeMemPtr)ta)._aliases.abit() != -1)
-      return new StoreNode(this,((MemMergeNode)mem).obj((TypeMemPtr)ta,gvn),adr);
+    int alias;
+    if( ta instanceof TypeMemPtr && mem instanceof MemMergeNode &&
+        (alias=((TypeMemPtr)ta)._aliases.strip_nil().abit()) != -1 )
+      return new StoreNode(this,((MemMergeNode)mem).obj(alias,gvn),adr);
 
     // Stores bypass stores to unrelated fields.  TODO: Cannot really do this -
     // need parallel field updates.

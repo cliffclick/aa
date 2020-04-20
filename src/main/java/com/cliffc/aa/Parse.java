@@ -299,14 +299,17 @@ public class Parse {
     // Gather ids in x = y = z = ....
     Ary<String> toks = new Ary<>(new String[1],0);
     Ary<Type  > ts   = new Ary<>(new Type  [1],0);
-    Ary<Parse > bads = new Ary<>(new Parse [1],0);
+    Ary<Parse > badfs= new Ary<>(new Parse [1],0);
+    Ary<Parse > badts= new Ary<>(new Parse [1],0);
     BitSet rs = new BitSet();
     boolean default_nil = false;
     while( true ) {
-      int oldx = _x;
+      skipWS();
+      int oldx = _x;            // Unwind token parse point
+      Parse badf = errMsg();    // Capture location in case of field error
       String tok = token();     // Scan for 'id = ...'
       if( tok == null ) break;  // Out of ids
-      int oldx2 = _x;
+      int oldx2 = _x;           // Unwind assignment flavor point
       Type t = null;
       // x  =: ... type  assignment, handled before we get here
       // x  =  ... final assignment
@@ -315,7 +318,7 @@ public class Parse {
       // x : type := ... typed var   assignment
       // x : nontype = ... error, missing type
       // p? x : nontype ... part of trinary
-      Parse bad = errMsg();    // Capture location in case of type error
+      Parse badt = errMsg();    // Capture location in case of type error
       if( peek(":=") ) _x=oldx2; // Avoid confusion with typed assignment test
       else if( peek(':') && (t=type())==null ) { // Check for typed assignment
         if( _e._scope.test_if() ) _x = oldx2; // Grammar ambiguity, resolve p?a:b from a:int
@@ -332,9 +335,10 @@ public class Parse {
           break;     // Done parsing assignment tokens
         }
       }
-      toks.add(tok.intern());
-      ts  .add(t  );
-      bads.add(bad);
+      toks .add(tok.intern());
+      ts   .add(t  );
+      badfs.add(badf);
+      badts.add(badt);
     }
 
     // Normal statement value parse
@@ -345,7 +349,7 @@ public class Parse {
     }
     // Honor all type requests, all at once, by inserting type checks on the ifex.
     for( int i=0; i<ts._len; i++ )
-      ifex = typechk(ifex,ts.at(i),all_mem(),bads.at(i));
+      ifex = typechk(ifex,ts.at(i),all_mem(),badts.at(i));
     ifex.keep();
     // Assign tokens to value
     for( int i=0; i<toks._len; i++ ) {
@@ -381,7 +385,7 @@ public class Parse {
             ((NewObjNode)objmem.in(0)).is_mutable(tok) ) {
           ((NewObjNode)objmem.in(0)).update(tok,mutable,ifex,_gvn);
         } else {
-          StoreNode st = (StoreNode)gvn(new StoreNode(objmem,ptr,ifex,mutable,tok,errMsg()));
+          StoreNode st = (StoreNode)gvn(new StoreNode(objmem,ptr,ifex,mutable,tok,badfs.at(i)));
           mem_active().st(st,_gvn);     // Update active memory
         }
         scope.def_if(tok,mutable,false); // Note 1-side-of-if update

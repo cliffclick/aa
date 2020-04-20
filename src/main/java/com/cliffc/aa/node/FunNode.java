@@ -125,7 +125,8 @@ public class FunNode extends RegionNode {
       ? "?"+name
       : (_op_prec >= 0 ? "{"+name+"}" : name+"={->}");
   }
-  public boolean noinline() { return _name != null && _name.startsWith("noinline"); }
+  // This function has disabled inlining
+  public boolean noinline() { return _name != null && _name.startsWith("noinline") && in(0)==null; }
 
   // Can return nothing, or "name" or "[name0,name1,name2...]" or "[35]"
   public static SB names(BitsFun fidxs, SB sb ) {

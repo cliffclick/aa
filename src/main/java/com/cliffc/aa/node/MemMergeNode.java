@@ -170,26 +170,16 @@ public class MemMergeNode extends Node {
   public void st( StoreNode st, GVNGCM gvn ) {
     assert !gvn.touched(this);
     Type tadr = gvn.type(st.adr());
-    if( tadr instanceof TypeMemPtr ) {
-      TypeMemPtr ptr = (TypeMemPtr)tadr;
-      BitSet bs = ptr._aliases.tree().plus_kids(ptr._aliases);
-      for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) ) {
-        int idx = make_alias2idx(alias);
-        set_def(idx,st,gvn);
-      }
-    } else {
+    // If address is super conservative, store over everything
+    if( !(tadr instanceof TypeMemPtr) ) {
       if( tadr.above_center() ) return; // Assume nothing is being stored into
       assert TypeMemPtr.OOP.isa(tadr);  // Address might lift to a valid ptr
-      // Assume all RECORD aliases are stomped over.  Very conservative.
-      // Reset this MemMerge to having just the 'st' in slot#1, alias#2.
-      while( _defs._len > 1 ) pop(gvn);
-      _aliases.set_len(1);
-      _aidxes .set_len(BitsAlias.RECORD+1);
-      add_def(st);
-      _aliases.push(BitsAlias.RECORD);
-      _aidxes .setX(BitsAlias.RECORD,1);
-      assert check();
+      tadr = TypeMemPtr.STRUCT;         // All possible field aliases
     }
+    TypeMemPtr ptr = (TypeMemPtr)tadr;
+    for( int alias : ptr._aliases )
+      for( int kid = alias; kid!=0; kid = BitsAlias.next_kid(alias,kid) )
+        set_def(make_alias2idx(alias),st,gvn);
   }
 
 
