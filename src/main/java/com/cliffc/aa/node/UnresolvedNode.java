@@ -141,4 +141,12 @@ public class UnresolvedNode extends Node {
     String name = fun==null ? null : fun.xstr();
     return _bad==null ? null : _bad.errMsg("Unable to resolve "+name);
   }
+  // Choice of typically primitives, all of which are pure.
+  // Instead of returning the pre-call memory on true, returns self.
+  @Override Node is_pure_call() {
+    for( Node fun : _defs )
+      if( fun.is_pure_call() == null )
+        return null;
+    return this;                // Yes, all choices are pure
+  }
 }

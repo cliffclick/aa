@@ -462,6 +462,10 @@ public abstract class Node implements Cloneable {
   // Only true for some RetNodes and FunNodes
   public boolean is_forward_ref() { return false; }
 
+  // True if this Call/CallEpi pair does not read or write memory.
+  // True for most primitives.  Returns the pre-call memory or null.
+  Node is_pure_call() { return null; }
+  
   // Walk a subset of the dominator tree, looking for the last place (highest
   // in tree) this predicate passes, or null if it never does.
   Node walk_dom_last(Predicate<Node> P) {

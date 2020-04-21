@@ -298,4 +298,5 @@ public final class CallEpiNode extends Node {
   boolean is_copy() { return !(in(0) instanceof CallNode); }
   @Override public Node is_copy(GVNGCM gvn, int idx) { return is_copy() ? in(idx) : null; }
   @Override public Type all_type() { return TypeTuple.CALLE; }
+  @Override Node is_pure_call() { return call().is_pure_call(); }
 }

@@ -1204,9 +1204,12 @@ public class Parse {
     Env e = _e;
     Node ptr = e._scope.ptr();
     MemMergeNode mmem = mem_active();
+    TypeMem tmem = (TypeMem)mmem.value(_gvn);
     while( true ) {
       if( scope == e._scope ) return ptr;
       ptr = gvn(new LoadNode(mmem,ptr,"^",null)); // Gen linked-list walk code, walking display slot
+      Type t = _gvn.type(ptr);
+      assert t instanceof TypeMemPtr && t.sharpen(tmem).is_display_ptr();
       e = e._par;                                 // Walk linked-list in parser also
     }
   }
@@ -1242,7 +1245,7 @@ public class Parse {
     _gvn = P._gvn;
     _e   = null;  _nf  = null;  _pp  = null;  _str = null;
   }
-  // Delayed error message, just record line/char index and share 697code buffer
+  // Delayed error message, just record line/char index and share code buffer
   Parse errMsg() { return errMsg(_x); }
   Parse errMsg(int x) { Parse P = new Parse(this); P._x=x; return P; }
   Parse[] errMsgs(int n) {      // n==1 or 2 arg operator

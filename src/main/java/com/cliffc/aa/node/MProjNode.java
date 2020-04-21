@@ -9,9 +9,9 @@ public class MProjNode extends ProjNode {
   @Override String xstr() { return "MProj_"+_idx; }
   @Override public Node ideal(GVNGCM gvn, int level) {
     Node x = in(0).is_copy(gvn,_idx);
-    if( x == null ) return null;
-    if( x != this ) return x;
-    return gvn.con(TypeMem.XMEM);// Happens in dead self-recursive functions
+    if( x != null )
+      return x == this ? gvn.con(TypeMem.XMEM) : x; // Happens in dead self-recursive functions
+    return in(0).is_pure_call(); // See if memory can bypass pure calls (most primitives)
   }
   @Override public Type value(GVNGCM gvn) {
     Type c = gvn.type(in(0));

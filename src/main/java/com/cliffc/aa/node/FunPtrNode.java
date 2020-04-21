@@ -83,6 +83,17 @@ public final class FunPtrNode extends Node {
   @Override boolean is_uncalled(GVNGCM gvn) {
     return !is_forward_ref() && ((TypeTuple)gvn.type(ret())).at(0)==Type.XCTRL;
   }
+  // Instead of returning the pre-call memory on true, returns self.
+  // Changes as the graph changes, because works purely off of graph shape.
+  @Override Node is_pure_call() {
+    // See if the RetNode points to a Parm:mem (so no mods on memory).
+    RetNode ret = ret();
+    if( ret.is_copy() ) return null;
+    FunNode fun = ret.fun();
+    Node mem = ret.mem();
+    if( mem.in(0)==fun && mem instanceof ParmNode ) return this; // Parm:mem on fun, no mods to memory
+    return null;
+  }
 
   // A forward-ref is an assumed unknown-function being used before being
   // declared.  Hence we want a callable function pointer, but have no defined

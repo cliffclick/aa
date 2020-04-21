@@ -274,6 +274,7 @@ public class GVNGCM {
         if( !check_new(x) ) return x; // If the replacement is old, no need to re-ideal
         add_work_defs(n);       // Force live-ness rechecking
       }
+      untype(n,null);           // Pull out for invariants on next iteration
       cnt++; assert cnt < 100;  // Catch infinite ideal-loops
     }
     // Global Value Numbering; n is "in the system" now

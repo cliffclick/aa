@@ -302,14 +302,14 @@ public class CallNode extends Node {
     if( gvn._opt_mode < 2 ) {
       BitsFun fidxs = fidxs(gvn);
       if( fidxs == null ) return TypeMem.FULL; // Assume Something Good will yet happen
-      if( fidxs.above_center() ) return TypeMem.FULL; // Got choices, dunno which one will stick
+      if( fidxs.above_center() ) return _live; // Got choices, dunno which one will stick
       CallEpiNode cepi = cepi();
       if( cepi==null ) return _live; // Collapsing
       if( gvn.type(ctl()) == Type.XCTRL ) return _live; // Unreachable
       // Expand (actually fail) if any parents
       BitSet bs = fidxs.tree().plus_kids(fidxs);
       if( bs.cardinality() > cepi.nwired() ) // More things to call
-        return TypeMem.FULL; // Cannot improve
+        return _live; // Cannot improve
     }
     // All choices discovered during GCP.  If the call is in-error it may not
     // resolve and so will have no uses other than the CallEpi - which is good
@@ -580,4 +580,5 @@ public class CallNode extends Node {
   }
   boolean is_copy() { return _is_copy; }
   @Override public Node is_copy(GVNGCM gvn, int idx) { return _is_copy  ? in(idx) : null; }
+  @Override Node is_pure_call() { return fun().is_pure_call()==null ? null : mem(); }
 }
