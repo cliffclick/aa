@@ -19,14 +19,13 @@ import com.cliffc.aa.type.*;
 public abstract class IntrinsicNewNode extends Node {
   public final String _name;    // Unique library call name
   final NewStrNode _nstr;       // Main alias
-  final TypeStruct _targs;      // Arguments
+  final TypeStruct _formals;     // Arguments
   IntrinsicNewNode( String name, Type[] ts ) {
     super(OP_LIBCALL);
     _name = name;
     _nstr = new NewStrNode(TypeStr.STR,null,null);
-    ts[0] = TypeMemPtr.make(_nstr._alias,TypeObj.OBJ); // Simple ptr return
-    ts[1] = TypeStruct.NO_DISP_SIMPLE; // No display
-    _targs = TypeStruct.make_args(ts.length==3 ? TypeStruct.ARGS_X : TypeStruct.ARGS_XY,ts);
+    ts[0] = TypeFunPtr.NO_DISP; // No display
+    _formals = TypeStruct.make_args(ts.length==2 ? TypeStruct.ARGS_X : TypeStruct.ARGS_XY,ts);
   }
   public static IntrinsicNewNode[] INTRINSICS = new IntrinsicNewNode[] {
     new ConvertI64Str(),
@@ -49,8 +48,8 @@ public abstract class IntrinsicNewNode extends Node {
     add_def(null);              // Control for the primitive in slot 0
     add_def(memp);              // Memory  for the primitive in slot 1
     add_def(null);              // Closure for the primitive in slot 2
-    for( int i=2; i<_targs._ts.length; i++ ) // Args follow, return in targ 0, closure in targ 1
-      add_def( gvn.xform(new ParmNode(i,_targs._flds[i],fun, gvn.con(_targs._ts[i].simple_ptr()),null)));
+    for( int i=1; i<_formals._ts.length; i++ ) // Args follow, closure in formal 0
+      add_def( gvn.xform(new ParmNode(i,_formals._flds[i],fun, gvn.con(_formals._ts[i].simple_ptr()),null)));
     Node rez = gvn.xform(this); // Returns a TypeObj
     // Fill in NewStrNode inputs, now that we have them.
     gvn.set_def_reg(nnn,0,fun);
@@ -61,14 +60,14 @@ public abstract class IntrinsicNewNode extends Node {
     Node mmem= gvn.xform(new MemMergeNode(memp,mem,_nstr._alias));
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,ptr,rpc,fun));
     mmem._live = mmem.live(gvn); // Refine initial memory
-    return new FunPtrNode(ret,gvn.con(TypeStruct.NO_DISP_SIMPLE));
+    return new FunPtrNode(ret,null);
   }
 
 }
 
 // --------------------------------------------------------------------------
 class ConvertI64Str extends IntrinsicNewNode {
-  ConvertI64Str() { super("str",TypeStruct.ts(null,null,TypeInt.INT64)); }
+  ConvertI64Str() { super("str",TypeStruct.ts(null,TypeInt.INT64)); }
   @Override public Node ideal(GVNGCM gvn, int level) { return null; }
   @Override public Type value(GVNGCM gvn) {
     Type t = gvn.type(in(3));
@@ -79,7 +78,7 @@ class ConvertI64Str extends IntrinsicNewNode {
 }
 
 class ConvertF64Str extends IntrinsicNewNode {
-  ConvertF64Str() { super("str",TypeStruct.ts(null,null,TypeFlt.FLT64)); }
+  ConvertF64Str() { super("str",TypeStruct.ts(null,TypeFlt.FLT64)); }
   @Override public Node ideal(GVNGCM gvn, int level) { return null; }
   @Override public Type value(GVNGCM gvn) {
     Type t = gvn.type(in(3));
@@ -94,7 +93,7 @@ class ConvertF64Str extends IntrinsicNewNode {
 // If one  argument  is  NIL, the other non-nil argument is returned.
 // If neither argument is NIL, the two strings are concatenated into a new third string.
 class AddStrStr extends IntrinsicNewNode {
-  AddStrStr() { super("+",TypeStruct.ts(null,null,TypeMemPtr.STR0,TypeMemPtr.STR0)); }
+  AddStrStr() { super("+",TypeStruct.ts(null,TypeMemPtr.STR0,TypeMemPtr.STR0)); }
   @Override public Node ideal(GVNGCM gvn, int level) { return null; }
   @Override public Type value(GVNGCM gvn) {
     Type m   = gvn.type(in(1));

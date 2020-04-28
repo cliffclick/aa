@@ -28,31 +28,36 @@ public class TypeNode extends Node {
     // function with a new function which does the right arg-checks.  This
     // happens immediately in the Parser and is here to declutter the Parser.
     if( _t instanceof TypeFunPtr/*signature not fidxs*/ ) {
-      TypeFunPtr tfp = (TypeFunPtr)_t;
-      Type[] targs = tfp._args._ts;
-      Node[] args = new Node[targs.length-2/*not return nor display*/+/*+ctrl+mem+tfp+all args*/3];
-      FunNode fun = gvn.init((FunNode)(new FunNode(tfp._args._flds,targs).add_def(Env.ALL_CTRL)));
-      args[0] = fun;            // Call control
-      args[1] = mem = gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM),null)).keep();
-      args[2] = arg;            // The whole TFP to the call
-      for( int i=2; i<targs.length; i++ ) { // First is return, 2nd is display
-        // All the parms, with types
-        Node parm = gvn.xform(new ParmNode(i,"arg"+i,fun,gvn.con(Type.SCALAR),null));
-        args[i+1] = gvn.xform(new TypeNode(mem,parm,targs[i],_error_parse));
-      }
-      Parse[] badargs = new Parse[targs.length];
-      Arrays.fill(badargs,_error_parse);
-      Node rpc= gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
-      CallNode call = (CallNode)gvn.xform(new CallNode(true,badargs,args));
-      Node cepi   = gvn.xform(new CallEpiNode(call)).keep();
-      Node ctl    = gvn.xform(new CProjNode(cepi,0));
-      Node postmem= gvn.xform(new MProjNode(cepi,1)).keep();
-      Node val    = gvn.xform(new  ProjNode(cepi.unhook(),2));
-      Node chk    = gvn.xform(new  TypeNode(mem.unhook(),val,tfp.ret(),_error_parse)); // Type-check the return also
-      RetNode ret = (RetNode)gvn.xform(new RetNode(ctl,postmem.unhook(),chk,rpc,fun));
-      // Just the Closure when we make a new TFP
-      Node clos = gvn.xform(new FP2ClosureNode(arg));
-      return gvn.xform(new FunPtrNode(ret,clos));
+
+      // Type system parser needs to make a function-type with complex formals.
+
+      
+      throw com.cliffc.aa.AA.unimpl();
+      //TypeFunPtr tfp = (TypeFunPtr)_t;
+      //Type[] targs = tfp._args._ts;
+      //Node[] args = new Node[targs.length-2/*not return nor display*/+/*+ctrl+mem+tfp+all args*/3];
+      //FunNode fun = gvn.init((FunNode)(new FunNode(tfp._args._flds,targs).add_def(Env.ALL_CTRL)));
+      //args[0] = fun;            // Call control
+      //args[1] = mem = gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM),null)).keep();
+      //args[2] = arg;            // The whole TFP to the call
+      //for( int i=2; i<targs.length; i++ ) { // First is return, 2nd is display
+      //  // All the parms, with types
+      //  Node parm = gvn.xform(new ParmNode(i,"arg"+i,fun,gvn.con(Type.SCALAR),null));
+      //  args[i+1] = gvn.xform(new TypeNode(mem,parm,targs[i],_error_parse));
+      //}
+      //Parse[] badargs = new Parse[targs.length];
+      //Arrays.fill(badargs,_error_parse);
+      //Node rpc= gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
+      //CallNode call = (CallNode)gvn.xform(new CallNode(true,badargs,args));
+      //Node cepi   = gvn.xform(new CallEpiNode(call)).keep();
+      //Node ctl    = gvn.xform(new CProjNode(cepi,0));
+      //Node postmem= gvn.xform(new MProjNode(cepi,1)).keep();
+      //Node val    = gvn.xform(new  ProjNode(cepi.unhook(),2));
+      //Node chk    = gvn.xform(new  TypeNode(mem.unhook(),val,tfp.ret(),_error_parse)); // Type-check the return also
+      //RetNode ret = (RetNode)gvn.xform(new RetNode(ctl,postmem.unhook(),chk,rpc,fun));
+      //// Just the Closure when we make a new TFP
+      //Node clos = gvn.xform(new FP2ClosureNode(arg));
+      //return gvn.xform(new FunPtrNode(ret,clos));
     }
 
     // Push TypeNodes 'up' to widen the space they apply to, and hopefully push

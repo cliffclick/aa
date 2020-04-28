@@ -268,7 +268,7 @@ public class TestNodeSmall {
     TypeFunPtr tint1 = v(aint,gvn), tint1X = tint1.dual();
     TypeFunPtr tstr1 = v(astr,gvn), tstr1X = tstr1.dual();
 
-    TypeFunPtr tmul1E = TypeFunPtr.make(BitsFun.EMPTY,tmul1._args.make_from_empty()); // All bad choices
+    TypeFunPtr tmul1E = TypeFunPtr.make(BitsFun.EMPTY,1,TypeFunPtr.NO_DISP); // All bad choices
 
     assert tadd1X.isa(tnum1X) && tnum1X.isa(tflt1X) && tflt1X.isa(tnum1) && tnum1.isa(tadd1);
 
@@ -283,7 +283,7 @@ public class TestNodeSmall {
       TypeTuple.make( tctl, tfull, tmul1, tscl , tscl , tmul1 ), //   S     S   [ int,flt] ; low
       TypeTuple.make( tctl, tfull, tmul1, txscl, tscl , tmul1 ), //  ~S     S   [ int,flt] ; low     +high
       TypeTuple.make( tctl, tfull, tmul1, txscl, tabc , tmul1X), //  ~S    str  [ int,flt] ; bad      high
-      TypeTuple.make( tctl, tfull, tmul1, tabc , tabc , tmul1E), //  str   str  [        ] ; bad
+      TypeTuple.make( tctl, tfull, tmul1, tabc , tabc , tmul1 ), //  str   str  [        ] ; bad
       TypeTuple.make( tctl, tfull, tmul1, t2   , tabc , tmul1E), //   2    str  [ int,flt] ; bad+good
     };
     _testMonotonicChain(ins,call,argss_mul1);
@@ -318,7 +318,7 @@ public class TestNodeSmall {
       TypeTuple.make( tctl, tfull, tadd1, tnil , tscl , tadd1 ), //   0     S   [ int,flt,str] (LG_,LG_,LG_) ; Some low , keep all, meet
       TypeTuple.make( tctl, tfull, tadd1, t2   , txscl, tadd1X), //   2    ~S   [+int+flt+str] (_GH,_GH,B_H) ; Some high, keep all, join
       TypeTuple.make( tctl, tfull, tadd1, t2   , t3   , tnum1 ), //   2     3   [ int,flt    ] (_G_,_G_,B__) ; Some good, drop bad, fidx/meet
-      TypeTuple.make( tctl, tfull, tadd1, t2   , tabc , tmul1E), //   2    str  [ int,flt,str] (BG_,BG_,BG_) ; All  bad , keep all, meet
+      TypeTuple.make( tctl, tfull, tadd1, t2   , tabc , tadd1 ), //   2    str  [ int,flt,str] (BG_,BG_,BG_) ; All  bad , keep all, meet
       TypeTuple.make( tctl, tfull, tadd1, t2   , tscl , tadd1 ), //   2     S   [ int,flt,str] (LG_,LG_,B__) ; Some low , keep all, meet
       TypeTuple.make( tctl, tfull, tadd1, tabc , tabc , tstr1 ), //  str   str  [         str] (B__,B__,_G_) ; Some good, drop bad, fidx/meet
       TypeTuple.make( tctl, tfull, tadd1, tscl , tscl , tadd1 ), //   S     S   [ int,flt,str] (L__,L__,L__) ; All  low , keep all, meet
@@ -430,12 +430,9 @@ public class TestNodeSmall {
     Env.DISPLAYS.set(dsp_file._alias);
     MemMergeNode dsp_merge = gvn.init(new MemMergeNode(mem,dsp_file_obj,dsp_file._alias));
     // The Fun and Fun._tf:
-    Type[] args = TypeAry.get(3);
-    args[0] = Type.SCALAR;            // Return
-    args[1] = gvn.type(dsp_file_ptr).dual(); // File-scope display as arg0
-    args[2] = Type.SCALAR;            // Some scalar arg1
-    TypeFunPtr tf = TypeFunPtr.make_new(TypeStruct.make_args(new String[]{"->","^","x"},args));
-    FunNode fun = new FunNode("fact",tf);
+    TypeStruct formals = TypeStruct.make_args(TypeAry.ts(gvn.type(dsp_file_ptr), // File-scope display as arg0
+                                                         Type.SCALAR));          // Some scalar arg1
+    FunNode fun = new FunNode("fact",formals,-1);
     gvn.init(fun.add_def(ctl).add_def(ctl));
     // Parms for the Fun.  Note that the default type is "weak" because the
     // file-level display can not yet know about "fact".
@@ -473,8 +470,9 @@ public class TestNodeSmall {
 
     // Validate cyclic display/function type
     TypeFunPtr tfptr0 = (TypeFunPtr)gvn.type(fptr);
-    Type tdptr0 = tfptr0.display();
-    assertEquals(tfptr0.ret(),tdptr0); // Returning the display
+    Type tdptr0 = tfptr0._disp;
+    Type tret = ((TypeTuple)gvn.type(ret)).at(2);
+    assertEquals(tdptr0,tret); // Returning the display
     // Display contains 'fact' pointing to self
     TypeMem tmem = (TypeMem)gvn.type(dsp_merge);
     TypeStruct tdisp0 = (TypeStruct)tmem.ld((TypeMemPtr)tdptr0);

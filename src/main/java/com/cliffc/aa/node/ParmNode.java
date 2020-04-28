@@ -40,7 +40,7 @@ public class ParmNode extends PhiNode {
       for( int i=1; i<_defs._len; i++  )      // For all arguments
         if( gvn.type(fun.in(i))==Type.CTRL && // Path is alive
             in(i)!=this &&                    // Can ignore self- only other inputs will determine arg-check
-            !gvn.sharptr(in(i),mem.in(i)).isa(fun.targ(_idx)) ) // Arg is NOT correct type
+            !gvn.sharptr(in(i),mem.in(i)).isa(fun.formal(_idx)) ) // Arg is NOT correct type
           return null;          // Not correct arg-type; refuse to collapse
     } else if( _idx== -2 ) {
       for( Node use : fun._uses )
@@ -56,7 +56,7 @@ public class ParmNode extends PhiNode {
     // Bound results by simple Fun argument types.  This keeps errors from
     // spreading past function call boundaries.
     if( in(0) instanceof FunNode && _idx >= 0 )
-      t = t.bound(fun().targ(_idx).simple_ptr());
+      t = t.bound(fun().formal(_idx).simple_ptr());
 
     // Memory tracks the notion of 'clean' or 'unwritten' since the function
     // start.  Changed memory is returned at exit and unchanged memory is NOT
@@ -69,7 +69,7 @@ public class ParmNode extends PhiNode {
   // Same as PhiNode, but bound like value
   @Override public Type all_type() {
     if( in(0) instanceof FunNode && _idx >= 0 )
-      return fun().targ(_idx).simple_ptr();
+      return fun().formal(_idx).simple_ptr();
     return _t;
   }
   @Override public String err( GVNGCM gvn ) {
@@ -78,7 +78,7 @@ public class ParmNode extends PhiNode {
     assert fun._defs._len==_defs._len;
     if( _idx < 0 ) return null;                    // No arg check on RPC or Mem
     Node mem = fun.parm(-2);
-    Type formal = fun.targ(_idx);
+    Type formal = fun.formal(_idx);
     for( int i=1; i<_defs._len; i++ ) {
       if( gvn.type(fun.in(i))!=Type.CTRL ) continue; // Ignore dead paths
       Type argt = gvn.sharptr(in(i),mem); // Arg type for this incoming path

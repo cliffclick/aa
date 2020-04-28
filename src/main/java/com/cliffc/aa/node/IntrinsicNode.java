@@ -37,14 +37,14 @@ public class IntrinsicNode extends Node {
 
     // This function call takes in and returns a plain ptr-to-object.
     // Only after folding together does the name become apparent.
-    TypeFunPtr tf = TypeFunPtr.make_new(TypeStruct.make_args(TypeStruct.ts(TypeMemPtr.STRUCT,TypeStruct.NO_DISP_SIMPLE,TypeMemPtr.STRUCT)));
-    FunNode fun = (FunNode) gvn.xform(new FunNode(tn._name,tf).add_def(Env.ALL_CTRL));
+    TypeStruct formals = TypeStruct.make_args(TypeStruct.ts(TypeFunPtr.NO_DISP,TypeMemPtr.STRUCT));
+    FunNode fun = (FunNode) gvn.xform(new FunNode(tn._name,formals,-1).add_def(Env.ALL_CTRL));
     Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
     Node mem = gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM     ),null));
     Node ptr = gvn.xform(new ParmNode( 2,"ptr",fun,gvn.con(TypeMemPtr.OOP  ),null));
     Node cvt = gvn.xform(new IntrinsicNode(tn,badargs,fun,mem,ptr));
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,cvt,ptr,rpc,fun));
-    return (FunPtrNode)gvn.xform(new FunPtrNode(ret,gvn.con(TypeStruct.NO_DISP_SIMPLE)));
+    return (FunPtrNode)gvn.xform(new FunPtrNode(ret,null));
   }
 
   @Override public Type all_type() { return TypeMem.MEM; }
@@ -116,32 +116,23 @@ public class IntrinsicNode extends Node {
   public static FunPtrNode convertTypeNameStruct( TypeStruct to, int alias, GVNGCM gvn ) {
     assert to.has_name();
     assert Util.eq(to._flds[0],"^"); // Display already
-    Type[] tsclr = TypeStruct.ts(to._ts.length);
-    tsclr[0] = Type.XSCALAR;       // No display, but all other fields SCALAR
-    NewObjNode nnn = new NewObjNode(false,alias,to.make_from(tsclr),null,gvn.con(Type.XNIL)).keep();
-    // Tacky conversion from struct fields to function call args.
-    Type[] ts = TypeAry.get(to._ts.length+1);
-    ts[0] = TypeMemPtr.make(alias,to); // Return
-    ts[1] = TypeStruct.NO_DISP_SIMPLE; // Display
-    System.arraycopy(to._ts,1,ts,2,to._ts.length-1);
-    TypeStruct args = TypeStruct.make_args(ts);
-    TypeFunPtr tf = TypeFunPtr.make_new(args);
-    FunNode fun = (FunNode) gvn.xform(new FunNode(to._name,tf).add_def(Env.ALL_CTRL));
+    TypeStruct formals = to.remove_name();
+    FunNode fun = (FunNode) gvn.xform(new FunNode(to._name,formals,-1).add_def(Env.ALL_CTRL));
     Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
     Node memp= gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM),null));
     // Add input edges to the NewNode
-    nnn.set_def(0,fun,gvn);     // Set control to function start
+    NewObjNode nnn = new NewObjNode(false,alias,to,fun,gvn.con(TypeFunPtr.NO_DISP)).keep();
     for( int i=1; i<to._ts.length; i++ ) { // Display in 0, fields in 1+
       String argx = to._flds[i];
       if( TypeStruct.fldBot(argx) ) argx = null;
-      nnn.add_def(gvn.xform(new ParmNode(i+1,argx,fun, gvn.con(to._ts[i].simple_ptr()),null)));
+      nnn.add_def(gvn.xform(new ParmNode(i,argx,fun, gvn.con(to._ts[i].simple_ptr()),null)));
     }
     gvn.init(nnn);
     Node ptr = gvn.xform(new  ProjNode(nnn,1));
     Node obj = gvn.xform(new OProjNode(nnn,0));
     Node mmem= gvn.xform(new MemMergeNode(memp,obj,nnn.<NewObjNode>unhook()._alias));
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,ptr,rpc,fun));
-    return (FunPtrNode)gvn.xform(new FunPtrNode(ret,gvn.con(TypeStruct.NO_DISP_SIMPLE)));
+    return (FunPtrNode)gvn.xform(new FunPtrNode(ret,null));
   }
 
 }

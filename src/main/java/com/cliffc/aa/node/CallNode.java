@@ -5,6 +5,7 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.VBitSet;
 import org.jetbrains.annotations.NotNull;
 
@@ -85,30 +86,27 @@ public class CallNode extends Node {
 
   // Call arguments:
   // 0 - Control.  If XCTRL, call is not reached.
-  // 1 - Memory.  This is memory into the call.  The following MProj is memory
-  //     passed to the called function - which is generally trimmed to just
-  //     what the function can use.  The unused memory bypasses to the CallEpi.
+  // 1 - Memory.  This is memory into the call.
   // 2 - Function pointer, typed as a TypeFunPtr.  Might be a FunPtrNode, might
-  //     be e.g. a Phi or a Load.  This is argument#1, both as the Closure AND
-  //     as the Code pointer.
-  // 3+  Other "normal" arguments, numbered#2 and up.
+  //     be e.g. a Phi or a Load.  This is argument#0, both as the Closure AND
+  //     as the Code pointer.  The output type here is trimmed to what is "resolved"
+  // 3+  Other "normal" arguments, numbered#1 and up.
 
-  // Number of actual arguments, including the closure/code ptr AND return.
+  // Number of actual arguments, including the closure/code ptr.
   // This is 2 higher than the user-visible arg count.
-  int nargs() { return _defs._len-1; }
+  int nargs() { return _defs._len-2; }
   // Argument type
   Type targ( GVNGCM gvn, int x ) {
     Type t = gvn.type(arg(x));
     if( x>0 ) return t;         // Normal argument type
     if( !(t instanceof TypeFunPtr) ) return Type.SCALAR;
-    return ((TypeFunPtr)t).display(); // Extract Display type from TFP
+    return ((TypeFunPtr)t)._disp; // Extract Display type from TFP
   }
-  // Actual arguments.  Arg(1) is allowed and refers to the Display/TFP.
-  // Arg(0) is the return and is not allowed.
-  Node arg( int x ) { assert x>=1; return _defs.at(x+1); }
+  // Actual arguments.  Arg(0) is allowed and refers to the Display/TFP.
+  Node arg( int x ) { assert x>=0; return _defs.at(x+2); }
   // Set an argument.  Use 'set_fun' to set the Display/Code.
-  Node set_arg    (int idx, Node arg, GVNGCM gvn) { assert idx>1; return set_def(idx+1,arg,gvn); }
-  void set_arg_reg(int idx, Node arg, GVNGCM gvn) { assert idx>1; gvn.set_def_reg(this,idx+1,arg); }
+  Node set_arg    (int idx, Node arg, GVNGCM gvn) { assert idx>0; return set_def(idx+2,arg,gvn); }
+  void set_arg_reg(int idx, Node arg, GVNGCM gvn) { assert idx>0; gvn.set_def_reg(this,idx+2,arg); }
 
           Node ctl() { return in(0); }
   public  Node mem() { return in(1); }
@@ -217,10 +215,10 @@ public class CallNode extends Node {
     if( gvn._opt_mode > 2 && err(gvn)==null ) {
       Node progress = null;
       outer_loop:
-      for( int i=2; i<nargs(); i++ ) // Skip the FP/DISPLAY arg, as its useful for error messages
+      for( int i=1; i<nargs(); i++ ) // Skip the FP/DISPLAY arg, as its useful for error messages
         if( !(arg(i) instanceof ConNode && targ(gvn,i)==Type.XSCALAR) ) { // Not already folded
           for( int fidx2 : fidxs )
-            if( FunNode.find_fidx(fidx2).targ(i)!=Type.XSCALAR )
+            if( FunNode.find_fidx(fidx2).parm(i)==null ) // Parm is dead
               continue outer_loop; // Fail this arg, as is alive on at least one called function
           progress = set_arg(i,gvn.con(Type.XSCALAR),gvn); // Kill dead arg
         }
@@ -258,23 +256,21 @@ public class CallNode extends Node {
     if( ctl == Type.XCTRL ) mem = TypeMem.XMEM;
     TypeMem tmem = (TypeMem)(ts[1]=mem);
 
-    // Copy args for called functions.
+    // Copy args for called functions.  Arg0 is display, handled below.
     for( int i=1; i<nargs(); i++ )
-      ts[i+1] = targ(gvn,i).bound(Type.SCALAR);
+      ts[i+2] = targ(gvn,i).bound(Type.SCALAR);
 
     // Not a function to call?
     Type tfx = gvn.type(fun());
     if( !(tfx instanceof TypeFunPtr) )
       tfx = tfx.above_center() ? TypeFunPtr.GENERIC_FUNPTR.dual() : TypeFunPtr.GENERIC_FUNPTR;
-    TypeFunPtr tfp = (TypeFunPtr)tfx;
-    BitsFun fidxs = tfp.fidxs();
+    BitsFun fidxs = ((TypeFunPtr)tfx).fidxs();
     // Resolve; only keep choices with sane arguments during GCP
     BitsFun rfidxs = resolve(fidxs,ts);
     if( rfidxs==null ) return (TypeTuple)gvn.self_type(this); // Dead function input, stall until this dies
 
     // Call.ts[2] is a TFP just for the resolved fidxs and display.
-    TypeStruct args = TypeStruct.make_args(TypeStruct.ts(Type.SCALAR,tfp.display()));
-    ts[2] = TypeFunPtr.make(rfidxs,args);
+    ts[2] = ((TypeFunPtr)tfx).make_from(rfidxs);
     return TypeTuple.make(ts);
   }
 
@@ -383,18 +379,18 @@ public class CallNode extends Node {
     FunNode fun = FunNode.find_fidx(fidx);
     if( fun==null || fun.is_dead() ) return DEAD; // Stale fidx leading to dead fun
     // Forward refs are only during parsing; assume they fit the bill
-    if( fun.is_forward_ref() ) return HIGH;    // Assume they work
-    if( fun.nargs() != nargs() ) return BAD;   // Wrong arg count, toss out
-    TypeStruct formals = fun._tf._args;        // Type of each argument
+    if( fun.is_forward_ref() ) return HIGH; // Assume they work
+    if( fun.nargs() != nargs() ) return BAD; // Wrong arg count, toss out
+    TypeStruct formals = fun._formals;       // Type of each argument
     int flags=0;
-    for( int j=1; j<nargs(); j++ ) {        // Skip 0, the function return
+    for( int j=0; j<nargs(); j++ ) {
       Type formal = formals.at(j);
-      if( formal.above_center() ) continue; // Arg is ignored
-      Type actual = targs[j+1];             // Calls skip ctrl & mem
-      if( j==1 && actual instanceof TypeFunPtr )
-        actual = ((TypeFunPtr)actual).display(); // Extract Display type from TFP
-      assert actual==actual.simple_ptr();        // Only simple ptrs from nodes
-      actual = actual.sharpen(tmem);             // Sharpen actual pointers before checking vs formals
+      if( fun.parm(j)==null ) continue;     // Arg is ignored
+      Type actual = targs[j+2];             // Calls skip ctrl & mem
+      if( j==0 && actual instanceof TypeFunPtr )
+        actual = ((TypeFunPtr)actual)._disp; // Extract Display type from TFP
+      assert actual==actual.simple_ptr();    // Only simple ptrs from nodes
+      actual = actual.sharpen(tmem); // Sharpen actual pointers before checking vs formals
 
       if( actual==formal ) { flags|=GOOD; continue; } // Arg is fine.  Covers NO_DISP which can be a high formal.
       Type mt_lo = actual.meet(formal       );
@@ -428,9 +424,9 @@ public class CallNode extends Node {
 
         FunNode fun = FunNode.find_fidx(kidx);
         if( fun.nargs()!=nargs() || fun.ret() == null ) continue; // BAD/dead
-        TypeStruct formals = fun._tf._args; // Type of each argument
-        int cvts=0;                         // Arg conversion cost
-        for( int j=2; j<nargs(); j++ ) {    // Skip arg#0, the return and #1 the display
+        TypeStruct formals = fun._formals; // Type of each argument
+        int cvts=0;                        // Arg conversion cost
+        for( int j=2; j<nargs(); j++ ) {   // Skip arg#0, the return and #1 the display
           Type actual = targ(gvn,j);
           Type formal = formals.at(j);
           if( actual==formal ) continue;
@@ -518,28 +514,24 @@ public class CallNode extends Node {
       return null; // This is an unresolved call, and that error is reported elsewhere
 
     // bad-arg-count
-    if( tfp.nargs() != nargs() )
-      return fast ? "" : _badargs[1].errMsg("Passing "+(nargs()-2)+" arguments to "+tfp.names()+" which takes "+(tfp.nargs()-2)+" arguments");
+    if( tfp._nargs != nargs() )
+      return fast ? "" : _badargs[1].errMsg("Passing "+(nargs()-1)+" arguments to "+tfp.names()+" which takes "+(tfp._nargs-1)+" arguments");
 
     // Now do an arg-check.
-    TypeStruct formals = tfp._args; // Type of each argument
-    for( int j=2; j<nargs(); j++ ) {
+    for( int j=1; j<nargs(); j++ ) {
       Type actual = gvn.sharptr(arg(j),mem());
-      Type formal = formals.at(j);
-      if( formal==Type.XSCALAR ) continue; // Formal is dead
-      if( !actual.isa(formal) ) { // Actual is not a formal
-        if( fast ) return "";
-        if( tfp.fidxs().abit() != -1 )
-          return _badargs[j].typerr(actual,null,formal);
-        // Multiple fails.  Try for a better error message.
-        Type[] ts = new Type[tfp.fidxs().bitCount()];
-        int i=0;
-        for( int fidx : tfp.fidxs() ) {
-          FunNode fun = FunNode.find_fidx(fidx);
-          ts[i++] = fun.targ(j);
-        }
-        return _badargs[j].typerr(actual,null,ts);
+      Ary<Type> ts=null;
+      for( int fidx : tfp._fidxs ) {
+        FunNode fun = FunNode.find_fidx(fidx);
+        TypeStruct formals = fun._formals; // Type of each argument
+        if( fun.parm(j)==null ) continue;  // Formal is dead
+        Type formal = formals.at(j);
+        if( actual.isa(formal) ) continue; // Actual is a formal
+        if( fast ) return "";              // Fail-fast
+        if( ts==null ) ts = new Ary<>(new Type[1],0);
+        ts.push(formal);
       }
+      return _badargs[j].typerr(actual,null,ts.asAry());
     }
 
     return null;

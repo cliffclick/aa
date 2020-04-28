@@ -85,10 +85,8 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   public static TypeMemPtr make_nil( int alias, TypeObj obj ) { return make(BitsAlias.make0(alias).meet_nil(),obj); }
 
   public  static final TypeMemPtr DISPLAY_PTR= new TypeMemPtr(BitsAlias.RECORD_BITS0,TypeStruct.DISPLAY );
-  public  static final TypeMemPtr NIL_DISPLAY= new TypeMemPtr(BitsAlias.NIL         ,TypeStruct.DISPLAY0);
   static {
     DISPLAY_PTR._hash = DISPLAY_PTR.compute_hash(); // Filled in during DISPLAY.install_cyclic
-    NIL_DISPLAY._hash = NIL_DISPLAY.compute_hash(); // Filled in during DISPLAY.install_cyclic
   }
   public  static final TypeMemPtr OOP0   = make(BitsAlias.FULL    ,TypeObj.OBJ); // Includes nil
   public  static final TypeMemPtr OOP    = make(BitsAlias.NZERO   ,TypeObj.OBJ); // Excludes nil

@@ -695,6 +695,7 @@ public class TestApprox {
   @Test public void testApprox8() {
     Object dummy0 = TypeStruct.TYPES;
     Object dummy1 = TypeFunPtr.TYPES;
+    Object dummy2 = Env.GVN;
     final int CUTOFF=2;
     final String[] fflds = TypeStruct.flds("^","fib");
     final String[] xflds = TypeStruct.flds("->","^","x");
@@ -709,21 +710,21 @@ public class TestApprox {
     // for this test, as the cyclic approx is supposed to be low - and it has
     // args known post-parse but not pre-parse.
     Type tY = TypeMemPtr.DISPLAY_PTR;
-    TypeStruct tfp0_args = TypeStruct.make_x_args(true,TypeAry.ts(Type.XSCALAR,tY.simple_ptr()));
+    TypeStruct tfp0_args = TypeStruct.make_x_args(true,TypeAry.ts(tY.simple_ptr()));
 
-    TypeFunPtr tfp0 = TypeFunPtr.make(BitsFun.ANY,tfp0_args); // fib with generic display
+    TypeFunPtr tfp0 = TypeFunPtr.make(BitsFun.ANY,2,(TypeMemPtr)TypeFunPtr.DISP.simple_ptr()); // fib with generic display
     TypeStruct dsp0 = TypeStruct.make(fflds,TypeStruct.ts(tY,tfp0),fmods); // The display with weak fib-type
     TypeMemPtr ptr0 = TypeMemPtr.make(alias,dsp0);
     // Args for a strong fib: { ^:ptr0 x:int64 -> ~Scalar } // LOW
     TypeStruct arg0 = TypeStruct.make(xflds,TypeStruct.ts(Type.SCALAR,ptr0.simple_ptr(),TypeInt.INT64),xmods);
 
-    TypeFunPtr tfp1 = TypeFunPtr.make(fidxs,arg0); // FIB with weak display
+    TypeFunPtr tfp1 = TypeFunPtr.make(fidxs,2,(TypeMemPtr)ptr0.simple_ptr()); // FIB with weak display
     TypeStruct dsp1 = TypeStruct.make(fflds,TypeStruct.ts(tY,tfp1),fmods); // Display with stronger FIB-type
     TypeMemPtr ptr1 = TypeMemPtr.make(alias,dsp1);
     // Args for a strong fib: { ^:ptr x:int -> ~Scalar } // LOW.  Display still not recursive.
     TypeStruct arg1 = TypeStruct.make(xflds,TypeStruct.ts(Type.SCALAR,ptr1.simple_ptr(),TypeInt.INT64),xmods);
 
-    TypeFunPtr tfp2 = TypeFunPtr.make(fidxs,arg1); // fib2->dsp1->fib1->dsp0->fib0->generic_display
+    TypeFunPtr tfp2 = TypeFunPtr.make(fidxs,2,(TypeMemPtr)ptr1.simple_ptr()); // fib2->dsp1->fib1->dsp0->fib0->generic_display
     TypeStruct dsp2 = TypeStruct.make(fflds,TypeStruct.ts(tY,tfp2),fmods); // dsp2->fib2->dsp1->fib1->dsp0->fib0->generic_display
 
     // The approx that gets built: fib3->dsp3->fib3->dsp3->...
@@ -732,7 +733,7 @@ public class TestApprox {
     dsp3._hash = dsp3.compute_hash();  dsp3._cyclic = true;
     TypeMemPtr ptr3 = TypeMemPtr.make(alias,dsp3);
     TypeStruct arg3 = TypeStruct.make(xflds,TypeStruct.ts(Type.SCALAR,ptr3.simple_ptr(),TypeInt.INT64),xmods);
-    TypeFunPtr tfp3 = TypeFunPtr.make(fidxs,arg3);
+    TypeFunPtr tfp3 = TypeFunPtr.make(fidxs,2,(TypeMemPtr)ptr3.simple_ptr());
     dsp3._ts[0] = tY;
     dsp3._ts[1] = tfp3;
     Type.RECURSIVE_MEET--;

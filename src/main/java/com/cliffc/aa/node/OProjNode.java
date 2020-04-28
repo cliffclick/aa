@@ -32,7 +32,7 @@ public class OProjNode extends ProjNode {
   // dead.
   private TypeObj captured() {
     if( in(0) instanceof NewNode && ((NewNode)in(0))._captured )
-      return in(0) instanceof NewObjNode ? TypeStruct.GENERIC : TypeObj.XOBJ;
+      return in(0) instanceof NewObjNode ? TypeStruct.ANYSTRUCT : TypeObj.XOBJ;
     return null;
   }
   @Override public Type all_type() { return ((TypeTuple)in(0).all_type())._ts[_idx]; }

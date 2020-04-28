@@ -12,7 +12,8 @@ import com.cliffc.aa.type.*;
 
 public final class RetNode extends Node {
   int _fidx;                 // Shortcut to fidx when the FunNode has collapsed
-  public RetNode( Node ctrl, Node mem, Node val, Node rpc, FunNode fun ) { super(OP_RET,ctrl,mem,val,rpc,fun); _fidx = fun.fidx();}
+  int _nargs;                // Replicated from FunNode
+  public RetNode( Node ctrl, Node mem, Node val, Node rpc, FunNode fun ) { super(OP_RET,ctrl,mem,val,rpc,fun); _fidx = fun._fidx; _nargs=fun.nargs(); }
   public Node ctl() { return in(0); }
   public Node mem() { return in(1); }
   public Node val() { return in(2); }
@@ -83,7 +84,7 @@ public final class RetNode extends Node {
   @Override public boolean basic_liveness() { return false; }
 
   @Override public Node is_copy(GVNGCM gvn, int idx) { throw com.cliffc.aa.AA.unimpl(); }
-  boolean is_copy() { return !(in(4) instanceof FunNode) || fun()._tf.fidx() != _fidx; }
+  boolean is_copy() { return !(in(4) instanceof FunNode) || fun()._fidx != _fidx; }
   // Return the op_prec of the returned value.  Not sensible except when called
   // on primitives.
   @Override public byte op_prec() {

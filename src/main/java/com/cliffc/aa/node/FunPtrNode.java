@@ -39,7 +39,7 @@ public final class FunPtrNode extends Node {
     if( is_forward_ref() ) return null;
     RetNode ret = ret();
     FunNode fun = ret.is_copy() ? FunNode.find_fidx(ret._fidx) : ret.fun();
-    if( display() !=null && (ret.is_copy() || fun._tf.display()==TypeStruct.NO_DISP_SIMPLE) ) {
+    if( display() !=null && (ret.is_copy() || fun.parm(0)==null) ) {
       set_def(1,null,gvn);      // No display needed
       return this;
     }
@@ -50,11 +50,8 @@ public final class FunPtrNode extends Node {
       return TypeFunPtr.EMPTY;
     RetNode ret = ret();
     Node disp = display();
-    FunNode fun = ret.is_copy() ? FunNode.find_fidx(ret._fidx) : ret.fun();
-    if( is_forward_ref() ) return fun._tf;
-    Type tret = gvn.type(ret);
-    Type tdsp = disp==null ? Type.NIL : gvn.type(display());
-    return fun._tf.make_from(tdsp,((TypeTuple)tret).at(2));
+    TypeMemPtr tdisp = disp==null ? TypeFunPtr.NO_DISP : (TypeMemPtr)gvn.type(disp);
+    return TypeFunPtr.make(ret._fidx,ret._nargs,tdisp);
   }
 
   @Override public TypeMem live( GVNGCM gvn) {
@@ -99,7 +96,7 @@ public final class FunPtrNode extends Node {
   public static FunPtrNode forward_ref( GVNGCM gvn, String name, Parse unkref ) {
     FunNode fun = gvn.init(new FunNode(name));
     RetNode ret = gvn.init(new RetNode(fun,gvn.con(TypeMem.MEM),gvn.con(Type.SCALAR),gvn.con(TypeRPC.ALL_CALL),fun));
-    return new FunPtrNode(unkref.forward_ref_err(fun),ret,gvn.con(TypeMemPtr.DISP_SIMPLE));
+    return new FunPtrNode(unkref.forward_ref_err(fun),ret,gvn.con(TypeMemPtr.DISPLAY_PTR));
   }
 
   // True if this is a forward_ref
@@ -117,29 +114,19 @@ public final class FunPtrNode extends Node {
 
     // Make a function pointer based on the original forward-ref fidx, but with
     // the known types.
-    FunNode.FUNS.setX(dfun.fidx(),null); // Track FunNode by fidx
-    TypeFunPtr tfp = TypeFunPtr.make(rfun._tf.fidxs(),dfun._tf._args);
-    gvn.setype(def,tfp);
-    gvn.unreg(dfun);  dfun._tf = tfp;  gvn.rereg(dfun,Type.CTRL);
-    Type tret = gvn.unreg(def.ret());
-    int fidx = def.ret()._fidx = rfun._tf.fidx();
-    gvn.rereg(def.ret(),tret);
-    FunNode.FUNS.setX(fidx,dfun);     // Track FunNode by fidx
+    FunNode.FUNS.setX(dfun._fidx,null); // Untrack dfun by old fidx
+    gvn.unreg(dfun);  dfun._fidx = rfun._fidx;  gvn.rereg(dfun,Type.CTRL);
+    FunNode.FUNS.setX(dfun._fidx,dfun); // Track FunNode by fidx
+    
+    RetNode dret = def.ret();
+    Type tret = gvn.unreg(dret);
+    dret._fidx  = rfun._fidx ;
+    dret._nargs = rfun.nargs();
+    gvn.rereg(dret,tret);
+    
     // Replace the forward_ref with the def.
     gvn.subsume(this,def);
     dfun.bind(tok);
-
-    // Update types: all users of the forward_ref where using the generic
-    // DISPLAY_PTR.  Now they can use the known actual display.  While in
-    // theory original DISPLAY_PTR may have spread far, it suffices to update
-    // the local closure which already "knows" what the def "knows" about the
-    // display pointer - to keep the local closure from rolling backwards.
-    for( Node use : def._uses ) {
-      gvn.setype(use,use.value(gvn));
-      if( use instanceof NewObjNode )
-        for( Node useuse : use._uses )
-          gvn.setype(useuse,useuse.value(gvn));
-    }
   }
 
   @Override public String err(GVNGCM gvn) { return is_forward_ref() ? _referr : null; }

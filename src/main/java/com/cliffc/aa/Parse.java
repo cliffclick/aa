@@ -847,9 +847,6 @@ public class Parse {
       // Standard return; function control, memory, result, RPC.  Plus a hook
       // to the function for faster access.
       RetNode ret = (RetNode)gvn(new RetNode(ctrl(),all_mem(),rez,rpc.unhook(),fun.unhook()));
-      // Update the function type for the current return value
-      Type tret = ((TypeTuple)_gvn.type(ret)).at(2);
-      fun.set_tf(fun._tf.make_from(tpar_disp,tret)); // Sharpen alltype return, equal to what parser already knowns
       // The FunPtr builds a real display; any up-scope references are passed in now.
       Node fptr = gvn(new FunPtrNode(ret,e._par._scope.ptr()));
       _e = _e._par;             // Pop nested environment
@@ -1004,21 +1001,22 @@ public class Parse {
   // Type or null or Type.ANY for '->' token
   private Type type0(boolean type_var) {
     if( peek('{') ) {           // Function type
-      Ary<Type> ts = new Ary<>(new Type[]{Type.SCALAR,TypeStruct.NO_DISP_SIMPLE});  Type t;
-      while( (t=typep(type_var)) != null && t != Type.ANY  )
-        ts.add(t);              // Collect arg types
-      Type ret;
-      if( t==Type.ANY ) {       // Found ->, expect return type
-        ret = typep(type_var);
-        if( ret == null ) return null; // should return TypeErr missing type after ->
-      } else {                  // Allow no-args and simple return type
-        if( ts._len != 3 ) return null; // should return TypeErr missing -> in tfun
-        ret = ts.pop();         // Get single return type
-      }
-      ts.setX(0,ret);           // 1st arg is return
-      TypeStruct targs = TypeStruct.make_args(ts.asAry());
-      if( !peek('}') ) return null;
-      return typeq(TypeFunPtr.make(BitsFun.NZERO,targs));
+      //Ary<Type> ts = new Ary<>(new Type[]{Type.SCALAR,TypeFunPtr.NO_DISP});  Type t;
+      //while( (t=typep(type_var)) != null && t != Type.ANY  )
+      //  ts.add(t);              // Collect arg types
+      //Type ret;
+      //if( t==Type.ANY ) {       // Found ->, expect return type
+      //  ret = typep(type_var);
+      //  if( ret == null ) return null; // should return TypeErr missing type after ->
+      //} else {                  // Allow no-args and simple return type
+      //  if( ts._len != 3 ) return null; // should return TypeErr missing -> in tfun
+      //  ret = ts.pop();         // Get single return type
+      //}
+      //ts.setX(0,ret);           // 1st arg is return
+      //TypeStruct targs = TypeStruct.make_args(ts.asAry());
+      //if( !peek('}') ) return null;
+      //return typeq(TypeFunPtr.make(BitsFun.NZERO,targs));
+      throw com.cliffc.aa.AA.unimpl("need a formals TypeFunPtr, vs a code-ptr type");
     }
 
     if( peek("@{") ) {          // Struct type

@@ -36,7 +36,7 @@ public class TestParse {
     testerr("{+}(1,2,3)", "Passing 3 arguments to {+} which takes 2 arguments",3);
     test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
     testerr("x=1+y","Unknown ref 'y'",5);
-    test_isa("{x y -> x+y}", TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make_args(TypeStruct.ts(TypeMemPtr.DISPLAY_PTR,Type.SCALAR,Type.SCALAR,Type.SCALAR)))); // {Scalar Scalar -> Scalar}
+    test_isa("{x y -> x+y}", TypeFunPtr.make(BitsFun.make0(35),3,TypeMemPtr.DISPLAY_PTR)); // {Scalar Scalar -> Scalar}
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.TRUE );
     testerr ("Point=:@{x;y}; Point((0,1))", "*[$](~nil;1) is not a *[$]Point:@{x=;y=}",20);
     test_ptr("x=@{n:=1;v:=2}; x.n := 3; x", "@{n:=3;v:=2}");
@@ -158,11 +158,11 @@ public class TestParse {
     TypeMemPtr tdisp = TypeMemPtr.make(10,TypeObj.OBJ);
     Env.DISPLAYS.set(10);
     // Anonymous function definition
-    test_isa("{x y -> x+y}", TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make_args(TypeStruct.ARGS_XY,TypeStruct.ts(Type.XSCALAR,tdisp,Type.SCALAR,Type.SCALAR)))); // {Scalar Scalar -> Scalar}
+    test_isa("{x y -> x+y}", TypeFunPtr.make(BitsFun.make0(35),3,TypeFunPtr.NO_DISP)); // {Scalar Scalar -> Scalar}
     // Since call not-taken, post GCP Parms not loaded from _tf, limited to ~Scalar.  The
     // hidden internal call from {&} to the primitive is never inlined (has ~Scalar args)
     // so 'x&1' never sees the TypeInt return from primitive AND.
-    test_isa("{x -> x&1}", TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make_args(TypeStruct.ARGS_X,TypeStruct.ts(Type.XSCALAR,tdisp,Type.SCALAR)))); // {Int -> Int}
+    test_isa("{x -> x&1}", TypeFunPtr.make(BitsFun.make0(35),2,TypeFunPtr.NO_DISP)); // {Int -> Int}
     test("{5}()", TypeInt.con(5)); // No args nor -> required; this is simply a function returning 5, being executed
 
     // ID in different contexts; in general requires a new TypeVar per use; for
@@ -295,7 +295,7 @@ public class TestParse {
     test_isa("(1,\"abc\").1", TypeMemPtr.STRPTR);
 
     // Named type variables
-    test("gal=:flt; gal", TypeFunPtr.make(BitsFun.make0(35),TypeStruct.make_args(TypeStruct.ts(Type.XSCALAR, TypeStruct.NO_DISP,TypeFlt.FLT64))));
+    test("gal=:flt; gal", TypeFunPtr.make(BitsFun.make0(35),2,TypeFunPtr.NO_DISP));
     test("gal=:flt; 3==gal(2)+1", TypeInt.TRUE);
     test("gal=:flt; tank:gal = gal(2)", TypeInt.con(2).set_name("gal:"));
     // test    ("gal=:flt; tank:gal = 2.0", TypeName.make("gal",TypeFlt.con(2))); // TODO: figure out if free cast for bare constants?
@@ -782,7 +782,7 @@ strs:List(str?) = ... // List of null-or-strings
     try( TypeEnv te = run(program) ) {
       assertTrue(te._t instanceof TypeFunPtr);
       TypeFunPtr actual = (TypeFunPtr)te._t;
-      TypeFunPtr expected = TypeFunPtr.make(actual.fidxs(),TypeStruct.make_args(TypeStruct.ts(Type.XSCALAR,TypeStruct.NO_DISP_SIMPLE,TypeMemPtr.STRUCT)));
+      TypeFunPtr expected = TypeFunPtr.make(actual.fidxs(),2,TypeFunPtr.NO_DISP);
       assertEquals(expected,actual);
     }
   }

@@ -15,13 +15,15 @@ import com.cliffc.aa.type.*;
 //
 public abstract class PrimNode extends Node {
   public final String _name;    // Unique name (and program bits)
-  final TypeStruct _targs;      // Argument types, 0-based
+  final TypeStruct _formals;    // Argument types; 0 is display, 1 is 1st real arg
+  final Type _ret;              // Return type
   Parse[] _badargs;             // Filled in when inlined in CallNode
-  PrimNode( String name, TypeStruct targs ) {
+  PrimNode( String name, TypeStruct formals, Type ret ) {
     super(OP_PRIM);
     _name=name;
-    assert targs.at(1)==TypeStruct.NO_DISP_SIMPLE; // Room for no closure
-    _targs=targs;
+    assert formals.at(0)==TypeFunPtr.NO_DISP; // Room for no closure
+    _formals=formals;
+    _ret = ret;
     _badargs=null;
   }
 
@@ -71,48 +73,48 @@ public abstract class PrimNode extends Node {
   }
 
   // Apply types are 1-based (same as the incoming node index), and not
-  // zero-based (not same as the _targs and _args fields).
+  // zero-based (not same as the _formals and _args fields).
   public abstract Type apply( Type[] args ); // Execute primitive
-  @Override public String xstr() { return _name+"::"+_targs; }
+  @Override public String xstr() { return _name+"::"+_formals; }
   @Override public Node ideal(GVNGCM gvn, int level) { return null; }
   @Override public Type value(GVNGCM gvn) {
     Type[] ts = new Type[_defs._len]; // 1-based
-    // If the meet with _targs.dual stays above center for all inputs, then we
+    // If the meet with _formals.dual stays above center for all inputs, then we
     // return the dual, the highest allowed result; if all inputs are constants
     // we constant fold; else some input is low so we return the lowest
     // possible result.
     boolean is_con = true;
     for( int i=1; i<_defs._len; i++ ) { // first is control
       Type tactual = gvn.type(in(i));
-      Type tformal = _targs.at(i+1); // Return in 0, display in 1
+      Type tformal = _formals.at(i);
       Type t = tformal.dual().meet(ts[i] = tactual);
       if( t.is_con() ) ;                          // All constants, will fold
       else if( t.above_center() ) is_con = false; // Not a constant
-      else return _targs.at(0);                   // Some input is too low
+      else return _ret;           // Some input is too low
     }
-    return is_con ? apply(ts) : _targs.at(0).dual();
+    return is_con ? apply(ts) : _ret.dual();
   }
   @Override public String err(GVNGCM gvn) {
     for( int i=1; i<_defs._len; i++ ) { // first is control
       Type tactual = gvn.type(in(i));
-      Type tformal = _targs.at(i+1); // Skip leading return
+      Type tformal = _formals.at(i+1); // Skip leading return
       if( !tactual.isa(tformal) )
         return _badargs==null ? "bad arguments" : _badargs[i].typerr(tactual,null,tformal);
     }
     return null;
   }
   // Worse-case type for this Node
-  @Override public Type all_type() { return _targs.at(0); }
+  @Override public Type all_type() { return _ret; }
   // Prims are equal for same-name-same-signature (and same inputs).
   // E.g. float-minus of x and y is NOT the same as int-minus of x and y
   // despite both names being '-'.
-  @Override public int hashCode() { return super.hashCode()+_name.hashCode()+_targs._hash; }
+  @Override public int hashCode() { return super.hashCode()+_name.hashCode()+_formals._hash; }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !super.equals(o) ) return false;
     if( !(o instanceof PrimNode) ) return false;
     PrimNode p = (PrimNode)o;
-    return _name.equals(p._name) && _targs==p._targs;
+    return _name.equals(p._name) && _formals==p._formals;
   }
 
   // Called during basic Env creation and making of type constructors, this
@@ -123,23 +125,22 @@ public abstract class PrimNode extends Node {
     ParmNode rpc = (ParmNode) gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
     ParmNode mem = (ParmNode) gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM),null));
     add_def(null);              // Control for the primitive in slot 0
-    for( int i=2; i<_targs._ts.length; i++ ) // First is return, next is display
-      add_def(gvn.init(new ParmNode(i,_targs._flds[i],fun, gvn.con(_targs._ts[i].simple_ptr()),null)));
+    for( int i=1; i<_formals._ts.length; i++ ) // First is display
+      add_def(gvn.init(new ParmNode(i,_formals._flds[i],fun, gvn.con(_formals._ts[i].simple_ptr()),null)));
     // Functions return the set of *modified* memory.  PrimNodes never *modify*
     // memory (see Intrinsic*Node for some primitives that *modify* memory).
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mem,gvn.init(this),rpc,fun));
     // No closures are added to primitives
-    return new FunPtrNode(ret,gvn.con(TypeStruct.NO_DISP_SIMPLE));
+    return new FunPtrNode(ret,null);
   }
 
 
   // --------------------
 // Default name constructor using a single tuple type
 static class ConvertTypeName extends PrimNode {
-  private final Parse _badargs; // Only for converts
   ConvertTypeName(Type from, Type to, Parse badargs) {
-    super(to._name,TypeStruct.make_args(TypeStruct.ts(to,TypeStruct.NO_DISP_SIMPLE,from)));
-    _badargs=badargs;
+    super(to._name,TypeStruct.make_args(TypeStruct.ts(TypeStruct.NO_DISP,from)),to);
+    _badargs = new Parse[]{badargs};
   }
   @Override public Type value(GVNGCM gvn) {
     Type[] ts = new Type[_defs._len];
@@ -149,37 +150,36 @@ static class ConvertTypeName extends PrimNode {
   }
   @Override public Type apply( Type[] args ) {
     Type actual = args[1];
-    Type formal = _targs.at(2);
-    if( formal.dual().isa(actual) && actual.isa(formal) )
-      return actual.set_name(_targs.at(0)._name);
-    // If args are illegal, the output is still no worse than ret in either direction
-    return actual.bound(_targs.at(0));
+    Type formal = _formals.at(1);
+    // Wrapping function will not inline if args are in-error
+    assert formal.dual().isa(actual) && actual.isa(formal);
+    return actual.set_name(_ret._name);
   }
   @Override public String err(GVNGCM gvn) {
     Type actual = gvn.type(in(1));
-    Type formal = _targs.at(2);
+    Type formal = _formals.at(2);
     if( !actual.isa(formal) ) // Actual is not a formal
-      return _badargs.typerr(actual,null,formal);
+      return _badargs[0].typerr(actual,null,formal);
     return null;
   }
 }
 
 static class ConvertInt64F64 extends PrimNode {
-  ConvertInt64F64() { super("flt64",TypeStruct.INT64__FLT64); }
+  ConvertInt64F64() { super("flt64",TypeStruct.INT64,TypeFlt.FLT64); }
   @Override public Type apply( Type[] args ) { return TypeFlt.con((double)args[1].getl()); }
 }
 
   // TODO: Type-check strptr input args
 static class ConvertStrStr extends PrimNode {
-  ConvertStrStr() { super("str",TypeStruct.STRPTR__STRPTR); }
+  ConvertStrStr() { super("str",TypeStruct.STRPTR,TypeMemPtr.OOP); }
   @Override public Node ideal(GVNGCM gvn, int level) { return in(1); }
-  @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)).bound(_targs.at(0)); }
+  @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)); }
   @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
 }
 
 // 1Ops have uniform input/output types, so take a shortcut on name printing
 abstract static class Prim1OpF64 extends PrimNode {
-  Prim1OpF64( String name ) { super(name,TypeStruct.FLT64__FLT64); }
+  Prim1OpF64( String name ) { super(name,TypeStruct.FLT64,TypeFlt.FLT64); }
   public Type apply( Type[] args ) { return TypeFlt.con(op(args[1].getd())); }
   abstract double op( double d );
 }
@@ -192,7 +192,7 @@ static class MinusF64 extends Prim1OpF64 {
 
 // 1Ops have uniform input/output types, so take a shortcut on name printing
 abstract static class Prim1OpI64 extends PrimNode {
-  Prim1OpI64( String name ) { super(name,TypeStruct.INT64__INT64); }
+  Prim1OpI64( String name ) { super(name,TypeStruct.INT64,TypeInt.INT64); }
   @Override public Type apply( Type[] args ) { return TypeInt.con(op(args[1].getl())); }
   abstract long op( long d );
 }
@@ -205,7 +205,7 @@ static class MinusI64 extends Prim1OpI64 {
 
 // 2Ops have uniform input/output types, so take a shortcut on name printing
 abstract static class Prim2OpF64 extends PrimNode {
-  Prim2OpF64( String name ) { super(name,TypeStruct.FLT64_FLT64__FLT64); }
+  Prim2OpF64( String name ) { super(name,TypeStruct.FLT64_FLT64,TypeFlt.FLT64); }
   @Override public Type apply( Type[] args ) { return TypeFlt.con(op(args[1].getd(),args[2].getd())); }
   abstract double op( double x, double y );
 }
@@ -230,7 +230,7 @@ static class MulF64 extends Prim2OpF64 {
 
 // 2RelOps have uniform input types, and bool output
 abstract static class Prim2RelOpF64 extends PrimNode {
-  Prim2RelOpF64( String name ) { super(name,TypeStruct.FLT64_FLT64__BOOL); }
+  Prim2RelOpF64( String name ) { super(name,TypeStruct.FLT64_FLT64,TypeInt.BOOL); }
   @Override public Type apply( Type[] args ) { return op(args[1].getd(),args[2].getd())?TypeInt.TRUE:TypeInt.FALSE; }
   abstract boolean op( double x, double y );
   @Override public byte op_prec() { return 4; }
@@ -246,7 +246,7 @@ static class NE_F64 extends Prim2RelOpF64 { NE_F64() { super("!="); } boolean op
 
 // 2Ops have uniform input/output types, so take a shortcut on name printing
 abstract static class Prim2OpI64 extends PrimNode {
-  Prim2OpI64( String name ) { super(name,TypeStruct.INT64_INT64__INT64); }
+  Prim2OpI64( String name ) { super(name,TypeStruct.INT64_INT64,TypeInt.INT64); }
   @Override public Type apply( Type[] args ) { return TypeInt.con(op(args[1].getl(),args[2].getl())); }
   abstract long op( long x, long y );
 }
@@ -295,7 +295,7 @@ static class AndI64 extends Prim2OpI64 {
 
 // 2RelOps have uniform input types, and bool output
 abstract static class Prim2RelOpI64 extends PrimNode {
-  Prim2RelOpI64( String name ) { super(name,TypeStruct.INT64_INT64__BOOL); }
+  Prim2RelOpI64( String name ) { super(name,TypeStruct.INT64_INT64,TypeInt.BOOL); }
   @Override public Type apply( Type[] args ) { return op(args[1].getl(),args[2].getl())?TypeInt.TRUE:TypeInt.FALSE; }
   abstract boolean op( long x, long y );
   @Override public byte op_prec() { return 4; }
@@ -310,7 +310,7 @@ static class NE_I64 extends Prim2RelOpI64 { NE_I64() { super("!="); } boolean op
 
 
 static class EQ_OOP extends PrimNode {
-  EQ_OOP() { super("==",TypeStruct.OOP_OOP__BOOL); }
+  EQ_OOP() { super("==",TypeStruct.OOP_OOP,TypeInt.BOOL); }
   @Override public Type value(GVNGCM gvn) {
     // Oop-equivalence is based on pointer-equivalence NOT on a "deep equals".
     // Probably need a java-like "===" vs "==" to mean deep-equals.  You are
@@ -342,7 +342,7 @@ static class EQ_OOP extends PrimNode {
 }
 
 static class NE_OOP extends PrimNode {
-  NE_OOP() { super("!=",TypeStruct.OOP_OOP__BOOL); }
+  NE_OOP() { super("!=",TypeStruct.OOP_OOP,TypeInt.BOOL); }
   @Override public Type value(GVNGCM gvn) {
     // Oop-equivalence is based on pointer-equivalence NOT on a "deep equals".
     // Probably need a java-like "===" vs "==" to mean deep-equals.  You are
@@ -371,7 +371,7 @@ static class NE_OOP extends PrimNode {
 
 static class Not extends PrimNode {
   // Rare function which takes a Scalar (works for both ints and ptrs)
-  Not() { super("!",TypeStruct.SCALAR1__BOOL); }
+  Not() { super("!",TypeStruct.SCALAR1,TypeInt.BOOL); }
   @Override public Type value(GVNGCM gvn) {
     Type t = gvn.type(in(1));
     if( t== Type.NIL ) return TypeInt.TRUE;
@@ -385,7 +385,7 @@ static class Not extends PrimNode {
 
 
 static class RandI64 extends PrimNode {
-  RandI64() { super("math_rand",TypeStruct.INT64__INT64); }
+  RandI64() { super("math_rand",TypeStruct.INT64,TypeInt.INT64); }
   @Override public Type value(GVNGCM gvn) {
     Type t = gvn.type(in(1));
     if( t.above_center() ) return TypeInt.BOOL.dual();
@@ -397,9 +397,9 @@ static class RandI64 extends PrimNode {
 }
 
 static class Id extends PrimNode {
-  Id(Type arg) { super("id",TypeStruct.make_args(TypeStruct.ARGS_X,TypeStruct.ts(Type.SCALAR,TypeStruct.NO_DISP_SIMPLE,arg))); }
+  Id(Type arg) { super("id",TypeStruct.make_args(TypeStruct.ts(TypeStruct.NO_DISP,arg)),arg); }
   @Override public Node ideal(GVNGCM gvn, int level) { return in(1); }
-  @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)).bound(_targs.last()); }
+  @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)); }
   @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
 }
 

@@ -32,8 +32,8 @@ public final class FP2ClosureNode extends Node {
   @Override public Type all_type() { return Type.SCALAR; }
   static public Type convert( Type t ) {
     if( !(t instanceof TypeFunPtr) )
-      return t.above_center() ? TypeMemPtr.DISPLAY_PTR.dual() : TypeMemPtr.DISPLAY_PTR;
+      return t.above_center() ? TypeFunPtr.DISP.dual() : TypeFunPtr.DISP;
     TypeFunPtr tfp = (TypeFunPtr)t;
-    return tfp.display();
+    return tfp._disp;
   }
 }

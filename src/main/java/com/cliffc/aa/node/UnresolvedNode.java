@@ -75,7 +75,7 @@ public class UnresolvedNode extends Node {
         t = (TypeFunPtr)t.join(td.dual()); // Lift all the displays; all args are ignored
         fidxs = fidxs.set(((TypeFunPtr)td).fidx());
       }
-      return TypeFunPtr.make(fidxs.dual(),t._args);
+      return t.make_from(fidxs.dual());
     }
     // Post-GCP.  Should be dead, except for primitive hooks.  If we inline,
     // we split a fidx and the Unresolved does not get both options... so it

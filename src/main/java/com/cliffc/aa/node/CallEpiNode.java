@@ -83,7 +83,7 @@ public final class CallEpiNode extends Node {
     assert ret!=null;
 
     // Single choice; check compatible args and no conversions needed.
-    TypeStruct formals = fun._tf._args;
+    TypeStruct formals = fun._formals;
     for( Node parm : fun._uses ) {
       if( parm instanceof ParmNode && parm.in(0)==fun ) {
         int idx = ((ParmNode)parm)._idx;
@@ -91,7 +91,7 @@ public final class CallEpiNode extends Node {
         Node arg = idx==-2 ? call.mem() : call.arg(idx);
         Type actual = gvn.type(arg);
         // Display arg comes from function pointer
-        if( idx==0 ) actual = (actual instanceof TypeFunPtr) ? ((TypeFunPtr)actual).display() : Type.SCALAR;
+        if( idx==0 ) actual = (actual instanceof TypeFunPtr) ? ((TypeFunPtr)actual)._disp : Type.SCALAR;
         Type tparm = gvn.type(parm); // Pre-GCP this should be the default type
         if( !actual.isa(tparm) ||  // Not compatible
             (idx >= 0 && actual.isBitShape(formals.at(idx)) == 99) ) { // Requires user-specified conversion
