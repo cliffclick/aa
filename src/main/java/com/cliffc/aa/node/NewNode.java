@@ -1,8 +1,13 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.*;
-import com.cliffc.aa.type.*;
+import com.cliffc.aa.GVNGCM;
+import com.cliffc.aa.type.BitsAlias;
+import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeObj;
+import com.cliffc.aa.type.TypeStr;
 import org.jetbrains.annotations.NotNull;
+
+import java.util.BitSet;
 
 // Allocates a TypeObj and produces a Tuple with the TypeObj and a TypeMemPtr.
 //
@@ -13,9 +18,12 @@ import org.jetbrains.annotations.NotNull;
 public abstract class NewNode<T extends TypeObj> extends Node {
   // Unique alias class, one class per unique memory allocation site.
   // Only effectively-final, because the copy/clone sets a new alias value.
-  public int _alias;          // Alias class
-  T _ts;                      // Base object type.  Can contain complex ptr types.
-  boolean _captured;          // False if escapes, monotonic transition to true upon capture
+  public int _alias; // Alias class
+  // Represents all possible future values, counting all allowed Stores that
+  // may yet happen.  Fixed at SCALAR unless final, then equal to the final
+  // store.  Field names are valid, and mods can only lift from R/W to FINAL.
+  T _ts;             // Base object type, representing all possible future values
+  boolean _captured; // False if escapes, monotonic transition to true upon capture
 
   // NewNodes can participate in cycles, where the same structure is appended
   // to in a loop until the size grows without bound.  If we detect this we
@@ -24,13 +32,9 @@ public abstract class NewNode<T extends TypeObj> extends Node {
 
   // NewNodes do not really need a ctrl; useful to bind the upward motion of
   // closures so variable stores can more easily fold into them.
-  public NewNode( byte type, int parent_alias, T to, Node ctrl ) {
-    super(type,ctrl);
-    _alias = BitsAlias.new_alias(parent_alias);
-    _ts = to;
-  }
-  public NewNode( byte type, int parent_alias, T to, Node ctrl, Node fld ) {
-    super(type,ctrl,fld);
+  public NewNode( byte type, int parent_alias, T to, Node ctrl         ) { super(type,ctrl    ); _init(parent_alias,to); }
+  public NewNode( byte type, int parent_alias, T to, Node ctrl,Node fld) { super(type,ctrl,fld); _init(parent_alias,to); }
+  private void _init(int parent_alias, T to) {
     _alias = BitsAlias.new_alias(parent_alias);
     _ts = to;
   }
@@ -41,7 +45,10 @@ public abstract class NewNode<T extends TypeObj> extends Node {
   Node fld(int fld) { return in(def_idx(fld)); } // Node for field#
 
   // Called when folding a Named Constructor into this allocation site
-  void set_name( T name ) { assert !name.above_center();  _ts = name; }
+  void set_name( T name, GVNGCM gvn ) { assert !name.above_center();  sets(name,gvn); }
+
+  // Recompute default memory cache on a change
+  protected final void sets( T ts, GVNGCM gvn ) { _ts = ts; gvn.add_work_uses(this); }
 
   @Override public Node ideal(GVNGCM gvn, int level) {
     // If either the address or memory is not looked at then the memory
@@ -50,12 +57,9 @@ public abstract class NewNode<T extends TypeObj> extends Node {
     boolean old = _captured;
     if( captured(gvn) ) {
       boolean progress = !old;  // Progress if 1st time captured in any case
-      for( int i=1; i<_defs._len; i++ ) {
-        if( gvn.type(in(i))!=Type.XSCALAR || !(in(i) instanceof ConNode) ) {
-          set_def(i,gvn.con(Type.XSCALAR),gvn);
-          progress=true;         // Progress!
-          if( is_dead() ) break; // Progress if any edge removed
-        }
+      while( !is_dead() && _defs._len > 1 ) {
+        progress = true;
+        pop(gvn);
       }
       return progress ? this : null;
     }
@@ -83,14 +87,15 @@ public abstract class NewNode<T extends TypeObj> extends Node {
   }
 
   // Clones during inlining all become unique new sites
-  @Override @NotNull public NewNode copy( boolean copy_edges, CallEpiNode unused, GVNGCM gvn) {
+  @SuppressWarnings("unchecked")
+  @Override @NotNull public NewNode copy( boolean copy_edges, GVNGCM gvn) {
     // Split the original '_alias' class into 2 sub-aliases
-    NewNode nnn = (NewNode)super.copy(copy_edges, unused, gvn);
-    nnn._alias = BitsAlias.new_alias(_alias); // Children alias classes, split from parent
+    NewNode<T> nnn = (NewNode<T>)super.copy(copy_edges, gvn);
+    nnn._init(_alias,_ts);      // Children alias classes, split from parent
     // The original NewNode also splits from the parent alias
     assert gvn.touched(this);
     Type oldt = gvn.unreg(this);
-    _alias = BitsAlias.new_alias(_alias);
+    _init(_alias,_ts);
     gvn.rereg(this,oldt);
     return nnn;
   }

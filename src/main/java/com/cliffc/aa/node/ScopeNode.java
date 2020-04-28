@@ -95,9 +95,9 @@ public class ScopeNode extends Node {
         // pointer, and do not need the memory state on exit.
         !TypeMemPtr.OOP0.dual().isa(gvn.type(rez())) &&
         // And not already wiped it out
-        !(mem() instanceof ConNode && gvn.type(mem())==TypeMem.EMPTY) )
+        !(mem() instanceof ConNode && gvn.type(mem())==TypeMem.XMEM) )
       // Wipe out return memory
-      return set_mem(gvn.con(TypeMem.EMPTY), gvn);
+      return set_mem(gvn.add_work(gvn.con(TypeMem.XMEM)), gvn);
     return null;
   }
   @Override public Type value(GVNGCM gvn) { return all_type(); }
@@ -137,6 +137,7 @@ public class ScopeNode extends Node {
     // Memory returns the compute_live_mem state in _live.  If rez() is a
     // pointer, this will include the memory slice.
     assert def == mem();
+    if( _live==TypeMem.EMPTY ) return TypeMem.DEAD;  // Contains only basic liveness, hence not a pointer, hence no memory
     return _live;
   }
   @Override public boolean basic_liveness() { return false; }

@@ -304,6 +304,7 @@ public class Type<T extends Type<T>> implements Cloneable {
   // True if 'this' isa SCALAR, without the cost of a full 'meet()'
   private static final byte[] ISA_SCALAR = new byte[]{/*ALL-0*/0,0,0,0,1,1,1,1,1,1,/*TNNUM-10*/1,1,1,1,1,1,1,1,/*TSIMPLE-18*/0, 1,1,1,0,0,0,0,0,1,/*TFUNPTR-28*/1}/*TLAST=29*/;
   public final boolean isa_scalar() { assert ISA_SCALAR.length==TLAST; return ISA_SCALAR[_type]!=0; }
+  // Simplify pointers (lose what they point at).
   public Type simple_ptr() { return this; }
 
   // Return cached dual
@@ -756,7 +757,15 @@ public class Type<T extends Type<T>> implements Cloneable {
   }
   // "widen" a narrow type for primitive type-specialization.
   // e.g. "3" becomes "int64".
-  public Type widen() { return this; } // Overridden in subclasses
+  public Type widen() {
+    switch( _type ) {
+    case TNUM:
+    case TXNUM:
+    case TXREAL:
+    case TREAL: return SCALAR;
+    default: return this;
+    }
+  } 
   // Operator precedence
   public byte op_prec() { return -1; } // Overridden in subclasses
 

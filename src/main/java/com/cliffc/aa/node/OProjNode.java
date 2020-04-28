@@ -11,18 +11,15 @@ public class OProjNode extends ProjNode {
     Node n = in(0).is_copy(gvn,_idx);
     if( n != null ) return n;
 
-    // If Store is by a New and no other Stores, trigger Store to fold into New
-    //if( _uses._len==1 && _uses.at(0) instanceof StoreNode )
-    //  gvn.add_work(_uses.at(0));
-    if( in(0) instanceof NewNode && ((NewNode)in(0))._captured )
-      return gvn.con(TypeObj.XOBJ);
+    Type t = captured();
+    if( t != null ) return gvn.con(t);
     
     return null;
   }
       
   @Override public Type value(GVNGCM gvn) {
-    if( in(0) instanceof NewNode && ((NewNode)in(0))._captured )
-      return TypeObj.XOBJ;
+    Type t = captured();
+    if( t != null ) return t;
     Type c = gvn.type(in(0));
     if( c instanceof TypeTuple ) {
       TypeTuple ct = (TypeTuple)c;
@@ -31,5 +28,12 @@ public class OProjNode extends ProjNode {
     }
     return c.above_center() ? TypeObj.XOBJ : TypeObj.OBJ;
   }
-  @Override public Type all_type() { return TypeObj.OBJ; }
+  // Return not-null if NewNode is captured and being removed.  This alias goes
+  // dead.
+  private TypeObj captured() {
+    if( in(0) instanceof NewNode && ((NewNode)in(0))._captured )
+      return in(0) instanceof NewObjNode ? TypeStruct.GENERIC : TypeObj.XOBJ;
+    return null;
+  }
+  @Override public Type all_type() { return ((TypeTuple)in(0).all_type())._ts[_idx]; }
 }

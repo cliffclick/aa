@@ -55,7 +55,7 @@ public class ParmNode extends PhiNode {
     Type t = super.value(gvn);
     // Bound results by simple Fun argument types.  This keeps errors from
     // spreading past function call boundaries.
-    if( in(0) instanceof FunNode )
+    if( in(0) instanceof FunNode && _idx >= 0 )
       t = t.bound(fun().targ(_idx).simple_ptr());
 
     // Memory tracks the notion of 'clean' or 'unwritten' since the function
@@ -66,6 +66,12 @@ public class ParmNode extends PhiNode {
     return t;
   }
 
+  // Same as PhiNode, but bound like value
+  @Override public Type all_type() {
+    if( in(0) instanceof FunNode && _idx >= 0 )
+      return fun().targ(_idx).simple_ptr();
+    return _t;
+  }
   @Override public String err( GVNGCM gvn ) {
     if( !(in(0) instanceof FunNode) ) return null; // Dead, report elsewhere
     FunNode fun = fun();

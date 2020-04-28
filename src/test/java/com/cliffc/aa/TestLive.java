@@ -45,7 +45,7 @@ public class TestLive {
     gvn.setype(fdy,fdy.all_type());
 
     // New object, fields x,y holding ints
-    NewObjNode nnn = new NewObjNode(false,TypeStruct.DISPLAY,ctl,gvn.con(Type.NIL));
+    NewObjNode nnn = new NewObjNode(false,TypeStruct.GENERIC,ctl,gvn.con(Type.NIL));
     nnn.create_active("x",fdx,TypeStruct.FFNL,gvn);
     nnn.create_active("y",fdy,TypeStruct.FFNL,gvn);
     gvn.setype(nnn,nnn.value(gvn));

@@ -48,6 +48,9 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
   public TypeObj update(byte fin, String fld, Type val) { return this; }
   // Exact object update.  Replaces fields.
   public TypeObj st    (byte fin, String fld, Type val) { return this; }
+  // Widen (loss info), to make it suitable as the default function memory.
+  public TypeObj widen_as_default() { return this; }
+
   // True if this field is not modified.  Allows a Load to bypass.
   boolean is_clean(String fld) { return _any; }
 

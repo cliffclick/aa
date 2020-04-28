@@ -139,7 +139,7 @@ public class PhiNode extends Node {
     return _t==Type.SCALAR;
   }
 
-  @Override public Type all_type() { return Type.ALL; } // Might need something here for Scalar vs Memory
+  @Override public Type all_type() { return _t; } // Might need something here for Scalar vs Memory
   @Override public String err(GVNGCM gvn) {
     if( !(in(0) instanceof FunNode && ((FunNode)in(0))._name.equals("!") ) && // Specifically "!" takes a Scalar
         (gvn.type(this).contains(Type.SCALAR) ||

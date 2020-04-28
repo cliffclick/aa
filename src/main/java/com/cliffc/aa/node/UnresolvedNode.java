@@ -3,6 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
+import com.cliffc.aa.type.BitsFun;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeFunPtr;
 import com.cliffc.aa.type.TypeMem;
@@ -55,16 +56,26 @@ public class UnresolvedNode extends Node {
       // preserve choice until GCP resolves.
       // Post-GCP: never here unless in-error, or returning an ambiguous fun ptr
 
-      // Ignores incoming types, as they are function pointers (code pointer
-      // plus display) and goes straight to the FunNode._tf.
+      //// Ignores incoming types, as they are function pointers (code pointer
+      //// plus display) and goes straight to the FunNode._tf.
+      //TypeFunPtr t = GF;
+      //for( Node def : _defs ) {
+      //  if( !(def instanceof FunPtrNode) ) return GF.dual(); // Only fails during testing
+      //  TypeFunPtr tf = ((FunPtrNode)def).fun()._tf;
+      //  tf = tf.dual();
+      //  t = (TypeFunPtr)t.join(tf);
+      //}
+      //return t;
       TypeFunPtr t = GF;
+      BitsFun fidxs = BitsFun.EMPTY;
       for( Node def : _defs ) {
-        if( !(def instanceof FunPtrNode) ) return GF.dual(); // Only fails during testing
-        TypeFunPtr tf = ((FunPtrNode)def).fun()._tf;
-        tf = tf.dual();
-        t = (TypeFunPtr)t.join(tf);
+        Type td = gvn.type(def);
+        if( !(td instanceof TypeFunPtr) ) return GF.dual(); // Only fails during testing
+        if( td.above_center() ) return GF.dual();
+        t = (TypeFunPtr)t.join(td.dual()); // Lift all the displays; all args are ignored
+        fidxs = fidxs.set(((TypeFunPtr)td).fidx());
       }
-      return t;
+      return TypeFunPtr.make(fidxs.dual(),t._args);
     }
     // Post-GCP.  Should be dead, except for primitive hooks.  If we inline,
     // we split a fidx and the Unresolved does not get both options... so it
@@ -137,6 +148,7 @@ public class UnresolvedNode extends Node {
     return _uses._len==0 || (_uses._len==1 && _uses.at(0)== Env.STK_0);
   }
   @Override public String err(GVNGCM gvn) {
+    if( in(0) instanceof ConNode ) return null; // Mid-collapse
     FunNode fun = ((FunPtrNode)in(0)).fun();
     String name = fun==null ? null : fun.xstr();
     return _bad==null ? null : _bad.errMsg("Unable to resolve "+name);

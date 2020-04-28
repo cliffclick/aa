@@ -13,15 +13,15 @@ import java.util.concurrent.ConcurrentHashMap;
 public class GVNGCM {
   // Unique dense node-numbering
   private static int CNT;
-  private static BitSet _live = new BitSet();  // Conservative approximation of live; due to loops some things may be marked live, but are dead
+  private static final BitSet _live = new BitSet();  // Conservative approximation of live; due to loops some things may be marked live, but are dead
 
   public static int uid() { assert CNT < 100000 : "infinite node create loop"; _live.set(CNT);  return CNT++; }
 
   public int _opt_mode;         // 0 - Parse (discovery), 1 - iter (lifting), 2 - gcp/opto (falling)
 
   // Iterative worklist
-  private Ary<Node> _work = new Ary<>(new Node[1], 0);
-  private BitSet _wrk_bits = new BitSet();
+  private final Ary<Node> _work = new Ary<>(new Node[1], 0);
+  private final BitSet _wrk_bits = new BitSet();
 
   public Node add_work( Node n ) { if( !_wrk_bits.get(n._uid) ) add_work0(n); return n;}
   private <N extends Node> N add_work0( N n ) {
@@ -45,8 +45,8 @@ public class GVNGCM {
 
   // A second worklist, for code-expanding and thus lower priority work.
   // Inlining happens off this worklist, once the main worklist runs dry.
-  private Ary<Node> _work2 = new Ary<>(new Node[1], 0);
-  private VBitSet _wrk2_bits = new VBitSet();
+  private final Ary<Node> _work2 = new Ary<>(new Node[1], 0);
+  private final VBitSet _wrk2_bits = new VBitSet();
   public void add_work2( Node n ) {
     if( !_wrk2_bits.tset(n._uid) )
       _work2.add(n);
@@ -55,10 +55,10 @@ public class GVNGCM {
   // Array of types representing current node types.  Essentially a throw-away
   // temp extra field on Nodes.  It is either bottom-up, conservatively correct
   // or top-down and optimistic.
-  private Ary<Type> _ts = new Ary<>(new Type[1],0);
+  private final Ary<Type> _ts = new Ary<>(new Type[1],0);
 
   // Global expressions, to remove redundant Nodes
-  private ConcurrentHashMap<Node,Node> _vals = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<Node,Node> _vals = new ConcurrentHashMap<>();
 
   // Initial state after loading e.g. primitives & boot libs.  Record state
   // here, so can reset to here cheaply and parse again.
@@ -343,8 +343,13 @@ public class GVNGCM {
     if( check_new(nnn) )        // If new, replace back in GVN
       rereg(nnn,nnn.value(this));
     if( !old.is_dead() ) { // if old is being replaced, it got removed from GVN table and types table.
-      if( old instanceof ParmNode && ((ParmNode)old)._idx != -2 )
-        add_work(((FunNode)old.in(0)).parm(-2)); // Dropping a Parm, check Parm:Mem
+      if( old instanceof ParmNode && ((ParmNode)old)._idx != -2 ) {
+        Node fun = old.in(0);
+        if( fun instanceof FunNode ) {
+          ParmNode parm = ((FunNode)fun).parm(-2);
+          if( parm != null ) add_work(parm); // Dropping a Parm, check Parm:Mem
+        }
+      }
       assert !check_opt(old);
       replace(old,nnn);
       nnn.keep();               // Keep-alive
@@ -475,7 +480,7 @@ public class GVNGCM {
       if( n._uses._len==0 && n._keep==0 ) kill(n);
       else xform_old(n,small_work ? 0 : 2);
       // VERY EXPENSIVE ASSERT
-      //assert Env.START.more_flow(this,new VBitSet(),true,0)==0; // Initial conditions are correct
+      assert Env.START.more_flow(this,new VBitSet(),true,0)==0; // Initial conditions are correct
       cnt++; assert cnt < 10000; // Catch infinite ideal-loops
     }
     // No more ideal calls, small or large, to apply

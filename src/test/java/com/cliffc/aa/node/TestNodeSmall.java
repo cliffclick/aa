@@ -179,9 +179,9 @@ public class TestNodeSmall {
     }
     // Equals check after computing them all
     for( int i=0; i<argss.length; i++ ) {
-      Type expect = argss[i].at(ins.length);
-      Type actual = tns[i].at(2); // Looking at the TFP from the Call, ignore ctrl,memory,args
-      assertEquals(expect,actual);
+      TypeFunPtr expect = (TypeFunPtr)argss[i].at(ins.length);
+      TypeFunPtr actual = (TypeFunPtr)tns[i].at(2); // Looking at the TFP from the Call, ignore ctrl,memory,args
+      assertEquals(expect.fidxs(),actual.fidxs());
     }
     return tns;
   }
@@ -189,7 +189,7 @@ public class TestNodeSmall {
 
   private static TypeFunPtr v(Node n, GVNGCM gvn) { return (TypeFunPtr)n.value(gvn); }
 
-  /** Valdiate monotonicity of CallNode.resolve().  There are only a couple of
+  /** Validate monotonicity of CallNode.resolve().  There are only a couple of
    *  interesting variants; this test also tests e.g. XCTRL for correctness but
    *  its implementation is a simple cutout, same for the display arg "^" being
    *  NO_DISP.
@@ -427,6 +427,7 @@ public class TestNodeSmall {
     NewObjNode dsp_file = (NewObjNode)gvn.xform(new NewObjNode(true,TypeStruct.DISPLAY,ctl,dsp_prims));
     OProjNode dsp_file_obj = (OProjNode)gvn.xform(new OProjNode(dsp_file,0));
     ProjNode  dsp_file_ptr = ( ProjNode)gvn.xform(new  ProjNode(dsp_file,1));
+    Env.DISPLAYS.set(dsp_file._alias);
     MemMergeNode dsp_merge = gvn.init(new MemMergeNode(mem,dsp_file_obj,dsp_file._alias));
     // The Fun and Fun._tf:
     Type[] args = TypeAry.get(3);
@@ -434,7 +435,7 @@ public class TestNodeSmall {
     args[1] = gvn.type(dsp_file_ptr).dual(); // File-scope display as arg0
     args[2] = Type.SCALAR;            // Some scalar arg1
     TypeFunPtr tf = TypeFunPtr.make_new(TypeStruct.make_args(new String[]{"->","^","x"},args));
-    FunNode fun = new FunNode("fact",tf,BitsAlias.make0(dsp_file._alias));
+    FunNode fun = new FunNode("fact",tf);
     gvn.init(fun.add_def(ctl).add_def(ctl));
     // Parms for the Fun.  Note that the default type is "weak" because the
     // file-level display can not yet know about "fact".
@@ -444,7 +445,7 @@ public class TestNodeSmall {
     gvn.init(parm_dsp.add_def(dsp_file_ptr));
     // Close the function up
     RetNode ret = gvn.init(new RetNode(fun,parm_mem,parm_dsp,rpc,fun));
-    FunPtrNode fptr = gvn.init(new FunPtrNode(ret,dsp_file_ptr,(TypeMemPtr)gvn.type(dsp_file_ptr)));
+    FunPtrNode fptr = gvn.init(new FunPtrNode(ret,dsp_file_ptr));
     // Close the cycle
     dsp_file.create("fact",fptr,TypeStruct.FFNL,gvn);
     // Return the fptr to keep all alive
@@ -473,7 +474,7 @@ public class TestNodeSmall {
     // Validate cyclic display/function type
     TypeFunPtr tfptr0 = (TypeFunPtr)gvn.type(fptr);
     Type tdptr0 = tfptr0.display();
-    assertEquals(tfptr0.ret().meet_nil(Type.NIL),tdptr0); // Returning the display
+    assertEquals(tfptr0.ret(),tdptr0); // Returning the display
     // Display contains 'fact' pointing to self
     TypeMem tmem = (TypeMem)gvn.type(dsp_merge);
     TypeStruct tdisp0 = (TypeStruct)tmem.ld((TypeMemPtr)tdptr0);

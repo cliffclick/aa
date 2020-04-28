@@ -124,8 +124,8 @@ public class CallNode extends Node {
   // splits into 2, and the two new children RPCs replace it entirely.  The
   // original RPC may exist in the type system for a little while, until the
   // children propagate everywhere.
-  @Override @NotNull CallNode copy( boolean copy_edges, CallEpiNode unused, GVNGCM gvn) {
-    CallNode call = (CallNode)super.copy(copy_edges,unused,gvn);
+  @Override @NotNull CallNode copy( boolean copy_edges, GVNGCM gvn) {
+    CallNode call = (CallNode)super.copy(copy_edges,gvn);
     ConNode old_rpc = gvn.con(TypeRPC.make(_rpc));
     call._rpc = BitsRPC.new_rpc(_rpc); // Children RPC
     Type oldt = gvn.unreg(this);       // Changes hash, so must remove from hash table
@@ -254,10 +254,9 @@ public class CallNode extends Node {
     Type mem = gvn.type(mem());
     if( !(mem instanceof TypeMem) )
       mem = mem.above_center() ? TypeMem.XMEM : TypeMem.MEM;
-    ts[1] = mem;
-
     // If not called, then no memory to functions
-    if( ctl == Type.XCTRL ) { ts[1] = TypeMem.XMEM; }
+    if( ctl == Type.XCTRL ) mem = TypeMem.XMEM;
+    TypeMem tmem = (TypeMem)(ts[1]=mem);
 
     // Copy args for called functions.
     for( int i=1; i<nargs(); i++ )
@@ -267,32 +266,15 @@ public class CallNode extends Node {
     Type tfx = gvn.type(fun());
     if( !(tfx instanceof TypeFunPtr) )
       tfx = tfx.above_center() ? TypeFunPtr.GENERIC_FUNPTR.dual() : TypeFunPtr.GENERIC_FUNPTR;
-    TypeFunPtr tfp = (TypeFunPtr)(ts[2] = tfx);
+    TypeFunPtr tfp = (TypeFunPtr)tfx;
     BitsFun fidxs = tfp.fidxs();
     // Resolve; only keep choices with sane arguments during GCP
     BitsFun rfidxs = resolve(fidxs,ts);
     if( rfidxs==null ) return (TypeTuple)gvn.self_type(this); // Dead function input, stall until this dies
-    if( !rfidxs.test(1) ) { // Neither ANY nor ALL,
-      TypeStruct args = tfp._args;
-      if( rfidxs == BitsFun.EMPTY ) { // No choices (error)
-        args = args.make_from_empty();
-      } else { // Unequal function sets; recompute tighter args bounds
-        // Meet of remaining function arg types
-        args = TypeFunPtr.ARGS.dual();
-        for( int fidx : rfidxs )
-          args = (TypeStruct)args.meet(FunNode.find_fidx(fidx)._tf._args);
-        // Function types always allow nil, so the display can monotonically
-        // fall to nil when unused.  If unused, then a nil is passed in and
-        // dead in the function.  To preserve monotonicity FPtr, Call and
-        // FP2Closure never report a nil possibility.
-        TypeMemPtr disp = (TypeMemPtr)args.at(1);
-        BitsAlias disp_alias = disp._aliases;
-        args = args.set_fld(1,TypeMemPtr.make(disp_alias.strip_nil(),disp._obj),TypeStruct.FFNL);
-        if( rfidxs.above_center() )
-          args = args.dual();     // Args sign needs to match rfidxs sign
-      }
-      ts[2] = TypeFunPtr.make(rfidxs,args);
-    }
+
+    // Call.ts[2] is a TFP just for the resolved fidxs and display.
+    TypeStruct args = TypeStruct.make_args(TypeStruct.ts(Type.SCALAR,tfp.display()));
+    ts[2] = TypeFunPtr.make(rfidxs,args);
     return TypeTuple.make(ts);
   }
 
@@ -352,7 +334,9 @@ public class CallNode extends Node {
 
     int flags = 0;
     for( int fidx : fidxs )
-      flags |= resolve(fidx,targs);
+      // Parent/kids happen during inlining
+      for( int kidx=fidx; kidx!=0; kidx=BitsFun.next_kid(fidx,kidx) )
+        flags |= resolve(kidx,targs);
     if( x(flags,DEAD) ) return null; // Caller should stall for time, till dead folds up
     // - Some args High & no Low, keep all & join (ignore Good,Bad)
     if(  x(flags,HIGH) && !x(flags,LOW) ) return sgn(fidxs,true);
@@ -392,8 +376,8 @@ public class CallNode extends Node {
   // formals: [High,Low,Good,Bad].  High > formal.dual >= Good >= formal > Low.
   // Bad is none of the prior (actual is neither above nor below the formal).
   int resolve( int fidx, Type[] targs ) {
-    if( BitsFun.is_parent(fidx) ) // Parent is never a real choice.  See these during inlining.
-      throw com.cliffc.aa.AA.unimpl();
+    if( BitsFun.is_parent(fidx) )
+      return 0; // Parent is never a real choice.  See these during inlining.
 
     TypeMem tmem = (TypeMem)targs[1]; // Call Memory
     FunNode fun = FunNode.find_fidx(fidx);
@@ -437,42 +421,46 @@ public class CallNode extends Node {
     TypeStruct best_formals=null;  //
     boolean tied=false;            // Ties not allowed
     for( int fidx : choices ) {
-      if( BitsFun.is_parent(fidx) ) throw com.cliffc.aa.AA.unimpl();
+      // Parent/kids happen during inlining
+      for( int kidx=fidx; kidx!=0; kidx=BitsFun.next_kid(fidx,kidx) ) {
+        if( BitsFun.is_parent(kidx) )
+          continue;
 
-      FunNode fun = FunNode.find_fidx(fidx);
-      if( fun.nargs()!=nargs() || fun.ret() == null ) continue; // BAD/dead
-      TypeStruct formals = fun._tf._args; // Type of each argument
-      int cvts=0;                         // Arg conversion cost
-      for( int j=2; j<nargs(); j++ ) {    // Skip arg#0, the return and #1 the display
-        Type actual = targ(gvn,j);
-        Type formal = formals.at(j);
-        if( actual==formal ) continue;
-        if( formal.above_center() ) continue; // Formal is ignored
-        byte cvt = actual.isBitShape(formal); // +1 needs convert, 0 no-cost convert, -1 unknown, 99 never
-        if( cvt == -1 ) return null; // Might be the best choice, or only choice, dunno
-        cvts += cvt;
-      }
-
-      if( cvts < best_cvts ) {
-        best_cvts = cvts;
-        best_fptr = fun.ret().funptr();
-        best_formals = formals;
-        tied=false;
-      } else if( cvts==best_cvts ) {
-        // Look for monotonic formals
-        int fcnt=0, bcnt=0;
-        for( int i=0; i<formals._ts.length; i++ ) {
-          Type ff = formals.at(i), bf = best_formals.at(i);
-          if( ff==bf ) continue;
-          Type mt = ff.meet(bf);
-          if( ff==mt ) bcnt++;       // Best formal is higher than new
-          else if( bf==mt ) fcnt++;  // New  formal is higher than best
-          else { fcnt=bcnt=-1; break; } // Not monotonic, no obvious winner
+        FunNode fun = FunNode.find_fidx(kidx);
+        if( fun.nargs()!=nargs() || fun.ret() == null ) continue; // BAD/dead
+        TypeStruct formals = fun._tf._args; // Type of each argument
+        int cvts=0;                         // Arg conversion cost
+        for( int j=2; j<nargs(); j++ ) {    // Skip arg#0, the return and #1 the display
+          Type actual = targ(gvn,j);
+          Type formal = formals.at(j);
+          if( actual==formal ) continue;
+          if( formal.above_center() ) continue; // Formal is ignored
+          byte cvt = actual.isBitShape(formal); // +1 needs convert, 0 no-cost convert, -1 unknown, 99 never
+          if( cvt == -1 ) return null; // Might be the best choice, or only choice, dunno
+          cvts += cvt;
         }
-        // If one is monotonically higher than the other, take it
-        if( fcnt > 0 && bcnt==0 ) { best_fptr = fun.ret().funptr(); best_formals = formals; }
-        else if( fcnt==0 && bcnt > 0 ) {} // Keep current
-        else tied=true;                   // Tied, ambiguous
+
+        if( cvts < best_cvts ) {
+          best_cvts = cvts;
+          best_fptr = fun.ret().funptr();
+          best_formals = formals;
+          tied=false;
+        } else if( cvts==best_cvts ) {
+          // Look for monotonic formals
+          int fcnt=0, bcnt=0;
+          for( int i=0; i<formals._ts.length; i++ ) {
+            Type ff = formals.at(i), bf = best_formals.at(i);
+            if( ff==bf ) continue;
+            Type mt = ff.meet(bf);
+            if( ff==mt ) bcnt++;       // Best formal is higher than new
+            else if( bf==mt ) fcnt++;  // New  formal is higher than best
+            else { fcnt=bcnt=-1; break; } // Not monotonic, no obvious winner
+          }
+          // If one is monotonically higher than the other, take it
+          if( fcnt > 0 && bcnt==0 ) { best_fptr = fun.ret().funptr(); best_formals = formals; }
+          else if( fcnt==0 && bcnt > 0 ) {} // Keep current
+          else tied=true;                   // Tied, ambiguous
+        }
       }
     }
     if( best_cvts >= 99 ) return null; // No valid functions
@@ -501,6 +489,7 @@ public class CallNode extends Node {
       if( BitsFun.is_parent(fidx) ) continue; // Do not wire parents, as they will eventually settle out
       FunNode fun = FunNode.find_fidx(fidx);  // Lookup, even if not wired
       if( fun.is_forward_ref() ) continue;    // Not forward refs, which at GCP just means a syntax error
+      if( gvn.type(fun)!=Type.CTRL) continue; // Dead function (perhaps wiring to itself)
       RetNode ret = fun.ret();
       // Internally wire() checks for already wired.
       progress |= cepi.wire(gvn,this,fun,ret);

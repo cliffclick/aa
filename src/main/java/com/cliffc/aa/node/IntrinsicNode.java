@@ -38,13 +38,13 @@ public class IntrinsicNode extends Node {
     // This function call takes in and returns a plain ptr-to-object.
     // Only after folding together does the name become apparent.
     TypeFunPtr tf = TypeFunPtr.make_new(TypeStruct.make_args(TypeStruct.ts(TypeMemPtr.STRUCT,TypeStruct.NO_DISP_SIMPLE,TypeMemPtr.STRUCT)));
-    FunNode fun = (FunNode) gvn.xform(new FunNode(tn._name,tf,BitsAlias.EMPTY).add_def(Env.ALL_CTRL));
+    FunNode fun = (FunNode) gvn.xform(new FunNode(tn._name,tf).add_def(Env.ALL_CTRL));
     Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
     Node mem = gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM     ),null));
     Node ptr = gvn.xform(new ParmNode( 2,"ptr",fun,gvn.con(TypeMemPtr.OOP  ),null));
     Node cvt = gvn.xform(new IntrinsicNode(tn,badargs,fun,mem,ptr));
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,cvt,ptr,rpc,fun));
-    return (FunPtrNode)gvn.xform(new FunPtrNode(ret,gvn.con(TypeStruct.NO_DISP_SIMPLE),TypeStruct.NO_DISP_SIMPLE));
+    return (FunPtrNode)gvn.xform(new FunPtrNode(ret,gvn.con(TypeStruct.NO_DISP_SIMPLE)));
   }
 
   @Override public Type all_type() { return TypeMem.MEM; }
@@ -69,8 +69,8 @@ public class IntrinsicNode extends Node {
         Type actual = tnnn.at(0).sharpen(gvn.type(mem));
         Type formal = _tn.remove_name();
         if( actual.isa(formal) ) {
-          TypeStruct tn = TypeStruct.make(_tn._name,nnn._ts._flds,nnn._ts._ts,nnn._ts.flags_clone());
-          nnn.set_name(tn);
+          TypeStruct tn = nnn._ts.make_from(_tn._name);
+          nnn.set_name(tn,gvn);
           gvn.add_work(nnn);
           return new MemMergeNode(mem,opj,alias);
         }
@@ -109,13 +109,6 @@ public class IntrinsicNode extends Node {
     return _badargs.typerr(ptr,mem(),TypeMemPtr.make(BitsAlias.RECORD,_tn)); // Did not remove the aliasing
   }
 
-  // Clones during inlining all become unique new sites
-  @Override @NotNull public IntrinsicNode copy( boolean copy_edges, CallEpiNode cepi, GVNGCM gvn) {
-    IntrinsicNode nnn = (IntrinsicNode)super.copy(copy_edges, cepi, gvn);
-    nnn._badargs = cepi.call()._badargs[1];
-    return nnn;
-  }
-
   // --------------------------------------------------------------------------
   // Default name constructor using expanded args list.  Just a NewObjNode but the
   // result is a named type.  Same as convertTypeName on an unaliased NewObjNode.
@@ -133,9 +126,9 @@ public class IntrinsicNode extends Node {
     System.arraycopy(to._ts,1,ts,2,to._ts.length-1);
     TypeStruct args = TypeStruct.make_args(ts);
     TypeFunPtr tf = TypeFunPtr.make_new(args);
-    FunNode fun = (FunNode) gvn.xform(new FunNode(to._name,tf,BitsAlias.EMPTY).add_def(Env.ALL_CTRL));
+    FunNode fun = (FunNode) gvn.xform(new FunNode(to._name,tf).add_def(Env.ALL_CTRL));
     Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
-    Node memp= gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM     ),null));
+    Node memp= gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM),null));
     // Add input edges to the NewNode
     nnn.set_def(0,fun,gvn);     // Set control to function start
     for( int i=1; i<to._ts.length; i++ ) { // Display in 0, fields in 1+
@@ -148,7 +141,7 @@ public class IntrinsicNode extends Node {
     Node obj = gvn.xform(new OProjNode(nnn,0));
     Node mmem= gvn.xform(new MemMergeNode(memp,obj,nnn.<NewObjNode>unhook()._alias));
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,ptr,rpc,fun));
-    return (FunPtrNode)gvn.xform(new FunPtrNode(ret,gvn.con(TypeStruct.NO_DISP_SIMPLE),TypeStruct.NO_DISP_SIMPLE));
+    return (FunPtrNode)gvn.xform(new FunPtrNode(ret,gvn.con(TypeStruct.NO_DISP_SIMPLE)));
   }
 
 }

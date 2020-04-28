@@ -11,7 +11,15 @@ import java.util.function.Predicate;
 public final class TypeMemPtr extends Type<TypeMemPtr> {
   // List of known memory aliases.  Zero is nil.
   public BitsAlias _aliases;
-  public TypeObj _obj;          // Meet/join of aliases
+  // The _obj field is unused (trivially OBJ or XOBJ) for TMPs used as graph
+  // node results, because memory contents are modified in TypeMems and
+  // TypeObjs and NOT in pointers - hence this field "goes stale" rapidly as
+  // graph nodes manipulate the state of memory.
+  //
+  // The _obj field can be filled out accurately with a TypeMem.sharpen call,
+  // and is used to e.g. check pointer types at type assertions (including
+  // function call args).
+  public TypeObj _obj;          // Meet/join of aliases.  Unused in simple_ptrs in graph nodes.
 
   boolean _cyclic; // Type is cyclic.  This is a summary property, not a description of value sets, hence is not in the equals or hash
 
@@ -86,7 +94,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   public  static final TypeMemPtr OOP    = make(BitsAlias.NZERO   ,TypeObj.OBJ); // Excludes nil
   public  static final TypeMemPtr STRPTR = make(BitsAlias.STRBITS ,TypeStr.STR);
   public  static final TypeMemPtr STR0   = make(BitsAlias.STRBITS0,TypeStr.STR);
-  public  static final TypeMemPtr ABCPTR = make(BitsAlias.type_alias(BitsAlias.STR),TypeStr.ABC);
+  public  static final TypeMemPtr ABCPTR = make(BitsAlias.ABC     ,TypeStr.ABC);
   public  static final TypeMemPtr ABC0   = make(ABCPTR._aliases.meet_nil(),TypeStr.ABC);
   public  static final TypeMemPtr STRUCT = make(BitsAlias.RECORD_BITS ,TypeStruct.ALLSTRUCT);
   public  static final TypeMemPtr STRUCT0= make(BitsAlias.RECORD_BITS0,TypeStruct.ALLSTRUCT);
@@ -95,10 +103,11 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   static final TypeMemPtr[] TYPES = new TypeMemPtr[]{OOP0,STR0,STRPTR,ABCPTR,STRUCT,NILPTR};
 
   @Override public boolean is_display_ptr() {
-    return
-      this==DISPLAY_PTR || this==DISPLAY_PTR._dual ||
-      this==NIL_DISPLAY || this==NIL_DISPLAY._dual ||
-      _obj.is_display();
+    BitsAlias x = _aliases.strip_nil();
+    if( x==BitsAlias.EMPTY ) return true; // Just a NIL
+    int alias = x.abit();                 // Just a single alias
+    // The GENERIC function allows the generic record, otherwise must be on the display list
+    return alias!= -1 && (Math.abs(alias)==BitsAlias.RECORD || com.cliffc.aa.Env.DISPLAYS.get(Math.abs(alias)));
   }
 
   @Override protected TypeMemPtr xdual() {
@@ -235,6 +244,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   @Override public Type sharpen( Type tmem ) {
     if( !(tmem instanceof TypeMem) ) return this;
     assert this==simple_ptr();
+    // TODO: Needs to be recursive
     return make(_aliases,((TypeMem)tmem).ld(this));
   }
 }

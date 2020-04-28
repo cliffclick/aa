@@ -129,7 +129,7 @@ public abstract class PrimNode extends Node {
     // memory (see Intrinsic*Node for some primitives that *modify* memory).
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mem,gvn.init(this),rpc,fun));
     // No closures are added to primitives
-    return new FunPtrNode(ret,gvn.con(TypeStruct.NO_DISP_SIMPLE),TypeStruct.NO_DISP_SIMPLE);
+    return new FunPtrNode(ret,gvn.con(TypeStruct.NO_DISP_SIMPLE));
   }
 
 
@@ -171,7 +171,7 @@ static class ConvertInt64F64 extends PrimNode {
 
   // TODO: Type-check strptr input args
 static class ConvertStrStr extends PrimNode {
-  ConvertStrStr() { super("str",TypeStruct.STRPTR__SCALAR); }
+  ConvertStrStr() { super("str",TypeStruct.STRPTR__STRPTR); }
   @Override public Node ideal(GVNGCM gvn, int level) { return in(1); }
   @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)).bound(_targs.at(0)); }
   @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }

@@ -234,7 +234,7 @@ public class TestNode {
     test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  null, TypeFlt.FLT64));
     test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  null, Type   .CTRL ));
     test1monotonic(new    FunNode(new String[]{"->","^","x"},new Type[]{TypeInt.INT64,TypeMemPtr.DISP_SIMPLE,TypeInt.INT64}));
-    test1monotonic(new FunPtrNode(ret,_gvn.con(TypeStruct.NO_DISP_SIMPLE),TypeStruct.NO_DISP_SIMPLE));
+    test1monotonic(new FunPtrNode(ret,_gvn.con(TypeStruct.NO_DISP_SIMPLE)));
     test1monotonic(new FP2ClosureNode(_ins[1])); // Only takes in a TFP
     test1monotonic(new     IfNode(_ins[0],_ins[1]));
     for( IntrinsicNewNode prim : IntrinsicNewNode.INTRINSICS )
@@ -249,7 +249,7 @@ public class TestNode {
     NewObjNode nnn2 = new NewObjNode(false,TypeStruct.DISPLAY,_ins[0],_gvn.con(Type.NIL));
     set_type(1,Type.SCALAR);  nnn2.create_active("x",_ins[2],TypeStruct.FFNL,_gvn);
     set_type(2,Type.SCALAR);  nnn2.create_active("y",_ins[3],TypeStruct.FFNL,_gvn);
-    nnn2.set_name(tname);
+    nnn2.set_name(tname,_gvn);
     test1monotonic(nnn2);
     ((ConNode<Type>)_ins[1])._t = Type.SCALAR; // ParmNode reads this for _alltype
     test1monotonic(new   ParmNode( 1, "x",_ins[0],(ConNode)_ins[1],null).add_def(_ins[2]));
@@ -259,8 +259,8 @@ public class TestNode {
     test1monotonic(new   ProjNode(_ins[0],1));
     test1monotonic(new RegionNode(null,_ins[1],_ins[2]));
     test1monotonic(new    RetNode(_ins[0],mem,_ins[1],_ins[2],fun_plus)); // ctl,mem,val,rpc,fun
-    test1monotonic(new  StoreNode(_ins[1],_ins[2],_ins[3],TypeStruct.FRW,"x",null));
-    test1monotonic(new  StoreNode(_ins[1],_ins[2],_ins[3],TypeStruct.FRO,"x",null));
+    test1monotonic(new  StoreNode(_ins[1],_ins[2],_ins[3],TypeStruct.FRW ,"x",null));
+    test1monotonic(new  StoreNode(_ins[1],_ins[2],_ins[3],TypeStruct.FFNL,"x",null));
     //                  ScopeNode has no inputs, and value() call is monotonic
     test1monotonic(new   TypeNode(_ins[1],_ins[2],TypeInt.FALSE    ,null));
     test1monotonic(new   TypeNode(_ins[1],_ins[2],TypeMemPtr.STRPTR,null));
@@ -290,7 +290,7 @@ public class TestNode {
 
   // Fill a Node with {null,edge,edge} and start the search
   private void test1monotonic_prim(PrimNode prim) {
-    PrimNode n = (PrimNode)prim.copy(false,null,_gvn);
+    PrimNode n = (PrimNode)prim.copy(false,_gvn);
     assert n._defs._len==0;
     n.add_def( null  );
     n.add_def(_ins[1]);
@@ -300,7 +300,7 @@ public class TestNode {
 
   // Fill a Node with {null,edge,edge} and start the search
   private void test1monotonic_intrinsic(IntrinsicNewNode prim) {
-    IntrinsicNewNode n = (IntrinsicNewNode)prim.copy(false,null,_gvn);
+    IntrinsicNewNode n = (IntrinsicNewNode)prim.copy(false,_gvn);
     assert n._defs._len==0;
     n.add_def( null  );
     n.add_def(_ins[1]);         // memory

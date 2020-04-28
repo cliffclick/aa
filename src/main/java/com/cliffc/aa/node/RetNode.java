@@ -64,7 +64,7 @@ public final class RetNode extends Node {
     return null;
   }
   @Override public Type value(GVNGCM gvn) {
-    if( is_copy() ) return gvn.self_type(this); // No change if a copy
+    if( ctl()==null ) return gvn.self_type(this); // No change if a copy
     TypeTuple TALL = TypeTuple.RET;
     Type ctl = gvn.type(ctl());
     if( ctl != Type.CTRL ) return ctl.above_center() ? TALL.dual() : TALL;

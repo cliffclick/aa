@@ -21,8 +21,8 @@ public class TypeNode extends Node {
   Node arg() { return in(2); }
 
   @Override public Node ideal(GVNGCM gvn, int level) {
-    Node arg = arg(), mem;
-    Type at = gvn.sharptr(arg,mem());
+    Node arg= arg(), mem = mem();
+    Type at = gvn.sharptr(arg,mem);
     if( at.isa(_t) ) return arg;
     // If TypeNode check is for a function pointer, it will wrap any incoming
     // function with a new function which does the right arg-checks.  This
@@ -52,7 +52,7 @@ public class TypeNode extends Node {
       RetNode ret = (RetNode)gvn.xform(new RetNode(ctl,postmem.unhook(),chk,rpc,fun));
       // Just the Closure when we make a new TFP
       Node clos = gvn.xform(new FP2ClosureNode(arg));
-      return gvn.xform(new FunPtrNode(ret,clos,(TypeMemPtr)gvn.type(clos)));
+      return gvn.xform(new FunPtrNode(ret,clos));
     }
 
     // Push TypeNodes 'up' to widen the space they apply to, and hopefully push

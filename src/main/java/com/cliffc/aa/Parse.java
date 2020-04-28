@@ -180,7 +180,7 @@ public class Parse {
     _gvn._opt_mode = 0;
     Node res = stmts();
     if( res == null ) res = con(Type.ANY);
-    _gvn.add_work(all_mem());   // Close off top-level active memory
+    _gvn.add_work(all_mem());     // Close off top-level active memory
     _e._par._scope.all_mem(_gvn); // Loads against primitive scope will 'activate' memory, close it also
     _e._scope.set_rez(res,_gvn);  // Hook result
   }
@@ -361,7 +361,7 @@ public class Parse {
       if( scope==null ) {                    // Token not already bound at any scope
         if( ifex instanceof FunPtrNode && !ifex.is_forward_ref() )
           ((FunPtrNode)ifex).fun().bind(tok); // Debug only: give name to function
-        create(tok,con(Type.XNIL),ts_mutable(true)); // Create at top of scope as nil.
+        create(tok,con(Type.XNIL),TypeStruct.FRW); // Create at top of scope as ~scalar.
         scope = _e._scope;              // Scope is the current one
         scope.def_if(tok,mutable,true); // Record if inside arm of if (partial def error check)
       }
@@ -376,8 +376,8 @@ public class Parse {
 
         // Active (parser) memory state.
         int alias = scope.stk()._alias;        // Alias for display/object
-        Node objmem = mem_active().active_obj(alias);  // Active struct memory
         Node ptr = get_display_ptr(scope,tok); // Pointer, possibly loaded up the display-display
+        Node objmem = mem_active().active_obj(alias);  // Active struct memory
         // If the active state is directly a NewObj, update-in-place.  This is
         // an early optimization.
         if( objmem.in(0) instanceof NewObjNode &&
@@ -772,7 +772,7 @@ public class Parse {
     Node parent_display = _e._scope.ptr();
     TypeMemPtr tpar_disp = (TypeMemPtr)_gvn.type(parent_display); // Just a TMP of the right alias
     ids .push("^");
-    ts  .push(tpar_disp.meet_nil(Type.NIL)); // Functions allow a NIL display
+    ts  .push(tpar_disp); // Functions allow a NIL display
     bads.push(null);
 
     // Parse arguments
@@ -810,14 +810,13 @@ public class Parse {
 
     // Increase scope depth for function body.
     try( Env e = new Env(_e,errMsg(oldx-1), true) ) { // Nest an environment for the local vars
-      fun._my_display_alias = e._display_alias;
       _e = e;                   // Push nested environment
       _gvn.set_def_reg(e._scope.stk(),0,fun); // Display creation control defaults to function entry
       set_ctrl(fun);            // New control is function head
       // Build Parms for all incoming values
       Node rpc = gvn(new ParmNode(-1,"rpc",fun,con(TypeRPC.ALL_CALL),null)).keep();
-      Node mem = gvn(new ParmNode(-2,"mem",fun,con(TypeMem.MEM     ),null)).keep();
-      Node clo = gvn(new ParmNode( 1,"^"  ,fun,con(tpar_disp       ),null));
+      Node mem = gvn(new ParmNode(-2,"mem",fun,con(TypeMem.MEM),null)).keep();
+      Node clo = gvn(new ParmNode( 1,"^"  ,fun,con(tpar_disp),null));
       // Display is special: the default is simply the outer lexical scope.
       // But here, in a function, the display is actually passed in as a hidden
       // extra argument and replaces the default.
@@ -850,9 +849,9 @@ public class Parse {
       RetNode ret = (RetNode)gvn(new RetNode(ctrl(),all_mem(),rez,rpc.unhook(),fun.unhook()));
       // Update the function type for the current return value
       Type tret = ((TypeTuple)_gvn.type(ret)).at(2);
-      fun.sharpen(_gvn,fun._tf.make(tpar_disp.meet_nil(Type.NIL),tret)); // Sharpen alltype return, equal to what parser already knowns
+      fun.set_tf(fun._tf.make_from(tpar_disp,tret)); // Sharpen alltype return, equal to what parser already knowns
       // The FunPtr builds a real display; any up-scope references are passed in now.
-      Node fptr = gvn(new FunPtrNode(ret,e._par._scope.ptr(),tpar_disp));
+      Node fptr = gvn(new FunPtrNode(ret,e._par._scope.ptr()));
       _e = _e._par;             // Pop nested environment
       set_ctrl(old_ctrl);       // Back to the pre-function-def control
       set_mem (old_mem.unhook());// Back to the pre-function-def memory
@@ -998,12 +997,9 @@ public class Parse {
   private byte tmod() {
     if( peek("==") ) { _x--; return TypeStruct.FFNL; } // final     , leaving trailing '='
     if( peek(":=") ) { _x--; return TypeStruct.FRW;  } // read-write, leaving trailing '='
-    return tmod_default();
+    // Default for unnamed field mod
+    return TypeStruct.FRW;
   }
-  // Experimenting, would like to default to most unconstrained type: r/w.  But
-  // r/o is the lattice bottom, and defaulting to r/w means the default cannot
-  // accept final-fields.  Using lattice bottom for the default.
-  private byte tmod_default() { return TypeStruct.FRO; }
 
   // Type or null or Type.ANY for '->' token
   private Type type0(boolean type_var) {
@@ -1177,7 +1173,8 @@ public class Parse {
   // Close off active memory and return it.
   private Node all_mem() { return _e._scope.all_mem(_gvn); }
   // Expand default memory to support precise aliasing: an active MemMerge (not
-  // in GVN)
+  // in GVN).  Because its active it can be directly modified without removing
+  // from GVN.
   private MemMergeNode mem_active() {
     ScopeNode scope = _e._scope;
     Node mem = scope.mem();
@@ -1203,8 +1200,8 @@ public class Parse {
     // exists at scope up in the display.
     Env e = _e;
     Node ptr = e._scope.ptr();
-    MemMergeNode mmem = mem_active();
-    TypeMem tmem = (TypeMem)mmem.value(_gvn);
+    Node mmem = all_mem();
+    TypeMem tmem = (TypeMem)_gvn.type(mmem);
     while( true ) {
       if( scope == e._scope ) return ptr;
       ptr = gvn(new LoadNode(mmem,ptr,"^",null)); // Gen linked-list walk code, walking display slot

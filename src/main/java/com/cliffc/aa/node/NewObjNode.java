@@ -27,11 +27,14 @@ public class NewObjNode extends NewNode<TypeStruct> {
     _is_closure = is_closure;
     assert ts._ts[0].is_display_ptr();
     for( int i=1; i<ts._ts.length; i++ )
-      assert ts._ts[i]==Type.SCALAR; // Field contents not specified, ever
+      assert ts._ts[i]==Type.SCALAR; // Field contents not specified unless final
   }
   public Node get(String name) { int idx = _ts.find(name);  assert idx >= 0; return fld(idx); }
   public boolean exists(String name) { return _ts.find(name)!=-1; }
-  public boolean is_mutable(String name) { return _ts.fmod(_ts.find(name)) == TypeStruct.FRW; }
+  public boolean is_mutable(String name) {
+    byte fmod = _ts.fmod(_ts.find(name));
+    return fmod == TypeStruct.FRW;
+  }
   public TypeMemPtr tptr() { return TypeMemPtr.make(_alias,_ts); }
 
   // Create a field from parser for an inactive this
@@ -52,7 +55,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
     assert !gvn.touched(this);
     assert def_idx(_ts._ts.length)== _defs._len;
     assert _ts.find(name) == -1; // No dups
-    _ts = _ts.add_fld(name,mutable);
+    sets(_ts.add_fld(name,mutable,mutable==TypeStruct.FFNL ? gvn.type(val) : Type.SCALAR),gvn);
     add_def(val);
   }
   public void update( String tok, byte mutable, Node val, GVNGCM gvn  ) { update(_ts.find(tok),mutable,val,gvn); }
@@ -80,7 +83,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
   public void update_active( int fidx, byte mutable, Node val, GVNGCM gvn  ) {
     assert !gvn.touched(this);
     assert def_idx(_ts._ts.length)== _defs._len;
-    _ts = _ts.set_fld(fidx,Type.SCALAR,mutable);
+    sets(_ts.set_fld(fidx,mutable==TypeStruct.FFNL ? gvn.type(val) : Type.SCALAR,mutable),gvn);
     set_def(def_idx(fidx),val,gvn);
   }
 
@@ -110,26 +113,24 @@ public class NewObjNode extends NewNode<TypeStruct> {
     for( int i=0; i<ts._ts.length; i++ ) {
       Node n = fld(i);
       if( n != null && n.is_forward_ref() ) {
-        parent.create(ts._flds[i],n,TypeStruct.fmod(ts.flags(i)),gvn);
+        // Make field in the parent
+        parent.create(ts._flds[i],n,ts.fmod(i),gvn);
+        // Stomp field locally to XSCALAR
+        sets(_ts.set_fld(i,Type.XSCALAR,TypeStruct.FFNL),gvn);
         gvn.set_def_reg(this,def_idx(i),gvn.con(Type.XSCALAR));
       }
     }
   }
 
   @Override public Type value(GVNGCM gvn) {
+    if( _captured )             // Captured, dead
+      return gvn.self_type(this);
     // Gather args and produce a TypeStruct
     Type[] ts = TypeAry.get(_ts._ts.length);
     for( int i=0; i<ts.length; i++ )
-      ts[i] = gvn.type(fld(i));
+      ts[i] = gvn.type(fld(i)).join(_ts._ts[i]);
     TypeStruct newt = _ts.make_from(ts);
-  
-    //// Check for TypeStructs with this same NewNode types occurring more than
-    //// CUTOFF deep, and fold the deepest ones onto themselves to limit the type
-    //// depth.  If this happens, the types become recursive with the
-    //// approximations happening at the deepest points.
-    //TypeStruct xs = newt.approx(CUTOFF,_alias);
-    //assert Util.eq(xs._name,_ts._name);
-    //return TypeTuple.make(xs,TypeMemPtr.make(_alias,_ts));
+
     return TypeTuple.make(newt,TypeMemPtr.make(_alias,TypeObj.OBJ)); // Complex obj, simple ptr.
   }
   @Override public Type all_type() { return TypeTuple.NEWOBJ; }

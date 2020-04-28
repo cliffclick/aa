@@ -122,7 +122,7 @@ public class TypeMem extends Type<TypeMem> {
     for( int i=1; i<_aliases.length; i++ )
       if( _aliases[i] != null )
         sb.p(i).p(':').p(_aliases[i].toString()).p(",");
-    return sb.p(']').toString();
+    return sb.unchar().p(']').toString();
   }
 
   // Alias-at.  Out of bounds or null uses the parent value.
@@ -262,10 +262,11 @@ public class TypeMem extends Type<TypeMem> {
     // All memory.  Includes breakouts for all structs and all strings.
     // Triggers BitsAlias.<clinit> which makes all the initial alias splits.
     // Not currently including closures
-    TypeObj[] tos = new TypeObj[Math.max(BitsAlias.RECORD,BitsAlias.STR)+1];
+    TypeObj[] tos = new TypeObj[Math.max(BitsAlias.RECORD,BitsAlias.ABC)+1];
     tos[BitsAlias.ALL] = TypeObj.OBJ;
     tos[BitsAlias.RECORD]=TypeStruct.ALLSTRUCT;
     tos[BitsAlias.STR] = TypeStr.STR; // TODO: Proxy for all-arrays
+    tos[BitsAlias.ABC] = TypeStr.ABC; // TODO: Proxy for all-arrays
     MEM  = make(tos);
     XMEM = MEM.dual();
 
@@ -337,8 +338,22 @@ public class TypeMem extends Type<TypeMem> {
     return TypeMem.make0(tos);
   }
 
-  // Mark all memory as being clean (not modified in this function).
-  // Recursive.
+  // Widen (lose info) a TypeMem "as if" all possible legal future memory
+  // stores happen, making it suitable as the default function memory.  Final
+  // fields can remain as-is; non-finals are all widened to SCALAR (assuming a
+  // future Store); the field names & mods are kept.  All objects in the
+  // display stack are 'open'; low and assuming more fields will appear.  Other
+  // objects can have their fields frozen.
+  public TypeMem widen_as_default() {
+    TypeObj[] tos = new TypeObj[_aliases.length];
+    for( int i=0; i<tos.length; i++ )
+      tos[i] = _aliases[i]==null ? null : _aliases[i].widen_as_default();
+    return TypeMem.make0(tos);
+  }
+
+
+  // Support for SESE flow optimizations.  Mark all memory as being clean (not
+  // modified in this function).  Recursive.
   public TypeMem clean() {
     if( this==XMEM ) return XMEM;
     TypeObj[] ts = _aliases.clone();
@@ -348,7 +363,8 @@ public class TypeMem extends Type<TypeMem> {
     return make0(ts);
   }
 
-  // True if all looked-at memory is clean.  Allows a Load to bypass calls.
+  // Support for SESE flow optimizations.  True if all looked-at memory is
+  // clean.  Allows a Load to bypass calls.
   public boolean is_clean( BitsAlias aliases, String fld ) {
     for( int alias : aliases )
       if( alias != 0 && !at(alias).is_clean(fld) )
@@ -358,7 +374,7 @@ public class TypeMem extends Type<TypeMem> {
 
   @Override public boolean above_center() {
     for( TypeObj alias : _aliases )
-      if( alias != null && !alias.above_center() )
+      if( alias != null && !alias.above_center() && !alias.is_con() )
         return false;
     return true;
   }

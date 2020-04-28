@@ -18,7 +18,7 @@ public final class CallEpiNode extends Node {
   String xstr() { return ((is_dead() || is_copy()) ? "x" : "C")+"allEpi"; } // Self short name
   public CallNode call() { return (CallNode)in(0); }
   int nwired() { return _defs._len-1; }
-  int wire_num(int x) { return x+1; }
+  static int wire_num(int x) { return x+1; }
   RetNode wired(int x) { return (RetNode)in(x+1); }
 
   @Override public Node ideal(GVNGCM gvn, int level) {
@@ -30,11 +30,10 @@ public final class CallEpiNode extends Node {
     if( tcall.at(0) != Type.CTRL ) return null; // Call not executable
     // Get calls resolved function.
     if( !(tcall.at(2) instanceof TypeFunPtr) ) return null; // No known function pointer
-    TypeFunPtr tfp = (TypeFunPtr)tcall.at(2);
+    BitsFun fidxs = ((TypeFunPtr)tcall.at(2)).fidxs();
 
     // The one allowed function is already wired?  Then directly inline.
     // Requires this calls 1 target, and the 1 target is only called by this.
-    BitsFun fidxs = tfp.fidxs();
     if( nwired()==1 && fidxs.abit() != -1 ) { // Wired to 1 target
       RetNode ret = wired(0);                 // One wired return
       FunNode fun = ret.fun();
@@ -60,23 +59,21 @@ public final class CallEpiNode extends Node {
           // Post-GCP all CG edges are manifest, but types can keep lifting
           // and so CG edges can still be killed.
           unwire(gvn,call,ret);
-          del(wire_num(i));
           return this; // Return with progress
         }
       }
     }
 
     // Only inline wired single-target function with valid args.  CallNode wires.
-    if( nwired()!=1 ) return null;
-    int fidx = fidxs.abit();      // Could be 1 or multi
-    if( fidx == -1 ) return null; // Multi choices, only 1 wired at the moment.
-    //assert !fidxs.above_center(); // Since wired, not above center
-    if( fidxs.above_center() )
+    if( nwired()!=1 ) return null; // More than 1 wired, inline only via FunNode
+    int fidx = fidxs.abit();       // Could be 1 or multi
+    if( fidx == -1 ) return null;  // Multi choices, only 1 wired at the moment.
+    if( fidxs.above_center() )     // Can be unresolved yet
       return null;
 
     if( call.err(gvn,true)!=null ) return null; // CallNode claims args in-error, do not inline
 
-    // Call allows 1 function not yet wired, sanity check it.
+    // Call allows 1 function not yet inlined, sanity check it.
     int cnargs = call.nargs();
     FunNode fun = FunNode.find_fidx(fidx);
     assert !fun.is_forward_ref() && !fun.is_dead()
@@ -113,6 +110,10 @@ public final class CallEpiNode extends Node {
     // If the function does nothing with memory, then use the call memory directly.
     if( (rmem instanceof ParmNode && rmem.in(0) == fun) || gvn.type(rmem)==TypeMem.XMEM )
       rmem = cmem;
+    // Check that function return memory and post-call memory are compatible
+    TypeTuple tself = (TypeTuple)gvn.type(this);
+    if( !gvn.type(rmem).isa( tself.at(1)) )
+      return null;
 
     // Check for zero-op body (id function)
     if( rrez instanceof ParmNode && rrez.in(0) == fun && cmem == rmem )
@@ -130,7 +131,7 @@ public final class CallEpiNode extends Node {
         can_inline=false;       // Not trivial
     if( fun.noinline() ) can_inline=false;
     if( can_inline ) {
-      Node irez = rrez.copy(false,this,gvn);// Copy the entire function body
+      Node irez = rrez.copy(false,gvn);// Copy the entire function body
       irez._live = _live; // Keep liveness from CallEpi, as the original might be dead.
       for( Node parm : rrez._defs )
         irez.add_def((parm instanceof ParmNode && parm.in(0) == fun) ? call.arg(((ParmNode)parm)._idx) : parm);
@@ -145,16 +146,20 @@ public final class CallEpiNode extends Node {
   // knowledge of its callers and arguments.  This adds an edge in the Call-Graph.
   boolean wire( GVNGCM gvn, CallNode call, FunNode fun, RetNode ret ) {
     assert _keep==0;            // not expecting this during calls
-
     for( int i=0; i<nwired(); i++ )
       if( wired(i) == ret )     // Look for same Ret
         return false;           // Already wired up
+    wire1(gvn,call,fun,ret);
+    return true;
+  }
 
+  // Wire without the redundancy check.
+  void wire1( GVNGCM gvn, CallNode call, FunNode fun, RetNode ret ) {
     wire0(gvn,call,fun);
+    // Wire self to the return
     gvn.add_def(this,ret);
     gvn.add_work(ret);
     gvn.add_work(ret.funptr());
-    return true;
   }
 
   // Wire without the redundancy check, or adding to the CallEpi
@@ -195,11 +200,13 @@ public final class CallEpiNode extends Node {
   // unwired Returns may yet appear, and be conservative.  Otherwise it can
   // just meet the set of known functions.
   @Override public TypeTuple value(GVNGCM gvn) {
-
     if( is_copy() )
       return gvn.type(in(0))!=Type.CTRL
         ? TypeTuple.CALLE.dual()
         : TypeTuple.make(gvn.type(in(0)),gvn.type(in(1)),gvn.type(in(2)));
+
+    assert sane_wiring();
+
     // Get Call result.  If the Call args are in-error, then the Call is called
     // and we flow types to the post-call.... BUT the bad args are NOT passed
     // along to the function being called.
@@ -217,16 +224,20 @@ public final class CallEpiNode extends Node {
     if( !(tfptr instanceof TypeFunPtr) ) // Call does not know what it is calling?
       return TypeTuple.CALLE;
 
-    // If pre-gcp, we may have unknown callers.  Be very conservative until we
-    // have wired all callers.
     BitsFun fidxs = ((TypeFunPtr)tfptr).fidxs();
-    if( gvn._opt_mode < 2 && fidxs.bitCount() > nwired() )
-      return TypeTuple.CALLE;
+    if( tfptr.is_forward_ref() ) return TypeTuple.CALLE; // Still in the parser.
     // NO fidxs, means we're not calling anything.
     if( fidxs==BitsFun.EMPTY ) return TypeTuple.CALLE.dual();
     if( fidxs.above_center() ) return TypeTuple.CALLE.dual();
+    if( fidxs.test(1) ) return TypeTuple.CALLE;
+    if( fidxs.test(0) ) throw com.cliffc.aa.AA.unimpl(); // Handle nil fptr
+    // If pre-gcp, we may have unknown callers.  Be very conservative until we
+    // have wired all callers.  While GCP will discover a more precise set of
+    // fidxes, we always have a conservative set even pre-GCP.
+    if( gvn._opt_mode < 2 && fidxs.bitCount() > nwired() )
+      return TypeTuple.CALLE;
     // Meet across wired callers.
-    TypeTuple tt = TypeTuple.XRET;
+    TypeTuple mt = TypeTuple.XRET; // Start high and 'meet'
     for( int i=0; i<nwired(); i++ ) {
       Node ret = in(wire_num(i));
       if( ret instanceof RetNode &&            // Only fails during testing
@@ -235,9 +246,25 @@ public final class CallEpiNode extends Node {
       if( !(tr instanceof TypeTuple) || // Only fails during testing
           ((TypeTuple)tr)._ts.length != TypeTuple.XRET._ts.length )
         continue;               // Only fails during testing
-      tt = (TypeTuple)tt.meet(tr);
+      mt = (TypeTuple)mt.meet(tr);
     }
-    return tt;
+
+    return mt;
+  }
+
+  // Sanity check
+  boolean sane_wiring() {
+    CallNode call = call();
+    ProjNode cprj = ProjNode.proj(call,0); // Control proj
+    if( cprj==null ) return true; // Abort check, call is dead
+    for( int i=0; i<nwired(); i++ ) {
+      RetNode ret = wired(i);
+      if( ret.is_copy() ) return true; // Abort check, will be misaligned until dead path removed
+      FunNode fun = ret.fun();
+      if( cprj._uses.find(fun) == -1 )
+        return false;           // ith usage is ith wire
+    }
+    return true;
   }
 
   // Inline the CallNode.  Remove all edges except the results.  This triggers
@@ -264,11 +291,18 @@ public final class CallEpiNode extends Node {
   }
 
   void unwire(GVNGCM gvn, CallNode call, RetNode ret) {
-    if( ret.is_copy() ) return;
-    FunNode fun = ret.fun();
-    for( int i=1; i<fun._defs._len; i++ ) // Unwire
-      if( fun.in(i).in(0)==call ) gvn.set_def_reg(fun,i,gvn.con(Type.XCTRL));
-    gvn.add_work_uses(fun);
+    assert sane_wiring();
+    if( !ret.is_copy() ) {
+      FunNode fun = ret.fun();
+      for( int i = 1; i < fun._defs._len; i++ ) // Unwire
+        if( fun.in(i).in(0) == call ) {
+          gvn.set_def_reg(fun, i, gvn.con(Type.XCTRL));
+          break;
+        }
+      gvn.add_work_uses(fun);
+    }
+    del(_defs.find(ret));
+    assert sane_wiring();
   }
 
   // Compute local contribution of use liveness to this def.  If the call is

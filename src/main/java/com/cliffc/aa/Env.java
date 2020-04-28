@@ -3,23 +3,24 @@ package com.cliffc.aa;
 import com.cliffc.aa.node.*;
 import com.cliffc.aa.type.*;
 
+import java.util.BitSet;
+
 public class Env implements AutoCloseable {
   final Env _par;
   Parse _P;          // Used to get debug info
   public final ScopeNode _scope;  // Lexical anchor; "end of display"; goes when this environment leaves scope
-  int _display_alias;// Local display alias
   Env( Env par, Parse P, boolean is_closure ) {
     _P = P;
     _par = par;
     Node ctl = par == null ? CTL_0 : par._scope.ctrl();
-    Node clo = par == null ? GVN.con(TypeStruct.NO_DISP_SIMPLE) : par._scope.ptr();
+    Node clo = par == null ? GVN.con(Type.XNIL) : par._scope.ptr();
     Node mem = par == null ? MEM_0 : par._scope.mem ();
-    TypeStruct tdisp = TypeStruct.make_tuple(TypeStruct.ts(par == null ? TypeStruct.NO_DISP : par._scope.stk().tptr()));
+    TypeStruct tdisp = TypeStruct.make_tuple(TypeStruct.ts(par == null ? Type.XNIL : par._scope.stk().tptr()));
     NewObjNode nnn = (NewObjNode)GVN.xform(new NewObjNode(is_closure,tdisp,ctl,clo).keep());
     Node frm = GVN.xform(new OProjNode(nnn,0));
     Node ptr = GVN.xform(new  ProjNode(nnn,1));
-    BitsAlias bits_clo = BitsAlias.make0(_display_alias = nnn._alias);
-    DISPLAY = DISPLAY.meet(bits_clo);
+    DISPLAY .set(nnn._alias);   // Current display stack
+    DISPLAYS.set(nnn._alias);   // Displays for all time
     MemMergeNode mmem = new MemMergeNode(mem,frm,nnn.<NewObjNode>unhook()._alias);
     ScopeNode scope = _scope = new ScopeNode(P==null ? null : P.errMsg(),is_closure);
     scope.set_ctrl(ctl,GVN);
@@ -33,18 +34,23 @@ public class Env implements AutoCloseable {
   public  final static  CProjNode CTL_0; // Program start value control
   public  final static  MProjNode MEM_0; // Program start value memory
   public  final static NewObjNode STK_0; // Program start stack frame (has primitives)
-  public  final static    ConNode ALL_CTRL;
+
+  public  final static    ConNode ALL_CTRL; // Default control
           final static int LAST_START_UID;
   private final static int NINIT_CONS;
   public  final static Env TOP; // Top-most lexical Environment, has all primitives, unable to be removed
-  public        static BitsAlias DISPLAY;
+  public        static BitsAlias DISPLAY; // Currently active display stack
+  // Set of display aliases, used for assertions
+  public final static BitSet DISPLAYS = new BitSet();
+
 
   static {
     GVN = new GVNGCM();      // Initial GVN, defaults to ALL, lifts towards ANY
     DISPLAY = BitsAlias.EMPTY;
+    DISPLAYS.clear();
 
     // Initial control & memory
-    START  = GVN.init(new StartNode(       ));
+    START  = (StartNode)GVN.xform(new StartNode(       ));
     CTL_0  = (CProjNode)GVN.xform(new CProjNode(START,0));
     MEM_0  = (MProjNode)GVN.xform(new MProjNode(START,1));
     // Top-most (file-scope) lexical environment
@@ -158,9 +164,6 @@ public class Env implements AutoCloseable {
     ScopeNode scope = lookup_scope(name,false);
     return scope==null ? null : scope.get(name);
   }
-  // Return nearest enclosing closure, for forward-ref placement.
-  // Struct-scopes do not count.
-  ScopeNode lookup_closure( ) { return _scope.is_closure() || _par == null ? _scope : _par.lookup_closure(); }
   // Test support, return top-level name type
   static Type lookup_valtype( String name ) {
     Node n = TOP.lookup(name);

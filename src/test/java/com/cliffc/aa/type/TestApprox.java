@@ -1,5 +1,6 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.Env;
 import org.junit.Test;
 
 import java.util.HashMap;
@@ -697,11 +698,12 @@ public class TestApprox {
     final int CUTOFF=2;
     final String[] fflds = TypeStruct.flds("^","fib");
     final String[] xflds = TypeStruct.flds("->","^","x");
-    final byte[] fmods = new byte[]{TypeStruct.fnl_flag,TypeStruct.fnl_flag };
-    final byte[] xmods = new byte[]{TypeStruct.fnl_flag,TypeStruct.fbot_flag,TypeStruct.fbot_flag};
+    final byte[] fmods = TypeStruct.ffnls(2);
+    final byte[] xmods = TypeStruct.ffnls(3);
     final int fidx = BitsFun.new_fidx(1), fidx0 = BitsFun.new_fidx(fidx), fidx1 = BitsFun.new_fidx(fidx);
     final BitsFun fidxs = BitsFun.make0(fidx0,fidx1).dual();
     final int alias = BitsAlias.new_alias(BitsAlias.RECORD);
+    Env.DISPLAYS.set(alias); // Declare a display
 
     // Args for the forward-ref fib(^ ->Scalar).  This has to start as hi-args
     // for this test, as the cyclic approx is supposed to be low - and it has

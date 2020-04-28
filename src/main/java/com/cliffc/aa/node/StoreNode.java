@@ -205,7 +205,8 @@ public class StoreNode extends Node {
     }
     return null;
   }
-  @Override public Type all_type() { return TypeObj.OBJ; }
+  // TODO: Actually needs to split out array from non-array
+  @Override public Type all_type() { return TypeStruct.ALLSTRUCT; }  
   @Override public int hashCode() { return super.hashCode()+_fld.hashCode()+_fin; }
   // Stores are never CSE/equal lest we force a partial execution to become a
   // total execution (require a store on some path it didn't happen).  Stores

@@ -243,17 +243,17 @@ public class MemMergeNode extends Node {
 
   // Base memory (alias#1) comes in input#0.  Other inputs refer to other
   // aliases (see _aliases) and children follow parents (since alias#s are
-  // sorted).  Each input replaces (not merges) their parent in just that
-  // subtree.
+  // sorted).  Each input merges their parent in just that subtree.
   @Override public Type value(GVNGCM gvn) {
     // Base memory type in slot 0
-    Type t = gvn.type(in(0));
+    Type t = gvn.type(mem());
     if( !(t instanceof TypeMem) )
       return t.above_center() ? TypeMem.XMEM : TypeMem.MEM;
     TypeMem tm = (TypeMem)t;
 
     // Merge inputs with parent.
-    Ary<TypeObj> tos = new Ary<>(tm.alias2objs().clone());
+    TypeObj[] tpars = tm.alias2objs(); // Parent memory
+    Ary<TypeObj> tos = new Ary<>(tpars.clone());
     for( int i=1; i<_defs._len; i++ ) {
       final int alias = alias_at(i);
       Type ta = gvn.type(in(i));
@@ -262,16 +262,14 @@ public class MemMergeNode extends Node {
       TypeObj tao = ta instanceof TypeObj ? (TypeObj)ta
         : (ta==null || ta.above_center() ? TypeObj.XOBJ : TypeObj.OBJ); // Handle ANY, ALL
 
-      // Meet this alias (plus all children) into the base.  Must be a MEET and
-      // not a replacement, because the same alias might be available in the
-      // base as well as from a local edge.
-      TypeObj base = tm.at(alias);
-      if( base == null ) base = TypeObj.XOBJ;
-      for( int kid=alias; kid!=0; kid=BitsAlias.next_kid(alias,kid) ) {
-        TypeObj tkid = tos.atX(kid);
-        if( tkid == null ) tkid = base;
-        tos.setX(kid,(TypeObj)tkid.meet(tao));
-      }
+      // Assuming prior aliases are correctly computed in "tos", find the
+      // parent and merge.  Parents not-set locally just inherent from the last
+      // local-set parent.
+      int par_alias = alias_at(find_alias2idx(BitsAlias.parent(alias)));
+      TypeObj base = par_alias==1 ? tm.at(alias) : tos.at(par_alias);
+      TypeObj rez = (TypeObj)base.meet(tao);
+
+      tos.setX(alias,rez);
     }
     return TypeMem.make0(tos._es);
   }
@@ -293,8 +291,8 @@ public class MemMergeNode extends Node {
 
   @Override public Type all_type() { return TypeMem.MEM; }
 
-  @Override @NotNull public MemMergeNode copy( boolean copy_edges, CallEpiNode unused, GVNGCM gvn) {
-    MemMergeNode mmm = (MemMergeNode)super.copy(copy_edges, unused, gvn);
+  @Override @NotNull public MemMergeNode copy( boolean copy_edges, GVNGCM gvn) {
+    MemMergeNode mmm = (MemMergeNode)super.copy(copy_edges, gvn);
     mmm._aliases = new AryInt(_aliases._es.clone(),_aliases._len);
     mmm._aidxes  = new AryInt(_aidxes ._es.clone(),_aidxes ._len);
     return mmm;
@@ -302,7 +300,7 @@ public class MemMergeNode extends Node {
   void update_alias( Node copy, BitSet aliases, GVNGCM gvn ) {
     MemMergeNode cmem = (MemMergeNode)copy;
     assert gvn.touched(this);
-    Node xobj = gvn.con(TypeObj.XOBJ);
+    Node xobj = gvn.add_work(gvn.con(TypeObj.XOBJ));
     Type oldt = gvn.unreg(this);
     for( int i=1; i<_aliases._len; i++ ) {
       int mya = _aliases.at(i);
