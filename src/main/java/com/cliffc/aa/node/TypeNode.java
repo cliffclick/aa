@@ -1,11 +1,10 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.type.*;
-
-import java.util.Arrays;
+import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeFunPtr;
+import com.cliffc.aa.type.TypeMemPtr;
 
 // Assert the matching type.  Parse-time error if it does not remove.  Note the
 // difference with CastNode: both Nodes always join their input with their
@@ -31,7 +30,7 @@ public class TypeNode extends Node {
 
       // Type system parser needs to make a function-type with complex formals.
 
-      
+
       throw com.cliffc.aa.AA.unimpl();
       //TypeFunPtr tfp = (TypeFunPtr)_t;
       //Type[] targs = tfp._args._ts;
@@ -88,8 +87,8 @@ public class TypeNode extends Node {
       return t.bound(_t).simple_ptr();
     Type tmem = gvn.type(mem());
     Type t2 = t.sharpen(tmem);
-    if( _t.dual().isa(t2) && t2.isa(_t) ) return t.simple_ptr();
-    return (tmem.above_center() ? _t.dual() : _t).simple_ptr();
+    if( _t.dual().isa(t2) && t2.isa(_t) ) return t;
+    return (t.above_center() ? _t.dual() : _t).simple_ptr();
   }
   @Override public Type all_type() { return Type.SCALAR; }
   // Check TypeNode for being in-error

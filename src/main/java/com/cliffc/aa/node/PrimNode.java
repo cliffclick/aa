@@ -173,7 +173,7 @@ static class ConvertInt64F64 extends PrimNode {
 static class ConvertStrStr extends PrimNode {
   ConvertStrStr() { super("str",TypeStruct.STRPTR,TypeMemPtr.OOP); }
   @Override public Node ideal(GVNGCM gvn, int level) { return in(1); }
-  @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)); }
+  @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)).bound(all_type()); }
   @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
 }
 
@@ -399,7 +399,7 @@ static class RandI64 extends PrimNode {
 static class Id extends PrimNode {
   Id(Type arg) { super("id",TypeStruct.make_args(TypeStruct.ts(TypeStruct.NO_DISP,arg)),arg); }
   @Override public Node ideal(GVNGCM gvn, int level) { return in(1); }
-  @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)); }
+  @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)).bound(all_type()); }
   @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
 }
 

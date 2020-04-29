@@ -233,7 +233,7 @@ public class TestNode {
     test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  null, TypeStr.ABC  ));
     test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  null, TypeFlt.FLT64));
     test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  null, Type   .CTRL ));
-    test1monotonic(new    FunNode(new String[]{"->","^","x"},new Type[]{TypeInt.INT64,TypeMemPtr.DISP_SIMPLE,TypeInt.INT64}));
+    test1monotonic(new    FunNode(TypeStruct.ARGS_X,new Type[]{TypeMemPtr.DISP_SIMPLE,TypeInt.INT64}));
     test1monotonic(new FunPtrNode(ret,_gvn.con(TypeFunPtr.NO_DISP)));
     test1monotonic(new FP2ClosureNode(_ins[1])); // Only takes in a TFP
     test1monotonic(new     IfNode(_ins[0],_ins[1]));

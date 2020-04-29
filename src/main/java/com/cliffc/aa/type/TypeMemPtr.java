@@ -240,9 +240,9 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   public int getbit() { return _aliases.getbit(); }
   // Sharpen a TypeMemPtr with a TypeMem
   @Override public Type sharpen( Type tmem ) {
-    if( !(tmem instanceof TypeMem) ) return this;
+    TypeMem tmem2 = (TypeMem)tmem.bound(TypeMem.MEM);
     assert this==simple_ptr();
     // TODO: Needs to be recursive
-    return make(_aliases,((TypeMem)tmem).ld(this));
+    return make(_aliases,tmem2.ld(this));
   }
 }

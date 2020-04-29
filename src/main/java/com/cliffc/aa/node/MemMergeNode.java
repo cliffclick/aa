@@ -249,7 +249,7 @@ public class MemMergeNode extends Node {
     Type t = gvn.type(mem());
     if( !(t instanceof TypeMem) )
       return t.above_center() ? TypeMem.XMEM : TypeMem.MEM;
-    TypeMem tm = (TypeMem)t;
+    TypeMem tm = (TypeMem)(t.bound(TypeMem.MEM)); // Only bounding for TestNode
 
     // Merge inputs with parent.
     TypeObj[] tpars = tm.alias2objs(); // Parent memory

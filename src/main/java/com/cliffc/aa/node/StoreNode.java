@@ -180,7 +180,7 @@ public class StoreNode extends Node {
   }
   // Liveness is specific to the stored-aliases
   @Override public boolean basic_liveness() { return false; }
-  
+
   @Override public String err(GVNGCM gvn) {
     String msg = err0(gvn);
     if( msg == null ) return null;
@@ -205,8 +205,7 @@ public class StoreNode extends Node {
     }
     return null;
   }
-  // TODO: Actually needs to split out array from non-array
-  @Override public Type all_type() { return TypeStruct.ALLSTRUCT; }  
+  @Override public Type all_type() { return TypeObj.OBJ; }
   @Override public int hashCode() { return super.hashCode()+_fld.hashCode()+_fin; }
   // Stores are never CSE/equal lest we force a partial execution to become a
   // total execution (require a store on some path it didn't happen).  Stores

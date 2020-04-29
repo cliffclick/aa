@@ -119,7 +119,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     BitsFun fidxs = _fidxs.meet(tf._fidxs);
     TypeFunPtr min_tf = _nargs < tf._nargs ? this : tf;
     TypeFunPtr max_tf = _nargs < tf._nargs ? tf : this;
-    int nargs = min_tf.above_center() ? max_tf._nargs : min_tf._nargs;
+    int nargs = (min_tf.above_center() || _fidxs==BitsFun.EMPTY) ? max_tf._nargs : min_tf._nargs;
     return make(fidxs,nargs,(TypeMemPtr)_disp.meet(tf._disp));
   }
 
@@ -148,7 +148,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
       if( _disp==DISP.dual() && nil==XNIL )  return XNIL;
       if( nil==NIL ) return NIL;
     }
-    return make(_fidxs.meet(BitsFun.NIL),_nargs,nil==NIL ? DISP : _disp);
+    return make(_fidxs.meet(BitsFun.NIL),_nargs,nil==NIL ? TypeMemPtr.DISP_SIMPLE : _disp);
   }
   // Used during approximations, with a not-interned 'this'.
   // Updates-in-place.
