@@ -97,7 +97,7 @@ public abstract class PrimNode extends Node {
   @Override public String err(GVNGCM gvn) {
     for( int i=1; i<_defs._len; i++ ) { // first is control
       Type tactual = gvn.type(in(i));
-      Type tformal = _formals.at(i+1); // Skip leading return
+      Type tformal = _formals.at(i);
       if( !tactual.isa(tformal) )
         return _badargs==null ? "bad arguments" : _badargs[i].typerr(tactual,null,tformal);
     }

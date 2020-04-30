@@ -32,11 +32,11 @@ public class ParmNode extends PhiNode {
   @Override public Node ideal(GVNGCM gvn, int level) {
     if( !(in(0) instanceof FunNode) ) return null; // Dying
     FunNode fun = fun();
-    Node mem = fun.parm(-2);
     if( gvn.type(fun) == Type.XCTRL ) return null; // All dead, c-prop will fold up
     assert fun._defs._len==_defs._len;
     // Arg-check before folding up
     if( _idx >= 0 ) {                         // Skip RPC and memory
+      Node mem = fun.parm(-2);
       for( int i=1; i<_defs._len; i++  )      // For all arguments
         if( gvn.type(fun.in(i))==Type.CTRL && // Path is alive
             in(i)!=this &&                    // Can ignore self- only other inputs will determine arg-check

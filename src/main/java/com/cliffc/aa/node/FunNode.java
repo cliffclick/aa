@@ -107,30 +107,37 @@ public class FunNode extends RegionNode {
   // Inline longer info
   @Override public String str() { return is_forward_ref() ? xstr() : _formals.str(null); }
   // Name from fidx alone
-  private static String name( int fidx ) {
+  private static String name( int fidx) {
     FunNode fun = find_fidx(fidx);
-    return fun==null ? name(null,fidx,-1,false) : fun.name();
+    return fun==null ? name(null,fidx,-1,false) : name(fun._name,fidx,fun._op_prec,fun.is_forward_ref());
   }
   // Name from FunNode
   String name() { return name(_name,fidx(),_op_prec,is_forward_ref()); }
   static String name(String name, int fidx, int op_prec, boolean fref) {
-    if( name == null ) name = "";
-    if( op_prec >= 0 ) name = '{'+name+'}'; // Primitives wrap
+    if( op_prec >= 0 && name != null ) name = '{'+name+'}'; // Primitives wrap
+    if( name==null ) name="";
     name = name + '['+fidx+']';             // Always the fidx
-    return fref ? "?"+name : name;
+    return fref ? "?"+name : name;          // Leading '?'
   }
-  
+
   // Can return nothing, or "name" or "[name0,name1,name2...]" or "[35]"
   public static SB names(BitsFun fidxs, SB sb ) {
     int fidx = fidxs.abit();
     if( fidx >= 0 ) return sb.p(name(fidx));
+    if( fidxs==BitsFun.EMPTY ) return sb.p("[]");
     // See if this is just one common name, common for overloaded functions
     String s=null;
-    for( Integer ii : fidxs )
-      if( s==null ) s = name(ii);
-      else if( !s.equals(name(ii)) )
+    boolean prim=false;
+    for( Integer ii : fidxs ) {
+      FunNode fun = find_fidx(ii);
+      if( fun==null || fun._name==null ) { s=null; break; } // Unnamed fidx
+      prim |= fun._op_prec >= 0;
+      if( s==null ) s = fun._name;
+      else if( !s.equals(fun._name) )
         { s=null; break; }
-    if( s!=null ) sb.p(s);
+    }
+    if( s!=null )
+      if( prim ) sb.p('{').p(s).p('}'); else sb.p(s);
     // Make a list of the names
     int cnt=0;
     sb.p('[');
@@ -527,7 +534,7 @@ public class FunNode extends RegionNode {
     new_funptr.add_def(newret);
     new_funptr.add_def(old_funptr.in(1)); // Share same display
     TypeFunPtr ofptr = (TypeFunPtr)gvn.type(old_funptr);
-    gvn.rereg(new_funptr,TypeFunPtr.make(BitsFun.make0(_fidx),ofptr._nargs,ofptr._disp));
+    gvn.rereg(new_funptr,TypeFunPtr.make(BitsFun.make0(newret._fidx),ofptr._nargs,ofptr._disp));
     old_funptr.keep();
 
     // Fill in edges.  New Nodes point to New instead of Old; everybody

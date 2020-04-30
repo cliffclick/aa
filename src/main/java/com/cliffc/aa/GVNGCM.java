@@ -325,9 +325,6 @@ public class GVNGCM {
     if( nnn==null ) return;     // No progress
     assert (level&1)==0;        // No changes during asserts
     if( nnn == old ) {          // Progress, but not replacement
-      // If a Parm or Ret child, put FunNode on worklist for _tf improvement.
-      if( old instanceof ParmNode ) add_work(old.in(0));
-      if( old instanceof RetNode && old.in(4)!=null ) add_work(old.in(4));
       // All users on worklist
       for( Node use : old._uses ) {
         add_work(use);
@@ -343,13 +340,6 @@ public class GVNGCM {
     if( check_new(nnn) )        // If new, replace back in GVN
       rereg(nnn,nnn.value(this));
     if( !old.is_dead() ) { // if old is being replaced, it got removed from GVN table and types table.
-      if( old instanceof ParmNode && ((ParmNode)old)._idx != -2 ) {
-        Node fun = old.in(0);
-        if( fun instanceof FunNode ) {
-          ParmNode parm = ((FunNode)fun).parm(-2);
-          if( parm != null ) add_work(parm); // Dropping a Parm, check Parm:Mem
-        }
-      }
       assert !check_opt(old);
       replace(old,nnn);
       nnn.keep();               // Keep-alive

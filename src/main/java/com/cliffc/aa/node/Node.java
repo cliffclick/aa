@@ -81,12 +81,15 @@ public abstract class Node implements Cloneable {
       old._uses.del(this);
       if( old._uses._len==0 && old._keep==0 ) gvn.kill(old); // Recursively begin deleting
       if( !old.is_dead() ) {
+        // TODO: Find a better way
         gvn.add_work(old);      // Lost a use, so recompute live
         if( old instanceof UnresolvedNode )
           gvn.add_work_defs(old);
         // Fold stores into NewNodes, requires no extra uses
         if( old instanceof OProjNode && old.in(0) instanceof NewNode && old._uses._len<=2 )
           gvn.add_work_uses(old);
+        if( this instanceof ParmNode && ((ParmNode)this)._idx==0 && old instanceof FunNode )
+          gvn.add_work(((FunNode)old).ret().funptr());
       }
     }
     return this;
@@ -465,7 +468,7 @@ public abstract class Node implements Cloneable {
   // True if this Call/CallEpi pair does not read or write memory.
   // True for most primitives.  Returns the pre-call memory or null.
   Node is_pure_call() { return null; }
-  
+
   // Walk a subset of the dominator tree, looking for the last place (highest
   // in tree) this predicate passes, or null if it never does.
   Node walk_dom_last(Predicate<Node> P) {

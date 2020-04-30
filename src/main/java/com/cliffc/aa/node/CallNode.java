@@ -95,13 +95,6 @@ public class CallNode extends Node {
   // Number of actual arguments, including the closure/code ptr.
   // This is 2 higher than the user-visible arg count.
   int nargs() { return _defs._len-2; }
-  // Argument type
-  Type targ( GVNGCM gvn, int x ) {
-    Type t = gvn.type(arg(x));
-    if( x>0 ) return t;         // Normal argument type
-    if( !(t instanceof TypeFunPtr) ) return Type.SCALAR;
-    return ((TypeFunPtr)t)._disp; // Extract Display type from TFP
-  }
   // Actual arguments.  Arg(0) is allowed and refers to the Display/TFP.
   Node arg( int x ) { assert x>=0; return _defs.at(x+2); }
   // Set an argument.  Use 'set_fun' to set the Display/Code.
@@ -158,17 +151,17 @@ public class CallNode extends Node {
     // When do I do 'pattern matching'?  For the moment, right here: if not
     // already unpacked a tuple, and can see the NewNode, unpack it right now.
     if( !_unpacked ) {          // Not yet unpacked a tuple
-      assert nargs()==3;        // The return, Display plus the arg tuple
+      assert nargs()==2;        // The return, Display plus the arg tuple
       Node mem = mem();
-      Node arg2 = arg(2);
-      Type tadr = gvn.type(arg2);
+      Node arg1 = arg(1);
+      Type tadr = gvn.type(arg1);
       // Bypass a merge on the 2-arg input during unpacking
       if( tadr instanceof TypeMemPtr && mem instanceof MemMergeNode ) {
         int alias = ((TypeMemPtr)tadr)._aliases.abit();
         if( alias == -1 ) throw AA.unimpl(); // Handle multiple aliases, handle all/empty
         Node obj = ((MemMergeNode)mem).alias2node(alias);
-        if( obj instanceof OProjNode && arg2 instanceof ProjNode && arg2.in(0) instanceof NewNode ) {
-          NewNode nnn = (NewNode)arg2.in(0);
+        if( obj instanceof OProjNode && arg1 instanceof ProjNode && arg1.in(0) instanceof NewNode ) {
+          NewNode nnn = (NewNode)arg1.in(0);
           remove(_defs._len-1,gvn); // Pop off the NewNode tuple
           int len = nnn._defs._len;
           for( int i=2; i<len; i++ ) // Push the args; unpacks the tuple
@@ -212,11 +205,11 @@ public class CallNode extends Node {
     // alive args still need to resolve.  Constants are an issue, because they
     // fold into the Parm and the Call can lose the matching DProj while the
     // arg is still alive.
-    if( gvn._opt_mode > 2 && err(gvn)==null ) {
+    if( gvn._opt_mode > 2 && err(gvn,true)==null ) {
       Node progress = null;
       outer_loop:
       for( int i=1; i<nargs(); i++ ) // Skip the FP/DISPLAY arg, as its useful for error messages
-        if( !(arg(i) instanceof ConNode && targ(gvn,i)==Type.XSCALAR) ) { // Not already folded
+        if( !(arg(i) instanceof ConNode && gvn.type(arg(i))==Type.XSCALAR) ) { // Not already folded
           for( int fidx2 : fidxs )
             if( FunNode.find_fidx(fidx2).parm(i)==null ) // Parm is dead
               continue outer_loop; // Fail this arg, as is alive on at least one called function
@@ -236,8 +229,8 @@ public class CallNode extends Node {
   @Override public TypeTuple value(GVNGCM gvn) {
     // ts[0] = Ctrl = in(0)
     // ts[1] = Mem into the call = in(1)
-    // ts[2] = Function pointer (code ptr + display) == in(2) == arg(1)
-    // ts[3] = in(3) == arg(2)
+    // ts[2] = Function pointer (code ptr + display) == in(2) == arg(0)
+    // ts[3] = in(3) == arg(1)
     // ts[4]...
     final Type[] ts = TypeAry.get(_defs._len);
 
@@ -258,8 +251,8 @@ public class CallNode extends Node {
     TypeMem tmem = (TypeMem)(ts[1]=mem);
 
     // Copy args for called functions.  Arg0 is display, handled below.
-    for( int i=1; i<nargs(); i++ )
-      ts[i+2] = targ(gvn,i).bound(Type.SCALAR);
+    for( int i=0; i<nargs(); i++ )
+      ts[i+2] = gvn.type(arg(i)).bound(Type.SCALAR);
 
     // Not a function to call?
     Type tfx = gvn.type(fun());
@@ -427,11 +420,11 @@ public class CallNode extends Node {
         if( fun.nargs()!=nargs() || fun.ret() == null ) continue; // BAD/dead
         TypeStruct formals = fun._formals; // Type of each argument
         int cvts=0;                        // Arg conversion cost
-        for( int j=2; j<nargs(); j++ ) {   // Skip arg#0, the return and #1 the display
-          Type actual = targ(gvn,j);
+        for( int j=1; j<nargs(); j++ ) {   // Skip arg#0, the display
+          if( fun.parm(j)==null ) continue; // Formal is ignored
+          Type actual = gvn.type(arg(j));
           Type formal = formals.at(j);
           if( actual==formal ) continue;
-          if( formal.above_center() ) continue; // Formal is ignored
           byte cvt = actual.isBitShape(formal); // +1 needs convert, 0 no-cost convert, -1 unknown, 99 never
           if( cvt == -1 ) return null; // Might be the best choice, or only choice, dunno
           cvts += cvt;
@@ -532,7 +525,8 @@ public class CallNode extends Node {
         if( ts==null ) ts = new Ary<>(new Type[1],0);
         ts.push(formal);
       }
-      return _badargs[j].typerr(actual,null,ts.asAry());
+      if( ts!=null )
+        return _badargs[j].typerr(actual,null,ts.asAry());
     }
 
     return null;

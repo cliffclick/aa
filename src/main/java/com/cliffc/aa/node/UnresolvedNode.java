@@ -91,8 +91,8 @@ public class UnresolvedNode extends Node {
     for( Node epi : _defs ) {
       FunNode fun =  ((FunPtrNode)epi).fun();
       // User-nargs are user-visible #arguments.
-      // Fun-nargs include the return and the display, hence the +2.
-      if( fun.nargs() != nargs+2 ) continue;
+      // Fun-nargs include the display, hence the +1.
+      if( fun.nargs() != nargs+1 ) continue;
       if( x == null ) x = epi;
       else if( x instanceof UnresolvedNode ) x.add_def(epi);
       else x = new UnresolvedNode(_bad,x,epi);

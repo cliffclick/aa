@@ -50,7 +50,7 @@ public final class FunPtrNode extends Node {
       return TypeFunPtr.EMPTY;
     RetNode ret = ret();
     Node disp = display();
-    TypeMemPtr tdisp = disp==null ? TypeFunPtr.NO_DISP : (TypeMemPtr)gvn.type(disp);
+    TypeMemPtr tdisp = disp==null ? TypeFunPtr.NO_DISP.dual() : (TypeMemPtr)gvn.type(disp);
     return TypeFunPtr.make(ret._fidx,ret._nargs,tdisp);
   }
 

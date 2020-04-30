@@ -177,12 +177,12 @@ public final class CallEpiNode extends Node {
       Node actual;
       int idx = ((ParmNode)arg)._idx;
       switch( idx ) {
-      case  1: actual = new FP2ClosureNode(call); break; // Filter Function Pointer to Closure
+      case  0: actual = new FP2ClosureNode(call); break; // Filter Function Pointer to Closure
       case -1: actual = new ConNode<>(TypeRPC.make(call._rpc)); break; // Always RPC is a constant
       case -2: actual = new MProjNode(call,1); break;    // Memory
       default: actual = idx >= call.nargs()              // Check for args present
           ? new ConNode<>(Type.XSCALAR) // Missing args, still wire (to keep FunNode neighbors) but will error out later.
-          : new ProjNode(call,idx+1);   // Normal args
+          : new ProjNode(call,idx+2);   // Normal args
         break;
       }
       actual = gvn._opt_mode == 2 ? gvn.new_gcp(actual) : gvn.xform(actual);

@@ -763,16 +763,12 @@ public class Parse {
     Ary<Type  > ts  = new Ary<>(new Type  [1],0);
     Ary<Parse > bads= new Ary<>(new Parse [1],0);
 
-    // Push the return type first
-    ids .push("->");
-    ts  .push(Type.SCALAR);
-    bads.push(null);
     // Push an extra hidden display argument.  Similar to java inner-class ptr
     // or when inside of a struct definition: 'this'.
     Node parent_display = _e._scope.ptr();
     TypeMemPtr tpar_disp = (TypeMemPtr)_gvn.type(parent_display); // Just a TMP of the right alias
     ids .push("^");
-    ts  .push(tpar_disp); // Functions allow a NIL display
+    ts  .push(tpar_disp);
     bads.push(null);
 
     // Parse arguments
@@ -800,8 +796,8 @@ public class Parse {
       bads.add(bad);
     }
     // If this is a no-arg function, we may have parsed 1 or 2 tokens as-if
-    // args, and then reset.  Also reset to just the return & display arg.
-    if( _x == oldx ) { ids.set_len(2); ts.set_len(2); bads.set_len(2);  }
+    // args, and then reset.  Also reset to just the display arg.
+    if( _x == oldx ) { ids.set_len(1); ts.set_len(1); bads.set_len(1);  }
 
     // Build the FunNode header
     Node old_ctrl = ctrl();
@@ -816,14 +812,14 @@ public class Parse {
       // Build Parms for all incoming values
       Node rpc = gvn(new ParmNode(-1,"rpc",fun,con(TypeRPC.ALL_CALL),null)).keep();
       Node mem = gvn(new ParmNode(-2,"mem",fun,con(TypeMem.MEM),null)).keep();
-      Node clo = gvn(new ParmNode( 1,"^"  ,fun,con(tpar_disp),null));
+      Node clo = gvn(new ParmNode( 0,"^"  ,fun,con(tpar_disp),null));
       // Display is special: the default is simply the outer lexical scope.
       // But here, in a function, the display is actually passed in as a hidden
       // extra argument and replaces the default.
       e._scope.stk().update(0,ts_mutable(false),clo,_gvn);
       // Parms for all arguments
       Parse errmsg = errMsg();  // Lazy error message
-      for( int i=2; i<ids._len; i++ ) { // User parms start at#2
+      for( int i=1; i<ids._len; i++ ) { // User parms start at#1
         Node parm = gvn(new ParmNode(i,ids.at(i),fun,con(Type.SCALAR),errmsg));
         // Type-check arguments
         Node mt = typechk(parm,ts.at(i),mem,bads.at(i));
