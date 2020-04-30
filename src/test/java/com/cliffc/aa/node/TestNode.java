@@ -294,7 +294,7 @@ public class TestNode {
     assert n._defs._len==0;
     n.add_def( null  );
     n.add_def(_ins[1]);
-    if( n._formals._ts.length >= 3 ) n.add_def(_ins[2]);
+    if( n._sig.nargs() >= 3 ) n.add_def(_ins[2]);
     test1monotonic_init(n);
   }
 
@@ -306,7 +306,7 @@ public class TestNode {
     n.add_def(_ins[1]);         // memory
     n.add_def(null);            // display
     n.add_def(_ins[2]);         // arg#1
-    if( n._formals._ts.length >= 2 ) n.add_def(_ins[3]);
+    if( n._sig.nargs() >= 2 ) n.add_def(_ins[3]);
     test1monotonic_init(n);
   }
 

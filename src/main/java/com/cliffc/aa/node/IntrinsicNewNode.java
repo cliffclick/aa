@@ -19,13 +19,13 @@ import com.cliffc.aa.type.*;
 public abstract class IntrinsicNewNode extends Node {
   public final String _name;    // Unique library call name
   final NewStrNode _nstr;       // Main alias
-  final TypeStruct _formals;     // Arguments
+  final TypeFunSig _sig;        // Arguments
   IntrinsicNewNode( String name, Type[] ts ) {
     super(OP_LIBCALL);
     _name = name;
     _nstr = new NewStrNode(TypeStr.STR,null,null);
     ts[0] = TypeFunPtr.NO_DISP; // No display
-    _formals = TypeStruct.make_args(ts.length==2 ? TypeStruct.ARGS_X : TypeStruct.ARGS_XY,ts);
+    _sig = TypeFunSig.make(TypeStruct.make_args(ts.length==2 ? TypeStruct.ARGS_X : TypeStruct.ARGS_XY,ts),TypeMemPtr.STRPTR);
   }
   public static IntrinsicNewNode[] INTRINSICS = new IntrinsicNewNode[] {
     new ConvertI64Str(),
@@ -48,8 +48,8 @@ public abstract class IntrinsicNewNode extends Node {
     add_def(null);              // Control for the primitive in slot 0
     add_def(memp);              // Memory  for the primitive in slot 1
     add_def(null);              // Closure for the primitive in slot 2
-    for( int i=1; i<_formals._ts.length; i++ ) // Args follow, closure in formal 0
-      add_def( gvn.xform(new ParmNode(i,_formals._flds[i],fun, gvn.con(_formals._ts[i].simple_ptr()),null)));
+    for( int i=1; i<_sig.nargs(); i++ ) // Args follow, closure in formal 0
+      add_def( gvn.xform(new ParmNode(i,_sig.fld(i),fun, gvn.con(_sig.arg(i).simple_ptr()),null)));
     Node rez = gvn.xform(this); // Returns a TypeObj
     // Fill in NewStrNode inputs, now that we have them.
     gvn.set_def_reg(nnn,0,fun);

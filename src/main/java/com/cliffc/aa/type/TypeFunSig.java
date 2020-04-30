@@ -48,10 +48,17 @@ public final class TypeFunSig extends Type<TypeFunSig> {
     TypeFunSig t2 = (TypeFunSig)t1.hashcons();
     return t1==t2 ? t1 : t1.free(t2);
   }
+  public static TypeFunSig make( Type ret, TypeMemPtr disp, Type arg1 ) { return make(ret,TypeStruct.ts(disp,arg1)); }
+  public static TypeFunSig make( Type ret, TypeMemPtr disp, Type arg1, Type arg2 ) { return make(ret,TypeStruct.ts(disp,arg1,arg2)); }
+  public static TypeFunSig make( Type ret, Type[] ts ) { return make(TypeStruct.make_args(ts),ret); }
 
   public static final TypeFunSig II_I = make(TypeStruct.INT64_INT64,TypeInt.INT64);
   static final TypeFunSig[] TYPES = new TypeFunSig[]{II_I};
 
+  public int nargs() { return _formals._ts.length; }
+  public Type arg(int idx) { return _formals._ts[idx]; }
+  public String fld(int idx) { return _formals._flds[idx]; }
+  
   @Override protected TypeFunSig xdual() { return new TypeFunSig(_formals.dual(),_ret.dual()); }
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {

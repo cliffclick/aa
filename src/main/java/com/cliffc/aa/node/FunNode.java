@@ -66,8 +66,8 @@ public class FunNode extends RegionNode {
   // Used to make the primitives at boot time.  Note the empty displays: in
   // theory Primitives should get the top-level primitives-display, but in
   // practice most primitives neither read nor write their own scope.
-  public FunNode(        PrimNode prim) { this(prim._name,prim._formals,prim.op_prec()); }
-  public FunNode(IntrinsicNewNode prim) { this(prim._name,prim._formals,prim.op_prec()); }
+  public FunNode(        PrimNode prim) { this(prim._name,prim._sig._formals,prim.op_prec()); }
+  public FunNode(IntrinsicNewNode prim) { this(prim._name,prim._sig._formals,prim.op_prec()); }
   // Used to start an anonymous function in the Parser
   public FunNode(String[] flds, Type[] ts) { this(null,TypeStruct.make_args(flds,ts),-1); }
   // Used to forward-decl anon functions

@@ -15,15 +15,13 @@ import com.cliffc.aa.type.*;
 //
 public abstract class PrimNode extends Node {
   public final String _name;    // Unique name (and program bits)
-  final TypeStruct _formals;    // Argument types; 0 is display, 1 is 1st real arg
-  final Type _ret;              // Return type
+  final TypeFunSig _sig;        // Argument types; 0 is display, 1 is 1st real arg
   Parse[] _badargs;             // Filled in when inlined in CallNode
   PrimNode( String name, TypeStruct formals, Type ret ) {
     super(OP_PRIM);
     _name=name;
     assert formals.at(0)==TypeFunPtr.NO_DISP; // Room for no closure
-    _formals=formals;
-    _ret = ret;
+    _sig=TypeFunSig.make(formals,ret);
     _badargs=null;
   }
 
@@ -75,7 +73,7 @@ public abstract class PrimNode extends Node {
   // Apply types are 1-based (same as the incoming node index), and not
   // zero-based (not same as the _formals and _args fields).
   public abstract Type apply( Type[] args ); // Execute primitive
-  @Override public String xstr() { return _name+"::"+_formals; }
+  @Override public String xstr() { return _name+"::"+_sig._formals; }
   @Override public Node ideal(GVNGCM gvn, int level) { return null; }
   @Override public Type value(GVNGCM gvn) {
     Type[] ts = new Type[_defs._len]; // 1-based
@@ -86,35 +84,35 @@ public abstract class PrimNode extends Node {
     boolean is_con = true;
     for( int i=1; i<_defs._len; i++ ) { // first is control
       Type tactual = gvn.type(in(i));
-      Type tformal = _formals.at(i);
+      Type tformal = _sig.arg(i);
       Type t = tformal.dual().meet(ts[i] = tactual);
       if( t.is_con() ) ;                          // All constants, will fold
       else if( t.above_center() ) is_con = false; // Not a constant
-      else return _ret;           // Some input is too low
+      else return _sig._ret;                      // Some input is too low
     }
-    return is_con ? apply(ts) : _ret.dual();
+    return is_con ? apply(ts) : _sig._ret.dual();
   }
   @Override public String err(GVNGCM gvn) {
     for( int i=1; i<_defs._len; i++ ) { // first is control
       Type tactual = gvn.type(in(i));
-      Type tformal = _formals.at(i);
+      Type tformal = _sig.arg(i);
       if( !tactual.isa(tformal) )
         return _badargs==null ? "bad arguments" : _badargs[i].typerr(tactual,null,tformal);
     }
     return null;
   }
   // Worse-case type for this Node
-  @Override public Type all_type() { return _ret; }
+  @Override public Type all_type() { return _sig._ret; }
   // Prims are equal for same-name-same-signature (and same inputs).
   // E.g. float-minus of x and y is NOT the same as int-minus of x and y
   // despite both names being '-'.
-  @Override public int hashCode() { return super.hashCode()+_name.hashCode()+_formals._hash; }
+  @Override public int hashCode() { return super.hashCode()+_name.hashCode()+_sig._hash; }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !super.equals(o) ) return false;
     if( !(o instanceof PrimNode) ) return false;
     PrimNode p = (PrimNode)o;
-    return _name.equals(p._name) && _formals==p._formals;
+    return _name.equals(p._name) && _sig==p._sig;
   }
 
   // Called during basic Env creation and making of type constructors, this
@@ -125,8 +123,8 @@ public abstract class PrimNode extends Node {
     ParmNode rpc = (ParmNode) gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
     ParmNode mem = (ParmNode) gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM),null));
     add_def(null);              // Control for the primitive in slot 0
-    for( int i=1; i<_formals._ts.length; i++ ) // First is display
-      add_def(gvn.init(new ParmNode(i,_formals._flds[i],fun, gvn.con(_formals._ts[i].simple_ptr()),null)));
+    for( int i=1; i<_sig.nargs(); i++ ) // First is display
+      add_def(gvn.init(new ParmNode(i,_sig.fld(i),fun, gvn.con(_sig.arg(i).simple_ptr()),null)));
     // Functions return the set of *modified* memory.  PrimNodes never *modify*
     // memory (see Intrinsic*Node for some primitives that *modify* memory).
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mem,gvn.init(this),rpc,fun));
@@ -150,14 +148,14 @@ static class ConvertTypeName extends PrimNode {
   }
   @Override public Type apply( Type[] args ) {
     Type actual = args[1];
-    Type formal = _formals.at(1);
+    Type formal = _sig.arg(1);
     // Wrapping function will not inline if args are in-error
     assert formal.dual().isa(actual) && actual.isa(formal);
-    return actual.set_name(_ret._name);
+    return actual.set_name(_sig._ret._name);
   }
   @Override public String err(GVNGCM gvn) {
     Type actual = gvn.type(in(1));
-    Type formal = _formals.at(2);
+    Type formal = _sig.arg(1);
     if( !actual.isa(formal) ) // Actual is not a formal
       return _badargs[0].typerr(actual,null,formal);
     return null;
