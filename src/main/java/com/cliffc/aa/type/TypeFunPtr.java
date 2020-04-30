@@ -76,16 +76,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public static TypeFunPtr make( int fidx, int nargs, TypeMemPtr disp ) { return make(BitsFun.make0(fidx),nargs,disp); }
   public static TypeFunPtr make_new_fidx( int parent, int nargs, TypeMemPtr disp ) { return make(BitsFun.make_new_fidx(parent),nargs,disp); }
   public static TypeMemPtr DISP = TypeMemPtr.DISPLAY_PTR;
-  public static TypeMemPtr NO_DISP = TypeMemPtr.NILPTR;
-  //public static TypeFunPtr make_new(int nargs,TypeStruct disp) { return make(BitsFun.make_new_fidx(BitsFun.ALL),narg,disp); }
-  //public TypeFunPtr make_fidx( int fidx ) { return make(BitsFun.make0(fidx),_disp); }
-  //public static TypeStruct DISP =
-  //  TypeStruct.make(false,     // Low, so extra disp are all SCALAR
-  //                  new String[]{"->","^"}, // First two disp normal for a function
-  //                  TypeAry.ts(Type.SCALAR,TypeMemPtr.DISP_SIMPLE),
-  //                  TypeStruct.fbots(2));
-  //public static TypeFunPtr make_anon() { return make_new(DISP); } // Make a new anonymous function ptr
-  //// Make a TFP with a new display and return value, used by FunPtrNode
+  public static TypeMemPtr NO_DISP = TypeMemPtr.NO_DISP;
   public TypeFunPtr make_from(BitsFun fidxs) { return make(fidxs,_nargs,_disp);  }
 
   public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.FULL,1,(TypeMemPtr)DISP.simple_ptr());
@@ -108,6 +99,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     case TINT:
     case TMEMPTR:
     case TRPC:   return cross_nil(t);
+    case TFUNSIG:
     case TTUPLE:
     case TOBJ:
     case TSTR:

@@ -38,9 +38,9 @@ public final class FunPtrNode extends Node {
   @Override public Node ideal(GVNGCM gvn, int level) {
     if( is_forward_ref() ) return null;
     RetNode ret = ret();
-    FunNode fun = ret.is_copy() ? FunNode.find_fidx(ret._fidx) : ret.fun();
-    if( display() !=null && (ret.is_copy() || fun.parm(0)==null) ) {
-      set_def(1,null,gvn);      // No display needed
+    if( !(display() instanceof ConNode) && (ret.is_copy() || ret.fun().parm(0)==null) ) {
+      TypeMemPtr tdisp = (TypeMemPtr)gvn.type(display());
+      set_def(1,gvn.con(TypeMemPtr.make(tdisp._aliases,TypeObj.XOBJ)),gvn); // No display needed
       return this;
     }
     return null;
@@ -50,7 +50,7 @@ public final class FunPtrNode extends Node {
       return TypeFunPtr.EMPTY;
     RetNode ret = ret();
     Node disp = display();
-    TypeMemPtr tdisp = disp==null ? TypeFunPtr.NO_DISP.dual() : (TypeMemPtr)gvn.type(disp);
+    TypeMemPtr tdisp = (TypeMemPtr)gvn.type(disp);
     return TypeFunPtr.make(ret._fidx,ret._nargs,tdisp);
   }
 

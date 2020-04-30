@@ -70,9 +70,10 @@ public class UnresolvedNode extends Node {
       BitsFun fidxs = BitsFun.EMPTY;
       for( Node def : _defs ) {
         Type td = gvn.type(def);
+        if( td == GF ) return GF.dual();
         if( !(td instanceof TypeFunPtr) ) return GF.dual(); // Only fails during testing
         if( td.above_center() ) return GF.dual();
-        if( td == GF ) return GF.dual();
+        if( ((TypeFunPtr)td)._disp.above_center() ) return GF.dual();
         t = (TypeFunPtr)t.join(td.dual()); // Lift all the displays; all args are ignored
         BitsFun fidxs2 = ((TypeFunPtr)td).fidxs();
         if( fidxs2.abit() != -1 ) fidxs = fidxs.set(fidxs2.abit());

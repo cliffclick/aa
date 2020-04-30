@@ -48,6 +48,7 @@ public class TypeStr extends TypeObj<TypeStr> {
   public  static final TypeStr  STR = make(false,null); // not null
   public  static final TypeStr XSTR = make(true ,null); // choice string
   public  static final TypeStr  ABC = make(false,"abc"); // a string constant
+  public  static final TypeStr NO_DISP=make(false,"no_disp"); // a string constant
   private static final TypeStr  DEF = con("def"); // a string constant
   static final TypeStr[] TYPES = new TypeStr[]{STR,XSTR,ABC,DEF};
   static void init1( HashMap<String,Type> types ) { types.put("str",STR); }
@@ -67,6 +68,7 @@ public class TypeStr extends TypeObj<TypeStr> {
     case TSTR:   break;
     case TSTRUCT:return OBJ;
     case TOBJ:   return t.above_center() ? this : t;
+    case TFUNSIG:
     case TTUPLE:
     case TFUNPTR:
     case TMEMPTR:

@@ -368,7 +368,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     DISPLAY.install_cyclic(new Ary<>(ts(DISPLAY ,TypeMemPtr.DISPLAY_PTR)));
     assert DISPLAY.is_display();
   }
-  public static TypeMemPtr NO_DISP = TypeMemPtr.NILPTR;
+  public static TypeMemPtr NO_DISP = TypeMemPtr.NO_DISP;
   @Override boolean is_display() {
     return
       this==DISPLAY || this==DISPLAY._dual ||
@@ -539,6 +539,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     case TSTRUCT:break;
     case TSTR:   return OBJ;
     case TOBJ:   return t.above_center() ? this : t;
+    case TFUNSIG:
     case TFLT:
     case TINT:
     case TTUPLE :
