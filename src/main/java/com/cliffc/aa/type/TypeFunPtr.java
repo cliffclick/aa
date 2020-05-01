@@ -49,18 +49,17 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   @Override public String str( VBitSet dups) {
     if( dups == null ) dups = new VBitSet();
     if( dups.tset(_uid) ) return "$"; // Break recursive printing cycle
-    return "*"+names()+"{"+_disp+"}";
+    return "*"+names(true)+"{"+_disp+"}";
   }
 
   @Override SB dstr( SB sb, VBitSet dups ) {
     sb.p('_').p(_uid);
     if( dups == null ) dups = new VBitSet();
     if( dups.tset(_uid) ) return sb.p('$'); // Break recursive printing cycle
-    sb.p('*').p(names()).p('{');
-    _disp.dstr(sb,dups);
-    return sb.p('}');
+    sb.p('*').p(names(true)).p('{');
+    return _disp.dstr(sb,dups).p('}');
   }
-  public String names() { return FunNode.names(_fidxs,new SB()).toString(); }
+  public String names(boolean debug) { return FunNode.names(_fidxs,new SB(),debug).toString(); }
 
   private static TypeFunPtr FREE=null;
   @Override protected TypeFunPtr free( TypeFunPtr ret ) { FREE=this; return ret; }
@@ -95,11 +94,11 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TFUNPTR:break;
+    case TFUNSIG: return ((TypeFunSig)t).xmeet(this);
     case TFLT:
     case TINT:
     case TMEMPTR:
     case TRPC:   return cross_nil(t);
-    case TFUNSIG:
     case TTUPLE:
     case TOBJ:
     case TSTR:

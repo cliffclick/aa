@@ -88,8 +88,10 @@ public abstract class Node implements Cloneable {
         // Fold stores into NewNodes, requires no extra uses
         if( old instanceof OProjNode && old.in(0) instanceof NewNode && old._uses._len<=2 )
           gvn.add_work_uses(old);
-        if( this instanceof ParmNode && ((ParmNode)this)._idx==0 && old instanceof FunNode )
-          gvn.add_work(((FunNode)old).ret().funptr());
+        if( this instanceof ParmNode && ((ParmNode)this)._idx==0 && old instanceof FunNode ) {
+          RetNode ret = ((FunNode)old).ret();
+          if( ret != null ) gvn.add_work(ret.funptr());
+        }
       }
     }
     return this;

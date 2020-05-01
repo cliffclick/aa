@@ -83,6 +83,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
 
   public static TypeMemPtr make( int alias, TypeObj obj ) { return make(BitsAlias.make0(alias),obj); }
   public static TypeMemPtr make_nil( int alias, TypeObj obj ) { return make(BitsAlias.make0(alias).meet_nil(),obj); }
+  public TypeMemPtr make_from( TypeObj obj ) { return make(_aliases,obj); }
 
   public  static final TypeMemPtr DISPLAY_PTR= new TypeMemPtr(BitsAlias.RECORD_BITS0,TypeStruct.DISPLAY );
   static {

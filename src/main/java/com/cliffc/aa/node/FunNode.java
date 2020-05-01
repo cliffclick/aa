@@ -57,7 +57,7 @@ import java.util.Map;
 public class FunNode extends RegionNode {
   public String _name; // Optional for anon functions; can be set later via bind()
   public int _fidx;
-  public final TypeStruct _formals; // 0 is the display
+  public final TypeFunSig _sig;
   // Operator precedence; only set on top-level primitive wrappers.
   // -1 for normal non-operator functions and -2 for forward_decls.
   private final byte _op_prec;  // Operator precedence; only set on top-level primitive wrappers
@@ -66,19 +66,19 @@ public class FunNode extends RegionNode {
   // Used to make the primitives at boot time.  Note the empty displays: in
   // theory Primitives should get the top-level primitives-display, but in
   // practice most primitives neither read nor write their own scope.
-  public FunNode(        PrimNode prim) { this(prim._name,prim._sig._formals,prim.op_prec()); }
-  public FunNode(IntrinsicNewNode prim) { this(prim._name,prim._sig._formals,prim.op_prec()); }
+  public FunNode(        PrimNode prim) { this(prim._name,prim._sig,prim.op_prec()); }
+  public FunNode(IntrinsicNewNode prim) { this(prim._name,prim._sig,prim.op_prec()); }
   // Used to start an anonymous function in the Parser
-  public FunNode(String[] flds, Type[] ts) { this(null,TypeStruct.make_args(flds,ts),-1); }
+  public FunNode(String[] flds, Type[] ts) { this(null,TypeFunSig.make(TypeStruct.make_args(flds,ts),Type.SCALAR),-1); }
   // Used to forward-decl anon functions
-         FunNode(String name) { this(name,TypeStruct.NO_ARGS,-2); add_def(Env.ALL_CTRL); }
-  public FunNode(String name, TypeStruct formals, int op_prec) { this(name,formals,op_prec,BitsFun.new_fidx()); }
+  FunNode(String name) { this(name,TypeFunSig.make(TypeStruct.NO_ARGS,Type.SCALAR),-2); add_def(Env.ALL_CTRL); }
+  public FunNode(String name, TypeFunSig sig, int op_prec) { this(name,sig,op_prec,BitsFun.new_fidx()); }
   // Shared common constructor
-  private FunNode(String name, TypeStruct formals, int op_prec, int fidx) {
+  private FunNode(String name, TypeFunSig sig, int op_prec, int fidx) {
     super(OP_FUN);
     _name = name;
     _fidx = fidx;
-    _formals = formals;
+    _sig = sig;
     _op_prec = (byte)op_prec;
     FUNS.setX(fidx(),this); // Track FunNode by fidx; assert single-bit fidxs
   }
@@ -105,25 +105,25 @@ public class FunNode extends RegionNode {
   // Short self name
   @Override String xstr() { return name(); }
   // Inline longer info
-  @Override public String str() { return is_forward_ref() ? xstr() : _formals.str(null); }
+  @Override public String str() { return is_forward_ref() ? xstr() : _sig.str(null); }
   // Name from fidx alone
-  private static String name( int fidx) {
+  private static String name( int fidx, boolean debug) {
     FunNode fun = find_fidx(fidx);
-    return fun==null ? name(null,fidx,-1,false) : name(fun._name,fidx,fun._op_prec,fun.is_forward_ref());
+    return fun==null ? name(null,fidx,-1,false,debug) : name(fun._name,fidx,fun._op_prec,fun.is_forward_ref(),debug);
   }
   // Name from FunNode
-  String name() { return name(_name,fidx(),_op_prec,is_forward_ref()); }
-  static String name(String name, int fidx, int op_prec, boolean fref) {
+  String name() { return name(_name,fidx(),_op_prec,is_forward_ref(),true); }
+  static String name(String name, int fidx, int op_prec, boolean fref, boolean debug) {
     if( op_prec >= 0 && name != null ) name = '{'+name+'}'; // Primitives wrap
     if( name==null ) name="";
-    name = name + '['+fidx+']';             // Always the fidx
+    if( debug ) name = name + "["+fidx+"]"; // FIDX in debug
     return fref ? "?"+name : name;          // Leading '?'
   }
 
   // Can return nothing, or "name" or "[name0,name1,name2...]" or "[35]"
-  public static SB names(BitsFun fidxs, SB sb ) {
+  public static SB names(BitsFun fidxs, SB sb, boolean debug ) {
     int fidx = fidxs.abit();
-    if( fidx >= 0 ) return sb.p(name(fidx));
+    if( fidx >= 0 ) return sb.p(name(fidx,debug));
     if( fidxs==BitsFun.EMPTY ) return sb.p("[]");
     // See if this is just one common name, common for overloaded functions
     String s=null;
@@ -138,16 +138,19 @@ public class FunNode extends RegionNode {
     }
     if( s!=null )
       if( prim ) sb.p('{').p(s).p('}'); else sb.p(s);
-    // Make a list of the names
-    int cnt=0;
-    sb.p('[');
-    for( Integer ii : fidxs ) {
-      if( ++cnt==5 ) break;
-      sb.p(ii).p(fidxs.above_center()?'+':',');
+    // Make a list of the fidxs
+    if( debug ) {
+      int cnt = 0;
+      sb.p('[');
+      for( Integer ii : fidxs ) {
+        if( ++cnt == 5 ) break;
+        sb.p(ii).p(fidxs.above_center() ? '+' : ',');
+      }
+      if( cnt >= 5 ) sb.p("...");
+      else sb.unchar();
+      sb.p(']');
     }
-    if( cnt>=5 ) sb.p("...");
-    else sb.unchar();
-    return sb.p(']');
+    return sb;
   }
 
   // Debug only: make an attempt to bind name to a function
@@ -167,9 +170,9 @@ public class FunNode extends RegionNode {
   // Formal types.
   Type formal(int idx) {
     return idx == -1 ? TypeRPC.ALL_CALL :
-      (idx == -2 ? TypeMem.MEM : _formals.at(idx));
+      (idx == -2 ? TypeMem.MEM : _sig.arg(idx));
   }
-  int nargs() { return _formals._ts.length; } // Slot 0 is the return and not an arg, and is included in the length
+  int nargs() { return _sig.nargs(); } // Slot 0 is the return and not an arg, and is included in the length
   void set_is_copy(GVNGCM gvn) { gvn.set_def_reg(this,0,this); }
 
   // ----
@@ -204,14 +207,15 @@ public class FunNode extends RegionNode {
     // level 2 (or 3) work: heuristics & inline
 
     // Every input path is wired to an output path
-    assert _defs._len == ret._uses._len+(has_unknown_callers() ? 1 : 0);
+    if( _defs._len != ret._uses._len+(has_unknown_callers() ? 1 : 0) )
+      return null;
 
     // Look for appropriate type-specialize callers
     TypeStruct formals = type_special(gvn, parms);
     Ary<Node> body = find_body(ret);
     int path = -1;              // Paths will split according to type
     if( formals == null ) {     // No type-specialization to do
-      formals = _formals;       // Use old args
+      formals = _sig._formals;  // Use old args
       if( _cnt_size_inlines >= 10 && !is_prim() ) return null;
       // Large code-expansion allowed; can inline for other reasons
       path = split_size(gvn,body,parms);
@@ -289,9 +293,11 @@ public class FunNode extends RegionNode {
     int idx = find_type_split_index(gvn,parms);
     if( idx != -1 ) {           // Found; split along a specific input path using widened types
       Type[] sig = TypeAry.get(parms.length);
-      sig[0] = parms[0]==null ? TypeFunPtr.NO_DISP : gvn.type(parms[0].in(idx));
-      for( int i=1; i<parms.length; i++ ) // 0 for return, 1 for display
-        sig[i] = parms[i]==null ? Type.XSCALAR : gvn.type(parms[i].in(idx)).widen();
+      sig[0] = parms[0]==null
+        ? _sig.display().make_from(TypeStr.NO_DISP)
+        : gvn.type(parms[0].in(idx));
+      for( int i=1; i<parms.length; i++ ) // 0 for display
+        sig[i] = parms[i]==null ? Type.SCALAR : gvn.type(parms[i].in(idx)).widen();
       return sig;
     }
 
@@ -336,9 +342,9 @@ public class FunNode extends RegionNode {
     Type[] sig = find_type_split(gvn,parms);
     if( sig == null ) return null; // No unresolved calls; no point in type-specialization
     // Make a new function header with new signature
-    TypeStruct formals = TypeStruct.make_args(_formals._flds,sig);
-    if( !formals.isa(_formals) ) return null;    // Fails in error cases
-    return formals == _formals ? null : formals; // Must see improvement
+    TypeStruct formals = TypeStruct.make_args(_sig._formals._flds,sig);
+    if( !formals.isa(_sig._formals) ) return null;    // Fails in error cases
+    return formals == _sig._formals ? null : formals; // Must see improvement
   }
 
 
@@ -455,7 +461,7 @@ public class FunNode extends RegionNode {
   private FunNode make_new_fun(GVNGCM gvn, RetNode ret, TypeStruct new_formals) {
     // Make a prototype new function header split from the original.
     int oldfidx = fidx();
-    FunNode fun = new FunNode(_name,new_formals,_op_prec,BitsFun.new_fidx(oldfidx));
+    FunNode fun = new FunNode(_name,TypeFunSig.make(new_formals,_sig._ret),_op_prec,BitsFun.new_fidx(oldfidx));
     fun.pop();                  // Remove null added by RegionNode, will be added later
     // Renumber the original as well; the original _fidx is now a *class* of 2
     // fidxs.  Each FunNode fidx is only ever a constant, so the original Fun

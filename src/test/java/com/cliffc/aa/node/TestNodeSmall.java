@@ -432,7 +432,8 @@ public class TestNodeSmall {
     // The Fun and Fun._tf:
     TypeStruct formals = TypeStruct.make_args(TypeAry.ts(gvn.type(dsp_file_ptr), // File-scope display as arg0
                                                          Type.SCALAR));          // Some scalar arg1
-    FunNode fun = new FunNode("fact",formals,-1);
+    TypeFunSig sig = TypeFunSig.make(formals,Type.SCALAR);
+    FunNode fun = new FunNode("fact",sig,-1);
     gvn.init(fun.add_def(ctl).add_def(ctl));
     // Parms for the Fun.  Note that the default type is "weak" because the
     // file-level display can not yet know about "fact".

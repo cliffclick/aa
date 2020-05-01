@@ -96,7 +96,7 @@ public final class FunPtrNode extends Node {
   public static FunPtrNode forward_ref( GVNGCM gvn, String name, Parse unkref ) {
     FunNode fun = gvn.init(new FunNode(name));
     RetNode ret = gvn.init(new RetNode(fun,gvn.con(TypeMem.MEM),gvn.con(Type.SCALAR),gvn.con(TypeRPC.ALL_CALL),fun));
-    return new FunPtrNode(unkref.forward_ref_err(fun),ret,gvn.con(TypeMemPtr.DISPLAY_PTR));
+    return new FunPtrNode(unkref.forward_ref_err(fun),ret,gvn.con(TypeMemPtr.DISP_SIMPLE));
   }
 
   // True if this is a forward_ref
@@ -117,13 +117,14 @@ public final class FunPtrNode extends Node {
     FunNode.FUNS.setX(dfun._fidx,null); // Untrack dfun by old fidx
     gvn.unreg(dfun);  dfun._fidx = rfun._fidx;  gvn.rereg(dfun,Type.CTRL);
     FunNode.FUNS.setX(dfun._fidx,dfun); // Track FunNode by fidx
-    
+
     RetNode dret = def.ret();
     Type tret = gvn.unreg(dret);
     dret._fidx  = rfun._fidx ;
-    dret._nargs = rfun.nargs();
     gvn.rereg(dret,tret);
-    
+    FunPtrNode fptr = dret.funptr();
+    gvn.setype(fptr,fptr.value(gvn));
+
     // Replace the forward_ref with the def.
     gvn.subsume(this,def);
     dfun.bind(tok);

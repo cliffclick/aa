@@ -38,7 +38,8 @@ public class IntrinsicNode extends Node {
     // This function call takes in and returns a plain ptr-to-object.
     // Only after folding together does the name become apparent.
     TypeStruct formals = TypeStruct.make_args(TypeStruct.ts(TypeFunPtr.NO_DISP,TypeMemPtr.STRUCT));
-    FunNode fun = (FunNode) gvn.xform(new FunNode(tn._name,formals,-1).add_def(Env.ALL_CTRL));
+    TypeFunSig sig = TypeFunSig.make(formals,tn);
+    FunNode fun = (FunNode) gvn.xform(new FunNode(tn._name,sig,-1).add_def(Env.ALL_CTRL));
     Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
     Node mem = gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM     ),null));
     Node ptr = gvn.xform(new ParmNode( 2,"ptr",fun,gvn.con(TypeMemPtr.OOP  ),null));
@@ -117,7 +118,8 @@ public class IntrinsicNode extends Node {
     assert to.has_name();
     assert Util.eq(to._flds[0],"^"); // Display already
     TypeStruct formals = to.remove_name();
-    FunNode fun = (FunNode) gvn.xform(new FunNode(to._name,formals,-1).add_def(Env.ALL_CTRL));
+    TypeFunSig sig = TypeFunSig.make(formals,to);
+    FunNode fun = (FunNode) gvn.xform(new FunNode(to._name,sig,-1).add_def(Env.ALL_CTRL));
     Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
     Node memp= gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM),null));
     // Add input edges to the NewNode

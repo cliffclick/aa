@@ -83,7 +83,7 @@ public final class CallEpiNode extends Node {
     assert ret!=null;
 
     // Single choice; check compatible args and no conversions needed.
-    TypeStruct formals = fun._formals;
+    TypeStruct formals = fun._sig._formals;
     for( Node parm : fun._uses ) {
       if( parm instanceof ParmNode && parm.in(0)==fun ) {
         int idx = ((ParmNode)parm)._idx;

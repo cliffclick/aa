@@ -1,17 +1,16 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.node.FunNode;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
 
-import java.util.function.Predicate;
+import java.util.Arrays;
 
 // Function signatures: formal arguments (and return) used to type-check.  This
 // is NOT any "code pointer" or "function index" or "fidx"; see TypeFunPtr.
 public final class TypeFunSig extends Type<TypeFunSig> {
   public TypeStruct _formals;
   public Type _ret;
-  
+
   private TypeFunSig(TypeStruct formals, Type ret ) { super(TFUNSIG); init(formals,ret); }
   private void init (TypeStruct formals, Type ret ) { _formals=formals; _ret=ret; }
   @Override int compute_hash() { assert _formals._hash != 0;  return TFUNSIG + _formals._hash + _ret._hash; }
@@ -23,19 +22,16 @@ public final class TypeFunSig extends Type<TypeFunSig> {
     return _formals==tf._formals && _ret==tf._ret;
   }
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
-  
-  @Override public String str( VBitSet dups) {
-    if( dups == null ) dups = new VBitSet();
-    if( dups.tset(_uid) ) return "$"; // Break recursive printing cycle
-    return _formals+" -> "+_ret;
-  }
 
-  @Override SB dstr( SB sb, VBitSet dups ) {
-    sb.p('_').p(_uid);
-    _formals.dstr(sb,dups);
-    sb.p("->");
-    _ret.dstr(sb,dups);
-    return sb;
+  @Override public String str( VBitSet dups) { return xstr(new SB(),null).toString(); }
+  @Override   SB dstr( SB sb, VBitSet dups ) { return xstr(sb.p('_').p(_uid),dups); }
+  private SB xstr( SB sb, VBitSet dups ) {
+    sb.p('{');
+    for( int i=0; i<nargs(); i++ ) {
+      if( !TypeStruct.fldBot(fld(i)) ) sb.p(fld(i)).p(':');
+      arg(i).dstr(sb,dups).p(", ");
+    }
+    return sb.unchar().unchar().p(" -> ").p(_ret).p('}');
   }
 
   private static TypeFunSig FREE=null;
@@ -57,14 +53,17 @@ public final class TypeFunSig extends Type<TypeFunSig> {
 
   public int nargs() { return _formals._ts.length; }
   public Type arg(int idx) { return _formals._ts[idx]; }
+  public TypeMemPtr display() { return (TypeMemPtr)arg(0); }
   public String fld(int idx) { return _formals._flds[idx]; }
-  
+
   @Override protected TypeFunSig xdual() { return new TypeFunSig(_formals.dual(),_ret.dual()); }
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TFUNSIG: break;
-    case TFLT:
     case TFUNPTR:
+      t = make_funptr((TypeFunPtr)t);
+      break;
+    case TFLT:
     case TINT:
     case TMEM:
     case TMEMPTR:
@@ -78,6 +77,15 @@ public final class TypeFunSig extends Type<TypeFunSig> {
     }
     TypeFunSig tf = (TypeFunSig)t;
     return make((TypeStruct)_formals.meet(tf._formals),_ret.meet(tf._ret));
+  }
+
+  // Make a TypeFunSig from a TypeFunPtr.  All args & return is SCALAR,
+  // matching sign and keeping the display.
+  TypeFunSig make_funptr(TypeFunPtr tfp) {
+    Type[] ts = TypeStruct.ts(tfp._nargs);
+    if( tfp.above_center() ) Arrays.fill(ts,Type.XSCALAR);
+    ts[0] = tfp._disp;
+    return make(tfp.above_center() ? Type.XSCALAR : Type.SCALAR,ts);
   }
 
   @Override public boolean above_center() { return _formals.above_center(); }

@@ -997,22 +997,20 @@ public class Parse {
   // Type or null or Type.ANY for '->' token
   private Type type0(boolean type_var) {
     if( peek('{') ) {           // Function type
-      //Ary<Type> ts = new Ary<>(new Type[]{Type.SCALAR,TypeFunPtr.NO_DISP});  Type t;
-      //while( (t=typep(type_var)) != null && t != Type.ANY  )
-      //  ts.add(t);              // Collect arg types
-      //Type ret;
-      //if( t==Type.ANY ) {       // Found ->, expect return type
-      //  ret = typep(type_var);
-      //  if( ret == null ) return null; // should return TypeErr missing type after ->
-      //} else {                  // Allow no-args and simple return type
-      //  if( ts._len != 3 ) return null; // should return TypeErr missing -> in tfun
-      //  ret = ts.pop();         // Get single return type
-      //}
-      //ts.setX(0,ret);           // 1st arg is return
-      //TypeStruct targs = TypeStruct.make_args(ts.asAry());
-      //if( !peek('}') ) return null;
-      //return typeq(TypeFunPtr.make(BitsFun.NZERO,targs));
-      throw com.cliffc.aa.AA.unimpl("need a formals TypeFunPtr, vs a code-ptr type");
+      Ary<Type> ts = new Ary<>(new Type[]{TypeMemPtr.DISP_SIMPLE});  Type t;
+      while( (t=typep(type_var)) != null && t != Type.ANY  )
+        ts.add(t);              // Collect arg types
+      Type ret;
+      if( t==Type.ANY ) {       // Found ->, expect return type
+        ret = typep(type_var);
+        if( ret == null ) return null; // should return TypeErr missing type after ->
+      } else {                  // Allow no-args and simple return type
+        if( ts._len != 2 ) return null; // should return TypeErr missing -> in tfun
+        ret = ts.pop();         // e.g. { int } Get single return type
+      }
+      TypeStruct targs = TypeStruct.make_args(ts.asAry());
+      if( !peek('}') ) return null;
+      return typeq(TypeFunSig.make(targs,ret));
     }
 
     if( peek("@{") ) {          // Struct type
@@ -1255,13 +1253,15 @@ public class Parse {
   public String typerr( Type actual, Node mem, Type[] expecteds ) {
     Type t = mem==null ? null : _gvn.type(mem);
     TypeMem tmem = t instanceof TypeMem ? (TypeMem)t : null;
-    SB sb = new SB().p(typerr(actual,tmem)).p(" is none of (");
+    SB sb = new SB().p(typerr(actual,tmem));
+    sb.p( expecteds.length==1 ? " is not a " : " is none of (");
     for( Type expect : expecteds ) sb.p(typerr(expect,null)).p(',');
-    return errMsg(sb.unchar().p(")").toString());
+    sb.unchar().p(expecteds.length==1 ? "" : ")");
+    return errMsg(sb.toString());
   }
   private static String typerr( Type t, TypeMem tmem ) {
     return t.is_forward_ref()
-      ? ((TypeFunPtr)t).names()
+      ? ((TypeFunPtr)t).names(false)
       : (t instanceof TypeMemPtr
          ? t.str(new SB(), null, tmem).toString()
          : t.toString());

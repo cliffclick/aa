@@ -248,7 +248,7 @@ public class CallNode extends Node {
       : mem.above_center() ? TypeMem.XMEM : TypeMem.MEM;
     // If not called, then no memory to functions
     if( ctl == Type.XCTRL ) mem = TypeMem.XMEM;
-    TypeMem tmem = (TypeMem)(ts[1]=mem);
+    ts[1]=mem;
 
     // Copy args for called functions.  Arg0 is display, handled below.
     for( int i=0; i<nargs(); i++ )
@@ -373,9 +373,9 @@ public class CallNode extends Node {
     FunNode fun = FunNode.find_fidx(fidx);
     if( fun==null || fun.is_dead() ) return DEAD; // Stale fidx leading to dead fun
     // Forward refs are only during parsing; assume they fit the bill
-    if( fun.is_forward_ref() ) return HIGH; // Assume they work
+    if( fun.is_forward_ref() ) return LOW;   // Assume they work
     if( fun.nargs() != nargs() ) return BAD; // Wrong arg count, toss out
-    TypeStruct formals = fun._formals;       // Type of each argument
+    TypeStruct formals = fun._sig._formals;  // Type of each argument
     int flags=0;
     for( int j=0; j<nargs(); j++ ) {
       Type formal = formals.at(j);
@@ -418,7 +418,7 @@ public class CallNode extends Node {
 
         FunNode fun = FunNode.find_fidx(kidx);
         if( fun.nargs()!=nargs() || fun.ret() == null ) continue; // BAD/dead
-        TypeStruct formals = fun._formals; // Type of each argument
+        TypeStruct formals = fun._sig._formals; // Type of each argument
         int cvts=0;                        // Arg conversion cost
         for( int j=1; j<nargs(); j++ ) {   // Skip arg#0, the display
           if( fun.parm(j)==null ) continue; // Formal is ignored
@@ -509,7 +509,7 @@ public class CallNode extends Node {
 
     // bad-arg-count
     if( tfp._nargs != nargs() )
-      return fast ? "" : _badargs[1].errMsg("Passing "+(nargs()-1)+" arguments to "+tfp.names()+" which takes "+(tfp._nargs-1)+" arguments");
+      return fast ? "" : _badargs[1].errMsg("Passing "+(nargs()-1)+" arguments to "+tfp.names(false)+" which takes "+(tfp._nargs-1)+" arguments");
 
     // Now do an arg-check.
     for( int j=1; j<nargs(); j++ ) {
@@ -517,7 +517,7 @@ public class CallNode extends Node {
       Ary<Type> ts=null;
       for( int fidx : tfp._fidxs ) {
         FunNode fun = FunNode.find_fidx(fidx);
-        TypeStruct formals = fun._formals; // Type of each argument
+        TypeStruct formals = fun._sig._formals; // Type of each argument
         if( fun.parm(j)==null ) continue;  // Formal is dead
         Type formal = formals.at(j);
         if( actual.isa(formal) ) continue; // Actual is a formal
