@@ -377,7 +377,7 @@ concurrency:
 * CAS built-in lang primitive: 'res := atomic(old,new)'; JMM
 * CPS for threads/concurrency;
 * not really actors but spawn/fork worker threads, run until they 'join' with parent.
-* Transactions-for-shared-memory-always (Closure style)
+* Transactions-for-shared-memory-always (Clojure style)
 
 types and name spaces and nils:
 
