@@ -71,8 +71,8 @@ public class CallNode extends Node {
   boolean _unpacked;        // Call site allows unpacking a tuple (once)
   boolean _is_copy;         // One-shot flag set when inlining an entire single-caller-single-called
   // Example: call(arg1,arg2)
-  // _badargs[1] points to the openning paren.
-  // _badargs[2] points to the start of arg1, same for arg2, etc.
+  // _badargs[0] points to the openning paren.
+  // _badargs[1] points to the start of arg1, same for arg2, etc.
   Parse[] _badargs;         // Errors for e.g. wrong arg counts or incompatible args; one error point per arg.
   public CallNode( boolean unpacked, Parse[] badargs, Node... defs ) {
     super(OP_CALL,defs);
@@ -133,10 +133,7 @@ public class CallNode extends Node {
     // If inlined, no further xforms.  The using Projs will fold up.
     if( is_copy() ) return null;
     // Dead, do nothing
-    TypeTuple tcall = (TypeTuple)gvn.type(this);
-    Type tctl = tcall.at(0);
-    Type tfp  = tcall.at(2);
-    if( tctl!=Type.CTRL ) {     // Dead?
+    if( gvn.type(ctl())!=Type.CTRL ) {     // Dead control (NOT dead self-type, which happens if we do not resolve)
       if( (ctl() instanceof ConNode) ) return null;
       // Kill all inputs with type-safe dead constants
       set_def(1,gvn.con(TypeMem.XMEM),gvn);
@@ -172,6 +169,8 @@ public class CallNode extends Node {
       }
     }
     // Have some sane function choices?
+    TypeTuple tcall = (TypeTuple)gvn.type(this);
+    Type tfp  = tcall.at(2);
     if( !(tfp instanceof TypeFunPtr) ) return null;
     BitsFun fidxs = ((TypeFunPtr)tfp).fidxs();
     if( fidxs==BitsFun.EMPTY ) // TODO: zap function to empty function constant
@@ -254,12 +253,15 @@ public class CallNode extends Node {
     Type tfx = gvn.type(fun());
     if( !(tfx instanceof TypeFunPtr) )
       tfx = tfx.above_center() ? TypeFunPtr.GENERIC_FUNPTR.dual() : TypeFunPtr.GENERIC_FUNPTR;
-    BitsFun fidxs = ((TypeFunPtr)tfx).fidxs();
+    TypeFunPtr tfp = (TypeFunPtr)tfx;
+    BitsFun fidxs = tfp.fidxs();
+    if( fidxs.above_center()!=tfp._disp.above_center() )
+      return (TypeTuple)gvn.self_type(this); // Display and FIDX mis-aligned; stall
     // Resolve; only keep choices with sane arguments during GCP
     BitsFun rfidxs = resolve(fidxs,ts);
     if( rfidxs==null ) return (TypeTuple)gvn.self_type(this); // Dead function input, stall until this dies
     // Call.ts[2] is a TFP just for the resolved fidxs and display.
-    ts[2] = ((TypeFunPtr)tfx).make_from(rfidxs);
+    ts[2] = TypeFunPtr.make(rfidxs,tfp._nargs,rfidxs.above_center() == fidxs.above_center() ? tfp._disp : tfp._disp.dual());
 
     // No forward progress until resolution
     if( rfidxs.above_center() ) ts[0]=Type.XCTRL;
@@ -290,6 +292,7 @@ public class CallNode extends Node {
   @Override public boolean basic_liveness() { return false; }
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
     if( gvn._opt_mode < 2 ) return super.live_use(gvn,def);
+    if( def!=fun() ) return _live; // Args always alive
     if( !(def instanceof FunPtrNode) ) return _live;
     int dfidx = ((FunPtrNode)def).ret()._fidx;
     return live_use_call(gvn,dfidx);
@@ -297,7 +300,7 @@ public class CallNode extends Node {
   TypeMem live_use_call( GVNGCM gvn, int dfidx ) {
     Type tfx = ((TypeTuple)gvn.type(this)).at(2);
     // If resolve has chosen this dfidx, then the FunPtr is alive.
-    return tfx instanceof TypeFunPtr && ((TypeFunPtr)tfx).fidxs().test(dfidx)
+    return tfx instanceof TypeFunPtr && ((TypeFunPtr)tfx).fidxs().test_recur(dfidx)
       ? _live : TypeMem.DEAD;
   }
 
@@ -476,7 +479,7 @@ public class CallNode extends Node {
     if( fidxs.above_center() )  return false; // Still choices to be made
     if( gvn._opt_mode == 0 ) return false; // Graph not formed yet
     CallEpiNode cepi = cepi();
-    assert cepi!=null;
+    if( cepi==null ) return false; // Dying
 
     // Check all fidxs for being wirable
     boolean progress = false;
@@ -484,7 +487,6 @@ public class CallNode extends Node {
       if( BitsFun.is_parent(fidx) ) continue; // Do not wire parents, as they will eventually settle out
       FunNode fun = FunNode.find_fidx(fidx);  // Lookup, even if not wired
       if( fun.is_forward_ref() ) continue;    // Not forward refs, which at GCP just means a syntax error
-      if( gvn.type(fun)!=Type.CTRL) continue; // Dead function (perhaps wiring to itself)
       RetNode ret = fun.ret();
       // Internally wire() checks for already wired.
       progress |= cepi.wire(gvn,this,fun,ret);
@@ -503,18 +505,18 @@ public class CallNode extends Node {
     // Expect a function pointer
     Type tfun = gvn.type(fun());
     if( !(tfun instanceof TypeFunPtr) )
-      return fast ? "" : _badargs[1].errMsg("A function is being called, but "+tfun+" is not a function type");
+      return fast ? "" : _badargs[0].errMsg("A function is being called, but "+tfun+" is not a function type");
     TypeFunPtr tfp = (TypeFunPtr)tfun;
 
     // Indirectly, forward-ref for function type
     if( tfp.is_forward_ref() ) // Forward ref on incoming function
-      return _badargs[1].forward_ref_err(FunNode.find_fidx(tfp.fidx()));
+      return _badargs[0].forward_ref_err(FunNode.find_fidx(tfp.fidx()));
     if( tfp.fidxs().is_empty() )
       return null; // This is an unresolved call, and that error is reported elsewhere
 
     // bad-arg-count
     if( tfp._nargs != nargs() )
-      return fast ? "" : _badargs[1].errMsg("Passing "+(nargs()-1)+" arguments to "+tfp.names(false)+" which takes "+(tfp._nargs-1)+" arguments");
+      return fast ? "" : _badargs[0].errMsg("Passing "+(nargs()-1)+" arguments to "+tfp.names(false)+" which takes "+(tfp._nargs-1)+" arguments");
 
     // Now do an arg-check.
     for( int j=1; j<nargs(); j++ ) {

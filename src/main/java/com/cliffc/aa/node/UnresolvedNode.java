@@ -56,16 +56,6 @@ public class UnresolvedNode extends Node {
       // preserve choice until GCP resolves.
       // Post-GCP: never here unless in-error, or returning an ambiguous fun ptr
 
-      //// Ignores incoming types, as they are function pointers (code pointer
-      //// plus display) and goes straight to the FunNode._tf.
-      //TypeFunPtr t = GF;
-      //for( Node def : _defs ) {
-      //  if( !(def instanceof FunPtrNode) ) return GF.dual(); // Only fails during testing
-      //  TypeFunPtr tf = ((FunPtrNode)def).fun()._tf;
-      //  tf = tf.dual();
-      //  t = (TypeFunPtr)t.join(tf);
-      //}
-      //return t;
       TypeFunPtr t = GF;
       BitsFun fidxs = BitsFun.EMPTY;
       for( Node def : _defs ) {

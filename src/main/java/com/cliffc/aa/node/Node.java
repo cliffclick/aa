@@ -307,9 +307,12 @@ public abstract class Node implements Cloneable {
   // must be monotonic.  This is a forwards-flow transfer-function computation.
   abstract public Type value(GVNGCM gvn);
 
-  // Compute the current best liveness for this Node, based on the liveness of its uses.
-  // May return TypeMem.FULL, especially if its uses are of unwired functions.  It
-  // must be monotonic.  This is a reverse-flow transfer-function computation.
+  // Compute the current best liveness for this Node, based on the liveness of
+  // its uses.  If basic_liveness(), returns a simple DEAD/EMPTY.  Otherwise
+  // computes the alive memory set down to the field level.  May return
+  // TypeMem.FULL, especially if its uses are of unwired functions.
+  // It must be monotonic.
+  // This is a reverse-flow transfer-function computation.
   public TypeMem live( GVNGCM gvn) {
     if( basic_liveness() ) {    // Basic liveness only; e.g. primitive math ops
       for( Node use : _uses )   // Computed across all uses
@@ -328,14 +331,15 @@ public abstract class Node implements Cloneable {
   public TypeMem live_use( GVNGCM gvn, Node def ) {
     return _keep>0 ? TypeMem.FULL : _live;
   }
-  // Compute basic liveness only
+  // Compute basic liveness only: a boolean flag of alive-or-dead represented
+  // as TypeMem.DEAD or TypeMem.EMPTY.
   public boolean basic_liveness() { return true; }
   // We have a 'crossing optimization' point: changing the pointer input to a
   // Load or a Scope changes the memory demanded by the Load or Scope.  Same:
   // changing a def._type changes the use._live, requiring other defs to be
   // revisited.  For Calls, changing the input function type to something low
   // means the call can resolve it - unresolved fptrs are not live.
-  public boolean input_value_changes_live() { return _op==OP_SCOPE || _op==OP_LOAD || _op==OP_CALLEPI; }
+  public boolean input_value_changes_live() { return _op==OP_SCOPE || _op==OP_LOAD || _op==OP_CALLEPI || _op==OP_TYPE; }
   public boolean value_changes_live() { return _op==OP_CALL; }
   public boolean live_changes_value() { return false; }
 

@@ -15,7 +15,7 @@ import com.cliffc.aa.util.Util;
 
 public class NewObjNode extends NewNode<TypeStruct> {
   public final boolean _is_closure; // For error messages
-  public       Parse[] _fld_starts; // Start of each tuple member
+  public       Parse[] _fld_starts; // Start of each tuple member; 0 for the display
   // NewNodes do not really need a ctrl; useful to bind the upward motion of
   // closures so variable stores can more easily fold into them.
   public NewObjNode( boolean is_closure, TypeStruct disp, Node ctrl, Node clo ) {
@@ -27,7 +27,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
     _is_closure = is_closure;
     assert ts._ts[0].is_display_ptr();
     for( int i=1; i<ts._ts.length; i++ )
-      assert ts._ts[i]==Type.SCALAR; // Field contents not specified unless final
+      assert ts._ts[i]==Type.SCALAR || ts.fmod(i)==TypeStruct.FFNL; // Field contents not specified unless final
   }
   public Node get(String name) { int idx = _ts.find(name);  assert idx >= 0; return fld(idx); }
   public boolean exists(String name) { return _ts.find(name)!=-1; }

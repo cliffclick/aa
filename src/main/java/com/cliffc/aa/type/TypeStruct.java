@@ -142,7 +142,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   }
 
   private static boolean isDigit(char c) { return '0' <= c && c <= '9'; }
-  private boolean is_tup() { return _flds.length==0 || fldTop(_flds[0]) || fldBot(_flds[0]) || isDigit(_flds[0].charAt(0)); }
+  private boolean is_tup() { return _flds.length<=1 || fldTop(_flds[0]) || fldBot(_flds[0]) || isDigit(_flds[1].charAt(0)); }
   public String str( VBitSet dups) {
     if( dups == null ) dups = new VBitSet();
     if( dups.tset(_uid) ) return "$"; // Break recursive printing cycle

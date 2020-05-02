@@ -90,6 +90,13 @@ public class TypeNode extends Node {
     if( _t.dual().isa(t2) && t2.isa(_t) ) return t;
     return (t.above_center() ? _t.dual() : _t).simple_ptr();
   }
+  @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
+    if( _live == TypeMem.DEAD ) return TypeMem.DEAD; // Am dead, so nothing extra is alive.
+    // Alive (like normal liveness), plus the address, plus whatever can be
+    // reached from the address.
+    return ScopeNode.compute_live_mem(gvn,TypeMem.EMPTY,mem(),arg());
+  }
+  
   @Override public Type all_type() { return Type.SCALAR; }
   // Check TypeNode for being in-error
   @Override public String err(GVNGCM gvn) { return _error_parse.typerr(gvn.type(arg()),mem(),_t); }

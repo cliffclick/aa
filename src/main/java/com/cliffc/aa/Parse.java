@@ -486,13 +486,13 @@ public class Parse {
           assert fun.op_prec() <= max;
           if( fun.op_prec() < max ) continue; // Not yet
           if( i==0 ) {
-            Node call = do_call(new CallNode(true,new Parse[]{null,bad,bad},ctrl(),all_mem(),fun.unhook(),args.in(0)));
+            Node call = do_call(new CallNode(true,new Parse[]{bad,bad},ctrl(),all_mem(),fun.unhook(),args.in(0)));
             args.set_def(0,call,_gvn);
             funs.setX(0,null);
             bads.setX(0,null);
           } else {
             Parse bad1 = bads.at(i-1);
-            Node call = do_call(new CallNode(true,new Parse[]{null,bad1,bad1,bad},ctrl(),all_mem(),fun.unhook(),args.in(i-1),args.in(i)));
+            Node call = do_call(new CallNode(true,new Parse[]{bad1,bad1,bad},ctrl(),all_mem(),fun.unhook(),args.in(i-1),args.in(i)));
             args.set_def(i-1,call,_gvn);
             funs.remove(i);  args.remove(i);  bads.remove(i);  i--;
           }
@@ -578,8 +578,8 @@ public class Parse {
         } else {
           Parse[] badargs = arglist
             ? ((NewObjNode)arg.in(0))._fld_starts        // Args from tuple
-            : new Parse[]{null,null,errMsg(first_arg_start)}; // The one arg start
-          badargs[1] = errMsg(oldx-1); // Base call error reported at the openning paren
+            : new Parse[]{null,errMsg(first_arg_start)}; // The one arg start
+          badargs[0] = errMsg(oldx-1); // Base call error reported at the openning paren
           n = do_call(new CallNode(!arglist,badargs,ctrl(),all_mem(),n,arg)); // Pass the 1 arg
         }
       }
@@ -711,7 +711,7 @@ public class Parse {
   private Node tuple(Node s, int first_arg_start) {
     TypeStruct mt_tuple = TypeStruct.make(new String[]{"^"},TypeStruct.ts(Type.XNIL),new byte[]{TypeStruct.FFNL});
     NewObjNode nn = new NewObjNode(false,BitsAlias.RECORD,mt_tuple,ctrl(),con(Type.XNIL));
-    Ary<Parse> args = new Ary<>(new Parse[]{null,null,errMsg(first_arg_start)});
+    Ary<Parse> args = new Ary<>(new Parse[]{null,errMsg(first_arg_start)});
     int fidx=0, oldx=_x-1; // Field name counter, mismatched parens balance point
     while( s!=null ) {
       nn.create_active((""+(fidx++)).intern(),s,TypeStruct.FFNL,_gvn);
