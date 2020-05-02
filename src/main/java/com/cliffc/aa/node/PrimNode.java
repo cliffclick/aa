@@ -77,20 +77,19 @@ public abstract class PrimNode extends Node {
   @Override public Node ideal(GVNGCM gvn, int level) { return null; }
   @Override public Type value(GVNGCM gvn) {
     Type[] ts = new Type[_defs._len]; // 1-based
-    // If the meet with _formals.dual stays above center for all inputs, then we
-    // return the dual, the highest allowed result; if all inputs are constants
-    // we constant fold; else some input is low so we return the lowest
-    // possible result.
-    boolean is_con = true;
+    // If all inputs are constants we constant fold.  If any input is high, we
+    // return high otherwise we return low.
+    boolean is_con = true, has_high = false;
     for( int i=1; i<_defs._len; i++ ) { // first is control
       Type tactual = gvn.type(in(i));
       Type tformal = _sig.arg(i);
       Type t = tformal.dual().meet(ts[i] = tactual);
-      if( t.is_con() ) ;                          // All constants, will fold
-      else if( t.above_center() ) is_con = false; // Not a constant
-      else return _sig._ret;                      // Some input is too low
+      if( !t.is_con() ) {
+        is_con = false;         // Some non-constant
+        if( t.above_center() ) has_high=true;
+      }
     }
-    return is_con ? apply(ts) : _sig._ret.dual();
+    return is_con ? apply(ts) : (has_high ? _sig._ret.dual() : _sig._ret);
   }
   @Override public String err(GVNGCM gvn) {
     for( int i=1; i<_defs._len; i++ ) { // first is control

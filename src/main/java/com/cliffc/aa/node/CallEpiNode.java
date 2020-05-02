@@ -228,7 +228,6 @@ public final class CallEpiNode extends Node {
     if( tfptr.is_forward_ref() ) return TypeTuple.CALLE; // Still in the parser.
     // NO fidxs, means we're not calling anything.
     if( fidxs==BitsFun.EMPTY ) return TypeTuple.CALLE.dual();
-    if( fidxs.above_center() ) return TypeTuple.CALLE.dual();
     if( fidxs.test(1) ) return TypeTuple.CALLE;
     if( fidxs.test(0) ) throw com.cliffc.aa.AA.unimpl(); // Handle nil fptr
     // If pre-gcp, we may have unknown callers.  Be very conservative until we

@@ -35,5 +35,7 @@ public class OProjNode extends ProjNode {
       return in(0) instanceof NewObjNode ? TypeStruct.ANYSTRUCT : TypeObj.XOBJ;
     return null;
   }
+  // Object needs precise liveness
+  @Override public boolean basic_liveness() { return false; }
   @Override public Type all_type() { return ((TypeTuple)in(0).all_type())._ts[_idx]; }
 }

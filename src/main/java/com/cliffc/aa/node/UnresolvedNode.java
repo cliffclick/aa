@@ -105,7 +105,7 @@ public class UnresolvedNode extends Node {
   // If pre-GCP, same as value() above, use the conservative answer.
   // During GCP, this will resolve so use the optimistic answer.
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
-    if( gvn._opt_mode < 2 ) return super.live_use(gvn,def);
+    if( gvn._opt_mode != 2 ) return super.live_use(gvn,def);
     if( !(def instanceof FunPtrNode) ) return _live;
     // If any Call has resolved to this def, its alive.
     // If not a Call, must assume it props to some unknown Call and is alive.
@@ -153,7 +153,7 @@ public class UnresolvedNode extends Node {
   @Override public String err(GVNGCM gvn) {
     if( in(0) instanceof ConNode ) return null; // Mid-collapse
     FunNode fun = ((FunPtrNode)in(0)).fun();
-    String name = fun==null ? null : fun.xstr();
+    String name = fun==null ? null : fun.name(false);
     return _bad==null ? null : _bad.errMsg("Unable to resolve "+name);
   }
   // Choice of typically primitives, all of which are pure.

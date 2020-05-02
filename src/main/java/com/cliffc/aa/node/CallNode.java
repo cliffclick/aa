@@ -207,14 +207,10 @@ public class CallNode extends Node {
     // arg is still alive.
     if( gvn._opt_mode > 2 && err(gvn,true)==null ) {
       Node progress = null;
-      outer_loop:
       for( int i=1; i<nargs(); i++ ) // Skip the FP/DISPLAY arg, as its useful for error messages
-        if( !(arg(i) instanceof ConNode && gvn.type(arg(i))==Type.XSCALAR) ) { // Not already folded
-          for( int fidx2 : fidxs )
-            if( FunNode.find_fidx(fidx2).parm(i)==null ) // Parm is dead
-              continue outer_loop; // Fail this arg, as is alive on at least one called function
+        if( ProjNode.proj(this,i+2)==null &&
+            !(arg(i) instanceof ConNode && gvn.type(arg(i))==Type.XSCALAR) ) // Not already folded
           progress = set_arg(i,gvn.con(Type.XSCALAR),gvn); // Kill dead arg
-        }
       if( progress != null ) return this;
     }
 
@@ -262,9 +258,12 @@ public class CallNode extends Node {
     // Resolve; only keep choices with sane arguments during GCP
     BitsFun rfidxs = resolve(fidxs,ts);
     if( rfidxs==null ) return (TypeTuple)gvn.self_type(this); // Dead function input, stall until this dies
-
     // Call.ts[2] is a TFP just for the resolved fidxs and display.
     ts[2] = ((TypeFunPtr)tfx).make_from(rfidxs);
+
+    // No forward progress until resolution
+    if( rfidxs.above_center() ) ts[0]=Type.XCTRL;
+
     return TypeTuple.make(ts);
   }
 
@@ -298,7 +297,7 @@ public class CallNode extends Node {
   TypeMem live_use_call( GVNGCM gvn, int dfidx ) {
     Type tfx = ((TypeTuple)gvn.type(this)).at(2);
     // If resolve has chosen this dfidx, then the FunPtr is alive.
-    return tfx instanceof TypeFunPtr && ((TypeFunPtr)tfx).fidxs().abit() == dfidx
+    return tfx instanceof TypeFunPtr && ((TypeFunPtr)tfx).fidxs().test(dfidx)
       ? _live : TypeMem.DEAD;
   }
 
@@ -315,6 +314,8 @@ public class CallNode extends Node {
   // - Mix High/Low & no Good , keep all
   // - Some Good, no Low, no High, drop Bad & fidx?join:meet
   // - All Bad, like Low: keep all & meet
+  // At any time during iter (not GCP), an arg can go dead and
+  // be removed - so losing an arg can only lift.
   private static final int BAD=1, GOOD=2, LOW=4, HIGH=8, DEAD=16;
 
   BitsFun resolve( BitsFun fidxs, Type[] targs ) {
@@ -343,7 +344,11 @@ public class CallNode extends Node {
       // where the BAD arg is required to make the signature unambiguous) then
       // return all the fidxs, and wait for some arg to die (or else the
       // program is in-error).
-      return fidxs;
+    return fidxs;
+
+    // No args is at least as high as anything with args
+    if( flags==0 )
+      return sgn(fidxs,true);
 
     // All that is left is the no-args case (all formals ignoring), no high/low
     // and some good and maybe bad.  Toss out the bad & return the remaining
@@ -517,6 +522,7 @@ public class CallNode extends Node {
       Ary<Type> ts=null;
       for( int fidx : tfp._fidxs ) {
         FunNode fun = FunNode.find_fidx(fidx);
+        if( fun.is_dead() ) return "";
         TypeStruct formals = fun._sig._formals; // Type of each argument
         if( fun.parm(j)==null ) continue;  // Formal is dead
         Type formal = formals.at(j);

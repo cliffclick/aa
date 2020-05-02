@@ -311,11 +311,17 @@ public class GVNGCM {
     if( n._keep >0 || n instanceof ConNode || n instanceof ErrNode )
       return false; // Already a constant, or never touch an ErrNode
     if( !t.is_con() ) return false;
+    // Dead function
     if( t instanceof TypeFunPtr ) {
       Node x = FunNode.find_fidx(((TypeFunPtr)t).fidx());
       if( x==null || x.is_dead() ) return false;
     }
+    // Parm is in-error; do not remove the error.
     if( n instanceof ParmNode && n.err(this) != null )
+      return false;
+    // Constant argument to call: keep for call resolution.
+    // Call can always inline to fold constant.
+    if( n instanceof ProjNode && n.in(0) instanceof CallNode )
       return false;
     return true; // Replace with a ConNode
   }
@@ -523,13 +529,6 @@ public class GVNGCM {
         Node n = _work.pop();
         _wrk_bits.clear(n._uid);
         if( n.is_dead() ) continue; // Can be dead functions after removing ambiguous calls
-        if( n instanceof CallNode && n._live != TypeMem.DEAD ) {
-          CallNode call = (CallNode)n;
-          TypeFunPtr tfp = (TypeFunPtr)((TypeTuple)type(call)).at(2);
-          BitsFun fidxs = tfp.fidxs();
-          if( fidxs != null && fidxs.above_center() && ambi_calls.find(call)== -1 )
-            ambi_calls.add((CallNode)n); // Track ambiguous calls
-        }
 
         // Forwards flow
         Type ot = type(n);       // Old type
@@ -554,7 +553,10 @@ public class GVNGCM {
             if( use instanceof RegionNode )
               add_work_uses(use);
           }
-          if( n.value_changes_live() )  add_work_defs(n);
+          if( n.value_changes_live() ) {
+            add_work_defs(n);
+            add_work_defs(n.in(2)); // Also Call.Unresolved: any resolved call makes that call alive
+          }
           // Optimistic Call-Graph discovery.  If the funptr input lowers
           // to where a new FIDX might be possible, wire the CG edge.
           if( n instanceof CallNode )
@@ -570,6 +572,16 @@ public class GVNGCM {
           add_work_defs(n);    // Put defs on worklist... liveness flows uphill
           if( n.live_changes_value() )
             add_work(n);
+        }
+        // See if we can resolve an unresolved
+        if( n instanceof CallNode && n._live != TypeMem.DEAD ) {
+          CallNode call = (CallNode)n;
+          if( ((TypeTuple)nt).at(0)!=Type.XCTRL ) { // Wait until the Call is reachable
+            TypeFunPtr tfp = (TypeFunPtr) ((TypeTuple) type(call)).at(2);
+            BitsFun fidxs = tfp.fidxs();
+            if( fidxs.above_center() && fidxs.abit() == -1 && ambi_calls.find(call) == -1 )
+              ambi_calls.add((CallNode) n); // Track ambiguous calls
+          }
         }
         // Very expensive assert
         //assert Env.START.more_flow(this,new VBitSet(),false,0)==0; // Initial conditions are correct

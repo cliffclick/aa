@@ -18,6 +18,7 @@ public class TestParse {
   @Test public void testParse() {
     Object dummy = Env.GVN; // Force class loading cycle
     // Temp bugs to get stability on parse0-3 plus type tests for incremental git pushes
+    test("{5}()", TypeInt.con(5)); // No args nor -> required; this is simply a function returning 5, being executed
     test("-1",  TypeInt.con( -1));
     test   ("math_rand(1)?x=4:x=3;x", TypeInt.NINT8); // x defined on both arms, so available after
     test_ptr("x=@{n:=1;v:=2}; x.n := 3; x", "@{n:=3;v:=2}");
@@ -137,7 +138,6 @@ public class TestParse {
     test   ("math_rand(1)?(y=2;x=y*y):x=3;x", TypeInt.NINT8); // x defined on both arms, so available after, while y is not
     testerr("math_rand(1)?x=2: 3 ;x", "'x' not defined on false arm of trinary",20);
     testerr("math_rand(1)?x=2: 3 ;y=x+2;y", "'x' not defined on false arm of trinary",20);
-    testerr("x:=1;math_rand(1)?x=2:3;x", "'x' final on true arm, not-final on false arm of trinary",20);
     testerr("0 ? x=2 : 3;x", "'x' not defined on false arm of trinary",11);
     test   ("2 ? x=2 : 3;x", TypeInt.con(2)); // off-side is constant-dead, so missing x-assign is ignored
     test   ("2 ? x=2 : y  ", TypeInt.con(2)); // off-side is constant-dead, so missing 'y'      is ignored
@@ -155,14 +155,14 @@ public class TestParse {
 
   @Test public void testParse02() {
     Object dummy = Env.GVN; // Force class loading cycle
-    TypeMemPtr tdisp = TypeMemPtr.make(10,TypeObj.OBJ);
+    TypeMemPtr tdisp = TypeMemPtr.make(10,TypeStr.NO_DISP);
     Env.DISPLAYS.set(10);
     // Anonymous function definition
-    test_isa("{x y -> x+y}", TypeFunPtr.make(BitsFun.make0(35),3,TypeFunPtr.NO_DISP)); // {Scalar Scalar -> Scalar}
+    test_isa("{x y -> x+y}", TypeFunPtr.make(BitsFun.make0(35),3,tdisp)); // {Scalar Scalar -> Scalar}
     // Since call not-taken, post GCP Parms not loaded from _tf, limited to ~Scalar.  The
     // hidden internal call from {&} to the primitive is never inlined (has ~Scalar args)
     // so 'x&1' never sees the TypeInt return from primitive AND.
-    test_isa("{x -> x&1}", TypeFunPtr.make(BitsFun.make0(35),2,TypeFunPtr.NO_DISP)); // {Int -> Int}
+    test_isa("{x -> x&1}", TypeFunPtr.make(BitsFun.make0(35),2,tdisp)); // {Int -> Int}
     test("{5}()", TypeInt.con(5)); // No args nor -> required; this is simply a function returning 5, being executed
 
     // ID in different contexts; in general requires a new TypeVar per use; for
@@ -187,12 +187,12 @@ public class TestParse {
     test("sq={x -> x*x}; sq 2.1", TypeFlt.con(4.41)); // No () required for single args
     testerr("sq={x -> x&x}; sq(\"abc\")", "*[$]\"abc\" is not a int64",9);
     testerr("sq={x -> x*x}; sq(\"abc\")", "*[$]\"abc\" is none of (flt64,int64)",9);
-    testerr("f0 = { f x -> f0(x-1) }; f0({+},2)", "Passing 1 arguments to f0={->} which takes 2 arguments",16);
+    testerr("f0 = { f x -> f0(x-1) }; f0({+},2)", "Passing 1 arguments to f0 which takes 2 arguments",16);
     // Recursive:
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
     test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)",TypeInt.con(5));
     test("f0 = { x -> x ? {+}(f0(x-1),1) : 0 }; f0(2)", TypeInt.con(2));
-    testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact()","Passing 0 arguments to fact={->} which takes 1 arguments",46);
+    testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact()","Passing 0 arguments to fact which takes 1 arguments",46);
     test_obj("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(0),fact(1),fact(2))",
              TypeStruct.make_tuple(Type.XNIL,Type.XNIL,TypeInt.con(1),TypeInt.con(2)));
 

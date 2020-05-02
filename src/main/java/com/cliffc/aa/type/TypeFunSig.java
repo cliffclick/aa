@@ -61,8 +61,7 @@ public final class TypeFunSig extends Type<TypeFunSig> {
     switch( t._type ) {
     case TFUNSIG: break;
     case TFUNPTR:
-      t = make_funptr((TypeFunPtr)t);
-      break;
+      return ALL;               // Not supposed to mix TypeFunPtr and TypeFunSig
     case TFLT:
     case TINT:
     case TMEM:
@@ -77,15 +76,6 @@ public final class TypeFunSig extends Type<TypeFunSig> {
     }
     TypeFunSig tf = (TypeFunSig)t;
     return make((TypeStruct)_formals.meet(tf._formals),_ret.meet(tf._ret));
-  }
-
-  // Make a TypeFunSig from a TypeFunPtr.  All args & return is SCALAR,
-  // matching sign and keeping the display.
-  TypeFunSig make_funptr(TypeFunPtr tfp) {
-    Type[] ts = TypeStruct.ts(tfp._nargs);
-    if( tfp.above_center() ) Arrays.fill(ts,Type.XSCALAR);
-    ts[0] = tfp._disp;
-    return make(tfp.above_center() ? Type.XSCALAR : Type.SCALAR,ts);
   }
 
   @Override public boolean above_center() { return _formals.above_center(); }

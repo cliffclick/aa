@@ -92,6 +92,10 @@ public abstract class Node implements Cloneable {
           RetNode ret = ((FunNode)old).ret();
           if( ret != null ) gvn.add_work(ret.funptr());
         }
+        if( this instanceof ParmNode && ((ParmNode)this)._idx!=-2 && old instanceof FunNode ) {
+          ParmNode pmem = ((FunNode)old).parm(-2);
+          if( pmem != null ) gvn.add_work(pmem);
+        }
       }
     }
     return this;

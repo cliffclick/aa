@@ -109,10 +109,11 @@ public class FunNode extends RegionNode {
   // Name from fidx alone
   private static String name( int fidx, boolean debug) {
     FunNode fun = find_fidx(fidx);
-    return fun==null ? name(null,fidx,-1,false,debug) : name(fun._name,fidx,fun._op_prec,fun.is_forward_ref(),debug);
+    return fun==null ? name(null,fidx,-1,false,debug) : fun.name(debug);
   }
   // Name from FunNode
-  String name() { return name(_name,fidx(),_op_prec,is_forward_ref(),true); }
+  String name(boolean debug) { return name(_name,fidx(),_op_prec,is_forward_ref(),debug); }
+  String name() { return name(true); }
   static String name(String name, int fidx, int op_prec, boolean fref, boolean debug) {
     if( op_prec >= 0 && name != null ) name = '{'+name+'}'; // Primitives wrap
     if( name==null ) name="";
@@ -429,10 +430,11 @@ public class FunNode extends RegionNode {
     for( int i=has_unknown_callers() ? 2 : 1; i<_defs._len; i++ ) {
       Node call = in(i).in(0);
       if( !(call instanceof CallNode) ) continue; // Not well formed
+      if( ((CallNode)call).nargs() != nargs() ) continue; // Will not inline
       Type fidxs = ((TypeTuple)gvn.type(call)).at(2);
       if( !(fidxs instanceof TypeFunPtr) ) continue;
-      if( ((TypeFunPtr)fidxs).fidxs().abit() == -1 )
-        continue;               // Call must only target here
+      int fidx = ((TypeFunPtr)fidxs).fidxs().abit();
+      if( fidx < 0 ) continue;  // Call must only target one fcn
       int ncon=0;
       for( ParmNode parm : parms )
         if( parm != null ) {    // Some can be dead

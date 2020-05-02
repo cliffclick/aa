@@ -279,13 +279,12 @@ public class MemMergeNode extends Node {
   // incoming memory types, as this is a backwards propagation of demanded
   // memory.
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
-    if( in(0)==def ) {
-      return _live;             // Pass thru all requests.
-    } else {
-      // Pass thru just the alias slice in question
-      int alias = alias_at(_defs.find(def));
-      return TypeMem.make(alias, _live.at(alias));
-    }
+    if( _live==TypeMem.DEAD ) return TypeMem.DEAD;
+    if( in(0)==def ) return _live; // Pass thru all requests.
+    // Pass thru just the alias slice in question
+    int alias = alias_at(_defs.find(def));
+    TypeObj obj = _live.at(alias);
+    return obj==TypeObj.XOBJ ? TypeMem.DEAD : TypeMem.make(alias, obj);
   }
   @Override public boolean basic_liveness() { return false; }
 
