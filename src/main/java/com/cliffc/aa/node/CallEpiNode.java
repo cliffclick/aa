@@ -316,14 +316,9 @@ public final class CallEpiNode extends Node {
       int fidx = ((RetNode)def).fidx();
       if( fidxs.above_center() || !fidxs.test(fidx) )
         return TypeMem.DEAD;    // Call does not call this, so not alive.
-      // Target is as alive as we are.
-      return _live;
     }
-    // Call is as alive as we are, demanding what we demand.  Since Call is
-    // alive, the FunPtr to the Call is also alive, even if the targets are not
-    // alive (because the FunPtr has XSCALAR value).
-    if( _live==TypeMem.DEAD ) return TypeMem.DEAD;
-    return _live.at(1) == TypeObj.OBJ ? TypeMem.make(1,TypeObj.OBJ) : TypeMem.EMPTY;
+    // Target is as alive as we are.
+    return _live;
   }
   @Override public boolean basic_liveness() { return false; }
 

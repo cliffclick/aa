@@ -17,7 +17,7 @@ public class PhiNode extends Node {
     else if( t instanceof TypeObj ) _t = TypeObj.OBJ; // Need to check liveness
     else { assert t.isa(Type.SCALAR); _t = Type.SCALAR; }
     _badgc = badgc;
-    _live = basic_liveness() ? TypeMem.EMPTY : TypeMem.FULL;
+    _live = basic_liveness() ? TypeMem.EMPTY : TypeMem.MEM;
   }
   public PhiNode( Type t, Parse badgc, Node... vals ) { this(OP_PHI,t,badgc,vals); }
   // For ParmNodes

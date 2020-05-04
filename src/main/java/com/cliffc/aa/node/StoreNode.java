@@ -171,12 +171,8 @@ public class StoreNode extends Node {
   // memory.
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
     if( mem()!=def ) return _live == TypeMem.DEAD ? TypeMem.DEAD : TypeMem.EMPTY; // Non-memory use basic liveness
-    // Alive (like normal liveness), plus the address, plus whatever can be
-    // reached from the address.
-    TypeMem live1 = ScopeNode.compute_live_mem(gvn,TypeMem.EMPTY,mem(),adr());
-    // PLUS whatever can be reached from a pointer being stored
-    TypeMem live2 = ScopeNode.compute_live_mem(gvn,live1,mem(),val());
-    return live2;
+    // Pass the liveness along
+    return _live;
   }
   // Liveness is specific to the stored-aliases
   @Override public boolean basic_liveness() { return false; }

@@ -124,7 +124,7 @@ public abstract class Node implements Cloneable {
     _defs = new Ary<>(defs);
     _uses = new Ary<>(new Node[1],0);
     for( Node def : defs ) if( def != null ) def._uses.add(this);
-    _live = basic_liveness() ? TypeMem.EMPTY : TypeMem.FULL;
+    _live = basic_liveness() ? TypeMem.EMPTY : TypeMem.MEM;
    }
 
   // Is a primitive

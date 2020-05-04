@@ -1147,7 +1147,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // or field-num out-of-bounds.
   public int find( String fld ) {
     for( int i=0; i<_flds.length; i++ )
-      if( fld.equals(_flds[i]) )
+      if( Util.eq(_flds[i],fld) )
         return i;
     return -1;
   }
@@ -1193,7 +1193,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     if( i==_ts.length && !_any ) return this; // All fields final and low - fine as-is
     assert !_any;               // Only expect low-structs here
     Type[] ts = TypeAry.clone(_ts);
-    for( i=0; i<ts.length; i++ ) if( fmod(i)!=FFNL ) ts[i]=ts[i].simple_ptr();
+    for( i=0; i<ts.length; i++ ) if( fmod(i)!=FFNL ) ts[i]=SCALAR;
     return make_from(ts);
   }
 

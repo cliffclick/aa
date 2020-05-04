@@ -576,11 +576,10 @@ public class FunNode extends RegionNode {
         // Change the unknown caller parm types to match the new sig.  Default
         // memory includes the other half of alias splits, which might be
         // passed in from recursive calls.
-        assert fun.formal(-2)==TypeMem.MEM;
         ParmNode parm;
         for( Node p : fun._uses )
           if( p instanceof ParmNode && (parm=(ParmNode)p)._idx != 0 )
-            parm.set_def(1,gvn.con(fun.formal(parm._idx)),gvn);
+            parm.set_def(1,gvn.con(parm._idx==-2 ? gvn.type(parm.in(1)) : fun.formal(parm._idx)),gvn);
       }
 
     } else {                    // Path Split

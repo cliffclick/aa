@@ -443,7 +443,7 @@ public class Parse {
     int oldx = _x;
     String uni = token();
     if( uni!=null ) {
-      unifun = _e.lookup_filter(uni,_gvn,1); // UniOp, or null
+      unifun = _e.lookup_filter(uni.intern(),_gvn,1); // UniOp, or null
       if( unifun==null || unifun.op_prec() == -1 ) { unifun=null; _x=oldx; } // Not a uniop
     }
 
@@ -465,7 +465,7 @@ public class Parse {
         oldx = _x;
         String bin = token();
         if( bin==null ) break;    // Valid parse, but no more Kleene star
-        Node binfun = _e.lookup_filter(bin,_gvn,2); // BinOp, or null
+        Node binfun = _e.lookup_filter(bin.intern(),_gvn,2); // BinOp, or null
         if( binfun==null ) { _x=oldx; break; } // Not a binop, no more Kleene star
         skipWS();  oldx = _x;
         term = term();
@@ -664,7 +664,7 @@ public class Parse {
     // Anonymous function or operator
     if( peek1(c,'{') ) {
       String tok = token0();
-      Node op = tok == null ? null : _e.lookup_filter(tok,_gvn,2); // TODO: filter by >2 not ==3
+      Node op = tok == null ? null : _e.lookup_filter(tok.intern(),_gvn,2); // TODO: filter by >2 not ==3
       if( peek('}') && op != null && op.op_prec() > 0 ) {
         // If a primitive unresolved, clone to give a proper error message.
         if( op instanceof UnresolvedNode && op.is_prim() )
@@ -679,7 +679,9 @@ public class Parse {
 
     // Check for a valid 'id'
     String tok = token0();
-    if( tok == null || tok.equals("=") || tok.equals("^"))
+    if( tok == null ) { _x = oldx; return null; }
+    tok = tok.intern();
+    if( tok.equals("=") || tok.equals("^"))
       { _x = oldx; return null; } // Disallow '=' as a fact, too easy to make mistakes
     ScopeNode scope = lookup_scope(tok,false);
     if( scope == null ) { // Assume any unknown ref is a forward-ref of a recursive function
@@ -701,8 +703,8 @@ public class Parse {
     int alias = scope.stk()._alias;   // Display alias
     MemMergeNode mmem = mem_active(); // Active memory
     Node objmem = mmem.active_obj(alias);
-    Node ptr = get_display_ptr(scope,tok);
-    return gvn(new LoadNode(objmem,ptr,tok.intern(),null));
+    Node ptr = get_display_ptr(scope,tok.intern());
+    return gvn(new LoadNode(objmem,ptr,tok,null));
   }
 
   /** Parse a tuple; first stmt but not the ',' parsed.
@@ -770,6 +772,7 @@ public class Parse {
     ids .push("^");
     ts  .push(tpar_disp);
     bads.push(null);
+    TypeMem tpar_mem = ((TypeMem)_e._scope.mem().value(_gvn)).widen_as_default();
 
     // Parse arguments
     while( true ) {
@@ -811,7 +814,7 @@ public class Parse {
       set_ctrl(fun);            // New control is function head
       // Build Parms for all incoming values
       Node rpc = gvn(new ParmNode(-1,"rpc",fun,con(TypeRPC.ALL_CALL),null)).keep();
-      Node mem = gvn(new ParmNode(-2,"mem",fun,con(TypeMem.MEM),null)).keep();
+      Node mem = gvn(new ParmNode(-2,"mem",fun,con(tpar_mem ),null)).keep();
       Node clo = gvn(new ParmNode( 0,"^"  ,fun,con(tpar_disp),null));
       // Display is special: the default is simply the outer lexical scope.
       // But here, in a function, the display is actually passed in as a hidden

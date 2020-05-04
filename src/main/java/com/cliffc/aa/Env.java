@@ -84,7 +84,7 @@ public class Env implements AutoCloseable {
     GVN.rereg(STK_0,STK_0.value(GVN));
     for( Node use : STK_0._uses ) GVN.rereg(use,use.value(GVN));
     GVN.rereg(_scope.mem(),_scope.mem().value(GVN));
-    _scope._live = TypeMem.FULL;
+    _scope._live = TypeMem.MEM;
     GVN.rereg(_scope,_scope.value(GVN));
     GVN.add_work(MEM_0);
     // Run the worklist dry

@@ -729,6 +729,8 @@ public class Type<T extends Type<T>> implements Cloneable {
     default: throw typerr(null);// Overridden in subclass
     }
   }
+  public Type high() { return above_center() ? this : dual(); }
+  
   // Return true if this is a forward-ref function pointer (return type from EpilogNode)
   public boolean is_forward_ref() { return false; }
 

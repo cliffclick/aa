@@ -38,11 +38,14 @@ public final class FunPtrNode extends Node {
   @Override public Node ideal(GVNGCM gvn, int level) {
     if( is_forward_ref() ) return null;
     RetNode ret = ret();
-    if( !(display() instanceof ConNode) && (ret.is_copy() || ret.fun().parm(0)==null) ) {
-      TypeMemPtr tdisp = (TypeMemPtr)gvn.type(display());
-      set_def(1,gvn.con(TypeMemPtr.make(tdisp._aliases,TypeObj.XOBJ)),gvn); // No display needed
-      return this;
-    }
+    // Cannot remove the display, unless there are no FORWARD uses, even if the
+    // function no longer uses the display.  Can be a FP2Closure user (via a
+    // chain of loads/stores/calls) which needs the display.
+    //if( !(display() instanceof ConNode) && (ret.is_copy() || ret.fun().parm(0)==null) ) {
+    //  TypeMemPtr tdisp = (TypeMemPtr)gvn.type(display());
+    //  set_def(1,gvn.con(TypeMemPtr.make(tdisp._aliases,TypeObj.XOBJ)),gvn); // No display needed
+    //  return this;
+    //}
     return null;
   }
   @Override public TypeFunPtr value(GVNGCM gvn) {
@@ -58,7 +61,7 @@ public final class FunPtrNode extends Node {
     // Pre-GCP, if the function is anywhere alive it might be used in a call
     // and thus demands all the memory that the CallEpi demands.
     // Post-GCP, all things are resolved and normal liveness flows.
-    return gvn._opt_mode < 2 ? TypeMem.FULL : super.live(gvn);
+    return gvn._opt_mode < 2 ? TypeMem.MEM : super.live(gvn);
   }
   // A function pointer can be applied at a Call, in which case the associated
   // Ret demands everything the CallEpi demands.  Until GCP we assume this

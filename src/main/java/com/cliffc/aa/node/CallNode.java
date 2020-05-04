@@ -101,7 +101,7 @@ public class CallNode extends Node {
   Node set_arg    (int idx, Node arg, GVNGCM gvn) { assert idx>0; return set_def(idx+2,arg,gvn); }
   void set_arg_reg(int idx, Node arg, GVNGCM gvn) { assert idx>0; gvn.set_def_reg(this,idx+2,arg); }
 
-          Node ctl() { return in(0); }
+  public  Node ctl() { return in(0); }
   public  Node mem() { return in(1); }
   public  Node fun() { return in(2); }
           Node set_fun    (Node fun, GVNGCM gvn) { return set_def(2,fun,gvn); }
@@ -255,7 +255,7 @@ public class CallNode extends Node {
       tfx = tfx.above_center() ? TypeFunPtr.GENERIC_FUNPTR.dual() : TypeFunPtr.GENERIC_FUNPTR;
     TypeFunPtr tfp = (TypeFunPtr)tfx;
     BitsFun fidxs = tfp.fidxs();
-    if( fidxs.above_center()!=tfp._disp.above_center() )
+    if( !fidxs.is_empty() && fidxs.above_center()!=tfp._disp.above_center() )
       return (TypeTuple)gvn.self_type(this); // Display and FIDX mis-aligned; stall
     // Resolve; only keep choices with sane arguments during GCP
     BitsFun rfidxs = resolve(fidxs,ts);
@@ -274,7 +274,7 @@ public class CallNode extends Node {
   @Override public TypeMem live( GVNGCM gvn) {
     if( gvn._opt_mode < 2 ) {
       BitsFun fidxs = fidxs(gvn);
-      if( fidxs == null ) return TypeMem.FULL; // Assume Something Good will yet happen
+      if( fidxs == null ) return TypeMem.MEM;  // Assume Something Good will yet happen
       if( fidxs.above_center() ) return _live; // Got choices, dunno which one will stick
       CallEpiNode cepi = cepi();
       if( cepi==null ) return _live; // Collapsing

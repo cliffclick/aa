@@ -69,7 +69,7 @@ public class GVNGCM {
     assert _live.get(CNT-1) && !_live.get(CNT) && _work._len==0 && _wrk_bits.isEmpty() && _ts._len==CNT;
     _INIT0_CNT=CNT;
     _INIT0_NODES = _vals.keySet().toArray(new Node[0]);
-    for( Node n : _INIT0_NODES ) { assert !n.is_dead();  n._live = TypeMem.FULL; add_work(n); }
+    for( Node n : _INIT0_NODES ) { assert !n.is_dead();  n._live = TypeMem.MEM; add_work(n); }
   }
   // Reset is called after a top-level exec exits (e.g. junits) with no parse
   // state left alive.  NOT called after a line in the REPL or a user-call to
@@ -79,7 +79,7 @@ public class GVNGCM {
     _opt_mode = 0;
     for( Node n : _INIT0_NODES ) {
       n.reset_to_init1(this);
-      n._live = n.basic_liveness() ? TypeMem.EMPTY : TypeMem.FULL;
+      n._live = n.basic_liveness() ? TypeMem.EMPTY : TypeMem.MEM;
       for( int i=0; i<n._uses._len; i++ )
         if( !n._uses.at(i).is_prim() )
           n._uses.del(i--);
@@ -343,8 +343,10 @@ public class GVNGCM {
       add_work(old);
       return;
     }
-    if( check_new(nnn) )        // If new, replace back in GVN
-      rereg(nnn,nnn.value(this));
+    if( check_new(nnn) ) {      // If new, replace back in GVN
+      nnn._live = old._live;    // Replacement has same liveness as original
+      rereg(nnn, nnn.value(this));
+    }
     if( !old.is_dead() ) { // if old is being replaced, it got removed from GVN table and types table.
       assert !check_opt(old);
       replace(old,nnn);
@@ -394,7 +396,7 @@ public class GVNGCM {
         !(n instanceof UnresolvedNode) && // Keep for proper errors
         !(n instanceof RetNode) &&        // Keep for proper errors
         !(n instanceof ConNode) )         // Already a constant
-      return untype(n, con(n.all_type().dual())); // Replace non-constants with high (dead) constants
+      return untype(n, con(n.all_type().high())); // Replace non-constants with high (dead) constants
 
     // [ts!] Compute best type, and type is IN ts
     Type t = n.value(this);     // Get best type
@@ -576,7 +578,7 @@ public class GVNGCM {
         // See if we can resolve an unresolved
         if( n instanceof CallNode && n._live != TypeMem.DEAD ) {
           CallNode call = (CallNode)n;
-          if( ((TypeTuple)nt).at(0)!=Type.XCTRL ) { // Wait until the Call is reachable
+          if( type(call.ctl()) !=Type.XCTRL ) { // Wait until the Call is reachable
             TypeFunPtr tfp = (TypeFunPtr) ((TypeTuple) type(call)).at(2);
             BitsFun fidxs = tfp.fidxs();
             if( fidxs.above_center() && fidxs.abit() == -1 && ambi_calls.find(call) == -1 )
