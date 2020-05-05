@@ -1,13 +1,9 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.type.BitsAlias;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeObj;
-import com.cliffc.aa.type.TypeStr;
+import com.cliffc.aa.type.*;
 import org.jetbrains.annotations.NotNull;
-
-import java.util.BitSet;
 
 // Allocates a TypeObj and produces a Tuple with the TypeObj and a TypeMemPtr.
 //
@@ -15,7 +11,7 @@ import java.util.BitSet;
 // NewNode, even if they have the same type.  Upon cloning both NewNodes get
 // new aliases that inherit (tree-like) from the original alias.
 
-public abstract class NewNode<T extends TypeObj> extends Node {
+public abstract class NewNode<T extends TypeObj<T>> extends Node {
   // Unique alias class, one class per unique memory allocation site.
   // Only effectively-final, because the copy/clone sets a new alias value.
   public int _alias; // Alias class
@@ -23,7 +19,6 @@ public abstract class NewNode<T extends TypeObj> extends Node {
   // may yet happen.  Fixed at SCALAR unless final, then equal to the final
   // store.  Field names are valid, and mods can only lift from R/W to FINAL.
   T _ts;             // Base object type, representing all possible future values
-  boolean _captured; // False if escapes, monotonic transition to true upon capture
 
   // NewNodes can participate in cycles, where the same structure is appended
   // to in a loop until the size grows without bound.  If we detect this we
@@ -36,7 +31,7 @@ public abstract class NewNode<T extends TypeObj> extends Node {
   public NewNode( byte type, int parent_alias, T to, Node ctrl,Node fld) { super(type,ctrl,fld); _init(parent_alias,to); }
   private void _init(int parent_alias, T to) {
     _alias = BitsAlias.new_alias(parent_alias);
-    _ts = to;
+    sets(to,null);
   }
   String xstr() { return "New*"+_alias; } // Self short name
   String  str() { return "New"+_ts; } // Inline less-short name
@@ -48,42 +43,46 @@ public abstract class NewNode<T extends TypeObj> extends Node {
   void set_name( T name, GVNGCM gvn ) { assert !name.above_center();  sets(name,gvn); }
 
   // Recompute default memory cache on a change
-  protected final void sets( T ts, GVNGCM gvn ) { _ts = ts; gvn.add_work_uses(this); }
+  @SuppressWarnings("unchecked")
+  protected final void sets( T ts, GVNGCM gvn ) {
+    _ts = (T)ts.widen_as_default();
+    if( gvn!=null ) gvn.add_work_uses(this);
+  }
 
   @Override public Node ideal(GVNGCM gvn, int level) {
+    if( DefMemNode.CAPTURED.get(_alias) ) return null;
     // If either the address or memory is not looked at then the memory
     // contents are dead.  The object might remain as a 'gensym' or 'sentinel'
     // for identity tests.
-    boolean old = _captured;
     if( captured(gvn) ) {
-      boolean progress = !old;  // Progress if 1st time captured in any case
-      while( !is_dead() && _defs._len > 1 ) {
-        progress = true;
-        pop(gvn);
-      }
-      return progress ? this : null;
+      DefMemNode.CAPTURED.set(_alias);
+      // All fields set to final-xscalar
+      _ts = _ts.make_dead();
+      while( !is_dead() && _defs._len > 1 )
+        pop(gvn);               // Kill all fields
+      gvn.add_work(Env.DEFMEM);
+      return this;
     }
     return null;
   }
 
   // Basic escape analysis.  If no escapes and no loads this object is dead.
   // TODO: A better answer is to put escape analysis into the type flows.
-  boolean captured( GVNGCM gvn ) {
+  private boolean captured( GVNGCM gvn ) {
     if( _keep > 0 ) return false;
-    if( _captured ) return true; // Already flagged
     if( _uses._len==0 ) return false; // Dead or being created
     Node ptr = _uses.at(0);
     // If only either address or memory remains, then memory contents are dead
-    if( _uses._len==1 && ptr instanceof OProjNode ) return (_captured = true);
+    if( _uses._len==1 && ptr instanceof OProjNode ) return true;
     if( _uses._len==1 && !(gvn.type(in(1)) instanceof TypeStr) )
-      return (_captured = true);
+      return true;
     if( ptr instanceof OProjNode ) ptr = _uses.at(1); // Get ptr not mem
     // Scan for pointer-escapes.  Really stupid: allow if-nil-check and if-eq-check only.
     for( Node use : ptr._uses )
       if( !(use instanceof IfNode) )
         return false;
     // No escape, no loads, so object is dead
-    return (_captured = true);
+    return true;
   }
 
   // Clones during inlining all become unique new sites

@@ -338,6 +338,12 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public TypeStruct make_from( boolean any, Type[] ts, byte[] bs ) { return malloc(_name,any,_flds,ts,bs).hashcons_free(); }
   // Make a TS with a name
   public TypeStruct make_from( String name ) { return malloc(name,_any,_flds,_ts,_flags).hashcons_free();  }
+  // Make a dead (all fields final XSCALAR) variant
+  @Override public TypeStruct make_dead() {
+    Type[] ts = ts(_ts.length);
+    Arrays.fill(ts,XSCALAR);
+    return make(_name,_flds,ts,ffnls(_ts.length));
+  }
 
   // Recursive meet in progress.
   // Called during class-init.
@@ -1187,13 +1193,13 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // Widen (loss info), to make it suitable as the default function memory.
   // Final fields can remain as-is; non-finals are all widened to SCALAR
   // (assuming a future Store); the field names & mods are kept.
-  public TypeStruct widen_as_default() {
+  @Override public TypeStruct widen_as_default() {
     if( this==ANYSTRUCT ) return ALLSTRUCT; // Shortcut
-    int i; for( i=0; i<_ts.length; i++ ) if( fmod(i)!=FFNL ) break;
-    if( i==_ts.length && !_any ) return this; // All fields final and low - fine as-is
     assert !_any;               // Only expect low-structs here
     Type[] ts = TypeAry.clone(_ts);
-    for( i=0; i<ts.length; i++ ) if( fmod(i)!=FFNL ) ts[i]=SCALAR;
+    for( int i=0; i<ts.length; i++ )
+      if( fmod(i)!=FFNL ) ts[i]=SCALAR;
+      else ts[i]=ts[i].simple_ptr();
     return make_from(ts);
   }
 

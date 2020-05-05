@@ -123,6 +123,10 @@ public class LoadNode extends Node {
 
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
     if( _live == TypeMem.DEAD ) return TypeMem.DEAD; // Am dead, so nothing extra is alive.
+    Type tmem = gvn.type(mem());
+    Type tptr = gvn.type(adr());
+    if( tmem instanceof TypeObj && tptr instanceof TypeMemPtr )
+      return TypeMem.make(((TypeMemPtr)tptr)._aliases,(TypeObj)tmem);
     // Alive (like normal liveness), plus the address, plus whatever can be
     // reached from the address.
     return ScopeNode.compute_live_mem(gvn,TypeMem.EMPTY,mem(),adr());

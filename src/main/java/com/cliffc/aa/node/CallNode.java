@@ -142,7 +142,7 @@ public class CallNode extends Node {
       for( int i=3; i<_defs._len; i++ )
         set_def(i,gvn.con(Type.XSCALAR),gvn);
       gvn.add_work_defs(this);
-      return set_def(0,gvn.con(Type.XCTRL),gvn);
+      return set_def(0,gvn.add_work(gvn.con(Type.XCTRL)),gvn);
     }
 
     // When do I do 'pattern matching'?  For the moment, right here: if not
@@ -300,8 +300,9 @@ public class CallNode extends Node {
   TypeMem live_use_call( GVNGCM gvn, int dfidx ) {
     Type tfx = ((TypeTuple)gvn.type(this)).at(2);
     // If resolve has chosen this dfidx, then the FunPtr is alive.
-    return tfx instanceof TypeFunPtr && ((TypeFunPtr)tfx).fidxs().test_recur(dfidx)
-      ? _live : TypeMem.DEAD;
+    if( !(tfx instanceof TypeFunPtr) ) return TypeMem.DEAD;
+    BitsFun fidxs = ((TypeFunPtr)tfx).fidxs();
+    return !fidxs.above_center() && fidxs.test_recur(dfidx) ? _live : TypeMem.DEAD;
   }
 
 
@@ -480,6 +481,7 @@ public class CallNode extends Node {
     if( gvn._opt_mode == 0 ) return false; // Graph not formed yet
     CallEpiNode cepi = cepi();
     if( cepi==null ) return false; // Dying
+    TypeMem callmem = (TypeMem)((TypeTuple)gvn.type(this))._ts[1];
 
     // Check all fidxs for being wirable
     boolean progress = false;
@@ -487,9 +489,19 @@ public class CallNode extends Node {
       if( BitsFun.is_parent(fidx) ) continue; // Do not wire parents, as they will eventually settle out
       FunNode fun = FunNode.find_fidx(fidx);  // Lookup, even if not wired
       if( fun.is_forward_ref() ) continue;    // Not forward refs, which at GCP just means a syntax error
-      RetNode ret = fun.ret();
+
+      // Wiring a Call brings in memory that the Call knows into what the
+      // Function knows.  These can be out-of-sync, if one or the other has
+      // propagated knowlege of e.g. new allocations.  Stall wiring until the
+      // types are properly "isa".
+      ParmNode fmem = fun.parm(-2);
+      if( fmem != null ) {
+        TypeMem funmem = (TypeMem)gvn.type(fmem);
+        if( !callmem.isa(funmem) ) // If call is lower than Parm:mem, the Parm will drop - not allowed
+          continue;
+      }
       // Internally wire() checks for already wired.
-      progress |= cepi.wire(gvn,this,fun,ret);
+      progress |= cepi.wire(gvn,this,fun,fun.ret());
     }
     assert !progress || Env.START.more_flow(gvn,new VBitSet(),gvn._opt_mode!=2,0)==0; // Post conditions are correct
     return progress;

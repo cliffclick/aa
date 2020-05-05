@@ -6,6 +6,7 @@ import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.VBitSet;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.Set;
 import java.util.BitSet;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -71,6 +72,7 @@ public class GVNGCM {
     _INIT0_NODES = _vals.keySet().toArray(new Node[0]);
     for( Node n : _INIT0_NODES ) { assert !n.is_dead();  n._live = TypeMem.MEM; add_work(n); }
   }
+  Set<Node> valsKeySet() { return _vals.keySet(); }
   // Reset is called after a top-level exec exits (e.g. junits) with no parse
   // state left alive.  NOT called after a line in the REPL or a user-call to
   // "eval" as user state carries on.
@@ -479,7 +481,7 @@ public class GVNGCM {
       else xform_old(n,small_work ? 0 : 2);
       // VERY EXPENSIVE ASSERT
       assert Env.START.more_flow(this,new VBitSet(),true,0)==0; // Initial conditions are correct
-      cnt++; assert cnt < 10000; // Catch infinite ideal-loops
+      cnt++; assert cnt < 11000; // Catch infinite ideal-loops
     }
     // No more ideal calls, small or large, to apply
     assert !Env.START.more_ideal(this,new VBitSet(),3);

@@ -46,7 +46,7 @@ public class StoreNode extends Node {
     NewObjNode nnn;  int idx;
     if( mem instanceof OProjNode &&
         mem.in(0) instanceof NewObjNode && (nnn=(NewObjNode)mem.in(0)) == adr.in(0) &&
-        mem._uses._len==1 && !val().is_forward_ref() && !nnn._captured &&
+        mem._uses._len==1 && !val().is_forward_ref() && !DefMemNode.CAPTURED.get(nnn._alias) &&
         (idx=nnn._ts.find(_fld))!= -1 && nnn._ts.can_update(idx) ) {
       // Update the value, and perhaps the final field
       nnn.update(idx,_fin,val(),gvn);
@@ -75,10 +75,10 @@ public class StoreNode extends Node {
 
   @Override public Type value(GVNGCM gvn) {
     Type adr = gvn.type(adr());
-    if( adr.isa(TypeMemPtr.OOP0.dual()) ) return TypeObj.XOBJ; // Very high address; might fall to any valid address
-    if( TypeMemPtr.OOP0.isa(adr) ) return TypeObj.OBJ; // Very low, might be any address
+    if( adr.isa(TypeMemPtr.OOP0.dual()) ) return TypeStruct.ANYSTRUCT; // Very high address; might fall to any valid address
+    if( TypeMemPtr.OOP0.isa(adr) ) return TypeStruct.ALLSTRUCT; // Very low, might be any address
     if( !(adr instanceof TypeMemPtr) )
-      return adr.above_center() ? TypeObj.XOBJ : TypeObj.OBJ;
+      return adr.above_center() ? TypeStruct.ANYSTRUCT : TypeStruct.ALLSTRUCT;
     TypeMemPtr tmp = (TypeMemPtr)adr;
     // Value is sane
     Type val = gvn.type(val());     // Value
@@ -201,7 +201,7 @@ public class StoreNode extends Node {
     }
     return null;
   }
-  @Override public Type all_type() { return TypeObj.OBJ; }
+  @Override public Type all_type() { return TypeStruct.ALLSTRUCT; }
   @Override public int hashCode() { return super.hashCode()+_fld.hashCode()+_fin; }
   // Stores are never CSE/equal lest we force a partial execution to become a
   // total execution (require a store on some path it didn't happen).  Stores

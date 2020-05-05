@@ -17,8 +17,8 @@ public class Env implements AutoCloseable {
     Node mem = par == null ? MEM_0 : par._scope.mem ();
     TypeStruct tdisp = TypeStruct.make_tuple(TypeStruct.ts(par == null ? Type.XNIL : par._scope.stk().tptr()));
     NewObjNode nnn = (NewObjNode)GVN.xform(new NewObjNode(is_closure,tdisp,ctl,clo).keep());
-    Node frm = GVN.xform(new OProjNode(nnn,0));
-    Node ptr = GVN.xform(new  ProjNode(nnn,1));
+    Node frm = DEFMEM.make_mem_proj(GVN,nnn);
+    Node ptr = GVN.xform(new ProjNode(nnn,1));
     DISPLAY .set(nnn._alias);   // Current display stack
     DISPLAYS.set(nnn._alias);   // Displays for all time
     MemMergeNode mmem = new MemMergeNode(mem,frm,nnn.<NewObjNode>unhook()._alias);
@@ -34,6 +34,7 @@ public class Env implements AutoCloseable {
   public  final static  CProjNode CTL_0; // Program start value control
   public  final static  MProjNode MEM_0; // Program start value memory
   public  final static NewObjNode STK_0; // Program start stack frame (has primitives)
+  public  final static DefMemNode DEFMEM;// Default memory (all structure types)
 
   public  final static    ConNode ALL_CTRL; // Default control
           final static int LAST_START_UID;
@@ -53,10 +54,12 @@ public class Env implements AutoCloseable {
     START  = (StartNode)GVN.xform(new StartNode(       ));
     CTL_0  = (CProjNode)GVN.xform(new CProjNode(START,0));
     MEM_0  = (MProjNode)GVN.xform(new MProjNode(START,1));
+    DEFMEM = (DefMemNode)GVN.xform(new DefMemNode(GVN.con(TypeObj.OBJ)));
     // Top-most (file-scope) lexical environment
     TOP = new Env(null,null, true);
     // Top-level display defining all primitives
     STK_0  = TOP._scope.stk();
+    TOP._scope.add_def(DEFMEM);
 
     // Top-level default values; ALL_CTRL is used by declared functions to
     // indicate that future not-yet-parsed code may call the function.
@@ -86,12 +89,19 @@ public class Env implements AutoCloseable {
     GVN.rereg(_scope.mem(),_scope.mem().value(GVN));
     _scope._live = TypeMem.MEM;
     GVN.rereg(_scope,_scope.value(GVN));
+    GVN.setype(DEFMEM,DEFMEM.value(GVN));
+    // Uplift all types once, since early Parm:mem got early versions of prims,
+    // and later prims *added* choices which *lowered* types.
+    for( int i=0; i<2; i++ )
+      for( Node n : GVN.valsKeySet() )
+        GVN.setype(n,n.value(GVN));
     GVN.add_work(MEM_0);
     // Run the worklist dry
     GVN.iter(1);
     BitsAlias.init0(); // Done with adding primitives
     BitsFun  .init0(); // Done with adding primitives
     BitsRPC  .init0(); // Done with adding primitives
+    DEFMEM   .init0(); // Done with adding primitives
     FunNode  .init0(); // Done with adding primitives
     GVN      .init0(); // Done with adding primitives
   }

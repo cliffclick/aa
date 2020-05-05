@@ -41,7 +41,7 @@ public abstract class IntrinsicNewNode extends Node {
     NewStrNode nnn = gvn.init(_nstr).keep();
     FunNode  fun = ( FunNode) gvn.xform(new  FunNode(this).add_def(Env.ALL_CTRL));
     ParmNode rpc = (ParmNode) gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
-    Node memp= gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM),null));
+    Node memp= gvn.xform(new ParmNode(-2,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
     gvn.add_work(memp);         // This may refine more later
 
     // Add input edges to the intrinsic
@@ -54,8 +54,8 @@ public abstract class IntrinsicNewNode extends Node {
     // Fill in NewStrNode inputs, now that we have them.
     gvn.set_def_reg(nnn,0,fun);
     gvn.set_def_reg(nnn,1,rez);
-    Node mem = gvn.xform(new OProjNode(nnn,0));
-    Node ptr = gvn.xform(new  ProjNode(nnn,1));
+    Node mem = Env.DEFMEM.make_mem_proj(gvn,nnn);
+    Node ptr = gvn.xform(new ProjNode(nnn,1));
     nnn.unhook();
     Node mmem= gvn.xform(new MemMergeNode(memp,mem,_nstr._alias));
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,ptr,rpc,fun));

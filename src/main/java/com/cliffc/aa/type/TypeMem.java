@@ -244,7 +244,14 @@ public class TypeMem extends Type<TypeMem> {
     as[alias] = oop;
     return make0(as);
   }
-
+  public static TypeMem make(BitsAlias aliases, TypeObj oop ) {
+    TypeObj[] as = new TypeObj[aliases.max()+1];
+    as[1] = TypeObj.XOBJ;
+    for( int alias : aliases )
+      as[alias] = oop;
+    return make0(as);
+  }
+  
   public static final TypeMem FULL; // Every alias filled with something
   public static final TypeMem EMPTY;// Every alias filled with anything
   public static final TypeMem  MEM; // FULL, except lifts REC, arrays, STR
@@ -265,8 +272,8 @@ public class TypeMem extends Type<TypeMem> {
     TypeObj[] tos = new TypeObj[Math.max(BitsAlias.RECORD,BitsAlias.ABC)+1];
     tos[BitsAlias.ALL] = TypeObj.OBJ;
     tos[BitsAlias.RECORD]=TypeStruct.ALLSTRUCT;
-    tos[BitsAlias.STR] = TypeStr.STR; // TODO: Proxy for all-arrays
-    tos[BitsAlias.ABC] = TypeStr.ABC; // TODO: Proxy for all-arrays
+    tos[BitsAlias.ARY] = TypeStr.STR; // TODO: Proxy for all-arrays
+    tos[BitsAlias.ABC] = TypeStr.ABC; //
     MEM  = make(tos);
     XMEM = MEM.dual();
 

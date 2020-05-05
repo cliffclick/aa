@@ -60,4 +60,6 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
   @Override public boolean must_nil() { return false; }
   @Override public boolean  may_nil() { return false; }
   @Override void walk( Predicate<Type> p ) { p.test(this); }
+  @SuppressWarnings("unchecked")
+  public O make_dead() { return (O)XOBJ; }
 }

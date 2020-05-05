@@ -109,10 +109,7 @@ public class ScopeNode extends Node {
   static TypeMem compute_live_mem(GVNGCM gvn, TypeMem live, Node mem, Node rez) {
     Type tmem = gvn.type(mem);
     Type trez = gvn.type(rez);
-    if( !(tmem instanceof TypeMem ) ) {
-      if( !(tmem instanceof TypeObj ) ) return live; // Not a memory
-      tmem = TypeMem.make(BitsAlias.RECORD,TypeStruct.ALLSTRUCT);
-    }
+    if( !(tmem instanceof TypeMem ) ) return live; // Not a memory
     if( TypeMemPtr.OOP.isa(trez) ) return (TypeMem)tmem; // All possible pointers
     if( !(trez instanceof TypeMemPtr) ) return live; // Not a pointer
     if( tmem.above_center() || trez.above_center() ) return live; // Have infinite choices still, report basic live only

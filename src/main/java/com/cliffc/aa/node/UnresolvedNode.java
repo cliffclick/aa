@@ -42,6 +42,8 @@ public class UnresolvedNode extends Node {
   @Override public TypeFunPtr value(GVNGCM gvn) {
     final TypeFunPtr GF = TypeFunPtr.GENERIC_FUNPTR;
     if( gvn._opt_mode < 2 ) { // parse or 1st iter: assume all can happen, and hope to resolve to lift
+      // During iter() has to only LIFT.  Resolving a Call removes choices...
+      // which if Unresolved returns high DROPS not LIFTS.  
       TypeFunPtr t = GF.dual();
       for( Node def : _defs ) {
         Type td = gvn.type(def);

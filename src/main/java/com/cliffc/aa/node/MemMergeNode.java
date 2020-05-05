@@ -252,7 +252,7 @@ public class MemMergeNode extends Node {
     TypeMem tm = (TypeMem)(t.bound(TypeMem.MEM)); // Only bounding for TestNode
 
     // Merge inputs with parent.
-    TypeObj[] tpars = tm.alias2objs(); // Parent memory
+    TypeObj[] tpars = tm.alias2objs(); // Clone of base memory
     Ary<TypeObj> tos = new Ary<>(tpars.clone());
     for( int i=1; i<_defs._len; i++ ) {
       final int alias = alias_at(i);
@@ -265,11 +265,10 @@ public class MemMergeNode extends Node {
       // Assuming prior aliases are correctly computed in "tos", find the
       // parent and merge.  Parents not-set locally just inherent from the last
       // local-set parent.
-      int par_alias = alias_at(find_alias2idx(BitsAlias.parent(alias)));
-      TypeObj base = par_alias==1 ? tm.at(alias) : tos.at(par_alias);
-      TypeObj rez = (TypeObj)base.meet(tao);
-
-      tos.setX(alias,rez);
+      TypeObj base = tos.atX(alias);
+      for( int a = alias; base==null; a = BitsAlias.parent(a))
+        base = tos.atX(a);
+      tos.setX(alias, (TypeObj)base.meet(tao) );
     }
     return TypeMem.make0(tos._es);
   }

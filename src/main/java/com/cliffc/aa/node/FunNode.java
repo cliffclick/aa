@@ -371,6 +371,7 @@ public class FunNode extends RegionNode {
       int op = n._op;           // opcode
       if( op == OP_FUN  && n       != this ) continue; // Call to other function, not part of inlining
       if( op == OP_PARM && n.in(0) != this ) continue; // Arg  to other function, not part of inlining
+      if( op == OP_DEFMEM ) continue;                  // Never part of body, but reachable from all allocations
       body.push(n);                                    // Part of body
       if( op == OP_RET ) continue;                     // Return (of this or other function)
       if( n instanceof ProjNode && n.in(0) instanceof CallNode ) continue; // Wired call; all projs lead to other functions
@@ -579,7 +580,7 @@ public class FunNode extends RegionNode {
         ParmNode parm;
         for( Node p : fun._uses )
           if( p instanceof ParmNode && (parm=(ParmNode)p)._idx != 0 )
-            parm.set_def(1,gvn.con(parm._idx==-2 ? gvn.type(parm.in(1)) : fun.formal(parm._idx)),gvn);
+            parm.set_def(1,parm._idx==-2 ? Env.DEFMEM : gvn.con(fun.formal(parm._idx)),gvn);
       }
 
     } else {                    // Path Split
@@ -600,6 +601,8 @@ public class FunNode extends RegionNode {
         ParmNode pnn = (ParmNode)nn; // Update non-display type to match new signature
         if( pnn._idx > 0 ) nt = fun.formal(pnn._idx).simple_ptr(); // Upgrade new Parm default type
       }
+      if( nn instanceof OProjNode ) // Cloned allocations registers with default memory
+        Env.DEFMEM.make_mem(gvn,(NewNode)nn.in(0),(OProjNode)nn);
       gvn.rereg(nn,nt);
     }
 

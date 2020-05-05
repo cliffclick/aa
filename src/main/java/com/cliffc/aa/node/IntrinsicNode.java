@@ -40,7 +40,7 @@ public class IntrinsicNode extends Node {
     TypeFunSig sig = TypeFunSig.make(formals,TypeMemPtr.make(BitsAlias.RECORD,tn));
     FunNode fun = (FunNode) gvn.xform(new FunNode(tn._name,sig,-1).add_def(Env.ALL_CTRL));
     Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
-    Node mem = gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM     ),null));
+    Node mem = gvn.xform(new ParmNode(-2,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
     Node ptr = gvn.xform(new ParmNode( 1,"ptr",fun,gvn.con(TypeMemPtr.OOP  ),null));
     Node cvt = gvn.xform(new IntrinsicNode(tn,badargs,fun,mem,ptr));
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,cvt,ptr,rpc,fun));
@@ -129,8 +129,8 @@ public class IntrinsicNode extends Node {
       nnn.add_def(gvn.xform(new ParmNode(i,argx,fun, gvn.con(to._ts[i].simple_ptr()),null)));
     }
     gvn.init(nnn);
+    Node obj = Env.DEFMEM.make_mem_proj(gvn,nnn);
     Node ptr = gvn.xform(new  ProjNode(nnn,1));
-    Node obj = gvn.xform(new OProjNode(nnn,0));
     Node mmem= gvn.xform(new MemMergeNode(memp,obj,nnn.<NewObjNode>unhook()._alias));
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,ptr,rpc,fun));
     return (FunPtrNode)gvn.xform(new FunPtrNode(ret,gvn.con(TypeFunPtr.NO_DISP)));

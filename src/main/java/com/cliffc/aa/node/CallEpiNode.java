@@ -230,11 +230,7 @@ public final class CallEpiNode extends Node {
     if( fidxs==BitsFun.EMPTY ) return TypeTuple.CALLE.dual();
     if( fidxs.test(1) ) return TypeTuple.CALLE;
     if( fidxs.test(0) ) throw com.cliffc.aa.AA.unimpl(); // Handle nil fptr
-    // If pre-gcp, we may have unknown callers.  Be very conservative until we
-    // have wired all callers.  While GCP will discover a more precise set of
-    // fidxes, we always have a conservative set even pre-GCP.
-    if( gvn._opt_mode < 2 && fidxs.bitCount() > nwired() )
-      return TypeTuple.CALLE;
+
     // Meet across wired callers.
     TypeTuple mt = TypeTuple.XRET; // Start high and 'meet'
     for( int i=0; i<nwired(); i++ ) {
@@ -247,7 +243,16 @@ public final class CallEpiNode extends Node {
         continue;               // Only fails during testing
       mt = (TypeTuple)mt.meet(tr);
     }
-
+    // If pre-gcp, we may have unknown callers.  Be very conservative until we
+    // have wired all callers.  While GCP will discover a more precise set of
+    // fidxes, we always have a conservative set even pre-GCP.  Memory remains
+    // as sharp as widen_as_default, so the Parser can continue to do lookups,
+    // but cannot be any more precise since the unknown called functions can
+    // modify all non-final memory.
+    if( gvn._opt_mode < 2 ) {
+      TypeTuple precall_crushed = TypeTuple.make(Type.CTRL,((TypeMem)tcall.at(1)).widen_as_default(),Type.SCALAR);
+      mt = mt==TypeTuple.XRET ? precall_crushed : (TypeTuple)mt.join(precall_crushed);
+    }
     return mt;
   }
 

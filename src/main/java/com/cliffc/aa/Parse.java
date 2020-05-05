@@ -726,8 +726,8 @@ public class Parse {
     nn._fld_starts = args.asAry();
     // NewNode returns a TypeObj and a TypeMemPtr (the reference).
     Node nnn = gvn(nn).keep();
-    Node ptr = gvn(new  ProjNode(nnn,1));
-    Node mem = gvn(new OProjNode(nnn,0));
+    Node mem = Env.DEFMEM.make_mem_proj(_gvn,nn);
+    Node ptr = gvn(new ProjNode(nnn,1));
     mem_active().create_alias_active(nn.<NewObjNode>unhook()._alias,mem,_gvn);
     return ptr;
   }
@@ -772,7 +772,6 @@ public class Parse {
     ids .push("^");
     ts  .push(tpar_disp);
     bads.push(null);
-    TypeMem tpar_mem = ((TypeMem)_e._scope.mem().value(_gvn)).widen_as_default();
 
     // Parse arguments
     while( true ) {
@@ -814,7 +813,7 @@ public class Parse {
       set_ctrl(fun);            // New control is function head
       // Build Parms for all incoming values
       Node rpc = gvn(new ParmNode(-1,"rpc",fun,con(TypeRPC.ALL_CALL),null)).keep();
-      Node mem = gvn(new ParmNode(-2,"mem",fun,con(tpar_mem ),null)).keep();
+      Node mem = gvn(new ParmNode(-2,"mem",fun,TypeMem.MEM,Env.DEFMEM,null)).keep();
       Node clo = gvn(new ParmNode( 0,"^"  ,fun,con(tpar_disp),null));
       // Display is special: the default is simply the outer lexical scope.
       // But here, in a function, the display is actually passed in as a hidden
@@ -948,8 +947,8 @@ public class Parse {
     TypeStr ts = TypeStr.con(new String(_buf,oldx,_x-oldx-1).intern());
     // Convert to ptr-to-constant-memory-string
     NewStrNode nnn = init( new NewStrNode(ts,ctrl(),con(ts))).keep();
+    Node mem = Env.DEFMEM.make_mem_proj(_gvn,nnn);
     Node ptr = gvn( new  ProjNode(nnn,1));
-    Node mem = gvn( new OProjNode(nnn,0));
     mem_active().create_alias_active(nnn.<NewStrNode>unhook()._alias,mem,_gvn);
     return ptr;
   }
