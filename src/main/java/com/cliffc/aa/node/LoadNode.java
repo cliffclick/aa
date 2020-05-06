@@ -125,6 +125,10 @@ public class LoadNode extends Node {
     if( _live == TypeMem.DEAD ) return TypeMem.DEAD; // Am dead, so nothing extra is alive.
     Type tmem = gvn.type(mem());
     Type tptr = gvn.type(adr());
+    // If either is above-center, then only basic-liveness - the load can load
+    // from anything getting anything.
+    if( tmem.above_center() || tptr.above_center() ) return _live;
+    // TypeObj memory is already alias-constricted.  Can only demand from that alias.
     if( tmem instanceof TypeObj && tptr instanceof TypeMemPtr )
       return TypeMem.make(((TypeMemPtr)tptr)._aliases,(TypeObj)tmem);
     // Alive (like normal liveness), plus the address, plus whatever can be

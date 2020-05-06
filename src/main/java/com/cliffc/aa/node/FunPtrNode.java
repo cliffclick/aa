@@ -37,15 +37,13 @@ public final class FunPtrNode extends Node {
 
   @Override public Node ideal(GVNGCM gvn, int level) {
     if( is_forward_ref() ) return null;
-    RetNode ret = ret();
-    // Cannot remove the display, unless there are no FORWARD uses, even if the
-    // function no longer uses the display.  Can be a FP2Closure user (via a
-    // chain of loads/stores/calls) which needs the display.
-    //if( !(display() instanceof ConNode) && (ret.is_copy() || ret.fun().parm(0)==null) ) {
-    //  TypeMemPtr tdisp = (TypeMemPtr)gvn.type(display());
-    //  set_def(1,gvn.con(TypeMemPtr.make(tdisp._aliases,TypeObj.XOBJ)),gvn); // No display needed
-    //  return this;
-    //}
+
+    // Display is known captured?  Yank it.
+    if( display().in(0) instanceof NewNode ) {
+      int alias = ((NewNode)display().in(0))._alias;
+      if( DefMemNode.CAPTURED.get(alias) )
+        return set_def(1,gvn.con(TypeMemPtr.make(alias,TypeStr.NO_DISP)),gvn); // No display needed
+    }
     return null;
   }
   @Override public TypeFunPtr value(GVNGCM gvn) {

@@ -21,7 +21,6 @@ public class TestParse {
     Env.DISPLAYS.set(10);
 
     // Temp bugs to get stability on parse0-3 plus type tests for incremental git pushes
-    test   ("fun:{int str -> int}={x y -> x+2}; fun(2,3)", TypeInt.con(4));
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(1)",TypeInt.con(1));
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
     test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(1)",TypeInt.con(1));
@@ -34,6 +33,7 @@ public class TestParse {
     test_ptr("x=@{n:=1;v:=2}; x.n := 3; x", "@{n:=3;v:=2}");
     test("x=3; mul2={x -> x*2}; mul2(2.1)", TypeFlt.con(2.1*2.0)); // must inline to resolve overload {*}:Flt with I->F conversion
     testerr("sq={x -> x*x}; sq(\"abc\")", "*[$]\"abc\" is none of (flt64,int64)",9);
+    test   ("fun:{int str -> int}={x y -> x+2}; fun(2,3)", TypeInt.con(4));
 
 
     // A collection of tests which like to fail easily
@@ -161,7 +161,6 @@ public class TestParse {
 
   @Test public void testParse02() {
     Object dummy = Env.GVN; // Force class loading cycle
-    testerr("(math_rand(1) ? {+} : {*})(2,3)","Unable to resolve {+}",19); // either 2+3 or 2*3, or {5,6} which is INT8.
     TypeMemPtr tdisp = TypeMemPtr.make(10,TypeStr.NO_DISP);
     Env.DISPLAYS.set(10);
     // Anonymous function definition

@@ -28,8 +28,9 @@ public class DefMemNode extends Node {
     }
     return TypeMem.make0(tos);
   }
-  // Uses OProjs but never demands memory
-  @Override public TypeMem live_use( GVNGCM gvn, Node def ) { return def instanceof ConNode ? TypeMem.EMPTY : TypeMem.DEAD; }
+  // Basic live only, never uses memory.  If this is all that keeps an OProj
+  // alive, the 
+  @Override public TypeMem live_use( GVNGCM gvn, Node def ) { return _live; }
   @Override public TypeMem all_type() { return TypeMem.MEM; }
   @Override public boolean equals(Object o) { return this==o; } // Only one
 

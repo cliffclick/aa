@@ -71,12 +71,22 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   private boolean captured( GVNGCM gvn ) {
     if( _keep > 0 ) return false;
     if( _uses._len==0 ) return false; // Dead or being created
-    Node ptr = _uses.at(0);
+    Node mem = _uses.at(0);
     // If only either address or memory remains, then memory contents are dead
-    if( _uses._len==1 && ptr instanceof OProjNode ) return true;
-    if( _uses._len==1 && !(gvn.type(in(1)) instanceof TypeStr) )
+    if( _uses._len==1 ) {
+      if( mem instanceof OProjNode ) return true; // No pointer, just dead memory
+      // Just a pointer; currently on Strings become memory constants and
+      // constant-fold - leaving the allocation dead.
+      return !(gvn.type(in(1)) instanceof TypeStr);
+    }
+    Node ptr = _uses.at(1);
+    if( ptr instanceof OProjNode ) { mem=ptr; ptr = _uses.at(0); } // Get ptr not mem
+    // Only memory use is default memory - means no loads, no stores.  Only the
+    // pointer-use remains.
+    if( mem._uses._len==1 ) {
+      assert mem._uses.at(0)==Env.DEFMEM;
       return true;
-    if( ptr instanceof OProjNode ) ptr = _uses.at(1); // Get ptr not mem
+    }
     // Scan for pointer-escapes.  Really stupid: allow if-nil-check and if-eq-check only.
     for( Node use : ptr._uses )
       if( !(use instanceof IfNode) )

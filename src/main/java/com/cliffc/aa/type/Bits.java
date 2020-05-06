@@ -267,7 +267,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   private static void and( long[] bits, long con ) { bits[idx(con)] &= ~mask(con); }
   private static long[] bits( int b ) { return new long[idx(b)+1]; }
   int max( ) {
-    return _bits==null ? _con : (63 - Long.numberOfLeadingZeros(_bits[_bits.length-1]))+((_bits.length-1)<<6);
+    return _bits==null ? Math.abs(_con) : (63 - Long.numberOfLeadingZeros(_bits[_bits.length-1]))+((_bits.length-1)<<6);
   }
 
   // Meet is more complex than the obvious AND/OR over bits.  There's a bit of
