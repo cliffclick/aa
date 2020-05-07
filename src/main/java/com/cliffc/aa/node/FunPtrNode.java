@@ -59,7 +59,7 @@ public final class FunPtrNode extends Node {
     // Pre-GCP, if the function is anywhere alive it might be used in a call
     // and thus demands all the memory that the CallEpi demands.
     // Post-GCP, all things are resolved and normal liveness flows.
-    return gvn._opt_mode < 2 ? TypeMem.MEM : super.live(gvn);
+    return gvn._opt_mode < 2 ? TypeMem.FULL : super.live(gvn);
   }
   // A function pointer can be applied at a Call, in which case the associated
   // Ret demands everything the CallEpi demands.  Until GCP we assume this

@@ -109,7 +109,7 @@ public class StoreNode extends Node {
     else if( tmem instanceof TypeObj )
       tobj = (TypeObj)tmem;   // Object being updated
     else                      // Else dunno what is being updated
-      return TypeObj.make0(tmem.above_center());
+      return tmem.above_center() ? TypeObj.XOBJ : TypeObj.OBJ;
 
     // Not updating a struct?
     if( !(tobj instanceof TypeStruct) )
@@ -201,7 +201,7 @@ public class StoreNode extends Node {
     }
     return null;
   }
-  @Override public Type all_type() { return TypeStruct.ALLSTRUCT; }
+  @Override public Type all_type() { return TypeObj.OBJ; }
   @Override public int hashCode() { return super.hashCode()+_fld.hashCode()+_fin; }
   // Stores are never CSE/equal lest we force a partial execution to become a
   // total execution (require a store on some path it didn't happen).  Stores

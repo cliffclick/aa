@@ -47,7 +47,7 @@ public class IntrinsicNode extends Node {
     return (FunPtrNode)gvn.xform(new FunPtrNode(ret,gvn.con(TypeFunPtr.NO_DISP)));
   }
 
-  @Override public Type all_type() { return TypeMem.MEM; }
+  @Override public Type all_type() { return TypeMem.FULL; }
 
   // If the input memory is unaliased, fold into the NewNode.
   // If this node does not fold away, the program is in error.

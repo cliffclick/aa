@@ -338,12 +338,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public TypeStruct make_from( boolean any, Type[] ts, byte[] bs ) { return malloc(_name,any,_flds,ts,bs).hashcons_free(); }
   // Make a TS with a name
   public TypeStruct make_from( String name ) { return malloc(name,_any,_flds,_ts,_flags).hashcons_free();  }
-  // Make a dead (all fields final XSCALAR) variant
-  @Override public TypeStruct make_dead() {
-    Type[] ts = ts(_ts.length);
-    Arrays.fill(ts,XSCALAR);
-    return make(_name,_flds,ts,ffnls(_ts.length));
-  }
 
   // Recursive meet in progress.
   // Called during class-init.
@@ -1194,13 +1188,11 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // Final fields can remain as-is; non-finals are all widened to SCALAR
   // (assuming a future Store); the field names & mods are kept.
   @Override public TypeStruct widen_as_default() {
-    if( this==ANYSTRUCT ) return ALLSTRUCT; // Shortcut
-    assert !_any;               // Only expect low-structs here
     Type[] ts = TypeAry.clone(_ts);
     for( int i=0; i<ts.length; i++ )
-      if( fmod(i)!=FFNL ) ts[i]=SCALAR;
+      if( fmod(i)!=FFNL ) ts[i]=SCALAR; // Widen non-finals to SCALAR, as-if crushed
       else ts[i]=ts[i].simple_ptr();
-    return make_from(ts);
+    return make_from(false,ts,_flags);
   }
 
   // True if isBitShape on all bits

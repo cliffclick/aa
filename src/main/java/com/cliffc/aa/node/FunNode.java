@@ -531,8 +531,8 @@ public class FunNode extends RegionNode {
       if( old_alias != -1 )       // Was a NewNode?
         aliases.set(old_alias);   // Record old alias before copy/split
       // Slightly better error message when cloning constructors
-      //if( path > 0 && n instanceof IntrinsicNode )
-      //  ((IntrinsicNode)c)._badargs = ((CallNode)in(path).in(0))._badargs[1];
+      if( path > 0 && n instanceof IntrinsicNode )
+        ((IntrinsicNode)c)._badargs = path_call._badargs[1];
     }
 
     // Collect the old/new returns and funptrs and add to map also.

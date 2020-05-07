@@ -132,7 +132,7 @@ public class ScopeNode extends Node {
     // The top scope is always alive, and represents what all future unparsed
     // code MIGHT do.
     if( this==Env.TOP._scope )
-      return gvn._opt_mode < 2 ? TypeMem.MEM : TypeMem.DEAD;
+      return gvn._opt_mode < 2 ? TypeMem.FULL : TypeMem.DEAD;
     // Basic liveness ("You are Alive!") for control and returned value
     if( def == ctrl() ) return TypeMem.EMPTY;
     if( def == rez () ) return TypeMem.EMPTY;

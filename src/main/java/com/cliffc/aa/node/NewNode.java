@@ -56,8 +56,6 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     // for identity tests.
     if( captured(gvn) ) {
       DefMemNode.CAPTURED.set(_alias);
-      // All fields set to final-xscalar
-      _ts = _ts.make_dead();
       while( !is_dead() && _defs._len > 1 )
         pop(gvn);               // Kill all fields
       gvn.add_work(Env.DEFMEM);
@@ -81,12 +79,6 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     }
     Node ptr = _uses.at(1);
     if( ptr instanceof OProjNode ) { mem=ptr; ptr = _uses.at(0); } // Get ptr not mem
-    // Only memory use is default memory - means no loads, no stores.  Only the
-    // pointer-use remains.
-    if( mem._uses._len==1 ) {
-      assert mem._uses.at(0)==Env.DEFMEM;
-      return true;
-    }
     // Scan for pointer-escapes.  Really stupid: allow if-nil-check and if-eq-check only.
     for( Node use : ptr._uses )
       if( !(use instanceof IfNode) )

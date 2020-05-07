@@ -249,7 +249,7 @@ public class MemMergeNode extends Node {
     Type t = gvn.type(mem());
     if( !(t instanceof TypeMem) )
       return t.above_center() ? TypeMem.XMEM : TypeMem.MEM;
-    TypeMem tm = (TypeMem)(t.bound(TypeMem.MEM)); // Only bounding for TestNode
+    TypeMem tm = (TypeMem)(t.bound(TypeMem.FULL)); // Only bounding for TestNode
 
     // Merge inputs with parent.
     TypeObj[] tpars = tm.alias2objs(); // Clone of base memory
@@ -262,13 +262,16 @@ public class MemMergeNode extends Node {
       TypeObj tao = ta instanceof TypeObj ? (TypeObj)ta
         : (ta==null || ta.above_center() ? TypeObj.XOBJ : TypeObj.OBJ); // Handle ANY, ALL
 
-      // Assuming prior aliases are correctly computed in "tos", find the
-      // parent and merge.  Parents not-set locally just inherent from the last
-      // local-set parent.
-      TypeObj base = tos.atX(alias);
-      for( int a = alias; base==null; a = BitsAlias.parent(a))
-        base = tos.atX(a);
-      tos.setX(alias, (TypeObj)base.meet(tao) );
+      if( tao!=TypeObj.UNUSED ) {
+        // Assuming prior aliases are correctly computed in "tos", find the
+        // parent and merge.  Parents not-set locally just inherent from the last
+        // local-set parent.
+        TypeObj base = tos.atX(alias);
+        for( int a = alias; base==null; a = BitsAlias.parent(a))
+          base = tos.atX(a);
+        tao = (TypeObj)base.meet(tao);
+      }
+      tos.setX(alias, tao );
     }
     return TypeMem.make0(tos._es);
   }
@@ -283,11 +286,11 @@ public class MemMergeNode extends Node {
     // Pass thru just the alias slice in question
     int alias = alias_at(_defs.find(def));
     TypeObj obj = _live.at(alias);
-    return obj==TypeObj.XOBJ ? TypeMem.DEAD : TypeMem.make(alias, obj);
+    return obj==TypeObj.XOBJ || obj==TypeObj.UNUSED ? TypeMem.DEAD : TypeMem.make(alias, obj);
   }
   @Override public boolean basic_liveness() { return false; }
 
-  @Override public Type all_type() { return TypeMem.MEM; }
+  @Override public Type all_type() { return TypeMem.FULL; }
 
   @Override @NotNull public MemMergeNode copy( boolean copy_edges, GVNGCM gvn) {
     MemMergeNode mmm = (MemMergeNode)super.copy(copy_edges, gvn);

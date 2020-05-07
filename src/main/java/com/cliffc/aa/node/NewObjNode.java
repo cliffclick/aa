@@ -123,14 +123,13 @@ public class NewObjNode extends NewNode<TypeStruct> {
   }
 
   @Override public Type value(GVNGCM gvn) {
-    TypeObj newt = _ts;                      // Default if captured/dead
-    if( !DefMemNode.CAPTURED.get(_alias) ) { // Not captured, still alive
-      // Gather args and produce a TypeStruct
-      Type[] ts = TypeAry.get(_ts._ts.length);
-      for( int i=0; i<ts.length; i++ )
-        ts[i] = gvn.type(fld(i)).join(_ts._ts[i]);
-      newt = _ts.make_from(ts);
-    }
+    if( DefMemNode.CAPTURED.get(_alias) ) // Captured/dead
+      return TypeTuple.make(TypeObj.UNUSED,TypeMemPtr.make(_alias,TypeObj.OBJ));
+    // Gather args and produce a TypeStruct
+    Type[] ts = TypeAry.get(_ts._ts.length);
+    for( int i=0; i<ts.length; i++ )
+      ts[i] = gvn.type(fld(i)).join(_ts._ts[i]);
+    TypeStruct newt = _ts.make_from(ts);
     return TypeTuple.make(newt,TypeMemPtr.make(_alias,TypeObj.OBJ)); // Complex obj, simple ptr.
   }
   @Override public Type all_type() { return TypeTuple.NEWOBJ; }

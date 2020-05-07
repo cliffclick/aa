@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 
@@ -8,8 +9,14 @@ public class OProjNode extends ProjNode {
   public OProjNode( Node ifn, int idx ) { super(ifn,idx); }
   @Override String xstr() { return "OProj_"+_idx; }
   @Override public Node ideal(GVNGCM gvn, int level) {
+    // Only memory use is default memory - means no loads, no stores.  Only the
+    // pointer-use remains.
+    if( _uses._len==1 ) {
+      assert _uses.at(0)==Env.DEFMEM;
+      return gvn.con(TypeObj.UNUSED);
+    }
     if( DefMemNode.CAPTURED.get(alias()) )
-      return gvn.con(((NewNode)in(0))._ts);
+      return gvn.con(TypeObj.UNUSED);
     return null;
   }
   @Override public Type value(GVNGCM gvn) {

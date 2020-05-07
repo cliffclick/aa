@@ -29,9 +29,10 @@ public class DefMemNode extends Node {
     return TypeMem.make0(tos);
   }
   // Basic live only, never uses memory.  If this is all that keeps an OProj
-  // alive, the 
+  // alive, the NewNode will shortly declare captured.
+  @Override public boolean basic_liveness() { return false; }
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) { return _live; }
-  @Override public TypeMem all_type() { return TypeMem.MEM; }
+  @Override public TypeMem all_type() { return TypeMem.FULL; }
   @Override public boolean equals(Object o) { return this==o; } // Only one
 
   // Make an OProj for a New, and 'hook' it into the default memory

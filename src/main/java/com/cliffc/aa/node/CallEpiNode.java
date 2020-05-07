@@ -232,6 +232,7 @@ public final class CallEpiNode extends Node {
     if( fidxs.test(0) ) throw com.cliffc.aa.AA.unimpl(); // Handle nil fptr
 
     // Meet across wired callers.
+    boolean progress=false;
     TypeTuple mt = TypeTuple.XRET; // Start high and 'meet'
     for( int i=0; i<nwired(); i++ ) {
       Node ret = in(wire_num(i));
@@ -242,6 +243,7 @@ public final class CallEpiNode extends Node {
           ((TypeTuple)tr)._ts.length != TypeTuple.XRET._ts.length )
         continue;               // Only fails during testing
       mt = (TypeTuple)mt.meet(tr);
+      progress=true;
     }
     // If pre-gcp, we may have unknown callers.  Be very conservative until we
     // have wired all callers.  While GCP will discover a more precise set of
@@ -251,7 +253,7 @@ public final class CallEpiNode extends Node {
     // modify all non-final memory.
     if( gvn._opt_mode < 2 ) {
       TypeTuple precall_crushed = TypeTuple.make(Type.CTRL,((TypeMem)tcall.at(1)).widen_as_default(),Type.SCALAR);
-      mt = mt==TypeTuple.XRET ? precall_crushed : (TypeTuple)mt.join(precall_crushed);
+      mt = progress ? (TypeTuple)mt.join(precall_crushed) : precall_crushed;
     }
     return mt;
   }
