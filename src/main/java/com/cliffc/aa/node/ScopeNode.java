@@ -122,17 +122,17 @@ public class ScopeNode extends Node {
     // The top scope is always alive, and represents what all future unparsed
     // code MIGHT do.
     if( this==Env.TOP._scope )
-      return gvn._opt_mode < 2 ? TypeMem.MEM : TypeMem.DEAD;
+      return gvn._opt_mode < 2 ? TypeMem.ISUSED : TypeMem.DEAD;
     assert _uses._len==0;
     // All fields in all reachable pointers from rez() will be marked live
-    return compute_live_mem(gvn,TypeMem.EMPTY,mem(),rez());
+    return compute_live_mem(gvn,TypeMem.UNUSED,mem(),rez());
   }
 
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
     // The top scope is always alive, and represents what all future unparsed
     // code MIGHT do.
     if( this==Env.TOP._scope )
-      return gvn._opt_mode < 2 ? TypeMem.FULL : TypeMem.DEAD;
+      return gvn._opt_mode < 2 ? TypeMem.ISUSED : TypeMem.DEAD;
     // Basic liveness ("You are Alive!") for control and returned value
     if( def == ctrl() ) return TypeMem.EMPTY;
     if( def == rez () ) return TypeMem.EMPTY;

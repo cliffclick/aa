@@ -13,11 +13,11 @@ public class PhiNode extends Node {
   final Type _t;
   private PhiNode( byte op, Type t, Parse badgc, Node... vals ) {
     super(op,vals);
-    if( t instanceof TypeMem ) _t = TypeMem.FULL;
+    if( t instanceof TypeMem ) _t = TypeMem.ISUSED;
     else if( t instanceof TypeObj ) _t = TypeObj.OBJ; // Need to check liveness
     else { assert t.isa(Type.SCALAR); _t = Type.SCALAR; }
     _badgc = badgc;
-    _live = basic_liveness() ? TypeMem.EMPTY : TypeMem.FULL;
+    _live = basic_liveness() ? TypeMem.EMPTY : TypeMem.ISUSED;
   }
   public PhiNode( Type t, Parse badgc, Node... vals ) { this(OP_PHI,t,badgc,vals); }
   // For ParmNodes

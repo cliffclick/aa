@@ -249,7 +249,7 @@ public class MemMergeNode extends Node {
     Type t = gvn.type(mem());
     if( !(t instanceof TypeMem) )
       return t.above_center() ? TypeMem.XMEM : TypeMem.MEM;
-    TypeMem tm = (TypeMem)(t.bound(TypeMem.FULL)); // Only bounding for TestNode
+    TypeMem tm = (TypeMem)(t.bound(TypeMem.ISUSED)); // Only bounding for TestNode
 
     // Merge inputs with parent.
     TypeObj[] tpars = tm.alias2objs(); // Clone of base memory
@@ -290,7 +290,7 @@ public class MemMergeNode extends Node {
   }
   @Override public boolean basic_liveness() { return false; }
 
-  @Override public Type all_type() { return TypeMem.FULL; }
+  @Override public Type all_type() { return TypeMem.ISUSED; }
 
   @Override @NotNull public MemMergeNode copy( boolean copy_edges, GVNGCM gvn) {
     MemMergeNode mmm = (MemMergeNode)super.copy(copy_edges, gvn);
@@ -301,7 +301,7 @@ public class MemMergeNode extends Node {
   void update_alias( Node copy, BitSet aliases, GVNGCM gvn ) {
     MemMergeNode cmem = (MemMergeNode)copy;
     assert gvn.touched(this);
-    Node xobj = gvn.add_work(gvn.con(TypeObj.XOBJ));
+    Node xobj = gvn.add_work(gvn.con(TypeObj.UNUSED));
     Type oldt = gvn.unreg(this);
     for( int i=1; i<_aliases._len; i++ ) {
       int mya = _aliases.at(i);

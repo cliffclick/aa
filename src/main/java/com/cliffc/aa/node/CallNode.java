@@ -239,10 +239,10 @@ public class CallNode extends Node {
     // Not a memory to the call?
     Type mem = gvn.type(mem());
     mem = mem instanceof TypeMem
-      ? mem.bound(TypeMem.FULL)  // Cap FULL mem; only bounding for TestNode
+      ? mem.bound(TypeMem.ISUSED)  // Cap FULL mem; only bounding for TestNode
       : mem.above_center() ? TypeMem.XMEM : TypeMem.MEM;
     // If not called, then no memory to functions
-    if( ctl == Type.XCTRL ) mem = TypeMem.EMPTY;
+    if( ctl == Type.XCTRL ) mem = TypeMem.UNUSED;
     ts[1]=mem;
 
     // Copy args for called functions.  Arg0 is display, handled below.
@@ -274,7 +274,7 @@ public class CallNode extends Node {
   @Override public TypeMem live( GVNGCM gvn) {
     if( gvn._opt_mode < 2 ) {
       BitsFun fidxs = fidxs(gvn);
-      if( fidxs == null ) return TypeMem.FULL; // Assume Something Good will yet happen
+      if( fidxs == null ) return TypeMem.ISUSED; // Assume Something Good will yet happen
       if( fidxs.above_center() ) return _live; // Got choices, dunno which one will stick
       CallEpiNode cepi = cepi();
       if( cepi==null ) return _live; // Collapsing
@@ -556,7 +556,7 @@ public class CallNode extends Node {
     Type[] ts = TypeAry.get(_defs._len);
     Arrays.fill(ts,Type.SCALAR);
     ts[0] = Type.CTRL;
-    ts[1] = TypeMem.FULL;
+    ts[1] = TypeMem.ISUSED;
     ts[2] = TypeFunPtr.GENERIC_FUNPTR;
     return TypeTuple.make(ts);
   }

@@ -38,13 +38,14 @@ public abstract class Node implements Cloneable {
   static final byte OP_RET    =23;
   static final byte OP_SCOPE  =24;
   static final byte OP_START  =25;
-  static final byte OP_STORE  =26;
-  static final byte OP_TMP    =27;
-  static final byte OP_TYPE   =28;
-  static final byte OP_UNR    =29;
-  static final byte OP_MAX    =30;
+  static final byte OP_STMEM  =26;
+  static final byte OP_STORE  =27;
+  static final byte OP_TMP    =28;
+  static final byte OP_TYPE   =29;
+  static final byte OP_UNR    =30;
+  static final byte OP_MAX    =31;
 
-  private static final String[] STRS = new String[] { null, "Call", "CallEpi", "Cast", "Con", "CProj", "DefMem", "Err", "FP2Clo", "Fun", "FunPtr", "If", "LibCall", "Load", "Merge", "Name", "NewObj", "NewStr", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Scope", "Start", "Store", "Tmp", "Type", "Unresolved" };
+  private static final String[] STRS = new String[] { null, "Call", "CallEpi", "Cast", "Con", "CProj", "DefMem", "Err", "FP2Clo", "Fun", "FunPtr", "If", "LibCall", "Load", "Merge", "Name", "NewObj", "NewStr", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Scope", "Start", "StartMem", "Store", "Tmp", "Type", "Unresolved" };
 
   public int _uid;  // Unique ID, will have gaps, used to give a dense numbering to nodes
   final byte _op;   // Opcode (besides the object class), used to avoid v-calls in some places
@@ -97,6 +98,8 @@ public abstract class Node implements Cloneable {
           ParmNode pmem = ((FunNode)old).parm(-2);
           if( pmem != null ) gvn.add_work(pmem);
         }
+        if( old instanceof ProjNode && old.in(0) instanceof NewNode )
+          gvn.add_work(old.in(0));
       }
     }
     return this;
@@ -125,7 +128,7 @@ public abstract class Node implements Cloneable {
     _defs = new Ary<>(defs);
     _uses = new Ary<>(new Node[1],0);
     for( Node def : defs ) if( def != null ) def._uses.add(this);
-    _live = basic_liveness() ? TypeMem.EMPTY : TypeMem.FULL;
+    _live = basic_liveness() ? TypeMem.EMPTY : TypeMem.ISUSED;
    }
 
   // Is a primitive

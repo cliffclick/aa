@@ -32,7 +32,7 @@ public class Env implements AutoCloseable {
   public  final static GVNGCM GVN; // Initial GVN, defaults to ALL, lifts towards ANY
   public  final static  StartNode START; // Program start values (control, empty memory, cmd-line args)
   public  final static  CProjNode CTL_0; // Program start value control
-  public  final static  MProjNode MEM_0; // Program start value memory
+  public  final static StartMemNode MEM_0; // Program start value memory
   public  final static NewObjNode STK_0; // Program start stack frame (has primitives)
   public  final static DefMemNode DEFMEM;// Default memory (all structure types)
 
@@ -53,8 +53,8 @@ public class Env implements AutoCloseable {
     // Initial control & memory
     START  = (StartNode)GVN.xform(new StartNode(       ));
     CTL_0  = (CProjNode)GVN.xform(new CProjNode(START,0));
-    MEM_0  = (MProjNode)GVN.xform(new MProjNode(START,1));
     DEFMEM = (DefMemNode)GVN.xform(new DefMemNode(GVN.con(TypeObj.OBJ)));
+    MEM_0  = (StartMemNode)GVN.xform(new StartMemNode(START,DEFMEM));
     // Top-most (file-scope) lexical environment
     TOP = new Env(null,null, true);
     // Top-level display defining all primitives

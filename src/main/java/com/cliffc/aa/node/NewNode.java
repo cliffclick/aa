@@ -20,6 +20,16 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   // store.  Field names are valid, and mods can only lift from R/W to FINAL.
   T _ts;             // Base object type, representing all possible future values
 
+  // True if pointer does not escape: the ptr can be used as the address in
+  // loads and stores and null-and-eq checked.  It can NOT be used as a call
+  // arg, a funptr display (same as a call arg), or value-stored.  Such values
+  // are never produced by the unknown-caller, thus can bypass calls which
+  // otherwise merge with the unknown.
+  //
+  // Note that DefMemNode.CAPTURED is stronger: there are literally NO pointer
+  // uses.
+  boolean _no_escape;
+
   // NewNodes can participate in cycles, where the same structure is appended
   // to in a loop until the size grows without bound.  If we detect this we
   // need to approximate a new cyclic type.
@@ -59,6 +69,19 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
       while( !is_dead() && _defs._len > 1 )
         pop(gvn);               // Kill all fields
       gvn.add_work(Env.DEFMEM);
+      if( is_dead() ) return this;
+      Node ptr = _uses.at(0);
+      gvn.add_work_uses(ptr);   // Progress for remaining pointer users
+      return this;
+    }
+    // If the address is only used by loads & stores, null and eq checks then
+    // it does not escape.
+    if( _no_escape ) return null;
+    if( no_escape(gvn) ) {
+      _no_escape = true;        // Allow loads/stores to bypass calls
+      Node ptr = _uses.at(0);
+      if( ptr instanceof OProjNode ) ptr = _uses.at(1); // Get ptr not mem
+      gvn.add_work_uses(ptr);   // Progress for all load/store users
       return this;
     }
     return null;
@@ -87,7 +110,30 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     return true;
   }
 
-  // Clones during inlining all become unique new sites
+  // Basic escape analysis.  If no escapes, this pointer can bypass calls.
+  // TODO: A better answer is to put escape analysis into the type flows.
+  private boolean no_escape( GVNGCM gvn ) {
+    if( _keep > 0 ) return false;
+    if( _uses._len==0 ) return false; // Dead or being created
+    if( _no_escape ) return true;     // Already done
+    if( DefMemNode.CAPTURED.get(_alias) ) return true; // Stronger notion
+    Node ptr = _uses.at(0);
+    if( ptr instanceof OProjNode ) ptr = _uses.at(1); // Get ptr not mem
+
+    // Validate all pointer uses
+    for( Node use : ptr._uses ) {
+      if( use instanceof IfNode ) continue; // NIL check
+      if( use instanceof PrimNode.EQ_OOP ||
+          use instanceof PrimNode.NE_OOP ) continue; // eq-check
+      if( use instanceof LoadNode ) continue; // Address to a load
+      if( use instanceof StoreNode &&
+          ((StoreNode)use).val() != use ) continue; // Not a store-value
+      return false;             // Escapes - might be call arg, stored, returned, funptr, phi, etc
+    }
+    return true;                // No escape
+  }
+
+  // clones during inlining all become unique new sites
   @SuppressWarnings("unchecked")
   @Override @NotNull public NewNode copy( boolean copy_edges, GVNGCM gvn) {
     // Split the original '_alias' class into 2 sub-aliases

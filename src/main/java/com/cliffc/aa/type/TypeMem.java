@@ -79,7 +79,9 @@ public class TypeMem extends Type<TypeMem> {
     if( as.length == 0 ) return true;
     if( as[0]!=null ) return false;          // Slot 0 reserved
     if( as.length == 1 ) return true;
-    if( as[1]!=TypeObj.OBJ && as[1]!=TypeObj.XOBJ && as[1] != null )
+    if( as[1]!=TypeObj.OBJ    && as[1]!=TypeObj.XOBJ   &&
+        as[1]!=TypeObj.ISUSED && as[1]!=TypeObj.UNUSED &&
+        as[1] != null )
       return false;             // Only 2 choices
     if( as.length==2 ) return true; // Trivial all of memory
     // "tight" - something in the last slot
@@ -170,7 +172,7 @@ public class TypeMem extends Type<TypeMem> {
   private TypeObj[] _slice_all_aliases_plus_children(BitsAlias aliases) {
     BitSet bs = aliases.tree().plus_kids(aliases);
     TypeObj[] tos = new TypeObj[bs.length()];
-    tos[1] = TypeObj.XOBJ;
+    tos[1] = TypeObj.UNUSED;
     for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) )
       tos[alias] = at(alias);
     return tos;
@@ -251,17 +253,22 @@ public class TypeMem extends Type<TypeMem> {
       as[alias] = oop;
     return make0(as);
   }
-  
+
   public static final TypeMem FULL; // Every alias filled with something
   public static final TypeMem EMPTY;// Every alias filled with anything
   public static final TypeMem  MEM; // FULL, except lifts REC, arrays, STR
   public static final TypeMem XMEM; //
   public static final TypeMem DEAD; // Sentinel for liveness flow; top of lattice
+  public static final TypeMem UNUSED,ISUSED; // Every alias is unused
   public static final TypeMem MEM_ABC, MEM_STR;
   static {
+    // Every alias is unused
+    UNUSED = make(new TypeObj[]{null,TypeObj.UNUSED});
+    ISUSED = UNUSED.dual();
     // All memory, all aliases, holding anything.
     FULL = make(new TypeObj[]{null,TypeObj.OBJ});
     EMPTY= FULL.dual();
+
 
     // Sentinel for liveness flow; top of lattice
     DEAD = make(new TypeObj[1]);
@@ -297,11 +304,8 @@ public class TypeMem extends Type<TypeMem> {
     if( t._type != TMEM ) return ALL; //
     TypeMem tf = (TypeMem)t;
     // Shortcut common case
-    if( this==FULL || tf==FULL ) return FULL;
     if( this==DEAD ) return t;
     if( tf  ==DEAD ) return this;
-    if( this==EMPTY ) return t;
-    if( tf  ==EMPTY ) return this;
     // Meet of default values, meet of element-by-element.
     int  len = Math.max(_aliases.length,tf._aliases.length);
     int mlen = Math.min(_aliases.length,tf._aliases.length);

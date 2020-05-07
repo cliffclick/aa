@@ -70,7 +70,7 @@ public class GVNGCM {
     assert _live.get(CNT-1) && !_live.get(CNT) && _work._len==0 && _wrk_bits.isEmpty() && _ts._len==CNT;
     _INIT0_CNT=CNT;
     _INIT0_NODES = _vals.keySet().toArray(new Node[0]);
-    for( Node n : _INIT0_NODES ) { assert !n.is_dead();  n._live = TypeMem.FULL; add_work(n); }
+    for( Node n : _INIT0_NODES ) { assert !n.is_dead();  n._live = TypeMem.ISUSED; add_work(n); }
   }
   Set<Node> valsKeySet() { return _vals.keySet(); }
   // Reset is called after a top-level exec exits (e.g. junits) with no parse
@@ -81,7 +81,7 @@ public class GVNGCM {
     _opt_mode = 0;
     for( Node n : _INIT0_NODES ) {
       n.reset_to_init1(this);
-      n._live = n.basic_liveness() ? TypeMem.EMPTY : TypeMem.FULL;
+      n._live = n.basic_liveness() ? TypeMem.EMPTY : TypeMem.ISUSED;
       for( int i=0; i<n._uses._len; i++ )
         if( !n._uses.at(i).is_prim() )
           n._uses.del(i--);

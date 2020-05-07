@@ -49,12 +49,12 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
   @Override protected O xdual() { return (O)new TypeObj(TOBJ,_name,!_any,!_use); }
   @Override protected Type xmeet( Type t ) {
     if( !(t instanceof TypeObj) ) return ALL;
-    if( this==OBJ || t==OBJ ) return OBJ;
     if( this==ISUSED || t==ISUSED ) return ISUSED;
-    if( this==XOBJ ) return t;
-    if( t   ==XOBJ ) return this;
+    if( this==OBJ || t==OBJ ) return OBJ;
     if( this==UNUSED ) return t;
     if( t   ==UNUSED ) return this;
+    if( this==XOBJ ) return t;
+    if( t   ==XOBJ ) return this;
     throw com.cliffc.aa.AA.unimpl("ShouldNotReachHere");
   }
   // Update (approximately) the current TypeObj.  Merges fields.
@@ -72,5 +72,6 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
   @Override public boolean  may_nil() { return false; }
   @Override void walk( Predicate<Type> p ) { p.test(this); }
   // Widen (loss info), to make it suitable as the default function memory.
-  public TypeObj widen_as_default() { return this; }
+  // UNUSE->UNUSE, but XOBJ->OBJ.
+  public TypeObj widen_as_default() { return this==XOBJ ? OBJ : this; }
 }

@@ -34,9 +34,9 @@ public class LoadNode extends Node {
 
   @Override public Node ideal(GVNGCM gvn, int level) {
     Node mem  = mem();
-    Node addr = adr();
+    Node adr = adr();
 
-    Type tadr = gvn.type(addr);
+    Type tadr = gvn.type(adr);
     BitsAlias aliases = tadr instanceof TypeMemPtr ? ((TypeMemPtr)tadr)._aliases : null;
     int alias = aliases == null ? -2 : aliases.strip_nil().abit();
 
@@ -55,8 +55,13 @@ public class LoadNode extends Node {
     if( mem instanceof MProjNode && mem.in(0) instanceof CallNode && !(call=(CallNode)mem.in(0)).is_copy() )
       return set_mem(call.mem(),gvn);
 
+    // Loads from unescape memory can bypass calls
+    if( adr instanceof  ProjNode && adr.in(0) instanceof NewNode && ((NewNode)adr.in(0))._no_escape &&
+        mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode )
+      return set_mem(((CallEpiNode)mem.in(0)).call().mem(),gvn);
+    
     // Loads against a NewNode cannot NPE, cannot fail, always return the input
-    NewObjNode nnn = addr.in(0) instanceof NewObjNode ? (NewObjNode)addr.in(0) : null;
+    NewObjNode nnn = adr.in(0) instanceof NewObjNode ? (NewObjNode)adr.in(0) : null;
     int idx;
     if( nnn != null && nnn == mem.in(0) && (idx=nnn._ts.find(_fld)) != -1 )
       return nnn.fld(idx);      // Field value
@@ -67,14 +72,14 @@ public class LoadNode extends Node {
       if( !(mem instanceof ParmNode) ) {
         Node lphi = new PhiNode(Type.SCALAR,((PhiNode)mem)._badgc,mem.in(0));
         for( int i=1; i<mem._defs._len; i++ )
-          lphi.add_def(gvn.xform(new LoadNode(mem.in(i),addr,_fld,_bad)));
+          lphi.add_def(gvn.xform(new LoadNode(mem.in(i),adr,_fld,_bad)));
         return lphi;
       }
     }
 
     // Loads against an equal store; cannot NPE since the Store did not.
     StoreNode st=null;
-    if( mem instanceof StoreNode && addr == (st=((StoreNode)mem)).adr() ) {
+    if( mem instanceof StoreNode && adr == (st=((StoreNode)mem)).adr() ) {
       if( Util.eq(_fld,st._fld) && st.err(gvn)==null )
         return st.val();
     }
@@ -127,13 +132,14 @@ public class LoadNode extends Node {
     Type tptr = gvn.type(adr());
     // If either is above-center, then only basic-liveness - the load can load
     // from anything getting anything.
-    if( tmem.above_center() || tptr.above_center() ) return _live;
+    if( tmem.above_center() || tptr.above_center() )
+      return _live==TypeMem.DEAD ? TypeMem.DEAD : (mem()==def ? TypeMem.UNUSED : TypeMem.EMPTY);
     // TypeObj memory is already alias-constricted.  Can only demand from that alias.
     if( tmem instanceof TypeObj && tptr instanceof TypeMemPtr )
       return TypeMem.make(((TypeMemPtr)tptr)._aliases,(TypeObj)tmem);
     // Alive (like normal liveness), plus the address, plus whatever can be
     // reached from the address.
-    return ScopeNode.compute_live_mem(gvn,TypeMem.EMPTY,mem(),adr());
+    return ScopeNode.compute_live_mem(gvn,TypeMem.UNUSED,mem(),adr());
   }
 
   @Override public String err(GVNGCM gvn) {
