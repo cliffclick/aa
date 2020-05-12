@@ -115,7 +115,7 @@ public class StoreNode extends Node {
     if( !(tobj instanceof TypeStruct) )
       // Updating XOBJ means updating any choice, and we choose no-change.
       // Updating  OBJ means we're already as low as we can go.
-      return tobj;
+      return tobj.meet(TypeStruct.ANYSTRUCT);
 
     // Update the field.  Illegal updates make no changes (except clear 'clean' bit).
     TypeStruct ts = (TypeStruct)tobj;

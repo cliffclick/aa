@@ -52,17 +52,29 @@ public class ParmNode extends PhiNode {
   }
 
   @Override public Type value(GVNGCM gvn) {
-    Type t = super.value(gvn);
+    // Not executing, go the 
+    Type ctl = gvn.type(in(0));
+    Type t = all_type().dual();
+    if( ctl != Type.CTRL ) return ctl.above_center() ? t : t.dual();
+    // If unknown callers, then always the default value because some unknown
+    // caller can be that bad.
+    FunNode fun = fun();
+    if( fun.has_unknown_callers() )
+      return gvn.type(in(1));
+    // All callers known; merge the wired & flowing ones
+    CallEpiNode cepi;
+    for( int i=1; i<_defs._len; i++ )
+      if( gvn.type(fun.in(i))==Type.CTRL ) { // Only meet alive paths
+        // Only meet with wired edges
+        if( (cepi=((CallNode)fun.in(i).in(0)).cepi())!=null &&
+             cepi.cg_tst(fun.fidx()) )
+          t = t.meet(gvn.type(in(i)));
+      }
     // Bound results by simple Fun argument types.  This keeps errors from
     // spreading past function call boundaries.
-    if( in(0) instanceof FunNode && _idx >= 0 )
-      t = t.bound(fun().formal(_idx).simple_ptr());
-
-    // Memory tracks the notion of 'clean' or 'unwritten' since the function
-    // start.  Changed memory is returned at exit and unchanged memory is NOT
-    // returned - and CallEpis are aware of this behavior and do the correct
-    // merge-around.  This allows loads & stores below a call bypass the call.
-    t = t.clean();              // Mark all as clean
+    if( _idx >= 0 )
+      t = t.bound(fun.formal(_idx).simple_ptr());
+    assert t.bound(_t)==t;
     return t;
   }
 

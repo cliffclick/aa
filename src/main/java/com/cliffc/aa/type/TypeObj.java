@@ -72,6 +72,6 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
   @Override public boolean  may_nil() { return false; }
   @Override void walk( Predicate<Type> p ) { p.test(this); }
   // Widen (loss info), to make it suitable as the default function memory.
-  // UNUSE->UNUSE, but XOBJ->OBJ.
-  public TypeObj widen_as_default() { return this==XOBJ ? OBJ : this; }
+  // Must be monotonic, as CallEpiNode.value() uses this.
+  public TypeObj widen_as_default() { return this; }
 }

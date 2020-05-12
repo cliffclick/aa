@@ -146,7 +146,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     gvn.rereg(this,oldt);
     return nnn;
   }
-
+  
   @Override public int hashCode() { return super.hashCode()+ _alias; }
   // Only ever equal to self, because of unique _alias.  We can collapse equal
   // NewNodes and join alias classes, but this is not the normal CSE and so is

@@ -51,11 +51,19 @@ public class DefMemNode extends Node {
     gvn.add_work_uses(this);
     return mem;
   }
-  private static int PRIM_DEFS;
-  public void init0() { PRIM_DEFS = _defs._len; }
+  private static Node[] PRIM_DEFS;
+  public void init0() {
+    PRIM_DEFS = _defs.asAry();
+  }
   @Override public void reset_to_init1(GVNGCM gvn ) {
     gvn.unreg(this);
-    while( _defs._len > PRIM_DEFS ) pop(gvn);
+    while( _defs._len > PRIM_DEFS.length ) pop(gvn);
+    for( int i=0; i<_defs._len; i++ ) {
+      Node o = PRIM_DEFS[i];
+      set_def(i,o,gvn);
+      if( o instanceof OProjNode )
+        ((NewNode)o.in(0))._alias = i;
+    }
     CAPTURED.clear();
   }
 

@@ -1188,6 +1188,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // Final fields can remain as-is; non-finals are all widened to SCALAR
   // (assuming a future Store); the field names & mods are kept.
   @Override public TypeStruct widen_as_default() {
+    if( _any )
+      return this;              // No change if above center
     Type[] ts = TypeAry.clone(_ts);
     for( int i=0; i<ts.length; i++ )
       if( fmod(i)!=FFNL ) ts[i]=SCALAR; // Widen non-finals to SCALAR, as-if crushed

@@ -1,12 +1,10 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.AA;
-import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
-import com.cliffc.aa.util.VBitSet;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Arrays;
@@ -15,16 +13,16 @@ import java.util.BitSet;
 // Call/apply node.
 //
 // Control is not required for an apply but inlining the function body will
-// require it; slot 0 is for Control.  Slot 1 is a function value - a Node
-// typed as a TypeFunPtr; can be a FunPtrNode, an Unresolved, or e.g. a Phi or
-// a Load.  Slot 2 is for memory.  Slots 3+ are for other args.
+// require it; slot 0 is for Control.  Slot 1 is function memory, slot 2 the
+// function ptr - a Node typed as a TypeFunPtr; can be a FunPtrNode, an
+// Unresolved, or e.g. a Phi or a Load.  Slots 3+ are for other args.
 //
-// When the function type simplifies to a single TypeFunPtr, the Call can inline.
+// When the function type simplifies to a single FIDX, the Call can inline.
 //
 // TFPs are actually Closures and include an extra argument for the enclosed
 // environment (actually expanded out to one arg-per-used-scope).  These extra
 // arguments are part of the function signature but are not direct inputs into
-// the call.
+// the call.  FP2Closure strips out the FIDX and passes on just the display.
 //
 // The Call-graph is lazily discovered during GCP/opto.  Before then all
 // functions are kept alive with a special control (see FunNode), and all Calls
@@ -66,6 +64,22 @@ import java.util.BitSet;
 //  \   / | \
 //  MemMerge: limited to reachable writable
 //
+// Wiring a Call changes the Node graph and has to preserve invariants.  The
+// graph has a major type invariant: at every moment in time computing the
+// value() call on a Node (from the types of its inputs) produces a type which
+// is monotonically better (either up or down, according to iter() vs gcp()).
+//
+// Wiring adds a bunch of edges and thus inputs.  The graph has to keep the
+// type invariant after adding the edges, and this is not always possible; the
+// types can flow to the Fun and the Call at a different rate, and the two
+// not-connected Nodes might be out-of-type-order relative to each other.  The
+// progress and monotonicity properties guarentee they will eventually align.
+//
+// Discovery of a CG edge happens when a Call's function value changes, but
+// graph type alignment might be much later.  We want to act on the discovery
+// of a CG edge now, but not flow types until they align.  See CallEpi for
+// wired_not_typed bits.
+
 public class CallNode extends Node {
   int _rpc;                 // Call-site return PC
   boolean _unpacked;        // Call site allows unpacking a tuple (once)
@@ -475,13 +489,13 @@ public class CallNode extends Node {
     BitsFun fidxs = ((TypeFunPtr)tfp).fidxs();
     check_wire(gvn, fidxs);
   }
-  // Used during GCP and Ideal calls to see if wiring is appropriate.
+
+  // Used during GCP and Ideal calls to see if wiring is possible.
   public boolean check_wire( GVNGCM gvn, BitsFun fidxs ) {
-    if( fidxs.above_center() )  return false; // Still choices to be made
     if( gvn._opt_mode == 0 ) return false; // Graph not formed yet
+    if( fidxs.above_center() )  return false; // Still choices to be made during GCP.
     CallEpiNode cepi = cepi();
     if( cepi==null ) return false; // Dying
-    TypeMem callmem = (TypeMem)((TypeTuple)gvn.type(this))._ts[1];
 
     // Check all fidxs for being wirable
     boolean progress = false;
@@ -490,20 +504,9 @@ public class CallNode extends Node {
       FunNode fun = FunNode.find_fidx(fidx);  // Lookup, even if not wired
       if( fun.is_forward_ref() ) continue;    // Not forward refs, which at GCP just means a syntax error
 
-      // Wiring a Call brings in memory that the Call knows into what the
-      // Function knows.  These can be out-of-sync, if one or the other has
-      // propagated knowlege of e.g. new allocations.  Stall wiring until the
-      // types are properly "isa".
-      ParmNode fmem = fun.parm(-2);
-      if( fmem != null ) {
-        TypeMem funmem = (TypeMem)gvn.type(fmem);
-        if( !callmem.isa(funmem) ) // If call is lower than Parm:mem, the Parm will drop - not allowed
-          continue;
-      }
       // Internally wire() checks for already wired.
-      progress |= cepi.wire(gvn,this,fun,fun.ret());
+      progress |= cepi.wire(gvn,this,fun);
     }
-    assert !progress || Env.START.more_flow(gvn,new VBitSet(),gvn._opt_mode!=2,0)==0; // Post conditions are correct
     return progress;
   }
 
