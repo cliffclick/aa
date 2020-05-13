@@ -140,6 +140,7 @@ public class TypeMem extends Type<TypeMem> {
   }
   //
   public TypeObj[] alias2objs() { return _aliases; }
+  public int len() { return _aliases.length; }
 
   // Return set of aliases.  Not even sure if this is well-defined.
   public BitsAlias aliases() {

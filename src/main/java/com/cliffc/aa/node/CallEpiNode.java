@@ -260,12 +260,17 @@ public final class CallEpiNode extends Node {
   // unwired Returns may yet appear, and be conservative.  Otherwise it can
   // just meet the set of known functions.
   @Override public TypeTuple value(GVNGCM gvn) {
-    if( is_copy() )
-      return gvn.type(in(0))!=Type.CTRL
-        ? TypeTuple.CALLE.dual()
-        : TypeTuple.make(gvn.type(in(0)),gvn.type(in(1)),gvn.type(in(2)));
-
-    assert sane_wiring();
+    Node call = in(0);
+    Type tin0 = gvn.type(call);  TypeTuple tcall;
+    // Check for is_copy, based on types: if input is NOT a call-type then we
+    // are an inlined XallEpi and make a call-like tuple directly from our
+    // inputs.
+    if( !(tin0 instanceof TypeTuple) ||
+        (tcall=(TypeTuple)tin0)._ts.length < 3 ) // Must be inlined
+      return tin0==Type.CTRL
+        ? (TypeTuple)TypeTuple.make(Type.CTRL,gvn.type(in(1)),gvn.type(in(2))).bound(all_type())
+        : (tin0.above_center() ? TypeTuple.CALLE.dual() : TypeTuple.CALLE);
+    //assert sane_wiring();
 
     // Get Call result.  If the Call args are in-error, then the Call is called
     // and we flow types to the post-call.... BUT the bad args are NOT passed
@@ -274,8 +279,6 @@ public final class CallEpiNode extends Node {
     // tcall[1] = Memory passed into the functions.
     // tcall[2] = TypeFunPtr passed to FP2Closure
     // tcall[3+]= Arg types
-    CallNode call = call();
-    TypeTuple tcall = (TypeTuple)gvn.type(call);
     Type ctl = tcall.at(0); // Call is reached or not?
     if( ctl != Type.CTRL && ctl != Type.ALL )
       return TypeTuple.CALLE.dual();
@@ -289,17 +292,16 @@ public final class CallEpiNode extends Node {
     // NO fidxs, means we're not calling anything.
     if( fidxs==BitsFun.EMPTY ) return TypeTuple.CALLE.dual();
 
-    // TODO: This is a WIP; how to lower types across an unknown call.
+    // Crush all the non-finals across the call
     TypeMem tcmem = (TypeMem)tcall.at(1);
-    TypeObj[] tos = tcmem.alias2objs().clone();
-    for( int i=1; i<tos.length; i++ ) {
+    int len = Math.max(tcmem.len(),TypeMem.MEM.len());
+    TypeObj[] tos = new TypeObj[len];
+    for( int i=1; i<len; i++ ) {
       TypeObj to = tcmem.at(i);
-      TypeObj tx = to==TypeObj.UNUSED // No call can make an unused used again
-        ? TypeObj.UNUSED              // Unused now and forever
-        : ( to.above_center()
-            ? (TypeObj)to.dual()  // Might be the default memory in all cases
-            : to.widen_as_default()); // Crush non-finals
-      tos[i] = tx;
+      if( to != TypeObj.UNUSED && to.above_center() )
+        to=TypeMem.MEM.at(i);
+      else to = to.widen_as_default();
+      tos[i] = to; // Crush non-finals
     }
     TypeTuple post_call_crush = TypeTuple.make(Type.CTRL,TypeMem.make0(tos),Type.SCALAR);
     TypeTuple mt = post_call_crush;

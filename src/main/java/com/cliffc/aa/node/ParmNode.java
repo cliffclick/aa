@@ -1,8 +1,9 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.type.*;
+import com.cliffc.aa.type.Type;
 
 // Function parameter node; almost just a Phi with a name.  There is a dense
 // numbering matching function arguments, with -1 reserved for the RPC and -2
@@ -34,25 +35,50 @@ public class ParmNode extends PhiNode {
     FunNode fun = fun();
     if( gvn.type(fun) == Type.XCTRL ) return null; // All dead, c-prop will fold up
     assert fun._defs._len==_defs._len;
-    // Arg-check before folding up
-    if( _idx >= 0 ) {                         // Skip RPC and memory
-      Node mem = fun.parm(-2);
-      for( int i=1; i<_defs._len; i++  )      // For all arguments
-        if( gvn.type(fun.in(i))==Type.CTRL && // Path is alive
-            in(i)!=this &&                    // Can ignore self- only other inputs will determine arg-check
-            !gvn.sharptr(in(i),mem.in(i)).isa(fun.formal(_idx)) ) // Arg is NOT correct type
-          return null;          // Not correct arg-type; refuse to collapse
-    } else if( _idx== -2 ) {
+
+    // Has unknown caller input
+    if( fun._defs.len() > 1 && fun.in(1) == Env.ALL_CTRL ) return null;
+
+    // TODO: Relax this
+    // Never collapse memory phi, used for error reporting by other parms
+    if( _idx== -2 )
       for( Node use : fun._uses )
         if( use instanceof ParmNode && use != this )
-          // TODO: Relax this
-          return null; // Never collapse memory phi, used for error reporting by other parms
+          return null;
+    // If only 1 unique live input, return that
+    // Arg-check before folding up.
+    // - Dead path & self-cycle, always fold
+    // - Live-path but
+    //   - no Call, Cepi, - confused, do not fold
+    //   - not flowing - bad args, do not fold
+    //   - flowing but bad args, do not fold
+
+    Node live=null;
+    Node mem = fun.parm(-2);
+    for( int i=1; i<_defs._len; i++  ) { // For all arguments
+      Node n = in(i);
+      if( gvn.type(fun.in(i))==Type.CTRL && // Dead path
+          valid_args(fun,i) ) {             // And valid arguments
+        if( n==this || n==live ) continue;  // Ignore self or duplicates
+        if( live==null ) live = n;          // Found unique live input
+        else live=this;         // Found 2nd live input, no collapse
+      }
     }
-    return super.ideal(gvn,level); // Let PhiNode collapse
+    return live == this ? null : live; // Return single unique live input
   }
 
+  private boolean valid_args(FunNode fun, int i) {
+    Node call = fun.in(i).in(0);
+    if( !(call instanceof CallNode) ) return false; // Bad graph, do not change
+    CallEpiNode cepi  = ((CallNode)call).cepi();
+    // If flowing, then args are valid
+    return cepi.cg_tst(fun.fidx());
+    // if( !gvn.sharptr(in(i),mem.in(i)).isa(fun.formal(_idx)) ) // Arg is NOT correct type
+  }
+
+
   @Override public Type value(GVNGCM gvn) {
-    // Not executing, go the 
+    // Not executing, go the
     Type ctl = gvn.type(in(0));
     Type t = all_type().dual();
     if( ctl != Type.CTRL ) return ctl.above_center() ? t : t.dual();
@@ -65,7 +91,7 @@ public class ParmNode extends PhiNode {
     // All callers known; merge the wired & flowing ones
     for( int i=1; i<_defs._len; i++ )
       if( gvn.type(fun.in(i))==Type.CTRL ) { // Only meet alive paths
-        // Only meet with wired edges
+        // Only meet with wired & flowing edges
         Node call = fun.in(i).in(0);
         CallEpiNode cepi;
         if( call instanceof CallNode && (cepi=((CallNode)call).cepi())!=null &&

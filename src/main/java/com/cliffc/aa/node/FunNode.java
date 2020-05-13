@@ -428,7 +428,8 @@ public class FunNode extends RegionNode {
       if( !(fidxs instanceof TypeFunPtr) ) continue;
       int fidx = ((TypeFunPtr)fidxs).fidxs().abit();
       if( fidx < 0 ) continue;  // Call must only target one fcn
-      assert ((CallNode)call).cepi().cg_tst(fidx); // CG edge must have been turned on already
+      if( !((CallNode)call).cepi().cg_tst(fidx) ) // CG edge must have been turned on already
+        continue;               // Probably bad-args; not a candidate for a private split
       int ncon=0;
       for( ParmNode parm : parms )
         if( parm != null ) {    // Some can be dead
