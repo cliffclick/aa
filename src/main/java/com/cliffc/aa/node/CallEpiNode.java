@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 
@@ -18,13 +19,12 @@ import com.cliffc.aa.type.*;
 // bit-vector.
 
 public final class CallEpiNode extends Node {
-  public CallEpiNode( CallNode call ) { this(new Node[]{call}); }
-  public CallEpiNode( Node... nodes ) { super(OP_CALLEPI,nodes);  _cg_wired = BitsFun.EMPTY; }
+  public CallEpiNode( Node... nodes ) { super(OP_CALLEPI,nodes);  assert nodes[1] instanceof DefMemNode; _cg_wired = BitsFun.EMPTY; }
   String xstr() { return ((is_dead() || is_copy()) ? "x" : "C")+"allEpi"; } // Self short name
   public CallNode call() { return (CallNode)in(0); }
-  int nwired() { return _defs._len-1; }
-  static int wire_num(int x) { return x+1; }
-  RetNode wired(int x) { return (RetNode)in(x+1); }
+  int nwired() { return _defs._len-2; }
+  static int wire_num(int x) { return x+2; }
+  RetNode wired(int x) { return (RetNode)in(x+2); }
 
   // Set of FIDXS that are both wired & flowing types.
   BitsFun _cg_wired;
@@ -293,17 +293,8 @@ public final class CallEpiNode extends Node {
     if( fidxs==BitsFun.EMPTY ) return TypeTuple.CALLE.dual();
 
     // Crush all the non-finals across the call
-    TypeMem tcmem = (TypeMem)tcall.at(1);
-    int len = Math.max(tcmem.len(),TypeMem.MEM.len());
-    TypeObj[] tos = new TypeObj[len];
-    for( int i=1; i<len; i++ ) {
-      TypeObj to = tcmem.at(i);
-      if( to != TypeObj.UNUSED && to.above_center() )
-        to=TypeMem.MEM.at(i);
-      else to = to.widen_as_default();
-      tos[i] = to; // Crush non-finals
-    }
-    TypeTuple post_call_crush = TypeTuple.make(Type.CTRL,TypeMem.make0(tos),Type.SCALAR);
+    TypeMem post_call_mem = (TypeMem)gvn.type(Env.DEFMEM);
+    TypeTuple post_call_crush = TypeTuple.make(Type.CTRL,post_call_mem,Type.SCALAR);
     TypeTuple mt = post_call_crush;
 
     // Are all call targets known, wired & enabled?
@@ -386,6 +377,7 @@ public final class CallEpiNode extends Node {
   // Unresolved, then none of CallEpi targets are (yet) alive.
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
     assert _keep==0;
+    if( def instanceof DefMemNode ) return _live;
     // If is_copy, then basically acting like pass-thru.
     if( !is_copy() && def != call() ) { // Not a copy, check call site
       // The given function is alive, only if the Call will Call it.

@@ -205,8 +205,6 @@ public class TestParse {
   }
 
   @Test public void testParse03() {
-    testerr("fun={x y -> x+y}; baz={x:int y:@{x;y} -> foo(x,y)}; (fun(2,3), baz(2,3))",
-            "Unknown ref 'foo'", 44);
     // Type annotations
     test("-1:int", TypeInt.con( -1));
     test("(1+2.3):flt", TypeFlt.make(0,64,3.3));

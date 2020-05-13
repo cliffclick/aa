@@ -265,6 +265,7 @@ public class Parse {
       if( t instanceof TypeStruct ) {   // Add struct types with expanded arg lists
         FunPtrNode epi2 = IntrinsicNode.convertTypeNameStruct((TypeStruct)tn, BitsAlias.RECORD, _gvn);
         Node rez2 = _e.add_fun(bad,tvar,epi2); // type-name constructor with expanded arg list
+        _gvn.setype(Env.DEFMEM,Env.DEFMEM.value(_gvn));
         _gvn.init0(rez2._uses.at(0));      // Force init of Unresolved
       }
     }
@@ -579,7 +580,7 @@ public class Parse {
           Parse[] badargs = arglist
             ? ((NewObjNode)arg.in(0))._fld_starts        // Args from tuple
             : new Parse[]{null,errMsg(first_arg_start)}; // The one arg start
-          badargs[0] = errMsg(oldx-1); // Base call error reported at the openning paren
+          badargs[0] = errMsg(oldx-1); // Base call error reported at the opening paren
           n = do_call(new CallNode(!arglist,badargs,ctrl(),all_mem(),n,arg)); // Pass the 1 arg
         }
       }
@@ -712,16 +713,16 @@ public class Parse {
    */
   private Node tuple(int oldx, Node s, int first_arg_start) {
     Parse bad = errMsg(first_arg_start);
-    Ary<Parse> bads = new Ary<>(new Parse[1],0);
+    Ary<Parse> bads = new Ary<>(new Parse[1],1);
     Ary<Node > args = new Ary<>(new Node [1],0);
-    do { 
+    while( s!= null ) {         // More args
       bads.push(bad);           // Collect arg & arg start
       args.push(s);
       if( !peek(',') ) break;   // Final comma is optional
       skipWS();                 // Skip to arg start before recording arg start
       bad = errMsg();           // Record arg start
       s=stmts();                // Parse arg
-    } while( s!=null );         // No more args
+    } 
     require(')',oldx);          // Balanced closing paren
 
     // Build the tuple from gathered args
@@ -1220,7 +1221,7 @@ public class Parse {
     // Call Epilog takes in the call projections which it uses to both track
     // wireable functions, and also trim the result memory to passed-in aliases.
     // CallEpi internally tracks all wired functions.
-    Node cepi  = gvn(new CallEpiNode(call)).keep();
+    Node cepi  = gvn(new CallEpiNode(call,Env.DEFMEM)).keep();
     set_ctrl(    gvn(new CProjNode(cepi,0)));
     Node postcall_memory = gvn(new MProjNode(cepi,1)); // Return memory from all called functions, trimmed to reachable aliases
     set_mem( gvn(new MemMergeNode(postcall_memory)));

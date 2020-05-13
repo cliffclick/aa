@@ -85,7 +85,7 @@ public class CallNode extends Node {
   boolean _unpacked;        // Call site allows unpacking a tuple (once)
   boolean _is_copy;         // One-shot flag set when inlining an entire single-caller-single-called
   // Example: call(arg1,arg2)
-  // _badargs[0] points to the openning paren.
+  // _badargs[0] points to the opening paren.
   // _badargs[1] points to the start of arg1, same for arg2, etc.
   Parse[] _badargs;         // Errors for e.g. wrong arg counts or incompatible args; one error point per arg.
   public CallNode( boolean unpacked, Parse[] badargs, Node... defs ) {
@@ -113,7 +113,6 @@ public class CallNode extends Node {
   Node arg( int x ) { assert x>=0; return _defs.at(x+2); }
   // Set an argument.  Use 'set_fun' to set the Display/Code.
   Node set_arg    (int idx, Node arg, GVNGCM gvn) { assert idx>0; return set_def(idx+2,arg,gvn); }
-  void set_arg_reg(int idx, Node arg, GVNGCM gvn) { assert idx>0; gvn.set_def_reg(this,idx+2,arg); }
 
   public  Node ctl() { return in(0); }
   public  Node mem() { return in(1); }

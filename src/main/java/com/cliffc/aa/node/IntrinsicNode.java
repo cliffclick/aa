@@ -59,7 +59,7 @@ public class IntrinsicNode extends Node {
       int alias = tptr._aliases.abit();
       Node opj = mem.alias2node(alias);
       if( alias > 0 &&          // Not a mixed set of aliases
-          opj._uses._len==1 &&  // No unknown extra users
+          opj._uses._len==2 &&  // No unknown extra users (self and DefMem)
           opj instanceof OProjNode && ptr instanceof ProjNode &&
           opj.in(0)==ptr.in(0) && opj.in(0) instanceof NewNode ) {
         NewObjNode nnn = (NewObjNode)opj.in(0);
@@ -72,6 +72,7 @@ public class IntrinsicNode extends Node {
           TypeStruct tn = nnn._ts.make_from(_tn._name);
           nnn.set_name(tn,gvn);
           gvn.add_work(nnn);
+          gvn.add_work(Env.DEFMEM);
           return new MemMergeNode(mem,opj,alias);
         }
       }
@@ -120,7 +121,7 @@ public class IntrinsicNode extends Node {
     TypeFunSig sig = TypeFunSig.make(formals,TypeMemPtr.make(alias,to));
     FunNode fun = (FunNode) gvn.xform(new FunNode(to._name,sig,-1).add_def(Env.ALL_CTRL));
     Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
-    Node memp= gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM),null));
+    Node memp= gvn.xform(new ParmNode(-2,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
     // Add input edges to the NewNode
     NewObjNode nnn = new NewObjNode(false,alias,to,fun,gvn.con(TypeFunPtr.NO_DISP)).keep();
     for( int i=1; i<to._ts.length; i++ ) { // Display in 0, fields in 1+
