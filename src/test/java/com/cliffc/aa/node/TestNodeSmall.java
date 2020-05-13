@@ -12,6 +12,7 @@ public class TestNodeSmall {
 
 
   @Test public void testUnresolvedAdd() {
+    Env top = Env.top_scope();
     GVNGCM gvn = Env.GVN;
 
     // Current theory on Unresolved:  Call.resolve moves closer to the centerline:
@@ -35,7 +36,7 @@ public class TestNodeSmall {
     // Kinda sorta looks like: use startype on incoming, and JOIN.
 
     gvn._opt_mode=0;
-    UnresolvedNode uadd = (UnresolvedNode)Env.top().lookup("+"); // {int int -> int} and {flt flt -> flt} and {str str -> str}
+    UnresolvedNode uadd = (UnresolvedNode)top.lookup("+"); // {int int -> int} and {flt flt -> flt} and {str str -> str}
     FunPtrNode aflt = (FunPtrNode)uadd.in(0);
     FunPtrNode aint = (FunPtrNode)uadd.in(1);
     FunPtrNode astr = (FunPtrNode)uadd.in(2);
@@ -224,14 +225,15 @@ public class TestNodeSmall {
    */
   @SuppressWarnings("unchecked")
   @Test public void testCallNodeResolve() {
+    Env top = Env.top_scope();
     GVNGCM gvn = Env.GVN;
 
     // Make a Unknown/CallNode/CallEpi combo.
     // Unwired.  Validate the resolve process and monotonicity.
     gvn._opt_mode=0;
     ConNode ctrl = (ConNode) gvn.xform(new ConNode<>(Type.CTRL));
-    UnresolvedNode fp_mul = (UnresolvedNode)Env.top().lookup("*"); // {int int -> int} and {flt flt -> flt}
-    UnresolvedNode fp_add = (UnresolvedNode)Env.top().lookup("+"); // {int int -> int} and {flt flt -> flt} and {str str -> str}
+    UnresolvedNode fp_mul = (UnresolvedNode)top.lookup("*"); // {int int -> int} and {flt flt -> flt}
+    UnresolvedNode fp_add = (UnresolvedNode)top.lookup("+"); // {int int -> int} and {flt flt -> flt} and {str str -> str}
     FunPtrNode aflt = (FunPtrNode)fp_add.in(0);
     FunPtrNode aint = (FunPtrNode)fp_add.in(1);
     FunPtrNode astr = (FunPtrNode)fp_add.in(2);
@@ -405,6 +407,7 @@ public class TestNodeSmall {
   // Code: "gen_ctr={cnt;{cnt++}}; ctrA=gen_ctr(); ctrB=gen_ctr(); ctrA(); ctrB(); ctrB()"
   //
   @Test public void testRecursiveDisplay() {
+    Env top = Env.top_scope();
     GVNGCM gvn = Env.GVN;
 
     // Build the graph for the "fact" example:
@@ -438,7 +441,7 @@ public class TestNodeSmall {
     // Parms for the Fun.  Note that the default type is "weak" because the
     // file-level display can not yet know about "fact".
     ParmNode parm_mem = new ParmNode(-2,"mem",fun,mem,null);
-    ParmNode parm_dsp = new ParmNode( 0,"^"  ,fun,Type.SCALAR,dsp_file_ptr,null);
+    ParmNode parm_dsp = new ParmNode( 0,"^"  ,fun,Type.SCALAR,gvn.con(gvn.type(dsp_file_ptr)),null);
     gvn.init(parm_mem.add_def(dsp_merge));
     gvn.init(parm_dsp.add_def(dsp_file_ptr));
     // Close the function up

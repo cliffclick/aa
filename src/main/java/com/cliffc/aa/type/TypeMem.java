@@ -316,8 +316,10 @@ public class TypeMem extends Type<TypeMem> {
     return make0(objs);
   }
 
-  // Shallow meet of all possible loadable values
+  // Shallow meet of all possible loadable values.  Used in Node.value calls, so must be monotonic.
   public TypeObj ld( TypeMemPtr ptr ) {
+    if( ptr._aliases == BitsAlias.EMPTY || ptr._aliases == BitsAlias.NIL )
+      return above_center() ? TypeObj.XOBJ : TypeObj.OBJ;
     if( this== FULL ) return TypeObj. OBJ;
     if( this==EMPTY ) return TypeObj.XOBJ;
     boolean any = ptr.above_center();

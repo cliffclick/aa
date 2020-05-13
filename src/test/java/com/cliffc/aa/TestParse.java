@@ -2,7 +2,6 @@ package com.cliffc.aa;
 
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.SB;
-import org.junit.Assert;
 import org.junit.Ignore;
 import org.junit.Test;
 
@@ -16,7 +15,7 @@ public class TestParse {
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
-    Object dummy = Env.GVN; // Force class loading cycle
+    TypeStruct dummy = TypeStruct.DISPLAY;
     TypeMemPtr tdisp = TypeMemPtr.make(10,TypeStr.NO_DISP);
     Env.DISPLAYS.set(10);
 
@@ -90,8 +89,8 @@ public class TestParse {
     test("math_pi", TypeFlt.PI);
     // bare function lookup; returns a union of '+' functions
     testerr("+", "Syntax error; trailing junk",0);
-    test("{+}", Env.lookup_valtype("+"));
-    test("!", Env.lookup_valtype("!")); // uniops are just like normal functions
+    test_prim("{+}", "+");
+    test_prim("!", "!"); // uniops are just like normal functions
     // Function application, traditional paren/comma args
     test("{+}(1,2)", TypeInt.con( 3));
     test("{-}(1,2)", TypeInt.con(-1)); // binary version
@@ -155,7 +154,7 @@ public class TestParse {
   }
 
   @Test public void testParse02() {
-    Object dummy = Env.GVN; // Force class loading cycle
+    TypeStruct dummy = TypeStruct.DISPLAY;
     TypeMemPtr tdisp = TypeMemPtr.make(10,TypeStr.NO_DISP);
     Env.DISPLAYS.set(10);
     // Anonymous function definition
@@ -168,10 +167,10 @@ public class TestParse {
 
     // ID in different contexts; in general requires a new TypeVar per use; for
     // such a small function it is always inlined completely, has the same effect.
-    test("id", Env.lookup_valtype("id"));
+    test_prim("id", "id");
     test("id(1)",TypeInt.con(1));
     test("id(3.14)",TypeFlt.con(3.14));
-    test("id({+})",Env.lookup_valtype("+")); //
+    test_prim("id({+})","+");
     test("id({+})(id(1),id(math_pi))",TypeFlt.make(0,64,Math.PI+1));
 
     // Function execution and result typing
@@ -344,9 +343,9 @@ public class TestParse {
     test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*[$]A:(~nil;2);3)");
 
     // TODO: Needs a way to easily test simple recursive types
-    TypeEnv te3 = Exec.go(Env.top(),"args","A= :@{n=A?; v=int}; A(@{n=0;v=3})");
+    TypeEnv te3 = Exec.go(Env.file_scope(Env.top_scope()),"args","A= :@{n=A?; v=int}; A(@{n=0;v=3})");
     if( te3._errs != null ) System.err.println(te3._errs.toString());
-    Assert.assertNull(te3._errs);
+    assertNull(te3._errs);
     TypeStruct tt3 = (TypeStruct)te3._tmem.ld((TypeMemPtr)te3._t);
     assertEquals("A:", tt3._name);
     assertEquals(Type.XNIL     ,tt3.at(0));
@@ -399,9 +398,9 @@ public class TestParse {
     test_isa(ll_def+ll_con+ll_map+ll_fun, TypeFunPtr.GENERIC_FUNPTR);
 
     // TODO: Needs a way to easily test simple recursive types
-    TypeEnv te4 = Exec.go(Env.top(),"args",ll_def+ll_con+ll_map+ll_fun+ll_apl);
+    TypeEnv te4 = Exec.go(Env.file_scope(Env.top_scope()),"args",ll_def+ll_con+ll_map+ll_fun+ll_apl);
     if( te4._errs != null ) System.err.println(te4._errs.toString());
-    Assert.assertNull(te4._errs);
+    assertNull(te4._errs);
     TypeStruct tt4 = (TypeStruct)te4._tmem.ld((TypeMemPtr)te4._t);
     assertEquals("List:", tt4._name);
     TypeMemPtr tmp5 = (TypeMemPtr)tt4.at(0);
@@ -770,14 +769,23 @@ strs:List(str?) = ... // List of null-or-strings
 
   // Caller must close TypeEnv
   static private TypeEnv run( String program ) {
-    TypeEnv te = Exec.open(Env.top(),"args",program);
+    TypeEnv te = Exec.open(Env.file_scope(Env.top_scope()),"args",program);
     if( te._errs != null ) System.err.println(te._errs.toString());
-    Assert.assertNull(te._errs);
+    assertNull(te._errs);
     return te;
   }
 
   static private void test( String program, Type expected ) {
     try( TypeEnv te = run(program) ) {
+      assertEquals(expected,te._t);
+    }
+  }
+  static private void test_prim( String program, String prim ) {
+    Env top = Env.top_scope();
+    Type expected = top.lookup_valtype(prim);
+    try( TypeEnv te = Exec.open(Env.file_scope(top),"args",program) ) {
+      if( te._errs != null ) System.err.println(te._errs.toString());
+      assertNull(te._errs);
       assertEquals(expected,te._t);
     }
   }
@@ -849,7 +857,7 @@ strs:List(str?) = ... // List of null-or-strings
     fail();
   }
   static private void testerr( String program, String err, int cur_off ) {
-    TypeEnv te = Exec.go(Env.top(),"args",program);
+    TypeEnv te = Exec.go(Env.file_scope(Env.top_scope()),"args",program);
     assertTrue(te._errs != null && te._errs._len>=1);
     String cursor = new String(new char[cur_off]).replace('\0', ' ');
     String err2 = "\nargs:0:"+err+"\n"+program+"\n"+cursor+"^\n";

@@ -254,7 +254,7 @@ public class CallNode extends Node {
     Type mem = gvn.type(mem());
     mem = mem instanceof TypeMem
       ? mem.bound(TypeMem.ISUSED)  // Cap FULL mem; only bounding for TestNode
-      : mem.above_center() ? TypeMem.XMEM : TypeMem.MEM;
+      : mem.above_center() ? TypeMem.EMPTY : TypeMem.FULL;
     // If not called, then no memory to functions
     if( ctl == Type.XCTRL ) mem = TypeMem.UNUSED;
     ts[1]=mem;

@@ -56,17 +56,19 @@ public class ParmNode extends PhiNode {
     Type ctl = gvn.type(in(0));
     Type t = all_type().dual();
     if( ctl != Type.CTRL ) return ctl.above_center() ? t : t.dual();
+    if( !(in(0) instanceof FunNode) )  return t.dual();
     // If unknown callers, then always the default value because some unknown
     // caller can be that bad.
     FunNode fun = fun();
     if( fun.has_unknown_callers() )
       return gvn.type(in(1));
     // All callers known; merge the wired & flowing ones
-    CallEpiNode cepi;
     for( int i=1; i<_defs._len; i++ )
       if( gvn.type(fun.in(i))==Type.CTRL ) { // Only meet alive paths
         // Only meet with wired edges
-        if( (cepi=((CallNode)fun.in(i).in(0)).cepi())!=null &&
+        Node call = fun.in(i).in(0);
+        CallEpiNode cepi;
+        if( call instanceof CallNode && (cepi=((CallNode)call).cepi())!=null &&
              cepi.cg_tst(fun.fidx()) )
           t = t.meet(gvn.type(in(i)));
       }

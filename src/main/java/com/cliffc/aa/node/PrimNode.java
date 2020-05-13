@@ -25,46 +25,52 @@ public abstract class PrimNode extends Node {
     _badargs=null;
   }
 
-  public static PrimNode[] PRIMS = new PrimNode[] {
-    new RandI64(),
-    new Id(TypeMemPtr.OOP0), // Pre-split OOP from non-OOP
-    new Id(TypeFunPtr.GENERIC_FUNPTR),
-    new Id(Type.REAL),
-
-    new ConvertInt64F64(),
-    new ConvertStrStr(),
-
-    new MinusF64(),
-    new MinusI64(),
-    new Not(),
-
-    new   AddF64(),
-    new   SubF64(),
-    new   MulF64(),
-
-    new   LT_F64(),
-    new   LE_F64(),
-    new   GT_F64(),
-    new   GE_F64(),
-    new   EQ_F64(),
-    new   NE_F64(),
-
-    new   AddI64(),
-    new   SubI64(),
-    new   MulI64(),
-
-    new   AndI64(),
-
-    new   LT_I64(),
-    new   LE_I64(),
-    new   GT_I64(),
-    new   GE_I64(),
-    new   EQ_I64(),
-    new   NE_I64(),
-
-    new   EQ_OOP(),
-    new   NE_OOP(),
-  };
+  private static PrimNode[] PRIMS = null;
+  public static void reset() { PRIMS=null; }
+  public static PrimNode[] PRIMS() {
+    if( PRIMS==null )
+      PRIMS = new PrimNode[] {
+        new RandI64(),
+        new Id(TypeMemPtr.OOP0), // Pre-split OOP from non-OOP
+        new Id(TypeFunPtr.GENERIC_FUNPTR),
+        new Id(Type.REAL),
+        
+        new ConvertInt64F64(),
+        new ConvertStrStr(),
+        
+        new MinusF64(),
+        new MinusI64(),
+        new Not(),
+        
+        new   AddF64(),
+        new   SubF64(),
+        new   MulF64(),
+        
+        new   LT_F64(),
+        new   LE_F64(),
+        new   GT_F64(),
+        new   GE_F64(),
+        new   EQ_F64(),
+        new   NE_F64(),
+        
+        new   AddI64(),
+        new   SubI64(),
+        new   MulI64(),
+        
+        new   AndI64(),
+        
+        new   LT_I64(),
+        new   LE_I64(),
+        new   GT_I64(),
+        new   GE_I64(),
+        new   EQ_I64(),
+        new   NE_I64(),
+        
+        new   EQ_OOP(),
+        new   NE_OOP(),
+      };
+    return PRIMS;
+  }
 
   public static PrimNode convertTypeName( Type from, Type to, Parse badargs ) {
     return new ConvertTypeName(from,to,badargs);
@@ -118,6 +124,7 @@ public abstract class PrimNode extends Node {
   // wraps a PrimNode as a full 1st-class function to be passed about or
   // assigned to variables.
   public FunPtrNode as_fun( GVNGCM gvn ) {
+    _defs.clear();  _uses.clear();
     FunNode  fun = ( FunNode) gvn.xform(new  FunNode(this).add_def(Env.ALL_CTRL)); // Points to ScopeNode only
     ParmNode rpc = (ParmNode) gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
     ParmNode mem = (ParmNode) gvn.xform(new ParmNode(-2,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));

@@ -27,11 +27,17 @@ public abstract class IntrinsicNewNode extends Node {
     ts[0] = TypeFunPtr.NO_DISP; // No display
     _sig = TypeFunSig.make(TypeStruct.make_args(ts.length==2 ? TypeStruct.ARGS_X : TypeStruct.ARGS_XY,ts),TypeMemPtr.STRPTR);
   }
-  public static IntrinsicNewNode[] INTRINSICS = new IntrinsicNewNode[] {
-    new ConvertI64Str(),
-    new ConvertF64Str(),
-    new AddStrStr(),
-  };
+  private static IntrinsicNewNode[] INTRINSICS = null;
+  public static void reset() { INTRINSICS = null; }
+  public static IntrinsicNewNode[] INTRINSICS() {
+    if( INTRINSICS == null )
+      INTRINSICS = new IntrinsicNewNode[] {
+        new ConvertI64Str(),
+        new ConvertF64Str(),
+        new AddStrStr(),
+      };
+    return INTRINSICS;
+  }
   @Override public String xstr() { return _name+"*"+_nstr._alias; }
   @Override public Type all_type() { return TypeStr.STR; }
 

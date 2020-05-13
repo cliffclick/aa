@@ -295,11 +295,11 @@ public class TestType {
     assertTrue(ld.isa(ax));
   }
 
-  
+
   @Test public void testFunction() {
     Type.init0(new HashMap<>());
     Type ignore = TypeTuple.ANY; // Break class-loader cycle; load Tuple before Fun.
-    PrimNode[] ignore2 = PrimNode.PRIMS; // Force node
+    PrimNode[] ignore2 = PrimNode.PRIMS(); // Force node
 
     TypeFunPtr gf = TypeFunPtr.GENERIC_FUNPTR;
     // New functions fall squarely between +/- GENERIC_FUNPTR.
@@ -492,6 +492,47 @@ public class TestType {
     assertEquals(smt,mx);
   }
 
+  @Test public void testLoad() {
+    Type.init0(new HashMap<>());
+    Object dummy0 = TypeStruct.TYPES;
+    // All are ISA
+    TypeMemPtr[] tmps = new TypeMemPtr[]{
+      TypeMemPtr.STRPTR.dual(),
+      TypeMemPtr.ABCPTR,
+      TypeMemPtr.STRPTR,
+    };
+    TypeMemPtr[] tmps1 = new TypeMemPtr[]{
+      TypeMemPtr.make(-4,TypeObj.XOBJ),
+      TypeMemPtr.make(-5,TypeObj.XOBJ),
+      TypeMemPtr.make(5,TypeObj. OBJ), // testing 5-obj & ISUSED [1....:use] vs MEM_ABC
+      TypeMemPtr.make(4,TypeObj. OBJ),
+    };
+    for( int i=0; i<tmps.length-1; i++ )
+      assertTrue(tmps[i].isa(tmps[i+1]));
+
+    // All are ISA
+    TypeMem[] tmems = new TypeMem[]{
+      TypeMem.UNUSED,
+      TypeMem.MEM_ABC,            // [1:~obj,5:"abc"]
+      TypeMem.MEM.dual(),         // [1:~obj,2:~(),3:~str,5:"abc"]
+      TypeMem.MEM,
+      TypeMem.MEM_ABC.dual(),     // [1: obj,5:"abc"]
+      TypeMem.ISUSED,
+    };
+    for( int j=0; j<tmems.length-1; j++ )
+      assertTrue(tmems[j].isa(tmems[j+1]));
+
+    TypeObj[][] rez = new TypeObj[tmps.length][tmems.length];
+    for( int i=0; i<tmps.length; i++ )
+      for( int j=0; j<tmems.length; j++ )
+        rez[i][j] = tmems[j].ld(tmps[i]);
+
+    for( int i0=0; i0<tmps.length; i0++ )
+      for( int j0=0; j0<tmems.length; j0++ )
+        for( int i1=i0; i1<tmps.length; i1++ )
+          for( int j1=j0; j1<tmems.length; j1++ )
+            assertTrue( rez[i0][j0].isa(rez[i1][j1]) );
+  }
 
   @Test public void testCommuteSymmetricAssociative() {
     Type.init0(new HashMap<>());
@@ -500,4 +541,5 @@ public class TestType {
 
     assertTrue(Type.check_startup());
   }
+
 }

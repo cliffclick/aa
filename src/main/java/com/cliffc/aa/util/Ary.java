@@ -299,4 +299,8 @@ public class Ary<E> implements Iterable<E> {
       sum += _es[i]==null ? 0 : _es[i].hashCode();
     return sum;
   }
+
+  public Ary<E> deepCopy() {
+    return new Ary<>(_es.clone(),_len);
+  }
 }

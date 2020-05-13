@@ -124,7 +124,7 @@ public abstract class Node implements Cloneable {
   Node( byte op ) { this(op,new Node[0]); }
   Node( byte op, Node... defs ) {
     _op   = op;
-    _uid  = GVNGCM.uid();
+    _uid  = Env.GVN.uid();
     _defs = new Ary<>(defs);
     _uses = new Ary<>(new Node[1],0);
     for( Node def : defs ) if( def != null ) def._uses.add(this);
@@ -139,7 +139,7 @@ public abstract class Node implements Cloneable {
   @NotNull Node copy( boolean copy_edges, GVNGCM gvn) {
     try {
       Node n = (Node)clone();
-      n._uid = GVNGCM.uid();              // A new UID
+      n._uid = Env.GVN.uid();             // A new UID
       n._defs = new Ary<>(new Node[1],0); // New empty defs
       n._uses = new Ary<>(new Node[1],0); // New empty uses
       if( copy_edges )
@@ -294,9 +294,6 @@ public abstract class Node implements Cloneable {
     for( Node n : _uses ) if(            (m=n.find(uid,bs)) !=null ) return m;
     return null;
   }
-
-  // Cleanup, so can re-run in the same test harness iteration
-  public void reset_to_init1(GVNGCM gvn) { }
 
   // Graph rewriting.  Can change defs, including making new nodes - but if it
   // does so, all new nodes will first call gvn.xform().  If gvn._opt if false,

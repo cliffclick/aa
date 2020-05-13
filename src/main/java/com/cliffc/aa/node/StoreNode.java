@@ -109,13 +109,13 @@ public class StoreNode extends Node {
     else if( tmem instanceof TypeObj )
       tobj = (TypeObj)tmem;   // Object being updated
     else                      // Else dunno what is being updated
-      return tmem.above_center() ? TypeObj.XOBJ : TypeObj.OBJ;
+      return tmem.above_center() ? TypeStruct.ANYSTRUCT : TypeStruct.ALLSTRUCT;
 
     // Not updating a struct?
     if( !(tobj instanceof TypeStruct) )
       // Updating XOBJ means updating any choice, and we choose no-change.
       // Updating  OBJ means we're already as low as we can go.
-      return tobj.meet(TypeStruct.ANYSTRUCT);
+      return tobj.above_center() ? TypeStruct.ANYSTRUCT : TypeStruct.ALLSTRUCT;
 
     // Update the field.  Illegal updates make no changes (except clear 'clean' bit).
     TypeStruct ts = (TypeStruct)tobj;

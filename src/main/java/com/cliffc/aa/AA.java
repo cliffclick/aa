@@ -22,9 +22,9 @@ public abstract class AA {
   }
   public static void main( String[] args ) {
     System.out.println(ABV.toString());
-    Env top = Env.top();
-    if( args.length > 0 ) System.out.println(Exec.go(top,"args",String.join(" ",args))._t.toString());
-    else REPL.go(top);
+    Env file = Env.file_scope(Env.top_scope());
+    if( args.length > 0 ) System.out.println(Exec.go(file,"args",String.join(" ",args))._t.toString());
+    else REPL.go(file);
   }
   public static boolean DEBUG = true;
   public static <T> T p(T x, String s) {

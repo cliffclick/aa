@@ -56,7 +56,7 @@ public class TestNode {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testNode() {
     Type.init0(new HashMap<>());
-    Env.top();
+    Env.file_scope(Env.top_scope());
   }
 
   // A sparse list of all subtypes.  The outer array is the index into
@@ -161,7 +161,8 @@ public class TestNode {
   @SuppressWarnings("unchecked")
   @Test public void testMonotonic() {
     Type.init0(new HashMap<>());
-    Env.top();
+    Env top = Env.top_scope();
+    Env.file_scope(top);
     assert _errs == 0;          // Start with no errors
 
     // Types we are testing
@@ -204,7 +205,7 @@ public class TestNode {
     Node mem = new ConNode<Type>(TypeMem.MEM);
     FunNode fun_forward_ref = new FunNode("anon");
 
-    Node unr = Env.top().lookup("+"); // All the "+" functions
+    Node unr = top.lookup("+"); // All the "+" functions
     FunNode fun_plus = ((FunPtrNode)unr.in(1)).fun();
     RetNode ret = fun_plus.ret();
     CallNode call = new CallNode(false,null,_ins[0],unr,mem);
@@ -237,7 +238,7 @@ public class TestNode {
     test1monotonic(new FunPtrNode(ret,_gvn.con(TypeFunPtr.NO_DISP)));
     test1monotonic(new FP2ClosureNode(_ins[1])); // Only takes in a TFP
     test1monotonic(new     IfNode(_ins[0],_ins[1]));
-    for( IntrinsicNewNode prim : IntrinsicNewNode.INTRINSICS )
+    for( IntrinsicNewNode prim : IntrinsicNewNode.INTRINSICS() )
       test1monotonic_intrinsic(prim);
     test1monotonic(new IntrinsicNode(tname,null,null,mem,_ins[2]));
     test1monotonic(new   LoadNode(_ins[1],_ins[2],"x",null));
@@ -254,7 +255,7 @@ public class TestNode {
     ((ConNode<Type>)_ins[1])._t = Type.SCALAR; // ParmNode reads this for _alltype
     test1monotonic(new   ParmNode( 1, "x",_ins[0],(ConNode)_ins[1],null).add_def(_ins[2]));
     test1monotonic(new    PhiNode(Type.SCALAR,null,_ins[0],_ins[1],_ins[2]));
-    for( PrimNode prim : PrimNode.PRIMS )
+    for( PrimNode prim : PrimNode.PRIMS() )
       test1monotonic_prim(prim);
     test1monotonic(new   ProjNode(_ins[0],1));
     test1monotonic(new RegionNode(null,_ins[1],_ins[2]));
@@ -411,7 +412,7 @@ public class TestNode {
     _gvn.setype(_ins[idx], tyx);
   }
 
-  private static int[] stx_any = new int[]{};
+  private static final int[] stx_any = new int[]{};
   private int[] stx(final Node n, long xx, int i) {
     if( i >= n._defs._len || n.in(i) == null ) return stx_any;
     return _min_subtypes[xx(xx,i)];

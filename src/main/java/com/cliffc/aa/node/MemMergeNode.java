@@ -53,13 +53,6 @@ public class MemMergeNode extends Node {
     this(mem);
     create_alias_active(alias,obj,null);
   }
-  @Override public void reset_to_init1(GVNGCM gvn) {
-    gvn.unreg(this);
-    for( int i=1; i<_defs._len; i++ )
-      if( !in(i).is_prim() )
-        remove0(i--,gvn);
-    _aliases.set_len(_defs._len);
-  }
 
   @Override String str() {
     SB sb = new SB().p('[');
@@ -248,7 +241,7 @@ public class MemMergeNode extends Node {
     // Base memory type in slot 0
     Type t = gvn.type(mem());
     if( !(t instanceof TypeMem) )
-      return t.above_center() ? TypeMem.XMEM : TypeMem.MEM;
+      return t.above_center() ? TypeMem.EMPTY : TypeMem.FULL;
     TypeMem tm = (TypeMem)(t.bound(TypeMem.ISUSED)); // Only bounding for TestNode
 
     // Merge inputs with parent.

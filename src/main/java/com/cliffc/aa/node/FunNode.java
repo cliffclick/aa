@@ -4,7 +4,10 @@ import com.cliffc.aa.AA;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.*;
+import com.cliffc.aa.util.Ary;
+import com.cliffc.aa.util.SB;
+import com.cliffc.aa.util.VBitSet;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.BitSet;
 import java.util.HashMap;
@@ -85,22 +88,11 @@ public class FunNode extends RegionNode {
 
   // Find FunNodes by fidx
   static Ary<FunNode> FUNS = new Ary<>(new FunNode[]{null,});
+  public static void reset() { FUNS.clear(); }
   public static FunNode find_fidx( int fidx ) { return fidx >= FUNS._len ? null : FUNS.at(fidx); }
   int fidx() { return _fidx; }
 
   // Fast reset of parser state between calls to Exec
-  static int PRIM_CNT;
-  public static void init0() { PRIM_CNT = FUNS._len; }
-  public static void reset_to_init0() {
-    FUNS.set_len(PRIM_CNT);
-    for( int i=2; i<PRIM_CNT; i++ ) {
-      FunNode fun = FUNS.at(i);
-      if( fun != null && fun.fidx() != i ) { // Cloned primitives get renumbered, so renumber back
-        RetNode ret = fun.ret(); // Done before flipping fidx, because of asserts
-        ret._fidx = fun._fidx = i;
-      }
-    }
-  }
 
   // Short self name
   @Override String xstr() { return name(); }
@@ -164,7 +156,7 @@ public class FunNode extends RegionNode {
   public boolean noinline() { return _name != null && _name.startsWith("noinline") && in(0)==null; }
 
   // Never inline with a nested function
-  @Override Node copy(boolean copy_edges, GVNGCM gvn) { throw AA.unimpl(); }
+  @Override @NotNull Node copy( boolean copy_edges, GVNGCM gvn) { throw AA.unimpl(); }
 
   // True if may have future unknown callers.
   boolean has_unknown_callers() { return _defs._len > 1 && in(1) == Env.ALL_CTRL; }

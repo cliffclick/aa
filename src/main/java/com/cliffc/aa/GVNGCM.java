@@ -13,10 +13,10 @@ import java.util.concurrent.ConcurrentHashMap;
 // Global Value Numbering, Global Code Motion
 public class GVNGCM {
   // Unique dense node-numbering
-  private static int CNT;
-  private static final BitSet _live = new BitSet();  // Conservative approximation of live; due to loops some things may be marked live, but are dead
+  private int CNT;
+  private final BitSet _live = new BitSet();  // Conservative approximation of live; due to loops some things may be marked live, but are dead
 
-  public static int uid() { assert CNT < 100000 : "infinite node create loop"; _live.set(CNT);  return CNT++; }
+  public int uid() { assert CNT < 100000 : "infinite node create loop"; _live.set(CNT);  return CNT++; }
 
   public int _opt_mode;         // 0 - Parse (discovery), 1 - iter (lifting), 2 - gcp/opto (falling)
 
@@ -60,65 +60,25 @@ public class GVNGCM {
 
   // Global expressions, to remove redundant Nodes
   private final ConcurrentHashMap<Node,Node> _vals = new ConcurrentHashMap<>();
+  Set<Node> valsKeySet() { return _vals.keySet(); }
 
-  // Initial state after loading e.g. primitives & boot libs.  Record state
-  // here, so can reset to here cheaply and parse again.
+  // Initial state after loading e.g. primitives.
   public static int _INIT0_CNT;
-  private static Node[] _INIT0_NODES;
   void init0() {
-    _work.clear();  _wrk_bits.clear();
     assert _live.get(CNT-1) && !_live.get(CNT) && _work._len==0 && _wrk_bits.isEmpty() && _ts._len==CNT;
     _INIT0_CNT=CNT;
-    _INIT0_NODES = _vals.keySet().toArray(new Node[0]);
-    for( Node n : _INIT0_NODES ) { assert !n.is_dead();  n._live = TypeMem.ISUSED; add_work(n); }
   }
-  Set<Node> valsKeySet() { return _vals.keySet(); }
   // Reset is called after a top-level exec exits (e.g. junits) with no parse
   // state left alive.  NOT called after a line in the REPL or a user-call to
   // "eval" as user state carries on.
   void reset_to_init0() {
-    assert _work2._len==0;
+    _work .clear(); _wrk_bits .clear();
+    _work2.clear(); _wrk2_bits.clear();
     _opt_mode = 0;
-    for( Node n : _INIT0_NODES ) {
-      n.reset_to_init1(this);
-      n._live = n.basic_liveness() ? TypeMem.EMPTY : TypeMem.ISUSED;
-      for( int i=0; i<n._uses._len; i++ )
-        if( !n._uses.at(i).is_prim() )
-          n._uses.del(i--);
-      for( int i=0; i<n._defs._len; i++ )
-        if( n.in(i) != null && !n.in(i).is_prim() )
-          n._defs.del(i--);
-      assert !n.is_dead();
-    }
-    while( !_work.isEmpty() ) {
-      Node n = _work.pop();     // Pull from main worklist before functions
-      _wrk_bits.clear(n._uid);
-      if( n.is_dead() || n._keep!=0 ) continue;
-      if( n._uses._len==0 ) kill(n);
-    }
-    CNT = _INIT0_CNT;
-    _live.clear();  _live.set(0,_INIT0_CNT);
-    _ts.set_len(_INIT0_CNT);
+    CNT = 0;
+    _live.clear();
+    _ts.clear();
     _vals.clear();
-    // Reset primitive types until fixed point.  Mostly cloned primitives
-    // changed function pointers (and sometimes string aliases) which are all
-    // getting reset - plus their Unresolved and Prim closure types.
-    for( Node n : _INIT0_NODES ) add_work0(n);
-    while( !_work.isEmpty() ) {
-      Node n = _work.pop();
-      _wrk_bits.clear(n._uid);
-      _vals.put(n,n);           // Put in hash table
-      Type t = n.value(this);   // Current type
-      if( t != _ts.at(n._uid) ){// Cached vs current
-        _ts.setX(n._uid,t);     // Reset cache to current
-        add_work_uses(n);
-      }
-      TypeMem live = n.live(this);
-      if( live != n._live ) {
-        n._live = live;        // Reset cache to current
-        add_work_defs(n);      // Put defs on worklist... liveness flows uphill
-      }
-    }
   }
 
   public Type type( Node n ) {
@@ -293,7 +253,7 @@ public class GVNGCM {
   // Version for never-GVN'd; common for e.g. constants to die early or
   // RootNode, and some other make-and-toss Nodes.
   private void kill0( Node n ) {
-    assert n._uses._len==0 && n._keep==0 && (_INIT0_CNT==0 || !n.is_prim());
+    assert n._uses._len==0 && n._keep==0;
     for( int i=0; i<n._defs._len; i++ )
       n.set_def(i,null,this);   // Recursively destroy dead nodes
     n.set_dead();               // n is officially dead now
@@ -520,7 +480,6 @@ public class GVNGCM {
     // Prime the worklist
     rez.unhook(); // Must be unhooked to hit worklist
     add_work(rez);
-    for( Node n : _INIT0_NODES ) add_work(n);
     // Collect unresolved calls, and verify they get resolved.
     Ary<CallNode> ambi_calls = new Ary<>(new CallNode[1],0);
 
