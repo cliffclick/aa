@@ -558,7 +558,7 @@ public class Parse {
         oldx = _x;
         skipWS();               // Skip to start of 1st arg
         int first_arg_start = _x; // For the non-arg-list case
-        Node arg = arglist ? tuple(stmts(),first_arg_start) : term(); // Start of an argument list?
+        Node arg = arglist ? tuple(oldx,stmts(),first_arg_start) : term(); // Start of an argument list?
         if( arg == null )       // tfact but no arg is just the tfact
           break;
         Type tn = _gvn.type(n);
@@ -659,7 +659,7 @@ public class Parse {
       if( peek(')') ) return s;                 // A (grouped) statement
       if( !peek(',') ) return s;                // Not a tuple, probably a syntax error
       _x --;                                    // Reparse the ',' in tuple
-      return tuple(s,first_arg_start);          // Parse a tuple
+      return tuple(oldx,s,first_arg_start);     // Parse a tuple
     }
     // Anonymous function or operator
     if( peek1(c,'{') ) {
@@ -710,20 +710,27 @@ public class Parse {
   /** Parse a tuple; first stmt but not the ',' parsed.
    *  tuple= (stmts,[stmts,])     // Tuple; final comma is optional
    */
-  private Node tuple(Node s, int first_arg_start) {
-    TypeStruct mt_tuple = TypeStruct.make(new String[]{"^"},TypeStruct.ts(Type.XNIL),new byte[]{TypeStruct.FFNL});
-    NewObjNode nn = new NewObjNode(false,BitsAlias.RECORD,mt_tuple,ctrl(),con(Type.XNIL));
-    Ary<Parse> args = new Ary<>(new Parse[]{null,errMsg(first_arg_start)});
-    int fidx=0, oldx=_x-1; // Field name counter, mismatched parens balance point
-    while( s!=null ) {
-      nn.create_active((""+(fidx++)).intern(),s,TypeStruct.FFNL,_gvn);
+  private Node tuple(int oldx, Node s, int first_arg_start) {
+    Parse bad = errMsg(first_arg_start);
+    Ary<Parse> bads = new Ary<>(new Parse[1],0);
+    Ary<Node > args = new Ary<>(new Node [1],0);
+    do { 
+      bads.push(bad);           // Collect arg & arg start
+      args.push(s);
       if( !peek(',') ) break;   // Final comma is optional
       skipWS();                 // Skip to arg start before recording arg start
-      args.push(errMsg());      // Record arg start
+      bad = errMsg();           // Record arg start
       s=stmts();                // Parse arg
-    }
-    require(')',oldx);
-    nn._fld_starts = args.asAry();
+    } while( s!=null );         // No more args
+    require(')',oldx);          // Balanced closing paren
+
+    // Build the tuple from gathered args
+    TypeStruct mt_tuple = TypeStruct.make(new String[]{"^"},TypeStruct.ts(Type.XNIL),new byte[]{TypeStruct.FFNL});
+    NewObjNode nn = new NewObjNode(false,BitsAlias.RECORD,mt_tuple,ctrl(),con(Type.XNIL));
+    for( int i=0; i<args._len; i++ )
+      nn.create_active((""+i).intern(),args.at(i),TypeStruct.FFNL,_gvn);
+    nn._fld_starts = bads.asAry();
+
     // NewNode returns a TypeObj and a TypeMemPtr (the reference).
     Node nnn = gvn(nn).keep();
     Node mem = Env.DEFMEM.make_mem_proj(_gvn,nn);

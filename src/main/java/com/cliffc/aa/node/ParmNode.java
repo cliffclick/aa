@@ -52,13 +52,12 @@ public class ParmNode extends PhiNode {
     //   - no Call, Cepi, - confused, do not fold
     //   - not flowing - bad args, do not fold
     //   - flowing but bad args, do not fold
-
     Node live=null;
     Node mem = fun.parm(-2);
     for( int i=1; i<_defs._len; i++  ) { // For all arguments
       Node n = in(i);
       if( gvn.type(fun.in(i))==Type.CTRL && // Dead path
-          valid_args(fun,i) ) {             // And valid arguments
+          valid_args(gvn,fun,i,mem) ) {     // And valid arguments
         if( n==this || n==live ) continue;  // Ignore self or duplicates
         if( live==null ) live = n;          // Found unique live input
         else live=this;         // Found 2nd live input, no collapse
@@ -67,13 +66,16 @@ public class ParmNode extends PhiNode {
     return live == this ? null : live; // Return single unique live input
   }
 
-  private boolean valid_args(FunNode fun, int i) {
+  private boolean valid_args(GVNGCM gvn, FunNode fun, int i, Node mem) {
     Node call = fun.in(i).in(0);
     if( !(call instanceof CallNode) ) return false; // Bad graph, do not change
     CallEpiNode cepi  = ((CallNode)call).cepi();
-    // If flowing, then args are valid
-    return cepi.cg_tst(fun.fidx());
-    // if( !gvn.sharptr(in(i),mem.in(i)).isa(fun.formal(_idx)) ) // Arg is NOT correct type
+    // If not flowing, then args are not aligned
+    if( !cepi.cg_tst(fun.fidx()) ) return false;
+    // Check arg type
+    if( !gvn.sharptr(in(i),mem.in(i)).isa(fun.formal(_idx)) )
+      return false; // Arg is NOT correct type
+    return true;
   }
 
 

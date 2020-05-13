@@ -285,11 +285,8 @@ public class TypeMem extends Type<TypeMem> {
     MEM  = make(tos);
     XMEM = MEM.dual();
 
-    TypeObj[] tss = new TypeObj[BitsAlias.STR+1];
-    tss[1] = TypeObj.XOBJ;
-    tss[BitsAlias.STR] = TypeStr.STR;
-    MEM_STR  = make(tss);
-    MEM_ABC  = make(TypeMemPtr.ABCPTR.getbit(),TypeStr.ABC);
+    MEM_STR = make(BitsAlias.STR,TypeStr.STR);
+    MEM_ABC = make(BitsAlias.ABC,TypeStr.ABC);
   }
   static final TypeMem[] TYPES = new TypeMem[]{FULL,MEM,MEM_ABC};
 
