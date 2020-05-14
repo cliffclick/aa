@@ -112,7 +112,6 @@ public class TestParse {
   }
 
   @Test public void testParse01() {
-    testerr("x=(1+(x=2)+x); x", "Cannot re-assign final field '.x'",0);
     // Syntax for variable assignment
     test("x=1", TypeInt.TRUE);
     test("x=y=1", TypeInt.TRUE);
@@ -260,7 +259,8 @@ public class TestParse {
   }
 
   @Test public void testParse04() {
-    test("x=@{a:=1;b= {a=a+1;b=0}}; x.b(); x.a",TypeInt.con(2));
+    TypeStruct dummy = TypeStruct.DISPLAY;
+    testerr ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1;y=2}))", "*[$]@{x==1;y==2} is not a *[$]Point:@{x:=;y:=}",22);
     // simple anon struct tests
     testerr("a=@{x=1.2;y}; x", "Unknown ref 'x'",15);
     testerr("a=@{x=1;x=2}.x", "Cannot re-assign final field '.x'",8);
@@ -290,9 +290,9 @@ public class TestParse {
     test("x=@{a:=1;b= {a=a+1;b=0}}; x.b(); x.a",TypeInt.con(2));
 
     // Tuple
-    test_obj_isa("(0,\"abc\")", TypeStruct.make_tuple(Type.NIL,Type.NIL,TypeMemPtr.STRPTR));
+    test_obj_isa("(0,\"abc\")", TypeStruct.make_tuple(Type.NIL,Type.NIL,TypeMemPtr.OOP));
     test("(1,\"abc\").0", TypeInt.TRUE);
-    test_isa("(1,\"abc\").1", TypeMemPtr.STRPTR);
+    test_obj("(1,\"abc\").1", TypeStr.ABC);
 
     // Named type variables
     test("gal=:flt; gal", TypeFunPtr.make(BitsFun.make0(35),2,TypeFunPtr.NO_DISP));
@@ -303,11 +303,11 @@ public class TestParse {
 
     test    ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
     test    ("Point=:@{x;y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
-    testerr ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1;y=2}))", "*[$]@{x==;y==} is not a *[$]Point:@{x=;y=}",22);
-    testerr ("Point=:@{x;y}; Point((0,1))", "*[$](~nil;1) is not a *[$]Point:@{x=;y=}",20);
+    testerr ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1;y=2}))", "*[$]@{x==1;y==2} is not a *[$]Point:@{x:=;y:=}",22);
+    testerr ("Point=:@{x;y}; Point((0,1))", "*[$](~nil;1) is not a *[$]Point:@{x:=;y:=}",21);
     testerr("x=@{n: =1;}","Missing type after ':'",7);
     testerr("x=@{n=;}","Missing ifex after assignment of 'n'",6);
-    test_obj_isa("x=@{n}",TypeStruct.make(new String[]{"^","n"},TypeStruct.ts(TypeMemPtr.DISPLAY_PTR,Type.NIL),TypeStruct.ffnls(2)));
+    test_obj_isa("x=@{n}",TypeStruct.make(new String[]{"^","n"},TypeStruct.ts(TypeMemPtr.OOP,Type.XNIL),TypeStruct.ffnls(2)));
   }
 
   @Test public void testParse05() {
@@ -823,12 +823,12 @@ strs:List(str?) = ... // List of null-or-strings
       assertEquals(obj,to);
     }
   }
-  static private void test_obj_isa( String program, TypeObj obj) {
+  static private void test_obj_isa( String program, TypeObj expected) {
     try( TypeEnv te = run(program) ) {
       assertTrue(te._t instanceof TypeMemPtr);
       int alias = ((TypeMemPtr)te._t).getbit(); // internally asserts only 1 bit set
       TypeObj to = te._tmem.ld((TypeMemPtr)te._t);
-      assertTrue(to.isa(obj));
+      assertTrue(to.isa(expected));
     }
   }
   static private void test_ptr( String program, String expected ) {

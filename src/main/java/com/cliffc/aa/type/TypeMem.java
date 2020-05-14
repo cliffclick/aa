@@ -331,6 +331,11 @@ public class TypeMem extends Type<TypeMem> {
       }
     return obj1;
   }
+  // TODO: Implement this.  Needed when checking complex actuals against
+  // complex formals.
+  public TypeObj ld_deep( TypeMemPtr ptr ) {
+    return ld(ptr);
+  }
 
   // Whole object Store at an alias.  Just merge with the parent.
   public TypeMem st( int alias, TypeObj obj ) {

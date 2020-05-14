@@ -39,11 +39,9 @@ public class TypeNode extends Node {
       args[0] = fun;            // Call control
       args[1] = mem = gvn.xform(new ParmNode(-2,"mem",fun,TypeMem.MEM,Env.DEFMEM,null)).keep();
       args[2] = arg;            // The whole TFP to the call
-      for( int i=1; i<sig.nargs(); i++ ) { // First is display
-        // All the parms, with types
-        Node parm = gvn.xform(new ParmNode(i,"arg"+i,fun,gvn.con(Type.SCALAR),null));
-        args[i+2] = gvn.xform(new TypeNode(mem,parm,sig.arg(i),_error_parse));
-      }
+      for( int i=1; i<sig.nargs(); i++ )  // First is display
+        // All the parms; types in the function signature
+        args[i+2] = gvn.xform(new ParmNode(i,"arg"+i,fun,gvn.con(Type.SCALAR),null));
       Parse[] badargs = new Parse[sig.nargs()];
       Arrays.fill(badargs,_error_parse);
       Node rpc= gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
@@ -52,7 +50,8 @@ public class TypeNode extends Node {
       Node ctl    = gvn.xform(new CProjNode(cepi,0));
       Node postmem= gvn.xform(new MProjNode(cepi,1)).keep();
       Node val    = gvn.xform(new  ProjNode(cepi.unhook(),2));
-      Node chk    = gvn.xform(new  TypeNode(mem.unhook(),val,sig._ret,_error_parse)); // Type-check the return also
+      // Type-check the return also
+      Node chk    = gvn.xform(new  TypeNode(mem.unhook(),val,sig._ret,_error_parse)); 
       RetNode ret = (RetNode)gvn.xform(new RetNode(ctl,postmem.unhook(),chk,rpc,fun));
       // Just the Closure when we make a new TFP
       Node clos = gvn.xform(new FP2ClosureNode(arg));
@@ -82,13 +81,9 @@ public class TypeNode extends Node {
   }
   @Override public Type value(GVNGCM gvn) {
     Node arg = arg();
-    Type t = gvn.type(arg);
-    if( mem() == null || !(t instanceof TypeMemPtr) || !(_t instanceof TypeMemPtr) )
-      return t.bound(_t).simple_ptr();
-    Type tmem = gvn.type(mem());
-    Type t2 = t.sharpen(tmem);
-    Type t3 = t2.bound(_t);
-    return t3.simple_ptr();
+    Type t1 = gvn.type(arg);
+    Type t2 = t1.bound(_t.simple_ptr());
+    return t2;
   }
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
     if( _live == TypeMem.DEAD ) return TypeMem.DEAD; // Am dead, so nothing extra is alive.

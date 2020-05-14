@@ -244,7 +244,6 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   @Override public Type sharpen( Type tmem ) {
     TypeMem tmem2 = (TypeMem)tmem.bound(TypeMem.ISUSED);
     assert this==simple_ptr();
-    // TODO: Needs to be recursive
-    return make(_aliases,tmem2.ld(this));
+    return make(_aliases,tmem2.ld_deep(this));
   }
 }

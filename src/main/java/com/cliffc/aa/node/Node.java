@@ -429,7 +429,7 @@ public abstract class Node implements Cloneable {
     assert !is_dead();
     if( bs.tset(_uid) ) return; // Been there, done that
     if( is_uncalled(gvn) ) return; // FunPtr is a constant, but never executed, do not check for errors
-    // Reverse walk: start and exit/return of graph and walk towards root/start.
+    // Reverse walk: start at exit/return of graph and walk towards root/start.
     for( int i=0; i<_defs._len; i++ ) {
       Node def = _defs.at(i);   // Walk data defs for more errors
       if( def == null || gvn.type(def) == Type.XCTRL ) continue;

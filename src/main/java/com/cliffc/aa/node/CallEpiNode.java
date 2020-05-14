@@ -266,10 +266,13 @@ public final class CallEpiNode extends Node {
     // are an inlined XallEpi and make a call-like tuple directly from our
     // inputs.
     if( !(tin0 instanceof TypeTuple) ||
-        (tcall=(TypeTuple)tin0)._ts.length < 3 ) // Must be inlined
-      return tin0==Type.CTRL
-        ? (TypeTuple)TypeTuple.make(Type.CTRL,gvn.type(in(1)),gvn.type(in(2))).bound(all_type())
-        : (tin0.above_center() ? TypeTuple.CALLE.dual() : TypeTuple.CALLE);
+        (tcall=(TypeTuple)tin0)._ts.length < 3 ) { // Must be inlined
+      if( tin0!=Type.CTRL )                        // Weird stuff?
+        return tin0.above_center() ? TypeTuple.CALLE.dual() : TypeTuple.CALLE;
+      // Must be an is_copy.  Just return the arg types, capped at all_type for testing
+      TypeTuple tall = all_type();
+      return TypeTuple.make(Type.CTRL,gvn.type(in(1)).bound(tall.at(1)),gvn.type(in(2)).bound(tall.at(2)));
+    }
     //assert sane_wiring();
 
     // Get Call result.  If the Call args are in-error, then the Call is called
@@ -305,10 +308,11 @@ public final class CallEpiNode extends Node {
         Node ret = in(wire_num(i));
         if( ret instanceof RetNode &&            // Only fails during testing
             ((RetNode)ret).is_copy() ) continue; // Dying, not called, not returning here
-        Type tr = gvn.type(ret);
+        Type tr = gvn.type(ret);          // Allow ConNode here for testing
         if( !(tr instanceof TypeTuple) || // Only fails during testing
             ((TypeTuple)tr)._ts.length != TypeTuple.XRET._ts.length )
           continue;               // Only fails during testing
+        if( !fidxs.test_recur(((RetNode)ret)._fidx) ) continue; // Wired, but fptr does not reach here
         tret = (TypeTuple)tret.meet(tr);
       }
       // Still must join with the post_call_crush, because the return knows as
@@ -395,6 +399,6 @@ public final class CallEpiNode extends Node {
   // If slot 0 is not a CallNode, we have been inlined.
   boolean is_copy() { return !(in(0) instanceof CallNode); }
   @Override public Node is_copy(GVNGCM gvn, int idx) { return is_copy() ? in(idx) : null; }
-  @Override public Type all_type() { return TypeTuple.CALLE; }
+  @Override public TypeTuple all_type() { return TypeTuple.CALLE; }
   @Override Node is_pure_call() { return call().is_pure_call(); }
 }

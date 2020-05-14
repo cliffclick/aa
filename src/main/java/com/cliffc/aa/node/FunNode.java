@@ -264,7 +264,7 @@ public class FunNode extends RegionNode {
     assert has_unknown_callers(); // Only overly-wide calls.
     for( ParmNode parm : parms ) // For all parms
       if( parm != null && parm._idx > 0 ) // (some can be dead) and skipping the display
-        for( Node call : parm._uses ) // See if a parm-user needs a type-specialization split
+        for( Node call : parm._uses ) { // See if a parm-user needs a type-specialization split
           if( call instanceof CallNode &&
               ((CallNode)call).fun() instanceof UnresolvedNode ) { // Call overload not resolved
             Type t0 = gvn.type(parm.in(1));            // Generic type in slot#1
@@ -277,6 +277,16 @@ public class FunNode extends RegionNode {
             }
             // Else no split will help this call, look for other calls to help
           }
+          //if( call instanceof TypeNode ) {
+          //  Type t0 = gvn.type(parm.in(1));            // Generic type in slot#1
+          //  for( int i=2; i<parm._defs._len; i++ ) {   // For all other inputs
+          //    Type tp = gvn.type(parm.in(i));
+          //    if( tp.above_center() ) continue;        // This parm input is in-error
+          //    System.out.println("Can we sharpen by inlining here?");
+          //  }
+          //}
+        }
+
     return -1; // No unresolved calls; no point in type-specialization
   }
 
@@ -537,7 +547,8 @@ public class FunNode extends RegionNode {
     new_funptr.add_def(newret);
     new_funptr.add_def(old_funptr.in(1)); // Share same display
     TypeFunPtr ofptr = (TypeFunPtr)gvn.type(old_funptr);
-    gvn.rereg(new_funptr,TypeFunPtr.make(BitsFun.make0(newret._fidx),ofptr._nargs,ofptr._disp));
+    TypeFunPtr nfptr = TypeFunPtr.make(BitsFun.make0(newret._fidx),ofptr._nargs,ofptr._disp);
+    gvn.rereg(new_funptr,nfptr);
     old_funptr.keep();
 
     // Fill in edges.  New Nodes point to New instead of Old; everybody
@@ -602,7 +613,8 @@ public class FunNode extends RegionNode {
 
     if( path >= 0 ) {            // Path split
       path_call.set_fun_reg(new_funptr, gvn); // Force new_funptr, will re-wire later
-      gvn.setype(path_call, path_call.value(gvn));
+      TypeTuple tt = (TypeTuple)gvn.type(path_call);
+      gvn.setype(path_call, tt.set(2,nfptr));
     }
 
     // Rewire all unwired calls.

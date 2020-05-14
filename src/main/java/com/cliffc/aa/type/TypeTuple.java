@@ -131,6 +131,14 @@ public class TypeTuple extends Type<TypeTuple> {
 
   public Type at( int idx ) { return _ts[idx]; } // Must be in-size
 
+  // Same as the original, with one field changed
+  public TypeTuple set( int idx, Type t ) {
+    Type[] ts = TypeAry.clone(_ts);
+    ts[idx]=t;
+    return make(ts);
+  }
+
+  
   @Override public boolean above_center() { return _any; }
   // True if all internals may_be_con
   @Override public boolean may_be_con() {

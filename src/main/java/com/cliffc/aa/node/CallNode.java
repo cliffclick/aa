@@ -315,7 +315,7 @@ public class CallNode extends Node {
     // If resolve has chosen this dfidx, then the FunPtr is alive.
     if( !(tfx instanceof TypeFunPtr) ) return TypeMem.DEAD;
     BitsFun fidxs = ((TypeFunPtr)tfx).fidxs();
-    return !fidxs.above_center() && fidxs.test_recur(dfidx) ? _live : TypeMem.DEAD;
+    return !fidxs.above_center() && fidxs.test_recur(dfidx) ? TypeMem.EMPTY : TypeMem.DEAD;
   }
 
 
@@ -372,8 +372,10 @@ public class CallNode extends Node {
     // fidxs with the same sign.
     BitsFun choices = BitsFun.EMPTY;
     for( int fidx : fidxs )
-      if( !x(resolve(fidx,targs),BAD) )
-        choices = choices.set(fidx);
+      // Parent/kids happen during inlining
+      for( int kidx=fidx; kidx!=0; kidx=BitsFun.next_kid(fidx,kidx) )
+        if( !BitsFun.is_parent(kidx) && !x(resolve(kidx,targs),BAD) )
+          choices = choices.set(kidx);
     if( choices.abit() != -1 )  // Single choice with all good, no high, no low, no bad
       return choices;           // Report it low
     return sgn(choices,fidxs.above_center());
@@ -397,6 +399,16 @@ public class CallNode extends Node {
     // Forward refs are only during parsing; assume they fit the bill
     if( fun.is_forward_ref() ) return LOW;   // Assume they work
     if( fun.nargs() != nargs() ) return BAD; // Wrong arg count, toss out
+    // Toss out single-path FunNodes to the wrong call.
+    if( !fun.has_unknown_callers() && !is_copy() ) {
+      CallEpiNode cepi = cepi();
+      if( cepi != null ) {
+        int i; for( i=0; i<cepi.nwired(); i++ )
+          if( cepi.wired(i).fun()==fun )
+            break;
+        if( i==cepi.nwired() ) return 0; // While a (stale) fidx might be available, this path is for another call.
+      }
+    }
     TypeStruct formals = fun._sig._formals;  // Type of each argument
     int flags=0;
     for( int j=0; j<nargs(); j++ ) {
@@ -417,7 +429,7 @@ public class CallNode extends Node {
       else if( mt_lo==formal ) flags|=GOOD; // handles some display cases with prims hi/lo inverted
       else flags|=BAD;                      // Side-ways is bad
     }
-
+    if( flags==0 ) flags=GOOD; // No args counts as all-good-args
     return flags;
   }
 
@@ -545,7 +557,8 @@ public class CallNode extends Node {
         if( actual.isa(formal) ) continue; // Actual is a formal
         if( fast ) return "";              // Fail-fast
         if( ts==null ) ts = new Ary<>(new Type[1],0);
-        ts.push(formal);
+        if( ts.find(formal) == -1 ) // Dup filter
+          ts.push(formal);          // Add broken type
       }
       if( ts!=null )
         return _badargs[j].typerr(actual,mem(),ts.asAry());

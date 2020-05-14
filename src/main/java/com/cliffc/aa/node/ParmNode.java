@@ -4,6 +4,7 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeMemPtr;
 
 // Function parameter node; almost just a Phi with a name.  There is a dense
 // numbering matching function arguments, with -1 reserved for the RPC and -2
@@ -73,7 +74,10 @@ public class ParmNode extends PhiNode {
     // If not flowing, then args are not aligned
     if( !cepi.cg_tst(fun.fidx()) ) return false;
     // Check arg type
-    if( !gvn.sharptr(in(i),mem.in(i)).isa(fun.formal(_idx)) )
+    Type t = gvn.type(in(i));   // Arg type
+    if( t instanceof TypeMemPtr ) // Sharpen pointers
+      t = t.sharpen(gvn.type(mem.in(i)));
+    if( !t.isa(fun.formal(_idx)) )
       return false; // Arg is NOT correct type
     return true;
   }
@@ -90,20 +94,25 @@ public class ParmNode extends PhiNode {
     FunNode fun = fun();
     if( fun.has_unknown_callers() )
       return gvn.type(in(1));
+    Node mem = fun.parm(-2);    // Memory for sharpening pointers
     // All callers known; merge the wired & flowing ones
-    for( int i=1; i<_defs._len; i++ )
-      if( gvn.type(fun.in(i))==Type.CTRL ) { // Only meet alive paths
-        // Only meet with wired & flowing edges
-        Node call = fun.in(i).in(0);
-        CallEpiNode cepi;
-        if( call instanceof CallNode && (cepi=((CallNode)call).cepi())!=null &&
-             cepi.cg_tst(fun.fidx()) )
-          t = t.meet(gvn.type(in(i)));
-      }
+    for( int i=1; i<_defs._len; i++ ) {
+      if( gvn.type(fun.in(i))!=Type.CTRL ) continue; // Only meet alive paths
+      // Only meet with wired & flowing edges
+      Node call = fun.in(i).in(0);
+      if( !(call instanceof CallNode) ) continue;
+      CallEpiNode cepi = ((CallNode)call).cepi();
+      if( cepi == null ) continue;             // Broken graph
+      if( !cepi.cg_tst(fun.fidx()) ) continue; // Wired and flowing
+      Type ta = gvn.type(in(i));   // Arg type
+      if( ta instanceof TypeMemPtr ) // Sharpen pointers
+        ta = ta.sharpen(gvn.type(mem.in(i)));
+      t = t.meet(ta);
+    }
     // Bound results by simple Fun argument types.  This keeps errors from
     // spreading past function call boundaries.
     if( _idx >= 0 )
-      t = t.bound(fun.formal(_idx).simple_ptr());
+      t = t.bound(fun.formal(_idx).simple_ptr()).simple_ptr();
     assert t.bound(_t)==t;
     return t;
   }
