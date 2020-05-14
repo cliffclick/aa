@@ -243,7 +243,7 @@ public class TestNodeSmall {
     ConNode arg1 = gvn.init(new ConNode<>(Type.SCALAR));
     ConNode arg2 = gvn.init(new ConNode<>(Type.SCALAR));
     CallNode call = (CallNode)gvn.xform(new CallNode(true, null, ctrl, mem, fp_mul, arg1, arg2));
-    CallEpiNode cepi = (CallEpiNode)gvn.xform(new CallEpiNode(call)); // Unwired
+    CallEpiNode cepi = (CallEpiNode)gvn.xform(new CallEpiNode(call, Env.DEFMEM)); // Unwired
 
     gvn.unreg(call);            // Will be hacking edges
     Node[] ins = new Node[]{ctrl,mem,fp_mul,arg1,arg2};

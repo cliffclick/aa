@@ -543,7 +543,7 @@ public class GVNGCM {
             TypeFunPtr tfp = (TypeFunPtr) ((TypeTuple) type(call)).at(2);
             BitsFun fidxs = tfp.fidxs();
             if( fidxs.above_center() && fidxs.abit() == -1 && ambi_calls.find(call) == -1 )
-              ambi_calls.add((CallNode) n); // Track ambiguous calls
+              ambi_calls.add(call); // Track ambiguous calls
           }
         }
         // Very expensive assert
