@@ -482,4 +482,194 @@ public class TestNodeSmall {
     TypeStruct tdisp0 = (TypeStruct)tmem.ld((TypeMemPtr)tdptr0);
     assertEquals(tfptr0,tdisp0.at(tdisp0.find("fact")));
   }
+
+
+  // Memory checks args "just like" normal args, except it changes contents of
+  // memory to match incoming args.
+  //
+  // Single bad ptr + memory, e.g. [13]->obj and [13:@{x==1,y==2}] but the
+  // formal is [2:Point:@{x,y}].  Can change memory directly here (no sharing):
+  // [13:Point:@{x,y}] and leave the ptr alone.
+  //
+  // Can also make a new fake alias: 14>>13, change both ptr and mem:
+  // *[14]->obj, [14:Point:@{x,y}].  If [13] lifts to some other refinement
+  // alias, may need new fake aliases.  If [13] lifts to a refinement with a
+  // valid memory, no need to change memory.
+  //
+  // Must be monotonic towards correctness, if theres any chance to lift (fall)
+  // and be correct.  If always an error, can go sideways but still monotonic
+  // on the side path.
+  //
+  // Have to figure out how to handle N busted ptrs, and N busted memories.
+  // Either fake aliases for all, or union the incompatible types?  Begs for a
+  // custom test: Fun, Parm:mem, Parm:x, Parm:y.  Outputs always within formal
+  // bounds, and always monotonic, and preserves shape if in-bounds.
+
+
+  /**
+     PLAN A:
+     cannot produce ptrs that are >= formals, because dunno proper alias #s - in general.
+
+     New weaker Parm property: output is never "besides" a formal, either
+     formal.isa(value) or value.isa(formal).  IF value < formal, then produce
+     something i can always produce even if value lifts to besides the formal.
+     For TMP, produce [2]->obj.  For ARY, produce [3]->ary.  Leave it at that
+     until value is >= formal, then lift to value.  If lifting above a formal
+     probably have to hit [~2]->~obj for symmetry.
+
+     Because Parm now produces weaker results, will push error messages
+     forwards into calls.  Could claim, e.g. errors where one input is one of
+     these default values [2]->obj or [3]->ary or etc, probably come from
+     failed call args, and have lower priority than Parm.err.
+
+     Parm uses Phi alltype.
+     Parm does not bound vs formal, but checks below/above and pins.
+
+
+   */
+  private static int ERR=0;
+  @Test public void testMemoryArgs() {
+    Env top = Env.top_scope();
+    GVNGCM gvn = Env.GVN;
+
+    // Check Parm.value calls are monotonic, and within Fun.sig bounds -
+    // including memory args.
+
+    // Build a bunch of aliases.
+    int a1 = BitsAlias.new_alias(BitsAlias.RECORD);
+    int a2 = BitsAlias.new_alias(BitsAlias.RECORD);
+    int a3 = BitsAlias.new_alias(BitsAlias.RECORD);
+    Type[] ts_int_flt = TypeStruct.ts(TypeMemPtr.NO_DISP,TypeInt.INT64,TypeFlt.FLT64);
+    Type[] ts_int_abc = TypeStruct.ts(TypeMemPtr.NO_DISP,TypeInt.INT64,TypeMemPtr.ABCPTR);
+    // @{ a:int; b:"abc" }
+    TypeStruct a_int_b_abc = TypeStruct.make(new String[]{"^","a","b"},ts_int_abc);
+
+    // Build a bunch of function type signatures
+    TypeFunSig[] sigs = new TypeFunSig[] {
+      TypeFunSig.make(Type.SCALAR,ts_int_flt), // {int flt   -> }
+      TypeFunSig.make(Type.SCALAR,ts_int_abc), // {int "abc" -> }
+      // { flt @{a:int; b:"abc"} -> }
+      TypeFunSig.make(Type.SCALAR,TypeStruct.ts(TypeMemPtr.NO_DISP,TypeFlt.FLT64,TypeMemPtr.make(BitsAlias.RECORD,a_int_b_abc))),
+    };
+
+    // Build a bunch of memory parm types
+    TypeMem[] mems = new TypeMem[] {
+      tmem(null),
+      tmem(null).dual(),
+      tmem(new int[]{a1},TypeStr.STR),
+      tmem(new int[]{a1},a_int_b_abc),
+    };
+
+    // Build a bunch of parameter types
+    Type[] args = new Type[] {
+      Type.NIL,
+      Type.XNIL,
+      TypeInt.INT64,
+      TypeInt.INT64.dual(),
+      TypeInt.NINT64,
+      TypeMemPtr.ABCPTR,
+      TypeMemPtr.ABCPTR.dual(),
+      TypeMemPtr.make(a1,TypeObj.OBJ),
+      TypeMemPtr.make(a1,TypeObj.OBJ).dual(),
+    };
+
+    // One-off jig for testing single combo
+    Type[] rez1 = check(gvn,sigs[2],mems[1],args[0],args[7]);
+    Type[] rez2 = check(gvn,sigs[2],mems[3],args[0],args[7]);
+    assertTrue(rez1[2].isa(rez2[2]));
+
+
+    // Call for all combos.
+    // Check results are isa-sig.
+    Type[][][][][] rezs = new Type[sigs.length][mems.length][args.length][args.length][];
+    for( int is = 0; is<sigs.length; is++ )
+      for( int im = 0; im<mems.length; im++ )
+        for( int ia0 = 0; ia0<args.length; ia0++ )
+          for( int ia1 = 0; ia1<args.length; ia1++ )
+            rezs[is][im][ia0][ia1] = check(gvn,sigs[is],mems[im],args[ia0],args[ia1]);
+
+    // Check results are monotonic:
+    for( int is = 0; is<sigs.length; is++ )
+      for( int js = 0; js<sigs.length; js++ )
+        if( sigs[is].isa(sigs[js]) )
+          for( int im = 0; im<mems.length; im++ )
+            for( int jm = 0; jm<mems.length; jm++ )
+              if( mems[im].isa(mems[jm]) )
+                for( int ia0 = 0; ia0<args.length; ia0++ )
+                  for( int ja0 = 0; ja0<args.length; ja0++ )
+                    if( args[ia0].isa(args[ja0]) )
+                      for( int ia1 = 0; ia1<args.length; ia1++ )
+                        for( int ja1 = 0; ja1<args.length; ja1++ )
+                          if( args[ia1].isa(args[ja1]) ) {
+                            Type[] rezi = rezs[is][im][ia0][ia1];
+                            Type[] rezj = rezs[js][jm][ja0][ja1];
+                            for( int k=0; k<rezi.length; k++ )
+                              if( !rezi[k].isa(rezj[k]) )
+                                perror("Not monotonic",rezi[k],rezj[k]);
+                          }
+    assertEquals(0,ERR);
+  }
+
+  // Check that the Parm.value calls for these incoming args are monotonic, and
+  // within the sig bounds.
+  private static Type[] check( GVNGCM gvn, TypeFunSig tsig, TypeMem tmem, Type targ1, Type targ2 ) {
+
+    ConNode ctl = gvn.init(new ConNode<>(Type.CTRL));
+    CallNode call = gvn.init(new CallNode(true, null, ctl, null, null, null, null));
+    CallEpiNode cepi = gvn.init(new CallEpiNode(call, Env.DEFMEM)); // Unwired
+    CProjNode cpj = gvn.init(new CProjNode(call,0));
+    ConNode mem = gvn.init(new ConNode<>(tmem ));
+    ConNode arg1= gvn.init(new ConNode<>(targ1.simple_ptr()));
+    ConNode arg2= gvn.init(new ConNode<>(targ2.simple_ptr()));
+
+    // Make nodes
+    FunNode fun = new FunNode("fun",tsig,-1);
+    gvn.init(fun.add_def(cpj));
+    cepi.cg_set(fun._fidx);
+
+    ParmNode parmem= gvn.init(new ParmNode(-2,"mem" ,fun,mem ,null));
+    ParmNode parm1 = gvn.init(new ParmNode( 1,"arg1",fun,arg1,null));
+    ParmNode parm2 = gvn.init(new ParmNode( 2,"arg2",fun,arg2,null));
+
+    // Types for normal args before memory type
+    Type tp1 = parm1 .value(gvn);  gvn.setype(parm1,tp1);
+    Type tp2 = parm2 .value(gvn);  gvn.setype(parm2,tp2);
+    Type tpm = parmem.value(gvn);
+
+    // Check the isa(sig) on complex pointer args
+    Type actual1 = tp1.sharpen(tpm);
+    Type formal1 = fun.formal(1);
+    if( !actual1.isa(formal1) && !formal1.isa(actual1) )
+      perror("arg1-vs-formal1",actual1,formal1);
+    Type actual2 = tp2.sharpen(tpm);
+    Type formal2 = fun.formal(2);
+    if( !actual2.isa(formal2) && !formal2.isa(actual2) )
+      perror("arg2-vs-formal2",actual2,formal2);
+
+    // Record for later monotonic check
+    return new Type[]{tpm,tp1,tp2};
+  }
+
+  static void perror( String msg, Type t1, Type t2 ) {
+    if( ERR < 10 )
+      System.out.println(msg+", "+t1+" is not "+t2);
+    ERR++;
+  }
+
+
+  // Helper to make memory
+  private static TypeMem tmem(int[] as, TypeObj... ts) {
+    int max = BitsAlias.ABC;
+    if( as !=null && as.length> 0 ) max = Math.max(max,as[as.length-1]);
+    TypeObj[] tos = new TypeObj[max+1];
+    tos[BitsAlias.ALL] = TypeObj.OBJ;
+    tos[BitsAlias.RECORD]=TypeStruct.ALLSTRUCT;
+    tos[BitsAlias.ARY] = TypeStr.STR; // TODO: Proxy for all-arrays
+    tos[BitsAlias.ABC] = TypeStr.ABC; //
+    if( as != null )
+      for( int i=0; i<as.length; i++ )
+        tos[as[i]] = ts[i];
+    return TypeMem.make0(tos);
+  }
 }
+
