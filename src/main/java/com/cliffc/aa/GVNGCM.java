@@ -577,7 +577,6 @@ public class GVNGCM {
     _wrk2_bits.clear();
     rez.keep();
     walk_dead(Env.START);
-    assert Env.START.more_flow(this,new VBitSet(),false,0)==0; // Post conditions are correct
   }
   // Debugging hook
   private boolean check_monotonicity(Node n, Type ot, Type nt) {
@@ -616,21 +615,16 @@ public class GVNGCM {
   // GCP optimizations on the live subgraph
   private void walk_opt( Node n ) {
     assert !n.is_dead();
-    if( _wrk2_bits.get(n._uid) ) return; // Been there, done that
-    _wrk2_bits.set(n._uid);              // Mark the visit
+    if( _wrk2_bits.tset(n._uid) ) return; // Been there, done that
     if( n==Env.START ) return;          // Top-level scope
-    add_work(n);                        // Only walk once
-    Type t = type(n);                   // Get optimistic computed type
-    // Replace with a constant, if possible
-    if( replace_con(t,n) ) {
-      n=subsume(n,con(t));      // Constant replacement
-    }
     // Hit the fixed point, despite any immediate updates.  All prims are live,
     // even if unused so they might not have been computed
+    Type t = type(n);                   // Get optimistic computed type
     assert n.value(this)==t;
     assert n.live(this)==n._live;
 
     // Walk reachable graph
+    add_work(n);                        // Only walk once
     for( Node def : n._defs )
       if( def != null )
         walk_opt(def);

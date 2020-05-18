@@ -46,7 +46,7 @@ public class TypeInt extends Type<TypeInt> {
   static public  final Type    FALSE  = (TypeInt)make( 0, 1,0);
   static public  final TypeInt XINT1  = (TypeInt)make( 2, 1,0);
   static public  final TypeInt NINT8  = (TypeInt)make(-1, 8,0);
-  static private final TypeInt NINT64 = (TypeInt)make(-1,64,0);
+  static public  final TypeInt NINT64 = (TypeInt)make(-1,64,0);
   static         final TypeInt ZERO   = (TypeInt)new TypeInt(0,1,0).hashcons(); // Not exposed since not the canonical NIL
   static final TypeInt[] TYPES = new TypeInt[]{INT64,INT32,INT16,BOOL,TRUE,XINT1,NINT64};
   static void init1( HashMap<String,Type> types ) {

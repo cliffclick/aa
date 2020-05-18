@@ -3,8 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeMemPtr;
+import com.cliffc.aa.type.*;
 
 // Function parameter node; almost just a Phi with a name.  There is a dense
 // numbering matching function arguments, with -1 reserved for the RPC and -2
@@ -50,8 +49,8 @@ public class ParmNode extends PhiNode {
     // Arg-check before folding up.
     // - Dead path & self-cycle, always fold
     // - Live-path but
-    //   - no Call, Cepi, - confused, do not fold
-    //   - not flowing - bad args, do not fold
+    //   - no Call, Cepi - confused, do not fold
+    //   - not flowing, - types not aligned, do not fold
     //   - flowing but bad args, do not fold
     Node live=null;
     Node mem = fun.parm(-2);
@@ -82,13 +81,12 @@ public class ParmNode extends PhiNode {
     return true;
   }
 
-
   @Override public Type value(GVNGCM gvn) {
     // Not executing, go the
     Type ctl = gvn.type(in(0));
-    Type t = all_type().dual();
-    if( ctl != Type.CTRL ) return ctl.above_center() ? t : t.dual();
-    if( !(in(0) instanceof FunNode) )  return t.dual();
+    Type all = all_type();
+    if( ctl != Type.CTRL ) return ctl.above_center() ? all.dual() : all;
+    if( !(in(0) instanceof FunNode) )  return all;
     // If unknown callers, then always the default value because some unknown
     // caller can be that bad.
     FunNode fun = fun();
@@ -96,6 +94,7 @@ public class ParmNode extends PhiNode {
       return gvn.type(in(1));
     Node mem = fun.parm(-2);    // Memory for sharpening pointers
     // All callers known; merge the wired & flowing ones
+    Type t = all.dual();
     for( int i=1; i<_defs._len; i++ ) {
       if( gvn.type(fun.in(i))!=Type.CTRL ) continue; // Only meet alive paths
       // Only meet with wired & flowing edges
@@ -109,20 +108,26 @@ public class ParmNode extends PhiNode {
         ta = ta.sharpen(gvn.type(mem.in(i)));
       t = t.meet(ta);
     }
+
     // Bound results by simple Fun argument types.  This keeps errors from
     // spreading past function call boundaries.
-    if( _idx >= 0 )
-      t = t.bound(fun.formal(_idx).simple_ptr()).simple_ptr();
-    assert t.bound(_t)==t;
-    return t;
+    if( _idx < 0 ) return t;
+    Type formal = fun.formal(_idx);
+    // Good case: t.isa(formal).
+    if( formal.dual().isa(t) && t.isa(formal) )
+      return t.simple_ptr();
+    // Bad case.  If not a pointer, just pin at limits.
+    if( !(t instanceof TypeMemPtr) || !(formal instanceof TypeMemPtr) )
+      return (t.above_center() ? formal.dual() : formal).simple_ptr();
+    // If a pointer, pin each of the aliases and object at limits.
+    TypeMemPtr tmpa = (TypeMemPtr)t;
+    TypeMemPtr tmpf = (TypeMemPtr)formal;
+    int a = tmpf._aliases.getbit();
+    if( tmpa._aliases.above_center() ) a = -a;
+    TypeObj o = tmpa._obj.above_center() ? TypeObj.XOBJ : TypeObj.OBJ;
+    return TypeMemPtr.make(a,o);
   }
 
-  // Same as PhiNode, but bound like value
-  @Override public Type all_type() {
-    if( in(0) instanceof FunNode && _idx >= 0 )
-      return fun().formal(_idx).simple_ptr();
-    return _t;
-  }
   @Override public String err( GVNGCM gvn ) {
     if( !(in(0) instanceof FunNode) ) return null; // Dead, report elsewhere
     FunNode fun = fun();
