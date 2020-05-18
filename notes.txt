@@ -1,4 +1,71 @@
 =======================================
+Notes from 05/18/2020
+
+PC dead, a little behind on laptop.
+
+Thinking through the issues with splitting memory from pointers, at type-check
+places (call-sites with formals vs actuals, and TypeNodes).  Thinking about all
+the places i add code to do partial correctness & forward progress - makes
+things very complex.
+
+Can't make out-of-bounds ParmNodes put out their formal value for pointers,
+because their pointer aliases (from several Parms) will alias their formals.
+e.g. Parm x is typed *[2]->@{x:int}, and Parm y is typed *[2]->@{x:str}.  The
+result has @{x:obj}.  Why not merge memory of the formals?  Because formal
+memory might LIFT from actual.  I can MEET formal memory and actual memory
+also.  This is lower than formal memory; same for the Parms - I cannot lift
+them to formals, because the Parm:mem will be BELOW formal memory (being the
+meet of actual & formal), and even if i do not meet actual - still the meet of
+formals is low.
+
+Other theory: dump out ANY/ALL for every bad result.  Any body with an ALL
+input always produces an ALL (except for region/phi which can ignore some
+inputs).  Error finding can ignore nodes with ALL inputs - they will be
+in-error, but they are not the root error.  Much simpler logic.  CON: cannot
+start doing type-specialization, until the types show up.  Means e.g.
+typed-functions cannot do primitive spec until GCP proves their input types.
+
+Surely means i need to do type-spec on MEMORY contents, not just normal args.
+But still how?  2 Parm:arg come in with ptr types, but totally unknown aliases.
+Their formal memories will get merged.  Kinda want to type-spec on alias#s so i
+can sharpen each Parm:ptr independently.  This gets me to the notion of having
+a alias# that is for a formal, and not related to an allocation site.  I can
+use this alias# for all allocation sites that meet the formal spec, in addition
+to the normal alias#.  Or I can just note which alloc alias#as match which
+"interface alias#s".  At a Parm:arg, if the actuals are OOB the formals, i use
+the "iface#" (and Parm:mem uses the iface# for formal memory).  This means an
+iface# can hit a Parm:arg.  Usual story: if Parm:arg is OOB, output the formal-
+including the formal iface#.
+
+How do i "lift"-only a Parm:ptr?  If it has iface#11, then gets actual memory
+12 which is IN-bounds with actual Parm:mem - flipping it from #11 to #12 is
+a sideways move???  Not monotonic?
+
+Maybe iface#s are always "below" actual alias#s?  So a meet with any IFACE#
+beats all ALIAS#s?  Otherwise IFACE#s simply meet like alias#s.  Still need a
+heirarchy of iface#s - or else, if any Parm has an iface# come in, it must
+produce its own iface# out.  This means all recursive/loops will only be using
+iface#s.  This means i can make forward progress on the loop body - but must
+always use GCP to clear out.
+
+
+PLAN A: All OOB types produce an ALL.  Most nodes when recieve a ALL, produce
+an ALL.  All nodes when receive a bad type, produce an ALL.  "Broken graph"
+produces the same type (freeze in place).  Errors don't count if a node gets an
+ALL (not the root error cause).
+PRO: Much simpler.
+CON: Cannot make progress without valid types, especially for recursive fcns.
+
+PLAN B: Same as now: produce valid value out always.  For Formal pointers,
+invent an "iface#" like an alias# but not related to a New.  For Parm:ptr, if
+OOB, produce this iface#.  For Parm:mem, JOIN the formal memory with actual,
+using this iface#.  Lifts the produced memory "as if" the formal, so can make
+progress before GCP.  At any Parm:arg, if any value is an iface# or not any
+alias#, or alias#+memory is OOB to formal - then produce the local iface#
+always.  Similar to poison ALL, except can make forward progress.
+
+
+=======================================
 Notes from 03/26/2020
 
 Wiring: purpose is to shortcut args into parm-meets.
