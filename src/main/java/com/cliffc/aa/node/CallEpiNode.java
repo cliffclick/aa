@@ -77,7 +77,7 @@ public final class CallEpiNode extends Node {
         // the types are properly "isa".
         ParmNode fmem = fun.parm(-2);
         if( fmem != null ) {
-          TypeMem funmem = (TypeMem)gvn.type(fmem);
+          Type funmem = gvn.type(fmem);
           if( !callmem.isa(funmem) ) // If call is lower than Parm:mem, the Parm will drop - not allowed
             continue;
         }
