@@ -814,6 +814,7 @@ public class Parse {
     Node old_ctrl = ctrl();
     Node old_mem  = all_mem().keep();
     FunNode fun = init(new FunNode(ids.asAry(),ts.asAry()).add_def(Env.ALL_CTRL)).keep();
+    _gvn.setype(fun,Type.CTRL);
 
     // Increase scope depth for function body.
     try( Env e = new Env(_e,errMsg(oldx-1), true) ) { // Nest an environment for the local vars

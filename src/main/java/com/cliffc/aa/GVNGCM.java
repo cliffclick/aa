@@ -537,7 +537,7 @@ public class GVNGCM {
         // See if we can resolve an unresolved
         if( n instanceof CallNode && n._live != TypeMem.DEAD ) {
           CallNode call = (CallNode)n;
-          if( type(call.ctl()) !=Type.XCTRL ) { // Wait until the Call is reachable
+          if( type(call.ctl()) == Type.CTRL && type(call) instanceof TypeTuple ) { // Wait until the Call is reachable
             TypeFunPtr tfp = (TypeFunPtr) ((TypeTuple) type(call)).at(2);
             BitsFun fidxs = tfp.fidxs();
             if( fidxs.above_center() && fidxs.abit() == -1 && ambi_calls.find(call) == -1 )

@@ -34,7 +34,9 @@ public final class CallEpiNode extends Node {
     if( is_copy() ) return null;
 
     CallNode call = call();
-    TypeTuple tcall = (TypeTuple)gvn.type(call);
+    Type tc = gvn.type(call);
+    if( !(tc instanceof TypeTuple) ) return null;
+    TypeTuple tcall = (TypeTuple)tc;
     if( tcall.at(0) != Type.CTRL ) return null; // Call not executable
     // Get calls resolved function.
     if( !(tcall.at(2) instanceof TypeFunPtr) ) return null; // No known function pointer

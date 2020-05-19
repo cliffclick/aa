@@ -144,6 +144,9 @@ public class CallNode extends Node {
   @Override public Node ideal(GVNGCM gvn, int level) {
     // If inlined, no further xforms.  The using Projs will fold up.
     if( is_copy() ) return null;
+    Type tc = gvn.type(this);
+    if( !(tc instanceof TypeTuple) ) return null;
+    TypeTuple tcall = (TypeTuple)tc;
     // Dead, do nothing
     if( gvn.type(ctl())!=Type.CTRL ) {     // Dead control (NOT dead self-type, which happens if we do not resolve)
       if( (ctl() instanceof ConNode) ) return null;
@@ -181,7 +184,6 @@ public class CallNode extends Node {
       }
     }
     // Have some sane function choices?
-    TypeTuple tcall = (TypeTuple)gvn.type(this);
     Type tfp  = tcall.at(2);
     if( !(tfp instanceof TypeFunPtr) ) return null;
     BitsFun fidxs = ((TypeFunPtr)tfp).fidxs();
@@ -233,7 +235,7 @@ public class CallNode extends Node {
   // full scatter lets users decide the meaning; e.g. wired FunNodes will take
   // the full arg set but if the call is not reachable the FunNode will not
   // merge from that path.  Result tuple type:
-  @Override public TypeTuple value(GVNGCM gvn) {
+  @Override public Type value(GVNGCM gvn) {
     // ts[0] = Ctrl = in(0)
     // ts[1] = Mem into the call = in(1)
     // ts[2] = Function pointer (code ptr + display) == in(2) == arg(0)
@@ -243,18 +245,13 @@ public class CallNode extends Node {
 
     // Pinch to XCTRL/CTRL
     Type ctl = gvn.type(ctl());
-    if( ctl == Type.ALL  ) ctl = Type. CTRL;
-    if( ctl != Type.CTRL ) ctl = Type.XCTRL;
     if( !_is_copy && gvn._opt_mode>0 && cepi()==null ) ctl = Type.XCTRL; // Dead from below
-    ts[0] = ctl;
+    if( ctl != Type.CTRL ) return ctl.oob();
+    ts[0] = Type.CTRL;
 
     // Not a memory to the call?
     Type mem = gvn.type(mem());
-    mem = mem instanceof TypeMem
-      ? mem.bound(TypeMem.ISUSED)  // Cap FULL mem; only bounding for TestNode
-      : mem.above_center() ? TypeMem.EMPTY : TypeMem.FULL;
-    // If not called, then no memory to functions
-    if( ctl == Type.XCTRL ) mem = TypeMem.UNUSED;
+    if( !(mem instanceof TypeMem) ) return mem.oob();
     ts[1]=mem;
 
     // Copy args for called functions.  Arg0 is display, handled below.
@@ -268,15 +265,15 @@ public class CallNode extends Node {
     TypeFunPtr tfp = (TypeFunPtr)tfx;
     BitsFun fidxs = tfp.fidxs();
     if( !fidxs.is_empty() && fidxs.above_center()!=tfp._disp.above_center() )
-      return (TypeTuple)gvn.self_type(this); // Display and FIDX mis-aligned; stall
+      return gvn.self_type(this); // Display and FIDX mis-aligned; stall
     // Resolve; only keep choices with sane arguments during GCP
     BitsFun rfidxs = resolve(fidxs,ts);
-    if( rfidxs==null ) return (TypeTuple)gvn.self_type(this); // Dead function input, stall until this dies
+    if( rfidxs==null ) return gvn.self_type(this); // Dead function input, stall until this dies
     // Call.ts[2] is a TFP just for the resolved fidxs and display.
     ts[2] = TypeFunPtr.make(rfidxs,tfp._nargs,rfidxs.above_center() == fidxs.above_center() ? tfp._disp : tfp._disp.dual());
 
     // No forward progress until resolution
-    if( rfidxs.above_center() ) ts[0]=Type.XCTRL;
+    if( rfidxs.above_center() ) return Type.ANY;
 
     return TypeTuple.make(ts);
   }
