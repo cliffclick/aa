@@ -40,7 +40,9 @@ public class IfNode extends Node {
     throw AA.unimpl(); // Dunno what test this is?
   }
   @Override public Node is_copy(GVNGCM gvn, int idx) {
-    TypeTuple tt = (TypeTuple)gvn.type(this);
+    Type t = gvn.type(this);
+    if( !(t instanceof TypeTuple) ) return null;
+    TypeTuple tt = (TypeTuple)t;
     if( tt==TypeTuple.IF_ANY ) return gvn.con(Type.XCTRL);
     if( tt==TypeTuple.IF_TRUE  && idx==1 ) return in(0);
     if( tt==TypeTuple.IF_FALSE && idx==0 ) return in(0);

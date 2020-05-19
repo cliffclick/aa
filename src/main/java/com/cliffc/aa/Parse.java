@@ -431,6 +431,7 @@ public class Parse {
     f_mem = _e._scope.check_if(false,bad,_gvn,f_ctrl,_e._scope.ptr(),f_mem); // Insert errors if created only 1 side
     _e._scope.pop_if();         // Pop the if-scope
     RegionNode r = set_ctrl(init(new RegionNode(null,t_ctrl.unhook(),f_ctrl.unhook())).keep());
+    _gvn.setype(r,Type.CTRL);
     set_mem(gvn(new PhiNode(TypeMem.FULL,bad,r       ,t_mem.unhook(),f_mem.unhook())));
     return  gvn(new PhiNode(Type.SCALAR ,bad,r.unhook(),tex.unhook(),  fex.unhook())) ; // Ifex result
   }
@@ -722,7 +723,7 @@ public class Parse {
       skipWS();                 // Skip to arg start before recording arg start
       bad = errMsg();           // Record arg start
       s=stmts();                // Parse arg
-    } 
+    }
     require(')',oldx);          // Balanced closing paren
 
     // Build the tuple from gathered args
