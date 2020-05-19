@@ -22,7 +22,7 @@ public class MProjNode extends ProjNode {
       if( _idx < ct._ts.length )
         return ct._ts[_idx];
     }
-    return c.above_center() ? TypeMem.XMEM : TypeMem.MEM;
+    return c.oob();
   }
   // Memory need precise liveness
   @Override public boolean basic_liveness() { return false; }

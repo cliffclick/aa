@@ -284,6 +284,7 @@ public final class CallEpiNode extends Node {
     if( ctl != Type.CTRL && ctl != Type.ALL )
       return TypeTuple.CALLE.dual();
 
+    Type tmem = tcall.at(1);
     Type tfptr = tcall.at(2);
     if( !(tfptr instanceof TypeFunPtr) ) // Call does not know what it is calling?
       return TypeTuple.CALLE;
@@ -293,8 +294,16 @@ public final class CallEpiNode extends Node {
     // NO fidxs, means we're not calling anything.
     if( fidxs==BitsFun.EMPTY ) return TypeTuple.CALLE.dual();
 
-    // Crush all the non-finals across the call
+    // If call memory is not at least default memory - stall typing until the
+    // Call catches up.  Might need to bring default memory into a Call.
     TypeMem post_call_mem = (TypeMem)gvn.type(Env.DEFMEM);
+    if( !tmem.isa(post_call_mem) ) {
+      // Self type, except easier to report a sane lower bound.
+      Type self = gvn.self_type(this);
+      return self==Type.ALL ? TypeTuple.CALLE : self;
+    }
+
+    // Crush all the non-finals across the call
     TypeTuple post_call_crush = TypeTuple.make(Type.CTRL,post_call_mem,Type.SCALAR);
     TypeTuple mt = post_call_crush;
 
@@ -383,7 +392,9 @@ public final class CallEpiNode extends Node {
     // If is_copy, then basically acting like pass-thru.
     if( !is_copy() && def != call() ) { // Not a copy, check call site
       // The given function is alive, only if the Call will Call it.
-      TypeTuple tcall = (TypeTuple)gvn.type(call());
+      Type tfx = gvn.type(call());
+      if( !(tfx instanceof TypeTuple) ) return tfx.above_center() ? TypeMem.DEAD : _live;
+      TypeTuple tcall = (TypeTuple)tfx;
       BitsFun fidxs = ((TypeFunPtr)tcall.at(2)).fidxs();
       int fidx = ((RetNode)def).fidx();
       if( fidxs.above_center() || !fidxs.test(fidx) )

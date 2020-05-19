@@ -87,7 +87,7 @@ class ConvertF64Str extends IntrinsicNewNode {
   @Override public Node ideal(GVNGCM gvn, int level) { return null; }
   @Override public Type value(GVNGCM gvn) {
     Type t = gvn.type(in(3));
-    if( t.above_center() || !(t instanceof TypeInt) ) return t.oob();
+    if( t.above_center() || !(t instanceof TypeFlt) ) return t.oob();
     if( !t.is_con() ) return TypeStr.STR;
     return TypeStr.make(false,Double.toString(t.getd()).intern());
   }

@@ -37,6 +37,8 @@ public class UnresolvedNode extends Node {
   }
 
   @Override public Type value(GVNGCM gvn) {
+    // Freeze after GVN - only still around for errors
+    if( gvn._opt_mode > 2 ) return gvn.self_type(this);
     // If any arg is ALL - that wins; if ANY - ignored.
     // If any arg is not a TFP, then OOB.
     // If any arg is high, ignore - FunPtrs always fall.

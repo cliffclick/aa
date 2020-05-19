@@ -240,9 +240,8 @@ public class MemMergeNode extends Node {
   @Override public Type value(GVNGCM gvn) {
     // Base memory type in slot 0
     Type t = gvn.type(mem());
-    if( !(t instanceof TypeMem) )
-      return t.above_center() ? TypeMem.EMPTY : TypeMem.FULL;
-    TypeMem tm = (TypeMem)(t.bound(TypeMem.ISUSED)); // Only bounding for TestNode
+    if( !(t instanceof TypeMem) ) return t.oob();
+    TypeMem tm = (TypeMem)t;
 
     // Merge inputs with parent.
     TypeObj[] tpars = tm.alias2objs(); // Clone of base memory

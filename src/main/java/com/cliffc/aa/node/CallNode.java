@@ -7,7 +7,6 @@ import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.Arrays;
 import java.util.BitSet;
 
 // Call/apply node.
@@ -311,11 +310,13 @@ public class CallNode extends Node {
     return live_use_call(gvn,dfidx);
   }
   TypeMem live_use_call( GVNGCM gvn, int dfidx ) {
-    Type tfx = ((TypeTuple)gvn.type(this)).at(2);
+    Type tfx = gvn.type(this);
+    if( !(tfx instanceof TypeTuple) ) return tfx.above_center() ? TypeMem.DEAD : _live;
+    Type tfp = ((TypeTuple)tfx).at(2);
     // If resolve has chosen this dfidx, then the FunPtr is alive.
-    if( !(tfx instanceof TypeFunPtr) ) return TypeMem.DEAD;
-    BitsFun fidxs = ((TypeFunPtr)tfx).fidxs();
-    return !fidxs.above_center() && fidxs.test_recur(dfidx) ? TypeMem.EMPTY : TypeMem.DEAD;
+    if( !(tfp instanceof TypeFunPtr) ) return TypeMem.DEAD;
+    BitsFun fidxs = ((TypeFunPtr)tfp).fidxs();
+    return !fidxs.above_center() && fidxs.test_recur(dfidx) ? _live : TypeMem.DEAD;
   }
 
 

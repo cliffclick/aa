@@ -83,7 +83,7 @@ public class GVNGCM {
 
   public Type type( Node n ) {
     Type t = _ts.atX(n._uid);
-    return t==null ? Type.ALL : t;    
+    return t==null ? Type.ALL : t;
   }
   public Type raw_type( int uid ) { return _ts.atX(uid); }
   public void setype( Node n, Type t ) {
@@ -421,8 +421,8 @@ public class GVNGCM {
   // Once the program is complete, any time anything is on the worklist we can
   // always conservatively iterate on it.
   void iter(int opt_mode) {
-    assert Env.START.more_flow(this,new VBitSet(),true,0)==0; // Initial conditions are correct
     _opt_mode = opt_mode;
+    assert Env.START.more_flow(this,new VBitSet(),true,0)==0; // Initial conditions are correct
     // As a modest debugging convenience, avoid inlining (which blows up the
     // graph) until other optimizations are done.  Gather the possible inline
     // requests and set them aside until the main list is empty, then work down
