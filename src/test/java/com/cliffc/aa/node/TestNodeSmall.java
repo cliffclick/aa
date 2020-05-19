@@ -41,18 +41,18 @@ public class TestNodeSmall {
     FunPtrNode aint = (FunPtrNode)uadd.in(1);
     FunPtrNode astr = (FunPtrNode)uadd.in(2);
     // Make a flt/int combo, drops off string.
-    UnresolvedNode anum = new UnresolvedNode(null,aflt,aint);
+    UnresolvedNode anum = (UnresolvedNode)gvn.xform(new UnresolvedNode(null,aflt,aint));
 
     // All nodes have this property: START >= {ALL.dual(),value(START)} >= value(ALL.dual()) >= value(ALL) >= ALL
     // Holds for both ITER and GCP.
 
 
     // Compute Node.all_type() and all_type.startype()
-    TypeFunPtr uaddALL = uadd.all_type(), uaddSTART = uaddALL.dual();
-    TypeFunPtr anumALL = anum.all_type(), anumSTART = anumALL.dual();
-    TypeFunPtr afltALL = aflt.all_type(), afltSTART = afltALL.dual();
-    TypeFunPtr aintALL = aint.all_type(), aintSTART = aintALL.dual();
-    TypeFunPtr astrALL = astr.all_type(), astrSTART = astrALL.dual();
+    Type uaddALL = gvn.type(uadd), uaddSTART = Type.ANY;
+    Type anumALL = gvn.type(anum), anumSTART = Type.ANY;
+    Type afltALL = gvn.type(aflt), afltSTART = Type.ANY;
+    Type aintALL = gvn.type(aint), aintSTART = Type.ANY;
+    Type astrALL = gvn.type(astr), astrSTART = Type.ANY;
 
     // Compute Node.value() where initial GVN is startype()
     gvn.setype(uadd,uaddSTART);
@@ -61,17 +61,17 @@ public class TestNodeSmall {
     gvn.setype(aint,aintSTART);
     gvn.setype(astr,astrSTART);
     gvn._opt_mode=1;
-    TypeFunPtr uaddVAL1START = uadd.value(gvn);
-    TypeFunPtr anumVAL1START = anum.value(gvn);
-    TypeFunPtr afltVAL1START = aflt.value(gvn);
-    TypeFunPtr aintVAL1START = aint.value(gvn);
-    TypeFunPtr astrVAL1START = astr.value(gvn);
+    Type uaddVAL1START = uadd.value(gvn);
+    Type anumVAL1START = anum.value(gvn);
+    Type afltVAL1START = aflt.value(gvn);
+    Type aintVAL1START = aint.value(gvn);
+    Type astrVAL1START = astr.value(gvn);
     gvn._opt_mode=2;
-    TypeFunPtr uaddVAL2START = uadd.value(gvn);
-    TypeFunPtr anumVAL2START = anum.value(gvn);
-    TypeFunPtr afltVAL2START = aflt.value(gvn);
-    TypeFunPtr aintVAL2START = aint.value(gvn);
-    TypeFunPtr astrVAL2START = astr.value(gvn);
+    Type uaddVAL2START = uadd.value(gvn);
+    Type anumVAL2START = anum.value(gvn);
+    Type afltVAL2START = aflt.value(gvn);
+    Type aintVAL2START = aint.value(gvn);
+    Type astrVAL2START = astr.value(gvn);
 
     // Compute Node.value() where initial GVN is all_type.dual()
     gvn.setype(uadd,uaddALL.dual());
@@ -80,17 +80,17 @@ public class TestNodeSmall {
     gvn.setype(aint,aintALL.dual());
     gvn.setype(astr,astrALL.dual());
     gvn._opt_mode=1;
-    TypeFunPtr uaddVAL1XALL = uadd.value(gvn);
-    TypeFunPtr anumVAL1XALL = anum.value(gvn);
-    TypeFunPtr afltVAL1XALL = aflt.value(gvn);
-    TypeFunPtr aintVAL1XALL = aint.value(gvn);
-    TypeFunPtr astrVAL1XALL = astr.value(gvn);
+    Type uaddVAL1XALL = uadd.value(gvn);
+    Type anumVAL1XALL = anum.value(gvn);
+    Type afltVAL1XALL = aflt.value(gvn);
+    Type aintVAL1XALL = aint.value(gvn);
+    Type astrVAL1XALL = astr.value(gvn);
     gvn._opt_mode=2;
-    TypeFunPtr uaddVAL2XALL = uadd.value(gvn);
-    TypeFunPtr anumVAL2XALL = anum.value(gvn);
-    TypeFunPtr afltVAL2XALL = aflt.value(gvn);
-    TypeFunPtr aintVAL2XALL = aint.value(gvn);
-    TypeFunPtr astrVAL2XALL = astr.value(gvn);
+    Type uaddVAL2XALL = uadd.value(gvn);
+    Type anumVAL2XALL = anum.value(gvn);
+    Type afltVAL2XALL = aflt.value(gvn);
+    Type aintVAL2XALL = aint.value(gvn);
+    Type astrVAL2XALL = astr.value(gvn);
 
     // Compute Node.value() where initial GVN is all_type()
     gvn.setype(uadd,uaddALL);
@@ -99,32 +99,32 @@ public class TestNodeSmall {
     gvn.setype(aint,aintALL);
     gvn.setype(astr,astrALL);
     gvn._opt_mode=1;
-    TypeFunPtr uaddVAL1ALL = uadd.value(gvn);
-    TypeFunPtr anumVAL1ALL = anum.value(gvn);
-    TypeFunPtr afltVAL1ALL = aflt.value(gvn);
-    TypeFunPtr aintVAL1ALL = aint.value(gvn);
-    TypeFunPtr astrVAL1ALL = astr.value(gvn);
+    Type uaddVAL1ALL = uadd.value(gvn);
+    Type anumVAL1ALL = anum.value(gvn);
+    Type afltVAL1ALL = aflt.value(gvn);
+    Type aintVAL1ALL = aint.value(gvn);
+    Type astrVAL1ALL = astr.value(gvn);
     gvn._opt_mode=2;
-    TypeFunPtr uaddVAL2ALL = uadd.value(gvn);
-    TypeFunPtr anumVAL2ALL = anum.value(gvn);
-    TypeFunPtr afltVAL2ALL = aflt.value(gvn);
-    TypeFunPtr aintVAL2ALL = aint.value(gvn);
-    TypeFunPtr astrVAL2ALL = astr.value(gvn);
+    Type uaddVAL2ALL = uadd.value(gvn);
+    Type anumVAL2ALL = anum.value(gvn);
+    Type afltVAL2ALL = aflt.value(gvn);
+    Type aintVAL2ALL = aint.value(gvn);
+    Type astrVAL2ALL = astr.value(gvn);
 
-    TypeFunPtr[] uadds = new TypeFunPtr[]{uaddSTART,uaddALL.dual(),uaddVAL1START,uaddVAL2START,uaddVAL1XALL,uaddVAL2XALL,uaddVAL1ALL,uaddVAL2ALL,uaddALL};
-    TypeFunPtr[] anums = new TypeFunPtr[]{anumSTART,anumALL.dual(),anumVAL1START,anumVAL2START,anumVAL1XALL,anumVAL2XALL,anumVAL1ALL,anumVAL2ALL,anumALL};
-    TypeFunPtr[] aflts = new TypeFunPtr[]{afltSTART,afltALL.dual(),afltVAL1START,afltVAL2START,afltVAL1XALL,afltVAL2XALL,afltVAL1ALL,afltVAL2ALL,afltALL};
-    TypeFunPtr[] aints = new TypeFunPtr[]{aintSTART,aintALL.dual(),aintVAL1START,aintVAL2START,aintVAL1XALL,aintVAL2XALL,aintVAL1ALL,aintVAL2ALL,aintALL};
-    TypeFunPtr[] astrs = new TypeFunPtr[]{astrSTART,astrALL.dual(),astrVAL1START,astrVAL2START,astrVAL1XALL,astrVAL2XALL,astrVAL1ALL,astrVAL2ALL,astrALL};
-    TypeFunPtr[][] tfpss = new TypeFunPtr[][]{aflts,aints,astrs,anums,uadds};
+    Type[] uadds = new Type[]{uaddSTART,uaddALL.dual(),uaddVAL1START,uaddVAL2START,uaddVAL1XALL,uaddVAL2XALL,uaddVAL1ALL,uaddVAL2ALL,uaddALL};
+    Type[] anums = new Type[]{anumSTART,anumALL.dual(),anumVAL1START,anumVAL2START,anumVAL1XALL,anumVAL2XALL,anumVAL1ALL,anumVAL2ALL,anumALL};
+    Type[] aflts = new Type[]{afltSTART,afltALL.dual(),afltVAL1START,afltVAL2START,afltVAL1XALL,afltVAL2XALL,afltVAL1ALL,afltVAL2ALL,afltALL};
+    Type[] aints = new Type[]{aintSTART,aintALL.dual(),aintVAL1START,aintVAL2START,aintVAL1XALL,aintVAL2XALL,aintVAL1ALL,aintVAL2ALL,aintALL};
+    Type[] astrs = new Type[]{astrSTART,astrALL.dual(),astrVAL1START,astrVAL2START,astrVAL1XALL,astrVAL2XALL,astrVAL1ALL,astrVAL2ALL,astrALL};
+    Type[][] tfpss = new Type[][]{aflts,aints,astrs,anums,uadds};
 
     // All nodes have these properties:
     //    START >= {ALL.dual(),value1(START)} >= value1(ALL.dual()) >= value1(ALL) >= ALL
     //    START >= {ALL.dual(),value2(START)} >= value2(ALL.dual()) >= value2(ALL) >= ALL
-    for( TypeFunPtr[] tfps : tfpss ) {
-      TypeFunPtr start = tfps[0], xall  = tfps[1], val1s = tfps[2], val2s = tfps[3];
-      TypeFunPtr val1x = tfps[4], val2x = tfps[5], val1a = tfps[6], val2a = tfps[7];
-      TypeFunPtr all   = tfps[8];
+    for( Type[] tfps : tfpss ) {
+      Type start = tfps[0], xall  = tfps[1], val1s = tfps[2], val2s = tfps[3];
+      Type val1x = tfps[4], val2x = tfps[5], val1a = tfps[6], val2a = tfps[7];
+      Type all   = tfps[8];
 
       assertTrue(start.isa(xall ));
       assertTrue(start.isa(val1s));   assertTrue(start.isa(val2s));
@@ -431,7 +431,7 @@ public class TestNodeSmall {
     OProjNode dsp_file_obj = (OProjNode)gvn.xform(new OProjNode(dsp_file,0));
     ProjNode  dsp_file_ptr = ( ProjNode)gvn.xform(new  ProjNode(dsp_file,1));
     Env.DISPLAYS.set(dsp_file._alias);
-    MemMergeNode dsp_merge = gvn.init(new MemMergeNode(mem,dsp_file_obj,dsp_file._alias));
+    MemMergeNode dsp_merge = (MemMergeNode)gvn.xform(new MemMergeNode(mem,dsp_file_obj,dsp_file._alias));
     // The Fun and Fun._tf:
     TypeStruct formals = TypeStruct.make_args(TypeAry.ts(gvn.type(dsp_file_ptr), // File-scope display as arg0
                                                          Type.SCALAR));          // Some scalar arg1

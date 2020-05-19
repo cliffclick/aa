@@ -14,16 +14,17 @@ public class TestLive {
     ScopeNode scope = new ScopeNode(null,false);
 
     Node fullmem = new ConNode<>(TypeMem.FULL);
-    gvn.setype(fullmem,fullmem.all_type());
+    gvn.setype(fullmem,TypeMem.FULL);
     scope.set_mem(fullmem,gvn);
 
     // Return the number '5' - should be alive with no special memory.
     Node rez = new ConNode<>(TypeInt.con(5));
+    gvn.setype(rez,TypeInt.con(5));
     scope.set_rez(rez,gvn);
 
     // Check liveness base case
     scope._live = scope.live(gvn);
-    assertEquals(scope._live,TypeMem.EMPTY);
+    assertEquals(scope._live,TypeMem.UNUSED);
 
     // Check liveness recursive back one step
     rez._live = rez.live(gvn);
@@ -36,16 +37,18 @@ public class TestLive {
     GVNGCM._INIT0_CNT = 1; // No prims
     // Always control for the NewObj
     Node ctl = new ConNode<>(Type.CTRL);
-    gvn.setype(ctl,ctl.all_type());
+    gvn.setype(ctl,Type.CTRL);
 
     // Fields
-    ConNode fdx = new ConNode(TypeInt.con(5));
-    gvn.setype(fdx,fdx.all_type());
-    ConNode<Type> fdy = new ConNode<>(TypeInt.con(9));
-    gvn.setype(fdy,fdy.all_type());
+    Type ti5 = TypeInt.con(5);
+    ConNode fdx = new ConNode(ti5);
+    gvn.setype(fdx,ti5);
+    Type ti9 = TypeInt.con(9);
+    ConNode<Type> fdy = new ConNode<>(ti9);
+    gvn.setype(fdy,ti9);
 
     // New object, fields x,y holding ints
-    NewObjNode nnn = new NewObjNode(false,TypeStruct.ANYSTRUCT,ctl,gvn.con(Type.NIL));
+    NewObjNode nnn = new NewObjNode(false,TypeStruct.DISPLAY,ctl,gvn.con(Type.NIL));
     nnn.create_active("x",fdx,TypeStruct.FFNL,gvn);
     nnn.create_active("y",fdy,TypeStruct.FFNL,gvn);
     gvn.setype(nnn,nnn.value(gvn));
@@ -57,8 +60,9 @@ public class TestLive {
     gvn.setype(ptr,ptr.value(gvn));
 
     // Starting full memory
-    Node fullmem = new ConNode<>(TypeMem.FULL);
-    gvn.setype(fullmem,fullmem.all_type());
+    TypeMem tmem = TypeMem.ISUSED.set(nnn._alias,(TypeObj)gvn.type(mem));
+    Node fullmem = new ConNode<>(tmem);
+    gvn.setype(fullmem,tmem);
 
     // MemMerge object with all memory
     MemMergeNode mmm = new MemMergeNode(fullmem,mem,nnn._alias);
@@ -68,13 +72,13 @@ public class TestLive {
     ScopeNode scope = new ScopeNode(null,false);
     scope.set_mem(mmm,gvn);
     scope.set_rez(ptr,gvn);
-    gvn.setype(scope,scope.all_type());
+    gvn.setype(scope,Type.ALL);
 
-    // Check 'live' is stable on creation, except for mmm & scope
+    // Check 'live' is stable on creation, except for mem & scope
     // which are 'turning around' liveness.
     // Value was computed in a forwards flow.
     for( Node n : new Node[]{ctl,fdx,fdy,nnn,mem,ptr,fullmem,mmm,scope} ) {
-      if( n != mmm && n != scope )
+      if( n != mem && n != scope )
         assertEquals(n._live,n.live(gvn));
       assertEquals(gvn.type(n),n.value(gvn));
     }
@@ -92,9 +96,9 @@ public class TestLive {
     mmm._live = mmm.live(gvn);
     assertEquals(mmm._live,expected_live);
     mem._live = mem.live(gvn);
-    assertEquals(mem._live,TypeMem.EMPTY);
+    assertEquals(mem._live,expected_live); // Object demands of OProj, but OProj passes along request to NewObj
     nnn._live = nnn.live(gvn);
-    assertEquals(nnn._live,TypeMem.EMPTY); // Since ptr is scalar, all memory is alive
+    assertEquals(nnn._live,TypeMem.EMPTY); // NewObj supplies object, does not demand anything from inputs
     ctl._live = ctl.live(gvn);
     assertEquals(ctl._live,TypeMem.EMPTY); // Since ptr is scalar, all memory is alive
     fdx._live = fdx.live(gvn);

@@ -12,5 +12,4 @@ public class StartNode extends Node {
   // StartNodes are never equal
   @Override public int hashCode() { return 123456789+1; }
   @Override public boolean equals(Object o) { return this==o; }
-  @Override public Type all_type() { return TypeTuple.START; }
 }

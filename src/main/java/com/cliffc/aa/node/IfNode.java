@@ -39,7 +39,6 @@ public class IfNode extends Node {
 
     throw AA.unimpl(); // Dunno what test this is?
   }
-  @Override public Type all_type() { return TypeTuple.IF_ALL; }
   @Override public Node is_copy(GVNGCM gvn, int idx) {
     TypeTuple tt = (TypeTuple)gvn.type(this);
     if( tt==TypeTuple.IF_ANY ) return gvn.con(Type.XCTRL);

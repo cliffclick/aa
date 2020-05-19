@@ -10,9 +10,10 @@ public class StartMemNode extends Node {
   @Override public Node ideal(GVNGCM gvn, int level) { return null; }
   @Override public Type value(GVNGCM gvn) {
     // All memories are XOBJ, unless UNUSED in the default memory.
-    TypeMem defmem = (TypeMem)gvn.type(Env.DEFMEM);
+    Type defmem = gvn.type(Env.DEFMEM);
+    if( !(defmem instanceof TypeMem) ) return defmem.oob();
     if( defmem == TypeMem.UNUSED ) return TypeMem.UNUSED; // Shortcut
-    TypeObj[] objs = defmem.alias2objs().clone();
+    TypeObj[] objs = ((TypeMem)defmem).alias2objs().clone();
     for( int i=1; i<objs.length; i++ )
       if( objs[i]!=null && objs[i]!=TypeObj.UNUSED )
         objs[i]=TypeObj.XOBJ;
@@ -21,5 +22,4 @@ public class StartMemNode extends Node {
   // StartMemNodes are never equal
   @Override public int hashCode() { return 123456789+2; }
   @Override public boolean equals(Object o) { return this==o; }
-  @Override public Type all_type() { return TypeMem.ISUSED; }
 }

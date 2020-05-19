@@ -239,17 +239,17 @@ public class TypeMem extends Type<TypeMem> {
     return make(as);
   }
 
-  // Precise single alias.  Other aliases are "dont care".  Nil not allowed.
-  // Both "dont care" and this alias are exact.
+  // Precise single alias.  Other aliases are "do not care".  Nil not allowed.
+  // Both "do not care" and this alias are exact.
   public static TypeMem make(int alias, TypeObj oop ) {
     TypeObj[] as = new TypeObj[alias+1];
-    as[1] = TypeObj.XOBJ;
+    as[1] = TypeObj.UNUSED;
     as[alias] = oop;
     return make0(as);
   }
   public static TypeMem make(BitsAlias aliases, TypeObj oop ) {
     TypeObj[] as = new TypeObj[aliases.max()+1];
-    as[1] = TypeObj.XOBJ;
+    as[1] = TypeObj.UNUSED;
     for( int alias : aliases )
       as[alias] = oop;
     return make0(as);

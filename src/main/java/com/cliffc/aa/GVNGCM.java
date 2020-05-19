@@ -83,9 +83,7 @@ public class GVNGCM {
 
   public Type type( Node n ) {
     Type t = _ts.atX(n._uid);
-    if( t != null ) return t;
-    t = n.all_type();       // If no type yet, defaults to the pessimistic type
-    return _ts.setX(n._uid,t);
+    return t==null ? Type.ALL : t;    
   }
   public Type raw_type( int uid ) { return _ts.atX(uid); }
   public void setype( Node n, Type t ) {
@@ -97,7 +95,7 @@ public class GVNGCM {
   // Return the prior self_type during the value() call, without installing a
   // new type.
   public Type self_type( Node n ) {
-    return n._uid < _ts._len ? _ts._es[n._uid] : n.all_type();
+    return n._uid < _ts._len ? _ts._es[n._uid] : Type.ALL;
   }
   // Make globally shared common ConNode for this type.
   public @NotNull ConNode con( Type t ) {
@@ -125,7 +123,7 @@ public class GVNGCM {
     return init0(n);
   }
   <N extends Node> N init0( N n ) {
-    setype(n,n.all_type());
+    setype(n,Type.ALL);
     _vals.put(n,n);
     return add_work0(n);
   }
@@ -358,7 +356,7 @@ public class GVNGCM {
         !(n instanceof UnresolvedNode) && // Keep for proper errors
         !(n instanceof RetNode) &&        // Keep for proper errors
         !(n instanceof ConNode) )         // Already a constant
-      return untype(n, con(n.all_type().high())); // Replace non-constants with high (dead) constants
+      return untype(n, con(Type.ANY)); // Replace non-constants with high (dead) constants
 
     // [ts!] Compute best type, and type is IN ts
     Type t = n.value(this);     // Get best type
@@ -590,9 +588,7 @@ public class GVNGCM {
   // Forward reachable walk, setting types to all_type().dual() and making all dead.
   private void walk_initype( Node n ) {
     if( n==null || touched(n) ) return; // Been there, done that
-    Type all_type = n.all_type();
-    Type startype = all_type.above_center() ? all_type : all_type.dual();
-    setype(n,startype);
+    setype(n,Type.ANY);
     n._live = TypeMem.DEAD;     // Not alive
     // Walk reachable graph
     add_work(n);

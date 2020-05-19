@@ -39,7 +39,6 @@ public abstract class IntrinsicNewNode extends Node {
     return INTRINSICS;
   }
   @Override public String xstr() { return _name+"*"+_nstr._alias; }
-  @Override public Type all_type() { return TypeStr.STR; }
 
   // Wrap the PrimNode with a Fun/Epilog wrapper that includes memory effects.
   public FunPtrNode as_fun( GVNGCM gvn ) {
@@ -77,8 +76,8 @@ class ConvertI64Str extends IntrinsicNewNode {
   @Override public Node ideal(GVNGCM gvn, int level) { return null; }
   @Override public Type value(GVNGCM gvn) {
     Type t = gvn.type(in(3));
-    if( t.above_center() ) return all_type().dual();
-    if( !t.is_con() || !(t instanceof TypeInt) ) return all_type();
+    if( t.above_center() || !(t instanceof TypeInt) ) return t.oob();
+    if( !t.is_con() ) return TypeStr.STR;
     return TypeStr.make(false,Long.toString(t.getl()).intern());
   }
 }
@@ -88,8 +87,8 @@ class ConvertF64Str extends IntrinsicNewNode {
   @Override public Node ideal(GVNGCM gvn, int level) { return null; }
   @Override public Type value(GVNGCM gvn) {
     Type t = gvn.type(in(3));
-    if( t.above_center() ) return all_type().dual();
-    if( !t.is_con() || !(t instanceof TypeFlt) ) return all_type();
+    if( t.above_center() || !(t instanceof TypeInt) ) return t.oob();
+    if( !t.is_con() ) return TypeStr.STR;
     return TypeStr.make(false,Double.toString(t.getd()).intern());
   }
 }
@@ -105,18 +104,19 @@ class AddStrStr extends IntrinsicNewNode {
     Type m   = gvn.type(in(1));
     Type sp0 = gvn.type(in(3));
     Type sp1 = gvn.type(in(4));
-    if( m.above_center() || sp0.above_center() || sp1.above_center() ) return all_type().dual();
-    if( !(m instanceof TypeMem) ) return all_type();
-    if( !sp0.isa(TypeMemPtr.STRPTR) || !sp1.isa(TypeMemPtr.STRPTR) ) return all_type();
+    if( m.above_center() || sp0.above_center() || sp1.above_center() ) return Type.ANY;
+    if( !(m instanceof TypeMem) ) return Type.ALL;
+    if( !sp0.isa(TypeMemPtr.STRPTR) ) return Type.ALL;
+    if( !sp1.isa(TypeMemPtr.STRPTR) ) return Type.ALL;
     TypeMem mem = (TypeMem)m;
     if( sp0==Type.NIL ) return mem.ld((TypeMemPtr)sp1);
     if( sp1==Type.NIL ) return mem.ld((TypeMemPtr)sp0);
     Type s0 = mem.ld((TypeMemPtr)sp0);
     Type s1 = mem.ld((TypeMemPtr)sp1);
-    if( !(s0 instanceof TypeStr) || !(s1 instanceof TypeStr) ) return all_type();
+    if( !(s0 instanceof TypeStr) || !(s1 instanceof TypeStr) ) return Type.ALL;
     TypeStr str0 = (TypeStr)s0;
     TypeStr str1 = (TypeStr)s1;
-    if( !str0.is_con() || !str1.is_con() ) return all_type();
+    if( !str0.is_con() || !str1.is_con() ) return TypeStr.STR;
     return TypeStr.make(false,(str0.getstr()+str1.getstr()).intern());
   }
   @Override public byte op_prec() { return 5; }

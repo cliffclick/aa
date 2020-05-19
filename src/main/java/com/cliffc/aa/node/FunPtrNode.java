@@ -46,13 +46,14 @@ public final class FunPtrNode extends Node {
     }
     return null;
   }
-  @Override public TypeFunPtr value(GVNGCM gvn) {
+  @Override public Type value(GVNGCM gvn) {
     if( !(in(0) instanceof RetNode) )
       return TypeFunPtr.EMPTY;
     RetNode ret = ret();
     Node disp = display();
-    TypeMemPtr tdisp = (TypeMemPtr)gvn.type(disp);
-    return TypeFunPtr.make(ret._fidx,ret._nargs,tdisp);
+    Type tdisp = gvn.type(disp);
+    if( !(tdisp instanceof TypeMemPtr) ) return tdisp.oob();
+    return TypeFunPtr.make(ret._fidx,ret._nargs,(TypeMemPtr)tdisp);
   }
 
   @Override public TypeMem live( GVNGCM gvn) {
@@ -67,7 +68,6 @@ public final class FunPtrNode extends Node {
   @Override public boolean basic_liveness() { return false; }
 
   // Note: graph structure must be in place before calling
-  @Override public TypeFunPtr all_type() { return TypeFunPtr.GENERIC_FUNPTR; }
   @Override public String toString() { return super.toString(); }
   // Return the op_prec of the returned value.  Not sensible except when called
   // on primitives.

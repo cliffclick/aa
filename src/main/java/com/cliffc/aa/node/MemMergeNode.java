@@ -283,8 +283,6 @@ public class MemMergeNode extends Node {
   }
   @Override public boolean basic_liveness() { return false; }
 
-  @Override public Type all_type() { return TypeMem.ISUSED; }
-
   @Override @NotNull public MemMergeNode copy( boolean copy_edges, GVNGCM gvn) {
     MemMergeNode mmm = (MemMergeNode)super.copy(copy_edges, gvn);
     mmm._aliases = new AryInt(_aliases._es.clone(),_aliases._len);

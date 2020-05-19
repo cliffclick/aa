@@ -132,9 +132,4 @@ public class NewObjNode extends NewNode<TypeStruct> {
     TypeStruct newt = _ts.make_from(ts);
     return TypeTuple.make(newt,TypeMemPtr.make(_alias,TypeObj.OBJ)); // Complex obj, simple ptr.
   }
-  @Override public Type all_type() {
-    if( DefMemNode.CAPTURED.get(_alias) ) // Captured/dead
-      return TypeTuple.make(TypeObj.UNUSED,TypeMemPtr.make(_alias,TypeObj.OBJ));
-    return TypeTuple.NEWOBJ;
-  }
 }

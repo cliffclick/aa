@@ -100,7 +100,7 @@ public class ScopeNode extends Node {
       return set_mem(gvn.add_work(gvn.con(TypeMem.XMEM)), gvn);
     return null;
   }
-  @Override public Type value(GVNGCM gvn) { return all_type(); }
+  @Override public Type value(GVNGCM gvn) { return Type.ALL; }
 
   // From a memory and a possible pointer-to-memory, find all the reachable
   // aliases and fold them into 'live'.  This is unlike other live_use
@@ -144,7 +144,6 @@ public class ScopeNode extends Node {
   }
   @Override public boolean basic_liveness() { return false; }
 
-  @Override public Type all_type() { return Type.ALL; }
   @Override public int hashCode() { return 123456789; }
   // ScopeNodes are never equal
   @Override public boolean equals(Object o) { return this==o; }

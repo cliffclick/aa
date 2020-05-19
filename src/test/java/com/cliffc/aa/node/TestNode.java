@@ -48,9 +48,6 @@ public class TestNode {
   private long[] _work = new long[1];
   private int _work_len;
 
-  // Worse-case output for a Node
-  private Type _alltype;
-
   private int _errs;
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
@@ -204,6 +201,7 @@ public class TestNode {
       _ins[i] = new ConNode<>(Type.SCALAR);
     Node mem = new ConNode<Type>(TypeMem.MEM);
     FunNode fun_forward_ref = new FunNode("anon");
+    _gvn.setype(Env.DEFMEM,TypeMem.MEM);
 
     Node unr = top.lookup("+"); // All the "+" functions
     FunNode fun_plus = ((FunPtrNode)unr.in(1)).fun();
@@ -273,8 +271,6 @@ public class TestNode {
 
   @SuppressWarnings("unchecked")
   private Type test1jig(final Node n, Type t0, Type t1, Type t2, Type t3) {
-    _alltype = n.all_type();
-    assert _alltype.is_con() || (!_alltype.above_center() && _alltype.dual().above_center());
     // Prep graph edges
     _gvn.setype(_ins[0],                        t0);
     _gvn.setype(_ins[1],((ConNode)_ins[1])._t = t1);
@@ -314,8 +310,6 @@ public class TestNode {
   private void test1monotonic_init(final Node n) {
     System.out.println(n.xstr());
     _values.clear(true);
-    _alltype = n.all_type();
-    assert _alltype.is_con() || (!_alltype.above_center() && _alltype.dual().above_center());
 
     put(0,Type.ANY);            // First args are all ANY, so is result
     push(0);                    // Init worklist
@@ -372,13 +366,6 @@ public class TestNode {
     if( vm == null ) {
       set_type(idx,all[yx]);
       vm = n.value(_gvn);
-      // Assert the alltype() bounds any value() call result.
-      if( !(_alltype.dual().isa(vm) && vm.isa(_alltype)) ) {
-        _errs++;
-        System.out.println("Not in alltype bounds");
-        vm = n.value(_gvn);
-        assert _alltype.dual().isa(vm) && vm.isa(_alltype);
-      }
       Type old = put(xxx,vm);
       assert old==null;
       push(xxx);            // Now visit all children

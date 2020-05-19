@@ -92,7 +92,6 @@ public class TypeNode extends Node {
     return ScopeNode.compute_live_mem(gvn,TypeMem.UNUSED,mem(),arg());
   }
 
-  @Override public Type all_type() { return Type.SCALAR; }
   // Check TypeNode for being in-error
   @Override public String err(GVNGCM gvn) { return _error_parse.typerr(gvn.type(arg()),mem(),_t); }
 }

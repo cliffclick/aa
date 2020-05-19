@@ -26,5 +26,4 @@ public class MProjNode extends ProjNode {
   }
   // Memory need precise liveness
   @Override public boolean basic_liveness() { return false; }
-  @Override public Type all_type() { return TypeMem.ISUSED; }
 }

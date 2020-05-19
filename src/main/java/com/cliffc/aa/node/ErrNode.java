@@ -20,7 +20,6 @@ public final class ErrNode extends Node {
   @Override public String err(GVNGCM gvn) {
     return _bad == null ? _msg : _msg + _bad.errMsg("Missing close was openned here");
   }
-  @Override public Type all_type() { return _t; }
   @Override public int hashCode() { return super.hashCode()+_msg.hashCode()+_t.hashCode(); }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;

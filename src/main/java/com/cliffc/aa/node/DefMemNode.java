@@ -2,9 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.type.TypeMem;
-import com.cliffc.aa.type.TypeObj;
-import com.cliffc.aa.type.TypeTuple;
+import com.cliffc.aa.type.*;
 
 import java.util.BitSet;
 
@@ -23,8 +21,10 @@ public class DefMemNode extends Node {
           tos[i] = ((NewNode)n.in(0))._ts;
         else
           tos[i] = (TypeObj)((TypeTuple)gvn.type(n.in(0)))._ts[0];
-      } else
-        tos[i] = (TypeObj)gvn.type(n);
+      } else {
+        Type tn = gvn.type(n);
+        tos[i] = tn instanceof TypeObj ? (TypeObj)tn : (tn.above_center() ? TypeObj.XOBJ : TypeObj.OBJ);
+      }
     }
     return TypeMem.make0(tos);
   }
@@ -32,7 +32,6 @@ public class DefMemNode extends Node {
   // alive, the NewNode will shortly declare captured.
   @Override public boolean basic_liveness() { return false; }
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) { return _live; }
-  @Override public TypeMem all_type() { return TypeMem.ISUSED; }
   @Override public boolean equals(Object o) { return this==o; } // Only one
 
   // Make an OProj for a New, and 'hook' it into the default memory

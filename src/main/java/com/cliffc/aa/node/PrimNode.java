@@ -106,8 +106,6 @@ public abstract class PrimNode extends Node {
     }
     return null;
   }
-  // Worse-case type for this Node
-  @Override public Type all_type() { return _sig._ret; }
   // Prims are equal for same-name-same-signature (and same inputs).
   // E.g. float-minus of x and y is NOT the same as int-minus of x and y
   // despite both names being '-'.
@@ -177,7 +175,7 @@ static class ConvertInt64F64 extends PrimNode {
 static class ConvertStrStr extends PrimNode {
   ConvertStrStr() { super("str",TypeStruct.STRPTR,TypeMemPtr.OOP); }
   @Override public Node ideal(GVNGCM gvn, int level) { return in(1); }
-  @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)).bound(all_type()); }
+  @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)); }
   @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
 }
 
@@ -403,7 +401,7 @@ static class RandI64 extends PrimNode {
 static class Id extends PrimNode {
   Id(Type arg) { super("id",TypeStruct.make_args(TypeStruct.ts(TypeStruct.NO_DISP,arg)),arg); }
   @Override public Node ideal(GVNGCM gvn, int level) { return in(1); }
-  @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)).bound(all_type()); }
+  @Override public Type value(GVNGCM gvn) { return gvn.type(in(1)); }
   @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
 }
 

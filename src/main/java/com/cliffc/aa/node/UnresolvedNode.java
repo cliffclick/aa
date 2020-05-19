@@ -3,10 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.type.BitsFun;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeFunPtr;
-import com.cliffc.aa.type.TypeMem;
+import com.cliffc.aa.type.*;
 
 import java.util.Arrays;
 
@@ -39,43 +36,27 @@ public class UnresolvedNode extends Node {
     return progress ? this : null;
   }
 
-  @Override public TypeFunPtr value(GVNGCM gvn) {
-    final TypeFunPtr GF = TypeFunPtr.GENERIC_FUNPTR;
-    if( gvn._opt_mode < 2 ) { // parse or 1st iter: assume all can happen, and hope to resolve to lift
-      // During iter() has to only LIFT.  Resolving a Call removes choices...
-      // which if Unresolved returns high DROPS not LIFTS.
-      TypeFunPtr t = GF.dual();
-      for( Node def : _defs ) {
-        Type td = gvn.type(def);
-        if( !(td instanceof TypeFunPtr) ) return GF; // Only fails during testing
-        t = (TypeFunPtr)t.meet(td);
-      }
-      return t;
+  @Override public Type value(GVNGCM gvn) {
+    // If any arg is ALL - that wins; if ANY - ignored.
+    // If any arg is not a TFP, then OOB.
+    // If any arg is high, ignore - FunPtrs always fall.
+    // If opt_mode==2, then high else low
+    boolean lifting = gvn._opt_mode!=2;
+    Type initial = lifting ? Type.ANY : Type.ALL;
+    Type t = initial;
+    for( Node def : _defs ) {
+      Type td = gvn.type(def);
+      if( td==Type.ANY )        // Some arg is at high?
+        if( lifting ) continue; // Lifting: ignore it
+        else return Type.ANY;   // Falling: wait till it falls.
+      if( td==Type.ALL ) return Type.ALL;
+      if( !(td instanceof TypeFunPtr) ) return td.oob();
+      TypeFunPtr tfp = (TypeFunPtr)td;
+      if( tfp.above_center() ) tfp = tfp.dual();
+      if( tfp._disp.above_center() ) throw com.cliffc.aa.AA.unimpl(); // mixed-mode
+      t = lifting ? t.meet(tfp) : t.join(tfp.dual());
     }
-    if( gvn._opt_mode == 2 ) {
-      // See testUnresolvedAdd.
-      // gcp - always a choice, as gcp starts highest and falls as required.
-      // preserve choice until GCP resolves.
-      // Post-GCP: never here unless in-error, or returning an ambiguous fun ptr
-
-      TypeFunPtr t = GF;
-      BitsFun fidxs = BitsFun.EMPTY;
-      for( Node def : _defs ) {
-        Type td = gvn.type(def);
-        if( td == GF ) return GF.dual();
-        if( !(td instanceof TypeFunPtr) ) return GF.dual(); // Only fails during testing
-        if( td.above_center() ) return GF.dual();
-        if( ((TypeFunPtr)td)._disp.above_center() ) return GF.dual();
-        t = (TypeFunPtr)t.join(td.dual()); // Lift all the displays; all args are ignored
-        BitsFun fidxs2 = ((TypeFunPtr)td).fidxs();
-        if( fidxs2.abit() != -1 ) fidxs = fidxs.set(fidxs2.abit());
-      }
-      return t.make_from(fidxs.dual());
-    }
-    // Post-GCP.  Should be dead, except for primitive hooks.  If we inline,
-    // we split a fidx and the Unresolved does not get both options... so it
-    // runs "downhill" during iter.  Not useful, since dead.  Leave it set.
-    return (TypeFunPtr)gvn.self_type(this);
+    return t==initial ? Type.ANY : t; // If all inputs are ANY, then ANY result
   }
 
   // Filter out all the wrong-arg-count functions
@@ -109,8 +90,6 @@ public class UnresolvedNode extends Node {
     // Only call users, and no call wants this def.
     return TypeMem.DEAD;
   }
-
-  @Override public TypeFunPtr all_type() { return TypeFunPtr.GENERIC_FUNPTR; }
 
   // Return the op_prec of the returned value.  Not sensible except when called
   // on primitives.  Should be the same across all defs.

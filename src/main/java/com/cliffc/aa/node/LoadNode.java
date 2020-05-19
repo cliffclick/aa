@@ -160,7 +160,6 @@ public class LoadNode extends Node {
     String f = msg+" field '."+_fld+"'";
     return _bad==null ? f : _bad.errMsg(f);
   }
-  @Override public Type all_type() { return Type.SCALAR; }
   @Override public int hashCode() { return super.hashCode()+_fld.hashCode(); }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;

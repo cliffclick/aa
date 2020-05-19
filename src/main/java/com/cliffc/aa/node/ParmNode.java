@@ -84,9 +84,8 @@ public class ParmNode extends PhiNode {
   @Override public Type value(GVNGCM gvn) {
     // Not executing, go the
     Type ctl = gvn.type(in(0));
-    Type all = all_type();
-    if( ctl != Type.CTRL ) return ctl.above_center() ? all.dual() : all;
-    if( !(in(0) instanceof FunNode) )  return all;
+    if( ctl != Type.CTRL ) return ctl.oob();
+    if( !(in(0) instanceof FunNode) )  return gvn.type(in(0)).oob();
     // If unknown callers, then always the default value because some unknown
     // caller can be that bad.
     FunNode fun = fun();
@@ -94,7 +93,7 @@ public class ParmNode extends PhiNode {
       return gvn.type(in(1));
     Node mem = fun.parm(-2);    // Memory for sharpening pointers
     // All callers known; merge the wired & flowing ones
-    Type t = all.dual();
+    Type t = Type.ANY;
     for( int i=1; i<_defs._len; i++ ) {
       if( gvn.type(fun.in(i))!=Type.CTRL ) continue; // Only meet alive paths
       // Only meet with wired & flowing edges

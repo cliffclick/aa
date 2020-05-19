@@ -303,8 +303,8 @@ public abstract class Node implements Cloneable {
   // value() and live().
   abstract public Node ideal(GVNGCM gvn, int level);
 
-  // Compute the current best Type for this Node, based on the types of its inputs.
-  // May return the local "all_type()", especially if its inputs are in error.  It
+  // Compute the current best Type for this Node, based on the types of its
+  // inputs.  May return Type.ALL, especially if its inputs are in error.  It
   // must be monotonic.  This is a forwards-flow transfer-function computation.
   abstract public Type value(GVNGCM gvn);
 
@@ -346,9 +346,6 @@ public abstract class Node implements Cloneable {
 
   // Return any type error message, or null if no error
   public String err(GVNGCM gvn) { return null; }
-
-  // Worse-case type for this Node
-  public Type all_type() { return Type.ALL; }
 
   // Operator precedence is only valid for ConNode of binary functions
   public byte  op_prec() { return -1; }

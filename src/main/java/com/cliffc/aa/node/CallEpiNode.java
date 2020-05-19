@@ -259,7 +259,7 @@ public final class CallEpiNode extends Node {
   // If the Call's type includes all-functions, then the CallEpi must assume
   // unwired Returns may yet appear, and be conservative.  Otherwise it can
   // just meet the set of known functions.
-  @Override public TypeTuple value(GVNGCM gvn) {
+  @Override public Type value(GVNGCM gvn) {
     Node call = in(0);
     Type tin0 = gvn.type(call);  TypeTuple tcall;
     // Check for is_copy, based on types: if input is NOT a call-type then we
@@ -267,11 +267,9 @@ public final class CallEpiNode extends Node {
     // inputs.
     if( !(tin0 instanceof TypeTuple) ||
         (tcall=(TypeTuple)tin0)._ts.length < 3 ) { // Must be inlined
-      if( tin0!=Type.CTRL )                        // Weird stuff?
-        return tin0.above_center() ? TypeTuple.CALLE.dual() : TypeTuple.CALLE;
-      // Must be an is_copy.  Just return the arg types, capped at all_type for testing
-      TypeTuple tall = all_type();
-      return TypeTuple.make(Type.CTRL,gvn.type(in(1)).bound(tall.at(1)),gvn.type(in(2)).bound(tall.at(2)));
+      if( tin0!=Type.CTRL ) return tin0.oob();     // Weird stuff?
+      // Must be an is_copy.  Just return the arg types.
+      return TypeTuple.make(Type.CTRL,gvn.type(in(1)),gvn.type(in(2)));
     }
     //assert sane_wiring();
 
@@ -399,6 +397,5 @@ public final class CallEpiNode extends Node {
   // If slot 0 is not a CallNode, we have been inlined.
   boolean is_copy() { return !(in(0) instanceof CallNode); }
   @Override public Node is_copy(GVNGCM gvn, int idx) { return is_copy() ? in(idx) : null; }
-  @Override public TypeTuple all_type() { return TypeTuple.CALLE; }
   @Override Node is_pure_call() { return call().is_pure_call(); }
 }

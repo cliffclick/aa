@@ -567,14 +567,6 @@ public class CallNode extends Node {
     return null;
   }
 
-  @Override public TypeTuple all_type() {
-    Type[] ts = TypeAry.get(_defs._len);
-    Arrays.fill(ts,Type.SCALAR);
-    ts[0] = Type.CTRL;
-    ts[1] = TypeMem.ISUSED;
-    ts[2] = TypeFunPtr.GENERIC_FUNPTR;
-    return TypeTuple.make(ts);
-  }
   CallEpiNode cepi() {
     for( Node cepi : _uses )    // Find CallEpi for bypass aliases
       if( cepi instanceof CallEpiNode )

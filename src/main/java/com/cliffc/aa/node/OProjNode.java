@@ -31,5 +31,4 @@ public class OProjNode extends ProjNode {
   int alias() { return ((NewNode)in(0))._alias; }
   // Object needs precise liveness
   @Override public boolean basic_liveness() { return false; }
-  @Override public Type all_type() { return ((TypeTuple)in(0).all_type())._ts[_idx]; }
 }

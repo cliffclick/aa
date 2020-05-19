@@ -571,6 +571,7 @@ public class Type<T extends Type<T>> implements Cloneable {
     if( t.dual().isa(this) && this.isa(t) ) return this;
     return above_center() ? t.dual() : t;
   }
+  public Type oob( ) { return above_center() ? ANY : ALL; }
 
   public static void init0( HashMap<String,Type> types ) {
     types.put("real",REAL);

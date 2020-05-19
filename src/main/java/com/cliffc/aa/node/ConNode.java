@@ -13,7 +13,6 @@ public class ConNode<T extends Type> extends Node {
   @Override String xstr() { return Env.ALL_CTRL == this ? "ALL_CTL" : _t.toString(); }
   @Override public Node ideal(GVNGCM gvn, int level) { return null; }
   @Override public Type value(GVNGCM gvn) { return _t; }
-  @Override public Type all_type() { return _t; }
   @Override public TypeMem live( GVNGCM gvn) {
     // If any use is alive, the Con is alive... but it never demands memory.
     // Indeed, it may supply memory.

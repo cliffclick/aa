@@ -125,10 +125,10 @@ public class PhiNode extends Node {
 
   @Override public Type value(GVNGCM gvn) {
     Type ctl = gvn.type(in(0));
-    Type t = all_type().dual();
-    if( ctl != Type.CTRL ) return ctl.above_center() ? t : t.dual();
+    if( ctl != Type.CTRL ) return ctl.oob();
     RegionNode r = (RegionNode) in(0);
     assert r._defs._len==_defs._len;
+    Type t = Type.ANY;
     for( int i=1; i<_defs._len; i++ )
       if( gvn.type(r.in(i))==Type.CTRL ) // Only meet alive paths
         t = t.meet(gvn.type(in(i)));
@@ -139,7 +139,6 @@ public class PhiNode extends Node {
     return _t==Type.SCALAR;
   }
 
-  @Override public Type all_type() { return _t; } // Might need something here for Scalar vs Memory
   @Override public String err(GVNGCM gvn) {
     if( !(in(0) instanceof FunNode && ((FunNode)in(0))._name.equals("!") ) && // Specifically "!" takes a Scalar
         (gvn.type(this).contains(Type.SCALAR) ||

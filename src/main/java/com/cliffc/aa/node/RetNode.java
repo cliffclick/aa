@@ -75,7 +75,6 @@ public final class RetNode extends Node {
     Type val = gvn.type(val()).bound(Type.SCALAR);
     return TypeTuple.make(ctl,mem,val);
   }
-  @Override public TypeTuple all_type() { return TypeTuple.RET; }
 
 
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
