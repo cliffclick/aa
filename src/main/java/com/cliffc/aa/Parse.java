@@ -151,6 +151,7 @@ public class Parse {
     bs.set(Env.MEM_0._uid);     // Do not walk initial memory
     bs.set(Env.STK_0._uid);     // Do not walk initial memory
     bs.set(_e._scope._uid);     // Do not walk top-level scope
+    bs.set(Env.DEFMEM._uid);    // Do not walk default memory
     Ary<String> errs0 = new Ary<>(new String[1],0);
     Ary<String> errs1 = new Ary<>(new String[1],0);
     Ary<String> errs2 = new Ary<>(new String[1],0);
@@ -833,9 +834,7 @@ public class Parse {
       Parse errmsg = errMsg();  // Lazy error message
       for( int i=1; i<ids._len; i++ ) { // User parms start at#1
         Node parm = gvn(new ParmNode(i,ids.at(i),fun,con(Type.SCALAR),errmsg));
-        // Type-check arguments
-        Node mt = typechk(parm,ts.at(i),mem,bads.at(i));
-        create(ids.at(i),mt, args_are_mutable);
+        create(ids.at(i),parm, args_are_mutable);
       }
 
       // Function memory is a merge of incoming wide memory, and the local

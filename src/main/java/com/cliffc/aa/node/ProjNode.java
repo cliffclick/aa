@@ -27,12 +27,10 @@ public class ProjNode extends Node {
     Type c = gvn.type(in(0));
     if( c instanceof TypeTuple ) {
       TypeTuple ct = (TypeTuple)c;
-      if( _idx < ct._ts.length ) {
-        Type t = ct._ts[_idx].meet(Type.XSCALAR);
-        return Type.SCALAR.isa(t) ? Type.SCALAR : t;
-      }
+      if( _idx < ct._ts.length )
+        return ct._ts[_idx];
     }
-    return c.above_center() ? Type.XSCALAR : Type.SCALAR;
+    return c.oob();
   }
   static ProjNode proj( Node head, int idx ) {
     for( Node use : head._uses )

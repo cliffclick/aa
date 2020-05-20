@@ -10,8 +10,8 @@ import java.util.function.Function;
 import static org.junit.Assert.*;
 
 public class TestParse {
-  private static String[] FLDS = new String[]{"^","n","v"};
-  private static String[] FLDS2= new String[]{"^","nn","vv"};
+  private static final String[] FLDS = new String[]{"^","n","v"};
+  private static final String[] FLDS2= new String[]{"^","nn","vv"};
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
@@ -185,7 +185,7 @@ public class TestParse {
     test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
     test("sq={x -> x*x}; sq 2.1", TypeFlt.con(4.41)); // No () required for single args
     testerr("sq={x -> x&x}; sq(\"abc\")", "*[$]\"abc\" is not a int64",9);
-    testerr("sq={x -> x*x}; sq(\"abc\")", "*[$]\"abc\" is none of (flt64,int64)",9);
+    testerr("sq={x -> x*x}; sq(\"abc\")", "*[$]\"abc\" is not a flt64",9);
     testerr("f0 = { f x -> f0(x-1) }; f0({+},2)", "Passing 1 arguments to f0 which takes 2 arguments",16);
     // Recursive:
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
@@ -200,7 +200,7 @@ public class TestParse {
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(5)", Type.XNIL  );
 
     // This test merges 2 TypeFunPtrs in a Phi, and then fails to resolve.
-    testerr("(math_rand(1) ? {+} : {*})(2,3)","Unable to resolve {+}",19); // either 2+3 or 2*3, or {5,6} which is INT8.
+    testerr("(math_rand(1) ? {+} : {*})(2,3)","Unable to resolve call",26); // either 2+3 or 2*3, or {5,6} which is INT8.
   }
 
   @Test public void testParse03() {
@@ -260,7 +260,7 @@ public class TestParse {
 
   @Test public void testParse04() {
     TypeStruct dummy = TypeStruct.DISPLAY;
-    testerr ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1;y=2}))", "*[$]@{x==1;y==2} is not a *[$]Point:@{x:=;y:=}",22);
+    test   ("dist={p:@{x;y} -> p.x*p.x+p.y*p.y}; dist(@{x=1;y=2})", TypeInt.con(5)); // Typed func arg
     // simple anon struct tests
     testerr("a=@{x=1.2;y}; x", "Unknown ref 'x'",15);
     testerr("a=@{x=1;x=2}.x", "Cannot re-assign final field '.x'",8);
@@ -303,7 +303,7 @@ public class TestParse {
 
     test    ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
     test    ("Point=:@{x;y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
-    testerr ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1;y=2}))", "*[$]@{x==1;y==2} is not a *[$]Point:@{x:=;y:=}",22);
+    testerr ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1;y=2}))", "*[$]@{x==1;y==2} is not a *[$]Point:@{x:=;y:=}",55);
     testerr ("Point=:@{x;y}; Point((0,1))", "*[$](~nil;1) is not a *[$]Point:@{x:=;y:=}",21);
     testerr("x=@{n: =1;}","Missing type after ':'",7);
     testerr("x=@{n=;}","Missing ifex after assignment of 'n'",6);

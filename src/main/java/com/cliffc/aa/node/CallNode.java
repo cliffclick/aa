@@ -256,7 +256,7 @@ public class CallNode extends Node {
 
     // Copy args for called functions.  Arg0 is display, handled below.
     for( int i=0; i<nargs(); i++ )
-      ts[i+2] = gvn.type(arg(i)).bound(Type.SCALAR);
+      ts[i+2] = gvn.type(arg(i));
 
     // Not a function to call?
     Type tfx = gvn.type(fun());
@@ -535,12 +535,22 @@ public class CallNode extends Node {
     // Indirectly, forward-ref for function type
     if( tfp.is_forward_ref() ) // Forward ref on incoming function
       return _badargs[0].forward_ref_err(FunNode.find_fidx(tfp.fidx()));
-    if( tfp.fidxs().is_empty() )
-      return null; // This is an unresolved call, and that error is reported elsewhere
 
     // bad-arg-count
     if( tfp._nargs != nargs() )
       return fast ? "" : _badargs[0].errMsg("Passing "+(nargs()-1)+" arguments to "+tfp.names(false)+" which takes "+(tfp._nargs-1)+" arguments");
+
+    // Call did not resolve
+    BitsFun fidxs = tfp.fidxs();
+    if( fidxs.is_empty() || fidxs.above_center() ) // This is an unresolved call
+      return fast ? "" : _badargs[0].errMsg("Unable to resolve call");
+    
+    // If ANY args are ANY they will fail the arg check, BUT will be reported
+    // first where they became an ANY.
+    if( !fast )
+      for( int j=1; j<nargs(); j++ )
+        if( gvn.type(arg(j))==Type.ANY )
+          return null;
 
     // Now do an arg-check.
     for( int j=1; j<nargs(); j++ ) {

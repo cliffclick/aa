@@ -85,12 +85,14 @@ public class ParmNode extends PhiNode {
     // Not executing, go the
     Type ctl = gvn.type(in(0));
     if( ctl != Type.CTRL ) return ctl.oob();
-    if( !(in(0) instanceof FunNode) )  return gvn.type(in(0)).oob();
+    Node in0 = in(0);
+    if( !(in0 instanceof FunNode) )  return gvn.type(in0).oob();
     // If unknown callers, then always the default value because some unknown
     // caller can be that bad.
-    FunNode fun = fun();
+    FunNode fun = (FunNode)in0;
     if( fun.has_unknown_callers() )
       return gvn.type(in(1));
+    int fidx = fun.fidx();      // Used to test for wired and flowing
     Node mem = fun.parm(-2);    // Memory for sharpening pointers
     // All callers known; merge the wired & flowing ones
     Type t = Type.ANY;
@@ -100,31 +102,20 @@ public class ParmNode extends PhiNode {
       Node call = fun.in(i).in(0);
       if( !(call instanceof CallNode) ) continue;
       CallEpiNode cepi = ((CallNode)call).cepi();
-      if( cepi == null ) continue;             // Broken graph
-      if( !cepi.cg_tst(fun.fidx()) ) continue; // Wired and flowing
+      if( cepi == null ) continue;       // Broken graph
+      if( !cepi.cg_tst(fidx) ) continue; // Wired and flowing
       Type ta = gvn.type(in(i));   // Arg type
       if( ta instanceof TypeMemPtr ) // Sharpen pointers
         ta = ta.sharpen(gvn.type(mem.in(i)));
       t = t.meet(ta);
     }
 
-    // Bound results by simple Fun argument types.  This keeps errors from
-    // spreading past function call boundaries.
+    // Check against formals; if OOB, always produce an error.
     if( _idx < 0 ) return t;
     Type formal = fun.formal(_idx);
     // Good case: t.isa(formal).
-    if( formal.dual().isa(t) && t.isa(formal) )
-      return t.simple_ptr();
-    // Bad case.  If not a pointer, just pin at limits.
-    if( !(t instanceof TypeMemPtr) || !(formal instanceof TypeMemPtr) )
-      return (t.above_center() ? formal.dual() : formal).simple_ptr();
-    // If a pointer, pin each of the aliases and object at limits.
-    TypeMemPtr tmpa = (TypeMemPtr)t;
-    TypeMemPtr tmpf = (TypeMemPtr)formal;
-    int a = tmpf._aliases.getbit();
-    if( tmpa._aliases.above_center() ) a = -a;
-    TypeObj o = tmpa._obj.above_center() ? TypeObj.XOBJ : TypeObj.OBJ;
-    return TypeMemPtr.make(a,o);
+    if( formal.dual().isa(t) && t.isa(formal) )  return t.simple_ptr();
+    return t.oob();
   }
 
   @Override public String err( GVNGCM gvn ) {
@@ -137,7 +128,8 @@ public class ParmNode extends PhiNode {
     for( int i=1; i<_defs._len; i++ ) {
       if( gvn.type(fun.in(i))!=Type.CTRL ) continue; // Ignore dead paths
       Type argt = gvn.sharptr(in(i),mem); // Arg type for this incoming path
-      if( !argt.isa(formal) ) {    // Argument is legal?
+      if( argt==Type.ALL ) return null;   // Arg is in-error elsewhere, and reported elsewhere
+      if( !argt.isa(formal) ) { // Argument is legal?
         // The merge of all incoming calls for this argument is not legal.
         // Find the call bringing the broken args, and use it for error
         // reporting - it MUST exist, or we have a really weird situation
@@ -145,7 +137,7 @@ public class ParmNode extends PhiNode {
           if( def instanceof CProjNode ) {
             CallNode call = (CallNode)def.in(0);
             if( call.nargs() != fun.nargs() )
-              return null;                        // #args errors reported before bad-args
+              return null;      // #args errors reported before bad-args
             Type argc = gvn.sharptr(call.arg(_idx),call.mem()); // Call arg type
             if( !argc.isa(formal) ) // Check this call
               return call._badargs[_idx].typerr(argc,call.mem(),formal);

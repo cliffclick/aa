@@ -1,9 +1,10 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.type.*;
+import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeFunPtr;
+import com.cliffc.aa.type.TypeMem;
 
 import java.util.Arrays;
 
@@ -116,19 +117,8 @@ public class UnresolvedNode extends Node {
   public UnresolvedNode copy(Parse bad) {
     return new UnresolvedNode(bad,Arrays.copyOf(_defs._es,_defs._len));
   }
-  // True if unresolved is uncalled (but possibly returned or stored as a
-  // constant).  Such code is not searched for errors.  Here we just check for
-  // being ONLY used by the initial environment; if this value is loaded from,
-  // it will have other uses.
-  @Override boolean is_uncalled(GVNGCM gvn) {
-    return _uses._len==0 || (_uses._len==1 && _uses.at(0)== Env.STK_0);
-  }
-  @Override public String err(GVNGCM gvn) {
-    if( in(0) instanceof ConNode ) return null; // Mid-collapse
-    FunNode fun = ((FunPtrNode)in(0)).fun();
-    String name = fun==null ? null : fun.name(false);
-    return _bad==null ? null : _bad.errMsg("Unable to resolve "+name);
-  }
+  // Do not walk into the unresolved calls; there is only an error if a Call uses an Unresolved.
+  @Override boolean is_uncalled(GVNGCM gvn) { return true; }
   // Choice of typically primitives, all of which are pure.
   // Instead of returning the pre-call memory on true, returns self.
   @Override Node is_pure_call() {
