@@ -88,8 +88,8 @@ public class IntrinsicNode extends Node {
   @Override public Type value(GVNGCM gvn) {
     Type mem = gvn.type(mem());
     Type ptr = gvn.type(ptr());
-    if( !(mem instanceof TypeMem) ) return mem.above_center() ? TypeMem.XMEM : TypeMem.MEM ; // Inputs are confused
-    if( !(ptr instanceof TypeMemPtr) ) return mem;       // Inputs are confused
+    if( !(mem instanceof TypeMem   ) ) return mem.oob(); // Inputs are confused
+    if( !(ptr instanceof TypeMemPtr) ) return ptr.oob(); // Inputs are confused
     // Get the Obj from the pointer.
     int alias = ((TypeMemPtr)ptr)._aliases.abit();
     TypeObj obj = ((TypeMem)mem).ld((TypeMemPtr)ptr);

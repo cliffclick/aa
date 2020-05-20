@@ -438,7 +438,7 @@ public class GVNGCM {
       if( n._uses._len==0 && n._keep==0 ) kill(n);
       else xform_old(n,small_work ? 0 : 2);
       // VERY EXPENSIVE ASSERT
-      assert Env.START.more_flow(this,new VBitSet(),true,0)==0; // Initial conditions are correct
+      //assert Env.START.more_flow(this,new VBitSet(),true,0)==0; // Initial conditions are correct
       cnt++; assert cnt < 11000; // Catch infinite ideal-loops
     }
     // No more ideal calls, small or large, to apply

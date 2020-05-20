@@ -26,7 +26,7 @@ public class TestParse {
     test("math_rand(1)?x=4:x=3;x", TypeInt.NINT8); // x defined on both arms, so available after
     test_ptr("x=@{n:=1;v:=2}; x.n := 3; x", "@{n:=3;v:=2}");
     test("x=3; mul2={x -> x*2}; mul2(2.1)", TypeFlt.con(2.1*2.0)); // must inline to resolve overload {*}:Flt with I->F conversion
-    testerr("sq={x -> x*x}; sq(\"abc\")", "*[$]\"abc\" is none of (flt64,int64)",9);
+    testerr("sq={x -> x*x}; sq(\"abc\")", "*[$]\"abc\" is not a flt64",9);
     test("fun:{int str -> int}={x y -> x+2}; fun(2,3)", TypeInt.con(4));
     testerr("math_rand(1)?x=2: 3 ;y=x+2;y", "'x' not defined on false arm of trinary",20);
     testerr("{+}(1,2,3)", "Passing 3 arguments to {+} which takes 2 arguments",3);
@@ -260,7 +260,6 @@ public class TestParse {
 
   @Test public void testParse04() {
     TypeStruct dummy = TypeStruct.DISPLAY;
-    test   ("dist={p:@{x;y} -> p.x*p.x+p.y*p.y}; dist(@{x=1;y=2})", TypeInt.con(5)); // Typed func arg
     // simple anon struct tests
     testerr("a=@{x=1.2;y}; x", "Unknown ref 'x'",15);
     testerr("a=@{x=1;x=2}.x", "Cannot re-assign final field '.x'",8);

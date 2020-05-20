@@ -1026,8 +1026,8 @@ public class Parse {
 
     if( peek("@{") ) {          // Struct type
       Ary<String> flds = new Ary<>(new String[]{"^"});
-      Ary<Type  > ts   = new Ary<>(new Type  []{Type.XNIL});
-      Ary<Byte  > mods = new Ary<>(new Byte  []{TypeStruct.FFNL});
+      Ary<Type  > ts   = new Ary<>(new Type  []{TypeMemPtr.DISP_SIMPLE});
+      Ary<Byte  > mods = new Ary<>(new Byte  []{TypeStruct.FRW});
       while( true ) {
         String tok = token();            // Scan for 'id'
         if( tok == null ) break;         // end-of-struct-def

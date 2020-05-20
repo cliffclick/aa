@@ -272,9 +272,6 @@ public class CallNode extends Node {
     // Call.ts[2] is a TFP just for the resolved fidxs and display.
     ts[2] = TypeFunPtr.make(rfidxs,tfp._nargs,rfidxs.above_center() == fidxs.above_center() ? tfp._disp : tfp._disp.dual());
 
-    // No forward progress until resolution
-    if( rfidxs.above_center() ) return Type.ANY;
-
     return TypeTuple.make(ts);
   }
 
@@ -544,7 +541,7 @@ public class CallNode extends Node {
     BitsFun fidxs = tfp.fidxs();
     if( fidxs.is_empty() || fidxs.above_center() ) // This is an unresolved call
       return fast ? "" : _badargs[0].errMsg("Unable to resolve call");
-    
+
     // If ANY args are ANY they will fail the arg check, BUT will be reported
     // first where they became an ANY.
     if( !fast )

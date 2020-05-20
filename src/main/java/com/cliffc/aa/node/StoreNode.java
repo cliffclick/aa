@@ -184,7 +184,7 @@ public class StoreNode extends Node {
   }
   private String err0(GVNGCM gvn) {
     Type t = gvn.type(adr());
-    if( t.may_nil() ) return "Struct might be nil when writing";
+    if( t.may_nil() ) return "Struct might be nil when writing ";
     if( !(t instanceof TypeMemPtr) ) return "Unknown"; // Too low, might not have any fields
     Type mem = gvn.type(mem());
     if( mem == Type.ANY ) return null;

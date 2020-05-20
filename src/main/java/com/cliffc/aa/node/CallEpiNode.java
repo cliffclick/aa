@@ -295,6 +295,7 @@ public final class CallEpiNode extends Node {
     if( tfptr.is_forward_ref() ) return TypeTuple.CALLE; // Still in the parser.
     // NO fidxs, means we're not calling anything.
     if( fidxs==BitsFun.EMPTY ) return TypeTuple.CALLE.dual();
+    if( fidxs.above_center() ) return TypeTuple.CALLE.dual(); // Not resolved yet
 
     // If call memory is not at least default memory - stall typing until the
     // Call catches up.  Might need to bring default memory into a Call.

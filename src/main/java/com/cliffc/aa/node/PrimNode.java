@@ -34,38 +34,38 @@ public abstract class PrimNode extends Node {
         new Id(TypeMemPtr.OOP0), // Pre-split OOP from non-OOP
         new Id(TypeFunPtr.GENERIC_FUNPTR),
         new Id(Type.REAL),
-        
+
         new ConvertInt64F64(),
         new ConvertStrStr(),
-        
+
         new MinusF64(),
         new MinusI64(),
         new Not(),
-        
+
         new   AddF64(),
         new   SubF64(),
         new   MulF64(),
-        
+
         new   LT_F64(),
         new   LE_F64(),
         new   GT_F64(),
         new   GE_F64(),
         new   EQ_F64(),
         new   NE_F64(),
-        
+
         new   AddI64(),
         new   SubI64(),
         new   MulI64(),
-        
+
         new   AndI64(),
-        
+
         new   LT_I64(),
         new   LE_I64(),
         new   GT_I64(),
         new   GE_I64(),
         new   EQ_I64(),
         new   NE_I64(),
-        
+
         new   EQ_OOP(),
         new   NE_OOP(),
       };
@@ -128,7 +128,7 @@ public abstract class PrimNode extends Node {
     ParmNode mem = (ParmNode) gvn.xform(new ParmNode(-2,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
     add_def(null);              // Control for the primitive in slot 0
     for( int i=1; i<_sig.nargs(); i++ ) // First is display
-      add_def(gvn.init(new ParmNode(i,_sig.fld(i),fun, gvn.con(_sig.arg(i).simple_ptr()),null)));
+      add_def(gvn.xform(new ParmNode(i,_sig.fld(i),fun, gvn.con(_sig.arg(i).simple_ptr()),null)));
     // Functions return the set of *modified* memory.  PrimNodes never *modify*
     // memory (see Intrinsic*Node for some primitives that *modify* memory).
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mem,gvn.init(this),rpc,fun));
@@ -152,6 +152,7 @@ static class ConvertTypeName extends PrimNode {
   }
   @Override public Type apply( Type[] args ) {
     Type actual = args[1];
+    if( actual==Type.ANY || actual==Type.ALL ) return actual;
     Type formal = _sig.arg(1);
     // Wrapping function will not inline if args are in-error
     assert formal.dual().isa(actual) && actual.isa(formal);
