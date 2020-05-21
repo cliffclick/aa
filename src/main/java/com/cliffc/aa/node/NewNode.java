@@ -15,11 +15,20 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   // Unique alias class, one class per unique memory allocation site.
   // Only effectively-final, because the copy/clone sets a new alias value.
   public int _alias; // Alias class
-  // Represents all possible future values, counting all allowed Stores that
-  // may yet happen.  Fixed at SCALAR unless final, then equal to the final
-  // store.  Field names are valid, and mods can only lift from R/W to FINAL.
-  T _ts;             // Base object type, representing all possible future values
 
+  // A list of field names and field-mods, folded into the initial state of
+  // this NewObj.  These can come from initializers at parse-time, or stores
+  // folded in.  There are no types stored here; types come from the inputs.
+  T _ts;             // Base object type, representing all possible future values
+  
+  // The memory state for Env.DEFMEM, the default memory.  All non-final fields
+  // are Scalar; final fields keep their value.  All field flags are moved to
+  // bottom, e.g. as-if all fields are now final-stored.
+  T _defmem;
+
+  // Just TMP.make(_alias,OBJ); also effectively final
+  public TypeMemPtr _tptr;
+  
   // True if pointer does not escape: the ptr can be used as the address in
   // loads and stores and null-and-eq checked.  It can NOT be used as a call
   // arg, a funptr display (same as a call arg), or value-stored.  Such values
@@ -42,6 +51,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   private void _init(int parent_alias, T to) {
     _alias = BitsAlias.new_alias(parent_alias);
     sets(to,null);
+    _tptr = TypeMemPtr.make(_alias,TypeObj.OBJ);
   }
   String xstr() { return "New*"+_alias; } // Self short name
   String  str() { return "New"+_ts; } // Inline less-short name
@@ -49,13 +59,11 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   static int def_idx(int fld) { return fld+1; } // Skip ctrl in slot 0
   Node fld(int fld) { return in(def_idx(fld)); } // Node for field#
 
-  // Called when folding a Named Constructor into this allocation site
-  void set_name( T name, GVNGCM gvn ) { assert !name.above_center();  sets(name,gvn); }
-
   // Recompute default memory cache on a change
   @SuppressWarnings("unchecked")
   protected final void sets( T ts, GVNGCM gvn ) {
-    _ts = (T)ts.widen_as_default();
+    _ts = ts;
+    _defmem = (T)ts.widen_as_default();
     if( gvn!=null ) gvn.add_work_uses(this);
   }
 

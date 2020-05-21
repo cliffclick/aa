@@ -17,10 +17,7 @@ public class DefMemNode extends Node {
       Node n = _defs.at(i);
       if( n==null ) continue;
       if( n instanceof OProjNode ) {
-        if( n.in(0) instanceof NewNode )
-          tos[i] = ((NewNode)n.in(0))._ts;
-        else
-          tos[i] = (TypeObj)((TypeTuple)gvn.type(n.in(0)))._ts[0];
+        tos[i] = ((NewNode)n.in(0))._defmem;
       } else {
         Type tn = gvn.type(n);
         tos[i] = tn instanceof TypeObj ? (TypeObj)tn : (tn.above_center() ? TypeObj.XOBJ : TypeObj.OBJ);

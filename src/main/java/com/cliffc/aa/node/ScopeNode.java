@@ -205,7 +205,7 @@ public class ScopeNode extends Node {
       MemMergeNode mmem = new MemMergeNode(mem.unhook());
       for( String name : vars.keySet() ) {
         String msg = bad.errMsg("'"+name+"' not defined on "+arm+" arm of trinary");
-        Node err = gvn.xform(new ErrNode(ctrl,msg,null,Type.SCALAR));
+        Node err = gvn.xform(new ErrNode(ctrl,msg,null));
         // Exactly like a parser store of an error, on the missing side
         int alias = scope.stk()._alias; // Alias for scope
         Node omem = mmem.active_obj(alias);

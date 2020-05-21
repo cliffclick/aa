@@ -290,18 +290,6 @@ public class TestNodeSmall {
     };
     _testMonotonicChain(ins,call,argss_mul1);
 
-    // Simple XCTRL check
-    TypeTuple[] argss_mul1x = new TypeTuple[] {
-      TypeTuple.make( txctl, tfull, tmul1, txscl, txscl, tmul1X), //  ~S    ~S   [+int+flt]
-      TypeTuple.make( txctl, tfull, tmul1, t2   , txscl, tmul1X), //   2    ~S   [+int+flt]
-      TypeTuple.make( txctl, tfull, tmul1, t2   , t3   , tmul1 ), //   2     3   [ int,flt]
-      TypeTuple.make( txctl, tfull, tmul1, t2   , tscl , tmul1 ), //   2     S   [ int,flt]
-      TypeTuple.make( txctl, tfull, tmul1, tscl , tscl , tmul1 ), //   S     S   [ int,flt]
-      TypeTuple.make( txctl, tfull, tmul1, txscl, tabc , tmul1X), //  ~S    str  [ int,flt]
-      TypeTuple.make( txctl, tfull, tmul1, t2   , tabc , tmul1E), //   2    str  [ int,flt]
-    };
-    _testMonotonicChain(ins,call,argss_mul1x);
-
     // Check the {int,flt,str} meet.
     // Rules:
     // - Some args High & no Low, keep all & join (ignore Good,Bad)
@@ -360,18 +348,6 @@ public class TestNodeSmall {
     };
     _testMonotonicChain(ins,call,argss_mul2);
 
-    // Simple XCTRL check
-    TypeTuple[] argss_mul2x = new TypeTuple[] {
-      TypeTuple.make( txctl, tfull, tmul2X, txscl, txscl, tmul2X), //  ~S    ~S   [+int+flt]
-      TypeTuple.make( txctl, tfull, tmul2X, t2   , txscl, tmul2X), //   2    ~S   [+int+flt]
-      TypeTuple.make( txctl, tfull, tmul2X, t2   , t3   , tmul2X), //   2     3   [ int,flt]
-      TypeTuple.make( txctl, tfull, tmul2X, t2   , tscl , tmul2 ), //   2     S   [ int,flt]
-      TypeTuple.make( txctl, tfull, tmul2X, tscl , tscl , tmul2 ), //   S     S   [ int,flt]
-      TypeTuple.make( txctl, tfull, tmul2X, txscl, tabc , tmul2X), //  ~S    str  [ int,flt]
-      TypeTuple.make( txctl, tfull, tmul2X, t2   , tabc , tmul2E), //   2    str  [ int,flt]
-    };
-    _testMonotonicChain(ins,call,argss_mul2x);
-
     // Check the {+int+flt+str} choices
     call.set_fun(ins[2]=fp_add,gvn);
     TypeTuple[] argss_add2 = new TypeTuple[] {
@@ -422,8 +398,8 @@ public class TestNodeSmall {
     //   FunPtr - Ret
     gvn._opt_mode=0;
     ConNode ctl = (ConNode) gvn.xform(new ConNode<>(Type.CTRL));
-    ConNode mem = gvn.init(new ConNode<>(TypeMem.MEM.dual()));
-    ConNode rpc = gvn.init(new ConNode<>(TypeRPC.ALL_CALL));
+    ConNode mem = (ConNode)gvn.xform(new ConNode<>(TypeMem.MEM.dual()));
+    ConNode rpc = (ConNode)gvn.xform(new ConNode<>(TypeRPC.ALL_CALL));
     ConNode dsp_prims = (ConNode) gvn.xform(new ConNode<>(TypeMemPtr.DISP_SIMPLE));
     // The file-scope display closing the graph-cycle.  Needs the FunPtr, not
     // yet built.

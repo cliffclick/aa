@@ -35,11 +35,11 @@ public class Env implements AutoCloseable {
     _P = P;
     _par = par;
     ScopeNode s = par._scope;   // Parent scope
-    _scope = init(s.ctrl(),s.ptr(),s.mem(),s.stk().tptr(),P==null ? null : P.errMsg(),is_closure);
+    _scope = init(s.ctrl(),s.ptr(),s.mem(),s.stk()._tptr,P==null ? null : P.errMsg(),is_closure);
   }
   // Make the Scope object for an Env.
-  private static ScopeNode init(Node ctl, Node clo, Node mem, Type tsptr, Parse errmsg, boolean is_closure) {
-    TypeStruct tdisp = TypeStruct.make_tuple(TypeStruct.ts(tsptr));
+  private static ScopeNode init(Node ctl, Node clo, Node mem, Type back_ptr, Parse errmsg, boolean is_closure) {
+    TypeStruct tdisp = TypeStruct.make_tuple(TypeStruct.ts(back_ptr));
     NewObjNode nnn = (NewObjNode)GVN.xform(new NewObjNode(is_closure,tdisp,ctl,clo).keep());
     Node frm = DEFMEM.make_mem_proj(GVN,nnn);
     Node ptr = GVN.xform(new ProjNode(nnn,1));

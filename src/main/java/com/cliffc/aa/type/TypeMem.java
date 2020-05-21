@@ -251,7 +251,8 @@ public class TypeMem extends Type<TypeMem> {
     TypeObj[] as = new TypeObj[aliases.max()+1];
     as[1] = TypeObj.UNUSED;
     for( int alias : aliases )
-      as[alias] = oop;
+      if( alias != 0 )
+        as[alias] = oop;
     return make0(as);
   }
 
@@ -353,20 +354,6 @@ public class TypeMem extends Type<TypeMem> {
     tos[alias] = obj;
     return TypeMem.make0(tos);
   }
-
-  // Widen (lose info) a TypeMem "as if" all possible legal future memory
-  // stores happen, making it suitable as the default function memory.  Final
-  // fields can remain as-is; non-finals are all widened to SCALAR (assuming a
-  // future Store); the field names & mods are kept.  All objects in the
-  // display stack are 'open'; low and assuming more fields will appear.  Other
-  // objects can have their fields frozen.
-  public TypeMem widen_as_default() {
-    TypeObj[] tos = new TypeObj[_aliases.length];
-    for( int i=0; i<tos.length; i++ )
-      tos[i] = _aliases[i]==null ? null : _aliases[i].widen_as_default();
-    return TypeMem.make0(tos);
-  }
-
 
   // Support for SESE flow optimizations.  Mark all memory as being clean (not
   // modified in this function).  Recursive.

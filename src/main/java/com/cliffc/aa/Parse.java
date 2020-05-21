@@ -652,7 +652,7 @@ public class Parse {
     if( isDigit(c) ) return con(number());
     if( '"' == c ) {
       Node str = string();
-      return str==null ? err_ctrl1("Unterminated string",TypeStr.XSTR) : str;
+      return str==null ? err_ctrl2("Unterminated string") : str;
     }
     int oldx = _x;
     if( peek1(c,'(') ) {        // a nested statement or a tuple
@@ -1027,7 +1027,7 @@ public class Parse {
     if( peek("@{") ) {          // Struct type
       Ary<String> flds = new Ary<>(new String[]{"^"});
       Ary<Type  > ts   = new Ary<>(new Type  []{TypeMemPtr.DISP_SIMPLE});
-      Ary<Byte  > mods = new Ary<>(new Byte  []{TypeStruct.FRW});
+      Ary<Byte  > mods = new Ary<>(new Byte  []{TypeStruct.FFNL});
       while( true ) {
         String tok = token();            // Scan for 'id'
         if( tok == null ) break;         // end-of-struct-def
@@ -1056,7 +1056,7 @@ public class Parse {
     // "(, , )" is a 2-entry tuple
     if( peek('(') ) { // Tuple type
       byte c;
-      Ary<Type> ts = new Ary<>(new Type[]{Type.XNIL});
+      Ary<Type> ts = new Ary<>(new Type[]{TypeMemPtr.DISP_SIMPLE});
       while( (c=skipWS()) != ')' ) { // No more types...
         Type t = Type.SCALAR;    // Untyped, most generic field type
         if( c!=',' &&            // Has type annotation?
@@ -1230,10 +1230,9 @@ public class Parse {
   }
 
   // Whack current control with a syntax error
-  private ErrNode err_ctrl2( String s ) { return err_ctrl1(s,Type.SCALAR); }
-  private ErrNode err_ctrl1( String s, Type t ) { return init(new ErrNode(Env.START,errMsg(s),null,t)); }
+  private ErrNode err_ctrl2( String s ) { return init(new ErrNode(Env.START,errMsg(s),null)); }
   private void err_ctrl0(String s, Parse bad) {
-    set_ctrl(gvn(new ErrNode(ctrl(),errMsg(s),bad,Type.CTRL)));
+    set_ctrl(gvn(new ErrNode(ctrl(),errMsg(s),bad)));
   }
 
   // Make a private clone just for delayed error messages

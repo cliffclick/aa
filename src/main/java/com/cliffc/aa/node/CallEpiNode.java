@@ -62,8 +62,10 @@ public final class CallEpiNode extends Node {
     // See if we can flow more wired CG edges.
     if( _cg_wired != fidxs ) {
       //TODO: Surely must be in value() so GCP wires
-      TypeMem callmem = (TypeMem)((TypeTuple)gvn.type(call))._ts[1];
-      TypeMem cepimem = (TypeMem)((TypeTuple)gvn.type(this))._ts[1];
+      TypeMem callmem = (TypeMem)tcall._ts[1];
+      Type tci = gvn.type(this);
+      if( !(tci instanceof TypeTuple ) ) return null;
+      TypeMem cepimem = (TypeMem)((TypeTuple)tci)._ts[1];
       BitsFun progress = _cg_wired;
       for( int fidx : fidxs ) {                 // For all fidxs
         if( BitsFun.is_parent(fidx) ) continue; // Do not wire parents, as they will eventually settle out

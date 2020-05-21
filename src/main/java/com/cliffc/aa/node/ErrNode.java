@@ -8,24 +8,23 @@ import com.cliffc.aa.type.Type;
 public final class ErrNode extends Node {
   final String _msg;            // Error message
   final Parse _bad;             // Optional open point for missing close
-  public final Type _t;         // Default value if no error
-  public ErrNode( Node ctrl, String msg, Parse bad, Type t ) { super(OP_ERR,ctrl); _msg = msg; _bad = bad; _t=t; }
+  public ErrNode( Node ctrl, String msg, Parse bad ) { super(OP_ERR,ctrl); _msg = msg; _bad = bad; }
   @Override String xstr() { return _msg.split("\n")[1]; }
   @Override String str() { return "Err"; }
   @Override public Node ideal(GVNGCM gvn, int level) { return null; }
   @Override public Type value(GVNGCM gvn) {
     Type t = gvn.type(in(0));
-    return t == Type.ANY || t == Type.XCTRL ? _t.dual() : _t; // For dead data errors return ANY (no error)
+    return t == Type.ANY || t == Type.XCTRL ? Type.ANY : Type.ALL; // For dead data errors return ANY (no error)
   }
   @Override public String err(GVNGCM gvn) {
     return _bad == null ? _msg : _msg + _bad.errMsg("Missing close was openned here");
   }
-  @Override public int hashCode() { return super.hashCode()+_msg.hashCode()+_t.hashCode(); }
+  @Override public int hashCode() { return super.hashCode()+_msg.hashCode(); }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !super.equals(o) ) return false;
     if( !(o instanceof ErrNode) ) return false;
     ErrNode err = (ErrNode)o;
-    return _msg.equals(err._msg) && _t==err._t;
+    return _msg.equals(err._msg);
   }
 }

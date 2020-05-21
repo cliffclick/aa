@@ -115,6 +115,7 @@ public class IntrinsicNode extends Node {
   public static FunPtrNode convertTypeNameStruct( TypeStruct to, int alias, GVNGCM gvn ) {
     assert to.has_name();
     assert Util.eq(to._flds[0],"^"); // Display already
+    assert to.fmod(0)==TypeStruct.FFNL; // Display is final
     TypeStruct formals = to.remove_name();
     TypeFunSig sig = TypeFunSig.make(formals,TypeMemPtr.make(alias,to));
     FunNode fun = (FunNode) gvn.xform(new FunNode(to._name,sig,-1).add_def(Env.ALL_CTRL));

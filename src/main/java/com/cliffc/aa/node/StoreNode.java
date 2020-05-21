@@ -75,15 +75,12 @@ public class StoreNode extends Node {
 
   @Override public Type value(GVNGCM gvn) {
     Type adr = gvn.type(adr());
-    if( adr.isa(TypeMemPtr.OOP0.dual()) ) return TypeStruct.ANYSTRUCT; // Very high address; might fall to any valid address
-    if( TypeMemPtr.OOP0.isa(adr) ) return TypeStruct.ALLSTRUCT; // Very low, might be any address
-    if( !(adr instanceof TypeMemPtr) )
-      return adr.above_center() ? TypeStruct.ANYSTRUCT : TypeStruct.ALLSTRUCT;
+    if( !(adr instanceof TypeMemPtr) ) return adr.oob();
     TypeMemPtr tmp = (TypeMemPtr)adr;
     // Value is sane
     Type val = gvn.type(val());     // Value
     if( !val.isa_scalar() )         // Nothing sane
-      val = val.above_center() ? Type.XSCALAR : Type.SCALAR; // Pin to scalar for updates
+      return val.oob();
 
     // Store can bypass a Call, if the memory is not returned from the call.
     // This optimization is specifically targeting simple recursive functions.
@@ -184,7 +181,7 @@ public class StoreNode extends Node {
   }
   private String err0(GVNGCM gvn) {
     Type t = gvn.type(adr());
-    if( t.may_nil() ) return "Struct might be nil when writing ";
+    if( t.may_nil() ) return "Struct might be nil when writing '";
     if( !(t instanceof TypeMemPtr) ) return "Unknown"; // Too low, might not have any fields
     Type mem = gvn.type(mem());
     if( mem == Type.ANY ) return null;

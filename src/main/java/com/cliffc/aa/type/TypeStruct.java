@@ -160,7 +160,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     sb.p(is_tup ? "(" : "@{");
     for( int i=0; i<_flds.length; i++ ) {
       if( !is_tup )
-        sb.p(_flds[i]).p(fstr(fmod(i))).p('='); // Field name, access mod
+        sb.p(_flds[i]).p(fstr(_fmod(i))).p('='); // Field name, access mod
       Type t = at(i);
       if( t==null ) sb.p("!");  // Graceful with broken types
       else if( t==SCALAR ) ;    // Default answer, do not print
@@ -189,7 +189,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       sb.i();                   // indent, 1 field per line
       Type t = at(i);
       if( !is_tup )
-        sb.p(_flds[i]).p(fstr(fmod(i))).p('='); // Field name, access mod
+        sb.p(_flds[i]).p(fstr(_fmod(i))).p('='); // Field name, access mod
       if( t==null ) sb.p("!");  // Graceful with broken types
       else if( t==SCALAR ) ;    // Default answer, do not print
       else t.dstr(sb,dups);     // Recursively print field type
@@ -216,7 +216,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       if( Util.eq(_flds[i],"^") ) continue; // Do not print the ever-present display
       Type t = at(i);
       if( !is_tup )
-        sb.p(_flds[i]).p(fstr(fmod(i))).p('='); // Field name, access mod
+        sb.p(_flds[i]).p(fstr(_fmod(i))).p('='); // Field name, access mod
       if( t==null ) sb.p("!");  // Graceful with broken types
       else if( t==SCALAR ) ;    // Default answer, do not print
       else t.str(sb,dups,mem);  // Recursively print field type
@@ -247,13 +247,14 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // Unfortunate lack of Java-int-typing to help here, otherwise all are just bytes.
 
   // Field modifiers.
-  public static final byte FRW  = 0; // Read/Write
-  public static final byte FFNL = 1; // Final field (no load will witness other value)
+  public static final byte FRW  = 1; // Read/Write
+  public static final byte FFNL = 0; // Final field (no load will witness other value)
+  public static final byte FHI  = 2; // Field mod is inverted
   public static final byte FTOP = 1; // Flags top; must be 1 if MEET is AND
   public static final byte FBOT = 0; // Flags bot; must be 0 if MEET is AND
   // Printers
-  private static String fstr   ( short f ) { return new String[]{":","="}[f]; }
-  public  static String fstring( short f ) { return new String[]{"read-write","final"}[f]; }
+  private static String fstr   ( short f ) { return new String[]{"=",":","~:","~="}[f]; }
+  public  static String fstring( short f ) { return new String[]{"final","read-write","~read-write","~final"}[f]; }
   // Array of flags
   public static byte[] new_flags(int n, short flag) { byte[] bs = new byte[n]; Arrays.fill(bs,(byte)flag); return bs; }
   public static byte[] fbots(int n) { return new_flags(n,bot_flag); }
@@ -263,7 +264,12 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public static short  flags(byte[] flags, int idx) { return flags[idx]; }
   public static byte[] flags(byte[] flags, int idx, short flag ) { flags[idx] = (byte)flag; return flags; }
   // Accessors for field mods from flags
-  public static byte fmod( short flag ) { return (byte)(flag&1); }
+  public static byte fmod( short flag ) {
+    assert (flag&FHI)==0;       // Do not ask for inverted field mod
+    return _fmod(flag);
+  }
+  // Used by printers
+  private static byte _fmod( short flag ) { return (byte)(flag&3); }
   // Make a flags from all parts
   public static short make_flag( byte mod ) { assert mod==FRW || mod== FFNL; return mod; }
   // Modify just the field mods of a flags
@@ -271,18 +277,27 @@ public class TypeStruct extends TypeObj<TypeStruct> {
 
   // Shortcuts for the current flags[] as opposed to independent flags[]
   public byte fmod(int idx) { return fmod(flags(idx)); }
+  private byte _fmod(int idx) { return _fmod(flags(idx)); }
   public short flags(int idx) { return flags(_flags,idx); }
   public byte[] flags(int idx, short flag) { return flags(_flags,idx,flag); }
 
 
-  // MEET is AND
-  public static short fmeet( short f0, short f1 ) { return (short)(f0&f1); }
-  public static short fdual( short f ) { return (short)(f^1); }
+  // MEET is MIN
+  public static short fmeet( short f0, short f1 ) { return (short)Math.min(f0,f1); }
+  public static short fdual( short f ) { return (short)(f^3); }
   // Some precooked flags: combination of field mods and anything else (not current used)
   static final short fnl_flag = make_flag(FFNL); // Field final
   static final short frw_flag = make_flag(FRW ); // Field R/W
   static final short top_flag = make_flag(FTOP); // Flags top; must be 1 if MEET is AND
   static final short bot_flag = make_flag(FBOT); // Flags bot; must be 0 if MEET is AND
+  static {
+    assert fmeet(fdual(fnl_flag),fdual(frw_flag))==fdual(frw_flag);
+    assert fmeet(fdual(fnl_flag),     (frw_flag))==     (frw_flag);
+    assert fmeet(fdual(fnl_flag),     (fnl_flag))==     (fnl_flag);
+    assert fmeet(fdual(frw_flag),     (frw_flag))==     (frw_flag);
+    assert fmeet(fdual(frw_flag),     (fnl_flag))==     (fnl_flag);
+    assert fmeet(     (frw_flag),     (fnl_flag))==     (fnl_flag);
+  }
 
   // Default tuple field names - all bottom-field names
   static String[] flds(String... fs) { return fs; }
@@ -1186,15 +1201,14 @@ public class TypeStruct extends TypeObj<TypeStruct> {
 
   // Widen (loss info), to make it suitable as the default function memory.
   // Final fields can remain as-is; non-finals are all widened to SCALAR
-  // (assuming a future Store); the field names & mods are kept.
+  // (assuming a future Store); field flags set to bottom; the field names are kept.
   @Override public TypeStruct widen_as_default() {
-    if( _any )
-      return this;              // No change if above center
+    assert !_any;               // Expected to be below center
     Type[] ts = TypeAry.clone(_ts);
     for( int i=0; i<ts.length; i++ )
       if( fmod(i)!=FFNL ) ts[i]=SCALAR; // Widen non-finals to SCALAR, as-if crushed
       else ts[i]=ts[i].simple_ptr();
-    return make_from(false,ts,_flags);
+    return make_from(false,ts,fbots(ts.length));
   }
 
   // True if isBitShape on all bits

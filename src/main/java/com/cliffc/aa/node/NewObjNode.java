@@ -26,8 +26,6 @@ public class NewObjNode extends NewNode<TypeStruct> {
     super(OP_NEWOBJ,par_alias,ts,ctrl,clo);
     _is_closure = is_closure;
     assert ts._ts[0].is_display_ptr();
-    for( int i=1; i<ts._ts.length; i++ )
-      assert ts._ts[i]==Type.SCALAR || ts.fmod(i)==TypeStruct.FFNL; // Field contents not specified unless final
   }
   public Node get(String name) { int idx = _ts.find(name);  assert idx >= 0; return fld(idx); }
   public boolean exists(String name) { return _ts.find(name)!=-1; }
@@ -35,7 +33,8 @@ public class NewObjNode extends NewNode<TypeStruct> {
     byte fmod = _ts.fmod(_ts.find(name));
     return fmod == TypeStruct.FRW;
   }
-  public TypeMemPtr tptr() { return TypeMemPtr.make(_alias,_ts); }
+  // Called when folding a Named Constructor into this allocation site
+  void set_name( TypeStruct name, GVNGCM gvn ) { assert !name.above_center();  sets(name,gvn); }
 
   // Create a field from parser for an inactive this
   public void create( String name, Node val, byte mutable, GVNGCM gvn  ) {
@@ -124,12 +123,12 @@ public class NewObjNode extends NewNode<TypeStruct> {
 
   @Override public Type value(GVNGCM gvn) {
     if( DefMemNode.CAPTURED.get(_alias) ) // Captured/dead
-      return TypeTuple.make(TypeObj.UNUSED,TypeMemPtr.make(_alias,TypeObj.OBJ));
+      return TypeTuple.make(TypeObj.UNUSED,_tptr);
     // Gather args and produce a TypeStruct
     Type[] ts = TypeAry.get(_ts._ts.length);
     for( int i=0; i<ts.length; i++ )
-      ts[i] = gvn.type(fld(i)).join(_ts._ts[i]);
-    TypeStruct newt = _ts.make_from(ts);
-    return TypeTuple.make(newt,TypeMemPtr.make(_alias,TypeObj.OBJ)); // Complex obj, simple ptr.
+      ts[i] = gvn.type(fld(i));
+    TypeStruct newt = _ts.make_from(ts); // Pick up field names and mods
+    return TypeTuple.make(newt,_tptr); // Complex obj, simple ptr.
   }
 }
