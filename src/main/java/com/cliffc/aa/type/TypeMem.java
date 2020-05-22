@@ -1,11 +1,11 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.AryInt;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
 
 import java.util.Arrays;
-import java.util.BitSet;
 
 /**
    See also node/MemMerge.java
@@ -152,56 +152,49 @@ public class TypeMem extends Type<TypeMem> {
         bas = bas.set(i);
     return bas;
   }
-  // Toss out memory state not visible from these aliases
-  public TypeMem trim_to_alias(BitsAlias bas) {
-    if( bas == BitsAlias.EMPTY || this==EMPTY )
-      return EMPTY;                // Shortcut
-    if( bas.test(1) ) return this; // Shortcut, all aliases used so no trimming
-    TypeObj[] objs = new TypeObj[Math.max(bas.max()+1,_aliases.length)];
-    objs[1] = TypeObj.XOBJ;
-    // For every alias in the included set, include in the result (perhaps
-    // reading from a parent alias).
-    for( int alias : bas )
-      objs[alias] = at(alias);
-    // Also include any children, whose parent is included.
-    for( int i=2; i<_aliases.length; i++ )
-      if( _aliases[i]!=null && bas.test_recur(i) )
-        { assert objs[i]==null || objs[i]==_aliases[i]; objs[i] = _aliases[i]; }
-    return make0(objs);
-  }
 
-  private TypeObj[] _slice_all_aliases_plus_children(BitsAlias aliases) {
-    BitSet bs = aliases.tree().plus_kids(aliases);
-    TypeObj[] tos = new TypeObj[bs.length()];
-    tos[1] = TypeObj.UNUSED;
-    for( int alias = bs.nextSetBit(0); alias >= 0; alias = bs.nextSetBit(alias+1) )
-      tos[alias] = at(alias);
-    return tos;
+  // Walk all reachable aliases from this set of aliases, and
+  // include them all in the returned memory.
+  private TypeMem _slice_all_aliases_plus_children(BitsAlias aliases) {
+    AryInt work = new AryInt();
+    Ary<TypeObj> tos = new Ary<>(new TypeObj[]{null,TypeObj.UNUSED});
+    for( int alias : aliases )
+      for( int kid=alias; kid!=0; kid = BitsAlias.next_kid(alias,kid) ) {
+        work.push(kid);
+        tos.setX(kid,at(kid));
+      }
+
+    while( !work.isEmpty() ) {
+      int alias=work.pop();
+      TypeObj to = at(alias);
+      if( to==TypeObj.OBJ || to==TypeObj.ISUSED )
+        return this;            // All structs with all possible pointers
+      if( !(to instanceof TypeStruct) ) continue;
+      TypeStruct ts = (TypeStruct)to;
+      for( int i=0; i<ts._ts.length; i++ ) {
+        Type fld = ts._ts[i];
+        if( TypeMemPtr.OOP.isa(fld) )
+          fld = TypeMemPtr.OOP;                      // All possible pointers
+        if( !(fld instanceof TypeMemPtr) ) continue; // Not a pointer, no more aliases
+        if( ((TypeMemPtr)fld)._aliases.test(1) )
+          return this;          // All possible pointers
+        // Walk the possible pointers, and include them in the slice
+        for( int ptralias : ((TypeMemPtr)fld)._aliases ) {
+          for( int kid=ptralias; kid!=0; kid = BitsAlias.next_kid(ptralias,kid) ) {
+            if( tos.atX(kid) != null ) continue;
+            work.push(kid);
+            tos.setX(kid,at(kid));
+          }
+        }
+      }
+    }
+
+    return make0(tos.asAry());
   }
 
   // Report back just the given aliases (plus children)
   public TypeMem slice_all_aliases_plus_children(BitsAlias aliases) {
-    return make0(_slice_all_aliases_plus_children(aliases));
-  }
-
-  // Same as the above, except starts with just 1 alias instead of a list.
-  // Then removes the other aliases.
-  public TypeMem slice_1_alias_plus_children_minus_provides(int alias, AryInt aliases) {
-    if( this==TypeMem.DEAD ) return this; // Short cut
-
-    // A slice of the alias, plus its children.
-    TypeObj[] tos = _slice_all_aliases_plus_children(BitsAlias.make0(alias));
-    // We are making a liveness for MemMerge along one alias; MemMerge gets
-    // provided many aliases from other paths - these aliases are not demanded
-    // from this path.
-    for( int i = 0; i<aliases._len; i++ ) {
-      int ax = aliases.at(i);
-      if( ax != alias ) {
-        if( ax < tos.length )  tos[ax] = TypeObj.XOBJ;
-        else assert tos[1]==TypeObj.XOBJ; // Otherwise need to extend tos?
-      }
-    }
-    return make0(tos);
+    return _slice_all_aliases_plus_children(aliases);
   }
 
   private static TypeMem FREE=null;
@@ -388,36 +381,5 @@ public class TypeMem extends Type<TypeMem> {
 
   // For node liveness, anything alive means the node is alive
   public boolean is_live() { return this!=TypeMem.DEAD; }
-
-  // Find the alias slice out of 'live' and 'meet' it into 'this'.
-  public TypeMem meet_alias(TypeMem live, int alias) {
-    if( this==FULL ) return FULL; // Already maxed out
-    if( live==DEAD ) return live; // Nothing to add
-    if( live==EMPTY) return live; // Nothing to add
-    if( live==this ) return live; // No change
-    TypeObj flds = live.at(alias); // Get the alive fields for this alias
-    TypeObj olds =      at(alias); // Get current field state
-    if( flds == TypeObj.XOBJ ) return this; // No fields alive in live alias
-    if( olds == TypeObj. OBJ ) return this; // All fields already set, no change
-    if( flds == olds ) return this; // No change
-    if( olds == null ) olds = TypeObj.XOBJ; // Happens if 'this' is 'DEAD'
-
-    // Have to make a new result.
-    TypeObj[] ts = Arrays.copyOf(_aliases,Math.max(_aliases.length,alias+1));
-    ts[alias] = (TypeObj)flds.meet(olds); // Add new fields to the live set
-    return make0(ts);
-  }
-
-  // Bulk meet all these aliases all fields into 'this'
-  public TypeMem meet_alias(BitsAlias aliases) {
-    if( this==FULL ) return this; // Already maxed out
-    if( aliases.is_empty() ) return this;
-
-    // Have to make a new result.
-    TypeObj[] ts = Arrays.copyOf(_aliases,Math.max(_aliases.length,aliases.max()+1));
-    for( int alias : aliases )
-      ts[alias] = TypeObj.OBJ;  // All fields
-    return make0(ts);
-  }
 
 }

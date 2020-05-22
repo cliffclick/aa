@@ -223,8 +223,7 @@ public class MemMergeNode extends Node {
     // Remove not-live values
     for( int i=1; i<_defs._len; i++ ) {
       int alias = alias_at(i);
-      if( _live.at(alias) == TypeObj.UNUSED ) {
-        System.out.println("removing dead, need to check child aliases");
+      if( _live.at(alias) == TypeObj.UNUSED && gvn.type(in(i))!=TypeObj.UNUSED ) {
         // Check all children of 'alias' for being alive & NOT locally defined.
         // These are about to lose their parent, and so need a replacement
         // local def.
@@ -233,8 +232,8 @@ public class MemMergeNode extends Node {
             throw com.cliffc.aa.AA.unimpl("child alias "+kid+" is alive and about to lose sponsor");
           }
         }
-        //remove0(i,gvn);
-        //progress=true;
+        set_def(i,gvn.con(TypeObj.UNUSED),gvn);
+        progress=true;
       }
     }
     if( progress )

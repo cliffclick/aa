@@ -333,18 +333,18 @@ public class TestParse {
     test("A= :int; A(1)", TypeInt.TRUE.set_name("A:"));
     test_ptr("A= :(str?, int); A(0,2)","A:(~nil;2)");
     // Named recursive types
-    test_ptr("A= :(A?, int); A(0,2)",(alias) -> TypeMemPtr.make(alias,TypeStruct.make_tuple(TypeStruct.ts(Type.XNIL,Type.XNIL,TypeInt.con(2))).set_name("A:")));
+    test_ptr("A= :(A?, int); A(0,2)",(alias) -> TypeMemPtr.make(alias,TypeStruct.make_tuple(TypeStruct.ts(TypeMemPtr.NO_DISP,Type.XNIL,TypeInt.con(2))).set_name("A:")));
     test_ptr("A= :(A?, int); A(0,2)","A:(~nil;2)");
     test    ("A= :@{n=A?; v=flt}; A(@{n=0;v=1.2}).v;", TypeFlt.con(1.2));
     test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*[$]A:(~nil;2);3)");
 
     // TODO: Needs a way to easily test simple recursive types
-    TypeEnv te3 = Exec.go(Env.file_scope(Env.top_scope()),"args","A= :@{n=A?; v=int}; A(@{n=0;v=3})");
+    TypeEnv te3 = Exec.go(Env.file_scope(Env.top_scope()),"args","A= :@{n==A?; v==int}; A(@{n=0;v=3})");
     if( te3._errs != null ) System.err.println(te3._errs.toString());
     assertNull(te3._errs);
     TypeStruct tt3 = (TypeStruct)te3._tmem.ld((TypeMemPtr)te3._t);
     assertEquals("A:", tt3._name);
-    assertEquals(Type.XNIL     ,tt3.at(0));
+    assertTrue  (tt3.at(0).is_display_ptr());
     assertEquals(Type.XNIL     ,tt3.at(1));
     assertEquals(TypeInt.con(3),tt3.at(2));
     assertEquals("n",tt3._flds[1]);
