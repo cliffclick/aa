@@ -731,7 +731,7 @@ public class Type<T extends Type<T>> implements Cloneable {
     }
   }
   public Type high() { return above_center() ? this : dual(); }
-  
+
   // Return true if this is a forward-ref function pointer (return type from EpilogNode)
   public boolean is_forward_ref() { return false; }
 
@@ -770,7 +770,7 @@ public class Type<T extends Type<T>> implements Cloneable {
     case TREAL: return SCALAR;
     default: return this;
     }
-  } 
+  }
   // Operator precedence
   public byte op_prec() { return -1; } // Overridden in subclasses
 
@@ -887,7 +887,7 @@ public class Type<T extends Type<T>> implements Cloneable {
 
   // Sharpen a TypeMemPtr with a TypeMem
   public Type sharpen( Type tmem ) { return this; }
-  
+
   RuntimeException typerr(Type t) {
     throw new RuntimeException("Should not reach here: internal type system error with "+this+(t==null?"":(" and "+t)));
   }
@@ -898,6 +898,8 @@ public class Type<T extends Type<T>> implements Cloneable {
       t._uid();
       t._dual = null;
       t._hash = 0;
+      if( t instanceof TypeStruct )
+        ((TypeStruct)t)._cyclic = false;
       return t;
     }
     catch( CloneNotSupportedException cns ) { throw new RuntimeException(cns); }

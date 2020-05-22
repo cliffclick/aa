@@ -191,15 +191,6 @@ public class MemMergeNode extends Node {
   @Override public Node ideal(GVNGCM gvn, int level) {
     if( is_prim() ) return null;
     assert _defs._len==_aliases._len;
-    boolean live_stable = _live.isa(in(0)._live);
-    if( _defs._len==1 )
-      // Much pondering: MemMerge can filter liveness on slot0 (because some
-      // closure goes dead so the alias for it is XOBJ).  This knowledge has
-      // flowed "uphill": no one needs to provide this alias.  But also, the
-      // value()s can flow downhill and the slot0 might also be XOBJ.  Then we
-      // simplify to a single input edge, merging nothing.  But we cannot
-      // collapse lest we "lower" liveness by making the unused alias used again.
-      return live_stable ? in(0) : null; // Merging nothing
 
     // Remove child instances of the parent
     boolean progress = false;
@@ -210,8 +201,7 @@ public class MemMergeNode extends Node {
       if( in(i)==in(pidx) )
         { progress=true; remove0(i,gvn); }
     }
-    if( progress )
-      return this;
+    if( progress ) return this;
 
     // Collapse back-to-back MemMerge
     if( in(0) instanceof MemMergeNode ) {
@@ -229,6 +219,26 @@ public class MemMergeNode extends Node {
       set_def(0,mmm.in(0),gvn);
       return this;
     }
+
+    // Remove not-live values
+    for( int i=1; i<_defs._len; i++ ) {
+      int alias = alias_at(i);
+      if( _live.at(alias) == TypeObj.UNUSED ) {
+        System.out.println("removing dead, need to check child aliases");
+        // Check all children of 'alias' for being alive & NOT locally defined.
+        // These are about to lose their parent, and so need a replacement
+        // local def.
+        for( int kid=alias; kid!=0; kid=BitsAlias.next_kid(alias,kid) ) {
+          if( _live.at(kid)!=TypeObj.UNUSED && find_alias2idx(kid)==i ) {
+            throw com.cliffc.aa.AA.unimpl("child alias "+kid+" is alive and about to lose sponsor");
+          }
+        }
+        //remove0(i,gvn);
+        //progress=true;
+      }
+    }
+    if( progress )
+      return this;
 
     return null;
   }
@@ -264,6 +274,10 @@ public class MemMergeNode extends Node {
         tao = (TypeObj)base.meet(tao);
       }
       tos.setX(alias, tao );
+      for( int kid=BitsAlias.next_kid(alias,alias); kid!=0; kid=BitsAlias.next_kid(alias,kid) ) {
+        if( kid >= tos._len ) break;
+        tos.clear(kid);         // These all inherent
+      }
     }
     return TypeMem.make0(tos._es);
   }

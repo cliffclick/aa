@@ -90,7 +90,7 @@ public class TypeNode extends Node {
     if( _live == TypeMem.DEAD ) return TypeMem.DEAD; // Am dead, so nothing extra is alive.
     // Alive (like normal liveness), plus the address, plus whatever can be
     // reached from the address.
-    return ScopeNode.compute_live_mem(gvn,TypeMem.UNUSED,mem(),arg());
+    return ScopeNode.compute_live_mem(gvn,mem(),arg());
   }
 
   // Check TypeNode for being in-error

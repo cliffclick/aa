@@ -78,7 +78,7 @@ public class StoreNode extends Node {
     if( !(adr instanceof TypeMemPtr) ) return adr.oob();
     TypeMemPtr tmp = (TypeMemPtr)adr;
     // Value is sane
-    Type val = gvn.type(val());     // Value
+    Type val = val() instanceof ErrNode ? Type.SCALAR : gvn.type(val()); // Value
     if( !val.isa_scalar() )         // Nothing sane
       return val.oob();
 

@@ -55,10 +55,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     sb.p('_').p(_uid);
     if( dups == null ) dups = new VBitSet();
     if( dups.tset(_uid) ) return sb.p('$'); // Break recursive printing cycle
-    sb.p('*');
-    _obj.dstr(_aliases.toString(sb).p(" -> "),dups);
-    //_aliases.toString(sb);
-    return sb;
+    return _obj.dstr(_aliases.toString(sb.p('*')).p("->"),dups);
   }
   @Override public SB str(SB sb, VBitSet dups, TypeMem mem) {
     if( dups == null ) dups = new VBitSet();
@@ -169,7 +166,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     //    [~0]-> obj ==>   NIL  ==>  [0]-> obj
 
     if( _aliases.isa(BitsAlias.NIL.dual()) ) {
-      if( _obj==TypeObj.XOBJ && nil==XNIL )  return XNIL;
+      if( _obj.above_center() && nil==XNIL )  return XNIL;
       if( nil==NIL ) return NIL;
     }
     return make(_aliases.meet(BitsAlias.NIL),nil==NIL ? TypeObj.OBJ : _obj);

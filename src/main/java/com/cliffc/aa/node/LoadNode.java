@@ -59,7 +59,7 @@ public class LoadNode extends Node {
     if( adr instanceof  ProjNode && adr.in(0) instanceof NewNode && ((NewNode)adr.in(0))._no_escape &&
         mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode )
       return set_mem(((CallEpiNode)mem.in(0)).call().mem(),gvn);
-    
+
     // Loads against a NewNode cannot NPE, cannot fail, always return the input
     NewObjNode nnn = adr.in(0) instanceof NewObjNode ? (NewObjNode)adr.in(0) : null;
     int idx;
@@ -139,7 +139,7 @@ public class LoadNode extends Node {
       return TypeMem.make(((TypeMemPtr)tptr)._aliases,(TypeObj)tmem);
     // Alive (like normal liveness), plus the address, plus whatever can be
     // reached from the address.
-    return ScopeNode.compute_live_mem(gvn,TypeMem.UNUSED,mem(),adr());
+    return ScopeNode.compute_live_mem(gvn,mem(),adr());
   }
 
   @Override public String err(GVNGCM gvn) {
@@ -149,6 +149,7 @@ public class LoadNode extends Node {
       return bad("Unknown"); // Not a pointer nor memory, cannot load a field
     TypeMemPtr ptr = (TypeMemPtr)tadr;
     Type tmem = gvn.type(mem());
+    if( tmem==Type.ALL ) return null; // An error, reported earlier
     TypeObj objs = tmem instanceof TypeMem
       ? ((TypeMem)tmem).ld(ptr) // General load from memory
       : ((TypeObj)tmem);

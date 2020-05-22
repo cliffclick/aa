@@ -428,7 +428,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     byte[] ffs = _flags;
     if( ts  [idx] != t  ) ( ts = TypeAry.clone(_ts))[idx] = t;
     if( fmod(idx) != ff ) flags(ffs= _flags .clone(),idx,set_fmod(_flags[idx],ff));
-    return make(_flds,ts,ffs);
+    return make(_name,_flds,ts,ffs);
   }
 
   // Make a type-variable with no definition - it is assumed to be a

@@ -106,16 +106,16 @@ public class ScopeNode extends Node {
   // aliases and fold them into 'live'.  This is unlike other live_use
   // because this "turns around" the incoming live memory to also be the
   // demanded/used memory.
-  static TypeMem compute_live_mem(GVNGCM gvn, TypeMem live, Node mem, Node rez) {
+  static TypeMem compute_live_mem(GVNGCM gvn, Node mem, Node rez) {
     Type tmem = gvn.type(mem);
     Type trez = gvn.type(rez);
-    if( !(tmem instanceof TypeMem ) ) return live; // Not a memory
-    if( TypeMemPtr.OOP.isa(trez) ) return (TypeMem)tmem; // All possible pointers
-    if( !(trez instanceof TypeMemPtr) ) return live; // Not a pointer
-    if( tmem.above_center() || trez.above_center() ) return live; // Have infinite choices still, report basic live only
+    if( !(tmem instanceof TypeMem ) ) return tmem.above_center() ? TypeMem.UNUSED : TypeMem.ISUSED; // Not a memory, all alive
+    if( TypeMemPtr.OOP.isa(trez) ) return (TypeMem)tmem; // All possible pointers, so all memory is alive
+    if( !(trez instanceof TypeMemPtr) ) return TypeMem.UNUSED; // Not a pointer, basic live only
+    if( trez.above_center() ) return TypeMem.UNUSED; // Have infinite choices still, report basic live only
     // Find everything reachable from the pointer and memory, and report it all
     TypeMem live2 = ((TypeMem)tmem).slice_all_aliases_plus_children(((TypeMemPtr)trez)._aliases);
-    if( live2==TypeMem.DEAD ) return live; // Minimal liveness
+    if( live2==TypeMem.DEAD ) return TypeMem.UNUSED; // Minimal liveness
     return live2;
   }
   @Override public TypeMem live( GVNGCM gvn) {
@@ -125,7 +125,7 @@ public class ScopeNode extends Node {
       return gvn._opt_mode < 2 ? TypeMem.ISUSED : TypeMem.DEAD;
     assert _uses._len==0;
     // All fields in all reachable pointers from rez() will be marked live
-    return compute_live_mem(gvn,TypeMem.UNUSED,mem(),rez());
+    return compute_live_mem(gvn,mem(),rez());
   }
 
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
