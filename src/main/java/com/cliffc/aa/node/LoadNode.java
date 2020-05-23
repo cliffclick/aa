@@ -92,23 +92,19 @@ public class LoadNode extends Node {
 
   @Override public Type value(GVNGCM gvn) {
     Type adr = gvn.type(adr());
-    if( adr.isa(TypeMemPtr.OOP0.dual()) ) return Type.XSCALAR;
-    if( TypeMemPtr.OOP0.isa(adr) ) return Type.SCALAR; // Very low, might be any address
-    if( adr.is_forward_ref() ) return Type.SCALAR;
-    if( !(adr instanceof TypeMemPtr) )
-      return adr.above_center() ? Type.XSCALAR : Type.SCALAR;
+    if( !(adr instanceof TypeMemPtr) ) return adr.oob();
     TypeMemPtr tmp = (TypeMemPtr)adr;
 
     // Loading from TypeMem - will get a TypeObj out.
     Node mem = mem();
     Type tmem = gvn.type(mem); // Memory
     if( !(tmem instanceof TypeStruct) ) {
-      if( !(tmem instanceof TypeMem) ) // Nothing sane
-        return tmem.above_center() ? Type.XSCALAR : Type.SCALAR;
+      if( !(tmem instanceof TypeMem) ) return tmem.oob(); // Nothing sane
       tmem = ((TypeMem)tmem).ld(tmp);
     }
 
-    // Loading from TypeObj - hoping to get a field out
+    // Loading from TypeObj - hoping to get a field out.  If we reach here, we
+    // always return a Scalar and not e.g. Any or All.
     if( tmem == TypeObj.XOBJ ) return Type.XSCALAR;
     if( tmem == TypeObj. OBJ ) return Type. SCALAR;
     // Struct; check for field
@@ -116,7 +112,9 @@ public class LoadNode extends Node {
       TypeStruct ts = (TypeStruct)tmem;
       int idx = ts.find(_fld);  // Find the named field
       if( idx != -1 ) {         // Found a field
-        Type t = ts.at(idx);
+        Type t = ts.at(idx);    // Load field
+        if( t==Type.ANY ) t=Type.XSCALAR;
+        if( t==Type.ALL ) t=Type. SCALAR;
         if( tmp.must_nil() )    // Might be in-error, but might fall to correct
           return t.widen();     // Return conservative but sane answer
         return t;               // Field type

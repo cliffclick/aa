@@ -305,7 +305,7 @@ public final class CallEpiNode extends Node {
     if( !tmem.isa(post_call_mem) ) {
       // Self type, except easier to report a sane lower bound.
       Type self = gvn.self_type(this);
-      return self==Type.ALL ? TypeTuple.CALLE : self;
+      return self==null || self==Type.ALL ? TypeTuple.CALLE : self;
     }
 
     // Crush all the non-finals across the call

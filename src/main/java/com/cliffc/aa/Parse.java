@@ -530,7 +530,9 @@ public class Parse {
     if( n == null ) return null;
     while( true ) {             // Repeated application or field lookup is fine
       if( peek('.') ) {         // Field?
-        String fld = token();   // Field name
+        skipWS();               // 
+        int fld_start=_x;       // Get field start
+        String fld = token0();  // Field name
         if( fld == null ) {     // Not a token, check for a field number
           int fldnum = field_number();
           if( fldnum == -1 ) return err_ctrl2("Missing field name after '.'");
@@ -546,14 +548,14 @@ public class Parse {
           Node stmt = stmt();
           if( stmt == null ) n = err_ctrl2("Missing stmt after assigning field '."+fld+"'");
           else {
-            Node st = gvn(new StoreNode(all_mem(),castnn,n=stmt,fin,fld ,errMsg()));
+            Node st = gvn(new StoreNode(all_mem(),castnn,n=stmt,fin,fld ,errMsg(fld_start)));
             // Set the store into active memory.  It might have collapsed into
             // the local display already, so already be in the active memory.
             if( st instanceof StoreNode ) mem_active().st((StoreNode)st,_gvn);
             else { assert st instanceof OProjNode; }
           }
         } else {
-          n = gvn(new LoadNode(all_mem(),castnn,fld,errMsg()));
+          n = gvn(new LoadNode(all_mem(),castnn,fld,errMsg(fld_start)));
         }
 
       } else {                  // Attempt a function-call
