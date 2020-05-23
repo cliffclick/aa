@@ -123,6 +123,20 @@ public class CallNode extends Node {
     return tf instanceof TypeFunPtr ? ((TypeFunPtr)tf).fidxs() : null;
   }
 
+  // Add a bunch of utilities for breaking down a Call.value tuple:
+  // takes a Type, upcasts to tuple, & slices by name.
+  static final int MEMIDX=1;
+  static final int ARGIDX=2;
+  static Type       tctl( Type tcall ) { return ((TypeTuple)tcall).at(0); }
+  static TypeMem    tmem( Type tcall ) { return tmem(((TypeTuple)tcall)._ts); } // memory passed into function, reduced by non-reachable aliases
+  static TypeMem    tmem( Type[] ts  ) { return (TypeMem)ts[MEMIDX]; } // memory passed into function, reduced by non-reachable aliases
+  static TypeMem    tpre( Type tcall ) { throw com.cliffc.aa.AA.unimpl(); } // pre-call memory; all aliases
+  static TypeMemPtr tals( Type tcall ) { throw com.cliffc.aa.AA.unimpl(); } // aliases that are not available in callee
+  public static TypeFunPtr ttfp( Type tcall ) { return (TypeFunPtr)((TypeTuple)tcall).at(ARGIDX); }
+  static TypeTuple set_ttfp( TypeTuple tcall, TypeFunPtr nfptr ) { return tcall.set(ARGIDX,nfptr); }
+  static Type       targ( Type tcall, int x ) { return targ(((TypeTuple)tcall)._ts,x); }
+  static Type       targ( Type[] ts, int x ) { return ts[ARGIDX+x]; }
+
   // Clones during inlining all become unique new call sites.  The original RPC
   // splits into 2, and the two new children RPCs replace it entirely.  The
   // original RPC may exist in the type system for a little while, until the
@@ -184,9 +198,8 @@ public class CallNode extends Node {
       }
     }
     // Have some sane function choices?
-    Type tfp  = tcall.at(2);
-    if( !(tfp instanceof TypeFunPtr) ) return null;
-    BitsFun fidxs = ((TypeFunPtr)tfp).fidxs();
+    TypeFunPtr tfp  = ttfp(tcall);
+    BitsFun fidxs = tfp.fidxs();
     if( fidxs==BitsFun.EMPTY ) // TODO: zap function to empty function constant
       return null;             // Zero choices
 
@@ -241,7 +254,7 @@ public class CallNode extends Node {
     // ts[2] = Function pointer (code ptr + display) == in(2) == arg(0)
     // ts[3] = in(3) == arg(1)
     // ts[4]...
-    final Type[] ts = TypeAry.get(_defs._len);
+    final Type[] ts = TypeAry.get(_defs._len+(MEMIDX-1));
 
     // Pinch to XCTRL/CTRL
     Type ctl = gvn.type(ctl());
@@ -252,11 +265,11 @@ public class CallNode extends Node {
     // Not a memory to the call?
     Type mem = gvn.type(mem());
     if( !(mem instanceof TypeMem) ) return mem.oob();
-    ts[1]=mem;
+    ts[MEMIDX]=mem;
 
     // Copy args for called functions.  Arg0 is display, handled below.
     for( int i=0; i<nargs(); i++ )
-      ts[i+2] = gvn.type(arg(i));
+      ts[i+ARGIDX] = gvn.type(arg(i));
 
     // Not a function to call?
     Type tfx = gvn.type(fun());
@@ -270,9 +283,9 @@ public class CallNode extends Node {
     BitsFun rfidxs = resolve(fidxs,ts);
     if( rfidxs==null ) return gvn.self_type(this); // Dead function input, stall until this dies
     // Call.ts[2] is a TFP just for the resolved fidxs and display.
-    ts[2] = TypeFunPtr.make(rfidxs,tfp._nargs,rfidxs.above_center() == fidxs.above_center() ? tfp._disp : tfp._disp.dual());
-
-    return TypeTuple.make(ts);
+    ts[ARGIDX] = TypeFunPtr.make(rfidxs,tfp._nargs,rfidxs.above_center() == fidxs.above_center() ? tfp._disp : tfp._disp.dual());
+    TypeTuple rez = TypeTuple.make(ts);
+    return rez;
   }
 
   // Compute live across uses.  If pre-GCP, then we may not be wired and thus
@@ -304,12 +317,11 @@ public class CallNode extends Node {
     return live_use_call(gvn,dfidx);
   }
   TypeMem live_use_call( GVNGCM gvn, int dfidx ) {
-    Type tfx = gvn.type(this);
-    if( !(tfx instanceof TypeTuple) ) return tfx.above_center() ? TypeMem.DEAD : _live;
-    Type tfp = ((TypeTuple)tfx).at(2);
+    Type tcall = gvn.type(this);
+    if( !(tcall instanceof TypeTuple) ) return tcall.above_center() ? TypeMem.DEAD : _live;
+    TypeFunPtr tfp = ttfp(tcall);
     // If resolve has chosen this dfidx, then the FunPtr is alive.
-    if( !(tfp instanceof TypeFunPtr) ) return TypeMem.DEAD;
-    BitsFun fidxs = ((TypeFunPtr)tfp).fidxs();
+    BitsFun fidxs = tfp.fidxs();
     return !fidxs.above_center() && fidxs.test_recur(dfidx) ? _live : TypeMem.DEAD;
   }
 
@@ -388,7 +400,7 @@ public class CallNode extends Node {
     if( BitsFun.is_parent(fidx) )
       return 0; // Parent is never a real choice.  See these during inlining.
 
-    TypeMem tmem = (TypeMem)targs[1]; // Call Memory
+    TypeMem tmem = tmem(targs); // Call Memory
     FunNode fun = FunNode.find_fidx(fidx);
     if( fun==null || fun.is_dead() ) return DEAD; // Stale fidx leading to dead fun
     // Forward refs are only during parsing; assume they fit the bill
@@ -409,7 +421,7 @@ public class CallNode extends Node {
     for( int j=0; j<nargs(); j++ ) {
       Type formal = formals.at(j);
       if( fun.parm(j)==null ) continue;     // Arg is ignored
-      Type actual = targs[j+2];             // Calls skip ctrl & mem
+      Type actual = targ(targs,j);          // Calls skip ctrl & mem
       if( j==0 && actual instanceof TypeFunPtr )
         actual = ((TypeFunPtr)actual)._disp; // Extract Display type from TFP
       assert actual==actual.simple_ptr();    // Only simple ptrs from nodes
@@ -488,11 +500,9 @@ public class CallNode extends Node {
 
   // Called from GCP, using the optimistic type.
   public void check_wire( GVNGCM gvn) {
-    TypeTuple tcall = (TypeTuple)gvn.type(this);
-    if( tcall.at(0) != Type.CTRL ) return;
-    Type tfp  = tcall.at(2);
-    if( !(tfp instanceof TypeFunPtr) ) return;
-    BitsFun fidxs = ((TypeFunPtr)tfp).fidxs();
+    Type tcall = gvn.type(this);
+    if( tctl(tcall) != Type.CTRL ) return;
+    BitsFun fidxs = ttfp(tcall).fidxs();
     check_wire(gvn, fidxs);
   }
 
@@ -587,6 +597,8 @@ public class CallNode extends Node {
     return _rpc==call._rpc;
   }
   boolean is_copy() { return _is_copy; }
-  @Override public Node is_copy(GVNGCM gvn, int idx) { return _is_copy  ? in(idx) : null; }
+  @Override public Node is_copy(GVNGCM gvn, int idx) {
+    return _is_copy  ? in(idx<=MEMIDX ? idx : idx-(MEMIDX-1)) : null;
+  }
   @Override Node is_pure_call() { return fun().is_pure_call()==null ? null : mem(); }
 }

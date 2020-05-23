@@ -149,8 +149,8 @@ public class StoreNode extends Node {
     final Node fpctrl = pctrl;
     if( call.walk_dom_last(n -> n==fpctrl) == null ) return null;
 
-    TypeTuple tcall = (TypeTuple)gvn.type(call);
-    TypeMem tcm = (TypeMem)tcall.at(1);
+    Type tcall = gvn.type(call);
+    TypeMem tcm = CallNode.tmem(tcall);
     Node pre_call_mem = call.mem();
     if( tcm.at(alias).above_center() ) // Call does not produce the memory
       return pre_call_mem;

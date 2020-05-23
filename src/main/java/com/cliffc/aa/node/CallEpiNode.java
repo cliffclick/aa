@@ -37,10 +37,9 @@ public final class CallEpiNode extends Node {
     Type tc = gvn.type(call);
     if( !(tc instanceof TypeTuple) ) return null;
     TypeTuple tcall = (TypeTuple)tc;
-    if( tcall.at(0) != Type.CTRL ) return null; // Call not executable
+    if( CallNode.tctl(tcall) != Type.CTRL ) return null; // Call not executable
     // Get calls resolved function.
-    if( !(tcall.at(2) instanceof TypeFunPtr) ) return null; // No known function pointer
-    BitsFun fidxs = ((TypeFunPtr)tcall.at(2)).fidxs();
+    BitsFun fidxs = CallNode.ttfp(tcall).fidxs();
 
     // If the call's allowed functions excludes any wired, remove the extras
     if( !fidxs.test(BitsFun.ALL) ) { // Shortcut
@@ -62,7 +61,7 @@ public final class CallEpiNode extends Node {
     // See if we can flow more wired CG edges.
     if( _cg_wired != fidxs ) {
       //TODO: Surely must be in value() so GCP wires
-      TypeMem callmem = (TypeMem)tcall._ts[1];
+      TypeMem callmem = CallNode.tmem(tcall);
       Type tci = gvn.type(this);
       if( !(tci instanceof TypeTuple ) ) return null;
       TypeMem cepimem = (TypeMem)((TypeTuple)tci)._ts[1];
@@ -243,10 +242,10 @@ public final class CallEpiNode extends Node {
       switch( idx ) {
       case  0: actual = new FP2ClosureNode(call); break; // Filter Function Pointer to Closure
       case -1: actual = new ConNode<>(TypeRPC.make(call._rpc)); break; // Always RPC is a constant
-      case -2: actual = new MProjNode(call,1); break;    // Memory
+      case -2: actual = new MProjNode(call,CallNode.MEMIDX); break;    // Memory
       default: actual = idx >= call.nargs()              // Check for args present
           ? new ConNode<>(Type.XSCALAR) // Missing args, still wire (to keep FunNode neighbors) but will error out later.
-          : new ProjNode(call,idx+2);   // Normal args
+          : new ProjNode(call,idx+CallNode.ARGIDX); // Normal args
         break;
       }
       actual = gvn._opt_mode == 2 ? gvn.new_gcp(actual) : gvn.xform(actual);
@@ -284,16 +283,14 @@ public final class CallEpiNode extends Node {
     // tcall[1] = Memory passed into the functions.
     // tcall[2] = TypeFunPtr passed to FP2Closure
     // tcall[3+]= Arg types
-    Type ctl = tcall.at(0); // Call is reached or not?
+    Type ctl = CallNode.tctl(tcall); // Call is reached or not?
     if( ctl != Type.CTRL && ctl != Type.ALL )
       return TypeTuple.CALLE.dual();
 
-    Type tmem = tcall.at(1);
-    Type tfptr = tcall.at(2);
-    if( !(tfptr instanceof TypeFunPtr) ) // Call does not know what it is calling?
-      return TypeTuple.CALLE;
+    TypeMem tmem = CallNode.tmem(tcall);
+    TypeFunPtr tfptr = CallNode.ttfp(tcall);
 
-    BitsFun fidxs = ((TypeFunPtr)tfptr).fidxs();
+    BitsFun fidxs = tfptr.fidxs();
     if( tfptr.is_forward_ref() ) return TypeTuple.CALLE; // Still in the parser.
     // NO fidxs, means we're not calling anything.
     if( fidxs==BitsFun.EMPTY ) return TypeTuple.CALLE.dual();
@@ -397,10 +394,9 @@ public final class CallEpiNode extends Node {
     // If is_copy, then basically acting like pass-thru.
     if( !is_copy() && def != call() ) { // Not a copy, check call site
       // The given function is alive, only if the Call will Call it.
-      Type tfx = gvn.type(call());
-      if( !(tfx instanceof TypeTuple) ) return tfx.above_center() ? TypeMem.DEAD : _live;
-      TypeTuple tcall = (TypeTuple)tfx;
-      BitsFun fidxs = ((TypeFunPtr)tcall.at(2)).fidxs();
+      Type tcall = gvn.type(call());
+      if( !(tcall instanceof TypeTuple) ) return tcall.above_center() ? TypeMem.DEAD : _live;
+      BitsFun fidxs = CallNode.ttfp(tcall).fidxs();
       int fidx = ((RetNode)def).fidx();
       if( fidxs.above_center() || !fidxs.test(fidx) )
         return TypeMem.DEAD;    // Call does not call this, so not alive.

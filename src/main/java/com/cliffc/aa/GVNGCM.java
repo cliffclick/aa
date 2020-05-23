@@ -112,6 +112,7 @@ public class GVNGCM {
     con._live = TypeMem.EMPTY;  // Alive, but demands no memory
     setype(con,t);
     _vals.put(con,con);
+    add_work(con);
     return con;
   }
 
@@ -538,8 +539,7 @@ public class GVNGCM {
         if( n instanceof CallNode && n._live != TypeMem.DEAD ) {
           CallNode call = (CallNode)n;
           if( type(call.ctl()) == Type.CTRL && type(call) instanceof TypeTuple ) { // Wait until the Call is reachable
-            TypeFunPtr tfp = (TypeFunPtr) ((TypeTuple) type(call)).at(2);
-            BitsFun fidxs = tfp.fidxs();
+            BitsFun fidxs = CallNode.ttfp(type(call)).fidxs();
             if( fidxs.above_center() && fidxs.abit() == -1 && ambi_calls.find(call) == -1 )
               ambi_calls.add(call); // Track ambiguous calls
           }
@@ -551,8 +551,7 @@ public class GVNGCM {
       // Remove CallNode ambiguity after worklist runs dry
       while( !ambi_calls.isEmpty() ) {
         CallNode call = ambi_calls.pop();
-        TypeFunPtr tfp = (TypeFunPtr)((TypeTuple)type(call)).at(2);
-        BitsFun fidxs = tfp.fidxs();
+        BitsFun fidxs = CallNode.ttfp(type(call)).fidxs();
         if( fidxs.abit() != -1    ) continue; // resolved to one
         if( !fidxs.above_center() ) continue; // resolved to many
         if( fidxs==BitsFun.ANY )    continue; // no choices, must be error

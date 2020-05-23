@@ -9,7 +9,7 @@ import java.util.Arrays;
 public class TypeAry {
   // Lazy expanding list of TypeAry customed to handle various Type[] lengths.
   private static final Ary<TypeAry> TYPEARY = new Ary<>(new TypeAry[1],0);
-  private static Key K = new Key(null,0);
+  private static final Key K = new Key(null,0);
 
   // Wrapper to customize array.equals
   private static class Key {
@@ -36,7 +36,7 @@ public class TypeAry {
 
   private final int _len;       // Length of arrays being handled
   private final IHashMap _intern = new IHashMap();
-  private Ary<Type[]> _free = new Ary<>(new Type[1][],0);
+  private final Ary<Type[]> _free = new Ary<>(new Type[1][],0);
   private TypeAry( int len ) { _len=len; }
 
   // Make a TypeAry to handle Type[] of length 'len'
@@ -82,27 +82,27 @@ public class TypeAry {
   public static void free(Type[] ts) { tary(ts.length)._free.push(ts); }
   public static Type[] hash_cons(Type[] ts) { return tary(ts.length).check().hash_cons_(ts); }
   public static Type[] ts(Type t0) {
-    TypeAry t1 = tary(1).check(); 
+    TypeAry t1 = tary(1).check();
     Type[] ts = t1.get();
     ts[0] = t0;
     return ts;
   }
   public static Type[] ts(Type t0, Type t1) {
-    TypeAry t2 = tary(2).check(); 
+    TypeAry t2 = tary(2).check();
     Type[] ts = t2.get();
     ts[0] = t0;
     ts[1] = t1;
     return ts;
   }
   public static Type[] ts(Type t0, Type t1, Type t2) {
-    TypeAry t3 = tary(3).check(); 
+    TypeAry t3 = tary(3).check();
     Type[] ts = t3.get();
     ts[0] = t0;
     ts[1] = t1;
     ts[2] = t2;
     return ts;
   }
-  
+
   // Result not interned; suitable for direct hacking.
   // Original assumed in-use, not freed.
   public static Type[] clone(Type[] ts) {

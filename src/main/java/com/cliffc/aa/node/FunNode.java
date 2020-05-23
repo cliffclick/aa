@@ -434,9 +434,8 @@ public class FunNode extends RegionNode {
       Node call = in(i).in(0);
       if( !(call instanceof CallNode) ) continue; // Not well formed
       if( ((CallNode)call).nargs() != nargs() ) continue; // Will not inline
-      Type fidxs = ((TypeTuple)gvn.type(call)).at(2);
-      if( !(fidxs instanceof TypeFunPtr) ) continue;
-      int fidx = ((TypeFunPtr)fidxs).fidxs().abit();
+      TypeFunPtr tfp = CallNode.ttfp(gvn.type(call));
+      int fidx = tfp.fidxs().abit();
       if( fidx < 0 ) continue;  // Call must only target one fcn
       if( !((CallNode)call).cepi().cg_tst(fidx) ) // CG edge must have been turned on already
         continue;               // Probably bad-args; not a candidate for a private split
@@ -614,7 +613,7 @@ public class FunNode extends RegionNode {
     if( path >= 0 ) {            // Path split
       path_call.set_fun_reg(new_funptr, gvn); // Force new_funptr, will re-wire later
       TypeTuple tt = (TypeTuple)gvn.type(path_call);
-      gvn.setype(path_call, tt.set(2,nfptr));
+      gvn.setype(path_call, CallNode.set_ttfp(tt,nfptr));
     }
 
     // Rewire all unwired calls.
