@@ -181,7 +181,7 @@ public class TestNodeSmall {
     // Equals check after computing them all
     for( int i=0; i<argss.length; i++ ) {
       TypeFunPtr expect = (TypeFunPtr)argss[i].at(ins.length);
-      TypeFunPtr actual = (TypeFunPtr)tns[i].at(2); // Looking at the TFP from the Call, ignore ctrl,memory,args
+      TypeFunPtr actual = CallNode.ttfp(tns[i]); // Looking at the TFP from the Call, ignore ctrl,memory,args
       assertEquals(expect.fidxs(),actual.fidxs());
     }
     return tns;
@@ -406,7 +406,7 @@ public class TestNodeSmall {
     NewObjNode dsp_file = (NewObjNode)gvn.xform(new NewObjNode(true,TypeStruct.DISPLAY,ctl,dsp_prims));
     OProjNode dsp_file_obj = (OProjNode)gvn.xform(new OProjNode(dsp_file,0));
     ProjNode  dsp_file_ptr = ( ProjNode)gvn.xform(new  ProjNode(dsp_file,1));
-    Env.DISPLAYS.set(dsp_file._alias);
+    Env.DISPLAYS = Env.DISPLAYS.set(dsp_file._alias);
     MemMergeNode dsp_merge = (MemMergeNode)gvn.xform(new MemMergeNode(mem,dsp_file_obj,dsp_file._alias));
     // The Fun and Fun._tf:
     TypeStruct formals = TypeStruct.make_args(TypeAry.ts(gvn.type(dsp_file_ptr), // File-scope display as arg0

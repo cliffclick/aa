@@ -109,20 +109,18 @@ public class ScopeNode extends Node {
   static TypeMem compute_live_mem(GVNGCM gvn, Node mem, Node rez) {
     Type tmem = gvn.type(mem);
     Type trez = gvn.type(rez);
-    if( !(tmem instanceof TypeMem ) ) return tmem.above_center() ? TypeMem.UNUSED : TypeMem.ISUSED; // Not a memory, all alive
+    if( !(tmem instanceof TypeMem ) ) return tmem.above_center() ? TypeMem.ANYMEM : TypeMem.ALLMEM; // Not a memory?
     if( TypeMemPtr.OOP.isa(trez) ) return (TypeMem)tmem; // All possible pointers, so all memory is alive
-    if( !(trez instanceof TypeMemPtr) ) return TypeMem.UNUSED; // Not a pointer, basic live only
-    if( trez.above_center() ) return TypeMem.UNUSED; // Have infinite choices still, report basic live only
+    if( !(trez instanceof TypeMemPtr) ) return TypeMem.ANYMEM; // Not a pointer, basic live only
+    if( trez.above_center() ) return TypeMem.ANYMEM; // Have infinite choices still, report basic live only
     // Find everything reachable from the pointer and memory, and report it all
-    TypeMem live2 = ((TypeMem)tmem).slice_all_aliases_plus_children(((TypeMemPtr)trez)._aliases);
-    if( live2==TypeMem.DEAD ) return TypeMem.UNUSED; // Minimal liveness
-    return live2;
+    return ((TypeMem)tmem).slice_all_aliases_plus_children(((TypeMemPtr)trez)._aliases);
   }
   @Override public TypeMem live( GVNGCM gvn) {
     // The top scope is always alive, and represents what all future unparsed
     // code MIGHT do.
     if( this==Env.SCP_0 )
-      return gvn._opt_mode < 2 ? TypeMem.ISUSED : TypeMem.DEAD;
+      return gvn._opt_mode < 2 ? TypeMem.ALLMEM : TypeMem.DEAD;
     assert _uses._len==0;
     // All fields in all reachable pointers from rez() will be marked live
     return compute_live_mem(gvn,mem(),rez());
@@ -132,14 +130,13 @@ public class ScopeNode extends Node {
     // The top scope is always alive, and represents what all future unparsed
     // code MIGHT do.
     if( this==Env.SCP_0 )
-      return gvn._opt_mode < 2 ? TypeMem.ISUSED : TypeMem.DEAD;
+      return gvn._opt_mode < 2 ? TypeMem.ALLMEM : TypeMem.DEAD;
     // Basic liveness ("You are Alive!") for control and returned value
-    if( def == ctrl() ) return TypeMem.EMPTY;
-    if( def == rez () ) return TypeMem.EMPTY;
+    if( def == ctrl() ) return TypeMem.ANYMEM;
+    if( def == rez () ) return TypeMem.ANYMEM;
     // Memory returns the compute_live_mem state in _live.  If rez() is a
     // pointer, this will include the memory slice.
     assert def == mem();
-    if( _live==TypeMem.EMPTY ) return TypeMem.DEAD;  // Contains only basic liveness, hence not a pointer, hence no memory
     return _live;
   }
   @Override public boolean basic_liveness() { return false; }

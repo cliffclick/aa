@@ -253,19 +253,18 @@ public class TypeMem extends Type<TypeMem> {
   public static final TypeMem EMPTY;// Every alias filled with anything
   public static final TypeMem  MEM; // FULL, except lifts REC, arrays, STR
   public static final TypeMem XMEM; //
-  public static final TypeMem DEAD; // Sentinel for liveness flow; top of lattice
-  public static final TypeMem UNUSED,ISUSED; // Every alias is unused
+  public static final TypeMem DEAD; // Sentinel for liveness flow; not part of lattice
+  public static final TypeMem ANYMEM,ALLMEM; // Every alias is unused (so above XOBJ or below OBJ)
   public static final TypeMem MEM_ABC, MEM_STR;
   static {
     // Every alias is unused
-    UNUSED = make(new TypeObj[]{null,TypeObj.UNUSED});
-    ISUSED = UNUSED.dual();
+    ANYMEM = make(new TypeObj[]{null,TypeObj.UNUSED});
+    ALLMEM = ANYMEM.dual();
     // All memory, all aliases, holding anything.
     FULL = make(new TypeObj[]{null,TypeObj.OBJ});
     EMPTY= FULL.dual();
 
-
-    // Sentinel for liveness flow; top of lattice
+    // Sentinel for liveness flow; not part of lattice
     DEAD = make(new TypeObj[1]);
 
     // All memory.  Includes breakouts for all structs and all strings.
@@ -282,7 +281,7 @@ public class TypeMem extends Type<TypeMem> {
     MEM_STR = make(BitsAlias.STR,TypeStr.STR);
     MEM_ABC = make(BitsAlias.ABC,TypeStr.ABC);
   }
-  static final TypeMem[] TYPES = new TypeMem[]{FULL,MEM,MEM_ABC};
+  static final TypeMem[] TYPES = new TypeMem[]{FULL,MEM,MEM_ABC,ANYMEM};
 
   // All mapped memories remain, but each memory flips internally.
   @Override protected TypeMem xdual() {
@@ -295,7 +294,7 @@ public class TypeMem extends Type<TypeMem> {
   @Override protected Type xmeet( Type t ) {
     if( t._type != TMEM ) return ALL; //
     TypeMem tf = (TypeMem)t;
-    // Shortcut common case
+    // Sentinel only, not part of lattice.  Not symmetric, but we allow this shortcut here
     if( this==DEAD ) return t;
     if( tf  ==DEAD ) return this;
     // Meet of default values, meet of element-by-element.
@@ -342,11 +341,22 @@ public class TypeMem extends Type<TypeMem> {
 
   // Whole object Set at an alias.
   public TypeMem set( int alias, TypeObj obj ) {
+    if( at(alias)==obj ) return this; // Shortcut
     int max = Math.max(_aliases.length,alias+1);
     TypeObj[] tos = Arrays.copyOf(_aliases,max);
     tos[alias] = obj;
     return TypeMem.make0(tos);
   }
+
+  // This-isa-mem only on the given aliases
+  public boolean isa_escape( TypeMem mem, BitsAlias escapes ) {
+    for( int alias : escapes )
+      if( alias > 0 )
+        if( !at(alias).isa(mem.at(alias)) )
+          return false;
+    return true;
+  }
+
 
   // Support for SESE flow optimizations.  Mark all memory as being clean (not
   // modified in this function).  Recursive.
@@ -380,6 +390,6 @@ public class TypeMem extends Type<TypeMem> {
   @Override Type not_nil() { return this; }
 
   // For node liveness, anything alive means the node is alive
-  public boolean is_live() { return this!=TypeMem.DEAD; }
+  public boolean is_live() { return this!=DEAD; }
 
 }

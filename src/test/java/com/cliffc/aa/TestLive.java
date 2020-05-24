@@ -24,7 +24,7 @@ public class TestLive {
 
     // Check liveness base case
     scope._live = scope.live(gvn);
-    assertEquals(scope._live,TypeMem.UNUSED);
+    assertEquals(scope._live,TypeMem.ANYMEM);
 
     // Check liveness recursive back one step
     rez._live = rez.live(gvn);
@@ -60,7 +60,7 @@ public class TestLive {
     gvn.setype(ptr,ptr.value(gvn));
 
     // Starting full memory
-    TypeMem tmem = TypeMem.ISUSED.set(nnn._alias,(TypeObj)gvn.type(mem));
+    TypeMem tmem = TypeMem.ALLMEM.set(nnn._alias,(TypeObj)gvn.type(mem));
     Node fullmem = new ConNode<>(tmem);
     gvn.setype(fullmem,tmem);
 

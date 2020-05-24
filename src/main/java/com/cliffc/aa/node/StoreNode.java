@@ -73,14 +73,14 @@ public class StoreNode extends Node {
     return null;
   }
 
-  @Override public Type value(GVNGCM gvn) {
+  // StoreNode needs to return a TypeObj for the Parser.
+  @Override public TypeObj value(GVNGCM gvn) {
     Type adr = gvn.type(adr());
-    if( !(adr instanceof TypeMemPtr) ) return adr.oob();
+    if( !(adr instanceof TypeMemPtr) ) return adr.oob(TypeStruct.ALLSTRUCT);
     TypeMemPtr tmp = (TypeMemPtr)adr;
-    // Value is sane
-    Type val = val() instanceof ErrNode ? Type.SCALAR : gvn.type(val()); // Value
-    if( !val.isa_scalar() )         // Nothing sane
-      return val.oob();
+    Type val = gvn.type(val());   // Value
+    if( !val.isa_scalar() )       // Nothing sane
+      val = val.oob(Type.SCALAR); // Pin to scalar for updates
 
     // Store can bypass a Call, if the memory is not returned from the call.
     // This optimization is specifically targeting simple recursive functions.
@@ -106,13 +106,13 @@ public class StoreNode extends Node {
     else if( tmem instanceof TypeObj )
       tobj = (TypeObj)tmem;   // Object being updated
     else                      // Else dunno what is being updated
-      return tmem.above_center() ? TypeStruct.ANYSTRUCT : TypeStruct.ALLSTRUCT;
+      return tmem.oob(TypeStruct.ALLSTRUCT);
 
     // Not updating a struct?
     if( !(tobj instanceof TypeStruct) )
       // Updating XOBJ means updating any choice, and we choose no-change.
       // Updating  OBJ means we're already as low as we can go.
-      return tobj.above_center() ? TypeStruct.ANYSTRUCT : TypeStruct.ALLSTRUCT;
+      return tobj.oob(TypeStruct.ALLSTRUCT);
 
     // Update the field.  Illegal updates make no changes (except clear 'clean' bit).
     TypeStruct ts = (TypeStruct)tobj;
@@ -181,7 +181,8 @@ public class StoreNode extends Node {
   }
   private String err0(GVNGCM gvn) {
     Type t = gvn.type(adr());
-    if( t.may_nil() ) return "Struct might be nil when writing '";
+    if( t.must_nil() ) return "Struct might be nil when writing '";
+    if( t==Type.ANY ) return null;
     if( !(t instanceof TypeMemPtr) ) return "Unknown"; // Too low, might not have any fields
     Type mem = gvn.type(mem());
     if( mem == Type.ANY ) return null;

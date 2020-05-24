@@ -288,10 +288,14 @@ public class MemMergeNode extends Node {
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
     if( _live==TypeMem.DEAD ) return TypeMem.DEAD;
     if( in(0)==def ) return _live; // Pass thru all requests.
-    // Pass thru just the alias slice in question
-    int alias = alias_at(_defs.find(def));
-    TypeObj obj = _live.at(alias);
-    return obj==TypeObj.XOBJ || obj==TypeObj.UNUSED ? TypeMem.DEAD : TypeMem.make(alias, obj);
+    // Pass thru just the alias slice in question - which might appear more than once
+    TypeMem rez = TypeMem.ANYMEM;
+    for( int i=1; i<_defs._len; i++ )
+      if( in(i)==def ) {
+        int alias = alias_at(i);
+        rez = rez.set(alias,_live.at(alias));
+      }
+    return rez;
   }
   @Override public boolean basic_liveness() { return false; }
 

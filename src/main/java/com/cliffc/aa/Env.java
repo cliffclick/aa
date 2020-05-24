@@ -14,8 +14,8 @@ public class Env implements AutoCloseable {
   public static    ScopeNode SCP_0; // Program start scope
   public static   DefMemNode DEFMEM;// Default memory (all structure types)
   public static      ConNode ALL_CTRL; // Default control
-  // Set of display aliases, used for assertions
-  public final static BitSet DISPLAYS = new BitSet();
+  // Set of display aliases, used to track escaped displays at call sites
+  public static BitsAlias DISPLAYS = BitsAlias.EMPTY;
 
 
   final Env _par;                // Parent environment
@@ -43,7 +43,7 @@ public class Env implements AutoCloseable {
     NewObjNode nnn = (NewObjNode)GVN.xform(new NewObjNode(is_closure,tdisp,ctl,clo).keep());
     Node frm = DEFMEM.make_mem_proj(GVN,nnn);
     Node ptr = GVN.xform(new ProjNode(nnn,1));
-    DISPLAYS.set(nnn._alias);   // Displays for all time
+    DISPLAYS = DISPLAYS.set(nnn._alias);   // Displays for all time
     MemMergeNode mmem = new MemMergeNode(mem,frm,nnn.<NewObjNode>unhook()._alias);
     ScopeNode scope = new ScopeNode(errmsg,is_closure);
     scope.set_ctrl(ctl,GVN);
@@ -162,7 +162,7 @@ public class Env implements AutoCloseable {
     FunNode   .reset();
     IntrinsicNewNode.reset();
     PrimNode  .reset();
-    DISPLAYS  .clear(); // Reset aliases declared as Displays; strictly used for assertions
+    DISPLAYS = BitsAlias.EMPTY; // Reset aliases declared as Displays
   }
 
   // Return Scope for a name, so can be used to determine e.g. mutability

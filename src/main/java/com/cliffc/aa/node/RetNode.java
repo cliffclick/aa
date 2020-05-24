@@ -78,7 +78,7 @@ public final class RetNode extends Node {
 
 
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
-    return def == mem() ? _live : TypeMem.UNUSED; // Basic liveness for non-memory defs
+    return def == mem() ? _live : TypeMem.ANYMEM; // Basic liveness for non-memory defs
   }
   @Override public boolean basic_liveness() { return false; }
 

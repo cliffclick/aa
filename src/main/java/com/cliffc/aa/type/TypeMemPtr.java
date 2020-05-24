@@ -103,7 +103,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     if( x==BitsAlias.EMPTY ) return true; // Just a NIL
     int alias = x.abit();                 // Just a single alias
     // The GENERIC function allows the generic record, otherwise must be on the display list
-    return alias!= -1 && (Math.abs(alias)==BitsAlias.RECORD || com.cliffc.aa.Env.DISPLAYS.get(Math.abs(alias)));
+    return alias!= -1 && (Math.abs(alias)==BitsAlias.RECORD || com.cliffc.aa.Env.DISPLAYS.test(Math.abs(alias)));
   }
 
   @Override protected TypeMemPtr xdual() {
@@ -239,7 +239,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   public int getbit() { return _aliases.getbit(); }
   // Sharpen a TypeMemPtr with a TypeMem
   @Override public Type sharpen( Type tmem ) {
-    TypeMem tmem2 = (TypeMem)tmem.bound(TypeMem.ISUSED);
+    TypeMem tmem2 = (TypeMem)tmem.bound(TypeMem.ALLMEM);
     assert this==simple_ptr();
     return make(_aliases,tmem2.ld_deep(this));
   }

@@ -121,7 +121,7 @@ public class LoadNode extends Node {
       }
       // No such field
     }
-    return tmem.above_center() ? Type.XSCALAR : Type.SCALAR; // No loading from e.g. Strings
+    return tmem.oob(Type.SCALAR); // No loading from e.g. Strings
   }
 
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
@@ -131,7 +131,7 @@ public class LoadNode extends Node {
     // If either is above-center, then only basic-liveness - the load can load
     // from anything getting anything.
     if( tmem.above_center() || tptr.above_center() )
-      return _live==TypeMem.DEAD ? TypeMem.DEAD : (mem()==def ? TypeMem.UNUSED : TypeMem.EMPTY);
+      return TypeMem.ANYMEM;
     // TypeObj memory is already alias-constricted.  Can only demand from that alias.
     if( tmem instanceof TypeObj && tptr instanceof TypeMemPtr )
       return TypeMem.make(((TypeMemPtr)tptr)._aliases,(TypeObj)tmem);

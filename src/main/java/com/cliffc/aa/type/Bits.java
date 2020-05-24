@@ -266,7 +266,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   private static void or ( long[] bits, long con ) { bits[idx(con)] |=  mask(con); }
   private static void and( long[] bits, long con ) { bits[idx(con)] &= ~mask(con); }
   private static long[] bits( int b ) { return new long[idx(b)+1]; }
-  int max( ) {
+  public int max( ) {
     return _bits==null ? Math.abs(_con) : (63 - Long.numberOfLeadingZeros(_bits[_bits.length-1]))+((_bits.length-1)<<6);
   }
 

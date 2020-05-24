@@ -12,7 +12,7 @@ public class StartMemNode extends Node {
     // All memories are XOBJ, unless UNUSED in the default memory.
     Type defmem = gvn.type(Env.DEFMEM);
     if( !(defmem instanceof TypeMem) ) return defmem.oob();
-    if( defmem == TypeMem.UNUSED ) return TypeMem.UNUSED; // Shortcut
+    if( defmem == TypeMem.ANYMEM ) return TypeMem.ANYMEM; // Shortcut
     TypeObj[] objs = ((TypeMem)defmem).alias2objs().clone();
     for( int i=1; i<objs.length; i++ )
       if( objs[i]!=null && objs[i]!=TypeObj.UNUSED )

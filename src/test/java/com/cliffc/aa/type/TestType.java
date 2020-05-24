@@ -512,12 +512,12 @@ public class TestType {
 
     // All are ISA
     TypeMem[] tmems = new TypeMem[]{
-      TypeMem.UNUSED,
+      TypeMem.ANYMEM,
       TypeMem.MEM_ABC,            // [1:~obj,5:"abc"]
       TypeMem.MEM.dual(),         // [1:~obj,2:~(),3:~str,5:"abc"]
       TypeMem.MEM,
       TypeMem.MEM_ABC.dual(),     // [1: obj,5:"abc"]
-      TypeMem.ISUSED,
+      TypeMem.ALLMEM,
     };
     for( int j=0; j<tmems.length-1; j++ )
       assertTrue(tmems[j].isa(tmems[j+1]));

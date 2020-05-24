@@ -84,10 +84,10 @@ public final class CallEpiNode extends Node {
         }
         // Same for the reverse path from Return to CallEpi; the CallEpi must
         // merge all returns and also is conservative, so it must remain
-        // at or below the returns.
+        // at or below the returns, but only along the escaped aliases.
         RetNode ret = fun.ret();
         TypeMem retmem = (TypeMem)((TypeTuple)gvn.type(ret ))._ts[1];
-        if( !retmem.isa(cepimem) )
+        if( !retmem.isa_escape(cepimem,CallNode.tals(tcall).aliases()) )
           continue;
         cg_set(fidx);           // Set bit, wired and flowing types
       }
@@ -242,7 +242,7 @@ public final class CallEpiNode extends Node {
       switch( idx ) {
       case  0: actual = new FP2ClosureNode(call); break; // Filter Function Pointer to Closure
       case -1: actual = new ConNode<>(TypeRPC.make(call._rpc)); break; // Always RPC is a constant
-      case -2: actual = new MProjNode(call,CallNode.MEMIDX); break;    // Memory
+      case -2: actual = new MProjNode(call,CallNode.MEMIDX); break;    // Memory into the callee
       default: actual = idx >= call.nargs()              // Check for args present
           ? new ConNode<>(Type.XSCALAR) // Missing args, still wire (to keep FunNode neighbors) but will error out later.
           : new ProjNode(call,idx+CallNode.ARGIDX); // Normal args
@@ -269,7 +269,7 @@ public final class CallEpiNode extends Node {
     // are an inlined XallEpi and make a call-like tuple directly from our
     // inputs.
     if( !(tin0 instanceof TypeTuple) ||
-        (tcall=(TypeTuple)tin0)._ts.length < 3 ) { // Must be inlined
+        (tcall=(TypeTuple)tin0)._ts.length <= CallNode.ARGIDX ) { // Must be inlined
       if( tin0!=Type.CTRL ) return tin0.oob();     // Weird stuff?
       // Must be an is_copy.  Just return the arg types.
       return TypeTuple.make(Type.CTRL,gvn.type(in(1)),gvn.type(in(2)));
@@ -305,12 +305,26 @@ public final class CallEpiNode extends Node {
       return self==null || self==Type.ALL ? TypeTuple.CALLE : self;
     }
 
+    // Take Call reach-around aliases, and stomp/merge-over from pre-call
+    // memory.  These never made it into the function, and were not modified
+    // (or even visible).
+    BitsAlias escapes = CallNode.tals(tcall).aliases();
+    int emax = Math.max(Math.max(escapes.max()+1,post_call_mem.len()),tmem.len());
+    for( int escape=2; escape<emax; escape++ ) {
+      if( !escapes.test(escape) ) { // A non-escaping alias
+        Type tesc = tmem.at(escape);// The pre-call value
+        if( post_call_mem.at(escape) != tesc &&
+            tesc!=TypeObj.XOBJ ) // And pre-call HAS a value, other might be made IN the function & escaping out
+          post_call_mem = post_call_mem.set(escape,tmem.at(escape));
+      }
+    }
+
     // Crush all the non-finals across the call
     TypeTuple post_call_crush = TypeTuple.make(Type.CTRL,post_call_mem,Type.SCALAR);
     TypeTuple mt = post_call_crush;
 
     // Are all call targets known, wired & enabled?
-    // Then can lift to the meet-across.
+    // Then can lift to the meet-across of returns.
     if( fidxs.isa(_cg_wired) ) {
       TypeTuple tret = TypeTuple.XRET;    // Start high and 'meet'
       for( int i=0; i<nwired(); i++ ) {

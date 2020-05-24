@@ -214,6 +214,7 @@ public class TestNode {
     Type rez0 = test1jig(new CallEpiNode(_ins[0],Env.DEFMEM,_ins[2]), TypeTuple.TEST0,TypeTuple.RET, Type.ANY, Type.ANY);
 
     // All the Nodes, all Values, all Types
+    
     test1monotonic(new   CallNode(false,null,_ins[0],  unr  ,mem,_ins[2],_ins[3]));
     test1monotonic(new   CallNode(false,null,_ins[0],_ins[1],mem,_ins[2],_ins[3]));
     test1monotonic(new CallEpiNode(_ins[0],Env.DEFMEM,_ins[2])); // CallNode, then some count of RetNode, not flowing
@@ -262,7 +263,7 @@ public class TestNode {
     test1monotonic(new   TypeNode(_ins[1],_ins[2],TypeFlt.FLT64    ,null));
     _gvn._opt_mode=1;  test1monotonic(new UnresolvedNode(null,_ins[1],_ins[2]));  _gvn._opt_mode=0;
     _gvn._opt_mode=2;  test1monotonic(new UnresolvedNode(null,_ins[1],_ins[2]));  _gvn._opt_mode=0;
-
+    
     assertEquals(0,_errs);
   }
 

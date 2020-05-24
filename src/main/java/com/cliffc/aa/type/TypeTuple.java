@@ -88,12 +88,12 @@ public class TypeTuple extends Type<TypeTuple> {
 
   // This is the starting state of the program; CTRL is active and memory is empty.
   public  static final TypeTuple START_STATE = make(CTRL, TypeMem.EMPTY);
-  public  static final TypeTuple START = make(CTRL, TypeMem.ISUSED);
-  public  static final TypeTuple  RET = make(CTRL, TypeMem.ISUSED, SCALAR); // Type of RetNodes
+  public  static final TypeTuple START = make(CTRL, TypeMem.ALLMEM);
+  public  static final TypeTuple  RET = make(CTRL, TypeMem.ALLMEM, SCALAR); // Type of RetNodes
   public  static final TypeTuple XRET = RET.dual();
-  public  static final TypeTuple CALLE= make(CTRL, TypeMem.ISUSED, SCALAR); // Type of CallEpiNodes
-  public  static final TypeTuple TEST0= make(CTRL, TypeMem.MEM  , TypeFunPtr.GENERIC_FUNPTR, SCALAR); // Call with 1 arg
-  public  static final TypeTuple TEST1= make(CTRL, TypeMem.EMPTY, TypeFunPtr.GENERIC_FUNPTR, SCALAR); // Call with 1 arg
+  public  static final TypeTuple CALLE= make(CTRL, TypeMem.ALLMEM, ALL); // Type of CallEpiNodes
+  public  static final TypeTuple TEST0= make(CTRL, TypeMem.MEM  , TypeMemPtr.OOP, TypeFunPtr.GENERIC_FUNPTR, SCALAR); // Call with 1 arg
+  public  static final TypeTuple TEST1= make(CTRL, TypeMem.EMPTY, TypeMemPtr.OOP, TypeFunPtr.GENERIC_FUNPTR, SCALAR); // Call with 1 arg
   public  static final TypeTuple NEWSTR= make(TypeStr.STR,TypeMemPtr.STRPTR.simple_ptr()); // Type of NewStrNode
   public  static final TypeTuple NEWOBJ= make(TypeStruct.ALLSTRUCT,TypeMemPtr.STRUCT.simple_ptr()); // Type of NewObjNode
   static final TypeTuple[] TYPES = new TypeTuple[]{CALLE,START_STATE,IF_ALL, IF_TRUE, IF_FALSE, TEST0, TEST1};
@@ -138,7 +138,7 @@ public class TypeTuple extends Type<TypeTuple> {
     return make(ts);
   }
 
-  
+
   @Override public boolean above_center() { return _any; }
   // True if all internals may_be_con
   @Override public boolean may_be_con() {
