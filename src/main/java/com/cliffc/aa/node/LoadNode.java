@@ -105,8 +105,8 @@ public class LoadNode extends Node {
 
     // Loading from TypeObj - hoping to get a field out.  If we reach here, we
     // always return a Scalar and not e.g. Any or All.
-    if( tmem == TypeObj.XOBJ ) return Type.ALL;
-    if( tmem == TypeObj. OBJ ) return Type.ANY;
+    if( tmem == TypeObj.XOBJ ) return Type.ANY;
+    if( tmem == TypeObj. OBJ ) return Type.ALL;
     // Struct; check for field
     if( tmem instanceof TypeStruct ) {
       TypeStruct ts = (TypeStruct)tmem;
