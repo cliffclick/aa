@@ -320,7 +320,7 @@ public final class CallEpiNode extends Node {
     }
 
     // Crush all the non-finals across the call
-    TypeTuple post_call_crush = TypeTuple.make(Type.CTRL,post_call_mem,Type.SCALAR);
+    TypeTuple post_call_crush = TypeTuple.make(Type.CTRL,post_call_mem,Type.ALL);
     TypeTuple mt = post_call_crush;
 
     // Are all call targets known, wired & enabled?

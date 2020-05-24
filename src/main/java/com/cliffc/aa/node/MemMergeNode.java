@@ -192,6 +192,10 @@ public class MemMergeNode extends Node {
     if( is_prim() ) return null;
     assert _defs._len==_aliases._len;
 
+    // Collapse trivial
+    if( _defs._len==1 && gvn._opt_mode != 0 )
+      return in(0);
+
     // Remove child instances of the parent
     boolean progress = false;
     for( int i=_defs._len-1; i>=1; i-- ) {

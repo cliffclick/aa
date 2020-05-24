@@ -68,11 +68,11 @@ public final class RetNode extends Node {
     if( ctl()==null ) return gvn.self_type(this); // No change if a copy
     TypeTuple TALL = TypeTuple.RET;
     Type ctl = gvn.type(ctl());
-    if( ctl != Type.CTRL ) return ctl.above_center() ? TALL.dual() : TALL;
+    if( ctl != Type.CTRL ) return ctl.oob(TALL);
     Type mem = gvn.type(mem());
     if( mem.above(TypeMem.MEM.dual()) ) return TALL.dual();
     if( !(mem.isa(TypeMem.MEM      )) ) return TALL;
-    Type val = gvn.type(val()).bound(Type.SCALAR);
+    Type val = gvn.type(val());
     return TypeTuple.make(ctl,mem,val);
   }
 
