@@ -105,23 +105,21 @@ public class LoadNode extends Node {
 
     // Loading from TypeObj - hoping to get a field out.  If we reach here, we
     // always return a Scalar and not e.g. Any or All.
-    if( tmem == TypeObj.XOBJ ) return Type.XSCALAR;
-    if( tmem == TypeObj. OBJ ) return Type. SCALAR;
+    if( tmem == TypeObj.XOBJ ) return Type.ALL;
+    if( tmem == TypeObj. OBJ ) return Type.ANY;
     // Struct; check for field
     if( tmem instanceof TypeStruct ) {
       TypeStruct ts = (TypeStruct)tmem;
       int idx = ts.find(_fld);  // Find the named field
       if( idx != -1 ) {         // Found a field
         Type t = ts.at(idx);    // Load field
-        if( t==Type.ANY ) t=Type.XSCALAR;
-        if( t==Type.ALL ) t=Type. SCALAR;
         if( tmp.must_nil() )    // Might be in-error, but might fall to correct
           return t.widen();     // Return conservative but sane answer
         return t;               // Field type
       }
       // No such field
     }
-    return tmem.oob(Type.SCALAR); // No loading from e.g. Strings
+    return tmem.oob();          // No loading from e.g. Strings
   }
 
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
