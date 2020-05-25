@@ -311,11 +311,11 @@ public final class CallEpiNode extends Node {
     BitsAlias escapes = CallNode.tals(tcall).aliases();
     int emax = Math.max(Math.max(escapes.max()+1,post_call_mem.len()),tmem.len());
     for( int escape=2; escape<emax; escape++ ) {
-      if( !escapes.test(escape) ) { // A non-escaping alias
-        Type tesc = tmem.at(escape);// The pre-call value
+      if( !escapes.test_recur(escape) ) { // A non-escaping alias
+        TypeObj tesc = tmem.at(escape);// The pre-call value
         if( post_call_mem.at(escape) != tesc &&
-            tesc!=TypeObj.XOBJ ) // And pre-call HAS a value, other might be made IN the function & escaping out
-          post_call_mem = post_call_mem.set(escape,tmem.at(escape));
+            (tesc!=TypeObj.XOBJ && tesc !=TypeObj.UNUSED) ) // And pre-call HAS a value, other might be made IN the function & escaping out
+          post_call_mem = post_call_mem.set(escape,tesc);
       }
     }
 
@@ -345,6 +345,21 @@ public final class CallEpiNode extends Node {
     }
 
     return mt;
+  }
+
+  // Does this set of aliases bypass the call?
+  CallNode can_bypass( GVNGCM gvn, BitsAlias aliases ) {
+    if( !(in(0) instanceof CallNode) ) return null;
+    CallNode call = call();
+    Type tcall = gvn.type(call);
+    TypeMemPtr tmp = CallNode.tals(tcall);
+    if( tmp._aliases.join(aliases) != BitsAlias.EMPTY ) return null;
+    Type tret = ((TypeTuple)gvn.type(this))._ts[2];
+    if( TypeMemPtr.OOP.isa(tret) ) return null; // Might return an aliased pointer
+    if( tret instanceof TypeMemPtr )
+      if( ((TypeMemPtr)tret)._aliases.join(aliases) != BitsAlias.EMPTY ) return null;
+    // Load/Store can bypass this call.
+    return call;
   }
 
   // Sanity check

@@ -114,11 +114,11 @@ public class TypeMem extends Type<TypeMem> {
   // Never part of a cycle, so the normal check works
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
   @Override String str( VBitSet dups ) {
-    if( this==FULL ) return "[all ]";
-    if( this==EMPTY) return "[____]";
-    if( this== MEM ) return "[ mem]";
-    if( this==XMEM ) return "[~mem]";
-    if( this==DEAD ) return "[dead]";
+    if( this==FULL ) return "[ all ]";
+    if( this==EMPTY) return "[_____]";
+    if( this== MEM ) return "[ mem ]";
+    if( this==XMEM ) return "[~mem ]";
+    if( this==DEAD ) return "[dead ]";
     SB sb = new SB();
     sb.p('[');
     for( int i=1; i<_aliases.length; i++ )

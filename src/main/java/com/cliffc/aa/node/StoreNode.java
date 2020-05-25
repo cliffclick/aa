@@ -29,12 +29,13 @@ public class StoreNode extends Node {
   @Override public Node ideal(GVNGCM gvn, int level) {
     Node mem = mem();
     Node adr = adr();
+    Type ta = gvn.type(adr);
+    TypeMemPtr tmp = ta instanceof TypeMemPtr ? (TypeMemPtr)ta : null;
 
     // Stores bypass a Merge to the specific alias
-    Type ta = gvn.type(adr);
     int alias;
-    if( ta instanceof TypeMemPtr && mem instanceof MemMergeNode &&
-        (alias=((TypeMemPtr)ta)._aliases.strip_nil().abit()) != -1 )
+    if( tmp !=null && mem instanceof MemMergeNode &&
+        (alias=tmp._aliases.strip_nil().abit()) != -1 )
       return new StoreNode(this,((MemMergeNode)mem).obj(alias,gvn),adr);
 
     // Stores bypass stores to unrelated fields.  TODO: Cannot really do this -
@@ -55,20 +56,12 @@ public class StoreNode extends Node {
 
     // Store can bypass a Call, if the memory is not returned from the call,
     // This optimization is specifically targeting simple recursive functions.
-    //if( ta instanceof TypeMemPtr && mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode ) {
-    //  TypeMemPtr tmp = (TypeMemPtr)ta;
-    //  CallEpiNode cepi = (CallEpiNode)mem.in(0);
-    //  TypeMem retmem = (TypeMem)((TypeTuple)gvn.type(cepi)).at(3);
-    //  if( !cepi.is_copy() && retmem.is_clean(tmp.aliases(),_fld) )
-    //    return set_def(1,cepi.call().mem(),gvn);
-    //}
-
-    // Store can bypass a Call, if the memory is not returned from the call,
-    // and the pointer predates the call.  This optimization is specifically
-    // targeting simple recursive functions.
-    //Node pre_call_mem = bypass_call(gvn);
-    //if( pre_call_mem != null )  // Use memory before the call instead of after
-    //  return set_def(1,pre_call_mem,gvn);
+    if( mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode && tmp != null ) {
+      CallEpiNode cepi = (CallEpiNode)mem.in(0);
+      CallNode call = cepi.can_bypass(gvn,tmp._aliases);
+      if( call != null )
+        return set_def(1,call.mem(),gvn);
+    }
 
     return null;
   }
@@ -82,23 +75,8 @@ public class StoreNode extends Node {
     if( !val.isa_scalar() )       // Nothing sane
       val = val.oob(Type.SCALAR); // Pin to scalar for updates
 
-    // Store can bypass a Call, if the memory is not returned from the call.
-    // This optimization is specifically targeting simple recursive functions.
-    Node mem = mem();
-    //if( mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode ) {
-    //  CallEpiNode cepi = (CallEpiNode)mem.in(0);
-    //  TypeMem retmem = (TypeMem)((TypeTuple)gvn.type(cepi)).at(3);
-    //  if( !cepi.is_copy() && retmem.is_clean(tmp.aliases(),_fld) )
-    //    mem = cepi.call().mem();
-    //}
-    // Store can bypass a Call, if the memory is not returned from the call,
-    // and the pointer predates the call.  This optimization is specifically
-    // targeting simple recursive functions.
-    //Node pre_call_mem = bypass_call(gvn);
-    //if( pre_call_mem != null )  // Use memory before the call instead of after
-    //  mem = pre_call_mem;
-
     // Convert from memory to the struct being updated
+    Node mem = mem();
     Type tmem = gvn.type(mem);
     TypeObj tobj;
     if( tmem instanceof TypeMem )
@@ -123,45 +101,6 @@ public class StoreNode extends Node {
     // Imprecise update
     return ts.update(_fin, _fld, val);
   }
-
-  // Returns pre_call_mem if Store can bypass Call memory.
-  private Node bypass_call(GVNGCM gvn) {
-    // Store can bypass a Call, if the memory is not returned from the call,
-    // and the pointer predates the call.  This optimization is specifically
-    // targeting simple recursive functions.
-
-    // Store memory not after a call
-    Node mem = mem();
-    if( !(mem instanceof MProjNode) || !(mem.in(0) instanceof CallEpiNode) ) return null;
-    CallEpiNode cepi = (CallEpiNode)mem.in(0);
-    if( cepi.is_copy() ) return null; // Call is collapsing
-    Type tadr = gvn.type(adr());
-    if( !(tadr instanceof TypeMemPtr) ) return null; // Address is bad
-    int alias = ((TypeMemPtr)tadr).aliases().abit();
-    if( alias == -1 ) return null;  // Address not-nil already, and a single alias
-    // Address must predate the call, and is not passed into the call, so the
-    // Store cannot be storing any Call result.
-    Node pctrl = adr();         // Find address control
-    while( (tadr=gvn.type(pctrl)) != Type.CTRL && tadr!=Type.XCTRL )
-      pctrl = pctrl.in(0);
-    // Address control dominates call control
-    CallNode call = cepi.call();
-    final Node fpctrl = pctrl;
-    if( call.walk_dom_last(n -> n==fpctrl) == null ) return null;
-
-    Type tcall = gvn.type(call);
-    TypeMem tcm = CallNode.tmem(tcall);
-    Node pre_call_mem = call.mem();
-    if( tcm.at(alias).above_center() ) // Call does not produce the memory
-      return pre_call_mem;
-    if( pre_call_mem instanceof MemMergeNode &&
-        ((MemMergeNode)pre_call_mem).alias2idx(alias) != 0 )
-      return pre_call_mem;
-    // Call produces memory into function, or call-leading MemMerge not precise
-    // about alias... so we assume it goes into the call.
-    return null;
-  }
-
 
   // Compute the liveness local contribution to def's liveness.  Ignores the
   // incoming memory types, as this is a backwards propagation of demanded

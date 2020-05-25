@@ -360,11 +360,8 @@ public class TestParse {
 
   @Test public void testParse07() {
     TypeStruct dummy = TypeStruct.DISPLAY; // Force class loading cycle
-    test_obj_isa("noinline_map={x -> x ? @{nn=noinline_map(x.n);vv=x.v&x.v} : 0};"+
-                    "noinline_map(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0;v=1};v=2};v=3};v=4})",
-            TypeStruct.make(FLDS2,TypeStruct.ts(Type.NIL,TypeMemPtr.STRUCT0,TypeInt.INT8))); //con(20.25)
     // Passing a function recursively
-    test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({&},2)", TypeInt.FALSE);
+    test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({&},2)", Type.XNIL);
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({+},2)", TypeInt.con(2));
     test_isa("A= :@{n=A?; v=int}; f={x:A? -> x ? A(f(x.n),x.v*x.v) : 0}", TypeFunPtr.GENERIC_FUNPTR);
     test    ("A= :@{n=A?; v=flt}; f={x:A? -> x ? A(f(x.n),x.v*x.v) : 0}; f(A(0,1.2)).v;", TypeFlt.con(1.2*1.2));
@@ -824,8 +821,8 @@ strs:List(str?) = ... // List of null-or-strings
   static private void test_obj_isa( String program, TypeObj expected) {
     try( TypeEnv te = run(program) ) {
       assertTrue(te._t instanceof TypeMemPtr);
-      int alias = ((TypeMemPtr)te._t).getbit(); // internally asserts only 1 bit set
-      TypeObj to = te._tmem.ld((TypeMemPtr)te._t);
+      //int alias = ((TypeMemPtr)te._t).getbit(); // internally asserts only 1 bit set
+      TypeObj to = te._tmem.ld_deep((TypeMemPtr)te._t);
       assertTrue(to.isa(expected));
     }
   }

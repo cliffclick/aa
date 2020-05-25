@@ -60,6 +60,15 @@ public class LoadNode extends Node {
         mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode )
       return set_mem(((CallEpiNode)mem.in(0)).call().mem(),gvn);
 
+    // Loads can bypass a Call, if the memory is not returned from the call,
+    // This optimization is specifically targeting simple recursive functions.
+    if( mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode && aliases != null ) {
+      CallEpiNode cepi = (CallEpiNode)mem.in(0);
+      call = cepi.can_bypass(gvn,aliases);
+      if( call != null )
+        return set_def(1,call.mem(),gvn);
+    }
+
     // Loads against a NewNode cannot NPE, cannot fail, always return the input
     NewObjNode nnn = adr.in(0) instanceof NewObjNode ? (NewObjNode)adr.in(0) : null;
     int idx;

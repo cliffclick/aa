@@ -290,7 +290,7 @@ public class CallNode extends Node {
 
     // Compute set of aliases that are reachable in the called function, from
     // all argument pointers and memory state.
-    ts[ALSIDX]=_unpacked ? escapes(gvn,(TypeMem)mem) : TypeMemPtr.OOP;  // All aliases escape
+    ts[ALSIDX] = _unpacked ? escapes(gvn,(TypeMem)mem) : TypeMemPtr.OOP;  // All aliases escape
 
     return TypeTuple.make(ts);
   }
