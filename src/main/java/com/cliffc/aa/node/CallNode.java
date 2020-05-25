@@ -444,9 +444,11 @@ public class CallNode extends Node {
     if( !fun.has_unknown_callers() && !is_copy() ) {
       CallEpiNode cepi = cepi();
       if( cepi != null ) {
-        int i; for( i=0; i<cepi.nwired(); i++ )
-          if( cepi.wired(i).fun()==fun )
+        int i; for( i=0; i<cepi.nwired(); i++ ) {
+          RetNode ret = cepi.wired(i);
+          if( !ret.is_copy() && ret.fun()==fun )
             break;
+        }
         if( i==cepi.nwired() ) return 0; // While a (stale) fidx might be available, this path is for another call.
       }
     }

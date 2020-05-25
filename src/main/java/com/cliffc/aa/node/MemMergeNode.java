@@ -267,15 +267,8 @@ public class MemMergeNode extends Node {
       TypeObj tao = ta instanceof TypeObj ? (TypeObj)ta
         : (ta==null || ta.above_center() ? TypeObj.XOBJ : TypeObj.OBJ); // Handle ANY, ALL
 
-      if( tao!=TypeObj.UNUSED ) {
-        // Assuming prior aliases are correctly computed in "tos", find the
-        // parent and merge.  Parents not-set locally just inherent from the last
-        // local-set parent.
-        TypeObj base = tos.atX(alias);
-        for( int a = alias; base==null; a = BitsAlias.parent(a))
-          base = tos.atX(a);
-        tao = (TypeObj)base.meet(tao);
-      }
+      if( tao!=TypeObj.UNUSED )
+        tao = (TypeObj)tm.at(alias).meet(tao);
       tos.setX(alias, tao );
       for( int kid=BitsAlias.next_kid(alias,alias); kid!=0; kid=BitsAlias.next_kid(alias,kid) ) {
         if( kid >= tos._len ) break;

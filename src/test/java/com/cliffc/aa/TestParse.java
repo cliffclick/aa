@@ -154,15 +154,15 @@ public class TestParse {
 
   @Test public void testParse02() {
     TypeStruct dummy = TypeStruct.DISPLAY;
-    TypeMemPtr tdisp = TypeMemPtr.make(10,TypeStr.NO_DISP);
-    Env.DISPLAYS.set(10);
-    // Anonymous function definition
-    test_isa("{x y -> x+y}", TypeFunPtr.make(BitsFun.make0(35),3,tdisp)); // {Scalar Scalar -> Scalar}
+    test("{5}()", TypeInt.con(5)); // No args nor -> required; this is simply a function returning 5, being executed
     // Since call not-taken, post GCP Parms not loaded from _tf, limited to ~Scalar.  The
     // hidden internal call from {&} to the primitive is never inlined (has ~Scalar args)
     // so 'x&1' never sees the TypeInt return from primitive AND.
+    TypeMemPtr tdisp = TypeMemPtr.make(10,TypeStr.NO_DISP);
     test_isa("{x -> x&1}", TypeFunPtr.make(BitsFun.make0(35),2,tdisp)); // {Int -> Int}
-    test("{5}()", TypeInt.con(5)); // No args nor -> required; this is simply a function returning 5, being executed
+
+    // Anonymous function definition
+    test_isa("{x y -> x+y}", TypeFunPtr.make(BitsFun.make0(35),3,tdisp)); // {Scalar Scalar -> Scalar}
 
     // ID in different contexts; in general requires a new TypeVar per use; for
     // such a small function it is always inlined completely, has the same effect.
