@@ -352,6 +352,7 @@ public final class CallEpiNode extends Node {
     if( !(in(0) instanceof CallNode) ) return null;
     CallNode call = call();
     Type tcall = gvn.type(call);
+    if( tcall == Type.ANY ) return null;
     TypeMemPtr tmp = CallNode.tals(tcall);
     if( tmp._aliases.join(aliases) != BitsAlias.EMPTY ) return null;
     Type tret = ((TypeTuple)gvn.type(this))._ts[2];

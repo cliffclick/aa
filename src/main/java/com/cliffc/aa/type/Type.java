@@ -146,7 +146,7 @@ public class Type<T extends Type<T>> implements Cloneable {
   // Hash-Cons - all Types are interned in this hash table.  Thus an equality
   // check of a (possibly very large) Type is always a simple pointer-equality
   // check, except during construction and intern'ing.
-  private static ConcurrentHashMap<Type,Type> INTERN = new ConcurrentHashMap<>();
+  private static final ConcurrentHashMap<Type,Type> INTERN = new ConcurrentHashMap<>();
   static int RECURSIVE_MEET;    // Count of recursive meet depth
   @SuppressWarnings("unchecked")
   final Type hashcons() {
@@ -784,7 +784,7 @@ public class Type<T extends Type<T>> implements Cloneable {
     case TNUM:
     case TREAL:
     case TSCALAR:
-    case TNIL:
+    case TNIL: case TXNIL:
     case TCTRL:  // Nonsense, only for IfNode.value test
     case TXCTRL: // Nonsense, only for IfNode.value test
     case TMEM:   // Nonsense, only for IfNode.value test

@@ -207,45 +207,66 @@ public class MemMergeNode extends Node {
     }
     if( progress ) return this;
 
+    // Remove not-live values
+    if( _remove_unused(gvn) )
+      return this;
+
     // Collapse back-to-back MemMerge
     if( in(0) instanceof MemMergeNode ) {
       MemMergeNode mmm = (MemMergeNode)in(0);
-      int max_alias = Math.max(_aliases.last(),mmm._aliases.last());
-      for( int alias=2; alias<=max_alias; alias++ ) {
-        int xidx =     alias2idx(alias);
-        int midx = mmm.alias2idx(alias);
-        // Not set here, and yes set on coming?
-        if( xidx==0 && midx!=0 ) // Then set it here, instead of taking from base
-          create_alias_active(alias,mmm.in(midx),gvn);
-        else if( xidx > 0 && in(xidx)==mmm ) // Just gets from base?
-          set_def(xidx,mmm.in(midx),gvn); // Then get from where base gets it from
-      }
-      set_def(0,mmm.in(0),gvn);
-      return this;
-    }
 
-    // Remove not-live values
-    for( int i=1; i<_defs._len; i++ ) {
-      int alias = alias_at(i);
-      if( _live.at(alias) == TypeObj.UNUSED && gvn.type(in(i))!=TypeObj.UNUSED ) {
-        // Check all children of 'alias' for being alive & NOT locally defined.
-        // These are about to lose their parent, and so need a replacement
-        // local def.
-        for( int kid=alias; kid!=0; kid=BitsAlias.next_kid(alias,kid) ) {
-          if( _live.at(kid)!=TypeObj.UNUSED && find_alias2idx(kid)==i ) {
-            throw com.cliffc.aa.AA.unimpl("child alias "+kid+" is alive and about to lose sponsor");
-          }
-        }
-        set_def(i,gvn.con(TypeObj.UNUSED),gvn);
-        progress=true;
+      // Check for this.in[alias]==mmm, and mmm.find(alias)!=alias.  This means
+      // a lookup of 'alias' at this first bounces to 'mmm' then does a parent-
+      // alias lookup, and gets its type from some parent alias.  Currently
+      // there is no way to collapse this, as it requires remapping 'alias' to
+      // some parent without some middle-MemMerge doing it.
+      for( int i=1; i<_defs._len; i++ ) {
+        int alias = alias_at(i);         // alias overridden here.
+        int midx = mmm.alias2idx(alias); // mmm also overrides?
+        if( midx==0 &&          // Override of 'alias' not directly overridden in parent
+            mmm.find_alias2idx(alias)!=0 ) // And also not 'mmm.base'
+          return null;                     // Would require mapping 'alias' to 'mmm.find(alias)'
       }
+
+      MemMergeNode nnn = new MemMergeNode(mmm.in(0));
+      for( int i=1, ii=1; i<_defs._len || ii<mmm._defs._len; ) {
+        int a  = i <    _defs._len ?     alias_at(i)  : 999998;
+        int aa = ii<mmm._defs._len ? mmm.alias_at(ii) : 999999;
+        if( a <= aa ) {
+          nnn.create_alias_active( a,in(i),gvn);
+          i++;  if( a==aa ) ii++;
+        } else {
+          // Does 'this' already have alias 'aa' under a parent alias?
+          if( find_alias2idx(aa)==0 )
+            nnn.create_alias_active(aa,mmm.in(ii),gvn);
+          ii++;
+        }
+      }
+      return nnn;
     }
-    if( progress )
-      return this;
 
     return null;
   }
 
+  // Remove not-live values, setting to unused
+  private boolean _remove_unused(GVNGCM gvn) {
+    boolean progress=false;
+    outer:
+    for( int i=1; i<_defs._len; i++ ) {
+      int alias = alias_at(i);
+      if( _live.at(alias) == TypeObj.UNUSED && gvn.type(in(i))!=TypeObj.UNUSED ) {
+        // Check all children of 'alias' for being alive & NOT locally defined.
+        // These are about to lose their parent - which otherwise remaps the
+        // kid alias to the parent.
+        for( int kid=alias; kid!=0; kid=BitsAlias.next_kid(alias,kid) )
+          if( _live.at(kid)!=TypeObj.UNUSED && find_alias2idx(kid)==i )
+            continue outer;
+        set_def(i,gvn.con(TypeObj.UNUSED),gvn);
+        progress=true;
+      }
+    }
+    return progress;
+  }
 
   // Base memory (alias#1) comes in input#0.  Other inputs refer to other
   // aliases (see _aliases) and children follow parents (since alias#s are
@@ -265,7 +286,7 @@ public class MemMergeNode extends Node {
       if( ta instanceof TypeMem )
         ta = ((TypeMem)ta).at(alias);
       TypeObj tao = ta instanceof TypeObj ? (TypeObj)ta
-        : (ta==null || ta.above_center() ? TypeObj.XOBJ : TypeObj.OBJ); // Handle ANY, ALL
+        : (ta==null || ta.above_center() ? TypeObj.UNUSED : TypeObj.ISUSED); // Handle ANY, ALL
 
       if( tao!=TypeObj.UNUSED )
         tao = (TypeObj)tm.at(alias).meet(tao);

@@ -29,7 +29,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
 
   private TypeFunPtr(BitsFun fidxs, int nargs, TypeMemPtr disp ) { super(TFUNPTR); init(fidxs,nargs,disp); }
   private void init (BitsFun fidxs, int nargs, TypeMemPtr disp ) { _fidxs = fidxs; _nargs=nargs; _disp=disp; }
-  @Override int compute_hash() { assert _disp._hash != 0;  return TFUNPTR + _fidxs._hash + _nargs + _disp._hash; }
+  @Override int compute_hash() { assert _disp._hash != 0;  return (TFUNPTR + _fidxs._hash + _nargs + _disp._hash)|256; }
 
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;

@@ -291,14 +291,17 @@ public class GVNGCM {
     Node nnn = xform_old0(old,level);
     if( nnn==null ) return;     // No progress
     assert (level&1)==0;        // No changes during asserts
-    if( nnn == old ) {          // Progress, but not replacement
+    // Progress, so changes to the users which might change live-use-ness.
+    for( Node use : old._uses )
+      if( use.input_value_changes_live() )
+        add_work_defs(use);
+    // Progress, but not replacement    
+    if( nnn == old ) {
       // All users on worklist
       for( Node use : old._uses ) {
         add_work(use);
         if( use instanceof RegionNode ) // Region users need to recheck PhiNode
           add_work_uses(use);
-        if( use.input_value_changes_live() )
-          add_work_defs(use);
       }
       // Add self at the end, so the work loops pull it off again.
       add_work(old);
