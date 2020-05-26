@@ -214,7 +214,13 @@ public class MemMergeNode extends Node {
     // Collapse back-to-back MemMerge
     for( int i=1; i<_defs._len; i++ )
       if( in(i) instanceof MemMergeNode ) {
-        set_def(i,((MemMergeNode)in(i)).alias2node(alias_at(i)),gvn);
+        MemMergeNode mmm = (MemMergeNode)in(i);
+        int alias = alias_at(i);         // alias overridden here.
+        int midx = mmm.alias2idx(alias); // Check for exact match
+        int midx2= midx==0 ? mmm.find_alias2idx(alias) : midx; // Or any match
+        if( midx==0 && midx2!=0 ) // Inexact & non-base match?
+          continue;       // Would require mapping 'alias' to 'mmm.find(alias)'
+        set_def(i,mmm.in(midx2),gvn);
         progress=true;
       }
     if( progress )  return this;
@@ -291,17 +297,14 @@ public class MemMergeNode extends Node {
     for( int i=1; i<_defs._len; i++ ) {
       final int alias = alias_at(i);
       Type ta = gvn.type(in(i));
-      if( ta instanceof TypeMem )
-        ta = ((TypeMem)ta).at(alias);
-      TypeObj tao = ta instanceof TypeObj ? (TypeObj)ta
-        : (ta==null || ta.above_center() ? TypeObj.UNUSED : TypeObj.ISUSED); // Handle ANY, ALL
 
-      if( tao!=TypeObj.UNUSED )
-        tao = (TypeObj)tm.at(alias).meet(tao);
-      tos.setX(alias, tao );
-      for( int kid=BitsAlias.next_kid(alias,alias); kid!=0; kid=BitsAlias.next_kid(alias,kid) ) {
-        if( kid >= tos._len ) break;
-        tos.clear(kid);         // These all inherent
+      for( int kid=alias; kid!=0; kid=BitsAlias.next_kid(alias,kid) ) {
+        Type tax = ta instanceof TypeMem ? ((TypeMem)ta).at(kid) : ta;
+        TypeObj tao = tax instanceof TypeObj ? (TypeObj)tax
+          : (tax==null || tax.above_center() ? TypeObj.UNUSED : TypeObj.ISUSED); // Handle ANY, ALL
+        if( tao!=TypeObj.UNUSED )
+          tao = (TypeObj)tm.at(kid).meet(tao);
+        tos.setX(kid, tao );
       }
     }
     return TypeMem.make0(tos._es);

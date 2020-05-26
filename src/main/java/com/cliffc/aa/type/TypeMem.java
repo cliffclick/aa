@@ -155,7 +155,7 @@ public class TypeMem extends Type<TypeMem> {
 
   // Walk all reachable aliases from this set of aliases, and
   // include them all in the returned memory.
-  private TypeMem _slice_all_aliases_plus_children(BitsAlias aliases) {
+  public TypeMem slice_all_aliases_plus_children(BitsAlias aliases) {
     AryInt work = new AryInt();
     Ary<TypeObj> tos = new Ary<>(new TypeObj[]{null,TypeObj.UNUSED});
     for( int alias : aliases )
@@ -190,11 +190,6 @@ public class TypeMem extends Type<TypeMem> {
     }
 
     return make0(tos.asAry());
-  }
-
-  // Report back just the given aliases (plus children)
-  public TypeMem slice_all_aliases_plus_children(BitsAlias aliases) {
-    return _slice_all_aliases_plus_children(aliases);
   }
 
   private static TypeMem FREE=null;
