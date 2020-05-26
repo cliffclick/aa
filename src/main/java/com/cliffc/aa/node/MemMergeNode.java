@@ -212,6 +212,14 @@ public class MemMergeNode extends Node {
       return this;
 
     // Collapse back-to-back MemMerge
+    for( int i=1; i<_defs._len; i++ )
+      if( in(i) instanceof MemMergeNode ) {
+        set_def(i,((MemMergeNode)in(i)).alias2node(alias_at(i)),gvn);
+        progress=true;
+      }
+    if( progress )  return this;
+    
+    // Collapse back-to-back MemMerge base
     if( in(0) instanceof MemMergeNode ) {
       MemMergeNode mmm = (MemMergeNode)in(0);
 

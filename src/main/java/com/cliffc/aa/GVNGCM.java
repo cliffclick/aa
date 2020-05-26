@@ -295,7 +295,7 @@ public class GVNGCM {
     for( Node use : old._uses )
       if( use.input_value_changes_live() )
         add_work_defs(use);
-    // Progress, but not replacement    
+    // Progress, but not replacement
     if( nnn == old ) {
       // All users on worklist
       for( Node use : old._uses ) {
