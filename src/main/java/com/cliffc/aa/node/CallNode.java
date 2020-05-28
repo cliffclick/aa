@@ -461,7 +461,7 @@ public class CallNode extends Node {
       if( j==0 && actual instanceof TypeFunPtr )
         actual = ((TypeFunPtr)actual)._disp; // Extract Display type from TFP
       assert actual==actual.simple_ptr();    // Only simple ptrs from nodes
-      actual = actual.sharpen(tpre); // Sharpen actual pointers before checking vs formals
+      actual = tpre.sharptr(actual); // Sharpen actual pointers before checking vs formals
 
       if( actual==formal ) { flags|=GOOD; continue; } // Arg is fine.  Covers NO_DISP which can be a high formal.
       Type mt_lo = actual.meet(formal       );

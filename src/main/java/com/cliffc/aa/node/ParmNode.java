@@ -72,10 +72,8 @@ public class ParmNode extends PhiNode {
     CallEpiNode cepi  = ((CallNode)call).cepi();
     // If not flowing, then args are not aligned
     if( !cepi.cg_tst(fun.fidx()) ) return false;
-    // Check arg type
-    Type t = gvn.type(in(i));   // Arg type
-    if( t instanceof TypeMemPtr ) // Sharpen pointers
-      t = t.sharpen(gvn.type(mem.in(i)));
+    // Check arg type, after sharpening
+    Type t = gvn.sharptr(in(i),mem.in(i));
     if( !t.isa(fun.formal(_idx)) )
       return false; // Arg is NOT correct type
     return true;
@@ -104,9 +102,8 @@ public class ParmNode extends PhiNode {
       CallEpiNode cepi = ((CallNode)call).cepi();
       if( cepi == null ) continue;       // Broken graph
       if( !cepi.cg_tst(fidx) ) continue; // Wired and flowing
-      Type ta = gvn.type(in(i));   // Arg type
-      if( ta instanceof TypeMemPtr ) // Sharpen pointers
-        ta = ta.sharpen(gvn.type(mem.in(i)));
+      // Check arg type, after sharpening
+      Type ta = gvn.sharptr(in(i),mem.in(i));
       t = t.meet(ta);
     }
 

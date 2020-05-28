@@ -636,10 +636,5 @@ public class GVNGCM {
     for( Node use : n._uses ) walk_dead(use);
   }
 
-  public Type sharptr( Node ptr, Node mem ) {
-    Type t = type(ptr);
-    Type tmem = type(mem);
-    return t.sharpen(tmem);
-  }
-
+  public Type sharptr( Node ptr, Node mem ) { return type(mem).sharptr(type(ptr)); }
 }

@@ -1211,7 +1211,7 @@ public class Parse {
       if( scope == e._scope ) return ptr;
       ptr = gvn(new LoadNode(mmem,ptr,"^",null)); // Gen linked-list walk code, walking display slot
       Type t = _gvn.type(ptr);
-      assert t instanceof TypeMemPtr && t.sharpen(tmem).is_display_ptr();
+      assert t instanceof TypeMemPtr && tmem.sharpen((TypeMemPtr)t).is_display_ptr();
       e = e._par;                                 // Walk linked-list in parser also
     }
   }

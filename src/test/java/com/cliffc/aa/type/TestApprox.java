@@ -474,7 +474,7 @@ public class TestApprox {
     check_leaf(p4,alias,TypeInt.NINT8);
     check_leaf(p5,alias,TypeInt.NINT8);
     check_leaf(p6,alias,TypeInt.NINT8);
-    check_leaf(p7,alias,(TypeInt)TypeInt.con(7));
+    check_leaf(p7,alias,TypeInt.con(7));
 
     depths = pz1.depth();
     assertEquals(3,TypeMemPtr.max(alias,depths));

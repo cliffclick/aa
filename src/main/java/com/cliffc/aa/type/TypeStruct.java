@@ -310,10 +310,11 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public  static Type[] ts(Type t0, Type t1, Type t2, Type t3) { Type[] ts = TypeAry.get(4); ts[0]=t0; ts[1]=t1; ts[2]=t2; ts[3]=t3; return ts;}
   public  static Type[] ts(int n) { Type[] ts = TypeAry.get(n); Arrays.fill(ts,SCALAR); return ts; } // All Scalar fields
 
-  public  static TypeStruct make(Type[] ts) {
+  public  static TypeStruct make(Type[] ts) { return malloc(ts).hashcons_free(); }
+  public  static TypeStruct malloc(Type[] ts) {
     String[] flds = new String[ts.length];
     Arrays.fill(flds,fldBot());
-    return malloc("",false,flds,ts,fbots(ts.length)).hashcons_free();
+    return malloc("",false,flds,ts,fbots(ts.length));
   }
 
   // Function formals, used by FunNode.
@@ -680,9 +681,9 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     // Remove any final UF before installation.
     // Do not install until the cycle is complete.
     RECURSIVE_MEET++;
-    Ary<Type> reaches = mt.reachable();
     mt = shrink(mt.reachable(),mt);
-    assert check_uf(reaches = mt.reachable());
+    Ary<Type> reaches = mt.reachable(); // Recompute reaches after shrink
+    assert check_uf(reaches);
     UF.clear();
     RECURSIVE_MEET--;
     // This completes 'mt' as the Meet structure.
@@ -930,7 +931,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // Check for duplicating an interned Type or a UF hit, and use that instead.
   // Computes the final hash code.
   private static IHashMap DUPS = new IHashMap();
-  private static TypeStruct shrink( Ary<Type> reaches, TypeStruct tstart ) {
+  static TypeStruct shrink( Ary<Type> reaches, TypeStruct tstart ) {
     assert DUPS.isEmpty();
     // Structs never change their hash based on field types.  Set their hash first.
     for( int i=0; i<reaches._len; i++ ) {
@@ -1233,13 +1234,13 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       for( Type _t : _ts ) _t.walk(p);
   }
 
-  // Sharpen a TypeMemPtr with a TypeMem
-  @Override public Type sharpen( Type tmem ) {
-    if( !(tmem instanceof TypeMem) ) return this;
-    // TODO: Needs the cyclic touch
-    Type[] ts = TypeAry.get(_ts.length);
-    for( int i=0; i<ts.length; i++ )
-      ts[i] = _ts[i].sharpen(tmem);
-    return make_from(ts);
+  // Shallow clone
+  TypeStruct sharpen_clone() {
+    assert interned();
+    Type[] ts = TypeAry.clone(_ts);
+    TypeStruct t = malloc(_name,_any,_flds,ts,_flags);
+    t._hash = t.compute_hash();
+    return t;
   }
+
 }

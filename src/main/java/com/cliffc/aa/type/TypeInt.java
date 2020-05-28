@@ -27,7 +27,7 @@ public class TypeInt extends Type<TypeInt> {
   }
   private static TypeInt FREE=null;
   @Override protected TypeInt free( TypeInt ret ) { FREE=this; return ret; }
-  public static Type make( int x, int z, long con ) {
+  public static TypeInt make( int x, int z, long con ) {
     if( Math.abs(x)==1 && z==1 && con==0) con=1; // not-null-bool is just a 1
     TypeInt t1 = FREE;
     if( t1 == null ) t1 = new TypeInt(x,z,con);
@@ -35,18 +35,18 @@ public class TypeInt extends Type<TypeInt> {
     TypeInt t2 = (TypeInt)t1.hashcons();
     return t1==t2 ? t1 : t1.free(t2);
   }
-  public static Type con(long con) { return make(0,log(con),con); }
+  public static TypeInt con(long con) { return make(0,log(con),con); }
 
-  static public  final TypeInt  INT64 = (TypeInt)make(-2,64,0);
-  static         final TypeInt  INT32 = (TypeInt)make(-2,32,0);
-  static         final TypeInt  INT16 = (TypeInt)make(-2,16,0);
-  static public  final TypeInt  INT8  = (TypeInt)make(-2, 8,0);
-  static public  final TypeInt  BOOL  = (TypeInt)make(-2, 1,0);
-  static public  final TypeInt TRUE   = (TypeInt)make( 0, 1,1);
-  static public  final Type    FALSE  = (TypeInt)make( 0, 1,0);
-  static public  final TypeInt XINT1  = (TypeInt)make( 2, 1,0);
-  static public  final TypeInt NINT8  = (TypeInt)make(-1, 8,0);
-  static public  final TypeInt NINT64 = (TypeInt)make(-1,64,0);
+  static public  final TypeInt  INT64 = make(-2,64,0);
+  static         final TypeInt  INT32 = make(-2,32,0);
+  static         final TypeInt  INT16 = make(-2,16,0);
+  static public  final TypeInt  INT8  = make(-2, 8,0);
+  static public  final TypeInt  BOOL  = make(-2, 1,0);
+  static public  final TypeInt TRUE   = make( 0, 1,1);
+  static public  final Type    FALSE  = make( 0, 1,0);
+  static public  final TypeInt XINT1  = make( 2, 1,0);
+  static public  final TypeInt NINT8  = make(-1, 8,0);
+  static public  final TypeInt NINT64 = make(-1,64,0);
   static         final TypeInt ZERO   = (TypeInt)new TypeInt(0,1,0).hashcons(); // Not exposed since not the canonical NIL
   static final TypeInt[] TYPES = new TypeInt[]{INT64,INT32,INT16,BOOL,TRUE,XINT1,NINT64};
   static void init1( HashMap<String,Type> types ) {

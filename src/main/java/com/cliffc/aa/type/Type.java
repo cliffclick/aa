@@ -573,6 +573,7 @@ public class Type<T extends Type<T>> implements Cloneable {
   }
   public Type oob( ) { return oob(ALL); }
   public Type oob(Type e) { return above_center() ? e.dual() : e; }
+  public TypeObj oob(TypeObj e) { return above_center() ? (TypeObj)e.dual() : e; }
   public TypeStruct oob(TypeStruct e) { return above_center() ? e.dual() : e; }
 
   public static void init0( HashMap<String,Type> types ) {
@@ -875,6 +876,9 @@ public class Type<T extends Type<T>> implements Cloneable {
   // Mark (recursively) all memory as clean/unmodified
   public Type clean() { return this; }
 
+  // Sharpen pointer with memory
+  public Type sharptr( Type ptr ) { return ptr; }
+  
   // Apply the test(); if it returns true iterate over all nested child types.
   // If the test returns false, short-circuit the walk.  No attempt to guard
   // against recursive structure walks, so the 'test' must return false when
@@ -886,9 +890,6 @@ public class Type<T extends Type<T>> implements Cloneable {
   // Display might be Scalar or ~Scalar at GVN start
   public boolean is_display_ptr() { return _type==TSCALAR || _type==TXSCALAR || _type==TNIL || _type==TXNIL || _type==TANY; }
   boolean is_display() { return false; }
-
-  // Sharpen a TypeMemPtr with a TypeMem
-  public Type sharpen( Type tmem ) { return this; }
 
   RuntimeException typerr(Type t) {
     throw new RuntimeException("Should not reach here: internal type system error with "+this+(t==null?"":(" and "+t)));

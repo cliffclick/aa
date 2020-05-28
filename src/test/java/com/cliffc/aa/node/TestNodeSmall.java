@@ -481,28 +481,6 @@ public class TestNodeSmall {
   // custom test: Fun, Parm:mem, Parm:x, Parm:y.  Outputs always within formal
   // bounds, and always monotonic, and preserves shape if in-bounds.
 
-
-  /**
-     PLAN A:
-     cannot produce ptrs that are >= formals, because dunno proper alias #s - in general.
-
-     New weaker Parm property: output is never "besides" a formal, either
-     formal.isa(value) or value.isa(formal).  IF value < formal, then produce
-     something i can always produce even if value lifts to besides the formal.
-     For TMP, produce [2]->obj.  For ARY, produce [3]->ary.  Leave it at that
-     until value is >= formal, then lift to value.  If lifting above a formal
-     probably have to hit [~2]->~obj for symmetry.
-
-     Because Parm now produces weaker results, will push error messages
-     forwards into calls.  Could claim, e.g. errors where one input is one of
-     these default values [2]->obj or [3]->ary or etc, probably come from
-     failed call args, and have lower priority than Parm.err.
-
-     Parm uses Phi alltype.
-     Parm does not bound vs formal, but checks below/above and pins.
-
-
-   */
   private static int ERR=0;
   @Test public void testMemoryArgs() {
     Env top = Env.top_scope();
@@ -593,14 +571,14 @@ public class TestNodeSmall {
     ConNode ctl = gvn.init(new ConNode<>(Type.CTRL));
     CallNode call = gvn.init(new CallNode(true, null, ctl, null, null, null, null));
     CallEpiNode cepi = gvn.init(new CallEpiNode(call, Env.DEFMEM)); // Unwired
-    CProjNode cpj = gvn.init(new CProjNode(call,0));
-    ConNode mem = gvn.init(new ConNode<>(tmem ));
-    ConNode arg1= gvn.init(new ConNode<>(targ1.simple_ptr()));
-    ConNode arg2= gvn.init(new ConNode<>(targ2.simple_ptr()));
+    Node cpj = gvn.xform(new CProjNode(call,0));
+    ConNode mem = (ConNode)gvn.xform(new ConNode<>(tmem ));
+    ConNode arg1= (ConNode)gvn.xform(new ConNode<>(targ1.simple_ptr()));
+    ConNode arg2= (ConNode)gvn.xform(new ConNode<>(targ2.simple_ptr()));
 
     // Make nodes
     FunNode fun = new FunNode("fun",tsig,-1);
-    gvn.init(fun.add_def(cpj));
+    gvn.xform(fun.add_def(cpj));
     cepi.cg_set(fun._fidx);
 
     ParmNode parmem= gvn.init(new ParmNode(-2,"mem" ,fun,mem ,null));
@@ -613,11 +591,11 @@ public class TestNodeSmall {
     Type tpm = parmem.value(gvn);
 
     // Check the isa(sig) on complex pointer args
-    Type actual1 = tp1.sharpen(tpm);
+    Type actual1 = tpm.sharptr(tp1);
     Type formal1 = fun.formal(1);
     if( !actual1.isa(formal1) && !formal1.isa(actual1) )
       perror("arg1-vs-formal1",actual1,formal1);
-    Type actual2 = tp2.sharpen(tpm);
+    Type actual2 = tpm.sharptr(tp2);
     Type formal2 = fun.formal(2);
     if( !actual2.isa(formal2) && !formal2.isa(actual2) )
       perror("arg2-vs-formal2",actual2,formal2);

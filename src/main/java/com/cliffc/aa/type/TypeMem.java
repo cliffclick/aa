@@ -1,11 +1,9 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.util.Ary;
-import com.cliffc.aa.util.AryInt;
-import com.cliffc.aa.util.SB;
-import com.cliffc.aa.util.VBitSet;
+import com.cliffc.aa.util.*;
 
 import java.util.Arrays;
+import java.util.HashMap;
 
 /**
    See also node/MemMerge.java
@@ -65,6 +63,13 @@ public class TypeMem extends Type<TypeMem> {
   // is the default value.  Default values are replaced with null during
   // canonicalization.
   private TypeObj[] _aliases;
+
+  // A cache of sharpened pointers.  Pointers get sharpened by looking up their
+  // aliases in this memory (perhaps merging several aliases).  The process is
+  // recursive and "deeply" sharpens pointers, and is somewhat expensive.
+  // Maintain a cache of prior results.  Not related to the objects Type, so
+  // not part of the hash/equals checks.  Optional.  Lazily filled in.
+  private HashMap<TypeMemPtr,TypeMemPtr> _sharp_cache;
 
   private TypeMem  (TypeObj[] aliases) { super(TMEM); init(aliases); }
   private void init(TypeObj[] aliases) {
@@ -128,12 +133,13 @@ public class TypeMem extends Type<TypeMem> {
   }
 
   // Alias-at.  Out of bounds or null uses the parent value.
-  public TypeObj at(int alias) { return _aliases[at_idx(alias)]; }
+  public TypeObj at(int alias) { return at(_aliases,alias); }
+  static TypeObj at(TypeObj[] tos, int alias) { return tos[at_idx(tos,alias)]; }
   // Alias-at index
-  public int at_idx(int alias) {
+  static int at_idx(TypeObj[]aliases, int alias) {
     while( true ) {
       if( alias==0 ) return 0;
-      if( alias < _aliases.length && _aliases[alias] != null )
+      if( alias < aliases.length && aliases[alias] != null )
         return alias;
       alias = BitsAlias.TREE.parent(alias);
     }
@@ -193,7 +199,7 @@ public class TypeMem extends Type<TypeMem> {
   }
 
   private static TypeMem FREE=null;
-  @Override protected TypeMem free( TypeMem ret ) { _aliases=null; FREE=this; return ret; }
+  @Override protected TypeMem free( TypeMem ret ) { _aliases=null; _sharp_cache=null; FREE=this; return ret; }
   private static TypeMem make(TypeObj[] aliases) {
     TypeMem t1 = FREE;
     if( t1 == null ) t1 = new TypeMem(aliases);
@@ -305,25 +311,119 @@ public class TypeMem extends Type<TypeMem> {
   // Shallow meet of all possible loadable values.  Used in Node.value calls, so must be monotonic.
   public TypeObj ld( TypeMemPtr ptr ) {
     if( ptr._aliases == BitsAlias.EMPTY || ptr._aliases == BitsAlias.NIL )
-      return above_center() ? TypeObj.XOBJ : TypeObj.OBJ;
+      return oob(TypeObj.OBJ);
     if( this== FULL ) return TypeObj. OBJ;
     if( this==EMPTY ) return TypeObj.XOBJ;
-    boolean any = ptr.above_center();
+    return ld(_aliases,ptr._aliases);
+  }
+  static TypeObj ld( TypeObj[] tos, BitsAlias aliases ) {
+    boolean any = aliases.above_center();
     // Any alias, plus all of its children, are meet/joined.  This does a
     // tree-based scan on the inner loop.
     TypeObj obj1 = any ? TypeObj.OBJ : TypeObj.XOBJ;
-    for( int alias : ptr._aliases )
+    for( int alias : aliases )
       for( int kid=alias; kid!=0; kid=BitsAlias.next_kid(alias,kid) ) {
-        TypeObj x = at(kid);
+        TypeObj x = at(tos,kid);
         obj1 = (TypeObj)(any ? obj1.join(x) : obj1.meet(x));
       }
     return obj1;
   }
-  // TODO: Implement this.  Needed when checking complex actuals against
-  // complex formals.
-  public TypeObj ld_deep( TypeMemPtr ptr ) {
-    return ld(ptr);
+
+  // Incrementally build a sharpened memory, structs and pointers.  Alias sets
+  // can be looked-up directly in a map from BitsAlias to TypeObjs.  This is
+  // useful for resolving all the deep pointer structures at a point in the
+  // program (i.e., error checking arguments).  Given a HashMap, a TypeMem and
+  // a BitsAlias it returns a TypeObj (and extends the HashMap for future
+  // calls).  The TypeObj may contain deep pointers to other deep TypeObjs,
+  // including cyclic types.
+  public TypeMemPtr sharpen( TypeMemPtr tmp ) {
+    if( _sharp_cache==null ) _sharp_cache = new HashMap<>();
+    Ary<Type> reaches = new Ary<>(new Type[1],0);
+    TypeMemPtr tmpx = _sharpen_get(tmp,reaches);
+    if( reaches.isEmpty() ) return tmpx; // Fast path
+
+    // Walk the coarse sets, intern & update cache.  Make a single top struct
+    // with fields to all the new reaches pointers, and do the normal cyclic
+    // shrink/install on it.
+    int cnt=0;
+    for( Type t : reaches ) if( t instanceof TypeMemPtr ) cnt++;
+    Type[] ts = TypeAry.get(cnt);
+    cnt=0;
+    for( Type t : reaches ) if( t instanceof TypeMemPtr ) ts[cnt++] = t;
+    TypeStruct ts1 = TypeStruct.malloc(ts);
+    reaches.push(ts1);
+    TypeStruct ts2 = TypeStruct.shrink(reaches,ts1);
+    TypeStruct ts3 = ts2.install_cyclic(reaches);
+    assert ts2==ts3;
+    for( Type t2 : ts2._ts )
+      _sharp_cache.put(((TypeMemPtr)t2).make_from(TypeObj.OBJ),(TypeMemPtr)t2);
+    for( TypeMemPtr ptr : _sharp_cache.values() )
+      assert ptr.interned() && ptr._obj.interned();
+    return _sharp_cache.get(tmp); // Re-get updated value
   }
+  // Get the coarse match for this set of alias bits.
+  private TypeMemPtr _sharpen_get( TypeMemPtr tmp, Ary<Type> reaches ) {
+    if( tmp._obj != TypeObj.OBJ ) return tmp; // Already assumed canonical
+    TypeMemPtr tmpx = _sharp_cache.get(tmp); // Check deep-ptr cache
+    if( tmpx != null ) return tmpx;   // Winner!
+
+    // Missed in cache.  See if single bit.
+    int alias = tmp._aliases.strip_nil().abit();
+    if( alias != -1 ) {
+      TypeObj to = at(alias);   // Get from local memory.
+      // If this is a Struct, we need to start doing recursive things
+      if( to instanceof TypeStruct ) {
+        tmpx = (TypeMemPtr)tmp.clone();
+        tmpx._obj = ((TypeStruct)to).sharpen_clone();
+        tmpx._hash = tmpx.compute_hash();
+      } else {
+        tmpx = tmp.make_from(to); // Normal interned path
+      }
+    } else {                    // Handle multi-bit case
+      // Split out the max alias as a singleton, and "all the rest".
+      // Compute both (recursively), then merge the results.
+      int amax = tmp._aliases.max(); // Max alias
+      BitsAlias bmax = BitsAlias.make0(amax);
+      TypeMemPtr tmpmax = _sharpen_get(TypeMemPtr.make(bmax,TypeObj.OBJ),reaches);
+      BitsAlias bmin = tmp._aliases.clear(amax);
+      TypeMemPtr tmpmin = _sharpen_get(TypeMemPtr.make(bmin,TypeObj.OBJ),reaches);
+      // Merge results, without installing anything
+      assert TypeStruct.RECURSIVE_MEET==0; TypeStruct.RECURSIVE_MEET++;
+      tmpx = (TypeMemPtr)tmpmin.meet(tmpmax); // Merge results
+      TypeStruct.RECURSIVE_MEET--;  assert TypeStruct.RECURSIVE_MEET==0;
+    }
+    // Insert into cache
+    _sharp_cache.put(tmp,tmpx);
+    // If not interned, then we need to start doing recursive things
+    if( !tmpx.interned() ) {
+      TypeStruct ts = (TypeStruct)tmpx._obj;
+      reaches.push(tmpx);       // Push cloned things on reaches list.
+      reaches.push(ts);
+      // Walk internal fields, looking for more (deep) aliases
+      for( int i=0; i<ts._ts.length; i++ ) { // For all fields
+        Type fld = ts._ts[i];
+        if( fld instanceof TypeFunPtr ) {
+          TypeFunPtr tfp = (TypeFunPtr)fld;
+          if( tfp._disp==TypeMemPtr.NO_DISP || tfp._disp==TypeMemPtr.NO_DISP.dual() ) continue;
+          assert tfp.interned();
+          TypeFunPtr tfp2 = (TypeFunPtr)tfp.clone();
+          // Since cloned, directly change field - to the cloned field version.
+          reaches.push(ts._ts[i] = tfp2); // Push cloned things on reaches list
+          tfp2._disp = _sharpen_get(tfp2._disp,reaches);
+        }
+        // Since cloned, directly change field - to the cloned field version.
+        if( fld instanceof TypeMemPtr )
+          ts._ts[i] = _sharpen_get((TypeMemPtr)fld,reaches);
+      }
+    }
+
+    // Return result
+    return tmpx;
+  }
+
+  // Sharpen if a maybe-pointer
+  @Override public Type sharptr( Type ptr ) { return ptr instanceof TypeMemPtr ? sharpen((TypeMemPtr)ptr) : ptr; }
+
 
   // Whole object Store at an alias.  Just merge with the parent.
   public TypeMem st( int alias, TypeObj obj ) {

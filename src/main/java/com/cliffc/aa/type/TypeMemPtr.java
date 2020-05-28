@@ -141,11 +141,11 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   // Widens, not lowers.
   @Override public Type simple_ptr() {
     if( _obj==TypeObj.OBJ || _obj==TypeObj.XOBJ || _obj==TypeStr.NO_DISP ) return this;
-    return make(_aliases,above_center() ? TypeObj.XOBJ : TypeObj.OBJ);
+    return make(_aliases,oob(TypeObj.OBJ));
   }
   @Override public boolean above_center() {
-    // Aliases first, but if on the centerline (strictly EMPTY) then tie-break with _obj
-    return _aliases.above_center() || (_aliases==BitsAlias.EMPTY && _obj.above_center());
+    // If either is above, then the whole is above
+    return _aliases.above_center() || _obj.above_center();
   }
   // Aliases represent *classes* of pointers and are thus never constants.
   // nil is a constant.
@@ -237,10 +237,4 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   @SuppressWarnings("unchecked")
   @Override void walk( Predicate<Type> p ) { if( p.test(this) ) _obj.walk(p); }
   public int getbit() { return _aliases.getbit(); }
-  // Sharpen a TypeMemPtr with a TypeMem
-  @Override public Type sharpen( Type tmem ) {
-    TypeMem tmem2 = (TypeMem)tmem.bound(TypeMem.ALLMEM);
-    assert this==simple_ptr();
-    return make(_aliases,tmem2.ld_deep(this));
-  }
 }

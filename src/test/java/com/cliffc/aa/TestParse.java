@@ -11,7 +11,6 @@ import static org.junit.Assert.*;
 
 public class TestParse {
   private static final String[] FLDS = new String[]{"^","n","v"};
-  private static final String[] FLDS2= new String[]{"^","nn","vv"};
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
@@ -358,6 +357,7 @@ public class TestParse {
     test_isa("A= :@{n=B; v=int}; B= :@{n=A; v=flt}", TypeFunPtr.GENERIC_FUNPTR);
   }
 
+  private static final String[] FLDS2= new String[]{"^","map","nn","vv"};
   @Test public void testParse07() {
     TypeStruct dummy = TypeStruct.DISPLAY; // Force class loading cycle
     // Passing a function recursively
@@ -372,7 +372,7 @@ public class TestParse {
     // interspersed with recursive computation calls.
     test_obj_isa("map={x -> x ? @{nn=map(x.n);vv=x.v&x.v} : 0};"+
                  "map(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0;v=1};v=2};v=3};v=4})",
-            TypeStruct.make(FLDS2,TypeStruct.ts(Type.NIL,TypeMemPtr.STRUCT0,TypeInt.INT8))); //con(20.25)
+                 TypeStruct.make(FLDS2,TypeStruct.ts(TypeMemPtr.DISPLAY_PTR,Type.XSCALAR,TypeMemPtr.STRUCT0,TypeInt.INT8))); //con(20.25)
     // Test does loads after recursive call, which should be allowed to bypass.
     test("sum={x -> x ? sum(x.n) + x.v : 0};"+
          "sum(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0;v=1};v=2};v=3};v=4})",
@@ -792,8 +792,7 @@ strs:List(str?) = ... // List of null-or-strings
   }
   static private void test_ptr( String program, Function<Integer,Type> expected ) {
     try( TypeEnv te = run(program) ) {
-      assertTrue(te._t instanceof TypeMemPtr);
-      TypeMemPtr tmp = (TypeMemPtr)(te._t.sharpen(te._tmem));
+      TypeMemPtr tmp = te._tmem.sharpen((TypeMemPtr)te._t);
       int alias = tmp.getbit(); // internally asserts only 1 bit set
       Type t_expected = expected.apply(alias);
       assertEquals(t_expected,tmp);
@@ -801,8 +800,7 @@ strs:List(str?) = ... // List of null-or-strings
   }
   static private void test_ptr0( String program, Function<Integer,Type> expected ) {
     try( TypeEnv te = run(program) ) {
-      assertTrue(te._t instanceof TypeMemPtr);
-      TypeMemPtr tmp = (TypeMemPtr)(te._t.sharpen(te._tmem));
+      TypeMemPtr tmp = te._tmem.sharpen((TypeMemPtr)te._t);
       BitsAlias bits = tmp._aliases;
       assertTrue(bits.test(0));
       int alias = bits.strip_nil().getbit(); // internally asserts only 1 bit set
@@ -820,9 +818,8 @@ strs:List(str?) = ... // List of null-or-strings
   }
   static private void test_obj_isa( String program, TypeObj expected) {
     try( TypeEnv te = run(program) ) {
-      assertTrue(te._t instanceof TypeMemPtr);
-      //int alias = ((TypeMemPtr)te._t).getbit(); // internally asserts only 1 bit set
-      TypeObj to = te._tmem.ld_deep((TypeMemPtr)te._t);
+      int alias = ((TypeMemPtr)te._t)._aliases.strip_nil().getbit(); // internally asserts only 1 bit set
+      TypeObj to = te._tmem.sharpen((TypeMemPtr)te._t)._obj;
       assertTrue(to.isa(expected));
     }
   }
