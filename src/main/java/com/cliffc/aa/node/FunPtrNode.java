@@ -44,6 +44,26 @@ public final class FunPtrNode extends Node {
       if( DefMemNode.CAPTURED.get(alias) )
         return set_def(1,gvn.con(TypeMemPtr.make(alias,TypeStr.NO_DISP)),gvn); // No display needed
     }
+
+    // Remove unused displays.  Track uses; Calls with no FPClosure are OK.
+    // Uses storing the FPTR and passing it along are dangerous.
+    if( gvn._opt_mode>0 && !(display() instanceof ConNode) ) {
+      boolean safe=true;
+      for( Node use : _uses )  {
+        if( !(use instanceof CallNode) ) { safe=false; break; }
+        CallNode call = (CallNode)use;
+        for( int i=0; i<call.nargs(); i++ ) if( call.arg(i)==use ) { safe=false; break; }
+        for( Node cuse : call._uses )
+          if( cuse instanceof FP2ClosureNode )
+            { safe=false; break; }
+        if( !safe ) break;
+      }
+      if( safe ) {              // No unsafe users; nuke display
+        TypeMemPtr tdisp = (TypeMemPtr)gvn.type(display());
+        return set_def(1,gvn.con(tdisp.make_from(TypeStr.NO_DISP)),gvn); // No display needed
+      }
+    }
+
     return null;
   }
   @Override public Type value(GVNGCM gvn) {

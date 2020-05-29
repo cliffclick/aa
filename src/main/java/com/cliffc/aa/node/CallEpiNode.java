@@ -19,15 +19,12 @@ import com.cliffc.aa.type.*;
 // bit-vector.
 
 public final class CallEpiNode extends Node {
-  public CallEpiNode( Node... nodes ) { super(OP_CALLEPI,nodes);  assert nodes[1] instanceof DefMemNode; _cg_wired = BitsFun.EMPTY; }
+  public CallEpiNode( Node... nodes ) { super(OP_CALLEPI,nodes);  assert nodes[1] instanceof DefMemNode; }
   String xstr() { return ((is_dead() || is_copy()) ? "x" : "C")+"allEpi"; } // Self short name
   public CallNode call() { return (CallNode)in(0); }
   int nwired() { return _defs._len-2; }
   static int wire_num(int x) { return x+2; }
   RetNode wired(int x) { return (RetNode)in(x+2); }
-
-  // Set of FIDXS that are both wired & flowing types.
-  BitsFun _cg_wired;
 
   @Override public Node ideal(GVNGCM gvn, int level) {
     // If inlined, no further xforms.  The using Projs will fold up.
@@ -58,45 +55,13 @@ public final class CallEpiNode extends Node {
       }
     }
 
-    // See if we can flow more wired CG edges.
-    if( _cg_wired != fidxs ) {
-      //TODO: Surely must be in value() so GCP wires
-      TypeMem callmem = CallNode.tmem(tcall);
-      Type tci = gvn.type(this);
-      if( !(tci instanceof TypeTuple ) ) return null;
-      TypeMem cepimem = (TypeMem)((TypeTuple)tci)._ts[1];
-      BitsFun progress = _cg_wired;
-      for( int fidx : fidxs ) {                 // For all fidxs
-        if( BitsFun.is_parent(fidx) ) continue; // Do not wire parents, as they will eventually settle out
-        FunNode fun = FunNode.find_fidx(fidx);  // Lookup, even if not wired
-        if( fun.is_forward_ref() ) continue;    // Not forward refs, which at GCP just means a syntax error
-        if( cg_tst(fidx) ) continue;            // Already wired
-        if( _defs.find(fun.ret()) == -1 ) continue; // Wire before flow-enable
-        // Wiring a Call brings in memory that the Call knows into what the
-        // Function knows.  These can be out-of-sync, if one or the other has
-        // propagated knowledge of e.g. new allocations.  Stall wiring until
-        // the types are properly "isa".
-        ParmNode fmem = fun.parm(-2);
-        if( fmem != null ) {
-          Type funmem = gvn.type(fmem);
-          if( !callmem.isa(funmem) ) // If call is lower than Parm:mem, the Parm will drop - not allowed
-            continue;
-        }
-        // Same for the reverse path from Return to CallEpi; the CallEpi must
-        // merge all returns and also is conservative, so it must remain
-        // at or below the returns, but only along the escaped aliases.
-        RetNode ret = fun.ret();
-        TypeMem retmem = (TypeMem)((TypeTuple)gvn.type(ret ))._ts[1];
-        if( !retmem.isa_escape(cepimem,CallNode.tals(tcall).aliases()) )
-          continue;
-        cg_set(fidx);           // Set bit, wired and flowing types
-      }
-      if( _cg_wired != progress ) return this;
-    }
+    // See if we can wire any new fidxs directly between Call/Fun and Ret/CallEpi
+    if( check_and_wire(gvn) )
+      return this;              // Return with progress
 
     // The one allowed function is already wired?  Then directly inline.
     // Requires this calls 1 target, and the 1 target is only called by this.
-    if( nwired()==1 && fidxs.abit() != -1 && fidxs.isa(_cg_wired) ) { // Wired to 1 target
+    if( nwired()==1 && fidxs.abit() != -1 ) { // Wired to 1 target
       RetNode ret = wired(0);                 // One wired return
       FunNode fun = ret.fun();
       if( fun != null && fun._defs._len==2 && // Function is only called by 1 (and not the unknown caller)
@@ -187,46 +152,77 @@ public final class CallEpiNode extends Node {
     return null;
   }
 
-  boolean cg_tst(int fidx) { return _cg_wired.test_recur(fidx); }
+  // Used during GCP and Ideal calls to see if wiring is possible.
+  // Return true if a new edge is wired
+  public boolean check_and_wire( GVNGCM gvn ) {
+    if( gvn._opt_mode == 0 ) return false; // Graph not formed yet
+    CallNode call = call();
+    Type tcall = gvn.type(call);
+    if( !(tcall instanceof TypeTuple) ) return false;
+    BitsFun fidxs = CallNode.ttfp(tcall)._fidxs;
+    if( fidxs.above_center() )  return false; // Still choices to be made during GCP.
 
-  // Used during code-cloning to remove the parent fidx, and add one or more children.
-  void cg_clr(int fidx) {
-    assert cg_tst(fidx);
-    _cg_wired = _cg_wired.clear(fidx);
+    // Check all fidxs for being wirable
+    boolean progress = false;
+    for( int fidx : fidxs ) {                 // For all fidxs
+      if( BitsFun.is_parent(fidx) ) continue; // Do not wire parents, as they will eventually settle out
+      FunNode fun = FunNode.find_fidx(fidx);  // Lookup, even if not wired
+      if( fun.is_forward_ref() ) continue;    // Not forward refs, which at GCP just means a syntax error
+      if( _defs.find(fun.ret()) != -1 ) continue; // Wired already
+      if( !can_wire(gvn,fun,tcall) )
+        continue;         // Memory types not aligned
+      progress=true;
+      wire1(gvn,call,fun,fun.ret()); // Wire Call->Fun, Ret->CallEpi
+    }
+    return progress;
   }
-  void cg_set(int fidx) { _cg_wired = _cg_wired.set(fidx); }
+
+  // Ask if this unwired Fun/Ret is memory compatible with the Call/CallEpi.
+  boolean can_wire( GVNGCM gvn, FunNode fun, Type tcall ) {
+    Type tci = gvn.type(this);
+    if( !(tci instanceof TypeTuple ) ) return false; // Collapsing
+    if( gvn._opt_mode==2 ) return true;              // Adding wire edges during GCP?  Types all high
+    TypeMem cepimem = (TypeMem)((TypeTuple)tci)._ts[1];
+    assert !fun.is_forward_ref();
+    RetNode ret = fun.ret();
+    ParmNode fmem = fun.parm(-2);
+    if( fmem != null ) {        // Not all functions have memory
+      // Wiring a Call brings in memory that the Call knows into what the Fun
+      // knows.  These can be out-of-sync, if one or the other has propagated
+      // knowledge of e.g. new allocations.  Stall wiring until the types are
+      // properly "isa".
+      TypeMem callmem = CallNode.tmem(tcall);
+      Type funmem = gvn.type(fmem);
+      // If call is lower than Parm:mem, the Parm will drop - not allowed
+      if( !callmem.isa(funmem) )
+        return false;
+    }
+
+    // Same for the reverse path from Return to CallEpi; the CallEpi must
+    // merge all returns and also is conservative, so it must remain
+    // at or below the returns, but only along the escaped aliases.
+    TypeMem retmem = (TypeMem)((TypeTuple)gvn.type(ret ))._ts[1];
+    if( !retmem.isa_escape(cepimem,CallNode.tals(tcall).aliases()) )
+      return false;
+    return true;
+  }
+
 
   // Wire the call args to a known function, letting the function have precise
   // knowledge of its callers and arguments.  This adds a edges in the graph
   // but NOT in the CG, until _cg_wired gets set.
-  boolean wire( GVNGCM gvn, CallNode call, FunNode fun ) {
-    assert _keep==0;            // not expecting this during calls
-    RetNode ret = fun.ret();
-    for( int i=0; i<nwired(); i++ )
-      if( wired(i) == ret )     // Look for same Ret
-        return false;           // Already wired up
-    wire1(gvn,call,fun,ret);
-    return true;
-  }
-
-  // Wire, adding self AND setting the CG edge.  Used by FunNode
-  // cloning, which guarantees types are correct beforehand.
-  void wire2( GVNGCM gvn, CallNode call, FunNode fun, RetNode ret ) {
-    wire1(gvn,call,fun,ret);
-    cg_set(fun._fidx);
-  }
-
-  // Wire, then add self to the return
   void wire1( GVNGCM gvn, CallNode call, FunNode fun, RetNode ret ) {
-    wire0(gvn,call,fun);
+    assert _defs.find(ret)==-1; // No double wiring
+    wire0(gvn,call,fun,ret);
     // Wire self to the return
+    gvn.add_work(this);
     gvn.add_def(this,ret);
     gvn.add_work(ret);
     gvn.add_work(ret.funptr());
   }
 
   // Wire without the redundancy check, or adding to the CallEpi
-  void wire0( GVNGCM gvn, CallNode call, FunNode fun ) {
+  void wire0( GVNGCM gvn, CallNode call, FunNode fun, RetNode ret ) {
     // Wire.  During GCP, cannot call "xform" since e.g. types are not final
     // nor constant yet - and need to add all new nodes to the GCP worklist.
     // During iter(), must call xform() to register all new nodes.
@@ -314,37 +310,39 @@ public final class CallEpiNode extends Node {
       if( !escapes.test_recur(escape) ) { // A non-escaping alias
         TypeObj tesc = tmem.at(escape);// The pre-call value
         if( post_call_mem.at(escape) != tesc &&
-            (tesc!=TypeObj.XOBJ && tesc !=TypeObj.UNUSED) ) // And pre-call HAS a value, other might be made IN the function & escaping out
+            tesc!=TypeObj.XOBJ ) // And pre-call HAS a value, otherwise might be made IN the function & escaping out
           post_call_mem = post_call_mem.set(escape,tesc);
       }
     }
-
-    // Crush all the non-finals across the call
     TypeTuple post_call_crush = TypeTuple.make(Type.CTRL,post_call_mem,Type.ALL);
-    TypeTuple mt = post_call_crush;
 
-    // Are all call targets known, wired & enabled?
-    // Then can lift to the meet-across of returns.
-    if( fidxs.isa(_cg_wired) ) {
-      TypeTuple tret = TypeTuple.XRET;    // Start high and 'meet'
-      for( int i=0; i<nwired(); i++ ) {
-        Node ret = in(wire_num(i));
-        if( ret instanceof RetNode &&            // Only fails during testing
-            ((RetNode)ret).is_copy() ) continue; // Dying, not called, not returning here
-        Type tr = gvn.type(ret);          // Allow ConNode here for testing
-        if( !(tr instanceof TypeTuple) || // Only fails during testing
-            ((TypeTuple)tr)._ts.length != TypeTuple.XRET._ts.length )
-          continue;               // Only fails during testing
-        if( !fidxs.test_recur(((RetNode)ret)._fidx) ) continue; // Wired, but fptr does not reach here
-        tret = (TypeTuple)tret.meet(tr);
-      }
-      // Still must join with the post_call_crush, because the return knows as
-      // much as the crushed-call does in all cases.  Needed with recursive
-      // calls pre-GCP, as the tail-call-loop can never lift on its own.
-      mt = (TypeTuple)tret.join(post_call_crush);
+    // Everybody calls?  Shortcut.
+    if( fidxs==BitsFun.FULL )
+      return post_call_crush;
+    // If not wired all available fidxs, assume meet-across-all is
+    // TypeTuple.RET, and join and return.  Shortcut.
+    if( fidxs.bitCount() > nwired() )
+      return gvn._opt_mode==2 ? TypeTuple.XRET : post_call_crush;
+
+    // Meet across wired returns
+    TypeTuple tret = TypeTuple.XRET;    // Start high and 'meet'
+    for( int i=0; i<nwired(); i++ ) {
+      Node ret = in(wire_num(i));
+      if( ret instanceof RetNode &&            // Only fails during testing
+          ((RetNode)ret).is_copy() ) continue; // Dying, not called, not returning here
+
+      Type tr = gvn.type(ret);          // Allow ConNode here for testing
+      if( !(tr instanceof TypeTuple) || // Only fails during testing
+          ((TypeTuple)tr)._ts.length != TypeTuple.XRET._ts.length )
+        continue;               // Only fails during testing
+      if( !fidxs.test_recur(((RetNode)ret)._fidx) ) continue; // Wired, but fptr does not reach here
+      tret = (TypeTuple)tret.meet(tr);
     }
-
-    return mt;
+    // Still must join with the post_call_crush, because the return knows as
+    // much as the crushed-call does in all cases.  Needed with recursive
+    // calls pre-GCP, as the tail-call-loop can never lift on its own.
+    // Crush all the non-finals across the call
+    return tret.join(post_call_crush);
   }
 
   // Does this set of aliases bypass the call?

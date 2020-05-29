@@ -271,11 +271,10 @@ public class GVNGCM {
   private boolean replace_con(Type t, Node n) {
     if( n._keep >0 || n instanceof ConNode || n instanceof ErrNode )
       return false; // Already a constant, or never touch an ErrNode
-    if( !t.is_con() ) return false;
-    // Dead function
-    if( t instanceof TypeFunPtr ) {
-      Node x = FunNode.find_fidx(((TypeFunPtr)t).fidx());
-      if( x==null || x.is_dead() ) return false;
+    if( !t.is_con() ) {
+      if( t instanceof TypeFunPtr && !(n instanceof FunPtrNode) )
+        return ((TypeFunPtr)t).can_be_fpnode();
+      return false;
     }
     // Parm is in-error; do not remove the error.
     if( n instanceof ParmNode && n.err(this) != null )
@@ -302,6 +301,8 @@ public class GVNGCM {
         add_work(use);
         if( use instanceof RegionNode ) // Region users need to recheck PhiNode
           add_work_uses(use);
+        if( use instanceof ParmNode && ((ParmNode)use)._idx==-2 )
+          add_work(use.in(0));  // Recheck function inlining
       }
       // Add self at the end, so the work loops pull it off again.
       add_work(old);
@@ -522,10 +523,14 @@ public class GVNGCM {
             add_work_defs(n);
             add_work_defs(n.in(2)); // Also Call.Unresolved: any resolved call makes that call alive
           }
+          // Memory Parms enable sharpening all pointer-Parms.
+          if( n instanceof ParmNode && ((ParmNode)n)._idx==-2 )
+            add_work_uses(n.in(0));
           // Optimistic Call-Graph discovery.  If the funptr input lowers
           // to where a new FIDX might be possible, wire the CG edge.
-          if( n instanceof CallNode )
-            ((CallNode)n).check_wire(this);
+          if( n instanceof CallEpiNode ) check_and_wire((CallEpiNode)n);
+          for( Node use : n._uses )
+            if( use instanceof CallEpiNode ) check_and_wire((CallEpiNode)use);
         }
 
         // Reverse flow
@@ -561,6 +566,7 @@ public class GVNGCM {
         FunPtrNode fptr = call.least_cost(this,fidxs);
         if( fptr==null ) continue;  // declared ambiguous, will be an error later
         call.set_fun_reg(fptr,this);// Set resolved edge
+        add_work(call);
         add_work(fptr);             // Unresolved is now resolved and live
         // If this call is wired, a CallEpi will 'peek thru' an Unresolved to
         // pass liveness to a Ret.  Since 1-step removed from neighbor, have to
@@ -578,6 +584,13 @@ public class GVNGCM {
     rez.keep();
     walk_dead(Env.START);
   }
+  private void check_and_wire( CallEpiNode cepi ) {
+    if( !cepi.check_and_wire(this) ) return;
+    add_work(cepi.call());
+    add_work(cepi);
+    assert Env.START.more_flow(this,new VBitSet(),false,0)==0;
+  }
+
   // Debugging hook
   private boolean check_monotonicity(Node n, Type ot, Type nt) {
     assert nt==nt.simple_ptr();   // Only simple pointers in node types
@@ -601,7 +614,7 @@ public class GVNGCM {
   // Node n is new during GCP
   public Node new_gcp( Node n ) {
     Node x = _vals.get(n);
-    if( x!=null ) return x;
+    if( x!=null ) { kill0(n); return x; }
     _vals.put(n,n);
     n._live = TypeMem.DEAD;
     setype(n,n.value(this));
@@ -615,9 +628,14 @@ public class GVNGCM {
     assert !n.is_dead();
     if( _wrk2_bits.tset(n._uid) ) return; // Been there, done that
     if( n==Env.START ) return;          // Top-level scope
+    Type t = type(n);                   // Get optimistic computed type
+
+    // Replace with a constant, if possible
+    if( replace_con(t,n) )
+      n=subsume(n,con(t));      // Constant replacement
+
     // Hit the fixed point, despite any immediate updates.  All prims are live,
     // even if unused so they might not have been computed
-    Type t = type(n);                   // Get optimistic computed type
     assert n.value(this)==t;
     assert n.live(this)==n._live;
 

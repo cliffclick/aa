@@ -397,7 +397,8 @@ public class TestNodeSmall {
     //   Ret - {Fun,Mem,Parm:^} - Not really fact() nor gen_ctr() code but upwards exposed closure
     //   FunPtr - Ret
     gvn._opt_mode=0;
-    ConNode ctl = (ConNode) gvn.xform(new ConNode<>(Type.CTRL));
+    ConNode ctl = gvn.init(new ConNode<>(Type.CTRL));
+    gvn.setype(ctl,Type.CTRL);
     ConNode mem = (ConNode)gvn.xform(new ConNode<>(TypeMem.MEM.dual()));
     ConNode rpc = (ConNode)gvn.xform(new ConNode<>(TypeRPC.ALL_CALL));
     ConNode dsp_prims = (ConNode) gvn.xform(new ConNode<>(TypeMemPtr.DISP_SIMPLE));
@@ -579,7 +580,6 @@ public class TestNodeSmall {
     // Make nodes
     FunNode fun = new FunNode("fun",tsig,-1);
     gvn.xform(fun.add_def(cpj));
-    cepi.cg_set(fun._fidx);
 
     ParmNode parmem= gvn.init(new ParmNode(-2,"mem" ,fun,mem ,null));
     ParmNode parm1 = gvn.init(new ParmNode( 1,"arg1",fun,arg1,null));

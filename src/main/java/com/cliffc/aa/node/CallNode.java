@@ -227,10 +227,9 @@ public class CallNode extends Node {
       if( fptr != null ) return set_fun(fptr, gvn); // Resolve to 1 choice
     }
 
-    // Wire targets that are not choices (1 or multi) with matching nargs even
-    // with bad/low args; they may lift to good.  CallEpi will inline wired
-    // functions with good args.
-    if( check_wire(gvn,fidxs) )
+    // Wire valid targets.
+    CallEpiNode cepi = cepi();
+    if( cepi!=null && cepi.check_and_wire(gvn) )
       return this;              // Some wiring happened
 
     // Check for dead args and trim; must be after all wiring is done because
@@ -356,7 +355,7 @@ public class CallNode extends Node {
     TypeFunPtr tfp = ttfp(tcall);
     // If resolve has chosen this dfidx, then the FunPtr is alive.
     BitsFun fidxs = tfp.fidxs();
-    return !fidxs.above_center() && fidxs.test_recur(dfidx) ? _live : TypeMem.DEAD;
+    return !fidxs.above_center() && fidxs.test_recur(dfidx) ? TypeMem.EMPTY : TypeMem.DEAD;
   }
 
 
@@ -534,34 +533,6 @@ public class CallNode extends Node {
     return tied ? null : best_fptr; // Ties need to have the ambiguity broken another way
   }
 
-  // Called from GCP, using the optimistic type.
-  public void check_wire( GVNGCM gvn) {
-    Type tcall = gvn.type(this);
-    if( tctl(tcall) != Type.CTRL ) return;
-    BitsFun fidxs = ttfp(tcall).fidxs();
-    check_wire(gvn, fidxs);
-  }
-
-  // Used during GCP and Ideal calls to see if wiring is possible.
-  public boolean check_wire( GVNGCM gvn, BitsFun fidxs ) {
-    if( gvn._opt_mode == 0 ) return false; // Graph not formed yet
-    if( fidxs.above_center() )  return false; // Still choices to be made during GCP.
-    CallEpiNode cepi = cepi();
-    if( cepi==null ) return false; // Dying
-
-    // Check all fidxs for being wirable
-    boolean progress = false;
-    for( int fidx : fidxs ) {                 // For all fidxs
-      if( BitsFun.is_parent(fidx) ) continue; // Do not wire parents, as they will eventually settle out
-      FunNode fun = FunNode.find_fidx(fidx);  // Lookup, even if not wired
-      if( fun.is_forward_ref() ) continue;    // Not forward refs, which at GCP just means a syntax error
-
-      // Internally wire() checks for already wired.
-      progress |= cepi.wire(gvn,this,fun);
-    }
-    return progress;
-  }
-
   @Override public String err(GVNGCM gvn) { return err(gvn,false); }
   String err(GVNGCM gvn, boolean fast) {
     // Fail for passed-in unknown references directly.
@@ -618,7 +589,7 @@ public class CallNode extends Node {
     return null;
   }
 
-  CallEpiNode cepi() {
+  public CallEpiNode cepi() {
     for( Node cepi : _uses )    // Find CallEpi for bypass aliases
       if( cepi instanceof CallEpiNode )
         return (CallEpiNode)cepi;

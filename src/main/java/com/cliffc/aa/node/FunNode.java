@@ -437,15 +437,14 @@ public class FunNode extends RegionNode {
       TypeFunPtr tfp = CallNode.ttfp(gvn.type(call));
       int fidx = tfp.fidxs().abit();
       if( fidx < 0 ) continue;  // Call must only target one fcn
-      if( !((CallNode)call).cepi().cg_tst(fidx) ) // CG edge must have been turned on already
-        continue;               // Probably bad-args; not a candidate for a private split
       int ncon=0;
       for( ParmNode parm : parms )
         if( parm != null ) {    // Some can be dead
-          Type t = gvn.sharptr(parm.in(i),mem.in(i));
-          if( !t.isa(formal(parm._idx)) ) // Path is in-error?
-            { ncon = -2; break; } // This path is in-error, cannot inline even if small & constants
-          if( t.is_con() ) ncon++; // Count constants along each path
+          Type actual = gvn.sharptr(parm.in(i),mem.in(i));
+          Type formal = formal(parm._idx);
+          if( !actual.isa(formal) ) // Path is in-error?
+            { ncon = -2; break; }   // This path is in-error, cannot inline even if small & constants
+          if( actual.is_con() ) ncon++; // Count constants along each path
         }
       if( ncon > mncons && !recursive.get(in(i)._uid) )
         { mncons = ncon; m = i; } // Path with the most constants
@@ -624,8 +623,8 @@ public class FunNode extends RegionNode {
         BitsFun call_fidxs = ((TypeFunPtr)gvn.type(call.fun())).fidxs();
         assert call_fidxs.test_recur(    fidx());
         assert call_fidxs.test_recur(fun.fidx());
-        cepi.wire2(gvn,call,this,oldret);
-        cepi.wire2(gvn,call, fun,newret);
+        cepi.wire1(gvn,call,this,oldret);
+        cepi.wire1(gvn,call, fun,newret);
         if( cepi2!=null ) {
           // Found an unwired call in original: musta been a recursive
           // self-call.  wire the clone, same as the original was wired, so the
@@ -634,17 +633,17 @@ public class FunNode extends RegionNode {
           BitsFun call_fidxs2 = ((TypeFunPtr)gvn.type(call2.fun())).fidxs();
           assert call_fidxs2.test_recur(    fidx());
           assert call_fidxs2.test_recur(fun.fidx());
-          cepi2.wire2(gvn,call2,this,oldret);
-          cepi2.wire2(gvn,call2, fun,newret);
+          cepi2.wire1(gvn,call2,this,oldret);
+          cepi2.wire1(gvn,call2, fun,newret);
         }
       } else {                  // Non-type split, wire left or right
-        if( call==path_call ) cepi.wire2(gvn,call, fun,newret);
-        else                  cepi.wire2(gvn,call,this,oldret);
+        if( call==path_call ) cepi.wire1(gvn,call, fun,newret);
+        else                  cepi.wire1(gvn,call,this,oldret);
         if( cepi2!=null && cepi2.call()!=path_call ) {
           // Found an unwired call in original: musta been a recursive
           // self-call.  wire the clone, same as the original was wired, so the
           // clone keeps knowledge about its return type.
-          cepi2.wire2(gvn,cepi2.call(),this,oldret);
+          cepi2.wire1(gvn,cepi2.call(),this,oldret);
         }
       }
     }
@@ -657,7 +656,7 @@ public class FunNode extends RegionNode {
         for( int i=0; i<ncepi.nwired(); i++ ) {
           RetNode xxxret = ncepi.wired(i); // Neither newret nor oldret
           if( xxxret != newret && xxxret != oldret ) { // Not self-recursive
-            ncepi.wire0(gvn,ncepi.call(),xxxret.fun());
+            ncepi.wire0(gvn,ncepi.call(),xxxret.fun(),xxxret);
           }
         }
       }
@@ -670,6 +669,13 @@ public class FunNode extends RegionNode {
     // Will be an error eventually, but act like its executed so the trailing
     // EpilogNode gets visited during GCP
     if( is_forward_ref() ) return Type.CTRL;
+    
+    // TODO: CNC BUG - Wired call paths from optional resolving calls are treated as 'true' Ctrl
+    // even if dead.
+    // Theory#1: do not wire unresolved
+    // Theory#2: during GCP, check-back to CProj to Call & verify fidx is available.
+
+
     return super.value(gvn);
   }
 

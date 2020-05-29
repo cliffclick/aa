@@ -67,16 +67,10 @@ public class ParmNode extends PhiNode {
   }
 
   private boolean valid_args(GVNGCM gvn, FunNode fun, int i, Node mem) {
-    Node call = fun.in(i).in(0);
-    if( !(call instanceof CallNode) ) return false; // Bad graph, do not change
-    CallEpiNode cepi  = ((CallNode)call).cepi();
-    // If not flowing, then args are not aligned
-    if( !cepi.cg_tst(fun.fidx()) ) return false;
     // Check arg type, after sharpening
-    Type t = gvn.sharptr(in(i),mem.in(i));
-    if( !t.isa(fun.formal(_idx)) )
-      return false; // Arg is NOT correct type
-    return true;
+    Type actual = gvn.sharptr(in(i),mem.in(i));
+    Type formal = fun.formal(_idx);
+    return actual.isa(formal);
   }
 
   @Override public Type value(GVNGCM gvn) {
@@ -86,9 +80,10 @@ public class ParmNode extends PhiNode {
     Node in0 = in(0);
     if( !(in0 instanceof FunNode) )  return gvn.type(in0).oob();
     // If unknown callers, then always the default value because some unknown
-    // caller can be that bad.
+    // caller can be that bad.  During & after GCP all unknown callers are
+    // accounted for.
     FunNode fun = (FunNode)in0;
-    if( fun.has_unknown_callers() )
+    if( gvn._opt_mode < 2 && fun.has_unknown_callers() )
       return gvn.type(in(1));
     int fidx = fun.fidx();      // Used to test for wired and flowing
     Node mem = fun.parm(-2);    // Memory for sharpening pointers
@@ -96,12 +91,6 @@ public class ParmNode extends PhiNode {
     Type t = Type.ANY;
     for( int i=1; i<_defs._len; i++ ) {
       if( gvn.type(fun.in(i))!=Type.CTRL ) continue; // Only meet alive paths
-      // Only meet with wired & flowing edges
-      Node call = fun.in(i).in(0);
-      if( !(call instanceof CallNode) ) continue;
-      CallEpiNode cepi = ((CallNode)call).cepi();
-      if( cepi == null ) continue;       // Broken graph
-      if( !cepi.cg_tst(fidx) ) continue; // Wired and flowing
       // Check arg type, after sharpening
       Type ta = gvn.sharptr(in(i),mem.in(i));
       t = t.meet(ta);

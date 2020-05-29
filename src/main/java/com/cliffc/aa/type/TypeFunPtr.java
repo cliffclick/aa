@@ -121,6 +121,12 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   @Override public boolean may_be_con()   { return above_center(); }
   // Since fidxs may split, never a constant.
   @Override public boolean is_con()       { return false; }
+  // Basically, a constant fidx that may be split.
+  public boolean can_be_fpnode() {
+    return (_disp==TypeFunPtr.NO_DISP || _disp._obj==TypeStr.NO_DISP) && // No display
+      // Single function
+      _fidxs.abit() > 1 && !BitsAlias.is_parent(_fidxs.abit());
+  }
   @Override public boolean must_nil() { return _fidxs.test(0) && !_fidxs.above_center(); }
   @Override public boolean may_nil() { return _fidxs.may_nil(); }
   @Override Type not_nil() {
