@@ -87,7 +87,7 @@ public class Parse {
     _gvn = Env.GVN;      // Pessimistic during parsing
   }
   String dump() { return _e._scope.dump(99); }// debugging hook
-  String dumprpo() { return Env.START.dumprpo(false); }// debugging hook
+  String dumprpo() { return Env.START.dumprpo(false,false); }// debugging hook
 
   // Parse the string in the given lookup context, and return an executable
   // program.  Called in a partial-program context; passed in an existing
@@ -998,11 +998,11 @@ public class Parse {
   // Wrap in a nullable if there is a trailing '?'.  No spaces allowed
   private Type typeq(Type t) { return peek_noWS('?') ? t.meet_nil(Type.XNIL) : t; }
 
-  // No mod is r/o, the default and lattice bottom.  ':' is read-write, '=' is
-  // final.  Currently '-' is ambiguous with function arrow ->.
+  // No mod is r/w.  ':' is read-write, '=' is final.
+  // Currently '-' is  ambiguous with function arrow ->.
   private byte tmod() {
-    if( peek("==") ) { _x--; return TypeStruct.FFNL; } // final     , leaving trailing '='
-    if( peek(":=") ) { _x--; return TypeStruct.FRW;  } // read-write, leaving trailing '='
+    if( peek_not('=','=') ) { _x--; return TypeStruct.FFNL; } // final     , leaving trailing '='
+    if( peek(":="       ) ) { _x--; return TypeStruct.FRW ; } // read-write, leaving trailing '='
     // Default for unnamed field mod
     return TypeStruct.FRW;
   }

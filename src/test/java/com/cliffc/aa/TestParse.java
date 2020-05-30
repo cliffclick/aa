@@ -338,7 +338,7 @@ public class TestParse {
     test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*[$]A:(~nil;2);3)");
 
     // TODO: Needs a way to easily test simple recursive types
-    TypeEnv te3 = Exec.go(Env.file_scope(Env.top_scope()),"args","A= :@{n==A?; v==int}; A(@{n=0;v=3})");
+    TypeEnv te3 = Exec.go(Env.file_scope(Env.top_scope()),"args","A= :@{n=A?; v=int}; A(@{n=0;v=3})");
     if( te3._errs != null ) System.err.println(te3._errs.toString());
     assertNull(te3._errs);
     TypeStruct tt3 = (TypeStruct)te3._tmem.ld((TypeMemPtr)te3._t);
