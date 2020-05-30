@@ -298,7 +298,9 @@ public final class CallEpiNode extends Node {
     if( !tmem.isa(post_call_mem) ) {
       // Self type, except easier to report a sane lower bound.
       Type self = gvn.self_type(this);
-      return self==null || self==Type.ALL ? TypeTuple.CALLE : self;
+      return self==null || self==Type.ALL
+              ? TypeTuple.CALLE
+              : TypeTuple.make(Type.CTRL,post_call_mem,((TypeTuple)self).at(2));
     }
 
     // Take Call reach-around aliases, and stomp/merge-over from pre-call
