@@ -85,7 +85,6 @@ public class ParmNode extends PhiNode {
     FunNode fun = (FunNode)in0;
     if( gvn._opt_mode < 2 && fun.has_unknown_callers() )
       return gvn.type(in(1));
-    int fidx = fun.fidx();      // Used to test for wired and flowing
     Node mem = fun.parm(-2);    // Memory for sharpening pointers
     // All callers known; merge the wired & flowing ones
     Type t = Type.ANY;
@@ -113,9 +112,8 @@ public class ParmNode extends PhiNode {
     Type formal = fun.formal(_idx);
     for( int i=1; i<_defs._len; i++ ) {
       if( gvn.type(fun.in(i))!=Type.CTRL ) continue; // Ignore dead paths
-      Type argt = gvn.sharptr(in(i),mem); // Arg type for this incoming path
-      if( argt==Type.ALL ) return null;   // Arg is in-error elsewhere, and reported elsewhere
-      if( !argt.isa(formal) ) { // Argument is legal?
+      Type argt = gvn.sharptr(in(i),mem.in(i)); // Arg type for this incoming path
+      if( argt!=Type.ALL && !argt.isa(formal) ) { // Argument is legal?  ALL args are in-error elsewhere
         // The merge of all incoming calls for this argument is not legal.
         // Find the call bringing the broken args, and use it for error
         // reporting - it MUST exist, or we have a really weird situation
@@ -125,7 +123,7 @@ public class ParmNode extends PhiNode {
             if( call.nargs() != fun.nargs() )
               return null;      // #args errors reported before bad-args
             Type argc = gvn.sharptr(call.arg(_idx),call.mem()); // Call arg type
-            if( !argc.isa(formal) ) // Check this call
+            if( argc!=Type.ALL && !argc.isa(formal) ) // Check this call
               return call._badargs[_idx].typerr(argc,call.mem(),formal);
             // Must be a different call that is in-error
           }
