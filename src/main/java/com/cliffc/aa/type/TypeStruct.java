@@ -1201,13 +1201,13 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public boolean can_update(int idx) { return fmod(idx) == FRW; }
 
   // Widen (loss info), to make it suitable as the default function memory.
-  // Final fields can remain as-is; non-finals are all widened to SCALAR
+  // Final fields can remain as-is; non-finals are all widened to ALL
   // (assuming a future Store); field flags set to bottom; the field names are kept.
   @Override public TypeStruct widen_as_default() {
     assert !_any;               // Expected to be below center
     Type[] ts = TypeAry.clone(_ts);
     for( int i=0; i<ts.length; i++ )
-      if( fmod(i)!=FFNL ) ts[i]=SCALAR; // Widen non-finals to SCALAR, as-if crushed
+      if( fmod(i)!=FFNL ) ts[i]=ALL; // Widen non-finals to ALL, as-if crushed by errors
       else ts[i]=ts[i].simple_ptr();
     return make_from(false,ts,fbots(ts.length));
   }

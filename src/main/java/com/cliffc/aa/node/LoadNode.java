@@ -149,6 +149,7 @@ public class LoadNode extends Node {
 
   @Override public String err(GVNGCM gvn) {
     Type tadr = gvn.type(adr());
+    if( tadr==Type.ALL ) return null; // Error already
     if( tadr.must_nil() ) return bad("Struct might be nil when reading");
     if( !(tadr instanceof TypeMemPtr) )
       return bad("Unknown"); // Not a pointer nor memory, cannot load a field

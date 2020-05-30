@@ -22,7 +22,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   T _ts;             // Base object type, representing all possible future values
   
   // The memory state for Env.DEFMEM, the default memory.  All non-final fields
-  // are Scalar; final fields keep their value.  All field flags are moved to
+  // are ALL; final fields keep their value.  All field flags are moved to
   // bottom, e.g. as-if all fields are now final-stored.
   T _defmem;
 

@@ -562,9 +562,11 @@ public class CallNode extends Node {
     // If ANY args are ANY they will fail the arg check, BUT will be reported
     // first where they became an ANY.
     if( !fast )
-      for( int j=1; j<nargs(); j++ )
-        if( gvn.type(arg(j))==Type.ANY )
+      for( int j=1; j<nargs(); j++ ) {
+        Type ta = gvn.type(arg(j));
+        if( ta==Type.ANY || ta==Type.ALL )
           return null;
+      }
 
     // Now do an arg-check.
     for( int j=1; j<nargs(); j++ ) {
