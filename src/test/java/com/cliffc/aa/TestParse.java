@@ -394,17 +394,17 @@ public class TestParse {
     TypeEnv te4 = Exec.go(Env.file_scope(Env.top_scope()),"args",ll_def+ll_con+ll_map+ll_fun+ll_apl);
     if( te4._errs != null ) System.err.println(te4._errs.toString());
     assertNull(te4._errs);
-    TypeStruct tt4 = (TypeStruct)te4._tmem.ld((TypeMemPtr)te4._t);
+    TypeStruct tt4 = (TypeStruct)te4._tmem.sharpen((TypeMemPtr)te4._t)._obj;
     assertEquals("List:", tt4._name);
-    TypeMemPtr tmp5 = (TypeMemPtr)tt4.at(0);
-    assertEquals(2.3*2.3,tt4.at(1).getd(),1e-6);
-    assertEquals("next",tt4._flds[0]);
-    assertEquals("val" ,tt4._flds[1]);
+    TypeMemPtr tmp5 = (TypeMemPtr)tt4.at(1);
+    assertEquals(2.3*2.3,tt4.at(2).getd(),1e-6);
+    assertEquals("next",tt4._flds[1]);
+    assertEquals("val" ,tt4._flds[2]);
 
     // Test inferring a recursive struct type, with a little help
-    Type[] ts0 = TypeStruct.ts(Type.NIL,TypeFlt.con(1.2*1.2));
+    Type[] ts0 = TypeStruct.ts(TypeMemPtr.NO_DISP, Type.NIL,TypeFlt.con(1.2*1.2));
     test_obj("map={x:@{n;v=flt}? -> x ? @{n=map(x.n);v=x.v*x.v} : 0}; map(@{n=0;v=1.2})",
-             TypeStruct.make(FLDS,ts0,TypeStruct.ffnls(2)));
+             TypeStruct.make(FLDS,ts0,TypeStruct.ffnls(3)));
 
     // Test inferring a recursive struct type, with less help.  This one
     // inlines so doesn't actually test inferring a recursive type.

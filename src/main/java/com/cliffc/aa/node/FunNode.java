@@ -596,10 +596,6 @@ public class FunNode extends RegionNode {
       Node oo = e.getKey();           // Old node
       Node nn = e.getValue();         // New node
       Type nt = gvn.type(oo);   // Generally just copy type from original nodes
-      if( nn instanceof ParmNode && nn.in(0) == fun ) {  // Leading edge ParmNodes
-        ParmNode pnn = (ParmNode)nn; // Update non-display type to match new signature
-        if( pnn._idx > 0 ) nt = fun.formal(pnn._idx).simple_ptr(); // Upgrade new Parm default type
-      }
       if( nn instanceof OProjNode ) { // Cloned allocations registers with default memory
         Env.DEFMEM.make_mem(gvn,(NewNode)nn.in(0),(OProjNode)nn);
         Env.DEFMEM.make_mem(gvn,(NewNode)oo.in(0),(OProjNode)oo);
