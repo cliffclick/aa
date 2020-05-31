@@ -1,5 +1,6 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.util.AryInt;
 import java.util.HashMap;
 
 // Alias Bits supporting a lattice; immutable; hash-cons'd.
@@ -70,4 +71,12 @@ public class BitsAlias extends Bits<BitsAlias> {
   public static int  new_alias(int par) { return set_alias(par); }
   public static int type_alias(int par) { return set_alias(par); }
   private static int set_alias(int par) { return TREE.split(par); }
+
+  // Number of fields in a *completed* alias TypeStruct.  Completion is when
+  // the Parser scope exits, and no more fields can be added.  Field numbers
+  // are biased+1 in NFLDS, so the default 0 maps to -1, meaning "field number
+  // not known yet".
+  private static final AryInt NFLDS = new AryInt();
+  static int nflds(int alias) { return NFLDS.atX(alias)-1; }
+  public static void set_nflds(int alias, int nflds) { NFLDS.setX(alias,nflds+1); }
 }

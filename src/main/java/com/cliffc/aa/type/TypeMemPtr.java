@@ -27,7 +27,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   private void init (BitsAlias aliases, TypeObj obj ) { super.init(TMEMPTR); _aliases = aliases; _obj=obj; }
   @Override int compute_hash() {
     assert _obj._hash != 0;
-    return TMEMPTR + _aliases._hash + _obj._hash;
+    return (TMEMPTR + _aliases._hash + _obj._hash)|1;
   }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;

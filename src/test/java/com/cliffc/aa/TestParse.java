@@ -360,6 +360,9 @@ public class TestParse {
   private static final String[] FLDS2= new String[]{"^","map","nn","vv"};
   @Test public void testParse07() {
     TypeStruct dummy = TypeStruct.DISPLAY; // Force class loading cycle
+    test_obj_isa("map={x -> x ? @{nn=map(x.n);vv=x.v*x.v} : 0};"+
+                    "map(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0;v=1.2};v=2.3};v=3.4};v=4.5})",
+            TypeStruct.make(FLDS2,TypeStruct.ts(TypeMemPtr.STRUCT0,Type.XSCALAR,TypeMemPtr.STRUCT0,TypeFlt.FLT32))); //con(20.25)
     // Passing a function recursively
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({&},2)", Type.XNIL);
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({+},2)", TypeInt.con(2));
@@ -402,31 +405,29 @@ public class TestParse {
     assertEquals("val" ,tt4._flds[2]);
 
     // Test inferring a recursive struct type, with a little help
-    TypeMemPtr tdisp = TypeMemPtr.make(24,TypeObj.OBJ);
-    Env.DISPLAYS.set(24);
-    Type[] ts0 = TypeStruct.ts(tdisp, Type.XSCALAR, Type.XNIL,TypeFlt.con(1.2*1.2));
-    test_obj("map={x:@{n=;v=flt}? -> x ? @{nn=map(x.n);vv=x.v*x.v} : 0}; map(@{n=0;v=1.2})",
-            TypeStruct.make(FLDS2,ts0,TypeStruct.ffnls(4)));
+    Type[] ts0 = TypeStruct.ts(Type.XNIL, Type.XSCALAR, Type.XNIL,TypeFlt.con(1.2*1.2));
+    test_struct("map={x:@{n=;v=flt}? -> x ? @{nn=map(x.n);vv=x.v*x.v} : 0}; map(@{n=0;v=1.2})",
+                TypeStruct.make(FLDS2,ts0,TypeStruct.ffnls(4)));
 
     // Test inferring a recursive struct type, with less help.  This one
     // inlines so doesn't actually test inferring a recursive type.
-    test_obj("map={x -> x ? @{nn=map(x.n);vv=x.v*x.v} : 0}; map(@{n=0;v=1.2})",
-             TypeStruct.make(FLDS2,ts0,TypeStruct.ffnls(4)));
+    test_struct("map={x -> x ? @{nn=map(x.n);vv=x.v*x.v} : 0}; map(@{n=0;v=1.2})",
+                TypeStruct.make(FLDS2,ts0,TypeStruct.ffnls(4)));
 
     // Test inferring a recursive struct type, with less help. Too complex to
     // inline, so actual inference happens
-    test_obj_isa("map={x -> x ? @{nn=map(x.n);nv=x.v*x.v} : 0};"+
+    test_obj_isa("map={x -> x ? @{nn=map(x.n);vv=x.v*x.v} : 0};"+
                  "map(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0;v=1.2};v=2.3};v=3.4};v=4.5})",
                  TypeStruct.make(FLDS2,TypeStruct.ts(TypeMemPtr.STRUCT0,Type.XSCALAR,TypeMemPtr.STRUCT0,TypeFlt.FLT32))); //con(20.25)
 
     // Test inferring a recursive tuple type, with less help.  This one
     // inlines so doesn't actually test inferring a recursive type.
     test_ptr("map={x -> x ? (map(x.0),x.1*x.1) : 0}; map((0,1.2))",
-             (alias) -> TypeMemPtr.make(alias,TypeStruct.make_tuple(Type.NIL,Type.NIL,TypeFlt.con(1.2*1.2))));
+             (alias) -> TypeMemPtr.make(alias,TypeStruct.make_tuple(Type.XNIL,Type.XNIL,TypeFlt.con(1.2*1.2))));
 
     test_obj_isa("map={x -> x ? (map(x.0),x.1*x.1) : 0};"+
                  "map((math_rand(1)?0: (math_rand(1)?0: (math_rand(1)?0: (0,1.2), 2.3), 3.4), 4.5))",
-                 TypeStruct.make_tuple(TypeFlt.con(20.25)));
+                 TypeStruct.make(TypeStruct.ts(Type.XNIL,TypeMemPtr.STRUCT0,TypeFlt.con(20.25))));
 
     // TODO: Need real TypeVars for these
     //test("id:{A->A}"    , Env.lookup_valtype("id"));
@@ -781,10 +782,10 @@ strs:List(str?) = ... // List of null-or-strings
   }
   static private void test_ptr( String program, Function<Integer,Type> expected ) {
     try( TypeEnv te = run(program) ) {
-      TypeMemPtr tmp = te._tmem.sharpen((TypeMemPtr)te._t);
-      int alias = tmp.getbit(); // internally asserts only 1 bit set
+      TypeMemPtr actual = te._tmem.sharpen((TypeMemPtr)te._t);
+      int alias = actual.getbit(); // internally asserts only 1 bit set
       Type t_expected = expected.apply(alias);
-      assertEquals(t_expected,tmp);
+      assertEquals(t_expected,actual);
     }
   }
   static private void test_ptr0( String program, Function<Integer,Type> expected ) {
@@ -805,11 +806,18 @@ strs:List(str?) = ... // List of null-or-strings
       assertEquals(expected,actual);
     }
   }
+  static private void test_struct( String program, TypeStruct expected) {
+    try( TypeEnv te = run(program) ) {
+      TypeStruct actual = (TypeStruct)te._tmem.ld((TypeMemPtr)te._t);
+      actual = actual.set_fld(0,Type.XNIL,TypeStruct.FFNL);
+      assertEquals(expected,actual);
+    }
+  }
   static private void test_obj_isa( String program, TypeObj expected) {
     try( TypeEnv te = run(program) ) {
       int alias = ((TypeMemPtr)te._t)._aliases.strip_nil().getbit(); // internally asserts only 1 bit set
-      TypeObj to = te._tmem.sharpen((TypeMemPtr)te._t)._obj;
-      assertTrue(to.isa(expected));
+      TypeObj actual = te._tmem.sharpen((TypeMemPtr)te._t)._obj;
+      assertTrue(actual.isa(expected));
     }
   }
   static private void test_ptr( String program, String expected ) {

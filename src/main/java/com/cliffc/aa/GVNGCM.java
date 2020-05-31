@@ -4,6 +4,7 @@ import com.cliffc.aa.node.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.VBitSet;
+import com.cliffc.aa.util.NonBlockingHashMapLong;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Set;
@@ -428,28 +429,47 @@ public class GVNGCM {
   void iter(int opt_mode) {
     _opt_mode = opt_mode;
     assert Env.START.more_flow(this,new VBitSet(),true,0)==0; // Initial conditions are correct
-    // As a modest debugging convenience, avoid inlining (which blows up the
-    // graph) until other optimizations are done.  Gather the possible inline
-    // requests and set them aside until the main list is empty, then work down
-    // the inline list.
-    int cnt=0;
-    while( _work._len > 0 || _work2._len > 0 ) {
-      final boolean small_work = !_work.isEmpty();
+    // As a debugging convenience, avoid inlining (which blows up the graph)
+    // until other optimizations are done.  Gather the possible inline requests
+    // and set them aside until the main list is empty, then work down the
+    // inline list.
+    //
+    // As a coding/speed hack, do not try to find all nodes which respond to
+    // control dominance changes during worklist iteration.  These can be very
+    // far removed from the change point.  Collect and do them separately.
+    NonBlockingHashMapLong<Node> can_doms = new NonBlockingHashMapLong<>();
+    boolean did_doms=false;
+    int cnt=0, wlen;
+    while( (wlen=_work._len) > 0 || _work2._len > 0 ) {
+      final boolean dom_small_work = wlen!=0;
+      // Revisit all the possible control-dominance winners
+      if( !dom_small_work ) {
+        boolean old_doms=did_doms; did_doms=true;
+        if( !old_doms ) { do_doms(can_doms); continue; }
+      }
       // Turned on, fairly expensive assert
-      assert small_work || !Env.START.more_ideal(this,new VBitSet(),1); // No more small-work ideal calls to apply
-      Node n = (small_work ? _work : _work2).pop(); // Pull from main worklist before functions
-      (small_work ? _wrk_bits : _wrk2_bits).clear(n._uid);
+      assert dom_small_work || !Env.START.more_ideal(this,new VBitSet(),1); // No more small-work ideal calls to apply
+      Node n = (dom_small_work ? _work : _work2).pop(); // Pull from main worklist before functions
+      (dom_small_work ? _wrk_bits : _wrk2_bits).clear(n._uid);
       if( n.is_dead() ) continue;
-      if( n._uses._len==0 && n._keep==0 ) kill(n);
-      else xform_old(n,small_work ? 0 : 2);
+      if( n._uses._len==0 && n._keep==0 ) { kill(n); continue; }
+      if( can_dom(n) ) can_doms.put(n._uid,n);
+      xform_old(n, dom_small_work ? 0 : 2);
+      if( did_doms && _work._len != wlen-1 ) did_doms=false; // Did work, revisit doms
       // VERY EXPENSIVE ASSERT
       //assert Env.START.more_flow(this,new VBitSet(),true,0)==0; // Initial conditions are correct
-      cnt++; assert cnt < 11000; // Catch infinite ideal-loops
+      cnt++; assert cnt < 20000; // Catch infinite ideal-loops
     }
     // No more ideal calls, small or large, to apply
     assert !Env.START.more_ideal(this,new VBitSet(),3);
   }
 
+  private boolean can_dom(Node n) { return n instanceof CastNode; }
+  private void do_doms(NonBlockingHashMapLong<Node> can_doms) {
+    for( Node n : can_doms.values() )
+      if( n.is_dead() ) can_doms.remove(n._uid);
+      else add_work(n);
+  }
 
   // Global Optimistic Constant Propagation.  Passed in the final program state
   // (including any return result, i/o & memory state).  Returns the most-precise

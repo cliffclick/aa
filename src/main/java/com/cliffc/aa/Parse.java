@@ -530,7 +530,7 @@ public class Parse {
     if( n == null ) return null;
     while( true ) {             // Repeated application or field lookup is fine
       if( peek('.') ) {         // Field?
-        skipWS();               // 
+        skipWS();               //
         int fld_start=_x;       // Get field start
         String fld = token0();  // Field name
         if( fld == null ) {     // Not a token, check for a field number
@@ -735,6 +735,7 @@ public class Parse {
     for( int i=0; i<args._len; i++ )
       nn.create_active((""+i).intern(),args.at(i),TypeStruct.FFNL,_gvn);
     nn._fld_starts = bads.asAry();
+    BitsAlias.set_nflds(nn._alias,args._len);
 
     // NewNode returns a TypeObj and a TypeMemPtr (the reference).
     Node nnn = gvn(nn).keep();
@@ -757,6 +758,8 @@ public class Parse {
       stmts(true);              // Create local vars-as-fields
       require('}',oldx);        // Matched closing }
       assert ctrl() != e._scope;
+      NewNode nnn = e._scope.stk();
+      BitsAlias.set_nflds(nnn._alias,((TypeStruct)nnn._ts)._ts.length);
       ptr = e._scope.ptr().keep();           // A pointer to the constructed object
       e._par._scope.set_ctrl(ctrl(),_gvn);   // Carry any control changes back to outer scope
       e._par._scope.set_mem(all_mem(),_gvn); // Carry any memory  changes back to outer scope
