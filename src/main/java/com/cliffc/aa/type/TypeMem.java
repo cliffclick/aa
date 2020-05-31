@@ -1,6 +1,12 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.util.*;
+import com.cliffc.aa.Env;
+import com.cliffc.aa.node.NewObjNode;
+import com.cliffc.aa.node.OProjNode;
+import com.cliffc.aa.util.Ary;
+import com.cliffc.aa.util.AryInt;
+import com.cliffc.aa.util.SB;
+import com.cliffc.aa.util.VBitSet;
 
 import java.util.Arrays;
 import java.util.HashMap;
@@ -177,6 +183,9 @@ public class TypeMem extends Type<TypeMem> {
         return this;            // All structs with all possible pointers
       if( !(to instanceof TypeStruct) ) continue;
       TypeStruct ts = (TypeStruct)to;
+      // TODO: REMOVE THIS
+      if( Env.DEFMEM.in(alias) instanceof OProjNode && ((NewObjNode)Env.DEFMEM.in(alias).in(0))._ts._ts.length != ts._ts.length )
+        return this;
       for( int i=0; i<ts._ts.length; i++ ) {
         Type fld = ts._ts[i];
         if( TypeMemPtr.OOP.isa(fld) )
@@ -336,6 +345,9 @@ public class TypeMem extends Type<TypeMem> {
   // a BitsAlias it returns a TypeObj (and extends the HashMap for future
   // calls).  The TypeObj may contain deep pointers to other deep TypeObjs,
   // including cyclic types.
+
+
+  // TODO: CNC BUG: ptr->XOBJ NOT SHARPENED
   public TypeMemPtr sharpen( TypeMemPtr tmp ) {
     if( _sharp_cache==null ) _sharp_cache = new HashMap<>();
     Ary<Type> reaches = new Ary<>(new Type[1],0);
@@ -447,8 +459,9 @@ public class TypeMem extends Type<TypeMem> {
   public boolean isa_escape( TypeMem mem, BitsAlias escapes ) {
     for( int alias : escapes )
       if( alias > 0 )
-        if( !at(alias).isa(mem.at(alias)) )
-          return false;
+        for( int kid=alias; kid!=0; kid=BitsAlias.next_kid(alias,kid) )
+          if( !at(kid).isa(mem.at(kid)) )
+            return false;
     return true;
   }
 

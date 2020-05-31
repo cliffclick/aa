@@ -402,21 +402,22 @@ public class TestParse {
     assertEquals("val" ,tt4._flds[2]);
 
     // Test inferring a recursive struct type, with a little help
-    Type[] ts0 = TypeStruct.ts(TypeMemPtr.NO_DISP, Type.NIL,TypeFlt.con(1.2*1.2));
-    test_obj("map={x:@{n;v=flt}? -> x ? @{n=map(x.n);v=x.v*x.v} : 0}; map(@{n=0;v=1.2})",
-             TypeStruct.make(FLDS,ts0,TypeStruct.ffnls(3)));
+    TypeMemPtr tdisp = TypeMemPtr.make(24,TypeObj.OBJ);
+    Env.DISPLAYS.set(24);
+    Type[] ts0 = TypeStruct.ts(tdisp, Type.XSCALAR, Type.XNIL,TypeFlt.con(1.2*1.2));
+    test_obj("map={x:@{n=;v=flt}? -> x ? @{nn=map(x.n);vv=x.v*x.v} : 0}; map(@{n=0;v=1.2})",
+            TypeStruct.make(FLDS2,ts0,TypeStruct.ffnls(4)));
 
     // Test inferring a recursive struct type, with less help.  This one
     // inlines so doesn't actually test inferring a recursive type.
-    Type[] ts1 = TypeStruct.ts(Type.NIL,TypeFlt.con(1.2*1.2));
-    test_ptr("map={x -> x ? @{n=map(x.n);v=x.v*x.v} : 0}; map(@{n=0;v=1.2})",
-             (alias) -> TypeMemPtr.make(alias,TypeStruct.make(FLDS,ts1,TypeStruct.ffnls(2))));
+    test_obj("map={x -> x ? @{nn=map(x.n);vv=x.v*x.v} : 0}; map(@{n=0;v=1.2})",
+             TypeStruct.make(FLDS2,ts0,TypeStruct.ffnls(4)));
 
     // Test inferring a recursive struct type, with less help. Too complex to
     // inline, so actual inference happens
-    test_obj_isa("map={x -> x ? @{n=map(x.n);v=x.v*x.v} : 0};"+
+    test_obj_isa("map={x -> x ? @{nn=map(x.n);nv=x.v*x.v} : 0};"+
                  "map(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0;v=1.2};v=2.3};v=3.4};v=4.5})",
-                 TypeStruct.make(FLDS,TypeStruct.ts(TypeMemPtr.STRUCT0,TypeFlt.FLT32))); //con(20.25)
+                 TypeStruct.make(FLDS2,TypeStruct.ts(TypeMemPtr.STRUCT0,Type.XSCALAR,TypeMemPtr.STRUCT0,TypeFlt.FLT32))); //con(20.25)
 
     // Test inferring a recursive tuple type, with less help.  This one
     // inlines so doesn't actually test inferring a recursive type.
@@ -435,18 +436,6 @@ public class TestParse {
 
 
   @Test public void testParse08() {
-    // Asking self "why TMP._obj?" which basically is "why do ptrs carry
-    // structure info in addition to alias#?"
-    // It seems to be related to presence of correct fields?
-    // But these are carried in the alias#->TypeMem->TypeStruct.
-    //
-    // So remember I yanked TMP._obj and recursive Types, and then brought it
-    // back.  Not sure why I need it still.  And: is there a bug where I'm
-    // using tmp._obj instead of pulling from the TypeMem? - No, just looked,
-    // no real uses.  I believe I can pull recursive types again.
-    //
-    // Currently using TMP._obj for user-defined types
-
     test_ptr("tmp=@{"+
                     "  l=@{"+
                     "    l=@{ l=0; r=0; v=3 };"+
@@ -808,12 +797,12 @@ strs:List(str?) = ... // List of null-or-strings
       assertEquals(t_expected,tmp);
     }
   }
-  static private void test_obj( String program, TypeObj obj) {
+  static private void test_obj( String program, TypeObj expected) {
     try( TypeEnv te = run(program) ) {
       assertTrue(te._t instanceof TypeMemPtr);
       int alias = ((TypeMemPtr)te._t).getbit(); // internally asserts only 1 bit set
-      TypeObj to = te._tmem.ld((TypeMemPtr)te._t);
-      assertEquals(obj,to);
+      TypeObj actual = te._tmem.ld((TypeMemPtr)te._t);
+      assertEquals(expected,actual);
     }
   }
   static private void test_obj_isa( String program, TypeObj expected) {

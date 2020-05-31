@@ -19,7 +19,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   // A list of field names and field-mods, folded into the initial state of
   // this NewObj.  These can come from initializers at parse-time, or stores
   // folded in.  There are no types stored here; types come from the inputs.
-  T _ts;             // Base object type, representing all possible future values
+  public T _ts;             // Base object type, representing all possible future values
   
   // The memory state for Env.DEFMEM, the default memory.  All non-final fields
   // are ALL; final fields keep their value.  All field flags are moved to

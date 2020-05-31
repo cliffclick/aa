@@ -156,6 +156,7 @@ public final class CallEpiNode extends Node {
   // Return true if a new edge is wired
   public boolean check_and_wire( GVNGCM gvn ) {
     if( gvn._opt_mode == 0 ) return false; // Graph not formed yet
+    if( !(gvn.type(this) instanceof TypeTuple) ) return false; // Collapsing
     CallNode call = call();
     Type tcall = gvn.type(call);
     if( !(tcall instanceof TypeTuple) ) return false;
@@ -169,44 +170,11 @@ public final class CallEpiNode extends Node {
       FunNode fun = FunNode.find_fidx(fidx);  // Lookup, even if not wired
       if( fun.is_forward_ref() ) continue;    // Not forward refs, which at GCP just means a syntax error
       if( _defs.find(fun.ret()) != -1 ) continue; // Wired already
-      if( !can_wire(gvn,fun,tcall) )
-        continue;         // Memory types not aligned
       progress=true;
       wire1(gvn,call,fun,fun.ret()); // Wire Call->Fun, Ret->CallEpi
     }
     return progress;
   }
-
-  // Ask if this unwired Fun/Ret is memory compatible with the Call/CallEpi.
-  boolean can_wire( GVNGCM gvn, FunNode fun, Type tcall ) {
-    Type tci = gvn.type(this);
-    if( !(tci instanceof TypeTuple ) ) return false; // Collapsing
-    if( gvn._opt_mode==2 ) return true;              // Adding wire edges during GCP?  Types all high
-    TypeMem cepimem = (TypeMem)((TypeTuple)tci)._ts[1];
-    assert !fun.is_forward_ref();
-    RetNode ret = fun.ret();
-    ParmNode fmem = fun.parm(-2);
-    if( fmem != null ) {        // Not all functions have memory
-      // Wiring a Call brings in memory that the Call knows into what the Fun
-      // knows.  These can be out-of-sync, if one or the other has propagated
-      // knowledge of e.g. new allocations.  Stall wiring until the types are
-      // properly "isa".
-      TypeMem callmem = CallNode.tmem(tcall);
-      Type funmem = gvn.type(fmem);
-      // If call is lower than Parm:mem, the Parm will drop - not allowed
-      if( !callmem.isa(funmem) )
-        return false;
-    }
-
-    // Same for the reverse path from Return to CallEpi; the CallEpi must
-    // merge all returns and also is conservative, so it must remain
-    // at or below the returns, but only along the escaped aliases.
-    TypeMem retmem = (TypeMem)((TypeTuple)gvn.type(ret ))._ts[1];
-    if( !retmem.isa_escape(cepimem,CallNode.tals(tcall).aliases()) )
-      return false;
-    return true;
-  }
-
 
   // Wire the call args to a known function, letting the function have precise
   // knowledge of its callers and arguments.  This adds a edges in the graph
@@ -291,17 +259,7 @@ public final class CallEpiNode extends Node {
     // NO fidxs, means we're not calling anything.
     if( fidxs==BitsFun.EMPTY ) return TypeTuple.CALLE.dual();
     if( fidxs.above_center() ) return TypeTuple.CALLE.dual(); // Not resolved yet
-
-    // If call memory is not at least default memory - stall typing until the
-    // Call catches up.  Might need to bring default memory into a Call.
     TypeMem post_call_mem = (TypeMem)gvn.type(Env.DEFMEM);
-    if( !tmem.isa(post_call_mem) ) {
-      // Self type, except easier to report a sane lower bound.
-      Type self = gvn.self_type(this);
-      return self==null || self==Type.ALL
-              ? TypeTuple.CALLE
-              : TypeTuple.make(Type.CTRL,post_call_mem,((TypeTuple)self).at(2));
-    }
 
     // Take Call reach-around aliases, and stomp/merge-over from pre-call
     // memory.  These never made it into the function, and were not modified
@@ -310,7 +268,8 @@ public final class CallEpiNode extends Node {
     int emax = Math.max(Math.max(escapes.max()+1,post_call_mem.len()),tmem.len());
     for( int escape=2; escape<emax; escape++ ) {
       if( !escapes.test_recur(escape) ) { // A non-escaping alias
-        TypeObj tesc = tmem.at(escape);// The pre-call value
+        // Lift each pre-call non-escaping-into-call value to the post-call value.
+        TypeObj tesc = (TypeObj)tmem.at(escape).join(post_call_mem.at(escape));// The pre-call value
         if( post_call_mem.at(escape) != tesc &&
             tesc!=TypeObj.XOBJ ) // And pre-call HAS a value, otherwise might be made IN the function & escaping out
           post_call_mem = post_call_mem.set(escape,tesc);

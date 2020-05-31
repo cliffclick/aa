@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
@@ -47,7 +48,7 @@ public class StoreNode extends Node {
     NewObjNode nnn;  int idx;
     if( mem instanceof OProjNode &&
         mem.in(0) instanceof NewObjNode && (nnn=(NewObjNode)mem.in(0)) == adr.in(0) &&
-        mem._uses._len==1 && !val().is_forward_ref() && !DefMemNode.CAPTURED.get(nnn._alias) &&
+        mem._uses._len==2 && !val().is_forward_ref() && !DefMemNode.CAPTURED.get(nnn._alias) &&
         (idx=nnn._ts.find(_fld))!= -1 && nnn._ts.can_update(idx) ) {
       // Update the value, and perhaps the final field
       nnn.update(idx,_fin,val(),gvn);
@@ -59,7 +60,7 @@ public class StoreNode extends Node {
     if( mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode && tmp != null ) {
       CallEpiNode cepi = (CallEpiNode)mem.in(0);
       CallNode call = cepi.can_bypass(gvn,tmp._aliases);
-      if( call != null )
+      if( call != null && gvn.type(call.mem()).isa(gvn.type(Env.DEFMEM)) )
         return set_def(1,call.mem(),gvn);
     }
 
@@ -72,8 +73,6 @@ public class StoreNode extends Node {
     if( !(adr instanceof TypeMemPtr) ) return adr.oob(TypeStruct.ALLSTRUCT);
     TypeMemPtr tmp = (TypeMemPtr)adr;
     Type val = gvn.type(val());   // Value
-    if( !val.isa_scalar() )       // Nothing sane
-      val = val.oob(Type.SCALAR); // Pin to scalar for updates
 
     // Convert from memory to the struct being updated
     Node mem = mem();
@@ -92,7 +91,7 @@ public class StoreNode extends Node {
       // Updating  OBJ means we're already as low as we can go.
       return tobj.oob(TypeStruct.ALLSTRUCT);
 
-    // Update the field.  Illegal updates make no changes (except clear 'clean' bit).
+    // Update the field.  Illegal updates make no changes.
     TypeStruct ts = (TypeStruct)tobj;
     // Updates to a NewNode are precise, otherwise aliased updates
     if( mem().in(0) == adr().in(0) && mem().in(0) instanceof NewNode && !adr.must_nil())

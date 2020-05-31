@@ -1175,18 +1175,15 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   @Override public TypeObj update(byte fin, String fld, Type val) { return update(fin,fld,val,false); }
   @Override public TypeObj st    (byte fin, String fld, Type val) { return update(fin,fld,val,true ); }
   private TypeObj update(byte fin, String fld, Type val, boolean precise) {
-    assert val.isa_scalar();
+    int idx = find(fld);
+    if( idx == -1 )             // Unknown field, assume changes no fields
+      return this;
     // Pointers & Memory to a Store can fall during GCP, and go from r/w to r/o
     // and the StoreNode output must remain monotonic.  This means store
     // updates are allowed to proceed even if in-error.
     byte[] flags = _flags.clone();
     Type[] ts    = TypeAry.clone(_ts);
-    int idx = find(fld);
-    if( idx == -1 )             // Unknown field, might change all fields
-      for( int i=0; i<_flags.length; i++ )
-        _update(flags,ts,fin,i,val,precise);
-    else                        // Update the one field
-      _update(flags,ts,fin,idx,val,precise);
+    _update(flags,ts,fin,idx,val,precise);
     return malloc(_name,_any,_flds,ts,flags).hashcons_free();
   }
   private static void _update( byte[] flags, Type[] ts, byte fin, int idx, Type val, boolean precise ) {
@@ -1200,7 +1197,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // Allowed to update this field?
   public boolean can_update(int idx) { return fmod(idx) == FRW; }
 
-  // Widen (loss info), to make it suitable as the default function memory.
+  // Widen (lose info), to make it suitable as the default function memory.
   // Final fields can remain as-is; non-finals are all widened to ALL
   // (assuming a future Store); field flags set to bottom; the field names are kept.
   @Override public TypeStruct widen_as_default() {

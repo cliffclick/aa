@@ -11,8 +11,11 @@ public class MProjNode extends ProjNode {
     Node x = in(0).is_copy(gvn,_idx);
     if( x != null )
       return x == this ? gvn.con(TypeMem.XMEM) : x; // Happens in dead self-recursive functions
-    if( in(0) instanceof CallEpiNode )
-      return in(0).is_pure_call(); // See if memory can bypass pure calls (most primitives)
+    if( in(0) instanceof CallEpiNode ) {
+      Node precall = in(0).is_pure_call(); // See if memory can bypass pure calls (most primitives)
+      if( precall != null && gvn.type(this).isa(gvn.type(precall)) )
+        return precall;
+    }
     return null;
   }
   @Override public Type value(GVNGCM gvn) {
