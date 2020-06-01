@@ -3,8 +3,6 @@ package com.cliffc.aa;
 import com.cliffc.aa.node.*;
 import com.cliffc.aa.type.*;
 
-import java.util.BitSet;
-
 public class Env implements AutoCloseable {
   public final static GVNGCM GVN = new GVNGCM(); // Initial GVN
   public static    StartNode START; // Program start values (control, empty memory, cmd-line args)
@@ -83,6 +81,7 @@ public class Env implements AutoCloseable {
       STK_0.add_fun(null,lib ._name,(FunPtrNode) GVN.xform(lib .as_fun(GVN)), GVN);
     // Top-level constants
     STK_0.create_active("math_pi", GVN.con(TypeFlt.PI),TypeStruct.FFNL,GVN);
+    BitsAlias.set_nflds(STK_0._alias,STK_0._ts._ts.length);
     // Now that all the UnresolvedNodes have all possible hits for a name,
     // register them with GVN.
     for( Node val : STK_0._defs )  if( val instanceof UnresolvedNode ) GVN.init0(val);
@@ -122,6 +121,7 @@ public class Env implements AutoCloseable {
     Node ptr = _scope.ptr();
     if( ptr == null ) return;   // Already done
     NewObjNode stk = _scope.stk();
+    BitsAlias.set_nflds(stk._alias,stk._ts._ts.length);
     gvn.add_work_uses(stk);     // Scope object going dead, trigger following projs to cleanup
     _scope.set_ptr(null,gvn);   // Clear pointer to display
   }
