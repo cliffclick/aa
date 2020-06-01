@@ -54,6 +54,12 @@ public class MemMergeNode extends Node {
     create_alias_active(alias,obj,null);
   }
 
+  private MemMergeNode( AryInt aliases, AryInt aidxes, Node[] nodes ) {
+    super(OP_MERGE,nodes);
+    _aliases=aliases;
+    _aidxes =aidxes;
+  }
+
   @Override String str() {
     SB sb = new SB().p('[');
     for( int i=0;i<_defs._len; i++ )
@@ -190,74 +196,15 @@ public class MemMergeNode extends Node {
 
   @Override public Node ideal(GVNGCM gvn, int level) {
     if( is_prim() ) return null;
+    if( gvn._opt_mode == 0 ) return null;
     assert _defs._len==_aliases._len;
 
     // Collapse trivial
-    if( _defs._len==1 && gvn._opt_mode != 0 )
+    if( _defs._len==1 )
       return in(0);
 
-    // Remove child instances of the parent
-    boolean progress = false;
-    for( int i=_defs._len-1; i>=1; i-- ) {
-      int alias = alias_at(i);
-      int par = BitsAlias.parent(alias);
-      int pidx = find_alias2idx(par);
-      if( in(i)==in(pidx) )
-        { progress=true; remove0(i,gvn); }
-    }
-    if( progress ) return this;
-
-    // Remove not-live values
-    if( _remove_unused(gvn) )
-      return this;
-
-    // Collapse back-to-back MemMerge
-    for( int i=1; i<_defs._len; i++ )
-      if( in(i) instanceof MemMergeNode ) {
-        MemMergeNode mmm = (MemMergeNode)in(i);
-        int alias = alias_at(i);         // alias overridden here.
-        int midx = mmm.alias2idx(alias); // Check for exact match
-        int midx2= midx==0 ? mmm.find_alias2idx(alias) : midx; // Or any match
-        if( midx==0 && midx2!=0 ) // Inexact & non-base match?
-          continue;       // Would require mapping 'alias' to 'mmm.find(alias)'
-        set_def(i,mmm.in(midx2),gvn);
-        progress=true;
-      }
-    if( progress )  return this;
-    
-    // Collapse back-to-back MemMerge base
-    if( in(0) instanceof MemMergeNode ) {
-      MemMergeNode mmm = (MemMergeNode)in(0);
-
-      // Check for this.in[alias]==mmm, and mmm.find(alias)!=alias.  This means
-      // a lookup of 'alias' at this first bounces to 'mmm' then does a parent-
-      // alias lookup, and gets its type from some parent alias.  Currently
-      // there is no way to collapse this, as it requires remapping 'alias' to
-      // some parent without some middle-MemMerge doing it.
-      for( int i=1; i<_defs._len; i++ ) {
-        int alias = alias_at(i);         // alias overridden here.
-        int midx = mmm.alias2idx(alias); // mmm also overrides?
-        if( midx==0 &&          // Override of 'alias' not directly overridden in parent
-            mmm.find_alias2idx(alias)!=0 ) // And also not 'mmm.base'
-          return null;                     // Would require mapping 'alias' to 'mmm.find(alias)'
-      }
-
-      MemMergeNode nnn = new MemMergeNode(mmm.in(0));
-      for( int i=1, ii=1; i<_defs._len || ii<mmm._defs._len; ) {
-        int a  = i <    _defs._len ?     alias_at(i)  : 999998;
-        int aa = ii<mmm._defs._len ? mmm.alias_at(ii) : 999999;
-        if( a <= aa ) {
-          nnn.create_alias_active( a,in(i),gvn);
-          i++;  if( a==aa ) ii++;
-        } else {
-          // Does 'this' already have alias 'aa' under a parent alias?
-          if( find_alias2idx(aa)==0 )
-            nnn.create_alias_active(aa,mmm.in(ii),gvn);
-          ii++;
-        }
-      }
-      return nnn;
-    }
+    MemMergeNode mmm = ideal_collapse(gvn);
+    if( mmm != null ) return mmm;
 
     return null;
   }
@@ -280,6 +227,84 @@ public class MemMergeNode extends Node {
       }
     }
     return progress;
+  }
+
+  // Having not gotten MemMerge ideal() (nor value()) semantics right after a
+  // dozen tries, here comes a brute-force attempt at an optimal ideal() call.
+  private MemMergeNode ideal_collapse( GVNGCM gvn ) {
+    assert check();
+    Node base = mem();
+    if( !(gvn.type(base) instanceof TypeMem) ) return null; // Generally 'any' for dead code
+
+    // Build an array containing the Node used for each and every alias.
+    int len = Math.max(1,_aliases.last()+1);
+    len = Math.max(len,((TypeMem)gvn.self_type(this)).len());
+    Ary<Node> ins = new Ary<>(new Node[len]);
+    ins.setX(1,base);
+    for( int alias=2; alias<ins._len; alias++ )
+      ins.set(alias,alias2node(alias));
+
+    // "Peek" thru the base, to a prior MemMerge and go again (1-step).
+    // Repeat until no more back-to-back MemMerge.
+    while( base instanceof MemMergeNode ) {
+      MemMergeNode mmm = (MemMergeNode)base;
+      len = Math.max(len,mmm._aliases.last()+1);
+      // Stretch alias list to cover the max set
+      while( ins._len < len )
+        ins.push(alias2node(ins._len));
+      // Find instances of the base, and peek again
+      for( int alias=1; alias<len; alias++ )
+        if( ins.at(alias)==base )
+          ins.set(alias,mmm.alias2node(alias));
+      // Should have no instances of the base amongst the non-bases, just
+      // step-thru the base.
+      base=ins.at(1);
+      assert gvn.type(base) instanceof TypeMem;
+    } // Check for progress
+
+    // Find any unused inputs, and set them to either the base (if unused
+    // there) or to a constant unused.  Other constants (than UNUSED) do not
+    // work, since they can lift to UNUSED but UNUSED can never lift again.
+    Node unused=null;
+    TypeMem tself = (TypeMem)gvn.self_type(this);
+    TypeMem tbase = (TypeMem)gvn.self_type(base);
+    for( int alias=2; alias<len; alias++ )
+      if( _live.at(alias)==TypeObj.UNUSED ) {
+        int par = BitsAlias.parent(alias);
+        if( par>0 && ins.at(par)==base && tself.at(alias)==TypeObj.UNUSED && tbase.at(alias)==TypeObj.UNUSED )
+          ins.set(alias,base);
+        else {
+          if( unused==null ) unused = gvn.con(TypeObj.UNUSED);
+          ins.set(alias,unused);
+        }
+      }
+
+    // Compact.  Copy minimal edges to preserve semantics.
+    Ary<Node> outs = new Ary<>(new Node[_defs._len],0);
+    AryInt alss = new AryInt(new int[_defs._len],0);
+    AryInt adxs = new AryInt(new int[  ins._len],0);
+    for( int alias=1; alias<ins._len; alias++ ) {
+      // If the alias uses the same node as the parent, then compact away
+      int par = BitsAlias.parent(alias);
+      if( par==0 || ins.at(par)!=ins.at(alias) ) { // Need the edge
+        adxs.setX(alias,outs._len);
+        outs.push(ins.at(alias));
+        alss.push(alias);
+      }
+    }
+
+    // Check for progress.
+    if( _defs   .equals(outs) &&
+        _aliases.equals(alss) &&
+        _aidxes .equals(adxs) )
+      return null;              // No progress
+    // Crush/update & return.  Add before remove to avoid killing to early.
+    for( Node nnn : outs ) add_def(nnn);
+    while( _defs._len>outs._len ) remove(0,gvn);
+    _aliases=alss;
+    _aidxes =adxs;
+    assert check();
+    return this;
   }
 
   // Base memory (alias#1) comes in input#0.  Other inputs refer to other

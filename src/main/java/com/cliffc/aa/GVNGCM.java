@@ -397,6 +397,8 @@ public class GVNGCM {
   // type table and not in the vals table.  NNN is in both.
   private Node merge( Node old, Node nnn ) {
     nnn._live = (TypeMem)nnn._live.meet(old._live);
+    Type told = type(old), tnnn = type(nnn);
+    if( told!=tnnn ) setype(nnn,told.join(tnnn));
     return untype(old,nnn);      // Just toss old, keep nnn.
   }
 

@@ -63,8 +63,13 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   @SuppressWarnings("unchecked")
   protected final void sets( T ts, GVNGCM gvn ) {
     _ts = ts;
+    T olddef = _defmem;
     _defmem = (T)ts.widen_as_default();
-    if( gvn!=null ) gvn.add_work_uses(this);
+    if( gvn!=null ) {
+      gvn.add_work_uses(this);
+      if( olddef != _defmem )
+        gvn.add_work(Env.DEFMEM);
+    }
   }
 
   @Override public Node ideal(GVNGCM gvn, int level) {
