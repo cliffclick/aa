@@ -185,9 +185,6 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
 
   public BitsAlias aliases() { return _aliases; }
 
-  // Identical pointer but points to clean
-  @Override public TypeMemPtr clean() { return make(_aliases,(TypeObj)_obj.clean()); }
-
   // Build a mapping from types to their depth in a shortest-path walk from the
   // root.  Only counts depth on TypeStructs with the matching alias.  Only
   // used for testing.

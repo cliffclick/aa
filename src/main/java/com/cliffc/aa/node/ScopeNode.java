@@ -89,15 +89,30 @@ public class ScopeNode extends Node {
   public boolean is_closure() { assert _defs._len==4 || _defs._len==7; return _defs._len==7; }
 
   @Override public Node ideal(GVNGCM gvn, int level) {
+    Node mem = mem();
+    Node rez = rez();
+    Type trez = rez==null ? null : gvn.type(rez);
     if( gvn._opt_mode != 0 &&   // Past parsing
-        rez() != null &&        // Have a return result
+        rez != null &&          // Have a return result
         // If type(rez) can never lift to any TMP, then we will not return a
         // pointer, and do not need the memory state on exit.
-        !TypeMemPtr.OOP0.dual().isa(gvn.type(rez())) &&
+        !TypeMemPtr.OOP0.dual().isa(trez) &&
         // And not already wiped it out
-        !(mem() instanceof ConNode && gvn.type(mem())==TypeMem.XMEM) )
+        !(mem instanceof ConNode && gvn.type(mem)==TypeMem.XMEM) )
       // Wipe out return memory
       return set_mem(gvn.add_work(gvn.con(TypeMem.XMEM)), gvn);
+
+
+    // Load can move past a Join if all aliases align.
+    if( mem instanceof MemJoinNode &&
+        trez instanceof TypeMemPtr ) {
+      Node jmem = ((MemJoinNode)mem).can_bypass(gvn,(TypeMemPtr)trez);
+      // Aliases have to work out.  Also, must keep the isa
+      // types, which can fail for cycles until GCP.
+      if( jmem != null && gvn.type(jmem).isa(gvn.type(mem)) )
+        return set_mem(jmem,gvn);
+    }
+
     return null;
   }
   @Override public Type value(GVNGCM gvn) { return Type.ALL; }

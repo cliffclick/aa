@@ -62,9 +62,6 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
   // Exact object update.  Replaces fields.
   public TypeObj st    (byte fin, String fld, Type val) { return this; }
 
-  // True if this field is not modified.  Allows a Load to bypass.
-  boolean is_clean(String fld) { return _any; }
-
   @Override public boolean above_center() { return _any; }
   @Override public boolean may_be_con() { return _any; }
   @Override public boolean is_con() { return false; }

@@ -873,9 +873,6 @@ public class Type<T extends Type<T>> implements Cloneable {
   public final boolean contains( Type t ) { return contains(t,null); }
   boolean contains( Type t, VBitSet bs ) { return this==t; }
 
-  // Mark (recursively) all memory as clean/unmodified
-  public Type clean() { return this; }
-
   // Sharpen pointer with memory
   public Type sharptr( Type ptr ) { return ptr; }
   

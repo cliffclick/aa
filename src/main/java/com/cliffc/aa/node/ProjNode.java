@@ -15,11 +15,6 @@ public class ProjNode extends Node {
     // multi-head is collapsing?  Then follow suit.
     Node cp = in(0).is_copy(gvn,_idx);
     if( cp != null ) return cp;
-
-    // Basic escape analysis if DProj loses a use
-    //if( in(0) instanceof NewNode && ((NewNode) in(0)).captured(gvn) )
-    //  gvn.add_work(in(0));
-
     return null;
   }
 

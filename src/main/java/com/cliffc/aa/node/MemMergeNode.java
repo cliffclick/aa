@@ -12,7 +12,7 @@ import java.util.BitSet;
 
 // Merge a lot of TypeObjs into a TypeMem.  Each input is from a different
 // alias.  Each collection represents the whole of memory, with missing parts
-// coming in the alias#1 in slot 0, and no duplication.
+// coming in the alias#1 in slot 0, and no duplication in the other edges.
 //
 // MemMerge is used by the parser to create the initial memory state.  While
 // parsing the MemMerge is left "active" - not in the GVN tables - which means
@@ -28,9 +28,8 @@ import java.util.BitSet;
 // future unknown splits in them, so merges of all known children still expect
 // to have a parent merge.
 //
-// As a special case, MemMerge will take the results of an all-call-memory in
-// alias#1 slot 0 - and will gradually widen general memory around the call as
-// the call memory sharpens.  This is specifically for SESE call behavior.
+// The edge behavior encourages tree-like compaction, to handle the expected
+// common case of having many known aliases unrelated to the local computation.
 public class MemMergeNode extends Node {
 
   // Alias equivalence class matching each input.  Sorted.
@@ -54,12 +53,6 @@ public class MemMergeNode extends Node {
     create_alias_active(alias,obj,null);
   }
 
-  private MemMergeNode( AryInt aliases, AryInt aidxes, Node[] nodes ) {
-    super(OP_MERGE,nodes);
-    _aliases=aliases;
-    _aidxes =aidxes;
-  }
-
   @Override String str() {
     SB sb = new SB().p('[');
     for( int i=0;i<_defs._len; i++ )
@@ -67,10 +60,11 @@ public class MemMergeNode extends Node {
     return sb.unchar().unchar().p(']').toString();
   }
 
-  private Node mem() { return in(0); } // Phat/Wide mem
+  Node mem() { return in(0); } // Phat/Wide mem
   int alias_at(int idx) { return _aliases.at(idx); }
+  int max() { return _aliases.last(); }
 
-  // Index# for Alias#.  Returns 0 if no exact match.
+  // index# for Alias#.  Returns 0 if no exact match.
   public int alias2idx( int alias ) { return _aidxes.atX(alias); }
   private void set_alias2idx( int alias, int idx ) { _aidxes.setX(alias,idx); }
 
@@ -198,35 +192,16 @@ public class MemMergeNode extends Node {
     if( is_prim() ) return null;
     if( gvn._opt_mode == 0 ) return null;
     assert _defs._len==_aliases._len;
+    if( !(gvn.type(mem()) instanceof TypeMem) ) return null; // Generally 'any' for dead code
 
     // Collapse trivial
-    if( _defs._len==1 )
-      return in(0);
+    if( _defs._len==1 ) return in(0);
 
+    // Brute force back-to-back ideal collapse
     MemMergeNode mmm = ideal_collapse(gvn);
     if( mmm != null ) return mmm;
 
     return null;
-  }
-
-  // Remove not-live values, setting to unused
-  private boolean _remove_unused(GVNGCM gvn) {
-    boolean progress=false;
-    outer:
-    for( int i=1; i<_defs._len; i++ ) {
-      int alias = alias_at(i);
-      if( _live.at(alias) == TypeObj.UNUSED && gvn.type(in(i))!=TypeObj.UNUSED ) {
-        // Check all children of 'alias' for being alive & NOT locally defined.
-        // These are about to lose their parent - which otherwise remaps the
-        // kid alias to the parent.
-        for( int kid=alias; kid!=0; kid=BitsAlias.next_kid(alias,kid) )
-          if( _live.at(kid)!=TypeObj.UNUSED && find_alias2idx(kid)==i )
-            continue outer;
-        set_def(i,gvn.con(TypeObj.UNUSED),gvn);
-        progress=true;
-      }
-    }
-    return progress;
   }
 
   // Having not gotten MemMerge ideal() (nor value()) semantics right after a
@@ -234,11 +209,11 @@ public class MemMergeNode extends Node {
   private MemMergeNode ideal_collapse( GVNGCM gvn ) {
     assert check();
     Node base = mem();
-    if( !(gvn.type(base) instanceof TypeMem) ) return null; // Generally 'any' for dead code
 
     // Build an array containing the Node used for each and every alias.
-    int len = Math.max(1,_aliases.last()+1);
+    int len = Math.max(1,max()+1);
     len = Math.max(len,((TypeMem)gvn.self_type(this)).len());
+    len = Math.max(len,_live.len());
     Ary<Node> ins = new Ary<>(new Node[len]);
     ins.setX(1,base);
     for( int alias=2; alias<ins._len; alias++ )
@@ -248,7 +223,7 @@ public class MemMergeNode extends Node {
     // Repeat until no more back-to-back MemMerge.
     while( base instanceof MemMergeNode ) {
       MemMergeNode mmm = (MemMergeNode)base;
-      len = Math.max(len,mmm._aliases.last()+1);
+      len = Math.max(len,mmm.max()+1);
       // Stretch alias list to cover the max set
       while( ins._len < len )
         ins.push(alias2node(ins._len));
@@ -268,16 +243,22 @@ public class MemMergeNode extends Node {
     Node unused=null;
     TypeMem tself = (TypeMem)gvn.self_type(this);
     TypeMem tbase = (TypeMem)gvn.self_type(base);
-    for( int alias=2; alias<len; alias++ )
+    for( int alias=2; alias<len; alias++ ) {
       if( _live.at(alias)==TypeObj.UNUSED ) {
-        int par = BitsAlias.parent(alias);
-        if( par>0 && ins.at(par)==base && tself.at(alias)==TypeObj.UNUSED && tbase.at(alias)==TypeObj.UNUSED )
-          ins.set(alias,base);
-        else {
-          if( unused==null ) unused = gvn.con(TypeObj.UNUSED);
-          ins.set(alias,unused);
-        }
+        if( unused==null ) unused = gvn.con(TypeObj.UNUSED);
+        ins.set(alias,unused);
       }
+      // Use base instead of explicit unused set (folds up a lot of explicit sets)
+      int par = BitsAlias.parent(alias);
+      if( par>0 && ins.at(par)==base && tself.at(alias)==TypeObj.UNUSED && tbase.at(alias)==TypeObj.UNUSED ) {
+        // Only legit if parent has to used kids after unused base
+        boolean used_kids=false;
+        for( int kid=alias; kid != 0; kid = BitsAlias.next_kid(alias,kid) )
+          if( tbase.at(kid)!=TypeObj.UNUSED )
+            { used_kids=true; break; }
+        if( !used_kids ) ins.set(alias, base); // Use base instead of explicit set
+      }
+    }
 
     // Compact.  Copy minimal edges to preserve semantics.
     Ary<Node> outs = new Ary<>(new Node[_defs._len],0);
@@ -304,6 +285,7 @@ public class MemMergeNode extends Node {
     _aliases=alss;
     _aidxes =adxs;
     assert check();
+    assert value(gvn).isa(tself); // Can lift type if some goes unused
     return this;
   }
 

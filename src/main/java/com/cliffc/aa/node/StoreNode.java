@@ -39,6 +39,12 @@ public class StoreNode extends Node {
         (alias=tmp._aliases.strip_nil().abit()) != -1 )
       return new StoreNode(this,((MemMergeNode)mem).obj(alias,gvn),adr);
 
+    // Stores bypass a Split.
+    if( mem instanceof MProjNode && mem.in(0) instanceof MemSplitNode ) {
+      assert tmp!=null && tmp._aliases.isa(((MemSplitNode)mem.in(0))._split);
+      return set_def(1,mem.in(0).in(0),gvn);
+    }
+
     // Stores bypass stores to unrelated fields.  TODO: Cannot really do this -
     // need parallel field updates.
     //if( mem instanceof StoreNode && !Util.eq(_fld,((StoreNode)mem)._fld) )

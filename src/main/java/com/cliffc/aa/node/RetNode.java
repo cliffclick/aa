@@ -70,8 +70,7 @@ public final class RetNode extends Node {
     Type ctl = gvn.type(ctl());
     if( ctl != Type.CTRL ) return ctl.oob(TALL);
     Type mem = gvn.type(mem());
-    if( mem.above(TypeMem.MEM.dual()) ) return TALL.dual();
-    if( !(mem.isa(TypeMem.MEM      )) ) return TALL;
+    if( !(mem instanceof TypeMem) ) return mem.oob(TALL);
     Type val = gvn.type(val());
     return TypeTuple.make(ctl,mem,val);
   }

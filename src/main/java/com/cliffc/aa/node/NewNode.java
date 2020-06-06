@@ -20,7 +20,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   // this NewObj.  These can come from initializers at parse-time, or stores
   // folded in.  There are no types stored here; types come from the inputs.
   public T _ts;             // Base object type, representing all possible future values
-  
+
   // The memory state for Env.DEFMEM, the default memory.  All non-final fields
   // are ALL; final fields keep their value.  All field flags are moved to
   // bottom, e.g. as-if all fields are now final-stored.
@@ -28,7 +28,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
 
   // Just TMP.make(_alias,OBJ); also effectively final
   public TypeMemPtr _tptr;
-  
+
   // True if pointer does not escape: the ptr can be used as the address in
   // loads and stores and null-and-eq checked.  It can NOT be used as a call
   // arg, a funptr display (same as a call arg), or value-stored.  Such values
@@ -81,7 +81,8 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
       DefMemNode.CAPTURED.set(_alias);
       while( !is_dead() && _defs._len > 1 )
         pop(gvn);               // Kill all fields
-      gvn.add_work(Env.DEFMEM);
+      gvn.setype(Env.DEFMEM,Env.DEFMEM.value(gvn));
+      gvn.add_work_uses(Env.DEFMEM);
       if( is_dead() ) return this;
       Node ptr = _uses.at(0);
       gvn.add_work_uses(ptr);   // Progress for remaining pointer users
@@ -149,17 +150,20 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   // clones during inlining all become unique new sites
   @SuppressWarnings("unchecked")
   @Override @NotNull public NewNode copy( boolean copy_edges, GVNGCM gvn) {
+    int nflds = BitsAlias.nflds(_alias);
     // Split the original '_alias' class into 2 sub-aliases
     NewNode<T> nnn = (NewNode<T>)super.copy(copy_edges, gvn);
     nnn._init(_alias,_ts);      // Children alias classes, split from parent
+    BitsAlias.set_nflds(nnn._alias,nflds);
     // The original NewNode also splits from the parent alias
     assert gvn.touched(this);
     Type oldt = gvn.unreg(this);
     _init(_alias,_ts);
+    BitsAlias.set_nflds(_alias,nflds);
     gvn.rereg(this,oldt);
     return nnn;
   }
-  
+
   @Override public int hashCode() { return super.hashCode()+ _alias; }
   // Only ever equal to self, because of unique _alias.  We can collapse equal
   // NewNodes and join alias classes, but this is not the normal CSE and so is

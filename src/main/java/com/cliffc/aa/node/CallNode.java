@@ -110,7 +110,8 @@ public class CallNode extends Node {
   // This is 2 higher than the user-visible arg count.
   int nargs() { return _defs._len-2; }
   // Actual arguments.  Arg(0) is allowed and refers to the Display/TFP.
-  Node arg( int x ) { assert x>=0; return _defs.at(x+2); }
+  Node arg ( int x ) { assert x>=0; return _defs.at(x+2); }
+  Node argm( int x ) { return x==-2 ? mem() : arg(x); }
   // Set an argument.  Use 'set_fun' to set the Display/Code.
   Node set_arg    (int idx, Node arg, GVNGCM gvn) { assert idx>0; return set_def(idx+2,arg,gvn); }
 
@@ -127,18 +128,21 @@ public class CallNode extends Node {
   // Add a bunch of utilities for breaking down a Call.value tuple:
   // takes a Type, upcasts to tuple, & slices by name.
   // ts[0] = Ctrl = in(0)
-  // ts[1] = Mem into the caller = in(1)
+  // ts[1] = Mem into the caller = mem() = in(1)
   // ts[2] = Escaping aliases
-  // ts[3] = Function pointer (code ptr + display) == in(2) == arg(0)
-  // ts[4] = in(3) == arg(1)
-  // ts[5]...
+  // ts[3] = Mem into the callee = mem() filtered escapes
+  // ts[4] = Function pointer (code ptr + display) == in(2) == arg(0)
+  // ts[5] = in(3) == arg(1)
+  // ts[6]...
 
   static final int MEMIDX=1; // Memory into the caller
   static final int ALSIDX=2; // Aliases bypassing the callee
-  static final int ARGIDX=3; //
+  static final int MCEIDX=3; // Memory into the callee
+  static final int ARGIDX=4; //
   static        Type       tctl( Type tcall ) { return             ((TypeTuple)tcall).at(0); }
   static        TypeMem    tmem( Type tcall ) { return tmem(((TypeTuple)tcall)._ts); }
-  static        TypeMem    tmem( Type[] ts  ) { return (TypeMem)ts[MEMIDX]; } // memory passed into function
+  static        TypeMem    tmem( Type[] ts  ) { return (TypeMem)ts[MEMIDX]; } // caller memory passed around function
+  static        TypeMem    tmce( Type[] ts  ) { return (TypeMem)ts[MCEIDX]; } // callee memory passed into   function
   static        TypeMemPtr tals( Type tcall ) { return (TypeMemPtr)((TypeTuple)tcall).at(ALSIDX); } // aliases escaping into the function
   static public TypeFunPtr ttfp( Type tcall ) { return (TypeFunPtr)((TypeTuple)tcall).at(ARGIDX); }
   static TypeTuple set_ttfp( TypeTuple tcall, TypeFunPtr nfptr ) { return tcall.set(ARGIDX,nfptr); }
@@ -221,7 +225,7 @@ public class CallNode extends Node {
     // Fidxs are typically low during iter, but can be high during
     // iter post-GCP on error calls where nothing resolves.
     if( unk instanceof UnresolvedNode && !fidxs.above_center() && !fidxs.test(1)) {
-      BitsFun rfidxs = resolve(fidxs,tcall._ts);
+      BitsFun rfidxs = resolve(fidxs,tcall._ts,gvn._opt_mode==2);
       if( rfidxs==null ) return null;            // Dead function, stall for time
       FunPtrNode fptr = least_cost(gvn, rfidxs); // Check for least-cost target
       if( fptr != null ) return set_fun(fptr, gvn); // Resolve to 1 choice
@@ -256,18 +260,27 @@ public class CallNode extends Node {
   // the full arg set but if the call is not reachable the FunNode will not
   // merge from that path.  Result tuple type:
   @Override public Type value(GVNGCM gvn) {
-    final Type[] ts = TypeAry.get(_defs._len+(ARGIDX-2));
+    if( _is_copy ) return gvn.self_type(this);
 
     // Pinch to XCTRL/CTRL
     Type ctl = gvn.type(ctl());
     if( !_is_copy && gvn._opt_mode>0 && cepi()==null ) ctl = Type.XCTRL; // Dead from below
     if( ctl != Type.CTRL ) return ctl.oob();
+    final Type[] ts = TypeAry.get(_defs._len+(ARGIDX-2));
     ts[0] = Type.CTRL;
 
     // Not a memory to the call?
     Type mem = gvn.type(mem());
     if( !(mem instanceof TypeMem) ) return mem.oob();
-    ts[MEMIDX]=mem;             // Memory into the caller, not callee
+    TypeMem tmem = (TypeMem)(ts[MEMIDX]=mem); // Memory into the caller, not callee
+
+    // Compute set of aliases that are reachable in the called function, from
+    // all argument pointers and memory state.
+    TypeMemPtr tescapes = _unpacked ? escapes(gvn,tmem) : TypeMemPtr.OOP;  // All aliases escape
+    ts[ALSIDX] = tescapes;
+
+    // Compute memory into the Callee - which is caller memory, minus the no-escapes.
+    ts[MCEIDX] = gvn._opt_mode==2 ? tmem : tmem.split_by_alias(tescapes._aliases);
 
     // Copy args for called functions.  Arg0 is display, handled below.
     for( int i=0; i<nargs(); i++ )
@@ -282,18 +295,15 @@ public class CallNode extends Node {
     if( !fidxs.is_empty() && fidxs.above_center()!=tfp._disp.above_center() )
       return gvn.self_type(this); // Display and FIDX mis-aligned; stall
     // Resolve; only keep choices with sane arguments during GCP
-    BitsFun rfidxs = resolve(fidxs,ts);
+    BitsFun rfidxs = resolve(fidxs,ts,gvn._opt_mode==2);
     if( rfidxs==null ) return gvn.self_type(this); // Dead function input, stall until this dies
     // Call.ts[2] is a TFP just for the resolved fidxs and display.
     ts[ARGIDX] = TypeFunPtr.make(rfidxs,tfp._nargs,rfidxs.above_center() == fidxs.above_center() ? tfp._disp : tfp._disp.dual());
 
-    // Compute set of aliases that are reachable in the called function, from
-    // all argument pointers and memory state.
-    ts[ALSIDX] = _unpacked ? escapes(gvn,(TypeMem)mem) : TypeMemPtr.OOP;  // All aliases escape
-
     return TypeTuple.make(ts);
   }
 
+  // A set of escaping aliases
   TypeMemPtr escapes(GVNGCM gvn, TypeMem tmem) {
     BitsAlias aargs = BitsAlias.EMPTY;
     for( int i=0; i<nargs(); i++ ) {
@@ -375,7 +385,7 @@ public class CallNode extends Node {
   // be removed - so losing an arg can only lift.
   private static final int BAD=1, GOOD=2, LOW=4, HIGH=8, DEAD=16;
 
-  BitsFun resolve( BitsFun fidxs, Type[] targs ) {
+  BitsFun resolve( BitsFun fidxs, Type[] targs, boolean gcp ) {
     if( fidxs==BitsFun.EMPTY) return fidxs; // Nothing to resolve
     if( fidxs==BitsFun.ANY  ) return fidxs; // No point in attempting to resolve all things
     if( fidxs==BitsFun.FULL ) return fidxs; // No point in attempting to resolve all things
@@ -384,7 +394,7 @@ public class CallNode extends Node {
     for( int fidx : fidxs )
       // Parent/kids happen during inlining
       for( int kidx=fidx; kidx!=0; kidx=BitsFun.next_kid(fidx,kidx) )
-        flags |= resolve(kidx,targs);
+        flags |= resolve(kidx,targs,gcp);
     if( x(flags,DEAD) ) return null; // Caller should stall for time, till dead folds up
     // - Some args High & no Low, keep all & join (ignore Good,Bad)
     if(  x(flags,HIGH) && !x(flags,LOW) ) return sgn(fidxs,true);
@@ -395,17 +405,17 @@ public class CallNode extends Node {
     // - All Bad, like Low: keep all & meet.  Bad args can go dead, effectively lifting.
     if( !x(flags,HIGH) && !x(flags,LOW) && !x(flags,GOOD) && flags!=0 )
       return sgn(fidxs,false);
+    // No args is at least as high as anything with args
+    if( flags==0 )
+      return sgn(fidxs,true);
+
     // Only had a single target coming in.
     if( fidxs.abit() != -1 ) // Single target
       // If BAD args can die (false in primitives, and false in UnresolvedNodes
       // where the BAD arg is required to make the signature unambiguous) then
       // return all the fidxs, and wait for some arg to die (or else the
       // program is in-error).
-    return fidxs;
-
-    // No args is at least as high as anything with args
-    if( flags==0 )
-      return sgn(fidxs,true);
+      return fidxs;
 
     // All that is left is the no-args case (all formals ignoring), no high/low
     // and some good and maybe bad.  Toss out the bad & return the remaining
@@ -414,7 +424,7 @@ public class CallNode extends Node {
     for( int fidx : fidxs )
       // Parent/kids happen during inlining
       for( int kidx=fidx; kidx!=0; kidx=BitsFun.next_kid(fidx,kidx) )
-        if( !BitsFun.is_parent(kidx) && !x(resolve(kidx,targs),BAD) )
+        if( !BitsFun.is_parent(kidx) && !x(resolve(kidx,targs,gcp),BAD) )
           choices = choices.set(kidx);
     if( choices.abit() != -1 )  // Single choice with all good, no high, no low, no bad
       return choices;           // Report it low
@@ -429,7 +439,7 @@ public class CallNode extends Node {
   // Return 4 bools as 4 bits based on whether or not the actual args meets the
   // formals: [High,Low,Good,Bad].  High > formal.dual >= Good >= formal > Low.
   // Bad is none of the prior (actual is neither above nor below the formal).
-  int resolve( int fidx, Type[] targs ) {
+  int resolve( int fidx, Type[] targs, boolean gcp ) {
     if( BitsFun.is_parent(fidx) )
       return 0; // Parent is never a real choice.  See these during inlining.
 
@@ -439,8 +449,10 @@ public class CallNode extends Node {
     // Forward refs are only during parsing; assume they fit the bill
     if( fun.is_forward_ref() ) return LOW;   // Assume they work
     if( fun.nargs() != nargs() ) return BAD; // Wrong arg count, toss out
-    // Toss out single-path FunNodes to the wrong call.
-    if( !fun.has_unknown_callers() && !is_copy() ) {
+    // Toss out single-path (inlines specific to a single call-site) FunNodes
+    // to the wrong call.  Happens because the parent fidx splits, and both
+    // children appear at all call sites - for a little while.
+    if( !fun.has_unknown_callers() && !is_copy() && !gcp ) {
       CallEpiNode cepi = cepi();
       if( cepi != null ) {
         int i; for( i=0; i<cepi.nwired(); i++ ) {

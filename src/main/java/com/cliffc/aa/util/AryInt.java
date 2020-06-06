@@ -81,7 +81,7 @@ public class AryInt {
   }
 
   /** Remove all elements */
-  public void clear( ) { _len=0; }
+  public void clear( ) { Arrays.fill(_es,0,_len,0); _len=0; }
 
   // Extend and set
   public int setX( int i, int e ) {
@@ -118,7 +118,7 @@ public class AryInt {
   }
 
   public AryInt map_update( IntUnaryOperator f ) { for( int i = 0; i<_len; i++ ) _es[i] = f.applyAsInt(_es[i]); return this; }
-  
+
   /** @return compact array version, using the internal base array where possible. */
   public int[] asAry() { return _len==_es.length ? _es : Arrays.copyOf(_es,_len); }
 

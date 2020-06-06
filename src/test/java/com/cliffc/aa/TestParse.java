@@ -359,10 +359,6 @@ public class TestParse {
 
   private static final String[] FLDS2= new String[]{"^","map","nn","vv"};
   @Test public void testParse07() {
-    TypeStruct dummy = TypeStruct.DISPLAY; // Force class loading cycle
-    test_obj_isa("map={x -> x ? @{nn=map(x.n);vv=x.v*x.v} : 0};"+
-                    "map(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0;v=1.2};v=2.3};v=3.4};v=4.5})",
-            TypeStruct.make(FLDS2,TypeStruct.ts(TypeMemPtr.STRUCT0,Type.XSCALAR,TypeMemPtr.STRUCT0,TypeFlt.FLT32))); //con(20.25)
     // Passing a function recursively
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({&},2)", Type.XNIL);
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({+},2)", TypeInt.con(2));
@@ -411,8 +407,9 @@ public class TestParse {
 
     // Test inferring a recursive struct type, with less help.  This one
     // inlines so doesn't actually test inferring a recursive type.
+    Type[] ts1 = TypeStruct.ts(Type.XNIL, Type.XSCALAR, Type.XNIL,TypeFlt.con(1.2*1.2));
     test_struct("map={x -> x ? @{nn=map(x.n);vv=x.v*x.v} : 0}; map(@{n=0;v=1.2})",
-                TypeStruct.make(FLDS2,ts0,TypeStruct.ffnls(4)));
+                TypeStruct.make(FLDS2,ts1,TypeStruct.ffnls(4)));
 
     // Test inferring a recursive struct type, with less help. Too complex to
     // inline, so actual inference happens

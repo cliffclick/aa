@@ -57,7 +57,7 @@ public class BitsAlias extends Bits<BitsAlias> {
   public static int[] get_kids( int par ) { return TREE.get_kids(par); }
   // Fast reset of parser state between calls to Exec
   public static void init0() { TREE.init0(); }
-  public static void reset_to_init0() { TREE.reset_to_init0(); }
+  public static void reset_to_init0() { TREE.reset_to_init0(); NFLDS.clear(); }
   // Iterate over children
   public static int next_kid( int alias, int kid ) { return TREE.next_kid(alias,kid); }
 
@@ -77,6 +77,6 @@ public class BitsAlias extends Bits<BitsAlias> {
   // are biased+1 in NFLDS, so the default 0 maps to -1, meaning "field number
   // not known yet".
   private static final AryInt NFLDS = new AryInt();
-  static int nflds(int alias) { return NFLDS.atX(alias)-1; }
-  public static void set_nflds(int alias, int nflds) { NFLDS.setX(alias,nflds+1); }
+  public static int nflds(int alias) { return NFLDS.atX(alias)-1; }
+  public static void set_nflds(int alias, int nflds) { assert NFLDS.atX(alias)==0;  NFLDS.setX(alias,nflds+1); }
 }

@@ -49,6 +49,12 @@ public class LoadNode extends Node {
       if( obj != null ) return set_mem(obj,gvn);
     }
 
+    // Load can move past a Join if all aliases align.
+    if( mem instanceof MemJoinNode && aliases != null ) {
+      Node jmem = ((MemJoinNode)mem).can_bypass(gvn,(TypeMemPtr)tadr);
+      if( jmem != null ) return set_mem(jmem,gvn);
+    }
+    
     // Load can move out of a Call, if the function has no Parm:mem - happens
     // for single target calls that do not (have not yet) inlined.
     CallNode call;

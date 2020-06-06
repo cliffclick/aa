@@ -47,7 +47,7 @@ public class DefMemNode extends Node {
     gvn.add_work_uses(this);
     return mem;
   }
+  // Between compilations
   public static void reset() { CAPTURED.clear(); }
-
 }
 

@@ -398,7 +398,7 @@ public class GVNGCM {
   private Node merge( Node old, Node nnn ) {
     nnn._live = (TypeMem)nnn._live.meet(old._live);
     Type told = type(old), tnnn = type(nnn);
-    if( told!=tnnn ) setype(nnn,told.join(tnnn));
+    if( told!=tnnn ) { setype(nnn,told.join(tnnn)); add_work_uses(nnn); }
     return untype(old,nnn);      // Just toss old, keep nnn.
   }
 
@@ -414,6 +414,8 @@ public class GVNGCM {
       if( was ) {            // If was in GVN
         _vals.putIfAbsent(u,u);// Back in the table, since its still in the graph
         add_work(u);         // And put on worklist, to get re-visited
+        if( u instanceof RetNode )
+          add_work_uses(u); // really trying to get CallEpi to test trivial inline again
       }
     }
   }
@@ -466,7 +468,10 @@ public class GVNGCM {
     assert !Env.START.more_ideal(this,new VBitSet(),3);
   }
 
-  private boolean can_dom(Node n) { return n instanceof CastNode; }
+  private boolean can_dom(Node n) {
+    return n instanceof CastNode ||
+      (n instanceof MProjNode && n.in(0) instanceof CallEpiNode);
+  }
   private void do_doms(NonBlockingHashMapLong<Node> can_doms) {
     for( Node n : can_doms.values() )
       if( n.is_dead() ) can_doms.remove(n._uid);
@@ -540,6 +545,9 @@ public class GVNGCM {
             // same type (Ctrl) but the Phis must merge new values.
             if( use instanceof RegionNode )
               add_work_uses(use);
+            // If a Parm:Mem input is updated, all Parm:ptrs may update.
+            if( use instanceof ParmNode && ((ParmNode)use)._idx==-2 )
+              add_work_uses(use.in(0));
           }
           if( n.value_changes_live() ) {
             add_work_defs(n);

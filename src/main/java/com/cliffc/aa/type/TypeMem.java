@@ -162,49 +162,6 @@ public class TypeMem extends Type<TypeMem> {
     return bas;
   }
 
-  // Walk all reachable aliases from this set of aliases, and
-  // include them all in the returned memory.
-  public TypeMem slice_all_aliases_plus_children(BitsAlias aliases) {
-    AryInt work = new AryInt();
-    Ary<TypeObj> tos = new Ary<>(new TypeObj[]{null,TypeObj.UNUSED});
-    for( int alias : aliases )
-      for( int kid=alias; kid!=0; kid = BitsAlias.next_kid(alias,kid) ) {
-        work.push(kid);
-        tos.setX(kid,at(kid));
-      }
-
-    while( !work.isEmpty() ) {
-      int alias=work.pop();
-      TypeObj to = at(alias);
-      if( to==TypeObj.OBJ || to==TypeObj.ISUSED )
-        return this;            // All structs with all possible pointers
-      if( !(to instanceof TypeStruct) ) continue;
-      TypeStruct ts = (TypeStruct)to;
-      // Incomplete struct?  This is an early escapee from Parse times; more
-      // fields may be added which we assume is a pointer to all.
-      if( BitsAlias.nflds(alias) != ts._ts.length )
-        return this;
-      for( int i=0; i<ts._ts.length; i++ ) {
-        Type fld = ts._ts[i];
-        if( TypeMemPtr.OOP.isa(fld) )
-          fld = TypeMemPtr.OOP;                      // All possible pointers
-        if( !(fld instanceof TypeMemPtr) ) continue; // Not a pointer, no more aliases
-        if( ((TypeMemPtr)fld)._aliases.test(1) )
-          return this;          // All possible pointers
-        // Walk the possible pointers, and include them in the slice
-        for( int ptralias : ((TypeMemPtr)fld)._aliases ) {
-          for( int kid=ptralias; kid!=0; kid = BitsAlias.next_kid(ptralias,kid) ) {
-            if( tos.atX(kid) != null ) continue;
-            work.push(kid);
-            tos.setX(kid,at(kid));
-          }
-        }
-      }
-    }
-
-    return make0(tos.asAry());
-  }
-
   private static TypeMem FREE=null;
   @Override protected TypeMem free( TypeMem ret ) { _aliases=null; _sharp_cache=null; FREE=this; return ret; }
   private static TypeMem make(TypeObj[] aliases) {
@@ -336,6 +293,49 @@ public class TypeMem extends Type<TypeMem> {
     return obj1;
   }
 
+  // Walk all reachable aliases from this set of aliases, and
+  // include them all in the returned memory.
+  public TypeMem slice_all_aliases_plus_children(BitsAlias aliases) {
+    AryInt work = new AryInt();
+    Ary<TypeObj> tos = new Ary<>(new TypeObj[]{null,TypeObj.UNUSED});
+    for( int alias : aliases )
+      for( int kid=alias; kid!=0; kid = BitsAlias.next_kid(alias,kid) ) {
+        work.push(kid);
+        tos.setX(kid,at(kid));
+      }
+
+    while( !work.isEmpty() ) {
+      int alias=work.pop();
+      TypeObj to = at(alias);
+      if( to==TypeObj.OBJ || to==TypeObj.ISUSED )
+        return this;            // All structs with all possible pointers
+      if( !(to instanceof TypeStruct) ) continue;
+      TypeStruct ts = (TypeStruct)to;
+      // Incomplete struct?  This is an early escapee from Parse times; more
+      // fields may be added which we assume is a pointer to all.
+      if( BitsAlias.nflds(alias) != ts._ts.length )
+        return this;
+      for( int i=0; i<ts._ts.length; i++ ) {
+        Type fld = ts._ts[i];
+        if( TypeMemPtr.OOP.isa(fld) )
+          fld = TypeMemPtr.OOP;                      // All possible pointers
+        if( !(fld instanceof TypeMemPtr) ) continue; // Not a pointer, no more aliases
+        if( ((TypeMemPtr)fld)._aliases.test(1) )
+          return this;          // All possible pointers
+        // Walk the possible pointers, and include them in the slice
+        for( int ptralias : ((TypeMemPtr)fld)._aliases ) {
+          for( int kid=ptralias; kid!=0; kid = BitsAlias.next_kid(ptralias,kid) ) {
+            if( tos.atX(kid) != null ) continue;
+            work.push(kid);
+            tos.setX(kid,at(kid));
+          }
+        }
+      }
+    }
+
+    return make0(tos.asAry());
+  }
+
   // Incrementally build a sharpened memory, structs and pointers.  Alias sets
   // can be looked-up directly in a map from BitsAlias to TypeObjs.  This is
   // useful for resolving all the deep pointer structures at a point in the
@@ -343,8 +343,6 @@ public class TypeMem extends Type<TypeMem> {
   // a BitsAlias it returns a TypeObj (and extends the HashMap for future
   // calls).  The TypeObj may contain deep pointers to other deep TypeObjs,
   // including cyclic types.
-
-
   // TODO: CNC BUG: ptr->XOBJ NOT SHARPENED
   public TypeMemPtr sharpen( TypeMemPtr tmp ) {
     if( _sharp_cache==null ) _sharp_cache = new HashMap<>();
@@ -434,6 +432,43 @@ public class TypeMem extends Type<TypeMem> {
   // Sharpen if a maybe-pointer
   @Override public Type sharptr( Type ptr ) { return ptr instanceof TypeMemPtr ? sharpen((TypeMemPtr)ptr) : ptr; }
 
+  // Returns the same memory, with aliases not in the split set to either XOBJ
+  // or UNUSED.
+  public TypeMem split_by_alias(BitsAlias split) {
+    int max = Math.max(len(),split.max()+1);
+    TypeObj[] mems = new TypeObj[max];
+    mems[1] = at(1);            // Set base
+    for( int alias=2; alias<max; alias++ ) {
+      TypeObj to = at(alias);
+      mems[alias] = (to==TypeObj.UNUSED || split.test_recur(alias)) ? to : TypeObj.XOBJ;
+    }
+    return TypeMem.make0(mems);
+  }
+
+  // Merge memories, left or right by alias
+  public TypeMem merge_by_alias(TypeMem rhs, BitsAlias split) {
+    int max = Math.max(rhs.len(),Math.max(len(),split.max()+1));
+    TypeObj[] mems = new TypeObj[max];
+    mems[1] = at(1);            // Set base from LHS
+    for( int alias=2; alias<max; alias++ )
+      mems[alias] = merge_one_lhs(split,alias,rhs.at(alias));
+    return TypeMem.make0(mems);
+  }
+  // If split right, take rhs.
+  // If split left, and rhs has no answer, take lhs.
+  // Else lhs has no answer, so take rhs.
+  public TypeObj merge_one_lhs(BitsAlias split, int alias, TypeObj rhs) {
+    if( split.test_recur(alias) ) return rhs;          // Split right, always take right
+    // Split left.  See if this is a New alias
+    TypeObj lhs = at(alias);
+    return merge_pick(lhs,rhs);
+  }
+  public static TypeObj merge_pick(TypeObj lhs, TypeObj rhs) {
+    if( rhs == TypeObj.UNUSED ) return rhs; // Keep an UNUSED
+    if( lhs != TypeObj.UNUSED && lhs != TypeObj.XOBJ ) return lhs; // LHS has something
+    if( rhs == TypeObj.XOBJ ) return lhs; // RHS has no answer
+    return rhs;                 // RHS made a New or an Unused
+  }
 
   // Whole object Store at an alias.  Just merge with the parent.
   public TypeMem st( int alias, TypeObj obj ) {
@@ -460,27 +495,6 @@ public class TypeMem extends Type<TypeMem> {
         for( int kid=alias; kid!=0; kid=BitsAlias.next_kid(alias,kid) )
           if( !at(kid).isa(mem.at(kid)) )
             return false;
-    return true;
-  }
-
-
-  // Support for SESE flow optimizations.  Mark all memory as being clean (not
-  // modified in this function).  Recursive.
-  public TypeMem clean() {
-    if( this==XMEM ) return XMEM;
-    TypeObj[] ts = _aliases.clone();
-    for( int i=1; i<ts.length; i++ )
-      if( ts[i] != null )
-        ts[i] = (TypeObj)ts[i].clean();
-    return make0(ts);
-  }
-
-  // Support for SESE flow optimizations.  True if all looked-at memory is
-  // clean.  Allows a Load to bypass calls.
-  public boolean is_clean( BitsAlias aliases, String fld ) {
-    for( int alias : aliases )
-      if( alias != 0 && !at(alias).is_clean(fld) )
-        return false;
     return true;
   }
 

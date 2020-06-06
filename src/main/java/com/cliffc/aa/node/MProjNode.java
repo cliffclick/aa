@@ -18,15 +18,6 @@ public class MProjNode extends ProjNode {
     }
     return null;
   }
-  @Override public Type value(GVNGCM gvn) {
-    Type c = gvn.type(in(0));
-    if( c instanceof TypeTuple ) {
-      TypeTuple ct = (TypeTuple)c;
-      if( _idx < ct._ts.length )
-        return ct._ts[_idx];
-    }
-    return c.oob();
-  }
   // Memory need precise liveness
   @Override public boolean basic_liveness() { return false; }
 }
