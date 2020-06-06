@@ -1,6 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.AA;
+import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
@@ -211,9 +212,7 @@ public class MemMergeNode extends Node {
     Node base = mem();
 
     // Build an array containing the Node used for each and every alias.
-    int len = Math.max(1,max()+1);
-    len = Math.max(len,((TypeMem)gvn.self_type(this)).len());
-    len = Math.max(len,_live.len());
+    int len = Env.DEFMEM._defs._len;
     Ary<Node> ins = new Ary<>(new Node[len]);
     ins.setX(1,base);
     for( int alias=2; alias<ins._len; alias++ )
@@ -244,7 +243,7 @@ public class MemMergeNode extends Node {
     TypeMem tself = (TypeMem)gvn.self_type(this);
     TypeMem tbase = (TypeMem)gvn.self_type(base);
     for( int alias=2; alias<len; alias++ ) {
-      if( _live.at(alias)==TypeObj.UNUSED ) {
+      if( _live.at(alias)==TypeObj.UNUSED || tbase.at(alias)==TypeObj.UNUSED ) {
         if( unused==null ) unused = gvn.con(TypeObj.UNUSED);
         ins.set(alias,unused);
       }

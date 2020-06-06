@@ -4,6 +4,8 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
+import com.cliffc.aa.type.TypeObj;
+import com.cliffc.aa.type.TypeTuple;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
@@ -401,6 +403,7 @@ public abstract class Node implements Cloneable {
   public final int more_flow(GVNGCM gvn, VBitSet bs, boolean lifting, int errs) {
     if( bs.tset(_uid) ) return errs; // Been there, done that
     if( _keep == 0 ) {
+      // Check for only forwards flow, and if possible then also on worklist
       Type    oval=gvn.type(this), nval = value(gvn);
       TypeMem oliv=_live         , nliv = live (gvn);
       if( nval != oval || nliv != oliv ) {
@@ -411,6 +414,20 @@ public abstract class Node implements Cloneable {
           bs.clear(_uid);                     // Pop-frame & re-run in debugger
           System.err.println(dump(0,new SB(),true)); // Rolling backwards not allowed
           errs++;
+        }
+      }
+      // Check memory does not report unused unless default mem also does
+      Type t = nval instanceof TypeTuple ? ((TypeTuple)nval).at(1) : nval;
+      if( t instanceof TypeMem && t != TypeMem.ANYMEM ) {
+        TypeMem tval= (TypeMem)t;
+        Node def = Env.DEFMEM;
+        for( int alias=2; alias<def._defs._len; alias++ ) {
+          if( !(def.in(alias) instanceof ConNode && ((ConNode)def.in(alias))._t == TypeObj.UNUSED) &&
+              tval.at(alias)==TypeObj.UNUSED && nliv.at(alias)!=TypeObj.UNUSED ) {
+            bs.clear(_uid);     // Pop-frame & re-run in debugger
+            System.err.println(dump(0,new SB(),true)); // Rolling backwards not allowed
+            errs++;
+          }
         }
       }
     }

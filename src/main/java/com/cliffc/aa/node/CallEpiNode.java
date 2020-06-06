@@ -345,7 +345,9 @@ public final class CallEpiNode extends Node {
     if( tcall == Type.ANY ) return null;
     TypeMemPtr tmp = CallNode.tals(tcall);
     if( tmp._aliases.join(aliases) != BitsAlias.EMPTY ) return null;
-    Type tret = ((TypeTuple)gvn.type(this))._ts[2];
+    TypeTuple tcepi = (TypeTuple)gvn.type(this);
+    if( tcepi._ts[0]!=Type.CTRL ) return null;
+    Type tret = tcepi._ts[2];
     if( TypeMemPtr.OOP.isa(tret) ) return null; // Might return an aliased pointer
     if( tret instanceof TypeMemPtr )
       if( ((TypeMemPtr)tret)._aliases.join(aliases) != BitsAlias.EMPTY ) return null;

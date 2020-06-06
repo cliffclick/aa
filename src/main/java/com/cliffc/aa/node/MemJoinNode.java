@@ -43,8 +43,9 @@ public class MemJoinNode extends Node {
       MemMergeNode mmm1 = mem1 instanceof MemMergeNode ? (MemMergeNode)mem1 : null;
       TypeMem tmem0 = (TypeMem)gvn.type(mem0);
       TypeMem tmem1 = (TypeMem)gvn.type(mem1);
+      TypeMem defmem= (TypeMem)gvn.type(in(2));
 
-      int len = -1;
+      int len = ((TypeMem)gvn.type(this)).len();
       if( mmm0 != null ) len = Math.max(len,mmm0.max()+1);
       if( mmm1 != null ) len = Math.max(len,mmm1.max()+1);
 
@@ -55,6 +56,8 @@ public class MemJoinNode extends Node {
         Node n = tmem0.merge_one_lhs(_split,alias,rhs) == rhs
           ? (mmm1==null ? mem1 : mmm1.alias2node(alias))
           : (mmm0==null ? mem0 : mmm0.alias2node(alias));
+        if( defmem.at(alias)==TypeObj.UNUSED && gvn.type(n) != TypeObj.UNUSED )
+          n = split.in(0);
         mem.create_alias_active(alias,n,gvn);
       }
       return mem;
