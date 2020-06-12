@@ -25,8 +25,6 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   public int _nargs;            // Number of formals, including the display
   public TypeMemPtr _disp;      // Display; is_display_ptr
 
-  boolean _cyclic; // Type is cyclic.  This is a summary property, not a description of value sets, hence is not in the equals or hash
-
   private TypeFunPtr(BitsFun fidxs, int nargs, TypeMemPtr disp ) { super(TFUNPTR); init(fidxs,nargs,disp); }
   private void init (BitsFun fidxs, int nargs, TypeMemPtr disp ) { _fidxs = fidxs; _nargs=nargs; _disp=disp; }
   @Override int compute_hash() { assert _disp._hash != 0;  return (TFUNPTR + _fidxs._hash + _nargs + _disp._hash)|256; }
@@ -88,7 +86,6 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     TypeFunPtr dual = _dual = new TypeFunPtr(_fidxs.dual(),_nargs,_disp.rdual());
     dual._dual = this;
     if( _hash != 0 ) dual._hash = dual.compute_hash();
-    dual._cyclic = true;
     return dual;
   }
   @Override protected Type xmeet( Type t ) {
