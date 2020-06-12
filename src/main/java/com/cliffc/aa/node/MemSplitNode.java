@@ -3,24 +3,16 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.VBitSet;
 
 // Split a set of aliases into a SESE region, to be joined by a later MemJoin.
 // This allows more precision in the SESE that may otherwise merge many paths
 // in and out, and is especially targeting non-inlined calls.
 public class MemSplitNode extends Node {
 
-  final BitsAlias _split; // Aliases split on MProj#1; the unnamed ones are on MProj#0
-  public MemSplitNode( Node allmem, BitsAlias split, TypeMem live ) { super(OP_SPLIT,allmem); _split=split; _live=live; }
+  public MemSplitNode( Node allmem, TypeMem live ) { super(OP_SPLIT,allmem); _live=live; }
 
-  @Override String str() { return "Split"+_split; }
-  @Override public int hashCode() { return super.hashCode()+_split.hashCode(); }
-  @Override public boolean equals(Object o) {
-    if( this==o ) return true;
-    if( !super.equals(o) ) return false;
-    if( !(o instanceof MemSplitNode) ) return false;
-    MemSplitNode parm = (MemSplitNode)o;
-    return _split==parm._split;
-  }
+  @Override String str() { return "Split"; }
 
   @Override public Node ideal(GVNGCM gvn, int level) {
     if( _defs._len!=1 ) return null; // Already is_copy
@@ -39,7 +31,7 @@ public class MemSplitNode extends Node {
   // Becomes: newSplit/{MPrj0n/Merge0,oldSplit},MPrj0n/Merge1,oldSplit};
   private Node bypass_merge(GVNGCM gvn, MemMergeNode mem) {
     // New split from Merge base
-    MemSplitNode nsplit = (MemSplitNode)gvn.xform(new MemSplitNode(mem.mem(),_split,_live));
+    MemSplitNode nsplit = (MemSplitNode)gvn.xform(new MemSplitNode(mem.mem(),_live));
     Node m0n = gvn.xform(new MProjNode(nsplit,0));  m0n._live = _live;
     Node m1n = gvn.xform(new MProjNode(nsplit,1));  m1n._live = _live;
     // Two merges, one for left and one for right
@@ -51,7 +43,7 @@ public class MemSplitNode extends Node {
     TypeMem tsplit = (TypeMem)gvn.type(mem);
 
     // Feed alias edges to the merges, left or right
-    int max = Math.max(_split.max()+1,tsplit.len());
+    int max = Math.max(NewNode.ESCAPES.length(),tsplit.len());
     for( int alias=2; alias<max; alias++ ) {
       Node base = mem.alias2node(alias); // Alias node from base
       Node yobj = tsplit.at(alias)==TypeObj.XOBJ ? base : xobj; // XOBJ either way, but from base or a constant
@@ -59,7 +51,7 @@ public class MemSplitNode extends Node {
       Node l,r;
       if( tsplit.at(alias)==TypeObj.UNUSED ) {
         l = r = yuse;
-      } else if( _split.test_recur(alias) ) { // Alias splits right
+      } else if( NewNode.ESCAPES.get(alias) ) { // Alias splits right
         l=yobj; r=base;
       } else {                  // Alias splits left
         l=base; r=yobj;
@@ -78,7 +70,7 @@ public class MemSplitNode extends Node {
   @Override public Type value(GVNGCM gvn) {
     Type t0 = gvn.type(in(0));
     if( !(t0 instanceof TypeMem) ) return t0.oob();
-    return TypeTuple.make( t0, ((TypeMem)t0).split_by_alias(_split));
+    return TypeTuple.make( t0, ((TypeMem)t0).split_by_alias(NewNode.ESCAPES));
   }
   @Override public boolean basic_liveness() { return false; }
 

@@ -254,7 +254,6 @@ public final class CallEpiNode extends Node {
       return TypeTuple.CALLE.dual();
     TypeMem    tmem   = CallNode.tmem(tcall); // Peel apart Call tuple
     TypeFunPtr tfptr  = CallNode.ttfp(tcall); // Peel apart Call tuple
-    BitsAlias escapes = CallNode.tals(tcall).aliases();
 
     if( tfptr.is_forward_ref() ) return TypeTuple.CALLE; // Still in the parser.
     // NO fidxs, means we're not calling anything.
@@ -312,12 +311,13 @@ public final class CallEpiNode extends Node {
     //     If any FIDX has no ret, use DEFMEM (assume unwired call is bad)
     //     Else FIDX has Ret, merge all such Rets.
     //     Ignore Rets with no FIDX.
-    int emax = Math.max(Math.max(escapes.max()+1,def_mem.len()),tmem.len());
+    int emax = Math.max(def_mem.len(),tmem.len());
     TypeObj[] tos = new TypeObj[emax];
     tos[1] = def_mem.at(1);
     for( int alias=2; alias<emax; alias++ ) {
+      TypeObj lhs = tmem.at(alias);
       TypeObj rhs = TypeObj.OBJ; // Unknown caller modifies all memory
-      if( !has_unknown_callees ) {
+      if( !has_unknown_callees ) { // Meet of all known callers
         rhs = TypeObj.UNUSED;
         for( int i=0; i<nwired(); i++ )
           if( fidxs.test_recur(wired(i)._fidx) ) {
@@ -325,10 +325,14 @@ public final class CallEpiNode extends Node {
             TypeTuple ttret = (TypeTuple)gvn.type(ret);
             TypeMem trmem = (TypeMem)ttret.at(1);
             TypeObj tro = trmem.at(alias);
-            rhs = (TypeObj)rhs.meet(tro);
+            rhs = (TypeObj)rhs.meet(tro); // Meet of known callers
           }
       }
-      TypeObj to = gvn._opt_mode==2 ? rhs : tmem.merge_one_lhs(escapes,alias,rhs);  // always escape in GCP
+      // if XUSE, always XUSE.
+      // If escapes, use RHS.
+      // If not, and LHS is XOBJ then rhs (new allocation)
+      // Else LHS.
+      TypeObj to = tmem.merge_one_lhs(NewNode.ESCAPES,alias,rhs);  // 
       tos[alias] = (TypeObj)to.join(def_mem.at(alias));// But always at least as nice as DEFMEM
     }
     TypeMem post_call_mem = TypeMem.make0(tos);
@@ -340,19 +344,8 @@ public final class CallEpiNode extends Node {
   // Does this set of aliases bypass the call?
   CallNode can_bypass( GVNGCM gvn, BitsAlias aliases ) {
     if( !(in(0) instanceof CallNode) ) return null;
-    CallNode call = call();
-    Type tcall = gvn.type(call);
-    if( tcall == Type.ANY ) return null;
-    TypeMemPtr tmp = CallNode.tals(tcall);
-    if( tmp._aliases.join(aliases) != BitsAlias.EMPTY ) return null;
-    TypeTuple tcepi = (TypeTuple)gvn.type(this);
-    if( tcepi._ts[0]!=Type.CTRL ) return null;
-    Type tret = tcepi._ts[2];
-    if( TypeMemPtr.OOP.isa(tret) ) return null; // Might return an aliased pointer
-    if( tret instanceof TypeMemPtr )
-      if( ((TypeMemPtr)tret)._aliases.join(aliases) != BitsAlias.EMPTY ) return null;
-    // Load/Store can bypass this call.
-    return call;
+    // Are any aliases in the escape set?
+    return aliases.overlap(NewNode.ESCAPES) ? null : call();
   }
 
   // Sanity check
@@ -379,17 +372,14 @@ public final class CallEpiNode extends Node {
     Node precallmem = call.mem();
     if( precallmem!=mem ) {
       // Split call memory, same as CallNode does
-      BitsAlias escapes = CallNode.tals(tcall)._aliases;
-      if( escapes!=BitsAlias.NZERO ) { // All escape: no need to split/rejoin
-        Node split = gvn.xform(new MemSplitNode(precallmem,escapes,call._live).keep());
-        Node lhs = gvn.xform(new MProjNode(split,0)); lhs._live = call._live; // Caller memory (bypass)
-        Node rhs = gvn.xform(new MProjNode(split,1)); rhs._live = call._live; // Callee memory (escapes into call)
-        // Memory into the call comes from the split.  Call will disappear shortly.
-        gvn.set_def_reg(call,1,rhs);
-        // Merge the call-split and pre-call memory.
-        mem = gvn.xform(new MemJoinNode(lhs,mem,Env.DEFMEM,escapes,_live));
-        split.unkeep(gvn);
-      }
+      Node split = gvn.xform(new MemSplitNode(precallmem,call._live).keep());
+      Node lhs = gvn.xform(new MProjNode(split,0)); lhs._live = call._live; // Caller memory (bypass)
+      Node rhs = gvn.xform(new MProjNode(split,1)); rhs._live = call._live; // Callee memory (escapes into call)
+      // Memory into the call comes from the split.  Call will disappear shortly.
+      gvn.set_def_reg(call,1,rhs);
+      // Merge the call-split and pre-call memory.
+      mem = gvn.xform(new MemJoinNode(lhs,mem,Env.DEFMEM,_live));
+      split.unkeep(gvn);
     }
 
     // Unwire any wired called function

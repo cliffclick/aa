@@ -6,6 +6,7 @@ import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
 
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.HashMap;
 
 /**
@@ -434,20 +435,20 @@ public class TypeMem extends Type<TypeMem> {
 
   // Returns the same memory, with aliases not in the split set to either XOBJ
   // or UNUSED.
-  public TypeMem split_by_alias(BitsAlias split) {
-    int max = Math.max(len(),split.max()+1);
+  public TypeMem split_by_alias(BitSet split) {
+    int max = Math.max(len(),split.length());
     TypeObj[] mems = new TypeObj[max];
     mems[1] = at(1);            // Set base
     for( int alias=2; alias<max; alias++ ) {
       TypeObj to = at(alias);
-      mems[alias] = (to==TypeObj.UNUSED || split.test_recur(alias)) ? to : TypeObj.XOBJ;
+      mems[alias] = (to==TypeObj.UNUSED || split.get(alias)) ? to : TypeObj.XOBJ;
     }
     return TypeMem.make0(mems);
   }
 
   // Merge memories, left or right by alias
-  public TypeMem merge_by_alias(TypeMem rhs, BitsAlias split) {
-    int max = Math.max(rhs.len(),Math.max(len(),split.max()+1));
+  public TypeMem merge_by_alias(TypeMem rhs, BitSet split) {
+    int max = Math.max(rhs.len(),Math.max(len(),split.length()));
     TypeObj[] mems = new TypeObj[max];
     mems[1] = at(1);            // Set base from LHS
     for( int alias=2; alias<max; alias++ )
@@ -457,8 +458,8 @@ public class TypeMem extends Type<TypeMem> {
   // If split right, take rhs.
   // If split left, and rhs has no answer, take lhs.
   // Else lhs has no answer, so take rhs.
-  public TypeObj merge_one_lhs(BitsAlias split, int alias, TypeObj rhs) {
-    if( split.test_recur(alias) ) return rhs;          // Split right, always take right
+  public TypeObj merge_one_lhs(BitSet split, int alias, TypeObj rhs) {
+    if( split.get(alias) ) return rhs;          // Split right, always take right
     // Split left.  See if this is a New alias
     TypeObj lhs = at(alias);
     return merge_pick(lhs,rhs);

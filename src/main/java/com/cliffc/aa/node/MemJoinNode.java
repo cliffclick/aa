@@ -8,18 +8,8 @@ import com.cliffc.aa.type.*;
 // in and out, and is especially targeting non-inlined calls.
 public class MemJoinNode extends Node {
 
-  final BitsAlias _split;
-  public MemJoinNode( Node lhs, Node rhs, Node defmem, BitsAlias split, TypeMem live ) { super(OP_JOIN,lhs,rhs, defmem); _split=split; _live=live; }
+  public MemJoinNode( Node lhs, Node rhs, Node defmem, TypeMem live ) { super(OP_JOIN,lhs,rhs, defmem); _live=live; }
 
-  @Override String str() { return "Join"+_split; }
-  @Override public int hashCode() { return super.hashCode()+_split.hashCode(); }
-  @Override public boolean equals(Object o) {
-    if( this==o ) return true;
-    if( !super.equals(o) ) return false;
-    if( !(o instanceof MemJoinNode) ) return false;
-    MemJoinNode parm = (MemJoinNode)o;
-    return _split==parm._split;
-  }
   @Override public Node ideal(GVNGCM gvn, int level) {
 
     Node mem0 = in(0);
@@ -30,11 +20,11 @@ public class MemJoinNode extends Node {
 
     // Empty split?
     Node s00 = mpj0.in(0);
-    MemSplitNode split;
-    if( mpj1.in(0)==s00 && s00 instanceof MemSplitNode && (split=(MemSplitNode)s00)._split==_split &&
+    if( mpj1.in(0)==s00 && s00 instanceof MemSplitNode &&
         mpj0 instanceof MProjNode && ((MProjNode)mpj0)._idx==0 &&
         mpj1 instanceof MProjNode && ((MProjNode)mpj1)._idx==1 &&
         mem0._uses._len==1 && mem1._uses._len==1 ) {
+      MemSplitNode split = (MemSplitNode)s00;
 
       if( mem0==mpj0 && mem1==mpj1 ) // Just return the split base
         return split.in(0);
@@ -53,7 +43,7 @@ public class MemJoinNode extends Node {
       MemMergeNode mem = new MemMergeNode(split.in(0));
       for( int alias=2; alias<len; alias++ ) {
         TypeObj rhs = tmem1.at(alias);
-        Node n = tmem0.merge_one_lhs(_split,alias,rhs) == rhs
+        Node n = tmem0.merge_one_lhs(NewNode.ESCAPES,alias,rhs) == rhs
           ? (mmm1==null ? mem1 : mmm1.alias2node(alias))
           : (mmm0==null ? mem0 : mmm0.alias2node(alias));
         if( defmem.at(alias)==TypeObj.UNUSED && gvn.type(n) != TypeObj.UNUSED )
@@ -73,7 +63,7 @@ public class MemJoinNode extends Node {
     if( !(rhs instanceof TypeMem) ) return rhs.oob();
 
     // Merge types left and right
-    TypeMem trez = ((TypeMem)lhs).merge_by_alias((TypeMem)rhs,_split);
+    TypeMem trez = ((TypeMem)lhs).merge_by_alias((TypeMem)rhs,NewNode.ESCAPES);
     // Lift to UNUSED, if required.  This is basically a shortcut
     // because nearly always the join is useless.
     TypeMem defmem = (TypeMem)gvn.type(in(2));
@@ -88,7 +78,7 @@ public class MemJoinNode extends Node {
   // Some memory user can bypass, if the aliases are compatible
   Node can_bypass( GVNGCM gvn, TypeMemPtr tmp ) {
     // Check for easy split right
-    if( tmp._aliases.isa(_split) ) return in(1);
+    if( tmp._aliases.isa(NewNode.ESCAPES) ) return in(1);
     // Check for split left, but LHS has no answer and RHS made a New
     TypeMem lhs = (TypeMem)gvn.type(in(0));
     TypeMem rhs = (TypeMem)gvn.type(in(1));
@@ -97,7 +87,7 @@ public class MemJoinNode extends Node {
     if( TypeMem.merge_pick(lld,rld)==rld )
       return in(1);
     // Check for easy split left
-    if( tmp._aliases.join(_split).is_empty() )
+    if( !tmp._aliases.overlap(NewNode.ESCAPES) )
       return in(0);
     return null;
   }

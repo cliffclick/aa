@@ -1,4 +1,116 @@
 =======================================
+Notes from 06/11/2020
+
+Want to get away from non-local graph updates, e.g. DefMemNode.CAPUTRED &
+NewNode._no_escape.  So move these ideas into the graph flow.
+
+Forwards: ptrs are stored (or not), hence get mixed into memory & thus into
+unknown OBJ fields - or not.  A forwards flow property.  Might add into
+that a ptr is ld/st address, is used as a call arg, is phi mixed.
+
+Reverse: Ptr values are not just basic-live, but stored (or not), used as an
+address, a call arg, etc.  Used by a ScopeNode gives a worst-case user,
+so Parser does normal keep-alive.
+
+Doing both of these as a Type means they just flow = no non-local graph issues.
+
+Need a un-init memory value (ISUSED?), a OBJ memory value, a XOBJ and a UNUSED.
+Want to track un-init so at split/join can precisely split aliases.
+
+Want to precise-split memory.  No more mixed aliases, and no more mem-merge,
+and no more memory meets from MemMerge.  (Imprecise stores can do meets).
+Use MemSplit/MemJoin.
+
+Want Split/Join around calls for non-escapes.  Want split/join around all
+NewNodes as a single-alias precise memory split.  Want split/join around
+all stores (and loads), using the ptr-alias.  This gives me a zillion
+split/joins (instead of memmerges) and each one is an exact split.  Can
+be obviously optimized (widened) out to the ScopeNode.
+
+This gives the notion of having a Split/Join around each tiny memory piece
+in the Parser, and optimze the crap out of it later (including optimizing
+in hte Parser).  BUt get it right first, optimize later.
+
+Need a Split tech that replaces the Call/CallEpi - so a Split varient that
+takes in call args, does a full reaching analysis and splits memory based
+on what reaches.  Call/CallEpi get "stupid".  Inlining a Call gets trivial
+again.
+
+Need a split-tech that takes a single ptr value and splits on it.
+
+Join always does SESE regions, left is the Split, right is whatever - and
+never do the memories overlap.  So just parallel-joins the memory.
+
+When memory is split, label the not-available side as e.g. XOBJ.  Note that
+un-init always "goes right", so 1st time creation can happen anywhere.
+
+A little thinking on the monotonicity problem:
+  Split
+    Call
+      Fun...Funs
+        Body...Bodys
+      Ret...Rets
+    CEpi
+  Join
+Looking for the optimistic lift during GCP; if I do not find it, then I can
+pre-compute - there is no phase-ordering problem.  Optimistic: ptr arrives at
+Split but is not in memory, does not escape into Call, Fun, Bodys.  Memory
+contents are not modified, and Join takes un-mod memory directly from Split.
+If instead at Split, I make ptr go-Right, then into Body, which then escapes,
+which then forces a go-Right and mods memory.  When a ptr arrives at a Split,
+I need to decide if the memory goes Left or goes Right (or both or neither?).
+If I make it go one side, and later the analysis goes the Other Way - then i
+cannot drop the side it already went - loses monotonicity - so instead it
+must "go both".
+
+
+
+
+Action items
+- add global-ptr-use types (used as adr, stored into mem, merged at phi, call arg)
+- - meet/dual
+- - value props
+- add global-ptr-use live types (subclass of TypeObj, tracking reverse flow props)
+- - live-use props
+- look at ISUSE, to be renamed "uninitialized" UNINIT, and used to indicated never-been-alloc
+- make Call/CallEpi dumb on memory and ptrs
+- add Split/Join in parser around all calls & memory uses
+- - todo: start optimizing split/joins
+- TODO: figure out how to assert in a network slice that memory never overlaps
+
+
+======================================= Notes from 06/05/2020
+
+Working on escaping aliases.
+
+Root issue is non-monotonic behavior on escapes.  During GCP, assume ptr does
+not reach a call arg, does not escape, so memory slice not modified, so ptr
+does not reach call.  But if later DOES reach call, then slice is passed in to
+call, and modified.  So sometimes post-call uses the pre-call slice, and
+sometimes the post-call slice.  These have to be monotonic.
+
+E.g., alias#15 arrives at a Call, and otherwise is escaping (stored someplace
+into memory).  But at this call site, not used at any arg, and not reachable
+from any available ptr.  THinking maybe this is a non-issue now.
+
+When can memory slice bypass a call?  If it *ever* escapes (per NewNode), safe
+to assume call hammers it - even if not available from reachable ptrs.
+
+Ok, coming around to "not caring" - if alias escapes (via NewNode escape which
+limits to *storing* or Phi which stores or a Call), then thread thru all Calls.
+Goal: no escape simple recursive display ptrs.  They are not call args, and not
+Phi and not store-vals and not returns.  So pass around matching memory slice.
+
+Action: drop Call-escapes.  Keep pass-in / pre-call memory.  CallEpi acts like
+a MemJoin (or i insert a MemJoin/MemSplit).  Split criteria is all aliases
+based on NewNode escape notion.
+
+This gives-up a per-call slice-around notion!  Future Work!  Can obviously
+improve (to using per-call per-alias smarts), but can fix displays simpler.
+
+
+
+=======================================
 Notes from 05/18/2020
 
 PC dead, a little behind on laptop.

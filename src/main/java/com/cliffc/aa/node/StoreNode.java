@@ -41,7 +41,7 @@ public class StoreNode extends Node {
 
     // Stores bypass a Split.
     if( mem instanceof MProjNode && mem.in(0) instanceof MemSplitNode ) {
-      assert tmp!=null && tmp._aliases.isa(((MemSplitNode)mem.in(0))._split);
+      assert tmp!=null && tmp._aliases.isa(NewNode.ESCAPES);
       return set_def(1,mem.in(0).in(0),gvn);
     }
 

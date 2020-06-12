@@ -381,6 +381,22 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   // Note no special nil handling; both sides need to either handle nil or not
   public boolean isa(B bs) { return meet(bs) == bs; }
 
+  public boolean overlap( VBitSet bs ) {
+    for( int alias : this )
+      if( bs.get(alias) )
+        return true;
+    for( int alias : this )
+      for( int kid=alias; kid!=0; kid=BitsAlias.next_kid(alias,kid) )
+        if( bs.get(kid) )
+          throw com.cliffc.aa.AA.unimpl(); // Have to check for kids?
+    return false;
+  }
+  public boolean isa(VBitSet bs) {
+    throw com.cliffc.aa.AA.unimpl(); // Have to check for kids?
+    
+  }
+
+  
   // Bits are split in a tree like pattern, recorded here.  To avoid rehashing,
   // the exact same tree-split is handed out between tests.  Basically there is
   // only 1 tree shape, lazily discovered, for all tests.

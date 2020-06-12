@@ -136,14 +136,12 @@ public class CallNode extends Node {
   // ts[6]...
 
   static final int MEMIDX=1; // Memory into the caller
-  static final int ALSIDX=2; // Aliases bypassing the callee
-  static final int MCEIDX=3; // Memory into the callee
-  static final int ARGIDX=4; //
+  static final int MCEIDX=2; // Memory into the callee
+  static final int ARGIDX=3; //
   static        Type       tctl( Type tcall ) { return             ((TypeTuple)tcall).at(0); }
   static        TypeMem    tmem( Type tcall ) { return tmem(((TypeTuple)tcall)._ts); }
   static        TypeMem    tmem( Type[] ts  ) { return (TypeMem)ts[MEMIDX]; } // caller memory passed around function
   static        TypeMem    tmce( Type[] ts  ) { return (TypeMem)ts[MCEIDX]; } // callee memory passed into   function
-  static        TypeMemPtr tals( Type tcall ) { return (TypeMemPtr)((TypeTuple)tcall).at(ALSIDX); } // aliases escaping into the function
   static public TypeFunPtr ttfp( Type tcall ) { return (TypeFunPtr)((TypeTuple)tcall).at(ARGIDX); }
   static TypeTuple set_ttfp( TypeTuple tcall, TypeFunPtr nfptr ) { return tcall.set(ARGIDX,nfptr); }
   static Type       targ( Type tcall, int x ) { return targ(((TypeTuple)tcall)._ts,x); }
@@ -274,13 +272,8 @@ public class CallNode extends Node {
     if( !(mem instanceof TypeMem) ) return mem.oob();
     TypeMem tmem = (TypeMem)(ts[MEMIDX]=mem); // Memory into the caller, not callee
 
-    // Compute set of aliases that are reachable in the called function, from
-    // all argument pointers and memory state.
-    TypeMemPtr tescapes = _unpacked ? escapes(gvn,tmem) : TypeMemPtr.OOP;  // All aliases escape
-    ts[ALSIDX] = tescapes;
-
     // Compute memory into the Callee - which is caller memory, minus the no-escapes.
-    ts[MCEIDX] = gvn._opt_mode==2 ? tmem : tmem.split_by_alias(tescapes._aliases);
+    ts[MCEIDX] = tmem.split_by_alias(NewNode.ESCAPES);
 
     // Copy args for called functions.  Arg0 is display, handled below.
     for( int i=0; i<nargs(); i++ )
@@ -302,34 +295,6 @@ public class CallNode extends Node {
 
     return TypeTuple.make(ts);
   }
-
-  // A set of escaping aliases
-  TypeMemPtr escapes(GVNGCM gvn, TypeMem tmem) {
-    BitsAlias aargs = BitsAlias.EMPTY;
-    for( int i=0; i<nargs(); i++ ) {
-      Type targ = gvn.type(arg(i));
-      if( targ == Type.ALL ) return TypeMemPtr.OOP; // All pointers
-      // Functions escape their display
-      if( targ instanceof TypeFunPtr )
-        targ = ((TypeFunPtr)targ)._disp;
-      // Pointer args escape their pointer
-      if( targ instanceof TypeMemPtr )
-        aargs = aargs.meet(((TypeMemPtr)targ)._aliases);
-      else if( TypeMemPtr.OOP.isa(targ) )
-        return TypeMemPtr.OOP; // All pointers, so all escape
-      else if( TypeFunPtr.GENERIC_FUNPTR.isa(targ) )
-        aargs = aargs.meet(Env.DISPLAYS); // All displays
-    }
-
-    BitsAlias escape = BitsAlias.EMPTY;
-    if( aargs!=BitsAlias.EMPTY ) { // Trivial no-ptr case
-      TypeMem reaching_aliases = tmem.slice_all_aliases_plus_children(aargs);
-      escape = reaching_aliases.aliases();
-    }
-    return TypeMemPtr.make(escape,TypeObj.OBJ);
-  }
-
-
 
   // Compute live across uses.  If pre-GCP, then we may not be wired and thus
   // have not seen all possible function-body uses.  Check for #FIDXs == nwired().
