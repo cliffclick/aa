@@ -33,7 +33,8 @@ public class TestLive {
 
   @SuppressWarnings("unchecked")
   @Test public void testNewObj() {
-    GVNGCM gvn = new GVNGCM();
+    Env env = Env.top_scope();
+    GVNGCM gvn = Env.GVN;
     GVNGCM._INIT0_CNT = 1; // No prims
     // Always control for the NewObj
     Node ctl = new ConNode<>(Type.CTRL);
@@ -58,6 +59,7 @@ public class TestLive {
     gvn.setype(mem,mem.value(gvn));
     Node ptr = new  ProjNode(nnn,1);
     gvn.setype(ptr,ptr.value(gvn));
+    BitsAlias.set_nflds(10,3);
 
     // Starting full memory
     TypeMem tmem = TypeMem.ALLMEM.set(nnn._alias,(TypeObj)gvn.type(mem));
