@@ -466,8 +466,8 @@ public class TestType {
     TypeStruct bs4 = TypeStruct.malloc("",false,flds,TypeStruct.ts(2),finals).set_name("B:");
     as1._hash = as1.compute_hash();  as1._cyclic = true;
     bs4._hash = bs4.compute_hash();  bs4._cyclic = true;
-    TypeMemPtr ap5 = TypeMemPtr.make(alias,as1);  ap5._cyclic = true;
-    TypeMemPtr bp2 = TypeMemPtr.make(alias,bs4);  bp2._cyclic = true;
+    TypeMemPtr ap5 = TypeMemPtr.make(alias,as1);
+    TypeMemPtr bp2 = TypeMemPtr.make(alias,bs4);
     as1._ts[0] = bp2;
     as1._ts[1] = TypeInt.INT64;
     bs4._ts[0] = ap5;

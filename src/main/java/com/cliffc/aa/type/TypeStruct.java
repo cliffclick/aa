@@ -479,8 +479,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       Type st;
       for( int i=stack._len-1; (st=stack.at(i))!=t; i-- ) {
         st.untern()._dual.untern(); // Wrong hash
-        if( st._type==TMEMPTR ) ((TypeMemPtr)st)._cyclic = ((TypeMemPtr)st)._dual._cyclic = true;
-        else if( st._type==TFUNPTR ) ((TypeFunPtr)st)._cyclic = ((TypeFunPtr)st)._dual._cyclic = true;
+        if( st._type==TFUNPTR ) ((TypeFunPtr)st)._cyclic = ((TypeFunPtr)st)._dual._cyclic = true;
         else ((TypeStruct)st)._cyclic = ((TypeStruct)st)._dual._cyclic = true;
         st._hash = st._dual._hash = 0; // Clear.  Cannot compute until all children found/cycles walked.
       }
@@ -489,7 +488,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
         stack.push(t);              // Push on stack, in case a cycle is found
         if( t instanceof TypeMemPtr ) {
           rehash_cyclic(stack,((TypeMemPtr)t)._obj);
-          assert ((TypeMemPtr)t)._cyclic;
         } else if( t instanceof TypeFunPtr ) {
           rehash_cyclic(stack,((TypeFunPtr)t)._disp);
           assert ((TypeFunPtr)t)._cyclic;
@@ -1124,7 +1122,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
         TypeStruct ts = (TypeStruct)t;
         ts._ts = TypeAry.hash_cons(ts._ts); // hashcons cyclic arrays
       } else if( t instanceof TypeMemPtr ) {
-        ((TypeMemPtr)t)._cyclic = bcs.get(t._uid);
       } else {
         ((TypeFunPtr)t)._cyclic = bcs.get(t._uid);
       }

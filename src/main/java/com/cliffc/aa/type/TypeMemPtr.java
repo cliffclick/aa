@@ -21,8 +21,6 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   // function call args).
   public TypeObj _obj;          // Meet/join of aliases.  Unused in simple_ptrs in graph nodes.
 
-  boolean _cyclic; // Type is cyclic.  This is a summary property, not a description of value sets, hence is not in the equals or hash
-
   private TypeMemPtr(BitsAlias aliases, TypeObj obj ) { super     (TMEMPTR); init(aliases,obj); }
   private void init (BitsAlias aliases, TypeObj obj ) { super.init(TMEMPTR); _aliases = aliases; _obj=obj; }
   @Override int compute_hash() {
@@ -114,7 +112,6 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     TypeMemPtr dual = _dual = new TypeMemPtr(_aliases.dual(),(TypeObj)_obj.rdual());
     dual._dual = this;
     if( _hash != 0 ) dual._hash = dual.compute_hash();
-    dual._cyclic = true;
     return dual;
   }
   @Override protected Type xmeet( Type t ) {

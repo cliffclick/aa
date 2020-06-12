@@ -30,8 +30,8 @@ public class TestApprox {
     TypeStruct t1 = TypeStruct.malloc("",false,flds,TypeStruct.ts(2),finals);
     t0._hash = t0.compute_hash();  t0._cyclic = true;
     t1._hash = t1.compute_hash();  t1._cyclic = true;
-    TypeMemPtr p0 = TypeMemPtr.make(alias0,t0);  p0._cyclic = true;
-    TypeMemPtr p1 = TypeMemPtr.make(alias0,t1);  p1._cyclic = true;
+    TypeMemPtr p0 = TypeMemPtr.make(alias0,t0);
+    TypeMemPtr p1 = TypeMemPtr.make(alias0,t1);
     t0._ts[0] = p1;
     t0._ts[1] = TypeInt.INT64;
     t1._ts[0] = p0;
@@ -143,8 +143,8 @@ public class TestApprox {
     TypeStruct t1 = TypeStruct.malloc("",false,flds,TypeStruct.ts(2),finals);
     t0._hash = t0.compute_hash();  t0._cyclic = true;
     t1._hash = t1.compute_hash();  t1._cyclic = true;
-    TypeMemPtr p0 = TypeMemPtr.make(alias0,t0);  p0._cyclic = true;
-    TypeMemPtr p1 = TypeMemPtr.make(alias0,t1);  p1._cyclic = true;
+    TypeMemPtr p0 = TypeMemPtr.make(alias0,t0);
+    TypeMemPtr p1 = TypeMemPtr.make(alias0,t1);
     t0._ts[0] = p1;
     t0._ts[1] = TypeInt.INT64;
     t1._ts[0] = p0;
@@ -263,8 +263,8 @@ public class TestApprox {
     TypeStruct x4 = TypeStruct.malloc("",false,flds3,TypeStruct.ts(3),finals3);
     x3._hash = x3.compute_hash();  x3._cyclic = true;
     x4._hash = x4.compute_hash();  x4._cyclic = true;
-    TypeMemPtr px3 = TypeMemPtr.make(alias1,x3);  px3._cyclic = true;
-    TypeMemPtr px4 = TypeMemPtr.make(alias1,x4);  px4._cyclic = true;
+    TypeMemPtr px3 = TypeMemPtr.make(alias1,x3);
+    TypeMemPtr px4 = TypeMemPtr.make(alias1,x4);
     x3._ts[0] = i13;
     x3._ts[1] = px4;
     x3._ts[2] = pa3;
@@ -303,8 +303,8 @@ public class TestApprox {
     TypeStruct x1 = TypeStruct.malloc("",false,flds3,TypeStruct.ts(3),finals3);
     x0._hash = x0.compute_hash();  x0._cyclic = true;
     x1._hash = x1.compute_hash();  x1._cyclic = true;
-    TypeMemPtr px0 = TypeMemPtr.make(alias1,x0);  px0._cyclic = true;
-    TypeMemPtr px1 = TypeMemPtr.make(alias1,x1);  px1._cyclic = true;
+    TypeMemPtr px0 = TypeMemPtr.make(alias1,x0);
+    TypeMemPtr px1 = TypeMemPtr.make(alias1,x1);
     x0._ts[0] = i10;
     x0._ts[1] = px1;
     x0._ts[2] = pa1;
@@ -553,7 +553,7 @@ public class TestApprox {
     Type.RECURSIVE_MEET++;
     TypeStruct  x1 = TypeStruct.malloc("",false,flds,TypeStruct.ts(3),finals);
     x1._hash = x1.compute_hash();  x1._cyclic = true;
-    TypeMemPtr px1 = TypeMemPtr.make_nil(alias,x1);  px1._cyclic = true;
+    TypeMemPtr px1 = TypeMemPtr.make_nil(alias,x1);
     x1._ts[0] = Type.XNIL;
     x1._ts[1] = px1;
     x1._ts[2] = Type.SCALAR;
@@ -571,7 +571,7 @@ public class TestApprox {
     Type.RECURSIVE_MEET++;
     TypeStruct  x3 = TypeStruct.malloc("",false,flds,TypeStruct.ts(3),finals);
     x3._hash = x3.compute_hash();  x3._cyclic = true;
-    TypeMemPtr px3 = TypeMemPtr.make_nil(alias,x3);  px3._cyclic = true;
+    TypeMemPtr px3 = TypeMemPtr.make_nil(alias,x3);
     x3._ts[0] = px3;//TypeMemPtr.make_nil(alias,TypeObj.OBJ);
     x3._ts[1] = px3;
     x3._ts[2] = Type.SCALAR;
