@@ -40,16 +40,15 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public @NotNull String @NotNull[] _flds;  // The field names
   public Type[] _ts;                        // Matching field types
   private byte[] _flags; // Field mod types; see fmeet, fdual, fstr.  Clean.
+  private boolean _closed; // No more fields can be added
 
   boolean _cyclic; // Type is cyclic.  This is a summary property, not a description of value sets, hence is not in the equals or hash
-  private TypeStruct _uf;       // Tarjan Union-Find, used during cyclic meet
   private TypeStruct     ( String name, boolean any, String[] flds, Type[] ts, byte[] flags) { super(TSTRUCT, name, any); init(name, any, flds,ts,flags); }
   private TypeStruct init( String name, boolean any, String[] flds, Type[] ts, byte[] flags) {
     super.init(TSTRUCT, name, any);
     _flds  = flds;
     _ts    = ts;
     _flags= flags;
-    _uf    = null;
     return this;
   }
   // Precomputed hash code.  Note that it can NOT depend on the field types -
@@ -127,12 +126,10 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // repeats.  i.e., not a minimal cycle.
   TypeStruct repeats_in_cycles() {
     assert _cyclic;
-    assert _uf == null;         // Not collapsing
     return repeats_in_cycles(this,new VBitSet());
   }
   @Override TypeStruct repeats_in_cycles(TypeStruct head, VBitSet bs) {
     if( bs.tset(_uid) ) return null;
-    assert _uf == null;         // Not collapsing
     if( this!=head && equals(head) ) return this;
     for( Type t : _ts ) {
       TypeStruct ts = t.repeats_in_cycles(head,bs);
@@ -153,7 +150,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
         : "{PRIMS_"+_ts[1]+"}";
 
     SB sb = new SB();
-    if( _uf!=null ) return "=>"+_uf; // Only used mid-recursion
     if( _any ) sb.p('~');
     sb.p(_name);
     boolean is_tup = is_tup();
@@ -179,7 +175,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       return sb.p(((TypeFunPtr)_ts[1])._fidxs.above_center()
                   ? "{PRIMS}" : "{LOW_PRIMS}");
 
-    if( _uf!=null ) return _uf.dstr(sb.p("=>"),dups);
     if( _any ) sb.p('~');
     sb.p(_name);
     boolean is_tup = is_tup();
@@ -206,7 +201,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     if( find("!") != -1 && find("math_pi") != -1 && _ts[1] instanceof TypeFunPtr )
       return sb.p(((TypeFunPtr)_ts[1])._disp.above_center()
                   ? "{PRIMS}" : "{LOW_PRIMS}");
-    if( _uf!=null ) return _uf.str(sb.p("=>"),dups,mem);
     if( _any ) sb.p('~');
     sb.p(_name);
     boolean is_tup = is_tup();
@@ -662,13 +656,12 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       Type mti = (lfi==null) ? rti : (rti==null ? lfi : lfi.meet(rti));
       Type mtx = mt._ts[i];     // Prior value, perhaps updated recursively
       Type mts = mtx==null ? mti : mtx.meet(mti); // Meet again
-      assert mt._uf==null;      // writing results but value is ignored
       mt._ts[i] = mts;          // Finally update
     }
     // Check for repeats right now
     for( TypeStruct ts : MEETS0.values() )
       if( ts!=mt && ts.equals(mt) )
-        { mt.union(ts); mt = ts; break; } // Union together
+        { mt = ts; break; } // Union together
 
     // Lower recursive-meet flag.  At this point the Meet 'mt' is still
     // speculative and not interned.
@@ -721,22 +714,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     TypeStruct tstr = malloc(_name,_any,_flds.clone(),ts,_flags.clone());
     tstr._cyclic = true;
     return tstr;
-  }
-
-  // Tarjan Union-Find to help build cyclic structures
-  private void union( TypeStruct tt) {
-    assert !interned() ;
-    assert _uf==null && tt._uf==null;
-    if( this!=tt )
-      _uf = tt;
-  }
-  private TypeStruct ufind() {
-    TypeStruct u = _uf;
-    if( u==null ) return this;
-    while( u._uf != null ) u = u._uf;
-    TypeStruct t = this;
-    while( t != u ) { TypeStruct tmp = t._uf; t._uf = u; t=tmp; }
-    return u;
   }
 
   // This is for a struct that has grown 'too deep', and needs to be
@@ -899,7 +876,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       if( old == TypeObj.XOBJ ) break; // No changes, take nt as it is
       if( !(old instanceof TypeStruct) ) throw AA.unimpl();
       TypeStruct ots = (TypeStruct)old, nts = (TypeStruct)nt;
-      assert nts._uf==null;     // Already handled by the caller
       // Compute a new target length.  Generally size is unchanged, but will
       // change if mixing structs.
       int len = ots.len(nts);     // New length
@@ -1076,7 +1052,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       Type tt;
       if( ss.get(t) != null || // Found unresolved dup; ts0.equals(ts1) but ts0!=ts1
           ((tt = t.intern_lookup()) != null && tt != t) ||
-          (t instanceof TypeStruct && ((TypeStruct)t)._uf != null) || // Found unresolved UF
           ufind(t) != t )
         err++;
       ss.put(t,t);

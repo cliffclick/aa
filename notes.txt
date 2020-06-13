@@ -1,4 +1,21 @@
 =======================================
+Notes from 06/13/2020
+
+Action items
+- add global-ptr-use types (used as adr, stored into mem, merged at phi, call arg)
+- - meet/dual
+- - value props
+- add struct-field-complete bit, drop BitsAlias.nflds
+- add global-ptr-use live types (subclass of TypeObj, tracking reverse flow props)
+- - live-use props
+- look at ISUSE, to be renamed "uninitialized" UNINIT, and used to indicated never-been-alloc
+- make Call/CallEpi dumb on memory and ptrs
+- add Split/Join in parser around all calls & memory uses
+- - todo: start optimizing split/joins
+- TODO: figure out how to assert in a network slice that memory never overlaps
+
+
+=======================================
 Notes from 06/11/2020
 
 Want to get away from non-local graph updates, e.g. DefMemNode.CAPUTRED &
@@ -63,20 +80,6 @@ If I make it go one side, and later the analysis goes the Other Way - then i
 cannot drop the side it already went - loses monotonicity - so instead it
 must "go both".
 
-
-
-
-Action items
-- add global-ptr-use types (used as adr, stored into mem, merged at phi, call arg)
-- - meet/dual
-- - value props
-- add global-ptr-use live types (subclass of TypeObj, tracking reverse flow props)
-- - live-use props
-- look at ISUSE, to be renamed "uninitialized" UNINIT, and used to indicated never-been-alloc
-- make Call/CallEpi dumb on memory and ptrs
-- add Split/Join in parser around all calls & memory uses
-- - todo: start optimizing split/joins
-- TODO: figure out how to assert in a network slice that memory never overlaps
 
 
 ======================================= Notes from 06/05/2020
