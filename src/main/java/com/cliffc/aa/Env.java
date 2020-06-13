@@ -37,7 +37,7 @@ public class Env implements AutoCloseable {
   }
   // Make the Scope object for an Env.
   private static ScopeNode init(Node ctl, Node clo, Node mem, Type back_ptr, Parse errmsg, boolean is_closure) {
-    TypeStruct tdisp = TypeStruct.make_tuple(TypeStruct.ts(back_ptr));
+    TypeStruct tdisp = TypeStruct.open(back_ptr);
     NewObjNode nnn = (NewObjNode)GVN.xform(new NewObjNode(is_closure,tdisp,ctl,clo).keep());
     Node frm = DEFMEM.make_mem_proj(GVN,nnn);
     Node ptr = GVN.xform(new ProjNode(nnn,1));
@@ -81,7 +81,7 @@ public class Env implements AutoCloseable {
       STK_0.add_fun(null,lib ._name,(FunPtrNode) GVN.xform(lib .as_fun(GVN)), GVN);
     // Top-level constants
     STK_0.create_active("math_pi", GVN.con(TypeFlt.PI),TypeStruct.FFNL,GVN);
-    BitsAlias.set_nflds(STK_0._alias,STK_0._ts._ts.length);
+    STK_0.no_more_fields(GVN);
     // Now that all the UnresolvedNodes have all possible hits for a name,
     // register them with GVN.
     for( Node val : STK_0._defs )  if( val instanceof UnresolvedNode ) GVN.init0(val);
@@ -121,7 +121,7 @@ public class Env implements AutoCloseable {
     Node ptr = _scope.ptr();
     if( ptr == null ) return;   // Already done
     NewObjNode stk = _scope.stk();
-    BitsAlias.set_nflds(stk._alias,stk._ts._ts.length);
+    stk.no_more_fields(GVN);
     gvn.add_work_uses(stk);     // Scope object going dead, trigger following projs to cleanup
     _scope.set_ptr(null,gvn);   // Clear pointer to display
   }

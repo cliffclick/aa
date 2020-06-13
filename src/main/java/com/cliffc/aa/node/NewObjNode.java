@@ -36,6 +36,9 @@ public class NewObjNode extends NewNode<TypeStruct> {
   // Called when folding a Named Constructor into this allocation site
   void set_name( TypeStruct name, GVNGCM gvn ) { assert !name.above_center();  sets(name,gvn); }
 
+  // No more fields
+  public void no_more_fields(GVNGCM gvn) { sets(_ts.close(),gvn); }
+  
   // Create a field from parser for an inactive this
   public void create( String name, Node val, byte mutable, GVNGCM gvn  ) {
     assert !Util.eq(name,"^"); // Closure field created on init

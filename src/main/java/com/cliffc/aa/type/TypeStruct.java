@@ -40,7 +40,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public @NotNull String @NotNull[] _flds;  // The field names
   public Type[] _ts;                        // Matching field types
   private byte[] _flags; // Field mod types; see fmeet, fdual, fstr.  Clean.
-  private boolean _closed; // No more fields can be added
 
   boolean _cyclic; // Type is cyclic.  This is a summary property, not a description of value sets, hence is not in the equals or hash
   private TypeStruct     ( String name, boolean any, String[] flds, Type[] ts, byte[] flags) { super(TSTRUCT, name, any); init(name, any, flds,ts,flags); }
@@ -48,7 +47,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     super.init(TSTRUCT, name, any);
     _flds  = flds;
     _ts    = ts;
-    _flags= flags;
+    _flags = flags;
     return this;
   }
   // Precomputed hash code.  Note that it can NOT depend on the field types -
@@ -150,7 +149,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
         : "{PRIMS_"+_ts[1]+"}";
 
     SB sb = new SB();
-    if( _any ) sb.p('~');
     sb.p(_name);
     boolean is_tup = is_tup();
     sb.p(is_tup ? "(" : "@{");
@@ -161,8 +159,9 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       if( t==null ) sb.p("!");  // Graceful with broken types
       else if( t==SCALAR ) ;    // Default answer, do not print
       else sb.p(t.str(dups));   // Recursively print field type
-      if( i<_flds.length-1 ) sb.p(';');
+      sb.p(';');
     }
+    if( !_any ) sb.p("...");    // More fields allowed
     sb.p(!is_tup ? "}" : ")");
     return sb.toString();
   }
@@ -175,7 +174,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       return sb.p(((TypeFunPtr)_ts[1])._fidxs.above_center()
                   ? "{PRIMS}" : "{LOW_PRIMS}");
 
-    if( _any ) sb.p('~');
     sb.p(_name);
     boolean is_tup = is_tup();
     if( !is_tup ) sb.p('@');    // Not a tuple
@@ -188,9 +186,9 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       if( t==null ) sb.p("!");  // Graceful with broken types
       else if( t==SCALAR ) ;    // Default answer, do not print
       else t.dstr(sb,dups);     // Recursively print field type
-      if( i<_flds.length-1 ) sb.p(';');
-      sb.nl();                  // one field per line
+      sb.p(';').nl();           // One field per line
     }
+    if( !_any ) sb.p("...").nl(); // More fields allowed
     return sb.di(1).i().p(!is_tup ? '}' : ')');
   }
   // Print with memory instead of recursion
@@ -214,8 +212,9 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       if( t==null ) sb.p("!");  // Graceful with broken types
       else if( t==SCALAR ) ;    // Default answer, do not print
       else t.str(sb,dups,mem);  // Recursively print field type
-      if( i<_flds.length-1 ) sb.p(';');
+      sb.p(';');
     }
+    if( !_any ) sb.p("...");    // More fields allowed
     return sb.p(!is_tup ? '}' : ')');
   }
 
@@ -341,10 +340,13 @@ public class TypeStruct extends TypeObj<TypeStruct> {
                                          {"^","0","1","2"}};
   public static TypeStruct make_tuple( Type... ts ) { return make(TFLDS[ts.length],ts,ffnls(ts.length)); }
   public static TypeStruct make_tuple(Type t1) { return make_tuple(ts(NO_DISP,t1)); }
+  public static TypeStruct open(Type tdisp) { return make(false,TFLDS[1],ts(tdisp),ffnls(1)); }
+  public TypeStruct close() { return make_from(true,_ts); }
 
   public  static TypeStruct make(String[] flds, byte[] flags) { return make(flds,ts(flds.length),flags); }
   // Make from prior, just updating field types
   public TypeStruct make_from( Type[] ts ) { return make_from(_any,ts,_flags); }
+  public TypeStruct make_from( boolean any, Type[] ts ) { return make_from(any,ts,_flags); }
   public TypeStruct make_from( boolean any, Type[] ts, byte[] bs ) { return malloc(_name,any,_flds,ts,bs).hashcons_free(); }
   // Make a TS with a name
   public TypeStruct make_from( String name ) { return malloc(name,_any,_flds,_ts,_flags).hashcons_free();  }
@@ -409,6 +411,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public TypeStruct add_fld( String name, byte mutable ) { return add_fld(name,mutable,Type.SCALAR); }
   public TypeStruct add_fld( String name, byte mutable, Type tfld ) {
     assert name==null || fldBot(name) || find(name)==-1;
+    assert !_any;
 
     Type  []   ts = TypeAry.copyOf(_ts   ,_ts   .length+1);
     String[] flds = Arrays .copyOf(_flds ,_flds .length+1);
@@ -416,14 +419,14 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     ts   [_ts.length] = tfld;
     flds [_ts.length] = name==null ? fldBot() : name;
     flags(flags,_ts.length, make_flag(mutable));
-    return make(flds,ts,flags);
+    return make(_any,flds,ts,flags);
   }
   public TypeStruct set_fld( int idx, Type t, byte ff ) {
     Type[] ts  = _ts;
     byte[] ffs = _flags;
     if( ts  [idx] != t  ) ( ts = TypeAry.clone(_ts))[idx] = t;
     if( fmod(idx) != ff ) flags(ffs= _flags .clone(),idx,set_fmod(_flags[idx],ff));
-    return make(_name,_flds,ts,ffs);
+    return make_from(_any,ts,ffs);
   }
 
   // Make a type-variable with no definition - it is assumed to be a
@@ -1169,12 +1172,11 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // Final fields can remain as-is; non-finals are all widened to ALL
   // (assuming a future Store); field flags set to bottom; the field names are kept.
   @Override public TypeStruct widen_as_default() {
-    assert !_any;               // Expected to be below center
     Type[] ts = TypeAry.clone(_ts);
     for( int i=0; i<ts.length; i++ )
       if( fmod(i)!=FFNL ) ts[i]=ALL; // Widen non-finals to ALL, as-if crushed by errors
       else ts[i]=ts[i].simple_ptr();
-    return make_from(false,ts,fbots(ts.length));
+    return make_from(_any,ts,fbots(ts.length));
   }
 
   // True if isBitShape on all bits

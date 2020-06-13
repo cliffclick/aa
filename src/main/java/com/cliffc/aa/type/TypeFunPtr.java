@@ -72,11 +72,10 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
 
   public static TypeFunPtr make( int fidx, int nargs, TypeMemPtr disp ) { return make(BitsFun.make0(fidx),nargs,disp); }
   public static TypeFunPtr make_new_fidx( int parent, int nargs, TypeMemPtr disp ) { return make(BitsFun.make_new_fidx(parent),nargs,disp); }
-  public static TypeMemPtr DISP = TypeMemPtr.DISPLAY_PTR;
+  public static TypeMemPtr DISP = TypeMemPtr.DISPLAY_PTR; // Open display, allows more fields
   public static TypeMemPtr NO_DISP = TypeMemPtr.NO_DISP;
-  public TypeFunPtr make_from(BitsFun fidxs) { return make(fidxs,_nargs,_disp);  }
 
-  public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.FULL,1,(TypeMemPtr)DISP.simple_ptr());
+  public  static final TypeFunPtr GENERIC_FUNPTR = make(BitsFun.FULL,1,TypeMemPtr.DISP_SIMPLE);
   public  static final TypeFunPtr EMPTY = make(BitsFun.EMPTY,1,NO_DISP);
   static final TypeFunPtr[] TYPES = new TypeFunPtr[]{GENERIC_FUNPTR,EMPTY};
 
@@ -91,7 +90,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TFUNPTR:break;
-    case TFUNSIG: return ((TypeFunSig)t).xmeet(this);
+    case TFUNSIG: return t.xmeet(this);
     case TFLT:
     case TINT:
     case TMEMPTR:

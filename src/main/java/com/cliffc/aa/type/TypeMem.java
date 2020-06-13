@@ -314,7 +314,7 @@ public class TypeMem extends Type<TypeMem> {
       TypeStruct ts = (TypeStruct)to;
       // Incomplete struct?  This is an early escapee from Parse times; more
       // fields may be added which we assume is a pointer to all.
-      if( BitsAlias.nflds(alias) != ts._ts.length )
+      if( ts._any )
         return this;
       for( int i=0; i<ts._ts.length; i++ ) {
         Type fld = ts._ts[i];

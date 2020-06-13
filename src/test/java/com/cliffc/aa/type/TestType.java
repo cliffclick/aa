@@ -17,11 +17,13 @@ public class TestType {
     Object dummy0 = TypeStruct.TYPES;
     Object dummy1 = TypeMemPtr.TYPES;
 
-    Type xstr = TypeStr.XSTR;   // ~str isa Point:~str
-    Type npt  = TypeStruct.NAMEPT; // Point:{fields}
-    Type mt = xstr.meet(npt);   // Meet falls hard, loses name
-    assertEquals(TypeObj.OBJ,mt);
+    TypeStruct ts0 = TypeStruct.open(TypeMemPtr.DISPLAY_PTR); // infinite extent of any-field, top mod, Scalar
+    TypeStruct ts1 = ts0.add_fld("fact",TypeStruct.FFNL); // adding a field lifts
+    Type mt = ts0.meet(ts1);
+    assertEquals(ts0,mt);
 
+    TypeStruct ts2 = ts1.close();
+    assertTrue(ts2.isa(ts1));
   }
 
   @Test public void testBits0() {

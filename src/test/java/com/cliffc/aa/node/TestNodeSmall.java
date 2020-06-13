@@ -426,6 +426,7 @@ public class TestNodeSmall {
     FunPtrNode fptr = gvn.init(new FunPtrNode(ret,dsp_file_ptr));
     // Close the cycle
     dsp_file.create("fact",fptr,TypeStruct.FFNL,gvn);
+    dsp_file.no_more_fields(gvn);
     // Return the fptr to keep all alive
     ScopeNode env = new ScopeNode(null,true);
     env.set_ctrl(ctl,gvn);

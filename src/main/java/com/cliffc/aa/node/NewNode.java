@@ -28,7 +28,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   // bottom, e.g. as-if all fields are now final-stored.
   T _defmem;
 
-  // Just TMP.make(_alias,OBJ); also effectively final
+  // Just TMP.make(_alias,OBJ)
   public TypeMemPtr _tptr;
 
   // True if pointer does not escape: the ptr can be used as the address in
@@ -68,6 +68,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   @SuppressWarnings("unchecked")
   protected final void sets( T ts, GVNGCM gvn ) {
     _ts = ts;
+    _tptr = TypeMemPtr.make(_alias,ts.oob(TypeObj.OBJ));
     T olddef = _defmem;
     _defmem = (T)ts.widen_as_default();
     if( gvn!=null ) {
@@ -157,17 +158,14 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   @SuppressWarnings("unchecked")
   @Override @NotNull public NewNode copy( boolean copy_edges, GVNGCM gvn) {
     boolean escaped = ESCAPES.get(_alias);
-    int nflds = BitsAlias.nflds(_alias);
     // Split the original '_alias' class into 2 sub-aliases
     NewNode<T> nnn = (NewNode<T>)super.copy(copy_edges, gvn);
     nnn._init(_alias,_ts);      // Children alias classes, split from parent
-    BitsAlias.set_nflds(nnn._alias,nflds);
     if( !escaped ) ESCAPES.clear(nnn._alias);
     // The original NewNode also splits from the parent alias
     assert gvn.touched(this);
     Type oldt = gvn.unreg(this);
     _init(_alias,_ts);
-    BitsAlias.set_nflds(_alias,nflds);
     if( !escaped ) ESCAPES.clear(_alias);
     gvn.rereg(this,oldt);
     return nnn;
@@ -184,6 +182,6 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     ESCAPES.set(BitsAlias.RECORD);
     ESCAPES.set(BitsAlias.ARY);
     ESCAPES.set(BitsAlias.STR);
-    
+
   }
 }

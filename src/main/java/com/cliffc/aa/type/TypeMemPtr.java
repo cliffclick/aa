@@ -93,7 +93,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   public  static final TypeMemPtr STRUCT = make(BitsAlias.RECORD_BITS ,TypeStruct.ALLSTRUCT);
   public  static final TypeMemPtr STRUCT0= make(BitsAlias.RECORD_BITS0,TypeStruct.ALLSTRUCT);
   public  static final TypeMemPtr NO_DISP= make(BitsAlias.NIL,TypeStr.NO_DISP); // Above [0]->obj, below center
-  public  static final TypeMemPtr DISP_SIMPLE= make(BitsAlias.RECORD_BITS0,TypeObj.OBJ);
+  public  static final TypeMemPtr DISP_SIMPLE= make(BitsAlias.RECORD_BITS0,TypeObj.OBJ); // closed display
   static final TypeMemPtr[] TYPES = new TypeMemPtr[]{OOP0,STR0,STRPTR,ABCPTR,STRUCT,NO_DISP};
 
   @Override public boolean is_display_ptr() {

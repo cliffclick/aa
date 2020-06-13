@@ -52,6 +52,7 @@ public class TestLive {
     NewObjNode nnn = new NewObjNode(false,TypeStruct.DISPLAY,ctl,gvn.con(Type.NIL));
     nnn.create_active("x",fdx,TypeStruct.FFNL,gvn);
     nnn.create_active("y",fdy,TypeStruct.FFNL,gvn);
+    nnn.no_more_fields(gvn);
     gvn.setype(nnn,nnn.value(gvn));
 
     // Proj, OProj
@@ -59,7 +60,6 @@ public class TestLive {
     gvn.setype(mem,mem.value(gvn));
     Node ptr = new  ProjNode(nnn,1);
     gvn.setype(ptr,ptr.value(gvn));
-    BitsAlias.set_nflds(10,3);
 
     // Starting full memory
     TypeMem tmem = TypeMem.ALLMEM.set(nnn._alias,(TypeObj)gvn.type(mem));
