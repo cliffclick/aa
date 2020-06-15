@@ -68,7 +68,6 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   @SuppressWarnings("unchecked")
   protected final void sets( T ts, GVNGCM gvn ) {
     _ts = ts;
-    _tptr = TypeMemPtr.make(_alias,ts.oob(TypeObj.OBJ));
     T olddef = _defmem;
     _defmem = (T)ts.widen_as_default();
     if( gvn!=null ) {

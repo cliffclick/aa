@@ -565,12 +565,15 @@ public class Type<T extends Type<T>> implements Cloneable {
   public boolean above( Type t ) { return t != this && meet(t)==t; }
 
 
-  // Trim 'this' to being within lower bound 't' and upper bound 't.dual'
+  // Trim 'this' to being within lower bound 't' and upper bound 't.dual'.
+  // This is recursively deep.
   public Type bound( Type t ) {
     if( this==t || this==t.dual() ) return this; // Shortcut for being at the bounds already
     if( t.dual().isa(this) && this.isa(t) ) return this;
-    return above_center() ? t.dual() : t;
+    return bound_impl(t);
   }
+  // Compute recursively deep bounds, knowing OOB already.
+  public Type bound_impl(Type t) { return oob(); }
   public Type oob( ) { return oob(ALL); }
   public Type oob(Type e) { return above_center() ? e.dual() : e; }
   public TypeObj oob(TypeObj e) { return above_center() ? (TypeObj)e.dual() : e; }

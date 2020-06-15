@@ -162,6 +162,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       sb.p(';');
     }
     if( !_any ) sb.p("...");    // More fields allowed
+    else sb.unchar();
     sb.p(!is_tup ? "}" : ")");
     return sb.toString();
   }
@@ -199,7 +200,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     if( find("!") != -1 && find("math_pi") != -1 && _ts[1] instanceof TypeFunPtr )
       return sb.p(((TypeFunPtr)_ts[1])._disp.above_center()
                   ? "{PRIMS}" : "{LOW_PRIMS}");
-    if( _any ) sb.p('~');
     sb.p(_name);
     boolean is_tup = is_tup();
     if( !is_tup ) sb.p('@');    // Not a tuple
@@ -215,6 +215,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       sb.p(';');
     }
     if( !_any ) sb.p("...");    // More fields allowed
+    else sb.unchar();
     return sb.p(!is_tup ? '}' : ')');
   }
 

@@ -83,8 +83,9 @@ public class TypeNode extends Node {
   @Override public Type value(GVNGCM gvn) {
     Node arg = arg();
     Type t1 = gvn.type(arg);
-    Type t2 = t1.bound(_t.simple_ptr());
-    return t2;
+    Type t0 = _t.simple_ptr();
+    if( t0.dual().isa(t1) && t1.isa(t0) ) return t1;
+    return t1.oob(t0);
   }
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
     if( _live == TypeMem.DEAD ) return TypeMem.DEAD; // Am dead, so nothing extra is alive.

@@ -141,8 +141,16 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     return make(_aliases,oob(TypeObj.OBJ));
   }
   @Override public boolean above_center() {
-    // If either is above, then the whole is above
-    return _aliases.above_center() || _obj.above_center();
+    return _aliases.above_center();
+  }
+  @Override public Type bound_impl(Type t) {
+    if( !(t instanceof TypeMemPtr) ) return oob();
+    TypeMemPtr tmp = (TypeMemPtr)t;
+    // Deep bounds; keep the in-bounds _aliases but bound the _obj.
+    if( tmp._aliases.dual().isa(_aliases) && _aliases.isa(tmp._aliases) )
+      return _obj.bound_impl(tmp._obj);
+    // Aliases OOB
+    return oob();
   }
   // Aliases represent *classes* of pointers and are thus never constants.
   // nil is a constant.

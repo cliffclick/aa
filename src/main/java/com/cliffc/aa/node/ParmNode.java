@@ -100,7 +100,7 @@ public class ParmNode extends PhiNode {
     Type formal = fun.formal(_idx);
     // Good case: t.isa(formal).
     if( formal.dual().isa(t) && t.isa(formal) )  return t.simple_ptr();
-    return t.oob();
+    return t.bound(formal);
   }
 
   @Override public String err( GVNGCM gvn ) {

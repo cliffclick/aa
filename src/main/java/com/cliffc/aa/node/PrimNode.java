@@ -392,7 +392,9 @@ static class RandI64 extends PrimNode {
   @Override public Type value(GVNGCM gvn) {
     Type t = gvn.type(in(1));
     if( t.above_center() ) return TypeInt.BOOL.dual();
-    return t.meet(TypeInt.FALSE).bound(TypeInt.INT64);
+    if( TypeInt.INT64.dual().isa(t) && t.isa(TypeInt.INT64) )
+      return t.meet(TypeInt.FALSE);
+    return t.oob(TypeInt.INT64);
   }
   @Override public TypeInt apply( Type[] args ) { throw AA.unimpl(); }
   // Rands have hidden internal state; 2 Rands are never equal
