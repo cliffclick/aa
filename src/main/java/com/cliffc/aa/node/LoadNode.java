@@ -62,17 +62,13 @@ public class LoadNode extends Node {
       return set_mem(call.mem(),gvn);
 
     // Loads from unescape memory can bypass calls
-    if( adr instanceof  ProjNode && adr.in(0) instanceof NewNode && ((NewNode)adr.in(0))._no_escape &&
-        mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode )
-      return set_mem(((CallEpiNode)mem.in(0)).call().mem(),gvn);
-
-    // Loads can bypass a Call, if the memory is not returned from the call,
-    // This optimization is specifically targeting simple recursive functions.
-    if( mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode && aliases != null ) {
-      CallEpiNode cepi = (CallEpiNode)mem.in(0);
-      call = cepi.can_bypass(gvn,aliases);
-      if( call != null )
-        return set_def(1,call.mem(),gvn);
+    if( adr instanceof  ProjNode && adr.in(0) instanceof NewNode &&
+        mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode ) {
+      // TODO: a proper test
+      if( adr._live != TypeMem.ESCAPE && // Escapes
+          adr._live != TypeMem.ALLMEM )  // 
+        //return set_mem(((CallEpiNode)mem.in(0)).call().mem(),gvn);
+        throw com.cliffc.aa.AA.unimpl();
     }
 
     // Loads against a NewNode cannot NPE, cannot fail, always return the input
@@ -139,6 +135,7 @@ public class LoadNode extends Node {
 
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
     if( _live == TypeMem.DEAD ) return TypeMem.DEAD; // Am dead, so nothing extra is alive.
+    if( def==adr() ) return _live;                   // Alive as the Load is alive
     Type tmem = gvn.type(mem());
     Type tptr = gvn.type(adr());
     // If either is above-center, then only basic-liveness - the load can load

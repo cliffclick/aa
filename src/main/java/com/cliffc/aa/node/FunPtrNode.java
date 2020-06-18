@@ -82,10 +82,6 @@ public final class FunPtrNode extends Node {
     // Post-GCP, all things are resolved and normal liveness flows.
     return gvn._opt_mode < 2 ? TypeMem.ALLMEM : super.live(gvn);
   }
-  // A function pointer can be applied at a Call, in which case the associated
-  // Ret demands everything the CallEpi demands.  Until GCP we assume this
-  // FunPtr might end up at any Call.
-  @Override public boolean basic_liveness() { return false; }
 
   // Note: graph structure must be in place before calling
   @Override public String toString() { return super.toString(); }

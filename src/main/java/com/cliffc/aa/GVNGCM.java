@@ -107,10 +107,10 @@ public class GVNGCM {
     Node con2 = _vals.get(con);
     if( con2 != null ) {           // Found a prior constant
       kill0(con);                  // Kill the just-made one
-      con2._live = (TypeMem)con2._live.meet(TypeMem.EMPTY);  // Prior constant is now alive; might have been either dead or alive before
+      con2._live = (TypeMem)con2._live.meet(TypeMem.ALIVE);  // Prior constant is now alive; might have been either dead or alive before
       return (ConNode)con2;
     }
-    con._live = TypeMem.EMPTY;  // Alive, but demands no memory
+    con._live = TypeMem.ALIVE;  // Alive, but demands no memory
     setype(con,t);
     _vals.put(con,con);
     add_work(con);
@@ -461,7 +461,7 @@ public class GVNGCM {
       xform_old(n, dom_small_work ? 0 : 2);
       if( did_doms && _work._len != wlen-1 ) did_doms=false; // Did work, revisit doms
       // VERY EXPENSIVE ASSERT
-      //assert Env.START.more_flow(this,new VBitSet(),true,0)==0; // Initial conditions are correct
+      assert Env.START.more_flow(this,new VBitSet(),true,0)==0; // Initial conditions are correct
       cnt++; assert cnt < 30000; // Catch infinite ideal-loops
     }
     // No more ideal calls, small or large, to apply

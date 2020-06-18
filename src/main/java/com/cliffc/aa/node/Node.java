@@ -138,7 +138,7 @@ public abstract class Node implements Cloneable {
     _defs = new Ary<>(defs);
     _uses = new Ary<>(new Node[1],0);
     for( Node def : defs ) if( def != null ) def._uses.add(this);
-    _live = basic_liveness() ? TypeMem.EMPTY : TypeMem.ALLMEM;
+    _live = TypeMem.ALLMEM;
    }
 
   // Is a primitive
@@ -319,7 +319,7 @@ public abstract class Node implements Cloneable {
   abstract public Type value(GVNGCM gvn);
 
   // Compute the current best liveness for this Node, based on the liveness of
-  // its uses.  If basic_liveness(), returns a simple DEAD/EMPTY.  Otherwise
+  // its uses.  If basic_liveness(), returns a simple DEAD/ALIVE.  Otherwise
   // computes the alive memory set down to the field level.  May return
   // TypeMem.FULL, especially if its uses are of unwired functions.
   // It must be monotonic.
@@ -328,13 +328,14 @@ public abstract class Node implements Cloneable {
     if( basic_liveness() ) {    // Basic liveness only; e.g. primitive math ops
       for( Node use : _uses )   // Computed across all uses
         if( use._live != TypeMem.DEAD )
-          return TypeMem.EMPTY; // Report basic liveness only
+          return TypeMem.ALIVE; // Report basic liveness only
       return TypeMem.DEAD;
     }
     // Compute meet/union of all use livenesses
     TypeMem live = TypeMem.DEAD; // Start at lattice top
     for( Node use : _uses )      // Computed across all uses
-      live = (TypeMem)live.meet(use.live_use(gvn, this)); // Make alive used fields
+      if( use._live != TypeMem.DEAD )
+        live = (TypeMem)live.meet(use.live_use(gvn, this)); // Make alive used fields
     return live;
   }
   // Compute local contribution of use liveness to this def.
@@ -343,8 +344,8 @@ public abstract class Node implements Cloneable {
     return _keep>0 ? TypeMem.MEM : _live;
   }
   // Compute basic liveness only: a boolean flag of alive-or-dead represented
-  // as TypeMem.DEAD or TypeMem.EMPTY.
-  public boolean basic_liveness() { return true; }
+  // as TypeMem.DEAD or TypeMem.ALIVE.
+  public boolean basic_liveness() { return false; }
   // We have a 'crossing optimization' point: changing the pointer input to a
   // Load or a Scope changes the memory demanded by the Load or Scope.  Same:
   // changing a def._type changes the use._live, requiring other defs to be

@@ -5,14 +5,28 @@ Action items
 - add global-ptr-use types (used as adr, stored into mem, merged at phi, call arg)
 - - meet/dual
 - - value props
-- add struct-field-complete bit, drop BitsAlias.nflds
+- - drop NewNode.escapes, DefMemNode.CAPTURED
+* add struct-field-complete bit, drop BitsAlias.nflds
 - add global-ptr-use live types (subclass of TypeObj, tracking reverse flow props)
+* - add global-ptr-use ESCAPE type
 - - live-use props
+* - live-use ESCAPE props
 - look at ISUSE, to be renamed "uninitialized" UNINIT, and used to indicated never-been-alloc
-- make Call/CallEpi dumb on memory and ptrs
+* make Call/CallEpi dumb on memory and ptrs
 - add Split/Join in parser around all calls & memory uses
 - - todo: start optimizing split/joins
+* Store/Load do not bypass Call/CallEpi (but yes bypass Split/Join)
 - TODO: figure out how to assert in a network slice that memory never overlaps
+- TODO: drop DefMem
+
+
+Live values
+- are TypeMem
+- for simple numbers, use TypeLive sentinals for live/dead in slot 1
+- for pointers, have use types (used by call, store-val, return, etc).
+  The live-pointer-value does NOT carry alias info, nor used fields???
+- For memory, uses include TypeStruct fields.
+
 
 
 =======================================

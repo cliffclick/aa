@@ -147,14 +147,14 @@ public class ScopeNode extends Node {
     if( this==Env.SCP_0 )
       return gvn._opt_mode < 2 ? TypeMem.ALLMEM : TypeMem.DEAD;
     // Basic liveness ("You are Alive!") for control and returned value
-    if( def == ctrl() ) return TypeMem.ANYMEM;
-    if( def == rez () ) return TypeMem.ANYMEM;
+    if( def == ctrl() ) return TypeMem.ALIVE;
+    if( def == rez () ) return TypeMem.ALIVE;
+    if( def == ptr () ) return TypeMem.DEAD; // Returned display is dead
     // Memory returns the compute_live_mem state in _live.  If rez() is a
     // pointer, this will include the memory slice.
     assert def == mem();
     return _live;
   }
-  @Override public boolean basic_liveness() { return false; }
 
   @Override public int hashCode() { return 123456789; }
   // ScopeNodes are never equal

@@ -29,6 +29,4 @@ public class OProjNode extends ProjNode {
     return c.above_center() ? TypeObj.XOBJ : TypeObj.OBJ;
   }
   int alias() { return ((NewNode)in(0))._alias; }
-  // Object needs precise liveness
-  @Override public boolean basic_liveness() { return false; }
 }

@@ -129,19 +129,15 @@ public class CallNode extends Node {
   // takes a Type, upcasts to tuple, & slices by name.
   // ts[0] = Ctrl = in(0)
   // ts[1] = Mem into the caller = mem() = in(1)
-  // ts[2] = Escaping aliases
-  // ts[3] = Mem into the callee = mem() filtered escapes
-  // ts[4] = Function pointer (code ptr + display) == in(2) == arg(0)
-  // ts[5] = in(3) == arg(1)
-  // ts[6]...
+  // ts[2] = Function pointer (code ptr + display) == in(2) == arg(0)
+  // ts[3] = in(3) == arg(1)
+  // ts[4]...
 
   static final int MEMIDX=1; // Memory into the caller
-  static final int MCEIDX=2; // Memory into the callee
-  static final int ARGIDX=3; //
+  static final int ARGIDX=2; //
   static        Type       tctl( Type tcall ) { return             ((TypeTuple)tcall).at(0); }
   static        TypeMem    tmem( Type tcall ) { return tmem(((TypeTuple)tcall)._ts); }
   static        TypeMem    tmem( Type[] ts  ) { return (TypeMem)ts[MEMIDX]; } // caller memory passed around function
-  static        TypeMem    tmce( Type[] ts  ) { return (TypeMem)ts[MCEIDX]; } // callee memory passed into   function
   static public TypeFunPtr ttfp( Type tcall ) { return (TypeFunPtr)((TypeTuple)tcall).at(ARGIDX); }
   static TypeTuple set_ttfp( TypeTuple tcall, TypeFunPtr nfptr ) { return tcall.set(ARGIDX,nfptr); }
   static Type       targ( Type tcall, int x ) { return targ(((TypeTuple)tcall)._ts,x); }
@@ -272,9 +268,6 @@ public class CallNode extends Node {
     if( !(mem instanceof TypeMem) ) return mem.oob();
     TypeMem tmem = (TypeMem)(ts[MEMIDX]=mem); // Memory into the caller, not callee
 
-    // Compute memory into the Callee - which is caller memory, minus the no-escapes.
-    ts[MCEIDX] = tmem.split_by_alias(NewNode.ESCAPES);
-
     // Copy args for called functions.  Arg0 is display, handled below.
     for( int i=0; i<nargs(); i++ )
       ts[i+ARGIDX] = gvn.type(arg(i));
@@ -316,13 +309,19 @@ public class CallNode extends Node {
     // enough to declare this live, so it exists for errors.
     return super.live(gvn);
   }
-  @Override public boolean basic_liveness() { return false; }
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
-    if( gvn._opt_mode < 2 ) return super.live_use(gvn,def);
-    if( def!=fun() ) return _live; // Args always alive
-    if( !(def instanceof FunPtrNode) ) return _live;
-    int dfidx = ((FunPtrNode)def).ret()._fidx;
-    return live_use_call(gvn,dfidx);
+    if( !is_copy() ) {
+      if( def!=fun() )
+        return def==mem() ? _live : TypeMem.ESCAPE; // Args always alive
+      if( gvn._opt_mode < 2 ) return super.live_use(gvn,def);
+      if( !(def instanceof FunPtrNode) ) return _live;
+      int dfidx = ((FunPtrNode)def).ret()._fidx;
+      return live_use_call(gvn,dfidx);
+    }
+    // Target is as alive as our projs are.
+    int idx = _defs.find(def);
+    ProjNode proj = ProjNode.proj(this,idx);
+    return proj==null ? TypeMem.ALIVE : proj._live;
   }
   TypeMem live_use_call( GVNGCM gvn, int dfidx ) {
     Type tcall = gvn.type(this);
@@ -330,7 +329,7 @@ public class CallNode extends Node {
     TypeFunPtr tfp = ttfp(tcall);
     // If resolve has chosen this dfidx, then the FunPtr is alive.
     BitsFun fidxs = tfp.fidxs();
-    return !fidxs.above_center() && fidxs.test_recur(dfidx) ? TypeMem.EMPTY : TypeMem.DEAD;
+    return !fidxs.above_center() && fidxs.test_recur(dfidx) ? TypeMem.ALIVE : TypeMem.DEAD;
   }
 
 
@@ -584,7 +583,7 @@ public class CallNode extends Node {
   }
   boolean is_copy() { return _is_copy; }
   @Override public Node is_copy(GVNGCM gvn, int idx) {
-    return _is_copy  ? in(idx<=(ARGIDX-2) ? idx : idx-(ARGIDX-2)) : null;
+    return _is_copy ? in(idx<=(ARGIDX-2) ? idx : idx-(ARGIDX-2)) : null;
   }
   @Override Node is_pure_call() { return fun().is_pure_call()==null ? null : mem(); }
 }

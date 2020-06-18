@@ -18,6 +18,4 @@ public class MProjNode extends ProjNode {
     }
     return null;
   }
-  // Memory need precise liveness
-  @Override public boolean basic_liveness() { return false; }
 }

@@ -43,12 +43,13 @@ public class MemJoinNode extends Node {
       MemMergeNode mem = new MemMergeNode(split.in(0));
       for( int alias=2; alias<len; alias++ ) {
         TypeObj rhs = tmem1.at(alias);
-        Node n = tmem0.merge_one_lhs(NewNode.ESCAPES,alias,rhs) == rhs
-          ? (mmm1==null ? mem1 : mmm1.alias2node(alias))
-          : (mmm0==null ? mem0 : mmm0.alias2node(alias));
-        if( defmem.at(alias)==TypeObj.UNUSED && gvn.type(n) != TypeObj.UNUSED )
-          n = split.in(0);
-        mem.create_alias_active(alias,n,gvn);
+        //Node n = tmem0.merge_one_lhs(NewNode.ESCAPES,alias,rhs) == rhs
+        //  ? (mmm1==null ? mem1 : mmm1.alias2node(alias))
+        //  : (mmm0==null ? mem0 : mmm0.alias2node(alias));
+        //if( defmem.at(alias)==TypeObj.UNUSED && gvn.type(n) != TypeObj.UNUSED )
+        //  n = split.in(0);
+        //mem.create_alias_active(alias,n,gvn);
+        throw com.cliffc.aa.AA.unimpl();
       }
       return mem;
     }
@@ -62,34 +63,35 @@ public class MemJoinNode extends Node {
     if( !(lhs instanceof TypeMem) ) return lhs.oob();
     if( !(rhs instanceof TypeMem) ) return rhs.oob();
 
-    // Merge types left and right
-    TypeMem trez = ((TypeMem)lhs).merge_by_alias((TypeMem)rhs,NewNode.ESCAPES);
-    // Lift to UNUSED, if required.  This is basically a shortcut
-    // because nearly always the join is useless.
-    TypeMem defmem = (TypeMem)gvn.type(in(2));
-    for( int alias=2; alias<trez.len(); alias++ )
-      if( defmem.at(alias)==TypeObj.UNUSED && trez.at(alias)!=TypeObj.UNUSED )
-        return trez.join(defmem);
-
-    return trez;
+    //// Merge types left and right
+    //TypeMem trez = ((TypeMem)lhs).merge_by_alias((TypeMem)rhs,NewNode.ESCAPES);
+    //// Lift to UNUSED, if required.  This is basically a shortcut
+    //// because nearly always the join is useless.
+    //TypeMem defmem = (TypeMem)gvn.type(in(2));
+    //for( int alias=2; alias<trez.len(); alias++ )
+    //  if( defmem.at(alias)==TypeObj.UNUSED && trez.at(alias)!=TypeObj.UNUSED )
+    //    return trez.join(defmem);
+    //
+    //return trez;
+    throw com.cliffc.aa.AA.unimpl();
   }
-  @Override public boolean basic_liveness() { return false; }
 
   // Some memory user can bypass, if the aliases are compatible
   Node can_bypass( GVNGCM gvn, TypeMemPtr tmp ) {
-    // Check for easy split right
-    if( tmp._aliases.isa(NewNode.ESCAPES) ) return in(1);
-    // Check for split left, but LHS has no answer and RHS made a New
-    TypeMem lhs = (TypeMem)gvn.type(in(0));
-    TypeMem rhs = (TypeMem)gvn.type(in(1));
-    TypeObj lld = lhs.ld(tmp);
-    TypeObj rld = rhs.ld(tmp);
-    if( TypeMem.merge_pick(lld,rld)==rld )
-      return in(1);
-    // Check for easy split left
-    if( !tmp._aliases.overlap(NewNode.ESCAPES) )
-      return in(0);
-    return null;
+    //// Check for easy split right
+    //if( tmp._aliases.isa(NewNode.ESCAPES) ) return in(1);
+    //// Check for split left, but LHS has no answer and RHS made a New
+    //TypeMem lhs = (TypeMem)gvn.type(in(0));
+    //TypeMem rhs = (TypeMem)gvn.type(in(1));
+    //TypeObj lld = lhs.ld(tmp);
+    //TypeObj rld = rhs.ld(tmp);
+    //if( TypeMem.merge_pick(lld,rld)==rld )
+    //  return in(1);
+    //// Check for easy split left
+    //if( !tmp._aliases.overlap(NewNode.ESCAPES) )
+    //  return in(0);
+    //return null;
+    throw com.cliffc.aa.AA.unimpl();
   }
 
 }

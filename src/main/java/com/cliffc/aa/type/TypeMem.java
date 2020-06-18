@@ -90,6 +90,7 @@ public class TypeMem extends Type<TypeMem> {
     if( as.length == 1 ) return true;
     if( as[1]!=TypeObj.OBJ    && as[1]!=TypeObj.XOBJ   &&
         as[1]!=TypeObj.ISUSED && as[1]!=TypeObj.UNUSED &&
+        !(as[1] instanceof TypeLive) &&
         as[1] != null )
       return false;             // Only 2 choices
     if( as.length==2 ) return true; // Trivial all of memory
@@ -219,7 +220,8 @@ public class TypeMem extends Type<TypeMem> {
   public static final TypeMem EMPTY;// Every alias filled with anything
   public static final TypeMem  MEM; // FULL, except lifts REC, arrays, STR
   public static final TypeMem XMEM; //
-  public static final TypeMem DEAD; // Sentinel for liveness flow; not part of lattice
+  public static final TypeMem DEAD, ALIVE; // Sentinel for liveness flow; not part of lattice
+  public static final TypeMem ESCAPE; // Sentinel for liveness, where the value "escapes" the local scope
   public static final TypeMem ANYMEM,ALLMEM; // Every alias is unused (so above XOBJ or below OBJ)
   public static final TypeMem MEM_ABC, MEM_STR;
   static {
@@ -232,6 +234,8 @@ public class TypeMem extends Type<TypeMem> {
 
     // Sentinel for liveness flow; not part of lattice
     DEAD = make(new TypeObj[1]);
+    ALIVE = make(new TypeObj[]{null,TypeLive.BASIC});
+    ESCAPE = make(new TypeObj[]{null,TypeLive.ESCAPE});
 
     // All memory.  Includes breakouts for all structs and all strings.
     // Triggers BitsAlias.<clinit> which makes all the initial alias splits.

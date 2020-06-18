@@ -548,6 +548,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TSTRUCT:break;
+    case TLIVE:
     case TSTR:   return OBJ;
     case TOBJ:   return t.above_center() ? this : t;
     case TFUNSIG:

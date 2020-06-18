@@ -95,10 +95,11 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     case TINT:
     case TMEMPTR:
     case TRPC:   return cross_nil(t);
-    case TTUPLE:
+    case TLIVE:
     case TOBJ:
     case TSTR:
     case TSTRUCT:
+    case TTUPLE:
     case TMEM:   return ALL;
     default: throw typerr(t);   // All else should not happen
     }

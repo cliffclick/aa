@@ -122,6 +122,7 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     case TFUNPTR:
     case TRPC:   return cross_nil(t);
     case TFUNSIG:
+    case TLIVE:
     case TOBJ:
     case TSTR:
     case TSTRUCT:

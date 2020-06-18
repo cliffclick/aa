@@ -102,8 +102,11 @@ public class IntrinsicNode extends Node {
     TypeMem rezmem = ((TypeMem)mem).st(alias,rez);
     return rezmem;
   }
+  @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
+    if( def==mem() ) return _live;
+    return TypeMem.ALIVE;
+  }
   //
-  @Override public boolean basic_liveness() { return false; }
   @Override public String err(GVNGCM gvn) {
     Type ptr = gvn.type(ptr());
     return _badargs.typerr(ptr,mem(),TypeMemPtr.make(BitsAlias.RECORD,_tn)); // Did not remove the aliasing

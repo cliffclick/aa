@@ -41,14 +41,8 @@ public class StoreNode extends Node {
 
     // Stores bypass a Split.
     if( mem instanceof MProjNode && mem.in(0) instanceof MemSplitNode ) {
-      assert tmp!=null && tmp._aliases.isa(NewNode.ESCAPES);
       return set_def(1,mem.in(0).in(0),gvn);
     }
-
-    // Stores bypass stores to unrelated fields.  TODO: Cannot really do this -
-    // need parallel field updates.
-    //if( mem instanceof StoreNode && !Util.eq(_fld,((StoreNode)mem)._fld) )
-    //  return set_def(1,((StoreNode)mem).mem(),gvn);
 
     // If Store is by a New and no other Stores, fold into the New.
     NewObjNode nnn;  int idx;
@@ -59,15 +53,6 @@ public class StoreNode extends Node {
       // Update the value, and perhaps the final field
       nnn.update(idx,_fin,val(),gvn);
       return mem;               // Store is replaced by using the New directly.
-    }
-
-    // Store can bypass a Call, if the memory is not returned from the call,
-    // This optimization is specifically targeting simple recursive functions.
-    if( mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode && tmp != null ) {
-      CallEpiNode cepi = (CallEpiNode)mem.in(0);
-      CallNode call = cepi.can_bypass(gvn,tmp._aliases);
-      if( call != null && gvn.type(call.mem()).isa(gvn.type(Env.DEFMEM)) )
-        return set_def(1,call.mem(),gvn);
     }
 
     return null;
@@ -111,12 +96,12 @@ public class StoreNode extends Node {
   // incoming memory types, as this is a backwards propagation of demanded
   // memory.
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
-    if( mem()!=def ) return _live == TypeMem.DEAD ? TypeMem.DEAD : TypeMem.EMPTY; // Non-memory use basic liveness
-    // Pass the liveness along
-    return _live;
+    if( _live==TypeMem.DEAD ) return TypeMem.DEAD;
+    if( def==mem() ) return _live; // Pass full liveness along
+    if( def==adr() ) return TypeMem.ALIVE; // Basic aliveness
+    if( def==val() ) return TypeMem.ESCAPE;// Value escapes
+    throw com.cliffc.aa.AA.unimpl();       // Should not reach here
   }
-  // Liveness is specific to the stored-aliases
-  @Override public boolean basic_liveness() { return false; }
 
   @Override public String err(GVNGCM gvn) {
     String msg = err0(gvn);

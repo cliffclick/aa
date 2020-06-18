@@ -68,6 +68,7 @@ public class RegionNode extends Node {
     }
     return Type.XCTRL;
   }
+  @Override public boolean basic_liveness() { return true; }
 
   // Complex dominator tree.  Ok to subset, attempt the easy walk
   @Override Node walk_dom_last(Predicate<Node> P) {

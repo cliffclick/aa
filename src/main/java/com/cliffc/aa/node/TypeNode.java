@@ -89,6 +89,7 @@ public class TypeNode extends Node {
   }
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
     if( _live == TypeMem.DEAD ) return TypeMem.DEAD; // Am dead, so nothing extra is alive.
+    if( def==arg() ) return _live;                   // Alive as I am
     // Alive (like normal liveness), plus the address, plus whatever can be
     // reached from the address.
     return ScopeNode.compute_live_mem(gvn,mem(),arg());

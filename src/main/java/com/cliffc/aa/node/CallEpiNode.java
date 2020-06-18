@@ -142,7 +142,8 @@ public final class CallEpiNode extends Node {
     if( fun.noinline() ) can_inline=false;
     if( can_inline ) {
       Node irez = rrez.copy(false,gvn);// Copy the entire function body
-      irez._live = _live; // Keep liveness from CallEpi, as the original might be dead.
+      ProjNode proj = ProjNode.proj(this,2);
+      irez._live = proj==null ? TypeMem.ALIVE : proj._live;
       for( Node parm : rrez._defs )
         irez.add_def((parm instanceof ParmNode && parm.in(0) == fun) ? call.argm(((ParmNode)parm)._idx) : parm);
       if( irez instanceof PrimNode ) ((PrimNode)irez)._badargs = call._badargs;
@@ -206,7 +207,7 @@ public final class CallEpiNode extends Node {
       switch( idx ) {
       case  0: actual = new FP2ClosureNode(call); break; // Filter Function Pointer to Closure
       case -1: actual = new ConNode<>(TypeRPC.make(call._rpc)); break; // Always RPC is a constant
-      case -2: actual = new MProjNode(call,CallNode.MCEIDX); break;    // Memory into the callee
+      case -2: actual = new MProjNode(call,CallNode.MEMIDX); break;    // Memory into the callee
       default: actual = idx >= call.nargs()              // Check for args present
           ? new ConNode<>(Type.XSCALAR) // Missing args, still wire (to keep FunNode neighbors) but will error out later.
           : new ProjNode(call,idx+CallNode.ARGIDX); // Normal args
@@ -245,14 +246,11 @@ public final class CallEpiNode extends Node {
     // along to the function being called.
     // tcall[0] = Control
     // tcall[1] = Memory passed around the functions.
-    // tcall[2] = Aliases escaping into function
-    // tcall[3] = Memory passed into   the functions.
-    // tcall[4] = TypeFunPtr passed to FP2Closure
-    // tcall[5+]= Arg types
-    Type       ctl    = CallNode.tctl(tcall); // Call is reached or not?
+    // tcall[2] = TypeFunPtr passed to FP2Closure
+    // tcall[3+]= Arg types
+    Type ctl = CallNode.tctl(tcall); // Call is reached or not?
     if( ctl != Type.CTRL && ctl != Type.ALL )
       return TypeTuple.CALLE.dual();
-    TypeMem    tmem   = CallNode.tmem(tcall); // Peel apart Call tuple
     TypeFunPtr tfptr  = CallNode.ttfp(tcall); // Peel apart Call tuple
 
     if( tfptr.is_forward_ref() ) return TypeTuple.CALLE; // Still in the parser.
@@ -260,7 +258,6 @@ public final class CallEpiNode extends Node {
     BitsFun fidxs = tfptr.fidxs();
     if( fidxs==BitsFun.EMPTY ) return TypeTuple.CALLE.dual();
     if( fidxs.above_center() ) return TypeTuple.CALLE.dual(); // Not resolved yet
-    TypeMem def_mem = (TypeMem)gvn.type(Env.DEFMEM);
 
     // Any not-wired unknown call targets?
     boolean has_unknown_callees = fidxs==BitsFun.FULL;
@@ -296,56 +293,23 @@ public final class CallEpiNode extends Node {
     }
 
     // Compute call-return value from all callees
-    Type tret = Type.ALL;       // Unknown caller returns a type error
+    Type trez = Type.ALL;       // Unknown callee returns a type error
+    Type tmem = TypeMem.FULL;   // Unknown callee returns memory all stomped
     if( !has_unknown_callees ) {
-      tret = Type.ANY;
-      for( int i=0; i<nwired(); i++ )
-        if( fidxs.test_recur(wired(i)._fidx) )
-          tret = tret.meet(((TypeTuple)gvn.type(wired(i))).at(2));
-    }
-
-    // For every alias
-    //   if it does not escape, use caller (not callee) memory.
-    //     Unless caller is XOBJ, and callee is legit; then assume its a New allocation
-    //   if it DOES     escape
-    //     If any FIDX has no ret, use DEFMEM (assume unwired call is bad)
-    //     Else FIDX has Ret, merge all such Rets.
-    //     Ignore Rets with no FIDX.
-    int emax = Math.max(def_mem.len(),tmem.len());
-    TypeObj[] tos = new TypeObj[emax];
-    tos[1] = def_mem.at(1);
-    for( int alias=2; alias<emax; alias++ ) {
-      TypeObj lhs = tmem.at(alias);
-      TypeObj rhs = TypeObj.OBJ; // Unknown caller modifies all memory
-      if( !has_unknown_callees ) { // Meet of all known callers
-        rhs = TypeObj.UNUSED;
-        for( int i=0; i<nwired(); i++ )
-          if( fidxs.test_recur(wired(i)._fidx) ) {
-            RetNode ret = wired(i);
-            TypeTuple ttret = (TypeTuple)gvn.type(ret);
-            TypeMem trmem = (TypeMem)ttret.at(1);
-            TypeObj tro = trmem.at(alias);
-            rhs = (TypeObj)rhs.meet(tro); // Meet of known callers
-          }
+      trez = Type.ANY;
+      tmem = TypeMem.EMPTY;
+      for( int i=0; i<nwired(); i++ ) {
+        RetNode ret = wired(i);
+        if( fidxs.test_recur(ret._fidx) ) {
+          TypeTuple tret = (TypeTuple)gvn.type(ret);
+          tmem = tmem.meet(tret.at(1));
+          trez = trez.meet(tret.at(2));
+        }
       }
-      // if XUSE, always XUSE.
-      // If escapes, use RHS.
-      // If not, and LHS is XOBJ then rhs (new allocation)
-      // Else LHS.
-      TypeObj to = tmem.merge_one_lhs(NewNode.ESCAPES,alias,rhs);  // 
-      tos[alias] = (TypeObj)to.join(def_mem.at(alias));// But always at least as nice as DEFMEM
     }
-    TypeMem post_call_mem = TypeMem.make0(tos);
-    // Final result
-    TypeTuple rez = TypeTuple.make(Type.CTRL,post_call_mem,tret);
-    return rez;
-  }
 
-  // Does this set of aliases bypass the call?
-  CallNode can_bypass( GVNGCM gvn, BitsAlias aliases ) {
-    if( !(in(0) instanceof CallNode) ) return null;
-    // Are any aliases in the escape set?
-    return aliases.overlap(NewNode.ESCAPES) ? null : call();
+    // Final result
+    return TypeTuple.make(Type.CTRL,tmem,trez);
   }
 
   // Sanity check
@@ -369,25 +333,14 @@ public final class CallEpiNode extends Node {
     assert (level&1)==0; // Do not actually inline, if just checking that all forward progress was found
     assert nwired()==0 || nwired()==1; // not wired to several choices
 
-    Node precallmem = call.mem();
-    if( precallmem!=mem ) {
-      // Split call memory, same as CallNode does
-      Node split = gvn.xform(new MemSplitNode(precallmem,call._live).keep());
-      Node lhs = gvn.xform(new MProjNode(split,0)); lhs._live = call._live; // Caller memory (bypass)
-      Node rhs = gvn.xform(new MProjNode(split,1)); rhs._live = call._live; // Callee memory (escapes into call)
-      // Memory into the call comes from the split.  Call will disappear shortly.
-      gvn.set_def_reg(call,1,rhs);
-      // Merge the call-split and pre-call memory.
-      mem = gvn.xform(new MemJoinNode(lhs,mem,Env.DEFMEM,_live));
-      split.unkeep(gvn);
-    }
-
     // Unwire any wired called function
     if( ret != null && nwired() == 1 && !ret.is_copy() ) // Wired, and called function not already collapsing
       unwire(gvn,call,ret);
     // Call is also is_copy and will need to collapse
     call._is_copy = true;              // Call is also is-copy
     gvn.add_work_uses(call.keep());
+    for( int i=0; i<call.nargs(); i++ ) // All args no longer escape
+      gvn.add_work(call.arg(i)); 
     // Remove all edges except the inlined results
     ctl.keep();  mem.keep();  rez.keep();
     while( _defs._len > 0 ) pop(gvn);
@@ -429,10 +382,11 @@ public final class CallEpiNode extends Node {
       if( fidxs.above_center() || !fidxs.test(fidx) )
         return TypeMem.DEAD;    // Call does not call this, so not alive.
     }
-    // Target is as alive as we are.
-    return _live;
+    // Target is as alive as our projs are.
+    int idx = _defs.find(def);
+    ProjNode proj = ProjNode.proj(this,idx);
+    return proj==null ? TypeMem.ALIVE : proj._live;
   }
-  @Override public boolean basic_liveness() { return false; }
 
   // If slot 0 is not a CallNode, we have been inlined.
   boolean is_copy() { return !(in(0) instanceof CallNode); }

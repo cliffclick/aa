@@ -17,7 +17,6 @@ public class PhiNode extends Node {
     else if( t instanceof TypeObj ) _t = TypeObj.OBJ; // Need to check liveness
     else { assert t.isa(Type.SCALAR); _t = Type.SCALAR; }
     _badgc = badgc;
-    _live = basic_liveness() ? TypeMem.EMPTY : TypeMem.ALLMEM;
   }
   public PhiNode( Type t, Parse badgc, Node... vals ) { this(OP_PHI,t,badgc,vals); }
   // For ParmNodes
@@ -133,10 +132,6 @@ public class PhiNode extends Node {
       if( gvn.type(r.in(i))==Type.CTRL ) // Only meet alive paths
         t = t.meet(gvn.type(in(i)));
     return t;
-  }
-  // Only interested in memory aliases, if merging memory
-  @Override public boolean basic_liveness() {
-    return _t==Type.SCALAR;
   }
 
   @Override public String err(GVNGCM gvn) {

@@ -64,6 +64,7 @@ public final class TypeFunSig extends Type<TypeFunSig> {
       return ALL;               // Not supposed to mix TypeFunPtr and TypeFunSig
     case TFLT:
     case TINT:
+    case TLIVE:
     case TMEM:
     case TMEMPTR:
     case TOBJ:

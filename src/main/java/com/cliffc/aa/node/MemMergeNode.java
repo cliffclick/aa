@@ -332,7 +332,6 @@ public class MemMergeNode extends Node {
       }
     return rez;
   }
-  @Override public boolean basic_liveness() { return false; }
 
   @Override @NotNull public MemMergeNode copy( boolean copy_edges, GVNGCM gvn) {
     MemMergeNode mmm = (MemMergeNode)super.copy(copy_edges, gvn);

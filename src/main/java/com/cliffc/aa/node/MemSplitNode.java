@@ -43,21 +43,22 @@ public class MemSplitNode extends Node {
     TypeMem tsplit = (TypeMem)gvn.type(mem);
 
     // Feed alias edges to the merges, left or right
-    int max = Math.max(NewNode.ESCAPES.length(),tsplit.len());
+    int max = tsplit.len();
     for( int alias=2; alias<max; alias++ ) {
-      Node base = mem.alias2node(alias); // Alias node from base
-      Node yobj = tsplit.at(alias)==TypeObj.XOBJ ? base : xobj; // XOBJ either way, but from base or a constant
-      Node yuse = tsplit.at(alias)==TypeObj.XOBJ ? base : xuse; // XUSE either way, but from base or a constant
-      Node l,r;
-      if( tsplit.at(alias)==TypeObj.UNUSED ) {
-        l = r = yuse;
-      } else if( NewNode.ESCAPES.get(alias) ) { // Alias splits right
-        l=yobj; r=base;
-      } else {                  // Alias splits left
-        l=base; r=yobj;
-      }
-      lhs.create_alias_active(alias,l,gvn);
-      rhs.create_alias_active(alias,r,gvn);
+      throw com.cliffc.aa.AA.unimpl();
+      //Node base = mem.alias2node(alias); // Alias node from base
+      //Node yobj = tsplit.at(alias)==TypeObj.XOBJ ? base : xobj; // XOBJ either way, but from base or a constant
+      //Node yuse = tsplit.at(alias)==TypeObj.XOBJ ? base : xuse; // XUSE either way, but from base or a constant
+      //Node l,r;
+      //if( tsplit.at(alias)==TypeObj.UNUSED ) {
+      //  l = r = yuse;
+      //} else if( NewNode.ESCAPES.get(alias) ) { // Alias splits right
+      //  l=yobj; r=base;
+      //} else {                  // Alias splits left
+      //  l=base; r=yobj;
+      //}
+      //lhs.create_alias_active(alias,l,gvn);
+      //rhs.create_alias_active(alias,r,gvn);
     }
     Node nlhs = gvn.xform(lhs); nlhs._live = _live;
     Node nrhs = gvn.xform(rhs); nrhs._live = _live;
@@ -70,9 +71,9 @@ public class MemSplitNode extends Node {
   @Override public Type value(GVNGCM gvn) {
     Type t0 = gvn.type(in(0));
     if( !(t0 instanceof TypeMem) ) return t0.oob();
-    return TypeTuple.make( t0, ((TypeMem)t0).split_by_alias(NewNode.ESCAPES));
+    //return TypeTuple.make( t0, ((TypeMem)t0).split_by_alias(NewNode.ESCAPES));
+    throw com.cliffc.aa.AA.unimpl();
   }
-  @Override public boolean basic_liveness() { return false; }
 
   // If two inputs, we are a copy.
   @Override public Node is_copy(GVNGCM gvn, int idx) { return _defs._len==1 ? null : in(idx); }

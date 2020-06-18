@@ -161,7 +161,6 @@ public class Env implements AutoCloseable {
     DefMemNode.reset();
     FunNode   .reset();
     IntrinsicNewNode.reset();
-    NewNode   .reset();
     PrimNode  .reset();
     DISPLAYS = BitsAlias.EMPTY; // Reset aliases declared as Displays
   }
