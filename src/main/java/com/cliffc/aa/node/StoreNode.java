@@ -1,6 +1,5 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
@@ -36,7 +35,8 @@ public class StoreNode extends Node {
     // Stores bypass a Merge to the specific alias
     int alias;
     if( tmp !=null && mem instanceof MemMergeNode &&
-        (alias=tmp._aliases.strip_nil().abit()) != -1 )
+        (alias=tmp._aliases.strip_nil().abit()) != -1 &&
+        !BitsAlias.is_parent(alias) )
       return new StoreNode(this,((MemMergeNode)mem).obj(alias,gvn),adr);
 
     // Stores bypass a Split.
@@ -48,7 +48,7 @@ public class StoreNode extends Node {
     NewObjNode nnn;  int idx;
     if( mem instanceof OProjNode &&
         mem.in(0) instanceof NewObjNode && (nnn=(NewObjNode)mem.in(0)) == adr.in(0) &&
-        mem._uses._len==2 && !val().is_forward_ref() && !DefMemNode.CAPTURED.get(nnn._alias) &&
+        mem._uses._len==2 && !val().is_forward_ref() &&
         (idx=nnn._ts.find(_fld))!= -1 && nnn._ts.can_update(idx) ) {
       // Update the value, and perhaps the final field
       nnn.update(idx,_fin,val(),gvn);

@@ -10,7 +10,7 @@ public class StartMemNode extends Node {
   @Override public Node ideal(GVNGCM gvn, int level) { return null; }
   @Override public Type value(GVNGCM gvn) {
     // All memories are XOBJ, unless UNUSED in the default memory.
-    Type defmem = gvn.type(Env.DEFMEM);
+    Type defmem = gvn.type(in(1));
     if( !(defmem instanceof TypeMem) ) return defmem.oob();
     if( defmem == TypeMem.ANYMEM ) return TypeMem.ANYMEM; // Shortcut
     TypeObj[] objs = ((TypeMem)defmem).alias2objs().clone();

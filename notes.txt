@@ -5,19 +5,22 @@ Action items
 - add global-ptr-use types (used as adr, stored into mem, merged at phi, call arg)
 - - meet/dual
 - - value props
-- - drop NewNode.escapes, DefMemNode.CAPTURED
+* - drop NewNode.escapes, DefMemNode.CAPTURED
 * add struct-field-complete bit, drop BitsAlias.nflds
 - add global-ptr-use live types (subclass of TypeObj, tracking reverse flow props)
 * - add global-ptr-use ESCAPE type
 - - live-use props
 * - live-use ESCAPE props
-- look at ISUSE, to be renamed "uninitialized" UNINIT, and used to indicated never-been-alloc
+*- OBJ: never-alloc; low-struct: alloc, still adding fields; high-struct: closed, no more fields; XOBJ: alloc, uninit; UNUSE: unused/dead
 * make Call/CallEpi dumb on memory and ptrs
 - add Split/Join in parser around all calls & memory uses
 - - todo: start optimizing split/joins
 * Store/Load do not bypass Call/CallEpi (but yes bypass Split/Join)
-- TODO: figure out how to assert in a network slice that memory never overlaps
-- TODO: drop DefMem
+* CEPI takes a default RetNode value, same as FunNode takes a default Caller.
+* Default FunNode caller knows about default Display memory for parsing.
+* Wire when known.
+- Set value equal to the default RetNode or default Parm; this allows OOO types
+  right up until we remove the default.  At that time, the types must be in alignment.
 
 
 Live values

@@ -54,21 +54,20 @@ public class LoadNode extends Node {
       Node jmem = ((MemJoinNode)mem).can_bypass(gvn,(TypeMemPtr)tadr);
       if( jmem != null ) return set_mem(jmem,gvn);
     }
-    
+
     // Load can move out of a Call, if the function has no Parm:mem - happens
     // for single target calls that do not (have not yet) inlined.
     CallNode call;
     if( mem instanceof MProjNode && mem.in(0) instanceof CallNode && !(call=(CallNode)mem.in(0)).is_copy() )
       return set_mem(call.mem(),gvn);
 
-    // Loads from unescape memory can bypass calls
+    // Loads from final memory can bypass calls
     if( adr instanceof  ProjNode && adr.in(0) instanceof NewNode &&
         mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode ) {
-      // TODO: a proper test
-      if( adr._live != TypeMem.ESCAPE && // Escapes
-          adr._live != TypeMem.ALLMEM )  // 
-        //return set_mem(((CallEpiNode)mem.in(0)).call().mem(),gvn);
-        throw com.cliffc.aa.AA.unimpl();
+      TypeStruct ts = (TypeStruct)((NewNode)adr.in(0))._ts;
+      int idx = ts.find(_fld);
+      if( idx != -1 && ts.fmod(idx)==TypeStruct.FFNL )
+        return set_mem(((CallEpiNode)mem.in(0)).call().mem(),gvn);
     }
 
     // Loads against a NewNode cannot NPE, cannot fail, always return the input
@@ -134,13 +133,12 @@ public class LoadNode extends Node {
   }
 
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
-    if( _live == TypeMem.DEAD ) return TypeMem.DEAD; // Am dead, so nothing extra is alive.
     if( def==adr() ) return _live;                   // Alive as the Load is alive
     Type tmem = gvn.type(mem());
     Type tptr = gvn.type(adr());
     // If either is above-center, then only basic-liveness - the load can load
     // from anything getting anything.
-    if( tmem.above_center() || tptr.above_center() )
+    if( tptr.above_center() )
       return TypeMem.ANYMEM;
     // TypeObj memory is already alias-constricted.  Can only demand from that alias.
     if( tmem instanceof TypeObj && tptr instanceof TypeMemPtr )

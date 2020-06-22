@@ -243,14 +243,14 @@ public class MemMergeNode extends Node {
     TypeMem tself = (TypeMem)gvn.self_type(this);
     TypeMem tbase = (TypeMem)gvn.self_type(base);
     for( int alias=2; alias<len; alias++ ) {
-      if( _live.at(alias)==TypeObj.UNUSED || tbase.at(alias)==TypeObj.UNUSED ) {
+      if( _live.at(alias)==TypeObj.UNUSED ) {
         if( unused==null ) unused = gvn.con(TypeObj.UNUSED);
         ins.set(alias,unused);
       }
       // Use base instead of explicit unused set (folds up a lot of explicit sets)
       int par = BitsAlias.parent(alias);
       if( par>0 && ins.at(par)==base && tself.at(alias)==TypeObj.UNUSED && tbase.at(alias)==TypeObj.UNUSED ) {
-        // Only legit if parent has to used kids after unused base
+        // Only legit if parent has no used kids after unused base
         boolean used_kids=false;
         for( int kid=alias; kid != 0; kid = BitsAlias.next_kid(alias,kid) )
           if( tbase.at(kid)!=TypeObj.UNUSED )
@@ -276,8 +276,12 @@ public class MemMergeNode extends Node {
     // Check for progress.
     if( _defs   .equals(outs) &&
         _aliases.equals(alss) &&
-        _aidxes .equals(adxs) )
+        _aidxes .equals(adxs) ) {
+      if( unused!=null )
+        if( unused._uses._len==0 ) gvn.kill(unused);
+        else unused._live = unused.live(gvn); // Unwind making it alive
       return null;              // No progress
+    }
     // Crush/update & return.  Add before remove to avoid killing to early.
     for( Node nnn : outs ) add_def(nnn);
     while( _defs._len>outs._len ) remove(0,gvn);

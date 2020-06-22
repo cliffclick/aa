@@ -1,15 +1,16 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.type.*;
+import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeMem;
+import com.cliffc.aa.type.TypeObj;
 
 import java.util.BitSet;
 
 public class DefMemNode extends Node {
   public static BitSet CAPTURED = new BitSet();
 
-  public DefMemNode( Node obj) { super(OP_DEFMEM,Env.START,obj); }
+  public DefMemNode( Node ctrl, Node isuse) { super(OP_DEFMEM,ctrl,isuse); }
   @Override public Node ideal(GVNGCM gvn, int level) { return null; }
   @Override public TypeMem value(GVNGCM gvn) {
     TypeObj[] tos = new TypeObj[_defs._len];
@@ -20,7 +21,7 @@ public class DefMemNode extends Node {
         tos[i] = ((NewNode)n.in(0))._defmem;
       } else {
         Type tn = gvn.type(n);
-        tos[i] = tn instanceof TypeObj ? (TypeObj)tn : (tn.above_center() ? TypeObj.XOBJ : TypeObj.OBJ);
+        tos[i] = tn instanceof TypeObj ? (TypeObj)tn : tn.oob(TypeObj.ISUSED);
       }
     }
     return TypeMem.make0(tos);

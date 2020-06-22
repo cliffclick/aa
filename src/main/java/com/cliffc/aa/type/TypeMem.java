@@ -241,7 +241,7 @@ public class TypeMem extends Type<TypeMem> {
     // Triggers BitsAlias.<clinit> which makes all the initial alias splits.
     // Not currently including closures
     TypeObj[] tos = new TypeObj[Math.max(BitsAlias.RECORD,BitsAlias.ABC)+1];
-    tos[BitsAlias.ALL] = TypeObj.OBJ;
+    tos[BitsAlias.ALL] = TypeObj.ISUSED;
     tos[BitsAlias.RECORD]=TypeStruct.ALLSTRUCT;
     tos[BitsAlias.ARY] = TypeStr.STR; // TODO: Proxy for all-arrays
     tos[BitsAlias.ABC] = TypeStr.ABC; //
@@ -437,6 +437,14 @@ public class TypeMem extends Type<TypeMem> {
   // Sharpen if a maybe-pointer
   @Override public Type sharptr( Type ptr ) { return ptr instanceof TypeMemPtr ? sharpen((TypeMemPtr)ptr) : ptr; }
 
+  // Widen (lose info), to make it suitable as the default memory.
+  public TypeMem crush() {
+    TypeObj[] oops = _aliases.clone();
+    for( int i=1; i<oops.length; i++ )
+      if( oops[i]!=null ) oops[i] = oops[i].crush();
+    return TypeMem.make0(oops);
+  }
+  
   // Returns the same memory, with aliases not in the split set to either XOBJ
   // or UNUSED.
   public TypeMem split_by_alias(BitSet split) {

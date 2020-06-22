@@ -15,8 +15,6 @@ public class OProjNode extends ProjNode {
       assert _uses.at(0)==Env.DEFMEM;
       return gvn.con(TypeObj.UNUSED);
     }
-    if( DefMemNode.CAPTURED.get(alias()) )
-      return gvn.con(TypeObj.UNUSED);
     return null;
   }
   @Override public Type value(GVNGCM gvn) {
@@ -26,7 +24,7 @@ public class OProjNode extends ProjNode {
       if( _idx < ct._ts.length )
         return ct._ts[_idx];
     }
-    return c.above_center() ? TypeObj.XOBJ : TypeObj.OBJ;
+    return c.oob(TypeObj.OBJ);
   }
   int alias() { return ((NewNode)in(0))._alias; }
 }

@@ -3,8 +3,6 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.VBitSet;
-
 import org.jetbrains.annotations.NotNull;
 
 // Allocates a TypeObj and produces a Tuple with the TypeObj and a TypeMemPtr.
@@ -25,8 +23,9 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
 
   // The memory state for Env.DEFMEM, the default memory.  All non-final fields
   // are ALL; final fields keep their value.  All field flags are moved to
-  // bottom, e.g. as-if all fields are now final-stored.
-  T _defmem;
+  // bottom, e.g. as-if all fields are now final-stored.  Will be set to
+  // TypeObj.UNUSE for dead allocations.
+  TypeObj _defmem;
 
   // Just TMP.make(_alias,OBJ)
   public TypeMemPtr _tptr;
@@ -55,8 +54,8 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   @SuppressWarnings("unchecked")
   protected final void sets( T ts, GVNGCM gvn ) {
     _ts = ts;
-    T olddef = _defmem;
-    _defmem = (T)ts.widen_as_default();
+    TypeObj olddef = _defmem;
+    _defmem = (T)ts.crush();
     if( gvn!=null ) {
       gvn.add_work_uses(this);
       if( olddef != _defmem )
@@ -64,27 +63,27 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     }
   }
 
+  @SuppressWarnings("unchecked")
   @Override public Node ideal(GVNGCM gvn, int level) {
-    if( DefMemNode.CAPTURED.get(_alias) ) return null;
     // If either the address or memory is not looked at then the memory
     // contents are dead.  The object might remain as a 'gensym' or 'sentinel'
     // for identity tests.
-    if( captured(gvn) ) {
-      DefMemNode.CAPTURED.set(_alias);
+    if( _defs._len > 1 && captured(gvn) ) {
       while( !is_dead() && _defs._len > 1 )
         pop(gvn);               // Kill all fields
-      gvn.setype(Env.DEFMEM,Env.DEFMEM.value(gvn));
-      gvn.add_work_uses(Env.DEFMEM);
       if( is_dead() ) return this;
-      Node ptr = _uses.at(0);
-      gvn.add_work_uses(ptr);   // Progress for remaining pointer users
+      _ts = dead_type();
+      _defmem = TypeObj.UNUSED;
+      gvn.add_work_uses(_uses.at(0));  // Get FPtrs from OProj from this
       return this;
     }
     return null;
   }
-
+  abstract T dead_type();
+  @Override public boolean basic_liveness() { return true; }
+  @Override public TypeMem live_use( GVNGCM gvn, Node def ) { return def==in(0) ? TypeMem.ALIVE : TypeMem.ESCAPE; }
+  
   // Basic escape analysis.  If no escapes and no loads this object is dead.
-  // TODO: A better answer is to put escape analysis into the type flows.
   private boolean captured( GVNGCM gvn ) {
     if( _keep > 0 ) return false;
     if( _uses._len==0 ) return false; // Dead or being created
@@ -97,7 +96,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
       return !(gvn.type(in(1)) instanceof TypeStr);
     }
     Node ptr = _uses.at(1);
-    if( ptr instanceof OProjNode ) { mem=ptr; ptr = _uses.at(0); } // Get ptr not mem
+    if( ptr instanceof OProjNode ) ptr = _uses.at(0); // Get ptr not mem
     // Scan for pointer-escapes.  Really stupid: allow if-nil-check and if-eq-check only.
     for( Node use : ptr._uses )
       if( !(use instanceof IfNode) )

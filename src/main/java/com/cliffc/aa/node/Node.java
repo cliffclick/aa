@@ -4,8 +4,6 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
-import com.cliffc.aa.type.TypeObj;
-import com.cliffc.aa.type.TypeTuple;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
@@ -138,7 +136,7 @@ public abstract class Node implements Cloneable {
     _defs = new Ary<>(defs);
     _uses = new Ary<>(new Node[1],0);
     for( Node def : defs ) if( def != null ) def._uses.add(this);
-    _live = TypeMem.ALLMEM;
+    _live = basic_liveness() ? TypeMem.ESCAPE : TypeMem.ALLMEM;
    }
 
   // Is a primitive
@@ -324,7 +322,7 @@ public abstract class Node implements Cloneable {
   // TypeMem.FULL, especially if its uses are of unwired functions.
   // It must be monotonic.
   // This is a reverse-flow transfer-function computation.
-  public TypeMem live( GVNGCM gvn) {
+  public TypeMem live( GVNGCM gvn ) {
     if( basic_liveness() ) {    // Basic liveness only; e.g. primitive math ops
       for( Node use : _uses )   // Computed across all uses
         if( use._live != TypeMem.DEAD )
@@ -415,20 +413,6 @@ public abstract class Node implements Cloneable {
           bs.clear(_uid);                     // Pop-frame & re-run in debugger
           System.err.println(dump(0,new SB(),true)); // Rolling backwards not allowed
           errs++;
-        }
-      }
-      // Check memory does not report unused unless default mem also does
-      Type t = nval instanceof TypeTuple ? ((TypeTuple)nval).at(1) : nval;
-      if( t instanceof TypeMem && t != TypeMem.ANYMEM ) {
-        TypeMem tval= (TypeMem)t;
-        Node def = Env.DEFMEM;
-        for( int alias=2; alias<def._defs._len; alias++ ) {
-          if( !(def.in(alias) instanceof ConNode && ((ConNode)def.in(alias))._t == TypeObj.UNUSED) &&
-              tval.at(alias)==TypeObj.UNUSED && nliv.at(alias)!=TypeObj.UNUSED ) {
-            bs.clear(_uid);     // Pop-frame & re-run in debugger
-            System.err.println(dump(0,new SB(),true)); // Rolling backwards not allowed
-            errs++;
-          }
         }
       }
     }

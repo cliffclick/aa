@@ -823,7 +823,8 @@ public class Parse {
     // Increase scope depth for function body.
     try( Env e = new Env(_e,errMsg(oldx-1), true) ) { // Nest an environment for the local vars
       _e = e;                   // Push nested environment
-      _gvn.set_def_reg(e._scope.stk(),0,fun); // Display creation control defaults to function entry
+      NewObjNode stk = e._scope.stk();
+      _gvn.set_def_reg(stk,0,fun); // Display creation control defaults to function entry
       set_ctrl(fun);            // New control is function head
       // Build Parms for all incoming values
       Node rpc = gvn(new ParmNode(-1,"rpc",fun,con(TypeRPC.ALL_CALL),null)).keep();
@@ -832,7 +833,7 @@ public class Parse {
       // Display is special: the default is simply the outer lexical scope.
       // But here, in a function, the display is actually passed in as a hidden
       // extra argument and replaces the default.
-      e._scope.stk().update(0,ts_mutable(false),clo,_gvn);
+      stk.update(0,ts_mutable(false),clo,_gvn);
       // Parms for all arguments
       Parse errmsg = errMsg();  // Lazy error message
       for( int i=1; i<ids._len; i++ ) { // User parms start at#1
@@ -844,7 +845,7 @@ public class Parse {
       // display implied by arguments.  Starts merging in parent scope, but
       // this is incorrect - should start from the incoming function memory.
       MemMergeNode amem = mem_active();
-      assert amem.in(1).in(0) == e._scope.stk(); // amem slot#1 is the display
+      assert amem.in(1).in(0) == stk; // amem slot#1 is the display
       // amem slot#0 was outer display, should be function memory
       // Adding mem to worklist, because its liveness now changes
       amem.set_def(0,_gvn.add_work(mem.unhook()),_gvn);

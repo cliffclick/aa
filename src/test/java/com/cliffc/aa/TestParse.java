@@ -15,14 +15,14 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
     TypeStruct dummy = TypeStruct.DISPLAY;
-    TypeMemPtr tdisp = TypeMemPtr.make(10,TypeStr.NO_DISP);
-    Env.DISPLAYS.set(10);
-    test("x=@{a:=1;b= {a=a+1;b=0}}; x.b(); x.a",TypeInt.con(2));
+    TypeMemPtr tdisp = TypeMemPtr.make(2,TypeStr.NO_DISP);
+    test("x=@{a:=1;noinline_b= {a=a+1;b=0}}; x.noinline_b(); x.a",TypeInt.NINT8);
 
     // A collection of tests which like to fail easily
     test("-1",  TypeInt.con( -1));
     test("{5}()", TypeInt.con(5)); // No args nor -> required; this is simply a function returning 5, being executed
     testerr("x=1+y","Unknown ref 'y'",5);
+    test_obj("str(3.14)", TypeStr.con("3.14"));
     test("math_rand(1)?x=4:x=3;x", TypeInt.NINT8); // x defined on both arms, so available after
     test_ptr("x=@{n:=1;v:=2}; x.n := 3; x", "@{n:=3;v:=2}");
     test("x=3; mul2={x -> x*2}; mul2(2.1)", TypeFlt.con(2.1*2.0)); // must inline to resolve overload {*}:Flt with I->F conversion

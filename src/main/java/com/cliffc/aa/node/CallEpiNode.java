@@ -1,6 +1,5 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 
@@ -129,8 +128,9 @@ public final class CallEpiNode extends Node {
     if( rrez instanceof ParmNode && rrez.in(0) == fun && cmem == rmem )
       return inline(gvn,level,call,tcall,cctl,cmem,call.arg(((ParmNode)rrez)._idx), ret);
     // Check for constant body
-    if( gvn.type(rrez).is_con() && rctl==fun && cmem == rmem)
-      return inline(gvn,level,call,tcall,cctl,cmem,rrez,ret);
+    Type trez = gvn.type(rrez);
+    if( trez.is_con() && rctl==fun && cmem == rmem)
+      return inline(gvn,level,call,tcall,cctl,cmem,gvn.con(trez),ret);
 
     // Check for a 1-op body using only constants or parameters and no memory effects
     boolean can_inline=!(rrez instanceof ParmNode) && rmem==cmem;
@@ -215,6 +215,7 @@ public final class CallEpiNode extends Node {
       }
       actual = gvn._opt_mode == 2 ? gvn.new_gcp(actual) : gvn.xform(actual);
       gvn.add_def(arg,actual);
+      actual._live = actual.live(gvn);
     }
 
     // Add matching control to function via a CallGraph edge.
@@ -251,6 +252,7 @@ public final class CallEpiNode extends Node {
     Type ctl = CallNode.tctl(tcall); // Call is reached or not?
     if( ctl != Type.CTRL && ctl != Type.ALL )
       return TypeTuple.CALLE.dual();
+    TypeMem    tcmem  = CallNode.tmem(tcall); // Peel apart Call tuple
     TypeFunPtr tfptr  = CallNode.ttfp(tcall); // Peel apart Call tuple
 
     if( tfptr.is_forward_ref() ) return TypeTuple.CALLE; // Still in the parser.
@@ -259,57 +261,63 @@ public final class CallEpiNode extends Node {
     if( fidxs==BitsFun.EMPTY ) return TypeTuple.CALLE.dual();
     if( fidxs.above_center() ) return TypeTuple.CALLE.dual(); // Not resolved yet
 
+    // Crush it down to what the unknown callee might do
+    TypeMem crush = tcmem.crush();
+    // Default memory: global worse-case scenario
+    Type    defmem = gvn.type(in(1));
+    // Pre-call should be at least as good as this.  Can be lower if
+    // e.g. "news" of an alias-death has not arrived yet.
+    TypeMem tcmem2 = (TypeMem)crush.join(defmem);
     // Any not-wired unknown call targets?
-    boolean has_unknown_callees = fidxs==BitsFun.FULL;
-    if( !has_unknown_callees ) {
-      // If fidxs includes a parent fidx, then it was split - currently exactly
-      // in two.  If both children are wired, then proceed to merge both
-      // children as expected; same if the parent is still wired (perhaps with
-      // some children).  If only 1 child is wired, then we have an extra fidx
-      // for a not-wired child.  If this fidx is really some unknown caller we
-      // would have to get super conservative; but its actually just a recently
-      // split child fidx.  If we get the fidx via FunNode.find_fidx we suffer
-      // the non-local progress curse.  If we get super conservative, we end up
-      // rolling backwards (original fidx returned int; each split will only
-      // ever return int-or-better).  So instead we "freeze in place".
-      BitsFun ws = BitsFun.EMPTY;
-      for( int i=0; i<nwired(); i++ )
-        ws = ws.set(wired(i)._fidx);
-      for( int fidx : fidxs ) {
-        boolean fwired=false;
-        int kids=0;
-        for( int i=0; i<nwired(); i++ ) {
-          int rfidx = wired(i)._fidx;
-          if( fidx == rfidx ) { fwired=true; break; } // Directly wired is always OK
-          if( fidx == BitsFun.parent(rfidx) ) kids++; // Both kids of a split parent is OK.
-        }
-        if( !fwired ) {         // Directly wired is always OK
-          if( BitsFun.is_parent(fidx) ) { // Child of a split parent, need both kids wired
-            if( kids!=2 ) return gvn.self_type(this); // "Freeze in place"
-          } else
-            has_unknown_callees = gvn._opt_mode<2; // Assume unknown callers (or not) according to starting assumptions
-        }
-      }
-    }
+    if( fidxs==BitsFun.FULL )
+      return TypeTuple.make(Type.CTRL,tcmem2,Type.ALL);
 
-    // Compute call-return value from all callees
-    Type trez = Type.ALL;       // Unknown callee returns a type error
-    Type tmem = TypeMem.FULL;   // Unknown callee returns memory all stomped
-    if( !has_unknown_callees ) {
-      trez = Type.ANY;
-      tmem = TypeMem.EMPTY;
+    // If fidxs includes a parent fidx, then it was split - currently exactly
+    // in two.  If both children are wired, then proceed to merge both
+    // children as expected; same if the parent is still wired (perhaps with
+    // some children).  If only 1 child is wired, then we have an extra fidx
+    // for a not-wired child.  If this fidx is really some unknown caller we
+    // would have to get super conservative; but its actually just a recently
+    // split child fidx.  If we get the RetNode via FunNode.find_fidx we suffer
+    // the non-local progress curse.  If we get super conservative, we end up
+    // rolling backwards (original fidx returned int; each split will only
+    // ever return int-or-better).  So instead we "freeze in place".
+    outerloop:
+    for( int fidx : fidxs ) {
+      int kids=0;
       for( int i=0; i<nwired(); i++ ) {
-        RetNode ret = wired(i);
-        if( fidxs.test_recur(ret._fidx) ) {
-          TypeTuple tret = (TypeTuple)gvn.type(ret);
-          tmem = tmem.meet(tret.at(1));
-          trez = trez.meet(tret.at(2));
-        }
+        int rfidx = wired(i)._fidx;
+        if( fidx == rfidx ) continue outerloop; // Directly wired is always OK
+        if( fidx == BitsFun.parent(rfidx) ) kids++; // Count wired kids of a parent fidx
       }
+      if( BitsFun.is_parent(fidx) ) { // Child of a split parent, need both kids wired
+        if( kids==2 ) continue;       // Both kids wired, this is ok
+        return gvn.self_type(this);   // "Freeze in place"
+      }
+      if( gvn._opt_mode<2 )     // Before GCP?  Fidx is a unwired unknown call target
+        return TypeTuple.make(Type.CTRL,tcmem2,Type.ALL);
+      assert false;             // During GCP, still wiring, post GCP all are wired
     }
 
+    // Compute call-return value from all callee returns
+    Type trez = Type.ANY;
+    Type tmem = TypeMem.ANYMEM;
+    for( int i=0; i<nwired(); i++ ) {
+      RetNode ret = wired(i);
+      if( fidxs.test_recur(ret._fidx) ) { // Can be wired, but later fidx is removed
+        TypeTuple tret = (TypeTuple)gvn.type(ret);
+        tmem = tmem.meet(tret.at(1));
+        trez = trez.meet(tret.at(2));
+      }
+    }
+    // Lift return to the crushed-pre-call.  This is because the callee may not
+    // have heard of our local display status (yet), and will not be sure about
+    // it until after all unknown callERs are removed.  However, on this path
+    // we are sure about at least our crushed-pre-call (which includes the
+    // lexical scope, needed for parsing).
+    Type tmem2 = tmem.join(defmem);
     // Final result
-    return TypeTuple.make(Type.CTRL,tmem,trez);
+    return TypeTuple.make(Type.CTRL,tmem2,trez);
   }
 
   // Sanity check
@@ -340,7 +348,7 @@ public final class CallEpiNode extends Node {
     call._is_copy = true;              // Call is also is-copy
     gvn.add_work_uses(call.keep());
     for( int i=0; i<call.nargs(); i++ ) // All args no longer escape
-      gvn.add_work(call.arg(i)); 
+      gvn.add_work(call.arg(i));
     // Remove all edges except the inlined results
     ctl.keep();  mem.keep();  rez.keep();
     while( _defs._len > 0 ) pop(gvn);

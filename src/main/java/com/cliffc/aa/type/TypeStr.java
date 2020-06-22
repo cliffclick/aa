@@ -98,7 +98,7 @@ public class TypeStr extends TypeObj<TypeStr> {
   @Override public boolean is_con() { return _con != null; }
   @Override public Type meet_nil(Type t) { return this; }
   // Widen (loss info), to make it suitable as the default function memory.
-  @Override public TypeObj widen_as_default() { return this; }
+  @Override public TypeObj crush() { return this==XSTR ? STR : this; }
 
   // Lattice of conversions:
   // -1 unknown; top; might fail, might be free (Scalar->Str); Scalar might lift

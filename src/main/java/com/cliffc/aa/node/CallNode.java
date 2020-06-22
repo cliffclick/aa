@@ -1,7 +1,6 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.AA;
-import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
@@ -312,8 +311,8 @@ public class CallNode extends Node {
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
     if( !is_copy() ) {
       if( def!=fun() )
-        return def==mem() ? _live : TypeMem.ESCAPE; // Args always alive
-      if( gvn._opt_mode < 2 ) return super.live_use(gvn,def);
+        return def==mem() ? _live : TypeMem.ESCAPE; // Args always alive and escape
+      if( gvn._opt_mode < 2 ) return TypeMem.ESCAPE; // Prior to GCP, assume all fptrs are alive
       if( !(def instanceof FunPtrNode) ) return _live;
       int dfidx = ((FunPtrNode)def).ret()._fidx;
       return live_use_call(gvn,dfidx);

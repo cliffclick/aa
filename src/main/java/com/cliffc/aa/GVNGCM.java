@@ -461,7 +461,7 @@ public class GVNGCM {
       xform_old(n, dom_small_work ? 0 : 2);
       if( did_doms && _work._len != wlen-1 ) did_doms=false; // Did work, revisit doms
       // VERY EXPENSIVE ASSERT
-      assert Env.START.more_flow(this,new VBitSet(),true,0)==0; // Initial conditions are correct
+      //assert Env.START.more_flow(this,new VBitSet(),true,0)==0; // Initial conditions are correct
       cnt++; assert cnt < 30000; // Catch infinite ideal-loops
     }
     // No more ideal calls, small or large, to apply
@@ -572,6 +572,8 @@ public class GVNGCM {
           add_work_defs(n);    // Put defs on worklist... liveness flows uphill
           if( n.live_changes_value() )
             add_work(n);
+          if( n instanceof CProjNode && n.in(0) instanceof CallEpiNode )
+            add_work(((CallEpiNode)n.in(0)).call());
         }
         // See if we can resolve an unresolved
         if( n instanceof CallNode && n._live != TypeMem.DEAD ) {
@@ -660,12 +662,7 @@ public class GVNGCM {
     if( n==Env.START ) return;          // Top-level scope
     Type t = type(n);                   // Get optimistic computed type
 
-    // Replace with a constant, if possible
-    if( replace_con(t,n) )
-      n=subsume(n,con(t));      // Constant replacement
-
-    // Hit the fixed point, despite any immediate updates.  All prims are live,
-    // even if unused so they might not have been computed
+    // Hit the fixed point, despite any immediate updates.
     assert n.value(this)==t;
     assert n.live(this)==n._live;
 

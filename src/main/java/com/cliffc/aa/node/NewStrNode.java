@@ -12,15 +12,10 @@ public class NewStrNode extends NewNode<TypeStr> {
     add_def(str);
   }
   @Override public Type value(GVNGCM gvn) {
-    // If the address is not looked at then memory contents cannot be looked at
-    // and is dead.  Since this can happen DURING opto (when a call resolves)
-    // and during iter, "freeze" the value in-place.  It will DCE shortly.
-    if( DefMemNode.CAPTURED.get(_alias) ) // Captured, dead
-      return gvn.self_type(this);
-
     // Gather args and produce a TypeStruct
     Type xs = gvn.type(fld(0));
-    if( !(xs instanceof TypeObj) ) return xs.oob();
-    return TypeTuple.make(xs,TypeMemPtr.make(_alias,TypeObj.OBJ));
+    TypeStr ss = xs instanceof TypeStr ? (TypeStr)xs : (TypeStr)xs.oob(TypeStr.STR);
+    return TypeTuple.make(ss,TypeMemPtr.make(_alias,TypeObj.OBJ));
   }
+  @Override TypeStr dead_type() { return TypeStr.XSTR; }
 }

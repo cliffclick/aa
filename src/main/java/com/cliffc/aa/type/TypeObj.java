@@ -38,10 +38,10 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
     TypeObj t2 = (TypeObj)t1.hashcons();
     return t1==t2 ? t1 : t1.free(t2);
   }
-  public static final TypeObj OBJ   = make("",false,false);
-  public static final TypeObj ISUSED= make("",false,true );
-  public static final TypeObj UNUSED= (TypeObj)ISUSED.dual();
-  public static final TypeObj XOBJ  = (TypeObj)OBJ   .dual();
+  public static final TypeObj OBJ   = make("",false,false);    // Any obj; also: not-yet-alloc but might be
+  public static final TypeObj ISUSED= make("",false,true );    //
+  public static final TypeObj UNUSED= (TypeObj)ISUSED.dual();  // dead obj; alias has been used & deleted
+  public static final TypeObj XOBJ  = (TypeObj)OBJ   .dual();  // object is uninitialized
   static final TypeObj[] TYPES = new TypeObj[]{OBJ,ISUSED,UNUSED,XOBJ};
 
   @Override boolean is_display() { return false; }
@@ -70,5 +70,5 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
   @Override void walk( Predicate<Type> p ) { p.test(this); }
   // Widen (loss info), to make it suitable as the default function memory.
   // Must be monotonic, as CallEpiNode.value() uses this.
-  public TypeObj widen_as_default() { return this; }
+  public TypeObj crush() { return this==ISUSED ? ISUSED : OBJ; }
 }

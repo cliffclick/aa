@@ -38,11 +38,11 @@ public final class FunPtrNode extends Node {
   @Override public Node ideal(GVNGCM gvn, int level) {
     if( is_forward_ref() ) return null;
 
-    // Display is known captured?  Yank it.
+    // Display is known dead?  Yank it.
     if( display().in(0) instanceof NewNode ) {
-      int alias = ((NewNode)display().in(0))._alias;
-      if( DefMemNode.CAPTURED.get(alias) )
-        return set_def(1,gvn.con(TypeMemPtr.make(alias,TypeStr.NO_DISP)),gvn); // No display needed
+      NewNode nn = (NewNode)display().in(0);
+      if( nn._defmem==TypeObj.UNUSED )
+        return set_def(1,gvn.con(TypeMemPtr.make(nn._alias,TypeStr.NO_DISP)),gvn); // No display needed
     }
 
     // Remove unused displays.  Track uses; Calls with no FPClosure are OK.

@@ -162,7 +162,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       sb.p(';');
     }
     if( !_any ) sb.p("...");    // More fields allowed
-    else sb.unchar();
+    else if( _flds.length>0 ) sb.unchar();
     sb.p(!is_tup ? "}" : ")");
     return sb.toString();
   }
@@ -215,7 +215,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       sb.p(';');
     }
     if( !_any ) sb.p("...");    // More fields allowed
-    else sb.unchar();
+    else if( _flds.length>0 ) sb.unchar();
     return sb.p(!is_tup ? '}' : ')');
   }
 
@@ -1171,9 +1171,9 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public boolean can_update(int idx) { return fmod(idx) == FRW; }
 
   // Widen (lose info), to make it suitable as the default function memory.
-  // Final fields can remain as-is; non-finals are all widened to ALL
-  // (assuming a future Store); field flags set to bottom; the field names are kept.
-  @Override public TypeStruct widen_as_default() {
+  // Final fields can remain as-is; non-finals are all widened to ALL (assuming
+  // a future error Store); field flags set to bottom; the field names are kept.
+  @Override public TypeStruct crush() {
     Type[] ts = TypeAry.clone(_ts);
     for( int i=0; i<ts.length; i++ )
       if( fmod(i)!=FFNL ) ts[i]=ALL; // Widen non-finals to ALL, as-if crushed by errors
