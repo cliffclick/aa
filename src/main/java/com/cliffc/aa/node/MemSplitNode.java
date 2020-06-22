@@ -74,6 +74,7 @@ public class MemSplitNode extends Node {
     //return TypeTuple.make( t0, ((TypeMem)t0).split_by_alias(NewNode.ESCAPES));
     throw com.cliffc.aa.AA.unimpl();
   }
+  @Override public boolean basic_liveness() { return false; }
 
   // If two inputs, we are a copy.
   @Override public Node is_copy(GVNGCM gvn, int idx) { return _defs._len==1 ? null : in(idx); }

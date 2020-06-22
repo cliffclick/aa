@@ -116,6 +116,7 @@ public class ScopeNode extends Node {
     return null;
   }
   @Override public Type value(GVNGCM gvn) { return Type.ALL; }
+  @Override public boolean basic_liveness() { return false; }
 
   // From a memory and a possible pointer-to-memory, find all the reachable
   // aliases and fold them into 'live'.  This is unlike other live_use

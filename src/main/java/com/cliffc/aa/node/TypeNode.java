@@ -87,6 +87,7 @@ public class TypeNode extends Node {
     if( t0.dual().isa(t1) && t1.isa(t0) ) return t1;
     return t1.oob(t0);
   }
+  @Override public boolean basic_liveness() { return false; }
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
     if( _live == TypeMem.DEAD ) return TypeMem.DEAD; // Am dead, so nothing extra is alive.
     if( def==arg() ) return _live;                   // Alive as I am

@@ -2,6 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.type.TypeTuple;
 
 // Proj control
@@ -23,7 +24,8 @@ public class CProjNode extends ProjNode {
     Type res = ct.at(_idx);
     return res==Type.XCTRL ? Type.XCTRL : Type.CTRL;
   }
-  @Override public boolean basic_liveness() { return true; }
+  // Only called here if alive, and input is more-than-basic-alive
+  @Override public TypeMem live_use( GVNGCM gvn, Node def ) { return TypeMem.ANYMEM; }
   // Return the op_prec of the returned value.  Not sensible except
   // when call on primitives.
   @Override public byte op_prec() { return _defs.at(0).op_prec(); }

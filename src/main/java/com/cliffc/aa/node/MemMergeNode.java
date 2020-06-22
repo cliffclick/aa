@@ -319,6 +319,7 @@ public class MemMergeNode extends Node {
     }
     return TypeMem.make0(tos._es);
   }
+  @Override public boolean basic_liveness() { return false; }
 
 
   // Compute the liveness local contribution to def's liveness.  Ignores the

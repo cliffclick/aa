@@ -17,6 +17,7 @@ public class PhiNode extends Node {
     else if( t instanceof TypeObj ) _t = TypeObj.OBJ; // Need to check liveness
     else { assert t.isa(Type.SCALAR); _t = Type.SCALAR; }
     _badgc = badgc;
+    _live = _t==Type.SCALAR ? TypeMem.ESCAPE : TypeMem.ALLMEM;
   }
   public PhiNode( Type t, Parse badgc, Node... vals ) { this(OP_PHI,t,badgc,vals); }
   // For ParmNodes
@@ -133,6 +134,7 @@ public class PhiNode extends Node {
         t = t.meet(gvn.type(in(i)));
     return t;
   }
+  @Override public boolean basic_liveness() { return _t==Type.SCALAR; }
 
   @Override public String err(GVNGCM gvn) {
     if( !(in(0) instanceof FunNode && ((FunNode)in(0))._name.equals("!") ) && // Specifically "!" takes a Scalar

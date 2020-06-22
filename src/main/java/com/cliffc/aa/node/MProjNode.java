@@ -18,4 +18,7 @@ public class MProjNode extends ProjNode {
     }
     return null;
   }
+  @Override public boolean basic_liveness() { return false; }
+  // Only called here if alive, and input is more-than-basic-alive
+  @Override public TypeMem live_use( GVNGCM gvn, Node def ) { return _live; }
 }

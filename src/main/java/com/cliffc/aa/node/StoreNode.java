@@ -92,11 +92,11 @@ public class StoreNode extends Node {
     return ts.update(_fin, _fld, val);
   }
 
+  @Override public boolean basic_liveness() { return false; }
   // Compute the liveness local contribution to def's liveness.  Ignores the
   // incoming memory types, as this is a backwards propagation of demanded
   // memory.
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
-    if( _live==TypeMem.DEAD ) return TypeMem.DEAD;
     if( def==mem() ) return _live; // Pass full liveness along
     if( def==adr() ) return TypeMem.ALIVE; // Basic aliveness
     if( def==val() ) return TypeMem.ESCAPE;// Value escapes

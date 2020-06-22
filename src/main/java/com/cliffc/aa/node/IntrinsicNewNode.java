@@ -80,6 +80,7 @@ class ConvertI64Str extends IntrinsicNewNode {
     if( !t.is_con() ) return TypeStr.STR;
     return TypeStr.make(false,Long.toString(t.getl()).intern());
   }
+  @Override public boolean basic_liveness() { return false; }
 }
 
 class ConvertF64Str extends IntrinsicNewNode {
@@ -91,6 +92,7 @@ class ConvertF64Str extends IntrinsicNewNode {
     if( !t.is_con() ) return TypeStr.STR;
     return TypeStr.make(false,Double.toString(t.getd()).intern());
   }
+  @Override public boolean basic_liveness() { return false; }
 }
 
 // String concat.  NIL values are treated "as-if" the empty string.
@@ -119,5 +121,6 @@ class AddStrStr extends IntrinsicNewNode {
     if( !str0.is_con() || !str1.is_con() ) return TypeStr.STR;
     return TypeStr.make(false,(str0.getstr()+str1.getstr()).intern());
   }
+  @Override public boolean basic_liveness() { return false; }
   @Override public byte op_prec() { return 5; }
 }

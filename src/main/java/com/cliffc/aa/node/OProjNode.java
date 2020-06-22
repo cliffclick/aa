@@ -26,5 +26,8 @@ public class OProjNode extends ProjNode {
     }
     return c.oob(TypeObj.OBJ);
   }
+  @Override public boolean basic_liveness() { return false; }
+  // Only called here if alive, and input is more-than-basic-alive
+  @Override public TypeMem live_use( GVNGCM gvn, Node def ) { return _live; }
   int alias() { return ((NewNode)in(0))._alias; }
 }

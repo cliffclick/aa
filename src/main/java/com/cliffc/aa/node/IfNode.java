@@ -39,7 +39,6 @@ public class IfNode extends Node {
 
     throw AA.unimpl(); // Dunno what test this is?
   }
-  @Override public boolean basic_liveness() { return true; }
   @Override public Node is_copy(GVNGCM gvn, int idx) {
     Type t = gvn.type(this);
     if( !(t instanceof TypeTuple) ) return null;

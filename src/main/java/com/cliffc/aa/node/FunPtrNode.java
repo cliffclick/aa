@@ -76,15 +76,15 @@ public final class FunPtrNode extends Node {
     return TypeFunPtr.make(ret._fidx,ret._nargs,(TypeMemPtr)tdisp);
   }
 
+  @Override public boolean basic_liveness() { return true; }
   @Override public TypeMem live( GVNGCM gvn) {
-    // Pre-GCP, if the function is anywhere alive it might be used in a call
-    // and thus demands all the memory that the CallEpi demands.
-    // Post-GCP, all things are resolved and normal liveness flows.
-    return gvn._opt_mode < 2 ? TypeMem.ALLMEM : super.live(gvn);
+    // Pre-GCP, might be used anywhere (still finding the CFG)
+    return gvn._opt_mode < 2 ? TypeMem.ESCAPE : super.live(gvn);
+  }
+  @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
+    return def==ret() ? TypeMem.ANYMEM : TypeMem.ESCAPE;
   }
 
-  // Note: graph structure must be in place before calling
-  @Override public String toString() { return super.toString(); }
   // Return the op_prec of the returned value.  Not sensible except when called
   // on primitives.
   @Override public byte op_prec() { return ret().op_prec(); }

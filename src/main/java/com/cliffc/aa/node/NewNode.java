@@ -80,8 +80,8 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     return null;
   }
   abstract T dead_type();
-  @Override public boolean basic_liveness() { return true; }
-  @Override public TypeMem live_use( GVNGCM gvn, Node def ) { return def==in(0) ? TypeMem.ALIVE : TypeMem.ESCAPE; }
+  @Override public boolean basic_liveness() { return false; }
+  @Override public TypeMem live_use( GVNGCM gvn, Node def ) { return def==in(0) ? TypeMem.ALIVE : _live; }
   
   // Basic escape analysis.  If no escapes and no loads this object is dead.
   private boolean captured( GVNGCM gvn ) {

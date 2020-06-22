@@ -3,6 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeLive;
 import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
@@ -324,16 +325,18 @@ public abstract class Node implements Cloneable {
   // This is a reverse-flow transfer-function computation.
   public TypeMem live( GVNGCM gvn ) {
     if( basic_liveness() ) {    // Basic liveness only; e.g. primitive math ops
+      boolean alive=false;
       for( Node use : _uses )   // Computed across all uses
-        if( use._live != TypeMem.DEAD )
-          return TypeMem.ALIVE; // Report basic liveness only
-      return TypeMem.DEAD;
+        if( use._live == TypeMem.ALIVE ) alive = true;
+        else if( use._live != TypeMem.DEAD ) return TypeMem.ESCAPE;
+      return alive ? TypeMem.ALIVE : TypeMem.DEAD;
     }
     // Compute meet/union of all use livenesses
     TypeMem live = TypeMem.DEAD; // Start at lattice top
     for( Node use : _uses )      // Computed across all uses
       if( use._live != TypeMem.DEAD )
         live = (TypeMem)live.meet(use.live_use(gvn, this)); // Make alive used fields
+    assert !(live.at(1) instanceof TypeLive);
     return live;
   }
   // Compute local contribution of use liveness to this def.
@@ -341,9 +344,9 @@ public abstract class Node implements Cloneable {
   public TypeMem live_use( GVNGCM gvn, Node def ) {
     return _keep>0 ? TypeMem.MEM : _live;
   }
-  // Compute basic liveness only: a boolean flag of alive-or-dead represented
-  // as TypeMem.DEAD or TypeMem.ALIVE.
-  public boolean basic_liveness() { return false; }
+  // Compute basic liveness only: a flag of alive-or-dead represented
+  // as TypeMem.DEAD or TypeMem.ALIVE or TypeMem.ESCAPE;
+  public boolean basic_liveness() { return true; }
   // We have a 'crossing optimization' point: changing the pointer input to a
   // Load or a Scope changes the memory demanded by the Load or Scope.  Same:
   // changing a def._type changes the use._live, requiring other defs to be

@@ -19,6 +19,7 @@ public class StartMemNode extends Node {
         objs[i]=TypeObj.XOBJ;
     return TypeMem.make0(objs);
   }
+  @Override public boolean basic_liveness() { return false; }
   // StartMemNodes are never equal
   @Override public int hashCode() { return 123456789+2; }
   @Override public boolean equals(Object o) { return this==o; }

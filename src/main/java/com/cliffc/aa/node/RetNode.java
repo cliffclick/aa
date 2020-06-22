@@ -76,8 +76,12 @@ public final class RetNode extends Node {
   }
 
 
+  @Override public boolean basic_liveness() { return false; }
+  @Override public TypeMem live( GVNGCM gvn) {
+    // Pre-GCP, might be used anywhere (still finding CFG)
+    return gvn._opt_mode < 2 ? TypeMem.ALLMEM : super.live(gvn);
+  }
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
-    if( _live==TypeMem.DEAD ) return TypeMem.DEAD;
     if( def==mem() ) return _live;
     if( def==val() ) return TypeMem.ESCAPE;
     return TypeMem.ALIVE;       // Basic aliveness

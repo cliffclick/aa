@@ -2,6 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.*;
 import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.type.TypeTuple;
 
 // Proj data
@@ -27,6 +28,9 @@ public class ProjNode extends Node {
     }
     return c.oob();
   }
+  // Only called here if alive, and input is more-than-basic-alive
+  @Override public TypeMem live_use( GVNGCM gvn, Node def ) { return TypeMem.ANYMEM; }
+  
   static ProjNode proj( Node head, int idx ) {
     for( Node use : head._uses )
       if( use instanceof ProjNode && ((ProjNode)use)._idx==idx )

@@ -75,6 +75,7 @@ public class MemJoinNode extends Node {
     //return trez;
     throw com.cliffc.aa.AA.unimpl();
   }
+  @Override public boolean basic_liveness() { return false; }
 
   // Some memory user can bypass, if the aliases are compatible
   Node can_bypass( GVNGCM gvn, TypeMemPtr tmp ) {

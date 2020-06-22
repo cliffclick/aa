@@ -102,6 +102,10 @@ public class ParmNode extends PhiNode {
     if( formal.dual().isa(t) && t.isa(formal) )  return t.simple_ptr();
     return t.bound(formal);
   }
+  @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
+    return def==in(0) ? TypeMem.ALIVE
+      : (_t==Type.SCALAR ? TypeMem.ESCAPE : _live);
+  }
 
   @Override public String err( GVNGCM gvn ) {
     if( !(in(0) instanceof FunNode) ) return null; // Dead, report elsewhere

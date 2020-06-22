@@ -77,6 +77,7 @@ public class UnresolvedNode extends Node {
     return x instanceof UnresolvedNode ? gvn.xform(x) : x;
   }
 
+  @Override public boolean basic_liveness() { return false; }
   // Compute local contribution of use liveness to this def.
   // If pre-GCP, same as value() above, use the conservative answer.
   // During GCP, this will resolve so use the optimistic answer.

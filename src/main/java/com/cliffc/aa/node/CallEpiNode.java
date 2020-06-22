@@ -204,18 +204,21 @@ public final class CallEpiNode extends Node {
       // See CallNode output tuple type for what these horrible magic numbers are.
       Node actual;
       int idx = ((ParmNode)arg)._idx;
+      TypeMem live;
       switch( idx ) {
-      case  0: actual = new FP2ClosureNode(call); break; // Filter Function Pointer to Closure
-      case -1: actual = new ConNode<>(TypeRPC.make(call._rpc)); break; // Always RPC is a constant
-      case -2: actual = new MProjNode(call,CallNode.MEMIDX); break;    // Memory into the callee
+      case  0: actual = new FP2ClosureNode(call); live = TypeMem.ESCAPE; break; // Filter Function Pointer to Closure
+      case -1: actual = new ConNode<>(TypeRPC.make(call._rpc)); live = TypeMem.ALIVE; break; // Always RPC is a constant
+      case -2: actual = new MProjNode(call,CallNode.MEMIDX); live = arg._live; break;    // Memory into the callee
       default: actual = idx >= call.nargs()              // Check for args present
           ? new ConNode<>(Type.XSCALAR) // Missing args, still wire (to keep FunNode neighbors) but will error out later.
           : new ProjNode(call,idx+CallNode.ARGIDX); // Normal args
+        live = TypeMem.ESCAPE;
         break;
       }
       actual = gvn._opt_mode == 2 ? gvn.new_gcp(actual) : gvn.xform(actual);
       gvn.add_def(arg,actual);
-      actual._live = actual.live(gvn);
+      actual._live = (TypeMem)actual._live.meet(live);
+      gvn.add_work(actual);
     }
 
     // Add matching control to function via a CallGraph edge.
@@ -315,7 +318,7 @@ public final class CallEpiNode extends Node {
     // it until after all unknown callERs are removed.  However, on this path
     // we are sure about at least our crushed-pre-call (which includes the
     // lexical scope, needed for parsing).
-    Type tmem2 = tmem.join(defmem);
+    Type tmem2 = tmem.join(tcmem2);
     // Final result
     return TypeTuple.make(Type.CTRL,tmem2,trez);
   }
@@ -375,25 +378,30 @@ public final class CallEpiNode extends Node {
     assert sane_wiring();
   }
 
+  @Override public boolean basic_liveness() { return false; }
   // Compute local contribution of use liveness to this def.  If the call is
   // Unresolved, then none of CallEpi targets are (yet) alive.
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
     assert _keep==0;
-    if( def instanceof DefMemNode ) return _live;
     // If is_copy, then basically acting like pass-thru.
-    if( !is_copy() && def != call() ) { // Not a copy, check call site
-      // The given function is alive, only if the Call will Call it.
-      Type tcall = gvn.type(call());
-      if( !(tcall instanceof TypeTuple) ) return tcall.above_center() ? TypeMem.DEAD : _live;
-      BitsFun fidxs = CallNode.ttfp(tcall).fidxs();
-      int fidx = ((RetNode)def).fidx();
-      if( fidxs.above_center() || !fidxs.test(fidx) )
-        return TypeMem.DEAD;    // Call does not call this, so not alive.
+    if( is_copy() ) {
+      // Target is as alive as our projs are.
+      int idx = _defs.find(def);
+      ProjNode proj = ProjNode.proj(this,idx);
+      return proj==null ? TypeMem.ANYMEM : proj._live;
     }
-    // Target is as alive as our projs are.
-    int idx = _defs.find(def);
-    ProjNode proj = ProjNode.proj(this,idx);
-    return proj==null ? TypeMem.ALIVE : proj._live;
+    // Not a copy
+    if( def==in(0) ) return _live; // The Call
+    if( def==in(1) ) return _live; // The DefMem
+    // Wired return.
+    // The given function is alive, only if the Call will Call it.
+    Type tcall = gvn.type(call());
+    if( !(tcall instanceof TypeTuple) ) return tcall.above_center() ? TypeMem.DEAD : _live;
+    BitsFun fidxs = CallNode.ttfp(tcall).fidxs();
+    int fidx = ((RetNode)def).fidx();
+    if( fidxs.above_center() || !fidxs.test(fidx) )
+      return TypeMem.DEAD;    // Call does not call this, so not alive.
+    return _live;
   }
 
   // If slot 0 is not a CallNode, we have been inlined.

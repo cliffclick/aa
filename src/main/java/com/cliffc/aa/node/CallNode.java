@@ -308,11 +308,12 @@ public class CallNode extends Node {
     // enough to declare this live, so it exists for errors.
     return super.live(gvn);
   }
+  @Override public boolean basic_liveness() { return false; }
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
     if( !is_copy() ) {
       if( def!=fun() )
         return def==mem() ? _live : TypeMem.ESCAPE; // Args always alive and escape
-      if( gvn._opt_mode < 2 ) return TypeMem.ESCAPE; // Prior to GCP, assume all fptrs are alive
+      if( gvn._opt_mode < 2 ) return TypeMem.ALLMEM; // Prior to GCP, assume all fptrs are alive
       if( !(def instanceof FunPtrNode) ) return _live;
       int dfidx = ((FunPtrNode)def).ret()._fidx;
       return live_use_call(gvn,dfidx);
