@@ -256,9 +256,9 @@ public final class CallEpiNode extends Node {
     if( ctl != Type.CTRL && ctl != Type.ALL )
       return TypeTuple.CALLE.dual();
     TypeMem    tcmem  = CallNode.tmem(tcall); // Peel apart Call tuple
-    TypeFunPtr tfptr  = CallNode.ttfp(tcall); // Peel apart Call tuple
+    TypeFunPtr tfptr  = CallNode.ttfpx(tcall);// Peel apart Call tuple
 
-    if( tfptr.is_forward_ref() ) return TypeTuple.CALLE; // Still in the parser.
+    if( tfptr==null || tfptr.is_forward_ref() ) return TypeTuple.CALLE; // Still in the parser.
     // NO fidxs, means we're not calling anything.
     BitsFun fidxs = tfptr.fidxs();
     if( fidxs==BitsFun.EMPTY ) return TypeTuple.CALLE.dual();

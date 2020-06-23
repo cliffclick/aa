@@ -138,6 +138,10 @@ public class CallNode extends Node {
   static        TypeMem    tmem( Type tcall ) { return tmem(((TypeTuple)tcall)._ts); }
   static        TypeMem    tmem( Type[] ts  ) { return (TypeMem)ts[MEMIDX]; } // caller memory passed around function
   static public TypeFunPtr ttfp( Type tcall ) { return (TypeFunPtr)((TypeTuple)tcall).at(ARGIDX); }
+  static public TypeFunPtr ttfpx(Type tcall ) {
+    Type t = ((TypeTuple)tcall).at(ARGIDX);
+    return t instanceof TypeFunPtr ? (TypeFunPtr)t : null;
+  }
   static TypeTuple set_ttfp( TypeTuple tcall, TypeFunPtr nfptr ) { return tcall.set(ARGIDX,nfptr); }
   static Type       targ( Type tcall, int x ) { return targ(((TypeTuple)tcall)._ts,x); }
   static Type       targ( Type[] ts, int x ) { return ts[ARGIDX+x]; }
