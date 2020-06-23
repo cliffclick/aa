@@ -575,10 +575,11 @@ public class Type<T extends Type<T>> implements Cloneable {
   }
   // Compute recursively deep bounds, knowing OOB already.
   public Type bound_impl(Type t) { return oob(); }
-  public Type oob( ) { return oob(ALL); }
-  public Type oob(Type e) { return above_center() ? e.dual() : e; }
-  public TypeObj oob(TypeObj e) { return above_center() ? (TypeObj)e.dual() : e; }
+  public Type       oob( ) { return oob(ALL); }
+  public Type       oob(Type       e) { return above_center() ? e.dual() : e; }
+  public TypeObj    oob(TypeObj    e) { return above_center() ? (TypeObj)e.dual() : e; }
   public TypeStruct oob(TypeStruct e) { return above_center() ? e.dual() : e; }
+  public TypeMem    oob(TypeMem    e) { return above_center() ? e.dual() : e; }
 
   public static void init0( HashMap<String,Type> types ) {
     types.put("real",REAL);
@@ -880,7 +881,7 @@ public class Type<T extends Type<T>> implements Cloneable {
 
   // Sharpen pointer with memory
   public Type sharptr( Type ptr ) { return ptr; }
-  
+
   // Apply the test(); if it returns true iterate over all nested child types.
   // If the test returns false, short-circuit the walk.  No attempt to guard
   // against recursive structure walks, so the 'test' must return false when

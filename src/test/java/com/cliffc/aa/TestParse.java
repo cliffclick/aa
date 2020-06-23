@@ -16,7 +16,6 @@ public class TestParse {
   @Test public void testParse() {
     TypeStruct dummy = TypeStruct.DISPLAY;
     TypeMemPtr tdisp = TypeMemPtr.make(2,TypeStr.NO_DISP);
-    test("x=@{a:=1;noinline_b= {a=a+1;b=0}}; x.noinline_b(); x.a",TypeInt.NINT8);
 
     // A collection of tests which like to fail easily
     test("-1",  TypeInt.con( -1));
@@ -193,7 +192,7 @@ public class TestParse {
     test("f0 = { x -> x ? {+}(f0(x-1),1) : 0 }; f0(2)", TypeInt.con(2));
     testerr("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact()","Passing 0 arguments to fact which takes 1 arguments",46);
     test_obj("fact = { x -> x <= 1 ? x : x*fact(x-1) }; (fact(0),fact(1),fact(2))",
-             TypeStruct.make_tuple(Type.XNIL,Type.XNIL,TypeInt.con(1),TypeInt.con(2)));
+             TypeStruct.make_tuple(Type.XNIL,Type.XNIL,TypeInt.con(1),TypeInt.con(2)).close());
 
     // Co-recursion requires parallel assignment & type inference across a lexical scope
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.TRUE );
@@ -227,9 +226,9 @@ public class TestParse {
     testerr("fun:{int str -> int}={x y -> x+y}; fun(2,3)", "3 is not a *[$]str",41);
     // Test that the type-check is on the variable and not the function.
     test_obj("fun={x y -> x*2}; bar:{int str -> int} = fun; baz:{int @{x;y} -> int} = fun; (fun(2,3),bar(2,\"abc\"))",
-             TypeStruct.make_tuple(Type.XNIL,TypeInt.con(4),TypeInt.con(4)));
+             TypeStruct.make_tuple(Type.XNIL,TypeInt.con(4),TypeInt.con(4)).close());
     testerr("fun={x y -> x+y}; baz:{int @{x;y} -> int} = fun; (fun(2,3), baz(2,3))",
-            "3 is not a *[$]@{x:=;y:=}", 66);
+            "3 is not a *[$]@{x:=;y:=;...}", 66);
     testerr("fun={x y -> x+y}; baz={x:int y:@{x;y} -> foo(x,y)}; (fun(2,3), baz(2,3))",
             "Unknown ref 'foo'", 44);
     // This test failed because the inner fun does not inline until GCP,
@@ -237,7 +236,7 @@ public class TestParse {
     // is no longer needed).  Means: cannot resolve during GCP and preserve
     // monotonicity.  Would like '.fun' to load BEFORE GCP.
     testerr("fun={x y -> x+y}; baz={x:int y:@{x;y} -> fun(x,y)}; (fun(2,3), baz(2,3))",
-            "3 is not a *[$]@{x:=;y:=}", 69);
+            "3 is not a *[$]@{x:=;y:=;...}", 69);
 
     testerr("x=3; fun:{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int64",36);
     test("x=3; fun:{real->real}={x -> x*2}; fun(2.1)+fun(x)", TypeFlt.con(2.1*2+3*2)); // Mix of types to fun()
@@ -253,8 +252,8 @@ public class TestParse {
     test_name("A= :(flt,int)", TypeFlt.FLT64,TypeInt.INT64);
     test_name("A= :(   ,int)", Type.SCALAR  ,TypeInt.INT64);
 
-    test_ptr("A= :(str?, int); A( \"abc\",2 )","A:(*[$]\"abc\";2)");
-    test_ptr("A= :(str?, int); A( (\"abc\",2) )","A:(*[$]\"abc\";2)");
+    test_ptr("A= :(str?, int); A( \"abc\",2 )","A:(*[$]\"abc\";2;...)");
+    test_ptr("A= :(str?, int); A( (\"abc\",2) )","A:(*[$]\"abc\";2;...)");
     testerr("A= :(str?, int)?","Named types are never nil",16);
   }
 
@@ -331,7 +330,7 @@ public class TestParse {
 
     // Building recursive types
     test("A= :int; A(1)", TypeInt.TRUE.set_name("A:"));
-    test_ptr("A= :(str?, int); A(0,2)","A:(~nil;2)");
+    test_ptr("A= :(str?, int); A(0,2)","A:(~nil;2;...)");
     // Named recursive types
     test_ptr("A= :(A?, int); A(0,2)",(alias) -> TypeMemPtr.make(alias,TypeStruct.make_tuple(TypeStruct.ts(TypeMemPtr.NO_DISP,Type.XNIL,TypeInt.con(2))).set_name("A:")));
     test_ptr("A= :(A?, int); A(0,2)","A:(~nil;2)");

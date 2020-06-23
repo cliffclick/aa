@@ -135,6 +135,9 @@ public class PhiNode extends Node {
     return t;
   }
   @Override public boolean basic_liveness() { return _t==Type.SCALAR; }
+  @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
+    return basic_liveness() && !def.basic_liveness() ? TypeMem.ANYMEM : _live;
+  }
 
   @Override public String err(GVNGCM gvn) {
     if( !(in(0) instanceof FunNode && ((FunNode)in(0))._name.equals("!") ) && // Specifically "!" takes a Scalar

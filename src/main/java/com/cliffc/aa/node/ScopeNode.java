@@ -125,7 +125,7 @@ public class ScopeNode extends Node {
   static TypeMem compute_live_mem(GVNGCM gvn, Node mem, Node rez) {
     Type tmem = gvn.type(mem);
     Type trez = gvn.type(rez);
-    if( !(tmem instanceof TypeMem ) ) return tmem.above_center() ? TypeMem.ANYMEM : TypeMem.ALLMEM; // Not a memory?
+    if( !(tmem instanceof TypeMem ) ) return tmem.oob(TypeMem.ALLMEM); // Not a memory?
     if( TypeMemPtr.OOP.isa(trez) ) return (TypeMem)tmem; // All possible pointers, so all memory is alive
     if( !(trez instanceof TypeMemPtr) ) return TypeMem.ANYMEM; // Not a pointer, basic live only
     if( trez.above_center() ) return TypeMem.ANYMEM; // Have infinite choices still, report basic live only
@@ -149,7 +149,7 @@ public class ScopeNode extends Node {
       return gvn._opt_mode < 2 ? TypeMem.ALLMEM : TypeMem.DEAD;
     // Basic liveness ("You are Alive!") for control and returned value
     if( def == ctrl() ) return TypeMem.ALIVE;
-    if( def == rez () ) return TypeMem.ALIVE;
+    if( def == rez () ) return def.basic_liveness() ? TypeMem.ALIVE : TypeMem.ANYMEM;
     if( def == ptr () ) return TypeMem.DEAD; // Returned display is dead
     // Memory returns the compute_live_mem state in _live.  If rez() is a
     // pointer, this will include the memory slice.

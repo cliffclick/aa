@@ -117,7 +117,7 @@ public class CallNode extends Node {
   public  Node ctl() { return in(0); }
   public  Node mem() { return in(1); }
   public  Node fun() { return in(2); }
-          Node set_fun    (Node fun, GVNGCM gvn) { return set_def(2,fun,gvn); }
+  Node set_fun    (Node fun, GVNGCM gvn) { return set_def(2,fun,gvn); }
   public  void set_fun_reg(Node fun, GVNGCM gvn) { gvn.set_def_reg(this,2,fun); }
   public BitsFun fidxs(GVNGCM gvn) {
     Type tf = gvn.type(fun());
@@ -310,19 +310,41 @@ public class CallNode extends Node {
   }
   @Override public boolean basic_liveness() { return false; }
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
-    if( !is_copy() ) {
-      if( def!=fun() )
-        return def==mem() ? _live : TypeMem.ESCAPE; // Args always alive and escape
+    if( is_copy() ) {           // Target is as alive as our projs are.
+      int idx = _defs.find(def);
+      ProjNode proj = ProjNode.proj(this,idx);
+      if( proj != null ) return proj._live;
+      if( idx==1 ) return _live; // Memory
+      return def.basic_liveness() ? TypeMem.ALIVE : TypeMem.ANYMEM; // Args always alive
+    }
+    if( def==fun() ) {                               // Function argument
       if( gvn._opt_mode < 2 ) return TypeMem.ALLMEM; // Prior to GCP, assume all fptrs are alive
       if( !(def instanceof FunPtrNode) ) return _live;
       int dfidx = ((FunPtrNode)def).ret()._fidx;
-      return live_use_call(gvn,dfidx);
+      return live_use_call(gvn,dfidx); // Can be precise
     }
-    // Target is as alive as our projs are.
-    int idx = _defs.find(def);
-    ProjNode proj = ProjNode.proj(this,idx);
-    return proj==null ? TypeMem.ALIVE : proj._live;
+    if( def!=mem() )            // Some argument
+      return def.basic_liveness() ? TypeMem.ESCAPE : TypeMem.ANYMEM;    // Args always alive and escape
+    // Needed to sharpen args for e.g. resolve and errors.
+    Type tcall = gvn.type(this);
+    if( tcall==Type.ANY ) return _live; // No type to sharpen
+    BitsAlias aliases = BitsAlias.EMPTY;
+    for( int i=1; i<nargs(); i++ ) {
+      Type targ = targ(tcall,i);
+      if( TypeMemPtr.OOP.isa(targ) )
+        { aliases=BitsAlias.FULL; break; }; // All possible pointers, so all memory is alive
+      if( !(targ instanceof TypeMemPtr) ) continue; // Not a pointer, does not need memory to sharpen
+      if( targ.above_center() ) continue; // Have infinite choices still, no memory
+      aliases = aliases.meet(((TypeMemPtr)targ)._aliases);
+    }
+    // Conservative too strong; need only memories that go as deep as the
+    // formal types.
+    TypeMem tmem = tmem(tcall);
+    TypeMem tmem2 = tmem.slice_all_aliases_plus_children(aliases);
+    TypeMem tmem3 = (TypeMem)tmem2.meet(_live);
+    return tmem3;
   }
+
   TypeMem live_use_call( GVNGCM gvn, int dfidx ) {
     Type tcall = gvn.type(this);
     if( !(tcall instanceof TypeTuple) ) return tcall.above_center() ? TypeMem.DEAD : _live;
