@@ -161,7 +161,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       else sb.p(t.str(dups));   // Recursively print field type
       sb.p(';');
     }
-    if( !_any ) sb.p("...");    // More fields allowed
+    if( _any ) sb.p("...");     // More fields allowed
     else if( _flds.length>0 ) sb.unchar();
     sb.p(!is_tup ? "}" : ")");
     return sb.toString();
@@ -189,7 +189,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       else t.dstr(sb,dups);     // Recursively print field type
       sb.p(';').nl();           // One field per line
     }
-    if( !_any ) sb.p("...").nl(); // More fields allowed
+    if( _any ) sb.p("...").nl(); // More fields allowed
     return sb.di(1).i().p(!is_tup ? '}' : ')');
   }
   // Print with memory instead of recursion
@@ -214,7 +214,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       else t.str(sb,dups,mem);  // Recursively print field type
       sb.p(';');
     }
-    if( !_any ) sb.p("...");    // More fields allowed
+    if( _any ) sb.p("...");     // More fields allowed
     else if( _flds.length>0 ) sb.unchar();
     return sb.p(!is_tup ? '}' : ')');
   }
@@ -342,7 +342,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public static TypeStruct make_tuple( Type... ts ) { return make(TFLDS[ts.length],ts,ffnls(ts.length)); }
   public static TypeStruct make_tuple(Type t1) { return make_tuple(ts(NO_DISP,t1)); }
   public static TypeStruct open(Type tdisp) { return make(false,TFLDS[1],ts(tdisp),ffnls(1)); }
-  public TypeStruct close() { return make_from(true,_ts); }
+  public TypeStruct close() { return this; } // Mark as no-more-fields
 
   public  static TypeStruct make(String[] flds, byte[] flags) { return make(flds,ts(flds.length),flags); }
   // Make from prior, just updating field types
