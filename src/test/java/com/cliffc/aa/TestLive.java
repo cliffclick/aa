@@ -5,6 +5,7 @@ import com.cliffc.aa.type.*;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 public class TestLive {
   @Test public void testBasic() {
@@ -28,7 +29,7 @@ public class TestLive {
 
     // Check liveness recursive back one step
     rez._live = rez.live(gvn);
-    assertEquals(rez._live,TypeMem.EMPTY);
+    assertEquals(rez._live,TypeMem.ALIVE);
   }
 
   @SuppressWarnings("unchecked")
@@ -81,7 +82,7 @@ public class TestLive {
     // Value was computed in a forwards flow.
     for( Node n : new Node[]{ctl,fdx,fdy,nnn,mem,ptr,fullmem,mmm,scope} ) {
       if( n != mem && n != scope )
-        assertEquals(n._live,n.live(gvn));
+        assertTrue(n.live(gvn).isa(n._live));
       assertEquals(gvn.type(n),n.value(gvn));
     }
 
@@ -94,17 +95,17 @@ public class TestLive {
 
     // Check liveness recursive back one step
     ptr._live = ptr.live(gvn);
-    assertEquals(ptr._live,TypeMem.EMPTY); // Ptr is all_type, conservative so all memory alive
+    assertEquals(TypeMem.ESCAPE,ptr._live); // Ptr is all_type, conservative so all memory alive
     mmm._live = mmm.live(gvn);
     assertEquals(mmm._live,expected_live);
     mem._live = mem.live(gvn);
     assertEquals(mem._live,expected_live); // Object demands of OProj, but OProj passes along request to NewObj
     nnn._live = nnn.live(gvn);
-    assertEquals(nnn._live,TypeMem.EMPTY); // NewObj supplies object, does not demand anything from inputs
+    assertEquals(expected_live,nnn._live); // NewObj supplies object, needs what its input needs
     ctl._live = ctl.live(gvn);
-    assertEquals(ctl._live,TypeMem.EMPTY); // Since ptr is scalar, all memory is alive
+    assertEquals(TypeMem.ALIVE,ctl._live); // Since ptr is scalar, all memory is alive
     fdx._live = fdx.live(gvn);
-    assertEquals(fdx._live,TypeMem.EMPTY); // Since ptr is scalar, all memory is alive
+    assertEquals(TypeMem.ALIVE,fdx._live); // Since ptr is scalar, all memory is alive
 
   }
 }
