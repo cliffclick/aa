@@ -317,8 +317,8 @@ public class CallNode extends Node {
     if( is_copy() ) {           // Target is as alive as our projs are.
       int idx = _defs.find(def);
       ProjNode proj = ProjNode.proj(this,idx);
-      if( proj != null ) return proj._live;
-      if( idx==1 ) return _live; // Memory
+      if( idx==1 ) return proj==null ? _live : proj._live;
+      if( proj !=null && proj._live==TypeMem.DEAD ) return TypeMem.DEAD;
       return def.basic_liveness() ? TypeMem.ALIVE : TypeMem.ANYMEM; // Args always alive
     }
     if( def==fun() ) {                               // Function argument

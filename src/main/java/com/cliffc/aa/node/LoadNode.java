@@ -57,17 +57,18 @@ public class LoadNode extends Node {
 
     // Load can move out of a Call, if the function has no Parm:mem - happens
     // for single target calls that do not (have not yet) inlined.
-    CallNode call;
+    CallNode call;    CallEpiNode cepi;
     if( mem instanceof MProjNode && mem.in(0) instanceof CallNode && !(call=(CallNode)mem.in(0)).is_copy() )
       return set_mem(call.mem(),gvn);
 
     // Loads from final memory can bypass calls
     if( adr instanceof  ProjNode && adr.in(0) instanceof NewNode &&
-        mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode ) {
+        mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode &&
+        !(cepi=(CallEpiNode)mem.in(0)).is_copy() ) {
       TypeStruct ts = (TypeStruct)((NewNode)adr.in(0))._ts;
       int idx = ts.find(_fld);
       if( idx != -1 && ts.fmod(idx)==TypeStruct.FFNL )
-        return set_mem(((CallEpiNode)mem.in(0)).call().mem(),gvn);
+        return set_mem(cepi.call().mem(),gvn);
     }
 
     // Loads against a NewNode cannot NPE, cannot fail, always return the input
