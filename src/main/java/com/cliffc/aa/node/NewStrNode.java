@@ -15,7 +15,7 @@ public class NewStrNode extends NewNode<TypeStr> {
     // Gather args and produce a TypeStruct
     Type xs = gvn.type(fld(0));
     TypeStr ss = xs instanceof TypeStr ? (TypeStr)xs : (TypeStr)xs.oob(TypeStr.STR);
-    return TypeTuple.make(ss,TypeMemPtr.make(_alias,TypeObj.OBJ));
+    return TypeTuple.make(ss,_tptr);
   }
   @Override TypeStr dead_type() { return TypeStr.XSTR; }
 }
