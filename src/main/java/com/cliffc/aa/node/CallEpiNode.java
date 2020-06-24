@@ -242,6 +242,7 @@ public final class CallEpiNode extends Node {
     if( !(tin0 instanceof TypeTuple) )
       return tin0.oob();     // Weird stuff?
     TypeTuple tcall = (TypeTuple)tin0;
+    if( tcall._ts.length <= CallNode.ARGIDX ) return tcall.oob(); // Weird stuff
 
     // Get Call result.  If the Call args are in-error, then the Call is called
     // and we flow types to the post-call.... BUT the bad args are NOT passed

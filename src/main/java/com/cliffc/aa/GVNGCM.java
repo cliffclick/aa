@@ -369,8 +369,6 @@ public class GVNGCM {
 
     // [ts!] Put updated types into table for use by ideal()
     if( nval!=oval ) {
-      if( !nval.isa(oval) )
-        { System.out.println(nval); System.out.println(oval); }
       assert nval.isa(oval);       // Monotonically improving
       // [ts!] Replace with a constant, if possible.  This is also very cheap
       // (once we expensively computed best value) and makes the best forward
