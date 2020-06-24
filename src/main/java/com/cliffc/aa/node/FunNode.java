@@ -89,7 +89,7 @@ public class FunNode extends RegionNode {
   // Find FunNodes by fidx
   static Ary<FunNode> FUNS = new Ary<>(new FunNode[]{null,});
   public static void reset() { FUNS.clear(); }
-  public static FunNode find_fidx( int fidx ) { return fidx >= FUNS._len ? null : FUNS.at(fidx); }
+  public static FunNode find_fidx( int fidx ) { return FUNS.atX(fidx); }
   int fidx() { return _fidx; }
 
   // Fast reset of parser state between calls to Exec
@@ -473,6 +473,7 @@ public class FunNode extends RegionNode {
     // becomes the other child fidx.
     int newfidx = _fidx = BitsFun.new_fidx(oldfidx);
     FUNS.setX(newfidx,this);    // Track FunNode by fidx
+    FUNS.clear(oldfidx);        // Old fidx no longer refers to a single FunNode
     Type toldret = gvn.unreg(ret);// Remove before renumbering
     ret._fidx = newfidx;        // Renumber in the old RetNode
     gvn.rereg(ret,toldret);

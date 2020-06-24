@@ -18,6 +18,7 @@ import com.cliffc.aa.type.*;
 // bit-vector.
 
 public final class CallEpiNode extends Node {
+  boolean _is_copy;         // One-shot flag set when inlining an entire single-caller-single-called
   public CallEpiNode( Node... nodes ) { super(OP_CALLEPI,nodes);  assert nodes[1] instanceof DefMemNode; }
   String xstr() { return ((is_dead() || is_copy()) ? "x" : "C")+"allEpi"; } // Self short name
   public CallNode call() { return (CallNode)in(0); }
@@ -77,8 +78,8 @@ public final class CallEpiNode extends Node {
     if( nwired()!=1 ) return null; // More than 1 wired, inline only via FunNode
     int fidx = fidxs.abit();       // Could be 1 or multi
     if( fidx == -1 ) return null;  // Multi choices, only 1 wired at the moment.
-    if( fidxs.above_center() )     // Can be unresolved yet
-      return null;
+    if( fidxs.above_center() ) return null; // Can be unresolved yet
+    if( BitsFun.is_parent(fidx) ) return null; // Parent, only 1 child wired
 
     if( call.err(gvn,true)!=null ) return null; // CallNode claims args in-error, do not inline
 
@@ -232,18 +233,15 @@ public final class CallEpiNode extends Node {
   // unwired Returns may yet appear, and be conservative.  Otherwise it can
   // just meet the set of known functions.
   @Override public Type value(GVNGCM gvn) {
-    Node call = in(0);
-    Type tin0 = gvn.type(call);  TypeTuple tcall;
-    // Check for is_copy, based on types: if input is NOT a call-type then we
-    // are an inlined XallEpi and make a call-like tuple directly from our
-    // inputs.
-    if( !(tin0 instanceof TypeTuple) ||
-        (tcall=(TypeTuple)tin0)._ts.length <= CallNode.ARGIDX ) { // Must be inlined
-      if( tin0!=Type.CTRL ) return tin0.oob();     // Weird stuff?
-      // Must be an is_copy.  Just return the arg types.
-      return TypeTuple.make(Type.CTRL,gvn.type(in(1)),gvn.type(in(2)));
+    if( _is_copy ) {         // Just return the arg types.
+      return is_copy_aligned(gvn)
+        ? TypeTuple.make(Type.CTRL,gvn.type(in(1)),gvn.type(in(2)))
+        : gvn.self_type(this);  // Not aligned, "freeze" in place
     }
-    //assert sane_wiring();
+    Type tin0 = gvn.type(in(0));
+    if( !(tin0 instanceof TypeTuple) )
+      return tin0.oob();     // Weird stuff?
+    TypeTuple tcall = (TypeTuple)tin0;
 
     // Get Call result.  If the Call args are in-error, then the Call is called
     // and we flow types to the post-call.... BUT the bad args are NOT passed
@@ -348,7 +346,7 @@ public final class CallEpiNode extends Node {
     if( ret != null && nwired() == 1 && !ret.is_copy() ) // Wired, and called function not already collapsing
       unwire(gvn,call,ret);
     // Call is also is_copy and will need to collapse
-    call._is_copy = true;              // Call is also is-copy
+    _is_copy = call._is_copy = true; // Call is also is-copy
     gvn.add_work_uses(call.keep());
     for( int i=0; i<call.nargs(); i++ ) // All args no longer escape
       gvn.add_work(call.arg(i));
@@ -405,7 +403,20 @@ public final class CallEpiNode extends Node {
   }
 
   // If slot 0 is not a CallNode, we have been inlined.
-  boolean is_copy() { return !(in(0) instanceof CallNode); }
-  @Override public Node is_copy(GVNGCM gvn, int idx) { return is_copy() ? in(idx) : null; }
-  @Override Node is_pure_call() { return call().is_pure_call(); }
+  boolean is_copy() { return _is_copy; }
+  boolean is_copy_aligned(GVNGCM gvn) {
+    if( !_is_copy ) return false;
+    // Flagged as an inline copy, to be removed.  To preserve monotonicity,
+    // cannot remove until memory types align.  The called function can be
+    // "behind" the Call/CallEpi pair and needs to catch up before directly
+    // inlining.
+    TypeTuple tself = (TypeTuple)gvn.self_type(this);
+    Type tmem0 = tself.at(1);
+    Type tmem1 = gvn.type(in(1));
+    return tmem1.isa(tmem0);    // Incoming inline memory isa self memory
+  }
+  @Override public Node is_copy(GVNGCM gvn, int idx) {
+    return is_copy_aligned(gvn) ? in(idx) : null;
+  }
+  @Override Node is_pure_call() { return in(0) instanceof CallNode ? call().is_pure_call() : null; }
 }

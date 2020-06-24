@@ -261,7 +261,7 @@ public class CallNode extends Node {
 
     // Pinch to XCTRL/CTRL
     Type ctl = gvn.type(ctl());
-    if( !_is_copy && gvn._opt_mode>0 && cepi()==null ) ctl = Type.XCTRL; // Dead from below
+    if( gvn._opt_mode>0 && cepi()==null ) ctl = Type.XCTRL; // Dead from below
     if( ctl != Type.CTRL ) return ctl.oob();
     final Type[] ts = TypeAry.get(_defs._len+(ARGIDX-2));
     ts[0] = Type.CTRL;

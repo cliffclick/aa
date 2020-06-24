@@ -329,7 +329,7 @@ public class GVNGCM {
    *  @return null for no-change, or a better version of n, already in GVN */
   private Node xform_old0( Node n, int level ) {
     assert touched(n);          // Node is in type tables, but might be already out of GVN
-    Type oldt = type(n);        // Get old type
+    Type oval = type(n);        // Get old type
 
     // Must exit either with {old node | null} and the old node in both types
     // and vals tables, OR exit with a new node and the old node in neither table.
@@ -365,16 +365,18 @@ public class GVNGCM {
       return untype(n, con(Type.ANY)); // Replace non-constants with high (dead) constants
 
     // [ts!] Compute best type, and type is IN ts
-    Type t = n.value(this);     // Get best type
+    Type nval = n.value(this);     // Get best type
 
     // [ts!] Put updated types into table for use by ideal()
-    if( t!=oldt ) {
-      assert t.isa(oldt);       // Monotonically improving
+    if( nval!=oval ) {
+      if( !nval.isa(oval) )
+        { System.out.println(nval); System.out.println(oval); }
+      assert nval.isa(oval);       // Monotonically improving
       // [ts!] Replace with a constant, if possible.  This is also very cheap
       // (once we expensively computed best value) and makes the best forward
       // progress.
-      if( replace_con(t,n) ) { unreg0(n); return con(t); }
-      setype(n,t);
+      if( replace_con(nval,n) ) { unreg0(n); return con(nval); }
+      setype(n,nval);
     }
 
     // [ts+] Try generic graph reshaping using updated types
@@ -389,7 +391,7 @@ public class GVNGCM {
 
     // [ts+,vals!]
     assert check_opt(n);
-    return oldt == t && y==null ? null : n; // Progress if types improved
+    return oval == nval && y==null ? null : n; // Progress if types improved
   }
 
   // Utility: Merge old and new, returning node with the merged liveness.
