@@ -348,21 +348,21 @@ public class GVNGCM {
 
     // [ts!] Compute uses & live bits.  If progress, push the defs on the
     // worklist.  This is a reverse flow computation.
-    TypeMem old = n._live;
-    TypeMem nnn = n.live(this);
-    if( old != nnn ) {          // Progress?
-      assert nnn.isa(old);      // Monotonically improving
-      n._live = nnn;            // Mark progress
+    TypeMem oliv = n._live;
+    TypeMem nliv = n.live(this);
+    if( oliv != nliv ) {        // Progress?
+        assert nliv.isa(oliv);    // Monotonically improving
+      n._live = nliv;           // Mark progress
       add_work_defs(n);         // Put defs on worklist... liveness flows uphill
     }
 
     // [ts!] If completely dead, exit now.
-    if( !nnn.is_live() && !n.is_prim() && n.err(this)==null &&
+    if( !nliv.is_live() && !n.is_prim() && n.err(this)==null &&
         !(n instanceof CallNode) &&       // Keep for proper errors
         !(n instanceof UnresolvedNode) && // Keep for proper errors
         !(n instanceof RetNode) &&        // Keep for proper errors
         !(n instanceof ConNode) )         // Already a constant
-      return untype(n, con(Type.ANY)); // Replace non-constants with high (dead) constants
+      return untype(n, con(Type.ANY));    // Replace non-constants with high (dead) constants
 
     // [ts!] Compute best type, and type is IN ts
     Type nval = n.value(this);     // Get best type

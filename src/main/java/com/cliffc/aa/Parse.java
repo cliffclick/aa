@@ -730,7 +730,7 @@ public class Parse {
     require(')',oldx);          // Balanced closing paren
 
     // Build the tuple from gathered args
-    TypeStruct mt_tuple = TypeStruct.make(new String[]{"^"},TypeStruct.ts(Type.XNIL),new byte[]{TypeStruct.FFNL});
+    TypeStruct mt_tuple = TypeStruct.make(false,new String[]{"^"},TypeStruct.ts(Type.XNIL),new byte[]{TypeStruct.FFNL},true);
     NewObjNode nn = new NewObjNode(false,BitsAlias.RECORD,mt_tuple,ctrl(),con(Type.XNIL));
     for( int i=0; i<args._len; i++ )
       nn.create_active((""+i).intern(),args.at(i),TypeStruct.FFNL,_gvn);
@@ -1049,7 +1049,7 @@ public class Parse {
       }
       byte[] finals = new byte[mods._len];
       for( int i=0; i<mods._len; i++ )  finals[i] = mods.at(i);
-      return peek('}') ? TypeStruct.make(flds.asAry(),ts.asAry(),finals) : null;
+      return peek('}') ? TypeStruct.make(false,flds.asAry(),ts.asAry(),finals,true) : null;
     }
 
     // "()" is the zero-entry tuple
@@ -1069,7 +1069,7 @@ public class Parse {
         ts.add(t);
         if( !peek(',') ) break; // Final comma is optional
       }
-      return peek(')') ? TypeStruct.make_tuple(ts.asAry()) : null;
+      return peek(')') ? TypeStruct.make_tuple_open(ts.asAry()) : null;
     }
 
     // Primitive type

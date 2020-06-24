@@ -39,21 +39,23 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // is Top; a '.' is Bot; all other values are valid field names.
   public @NotNull String @NotNull[] _flds;  // The field names
   public Type[] _ts;                        // Matching field types
-  private byte[] _flags; // Field mod types; see fmeet, fdual, fstr.  Clean.
+  private byte[] _flags; // Field mod types; see fmeet, fdual, fstr.
+  boolean _open; // Fields after _ts.length are treated as ALL (or ANY)
 
   boolean _cyclic; // Type is cyclic.  This is a summary property, not a description of value sets, hence is not in the equals or hash
-  private TypeStruct     ( String name, boolean any, String[] flds, Type[] ts, byte[] flags) { super(TSTRUCT, name, any); init(name, any, flds,ts,flags); }
-  private TypeStruct init( String name, boolean any, String[] flds, Type[] ts, byte[] flags) {
+  private TypeStruct     ( String name, boolean any, String[] flds, Type[] ts, byte[] flags, boolean open) { super(TSTRUCT, name, any); init(name, any, flds,ts,flags,open); }
+  private TypeStruct init( String name, boolean any, String[] flds, Type[] ts, byte[] flags, boolean open) {
     super.init(TSTRUCT, name, any);
     _flds  = flds;
     _ts    = ts;
     _flags = flags;
+    _open  = open;
     return this;
   }
   // Precomputed hash code.  Note that it can NOT depend on the field types -
   // because during recursive construction the types are not available.
   @Override int compute_hash() {
-    int hash = super.compute_hash(), hash1=hash;
+    int hash = super.compute_hash()+(_open?1023:0), hash1=hash;
     for( int i=0; i<_flds.length; i++ ) hash = ((hash+(_flags[i]<<5))*_flds[i].hashCode())|(hash>>>17);
     return hash == 0 ? hash1 : hash;
   }
@@ -68,7 +70,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // needing the cyclic test.
   private int cmp( TypeStruct t ) {
     if( !super.equals(t) ) return 0;
-    if( _ts.length != t._ts.length ) return 0;
+    if( _ts.length != t._ts.length || _open != t._open ) return 0;
     if( _ts == t._ts && _flds == t._flds && _flags == t._flags ) return 1;
     for( int i=0; i<_ts.length; i++ )
       if( !Util.eq(_flds[i],t._flds[i]) || _flags[i]!=t._flags[i] )
@@ -144,11 +146,12 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     if( dups.tset(_uid) ) return "$"; // Break recursive printing cycle
     // Special shortcut for the all-prims display type
     if( find("!") != -1 && find("math_pi") != -1 )
-      return _ts[1] instanceof TypeFunPtr
+      return (_any?"~":"") + (_ts[1] instanceof TypeFunPtr
         ? (((TypeFunPtr)_ts[1])._fidxs.above_center() ? "{PRIMS}" : "{LOW_PRIMS}")
-        : "{PRIMS_"+_ts[1]+"}";
+                              : "{PRIMS_"+_ts[1]+"}");
 
     SB sb = new SB();
+    if( _any ) sb.p('~');
     sb.p(_name);
     boolean is_tup = is_tup();
     sb.p(is_tup ? "(" : "@{");
@@ -161,7 +164,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       else sb.p(t.str(dups));   // Recursively print field type
       sb.p(';');
     }
-    if( _any ) sb.p("...");     // More fields allowed
+    if( _open ) sb.p("...");    // More fields allowed
     else if( _flds.length>0 ) sb.unchar();
     sb.p(!is_tup ? "}" : ")");
     return sb.toString();
@@ -172,9 +175,10 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     if( dups.tset(_uid) ) return sb.p('$'); // Break recursive printing cycle
     // Special shortcut for the all-prims display type
     if( find("!") != -1 && find("math_pi") != -1 && _ts[1] instanceof TypeFunPtr )
-      return sb.p(((TypeFunPtr)_ts[1])._fidxs.above_center()
-                  ? "{PRIMS}" : "{LOW_PRIMS}");
+      return sb.p(_any?"~":"").p(((TypeFunPtr)_ts[1])._fidxs.above_center()
+                                 ? "{PRIMS}" : "{LOW_PRIMS}");
 
+    if( _any ) sb.p('~');
     sb.p(_name);
     boolean is_tup = is_tup();
     if( !is_tup ) sb.p('@');    // Not a tuple
@@ -189,7 +193,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       else t.dstr(sb,dups);     // Recursively print field type
       sb.p(';').nl();           // One field per line
     }
-    if( _any ) sb.p("...").nl(); // More fields allowed
+    if( _open ) sb.p("...").nl(); // More fields allowed
     return sb.di(1).i().p(!is_tup ? '}' : ')');
   }
   // Print with memory instead of recursion
@@ -198,8 +202,9 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     if( dups.tset(_uid) ) return sb.p('$'); // Break recursive printing cycle
     // Special shortcut for the all-prims display type
     if( find("!") != -1 && find("math_pi") != -1 && _ts[1] instanceof TypeFunPtr )
-      return sb.p(((TypeFunPtr)_ts[1])._disp.above_center()
+      return sb.p(_any?"~":"").p(((TypeFunPtr)_ts[1])._disp.above_center()
                   ? "{PRIMS}" : "{LOW_PRIMS}");
+    if( _any ) sb.p('~');
     sb.p(_name);
     boolean is_tup = is_tup();
     if( !is_tup ) sb.p('@');    // Not a tuple
@@ -214,7 +219,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       else t.str(sb,dups,mem);  // Recursively print field type
       sb.p(';');
     }
-    if( _any ) sb.p("...");     // More fields allowed
+    if( _open ) sb.p("...");     // More fields allowed
     else if( _flds.length>0 ) sb.unchar();
     return sb.p(!is_tup ? '}' : ')');
   }
@@ -223,11 +228,11 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // cyclic types for which a DAG-like bottom-up-remove-dups approach cannot work.
   private static TypeStruct FREE=null;
   @Override protected TypeStruct free( TypeStruct ret ) { FREE=this; return ret; }
-  static TypeStruct malloc( String name, boolean any, String[] flds, Type[] ts, byte[] flags ) {
+  static TypeStruct malloc( String name, boolean any, String[] flds, Type[] ts, byte[] flags, boolean open ) {
     assert check_name(name);
-    if( FREE == null ) return new TypeStruct(name, any,flds,ts,flags);
+    if( FREE == null ) return new TypeStruct(name, any,flds,ts,flags,open);
     TypeStruct t1 = FREE;  FREE = null;
-    return t1.init(name, any,flds,ts,flags);
+    return t1.init(name, any,flds,ts,flags,open);
   }
   private TypeStruct hashcons_free() {
     _ts = TypeAry.hash_cons(_ts);
@@ -308,7 +313,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public  static TypeStruct malloc(Type[] ts) {
     String[] flds = new String[ts.length];
     Arrays.fill(flds,fldBot());
-    return malloc("",false,flds,ts,fbots(ts.length));
+    return malloc("",false,flds,ts,fbots(ts.length),false);
   }
 
   // Function formals, used by FunNode.
@@ -326,12 +331,13 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     assert Util.eq(flds[0],"^");
     assert ts[0].is_display_ptr() && ts[0]==ts[0].simple_ptr(); // Simple display ptrs only
     byte[] fs = fbots(ts.length);
-    return malloc("",any,flds,ts,fs).hashcons_free();
+    return malloc("",any,flds,ts,fs,false).hashcons_free();
   }
-  public  static TypeStruct make(String[] flds, Type[] ts) { return malloc("",false,flds,ts,fbots(ts.length)).hashcons_free(); }
-  public  static TypeStruct make(String[] flds, Type[] ts, byte[] flags) { return malloc("",false,flds,ts,flags).hashcons_free(); }
-  public  static TypeStruct make(String name, String[] flds, Type[] ts, byte[] flags) { return malloc(name,false,flds,ts,flags).hashcons_free(); }
-  public  static TypeStruct make(boolean any, String[] flds, Type[] ts, byte[] flags) { return malloc("",any,flds,ts,flags).hashcons_free(); }
+  public  static TypeStruct make(String[] flds, Type[] ts) { return malloc("",false,flds,ts,fbots(ts.length),false).hashcons_free(); }
+  public  static TypeStruct make(String[] flds, Type[] ts, byte[] flags) { return malloc("",false,flds,ts,flags,false).hashcons_free(); }
+  public  static TypeStruct make(String name, String[] flds, Type[] ts, byte[] flags) { return malloc(name,false,flds,ts,flags,false).hashcons_free(); }
+  public  static TypeStruct make(String name, String[] flds, Type[] ts, byte[] flags, boolean open) { return malloc(name,false,flds,ts,flags,open).hashcons_free(); }
+  public  static TypeStruct make(boolean any, String[] flds, Type[] ts, byte[] flags, boolean open) { return malloc("",any,flds,ts,flags,open).hashcons_free(); }
 
   // Generic parser struct object, slot 0 is the display and is NO_DISP post-parse.
   private static final String[][] TFLDS={{},
@@ -340,17 +346,18 @@ public class TypeStruct extends TypeObj<TypeStruct> {
                                          {"^","0","1"},
                                          {"^","0","1","2"}};
   public static TypeStruct make_tuple( Type... ts ) { return make(TFLDS[ts.length],ts,ffnls(ts.length)); }
+  public static TypeStruct make_tuple_open( Type... ts ) { return make(false,TFLDS[ts.length],ts,ffnls(ts.length),true); }
   public static TypeStruct make_tuple(Type t1) { return make_tuple(ts(NO_DISP,t1)); }
-  public static TypeStruct open(Type tdisp) { return make(false,TFLDS[1],ts(tdisp),ffnls(1)); }
-  public TypeStruct close() { return this; } // Mark as no-more-fields
+  public static TypeStruct open(Type tdisp) { return make(false,TFLDS[1],ts(tdisp),ffnls(1),true); }
+  public TypeStruct close() { assert _open; return malloc(_name,_any,_flds,_ts,_flags,false).hashcons_free(); } // Mark as no-more-fields
 
   public  static TypeStruct make(String[] flds, byte[] flags) { return make(flds,ts(flds.length),flags); }
   // Make from prior, just updating field types
   public TypeStruct make_from( Type[] ts ) { return make_from(_any,ts,_flags); }
   public TypeStruct make_from( boolean any, Type[] ts ) { return make_from(any,ts,_flags); }
-  public TypeStruct make_from( boolean any, Type[] ts, byte[] bs ) { return malloc(_name,any,_flds,ts,bs).hashcons_free(); }
+  public TypeStruct make_from( boolean any, Type[] ts, byte[] bs ) { return malloc(_name,any,_flds,ts,bs,_open).hashcons_free(); }
   // Make a TS with a name
-  public TypeStruct make_from( String name ) { return malloc(name,_any,_flds,_ts,_flags).hashcons_free();  }
+  public TypeStruct make_from( String name ) { return malloc(name,_any,_flds,_ts,_flags,_open).hashcons_free();  }
 
   // Recursive meet in progress.
   // Called during class-init.
@@ -366,13 +373,13 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   }
   private static final HashMap<TPair,TypeStruct> MEETS0 = new HashMap<>();
 
-  public  static final TypeStruct ANYSTRUCT = malloc("",true ,new String[0],TypeAry.get(0),fbots(0)).hashcons_free();
-  public  static final TypeStruct ALLSTRUCT = malloc("",false,new String[0],TypeAry.get(0),fbots(0)).hashcons_free();
+  public  static final TypeStruct ANYSTRUCT = malloc("",true ,new String[0],TypeAry.get(0),fbots(0),false).hashcons_free();
+  public  static final TypeStruct ALLSTRUCT = malloc("",false,new String[0],TypeAry.get(0),fbots(0),true ).hashcons_free();
   // The display is a self-recursive structure: slot 0 is a ptr to a Display.
   // To break class-init cycle, this is partially made here, now.
   // Then we touch TypeMemPtr, which uses this field.
   // Then we finish making DISPLAY.
-  public static final TypeStruct DISPLAY = malloc("",false,new String[]{"^"},ts(NIL),ffnls(1));
+  public static final TypeStruct DISPLAY = malloc("",false,new String[]{"^"},ts(NIL),ffnls(1),true);
   static {
     DISPLAY._hash = DISPLAY.compute_hash();
     Type dummy = TypeMemPtr.STRPTR; // Force TypeMemPtr
@@ -412,7 +419,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public TypeStruct add_fld( String name, byte mutable ) { return add_fld(name,mutable,Type.SCALAR); }
   public TypeStruct add_fld( String name, byte mutable, Type tfld ) {
     assert name==null || fldBot(name) || find(name)==-1;
-    assert !_any;
+    assert !_any && _open;
 
     Type  []   ts = TypeAry.copyOf(_ts   ,_ts   .length+1);
     String[] flds = Arrays .copyOf(_flds ,_flds .length+1);
@@ -420,7 +427,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     ts   [_ts.length] = tfld;
     flds [_ts.length] = name==null ? fldBot() : name;
     flags(flags,_ts.length, make_flag(mutable));
-    return make(_any,flds,ts,flags);
+    return make(_any,flds,ts,flags,true);
   }
   public TypeStruct set_fld( int idx, Type t, byte ff ) {
     Type[] ts  = _ts;
@@ -433,7 +440,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // Make a type-variable with no definition - it is assumed to be a
   // forward-reference, to be resolved before the end of parsing.
   public static Type make_forward_def_type(String tok) {
-    return make((tok+":").intern(),flds("$fref"),ts(SCALAR),fbots(1));
+    return make((tok+":").intern(),flds("$fref"),ts(SCALAR),fbots(1),true);
   }
   // We have a cycle because we are unioning {t,this} and we have a graph from
   // t->...->this.  This cycle may pre-exist once closed and can be detected
@@ -514,7 +521,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     for( int i=0; i<ts.length; i++ ) ts[i] = _ts[i].dual();
     for( int i=0; i<bs.length; i++ ) flags(bs,i,fdual(_flags[i]));
     ts = TypeAry.hash_cons(ts);
-    return new TypeStruct(_name,!_any,as,ts,bs);
+    return new TypeStruct(_name,!_any,as,ts,bs,!_open);
   }
 
   // Recursive dual
@@ -525,7 +532,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     byte  [] bs = new byte  [_ts  .length];
     for( int i=0; i<as.length; i++ ) as[i]=sdual(_flds[i]);
     for( int i=0; i<bs.length; i++ ) flags(bs,i,fdual(_flags[i]));
-    TypeStruct dual = _dual = new TypeStruct(_name,!_any,as,ts,bs);
+    TypeStruct dual = _dual = new TypeStruct(_name,!_any,as,ts,bs,!_open);
     if( _hash != 0 ) {
       assert _hash == compute_hash();
       dual._hash = dual.compute_hash(); // Compute hash before recursion
@@ -601,7 +608,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     }
     // Ignore name in the non-recursive meet, it will be computed by the outer
     // 'meet' call anyways.
-    return malloc("",_any&tmax._any,as,ts,bs).hashcons_free();
+    return malloc("",_any&tmax._any,as,ts,bs,_open|tmax._open).hashcons_free();
   }
 
   // Both structures are cyclic.  The meet will be "as if" both structures are
@@ -716,7 +723,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     assert _cyclic;
     Type[] ts = TypeAry.get(_ts.length);
     Arrays.fill(ts,Type.ANY);
-    TypeStruct tstr = malloc(_name,_any,_flds.clone(),ts,_flags.clone());
+    TypeStruct tstr = malloc(_name,_any,_flds.clone(),ts,_flags.clone(),_open);
     tstr._cyclic = true;
     return tstr;
   }
@@ -1157,7 +1164,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     byte[] flags = _flags.clone();
     Type[] ts    = TypeAry.clone(_ts);
     _update(flags,ts,fin,idx,val,precise);
-    return malloc(_name,_any,_flds,ts,flags).hashcons_free();
+    return malloc(_name,_any,_flds,ts,flags,_open).hashcons_free();
   }
   private static void _update( byte[] flags, Type[] ts, byte fin, int idx, Type val, boolean precise ) {
     short flag = flags(flags,idx);
@@ -1207,7 +1214,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   TypeStruct sharpen_clone() {
     assert interned();
     Type[] ts = TypeAry.clone(_ts);
-    TypeStruct t = malloc(_name,_any,_flds,ts,_flags);
+    TypeStruct t = malloc(_name,_any,_flds,ts,_flags,_open);
     t._hash = t.compute_hash();
     return t;
   }
