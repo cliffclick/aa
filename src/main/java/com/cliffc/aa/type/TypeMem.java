@@ -318,7 +318,7 @@ public class TypeMem extends Type<TypeMem> {
       TypeStruct ts = (TypeStruct)to;
       // Incomplete struct?  This is an early escapee from Parse times; more
       // fields may be added which we assume is a pointer to all.
-      if( !ts._any )
+      if( ts._open )
         return this;
       for( int i=0; i<ts._ts.length; i++ ) {
         Type fld = ts._ts[i];
@@ -444,7 +444,7 @@ public class TypeMem extends Type<TypeMem> {
       if( oops[i]!=null ) oops[i] = oops[i].crush();
     return TypeMem.make0(oops);
   }
-  
+
   // Returns the same memory, with aliases not in the split set to either XOBJ
   // or UNUSED.
   public TypeMem split_by_alias(BitSet split) {
