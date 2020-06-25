@@ -382,13 +382,7 @@ public final class CallEpiNode extends Node {
   // Unresolved, then none of CallEpi targets are (yet) alive.
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
     assert _keep==0;
-    // If is_copy, then basically acting like pass-thru.
-    if( is_copy() ) {
-      // Target is as alive as our projs are.
-      int idx = _defs.find(def);
-      ProjNode proj = ProjNode.proj(this,idx);
-      return proj==null ? TypeMem.ANYMEM : proj._live;
-    }
+    if( is_copy() ) return live_use_copy(def); // Target is as alive as our projs are.
     // Not a copy
     if( def==in(0) ) return _live; // The Call
     if( def==in(1) ) return _live; // The DefMem

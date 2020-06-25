@@ -351,7 +351,7 @@ public class TestParse {
 
     // Missing type B is also never worked on.
     test_isa("A= :@{n=B?; v=int}", TypeFunPtr.GENERIC_FUNPTR);
-    test_isa("A= :@{n=B?; v=int}; a = A(0,2)", TypeMemPtr.OOP);
+    test_isa("A= :@{n=B?; v=int}; a = A(0,2)", TypeMemPtr.ISUSED);
     test_isa("A= :@{n=B?; v=int}; a = A(0,2); a.n", Type.NIL);
     // Mutually recursive type
     test_isa("A= :@{n=B; v=int}; B= :@{n=A; v=flt}", TypeFunPtr.GENERIC_FUNPTR);

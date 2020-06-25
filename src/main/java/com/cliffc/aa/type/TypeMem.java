@@ -369,14 +369,14 @@ public class TypeMem extends Type<TypeMem> {
     TypeStruct ts3 = ts2.install_cyclic(reaches);
     assert ts2==ts3;
     for( Type t2 : ts2._ts )
-      _sharp_cache.put(((TypeMemPtr)t2).make_from(TypeObj.OBJ),(TypeMemPtr)t2);
+      _sharp_cache.put(((TypeMemPtr)t2).make_from(TypeObj.ISUSED),(TypeMemPtr)t2);
     for( TypeMemPtr ptr : _sharp_cache.values() )
       assert ptr.interned() && ptr._obj.interned();
     return _sharp_cache.get(tmp); // Re-get updated value
   }
   // Get the coarse match for this set of alias bits.
   private TypeMemPtr _sharpen_get( TypeMemPtr tmp, Ary<Type> reaches ) {
-    if( tmp._obj != TypeObj.OBJ ) return tmp; // Already assumed canonical
+    if( tmp._obj != TypeObj.ISUSED ) return tmp; // Already assumed canonical
     TypeMemPtr tmpx = _sharp_cache.get(tmp); // Check deep-ptr cache
     if( tmpx != null ) return tmpx;   // Winner!
 

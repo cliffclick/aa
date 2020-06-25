@@ -351,7 +351,7 @@ public class GVNGCM {
     TypeMem oliv = n._live;
     TypeMem nliv = n.live(this);
     if( oliv != nliv ) {        // Progress?
-        assert nliv.isa(oliv);    // Monotonically improving
+      assert nliv.isa(oliv);    // Monotonically improving
       n._live = nliv;           // Mark progress
       add_work_defs(n);         // Put defs on worklist... liveness flows uphill
     }

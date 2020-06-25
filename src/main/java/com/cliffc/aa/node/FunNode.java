@@ -666,13 +666,6 @@ public class FunNode extends RegionNode {
     // Will be an error eventually, but act like its executed so the trailing
     // EpilogNode gets visited during GCP
     if( is_forward_ref() ) return Type.CTRL;
-    
-    // TODO: CNC BUG - Wired call paths from optional resolving calls are treated as 'true' Ctrl
-    // even if dead.
-    // Theory#1: do not wire unresolved
-    // Theory#2: during GCP, check-back to CProj to Call & verify fidx is available.
-
-
     return super.value(gvn);
   }
 

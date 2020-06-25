@@ -326,9 +326,11 @@ public abstract class Node implements Cloneable {
   public TypeMem live( GVNGCM gvn ) {
     if( basic_liveness() ) {    // Basic liveness only; e.g. primitive math ops
       boolean alive=false;
-      for( Node use : _uses )   // Computed across all uses
-        if( use._live == TypeMem.ALIVE ) alive = true;
-        else if( use._live != TypeMem.DEAD ) return TypeMem.ESCAPE;
+      for( Node use : _uses ) { // Computed across all uses
+        TypeMem live = use.live_use(gvn,this);
+        if( live == TypeMem.ALIVE ) alive = true;
+        else if( live != TypeMem.DEAD ) return TypeMem.ESCAPE;
+      }
       return alive ? TypeMem.ALIVE : TypeMem.DEAD;
     }
     // Compute meet/union of all use livenesses
@@ -344,6 +346,19 @@ public abstract class Node implements Cloneable {
   public TypeMem live_use( GVNGCM gvn, Node def ) {
     return _keep>0 ? TypeMem.MEM : _live;
   }
+  // More complex liveness for a collapsing "is_copy" node
+  TypeMem live_use_copy(Node def ) {
+    int idx = _defs.find(def);  // idx==1 is memory
+    ProjNode proj = ProjNode.proj(this,idx); // Projection for the copy
+    // If memory, use the memory projection (if its there), else self must also be a memory liveness
+    if( idx==1 ) return proj==null ? _live : proj._live;
+    // If the projection is dead, so is the def
+    if( proj !=null && proj._live==TypeMem.DEAD ) return TypeMem.DEAD;
+    if( proj != null ) return proj._live;
+    // Not a memory, not dead, so basic liveness
+    return def.basic_liveness() ? TypeMem.ALIVE : TypeMem.ANYMEM; // Args always alive
+  }
+
   // Compute basic liveness only: a flag of alive-or-dead represented
   // as TypeMem.DEAD or TypeMem.ALIVE or TypeMem.ESCAPE;
   public boolean basic_liveness() { return true; }

@@ -24,8 +24,7 @@ public class CProjNode extends ProjNode {
     Type res = ct.at(_idx);
     return res==Type.XCTRL ? Type.XCTRL : Type.CTRL;
   }
-  // Only called here if alive, and input is more-than-basic-alive
-  @Override public TypeMem live_use( GVNGCM gvn, Node def ) { return TypeMem.ANYMEM; }
+  @Override public TypeMem live_use( GVNGCM gvn, Node def ) { return def.basic_liveness() ? TypeMem.ALIVE : TypeMem.ANYMEM; }
   // Return the op_prec of the returned value.  Not sensible except
   // when call on primitives.
   @Override public byte op_prec() { return _defs.at(0).op_prec(); }

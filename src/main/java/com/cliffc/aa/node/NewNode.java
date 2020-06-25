@@ -42,7 +42,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   private void _init(int parent_alias, T to) {
     _alias = BitsAlias.new_alias(parent_alias);
     sets(to,null);
-    _tptr = TypeMemPtr.make(_alias,TypeObj.OBJ);
+    _tptr = TypeMemPtr.make(_alias,TypeObj.ISUSED);
   }
   String xstr() { return "New*"+_alias; } // Self short name
   String  str() { return "New"+_ts; } // Inline less-short name
@@ -82,7 +82,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   abstract T dead_type();
   @Override public boolean basic_liveness() { return false; }
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) { return def==in(0) ? TypeMem.ALIVE : _live; }
-  
+
   // Basic escape analysis.  If no escapes and no loads this object is dead.
   private boolean captured( GVNGCM gvn ) {
     if( _keep > 0 ) return false;

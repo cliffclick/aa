@@ -314,19 +314,14 @@ public class CallNode extends Node {
   }
   @Override public boolean basic_liveness() { return false; }
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
-    if( is_copy() ) {           // Target is as alive as our projs are.
-      int idx = _defs.find(def);
-      ProjNode proj = ProjNode.proj(this,idx);
-      if( idx==1 ) return proj==null ? _live : proj._live;
-      if( proj !=null && proj._live==TypeMem.DEAD ) return TypeMem.DEAD;
-      return def.basic_liveness() ? TypeMem.ALIVE : TypeMem.ANYMEM; // Args always alive
-    }
-    if( def==fun() ) {                               // Function argument
+    if( is_copy() ) return live_use_copy(def); // Target is as alive as our projs are.
+    if( def==fun() ) {                         // Function argument
       if( gvn._opt_mode < 2 ) return TypeMem.ALLMEM; // Prior to GCP, assume all fptrs are alive
       if( !(def instanceof FunPtrNode) ) return _live;
       int dfidx = ((FunPtrNode)def).ret()._fidx;
       return live_use_call(gvn,dfidx); // Can be precise
     }
+    if( def==ctl() ) return TypeMem.ALIVE;
     if( def!=mem() )            // Some argument
       return def.basic_liveness() ? TypeMem.ESCAPE : TypeMem.ANYMEM;    // Args always alive and escape
     // Needed to sharpen args for e.g. resolve and errors.
@@ -357,7 +352,6 @@ public class CallNode extends Node {
     BitsFun fidxs = tfp.fidxs();
     return !fidxs.above_center() && fidxs.test_recur(dfidx) ? TypeMem.ALIVE : TypeMem.DEAD;
   }
-
 
   // Resolve an Unresolved.  Called in value() and so must be monotonic.
   // Strictly looks at arguments and the list of function choices.  Mostly all

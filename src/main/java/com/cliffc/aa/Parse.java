@@ -540,7 +540,7 @@ public class Parse {
         }
         fld=fld.intern();
 
-        Node castnn = gvn(new CastNode(ctrl(),n,TypeMemPtr.OOP)); // Remove nil choice
+        Node castnn = gvn(new CastNode(ctrl(),n,TypeMemPtr.ISUSED)); // Remove nil choice
 
         // Store or load against memory
         if( peek(":=") || peek_not('=','=')) {

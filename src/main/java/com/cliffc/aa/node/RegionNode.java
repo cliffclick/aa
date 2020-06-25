@@ -3,6 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeMem;
 
 import java.util.function.Predicate;
 
@@ -58,7 +59,7 @@ public class RegionNode extends Node {
   }
 
   void unwire(GVNGCM gvn, int idx) { }
-  
+
   @Override public Type value(GVNGCM gvn) {
     if( _defs._len==2 && in(1)==this ) return Type.XCTRL; // Dead self-loop
     for( int i=1; i<_defs._len; i++ ) {
@@ -68,6 +69,7 @@ public class RegionNode extends Node {
     }
     return Type.XCTRL;
   }
+  @Override public TypeMem live_use( GVNGCM gvn, Node def ) { return TypeMem.ALIVE; }
 
   // Complex dominator tree.  Ok to subset, attempt the easy walk
   @Override Node walk_dom_last(Predicate<Node> P) {

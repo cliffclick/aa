@@ -880,7 +880,7 @@ public class Type<T extends Type<T>> implements Cloneable {
   boolean contains( Type t, VBitSet bs ) { return this==t; }
 
   // Sharpen pointer with memory
-  public Type sharptr( Type ptr ) { return ptr; }
+  public Type sharptr( Type ptr ) { return this==ANY ? TypeMem.ANYMEM.sharptr(ptr) : ptr; }
 
   // Apply the test(); if it returns true iterate over all nested child types.
   // If the test returns false, short-circuit the walk.  No attempt to guard

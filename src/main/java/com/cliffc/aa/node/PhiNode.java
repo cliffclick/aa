@@ -136,6 +136,7 @@ public class PhiNode extends Node {
   }
   @Override public boolean basic_liveness() { return _t==Type.SCALAR; }
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
+    if( def==in(0) ) return TypeMem.ALIVE;
     return basic_liveness() && !def.basic_liveness() ? TypeMem.ANYMEM : _live;
   }
 

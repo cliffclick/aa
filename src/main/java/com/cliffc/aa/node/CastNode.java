@@ -2,6 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeMem;
 
 // Gain precision after an If-test.
 public class CastNode extends Node {
@@ -43,6 +44,9 @@ public class CastNode extends Node {
     if( !checked(in(0),in(1)) ) return t;
     // Lift result.
     return _t.join(t);
+  }
+  @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
+    return def==in(0) ? TypeMem.ALIVE : _live;
   }
 
   private static boolean checked( Node n, Node addr ) {
