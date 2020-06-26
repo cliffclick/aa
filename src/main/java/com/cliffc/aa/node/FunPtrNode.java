@@ -92,7 +92,7 @@ public final class FunPtrNode extends Node {
   // True if function is uncalled (but possibly returned or stored as
   // a constant).  Such code is not searched for errors.
   @Override boolean is_uncalled(GVNGCM gvn) {
-    return !is_forward_ref() && ((TypeTuple)gvn.type(ret())).at(0)==Type.XCTRL;
+    return !is_forward_ref() && !ret().is_copy() && ((TypeTuple)gvn.type(ret())).at(0)==Type.XCTRL;
   }
   // Instead of returning the pre-call memory on true, returns self.
   // Changes as the graph changes, because works purely off of graph shape.

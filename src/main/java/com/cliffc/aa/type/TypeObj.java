@@ -70,5 +70,9 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
   @Override void walk( Predicate<Type> p ) { p.test(this); }
   // Widen (loss info), to make it suitable as the default function memory.
   // Must be monotonic, as CallEpiNode.value() uses this.
-  public TypeObj crush() { return this==ISUSED ? ISUSED : OBJ; }
+  public TypeObj crush() {
+    if( this==UNUSED ) return UNUSED;
+    if( this==ISUSED ) return ISUSED;
+    return OBJ;
+  }
 }

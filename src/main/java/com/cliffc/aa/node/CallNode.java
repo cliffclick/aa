@@ -104,6 +104,9 @@ public class CallNode extends Node {
   //     be e.g. a Phi or a Load.  This is argument#0, both as the Closure AND
   //     as the Code pointer.  The output type here is trimmed to what is "resolved"
   // 3+  Other "normal" arguments, numbered#1 and up.
+  public  Node ctl() { return in(0); }
+  public  Node mem() { return in(1); }
+  public  Node fun() { return in(2); }
 
   // Number of actual arguments, including the closure/code ptr.
   // This is 2 higher than the user-visible arg count.
@@ -112,13 +115,10 @@ public class CallNode extends Node {
   Node arg ( int x ) { assert x>=0; return _defs.at(x+2); }
   Node argm( int x ) { return x==-2 ? mem() : arg(x); }
   // Set an argument.  Use 'set_fun' to set the Display/Code.
-  Node set_arg    (int idx, Node arg, GVNGCM gvn) { assert idx>0; return set_def(idx+2,arg,gvn); }
-
-  public  Node ctl() { return in(0); }
-  public  Node mem() { return in(1); }
-  public  Node fun() { return in(2); }
-  Node set_fun    (Node fun, GVNGCM gvn) { return set_def(2,fun,gvn); }
-  public  void set_fun_reg(Node fun, GVNGCM gvn) { gvn.set_def_reg(this,2,fun); }
+  Node set_arg (int idx, Node arg, GVNGCM gvn) { assert idx>0; return set_def(idx+2,arg,gvn); }
+  public void set_mem( Node mem, GVNGCM gvn) { set_def(1, mem, gvn); }
+  Node set_fun( Node fun, GVNGCM gvn) { return set_def(2,fun,gvn); }
+  public void set_fun_reg(Node fun, GVNGCM gvn) { gvn.set_def_reg(this,2,fun); }
   public BitsFun fidxs(GVNGCM gvn) {
     Type tf = gvn.type(fun());
     return tf instanceof TypeFunPtr ? ((TypeFunPtr)tf).fidxs() : null;
@@ -190,6 +190,9 @@ public class CallNode extends Node {
       Node mem = mem();
       Node arg1 = arg(1);
       Type tadr = gvn.type(arg1);
+      // Bypass a MemSplit
+      if( tadr instanceof TypeMemPtr && mem instanceof MProjNode && mem.in(0) instanceof MemSplitNode )
+        mem = ((MemSplitNode)mem.in(0)).mem();
       // Bypass a merge on the 2-arg input during unpacking
       if( tadr instanceof TypeMemPtr && mem instanceof MemMergeNode ) {
         int alias = ((TypeMemPtr)tadr)._aliases.abit();

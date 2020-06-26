@@ -8,51 +8,33 @@ import com.cliffc.aa.type.*;
 // in and out, and is especially targeting non-inlined calls.
 public class MemJoinNode extends Node {
 
-  public MemJoinNode( Node lhs, Node rhs, Node defmem, TypeMem live ) { super(OP_JOIN,lhs,rhs, defmem); _live=live; }
+  public MemJoinNode( MProjNode lhs, Node rhs ) { super(OP_JOIN,lhs,rhs); }
 
+  MemSplitNode msp() {
+    if( !(in(0) instanceof MProjNode) ) return null;
+    if( !(in(0).in(0) instanceof MemSplitNode) ) return null;
+    return (MemSplitNode)in(0).in(0);
+  }
   @Override public Node ideal(GVNGCM gvn, int level) {
-
-    Node mem0 = in(0);
-    Node mpj0 = mem0 instanceof MemMergeNode ? mem0.in(0) : mem0;
-
-    Node mem1 = in(1);
-    Node mpj1 = mem1 instanceof MemMergeNode ? mem1.in(0) : mem1;
-
     // Empty split?
-    Node s00 = mpj0.in(0);
-    if( mpj1.in(0)==s00 && s00 instanceof MemSplitNode &&
-        mpj0 instanceof MProjNode && ((MProjNode)mpj0)._idx==0 &&
-        mpj1 instanceof MProjNode && ((MProjNode)mpj1)._idx==1 &&
-        mem0._uses._len==1 && mem1._uses._len==1 ) {
-      MemSplitNode split = (MemSplitNode)s00;
+    MemSplitNode msp = msp();
+    if( msp == null ) return null;
+    if( msp==in(1).in(0) )
+      return msp.mem();
 
-      if( mem0==mpj0 && mem1==mpj1 ) // Just return the split base
-        return split.in(0);
+    // Nearly empty split - just a MemMerge
+    MemMergeNode mmm;  Node base;
+    if( in(1) instanceof MemMergeNode &&
+        (base=(mmm=((MemMergeNode)in(1))).mem()) instanceof MProjNode &&
+        msp==base.in(0) )
+      return gvn.set_def_reg(mmm,0,msp.mem());
 
-      MemMergeNode mmm0 = mem0 instanceof MemMergeNode ? (MemMergeNode)mem0 : null;
-      MemMergeNode mmm1 = mem1 instanceof MemMergeNode ? (MemMergeNode)mem1 : null;
-      TypeMem tmem0 = (TypeMem)gvn.type(mem0);
-      TypeMem tmem1 = (TypeMem)gvn.type(mem1);
-      TypeMem defmem= (TypeMem)gvn.type(in(2));
-
-      int len = ((TypeMem)gvn.type(this)).len();
-      if( mmm0 != null ) len = Math.max(len,mmm0.max()+1);
-      if( mmm1 != null ) len = Math.max(len,mmm1.max()+1);
-
-      // Same algo as merge_by_alias, merge_one_lhs, merge_pick.
-      MemMergeNode mem = new MemMergeNode(split.in(0));
-      for( int alias=2; alias<len; alias++ ) {
-        TypeObj rhs = tmem1.at(alias);
-        //Node n = tmem0.merge_one_lhs(NewNode.ESCAPES,alias,rhs) == rhs
-        //  ? (mmm1==null ? mem1 : mmm1.alias2node(alias))
-        //  : (mmm0==null ? mem0 : mmm0.alias2node(alias));
-        //if( defmem.at(alias)==TypeObj.UNUSED && gvn.type(n) != TypeObj.UNUSED )
-        //  n = split.in(0);
-        //mem.create_alias_active(alias,n,gvn);
-        throw com.cliffc.aa.AA.unimpl();
-      }
-      return mem;
-    }
+    // Nearly empty split - just a Name
+    IntrinsicNode isn;
+    if( in(1) instanceof IntrinsicNode &&
+        (base=(isn=((IntrinsicNode)in(1))).mem()) instanceof MProjNode &&
+        msp==base.in(0) )
+      return gvn.set_def_reg(isn,0,msp.mem());
 
     return null;
   }
@@ -62,18 +44,8 @@ public class MemJoinNode extends Node {
     Type rhs = gvn.type(in(1));
     if( !(lhs instanceof TypeMem) ) return lhs.oob();
     if( !(rhs instanceof TypeMem) ) return rhs.oob();
-
-    //// Merge types left and right
-    //TypeMem trez = ((TypeMem)lhs).merge_by_alias((TypeMem)rhs,NewNode.ESCAPES);
-    //// Lift to UNUSED, if required.  This is basically a shortcut
-    //// because nearly always the join is useless.
-    //TypeMem defmem = (TypeMem)gvn.type(in(2));
-    //for( int alias=2; alias<trez.len(); alias++ )
-    //  if( defmem.at(alias)==TypeObj.UNUSED && trez.at(alias)!=TypeObj.UNUSED )
-    //    return trez.join(defmem);
-    //
-    //return trez;
-    throw com.cliffc.aa.AA.unimpl();
+    assert lhs==TypeMem.ANYMEM;
+    return rhs;
   }
   @Override public boolean basic_liveness() { return false; }
 
@@ -94,5 +66,4 @@ public class MemJoinNode extends Node {
     //return null;
     throw com.cliffc.aa.AA.unimpl();
   }
-
 }

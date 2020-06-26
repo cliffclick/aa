@@ -1218,19 +1218,23 @@ public class Parse {
     }
   }
 
-  // Insert a call, with projections
+  // Insert a call, with memory splits.  Wiring happens later, and when a call
+  // is wired it picks up projections to merge at the Fun & Parm nodes.
   private Node do_call( CallNode call0 ) {
-    // CallNode has 3 following projections: ctrl, called function ptr, input
-    // memory.  Input memory is refined to only reachable-from-args memory.
+    // Theoretically, a memory split is inserted around every call.
+    // TODO: fast-path primitives with obviously no memory.
+    MemSplitNode split = gvn(new MemSplitNode(call0)).keep();
+    MProjNode lhs = (MProjNode)gvn(new MProjNode(split,0));
+    MProjNode rhs = (MProjNode)gvn(new MProjNode(split.unhook(),1));
+    call0.set_mem(rhs,_gvn);
     CallNode call = (CallNode)gvn(call0);
-    // Call Epilog takes in the call projections which it uses to both track
-    // wireable functions, and also trim the result memory to passed-in aliases.
+    // Call Epilog takes in the call which it uses to track wireable functions.
     // CallEpi internally tracks all wired functions.
     Node cepi  = gvn(new CallEpiNode(call,Env.DEFMEM)).keep();
     set_ctrl(    gvn(new CProjNode(cepi,0)));
     Node postcall_memory = gvn(new MProjNode(cepi,1)); // Return memory from all called functions, trimmed to reachable aliases
-    set_mem( gvn(new MemMergeNode(postcall_memory)));
-    return   gvn(new  ProjNode(cepi.unhook(),2));
+    set_mem( gvn(new MemJoinNode(lhs,postcall_memory)) );
+    return gvn(new ProjNode(cepi.unhook(),2));
   }
 
   // Whack current control with a syntax error

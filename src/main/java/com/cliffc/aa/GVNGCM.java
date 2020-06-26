@@ -166,13 +166,13 @@ public class GVNGCM {
   }
 
   // Hack an edge, updating GVN as needed
-  public void set_def_reg(Node n, int idx, Node def) {
+  public Node set_def_reg(Node n, int idx, Node def) {
     _vals.remove(n);            // Remove from GVN
     n.set_def(idx,def,this);    // Hack edge
-    if( n.is_dead() ) return;
+    if( n.is_dead() ) return null;
     assert !check_gvn(n,false); // Check not in GVN table after hack
     _vals.put(n,n);             // Back in GVN table
-    add_work(n);
+    return add_work(n);
   }
   public void remove_reg(Node n, int idx) {
     _vals.remove(n);            // Remove from GVN
@@ -305,6 +305,10 @@ public class GVNGCM {
         if( use instanceof ParmNode && ((ParmNode)use)._idx==-2 )
           add_work(use.in(0));  // Recheck function inlining
       }
+      // MemSplit matches Call args
+      if( nnn instanceof CallNode && nnn.in(1) instanceof MProjNode &&
+          nnn.in(1).in(0) instanceof MemSplitNode )
+        add_work(nnn.in(1).in(0));
       // Add self at the end, so the work loops pull it off again.
       add_work(old);
       return;
@@ -416,6 +420,9 @@ public class GVNGCM {
         add_work(u);         // And put on worklist, to get re-visited
         if( u instanceof RetNode )
           add_work_uses(u); // really trying to get CallEpi to test trivial inline again
+        if( nnn instanceof MProjNode && nnn.in(0) instanceof MemSplitNode )
+          add_work_uses(u); // Trying to get Join/Merge/Split to fold up
+          if( nnn.in(0) != null ) add_work(nnn.in(0));
       }
     }
   }

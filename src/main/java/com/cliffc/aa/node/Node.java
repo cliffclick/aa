@@ -268,22 +268,31 @@ public abstract class Node implements Cloneable {
       for( Node use : _uses )
         if( use._op == OP_CPROJ )
           use.postorder(nodes,bs);
-      // Walk the CFG, walking a CallEpi very last
-      Node cepi = null;
+      // Walk the CFG, walking CallEpis last
       for( Node use : _uses )
-        if( use instanceof CallEpiNode ) cepi = use;
-        else if( use.is_CFG() ) use.postorder(nodes,bs);
-      if( cepi != null ) cepi.postorder(nodes,bs);
+        if( !(use instanceof CallEpiNode) && use.is_CFG() ) 
+          use.postorder(nodes,bs);
+      for( Node use : _uses )
+        if(  (use instanceof CallEpiNode) && use.is_CFG() )
+          use.postorder(nodes,bs);
     }
 
-    // Walk the rest (especially data).  Since visit bit set on the CFGs its OK
-    // to walk them also.  Calls are special, since their Proj's feed into a
-    // Fun's Parms.  We want the Fun to walk its own Parms, in order so ignore
-    // these edges.  Since the Parms are all reachable from the Fun they get
-    // walked eventually.
-    if( _op != OP_CALL && _op!=OP_RET )
-      for( Node use : _uses )
-        use.postorder(nodes,bs);
+    // Walk the rest (especially data).  Since visit bits are set on the CFGs
+    // its OK to walk them also.  Calls are special, since their Proj's feed
+    // into a Fun's Parms.  We want the Fun to walk its own Parms, in order so
+    // ignore these edges.  Since the Parms are all reachable from the Fun they
+    // get walked eventually.
+    if( _op != OP_CALL && _op!=OP_RET ) {
+      if( _op!=OP_SPLIT || _uses._len!=2 )
+        for( Node use : _uses )
+          use.postorder(nodes,bs);
+      else {                    // For MemSplit, walk the "busy" side first
+        Node p0 = _uses.at(0), p1 = _uses.at(1);
+        if( ((ProjNode)p0)._idx==1 ) { p0=p1; p1=_uses.at(0); } // Swap
+        p1.postorder(nodes,bs);
+        p0.postorder(nodes,bs);
+      }
+    }
 
     // Slight PO tweak: heads and tails together.
     if( is_multi_head() )

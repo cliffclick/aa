@@ -102,17 +102,6 @@ public class ScopeNode extends Node {
       // Wipe out return memory
       return set_mem(gvn.add_work(gvn.con(TypeMem.XMEM)), gvn);
 
-
-    // Load can move past a Join if all aliases align.
-    if( mem instanceof MemJoinNode &&
-        trez instanceof TypeMemPtr ) {
-      Node jmem = ((MemJoinNode)mem).can_bypass(gvn,(TypeMemPtr)trez);
-      // Aliases have to work out.  Also, must keep the isa
-      // types, which can fail for cycles until GCP.
-      if( jmem != null && gvn.type(jmem).isa(gvn.type(mem)) )
-        return set_mem(jmem,gvn);
-    }
-
     return null;
   }
   @Override public Type value(GVNGCM gvn) { return Type.ALL; }
