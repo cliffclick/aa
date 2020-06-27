@@ -51,19 +51,18 @@ public class MemJoinNode extends Node {
 
   // Some memory user can bypass, if the aliases are compatible
   Node can_bypass( GVNGCM gvn, TypeMemPtr tmp ) {
-    //// Check for easy split right
-    //if( tmp._aliases.isa(NewNode.ESCAPES) ) return in(1);
-    //// Check for split left, but LHS has no answer and RHS made a New
-    //TypeMem lhs = (TypeMem)gvn.type(in(0));
-    //TypeMem rhs = (TypeMem)gvn.type(in(1));
-    //TypeObj lld = lhs.ld(tmp);
-    //TypeObj rld = rhs.ld(tmp);
-    //if( TypeMem.merge_pick(lld,rld)==rld )
-    //  return in(1);
-    //// Check for easy split left
-    //if( !tmp._aliases.overlap(NewNode.ESCAPES) )
-    //  return in(0);
-    //return null;
-    throw com.cliffc.aa.AA.unimpl();
+    MemSplitNode msp = msp();
+    if( msp == null ) return null;
+    TypeMem lmm = msp.lhs_mem(gvn);
+    TypeMem rmm = msp.rhs_mem(gvn);
+    if( lmm==null || rmm==null ) return null;
+    TypeObj lld = lmm.ld(tmp);
+    TypeObj rld = rmm.ld(tmp);
+
+    if( rld==TypeObj.UNUSED )
+      return in(0);
+    if( lld==TypeObj.UNUSED )
+      return in(1);
+    return null;
   }
 }

@@ -171,7 +171,7 @@ public class CallNode extends Node {
     if( !(tc instanceof TypeTuple) ) return null;
     TypeTuple tcall = (TypeTuple)tc;
     // Dead, do nothing
-    if( gvn.type(ctl())!=Type.CTRL ) {     // Dead control (NOT dead self-type, which happens if we do not resolve)
+    if( tctl(tcall)!=Type.CTRL ) { // Dead control (NOT dead self-type, which happens if we do not resolve)
       if( (ctl() instanceof ConNode) ) return null;
       // Kill all inputs with type-safe dead constants
       set_def(1,gvn.con(TypeMem.XMEM),gvn);
@@ -265,14 +265,14 @@ public class CallNode extends Node {
     // Pinch to XCTRL/CTRL
     Type ctl = gvn.type(ctl());
     if( gvn._opt_mode>0 && cepi()==null ) ctl = Type.XCTRL; // Dead from below
-    if( ctl != Type.CTRL ) return ctl.oob();
+    if( ctl != Type.CTRL && ctl != Type.ALL ) return ctl.oob();
     final Type[] ts = TypeAry.get(_defs._len+(ARGIDX-2));
     ts[0] = Type.CTRL;
 
     // Not a memory to the call?
     Type mem = gvn.type(mem());
     if( !(mem instanceof TypeMem) ) return mem.oob();
-    TypeMem tmem = (TypeMem)(ts[MEMIDX]=mem); // Memory into the caller, not callee
+    ts[MEMIDX]=mem; // Memory into the caller, not callee
 
     // Copy args for called functions.  Arg0 is display, handled below.
     for( int i=0; i<nargs(); i++ )
@@ -320,7 +320,7 @@ public class CallNode extends Node {
     if( is_copy() ) return live_use_copy(def); // Target is as alive as our projs are.
     if( def==fun() ) {                         // Function argument
       if( gvn._opt_mode < 2 ) return TypeMem.ALLMEM; // Prior to GCP, assume all fptrs are alive
-      if( !(def instanceof FunPtrNode) ) return _live;
+      if( !(def instanceof FunPtrNode) ) return TypeMem.ALIVE;
       int dfidx = ((FunPtrNode)def).ret()._fidx;
       return live_use_call(gvn,dfidx); // Can be precise
     }

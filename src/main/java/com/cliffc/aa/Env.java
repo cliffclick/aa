@@ -134,9 +134,6 @@ public class Env implements AutoCloseable {
     if( pscope != null && _par._par != null )
       _scope.stk().promote_forward(GVN,pscope.stk());
     close_display(GVN);
-    // Whats left is function-ref generic entry points which promote to next
-    // outer scope, and control-users which promote to the Scope's control.
-    assert _scope._uses.isEmpty();
     _scope.unkeep(GVN);
     assert _scope.is_dead();
   }

@@ -236,6 +236,11 @@ public class MemMergeNode extends Node {
       assert gvn.type(base) instanceof TypeMem;
     } // Check for progress
 
+    // "Peek" through each input, past a prior MemMarge
+    for( int alias=2; alias<len; alias++ )
+      while( ins.at(alias) instanceof MemMergeNode )
+        ins.set(alias,((MemMergeNode)ins.at(alias)).alias2node(alias));
+    
     // Find any unused inputs, and set them to either the base (if unused
     // there) or to a constant unused.  Other constants (than UNUSED) do not
     // work, since they can lift to UNUSED but UNUSED can never lift again.
@@ -277,7 +282,7 @@ public class MemMergeNode extends Node {
     if( _defs   .equals(outs) &&
         _aliases.equals(alss) &&
         _aidxes .equals(adxs) ) {
-      if( unused!=null )
+      if( unused!=null )        // No progress, but must unwind 'unused' so no-progress-ideal() can be used in an assert
         if( unused._uses._len==0 ) gvn.kill(unused);
         else unused._live = unused.live(gvn); // Unwind making it alive
       return null;              // No progress

@@ -289,7 +289,7 @@ public class TypeMem extends Type<TypeMem> {
     boolean any = aliases.above_center();
     // Any alias, plus all of its children, are meet/joined.  This does a
     // tree-based scan on the inner loop.
-    TypeObj obj1 = any ? TypeObj.OBJ : TypeObj.XOBJ;
+    TypeObj obj1 = any ? TypeObj.ISUSED : TypeObj.UNUSED;
     for( int alias : aliases )
       for( int kid=alias; kid!=0; kid=BitsAlias.next_kid(alias,kid) ) {
         TypeObj x = at(tos,kid);
