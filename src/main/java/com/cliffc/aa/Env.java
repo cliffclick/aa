@@ -92,7 +92,7 @@ public class Env implements AutoCloseable {
     GVN.setype(DEFMEM,DEFMEM.value(GVN));
     // Uplift all types once, since early Parm:mem got early versions of prims,
     // and later prims *added* choices which *lowered* types.
-    for( int i=0; i<2; i++ )
+    for( int i=0; i<3; i++ )
       for( Node n : GVN.valsKeySet() )
         GVN.setype(n,n.value(GVN));
     GVN.add_work(MEM_0);

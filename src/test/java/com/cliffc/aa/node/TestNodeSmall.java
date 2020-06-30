@@ -399,16 +399,16 @@ public class TestNodeSmall {
     gvn._opt_mode=0;
     ConNode ctl = gvn.init(new ConNode<>(Type.CTRL));
     gvn.setype(ctl,Type.CTRL);
-    ConNode mem = (ConNode)gvn.xform(new ConNode<>(TypeMem.MEM.dual()));
+    ConNode mem = (ConNode)gvn.xform(new ConNode<>(TypeMem.XMEM));
     ConNode rpc = (ConNode)gvn.xform(new ConNode<>(TypeRPC.ALL_CALL));
     ConNode dsp_prims = (ConNode) gvn.xform(new ConNode<>(TypeMemPtr.DISP_SIMPLE));
     // The file-scope display closing the graph-cycle.  Needs the FunPtr, not
     // yet built.
-    NewObjNode dsp_file = (NewObjNode)gvn.xform(new NewObjNode(true,TypeStruct.DISPLAY,ctl,dsp_prims));
-    OProjNode dsp_file_obj = (OProjNode)gvn.xform(new OProjNode(dsp_file,0));
+    NewObjNode dsp_file = (NewObjNode)gvn.xform(new NewObjNode(true,TypeStruct.DISPLAY,mem,dsp_prims));
+    MProjNode dsp_file_obj = Env.DEFMEM.make_mem_proj(gvn,dsp_file);
     ProjNode  dsp_file_ptr = ( ProjNode)gvn.xform(new  ProjNode(dsp_file,1));
     Env.DISPLAYS = Env.DISPLAYS.set(dsp_file._alias);
-    MemMergeNode dsp_merge = (MemMergeNode)gvn.xform(new MemMergeNode(mem,dsp_file_obj,dsp_file._alias));
+    MemJoinNode dsp_merge = (MemJoinNode)gvn.xform(new MemJoinNode(mem,dsp_file_obj,dsp_file));
     // The Fun and Fun._tf:
     TypeStruct formals = TypeStruct.make_args(TypeAry.ts(gvn.type(dsp_file_ptr), // File-scope display as arg0
                                                          Type.SCALAR));          // Some scalar arg1

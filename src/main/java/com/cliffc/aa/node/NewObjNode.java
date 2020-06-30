@@ -128,12 +128,14 @@ public class NewObjNode extends NewNode<TypeStruct> {
     Type tmem0 = gvn.type(mem());
     if( !(tmem0 instanceof TypeMem) ) return tmem0.oob();
     TypeMem tmem = (TypeMem)tmem0;
-    if( _ts==dead_type() ) return TypeTuple.make(TypeObj.UNUSED,_tptr);
-    // Gather args and produce a TypeStruct
-    Type[] ts = TypeAry.get(_ts._ts.length);
-    for( int i=0; i<ts.length; i++ )
-      ts[i] = gvn.type(fld(i));
-    TypeStruct newt = _ts.make_from(ts);  // Pick up field names and mods
+    TypeObj newt=TypeObj.UNUSED; // If dead
+    if( _ts!=dead_type() ) {
+      // Gather args and produce a TypeStruct
+      Type[] ts = TypeAry.get(_ts._ts.length);
+      for( int i=0; i<ts.length; i++ )
+        ts[i] = gvn.type(fld(i));
+      newt = _ts.make_from(ts);  // Pick up field names and mods
+    }
     TypeMem tmem2 = tmem.st(_alias,newt); // Merge with incoming value at same alias
     return TypeTuple.make(tmem2,_tptr);   // Complex obj, simple ptr.
   }

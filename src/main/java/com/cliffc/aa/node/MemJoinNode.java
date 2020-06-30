@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 
@@ -49,6 +50,7 @@ public class MemJoinNode extends Node {
   // ~use always goes-right (post-split only).
   // Others use the escapee set, which monotonically decreases over time.
   @Override public Type value(GVNGCM gvn) {
+    if( _defs._len > 3 ) throw com.cliffc.aa.AA.unimpl(); // Handle more than one set
     Type pre = gvn.type(pre());
     Type rhs = gvn.type(rhs());
     if( !(pre instanceof TypeMem) ) return pre.oob();
@@ -65,33 +67,16 @@ public class MemJoinNode extends Node {
     // All ~use always goes-right
     if( tpre == TypeMem.ANYMEM) return trhs;
 
-    //Type msp = gvn.type(msp());
-    //if( !(msp instanceof TypeTuple) ) return msp.oob();
-    //TypeTuple tmsp = (TypeTuple)msp;
-    //BitsAlias as = ((TypeMemPtr)(tmsp.at(2)))._aliases;
-    //if( as==BitsAlias.FULL || as==BitsAlias.NZERO ) return rhs;
-    //TypeMem precall_mem = (TypeMem)tmsp.at(0); // Pre-call memory
-    //TypeMem defmem = (TypeMem)gvn.type(in(2));
-    //// Since the RHS will have a call, all its memory is JOINed with DEFMEM
-    //// already.  If any alias moves from Right to Left, the LHS now needs to be
-    //// joined with DEFMEM also.
-    //TypeMem tmem = (TypeMem)precall_mem.join(defmem);
-    //// Replace pre-call with RHS on escaping aliases
-    //for( int alias : as )
-    //  for( int kid=alias; kid!=0; kid=BitsAlias.next_kid(alias,kid) )
-    //    tmem = tmem.set(kid,trhs.at(kid));
-    //// Replace pre-call with RHS, where LHS is ~obj and RHS is != ~use.
-    //// This catches RHS fresh allocations.
-    //TypeMem tmem2 = tmem;
-    //for( int alias=2; alias<tmem.len(); alias++ ) {
-    //  if( tmem.at(alias)==TypeObj.XOBJ && trhs.at(alias)!=TypeObj.UNUSED )
-    //    tmem2 = tmem2.set(alias,trhs.at(alias));
-    //}
-    //
-    //return tmem2;
-
-    // Expect pairs of RHS-memory and RHS-aliases; RHS-aliases supports v-call for aliases.
-    throw com.cliffc.aa.AA.unimpl();
+    // Pick left or right and merge (not meet)
+    TypeObj[] tos = new TypeObj[Env.DEFMEM._defs._len];
+    for( int alias=1; alias<tos.length; alias++ ) {
+      TypeObj tl = tpre.at(alias);
+      TypeObj tr = trhs.at(alias);
+      tos[alias] = tl==TypeObj.ISUSED ? tl // 'use' always LHS
+        : (tl==TypeObj.UNUSED ? tr         // '~use' always RHS
+           : (aliases.test_recur(alias) ? tr : tl)); // Otherwise pick from escapes
+    }
+    return TypeMem.make0(tos);
   }
   @Override public boolean basic_liveness() { return false; }
 

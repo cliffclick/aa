@@ -18,12 +18,13 @@ public class TestType {
     Object dummy1 = TypeMemPtr.TYPES;
 
     TypeStruct ts0 = TypeStruct.open(TypeMemPtr.DISPLAY_PTR); // infinite extent of any-field, top mod, Scalar
-    TypeStruct ts1 = ts0.add_fld("fact",TypeStruct.FFNL); // adding a field lifts
-    Type mt = ts0.meet(ts1);
-    assertEquals(ts0,mt);
+    TypeStruct ts1 = ts0.add_fld("a",TypeStruct.FFNL); // adding a field lifts
+    TypeStruct ts2 = ts1.add_fld("b",TypeStruct.FFNL); // adding a field lifts
+    Type mt = ts1.meet(ts2);
+    assertEquals(ts1,mt);
 
-    TypeStruct ts2 = ts1.close();
-    assertTrue(ts2.isa(ts1));
+    TypeStruct ts3 = ts2.close();
+    assertTrue(ts3.isa(ts2));
   }
 
   @Test public void testBits0() {
@@ -572,8 +573,8 @@ public class TestType {
       assertTrue(tic.isa(tjc));
     }
   }
-  
-  
+
+
   @Test public void testCommuteSymmetricAssociative() {
     Type.init0(new HashMap<>());
     Object dummy0 = TypeStruct.TYPES;

@@ -274,11 +274,17 @@ public class CallNode extends Node {
     // Not a memory to the call?
     Type mem = gvn.type(mem());
     if( !(mem instanceof TypeMem) ) return mem.oob();
-    ts[MEMIDX]=mem; // Memory into the caller, not callee
+    TypeMem tmem = (TypeMem)mem;
+    ts[MEMIDX]=tmem; // Memory into the caller, not callee
 
     // Copy args for called functions.  Arg0 is display, handled below.
+    // Also gather all aliases from all args
+    BitsAlias as = BitsAlias.EMPTY;
     for( int i=0; i<nargs(); i++ )
-      ts[i+ARGIDX] = gvn.type(arg(i));
+      as = as.meet(get_alias(ts[i+ARGIDX] = gvn.type(arg(i))));
+    // Recursively search memory for aliases; compute escaping aliases
+    BitsAlias as2 = tmem.all_reaching_aliases(as);
+    ts[ESCIDX] = TypeMemPtr.make(as2,TypeObj.UNUSED);
 
     // Not a function to call?
     Type tfx = gvn.type(fun());
@@ -294,10 +300,14 @@ public class CallNode extends Node {
     // Call.ts[2] is a TFP just for the resolved fidxs and display.
     ts[ARGIDX] = TypeFunPtr.make(rfidxs,tfp._nargs,rfidxs.above_center() == fidxs.above_center() ? tfp._disp : tfp._disp.dual());
 
-    // 
-    ts[ESCIDX] = null;
-    throw com.cliffc.aa.AA.unimpl();
-    //return TypeTuple.make(ts);
+    return TypeTuple.make(ts);
+  }
+  // Get (shallow) aliases from the type
+  private static BitsAlias get_alias(Type t) {
+    if( t instanceof TypeMemPtr ) return ((TypeMemPtr)t)._aliases;
+    if( t instanceof TypeFunPtr ) return ((TypeFunPtr)t)._disp._aliases;
+    if( TypeMemPtr.OOP.isa(t)   ) return BitsAlias.FULL;
+    return BitsAlias.EMPTY;
   }
 
   // Compute live across uses.  If pre-GCP, then we may not be wired and thus
