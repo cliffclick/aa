@@ -1,4 +1,55 @@
 =======================================
+Notes from 06/29/2020
+
+- Drop MemMerge
+- StartMem is always ~use
+- DefMem starts use, lifts per-alias as they appear.
+- New takes in mem (not control) and Meets with itself along alias.
+- - New produces MProj not OProj
+- Store takes in mem and produces mem.
+- Parser Split/Join instead of MemMerge around Stores & Calls & New (calls done)
+- Drop Split!  Since nobody needs the refined RHS (I think), since they're not touching it anyways
+- Call computes escaping aliases (monotonically decrease over time)
+- All never-yet-made Go Right.  Get from DefMem (non-local curse)
+
+- Join takes pre-call memory (for LHS)
+- Join takes post-call memory (for RHS)
+- Join takes alias set from Call output, or Store output - directly pointing at Call or Store
+- - Store output can stay put, Join can touch Store directly and compute alias from address
+- Join also splits dead-aliases LHS always, and not-yet-aliases RHS always, or otherwise takes according to alias.
+- OPTIMIZATION: Join handles parallel updates with parallel alias sets, broken out from
+  left-to-right and the same pre-memory.  Always 100% independent updates.
+
+Example:
+StartMem 12:~use ->
+Call     12:~use -> // and alias#12 not in ptrs, but is '~use', not-yet-alloc, Goes Right
+CallEpi  12: use -> // Unknown call makes all possible '12' objects (and all other 'use' aliases)
+MProj    12: use -> // Projection
+Join     PRE:12:~use  RHS:12:use  Alias#12 is '~use' in PRE, so take right.
+
+StartMem 12:~use ->
+NewObj   12:@{}  -> // Meets ~use input with self; if DProj goes dead can lift self to ~use.
+MProj    12:@{}  -> // if MProj goes dead, again lift to ~use & DProj becomes gensym
+Join     PRE:~use  RHS:12:@{}  Alias#12 is '~use' in PRE, so take right; but also NewObj takes right
+
+Join     12:@{x=3}
+Store    12:@{x=4} // Produces TypeMem NOT TypeObj, since updates many
+Join     LHS:12:@{x=3}  RHS:12:@{x=4}  Alias@12 from Store, so take right
+
+- use: will not be allocated; alloc-and-dead
+- obj: alloc as something
+- @{low open }: adding  fields; all unknown fields are 'all'
+- @{low close}: no more fields; all unknown fields are 'any'
+- ~@{}: high, discovery?
+- ~obj: high, discovery? of struct-vs-array
+- ~use: yet to be alloced
+
+PONDER:
+Drop TypeStruct._open, use TypeStruct._use instead
+
+
+
+=======================================
 Notes from 06/13/2020
 
 Action items

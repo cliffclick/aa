@@ -47,20 +47,22 @@ public class ScopeNode extends Node {
   }
   // Set a new active NOT-GVNd memory, ready for directly updating memory edges.
   public MemMergeNode set_active_mem( MemMergeNode mmem, GVNGCM gvn) {
-    assert !gvn.touched(mmem);
-    set_def(1,mmem,gvn);
-    return mmem;
+    //assert !gvn.touched(mmem);
+    //set_def(1,mmem,gvn);
+    //return mmem;
+    throw com.cliffc.aa.AA.unimpl();
   }
   // Convert a possibly active memory to an inactive memory.
   public Node all_mem( GVNGCM gvn ) {
-    Node mem = mem();
-    if( gvn.touched(mem) ) return mem; // Already not active
-    assert mem._uses._len==1;          // Only self usage
-    mem.keep();                 // Remove this scope usage without deleting
-    set_mem(null,gvn);          // Remove this scope usage
-    mem = gvn.xform(mem.unhook());// Then xform like a new node
-    set_mem(mem,gvn);           // Re-insert
-    return mem;                 // Return inactive memory
+    //Node mem = mem();
+    //if( gvn.touched(mem) ) return mem; // Already not active
+    //assert mem._uses._len==1;          // Only self usage
+    //mem.keep();                 // Remove this scope usage without deleting
+    //set_mem(null,gvn);          // Remove this scope usage
+    //mem = gvn.xform(mem.unhook());// Then xform like a new node
+    //set_mem(mem,gvn);           // Re-insert
+    //return mem;                 // Return inactive memory
+    throw com.cliffc.aa.AA.unimpl();
   }
 
   public Node get(String name) { return stk().get(name); }
@@ -119,7 +121,9 @@ public class ScopeNode extends Node {
     if( !(trez instanceof TypeMemPtr) ) return TypeMem.ANYMEM; // Not a pointer, basic live only
     if( trez.above_center() ) return TypeMem.ANYMEM; // Have infinite choices still, report basic live only
     // Find everything reachable from the pointer and memory, and report it all
-    return ((TypeMem)tmem).slice_all_aliases_plus_children(((TypeMemPtr)trez)._aliases);
+    TypeMem tmem0 = (TypeMem)tmem;
+    BitsAlias aliases = tmem0.all_reaching_aliases(((TypeMemPtr)trez)._aliases);
+    return tmem0.slice_reaching_aliases(aliases);
   }
   @Override public TypeMem live( GVNGCM gvn) {
     // The top scope is always alive, and represents what all future unparsed

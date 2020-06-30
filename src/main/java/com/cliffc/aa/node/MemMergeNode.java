@@ -47,6 +47,8 @@ public class MemMergeNode extends Node {
     // Reverse mapping from alias# to idx#.  BitsAlias.ALL is always slot 0,
     // and null (alias 0) is never a thing.
     _aidxes  = new AryInt(new int[]{-1,0});
+    // CNC 6/29/2020 - not using
+    throw com.cliffc.aa.AA.unimpl();
   }
   // A first alias
   public MemMergeNode( Node mem, Node obj, int alias ) {

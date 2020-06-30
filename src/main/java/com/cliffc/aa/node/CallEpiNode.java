@@ -405,8 +405,8 @@ public final class CallEpiNode extends Node {
     // cannot remove until memory types align.  The called function can be
     // "behind" the Call/CallEpi pair and needs to catch up before directly
     // inlining.
-    TypeTuple tself = (TypeTuple)gvn.self_type(this);
-    Type tmem0 = tself.at(1);
+    Type tself = gvn.self_type(this);
+    Type tmem0 = tself instanceof TypeTuple ? ((TypeTuple)tself).at(1) : tself;
     Type tmem1 = gvn.type(in(1));
     return tmem1.isa(tmem0);    // Incoming inline memory isa self memory
   }

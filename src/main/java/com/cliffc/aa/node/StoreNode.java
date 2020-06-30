@@ -39,11 +39,6 @@ public class StoreNode extends Node {
         !BitsAlias.is_parent(alias) )
       return new StoreNode(this,((MemMergeNode)mem).obj(alias,gvn),adr);
 
-    // Stores bypass a Split.
-    if( mem instanceof MProjNode && mem.in(0) instanceof MemSplitNode ) {
-      return set_def(1,mem.in(0).in(0),gvn);
-    }
-
     // If Store is by a New and no other Stores, fold into the New.
     NewObjNode nnn;  int idx;
     if( mem instanceof OProjNode &&
@@ -65,31 +60,34 @@ public class StoreNode extends Node {
     TypeMemPtr tmp = (TypeMemPtr)adr;
     Type val = gvn.type(val());   // Value
 
-    // Convert from memory to the struct being updated
-    Node mem = mem();
-    Type tmem = gvn.type(mem);
-    TypeObj tobj;
-    if( tmem instanceof TypeMem )
-      tobj = ((TypeMem)tmem).ld(tmp); // Get approx object being updated
-    else if( tmem instanceof TypeObj )
-      tobj = (TypeObj)tmem;   // Object being updated
-    else                      // Else dunno what is being updated
-      return tmem.oob(TypeStruct.ALLSTRUCT);
+    //// Convert from memory to the struct being updated
+    //Node mem = mem();
+    //Type tmem = gvn.type(mem);
+    //TypeObj tobj;
+    //if( tmem instanceof TypeMem )
+    //  tobj = ((TypeMem)tmem).ld(tmp); // Get approx object being updated
+    //else if( tmem instanceof TypeObj )
+    //  tobj = (TypeObj)tmem;   // Object being updated
+    //else                      // Else dunno what is being updated
+    //  return tmem.oob(TypeStruct.ALLSTRUCT);
+    //
+    //// Not updating a struct?
+    //if( !(tobj instanceof TypeStruct) )
+    //  // Updating XOBJ means updating any choice, and we choose no-change.
+    //  // Updating  OBJ means we're already as low as we can go.
+    //  return tobj.oob(TypeStruct.ALLSTRUCT);
+    //
+    //// Update the field.  Illegal updates make no changes.
+    //TypeStruct ts = (TypeStruct)tobj;
+    //// Updates to a NewNode are precise, otherwise aliased updates
+    //if( mem().in(0) == adr().in(0) && mem().in(0) instanceof NewNode && !adr.must_nil())
+    //  // No aliasing, even if the NewNode is called repeatedly
+    //  return ts.st(_fin, _fld, val);
+    //// Imprecise update
+    //return ts.update(_fin, _fld, val);
 
-    // Not updating a struct?
-    if( !(tobj instanceof TypeStruct) )
-      // Updating XOBJ means updating any choice, and we choose no-change.
-      // Updating  OBJ means we're already as low as we can go.
-      return tobj.oob(TypeStruct.ALLSTRUCT);
-
-    // Update the field.  Illegal updates make no changes.
-    TypeStruct ts = (TypeStruct)tobj;
-    // Updates to a NewNode are precise, otherwise aliased updates
-    if( mem().in(0) == adr().in(0) && mem().in(0) instanceof NewNode && !adr.must_nil())
-      // No aliasing, even if the NewNode is called repeatedly
-      return ts.st(_fin, _fld, val);
-    // Imprecise update
-    return ts.update(_fin, _fld, val);
+    // Returns TypeMem
+    throw com.cliffc.aa.AA.unimpl();
   }
 
   @Override public boolean basic_liveness() { return false; }

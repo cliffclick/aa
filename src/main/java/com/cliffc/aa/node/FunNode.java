@@ -597,9 +597,9 @@ public class FunNode extends RegionNode {
       Node oo = e.getKey();           // Old node
       Node nn = e.getValue();         // New node
       Type nt = gvn.type(oo);   // Generally just copy type from original nodes
-      if( nn instanceof OProjNode ) { // Cloned allocations registers with default memory
-        Env.DEFMEM.make_mem(gvn,(NewNode)nn.in(0),(OProjNode)nn);
-        Env.DEFMEM.make_mem(gvn,(NewNode)oo.in(0),(OProjNode)oo);
+      if( nn instanceof MProjNode && nn.in(0) instanceof NewNode ) { // Cloned allocations registers with default memory
+        Env.DEFMEM.make_mem(gvn,(NewNode)nn.in(0),(MProjNode)nn);
+        Env.DEFMEM.make_mem(gvn,(NewNode)oo.in(0),(MProjNode)oo);
         int oldalias = BitsAlias.parent(((NewNode)oo.in(0))._alias);
         gvn.set_def_reg(Env.DEFMEM,oldalias,gvn.con(TypeObj.UNUSED));
       }

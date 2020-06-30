@@ -6,18 +6,11 @@ import com.cliffc.aa.type.*;
 
 // Program memory start
 public class StartMemNode extends Node {
-  public StartMemNode(StartNode st, DefMemNode def) { super(OP_STMEM,st,def); }
+  public StartMemNode(StartNode st) { super(OP_STMEM,st); }
   @Override public Node ideal(GVNGCM gvn, int level) { return null; }
   @Override public Type value(GVNGCM gvn) {
-    // All memories are XOBJ, unless UNUSED in the default memory.
-    Type defmem = gvn.type(in(1));
-    if( !(defmem instanceof TypeMem) ) return defmem.oob();
-    if( defmem == TypeMem.ANYMEM ) return TypeMem.ANYMEM; // Shortcut
-    TypeObj[] objs = ((TypeMem)defmem).alias2objs().clone();
-    for( int i=1; i<objs.length; i++ )
-      if( objs[i]!=null && objs[i]!=TypeObj.UNUSED )
-        objs[i]=TypeObj.XOBJ;
-    return TypeMem.make0(objs);
+    // All things are '~use' (to-be-allocated)
+    return TypeMem.ANYMEM;
   }
   @Override public boolean basic_liveness() { return false; }
   // StartMemNodes are never equal

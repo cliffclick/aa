@@ -18,12 +18,12 @@ public class NewObjNode extends NewNode<TypeStruct> {
   public       Parse[] _fld_starts; // Start of each tuple member; 0 for the display
   // NewNodes do not really need a ctrl; useful to bind the upward motion of
   // closures so variable stores can more easily fold into them.
-  public NewObjNode( boolean is_closure, TypeStruct disp, Node ctrl, Node clo ) {
-    this(is_closure, BitsAlias.RECORD, disp, ctrl,clo);
+  public NewObjNode( boolean is_closure, TypeStruct disp, Node mem, Node clo ) {
+    this(is_closure, BitsAlias.RECORD, disp, mem, clo);
   }
   // Called by IntrinsicNode.convertTypeNameStruct
-  public NewObjNode( boolean is_closure, int par_alias, TypeStruct ts, Node ctrl, Node clo ) {
-    super(OP_NEWOBJ,par_alias,ts,ctrl,clo);
+  public NewObjNode( boolean is_closure, int par_alias, TypeStruct ts, Node mem, Node clo ) {
+    super(OP_NEWOBJ,par_alias,ts,mem,clo);
     _is_closure = is_closure;
     assert ts._ts[0].is_display_ptr();
   }
@@ -125,13 +125,17 @@ public class NewObjNode extends NewNode<TypeStruct> {
   }
 
   @Override public Type value(GVNGCM gvn) {
+    Type tmem0 = gvn.type(mem());
+    if( !(tmem0 instanceof TypeMem) ) return tmem0.oob();
+    TypeMem tmem = (TypeMem)tmem0;
     if( _ts==dead_type() ) return TypeTuple.make(TypeObj.UNUSED,_tptr);
     // Gather args and produce a TypeStruct
     Type[] ts = TypeAry.get(_ts._ts.length);
     for( int i=0; i<ts.length; i++ )
       ts[i] = gvn.type(fld(i));
-    TypeStruct newt = _ts.make_from(ts); // Pick up field names and mods
-    return TypeTuple.make(newt,_tptr); // Complex obj, simple ptr.
+    TypeStruct newt = _ts.make_from(ts);  // Pick up field names and mods
+    TypeMem tmem2 = tmem.st(_alias,newt); // Merge with incoming value at same alias
+    return TypeTuple.make(tmem2,_tptr);   // Complex obj, simple ptr.
   }
   @Override TypeStruct dead_type() { return TypeStruct.ANYSTRUCT; }
 }

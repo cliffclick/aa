@@ -7,17 +7,12 @@ import com.cliffc.aa.type.TypeTuple;
 
 // Proj data
 public class ProjNode extends Node {
-  final int _idx;
+  public final int _idx;
   public ProjNode( Node ifn, int idx ) { this(OP_PROJ,ifn,idx); }
   ProjNode( byte op, Node ifn, int idx ) { super(op,ifn); _idx=idx; }
   @Override String xstr() { return "DProj_"+_idx; }
 
-  @Override public Node ideal(GVNGCM gvn, int level) {
-    // multi-head is collapsing?  Then follow suit.
-    Node cp = in(0).is_copy(gvn,_idx);
-    if( cp != null ) return cp;
-    return null;
-  }
+  @Override public Node ideal(GVNGCM gvn, int level) { return in(0).is_copy(gvn,_idx); }
 
   @Override public Type value(GVNGCM gvn) {
     Type c = gvn.type(in(0));

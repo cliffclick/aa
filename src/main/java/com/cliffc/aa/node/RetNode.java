@@ -51,7 +51,7 @@ public final class RetNode extends Node {
     // If no users inlining, wipe out all edges
     if( is_copy() && in(0)!=null && _uses._len==1 && _uses.at(0) instanceof FunPtrNode ) {
       set_def(0,null,gvn);      // No ctrl
-      set_def(1,null,gvn);      // No mem
+      set_def(1,null,gvn); if( is_dead() ) return this; // No mem
       set_def(2,null,gvn);      // No val
       set_def(3,null,gvn);      // No rpc
       set_def(4,null,gvn);      // No fun

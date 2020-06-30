@@ -38,10 +38,10 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
     TypeObj t2 = (TypeObj)t1.hashcons();
     return t1==t2 ? t1 : t1.free(t2);
   }
-  public static final TypeObj OBJ   = make("",false,false);    // Any obj; also: not-yet-alloc but might be
-  public static final TypeObj ISUSED= make("",false,true );    //
-  public static final TypeObj UNUSED= (TypeObj)ISUSED.dual();  // dead obj; alias has been used & deleted
-  public static final TypeObj XOBJ  = (TypeObj)OBJ   .dual();  // object is uninitialized
+  public static final TypeObj OBJ   = make("",false,false);    // Any obj; allocated as *something*
+  public static final TypeObj ISUSED= make("",false,true );    // dead obj; alias has been used & deleted
+  public static final TypeObj UNUSED= (TypeObj)ISUSED.dual();  // Not-yet-allocated, but might be
+  public static final TypeObj XOBJ  = (TypeObj)OBJ   .dual();  // object type is unknown (either struct or array)
   static final TypeObj[] TYPES = new TypeObj[]{OBJ,ISUSED,UNUSED,XOBJ};
 
   @Override boolean is_display() { return false; }
@@ -70,9 +70,5 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
   @Override void walk( Predicate<Type> p ) { p.test(this); }
   // Widen (loss info), to make it suitable as the default function memory.
   // Must be monotonic, as CallEpiNode.value() uses this.
-  public TypeObj crush() {
-    if( this==UNUSED ) return UNUSED;
-    if( this==ISUSED ) return ISUSED;
-    return OBJ;
-  }
+  public TypeObj crush() { return this; }
 }

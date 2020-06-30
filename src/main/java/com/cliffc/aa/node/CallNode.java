@@ -133,10 +133,12 @@ public class CallNode extends Node {
   // ts[4]...
 
   static final int MEMIDX=1; // Memory into the caller
-  static final int ARGIDX=2; //
+  static final int ESCIDX=2; // Aliases escaping into callee
+  static final int ARGIDX=3; //
   static        Type       tctl( Type tcall ) { return             ((TypeTuple)tcall).at(0); }
-  static        TypeMem    tmem( Type tcall ) { return tmem(((TypeTuple)tcall)._ts); }
-  static        TypeMem    tmem( Type[] ts  ) { return (TypeMem)ts[MEMIDX]; } // caller memory passed around function
+  static        TypeMem    tmem( Type tcall ) { return tmem(       ((TypeTuple)tcall)._ts ); }
+  static        TypeMem    tmem( Type[] ts  ) { return (TypeMem   ) ts[MEMIDX]; } // caller memory passed around function
+  static        TypeMemPtr tesc( Type tcall ) { return (TypeMemPtr)((TypeTuple)tcall).at(ESCIDX); }
   static public TypeFunPtr ttfp( Type tcall ) { return (TypeFunPtr)((TypeTuple)tcall).at(ARGIDX); }
   static public TypeFunPtr ttfpx(Type tcall ) {
     Type t = ((TypeTuple)tcall).at(ARGIDX);
@@ -292,7 +294,10 @@ public class CallNode extends Node {
     // Call.ts[2] is a TFP just for the resolved fidxs and display.
     ts[ARGIDX] = TypeFunPtr.make(rfidxs,tfp._nargs,rfidxs.above_center() == fidxs.above_center() ? tfp._disp : tfp._disp.dual());
 
-    return TypeTuple.make(ts);
+    // 
+    ts[ESCIDX] = null;
+    throw com.cliffc.aa.AA.unimpl();
+    //return TypeTuple.make(ts);
   }
 
   // Compute live across uses.  If pre-GCP, then we may not be wired and thus
@@ -329,7 +334,7 @@ public class CallNode extends Node {
       return def.basic_liveness() ? TypeMem.ESCAPE : TypeMem.ANYMEM;    // Args always alive and escape
     // Needed to sharpen args for e.g. resolve and errors.
     Type tcall = gvn.type(this);
-    if( tcall==Type.ANY ) return _live; // No type to sharpen
+    if( !(tcall instanceof TypeTuple) ) return _live; // No type to sharpen
     BitsAlias aliases = BitsAlias.EMPTY;
     for( int i=1; i<nargs(); i++ ) {
       Type targ = targ(tcall,i);
@@ -342,7 +347,7 @@ public class CallNode extends Node {
     // Conservative too strong; need only memories that go as deep as the
     // formal types.
     TypeMem tmem = tmem(tcall);
-    TypeMem tmem2 = tmem.slice_all_aliases_plus_children(aliases);
+    TypeMem tmem2 = tmem.slice_reaching_aliases(tmem.all_reaching_aliases(aliases));
     TypeMem tmem3 = (TypeMem)tmem2.meet(_live);
     return tmem3;
   }

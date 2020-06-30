@@ -2,9 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeLive;
-import com.cliffc.aa.type.TypeMem;
+import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
@@ -270,7 +268,7 @@ public abstract class Node implements Cloneable {
           use.postorder(nodes,bs);
       // Walk the CFG, walking CallEpis last
       for( Node use : _uses )
-        if( !(use instanceof CallEpiNode) && use.is_CFG() ) 
+        if( !(use instanceof CallEpiNode) && use.is_CFG() )
           use.postorder(nodes,bs);
       for( Node use : _uses )
         if(  (use instanceof CallEpiNode) && use.is_CFG() )
@@ -420,6 +418,9 @@ public abstract class Node implements Cloneable {
       TypeMem live = live(gvn);
       if( _live != live )
         return true;            // Found a liveness improvement
+      if( this instanceof CallEpiNode && ((CallEpiNode)this).is_copy() ||
+          this instanceof CallNode    && ((CallNode   )this).is_copy() )
+        return true;
     }
     for( Node def : _defs ) if( def != null && def.more_ideal(gvn,bs,level) ) return true;
     for( Node use : _uses ) if( use != null && use.more_ideal(gvn,bs,level) ) return true;
@@ -516,6 +517,10 @@ public abstract class Node implements Cloneable {
   // True for most primitives.  Returns the pre-call memory or null.
   Node is_pure_call() { return null; }
 
+  // Aliases that a MemJoin might choose between.  Not valid for nodes which do
+  // not manipulate memory.
+  BitsAlias escapees() { throw com.cliffc.aa.AA.unimpl("graph error"); }
+  
   // Walk a subset of the dominator tree, looking for the last place (highest
   // in tree) this predicate passes, or null if it never does.
   Node walk_dom_last(Predicate<Node> P) {

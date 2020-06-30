@@ -54,9 +54,6 @@ public class LoadNode extends Node {
       Node jmem = ((MemJoinNode)mem).can_bypass(gvn,(TypeMemPtr)tadr);
       if( jmem != null ) return set_mem(jmem,gvn);
     }
-    // Load can always move past a Split
-    if( mem instanceof MProjNode && mem.in(0) instanceof MemSplitNode )
-      return set_mem(((MemSplitNode)mem.in(0)).mem(),gvn);
 
     // Load can move out of a Call, if the function has no Parm:mem - happens
     // for single target calls that do not (have not yet) inlined.

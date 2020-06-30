@@ -3,7 +3,6 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
-import com.cliffc.aa.type.TypeTuple;
 
 // Proj control
 public class CProjNode extends ProjNode {
@@ -16,13 +15,10 @@ public class CProjNode extends ProjNode {
   }
   @Override public Node ideal(GVNGCM gvn, int level) { return in(0).is_copy(gvn,_idx); }
   @Override public Type value(GVNGCM gvn) {
-    Type c = gvn.type(in(0));  // our type is just the matching tuple slice
-    if( c.isa(TypeTuple.IF_ANY) ) return Type.XCTRL;
-    if( TypeTuple.IF_ALL.isa(c) ) return Type. CTRL;
-    if( !(c instanceof TypeTuple) ) return Type.CTRL;
-    TypeTuple ct = (TypeTuple)c;
-    Type res = ct.at(_idx);
-    return res==Type.XCTRL ? Type.XCTRL : Type.CTRL;
+    Type x = super.value(gvn);
+    if( x==Type.ANY ) return Type.XCTRL;
+    if( x==Type.ALL ) return Type. CTRL;
+    return x;
   }
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) { return def.basic_liveness() ? TypeMem.ALIVE : TypeMem.ANYMEM; }
   // Return the op_prec of the returned value.  Not sensible except

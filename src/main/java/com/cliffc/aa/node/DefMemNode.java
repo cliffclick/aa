@@ -14,10 +14,12 @@ public class DefMemNode extends Node {
   @Override public Node ideal(GVNGCM gvn, int level) { return null; }
   @Override public TypeMem value(GVNGCM gvn) {
     TypeObj[] tos = new TypeObj[_defs._len];
-    for( int i=1; i<_defs._len; i++ ) {
-      Node n = _defs.at(i);
+    assert in(1)==null; // No need for a 'USE' object
+    tos[1] = TypeObj.ISUSED;    // Default: all objects are not-yet-allocated
+    for( int i=2; i<_defs._len; i++ ) {
+      Node n = in(i);
       if( n==null ) continue;
-      if( n instanceof OProjNode ) {
+      if( n instanceof MProjNode ) {
         tos[i] = ((NewNode)n.in(0))._defmem;
       } else {
         Type tn = gvn.type(n);
@@ -30,12 +32,12 @@ public class DefMemNode extends Node {
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) { return _live; }
   @Override public boolean equals(Object o) { return this==o; } // Only one
 
-  // Make an OProj for a New, and 'hook' it into the default memory
-  public OProjNode make_mem_proj(GVNGCM gvn, NewNode nn) {
-    OProjNode mem = (OProjNode)gvn.xform(new OProjNode(nn,0));
+  // Make an MProj for a New, and 'hook' it into the default memory
+  public MProjNode make_mem_proj(GVNGCM gvn, NewNode nn) {
+    MProjNode mem = (MProjNode)gvn.xform(new MProjNode(nn,0));
     return make_mem(gvn,nn,mem);
   }
-  public OProjNode make_mem(GVNGCM gvn, NewNode nn, OProjNode mem) {
+  public MProjNode make_mem(GVNGCM gvn, NewNode nn, MProjNode mem) {
     TypeObj[] tos0 = TypeMem.MEM.alias2objs();
     while( _defs._len < tos0.length )
       gvn.add_def(this,gvn.con(TypeMem.MEM.at(_defs._len)));

@@ -304,11 +304,9 @@ public class GVNGCM {
           add_work_uses(use);
         if( use instanceof ParmNode && ((ParmNode)use)._idx==-2 )
           add_work(use.in(0));  // Recheck function inlining
+        if( use instanceof MProjNode && ((MProjNode)use)._idx==0 && use._uses.at(0) instanceof MemJoinNode )
+          add_work(use._uses.at(0));
       }
-      // MemSplit matches Call args
-      if( nnn instanceof CallNode && nnn.in(1) instanceof MProjNode &&
-          nnn.in(1).in(0) instanceof MemSplitNode )
-        add_work(nnn.in(1).in(0));
       // Add self at the end, so the work loops pull it off again.
       add_work(old);
       return;

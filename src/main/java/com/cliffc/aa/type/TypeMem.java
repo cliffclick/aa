@@ -298,47 +298,59 @@ public class TypeMem extends Type<TypeMem> {
     return obj1;
   }
 
-  // Walk all reachable aliases from this set of aliases, and
-  // include them all in the returned memory.
-  public TypeMem slice_all_aliases_plus_children(BitsAlias aliases) {
+  // Transitively walk all reachable aliases from this set of aliases, and
+  // return the complete set.
+  public BitsAlias all_reaching_aliases(BitsAlias aliases) {
+    if( aliases==BitsAlias.NIL || aliases==BitsAlias.EMPTY ) return aliases;
+    if( aliases==BitsAlias.FULL ) return aliases;
     AryInt work = new AryInt();
-    Ary<TypeObj> tos = new Ary<>(new TypeObj[]{null,TypeObj.UNUSED});
+    VBitSet visit = new VBitSet();
     for( int alias : aliases )
-      for( int kid=alias; kid!=0; kid = BitsAlias.next_kid(alias,kid) ) {
+      for( int kid=alias; kid!=0; kid = BitsAlias.next_kid(alias,kid) )
         work.push(kid);
-        tos.setX(kid,at(kid));
-      }
 
     while( !work.isEmpty() ) {
       int alias=work.pop();
       TypeObj to = at(alias);
       if( to==TypeObj.OBJ || to==TypeObj.ISUSED )
-        return this;            // All structs with all possible pointers
+        return BitsAlias.FULL;  // All structs with all possible pointers
       if( !(to instanceof TypeStruct) ) continue;
       TypeStruct ts = (TypeStruct)to;
       // Incomplete struct?  This is an early escapee from Parse times; more
       // fields may be added which we assume is a pointer to all.
       if( ts._open )
-        return this;
+        return BitsAlias.FULL;
       for( int i=0; i<ts._ts.length; i++ ) {
         Type fld = ts._ts[i];
         if( TypeMemPtr.OOP.isa(fld) )
           fld = TypeMemPtr.OOP;                      // All possible pointers
         if( !(fld instanceof TypeMemPtr) ) continue; // Not a pointer, no more aliases
         if( ((TypeMemPtr)fld)._aliases.test(1) )
-          return this;          // All possible pointers
+          return BitsAlias.FULL; // All possible pointers
         // Walk the possible pointers, and include them in the slice
-        for( int ptralias : ((TypeMemPtr)fld)._aliases ) {
-          for( int kid=ptralias; kid!=0; kid = BitsAlias.next_kid(ptralias,kid) ) {
-            if( tos.atX(kid) != null ) continue;
-            work.push(kid);
-            tos.setX(kid,at(kid));
-          }
-        }
+        for( int ptralias : ((TypeMemPtr)fld)._aliases )
+          for( int kid=ptralias; kid!=0; kid = BitsAlias.next_kid(ptralias,kid) )
+            if( !visit.tset(kid) ) {
+              work.push(kid);
+              aliases = aliases.set(kid);
+            }
       }
     }
 
-    return make0(tos.asAry());
+    return aliases;
+  }
+
+  // Slice memory by aliases; unnamed aliases are replaced with ~use.
+  public TypeMem slice_reaching_aliases(BitsAlias aliases) { return slice_reaching_aliases(aliases,at(1),TypeObj.UNUSED); }
+  public TypeMem slice_reaching_aliases(BitsAlias aliases, TypeObj base, TypeObj unuse) {
+    if( aliases==BitsAlias.FULL ) return this;
+    TypeObj tos[] = new TypeObj[Math.max(_aliases.length,aliases.max()+1)];
+    tos[1]=base;
+    for( int i=2; i<tos.length; i++ ) {
+      TypeObj to = at(i);
+      tos[i] = aliases.test_recur(i) || to==TypeObj.UNUSED ? to : unuse;
+    }
+    return make0(tos);
   }
 
   // Incrementally build a sharpened memory, structs and pointers.  Alias sets
@@ -486,6 +498,7 @@ public class TypeMem extends Type<TypeMem> {
   // Whole object Store at an alias.  Just merge with the parent.
   public TypeMem st( int alias, TypeObj obj ) {
     TypeObj to = at(alias);     // Current value for alias
+    if( to==obj ) return this;  // Shortcut
     int max = Math.max(_aliases.length,alias+1);
     TypeObj[] tos = Arrays.copyOf(_aliases,max);
     tos[alias] = (TypeObj)to.meet(obj);

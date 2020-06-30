@@ -37,8 +37,8 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
 
   // NewNodes do not really need a ctrl; useful to bind the upward motion of
   // closures so variable stores can more easily fold into them.
-  public NewNode( byte type, int parent_alias, T to, Node ctrl         ) { super(type,ctrl    ); _init(parent_alias,to); }
-  public NewNode( byte type, int parent_alias, T to, Node ctrl,Node fld) { super(type,ctrl,fld); _init(parent_alias,to); }
+  public NewNode( byte type, int parent_alias, T to, Node mem         ) { super(type,mem    ); _init(parent_alias,to); }
+  public NewNode( byte type, int parent_alias, T to, Node mem,Node fld) { super(type,mem,fld); _init(parent_alias,to); }
   private void _init(int parent_alias, T to) {
     _alias = BitsAlias.new_alias(parent_alias);
     sets(to,null);
@@ -47,7 +47,8 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   String xstr() { return "New*"+_alias; } // Self short name
   String  str() { return "New"+_ts; } // Inline less-short name
 
-  static int def_idx(int fld) { return fld+1; } // Skip ctrl in slot 0
+  Node mem() { return in(0); }
+  static int def_idx(int fld) { return fld+1; } // Skip mem in slot 0
   Node fld(int fld) { return in(def_idx(fld)); } // Node for field#
 
   // Recompute default memory cache on a change
@@ -65,6 +66,8 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
 
   @SuppressWarnings("unchecked")
   @Override public Node ideal(GVNGCM gvn, int level) {
+    Type tmem = gvn.type(in(0));
+    assert tmem instanceof TypeMem || tmem==Type.ANY || tmem==Type.ALL;
     // If either the address or memory is not looked at then the memory
     // contents are dead.  The object might remain as a 'gensym' or 'sentinel'
     // for identity tests.
@@ -79,6 +82,8 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     }
     return null;
   }
+
+  @Override BitsAlias escapees() { return BitsAlias.make0(_alias); }
   abstract T dead_type();
   @Override public boolean basic_liveness() { return false; }
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) { return def==in(0) ? TypeMem.ALIVE : _live; }

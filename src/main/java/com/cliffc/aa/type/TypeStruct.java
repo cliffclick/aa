@@ -264,7 +264,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public static byte[] flags(byte[] flags, int idx, short flag ) { flags[idx] = (byte)flag; return flags; }
   // Accessors for field mods from flags
   public static byte fmod( short flag ) {
-    assert (flag&FHI)==0;       // Do not ask for inverted field mod
+    //assert (flag&FHI)==0;       // Do not ask for inverted field mod
     return _fmod(flag);
   }
   // Used by printers
@@ -290,12 +290,12 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   static final short top_flag = make_flag(FTOP); // Flags top; must be 1 if MEET is AND
   static final short bot_flag = make_flag(FBOT); // Flags bot; must be 0 if MEET is AND
   static {
-    assert fmeet(fdual(fnl_flag),fdual(frw_flag))==fdual(frw_flag);
-    assert fmeet(fdual(fnl_flag),     (frw_flag))==     (frw_flag);
-    assert fmeet(fdual(fnl_flag),     (fnl_flag))==     (fnl_flag);
-    assert fmeet(fdual(frw_flag),     (frw_flag))==     (frw_flag);
-    assert fmeet(fdual(frw_flag),     (fnl_flag))==     (fnl_flag);
-    assert fmeet(     (frw_flag),     (fnl_flag))==     (fnl_flag);
+    assert fmeet(fdual(fnl_flag),fdual(frw_flag))==fdual(frw_flag); // ~final .isa( ~rw ) 3 isa 2
+    assert fmeet(fdual(fnl_flag),     (frw_flag))==     (frw_flag); // ~final .isa(  rw ) 3 isa 1
+    assert fmeet(fdual(fnl_flag),     (fnl_flag))==     (fnl_flag); // ~final .isa(final) 3 isa 0
+    assert fmeet(fdual(frw_flag),     (frw_flag))==     (frw_flag); // ~rw    .isa(  rw ) 2 isa 1
+    assert fmeet(fdual(frw_flag),     (fnl_flag))==     (fnl_flag); // ~rw    .isa(final) 2 isa 0
+    assert fmeet(     (frw_flag),     (fnl_flag))==     (fnl_flag); //  rw    .isa(final) 1 isa 0
   }
 
   // Default tuple field names - all bottom-field names
@@ -411,7 +411,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public  static final TypeStruct A     = make(flds("^","a"),ts(NO_DISP,TypeFlt.FLT64 ));
   private static final TypeStruct C0    = make(flds("^","c"),ts(NO_DISP,TypeInt.FALSE )); // @{c:0}
   private static final TypeStruct D1    = make(flds("^","d"),ts(NO_DISP,TypeInt.TRUE  )); // @{d:1}
-  private static final TypeStruct ARW   = make(flds("^","a"),ts(NO_DISP,TypeFlt.FLT64),new byte[]{FRW,FRW});
+          static final TypeStruct ARW   = make(flds("^","a"),ts(NO_DISP,TypeFlt.FLT64),new byte[]{FRW,FRW});
 
   static final TypeStruct[] TYPES = new TypeStruct[]{ALLSTRUCT,STRPTR,FLT64,POINT,NAMEPT,A,C0,D1,ARW,DISPLAY,INT64_INT64,ANYSTRUCT};
 
@@ -1181,11 +1181,16 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // Final fields can remain as-is; non-finals are all widened to ALL (assuming
   // a future error Store); field flags set to bottom; the field names are kept.
   @Override public TypeStruct crush() {
+    if( _any ) return this;     // No crush on high structs
     Type[] ts = TypeAry.clone(_ts);
+    byte[] flags = _flags.clone();
     for( int i=0; i<ts.length; i++ )
-      if( fmod(i)!=FFNL ) ts[i]=ALL; // Widen non-finals to ALL, as-if crushed by errors
-      else ts[i]=ts[i].simple_ptr();
-    return make_from(_any,ts,fbots(ts.length));
+      if( fmod(i)!=FFNL && fmod(i)!=fdual(FFNL) ) { ts[i]=ALL; flags[i]=FFNL; }// Widen non-finals to ALL, as-if crushed by errors
+      else { ts[i]=ts[i].simple_ptr(); flags[i]=_flags[i]; }
+    // Keep the name and field names.
+    // Low input so low output.
+    // Currently must keep _open==true to pass monotonicity
+    return malloc(_name,false,_flds,ts,flags,true).hashcons_free();
   }
 
   // True if isBitShape on all bits

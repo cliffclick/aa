@@ -605,6 +605,9 @@ public class Parse {
       if( !scope.is_mutable(tok) )
         return err_ctrl2("Cannot re-assign final val '"+tok+"'");
     }
+
+    // Scope is discovered by walking lexical display stack.
+    // Pointer to the proper display is found via ptr-walking live display stack.
     // Now properly load from the display
     int alias = scope.stk()._alias;        // Display alias
     MemMergeNode mmem = mem_active();      // Active memory
@@ -1166,6 +1169,7 @@ public class Parse {
   public Node ctrl() { return _e._scope.ctrl(); }
   // Set and return a new control
   private <N extends Node> N set_ctrl(N n) { return _e._scope.set_ctrl(n,_gvn); }
+  private Node mem() { return _e._scope.mem(); }
   private Node set_mem(Node n) { return _e._scope.set_mem(n,_gvn); }
 
   private @NotNull ConNode con( Type t ) { return _gvn.con(t); }
@@ -1178,20 +1182,24 @@ public class Parse {
   private static byte ts_mutable(boolean mutable) { return mutable ? TypeStruct.FRW : TypeStruct.FFNL; }
 
   // Close off active memory and return it.
-  private Node all_mem() { return _e._scope.all_mem(_gvn); }
+  private Node all_mem() {
+    //return _e._scope.all_mem(_gvn);
+    throw com.cliffc.aa.AA.unimpl();
+  }
   // Expand default memory to support precise aliasing: an active MemMerge (not
   // in GVN).  Because its active it can be directly modified without removing
   // from GVN.
   private MemMergeNode mem_active() {
-    ScopeNode scope = _e._scope;
-    Node mem = scope.mem();
-    if( _gvn.touched(mem) ) {
-      // If only used by the parser, just make it active.
-      if( mem instanceof MemMergeNode && mem._uses._len==1 && mem._keep == 0 ) _gvn.unreg(mem);
-      // Not active and has uses, so make a new active memory feeding from the old
-      else return scope.set_active_mem(new MemMergeNode(mem),_gvn);
-    }
-    return (MemMergeNode)mem;
+    //ScopeNode scope = _e._scope;
+    //Node mem = scope.mem();
+    //if( _gvn.touched(mem) ) {
+    //  // If only used by the parser, just make it active.
+    //  if( mem instanceof MemMergeNode && mem._uses._len==1 && mem._keep == 0 ) _gvn.unreg(mem);
+    //  // Not active and has uses, so make a new active memory feeding from the old
+    //  else return scope.set_active_mem(new MemMergeNode(mem),_gvn);
+    //}
+    //return (MemMergeNode)mem;
+    throw com.cliffc.aa.AA.unimpl();
   }
 
   // Get the display pointer.  If this is the local scope, then it directly
@@ -1221,19 +1229,14 @@ public class Parse {
   // Insert a call, with memory splits.  Wiring happens later, and when a call
   // is wired it picks up projections to merge at the Fun & Parm nodes.
   private Node do_call( CallNode call0 ) {
-    // Theoretically, a memory split is inserted around every call.
-    // TODO: fast-path primitives with obviously no memory.
-    MemSplitNode split = gvn(new MemSplitNode(call0)).keep();
-    MProjNode lhs = (MProjNode)gvn(new MProjNode(split,0));
-    MProjNode rhs = (MProjNode)gvn(new MProjNode(split.unhook(),1));
-    call0.set_mem(rhs,_gvn);
     CallNode call = (CallNode)gvn(call0);
     // Call Epilog takes in the call which it uses to track wireable functions.
     // CallEpi internally tracks all wired functions.
-    Node cepi  = gvn(new CallEpiNode(call,Env.DEFMEM)).keep();
-    set_ctrl(    gvn(new CProjNode(cepi,0)));
-    Node postcall_memory = gvn(new MProjNode(cepi,1)); // Return memory from all called functions, trimmed to reachable aliases
-    set_mem( gvn(new MemJoinNode(lhs,postcall_memory)) );
+    Node cepi  =   gvn(new CallEpiNode(call,Env.DEFMEM)).keep();
+    set_ctrl(      gvn(new CProjNode(cepi,0)));
+    Node post_mem= gvn(new MProjNode(cepi,1)); // Return memory from all called functions
+    // Allow unescaped memory to bypass a call.
+    set_mem( gvn(new MemJoinNode(call.mem(),post_mem,call)) );
     return gvn(new ProjNode(cepi.unhook(),2));
   }
 
