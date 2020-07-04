@@ -160,6 +160,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
         if( ((NewNode)use)._not_escaped ) continue;
         else return true;              // Escaping if other struct does
       if( use instanceof IntrinsicNode ) continue; // Changes memory/v-table; similar to Store address
+      if( use instanceof    TypeNode ) continue;   // Type-checking, read-only
       throw com.cliffc.aa.AA.unimpl(); // Handle all cases, shouldn't be too many
     }
     return false;

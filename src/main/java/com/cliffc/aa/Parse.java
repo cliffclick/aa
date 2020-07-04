@@ -589,21 +589,15 @@ public class Parse {
     // Scope is discovered by walking lexical display stack.
     // Pointer to the proper display is found via ptr-walking live display stack.
     // Now properly load from the display
-    int alias = scope.stk()._alias;        // Display alias
-    MemMergeNode mmem = mem_active();      // Active memory
-    Node objmem = mmem.active_obj(alias);
     Node ptr = get_display_ptr(scope,tok);
-    n = gvn(new LoadNode(objmem,ptr,tok,null));
+    n = gvn(new LoadNode(mem(),ptr,tok,null));
     if( n.is_forward_ref() )    // Prior is actually a forward-ref
       return err_ctrl2(forward_ref_err(((FunPtrNode)n).fun()));
     // Do a full lookup on "+", and execute the function
     Node plus = _e.lookup_filter("+",_gvn,2);
-    Node sum = do_call(new CallNode(true,errMsgs(2),ctrl(),all_mem(),plus,n.keep(),con(TypeInt.con(d))));
+    Node sum = do_call(new CallNode(true,errMsgs(2),ctrl(),mem(),plus,n.keep(),con(TypeInt.con(d))));
     // Active memory for the chosen scope, after the call to plus
-    MemMergeNode mmem2 = mem_active();
-    Node objmem2 = mmem2.active_obj(alias);
-    StoreNode st = (StoreNode)gvn(new StoreNode(objmem2,ptr,sum,TypeStruct.FRW,tok,errMsg()));
-    mmem2.st(st,_gvn);
+    set_mem(gvn(new StoreNode(mem(),ptr,sum,TypeStruct.FRW,tok,errMsg())));
     return n.unhook();          // Return pre-increment value
   }
 
@@ -618,7 +612,7 @@ public class Parse {
     if( !peek(':') ) { _x = oldx; return fact; }
     Type t = type();
     if( t==null ) { _x = oldx; return fact; } // No error for missing type, because can be ?: instead
-    return typechk(fact,t,all_mem(),bad);
+    return typechk(fact,t,mem(),bad);
   }
 
   /** Parse a factor, a leaf grammar token

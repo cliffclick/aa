@@ -171,10 +171,13 @@ public final class CallEpiNode extends Node {
     for( int fidx : fidxs ) {                 // For all fidxs
       if( BitsFun.is_parent(fidx) ) continue; // Do not wire parents, as they will eventually settle out
       FunNode fun = FunNode.find_fidx(fidx);  // Lookup, even if not wired
+      if( fun.is_dead() ) continue;           // Already dead, stale fidx
       if( fun.is_forward_ref() ) continue;    // Not forward refs, which at GCP just means a syntax error
-      if( _defs.find(fun.ret()) != -1 ) continue; // Wired already
+      RetNode ret = fun.ret();
+      if( ret==null ) continue;               // Mid-death
+      if( _defs.find(ret) != -1 ) continue;   // Wired already
       progress=true;
-      wire1(gvn,call,fun,fun.ret()); // Wire Call->Fun, Ret->CallEpi
+      wire1(gvn,call,fun,ret); // Wire Call->Fun, Ret->CallEpi
     }
     return progress;
   }

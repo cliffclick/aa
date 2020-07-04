@@ -22,6 +22,7 @@ public class PhiNode extends Node {
   public PhiNode( Type t, Parse badgc, Node... vals ) { this(OP_PHI,t,badgc,vals); }
   // For ParmNodes
   PhiNode( byte op, Node fun, Type tdef, Node defalt, Parse badgc ) { this(op,tdef,badgc, fun,defalt); }
+  @Override boolean is_mem() { return _t==TypeMem.ALLMEM; }
   @Override public int hashCode() { return super.hashCode()+_t.hashCode(); }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;

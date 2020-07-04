@@ -50,17 +50,14 @@ public class IntrinsicNode extends Node {
   // If the input memory is unaliased, fold into the NewNode.
   // If this node does not fold away, the program is in error.
   @Override public Node ideal(GVNGCM gvn, int level) {
-    if( mem() instanceof MemMergeNode ) {
-      MemMergeNode mem = (MemMergeNode)mem();
-      Node ptr = ptr();
+    Node mem = mem();
+    Node ptr = ptr();
+    if( mem instanceof MProjNode && mem.in(0) instanceof NewObjNode &&
+        mem.in(0)==ptr.in(0) && mem._uses._len==2 ) { // Only self and DefMem users
       TypeMemPtr tptr = (TypeMemPtr)gvn.type(ptr);
       int alias = tptr._aliases.abit();
-      Node opj = mem.alias2node(alias);
-      if( alias > 0 &&          // Not a mixed set of aliases
-          opj._uses._len==2 &&  // No unknown extra users (self and DefMem)
-          opj instanceof OProjNode && ptr instanceof ProjNode &&
-          opj.in(0)==ptr.in(0) && opj.in(0) instanceof NewNode ) {
-        NewObjNode nnn = (NewObjNode)opj.in(0);
+      if( alias > 0 ) {         // Not a mixed set of aliases
+        NewObjNode nnn = (NewObjNode)mem.in(0);
         // NewObjNode is well-typed and producing a pointer to memory with the
         // correct type?  Fold into the NewObjNode and remove this Convert.
         TypeTuple tnnn = (TypeTuple)gvn.type(nnn);
@@ -72,7 +69,7 @@ public class IntrinsicNode extends Node {
           nnn.set_name(tn,gvn);
           gvn.add_work(nnn);
           gvn.add_work(Env.DEFMEM);
-          return new MemMergeNode(mem,opj,alias);
+          return mem;
         }
       }
     }
