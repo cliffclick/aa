@@ -57,13 +57,12 @@ public abstract class IntrinsicNewNode extends Node {
       add_def( gvn.xform(new ParmNode(i,_sig.fld(i),fun, gvn.con(_sig.arg(i).simple_ptr()),null)));
     Node rez = gvn.xform(this); // Returns a TypeObj
     // Fill in NewStrNode inputs, now that we have them.
-    gvn.set_def_reg(nnn,0,memp);
-    gvn.set_def_reg(nnn,1,rez);
+    gvn.set_def_reg(nnn,1,memp);
+    gvn.set_def_reg(nnn,2,rez);
     Node mem = Env.DEFMEM.make_mem_proj(gvn,nnn);
     Node ptr = gvn.xform(new ProjNode(nnn.unhook(),1));
-    Node mmem= gvn.xform(new MemJoinNode(memp,mem,nnn));
-    RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,ptr,rpc,fun));
-    mmem._live = mmem.live(gvn); // Refine initial memory
+    RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mem,ptr,rpc,fun));
+    mem._live = mem.live(gvn); // Refine initial memory
     return new FunPtrNode(ret,gvn.con(TypeFunPtr.NO_DISP));
   }
 

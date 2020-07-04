@@ -230,9 +230,12 @@ public class GVNGCM {
       Node x = n.ideal(this,0);
       if( x == null ) break;
       if( x != n ) {          // Different return, so delete original dead node
-        x.keep();             // Keep alive during deletion of n
-        kill(n);              // replace so immediately recycle n and dead subgraph
-        n = x.unhook();       // Remove keep-alive
+        if( n._uses._len==0 ) {
+          x.keep();           // Keep alive during deletion of n
+          kill(n);            // replace so immediately recycle n and dead subgraph
+          x.unhook();         // Remove keep-alive
+        }
+        n=x;
         if( !check_new(x) ) return x; // If the replacement is old, no need to re-ideal
         add_work_defs(n);       // Force live-ness rechecking
       }

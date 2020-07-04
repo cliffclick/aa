@@ -234,7 +234,7 @@ public class FunNode extends RegionNode {
       CallEpiNode cepi = call.cepi();
       if( cepi != null ) {
         int ridx = cepi._defs.find(ret());
-        gvn.remove_reg(cepi,ridx);
+        if( ridx != -1 ) gvn.remove_reg(cepi,ridx);
       }
     }
     // Single-target CallEpi can now inline
@@ -564,8 +564,8 @@ public class FunNode extends RegionNode {
     // For all aliases split in this pass, update in-node both old and new.
     // This changes their hash, and afterwards the keys cannot be looked up.
     for( Map.Entry<Node,Node> e : map.entrySet() )
-      if( e.getKey() instanceof MemMergeNode )
-        ((MemMergeNode)e.getKey()).update_alias(e.getValue(),aliases,gvn);
+      if( e.getKey() instanceof MemSplitNode )
+        ((MemSplitNode)e.getKey()).split_alias(e.getValue(),aliases,gvn);
 
     // Wired Call Handling:
     if( path < 0 ) {            // Type Split
@@ -605,6 +605,7 @@ public class FunNode extends RegionNode {
       }
       gvn.rereg(nn,nt);
     }
+    gvn.setype(Env.DEFMEM,Env.DEFMEM.value(gvn));
 
     if( path >= 0 ) {            // Path split
       path_call.set_fun_reg(new_funptr, gvn); // Force new_funptr, will re-wire later

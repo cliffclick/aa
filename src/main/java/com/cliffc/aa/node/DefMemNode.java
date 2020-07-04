@@ -15,7 +15,7 @@ public class DefMemNode extends Node {
   @Override public TypeMem value(GVNGCM gvn) {
     TypeObj[] tos = new TypeObj[_defs._len];
     assert in(1)==null; // No need for a 'USE' object
-    tos[1] = TypeObj.ISUSED;    // Default: all objects are not-yet-allocated
+    tos[1] = TypeObj.ISUSED; // Default: all objects are possibly allocated to worst possible
     for( int i=2; i<_defs._len; i++ ) {
       Node n = in(i);
       if( n==null ) continue;

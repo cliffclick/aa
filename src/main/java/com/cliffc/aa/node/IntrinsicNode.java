@@ -129,18 +129,18 @@ public class IntrinsicNode extends Node {
     Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
     Node memp= gvn.xform(new ParmNode(-2,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
     // Add input edges to the NewNode
-    NewObjNode nnn = new NewObjNode(false,alias,to1,fun,gvn.con(TypeMemPtr.NO_DISP)).keep();
+    ConNode nodisp = gvn.con(TypeMemPtr.NO_DISP);
+    NewObjNode nnn = new NewObjNode(false,alias,to1,memp,nodisp).keep();
     for( int i=1; i<to._ts.length; i++ ) { // Display in 0, fields in 1+
       String argx = to._flds[i];
       if( TypeStruct.fldBot(argx) ) argx = null;
       nnn.add_def(gvn.xform(new ParmNode(i,argx,fun, gvn.con(to._ts[i].simple_ptr()),null)));
     }
     gvn.init(nnn);
-    Node obj = Env.DEFMEM.make_mem_proj(gvn,nnn);
+    Node mmem = Env.DEFMEM.make_mem_proj(gvn,nnn.unhook());
     Node ptr = gvn.xform(new  ProjNode(nnn,1));
-    Node mmem= gvn.xform(new MemMergeNode(memp,obj,nnn.<NewObjNode>unhook()._alias));
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,ptr,rpc,fun));
-    return (FunPtrNode)gvn.xform(new FunPtrNode(ret,gvn.con(TypeFunPtr.NO_DISP)));
+    return (FunPtrNode)gvn.xform(new FunPtrNode(ret,nodisp));
   }
 
 }

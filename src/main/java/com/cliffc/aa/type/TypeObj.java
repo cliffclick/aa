@@ -39,9 +39,9 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
     return t1==t2 ? t1 : t1.free(t2);
   }
   public static final TypeObj OBJ   = make("",false,false);    // Any obj; allocated as *something*
-  public static final TypeObj ISUSED= make("",false,true );    // dead obj; alias has been used & deleted
-  public static final TypeObj UNUSED= (TypeObj)ISUSED.dual();  // Not-yet-allocated, but might be
-  public static final TypeObj XOBJ  = (TypeObj)OBJ   .dual();  // object type is unknown (either struct or array)
+  public static final TypeObj ISUSED= make("",false,true );    // Possibly allocated, to worst possible result
+  public static final TypeObj UNUSED= (TypeObj)ISUSED.dual();  // Never allocated
+  public static final TypeObj XOBJ  = (TypeObj)OBJ   .dual();  // alloc, but object type is unknown (either struct or array)
   static final TypeObj[] TYPES = new TypeObj[]{OBJ,ISUSED,UNUSED,XOBJ};
 
   @Override boolean is_display() { return false; }

@@ -102,8 +102,14 @@ public abstract class Node implements Cloneable {
           if( pmem != null ) gvn.add_work(pmem);
         }
         // NewNodes can be captured, if no uses
-        if( old instanceof ProjNode && old.in(0) instanceof NewNode )
+        if( old instanceof ProjNode && old.in(0) instanceof NewNode ) {
           gvn.add_work(old.in(0));
+          for( Node use : old._uses )
+            if( use instanceof MemSplitNode )
+              gvn.add_work(((MemSplitNode)use).join());// Split/Join will swallow a NewNode
+            else if( use instanceof StoreNode )
+              gvn.add_work(use);
+        }
         // Removing 1/2 of the split, put other half on worklist
         if( old instanceof MemSplitNode )
           gvn.add_work_uses(old);
@@ -123,7 +129,7 @@ public abstract class Node implements Cloneable {
   public Node pop( ) { return del(_defs._len-1); }
   public void pop(GVNGCM gvn ) { _chk(); unuse(_defs.pop(),gvn); }
   // Remove Node at idx, auto-delete and preserve order.
-  public void remove(int idx, GVNGCM gvn) { _chk(); unuse(_defs.remove(idx),gvn); }
+  public Node remove(int idx, GVNGCM gvn) { _chk(); return unuse(_defs.remove(idx),gvn); }
 
   // Uses.  Generally variable length; unordered, no nulls, compressed, unused trailing space
   public Ary<Node> _uses;
@@ -517,10 +523,28 @@ public abstract class Node implements Cloneable {
   // True for most primitives.  Returns the pre-call memory or null.
   Node is_pure_call() { return null; }
 
+  // True if normally (not in-error) produces a TypeMem value or a TypeTuple
+  // with a TypeMem at(1).
+  boolean is_mem() { return false; }
+  // For most memory-producing Nodes, exactly 1 memory producer follows.
+  Node get_mem_writer() {
+    for( Node use : _uses ) if( use.is_mem() )return use;
+    return null;
+  }
+  // Easy assertion check
+  boolean check_solo_mem_writer(Node memw) {
+    if( is_prim() ) return true; // Several top-level memory primitives, including top scope & defmem blow this
+    boolean found=false;
+    for( Node use : _uses )
+      if( use == memw ) found=true; // Only memw mem-writer follows
+      else if( use.is_mem() ) return false; // Found a 2nd mem-writer
+    return found;
+  }
+
   // Aliases that a MemJoin might choose between.  Not valid for nodes which do
   // not manipulate memory.
-  BitsAlias escapees() { throw com.cliffc.aa.AA.unimpl("graph error"); }
-  
+  BitsAlias escapees(GVNGCM gvn) { throw com.cliffc.aa.AA.unimpl("graph error"); }
+
   // Walk a subset of the dominator tree, looking for the last place (highest
   // in tree) this predicate passes, or null if it never does.
   Node walk_dom_last(Predicate<Node> P) {

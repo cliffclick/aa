@@ -22,6 +22,7 @@ public final class CallEpiNode extends Node {
   public CallEpiNode( Node... nodes ) { super(OP_CALLEPI,nodes);  assert nodes[1] instanceof DefMemNode; }
   String xstr() { return ((is_dead() || is_copy()) ? "x" : "C")+"allEpi"; } // Self short name
   public CallNode call() { return (CallNode)in(0); }
+  @Override boolean is_mem() { return true; }
   int nwired() { return _defs._len-2; }
   static int wire_num(int x) { return x+2; }
   RetNode wired(int x) { return (RetNode)in(x+2); }
@@ -233,11 +234,8 @@ public final class CallEpiNode extends Node {
   // unwired Returns may yet appear, and be conservative.  Otherwise it can
   // just meet the set of known functions.
   @Override public Type value(GVNGCM gvn) {
-    if( _is_copy ) {         // Just return the arg types.
-      return is_copy_aligned(gvn)
-        ? TypeTuple.make(Type.CTRL,gvn.type(in(1)),gvn.type(in(2)))
-        : gvn.self_type(this);  // Not aligned, "freeze" in place
-    }
+    if( _is_copy )           // Just return the arg types.
+      return TypeTuple.make(Type.CTRL,gvn.type(in(1)),gvn.type(in(2)));
     Type tin0 = gvn.type(in(0));
     if( !(tin0 instanceof TypeTuple) )
       return tin0.oob();     // Weird stuff?
@@ -263,16 +261,12 @@ public final class CallEpiNode extends Node {
     if( fidxs==BitsFun.EMPTY ) return TypeTuple.CALLE.dual();
     if( fidxs.above_center() ) return TypeTuple.CALLE.dual(); // Not resolved yet
 
-    // Crush it down to what the unknown callee might do
-    TypeMem crush = tcmem.crush();
     // Default memory: global worse-case scenario
-    Type    defmem = gvn.type(in(1));
-    // Pre-call should be at least as good as this.  Can be lower if
-    // e.g. "news" of an alias-death has not arrived yet.
-    TypeMem tcmem2 = (TypeMem)crush.join(defmem);
+    Node defnode = in(1);
+    Type defmem = gvn.type(defnode);
     // Any not-wired unknown call targets?
     if( fidxs==BitsFun.FULL )
-      return TypeTuple.make(Type.CTRL,tcmem2,Type.ALL);
+      return TypeTuple.make(Type.CTRL,defmem,Type.ALL);
 
     // If fidxs includes a parent fidx, then it was split - currently exactly
     // in two.  If both children are wired, then proceed to merge both
@@ -297,7 +291,7 @@ public final class CallEpiNode extends Node {
         return gvn.self_type(this);   // "Freeze in place"
       }
       if( gvn._opt_mode<2 )     // Before GCP?  Fidx is a unwired unknown call target
-        return TypeTuple.make(Type.CTRL,tcmem2,Type.ALL);
+        return TypeTuple.make(Type.CTRL,defmem,Type.ALL);
       assert false;             // During GCP, still wiring, post GCP all are wired
     }
 
@@ -312,14 +306,28 @@ public final class CallEpiNode extends Node {
         trez = trez.meet(tret.at(2));
       }
     }
-    // Lift return to the crushed-pre-call.  This is because the callee may not
-    // have heard of our local display status (yet), and will not be sure about
-    // it until after all unknown callERs are removed.  However, on this path
-    // we are sure about at least our crushed-pre-call (which includes the
-    // lexical scope, needed for parsing).
-    Type tmem2 = tmem.join(tcmem2);
-    // Final result
-    return TypeTuple.make(Type.CTRL,tmem2,trez);
+
+    // Can keep non-escaping aliases to their pre-call value
+    TypeMem tmem2 = (TypeMem)tmem;
+    for( int alias=2; alias<defnode._defs._len; alias++ ) {
+      Node mprj = defnode.in(alias);
+      // Expect Con:~use, Con:low or NewNode.
+      // ConNode:~use is dead not escaping, or NewNode flagged _not_escaped
+      if( (mprj instanceof ConNode   && gvn.type(mprj).above_center()) ||
+          (mprj instanceof MProjNode && ((NewNode)mprj.in(0))._not_escaped ) ) {
+        TypeObj pre = tcmem.at(alias);
+        if( tmem2.at(alias) != pre ) {
+          TypeObj tprr = tmem2.at(alias);
+          TypeObj tpre = (TypeObj)pre.join(tprr); // Strictly improves
+          if( tprr != tpre ) tmem2 = tmem2.set(alias,tpre);
+        }
+      }
+    }
+
+    // Pre-call should be at least as good as this.  Can be lower if
+    // e.g. "news" of an alias-death has not arrived yet.
+    TypeMem tmem3 = (TypeMem)tmem2.join(defmem);
+    return TypeTuple.make(Type.CTRL,tmem3,trez);
   }
 
   // Sanity check
@@ -414,4 +422,8 @@ public final class CallEpiNode extends Node {
     return is_copy_aligned(gvn) ? in(idx) : null;
   }
   @Override Node is_pure_call() { return in(0) instanceof CallNode ? call().is_pure_call() : null; }
+  // Return the set of updatable memory - including everything reachable from
+  // every call argument (including the display), and any calls reachable from
+  // there, transitively through memory.
+  @Override BitsAlias escapees(GVNGCM gvn) { return BitsAlias.FULL; }
 }

@@ -181,8 +181,6 @@ public class Parse {
     _gvn._opt_mode = 0;
     Node res = stmts();
     if( res == null ) res = con(Type.ANY);
-    _gvn.add_work(all_mem());     // Close off top-level active memory
-    _e._par._scope.all_mem(_gvn); // Loads against primitive scope will 'activate' memory, close it also
     _e._scope.set_rez(res,_gvn);  // Hook result
   }
 
@@ -351,7 +349,7 @@ public class Parse {
     }
     // Honor all type requests, all at once, by inserting type checks on the ifex.
     for( int i=0; i<ts._len; i++ )
-      ifex = typechk(ifex,ts.at(i),all_mem(),badts.at(i));
+      ifex = typechk(ifex,ts.at(i),mem(),badts.at(i));
     ifex.keep();
     // Assign tokens to value
     for( int i=0; i<toks._len; i++ ) {
@@ -375,21 +373,9 @@ public class Parse {
           ((FunPtrNode)n).merge_ref_def(_gvn,tok,(FunPtrNode)ifex,(TypeMemPtr)_gvn.type(scope.ptr()));
         else ; // Can be here if already in-error
       } else { // Store into scope/NewObjNode/display
-
-        // Active (parser) memory state.
-        int alias = scope.stk()._alias;        // Alias for display/object
+        // Assign into display
         Node ptr = get_display_ptr(scope,tok); // Pointer, possibly loaded up the display-display
-        Node objmem = mem_active().active_obj(alias);  // Active struct memory
-        // If the active state is directly a NewObj, update-in-place.  This is
-        // an early optimization.
-        if( objmem.in(0) instanceof NewObjNode &&
-            !ifex.is_forward_ref() &&
-            ((NewObjNode)objmem.in(0)).is_mutable(tok) ) {
-          ((NewObjNode)objmem.in(0)).update(tok,mutable,ifex,_gvn);
-        } else {
-          StoreNode st = (StoreNode)gvn(new StoreNode(objmem,ptr,ifex,mutable,tok,badfs.at(i)));
-          mem_active().st(st,_gvn);     // Update active memory
-        }
+        set_mem(gvn(new StoreNode(mem(),ptr,ifex,mutable,tok,badfs.at(i))));
         scope.def_if(tok,mutable,false); // Note 1-side-of-if update
       }
     }
@@ -410,12 +396,12 @@ public class Parse {
     _e._scope.push_if();            // Start if-expression tracking new defs
     Node ifex = init(new IfNode(ctrl(),expr)).keep();
     set_ctrl(gvn(new CProjNode(ifex,1))); // Control for true branch
-    Node old_mem = all_mem().keep();      // Keep until parse false-side
+    Node old_mem = mem().keep();          // Keep until parse false-side
     Node tex = stmt();                    // Parse true expression
     if( tex == null ) tex = err_ctrl2("missing expr after '?'");
     tex.keep();                    // Keep until merge point
     Node t_ctrl= ctrl().keep();    // Keep until merge point
-    Node t_mem = all_mem().keep(); // Keep until merge point
+    Node t_mem = mem ().keep();    // Keep until merge point
 
     _e._scope.flip_if();        // Flip side of tracking new defs
     set_ctrl(gvn(new CProjNode(ifex.unhook(),0))); // Control for false branch
@@ -424,12 +410,12 @@ public class Parse {
     if( fex == null ) fex = err_ctrl2("missing expr after ':'");
     fex.keep();                    // Keep until merge point
     Node f_ctrl= ctrl().keep();    // Keep until merge point
-    Node f_mem = all_mem().keep(); // Keep until merge point
+    Node f_mem = mem ().keep();    // Keep until merge point
     old_mem.unkeep(_gvn);
 
     Parse bad = errMsg();
-    t_mem = _e._scope.check_if(true ,bad,_gvn,t_ctrl,_e._scope.ptr(),t_mem); // Insert errors if created only 1 side
-    f_mem = _e._scope.check_if(false,bad,_gvn,f_ctrl,_e._scope.ptr(),f_mem); // Insert errors if created only 1 side
+    t_mem = _e._scope.check_if(true ,bad,_gvn,t_ctrl,t_mem); // Insert errors if created only 1 side
+    f_mem = _e._scope.check_if(false,bad,_gvn,f_ctrl,f_mem); // Insert errors if created only 1 side
     _e._scope.pop_if();         // Pop the if-scope
     RegionNode r = set_ctrl(init(new RegionNode(null,t_ctrl.unhook(),f_ctrl.unhook())).keep());
     _gvn.setype(r,Type.CTRL);
@@ -489,13 +475,13 @@ public class Parse {
           assert fun.op_prec() <= max;
           if( fun.op_prec() < max ) continue; // Not yet
           if( i==0 ) {
-            Node call = do_call(new CallNode(true,new Parse[]{bad,bad},ctrl(),all_mem(),fun.unhook(),args.in(0)));
+            Node call = do_call(new CallNode(true,new Parse[]{bad,bad},ctrl(),mem(),fun.unhook(),args.in(0)));
             args.set_def(0,call,_gvn);
             funs.setX(0,null);
             bads.setX(0,null);
           } else {
             Parse bad1 = bads.at(i-1);
-            Node call = do_call(new CallNode(true,new Parse[]{bad1,bad1,bad},ctrl(),all_mem(),fun.unhook(),args.in(i-1),args.in(i)));
+            Node call = do_call(new CallNode(true,new Parse[]{bad1,bad1,bad},ctrl(),mem(),fun.unhook(),args.in(i-1),args.in(i)));
             args.set_def(i-1,call,_gvn);
             funs.remove(i);  args.remove(i);  bads.remove(i);  i--;
           }
@@ -547,15 +533,9 @@ public class Parse {
           byte fin = _buf[_x-2]==':' ? TypeStruct.FRW : TypeStruct.FFNL;
           Node stmt = stmt();
           if( stmt == null ) n = err_ctrl2("Missing stmt after assigning field '."+fld+"'");
-          else {
-            Node st = gvn(new StoreNode(all_mem(),castnn,n=stmt,fin,fld ,errMsg(fld_start)));
-            // Set the store into active memory.  It might have collapsed into
-            // the local display already, so already be in the active memory.
-            if( st instanceof StoreNode ) mem_active().st((StoreNode)st,_gvn);
-            else { assert st instanceof OProjNode; }
-          }
+          else set_mem( gvn(new StoreNode(mem(),castnn,n=stmt,fin,fld ,errMsg(fld_start))));
         } else {
-          n = gvn(new LoadNode(all_mem(),castnn,fld,errMsg(fld_start)));
+          n = gvn(new LoadNode(mem(),castnn,fld,errMsg(fld_start)));
         }
 
       } else {                  // Attempt a function-call
@@ -585,7 +565,7 @@ public class Parse {
             ? ((NewObjNode)arg.in(0))._fld_starts        // Args from tuple
             : new Parse[]{null,errMsg(first_arg_start)}; // The one arg start
           badargs[0] = errMsg(oldx-1); // Base call error reported at the opening paren
-          n = do_call(new CallNode(!arglist,badargs,ctrl(),all_mem(),n,arg)); // Pass the 1 arg
+          n = do_call(new CallNode(!arglist,badargs,ctrl(),mem(),n,arg)); // Pass the 1 arg
         }
       }
     } // Else no trailing arg, just return value
@@ -708,11 +688,8 @@ public class Parse {
     // Else must load against most recent display update.  Get the display to
     // load against.  If the scope is local, we load against it directly,
     // otherwise the display is passed in as a hidden argument.
-    int alias = scope.stk()._alias;   // Display alias
-    MemMergeNode mmem = mem_active(); // Active memory
-    Node objmem = mmem.active_obj(alias);
     Node ptr = get_display_ptr(scope,tok.intern());
-    return gvn(new LoadNode(objmem,ptr,tok,null));
+    return gvn(new LoadNode(mem(),ptr,tok,null));
   }
 
   /** Parse a tuple; first stmt but not the ',' parsed.
@@ -734,18 +711,16 @@ public class Parse {
 
     // Build the tuple from gathered args
     TypeStruct mt_tuple = TypeStruct.make(false,new String[]{"^"},TypeStruct.ts(Type.XNIL),new byte[]{TypeStruct.FFNL},true);
-    NewObjNode nn = new NewObjNode(false,BitsAlias.RECORD,mt_tuple,ctrl(),con(Type.XNIL));
+    NewObjNode nn = new NewObjNode(false,BitsAlias.RECORD,mt_tuple,mem(),con(Type.XNIL));
     for( int i=0; i<args._len; i++ )
       nn.create_active((""+i).intern(),args.at(i),TypeStruct.FFNL,_gvn);
     nn._fld_starts = bads.asAry();
     nn.no_more_fields(_gvn);
 
-    // NewNode returns a TypeObj and a TypeMemPtr (the reference).
-    Node nnn = gvn(nn).keep();
-    Node mem = Env.DEFMEM.make_mem_proj(_gvn,nn);
-    Node ptr = gvn(new ProjNode(nnn,1));
-    mem_active().create_alias_active(nn.<NewObjNode>unhook()._alias,mem,_gvn);
-    return ptr;
+    // NewNode returns a TypeMem and a TypeMemPtr (the reference).
+    NewObjNode nnn = (NewObjNode)gvn(nn);
+    set_mem( Env.DEFMEM.make_mem_proj(_gvn,nnn) );
+    return gvn(new ProjNode(nnn,1));
   }
 
   /** Parse anonymous struct; the opening "@{" already parsed.  A lexical scope
@@ -755,16 +730,15 @@ public class Parse {
    */
   private Node struct() {
     int oldx = _x-1; Node ptr;  // Opening @{
-    all_mem();                  // Close active memory
     try( Env e = new Env(_e,errMsg(oldx-1), false) ) { // Nest an environment for the local vars
       _e = e;                   // Push nested environment
       stmts(true);              // Create local vars-as-fields
       require('}',oldx);        // Matched closing }
       assert ctrl() != e._scope;
-      ptr = e._scope.ptr().keep();           // A pointer to the constructed object
-      e._par._scope.set_ctrl(ctrl(),_gvn);   // Carry any control changes back to outer scope
-      e._par._scope.set_mem(all_mem(),_gvn); // Carry any memory  changes back to outer scope
-      _e = e._par;                           // Pop nested environment
+      ptr = e._scope.ptr().keep();         // A pointer to the constructed object
+      e._par._scope.set_ctrl(ctrl(),_gvn); // Carry any control changes back to outer scope
+      e._par._scope.set_mem (mem (),_gvn); // Carry any memory  changes back to outer scope
+      _e = e._par;                         // Pop nested environment
     } // Pop lexical scope around struct
     return ptr.unhook();
   }
@@ -819,24 +793,24 @@ public class Parse {
 
     // Build the FunNode header
     Node old_ctrl = ctrl();
-    Node old_mem  = all_mem().keep();
-    FunNode fun = init(new FunNode(ids.asAry(),ts.asAry()).add_def(Env.ALL_CTRL)).keep();
-    _gvn.setype(fun,Type.CTRL);
+    Node old_mem  = mem().keep();
+    FunNode fun = gvn(new FunNode(ids.asAry(),ts.asAry()).add_def(Env.ALL_CTRL)).keep();
+    // Build Parms for system incoming values
+    Node rpc = gvn(new ParmNode(-1,"rpc",fun,con(TypeRPC.ALL_CALL),null)).keep();
+    Node mem = gvn(new ParmNode(-2,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
+    Node clo = gvn(new ParmNode( 0,"^"  ,fun,con(tpar_disp),null));
+    set_ctrl(fun);              // New control is function head
+    set_mem(mem);               // New memory  is function memory
 
     // Increase scope depth for function body.
     try( Env e = new Env(_e,errMsg(oldx-1), true) ) { // Nest an environment for the local vars
       _e = e;                   // Push nested environment
-      NewObjNode stk = e._scope.stk();
-      _gvn.set_def_reg(stk,0,fun); // Display creation control defaults to function entry
-      set_ctrl(fun);            // New control is function head
-      // Build Parms for all incoming values
-      Node rpc = gvn(new ParmNode(-1,"rpc",fun,con(TypeRPC.ALL_CALL),null)).keep();
-      Node mem = gvn(new ParmNode(-2,"mem",fun,TypeMem.MEM,Env.DEFMEM,null)).keep();
-      Node clo = gvn(new ParmNode( 0,"^"  ,fun,con(tpar_disp),null));
       // Display is special: the default is simply the outer lexical scope.
       // But here, in a function, the display is actually passed in as a hidden
       // extra argument and replaces the default.
+      NewObjNode stk = e._scope.stk();
       stk.update(0,ts_mutable(false),clo,_gvn);
+
       // Parms for all arguments
       Parse errmsg = errMsg();  // Lazy error message
       for( int i=1; i<ids._len; i++ ) { // User parms start at#1
@@ -844,14 +818,6 @@ public class Parse {
         create(ids.at(i),parm, args_are_mutable);
       }
 
-      // Function memory is a merge of incoming wide memory, and the local
-      // display implied by arguments.  Starts merging in parent scope, but
-      // this is incorrect - should start from the incoming function memory.
-      MemMergeNode amem = mem_active();
-      assert amem.in(1).in(0) == stk; // amem slot#1 is the display
-      // amem slot#0 was outer display, should be function memory
-      // Adding mem to worklist, because its liveness now changes
-      amem.set_def(0,_gvn.add_work(mem.unhook()),_gvn);
       // Parse function body
       Node rez = stmts();       // Parse function body
       if( rez == null ) rez = err_ctrl2("Missing function body");
@@ -860,7 +826,7 @@ public class Parse {
       if( e._scope.is_closure() ) rez = merge_exits(rez);
       // Standard return; function control, memory, result, RPC.  Plus a hook
       // to the function for faster access.
-      RetNode ret = (RetNode)gvn(new RetNode(ctrl(),all_mem(),rez,rpc.unhook(),fun.unhook()));
+      RetNode ret = (RetNode)gvn(new RetNode(ctrl(),mem(),rez,rpc.unhook(),fun.unhook()));
       // The FunPtr builds a real display; any up-scope references are passed in now.
       Node fptr = gvn(new FunPtrNode(ret,e._par._scope.ptr()));
       _e = _e._par;             // Pop nested environment
@@ -962,11 +928,9 @@ public class Parse {
     }
     TypeStr ts = TypeStr.con(new String(_buf,oldx,_x-oldx-1).intern());
     // Convert to ptr-to-constant-memory-string
-    NewStrNode nnn = init( new NewStrNode(ts,ctrl(),con(ts))).keep();
-    Node mem = Env.DEFMEM.make_mem_proj(_gvn,nnn);
-    Node ptr = gvn( new  ProjNode(nnn,1));
-    mem_active().create_alias_active(nnn.<NewStrNode>unhook()._alias,mem,_gvn);
-    return ptr;
+    NewStrNode nnn = (NewStrNode)gvn( new NewStrNode(ts,mem(),con(ts))).keep();
+    set_mem(Env.DEFMEM.make_mem_proj(_gvn,nnn));
+    return gvn( new ProjNode(nnn,1));
   }
 
   /** Parse a type or return null
@@ -1215,7 +1179,7 @@ public class Parse {
     // exists at scope up in the display.
     Env e = _e;
     Node ptr = e._scope.ptr();
-    Node mmem = all_mem();
+    Node mmem = mem();
     TypeMem tmem = (TypeMem)_gvn.type(mmem);
     while( true ) {
       if( scope == e._scope ) return ptr;
@@ -1232,11 +1196,9 @@ public class Parse {
     CallNode call = (CallNode)gvn(call0);
     // Call Epilog takes in the call which it uses to track wireable functions.
     // CallEpi internally tracks all wired functions.
-    Node cepi  =   gvn(new CallEpiNode(call,Env.DEFMEM)).keep();
-    set_ctrl(      gvn(new CProjNode(cepi,0)));
-    Node post_mem= gvn(new MProjNode(cepi,1)); // Return memory from all called functions
-    // Allow unescaped memory to bypass a call.
-    set_mem( gvn(new MemJoinNode(call.mem(),post_mem,call)) );
+    Node cepi = gvn(new CallEpiNode(call,Env.DEFMEM)).keep();
+    set_ctrl(   gvn(new CProjNode(cepi,0)));
+    set_mem (   gvn(new MProjNode(cepi,1))); // Return memory from all called functions
     return gvn(new ProjNode(cepi.unhook(),2));
   }
 

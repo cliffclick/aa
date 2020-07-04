@@ -21,6 +21,7 @@ public class StoreNode extends Node {
 
   String xstr() { return "."+_fld+"="; } // Self short name
   String  str() { return xstr(); }   // Inline short name
+  @Override boolean is_mem() { return true; }
 
   Node mem() { return in(1); }
   Node adr() { return in(2); }
@@ -32,16 +33,48 @@ public class StoreNode extends Node {
     Type ta = gvn.type(adr);
     TypeMemPtr tmp = ta instanceof TypeMemPtr ? (TypeMemPtr)ta : null;
 
-    // Stores bypass a Merge to the specific alias
-    int alias;
-    if( tmp !=null && mem instanceof MemMergeNode &&
-        (alias=tmp._aliases.strip_nil().abit()) != -1 &&
-        !BitsAlias.is_parent(alias) )
-      return new StoreNode(this,((MemMergeNode)mem).obj(alias,gvn),adr);
+    // If Store is of a Store, and the aliases do not overlap, make parallel with a Join
+    if( tmp != null && mem.is_mem() ) {
+      Node memw = mem.get_mem_writer();
+      if( mem.check_solo_mem_writer(memw) ) {
+        BitsAlias esc2 = mem.escapees(gvn);
+        if( tmp._aliases.join(esc2)==BitsAlias.EMPTY ) {
+          Node head2;
+          if( mem instanceof StoreNode ) head2=mem;
+          else if( mem instanceof MProjNode && mem.in(0) instanceof NewNode ) head2=mem.in(0);
+          else throw com.cliffc.aa.AA.unimpl(); // Break out another SESE split
+
+          Node st2 = gvn.xform(new StoreNode(this,mem,adr).keep());
+          MemSplitNode msp = (MemSplitNode)gvn.xform(new MemSplitNode(st2.unhook()).keep());
+          MProjNode mprj = (MProjNode)gvn.xform(new MProjNode(msp,0));
+          MemJoinNode mjn = new MemJoinNode(mprj);
+          set_def(1,null,gvn);                // Remove extra mem-writer
+          mjn.add_alias_above(gvn,msp.mem()); // Move 'this' clone st2 into Split
+          mjn.add_alias_above(gvn,head2);     // Move from 'mem' to 'head' into Split
+          msp.unhook();
+          return mjn;
+        }
+      }
+    }
+
+    // If Store is of a MemJoin and it can enter the split region, do so.
+    if( _keep==0 && tmp != null && mem instanceof MemJoinNode ) {
+      Node memw = get_mem_writer();
+      // Check the address does not have a memory dependence on the Join.
+      // TODO: This is super conservative
+      if( memw != null && adr instanceof ProjNode && adr.in(0) instanceof NewNode ) {
+        MemJoinNode mjn = (MemJoinNode)mem;
+        Node st = gvn.xform(new StoreNode(keep(),mem,adr).keep());
+        mjn.add_alias_below(gvn,st,st.unhook(),memw);
+        unhook();
+        gvn.setype(mjn,mjn.value(gvn));
+        return mjn;
+      }
+    }
 
     // If Store is by a New and no other Stores, fold into the New.
     NewObjNode nnn;  int idx;
-    if( mem instanceof OProjNode &&
+    if( mem instanceof MProjNode &&
         mem.in(0) instanceof NewObjNode && (nnn=(NewObjNode)mem.in(0)) == adr.in(0) &&
         mem._uses._len==2 && !val().is_forward_ref() &&
         (idx=nnn._ts.find(_fld))!= -1 && nnn._ts.can_update(idx) ) {
@@ -54,40 +87,21 @@ public class StoreNode extends Node {
   }
 
   // StoreNode needs to return a TypeObj for the Parser.
-  @Override public TypeObj value(GVNGCM gvn) {
+  @Override public TypeMem value(GVNGCM gvn) {
+    Type mem = gvn.type(mem());
     Type adr = gvn.type(adr());
-    if( !(adr instanceof TypeMemPtr) ) return adr.oob(TypeStruct.ALLSTRUCT);
-    TypeMemPtr tmp = (TypeMemPtr)adr;
     Type val = gvn.type(val());   // Value
+    if( !(mem instanceof TypeMem   ) ) return mem.oob(TypeMem.ALLMEM);
+    if( !(adr instanceof TypeMemPtr) ) return adr.oob(TypeMem.ALLMEM);
+    TypeMem    tmem= (TypeMem   )mem;
+    TypeMemPtr tmp = (TypeMemPtr)adr;
 
-    //// Convert from memory to the struct being updated
-    //Node mem = mem();
-    //Type tmem = gvn.type(mem);
-    //TypeObj tobj;
-    //if( tmem instanceof TypeMem )
-    //  tobj = ((TypeMem)tmem).ld(tmp); // Get approx object being updated
-    //else if( tmem instanceof TypeObj )
-    //  tobj = (TypeObj)tmem;   // Object being updated
-    //else                      // Else dunno what is being updated
-    //  return tmem.oob(TypeStruct.ALLSTRUCT);
-    //
-    //// Not updating a struct?
-    //if( !(tobj instanceof TypeStruct) )
-    //  // Updating XOBJ means updating any choice, and we choose no-change.
-    //  // Updating  OBJ means we're already as low as we can go.
-    //  return tobj.oob(TypeStruct.ALLSTRUCT);
-    //
-    //// Update the field.  Illegal updates make no changes.
-    //TypeStruct ts = (TypeStruct)tobj;
-    //// Updates to a NewNode are precise, otherwise aliased updates
-    //if( mem().in(0) == adr().in(0) && mem().in(0) instanceof NewNode && !adr.must_nil())
-    //  // No aliasing, even if the NewNode is called repeatedly
-    //  return ts.st(_fin, _fld, val);
-    //// Imprecise update
-    //return ts.update(_fin, _fld, val);
-
-    // Returns TypeMem
-    throw com.cliffc.aa.AA.unimpl();
+    return tmem.st(tmp._aliases,_fin,_fld,val);
+  }
+  @Override BitsAlias escapees(GVNGCM gvn) {
+    Type adr = gvn.type(adr());
+    if( !(adr instanceof TypeMemPtr) ) return adr.above_center() ? BitsAlias.EMPTY : BitsAlias.FULL;
+    return ((TypeMemPtr)adr)._aliases;
   }
 
   @Override public boolean basic_liveness() { return false; }

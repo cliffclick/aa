@@ -40,18 +40,9 @@ public class LoadNode extends Node {
     BitsAlias aliases = tadr instanceof TypeMemPtr ? ((TypeMemPtr)tadr)._aliases : null;
     int alias = aliases == null ? -2 : aliases.strip_nil().abit();
 
-    // Load from a single alias bypasses a MemMerge
-    if( alias >= 0 && mem instanceof MemMergeNode ) {
-      // TODO: Actually if all bits subset a single entry, and no partial
-      // subsets, can bypass along the single entry.
-      // Find nearest alias parent
-      Node obj = ((MemMergeNode)mem).alias2node_precise(alias);
-      if( obj != null ) return set_mem(obj,gvn);
-    }
-
     // Load can move past a Join if all aliases align.
     if( mem instanceof MemJoinNode && aliases != null ) {
-      Node jmem = ((MemJoinNode)mem).can_bypass(gvn,(TypeMemPtr)tadr);
+      Node jmem = ((MemJoinNode)mem).can_bypass(aliases);
       if( jmem != null ) return set_mem(jmem,gvn);
     }
 
@@ -87,6 +78,11 @@ public class LoadNode extends Node {
         return lphi;
       }
     }
+
+    // If Load is of a New and the aliases do not overlap, bypass.
+    if( mem instanceof MProjNode && mem.in(0) instanceof NewNode && aliases != null &&
+        !aliases.test_recur(((NewNode)mem.in(0))._alias) )
+      return set_mem(((NewNode)mem.in(0)).mem(),gvn);
 
     // Loads against an equal store; cannot NPE since the Store did not.
     StoreNode st=null;

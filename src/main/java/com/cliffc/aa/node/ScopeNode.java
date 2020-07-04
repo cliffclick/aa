@@ -45,25 +45,7 @@ public class ScopeNode extends Node {
     set_def(1,n,gvn);
     return this;
   }
-  // Set a new active NOT-GVNd memory, ready for directly updating memory edges.
-  public MemMergeNode set_active_mem( MemMergeNode mmem, GVNGCM gvn) {
-    //assert !gvn.touched(mmem);
-    //set_def(1,mmem,gvn);
-    //return mmem;
-    throw com.cliffc.aa.AA.unimpl();
-  }
-  // Convert a possibly active memory to an inactive memory.
-  public Node all_mem( GVNGCM gvn ) {
-    //Node mem = mem();
-    //if( gvn.touched(mem) ) return mem; // Already not active
-    //assert mem._uses._len==1;          // Only self usage
-    //mem.keep();                 // Remove this scope usage without deleting
-    //set_mem(null,gvn);          // Remove this scope usage
-    //mem = gvn.xform(mem.unhook());// Then xform like a new node
-    //set_mem(mem,gvn);           // Re-insert
-    //return mem;                 // Return inactive memory
-    throw com.cliffc.aa.AA.unimpl();
-  }
+  @Override boolean is_mem() { return true; }
 
   public Node get(String name) { return stk().get(name); }
   public boolean is_mutable(String name) { return stk().is_mutable(name); }
@@ -175,7 +157,7 @@ public class ScopeNode extends Node {
     _ifs.last().def(name,mutable,create);      // Var defined in arm of if
   }
 
-  public Node check_if( boolean arm, Parse bad, GVNGCM gvn, Node ctrl, Node ptr, Node mem ) { return _ifs.last().check(this,arm,bad,gvn,ctrl,ptr,mem); }
+  public Node check_if( boolean arm, Parse bad, GVNGCM gvn, Node ctrl, Node mem ) { return _ifs.last().check(this,arm,bad,gvn,ctrl,mem); }
 
   private static class IfScope {
     HashMap<String,Byte> _tvars, _fvars;
@@ -195,7 +177,7 @@ public class ScopeNode extends Node {
       }
     }
     // Check for balanced creation, and insert errors on unbalanced
-    Node check(ScopeNode scope, boolean arm, Parse bad, GVNGCM gvn, Node ctrl, Node ptr, Node mem) {
+    Node check(ScopeNode scope, boolean arm, Parse bad, GVNGCM gvn, Node ctrl, Node mem) {
       if( _tvars == null ) return mem; // No new vars on either arm
       // Pull from both variable sets names that are common to both
       if( arm ) {               // Only do it first time
@@ -208,18 +190,14 @@ public class ScopeNode extends Node {
       // Everything in this set is a partially-created variable error
       HashMap<String,Byte> vars = arm ? _fvars : _tvars;
       if( vars.isEmpty() ) return mem;
-      MemMergeNode mmem = new MemMergeNode(mem.unhook());
+      mem.unhook();             // Passed-in 'hooked' memory
       for( String name : vars.keySet() ) {
         String msg = bad.errMsg("'"+name+"' not defined on "+arm+" arm of trinary");
         Node err = gvn.xform(new ErrNode(ctrl,msg,null));
         // Exactly like a parser store of an error, on the missing side
-        int alias = scope.stk()._alias; // Alias for scope
-        Node omem = mmem.active_obj(alias);
-        Node st = gvn.xform(new StoreNode(omem,scope.ptr(),err,TypeStruct.FFNL,name,bad));
-        int idx = mmem.make_alias2idx(alias); // Precise alias update
-        mmem.set_def(idx,st,gvn);
+        mem = gvn.xform(new StoreNode(mem,scope.ptr(),err,TypeStruct.FFNL,name,bad));
       }
-      return gvn.xform(mmem.deactive(gvn)).keep();
+      return mem.keep();        // Return 'hooked' memory
     }
   }
 }

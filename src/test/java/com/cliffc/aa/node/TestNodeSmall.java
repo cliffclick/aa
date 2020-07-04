@@ -399,7 +399,7 @@ public class TestNodeSmall {
     gvn._opt_mode=0;
     ConNode ctl = gvn.init(new ConNode<>(Type.CTRL));
     gvn.setype(ctl,Type.CTRL);
-    ConNode mem = (ConNode)gvn.xform(new ConNode<>(TypeMem.XMEM));
+    ConNode mem = (ConNode)gvn.xform(new ConNode<>(TypeMem.ANYMEM));
     ConNode rpc = (ConNode)gvn.xform(new ConNode<>(TypeRPC.ALL_CALL));
     ConNode dsp_prims = (ConNode) gvn.xform(new ConNode<>(TypeMemPtr.DISP_SIMPLE));
     // The file-scope display closing the graph-cycle.  Needs the FunPtr, not
@@ -408,7 +408,6 @@ public class TestNodeSmall {
     MProjNode dsp_file_obj = Env.DEFMEM.make_mem_proj(gvn,dsp_file);
     ProjNode  dsp_file_ptr = ( ProjNode)gvn.xform(new  ProjNode(dsp_file,1));
     Env.DISPLAYS = Env.DISPLAYS.set(dsp_file._alias);
-    MemJoinNode dsp_merge = (MemJoinNode)gvn.xform(new MemJoinNode(mem,dsp_file_obj,dsp_file));
     // The Fun and Fun._tf:
     TypeStruct formals = TypeStruct.make_args(TypeAry.ts(gvn.type(dsp_file_ptr), // File-scope display as arg0
                                                          Type.SCALAR));          // Some scalar arg1
@@ -419,7 +418,7 @@ public class TestNodeSmall {
     // file-level display can not yet know about "fact".
     ParmNode parm_mem = new ParmNode(-2,"mem",fun,mem,null);
     ParmNode parm_dsp = new ParmNode( 0,"^"  ,fun,Type.SCALAR,gvn.con(gvn.type(dsp_file_ptr)),null);
-    gvn.init(parm_mem.add_def(dsp_merge));
+    gvn.init(parm_mem.add_def(dsp_file_obj));
     gvn.init(parm_dsp.add_def(dsp_file_ptr));
     // Close the function up
     RetNode ret = gvn.init(new RetNode(fun,parm_mem,parm_dsp,rpc,fun));
@@ -431,11 +430,11 @@ public class TestNodeSmall {
     ScopeNode env = new ScopeNode(null,true);
     env.set_ctrl(ctl,gvn);
     env.set_ptr (dsp_file_ptr,gvn);
-    env.set_mem (dsp_merge,gvn);
+    env.set_mem (dsp_file_obj,gvn);
     env.set_rez (fptr,gvn);
     gvn.init(env);
 
-    Node[] nodes = new Node[]{ctl,mem,rpc,dsp_prims,dsp_file,dsp_file_obj,dsp_file_ptr,dsp_merge,fun,parm_mem,parm_dsp,ret,fptr,env};
+    Node[] nodes = new Node[]{ctl,mem,rpc,dsp_prims,dsp_file,dsp_file_obj,dsp_file_ptr,fun,parm_mem,parm_dsp,ret,fptr,env};
 
     // Validate graph initial conditions.  No optimizations, as this
     // pile-o-bits is all dead and will vaporize if the optimizer is turned
@@ -456,7 +455,7 @@ public class TestNodeSmall {
     Type tret = ((TypeTuple)gvn.type(ret)).at(2);
     assertEquals(tdptr0,tret); // Returning the display
     // Display contains 'fact' pointing to self
-    TypeMem tmem = (TypeMem)gvn.type(dsp_merge);
+    TypeMem tmem = (TypeMem)gvn.type(dsp_file_obj);
     TypeStruct tdisp0 = (TypeStruct)tmem.ld((TypeMemPtr)tdptr0);
     assertEquals(tfptr0,tdisp0.at(tdisp0.find("fact")));
   }

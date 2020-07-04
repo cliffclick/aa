@@ -19,6 +19,7 @@ public final class RetNode extends Node {
   public Node val() { return in(2); }
   public Node rpc() { return in(3); }
   public FunNode fun() { return (FunNode)in(4); }
+  @Override boolean is_mem() { return true; }
   // If this function is not using any displays, then there is a single unique
   // FunPtr.  Otherwise this call is ambiguous, as each execution of the
   // FunPtrNode makes a new display.
@@ -48,6 +49,11 @@ public final class RetNode extends Node {
   @Override public String str() { return in(4) instanceof FunNode ? "Ret"+fun().str() : xstr(); }
 
   @Override public Node ideal(GVNGCM gvn, int level) {
+    // If control is dead, but the Ret is alive, we're probably only using the
+    // FunPtr as a 'gensym'.  Nuke the function body.
+    if( !is_copy() && gvn.type(ctl())== Type.XCTRL )
+      set_def(4,null,gvn);      // We're a copy now!
+    
     // If no users inlining, wipe out all edges
     if( is_copy() && in(0)!=null && _uses._len==1 && _uses.at(0) instanceof FunPtrNode ) {
       set_def(0,null,gvn);      // No ctrl

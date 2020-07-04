@@ -96,6 +96,7 @@ public class CallNode extends Node {
 
   String xstr() { return ((is_dead() || is_copy()) ? "x" : "C")+"all#"+_rpc; } // Self short name
   String  str() { return xstr(); }       // Inline short name
+  @Override boolean is_mem() { return true; }
 
   // Call arguments:
   // 0 - Control.  If XCTRL, call is not reached.
@@ -133,12 +134,11 @@ public class CallNode extends Node {
   // ts[4]...
 
   static final int MEMIDX=1; // Memory into the caller
-  static final int ESCIDX=2; // Aliases escaping into callee
-  static final int ARGIDX=3; //
+  static final int ARGIDX=2; //
   static        Type       tctl( Type tcall ) { return             ((TypeTuple)tcall).at(0); }
   static        TypeMem    tmem( Type tcall ) { return tmem(       ((TypeTuple)tcall)._ts ); }
   static        TypeMem    tmem( Type[] ts  ) { return (TypeMem   ) ts[MEMIDX]; } // caller memory passed around function
-  static        TypeMemPtr tesc( Type tcall ) { return (TypeMemPtr)((TypeTuple)tcall).at(ESCIDX); }
+                TypeMemPtr tesc( Type tcall ) { return (TypeMemPtr)((TypeTuple)tcall).at(_defs._len); }
   static public TypeFunPtr ttfp( Type tcall ) { return (TypeFunPtr)((TypeTuple)tcall).at(ARGIDX); }
   static public TypeFunPtr ttfpx(Type tcall ) {
     Type t = ((TypeTuple)tcall).at(ARGIDX);
@@ -192,23 +192,18 @@ public class CallNode extends Node {
       Node mem = mem();
       Node arg1 = arg(1);
       Type tadr = gvn.type(arg1);
-      // Bypass a MemSplit
-      if( tadr instanceof TypeMemPtr && mem instanceof MProjNode && mem.in(0) instanceof MemSplitNode )
-        mem = ((MemSplitNode)mem.in(0)).mem();
       // Bypass a merge on the 2-arg input during unpacking
-      if( tadr instanceof TypeMemPtr && mem instanceof MemMergeNode ) {
+      if( mem instanceof MProjNode && tadr instanceof TypeMemPtr &&
+          arg1 instanceof ProjNode && arg1.in(0) instanceof NewNode ) {
         int alias = ((TypeMemPtr)tadr)._aliases.abit();
         if( alias == -1 ) throw AA.unimpl(); // Handle multiple aliases, handle all/empty
-        Node obj = ((MemMergeNode)mem).alias2node(alias);
-        if( obj instanceof OProjNode && arg1 instanceof ProjNode && arg1.in(0) instanceof NewNode ) {
-          NewNode nnn = (NewNode)arg1.in(0);
-          remove(_defs._len-1,gvn); // Pop off the NewNode tuple
-          int len = nnn._defs._len;
-          for( int i=2; i<len; i++ ) // Push the args; unpacks the tuple
-            add_def( nnn.in(i));
-          _unpacked = true;     // Only do it once
-          return this;
-        }
+        NewNode nnn = (NewNode)arg1.in(0);
+        remove(_defs._len-1,gvn); // Pop off the NewNode tuple
+        int len = nnn._defs._len;
+        for( int i=1; NewNode.def_idx(i)<len; i++ ) // Push the args; unpacks the tuple
+          add_def( nnn.fld(i));
+        _unpacked = true;     // Only do it once
+        return this;
       }
     }
     // Have some sane function choices?
@@ -268,7 +263,7 @@ public class CallNode extends Node {
     Type ctl = gvn.type(ctl());
     if( gvn._opt_mode>0 && cepi()==null ) ctl = Type.XCTRL; // Dead from below
     if( ctl != Type.CTRL && ctl != Type.ALL ) return ctl.oob();
-    final Type[] ts = TypeAry.get(_defs._len+(ARGIDX-2));
+    final Type[] ts = TypeAry.get(_defs._len+1);
     ts[0] = Type.CTRL;
 
     // Not a memory to the call?
@@ -284,7 +279,7 @@ public class CallNode extends Node {
       as = as.meet(get_alias(ts[i+ARGIDX] = gvn.type(arg(i))));
     // Recursively search memory for aliases; compute escaping aliases
     BitsAlias as2 = tmem.all_reaching_aliases(as);
-    ts[ESCIDX] = TypeMemPtr.make(as2,TypeObj.UNUSED);
+    ts[_defs._len] = TypeMemPtr.make(as2,TypeObj.UNUSED);
 
     // Not a function to call?
     Type tfx = gvn.type(fun());
@@ -309,6 +304,7 @@ public class CallNode extends Node {
     if( TypeMemPtr.OOP.isa(t)   ) return BitsAlias.FULL;
     return BitsAlias.EMPTY;
   }
+  @Override BitsAlias escapees(GVNGCM gvn) { return tesc(gvn.self_type(this))._aliases; }
 
   // Compute live across uses.  If pre-GCP, then we may not be wired and thus
   // have not seen all possible function-body uses.  Check for #FIDXs == nwired().

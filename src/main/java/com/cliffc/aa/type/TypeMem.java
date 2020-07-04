@@ -505,13 +505,23 @@ public class TypeMem extends Type<TypeMem> {
     return TypeMem.make0(tos);
   }
 
+  // Field store into a conservative set of aliases.
+  public TypeMem st( BitsAlias aliases, byte fin, String fld, Type val ) {
+    int max = Math.max(_aliases.length,aliases.max()+1);
+    TypeObj[] tos = Arrays.copyOf(_aliases,max);
+    for( int alias : aliases )
+      if( alias != 0 )
+        tos[alias] = at(alias).update(fin,fld,val);
+    return make0(tos);
+  }
+
   // Whole object Set at an alias.
   public TypeMem set( int alias, TypeObj obj ) {
     if( at(alias)==obj ) return this; // Shortcut
     int max = Math.max(_aliases.length,alias+1);
     TypeObj[] tos = Arrays.copyOf(_aliases,max);
     tos[alias] = obj;
-    return TypeMem.make0(tos);
+    return make0(tos);
   }
 
   // This-isa-mem only on the given aliases

@@ -7,6 +7,7 @@ import com.cliffc.aa.type.*;
 public class MProjNode extends ProjNode {
   public MProjNode( Node ifn, int idx ) { super(ifn,idx); }
   @Override String xstr() { return "MProj_"+_idx; }
+  @Override boolean is_mem() { return true; }
   @Override public Node ideal(GVNGCM gvn, int level) {
     Node x = in(0).is_copy(gvn,_idx);
     if( x != null )
@@ -18,6 +19,7 @@ public class MProjNode extends ProjNode {
     }
     return null;
   }
+  @Override BitsAlias escapees(GVNGCM gvn) { return in(0).escapees(gvn); }
   @Override public boolean basic_liveness() { return false; }
   // Only called here if alive, and input is more-than-basic-alive
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) { return _live; }

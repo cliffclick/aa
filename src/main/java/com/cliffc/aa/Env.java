@@ -30,6 +30,7 @@ public class Env implements AutoCloseable {
 
   // A file-level Env, or below.  Contains user written code.
   Env( Env par, Parse P, boolean is_closure ) {
+    GVN._opt_mode=0;
     _P = P;
     _par = par;
     ScopeNode s = par._scope;   // Parent scope
@@ -38,15 +39,14 @@ public class Env implements AutoCloseable {
   // Make the Scope object for an Env.
   private static ScopeNode init(Node ctl, Node clo, Node mem, Type back_ptr, Parse errmsg, boolean is_closure) {
     TypeStruct tdisp = TypeStruct.open(back_ptr);
-    NewObjNode nnn = (NewObjNode)GVN.xform(new NewObjNode(is_closure,tdisp,mem,clo).keep());
+    NewObjNode nnn = (NewObjNode)GVN.xform(new NewObjNode(is_closure,tdisp,mem,clo));
     MProjNode  frm = DEFMEM.make_mem_proj(GVN,nnn);
     Node ptr = GVN.xform(new ProjNode(nnn,1));
     DISPLAYS = DISPLAYS.set(nnn._alias);   // Displays for all time
-    Node mmem = GVN.xform(new MemJoinNode(mem,frm,nnn));
     ScopeNode scope = new ScopeNode(errmsg,is_closure);
     scope.set_ctrl(ctl,GVN);
     scope.set_ptr (ptr,GVN);  // Address for 'nnn', the local stack frame
-    scope.set_mem (mmem,GVN); // Memory includes local stack frame
+    scope.set_mem (frm,GVN);  // Memory includes local stack frame
     scope.set_rez (GVN.con(Type.SCALAR),GVN);
     return scope;
   }
