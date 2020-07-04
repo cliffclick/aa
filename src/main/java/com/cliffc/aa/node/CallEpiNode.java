@@ -312,25 +312,23 @@ public final class CallEpiNode extends Node {
 
     // Can keep non-escaping aliases to their pre-call value
     TypeMem tmem2 = (TypeMem)tmem;
+    TypeObj[] tos = new TypeObj[defnode._defs._len];
     for( int alias=2; alias<defnode._defs._len; alias++ ) {
       Node mprj = defnode.in(alias);
       // Expect Con:~use, Con:low or NewNode.
       // ConNode:~use is dead not escaping, or NewNode flagged _not_escaped
+      TypeObj to = tmem2.at(alias);
       if( (mprj instanceof ConNode   && gvn.type(mprj).above_center()) ||
-          (mprj instanceof MProjNode && ((NewNode)mprj.in(0))._not_escaped ) ) {
-        TypeObj pre = tcmem.at(alias);
-        if( tmem2.at(alias) != pre ) {
-          TypeObj tprr = tmem2.at(alias);
-          TypeObj tpre = (TypeObj)pre.join(tprr); // Strictly improves
-          if( tprr != tpre ) tmem2 = tmem2.set(alias,tpre);
-        }
-      }
+          (mprj instanceof MProjNode && ((NewNode)mprj.in(0))._not_escaped ) )
+        to = (TypeObj)to.join(tcmem.at(alias)); // Strictly improves
+      tos[alias] = to;
     }
+    TypeMem tmem3 = TypeMem.make0(tos);
 
     // Pre-call should be at least as good as this.  Can be lower if
     // e.g. "news" of an alias-death has not arrived yet.
-    TypeMem tmem3 = (TypeMem)tmem2.join(defmem);
-    return TypeTuple.make(Type.CTRL,tmem3,trez);
+    TypeMem tmem4 = (TypeMem)tmem3.join(defmem);
+    return TypeTuple.make(Type.CTRL,tmem4,trez);
   }
 
   // Sanity check

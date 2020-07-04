@@ -922,9 +922,9 @@ public class Parse {
     }
     TypeStr ts = TypeStr.con(new String(_buf,oldx,_x-oldx-1).intern());
     // Convert to ptr-to-constant-memory-string
-    NewStrNode nnn = (NewStrNode)gvn( new NewStrNode(ts,mem(),con(ts))).keep();
+    NewStrNode nnn = gvn( new NewStrNode(ts,mem(),con(ts))).keep();
     set_mem(Env.DEFMEM.make_mem_proj(_gvn,nnn));
-    return gvn( new ProjNode(nnn,1));
+    return gvn( new ProjNode(nnn.unhook(),1));
   }
 
   /** Parse a type or return null

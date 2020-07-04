@@ -33,7 +33,7 @@ public class StoreNode extends Node {
     Type ta = gvn.type(adr);
     TypeMemPtr tmp = ta instanceof TypeMemPtr ? (TypeMemPtr)ta : null;
 
-    // If Store is of a Store, and the aliases do not overlap, make parallel with a Join
+    // If Store is of a memory-writer, and the aliases do not overlap, make parallel with a Join
     if( tmp != null && mem.is_mem() ) {
       Node memw = mem.get_mem_writer();
       if( mem.check_solo_mem_writer(memw) ) {

@@ -88,7 +88,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
       _ts = dead_type();
       _defmem = TypeObj.UNUSED;
       did_not_escape(gvn);
-      gvn.set_def_reg(Env.DEFMEM,_alias,gvn.con(_defmem));
+      gvn.set_def_reg(Env.DEFMEM,_alias,gvn.add_work(gvn.con(_defmem)));
       if( is_dead() ) return this;
       gvn.add_work_uses(_uses.at(0));  // Get FPtrs from MProj from this
       return this;

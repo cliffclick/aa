@@ -14,10 +14,13 @@ public class NewStrNode extends NewNode<TypeStr> {
     Type tmem0 = gvn.type(mem());
     if( !(tmem0 instanceof TypeMem) ) return tmem0.oob();
     TypeMem tmem = (TypeMem)tmem0;
-    // Gather args and produce a TypeStruct
-    Type xs = gvn.type(fld(0));
-    TypeStr ss = xs instanceof TypeStr ? (TypeStr)xs : (TypeStr)xs.oob(TypeStr.STR);
-    TypeMem tmem2 = tmem.st(_alias,ss); // Merge with incoming value at same alias
+    TypeObj newt=TypeObj.UNUSED; // If dead
+    if( _ts!=dead_type() ) {
+      // Gather args and produce a TypeStruct
+      Type xs = gvn.type(fld(0));
+      newt = xs instanceof TypeStr ? (TypeStr)xs : (TypeStr)xs.oob(TypeStr.STR);
+    }
+    TypeMem tmem2 = tmem.st(_alias,newt); // Merge with incoming value at same alias
     return TypeTuple.make(tmem2,_tptr); // Complex obj, simple ptr.
   }
   @Override TypeStr dead_type() { return TypeStr.XSTR; }

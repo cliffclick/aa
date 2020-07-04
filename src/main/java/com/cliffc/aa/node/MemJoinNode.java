@@ -102,9 +102,11 @@ public class MemJoinNode extends Node {
     gvn.setype(msp,tmsp_new);    // Moving a region 'inside' might lift the Split
     for( Node use : msp._uses ) {// Also lift all MProjs
       gvn.setype(use,use.value(gvn));
+      use._live = use.live(gvn); // Also might lower all _live sets
       if( tmsp_old!=tmsp_new )  // If the Split moved, the MProjs also moved
         gvn.add_work_uses(use); // And if they moved, revisit the interior
     }
+    msp._live = msp.live(gvn);
     return this;
   }
 
