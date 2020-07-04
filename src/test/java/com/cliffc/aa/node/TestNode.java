@@ -236,7 +236,6 @@ public class TestNode {
       test1monotonic_intrinsic(prim);
     test1monotonic(new IntrinsicNode(tname,null,null,mem,_ins[2]));
     test1monotonic(new   LoadNode(_ins[1],_ins[2],"x",null));
-    test1monotonic(new MemMergeNode(_ins[1],_ins[2],BitsAlias.RECORD));
     NewObjNode nnn1 = new NewObjNode(false,TypeStruct.DISPLAY,_ins[0],_gvn.con(Type.NIL));
     set_type(1,Type.SCALAR);  nnn1.create_active("x",_ins[1],TypeStruct.FFNL,_gvn);
     set_type(2,Type.SCALAR);  nnn1.create_active("y",_ins[2],TypeStruct.FFNL,_gvn);

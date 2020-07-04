@@ -841,7 +841,7 @@ public class Parse {
     set_ctrl(ctrl=init(ctrl.add_def(ctrl())));
     mem.set_def(0,ctrl,null);
     val.set_def(0,ctrl,null);
-    set_mem (gvn(mem.add_def(all_mem())));
+    set_mem (gvn(mem.add_def(mem())));
     return   gvn(val.add_def(rez.unhook())) ;
   }
 
@@ -857,7 +857,7 @@ public class Parse {
       s.set_def(6,val =new PhiNode(Type.SCALAR, null,(Node)null),null);
     }
     ctrl.add_def(ctrl());
-    mem .add_def(all_mem());
+    mem .add_def(mem ());
     val .add_def(rez   );
     set_ctrl(con(Type.XCTRL  ));
     set_mem (con(TypeMem.XMEM));
@@ -1138,27 +1138,6 @@ public class Parse {
   public  ScopeNode scope( ) { return _e._scope; }
   private void create( String tok, Node n, byte mutable ) { _e._scope.stk().create(tok,n,mutable,_gvn ); }
   private static byte ts_mutable(boolean mutable) { return mutable ? TypeStruct.FRW : TypeStruct.FFNL; }
-
-  // Close off active memory and return it.
-  private Node all_mem() {
-    //return _e._scope.all_mem(_gvn);
-    throw com.cliffc.aa.AA.unimpl();
-  }
-  // Expand default memory to support precise aliasing: an active MemMerge (not
-  // in GVN).  Because its active it can be directly modified without removing
-  // from GVN.
-  private MemMergeNode mem_active() {
-    //ScopeNode scope = _e._scope;
-    //Node mem = scope.mem();
-    //if( _gvn.touched(mem) ) {
-    //  // If only used by the parser, just make it active.
-    //  if( mem instanceof MemMergeNode && mem._uses._len==1 && mem._keep == 0 ) _gvn.unreg(mem);
-    //  // Not active and has uses, so make a new active memory feeding from the old
-    //  else return scope.set_active_mem(new MemMergeNode(mem),_gvn);
-    //}
-    //return (MemMergeNode)mem;
-    throw com.cliffc.aa.AA.unimpl();
-  }
 
   // Get the display pointer.  If this is the local scope, then it directly
   // refers to the correct display.  If 'tok' is final in the display then
