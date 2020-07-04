@@ -17,7 +17,8 @@ public class MemJoinNode extends Node {
 
   @Override public Node ideal(GVNGCM gvn, int level) {
     // If the split count is lower than 2, then the split serves no purpose
-    if( _defs._len == 2 ) return in(1); // Just become the last split
+    if( _defs._len == 2 && gvn.type(in(1)).isa(gvn.self_type(this)) )
+      return in(1); // Just become the last split
 
     // If the Split memory has an obvious SESE region, move it into the Split
     MemSplitNode msp = msp();

@@ -435,19 +435,17 @@ public abstract class Node implements Cloneable {
   // Assert all value and liveness calls only go forwards.  Returns >0 for failures.
   public final int more_flow(GVNGCM gvn, VBitSet bs, boolean lifting, int errs) {
     if( bs.tset(_uid) ) return errs; // Been there, done that
-    if( _keep == 0 ) {
-      // Check for only forwards flow, and if possible then also on worklist
-      Type    oval=gvn.type(this), nval = value(gvn);
-      TypeMem oliv=_live         , nliv = live (gvn);
-      if( nval != oval || nliv != oliv ) {
-        boolean ok = lifting
-          ? nval.isa(oval) && nliv.isa(oliv)
-          : oval.isa(nval) && oliv.isa(nliv);
-        if( !ok || !gvn.on_work(this) ) {     // Still-to-be-computed?
-          bs.clear(_uid);                     // Pop-frame & re-run in debugger
-          System.err.println(dump(0,new SB(),true)); // Rolling backwards not allowed
-          errs++;
-        }
+    // Check for only forwards flow, and if possible then also on worklist
+    Type    oval=gvn.type(this), nval = value(gvn);
+    TypeMem oliv=_live         , nliv = live (gvn);
+    if( nval != oval || nliv != oliv ) {
+      boolean ok = lifting
+        ? nval.isa(oval) && nliv.isa(oliv)
+        : oval.isa(nval) && oliv.isa(nliv);
+      if( !ok || !gvn.on_work(this) ) {     // Still-to-be-computed?
+        bs.clear(_uid);                     // Pop-frame & re-run in debugger
+        System.err.println(dump(0,new SB(),true)); // Rolling backwards not allowed
+        errs++;
       }
     }
     for( Node def : _defs ) if( def != null ) errs = def.more_flow(gvn,bs,lifting,errs);

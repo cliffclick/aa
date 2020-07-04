@@ -101,12 +101,17 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
 
     return null;
   }
+  // Set the no-escape flag, and push neighbors on worklist
   private Node did_not_escape(GVNGCM gvn) {
     _not_escaped=true;
     // Every CallEpi can now bypass
     for( Node use : Env.DEFMEM._uses )
       if( use instanceof CallEpiNode )
         gvn.add_work(use);
+    // Stored ptrs do not escape
+    for( Node def : _defs )
+      if( def instanceof MProjNode && def.in(0) instanceof NewNode )
+        gvn.add_work(def.in(0));
     return this;
   }
 
