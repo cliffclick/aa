@@ -786,8 +786,8 @@ public class Parse {
     if( _x == oldx ) { ids.set_len(1); ts.set_len(1); bads.set_len(1);  }
 
     // Build the FunNode header
-    Node old_ctrl = ctrl();
-    Node old_mem  = mem().keep();
+    Node old_ctrl = ctrl().keep();
+    Node old_mem  = mem ().keep();
     FunNode fun = gvn(new FunNode(ids.asAry(),ts.asAry()).add_def(Env.ALL_CTRL)).keep();
     // Build Parms for system incoming values
     Node rpc = gvn(new ParmNode(-1,"rpc",fun,con(TypeRPC.ALL_CALL),null)).keep();
@@ -823,10 +823,10 @@ public class Parse {
       RetNode ret = (RetNode)gvn(new RetNode(ctrl(),mem(),rez,rpc.unhook(),fun.unhook()));
       // The FunPtr builds a real display; any up-scope references are passed in now.
       Node fptr = gvn(new FunPtrNode(ret,e._par._scope.ptr()));
-      _e = _e._par;             // Pop nested environment
-      set_ctrl(old_ctrl);       // Back to the pre-function-def control
-      set_mem (old_mem.unhook());// Back to the pre-function-def memory
-      return fptr;              // Return function; close-out and DCE 'e'
+      _e = _e._par;                // Pop nested environment
+      set_ctrl(old_ctrl.unhook()); // Back to the pre-function-def control
+      set_mem (old_mem .unhook()); // Back to the pre-function-def memory
+      return fptr;                 // Return function; close-out and DCE 'e'
     }
   }
 

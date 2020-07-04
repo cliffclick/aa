@@ -88,7 +88,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
       _ts = dead_type();
       _defmem = TypeObj.UNUSED;
       did_not_escape(gvn);
-      gvn.set_def_reg(Env.DEFMEM,_alias,gvn.add_work(gvn.con(_defmem)));
+      gvn.set_def_reg(Env.DEFMEM,_alias,gvn.add_work(gvn.con(TypeObj.UNUSED)));
       if( is_dead() ) return this;
       gvn.add_work_uses(_uses.at(0));  // Get FPtrs from MProj from this
       return this;
@@ -109,9 +109,10 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
       if( use instanceof CallEpiNode )
         gvn.add_work(use);
     // Stored ptrs do not escape
-    for( Node def : _defs )
-      if( def instanceof MProjNode && def.in(0) instanceof NewNode )
-        gvn.add_work(def.in(0));
+    if( !is_dead() )
+      for( Node def : _defs )
+        if( def instanceof MProjNode && def.in(0) instanceof NewNode )
+          gvn.add_work(def.in(0));
     return this;
   }
 

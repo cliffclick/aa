@@ -22,12 +22,13 @@ public class MemJoinNode extends Node {
 
     // If the Split memory has an obvious SESE region, move it into the Split
     MemSplitNode msp = msp();
-    Node mem = msp.mem();
-    if( mem instanceof MProjNode && mem.in(0) instanceof NewNode && !mem.is_prim() &&
-        msp().mem().check_solo_mem_writer(msp()) ) { // Split is only memory writer after base
+    Node mem = msp.mem(), nnn=mem.in(0);
+    if( mem instanceof MProjNode && nnn instanceof NewNode && !mem.is_prim() &&
+        mem.check_solo_mem_writer(msp) &&        // Split is only memory writer after mprj
+        nnn.in(1).check_solo_mem_writer(nnn) ) { // NewNode is the only memory writer after nnn.in
       assert level==0;
       // Since NewNodes are 1 alias only, they always can move inside.
-      return add_alias_above(gvn, mem.in(0));
+      return add_alias_above(gvn, nnn);
     }
 
     // If some Split/Join path clears out, remove the (useless) split.

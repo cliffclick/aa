@@ -67,9 +67,11 @@ public final class CallEpiNode extends Node {
       FunNode fun = ret.fun();
       if( fun != null && fun._defs._len==2 && // Function is only called by 1 (and not the unknown caller)
           call.err(gvn,true)==null &&   // And args are ok
+          // And memory types are aligned
+          gvn.type(ret.mem()).isa(((TypeTuple)gvn.self_type(this)).at(1)) &&
           !fun.noinline() ) {           // And not turned off
         assert fun.in(1).in(0)==call;   // Just called by us
-          // TODO: Bring back SESE opts
+        // TODO: Bring back SESE opts
         fun.set_is_copy(gvn);
         return inline(gvn,level, call, tcall, ret.ctl(), ret.mem(), ret.val(), null/*do not unwire, because using the entire function body inplace*/);
       }
@@ -313,6 +315,7 @@ public final class CallEpiNode extends Node {
     // Can keep non-escaping aliases to their pre-call value
     TypeMem tmem2 = (TypeMem)tmem;
     TypeObj[] tos = new TypeObj[defnode._defs._len];
+    tos[1] = tmem2.at(1);
     for( int alias=2; alias<defnode._defs._len; alias++ ) {
       Node mprj = defnode.in(alias);
       // Expect Con:~use, Con:low or NewNode.
@@ -426,5 +429,7 @@ public final class CallEpiNode extends Node {
   // Return the set of updatable memory - including everything reachable from
   // every call argument (including the display), and any calls reachable from
   // there, transitively through memory.
+  //
+  // In practice, just the no-escape aliases
   @Override BitsAlias escapees(GVNGCM gvn) { return BitsAlias.FULL; }
 }
