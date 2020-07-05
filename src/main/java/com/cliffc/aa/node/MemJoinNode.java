@@ -23,13 +23,12 @@ public class MemJoinNode extends Node {
 
     // If the Split memory has an obvious SESE region, move it into the Split
     MemSplitNode msp = msp();
-    Node mem = msp.mem(), nnn=mem.in(0);
-    if( mem instanceof MProjNode && nnn instanceof NewNode && !mem.is_prim() &&
-        mem.check_solo_mem_writer(msp) &&        // Split is only memory writer after mprj
-        nnn.in(1).check_solo_mem_writer(nnn) ) { // NewNode is the only memory writer after nnn.in
-      assert level==0;
-      // Since NewNodes are 1 alias only, they always can move inside.
-      return add_alias_above(gvn, nnn);
+    Node mem = msp.mem();
+    if( !mem.is_prim() && mem.check_solo_mem_writer(msp) ) { // Split is only memory writer after mem
+      Node head = find_sese_head(mem);                       // Find head of SESE region
+      if( head != null && head.in(1).check_solo_mem_writer(head) ) // Head is the only writer after the above-head
+        // Move from Split.mem() to head inside the split/join area
+        return add_alias_above(gvn, head);
     }
 
     // If some Split/Join path clears out, remove the (useless) split.
@@ -41,6 +40,22 @@ public class MemJoinNode extends Node {
 
     return null;
   }
+
+  private Node find_sese_head(Node mem) {
+    if( mem instanceof StoreNode ) return mem;
+    if( mem instanceof MemJoinNode )
+      throw com.cliffc.aa.AA.unimpl(); // Merge Split with prior Join
+    //return null; // TODO
+    if( mem instanceof MProjNode ) {
+      Node head = mem.in(0);
+      if( head instanceof NewNode ) return head;
+      if( head instanceof CallNode ) return null; // Do not swallow a Call/CallEpi into a Split/Join
+      if( head instanceof CallEpiNode ) return null; // Do not swallow a Call/CallEpi into a Split/Join
+      throw com.cliffc.aa.AA.unimpl(); // Break out another SESE split
+    }
+    throw com.cliffc.aa.AA.unimpl(); // Break out another SESE split
+  }
+
 
   @Override public Type value(GVNGCM gvn) {
     // Gather all memories
@@ -121,7 +136,7 @@ public class MemJoinNode extends Node {
     MemSplitNode msp = msp();
     int idx = msp.add_alias(gvn,head.escapees(gvn)), bidx; // Add escape set, find index
     if( idx == _defs._len ) {         // Escape set added at the end
-      throw com.cliffc.aa.AA.unimpl();
+      gvn.add_def(this,gvn.xform(new MProjNode(msp,idx)));
     } else {                    // Inserted into prior region
       assert idx!=0;     // No partial overlap; all escape sets are independent
     }

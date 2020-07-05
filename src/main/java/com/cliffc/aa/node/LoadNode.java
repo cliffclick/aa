@@ -38,7 +38,6 @@ public class LoadNode extends Node {
 
     Type tadr = gvn.type(adr);
     BitsAlias aliases = tadr instanceof TypeMemPtr ? ((TypeMemPtr)tadr)._aliases : null;
-    int alias = aliases == null ? -2 : aliases.strip_nil().abit();
 
     // Load can move past a Join if all aliases align.
     if( mem instanceof MemJoinNode && aliases != null ) {

@@ -1,8 +1,12 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.type.*;
+import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeMem;
+import com.cliffc.aa.type.TypeMemPtr;
+import com.cliffc.aa.type.TypeStruct;
 import com.cliffc.aa.util.IBitSet;
 
 // Store a value into a named struct field.  Does it's own nil-check and value
@@ -38,20 +42,26 @@ public class StoreNode extends Node {
     if( tmp != null && mem.is_mem() && mem.check_solo_mem_writer(this) ) {
       IBitSet esc2 = mem.escapees(gvn);
       if( !tmp._aliases.overlaps(esc2) ) {
-        Node head2;
-        if( mem instanceof StoreNode ) head2=mem;
-        else if( mem instanceof MProjNode && mem.in(0) instanceof NewNode ) head2=mem.in(0);
+        Node head;
+        if( mem instanceof StoreNode ) head=mem;
+        else if( mem instanceof MProjNode && mem.in(0) instanceof NewNode ) head=mem.in(0);
         else throw com.cliffc.aa.AA.unimpl(); // Break out another SESE split
+        // Cannot have any Loads following mem; because after the split they
+        // will not see the effects of previous stores that also move into the
+        // split.  However, a Load-after-Store will fold anyways.
+        if( (mem._uses._len==1) ||
+            (mem._uses._len==2 && mem._uses.find(Env.DEFMEM)!= -1 ) ) {
+          Node st2 = gvn.xform(new StoreNode(this,mem,adr).keep());
+          MemSplitNode msp = (MemSplitNode)gvn.xform(new MemSplitNode(st2.unhook()).keep());
+          MProjNode mprj = (MProjNode)gvn.xform(new MProjNode(msp,0));
+          MemJoinNode mjn = new MemJoinNode(mprj);
+          set_def(1,null,gvn);                // Remove extra mem-writer
+          mjn.add_alias_above(gvn,msp.mem()); // Move 'this' clone st2 into Split
+          mjn.add_alias_above(gvn,head);      // Move from 'mem' to 'head' into Split
 
-        Node st2 = gvn.xform(new StoreNode(this,mem,adr).keep());
-        MemSplitNode msp = (MemSplitNode)gvn.xform(new MemSplitNode(st2.unhook()).keep());
-        MProjNode mprj = (MProjNode)gvn.xform(new MProjNode(msp,0));
-        MemJoinNode mjn = new MemJoinNode(mprj);
-        set_def(1,null,gvn);                // Remove extra mem-writer
-        mjn.add_alias_above(gvn,msp.mem()); // Move 'this' clone st2 into Split
-        mjn.add_alias_above(gvn,head2);     // Move from 'mem' to 'head' into Split
-        msp.unhook();
-        return mjn;
+          msp.unhook();
+          return mjn;
+        }
       }
     }
 

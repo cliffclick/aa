@@ -41,13 +41,17 @@ public class IBitSet {
   public IBitSet flip() { _sign=!_sign; return this; }
 
   private int wd(int x) { return _bits._es[x]; }
+  private int xd(int x) {
+    int b = _bits.atX(x); // zero extend if off end
+    return _sign ? ~b : b;// adjust for sign
+  }
 
   public IBitSet clear() {
     _sign=false;
     _bits.clear();
     return this;
   }
-  
+
   // OR-into-this
   public IBitSet or( IBitSet bs ) {
     for( int i=0; i<bs._bits._len; i++ )
@@ -76,30 +80,15 @@ public class IBitSet {
     return true;
   }
 
-  // True if all bits in common: "this== this.OR (bs)".
-  // False if all bits disjoint: "0   == this.AND(bs)".
-  // Error for anything else.
+  // Does 'this' subset 'bs'?
+  // True if all bits in common: "bs== this.OR (bs)".
   public boolean subsetsX( IBitSet bs ) {
     assert !bs.is_empty();      // Undefined
-    int x=-1, i;
-    int min=Math.min(_bits._len,bs._bits._len), max=Math.max(_bits._len,bs._bits._len);
-    for( i=0; i<min; i++ ) {
-      int a=wd(i), b=bs.wd(i);
-      if( a==0 ) throw com.cliffc.aa.AA.unimpl();
-      if( b==0 ) throw com.cliffc.aa.AA.unimpl();
-      if( (a&b)==0 )            // No bits in common
-        if( x==-1 ) x=0;        // Must be false, but need to check all bits
-        else assert x==0;       // Error if some other word had bits in common
-      else if( (a|b) == a )     // All bits in common
-        if( x==-1 ) x=1;        // Must be true, but need to check all bits
-        else assert x==1;       // Error if some other word missing bits
-      else assert false;        // Mis-mash
-    }
-
-    for( ; i<max; i++ )
-      throw com.cliffc.aa.AA.unimpl();
-    assert x!=-1;
-    return x != 0;
+    int max=Math.max(_bits._len,bs._bits._len);
+    for( int i=0; i<max; i++ )
+      if( (xd(i)|bs.xd(i)) != bs.xd(i) )     // All bits in common
+        return false;
+    return true;
   }
 
   @Override public String toString() { return toString(new SB()).toString(); }
@@ -113,8 +102,8 @@ public class IBitSet {
       } else {
         if( x!=-1 ) {           // End a range
           if( x+1==i ) sb.p(x).p(',');
-          else if( x+2==i ) sb.p(x).p(',').p(i).p(',');
-          else sb.p(x).p("...").p(i).p(',');
+          else if( x+2==i ) sb.p(x).p(',').p(i-1).p(',');
+          else sb.p(x).p("...").p(i-1).p(',');
           x = -1;
         }
       }

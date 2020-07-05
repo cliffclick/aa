@@ -375,12 +375,12 @@ public class GVNGCM {
     // [ts!] Put updated types into table for use by ideal()
     if( nval!=oval ) {
       assert nval.isa(oval);       // Monotonically improving
-      // [ts!] Replace with a constant, if possible.  This is also very cheap
-      // (once we expensively computed best value) and makes the best forward
-      // progress.
-      if( replace_con(nval,n) ) { unreg0(n); return con(nval); }
       setype(n,nval);
     }
+    // [ts!] Replace with a constant, if possible.  This is also very cheap
+    // (once we expensively computed best value) and makes the best forward
+    // progress.
+    if( replace_con(nval,n) ) { unreg0(n); return con(nval); }
 
     // [ts+] Try generic graph reshaping using updated types
     Node y = n.ideal(this,level);
