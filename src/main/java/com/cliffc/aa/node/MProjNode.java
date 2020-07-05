@@ -2,6 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.IBitSet;
 
 // Proj memory
 public class MProjNode extends ProjNode {
@@ -19,7 +20,7 @@ public class MProjNode extends ProjNode {
     }
     return null;
   }
-  @Override BitsAlias escapees(GVNGCM gvn) { return in(0).escapees(gvn); }
+  @Override IBitSet escapees(GVNGCM gvn) { return in(0).escapees(gvn); }
   @Override public boolean basic_liveness() { return false; }
   // Only called here if alive, and input is more-than-basic-alive
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) { return _live; }

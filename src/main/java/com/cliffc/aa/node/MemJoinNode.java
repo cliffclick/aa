@@ -4,6 +4,7 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
+import com.cliffc.aa.util.IBitSet;
 
 // Join a split set of aliases from a SESE region, split by an earlier MemSplit.
 // This allows more precision in the SESE that may otherwise merge many paths
@@ -55,15 +56,16 @@ public class MemJoinNode extends Node {
 
     // Walk all aliases and take from matching escape set in the Split.  Since
     // nothing overlaps this is unambiguous.
-    Ary<BitsAlias> escs = msp()._escs;
+    Ary<IBitSet> escs = msp()._escs;
     TypeObj[] tos = new TypeObj[Env.DEFMEM._defs._len];
     for( int alias=1, i; alias<tos.length; alias++ ) {
-      if( escs.at(0).test_recur(alias) ) { // In some RHS set
+      if( escs.at(0).tst(alias) ) { // In some RHS set
         for( i=1; i<_defs._len; i++ )
-          if( escs.at(i).test_recur(alias) )
+          if( escs.at(i).tst(alias) )
             break;
       } else i=0;                     // In the base memory
-      tos[alias] = mems[i].at(alias); // Merge alias
+      if( alias == 1 || Env.DEFMEM.in(alias) != null )  // Check never-made aliases
+        tos[alias] = mems[i].at(alias); // Merge alias
     }
     return TypeMem.make0(tos);
   }
@@ -114,7 +116,7 @@ public class MemJoinNode extends Node {
 
   // Move the given SESE region just behind of the join into the join/split
   // area.  The head node has the escape-set.
-  MemJoinNode add_alias_below( GVNGCM gvn, Node head, Node base, Node base_memw ) {
+  void add_alias_below( GVNGCM gvn, Node head, Node base, Node base_memw ) {
     assert head.is_mem() && base.is_mem();
     MemSplitNode msp = msp();
     int idx = msp.add_alias(gvn,head.escapees(gvn)), bidx; // Add escape set, find index
@@ -128,21 +130,21 @@ public class MemJoinNode extends Node {
     gvn.set_def_reg(head,1,in(idx));
     gvn.set_def_reg(this,idx,base);
     gvn.set_def_reg(base_memw,1,this);
-    return unhook();
+    unhook();
   }
 
   // Find a compatible alias edge, including base memory if nothing overlaps.
   // Return null for any partial overlaps.
-  Node can_bypass( BitsAlias esc ) {
-    Ary<BitsAlias> escs = msp()._escs;
-    if( escs.at(0).join(esc)==BitsAlias.EMPTY ) // No overlap with any other alias set
-      return msp().mem();                       // Can completely bypass
+  Node can_bypass( IBitSet esc ) {
+    Ary<IBitSet> escs = msp()._escs;
+    if( escs.at(0).disjoint(esc) ) // No overlap with any other alias set
+      return msp().mem();          // Can completely bypass
     // Overlaps with at least 1
     for( int i=1; i<escs._len; i++ )
-      if( esc.isa(escs.at(i)) ) // Fully contained with alias set 'i'?
-        return in(i);           // Can use this memory
-    return null;                // Not fully contained within any 1 alias set
+      if( esc.subsetsX(escs.at(i)) ) // Fully contained with alias set 'i'?
+        return in(i);                // Can use this memory
+    return null;                     // Not fully contained within any 1 alias set
   }
   // Modifies all of memory
-  @Override BitsAlias escapees(GVNGCM gvn) { return BitsAlias.FULL; }
+  @Override IBitSet escapees(GVNGCM gvn) { return IBitSet.FULL; }
 }

@@ -2,6 +2,7 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.IBitSet;
 
 // See CallNode.  Slot 0 is the Call.  The remaining slots are Returns which
 // are typed as standard function returns: {Ctrl,Mem,Val}.  These Returns
@@ -431,5 +432,5 @@ public final class CallEpiNode extends Node {
   // there, transitively through memory.
   //
   // In practice, just the no-escape aliases
-  @Override BitsAlias escapees(GVNGCM gvn) { return BitsAlias.FULL; }
+  @Override IBitSet escapees(GVNGCM gvn) { return IBitSet.FULL; }
 }

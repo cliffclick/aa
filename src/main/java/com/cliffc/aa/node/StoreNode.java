@@ -3,6 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.IBitSet;
 
 // Store a value into a named struct field.  Does it's own nil-check and value
 // testing; also checks final field updates.
@@ -34,26 +35,23 @@ public class StoreNode extends Node {
     TypeMemPtr tmp = ta instanceof TypeMemPtr ? (TypeMemPtr)ta : null;
 
     // If Store is of a memory-writer, and the aliases do not overlap, make parallel with a Join
-    if( tmp != null && mem.is_mem() ) {
-      Node memw = mem.get_mem_writer();
-      if( mem.check_solo_mem_writer(memw) ) {
-        BitsAlias esc2 = mem.escapees(gvn);
-        if( tmp._aliases.join(esc2)==BitsAlias.EMPTY ) {
-          Node head2;
-          if( mem instanceof StoreNode ) head2=mem;
-          else if( mem instanceof MProjNode && mem.in(0) instanceof NewNode ) head2=mem.in(0);
-          else throw com.cliffc.aa.AA.unimpl(); // Break out another SESE split
+    if( tmp != null && mem.is_mem() && mem.check_solo_mem_writer(this) ) {
+      IBitSet esc2 = mem.escapees(gvn);
+      if( !tmp._aliases.overlaps(esc2) ) {
+        Node head2;
+        if( mem instanceof StoreNode ) head2=mem;
+        else if( mem instanceof MProjNode && mem.in(0) instanceof NewNode ) head2=mem.in(0);
+        else throw com.cliffc.aa.AA.unimpl(); // Break out another SESE split
 
-          Node st2 = gvn.xform(new StoreNode(this,mem,adr).keep());
-          MemSplitNode msp = (MemSplitNode)gvn.xform(new MemSplitNode(st2.unhook()).keep());
-          MProjNode mprj = (MProjNode)gvn.xform(new MProjNode(msp,0));
-          MemJoinNode mjn = new MemJoinNode(mprj);
-          set_def(1,null,gvn);                // Remove extra mem-writer
-          mjn.add_alias_above(gvn,msp.mem()); // Move 'this' clone st2 into Split
-          mjn.add_alias_above(gvn,head2);     // Move from 'mem' to 'head' into Split
-          msp.unhook();
-          return mjn;
-        }
+        Node st2 = gvn.xform(new StoreNode(this,mem,adr).keep());
+        MemSplitNode msp = (MemSplitNode)gvn.xform(new MemSplitNode(st2.unhook()).keep());
+        MProjNode mprj = (MProjNode)gvn.xform(new MProjNode(msp,0));
+        MemJoinNode mjn = new MemJoinNode(mprj);
+        set_def(1,null,gvn);                // Remove extra mem-writer
+        mjn.add_alias_above(gvn,msp.mem()); // Move 'this' clone st2 into Split
+        mjn.add_alias_above(gvn,head2);     // Move from 'mem' to 'head' into Split
+        msp.unhook();
+        return mjn;
       }
     }
 
@@ -98,10 +96,10 @@ public class StoreNode extends Node {
 
     return tmem.st(tmp._aliases,_fin,_fld,val);
   }
-  @Override BitsAlias escapees(GVNGCM gvn) {
+  @Override IBitSet escapees(GVNGCM gvn) {
     Type adr = gvn.type(adr());
-    if( !(adr instanceof TypeMemPtr) ) return adr.above_center() ? BitsAlias.EMPTY : BitsAlias.FULL;
-    return ((TypeMemPtr)adr)._aliases;
+    if( !(adr instanceof TypeMemPtr) ) return adr.above_center() ? IBitSet.EMPTY : IBitSet.FULL;
+    return ((TypeMemPtr)adr)._aliases.bitset();
   }
 
   @Override public boolean basic_liveness() { return false; }

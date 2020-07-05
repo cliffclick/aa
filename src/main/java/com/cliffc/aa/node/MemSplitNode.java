@@ -3,6 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
+import com.cliffc.aa.util.IBitSet;
 import com.cliffc.aa.util.SB;
 import org.jetbrains.annotations.NotNull;
 
@@ -13,7 +14,7 @@ import java.util.BitSet;
 // This allows more precision in the SESE that may otherwise merge many paths
 // in and out, and is especially targeting non-inlined calls.
 public class MemSplitNode extends Node {
-  Ary<BitsAlias> _escs = new Ary<>(new BitsAlias[]{BitsAlias.EMPTY});
+  Ary<IBitSet> _escs = new Ary<>(new IBitSet[]{new IBitSet()});
   public MemSplitNode( Node mem ) { super(OP_SPLIT,null,mem); }
   Node mem() { return in(1); }
   MemJoinNode join() {
@@ -41,26 +42,23 @@ public class MemSplitNode extends Node {
   @Override public boolean basic_liveness() { return false; }
 
   // Find the escape set this esc set belongs to, or make a new one.
-  int add_alias( GVNGCM gvn, BitsAlias esc ) {
-    BitsAlias all = _escs.at(0); // Summary of Right Hand Side(s) escapes
-    if( esc.join(all)==BitsAlias.EMPTY ) { // No overlap
-      _escs.set(0,esc.meet(all));          // Update summary
-      _escs.add(esc);                      // Add escape set
-      gvn.setype(this,value(gvn));         // Expand tuple result
+  int add_alias( GVNGCM gvn, IBitSet esc ) {
+    IBitSet all = _escs.at(0);     // Summary of Right Hand Side(s) escapes
+    if( all.disjoint(esc) ) {      // No overlap
+      _escs.set(0,all.or(esc));    // Update summary
+      _escs.add(esc);              // Add escape set
+      gvn.setype(this,value(gvn)); // Expand tuple result
       return _escs._len-1;
     }
     for( int i=1; i<_escs._len; i++ )
-      if( esc.isa(_escs.at(i)) )
+      if( esc.subsetsX(_escs.at(i)) )
         return i;               // Found exact alias slice
     return 0;                   // No match, partial overlap
   }
   void remove_alias( GVNGCM gvn, int idx ) {
-    _escs.remove(idx);
-    // Recompute the roll-up.  TODO: since all are disjoint, a version of bit 'subtract' works
-    BitsAlias escs = BitsAlias.EMPTY;
-    for( int i=1; i<_escs._len; i++ )
-      escs = escs.meet(_escs.at(i));
-    _escs.set(0,escs);
+    // Remove (non-overlapping) bits from the rollup
+    _escs.at(0).subtract(_escs.at(idx));
+    _escs.remove(idx);          // Remove the escape set
     TypeTuple tt = (TypeTuple)value(gvn);
     gvn.setype(this,tt);        // Reduce tuple result
     // Renumber all trailing projections to match
@@ -88,13 +86,15 @@ public class MemSplitNode extends Node {
   }
   // Replace the old alias with the new child alias
   private void _update(int oldalias, int newalias) {
-    BitsAlias esc0 = _escs.at(0);
-    if( esc0.test_recur(oldalias) ) {
-      _escs.set(0, esc0.clear(oldalias).set(newalias));
+    IBitSet esc0 = _escs.at(0);
+    if( esc0.tst(oldalias) ) {
+      esc0.clr(oldalias);
+      esc0.set(newalias);
       for( int i=1; i<_escs._len; i++ ) {
-        BitsAlias esc = _escs.at(i);
-        if( esc.test_recur(oldalias) ) {
-          _escs.set(i, esc.clear(oldalias).set(newalias));
+        IBitSet esc = _escs.at(i);
+        if( esc.tst(oldalias) ) {
+          esc.clr(oldalias);
+          esc.set(newalias);
           break;
         }
       }
@@ -111,5 +111,5 @@ public class MemSplitNode extends Node {
     return _uses._len==1 && _keep==0 ? mem() : null;
   }
     // Modifies all of memory - just does it in parts
-  @Override BitsAlias escapees(GVNGCM gvn) { return BitsAlias.FULL; }
+  @Override IBitSet escapees(GVNGCM gvn) { return IBitSet.FULL; }
 }

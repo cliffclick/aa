@@ -1,6 +1,7 @@
 package com.cliffc.aa.type;
 
 import com.cliffc.aa.util.SB;
+import com.cliffc.aa.util.IBitSet;
 import com.cliffc.aa.util.VBitSet;
 import org.jetbrains.annotations.NotNull;
 
@@ -381,22 +382,29 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   // Note no special nil handling; both sides need to either handle nil or not
   public boolean isa(B bs) { return meet(bs) == bs; }
 
-  public boolean overlap( VBitSet bs ) {
+  // True if overlap.  Does not check kids.
+  public boolean overlaps( IBitSet bs ) {
     for( int alias : this )
-      if( bs.get(alias) )
+      if( bs.tst(alias) )
         return true;
-    for( int alias : this )
-      for( int kid=alias; kid!=0; kid=BitsAlias.next_kid(alias,kid) )
-        if( bs.get(kid) )
-          throw com.cliffc.aa.AA.unimpl(); // Have to check for kids?
+    assert !overlaps_kids(bs);
     return false;
   }
-  public boolean isa(VBitSet bs) {
-    throw com.cliffc.aa.AA.unimpl(); // Have to check for kids?
-    
+  private boolean overlaps_kids( IBitSet bs ) {
+    for( int alias : this )
+      for( int kid=alias; kid==0; kid = tree().next_kid(alias,kid) )
+        if( bs.tst(kid) )
+          return true;
+    return false;
+  }
+  // No kids
+  public IBitSet bitset() {
+    IBitSet bs = new IBitSet();
+    for( int alias : this )
+      bs.set(alias);
+    return bs;
   }
 
-  
   // Bits are split in a tree like pattern, recorded here.  To avoid rehashing,
   // the exact same tree-split is handed out between tests.  Basically there is
   // only 1 tree shape, lazily discovered, for all tests.
@@ -481,7 +489,7 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     int peek() { return _kids[1][_kids[1][0]]; } // for testing
     // Smear out the kids in a non-canonical representation, to allow the caller
     // to iterate more easily.
-    public VBitSet plus_kids(Bits<B> bits) {
+    public VBitSet plus_kids( Bits<B> bits) {
       VBitSet bs = new VBitSet();
       for( int i : bits )
         if( i != 0 )

@@ -3,9 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.Ary;
-import com.cliffc.aa.util.SB;
-import com.cliffc.aa.util.VBitSet;
+import com.cliffc.aa.util.*;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.function.Predicate;
@@ -541,7 +539,7 @@ public abstract class Node implements Cloneable {
 
   // Aliases that a MemJoin might choose between.  Not valid for nodes which do
   // not manipulate memory.
-  BitsAlias escapees(GVNGCM gvn) { throw com.cliffc.aa.AA.unimpl("graph error"); }
+  IBitSet escapees(GVNGCM gvn) { throw com.cliffc.aa.AA.unimpl("graph error"); }
 
   // Walk a subset of the dominator tree, looking for the last place (highest
   // in tree) this predicate passes, or null if it never does.

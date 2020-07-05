@@ -42,7 +42,7 @@ public class LoadNode extends Node {
 
     // Load can move past a Join if all aliases align.
     if( mem instanceof MemJoinNode && aliases != null ) {
-      Node jmem = ((MemJoinNode)mem).can_bypass(aliases);
+      Node jmem = ((MemJoinNode)mem).can_bypass(aliases.bitset());
       if( jmem != null ) return set_mem(jmem,gvn);
     }
 

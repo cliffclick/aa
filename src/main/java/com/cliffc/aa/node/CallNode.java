@@ -5,6 +5,7 @@ import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
+import com.cliffc.aa.util.IBitSet;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.BitSet;
@@ -304,7 +305,7 @@ public class CallNode extends Node {
     if( TypeMemPtr.OOP.isa(t)   ) return BitsAlias.FULL;
     return BitsAlias.EMPTY;
   }
-  @Override BitsAlias escapees(GVNGCM gvn) { return tesc(gvn.self_type(this))._aliases; }
+  @Override IBitSet escapees(GVNGCM gvn) { return IBitSet.FULL; }
 
   // Compute live across uses.  If pre-GCP, then we may not be wired and thus
   // have not seen all possible function-body uses.  Check for #FIDXs == nwired().

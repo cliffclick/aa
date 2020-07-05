@@ -1,30 +1,32 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeMem;
-import com.cliffc.aa.type.TypeObj;
-
-import java.util.BitSet;
+import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.IBitSet;
 
 public class DefMemNode extends Node {
-  public static BitSet CAPTURED = new BitSet();
-
-  public DefMemNode( Node ctrl, Node isuse) { super(OP_DEFMEM,ctrl,isuse); }
+  IBitSet _escs;               // Updated with every value call
+  public DefMemNode( Node ctrl, Node isuse) { super(OP_DEFMEM,ctrl,isuse);  _escs = new IBitSet().flip(); }
   @Override public Node ideal(GVNGCM gvn, int level) { return null; }
   @Override public TypeMem value(GVNGCM gvn) {
     TypeObj[] tos = new TypeObj[_defs._len];
     assert in(1)==null; // No need for a 'USE' object
     tos[1] = TypeObj.ISUSED; // Default: all objects are possibly allocated to worst possible
+    _escs.clear().flip();
     for( int i=2; i<_defs._len; i++ ) {
       Node n = in(i);
       if( n==null ) continue;
-      if( n instanceof MProjNode ) {
-        tos[i] = ((NewNode)n.in(0))._defmem;
-      } else {
+      boolean no_esc;
+      if( n instanceof MProjNode ) { // NewNode still alive
+        NewNode nnn = (NewNode)n.in(0);
+        tos[i] = nnn._defmem;
+        no_esc = nnn._not_escaped;
+      } else {                  // Collapsed NewNode
         Type tn = gvn.type(n);
         tos[i] = tn instanceof TypeObj ? (TypeObj)tn : tn.oob(TypeObj.ISUSED);
+        no_esc = tos[i]==TypeObj.UNUSED;
       }
+      if( no_esc && !BitsAlias.is_parent(i) ) _escs.clr(i);
     }
     return TypeMem.make0(tos);
   }
@@ -48,7 +50,5 @@ public class DefMemNode extends Node {
     gvn.add_work_uses(this);
     return mem;
   }
-  // Between compilations
-  public static void reset() { CAPTURED.clear(); }
 }
 

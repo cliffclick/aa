@@ -3,6 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.IBitSet;
 import org.jetbrains.annotations.NotNull;
 
 // Allocates a TypeObj and produces a Tuple with the TypeObj and a TypeMemPtr.
@@ -15,6 +16,8 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   // Unique alias class, one class per unique memory allocation site.
   // Only effectively-final, because the copy/clone sets a new alias value.
   public int _alias; // Alias class
+
+  public IBitSet _escapees;
 
   // A list of field names and field-mods, folded into the initial state of
   // this NewObj.  These can come from initializers at parse-time, or stores
@@ -54,6 +57,8 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     _ts = to;
     _defmem = to==dead_type() ? TypeObj.UNUSED : to.crush();
     _tptr = TypeMemPtr.make(_alias,TypeObj.ISUSED);
+    _escapees = new IBitSet();
+    _escapees.set(_alias);
   }
   String xstr() { return "New"+(_not_escaped?"":"!")+"*"+_alias; } // Self short name
   String  str() { return "New"+(_not_escaped?"":"!")+_ts; } // Inline less-short name
@@ -117,7 +122,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   }
 
 
-  @Override BitsAlias escapees(GVNGCM gvn) { return BitsAlias.make0(_alias); }
+  @Override IBitSet escapees(GVNGCM gvn) { return _escapees; }
   abstract T dead_type();
   @Override public boolean basic_liveness() { return false; }
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) { return _live; }

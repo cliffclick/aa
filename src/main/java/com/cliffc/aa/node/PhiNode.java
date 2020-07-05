@@ -4,6 +4,7 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.IBitSet;
 
 import java.util.BitSet;
 
@@ -65,7 +66,7 @@ public class PhiNode extends Node {
         t = t.meet(gvn.type(in(i)));
     return t;
   }
-  @Override BitsAlias escapees(GVNGCM gvn) { return BitsAlias.FULL; }
+  @Override IBitSet escapees(GVNGCM gvn) { return IBitSet.FULL; }
   @Override public boolean basic_liveness() { return _t==Type.SCALAR; }
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
     if( def==in(0) ) return TypeMem.ALIVE;
