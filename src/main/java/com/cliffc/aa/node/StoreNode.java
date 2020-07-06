@@ -38,6 +38,17 @@ public class StoreNode extends Node {
     Type ta = gvn.type(adr);
     TypeMemPtr tmp = ta instanceof TypeMemPtr ? (TypeMemPtr)ta : null;
 
+    // If Store is by a New and no other Stores, fold into the New.
+    NewObjNode nnn;  int idx;
+    if( mem instanceof MProjNode &&
+        mem.in(0) instanceof NewObjNode && (nnn=(NewObjNode)mem.in(0)) == adr.in(0) &&
+        mem._uses._len==2 && !val().is_forward_ref() &&
+        (idx=nnn._ts.find(_fld))!= -1 && nnn._ts.can_update(idx) ) {
+      // Update the value, and perhaps the final field
+      nnn.update(idx,_fin,val(),gvn);
+      return mem;               // Store is replaced by using the New directly.
+    }
+
     // If Store is of a memory-writer, and the aliases do not overlap, make parallel with a Join
     if( tmp != null && mem.is_mem() && mem.check_solo_mem_writer(this) ) {
       IBitSet esc2 = mem.escapees(gvn);
@@ -78,17 +89,6 @@ public class StoreNode extends Node {
         gvn.setype(mjn,mjn.value(gvn));
         return mjn;
       }
-    }
-
-    // If Store is by a New and no other Stores, fold into the New.
-    NewObjNode nnn;  int idx;
-    if( mem instanceof MProjNode &&
-        mem.in(0) instanceof NewObjNode && (nnn=(NewObjNode)mem.in(0)) == adr.in(0) &&
-        mem._uses._len==2 && !val().is_forward_ref() &&
-        (idx=nnn._ts.find(_fld))!= -1 && nnn._ts.can_update(idx) ) {
-      // Update the value, and perhaps the final field
-      nnn.update(idx,_fin,val(),gvn);
-      return mem;               // Store is replaced by using the New directly.
     }
 
     return null;

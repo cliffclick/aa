@@ -24,8 +24,8 @@ public class MemSplitNode extends Node {
   }
 
   @Override String str() {
-    SB sb = new SB().p('(');
-    sb.p("base,");
+    SB sb = new SB();
+    sb.p('(').p("base,");
     for( int i=1; i<_escs._len; i++ )
       _escs.at(i).toString(sb).p(',');
     return sb.unchar().p(')').toString();
@@ -67,7 +67,7 @@ public class MemSplitNode extends Node {
       if( mprj._idx > idx ) {
         gvn.unreg(mprj);
         mprj._idx--;
-        gvn.rereg(mprj,tt.at(0));
+        gvn.rereg(mprj,tt.at(mprj._idx));
       }
     }
   }
@@ -75,6 +75,7 @@ public class MemSplitNode extends Node {
   // A function body was cloned and all aliases split.  The 'this' Split takes
   // the first child and the clone takes the 2nd child.
   void split_alias( Node copy, BitSet aliases, GVNGCM gvn ) {
+    gvn.add_work(this);
     MemSplitNode cmsp = (MemSplitNode)copy;
     for( int alias = aliases.nextSetBit(0); alias != -1; alias = aliases.nextSetBit(alias + 1)) {
       int[] kid0_aliases = BitsAlias.get_kids(alias);
@@ -108,7 +109,8 @@ public class MemSplitNode extends Node {
     return nnn;
   }
   @Override public Node is_copy(GVNGCM gvn, int idx) {
-    return _uses._len==1 && _keep==0 ? mem() : null;
+    if( _uses._len==1 && _keep==0 ) return mem(); // Single user
+    return null;
   }
     // Modifies all of memory - just does it in parts
   @Override IBitSet escapees(GVNGCM gvn) { return IBitSet.FULL; }

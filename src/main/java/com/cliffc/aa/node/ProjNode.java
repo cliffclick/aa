@@ -10,7 +10,7 @@ public class ProjNode extends Node {
   public int _idx;
   public ProjNode( Node ifn, int idx ) { this(OP_PROJ,ifn,idx); }
   ProjNode( byte op, Node ifn, int idx ) { super(op,ifn); _idx=idx; }
-  @Override String xstr() { return "DProj_"+_idx; }
+  @Override String xstr() { return "DProj"+_idx; }
 
   @Override public Node ideal(GVNGCM gvn, int level) { return in(0).is_copy(gvn,_idx); }
 
@@ -25,8 +25,8 @@ public class ProjNode extends Node {
   }
   // Only called here if alive, and input is more-than-basic-alive
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) { return TypeMem.ANYMEM; }
-  
-  static ProjNode proj( Node head, int idx ) {
+
+  public static ProjNode proj( Node head, int idx ) {
     for( Node use : head._uses )
       if( use instanceof ProjNode && ((ProjNode)use)._idx==idx )
         return (ProjNode)use;

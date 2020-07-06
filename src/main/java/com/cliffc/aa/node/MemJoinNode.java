@@ -21,31 +21,31 @@ public class MemJoinNode extends Node {
     if( _defs._len == 2 && gvn.type(in(1)).isa(gvn.self_type(this)) )
       return in(1); // Just become the last split
 
-    // If the Split memory has an obvious SESE region, move it into the Split
-    MemSplitNode msp = msp();
-    Node mem = msp.mem();
-    if( !mem.is_prim() && mem.check_solo_mem_writer(msp) ) { // Split is only memory writer after mem
-      Node head = find_sese_head(mem);                       // Find head of SESE region
-      if( head != null && head.in(1).check_solo_mem_writer(head) ) // Head is the only writer after the above-head
-        // Move from Split.mem() to head inside the split/join area
-        return add_alias_above(gvn, head);
-    }
-
     // If some Split/Join path clears out, remove the (useless) split.
+    MemSplitNode msp = msp();
     for( int i=1; i<_defs._len; i++ )
       if( in(i) instanceof MProjNode && in(i).in(0)==msp ) {
         msp.remove_alias(gvn,i);
         return remove(i,gvn);
       }
 
+    // If the Split memory has an obvious SESE region, move it into the Split
+    Node mem = msp.mem();
+    if( !mem.is_prim() && mem.check_solo_mem_writer(msp) ) { // Split is only memory writer after mem
+      Node head = find_sese_head(mem);                       // Find head of SESE region
+      if( head instanceof MemSplitNode )                     // Back to back split/join combo
+        return combine_splits(gvn,(MemSplitNode)head);
+      if( head != null && head.in(1).check_solo_mem_writer(head) ) // Head is the only writer after the above-head
+        // Move from Split.mem() to head inside the split/join area
+        return add_alias_above(gvn, head);
+    }
+
     return null;
   }
 
   private Node find_sese_head(Node mem) {
-    if( mem instanceof StoreNode ) return mem;
-    if( mem instanceof MemJoinNode )
-      throw com.cliffc.aa.AA.unimpl(); // Merge Split with prior Join
-    //return null; // TODO
+    if( mem instanceof MemJoinNode ) return ((MemJoinNode)mem).msp(); // Merge Split with prior Join
+    if( mem instanceof StoreNode ) return mem;   // Move Store into Split/Join
     if( mem instanceof MProjNode ) {
       Node head = mem.in(0);
       if( head instanceof NewNode ) return head;
@@ -56,6 +56,37 @@ public class MemJoinNode extends Node {
     throw com.cliffc.aa.AA.unimpl(); // Break out another SESE split
   }
 
+  // Move one escape set from the lower Split/Join to the upper.
+  private Node combine_splits( GVNGCM gvn, MemSplitNode head ) {
+    MemSplitNode msp = msp();
+    MemJoinNode mjn = (MemJoinNode)msp.mem();
+    if( _defs._len==1 ) return null; // Nothing to move
+    if( true )
+      return null; // TODO: Fails right now because types get OOO
+
+    // Get the escaping set being moved.
+    // Remove esc set from lower rollup and add to upper
+    IBitSet esc = msp._escs.pop();
+    msp._escs.at(0).subtract(esc);
+    int idx = head.add_alias(gvn,esc);
+    assert idx!=0; // No partial overlaps; actually we could just legit bail here, no assert
+    if( idx == mjn._defs._len ) // Add edge Join->Split as needed
+      gvn.add_def(mjn,gvn.xform(new MProjNode(head,idx))); // Add a new MProj from MemSplit
+    // Move SESE region from lower Split/Join to upper Split/Join
+    ProjNode prj = ProjNode.proj(msp,msp._escs._len);
+    gvn.subsume(prj,mjn.in(idx));
+    gvn.set_def_reg(mjn,idx,in(_defs._len-1));
+    gvn.remove_reg(this,_defs._len-1);
+
+    // Moving this can *lower* the upper Join type, if an allocation moves up.
+    Type tt = mjn.value(gvn);
+    gvn.setype(mjn,tt);
+    gvn.setype(msp,msp.value(gvn));
+    for( Node use : msp._uses )
+      gvn.setype(use,tt);
+
+    return this;
+  }
 
   @Override public Type value(GVNGCM gvn) {
     // Gather all memories
@@ -126,6 +157,9 @@ public class MemJoinNode extends Node {
         gvn.add_work_uses(use); // And if they moved, revisit the interior
     }
     msp._live = msp.live(gvn);
+    gvn.setype(head,head.value(gvn));
+    if( base != head )
+      gvn.setype(base,base.value(gvn));
     return this;
   }
 

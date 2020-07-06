@@ -421,9 +421,11 @@ public class GVNGCM {
         add_work(u);         // And put on worklist, to get re-visited
         if( u instanceof RetNode )
           add_work_uses(u); // really trying to get CallEpi to test trivial inline again
+        if( u instanceof MemSplitNode )
+          add_work_uses(ProjNode.proj(u,0));
         if( nnn instanceof MProjNode && nnn.in(0) instanceof MemSplitNode )
           add_work_uses(u); // Trying to get Join/Merge/Split to fold up
-          if( nnn.in(0) != null ) add_work(nnn.in(0));
+        if( nnn.in(0) != null ) add_work(nnn.in(0));
       }
     }
   }

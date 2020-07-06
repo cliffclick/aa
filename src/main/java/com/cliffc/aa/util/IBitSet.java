@@ -1,9 +1,13 @@
 package com.cliffc.aa.util;
 
+import org.jetbrains.annotations.NotNull;
+
+import java.util.Iterator;
+
 // Standard bit-set but supports the notion of an 'infinite extension' of 1.
 // i.e. all bits past the end are either 0 or 1.
 // Supports update-in-place, mutable, NOT hash-consed
-public class IBitSet {
+public class IBitSet implements Iterable<Integer> {
   private boolean _sign; // false=infinite zeros, true=infinite ones
   private final AryInt _bits = new AryInt();
 
@@ -40,6 +44,17 @@ public class IBitSet {
   // Constant-time, invert all bits
   public IBitSet flip() { _sign=!_sign; return this; }
 
+  public int bitCount() {
+    int sum=0;
+    for( int i=0; i<_bits._len; i++ )
+      sum += Integer.bitCount(_bits._es[i]);
+    return sum;
+  }
+  public int max( ) {
+    if( _bits._len==0 ) return 0;
+    return (31 - Integer.numberOfLeadingZeros(_bits.last()))+((_bits._len-1)<<5);
+  }
+  
   private int wd(int x) { return _bits._es[x]; }
   private int xd(int x) {
     int b = _bits.atX(x); // zero extend if off end
@@ -110,5 +125,22 @@ public class IBitSet {
     }
     if( x != -1 ) sb.p(x).p("...,"); // Close open range
     return sb.unchar().p(']');
+  }
+
+  /** @return an iterator */
+  @NotNull @Override public Iterator<Integer> iterator() { return new Iter(); }
+  private class Iter implements Iterator<Integer> {
+    int _i=-1;
+    @Override public boolean hasNext() {
+      int idx;
+      while( (idx=idx(++_i)) < _bits._len )
+        if( (_bits._es[idx]&mask(_i)) != 0 )
+          return true;
+      return false;
+    }
+    @Override public Integer next() {
+      if( idx(_i) < _bits._len ) return _i;
+      throw new java.util.NoSuchElementException();
+    }
   }
 }

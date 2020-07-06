@@ -7,7 +7,7 @@ import com.cliffc.aa.util.IBitSet;
 // Proj memory
 public class MProjNode extends ProjNode {
   public MProjNode( Node ifn, int idx ) { super(ifn,idx); }
-  @Override String xstr() { return "MProj_"+_idx; }
+  @Override String xstr() { return "MProj"+_idx; }
   @Override boolean is_mem() { return true; }
   @Override public Node ideal(GVNGCM gvn, int level) {
     Node x = in(0).is_copy(gvn,_idx);

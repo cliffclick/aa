@@ -11,7 +11,7 @@ public class CProjNode extends ProjNode {
   @Override String xstr() {
     if( !is_dead() && in(0) instanceof IfNode )
       return _idx==0 ? "False" : "True";
-    return "CProj_"+_idx;
+    return "CProj"+_idx;
   }
   @Override public Node ideal(GVNGCM gvn, int level) { return in(0).is_copy(gvn,_idx); }
   @Override public Type value(GVNGCM gvn) {
