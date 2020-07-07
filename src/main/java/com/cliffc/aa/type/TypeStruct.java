@@ -193,7 +193,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       else t.dstr(sb,dups);     // Recursively print field type
       sb.p(';').nl();           // One field per line
     }
-    if( _open ) sb.p("...").nl(); // More fields allowed
+    if( _open ) sb.i().p("...").nl(); // More fields allowed
     return sb.di(1).i().p(!is_tup ? '}' : ')');
   }
   // Print with memory instead of recursion
@@ -641,7 +641,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       mt._ts   = Arrays.copyOf(mt._ts   , len);// escaped a _ts
       mt._flags= Arrays.copyOf(mt._flags, len);
     }
-    if( mt._any && !mx._any ) mt._any=false;
+    if( mt._any  && !mx._any ) mt._any =false;
+    if(!mt._open &&  mx._open) mt._open=true ;
     for( int i=0; i<len; i++ ) {
       String s0 = mt._flds[i];
       String s1 = i<mx._flds.length ? mx._flds[i] : null;
@@ -898,7 +899,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       }
       int clen = Math.min(len,ots._ts.length);
       // Meet all the non-recursive parts
-      nts._any &= ots._any;
+      nts._any &= ots._any ; 
+      nts._open|= ots._open;
       for( int i=0; i<clen; i++ ) {
         nts._flds [i] = smeet(nts._flds[i],ots._flds[i]); // Set the Meet of field names
         nts.flags(i,    fmeet(nts.flags(i),ots.flags(i)));
@@ -1169,6 +1171,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   private static void _update( byte[] flags, Type[] ts, byte fin, int idx, Type val, boolean precise ) {
     short flag = flags(flags,idx);
     if( fmod(flag)==FFNL ) precise=false; // Illegal store into final field
+  //if( fmod(flag)==FFNL ) {val=Type.ALL; precise=true; }// Illegal store into final field
     ts[idx] =  precise ? val : ts[idx].meet(val);
     byte mod = precise ? fin : fmod(fmeet(flag,make_flag(fin)));
     flags(flags,idx,set_fmod(flags(flags,idx),mod));

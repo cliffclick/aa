@@ -729,7 +729,7 @@ public class TestApprox {
 
     // The approx that gets built: fib3->dsp3->fib3->dsp3->...
     Type.RECURSIVE_MEET++;
-    TypeStruct dsp3 = TypeStruct.malloc("",false,fflds,TypeStruct.ts(2),fmods,true);
+    TypeStruct dsp3 = TypeStruct.malloc("",false,fflds,TypeStruct.ts(2),fmods,false);
     dsp3._hash = dsp3.compute_hash();  dsp3._cyclic = true;
     TypeMemPtr ptr3 = TypeMemPtr.make(alias,dsp3);
     TypeStruct arg3 = TypeStruct.make(xflds,TypeStruct.ts(Type.SCALAR,ptr3.simple_ptr(),TypeInt.INT64),xmods);
