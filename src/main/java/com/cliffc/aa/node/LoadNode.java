@@ -104,10 +104,8 @@ public class LoadNode extends Node {
     // Loading from TypeMem - will get a TypeObj out.
     Node mem = mem();
     Type tmem = gvn.type(mem); // Memory
-    if( !(tmem instanceof TypeStruct) ) {
-      if( !(tmem instanceof TypeMem) ) return tmem.oob(); // Nothing sane
+    if( !(tmem instanceof TypeMem) ) return tmem.oob(); // Nothing sane
       tmem = ((TypeMem)tmem).ld(tmp);
-    }
 
     // Loading from TypeObj - hoping to get a field out.  If we reach here, we
     // always return a Scalar and not e.g. Any or All.

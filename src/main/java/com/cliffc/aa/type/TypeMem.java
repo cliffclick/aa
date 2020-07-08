@@ -279,7 +279,9 @@ public class TypeMem extends Type<TypeMem> {
 
   // Shallow meet of all possible loadable values.  Used in Node.value calls, so must be monotonic.
   public TypeObj ld( TypeMemPtr ptr ) {
-    if( ptr._aliases == BitsAlias.EMPTY || ptr._aliases == BitsAlias.NIL )
+    if( ptr._aliases == BitsAlias.NIL.dual() || ptr._aliases == BitsAlias.NIL )
+      return ptr.oob(TypeObj.OBJ);
+    if( ptr._aliases == BitsAlias.EMPTY )
       return oob(TypeObj.OBJ);
     if( this== FULL ) return TypeObj. OBJ;
     if( this==EMPTY ) return TypeObj.XOBJ;
@@ -409,9 +411,9 @@ public class TypeMem extends Type<TypeMem> {
       // Compute both (recursively), then merge the results.
       int amax = tmp._aliases.max(); // Max alias
       BitsAlias bmax = BitsAlias.make0(amax);
-      TypeMemPtr tmpmax = _sharpen_get(TypeMemPtr.make(bmax,TypeObj.OBJ),reaches);
+      TypeMemPtr tmpmax = _sharpen_get(TypeMemPtr.make(bmax,TypeObj.ISUSED),reaches);
       BitsAlias bmin = tmp._aliases.clear(amax);
-      TypeMemPtr tmpmin = _sharpen_get(TypeMemPtr.make(bmin,TypeObj.OBJ),reaches);
+      TypeMemPtr tmpmin = _sharpen_get(TypeMemPtr.make(bmin,TypeObj.ISUSED),reaches);
       // Merge results, without installing anything
       assert TypeStruct.RECURSIVE_MEET==0; TypeStruct.RECURSIVE_MEET++;
       tmpx = (TypeMemPtr)tmpmin.meet(tmpmax); // Merge results

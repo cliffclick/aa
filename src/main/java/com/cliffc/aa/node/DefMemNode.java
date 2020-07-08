@@ -31,7 +31,7 @@ public class DefMemNode extends Node {
     return TypeMem.make0(tos);
   }
   @Override public boolean basic_liveness() { return false; }
-  @Override public TypeMem live_use( GVNGCM gvn, Node def ) { return _live; }
+  @Override public TypeMem live_use( GVNGCM gvn, Node def ) { return gvn._opt_mode < 2 ? _live : TypeMem.DEAD; }
   @Override public boolean equals(Object o) { return this==o; } // Only one
 
   // Make an MProj for a New, and 'hook' it into the default memory

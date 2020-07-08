@@ -331,7 +331,7 @@ public final class CallEpiNode extends Node {
 
     // Pre-call should be at least as good as this.  Can be lower if
     // e.g. "news" of an alias-death has not arrived yet.
-    TypeMem tmem4 = (TypeMem)tmem3.join(defmem);
+    TypeMem tmem4 = gvn._opt_mode < 2 ? (TypeMem)tmem3.join(defmem) : tmem3;
     return TypeTuple.make(Type.CTRL,tmem4,trez);
   }
 

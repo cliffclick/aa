@@ -1170,8 +1170,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   }
   private static void _update( byte[] flags, Type[] ts, byte fin, int idx, Type val, boolean precise ) {
     short flag = flags(flags,idx);
-    if( fmod(flag)==FFNL ) precise=false; // Illegal store into final field
-  //if( fmod(flag)==FFNL ) {val=Type.ALL; precise=true; }// Illegal store into final field
+    if( fmod(flag)==FFNL ) {val=val.widen(); precise=false; }// Illegal store into final field
     ts[idx] =  precise ? val : ts[idx].meet(val);
     byte mod = precise ? fin : fmod(fmeet(flag,make_flag(fin)));
     flags(flags,idx,set_fmod(flags(flags,idx),mod));

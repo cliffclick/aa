@@ -51,9 +51,9 @@ public final class RetNode extends Node {
   @Override public Node ideal(GVNGCM gvn, int level) {
     // If control is dead, but the Ret is alive, we're probably only using the
     // FunPtr as a 'gensym'.  Nuke the function body.
-    if( !is_copy() && gvn.type(ctl())== Type.XCTRL )
+    if( !is_copy() && gvn.type(ctl())== Type.XCTRL && !is_prim())
       set_def(4,null,gvn);      // We're a copy now!
-    
+
     // If no users inlining, wipe out all edges
     if( is_copy() && in(0)!=null && _uses._len==1 && _uses.at(0) instanceof FunPtrNode ) {
       set_def(0,null,gvn);      // No ctrl

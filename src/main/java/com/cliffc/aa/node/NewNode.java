@@ -116,7 +116,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     // Stored ptrs do not escape
     if( !is_dead() )
       for( Node def : _defs )
-        if( def instanceof MProjNode && def.in(0) instanceof NewNode )
+        if( def instanceof ProjNode && def.in(0) instanceof NewNode )
           gvn.add_work(def.in(0));
     return this;
   }

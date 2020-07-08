@@ -434,6 +434,13 @@ public class TestParse {
 
 
   @Test public void testParse08() {
+
+    // Main issue with the map() test is final assignments crossing recursive
+    // not-inlined calls.  Smaller test case:
+    test_ptr("tmp=@{val=2;nxt=@{val=1;nxt=0}}; noinline_map={tree -> tree ? @{vv=tree.val&tree.val;nn=noinline_map(tree.nxt)} : 0}; noinline_map(tmp)",
+             "@{vv==int64;noinline_map==~Scalar;nn==*[$]$?}");
+
+    // Too big to inline, multi-recursive
     test_ptr("tmp=@{"+
                     "  l=@{"+
                     "    l=@{ l=0; r=0; v=3 };"+
@@ -451,7 +458,7 @@ public class TestParse {
                     "     ? @{ll=map(tree.l);rr=map(tree.r);vv=tree.v&tree.v}"+
                     "     : 0};"+
                     "map(tmp)",
-             "@{ll=*[$]@{ll=*[$]@{ll=$;rr=$;vv=int64}!?;rr=$;vv=int64}!?;rr=$;vv=int8}!");
+             "@{map==~Scalar;ll==*[$]@{map==~Scalar;ll==*[$]@{map==~Scalar;ll==~nil;rr==~nil;vv==3};rr==*[$]@{map==~Scalar;ll==$;rr==$;vv==int64}?;vv==5};rr==*[$]@{map==~Scalar;ll==*[$]@{map==~Scalar;ll==$;rr==$;vv==15};rr==*[$]@{map==~Scalar;ll==~nil;rr==~nil;vv==22};vv==20};vv==12}");
 
     // Failed attempt at a Tree-structure inference test.  Triggered all sorts
     // of bugs and error reporting issues, so keeping it as a regression test.
@@ -467,7 +474,7 @@ public class TestParse {
          "     ? @{ll=map(tree.l);vv=tree.v}"+
          "     : 0};"+
          "map(tmp)",
-            "Cannot re-assign final field '.l'",39);
+            "Cannot re-assign final field '.l'",36);
 
     // Good tree-structure inference test
     test_ptr("tmp=@{"+

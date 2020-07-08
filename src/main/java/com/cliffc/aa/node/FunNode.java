@@ -209,7 +209,7 @@ public class FunNode extends RegionNode {
     int path = -1;              // Paths will split according to type
     if( formals == null ) {     // No type-specialization to do
       formals = _sig._formals;  // Use old args
-      if( _cnt_size_inlines >= 2 && !is_prim() ) return null;
+      if( _cnt_size_inlines >= 10 && !is_prim() ) return null;
       // Large code-expansion allowed; can inline for other reasons
       path = split_size(gvn,body,parms);
       if( path == -1 ) return null;
@@ -390,6 +390,7 @@ public class FunNode extends RegionNode {
       body.push(n);                                    // Part of body
       if( op == OP_RET ) continue;                     // Return (of this or other function)
       if( n instanceof ProjNode && n.in(0) instanceof CallNode ) continue; // Wired call; all projs lead to other functions
+      if( n instanceof FP2ClosureNode ) continue; // Wired call; all projs lead to other functions
       work.addAll(n._uses);   // Visit all uses
     }
 
@@ -614,7 +615,7 @@ public class FunNode extends RegionNode {
         Env.DEFMEM.make_mem(gvn,(NewNode)nn.in(0),(MProjNode)nn);
         Env.DEFMEM.make_mem(gvn,(NewNode)oo.in(0),(MProjNode)oo);
         int oldalias = BitsAlias.parent(((NewNode)oo.in(0))._alias);
-        gvn.set_def_reg(Env.DEFMEM,oldalias,gvn.con(TypeObj.UNUSED));
+        gvn.set_def_reg(Env.DEFMEM,oldalias,gvn.add_work(gvn.con(TypeObj.UNUSED)));
       }
       gvn.rereg(nn,nt);
     }

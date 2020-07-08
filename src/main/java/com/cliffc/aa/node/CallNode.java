@@ -266,9 +266,8 @@ public class CallNode extends Node {
         gvn.setype(nnn,nnn.value(gvn));
         gvn.setype(mem,mem.value(gvn));
         // Recompute lives for Call/CallEpi, which moves before the New.
-        cepij._live = cepij.live(gvn);
-        cepi ._live = cepi .live(gvn);
-        _live = live(gvn);
+        for( Node x : new Node[]{mem,nnn,cepij,cepi,this} )
+            x._live = x.live(gvn);
         return this;
       }
     }
