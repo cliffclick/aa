@@ -209,13 +209,26 @@ public class FunNode extends RegionNode {
     int path = -1;              // Paths will split according to type
     if( formals == null ) {     // No type-specialization to do
       formals = _sig._formals;  // Use old args
-      if( _cnt_size_inlines >= 10 && !is_prim() ) return null;
+      if( _cnt_size_inlines >= 2 && !is_prim() ) return null;
       // Large code-expansion allowed; can inline for other reasons
       path = split_size(gvn,body,parms);
       if( path == -1 ) return null;
       if( noinline() ) return null;
       if( !is_prim() ) _cnt_size_inlines++; // Disallow infinite size-inlining of recursive non-primitives
     }
+    // Memory is not 'lifted' by DefMem, a sign that a bad-memory-arg is being
+    // passed in.
+    if( has_unknown_callers() ) {
+      ParmNode mem = parm(-2);
+      if( mem!=null ) {
+        Type mt = Type.ANY;
+        for( int i=1; i<_defs._len; i++ )
+          mt = mt.meet(gvn.type(mem.in(i)));
+        if( !mt.isa(gvn.type(Env.DEFMEM)) )
+          return null;          // Do not inline a bad memory type
+      }
+    }
+
     assert level==2; // Do not actually inline, if just checking that all forward progress was found
 
     // --------------

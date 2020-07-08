@@ -1,8 +1,6 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.AA;
-import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.Parse;
+import com.cliffc.aa.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.IBitSet;
@@ -247,6 +245,32 @@ public class CallNode extends Node {
             !(arg(i) instanceof ConNode && gvn.type(arg(i))==Type.XSCALAR) ) // Not already folded
           progress = set_arg(i,gvn.con(Type.XSCALAR),gvn); // Kill dead arg
       if( progress != null ) return this;
+    }
+
+    // Check for a prior New and move past the call (pushes a store-like
+    // behavior down).  The New address must not be reachable from the Call
+    // arguments transitively.
+    Node mem = mem();
+    if( gvn._opt_mode > 0 && mem instanceof MProjNode && mem.in(0) instanceof NewNode &&
+        cepi != null && (mem._uses._len==1 || (mem._uses._len==2 && mem._uses.find(Env.DEFMEM)!=-1) ) ) {
+      NewNode nnn = (NewNode)mem.in(0);
+      ProjNode cepij = ProjNode.proj(cepi,1); // Memory projection from Cepi
+      if( cepij!=null && !tesc(tcall)._aliases.test_recur(nnn._alias) ) {
+        // Swap the Call/CallEpi & NewNode.
+        mem.keep();
+        set_mem(nnn.mem(),gvn);
+        gvn.replace(cepij,mem);
+        gvn.set_def_reg(nnn,1,cepij);
+        mem.unhook();
+        // Recompute values for NewNode, which moves after the Call.
+        gvn.setype(nnn,nnn.value(gvn));
+        gvn.setype(mem,mem.value(gvn));
+        // Recompute lives for Call/CallEpi, which moves before the New.
+        cepij._live = cepij.live(gvn);
+        cepi ._live = cepi .live(gvn);
+        _live = live(gvn);
+        return this;
+      }
     }
 
     return null;

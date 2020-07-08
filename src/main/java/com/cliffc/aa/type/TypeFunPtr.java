@@ -62,7 +62,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
   private static TypeFunPtr FREE=null;
   @Override protected TypeFunPtr free( TypeFunPtr ret ) { FREE=this; return ret; }
   public static TypeFunPtr make( BitsFun fidxs, int nargs, TypeMemPtr disp ) {
-    assert disp.is_display_ptr() && disp==disp.simple_ptr(); // Simple display ptr.  Just the alias.
+    assert disp.is_display_ptr(); // Simple display ptr.  Just the alias.
     TypeFunPtr t1 = FREE;
     if( t1 == null ) t1 = new TypeFunPtr(fidxs,nargs,disp);
     else {   FREE = null;        t1.init(fidxs,nargs,disp); }

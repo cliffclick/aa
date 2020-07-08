@@ -69,24 +69,29 @@ public class StoreNode extends Node {
           set_def(1,null,gvn);                // Remove extra mem-writer
           mjn.add_alias_above(gvn,msp.mem()); // Move 'this' clone st2 into Split
           mjn.add_alias_above(gvn,head);      // Move from 'mem' to 'head' into Split
-
           msp.unhook();
+          // Reverse propagate new live info
+          mjn._live = _live;
+          for( Node x : new Node[]{mprj,st2,st2.in(1),mem,head,head.in(1),msp} )
+            x._live = x.live(gvn);
           return mjn;
         }
       }
     }
 
     // If Store is of a MemJoin and it can enter the split region, do so.
-    if( _keep==0 && tmp != null && mem instanceof MemJoinNode ) {
+    if( _keep==0 && tmp != null && mem instanceof MemJoinNode && mem.check_solo_mem_writer(this) ) {
       Node memw = get_mem_writer();
       // Check the address does not have a memory dependence on the Join.
       // TODO: This is super conservative
       if( memw != null && adr instanceof ProjNode && adr.in(0) instanceof NewNode ) {
         MemJoinNode mjn = (MemJoinNode)mem;
         Node st = gvn.xform(new StoreNode(keep(),mem,adr).keep());
+        st._live = _live;
         mjn.add_alias_below(gvn,st,st.unhook(),memw);
         unhook();
         gvn.setype(mjn,mjn.value(gvn));
+        mjn._live = mjn.live(gvn);
         return mjn;
       }
     }

@@ -296,9 +296,9 @@ public final class CallEpiNode extends Node {
         if( kids==2 ) continue;       // Both kids wired, this is ok
         return gvn.self_type(this);   // "Freeze in place"
       }
-      if( gvn._opt_mode<2 )     // Before GCP?  Fidx is a unwired unknown call target
+      if( gvn._opt_mode < 2 )  // Before GCP?  Fidx is an unwired unknown call target
         return TypeTuple.make(Type.CTRL,defmem,Type.ALL);
-      assert false;             // During GCP, still wiring, post GCP all are wired
+      assert gvn._opt_mode==2; // During GCP, still wiring, post GCP all are wired
     }
 
     // Compute call-return value from all callee returns

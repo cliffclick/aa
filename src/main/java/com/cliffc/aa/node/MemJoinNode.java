@@ -62,7 +62,13 @@ public class MemJoinNode extends Node {
     MemJoinNode mjn = (MemJoinNode)msp.mem();
     if( _defs._len==1 ) return null; // Nothing to move
     if( true )
-      return null; // TODO: Fails right now because types get OOO
+      // TODO: Fails right now because types get OOO when removing a Split/Join
+
+      // TODO: Perhaps: upon moving a SESE region into the Split/Join,
+      // immediately the Split types the 'other' aliases as "use" (ISUSED),
+      // i.e. low as possible.  Later optimizations that lift these nodes (such
+      // as when the Split/Join optimizes away) then only lifts types.
+      return null;
 
     // Get the escaping set being moved.
     // Remove esc set from lower rollup and add to upper
@@ -128,6 +134,7 @@ public class MemJoinNode extends Node {
     Node mprj, body;
     if( idx == _defs._len ) {         // Escape set added at the end
       add_def(mprj = gvn.xform(new MProjNode(msp,idx))); // Add a new MProj from MemSplit
+      mprj._live=_live;
       body = this;              // Head of inside-body region is just 'this'
       bidx = idx;               // Memory input from Join to MProj
     } else {
@@ -152,14 +159,16 @@ public class MemJoinNode extends Node {
     gvn.setype(msp,tmsp_new);    // Moving a region 'inside' might lift the Split
     for( Node use : msp._uses ) {// Also lift all MProjs
       gvn.setype(use,use.value(gvn));
-      use._live = use.live(gvn); // Also might lower all _live sets
       if( tmsp_old!=tmsp_new )  // If the Split moved, the MProjs also moved
         gvn.add_work_uses(use); // And if they moved, revisit the interior
     }
-    msp._live = msp.live(gvn);
     gvn.setype(head,head.value(gvn));
-    if( base != head )
-      gvn.setype(base,base.value(gvn));
+    if( base != head ) gvn.setype(base,base.value(gvn));
+    // Update live same way
+    base._live = base.live(gvn);
+    if( base != head ) head._live = head.live(gvn);
+    mprj._live = mprj.live(gvn);
+    msp ._live = msp .live(gvn);
     return this;
   }
 

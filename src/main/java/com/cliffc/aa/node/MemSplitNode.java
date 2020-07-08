@@ -83,6 +83,7 @@ public class MemSplitNode extends Node {
       int newalias2 = kid0_aliases[2];
       cmsp._update(alias,newalias1);
       this._update(alias,newalias2);
+      gvn.add_work(join());
     }
   }
   // Replace the old alias with the new child alias
