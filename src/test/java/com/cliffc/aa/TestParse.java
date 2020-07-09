@@ -434,6 +434,24 @@ public class TestParse {
 
 
   @Test public void testParse08() {
+    test_ptr("tmp=@{"+
+                    "  l=@{"+
+                    "    l=@{ l=0; r=0; v=3 };"+
+                    "    r=@{ l=0; r=0; v=7 };"+
+                    "    v=5"+
+                    "  };"+
+                    "  r=@{"+
+                    "    l=@{ l=0; r=0; v=15 };"+
+                    "    r=@{ l=0; r=0; v=22 };"+
+                    "    v=20"+
+                    "  };"+
+                    "  v=12 "+
+                    "};"+
+                    "map={tree fun -> tree"+
+                    "     ? @{l=map(tree.l,fun);r=map(tree.r,fun);v=fun(tree.v)}"+
+                    "     : 0};"+
+                    "map(tmp,{x->x+x})",
+            "@{l=*[$]$?;r=$;v=int64}!");
 
     // Main issue with the map() test is final assignments crossing recursive
     // not-inlined calls.  Smaller test case:

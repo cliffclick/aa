@@ -372,6 +372,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     }
   }
   private static final HashMap<TPair,TypeStruct> MEETS0 = new HashMap<>();
+  public static void reset_recursive() { assert RECURSIVE_MEET==0; MEETS0.clear(); }
 
   public  static final TypeStruct ANYSTRUCT = malloc("",true ,new String[0],TypeAry.get(0),fbots(0),false).hashcons_free();
   public  static final TypeStruct ALLSTRUCT = malloc("",false,new String[0],TypeAry.get(0),fbots(0),true ).hashcons_free();
@@ -899,7 +900,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
       }
       int clen = Math.min(len,ots._ts.length);
       // Meet all the non-recursive parts
-      nts._any &= ots._any ; 
+      nts._any &= ots._any ;
       nts._open|= ots._open;
       for( int i=0; i<clen; i++ ) {
         nts._flds [i] = smeet(nts._flds[i],ots._flds[i]); // Set the Meet of field names
@@ -1082,7 +1083,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   }
   private static BitSet get_cyclic(BitSet bcs, VBitSet bs, Ary<Type> stack, Type t ) {
     if( t.interned() ) return bcs;
-    if( bs.tset(t._uid) ) {     // If visiting again... have found a cycle t->....->t
+    if( bs.test(t._uid) ) {     // If visiting again... have found a cycle t->....->t
       // All on the stack are flagged as being part of a cycle
       int i;
       i=stack._len-1;
@@ -1097,7 +1098,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     switch( t._type ) {
     case TMEMPTR: get_cyclic(bcs,bs,stack,((TypeMemPtr)t)._obj ); break;
     case TFUNPTR: get_cyclic(bcs,bs,stack,((TypeFunPtr)t)._disp); break;
-    case TSTRUCT: for( Type tf : ((TypeStruct)t)._ts ) get_cyclic(bcs,bs,stack,tf); break;
+    case TSTRUCT: bs.set(t._uid); for( Type tf : ((TypeStruct)t)._ts ) get_cyclic(bcs,bs,stack,tf); break;
     }
     stack.pop();                // Pop, not part of anothers cycle
     return bcs;

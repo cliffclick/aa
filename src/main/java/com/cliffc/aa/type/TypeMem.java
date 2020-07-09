@@ -367,7 +367,7 @@ public class TypeMem extends Type<TypeMem> {
     if( _sharp_cache==null ) _sharp_cache = new HashMap<>();
     Ary<Type> reaches = new Ary<>(new Type[1],0);
     TypeMemPtr tmpx = _sharpen_get(tmp,reaches);
-    if( reaches.isEmpty() ) return tmpx; // Fast path
+    if( reaches.isEmpty() ) { TypeStruct.reset_recursive(); return tmpx; } // Fast path
 
     // Walk the coarse sets, intern & update cache.  Make a single top struct
     // with fields to all the new reaches pointers, and do the normal cyclic
@@ -422,7 +422,7 @@ public class TypeMem extends Type<TypeMem> {
     // Insert into cache
     _sharp_cache.put(tmp,tmpx);
     // If not interned, then we need to start doing recursive things
-    if( !tmpx.interned() ) {
+    if( !tmpx.interned() && tmpx._obj instanceof TypeStruct ) {
       TypeStruct ts = (TypeStruct)tmpx._obj;
       reaches.push(tmpx);       // Push cloned things on reaches list.
       reaches.push(ts);
@@ -440,6 +440,17 @@ public class TypeMem extends Type<TypeMem> {
         }
         // Since cloned, directly change field - to the cloned field version.
         if( fld instanceof TypeMemPtr )
+          /**
+TODO: CNC: BUSTED:
+
+Intention was that the recursive call revisits the above placement/clone logic,
+recursively deep into the structure.  Instead, instantly returns (always)
+because the 'fld' was already sharp'd.  This leaves a recursive structure not
+placed on 'reaches' list; the built struct came from the above RECURSIVE_MEET
+and can get very deep.  Since not on 'reaches', it does not intern during
+intern_cyclic.
+
+           */          
           ts._ts[i] = _sharpen_get((TypeMemPtr)fld,reaches);
       }
     }
