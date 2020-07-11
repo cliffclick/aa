@@ -434,25 +434,8 @@ public class TestParse {
 
 
   @Test public void testParse08() {
-    test_ptr("tmp=@{"+
-                    "  l=@{"+
-                    "    l=@{ l=0; r=0; v=3 };"+
-                    "    r=@{ l=0; r=0; v=7 };"+
-                    "    v=5"+
-                    "  };"+
-                    "  r=@{"+
-                    "    l=@{ l=0; r=0; v=15 };"+
-                    "    r=@{ l=0; r=0; v=22 };"+
-                    "    v=20"+
-                    "  };"+
-                    "  v=12 "+
-                    "};"+
-                    "map={tree fun -> tree"+
-                    "     ? @{l=map(tree.l,fun);r=map(tree.r,fun);v=fun(tree.v)}"+
-                    "     : 0};"+
-                    "map(tmp,{x->x+x})",
-            "@{l=*[$]$?;r=$;v=int64}!");
-
+    Object dummy = Env.GVN; // Force class loading cycle
+    Type dummy2 = TypeStruct.DISPLAY;
     // Main issue with the map() test is final assignments crossing recursive
     // not-inlined calls.  Smaller test case:
     test_ptr("tmp=@{val=2;nxt=@{val=1;nxt=0}}; noinline_map={tree -> tree ? @{vv=tree.val&tree.val;nn=noinline_map(tree.nxt)} : 0}; noinline_map(tmp)",
@@ -512,7 +495,7 @@ public class TestParse {
          "     ? @{l=map(tree.l,fun);r=map(tree.r,fun);v=fun(tree.v)}"+
          "     : 0};"+
          "map(tmp,{x->x+x})",
-         "@{l=*[$]$?;r=$;v=int64}!");
+         "@{map==~Scalar;l==*[$]@{map==~Scalar;l==*[$]$?;r==$;v==int64}?;r==$;v==24}");
 
     // A linked-list mixing ints and strings, always in pairs
     String ll_cona = "a=0; ";
@@ -528,13 +511,17 @@ public class TestParse {
     // End type: ((((*?,scalar)?,str)?,int64),str)?
 
     // After inlining once, we become pair-aware.
-    test_isa(ll_cona+ll_conb+ll_conc+ll_cond+ll_cone+ll_cont+ll_map2+ll_fun2+ll_apl2,
-             TypeMemPtr.make(BitsAlias.RECORD_BITS0,TypeStruct.make_tuple(TypeMemPtr.make(BitsAlias.RECORD_BITS0,TypeStruct.make_tuple(TypeInt.INT64)),TypeMemPtr.STRPTR)));
+
+    TypeStruct xts_int = TypeStruct.make_tuple(Type.XNIL,TypeMemPtr.OOP0,TypeInt.INT64);
+    TypeMemPtr xpt_int = TypeMemPtr.make(BitsAlias.RECORD_BITS0,xts_int);
+    TypeStruct xts_str = TypeStruct.make_tuple(Type.XNIL,xpt_int,TypeMemPtr.STRPTR);
+    TypeMemPtr xtmp = TypeMemPtr.make(BitsAlias.RECORD_BITS0,xts_str);
+
+    test_isa(ll_cona+ll_conb+ll_conc+ll_cond+ll_cone+ll_cont+ll_map2+ll_fun2+ll_apl2,xtmp);
 
   }
 
   @Test public void testParse09() {
-    test_obj("x:=0; a=x; x:=1; b=x; x:=2; (a,b,x)", TypeStruct.make_tuple(Type.NIL,Type.NIL,TypeInt.con(1),TypeInt.con(2)));
     // Test re-assignment
     test("x=1", TypeInt.TRUE);
     test("x=y=1", TypeInt.TRUE);
@@ -543,17 +530,17 @@ public class TestParse {
     testerr("x=1+y","Unknown ref 'y'",5);
 
     test("x:=1", TypeInt.TRUE);
-    test_obj("x:=0; a=x; x:=1; b=x; x:=2; (a,b,x)", TypeStruct.make_tuple(Type.NIL,Type.NIL,TypeInt.con(1),TypeInt.con(2)));
+    test_obj("x:=0; a=x; x:=1; b=x; x:=2; (a,b,x)", TypeStruct.make_tuple(Type.XNIL,Type.XNIL,TypeInt.con(1),TypeInt.con(2)));
 
-    testerr("x=1; x:=2; x", "Cannot re-assign final val 'x'", 9);
-    testerr("x=1; x=2; x", "Cannot re-assign final val 'x'", 8);
+    testerr("x=1; x:=2; x", "Cannot re-assign final field '.x'", 5);
+    testerr("x=1; x =2; x", "Cannot re-assign final field '.x'", 5);
 
     test("math_rand(1)?(x=4):(x=3);x", TypeInt.NINT8); // x defined on both arms, so available after
     test("math_rand(1)?(x:=4):(x:=3);x", TypeInt.NINT8); // x defined on both arms, so available after
     test("math_rand(1)?(x:=4):(x:=3);x:=x+1", TypeInt.INT64); // x mutable on both arms, so mutable after
     test   ("x:=0; 1 ? (x:=4):; x:=x+1", TypeInt.con(5)); // x mutable ahead; ok to mutate on 1 arm and later
     test   ("x:=0; 1 ? (x =4):; x", TypeInt.con(4)); // x final on 1 arm, dead on other arm
-    testerr("x:=0; math_rand(1) ? (x =4):3; x=2; x", "Cannot re-assign read-only val 'x'",34);
+    testerr("x:=0; math_rand(1) ? (x =4):3; x=2; x", "Cannot re-assign final field '.x'",31);
   }
 
   // Ffnls are declared with an assignment.  This is to avoid the C++/Java
@@ -858,7 +845,8 @@ strs:List(str?) = ... // List of null-or-strings
   }
   static private void test_isa( String program, Type expected ) {
     try( TypeEnv te = run(program) ) {
-      assertTrue(te._t.isa(expected));
+      Type actual = te._tmem.sharptr(te._t);
+      assertTrue(actual.isa(expected));
     }
   }
   static private void testerr( String program, String err, String cursor ) {

@@ -72,6 +72,7 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
 
   public static TypeFunPtr make( int fidx, int nargs, TypeMemPtr disp ) { return make(BitsFun.make0(fidx),nargs,disp); }
   public static TypeFunPtr make_new_fidx( int parent, int nargs, TypeMemPtr disp ) { return make(BitsFun.make_new_fidx(parent),nargs,disp); }
+                TypeFunPtr make_from( TypeMemPtr disp ) { return make(_fidxs,_nargs,disp); }
   public static TypeMemPtr DISP = TypeMemPtr.DISPLAY_PTR; // Open display, allows more fields
   public static TypeMemPtr NO_DISP = TypeMemPtr.NO_DISP;
 
@@ -170,5 +171,11 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     if( _fidxs.getbit() == 1 ) return false; // Thats the generic function ptr
     FunNode fun = FunNode.find_fidx(Math.abs(fidx()));
     return fun != null && fun.is_forward_ref();
+  }
+  TypeFunPtr _sharpen_clone(TypeMemPtr disp) {
+    TypeFunPtr tf = (TypeFunPtr)clone();
+    tf._disp = disp;
+    tf._hash = tf.compute_hash();
+    return tf;
   }
 }

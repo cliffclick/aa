@@ -1120,6 +1120,130 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   private int len( TypeStruct tt ) { return _ts.length <= tt._ts.length ? len0(tt) : tt.len0(this); }
   private int len0( TypeStruct tmax ) { return _any ? tmax._ts.length : _ts.length; }
 
+  // Buid a (recursively) sharpened pointer from memory.  Alias sets can be
+  // looked-up directly in a map from BitsAlias to TypeObjs.  This is useful
+  // for resolving all the deep pointer structures at a point in the program
+  // (i.e., error checking arguments).  Given a TypeMem and a BitsAlias it
+  // returns a TypeObj (and extends the HashMap for future calls).  The TypeObj
+  // may contain deep pointers to other deep TypeObjs, including cyclic types.
+  static TypeMemPtr sharpen( TypeMem mem, TypeMemPtr dull ) {
+    assert dull==dull.simple_ptr() && mem.sharp_get(dull)==null;
+
+    // Pass 1:  fill "dull" cache
+    HashMap<BitsAlias,TypeMemPtr> dull_cache = new HashMap<>();
+    _dull(mem,dull,dull_cache);
+
+    // Pass 2: Stitch together structs with dull pointers to make a possibly cyclic result.
+    TypeMemPtr sharp = _sharp(mem,dull,dull_cache);
+    assert sharp.interned() == dull_cache.isEmpty();
+    // See if we need to cycle-install any cyclic types
+    if( dull_cache.isEmpty() )
+      return sharp;
+    // On exit, cyclic-intern all cyclic things; remove from dull cache.
+    RECURSIVE_MEET++;
+    TypeStruct mt = malloc(new Type[]{sharp}); // Bogus top-struct for API
+    mt = shrink(mt.reachable(),mt); // No shrinking nor UF expected
+    Ary<Type> reaches = mt.reachable(); // Recompute reaches after shrink
+    assert check_uf(reaches);
+    UF.clear();
+    RECURSIVE_MEET--;
+    mt = mt.install_cyclic(reaches); // But yes cycles
+    sharp = (TypeMemPtr)(mt._ts[0]); // Peek thru bogus top-struct
+    return mem.sharput(dull,sharp);
+  }
+
+  // Pass 1:  fill "dull" cache
+  //   Check "dull" & "sharp" cache for hit; if so return.
+  //   Walk all aliases;
+  //     Get obj from mem; it is "dull".
+  //     MEET "dull" objs.
+  //   If meet is sharp, put in sharp cache & return.
+  //   Put dull ptr to dull meet in dull cache.
+  //   Walk dull fields; for all dull TMPs, recurse.
+  private static void _dull( TypeMem mem, TypeMemPtr dull, HashMap<BitsAlias,TypeMemPtr> dull_cache ) {
+    // Check caches and return
+    if( mem.sharp_get(dull) != null ) return;
+    if( dull_cache.get(dull._aliases) != null ) return;
+    if( dull==TypeMemPtr.NO_DISP || dull==TypeMemPtr.NO_DISP.dual() ) { mem.sharput(dull,dull); return; }
+    // Walk and meet "dull" fields; all TMPs will point to ISUSED (hence are dull).
+    Type t = Type.ANY;
+    for( int alias : dull._aliases )
+      if( alias != 0 )
+        t = t.meet(mem.at(alias));
+    TypeMemPtr dptr = dull.make_from((TypeObj)t);
+    if( _is_sharp(t) ) {        // If sharp, install and return
+      mem.sharput(dull,dptr);
+      return;
+    }
+    // Install in dull result in dull cache BEFORE recursing.  We might see it
+    // again if cyclic types.
+    dull_cache.put(dull._aliases,dptr);
+    // Visit all dull pointers and recursively collect
+    for( Type tt : ((TypeStruct)t)._ts ) {
+      if( tt instanceof TypeFunPtr ) tt = ((TypeFunPtr)tt)._disp;
+      if( tt instanceof TypeMemPtr )
+        _dull(mem,(TypeMemPtr)tt,dull_cache);
+    }
+  }
+  // No dull pointers?
+  private static boolean _is_sharp(Type t) {
+    if( !(t instanceof TypeStruct) ) return true;
+    TypeStruct ts = (TypeStruct)t;
+    for( Type tt : ts._ts )
+      if( !tt.interned() ||     // Not interned internal, then this is not finished
+          (tt instanceof TypeMemPtr && // Or has internal dull pointers
+           ((TypeMemPtr)tt)._obj == TypeObj.ISUSED) )
+        return false;
+    return true;
+  }
+
+  // Pass 2: stitch together structs of dull pointers to make a possibly cyclic type.
+  //  Check for hit in sharp cache; if so return it.
+  //  Get from dull cache; if not interned, flag as cyclic & return it.
+  //  Put not-interned dull clone in dull cache.
+  //    Walk all fields.
+  //    Copy unless TMP; recurse TMP for field.
+  //  If not cyclic, all fields already interned; standard intern, put in sharp; remove dull; & return.
+  //  If cyclic, then some field is not interned, put on cyclic list?
+  //  Return not-interned value.
+  private static @NotNull TypeMemPtr _sharp( TypeMem mem, TypeMemPtr dull, HashMap<BitsAlias,TypeMemPtr> dull_cache ) {
+    TypeMemPtr sharp = mem.sharp_get(dull);
+    if( sharp != null ) return sharp; // Value returned is sharp and interned
+    TypeMemPtr dptr = dull_cache.get(dull._aliases);
+    if( !dptr.interned() )      // Closed a cycle
+      return dptr; // Not-yet-sharp and not interned; return the work-in-progress
+    // Copy, replace dull with not-interned dull clone
+    TypeStruct dts2 = ((TypeStruct)dptr._obj)._sharpen_clone();
+    TypeMemPtr dptr2 = (TypeMemPtr)dptr.clone();
+    dptr2._obj = dts2;  dptr2._hash = dptr2.compute_hash();
+    dull_cache.put(dull._aliases,dptr2);
+    // walk all fields, copy unless TMP.
+    for( int i=0; i<dts2._ts.length; i++ ) {
+      Type t = dts2._ts[i];
+      if( t instanceof TypeMemPtr ) // For TMP, recurse on dull pointers.
+        dts2._ts[i] = _sharp(mem,((TypeMemPtr)t),dull_cache);
+      if( t instanceof TypeFunPtr ) {
+        TypeFunPtr tf = (TypeFunPtr)t;
+        TypeMemPtr dptr3 = _sharp(mem,tf._disp,dull_cache);
+        dts2._ts[i] = dptr3.interned() // Sharp return?
+          ? tf.make_from(dptr3)        // Make sharp TFP field
+          : tf._sharpen_clone(dptr3);  // Make dull  TFP field
+      }
+    }
+    if( !_is_sharp(dts2) ) return dptr2; // Return the work-in-progress
+    // Then copied fields are all sharp and interned.
+    dull_cache.remove(dull._aliases);// Move the entry from dull cache to sharp cache
+    TypeStruct sts = dts2.hashcons_free();
+    return mem.sharput(dull,dull.make_from(sts));
+  }
+  // Shallow clone
+  private TypeStruct _sharpen_clone() {
+    assert interned() && !_cyclic;
+    Type[] ts = TypeAry.clone(_ts);
+    TypeStruct t = malloc(_name,_any,_flds,ts,_flags,_open);
+    t._hash = t.compute_hash();
+    return t;
+  }
 
   // ------ String field name lattice ------
   static private boolean fldTop( String s ) { return s.charAt(0)=='\\'; }
@@ -1216,15 +1340,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   @Override void walk( Predicate<Type> p ) {
     if( p.test(this) )
       for( Type _t : _ts ) _t.walk(p);
-  }
-
-  // Shallow clone
-  TypeStruct sharpen_clone() {
-    assert interned();
-    Type[] ts = TypeAry.clone(_ts);
-    TypeStruct t = malloc(_name,_any,_flds,ts,_flags,_open);
-    t._hash = t.compute_hash();
-    return t;
   }
 
 }

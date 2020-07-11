@@ -212,7 +212,7 @@ public class Type<T extends Type<T>> implements Cloneable {
   }
   private boolean intern_check0() {
     Type v = INTERN.get(this);
-    if( this == v ) return false;
+    if( this == v && _dual!=null && _dual._dual==this ) return false;
     System.out.println("INTERN_CHECK FAIL: "+_uid+":"+this+" vs "+v._uid+":"+v);
     return true;
   }
