@@ -27,8 +27,9 @@ public class TypeNode extends Node {
 
   @Override public Node ideal(GVNGCM gvn, int level) {
     Node arg= arg(), mem = mem();
-    Type at = gvn.sharptr(arg,mem);
-    if( at.isa(_t) ) return arg;
+    Type actual = gvn.sharptr(arg,mem);
+    if( actual.isa(_t) )
+      return arg;
     // If TypeNode check is for a function, it will wrap any incoming function
     // with a new function which does the right arg-checks.  This happens
     // immediately in the Parser and is here to declutter the Parser.
@@ -84,7 +85,12 @@ public class TypeNode extends Node {
     Node arg = arg();
     Type t1 = gvn.type(arg);
     Type t0 = _t.simple_ptr();
-    if( t0.dual().isa(t1) && t1.isa(t0) ) return t1;
+    if( t0.dual().isa(t1) && t1.isa(t0) ) {
+      Type actual = gvn.sharptr(arg,mem());
+      if( _t.dual().isa(actual) && actual.isa(_t) )
+        return t1;
+      throw com.cliffc.aa.AA.unimpl(); // expect should only use "sharptr"
+    }
     return t1.oob(t0);
   }
   @Override public boolean basic_liveness() { return true; }

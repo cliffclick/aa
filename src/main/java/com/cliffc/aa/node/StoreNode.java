@@ -57,11 +57,13 @@ public class StoreNode extends Node {
         if( mem instanceof StoreNode ) head=mem;
         else if( mem instanceof MProjNode && mem.in(0) instanceof NewNode ) head=mem.in(0);
         else throw com.cliffc.aa.AA.unimpl(); // Break out another SESE split
-        // Cannot have any Loads following mem; because after the split they
-        // will not see the effects of previous stores that also move into the
-        // split.  However, a Load-after-Store will fold anyways.
-        if( (mem._uses._len==1) ||
-            (mem._uses._len==2 && mem._uses.find(Env.DEFMEM)!= -1 ) ) {
+        // head is the 1 memory writer after head.in
+        if( head.in(1).check_solo_mem_writer(head) &&
+            // Cannot have any Loads following mem; because after the split
+            // they will not see the effects of previous stores that also move
+            // into the split.  However, a Load-after-Store will fold anyways.
+            ((mem._uses._len==1) ||
+             (mem._uses._len==2 && mem._uses.find(Env.DEFMEM)!= -1 ) ) ) {
           Node st2 = gvn.xform(new StoreNode(this,mem,adr).keep());
           MemSplitNode msp = (MemSplitNode)gvn.xform(new MemSplitNode(st2.unhook()).keep());
           MProjNode mprj = (MProjNode)gvn.xform(new MProjNode(msp,0));
@@ -90,6 +92,7 @@ public class StoreNode extends Node {
         st._live = _live;
         mjn.add_alias_below(gvn,st,st.unhook(),memw);
         unhook();
+        gvn.setype(st ,st .value(gvn));
         gvn.setype(mjn,mjn.value(gvn));
         mjn._live = mjn.live(gvn);
         return mjn;
