@@ -301,7 +301,7 @@ public class TestParse {
 
     test    ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
     test    ("Point=:@{x;y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
-    testerr ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1;y=2}))", "*[$]@{x==1;y==2} is not a *[$]Point:@{x:=;y:=;...}",55);
+    testerr ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1;y=2}))", "*[$]@{x=1;y=2} is not a *[$]Point:@{x:=;y:=;...}",55);
     testerr ("Point=:@{x;y}; Point((0,1))", "*[$](~nil;1) is not a *[$]Point:@{x:=;y:=;...}",21);
     testerr("x=@{n: =1;}","Missing type after ':'",7);
     testerr("x=@{n=;}","Missing ifex after assignment of 'n'",6);
@@ -439,7 +439,7 @@ public class TestParse {
     // Main issue with the map() test is final assignments crossing recursive
     // not-inlined calls.  Smaller test case:
     test_ptr("tmp=@{val=2;nxt=@{val=1;nxt=0}}; noinline_map={tree -> tree ? @{vv=tree.val&tree.val;nn=noinline_map(tree.nxt)} : 0}; noinline_map(tmp)",
-             "@{vv==int64;noinline_map==~Scalar;nn==*[$]$?}");
+             "@{vv==int64;noinline_map=~Scalar;nn==*[$]$?}");
 
     // Too big to inline, multi-recursive
     test_ptr("tmp=@{"+
@@ -459,7 +459,7 @@ public class TestParse {
                     "     ? @{ll=map(tree.l);rr=map(tree.r);vv=tree.v&tree.v}"+
                     "     : 0};"+
                     "map(tmp)",
-             "@{map==~Scalar;ll==*[$]@{map==~Scalar;ll==*[$]@{map==~Scalar;ll==~nil;rr==~nil;vv==3};rr==*[$]@{map==~Scalar;ll==$;rr==$;vv==int64}?;vv==5};rr==*[$]@{map==~Scalar;ll==*[$]@{map==~Scalar;ll==$;rr==$;vv==15};rr==*[$]@{map==~Scalar;ll==~nil;rr==~nil;vv==22};vv==20};vv==12}");
+             "@{map=~Scalar;ll=*[$]@{map=~Scalar;ll=*[$]@{map=~Scalar;ll=~nil;rr=~nil;vv=3};rr=*[$]@{map=~Scalar;ll==$;rr==$;vv==int64}?;vv=5};rr=*[$]@{map=~Scalar;ll=*[$]@{map=~Scalar;ll=$;rr=$;vv=15};rr=*[$]@{map=~Scalar;ll=~nil;rr=~nil;vv=22};vv=20};vv=12}");
 
     // Failed attempt at a Tree-structure inference test.  Triggered all sorts
     // of bugs and error reporting issues, so keeping it as a regression test.
@@ -495,7 +495,7 @@ public class TestParse {
          "     ? @{l=map(tree.l,fun);r=map(tree.r,fun);v=fun(tree.v)}"+
          "     : 0};"+
          "map(tmp,{x->x+x})",
-         "@{map==~Scalar;l==*[$]@{map==~Scalar;l==*[$]$?;r==$;v==int64}?;r==$;v==24}");
+         "@{map=~Scalar;l=*[$]@{map=~Scalar;l==*[$]$?;r==$;v==int64}?;r=$;v=24}");
 
     // A linked-list mixing ints and strings, always in pairs
     String ll_cona = "a=0; ";
@@ -540,7 +540,7 @@ public class TestParse {
     test("math_rand(1)?(x:=4):(x:=3);x:=x+1", TypeInt.INT64); // x mutable on both arms, so mutable after
     test   ("x:=0; 1 ? (x:=4):; x:=x+1", TypeInt.con(5)); // x mutable ahead; ok to mutate on 1 arm and later
     test   ("x:=0; 1 ? (x =4):; x", TypeInt.con(4)); // x final on 1 arm, dead on other arm
-    testerr("x:=0; math_rand(1) ? (x =4):3; x=2; x", "Cannot re-assign final field '.x'",31);
+    testerr("x:=0; math_rand(1) ? (x =4):3; x=2; x", "Cannot re-assign read-only field '.x'",31);
   }
 
   // Ffnls are declared with an assignment.  This is to avoid the C++/Java
@@ -561,21 +561,22 @@ public class TestParse {
   // object.  Hence you cannot cast to "final", but you can cast to "read-only"
   // which only applies to you, and not to other r/w pointers.
   @Test public void testParse10() {
+    Object dummy = TypeStruct.DISPLAY;
     // Test re-assignment in struct
-    Type[] ts = TypeStruct.ts(TypeInt.con(1), TypeInt.con(2));
-    test_obj("x=@{n:=1;v:=2}", TypeStruct.make(FLDS, ts,TypeStruct.frws(2)));
-    testerr ("x=@{n =1;v:=2}; x.n  = 3; x.n", "Cannot re-assign final field '.n'",24);
+    Type[] ts = TypeStruct.ts(TypeMemPtr.DISP_SIMPLE, TypeInt.con(1), TypeInt.con(2));
+    test_obj_isa("x=@{n:=1;v:=2}", TypeStruct.make(FLDS, ts,new byte[]{TypeStruct.FFNL,TypeStruct.FRW,TypeStruct.FRW}));
+    testerr ("x=@{n =1;v:=2}; x.n  = 3; x.n", "Cannot re-assign final field '.n'",18);
     test    ("x=@{n:=1;v:=2}; x.n  = 3", TypeInt.con(3));
-    test_ptr("x=@{n:=1;v:=2}; x.n := 3; x", "@{n:=3;v:=2}!");
-    testerr ("x=@{n:=1;v:=2}; x.n  = 3; x.v = 1; x.n = 4; x.n", "Cannot re-assign final field '.n'",42);
+    test_ptr("x=@{n:=1;v:=2}; x.n := 3; x", "@{n:=3;v:=2}");
+    testerr ("x=@{n:=1;v:=2}; x.n  = 3; x.v = 1; x.n = 4; x.n", "Cannot re-assign final field '.n'",37);
     test    ("x=@{n:=1;v:=2}; y=@{n=3;v:=4}; tmp = math_rand(1) ? x : y; tmp.n", TypeInt.NINT8);
-    testerr ("x=@{n:=1;v:=2}; y=@{n=3;v:=4}; tmp = math_rand(1) ? x : y; tmp.n = 5; tmp.n", "Cannot re-assign read-only field '.n'",68);
+    testerr ("x=@{n:=1;v:=2}; y=@{n=3;v:=4}; tmp = math_rand(1) ? x : y; tmp.n = 5; tmp.n", "Cannot re-assign final field '.n'",63);
     test    ("x=@{n:=1;v:=2}; foo={q -> q.n=3}; foo(x); x.n",TypeInt.con(3)); // Side effects persist out of functions
     // Tuple assignment
-    testerr ("x=(1,2); x.0=3; x", "Cannot re-assign final field '.0'",14);
+    testerr ("x=(1,2); x.0=3; x", "Cannot re-assign final field '.0'",11);
     // Final-only and read-only type syntax.
-    testerr ("ptr2rw = @{f:=1}; ptr2final:@{f==} = ptr2rw; ptr2final", "*[$]@{f:=1}! is not a *[$]@{f==}!",27); // Cannot cast-to-final
-    test_obj("ptr2   = @{f =1}; ptr2final:@{f==} = ptr2  ; ptr2final", // Good cast
+    testerr ("ptr2rw = @{f:=1}; ptr2final:@{f=} = ptr2rw; ptr2final", "*[$]@{f:=1}! is not a *[$]@{f=}",27); // Cannot cast-to-final
+    test_obj("ptr2   = @{f =1}; ptr2final:@{f=} = ptr2  ; ptr2final", // Good cast
              TypeStruct.make(new String[]{"f"},new Type[]{TypeInt.con(1)},TypeStruct.ffnls(1)));
     testerr ("ptr=@{f=1}; ptr2rw:@{f:=} = ptr; ptr2rw", "*[$]@{f==1}! is not a *[$]@{f:=}!", 18); // Cannot cast-away final
     test    ("ptr=@{f=1}; ptr2rw:@{f:=} = ptr; 2", TypeInt.con(2)); // Dead cast-away of final

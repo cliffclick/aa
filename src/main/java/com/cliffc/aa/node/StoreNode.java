@@ -112,7 +112,7 @@ public class StoreNode extends Node {
     TypeMem    tmem= (TypeMem   )mem;
     TypeMemPtr tmp = (TypeMemPtr)adr;
 
-    return tmem.st(tmp._aliases,_fin,_fld,val);
+    return tmem.update(tmp._aliases,_fin,_fld,val);
   }
   @Override IBitSet escapees(GVNGCM gvn) {
     Type adr = gvn.type(adr());

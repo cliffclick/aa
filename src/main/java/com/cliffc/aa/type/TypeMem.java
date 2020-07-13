@@ -432,7 +432,7 @@ public class TypeMem extends Type<TypeMem> {
   }
 
   // Field store into a conservative set of aliases.
-  public TypeMem st( BitsAlias aliases, byte fin, String fld, Type val ) {
+  public TypeMem update( BitsAlias aliases, byte fin, String fld, Type val ) {
     int max = Math.max(_aliases.length,aliases.max()+1);
     TypeObj[] tos = Arrays.copyOf(_aliases,max);
     for( int alias : aliases )

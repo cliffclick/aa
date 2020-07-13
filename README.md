@@ -84,7 +84,7 @@ BNF                           | Comment
 `tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str[?]` | Primitive types
 `tfun = {[[type]* ->]? type }` | Function types mirror func decls
 `ttuple = ([[type],]* )`      | Tuple types are just a list of optional types; the count of commas dictates the length, zero commas is zero length.  Tuples are always final.
-`tmod = = | := | ==`          | '=' is r/only, ':=' is r/w, '==' is final
+`tmod = := | = | ==`          | ':=' or '' is r/w, '=' is final, '==' is r/w
 `tstruct = @{ [id [tmod [type?]],]*}` | Struct types are field names with optional access and optional types.  Spaces not allowed
 `tvar = id`                   | Type variable lookup 
 
@@ -277,7 +277,7 @@ Final fields are made with a final store not a final declaration | ---
 `x=@{n:=1;v:=2}`  | `@{n:=1;v:=2` Mutable field declaration and initial writes
 `x=@{n =1;v:=2}; x.n=3` | `Cannot re-assign read-only field '.n'` Field initialized as final/read-only, cannot be changed
 `ptr0=@{p:=0;v:=1}; ptr1=@{p=ptr0;v:=2}; ptr0.p=ptr1; ptr0.p.v+ptr1.p.v` | `3:int` final pointer-cycle is ok
-`ptr2rw = @{f:=1}; ptr2final:@{f==} = ptr2rw; ptr2final` |  `*@{f:=1} is not a *{f==}`  Cannot cast-to-final, can only make finals with a store
+`ptr2rw = @{f:=1}; ptr2final:@{f=} = ptr2rw; ptr2final` |  `*@{f:=1} is not a *{f=}`  Cannot cast-to-final, can only make finals with a store
 
 
 LARGER EXAMPLES:

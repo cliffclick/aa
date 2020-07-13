@@ -54,7 +54,7 @@ import java.util.BitSet;
  *  ttuple = ( [[type],]* )        // Tuple types are just a list of optional types;
                                    // the count of commas dictates the length, zero commas is zero length.
                                    // Tuples are always final.
- *  tmod = = | := | ==             // '=' is r/only, ':=' is r/w, '==' is final
+ *  tmod = := | = | ==             // ':=' or '' is r/w, '=' is final, '==' is r/w
  *  tstruct = @{ [id [tmod [type?]],]*}  // Struct types are field names with optional types.  Spaces not allowed
  *  tvar = id                      // Type variable lookup
  */

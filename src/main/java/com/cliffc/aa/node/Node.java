@@ -111,6 +111,10 @@ public abstract class Node implements Cloneable {
         // Removing 1/2 of the split, put other half on worklist
         if( old instanceof MemSplitNode )
           gvn.add_work_uses(old);
+        if( old instanceof MemJoinNode )
+          for( Node use : old._uses )
+            if( use.is_mem() )
+              gvn.add_work(use);
       }
     }
     return this;

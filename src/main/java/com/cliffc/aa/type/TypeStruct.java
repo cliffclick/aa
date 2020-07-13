@@ -14,8 +14,7 @@ import java.util.function.Predicate;
  *  can be indexed by field name or numeric constant (i.e. tuples), but NOT by
  *  a general number - thats an Array.  Field access mods make a small lattice
  *  of: {choice,r/w,final,r-o}.  Note that mixing r/w and final moves to r-o and
- *  loses the final property.  Fields can be individually alive or clean (not
- *  modified in this function).
+ *  loses the final property.
  *
  *  The recursive type poses some interesting challenges.  It is represented as
  *  literally a cycle of pointers which must include a TypeStruct (and not a
@@ -240,20 +239,40 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return this==t2 ? this : free(t2);
   }
 
-  // ------ Flags lattice: 1 bit field mod ------
+  // ------ Flags lattice: 2 bit field mod ------
   // In other times, I've had other flags, and probably will again.
   // Flags are a 'short' stored as bytes, and the flag parts are 'bytes'.
   // Unfortunate lack of Java-int-typing to help here, otherwise all are just bytes.
 
-  // Field modifiers.
+  // Field modifiers.  {choice,r/w,final,r/o}
+  public static final byte FUNK = 3; // Unknown/choice field mod
+  public static final byte FFNL = 2; // Final field (no load will witness other value)
   public static final byte FRW  = 1; // Read/Write
-  public static final byte FFNL = 0; // Final field (no load will witness other value)
-  public static final byte FHI  = 2; // Field mod is inverted
-  public static final byte FTOP = 1; // Flags top; must be 1 if MEET is AND
-  public static final byte FBOT = 0; // Flags bot; must be 0 if MEET is AND
+  public static final byte FRO  = 0; // Final field (no load will witness other value)
+
+  public static final byte FHI  = 1<<2; // Field mod is inverted
+  public static final byte FTOP = FHI-1;// Flags top; must be 1 if MEET is AND
+  public static final byte FBOT = 0;    // Flags bot; must be 0 if MEET is AND
+  //   6
+  // 5   4
+  //   3
+  // 2   1
+  //   0
+  private static final String[] FMEET = {
+    /*    0123456 */
+    /*0*/"0000000",
+    /*1*/"0101111",
+    /*2*/"0022222",
+    /*3*/"0123333",
+    /*4*/"0123434",
+    /*5*/"0123355",
+    /*6*/"0123456",
+  };
+  public static short fmeet( short f0, short f1 ) {  return (short)(FMEET[f0].charAt(f1)-'0'); }
+  public static short fdual( short f ) { return (short)(("6453120".charAt(f))-'0'); }
   // Printers
-  private static String fstr   ( short f ) { return new String[]{"=",":","~:","~="}[f]; }
-  public  static String fstring( short f ) { return new String[]{"final","read-write","~read-write","~final"}[f]; }
+  private static String fstr   ( short f ) { return new String[]{"=",":","","~="}[f]; }
+  public  static String fstring( short f ) { return new String[]{"read-only","read-write","final","FUNK"}[f]; }
   // Array of flags
   public static byte[] new_flags(int n, short flag) { byte[] bs = new byte[n]; Arrays.fill(bs,(byte)flag); return bs; }
   public static byte[] fbots(int n) { return new_flags(n,bot_flag); }
@@ -264,16 +283,19 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public static byte[] flags(byte[] flags, int idx, short flag ) { flags[idx] = (byte)flag; return flags; }
   // Accessors for field mods from flags
   public static byte fmod( short flag ) {
-    //assert (flag&FHI)==0;       // Do not ask for inverted field mod
+    assert (flag&FHI)==0;       // Do not ask for inverted field mod
     return _fmod(flag);
   }
   // Used by printers
   private static byte _fmod( short flag ) { return (byte)(flag&3); }
   // Make a flags from all parts
-  public static short make_flag( byte mod ) { assert mod==FRW || mod== FFNL; return mod; }
+  public static short make_flag( byte mod ) { assert 0 <= mod && mod <= FTOP; return mod; }
   // Modify just the field mods of a flags
-  public static short set_fmod ( short flags, byte mod ) { assert mod==FRW || mod== FFNL; return mod; }
-
+  public static short set_fmod ( short flags, byte mod ) { assert 0 <= mod && mod <= FTOP; return mod; }
+  static boolean is_modifable(byte mod) {
+    return mod==FRW || mod==FUNK || mod==fdual(FRW) || mod==fdual(FUNK);
+  }
+  
   // Shortcuts for the current flags[] as opposed to independent flags[]
   public byte fmod(int idx) { return fmod(flags(idx)); }
   private byte _fmod(int idx) { return _fmod(flags(idx)); }
@@ -281,21 +303,27 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public byte[] flags(int idx, short flag) { return flags(_flags,idx,flag); }
 
 
-  // MEET is MIN
-  public static short fmeet( short f0, short f1 ) { return (short)Math.min(f0,f1); }
-  public static short fdual( short f ) { return (short)(f^3); }
   // Some precooked flags: combination of field mods and anything else (not current used)
   static final short fnl_flag = make_flag(FFNL); // Field final
   static final short frw_flag = make_flag(FRW ); // Field R/W
+  static final short fro_flag = make_flag(FRO ); // Field R/W
   static final short top_flag = make_flag(FTOP); // Flags top; must be 1 if MEET is AND
   static final short bot_flag = make_flag(FBOT); // Flags bot; must be 0 if MEET is AND
   static {
-    assert fmeet(fdual(fnl_flag),fdual(frw_flag))==fdual(frw_flag); // ~final .isa( ~rw ) 3 isa 2
-    assert fmeet(fdual(fnl_flag),     (frw_flag))==     (frw_flag); // ~final .isa(  rw ) 3 isa 1
-    assert fmeet(fdual(fnl_flag),     (fnl_flag))==     (fnl_flag); // ~final .isa(final) 3 isa 0
-    assert fmeet(fdual(frw_flag),     (frw_flag))==     (frw_flag); // ~rw    .isa(  rw ) 2 isa 1
-    assert fmeet(fdual(frw_flag),     (fnl_flag))==     (fnl_flag); // ~rw    .isa(final) 2 isa 0
-    assert fmeet(     (frw_flag),     (fnl_flag))==     (fnl_flag); //  rw    .isa(final) 1 isa 0
+    assert fmeet(fdual(fro_flag),fdual(fnl_flag))==fdual(fnl_flag); // ~fo   .isa(~final)
+    assert fmeet(fdual(fro_flag),fdual(frw_flag))==fdual(frw_flag); // ~fo   .isa( ~rw )
+
+    assert fmeet(fdual(frw_flag),fdual(top_flag))==fdual(top_flag); // ~rw    .isa( ~top)
+    assert fmeet(fdual(fnl_flag),fdual(top_flag))==fdual(top_flag); // ~final .isa( ~top)
+    assert fmeet(fdual(top_flag),     (top_flag))==     (top_flag); // ~top    .isa( top)
+
+    assert fmeet(fdual(frw_flag),     (frw_flag))==     (frw_flag); // ~rw    .isa(  rw )
+    assert fmeet(fdual(fnl_flag),     (fnl_flag))==     (fnl_flag); // ~final .isa(final)
+
+    assert fmeet(     (top_flag),     (frw_flag))==     (frw_flag); //  top   .isa(  rw )
+    assert fmeet(     (top_flag),     (fnl_flag))==     (fnl_flag); //  top   .isa(final)
+    assert fmeet(     (frw_flag),     (fro_flag))==     (fro_flag); //  rw    .isa(  ro )
+    assert fmeet(     (fnl_flag),     (fro_flag))==     (fro_flag); //  final .isa(  ro )
   }
 
   // Default tuple field names - all bottom-field names
@@ -1295,7 +1323,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   }
   private static void _update( byte[] flags, Type[] ts, byte fin, int idx, Type val, boolean precise ) {
     short flag = flags(flags,idx);
-    if( fmod(flag)==FFNL ) {val=val.widen(); precise=false; }// Illegal store into final field
+    if( !is_modifable(fmod(flag)) ) { val=val.widen(); precise=false; }// Illegal store into final field
     ts[idx] =  precise ? val : ts[idx].meet(val);
     byte mod = precise ? fin : fmod(fmeet(flag,make_flag(fin)));
     flags(flags,idx,set_fmod(flags(flags,idx),mod));
@@ -1312,7 +1340,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     Type[] ts = TypeAry.clone(_ts);
     byte[] flags = _flags.clone();
     for( int i=0; i<ts.length; i++ )
-      if( fmod(i)!=FFNL && fmod(i)!=fdual(FFNL) ) { ts[i]=ALL; flags[i]=FFNL; }// Widen non-finals to ALL, as-if crushed by errors
+      if( is_modifable(fmod(i)) ) { ts[i]=ALL; flags[i]=FBOT; }// Widen writables to ALL, as-if crushed by errors
       else { ts[i]=ts[i].simple_ptr(); flags[i]=_flags[i]; }
     // Keep the name and field names.
     // Low input so low output.
