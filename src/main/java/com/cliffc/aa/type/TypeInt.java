@@ -196,4 +196,5 @@ public class TypeInt extends Type<TypeInt> {
     return TypeInt.make(-2,_z,0);
   }
   @Override void walk( Predicate<Type> p ) { p.test(this); }
+  public TypeInt minsize(TypeInt ti) { return make(-2,Math.min(_z,ti._z),0);  }
 }

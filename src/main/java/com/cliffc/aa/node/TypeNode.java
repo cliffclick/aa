@@ -89,7 +89,6 @@ public class TypeNode extends Node {
       Type actual = gvn.sharptr(arg,mem());
       if( _t.dual().isa(actual) && actual.isa(_t) )
         return t1;
-      throw com.cliffc.aa.AA.unimpl(); // expect should only use "sharptr"
     }
     return t1.oob(t0);
   }

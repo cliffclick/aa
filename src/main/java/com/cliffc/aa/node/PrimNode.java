@@ -289,8 +289,10 @@ static class AndI64 extends Prim2OpI64 {
     // If both are constant ints, return the constant math.
     if( t1.is_con() && t2.is_con() )
       return TypeInt.con(t1.getl() & t2.getl());
-    // Preserve width by doing a MEET
-    return t1.meet(t2);
+    if( !(t1 instanceof TypeInt) || !(t2 instanceof TypeInt) )
+      return TypeInt.INT64;
+    // Preserve width
+    return ((TypeInt)t1).minsize((TypeInt)t2);
   }
   @Override long op( long l, long r ) { return l&r; }
   @Override public byte op_prec() { return 7; }

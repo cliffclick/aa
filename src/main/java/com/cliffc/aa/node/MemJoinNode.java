@@ -53,6 +53,7 @@ public class MemJoinNode extends Node {
       if( head instanceof CallEpiNode ) return null; // Do not swallow a Call/CallEpi into a Split/Join
       throw com.cliffc.aa.AA.unimpl(); // Break out another SESE split
     }
+    if( mem instanceof ParmNode ) return null;
     throw com.cliffc.aa.AA.unimpl(); // Break out another SESE split
   }
 

@@ -562,6 +562,7 @@ public class TestParse {
   // which only applies to you, and not to other r/w pointers.
   @Test public void testParse10() {
     Object dummy = TypeStruct.DISPLAY;
+    test    ("ptr=@{f=1}; ptr2rw:@{f:=} = ptr; 2", TypeInt.con(2)); // Dead cast-away of final
     // Test re-assignment in struct
     Type[] ts = TypeStruct.ts(TypeMemPtr.DISP_SIMPLE, TypeInt.con(1), TypeInt.con(2));
     test_obj_isa("x=@{n:=1;v:=2}", TypeStruct.make(FLDS, ts,new byte[]{TypeStruct.FFNL,TypeStruct.FRW,TypeStruct.FRW}));
@@ -570,15 +571,15 @@ public class TestParse {
     test_ptr("x=@{n:=1;v:=2}; x.n := 3; x", "@{n:=3;v:=2}");
     testerr ("x=@{n:=1;v:=2}; x.n  = 3; x.v = 1; x.n = 4; x.n", "Cannot re-assign final field '.n'",37);
     test    ("x=@{n:=1;v:=2}; y=@{n=3;v:=4}; tmp = math_rand(1) ? x : y; tmp.n", TypeInt.NINT8);
-    testerr ("x=@{n:=1;v:=2}; y=@{n=3;v:=4}; tmp = math_rand(1) ? x : y; tmp.n = 5; tmp.n", "Cannot re-assign final field '.n'",63);
+    testerr ("x=@{n:=1;v:=2}; y=@{n=3;v:=4}; tmp = math_rand(1) ? x : y; tmp.n = 5; tmp.n", "Cannot re-assign read-only field '.n'",63);
     test    ("x=@{n:=1;v:=2}; foo={q -> q.n=3}; foo(x); x.n",TypeInt.con(3)); // Side effects persist out of functions
     // Tuple assignment
     testerr ("x=(1,2); x.0=3; x", "Cannot re-assign final field '.0'",11);
     // Final-only and read-only type syntax.
-    testerr ("ptr2rw = @{f:=1}; ptr2final:@{f=} = ptr2rw; ptr2final", "*[$]@{f:=1}! is not a *[$]@{f=}",27); // Cannot cast-to-final
-    test_obj("ptr2   = @{f =1}; ptr2final:@{f=} = ptr2  ; ptr2final", // Good cast
-             TypeStruct.make(new String[]{"f"},new Type[]{TypeInt.con(1)},TypeStruct.ffnls(1)));
-    testerr ("ptr=@{f=1}; ptr2rw:@{f:=} = ptr; ptr2rw", "*[$]@{f==1}! is not a *[$]@{f:=}!", 18); // Cannot cast-away final
+    testerr ("ptr2rw = @{f:=1}; ptr2final:@{f=} = ptr2rw; ptr2final", "*[$]@{f:=1} is not a *[$]@{f=;...}",27); // Cannot cast-to-final
+    test_obj_isa("ptr2   = @{f =1}; ptr2final:@{f=} = ptr2  ; ptr2final", // Good cast
+             TypeStruct.make(new String[]{"^","f"},new Type[]{TypeMemPtr.DISPLAY_PTR,TypeInt.con(1)},TypeStruct.ffnls(2)));
+    testerr ("ptr=@{f=1}; ptr2rw:@{f:=} = ptr; ptr2rw", "*[$]@{f=1} is not a *[$]@{f:=;...}", 18); // Cannot cast-away final
     test    ("ptr=@{f=1}; ptr2rw:@{f:=} = ptr; 2", TypeInt.con(2)); // Dead cast-away of final
     test    ("@{x:=1;y =2}:@{x;y==}.y", TypeInt.con(2)); // Allowed reading final field
     testerr ("f={ptr2final:@{x;y==} -> ptr2final.y  }; f(@{x:=1;y:=2})", "*[$]@{x:=1;y:=2} is not a *[$]@{x=;y==}!",12); // Another version of casting-to-final
@@ -602,9 +603,9 @@ public class TestParse {
 
   // Early function exit
   @Test public void testParse11() {
-    test("x:=0; {1 ? ^2; x=3}(); x",TypeInt.con(0));  // Following statement is ignored
+    test("x:=0; {1 ? ^2; x=3}(); x",Type.XNIL);  // Following statement is ignored
     test("{ ^3; 5}()",TypeInt.con(3)); // early exit
-    test("x:=0; {^3; x++}(); x",TypeInt.con(0));  // Following statement is ignored
+    test("x:=0; {^3; x++}(); x",Type.XNIL);  // Following statement is ignored
     test("x:=0; {^1 ? (x=1); x=3}(); x",TypeInt.con(1));  // Return of an ifex
     test("x:=0; {^1 ?  x=1 ; x=3}(); x",TypeInt.con(1));  // Return of an ifex
     // Find: returns 0 if not found, or first element which passes predicate.

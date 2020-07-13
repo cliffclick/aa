@@ -839,6 +839,7 @@ public class Parse {
     s.early_kill();
     if( ctrl == null ) return rez.unhook(); // No other exits to merge into
     set_ctrl(ctrl=init(ctrl.add_def(ctrl())));
+    _gvn.setype(ctrl,Type.CTRL);
     mem.set_def(0,ctrl,null);
     val.set_def(0,ctrl,null);
     set_mem (gvn(mem.add_def(mem())));
@@ -1158,7 +1159,7 @@ public class Parse {
       if( scope == e._scope ) return ptr;
       ptr = gvn(new LoadNode(mmem,ptr,"^",null)); // Gen linked-list walk code, walking display slot
       Type t = _gvn.type(ptr);
-      assert t instanceof TypeMemPtr && tmem.sharpen((TypeMemPtr)t).is_display_ptr();
+      assert _gvn.sharptr(ptr,mmem).is_display_ptr();
       e = e._par;                                 // Walk linked-list in parser also
     }
   }

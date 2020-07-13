@@ -41,7 +41,7 @@ public class ScopeNode extends Node {
   public void set_rez ( Node n, GVNGCM gvn) { set_def(3,n,gvn); }
   // Set a new deactive GVNd memory, ready for nested Node.ideal() calls.
   public Node set_mem( Node n, GVNGCM gvn) {
-    assert n==null || (gvn.touched(n) && gvn.type(n) instanceof TypeMem);
+    assert n==null || (gvn.touched(n) && (gvn.type(n) instanceof TypeMem || gvn.type(n)==Type.ANY));
     set_def(1,n,gvn);
     return this;
   }

@@ -92,7 +92,7 @@ public abstract class Node implements Cloneable {
         // Displays for FunPtrs update
         if( this instanceof ParmNode && ((ParmNode)this)._idx==0 && old instanceof FunNode ) {
           RetNode ret = ((FunNode)old).ret();
-          if( ret != null ) gvn.add_work(ret.funptr());
+          if( ret != null && ret.funptr() != null ) gvn.add_work(ret.funptr());
         }
         // Parm memory may fold away, if no other parm needs it for sharpening
         if( this instanceof ParmNode && ((ParmNode)this)._idx!=-2 && old instanceof FunNode ) {
