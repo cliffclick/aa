@@ -85,9 +85,9 @@ public class TypeNode extends Node {
     Node arg = arg();
     Type t1 = gvn.type(arg);
     Type t0 = _t.simple_ptr();
-    if( t0.dual().isa(t1) && t1.isa(t0) ) {
+    if( t1.isa(t0) ) {
       Type actual = gvn.sharptr(arg,mem());
-      if( _t.dual().isa(actual) && actual.isa(_t) )
+      if( actual.isa(_t) )
         return t1;
     }
     return t1.oob(t0);

@@ -9,22 +9,20 @@ import com.cliffc.aa.util.Util;
 public class LoadNode extends Node {
   private final String _fld;
   private final Parse _bad;
-  // TRUE if either the address or value must be a TFP.
-  // Address: means loading from a closure.
-  // Value  : means loading      a closure.
-  // Both: this is a linked-list display walk, finding the closure at the proper lexical depth.
-  // Just address: this is loading a local variable at this closure.
-  // Neither: this is a normal field load from a non-closure structure.
-  // Just value: not allowed.
-  private final boolean _closure_adr, _closure_val;
+
   public LoadNode( Node mem, Node adr, String fld, Parse bad ) { this(mem,adr,fld,bad,false,false); }
   public LoadNode( Node mem, Node adr, String fld, Parse bad, boolean closure_adr, boolean closure_val ) {
     super(OP_LOAD,null,mem,adr);
     _fld = fld;
     _bad = bad;
+    // TRUE if either the address or value must be a TFP.
+    // Address: means loading from a closure.
+    // Value  : means loading      a closure.
+    // Both: this is a linked-list display walk, finding the closure at the proper lexical depth.
+    // Just address: this is loading a local variable at this closure.
+    // Neither: this is a normal field load from a non-closure structure.
+    // Just value: not allowed.
     assert (closure_adr || !closure_val); // Just value: not allowed
-    _closure_adr = closure_adr;
-    _closure_val = closure_val;
   }
   String xstr() { return "."+_fld; }   // Self short name
   String  str() { return xstr(); } // Inline short name
@@ -105,15 +103,11 @@ public class LoadNode extends Node {
     Node mem = mem();
     Type tmem = gvn.type(mem); // Memory
     if( !(tmem instanceof TypeMem) ) return tmem.oob(); // Nothing sane
-      tmem = ((TypeMem)tmem).ld(tmp);
+    TypeObj tobj = ((TypeMem)tmem).ld(tmp);
 
-    // Loading from TypeObj - hoping to get a field out.  If we reach here, we
-    // always return a Scalar and not e.g. Any or All.
-    if( tmem == TypeObj.XOBJ ) return Type.ANY;
-    if( tmem == TypeObj. OBJ ) return Type.ALL;
-    // Struct; check for field
-    if( tmem instanceof TypeStruct ) {
-      TypeStruct ts = (TypeStruct)tmem;
+    // Loading from TypeObj - hoping to get a field out.
+    if( tobj instanceof TypeStruct ) { // Struct; check for field
+      TypeStruct ts = (TypeStruct)tobj;
       int idx = ts.find(_fld);  // Find the named field
       if( idx != -1 ) {         // Found a field
         Type t = ts.at(idx);    // Load field
@@ -123,7 +117,7 @@ public class LoadNode extends Node {
       }
       // No such field
     }
-    return tmem.oob();          // No loading from e.g. Strings
+    return tobj.oob();          // No loading from e.g. Strings
   }
 
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {

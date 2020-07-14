@@ -1,6 +1,5 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.AryInt;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
@@ -280,7 +279,7 @@ public class TypeMem extends Type<TypeMem> {
   // Shallow meet of all possible loadable values.  Used in Node.value calls, so must be monotonic.
   public TypeObj ld( TypeMemPtr ptr ) {
     if( ptr._aliases == BitsAlias.NIL.dual() || ptr._aliases == BitsAlias.NIL )
-      return ptr.oob(TypeObj.OBJ);
+      return TypeObj.XOBJ;
     if( ptr._aliases == BitsAlias.EMPTY )
       return oob(TypeObj.OBJ);
     if( this== FULL ) return TypeObj. OBJ;
