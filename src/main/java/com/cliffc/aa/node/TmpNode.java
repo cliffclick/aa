@@ -8,8 +8,8 @@ import java.lang.AutoCloseable;
 // Sea-of-Nodes
 public class TmpNode extends Node implements AutoCloseable {
   public TmpNode() { super(OP_TMP); }
-  @Override public Node ideal(GVNGCM gvn) { return null; }
-  @Override public Type value(GVNGCM gvn) { return all_type(); }
+  @Override public Node ideal(GVNGCM gvn, int level) { return null; }
+  @Override public Type value(GVNGCM gvn) { return Type.ALL; }
   // TmpNodes are never equal
   @Override public int hashCode() { return 123456789; }
   @Override public boolean equals(Object o) { return this==o; }
@@ -23,7 +23,7 @@ public class TmpNode extends Node implements AutoCloseable {
   // Parser support of small lists of nodes to be kept alive during parsing
   public void remove( int i ) {
     Node n = _defs.remove(i);
-    n._uses.del(n._uses.find(this));
+    n._uses.del(this);
     if( n._uses._len==0 )
       Env.GVN.kill(n); // Recursively begin deleting
   }

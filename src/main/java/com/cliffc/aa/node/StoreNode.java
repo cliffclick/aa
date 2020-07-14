@@ -1,97 +1,164 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.type.*;
+import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeMem;
+import com.cliffc.aa.type.TypeMemPtr;
+import com.cliffc.aa.type.TypeStruct;
+import com.cliffc.aa.util.IBitSet;
 
 // Store a value into a named struct field.  Does it's own nil-check and value
 // testing; also checks final field updates.
 public class StoreNode extends Node {
-  final String _fld;
-  final int _fld_num;
-  private final byte _fin;    // TypeStruct.ffinal or TypeStruct.frw
-  private final boolean _xmem;// True if TypeMem only, False if TypeObj only
-  final Parse _bad;
-  private StoreNode( Node ctrl, Node mem, Node adr, Node val, byte fin, String fld, int fld_num, Parse bad, boolean xmem ) {
-    super(OP_STORE,ctrl,mem,adr,val);
+  final String _fld;        // Field being updated
+  private final byte _fin;  // TypeStruct.ffinal or TypeStruct.frw
+  private final Parse _bad;
+  public StoreNode( Node mem, Node adr, Node val, byte fin, String fld, Parse bad ) {
+    super(OP_STORE,null,mem,adr,val);
     _fld = fld;
-    _fld_num = fld_num;
     _fin = fin;
-    _xmem = xmem;
     _bad = bad;    // Tests can pass a null, but nobody else does
   }
-  public StoreNode( Node ctrl, Node mem, Node adr, Node val, byte fin, String fld , Parse bad ) { this(ctrl,mem,adr,val,fin,fld ,  -1   ,bad,true); }
-  public StoreNode( Node ctrl, Node mem, Node adr, Node val, byte fin, int fld_num, Parse bad ) { this(ctrl,mem,adr,val,fin,null,fld_num,bad,true); }
-  private StoreNode( StoreNode st, Node mem, Node adr ) { this(st.in(0),mem,adr,st.val(),st._fin,st._fld,st._fld_num,st._bad,false); }
+  private StoreNode( StoreNode st, Node mem, Node adr ) { this(mem,adr,st.val(),st._fin,st._fld,st._bad); }
+  //public  StoreNode( StoreNode st, Node ctr, Node mem, Node adr, Node val ) { this(ctr,mem,adr,   val  ,st._fin,st._eqv,st._bad); }
 
-  String xstr() { return "."+(_fld==null ? ""+_fld_num : _fld)+"="; } // Self short name
-  String  str() { return xstr(); }      // Inline short name
+  String xstr() { return "."+_fld+"="; } // Self short name
+  String  str() { return xstr(); }   // Inline short name
+  @Override boolean is_mem() { return true; }
 
   Node mem() { return in(1); }
   Node adr() { return in(2); }
   Node val() { return in(3); }
 
-  @Override public Node ideal(GVNGCM gvn) {
+  @Override public Node ideal(GVNGCM gvn, int level) {
     Node mem = mem();
     Node adr = adr();
-    MemMergeNode mmem;
-    if( mem instanceof MemMergeNode && (mmem=((MemMergeNode)mem)).obj().in(0) == adr.in(0) && mem._uses._len == 1 ) {
-      assert adr.in(0) instanceof NewNode;
-      Node st = gvn.xform(new StoreNode(this,mmem.obj(),adr));
-      return new MemMergeNode(mmem.mem(),st);
+    Type ta = gvn.type(adr);
+    TypeMemPtr tmp = ta instanceof TypeMemPtr ? (TypeMemPtr)ta : null;
+
+    // If Store is by a New and no other Stores, fold into the New.
+    NewObjNode nnn;  int idx;
+    if( mem instanceof MProjNode &&
+        mem.in(0) instanceof NewObjNode && (nnn=(NewObjNode)mem.in(0)) == adr.in(0) &&
+        mem._uses._len==2 && !val().is_forward_ref() &&
+        (idx=nnn._ts.find(_fld))!= -1 && nnn._ts.can_update(idx) ) {
+      // Update the value, and perhaps the final field
+      nnn.update(idx,_fin,val(),gvn);
+      return mem;               // Store is replaced by using the New directly.
     }
+
+    // If Store is of a memory-writer, and the aliases do not overlap, make parallel with a Join
+    if( tmp != null && mem.is_mem() && mem.check_solo_mem_writer(this) ) {
+      IBitSet esc2 = mem.escapees(gvn);
+      if( !tmp._aliases.overlaps(esc2) ) {
+        Node head;
+        if( mem instanceof StoreNode ) head=mem;
+        else if( mem instanceof MProjNode && mem.in(0) instanceof NewNode ) head=mem.in(0);
+        else throw com.cliffc.aa.AA.unimpl(); // Break out another SESE split
+        // head is the 1 memory writer after head.in
+        if( head.in(1).check_solo_mem_writer(head) &&
+            // Cannot have any Loads following mem; because after the split
+            // they will not see the effects of previous stores that also move
+            // into the split.  However, a Load-after-Store will fold anyways.
+            ((mem._uses._len==1) ||
+             (mem._uses._len==2 && mem._uses.find(Env.DEFMEM)!= -1 ) ) ) {
+          Node st2 = gvn.xform(new StoreNode(this,mem,adr).keep());
+          MemSplitNode msp = (MemSplitNode)gvn.xform(new MemSplitNode(st2.unhook()).keep());
+          MProjNode mprj = (MProjNode)gvn.xform(new MProjNode(msp,0));
+          MemJoinNode mjn = new MemJoinNode(mprj);
+          set_def(1,null,gvn);                // Remove extra mem-writer
+          mjn.add_alias_above(gvn,msp.mem()); // Move 'this' clone st2 into Split
+          mjn.add_alias_above(gvn,head);      // Move from 'mem' to 'head' into Split
+          msp.unhook();
+          // Reverse propagate new live info
+          mjn._live = _live;
+          for( Node x : new Node[]{mprj,st2,st2.in(1),mem,head,head.in(1),msp} )
+            x._live = x.live(gvn);
+          return mjn;
+        }
+      }
+    }
+
+    // If Store is of a MemJoin and it can enter the split region, do so.
+    if( _keep==0 && tmp != null && mem instanceof MemJoinNode && mem.check_solo_mem_writer(this) ) {
+      Node memw = get_mem_writer();
+      // Check the address does not have a memory dependence on the Join.
+      // TODO: This is super conservative
+      if( memw != null && adr instanceof ProjNode && adr.in(0) instanceof NewNode ) {
+        MemJoinNode mjn = (MemJoinNode)mem;
+        Node st = gvn.xform(new StoreNode(keep(),mem,adr).keep());
+        mjn.add_alias_below(gvn,st,st.unhook(),memw);
+        unhook();
+        gvn.setype(st ,st .value(gvn));
+        gvn.setype(mjn,mjn.value(gvn));
+        mjn._live = mjn.live(gvn);
+        st._live = st.live(gvn);
+        gvn.add_work_defs(mjn);
+        return mjn;
+      }
+    }
+
     return null;
   }
 
-  @Override public Type value(GVNGCM gvn) {
-    final Type  M = _xmem ? TypeMem. MEM : TypeObj. OBJ;
-    final Type XM = _xmem ? TypeMem.XMEM : TypeObj.XOBJ;
-    
-    Type adr = gvn.type(adr()).base();
-    if( adr.isa(TypeMemPtr.OOP0.dual()) ) return XM; // Very high address; might fall to any valid address
-    if( adr.must_nil() ) return M;           // Not provable not-nil, so fails
-    if( TypeMemPtr.OOP0.isa(adr) ) return M; // Very low, might be any address
-    if( !(adr instanceof TypeMemPtr) )
-      return adr.above_center() ? XM : M;
+  // StoreNode needs to return a TypeObj for the Parser.
+  @Override public TypeMem value(GVNGCM gvn) {
+    Type mem = gvn.type(mem());
+    Type adr = gvn.type(adr());
+    Type val = gvn.type(val());   // Value
+    if( !(mem instanceof TypeMem   ) ) return mem.oob(TypeMem.ALLMEM);
+    if( !(adr instanceof TypeMemPtr) ) return adr.oob(TypeMem.ALLMEM);
+    TypeMem    tmem= (TypeMem   )mem;
+    TypeMemPtr tmp = (TypeMemPtr)adr;
 
-    Type val = gvn.type(val());     // Value
-    if( !val.isa_scalar() )         // Nothing sane
-      val = val.above_center() ? Type.XSCALAR : Type.SCALAR; // Pin to scalar for updates
+    return tmem.update(tmp._aliases,_fin,_fld,val);
+  }
+  @Override IBitSet escapees(GVNGCM gvn) {
+    Type adr = gvn.type(adr());
+    if( !(adr instanceof TypeMemPtr) ) return adr.above_center() ? IBitSet.EMPTY : IBitSet.FULL;
+    return ((TypeMemPtr)adr)._aliases.bitset();
+  }
 
-    // Compute an updated memory state
-    Type mem = gvn.type(mem());     // Memory
-    if( mem().in(0) == adr().in(0) && mem().in(0) instanceof NewNode )
-      // No aliasing, even if the NewNode is called repeatedly
-      return ((TypeObj)mem).st(_fin, _fld, _fld_num, val);
-    if( _xmem && !(mem instanceof TypeMem) ||
-       !_xmem && !(mem instanceof TypeObj) )
-      return mem.above_center() ? XM : M;
-    return _xmem                // Object or Memory update
-      ? ((TypeMem)mem).update(_fin, _fld, _fld_num, val, (TypeMemPtr)adr )
-      : ((TypeObj)mem).update(_fin, _fld, _fld_num, val);
+  @Override public boolean basic_liveness() { return false; }
+  // Compute the liveness local contribution to def's liveness.  Ignores the
+  // incoming memory types, as this is a backwards propagation of demanded
+  // memory.
+  @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
+    if( def==mem() ) return _live; // Pass full liveness along
+    if( def==adr() ) return TypeMem.ALIVE; // Basic aliveness
+    if( def==val() ) return TypeMem.ESCAPE;// Value escapes
+    throw com.cliffc.aa.AA.unimpl();       // Should not reach here
   }
 
   @Override public String err(GVNGCM gvn) {
+    String msg = err0(gvn);
+    if( msg == null ) return null;
+    return _bad.errMsg(msg+_fld+"'");
+  }
+  private String err0(GVNGCM gvn) {
     Type t = gvn.type(adr());
-    while( t instanceof TypeName ) t = ((TypeName)t)._t;
-    if( t.may_nil() ) return bad("Struct might be nil when writing");
-    if( !(t instanceof TypeMemPtr) ) return bad("Unknown"); // Too low, might not have any fields
-    TypeMemPtr tptr = (TypeMemPtr)t;
+    if( t.must_nil() ) return "Struct might be nil when writing '";
+    if( t==Type.ANY ) return null;
+    if( !(t instanceof TypeMemPtr) ) return "Unknown"; // Too low, might not have any fields
     Type mem = gvn.type(mem());
-    TypeObj tobj = _xmem
-      ? ((TypeMem)mem).ld(tptr) // Load object from generic pre-store memory
-      : ((TypeObj)mem);         // Else handed object directly
-    if( !tobj.can_update(_fld,_fld_num) || !tptr._obj.can_update(_fld,_fld_num) )
-      return bad("Cannot re-assign read-only");
+    if( mem == Type.ANY ) return null;
+    if( mem instanceof TypeMem )
+      mem = ((TypeMem)mem).ld((TypeMemPtr)t);
+    if( !(mem instanceof TypeStruct) ) return "No such field '";
+    TypeStruct ts = (TypeStruct)mem;
+    int idx = ts.find(_fld);
+    if( idx == -1 )  return "No such field '";
+    if( !ts.can_update(idx) ) {
+      String fstr = TypeStruct.fstring(ts.fmod(idx));
+      String ftype = adr() instanceof ProjNode && adr().in(0) instanceof NewObjNode && ((NewObjNode)adr().in(0))._is_closure ? "val '" : "field '.";
+      return "Cannot re-assign "+fstr+" "+ftype;
+    }
     return null;
   }
-  private String bad( String msg ) {
-    String f = _fld==null ? ""+_fld_num : _fld;
-    return _bad.errMsg(msg+" field '."+f+"'");
-  }
-  @Override public Type all_type() { return _xmem ? TypeMem.MEM : TypeObj.OBJ; }
-  @Override public int hashCode() { return super.hashCode()+(_fld==null ? _fld_num : _fld.hashCode()); }
-  // Stores are never CSE/equal lest we force a partially-execution to become a
+  @Override public int hashCode() { return super.hashCode()+_fld.hashCode()+_fin; }
+  // Stores are never CSE/equal lest we force a partial execution to become a
   // total execution (require a store on some path it didn't happen).  Stores
   // that are common in local SESE regions can be optimized with local peepholes.
   @Override public boolean equals(Object o) { return this==o; }

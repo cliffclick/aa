@@ -48,15 +48,12 @@ public class TestNode {
   private long[] _work = new long[1];
   private int _work_len;
 
-  // Worse-case output for a Node
-  private Type _alltype;
-
   private int _errs;
 
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testNode() {
     Type.init0(new HashMap<>());
-    Env.top();
+    Env.file_scope(Env.top_scope());
   }
 
   // A sparse list of all subtypes.  The outer array is the index into
@@ -64,6 +61,12 @@ public class TestNode {
   // (again as indices into _alltypes).  _alltypes is sorted by 'isa'.  Numbers
   // in subs[i] are sorted and always greater than 'i'.
   private int[][] make_subtypes() {
+    // First simplify alltype ptrs - nodes can only produce and consume simple ptr types.
+    for( int i=0; i<_alltypes.length; i++ ) {
+      _alltypes[i] = _alltypes[i].simple_ptr();
+      assert i==0 || _alltypes[i] != _alltypes[i-1]; // Quick check for dups
+    }
+
     int[][] subs = new int[_alltypes.length][];
     int[] tmp = new int[_alltypes.length];
     for( int i=0; i<subs.length; i++ ) {
@@ -155,7 +158,8 @@ public class TestNode {
   @SuppressWarnings("unchecked")
   @Test public void testMonotonic() {
     Type.init0(new HashMap<>());
-    Env.top();
+    Env top = Env.top_scope();
+    Env.file_scope(top);
     assert _errs == 0;          // Start with no errors
 
     // Types we are testing
@@ -197,36 +201,22 @@ public class TestNode {
       _ins[i] = new ConNode<>(Type.SCALAR);
     Node mem = new ConNode<Type>(TypeMem.MEM);
     FunNode fun_forward_ref = new FunNode("anon");
+    _gvn.setype(Env.DEFMEM,TypeMem.MEM);
 
-    Node unr = Env.top().lookup("+"); // All the "+" functions
+    Node unr = top.lookup("+"); // All the "+" functions
     FunNode fun_plus = ((FunPtrNode)unr.in(1)).fun();
     RetNode ret = fun_plus.ret();
-    CallNode call = new CallNode(false,null,unr);
-
-    TypeMemPtr from_ptr = TypeMemPtr.make(BitsAlias.REC,TypeStruct.POINT);
-    TypeMemPtr to_ptr   = TypeMemPtr.make(BitsAlias.REC,TypeName.TEST_STRUCT);
+    CallNode call = new CallNode(false,null,_ins[0],unr,mem);
+    TypeStruct tname = TypeStruct.NAMEPT;
 
     // Testing 1 set of types into a value call.
     // Comment out when not debugging.
-    Type rez = test1jig(new CastNode(_ins[0],_ins[1],TypeMemPtr.STRPTR),
-            Type.CTRL,Type.NUM,Type.ANY,Type.ANY);
-
-    // Cast(flt) ==>
-    //   ~nScalar ^ flt = ~nScalar
-    //     nil    ^ flt =   0
-    // BUT ~nScalar isa nil, but ~nScalar !isa! 0
-    // WHY ~nScalar isa nil????  ... should fall to smallest value below nil... that still works for ints & ptrs
-    //
-    //   nil  ^ *[4] ==> *[+0+4]    // picks up nil choice
-    // Number ^ *[4] ==> ~nScalar   // nil isa Number, but *[0+4] !isa! ~nScalar
-    //
-    // PLAN B: nil isa many_things, nothing isa nil because its supposed to be
-    // outside the lattice.  Just weaken asserts around nil?
+    Type rez0 = test1jig(new CallEpiNode(_ins[0],Env.DEFMEM,_ins[2]), TypeTuple.TEST0,TypeTuple.RET, Type.ANY, Type.ANY);
 
     // All the Nodes, all Values, all Types
     test1monotonic(new   CallNode(false,null,_ins[0],  unr  ,mem,_ins[2],_ins[3]));
     test1monotonic(new   CallNode(false,null,_ins[0],_ins[1],mem,_ins[2],_ins[3]));
-    test1monotonic(new CallEpiNode(call,ret,_ins[1])); // CallNode, then some count of RetNode
+    test1monotonic(new CallEpiNode(_ins[0],Env.DEFMEM,_ins[2])); // CallNode, then some count of RetNode, not flowing
     test1monotonic(new    ConNode<Type>(          TypeInt.FALSE));
     test1monotonic(new    ConNode<Type>(          TypeStr.ABC  ));
     test1monotonic(new    ConNode<Type>(          TypeFlt.FLT64));
@@ -237,43 +227,46 @@ public class TestNode {
     test1monotonic(new   CastNode(_ins[0],_ins[1],TypeMemPtr.STRPTR));
     test1monotonic(new   CastNode(_ins[0],_ins[1],TypeMemPtr.STR0));
     test1monotonic(new  CProjNode(_ins[0],0));
-    test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  TypeInt.FALSE));
-    test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  TypeStr.ABC  ));
-    test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  TypeFlt.FLT64));
-    test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  Type   .CTRL ));
-    test1monotonic(new    FunNode(new Type[]{TypeInt.INT64}));
-    test1monotonic(new FunPtrNode(ret));
+    test1monotonic(new    ErrNode(_ins[0],"\nerr\n",  null));
+    test1monotonic(new    FunNode(TypeStruct.ARGS_X,new Type[]{TypeMemPtr.DISP_SIMPLE,TypeInt.INT64}));
+    test1monotonic(new FunPtrNode(ret,_gvn.con(TypeFunPtr.NO_DISP)));
+    test1monotonic(new FP2ClosureNode(_ins[1])); // Only takes in a TFP
     test1monotonic(new     IfNode(_ins[0],_ins[1]));
-    for( IntrinsicNewNode prim : IntrinsicNewNode.INTRINSICS )
+    for( IntrinsicNewNode prim : IntrinsicNewNode.INTRINSICS() )
       test1monotonic_intrinsic(prim);
-    test1monotonic(new IntrinsicNode.ConvertPtrTypeName("test",from_ptr,to_ptr,null,_ins[1],_ins[2]));
-    test1monotonic(new   LoadNode(_ins[0],_ins[1],_ins[2],0,null));
-    test1monotonic(new MemMergeNode(_ins[1],_ins[2]));
-    test1monotonic(new    NewNode(new Node[]{null,_ins[1],_ins[2]},TypeStruct.POINT));
-    test1monotonic(new    NewNode(new Node[]{null,_ins[1],_ins[2]},TypeName.TEST_STRUCT));
+    test1monotonic(new IntrinsicNode(tname,null,null,mem,_ins[2]));
+    test1monotonic(new   LoadNode(_ins[1],_ins[2],"x",null));
+    NewObjNode nnn1 = new NewObjNode(false,TypeStruct.DISPLAY,_ins[0],_gvn.con(Type.NIL));
+    set_type(1,Type.SCALAR);  nnn1.create_active("x",_ins[1],TypeStruct.FFNL,_gvn);
+    set_type(2,Type.SCALAR);  nnn1.create_active("y",_ins[2],TypeStruct.FFNL,_gvn);
+    test1monotonic(nnn1);
+    NewObjNode nnn2 = new NewObjNode(false,TypeStruct.DISPLAY,_ins[0],_gvn.con(Type.NIL));
+    set_type(1,Type.SCALAR);  nnn2.create_active("x",_ins[2],TypeStruct.FFNL,_gvn);
+    set_type(2,Type.SCALAR);  nnn2.create_active("y",_ins[3],TypeStruct.FFNL,_gvn);
+    nnn2.set_name(tname,_gvn);
+    test1monotonic(nnn2);
     ((ConNode<Type>)_ins[1])._t = Type.SCALAR; // ParmNode reads this for _alltype
-    test1monotonic(new   ParmNode( 1, "x",_ins[0],(ConNode)_ins[1],"badgc").add_def(_ins[2]));
-    test1monotonic(new    PhiNode("badgc",_ins[0],_ins[1],_ins[2]));
-    for( PrimNode prim : PrimNode.PRIMS )
+    test1monotonic(new   ParmNode( 1, "x",_ins[0],(ConNode)_ins[1],null).add_def(_ins[2]));
+    test1monotonic(new    PhiNode(Type.SCALAR,null,_ins[0],_ins[1],_ins[2]));
+    for( PrimNode prim : PrimNode.PRIMS() )
       test1monotonic_prim(prim);
     test1monotonic(new   ProjNode(_ins[0],1));
     test1monotonic(new RegionNode(null,_ins[1],_ins[2]));
     test1monotonic(new    RetNode(_ins[0],mem,_ins[1],_ins[2],fun_plus)); // ctl,mem,val,rpc,fun
-    test1monotonic(new  StoreNode(_ins[0],_ins[1],_ins[2],_ins[3],(byte)0,0,null));
-    test1monotonic(new  StoreNode(_ins[0],_ins[1],_ins[2],_ins[3],(byte)1,0,null));
+    test1monotonic(new  StoreNode(_ins[1],_ins[2],_ins[3],TypeStruct.FRW ,"x",null));
+    test1monotonic(new  StoreNode(_ins[1],_ins[2],_ins[3],TypeStruct.FFNL,"x",null));
     //                  ScopeNode has no inputs, and value() call is monotonic
-    //                    TmpNode has no inputs, and value() call is monotonic
-    test1monotonic(new   TypeNode(TypeInt.FALSE,_ins[1],null));
-    test1monotonic(new   TypeNode(TypeMemPtr.ABCPTR,_ins[1],null));
-    test1monotonic(new   TypeNode(TypeFlt.FLT64,_ins[1],null));
+    test1monotonic(new   TypeNode(_ins[1],_ins[2],TypeInt.FALSE    ,null));
+    test1monotonic(new   TypeNode(_ins[1],_ins[2],TypeMemPtr.STRPTR,null));
+    test1monotonic(new   TypeNode(_ins[1],_ins[2],TypeFlt.FLT64    ,null));
+    _gvn._opt_mode=1;  test1monotonic(new UnresolvedNode(null,_ins[1],_ins[2]));  _gvn._opt_mode=0;
+    _gvn._opt_mode=2;  test1monotonic(new UnresolvedNode(null,_ins[1],_ins[2]));  _gvn._opt_mode=0;
 
     assertEquals(0,_errs);
   }
 
   @SuppressWarnings("unchecked")
   private Type test1jig(final Node n, Type t0, Type t1, Type t2, Type t3) {
-    _alltype = n.all_type();
-    assert _alltype.is_con() || (!_alltype.above_center() && _alltype.dual().above_center());
     // Prep graph edges
     _gvn.setype(_ins[0],                        t0);
     _gvn.setype(_ins[1],((ConNode)_ins[1])._t = t1);
@@ -289,22 +282,23 @@ public class TestNode {
 
   // Fill a Node with {null,edge,edge} and start the search
   private void test1monotonic_prim(PrimNode prim) {
-    PrimNode n = (PrimNode)prim.copy(_gvn);
+    PrimNode n = (PrimNode)prim.copy(false,_gvn);
     assert n._defs._len==0;
     n.add_def( null  );
     n.add_def(_ins[1]);
-    if( n._targs._ts.length >= 2 ) n.add_def(_ins[2]);
+    if( n._sig.nargs() >= 3 ) n.add_def(_ins[2]);
     test1monotonic_init(n);
   }
 
   // Fill a Node with {null,edge,edge} and start the search
   private void test1monotonic_intrinsic(IntrinsicNewNode prim) {
-    IntrinsicNewNode n = prim.copy(_gvn);
+    IntrinsicNewNode n = (IntrinsicNewNode)prim.copy(false,_gvn);
     assert n._defs._len==0;
     n.add_def( null  );
     n.add_def(_ins[1]);         // memory
-    n.add_def(_ins[2]);         // arg
-    if( n._targs._ts.length >= 2 ) n.add_def(_ins[3]);
+    n.add_def(null);            // display
+    n.add_def(_ins[2]);         // arg#1
+    if( n._sig.nargs() >= 2 ) n.add_def(_ins[3]);
     test1monotonic_init(n);
   }
 
@@ -312,8 +306,6 @@ public class TestNode {
   private void test1monotonic_init(final Node n) {
     System.out.println(n.xstr());
     _values.clear(true);
-    _alltype = n.all_type();
-    assert _alltype.is_con() || (!_alltype.above_center() && _alltype.dual().above_center());
 
     put(0,Type.ANY);            // First args are all ANY, so is result
     push(0);                    // Init worklist
@@ -370,9 +362,6 @@ public class TestNode {
     if( vm == null ) {
       set_type(idx,all[yx]);
       vm = n.value(_gvn);
-      // Assert the alltype() bounds any value() call result.
-      assert vm.isa(_alltype);
-      assert _alltype.dual().isa(vm);
       Type old = put(xxx,vm);
       assert old==null;
       push(xxx);            // Now visit all children
@@ -380,28 +369,23 @@ public class TestNode {
     // The major monotonicity assert
     int x1 = xx(xx,1);
     int y1 = idx==1 ? yx : x1;
-    if( vn!= vm && !vn.isa(vm) && !special_cast_exception(n,x1,y1,all) ) {
+    if( vn!= vm && !vn.isa(vm) ) {
       int x0 = xx(xx,0), x2 = xx(xx,2), x3 = xx(xx,3);
       System.out.println(n.xstr()+"("+all[x0]+","+all[x1]+","+all[x2]+","+all[x3]+") = "+vn);
       System.out.println(n.xstr()+"("+all[idx==0?yx:x0]+","+all[idx==1?yx:x1]+","+all[idx==2?yx:x2]+","+all[idx==3?yx:x3]+") = "+vm);
       _errs++;
+      redo_(n,idx, xx(xx,idx),yx,all);
     }
   }
+  // Stop in debugger and repeat as needed to debug
+  private void redo_(Node n, int idx, int xidx, int yx, Type[] all) {
+    set_type(idx,all[xidx]);
+    Type err_n = n.value(_gvn);
 
-  // CastNode does a JOIN, sometimes with NIL.  This leads to weird
-  // crossing-nil cases that we end up checking for, which should not matter
-  // For Real.  Example: Cast to a "str" which is really a *[4]str.  Argument
-  // is either a NIL or a Number.  This is a basic distributivity property:
-  // If A-isa-B, then A.join(C) -isa- B.join(C).
-  //  NIL-isa-Number.  Thus NIL.join(str) -isa- Number.join(str).
-  // NIL-JOIN-*[4]str yields *[0+4+]str? (high string-or-NIL choice).
-  // Number-JOIN-*[4]str yields ~nScalar (because the Cast is in-error, mixing
-  // numbers and pointers).  Since NIL-isa-Number, we expect
-  // *[0+4+]str?-isa-~nScalar (via basic distributivity property).
-  //
-  private boolean special_cast_exception(Node n, int x1, int y1, Type[] all ) {
-    //return n instanceof CastNode && (all[x1]==Type.NIL || all[y1]==Type.NIL);
-    return false;
+    set_type(idx,all[yx]);
+    Type err_m = n.value(_gvn);
+
+    assert err_n.isa(err_m);
   }
 
   @SuppressWarnings("unchecked")
@@ -410,7 +394,7 @@ public class TestNode {
     _gvn.setype(_ins[idx], tyx);
   }
 
-  private static int[] stx_any = new int[]{};
+  private static final int[] stx_any = new int[]{};
   private int[] stx(final Node n, long xx, int i) {
     if( i >= n._defs._len || n.in(i) == null ) return stx_any;
     return _min_subtypes[xx(xx,i)];

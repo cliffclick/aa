@@ -2,26 +2,36 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.*;
 import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.type.TypeTuple;
 
 // Proj data
 public class ProjNode extends Node {
-  final int _idx;
-  public ProjNode( Node ifn, int idx ) { super(OP_PROJ,ifn); _idx=idx; }
-  @Override String xstr() { return "DProj_"+_idx; }
-  @Override public Node ideal(GVNGCM gvn) { return in(0).is_copy(gvn,_idx); }
+  public int _idx;
+  public ProjNode( Node ifn, int idx ) { this(OP_PROJ,ifn,idx); }
+  ProjNode( byte op, Node ifn, int idx ) { super(op,ifn); _idx=idx; }
+  @Override String xstr() { return "DProj"+_idx; }
+
+  @Override public Node ideal(GVNGCM gvn, int level) { return in(0).is_copy(gvn,_idx); }
+
   @Override public Type value(GVNGCM gvn) {
     Type c = gvn.type(in(0));
     if( c instanceof TypeTuple ) {
       TypeTuple ct = (TypeTuple)c;
-      if( _idx < ct._ts.length ) {
-        Type t = ct._ts[_idx].meet(Type.XSCALAR);
-        return Type.SCALAR.isa(t) ? Type.SCALAR : t;
-      }
+      if( _idx < ct._ts.length )
+        return ct._ts[_idx];
     }
-    return c.above_center() ? Type.XSCALAR : Type.SCALAR;
+    return c.oob();
   }
-  @Override public Type all_type() { return Type.SCALAR; }
+  // Only called here if alive, and input is more-than-basic-alive
+  @Override public TypeMem live_use( GVNGCM gvn, Node def ) { return TypeMem.ANYMEM; }
+
+  public static ProjNode proj( Node head, int idx ) {
+    for( Node use : head._uses )
+      if( use instanceof ProjNode && ((ProjNode)use)._idx==idx )
+        return (ProjNode)use;
+    return null;
+  }
 
   @Override public int hashCode() { return super.hashCode()+_idx; }
   @Override public boolean equals(Object o) {

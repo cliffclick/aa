@@ -1,10 +1,9 @@
 package com.cliffc.aa.type;
 
+import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.SB;
 import com.cliffc.aa.util.VBitSet;
-import com.cliffc.aa.util.NonBlockingHashMapLong;
-
-import java.util.BitSet;
+import java.util.HashMap;
 import java.util.function.Predicate;
 
 // Pointers-to-memory; these can be both the address and the value part of
@@ -12,19 +11,27 @@ import java.util.function.Predicate;
 public final class TypeMemPtr extends Type<TypeMemPtr> {
   // List of known memory aliases.  Zero is nil.
   public BitsAlias _aliases;
-  public TypeObj _obj;          // Meet/join of aliases
+  // The _obj field is unused (trivially OBJ or XOBJ) for TMPs used as graph
+  // node results, because memory contents are modified in TypeMems and
+  // TypeObjs and NOT in pointers - hence this field "goes stale" rapidly as
+  // graph nodes manipulate the state of memory.
+  //
+  // The _obj field can be filled out accurately with a TypeMem.sharpen call,
+  // and is used to e.g. check pointer types at type assertions (including
+  // function call args).
+  public TypeObj _obj;          // Meet/join of aliases.  Unused in simple_ptrs in graph nodes.
 
   private TypeMemPtr(BitsAlias aliases, TypeObj obj ) { super     (TMEMPTR); init(aliases,obj); }
   private void init (BitsAlias aliases, TypeObj obj ) { super.init(TMEMPTR); _aliases = aliases; _obj=obj; }
   @Override int compute_hash() {
     assert _obj._hash != 0;
-    return TMEMPTR + _aliases._hash + _obj._hash;
+    return (TMEMPTR + _aliases._hash + _obj._hash)|1;
   }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeMemPtr) ) return false;
     TypeMemPtr tf = (TypeMemPtr)o;
-    return _aliases==tf._aliases && _obj==tf._obj;
+    return cycle_equals(tf);
   }
   @Override public boolean cycle_equals( Type o ) {
     if( this==o ) return true;
@@ -36,8 +43,9 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   @Override String str( VBitSet dups) {
     if( dups == null ) dups = new VBitSet();
     if( dups.tset(_uid) ) return "$"; // Break recursive printing cycle
+    if( _aliases==BitsAlias.NIL || _aliases==BitsAlias.NIL.dual() ) return "*0";
     SB sb = new SB().p('*');
-    _aliases.toString(sb).p(_obj.str(dups));
+    _aliases.toString(sb); //.p(_obj.str(dups));
     if( _aliases.test(0) ) sb.p('?');
     return sb.toString();
   }
@@ -45,24 +53,22 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     sb.p('_').p(_uid);
     if( dups == null ) dups = new VBitSet();
     if( dups.tset(_uid) ) return sb.p('$'); // Break recursive printing cycle
-    sb.p('*');
-    _obj.dstr(_aliases.toString(sb).p(" -> "),dups);
+    return _obj.dstr(_aliases.toString(sb.p('*')).p("->"),dups);
+  }
+  @Override public SB str(SB sb, VBitSet dups, TypeMem mem) {
+    if( dups == null ) dups = new VBitSet();
+    if( dups.tset(_uid) ) return sb.p('$'); // Break recursive printing cycle
+    if( _aliases==BitsAlias.NIL || _aliases==BitsAlias.NIL.dual() ) return sb.p("*0");
+    TypeObj to = (mem == null || _aliases==BitsAlias.RECORD_BITS) ? _obj : mem.ld(this);
+    if( to == TypeObj.XOBJ ) to = _obj;
+    to.str(_aliases.toString(sb.p('*')),dups,mem);
+    if( _aliases.test(0) ) sb.p('?');
     return sb;
   }
 
   private static TypeMemPtr FREE=null;
   @Override protected TypeMemPtr free( TypeMemPtr ret ) { FREE=this; return ret; }
   public static TypeMemPtr make(BitsAlias aliases, TypeObj obj ) {
-    // Canonical form: cannot have a pointer with only NIL allowed... instead
-    // we only use NIL directly.
-    assert aliases != BitsAlias.NIL;
-    // Check that a pointer-to-struct does not include more structs than what
-    // is pointed at.
-    Type a2 = obj.base();       // Strip off any 'Names'
-    assert !(a2 instanceof TypeStruct)
-      || aliases.strip_nil()==((TypeStruct)a2)._news  // Pointing at same set
-      || aliases.strip_nil()==((TypeStruct)a2)._news.dual();  // Pointing at same set
-
     TypeMemPtr t1 = FREE;
     if( t1 == null ) t1 = new TypeMemPtr(aliases,obj);
     else { FREE = null;          t1.init(aliases,obj); }
@@ -70,55 +76,44 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     return t1==t2 ? t1 : t1.free(t2);
   }
 
-  public static TypeMemPtr make( int alias, TypeObj obj ) {
-    BitsAlias aliases = BitsAlias.make0(alias);
-    return make(aliases,narrow_obj(aliases,obj));
-  }
-  static TypeMemPtr make_nil( int alias, TypeObj obj ) {
-    BitsAlias aliases = BitsAlias.make0(alias);
-    return make(aliases.meet_nil(),narrow_obj(aliases,obj));
-  }
-  public TypeMemPtr make(TypeObj obj ) { return make(_aliases,obj); }
+  public static TypeMemPtr make( int alias, TypeObj obj ) { return make(BitsAlias.make0(alias),obj); }
+  public static TypeMemPtr make_nil( int alias, TypeObj obj ) { return make(BitsAlias.make0(alias).meet_nil(),obj); }
+  public TypeMemPtr make_from( TypeObj obj ) { return make(_aliases,obj); }
 
-  static TypeObj narrow_obj( BitsAlias aliases, TypeObj obj ) {
-    // Check that a pointer-to-struct does not include more structs than what
-    // is pointed at.
-    Type obj2 = obj.base();                         // Strip off any 'Names'
-    if( !(obj2 instanceof TypeStruct) ) return obj; // No change
-    TypeStruct ts = (TypeStruct)obj2;
-    BitsAlias a0 = aliases.strip_nil();
-    if( a0 == ts._news ) return obj; // All good
-    assert aliases.is_contained(ts._news); // narrow pointer, pointing at wide structure.
-    TypeStruct nts = ts.make(a0); // Make a narrower structure
-    return obj.make_base(nts);    // Rewrap with any 'Name' wrappers
+  public  static final TypeMemPtr DISPLAY_PTR= new TypeMemPtr(BitsAlias.RECORD_BITS0,TypeStruct.DISPLAY );
+  static {
+    DISPLAY_PTR._hash = DISPLAY_PTR.compute_hash(); // Filled in during DISPLAY.install_cyclic
   }
+  public  static final TypeMemPtr OOP0   = make(BitsAlias.FULL    ,TypeObj.OBJ); // Includes nil
+  public  static final TypeMemPtr OOP    = make(BitsAlias.NZERO   ,TypeObj.OBJ); // Excludes nil
+  public  static final TypeMemPtr ISUSED = make(BitsAlias.NZERO   ,TypeObj.ISUSED); // Excludes nil
+  public  static final TypeMemPtr STRPTR = make(BitsAlias.STRBITS ,TypeStr.STR);
+  public  static final TypeMemPtr STR0   = make(BitsAlias.STRBITS0,TypeStr.STR);
+  public  static final TypeMemPtr ABCPTR = make(BitsAlias.ABC     ,TypeStr.ABC);
+  public  static final TypeMemPtr ABC0   = make(ABCPTR._aliases.meet_nil(),TypeStr.ABC);
+  public  static final TypeMemPtr STRUCT = make(BitsAlias.RECORD_BITS ,TypeStruct.ALLSTRUCT);
+  public  static final TypeMemPtr STRUCT0= make(BitsAlias.RECORD_BITS0,TypeStruct.ALLSTRUCT);
+  public  static final TypeMemPtr NO_DISP= make(BitsAlias.NIL,TypeStr.NO_DISP); // Above [0]->obj, below center
+  public  static final TypeMemPtr DISP_SIMPLE= make(BitsAlias.RECORD_BITS0,TypeObj.ISUSED); // closed display
+  public  static final TypeMemPtr USE0   = make(BitsAlias.FULL    ,TypeObj.ISUSED); // Includes nil
+  static final TypeMemPtr[] TYPES = new TypeMemPtr[]{OOP0,STR0,STRPTR,ABCPTR,STRUCT,NO_DISP};
 
-  // Cannot have a NIL here, because a CastNode (JOIN) of a NIL to a "*[4]obj?"
-  // yields a TypeMemPtr.NIL instead of a Type.NIL which confuses all ISA tests
-  // with embedded NILs.
-  //public  static final TypeMemPtr NIL    = (TypeMemPtr)(new TypeMemPtr(BitsAlias.NIL, TypeObj.XOBJ).hashcons());
-  public  static final TypeMemPtr OOP0   = make(BitsAlias.FULL    , TypeObj.OBJ); // Includes nil
-  public  static final TypeMemPtr OOP    = make(BitsAlias.NZERO   , TypeObj.OBJ);// Excludes nil
-  public  static final TypeMemPtr STRPTR = make(BitsAlias.STRBITS , TypeStr.STR);
-  public  static final TypeMemPtr STR0   = make(BitsAlias.STRBITS0, TypeStr.STR);
-  public  static final TypeMemPtr ABCPTR = make(BitsAlias.ABCBITS , TypeStr.ABC);
-  public  static final TypeMemPtr ABC0   = make(BitsAlias.ABCBITS0, TypeStr.ABC);
-          static final TypeMemPtr STRUCT = make(BitsAlias.RECBITS , TypeStruct.ALLSTRUCT);
-  public  static final TypeMemPtr STRUCT0= make(BitsAlias.RECBITS0, TypeStruct.ALLSTRUCT);
-  private static final TypeMemPtr PNTPTR = make(BitsAlias.RECBITS , TypeName.TEST_STRUCT);
-  private static final TypeMemPtr PNT0   = make(BitsAlias.RECBITS0, TypeName.TEST_STRUCT);
-  static final TypeMemPtr[] TYPES = new TypeMemPtr[]{OOP0,STR0,STRPTR,ABCPTR,STRUCT,ABC0,PNTPTR,PNT0};
+  @Override public boolean is_display_ptr() {
+    BitsAlias x = _aliases.strip_nil();
+    if( x==BitsAlias.EMPTY ) return true; // Just a NIL
+    int alias = x.abit();                 // Just a single alias
+    // The GENERIC function allows the generic record, otherwise must be on the display list
+    return alias!= -1 && (Math.abs(alias)==BitsAlias.RECORD || com.cliffc.aa.Env.DISPLAYS.test(Math.abs(alias)));
+  }
 
   @Override protected TypeMemPtr xdual() {
-    if( _aliases==BitsAlias.NIL ) { assert _obj==TypeObj.XOBJ; return this; }
     return new TypeMemPtr(_aliases.dual(),(TypeObj)_obj.dual());
   }
   @Override TypeMemPtr rdual() {
     if( _dual != null ) return _dual;
-    TypeMemPtr dual = _dual = new TypeMemPtr(_aliases,(TypeObj)_obj.rdual());
+    TypeMemPtr dual = _dual = new TypeMemPtr(_aliases.dual(),(TypeObj)_obj.rdual());
     dual._dual = this;
-    dual._hash = dual.compute_hash();
-    dual._cyclic = true;
+    if( _hash != 0 ) dual._hash = dual.compute_hash();
     return dual;
   }
   @Override protected Type xmeet( Type t ) {
@@ -128,23 +123,39 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     case TINT:
     case TFUNPTR:
     case TRPC:   return cross_nil(t);
-    case TNIL:
-    case TNAME:  return t.xmeet(this); // Let other side decide
+    case TFUNSIG:
+    case TLIVE:
     case TOBJ:
     case TSTR:
     case TSTRUCT:
     case TTUPLE:
-    case TFUN:
     case TMEM:   return ALL;
     default: throw typerr(t);   // All else should not happen
     }
     // Meet of aliases
     TypeMemPtr ptr = (TypeMemPtr)t;
     BitsAlias aliases = _aliases.meet(ptr._aliases);
-    if( aliases == BitsAlias.NIL ) return NIL;
-    return make(aliases, narrow_obj(aliases,(TypeObj)_obj.meet(ptr._obj)));
+    TypeObj to = (TypeObj)_obj.meet(ptr._obj);
+    return make(aliases, to);
   }
-  @Override public boolean above_center() { return _aliases.above_center(); }
+  // Widens, not lowers.
+  @Override public Type simple_ptr() {
+    if( _obj==TypeObj.ISUSED || _obj==TypeObj.UNUSED || _obj==TypeStr.NO_DISP ) return this;
+    if( _obj==TypeObj.OBJ || _obj==TypeObj.XOBJ ) return this;
+    return make(_aliases,oob(TypeObj.ISUSED));
+  }
+  @Override public boolean above_center() {
+    return _aliases.above_center();
+  }
+  @Override public Type bound_impl(Type t) {
+    if( !(t instanceof TypeMemPtr) ) return oob();
+    TypeMemPtr tmp = (TypeMemPtr)t;
+    // Deep bounds; keep the in-bounds _aliases but bound the _obj.
+    if( tmp._aliases.dual().isa(_aliases) && _aliases.isa(tmp._aliases) )
+      return _obj.bound_impl(tmp._obj);
+    // Aliases OOB
+    return oob();
+  }
   // Aliases represent *classes* of pointers and are thus never constants.
   // nil is a constant.
   @Override public boolean may_be_con()   { return may_nil(); }
@@ -155,35 +166,81 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
     BitsAlias bits = _aliases.not_nil();
     return bits==_aliases ? this : make(bits,_obj);
   }
-  @Override public Type meet_nil() {
-    if( _aliases.test(0) )      // Already has a nil?
-      return _aliases.above_center() ? NIL : this;
-    BitsAlias aliases = _aliases.meet_nil();
-    return aliases==BitsAlias.NIL ? NIL : make(aliases,_obj);
+  @Override public Type meet_nil(Type nil) {
+    // See testLattice15.  The UNSIGNED NIL tests as a lattice:
+    //    [~0]->~obj  ==>  NIL  ==>  [0]-> obj
+    // But loses the pointed-at type down to OBJ.
+    // So using SIGNED NIL, which also tests as a lattice:
+    //    [~0]->~obj ==>  XNIL  ==>  [0]->~obj
+    //    [~0]-> obj ==>   NIL  ==>  [0]-> obj
+
+    if( _aliases.isa(BitsAlias.NIL.dual()) ) {
+      if( _obj.above_center() && nil==XNIL )  return XNIL;
+      if( nil==NIL ) return NIL;
+    }
+    return make(_aliases.meet(BitsAlias.NIL),nil==NIL ? TypeObj.OBJ : _obj);
+  }
+  // Used during approximations, with a not-interned 'this'.
+  // Updates-in-place.
+  public Type ax_meet_nil(Type nil) {
+    if( _aliases.isa(BitsAlias.NIL.dual()) ) {
+      if( _obj==TypeObj.XOBJ && nil==XNIL )  return XNIL;
+      if( nil==NIL ) return NIL;
+    }
+    _aliases = _aliases.meet(BitsAlias.NIL);
+    if( nil==NIL ) _obj = TypeObj.OBJ;
+    return this;
   }
 
-  // Build a depth-limited named type
-  @Override TypeMemPtr make_recur(TypeName tn, int d, VBitSet bs ) {
-    Type t2 = _obj.make_recur(tn,d,bs);
-    return t2==_obj ? this : make(_aliases,(TypeObj)t2);
+  public BitsAlias aliases() { return _aliases; }
+
+  // Build a mapping from types to their depth in a shortest-path walk from the
+  // root.  Only counts depth on TypeStructs with the matching alias.  Only
+  // used for testing.
+  HashMap<Type,Integer> depth() {
+    int alias = _aliases.getbit();
+    HashMap<Type,Integer> ds = new HashMap<>();
+    Ary<TypeStruct> t0 = new Ary<>(new TypeStruct[]{(TypeStruct)_obj});
+    Ary<TypeStruct> t1 = new Ary<>(new TypeStruct[1],0);
+    int d=0;                    // Current depth
+    while( !t0.isEmpty() ) {
+      while( !t0.isEmpty() ) {
+        TypeStruct ts = t0.pop();
+        if( ds.putIfAbsent(ts,d) == null )
+          for( Type tf : ts._ts ) {
+            if( ds.putIfAbsent(tf,d) == null &&  // Everything in ts is in the current depth
+                tf instanceof TypeMemPtr ) {
+              TypeMemPtr tmp = (TypeMemPtr)tf;
+              if( tmp._obj instanceof TypeStruct )
+                (tmp._aliases.test(alias) ? t1 : t0).push((TypeStruct)tmp._obj);
+            }
+          }
+      }
+      Ary<TypeStruct> tmp = t0; t0 = t1; t1 = tmp; // Swap t0,t1
+      d++;                                         // Raise depth
+    }
+    return ds;
   }
-  // Mark if part of a cycle
-  @Override void mark_cycle( Type head, VBitSet visit, BitSet cycle ) {
-    if( visit.tset(_uid) ) return;
-    if( this==head ) { cycle.set(_uid); _cyclic=_dual._cyclic=true; }
-    _obj.mark_cycle(head,visit,cycle);
-    if( cycle.get(_obj._uid) )
-      { cycle.set(_uid); _cyclic=_dual._cyclic=true; }
+
+  // Max depth of struct, with a matching alias TMP
+  static int max(int alias, HashMap<Type,Integer> ds) {
+    int max = -1;
+    for( Type t : ds.keySet() )
+      if( (t instanceof TypeMemPtr) && ((TypeMemPtr)t)._aliases.test(alias) )
+        max = Math.max(max,ds.get(t));
+    return max+1;               // Struct is 1 more depth than TMP
   }
-  @Override boolean contains( Type t, VBitSet bs ) { return _obj == t || _obj.contains(t, bs); }
-  @SuppressWarnings("unchecked")
-  @Override int depth( NonBlockingHashMapLong<Integer> ds ) { return _obj.depth(ds); }
+
+  // Lattice of conversions:
+  // -1 unknown; top; might fail, might be free (Scalar->Int); Scalar might lift
+  //    to e.g. Float and require a user-provided rounding conversion from F64->Int.
+  //  0 requires no/free conversion (Int8->Int64, F32->F64)
+  // +1 requires a bit-changing conversion (Int->Flt)
+  // 99 Bottom; No free converts; e.g. Flt->Int requires explicit rounding
+  @Override public byte isBitShape(Type t) {
+    return (byte)(t instanceof TypeMemPtr ? 0 : 99);  // Mixing TMP and a non-ptr
+  }
   @SuppressWarnings("unchecked")
   @Override void walk( Predicate<Type> p ) { if( p.test(this) ) _obj.walk(p); }
-  @Override TypeStruct repeats_in_cycles(TypeStruct head, VBitSet bs) { return _cyclic ? _obj.repeats_in_cycles(head,bs) : null; }
   public int getbit() { return _aliases.getbit(); }
-  // Keep the high parts
-  @Override public TypeMemPtr startype() {
-    return TypeMemPtr.make(_aliases.above_center() ? _aliases : _aliases.dual(), _obj.startype());
-  }
 }

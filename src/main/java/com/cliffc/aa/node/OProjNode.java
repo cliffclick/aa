@@ -1,15 +1,22 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeObj;
-import com.cliffc.aa.type.TypeTuple;
+import com.cliffc.aa.type.*;
 
 // Proj object
 public class OProjNode extends ProjNode {
   public OProjNode( Node ifn, int idx ) { super(ifn,idx); }
   @Override String xstr() { return "OProj_"+_idx; }
-  @Override public Node ideal(GVNGCM gvn) { return in(0).is_copy(gvn,_idx); }
+  @Override public Node ideal(GVNGCM gvn, int level) {
+    // Only memory use is default memory - means no loads, no stores.  Only the
+    // pointer-use remains.
+    if( _uses._len==1 ) {
+      assert _uses.at(0)==Env.DEFMEM;
+      return gvn.con(TypeObj.UNUSED);
+    }
+    return null;
+  }
   @Override public Type value(GVNGCM gvn) {
     Type c = gvn.type(in(0));
     if( c instanceof TypeTuple ) {
@@ -17,7 +24,10 @@ public class OProjNode extends ProjNode {
       if( _idx < ct._ts.length )
         return ct._ts[_idx];
     }
-    return c.above_center() ? TypeObj.XOBJ : TypeObj.OBJ;
+    return c.oob(TypeObj.OBJ);
   }
-  @Override public Type all_type() { return TypeObj.OBJ; }
+  @Override public boolean basic_liveness() { return false; }
+  // Only called here if alive, and input is more-than-basic-alive
+  @Override public TypeMem live_use( GVNGCM gvn, Node def ) { return _live; }
+  int alias() { return ((NewNode)in(0))._alias; }
 }

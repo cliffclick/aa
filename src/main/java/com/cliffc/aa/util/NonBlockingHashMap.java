@@ -469,6 +469,24 @@ public class NonBlockingHashMap<TypeK, TypeV>
     }
   }
 
+  // Get *any* valid Key.  Useful for making worklists out of a hashtable - the
+  // hashtable can remove dup work.  Repeated calls probably return the same
+  // Key, so only useful if keys are removed after calling.
+  @SuppressWarnings("unchecked")
+  public TypeK getKey() { return (TypeK)_getKey(_kvs); }
+  private static Object _getKey(Object[] kvs) {
+    for( int i=0; i<len(kvs); i++ ) {
+      Object key = key(kvs,i);
+      Object val = val(kvs,i);
+      Object U = Prime.unbox(val);
+      if( key != null && key != TOMBSTONE &&  // key is sane
+          val != null && U   != TOMBSTONE )   // val is sane
+        return key;
+    }
+    Object[] newkvs = chm(kvs)._newkvs; // New table, if any
+    return newkvs == null ? null : _getKey(newkvs);
+  }
+  
   // --- keyeq ---------------------------------------------------------------
   // Check for key equality.  Try direct pointer compare first, then see if
   // the hashes are unequal (fast negative test) and finally do the full-on

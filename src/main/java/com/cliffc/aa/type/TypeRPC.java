@@ -9,7 +9,7 @@ public class TypeRPC extends Type<TypeRPC> {
 
   private TypeRPC( BitsRPC rpcs ) { super(TRPC); init(rpcs); }
   private void init( BitsRPC rpcs ) { _rpcs = rpcs; }
-  @Override public int compute_hash( ) { return TRPC + _rpcs._hash; }
+  @Override public int compute_hash( ) { return ((TRPC + _rpcs._hash)<<1)|1; }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeRPC) ) return false;
@@ -46,10 +46,9 @@ public class TypeRPC extends Type<TypeRPC> {
     case TMEMPTR:
     case TFLT:
     case TINT:   return cross_nil(t);
-    case TNIL:
-    case TNAME:  return t.xmeet(this); // Let other side decide
+    case TFUNSIG:
     case TTUPLE:
-    case TFUN:
+    case TLIVE:
     case TOBJ:
     case TSTR:
     case TSTRUCT:
@@ -76,9 +75,9 @@ public class TypeRPC extends Type<TypeRPC> {
     BitsRPC bits = _rpcs.not_nil();
     return bits==_rpcs ? this : make(bits);
   }
-  @Override public Type meet_nil() {
-    if( _rpcs.test(0) )      // Already has a nil?
-      return _rpcs.above_center() ? NIL : this;
+  @Override public Type meet_nil(Type nil) {
+    // See testLattice15.
+    if( _rpcs.isa(BitsRPC.NIL.dual()) ) return nil;
     return make(_rpcs.meet(BitsRPC.NIL));
   }
 }

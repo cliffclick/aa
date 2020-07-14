@@ -23,30 +23,16 @@ public class TypeTuple extends Type<TypeTuple> {
   @Override public int compute_hash( ) {
     int hash = TTUPLE+(_any?0:1);
     for( Type t : _ts ) hash += t._hash;
-    return hash;
+    return hash|1;
   }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeTuple) ) return false;
     TypeTuple t = (TypeTuple)o;
-    if( _any!=t._any || _hash != t._hash || _ts.length != t._ts.length )
-      return false;
-    if( _ts == t._ts ) return true;
-    for( int i=0; i<_ts.length; i++ )
-      if( _ts[i]!=t._ts[i] ) return false;
-    return true;
+    return _any==t._any && _hash == t._hash && TypeAry.eq(_ts,t._ts);
   }
-  @Override public boolean cycle_equals( Type o ) {
-    if( this==o ) return true;
-    if( !(o instanceof TypeTuple) ) return false;
-    TypeTuple t = (TypeTuple)o;
-    if( _any!=t._any || _hash != t._hash || _ts.length != t._ts.length )
-      return false;
-    if( _ts == t._ts ) return true;
-    for( int i=0; i<_ts.length; i++ )
-      if( _ts[i]!=t._ts[i] && !_ts[i].cycle_equals(t._ts[i]) ) return false;
-    return true;
-  }
+  // Never part of a cycle so the normal equals works
+  @Override public boolean cycle_equals( Type o ) { return equals(o); }
   String open_parens() { return "("; }
   String clos_parens() { return ")"; }
   @Override String str( VBitSet dups) {
@@ -68,20 +54,10 @@ public class TypeTuple extends Type<TypeTuple> {
   }
 
   private static TypeTuple FREE=null;
-  private static Type[] FREE3=null;
-  @Override protected TypeTuple free( TypeTuple ret ) {
-    if( _ts.length==3 ) FREE3=_ts;
-    FREE=this;
-    return ret;
-  }
-  private static Type[] make_ary(int len) {
-    Type[] ts = FREE3;
-    if( len!=3 || ts==null ) return new Type[len];
-    FREE3=null;
-    return ts;
-  }
+  @Override protected TypeTuple free( TypeTuple ret ) { FREE=this; return ret; }
   @SuppressWarnings("unchecked")
-  static TypeTuple make0( boolean any, Type... ts ) {
+  public static TypeTuple make0( boolean any, Type[] ts ) {
+    ts = TypeAry.hash_cons(ts);
     TypeTuple t1 = FREE;
     if( t1 == null ) t1 = new TypeTuple(TTUPLE, any, ts);
     else { FREE = null; t1.init(TTUPLE, any, ts); }
@@ -89,42 +65,42 @@ public class TypeTuple extends Type<TypeTuple> {
     TypeTuple t2 = (TypeTuple)t1.hashcons();
     return t1==t2 ? t1 : t1.free(t2);
   }
-  public static TypeTuple make( Type... ts ) { return make0(false,ts); }
-  // Arguments are infinitely-extended with ALL
-  public static TypeTuple make_args( Type... ts ) { return make0(/*QQQfalse*/false,ts); }
-
-  // Most primitive function call argument type lists are 0-based
-          static final TypeTuple ALL_ARGS= make0(/*QQQfalse*/false); // Zero args and high
-  private static final TypeTuple SCALAR0 = make_args();
-  public  static final TypeTuple SCALAR1 = make_args(SCALAR);
-  public  static final TypeTuple SCALAR2 = make_args(SCALAR, SCALAR);
-  private static final TypeTuple INT32   = make_args(TypeInt.INT32 );
-  public  static final TypeTuple INT64   = make_args(TypeInt.INT64 );
-  public  static final TypeTuple FLT64   = make_args(TypeFlt.FLT64 );
-  public  static final TypeTuple STRPTR  = make_args(TypeMemPtr.STRPTR);
-  public  static final TypeTuple OOP_OOP = make_args(TypeMemPtr.OOP0,TypeMemPtr.OOP0);
-  public  static final TypeTuple INT64_INT64 = make_args(TypeInt.INT64,TypeInt.INT64);
-  public  static final TypeTuple FLT64_FLT64 = make_args(TypeFlt.FLT64,TypeFlt.FLT64);
-  private static final TypeTuple FLT64_INT64 = make_args(TypeFlt.FLT64,TypeInt.INT64);
-  public  static final TypeTuple STR_STR     = make_args(TypeMemPtr.STRPTR,TypeMemPtr.STRPTR);
-
-  public  static final TypeTuple IF_ANY  = make(XCTRL,XCTRL);
+  public static TypeTuple make( Type[] ts ) { return make0(false,ts); }
+  public static TypeTuple make( ) { Type[] ts = TypeAry.get(0);  return make0(false,ts); }
+  public static TypeTuple make( Type t0 ) { Type[] ts = TypeAry.get(1);  ts[0]=t0;  return make0(false,ts); }
+  public static TypeTuple make( Type t0, Type t1 ) { Type[] ts = TypeAry.get(2);  ts[0]=t0; ts[1]=t1; return make0(false,ts); }
+  public static TypeTuple make( Type t0, Type t1, Type t2 ) { Type[] ts = TypeAry.get(3); ts[0]=t0; ts[1]=t1; ts[2]=t2; return make0(false,ts); }
+  public static TypeTuple make( Type t0, Type t1, Type t2, Type t3 ) { Type[] ts = TypeAry.get(4); ts[0]=t0; ts[1]=t1; ts[2]=t2; ts[3]=t3; return make0(false,ts); }
+  public static TypeTuple make( Type t0, Type t1, Type t2, Type t3, Type t4 ) {
+    Type[] ts = TypeAry.get(5);
+    ts[0]=t0; ts[1]=t1; ts[2]=t2; ts[3]=t3; ts[4]=t4;
+    return make0(false,ts);
+  }
+  public static TypeTuple make( Type t0, Type t1, Type t2, Type t3, Type t4, Type t5 ) {
+    Type[] ts = TypeAry.get(6);
+    ts[0]=t0; ts[1]=t1; ts[2]=t2; ts[3]=t3; ts[4]=t4; ts[5]=t5;
+    return make0(false,ts);
+  }
   public  static final TypeTuple IF_ALL  = make(CTRL ,CTRL );
+  public  static final TypeTuple IF_ANY  = IF_ALL.dual();
   public  static final TypeTuple IF_TRUE = make(XCTRL,CTRL );
   public  static final TypeTuple IF_FALSE= make(CTRL ,XCTRL);
 
   // This is the starting state of the program; CTRL is active and memory is empty.
-  public  static final TypeTuple START_STATE = make(CTRL, TypeMem.EMPTY_MEM);
-  public  static final TypeTuple CALL  = make(CTRL, TypeMem.MEM, SCALAR);
-  public  static final TypeTuple XCALL = CALL.dual();
-  static final TypeTuple[] TYPES = new TypeTuple[]{SCALAR0,SCALAR1,STRPTR,INT32,INT64,FLT64,INT64_INT64,FLT64_FLT64,FLT64_INT64, IF_ALL, IF_TRUE, IF_FALSE, OOP_OOP};
+  public  static final TypeTuple START_STATE = make(CTRL, TypeMem.EMPTY);
+  public  static final TypeTuple  RET = make(CTRL, TypeMem.ALLMEM, ALL); // Type of RetNodes
+  public  static final TypeTuple CALLE= make(CTRL, TypeMem.ALLMEM, ALL); // Type of CallEpiNodes
+  public  static final TypeTuple TEST0= make(CTRL, TypeMem.MEM  , TypeFunPtr.GENERIC_FUNPTR, SCALAR); // Call with 1 arg
+  public  static final TypeTuple TEST1= make(CTRL, TypeMem.EMPTY, TypeFunPtr.GENERIC_FUNPTR, SCALAR); // Call with 1 arg
+  static final TypeTuple[] TYPES = new TypeTuple[]{CALLE,START_STATE,IF_ALL, IF_TRUE, IF_FALSE, TEST0, TEST1};
 
   // The length of Tuples is a constant, and so is its own dual.  Otherwise
   // just dual each element.  Also flip the infinitely extended tail type.
   @SuppressWarnings("unchecked")
   @Override protected TypeTuple xdual() {
-    Type[] ts = new Type[_ts.length];
+    Type[] ts = TypeAry.get(_ts.length);
     for( int i=0; i<_ts.length; i++ ) ts[i] = _ts[i].dual();
+    ts = TypeAry.hash_cons(ts);
     return new TypeTuple(TTUPLE, !_any, ts);
   }
   // Standard Meet.  Tuples have an infinite extent of 'ALL' for low, or 'ANY'
@@ -141,7 +117,7 @@ public class TypeTuple extends Type<TypeTuple> {
     // Short is low ; short extended by ALL so tail is ALL so trimmed to short.
     int len = _any ? tmax._ts.length : _ts.length;
     // Meet of common elements
-    Type[] ts = make_ary(len);
+    Type[] ts = TypeAry.get(len);
     for( int i=0; i<_ts.length; i++ )  ts[i] = _ts[i].meet(tmax._ts[i]);
     // Elements only in the longer tuple.
     for( int i=_ts.length; i<len; i++ )
@@ -150,6 +126,14 @@ public class TypeTuple extends Type<TypeTuple> {
   }
 
   public Type at( int idx ) { return _ts[idx]; } // Must be in-size
+
+  // Same as the original, with one field changed
+  public TypeTuple set( int idx, Type t ) {
+    Type[] ts = TypeAry.clone(_ts);
+    ts[idx]=t;
+    return make(ts);
+  }
+
 
   @Override public boolean above_center() { return _any; }
   // True if all internals may_be_con
@@ -164,7 +148,7 @@ public class TypeTuple extends Type<TypeTuple> {
   }
   @Override public boolean must_nil() { return false; }
   @Override Type not_nil() { return this; }
-  @Override public Type meet_nil() { throw AA.unimpl(); }
+  @Override public Type meet_nil(Type t) { throw AA.unimpl(); }
 
   // Return true if this is a function pointer (return type from EpilogNode)
   // 0 - Control for the function
@@ -182,7 +166,6 @@ public class TypeTuple extends Type<TypeTuple> {
   // True if isBitShape on all bits
   @Override public byte isBitShape(Type t) {
     if( isa(t) ) return 0; // Can choose compatible format
-    if( t instanceof TypeName ) return t.isBitShape(this);
     if( t instanceof TypeStruct ) return 99; // Not allowed to upcast a tuple to a struct
     if( t instanceof TypeTuple ) {
       TypeTuple tt = (TypeTuple)t;
@@ -194,12 +177,5 @@ public class TypeTuple extends Type<TypeTuple> {
     }
 
     throw AA.unimpl();
-  }
-
-  // Dual, except keep TypeMem.XOBJ as high for starting GVNGCM.opto() state.
-  @Override public TypeTuple startype() {
-    Type[] ts = new Type[_ts.length];
-    for( int i=0; i<_ts.length; i++ ) ts[i] = _ts[i].startype();
-    return make0(!_any, ts);
   }
 }

@@ -11,114 +11,114 @@ import com.cliffc.aa.type.*;
 // These intrinsics take in memory of their alias# (same as a NewNode) and
 // update it (like a Store would) producing a new instance of the same alias#.
 // They also take in other arguments, and typically use them to define the
-// contents of memory.  They output a TypeTuple[ctrl,mem,val] same as a
-// CallNode, although the [ctrl] is always true and ignored.
+// contents of memory.  They output a TypeObj.
 //
 // The function wrapping these takes in all memory (like all functions do) and
 // split out just the alias in question, and remerge with all memory before the
 // epilog.
-public abstract class IntrinsicNewNode extends IntrinsicNode {
-  int _alias;                   // Alias class for new memory
-  IntrinsicNewNode( String name, String[] args, TypeTuple targs, TypeMemPtr funret, int alias ) {
-    super(name,args,targs,funret);
-    update_alias(alias);
+public abstract class IntrinsicNewNode extends Node {
+  public final String _name;    // Unique library call name
+  final NewStrNode _nstr;       // Main alias
+  final TypeFunSig _sig;        // Arguments
+  IntrinsicNewNode( String name, Type[] ts ) {
+    super(OP_LIBCALL);
+    _name = name;
+    _nstr = new NewStrNode(TypeStr.STR,null,null);
+    ts[0] = TypeFunPtr.NO_DISP; // No display
+    _sig = TypeFunSig.make(TypeStruct.make_args(ts.length==2 ? TypeStruct.ARGS_X : TypeStruct.ARGS_XY,ts),TypeMemPtr.STRPTR);
   }
-  private IntrinsicNewNode update_alias(int alias) {
-    _alias = alias;
-    _funret = TypeMemPtr.make(alias,_funret._obj);
-    return this;
+  private static IntrinsicNewNode[] INTRINSICS = null;
+  public static void reset() { INTRINSICS = null; }
+  public static IntrinsicNewNode[] INTRINSICS() {
+    if( INTRINSICS == null )
+      INTRINSICS = new IntrinsicNewNode[] {
+        new ConvertI64Str(),
+        new ConvertF64Str(),
+        new AddStrStr(),
+      };
+    return INTRINSICS;
   }
-  public static IntrinsicNewNode[] INTRINSICS = new IntrinsicNewNode[] {
-    new ConvertI64Str(BitsAlias.I64),
-    new ConvertF64Str(BitsAlias.F64),
-    new AddStrStr(BitsAlias.STR),
-  };
-  // Clones during inlining all become unique new sites
-  @Override IntrinsicNewNode copy(GVNGCM gvn) {
-    IntrinsicNewNode nnn = (IntrinsicNewNode)super.copy(gvn);
-    return nnn.update_alias(BitsAlias.new_alias(_alias)); // Children alias classes
-  }
-  @Override public String xstr() { return _name+"*"+_alias; }
-  @Override public Type all_type() { return TypeTuple.make(_funret._obj,_funret); }
+  @Override public String xstr() { return _name+"*"+_nstr._alias; }
 
   // Wrap the PrimNode with a Fun/Epilog wrapper that includes memory effects.
   public FunPtrNode as_fun( GVNGCM gvn ) {
-    FunNode  fun = ( FunNode) gvn.xform(new  FunNode(this,_funret).add_def(Env.ALL_CTRL));
+    // Make NewStrNode to get alias
+    NewStrNode nnn = gvn.init(_nstr).keep();
+    FunNode  fun = ( FunNode) gvn.xform(new  FunNode(this).add_def(Env.ALL_CTRL));
     ParmNode rpc = (ParmNode) gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
-    ParmNode memp= (ParmNode) gvn.xform(new ParmNode(-2,"mem",fun,gvn.con(TypeMem.MEM     ),null));
+    Node memp= gvn.xform(new ParmNode(-2,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
+    gvn.add_work(memp);         // This may refine more later
+
     // Add input edges to the intrinsic
     add_def(null);              // Control for the primitive in slot 0
-    add_def(memp);              // Control for the memory    in slot 1
-    for( int i=0; i<_args.length; i++ ) // Args follow
-      add_def(gvn.xform(new ParmNode(i,_args[i],fun, gvn.con(_targs.at(i)),null)));
-    Node rez = gvn.xform(this); // Returns a Tuple(mem,ptr)
-    Node mem = gvn.xform(new OProjNode(rez,0));
-    Node ptr = gvn.xform(new  ProjNode(rez,1));
-    Node mmem = gvn.xform(new MemMergeNode(memp,mem));
-    RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,ptr,rpc,fun));
-    return new FunPtrNode(ret);
+    add_def(memp);              // Memory  for the primitive in slot 1
+    add_def(null);              // Closure for the primitive in slot 2
+    for( int i=1; i<_sig.nargs(); i++ ) // Args follow, closure in formal 0
+      add_def( gvn.xform(new ParmNode(i,_sig.fld(i),fun, gvn.con(_sig.arg(i).simple_ptr()),null)));
+    Node rez = gvn.xform(this); // Returns a TypeObj
+    // Fill in NewStrNode inputs, now that we have them.
+    gvn.set_def_reg(nnn,1,memp);
+    gvn.set_def_reg(nnn,2,rez);
+    Node mem = Env.DEFMEM.make_mem_proj(gvn,nnn);
+    Node ptr = gvn.xform(new ProjNode(nnn.unhook(),1));
+    RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mem,ptr,rpc,fun));
+    mem._live = mem.live(gvn); // Refine initial memory
+    return new FunPtrNode(ret,gvn.con(TypeFunPtr.NO_DISP));
   }
 
-  // --------------------------------------------------------------------------
-  static class ConvertI64Str extends IntrinsicNewNode {
-    ConvertI64Str(int alias) { super("str",ARGS1,TypeTuple.INT64, TypeMemPtr.STRPTR,alias); }
-    @Override public Type value(GVNGCM gvn) {
-      Type t = gvn.type(in(2));
-      if( t.above_center() ) return all_type().dual();
-      if( !t.is_con() || !(t instanceof TypeInt) ) return all_type();
-      TypeStr str = TypeStr.con(Long.toString(t.getl()));
-      return TypeTuple.make(str,TypeMemPtr.make(_alias,str));
-    }
-  }
+}
 
-  static class ConvertF64Str extends IntrinsicNewNode {
-    ConvertF64Str(int alias) { super("str",ARGS1,TypeTuple.FLT64, TypeMemPtr.STRPTR, alias); }
-    @Override public Type value(GVNGCM gvn) {
-      Type t = gvn.type(in(2));
-      if( t.above_center() ) return all_type().dual();
-      if( !t.is_con() || !(t instanceof TypeFlt) ) return all_type();
-      TypeStr str = TypeStr.con(Double.toString(t.getd()));
-      return TypeTuple.make(str,TypeMemPtr.make(_alias,str));
-    }
+// --------------------------------------------------------------------------
+class ConvertI64Str extends IntrinsicNewNode {
+  ConvertI64Str() { super("str",TypeStruct.ts(null,TypeInt.INT64)); }
+  @Override public Node ideal(GVNGCM gvn, int level) { return null; }
+  @Override public Type value(GVNGCM gvn) {
+    Type t = gvn.type(in(3));
+    if( t.above_center() || !(t instanceof TypeInt) ) return t.oob();
+    if( !t.is_con() ) return TypeStr.STR;
+    return TypeStr.make(false,Long.toString(t.getl()).intern());
   }
+  @Override public boolean basic_liveness() { return false; }
+}
 
-  // String concat.  NIL values are treated "as-if" the empty string.
-  // If both arguments are NIL, NIL is returned.
-  // If one  argument  is  NIL, the other non-nil argument is returned.
-  // If neither argument is NIL, the two strings are concatenated into a new third string.
-  static class AddStrStr extends IntrinsicNewNode {
-    // TODO BUG: Default behavior stomps memory type to [mem] when not inlined,
-    // and not resolved.  GCP then cannot keep the correct memory type.
-    // Probably need Unresolved to disallow memory updates in e.g. CallEpiNode
-    // across all Prims.
-    //
-    // TODO: Confirm unknown-caller in GCP on Prims is dead path; so when doing
-    // Unresolved, all prims "look dead", including memory state.  Keep them
-    // dead until resolving or not.
-    //
-    // TODO: If fail to resolve during GCP, probably need to bail out there as
-    // a hard error.  All calls should resolve during GCP, or else cannot
-    // further propagate optimality.
-    AddStrStr(int alias) { super("+",ARGS2,TypeTuple.STR_STR, TypeMemPtr.STRPTR, alias); }
-    @Override public Type value(GVNGCM gvn) {
-      Type m   = gvn.type(in(1));
-      Type sp0 = gvn.type(in(2));
-      Type sp1 = gvn.type(in(3));
-      if( m.above_center() || sp0.above_center() || sp1.above_center() ) return all_type().dual();
-      if( !(m instanceof TypeMem) ) return all_type();
-      if( sp0==Type.NIL ) return TypeTuple.make(((TypeMemPtr)sp1)._obj,sp1);
-      if( sp1==Type.NIL ) return TypeTuple.make(((TypeMemPtr)sp0)._obj,sp1);
-      if( !sp0.isa(TypeMemPtr.STRPTR) || !sp1.isa(TypeMemPtr.STRPTR) ) return all_type();
-      TypeMem mem = (TypeMem)m;
-      Type s0 = mem.ld((TypeMemPtr)sp0);
-      Type s1 = mem.ld((TypeMemPtr)sp1);
-      if( !(s0 instanceof TypeStr) || !(s1 instanceof TypeStr) ) return all_type();
-      TypeStr str0 = (TypeStr)s0;
-      TypeStr str1 = (TypeStr)s1;
-      if( !str0.is_con() || !str1.is_con() ) return all_type();
-      TypeStr str = TypeStr.con(str0.getstr()+str1.getstr());
-      return TypeTuple.make(str,TypeMemPtr.make(_alias,str));
-    }
-    @Override public byte op_prec() { return 5; }
+class ConvertF64Str extends IntrinsicNewNode {
+  ConvertF64Str() { super("str",TypeStruct.ts(null,TypeFlt.FLT64)); }
+  @Override public Node ideal(GVNGCM gvn, int level) { return null; }
+  @Override public Type value(GVNGCM gvn) {
+    Type t = gvn.type(in(3));
+    if( t.above_center() || !(t instanceof TypeFlt) ) return t.oob();
+    if( !t.is_con() ) return TypeStr.STR;
+    return TypeStr.make(false,Double.toString(t.getd()).intern());
   }
+  @Override public boolean basic_liveness() { return false; }
+}
+
+// String concat.  NIL values are treated "as-if" the empty string.
+// If both arguments are NIL, NIL is returned.
+// If one  argument  is  NIL, the other non-nil argument is returned.
+// If neither argument is NIL, the two strings are concatenated into a new third string.
+class AddStrStr extends IntrinsicNewNode {
+  AddStrStr() { super("+",TypeStruct.ts(null,TypeMemPtr.STR0,TypeMemPtr.STR0)); }
+  @Override public Node ideal(GVNGCM gvn, int level) { return null; }
+  @Override public Type value(GVNGCM gvn) {
+    Type m   = gvn.type(in(1));
+    Type sp0 = gvn.type(in(3));
+    Type sp1 = gvn.type(in(4));
+    if( m.above_center() || sp0.above_center() || sp1.above_center() ) return Type.ANY;
+    if( !(m instanceof TypeMem) ) return Type.ALL;
+    if( !sp0.isa(TypeMemPtr.STRPTR) ) return Type.ALL;
+    if( !sp1.isa(TypeMemPtr.STRPTR) ) return Type.ALL;
+    TypeMem mem = (TypeMem)m;
+    if( sp0==Type.NIL ) return mem.ld((TypeMemPtr)sp1);
+    if( sp1==Type.NIL ) return mem.ld((TypeMemPtr)sp0);
+    Type s0 = mem.ld((TypeMemPtr)sp0);
+    Type s1 = mem.ld((TypeMemPtr)sp1);
+    if( !(s0 instanceof TypeStr) || !(s1 instanceof TypeStr) ) return Type.ALL;
+    TypeStr str0 = (TypeStr)s0;
+    TypeStr str1 = (TypeStr)s1;
+    if( !str0.is_con() || !str1.is_con() ) return TypeStr.STR;
+    return TypeStr.make(false,(str0.getstr()+str1.getstr()).intern());
+  }
+  @Override public boolean basic_liveness() { return false; }
+  @Override public byte op_prec() { return 5; }
 }

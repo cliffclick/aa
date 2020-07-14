@@ -1,127 +1,203 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.IBitSet;
 import org.jetbrains.annotations.NotNull;
 
-// TODO: fix recursive types
+// Allocates a TypeObj and produces a Tuple with the TypeObj and a TypeMemPtr.
 //
-// Types are extended via NewNode; TypeStructs only created here - but merged
-// at Phis so new variants appear at every MEET.  But depth only increases here.
-//
-// Cyclic types created to approx when more than CUTOFF_DEPTH number of the
-// same NewNodes have added TypeStructs to the same type.
-//
-// Approx at the deepest point: top-level triggers at depth e.g. 5, so find the
-// depth(1) TypeStruct and the depth(0) TS points point back to the depth(1) TS
-// (same as approx() does now), and MEET the depth(0) over the depth(1).
-//
-// NewNode types can be MEET at Phis; such merged {NewNodes/TypeStructs} count
-// as a "same NewNode" for cyclic depth purposes.  This implies we need to UF
-// NewNode TS types at MEETs.
-//
-// Implementation: TS types pick up a NewNode UF field.  Literally a NewNode
-// ptr, and NewNode has a UF ptr also.  Standard UF; "union" happens when 2 TS
-// types are meet with different NNs.  When computing depth, can use the UF NN
-// id to look for repeats, and report back the depth(0) to the depth(1).
-//
-// At compilation unit end, can wipe out all TS with non-null NN?
+// NewNodes have a unique alias class - they do not alias with any other
+// NewNode, even if they have the same type.  Upon cloning both NewNodes get
+// new aliases that inherit (tree-like) from the original alias.
 
-
-
-// Make a new object of given type.  Returns both the pointer and the TypeObj
-// but NOT the memory state.
-public class NewNode extends Node {
+public abstract class NewNode<T extends TypeObj<T>> extends Node {
   // Unique alias class, one class per unique memory allocation site.
   // Only effectively-final, because the copy/clone sets a new alias value.
-  private int _alias;           // Alias class
-  TypeStruct _ts;               // Result struct (may be named)
-  private TypeObj _obj;         // Optional named struct
-  TypeMemPtr _ptr;              // Cached pointer-to-_obj
+  public int _alias; // Alias class
+
+  public IBitSet _escapees;
+
+  // A list of field names and field-mods, folded into the initial state of
+  // this NewObj.  These can come from initializers at parse-time, or stores
+  // folded in.  There are no types stored here; types come from the inputs.
+  public T _ts;             // Base object type, representing all possible future values
+
+  // The memory state for Env.DEFMEM, the default memory.  All non-final fields
+  // are ALL; final fields keep their value.  All field flags are moved to
+  // bottom, e.g. as-if all fields are now final-stored.  Will be set to
+  // TypeObj.UNUSE for never-allocated (eg dead allocations)
+  TypeObj _defmem;
+
+  // Just TMP.make(_alias,OBJ)
+  public TypeMemPtr _tptr;
+
+  // Monotonic, conservatively correct flag.  Starts true, flips once to false.
+  // Only used by Load & Store addresses & If equality/nil checks.  Definitely
+  // fails if transitively passed to an unknown Call.  Closures can be used by
+  // FunPtrs and this is an escape.  Structs can be value-stored (and later
+  // loaded) and this is an escape.
+  //
+  // TODO: Can be transitive thru _live tracking thru Phis & known Calls &
+  // memory.
+  public boolean _not_escaped;
 
   // NewNodes can participate in cycles, where the same structure is appended
   // to in a loop until the size grows without bound.  If we detect this we
   // need to approximate a new cyclic type.
   public final static int CUTOFF=2; // Depth of types before we start forcing approximations
 
-  public NewNode( Node[] flds, TypeObj obj ) {
-    super(OP_NEW,flds);
-    assert flds[0]==null;       // no ctrl field
-    _alias = BitsAlias.new_alias(BitsAlias.REC);
-    TypeStruct ts = (TypeStruct)obj.base();
-    // Reconstruct obj with 'this' _news
-    _ts = TypeStruct.make(ts._flds,ts._ts,ts._finals,BitsAlias.make0(_alias));
-    // If a TypeName wrapper, rewrap
-    if( obj instanceof TypeName ) obj = ((TypeName)obj).make(_ts);
-    else obj = _ts;
-    _obj = obj;
-    _ptr = TypeMemPtr.make(_alias,obj);
+  // NewNodes do not really need a ctrl; useful to bind the upward motion of
+  // closures so variable stores can more easily fold into them.
+  public NewNode( byte type, int parent_alias, T to, Node mem         ) { super(type,null,mem    ); _init(parent_alias,to); }
+  public NewNode( byte type, int parent_alias, T to, Node mem,Node fld) { super(type,null,mem,fld); _init(parent_alias,to); }
+  private void _init(int parent_alias, T to) {
+    _alias = BitsAlias.new_alias(parent_alias);
+    _ts = to;
+    _defmem = to==dead_type() ? TypeObj.UNUSED : to.crush();
+    _tptr = TypeMemPtr.make(_alias,TypeObj.ISUSED);
+    _escapees = new IBitSet();
+    _escapees.set(_alias);
   }
-  private int def_idx(int fld) { return fld+1; }
-  Node fld(int fld) { return in(def_idx(fld)); }
+  String xstr() { return "New"+(_not_escaped?"":"!")+"*"+_alias; } // Self short name
+  String  str() { return "New"+(_not_escaped?"":"!")+_ts; } // Inline less-short name
 
-  // Called when folding a Named Constructor into this allocation site
-  void set_name( GVNGCM gvn, TypeName to ) {
-    TypeTuple oldt = (TypeTuple)gvn.type(this);
-    TypeStruct oldts = (TypeStruct)oldt.at(0);
-    TypeMemPtr poldt = (TypeMemPtr)oldt.at(1);
-    gvn.unreg(this);
-    TypeStruct ts = (TypeStruct)to.base();
-    // Reconstruct obj with 'this' _news
-    TypeStruct ts2 = TypeStruct.make(ts._flds,ts._ts,oldts._finals,BitsAlias.make0(_alias));
-    assert ts2.isa(_ts);
-    _ts = ts2;
-    _obj = to.make(_ts);
-    _ptr = TypeMemPtr.make(_alias,_obj);
-    TypeMemPtr nameptr = _ptr.make(to.make(poldt._obj));
-    gvn.rereg(this,nameptr);
-  }
+  Node mem() { return in(1); }
+  static int def_idx(int fld) { return fld+2; } // Skip mem in slot 1
+  Node fld(int fld) { return in(def_idx(fld)); } // Node for field#
 
-  String xstr() { return "New*"+_alias; } // Self short name
-  String  str() { return "New"+_ptr; } // Inline less-short name
-
-  @Override public Node ideal(GVNGCM gvn) { return null; }
-
-  // Produces a TypeMemPtr
-  @Override public Type value(GVNGCM gvn) {
-    // Gather args and produce a TypeStruct
-    Type[] ts = new Type[_ts._ts.length];
-    for( int i=0; i<_ts._ts.length; i++ )
-      ts[i] = gvn.type(fld(i)).bound(_ts._ts[i]); // Limit to Scalar results
-    TypeStruct newt = TypeStruct.make(_ts._flds,ts,_ts._finals,_alias);
-
-    // Check for TypeStructs with this same NewNode U-F types occurring more
-    // than CUTOFF deep, and fold the deepest ones onto themselves to limit the
-    // type depth.  If this happens, the types become recursive with the
-    // approximations happening at the deepest points.
-    TypeStruct res = newt.approx(CUTOFF);
-    TypeObj res2 = _obj instanceof TypeName ? ((TypeName)_obj).make(res) : res;
-    return TypeTuple.make(res2,TypeMemPtr.make(_alias,res2));
+  // Recompute default memory cache on a change
+  @SuppressWarnings("unchecked")
+  protected final void sets( T ts, GVNGCM gvn ) {
+    _ts = ts;
+    TypeObj olddef = _defmem;
+    _defmem = ts.crush();
+    if( gvn!=null ) {
+      gvn.add_work_uses(this);
+      if( olddef != _defmem )
+        gvn.add_work(Env.DEFMEM);
+    }
   }
 
-  @Override public Type all_type() { return TypeTuple.make(_obj,_ptr); }
+  @SuppressWarnings("unchecked")
+  @Override public Node ideal(GVNGCM gvn, int level) {
+    Type tmem = gvn.type(mem());
+    assert tmem instanceof TypeMem || tmem==Type.ANY || tmem==Type.ALL;
+    // If either the address or memory is not looked at then the memory
+    // contents are dead.  The object might remain as a 'gensym' or 'sentinel'
+    // for identity tests.
+    if( _defs._len > 2 && captured(gvn) ) {
+      while( !is_dead() && _defs._len > 2 )
+        pop(gvn);               // Kill all fields except memory
+      _ts = dead_type();
+      _defmem = TypeObj.UNUSED;
+      did_not_escape(gvn);
+      gvn.set_def_reg(Env.DEFMEM,_alias,gvn.add_work(gvn.con(TypeObj.UNUSED)));
+      if( is_dead() ) return this;
+      gvn.add_work_uses(_uses.at(0));  // Get FPtrs from MProj from this
+      return this;
+    }
 
-  // Clones during inlining all become unique new sites
-  @Override @NotNull NewNode copy( GVNGCM gvn) {
-    // Split the original '_alias' class into 2 sub-classes
-    NewNode nnn = (NewNode)super.copy(gvn);
-    nnn._alias = BitsAlias.new_alias(_alias); // Children alias classes, split from parent
-    nnn._ptr = TypeMemPtr.make(nnn._alias,nnn._obj = _obj.realias(nnn._alias));
+    // Scan for pointer-escapes to some unknown caller.
+    // If not escaped we can bypass unknown calls.
+    if( !_not_escaped && gvn._opt_mode>0 && !escaped() )
+      return did_not_escape(gvn);
+
+    return null;
+  }
+  // Set the no-escape flag, and push neighbors on worklist
+  private Node did_not_escape(GVNGCM gvn) {
+    _not_escaped=true;
+    // Every CallEpi can now bypass
+    for( Node use : Env.DEFMEM._uses )
+      if( use instanceof CallEpiNode )
+        gvn.add_work(use);
+    // Stored ptrs do not escape
+    if( !is_dead() )
+      for( Node def : _defs )
+        if( def instanceof ProjNode && def.in(0) instanceof NewNode )
+          gvn.add_work(def.in(0));
+    return this;
+  }
+
+
+  @Override IBitSet escapees(GVNGCM gvn) { return _escapees; }
+  abstract T dead_type();
+  @Override public boolean basic_liveness() { return false; }
+  @Override public TypeMem live_use( GVNGCM gvn, Node def ) { return _live; }
+
+  // Basic escape analysis.  If no escapes and no loads this object is dead.
+  private boolean captured( GVNGCM gvn ) {
+    if( _keep > 0 ) return false;
+    if( _uses._len==0 ) return false; // Dead or being created
+    Node mem = _uses.at(0);
+    // If only either address or memory remains, then memory contents are dead
+    if( _uses._len==1 ) {
+      if( mem instanceof MProjNode ) return true; // No pointer, just dead memory
+      // Just a pointer; currently on Strings become memory constants and
+      // constant-fold - leaving the allocation dead.
+      return !(gvn.type(in(1)) instanceof TypeStr);
+    }
+    Node ptr = _uses.at(1);
+    if( ptr instanceof MProjNode ) ptr = _uses.at(0); // Get ptr not mem
+
+    // Scan for memory contents being unreachable.
+    // Really stupid!
+    for( Node use : ptr._uses )
+      if( !(use instanceof IfNode) )
+        return false;
+    // Only used to nil-check (always not-nil) and equality (always unequal to
+    // other aliases).
+    return true;
+  }
+
+  private boolean escaped() {
+    if( _uses._len!=2 ) return false; // Dying/dead, not escaped
+    Node ptr = _uses.at(0);
+    if( ptr instanceof MProjNode ) ptr = _uses.at(1); // Get ptr not mem
+    for( Node use : ptr._uses ) {
+      if( use instanceof LoadNode ) continue;
+      if( use instanceof StoreNode )
+        if( ((StoreNode)use).val()==use ) return true; // Store to memory
+        else continue; // Store address
+      if( use instanceof  ScopeNode ) continue;    // Scope inspects all contents but modifies none
+      if( use instanceof    PhiNode ) return true; // Requires flow tracking
+      if( use instanceof FunPtrNode ) return true; // Appears as display in called function - which can then escape
+      if( use instanceof   CallNode ) return true; // Downward exposed Call arg
+      if( use instanceof    RetNode ) return true; // Upwards  exposed return
+      if( use instanceof CallEpiNode) { assert ((CallEpiNode)use).is_copy(); return true; }
+      if( use instanceof    NewNode )  // Store to a specific struct
+        if( ((NewNode)use)._not_escaped ) continue;
+        else return true;              // Escaping if other struct does
+      if( use instanceof IntrinsicNode ) continue; // Changes memory/v-table; similar to Store address
+      if( use instanceof    TypeNode ) continue;   // Type-checking, read-only
+      throw com.cliffc.aa.AA.unimpl(); // Handle all cases, shouldn't be too many
+    }
+    return false;
+  }
+
+
+  // clones during inlining all become unique new sites
+  @SuppressWarnings("unchecked")
+  @Override @NotNull public NewNode copy( boolean copy_edges, GVNGCM gvn) {
+    // Split the original '_alias' class into 2 sub-aliases
+    NewNode<T> nnn = (NewNode<T>)super.copy(copy_edges, gvn);
+    nnn._init(_alias,_ts);      // Children alias classes, split from parent
     // The original NewNode also splits from the parent alias
-    Type oldt = gvn.type(this);
-    gvn.unreg(this);
-    _alias = BitsAlias.new_alias(_alias);
-    _ptr = TypeMemPtr.make(_alias,_obj = _obj.realias(_alias));
+    assert gvn.touched(this);
+    Type oldt = gvn.unreg(this);
+    _init(_alias,_ts);
     gvn.rereg(this,oldt);
     return nnn;
   }
 
-  @Override public int hashCode() { return super.hashCode()+ _ptr._hash; }
-  @Override public boolean equals(Object o) {
-    if( this==o ) return true;
-    if( !super.equals(o) ) return false;
-    if( !(o instanceof NewNode) ) return false;
-    NewNode nnn = (NewNode)o;
-    return _ptr==nnn._ptr;
+  @Override public int hashCode() { return super.hashCode()+ _alias; }
+  // Only ever equal to self, because of unique _alias.  We can collapse equal
+  // NewNodes and join alias classes, but this is not the normal CSE and so is
+  // not done by default.
+  @Override public boolean equals(Object o) {  return this==o; }
+  @Override public Node is_copy(GVNGCM gvn, int idx) {
+    return _defmem == TypeObj.UNUSED && idx==0 ? mem(): null;
   }
 }

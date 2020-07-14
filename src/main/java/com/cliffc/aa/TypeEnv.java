@@ -3,6 +3,7 @@ package com.cliffc.aa;
 import com.cliffc.aa.type.Type;
 import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.util.Ary;
+import java.util.HashMap;
 
 public class TypeEnv implements AutoCloseable {
   final Type _t;

@@ -10,44 +10,43 @@ public class TypeInt extends Type<TypeInt> {
   private byte _z;        // bitsiZe, one of: 1,8,16,32,64
   private long _con;      // hi or lo according to _x
   private TypeInt ( int x, int z, long con ) { super(TINT); init(x,z,con); }
-  private void init(int x, int z, long con ) { _x=(byte)x; _z=(byte)z; _con = con; }
+  private void init(int x, int z, long con ) { super.init(TINT); _x=(byte)x; _z=(byte)z; _con = con; }
   // Hash does not depend on other types
-  @Override int compute_hash() { return TINT+_x+_z+(int)_con; }
+  @Override int compute_hash() { return super.compute_hash()+_x+_z+(int)_con; }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeInt) ) return false;
     TypeInt t2 = (TypeInt)o;
-    return _x==t2._x && _z==t2._z && _con==t2._con;
+    return super.equals(o) && _x==t2._x && _z==t2._z && _con==t2._con;
   }
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
   @Override String str( VBitSet dups) {
-    if( _con != 0 ) return (_x<0 ? "&" : (_x>0 ? "+" : ""))+Long.toString(_con);
-    if( _x==0 ) return Long.toString(_con);
-    return (_x>0?"~":"")+(Math.abs(_x)==1?"n":"")+"int"+Integer.toString(_z);
+    if( _con != 0 ) return _name+(_x<0 ? "&" : (_x>0 ? "+" : ""))+_con;
+    if( _x==0 ) return _name+_con;
+    return _name+(_x>0?"~":"")+(Math.abs(_x)==1?"n":"")+"int"+_z;
   }
   private static TypeInt FREE=null;
   @Override protected TypeInt free( TypeInt ret ) { FREE=this; return ret; }
-  public static Type make( int x, int z, long con ) {
-    if( x==0 && con==0 ) return NIL;
+  public static TypeInt make( int x, int z, long con ) {
     if( Math.abs(x)==1 && z==1 && con==0) con=1; // not-null-bool is just a 1
     TypeInt t1 = FREE;
     if( t1 == null ) t1 = new TypeInt(x,z,con);
-    else { FREE = null; t1.init(x,z,con); }
+    else {  FREE = null;      t1.init(x,z,con); }
     TypeInt t2 = (TypeInt)t1.hashcons();
     return t1==t2 ? t1 : t1.free(t2);
   }
-  public static Type con(long con) { return make(0,log(con),con); }
+  public static TypeInt con(long con) { return make(0,log(con),con); }
 
-  static public  final TypeInt  INT64 = (TypeInt)make(-2,64,0);
-  static         final TypeInt  INT32 = (TypeInt)make(-2,32,0);
-  static         final TypeInt  INT16 = (TypeInt)make(-2,16,0);
-  static public  final TypeInt  INT8  = (TypeInt)make(-2, 8,0);
-  static public  final TypeInt  BOOL  = (TypeInt)make(-2, 1,0);
-  static public  final TypeInt TRUE   = (TypeInt)make( 0, 1,1);
-  static public  final Type    FALSE  = NIL;
-  static public  final TypeInt XINT1  = (TypeInt)make( 2, 1,0);
-  static public  final TypeInt NINT8  = (TypeInt)make(-1, 8,0);
-  static private final TypeInt NINT64 = (TypeInt)make(-1,64,0);
+  static public  final TypeInt  INT64 = make(-2,64,0);
+  static         final TypeInt  INT32 = make(-2,32,0);
+  static         final TypeInt  INT16 = make(-2,16,0);
+  static public  final TypeInt  INT8  = make(-2, 8,0);
+  static public  final TypeInt  BOOL  = make(-2, 1,0);
+  static public  final TypeInt TRUE   = make( 0, 1,1);
+  static public  final Type    FALSE  = make( 0, 1,0);
+  static public  final TypeInt XINT1  = make( 2, 1,0);
+  static public  final TypeInt NINT8  = make(-1, 8,0);
+  static public  final TypeInt NINT64 = make(-1,64,0);
   static         final TypeInt ZERO   = (TypeInt)new TypeInt(0,1,0).hashcons(); // Not exposed since not the canonical NIL
   static final TypeInt[] TYPES = new TypeInt[]{INT64,INT32,INT16,BOOL,TRUE,XINT1,NINT64};
   static void init1( HashMap<String,Type> types ) {
@@ -72,13 +71,12 @@ public class TypeInt extends Type<TypeInt> {
     case TFUNPTR:
     case TMEMPTR:
     case TRPC:   return cross_nil(t);
-    case TNIL:
-    case TNAME:  return t.xmeet(this); // Let other side decide
-    case TFUN:
-    case TTUPLE:
+    case TFUNSIG:
+    case TLIVE:
     case TOBJ:
     case TSTR:
     case TSTRUCT:
+    case TTUPLE:
     case TMEM:   return ALL;
     default: throw typerr(t);
     }
@@ -97,7 +95,7 @@ public class TypeInt extends Type<TypeInt> {
     TypeInt ttop = _x>0 ? this : tt;
     if( that._x<0 ) return that; // Return low value
     if( log(that._con) <= ttop._z && (that._con!=0 || ttop._x==2) )
-      return that==ZERO ? NIL : that; // Keep a fitting constant
+      return that;                    // Keep a fitting constant
     return make(that.nn(),that._z,0); // No longer a constant
   }
 
@@ -139,7 +137,7 @@ public class TypeInt extends Type<TypeInt> {
       // tf._x > 0 // Can a high float fall to the int constant?
       double dcon = tf._z==32 ? (float)_con : (double)_con;
       if( (long)dcon == _con && (_con!=0 || tf._x == 2) )
-        return this==ZERO ? NIL : this;
+        return this;
       tx = _con==0 ? -2 : -1; // Fall from constant
     } // Fall into the bottom-int case
 
@@ -166,6 +164,7 @@ public class TypeInt extends Type<TypeInt> {
     if( t._type == TINT ) return (byte)(_z<=((TypeInt)t)._z ? 0 : 99);
     if( t._type == TFLT ) return 2; // Int->Flt ignores large int overflow issues
     if( t._type == Type.TMEMPTR ) return 99; // No flt->ptr conversion
+    if( t._type == Type.TFUNPTR ) return 99; // No flt->ptr conversion
     if( t._type == TREAL ) return 1;
     if( t._type == TSCALAR ) return 9; // Might have to autobox
     if( t._type == TSTR ) return 99;
@@ -191,7 +190,11 @@ public class TypeInt extends Type<TypeInt> {
     // Never had a nil choice
     return this;
   }
-  @Override public Type meet_nil() { return xmeet(ZERO); }
-  @Override Type make_recur(TypeName tn, int d, VBitSet bs ) { return this; }
+  @Override public Type meet_nil(Type nil) {
+    if( _x==2 ) return nil;
+    if( _x==0 && _con==0 ) return nil==Type.XNIL ? this : Type.NIL;
+    return TypeInt.make(-2,_z,0);
+  }
   @Override void walk( Predicate<Type> p ) { p.test(this); }
+  public TypeInt minsize(TypeInt ti) { return make(-2,Math.min(_z,ti._z),0);  }
 }

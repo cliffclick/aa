@@ -47,5 +47,15 @@ public final class SB {
 
   public SB nl( ) { return p('\n'); }
 
+  // Delete last char.  Useful when doing string-joins and JSON printing and an
+  // extra seperater char needs to be removed:
+  //
+  //   sb.p('[');
+  //   for( Foo foo : foos )
+  //     sb.p(foo).p(',');
+  //   sb.unchar().p(']');  // remove extra trailing comma
+  //
+  public SB unchar() { _sb.setLength(_sb.length()-1); return this; }
+  
   @Override public String toString() { return _sb.toString(); }
 }

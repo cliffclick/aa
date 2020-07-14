@@ -1,146 +1,165 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.Parse;
+import com.cliffc.aa.*;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.Util;
 
 // Load a named field from a struct.  Does it's own nil-check testing.  Loaded
 // value depends on the struct typing.
 public class LoadNode extends Node {
   private final String _fld;
-  private final int _fld_num;
-  final Parse _bad;
-  private LoadNode( Node ctrl, Node mem, Node adr, String fld, int fld_num, Parse bad ) {
-    super(OP_LOAD,ctrl,mem,adr);
+  private final Parse _bad;
+
+  public LoadNode( Node mem, Node adr, String fld, Parse bad ) { this(mem,adr,fld,bad,false,false); }
+  public LoadNode( Node mem, Node adr, String fld, Parse bad, boolean closure_adr, boolean closure_val ) {
+    super(OP_LOAD,null,mem,adr);
     _fld = fld;
-    _fld_num = fld_num;
     _bad = bad;
+    // TRUE if either the address or value must be a TFP.
+    // Address: means loading from a closure.
+    // Value  : means loading      a closure.
+    // Both: this is a linked-list display walk, finding the closure at the proper lexical depth.
+    // Just address: this is loading a local variable at this closure.
+    // Neither: this is a normal field load from a non-closure structure.
+    // Just value: not allowed.
+    assert (closure_adr || !closure_val); // Just value: not allowed
   }
-  public LoadNode( Node ctrl, Node mem, Node adr, String fld , Parse bad ) { this(ctrl,mem,adr,fld,-1,bad); }
-  public LoadNode( Node ctrl, Node mem, Node adr, int fld_num, Parse bad ) { this(ctrl,mem,adr,null,fld_num,bad); }
-  String xstr() { return "."+(_fld==null ? ""+_fld_num : _fld); } // Self short name
-  String  str() { return xstr(); }      // Inline short name
-  private Node ctl() { return in(0); }
+  String xstr() { return "."+_fld; }   // Self short name
+  String  str() { return xstr(); } // Inline short name
   private Node mem() { return in(1); }
-  private Node adr() { return in(2); }
-  private Node nil_ctl(GVNGCM gvn) { return set_def(0,null,gvn); }
-  private void set_adr(Node a, GVNGCM gvn) { set_def(2,a,gvn); }
+          Node adr() { return in(2); }
+  private Node set_mem(Node a, GVNGCM gvn) { return set_def(1,a,gvn); }
 
-  @Override public Node ideal(GVNGCM gvn) {
-    Node ctrl = ctl();
+  @Override public Node ideal(GVNGCM gvn, int level) {
     Node mem  = mem();
-    Node addr = adr();
+    Node adr = adr();
+
+    Type tadr = gvn.type(adr);
+    BitsAlias aliases = tadr instanceof TypeMemPtr ? ((TypeMemPtr)tadr)._aliases : null;
+
+    // Load can move past a Join if all aliases align.
+    if( mem instanceof MemJoinNode && aliases != null ) {
+      Node jmem = ((MemJoinNode)mem).can_bypass(aliases.bitset());
+      if( jmem != null ) return set_mem(jmem,gvn);
+    }
+
+    // Load can move out of a Call, if the function has no Parm:mem - happens
+    // for single target calls that do not (have not yet) inlined.
+    CallNode call;    CallEpiNode cepi;
+    if( mem instanceof MProjNode && mem.in(0) instanceof CallNode && !(call=(CallNode)mem.in(0)).is_copy() )
+      return set_mem(call.mem(),gvn);
+
+    // Loads from final memory can bypass calls
+    if( adr instanceof  ProjNode && adr.in(0) instanceof NewNode &&
+        mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode &&
+        !(cepi=(CallEpiNode)mem.in(0)).is_copy() ) {
+      TypeStruct ts = (TypeStruct)((NewNode)adr.in(0))._ts;
+      int idx = ts.find(_fld);
+      if( idx != -1 && ts.fmod(idx)==TypeStruct.FFNL )
+        return set_mem(cepi.call().mem(),gvn);
+    }
+
     // Loads against a NewNode cannot NPE, cannot fail, always return the input
-    if( addr instanceof NewNode && mem instanceof MemMergeNode && mem.in(1)==addr ) {
-      NewNode nnn = (NewNode)addr;
-      int idx = nnn._ts.find(_fld,_fld_num);  // Find the named field
-      if( idx != -1 ) return nnn.fld(idx);    // Field value
-      // Broken load-vs-new
+    NewObjNode nnn = adr.in(0) instanceof NewObjNode ? (NewObjNode)adr.in(0) : null;
+    int idx;
+    if( nnn != null && nnn == mem.in(0) && (idx=nnn._ts.find(_fld)) != -1 )
+      return nnn.fld(idx);      // Field value
+
+    // Load from a memory Phi; split through in an effort to sharpen the memory.
+    if( mem instanceof PhiNode && nnn!=null ) {
+      // TODO: Only split thru function args if no unknown_callers, and must make a Parm not a Phi
+      if( !(mem instanceof ParmNode) ) {
+        Node lphi = new PhiNode(Type.SCALAR,((PhiNode)mem)._badgc,mem.in(0));
+        for( int i=1; i<mem._defs._len; i++ )
+          lphi.add_def(gvn.xform(new LoadNode(mem.in(i),adr,_fld,_bad)));
+        return lphi;
+      }
     }
+
+    // If Load is of a New and the aliases do not overlap, bypass.
+    if( mem instanceof MProjNode && mem.in(0) instanceof NewNode && aliases != null &&
+        !aliases.test_recur(((NewNode)mem.in(0))._alias) )
+      return set_mem(((NewNode)mem.in(0)).mem(),gvn);
+
     // Loads against an equal store; cannot NPE since the Store did not.
-    StoreNode st;
-    if( mem instanceof StoreNode && addr == (st=((StoreNode)mem)).adr() ) {
-      if( _fld.equals(st._fld) && _fld_num == st._fld_num && st.err(gvn)==null )
+    StoreNode st=null;
+    if( mem instanceof StoreNode && adr == (st=((StoreNode)mem)).adr() ) {
+      if( Util.eq(_fld,st._fld) && st.err(gvn)==null )
         return st.val();
-      // TODO: Else can use field-level aliasing to by pass.  Needs a
-      // field-level alias notion on memory edges.
     }
-      
-    if( ctrl==null || gvn.type(ctrl)!=Type.CTRL )
-      return null;              // Dead load, or a no-control-no-fail load
-    if( addr.is_forward_ref() ) return null;
-    Type t = gvn.type(addr);    // Address type
 
-    // Lift control on Loads as high as possible... and move them over
-    // to a CastNode (to remove nil-ness) and remove the control.
-    if( !t.must_nil() ) // No nil, no need for ctrl
-      // remove ctrl; address already casts-away-nil
-      return nil_ctl(gvn);
-
-    // Looking for a nil-check pattern:
-    //   this.0->dom*->True->If->addr
-    //   this.1->[Cast]*-------/   Cast(s) are optional
-    // If found, convert to this pattern:
-    //   this.0      ->True->If->addr
-    //   this.1->Cast/---------/
-    // Where the cast-away-nil is local and explicit
-    Node baseaddr = addr;
-    while( baseaddr instanceof CastNode ) baseaddr = baseaddr.in(1);
-    final Node fbaseaddr = baseaddr;
-
-    Node tru = ctrl.walk_dom_last(n ->
-                                  n instanceof CProjNode && ((CProjNode)n)._idx==1 &&
-                                  n.in(0) instanceof IfNode &&
-                                  n.in(0).in(1) == fbaseaddr );
-    if( tru==null ) return null;
-    assert !(tru==ctrl && addr != baseaddr) : "not the immediate location or we would be not-nil already";
-
-    if( !(t instanceof TypeMemPtr) )
-      return null; // below a nil (e.g. Scalar), do nothing yet
-    Type tnz = t.join(TypeMemPtr.OOP); // Remove nil choice
-    set_adr(gvn.xform(new CastNode(tru,baseaddr,tnz)),gvn);
-    return nil_ctl(gvn);
+    // Bypass unrelated Stores.  Since unrelated, can bypass in-error stores.
+    if( st != null && !Util.eq(_fld,st._fld) )
+      return set_mem(st.mem(),gvn);
+    return null;
   }
 
   @Override public Type value(GVNGCM gvn) {
-    Type adr = gvn.type(adr()).base();
-    if( adr.isa(TypeMemPtr.OOP0.dual()) ) return Type.XSCALAR;
-    if( adr.must_nil() ) return Type.SCALAR; // Not provable not-nil, so fails
-    if( TypeMemPtr.OOP0.isa(adr) ) return Type.SCALAR; // Very low, might be any address
-    if( adr.is_forward_ref() ) return Type.SCALAR;
-    if( !(adr instanceof TypeMemPtr) )
-      return adr.above_center() ? Type.XSCALAR : Type.SCALAR;
-    TypeMemPtr tadr = (TypeMemPtr)adr;
+    Type adr = gvn.type(adr());
+    if( !(adr instanceof TypeMemPtr) ) return adr.oob();
+    TypeMemPtr tmp = (TypeMemPtr)adr;
 
-    Type mem = gvn.type(mem());     // Memory
-    if( !(mem instanceof TypeMem) ) // Nothing sane
-      return mem.above_center() ? Type.XSCALAR : Type.SCALAR;
-    TypeObj obj = ((TypeMem)mem).ld(tadr);
-    TypeObj obj2 = (TypeObj)obj.meet(tadr._obj); // Loaded obj is in expected type bounds of pointer?
-    Type base = obj2.base();
+    // Loading from TypeMem - will get a TypeObj out.
+    Node mem = mem();
+    Type tmem = gvn.type(mem); // Memory
+    if( !(tmem instanceof TypeMem) ) return tmem.oob(); // Nothing sane
+    TypeObj tobj = ((TypeMem)tmem).ld(tmp);
 
-    if( base instanceof TypeStruct ) {
-      TypeStruct ts = (TypeStruct)base;
-      int idx = ts.find(_fld,_fld_num);  // Find the named field
-      if( idx != -1 ) return ts.at(idx); // Field type
+    // Loading from TypeObj - hoping to get a field out.
+    if( tobj instanceof TypeStruct ) { // Struct; check for field
+      TypeStruct ts = (TypeStruct)tobj;
+      int idx = ts.find(_fld);  // Find the named field
+      if( idx != -1 ) {         // Found a field
+        Type t = ts.at(idx);    // Load field
+        if( tmp.must_nil() )    // Might be in-error, but might fall to correct
+          return t.widen();     // Return conservative but sane answer
+        return t;               // Field type
+      }
       // No such field
-      return base.above_center() ? Type.XSCALAR : Type.SCALAR;
     }
-    return Type.SCALAR;        // No loading from e.g. Strings
+    return tobj.oob();          // No loading from e.g. Strings
+  }
+
+  @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
+    if( def==adr() ) return _live;                   // Alive as the Load is alive
+    Type tmem = gvn.type(mem());
+    Type tptr = gvn.type(adr());
+    // If either is above-center, then only basic-liveness - the load can load
+    // from anything getting anything.
+    if( tptr.above_center() )
+      return TypeMem.ANYMEM;
+    // TypeObj memory is already alias-constricted.  Can only demand from that alias.
+    if( tmem instanceof TypeObj && tptr instanceof TypeMemPtr )
+      return TypeMem.make(((TypeMemPtr)tptr)._aliases,(TypeObj)tmem);
+    // Alive (like normal liveness), plus the address, plus whatever can be
+    // reached from the address.
+    return ScopeNode.compute_live_mem(gvn,mem(),adr());
   }
 
   @Override public String err(GVNGCM gvn) {
-    Type t = gvn.type(adr());
-    while( t instanceof TypeName ) t = ((TypeName)t)._t;
-    if( t.must_nil() ) return bad("Struct might be nil when reading");
-    if( !(t instanceof TypeMemPtr) )
-      return bad("Unknown"); // Not a pointer, cannot load a field
-    TypeMemPtr t3 = (TypeMemPtr)t;
-    TypeMem t4 = (TypeMem)gvn.type(mem()); // Should be memory
-    Type t5 = t4.ld(t3);                   // Meets of all aliases
-    if( !(t5 instanceof TypeStruct) ) {    // No fields, so memory or ptr is in-error
-      Type t6 = t3._obj.base();
-      if( t6 instanceof TypeStruct ) {
-        t5 = t6;
-      } else {
-        return bad("Unknown");
-      }
-    }
-    if( ((TypeStruct)t5).find(_fld,_fld_num) == -1 )
+    Type tadr = gvn.type(adr());
+    if( tadr==Type.ALL ) return null; // Error already
+    if( tadr.must_nil() ) return bad("Struct might be nil when reading");
+    if( !(tadr instanceof TypeMemPtr) )
+      return bad("Unknown"); // Not a pointer nor memory, cannot load a field
+    TypeMemPtr ptr = (TypeMemPtr)tadr;
+    Type tmem = gvn.type(mem());
+    if( tmem==Type.ALL ) return null; // An error, reported earlier
+    TypeObj objs = tmem instanceof TypeMem
+      ? ((TypeMem)tmem).ld(ptr) // General load from memory
+      : ((TypeObj)tmem);
+    if( !(objs instanceof TypeStruct) || ((TypeStruct)objs).find(_fld) == -1 )
       return bad("Unknown");
     return null;
   }
   private String bad( String msg ) {
-    String f = _fld==null ? ""+_fld_num : _fld;
-    return _bad.errMsg(msg+" field '."+f+"'");
+    String f = msg+" field '."+_fld+"'";
+    return _bad==null ? f : _bad.errMsg(f);
   }
-  @Override public Type all_type() { return Type.SCALAR; }
-  @Override public int hashCode() { return super.hashCode()+(_fld==null ? _fld_num : _fld.hashCode()); }
+  @Override public int hashCode() { return super.hashCode()+_fld.hashCode(); }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
     if( !super.equals(o) ) return false;
-    if( !(o instanceof LoadNode) ) return false;
-    LoadNode ld = (LoadNode)o;
-    return _fld_num == ld._fld_num && (_fld==null ? ld._fld==null : _fld.equals(ld._fld));
+    return (o instanceof LoadNode) && Util.eq(_fld,((LoadNode)o)._fld);
   }
 }

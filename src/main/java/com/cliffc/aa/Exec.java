@@ -13,5 +13,5 @@ public abstract class Exec {
     return (P=new Parse(src,top,str)).go_whole();
   }
 
-  public static String dump() { return P.dumprpo(); } // Debugging hook
+  public static String dump() { return Env.START.dumprpo(false,false); } // Debugging hook
 }

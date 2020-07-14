@@ -6,13 +6,13 @@ import java.lang.reflect.Array;
 import java.util.*;
 import java.util.function.Function;
 import java.util.function.Predicate;
-  
+
 // ArrayList with saner syntax
 public class Ary<E> implements Iterable<E> {
   public E[] _es;
   public int _len;
   public Ary(E[] es) { this(es,es.length); }
-  public Ary(E[] es, int len) { _es=es; _len=len; }
+  public Ary(E[] es, int len) { if( es.length==0 ) es=Arrays.copyOf(es,1); _es=es; _len=len; }
   @SuppressWarnings("unchecked")
   public Ary(Class<E> clazz) { this((E[]) Array.newInstance(clazz, 1),0); }
 
@@ -36,13 +36,13 @@ public class Ary<E> implements Iterable<E> {
     range_check(0);
     return _es[_len-1];
   }
-  
+
   /** @return remove and return last element */
   public E pop( ) {
     range_check(0);
     return _es[--_len];
   }
-  
+
   /** Add element in amortized constant time
    *  @param e Element to add at end of list
    *  @return 'this' for flow-coding */
@@ -54,11 +54,22 @@ public class Ary<E> implements Iterable<E> {
 
   /** Add element in amortized constant time
    *  @param e Element to add at end of list
-   *  @return e for flow-coding */
-  public E push( E e ) {
+   **/
+  public void push( E e ) {
     if( _len >= _es.length ) _es = Arrays.copyOf(_es,Math.max(1,_es.length<<1));
     _es[_len++] = e;
-    return e;
+  }
+
+  /** Slow, linear-time, element insert.  Preserves order.
+   *  @param i index to insert at, between 0 and _len inclusive.
+   *  @param e Element to insert
+   */
+  public void insert( int i, E e ) {
+    if( i < 0 || i>_len )
+      throw new ArrayIndexOutOfBoundsException(""+i+" >= "+_len);
+    if( _len >= _es.length ) _es = Arrays.copyOf(_es,Math.max(1,_es.length<<1));
+    System.arraycopy(_es,i,_es,i+1,(_len++)-i);
+    _es[i] = e;
   }
 
   /** Fast, constant-time, element removal.  Does not preserve order
@@ -71,8 +82,22 @@ public class Ary<E> implements Iterable<E> {
     return tmp;
   }
 
+  /** Element removal, using '=='.  Does not preserve order.
+   *  @param e element to be removed
+   *  @return element removed */
+  public E del( E e ) {
+    for( int i=0; i<_len; i++ ) {
+      E tmp = _es[i];
+      if( tmp==e ) {
+        _es[i]=_es[--_len];
+        return tmp;
+      }
+    }
+    return null;
+  }
+
   /** Slow, linear-time, element removal.  Preserves order.
-   *  @param i element to be removed 
+   *  @param i element to be removed
    *  @return element removed */
   public E remove( int i ) {
     range_check(i);
@@ -80,36 +105,51 @@ public class Ary<E> implements Iterable<E> {
     System.arraycopy(_es,i+1,_es,i,(--_len)-i);
     return e;
   }
-  
+
   /** Remove all elements */
   public void clear( ) { _len=0; }
 
+  public void fill( E e ) { Arrays.fill(_es,0,_len,e); }
+  
   // Extend and set
   public E setX( int i, E e ) {
-    if( i >= _es.length ) Arrays.fill(_es,_len,_es.length,null);
+    if( i >= _len ) Arrays.fill(_es,_len,_es.length,null);
     while( i>= _es.length ) _es = Arrays.copyOf(_es,_es.length<<1);
     if( i >= _len ) _len = i+1;
     return (_es[i] = e);
   }
-  
+
+  /** Clear element.  Does nothing if element is OOB, since these are clear by
+   *  default.
+   *  @param i element to clear
+   */
+  public void clear( int i ) {  if( i<_len ) _es[i]=null; }
+
+  /** Set existing element
+   * @param i element to set
+   * @param e value to set
+   * @return old value
+   */
   public E set( int i, E e ) {
     range_check(i);
-    return (_es[i] = e);
+    E old = _es[i];
+    _es[i] = e;
+    return old;
   }
-  
-  public Ary<E> set_as( E e ) { _es[0] = e; _len=1; return this; }
+
   public Ary<E> set_len( int len ) {
-    if( len > _len ) throw new RuntimeException("unimpl");
+    if( len > _len )
+      while( len>= _es.length ) _es = Arrays.copyOf(_es,_es.length<<1);
     _len = len;
     while( _es.length > (len<<1) ) // Shrink if hugely too large
       _es = Arrays.copyOf(_es,_es.length>>1);
     Arrays.fill(_es,len,_es.length,null);
     return this;
   }
-  
+
   /** @param c Collection to be added */
-  public void addAll( Collection<? extends E> c ) { for( E e : c ) add(e); }
-    
+  public Ary<E> addAll( Collection<? extends E> c ) { for( E e : c ) add(e); return this; }
+
   /** @param es Array to be added */
   public <F extends E> Ary<E> addAll( F[] es ) {
     if( es.length==0 ) return this;
@@ -118,7 +158,7 @@ public class Ary<E> implements Iterable<E> {
     _len += es.length;
     return this;
   }
-    
+
   /** @param c Collection to be added */
   public void addAll( Ary<? extends E> c ) {
     if( c._len==0 ) return;
@@ -126,14 +166,14 @@ public class Ary<E> implements Iterable<E> {
     System.arraycopy(c._es,0,_es,_len,c._len);
     _len += c._len;
   }
-  
-  /** @return compact array version, using the internal base array where possible. */
-  public E[] asAry() { return _len==_es.length ? _es : Arrays.copyOf(_es,_len); }
+
+  /** @return compact array version */
+  public E[] asAry() { return Arrays.copyOf(_es,_len); }
 
   /** @param f function to apply to each element.  Updates in-place. */
   public Ary<E> map_update( Function<E,E> f ) { for( int i = 0; i<_len; i++ ) _es[i] = f.apply(_es[i]); return this; }
   /** @param P filter out elements failing to pass the predicate; updates in
-   *  place and shuffles list. 
+   *  place and shuffles list.
    *  @return this, for flow-coding */
   public Ary<E> filter_update( Predicate<E> P ) {
     for( int i=0; i<_len; i++ )
@@ -141,7 +181,7 @@ public class Ary<E> implements Iterable<E> {
         del(i--);
     return this;
   }
-  /** Sorts in-place 
+  /** Sorts in-place
    *  @param c Comparator to sort by */
   public void sort_update(Comparator<? super E> c ) { Arrays.sort(_es, 0, _len, c);  }
   /** Find the first matching element using ==, or -1 if none.  Note that
@@ -160,6 +200,15 @@ public class Ary<E> implements Iterable<E> {
     for( int i=0; i<_len; i++ )  if( P.test(_es[i]) )  return i;
     return -1;
   }
+  /** Find and replace the first matching element using ==.
+   *  @param old Element to find
+   *  @param nnn Element replacing old
+   *  @return true if replacement happened */
+  public boolean replace( E old, E nnn ) {
+    for( int i=0; i<_len; i++ )  if( _es[i]==old )  { _es[i]=nnn; return true; }
+    return false;
+  }
+
 
   /** Merge-Or.  Merge 2 sorted Arys, tossing out duplicates.  Return a new
    *  sorted Ary with the merged list.  Undefined if the original arrays are
@@ -206,7 +255,7 @@ public class Ary<E> implements Iterable<E> {
     }
     return res;
   }
-  
+
   /** @return an iterator */
   @NotNull
   @Override public Iterator<E> iterator() { return new Iter(); }
@@ -215,7 +264,7 @@ public class Ary<E> implements Iterable<E> {
     @Override public boolean hasNext() { return _i<_len; }
     @Override public E next() { return _es[_i++]; }
   }
-  
+
   @Override public String toString() {
     SB sb = new SB().p('{');
     for( int i=0; i<_len; i++ ) {
@@ -230,6 +279,9 @@ public class Ary<E> implements Iterable<E> {
       throw new ArrayIndexOutOfBoundsException(""+i+" >= "+_len);
   }
 
+  // Note that the hashCode() and equals() are not invariant to changes in the
+  // underlying array.  If the hashCode() is used (e.g., inserting into a
+  // HashMap) and the then the array changes, the hashCode() will change also.
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof Ary) ) return false;
@@ -246,5 +298,9 @@ public class Ary<E> implements Iterable<E> {
     for( int i=0; i<_len; i++ )
       sum += _es[i]==null ? 0 : _es[i].hashCode();
     return sum;
+  }
+
+  public Ary<E> deepCopy() {
+    return new Ary<>(_es.clone(),_len);
   }
 }
