@@ -7,8 +7,36 @@ import com.cliffc.aa.type.*;
 public class IfNode extends Node {
   public IfNode( Node ctrl, Node pred ) { super(OP_IF,ctrl,pred); _live=TypeMem.ALIVE; }
   @Override public Node ideal(GVNGCM gvn, int level) {
-    return gvn.type(in(0)) == Type.XCTRL ? gvn.con(TypeTuple.IF_ANY) : null;
+    Node ctl = in(0);
+    Node tst = in(1);
+    if( gvn.type(ctl) == Type.XCTRL ) return gvn.con(TypeTuple.IF_ANY);
+    // Remove leading test-vs-0
+    if( tst instanceof PrimNode.EQ_I64 ) throw AA.unimpl();
+    if( tst instanceof PrimNode.EQ_F64 ) throw AA.unimpl();
+    if( tst instanceof PrimNode.EQ_OOP ) throw AA.unimpl();
+    
+    // Remove leading negation-vs-0 by inverting
+    if( tst instanceof PrimNode.NE_I64 ) throw AA.unimpl();
+    if( tst instanceof PrimNode.NE_F64 ) throw AA.unimpl();
+    if( tst instanceof PrimNode.NE_OOP ) throw AA.unimpl();
+    
+    if( tst instanceof PrimNode.Not ) return flip(gvn, gvn.xform(new IfNode(ctl,tst.in(1))));
+    
+    return null;
   }
+
+  Node flip(GVNGCM gvn, Node that) {
+    ProjNode p0 = (ProjNode)_uses.atX(0);
+    ProjNode p1 = (ProjNode)_uses.atX(1);
+    if( p0!=null && p0._idx==1 ) { ProjNode tmp=p0; p0=p1; p1=tmp; }
+    Node x0 = gvn.xform(new CProjNode(that,0));
+    Node x1 = gvn.xform(new CProjNode(that,1));
+    if( p0!=null ) gvn.replace(p0,x1);
+    if( p1!=null ) gvn.replace(p1,x0);
+    return that;
+  }
+
+  
   @Override public TypeTuple value(GVNGCM gvn) {
     // If the input is exactly zero, we can return false: {ANY,CONTROL}
     // If the input excludes   zero, we can return true : {CONTROL,ANY}
