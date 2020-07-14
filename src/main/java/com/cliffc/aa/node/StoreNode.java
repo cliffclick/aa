@@ -89,12 +89,13 @@ public class StoreNode extends Node {
       if( memw != null && adr instanceof ProjNode && adr.in(0) instanceof NewNode ) {
         MemJoinNode mjn = (MemJoinNode)mem;
         Node st = gvn.xform(new StoreNode(keep(),mem,adr).keep());
-        st._live = _live;
         mjn.add_alias_below(gvn,st,st.unhook(),memw);
         unhook();
         gvn.setype(st ,st .value(gvn));
         gvn.setype(mjn,mjn.value(gvn));
         mjn._live = mjn.live(gvn);
+        st._live = st.live(gvn);
+        gvn.add_work_defs(mjn);
         return mjn;
       }
     }

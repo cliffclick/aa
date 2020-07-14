@@ -54,7 +54,7 @@ import java.util.BitSet;
  *  ttuple = ( [[type],]* )        // Tuple types are just a list of optional types;
                                    // the count of commas dictates the length, zero commas is zero length.
                                    // Tuples are always final.
- *  tmod = := | = | ==             // ':=' or '' is r/w, '=' is final, '==' is r/w
+ *  tmod = := | = | ==             // ':=' or '' is r/w, '=' is final, '==' is r/o
  *  tstruct = @{ [id [tmod [type?]],]*}  // Struct types are field names with optional types.  Spaces not allowed
  *  tvar = id                      // Type variable lookup
  */
@@ -932,7 +932,7 @@ public class Parse {
    *  type = tcon | tfun | tstruct | ttuple | tvar  // Type choices
    *  tcon = int, int[1,8,16,32,64], flt, flt[32,64], real, str[?]
    *  tfun = {[[type]* ->]? type } // Function types mirror func decls
-   *  tmod = = | := | ==  // '=' is r/only, ':=' is r/w, '==' is final
+   *  tmod = = | := | ==  // '=' is r/final, ':=' is r/w, '==' is read-only
    *  tstruct = @{ [id [tmod [type?]];]*}  // Struct types are field names with optional types.  Spaces not allowed
    *  ttuple = ([type?] [,[type?]]*) // List of types, trailing comma optional
    *  tvar = A previously declared type variable
@@ -962,11 +962,12 @@ public class Parse {
   // Wrap in a nullable if there is a trailing '?'.  No spaces allowed
   private Type typeq(Type t) { return peek_noWS('?') ? t.meet_nil(Type.XNIL) : t; }
 
-  // No mod is r/w.  ':' is read-write, '=' is final.
+  // No mod is r/w.  ':=' is read-write, '=' is final.
   // Currently '-' is  ambiguous with function arrow ->.
   private byte tmod() {
     if( peek_not('=','=') ) { _x--; return TypeStruct.FFNL; } // final     , leaving trailing '='
     if( peek(":="       ) ) { _x--; return TypeStruct.FRW ; } // read-write, leaving trailing '='
+    if( peek("=="       ) ) { _x--; return TypeStruct.FRO ; } // read-only , leaving trailing '='
     // Default for unnamed field mod
     return TypeStruct.FRW;
   }

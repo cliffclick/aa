@@ -562,7 +562,6 @@ public class TestParse {
   // which only applies to you, and not to other r/w pointers.
   @Test public void testParse10() {
     Object dummy = TypeStruct.DISPLAY;
-    test    ("ptr=@{f=1}; ptr2rw:@{f:=} = ptr; 2", TypeInt.con(2)); // Dead cast-away of final
     // Test re-assignment in struct
     Type[] ts = TypeStruct.ts(TypeMemPtr.DISP_SIMPLE, TypeInt.con(1), TypeInt.con(2));
     test_obj_isa("x=@{n:=1;v:=2}", TypeStruct.make(FLDS, ts,new byte[]{TypeStruct.FFNL,TypeStruct.FRW,TypeStruct.FRW}));
@@ -581,14 +580,14 @@ public class TestParse {
              TypeStruct.make(new String[]{"^","f"},new Type[]{TypeMemPtr.DISPLAY_PTR,TypeInt.con(1)},TypeStruct.ffnls(2)));
     testerr ("ptr=@{f=1}; ptr2rw:@{f:=} = ptr; ptr2rw", "*[$]@{f=1} is not a *[$]@{f:=;...}", 18); // Cannot cast-away final
     test    ("ptr=@{f=1}; ptr2rw:@{f:=} = ptr; 2", TypeInt.con(2)); // Dead cast-away of final
-    test    ("@{x:=1;y =2}:@{x;y==}.y", TypeInt.con(2)); // Allowed reading final field
-    testerr ("f={ptr2final:@{x;y==} -> ptr2final.y  }; f(@{x:=1;y:=2})", "*[$]@{x:=1;y:=2} is not a *[$]@{x=;y==}!",12); // Another version of casting-to-final
-    testerr ("f={ptr2final:@{x;y==} -> ptr2final.y=3; ptr2final}; f(@{x =1;y =2})", "Cannot re-assign final field '.y'",38);
-    test    ("f={ptr:@{x= ;y:=} -> ptr.y=3; ptr}; f(@{x:=1;y:=2}).y", TypeInt.con(3)); // On field x, cast-away r/w for r/o
-    test    ("f={ptr:@{x==;y:=} -> ptr.y=3; ptr}; f(@{x =1;y:=2}).y", TypeInt.con(3)); // On field x, cast-up r/o for final but did not read
-    testerr ("f={ptr:@{x==;y:=} -> ptr.y=3; ptr}; f(@{x:=1;y:=2}).x", "*[$]@{x:=1;y:=2} is not a *[$]@{x==;y:=}!",6); // On field x, cast-up r/w for final and read
-    test    ("f={ptr:@{x;y} -> ptr.y }; f(@{x:=1;y:=2}:@{x;y=})", TypeInt.con(2)); // cast r/w to r/o, and read
-    test    ("f={ptr:@{x;y} -> ptr }; f(@{x=1;y=2}).y", TypeInt.con(2)); // cast final to r/o and read
+    test    ("@{x:=1;y =2}:@{x;y=}.y", TypeInt.con(2)); // Allowed reading final field
+    testerr ("f={ptr2final:@{x;y=} -> ptr2final.y  }; f(@{x:=1;y:=2})", "*[$]@{x:=1;y:=2} is not a *[$]@{x:=;y=;...}",42); // Another version of casting-to-final
+    testerr ("f={ptr2final:@{x;y=} -> ptr2final.y=3; ptr2final}; f(@{x:=1;y =2})", "Cannot re-assign final field '.y'",34);
+    test    ("f={ptr:@{x==;y:=} -> ptr.y=3; ptr}; f(@{x:=1;y:=2}).y", TypeInt.con(3)); // On field x, cast-away r/w for r/o
+    test    ("f={ptr:@{x=;y:=} -> ptr.y=3; ptr}; f(@{x =1;y:=2}).y", TypeInt.con(3)); // On field x, cast-up r/o for final but did not read
+    testerr ("f={ptr:@{x=;y:=} -> ptr.y=3; ptr}; f(@{x:=1;y:=2}).x", "*[$]@{x:=1;y:=2} is not a *[$]@{x=;y:=;...}",37); // On field x, cast-up r/w for final and read
+    test    ("f={ptr:@{x;y} -> ptr.y }; f(@{x:=1;y:=2}:@{x;y==})", TypeInt.con(2)); // cast r/w to r/o, and read
+    test    ("f={ptr:@{x==;y==} -> ptr }; f(@{x=1;y=2}).y", TypeInt.con(2)); // cast final to r/o and read
     test    ("ptr=@{f:=1}; ptr:@{f=}.f=2",TypeInt.con(2)); // Checking that it is-a final does not make it final
     // In general for these next two, want a 'MEET' style type assertion where
     // locally at the function parm we "finalize" ptr.y, so the function body
