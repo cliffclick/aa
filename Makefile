@@ -9,8 +9,7 @@ DATE=`date +%Y%m%d`
 print-%  : ; @echo $* = $($*)
 
 # literal space
-space :=
-space +=
+space := $() $()
 
 # Decide OS-specific questions
 # jar-file seperator
@@ -53,6 +52,7 @@ javas = $(main_javas)
 # All the libraries: see lib/README.md for more info
 libs = $(wildcard lib/*jar)
 jars = $(subst $(space),$(SEP),$(libs))
+
 
 default_targets := build/aa.jar
 # Optionally add ctags to the default target if a reasonable one was found.
@@ -170,12 +170,12 @@ lib:	lib/junit-4.12.jar lib/hamcrest-core-1.3.jar lib/annotations-16.0.2.jar
 # Unit testing
 lib/junit-4.12.jar lib/hamcrest-core-1.3.jar:
 	@[ -d lib ] || mkdir -p lib
-	@(cd lib; wget http://repo1.maven.org/maven2/junit/junit/4.12/junit-4.12.jar)
-	@(cd lib; wget http://repo1.maven.org/maven2/org/hamcrest/hamcrest-core/1.3/hamcrest-core-1.3.jar)
+	@(cd lib; wget https://repo1.maven.org/maven2/junit/junit/4.12/junit-4.12.jar)
+	@(cd lib; wget https://repo1.maven.org/maven2/org/hamcrest/hamcrest-core/1.3/hamcrest-core-1.3.jar)
 # @NotNull annotations
 lib/annotations-16.0.2.jar:
 	@[ -d lib ] || mkdir -p lib
-	@(cd lib; wget http://repo1.maven.org/maven2/org/jetbrains/annotations/16.0.2/annotations-16.0.2.jar)
+	@(cd lib; wget https://repo1.maven.org/maven2/org/jetbrains/annotations/16.0.2/annotations-16.0.2.jar)
 
 # Build emacs tags (part of a tasty emacs ide experience)
 tags:	$(main_javas) $(test_javas)
