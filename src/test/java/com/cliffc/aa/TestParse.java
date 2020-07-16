@@ -614,16 +614,16 @@ public class TestParse {
 
   // Upwards exposed closure tests
   @Test public void testParse12() {
-    test("gen = {cnt:=0;({cnt++},{cnt})};" +
-         "tmp:=gen(); incA=tmp.0;getA=tmp.1;"+
-         "tmp:=gen(); incB=tmp.0;getB=tmp.1;"+
-         "incA();incB();incA(); getA()*10+getB()",
-         TypeInt.con(2*10+1));
     test("incA= {cnt:=0; {cnt++}       }(); incA();incA()",TypeInt.con(1));
     test("cnt:=0; incA={cnt++}; incA();incA()+cnt",TypeInt.con(1+2));
     test("incA= {cnt:=0; {cnt++}       }();                      incA()       ",Type.XNIL);
     test("incA= {cnt:=0; {cnt++}       }();                      incA();incA()",TypeInt.con(1));
     test("tmp = {cnt:=0;({cnt++},{cnt})}();incA=tmp.0;getA=tmp.1;incA();incA()+getA()",TypeInt.con(1+2));
+    test("gen = {cnt:=0;({cnt++},{cnt})};" +
+         "tmp:=gen(); incA=tmp.0;getA=tmp.1;"+
+         "tmp:=gen(); incB=tmp.0;getB=tmp.1;"+
+         "incA();incB();incA(); getA()*10+getB()",
+         TypeInt.con(2*10+1));
   }
 
 
