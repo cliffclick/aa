@@ -1,10 +1,7 @@
 package com.cliffc.aa.node;
 
 import com.cliffc.aa.GVNGCM;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeFunPtr;
-import com.cliffc.aa.type.TypeMem;
-import com.cliffc.aa.type.TypeTuple;
+import com.cliffc.aa.type.*;
 
 // Extract a Display pointer (a TypeMemPtr) from a TypeFunPtr.
 public final class FP2ClosureNode extends Node {
@@ -29,7 +26,7 @@ public final class FP2ClosureNode extends Node {
     Type tfp = t0 instanceof TypeTuple ? CallNode.ttfp(t0) : t0;
     return convert(tfp).simple_ptr();
   }
-  @Override public TypeMem live_use( GVNGCM gvn, Node def ) { return TypeMem.ANYMEM; }
+  @Override public TypeMem live_use( GVNGCM gvn, Node def ) { return def.basic_liveness() ? TypeMem.ALIVE: TypeMem.ANYMEM; }
   static public Type convert( Type t ) {
     if( !(t instanceof TypeFunPtr) )
       return t.above_center() ? TypeFunPtr.DISP.dual() : TypeFunPtr.DISP;

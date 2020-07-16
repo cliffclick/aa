@@ -593,7 +593,7 @@ public class TestParse {
     // locally at the function parm we "finalize" ptr.y, so the function body
     // cannot modify it.  However, no final store occurs so after the function,
     // ptr.y remains writable.
-    //testerr ("f={ptr:@{x;y} -> ptr.y=3}; f(@{x:=1;y:=2});", "Cannot re-assign read-only field '.y'",24);
+    //testerr ("f={ptr:@{x;y=} -> ptr.y=3}; f(@{x:=1;y:=2});", "Cannot re-assign read-only field '.y'",24);
     //testerr ("f={ptr:@{x;y} -> ptr.y=3}; f(@{x:=1;y:=2}:@{x;y=})", "Cannot re-assign read-only field '.y'",24);
     test    ("ptr=@{a:=1}; val=ptr.a; ptr.a=2; val",TypeInt.con(1));
     // Allowed to build final pointer cycles
@@ -614,10 +614,14 @@ public class TestParse {
 
   // Upwards exposed closure tests
   @Test public void testParse12() {
+    test("gen = {cnt:=0;({cnt++},{cnt})};" +
+         "tmp:=gen(); incA=tmp.0;getA=tmp.1;"+
+         "tmp:=gen(); incB=tmp.0;getB=tmp.1;"+
+         "incA();incB();incA(); getA()*10+getB()",
+         TypeInt.con(2*10+1));
     test("incA= {cnt:=0; {cnt++}       }(); incA();incA()",TypeInt.con(1));
-
     test("cnt:=0; incA={cnt++}; incA();incA()+cnt",TypeInt.con(1+2));
-    test("incA= {cnt:=0; {cnt++}       }();                      incA()       ",TypeInt.con(0));
+    test("incA= {cnt:=0; {cnt++}       }();                      incA()       ",Type.XNIL);
     test("incA= {cnt:=0; {cnt++}       }();                      incA();incA()",TypeInt.con(1));
     test("tmp = {cnt:=0;({cnt++},{cnt})}();incA=tmp.0;getA=tmp.1;incA();incA()+getA()",TypeInt.con(1+2));
   }
@@ -664,8 +668,8 @@ Using:
 
 Other forms of for:
 x:=0; for {
-  !(x < 10) ? ^0;
-  ! x%2 ? ^1;
+  !(x < 10) ? ^0; // return false, so loop exit
+  ! x%2 ? ^1;     // return true, so loop "continues"
   sys.p(x)
   ++x
 }

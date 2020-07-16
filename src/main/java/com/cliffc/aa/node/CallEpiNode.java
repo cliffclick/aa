@@ -150,7 +150,7 @@ public final class CallEpiNode extends Node {
       ProjNode proj = ProjNode.proj(this,2);
       irez._live = proj==null ? TypeMem.ALIVE : proj._live;
       for( Node parm : rrez._defs )
-        irez.add_def((parm instanceof ParmNode && parm.in(0) == fun) ? call.argm(((ParmNode)parm)._idx) : parm);
+        irez.add_def((parm instanceof ParmNode && parm.in(0) == fun) ? call.argm(((ParmNode)parm)._idx,gvn) : parm);
       if( irez instanceof PrimNode ) ((PrimNode)irez)._badargs = call._badargs;
       return inline(gvn,level,call,tcall,cctl,cmem,gvn.add_work(gvn.xform(irez)),ret); // New exciting replacement for inlined call
     }
@@ -190,16 +190,15 @@ public final class CallEpiNode extends Node {
   // but NOT in the CG, until _cg_wired gets set.
   void wire1( GVNGCM gvn, CallNode call, FunNode fun, RetNode ret ) {
     assert _defs.find(ret)==-1; // No double wiring
-    wire0(gvn,call,fun,ret);
+    wire0(gvn,call,fun);
     // Wire self to the return
     gvn.add_work(this);
     gvn.add_def(this,ret);
     gvn.add_work(ret);
-    gvn.add_work(ret.funptr());
   }
 
   // Wire without the redundancy check, or adding to the CallEpi
-  void wire0( GVNGCM gvn, CallNode call, FunNode fun, RetNode ret ) {
+  void wire0(GVNGCM gvn, CallNode call, FunNode fun) {
     // Wire.  During GCP, cannot call "xform" since e.g. types are not final
     // nor constant yet - and need to add all new nodes to the GCP worklist.
     // During iter(), must call xform() to register all new nodes.

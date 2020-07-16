@@ -101,9 +101,15 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   @Override public boolean is_display_ptr() {
     BitsAlias x = _aliases.strip_nil();
     if( x==BitsAlias.EMPTY ) return true; // Just a NIL
-    int alias = x.abit();                 // Just a single alias
+    int alias1 = x.abit();                 // Just a single alias
     // The GENERIC function allows the generic record, otherwise must be on the display list
-    return alias!= -1 && (Math.abs(alias)==BitsAlias.RECORD || com.cliffc.aa.Env.DISPLAYS.test(Math.abs(alias)));
+    if( alias1 != -1 )
+      return Math.abs(alias1)==BitsAlias.RECORD || com.cliffc.aa.Env.DISPLAYS.test_recur(Math.abs(alias1));
+    // If closures are being used, can be multiple valid displays
+    for( int alias : _aliases )
+      if( alias != 0 && !com.cliffc.aa.Env.DISPLAYS.test_recur(alias) )
+        return false;           // This alias is not on the DISPLAYS list
+    return true;
   }
 
   @Override protected TypeMemPtr xdual() {

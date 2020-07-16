@@ -79,7 +79,7 @@ public abstract class PrimNode extends Node {
   // Apply types are 1-based (same as the incoming node index), and not
   // zero-based (not same as the _formals and _args fields).
   public abstract Type apply( Type[] args ); // Execute primitive
-  @Override public String xstr() { return _name+"::"+_sig._formals; }
+  @Override public String xstr() { return _name+":"+_sig._formals.at(1); }
   @Override public Node ideal(GVNGCM gvn, int level) { return null; }
   @Override public Type value(GVNGCM gvn) {
     Type[] ts = new Type[_defs._len]; // 1-based

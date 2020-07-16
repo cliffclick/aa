@@ -309,6 +309,12 @@ public class GVNGCM {
           add_work(use.in(0));  // Recheck function inlining
         if( use instanceof MProjNode && ((MProjNode)use)._idx==0 && use._uses.at(0) instanceof MemJoinNode )
           add_work(use._uses.at(0));
+        if( old instanceof CallNode && use instanceof CallEpiNode )
+          for( Node useuse : use._uses )
+            if( useuse instanceof MProjNode )
+              for( Node useuseuse : useuse._uses )
+                if( useuseuse instanceof LoadNode )
+                  add_work(useuseuse); // Final load bypassing a Call
       }
       // Add self at the end, so the work loops pull it off again.
       add_work(old);
@@ -425,6 +431,8 @@ public class GVNGCM {
           add_work_uses(ProjNode.proj(u,0));
         if( nnn instanceof MProjNode && nnn.in(0) instanceof MemSplitNode )
           add_work_uses(u); // Trying to get Join/Merge/Split to fold up
+        if( u instanceof StoreNode ) // Load/Store fold up
+          for( Node n : u._uses ) if( n instanceof LoadNode ) add_work(n);
         if( nnn.in(0) != null ) add_work(nnn.in(0));
       }
     }

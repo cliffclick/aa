@@ -55,8 +55,12 @@ public class LoadNode extends Node {
         !(cepi=(CallEpiNode)mem.in(0)).is_copy() ) {
       TypeStruct ts = (TypeStruct)((NewNode)adr.in(0))._ts;
       int idx = ts.find(_fld);
-      if( idx != -1 && ts.fmod(idx)==TypeStruct.FFNL )
-        return set_mem(cepi.call().mem(),gvn);
+      if( idx != -1 && ts.fmod(idx)==TypeStruct.FFNL ) {
+        call = cepi.call();
+        Type tcall = gvn.type(call);
+        if( tcall instanceof TypeTuple && CallNode.tmem(tcall).isa(gvn.type(mem)) )
+          return set_mem(call.mem(),gvn);
+      }
     }
 
     // Loads against a NewNode cannot NPE, cannot fail, always return the input

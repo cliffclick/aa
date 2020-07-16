@@ -27,10 +27,10 @@ public final class RetNode extends Node {
     FunPtrNode fpn=null;
     for( Node use : _uses )
       if( use instanceof FunPtrNode ) {
-        assert fpn==null;
+        if( fpn!=null ) return null; // Ambiguous; several displays from the same function
         fpn = (FunPtrNode)use;
       }
-    return fpn;
+    return fpn;                 // Zero (null) or 1 display.
   }
   public int fidx() { return _fidx; }
   @Override public int hashCode() { return super.hashCode()+_fidx; }

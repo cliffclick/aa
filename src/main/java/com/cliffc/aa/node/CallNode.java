@@ -113,7 +113,7 @@ public class CallNode extends Node {
   int nargs() { return _defs._len-2; }
   // Actual arguments.  Arg(0) is allowed and refers to the Display/TFP.
   Node arg ( int x ) { assert x>=0; return _defs.at(x+2); }
-  Node argm( int x ) { return x==-2 ? mem() : arg(x); }
+  Node argm( int x, GVNGCM gvn ) { return x==-2 ? mem() : (x==0 ? gvn.xform(new FP2ClosureNode(fun())) : arg(x)); }
   // Set an argument.  Use 'set_fun' to set the Display/Code.
   Node set_arg (int idx, Node arg, GVNGCM gvn) { assert idx>0; return set_def(idx+2,arg,gvn); }
   public void set_mem( Node mem, GVNGCM gvn) { set_def(1, mem, gvn); }
@@ -214,8 +214,10 @@ public class CallNode extends Node {
     // If we have a single function allowed, force the function constant.
     Node unk = fun();           // Function epilog/function pointer
     int fidx = fidxs.abit();    // Check for single target
-    if( fidx != -1 && !(unk instanceof FunPtrNode) )
-      return set_fun(FunNode.find_fidx(Math.abs(fidx)).ret().funptr(),gvn);
+    if( fidx != -1 && !(unk instanceof FunPtrNode) ) {
+      FunPtrNode fptr = FunNode.find_fidx(Math.abs(fidx)).ret().funptr();
+      if( fptr != null ) return set_fun(fptr,gvn);
+    }
 
     // If the function is unresolved, see if we can resolve it now.
     // Fidxs are typically low during iter, but can be high during
