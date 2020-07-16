@@ -95,6 +95,15 @@ public class LoadNode extends Node {
     // Bypass unrelated Stores.  Since unrelated, can bypass in-error stores.
     if( st != null && !Util.eq(_fld,st._fld) )
       return set_mem(st.mem(),gvn);
+    if( st != null ) {
+      Type stadr = gvn.type(st.adr());
+      BitsAlias st_aliases = stadr instanceof TypeMemPtr ? ((TypeMemPtr)stadr)._aliases : null;
+      if( aliases != null && st_aliases != null && aliases != st_aliases &&
+          aliases.join(st_aliases) == BitsAlias.EMPTY ) {
+        return set_mem(st.mem(),gvn);
+      }
+    }
+    
     return null;
   }
 

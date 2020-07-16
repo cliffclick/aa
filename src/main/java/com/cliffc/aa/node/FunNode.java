@@ -644,7 +644,8 @@ public class FunNode extends RegionNode {
 
       if( nn instanceof FunPtrNode ) { // FunPtrs pick up the new fidx
         TypeFunPtr ofptr = (TypeFunPtr)nt;
-        nt = TypeFunPtr.make(BitsFun.make0(newret._fidx),ofptr._nargs,ofptr._disp);
+        if( ofptr.fidx()==oldret._fidx )
+          nt = TypeFunPtr.make(BitsFun.make0(newret._fidx),ofptr._nargs,ofptr._disp);
       }
       
       gvn.rereg(nn,nt);
