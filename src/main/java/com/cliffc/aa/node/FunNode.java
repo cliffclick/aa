@@ -385,40 +385,38 @@ public class FunNode extends RegionNode {
     // forward walk first.
     VBitSet freached = new VBitSet(); // Forwards reached
     Ary<Node> work = new Ary<>(new Node[1],0);
-    Ary<Node> body = new Ary<>(new Node[1],0);
     work.add(this);             // Prime worklist
     while( !work.isEmpty() ) {  // While have work
       Node n = work.pop();      // Get work
-      if( freached.tset(n._uid) ) continue; // Already visited?
       int op = n._op;           // opcode
       if( op == OP_FUN  && n       != this ) continue; // Call to other function, not part of inlining
       if( op == OP_PARM && n.in(0) != this ) continue; // Arg  to other function, not part of inlining
-      if( op == OP_DEFMEM ) continue;                  // Never part of body, but reachable from all allocations
-      body.push(n);                                    // Part of body
-      if( op == OP_RET ) {        // Return (of this or other function)
-        for( Node use : n._uses ) // Include all FunPtrs as part of body
-          if( use instanceof FunPtrNode )
-            body.push(use);
-        continue;               // 
-      }
+      if( op == OP_DEFMEM ) continue;       // Never part of body, but reachable from all allocations
+      if( op == OP_RET && n != ret ) continue; // Return (of other function)
+      if( freached.tset(n._uid) ) continue; // Already visited?
+      if( op == OP_RET ) continue;          // End of this function
       if( n instanceof ProjNode && n.in(0) instanceof CallNode ) continue; // Wired call; all projs lead to other functions
       if( n instanceof FP2ClosureNode ) continue; // Wired call; all projs lead to other functions
       work.addAll(n._uses);   // Visit all uses
     }
 
-    //// Backwards walk, trimmed to reachable from forwards
-    //VBitSet breached = new VBitSet(); // Backwards and forwards reached
-    //work.add(ret);
-    //while( !work.isEmpty() ) {  // While have work
-    //  Node n = work.pop();      // Get work
-    //  if( n==null ) continue;   // Defs can be null
-    //  if( !freached.get (n._uid) ) continue; // Not reached from fcn top
-    //  if(  breached.tset(n._uid) ) continue; // Already visited?
-    //  body.push(n);                          // Part of body
-    //  work.addAll(n._defs);                  // Visit all defs
-    //  if( n.is_multi_head() )                // Multi-head?
-    //    work.addAll(n._uses);                // All uses are ALSO part, even if not reachable in this fcn
-    //}
+    // Backwards walk, trimmed to reachable from forwards
+    VBitSet breached = new VBitSet(); // Backwards and forwards reached
+    Ary<Node> body = new Ary<>(new Node[1],0);
+    for( Node use : ret._uses ) // Include all FunPtrs as part of body
+      if( use instanceof FunPtrNode )
+        body.push(use);
+    work.add(ret);
+    while( !work.isEmpty() ) {  // While have work
+      Node n = work.pop();      // Get work
+      if( n==null ) continue;   // Defs can be null
+      if( !freached.get (n._uid) ) continue; // Not reached from fcn top
+      if(  breached.tset(n._uid) ) continue; // Already visited?
+      body.push(n);                          // Part of body
+      work.addAll(n._defs);                  // Visit all defs
+      if( n.is_multi_head() )                // Multi-head?
+        work.addAll(n._uses);                // All uses are ALSO part, even if not reachable in this fcn
+    }
     return body;
   }
 
