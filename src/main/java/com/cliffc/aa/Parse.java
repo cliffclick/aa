@@ -26,7 +26,7 @@ import java.util.BitSet;
  *  term = tfact post              // A term is a tfact and some more stuff...
  *  post = empty                   // A term can be just a plain 'tfact'
  *  post = (tuple) post            // Application argument list
- *  post = tfact post              // Application as adjacent value
+ *  post = tfact tfact             // Application as adjacent value
  *  post = .field post             // Field and tuple lookup
  *  post = .field [:]= stmt        // Field (re)assignment.  Plain '=' is a final assignment
  *  post = .field++ | .field--     // Allowed anytime a := is allowed
@@ -495,6 +495,32 @@ public class Parse {
   /** Parse a term, either an optional application or a field lookup
    *    term = id++ | id--
    *    term = tfact [tuple | term | .field | .field[:]=stmt]* // application (includes uniop) or field (and tuple) lookup
+
+   * Want fields to associate left-to-right, with higher precidence than application.
+   * Want application to associated left-to-right.
+
+   * Here is a left-recursive grammer, with precidence of field ops over application.
+E = id++
+E = A         // tErm isa Arg
+E = E1 _ A    // tErm is a term-apply-arg
+A = F          // Arg is a tfact
+A = A .field   // Arg is a Arg.field
+F = id
+
+   * Same grammer, now right-recursive, still left associative.
+T = id++      // Term
+T = A P       // Term is Arg Post
+P = e         // Post is either empty, or...
+P = _ A P     // Post is apply Arg Post
+A = F Q       // Arg is tFact Qost
+Q = e         // Qost ie either empty, or...
+Q = .field Q  // .field[:=stmt] Qost
+F = id        // tFact is all those things
+
+---
+
+
+
    *  An alternative expression of the same grammar is:
    *    term = tfact post
    *    post = empty | (tuple) post | tfact post | .field post
