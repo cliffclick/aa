@@ -602,6 +602,11 @@ public class TestParse {
 
   // Early function exit
   @Test public void testParse11() {
+    // Curried functions
+    //test("for={A->A+3}; for 2", TypeInt.con(5));
+    test("for={A->{B->A+B}}; for 2 3}", TypeInt.con(5));
+    test("for={pred->{body->!pred()?^;tmp=body()?^tmp;7}}; for {1}{0}", TypeInt.con(7));
+
     test("x:=0; {1 ? ^2; x=3}(); x",Type.XNIL);  // Following statement is ignored
     test("{ ^3; 5}()",TypeInt.con(3)); // early exit
     test("x:=0; {^3; x++}(); x",Type.XNIL);  // Following statement is ignored
@@ -626,6 +631,19 @@ public class TestParse {
          TypeInt.con(2*10+1));
   }
 
+  // Serial loops; keyword 'for': "for pred body".
+  // If 'pred' is false, the loop exits with false.
+  // If 'body' is true, the loop exits with this value.
+  //    for = { pred -> { body -> !pred ? ^0; tmp=body ? ^tmp; for pred body } }
+  @Ignore
+  @Test public void testParse13() {
+    test("for = { pred -> { body -> !pred() ? ^0; tmp=body() ? ^tmp; for pred body } }; sum:=0; i:=0; for {i++ < 100} {sum+=i}; sum",TypeInt.INT64);
+    test("i:=0; for {i++ < 2} {i== 5} ? ",TypeInt.TRUE); // Early exit on condition i==5
+    test("i:=0; for {i++ < 2} {i==-1} ? ",Type.XNIL);    // Late exit, body never returns true.
+    test("i:=0; for {i++ < 100} {i== 5} ? ",TypeInt.BOOL); // Not sure of exit value, except bool
+    
+    
+  }
 
   /* Closures
 
@@ -680,12 +698,6 @@ x:=0; for {x<10} {x++} {
 
 
   */
-  @Ignore
-  @Test public void testParse13() {
-    test("sum:=0; i:=0; do (i++ < 100) {sum+=i}",Type.ALL);
-    test("for (init;pred;post) no-arg-func",Type.ALL);
-    test("{init do (pred) {no-arg-func;post}}",Type.ALL);
-  }
 
 /*
   Array creation: just [7] where '[' is a unary prefix, and ']' is a unary postfix.
