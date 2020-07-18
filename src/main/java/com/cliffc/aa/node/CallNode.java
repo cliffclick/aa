@@ -82,6 +82,7 @@ public class CallNode extends Node {
   int _rpc;                 // Call-site return PC
   boolean _unpacked;        // Call site allows unpacking a tuple (once)
   boolean _is_copy;         // One-shot flag set when inlining an entire single-caller-single-called
+  public boolean _not_resolved_by_gcp; // One-shot flag set when GCP cannot resolve; this Call is definitely in-error
   // Example: call(arg1,arg2)
   // _badargs[0] points to the opening paren.
   // _badargs[1] points to the start of arg1, same for arg2, etc.
@@ -111,6 +112,7 @@ public class CallNode extends Node {
   // Number of actual arguments, including the closure/code ptr.
   // This is 2 higher than the user-visible arg count.
   int nargs() { return _defs._len-2; }
+  static int idx2arg_num(int x) { return x-2; }
   // Actual arguments.  Arg(0) is allowed and refers to the Display/TFP.
   Node arg ( int x ) { assert x>=0; return _defs.at(x+2); }
   Node argm( int x, GVNGCM gvn ) { return x==-2 ? mem() : (x==0 ? gvn.xform(new FP2ClosureNode(fun())) : arg(x)); }
@@ -179,7 +181,7 @@ public class CallNode extends Node {
       set_def(2,gvn.con(TypeFunPtr.GENERIC_FUNPTR.dual()),gvn);
       if( is_dead() ) return this;
       for( int i=3; i<_defs._len; i++ )
-        set_def(i,gvn.con(Type.XSCALAR),gvn);
+        set_def(i,gvn.con(Type.ANY),gvn);
       gvn.add_work_defs(this);
       return set_def(0,gvn.add_work(gvn.con(Type.XCTRL)),gvn);
     }
@@ -215,8 +217,15 @@ public class CallNode extends Node {
     Node unk = fun();           // Function epilog/function pointer
     int fidx = fidxs.abit();    // Check for single target
     if( fidx != -1 && !(unk instanceof FunPtrNode) ) {
-      FunPtrNode fptr = FunNode.find_fidx(Math.abs(fidx)).ret().funptr();
-      if( fptr != null ) return set_fun(fptr,gvn);
+      FunNode fun = FunNode.find_fidx(Math.abs(fidx));
+      if( fun != null ) {
+        RetNode ret = fun.ret();
+        if( ret != null ) {
+          FunPtrNode fptr = ret.funptr();
+          if( fptr != null && fptr.display()._live != TypeMem.ESCAPE )
+            return set_fun(fptr, gvn);
+        }
+      }
     }
 
     // If the function is unresolved, see if we can resolve it now.
@@ -225,7 +234,7 @@ public class CallNode extends Node {
     if( unk instanceof UnresolvedNode && !fidxs.above_center() && !fidxs.test(1)) {
       BitsFun rfidxs = resolve(fidxs,tcall._ts,gvn._opt_mode==2);
       if( rfidxs==null ) return null;            // Dead function, stall for time
-      FunPtrNode fptr = least_cost(gvn, rfidxs); // Check for least-cost target
+      FunPtrNode fptr = least_cost(gvn, rfidxs, unk); // Check for least-cost target
       if( fptr != null ) return set_fun(fptr, gvn); // Resolve to 1 choice
     }
 
@@ -244,8 +253,8 @@ public class CallNode extends Node {
       Node progress = null;
       for( int i=1; i<nargs(); i++ ) // Skip the FP/DISPLAY arg, as its useful for error messages
         if( ProjNode.proj(this,i+ARGIDX)==null &&
-            !(arg(i) instanceof ConNode && gvn.type(arg(i))==Type.XSCALAR) ) // Not already folded
-          progress = set_arg(i,gvn.con(Type.XSCALAR),gvn); // Kill dead arg
+            !(arg(i) instanceof ConNode && gvn.type(arg(i))==Type.ANY) ) // Not already folded
+          progress = set_arg(i,gvn.con(Type.ANY),gvn); // Kill dead arg
       if( progress != null ) return this;
     }
 
@@ -355,15 +364,26 @@ public class CallNode extends Node {
   @Override public boolean basic_liveness() { return false; }
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
     if( is_copy() ) return live_use_copy(def); // Target is as alive as our projs are.
+    if( _live==TypeMem.DEAD ) return TypeMem.DEAD;
     if( def==fun() ) {                         // Function argument
-      if( gvn._opt_mode < 2 ) return TypeMem.ALLMEM; // Prior to GCP, assume all fptrs are alive
-      if( !(def instanceof FunPtrNode) ) return TypeMem.ALIVE;
-      int dfidx = ((FunPtrNode)def).ret()._fidx;
-      return live_use_call(gvn,dfidx); // Can be precise
+      if( gvn._opt_mode < 2 ) return TypeMem.ALIVE;   // Prior to GCP, assume all fptrs are alive
+      if( _not_resolved_by_gcp ) return TypeMem.ALIVE;// GCP failed to resolve, this call is in-error
+      // During GCP, unresolved calls might resolve & remove this use.  Keep dead till resolve fails.
+      // If we have a fidx directly, use it more precisely.
+      int dfidx = def instanceof FunPtrNode ? ((FunPtrNode)def).ret()._fidx : -1;
+      return live_use_call(gvn,dfidx);
     }
     if( def==ctl() ) return TypeMem.ALIVE;
-    if( def!=mem() )            // Some argument
+    if( def!=mem() ) {          // Some argument
+      if( gvn._opt_mode > 2 && gvn.type(def) != Type.ANY ) { // If all are wired, we can check projs for uses
+        int argn = idx2arg_num(_defs.find(def));
+        ProjNode proj = ProjNode.proj(this, argn + ARGIDX);
+        if( proj == null || proj._live == TypeMem.DEAD )
+          return TypeMem.DEAD; // Proj not used
+      }
       return def.basic_liveness() ? TypeMem.ESCAPE : TypeMem.ANYMEM;    // Args always alive and escape
+    }
+    
     // Needed to sharpen args for e.g. resolve and errors.
     Type tcall = gvn.type(this);
     if( !(tcall instanceof TypeTuple) ) return _live; // No type to sharpen
@@ -390,7 +410,7 @@ public class CallNode extends Node {
     TypeFunPtr tfp = ttfp(tcall);
     // If resolve has chosen this dfidx, then the FunPtr is alive.
     BitsFun fidxs = tfp.fidxs();
-    return !fidxs.above_center() && fidxs.test_recur(dfidx) ? TypeMem.ALIVE : TypeMem.DEAD;
+    return !fidxs.above_center() && (dfidx==-1 || fidxs.test_recur(dfidx)) ? TypeMem.ALIVE : TypeMem.DEAD;
   }
 
   // Resolve an Unresolved.  Called in value() and so must be monotonic.
@@ -514,7 +534,7 @@ public class CallNode extends Node {
 
   // Amongst these choices return the least-cost.  Some or all might be
   // invalid.
-  public FunPtrNode least_cost(GVNGCM gvn, BitsFun choices) {
+  public FunPtrNode least_cost(GVNGCM gvn, BitsFun choices, Node unk) {
     if( choices==BitsFun.EMPTY ) return null;
     assert choices.bitCount() > 0; // Must be some choices
     assert choices.above_center() == (gvn._opt_mode==2);
@@ -544,7 +564,7 @@ public class CallNode extends Node {
 
         if( cvts < best_cvts ) {
           best_cvts = cvts;
-          best_fptr = fun.ret().funptr();
+          best_fptr = get_fptr(fun,unk);
           best_formals = formals;
           tied=false;
         } else if( cvts==best_cvts ) {
@@ -559,7 +579,7 @@ public class CallNode extends Node {
             else { fcnt=bcnt=-1; break; } // Not monotonic, no obvious winner
           }
           // If one is monotonically higher than the other, take it
-          if( fcnt > 0 && bcnt==0 ) { best_fptr = fun.ret().funptr(); best_formals = formals; }
+          if( fcnt > 0 && bcnt==0 ) { best_fptr = get_fptr(fun,unk); best_formals = formals; }
           else if( fcnt==0 && bcnt > 0 ) {} // Keep current
           else tied=true;                   // Tied, ambiguous
         }
@@ -568,6 +588,17 @@ public class CallNode extends Node {
     if( best_cvts >= 99 ) return null; // No valid functions
     return tied ? null : best_fptr; // Ties need to have the ambiguity broken another way
   }
+  private static FunPtrNode get_fptr(FunNode fun, Node unk) {
+    RetNode ret = fun.ret();
+    FunPtrNode fptr = ret.funptr();
+    if( fptr != null ) return fptr; // Only one choice
+    if( !(unk instanceof UnresolvedNode) ) return null; // No selection of fptrs to pick from
+    for( Node def : unk._defs )
+      if( ((FunPtrNode)def).ret()== ret )
+        return (FunPtrNode)def;
+    return null;
+  }
+
 
   @Override public String err(GVNGCM gvn) { return err(gvn,false); }
   String err(GVNGCM gvn, boolean fast) {

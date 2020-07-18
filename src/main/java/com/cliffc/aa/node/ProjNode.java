@@ -12,7 +12,11 @@ public class ProjNode extends Node {
   ProjNode( byte op, Node ifn, int idx ) { super(op,ifn); _idx=idx; }
   @Override String xstr() { return "DProj"+_idx; }
 
-  @Override public Node ideal(GVNGCM gvn, int level) { return in(0).is_copy(gvn,_idx); }
+  @Override public Node ideal(GVNGCM gvn, int level) {
+    Node c = in(0).is_copy(gvn,_idx);
+    if( c != null ) return c==this ? gvn.con(Type.ANY) : c; // Happens in dying loops
+    return null;
+  }
 
   @Override public Type value(GVNGCM gvn) {
     Type c = gvn.type(in(0));

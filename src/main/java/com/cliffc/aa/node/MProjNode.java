@@ -12,7 +12,7 @@ public class MProjNode extends ProjNode {
   @Override public Node ideal(GVNGCM gvn, int level) {
     Node x = in(0).is_copy(gvn,_idx);
     if( x != null )
-      return x == this ? gvn.con(TypeMem.XMEM) : x; // Happens in dead self-recursive functions
+      return x == this ? gvn.con(TypeMem.ANYMEM) : x; // Happens in dead self-recursive functions
     if( in(0) instanceof CallEpiNode ) {
       Node precall = in(0).is_pure_call(); // See if memory can bypass pure calls (most primitives)
       if( precall != null && gvn.type(this)==gvn.type(precall) )

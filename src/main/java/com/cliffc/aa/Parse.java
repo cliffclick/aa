@@ -492,42 +492,50 @@ public class Parse {
     }
   }
 
-  /** Parse a term, either an optional application or a field lookup
-   *    term = id++ | id--
-   *    term = tfact [tuple | term | .field | .field[:]=stmt]* // application (includes uniop) or field (and tuple) lookup
-
-   * Want fields to associate left-to-right, with higher precidence than application.
-   * Want application to associated left-to-right.
-
-   * Here is a left-recursive grammer, with precidence of field ops over application.
-E = id++
-E = A         // tErm isa Arg
-E = E1 _ A    // tErm is a term-apply-arg
-A = F          // Arg is a tfact
-A = A .field   // Arg is a Arg.field
-F = id
-
-   * Same grammer, now right-recursive, still left associative.
-T = id++      // Term
-T = A P       // Term is Arg Post
-P = e         // Post is either empty, or...
-P = _ A P     // Post is apply Arg Post
-A = F Q       // Arg is tFact Qost
-Q = e         // Qost ie either empty, or...
-Q = .field Q  // .field[:=stmt] Qost
-F = id        // tFact is all those things
-
----
-
-
-
-   *  An alternative expression of the same grammar is:
-   *    term = tfact post
-   *    post = empty | (tuple) post | tfact post | .field post
-   *  Also, field assignments are:
-   *    post = .field [:]= stmt
+  /** Parse a term of a lisp-like application.  Field lookups and C-like calls
+   *  associate have higher precedence than lisp-like application.
+   *    term = arg post
+   *    post = e | _ arg post
    */
   private Node term() {
+    // Normal term expansion
+    Node n = arg();
+    if( n == null ) return null;
+    while( true ) {             // Repeated application or field lookup is fine
+      int oldx = _x;            // Parser reset point
+      skipWS();                 // Skip to start of 1st arg
+      int arg_start = _x;       // For errors
+      Node arg = arg();         // Get argument
+      if( arg == null )         // just 1 arg is just the arg
+        return n;
+      Type tn = _gvn.type(n);
+      boolean may_fun = tn.isa(TypeFunPtr.GENERIC_FUNPTR);
+      if( !may_fun && arg.may_prec() >= 0 ) { _x=oldx; return n; }
+      if( !may_fun &&
+          // Notice the backwards condition: n was already tested for !(tn instanceof TypeFun).
+          // Now we test the other way: the generic function can never be an 'n'.
+          // Only if we cannot 'isa' in either direction do we bail out early
+          // here.  Otherwise, e.g. 'n' might be an unknown function argument
+          // and during GCP be 'lifted' to a function; if we bail out now we
+          // may disallow a legal program with function arguments.  However,
+          // if 'n' is a e.g. Float there's no way it can 'lift' to a function.
+          !TypeFunPtr.GENERIC_FUNPTR.isa(tn) ) {
+        kill(arg);
+        n = err_ctrl2("A function is being called, but "+tn+" is not a function");
+      } else {
+        Parse[] badargs = new Parse[]{null,errMsg(arg_start)}; // The one arg start
+        badargs[0] = errMsg(oldx-1); // Base call error reported at the opening paren
+        n = do_call(new CallNode(true,badargs,ctrl(),mem(),n,arg)); // Pass the 1 arg
+      }
+    } // Else no trailing arg, just return value
+  }
+
+  /** Parse an argument.  Field lookups and C-like calls associate
+   *  left-to-right with higher precedence than lisp-like application.
+   *    arg  = id++ | id--
+   *    arg  = tfact [tuple | .field]* [.field[:]=stmt | .field++ | .field-- | e]
+   */
+  private Node arg() {
     // Check for id++ / id--
     int oldx = _x;
     String tok = token();
@@ -564,17 +572,16 @@ F = id        // tFact is all those things
           n = gvn(new LoadNode(mem(),castnn,fld,errMsg(fld_start)));
         }
 
-      } else {                  // Attempt a function-call
-        boolean arglist = peek('(');
+      } else if( peek('(') ) {  // Attempt a function-call
         oldx = _x;
-        skipWS();               // Skip to start of 1st arg
-        int first_arg_start = _x; // For the non-arg-list case
-        Node arg = arglist ? tuple(oldx,stmts(),first_arg_start) : term(); // Start of an argument list?
+        skipWS();                 // Skip to start of 1st arg
+        int first_arg_start = _x;
+        Node arg = tuple(oldx,stmts(),first_arg_start); // Parse argument list
         if( arg == null )       // tfact but no arg is just the tfact
-          break;
+          { _x = oldx; return n; }
         Type tn = _gvn.type(n);
         boolean may_fun = tn.isa(TypeFunPtr.GENERIC_FUNPTR);
-        if( !may_fun && arg.may_prec() >= 0 ) { _x=oldx; break; }
+        if( !may_fun && arg.may_prec() >= 0 ) { _x=oldx; return n; }
         if( !may_fun &&
             // Notice the backwards condition: n was already tested for !(tn instanceof TypeFun).
             // Now we test the other way: the generic function can never be an 'n'.
@@ -587,15 +594,15 @@ F = id        // tFact is all those things
           kill(arg);
           n = err_ctrl2("A function is being called, but "+tn+" is not a function");
         } else {
-          Parse[] badargs = arglist
-            ? ((NewObjNode)arg.in(0))._fld_starts        // Args from tuple
-            : new Parse[]{null,errMsg(first_arg_start)}; // The one arg start
+          Parse[] badargs = ((NewObjNode)arg.in(0))._fld_starts; // Args from tuple
           badargs[0] = errMsg(oldx-1); // Base call error reported at the opening paren
-          n = do_call(new CallNode(!arglist,badargs,ctrl(),mem(),n,arg)); // Pass the 1 arg
+          n = do_call(new CallNode(false,badargs,ctrl(),mem(),n,arg)); // Pass the tuple
         }
+        
+      } else {
+        return n;               // Just an arg
       }
     } // Else no trailing arg, just return value
-    return n;                   // No more terms
   }
 
   // Handle post-increment/post-decrement operator.
@@ -909,6 +916,8 @@ F = id        // tFact is all those things
     else return null; // Not a token; specifically excludes e.g. all bytes >= 128, or most bytes < 32
     if( (c==':' || c==',') && _x-x==1 ) // Disallow bare ':' as a token; ambiguous with ?: and type annotations; same for ','
       { _x=x; return null; } // Unwind, not a token
+    if( c=='-' && _x-x>2 && _buf[x+1]=='>' ) // Disallow leading "->", confusing with function parameter list end; eg "not={x->!x}"
+      _x=x+2;                                // Just return the "->"
     return new String(_buf,x,_x-x);
   }
 
@@ -1167,25 +1176,18 @@ F = id        // tFact is all those things
   private void create( String tok, Node n, byte mutable ) { _e._scope.stk().create(tok,n,mutable,_gvn ); }
   private static byte ts_mutable(boolean mutable) { return mutable ? TypeStruct.FRW : TypeStruct.FFNL; }
 
-  // Get the display pointer.  If this is the local scope, then it directly
-  // refers to the correct display.  If 'tok' is final in the display then
-  // again we can load from the display directly.  Otherwise the function call
+  // Get the display pointer.  The function call
   // passed in the display as a hidden argument which we return here.
   private Node get_display_ptr(ScopeNode scope, String tok) {
-    if( !scope.is_mutable(tok) ) // Field is immutable (common for primitive display)
-      return scope.ptr();        // Directly reference
-
     // Issue Loads against the Display, until we get the correct scope.  The
     // Display is a linked list of displays, and we already checked that token
     // exists at scope up in the display.
     Env e = _e;
     Node ptr = e._scope.ptr();
     Node mmem = mem();
-    TypeMem tmem = (TypeMem)_gvn.type(mmem);
     while( true ) {
       if( scope == e._scope ) return ptr;
       ptr = gvn(new LoadNode(mmem,ptr,"^",null)); // Gen linked-list walk code, walking display slot
-      Type t = _gvn.type(ptr);
       assert _gvn.sharptr(ptr,mmem).is_display_ptr();
       e = e._par;                                 // Walk linked-list in parser also
     }

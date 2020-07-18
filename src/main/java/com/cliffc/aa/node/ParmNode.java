@@ -99,7 +99,7 @@ public class ParmNode extends PhiNode {
     if( _idx < 0 ) return t;
     Type formal = fun.formal(_idx);
     // Good case: t.isa(formal).
-    if( formal.dual().isa(t) && t.isa(formal) )  return t.simple_ptr();
+    if( t.isa(formal) )  return t.simple_ptr();
     return t.bound(formal);
   }
   // TODO: for mem(), include ScopeNode.compute_live_mem forall args & mem.

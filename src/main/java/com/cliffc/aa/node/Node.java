@@ -79,7 +79,14 @@ public abstract class Node implements Cloneable {
   private Node unuse( Node old, GVNGCM gvn ) {
     if( old != null ) {
       old._uses.del(this);
-      if( old._uses._len==0 && old._keep==0 ) gvn.kill(old); // Recursively begin deleting
+      if( old._uses._len==0 && old._keep==0 ) { // Recursively begin deleting
+        Node x0 = old.in(0);
+        gvn.kill(old);          // Recursively delete
+        if( x0 != null && !x0.is_dead() && old instanceof ProjNode ) { // Remove a projection can make a is_copy input go dead
+          Node x1 = x0._defs.atX(((ProjNode)old)._idx);
+          if( x1 != null ) gvn.add_work(x1);
+        }
+      }
       if( !old.is_dead() ) {
         // TODO: Find a better way
         gvn.add_work(old);      // Lost a use, so recompute live
@@ -97,6 +104,10 @@ public abstract class Node implements Cloneable {
         if( this instanceof ParmNode && ((ParmNode)this)._idx!=-2 && old instanceof FunNode ) {
           ParmNode pmem = ((FunNode)old).parm(-2);
           if( pmem != null ) gvn.add_work(pmem);
+        }
+        if( this instanceof ProjNode ) { // A proj dying might let an is_copy input also die
+          Node x1 = old._defs.atX(((ProjNode)this)._idx);
+          if( x1 != null ) gvn.add_work(x1);
         }
         // NewNodes can be captured, if no uses
         if( old instanceof ProjNode && old.in(0) instanceof NewNode ) {
@@ -366,11 +377,12 @@ public abstract class Node implements Cloneable {
     ProjNode proj = ProjNode.proj(this,idx); // Projection for the copy
     // If memory, use the memory projection (if its there), else self must also be a memory liveness
     if( idx==1 ) return proj==null ? _live : proj._live;
-    // If the projection is dead, so is the def
-    if( proj !=null && proj._live==TypeMem.DEAD ) return TypeMem.DEAD;
-    if( proj != null ) return proj._live;
-    // Not a memory, not dead, so basic liveness
-    return def.basic_liveness() ? TypeMem.ALIVE : TypeMem.ANYMEM; // Args always alive
+    // Dead inputs often set to ANY, which is 'alive' because it has a use but it just marks a dead input
+    if( def instanceof ConNode && ((ConNode)def)._t==Type.ANY ) return TypeMem.ALIVE;
+    // If a projection, as alive as it is
+    if( proj !=null ) return proj._live;
+    // Not a memory, no projection user so dead
+    return TypeMem.DEAD;
   }
 
   // Compute basic liveness only: a flag of alive-or-dead represented

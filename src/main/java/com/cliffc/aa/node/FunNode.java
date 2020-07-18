@@ -430,6 +430,7 @@ public class FunNode extends RegionNode {
     // Count function body size.  Requires walking the function body and
     // counting opcodes.  Some opcodes are ignored, because they manage
     // dependencies but make no code.
+    int call_indirect=0;        // Count of calls to e.g. loads/args/parms
     int[] cnts = new int[OP_MAX];
     for( Node n : body ) {
       int op = n._op;           // opcode
@@ -442,7 +443,8 @@ public class FunNode extends RegionNode {
             op = OP_PRIM;       // Treat as primitive for inlining purposes
           if( fpn.fun() == this )
             recursive.set(n.in(0)._uid);  // No self-recursive inlining till after parse
-        }
+        } else
+          call_indirect++;
       }
       cnts[op]++;               // Histogram ops
     }
@@ -460,7 +462,7 @@ public class FunNode extends RegionNode {
       if( ((CallNode)call).nargs() != nargs() ) continue; // Will not inline
       TypeFunPtr tfp = CallNode.ttfp(gvn.type(call));
       int fidx = tfp.fidxs().abit();
-      if( fidx < 0 ) continue;  // Call must only target one fcn
+      if( fidx < 0 || BitsFun.is_parent(fidx) ) continue;  // Call must only target one fcn
       int ncon=0;
       for( ParmNode parm : parms )
         if( parm != null ) {    // Some can be dead
@@ -481,7 +483,10 @@ public class FunNode extends RegionNode {
     // do not generate any code.
     if( cnts[OP_CALL] > 2 || // Careful inlining more calls; leads to exponential growth
         cnts[OP_IF  ] > 1+mncons || // Allow some trivial filtering to inline
-        cnts[OP_PRIM] > 6 )  // Allow small-ish primitive counts to inline
+        cnts[OP_LOAD] > 4 ||
+        cnts[OP_STORE]> 2 ||
+        cnts[OP_PRIM] > 6 ||   // Allow small-ish primitive counts to inline
+        call_indirect > 0 )
       return -1;
 
     return m;                   // Return path to split on

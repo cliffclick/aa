@@ -610,11 +610,12 @@ public class GVNGCM {
       while( !ambi_calls.isEmpty() ) {
         CallNode call = ambi_calls.pop();
         BitsFun fidxs = CallNode.ttfp(type(call)).fidxs();
-        if( fidxs.abit() != -1    ) continue; // resolved to one
-        if( !fidxs.above_center() ) continue; // resolved to many
-        if( fidxs==BitsFun.ANY )    continue; // no choices, must be error
-        FunPtrNode fptr = call.least_cost(this,fidxs);
-        if( fptr==null ) continue;  // declared ambiguous, will be an error later
+        FunPtrNode fptr = resolve_ambi(call,fidxs);
+        if( fptr==null ) {      // Not resolving, will be an error later
+          call._not_resolved_by_gcp = true;
+          add_work(call.fun());
+          continue;  
+        }
         call.set_fun_reg(fptr,this);// Set resolved edge
         add_work(call);
         add_work(fptr);             // Unresolved is now resolved and live
@@ -634,6 +635,14 @@ public class GVNGCM {
     rez.keep();
     walk_dead(Env.START);
   }
+
+  private FunPtrNode resolve_ambi(CallNode call, BitsFun fidxs) {
+    if( fidxs.abit() != -1    ) return null; // resolved to one
+    if( !fidxs.above_center() ) return null; // resolved to many
+    if( fidxs==BitsFun.ANY )    return null; // no choices, must be error
+    return call.least_cost(this,fidxs,call.fun());
+  }
+  
   private void check_and_wire( CallEpiNode cepi ) {
     if( !cepi.check_and_wire(this) ) return;
     add_work(cepi.call());

@@ -52,7 +52,7 @@ public final class FunPtrNode extends Node {
       for( Node use : _uses )  {
         if( !(use instanceof CallNode) ) { safe=false; break; }
         CallNode call = (CallNode)use;
-        for( int i=0; i<call.nargs(); i++ ) if( call.arg(i)==use ) { safe=false; break; }
+        for( int i=0; i<call.nargs(); i++ ) if( call.arg(i)==this ) { safe=false; break; }
         for( Node cuse : call._uses )
           if( cuse instanceof FP2ClosureNode )
             { safe=false; break; }

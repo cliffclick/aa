@@ -94,7 +94,7 @@ public final class CallEpiNode extends Node {
       && gvn.type(fun) == Type.CTRL
       && fun.nargs() == cnargs; // All checked by call.err
     RetNode ret = fun.ret();    // Return from function
-    assert ret!=null;
+    if( ret==null ) return null;
 
     // Single choice; check compatible args and no conversions needed.
     TypeStruct formals = fun._sig._formals;

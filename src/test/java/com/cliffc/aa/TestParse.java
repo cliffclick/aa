@@ -459,8 +459,8 @@ public class TestParse {
                     "     ? @{ll=map(tree.l);rr=map(tree.r);vv=tree.v&tree.v}"+
                     "     : 0};"+
                     "map(tmp)",
-             "@{map=~Scalar;ll=*[$]@{map=~Scalar;ll=*[$]@{map=~Scalar;ll=~nil;rr=~nil;vv=3};rr=*[$]@{map=~Scalar;ll==$;rr==$;vv==int64}?;vv=5};rr=*[$]@{map=~Scalar;ll=*[$]@{map=~Scalar;ll=$;rr=$;vv=15};rr=*[$]@{map=~Scalar;ll=~nil;rr=~nil;vv=22};vv=20};vv=12}");
-
+             "@{map=~Scalar;ll=*[$]@{map=~Scalar;ll==*[$]$?;rr==$;vv==int64}?;rr=$;vv=12}");
+    
     // Failed attempt at a Tree-structure inference test.  Triggered all sorts
     // of bugs and error reporting issues, so keeping it as a regression test.
     testerr("tmp=@{"+
@@ -603,8 +603,8 @@ public class TestParse {
   // Early function exit
   @Test public void testParse11() {
     // Curried functions
-    //test("for={A->A+3}; for 2", TypeInt.con(5));
-    test("for={A->{B->A+B}}; for 2 3}", TypeInt.con(5));
+    test("for={A->    A+3 }; for 2  ", TypeInt.con(5));
+    test("for={A->{B->A+B}}; for 2 3", TypeInt.con(5));
     test("for={pred->{body->!pred()?^;tmp=body()?^tmp;7}}; for {1}{0}", TypeInt.con(7));
 
     test("x:=0; {1 ? ^2; x=3}(); x",Type.XNIL);  // Following statement is ignored

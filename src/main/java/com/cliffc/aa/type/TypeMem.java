@@ -302,7 +302,7 @@ public class TypeMem extends Type<TypeMem> {
   // Transitively walk all reachable aliases from this set of aliases, and
   // return the complete set.
   public BitsAlias all_reaching_aliases(BitsAlias aliases) {
-    if( aliases==BitsAlias.NIL || aliases==BitsAlias.EMPTY ) return aliases;
+    if( aliases==BitsAlias.NIL || aliases==BitsAlias.EMPTY ) return BitsAlias.EMPTY;
     if( aliases==BitsAlias.FULL ) return aliases;
     AryInt work = new AryInt();
     VBitSet visit = new VBitSet();
@@ -312,6 +312,7 @@ public class TypeMem extends Type<TypeMem> {
 
     while( !work.isEmpty() ) {
       int alias=work.pop();
+      if( alias==0 ) continue;
       TypeObj to = at(alias);
       if( to==TypeObj.OBJ || to==TypeObj.ISUSED )
         return BitsAlias.FULL;  // All structs with all possible pointers
@@ -337,7 +338,7 @@ public class TypeMem extends Type<TypeMem> {
             }
       }
     }
-
+    assert !aliases.may_nil();
     return aliases;
   }
 
