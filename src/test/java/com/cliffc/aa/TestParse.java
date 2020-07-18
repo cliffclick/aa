@@ -16,6 +16,7 @@ public class TestParse {
   @Test public void testParse() {
     TypeStruct dummy = TypeStruct.DISPLAY;
     TypeMemPtr tdisp = TypeMemPtr.make(2,TypeStr.NO_DISP);
+    test("f = { x s -> x ? f(x-1,s+x) : s }; f(100,0)", TypeInt.INT64);
 
     // A collection of tests which like to fail easily
     test("-1",  TypeInt.con( -1));
@@ -602,19 +603,19 @@ public class TestParse {
 
   // Early function exit
   @Test public void testParse11() {
-    // Curried functions
-    test("for={A->    A+3 }; for 2  ", TypeInt.con(5));
-    test("for={A->{B->A+B}}; for 2 3", TypeInt.con(5));
-    test("for={pred->{body->!pred()?^;tmp=body()?^tmp;7}}; for {1}{0}", TypeInt.con(7));
-
     test("x:=0; {1 ? ^2; x=3}(); x",Type.XNIL);  // Following statement is ignored
     test("{ ^3; 5}()",TypeInt.con(3)); // early exit
     test("x:=0; {^3; x++}(); x",Type.XNIL);  // Following statement is ignored
     test("x:=0; {^1 ? (x=1); x=3}(); x",TypeInt.con(1));  // Return of an ifex
     test("x:=0; {^1 ?  x=1 ; x=3}(); x",TypeInt.con(1));  // Return of an ifex
+    test("f={0 ? ^0; 7}; f()", TypeInt.con(7));
     // Find: returns 0 if not found, or first element which passes predicate.
     test("find={list pred -> !list ? ^0; pred(list.1) ? ^list.1; find(list.0,pred)}; find(((0,3),2),{e -> e&1})", TypeInt.INT8);
     test("x:=0; {1 ? ^2; x=3}(); x",Type.XNIL);  // Following statement is ignored
+    // Curried functions
+    test("for={A->    A+3 }; for 2  ", TypeInt.con(5));
+    test("for={A->{B->A+B}}; for 2 3", TypeInt.con(5));
+    test("for={pred->{body->!pred()?^;tmp=body(); tmp?^tmp;7}}; for {1}{0}", TypeInt.con(7));
   }
 
   // Upwards exposed closure tests
@@ -635,9 +636,10 @@ public class TestParse {
   // If 'pred' is false, the loop exits with false.
   // If 'body' is true, the loop exits with this value.
   //    for = { pred -> { body -> !pred ? ^0; tmp=body ? ^tmp; for pred body } }
+  private final String FOR="for={pred->{body->!pred()?^;(tmp=body())?^tmp; for pred body}};";
   @Ignore
   @Test public void testParse13() {
-    test("for = { pred -> { body -> !pred() ? ^0; tmp=body() ? ^tmp; for pred body } }; sum:=0; i:=0; for {i++ < 100} {sum+=i}; sum",TypeInt.INT64);
+    test(FOR+"sum:=0; i:=0; for {i++ < 100} {sum+=i}; sum",TypeInt.INT64);
     test("i:=0; for {i++ < 2} {i== 5} ? ",TypeInt.TRUE); // Early exit on condition i==5
     test("i:=0; for {i++ < 2} {i==-1} ? ",Type.XNIL);    // Late exit, body never returns true.
     test("i:=0; for {i++ < 100} {i== 5} ? ",TypeInt.BOOL); // Not sure of exit value, except bool

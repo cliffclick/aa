@@ -55,9 +55,52 @@ public class RegionNode extends Node {
       }
     }
 
+    // Check for stacked Region (not Fun) and collapse.
+    Node stack = stacked_region(gvn);
+    if( stack != null ) return stack;
+      
     return null;
   }
 
+  // Collapse stacked regions.
+  Node stacked_region( GVNGCM gvn ) {
+    if( _op != OP_REGION ) return null; // Does not apply to e.g. functions & loops
+    int idx = _defs.find( e -> e !=null && e._op==OP_REGION );
+    if( idx== -1 ) return null; // No stacked region
+    Node r = in(idx);
+    if( r == this ) return null; // Dying code
+    // Every 'r' Phi is pointed *at* by exactly a 'this' Phi
+    for( Node rphi : r._uses )
+      if( rphi._op == OP_PHI ) {
+        if( rphi._uses._len != 1 ) return null; // Busy rphi
+        Node phi = rphi._uses.at(0);            // Exactly a this.phi
+        if( phi._op != OP_PHI ||                // Not a Phi
+            phi.in(0) != this ||                // Control to this
+            phi.in(idx) != rphi )               // Matching along idx
+          return null;                          // Not exact shape
+      }
+    
+    // Collapse stacked Phis
+    for( Node phi : _uses )
+      if( phi._op == OP_PHI ) {
+        Type oldt = gvn.unreg(phi);
+        Node rphi = phi.in(idx);
+        boolean stacked_phi = rphi._op == OP_PHI && rphi.in(0)==r;
+        for( int i = 1; i<r._defs._len; i++ )
+          phi.add_def(stacked_phi ? rphi.in(i) : rphi);
+        phi.remove(idx,gvn);
+        assert !stacked_phi || rphi.is_dead();
+        gvn.rereg(phi,oldt);
+      }
+    
+    // Collapse stacked Region
+    for( int i = 1; i<r._defs._len; i++ )
+      add_def(r.in(i));
+    remove(idx,gvn);
+    assert r.is_dead();
+    return this;
+  }
+  
   void unwire(GVNGCM gvn, int idx) { }
 
   @Override public Type value(GVNGCM gvn) {

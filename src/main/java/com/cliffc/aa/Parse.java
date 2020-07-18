@@ -488,6 +488,7 @@ public class Parse {
         }
         max--;
       }
+      if( funs.last() != null ) funs.pop().unhook();
       return args.del(0);       // Return the remaining expression
     }
   }

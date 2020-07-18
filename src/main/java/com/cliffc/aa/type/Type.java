@@ -765,7 +765,7 @@ public class Type<T extends Type<T>> implements Cloneable {
     if( t._type==TSCALAR ) return 0; // Generic function arg never requires a conversion
     if( _type == TALL || _type == TSCALAR || _type == TNSCALR ) return -1; // Scalar has to resolve
     if( (_type == TREAL || _type == TNREAL) && t.is_num() ) return -1; // Real->Int/Flt has to resolve
-    if( t._type == TNIL ) return (byte)(may_nil() ? -1 : 99); // Must resolve to a NIL first
+    if( t._type == TNIL || t._type == TXNIL ) return (byte)(may_nil() ? -1 : 99); // Must resolve to a NIL first
 
     throw typerr(t);  // Overridden in subtypes
   }

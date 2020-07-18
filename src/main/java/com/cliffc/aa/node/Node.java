@@ -125,6 +125,12 @@ public abstract class Node implements Cloneable {
           for( Node use : old._uses )
             if( use.is_mem() )
               gvn.add_work(use);
+        // Remove a use from a busy stacked Phi
+        if( old._uses._len==1 ) {
+          Node use = old._uses.at(0);
+          if( use._op == OP_PHI && use != old && use.in(0) != null )
+            gvn.add_work(use.in(0));
+        }
       }
     }
     return this;
