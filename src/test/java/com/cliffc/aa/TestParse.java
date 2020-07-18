@@ -16,7 +16,6 @@ public class TestParse {
   @Test public void testParse() {
     TypeStruct dummy = TypeStruct.DISPLAY;
     TypeMemPtr tdisp = TypeMemPtr.make(2,TypeStr.NO_DISP);
-    test("f = { x s -> x ? f(x-1,s+x) : s }; f(100,0)", TypeInt.INT64);
 
     // A collection of tests which like to fail easily
     test("-1",  TypeInt.con( -1));
@@ -39,7 +38,7 @@ public class TestParse {
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({&},2)", Type.XNIL);
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(1)",TypeInt.con(1));
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
-    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.TRUE );
+    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.BOOL );
     test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(1)",TypeInt.con(1));
     test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)",TypeInt.con(5));
 
@@ -196,8 +195,8 @@ public class TestParse {
              TypeStruct.make_tuple(Type.XNIL,Type.XNIL,TypeInt.con(1),TypeInt.con(2)));
 
     // Co-recursion requires parallel assignment & type inference across a lexical scope
-    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.TRUE );
-    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(5)", Type.XNIL  );
+    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.BOOL );
+    test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(5)", TypeInt.BOOL );
 
     // This test merges 2 TypeFunPtrs in a Phi, and then fails to resolve.
     testerr("(math_rand(1) ? {+} : {*})(2,3)","Unable to resolve call",26); // either 2+3 or 2*3, or {5,6} which is INT8.

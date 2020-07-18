@@ -24,26 +24,27 @@ public abstract class Node implements Cloneable {
   static final byte OP_JOIN   =12;
   static final byte OP_LIBCALL=13;
   static final byte OP_LOAD   =14;
-  static final byte OP_NAME   =15; // Cast a prior NewObj to have a runtime Name
-  static final byte OP_NEWOBJ =16; // Allocate a new struct
-  static final byte OP_NEWSTR =17; // Allocate a new string (array)
-  static final byte OP_PARM   =18;
-  static final byte OP_PHI    =19;
-  static final byte OP_PRIM   =20;
-  static final byte OP_PROJ   =21;
-  static final byte OP_REGION =22;
-  static final byte OP_RET    =23;
-  static final byte OP_SCOPE  =24;
-  static final byte OP_SPLIT  =25;
-  static final byte OP_START  =26;
-  static final byte OP_STMEM  =27;
-  static final byte OP_STORE  =28;
-  static final byte OP_TMP    =29;
-  static final byte OP_TYPE   =30;
-  static final byte OP_UNR    =31;
-  static final byte OP_MAX    =32;
+  static final byte OP_LOOP   =15;
+  static final byte OP_NAME   =16; // Cast a prior NewObj to have a runtime Name
+  static final byte OP_NEWOBJ =17; // Allocate a new struct
+  static final byte OP_NEWSTR =18; // Allocate a new string (array)
+  static final byte OP_PARM   =19;
+  static final byte OP_PHI    =20;
+  static final byte OP_PRIM   =21;
+  static final byte OP_PROJ   =22;
+  static final byte OP_REGION =23;
+  static final byte OP_RET    =24;
+  static final byte OP_SCOPE  =25;
+  static final byte OP_SPLIT  =26;
+  static final byte OP_START  =27;
+  static final byte OP_STMEM  =28;
+  static final byte OP_STORE  =29;
+  static final byte OP_TMP    =30;
+  static final byte OP_TYPE   =31;
+  static final byte OP_UNR    =32;
+  static final byte OP_MAX    =33;
 
-  private static final String[] STRS = new String[] { null, "Call", "CallEpi", "Cast", "Con", "CProj", "DefMem", "Err", "FP2Clo", "Fun", "FunPtr", "If", "Join", "LibCall", "Load", "Name", "NewObj", "NewStr", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Scope","Split", "Start", "StartMem", "Store", "Tmp", "Type", "Unresolved" };
+  private static final String[] STRS = new String[] { null, "Call", "CallEpi", "Cast", "Con", "CProj", "DefMem", "Err", "FP2Clo", "Fun", "FunPtr", "If", "Join", "LibCall", "Load", "Loop", "Name", "NewObj", "NewStr", "Parm", "Phi", "Prim", "Proj", "Region", "Return", "Scope","Split", "Start", "StartMem", "Store", "Tmp", "Type", "Unresolved" };
 
   public int _uid;  // Unique ID, will have gaps, used to give a dense numbering to nodes
   final byte _op;   // Opcode (besides the object class), used to avoid v-calls in some places
@@ -252,9 +253,9 @@ public abstract class Node implements Cloneable {
       return dump(d,sb,plive).nl();
     }
   }
-  boolean is_multi_head() { return _op==OP_CALL || _op==OP_CALLEPI || _op==OP_FUN || _op==OP_IF || _op==OP_LIBCALL || _op==OP_NEWOBJ || _op==OP_NEWSTR || _op==OP_REGION || _op==OP_SPLIT || _op==OP_START; }
+  boolean is_multi_head() { return _op==OP_CALL || _op==OP_CALLEPI || _op==OP_FUN || _op==OP_IF || _op==OP_LIBCALL || _op==OP_LOOP || _op==OP_NEWOBJ || _op==OP_NEWSTR || _op==OP_REGION || _op==OP_SPLIT || _op==OP_START; }
   private boolean is_multi_tail() { return _op==OP_PARM || _op==OP_PHI || _op==OP_PROJ || _op==OP_CPROJ || _op==OP_FP2CLO; }
-  private boolean is_CFG()        { return _op==OP_CALL || _op==OP_CALLEPI || _op==OP_FUN || _op==OP_RET || _op==OP_IF || _op==OP_REGION || _op==OP_START || _op==OP_CPROJ || _op==OP_SCOPE; }
+  boolean is_CFG() { return _op==OP_CALL || _op==OP_CALLEPI || _op==OP_FUN || _op==OP_RET || _op==OP_IF || _op==OP_LOOP || _op==OP_REGION || _op==OP_START || _op==OP_CPROJ || _op==OP_SCOPE; }
 
   public String dumprpo( boolean prims, boolean plive ) {
     Ary<Node> nodes = new Ary<>(new Node[1],0);

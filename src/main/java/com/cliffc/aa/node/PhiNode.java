@@ -3,10 +3,10 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.type.*;
+import com.cliffc.aa.type.Type;
+import com.cliffc.aa.type.TypeMem;
+import com.cliffc.aa.type.TypeObj;
 import com.cliffc.aa.util.IBitSet;
-
-import java.util.BitSet;
 
 // Merge results; extended by ParmNode
 public class PhiNode extends Node {
@@ -64,6 +64,7 @@ public class PhiNode extends Node {
     for( int i=1; i<_defs._len; i++ )
       if( gvn.type(r.in(i))==Type.CTRL ) // Only meet alive paths
         t = t.meet(gvn.type(in(i)));
+    if( _t.isa(t) ) return _t;
     return t;
   }
   @Override IBitSet escapees(GVNGCM gvn) { return IBitSet.FULL; }

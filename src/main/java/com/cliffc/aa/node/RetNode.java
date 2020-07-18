@@ -69,11 +69,77 @@ public final class RetNode extends Node {
     }
     if( is_copy() ) return null;
     // Collapsed to a constant?  Remove any control interior.
-    if( gvn.type(val()).is_con() && ctl()!=fun() && // Profit: can change control and delete function interior
+    Node ctl = ctl();
+    if( gvn.type(val()).is_con() && ctl!=fun() && // Profit: can change control and delete function interior
         (gvn.type(mem())==TypeMem.EMPTY || (mem() instanceof ParmNode && mem().in(0)==fun())) ) // Memory has to be trivial also
       return set_def(0,fun(),gvn); // Gut function body
+
+    // Look for a tail recursive call
+    Node tail = tail_recursive(gvn);
+    if( tail != null ) return tail;
+    
     return null;
   }
+
+  // Look for a tail-Call.  There should be 1 (collapsed) Region, and maybe a
+  // tail Call.  Look no further than 1 Region, since collapsing will fold
+  // nested regions up.  Since the RetNode is a single "pinch point" for
+  // control flow in the entire function, if we see a tail-call here, it means
+  // the function ends in an infinite loop, not currently optimized.
+  Node tail_recursive( GVNGCM gvn ) {
+    Node ctl = ctl();
+    if( ctl._op!=OP_REGION ) return null;
+    int idx; for( idx=1; idx<ctl._defs._len; idx++ ) {
+      Node c = ctl.in(idx), cepi = c.in(0);
+      if( c._op == OP_CPROJ && cepi._op == OP_CALLEPI &&
+          ((CallEpiNode)cepi).nwired()==1 && 
+          ((CallEpiNode)cepi).wired(0)== this && // TODO: if in tail position, can be a tail call not self-recursive
+          ((CallEpiNode)cepi).call().fun()._op == OP_FUNPTR ) // And a direct call
+        break;
+    }
+    if( idx == ctl._defs._len ) return null; // No call-epi found
+    CallEpiNode cepi = (CallEpiNode)ctl.in(idx).in(0);
+    CallNode call = cepi.call();
+    if( gvn.type(call.ctl()) != Type.CTRL ) return null; // Dead call
+    // Every Phi on the region must come directly from the CallEpi.
+    for( Node phi : ctl._uses )
+      if( phi._op == OP_PHI && phi.in(idx).in(0)!=cepi )
+          return null;
+    
+    System.out.println("Found a tail recursive call");
+
+    // Behind the function entry, split out a LoopNode/Phi setup - one phi for
+    // every argument.  The first input comes from the parms; the second input
+    // from the Call arguments - including the control.  Cut the call control,
+    // which will go dead & collapse.
+    FunNode fun = fun();
+    // Find the trailing control behind the Fun.
+    Node cuse = null;           // Control use behind fun.
+    for( Node use : fun._uses )
+      if( use != this && use.is_CFG() )
+        { assert cuse==null; cuse = use; }
+    int cidx = cuse._defs.find(fun);
+    // Insert loop in-the-middle
+    LoopNode loop = new LoopNode();
+    loop.add_def(fun);
+    loop.add_def(call.ctl());
+    loop = (LoopNode)gvn.xform(loop);
+    gvn.set_def_reg(cuse,cidx,loop);
+    // Insert loop phis in-the-middle
+    for( int i=1; i<call.nargs(); i++ ) {
+      ParmNode parm = fun.parm(i);
+      if( parm==null ) continue; // arg/parm might be dead
+      PhiNode phi = new PhiNode(parm._t,parm._badgc,loop,null,call.arg(i));
+      gvn.replace(parm,phi);
+      phi.set_def(1,parm,null);
+      gvn.rereg(phi,gvn.type(parm));
+    }
+    // Cut the Call control
+    gvn.set_def_reg(call,0,gvn.con(Type.XCTRL));
+    
+    return this;
+  }
+  
   @Override public Type value(GVNGCM gvn) {
     if( ctl()==null ) return gvn.self_type(this); // No change if a copy
     TypeTuple TALL = TypeTuple.RET;

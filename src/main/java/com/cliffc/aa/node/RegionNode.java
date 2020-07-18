@@ -7,7 +7,7 @@ import com.cliffc.aa.type.TypeMem;
 
 import java.util.function.Predicate;
 
-// Merge results
+// Merge results.  Supports many merging paths; used by FunNode and LoopNode.
 public class RegionNode extends Node {
   public RegionNode( Node... ctrls) { super(OP_REGION,ctrls); }
   RegionNode( byte op ) { super(op,(Node)null); } // For FunNodes
