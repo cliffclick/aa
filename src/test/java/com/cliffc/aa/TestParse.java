@@ -632,10 +632,12 @@ public class TestParse {
   }
 
   // Serial loops; using variable 'for': "for pred body".
-  // If 'pred' is false, the loop exits with false.
-  // If 'body' is true, the loop exits with this value.
+  // If 'pred' is false , the loop exits with false.
+  // If 'body' is truthy, the loop exits with this value.
   private final String FORELSE="for={pred->{body->!pred()?^;(tmp=body())?^tmp; for pred body}};";
-  private final String FOR="for={pred->{body->!pred()?^;!body()?^; for pred body}};";
+  // If 'pred' is false, the loop exits with false, else loop continues.
+  // 'body' value is ignored.
+  private final String FOR="for={pred->{body->!pred()?^;body(); for pred body}};";
   @Ignore
   @Test public void testParse13() {
     test(FOR+"sum:=0; i:=0; for {i++ < 100} {sum:=sum+i}; sum",TypeInt.INT64);

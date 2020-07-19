@@ -549,7 +549,7 @@ public class GVNGCM {
           _ts.setX(n._uid,nt);   // Record progress
           // Classic forwards flow on change:
           for( Node use : n._uses ) {
-            assert use!=n; // Stop self-cycle (not legit, but happens during debugging)
+            if( use==n ) continue; // Stop self-cycle (not legit, but happens during debugging)
             add_work(use); // Re-run users to check for progress
             // We may have a 'crossing optimization' point: changing the
             // pointer input to a Load or a Scope changes the memory demanded

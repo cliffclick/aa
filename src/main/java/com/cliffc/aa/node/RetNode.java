@@ -126,19 +126,23 @@ public final class RetNode extends Node {
     loop = (LoopNode)gvn.xform(loop);
     gvn.set_def_reg(cuse,cidx,loop);
     // Insert loop phis in-the-middle
-    for( int i=1; i<call.nargs(); i++ ) {
-      ParmNode parm = fun.parm(i);
-      if( parm==null ) continue; // arg/parm might be dead
-      PhiNode phi = new PhiNode(parm._t,parm._badgc,loop,null,call.arg(i));
-      gvn.replace(parm,phi);
-      phi.set_def(1,parm,null);
-      gvn.rereg(phi,gvn.type(parm));
-    }
+    for( int i=1; i<call.nargs(); i++ ) do_phi(gvn,fun,call,loop,i);
+    do_phi(gvn,fun,call,loop,-2);   // Also memory Phi
     // Cut the Call control
     gvn.set_def_reg(call,0,gvn.con(Type.XCTRL));
     
     return this;
   }
+
+  private static void do_phi(GVNGCM gvn, FunNode fun, CallNode call, LoopNode loop, int argn) {
+    ParmNode parm = fun.parm(argn);
+    if( parm==null ) return; // arg/parm might be dead
+    PhiNode phi = new PhiNode(parm._t,parm._badgc,loop,null,call.argm(argn,gvn));
+    gvn.replace(parm,phi);
+    phi.set_def(1,parm,null);
+    gvn.rereg(phi,gvn.type(parm));
+  }
+  
   
   @Override public Type value(GVNGCM gvn) {
     if( ctl()==null ) return gvn.self_type(this); // No change if a copy

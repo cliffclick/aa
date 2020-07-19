@@ -250,6 +250,7 @@ public class FunNode extends RegionNode {
   @Override void unwire(GVNGCM gvn,int idx) {
     Node ctl = in(idx);
     if( !(ctl instanceof ConNode) ) {
+      if( ctl.in(0)._op != OP_CALL ) return;
       CallNode call = (CallNode)ctl.in(0);
       CallEpiNode cepi = call.cepi();
       if( cepi != null ) {

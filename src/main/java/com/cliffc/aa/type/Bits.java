@@ -382,17 +382,10 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   // Note no special nil handling; both sides need to either handle nil or not
   public boolean isa(B bs) { return meet(bs) == bs; }
 
-  // True if overlap.  Does not check kids.
+  // True if overlap.
   public boolean overlaps( IBitSet bs ) {
     for( int alias : this )
-      if( bs.tst(alias) )
-        return true;
-    assert !overlaps_kids(bs);
-    return false;
-  }
-  private boolean overlaps_kids( IBitSet bs ) {
-    for( int alias : this )
-      for( int kid=alias; kid==0; kid = tree().next_kid(alias,kid) )
+      for( int kid=alias; kid!=0; kid = tree().next_kid(alias,kid) )
         if( bs.tst(kid) )
           return true;
     return false;

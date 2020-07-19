@@ -388,6 +388,9 @@ public abstract class Node implements Cloneable {
     if( def instanceof ConNode && ((ConNode)def)._t==Type.ANY ) return TypeMem.ALIVE;
     // If a projection, as alive as it is
     if( proj !=null ) return proj._live;
+    // TODO: Rethink FP2Closure
+    if( _op==OP_CALL && idx==2/*looking at call.fun*/ && (idx=_uses.find(e -> e._op==OP_FP2CLO))!= -1 )
+      return _uses.at(idx)._live;
     // Not a memory, no projection user so dead
     return TypeMem.DEAD;
   }

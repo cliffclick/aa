@@ -67,7 +67,7 @@ public class LoadNode extends Node {
     NewObjNode nnn = adr.in(0) instanceof NewObjNode ? (NewObjNode)adr.in(0) : null;
     int idx;
     if( nnn != null && nnn == mem.in(0) && (idx=nnn._ts.find(_fld)) != -1 )
-      return nnn.fld(idx);      // Field value
+      return nnn.fld(idx)==this ? gvn.con(Type.ANY) : nnn.fld(idx); // Field value
 
     // Load from a memory Phi; split through in an effort to sharpen the memory.
     if( mem instanceof PhiNode && nnn!=null ) {

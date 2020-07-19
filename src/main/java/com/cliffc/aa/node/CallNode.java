@@ -366,8 +366,8 @@ public class CallNode extends Node {
     if( is_copy() ) return live_use_copy(def); // Target is as alive as our projs are.
     if( _live==TypeMem.DEAD ) return TypeMem.DEAD;
     if( def==fun() ) {                         // Function argument
-      if( gvn._opt_mode < 2 ) return TypeMem.ALIVE;   // Prior to GCP, assume all fptrs are alive
-      if( _not_resolved_by_gcp ) return TypeMem.ALIVE;// GCP failed to resolve, this call is in-error
+      if( gvn._opt_mode < 2 ) return TypeMem.ESCAPE;   // Prior to GCP, assume all fptrs are alive and display escapes
+      if( _not_resolved_by_gcp ) return TypeMem.ESCAPE;// GCP failed to resolve, this call is in-error
       // During GCP, unresolved calls might resolve & remove this use.  Keep dead till resolve fails.
       // If we have a fidx directly, use it more precisely.
       int dfidx = def instanceof FunPtrNode ? ((FunPtrNode)def).ret()._fidx : -1;
@@ -410,7 +410,7 @@ public class CallNode extends Node {
     TypeFunPtr tfp = ttfp(tcall);
     // If resolve has chosen this dfidx, then the FunPtr is alive.
     BitsFun fidxs = tfp.fidxs();
-    return !fidxs.above_center() && (dfidx==-1 || fidxs.test_recur(dfidx)) ? TypeMem.ALIVE : TypeMem.DEAD;
+    return !fidxs.above_center() && (dfidx==-1 || fidxs.test_recur(dfidx)) ? TypeMem.ESCAPE : TypeMem.DEAD;
   }
 
   // Resolve an Unresolved.  Called in value() and so must be monotonic.
