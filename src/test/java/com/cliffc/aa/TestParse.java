@@ -631,14 +631,14 @@ public class TestParse {
          TypeInt.con(2*10+1));
   }
 
-  // Serial loops; keyword 'for': "for pred body".
+  // Serial loops; using variable 'for': "for pred body".
   // If 'pred' is false, the loop exits with false.
   // If 'body' is true, the loop exits with this value.
-  //    for = { pred -> { body -> !pred ? ^0; tmp=body ? ^tmp; for pred body } }
-  private final String FOR="for={pred->{body->!pred()?^;(tmp=body())?^tmp; for pred body}};";
+  private final String FORELSE="for={pred->{body->!pred()?^;(tmp=body())?^tmp; for pred body}};";
+  private final String FOR="for={pred->{body->!pred()?^;!body()?^; for pred body}};";
   @Ignore
   @Test public void testParse13() {
-    test(FOR+"sum:=0; i:=0; for {i++ < 100} {sum+=i}; sum",TypeInt.INT64);
+    test(FOR+"sum:=0; i:=0; for {i++ < 100} {sum:=sum+i}; sum",TypeInt.INT64);
     test("i:=0; for {i++ < 2} {i== 5} ? ",TypeInt.TRUE); // Early exit on condition i==5
     test("i:=0; for {i++ < 2} {i==-1} ? ",Type.XNIL);    // Late exit, body never returns true.
     test("i:=0; for {i++ < 100} {i== 5} ? ",TypeInt.BOOL); // Not sure of exit value, except bool

@@ -13,7 +13,6 @@ public class CProjNode extends ProjNode {
       return _idx==0 ? "False" : "True";
     return "CProj"+_idx;
   }
-  @Override public Node ideal(GVNGCM gvn, int level) { return in(0).is_copy(gvn,_idx); }
   @Override public Type value(GVNGCM gvn) {
     Type x = super.value(gvn);
     if( x==Type.ANY ) return Type.XCTRL;

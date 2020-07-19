@@ -274,7 +274,10 @@ public class FunNode extends RegionNode {
         ParmNode parm = (ParmNode)use;
         if( parm._idx >= 0 ) // Skip memory, rpc
           parms[parm._idx] = parm;
-      } else if( use instanceof RetNode ) { assert ret==null || ret==use; ret = (RetNode)use; }
+      } else if( use instanceof RetNode ) {
+        if( ret != use && ret != null ) return null; // Too many returns
+        ret = (RetNode)use;
+      }
     return ret;                 // return (or null if dead)
   }
 
