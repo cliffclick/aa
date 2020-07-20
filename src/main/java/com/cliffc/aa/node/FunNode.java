@@ -177,10 +177,8 @@ public class FunNode extends RegionNode {
     // If no trailing RetNode and hence no FunPtr... function is uncallable
     // from the unknown caller.
     RetNode ret = ret();
-    if( has_unknown_callers() && ret == null && gvn._opt_mode != 0 ) { // Dead after construction?
-      set_def(1,gvn.con(Type.XCTRL),gvn); // Kill unknown caller
-      return this;
-    }
+    if( has_unknown_callers() && ret == null && gvn._opt_mode != 0 ) // Dead after construction?
+      return null;
 
     if( is_forward_ref() ) return null; // No mods on a forward ref
     if( _defs._len <= 1 ) return null; // Not even the unknown caller

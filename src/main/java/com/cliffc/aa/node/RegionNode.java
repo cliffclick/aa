@@ -69,6 +69,9 @@ public class RegionNode extends Node {
     if( idx== -1 ) return null; // No stacked region
     Node r = in(idx);
     if( r == this ) return null; // Dying code
+    int cfgs=0;
+    for( Node use : r._uses ) cfgs += use.is_CFG() ? 1 : 0;
+    if( cfgs != 1 ) return null;
     // Every 'r' Phi is pointed *at* by exactly a 'this' Phi
     for( Node rphi : r._uses )
       if( rphi._op == OP_PHI ) {

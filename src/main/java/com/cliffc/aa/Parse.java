@@ -293,7 +293,8 @@ public class Parse {
   private Node stmt(boolean lookup_current_scope_only) {
     if( peek('^') ) {           // Early function exit
       Node ifex = ifex();
-      return ifex == null ? err_ctrl2("Missing term after ^") : _e.early_exit(this,ifex);
+      if( ifex==null ) ifex=_gvn.con(Type.XNIL);
+      return _e.early_exit(this,ifex);
     }
 
     // Gather ids in x = y = z = ....
@@ -325,7 +326,7 @@ public class Parse {
         else                      err_ctrl0("Missing type after ':'",null);
       }
       if( peek(":=") ) rs.set(toks._len);              // Re-assignment parse
-      else if( !peek('=') ) {                          // Not any assignment
+      else if( !peek_not('=','=') ) {                  // Not any assignment
         // For structs, allow a bare id as a default def of nil
         if( lookup_current_scope_only && ts.isEmpty() && (peek(';') || peek('}') )){
           _x--;                                        // Push back statement end
@@ -701,7 +702,7 @@ public class Parse {
       { _x = oldx; return null; } // Disallow '=' as a fact, too easy to make mistakes
     ScopeNode scope = lookup_scope(tok,false);
     if( scope == null ) { // Assume any unknown ref is a forward-ref of a recursive function
-      Node fref = gvn(FunPtrNode.forward_ref(_gvn,tok,this));
+      Node fref = gvn(FunPtrNode.forward_ref(_gvn,tok,errMsg(oldx)));
       // Place in nearest enclosing closure scope
       _e._scope.stk().create(tok.intern(),fref,TypeStruct.FFNL,_gvn);
       return fref;
@@ -796,6 +797,7 @@ public class Parse {
       String tok = token();
       if( tok == null ) { _x=oldx; break; } // not a "[id]* ->"
       if( tok.equals("->") ) break; // End of argument list
+      if( !isAlpha0((byte)tok.charAt(0)) ) { _x=oldx; break; } // not a "[id]* ->"
       Type t = Type.SCALAR;    // Untyped, most generic type
       Parse bad = errMsg();    // Capture location in case of type error
       if( peek(':') &&         // Has type annotation?

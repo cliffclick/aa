@@ -11,7 +11,7 @@ import com.cliffc.aa.util.IBitSet;
 // Merge results; extended by ParmNode
 public class PhiNode extends Node {
   final Parse _badgc;
-  final Type _t;
+  final Type _t;                // Just a flag to signify scalar vs memory vs object
   private PhiNode( byte op, Type t, Parse badgc, Node... vals ) {
     super(op,vals);
     if( t instanceof TypeMem ) _t = TypeMem.ALLMEM;
@@ -64,7 +64,6 @@ public class PhiNode extends Node {
     for( int i=1; i<_defs._len; i++ )
       if( gvn.type(r.in(i))==Type.CTRL ) // Only meet alive paths
         t = t.meet(gvn.type(in(i)));
-    if( _t.isa(t) ) return _t;
     return t;
   }
   @Override IBitSet escapees(GVNGCM gvn) { return IBitSet.FULL; }

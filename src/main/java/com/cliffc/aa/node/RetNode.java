@@ -105,14 +105,19 @@ public final class RetNode extends Node {
     for( Node phi : ctl._uses )
       if( phi._op == OP_PHI && phi.in(idx).in(0)!=cepi )
           return null;
-    
-    System.out.println("Found a tail recursive call");
+    FunNode fun = fun();
+    // Every Phi must be type compatible
+    for( int i=1; i<call.nargs(); i++ )
+      if( !check_phi_type(gvn,fun,call, i) )
+        return null;
+    if( !check_phi_type(gvn,fun,call, -2) )  // Also memory Phi
+      return null;
 
     // Behind the function entry, split out a LoopNode/Phi setup - one phi for
     // every argument.  The first input comes from the parms; the second input
     // from the Call arguments - including the control.  Cut the call control,
     // which will go dead & collapse.
-    FunNode fun = fun();
+    
     // Find the trailing control behind the Fun.
     Node cuse = null;           // Control use behind fun.
     for( Node use : fun._uses )
@@ -134,6 +139,14 @@ public final class RetNode extends Node {
     return this;
   }
 
+  private static boolean check_phi_type( GVNGCM gvn, FunNode fun, CallNode call, int argn ) {
+    ParmNode parm = fun.parm(argn);
+    if( parm==null ) return true; // arg/parm might be dead
+    Type tenter = gvn.type(parm);
+    Type tback  = gvn.type(call.argm(argn,gvn));
+    return tback.isa(tenter);
+  }
+  
   private static void do_phi(GVNGCM gvn, FunNode fun, CallNode call, LoopNode loop, int argn) {
     ParmNode parm = fun.parm(argn);
     if( parm==null ) return; // arg/parm might be dead
@@ -142,7 +155,6 @@ public final class RetNode extends Node {
     phi.set_def(1,parm,null);
     gvn.rereg(phi,gvn.type(parm));
   }
-  
   
   @Override public Type value(GVNGCM gvn) {
     if( ctl()==null ) return gvn.self_type(this); // No change if a copy

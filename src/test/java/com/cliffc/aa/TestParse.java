@@ -20,7 +20,7 @@ public class TestParse {
     // A collection of tests which like to fail easily
     test("-1",  TypeInt.con( -1));
     test("{5}()", TypeInt.con(5)); // No args nor -> required; this is simply a function returning 5, being executed
-    testerr("x=1+y","Unknown ref 'y'",5);
+    testerr("x=1+y","Unknown ref 'y'",4);
     test_obj("str(3.14)", TypeStr.con("3.14"));
     test("math_rand(1)?x=4:x=3;x", TypeInt.NINT8); // x defined on both arms, so available after
     test_ptr("x=@{n:=1;v:=2}; x.n := 3; x", "@{n:=3;v:=2}");
@@ -115,9 +115,9 @@ public class TestParse {
     test("x=1", TypeInt.TRUE);
     test("x=y=1", TypeInt.TRUE);
     testerr("x=y=", "Missing ifex after assignment of 'y'",4);
-    testerr("x=z" , "Unknown ref 'z'",3);
-    testerr("x=1+y","Unknown ref 'y'",5);
-    testerr("x=y; x=y","Unknown ref 'y'",3);
+    testerr("x=z" , "Unknown ref 'z'",2);
+    testerr("x=1+y","Unknown ref 'y'",4);
+    testerr("x=y; x=y","Unknown ref 'y'",2);
     test("x=2; y=x+1; x*y", TypeInt.con(6));
     // Re-use ref immediately after def; parses as: x=(2*3); 1+x+x*x
     test("1+(x=2*3)+x*x", TypeInt.con(1+6+6*6));
@@ -148,7 +148,7 @@ public class TestParse {
     test   ("math_rand(1)?1",TypeInt.BOOL); // Missing optional else defaults to nil
     test_ptr0("math_rand(1)?\"abc\"", (alias)->TypeMemPtr.make_nil(alias,TypeStr.ABC));
     test   ("x:=0;math_rand(1)?(x:=1);x",TypeInt.BOOL);
-    testerr("a.b.c();","Unknown ref 'a'",1);
+    testerr("a.b.c();","Unknown ref 'a'",0);
   }
 
   @Test public void testParse02() {
@@ -174,9 +174,9 @@ public class TestParse {
     // Function execution and result typing
     test("x=3; andx={y -> x & y}; andx(2)", TypeInt.con(2)); // trivially inlined; capture external variable
     test("x=3; and2={x -> x & 2}; and2(x)", TypeInt.con(2)); // trivially inlined; shadow  external variable
-    testerr("plus2={x -> x+2}; x", "Unknown ref 'x'",19); // Scope exit ends lifetime
+    testerr("plus2={x -> x+2}; x", "Unknown ref 'x'",18); // Scope exit ends lifetime
     testerr("fun={x -> }; fun(0)", "Missing function body",10);
-    testerr("fun(2)", "Unknown ref 'fun'", 3);
+    testerr("fun(2)", "Unknown ref 'fun'", 0);
     test("mul3={x -> y=3; x*y}; mul3(2)", TypeInt.con(6)); // multiple statements in func body
     // Needs overload cloning/inlining to resolve {+}
     test("x=3; addx={y -> x+y}; addx(2)", TypeInt.con(5)); // must inline to resolve overload {+}:Int
@@ -230,7 +230,7 @@ public class TestParse {
     testerr("fun={x y -> x+y}; baz:{int @{x;y} -> int} = fun; (fun(2,3), baz(2,3))",
             "3 is not a *[$]@{x:=;y:=;...}", 66);
     testerr("fun={x y -> x+y}; baz={x:int y:@{x;y} -> foo(x,y)}; (fun(2,3), baz(2,3))",
-            "Unknown ref 'foo'", 44);
+            "Unknown ref 'foo'", 41);
     // This test failed because the inner fun does not inline until GCP,
     // and then it resolves and lifts the DISPLAY (which after resolution
     // is no longer needed).  Means: cannot resolve during GCP and preserve
@@ -260,7 +260,7 @@ public class TestParse {
   @Test public void testParse04() {
     TypeStruct dummy = TypeStruct.DISPLAY;
     // simple anon struct tests
-    testerr("a=@{x=1.2;y}; x", "Unknown ref 'x'",15);
+    testerr("a=@{x=1.2;y}; x", "Unknown ref 'x'",14);
     testerr("a=@{x=1;x=2}.x", "Cannot re-assign final field '.x'",8);
     test   ("a=@{x=1.2;y;}; a.x", TypeFlt.con(1.2)); // standard "." field naming; trailing semicolon optional
     test_ptr("x=@{n:=1;v:=2}; x.n := 3; x", "@{n:=3;v:=2}");
@@ -274,7 +274,7 @@ public class TestParse {
     test   ("dist={p:@{x;y} -> p.x*p.x+p.y*p.y}; dist(@{x:=1;y:=2})", TypeInt.con(5)); // Typed func arg
     test   ("a=@{x=(b=1.2)*b;y=b}; a.y", TypeFlt.con(1.2 )); // ok to use temp defs
     test   ("a=@{x=(b=1.2)*b;y=x}; a.y", TypeFlt.con(1.44)); // ok to use early fields in later defs
-    testerr("a=@{x=(b=1.2)*b;y=b}; b", "Unknown ref 'b'",23);
+    testerr("a=@{x=(b=1.2)*b;y=b}; b", "Unknown ref 'b'",22);
     test   ("t=@{n=0;val=1.2}; u=math_rand(1) ? t : @{n=t;val=2.3}; u.val", TypeFlt.NFLT64); // structs merge field-by-field
     // Comments in the middle of a struct decl
     test   ("dist={p->p//qqq\n.//qqq\nx*p.x+p.y*p.y}; dist(//qqq\n@{x//qqq\n=1;y=2})", TypeInt.con(5));
@@ -526,8 +526,8 @@ public class TestParse {
     test("x=1", TypeInt.TRUE);
     test("x=y=1", TypeInt.TRUE);
     testerr("x=y=", "Missing ifex after assignment of 'y'",4);
-    testerr("x=z" , "Unknown ref 'z'",3);
-    testerr("x=1+y","Unknown ref 'y'",5);
+    testerr("x=z" , "Unknown ref 'z'",2);
+    testerr("x=1+y","Unknown ref 'y'",4);
 
     test("x:=1", TypeInt.TRUE);
     test_obj("x:=0; a=x; x:=1; b=x; x:=2; (a,b,x)", TypeStruct.make_tuple(Type.XNIL,Type.XNIL,TypeInt.con(1),TypeInt.con(2)));
@@ -634,14 +634,17 @@ public class TestParse {
   // Serial loops; using variable 'for': "for pred body".
   // If 'pred' is false , the loop exits with false.
   // If 'body' is truthy, the loop exits with this value.
+  // To 'continue', use '^0'.  To 'break' with non-zero 'val' use '^val'.
+  // Break cannot exit with '0'.
   private final String FORELSE="for={pred->{body->!pred()?^;(tmp=body())?^tmp; for pred body}};";
   // If 'pred' is false, the loop exits with false, else loop continues.
-  // 'body' value is ignored.
+  // 'body' value is ignored.  Early exit is same as a 'continue' and there is no 'break'.
   private final String FOR="for={pred->{body->!pred()?^;body(); for pred body}};";
   @Ignore
   @Test public void testParse13() {
+    test("i:=0; for={ i >= 100 ? ^0; i++; tmp= (i==50)?i:0; tmp ? ^tmp; for()}; for()",TypeInt.INT64); // Early exit on condition i==5
+    test(FORELSE+"i:=0; for {i++ < 100} {i==50?i}",TypeInt.INT64); // Early exit on condition i==5
     test(FOR+"sum:=0; i:=0; for {i++ < 100} {sum:=sum+i}; sum",TypeInt.INT64);
-    test("i:=0; for {i++ < 2} {i== 5} ? ",TypeInt.TRUE); // Early exit on condition i==5
     test("i:=0; for {i++ < 2} {i==-1} ? ",Type.XNIL);    // Late exit, body never returns true.
     test("i:=0; for {i++ < 100} {i== 5} ? ",TypeInt.BOOL); // Not sure of exit value, except bool
     

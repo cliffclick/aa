@@ -54,6 +54,7 @@ public class MemJoinNode extends Node {
       throw com.cliffc.aa.AA.unimpl(); // Break out another SESE split
     }
     if( mem instanceof ParmNode ) return null;
+    if( mem instanceof PhiNode ) return null;
     throw com.cliffc.aa.AA.unimpl(); // Break out another SESE split
   }
 

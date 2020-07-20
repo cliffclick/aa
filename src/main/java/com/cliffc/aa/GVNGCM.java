@@ -316,6 +316,13 @@ public class GVNGCM {
                 if( useuseuse instanceof LoadNode )
                   add_work(useuseuse); // Final load bypassing a Call
       }
+      if( old instanceof FP2ClosureNode )
+        add_work(old.in(0)); // Liveness update
+      Node fun;
+      if( old instanceof CallNode && (fun=((CallNode)old).fun()) instanceof FunPtrNode ) // Call value update changes liveness of FP2Closure
+        add_work(fun);
+      if( old.value_changes_live() )
+        add_work_defs(old);
       // Add self at the end, so the work loops pull it off again.
       add_work(old);
       return;

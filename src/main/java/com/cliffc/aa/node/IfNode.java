@@ -10,15 +10,19 @@ public class IfNode extends Node {
     Node ctl = in(0);
     Node tst = in(1);
     if( gvn.type(ctl) == Type.XCTRL ) return gvn.con(TypeTuple.IF_ANY);
-    // Remove leading test-vs-0
-    if( tst instanceof PrimNode.EQ_I64 ) throw AA.unimpl();
-    if( tst instanceof PrimNode.EQ_F64 ) throw AA.unimpl();
-    if( tst instanceof PrimNode.EQ_OOP ) throw AA.unimpl();
+    // Binary test vs 0?
+    if( tst._defs._len==3 &&
+        (gvn.type(tst.in(1))==Type.XNIL || gvn.type(tst.in(2))==Type.XNIL) ) {
+      // Remove leading test-vs-0
+      if( tst instanceof PrimNode.EQ_I64 ) throw AA.unimpl();
+      if( tst instanceof PrimNode.EQ_F64 ) throw AA.unimpl();
+      if( tst instanceof PrimNode.EQ_OOP ) throw AA.unimpl();
     
-    // Remove leading negation-vs-0 by inverting
-    if( tst instanceof PrimNode.NE_I64 ) throw AA.unimpl();
-    if( tst instanceof PrimNode.NE_F64 ) throw AA.unimpl();
-    if( tst instanceof PrimNode.NE_OOP ) throw AA.unimpl();
+      // Remove leading negation-vs-0 by inverting
+      if( tst instanceof PrimNode.NE_I64 ) throw AA.unimpl();
+      if( tst instanceof PrimNode.NE_F64 ) throw AA.unimpl();
+      if( tst instanceof PrimNode.NE_OOP ) throw AA.unimpl();
+    }
     
     if( tst instanceof PrimNode.Not ) return flip(gvn, gvn.xform(new IfNode(ctl,tst.in(1))));
     
