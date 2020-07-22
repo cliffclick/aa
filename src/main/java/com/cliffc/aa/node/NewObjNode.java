@@ -136,7 +136,11 @@ public class NewObjNode extends NewNode<TypeStruct> {
         ts[i] = gvn.type(fld(i));
       newt = _ts.make_from(ts);  // Pick up field names and mods
     }
-    TypeMem tmem2 = tmem.st(_alias,newt); // Merge with incoming value at same alias
+    ProjNode ptr = ProjNode.proj(this,1);
+    TypeMem tmem2 = (ptr ==null && gvn._opt_mode!=0) || (ptr != null && ptr._live!=TypeMem.ESCAPE)  // No escape on pointer, so no incoming self-variant
+      ? tmem.set(_alias,newt)   // Stomp over incoming value at same alias
+      : tmem.st (_alias,newt);  // Merge with incoming value at same alias
+    
     return TypeTuple.make(tmem2,_tptr);   // Complex obj, simple ptr.
   }
   @Override TypeStruct dead_type() { return TypeStruct.ANYSTRUCT; }

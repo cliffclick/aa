@@ -73,7 +73,7 @@ public class Env implements AutoCloseable {
     SCP_0.init0();              // Add base types
     STK_0  = SCP_0.stk();
 
-    GVN.unreg(STK_0);           // Make STK_0 active, to cheaply add primitives
+    GVN.unreg(STK_0.keep());    // Make STK_0 active, to cheaply add primitives
     for( Node use : STK_0._uses ) GVN.unreg(use); // Also the OProj,DProj will rapidly change types
     for( PrimNode prim : PrimNode.PRIMS() )
       STK_0.add_fun(null,prim._name,(FunPtrNode) GVN.xform(prim.as_fun(GVN)), GVN);

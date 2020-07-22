@@ -195,7 +195,7 @@ public class CallNode extends Node {
       Type tadr = gvn.type(arg1);
       // Bypass a merge on the 2-arg input during unpacking
       if( mem instanceof MProjNode && tadr instanceof TypeMemPtr &&
-          arg1 instanceof ProjNode && arg1.in(0) instanceof NewNode ) {
+          arg1 instanceof ProjNode && arg1.in(0) instanceof NewNode && mem.in(0)==arg1.in(0) ) {
         int alias = ((TypeMemPtr)tadr)._aliases.abit();
         if( alias == -1 ) throw AA.unimpl(); // Handle multiple aliases, handle all/empty
         NewNode nnn = (NewNode)arg1.in(0);
@@ -203,6 +203,7 @@ public class CallNode extends Node {
         int len = nnn._defs._len;
         for( int i=1; NewNode.def_idx(i)<len; i++ ) // Push the args; unpacks the tuple
           add_def( nnn.fld(i));
+        set_mem(nnn.mem(),gvn);
         _unpacked = true;     // Only do it once
         return this;
       }
@@ -305,7 +306,7 @@ public class CallNode extends Node {
     Type mem = gvn.type(mem());
     if( !(mem instanceof TypeMem) ) return mem.oob();
     TypeMem tmem = (TypeMem)mem;
-    ts[MEMIDX]=tmem; // Memory into the caller, not callee
+    ts[MEMIDX]=tmem;            // Memory into the caller, not callee
 
     // Copy args for called functions.  Arg0 is display, handled below.
     // Also gather all aliases from all args
@@ -375,7 +376,7 @@ public class CallNode extends Node {
     }
     if( def==ctl() ) return TypeMem.ALIVE;
     if( def!=mem() ) {          // Some argument
-      if( gvn._opt_mode > 2 && gvn.type(def) != Type.ANY ) { // If all are wired, we can check projs for uses
+      if( gvn._opt_mode > 2 && !(def instanceof ConNode && (((ConNode)def)._t == Type.ANY)) ) { // If all are wired, we can check projs for uses
         int argn = idx2arg_num(_defs.find(def));
         ProjNode proj = ProjNode.proj(this, argn + ARGIDX);
         if( proj == null || proj._live == TypeMem.DEAD )

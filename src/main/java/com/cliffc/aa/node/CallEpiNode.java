@@ -213,7 +213,7 @@ public final class CallEpiNode extends Node {
       int idx = ((ParmNode)arg)._idx;
       TypeMem live;
       switch( idx ) {
-      case  0: actual = new FP2ClosureNode(call); live = TypeMem.ESCAPE; break; // Filter Function Pointer to Closure
+      case  0: actual = new FP2ClosureNode(call); live = TypeMem.ALIVE; break; // Filter Function Pointer to Closure
       case -1: actual = new ConNode<>(TypeRPC.make(call._rpc)); live = TypeMem.ALIVE; break; // Always RPC is a constant
       case -2: actual = new MProjNode(call,CallNode.MEMIDX); live = arg._live; break;    // Memory into the callee
       default: actual = idx >= call.nargs()              // Check for args present
@@ -269,69 +269,82 @@ public final class CallEpiNode extends Node {
     // Default memory: global worse-case scenario
     Node defnode = in(1);
     Type defmem = gvn.type(defnode);
+    
     // Any not-wired unknown call targets?
-    if( fidxs==BitsFun.FULL )
-      return TypeTuple.make(Type.CTRL,defmem,Type.ALL);
-
-    // If fidxs includes a parent fidx, then it was split - currently exactly
-    // in two.  If both children are wired, then proceed to merge both
-    // children as expected; same if the parent is still wired (perhaps with
-    // some children).  If only 1 child is wired, then we have an extra fidx
-    // for a not-wired child.  If this fidx is really some unknown caller we
-    // would have to get super conservative; but its actually just a recently
-    // split child fidx.  If we get the RetNode via FunNode.find_fidx we suffer
-    // the non-local progress curse.  If we get super conservative, we end up
-    // rolling backwards (original fidx returned int; each split will only
-    // ever return int-or-better).  So instead we "freeze in place".
-    outerloop:
-    for( int fidx : fidxs ) {
-      int kids=0;
-      for( int i=0; i<nwired(); i++ ) {
-        int rfidx = wired(i)._fidx;
-        if( fidx == rfidx ) continue outerloop; // Directly wired is always OK
-        if( fidx == BitsFun.parent(rfidx) ) kids++; // Count wired kids of a parent fidx
+    if( fidxs!=BitsFun.FULL ) {
+      // If fidxs includes a parent fidx, then it was split - currently exactly
+      // in two.  If both children are wired, then proceed to merge both
+      // children as expected; same if the parent is still wired (perhaps with
+      // some children).  If only 1 child is wired, then we have an extra fidx
+      // for a not-wired child.  If this fidx is really some unknown caller we
+      // would have to get super conservative; but its actually just a recently
+      // split child fidx.  If we get the RetNode via FunNode.find_fidx we suffer
+      // the non-local progress curse.  If we get super conservative, we end up
+      // rolling backwards (original fidx returned int; each split will only
+      // ever return int-or-better).  So instead we "freeze in place".
+      outerloop:
+      for( int fidx : fidxs ) {
+        int kids=0;
+        for( int i=0; i<nwired(); i++ ) {
+          int rfidx = wired(i)._fidx;
+          if( fidx == rfidx ) continue outerloop; // Directly wired is always OK
+          if( fidx == BitsFun.parent(rfidx) ) kids++; // Count wired kids of a parent fidx
+        }
+        if( BitsFun.is_parent(fidx) ) { // Child of a split parent, need both kids wired
+          if( kids==2 ) continue;       // Both kids wired, this is ok
+          return gvn.self_type(this);   // "Freeze in place"
+        }
+        if( gvn._opt_mode < 2 )  // Before GCP?  Fidx is an unwired unknown call target
+          { fidxs = BitsFun.FULL; break; }
+        assert gvn._opt_mode==2; // During GCP, still wiring, post GCP all are wired
       }
-      if( BitsFun.is_parent(fidx) ) { // Child of a split parent, need both kids wired
-        if( kids==2 ) continue;       // Both kids wired, this is ok
-        return gvn.self_type(this);   // "Freeze in place"
-      }
-      if( gvn._opt_mode < 2 )  // Before GCP?  Fidx is an unwired unknown call target
-        return TypeTuple.make(Type.CTRL,defmem,Type.ALL);
-      assert gvn._opt_mode==2; // During GCP, still wiring, post GCP all are wired
     }
 
     // Compute call-return value from all callee returns
     Type trez = Type.ANY;
     Type tmem = TypeMem.ANYMEM;
-    for( int i=0; i<nwired(); i++ ) {
-      RetNode ret = wired(i);
-      if( fidxs.test_recur(ret._fidx) ) { // Can be wired, but later fidx is removed
-        TypeTuple tret = (TypeTuple)gvn.type(ret);
-        tmem = tmem.meet(tret.at(1));
-        trez = trez.meet(tret.at(2));
+    if( fidxs == BitsFun.FULL ) { // Called something unknown
+      trez = Type.ALL;            // Unknown target does worst thing
+      tmem = defmem;
+    } else {                    // All targets are known & wired
+      for( int i=0; i<nwired(); i++ ) {
+        RetNode ret = wired(i);
+        if( fidxs.test_recur(ret._fidx) ) { // Can be wired, but later fidx is removed
+          TypeTuple tret = (TypeTuple)gvn.type(ret);
+          tmem = tmem.meet(tret.at(1));
+          trez = trez.meet(tret.at(2));
+        }
       }
     }
 
-    // Can keep non-escaping aliases to their pre-call value
+    // Compute return memory, generally as the meet of all wired returns.
+    // However, can keep non-escaping aliases to their pre-call value;
+    // can "discover" dead from DefMem ahead of wired returns.
     TypeMem tmem2 = (TypeMem)tmem;
+    TypeMem tdefmem = (TypeMem)defmem;
     TypeObj[] tos = new TypeObj[defnode._defs._len];
     tos[1] = tmem2.at(1);
     for( int alias=2; alias<defnode._defs._len; alias++ ) {
       Node mprj = defnode.in(alias);
       // Expect Con:~use, Con:low or NewNode.
       // ConNode:~use is dead not escaping, or NewNode flagged _not_escaped
-      TypeObj to = tmem2.at(alias);
-      if( (mprj instanceof ConNode   && gvn.type(mprj).above_center()) ||
-          (mprj instanceof MProjNode && ((NewNode)mprj.in(0))._not_escaped ) )
-        to = (TypeObj)to.join(tcmem.at(alias)); // Strictly improves
+      TypeObj to;
+      if( mprj==null )          // Nothing at DefMem
+        to = null;              // Alias is unused
+      else if( mprj instanceof ConNode && ((ConNode)mprj)._t.above_center() )
+        to = ((ConNode)mprj)._t.oob(TypeObj.ISUSED); // Dead, take it
+      else if( mprj instanceof MProjNode && ((NewNode)mprj.in(0))._not_escaped )
+        to = (TypeObj)tcmem.at(alias).join(((NewNode)mprj.in(0))._crushed); // Not escaped, use pre-call joined with the crush
+      else {
+        to = tmem2.at(alias);   // Use post-call
+        if( gvn._opt_mode < 2 ) // Use post-call, but at least as a good as the default
+          to = (TypeObj)to.join(tdefmem.at(alias));
+      }
       tos[alias] = to;
     }
     TypeMem tmem3 = TypeMem.make0(tos);
 
-    // Pre-call should be at least as good as this.  Can be lower if
-    // e.g. "news" of an alias-death has not arrived yet.
-    TypeMem tmem4 = gvn._opt_mode < 2 ? (TypeMem)tmem3.join(defmem) : tmem3;
-    return TypeTuple.make(Type.CTRL,tmem4,trez);
+    return TypeTuple.make(Type.CTRL,tmem3,trez);
   }
 
   // Sanity check

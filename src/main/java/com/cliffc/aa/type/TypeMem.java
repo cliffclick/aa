@@ -1,8 +1,6 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.util.AryInt;
-import com.cliffc.aa.util.SB;
-import com.cliffc.aa.util.VBitSet;
+import com.cliffc.aa.util.*;
 
 import java.util.Arrays;
 import java.util.BitSet;
@@ -433,12 +431,12 @@ public class TypeMem extends Type<TypeMem> {
 
   // Field store into a conservative set of aliases.
   public TypeMem update( BitsAlias aliases, byte fin, String fld, Type val ) {
-    int max = Math.max(_aliases.length,aliases.max()+1);
-    TypeObj[] tos = Arrays.copyOf(_aliases,max);
+    Ary<TypeObj> tos = new Ary<>(_aliases.clone());
     for( int alias : aliases )
       if( alias != 0 )
-        tos[alias] = at(alias).update(fin,fld,val);
-    return make0(tos);
+        for( int kid=alias; kid != 0; kid=BitsAlias.next_kid(alias,kid) )
+          tos.setX(kid,at(kid).update(fin,fld,val));
+    return make0(tos.asAry());
   }
 
   // Whole object Set at an alias.

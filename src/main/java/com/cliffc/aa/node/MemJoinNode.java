@@ -25,6 +25,7 @@ public class MemJoinNode extends Node {
     MemSplitNode msp = msp();
     for( int i=1; i<_defs._len; i++ )
       if( in(i) instanceof MProjNode && in(i).in(0)==msp ) {
+        gvn.setype(in(0),in(0).value(gvn)); // Update the default type
         msp.remove_alias(gvn,i);
         return remove(i,gvn);
       }

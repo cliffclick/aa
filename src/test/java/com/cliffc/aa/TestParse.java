@@ -642,7 +642,6 @@ public class TestParse {
   private final String FOR="for={pred->{body->!pred()?^;body(); for pred body}};";
   @Ignore
   @Test public void testParse13() {
-    test("i:=0; for={ i >= 100 ? ^0; i++; tmp= (i==50)?i:0; tmp ? ^tmp; for()}; for()",TypeInt.INT64); // Early exit on condition i==5
     test(FORELSE+"i:=0; for {i++ < 100} {i==50?i}",TypeInt.INT64); // Early exit on condition i==5
     test(FOR+"sum:=0; i:=0; for {i++ < 100} {sum:=sum+i}; sum",TypeInt.INT64);
     test("i:=0; for {i++ < 2} {i==-1} ? ",Type.XNIL);    // Late exit, body never returns true.

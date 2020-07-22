@@ -133,7 +133,7 @@ public class LoadNode extends Node {
   }
 
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
-    if( def==adr() ) return _live;                   // Alive as the Load is alive
+    if( def==adr() ) return _live==TypeMem.DEAD ? _live : TypeMem.ALIVE; // Alive as the Load is alive
     Type tmem = gvn.type(mem());
     Type tptr = gvn.type(adr());
     // If either is above-center, then only basic-liveness - the load can load

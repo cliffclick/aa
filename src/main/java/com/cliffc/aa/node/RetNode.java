@@ -153,6 +153,7 @@ public final class RetNode extends Node {
     PhiNode phi = new PhiNode(parm._t,parm._badgc,loop,null,call.argm(argn,gvn));
     gvn.replace(parm,phi);
     phi.set_def(1,parm,null);
+    phi._live = parm._live;
     gvn.rereg(phi,gvn.type(parm));
   }
   

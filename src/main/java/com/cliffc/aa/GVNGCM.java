@@ -315,6 +315,10 @@ public class GVNGCM {
               for( Node useuseuse : useuse._uses )
                 if( useuseuse instanceof LoadNode )
                   add_work(useuseuse); // Final load bypassing a Call
+        if( use.is_multi_head() )
+          for( Node useuse : use._uses )
+            if( useuse instanceof ProjNode && use.is_copy(this,((ProjNode)useuse)._idx)!=null )
+              add_work(useuse);
       }
       if( old instanceof FP2ClosureNode )
         add_work(old.in(0)); // Liveness update

@@ -17,6 +17,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   // Only effectively-final, because the copy/clone sets a new alias value.
   public int _alias; // Alias class
 
+  // Set of aliases read or written by this node.  Only _alias.
   public IBitSet _escapees;
 
   // A list of field names and field-mods, folded into the initial state of
@@ -29,6 +30,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   // bottom, e.g. as-if all fields are now final-stored.  Will be set to
   // TypeObj.UNUSE for never-allocated (eg dead allocations)
   TypeObj _defmem;
+  TypeObj _crushed;
 
   // Just TMP.make(_alias,OBJ)
   public TypeMemPtr _tptr;
@@ -54,11 +56,10 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   public NewNode( byte type, int parent_alias, T to, Node mem,Node fld) { super(type,null,mem,fld); _init(parent_alias,to); }
   private void _init(int parent_alias, T to) {
     _alias = BitsAlias.new_alias(parent_alias);
-    _ts = to;
-    _defmem = to==dead_type() ? TypeObj.UNUSED : to.crush();
     _tptr = TypeMemPtr.make(_alias,TypeObj.ISUSED);
     _escapees = new IBitSet();
     _escapees.set(_alias);
+    sets(to,null);
   }
   String xstr() { return "New"+(_not_escaped?"":"!")+"*"+_alias; } // Self short name
   String  str() { return "New"+(_not_escaped?"":"!")+_ts; } // Inline less-short name
@@ -72,7 +73,8 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   protected final void sets( T ts, GVNGCM gvn ) {
     _ts = ts;
     TypeObj olddef = _defmem;
-    _defmem = ts.crush();
+    _crushed = ts.crush();
+    _defmem = _not_escaped || ts==dead_type() ? TypeObj.UNUSED : _crushed;
     if( gvn!=null ) {
       gvn.add_work_uses(this);
       if( olddef != _defmem )
@@ -91,7 +93,6 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
       while( !is_dead() && _defs._len > 2 )
         pop(gvn);               // Kill all fields except memory
       _ts = dead_type();
-      _defmem = TypeObj.UNUSED;
       did_not_escape(gvn);
       gvn.set_def_reg(Env.DEFMEM,_alias,gvn.add_work(gvn.con(TypeObj.UNUSED)));
       if( is_dead() ) return this;
@@ -101,7 +102,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
 
     // Scan for pointer-escapes to some unknown caller.
     // If not escaped we can bypass unknown calls.
-    if( !_not_escaped && gvn._opt_mode>0 && !escaped() )
+    if( !_not_escaped && _keep==0 && gvn._opt_mode>0 && !escaped() )
       return did_not_escape(gvn);
 
     return null;
@@ -109,6 +110,8 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   // Set the no-escape flag, and push neighbors on worklist
   private Node did_not_escape(GVNGCM gvn) {
     _not_escaped=true;
+    _defmem = TypeObj.UNUSED;  // Since not escaped, the default is empty
+    gvn.add_work(Env.DEFMEM);
     // Every CallEpi can now bypass
     for( Node use : Env.DEFMEM._uses )
       if( use instanceof CallEpiNode )
@@ -197,7 +200,8 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   // NewNodes and join alias classes, but this is not the normal CSE and so is
   // not done by default.
   @Override public boolean equals(Object o) {  return this==o; }
+  // If object is dead, memory is a pass-thru
   @Override public Node is_copy(GVNGCM gvn, int idx) {
-    return _defmem == TypeObj.UNUSED && idx==0 ? mem(): null;
+    return _ts == dead_type() && idx==0 ? mem(): null;
   }
 }
