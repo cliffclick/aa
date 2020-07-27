@@ -53,7 +53,7 @@ public class TestLive {
     NewObjNode nnn = new NewObjNode(false,TypeStruct.DISPLAY,mmm,gvn.con(Type.NIL));
     nnn.create_active("x",fdx,TypeStruct.FFNL,gvn);
     nnn.create_active("y",fdy,TypeStruct.FFNL,gvn);
-    nnn.no_more_fields(gvn);
+    nnn.no_more_fields();
     gvn.setype(nnn,nnn.value(gvn));
 
     // Proj, OProj

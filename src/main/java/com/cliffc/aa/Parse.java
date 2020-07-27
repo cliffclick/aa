@@ -744,7 +744,7 @@ public class Parse {
     for( int i=0; i<args._len; i++ )
       nn.create_active((""+i).intern(),args.at(i),TypeStruct.FFNL,_gvn);
     nn._fld_starts = bads.asAry();
-    nn.no_more_fields(_gvn);
+    nn.no_more_fields();
 
     // NewNode returns a TypeMem and a TypeMemPtr (the reference).
     NewObjNode nnn = (NewObjNode)gvn(nn);

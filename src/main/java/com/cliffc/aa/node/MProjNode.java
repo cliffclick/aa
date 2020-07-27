@@ -11,11 +11,8 @@ public class MProjNode extends ProjNode {
   @Override boolean is_mem() { return true; }
   @Override public Node ideal(GVNGCM gvn, int level) {
     Node x = in(0).is_copy(gvn,_idx);
-    if( x != null ) {
-      if( x== this ) return gvn.con(TypeMem.ANYMEM); // Happens in dead self-recursive functions
-      // If copy isa self, use it; otherwise types out-of-sync, wait for type lift.
-      return gvn.type(x).isa(gvn.type(this)) ? x : null;
-    }
+    if( x != null )
+      return x == this ? gvn.con(TypeMem.ANYMEM) : x; // Happens in dead self-recursive functions
     if( in(0) instanceof CallEpiNode ) {
       Node precall = in(0).is_pure_call(); // See if memory can bypass pure calls (most primitives)
       if( precall != null && gvn.type(this)==gvn.type(precall) )

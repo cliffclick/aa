@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
@@ -34,10 +35,10 @@ public class NewObjNode extends NewNode<TypeStruct> {
     return fmod == TypeStruct.FRW;
   }
   // Called when folding a Named Constructor into this allocation site
-  void set_name( TypeStruct name, GVNGCM gvn ) { assert !name.above_center();  sets(name,gvn); }
+  void set_name( TypeStruct name ) { assert !name.above_center();  sets(name); }
 
   // No more fields
-  public void no_more_fields(GVNGCM gvn) { sets(_ts.close(),gvn); }
+  public void no_more_fields() { sets(_ts.close()); }
   
   // Create a field from parser for an inactive this
   public void create( String name, Node val, byte mutable, GVNGCM gvn  ) {
@@ -57,13 +58,13 @@ public class NewObjNode extends NewNode<TypeStruct> {
     assert !gvn.touched(this);
     assert def_idx(_ts._ts.length)== _defs._len;
     assert _ts.find(name) == -1; // No dups
-    sets(_ts.add_fld(name,mutable,mutable==TypeStruct.FFNL ? gvn.type(val) : Type.SCALAR),gvn);
+    sets(_ts.add_fld(name,mutable,mutable==TypeStruct.FFNL ? gvn.type(val) : Type.SCALAR));
     add_def(val);
   }
   public void update( String tok, byte mutable, Node val, GVNGCM gvn  ) { update(_ts.find(tok),mutable,val,gvn); }
   // Update the field & mod
   public void update( int fidx, byte mutable, Node val, GVNGCM gvn  ) {
-    Type oldt = gvn.unreg(this);
+    Type oldt = gvn.unreg(this);  TypeObj oldc = _crushed;
     update_active(fidx,mutable,val,gvn);
     Type newt = value(gvn);
     gvn.rereg(this,newt);
@@ -78,6 +79,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
     if( newt!=oldt )
       for( Node use : _uses )
         gvn.setype(use,use.value(gvn)); // Record "downhill" type for OProj, DProj
+    if( _crushed != oldc )   gvn.add_work(Env.DEFMEM); // Crush updates DefMem
   }
   // Update default value.  Used by StoreNode folding into a NewObj initial
   // state.  Used by the Parser when updating local variables... basically
@@ -85,7 +87,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
   public void update_active( int fidx, byte mutable, Node val, GVNGCM gvn  ) {
     assert !gvn.touched(this);
     assert def_idx(_ts._ts.length)== _defs._len;
-    sets(_ts.set_fld(fidx,mutable==TypeStruct.FFNL ? gvn.type(val) : Type.SCALAR,mutable),gvn);
+    sets(_ts.set_fld(fidx,mutable==TypeStruct.FFNL ? gvn.type(val) : Type.SCALAR,mutable));
     set_def(def_idx(fidx),val,gvn);
   }
 
@@ -118,7 +120,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
         // Make field in the parent
         parent.create(ts._flds[i],n,ts.fmod(i),gvn);
         // Stomp field locally to XSCALAR
-        sets(_ts.set_fld(i,Type.XSCALAR,TypeStruct.FFNL),gvn);
+        sets(_ts.set_fld(i,Type.XSCALAR,TypeStruct.FFNL));
         gvn.set_def_reg(this,def_idx(i),gvn.con(Type.XSCALAR));
       }
     }
@@ -135,11 +137,11 @@ public class NewObjNode extends NewNode<TypeStruct> {
       for( int i=0; i<ts.length; i++ )
         ts[i] = gvn.type(fld(i));
       newt = _ts.make_from(ts);  // Pick up field names and mods
+      if( !escaped(gvn) ) newt = newt.make_from_esc(false);
     }
-    ProjNode ptr = ProjNode.proj(this,1);
-    TypeMem tmem2 = (ptr ==null && gvn._opt_mode!=0) || (ptr != null && ptr._live!=TypeMem.ESCAPE)  // No escape on pointer, so no incoming self-variant
-      ? tmem.set(_alias,newt)   // Stomp over incoming value at same alias
-      : tmem.st (_alias,newt);  // Merge with incoming value at same alias
+    TypeMem tmem2 = !escaped(gvn)// No escape on pointer, so no incoming self-variant
+      ? tmem.set(_alias,newt)    // Stomp over incoming value at same alias
+      : tmem.st (_alias,newt);   // Merge with incoming value at same alias
     
     return TypeTuple.make(tmem2,_tptr);   // Complex obj, simple ptr.
   }

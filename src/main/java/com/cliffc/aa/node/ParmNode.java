@@ -38,6 +38,7 @@ public class ParmNode extends PhiNode {
 
     // Has unknown caller input
     if( fun._defs.len() > 1 && fun.in(1) == Env.ALL_CTRL ) return null;
+    if( fun.noinline() ) return null; // Do not fold up, because asked not to.
 
     // TODO: Relax this
     // Never collapse memory phi, used for error reporting by other parms

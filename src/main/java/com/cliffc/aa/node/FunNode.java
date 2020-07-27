@@ -200,12 +200,9 @@ public class FunNode extends RegionNode {
     // Every input path is wired to an output path
     for( int i=1+(has_unknown_callers() ? 1 : 0); i<_defs._len; i++ ) {
       Node c = in(i);
-      if( !(c instanceof CProjNode) || !(c.in(0) instanceof CallNode) )
-        return null;            // Unknown input path
-      CallNode call = (CallNode)c.in(0);
+      CallNode call = (CallNode)c.in(0); // If this is not a CallNode, just bail
       CallEpiNode cepi = call.cepi();
-      if( cepi._defs.find(ret)==-1 )
-        return null;            // Unwired call
+      assert cepi._defs.find(ret)!= -1;  // If this is not wired, just bail
     }
 
     // Look for appropriate type-specialize callers
@@ -218,6 +215,9 @@ public class FunNode extends RegionNode {
       // Large code-expansion allowed; can inline for other reasons
       path = split_size(gvn,body,parms);
       if( path == -1 ) return null;
+      CallNode call = (CallNode)in(path).in(0);
+      if( !(call.fun() instanceof FunPtrNode) )
+        return null;
       if( noinline() ) return null;
       if( !is_prim() ) _cnt_size_inlines++; // Disallow infinite size-inlining of recursive non-primitives
     }
@@ -637,8 +637,8 @@ public class FunNode extends RegionNode {
     
     // Put all new nodes into the GVN tables and worklist
     for( Map.Entry<Node,Node> e : map.entrySet() ) {
-      Node oo = e.getKey();           // Old node
-      Node nn = e.getValue();         // New node
+      Node oo = e.getKey();     // Old node
+      Node nn = e.getValue();   // New node
       Type nt = gvn.type(oo);   // Generally just copy type from original nodes
       if( nn instanceof MProjNode && nn.in(0) instanceof NewNode ) { // Cloned allocations registers with default memory
         Env.DEFMEM.make_mem(gvn,(NewNode)nn.in(0),(MProjNode)nn);

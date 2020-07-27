@@ -17,12 +17,13 @@ public class MemSplitNode extends Node {
   Ary<IBitSet> _escs = new Ary<>(new IBitSet[]{new IBitSet()});
   public MemSplitNode( Node mem ) { super(OP_SPLIT,null,mem); }
   Node mem() { return in(1); }
-  MemJoinNode join() {
+  public MemJoinNode join() {
     Node prj = ProjNode.proj(this,0);
     if( prj==null ) return null;
     return (MemJoinNode)prj._uses.at(0);
   }
 
+  @Override boolean is_mem() { return true; }
   @Override String str() {
     SB sb = new SB();
     sb.p('(').p("base,");

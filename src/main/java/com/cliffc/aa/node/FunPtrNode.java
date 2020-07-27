@@ -41,7 +41,7 @@ public final class FunPtrNode extends Node {
     // Display is known dead?  Yank it.
     if( display().in(0) instanceof NewNode ) {
       NewNode nn = (NewNode)display().in(0);
-      if( nn._defmem==TypeObj.UNUSED )
+      if( nn._ts==nn.dead_type() )
         return set_def(1,gvn.con(TypeMemPtr.make(nn._alias,TypeStr.NO_DISP)),gvn); // No display needed
     }
 

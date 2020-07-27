@@ -19,7 +19,7 @@ public class IBitSet implements Iterable<Integer> {
   private static int mask(int i) { return 1<<(i&31); }
 
   // Test; returns the value
-  public boolean tst(int idx) { return _sign != _tst(idx); }
+  public  boolean  tst(int idx) { return _sign != _tst(idx); }
   private boolean _tst(int idx) { return (_bits.atX(idx(idx)) & mask(idx)) != 0; }
 
   // Test and set; returns the old value
@@ -45,12 +45,14 @@ public class IBitSet implements Iterable<Integer> {
   public IBitSet flip() { _sign=!_sign; return this; }
 
   public int bitCount() {
+    assert !_sign;              // Infinite if sign is set
     int sum=0;
     for( int i=0; i<_bits._len; i++ )
       sum += Integer.bitCount(_bits._es[i]);
     return sum;
   }
   public int max( ) {
+    assert !_sign;              // Infinite if sign is set
     if( _bits._len==0 ) return 0;
     return (31 - Integer.numberOfLeadingZeros(_bits.last()))+((_bits._len-1)<<5);
   }
@@ -69,6 +71,7 @@ public class IBitSet implements Iterable<Integer> {
 
   // OR-into-this
   public IBitSet or( IBitSet bs ) {
+    _sign |= bs._sign;
     for( int i=0; i<bs._bits._len; i++ )
       _bits.setX(i,_bits.atX(i)|bs.wd(i));
     return this;

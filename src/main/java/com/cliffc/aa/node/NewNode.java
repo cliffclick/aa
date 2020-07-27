@@ -29,21 +29,10 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   // are ALL; final fields keep their value.  All field flags are moved to
   // bottom, e.g. as-if all fields are now final-stored.  Will be set to
   // TypeObj.UNUSE for never-allocated (eg dead allocations)
-  TypeObj _defmem;
   TypeObj _crushed;
 
   // Just TMP.make(_alias,OBJ)
   public TypeMemPtr _tptr;
-
-  // Monotonic, conservatively correct flag.  Starts true, flips once to false.
-  // Only used by Load & Store addresses & If equality/nil checks.  Definitely
-  // fails if transitively passed to an unknown Call.  Closures can be used by
-  // FunPtrs and this is an escape.  Structs can be value-stored (and later
-  // loaded) and this is an escape.
-  //
-  // TODO: Can be transitive thru _live tracking thru Phis & known Calls &
-  // memory.
-  public boolean _not_escaped;
 
   // NewNodes can participate in cycles, where the same structure is appended
   // to in a loop until the size grows without bound.  If we detect this we
@@ -59,27 +48,21 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     _tptr = TypeMemPtr.make(_alias,TypeObj.ISUSED);
     _escapees = new IBitSet();
     _escapees.set(_alias);
-    sets(to,null);
+    sets(to);
   }
-  String xstr() { return "New"+(_not_escaped?"":"!")+"*"+_alias; } // Self short name
-  String  str() { return "New"+(_not_escaped?"":"!")+_ts; } // Inline less-short name
+  String xstr() { return "New"+"*"+_alias; } // Self short name
+  String  str() { return "New"+_ts; } // Inline less-short name
 
+  @Override boolean is_mem() { return true; }
   Node mem() { return in(1); }
   static int def_idx(int fld) { return fld+2; } // Skip mem in slot 1
   Node fld(int fld) { return in(def_idx(fld)); } // Node for field#
 
   // Recompute default memory cache on a change
   @SuppressWarnings("unchecked")
-  protected final void sets( T ts, GVNGCM gvn ) {
+  protected final void sets( T ts ) {
     _ts = ts;
-    TypeObj olddef = _defmem;
     _crushed = ts.crush();
-    _defmem = _not_escaped || ts==dead_type() ? TypeObj.UNUSED : _crushed;
-    if( gvn!=null ) {
-      gvn.add_work_uses(this);
-      if( olddef != _defmem )
-        gvn.add_work(Env.DEFMEM);
-    }
   }
 
   @SuppressWarnings("unchecked")
@@ -92,38 +75,15 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     if( _defs._len > 2 && captured(gvn) ) {
       while( !is_dead() && _defs._len > 2 )
         pop(gvn);               // Kill all fields except memory
-      _ts = dead_type();
-      did_not_escape(gvn);
+      sets(dead_type());
       gvn.set_def_reg(Env.DEFMEM,_alias,gvn.add_work(gvn.con(TypeObj.UNUSED)));
       if( is_dead() ) return this;
       gvn.add_work_uses(_uses.at(0));  // Get FPtrs from MProj from this
       return this;
     }
 
-    // Scan for pointer-escapes to some unknown caller.
-    // If not escaped we can bypass unknown calls.
-    if( !_not_escaped && _keep==0 && gvn._opt_mode>0 && !escaped() )
-      return did_not_escape(gvn);
-
     return null;
   }
-  // Set the no-escape flag, and push neighbors on worklist
-  private Node did_not_escape(GVNGCM gvn) {
-    _not_escaped=true;
-    _defmem = TypeObj.UNUSED;  // Since not escaped, the default is empty
-    gvn.add_work(Env.DEFMEM);
-    // Every CallEpi can now bypass
-    for( Node use : Env.DEFMEM._uses )
-      if( use instanceof CallEpiNode )
-        gvn.add_work(use);
-    // Stored ptrs do not escape
-    if( !is_dead() )
-      for( Node def : _defs )
-        if( def instanceof ProjNode && def.in(0) instanceof NewNode )
-          gvn.add_work(def.in(0));
-    return this;
-  }
-
 
   @Override IBitSet escapees(GVNGCM gvn) { return _escapees; }
   abstract T dead_type();
@@ -155,31 +115,13 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     return true;
   }
 
-  private boolean escaped() {
+  boolean escaped(GVNGCM gvn) {
+    if( gvn._opt_mode==0 ) return true; // Assume escaped in parser
     if( _uses._len!=2 ) return false; // Dying/dead, not escaped
     Node ptr = _uses.at(0);
     if( ptr instanceof MProjNode ) ptr = _uses.at(1); // Get ptr not mem
-    for( Node use : ptr._uses ) {
-      if( use instanceof LoadNode ) continue;
-      if( use instanceof StoreNode )
-        if( ((StoreNode)use).val()==use ) return true; // Store to memory
-        else continue; // Store address
-      if( use instanceof  ScopeNode ) continue;    // Scope inspects all contents but modifies none
-      if( use instanceof    PhiNode ) return true; // Requires flow tracking
-      if( use instanceof FunPtrNode ) return true; // Appears as display in called function - which can then escape
-      if( use instanceof   CallNode ) return true; // Downward exposed Call arg
-      if( use instanceof    RetNode ) return true; // Upwards  exposed return
-      if( use instanceof CallEpiNode) { assert ((CallEpiNode)use).is_copy(); return true; }
-      if( use instanceof    NewNode )  // Store to a specific struct
-        if( ((NewNode)use)._not_escaped ) continue;
-        else return true;              // Escaping if other struct does
-      if( use instanceof IntrinsicNode ) continue; // Changes memory/v-table; similar to Store address
-      if( use instanceof    TypeNode ) continue;   // Type-checking, read-only
-      throw com.cliffc.aa.AA.unimpl(); // Handle all cases, shouldn't be too many
-    }
-    return false;
+    return ptr._live==TypeMem.ESCAPE;
   }
-
 
   // clones during inlining all become unique new sites
   @SuppressWarnings("unchecked")
@@ -202,6 +144,13 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   @Override public boolean equals(Object o) {  return this==o; }
   // If object is dead, memory is a pass-thru
   @Override public Node is_copy(GVNGCM gvn, int idx) {
-    return _ts == dead_type() && idx==0 ? mem(): null;
+    if( idx!=0 ) return null;
+    if( _ts != dead_type() ) return null;
+    Type t = gvn.type(mem());
+    if( !(t instanceof TypeMem) ) return null;
+    TypeMem tm = (TypeMem)t;
+    if( tm.at(_alias) != TypeObj.UNUSED )
+      return null;
+    return mem();
   }
 }

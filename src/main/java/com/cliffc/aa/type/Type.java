@@ -340,8 +340,6 @@ public class Type<T extends Type<T>> implements Cloneable {
   public final Type meet( Type t ) {
     // Short cut for the self case
     if( t == this ) return this;
-    if( _dual==t )
-      return above_center() ? t : this;
     // Short-cut for seeing this meet before
     Type mt = Key.get(this,t);
     if( mt != null ) return mt;

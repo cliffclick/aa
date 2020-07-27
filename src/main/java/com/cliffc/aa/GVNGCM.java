@@ -316,15 +316,20 @@ public class GVNGCM {
                 if( useuseuse instanceof LoadNode )
                   add_work(useuseuse); // Final load bypassing a Call
         if( use.is_multi_head() )
-          for( Node useuse : use._uses )
-            if( useuse instanceof ProjNode && use.is_copy(this,((ProjNode)useuse)._idx)!=null )
+          for( Node useuse : use._uses ) {
+            if( useuse instanceof ProjNode && use.is_copy(this, ((ProjNode) useuse)._idx) != null )
               add_work(useuse);
+            if( useuse instanceof CallEpiNode )
+              add_work(useuse);
+          }
       }
       if( old instanceof FP2ClosureNode )
         add_work(old.in(0)); // Liveness update
       Node fun;
       if( old instanceof CallNode && (fun=((CallNode)old).fun()) instanceof FunPtrNode ) // Call value update changes liveness of FP2Closure
         add_work(fun);
+      if( old instanceof ProjNode && old.in(0) instanceof NewNode )
+        add_work(Env.DEFMEM);
       if( old.value_changes_live() )
         add_work_defs(old);
       // Add self at the end, so the work loops pull it off again.
@@ -411,7 +416,7 @@ public class GVNGCM {
 
     // [ts+,vals!]
     assert check_opt(n);
-    return oval == nval && y==null ? null : n; // Progress if types improved
+    return oval == nval && oliv == nliv && y==null ? null : n; // Progress if types improved
   }
 
   // Utility: Merge old and new, returning node with the merged liveness.
@@ -444,6 +449,8 @@ public class GVNGCM {
           add_work_uses(u); // Trying to get Join/Merge/Split to fold up
         if( u instanceof StoreNode ) // Load/Store fold up
           for( Node n : u._uses ) if( n instanceof LoadNode ) add_work(n);
+        if( u instanceof CallNode )
+          for( Node n : u._uses ) if( n instanceof CallEpiNode ) add_work(n);
         if( nnn.in(0) != null ) add_work(nnn.in(0));
       }
     }

@@ -11,52 +11,62 @@ import java.util.function.Predicate;
 public class TypeObj<O extends TypeObj<O>> extends Type<O> {
   boolean _any;                 // True=choice/join; False=all/meet
   boolean _use;                 // Equal to _any for OBJ/XOBJ; unequal to _any for UNUSED/ISUSED
-  TypeObj             (byte type, String name, boolean any) { this(type,name,any,any); }
-  protected void init (byte type, String name, boolean any) { init(type,name,any,any); }
-  private TypeObj     (byte type, String name, boolean any, boolean use) { super(type); init(type,name,any,use); }
-  private   void init (byte type, String name, boolean any, boolean use) { super.init(type, name); _any=any; _use=use; }
+  public boolean _esc;          // Some pointer-to-obj has escaped
+  protected TypeObj  (byte type, String name, boolean any, boolean esc) { this(type,name,any,any,esc); }
+  protected void init(byte type, String name, boolean any, boolean esc) { init(type,name,any,any,esc); }
+  private TypeObj    (byte type, String name, boolean any, boolean use, boolean esc) { super(type); init(type,name,any,use,esc); }
+  private void init  (byte type, String name, boolean any, boolean use, boolean esc) { super.init(type, name); _any=any; _use=use; _esc=esc; }
   // Hash does not depend on other types, so never changes
-  @Override int compute_hash() { return super.compute_hash()+(_any?1:0)+(_use?2:0); }
+  @Override int compute_hash() { return super.compute_hash()+(_any?1:0)+(_use?2:0)+(_esc?4:0); }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeObj) || !super.equals(o) ) return false;
-    return _any ==((TypeObj)o)._any && _use ==((TypeObj)o)._use;
+    TypeObj to = (TypeObj)o;
+    return _any ==to._any && _use ==to._use && _esc==to._esc;
   }
   @Override public boolean cycle_equals( Type o ) { return equals(o); }
   @Override String str( VBitSet dups ) {
     String x = _any==_use ? "obj" : "use";
-    return _name+(_any?"~"+x:x);
+    return _name+((_any?"~":"")+(_esc?"!":"")+x);
   }
 
   private static TypeObj FREE=null;
   @Override protected O free( O ret ) { FREE=this; return ret; }
   @SuppressWarnings("unchecked")
-  private static TypeObj make( String name, boolean any, boolean use ) {
+  private static TypeObj make( String name, boolean any, boolean use, boolean esc ) {
     TypeObj t1 = FREE;
-    if( t1 == null ) t1 = new TypeObj(TOBJ,name,any,use);
-    else {  FREE = null;      t1.init(TOBJ,name,any,use); }
+    if( t1 == null ) t1 = new TypeObj(TOBJ,name,any,use,esc);
+    else {  FREE = null;      t1.init(TOBJ,name,any,use,esc); }
     TypeObj t2 = (TypeObj)t1.hashcons();
     return t1==t2 ? t1 : t1.free(t2);
   }
-  public static final TypeObj OBJ   = make("",false,false);    // Any obj; allocated as *something*
-  public static final TypeObj ISUSED= make("",false,true );    // Possibly allocated, to worst possible result
-  public static final TypeObj UNUSED= (TypeObj)ISUSED.dual();  // Never allocated
-  public static final TypeObj XOBJ  = (TypeObj)OBJ   .dual();  // alloc, but object type is unknown (either struct or array)
+  public static final TypeObj OBJ   = make("",false,false,true); // Any obj; allocated as *something*
+  public static final TypeObj ISUSED= make("",false,true ,true); // Possibly allocated, the worst possible result
+  public static final TypeObj UNUSED= (TypeObj)ISUSED.dual();    // Never allocated
+  public static final TypeObj XOBJ  = (TypeObj)OBJ   .dual();    // alloc, but object type is unknown (either struct or array)
   static final TypeObj[] TYPES = new TypeObj[]{OBJ,ISUSED,UNUSED,XOBJ};
 
   @Override boolean is_display() { return false; }
   @SuppressWarnings("unchecked")
-  @Override protected O xdual() { return (O)new TypeObj(TOBJ,_name,!_any,!_use); }
+  @Override protected O xdual() { return (O)new TypeObj(TOBJ,_name,!_any,!_use,!_esc); }
   @Override protected Type xmeet( Type t ) {
     if( !(t instanceof TypeObj) ) return ALL;
-    if( this==ISUSED || t==ISUSED ) return ISUSED;
-    if( this==OBJ || t==OBJ ) return OBJ;
-    if( this==UNUSED ) return t;
-    if( t   ==UNUSED ) return this;
-    if( this==XOBJ ) return t;
-    if( t   ==XOBJ ) return this;
-    throw com.cliffc.aa.AA.unimpl("ShouldNotReachHere");
+    assert this!=t; // already handled
+    TypeObj to = (TypeObj)t;
+    boolean esc = _esc|to._esc;
+    if( _any ) {                // 'this' is high
+      if( _use && t == UNUSED ) return XOBJ.make_from_esc(esc);
+      return to.make_from_esc(esc); // Above all 't', so return 't' with esc
+    }
+    // 'this' is low
+    if( !_use && t == ISUSED ) return ISUSED.make_from_esc(esc);
+    return this.make_from_esc(esc);
   }
+  @SuppressWarnings("unchecked")
+  public O make_from_esc(boolean esc) { return _esc==esc ? (O)this : make_from_esc_impl(esc); }
+  @SuppressWarnings("unchecked")
+  protected O make_from_esc_impl(boolean esc) { return (O)make(_name,_any,_use,esc);  }
+      
   // Update (approximately) the current TypeObj.  Merges fields.
   public TypeObj update(byte fin, String fld, Type val) { return this; }
   // Exact object update.  Replaces fields.

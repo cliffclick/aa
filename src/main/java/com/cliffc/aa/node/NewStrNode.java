@@ -20,7 +20,9 @@ public class NewStrNode extends NewNode<TypeStr> {
       Type xs = gvn.type(fld(0));
       newt = xs instanceof TypeStr ? (TypeStr)xs : (TypeStr)xs.oob(TypeStr.STR);
     }
-    TypeMem tmem2 = tmem.st(_alias,newt); // Merge with incoming value at same alias
+    TypeMem tmem2 = !escaped(gvn) // No escape on pointer, so no incoming self-variant
+      ? tmem.set(_alias,newt)    // Stomp over incoming value at same alias
+      : tmem.st (_alias,newt);   // Merge with incoming value at same alias
     return TypeTuple.make(tmem2,_tptr); // Complex obj, simple ptr.
   }
   @Override TypeStr dead_type() { return TypeStr.XSTR; }

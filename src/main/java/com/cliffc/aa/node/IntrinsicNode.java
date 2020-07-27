@@ -18,6 +18,7 @@ public class IntrinsicNode extends Node {
     _badargs=badargs;
   }
 
+  @Override boolean is_mem() { return true; }
   @Override public String xstr() { return _tn._name; }
   Node mem() { return in(1); }
   Node ptr() { return in(2); }
@@ -66,7 +67,7 @@ public class IntrinsicNode extends Node {
         Type formal = _tn.remove_name();
         if( actual.isa(formal) ) { // Actual struct isa formal struct?
           TypeStruct tn = nnn._ts.make_from(_tn._name);
-          nnn.set_name(tn,gvn);
+          nnn.set_name(tn);
           gvn.add_work(nnn);
           gvn.add_work(Env.DEFMEM);
           return mem;

@@ -2,7 +2,9 @@ package com.cliffc.aa.node;
 
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
+import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.IBitSet;
+import com.cliffc.aa.util.VBitSet;
 
 // See CallNode.  Slot 0 is the Call.  The remaining slots are Returns which
 // are typed as standard function returns: {Ctrl,Mem,Val}.  These Returns
@@ -19,9 +21,8 @@ import com.cliffc.aa.util.IBitSet;
 // bit-vector.
 
 public final class CallEpiNode extends Node {
-  boolean _is_copy;         // One-shot flag set when inlining an entire single-caller-single-called
   public CallEpiNode( Node... nodes ) { super(OP_CALLEPI,nodes);  assert nodes[1] instanceof DefMemNode; }
-  String xstr() { return ((is_dead() || is_copy()) ? "x" : "C")+"allEpi"; } // Self short name
+  String xstr() { return (is_dead() ? "X" : "C")+"allEpi";  } // Self short name
   public CallNode call() { return (CallNode)in(0); }
   @Override boolean is_mem() { return true; }
   int nwired() { return _defs._len-2; }
@@ -29,9 +30,6 @@ public final class CallEpiNode extends Node {
   RetNode wired(int x) { return (RetNode)in(x+2); }
 
   @Override public Node ideal(GVNGCM gvn, int level) {
-    // If inlined, no further xforms.  The using Projs will fold up.
-    if( is_copy() ) return null;
-
     CallNode call = call();
     Type tc = gvn.type(call);
     if( !(tc instanceof TypeTuple) ) return null;
@@ -70,11 +68,12 @@ public final class CallEpiNode extends Node {
           call.err(gvn,true)==null &&   // And args are ok
           // And memory types are aligned
           gvn.type(ret.mem()).isa(((TypeTuple)gvn.self_type(this)).at(1)) &&
+          call.mem().in(0) != call &&   // Dead self-recursive
           !fun.noinline() ) {           // And not turned off
         assert fun.in(1).in(0)==call;   // Just called by us
         // TODO: Bring back SESE opts
         fun.set_is_copy(gvn);
-        return inline(gvn,level, call, tcall, ret.ctl(), ret.mem(), ret.val(), null/*do not unwire, because using the entire function body inplace*/);
+        return inline(gvn,level, call, ret.ctl(), ret.mem(), ret.val(), null/*do not unwire, because using the entire function body inplace*/);
       }
     }
 
@@ -125,17 +124,18 @@ public final class CallEpiNode extends Node {
     if( (rmem instanceof ParmNode && rmem.in(0) == fun) || gvn.type(rmem)==TypeMem.XMEM )
       rmem = cmem;
     // Check that function return memory and post-call memory are compatible
-    TypeTuple tself = (TypeTuple)gvn.type(this);
-    if( !gvn.type(rmem).isa( tself.at(1)) )
+    Type tself = gvn.type(this);
+    if( !(tself instanceof TypeTuple) ) return null;
+    if( !gvn.type(rmem).isa( ((TypeTuple)tself).at(1)) )
       return null;
 
     // Check for zero-op body (id function)
     if( rrez instanceof ParmNode && rrez.in(0) == fun && cmem == rmem )
-      return inline(gvn,level,call,tcall,cctl,cmem,call.arg(((ParmNode)rrez)._idx), ret);
+      return inline(gvn,level,call, cctl,cmem,call.arg(((ParmNode)rrez)._idx), ret);
     // Check for constant body
     Type trez = gvn.type(rrez);
     if( trez.is_con() && rctl==fun && cmem == rmem)
-      return inline(gvn,level,call,tcall,cctl,cmem,gvn.con(trez),ret);
+      return inline(gvn,level,call, cctl,cmem,gvn.con(trez),ret);
 
     // Check for a 1-op body using only constants or parameters and no memory effects
     boolean can_inline=!(rrez instanceof ParmNode) && rmem==cmem;
@@ -152,7 +152,7 @@ public final class CallEpiNode extends Node {
       for( Node parm : rrez._defs )
         irez.add_def((parm instanceof ParmNode && parm.in(0) == fun) ? call.argm(((ParmNode)parm)._idx,gvn) : parm);
       if( irez instanceof PrimNode ) ((PrimNode)irez)._badargs = call._badargs;
-      return inline(gvn,level,call,tcall,cctl,cmem,gvn.add_work(gvn.xform(irez)),ret); // New exciting replacement for inlined call
+      return inline(gvn,level,call, cctl,cmem,gvn.add_work(gvn.xform(irez)),ret); // New exciting replacement for inlined call
     }
 
     return null;
@@ -239,13 +239,14 @@ public final class CallEpiNode extends Node {
   // unwired Returns may yet appear, and be conservative.  Otherwise it can
   // just meet the set of known functions.
   @Override public Type value(GVNGCM gvn) {
-    if( _is_copy )           // Just return the arg types.
-      return TypeTuple.make(Type.CTRL,gvn.type(in(1)),gvn.type(in(2)));
     Type tin0 = gvn.type(in(0));
     if( !(tin0 instanceof TypeTuple) )
       return tin0.oob();     // Weird stuff?
     TypeTuple tcall = (TypeTuple)tin0;
     if( tcall._ts.length <= CallNode.ARGIDX ) return tcall.oob(); // Weird stuff
+    Type tcmem = gvn.type(call().mem());
+    if( !(tcmem instanceof TypeMem) ) return tcmem.oob();
+    TypeMem caller_mem = (TypeMem)tcmem;
 
     // Get Call result.  If the Call args are in-error, then the Call is called
     // and we flow types to the post-call.... BUT the bad args are NOT passed
@@ -257,7 +258,6 @@ public final class CallEpiNode extends Node {
     Type ctl = CallNode.tctl(tcall); // Call is reached or not?
     if( ctl != Type.CTRL && ctl != Type.ALL )
       return TypeTuple.CALLE.dual();
-    TypeMem    tcmem  = CallNode.tmem(tcall); // Peel apart Call tuple
     TypeFunPtr tfptr  = CallNode.ttfpx(tcall);// Peel apart Call tuple
 
     if( tfptr==null || tfptr.is_forward_ref() ) return TypeTuple.CALLE; // Still in the parser.
@@ -316,31 +316,37 @@ public final class CallEpiNode extends Node {
         }
       }
     }
+    TypeMem post_call = (TypeMem)tmem;
 
-    // Compute return memory, generally as the meet of all wired returns.
-    // However, can keep non-escaping aliases to their pre-call value;
-    // can "discover" dead from DefMem ahead of wired returns.
-    TypeMem tmem2 = (TypeMem)tmem;
+    // Build epilog memory.
+
+    // If pre-call is UNUSED and defmem is ESCAPED then the call makes new
+    // memory; use post-call.
+    // If pre-call is NO-ESCAPE then use pre-call.
+    // If pre-call is ESCAPED, but defmem is NO-ESCAPE then pre-call is stale
+    // but and eventually we'll use pre-call.  Use it now.
+    // If pre-call is ESCAPED and DEFMEM is also ESCAPED, then use post-call.
     TypeMem tdefmem = (TypeMem)defmem;
-    TypeObj[] tos = new TypeObj[defnode._defs._len];
-    tos[1] = tmem2.at(1);
-    for( int alias=2; alias<defnode._defs._len; alias++ ) {
-      Node mprj = defnode.in(alias);
-      // Expect Con:~use, Con:low or NewNode.
-      // ConNode:~use is dead not escaping, or NewNode flagged _not_escaped
+    int len = Math.max(caller_mem.len(),post_call.len());
+    if( gvn._opt_mode > 0 ) len = Math.max(len,tdefmem.len() );
+    TypeObj[] tos = new TypeObj[len];
+    for( int i=1; i<tos.length; i++ ) {
+      TypeObj tpre = caller_mem.at(i); // Pre-call memory
+      TypeObj tdef = tdefmem.at(i);    // Default  memory
+      TypeObj tpost= post_call.at(i);  // Post-call memory (merge of returns)
       TypeObj to;
-      if( mprj==null )          // Nothing at DefMem
-        to = null;              // Alias is unused
-      else if( mprj instanceof ConNode && ((ConNode)mprj)._t.above_center() )
-        to = ((ConNode)mprj)._t.oob(TypeObj.ISUSED); // Dead, take it
-      else if( mprj instanceof MProjNode && ((NewNode)mprj.in(0))._not_escaped )
-        to = (TypeObj)tcmem.at(alias).join(((NewNode)mprj.in(0))._crushed); // Not escaped, use pre-call joined with the crush
-      else {
-        to = tmem2.at(alias);   // Use post-call
-        if( gvn._opt_mode < 2 ) // Use post-call, but at least as a good as the default
-          to = (TypeObj)to.join(tdefmem.at(alias));
+      if( tpre==TypeObj.UNUSED ) { // Pre is unused, either never made or dead
+        if( tdef==TypeObj.UNUSED ) to = TypeObj.UNUSED;
+        else if( !tdef._esc )  throw com.cliffc.aa.AA.unimpl();
+        else to = (TypeObj)tpost.join(tdef); // dead & stale or made new in the function body
+      } else if( !tpre._esc ) { // Pre is no-escape
+        to = tpre;
+      } else {                  // Pre is escape
+        if( tdef==TypeObj.UNUSED ) to = tpre;// Def thinks no-escape, so does not pass along
+        else if( !tdef._esc )  throw com.cliffc.aa.AA.unimpl();
+        else to = (TypeObj)tpost.join(tdef).meet(tpre); // We all agree it has escaped, take post
       }
-      tos[alias] = to;
+      tos[i] = to;
     }
     TypeMem tmem3 = TypeMem.make0(tos);
 
@@ -362,28 +368,77 @@ public final class CallEpiNode extends Node {
     return true;
   }
 
-  // Inline the CallNode.  Remove all edges except the results.  This triggers
-  // "is_copy()", which in turn will trigger the following ProjNodes to inline.
-  private Node inline( GVNGCM gvn, int level, CallNode call, TypeTuple tcall, Node ctl, Node mem, Node rez, RetNode ret ) {
+  // Inline the CallNode.  All inputs and outputs to/from the Call and CallEpi
+  // nodes are replaced with the called function 'leafs'.  Memory must maintain
+  // the knowledge of the escape/no-escape split, so the entire inlined body is
+  // visited to "lower" the types.
+  private Node inline( GVNGCM gvn, int level, CallNode call, Node ctl, Node mem, Node rez, RetNode ret ) {
     assert (level&1)==0; // Do not actually inline, if just checking that all forward progress was found
     assert nwired()==0 || nwired()==1; // not wired to several choices
-
     // Unwire any wired called function
     if( ret != null && nwired() == 1 && !ret.is_copy() ) // Wired, and called function not already collapsing
       unwire(gvn,call,ret);
-    // Call is also is_copy and will need to collapse
-    _is_copy = call._is_copy = true; // Call is also is-copy
-    gvn.add_work_uses(call.keep());
-    for( int i=0; i<call.nargs(); i++ ) // All args no longer escape
-      gvn.add_work(call.arg(i));
-    // Remove all edges except the inlined results
-    ctl.keep();  mem.keep();  rez.keep();
-    while( _defs._len > 0 ) pop(gvn);
-    // Put results back on, and trigger is_copy to collapse
-    add_def(ctl .unhook());
-    add_def(mem .unhook());
-    add_def(rez .unhook());
-    add_def(call.unhook());     // Hook call, to get FIDX for value filtering.
+
+    // Update memory in the body with the not-escaped values (which had
+    // bypasses the body and now flow into it).
+    if( mem != call.mem() ) {   // Most primitives do nothing with memory
+      Ary<Node> work = new Ary<>(new Node[1],0);
+      VBitSet bs = new VBitSet(); // Worklist for memory
+      MProjNode cmprj = (MProjNode)ProjNode.proj(call,1);
+      for( Node use : cmprj._uses ) // Init worklist
+        if( use.is_mem() ) { work.push(use); bs.set(use._uid); }
+      gvn.subsume(cmprj,call.mem()); // Call->Fun memory now comes from the split
+      if( mem==cmprj ) mem = call.mem(); // The subsumed can also be the input memory
+      // Update all memory ops
+      while( !work.isEmpty() ) {
+        Node wrk = work.pop();
+        assert wrk.is_mem();
+        Type t2 = wrk.value(gvn); // Compute a new type
+        if( t2.isa(gvn.type(wrk)) ) { // Types in alignment, no need to forward progress here
+          if( wrk instanceof CallNode ) { // Unless a Call which escape-filters; then need to check CallEpi as well
+            CallEpiNode cepi = ((CallNode)wrk).cepi();
+            if( cepi != null && !bs.tset(cepi._uid) ) work.push(cepi);
+          }
+          continue;             // No more updates this path.
+        }
+        // Move types 'down' and add users to worklist.
+        gvn.setype(wrk,t2); // Move 'down', wrong direction, and recognize the escaped type is alive here
+        for( Node use : wrk._uses ) if( use.is_mem() && !bs.tset(use._uid) ) work.push(use);
+      }
+    }
+    MProjNode emprj = (MProjNode)ProjNode.proj(this,1);
+    if( emprj != null ) gvn.subsume(emprj,mem);
+    
+    // Move over Control
+    CProjNode ccprj = (CProjNode)ProjNode.proj(call,0);
+    if( ccprj != null ) gvn.subsume(ccprj,call.ctl());
+    CProjNode ceprj = (CProjNode)ProjNode.proj(this,0);
+    gvn.subsume(ceprj,ctl);
+
+    // Move over result
+    if( !is_dead() ) {
+      ProjNode reprj = ProjNode.proj(this,2);
+      gvn.subsume(reprj,rez);
+    }
+
+    // Move over arguments
+    for( int i=0, idx; !call.is_dead() && i<call._uses._len; ) {
+      Node use = call._uses.at(i);
+      if( use instanceof ProjNode && (idx=((ProjNode)use)._idx) >= 2 )
+        gvn.subsume(use,call.arg(idx-CallNode.ARGIDX));
+      else if( use instanceof FP2ClosureNode )
+        gvn.set_def_reg(use,0,call.fun());
+      else i++;
+    }
+
+    // While not strictly nessecary, immediately fold any dead paths to
+    // functions to clean up the CFG.
+    while( !call.is_dead() ) {
+      Node proj = call._uses.at(0);
+      Node parm = proj._uses.at(0);
+      gvn.xform_old(parm.in(0),0);
+    }
+    
     return this;
   }
 
@@ -407,7 +462,6 @@ public final class CallEpiNode extends Node {
   // Unresolved, then none of CallEpi targets are (yet) alive.
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
     assert _keep==0;
-    if( is_copy() ) return live_use_copy(def); // Target is as alive as our projs are.
     // Not a copy
     if( def==in(0) ) return _live; // The Call
     if( def==in(1) ) return _live; // The DefMem
@@ -422,22 +476,6 @@ public final class CallEpiNode extends Node {
     return _live;
   }
 
-  // If slot 0 is not a CallNode, we have been inlined.
-  boolean is_copy() { return _is_copy; }
-  boolean is_copy_aligned(GVNGCM gvn) {
-    if( !_is_copy ) return false;
-    // Flagged as an inline copy, to be removed.  To preserve monotonicity,
-    // cannot remove until memory types align.  The called function can be
-    // "behind" the Call/CallEpi pair and needs to catch up before directly
-    // inlining.
-    Type tself = gvn.self_type(this);
-    Type tmem0 = tself instanceof TypeTuple ? ((TypeTuple)tself).at(1) : tself;
-    Type tmem1 = gvn.type(in(1));
-    return tmem1.isa(tmem0);    // Incoming inline memory isa self memory
-  }
-  @Override public Node is_copy(GVNGCM gvn, int idx) {
-    return is_copy_aligned(gvn) ? in(idx) : null;
-  }
   @Override Node is_pure_call() { return in(0) instanceof CallNode ? call().is_pure_call() : null; }
   // Return the set of updatable memory - including everything reachable from
   // every call argument (including the display), and any calls reachable from

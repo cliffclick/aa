@@ -246,7 +246,7 @@ public class TypeMem extends Type<TypeMem> {
     XMEM = MEM.dual();
 
     MEM_STR = make(BitsAlias.STR,TypeStr.STR);
-    MEM_ABC = make(BitsAlias.ABC,TypeStr.ABC);
+    MEM_ABC = make(BitsAlias.ABC,TypeStr.ABC.dual());
   }
   static final TypeMem[] TYPES = new TypeMem[]{FULL,MEM,MEM_ABC,ANYMEM};
 
@@ -458,6 +458,37 @@ public class TypeMem extends Type<TypeMem> {
     return true;
   }
 
+  
+  // Flatten no-escapes to UNUSED
+  public TypeMem remove_no_escapes() {
+    int i; for( i=1; i<_aliases.length; i++ )
+      if( _aliases[i] != null && !_aliases[i]._esc && _aliases[i] != TypeObj.UNUSED )
+        break;                  // Found a no-escape to remove
+    if( i==_aliases.length ) return this; // Already flattened
+    TypeObj[] tos = _aliases.clone();
+    for( i=1; i<_aliases.length; i++ )
+      if( _aliases[i] != null && !_aliases[i]._esc && _aliases[i] != TypeObj.UNUSED )
+        tos[i] = TypeObj.UNUSED;
+    return make0(tos);
+  }
+
+  // Set of escaping; up to current aliases.  
+  public IBitSet find_escapes() {
+    IBitSet escs = new IBitSet().flip();
+    for( int i=1; i<_aliases.length; i++ )  if( !at(i)._esc )  escs.clr(i);
+    return escs;
+  }
+
+  public TypeMem remove(BitsAlias escs) {
+    if( escs==BitsAlias.EMPTY ) return this;
+    TypeObj[] tos = _aliases.clone();
+    for( int i=1; i<_aliases.length; i++ )
+      if( tos[i] != null && escs.test(i) )
+        tos[i] = TypeObj.UNUSED;
+    return make0(tos);
+  }
+  
+  
   @Override public boolean above_center() {
     for( TypeObj alias : _aliases )
       if( alias != null && !alias.above_center() && !alias.is_con() )

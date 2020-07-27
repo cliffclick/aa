@@ -96,6 +96,15 @@ public abstract class Node implements Cloneable {
         // Fold stores into NewNodes, requires no extra uses
         if( old instanceof OProjNode && old.in(0) instanceof NewNode && old._uses._len<=2 )
           for( Node use : old._uses ) if( use instanceof StoreNode ) gvn.add_work(use);
+        if( old.is_mem() ) {
+          Node nn = old.get_mem_writer();
+          if( nn instanceof NewNode ) {
+            Node nm = ProjNode.proj(nn,0);
+            Node msp = nm == null ? null : nm.get_mem_writer();
+            if( msp instanceof MemSplitNode )
+              gvn.add_work(((MemSplitNode)msp).join());
+          }
+        }
         // Displays for FunPtrs update
         if( this instanceof ParmNode && ((ParmNode)this)._idx==0 && old instanceof FunNode ) {
           RetNode ret = ((FunNode)old).ret();
@@ -119,6 +128,7 @@ public abstract class Node implements Cloneable {
             else if( use instanceof StoreNode )
               gvn.add_work(use);
         }
+        if( old instanceof NewNode ) gvn.add_work(Env.DEFMEM);
         // Removing 1/2 of the split, put other half on worklist
         if( old instanceof MemSplitNode )
           gvn.add_work_uses(old);
@@ -447,9 +457,6 @@ public abstract class Node implements Cloneable {
       TypeMem live = live(gvn);
       if( _live != live )
         return true;            // Found a liveness improvement
-      if( this instanceof CallEpiNode && ((CallEpiNode)this).is_copy() ||
-          this instanceof CallNode    && ((CallNode   )this).is_copy() )
-        return true;
     }
     for( Node def : _defs ) if( def != null && def.more_ideal(gvn,bs,level) ) return true;
     for( Node use : _uses ) if( use != null && use.more_ideal(gvn,bs,level) ) return true;
@@ -548,7 +555,7 @@ public abstract class Node implements Cloneable {
   // with a TypeMem at(1).
   boolean is_mem() { return false; }
   // For most memory-producing Nodes, exactly 1 memory producer follows.
-  Node get_mem_writer() {
+  public Node get_mem_writer() {
     for( Node use : _uses ) if( use.is_mem() )return use;
     return null;
   }

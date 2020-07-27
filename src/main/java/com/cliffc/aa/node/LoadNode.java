@@ -45,21 +45,19 @@ public class LoadNode extends Node {
 
     // Load can move out of a Call, if the function has no Parm:mem - happens
     // for single target calls that do not (have not yet) inlined.
-    CallNode call;    CallEpiNode cepi;
-    if( mem instanceof MProjNode && mem.in(0) instanceof CallNode && !(call=(CallNode)mem.in(0)).is_copy() )
-      return set_mem(call.mem(),gvn);
+    if( mem instanceof MProjNode && mem.in(0) instanceof CallNode )
+      return set_mem(((CallNode)mem.in(0)).mem(),gvn);
 
     // Loads from final memory can bypass calls
     if( adr instanceof  ProjNode && adr.in(0) instanceof NewNode &&
-        mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode &&
-        !(cepi=(CallEpiNode)mem.in(0)).is_copy() ) {
+        mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode ) {
+      CallEpiNode cepi = (CallEpiNode)mem.in(0);
       TypeStruct ts = (TypeStruct)((NewNode)adr.in(0))._ts;
       int idx = ts.find(_fld);
       if( idx != -1 && ts.fmod(idx)==TypeStruct.FFNL ) {
-        call = cepi.call();
-        Type tcall = gvn.type(call);
-        if( tcall instanceof TypeTuple && CallNode.tmem(tcall).isa(gvn.type(mem)) )
-          return set_mem(call.mem(),gvn);
+        Node cmem = cepi.call().mem();
+        if( gvn.type(cmem).isa(gvn.type(mem)) ) // Memory types align
+          return set_mem(cmem,gvn);
       }
     }
 
@@ -91,9 +89,12 @@ public class LoadNode extends Node {
         return st.val();
     }
 
-    // Bypass unrelated Stores.  Since unrelated, can bypass in-error stores.
-    if( st != null && !Util.eq(_fld,st._fld) )
+    // Display can bypass unrelated Stores.  Since unrelated, can bypass in-error stores -
+    // which means no checking for store errors.  Not valid in general, as it allows
+    // multiple memories alive at once.
+    if( st != null && Util.eq(_fld,"^") && !Util.eq(_fld,st._fld) )
       return set_mem(st.mem(),gvn);
+    
     if( st != null ) {
       Type stadr = gvn.type(st.adr());
       BitsAlias st_aliases = stadr instanceof TypeMemPtr ? ((TypeMemPtr)stadr)._aliases : null;
