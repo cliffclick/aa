@@ -3,7 +3,6 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
-import com.cliffc.aa.util.IBitSet;
 import org.jetbrains.annotations.NotNull;
 
 // Allocates a TypeObj and produces a Tuple with the TypeObj and a TypeMemPtr.
@@ -16,9 +15,6 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   // Unique alias class, one class per unique memory allocation site.
   // Only effectively-final, because the copy/clone sets a new alias value.
   public int _alias; // Alias class
-
-  // Set of aliases read or written by this node.  Only _alias.
-  public IBitSet _escapees;
 
   // A list of field names and field-mods, folded into the initial state of
   // this NewObj.  These can come from initializers at parse-time, or stores
@@ -41,54 +37,56 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
 
   // NewNodes do not really need a ctrl; useful to bind the upward motion of
   // closures so variable stores can more easily fold into them.
-  public NewNode( byte type, int parent_alias, T to, Node mem         ) { super(type,null,mem    ); _init(parent_alias,to); }
-  public NewNode( byte type, int parent_alias, T to, Node mem,Node fld) { super(type,null,mem,fld); _init(parent_alias,to); }
+  public NewNode( byte type, int parent_alias, T to         ) { super(type,(Node)null); _init(parent_alias,to); }
+  public NewNode( byte type, int parent_alias, T to,Node fld) { super(type,  null,fld); _init(parent_alias,to); }
   private void _init(int parent_alias, T to) {
     _alias = BitsAlias.new_alias(parent_alias);
     _tptr = TypeMemPtr.make(_alias,TypeObj.ISUSED);
-    _escapees = new IBitSet();
-    _escapees.set(_alias);
     sets(to);
   }
   String xstr() { return "New"+"*"+_alias; } // Self short name
   String  str() { return "New"+_ts; } // Inline less-short name
 
-  @Override boolean is_mem() { return true; }
-  Node mem() { return in(1); }
-  static int def_idx(int fld) { return fld+2; } // Skip mem in slot 1
+  static int def_idx(int fld) { return fld+1; } // Skip ctl in slot 0
   Node fld(int fld) { return in(def_idx(fld)); } // Node for field#
 
   // Recompute default memory cache on a change
   @SuppressWarnings("unchecked")
   protected final void sets( T ts ) {
     _ts = ts;
+    TypeObj oldc = _crushed;
     _crushed = ts.crush();
+    if( oldc != _crushed ) {
+      GVNGCM gvn = Env.GVN;                         // Big cheat
+      gvn.setype(Env.DEFMEM,Env.DEFMEM.value(gvn)); // Immediately update
+      gvn.add_work_uses(Env.DEFMEM);
+    }
   }
 
-  @SuppressWarnings("unchecked")
   @Override public Node ideal(GVNGCM gvn, int level) {
-    Type tmem = gvn.type(mem());
-    assert tmem instanceof TypeMem || tmem==Type.ANY || tmem==Type.ALL;
     // If either the address or memory is not looked at then the memory
     // contents are dead.  The object might remain as a 'gensym' or 'sentinel'
     // for identity tests.
-    if( _defs._len > 2 && captured(gvn) ) {
-      while( !is_dead() && _defs._len > 2 )
+    if( _defs._len > 1 && captured(gvn) ) {
+      while( !is_dead() && _defs._len > 1 )
         pop(gvn);               // Kill all fields except memory
       sets(dead_type());
       gvn.set_def_reg(Env.DEFMEM,_alias,gvn.add_work(gvn.con(TypeObj.UNUSED)));
       if( is_dead() ) return this;
-      gvn.add_work_uses(_uses.at(0));  // Get FPtrs from MProj from this
+      gvn.add_work_uses(_uses.at(0));  // Get FPtrs from MrgProj from this
       return this;
     }
 
+    if( _ts._esc && !_ts.is_con() && !escaped(gvn) ) {
+      sets(_ts.make_from_esc(false));
+      return this;
+    }
     return null;
   }
 
-  @Override IBitSet escapees(GVNGCM gvn) { return _escapees; }
+  @Override BitsAlias escapees( GVNGCM gvn) { return _tptr._aliases; }
   abstract T dead_type();
-  @Override public boolean basic_liveness() { return false; }
-  @Override public TypeMem live_use( GVNGCM gvn, Node def ) { return _live; }
+  boolean is_unused() { return _ts==dead_type(); }
 
   // Basic escape analysis.  If no escapes and no loads this object is dead.
   private boolean captured( GVNGCM gvn ) {
@@ -97,13 +95,13 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     Node mem = _uses.at(0);
     // If only either address or memory remains, then memory contents are dead
     if( _uses._len==1 ) {
-      if( mem instanceof MProjNode ) return true; // No pointer, just dead memory
+      if( mem instanceof MrgProjNode ) return true; // No pointer, just dead memory
       // Just a pointer; currently on Strings become memory constants and
       // constant-fold - leaving the allocation dead.
       return !(gvn.type(in(1)) instanceof TypeStr);
     }
     Node ptr = _uses.at(1);
-    if( ptr instanceof MProjNode ) ptr = _uses.at(0); // Get ptr not mem
+    if( ptr instanceof MrgProjNode ) ptr = _uses.at(0); // Get ptr not mem
 
     // Scan for memory contents being unreachable.
     // Really stupid!
@@ -119,7 +117,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     if( gvn._opt_mode==0 ) return true; // Assume escaped in parser
     if( _uses._len!=2 ) return false; // Dying/dead, not escaped
     Node ptr = _uses.at(0);
-    if( ptr instanceof MProjNode ) ptr = _uses.at(1); // Get ptr not mem
+    if( ptr instanceof MrgProjNode ) ptr = _uses.at(1); // Get ptr not mem
     return ptr._live==TypeMem.ESCAPE;
   }
 
@@ -142,15 +140,4 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   // NewNodes and join alias classes, but this is not the normal CSE and so is
   // not done by default.
   @Override public boolean equals(Object o) {  return this==o; }
-  // If object is dead, memory is a pass-thru
-  @Override public Node is_copy(GVNGCM gvn, int idx) {
-    if( idx!=0 ) return null;
-    if( _ts != dead_type() ) return null;
-    Type t = gvn.type(mem());
-    if( !(t instanceof TypeMem) ) return null;
-    TypeMem tm = (TypeMem)t;
-    if( tm.at(_alias) != TypeObj.UNUSED )
-      return null;
-    return mem();
-  }
 }

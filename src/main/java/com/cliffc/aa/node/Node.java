@@ -368,11 +368,12 @@ public abstract class Node implements Cloneable {
   public TypeMem live( GVNGCM gvn ) {
     if( basic_liveness() ) {    // Basic liveness only; e.g. primitive math ops
       boolean alive=false;
-      for( Node use : _uses ) { // Computed across all uses
-        TypeMem live = use.live_use(gvn,this);
-        if( live == TypeMem.ALIVE ) alive = true;
-        else if( live != TypeMem.DEAD ) return TypeMem.ESCAPE;
-      }
+      for( Node use : _uses ) // Computed across all uses
+        if( use._live != TypeMem.DEAD ) {
+          TypeMem live = use.live_use(gvn,this);
+          if( live == TypeMem.ALIVE ) alive = true;
+          else if( live != TypeMem.DEAD ) return TypeMem.ESCAPE;
+        }
       return alive ? TypeMem.ALIVE : TypeMem.DEAD;
     }
     // Compute meet/union of all use livenesses
@@ -380,6 +381,7 @@ public abstract class Node implements Cloneable {
     for( Node use : _uses )      // Computed across all uses
       if( use._live != TypeMem.DEAD )
         live = (TypeMem)live.meet(use.live_use(gvn, this)); // Make alive used fields
+    live = live.flatten_fields();
     assert !(live.at(1) instanceof TypeLive);
     return live;
   }
@@ -387,22 +389,6 @@ public abstract class Node implements Cloneable {
   // Overridden in subclasses that do per-def liveness.
   public TypeMem live_use( GVNGCM gvn, Node def ) {
     return _keep>0 ? TypeMem.MEM : _live;
-  }
-  // More complex liveness for a collapsing "is_copy" node
-  TypeMem live_use_copy(Node def ) {
-    int idx = _defs.find(def);  // idx==1 is memory
-    ProjNode proj = ProjNode.proj(this,idx); // Projection for the copy
-    // If memory, use the memory projection (if its there), else self must also be a memory liveness
-    if( idx==1 ) return proj==null ? _live : proj._live;
-    // Dead inputs often set to ANY, which is 'alive' because it has a use but it just marks a dead input
-    if( def instanceof ConNode && ((ConNode)def)._t==Type.ANY ) return TypeMem.ALIVE;
-    // If a projection, as alive as it is
-    if( proj !=null ) return proj._live;
-    // TODO: Rethink FP2Closure
-    if( _op==OP_CALL && idx==2/*looking at call.fun*/ && (idx=_uses.find(e -> e._op==OP_FP2CLO))!= -1 )
-      return _uses.at(idx)._live;
-    // Not a memory, no projection user so dead
-    return TypeMem.DEAD;
   }
 
   // Compute basic liveness only: a flag of alive-or-dead represented
@@ -553,7 +539,7 @@ public abstract class Node implements Cloneable {
 
   // True if normally (not in-error) produces a TypeMem value or a TypeTuple
   // with a TypeMem at(1).
-  boolean is_mem() { return false; }
+  public boolean is_mem() { return false; }
   // For most memory-producing Nodes, exactly 1 memory producer follows.
   public Node get_mem_writer() {
     for( Node use : _uses ) if( use.is_mem() )return use;
@@ -571,7 +557,7 @@ public abstract class Node implements Cloneable {
 
   // Aliases that a MemJoin might choose between.  Not valid for nodes which do
   // not manipulate memory.
-  IBitSet escapees(GVNGCM gvn) { throw com.cliffc.aa.AA.unimpl("graph error"); }
+  BitsAlias escapees( GVNGCM gvn) { throw com.cliffc.aa.AA.unimpl("graph error"); }
 
   // Walk a subset of the dominator tree, looking for the last place (highest
   // in tree) this predicate passes, or null if it never does.

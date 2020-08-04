@@ -45,7 +45,7 @@ public class ScopeNode extends Node {
     set_def(1,n,gvn);
     return this;
   }
-  @Override boolean is_mem() { return true; }
+  @Override public boolean is_mem() { return true; }
 
   public Node get(String name) { return stk().get(name); }
   public boolean is_mutable(String name) { return stk().is_mutable(name); }

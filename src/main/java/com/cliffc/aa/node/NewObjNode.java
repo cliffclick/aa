@@ -1,6 +1,5 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
@@ -19,12 +18,12 @@ public class NewObjNode extends NewNode<TypeStruct> {
   public       Parse[] _fld_starts; // Start of each tuple member; 0 for the display
   // NewNodes do not really need a ctrl; useful to bind the upward motion of
   // closures so variable stores can more easily fold into them.
-  public NewObjNode( boolean is_closure, TypeStruct disp, Node mem, Node clo ) {
-    this(is_closure, BitsAlias.RECORD, disp, mem, clo);
+  public NewObjNode( boolean is_closure, TypeStruct disp, Node clo ) {
+    this(is_closure, BitsAlias.RECORD, disp, clo);
   }
   // Called by IntrinsicNode.convertTypeNameStruct
-  public NewObjNode( boolean is_closure, int par_alias, TypeStruct ts, Node mem, Node clo ) {
-    super(OP_NEWOBJ,par_alias,ts,mem,clo);
+  public NewObjNode( boolean is_closure, int par_alias, TypeStruct ts, Node clo ) {
+    super(OP_NEWOBJ,par_alias,ts,clo);
     _is_closure = is_closure;
     assert ts._ts[0].is_display_ptr();
   }
@@ -39,7 +38,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
 
   // No more fields
   public void no_more_fields() { sets(_ts.close()); }
-  
+
   // Create a field from parser for an inactive this
   public void create( String name, Node val, byte mutable, GVNGCM gvn  ) {
     assert !Util.eq(name,"^"); // Closure field created on init
@@ -64,7 +63,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
   public void update( String tok, byte mutable, Node val, GVNGCM gvn  ) { update(_ts.find(tok),mutable,val,gvn); }
   // Update the field & mod
   public void update( int fidx, byte mutable, Node val, GVNGCM gvn  ) {
-    Type oldt = gvn.unreg(this);  TypeObj oldc = _crushed;
+    Type oldt = gvn.unreg(this);
     update_active(fidx,mutable,val,gvn);
     Type newt = value(gvn);
     gvn.rereg(this,newt);
@@ -79,7 +78,6 @@ public class NewObjNode extends NewNode<TypeStruct> {
     if( newt!=oldt )
       for( Node use : _uses )
         gvn.setype(use,use.value(gvn)); // Record "downhill" type for OProj, DProj
-    if( _crushed != oldc )   gvn.add_work(Env.DEFMEM); // Crush updates DefMem
   }
   // Update default value.  Used by StoreNode folding into a NewObj initial
   // state.  Used by the Parser when updating local variables... basically
@@ -126,12 +124,31 @@ public class NewObjNode extends NewNode<TypeStruct> {
     }
   }
 
+  @Override public Node ideal(GVNGCM gvn, int level) {
+    Node n = super.ideal(gvn,level);
+    if( n != null ) return n;
+
+    // If the value lifts a final field, so does the default lift.
+    Type ts0 = gvn.type(this);
+    if( ts0 instanceof TypeTuple ) {
+      TypeTuple ts1 = (TypeTuple)ts0;
+      TypeObj ts3 = (TypeObj)ts1.at(0);
+      if( ts3 != TypeObj.UNUSED ) {
+        TypeStruct ts4 = _ts.make_from(((TypeStruct)ts3)._ts);
+        TypeStruct ts5 = ts4.crush();
+        assert ts4.isa(ts5);
+        if( ts5 != _crushed ) {
+          sets(ts4);
+          return this;
+        }
+      }
+    }
+    return null;
+  }
+
   @Override public Type value(GVNGCM gvn) {
-    Type tmem0 = gvn.type(mem());
-    if( !(tmem0 instanceof TypeMem) ) return tmem0.oob();
-    TypeMem tmem = (TypeMem)tmem0;
     TypeObj newt=TypeObj.UNUSED; // If dead
-    if( _ts!=dead_type() ) {
+    if( !is_unused() ) {
       // Gather args and produce a TypeStruct
       Type[] ts = TypeAry.get(_ts._ts.length);
       for( int i=0; i<ts.length; i++ )
@@ -139,11 +156,9 @@ public class NewObjNode extends NewNode<TypeStruct> {
       newt = _ts.make_from(ts);  // Pick up field names and mods
       if( !escaped(gvn) ) newt = newt.make_from_esc(false);
     }
-    TypeMem tmem2 = !escaped(gvn)// No escape on pointer, so no incoming self-variant
-      ? tmem.set(_alias,newt)    // Stomp over incoming value at same alias
-      : tmem.st (_alias,newt);   // Merge with incoming value at same alias
-    
-    return TypeTuple.make(tmem2,_tptr);   // Complex obj, simple ptr.
+    return TypeTuple.make(newt,_tptr);   // Complex obj, simple ptr.
   }
   @Override TypeStruct dead_type() { return TypeStruct.ANYSTRUCT; }
+  // All fields are escaping
+  @Override public TypeMem live_use( GVNGCM gvn, Node def ) { return TypeMem.ESCAPE; }
 }

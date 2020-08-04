@@ -240,7 +240,7 @@ public class FunNode extends RegionNode {
     // Split the callers according to the new 'fun'.
     int old_fidx = fidx();
     FunNode fun = make_new_fun(gvn, ret, formals);
-    split_callers(gvn,ret,fun,body,path,old_fidx);
+    split_callers(gvn,ret,fun,body,path);
     assert Env.START.more_flow(gvn,new VBitSet(),true,0)==0; // Initial conditions are correct
     return this;
   }
@@ -535,7 +535,7 @@ public class FunNode extends RegionNode {
   // Clone the function; wire calls *from* the clone same as the original.
   // Then rewire all calls that were unwired; for a type-split wire both targets
   // with an Unresolved.  For a path-split rewire left-or-right by path.
-  private void split_callers( GVNGCM gvn, RetNode oldret, FunNode fun, Ary<Node> body, int path, int old_fidx ) {
+  private void split_callers( GVNGCM gvn, RetNode oldret, FunNode fun, Ary<Node> body, int path ) {
     gvn.add_work(this);
     // Unwire this function and collect unwired calls.  Leave the
     // unknown-caller, if any.
@@ -584,7 +584,7 @@ public class FunNode extends RegionNode {
 
     // Keep around the old body, even as the FunPtrs get shuffled from Call to Call
     for( Node use : oldret._uses ) if( use instanceof FunPtrNode ) use.keep();
-    
+
     // Collect the old/new returns and funptrs and add to map also.  The old
     // Ret has a set (not 1!) of FunPtrs, one per unique Display.
     RetNode newret = (RetNode)map.get(oldret);
@@ -634,15 +634,15 @@ public class FunNode extends RegionNode {
       } else                     // Path Split
         fun.set_def(1,gvn.con(Type.XCTRL),gvn);
     }
-    
+
     // Put all new nodes into the GVN tables and worklist
     for( Map.Entry<Node,Node> e : map.entrySet() ) {
       Node oo = e.getKey();     // Old node
       Node nn = e.getValue();   // New node
       Type nt = gvn.type(oo);   // Generally just copy type from original nodes
-      if( nn instanceof MProjNode && nn.in(0) instanceof NewNode ) { // Cloned allocations registers with default memory
-        Env.DEFMEM.make_mem(gvn,(NewNode)nn.in(0),(MProjNode)nn);
-        Env.DEFMEM.make_mem(gvn,(NewNode)oo.in(0),(MProjNode)oo);
+      if( nn instanceof MrgProjNode ) { // Cloned allocations registers with default memory
+        Env.DEFMEM.make_mem(gvn,(NewNode)nn.in(0),(MrgProjNode)nn);
+        Env.DEFMEM.make_mem(gvn,(NewNode)oo.in(0),(MrgProjNode)oo);
         int oldalias = BitsAlias.parent(((NewNode)oo.in(0))._alias);
         gvn.set_def_reg(Env.DEFMEM,oldalias,gvn.add_work(gvn.con(TypeObj.UNUSED)));
       }
@@ -652,7 +652,7 @@ public class FunNode extends RegionNode {
         if( ofptr.fidx()==oldret._fidx )
           nt = TypeFunPtr.make(BitsFun.make0(newret._fidx),ofptr._nargs,ofptr._disp);
       }
-      
+
       gvn.rereg(nn,nt);
     }
     gvn.setype(Env.DEFMEM,Env.DEFMEM.value(gvn));
@@ -725,7 +725,7 @@ public class FunNode extends RegionNode {
         return (ParmNode)use;
     return null;
   }
-  boolean is_parm( Node n ) { return n instanceof ParmNode && n.in(0)==this; }
+
   public ParmNode rpc() { return parm(-1); }
   public RetNode ret() {
     for( Node use : _uses )

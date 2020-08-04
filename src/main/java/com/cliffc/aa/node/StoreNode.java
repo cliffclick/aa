@@ -3,11 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeMem;
-import com.cliffc.aa.type.TypeMemPtr;
-import com.cliffc.aa.type.TypeStruct;
-import com.cliffc.aa.util.IBitSet;
+import com.cliffc.aa.type.*;
 
 // Store a value into a named struct field.  Does it's own nil-check and value
 // testing; also checks final field updates.
@@ -26,7 +22,7 @@ public class StoreNode extends Node {
 
   String xstr() { return "."+_fld+"="; } // Self short name
   String  str() { return xstr(); }   // Inline short name
-  @Override boolean is_mem() { return true; }
+  @Override public boolean is_mem() { return true; }
 
   Node mem() { return in(1); }
   Node adr() { return in(2); }
@@ -40,7 +36,7 @@ public class StoreNode extends Node {
 
     // If Store is by a New and no other Stores, fold into the New.
     NewObjNode nnn;  int idx;
-    if( mem instanceof MProjNode &&
+    if( mem instanceof MrgProjNode &&
         mem.in(0) instanceof NewObjNode && (nnn=(NewObjNode)mem.in(0)) == adr.in(0) &&
         mem._uses._len==2 && !val().is_forward_ref() &&
         (idx=nnn._ts.find(_fld))!= -1 && nnn._ts.can_update(idx) ) {
@@ -51,11 +47,11 @@ public class StoreNode extends Node {
 
     // If Store is of a memory-writer, and the aliases do not overlap, make parallel with a Join
     if( tmp != null && mem.is_mem() && mem.check_solo_mem_writer(this) ) {
-      IBitSet esc2 = mem.escapees(gvn);
+      BitsAlias esc2 = mem.escapees(gvn);
       if( !tmp._aliases.overlaps(esc2) ) {
         Node head;
         if( mem instanceof StoreNode ) head=mem;
-        else if( mem instanceof MProjNode && mem.in(0) instanceof NewNode ) head=mem.in(0);
+        else if( mem instanceof MrgProjNode ) head=mem;
         else throw com.cliffc.aa.AA.unimpl(); // Break out another SESE split
         // head is the 1 memory writer after head.in
         if( head.in(1).check_solo_mem_writer(head) &&
@@ -82,7 +78,9 @@ public class StoreNode extends Node {
     }
 
     // If Store is of a MemJoin and it can enter the split region, do so.
-    if( _keep==0 && tmp != null && mem instanceof MemJoinNode && mem.check_solo_mem_writer(this) ) {
+    // Requires no other memory *reader* (or writer), as the reader will
+    // now see the Store effects as part of the Join.
+    if( _keep==0 && tmp != null && mem instanceof MemJoinNode && mem._uses._len==1 ) {
       Node memw = get_mem_writer();
       // Check the address does not have a memory dependence on the Join.
       // TODO: This is super conservative
@@ -106,20 +104,31 @@ public class StoreNode extends Node {
 
   // StoreNode needs to return a TypeObj for the Parser.
   @Override public TypeMem value(GVNGCM gvn) {
-    Type mem = gvn.type(mem());
-    Type adr = gvn.type(adr());
-    Type val = gvn.type(val());   // Value
-    if( !(mem instanceof TypeMem   ) ) return mem.oob(TypeMem.ALLMEM);
-    if( !(adr instanceof TypeMemPtr) ) return adr.oob(TypeMem.ALLMEM);
-    TypeMem    tmem= (TypeMem   )mem;
-    TypeMemPtr tmp = (TypeMemPtr)adr;
+    Node mem = mem(), adr = adr(), val = val();
+    Type tmem = gvn.type(mem);
+    Type tadr = gvn.type(adr);
+    Type tval = gvn.type(val);  // Value
+    if( !(tmem instanceof TypeMem   ) ) return tmem.oob(TypeMem.ALLMEM);
+    if( !(tadr instanceof TypeMemPtr) ) return tadr.oob(TypeMem.ALLMEM);
+    TypeMem    tm  = (TypeMem   )tmem;
+    TypeMemPtr tmp = (TypeMemPtr)tadr;
 
-    return tmem.update(tmp._aliases,_fin,_fld,val);
+    // Find matching prior store, if possible
+    Node st = LoadNode.find_previous_store(gvn,mem,adr,tmp._aliases,_fld,false);
+    // If exactly storing into a NewNode, do the exact update
+    if( st instanceof NewNode ) {
+      for( int alias : tmp._aliases )
+        tm = tm.set(alias,tm.at(alias).st(_fin,_fld,tval));
+      return tm;
+    }
+    // Otherwise store into an approximate memory state
+    return tm.update(tmp._aliases,_fin,_fld,tval);
   }
-  @Override IBitSet escapees(GVNGCM gvn) {
+  @Override
+  BitsAlias escapees( GVNGCM gvn) {
     Type adr = gvn.type(adr());
-    if( !(adr instanceof TypeMemPtr) ) return adr.above_center() ? IBitSet.EMPTY : IBitSet.FULL;
-    return ((TypeMemPtr)adr)._aliases.bitset();
+    if( !(adr instanceof TypeMemPtr) ) return adr.above_center() ? BitsAlias.EMPTY : BitsAlias.FULL;
+    return ((TypeMemPtr)adr)._aliases;
   }
 
   @Override public boolean basic_liveness() { return false; }

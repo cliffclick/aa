@@ -98,6 +98,18 @@ public class TypeStr extends TypeObj<TypeStr> {
   @Override public boolean may_be_con() { return super.may_be_con() || _con != null; }
   @Override public boolean is_con() { return _con != null; }
   @Override public Type meet_nil(Type t) { return this; }
+  @Override public TypeObj st_meet(TypeObj obj) {
+    if( this==obj ) return this;
+    if( !(obj instanceof TypeStr) ) {
+      if( obj.getClass()==TypeObj.class ) return obj.st_meet(this);
+      throw com.cliffc.aa.AA.unimpl(); // Probably type error from parser
+    }
+    TypeStr str = (TypeStr)obj;
+    if( _con==null ) return str;
+    if( str._con==null ) return this;
+    throw com.cliffc.aa.AA.unimpl(); // Unequal strings is a parse error
+  }
+  @Override TypeObj flatten_fields() { return this; }
   // Widen (loss info), to make it suitable as the default function memory.
   @Override public TypeObj crush() { return this; }
 

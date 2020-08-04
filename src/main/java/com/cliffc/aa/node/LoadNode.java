@@ -37,10 +37,22 @@ public class LoadNode extends Node {
     Type tadr = gvn.type(adr);
     BitsAlias aliases = tadr instanceof TypeMemPtr ? ((TypeMemPtr)tadr)._aliases : null;
 
+    // If we can find an exact previous store, fold immediately to the value.
+    // Do not move Loads "up" past unrelated stores, lest we make memory alive twice.
+    Node st = find_previous_store(gvn,mem(),adr(),aliases,_fld,true);
+    if( st!=null ) {
+      if( st instanceof StoreNode ) return (( StoreNode)st).val();
+      else                          return ((NewObjNode)st).get(_fld);
+    }
+
     // Load can move past a Join if all aliases align.
     if( mem instanceof MemJoinNode && aliases != null ) {
-      Node jmem = ((MemJoinNode)mem).can_bypass(aliases.bitset());
-      if( jmem != null ) return set_mem(jmem,gvn);
+      Node jmem = ((MemJoinNode)mem).can_bypass(aliases);
+      if( jmem != null ) {
+        gvn.setype(jmem,jmem.value(gvn));
+        set_mem(jmem,gvn);
+        return this;
+      }
     }
 
     // Load can move out of a Call, if the function has no Parm:mem - happens
@@ -48,65 +60,92 @@ public class LoadNode extends Node {
     if( mem instanceof MProjNode && mem.in(0) instanceof CallNode )
       return set_mem(((CallNode)mem.in(0)).mem(),gvn);
 
-    // Loads from final memory can bypass calls
-    if( adr instanceof  ProjNode && adr.in(0) instanceof NewNode &&
-        mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode ) {
-      CallEpiNode cepi = (CallEpiNode)mem.in(0);
-      TypeStruct ts = (TypeStruct)((NewNode)adr.in(0))._ts;
-      int idx = ts.find(_fld);
-      if( idx != -1 && ts.fmod(idx)==TypeStruct.FFNL ) {
-        Node cmem = cepi.call().mem();
-        if( gvn.type(cmem).isa(gvn.type(mem)) ) // Memory types align
-          return set_mem(cmem,gvn);
-      }
-    }
-
-    // Loads against a NewNode cannot NPE, cannot fail, always return the input
-    NewObjNode nnn = adr.in(0) instanceof NewObjNode ? (NewObjNode)adr.in(0) : null;
-    int idx;
-    if( nnn != null && nnn == mem.in(0) && (idx=nnn._ts.find(_fld)) != -1 )
-      return nnn.fld(idx)==this ? gvn.con(Type.ANY) : nnn.fld(idx); // Field value
-
     // Load from a memory Phi; split through in an effort to sharpen the memory.
     // TODO: Only split thru function args if no unknown_callers, and must make a Parm not a Phi
     // TODO: Hoist out of loops.
-    if( mem._op == OP_PHI && mem.in(0)._op != OP_LOOP && nnn!=null ) {
+    if( mem._op == OP_PHI && mem.in(0)._op != OP_LOOP && adr.in(0) instanceof NewNode ) {
       Node lphi = new PhiNode(Type.SCALAR,((PhiNode)mem)._badgc,mem.in(0));
       for( int i=1; i<mem._defs._len; i++ )
         lphi.add_def(gvn.xform(new LoadNode(mem.in(i),adr,_fld,_bad)));
       return lphi;
     }
 
-    // If Load is of a New and the aliases do not overlap, bypass.
-    if( mem instanceof MProjNode && mem.in(0) instanceof NewNode && aliases != null &&
-        !aliases.test_recur(((NewNode)mem.in(0))._alias) )
-      return set_mem(((NewNode)mem.in(0)).mem(),gvn);
-
-    // Loads against an equal store; cannot NPE since the Store did not.
-    StoreNode st=null;
-    if( mem instanceof StoreNode && adr == (st=((StoreNode)mem)).adr() ) {
-      if( Util.eq(_fld,st._fld) && st.err(gvn)==null )
-        return st.val();
-    }
-
-    // Display can bypass unrelated Stores.  Since unrelated, can bypass in-error stores -
-    // which means no checking for store errors.  Not valid in general, as it allows
-    // multiple memories alive at once.
-    if( st != null && Util.eq(_fld,"^") && !Util.eq(_fld,st._fld) )
-      return set_mem(st.mem(),gvn);
-    
-    if( st != null ) {
-      Type stadr = gvn.type(st.adr());
-      BitsAlias st_aliases = stadr instanceof TypeMemPtr ? ((TypeMemPtr)stadr)._aliases : null;
-      if( aliases != null && st_aliases != null && aliases != st_aliases &&
-          aliases.join(st_aliases) == BitsAlias.EMPTY ) {
-        return set_mem(st.mem(),gvn);
-      }
-    }
-    
     return null;
   }
 
+  // Find a matching prior Store or NewObj - matching field name and address.
+  // Returns null if highest available memory does not match name & address.
+  static Node find_previous_store(GVNGCM gvn, Node mem, Node adr, BitsAlias aliases, String fld, boolean is_load ) {
+    Type tmem0 = gvn.type(mem);
+    if( !(tmem0 instanceof TypeMem) || aliases==null ) return null;
+    TypeMem tmem = (TypeMem)tmem0;
+    // Walk up the memory chain looking for an exact matching Store or New
+    while(true) {
+      if( mem instanceof StoreNode ) {
+        StoreNode st = (StoreNode)mem;
+        if( Util.eq(st._fld,fld) ) {
+          if( st.adr()==adr ) return st.err(gvn)== null ? st : null; // Exact matching store
+          // Matching field, wrong address.  Look for no-overlap in aliases
+          Type tst = gvn.type(st.adr());
+          if( !(tst instanceof TypeMemPtr) ) return null; // Store has weird address
+          BitsAlias st_alias = ((TypeMemPtr)tst)._aliases;
+          if( aliases.join(st_alias) != BitsAlias.EMPTY )
+            return null;        // Aliases not disjoint, might overlap but wrong address
+        }               // Wrong field name, cannot match
+        mem = st.mem(); // Advance past
+
+      } else if( mem instanceof MProjNode ) {
+        Node mem0 = mem.in(0);
+        if( mem0 instanceof CallEpiNode ) { // Bypass an entire function call
+          mem = _find_previous_store_call(gvn,aliases,tmem,(CallEpiNode)mem0,fld,is_load);
+          if( mem==null ) return null;
+        } else if( mem0 instanceof MemSplitNode ) { // Lifting out of a split/join region
+          mem = ((MemSplitNode)mem0).mem();
+        } else if( mem0 instanceof CallNode ) { // Lifting out of a Call
+          mem = ((CallNode)mem0).mem();
+        } else {
+          throw com.cliffc.aa.AA.unimpl(); // decide cannot be equal, and advance, or maybe-equal andreturn null
+        }
+      } else if( mem instanceof MrgProjNode ) {
+        MrgProjNode mrg = (MrgProjNode)mem;
+        NewNode nnn = mrg.nnn();
+        if( nnn instanceof NewObjNode ) {
+          int idx = ((NewObjNode)nnn)._ts.find(fld);
+          if( idx >= 0 && adr instanceof ProjNode && adr.in(0) == nnn ) return nnn; // Direct hit
+        }  // wrong field name or wrong alias, cannot match
+        if( aliases.test_recur(nnn._alias) ) return null; // Overlapping, but wrong address - dunno, so must fail
+        mem = mrg.mem(); // Advance past
+      } else if( mem instanceof MemJoinNode ) {
+        Node jmem = ((MemJoinNode)mem).can_bypass(aliases);
+        if( jmem == null ) return null;
+        mem = jmem;
+
+      } else if( mem instanceof PhiNode ||
+                 mem instanceof StartMemNode ) {
+        return null;            // Would have to match on both sides, and Phi the results
+      } else {
+        throw com.cliffc.aa.AA.unimpl(); // decide cannot be equal, and advance, or maybe-equal andreturn null
+      }
+    }
+  }
+
+  // Can bypass call?  Return null if cannot or call.mem if can.
+  static private Node _find_previous_store_call(GVNGCM gvn, BitsAlias aliases, TypeMem tmem, CallEpiNode cepi, String fld, boolean is_load) {
+    // TODO: Strengthen this.  Global no-esc can bypass, IF during inline/clone
+    // each clone body updates both aliases everywhere.
+    if( !is_load ) return null; // For now, Store types NEVER bypass a call.
+    CallNode call = cepi.call();
+    if( tmem.alias_is_no_esc(aliases) )
+      return call.mem();        // Can always bypass global no-escape
+    if( tmem.fld_is_final(aliases,fld) ) 
+      return is_load ? call.mem() : null; // Loads from final memory can bypass calls.  Stores cannot, store-over-final is in error.
+    TypeMemPtr escs = call.tesc(gvn.type(call));
+    if( is_load && escs._aliases.join(aliases)==BitsAlias.EMPTY )
+      return call.mem(); // Load from call; if memory is made *in* the call this will fail later on an address mismatch.
+    return null;         // Stuck behind call
+  }
+  
+  
   @Override public Type value(GVNGCM gvn) {
     Type adr = gvn.type(adr());
     if( !(adr instanceof TypeMemPtr) ) return adr.oob();
@@ -134,16 +173,7 @@ public class LoadNode extends Node {
   }
 
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
-    if( def==adr() ) return _live==TypeMem.DEAD ? _live : TypeMem.ALIVE; // Alive as the Load is alive
-    Type tmem = gvn.type(mem());
-    Type tptr = gvn.type(adr());
-    // If either is above-center, then only basic-liveness - the load can load
-    // from anything getting anything.
-    if( tptr.above_center() )
-      return TypeMem.ANYMEM;
-    // TypeObj memory is already alias-constricted.  Can only demand from that alias.
-    if( tmem instanceof TypeObj && tptr instanceof TypeMemPtr )
-      return TypeMem.make(((TypeMemPtr)tptr)._aliases,(TypeObj)tmem);
+    if( def==adr() ) return TypeMem.ALIVE;
     // Alive (like normal liveness), plus the address, plus whatever can be
     // reached from the address.
     return ScopeNode.compute_live_mem(gvn,mem(),adr());

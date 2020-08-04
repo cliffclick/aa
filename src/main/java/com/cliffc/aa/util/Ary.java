@@ -110,7 +110,7 @@ public class Ary<E> implements Iterable<E> {
   public void clear( ) { _len=0; }
 
   public void fill( E e ) { Arrays.fill(_es,0,_len,e); }
-  
+
   // Extend and set
   public E setX( int i, E e ) {
     if( i >= _len ) Arrays.fill(_es,_len,_es.length,null);
@@ -160,11 +160,12 @@ public class Ary<E> implements Iterable<E> {
   }
 
   /** @param c Collection to be added */
-  public void addAll( Ary<? extends E> c ) {
-    if( c._len==0 ) return;
+  public Ary<E> addAll( Ary<? extends E> c ) {
+    if( c._len==0 ) return this;
     while( _len+c._len > _es.length ) _es = Arrays.copyOf(_es,_es.length<<1);
     System.arraycopy(c._es,0,_es,_len,c._len);
     _len += c._len;
+    return this;
   }
 
   /** @return compact array version */

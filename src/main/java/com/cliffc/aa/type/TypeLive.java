@@ -69,6 +69,9 @@ public class TypeLive extends TypeObj<TypeLive> {
     return make(_any&ts._any,_esc|ts._esc,_flags|ts._flags);
   }
   @Override protected TypeLive make_from_esc_impl( boolean esc) { return make(_any,esc,_flags); }
+  @Override public TypeObj st_meet(TypeObj obj) { throw com.cliffc.aa.AA.unimpl(); }
+  // Widen (loss info), to make it suitable as the default function memory.
+  @Override public TypeObj crush() { return this; }
 
   @Override public boolean may_be_con() { return false; }
   @Override public boolean is_con() { return false; }

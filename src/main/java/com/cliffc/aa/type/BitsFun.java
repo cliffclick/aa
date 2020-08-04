@@ -7,7 +7,7 @@ import java.util.HashMap;
 public class BitsFun extends Bits<BitsFun> {
   // Intern: lookup and return an existing Bits or install in hashmap and
   // return a new Bits.  Overridden in subclasses to make type-specific Bits.
-  private static HashMap<BitsFun,BitsFun> INTERN = new HashMap<>();
+  private static final HashMap<BitsFun,BitsFun> INTERN = new HashMap<>();
   private static BitsFun FREE=null;
   @Override BitsFun make_impl(int con, long[] bits ) {
     BitsFun b1 = FREE;
@@ -31,7 +31,6 @@ public class BitsFun extends Bits<BitsFun> {
   // Have to make a first BitsFun here; thereafter the v-call to make_impl
   // will make more on demand.  But need the first one to make a v-call.
   public  static final BitsFun FULL = new BitsFun().make_impl(1,new long[]{1L | (1L<<ALL)});
-  public  static final BitsFun NZERO= make0(ALL);
   public  static final BitsFun ANY = FULL.dual();
   public  static final BitsFun NIL = make0(0);
   public  static final BitsFun EMPTY = make0();

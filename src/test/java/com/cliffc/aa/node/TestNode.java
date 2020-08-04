@@ -236,13 +236,13 @@ public class TestNode {
       test1monotonic_intrinsic(prim);
     test1monotonic(new IntrinsicNode(tname,null,null,mem,_ins[2]));
     test1monotonic(new   LoadNode(_ins[1],_ins[2],"x",null));
-    NewObjNode nnn1 = new NewObjNode(false,TypeStruct.DISPLAY,_ins[0],_gvn.con(Type.NIL));
+    NewObjNode nnn1 = new NewObjNode(false,TypeStruct.DISPLAY,_gvn.con(Type.NIL));
     set_type(1,Type.SCALAR);  nnn1.create_active("x",_ins[1],TypeStruct.FFNL,_gvn);
     set_type(2,Type.SCALAR);  nnn1.create_active("y",_ins[2],TypeStruct.FFNL,_gvn);
     test1monotonic(nnn1);
-    NewObjNode nnn2 = new NewObjNode(false,TypeStruct.DISPLAY,_ins[0],_gvn.con(Type.NIL));
-    set_type(1,Type.SCALAR);  nnn2.create_active("x",_ins[2],TypeStruct.FFNL,_gvn);
-    set_type(2,Type.SCALAR);  nnn2.create_active("y",_ins[3],TypeStruct.FFNL,_gvn);
+    NewObjNode nnn2 = new NewObjNode(false,TypeStruct.DISPLAY,_gvn.con(Type.NIL));
+    set_type(1,Type.SCALAR);  nnn2.create_active("x",_ins[1],TypeStruct.FFNL,_gvn);
+    set_type(2,Type.SCALAR);  nnn2.create_active("y",_ins[2],TypeStruct.FFNL,_gvn);
     nnn2.set_name(tname);
     test1monotonic(nnn2);
     ((ConNode<Type>)_ins[1])._t = Type.SCALAR; // ParmNode reads this for _alltype
@@ -250,7 +250,7 @@ public class TestNode {
     test1monotonic(new    PhiNode(Type.SCALAR,null,_ins[0],_ins[1],_ins[2]));
     for( PrimNode prim : PrimNode.PRIMS() )
       test1monotonic_prim(prim);
-    test1monotonic(new   ProjNode(_ins[0],1));
+    test1monotonic(new   ProjNode(1, _ins[0]));
     test1monotonic(new RegionNode(null,_ins[1],_ins[2]));
     test1monotonic(new    RetNode(_ins[0],mem,_ins[1],_ins[2],fun_plus)); // ctl,mem,val,rpc,fun
     test1monotonic(new  StoreNode(_ins[1],_ins[2],_ins[3],TypeStruct.FRW ,"x",null));

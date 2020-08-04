@@ -3,7 +3,6 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
-import com.cliffc.aa.util.IBitSet;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.BitSet;
@@ -71,7 +70,7 @@ import java.util.BitSet;
 // type invariant after adding the edges, and this is not always possible; the
 // types can flow to the Fun and the Call at a different rate, and the two
 // not-connected Nodes might be out-of-type-order relative to each other.  The
-// progress and monotonicity properties guarentee they will eventually align.
+// progress and monotonicity properties guarantee they will eventually align.
 //
 // Discovery of a CG edge happens when a Call's function value changes, but
 // graph type alignment might be much later.  We want to act on the discovery
@@ -95,7 +94,10 @@ public class CallNode extends Node {
 
   String xstr() { return (is_dead() ? "X" : "C")+"all";  } // Self short name
   String  str() { return xstr(); }       // Inline short name
-  @Override boolean is_mem() { return true; }
+  @Override public boolean is_mem() {    // Some calls are known to not write memory
+    CallEpiNode cepi = cepi();
+    return cepi!=null && ProjNode.proj(cepi,1)!=null;
+  }
 
   // Call arguments:
   // 0 - Control.  If XCTRL, call is not reached.
@@ -127,18 +129,22 @@ public class CallNode extends Node {
 
   // Add a bunch of utilities for breaking down a Call.value tuple:
   // takes a Type, upcasts to tuple, & slices by name.
-  // ts[0] = Ctrl = in(0)
-  // ts[1] = Mem into the callee = mem() = in(1)
-  // ts[2] = Function pointer (code ptr + display) == in(2) == arg(0)
-  // ts[3] = in(3) == arg(1)
-  // ts[4]...
+  // ts[0] == in(0) == ctl() == Ctrl
+  // ts[1] == in(1) == mem() == Mem into the callee = mem()
+  // ts[2] == in(2) == fun() == Function pointer (code ptr + display) == arg(0)
+  // ts[3] == in(3) == arg(1)
+  // ts[4] == in(4) == arg(2)
+  // ....
+  // ts[_defs._len] = Escape-in aliases as a BitsAlias
 
   static final int MEMIDX=1; // Memory into the callee
   static final int ARGIDX=2; //
   static        Type       tctl( Type tcall ) { return             ((TypeTuple)tcall).at(0); }
   static        TypeMem    emem( Type tcall ) { return emem(       ((TypeTuple)tcall)._ts ); }
   static        TypeMem    emem( Type[] ts  ) { return (TypeMem   ) ts[MEMIDX]; } // callee memory passed into function
-                TypeMemPtr tesc( Type tcall ) { return (TypeMemPtr)((TypeTuple)tcall).at(_defs._len); }
+  TypeMemPtr tesc( Type tcall ) {
+    return tcall==Type.ANY ? TypeMemPtr.OOP.dual() : (TypeMemPtr)((TypeTuple)tcall).at(_defs._len);
+  }
   static public TypeFunPtr ttfp( Type tcall ) { return (TypeFunPtr)((TypeTuple)tcall).at(ARGIDX); }
   static public TypeFunPtr ttfpx(Type tcall ) {
     Type t = ((TypeTuple)tcall).at(ARGIDX);
@@ -170,7 +176,7 @@ public class CallNode extends Node {
     Type tc = gvn.type(this);
     if( !(tc instanceof TypeTuple) ) return null;
     TypeTuple tcall = (TypeTuple)tc;
-    
+
     // Dead, do nothing
     if( tctl(tcall)!=Type.CTRL ) { // Dead control (NOT dead self-type, which happens if we do not resolve)
       if( (ctl() instanceof ConNode) ) return null;
@@ -192,8 +198,8 @@ public class CallNode extends Node {
       Node arg1 = arg(1);
       Type tadr = gvn.type(arg1);
       // Bypass a merge on the 2-arg input during unpacking
-      if( mem instanceof MProjNode && tadr instanceof TypeMemPtr &&
-          arg1 instanceof ProjNode && arg1.in(0) instanceof NewNode && mem.in(0)==arg1.in(0) ) {
+      if( mem instanceof MrgProjNode && tadr instanceof TypeMemPtr &&
+          arg1 instanceof ProjNode && mem.in(0)==arg1.in(0) ) {
         int alias = ((TypeMemPtr)tadr)._aliases.abit();
         if( alias == -1 ) throw AA.unimpl(); // Handle multiple aliases, handle all/empty
         NewNode nnn = (NewNode)arg1.in(0);
@@ -201,7 +207,7 @@ public class CallNode extends Node {
         int len = nnn._defs._len;
         for( int i=1; NewNode.def_idx(i)<len; i++ ) // Push the args; unpacks the tuple
           add_def( nnn.fld(i));
-        set_mem(nnn.mem(),gvn);
+        set_mem(((MrgProjNode)mem).mem(),gvn);
         _unpacked = true;     // Only do it once
         return this;
       }
@@ -230,7 +236,7 @@ public class CallNode extends Node {
     // If the function is unresolved, see if we can resolve it now.
     // Fidxs are typically low during iter, but can be high during
     // iter post-GCP on error calls where nothing resolves.
-    if( unk instanceof UnresolvedNode && !fidxs.above_center() && !fidxs.test(1)) {
+    if( fidx == -1 && !fidxs.above_center() && !fidxs.test(1)) {
       BitsFun rfidxs = resolve(fidxs,tcall._ts,(TypeMem)gvn.type(mem()),gvn._opt_mode==2);
       if( rfidxs==null ) return null;            // Dead function, stall for time
       FunPtrNode fptr = least_cost(gvn, rfidxs, unk); // Check for least-cost target
@@ -261,30 +267,32 @@ public class CallNode extends Node {
     // behavior down).  The New address must not be reachable from the Call
     // arguments transitively.
     Node mem = mem();
-    if( gvn._opt_mode > 0 && mem instanceof MProjNode && mem.in(0) instanceof NewNode &&
+    if( gvn._opt_mode > 0 && mem instanceof MrgProjNode &&
         cepi != null && (mem._uses._len==1 || (mem._uses._len==2 && mem._uses.find(Env.DEFMEM)!=-1) ) ) {
-      NewNode nnn = (NewNode)mem.in(0);
-      ProjNode cepij = ProjNode.proj(cepi,1); // Memory projection from Cepi
-      if( cepij!=null && !tesc(tcall)._aliases.test_recur(nnn._alias) ) {
+      MrgProjNode mrg = (MrgProjNode)mem;
+      NewNode nnn = mrg.nnn();
+      ProjNode cepij = ProjNode.proj(cepi,1); // Memory projection from CEPI
+      if( cepij!=null && !tesc(tcall)._aliases.test_recur(nnn._alias) ) { // No alias collisions
         TypeMem tmpj = (TypeMem)gvn.type(mem);
-        TypeMem tnnn = (TypeMem)gvn.type(nnn.mem());
-        // here a New Display and an unrelated recursive Call want to swap.
+        // here a New Display and an unrelated Call want to swap.
         // Swapping might allow required sharpening for the large map test.
         // But the New filters incoming New since its a Display.  Swapping
         // exposes the Call to a very weak prior value for New.
-        if( !tmpj.at(nnn._alias)._esc || tnnn.at(nnn._alias).isa(tmpj.at(nnn._alias)) ) {
+        if( !tmpj.at(nnn._alias)._esc /*|| tnnn.at(nnn._alias).isa(tmpj.at(nnn._alias))*/ ) {
           // Swap the Call/CallEpi & NewNode.
-          mem.keep();
-          set_mem(nnn.mem(),gvn);
-          gvn.replace(cepij,mem);
-          gvn.set_def_reg(nnn,1,cepij);
-          mem.unhook();
+          set_mem(mrg.mem(),gvn);
+          gvn.replace(cepij,mrg);
+          gvn.set_def_reg(mrg,1,cepij);
           // Recompute values for NewNode, which moves after the Call.
-          gvn.setype(nnn,nnn.value(gvn));
-          gvn.setype(mem,mem.value(gvn));
+          gvn.setype(cepi ,cepi .value(gvn));
+          gvn.setype(cepij,cepij.value(gvn));
+          gvn.setype( nnn , nnn .value(gvn));
+          gvn.setype( mem , mem .value(gvn));
           // Recompute lives for Call/CallEpi, which moves before the New.
           for( Node x : new Node[]{mem,nnn,cepij,cepi,this} )
             x._live = x.live(gvn);
+          gvn.add_work_uses(cepi);
+          gvn.add_work_uses(nnn);
           return this;
         }
       }
@@ -310,8 +318,6 @@ public class CallNode extends Node {
     Type mem = gvn.type(mem());
     if( !(mem instanceof TypeMem) ) return mem.oob();
     TypeMem tmem = (TypeMem)mem;
-    TypeMem tcallee = tmem.remove_no_escapes();
-    ts[MEMIDX]=tcallee;         // Memory into the callee, not caller
 
     // Copy args for called functions.  Arg0 is display, handled below.
     // Also gather all aliases from all args
@@ -321,6 +327,8 @@ public class CallNode extends Node {
     // Recursively search memory for aliases; compute escaping aliases
     BitsAlias as2 = tmem.all_reaching_aliases(as);
     ts[_defs._len] = TypeMemPtr.make(as2,TypeObj.UNUSED);
+    TypeMem tcallee = tmem.remove_no_escapes(as2);
+    ts[MEMIDX]=tcallee;         // Memory into the callee, not caller
 
     // Not a function to call?
     Type tfx = gvn.type(fun());
@@ -345,7 +353,7 @@ public class CallNode extends Node {
     if( TypeMemPtr.OOP.isa(t)   ) return BitsAlias.FULL;
     return BitsAlias.EMPTY;
   }
-  @Override IBitSet escapees(GVNGCM gvn) { return IBitSet.FULL; }
+  @Override BitsAlias escapees( GVNGCM gvn) { return BitsAlias.FULL; }
 
   // Compute live across uses.  If pre-GCP, then we may not be wired and thus
   // have not seen all possible function-body uses.  Check for #FIDXs == nwired().
@@ -369,7 +377,6 @@ public class CallNode extends Node {
   }
   @Override public boolean basic_liveness() { return false; }
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
-    if( _live==TypeMem.DEAD ) return TypeMem.DEAD;
     if( def==fun() ) {                         // Function argument
       if( gvn._opt_mode < 2 ) return TypeMem.ESCAPE;   // Prior to GCP, assume all fptrs are alive and display escapes
       if( _not_resolved_by_gcp ) return TypeMem.ESCAPE;// GCP failed to resolve, this call is in-error
@@ -386,9 +393,10 @@ public class CallNode extends Node {
         if( proj == null || proj._live == TypeMem.DEAD )
           return TypeMem.DEAD; // Proj not used
       }
-      return def.basic_liveness() ? TypeMem.ESCAPE : TypeMem.ANYMEM;    // Args always alive and escape
+      assert def.basic_liveness();
+      return TypeMem.ESCAPE;    // Args always alive and escape
     }
-    
+
     // Needed to sharpen args for e.g. resolve and errors.
     Type tcall = gvn.type(this);
     Type tcmem = gvn.type(mem());
@@ -398,7 +406,7 @@ public class CallNode extends Node {
     for( int i=1; i<nargs(); i++ ) {
       Type targ = targ(tcall,i);
       if( TypeMemPtr.OOP.isa(targ) )
-        { aliases=BitsAlias.FULL; break; }; // All possible pointers, so all memory is alive
+        { aliases=BitsAlias.FULL; break; } // All possible pointers, so all memory is alive
       if( !(targ instanceof TypeMemPtr) ) continue; // Not a pointer, does not need memory to sharpen
       if( targ.above_center() ) continue; // Have infinite choices still, no memory
       aliases = aliases.meet(((TypeMemPtr)targ)._aliases);
@@ -406,8 +414,7 @@ public class CallNode extends Node {
     // Conservative too strong; need only memories that go as deep as the
     // formal types.
     TypeMem tmem2 = caller_mem.slice_reaching_aliases(caller_mem.all_reaching_aliases(aliases));
-    TypeMem tmem3 = (TypeMem)tmem2.meet(_live);
-    return tmem3;
+    return (TypeMem)tmem2.meet(_live);
   }
 
   TypeMem live_use_call( GVNGCM gvn, int dfidx ) {
@@ -478,6 +485,8 @@ public class CallNode extends Node {
           choices = choices.set(kidx);
     if( choices.abit() != -1 )  // Single choice with all good, no high, no low, no bad
       return choices;           // Report it low
+    if( choices==BitsFun.EMPTY )// No good choices
+      return sgn(fidxs,false);  // Report all the bad ones low
     return sgn(choices,fidxs.above_center());
   }
 
@@ -527,7 +536,7 @@ public class CallNode extends Node {
       Type mt_lo = actual.meet(formal       );
       Type mt_hi = actual.meet(formal.dual());
       if( mt_lo==actual ) flags|=LOW;       // Low
-      else if( mt_hi==actual ) flags|=GOOD; // Good
+      else if( mt_hi==actual && mt_lo==formal ) flags|=GOOD; // Good
       else if( mt_hi==formal.dual() ) flags|=HIGH;
       else if( mt_lo==formal ) flags|=GOOD; // handles some display cases with prims hi/lo inverted
       else flags|=BAD;                      // Side-ways is bad

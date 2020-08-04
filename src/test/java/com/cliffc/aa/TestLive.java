@@ -50,7 +50,7 @@ public class TestLive {
     gvn.setype(fdy,ti9);
 
     // New object, fields x,y holding ints
-    NewObjNode nnn = new NewObjNode(false,TypeStruct.DISPLAY,mmm,gvn.con(Type.NIL));
+    NewObjNode nnn = new NewObjNode(false,TypeStruct.DISPLAY,gvn.con(Type.NIL));
     nnn.create_active("x",fdx,TypeStruct.FFNL,gvn);
     nnn.create_active("y",fdy,TypeStruct.FFNL,gvn);
     nnn.no_more_fields();
@@ -59,7 +59,7 @@ public class TestLive {
     // Proj, OProj
     Node mem = new MProjNode(nnn,0);
     gvn.setype(mem,mem.value(gvn));
-    Node ptr = new  ProjNode(nnn,1);
+    Node ptr = new  ProjNode(1, nnn);
     gvn.setype(ptr,ptr.value(gvn));
 
     // Use the object for scope exit

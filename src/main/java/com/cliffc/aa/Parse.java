@@ -264,7 +264,6 @@ public class Parse {
       if( t instanceof TypeStruct ) {   // Add struct types with expanded arg lists
         FunPtrNode epi2 = IntrinsicNode.convertTypeNameStruct((TypeStruct)tn, BitsAlias.RECORD, _gvn);
         Node rez2 = _e.add_fun(bad,tvar,epi2); // type-name constructor with expanded arg list
-        _gvn.setype(Env.DEFMEM,Env.DEFMEM.value(_gvn));
         _gvn.init0(rez2._uses.at(0));      // Force init of Unresolved
       }
     }
@@ -600,7 +599,7 @@ public class Parse {
           badargs[0] = errMsg(oldx-1); // Base call error reported at the opening paren
           n = do_call(new CallNode(false,badargs,ctrl(),mem(),n,arg)); // Pass the tuple
         }
-        
+
       } else {
         return n;               // Just an arg
       }
@@ -740,7 +739,7 @@ public class Parse {
 
     // Build the tuple from gathered args
     TypeStruct mt_tuple = TypeStruct.make(false,new String[]{"^"},TypeStruct.ts(Type.XNIL),new byte[]{TypeStruct.FFNL},true);
-    NewObjNode nn = new NewObjNode(false,BitsAlias.RECORD,mt_tuple,mem(),con(Type.XNIL));
+    NewObjNode nn = new NewObjNode(false,BitsAlias.RECORD,mt_tuple,con(Type.XNIL));
     for( int i=0; i<args._len; i++ )
       nn.create_active((""+i).intern(),args.at(i),TypeStruct.FFNL,_gvn);
     nn._fld_starts = bads.asAry();
@@ -748,8 +747,8 @@ public class Parse {
 
     // NewNode returns a TypeMem and a TypeMemPtr (the reference).
     NewObjNode nnn = (NewObjNode)gvn(nn);
-    set_mem( Env.DEFMEM.make_mem_proj(_gvn,nnn) );
-    return gvn(new ProjNode(nnn,1));
+    set_mem( Env.DEFMEM.make_mem_proj(_gvn,nnn,mem()) );
+    return gvn(new ProjNode(1, nnn));
   }
 
   /** Parse anonymous struct; the opening "@{" already parsed.  A lexical scope
@@ -961,9 +960,9 @@ public class Parse {
     }
     TypeStr ts = TypeStr.con(new String(_buf,oldx,_x-oldx-1).intern());
     // Convert to ptr-to-constant-memory-string
-    NewStrNode nnn = gvn( new NewStrNode(ts,mem(),con(ts))).keep();
-    set_mem(Env.DEFMEM.make_mem_proj(_gvn,nnn));
-    return gvn( new ProjNode(nnn.unhook(),1));
+    NewStrNode nnn = gvn( new NewStrNode(ts,con(ts))).keep();
+    set_mem(Env.DEFMEM.make_mem_proj(_gvn,nnn,mem()));
+    return gvn( new ProjNode(1, nnn.unhook()));
   }
 
   /** Parse a type or return null
@@ -1205,7 +1204,7 @@ public class Parse {
     Node cepi = gvn(new CallEpiNode(call,Env.DEFMEM)).keep();
     set_ctrl(   gvn(new CProjNode(cepi,0)));
     set_mem (   gvn(new MProjNode(cepi,1))); // Return memory from all called functions
-    return gvn(new ProjNode(cepi.unhook(),2));
+    return gvn(new ProjNode(2, cepi.unhook()));
   }
 
   // Whack current control with a syntax error

@@ -4,11 +4,10 @@ import com.cliffc.aa.node.*;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
 import com.cliffc.aa.util.VBitSet;
-import com.cliffc.aa.util.NonBlockingHashMapLong;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.Set;
 import java.util.BitSet;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 // Global Value Numbering, Global Code Motion
@@ -31,7 +30,8 @@ public class GVNGCM {
     _wrk_bits.set(n._uid);
     return n;
   }
-  public boolean on_work( Node n ) { return _wrk_bits.get(n._uid); }
+
+  public boolean on_work( Node n ) { return _wrk_bits.get(n._uid) || _wrk3_bits.get(n._uid); }
   // Add all uses as well
   public void add_work_uses( Node n ) {
     for( Node use : n._uses )  add_work(use);
@@ -52,6 +52,16 @@ public class GVNGCM {
   public void add_work2( Node n ) {
     if( !_wrk2_bits.tset(n._uid) )
       _work2.add(n);
+  }
+  // A third worklist.
+  // As a coding/speed hack, do not try to find all nodes which respond to
+  // control dominance changes during worklist iteration.  These can be very
+  // far removed from the change point.  Collect and do them separately.
+  private final Ary<Node> _work3 = new Ary<>(new Node[1], 0);
+  private final VBitSet _wrk3_bits = new VBitSet();
+  public void add_work3( Node n ) {
+    if( !_wrk3_bits.tset(n._uid) )
+      _work3.add(n);
   }
 
   // Array of types representing current node types.  Essentially a throw-away
@@ -107,13 +117,12 @@ public class GVNGCM {
     Node con2 = _vals.get(con);
     if( con2 != null ) {           // Found a prior constant
       kill0(con);                  // Kill the just-made one
-      con2._live = (TypeMem)con2._live.meet(TypeMem.ALIVE);  // Prior constant is now alive; might have been either dead or alive before
-      return (ConNode)con2;
+      con = (ConNode)con2;
     }
-    con._live = TypeMem.ALIVE;  // Alive, but demands no memory
     setype(con,t);
     _vals.put(con,con);
     add_work(con);
+    con._live = TypeMem.ALIVE;  // Alive, but demands no memory
     return con;
   }
 
@@ -273,7 +282,7 @@ public class GVNGCM {
   // - Not an ErrNode AND
   // - Type.is_con()
   private boolean replace_con(Type t, Node n) {
-    if( n._keep >0 || n instanceof ConNode || n instanceof ErrNode )
+    if( n._keep >0 || n instanceof ConNode || n instanceof ErrNode || n.is_prim() )
       return false; // Already a constant, or never touch an ErrNode
     if( !t.is_con() ) {
       if( t instanceof TypeFunPtr && !(n instanceof FunPtrNode) )
@@ -342,6 +351,10 @@ public class GVNGCM {
     }
     if( !old.is_dead() ) { // if old is being replaced, it got removed from GVN table and types table.
       assert !check_opt(old);
+      if( nnn._live != old._live ) {                    // New is as alive as the old
+        nnn._live = (TypeMem)nnn._live.meet(old._live); // Union of liveness
+        add_work_defs(nnn);                             // Push liveness uphill
+      }
       replace(old,nnn);
       nnn.keep();               // Keep-alive
       kill0(old);               // Delete the old n, and anything it uses
@@ -443,8 +456,10 @@ public class GVNGCM {
         add_work(u);         // And put on worklist, to get re-visited
         if( u instanceof RetNode )
           add_work_uses(u); // really trying to get CallEpi to test trivial inline again
-        if( u instanceof MemSplitNode )
-          add_work_uses(ProjNode.proj(u,0));
+        if( u instanceof MemSplitNode ) {
+          Node puse = ProjNode.proj(u, 0);
+          if( puse != null ) add_work_uses(puse);
+        }
         if( nnn instanceof MProjNode && nnn.in(0) instanceof MemSplitNode )
           add_work_uses(u); // Trying to get Join/Merge/Split to fold up
         if( u instanceof StoreNode ) // Load/Store fold up
@@ -473,19 +488,18 @@ public class GVNGCM {
     // until other optimizations are done.  Gather the possible inline requests
     // and set them aside until the main list is empty, then work down the
     // inline list.
-    //
-    // As a coding/speed hack, do not try to find all nodes which respond to
-    // control dominance changes during worklist iteration.  These can be very
-    // far removed from the change point.  Collect and do them separately.
-    NonBlockingHashMapLong<Node> can_doms = new NonBlockingHashMapLong<>();
-    boolean did_doms=false;
+    boolean did_doms=true;
     int cnt=0, wlen;
-    while( (wlen=_work._len) > 0 || _work2._len > 0 ) {
-      final boolean dom_small_work = wlen!=0;
-      // Revisit all the possible control-dominance winners
-      if( !dom_small_work ) {
-        boolean old_doms=did_doms; did_doms=true;
-        if( !old_doms ) { do_doms(can_doms); continue; }
+    while( (wlen=_work._len) > 0 || _work2._len > 0 || _work3._len > 0 ) {
+      boolean dom_small_work = wlen!=0;
+      // As a coding/speed hack, do not try to find all nodes which respond to
+      // control dominance changes during worklist iteration.  These can be
+      // very far removed from the change point.  Collect and do them
+      // separately.  Revisit all the possible control-dominance winners.
+      if( !dom_small_work ) { // No work
+        if( !did_doms ) { _work.addAll(_work3); _wrk_bits.or(_wrk3_bits); did_doms=true; dom_small_work=(wlen=_work._len)!=0; }
+        _work3.clear(); _wrk3_bits.clear();
+        if( _work._len == 0 && _work2._len == 0 ) break;
       }
       // Turned on, fairly expensive assert
       assert dom_small_work || !Env.START.more_ideal(this,new VBitSet(),1); // No more small-work ideal calls to apply
@@ -493,7 +507,7 @@ public class GVNGCM {
       (dom_small_work ? _wrk_bits : _wrk2_bits).clear(n._uid);
       if( n.is_dead() ) continue;
       if( n._uses._len==0 && n._keep==0 ) { kill(n); continue; }
-      if( can_dom(n) ) can_doms.put(n._uid,n);
+      if( can_dom(n) ) add_work3(n);
       xform_old(n, dom_small_work ? 0 : 2);
       if( did_doms && _work._len != wlen-1 ) did_doms=false; // Did work, revisit doms
       // VERY EXPENSIVE ASSERT
@@ -502,16 +516,13 @@ public class GVNGCM {
     }
     // No more ideal calls, small or large, to apply
     assert !Env.START.more_ideal(this,new VBitSet(),3);
+    assert _work3.isEmpty();
   }
 
   private boolean can_dom(Node n) {
-    return n instanceof CastNode ||
+    return n instanceof LoadNode || n instanceof StoreNode ||
+      n instanceof CastNode ||
       (n instanceof MProjNode && n.in(0) instanceof CallEpiNode);
-  }
-  private void do_doms(NonBlockingHashMapLong<Node> can_doms) {
-    for( Node n : can_doms.values() )
-      if( n.is_dead() ) can_doms.remove(n._uid);
-      else add_work(n);
   }
 
   // Global Optimistic Constant Propagation.  Passed in the final program state
@@ -579,7 +590,7 @@ public class GVNGCM {
 
             // When new control paths appear on Regions, the Region stays the
             // same type (Ctrl) but the Phis must merge new values.
-            if( use instanceof RegionNode )
+            if( use instanceof RegionNode || use instanceof CallNode )
               add_work_uses(use);
             // If a Parm:Mem input is updated, all Parm:ptrs may update.
             if( use instanceof ParmNode && ((ParmNode)use)._idx==-2 )
@@ -632,7 +643,7 @@ public class GVNGCM {
         if( fptr==null ) {      // Not resolving, will be an error later
           call._not_resolved_by_gcp = true;
           add_work(call.fun());
-          continue;  
+          continue;
         }
         call.set_fun_reg(fptr,this);// Set resolved edge
         add_work(call);
@@ -660,7 +671,7 @@ public class GVNGCM {
     if( fidxs==BitsFun.ANY )    return null; // no choices, must be error
     return call.least_cost(this,fidxs,call.fun());
   }
-  
+
   private void check_and_wire( CallEpiNode cepi ) {
     if( !cepi.check_and_wire(this) ) return;
     add_work(cepi.call());

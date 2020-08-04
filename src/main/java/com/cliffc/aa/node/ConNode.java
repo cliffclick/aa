@@ -23,7 +23,7 @@ public class ConNode<T extends Type> extends Node {
     // If any use is alive, the Con is alive... but it never demands memory.
     // Indeed, it may supply memory.
     for( Node use : _uses )
-      if( use.live_use(gvn, this) != TypeMem.DEAD )
+      if( use._live != TypeMem.DEAD && use.live_use(gvn, this) != TypeMem.DEAD )
         return TypeMem.ALIVE;
     return TypeMem.DEAD;
   }

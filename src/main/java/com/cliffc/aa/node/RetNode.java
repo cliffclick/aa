@@ -19,7 +19,7 @@ public final class RetNode extends Node {
   public Node val() { return in(2); }
   public Node rpc() { return in(3); }
   public FunNode fun() { return (FunNode)in(4); }
-  @Override boolean is_mem() { return true; }
+  @Override public boolean is_mem() { return true; }
   // If this function is not using any displays, then there is a single unique
   // FunPtr.  Otherwise this call is ambiguous, as each execution of the
   // FunPtrNode makes a new display.
@@ -77,7 +77,7 @@ public final class RetNode extends Node {
     // Look for a tail recursive call
     Node tail = tail_recursive(gvn);
     if( tail != null ) return tail;
-    
+
     return null;
   }
 
@@ -92,7 +92,7 @@ public final class RetNode extends Node {
     int idx; for( idx=1; idx<ctl._defs._len; idx++ ) {
       Node c = ctl.in(idx), cepi = c.in(0);
       if( c._op == OP_CPROJ && cepi._op == OP_CALLEPI &&
-          ((CallEpiNode)cepi).nwired()==1 && 
+          ((CallEpiNode)cepi).nwired()==1 &&
           ((CallEpiNode)cepi).wired(0)== this && // TODO: if in tail position, can be a tail call not self-recursive
           ((CallEpiNode)cepi).call().fun()._op == OP_FUNPTR ) // And a direct call
         break;
@@ -117,7 +117,7 @@ public final class RetNode extends Node {
     // every argument.  The first input comes from the parms; the second input
     // from the Call arguments - including the control.  Cut the call control,
     // which will go dead & collapse.
-    
+
     // Find the trailing control behind the Fun.
     Node cuse = null;           // Control use behind fun.
     for( Node use : fun._uses )
@@ -135,7 +135,7 @@ public final class RetNode extends Node {
     do_phi(gvn,fun,call,loop,-2);   // Also memory Phi
     // Cut the Call control
     gvn.set_def_reg(call,0,gvn.con(Type.XCTRL));
-    
+
     return this;
   }
 
@@ -146,7 +146,7 @@ public final class RetNode extends Node {
     Type tback  = gvn.type(call.argm(argn,gvn));
     return tback.isa(tenter);
   }
-  
+
   private static void do_phi(GVNGCM gvn, FunNode fun, CallNode call, LoopNode loop, int argn) {
     ParmNode parm = fun.parm(argn);
     if( parm==null ) return; // arg/parm might be dead
@@ -156,7 +156,7 @@ public final class RetNode extends Node {
     phi._live = parm._live;
     gvn.rereg(phi,gvn.type(parm));
   }
-  
+
   @Override public Type value(GVNGCM gvn) {
     if( ctl()==null ) return gvn.self_type(this); // No change if a copy
     TypeTuple TALL = TypeTuple.RET;

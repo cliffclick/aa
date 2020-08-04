@@ -71,7 +71,14 @@ public class TypeObj<O extends TypeObj<O>> extends Type<O> {
   public TypeObj update(byte fin, String fld, Type val) { return this; }
   // Exact object update.  Replaces fields.
   public TypeObj st    (byte fin, String fld, Type val) { return this; }
-
+  // Keep the same basic type, and meet related fields.  Type error if basic
+  // types are unrelated.
+  public TypeObj st_meet(TypeObj obj) {
+    if( _any || obj._any )  return (TypeObj)meet(obj);  // One is high, so just keep other side
+    return obj.crush().make_from_esc(_esc); // Both are low, so keep other fields but crush them
+  }
+  TypeObj flatten_fields() { return this; }
+  
   @Override public boolean above_center() { return _any; }
   @Override public boolean may_be_con() { return _any; }
   @Override public boolean is_con() { return false; }

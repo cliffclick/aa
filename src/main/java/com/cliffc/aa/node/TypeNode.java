@@ -51,7 +51,7 @@ public class TypeNode extends Node {
       Node cepi   = gvn.xform(new CallEpiNode(call,Env.DEFMEM)).keep();
       Node ctl    = gvn.xform(new CProjNode(cepi,0));
       Node postmem= gvn.xform(new MProjNode(cepi,1)).keep();
-      Node val    = gvn.xform(new  ProjNode(cepi.unhook(),2));
+      Node val    = gvn.xform(new  ProjNode(2, cepi.unhook()));
       // Type-check the return also
       Node chk    = gvn.xform(new  TypeNode(postmem,val,sig._ret,_error_parse));
       RetNode ret = (RetNode)gvn.xform(new RetNode(ctl,postmem.unhook(),chk,rpc,fun));

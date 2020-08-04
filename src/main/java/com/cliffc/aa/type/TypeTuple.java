@@ -44,10 +44,10 @@ public class TypeTuple extends Type<TypeTuple> {
       Type last = _ts[j];       // Last type
       for( j--; j>0; j-- ) if( _ts[j] != last )  break;
       sb.p(_ts[0].str(dups));   // First type
-      for( int i=1; i<=j; i++ ) // All types up to trailing equal parts
+      for( int i=1; i<=j+1; i++ ) // All types up to trailing equal parts
         sb.p(',').p(_ts[i].str(dups));
-      if( j+1<_ts.length-1 )  sb.p("..."); // Abbreviate tail
-      if( _ts.length> 1 ) sb.p(',').p(last);
+      if( j+2<_ts.length-1 )  sb.p("..."); // Abbreviate tail
+      if( _ts.length> j+2 ) sb.p(',').p(last);
     }
     sb.p(clos_parens());
     return sb.toString();

@@ -3,7 +3,6 @@ package com.cliffc.aa.type;
 import com.cliffc.aa.util.*;
 
 import java.util.Arrays;
-import java.util.BitSet;
 import java.util.HashMap;
 
 /**
@@ -344,7 +343,7 @@ public class TypeMem extends Type<TypeMem> {
   public TypeMem slice_reaching_aliases(BitsAlias aliases) { return slice_reaching_aliases(aliases,at(1),TypeObj.UNUSED); }
   public TypeMem slice_reaching_aliases(BitsAlias aliases, TypeObj base, TypeObj unuse) {
     if( aliases==BitsAlias.FULL ) return this;
-    TypeObj tos[] = new TypeObj[Math.max(_aliases.length,aliases.max()+1)];
+    TypeObj[] tos = new TypeObj[Math.max(_aliases.length,aliases.max()+1)];
     tos[1]=base;
     for( int i=2; i<tos.length; i++ ) {
       TypeObj to = at(i);
@@ -381,51 +380,23 @@ public class TypeMem extends Type<TypeMem> {
     return TypeMem.make0(oops);
   }
 
-  // Returns the same memory, with aliases not in the split set to either XOBJ
-  // or UNUSED.
-  public TypeMem split_by_alias(BitSet split) {
-    int max = Math.max(len(),split.length());
-    TypeObj[] mems = new TypeObj[max];
-    mems[1] = at(1);            // Set base
-    for( int alias=2; alias<max; alias++ ) {
-      TypeObj to = at(alias);
-      mems[alias] = (to==TypeObj.UNUSED || split.get(alias)) ? to : TypeObj.XOBJ;
-    }
-    return TypeMem.make0(mems);
+  // Whole object Set at an alias.
+  public TypeMem set( int alias, TypeObj obj ) {
+    if( at(alias)==obj ) return this; // Shortcut
+    int max = Math.max(_aliases.length,alias+1);
+    TypeObj[] tos = Arrays.copyOf(_aliases,max);
+    tos[alias] = obj;
+    return make0(tos);
   }
 
-  // Merge memories, left or right by alias
-  public TypeMem merge_by_alias(TypeMem rhs, BitSet split) {
-    int max = Math.max(rhs.len(),Math.max(len(),split.length()));
-    TypeObj[] mems = new TypeObj[max];
-    mems[1] = at(1);            // Set base from LHS
-    for( int alias=2; alias<max; alias++ )
-      mems[alias] = merge_one_lhs(split,alias,rhs.at(alias));
-    return TypeMem.make0(mems);
-  }
-  // If split right, take rhs.
-  // If split left, and rhs has no answer, take lhs.
-  // Else lhs has no answer, so take rhs.
-  public TypeObj merge_one_lhs(BitSet split, int alias, TypeObj rhs) {
-    if( split.get(alias) ) return rhs;          // Split right, always take right
-    // Split left.  See if this is a New alias
-    TypeObj lhs = at(alias);
-    return merge_pick(lhs,rhs);
-  }
-  public static TypeObj merge_pick(TypeObj lhs, TypeObj rhs) {
-    if( rhs == TypeObj.UNUSED ) return rhs; // Keep an UNUSED
-    if( lhs != TypeObj.UNUSED && lhs != TypeObj.XOBJ ) return lhs; // LHS has something
-    if( rhs == TypeObj.XOBJ ) return lhs; // RHS has no answer
-    return rhs;                 // RHS made a New or an Unused
-  }
-
-  // Whole object Store at an alias.  Just merge with the parent.
+  // Whole object Store at an alias.
+  // Lifts/sets the type, and meets fields.
   public TypeMem st( int alias, TypeObj obj ) {
     TypeObj to = at(alias);     // Current value for alias
     if( to==obj ) return this;  // Shortcut
     int max = Math.max(_aliases.length,alias+1);
     TypeObj[] tos = Arrays.copyOf(_aliases,max);
-    tos[alias] = (TypeObj)to.meet(obj);
+    tos[alias] = to.st_meet(obj);
     return TypeMem.make0(tos);
   }
 
@@ -439,44 +410,21 @@ public class TypeMem extends Type<TypeMem> {
     return make0(tos.asAry());
   }
 
-  // Whole object Set at an alias.
-  public TypeMem set( int alias, TypeObj obj ) {
-    if( at(alias)==obj ) return this; // Shortcut
-    int max = Math.max(_aliases.length,alias+1);
-    TypeObj[] tos = Arrays.copyOf(_aliases,max);
-    tos[alias] = obj;
-    return make0(tos);
-  }
 
-  // This-isa-mem only on the given aliases
-  public boolean isa_escape( TypeMem mem, BitsAlias escapes ) {
-    for( int alias : escapes )
-      if( alias > 0 )
-        for( int kid=alias; kid!=0; kid=BitsAlias.next_kid(alias,kid) )
-          if( !at(kid).isa(mem.at(kid)) )
-            return false;
-    return true;
-  }
-
-  
   // Flatten no-escapes to UNUSED
-  public TypeMem remove_no_escapes() {
+  public TypeMem remove_no_escapes( BitsAlias escs ) {
     int i; for( i=1; i<_aliases.length; i++ )
-      if( _aliases[i] != null && !_aliases[i]._esc && _aliases[i] != TypeObj.UNUSED )
+      if( test_no_escape(escs,i) )
         break;                  // Found a no-escape to remove
     if( i==_aliases.length ) return this; // Already flattened
     TypeObj[] tos = _aliases.clone();
     for( i=1; i<_aliases.length; i++ )
-      if( _aliases[i] != null && !_aliases[i]._esc && _aliases[i] != TypeObj.UNUSED )
+      if( test_no_escape(escs,i) )
         tos[i] = TypeObj.UNUSED;
     return make0(tos);
   }
-
-  // Set of escaping; up to current aliases.  
-  public IBitSet find_escapes() {
-    IBitSet escs = new IBitSet().flip();
-    for( int i=1; i<_aliases.length; i++ )  if( !at(i)._esc )  escs.clr(i);
-    return escs;
+  private boolean test_no_escape( BitsAlias escs, int alias ) {
+    return (_aliases[alias] != null && !_aliases[alias]._esc && _aliases[alias] != TypeObj.UNUSED) || !escs.test_recur(alias);
   }
 
   public TypeMem remove(BitsAlias escs) {
@@ -487,8 +435,44 @@ public class TypeMem extends Type<TypeMem> {
         tos[i] = TypeObj.UNUSED;
     return make0(tos);
   }
-  
-  
+
+  // True if field is final across all aliases
+  public boolean fld_is_final(BitsAlias aliases, String fld) {
+    for( int alias : aliases ) {
+      if( alias != 0 ) {
+        TypeObj to = at(alias);
+        if( !(to instanceof TypeStruct) ) return false;
+        TypeStruct ts = (TypeStruct)to;
+        int idx = ts.find(fld);
+        if( idx == -1 || ts.fmod(idx) != TypeStruct.FFNL )
+          return false;
+      }
+    }
+    return true;
+  }
+  // True if all aliases are no-escape
+  public boolean alias_is_no_esc(BitsAlias aliases) {
+    for( int alias : aliases )  if( alias != 0 && at(alias)._esc ) return false;
+    return true;
+  }
+
+  public TypeMem flatten_fields() {
+    TypeObj to, tof=null;
+    int i; for( i=1; i<_aliases.length; i++ ) {
+      if( (to =_aliases[i]) != null && (tof = to.flatten_fields())!=to )
+        break;
+    }
+    if( i==_aliases.length ) return this;
+
+    TypeObj[] tos = _aliases.clone();
+    tos[i++] = tof;
+    for( ; i<_aliases.length; i++ )
+      if( tos[i] != null )
+        tos[i] = tos[i].flatten_fields();
+    return make0(tos);
+  }
+
+
   @Override public boolean above_center() {
     for( TypeObj alias : _aliases )
       if( alias != null && !alias.above_center() && !alias.is_con() )

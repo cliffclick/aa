@@ -256,13 +256,6 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     bs[0] &= ~1;                // Strip nil
     return make(_con==-1,bs);
   }
-  // Ignore nil in 'this', and make both Bits below center, and check 'isa'
-  boolean is_contained(B bs1) {
-    B bs0 = strip_nil();
-    if( bs0.above_center() ) bs0 = bs0.dual();
-    if( bs1.above_center() ) bs1 = bs1.dual();
-    return bs0.isa(bs1);
-  }
 
   private static void or ( long[] bits, long con ) { bits[idx(con)] |=  mask(con); }
   private static void and( long[] bits, long con ) { bits[idx(con)] &= ~mask(con); }
@@ -329,13 +322,6 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     return above_center() ? bs : (B)this;
   }
 
-  private static int find_smallest_bit(long[] bits) {
-    for( long bit : bits )
-      if( bit != 0 )
-        return Long.numberOfTrailingZeros(bit);
-    return -1;
-  }
-
   // Virtually expand all bits in both arrays to cover all children,
   // then AND the bits, then re-pack.  However, we do it tree-by-tree
   // to keep from doing the full expansion costs.
@@ -356,24 +342,6 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
     }
   }
 
-  // Walk all the meet bits; if any are in the join return true.
-  private static boolean test( Tree tree, long[] meets, long[] joins ) {
-    for( int i=0; i<meets.length; i++ ) { // For all words
-      long l = meets[i];
-      if( l!=0 ) {
-        // TODO: Use Long.numberOfTrailingZeros (or LeadingZeros probably) to
-        // do this only once-per-set-bit.
-        for( int j=0; j<64; j++ ) // For all bits in word
-          if( (mask(j)&l) != 0 ) {
-            for( int par = (i<<6)+j; par!=0; par = tree.parent(par) ) // Walk parent chain
-              if( test(joins,par) )                // If parent set in join
-                return true;
-          }
-      }
-    }
-    return false;
-  }
-
   // Constants are self-dual; classes just flip the meet/join bit.
   @SuppressWarnings("unchecked")
   public B dual() { return make_impl(-_con,_bits); }
@@ -382,14 +350,22 @@ public abstract class Bits<B extends Bits<B>> implements Iterable<Integer> {
   // Note no special nil handling; both sides need to either handle nil or not
   public boolean isa(B bs) { return meet(bs) == bs; }
 
-  // True if overlap.
-  public boolean overlaps( IBitSet bs ) {
+  public Bits<B> subtract(Bits<B> bs) {
+    Bits<B> bs0 = this;
     for( int alias : this )
       for( int kid=alias; kid!=0; kid = tree().next_kid(alias,kid) )
-        if( bs.tst(kid) )
+        if( bs.test_recur(kid) )
+          bs0 = bs0.clear(kid);
+    return bs0;
+  }
+  public boolean overlaps(Bits<B> bs) {
+    for( int alias : this )
+      for( int kid=alias; kid!=0; kid = tree().next_kid(alias,kid) )
+        if( bs.test_recur(kid) )
           return true;
     return false;
   }
+
   // No kids
   public IBitSet bitset() {
     IBitSet bs = new IBitSet();

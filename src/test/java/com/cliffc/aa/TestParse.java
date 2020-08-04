@@ -16,11 +16,8 @@ public class TestParse {
   @Test public void testParse() {
     TypeStruct dummy = TypeStruct.DISPLAY;
     TypeMemPtr tdisp = TypeMemPtr.make(2,TypeStr.NO_DISP);
-    test("gen = {cnt:=0;({cnt++},{cnt})};" +
-        "tmp:=gen(); incA=tmp.0;getA=tmp.1;"+
-        "tmp:=gen(); incB=tmp.0;getB=tmp.1;"+
-        "incA();incB();incA(); getA()*10+getB()",
-      TypeInt.con(2*10+1));
+    //test_ptr("tmp=@{val=2;nxt=@{val=1;nxt=0}}; noinline_map={tree -> tree ? @{vv=tree.val&tree.val;nn=noinline_map(tree.nxt)} : 0}; noinline_map(tmp)",
+    //  "!@{vv=int8;noinline_map=~Scalar;nn=*[$]$?}");
 
     // A collection of tests which like to fail easily
     test("-1",  TypeInt.con( -1));
@@ -256,7 +253,7 @@ public class TestParse {
     test_name("A= :(flt,int)", TypeFlt.FLT64,TypeInt.INT64);
     test_name("A= :(   ,int)", Type.SCALAR  ,TypeInt.INT64);
 
-    test_ptr("A= :(str?, int); A( \"abc\",2 )","A:(*[$]!\"abc\";2;...)");
+    test_ptr("A= :(str?, int); A( \"abc\",2 )","A:(*[$]!\"abc\";2)");
     test_ptr("A= :(str?, int); A( (\"abc\",2) )","A:(*[$]!\"abc\";2)");
     testerr("A= :(str?, int)?","Named types are never nil",16);
   }
@@ -334,12 +331,12 @@ public class TestParse {
 
     // Building recursive types
     test("A= :int; A(1)", TypeInt.TRUE.set_name("A:"));
-    test_ptr("A= :(str?, int); A(0,2)","A:(~nil;2;...)");
+    test_ptr("A= :(str?, int); A(0,2)","A:(~nil;2)");
     // Named recursive types
-    test_ptr("A= :(A?, int); A(0,2)",(alias) -> TypeMemPtr.make(alias,TypeStruct.make_tuple_open(TypeStruct.ts(TypeMemPtr.NO_DISP,Type.XNIL,TypeInt.con(2))).set_name("A:").make_from_esc(false)));
-    test_ptr("A= :(A?, int); A(0,2)","A:(~nil;2;...)");
+    test_ptr("A= :(A?, int); A(0,2)",(alias) -> TypeMemPtr.make(alias,TypeStruct.make_tuple(TypeStruct.ts(TypeMemPtr.NO_DISP,Type.XNIL,TypeInt.con(2))).set_name("A:").make_from_esc(false)));
+    test_ptr("A= :(A?, int); A(0,2)","A:(~nil;2)");
     test    ("A= :@{n=A?; v=flt}; A(@{n=0;v=1.2}).v;", TypeFlt.con(1.2));
-    test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*[$]!A:(~nil;2;...);3;...)");
+    test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*[$]!A:(~nil;2);3)");
 
     // TODO: Needs a way to easily test simple recursive types
     TypeEnv te3 = Exec.go(Env.file_scope(Env.top_scope()),"args","A= :@{n=A?; v=int}; A(@{n=0;v=3})");
@@ -419,7 +416,7 @@ public class TestParse {
     // inline, so actual inference happens
     test_obj_isa("map={x -> x ? @{nn=map(x.n);vv=x.v*x.v} : 0};"+
                  "map(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0;v=1.2};v=2.3};v=3.4};v=4.5})",
-                 TypeStruct.make(FLDS2,TypeStruct.ts(TypeMemPtr.STRUCT0,Type.XSCALAR,TypeMemPtr.STRUCT0,TypeFlt.FLT32)).make_from_esc(false)); //con(20.25)
+                 TypeStruct.make(FLDS2,TypeStruct.ts(TypeMemPtr.STRUCT0,Type.XSCALAR,TypeMemPtr.STRUCT0,TypeFlt.FLT64)).make_from_esc(false)); //con(20.25)
 
     // Test inferring a recursive tuple type, with less help.  This one
     // inlines so doesn't actually test inferring a recursive type.
@@ -651,8 +648,8 @@ public class TestParse {
     test(FOR+"sum:=0; i:=0; for {i++ < 100} {sum:=sum+i}; sum",TypeInt.INT64);
     test("i:=0; for {i++ < 2} {i==-1} ? ",Type.XNIL);    // Late exit, body never returns true.
     test("i:=0; for {i++ < 100} {i== 5} ? ",TypeInt.BOOL); // Not sure of exit value, except bool
-    
-    
+
+
   }
 
   /* Closures
@@ -785,6 +782,24 @@ strs:List(str)  = ... // List of not-null strings
 strs:List(str?) = ... // List of null-or-strings
 
    */
+
+  /*** Fanciful attempt at a HashTable class.  No resize, size, clear, etc.
+HashTable = {@{
+  _tab = [7];
+
+  get = { key ->
+    entry = _tab[key.hash() % _tab.len];
+    entry && key.equals(entry.key) ? entry.val;
+  }
+  put = { key val ->
+    idx = key.hash() % _tab.len;
+    entry = _tab[idx];
+    _tab[idx]= @{key=key; val=val; next=entry};
+    entry ? entry.val;
+  }
+}}
+   */
+
 
   // Caller must close TypeEnv
   static private TypeEnv run( String program ) {

@@ -1,4 +1,25 @@
 =======================================
+Notes from 07/31/2020
+
+- bring back "MemMerge"; really need private-vs-public *memory* and pointers.
+- pointers i can declare private via graph shape: direct ptr to DProj-then-NewNode.
+- for memory, i need a node which MEETS public & private memory, unlike Join
+  which knows it has absolute independence and does a STOMP.
+- This MemMerge can really replace the MProj after a New, and so be a MrgProj.
+- MrgProj inherits from MProj, adds a public-memory edge and MEETS it.
+- MrgProj can flip unrelated public memory to its other side, similar to Join,
+  pushing other ops into the "NewNode/MrgProj" region, effectively growing the
+  known-private-memory region.  Goal is to handle a version of MAP which NEWs
+  before the recursive call, but to keep the known private version after the
+  MAP to allow private updates... and supports proper inlining.  Cloning a New
+  makes two children which should properly be monotonic for the "off brand"
+  memory.
+- New no longer takes memory, yes takes control.
+- Mrg has a ProjNode like input in slot 0, and a Memory like input in slot 1.
+
+
+
+=======================================
 Notes from 06/29/2020
 
 - Factory allocations blow all LHS/RHS choices.

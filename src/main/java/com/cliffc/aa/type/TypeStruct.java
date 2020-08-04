@@ -244,7 +244,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   @Override protected TypeStruct make_from_esc_impl( boolean esc) {
     return malloc(_name,_any,esc,_flds,_ts,_flags,_open).hashcons_free();
   }
-  
+
   // ------ Flags lattice: 2 bit field mod ------
   // In other times, I've had other flags, and probably will again.
   // Flags are a 'short' stored as bytes, and the flag parts are 'bytes'.
@@ -277,7 +277,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public static short fmeet( short f0, short f1 ) {  return (short)(FMEET[f0].charAt(f1)-'0'); }
   public static short fdual( short f ) { return (short)(("6453120".charAt(f))-'0'); }
   // Printers
-  private static String fstr   ( short f ) { return new String[]{"=",":","","~="}[f]; }
+  private static String fstr   ( short f ) { return new String[]{"=",":","","~"}[f]; }
   public  static String fstring( short f ) { return new String[]{"read-only","read-write","final","FUNK"}[f]; }
   // Array of flags
   public static byte[] new_flags(int n, short flag) { byte[] bs = new byte[n]; Arrays.fill(bs,(byte)flag); return bs; }
@@ -301,7 +301,9 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   static boolean is_modifable(byte mod) {
     return mod==FRW || mod==FUNK || mod==fdual(FRW) || mod==fdual(FUNK);
   }
-  
+  // Allowed to update this field?
+  public boolean can_update(int idx) { return is_modifable(fmod(idx)); }
+
   // Shortcuts for the current flags[] as opposed to independent flags[]
   public byte fmod(int idx) { return fmod(flags(idx)); }
   private byte _fmod(int idx) { return _fmod(flags(idx)); }
@@ -388,7 +390,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public  static TypeStruct make(String[] flds, byte[] flags) { return make(flds,ts(flds.length),flags); }
   // Make from prior, just updating field types
   public TypeStruct make_from( Type[] ts ) { return make_from(_any,ts,_flags); }
-  public TypeStruct make_from( boolean any, Type[] ts ) { return make_from(any,ts,_flags); }
   public TypeStruct make_from( boolean any, Type[] ts, byte[] bs ) { return malloc(_name,any,_esc,_flds,ts,bs,_open).hashcons_free(); }
   // Make a TS with a name
   public TypeStruct make_from( String name ) { return malloc(name,_any,_esc,_flds,_ts,_flags,_open).hashcons_free();  }
@@ -406,7 +407,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     }
   }
   private static final HashMap<TPair,TypeStruct> MEETS0 = new HashMap<>();
-  public static void reset_recursive() { assert RECURSIVE_MEET==0; MEETS0.clear(); }
 
   public  static final TypeStruct ANYSTRUCT = malloc("",true ,false,new String[0],TypeAry.get(0),fbots(0),false).hashcons_free();
   public  static final TypeStruct ALLSTRUCT = malloc("",false,true ,new String[0],TypeAry.get(0),fbots(0),true ).hashcons_free();
@@ -767,8 +767,8 @@ public class TypeStruct extends TypeObj<TypeStruct> {
 
   // This is for a struct that has grown 'too deep', and needs to be
   // approximated to avoid infinite growth.
-  private static NonBlockingHashMapLong<Type> UF = new NonBlockingHashMapLong<>();
-  private static IHashMap OLD2APX = new IHashMap();
+  private static final NonBlockingHashMapLong<Type> UF = new NonBlockingHashMapLong<>();
+  private static final IHashMap OLD2APX = new IHashMap();
   public TypeStruct approx( int cutoff, int alias ) {
     boolean shallow=true;
     for( Type t : _ts )
@@ -954,7 +954,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   // Walk an existing, not-interned, structure.  Stop at any interned leaves.
   // Check for duplicating an interned Type or a UF hit, and use that instead.
   // Computes the final hash code.
-  private static IHashMap DUPS = new IHashMap();
+  private static final IHashMap DUPS = new IHashMap();
   static TypeStruct shrink( Ary<Type> reaches, TypeStruct tstart ) {
     assert DUPS.isEmpty();
     // Structs never change their hash based on field types.  Set their hash first.
@@ -1028,12 +1028,6 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return ufind(tstart);
   }
 
-  private static <T extends Type> T pre_mod(Type t, T tf) {
-    T tu = ufind(tf);
-    if( tu == tf ) return tf;   // No change
-    DUPS.remove(t);   // Remove before field update changes equals(),hashCode()
-    return tu;
-  }
   // Set hash after field mod, and re-install in dups
   private static boolean post_mod(Type t) {
     t._hash = t.compute_hash();
@@ -1337,8 +1331,47 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     flags(flags,idx,set_fmod(flags(flags,idx),mod));
   }
 
-  // Allowed to update this field?
-  public boolean can_update(int idx) { return fmod(idx) == FRW; }
+  // Keep the same basic type, and meet related fields.  Type error if basic
+  // types are unrelated.
+  @Override public TypeObj st_meet(TypeObj obj) {
+    if( !(obj instanceof TypeStruct) ) {
+      if( obj.getClass()==TypeObj.class ) return obj.st_meet(this);
+      throw com.cliffc.aa.AA.unimpl(); // Probably type error from parser
+    }
+    TypeStruct trhs = (TypeStruct)obj;
+    if( trhs._ts.length < _ts.length ) throw com.cliffc.aa.AA.unimpl(); // Probably type error from parser
+
+    Type[] ts = TypeAry.clone(trhs._ts);
+    byte[] flags = trhs._flags.clone();
+    // Type error for mis-matched fields.  Meet common fields.
+    int len = _ts.length;
+    for( int i=0; i<trhs._ts.length; i++ ) {
+      if( i<len && !Util.eq(_flds[i],trhs._flds[i]) )
+        throw com.cliffc.aa.AA.unimpl(); // Probably type error from parser
+      if( is_modifable(trhs.fmod(i)) ) {
+        ts[i] = i<len ? trhs._ts[i].meet(_ts[i]) : ALL;
+        flags(flags,i,i<len ? fmeet(flags(i),trhs.flags(i)) : FBOT);
+      } // Else not modifiable, take RHS untouched
+      assert ts[i].simple_ptr()==ts[i];
+    }
+    if( !(_name.isEmpty() || Util.eq(trhs._name,_name)) ) throw com.cliffc.aa.AA.unimpl(); // Need to meet names
+    // Note that "closed" is closed for all, same as lifting fields from a low struct.
+    return malloc(trhs._name,false,trhs._esc|_esc,trhs._flds,ts,flags,trhs._open&_open).hashcons_free();
+  }
+
+  @Override TypeObj flatten_fields() {
+    Type[] ts = TypeAry.get(_ts.length);
+    Arrays.fill(ts,SCALAR);
+    return make_from(_any,ts,fbots(_ts.length));
+  }
+
+  boolean any_modifiable() {
+    if( _open ) return true;
+    for( byte b : _flags )
+      if( is_modifable(fmod(b)) )
+        return true;
+    return false;
+  }
 
   // Widen (lose info), to make it suitable as the default function memory.
   // Final fields can remain as-is; non-finals are all widened to ALL (assuming

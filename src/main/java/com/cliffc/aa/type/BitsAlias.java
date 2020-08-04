@@ -1,6 +1,5 @@
 package com.cliffc.aa.type;
 
-import com.cliffc.aa.util.AryInt;
 import java.util.HashMap;
 
 // Alias Bits supporting a lattice; immutable; hash-cons'd.
@@ -9,7 +8,7 @@ import java.util.HashMap;
 public class BitsAlias extends Bits<BitsAlias> {
   // Intern: lookup and return an existing Bits or install in hashmap and
   // return a new Bits.  Overridden in subclasses to make type-specific Bits.
-  private static HashMap<BitsAlias,BitsAlias> INTERN = new HashMap<>();
+  private static final HashMap<BitsAlias,BitsAlias> INTERN = new HashMap<>();
   private static BitsAlias FREE=null;
   @Override BitsAlias make_impl(int con, long[] bits ) {
     BitsAlias b1 = FREE;

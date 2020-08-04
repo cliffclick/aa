@@ -3,7 +3,6 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
-import com.cliffc.aa.util.IBitSet;
 import com.cliffc.aa.util.SB;
 import org.jetbrains.annotations.NotNull;
 
@@ -14,7 +13,7 @@ import java.util.BitSet;
 // This allows more precision in the SESE that may otherwise merge many paths
 // in and out, and is especially targeting non-inlined calls.
 public class MemSplitNode extends Node {
-  Ary<IBitSet> _escs = new Ary<>(new IBitSet[]{new IBitSet()});
+  Ary<BitsAlias> _escs = new Ary<>(new BitsAlias[]{new BitsAlias()});
   public MemSplitNode( Node mem ) { super(OP_SPLIT,null,mem); }
   Node mem() { return in(1); }
   public MemJoinNode join() {
@@ -23,7 +22,7 @@ public class MemSplitNode extends Node {
     return (MemJoinNode)prj._uses.at(0);
   }
 
-  @Override boolean is_mem() { return true; }
+  @Override public boolean is_mem() { return true; }
   @Override String str() {
     SB sb = new SB();
     sb.p('(').p("base,");
@@ -43,22 +42,22 @@ public class MemSplitNode extends Node {
   @Override public boolean basic_liveness() { return false; }
 
   // Find the escape set this esc set belongs to, or make a new one.
-  int add_alias( GVNGCM gvn, IBitSet esc ) {
-    IBitSet all = _escs.at(0);     // Summary of Right Hand Side(s) escapes
-    if( all.disjoint(esc) ) {      // No overlap
-      _escs.set(0,all.or(esc));    // Update summary
+  int add_alias( GVNGCM gvn, BitsAlias esc ) {
+    BitsAlias all = _escs.at(0);   // Summary of Right Hand Side(s) escapes
+    if( all.join(esc) == BitsAlias.EMPTY ) { // No overlap
+      _escs.set(0,all.meet(esc));  // Update summary
       _escs.add(esc);              // Add escape set
       gvn.setype(this,value(gvn)); // Expand tuple result
       return _escs._len-1;
     }
     for( int i=1; i<_escs._len; i++ )
-      if( esc.subsetsX(_escs.at(i)) )
+      if( esc.isa(_escs.at(i)) )
         return i;               // Found exact alias slice
     return 0;                   // No match, partial overlap
   }
   void remove_alias( GVNGCM gvn, int idx ) {
     // Remove (non-overlapping) bits from the rollup
-    _escs.at(0).subtract(_escs.at(idx));
+    _escs.set(0,(BitsAlias)_escs.at(0).subtract(_escs.at(idx)));
     _escs.remove(idx);          // Remove the escape set
     TypeTuple tt = (TypeTuple)value(gvn);
     gvn.setype(this,tt);        // Reduce tuple result
@@ -89,15 +88,13 @@ public class MemSplitNode extends Node {
   }
   // Replace the old alias with the new child alias
   private void _update(int oldalias, int newalias) {
-    IBitSet esc0 = _escs.at(0);
-    if( esc0.tst(oldalias) ) {
-      esc0.clr(oldalias);
-      esc0.set(newalias);
+    BitsAlias esc0 = _escs.at(0);
+    if( esc0.test(oldalias) ) {
+      _escs.set(0, esc0.set(newalias));
       for( int i=1; i<_escs._len; i++ ) {
-        IBitSet esc = _escs.at(i);
-        if( esc.tst(oldalias) ) {
-          esc.clr(oldalias);
-          esc.set(newalias);
+        BitsAlias esc = _escs.at(i);
+        if( esc.test(oldalias) ) {
+          _escs.set(i, esc.set(newalias));
           break;
         }
       }
@@ -115,5 +112,5 @@ public class MemSplitNode extends Node {
     return null;
   }
     // Modifies all of memory - just does it in parts
-  @Override IBitSet escapees(GVNGCM gvn) { return IBitSet.FULL; }
+  @Override BitsAlias escapees( GVNGCM gvn) { return BitsAlias.FULL; }
 }

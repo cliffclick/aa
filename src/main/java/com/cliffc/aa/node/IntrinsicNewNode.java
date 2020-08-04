@@ -23,7 +23,7 @@ public abstract class IntrinsicNewNode extends Node {
   IntrinsicNewNode( String name, Type[] ts ) {
     super(OP_LIBCALL);
     _name = name;
-    _nstr = new NewStrNode(TypeStr.STR,null,null);
+    _nstr = new NewStrNode(TypeStr.STR,null);
     ts[0] = TypeFunPtr.NO_DISP; // No display
     _sig = TypeFunSig.make(TypeStruct.make_args(ts.length==2 ? TypeStruct.ARGS_X : TypeStruct.ARGS_XY,ts),TypeMemPtr.STRPTR);
   }
@@ -57,10 +57,10 @@ public abstract class IntrinsicNewNode extends Node {
       add_def( gvn.xform(new ParmNode(i,_sig.fld(i),fun, gvn.con(_sig.arg(i).simple_ptr()),null)));
     Node rez = gvn.xform(this); // Returns a TypeObj
     // Fill in NewStrNode inputs, now that we have them.
-    gvn.set_def_reg(nnn,1,memp);
-    gvn.set_def_reg(nnn,2,rez);
-    Node mem = Env.DEFMEM.make_mem_proj(gvn,nnn);
-    Node ptr = gvn.xform(new ProjNode(nnn.unhook(),1));
+    gvn.set_def_reg(nnn,0,fun);
+    gvn.set_def_reg(nnn,1,rez);
+    Node mem = Env.DEFMEM.make_mem_proj(gvn,nnn,memp);
+    Node ptr = gvn.xform(new ProjNode(1, nnn.unhook()));
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mem,ptr,rpc,fun));
     mem._live = mem.live(gvn); // Refine initial memory
     return new FunPtrNode(ret,gvn.con(TypeFunPtr.NO_DISP));

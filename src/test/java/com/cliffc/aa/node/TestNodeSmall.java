@@ -251,7 +251,7 @@ public class TestNodeSmall {
     // Args to calls
     Type tctl = Type.CTRL, txctl = Type.XCTRL;
     Type tscl = Type.SCALAR, txscl = Type.XSCALAR;
-    Type tnil = Type.NIL;
+    Type tnil = Type.XNIL;
     TypeMem tfull = TypeMem.MEM;
     Type t2 = TypeInt.con(2);
     Type t3 = TypeInt.con(3);
@@ -286,7 +286,7 @@ public class TestNodeSmall {
       TypeTuple.make( tctl, tfull, tmul1, txscl, tscl , tmul1 ), //  ~S     S   [ int,flt] ; low     +high
       TypeTuple.make( tctl, tfull, tmul1, txscl, tabc , tmul1X), //  ~S    str  [ int,flt] ; bad      high
       TypeTuple.make( tctl, tfull, tmul1, tabc , tabc , tmul1 ), //  str   str  [        ] ; bad
-      TypeTuple.make( tctl, tfull, tmul1, t2   , tabc , tmul1E), //   2    str  [ int,flt] ; bad+good
+      TypeTuple.make( tctl, tfull, tmul1, t2   , tabc , tmul1 ), //   2    str  [ int,flt] ; bad+good
     };
     _testMonotonicChain(ins,call,argss_mul1);
 
@@ -308,7 +308,7 @@ public class TestNodeSmall {
       TypeTuple.make( tctl, tfull, tadd1, tnil , tscl , tadd1 ), //   0     S   [ int,flt,str] (LG_,LG_,LG_) ; Some low , keep all, meet
       TypeTuple.make( tctl, tfull, tadd1, t2   , txscl, tadd1X), //   2    ~S   [+int+flt+str] (_GH,_GH,B_H) ; Some high, keep all, join
       TypeTuple.make( tctl, tfull, tadd1, t2   , t3   , tnum1 ), //   2     3   [ int,flt    ] (_G_,_G_,B__) ; Some good, drop bad, fidx/meet
-      TypeTuple.make( tctl, tfull, tadd1, t2   , tabc , tmul1E), //   2    str  [ int,flt,str] (BG_,BG_,BG_) ; All  bad , keep all, meet
+      TypeTuple.make( tctl, tfull, tadd1, t2   , tabc , tadd1 ), //   2    str  [ int,flt,str] (BG_,BG_,BG_) ; All  bad , keep all, meet
       TypeTuple.make( tctl, tfull, tadd1, t2   , tscl , tadd1 ), //   2     S   [ int,flt,str] (LG_,LG_,B__) ; Some low , keep all, meet
       TypeTuple.make( tctl, tfull, tadd1, tabc , tabc , tstr1 ), //  str   str  [         str] (B__,B__,_G_) ; Some good, drop bad, fidx/meet
       TypeTuple.make( tctl, tfull, tadd1, tscl , tscl , tadd1 ), //   S     S   [ int,flt,str] (L__,L__,L__) ; All  low , keep all, meet
@@ -344,7 +344,7 @@ public class TestNodeSmall {
       TypeTuple.make( tctl, tfull, tmul2X, tscl , tscl , tmul2 ), //   S     S   [ int,flt]
       TypeTuple.make( tctl, tfull, tmul2X, txscl, tscl , tmul2X), //  ~S     S   [ int,flt]
       TypeTuple.make( tctl, tfull, tmul2X, txscl, tabc , tmul2X), //  ~S    str  [ int,flt]
-      TypeTuple.make( tctl, tfull, tmul2X, t2   , tabc , tmul2E), //   2    str  [ int,flt]
+      TypeTuple.make( tctl, tfull, tmul2X, t2   , tabc , tmul2 ), //   2    str  [ int,flt]
     };
     _testMonotonicChain(ins,call,argss_mul2);
 
@@ -360,7 +360,7 @@ public class TestNodeSmall {
       TypeTuple.make( tctl, tfull, tadd2X, tnil , tscl , tadd2 ), //   0     S   [ int,flt,str] (LG_,LG_,LG_) ; Some low , keep all, meet
       TypeTuple.make( tctl, tfull, tadd2X, t2   , txscl, tadd2X), //   2    ~S   [+int+flt+str] (_GH,_GH,B_H) ; Some high, keep all, join
       TypeTuple.make( tctl, tfull, tadd2X, t2   , t3   , tnum2X), //   2     3   [+int+flt    ] (_G_,_G_,B__) ; Some good, drop bad, fidx/join
-      TypeTuple.make( tctl, tfull, tadd2X, t2   , tabc , tmul2E), //   2    str  [ int,flt,str] (BG_,BG_,BG_) ; All  bad , keep all, meet
+      TypeTuple.make( tctl, tfull, tadd2X, t2   , tabc , tadd2 ), //   2    str  [ int,flt,str] (BG_,BG_,BG_) ; All  bad , keep all, meet
       TypeTuple.make( tctl, tfull, tadd2X, t2   , tscl , tadd2 ), //   2     S   [ int,flt,str] (LG_,LG_,B__) ; Some low , keep all, meet
       TypeTuple.make( tctl, tfull, tadd2X, tabc , tabc , tstr2 ), //  str   str  [        ~str] (B__,B__,_G_) ; Some good, drop bad, fidx/join
       TypeTuple.make( tctl, tfull, tadd2X, tscl , tscl , tadd2 ), //   S     S   [ int,flt,str] (L__,L__,L__) ; All  low , keep all, meet
@@ -404,9 +404,9 @@ public class TestNodeSmall {
     ConNode dsp_prims = (ConNode) gvn.xform(new ConNode<>(TypeMemPtr.DISP_SIMPLE));
     // The file-scope display closing the graph-cycle.  Needs the FunPtr, not
     // yet built.
-    NewObjNode dsp_file = (NewObjNode)gvn.xform(new NewObjNode(true,TypeStruct.DISPLAY,mem,dsp_prims));
-    MProjNode dsp_file_obj = Env.DEFMEM.make_mem_proj(gvn,dsp_file);
-    ProjNode  dsp_file_ptr = ( ProjNode)gvn.xform(new  ProjNode(dsp_file,1));
+    NewObjNode dsp_file = (NewObjNode)gvn.xform(new NewObjNode(true,TypeStruct.DISPLAY,dsp_prims));
+    MrgProjNode dsp_file_obj = Env.DEFMEM.make_mem_proj(gvn,dsp_file,mem);
+    ProjNode  dsp_file_ptr = ( ProjNode)gvn.xform(new  ProjNode(1, dsp_file));
     Env.DISPLAYS = Env.DISPLAYS.set(dsp_file._alias);
     // The Fun and Fun._tf:
     TypeStruct formals = TypeStruct.make_args(TypeAry.ts(gvn.type(dsp_file_ptr), // File-scope display as arg0

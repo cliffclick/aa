@@ -3,10 +3,7 @@ package com.cliffc.aa.node;
 import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
-import com.cliffc.aa.type.Type;
-import com.cliffc.aa.type.TypeMem;
-import com.cliffc.aa.type.TypeObj;
-import com.cliffc.aa.util.IBitSet;
+import com.cliffc.aa.type.*;
 
 // Merge results; extended by ParmNode
 public class PhiNode extends Node {
@@ -23,7 +20,7 @@ public class PhiNode extends Node {
   public PhiNode( Type t, Parse badgc, Node... vals ) { this(OP_PHI,t,badgc,vals); }
   // For ParmNodes
   PhiNode( byte op, Node fun, Type tdef, Node defalt, Parse badgc ) { this(op,tdef,badgc, fun,defalt); }
-  @Override boolean is_mem() { return _t==TypeMem.ALLMEM; }
+  @Override public boolean is_mem() { return _t==TypeMem.ALLMEM; }
   @Override public int hashCode() { return super.hashCode()+_t.hashCode(); }
   @Override public boolean equals(Object o) {
     if( this==o ) return true;
@@ -66,7 +63,7 @@ public class PhiNode extends Node {
         t = t.meet(gvn.type(in(i)));
     return t;
   }
-  @Override IBitSet escapees(GVNGCM gvn) { return IBitSet.FULL; }
+  @Override BitsAlias escapees( GVNGCM gvn) { return BitsAlias.FULL; }
   @Override public boolean basic_liveness() { return _t==Type.SCALAR; }
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
     if( def==in(0) ) return TypeMem.ALIVE;

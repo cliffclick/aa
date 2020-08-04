@@ -4,7 +4,6 @@ import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
-import com.cliffc.aa.util.IBitSet;
 
 // Join a split set of aliases from a SESE region, split by an earlier MemSplit.
 // This allows more precision in the SESE that may otherwise merge many paths
@@ -14,12 +13,12 @@ public class MemJoinNode extends Node {
   public MemJoinNode( MProjNode mprj ) { super(OP_JOIN,mprj); assert mprj.in(0) instanceof MemSplitNode; }
 
   MemSplitNode msp() { return (MemSplitNode)in(0).in(0); }  // The MemSplit
-  @Override boolean is_mem() { return true; }
+  @Override public boolean is_mem() { return true; }
 
   @Override public Node ideal(GVNGCM gvn, int level) {
     // If the split count is lower than 2, then the split serves no purpose
     if( _defs._len == 2 && gvn.type(in(1)).isa(gvn.self_type(this)) && _keep==0 )
-      return in(1); // Just become the last split
+      return in(1);             // Just become the last split
 
     // If some Split/Join path clears out, remove the (useless) split.
     MemSplitNode msp = msp();
@@ -49,11 +48,12 @@ public class MemJoinNode extends Node {
     if( mem instanceof StoreNode ) return mem;   // Move Store into Split/Join
     if( mem instanceof MProjNode ) {
       Node head = mem.in(0);
-      if( head instanceof NewNode ) return head;
       if( head instanceof CallNode ) return null; // Do not swallow a Call/CallEpi into a Split/Join
       if( head instanceof CallEpiNode ) return null; // Do not swallow a Call/CallEpi into a Split/Join
+      if( head instanceof MemSplitNode ) return null; // TODO: Handle back-to-back split/join/split/join
       throw com.cliffc.aa.AA.unimpl(); // Break out another SESE split
     }
+    if( mem instanceof MrgProjNode ) return mem;
     if( mem instanceof ParmNode ) return null;
     if( mem instanceof PhiNode ) return null;
     throw com.cliffc.aa.AA.unimpl(); // Break out another SESE split
@@ -75,8 +75,8 @@ public class MemJoinNode extends Node {
 
     // Get the escaping set being moved.
     // Remove esc set from lower rollup and add to upper
-    IBitSet esc = msp._escs.pop();
-    msp._escs.at(0).subtract(esc);
+    BitsAlias esc = msp._escs.pop();
+    msp._escs.set(0,(BitsAlias)msp._escs.at(0).subtract(esc));
     int idx = head.add_alias(gvn,esc);
     assert idx!=0; // No partial overlaps; actually we could just legit bail here, no assert
     if( idx == mjn._defs._len ) // Add edge Join->Split as needed
@@ -111,12 +111,12 @@ public class MemJoinNode extends Node {
 
     // Walk all aliases and take from matching escape set in the Split.  Since
     // nothing overlaps this is unambiguous.
-    Ary<IBitSet> escs = msp()._escs;
+    Ary<BitsAlias> escs = msp()._escs;
     TypeObj[] tos = new TypeObj[Env.DEFMEM._defs._len];
     for( int alias=1, i; alias<tos.length; alias++ ) {
-      if( escs.at(0).tst(alias) ) { // In some RHS set
+      if( escs.at(0).test_recur(alias) ) { // In some RHS set
         for( i=1; i<_defs._len; i++ )
-          if( escs.at(i).tst(alias) )
+          if( escs.at(i).test_recur(alias) )
             break;
       } else i=0;                     // In the base memory
       if( alias == 1 || Env.DEFMEM.in(alias) != null )  // Check never-made aliases
@@ -132,41 +132,37 @@ public class MemJoinNode extends Node {
     MemSplitNode msp = msp();
     Node base = msp.mem();                  // Base of SESE region
     assert base.check_solo_mem_writer(msp); // msp is only memory writer after base
-    assert head.in(1).check_solo_mem_writer(head); // head is the 1 memory writer after head.in
-    int idx = msp.add_alias(gvn,head.escapees(gvn)), bidx; // Add escape set, find index
-    Node mprj, body;
+    assert head.in(1).check_solo_mem_writer(head);   // head is the 1 memory writer after head.in
+    int idx = msp.add_alias(gvn,head.escapees(gvn)); // Add escape set, find index
+    Node mprj;
     if( idx == _defs._len ) {         // Escape set added at the end
       add_def(mprj = gvn.xform(new MProjNode(msp,idx))); // Add a new MProj from MemSplit
       mprj._live=_live;
-      body = this;              // Head of inside-body region is just 'this'
-      bidx = idx;               // Memory input from Join to MProj
     } else {
       assert idx!=0;     // No partial overlap; all escape sets are independent
       mprj = ProjNode.proj(msp,idx); // Find match MProj
-      body = mprj.get_mem_writer();
-      bidx = 1;                 // Standard memory input
     }
     // Resort edges to move SESE region inside
-    assert mprj.check_solo_mem_writer(body);
-    mprj.keep();
-    if( body==this ) set_def(bidx,base,gvn);
-    else gvn.set_def_reg(body,bidx,base); // Move body.mem -> base
+    mprj.keep();  base.keep();
     gvn.set_def_reg(msp,1,head.in(1)); // Move Split->base edge to Split->head.in(1)
-    gvn.set_def_reg(head,1,mprj.unhook()); // Move head->head.in(1) to head->MProj
+    gvn.replace(mprj,base);            // Move split mprj users to base
+    gvn.set_def_reg(head,1,mprj);      // Move head->head.in(1) to head->MProj
+    mprj.unhook();   base.unhook();
     // Moving things inside the Split/Join region might let types get
     // out-of-order; the Split might be able to lift and be stale, while the
     // moved body is on the 'wrong side' of the stale Split.  Update the Split
     // and following MProjNodes immediately.
-    Type tmsp_old = gvn.type(msp);
-    Type tmsp_new = msp.value(gvn);
-    gvn.setype(msp,tmsp_new);    // Moving a region 'inside' might lift the Split
-    for( Node use : msp._uses ) {// Also lift all MProjs
-      gvn.setype(use,use.value(gvn));
-      if( tmsp_old!=tmsp_new )  // If the Split moved, the MProjs also moved
-        gvn.add_work_uses(use); // And if they moved, revisit the interior
+    Ary<Node> work = new Ary<>(new Node[]{msp});
+    while( !work.isEmpty() ) {
+      Node n = work.pop();
+      assert n.is_mem();
+      Type t0 = gvn.type(n);
+      Type t1 = n.value(gvn);
+      if( t0==t1 ) continue;
+      gvn.setype(n,t1);
+      if( n == this ) continue;
+      for( Node use : n._uses ) if( use.is_mem() ) work.add(use);
     }
-    gvn.setype(head,head.value(gvn));
-    if( base != head ) gvn.setype(base,base.value(gvn));
     // Update live same way
     base._live = base.live(gvn);
     if( base != head ) head._live = head.live(gvn);
@@ -198,16 +194,16 @@ public class MemJoinNode extends Node {
 
   // Find a compatible alias edge, including base memory if nothing overlaps.
   // Return null for any partial overlaps.
-  Node can_bypass( IBitSet esc ) {
-    Ary<IBitSet> escs = msp()._escs;
-    if( escs.at(0).disjoint(esc) ) // No overlap with any other alias set
+  Node can_bypass( BitsAlias esc ) {
+    Ary<BitsAlias> escs = msp()._escs;
+    if( escs.at(0).join(esc) == BitsAlias.EMPTY ) // No overlap with any other alias set
       return msp().mem();          // Can completely bypass
     // Overlaps with at least 1
     for( int i=1; i<escs._len; i++ )
-      if( esc.subsetsX(escs.at(i)) ) // Fully contained with alias set 'i'?
-        return in(i);                // Can use this memory
-    return null;                     // Not fully contained within any 1 alias set
+      if( esc.isa(escs.at(i)) ) // Fully contained with alias set 'i'?
+        return in(i);           // Can use this memory
+    return null;                // Not fully contained within any 1 alias set
   }
   // Modifies all of memory
-  @Override IBitSet escapees(GVNGCM gvn) { return IBitSet.FULL; }
+  @Override BitsAlias escapees( GVNGCM gvn) { return BitsAlias.FULL; }
 }

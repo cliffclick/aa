@@ -18,7 +18,8 @@ public class IntrinsicNode extends Node {
     _badargs=badargs;
   }
 
-  @Override boolean is_mem() { return true; }
+  @Override
+  public boolean is_mem() { return true; }
   @Override public String xstr() { return _tn._name; }
   Node mem() { return in(1); }
   Node ptr() { return in(2); }
@@ -53,7 +54,7 @@ public class IntrinsicNode extends Node {
   @Override public Node ideal(GVNGCM gvn, int level) {
     Node mem = mem();
     Node ptr = ptr();
-    if( mem instanceof MProjNode && mem.in(0) instanceof NewObjNode &&
+    if( mem instanceof MrgProjNode &&
         mem.in(0)==ptr.in(0) && mem._uses._len==2 ) { // Only self and DefMem users
       TypeMemPtr tptr = (TypeMemPtr)gvn.type(ptr);
       int alias = tptr._aliases.abit();
@@ -68,8 +69,8 @@ public class IntrinsicNode extends Node {
         if( actual.isa(formal) ) { // Actual struct isa formal struct?
           TypeStruct tn = nnn._ts.make_from(_tn._name);
           nnn.set_name(tn);
-          gvn.add_work(nnn);
-          gvn.add_work(Env.DEFMEM);
+          gvn.setype(nnn,nnn.value(gvn)); // Update immediately to preserve monotonicity
+          gvn.setype(mem,mem.value(gvn));
           return mem;
         }
       }
@@ -97,8 +98,7 @@ public class IntrinsicNode extends Node {
     if(  obj.isa(tn.dual()) ) return mem;
     // Wrap result in Name
     TypeObj rez = (TypeObj)obj.set_name(_tn._name);
-    TypeMem rezmem = ((TypeMem)mem).st(alias,rez);
-    return rezmem;
+    return ((TypeMem)mem).st(alias,rez);
   }
   @Override public boolean basic_liveness() { return false; }
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
@@ -125,18 +125,18 @@ public class IntrinsicNode extends Node {
     TypeFunSig sig = TypeFunSig.make(formals,TypeMemPtr.make(alias,to));
     FunNode fun = (FunNode) gvn.xform(new FunNode(to._name,sig,-1).add_def(Env.ALL_CTRL));
     Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
-    Node memp= gvn.xform(new ParmNode(-2,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
+    Node memp= gvn.init(new ParmNode(-2,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
     // Add input edges to the NewNode
     ConNode nodisp = gvn.con(TypeMemPtr.NO_DISP);
-    NewObjNode nnn = new NewObjNode(false,alias,to1,memp,nodisp).keep();
+    NewObjNode nnn = new NewObjNode(false,alias,to1.close(),nodisp).keep();
     for( int i=1; i<to._ts.length; i++ ) { // Display in 0, fields in 1+
       String argx = to._flds[i];
       if( TypeStruct.fldBot(argx) ) argx = null;
       nnn.add_def(gvn.xform(new ParmNode(i,argx,fun, gvn.con(to._ts[i].simple_ptr()),null)));
     }
     gvn.init(nnn);
-    Node mmem = Env.DEFMEM.make_mem_proj(gvn,nnn.unhook());
-    Node ptr = gvn.xform(new  ProjNode(nnn,1));
+    Node mmem = Env.DEFMEM.make_mem_proj(gvn,nnn.unhook(),memp);
+    Node ptr = gvn.xform(new  ProjNode(1, nnn));
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,mmem,ptr,rpc,fun));
     return (FunPtrNode)gvn.xform(new FunPtrNode(ret,nodisp));
   }

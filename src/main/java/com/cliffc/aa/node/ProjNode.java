@@ -8,7 +8,8 @@ import com.cliffc.aa.type.TypeTuple;
 // Proj data
 public class ProjNode extends Node {
   public int _idx;
-  public ProjNode( Node ifn, int idx ) { this(OP_PROJ,ifn,idx); }
+  public ProjNode( int idx, Node head ) { this(OP_PROJ,head,idx); }
+  public ProjNode( int idx, Node... ns ) { super(OP_PROJ,ns); _idx=idx; }
   ProjNode( byte op, Node ifn, int idx ) { super(op,ifn); _idx=idx; }
   @Override String xstr() { return "DProj"+_idx; }
 
@@ -28,7 +29,7 @@ public class ProjNode extends Node {
     return c.oob();
   }
   // Only called here if alive, and input is more-than-basic-alive
-  @Override public TypeMem live_use( GVNGCM gvn, Node def ) { return TypeMem.ANYMEM; }
+  @Override public TypeMem live_use( GVNGCM gvn, Node def ) { return def.basic_liveness() ? _live : TypeMem.ANYMEM; }
 
   public static ProjNode proj( Node head, int idx ) {
     for( Node use : head._uses )
