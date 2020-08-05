@@ -1,4 +1,31 @@
 =======================================
+Notes from 08/05/2020
+
+Trying to solve: New / Call / St=; problem is Call blows aliasing on New if recursive.
+Code: "foo = { ptr -> ...@{ x=foo(ptr.fld); y=foo(); ... } }"
+
+In general, want to solve the problem of swapping a New & Call.
+
+(1) Via flow, but recursive return New is confused with an entry of prior New.
+Easier to see with a loop:   "prev=0; for{P}{ v=f(i); prev=@{_next=prev,_val=v; }}"
+So thinking:
+Keep a private & public memory in TypeMem, per-alias.
+Each ptr is either public or private.
+New makes a private ptr.
+MrgProj crushes all internal private ptrs to public, tosses away any prior
+private memory, replaces it with a new private memory from New.
+Private ptrs lose private at all Phis (e.g. ptr-meet is ALWAYS public).
+Storing & Loading private ptrs is allowed, and private-ptrs can be in memory.
+
+
+(2) Via graph, "ptr.fld" confuses with New, so cannot swap New around until
+after GCP sorts out 'ptr'.  Next problem: cannot swap New until after GCP, but
+the swap is required to solve the final-store of "y=".  So need to clone
+"foo={ptr->...} for a variant of ptr with fld.  "foo={ptr:@{fld} -> ...}".
+
+
+
+=======================================
 Notes from 07/31/2020
 
 - bring back "MemMerge"; really need private-vs-public *memory* and pointers.
@@ -16,8 +43,6 @@ Notes from 07/31/2020
   memory.
 - New no longer takes memory, yes takes control.
 - Mrg has a ProjNode like input in slot 0, and a Memory like input in slot 1.
-
-
 
 =======================================
 Notes from 06/29/2020

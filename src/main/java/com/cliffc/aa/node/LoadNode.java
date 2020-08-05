@@ -60,6 +60,13 @@ public class LoadNode extends Node {
     if( mem instanceof MProjNode && mem.in(0) instanceof CallNode )
       return set_mem(((CallNode)mem.in(0)).mem(),gvn);
 
+    // Load can bypass a New or Store if the address does not depend on the New/St.
+    if( aliases != null && mem instanceof MrgProjNode ) {
+      NewNode nnn = ((MrgProjNode)mem).nnn();
+      if( !aliases.test_recur(nnn._alias) )
+        return set_mem(mem.in(1),gvn);
+    }
+    
     // Load from a memory Phi; split through in an effort to sharpen the memory.
     // TODO: Only split thru function args if no unknown_callers, and must make a Parm not a Phi
     // TODO: Hoist out of loops.

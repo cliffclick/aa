@@ -274,27 +274,23 @@ public class CallNode extends Node {
       ProjNode cepij = ProjNode.proj(cepi,1); // Memory projection from CEPI
       if( cepij!=null && !tesc(tcall)._aliases.test_recur(nnn._alias) ) { // No alias collisions
         TypeMem tmpj = (TypeMem)gvn.type(mem);
-        // here a New Display and an unrelated Call want to swap.
-        // Swapping might allow required sharpening for the large map test.
-        // But the New filters incoming New since its a Display.  Swapping
-        // exposes the Call to a very weak prior value for New.
-        if( !tmpj.at(nnn._alias)._esc /*|| tnnn.at(nnn._alias).isa(tmpj.at(nnn._alias))*/ ) {
-          // Swap the Call/CallEpi & NewNode.
-          set_mem(mrg.mem(),gvn);
-          gvn.replace(cepij,mrg);
-          gvn.set_def_reg(mrg,1,cepij);
-          // Recompute values for NewNode, which moves after the Call.
-          gvn.setype(cepi ,cepi .value(gvn));
-          gvn.setype(cepij,cepij.value(gvn));
-          gvn.setype( nnn , nnn .value(gvn));
-          gvn.setype( mem , mem .value(gvn));
-          // Recompute lives for Call/CallEpi, which moves before the New.
-          for( Node x : new Node[]{mem,nnn,cepij,cepi,this} )
-            x._live = x.live(gvn);
-          gvn.add_work_uses(cepi);
-          gvn.add_work_uses(nnn);
-          return this;
-        }
+        // TODO: REALLY NEEDS TO BE A SPLIT/JOIN
+        
+        // Swap the Call/CallEpi & NewNode.
+        set_mem(mrg.<MrgProjNode>keep().mem(),gvn);
+        gvn.replace(cepij,mrg);
+        gvn.set_def_reg(mrg.unhook(),1,cepij);
+        // Recompute values for NewNode, which moves after the Call.
+        gvn.setype(cepi ,cepi .value(gvn));
+        gvn.setype(cepij,cepij.value(gvn));
+        gvn.setype( nnn , nnn .value(gvn));
+        gvn.setype( mem , mem .value(gvn));
+        // Recompute lives for Call/CallEpi, which moves before the New.
+        for( Node x : new Node[]{mem,nnn,cepij,cepi,this} )
+          x._live = x.live(gvn);
+        gvn.add_work_uses(cepi);
+        gvn.add_work_uses(nnn);
+        return this;
       }
     }
 
