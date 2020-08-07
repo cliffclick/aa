@@ -140,4 +140,9 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   // NewNodes and join alias classes, but this is not the normal CSE and so is
   // not done by default.
   @Override public boolean equals(Object o) {  return this==o; }
+  MrgProjNode mrg() {
+    Node ptr = _uses.at(0);
+    if( !(ptr instanceof MrgProjNode) ) ptr = _uses.at(1);
+    return (MrgProjNode)ptr;    
+  }
 }

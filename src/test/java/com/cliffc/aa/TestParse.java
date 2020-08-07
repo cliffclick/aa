@@ -16,8 +16,6 @@ public class TestParse {
   @Test public void testParse() {
     TypeStruct dummy = TypeStruct.DISPLAY;
     TypeMemPtr tdisp = TypeMemPtr.make(2,TypeStr.NO_DISP);
-    //test_ptr("tmp=@{val=2;nxt=@{val=1;nxt=0}}; noinline_map={tree -> tree ? @{vv=tree.val&tree.val;nn=noinline_map(tree.nxt)} : 0}; noinline_map(tmp)",
-    //  "!@{vv=int8;noinline_map=~Scalar;nn=*[$]$?}");
 
     // A collection of tests which like to fail easily
     test("-1",  TypeInt.con( -1));
@@ -43,6 +41,7 @@ public class TestParse {
     test("is_even = { n -> n ? is_odd(n-1) : 1}; is_odd = {n -> n ? is_even(n-1) : 0}; is_even(4)", TypeInt.BOOL );
     test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(1)",TypeInt.con(1));
     test("fib = { x -> x <= 1 ? 1 : fib(x-1)+fib(x-2) }; fib(4)",TypeInt.con(5));
+    test("A= :@{n=A?; v=flt}; f={x:A? -> x ? A(f(x.n),x.v*x.v) : 0}; f(A(0,1.2)).v;", TypeFlt.con(1.2*1.2));
   }
 
   @Test public void testParse00() {

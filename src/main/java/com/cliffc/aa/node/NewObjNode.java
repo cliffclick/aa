@@ -137,7 +137,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
         TypeStruct ts4 = _ts.make_from(((TypeStruct)ts3)._ts);
         TypeStruct ts5 = ts4.crush();
         assert ts4.isa(ts5);
-        if( ts5 != _crushed ) {
+        if( ts5 != _crushed && ts5.isa(_crushed) ) {
           sets(ts4);
           return this;
         }

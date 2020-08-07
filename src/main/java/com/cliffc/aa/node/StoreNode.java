@@ -115,8 +115,8 @@ public class StoreNode extends Node {
 
     // Find matching prior store, if possible
     Node st = LoadNode.find_previous_store(gvn,mem,adr,tmp._aliases,_fld,false);
-    // If exactly storing into a NewNode, do the exact update
-    if( st instanceof NewNode ) {
+    // If exactly storing into a NewNode with no bypass, do the exact update
+    if( st instanceof NewNode && ((NewNode)st).mrg().is_precise(gvn) ) {
       for( int alias : tmp._aliases )
         tm = tm.set(alias,tm.at(alias).st(_fin,_fld,tval));
       return tm;
@@ -124,8 +124,7 @@ public class StoreNode extends Node {
     // Otherwise store into an approximate memory state
     return tm.update(tmp._aliases,_fin,_fld,tval);
   }
-  @Override
-  BitsAlias escapees( GVNGCM gvn) {
+  @Override BitsAlias escapees( GVNGCM gvn) {
     Type adr = gvn.type(adr());
     if( !(adr instanceof TypeMemPtr) ) return adr.above_center() ? BitsAlias.EMPTY : BitsAlias.FULL;
     return ((TypeMemPtr)adr)._aliases;

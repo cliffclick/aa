@@ -17,11 +17,24 @@ private memory, replaces it with a new private memory from New.
 Private ptrs lose private at all Phis (e.g. ptr-meet is ALWAYS public).
 Storing & Loading private ptrs is allowed, and private-ptrs can be in memory.
 
-
 (2) Via graph, "ptr.fld" confuses with New, so cannot swap New around until
 after GCP sorts out 'ptr'.  Next problem: cannot swap New until after GCP, but
 the swap is required to solve the final-store of "y=".  So need to clone
 "foo={ptr->...} for a variant of ptr with fld.  "foo={ptr:@{fld} -> ...}".
+
+IDEA: Ptrs have 3-value: public, private, both.
+New ptr is private.
+Possible looping points (Loop-phi, Fun) sets to public, clearing private.
+Other Phi merges as normal (so can be pub+priv).
+TypeMem has public & private variants of all types.
+Stores update or the other or both; always precise in private, always a MEET in public.
+Loads from either merge, otherwise just load from one.
+MrgNode resets private mem to the New, passes-thru public.
+Fun/Loop/Phis all preserve private memory.
+Calls do local-esc analysis for CallEpi.
+CallEpi keeps pre-call private memory if not escaping, else uses post-call private memory.
+
+META-IDEA: partial unroll of graph in flow, to get the precision without cloning.
 
 
 

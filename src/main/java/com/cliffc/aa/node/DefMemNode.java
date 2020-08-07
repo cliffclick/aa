@@ -6,18 +6,17 @@ import com.cliffc.aa.type.TypeMem;
 import com.cliffc.aa.type.TypeObj;
 
 public class DefMemNode extends Node {
-  public DefMemNode( Node ctrl, Node isuse) { super(OP_DEFMEM,ctrl,isuse); }
+  public DefMemNode( Node ctrl) { super(OP_DEFMEM,ctrl); }
   @Override public Node ideal(GVNGCM gvn, int level) { return null; }
   @Override public TypeMem value(GVNGCM gvn) {
+    if( _defs._len <= 1 ) return TypeMem.ANYMEM;
     TypeObj[] tos = new TypeObj[_defs._len];
-    assert in(1)==null; // No need for a 'USE' object
-    tos[1] = TypeObj.ISUSED; // Default: all objects are possibly allocated to worst possible
-    for( int i=2; i<_defs._len; i++ ) {
+    for( int i=1; i<_defs._len; i++ ) {
       Node n = in(i);
       if( n==null ) continue;
       if( n instanceof MrgProjNode ) { // NewNode still alive
         NewNode nnn = n.in(0) instanceof NewNode ? (NewNode)n.in(0) : null;
-        tos[i] = nnn != null && nnn._ts._esc ? nnn._crushed : TypeObj.UNUSED;
+        tos[i] = nnn != null ? nnn._crushed : TypeObj.UNUSED;
       } else {                  // Collapsed NewNode
         Type tn = gvn.type(n);
         tos[i] = tn instanceof TypeObj ? (TypeObj)tn : tn.oob(TypeObj.ISUSED);

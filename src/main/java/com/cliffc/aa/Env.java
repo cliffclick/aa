@@ -63,7 +63,7 @@ public class Env implements AutoCloseable {
     // Initial control & memory
     START  = (StartNode)GVN.xform(new StartNode(       ));
     CTL_0  = (CProjNode)GVN.xform(new CProjNode(START,0));
-    DEFMEM = (DefMemNode)GVN.xform(new DefMemNode(CTL_0,null));
+    DEFMEM = (DefMemNode)GVN.xform(new DefMemNode(CTL_0));
     MEM_0  = (StartMemNode)GVN.xform(new StartMemNode(START));
     // Top-most (file-scope) lexical environment
     Env top = new Env();

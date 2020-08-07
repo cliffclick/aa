@@ -178,4 +178,5 @@ public final class TypeFunPtr extends Type<TypeFunPtr> {
     tf._hash = tf.compute_hash();
     return tf;
   }
+  @Override TypeFunPtr crush_fld_impl(String fld) { return make(_fidxs,_nargs,_disp.crush_fld_impl(fld)); }
 }

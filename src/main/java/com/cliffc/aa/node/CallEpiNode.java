@@ -258,6 +258,7 @@ public final class CallEpiNode extends Node {
     if( ctl != Type.CTRL && ctl != Type.ALL )
       return TypeTuple.CALLE.dual();
     TypeFunPtr tfptr= CallNode.ttfpx(tcall); // Peel apart Call tuple
+    TypeMemPtr tescs= call().tesc(tcall);    // Peel apart Call tuple
 
     // Fidxes; if still in the parser, assuming calling everything
     BitsFun fidxs = tfptr==null || tfptr.is_forward_ref() ? BitsFun.FULL : tfptr.fidxs();
@@ -322,34 +323,33 @@ public final class CallEpiNode extends Node {
       return TypeTuple.make(Type.CTRL,TypeMem.ANYMEM,trez);
 
     // Build epilog memory.
-    // pre-call UNUSED, post-call   USED - new-in-call.
-    // pre-call UNUSED, post-call UNUSED - not made (yet); might be dead.
-    // pre-call NOESC , post-call   USED - weird?
-    // pre-call NOESC , post-call UNUSED - normal, no-esc.  Use pre-call.
-    // pre-call   ESC , post-call UNUSED - weird?
-    // pre-call   ESC , post-call   USED - normal, escape.  Use post-call.
 
+    // Approximate "live out of call", includes things that are alive before
+    // the call but not flowing in.  Catchs all the "new in call" returns.
+    BitsAlias esc_out = trez instanceof TypeMemPtr
+      ? post_call.all_reaching_aliases(((TypeMemPtr)trez)._aliases)
+      : (TypeMemPtr.OOP0.dual().isa(trez) ? BitsAlias.NZERO : BitsAlias.EMPTY);
     TypeMem tdefmem = (TypeMem)defmem;
     TypeObj[] tos = new TypeObj[defnode._defs._len];
     for( int i=1; i<tos.length; i++ ) {
       TypeObj tpre = caller_mem.at(i); // Pre-call memory
-      TypeObj tdef = tdefmem.at(i);    // Default  memory
       TypeObj tpost= post_call.at(i);  // Post-call memory (merge of returns)
-      TypeObj to;
-      if( tpre==TypeObj.UNUSED ) {
-        if( tpost==TypeObj.UNUSED ) to = TypeObj.UNUSED; // Either dead or not-yet.
-        else to=(TypeObj)tpost.join(tdef);               // New-in-call
-      } else if( !tpre._esc ) {                          // Pre is no-escape
-        to = tpre;                                       // Normal no-escape, use pre-call
-      } else if( tdef==TypeObj.UNUSED  ) {               // Def is no-escape
-        Node n = defnode.in(i);
-        to = n instanceof MrgProjNode
-          ? (TypeObj)tpre.join(((MrgProjNode)n).nnn()._crushed)
-          : tdef;
 
-      } else {                                 // Pre is escape, def is also used,escape
-        if( tpost==TypeObj.UNUSED ) to = tpre; // Post thinks no-escape, nothing sane, so use pre
-        else to=(TypeObj)tpost.join(tdef);     // Normal escape, use post-call
+      // If passed-in or passed-out, must take post; Else pre.
+      TypeObj to = tescs._aliases.test_recur(i) || (tpre==TypeObj.UNUSED && esc_out.test_recur(i)) ? tpost : tpre; // TODO: Probably has to match CallNode EXACTLY.
+      // Before GCP, must use DefNode to keep types as strong as the Parser.
+      if( gvn._opt_mode < 2 ) {
+        Node dn = defnode.in(i);  // Taking directly from defnode & NewNode proper.
+        if( !(dn instanceof MrgProjNode) ) {
+          if( dn==null ) to = null; // A never-made (on this pass) type
+          else {                    // Else some kind of constant.
+            Type t = gvn.type(dn); // TODO: Probably should just jam down mrgproj/new for these constants
+            to = t instanceof TypeObj ? (TypeObj)t : t.oob(TypeObj.ISUSED);
+          }
+        } else {                // Else there is a New/MrgProj
+          TypeObj tdef2 = ((MrgProjNode)defnode.in(i)).nnn()._crushed;
+          to = (TypeObj)to.join(tdef2); // Lift to the default worse-case the Parser assumed
+        }
       }
       tos[i] = to;
     }
@@ -386,10 +386,11 @@ public final class CallEpiNode extends Node {
 
     // Update memory in the body with the not-escaped values (which had
     // bypasses the body and now flow into it).
+    Ary<Node> work = new Ary<>(new Node[1],0);
     MProjNode emprj = (MProjNode)ProjNode.proj(this,1);
     if( mem != call.mem() ) {   // Most primitives do nothing with memory
       MProjNode cmprj = (MProjNode)ProjNode.proj(call,1);
-      Ary<Node> work = new Ary<>(new Node[1],0).addAll(cmprj._uses);
+      work.addAll(cmprj._uses);
       gvn.subsume(cmprj,call.mem());
       if( mem == cmprj ) mem = call.mem();
       // Update all memory ops
@@ -410,7 +411,20 @@ public final class CallEpiNode extends Node {
         }
       }
     }
-    if( emprj != null ) gvn.subsume(emprj,mem);
+
+    // Sigh, ugly hack because Load/Stores are so strong.  All load/store
+    // children of the inlined call need to hit the worklist.
+    if( emprj != null ) {
+      work.addAll(emprj._uses);
+      while( !work.isEmpty() ) {
+        Node wrk = work.pop();
+        if( wrk.is_mem() ) {
+          if( wrk instanceof LoadNode ) gvn.add_work(wrk);
+          if( wrk instanceof StoreNode ) { gvn.add_work(wrk); work.addAll(wrk._uses); }
+        }
+      }
+      gvn.subsume(emprj,mem);
+    }
 
     // Move over Control
     CProjNode ccprj = (CProjNode)ProjNode.proj(call,0);
@@ -457,6 +471,7 @@ public final class CallEpiNode extends Node {
         }
       gvn.add_work_uses(fun);
     }
+    gvn.add_work(ret);
     del(_defs.find(ret));
     assert sane_wiring();
   }

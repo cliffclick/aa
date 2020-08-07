@@ -374,7 +374,7 @@ public class Parse {
         else ; // Can be here if already in-error
       } else { // Store into scope/NewObjNode/display
         // Assign into display
-        Node ptr = get_display_ptr(scope,tok); // Pointer, possibly loaded up the display-display
+        Node ptr = get_display_ptr(scope); // Pointer, possibly loaded up the display-display
         set_mem(gvn(new StoreNode(mem(),ptr,ifex,mutable,tok,badfs.at(i))));
         scope.def_if(tok,mutable,false); // Note 1-side-of-if update
       }
@@ -623,7 +623,7 @@ public class Parse {
     // Scope is discovered by walking lexical display stack.
     // Pointer to the proper display is found via ptr-walking live display stack.
     // Now properly load from the display
-    Node ptr = get_display_ptr(scope,tok);
+    Node ptr = get_display_ptr(scope);
     n = gvn(new LoadNode(mem(),ptr,tok,null));
     if( n.is_forward_ref() )    // Prior is actually a forward-ref
       return err_ctrl2(forward_ref_err(((FunPtrNode)n).fun()));
@@ -716,8 +716,8 @@ public class Parse {
     // Else must load against most recent display update.  Get the display to
     // load against.  If the scope is local, we load against it directly,
     // otherwise the display is passed in as a hidden argument.
-    Node ptr = get_display_ptr(scope,tok.intern());
-    return gvn(new LoadNode(mem(),ptr,tok,null));
+    Node ptr = get_display_ptr(scope);
+    return gvn(new LoadNode(mem(),ptr,tok.intern(),null));
   }
 
   /** Parse a tuple; first stmt but not the ',' parsed.
@@ -1167,7 +1167,7 @@ public class Parse {
   // Set and return a new control
   private <N extends Node> N set_ctrl(N n) { return _e._scope.set_ctrl(n,_gvn); }
   private Node mem() { return _e._scope.mem(); }
-  private Node set_mem(Node n) { return _e._scope.set_mem(n,_gvn); }
+  private void set_mem( Node n) { _e._scope.set_mem(n, _gvn); }
 
   private @NotNull ConNode con( Type t ) { return _gvn.con(t); }
 
@@ -1180,7 +1180,7 @@ public class Parse {
 
   // Get the display pointer.  The function call
   // passed in the display as a hidden argument which we return here.
-  private Node get_display_ptr(ScopeNode scope, String tok) {
+  private Node get_display_ptr( ScopeNode scope ) {
     // Issue Loads against the Display, until we get the correct scope.  The
     // Display is a linked list of displays, and we already checked that token
     // exists at scope up in the display.

@@ -119,7 +119,7 @@ public class GVNGCM {
       kill0(con);                  // Kill the just-made one
       con = (ConNode)con2;
     }
-    setype(con,t);
+    setype(con,t.simple_ptr());
     _vals.put(con,con);
     add_work(con);
     con._live = TypeMem.ALIVE;  // Alive, but demands no memory
@@ -595,6 +595,8 @@ public class GVNGCM {
             // If a Parm:Mem input is updated, all Parm:ptrs may update.
             if( use instanceof ParmNode && ((ParmNode)use)._idx==-2 )
               add_work_uses(use.in(0));
+            if( n instanceof CallNode && use instanceof CProjNode )
+              add_work_uses(use); // Call lowers fidxs, Funs might get turned on
           }
           if( n.value_changes_live() ) {
             add_work_defs(n);
@@ -648,6 +650,7 @@ public class GVNGCM {
         call.set_fun_reg(fptr,this);// Set resolved edge
         add_work(call);
         add_work(fptr);             // Unresolved is now resolved and live
+        add_work(fptr.fun());
         // If this call is wired, a CallEpi will 'peek thru' an Unresolved to
         // pass liveness to a Ret.  Since 1-step removed from neighbor, have to
         // add_work 1-step further afield.

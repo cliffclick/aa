@@ -147,6 +147,7 @@ public class CallNode extends Node {
   }
   static public TypeFunPtr ttfp( Type tcall ) { return (TypeFunPtr)((TypeTuple)tcall).at(ARGIDX); }
   static public TypeFunPtr ttfpx(Type tcall ) {
+    if( !(tcall instanceof TypeTuple) ) return null;
     Type t = ((TypeTuple)tcall).at(ARGIDX);
     return t instanceof TypeFunPtr ? (TypeFunPtr)t : null;
   }
@@ -273,24 +274,29 @@ public class CallNode extends Node {
       NewNode nnn = mrg.nnn();
       ProjNode cepij = ProjNode.proj(cepi,1); // Memory projection from CEPI
       if( cepij!=null && !tesc(tcall)._aliases.test_recur(nnn._alias) ) { // No alias collisions
-        TypeMem tmpj = (TypeMem)gvn.type(mem);
-        // TODO: REALLY NEEDS TO BE A SPLIT/JOIN
-        
-        // Swap the Call/CallEpi & NewNode.
-        set_mem(mrg.<MrgProjNode>keep().mem(),gvn);
-        gvn.replace(cepij,mrg);
-        gvn.set_def_reg(mrg.unhook(),1,cepij);
-        // Recompute values for NewNode, which moves after the Call.
-        gvn.setype(cepi ,cepi .value(gvn));
-        gvn.setype(cepij,cepij.value(gvn));
-        gvn.setype( nnn , nnn .value(gvn));
-        gvn.setype( mem , mem .value(gvn));
-        // Recompute lives for Call/CallEpi, which moves before the New.
-        for( Node x : new Node[]{mem,nnn,cepij,cepi,this} )
-          x._live = x.live(gvn);
-        gvn.add_work_uses(cepi);
-        gvn.add_work_uses(nnn);
-        return this;
+        // No wired return returns this alias
+        boolean ok=true;
+        for( int i = 0; i < cepi.nwired(); i++ ) {
+          Type tret = gvn.type(cepi.wired(i));
+          if( !(tret instanceof TypeMem && ((TypeMem) tret).at(nnn._alias) == TypeObj.UNUSED) )
+            {ok=false; break;} // Do not swap if CallEpi believes it is returning the New.
+        }
+        if( ok ) {
+          // TODO: REALLY NEEDS TO BE A SPLIT/JOIN
+          // Swap the Call/CallEpi & NewNode.
+          set_mem(mrg.<MrgProjNode>keep().mem(),gvn);
+          gvn.replace(cepij,mrg);
+          gvn.set_def_reg(mrg.unhook(),1,cepij);
+          // Recompute values for NewNode, which moves after the Call.
+          for( Node x : new Node[]{this,cepi,cepij,nnn,mem} )
+            gvn.setype(x,x.value(gvn));
+          // Recompute lives for Call/CallEpi, which moves before the New.
+          for( Node x : new Node[]{mem,nnn,cepij,cepi,this} )
+            x._live = x.live(gvn);
+          gvn.add_work_uses(cepi);
+          gvn.add_work_uses(nnn);
+          return this;
+        }
       }
     }
 

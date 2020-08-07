@@ -249,4 +249,17 @@ public final class TypeMemPtr extends Type<TypeMemPtr> {
   @SuppressWarnings("unchecked")
   @Override void walk( Predicate<Type> p ) { if( p.test(this) ) _obj.walk(p); }
   public int getbit() { return _aliases.getbit(); }
+  @Override TypeMemPtr crush_fld_impl(String fld) {
+    return make(_aliases,(TypeObj)_obj.crush_fld_impl(fld));
+  }
+  @Override public TypeMemPtr widen() {
+    // Flatten to either all-structs or all-strings, unless both.
+    boolean rec = _aliases.isa(BitsAlias.RECORD_BITS0);
+    boolean str = _aliases.isa(BitsAlias.STRBITS0);
+    BitsAlias bs = rec ? (str
+                          ? BitsAlias.FULL
+                          : BitsAlias.RECORD_BITS0)
+      : BitsAlias.STRBITS0;
+    return make(bs,(TypeObj)_obj.widen());
+  }
 }

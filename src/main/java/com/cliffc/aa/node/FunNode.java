@@ -238,7 +238,6 @@ public class FunNode extends RegionNode {
 
     // --------------
     // Split the callers according to the new 'fun'.
-    int old_fidx = fidx();
     FunNode fun = make_new_fun(gvn, ret, formals);
     split_callers(gvn,ret,fun,body,path);
     assert Env.START.more_flow(gvn,new VBitSet(),true,0)==0; // Initial conditions are correct
@@ -326,32 +325,60 @@ public class FunNode extends RegionNode {
       return sig;
     }
 
-    // Look for splitting to help a field Load from an unspecialized type.
-    // Split ~Scalar,~nScalar,~Oop,~nOop, ~Struct,~nStruct into ~Struct and add
-    // fields discovered.
-    boolean progress=false;
+    // Look for splitting to help a pointer from an unspecialized type
+    boolean progress = false;
     Type[] sig = new Type[parms.length];
+    TypeMem tmem = (TypeMem)gvn.type(parm(-2));
     for( int i=0; i<parms.length; i++ ) { // For all parms
       Node parm = parms[i];
       if( parm == null ) { sig[i]=Type.SCALAR; continue; } // (some can be dead)
-      Type tp = gvn.type(parm);
-      for( Node puse : parm._uses ) { // See if a parm-user needs a load specialization
-        Type rez = find_load_use(puse,tp);
-        if( rez != tp ) { progress = true; tp = rez; }
-      }
-      sig[i] = tp;
+      sig[i] = gvn.type(parm);                             // Current type
+      if( i==0 ) continue;                                 // No split on the display
+      // Best possible type
+      Type tp = Type.ALL;
+      for( Node def : parm._defs )
+        if( def != this )
+          tp = tp.join(gvn.type(def));
+      if( !(tp instanceof TypeMemPtr) ) continue; // Not a pointer
+      TypeObj to = (TypeObj)tmem.ld((TypeMemPtr)tp).widen(); //
+      // Are all the uses of parm compatible with this TMP?
+      // Also, flag all used fields.
+      if( bad_mem_use(parm, to) )
+        continue;               // So bad usage
+
+      sig[i] = TypeMemPtr.make(BitsAlias.RECORD_BITS0,to); // Signature takes any alias but has sharper guts
+      progress = true;
     }
-    if( !progress ) return null;
-    throw AA.unimpl();
+    return progress ?  sig : null;
   }
 
-  private static Type find_load_use(Node puse, Type tp) {
-    if( !tp.isa(TypeStruct.ANYSTRUCT) ) return tp;
-    if( puse instanceof CastNode )
-      throw AA.unimpl();
-    if( puse instanceof LoadNode )
-      throw AA.unimpl();
-    return tp;                  // Unknown use, can ignore
+  // Check all uses are compatible with sharpening to a pointer
+  private static boolean bad_mem_use( Node n, TypeObj to) {
+    for( Node use : n._uses ) {
+      switch( use._op ) {
+      case OP_NEWOBJ: break; // Field use is like store.value use
+      case OP_IF: break;     // Zero check is ok
+      case OP_CAST:          // Cast propagates check
+        if( bad_mem_use(use, to) ) return true;
+        break;
+      case OP_LOAD:
+        if( !(to instanceof TypeStruct) ||
+            ((LoadNode)use).find((TypeStruct)to)== -1 )
+          return true;          // Did not find field
+        break;
+      case OP_CALL: break; // Argument pass-thru probably needs to check formals
+      case OP_RET: break;  // Return pass-thru should be ok
+      case OP_LIBCALL:
+        TypeFunSig sig = ((IntrinsicNewNode)use)._sig;
+        Type formal = sig._formals.at(use._defs.find(n)-2);
+        if( !TypeMemPtr.OOP0.dual().isa(formal) )
+          return true;
+        break;
+      case OP_NAME: break; // Pointer to a nameable struct
+      default: throw AA.unimpl();
+      }
+    }
+    return false;
   }
 
 
@@ -596,7 +623,7 @@ public class FunNode extends RegionNode {
           // by non-application uses.  E.g., passing a unresolved function
           // pointer to a 'map()' call, or storing it to memory.
           Node old_funptr = use;
-          Node new_funptr = map.get(use);
+          Node new_funptr = map.get(old_funptr);
           gvn.replace(new_funptr,old_funptr);
           gvn.setype(new_funptr,new_funptr.value(gvn)); // Build type so Unresolved can compute type
           UnresolvedNode new_unr = new UnresolvedNode(null,new_funptr);
@@ -657,6 +684,16 @@ public class FunNode extends RegionNode {
     }
     gvn.setype(Env.DEFMEM,Env.DEFMEM.value(gvn));
 
+    // Eagerly lift any Unresolved types, so they quit propagating the parent
+    // (and both children) to all targets.
+    for( Node fptr : oldret._uses )
+      if( fptr instanceof FunPtrNode )
+        for( Node unr : fptr._uses )
+          if( unr instanceof UnresolvedNode ) {
+            gvn.setype(unr,unr.value(gvn));
+            gvn.add_work_uses(unr);
+          }
+
     // Rewire all unwired calls.
     for( CallEpiNode cepi : unwireds ) {
       CallNode call = cepi.call();
@@ -714,7 +751,19 @@ public class FunNode extends RegionNode {
     // Will be an error eventually, but act like its executed so the trailing
     // EpilogNode gets visited during GCP
     if( is_forward_ref() ) return Type.CTRL;
-    return super.value(gvn);
+    if( _defs._len==2 && in(1)==this ) return Type.XCTRL; // Dead self-loop
+    if( in(0)==this ) return gvn.type(in(1)); // is_copy
+    for( int i=1; i<_defs._len; i++ ) {
+      Type c = gvn.type(in(i));
+      if( c != Type.CTRL && c != Type.ALL ) continue; // Not control
+      if( !(in(i) instanceof CProjNode) ) return Type.CTRL; // A constant control
+      // Call might be alive and executing and calling many targets, just not this one.
+      CallNode call = (CallNode)in(i).in(0);
+      TypeFunPtr ttfp = CallNode.ttfpx(gvn.type(call));
+      if( ttfp != null && !ttfp.above_center() && ttfp._fidxs.test_recur(_fidx) )
+        return Type.CTRL;       // Call us
+    }
+    return Type.XCTRL;
   }
 
   // True if this is a forward_ref

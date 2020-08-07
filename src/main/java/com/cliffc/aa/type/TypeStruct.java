@@ -1196,7 +1196,7 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     if( dull_cache.get(dull._aliases) != null ) return;
     if( dull==TypeMemPtr.NO_DISP || dull==TypeMemPtr.NO_DISP.dual() ) { mem.sharput(dull,dull); return; }
     // Walk and meet "dull" fields; all TMPs will point to ISUSED (hence are dull).
-    Type t = Type.ANY;
+    Type t = TypeObj.UNUSED;
     for( int alias : dull._aliases )
       if( alias != 0 )
         t = t.meet(mem.at(alias));
@@ -1268,12 +1268,17 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   }
   // Shallow clone
   private TypeStruct _sharpen_clone() {
-    assert interned() && !_cyclic;
+    assert !_cyclic;
+    return _clone();
+  }
+  private TypeStruct _clone() {
+    assert interned();
     Type[] ts = TypeAry.clone(_ts);
     TypeStruct t = malloc(_name,_any,_esc,_flds,ts,_flags,_open);
     t._hash = t.compute_hash();
     return t;
   }
+
 
   // ------ String field name lattice ------
   static private boolean fldTop( String s ) { return s.charAt(0)=='\\'; }
@@ -1309,9 +1314,9 @@ public class TypeStruct extends TypeObj<TypeStruct> {
   public Type last() { return _ts[_ts.length-1]; }
 
   // Update (approximately) the current TypeObj.  Updates the named field.
-  @Override public TypeObj update(byte fin, String fld, Type val) { return update(fin,fld,val,false); }
-  @Override public TypeObj st    (byte fin, String fld, Type val) { return update(fin,fld,val,true ); }
-  private TypeObj update(byte fin, String fld, Type val, boolean precise) {
+  @Override public TypeStruct update(byte fin, String fld, Type val) { return update(fin,fld,val,false); }
+  @Override public TypeStruct st    (byte fin, String fld, Type val) { return update(fin,fld,val,true ); }
+  private TypeStruct update(byte fin, String fld, Type val, boolean precise) {
     int idx = find(fld);
     if( idx == -1 )             // Unknown field, assume changes no fields
       return this;
@@ -1373,6 +1378,35 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     return false;
   }
 
+
+  // COOL HACK NOT GONNA WORK.  NEED TO BUILD A CYCLIC STRUCTURE PROPER
+
+  // Replace (in a large recursive structure), all display fields 'fld' with scalar.
+  public TypeStruct crush_fld(String fld) {
+    RECURSIVE_MEET++;
+    TypeStruct mt = crush_fld_impl(fld);// Clone, crushing this field
+    DUPS.clear();
+    mt = shrink(mt.reachable(),mt);     // No shrinking nor UF expected
+    Ary<Type> reaches = mt.reachable(); // Recompute reaches after shrink
+    assert check_uf(reaches);
+    UF.clear();
+    RECURSIVE_MEET--;
+    mt = mt.install_cyclic(reaches); // But yes cycles
+    return mt;
+  }
+  @Override TypeStruct crush_fld_impl(String fld) {
+    TypeStruct mt = DUPS.get(this);
+    if( mt != null )
+      return mt; // Been there, done that.
+    mt = _clone();
+    Arrays.fill(mt._ts,ANY);
+    mt._cyclic = _cyclic;
+    DUPS.put(this,mt);          // Flag the cycle closed
+    for( int i=0; i<_ts.length; i++ )
+      mt._ts[i] = Util.eq(_flds[i],fld) ? SCALAR : _ts[i].crush_fld_impl(fld);
+    return mt;
+  }
+
   // Widen (lose info), to make it suitable as the default function memory.
   // Final fields can remain as-is; non-finals are all widened to ALL (assuming
   // a future error Store); field flags set to bottom; the field names are kept.
@@ -1386,6 +1420,13 @@ public class TypeStruct extends TypeObj<TypeStruct> {
     // Keep the name and field names.
     // Low input so low output.
     return malloc(_name,false,_esc,_flds,ts,flags,_open).hashcons_free();
+  }
+  // Keep field names and orders.  Widen all field contents, including finals.
+  @Override public Type widen() {
+    Type[] ts = TypeAry.clone(_ts);
+    for( int i=0; i<ts.length; i++ )
+      ts[i] = _ts[i].widen();
+    return make_from(ts);
   }
 
   // True if isBitShape on all bits

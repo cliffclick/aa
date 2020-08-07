@@ -29,6 +29,7 @@ public class LoadNode extends Node {
   private Node mem() { return in(1); }
           Node adr() { return in(2); }
   private Node set_mem(Node a, GVNGCM gvn) { return set_def(1,a,gvn); }
+  public int find(TypeStruct ts) { return ts.find(_fld); }
 
   @Override public Node ideal(GVNGCM gvn, int level) {
     Node mem  = mem();
@@ -66,7 +67,7 @@ public class LoadNode extends Node {
       if( !aliases.test_recur(nnn._alias) )
         return set_mem(mem.in(1),gvn);
     }
-    
+
     // Load from a memory Phi; split through in an effort to sharpen the memory.
     // TODO: Only split thru function args if no unknown_callers, and must make a Parm not a Phi
     // TODO: Hoist out of loops.
@@ -144,15 +145,15 @@ public class LoadNode extends Node {
     CallNode call = cepi.call();
     if( tmem.alias_is_no_esc(aliases) )
       return call.mem();        // Can always bypass global no-escape
-    if( tmem.fld_is_final(aliases,fld) ) 
+    if( tmem.fld_is_final(aliases,fld) )
       return is_load ? call.mem() : null; // Loads from final memory can bypass calls.  Stores cannot, store-over-final is in error.
     TypeMemPtr escs = call.tesc(gvn.type(call));
     if( is_load && escs._aliases.join(aliases)==BitsAlias.EMPTY )
       return call.mem(); // Load from call; if memory is made *in* the call this will fail later on an address mismatch.
     return null;         // Stuck behind call
   }
-  
-  
+
+
   @Override public Type value(GVNGCM gvn) {
     Type adr = gvn.type(adr());
     if( !(adr instanceof TypeMemPtr) ) return adr.oob();
@@ -198,7 +199,7 @@ public class LoadNode extends Node {
     TypeObj objs = tmem instanceof TypeMem
       ? ((TypeMem)tmem).ld(ptr) // General load from memory
       : ((TypeObj)tmem);
-    if( !(objs instanceof TypeStruct) || ((TypeStruct)objs).find(_fld) == -1 )
+    if( !(objs instanceof TypeStruct) || find((TypeStruct)objs) == -1 )
       return bad("Unknown");
     return null;
   }
