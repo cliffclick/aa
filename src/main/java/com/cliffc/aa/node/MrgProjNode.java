@@ -11,11 +11,19 @@ public class MrgProjNode extends ProjNode {
   NewNode nnn() { return (NewNode)in(0); }
   Node    mem() { return          in(1); }
   @Override public Node ideal(GVNGCM gvn, int level) {
-    if( nnn().is_unused() ) {
+    if( nnn().is_unused() ) {   // New is dead for no pointers
       Type t = gvn.type(mem());
       if( t instanceof TypeMem && ((TypeMem)t).at(nnn()._alias)==TypeObj.UNUSED )
         return mem();
     }
+
+    // New is dead from below.
+    if( _live.at(nnn()._alias)==TypeObj.UNUSED ) {
+      gvn.unreg(nnn());         // Unregister before self-kill
+      nnn().kill(gvn);          // Killing a NewNode has to do more updates than normal
+      return mem();             // Kill NewNode
+    }
+
     return null;
   }
   @Override public Type value(GVNGCM gvn) {

@@ -68,23 +68,25 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     // If either the address or memory is not looked at then the memory
     // contents are dead.  The object might remain as a 'gensym' or 'sentinel'
     // for identity tests.
-    if( _defs._len > 1 && captured(gvn) ) {
-      while( !is_dead() && _defs._len > 1 )
-        pop(gvn);               // Kill all fields except memory
-      if( is_dead() ) return this;
-      sets_in(dead_type());
-      gvn.set_def_reg(Env.DEFMEM,_alias,gvn.add_work(gvn.con(TypeObj.UNUSED)));
-      if( is_dead() ) return this;
-      gvn.add_work_uses(_uses.at(0));  // Get FPtrs from MrgProj from this
-      return this;
-    }
-
+    if( _defs._len > 1 && captured(gvn) ) return kill(gvn);
     return null;
   }
 
   @Override BitsAlias escapees( GVNGCM gvn) { return _tptr._aliases; }
   abstract T dead_type();
   boolean is_unused() { return _ts==dead_type(); }
+  // Kill all inputs, inform all users
+  NewNode kill(GVNGCM gvn) {
+    while( !is_dead() && _defs._len > 1 )
+      pop(gvn);               // Kill all fields except memory
+    if( is_dead() ) return this;
+    _crushed = _ts = dead_type();
+    Env.GVN.revalive(this,ProjNode.proj(this,0),Env.DEFMEM);
+    gvn.set_def_reg(Env.DEFMEM,_alias,gvn.add_work(gvn.con(TypeObj.UNUSED)));
+    if( is_dead() ) return this;
+    gvn.add_work_uses(_uses.at(0));  // Get FPtrs from MrgProj from this
+    return this;
+  }
 
   // Basic escape analysis.  If no escapes and no loads this object is dead.
   private boolean captured( GVNGCM gvn ) {

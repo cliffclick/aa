@@ -417,13 +417,12 @@ public class TypeMem extends Type<TypeMem> {
   // Everything NOT in the 'escs' is flattened to UNUSED.
   public TypeMem remove_no_escapes( BitsAlias escs ) {
     int i; for( i=1; i<_pubs.length; i++ )
-      if( !escs.test_recur(i) )
+      if( at(i) != TypeObj.UNUSED && !escs.test_recur(i) )
         break;                         // Found a no-escape to remove
     if( i==_pubs.length ) return this; // Already flattened
-    TypeObj[] tos = _pubs.clone();
-    for( i=1; i<_pubs.length; i++ )
-      if( !escs.test_recur(i) )
-        tos[i] = TypeObj.UNUSED;
+    TypeObj[] tos = new TypeObj[Math.max(_pubs.length,escs.max()+1)];
+    for( i=1; i<tos.length; i++ )
+      tos[i] = escs.test_recur(i) ? at(i) : TypeObj.UNUSED;
     return make0(tos);
   }
 
