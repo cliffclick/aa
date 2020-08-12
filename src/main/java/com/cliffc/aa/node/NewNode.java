@@ -84,7 +84,8 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     Env.GVN.revalive(this,ProjNode.proj(this,0),Env.DEFMEM);
     gvn.set_def_reg(Env.DEFMEM,_alias,gvn.add_work(gvn.con(TypeObj.UNUSED)));
     if( is_dead() ) return this;
-    gvn.add_work_uses(_uses.at(0));  // Get FPtrs from MrgProj from this
+    for( Node use : _uses )
+      gvn.add_work_uses(use); // Get FPtrs from MrgProj, and dead Ptrs into New
     return this;
   }
 

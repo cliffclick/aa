@@ -116,6 +116,17 @@ public class NewObjNode extends NewNode<TypeStruct> {
     Node n = super.ideal(gvn,level);
     if( n != null ) return n;
 
+    // If a field is unused, remove it.  Right now limited to the field being a
+    // pointer to a dead New.
+    boolean progress = false;
+    for( int i=1; i<_defs._len; i++ )
+      if( in(i) instanceof ProjNode && in(i).in(0) instanceof NewNode ) {
+        NewNode nnn = (NewNode)in(i).in(0);
+        if( nnn.is_unused() )
+          { set_def(i,gvn.con(Type.ANY),gvn); progress=true; }
+      }
+    if( progress ) return this;
+
     // If the value lifts a final field, so does the default lift.
     Type ts0 = gvn.type(this);
     if( ts0 instanceof TypeTuple ) {

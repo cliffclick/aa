@@ -1,4 +1,34 @@
 =======================================
+Notes from 08/12/2020
+
+Yanked priv/public notion.  Failed when calling many fcns, returning the same alias many times.
+
+Back to Basics!
+Standard Call-Graph Flow from Rice.
+Live & Value both entirely symmetric, so symmetric handling.
+
+Add to Ret a MOD-OUT set (union of NEW/STORED).  Ignores read   aliases.  Forward flow.
+Add to Fun a READ-IN set (union of     LOADED).  Ignores stored aliases.  Reverse flow.
+
+Recursively expand MOD-OUT at CEPI.value from union of RETs plus local.
+Recursively expand READ-IN at CALL.live  from union of FUNs plus local.
+
+Call.value: just capture from above
+Cepi.live : just capture from below
+
+
+Cepi.value:
+  for all rets, take pre.call or post.ret, based on ret MOD-OUT.
+  meet results.
+
+Symmetry
+Call.live:
+  for all funs, take pre.cepi or post.fun, based on fun READ-SET.
+
+How does this handle Recursion?
+
+
+=======================================
 Notes from 08/05/2020
 
 Trying to solve: New / Call / St=; problem is Call blows aliasing on New if recursive.
