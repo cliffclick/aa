@@ -16,12 +16,6 @@ public class TestParse {
   @Test public void testParse() {
     TypeStruct dummy = TypeStruct.DISPLAY;
     TypeMemPtr tdisp = TypeMemPtr.make(BitsAlias.make0(2),TypeMemPtr.PMIX,TypeStr.NO_DISP);
-    //test_obj_isa("map={x -> x ? @{nn=map(x.n);vv=x.v&x.v} : 0};"+
-    //    "map(@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=math_rand(1)?0:@{n=0;v=1};v=2};v=3};v=4})",
-    //  TypeStruct.make(FLDS2,TypeStruct.ts(TypeMemPtr.DISPLAY_PTR,Type.XSCALAR,TypeMemPtr.STRUCT0,TypeInt.INT8))); //con(20.25)
-    String ll_def = "List=:@{next;val};";
-    String ll_con = "tmp=List(List(0,1.2),2.3);";
-    test(ll_def+ll_con+"; tmp.next.val", TypeFlt.con(1.2));
 
     // A collection of tests which like to fail easily
     test("-1",  TypeInt.con( -1));
@@ -371,6 +365,8 @@ public class TestParse {
     test_isa("A= :@{n=A?; v=int}; f={x:A? -> x ? A(f(x.n),x.v*x.v) : 0}", TypeFunPtr.GENERIC_FUNPTR);
     test    ("A= :@{n=A?; v=flt}; f={x:A? -> x ? A(f(x.n),x.v*x.v) : 0}; f(A(0,1.2)).v;", TypeFlt.con(1.2*1.2));
     test("tmp=((0,1.2),2.3); sq={x->x*x}; map={f t -> t ? (map(f,t.0),f t.1) : 0}; map(sq,tmp).1",TypeFlt.con(2.3*2.3));
+    // Calling a function twice which returns the same alias.  Verify no pointer confusion.
+    test("noinline_x={@{a}}; x0=noinline_x(); x1=noinline_x(); x0.a:=2; x1.a",  TypeInt.con(0));
 
     // Longer variable-length list (so no inline-to-trivial).  Pure integer
     // ops, no overload resolution.  Does final stores into new objects

@@ -331,6 +331,7 @@ public class Parse {
         if( lookup_current_scope_only && ts.isEmpty() && (peek(';') || peek('}') )){
           _x--;                                        // Push back statement end
           default_nil=true;                            // Shortcut def of nil
+          rs.set(toks._len);                           // Shortcut mutable
         } else {
           _x = oldx; // Unwind the token parse, and try an expression parse
           break;     // Done parsing assignment tokens
