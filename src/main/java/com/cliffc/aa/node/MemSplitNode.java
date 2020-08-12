@@ -1,5 +1,6 @@
 package com.cliffc.aa.node;
 
+import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.type.*;
 import com.cliffc.aa.util.Ary;
@@ -100,6 +101,43 @@ public class MemSplitNode extends Node {
       }
     }
   }
+
+  // Insert a Split/Join pair, moving the two stacked memory SESE regions
+  // side-by-side.  If the SESE region is empty, the head & tail can be the
+  // same, which is true for e.g. StoreNodes & MrgNodes.
+  //      tail1->{SESE#1}->head1->tail2->{SESE#2}->head2
+  // New/Mrg pairs are just the Mrg; the New is not part of the SESE region.
+  // Call/CallEpi pairs are: MProj->{CallEpi}->Call.
+  static Node insert_split(GVNGCM gvn, Node tail1, Node head1, Node tail2, Node head2) {
+    assert tail1.is_mem() && head1.is_mem() && tail2.is_mem() && head2.is_mem();
+    assert check_split(gvn,head1);
+    // Insert empty split/join above head2
+    MemSplitNode msp = gvn.xform(new MemSplitNode(head2.in(1))).keep();
+    MProjNode mprj = (MProjNode)gvn.xform(new MProjNode(msp,0));
+    MemJoinNode mjn = (MemJoinNode)gvn.xform(new MemJoinNode(mprj));
+    gvn.set_def_reg(head2,1,mjn);
+    msp.unhook();
+    mjn._live = tail1._live;
+    // Pull the SESE regions in parallel from below
+    mjn.add_alias_below(gvn,head2,tail2);
+    mjn.add_alias_below(gvn,head1,tail1);
+    gvn.revalive(msp,mprj,mjn);
+    return head1;
+  }
+  static boolean check_split(GVNGCM gvn, Node head1) {
+    Node tail2 = head1.in(1);
+    // Must have only 1 mem-writer (this can fail if used by different control paths)
+    if( !tail2.check_solo_mem_writer(head1) ) return false;
+    // No alias overlaps
+    if( head1.escapees(gvn).overlaps(tail2.escapees(gvn)) ) return false;
+    // TODO: This is too strong.
+    // Cannot have any Loads following head1; because after the split
+    // they will not see the effects of previous stores that also move
+    // into the split.
+    return (tail2._uses._len==1) ||
+      (tail2._uses._len==2 && tail2._uses.find(Env.DEFMEM)!= -1 );
+  }
+
 
   //@SuppressWarnings("unchecked")
   @Override @NotNull public MemSplitNode copy( boolean copy_edges, GVNGCM gvn) {

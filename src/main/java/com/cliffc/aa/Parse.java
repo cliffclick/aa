@@ -262,12 +262,13 @@ public class Parse {
       rez = _e.add_fun(bad,tvar,epi1); // Return type-name constructor
       // For Structs, add a second constructor taking an expanded arg list
       if( t instanceof TypeStruct ) {   // Add struct types with expanded arg lists
-        FunPtrNode epi2 = IntrinsicNode.convertTypeNameStruct((TypeStruct)tn, BitsAlias.RECORD, _gvn);
+        FunPtrNode epi2 = IntrinsicNode.convertTypeNameStruct((TypeStruct)tn, BitsAlias.RECORD, _gvn, errMsg());
         Node rez2 = _e.add_fun(bad,tvar,epi2); // type-name constructor with expanded arg list
         _gvn.init0(rez2._uses.at(0));      // Force init of Unresolved
       }
     }
     _gvn.rereg(stk,stk.value(_gvn)); // Re-install display in GVN
+    _gvn.revalive(Env.DEFMEM);       // Update DEFMEM for both functions added
     // TODO: Add reverse cast-away
     return rez;
   }
@@ -478,7 +479,6 @@ public class Parse {
             Node call = do_call(new CallNode(true,new Parse[]{bad,bad},ctrl(),mem(),fun.unhook(),args.in(0)));
             args.set_def(0,call,_gvn);
             funs.setX(0,null);
-            bads.setX(0,null);
           } else {
             Parse bad1 = bads.at(i-1);
             Node call = do_call(new CallNode(true,new Parse[]{bad1,bad1,bad},ctrl(),mem(),fun.unhook(),args.in(i-1),args.in(i)));
@@ -743,12 +743,13 @@ public class Parse {
     for( int i=0; i<args._len; i++ )
       nn.create_active((""+i).intern(),args.at(i),TypeStruct.FFNL,_gvn);
     nn._fld_starts = bads.asAry();
-    nn.no_more_fields();
+    NewObjNode nnn = (NewObjNode)gvn(nn);
+    nnn.no_more_fields();
+    nnn._live = TypeMem.ESCAPE;
 
     // NewNode returns a TypeMem and a TypeMemPtr (the reference).
-    NewObjNode nnn = (NewObjNode)gvn(nn);
-    set_mem( Env.DEFMEM.make_mem_proj(_gvn,nnn,mem()) );
-    return gvn(new ProjNode(1, nnn));
+    set_mem( Env.DEFMEM.make_mem_proj(_gvn,nn,mem()) );
+    return gvn(new ProjNode(1, nn));
   }
 
   /** Parse anonymous struct; the opening "@{" already parsed.  A lexical scope
@@ -993,7 +994,7 @@ public class Parse {
     // Automatically convert to reference for fields.
     // Make a reasonably precise alias.
     int type_alias = t instanceof TypeStruct ? BitsAlias.RECORD : BitsAlias.STR;
-    TypeMemPtr tmp = TypeMemPtr.make(BitsAlias.make0(type_alias),(TypeObj)t);
+    TypeMemPtr tmp = TypeMemPtr.make(BitsAlias.make0(type_alias),TypeMemPtr.PMIX,(TypeObj)t);
     return typeq(tmp);          // And check for null-ness
   }
   // Wrap in a nullable if there is a trailing '?'.  No spaces allowed

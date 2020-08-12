@@ -61,6 +61,8 @@ public class PhiNode extends Node {
     for( int i=1; i<_defs._len; i++ )
       if( gvn.type(r.in(i))==Type.CTRL ) // Only meet alive paths
         t = t.meet(gvn.type(in(i)));
+    if( t instanceof TypeMemPtr && (r instanceof LoopNode || r instanceof FunNode) )
+      t = ((TypeMemPtr)t).make_from_public();
     return t;
   }
   @Override BitsAlias escapees( GVNGCM gvn) { return BitsAlias.FULL; }

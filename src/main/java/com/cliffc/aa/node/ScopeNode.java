@@ -114,7 +114,7 @@ public class ScopeNode extends Node {
       return gvn._opt_mode < 2 ? TypeMem.ALLMEM : TypeMem.DEAD;
     assert _uses._len==0;
     // All fields in all reachable pointers from rez() will be marked live
-    return compute_live_mem(gvn,mem(),rez());
+    return compute_live_mem(gvn,mem(),rez()).flatten_fields();
   }
 
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {

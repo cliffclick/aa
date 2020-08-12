@@ -131,6 +131,19 @@ public class Type<T extends Type<T>> implements Cloneable {
   SB dstr( SB sb, VBitSet dups ) { return sb.p(str(dups)); }
   String q() { return dstr(new SB(),null).toString(); }
 
+  // Shallow array compare, using '==' instead of 'equals'.  Since elements are
+  // interned, this is the same as 'equals' except asympotically faster unless
+  // there is a type-cycle, then infinitely faster.
+  public static boolean eq( Type[] t0, Type[] t1 ) {
+    if( t0==t1 ) return true;
+    if( t0==null || t1==null ) return false;
+    if( t0.length != t1.length ) return false;
+    for( int i=0; i<t0.length; i++ )
+      if( t0[i] != t1[i] )
+        return false;
+    return true;
+  }
+
   // Object Pooling to handle frequent (re)construction of temp objects being
   // interned.  One-entry pool for now.
   private static Type FREE=null;

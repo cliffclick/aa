@@ -112,17 +112,20 @@ public class MemJoinNode extends Node {
     // Walk all aliases and take from matching escape set in the Split.  Since
     // nothing overlaps this is unambiguous.
     Ary<BitsAlias> escs = msp()._escs;
-    TypeObj[] tos = new TypeObj[Env.DEFMEM._defs._len];
-    for( int alias=1, i; alias<tos.length; alias++ ) {
+    TypeObj[] pubs = new TypeObj[Env.DEFMEM._defs._len];
+    TypeObj[] prvs = new TypeObj[Env.DEFMEM._defs._len];
+    for( int alias=1, i; alias<Env.DEFMEM._defs._len; alias++ ) {
       if( escs.at(0).test_recur(alias) ) { // In some RHS set
         for( i=1; i<_defs._len; i++ )
           if( escs.at(i).test_recur(alias) )
             break;
       } else i=0;                     // In the base memory
-      if( alias == 1 || Env.DEFMEM.in(alias) != null )  // Check never-made aliases
-        tos[alias] = mems[i].at(alias); // Merge alias
+      if( alias == 1 || Env.DEFMEM.in(alias) != null ) { // Check never-made aliases
+        pubs[alias] = mems[i].at   (alias); // Merge alias
+        prvs[alias] = mems[i].atprv(alias); // Merge alias
+      }
     }
-    return TypeMem.make0(tos);
+    return TypeMem.make0(pubs,prvs);
   }
   @Override public boolean basic_liveness() { return false; }
 
@@ -173,7 +176,7 @@ public class MemJoinNode extends Node {
 
   // Move the given SESE region just behind of the join into the join/split
   // area.  The head node has the escape-set.
-  void add_alias_below( GVNGCM gvn, Node head, Node base, Node base_memw ) {
+  void add_alias_below( GVNGCM gvn, Node head, Node base ) {
     assert head.is_mem() && base.is_mem();
     MemSplitNode msp = msp();
     int idx = msp.add_alias(gvn,head.escapees(gvn)), bidx; // Add escape set, find index
@@ -183,13 +186,20 @@ public class MemJoinNode extends Node {
       assert idx!=0;     // No partial overlap; all escape sets are independent
     }
     // Reset edges to move SESE region inside
+    Node mspj = in(idx);
     keep();
     gvn.set_def_reg(head,1,in(idx));
-    gvn.set_def_reg(this,idx,base);
-    gvn.set_def_reg(base_memw,1,this);
-    if( base_memw instanceof CallNode )
-      gvn.add_work(((CallNode)base_memw).cepi());
-    unhook();
+    gvn.replace(base,this);
+    gvn.set_def_reg(unhook(),idx,base);
+    // Move any accidental refs to DefMem back to base
+    int didx = Env.DEFMEM._defs.find(this);
+    if( didx != -1 ) gvn.set_def_reg(Env.DEFMEM,didx,base);
+    // We just lost the off-alias updates.
+    // Forward-flow new values.
+    // Reverse-flow new lives.
+    if( base==head ) gvn.revalive(mspj,head);
+    else if( base.in(0)==head ) throw com.cliffc.aa.AA.unimpl(); //gvn.revalive(head,base);
+    else gvn.revalive(mspj,head,base.in(0),base);
   }
 
   // Find a compatible alias edge, including base memory if nothing overlaps.

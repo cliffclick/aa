@@ -174,6 +174,25 @@ public class GVNGCM {
     add_work_uses(n);
   }
 
+  // Did a bulk not-monotonic update.  Forceably update the entire region at
+  // once; restores monotonicity over the whole region when done.
+  public void revalive(Node... ns) {
+    for( Node n : ns ) {
+      if( n == null ) continue;
+      Type t = n.value(this);
+      if( t != type(n) ) {
+        setype(n, t);
+        add_work_uses(n);
+      }
+    }
+    for( int i=ns.length-1; i>=0; i-- ) {
+      Node n = ns[i];
+      if( n==null ) continue;
+      TypeMem t = n.live(this);
+      if( t != n._live ) { n._live=t; add_work_defs(n); }
+    }
+  }
+
   // Hack an edge, updating GVN as needed
   public Node set_def_reg(Node n, int idx, Node def) {
     _vals.remove(n);            // Remove from GVN
@@ -284,18 +303,19 @@ public class GVNGCM {
   private boolean replace_con(Type t, Node n) {
     if( n._keep >0 || n instanceof ConNode || n instanceof ErrNode || n.is_prim() )
       return false; // Already a constant, or never touch an ErrNode
+    // Constant argument to call: keep for call resolution.
+    // Call can always inline to fold constant.
+    if( n instanceof ProjNode && n.in(0) instanceof CallNode )
+      return false;
+    // Is in-error; do not remove the error.
+    if( n.err(this) != null )
+      return false;
+    // Is a constant (or could be)
     if( !t.is_con() ) {
       if( t instanceof TypeFunPtr && !(n instanceof FunPtrNode) )
         return ((TypeFunPtr)t).can_be_fpnode();
       return false;
     }
-    // Parm is in-error; do not remove the error.
-    if( n instanceof ParmNode && n.err(this) != null )
-      return false;
-    // Constant argument to call: keep for call resolution.
-    // Call can always inline to fold constant.
-    if( n instanceof ProjNode && n.in(0) instanceof CallNode )
-      return false;
     return true; // Replace with a ConNode
   }
 

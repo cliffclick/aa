@@ -77,6 +77,14 @@ public class UnresolvedNode extends Node {
     return x instanceof UnresolvedNode ? gvn.xform(x) : x;
   }
 
+  // Return a funptr for this fidx.
+  FunPtrNode find_fidx( int fidx ) {
+    for( Node n : _defs )
+      if( ((FunPtrNode)n).fun()._fidx==fidx )
+        return (FunPtrNode)n;
+    return null;
+  }
+
   @Override public boolean basic_liveness() { return true; }
   // Compute local contribution of use liveness to this def.
   // If pre-GCP, same as value() above, use the conservative answer.

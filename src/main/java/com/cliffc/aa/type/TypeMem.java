@@ -6,8 +6,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 
 /**
-   See also node/MemMerge.java
-
    Memory type; the state of all of memory; memory edges order memory ops.
    Produced at the program start, consumed by all function calls, consumed be
    Loads, consumed and produced by Stores.  Can be broken out in the "equiv-
@@ -38,20 +36,12 @@ import java.util.HashMap;
 
    The representation is a collection of TypeObjs indexed by alias#.  Missing
    aliases are always equal to their nearest present parent.  The root at
-   alias#1 is only either OBJ or XOBJ.  Alias#0 is nil and is always missing.
-   The structure is canonicalized; if a child is a dup of a parent it is
-   removed (since an ask will yield the correct value from the parent).
-
-   Child classes also contain a 'lost' bit, set if more than one instance of a
-   child class can be alive at once.  It is usually set for a parent (both
-   children alive at once) unless a child later dies.  It is typically set for
-   NewNodes that are called repeatedly and have a long lifetime.  It is
-   typically clear for closures (which are just NewNodes) which have a stack
-   lifetime.  Long-lived closures will again have the bit set.  This bit
-   inverts for inverted TypeObjs.
+   alias#1 is only either TypeObj.BOT or TOP.  Alias#0 is nil and is always
+   missing.  The structure is canonicalized; if a child is a dup of a parent it
+   is removed (since an ask will yield the correct value from the parent).
 
    There is no meet/join relationship between parent and child; a child can be
-   precisely updated independently from the parent and other sibilings.
+   precisely updated independently from the parent and other siblings.
 
    CNC - Observe that the alias Trees on Fields applies to Indices on arrays as
    well - if we can group indices in a tree-like access pattern (obvious one
@@ -62,7 +52,11 @@ public class TypeMem extends Type<TypeMem> {
   // reserved; TypeMem is never a nil.  Slot#1 is the Parent-Of-All aliases and
   // is the default value.  Default values are replaced with null during
   // canonicalization.
-  private TypeObj[] _aliases;
+  private TypeObj[] _pubs;
+
+  // Private aliases: same basic theory as the public ones, but support more
+  // precise updates against precisely known pointers.
+  private TypeObj[] _privs;
 
   // A cache of sharpened pointers.  Pointers get sharpened by looking up their
   // aliases in this memory (perhaps merging several aliases).  The process is
@@ -71,16 +65,17 @@ public class TypeMem extends Type<TypeMem> {
   // not part of the hash/equals checks.  Optional.  Lazily filled in.
   private HashMap<TypeMemPtr,TypeMemPtr> _sharp_cache;
 
-  private TypeMem  (TypeObj[] aliases) { super(TMEM); init(aliases); }
-  private void init(TypeObj[] aliases) {
+  private TypeMem  (TypeObj[] pubs,TypeObj[] privs) { super(TMEM); init(pubs,privs); }
+  private void init(TypeObj[] pubs,TypeObj[] privs) {
     super.init(TMEM);
-    _aliases = aliases;
-    assert check();
+    assert check(pubs) && check(privs);    // Caller has canonicalized arrays already
+    assert pubs==privs || !eq(pubs,privs); // Caller has combined equal arrays already
+    _pubs = pubs;
+    _privs= privs;
   }
   // False if not 'tight' (no trailing null pairs) or any matching pairs (should
   // collapse to their parent) or any mixed parent/child.
-  private boolean check() {
-    TypeObj[] as = _aliases;
+  private static boolean check(TypeObj[] as) {
     if( as.length == 0 ) return true;
     if( as[0]!=null ) return false;          // Slot 0 reserved
     if( as.length == 1 ) return true;
@@ -91,7 +86,7 @@ public class TypeMem extends Type<TypeMem> {
       return false;             // Only 2 choices
     if( as.length==2 ) return true; // Trivial all of memory
     // "tight" - something in the last slot
-    if( _aliases[_aliases.length-1] == null ) return false;
+    if( as[as.length-1] == null ) return false;
     // No dups of any parent
     for( int i=2; i<as.length; i++ )
       if( as[i] != null )
@@ -104,17 +99,23 @@ public class TypeMem extends Type<TypeMem> {
   }
   @Override int compute_hash() {
     int sum=TMEM;
-    for( TypeObj obj : _aliases ) sum += obj==null ? 0 : obj._hash;
+    for( TypeObj obj : _pubs ) sum += obj==null ? 0 : obj._hash;
+    for( TypeObj obj : _privs) sum += obj==null ? 0 : obj._hash;
     return sum;
   }
   @Override public boolean equals( Object o ) {
     if( this==o ) return true;
     if( !(o instanceof TypeMem) ) return false;
     TypeMem tf = (TypeMem)o;
-    if( _aliases.length != tf._aliases.length ) return false;
-    for( int i=0; i<_aliases.length; i++ )
-      if( _aliases[i] != tf._aliases[i] ) // note '==' and NOT '.equals()'
+    if( _pubs .length != tf._pubs .length ) return false;
+    if( _privs.length != tf._privs.length ) return false;
+    for( int i = 0; i< _pubs.length; i++ )
+      if( _pubs[i] != tf._pubs[i] ) // note '==' and NOT '.equals()'
         return false;
+    for( int i = 0; i< _privs.length; i++ )
+      if( _privs[i] != tf._privs[i] ) // note '==' and NOT '.equals()'
+        return false;
+
     return true;
   }
   // Never part of a cycle, so the normal check works
@@ -127,60 +128,84 @@ public class TypeMem extends Type<TypeMem> {
     if( this==DEAD ) return "[dead ]";
     SB sb = new SB();
     sb.p('[');
-    for( int i=1; i<_aliases.length; i++ )
-      if( _aliases[i] != null )
-        sb.p(i).p(':').p(_aliases[i].toString()).p(",");
+    int len = Math.max(_pubs.length,_privs.length);
+    for( int i = 1; i< len; i++ ) {
+      TypeObj pub = i<_pubs .length ? _pubs [i] : null;
+      TypeObj prv = i<_privs.length ? _privs[i] : null;
+      if( pub != null || prv != null ) {
+        pub = at(_pubs ,i);
+        prv = at(_privs,i);
+        sb.p(i).p(':');
+        sb.p(pub.toString());
+        if( pub!=prv ) sb.p('/').p(prv.toString());
+        sb.p(",");
+      }
+    }
     return sb.unchar().p(']').toString();
   }
 
   // Alias-at.  Out of bounds or null uses the parent value.
-  public TypeObj at(int alias) { return at(_aliases,alias); }
+  public TypeObj at   (int alias) { return at(_pubs ,alias); }
+  public TypeObj atprv(int alias) { return at(_privs,alias); }
   static TypeObj at(TypeObj[] tos, int alias) { return tos[at_idx(tos,alias)]; }
   // Alias-at index
-  static int at_idx(TypeObj[]aliases, int alias) {
+  static int at_idx(TypeObj[]tos, int alias) {
     while( true ) {
       if( alias==0 ) return 0;
-      if( alias < aliases.length && aliases[alias] != null )
+      if( alias < tos.length && tos[alias] != null )
         return alias;
       alias = BitsAlias.TREE.parent(alias);
     }
   }
   //
-  public TypeObj[] alias2objs() { return _aliases; }
-  public int len() { return _aliases.length; }
+  public TypeObj[] alias2objs() { return _pubs; }
+  public int len() { return _pubs.length; }
 
   // Return set of aliases.  Not even sure if this is well-defined.
   public BitsAlias aliases() {
     if( this== FULL ) return BitsAlias.NZERO;
     if( this==EMPTY ) return BitsAlias.EMPTY;
     BitsAlias bas = BitsAlias.EMPTY;
-    for( int i=0; i<_aliases.length; i++ )
-      if( _aliases[i]!=null && !_aliases[i].above_center() )
+    for( int i = 0; i< _pubs.length; i++ )
+      if( _pubs[i]!=null && !_pubs[i].above_center() )
         bas = bas.set(i);
     return bas;
   }
 
   private static TypeMem FREE=null;
-  @Override protected TypeMem free( TypeMem ret ) { _aliases=null; _sharp_cache=null; FREE=this; return ret; }
-  private static TypeMem make(TypeObj[] aliases) {
+  @Override protected TypeMem free( TypeMem ret ) { _pubs =null; _sharp_cache=null; FREE=this; return ret; }
+  private static TypeMem make(TypeObj[] pubs,TypeObj[] privs) {
     TypeMem t1 = FREE;
-    if( t1 == null ) t1 = new TypeMem(aliases);
-    else { FREE = null;       t1.init(aliases); }
+    if( t1 == null ) t1 = new TypeMem(pubs,privs);
+    else { FREE = null;       t1.init(pubs,privs); }
     TypeMem t2 = (TypeMem)t1.hashcons();
     return t1==t2 ? t1 : t1.free(t2);
   }
 
   // Canonicalize memory before making.  Unless specified, the default memory is "do not care"
   public static TypeMem make0( TypeObj[] as ) {
+    TypeObj[] tos = _make1(as);
+    if( tos==null ) return DEAD; // All things are dead, so dead
+    return make(tos,tos);
+  }
+  public static TypeMem make0( TypeObj[] pubs, TypeObj[] privs ) {
+    TypeObj[] pubs1  = _make1(pubs ); // Canonicalize pubs
+    TypeObj[] privs1 = _make1(privs); // Canonicalize privs
+    if( eq(pubs1,privs1) ) privs1=pubs1; // Remove if dups
+    return make(pubs1,privs1);
+  }
+
+  // Canonicalize memory before making.  Unless specified, the default memory is "do not care"
+  private static TypeObj[] _make1( TypeObj[] as ) {
     int len = as.length;
     if( as[1]==null ) {
       int i; for( i=2; i<len; i++ )
         if( as[i]!=null && as[i] != TypeObj.XOBJ )
           break;
-      if( i==len ) return DEAD; // All things are dead, so dead
+      if( i==len ) return null; // All things are dead, so dead
       as[1] = TypeObj.XOBJ;     // Default memory is "do not care"
     }
-    if( len == 2 ) return make(as);
+    if( len == 2 ) return as;
     // No dups of a parent
     for( int i=1; i<as.length; i++ )
       if( as[i] != null )
@@ -192,7 +217,7 @@ public class TypeMem extends Type<TypeMem> {
     // Remove trailing nulls; make the array "tight"
     while( as[len-1] == null ) len--;
     if( as.length!=len ) as = Arrays.copyOf(as,len);
-    return make(as);
+    return as;
   }
 
   // Precise single alias.  Other aliases are "do not care".  Nil not allowed.
@@ -222,16 +247,17 @@ public class TypeMem extends Type<TypeMem> {
   public static final TypeMem MEM_ABC, MEM_STR;
   static {
     // Every alias is unused
-    ANYMEM = make(new TypeObj[]{null,TypeObj.UNUSED});
+    ANYMEM = make0(new TypeObj[]{null,TypeObj.UNUSED});
     ALLMEM = ANYMEM.dual();
     // All memory, all aliases, holding anything.
-    FULL = make(new TypeObj[]{null,TypeObj.OBJ});
+    FULL = make0(new TypeObj[]{null,TypeObj.OBJ});
     EMPTY= FULL.dual();
 
     // Sentinel for liveness flow; not part of lattice
-    DEAD = make(new TypeObj[1]);
-    ALIVE = make(new TypeObj[]{null,TypeLive.BASIC});
-    ESCAPE = make(new TypeObj[]{null,TypeLive.ESCAPE});
+    TypeObj[] dtos = new TypeObj[1];
+    DEAD  = make (dtos,dtos);
+    ALIVE = make0(new TypeObj[]{null,TypeLive.BASIC});
+    ESCAPE= make0(new TypeObj[]{null,TypeLive.ESCAPE});
 
     // All memory.  Includes breakouts for all structs and all strings.
     // Triggers BitsAlias.<clinit> which makes all the initial alias splits.
@@ -241,7 +267,7 @@ public class TypeMem extends Type<TypeMem> {
     tos[BitsAlias.RECORD]=TypeStruct.ALLSTRUCT;
     tos[BitsAlias.ARY] = TypeStr.STR; // TODO: Proxy for all-arrays
     tos[BitsAlias.ABC] = TypeStr.ABC; //
-    MEM  = make(tos);
+    MEM  = make0(tos);
     XMEM = MEM.dual();
 
     MEM_STR = make(BitsAlias.STR,TypeStr.STR);
@@ -251,11 +277,19 @@ public class TypeMem extends Type<TypeMem> {
 
   // All mapped memories remain, but each memory flips internally.
   @Override protected TypeMem xdual() {
-    TypeObj[] oops = new TypeObj[_aliases.length];
-    for(int i=0; i<_aliases.length; i++ )
-      if( _aliases[i] != null )
-        oops[i] = (TypeObj)_aliases[i].dual();
-    return new TypeMem(oops);
+    TypeObj[] pubs = new TypeObj[_pubs.length];
+    for( int i = 0; i< _pubs.length; i++ )
+      if( _pubs[i] != null )
+        pubs[i] = (TypeObj) _pubs[i].dual();
+    TypeObj[] privs;
+    if( _pubs==_privs ) privs=pubs;
+    else {
+      privs = new TypeObj[_privs.length];
+      for( int i = 0; i< _privs.length; i++ )
+        if( _privs[i] != null )
+          privs[i] = (TypeObj) _privs[i].dual();
+    }
+    return new TypeMem(pubs,privs);
   }
   @Override protected Type xmeet( Type t ) {
     if( t._type != TMEM ) return ALL; //
@@ -264,13 +298,19 @@ public class TypeMem extends Type<TypeMem> {
     if( this==DEAD ) return t;
     if( tf  ==DEAD ) return this;
     // Meet of default values, meet of element-by-element.
-    int  len = Math.max(_aliases.length,tf._aliases.length);
-    int mlen = Math.min(_aliases.length,tf._aliases.length);
+    TypeObj[] pubs  = _meet(_pubs ,tf._pubs );
+    TypeObj[] privs = (_pubs==_privs && tf._pubs==tf._privs) ? pubs : _meet(_privs,tf._privs);
+    return make0(pubs,privs);
+  }
+
+  private static TypeObj[] _meet(TypeObj[] as, TypeObj[] bs) {
+    int  len = Math.max(as.length,bs.length);
+    int mlen = Math.min(as.length,bs.length);
     TypeObj[] objs = new TypeObj[len];
     for( int i=1; i<len; i++ )
-      objs[i] = i<mlen && _aliases[i]==null && tf._aliases[i]==null // Shortcut null-vs-null
-        ? null : (TypeObj)at(i).meet(tf.at(i)); // meet element-by-element
-    return make0(objs);
+      objs[i] = i<mlen && as[i]==null && bs[i]==null // Shortcut null-vs-null
+        ? null : (TypeObj)at(as,i).meet(at(bs,i)); // meet element-by-element
+    return objs;
   }
 
   // Shallow meet of all possible loadable values.  Used in Node.value calls, so must be monotonic.
@@ -281,7 +321,7 @@ public class TypeMem extends Type<TypeMem> {
       return oob(TypeObj.OBJ);
     if( this== FULL ) return TypeObj. OBJ;
     if( this==EMPTY ) return TypeObj.XOBJ;
-    return ld(_aliases,ptr._aliases);
+    return ld(ptr._priv==TypeMemPtr.PRIV ? _privs : _pubs,ptr._aliases);
   }
   static TypeObj ld( TypeObj[] tos, BitsAlias aliases ) {
     boolean any = aliases.above_center();
@@ -343,7 +383,7 @@ public class TypeMem extends Type<TypeMem> {
   public TypeMem slice_reaching_aliases(BitsAlias aliases) { return slice_reaching_aliases(aliases,at(1),TypeObj.UNUSED); }
   public TypeMem slice_reaching_aliases(BitsAlias aliases, TypeObj base, TypeObj unuse) {
     if( aliases==BitsAlias.FULL ) return this;
-    TypeObj[] tos = new TypeObj[Math.max(_aliases.length,aliases.max()+1)];
+    TypeObj[] tos = new TypeObj[Math.max(_pubs.length,aliases.max()+1)];
     tos[1]=base;
     for( int i=2; i<tos.length; i++ ) {
       TypeObj to = at(i);
@@ -374,7 +414,7 @@ public class TypeMem extends Type<TypeMem> {
 
   // Widen (lose info), to make it suitable as the default memory.
   public TypeMem crush() {
-    TypeObj[] oops = _aliases.clone();
+    TypeObj[] oops = _pubs.clone();
     for( int i=1; i<oops.length; i++ )
       if( oops[i]!=null ) oops[i] = oops[i].crush();
     return TypeMem.make0(oops);
@@ -383,54 +423,69 @@ public class TypeMem extends Type<TypeMem> {
   // Whole object Set at an alias.
   public TypeMem set( int alias, TypeObj obj ) {
     if( at(alias)==obj ) return this; // Shortcut
-    int max = Math.max(_aliases.length,alias+1);
-    TypeObj[] tos = Arrays.copyOf(_aliases,max);
+    int max = Math.max(_pubs.length,alias+1);
+    TypeObj[] tos = Arrays.copyOf(_pubs,max);
     tos[alias] = obj;
     return make0(tos);
   }
 
-  // Whole object Store at an alias.
-  // Lifts/sets the type, and meets fields.
-  public TypeMem st( int alias, TypeObj obj ) {
-    TypeObj to = at(alias);     // Current value for alias
-    if( to==obj ) return this;  // Shortcut
-    int max = Math.max(_aliases.length,alias+1);
-    TypeObj[] tos = Arrays.copyOf(_aliases,max);
-    tos[alias] = to.st_meet(obj);
-    return TypeMem.make0(tos);
+  // Whole object Store of a New at an alias.
+  // Sets the private type.
+  // Lifts/sets the public type, and meets fields.
+  public TypeMem st_new( int alias, int orig_alias, TypeObj obj ) {
+    TypeObj[] pubs  = _pubs ;
+    TypeObj[] privs = _privs;
+    TypeObj pub  = at(pubs ,alias); // Current value for alias
+    TypeObj priv = at(privs,alias); // Current value for alias
+    if( pub==obj && priv==obj && pubs==_pubs && privs==_privs ) return this;  // Shortcut
+    if( pub !=obj )  (pubs  = _st_new(_pubs ,pubs ,alias))[alias] = (TypeObj)pub.meet(obj);
+    if( priv!=obj )  (privs = _st_new(_privs,privs,alias))[alias] = obj;
+    return make0(pubs,privs);
+  }
+  private static TypeObj[] _st_new( TypeObj[] base, TypeObj[] as, int alias ) {
+    return base==as ? Arrays.copyOf(base,Math.max(base.length,alias+1)) : as;
   }
 
   // Field store into a conservative set of aliases.
   public TypeMem update( BitsAlias aliases, byte fin, String fld, Type val ) {
-    Ary<TypeObj> tos = new Ary<>(_aliases.clone());
+    Ary<TypeObj> pubs  = new Ary<>(_pubs .clone());
+    Ary<TypeObj> privs = new Ary<>(_privs.clone());
     for( int alias : aliases )
       if( alias != 0 )
-        for( int kid=alias; kid != 0; kid=BitsAlias.next_kid(alias,kid) )
-          tos.setX(kid,at(kid).update(fin,fld,val));
-    return make0(tos.asAry());
+        for( int kid=alias; kid != 0; kid=BitsAlias.next_kid(alias,kid) ) {
+          pubs .setX(kid,at(_pubs ,kid).update(fin,fld,val)); // imprecise
+          privs.setX(kid,at(_privs,kid).st    (fin,fld,val)); //   precise; CNC: TODO;
+        }
+    TypeObj[] pubs1  = _make1(pubs .asAry());
+    TypeObj[] privs1 = _make1(privs.asAry());
+    if( eq(pubs1,privs1) ) privs1=pubs1;
+    return make(pubs1,privs1);
   }
 
 
   // Flatten no-escapes to UNUSED
   public TypeMem remove_no_escapes( BitsAlias escs ) {
-    int i; for( i=1; i<_aliases.length; i++ )
-      if( test_no_escape(escs,i) )
-        break;                  // Found a no-escape to remove
-    if( i==_aliases.length ) return this; // Already flattened
-    TypeObj[] tos = _aliases.clone();
-    for( i=1; i<_aliases.length; i++ )
-      if( test_no_escape(escs,i) )
+    TypeObj[] pubs = _remove_no_escapes(escs,_pubs );
+    TypeObj[] privs= _remove_no_escapes(escs,_privs);
+    return make0(pubs,privs);
+  }
+  private static TypeObj[] _remove_no_escapes( BitsAlias escs, TypeObj[] as ) {
+    int i; for( i=1; i<as.length; i++ )
+      if( !escs.test_recur(i) )
+        break;                    // Found a no-escape to remove
+    if( i==as.length ) return as; // Already flattened
+    TypeObj[] tos = as.clone();
+    for( i=1; i<as.length; i++ )
+      if( !escs.test_recur(i) )
         tos[i] = TypeObj.UNUSED;
-    return make0(tos);
+    return tos;
   }
-  private boolean test_no_escape( BitsAlias escs, int alias ) {
-    return (_aliases[alias] != null && !_aliases[alias]._esc && _aliases[alias] != TypeObj.UNUSED) || !escs.test_recur(alias);
-  }
+
 
   public TypeMem remove(BitsAlias escs) {
     if( escs==BitsAlias.EMPTY ) return this;
-    TypeObj[] tos = _aliases.clone();
-    for( int i=1; i<_aliases.length; i++ )
+    TypeObj[] tos = _pubs.clone();
+    for( int i = 1; i< _pubs.length; i++ )
       if( tos[i] != null && escs.test(i) )
         tos[i] = TypeObj.UNUSED;
     return make0(tos);
@@ -452,21 +507,20 @@ public class TypeMem extends Type<TypeMem> {
   }
   // True if all aliases are no-escape
   public boolean alias_is_no_esc(BitsAlias aliases) {
-    for( int alias : aliases )  if( alias != 0 && at(alias)._esc ) return false;
-    return true;
+    throw com.cliffc.aa.AA.unimpl();
   }
 
   public TypeMem flatten_fields() {
     TypeObj to, tof=null;
-    int i; for( i=1; i<_aliases.length; i++ ) {
-      if( (to =_aliases[i]) != null && (tof = to.flatten_fields())!=to )
+    int i; for( i=1; i< _pubs.length; i++ ) {
+      if( (to = _pubs[i]) != null && (tof = to.flatten_fields())!=to )
         break;
     }
-    if( i==_aliases.length ) return this;
+    if( i== _pubs.length ) return this;
 
-    TypeObj[] tos = _aliases.clone();
+    TypeObj[] tos = _pubs.clone();
     tos[i++] = tof;
-    for( ; i<_aliases.length; i++ )
+    for( ; i< _pubs.length; i++ )
       if( tos[i] != null )
         tos[i] = tos[i].flatten_fields();
     return make0(tos);
@@ -474,7 +528,7 @@ public class TypeMem extends Type<TypeMem> {
 
 
   @Override public boolean above_center() {
-    for( TypeObj alias : _aliases )
+    for( TypeObj alias : _pubs )
       if( alias != null && !alias.above_center() && !alias.is_con() )
         return false;
     return true;

@@ -568,5 +568,4 @@ public abstract class Node implements Cloneable {
     if( n != null ) return n;   // Take last answer first
     return P.test(this) ? this : null;
   }
-
 }

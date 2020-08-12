@@ -326,37 +326,52 @@ public final class CallEpiNode extends Node {
 
     // Approximate "live out of call", includes things that are alive before
     // the call but not flowing in.  Catchs all the "new in call" returns.
-    BitsAlias esc_out = trez instanceof TypeMemPtr
-      ? post_call.all_reaching_aliases(((TypeMemPtr)trez)._aliases)
-      : (TypeMemPtr.OOP0.dual().isa(trez) ? BitsAlias.NZERO : BitsAlias.EMPTY);
-    TypeMem tdefmem = (TypeMem)defmem;
-    TypeObj[] tos = new TypeObj[defnode._defs._len];
-    for( int i=1; i<tos.length; i++ ) {
-      TypeObj tpre = caller_mem.at(i); // Pre-call memory
-      TypeObj tpost= post_call.at(i);  // Post-call memory (merge of returns)
-
-      // If passed-in or passed-out, must take post; Else pre.
-      TypeObj to = tescs._aliases.test_recur(i) || (tpre==TypeObj.UNUSED && esc_out.test_recur(i)) ? tpost : tpre; // TODO: Probably has to match CallNode EXACTLY.
-      // Before GCP, must use DefNode to keep types as strong as the Parser.
-      if( gvn._opt_mode < 2 ) {
-        Node dn = defnode.in(i);  // Taking directly from defnode & NewNode proper.
-        if( !(dn instanceof MrgProjNode) ) {
-          if( dn==null ) to = null; // A never-made (on this pass) type
-          else {                    // Else some kind of constant.
-            Type t = gvn.type(dn); // TODO: Probably should just jam down mrgproj/new for these constants
-            to = t instanceof TypeObj ? (TypeObj)t : t.oob(TypeObj.ISUSED);
-          }
-        } else {                // Else there is a New/MrgProj
-          TypeObj tdef2 = ((MrgProjNode)defnode.in(i)).nnn()._crushed;
-          to = (TypeObj)to.join(tdef2); // Lift to the default worse-case the Parser assumed
-        }
-      }
-      tos[i] = to;
+    BitsAlias esc_out = esc_out(post_call,trez);
+    TypeObj[] pubs = new TypeObj[defnode._defs._len];
+    TypeObj[] prvs = new TypeObj[defnode._defs._len];
+    for( int i=1; i<pubs.length; i++ ) {
+      boolean ein  = tescs._aliases.test_recur(i);
+      boolean eout = esc_out       .test_recur(i);
+      pubs[i] = live_out_gcp(ein,eout,caller_mem.at   (i),post_call.at   (i),gvn,defnode.in(i));
+      prvs[i] = live_out_gcp(ein,eout,caller_mem.atprv(i),post_call.atprv(i),gvn,defnode.in(i));
     }
-    TypeMem tmem3 = TypeMem.make0(tos);
+    TypeMem tmem3 = TypeMem.make0(pubs,prvs);
 
     return TypeTuple.make(Type.CTRL,tmem3,trez);
   }
+
+  static BitsAlias esc_out( TypeMem tmem, Type trez ) {
+    if( trez == Type.XNIL || trez == Type.NIL ) return BitsAlias.EMPTY;
+    return trez instanceof TypeMemPtr
+      ? tmem.all_reaching_aliases(((TypeMemPtr)trez)._aliases)
+      : (TypeMemPtr.OOP0.dual().isa(trez) ? BitsAlias.NZERO : BitsAlias.EMPTY);
+  }
+
+  // If passed-in or passed-out, must take post; Else pre.  'esc_out' includes
+  // all reaching, but needs to exclude things that do not exist beforehand,
+  // hence the cutout for pre==UNUSED.
+  static boolean is_live_out(boolean esc_in, boolean esc_out, TypeObj pre) {
+    return esc_in || (pre==TypeObj.UNUSED && esc_out); // TODO: Probably has to match CallNode EXACTLY.
+  }
+  
+  // If pre-GCP, must lift the types
+  // as strong as the Parser, which is a join with default memory.
+  private static TypeObj live_out_gcp(boolean esc_in, boolean esc_out, TypeObj pre, TypeObj post, GVNGCM gvn, Node dn ) {
+    TypeObj to = is_live_out(esc_in,esc_out,pre) ? post : pre;
+    // Before GCP, must use DefNode to keep types as strong as the Parser.
+    if( gvn._opt_mode >= 2 ) return to;
+    // Lift to DefNode same as parser
+    if( !(dn instanceof MrgProjNode) ) {
+      if( dn==null ) return null; // A never-made (on this pass) type
+      // Else some kind of constant.
+      Type t = gvn.type(dn); // TODO: Probably should just jam down mrgproj/new for these constants
+      return t instanceof TypeObj ? (TypeObj)t : t.oob(TypeObj.ISUSED);
+    }
+    // Else there is a New/MrgProj
+    TypeObj tdef2 = ((MrgProjNode)dn).nnn()._crushed;
+    return (TypeObj)to.join(tdef2); // Lift to the default worse-case the Parser assumed
+  }
+
 
   // Sanity check
   boolean sane_wiring() {

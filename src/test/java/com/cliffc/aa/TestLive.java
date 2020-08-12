@@ -57,7 +57,7 @@ public class TestLive {
     gvn.setype(nnn,nnn.value(gvn));
 
     // Proj, OProj
-    Node mem = new MProjNode(nnn,0);
+    Node mem = new MrgProjNode(nnn,mmm);
     gvn.setype(mem,mem.value(gvn));
     Node ptr = new  ProjNode(1, nnn);
     gvn.setype(ptr,ptr.value(gvn));
@@ -81,7 +81,7 @@ public class TestLive {
     scope._live = scope.live(gvn);
     // Since simple forwards-flow, the default memory is known UNUSED.
     // However, we got provided at least one object.
-    TypeMem expected_live = (TypeMem)gvn.type(mem);
+    TypeMem expected_live = ((TypeMem)gvn.type(mem)).flatten_fields();
     assertEquals(scope._live,expected_live);
 
     // Check liveness recursive back one step
@@ -90,7 +90,7 @@ public class TestLive {
     mem._live = mem.live(gvn);
     assertEquals(mem._live,expected_live); // Object demands of OProj, but OProj passes along request to NewObj
     nnn._live = nnn.live(gvn);
-    assertEquals(expected_live,nnn._live); // NewObj supplies object, needs what its input needs
+    assertEquals(TypeMem.ALIVE,nnn._live); // NewObj supplies object, needs what its input needs
     mmm._live = mmm.live(gvn);
     assertEquals(TypeMem.ALIVE,mmm._live); // Since ptr is scalar, all memory is alive
     fdx._live = fdx.live(gvn);

@@ -81,15 +81,13 @@ public class Env implements AutoCloseable {
       STK_0.add_fun(null,lib ._name,(FunPtrNode) GVN.xform(lib .as_fun(GVN)), GVN);
     // Top-level constants
     STK_0.create_active("math_pi", GVN.con(TypeFlt.PI),TypeStruct.FFNL,GVN);
-    STK_0.no_more_fields();
     // Now that all the UnresolvedNodes have all possible hits for a name,
     // register them with GVN.
     for( Node val : STK_0._defs )  if( val instanceof UnresolvedNode ) GVN.init0(val);
     GVN.rereg(STK_0,STK_0.value(GVN));
     for( Node use : STK_0._uses ) GVN.rereg(use,use.value(GVN));
-    //GVN.rereg(SCP_0.mem(),SCP_0.mem().value(GVN));
+    STK_0.no_more_fields();
     GVN.rereg(SCP_0,SCP_0.value(GVN));
-    GVN.setype(DEFMEM,DEFMEM.value(GVN));
     // Uplift all types once, since early Parm:mem got early versions of prims,
     // and later prims *added* choices which *lowered* types.
     for( int i=0; i<3; i++ )

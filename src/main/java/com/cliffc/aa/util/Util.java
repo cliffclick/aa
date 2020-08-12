@@ -13,5 +13,4 @@ public class Util {
     assert !s0.equals(s1) : "Not interned: "+s0;
     return false;
   }
-
 }

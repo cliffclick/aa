@@ -64,7 +64,14 @@ public class LoadNode extends Node {
     // Load can bypass a New or Store if the address does not depend on the New/St.
     if( aliases != null && mem instanceof MrgProjNode ) {
       NewNode nnn = ((MrgProjNode)mem).nnn();
+      // Bypass if aliases do not overlap
       if( !aliases.test_recur(nnn._alias) )
+        return set_mem(mem.in(1),gvn);
+      // Also bypass if address predates the allocation.  Here we just see that
+      // the address comes from the function Parm, and the New is made in the
+      // function.
+      Node adr2 = adr instanceof CastNode ? adr.in(1) : adr;
+      if( adr2 instanceof ParmNode )
         return set_mem(mem.in(1),gvn);
     }
 
@@ -143,12 +150,10 @@ public class LoadNode extends Node {
     // each clone body updates both aliases everywhere.
     if( !is_load ) return null; // For now, Store types NEVER bypass a call.
     CallNode call = cepi.call();
-    if( tmem.alias_is_no_esc(aliases) )
-      return call.mem();        // Can always bypass global no-escape
     if( tmem.fld_is_final(aliases,fld) )
-      return is_load ? call.mem() : null; // Loads from final memory can bypass calls.  Stores cannot, store-over-final is in error.
+      return call.mem(); // Loads from final memory can bypass calls.  Stores cannot, store-over-final is in error.
     TypeMemPtr escs = call.tesc(gvn.type(call));
-    if( is_load && escs._aliases.join(aliases)==BitsAlias.EMPTY )
+    if( escs._aliases.join(aliases)==BitsAlias.EMPTY )
       return call.mem(); // Load from call; if memory is made *in* the call this will fail later on an address mismatch.
     return null;         // Stuck behind call
   }
@@ -169,12 +174,7 @@ public class LoadNode extends Node {
     if( tobj instanceof TypeStruct ) { // Struct; check for field
       TypeStruct ts = (TypeStruct)tobj;
       int idx = ts.find(_fld);  // Find the named field
-      if( idx != -1 ) {         // Found a field
-        Type t = ts.at(idx);    // Load field
-        if( tmp.must_nil() )    // Might be in-error, but might fall to correct
-          return t.widen();     // Return conservative but sane answer
-        return t;               // Field type
-      }
+      if( idx != -1 ) return ts.at(idx);  // Field type
       // No such field
     }
     return tobj.oob();          // No loading from e.g. Strings

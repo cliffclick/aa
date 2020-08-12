@@ -23,7 +23,7 @@ public class BitsAlias extends Bits<BitsAlias> {
   static final Bits.Tree<BitsAlias> TREE = new Bits.Tree<>();
   @Override public Tree<BitsAlias> tree() { return TREE; }
   public static final int ALL, ARY, STR, RECORD, ABC;
-         static BitsAlias RECORD_BITS, STRBITS0;
+  public static BitsAlias RECORD_BITS, STRBITS0;
   public static BitsAlias FULL, NZERO, ANY, EMPTY, NIL, STRBITS, RECORD_BITS0;
 
   static {

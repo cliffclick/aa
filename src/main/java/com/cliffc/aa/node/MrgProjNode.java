@@ -27,18 +27,13 @@ public class MrgProjNode extends ProjNode {
     if( !(tm instanceof TypeMem  ) ) return tm.oob();
     TypeObj to = (TypeObj)((TypeTuple)tn).at(0);
     TypeMem tmem = (TypeMem)tm;
-    return nnn.is_unused() ? tmem.set(nnn._alias,TypeObj.UNUSED) : tmem.st(nnn._alias,to);
+    return nnn.is_unused()
+      ? tmem.set   (nnn._alias,TypeObj.UNUSED)
+      : tmem.st_new(nnn._alias,nnn._orig_alias,to);
   }
 
   @Override BitsAlias escapees( GVNGCM gvn) { return in(0).escapees(gvn); }
   @Override public boolean basic_liveness() { return false; }
   // Only called here if alive, and input is more-than-basic-alive
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) { return def==in(0) ? TypeMem.ALIVE : _live; }
-
-  // Precise if the matching alias does not appear on the main memory.
-  boolean is_precise(GVNGCM gvn) {
-    Type tmem = gvn.type(mem());
-    if( !(tmem instanceof TypeMem) ) return tmem.above_center(); // Memory is ANY, assume precise
-    return ((TypeMem)tmem).at(nnn()._alias)==TypeObj.UNUSED;
-  }
 }

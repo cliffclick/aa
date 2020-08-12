@@ -223,13 +223,22 @@ public class CallNode extends Node {
     Node unk = fun();           // Function epilog/function pointer
     int fidx = fidxs.abit();    // Check for single target
     if( fidx != -1 && !(unk instanceof FunPtrNode) ) {
+      // Check that the single target is well-formed
       FunNode fun = FunNode.find_fidx(Math.abs(fidx));
       if( fun != null ) {
         RetNode ret = fun.ret();
         if( ret != null ) {
+          // The same function might be called with different displays; make
+          // sure we get the right one.  See if there is a single un-escaped
+          // FunPtr.  Common for non-upwardsly exposed targets.
           FunPtrNode fptr = ret.funptr();
           if( fptr != null && fptr.display()._live != TypeMem.ESCAPE )
             return set_fun(fptr, gvn);
+          // See if FunPtr is available just above an Unresolved.
+          if( unk instanceof UnresolvedNode ) {
+            fptr = ((UnresolvedNode)unk).find_fidx(fidx);
+            if( fptr != null ) return set_fun(fptr, gvn);
+          }
         }
       }
     }
@@ -266,37 +275,15 @@ public class CallNode extends Node {
 
     // Check for a prior New and move past the call (pushes a store-like
     // behavior down).  The New address must not be reachable from the Call
-    // arguments transitively.
+    // arguments transitively, which is detected in the escape-in set.
     Node mem = mem();
-    if( gvn._opt_mode > 0 && mem instanceof MrgProjNode &&
-        cepi != null && (mem._uses._len==1 || (mem._uses._len==2 && mem._uses.find(Env.DEFMEM)!=-1) ) ) {
-      MrgProjNode mrg = (MrgProjNode)mem;
-      NewNode nnn = mrg.nnn();
+    if( gvn._opt_mode > 0 && mem instanceof MrgProjNode && cepi != null ) {
       ProjNode cepij = ProjNode.proj(cepi,1); // Memory projection from CEPI
-      if( cepij!=null && !tesc(tcall)._aliases.test_recur(nnn._alias) ) { // No alias collisions
-        // No wired return returns this alias
-        boolean ok=true;
-        for( int i = 0; i < cepi.nwired(); i++ ) {
-          Type tret = gvn.type(cepi.wired(i));
-          if( !(tret instanceof TypeMem && ((TypeMem) tret).at(nnn._alias) == TypeObj.UNUSED) )
-            {ok=false; break;} // Do not swap if CallEpi believes it is returning the New.
-        }
-        if( ok ) {
-          // TODO: REALLY NEEDS TO BE A SPLIT/JOIN
-          // Swap the Call/CallEpi & NewNode.
-          set_mem(mrg.<MrgProjNode>keep().mem(),gvn);
-          gvn.replace(cepij,mrg);
-          gvn.set_def_reg(mrg.unhook(),1,cepij);
-          // Recompute values for NewNode, which moves after the Call.
-          for( Node x : new Node[]{this,cepi,cepij,nnn,mem} )
-            gvn.setype(x,x.value(gvn));
-          // Recompute lives for Call/CallEpi, which moves before the New.
-          for( Node x : new Node[]{mem,nnn,cepij,cepi,this} )
-            x._live = x.live(gvn);
-          gvn.add_work_uses(cepi);
-          gvn.add_work_uses(nnn);
-          return this;
-        }
+      if( cepij != null && MemSplitNode.check_split(gvn,this) ) {
+        Type tn = gvn.type(mem);
+        Type tj = gvn.type(cepij);
+        if( tn.isa(tj) )
+          return MemSplitNode.insert_split(gvn,cepij,this,mem,mem);
       }
     }
 
@@ -328,7 +315,7 @@ public class CallNode extends Node {
       as = as.meet(get_alias(ts[i+ARGIDX] = gvn.type(arg(i))));
     // Recursively search memory for aliases; compute escaping aliases
     BitsAlias as2 = tmem.all_reaching_aliases(as);
-    ts[_defs._len] = TypeMemPtr.make(as2,TypeObj.UNUSED);
+    ts[_defs._len] = TypeMemPtr.make(as2,TypeMemPtr.PUB,TypeObj.UNUSED);
     TypeMem tcallee = tmem.remove_no_escapes(as2);
     ts[MEMIDX]=tcallee;         // Memory into the callee, not caller
 
@@ -343,8 +330,19 @@ public class CallNode extends Node {
     // Resolve; only keep choices with sane arguments during GCP
     BitsFun rfidxs = resolve(fidxs,ts,tmem,gvn._opt_mode==2);
     if( rfidxs==null ) return gvn.self_type(this); // Dead function input, stall until this dies
+    // nargs is min nargs across the resolved fidxs for below-center, max for above.
+    boolean rup = rfidxs.above_center();
+    int nargs = rup ? -1 : 9999;
+    if( rfidxs == BitsFun.FULL || rfidxs == BitsFun.EMPTY ) nargs = tfp._nargs;
+    else {
+      for( int fidx : rfidxs ) {
+        FunNode fun = FunNode.find_fidx(fidx);
+        int fnargs = fun==null ? tfp._nargs : fun._sig.nargs();
+        nargs = rup ? Math.max(nargs,fnargs) : Math.min(nargs,fnargs);
+      }
+    }
     // Call.ts[2] is a TFP just for the resolved fidxs and display.
-    ts[ARGIDX] = TypeFunPtr.make(rfidxs,tfp._nargs,rfidxs.above_center() == fidxs.above_center() ? tfp._disp : tfp._disp.dual());
+    ts[ARGIDX] = TypeFunPtr.make(rfidxs,nargs,rfidxs.above_center() == fidxs.above_center() ? tfp._disp : tfp._disp.dual());
 
     return TypeTuple.make(ts);
   }
@@ -355,7 +353,14 @@ public class CallNode extends Node {
     if( TypeMemPtr.OOP.isa(t)   ) return BitsAlias.FULL;
     return BitsAlias.EMPTY;
   }
-  @Override BitsAlias escapees( GVNGCM gvn) { return BitsAlias.FULL; }
+  @Override BitsAlias escapees( GVNGCM gvn) {
+    CallEpiNode cepi = cepi();
+    TypeTuple tcepi = (TypeTuple)gvn.type(cepi);
+    BitsAlias esc_out = CallEpiNode.esc_out((TypeMem)tcepi.at(1),tcepi.at(2));
+    BitsAlias esc_in  = tesc(gvn.type(this))._aliases;
+    // TODO: need to filter OUTS by UNUSED at pre
+    return esc_out.meet(esc_in);
+  }
 
   // Compute live across uses.  If pre-GCP, then we may not be wired and thus
   // have not seen all possible function-body uses.  Check for #FIDXs == nwired().

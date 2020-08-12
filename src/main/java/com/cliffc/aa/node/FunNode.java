@@ -346,7 +346,7 @@ public class FunNode extends RegionNode {
       if( bad_mem_use(parm, to) )
         continue;               // So bad usage
 
-      sig[i] = TypeMemPtr.make(BitsAlias.RECORD_BITS0,to); // Signature takes any alias but has sharper guts
+      sig[i] = TypeMemPtr.make(BitsAlias.RECORD_BITS0,TypeMemPtr.PMIX,to); // Signature takes any alias but has sharper guts
       progress = true;
     }
     return progress ?  sig : null;
@@ -742,9 +742,50 @@ public class FunNode extends RegionNode {
         }
       }
     }
+
+    // Retype memory, so we can everywhere lift the split-alias parents "up and
+    // out".
+    retype_mem(gvn,aliases,this.parm(-2));
+    retype_mem(gvn,aliases,fun .parm(-2));
+
     // Unhook the hooked FunPtrs
     for( Node use : oldret._uses ) if( use instanceof FunPtrNode ) use.unhook();
   }
+
+
+
+  // Walk all memory edges, and 'retype' them, probably DOWN (counter to
+  // 'iter').  Used when inlining, and the inlined body needs to acknowledge
+  // bypasses aliases.  Used during code-clone, to lift the split alias parent
+  // up & out.
+  private static void retype_mem(GVNGCM gvn, BitSet aliases, Node mem) {
+    Ary<Node> work = new Ary<>(new Node[1],0);
+    work.push(mem);
+    // Update all memory ops
+    while( !work.isEmpty() ) {
+      Node wrk = work.pop();
+      if( wrk.is_mem() ) {
+        boolean un=false;
+        Type twrk = gvn.type(wrk);
+        TypeMem tmem = (TypeMem)(twrk instanceof TypeTuple ? ((TypeTuple)twrk).at(1) : twrk);
+        for( int alias = aliases.nextSetBit(0); alias != -1; alias = aliases.nextSetBit(alias + 1))
+          if( tmem.at(alias)!= TypeObj.UNUSED )
+            { un=true; break; }
+        if( un ) {
+          Type tval = wrk.value(gvn);
+          if( twrk != tval ) {
+            gvn.setype(wrk,tval);
+            if( wrk instanceof MProjNode && wrk.in(0) instanceof CallNode ) {
+              CallEpiNode cepi = ((CallNode)wrk.in(0)).cepi();
+              if( cepi != null ) work.push(cepi);
+            } else if( !(wrk instanceof RetNode) )
+              work.addAll(wrk._uses);
+          }
+        }
+      }
+    }
+  }
+
 
   // Compute value from inputs.  Simple meet over inputs.
   @Override public Type value(GVNGCM gvn) {

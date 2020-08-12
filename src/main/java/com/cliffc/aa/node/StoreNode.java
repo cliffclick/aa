@@ -1,6 +1,5 @@
 package com.cliffc.aa.node;
 
-import com.cliffc.aa.Env;
 import com.cliffc.aa.GVNGCM;
 import com.cliffc.aa.Parse;
 import com.cliffc.aa.type.*;
@@ -18,7 +17,6 @@ public class StoreNode extends Node {
     _bad = bad;    // Tests can pass a null, but nobody else does
   }
   private StoreNode( StoreNode st, Node mem, Node adr ) { this(mem,adr,st.val(),st._fin,st._fld,st._bad); }
-  //public  StoreNode( StoreNode st, Node ctr, Node mem, Node adr, Node val ) { this(ctr,mem,adr,   val  ,st._fin,st._eqv,st._bad); }
 
   String xstr() { return "."+_fld+"="; } // Self short name
   String  str() { return xstr(); }   // Inline short name
@@ -38,7 +36,8 @@ public class StoreNode extends Node {
     NewObjNode nnn;  int idx;
     if( mem instanceof MrgProjNode &&
         mem.in(0) instanceof NewObjNode && (nnn=(NewObjNode)mem.in(0)) == adr.in(0) &&
-        mem._uses._len==2 && !val().is_forward_ref() &&
+        !val().is_forward_ref() &&
+        mem._uses._len==2 &&
         (idx=nnn._ts.find(_fld))!= -1 && nnn._ts.can_update(idx) ) {
       // Update the value, and perhaps the final field
       nnn.update(idx,_fin,val(),gvn);
@@ -47,34 +46,14 @@ public class StoreNode extends Node {
 
     // If Store is of a memory-writer, and the aliases do not overlap, make parallel with a Join
     if( tmp != null && mem.is_mem() && mem.check_solo_mem_writer(this) ) {
-      BitsAlias esc2 = mem.escapees(gvn);
-      if( !tmp._aliases.overlaps(esc2) ) {
-        Node head;
-        if( mem instanceof StoreNode ) head=mem;
-        else if( mem instanceof MrgProjNode ) head=mem;
-        else throw com.cliffc.aa.AA.unimpl(); // Break out another SESE split
-        // head is the 1 memory writer after head.in
-        if( head.in(1).check_solo_mem_writer(head) &&
-            // Cannot have any Loads following mem; because after the split
-            // they will not see the effects of previous stores that also move
-            // into the split.  However, a Load-after-Store will fold anyways.
-            ((mem._uses._len==1) ||
-             (mem._uses._len==2 && mem._uses.find(Env.DEFMEM)!= -1 ) ) ) {
-          Node st2 = gvn.xform(new StoreNode(this,mem,adr).keep());
-          MemSplitNode msp = (MemSplitNode)gvn.xform(new MemSplitNode(st2.unhook()).keep());
-          MProjNode mprj = (MProjNode)gvn.xform(new MProjNode(msp,0));
-          MemJoinNode mjn = new MemJoinNode(mprj);
-          set_def(1,null,gvn);                // Remove extra mem-writer
-          mjn.add_alias_above(gvn,msp.mem()); // Move 'this' clone st2 into Split
-          mjn.add_alias_above(gvn,head);      // Move from 'mem' to 'head' into Split
-          msp.unhook();
-          // Reverse propagate new live info
-          mjn._live = _live;
-          for( Node x : new Node[]{mprj,st2,st2.in(1),mem,head,head.in(1),msp} )
-            x._live = x.live(gvn);
-          return mjn;
-        }
-      }
+      Node head2;
+      if( mem instanceof StoreNode ) head2=mem;
+      else if( mem instanceof MrgProjNode ) head2=mem;
+      else if( mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode ) head2 = mem.in(0).in(0);
+      else head2 = null;
+      // Check no extra readers/writers at the split point
+      if( head2 != null && MemSplitNode.check_split(gvn,this) )
+        return MemSplitNode.insert_split(gvn,this,this,mem,head2);
     }
 
     // If Store is of a MemJoin and it can enter the split region, do so.
@@ -87,13 +66,10 @@ public class StoreNode extends Node {
       if( memw != null && adr instanceof ProjNode && adr.in(0) instanceof NewNode ) {
         MemJoinNode mjn = (MemJoinNode)mem;
         StoreNode st = (StoreNode)gvn.xform(new StoreNode(keep(),mem,adr).keep());
-        mjn.add_alias_below(gvn,st,st.unhook(),memw);
+        mjn.add_alias_below(gvn,st,st.unhook());
         unhook();
         gvn.setype(st ,st .value(gvn));
         gvn.setype(mjn,mjn.value(gvn));
-        mjn._live = mjn.live(gvn);
-        st._live = st.live(gvn);
-        st.mem()._live = st.mem().live(gvn);
         gvn.add_work_defs(mjn);
         return mjn;
       }
@@ -112,16 +88,6 @@ public class StoreNode extends Node {
     if( !(tadr instanceof TypeMemPtr) ) return tadr.oob(TypeMem.ALLMEM);
     TypeMem    tm  = (TypeMem   )tmem;
     TypeMemPtr tmp = (TypeMemPtr)tadr;
-
-    // Find matching prior store, if possible
-    Node st = LoadNode.find_previous_store(gvn,mem,adr,tmp._aliases,_fld,false);
-    // If exactly storing into a NewNode with no bypass, do the exact update
-    if( st instanceof NewNode && ((NewNode)st).mrg().is_precise(gvn) ) {
-      for( int alias : tmp._aliases )
-        tm = tm.set(alias,tm.at(alias).st(_fin,_fld,tval));
-      return tm;
-    }
-    // Otherwise store into an approximate memory state
     return tm.update(tmp._aliases,_fin,_fld,tval);
   }
   @Override BitsAlias escapees( GVNGCM gvn) {

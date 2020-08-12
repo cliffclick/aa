@@ -199,7 +199,7 @@ public class TestType {
     Type pabc0= TypeMemPtr.ABC0;    // *["abc"]?
     TypeMemPtr pabc = TypeMemPtr.ABCPTR; // *["abc"]
     TypeMemPtr pzer = TypeMemPtr.make(BitsAlias.type_alias(BitsAlias.RECORD),TypeStruct.ALLSTRUCT);// *[(0)]
-    TypeMemPtr pzer0= TypeMemPtr.make(pzer._aliases.meet_nil(),TypeStruct.ALLSTRUCT);  // *[(0)]?
+    TypeMemPtr pzer0= TypeMemPtr.make(pzer._aliases.meet_nil(),TypeMemPtr.PUB,TypeStruct.ALLSTRUCT);  // *[(0)]?
     Type nil  = Type.NIL, xnil=Type.XNIL;
 
     Type xtup = ptup .dual();
@@ -350,7 +350,7 @@ public class TestType {
     // Anonymous recursive structs -
     // - struct with pointer to self
     byte[] finals = TypeStruct.ffnls(2);
-    TypeStruct ts0 = TypeStruct.malloc("",false,true,flds,TypeStruct.ts(2),finals,true);
+    TypeStruct ts0 = TypeStruct.malloc("",false,flds,TypeStruct.ts(2),finals,true);
     ts0._hash = ts0.compute_hash();
     ts0._ts[0] = ts0ptr;    ts0._cyclic = true;
     ts0._ts[1] = TypeInt.INT64;
@@ -358,7 +358,7 @@ public class TestType {
     TypeMem ts0mem = TypeMem.make(alias1,ts0); // {1:@{n:*[1],v:int} }
 
     // - struct with pointer to self or nil
-    TypeStruct ts1 = TypeStruct.malloc("",false,true,flds,TypeStruct.ts(2),finals,true);
+    TypeStruct ts1 = TypeStruct.malloc("",false,flds,TypeStruct.ts(2),finals,true);
     ts1._hash = ts1.compute_hash();
     ts1._ts[0] = ts0ptr0;  ts1._cyclic = true;
     ts1._ts[1] = TypeInt.INT64;
@@ -465,8 +465,8 @@ public class TestType {
     final int alias = BitsAlias.RECORD;
 
     Type.RECURSIVE_MEET++;
-    TypeStruct as1 = TypeStruct.malloc("",false,true,flds,TypeStruct.ts(2),finals,true).set_name("A:");
-    TypeStruct bs4 = TypeStruct.malloc("",false,true,flds,TypeStruct.ts(2),finals,true).set_name("B:");
+    TypeStruct as1 = TypeStruct.malloc("",false,flds,TypeStruct.ts(2),finals,true).set_name("A:");
+    TypeStruct bs4 = TypeStruct.malloc("",false,flds,TypeStruct.ts(2),finals,true).set_name("B:");
     as1._hash = as1.compute_hash();  as1._cyclic = true;
     bs4._hash = bs4.compute_hash();  bs4._cyclic = true;
     TypeMemPtr ap5 = TypeMemPtr.make(alias,as1);

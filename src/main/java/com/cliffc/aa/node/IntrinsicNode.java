@@ -39,11 +39,11 @@ public class IntrinsicNode extends Node {
     // This function call takes in and returns a plain ptr-to-object.
     // Only after folding together does the name become apparent.
     TypeStruct formals = TypeStruct.make_args(TypeStruct.ts(TypeFunPtr.NO_DISP,TypeMemPtr.STRUCT));
-    TypeFunSig sig = TypeFunSig.make(formals,TypeMemPtr.make(BitsAlias.RECORD,tn));
+    TypeFunSig sig = TypeFunSig.make(formals,TypeMemPtr.make(BitsAlias.RECORD_BITS,TypeMemPtr.PMIX,tn));
     FunNode fun = (FunNode) gvn.xform(new FunNode(tn._name,sig,-1).add_def(Env.ALL_CTRL));
     Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
     Node mem = gvn.xform(new ParmNode(-2,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
-    Node ptr = gvn.xform(new ParmNode( 1,"ptr",fun,gvn.con(TypeMemPtr.ISUSED),null));
+    Node ptr = gvn.xform(new ParmNode( 1,"ptr",fun,gvn.con(TypeMemPtr.ISUSED),badargs));
     Node cvt = gvn.xform(new IntrinsicNode(tn,badargs,fun,mem,ptr));
     RetNode ret = (RetNode)gvn.xform(new RetNode(fun,cvt,ptr,rpc,fun));
     return (FunPtrNode)gvn.xform(new FunPtrNode(ret,gvn.con(TypeFunPtr.NO_DISP)));
@@ -90,15 +90,16 @@ public class IntrinsicNode extends Node {
     Type ptr = gvn.type(ptr());
     if( !(mem instanceof TypeMem   ) ) return mem.oob(); // Inputs are confused
     if( !(ptr instanceof TypeMemPtr) ) return ptr.oob(); // Inputs are confused
+    TypeMem tmem = (TypeMem)mem;
     // Get the Obj from the pointer.
     int alias = ((TypeMemPtr)ptr)._aliases.abit();
-    TypeObj obj = ((TypeMem)mem).ld((TypeMemPtr)ptr);
+    TypeObj obj = tmem.ld((TypeMemPtr)ptr);
     TypeObj tn = (TypeObj)_tn.remove_name();
-    if( !obj.isa(tn       ) ) return mem; // Inputs not correct from, and node is in-error
-    if(  obj.isa(tn.dual()) ) return mem;
+    if( !obj.isa(tn       ) ) return tmem; // Inputs not correct from, and node is in-error
+    if(  obj.isa(tn.dual()) ) return tmem;
     // Wrap result in Name
     TypeObj rez = (TypeObj)obj.set_name(_tn._name);
-    return ((TypeMem)mem).st(alias,rez);
+    return tmem.set(alias,rez);
   }
   @Override public boolean basic_liveness() { return false; }
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
@@ -115,14 +116,14 @@ public class IntrinsicNode extends Node {
   // Default name constructor using expanded args list.  Just a NewObjNode but the
   // result is a named type.  Same as convertTypeName on an unaliased NewObjNode.
   // Passed in a named TypeStruct, and the parent alias.
-  public static FunPtrNode convertTypeNameStruct( TypeStruct to, int alias, GVNGCM gvn ) {
+  public static FunPtrNode convertTypeNameStruct( TypeStruct to, int alias, GVNGCM gvn, Parse bad ) {
     assert to.has_name();
     assert Util.eq(to._flds[0],"^"); // Display already
     assert to.fmod(0)==TypeStruct.FFNL; // Display is final
     // Upgrade the type to one with no display for nnn.
     TypeStruct to1 = to.set_fld(0,TypeMemPtr.NO_DISP,TypeStruct.FFNL);
     TypeStruct formals = to1.remove_name();
-    TypeFunSig sig = TypeFunSig.make(formals,TypeMemPtr.make(alias,to));
+    TypeFunSig sig = TypeFunSig.make(formals,TypeMemPtr.make(BitsAlias.make0(alias),TypeMemPtr.PMIX,to));
     FunNode fun = (FunNode) gvn.xform(new FunNode(to._name,sig,-1).add_def(Env.ALL_CTRL));
     Node rpc = gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));
     Node memp= gvn.init(new ParmNode(-2,"mem",fun,TypeMem.MEM,Env.DEFMEM,null));
@@ -132,7 +133,7 @@ public class IntrinsicNode extends Node {
     for( int i=1; i<to._ts.length; i++ ) { // Display in 0, fields in 1+
       String argx = to._flds[i];
       if( TypeStruct.fldBot(argx) ) argx = null;
-      nnn.add_def(gvn.xform(new ParmNode(i,argx,fun, gvn.con(to._ts[i].simple_ptr()),null)));
+      nnn.add_def(gvn.xform(new ParmNode(i,argx,fun, gvn.con(to._ts[i].simple_ptr()),bad)));
     }
     gvn.init(nnn);
     Node mmem = Env.DEFMEM.make_mem_proj(gvn,nnn.unhook(),memp);

@@ -11,9 +11,9 @@ import java.util.HashMap;
 // should be replaced with a named Array.
 public class TypeStr extends TypeObj<TypeStr> {
   private String _con;          //
-  private TypeStr  (String name, boolean any, boolean esc, String con ) { super(TSTR,name,any,esc); init(name,any,esc,con); }
-  private void init(String name, boolean any, boolean esc, String con ) {
-    super.init(TSTR,name,any,esc);
+  private TypeStr  (String name, boolean any, String con ) { super(TSTR,name,any); init(name,any,con); }
+  private void init(String name, boolean any, String con ) {
+    super.init(TSTR,name,any);
     _con = con;
   }
   @Override int compute_hash() { return super.compute_hash() + (_con==null ? 0 : _con.hashCode());  }
@@ -26,19 +26,17 @@ public class TypeStr extends TypeObj<TypeStr> {
   @Override String str( VBitSet dups) {
     SB sb = new SB();
     if( _any ) sb.p('~');
-    if( _esc ) sb.p('!');
     if( _con == null ) sb.p("str");
     else sb.p('"').p(_con).p('"');
     return sb.toString();
   }
   private static TypeStr FREE=null;
   @Override protected TypeStr free( TypeStr ret ) { FREE=this; return ret; }
-  public static TypeStr make( boolean any, String con ) { return make("",any,true,con); }
-  public static TypeStr make( String name, boolean any, boolean esc, String con ) {
-    assert con==null || any == !esc; // "any" follows esc for constants
+  public static TypeStr make( boolean any, String con ) { return make("",any,con); }
+  public static TypeStr make( String name, boolean any, String con ) {
     TypeStr t1 = FREE;
-    if( t1 == null ) t1 = new TypeStr(name,any,esc,con);
-    else {   FREE = null;     t1.init(name,any,esc,con); }
+    if( t1 == null ) t1 = new TypeStr(name,any,con);
+    else {   FREE = null;     t1.init(name,any,con); }
     TypeStr t2 = (TypeStr)t1.hashcons();
     if( t1!=t2 ) return t1.free(t2);
     return t1;
@@ -56,7 +54,7 @@ public class TypeStr extends TypeObj<TypeStr> {
   // Return a String from a TypeStr constant; assert otherwise.
   @Override public String getstr() { assert _con!=null; return _con; }
 
-  @Override protected TypeStr xdual() { return new TypeStr(_name, !_any, !_esc,_con); }
+  @Override protected TypeStr xdual() { return new TypeStr(_name, !_any,_con); }
   @Override TypeStr rdual() {
     if( _dual != null ) return _dual;
     TypeStr dual = _dual = xdual();
@@ -68,7 +66,7 @@ public class TypeStr extends TypeObj<TypeStr> {
     switch( t._type ) {
     case TSTR:   break;
     case TLIVE:
-    case TSTRUCT:return OBJ.make_from_esc(_esc|((TypeObj)t)._esc);
+    case TSTRUCT:return OBJ;
     case TOBJ:   return t.xmeet(this);
     case TFUNSIG:
     case TTUPLE:
@@ -87,9 +85,8 @@ public class TypeStr extends TypeObj<TypeStr> {
     else if( _any &&  _con==null ) con = ts._con;
     else if( Util.eq(_con,ts._con) ) con =  _con;
     else any=false;
-    return make("",any,_esc|ts._esc,con);
+    return make("",any,con);
   }
-  @Override protected TypeStr make_from_esc_impl( boolean esc) { return make(_name,_any,esc,_con); }
 
   // Update (approximately) the current TypeObj.  Strings are not allowed to be
   // updated, so this is a program type-error.

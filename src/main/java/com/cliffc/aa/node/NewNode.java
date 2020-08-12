@@ -15,6 +15,7 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   // Unique alias class, one class per unique memory allocation site.
   // Only effectively-final, because the copy/clone sets a new alias value.
   public int _alias; // Alias class
+  public final int _orig_alias;
 
   // A list of field names and field-mods, folded into the initial state of
   // this NewObj.  These can come from initializers at parse-time, or stores
@@ -37,12 +38,13 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
 
   // NewNodes do not really need a ctrl; useful to bind the upward motion of
   // closures so variable stores can more easily fold into them.
-  public NewNode( byte type, int parent_alias, T to         ) { super(type,(Node)null); _init(parent_alias,to); }
-  public NewNode( byte type, int parent_alias, T to,Node fld) { super(type,  null,fld); _init(parent_alias,to); }
-  private void _init(int parent_alias, T to) {
+  public NewNode( byte type, int parent_alias, T to         ) { super(type,(Node)null); _init(parent_alias,to); _orig_alias = _alias; }
+  public NewNode( byte type, int parent_alias, T to,Node fld) { super(type,  null,fld); _init(parent_alias,to); _orig_alias = _alias; }
+  private void _init(int parent_alias, T ts) {
     _alias = BitsAlias.new_alias(parent_alias);
-    _tptr = TypeMemPtr.make(_alias,TypeObj.ISUSED);
-    sets(to);
+    _tptr = TypeMemPtr.make(BitsAlias.make0(_alias),TypeMemPtr.PRIV,TypeObj.ISUSED);
+    _ts = ts;
+    _crushed = ts.crush();
   }
   String xstr() { return "New"+"*"+_alias; } // Self short name
   String  str() { return "New"+_ts; } // Inline less-short name
@@ -51,16 +53,16 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   Node fld(int fld) { return in(def_idx(fld)); } // Node for field#
 
   // Recompute default memory cache on a change
-  @SuppressWarnings("unchecked")
-  protected final void sets( T ts ) {
+  protected final void sets_out( T ts ) {
+    assert !Env.GVN.touched(this);
     _ts = ts;
-    TypeObj oldc = _crushed;
     _crushed = ts.crush();
-    if( oldc != _crushed ) {
-      GVNGCM gvn = Env.GVN;                         // Big cheat
-      gvn.setype(Env.DEFMEM,Env.DEFMEM.value(gvn)); // Immediately update
-      gvn.add_work_uses(Env.DEFMEM);
-    }
+  }
+  protected final void sets_in( T ts ) {
+    assert Env.GVN.touched(this);
+    _ts = ts;
+    _crushed = ts.crush();
+    Env.GVN.revalive(this,ProjNode.proj(this,0),Env.DEFMEM);
   }
 
   @Override public Node ideal(GVNGCM gvn, int level) {
@@ -70,17 +72,14 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
     if( _defs._len > 1 && captured(gvn) ) {
       while( !is_dead() && _defs._len > 1 )
         pop(gvn);               // Kill all fields except memory
-      sets(dead_type());
+      if( is_dead() ) return this;
+      sets_in(dead_type());
       gvn.set_def_reg(Env.DEFMEM,_alias,gvn.add_work(gvn.con(TypeObj.UNUSED)));
       if( is_dead() ) return this;
       gvn.add_work_uses(_uses.at(0));  // Get FPtrs from MrgProj from this
       return this;
     }
 
-    if( _ts._esc && !_ts.is_con() && !escaped(gvn) ) {
-      sets(_ts.make_from_esc(false));
-      return this;
-    }
     return null;
   }
 
@@ -143,6 +142,6 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   MrgProjNode mrg() {
     Node ptr = _uses.at(0);
     if( !(ptr instanceof MrgProjNode) ) ptr = _uses.at(1);
-    return (MrgProjNode)ptr;    
+    return (MrgProjNode)ptr;
   }
 }

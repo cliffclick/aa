@@ -131,7 +131,8 @@ public class ParmNode extends PhiNode {
             // Must be a different call that is in-error
           }
         }
-        throw com.cliffc.aa.AA.unimpl(); // meet of args is not the formal, but no single arg is not the formal?
+        // meet of args is not the formal, but no single arg is not the formal?
+        return _badgc.typerr(argt,mem.in(i),formal); // Can be the default
       }
     }
     return null;

@@ -43,7 +43,7 @@ public class TypeNode extends Node {
       args[2] = arg;            // The whole TFP to the call
       for( int i=1; i<sig.nargs(); i++ )  // First is display
         // All the parms; types in the function signature
-        args[i+2] = gvn.xform(new ParmNode(i,"arg"+i,fun,gvn.con(Type.SCALAR),null));
+        args[i+2] = gvn.xform(new ParmNode(i,"arg"+i,fun,gvn.con(Type.SCALAR),_error_parse));
       Parse[] badargs = new Parse[sig.nargs()];
       Arrays.fill(badargs,_error_parse);
       Node rpc= gvn.xform(new ParmNode(-1,"rpc",fun,gvn.con(TypeRPC.ALL_CALL),null));

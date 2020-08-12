@@ -8,9 +8,9 @@ import java.util.function.Predicate;
 // Backwards liveness, used to gather forward use types in a reverse flow.
 public class TypeLive extends TypeObj<TypeLive> {
   private int _flags;
-  private TypeLive (boolean any, boolean esc, int flags ) { super(TLIVE,"",any,esc); init(any,esc,flags); }
-  private void init(boolean any, boolean esc, int flags ) {
-    super.init(TLIVE,"",any,esc);
+  private TypeLive (boolean any, int flags ) { super(TLIVE,"",any); init(any,flags); }
+  private void init(boolean any, int flags ) {
+    super.init(TLIVE,"",any);
     _flags = flags;
   }
   @Override int compute_hash() { return super.compute_hash() + _flags;  }
@@ -31,10 +31,10 @@ public class TypeLive extends TypeObj<TypeLive> {
   }
   private static TypeLive FREE=null;
   @Override protected TypeLive free( TypeLive ret ) { FREE=this; return ret; }
-  private static TypeLive make( boolean any, boolean esc, int flags ) {
+  private static TypeLive make( boolean any, int flags ) {
     TypeLive t1 = FREE;
-    if( t1 == null ) t1 = new TypeLive(any,esc,flags);
-    else {   FREE = null;      t1.init(any,esc,flags); }
+    if( t1 == null ) t1 = new TypeLive(any,flags);
+    else {   FREE = null;      t1.init(any,flags); }
     TypeLive t2 = (TypeLive)t1.hashcons();
     if( t1!=t2 ) return t1.free(t2);
     return t1;
@@ -44,16 +44,16 @@ public class TypeLive extends TypeObj<TypeLive> {
   // returned merged at a phi, folded into a funptr, etc.
   private static final int FLAG_ESCAPE=1;
   
-  static final TypeLive BASIC  = make(false,true,0); // Basic alive
-  static final TypeLive ESCAPE = make(false,true,FLAG_ESCAPE); // Used as a call argument
+  static final TypeLive BASIC  = make(false,0); // Basic alive
+  static final TypeLive ESCAPE = make(false,FLAG_ESCAPE); // Used as a call argument
   static final TypeLive[] TYPES = new TypeLive[]{BASIC};
 
-  @Override protected TypeLive xdual() { return new TypeLive(!_any,!_esc,~_flags); }
+  @Override protected TypeLive xdual() { return new TypeLive(!_any,~_flags); }
   @Override protected Type xmeet( Type t ) {
     switch( t._type ) {
     case TLIVE:   break;
     case TSTR:
-    case TSTRUCT:return OBJ.make_from_esc(_esc|((TypeObj)t)._esc);
+    case TSTRUCT:return OBJ;
     case TOBJ:   return t.xmeet(this);
     case TFUNSIG:
     case TTUPLE:
@@ -66,9 +66,8 @@ public class TypeLive extends TypeObj<TypeLive> {
     default: throw typerr(t);
     }
     TypeLive ts = (TypeLive)t;
-    return make(_any&ts._any,_esc|ts._esc,_flags|ts._flags);
+    return make(_any&ts._any,_flags|ts._flags);
   }
-  @Override protected TypeLive make_from_esc_impl( boolean esc) { return make(_any,esc,_flags); }
   @Override public TypeObj st_meet(TypeObj obj) { throw com.cliffc.aa.AA.unimpl(); }
   // Widen (loss info), to make it suitable as the default function memory.
   @Override public TypeObj crush() { return this; }

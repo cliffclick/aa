@@ -34,10 +34,10 @@ public class NewObjNode extends NewNode<TypeStruct> {
     return fmod == TypeStruct.FRW;
   }
   // Called when folding a Named Constructor into this allocation site
-  void set_name( TypeStruct name ) { assert !name.above_center();  sets(name); }
+  void set_name( TypeStruct name ) { assert !name.above_center();  sets_in(name); }
 
   // No more fields
-  public void no_more_fields() { sets(_ts.close()); }
+  public void no_more_fields() { sets_in(_ts.close()); }
 
   // Create a field from parser for an inactive this
   public void create( String name, Node val, byte mutable, GVNGCM gvn  ) {
@@ -57,27 +57,15 @@ public class NewObjNode extends NewNode<TypeStruct> {
     assert !gvn.touched(this);
     assert def_idx(_ts._ts.length)== _defs._len;
     assert _ts.find(name) == -1; // No dups
-    sets(_ts.add_fld(name,mutable,mutable==TypeStruct.FFNL ? gvn.type(val) : Type.SCALAR));
     add_def(val);
+    sets_out(_ts.add_fld(name,mutable,mutable==TypeStruct.FFNL ? gvn.type(val) : Type.SCALAR));
   }
   public void update( String tok, byte mutable, Node val, GVNGCM gvn  ) { update(_ts.find(tok),mutable,val,gvn); }
   // Update the field & mod
   public void update( int fidx, byte mutable, Node val, GVNGCM gvn  ) {
-    Type oldt = gvn.unreg(this);
-    update_active(fidx,mutable,val,gvn);
-    Type newt = value(gvn);
-    gvn.rereg(this,newt);
-    // As part of the local xform rule, the memory & ptr outputs of the NewNode
-    // need to update their types directly.  This is a sideways (or perhaps
-    // downhill) move of the NewNode type - which must run strictly uphill
-    // during iter().  Calling update() here assumes that the type being
-    // replaced has not "escaped" past the immediate OProj/Proj.  Hence it is
-    // safe to "move them sideways" without blowing the always-uphill
-    // invariant.  This is generally only true in the Parser, making this a
-    // small parse-time optimization.
-    if( newt!=oldt )
-      for( Node use : _uses )
-        gvn.setype(use,use.value(gvn)); // Record "downhill" type for OProj, DProj
+    assert def_idx(_ts._ts.length)== _defs._len;
+    gvn.set_def_reg(this,def_idx(fidx),val);
+    sets_in(_ts.set_fld(fidx,mutable==TypeStruct.FFNL ? gvn.type(val) : Type.SCALAR,mutable));
   }
   // Update default value.  Used by StoreNode folding into a NewObj initial
   // state.  Used by the Parser when updating local variables... basically
@@ -85,8 +73,8 @@ public class NewObjNode extends NewNode<TypeStruct> {
   public void update_active( int fidx, byte mutable, Node val, GVNGCM gvn  ) {
     assert !gvn.touched(this);
     assert def_idx(_ts._ts.length)== _defs._len;
-    sets(_ts.set_fld(fidx,mutable==TypeStruct.FFNL ? gvn.type(val) : Type.SCALAR,mutable));
     set_def(def_idx(fidx),val,gvn);
+    sets_out(_ts.set_fld(fidx,mutable==TypeStruct.FFNL ? gvn.type(val) : Type.SCALAR,mutable));
   }
 
 
@@ -118,8 +106,8 @@ public class NewObjNode extends NewNode<TypeStruct> {
         // Make field in the parent
         parent.create(ts._flds[i],n,ts.fmod(i),gvn);
         // Stomp field locally to XSCALAR
-        sets(_ts.set_fld(i,Type.XSCALAR,TypeStruct.FFNL));
         gvn.set_def_reg(this,def_idx(i),gvn.con(Type.XSCALAR));
+        sets_in(_ts.set_fld(i,Type.XSCALAR,TypeStruct.FFNL));
       }
     }
   }
@@ -138,7 +126,7 @@ public class NewObjNode extends NewNode<TypeStruct> {
         TypeStruct ts5 = ts4.crush();
         assert ts4.isa(ts5);
         if( ts5 != _crushed && ts5.isa(_crushed) ) {
-          sets(ts4);
+          sets_in(ts4);
           return this;
         }
       }
@@ -154,7 +142,6 @@ public class NewObjNode extends NewNode<TypeStruct> {
       for( int i=0; i<ts.length; i++ )
         ts[i] = gvn.type(fld(i));
       newt = _ts.make_from(ts);  // Pick up field names and mods
-      if( !escaped(gvn) ) newt = newt.make_from_esc(false);
     }
     return TypeTuple.make(newt,_tptr);   // Complex obj, simple ptr.
   }
