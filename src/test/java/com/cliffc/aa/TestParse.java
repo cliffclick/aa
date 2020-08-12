@@ -15,7 +15,8 @@ public class TestParse {
   // temp/junk holder for "instant" junits, when debugged moved into other tests
   @Test public void testParse() {
     TypeStruct dummy = TypeStruct.DISPLAY;
-    TypeMemPtr tdisp = TypeMemPtr.make(BitsAlias.make0(2),TypeMemPtr.PMIX,TypeStr.NO_DISP);
+    TypeMemPtr tdisp = TypeMemPtr.make(BitsAlias.make0(2),TypeStr.NO_DISP);
+    //test("noinline_x={@{a}}; x0=noinline_x(); x1=noinline_x(); x0.a:=2; x1.a",  TypeInt.con(0));
 
     // A collection of tests which like to fail easily
     test("-1",  TypeInt.con( -1));
@@ -25,15 +26,15 @@ public class TestParse {
     test("math_rand(1)?x=4:x=3;x", TypeInt.NINT8); // x defined on both arms, so available after
     test_ptr("x=@{n:=1;v:=2}; x.n := 3; x", "@{n:=3;v:=2}");
     test("x=3; mul2={x -> x*2}; mul2(2.1)", TypeFlt.con(2.1*2.0)); // must inline to resolve overload {*}:Flt with I->F conversion
-    testerr("sq={x -> x*x}; sq(\"abc\")", "*_[$]\"abc\" is not a flt64",9);
+    testerr("sq={x -> x*x}; sq(\"abc\")", "*[$]\"abc\" is not a flt64",9);
     test("fun:{int str -> int}={x y -> x+2}; fun(2,3)", TypeInt.con(4));
     testerr("math_rand(1)?x=2: 3 ;y=x+2;y", "'x' not defined on false arm of trinary",20);
     testerr("{+}(1,2,3)", "Passing 3 arguments to {+} which takes 2 arguments",3);
     test_isa("{x y -> x+y}", TypeFunPtr.make(BitsFun.make0(35),3,tdisp)); // {Scalar Scalar -> Scalar}
     testerr("dist={p->p.x*p.x+p.y*p.y}; dist(@{x=1})", "Unknown field '.y'",19);
-    testerr ("Point=:@{x;y}; Point((0,1))", "*_[$](~nil;1) is not a *[$]Point:@{x:=;y:=;...}",21);
+    testerr ("Point=:@{x;y}; Point((0,1))", "*[$](~nil;1) is not a *[$]Point:@{x:=;y:=;...}",21);
     test("x=@{a:=1;b= {a=a+1;b=0}}; x.b(); x.a",TypeInt.con(2));
-    test("x=@{a:=1;noinline_b= {a=a+1;b=0}}; x.noinline_b(); x.a",TypeInt.con(2));
+    test("x=@{a:=1;noinline_b= {a=a+1;b=0}}; x.noinline_b(); x.a",TypeInt.NINT8);
 
     test("f0 = { f x -> x ? f(f0(f,x-1),1) : 0 }; f0({&},2)", Type.XNIL);
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(1)",TypeInt.con(1));
@@ -146,7 +147,7 @@ public class TestParse {
     testerr("math_rand(1)?1::2:int","missing expr after ':'",15); // missing type
     testerr("math_rand(1)?1:\"a\"", "Cannot mix GC and non-GC types",18);
     test   ("math_rand(1)?1",TypeInt.BOOL); // Missing optional else defaults to nil
-    test_ptr0("math_rand(1)?\"abc\"", (alias)->TypeMemPtr.make_nil(alias,TypeStr.ABC).make_from_priv());
+    test_ptr0("math_rand(1)?\"abc\"", (alias)->TypeMemPtr.make_nil(alias,TypeStr.ABC));
     test   ("x:=0;math_rand(1)?(x:=1);x",TypeInt.BOOL);
     testerr("a.b.c();","Unknown ref 'a'",0);
   }
@@ -157,7 +158,7 @@ public class TestParse {
     // Since call not-taken, post GCP Parms not loaded from _tf, limited to ~Scalar.  The
     // hidden internal call from {&} to the primitive is never inlined (has ~Scalar args)
     // so 'x&1' never sees the TypeInt return from primitive AND.
-    TypeMemPtr tdisp = TypeMemPtr.make(BitsAlias.make0(10),TypeMemPtr.PMIX,TypeStr.NO_DISP);
+    TypeMemPtr tdisp = TypeMemPtr.make(BitsAlias.make0(10),TypeStr.NO_DISP);
     test_isa("{x -> x&1}", TypeFunPtr.make(BitsFun.make0(35),2,tdisp)); // {Int -> Int}
 
     // Anonymous function definition
@@ -183,8 +184,8 @@ public class TestParse {
     test("x=3; mul2={x -> x*2}; mul2(2.1)", TypeFlt.con(2.1*2.0)); // must inline to resolve overload {*}:Flt with I->F conversion
     test("x=3; mul2={x -> x*2}; mul2(2.1)+mul2(x)", TypeFlt.con(2.1*2.0+3*2)); // Mix of types to mul2(), mix of {*} operators
     test("sq={x -> x*x}; sq 2.1", TypeFlt.con(4.41)); // No () required for single args
-    testerr("sq={x -> x&x}; sq(\"abc\")", "*_[$]\"abc\" is not a int64",9);
-    testerr("sq={x -> x*x}; sq(\"abc\")", "*_[$]\"abc\" is not a flt64",9);
+    testerr("sq={x -> x&x}; sq(\"abc\")", "*[$]\"abc\" is not a int64",9);
+    testerr("sq={x -> x*x}; sq(\"abc\")", "*[$]\"abc\" is not a flt64",9);
     testerr("f0 = { f x -> f0(x-1) }; f0({+},2)", "Passing 1 arguments to f0 which takes 2 arguments",16);
     // Recursive:
     test("fact = { x -> x <= 1 ? x : x*fact(x-1) }; fact(3)",TypeInt.con(6));
@@ -215,20 +216,20 @@ public class TestParse {
 
     test   (" -1 :int1", TypeInt.con(-1));
     testerr("(-1):int1", "-1 is not a int1",4);
-    testerr("\"abc\":int", "*_[$]\"abc\" is not a int64",5);
-    testerr("1:str", "1 is not a *![$]str",1);
+    testerr("\"abc\":int", "*[$]\"abc\" is not a int64",5);
+    testerr("1:str", "1 is not a *[$]str",1);
 
     test   ("{x:int -> x*2}(1)", TypeInt.con(2)); // Types on parms
-    testerr("{x:str -> x}(1)", "1 is not a *![$]str", 13);
+    testerr("{x:str -> x}(1)", "1 is not a *[$]str", 13);
 
     // Type annotations on dead args are ignored
     test   ("fun:{int str -> int}={x y -> x+2}; fun(2,3)", TypeInt.con(4));
-    testerr("fun:{int str -> int}={x y -> x+y}; fun(2,3)", "3 is not a *![$]str",41);
+    testerr("fun:{int str -> int}={x y -> x+y}; fun(2,3)", "3 is not a *[$]str",41);
     // Test that the type-check is on the variable and not the function.
     test_obj("fun={x y -> x*2}; bar:{int str -> int} = fun; baz:{int @{x;y} -> int} = fun; (fun(2,3),bar(2,\"abc\"))",
              TypeStruct.make_tuple(Type.XNIL,TypeInt.con(4),TypeInt.con(4)));
     testerr("fun={x y -> x+y}; baz:{int @{x;y} -> int} = fun; (fun(2,3), baz(2,3))",
-            "3 is not a *![$]@{x:=;y:=;...}", 66);
+            "3 is not a *[$]@{x:=;y:=;...}", 66);
     testerr("fun={x y -> x+y}; baz={x:int y:@{x;y} -> foo(x,y)}; (fun(2,3), baz(2,3))",
             "Unknown ref 'foo'", 41);
     // This test failed because the inner fun does not inline until GCP,
@@ -236,7 +237,7 @@ public class TestParse {
     // is no longer needed).  Means: cannot resolve during GCP and preserve
     // monotonicity.  Would like '.fun' to load BEFORE GCP.
     testerr("fun={x y -> x+y}; baz={x:int y:@{x;y} -> fun(x,y)}; (fun(2,3), baz(2,3))",
-            "3 is not a *![$]@{x:=;y:=;...}", 69);
+            "3 is not a *[$]@{x:=;y:=;...}", 69);
 
     testerr("x=3; fun:{int->int}={x -> x*2}; fun(2.1)+fun(x)", "2.1 is not a int64",36);
     test("x=3; fun:{real->real}={x -> x*2}; fun(2.1)+fun(x)", TypeFlt.con(2.1*2+3*2)); // Mix of types to fun()
@@ -252,8 +253,8 @@ public class TestParse {
     test_name("A= :(flt,int)", TypeFlt.FLT64,TypeInt.INT64);
     test_name("A= :(   ,int)", Type.SCALAR  ,TypeInt.INT64);
 
-    test_ptr("A= :(str?, int); A( \"abc\",2 )","A:(*_[$]\"abc\";2)");
-    test_ptr("A= :(str?, int); A( (\"abc\",2) )","A:(*_[$]\"abc\";2)");
+    test_ptr("A= :(str?, int); A( \"abc\",2 )","A:(*[$]\"abc\";2)");
+    test_ptr("A= :(str?, int); A( (\"abc\",2) )","A:(*[$]\"abc\";2)");
     testerr("A= :(str?, int)?","Named types are never nil",16);
   }
 
@@ -301,19 +302,19 @@ public class TestParse {
 
     test    ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
     test    ("Point=:@{x;y}; dist={p       -> p.x*p.x+p.y*p.y}; dist(Point(1,2))", TypeInt.con(5));
-    testerr ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1;y=2}))", "*_[$]@{x=1;y=2} is not a *![$]Point:@{x:=;y:=;...}",55);
-    testerr ("Point=:@{x;y}; Point((0,1))", "*_[$](~nil;1) is not a *[$]Point:@{x:=;y:=;...}",21);
+    testerr ("Point=:@{x;y}; dist={p:Point -> p.x*p.x+p.y*p.y}; dist((@{x=1;y=2}))", "*[$]@{x=1;y=2} is not a *[$]Point:@{x:=;y:=;...}",55);
+    testerr ("Point=:@{x;y}; Point((0,1))", "*[$](~nil;1) is not a *[$]Point:@{x:=;y:=;...}",21);
     testerr("x=@{n: =1;}","Missing type after ':'",7);
     testerr("x=@{n=;}","Missing ifex after assignment of 'n'",6);
-    test_obj_isa("x=@{n}",TypeStruct.make(new String[]{"^","n"},TypeStruct.ts(TypeMemPtr.OOP,Type.XNIL),TypeStruct.ffnls(2)));
+    test_obj_isa("x=@{n}",TypeStruct.make(new String[]{"^","n"},TypeStruct.ts(TypeMemPtr.OOP,Type.XNIL),new byte[]{TypeStruct.FFNL,TypeStruct.FRW}));
   }
 
   @Test public void testParse05() {
     // nilable and not-nil pointers
     test   ("x:str? = 0", Type.XNIL); // question-type allows nil or not; zero digit is nil
     test_obj("x:str? = \"abc\"", TypeStr.ABC); // question-type allows nil or not
-    testerr("x:str  = 0", "~nil is not a *![$]str", 1);
-    test_ptr0("math_rand(1)?0:\"abc\"", (alias)->TypeMemPtr.make_nil(alias,TypeStr.ABC).make_from_priv());
+    testerr("x:str  = 0", "~nil is not a *[$]str", 1);
+    test_ptr0("math_rand(1)?0:\"abc\"", (alias)->TypeMemPtr.make_nil(alias,TypeStr.ABC));
     testerr("(math_rand(1)?0 : @{x=1}).x", "Struct might be nil when reading field '.x'", 26);
     test   ("p=math_rand(1)?0:@{x=1}; p ? p.x : 0", TypeInt.BOOL); // not-nil-ness after a nil-check
     test   ("x:int = y:str? = z:flt = 0", Type.XNIL); // nil/0 freely recasts
@@ -332,10 +333,10 @@ public class TestParse {
     test("A= :int; A(1)", TypeInt.TRUE.set_name("A:"));
     test_ptr("A= :(str?, int); A(0,2)","A:(~nil;2)");
     // Named recursive types
-    test_ptr("A= :(A?, int); A(0,2)",(alias) -> TypeMemPtr.make(alias,TypeStruct.make_tuple(TypeStruct.ts(TypeMemPtr.NO_DISP,Type.XNIL,TypeInt.con(2))).set_name("A:")).make_from_priv());
+    test_ptr("A= :(A?, int); A(0,2)",(alias) -> TypeMemPtr.make(alias,TypeStruct.make_tuple(TypeStruct.ts(TypeMemPtr.NO_DISP,Type.XNIL,TypeInt.con(2))).set_name("A:")));
     test_ptr("A= :(A?, int); A(0,2)","A:(~nil;2)");
     test    ("A= :@{n=A?; v=flt}; A(@{n=0;v=1.2}).v;", TypeFlt.con(1.2));
-    test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*_[$]A:(~nil;2);3)");
+    test_ptr("A= :(A?, int); A(A(0,2),3)","A:(*[$]A:(~nil;2);3)");
 
     // TODO: Needs a way to easily test simple recursive types
     TypeEnv te3 = Exec.go(Env.file_scope(Env.top_scope()),"args","A= :@{n=A?; v=int}; A(@{n=0;v=3})");
@@ -515,9 +516,9 @@ public class TestParse {
     // After inlining once, we become pair-aware.
 
     TypeStruct xts_int = TypeStruct.make_tuple(Type.XNIL,TypeMemPtr.OOP0,TypeInt.INT64);
-    TypeMemPtr xpt_int = TypeMemPtr.make(BitsAlias.RECORD_BITS0,TypeMemPtr.PUB,xts_int);
+    TypeMemPtr xpt_int = TypeMemPtr.make(BitsAlias.RECORD_BITS0,xts_int);
     TypeStruct xts_str = TypeStruct.make_tuple(Type.XNIL,xpt_int,TypeMemPtr.STRPTR);
-    TypeMemPtr xtmp = TypeMemPtr.make(BitsAlias.RECORD_BITS0,TypeMemPtr.PUB,xts_str);
+    TypeMemPtr xtmp = TypeMemPtr.make(BitsAlias.RECORD_BITS0,xts_str);
 
     test_isa(ll_cona+ll_conb+ll_conc+ll_cond+ll_cone+ll_cont+ll_map2+ll_fun2+ll_apl2,xtmp);
 

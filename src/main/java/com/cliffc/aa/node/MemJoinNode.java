@@ -120,12 +120,10 @@ public class MemJoinNode extends Node {
           if( escs.at(i).test_recur(alias) )
             break;
       } else i=0;                     // In the base memory
-      if( alias == 1 || Env.DEFMEM.in(alias) != null ) { // Check never-made aliases
-        pubs[alias] = mems[i].at   (alias); // Merge alias
-        prvs[alias] = mems[i].atprv(alias); // Merge alias
-      }
+      if( alias == 1 || Env.DEFMEM.in(alias) != null ) // Check never-made aliases
+        pubs[alias] = mems[i].at(alias); // Merge alias
     }
-    return TypeMem.make0(pubs,prvs);
+    return TypeMem.make0(pubs);
   }
   @Override public boolean basic_liveness() { return false; }
 

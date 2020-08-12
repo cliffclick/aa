@@ -15,7 +15,6 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
   // Unique alias class, one class per unique memory allocation site.
   // Only effectively-final, because the copy/clone sets a new alias value.
   public int _alias; // Alias class
-  public final int _orig_alias;
 
   // A list of field names and field-mods, folded into the initial state of
   // this NewObj.  These can come from initializers at parse-time, or stores
@@ -38,11 +37,11 @@ public abstract class NewNode<T extends TypeObj<T>> extends Node {
 
   // NewNodes do not really need a ctrl; useful to bind the upward motion of
   // closures so variable stores can more easily fold into them.
-  public NewNode( byte type, int parent_alias, T to         ) { super(type,(Node)null); _init(parent_alias,to); _orig_alias = _alias; }
-  public NewNode( byte type, int parent_alias, T to,Node fld) { super(type,  null,fld); _init(parent_alias,to); _orig_alias = _alias; }
+  public NewNode( byte type, int parent_alias, T to         ) { super(type,(Node)null); _init(parent_alias,to); }
+  public NewNode( byte type, int parent_alias, T to,Node fld) { super(type,  null,fld); _init(parent_alias,to); }
   private void _init(int parent_alias, T ts) {
     _alias = BitsAlias.new_alias(parent_alias);
-    _tptr = TypeMemPtr.make(BitsAlias.make0(_alias),TypeMemPtr.PRIV,TypeObj.ISUSED);
+    _tptr = TypeMemPtr.make(BitsAlias.make0(_alias),TypeObj.ISUSED);
     _ts = ts;
     _crushed = ts.crush();
   }

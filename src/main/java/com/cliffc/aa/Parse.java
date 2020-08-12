@@ -995,7 +995,7 @@ public class Parse {
     // Automatically convert to reference for fields.
     // Make a reasonably precise alias.
     int type_alias = t instanceof TypeStruct ? BitsAlias.RECORD : BitsAlias.STR;
-    TypeMemPtr tmp = TypeMemPtr.make(BitsAlias.make0(type_alias),TypeMemPtr.PMIX,(TypeObj)t);
+    TypeMemPtr tmp = TypeMemPtr.make(BitsAlias.make0(type_alias),(TypeObj)t);
     return typeq(tmp);          // And check for null-ness
   }
   // Wrap in a nullable if there is a trailing '?'.  No spaces allowed

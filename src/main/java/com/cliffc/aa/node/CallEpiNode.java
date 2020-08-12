@@ -328,14 +328,12 @@ public final class CallEpiNode extends Node {
     // the call but not flowing in.  Catchs all the "new in call" returns.
     BitsAlias esc_out = esc_out(post_call,trez);
     TypeObj[] pubs = new TypeObj[defnode._defs._len];
-    TypeObj[] prvs = new TypeObj[defnode._defs._len];
     for( int i=1; i<pubs.length; i++ ) {
       boolean ein  = tescs._aliases.test_recur(i);
       boolean eout = esc_out       .test_recur(i);
       pubs[i] = live_out_gcp(ein,eout,caller_mem.at   (i),post_call.at   (i),gvn,defnode.in(i));
-      prvs[i] = live_out_gcp(ein,eout,caller_mem.atprv(i),post_call.atprv(i),gvn,defnode.in(i));
     }
-    TypeMem tmem3 = TypeMem.make0(pubs,prvs);
+    TypeMem tmem3 = TypeMem.make0(pubs);
 
     return TypeTuple.make(Type.CTRL,tmem3,trez);
   }

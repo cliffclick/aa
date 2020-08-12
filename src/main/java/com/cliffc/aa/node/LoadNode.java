@@ -180,11 +180,14 @@ public class LoadNode extends Node {
     return tobj.oob();          // No loading from e.g. Strings
   }
 
+  // The only memory required here is what is needed to support the Load
   @Override public TypeMem live_use( GVNGCM gvn, Node def ) {
     if( def==adr() ) return TypeMem.ALIVE;
-    // Alive (like normal liveness), plus the address, plus whatever can be
-    // reached from the address.
-    return ScopeNode.compute_live_mem(gvn,mem(),adr());
+    Type tmem = gvn.type(mem());
+    Type tptr = gvn.type(adr());
+    if( !(tmem instanceof TypeMem   ) ) return tmem.oob(TypeMem.ALLMEM); // Not a memory?
+    if( !(tptr instanceof TypeMemPtr) ) return tptr.oob(TypeMem.ALLMEM); // Not a pointer?
+    return ((TypeMem)tmem).remove_no_escapes(((TypeMemPtr)tptr)._aliases);
   }
 
   @Override public String err(GVNGCM gvn) {

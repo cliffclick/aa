@@ -29,7 +29,7 @@ public class MrgProjNode extends ProjNode {
     TypeMem tmem = (TypeMem)tm;
     return nnn.is_unused()
       ? tmem.set   (nnn._alias,TypeObj.UNUSED)
-      : tmem.st_new(nnn._alias,nnn._orig_alias,to);
+      : tmem.st_new(nnn._alias, to);
   }
 
   @Override BitsAlias escapees( GVNGCM gvn) { return in(0).escapees(gvn); }

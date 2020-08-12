@@ -279,12 +279,11 @@ public class CallNode extends Node {
     Node mem = mem();
     if( gvn._opt_mode > 0 && mem instanceof MrgProjNode && cepi != null ) {
       ProjNode cepij = ProjNode.proj(cepi,1); // Memory projection from CEPI
-      if( cepij != null && MemSplitNode.check_split(gvn,this) ) {
-        Type tn = gvn.type(mem);
-        Type tj = gvn.type(cepij);
-        if( tn.isa(tj) )
-          return MemSplitNode.insert_split(gvn,cepij,this,mem,mem);
-      }
+      // Verify no extra mem readers in-between, no alias overlaps 
+      if( cepij != null && MemSplitNode.check_split(gvn,this) &&
+          // Verify call entry is not stale relative to call exit
+          gvn.type(mem).isa(gvn.type(cepij)) )
+        return MemSplitNode.insert_split(gvn,cepij,this,mem,mem);
     }
 
     return null;
@@ -315,7 +314,7 @@ public class CallNode extends Node {
       as = as.meet(get_alias(ts[i+ARGIDX] = gvn.type(arg(i))));
     // Recursively search memory for aliases; compute escaping aliases
     BitsAlias as2 = tmem.all_reaching_aliases(as);
-    ts[_defs._len] = TypeMemPtr.make(as2,TypeMemPtr.PUB,TypeObj.UNUSED);
+    ts[_defs._len] = TypeMemPtr.make(as2,TypeObj.UNUSED);
     TypeMem tcallee = tmem.remove_no_escapes(as2);
     ts[MEMIDX]=tcallee;         // Memory into the callee, not caller
 
@@ -354,12 +353,13 @@ public class CallNode extends Node {
     return BitsAlias.EMPTY;
   }
   @Override BitsAlias escapees( GVNGCM gvn) {
+    BitsAlias esc_in  = tesc(gvn.type(this))._aliases;
     CallEpiNode cepi = cepi();
     TypeTuple tcepi = (TypeTuple)gvn.type(cepi);
     BitsAlias esc_out = CallEpiNode.esc_out((TypeMem)tcepi.at(1),tcepi.at(2));
-    BitsAlias esc_in  = tesc(gvn.type(this))._aliases;
-    // TODO: need to filter OUTS by UNUSED at pre
-    return esc_out.meet(esc_in);
+    TypeMem precall = (TypeMem)gvn.type(mem());
+    BitsAlias esc_out2 = precall.and_unused(esc_out); // Filter by unused pre-call
+    return esc_out2.meet(esc_in);
   }
 
   // Compute live across uses.  If pre-GCP, then we may not be wired and thus
