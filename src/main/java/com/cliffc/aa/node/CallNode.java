@@ -430,7 +430,14 @@ public class CallNode extends Node {
     TypeFunPtr tfp = ttfp(tcall);
     // If resolve has chosen this dfidx, then the FunPtr is alive.
     BitsFun fidxs = tfp.fidxs();
-    return !fidxs.above_center() && (dfidx==-1 || fidxs.test_recur(dfidx)) ? TypeMem.ESCAPE : TypeMem.DEAD;
+    if( fidxs.above_center() ) return TypeMem.DEAD; // Nothing above-center is chosen
+    if( dfidx != -1 && !fidxs.test_recur(dfidx) ) return TypeMem.DEAD; // Not in the fidx set.
+    // If we are missing an FP2Closure, then the FunPtr is only ALIVE and the
+    // display does not escape.
+    if( _uses.find(e->e instanceof FP2ClosureNode) == -1 )
+      return TypeMem.ALIVE;
+    
+    return TypeMem.ESCAPE;
   }
 
   // Resolve an Unresolved.  Called in value() and so must be monotonic.
