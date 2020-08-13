@@ -16,7 +16,6 @@ public class TestParse {
   @Test public void testParse() {
     TypeStruct dummy = TypeStruct.DISPLAY;
     TypeMemPtr tdisp = TypeMemPtr.make(BitsAlias.make0(2),TypeStr.NO_DISP);
-    //test("noinline_x={@{a}}; x0=noinline_x(); x1=noinline_x(); x0.a:=2; x1.a",  TypeInt.con(0));
 
     // A collection of tests which like to fail easily
     test("-1",  TypeInt.con( -1));
@@ -367,7 +366,7 @@ public class TestParse {
     test    ("A= :@{n=A?; v=flt}; f={x:A? -> x ? A(f(x.n),x.v*x.v) : 0}; f(A(0,1.2)).v;", TypeFlt.con(1.2*1.2));
     test("tmp=((0,1.2),2.3); sq={x->x*x}; map={f t -> t ? (map(f,t.0),f t.1) : 0}; map(sq,tmp).1",TypeFlt.con(2.3*2.3));
     // Calling a function twice which returns the same alias.  Verify no pointer confusion.
-    test("noinline_x={@{a}}; x0=noinline_x(); x1=noinline_x(); x0.a:=2; x1.a",  TypeInt.con(0));
+    test("noinline_x={@{a}}; x0=noinline_x(); x1=noinline_x(); x0.a:=2; x1.a",  TypeInt.INT8);
 
     // Longer variable-length list (so no inline-to-trivial).  Pure integer
     // ops, no overload resolution.  Does final stores into new objects
@@ -442,7 +441,7 @@ public class TestParse {
     // Main issue with the map() test is final assignments crossing recursive
     // not-inlined calls.  Smaller test case:
     test_ptr("tmp=@{val=2;nxt=@{val=1;nxt=0}}; noinline_map={tree -> tree ? @{vv=tree.val&tree.val;nn=noinline_map(tree.nxt)} : 0}; noinline_map(tmp)",
-             "!@{vv=int8;noinline_map=~Scalar;nn=*[$]$?}");
+             "@{vv=int8;noinline_map=~Scalar;nn=*[$]$?}");
 
     // Too big to inline, multi-recursive
     test_ptr("tmp=@{"+

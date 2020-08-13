@@ -279,8 +279,8 @@ public class CallNode extends Node {
     Node mem = mem();
     if( gvn._opt_mode > 0 && mem instanceof MrgProjNode && cepi != null ) {
       ProjNode cepij = ProjNode.proj(cepi,1); // Memory projection from CEPI
-      // Verify no extra mem readers in-between, no alias overlaps 
-      if( cepij != null && MemSplitNode.check_split(gvn,this) &&
+      // Verify no extra mem readers in-between, no alias overlaps
+      if( cepij != null && MemSplitNode.check_split(gvn,this,escapees(gvn)) &&
           // Verify call entry is not stale relative to call exit
           gvn.type(mem).isa(gvn.type(cepij)) )
         return MemSplitNode.insert_split(gvn,cepij,this,mem,mem);
@@ -311,7 +311,7 @@ public class CallNode extends Node {
     // Also gather all aliases from all args
     BitsAlias as = BitsAlias.EMPTY;
     for( int i=0; i<nargs(); i++ )
-      as = as.meet(get_alias(ts[i+ARGIDX] = gvn.type(arg(i))));
+      as = as.meet(get_alias(gvn,ts[i+ARGIDX] = gvn.type(arg(i))));
     // Recursively search memory for aliases; compute escaping aliases
     BitsAlias as2 = tmem.all_reaching_aliases(as);
     ts[_defs._len] = TypeMemPtr.make(as2,TypeObj.UNUSED);
@@ -346,9 +346,13 @@ public class CallNode extends Node {
     return TypeTuple.make(ts);
   }
   // Get (shallow) aliases from the type
-  private static BitsAlias get_alias(Type t) {
+  private BitsAlias get_alias(GVNGCM gvn, Type t) {
     if( t instanceof TypeMemPtr ) return ((TypeMemPtr)t)._aliases;
-    if( t instanceof TypeFunPtr ) return ((TypeFunPtr)t)._disp._aliases;
+    if( t instanceof TypeFunPtr ) {
+      if( gvn._opt_mode >= 2 && _uses.find(e->e instanceof FP2ClosureNode)==-1 )
+        return BitsAlias.EMPTY; // Fully wired call still not using display
+      return ((TypeFunPtr)t)._disp._aliases;
+    }
     if( TypeMemPtr.OOP.isa(t)   ) return BitsAlias.FULL;
     return BitsAlias.EMPTY;
   }
@@ -436,7 +440,7 @@ public class CallNode extends Node {
     // display does not escape.
     if( _uses.find(e->e instanceof FP2ClosureNode) == -1 )
       return TypeMem.ALIVE;
-    
+
     return TypeMem.ESCAPE;
   }
 

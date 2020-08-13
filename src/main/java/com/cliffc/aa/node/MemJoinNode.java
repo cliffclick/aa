@@ -174,10 +174,10 @@ public class MemJoinNode extends Node {
 
   // Move the given SESE region just behind of the join into the join/split
   // area.  The head node has the escape-set.
-  void add_alias_below( GVNGCM gvn, Node head, Node base ) {
+  void add_alias_below( GVNGCM gvn, Node head, BitsAlias head1_escs, Node base ) {
     assert head.is_mem() && base.is_mem();
     MemSplitNode msp = msp();
-    int idx = msp.add_alias(gvn,head.escapees(gvn)), bidx; // Add escape set, find index
+    int idx = msp.add_alias(gvn,head1_escs), bidx; // Add escape set, find index
     if( idx == _defs._len ) {         // Escape set added at the end
       gvn.add_def(this,gvn.xform(new MProjNode(msp,idx)));
     } else {                    // Inserted into prior region

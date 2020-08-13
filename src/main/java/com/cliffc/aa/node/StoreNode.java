@@ -52,7 +52,7 @@ public class StoreNode extends Node {
       else if( mem instanceof MProjNode && mem.in(0) instanceof CallEpiNode ) head2 = mem.in(0).in(0);
       else head2 = null;
       // Check no extra readers/writers at the split point
-      if( head2 != null && MemSplitNode.check_split(gvn,this) )
+      if( head2 != null && MemSplitNode.check_split(gvn,this,escapees(gvn)) )
         return MemSplitNode.insert_split(gvn,this,this,mem,head2);
     }
 
@@ -66,7 +66,7 @@ public class StoreNode extends Node {
       if( memw != null && adr instanceof ProjNode && adr.in(0) instanceof NewNode ) {
         MemJoinNode mjn = (MemJoinNode)mem;
         StoreNode st = (StoreNode)gvn.xform(new StoreNode(keep(),mem,adr).keep());
-        mjn.add_alias_below(gvn,st,st.unhook());
+        mjn.add_alias_below(gvn,st,st.escapees(gvn),st.unhook());
         unhook();
         gvn.setype(st ,st .value(gvn));
         gvn.setype(mjn,mjn.value(gvn));

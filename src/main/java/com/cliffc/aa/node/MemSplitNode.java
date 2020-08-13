@@ -110,7 +110,9 @@ public class MemSplitNode extends Node {
   // Call/CallEpi pairs are: MProj->{CallEpi}->Call.
   static Node insert_split(GVNGCM gvn, Node tail1, Node head1, Node tail2, Node head2) {
     assert tail1.is_mem() && head1.is_mem() && tail2.is_mem() && head2.is_mem();
-    assert check_split(gvn,head1);
+    BitsAlias head1_escs = head1.escapees(gvn);
+    BitsAlias head2_escs = head2.escapees(gvn);
+    assert check_split(gvn,head1,head1_escs);
     // Insert empty split/join above head2
     MemSplitNode msp = gvn.xform(new MemSplitNode(head2.in(1))).keep();
     MProjNode mprj = (MProjNode)gvn.xform(new MProjNode(msp,0));
@@ -119,17 +121,17 @@ public class MemSplitNode extends Node {
     msp.unhook();
     mjn._live = tail1._live;
     // Pull the SESE regions in parallel from below
-    mjn.add_alias_below(gvn,head2,tail2);
-    mjn.add_alias_below(gvn,head1,tail1);
+    mjn.add_alias_below(gvn,head2,head2_escs,tail2);
+    mjn.add_alias_below(gvn,head1,head1_escs,tail1);
     gvn.revalive(msp,mprj,mjn);
     return head1;
   }
-  static boolean check_split(GVNGCM gvn, Node head1) {
+  static boolean check_split(GVNGCM gvn, Node head1, BitsAlias head1_escs) {
     Node tail2 = head1.in(1);
     // Must have only 1 mem-writer (this can fail if used by different control paths)
     if( !tail2.check_solo_mem_writer(head1) ) return false;
     // No alias overlaps
-    if( head1.escapees(gvn).overlaps(tail2.escapees(gvn)) ) return false;
+    if( head1_escs.overlaps(tail2.escapees(gvn)) ) return false;
     // TODO: This is too strong.
     // Cannot have any Loads following head1; because after the split
     // they will not see the effects of previous stores that also move
