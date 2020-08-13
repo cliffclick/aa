@@ -345,26 +345,20 @@ public final class CallEpiNode extends Node {
       : (TypeMemPtr.OOP0.dual().isa(trez) ? BitsAlias.NZERO : BitsAlias.EMPTY);
   }
 
-  // If passed-in or passed-out, must take post; Else pre.  'esc_out' includes
-  // all reaching, but needs to exclude things that do not exist beforehand,
-  // hence the cutout for pre==UNUSED.
-  static boolean is_live_out(boolean esc_in, boolean esc_out, TypeObj pre) {
-    return esc_in || (pre==TypeObj.UNUSED && esc_out); // TODO: Probably has to match CallNode EXACTLY.
-  }
-  
   // If pre-GCP, must lift the types
   // as strong as the Parser, which is a join with default memory.
   private static TypeObj live_out_gcp(boolean esc_in, boolean esc_out, TypeObj pre, TypeObj post, GVNGCM gvn, Node dn ) {
-    TypeObj to = is_live_out(esc_in,esc_out,pre) ? post : pre;
-    // Before GCP, must use DefNode to keep types as strong as the Parser.
+    if( dn == null ) return null; // A never-made (on this pass) type
+    Type tdn = gvn.type(dn);      // Get default type
+    if( tdn == TypeObj.UNUSED ) return TypeObj.UNUSED; // If dead, then dead
+    // Decide to take the pre-call or post-call value.
+    TypeObj to = esc_in || esc_out ? (TypeObj)post.meet(pre) : pre;
+    // After/During GCP, this is the value
     if( gvn._opt_mode >= 2 ) return to;
-    // Lift to DefNode same as parser
-    if( !(dn instanceof MrgProjNode) ) {
-      if( dn==null ) return null; // A never-made (on this pass) type
-      // Else some kind of constant.
-      Type t = gvn.type(dn); // TODO: Probably should just jam down mrgproj/new for these constants
-      return t instanceof TypeObj ? (TypeObj)t : t.oob(TypeObj.ISUSED);
-    }
+    // Before GCP, must use DefNode to keep types as strong as the Parser.
+    if( !(dn instanceof MrgProjNode) ) // Some kind of constant.
+      // TODO: Probably should just jam down mrgproj/new for these constants
+      return tdn instanceof TypeObj ? (TypeObj)tdn : tdn.oob(TypeObj.ISUSED);
     // Else there is a New/MrgProj
     TypeObj tdef2 = ((MrgProjNode)dn).nnn()._crushed;
     return (TypeObj)to.join(tdef2); // Lift to the default worse-case the Parser assumed

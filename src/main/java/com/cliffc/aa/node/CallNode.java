@@ -278,17 +278,37 @@ public class CallNode extends Node {
     // arguments transitively, which is detected in the escape-in set.
     Node mem = mem();
     if( gvn._opt_mode > 0 && mem instanceof MrgProjNode && cepi != null ) {
-      ProjNode cepij = ProjNode.proj(cepi,1); // Memory projection from CEPI
-      // Verify no extra mem readers in-between, no alias overlaps
-      if( cepij != null && MemSplitNode.check_split(gvn,this,escapees(gvn)) &&
-          // Verify call entry is not stale relative to call exit
-          gvn.type(mem).isa(gvn.type(cepij)) )
-        return MemSplitNode.insert_split(gvn,cepij,this,mem,mem);
+      ProjNode cepim = ProjNode.proj(cepi,1); // Memory projection from CEPI
+      ProjNode cepid = ProjNode.proj(cepi,2); // Return projection from CEPI
+      // Verify no extra mem readers in-between, no alias overlaps on input
+      if( cepim != null && MemSplitNode.check_split(gvn,this,escapees(gvn)) ) {
+        TypeMem tmcepi = (TypeMem)gvn.type(cepim);
+        // Verify call entry is not stale relative to call exit
+        if( gvn.type(mem).isa(tmcepi) ) {
+          // If call returns same as new (via recursion), cannot split, but CAN swap.
+          BitsAlias esc_out = CallEpiNode.esc_out(tmcepi,gvn.type(cepid));
+          int alias = ((MrgProjNode)mem).nnn()._alias;
+          if( !esc_out.test_recur(alias) ) // No return conflict, so parallelize memory
+            return MemSplitNode.insert_split(gvn,cepim,this,mem,mem);
+          else                  // Else move New below Call.
+            return swap_new(gvn,cepim,(MrgProjNode)mem);
+        }
+      }
     }
 
     return null;
   }
 
+  // Swap a New and a Call, when we cannot use a Split/Join.
+  private Node swap_new(GVNGCM gvn, Node cepim, MrgProjNode mrg ) {
+    cepim.keep();
+    gvn.replace(cepim,mrg);
+    set_def(1,mrg.mem(),gvn);
+    gvn.set_def_reg(mrg,1,cepim.unhook());
+    gvn.revalive(this,cepim,mrg);
+    return this;
+  }
+  
   // Pass thru all inputs directly - just a direct gather/scatter.  The gather
   // enforces SESE which in turn allows more precise memory and aliasing.  The
   // full scatter lets users decide the meaning; e.g. wired FunNodes will take
