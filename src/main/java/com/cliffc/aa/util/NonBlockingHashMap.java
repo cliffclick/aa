@@ -117,7 +117,7 @@ public class NonBlockingHashMap<TypeK, TypeV>
     return h;
   }
 
- 
+
 
   // --- The Hash Table --------------------
   // Slot 0 is always used for a 'CHM' entry below to hold the interesting
@@ -273,17 +273,17 @@ public class NonBlockingHashMap<TypeK, TypeV>
 
   /** Returns the number of key-value mappings in this map.
    *  @return the number of key-value mappings in this map */
-  @Override 
+  @Override
   public int     size       ( )                       { return chm(_kvs).size(); }
   /** Returns <tt>size() == 0</tt>.
    *  @return <tt>size() == 0</tt> */
-  @Override 
+  @Override
   public boolean isEmpty    ( )                       { return size() == 0;      }
 
   /** Tests if the key in the table using the <tt>equals</tt> method.
    * @return <tt>true</tt> if the key is in the table using the <tt>equals</tt> method
    * @throws NullPointerException if the specified key is null  */
-  @Override 
+  @Override
   public boolean containsKey( Object key )            { return get(key) != null; }
 
   /** Legacy method testing if some key maps into the specified value in this
@@ -486,7 +486,7 @@ public class NonBlockingHashMap<TypeK, TypeV>
     Object[] newkvs = chm(kvs)._newkvs; // New table, if any
     return newkvs == null ? null : _getKey(newkvs);
   }
-  
+
   // --- keyeq ---------------------------------------------------------------
   // Check for key equality.  Try direct pointer compare first, then see if
   // the hashes are unequal (fast negative test) and finally do the full-on
@@ -1039,9 +1039,6 @@ public class NonBlockingHashMap<TypeK, TypeV>
             workdone++;         // Yes!
         if( workdone > 0 )      // Report work-done occasionally
           copy_check_and_promote( topmap, oldkvs, workdone );// See if we can promote
-        //for( int i=0; i<MIN_COPY_WORK; i++ )
-        //  if( copy_slot(topmap,(copyidx+i)&(oldlen-1),oldkvs,newkvs) ) // Made an oldtable slot go dead?
-        //    copy_check_and_promote( topmap, oldkvs, 1 );// See if we can promote
 
         copyidx += MIN_COPY_WORK;
         // Uncomment these next 2 lines to turn on incremental table-copy.
@@ -1053,8 +1050,7 @@ public class NonBlockingHashMap<TypeK, TypeV>
       // then got stalled before promoting.
       copy_check_and_promote( topmap, oldkvs, 0 );// See if we can promote
     }
-
-
+    
     // --- copy_slot_and_check -----------------------------------------------
     // Copy slot 'idx' from the old table to the new table.  If this thread
     // confirmed the copy, update the counters and check for promotion.
@@ -1162,7 +1158,7 @@ public class NonBlockingHashMap<TypeK, TypeV>
       // transition in this copy.
       Object old_unboxed = ((Prime)oldval)._V;
       assert old_unboxed != TOMBSTONE;
-      boolean copied_into_new = (putIfMatch(topmap, newkvs, key, old_unboxed, null) == null);
+      putIfMatch(topmap, newkvs, key, old_unboxed, null);
 
       // ---
       // Finally, now that any old value is exposed in the new table, we can
@@ -1172,7 +1168,7 @@ public class NonBlockingHashMap<TypeK, TypeV>
       while( oldval != TOMBPRIME && !CAS_val(oldkvs,idx,oldval,TOMBPRIME) )
         oldval = val(oldkvs,idx);
 
-      return copied_into_new;
+      return true;
     } // end copy_slot
   } // End of CHM
 
